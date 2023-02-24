@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.ar.ar03.mapper.AR03Mapper">
+	
+	<select id="selectCaryngCount" parameterType="Map" resultType="int">
+		SELECT
+			COUNT(*)
+		FROM TB_AR03M01 A		
+		 LEFT OUTER JOIN TB_BM02M01 B ON A.TRANS_CO = B.CLNT_CD		
+		 LEFT OUTER JOIN TB_BM02M01 C ON A.CLNT_CD  = C.CLNT_CD				 
+		<where>				
+		<if test= "coCd != null and !coCd.equals('')">
+ 			    A.CO_CD = #{coCd}
+		</if>
+		<if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')">
+ 			AND A.TRANS_DT BETWEEN #{strtDt} AND #{endDt}
+		</if>
+		<if test= "transCo != null and !transCo.equals('')">
+ 			AND A.TRANS_CO = #{transCo}
+		</if>
+		<if test= "transNm != null and !transNm.equals('')">
+ 			AND B.CLNT_NM LIKE '%'|| #{transNm} ||'%'
+		</if>
+		<if test= "whCd != null and !whCd.equals('')">
+ 			AND A.WH_CD = #{whCd}
+		</if>
+		<if test= "desNm != null and !desNm.equals('')">
+ 			AND A.DES_NM LIKE '%' || #{desNm} ||'%'
+		</if>
+		<if test= "clntCd != null and !clntCd.equals('')">
+ 			AND A.CLNT_CD = #{clntCd}
+		</if>
+		<if test= "clntNm != null and !clntNm.equals('')">
+ 			AND C.CLNT_NM LIKE '%'|| #{clntNm}||'%'
+		</if>
+		<if test= "procYn != null and !procYn.equals('')">
+ 			AND A.PROC_YN = #{procYn}
+		</if>
+		<if test= "prdtGrp != null and !prdtGrp.equals('')">
+ 			AND A.PRDT_GRP = #{prdtGrp}
+		</if>
+		</where>
+	</select>
+	
+	<select id="selectCaryngList" parameterType="Map" resultType="CamelMap">
+		SELECT *
+			FROM(
+				SELECT
+						ROWNUM AS RNUM, D.*
+				FROM(		
+				SELECT
+					 	 TRANS_SEQ
+						,A.CO_CD
+						,FN_CM05M01_CD_TO_NM(A.CO_CD) AS CO_NM
+						,TO_CHAR(TO_DATE(A.TRANS_DT,'YYYYMMDD'),'YYYY-MM-DD') AS TRANS_DT
+						,A.TRANS_CO
+						,B.CLNT_NM AS TRANS_NM
+						,FN_CM05M01_CD_TO_NM(A.WH_CD) AS WH_NM
+						,A.WH_CD
+						,A.DES_CD
+						,A.DES_NM
+						,A.DRIVR_NM
+						,A.SHIP_VEH_NO
+						,A.SHIP_SEQ
+						,A.PRJCT_CD
+						,A.TOT_WT
+						,A.TRANS_UPR
+						,A.TRANS_AMT
+						,A.ARVPAY_YN
+						,A.PAY_CO
+						,A.CLNT_CD
+						,(SELECT CLNT_NM FROM TB_BM02M01 C WHERE A.CLNT_CD = C.CLNT_CD) AS CLNT_NM
+						,A.PROC_YN
+						,A.TRANS_RMK
+						,A.ODR_CREAT_DIV
+						,A.PRDT_GRP
+						,FN_CM05M01_CD_TO_NM(A.PRDT_GRP) AS PRDT_GRP_NM
+						,A.CREAT_ID
+						,A.CREAT_PGM
+						,A.CREAT_DTTM
+						,A.UDT_ID
+						,A.UDT_PGM
+						,A.UDT_DTTM
+						,A.TAXIVC_COPRT
+						,FN_CM05M01_CD_TO_NM(A.TAXIVC_COPRT) AS TAXIVC_COPRT_NM
+						,A.SITE_CD
+						, (SELECT SITE_NM FROM TB_SD09M01 WHERE SITE_CD = A.SITE_CD) AS SITE_NM
+						<!-- 실제 발생한 운반비는 발주서에서 온거, 출하요청서에서 온거가 구분이 안된다.. 둘다 더하면 된다.. 한곳에만 존재함으로 -->
+						, NVL( (SELECT SUM(H.BILG_AMT) FROM TB_AR02M01 H 
+						         INNER JOIN TB_AR01M01 AR01 ON H.TRST_RPRC_SEQ = AR01.SHIP_SEQ 
+						                AND  SUBSTR(H.CREAT_PGM,1,6) =  SUBSTR(AR01.CREAT_PGM,1,6)
+						                AND  AR01.TRANS_SEQ = A.TRANS_SEQ
+						        INNER JOIN TB_BM01M01 BM01	ON H.TRST_PRDT_CD = BM01.PRDT_CD 	
+	                                    AND PRDT_NM LIKE '%운반비%'), 0)
+						+  NVL( (SELECT SUM(H.BILG_AMT) FROM TB_AR02M01 H 
+						         INNER JOIN TB_OD01M01 OD01 ON H.TRST_RPRC_SEQ = OD01.ORDRG_SEQ 
+						                AND  SUBSTR(H.CREAT_PGM,1,6) =  SUBSTR(OD01.CREAT_PGM,1,6)
+						                AND  OD01.TRANS_SEQ = A.TRANS_SEQ
+						         INNER JOIN TB_BM01M01 BM01	ON H.TRST_PRDT_CD = BM01.PRDT_CD 	
+	                                    AND PRDT_NM LIKE '%운반비%'), 0)
+						+  NVL( (SELECT SUM(H.BILG_AMT) FROM TB_AR02M01 H 
+						         INNER JOIN TB_BM01M01 BM01	ON H.TRST_PRDT_CD = BM01.PRDT_CD 	
+	                                    AND PRDT_NM LIKE '%운반비%' 
+	                                    AND H.TRANS_SEQ = A.TRANS_SEQ), 0)	                                    
+						 AS SALES_TRANS_AMT --매출운반비
+				FROM TB_AR03M01 A
+				 LEFT OUTER JOIN TB_BM02M01 B ON A.TRANS_CO = B.CLNT_CD		
+				 LEFT OUTER JOIN TB_BM02M01 C ON A.CLNT_CD  = C.CLNT_CD				 
+				<where>				
+				<if test= "coCd != null and !coCd.equals('')">
+		 			    A.CO_CD = #{coCd}
+				</if>
+				<if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')">
+		 			AND A.TRANS_DT BETWEEN #{strtDt} AND #{endDt}
+				</if>
+				<if test= "transCo != null and !transCo.equals('')">
+		 			AND A.TRANS_CO = #{transCo}
+				</if>
+				<if test= "transNm != null and !transNm.equals('')">
+		 			AND B.CLNT_NM LIKE '%'|| #{transNm} ||'%'
+				</if>
+				<if test= "whCd != null and !whCd.equals('')">
+		 			AND A.WH_CD = #{whCd}
+				</if>
+				<if test= "desNm != null and !desNm.equals('')">
+		 			AND A.DES_NM LIKE '%' || #{desNm} ||'%'
+				</if>
+				<if test= "clntCd != null and !clntCd.equals('')">
+		 			AND A.CLNT_CD = #{clntCd}
+				</if>
+				<if test= "clntNm != null and !clntNm.equals('')">
+		 			AND C.CLNT_NM LIKE '%'|| #{clntNm}||'%'
+				</if>
+				<if test= "procYn != null and !procYn.equals('')">
+		 			AND A.PROC_YN = #{procYn}
+				</if>
+				<if test= "taxivcCoprt != null and !taxivcCoprt.equals('')">
+		 			AND A.TAXIVC_COPRT = #{taxivcCoprt}
+				</if>
+				<if test= "prdtGrp != null and !prdtGrp.equals('')">
+		 			AND A.PRDT_GRP = #{prdtGrp}
+				</if>
+				</where>
+			ORDER BY A.TRANS_DT,A.SITE_CD,A.TRANS_CO
+			) D
+		)
+		WHERE
+			RNUM BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>
+	
+	<select id="selectCaryngInfo" parameterType="Map" resultType="camelMap">
+		SELECT T.*,
+			(SELECT CODE_NM  FROM TB_CM05M01 WHERE CODE_ID      = T.CO_CD) AS CO_NM,		
+			(SELECT CLNT_NM  FROM TB_BM02M01 WHERE CLNT_CD      = T.TRANS_CO) AS TRANS_NM,
+			(SELECT CLNT_NM  FROM TB_BM02M01 C WHERE T.CLNT_CD  = C.CLNT_CD) AS CLNT_NM,
+			(SELECT PRJCT_NM FROM TB_SD05M01 P WHERE P.PRJCT_CD = T.PRJCT_CD) AS PRJCT_NM,			
+			(SELECT SITE_NM  FROM TB_SD09M01 S WHERE S.SITE_CD  = T.SITE_CD) AS SITE_NM,
+			FN_CM05M01_CD_TO_NM(T.TAXIVC_COPRT) AS TAXIVC_COPRT_NM,
+			FN_CM05M01_CD_TO_NM(T.PRDT_GRP) AS PRDT_GRP_NM
+		FROM TB_AR03M01 T
+		 LEFT JOIN TB_BM02M01 B ON T.CLNT_CD = B.CLNT_CD
+		WHERE 1=1
+		  AND T.TRANS_SEQ = #{transSeq}
+	</select>
+	
+	<select id="selectShipCount" parameterType="Map" resultType="int">
+		SELECT 
+	 		COUNT(*) 
+	 	FROM TB_AR01M01 A, TB_AR03M01 B
+	 	WHERE A.TRANS_SEQ = B.TRANS_SEQ
+		  AND A.TRANS_SEQ = #{transSeq}
+	</select>
+	
+	<select id="selectShipList" parameterType="Map" resultType="camelMap">
+		SELECT * FROM (
+			SELECT 
+				ROWNUM RNUM,
+				T.CO_CD,
+				FN_CM05M01_CD_TO_NM(T.CO_CD) AS CO_NM,
+		        TO_CHAR(TO_DATE(T.REQ_DT), 'YYYY-MM-DD') AS REQ_DT,
+				T.TAXIVC_COPRT,
+			    FN_CM05M01_CD_TO_NM(T.TAXIVC_COPRT) AS TAXIVC_COPRT_NM,
+		        T.CLNT_CD,
+		        (SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = T.CLNT_CD) AS CLNT_NM,
+		        T.SHIP_SEQ,
+		        T.PRJCT_CD,
+		        T.WH_CD,
+		        FN_CM05M01_CD_TO_NM(T.WH_CD) AS WH_NM,
+		        T.TYP_CD,
+		        T.OWNER_CD,
+		        T.SALES_AREA_CD,
+		        T.MNG_TEL,
+		        TO_CHAR(T.DLVR_DTTM, 'yyyy-MM-dd') AS DLVR_DTTM,
+		        T.DIRTRS_YN,
+		        T.DLVR_RMK,
+		        T.ADDR_ZIP,
+		        T.ADDR_MAIN,
+		        T.ADDR_SUB,
+		        T.SHIP_RMK,
+		        T.SHIP_TOT_QTY,
+		        T.SHIP_TOT_WT,
+		        T.SHIP_TOT_AMT,
+		        T.REAL_TOT_QTY,
+		        T.REAL_TOT_WT,
+		        T.REAL_TOT_AMT,
+		        T.TRANS_AMT,
+		        T.ODR_SEQ,
+		        T.ORDRG_SEQ,
+		        T.SALES_MNG,
+		        T.SHIP_YN,
+		        T.SHIP_PROC_ID,
+		        T.SHIP_DTTM,
+		        T.ODR_CREAT_DIV,
+		        T.ETC_FIELD1,
+		        T.ETC_FIELD2,
+		        T.ETC_FIELD3,
+		        T.CREAT_ID,
+		        T.CREAT_PGM,
+		        T.CREAT_DTTM,
+		        T.UDT_ID,
+		        T.UDT_PGM,
+		        T.UDT_DTTM,
+				ADDR_MAIN || ' ' || ADDR_SUB AS ADDR
+			FROM 
+			(
+			 	SELECT A.* FROM TB_AR01M01 A, TB_AR03M01 B
+			 	WHERE A.TRANS_SEQ = B.TRANS_SEQ
+			 	  AND A.TRANS_SEQ = #{transSeq}
+				ORDER BY UDT_DTTM DESC
+			) T
+		)
+		WHERE RNUM BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>
+	
+	<insert id="insertCaryng">
+		<selectKey keyProperty="transSeq" resultType="String" order="BEFORE">
+			SELECT TB_AR03M01_SQ01.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TB_AR03M01(
+			TRANS_SEQ,
+			CO_CD,
+			TRANS_DT,
+			TRANS_CO,
+			WH_CD,
+			DES_NM,
+			DRIVR_NM,
+			PRJCT_CD,
+			TOT_WT,
+			TRANS_UPR,
+			TRANS_AMT,
+			ARVPAY_YN,
+			PAY_CO,
+			CLNT_CD,
+			PROC_YN,
+			TRANS_RMK,
+			CREAT_PGM,
+			CREAT_ID,
+			CREAT_DTTM,
+			SITE_CD,
+			TAXIVC_COPRT,
+			SHIP_VEH_NO,
+			PRDT_GRP
+		)VALUES(
+			#{transSeq},
+			#{coCd},
+			TO_CHAR(TO_DATE(#{transDt},'YYYY-MM-DD'),'YYYYMMDD'),
+			#{transCo},
+			#{whCd},
+			#{desNm},
+			#{drivrNm},
+			#{prjctCd},
+			#{totWt},
+			#{transUpr},
+			#{transAmt},
+			#{arvpayYn},
+			#{payCo},
+			#{clntCd},
+			#{procYn},
+			#{transRmk},
+			#{pgmId},
+			#{userId},
+			SYSDATE,
+			#{siteCd},
+			#{taxivcCoprt, jdbcType=VARCHAR},
+			#{shipVehNo, jdbcType=VARCHAR},
+			#{prdtGrp, jdbcType=VARCHAR}
+		)
+	</insert>
+	
+	<update id="updateCaryng" parameterType="Map">
+		UPDATE TB_AR03M01
+		SET
+			 CO_CD     = #{coCd}
+			,TRANS_DT  = TO_CHAR(TO_DATE(#{transDt},'YYYY-MM-DD'),'YYYYMMDD')
+			,TRANS_CO  = #{transCo}
+			,WH_CD     = #{whCd}
+			,DES_NM    = #{desNm}
+			,DRIVR_NM  = #{drivrNm}
+			,PRJCT_CD  = #{prjctCd}
+			,SITE_CD   = #{siteCd}
+			,TOT_WT    = #{totWt}
+			,TRANS_UPR = #{transUpr}
+			,TRANS_AMT = #{transAmt}
+			,ARVPAY_YN = #{arvpayYn}
+			,PAY_CO    = #{payCo}
+			,CLNT_CD   = #{clntCd}
+			,PROC_YN   = #{procYn}
+			,TRANS_RMK = #{transRmk}
+			,UDT_PGM   = #{pgmId}
+			,UDT_ID    = #{userId}
+			,UDT_DTTM  = SYSDATE
+			,TAXIVC_COPRT = #{taxivcCoprt, jdbcType=VARCHAR}
+			,SHIP_VEH_NO  = #{shipVehNo, jdbcType=VARCHAR}
+			,PRDT_GRP     = #{prdtGrp, jdbcType=VARCHAR}
+		WHERE
+			TRANS_SEQ = #{transSeq}
+	</update>
+
+	<update id="updateProcYn" parameterType="Map">
+		UPDATE TB_AR03M01
+		SET
+			 PROC_YN   = #{procYn}
+			,UDT_PGM   = #{pgmId}
+			,UDT_ID    = #{userId}
+			,UDT_DTTM  = SYSDATE
+		WHERE
+			TRANS_SEQ = #{transSeq}
+	</update>	
+	
+	<delete id="deleteTrans" parameterType="Map">
+		DELETE FROM TB_AR03M01
+		WHERE TRANS_SEQ = #{transSeq}
+	</delete>
+	
+</mapper>

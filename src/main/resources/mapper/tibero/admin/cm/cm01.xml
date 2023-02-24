@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.admin.cm.cm01.mapper.CM01Mapper">
+
+	<select id="selectAuthList" resultType="CamelMap">
+		SELECT * FROM TB_CM01M01
+	</select>
+
+	<insert id="insertAuth" parameterType="Map">
+		INSERT INTO TB_CM01M01
+		(
+			AUTH_ID, AUTH_NM, EXPL, AUTH_ROLE, CREAT_ID, CREAT_PGM, CREAT_DTTM, UDT_ID, UDT_DTTM
+		)
+		VALUES(
+			#{authId}, #{authNm}, #{expl}, NULL, #{userId}, #{pgmId}, SYSDATE, NULL, NULL
+		)
+	</insert>
+
+	<delete id="deleteAuth" parameterType="Map">
+		DELETE FROM TB_CM01M01
+		WHERE AUTH_ID = #{authId}
+	</delete>
+
+	<update id="updateAuth" parameterType="Map">
+		UPDATE TB_CM01M01
+		SET 
+			AUTH_ID = #{authId}, 
+			AUTH_NM = #{authNm},
+			EXPL = #{expl},
+			UDT_ID = #{userId}, 
+			UDT_PGM = #{pgmId}, 
+			UDT_DTTM = SYSDATE
+		WHERE AUTH_ID = #{authId}
+	</update>
+
+	<update id="updateAuthRole" parameterType="Map">
+		UPDATE TB_CM01M01
+		SET 
+			AUTH_ROLE = #{authRole}
+		WHERE AUTH_ID = #{authId}
+	</update>
+
+	<select id="selectRoleFromAuth" parameterType="ArrayList" resultType="String">
+		SELECT AUTH_ROLE FROM TB_CM01M01 
+		WHERE
+			AUTH_ID IN
+			<foreach collection="authArray" item="item" index="index" separator="," open="(" close=")">
+    			 #{item}
+			</foreach>
+	</select>
+
+	<select id="selectMenuFromRole" parameterType="ArrayList" resultType="CamelMap">
+		SELECT ROLE_MENU
+		 , DECODE(MAX(SAVE_YN), 0, 'N', 1, 'Y') SAVE_YN
+	  FROM (SELECT LV
+				 , REGEXP_SUBSTR(ROLE_MENU,  '[^\,]+',1, LV) AS ROLE_MENU
+				 , DECODE(SAVE_YN, 'Y', 1, 'N', 0) SAVE_YN
+			  FROM (SELECT ROLE_MENU, SAVE_YN FROM TB_CM02M01
+					  WHERE
+						ROLE_ID IN
+						<foreach collection="roleArray" item="item" index="index" separator="," open="(" close=")">
+			    			 #{item}
+						</foreach>
+					ORDER BY SORT_NO ASC) S
+			  	 , (SELECT LEVEL AS LV FROM DUAL CONNECT BY LEVEL <![CDATA[ <= ]]> 1000)
+			 WHERE REGEXP_SUBSTR(ROLE_MENU,  '[^\,]+',1, LV) IS NOT NULL) 
+	GROUP BY ROLE_MENU
+	</select>
+
+	<select id="selectMenuAuth" parameterType="ArrayList" resultType="CamelMap">
+		SELECT 
+			* 
+		FROM 
+			TB_CM03M01 
+		WHERE
+			MENU_ID IN
+			<foreach collection="menuArray" item="item" index="index" separator="," open="(" close=")">
+    			 #{item}
+			</foreach>
+		
+		<!-- MENU_TYPE이 FOLDER인 부모메뉴를 조회하여 UNION -->	
+		UNION
+		
+		SELECT 
+			* 
+		FROM 
+			TB_CM03M01
+		WHERE
+			MENU_TYPE = 'FOLDER'
+			AND MENU_ID IN
+			(
+				SELECT 
+					DISTINCT UP_MENU_ID
+				FROM 
+					TB_CM03M01 
+				WHERE
+					MENU_ID IN
+					<foreach collection="menuArray" item="item" index="index" separator="," open="(" close=")">
+		    			 #{item}
+					</foreach>
+			) 
+		ORDER BY SORT_NO ASC
+	</select>
+
+	<select id="selectMenuAuthCookie" parameterType="ArrayList" resultType="CamelMap">
+		SELECT 
+			MENU_URL,
+			ME
+		FROM 
+			TB_CM03M01 
+		WHERE
+			MENU_ID IN
+			<foreach collection="menuArray" item="item" index="index" separator="," open="(" close=")">
+    			 #{item}
+			</foreach>
+		
+		<!-- MENU_TYPE이 FOLDER인 부모메뉴를 조회하여 UNION -->	
+		UNION
+		
+		SELECT 
+			* 
+		FROM 
+			TB_CM03M01
+		WHERE
+			MENU_TYPE = 'FOLDER'
+			AND MENU_ID IN
+			(
+				SELECT 
+					DISTINCT UP_MENU_ID
+				FROM 
+					TB_CM03M01 
+				WHERE
+					MENU_ID IN
+					<foreach collection="menuArray" item="item" index="index" separator="," open="(" close=")">
+		    			 #{item}
+					</foreach>
+			) 
+		ORDER BY SORT_NO ASC
+	</select>
+
+	<select id="selectParentMenuAuth" parameterType="String" resultType="CamelMap">
+		SELECT * FROM TB_CM03M01 
+		WHERE
+			UP_MENU_ID = #{upMenuId}
+	</select>
+	 
+</mapper>

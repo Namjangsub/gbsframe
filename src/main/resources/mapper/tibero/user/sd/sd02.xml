@@ -1,0 +1,1210 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.sd.sd02.mapper.SD02Mapper">
+
+	<select id="selectSellCount" parameterType="Map" resultType="int">
+		SELECT
+			COUNT(*)
+		FROM TB_SD01M01 
+		WHERE 1=1
+		<if test="coCd != null and !coCd.equals('')">
+			AND CO_CD = #{coCd}
+		</if>
+		<if test="planYm != null and !planYm.equals('')">
+			AND PLAN_YM = TO_CHAR(TO_DATE(#{planYm},'YYYY-MM'),'YYYYMM')
+		</if>
+		<if test="planSalesId != null and !planSalesId.equals('')">
+			AND PLAN_SALES_ID = #{planSalesId}
+		</if>
+		<if test="prdtGrp != null and !prdtGrp.equals('')">
+			AND PRDT_GRP = #{prdtGrp}
+		</if>
+		ORDER BY PLAN_SEQ
+	</select>
+	
+	<select id="selectSellList" parameterType="Map" resultType="CamelMap">
+			SELECT
+					ROWNUM AS RNUM, D.*
+			FROM(
+				SELECT 
+					  BM02.CLNT_DIV_CD
+					 <if test="coCd != null and !coCd.equals('')">
+				     ,  T1.CO_CD
+					 , FN_CM05M01_CD_TO_NM(T1.CO_CD) CO_NM
+				       </if>
+				    ,  T1.CLNT_CD
+				    ,  T1.PRDT_DIV
+<!-- 				    ,  T1.SALES_AREA_CD -->
+					 , FN_CM05M01_CD_TO_NM(BM02.CLNT_DIV_CD) CLNT_DIV_NM
+<!-- 					 , FN_CM05M01_CD_TO_NM(SALES_AREA_CD) SALES_AREA_NM -->
+					 , FN_CM05M01_CD_TO_NM(T1.PRDT_DIV) PRDT_DIV_NM
+					 , NVL(BM02.CLNT_NM, '기타') CLNT_NM
+				    , SUM(NVL(T1.PLAN_WT,0)) AS PLAN_WT
+				    , SUM(NVL(T1.TRST_Y,0)) AS TRST_Y
+				    , SUM(NVL(T1.TRST_N,0)) AS TRST_N
+				    , TO_CHAR(CASE WHEN SUM(NVL(T1.PLAN_WT,0)) != 0 THEN ((SUM(NVL(T1.TRST_N,0)) + SUM(NVL(T1.TRST_Y,0))) / SUM(NVL(T1.PLAN_WT,0))) * 100
+				    		ELSE 0 END, '9,999.99') AS TRST_RATE
+<!-- 				    <if test="planSalesNm != null and !planSalesNm.equals('')"> -->
+					 <if test='mngShow != null and mngShow == "Y"'>
+					  ,T1.PLAN_SALES_ID
+					  ,T1.PLAN_SALES_NM
+<!-- 					  ,T1.PLAN_SEQ -->
+					 </if>
+					 <if test="planDeptId != null and !planDeptId.equals('')">
+					  ,T1.PLAN_DEPT_ID
+					 </if>
+					 <if test="planDeptNm != null and !planDeptNm.equals('')">
+					 , T1.PLAN_DEPT_NM
+					 </if>
+				  FROM 
+				 (
+		
+				   	 SELECT '1' type1
+				   	   , S.PLAN_SEQ 
+				   	   , S.CO_CD
+				       , S.CLNT_CD 
+				       , TRIM(S.PRDT_DIV) PRDT_DIV
+<!-- 				       , NVL(S.SALES_AREA_CD, 'SALESAREA99') SALES_AREA_CD -->
+				       , S.PLAN_YM
+<!-- 					    <if test="planSalesNm != null and !planSalesNm.equals('')"> -->
+					  <if test='mngShow != null and mngShow == "Y"'>
+					    ,S.PLAN_SALES_ID
+					    , CM06.NAME AS PLAN_SALES_NM
+					  </if>
+				       <if test="planDeptId != null and !planDeptId.equals('')">
+					    ,S.PAN_DEPT_ID AS PLAN_DEPT_ID
+					  </if>
+				       <if test="planDeptNm != null and !planDeptNm.equals('')">
+					    ,CM04.DEPT_NM AS PLAN_DEPT_NM
+					  </if>
+				       , SUM(S.PLAN_WT) PLAN_WT
+				       , 0 TRST_Y
+				       , 0 TRST_N
+				     FROM TB_SD01M01 S
+				     LEFT JOIN TB_CM06M01 CM06 ON CM06.ID      = S.PLAN_SALES_ID
+				     LEFT JOIN TB_CM04M01 CM04 ON CM04.DEPT_ID = CM06.DEPT_ID
+				     WHERE 1=1
+				      <if test="coCd != null and !coCd.equals('')">
+				        AND S.CO_CD = #{coCd}
+				      </if>
+				      <if test="planYm != null and !planYm.equals('')">  
+			            AND S.PLAN_YM = TO_CHAR(TO_DATE(#{planYm},'YYYY-MM'),'YYYYMM')
+			          </if>
+			          <if test="planSalesId != null and !planSalesId.equals('')">
+					    AND S.PLAN_SALES_ID = #{planSalesId}
+					  </if>
+					  <if test="planSalesNm != null and !planSalesNm.equals('')">
+					    AND CM06.NAME  LIKE '%'||#{planSalesNm} || '%'
+					   </if>
+					   <if test="planDeptId != null and !planDeptId.equals('')">
+<!-- 					    AND S.PAN_DEPT_ID = #{planDeptId} -->
+					    AND S.PAN_DEPT_ID IN (SELECT
+													DEPT_ID
+												FROM
+												(
+													SELECT
+														LEVEL LV,
+														A.*
+													FROM
+														TB_CM04M01 A
+													WHERE USE_YN = 'Y'
+													START WITH DEPT_ID = #{planDeptId}
+													CONNECT BY PRIOR DEPT_ID = UP_DEPT_ID
+													ORDER SIBLINGS BY SORT_NO
+												) B)
+									
+					  </if>
+					   <if test="planDeptNm != null and !planDeptNm.equals('')">
+<!-- 					    AND CM04.DEPT_NM  like '%'||#{planDeptNm}||'%' -->
+                            AND CM04.DEPT_NM  IN (SELECT
+														DEPT_NM
+													FROM
+													(
+														SELECT
+															LEVEL LV,
+															A.*
+														FROM
+															TB_CM04M01 A
+														WHERE USE_YN = 'Y'
+														START WITH DEPT_NM like '%'||#{planDeptNm}||'%'
+														CONNECT BY PRIOR DEPT_ID = UP_DEPT_ID
+														ORDER SIBLINGS BY SORT_NO
+													) B)
+									
+					  </if>
+					  <if test="prdtGrp != null and !prdtGrp.equals('')">
+						AND S.PRDT_GRP = #{prdtGrp}
+					  </if>
+					  <if test="prdtDiv != null and !prdtDiv.equals('')">
+						AND S.PRDT_DIV = #{prdtDiv}
+					  </if>
+			          <if test="selpchCd != null and !selpchCd.equals('')">
+			             <choose>
+				            <when test="selpchCd.equals('SELPCH1')">
+			      	            AND ( S.SELPCH_CD = #{selpchCd}  OR SELPCH_CD = 'SELPCH3' )
+				            </when>
+				            <otherwise>
+					            AND ( S.SELPCH_CD = #{selpchCd}  OR SELPCH_CD = 'SELPCH4' )
+				            </otherwise>
+			             </choose>
+			           </if>					  
+			          GROUP BY S.PLAN_SEQ 
+				   	   , S.CO_CD
+				       , S.CLNT_CD 
+				       , TRIM(S.PRDT_DIV)
+<!-- 				       , NVL(S.SALES_AREA_CD, 'SALESAREA99') -->
+				       , S.PLAN_YM
+<!-- 					    <if test="planSalesNm != null and !planSalesNm.equals('')"> -->
+					  <if test='mngShow != null and mngShow == "Y"'>
+					   , S.PLAN_SALES_ID
+					   , CM06.NAME
+					  </if>
+					  <if test="planDeptId != null and !planDeptId.equals('')">
+					    ,S.PAN_DEPT_ID
+					  </if>
+					  <if test="planDeptNm != null and !planDeptNm.equals('')">
+					    ,CM04.DEPT_NM
+					  </if>
+			UNION ALL
+				   SELECT '2' type1
+				   	   , 0 AS PLAN_SEQ 
+				       , AR02.CO_CD
+				       , AR02.TRST_CLNT_CD
+				       , TRIM(AR02.PRDT_DIV) PRDT_DIV 
+<!-- 				       , NVL(AR02.SALES_AREA_CD, 'SALESAREA99') SALES_AREA_CD  -->
+				       , SUBSTRING(AR02.TRST_DT, 0, 6) TRST_DT
+<!-- 					    <if test="planSalesNm != null and !planSalesNm.equals('')"> -->
+					 <if test='mngShow != null and mngShow == "Y"'>
+					   , AR02.SALES_MNG 
+					   , CM06.NAME
+					  </if>
+				       <if test="planDeptId != null and !planDeptId.equals('')">
+					   , CM06.DEPT_ID
+					  </if>
+					  <if test="planDeptNm != null and !planDeptNm.equals('')">
+					    ,CM04.DEPT_NM
+					  </if>
+					   , 0 AS PLAN_WT 
+				       , SUM(DECODE(AR02.IMP_YN, 'Y', AR02.REAL_TRST_WT)) TRST_Y
+				       , SUM(DECODE(AR02.IMP_YN, 'N', AR02.REAL_TRST_WT)) TRST_N
+				     FROM TB_AR02M01 AR02
+				     INNER JOIN TB_BM01M01 BM01 ON BM01.PRDT_CD = AR02.TRST_PRDT_CD
+				     LEFT JOIN TB_CM06M01 CM06 ON CM06.ID      = AR02.SALES_MNG 
+				     LEFT JOIN TB_CM04M01 CM04 ON CM04.DEPT_ID = CM06.DEPT_ID
+				    WHERE 1=1
+				      <if test="coCd != null and !coCd.equals('')">
+				        AND AR02.CO_CD = #{coCd}
+				      </if>
+				      <if test="planYm != null and !planYm.equals('')">  
+			            AND SUBSTRING(AR02.TRST_DT, 0, 6) = TO_CHAR(TO_DATE(#{planYm},'YYYY-MM'),'YYYYMM')
+			          </if>
+			          <if test="selpchCd != null and !selpchCd.equals('')">
+			             <choose>
+				            <when test="selpchCd.equals('SELPCH1')">
+			      	            AND ( AR02.SELPCH_CD = #{selpchCd}  OR AR02.SELPCH_CD = 'SELPCH3' )
+				            </when>
+				            <otherwise>
+					            AND ( AR02.SELPCH_CD = #{selpchCd}  OR AR02.SELPCH_CD = 'SELPCH4' )
+				            </otherwise>
+			             </choose>
+			      	  </if>	
+			      	   <if test="planSalesId != null and !planSalesId.equals('')">
+					    AND AR02.SALES_MNG = #{planSalesId}
+					  </if>
+					  <if test="planSalesNm != null and !planSalesNm.equals('')">
+					    AND CM06.NAME  LIKE '%'||#{planSalesNm} || '%'
+					   </if>
+					  <if test="prdtGrp != null and !prdtGrp.equals('')">
+						AND BM01.PRDT_GRP = #{prdtGrp}
+					  </if>
+					  <if test="prdtDiv != null and !prdtDiv.equals('')">
+						AND BM01.PRDT_DIV = #{prdtDiv}
+					  </if>
+					  <if test="planDeptId != null and !planDeptId.equals('')">
+<!-- 					    AND CM06.DEPT_ID = #{planDeptId} -->
+					    AND CM06.DEPT_ID IN (SELECT
+										DEPT_ID
+									FROM
+									(
+										SELECT
+											LEVEL LV,
+											A.*
+										FROM
+											TB_CM04M01 A
+										WHERE USE_YN = 'Y'
+										START WITH DEPT_ID = #{planDeptId}
+										CONNECT BY PRIOR DEPT_ID = UP_DEPT_ID
+										ORDER SIBLINGS BY SORT_NO
+									) B)
+									
+					  </if>
+					  <if test="planDeptNm != null and !planDeptNm.equals('')">
+<!-- 					    AND CM04.DEPT_NM like '%'||#{planDeptNm}||'%' -->					    
+                            AND CM04.DEPT_NM  IN (SELECT
+										DEPT_NM
+									FROM
+									(
+										SELECT
+											LEVEL LV,
+											A.*
+										FROM
+											TB_CM04M01 A
+										WHERE USE_YN = 'Y'
+										START WITH DEPT_NM like '%'||#{planDeptNm}||'%'
+										CONNECT BY PRIOR DEPT_ID = UP_DEPT_ID
+										ORDER SIBLINGS BY SORT_NO
+									) B)
+					  </if>
+					  <if test="taxivcCoprt != null and !taxivcCoprt.equals('')">
+					     AND AR02.TAXIVC_COPRT = #{taxivcCoprt}
+					  </if>
+				   GROUP BY AR02.CO_CD, AR02.TRST_CLNT_CD, TRIM(AR02.PRDT_DIV)
+<!-- 				         , NVL(AR02.SALES_AREA_CD, 'SALESAREA99')  -->
+				         , SUBSTRING(AR02.TRST_DT, 0, 6) 
+<!-- 					    <if test="planSalesNm != null and !planSalesNm.equals('')"> -->
+						 <if test='mngShow != null and mngShow == "Y"'>
+					     , AR02.SALES_MNG 
+					     , CM06.NAME
+					    </if>
+					    <if test="planDeptId != null and !planDeptId.equals('')">
+						 , CM06.DEPT_ID
+						</if>
+						<if test="planDeptNm != null and !planDeptNm.equals('')">
+					     , CM04.DEPT_NM
+					    </if>
+				) T1
+			   LEFT JOIN TB_BM02M01 BM02 ON BM02.CLNT_CD = T1.CLNT_CD
+			  GROUP BY			  
+					   BM02.CLNT_DIV_CD
+					 <if test="coCd != null and !coCd.equals('')">
+					 , T1.CO_CD
+					 </if>
+				    ,  T1.CLNT_CD
+				    ,  T1.PRDT_DIV
+<!-- 				    ,  T1.SALES_AREA_CD -->
+				    , NVL(BM02.CLNT_NM, '기타')
+<!-- 				    <if test="planSalesNm != null and !planSalesNm.equals('')"> -->
+					 <if test='mngShow != null and mngShow == "Y"'>
+					  ,T1.PLAN_SALES_ID
+					  ,T1.PLAN_SALES_NM
+<!-- 					  ,ST1.PLAN_SEQ -->
+					 </if>
+					 <if test="planDeptId != null and !planDeptId.equals('')">
+					  ,T1.PLAN_DEPT_ID
+					 </if>
+					 <if test="planDeptNm != null and !planDeptNm.equals('')">
+					 , T1.PLAN_DEPT_NM
+					 </if>
+				 ORDER BY 
+				 <if test="planDeptNm != null and !planDeptNm.equals('')">
+					  T1.PLAN_DEPT_NM ,
+					 </if>
+<!-- 				    <if test="planSalesNm != null and !planSalesNm.equals('')"> -->
+					 <if test='mngShow != null and mngShow == "Y"'>
+					  T1.PLAN_SALES_ID,
+					  T1.PLAN_SALES_NM,
+					 </if>
+					 <if test="coCd != null and !coCd.equals('')">
+						 T1.CO_CD,
+					 </if> 
+					 BM02.CLNT_DIV_CD,
+<!-- 				 SALES_AREA_CD, -->
+					 T1.PRDT_DIV, T1.CLNT_CD 
+		    ) D
+	</select>
+	
+	<select id="selectPlanInfo" parameterType="Map" resultType="camelMap">
+		SELECT T.*,
+			(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = T.CO_CD) AS CO_NM,		
+			(SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = T.CLNT_CD) AS CLNT_NM,
+			(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = T.PRDT_DIV) AS PRDT_NM,
+			(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = T.SALES_AREA_CD) AS SALES_AREA_NM,
+			TO_CHAR(TO_DATE(PLAN_YM,'YYYYMM'),'YYYY-MM') as PLAN_YM2,
+			PLAN_SALES_ID AS SALES_MNG_ID,
+			C.NAME AS SALES_MNG_NM,
+			PAN_DEPT_ID AS DEPT_ID,
+			D.DEPT_NM AS DEPT_NM
+		FROM TB_SD01M01 T
+		LEFT JOIN  TB_CM06M01 C
+		   ON T.PLAN_SALES_ID = C.ID
+		LEFT JOIN  TB_CM04M01 D 
+		   ON C.DEPT_ID = D.DEPT_ID
+		LEFT OUTER JOIN TB_BM02M01 B
+	       ON T.CLNT_CD = B.CLNT_CD
+		WHERE 1=1
+		 <if test="planSeq != null and !planSeq.equals('')">
+		  AND PLAN_SEQ = #{planSeq}
+		  </if>
+		   <if test="coCd != null and !coCd.equals('')">
+		   AND T.CO_CD = #{coCd}
+		  </if>
+		   <if test="planYm != null and !planYm.equals('')">
+		   AND T.PLAN_YM = REPLACE(#{planYm},'-', '')
+		  </if>
+		   <if test="selpchCd != null and !selpchCd.equals('')">
+		   AND T.SELPCH_CD = #{selpchCd}
+		  </if>
+		   <if test="planDeptCd != null and !planDeptCd.equals('')">
+		   AND T.PAN_DEPT_ID = #{planDeptCd}
+		  </if>
+		   <if test="planDeptId != null and !planDeptId.equals('')">
+		   AND T.PAN_DEPT_ID = #{planDeptId}
+		  </if>
+		   <if test="planSalesId != null and !planSalesId.equals('')">
+		   AND T.PLAN_SALES_ID = #{planSalesId}
+		  </if>
+		   <if test="clntCd != null and !clntCd.equals('')">
+		   AND T.CLNT_CD = #{clntCd}
+		  </if>
+		   <if test="prdtDiv != null and !prdtDiv.equals('')">
+		   AND T.PRDT_DIV = #{prdtDiv}
+		  </if>
+		   <if test="selesAreaCd != null and !selesAreaCd.equals('')">
+		   AND T.SALES_AREA_CD = #{selesAreaCd}
+		  </if>
+		  ORDER BY PLAN_SEQ
+	</select>
+	
+	<insert id="insertPlan">
+		<selectKey keyProperty="planSeq" resultType="String" order="BEFORE">
+			SELECT TB_SD01M01_SQ01.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TB_SD01M01 (
+			 PLAN_SEQ
+			,CO_CD
+			,PLAN_YM
+			,SELPCH_CD
+			,PAN_DEPT_ID
+			,PLAN_SALES_ID
+			,CLNT_CD
+			,SALES_AREA_CD
+			,PRDT_GRP
+			,PRDT_DIV
+			,PRDT_STKN
+			,PLAN_WT
+			,RMK
+			,DRAW_DT
+			,CREAT_ID
+			,CREAT_PGM
+			,CREAT_DTTM
+		)VALUES(
+			 #{planSeq}
+			,#{coCd}
+			,TO_CHAR(TO_DATE(#{planYm},'YYYY-MM'),'YYYYMM')
+			,#{selpchCd}
+			,#{panDeptId}
+			,#{planSalesId}
+			,#{clntCd}
+			,#{selesAreaCd}
+			,#{prdtGrp}
+			,#{prdtDiv}
+			,#{prdtStkn}
+			,#{planWt}
+			,#{rmk}
+			,TO_CHAR(TO_DATE(SYSDATE, 'YYYY-MM-DD'), 'YYYYMMDD')
+			,#{userId}
+			,#{pgmId}
+			,SYSDATE
+		)
+	</insert>
+	
+	<update id="updatePlan">
+		UPDATE TB_SD01M01 SET
+			CLNT_CD   = #{clntCd},
+			SALES_AREA_CD = #{selesAreaCd},
+			PRDT_GRP  = #{prdtGrp},
+			PRDT_DIV  = #{prdtDiv},
+			PRDT_STKN = #{prdtStkn},
+			PLAN_WT   = #{planWt},
+			PAN_DEPT_ID   = #{panDeptId},
+			PLAN_SALES_ID = #{planSalesId},
+			RMK       = #{rmk},
+			UDT_ID    = #{userId},
+			UDT_PGM   = #{pgmId},
+			UDT_DTTM  = SYSDATE
+		WHERE		
+			 PLAN_SEQ = #{planSeq}
+	</update>
+	
+	<insert id="copyInsert">
+		INSERT INTO TB_SD01M01
+		(
+			PLAN_SEQ,
+			CO_CD,
+			SELPCH_CD,
+			PRDT_GRP,
+			PRDT_DIV,
+			ETC_FIELD1,
+			UDT_DTTM,
+			PLAN_YM,
+			PAN_DEPT_ID,
+			PLAN_SALES_ID,
+			MAKR_CD,
+			CLNT_CD,
+			SALES_AREA_CD,
+			PRDT_STKN,
+			PLAN_WT,
+			RMK,
+			DRAW_DT,
+			ETC_FIELD2,
+			CREAT_ID,
+			ETC_FIELD3,
+			CREAT_PGM,
+			CREAT_DTTM,
+			UDT_ID,
+			UDT_PGM
+		)
+		SELECT 
+			TB_SD01M01_SQ01.NEXTVAL,
+			CO_CD,
+			SELPCH_CD,
+			PRDT_GRP,
+			PRDT_DIV,
+			ETC_FIELD1,
+			UDT_DTTM,
+			TO_CHAR(TO_DATE(#{planYm}, 'YYYY-MM'),'YYYYMM'),
+			PAN_DEPT_ID,
+			PLAN_SALES_ID,
+			MAKR_CD,
+			CLNT_CD,
+			SALES_AREA_CD,
+			PRDT_STKN,
+			PLAN_WT,
+			RMK,
+			DRAW_DT,
+			ETC_FIELD2,
+			CREAT_ID,
+			ETC_FIELD3,
+			CREAT_PGM,
+			CREAT_DTTM,
+			UDT_ID,
+			UDT_PGM 
+	    from TB_SD01M01
+		WHERE 
+			PLAN_YM = TO_CHAR(TO_DATE(#{planYm}, 'YYYY-MM') + INTERVAL '-1' MONTH, 'YYYYMM')
+			<if test="coCd != null and !coCd.equals('')">
+		   AND CO_CD = #{coCd}
+		   </if>
+		   <if test="selpchCd != null and !selpchCd.equals('')">
+		   AND SELPCH_CD = #{selpchCd}
+		  </if>
+		   <if test="planDeptId != null and !planDeptId.equals('')">
+		   AND PAN_DEPT_ID = #{planDeptId}
+		  </if>
+		   <if test="planSalesId != null and !planSalesId.equals('')">
+		   AND PLAN_SALES_ID = #{planSalesId}
+		  </if>
+		   <if test="clntCd != null and !clntCd.equals('')">
+		   AND CLNT_CD = #{clntCd}
+		  </if>
+		   <if test="prdtDiv != null and !prdtDiv.equals('')">
+		   AND PRDT_DIV = #{prdtDiv}
+		  </if>
+		   <if test="prdtGrp != null and !prdtGrp.equals('')">
+		   AND PRDT_GRP = #{prdtGrp}
+		  </if>
+	</insert>
+	
+	<delete id="deleteCopy">
+		DELETE FROM TB_SD01M01
+		WHERE PLAN_YM = TO_CHAR(TO_DATE(#{planYm}, 'YYYY-MM'),'YYYYMM')
+		<if test="coCd != null and !coCd.equals('')">
+		   AND CO_CD = #{coCd}
+		   </if>
+		   <if test="selpchCd != null and !selpchCd.equals('')">
+		   AND SELPCH_CD = #{selpchCd}
+		  </if>
+		   <if test="planDeptId != null and !planDeptId.equals('')">
+		   AND PAN_DEPT_ID = #{planDeptId}
+		  </if>
+		   <if test="planSalesId != null and !planSalesId.equals('')">
+		   AND PLAN_SALES_ID = #{planSalesId}
+		  </if>
+		   <if test="clntCd != null and !clntCd.equals('')">
+		   AND CLNT_CD = #{clntCd}
+		  </if>
+		   <if test="prdtDiv != null and !prdtDiv.equals('')">
+		   AND PRDT_DIV = #{prdtDiv}
+		  </if>
+		   <if test="prdtGrp != null and !prdtGrp.equals('')">
+		   AND PRDT_GRP = #{prdtGrp}
+		  </if>
+	</delete>
+	
+	<delete id="deletePlan" parameterType="Map">
+		DELETE FROM TB_SD01M01
+		WHERE PLAN_SEQ = #{planSeq}
+	</delete>
+	
+	<select id="selectSellDailyRep" parameterType="Map" resultType="CamelMap">
+	SELECT
+		ROWNUM AS RNUM, D.*
+	FROM(
+		SELECT T1.CO_CD
+			 , BM02.CLNT_DIV_CD
+		    ,  T1.CLNT_CD
+		    ,  T1.PRDT_DIV
+			 , FN_CM05M01_CD_TO_NM(T1.CO_CD) CO_NM
+			 , FN_CM05M01_CD_TO_NM(BM02.CLNT_DIV_CD) CLNT_DIV_NM
+			 , FN_CM05M01_CD_TO_NM(T1.PRDT_DIV) PRDT_DIV_NM
+			 , NVL(BM02.CLNT_NM, '기타') CLNT_NM
+		    , SUM(NVL(T1.PLAN_WT,0)) AS PLAN_WT
+		    , SUM(NVL(T1.DAY_WT,0)) AS DAY_WT
+		    , SUM(NVL(T1.DAY_AMT,0)) AS DAY_AMT
+		    , SUM(NVL(T1.MON_WT,0)) AS MON_WT
+		    , SUM(NVL(T1.MON_AMT,0)) AS MON_AMT
+		    , TO_CHAR(CASE WHEN SUM(NVL(T1.PLAN_WT,0)) != 0 THEN ROUND(SUM(NVL(T1.MON_WT,0)) / SUM(NVL(T1.PLAN_WT,0)) * 100, 0)
+		    	   ELSE 0 END, '9,999.99') RATE_WT
+		  FROM 
+		 (
+
+		   	 SELECT '1' type1
+		   	   , S.PLAN_SEQ 
+		   	   , S.CO_CD
+		       , S.CLNT_CD 
+		       , TRIM(S.PRDT_DIV) PRDT_DIV
+		       , NVL(S.SALES_AREA_CD, 'SALESAREA99') SALES_AREA_CD
+		       , S.PLAN_YM
+		       , SUM(S.PLAN_WT) PLAN_WT
+		       , 0 DAY_WT
+		       , 0 DAY_AMT
+		       , 0 MON_WT
+		       , 0 MON_AMT
+		     FROM TB_SD01M01 S
+		     LEFT JOIN TB_CM06M01 CM06 ON CM06.ID      = S.PLAN_SALES_ID
+		     LEFT JOIN TB_CM04M01 CM04 ON CM04.DEPT_ID = CM06.DEPT_ID
+		     WHERE 1=1				
+		      <if test="coCd != null and !coCd.equals('')">
+		        AND S.CO_CD = #{coCd}
+		      </if>
+		      <if test="planDt != null and !planDt.equals('')">  
+	            AND S.PLAN_YM = TO_CHAR(TO_DATE(REPLACE(#{planDt}, '-', ''),'YYYYMMDD'),'YYYYMM')
+	          </if>
+	          <if test="planSalesId != null and !planSalesId.equals('')">
+			    AND S.PLAN_SALES_ID = #{planSalesId}
+			  </if>
+			   <if test="planDeptId != null and !planDeptId.equals('')">
+			    AND S.PAN_DEPT_ID IN (SELECT
+										DEPT_ID
+									FROM
+									(
+										SELECT
+											LEVEL LV,
+											A.*
+										FROM
+											TB_CM04M01 A
+										WHERE USE_YN = 'Y'
+										START WITH DEPT_ID = #{planDeptId}
+										CONNECT BY PRIOR DEPT_ID = UP_DEPT_ID
+										ORDER SIBLINGS BY SORT_NO
+									) B)
+			  </if>
+			  <if test="prdtGrp != null and !prdtGrp.equals('')">
+				AND S.PRDT_GRP = #{prdtGrp}
+			  </if>
+	          <if test="selpchCd != null and !selpchCd.equals('')">
+	             <choose>
+		            <when test="selpchCd.equals('SELPCH1')">
+	      	            AND ( S.SELPCH_CD = #{selpchCd}  OR SELPCH_CD = 'SELPCH3' )
+		            </when>
+		            <otherwise>
+			            AND ( S.SELPCH_CD = #{selpchCd}  OR SELPCH_CD = 'SELPCH4' )
+		            </otherwise>
+	             </choose>
+	           </if>	
+	          GROUP BY S.PLAN_SEQ 
+		   	   , S.CO_CD
+		       , S.CLNT_CD 
+		       , TRIM(S.PRDT_DIV)
+		       , NVL(S.SALES_AREA_CD, 'SALESAREA99')
+		       , S.PLAN_YM
+	UNION ALL
+		   SELECT '2' type1
+		   	   , 0 AS PLAN_SEQ 
+		       , AR02.CO_CD
+		       , AR02.TRST_CLNT_CD
+		       , TRIM(AR02.PRDT_DIV) PRDT_DIV 
+		       , NVL(AR02.SALES_AREA_CD, 'SALESAREA99') SALES_AREA_CD 
+		       , SUBSTRING(AR02.TRST_DT, 0, 6) TRST_DT
+			   , 0 AS PLAN_WT 
+		       , SUM(AR02.REAL_TRST_QTY) DAY_WT
+		       , SUM(AR02.REAL_TRST_AMT) DAY_AMT
+		       , 0 AS MON_WT
+		       , 0 AS MON_AMT
+		     FROM  TB_AR02M01 AR02
+		     INNER JOIN TB_BM01M01 BM01 ON BM01.PRDT_CD = AR02.TRST_PRDT_CD
+		     LEFT JOIN TB_CM06M01 CM06 ON CM06.ID      = AR02.SALES_MNG 
+		     LEFT JOIN TB_CM04M01 CM04 ON CM04.DEPT_ID = CM06.DEPT_ID
+		    WHERE 1=1
+		      <if test="coCd != null and !coCd.equals('')">
+		        AND AR02.CO_CD = #{coCd}
+		      </if>
+		      <if test="planDt != null and !planDt.equals('')">  
+	            AND AR02.TRST_DT = REPLACE(#{planDt}, '-', '')
+	          </if>
+	          <if test="selpchCd != null and !selpchCd.equals('')">
+	             <choose>
+		            <when test="selpchCd.equals('SELPCH1')">
+	      	            AND ( AR02.SELPCH_CD = #{selpchCd}  OR AR02.SELPCH_CD = 'SELPCH3' )
+		            </when>
+		            <otherwise>
+			            AND ( AR02.SELPCH_CD = #{selpchCd}  OR AR02.SELPCH_CD = 'SELPCH4' )
+		            </otherwise>
+	             </choose>
+	      	  </if>	
+	      	   <if test="planSalesId != null and !planSalesId.equals('')">
+			    AND AR02.SALES_MNG = #{planSalesId}
+			  </if>
+			  <if test="prdtGrp != null and !prdtGrp.equals('')">
+				AND BM01.PRDT_GRP = #{prdtGrp}
+			  </if>
+			  <if test="planDeptId != null and !planDeptId.equals('')">
+			    AND CM06.DEPT_ID IN (SELECT
+										DEPT_ID
+									FROM
+									(
+										SELECT
+											LEVEL LV,
+											A.*
+										FROM
+											TB_CM04M01 A
+										WHERE USE_YN = 'Y'
+										START WITH DEPT_ID = #{planDeptId}
+										CONNECT BY PRIOR DEPT_ID = UP_DEPT_ID
+										ORDER SIBLINGS BY SORT_NO
+									) B)
+			  </if>
+		   GROUP BY AR02.CO_CD, AR02.TRST_CLNT_CD, TRIM(AR02.PRDT_DIV) ,
+		         NVL(AR02.SALES_AREA_CD, 'SALESAREA99') , SUBSTRING(AR02.TRST_DT, 0, 6) 
+	UNION ALL 
+		SELECT '3' type1
+		   	 , 0 AS PLAN_SEQ 
+		   	 , AR02.CO_CD
+		     , AR02.TRST_CLNT_CD
+		     , TRIM(AR02.PRDT_DIV) PRDT_DIV 
+		     , NVL(AR02.SALES_AREA_CD, 'SALESAREA99') SALES_AREA_CD 
+	         , SUBSTRING(AR02.TRST_DT, 0, 6) TRST_DT
+		     , 0 AS PLAN_WT 
+	         , 0 DAY_WT
+	         , 0 DAY_AMT
+		     , SUM(AR02.REAL_TRST_QTY) MON_WT
+		     , SUM(AR02.REAL_TRST_AMT) MON_AMT
+		  FROM TB_AR02M01 AR02
+		INNER JOIN TB_BM01M01 BM01 ON BM01.PRDT_CD = AR02.TRST_PRDT_CD
+		 LEFT JOIN TB_CM06M01 CM06 ON CM06.ID      = AR02.SALES_MNG 
+		 LEFT JOIN TB_CM04M01 CM04 ON CM04.DEPT_ID = CM06.DEPT_ID
+		 WHERE 1=1
+		      <if test="coCd != null and !coCd.equals('')">
+		        AND AR02.CO_CD = #{coCd}
+		      </if>
+		      <if test="planDt != null and !planDt.equals('')">  
+	            AND AR02.TRST_DT BETWEEN TO_CHAR(TO_DATE(REPLACE(#{planDt}, '-', ''), 'YYYYMMDD'), 'YYYYMM') || '01' AND REPLACE(#{planDt}, '-', '')
+	          </if>
+	          <if test="selpchCd != null and !selpchCd.equals('')">
+	             <choose>
+		            <when test="selpchCd.equals('SELPCH1')">
+	      	            AND ( AR02.SELPCH_CD = #{selpchCd}  OR AR02.SELPCH_CD = 'SELPCH3' )
+		            </when>
+		            <otherwise>
+			            AND ( AR02.SELPCH_CD = #{selpchCd}  OR AR02.SELPCH_CD = 'SELPCH4' )
+		            </otherwise>
+	             </choose>
+	      	  </if>	
+	      	   <if test="planSalesId != null and !planSalesId.equals('')">
+			    AND AR02.SALES_MNG = #{planSalesId}
+			  </if>
+			  <if test="prdtGrp != null and !prdtGrp.equals('')">
+				AND BM01.PRDT_GRP = #{prdtGrp}
+			  </if>
+			  <if test="planDeptId != null and !planDeptId.equals('')">
+			    AND CM06.DEPT_ID IN (SELECT
+										DEPT_ID
+									FROM
+									(
+										SELECT
+											LEVEL LV,
+											A.*
+										FROM
+											TB_CM04M01 A
+										WHERE USE_YN = 'Y'
+										START WITH DEPT_ID = #{planDeptId}
+										CONNECT BY PRIOR DEPT_ID = UP_DEPT_ID
+										ORDER SIBLINGS BY SORT_NO
+									) B)
+			  </if>
+		GROUP BY AR02.CO_CD, AR02.TRST_CLNT_CD, TRIM(AR02.PRDT_DIV) ,
+		         NVL(AR02.SALES_AREA_CD, 'SALESAREA99') , SUBSTRING(AR02.TRST_DT, 0, 6) 
+		) T1
+	   LEFT JOIN TB_BM02M01 BM02 ON BM02.CLNT_CD = T1.CLNT_CD
+	  GROUP BY T1.CO_CD
+			 , BM02.CLNT_DIV_CD
+		    ,  T1.CLNT_CD
+		    ,  T1.PRDT_DIV
+		    , NVL(BM02.CLNT_NM, '기타')
+		 ORDER BY T1.CO_CD, T1.PRDT_DIV, BM02.CLNT_DIV_CD, T1.CLNT_CD 
+    ) D
+     WHERE 1=1
+    <if test="clntCd != null and !clntCd.equals('')">
+  	    AND D.CLNT_CD = #{clntCd}
+    </if>
+    <if test="clntNm != null and !clntNm.equals('')">
+  	    AND D.CLNT_NM like '%'||#{clntNm}||'%' -->
+    </if>
+	</select>
+	
+	<select id="selectSellListInd" parameterType="Map" resultType="CamelMap">
+			SELECT
+					ROWNUM AS RNUM, D.*
+			FROM(
+				SELECT 
+					  BM02.CLNT_DIV_CD
+					 , PLAN_SEQ
+				     , T1.CO_CD
+					 , FN_CM05M01_CD_TO_NM(T1.CO_CD) CO_NM
+				     , T1.CLNT_CD
+				     , T1.PRDT_DIV
+					 , FN_CM05M01_CD_TO_NM(BM02.CLNT_DIV_CD) CLNT_DIV_NM
+					 , FN_CM05M01_CD_TO_NM(T1.PRDT_DIV) PRDT_DIV_NM
+					 , NVL(BM02.CLNT_NM, '기타') CLNT_NM
+				     , NVL(T1.PLAN_WT,0) AS PLAN_WT
+				     , NVL(T1.TRST_Y,0) AS TRST_Y
+				     , NVL(T1.TRST_N,0) AS TRST_N
+				     , TO_CHAR(CASE WHEN NVL(T1.PLAN_WT,0) != 0 THEN ((NVL(T1.TRST_N,0) + NVL(T1.TRST_Y,0)) / NVL(T1.PLAN_WT,0)) * 100
+				    		ELSE 0 END, '9,999.99')  AS TRST_RATE
+				      <if test="!selpchCd.equals('SELPCH1') and selpchCd != null and !selpchCd.equals('')">
+					  ,T1.PLAN_SALES_ID
+					  ,T1.PLAN_SALES_NM
+					  ,T1.PLAN_DEPT_ID
+					 , T1.PLAN_DEPT_NM
+					 </if>
+				  FROM 
+				  (SELECT SD01.PLAN_SEQ
+				  	   , NVL(SD01.CO_CD, AR02.CO_CD) CO_CD
+				  	   , NVL(SD01.CLNT_CD, AR02.TRST_CLNT_CD) CLNT_CD
+				  	   , NVL(SD01.PRDT_DIV, AR02.PRDT_DIV) PRDT_DIV
+				  	   , SD01.PLAN_YM
+				       <if test="!selpchCd.equals('SELPCH1') and selpchCd != null and !selpchCd.equals('')">
+				  	   , NVL(SD01.PLAN_SALES_ID, AR02.SALES_MNG)  PLAN_SALES_ID
+				  	   , NVL(SD01.PLAN_SALES_NM, AR02.NAME) PLAN_SALES_NM
+				  	   , NVL(SD01.PLAN_DEPT_ID, AR02.DEPT_ID) PLAN_DEPT_ID
+				  	   , NVL(SD01.PLAN_DEPT_NM, AR02.DEPT_NM) PLAN_DEPT_NM
+				  	   </if>
+				  	   , SD01.PLAN_WT
+				  	   , AR02.TRST_Y
+				  	   , AR02.TRST_N
+				  	   FROM
+				 (
+				   	 SELECT '1' type1
+				   	   , S.PLAN_SEQ 
+				   	   , S.CO_CD
+				       , S.CLNT_CD 
+				       , TRIM(S.PRDT_DIV) PRDT_DIV
+				       , S.PLAN_YM
+				       <if test="!selpchCd.equals('SELPCH1') and selpchCd != null and !selpchCd.equals('')">
+					    ,S.PLAN_SALES_ID
+					    , CM06.NAME AS PLAN_SALES_NM
+					    ,S.PAN_DEPT_ID AS PLAN_DEPT_ID
+					    ,CM04.DEPT_NM AS PLAN_DEPT_NM
+					    </if>
+				       , S.PLAN_WT PLAN_WT
+				       , 0 TRST_Y
+				       , 0 TRST_N
+				     FROM TB_SD01M01 S
+				     LEFT JOIN TB_CM06M01 CM06 ON CM06.ID      = S.PLAN_SALES_ID
+				     LEFT JOIN TB_CM04M01 CM04 ON CM04.DEPT_ID = CM06.DEPT_ID
+				     WHERE 1=1
+				      <if test="coCd != null and !coCd.equals('')">
+				        AND S.CO_CD = #{coCd}
+				      </if>
+				      <if test="planYm != null and !planYm.equals('')">  
+			            AND S.PLAN_YM = TO_CHAR(TO_DATE(#{planYm},'YYYY-MM'),'YYYYMM')
+			          </if>
+			          <if test="planSalesId != null and !planSalesId.equals('')">
+					    AND S.PLAN_SALES_ID = #{planSalesId}
+					  </if>
+					  <if test="planSalesNm != null and !planSalesNm.equals('')">
+					    AND CM06.NAME  LIKE '%'||#{planSalesNm} || '%'
+					   </if>
+					   <if test="planDeptId != null and !planDeptId.equals('')">
+					    AND S.PAN_DEPT_ID IN (SELECT
+													DEPT_ID
+												FROM
+												(
+													SELECT
+														LEVEL LV,
+														A.*
+													FROM
+														TB_CM04M01 A
+													WHERE USE_YN = 'Y'
+													START WITH DEPT_ID = #{planDeptId}
+													CONNECT BY PRIOR DEPT_ID = UP_DEPT_ID
+													ORDER SIBLINGS BY SORT_NO
+												) B)
+									
+					  </if>
+					   <if test="planDeptNm != null and !planDeptNm.equals('')">
+                            AND CM04.DEPT_NM  IN (SELECT
+														DEPT_NM
+													FROM
+													(
+														SELECT
+															LEVEL LV,
+															A.*
+														FROM
+															TB_CM04M01 A
+														WHERE USE_YN = 'Y'
+														START WITH DEPT_NM like '%'||#{planDeptNm}||'%'
+														CONNECT BY PRIOR DEPT_ID = UP_DEPT_ID
+														ORDER SIBLINGS BY SORT_NO
+													) B)
+									
+					  </if>
+					  <if test="prdtGrp != null and !prdtGrp.equals('')">
+						AND S.PRDT_GRP = #{prdtGrp}
+					  </if>
+					  <if test="prdtDiv != null and !prdtDiv.equals('')">
+						AND S.PRDT_DIV = #{prdtDiv}
+					  </if>
+			          <if test="selpchCd != null and !selpchCd.equals('')">
+			             <choose>
+				            <when test="selpchCd.equals('SELPCH1')">
+			      	            AND ( S.SELPCH_CD = #{selpchCd}  OR SELPCH_CD = 'SELPCH3' )
+				            </when>
+				            <otherwise>
+					            AND ( S.SELPCH_CD = #{selpchCd}  OR SELPCH_CD = 'SELPCH4' )
+				            </otherwise>
+			             </choose>
+			           </if>
+			           <if test="clntCd != null and !clntCd.equals('')">
+					  	    AND S.CLNT_CD = #{clntCd}
+					    </if>
+					    	) SD01
+			       FULL OUTER JOIN
+				   (SELECT '2' type1
+				   	   , 0 AS PLAN_SEQ 
+				       , AR02.CO_CD
+				       , AR02.TRST_CLNT_CD
+				       , TRIM(AR02.PRDT_DIV) PRDT_DIV 
+				       , SUBSTRING(AR02.TRST_DT, 0, 6) TRST_DT 
+				       <if test="!selpchCd.equals('SELPCH1') and selpchCd != null and !selpchCd.equals('')">
+					   , AR02.SALES_MNG 
+					   , CM06.NAME
+					   , CM06.DEPT_ID
+					    ,CM04.DEPT_NM
+					   </if>
+					   , 0 AS PLAN_WT 
+				       , SUM(DECODE(AR02.IMP_YN, 'Y', AR02.REAL_TRST_WT)) TRST_Y
+				       , SUM(DECODE(AR02.IMP_YN, 'N', AR02.REAL_TRST_WT)) TRST_N
+				     FROM TB_AR02M01 AR02
+				     INNER JOIN TB_BM01M01 BM01 ON BM01.PRDT_CD = AR02.TRST_PRDT_CD
+				     LEFT JOIN TB_CM06M01 CM06 ON CM06.ID      = AR02.SALES_MNG 
+				     LEFT JOIN TB_CM04M01 CM04 ON CM04.DEPT_ID = CM06.DEPT_ID
+				    WHERE 1=1
+				      <if test="coCd != null and !coCd.equals('')">
+				        AND AR02.CO_CD = #{coCd}
+				      </if>
+				      <if test="planYm != null and !planYm.equals('')">  
+			            AND SUBSTRING(AR02.TRST_DT, 0, 6) = TO_CHAR(TO_DATE(#{planYm},'YYYY-MM'),'YYYYMM')
+			          </if>
+			          <if test="selpchCd != null and !selpchCd.equals('')">
+			             <choose>
+				            <when test="selpchCd.equals('SELPCH1')">
+			      	            AND ( AR02.SELPCH_CD = #{selpchCd}  OR AR02.SELPCH_CD = 'SELPCH3' )
+				            </when>
+				            <otherwise>
+					            AND ( AR02.SELPCH_CD = #{selpchCd}  OR AR02.SELPCH_CD = 'SELPCH4' )
+				            </otherwise>
+			             </choose>
+			      	  </if>	
+			      	   <if test="planSalesId != null and !planSalesId.equals('')">
+					    AND AR02.SALES_MNG = #{planSalesId}
+					  </if>
+					  <if test="planSalesNm != null and !planSalesNm.equals('')">
+					    AND CM06.NAME  LIKE '%'||#{planSalesNm} || '%'
+					   </if>
+					   <if test="prdtDiv != null and !prdtDiv.equals('')">
+						AND BM01.PRDT_DIV = #{prdtDiv}
+					  </if>
+					  <if test="prdtGrp != null and !prdtGrp.equals('')">
+						AND BM01.PRDT_GRP = #{prdtGrp}
+					  </if>
+					  <if test="planDeptId != null and !planDeptId.equals('')">
+					    AND CM06.DEPT_ID IN (SELECT
+										DEPT_ID
+									FROM
+									(
+										SELECT
+											LEVEL LV,
+											A.*
+										FROM
+											TB_CM04M01 A
+										WHERE USE_YN = 'Y'
+										START WITH DEPT_ID = #{planDeptId}
+										CONNECT BY PRIOR DEPT_ID = UP_DEPT_ID
+										ORDER SIBLINGS BY SORT_NO
+									) B)
+									
+					  </if>
+					  <if test="planDeptNm != null and !planDeptNm.equals('')">
+                            AND CM04.DEPT_NM  IN (SELECT
+										DEPT_NM
+									FROM
+									(
+										SELECT
+											LEVEL LV,
+											A.*
+										FROM
+											TB_CM04M01 A
+										WHERE USE_YN = 'Y'
+										START WITH DEPT_NM like '%'||#{planDeptNm}||'%'
+										CONNECT BY PRIOR DEPT_ID = UP_DEPT_ID
+										ORDER SIBLINGS BY SORT_NO
+									) B)
+					  </if>
+					  <if test="clntCd != null and !clntCd.equals('')">
+					  	  AND AR02.TRST_CLNT_CD = #{clntCd}
+					   </if>
+				   GROUP BY AR02.CO_CD, AR02.TRST_CLNT_CD, TRIM(AR02.PRDT_DIV)
+				         , SUBSTRING(AR02.TRST_DT, 0, 6) 
+				       <if test="!selpchCd.equals('SELPCH1') and selpchCd != null and !selpchCd.equals('')">
+					     , AR02.SALES_MNG 
+					     , CM06.NAME
+						 , CM06.DEPT_ID
+					     , CM04.DEPT_NM
+					     </if>
+					    ) AR02
+			ON SD01.CO_CD = AR02.CO_CD
+			AND SD01.CLNT_CD = AR02.TRST_CLNT_CD
+			AND SD01.PRDT_DIV = AR02.PRDT_DIV
+		    <if test="!selpchCd.equals('SELPCH1') and selpchCd != null and !selpchCd.equals('')">
+			AND SD01.PLAN_SALES_ID = AR02.SALES_MNG
+			</if>
+				) T1
+			   LEFT JOIN TB_BM02M01 BM02 ON BM02.CLNT_CD = T1.CLNT_CD
+				 ORDER BY 
+		             <if test="!selpchCd.equals('SELPCH1') and selpchCd != null and !selpchCd.equals('')">
+					  T1.PLAN_DEPT_NM ,
+					  T1.PLAN_SALES_ID,
+					  T1.PLAN_SALES_NM,
+					  </if>
+						 T1.CO_CD,
+					 BM02.CLNT_DIV_CD,
+					 T1.PRDT_DIV, T1.CLNT_CD 
+		    ) D
+		    <if test="clntNm != null and !clntNm.equals('')">
+		  	    WHERE D.CLNT_NM like '%'||#{clntNm}||'%'
+		    </if>
+		    ORDER BY CO_CD, CLNT_DIV_CD, PRDT_DIV, CLNT_CD
+	</select>
+</mapper>
+
+<!-- 	<select id="selectSellList" parameterType="Map" resultType="CamelMap"> -->
+<!-- 			SELECT -->
+<!-- 					ROWNUM AS RNUM, D.* -->
+<!-- 			FROM( -->
+		
+<!-- 				WITH SD01 AS ( -->
+<!-- 				   	 SELECT S.PLAN_SEQ  -->
+<!-- 				   	   , S.CO_CD -->
+<!-- 				       , S.CLNT_CD  -->
+<!-- 				       , TRIM(S.PRDT_DIV) PRDT_DIV -->
+<!-- 				       , NVL(S.SALES_AREA_CD, 'SALESAREA99') SALES_AREA_CD -->
+<!-- 				       , S.PLAN_YM -->
+<!-- 				       <if test="planSalesId != null and !planSalesId.equals('')"> -->
+<!-- 					    ,S.PLAN_SALES_ID -->
+<!-- 					    , CM06.NAME AS PLAN_SALES_NM -->
+<!-- 					  </if> -->
+<!-- 				       <if test="planDeptId != null and !planDeptId.equals('')"> -->
+<!-- 					    ,S.PAN_DEPT_ID AS PLAN_DEPT_ID -->
+<!-- 					  </if> -->
+<!-- 				       <if test="planDeptNm != null and !planDeptNm.equals('')"> -->
+<!-- 					    ,CM04.DEPT_NM AS PLAN_DEPT_NM -->
+<!-- 					  </if> -->
+<!-- 				       , SUM(S.PLAN_WT) PLAN_WT -->
+<!-- 				     FROM TB_SD01M01 S -->
+<!-- 				     LEFT JOIN TB_CM06M01 CM06 ON CM06.ID      = S.PLAN_SALES_ID -->
+<!-- 				     LEFT JOIN TB_CM04M01 CM04 ON CM04.DEPT_ID = CM06.DEPT_ID -->
+<!-- 				     WHERE 1=1 -->
+<!-- 				      <if test="coCd != null and !coCd.equals('')"> -->
+<!-- 				        AND S.CO_CD = #{coCd} -->
+<!-- 				      </if> -->
+<!-- 				      <if test="planYm != null and !planYm.equals('')">   -->
+<!-- 			            AND S.PLAN_YM = TO_CHAR(TO_DATE(#{planYm},'YYYY-MM'),'YYYYMM') -->
+<!-- 			          </if> -->
+<!-- 			          <if test="planSalesId != null and !planSalesId.equals('')"> -->
+<!-- 					    AND S.PLAN_SALES_ID = #{planSalesId} -->
+<!-- 					  </if> -->
+<!-- 					   <if test="planDeptId != null and !planDeptId.equals('')"> -->
+<!-- 					    AND S.PAN_DEPT_ID = #{planDeptId} -->
+<!-- 					  </if> -->
+<!-- 					   <if test="planDeptNm != null and !planDeptNm.equals('')"> -->
+<!-- 					    AND CM04.DEPT_NM  like '%'||#{planDeptNm}||'%' -->
+<!-- 					  </if> -->
+<!-- 					  <if test="prdtGrp != null and !prdtGrp.equals('')"> -->
+<!-- 						AND S.PRDT_GRP = #{prdtGrp} -->
+<!-- 					  </if> -->
+<!-- 			          <if test="selpchCd != null and !selpchCd.equals('')"> -->
+<!-- 			             <choose> -->
+<!-- 				            <when test="selpchCd.equals('SELPCH1')"> -->
+<!-- 			      	            AND ( S.SELPCH_CD = #{selpchCd}  OR SELPCH_CD = 'SELPCH3' ) -->
+<!-- 				            </when> -->
+<!-- 				            <otherwise> -->
+<!-- 					            AND ( S.SELPCH_CD = #{selpchCd}  OR SELPCH_CD = 'SELPCH4' ) -->
+<!-- 				            </otherwise> -->
+<!-- 			             </choose> -->
+<!-- 			           </if>					   -->
+<!-- 			          GROUP BY S.PLAN_SEQ  -->
+<!-- 				   	   , S.CO_CD -->
+<!-- 				       , S.CLNT_CD  -->
+<!-- 				       , TRIM(S.PRDT_DIV) -->
+<!-- 				       , NVL(S.SALES_AREA_CD, 'SALESAREA99') -->
+<!-- 				       , S.PLAN_YM -->
+<!-- 				       <if test="planSalesId != null and !planSalesId.equals('')"> -->
+<!-- 					   , S.PLAN_SALES_ID -->
+<!-- 					   , CM06.NAME -->
+<!-- 					  </if> -->
+<!-- 					  <if test="planDeptId != null and !planDeptId.equals('')"> -->
+<!-- 					    ,S.PAN_DEPT_ID -->
+<!-- 					  </if> -->
+<!-- 					  <if test="planDeptNm != null and !planDeptNm.equals('')"> -->
+<!-- 					    ,CM04.DEPT_NM -->
+<!-- 					  </if> -->
+<!-- 				), AR02 AS ( -->
+<!-- 				   SELECT '' AS PLAN_SEQ  -->
+<!-- 				       , AR02.CO_CD -->
+<!-- 				       , AR02.TRST_CLNT_CD -->
+<!-- 				       , TRIM(AR02.PRDT_DIV) PRDT_DIV  -->
+<!-- 				       , NVL(AR02.SALES_AREA_CD, 'SALESAREA99') SALES_AREA_CD  -->
+<!-- 				       , SUBSTRING(AR02.TRST_DT, 0, 6) TRST_DT -->
+<!-- 				       <if test="planSalesId != null and !planSalesId.equals('')"> -->
+<!-- 					   , AR02.SALES_MNG  -->
+<!-- 					   , CM06.NAME -->
+<!-- 					  </if> -->
+<!-- 				       <if test="planDeptId != null and !planDeptId.equals('')"> -->
+<!-- 					   , CM06.DEPT_ID -->
+<!-- 					  </if> -->
+<!-- 					  <if test="planDeptNm != null and !planDeptNm.equals('')"> -->
+<!-- 					    ,CM04.DEPT_NM -->
+<!-- 					  </if> -->
+<!-- 				       , SUM(DECODE(AR02.IMP_YN, 'Y', AR02.REAL_TRST_QTY)) TRST_Y -->
+<!-- 				       , SUM(DECODE(AR02.IMP_YN, 'N', AR02.REAL_TRST_QTY)) TRST_N -->
+<!-- 				     FROM TB_AR02M01 AR02 -->
+<!-- 				     INNER JOIN TB_BM01M01 BM01 ON BM01.PRDT_CD = AR02.TRST_PRDT_CD -->
+<!-- 				     LEFT JOIN TB_CM06M01 CM06 ON CM06.ID      = AR02.SALES_MNG  -->
+<!-- 				     LEFT JOIN TB_CM04M01 CM04 ON CM04.DEPT_ID = CM06.DEPT_ID -->
+<!-- 				    WHERE 1=1 -->
+<!-- 				      <if test="coCd != null and !coCd.equals('')"> -->
+<!-- 				        AND AR02.CO_CD = #{coCd} -->
+<!-- 				      </if> -->
+<!-- 				      <if test="planYm != null and !planYm.equals('')">   -->
+<!-- 			            AND SUBSTRING(AR02.TRST_DT, 0, 6) = TO_CHAR(TO_DATE(#{planYm},'YYYY-MM'),'YYYYMM') -->
+<!-- 			          </if> -->
+<!-- 			          <if test="selpchCd != null and !selpchCd.equals('')"> -->
+<!-- 			             <choose> -->
+<!-- 				            <when test="selpchCd.equals('SELPCH1')"> -->
+<!-- 			      	            AND ( AR02.SELPCH_CD = #{selpchCd}  OR AR02.SELPCH_CD = 'SELPCH3' ) -->
+<!-- 				            </when> -->
+<!-- 				            <otherwise> -->
+<!-- 					            AND ( AR02.SELPCH_CD = #{selpchCd}  OR AR02.SELPCH_CD = 'SELPCH4' ) -->
+<!-- 				            </otherwise> -->
+<!-- 			             </choose> -->
+<!-- 			      	  </if>	 -->
+<!-- 			      	   <if test="planSalesId != null and !planSalesId.equals('')"> -->
+<!-- 					    AND AR02.SALES_MNG = #{planSalesId} -->
+<!-- 					  </if> -->
+<!-- 					  <if test="prdtGrp != null and !prdtGrp.equals('')"> -->
+<!-- 						AND BM01.PRDT_GRP = #{prdtGrp} -->
+<!-- 					  </if> -->
+<!-- 					  <if test="planDeptId != null and !planDeptId.equals('')"> -->
+<!-- 					    AND CM06.DEPT_ID = #{planDeptId} -->
+<!-- 					  </if> -->
+<!-- 					  <if test="planDeptNm != null and !planDeptNm.equals('')"> -->
+<!-- 					    AND CM04.DEPT_NM like '%'||#{planDeptNm}||'%' -->
+<!-- 					  </if> -->
+<!-- 				   GROUP BY AR02.CO_CD, AR02.TRST_CLNT_CD, TRIM(AR02.PRDT_DIV) , -->
+<!-- 				         NVL(AR02.SALES_AREA_CD, 'SALESAREA99') , SUBSTRING(AR02.TRST_DT, 0, 6)  -->
+<!-- 				         <if test="planSalesId != null and !planSalesId.equals('')"> -->
+<!-- 					     , AR02.SALES_MNG  -->
+<!-- 					     , CM06.NAME -->
+<!-- 					    </if> -->
+<!-- 					    <if test="planDeptId != null and !planDeptId.equals('')"> -->
+<!-- 						 , CM06.DEPT_ID -->
+<!-- 						</if> -->
+<!-- 						<if test="planDeptNm != null and !planDeptNm.equals('')"> -->
+<!-- 					     , CM04.DEPT_NM -->
+<!-- 					    </if> -->
+<!-- 				) -->
+<!-- 				SELECT T1.PLAN_SEQ -->
+<!-- 				     , T1.CO_CD -->
+<!-- 					 , BM02.CLNT_DIV_CD -->
+<!-- 					 , T1.SALES_AREA_CD -->
+<!-- 					 , T1.PRDT_DIV -->
+<!-- 					 , T1.CLNT_CD -->
+<!-- 					 , FN_CM05M01_CD_TO_NM(T1.CO_CD) CO_NM -->
+<!-- 					 , FN_CM05M01_CD_TO_NM(BM02.CLNT_DIV_CD) CLNT_DIV_NM -->
+<!-- 					 , FN_CM05M01_CD_TO_NM(SALES_AREA_CD) SALES_AREA_NM -->
+<!-- 					 , FN_CM05M01_CD_TO_NM(T1.PRDT_DIV) PRDT_DIV_NM -->
+<!-- 					 , NVL(BM02.CLNT_NM, '기타') CLNT_NM -->
+<!-- 					 , T1.PLAN_WT -->
+<!-- 					 , T1.TRST_Y -->
+<!-- 					 , T1.TRST_N -->
+<!-- 					 , T1.TRST_RATE -->
+<!-- 				    <if test="planSalesId != null and !planSalesId.equals('')"> -->
+<!-- 					 , T1.PLAN_SALES_ID -->
+<!-- 					 , T1.PLAN_SALES_NM -->
+<!-- 					 </if>					  -->
+<!-- 				    <if test="planDeptId != null and !planDeptId.equals('')"> -->
+<!-- 					 , T1.PLAN_DEPT_ID -->
+<!-- 					 </if> -->
+<!-- 					 <if test="planDeptNm != null and !planDeptNm.equals('')"> -->
+<!-- 					 , T1.PLAN_DEPT_NM -->
+<!-- 					 </if> -->
+<!-- 				  FROM ( -->
+<!-- 				SELECT S.PLAN_SEQ -->
+<!-- 				    , CASE WHEN S.CO_CD IS NOT NULL THEN S.CO_CD -->
+<!-- 				         ELSE A.CO_CD END CO_CD -->
+<!-- 				    , CASE WHEN S.CLNT_CD IS NOT NULL THEN S.CLNT_CD -->
+<!-- 				          ELSE A.TRST_CLNT_CD END CLNT_CD -->
+<!-- 				    , CASE WHEN S.PRDT_DIV IS NOT NULL THEN S.PRDT_DIV -->
+<!-- 				          ELSE A.PRDT_DIV END PRDT_DIV -->
+<!-- 				    , CASE WHEN S.SALES_AREA_CD IS NULL THEN A.SALES_AREA_CD -->
+<!-- 				          ELSE S.SALES_AREA_CD END SALES_AREA_CD -->
+<!-- 				    , NVL(PLAN_WT,0) AS PLAN_WT -->
+<!-- 				    , NVL(TRST_Y,0) AS TRST_Y -->
+<!-- 				    , NVL(TRST_N,0) AS TRST_N -->
+<!-- 				    , CASE WHEN NVL(PLAN_WT,0) != 0 THEN ((NVL(TRST_N,0) + NVL(TRST_Y,0)) / NVL(PLAN_WT,0)) * 100  -->
+<!-- 				    		ELSE 0 END AS TRST_RATE -->
+<!-- 				    <if test="planSalesId != null and !planSalesId.equals('')"> -->
+<!-- 					  ,CASE WHEN S.PLAN_SALES_ID IS NULL THEN A.SALES_MNG ELSE S.PLAN_SALES_ID END PLAN_SALES_ID -->
+<!-- 					  ,CASE WHEN S.PLAN_SALES_NM IS NULL THEN A.NAME      ELSE S.PLAN_SALES_NM END PLAN_SALES_NM -->
+<!-- 					 </if> -->
+<!-- 					 <if test="planDeptId != null and !planDeptId.equals('')"> -->
+<!-- 					  ,CASE WHEN S.PLAN_DEPT_ID IS NULL THEN A.DEPT_ID  ELSE S.PLAN_DEPT_ID END PLAN_DEPT_ID -->
+<!-- 					 </if> -->
+<!-- 					 <if test="planDeptNm != null and !planDeptNm.equals('')"> -->
+<!-- 					 ,CASE WHEN S.PLAN_DEPT_NM IS NULL THEN A.DEPT_NM  ELSE S.PLAN_DEPT_NM END PLAN_DEPT_NM -->
+<!-- 					 </if> -->
+<!-- 				  FROM SD01 S -->
+<!-- 				 FULL OUTER JOIN AR02 A -->
+<!-- 				 ON S.CO_CD          = A.CO_CD -->
+<!-- 				 AND S.PLAN_SEQ      = A.PLAN_SEQ -->
+<!-- 				 AND S.CLNT_CD       = A.TRST_CLNT_CD -->
+<!-- 				 AND S.PRDT_DIV      = A.PRDT_DIV -->
+<!-- 				 AND S.SALES_AREA_CD = A.SALES_AREA_CD -->
+<!-- 				    <if test="planSalesId != null and !planSalesId.equals('')"> -->
+<!-- 				     AND S.PLAN_SALES_ID = A.SALES_MNG -->
+<!-- 				     AND S.PLAN_SALES_NM = A.NAME  -->
+<!-- 					 </if> -->
+<!-- 					 <if test="planDeptId != null and !planDeptId.equals('')"> -->
+<!-- 					 AND S.PLAN_DEPT_ID = A.DEPT_ID -->
+<!-- 					 </if> -->
+<!-- 					 <if test="planDeptNm != null and !planDeptNm.equals('')"> -->
+<!-- 					 AND S.PLAN_DEPT_NM = A.DEPT_NM -->
+<!-- 					 </if> -->
+<!-- 				 AND S.PLAN_YM       = A.TRST_DT) T1 -->
+<!-- 				 , TB_BM02M01 BM02 -->
+<!-- 				 WHERE T1.CLNT_CD = BM02.CLNT_CD(+) -->
+<!-- 				 ORDER BY T1.CO_CD, BM02.CLNT_DIV_CD,SALES_AREA_CD, T1.PRDT_DIV, T1.CLNT_CD  -->
+<!-- 		    ) D -->
+<!-- 	</select> -->

@@ -1,0 +1,232 @@
+<div class="container-fluid" id="popup_area">
+	<div class="row">
+		<div class="form-group">
+			<form id="frm">
+				<input type="hidden" id="pgmId" name="pgmId" value="BM0102P01">
+				<input type="hidden" id="userId" name="userId">
+				<table class="popup_table">
+					<colgroup> 
+						<col width="14%">
+						<col width="">
+						<col width="14%">
+						<col width="">
+						<col width="14%">
+						<col width=""> 
+					</colgroup>
+					<tr>
+						<th class="hit">제품코드</th>
+						<td> 
+							<input type="text" class="form-control" id="prdtCd" name="prdtCd"  required>
+						</td>
+						</th>
+						<th class="hit">제품명</th>
+						<td colspan="3">
+							<input type="text" class="form-control" id="prdtNm" name="prdtNm" required>
+						</td>
+					</tr>
+					<tr>
+						<th class="hit">제품 그룹</th>
+						<td>
+							<select class="form-control input-sm" id="prdtGrp" name="prdtGrp" data-kind="PRDTDIV" onchange="setPrdtDiv(this, 'popup');" required>
+								<option value="">선택</option>
+							</select>
+						</td>
+						<th class="hit">제품 구분</th>
+						<td>
+							<select class="form-control input-sm" id="prdtDiv" name="prdtDiv" required>
+								<option value="">선택</option>
+							</select>
+						</td>
+						<th class="hit">FRN구분</th>
+						<td>
+							<select class="form-control input-sm" id="prdtFrn" name="prdtFrn" data-kind="PRDTFRN" required>
+								<option value="">선택</option>
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<th>사이즈</th>
+						<td>
+							<input  type="text" class="form-control input-sm" id="prdtSize" name="prdtSize">
+						</td>
+						<th>제품 규격</th>
+						<td>
+							<input type="text" class="form-control input-sm" id="prdtSpec" name="prdtSpec">
+						</td>
+						<th>아이템구분</th>
+						<td>
+							<select class="form-control input-sm" id="prdtItem" name="prdtItem" data-kind="ITEMLIST">
+								<option value="">선택</option>
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<th>단위</th>
+						<td>
+							<select class="form-control input-sm" id="prdtUnit" name="prdtUnit" data-kind="PRDTUNIT">
+								<option value="">선택</option>
+							</select>
+						</td>
+						<th>중량</th>
+						<td>
+							<input type="text" class="form-control" id="prdtWt" name="prdtWt">
+						</td>
+						<th></th>
+						<td>
+						</td>
+					</tr>
+					<tr>
+						<th>기준단가</th>
+						<td>
+							<input type="text" class="form-control" id="prdtUpr" name="prdtUpr">
+						</td>
+						<th>단가 기준일</th>
+						<td>
+							<input type="text" class="form-control input_calendar" id="prdtDt" name="prdtDt" onkeyup="dateMask(this);" date>
+						</td>
+						<th>사용 구분</th>
+						<td>
+							<select class="form-control input-sm" id="useYn" name="useYn">
+								<option value="Y">사용</option>
+								<option value="N">미사용</option>
+							</select>
+						</td>
+					</tr>
+				</table>
+			</form>
+		</div>
+	</div>
+</div>
+<div>
+	<button type="button" class="btn btn-default btn-sm" id="checkBtn" onclick="checkOverLap()">중복체크</button>
+	<button type="button" class="btn btn-default btn-sm" id="actionBtn"></button>
+	<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫기</button>
+</div>
+<script type="text/javascript">
+	var insertOK = false;
+	$(document).ready(function() {
+		$("#userId").val(jwt.userId);
+		setCommonSelect($("#popup_area select[data-kind]"));
+		
+		$('#prdtDt').datepicker({
+			format : "yyyy-mm-dd",
+			language : "ko",
+			autoclose : true
+		});
+		
+		var actionType = modalStack.last().paramObj.actionType;
+		if(actionType == "U") {
+			$('#actionBtn').on("click", function(){updateMaterial();});
+			$("#actionBtn").html("수정");
+			$("#checkBtn").hide();
+			selectMaterialInfo();
+			insertOK = true;
+			
+		} else {
+			$('#actionBtn').on("click", function(){insertMaterial();});
+			$("#actionBtn").html("등록");
+			$('#prdtDt').datepicker("setDate", new Date());
+			 
+		}
+		
+		$('[required]').on("change", function(){
+			if(actionType != "U"){
+				insertOK = false;
+			}
+		});
+		
+	});
+	
+	function selectMaterialInfo() {
+	
+		var row = gridView.target.getList("selected")[0];
+		$("#prdtCd").val(row.prdtCd);
+		var formData = $('#frm').serializeObject();
+		postAjaxSync("/admin/bm/bm01/selectMaterialInfo", formData, null, function(data){
+			setData(data.materialInfo);
+		});
+	}
+	
+	function setData(data){
+		$.each(data, function(key, value){
+			if($('#'+key)[0]){
+				$('#'+key).val(value);
+				
+				if(key == "prdtGrp"){
+					$('#'+key).change();
+				}
+				
+			//	if($('#'+key).is('[required]') && key != "useYn"){
+			//		$('#'+key).prop("disabled", true);	
+			//	}
+				
+				if($('#'+key).is('[date]')){
+					$('#'+key).datepicker("setDate", moment(value, 'YYYY-MM-DD').toDate());
+				}
+			}
+		});
+	}
+
+	function insertMaterial() {
+		
+		if(inputValidation($('[required]'))) {
+			if(insertOK) {
+				
+				var formData = $('#frm').serializeObject();
+				formData.prdtDt = formData.prdtDt.replace(/\-/g,'');
+				
+				postAjax("/admin/bm/bm01/insertMaterial", formData, null, function(data){
+					if(data.resultCode == 200){
+						modalStack.close();
+						gridView.initView().setData(0);
+					}
+				});
+			}
+		} 
+	}
+	
+	function updateMaterial() {	
+		// for(var i=0; i<$('#frm [name]').length; i++) {
+			
+		// 	if($('#frm [name]')[i].required){ 
+		// 		$("#frm [name]")[i].disabled = false;
+		// 	}
+		// }
+
+		if(inputValidation($('[required]'))) {
+			if(insertOK) {
+				
+				var formData = $('#frm').serializeObject();
+				formData.prdtCd = formData.prdtCd + ''; 
+				formData.prdtDt = formData.prdtDt.replace(/\-/g,'');
+
+				putAjax("/admin/bm/bm01/updateMaterial", formData, null, function(data){
+					alert(data.resultMessage);
+					if(data.resultCode == 200){
+						modalStack.close();
+						gridView.initView().setData(0);
+					}
+				});
+			} 
+		}
+	}
+	
+	
+	function checkOverLap() {
+		
+		if(inputValidation($('[required]'))) {
+			var formData = $('#frm').serializeObject();
+			formData.prdtDt = formData.prdtDt.replace(/\-/g,'');
+			
+			postAjax("/admin/bm/bm01/checkOverLap", formData, null, function(data){
+				alert(data.resultMessage);
+				if(data.resultCode == 200){
+					insertOK = true;
+				} 
+			})
+			
+		}
+		
+	}
+	
+</script>

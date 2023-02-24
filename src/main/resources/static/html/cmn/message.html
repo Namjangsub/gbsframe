@@ -1,0 +1,168 @@
+<body>
+	<div class="row">
+		<span style="font-size: 25px; font-weight: bold;">채팅목록</span>
+		<div style="float: right;" class="form-inline">
+			<input id="searchValue" type="text" class="form-control" placeholder="사용자명">
+			<a id="loginBtn" class="btn btn-default btn-sm" onclick="getData();">검색</a>
+		</div>
+	</div>
+	<div class="row">
+		<div class="col-xs-6">
+			<div data-ax5grid="first-grid" data-ax5grid-config="{}" style="height: 500px; width: 100%"></div>
+		</div>
+		<div class="col-xs-6" style="float: right;">
+			<div data-ax5grid="second-grid" data-ax5grid-config="{}" style="height: 500px; width: 100%"></div>
+		</div>
+	</div>
+</body>
+<script src="/static/js/websocket/sockjs.min.js"></script>
+<script src="/static/js/websocket/stomp.min.js"></script>
+<script>
+	
+	var firstGrid = new ax5.ui.grid();
+	var secondGrid = new ax5.ui.grid();
+	var toast = new ax5.ui.toast();
+	var myRoomList = '';
+	var roomId = '';
+	
+	$(document).ready(function() {
+		$("#searchValue").keydown(function(key) {
+			if (key.keyCode == 13) {
+				loginAction();
+			}
+		});
+        toast.setConfig({
+            theme: "default",
+            displayTime: 5000,
+            animateTime: 200,
+            closeIcon: '<i>닫기</i>',
+            containerPosition: "bottom-right"
+        });
+        firstGrid.setConfig({
+        	showRowSelector: true,
+        	multipleSelect: false,
+            target: $('[data-ax5grid="first-grid"]'),
+            columns: [
+                {key: "userNm", label: "참가자", align: 'center'},
+                {key: "count", label: "참여자수", align: 'center'},
+                {
+                	key: "", label: "채팅", align: 'center', formatter: function(e) {
+                		return '<button type="button" onclick="openChatRoom('+this.dindex+');"/>대화하기';
+                	}
+                },
+                {key: "userId", label: "사용자ID", align: 'center', hidden: true},
+                {key: "roomId", label: "채팅방ID", align: 'center', hidden: true}
+            ]
+        });
+        
+        secondGrid.setConfig({
+        	showRowSelector: true,
+        	multipleSelect: false,
+            target: $('[data-ax5grid="second-grid"]'),
+            columns: [
+                {key: "id", label: "아이디", align: 'center'},
+                {key: "name", label: "사용자명", align: 'center'},
+                {key: "roleType", label: "직급", align: 'center'},
+                {
+                	key: "", label: "채팅", align: 'center', formatter: function(e) {
+                		return '<button type="button" onclick="checkChatRoom('+this.dindex+');"/>대화하기';
+                	}
+                }
+            ]
+        });
+        
+        getChatRoom();
+        getData();
+        connect();
+	});
+	
+	function getChatRoom() {
+		var formData = {
+			"userId" : jwt.userId
+		};
+		postAjax("/chat/selectChatRoom", formData, null, function(data){
+			firstGrid.setData(data.result);
+		});
+	}
+	
+	function getData() {
+		var formData = {
+			"searchValue" : $("#searchValue").val()	
+		};
+		postAjax("/admin/cm/user/selectUserList", formData, null, function(data){
+			secondGrid.setData(data.userList);
+		});
+	}
+
+	function openChatRoom(index) {
+		firstGrid.select(index);
+		roomId = firstGrid.getList("selected")[0].roomId;
+		var targetId = firstGrid.getList("selected")[0].userId;
+		var targetName = firstGrid.getList("selected")[0].userNm;
+		if(jwt.userId == targetId) {
+			alert("본인과 대화할 수 없습니다.");
+			return;
+		}
+		openChat(targetName);
+	}
+	
+	function quickOpenChatRoom(message) {
+		roomId = message.roomId;
+		openChat(message.userNm);
+	}
+	
+	function checkChatRoom(index) {
+		secondGrid.select(index);
+		var targetId = secondGrid.getList("selected")[0].id;
+		var targetName = secondGrid.getList("selected")[0].name;
+		if(jwt.userId == targetId) {
+			alert("본인과 대화할 수 없습니다.");
+			return;
+		}
+		var formData = {
+				"userId" : jwt.userId,
+				"targetId" : targetId
+		};
+		postAjax("/chat/checkChatRoom", formData, null, function(data){
+			roomId = data.result.roomId;
+			openChat(targetName);
+		});
+	}
+	
+	function openChat(userNm) {
+		openSecondModal("/static/html/cmn/messageRoom.html", 600, 600, userNm+"님과 대화");
+	}
+	
+	function connect() {
+		postAjax("/chat/selectChatRoomList", {"userId":jwt.userId}, null, function(data) {
+			myRoomList = data.result;
+		});
+		var socket = new SockJS('/ws');
+		stompClient = Stomp.over(socket);
+		stompClient.connect({}, function() {
+			$.each(myRoomList, function(idx, item){
+				stompClient.subscribe('/topic/receive/'+item.roomId, function(e) {
+					var result = JSON.parse(e.body);
+					if(result.userId != jwt.userId) {
+						if($("#jstalktheme_test")[0] == undefined) {
+							toast.push({
+				                msg: result.userNm+"\n"+result.message,		                
+				                onStateChanged: function () {
+				                	$("#"+this.toastId).on("click", function(event){
+				                		quickOpenChatRoom(result);
+				                	});
+				                    console.log(this);
+				                }
+				            }, function (e) { //창 닫힌 후 실해되는 곳
+				                console.log(this);
+				            });
+						} else {
+							jstalktheme_addmsg(1, result.userNm, getMessageTime(), result.message);	
+						}
+					}
+				});
+			});
+		});
+	}
+	
+</script>

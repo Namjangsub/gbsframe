@@ -1,0 +1,774 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.sd.sd05.mapper.SD05Mapper">
+	
+	<select id="selectProjectCount" parameterType="Map" resultType="int">
+	 	SELECT 
+	 		COUNT(*) 
+	 	FROM TB_SD05M01 A, TB_BM02M01 B, TB_CM06M01 C
+				WHERE A.CLNT_CD = B.CLNT_CD(+)
+				 AND  A.MNG_ID = C.ID(+)
+
+				<if test= "coCd != null and !coCd.equals('')">
+		 			AND A.CO_CD = #{coCd}
+				</if> 
+				<if test="strtDt != null and !strtDt.equals('')">
+				 	AND ( A.CREAT_DTTM >= #{strtDt})
+				</if>
+				<if test="endDt != null and !endDt.equals('')">
+				 	<![CDATA[AND ( A.CREAT_DTTM <= to_timestamp(to_date(#{endDt}, 'YYYY-MM-DD')+1)    )]]>
+				 	<!-- TO_CHAR(TO_DATE(#{endDt}, 'YYYYMMDD') +1, 'YYYY-MM-DD') AS .. -->
+				</if>
+				<if test="searchValue != null and !searchValue.equals('') and searchType != null and !searchType.equals('')">
+					AND ${searchType} LIKE '%${searchValue}%'
+				</if>
+				<if test="ordTyp != null and !ordTyp.equals('')">
+					AND A.ORD_TYP = #{ordTyp}
+				</if>
+				<if test="taxivcCoprt != null and !taxivcCoprt.equals('')">
+					AND A.COPRT_CD LIKE '%${taxivcCoprt}%'
+				</if>
+				<if test="taxivcCoprt != null and !taxivcCoprt.equals('')">
+					AND A.COPRT_CD = #{taxivcCoprt}
+				</if>
+				<if test="useYn != null and !useYn.equals('')">
+					AND A.USE_YN = #{useYn}
+				</if>
+				<if test="prdtGrp != null and !prdtGrp.equals('')">
+					AND A.PRJCT_CD IN (SELECT DISTINCT PRJCT_CD          -- 제품 구분을 통해 프로젝트 조회
+								 		 FROM TB_SD05D01
+									   WHERE PRDT_DIV IN (SELECT DISTINCT PRDT_DIV
+															FROM TB_BM01M01
+														   WHERE PRDT_GRP = #{prdtGrp}) --제품 그룹을 통해 제품 구분 조회
+								)
+				</if>
+	</select>
+	
+	<select id="selectProjectList" parameterType="Map" resultType="CamelMap">
+		SELECT *
+			FROM(
+				SELECT
+						ROWNUM AS RNUM, D.*,
+						NVL(D.TOT_WT,0) - NVL(D.TOT_CELL,0) AS TOT_REM
+				FROM(		
+				SELECT
+					 A.CO_CD
+					,FN_CM05M01_CD_TO_NM(A.CO_CD) AS CO_NM					 
+					,A.PRJCT_CD
+					,A.PRJCT_NM
+					,A.TNKEY_YN
+					,A.CLNT_CD
+					,B.CLNT_NM
+					,A.MAKR_CD
+					,FN_CM05M01_CD_TO_NM(A.MAKR_CD) AS MAKR_NM
+					,A.PRJCT_ADDR_ZIP 
+					,A.PRJCT_ADDR
+					,A.PRJCT_ADDR_SUB
+					,A.PRJCT_MNG_NM
+					,A.TEL_NO
+					,A.LOSS_RATE
+					,A.MNG_ID
+					,C.NAME AS MNG_NM
+					,TO_CHAR(TO_DATE(A.STRT_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS STRT_DT
+					,TO_CHAR(TO_DATE(A.END_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS END_DT
+					,TO_NUMBER(A.TOT_WT) / 1000 AS TOT_WT
+					,A.ODR_NO
+					,A.ODR_DT
+					,A.USE_YN
+					,A.OUTORD_RMK
+					,A.RMK
+					,A.PRJCT_MES_CD
+					,A.ETC_FIELD1
+					,A.ETC_FIELD2
+					,A.ETC_FIELD3
+					,A.CREAT_PGM
+					,A.CREAT_ID
+					,(SELECT NAME FROM TB_CM06M01 WHERE ID = A.CREAT_ID) AS CREAT_NM
+					,TO_CHAR(A.CREAT_DTTM,'YYYY-MM-DD') AS CREAT_DTTM
+					,A.CREAT_DTTM
+					,A.UDT_ID
+					,(SELECT NAME FROM TB_CM06M01 WHERE ID = A.UDT_ID) AS UDT_NM
+					,A.UDT_PGM
+					,TO_CHAR(A.UDT_DTTM,'YYYY-MM-DD') AS UDT_DTTM
+					,NVL((SELECT ROUND(SUM(REAL_TRST_WT)/1000) FROM TB_AR02M01 WHERE PRJCT_CD = A.PRJCT_CD and SELPCH_CD='SELPCH2'),0) AS TOT_CELL
+					,NVL((SELECT ROUND(SUM(PRCSN_WT)/1000)     FROM TB_AR02M01 WHERE PRJCT_CD = A.PRJCT_CD and SELPCH_CD='SELPCH2'),0) AS TOT_PRCSN_WT
+					,A.ORD_TYP
+					,FN_CM05M01_CD_TO_NM(A.ORD_TYP) AS ORD_TYP_NM
+					,A.BILDNG_TYP
+					,FN_CM05M01_CD_TO_NM(A.BILDNG_TYP) AS BILDNG_TYP_NM
+					,A.ENGRK_TYP
+					,FN_CM05M01_CD_TO_NM(A.ENGRK_TYP) AS ENGRK_TYP_NM
+					,A.MAKR_MNG_NM
+					,A.CLNT_EMAIL
+					,A.CLNT_FAX_NO
+					,A.PRCSN_UPR
+					,A.DC_DIV
+					,FN_CM05M01_CD_TO_NM(A.DC_DIV) AS DC_DIV_NM
+					,A.PRDT_UPR
+					,A.CPLR_YN
+					,A.PMNT_MTD_CD
+					,FN_CM05M01_CD_TO_NM(A.PMNT_MTD_CD) AS PMNT_MTD_NM
+					,A.SHOP_CLNT_CD
+			        ,(SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = A.SHOP_CLNT_CD) AS SHOP_CLNT_NM
+					,A.SHOP_UPR
+					,A.CTRT_RMK
+					,A.OUTORD_UPR
+					,A.OUTORD_LOSS_RATE
+					,A.OUTORD_MNG_ID
+					,A.OUTORD_MNG_NM
+					,A.OUTORD_TEL_NO
+					,A.OUTORD_FAX_NO
+					,A.WH_CD
+					,FN_CM05M01_CD_TO_NM(A.WH_CD) AS WH_NM
+					,A.SCND_WH_CD
+					,FN_CM05M01_CD_TO_NM(A.SCND_WH_CD) AS SCND_WH_NM
+					,A.THRD_WH_CD
+					,FN_CM05M01_CD_TO_NM(A.THRD_WH_CD) AS THRD_WH_NM
+					,TO_CHAR(TO_DATE(A.PCHS_STRT_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS PCHS_STRT_DT
+					,TO_CHAR(TO_DATE(A.PCHS_END_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS PCHS_END_DT
+					,A.CLMN_DAY
+					,A.CLMN_RMK
+                    ,A.CLMN_DIV_CD
+                    ,FN_CM05M01_CD_TO_NM(A.CLMN_DIV_CD) AS CLMN_DIV_NM
+                    ,A.PCHS_CLNT_CD
+                    ,(SELECT CLNT_NM FROM TB_BM02M01 BM02 WHERE BM02.CLNT_CD = A.PCHS_CLNT_CD) AS PCHS_CLNT_NM
+                    ,(SELECT MAX(TNKEY_CF_YN) FROM TB_SD09M01 SD09 WHERE A.PRJCT_CD = SD09.PRJCT_CD ) AS  TNKEY_CF_YN
+                    ,(SELECT MAX(TNKEY_CF_DT) FROM TB_SD09M01 SD09 WHERE A.PRJCT_CD = SD09.PRJCT_CD ) AS  TNKEY_CF_DT
+				FROM TB_SD05M01 A, TB_BM02M01 B, TB_CM06M01 C
+				WHERE A.CLNT_CD = B.CLNT_CD(+)
+				 AND  A.MNG_ID = C.ID(+)
+				<if test= "coCd != null and !coCd.equals('')">
+		 			AND A.CO_CD = #{coCd}
+				</if>
+				<if test="strtDt != null and !strtDt.equals('')">
+				 	AND ( A.CREAT_DTTM >= #{strtDt})
+				</if>
+				<if test="endDt != null and !endDt.equals('')">
+				 	<![CDATA[AND ( A.CREAT_DTTM <= to_timestamp(to_date(#{endDt}, 'YYYY-MM-DD')+1)    )]]>
+				</if>
+				<if test="searchValue != null and !searchValue.equals('') and searchType != null and !searchType.equals('')">
+					AND ${searchType} LIKE '%${searchValue}%'
+				</if>
+				<if test="ordTyp != null and !ordTyp.equals('')">
+					AND A.ORD_TYP = #{ordTyp}
+				</if>
+				<if test="prjctCd != null and !prjctCd.equals('')">
+					AND A.PRJCT_CD LIKE #{prjctCd}
+				</if>
+				<if test="prjctNm != null and !prjctNm.equals('')">
+					AND A.PRJCT_NM LIKE '%${prjctNm}%'
+				</if>
+				<if test="taxivcCoprt != null and !taxivcCoprt.equals('')">
+					AND A.COPRT_CD = #{taxivcCoprt}
+				</if>
+				<if test="useYn != null and !useYn.equals('')">
+					AND A.USE_YN = #{useYn}
+				</if>
+				<if test="prdtGrp != null and !prdtGrp.equals('')">
+					AND A.PRJCT_CD IN (SELECT DISTINCT PRJCT_CD          -- 제품 구분을 통해 프로젝트 조회
+								 		 FROM TB_SD05D01
+									   WHERE PRDT_DIV IN (SELECT DISTINCT PRDT_DIV
+															FROM TB_BM01M01
+														   WHERE PRDT_GRP = #{prdtGrp}) --제품 그룹을 통해 제품 구분 조회
+								)
+				</if>
+				ORDER BY  A.STRT_DT DESC
+			) D
+		)
+		WHERE
+			RNUM BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>
+	
+	<select id="selectPrjInfo" parameterType="Map" resultType="camelMap">
+		SELECT T.CO_CD
+			, T.PRJCT_CD
+			, T.COPRT_CD
+			, T.TNKEY_YN
+			, T.CLNT_CD
+			, T.MAKR_CD
+			, T.PRJCT_NM
+			, T.PRJCT_ADDR_ZIP
+			, T.PRJCT_ADDR
+			, T.PRJCT_ADDR_SUB
+			, T.PRJCT_MNG_NM
+			, T.TEL_NO
+			, T.LOSS_RATE
+			, T.STRT_DT
+			, T.END_DT
+			, TO_NUMBER(T.TOT_WT) / 1000 AS TOT_WT
+			, T.MNG_ID
+			, T.ODR_NO
+			, T.ODR_DT
+			, T.USE_YN
+			, T.RMK
+			, T.OUTORD_RMK
+			, T.PRJCT_MES_CD
+			, T.ETC_FIELD1
+			, T.ETC_FIELD2
+			, T.ETC_FIELD3
+			, T.CREAT_ID
+			, T.CREAT_PGM
+			, T.CREAT_DTTM
+			, T.UDT_ID
+			, T.UDT_PGM
+			, T.UDT_DTTM
+			, T.ORD_TYP
+			, T.BILDNG_TYP
+			, T.ENGRK_TYP
+			, T.MAKR_MNG_NM
+			, T.CLNT_EMAIL
+			, T.CLNT_FAX_NO
+			, T.PRCSN_UPR
+			, T.DC_DIV
+			, T.PRDT_UPR
+			, T.CPLR_YN
+			, T.PMNT_MTD_CD
+			, T.SHOP_CLNT_CD
+			, T.SHOP_UPR
+			, T.CTRT_RMK
+			, T.OUTORD_UPR
+			, T.OUTORD_LOSS_RATE
+			, T.OUTORD_MNG_NM
+			, T.OUTORD_TEL_NO
+			, T.OUTORD_FAX_NO
+			, T.WH_CD
+			, T.SALES_AREA_CD
+			, T.PCHS_STRT_DT
+			, T.PCHS_END_DT
+			, T.CLMN_DAY
+			, T.CLMN_RMK
+			, T.CLMN_DIV_CD
+			, T.SCND_WH_CD
+			, T.THRD_WH_CD
+			, T.PCHS_CLNT_CD
+			, T.OUTORD_MNG_ID,
+			(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = T.MAKR_CD) AS MAKR_NM,
+			(SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = T.CO_CD) AS CO_NM,		
+			(SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = T.CLNT_CD) AS CLNT_NM,
+			(SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = T.SHOP_CLNT_CD) AS SHOP_CLNT_NM,
+			MNG_ID AS SALES_MNG,
+			(SELECT NAME FROM TB_CM06M01 WHERE ID = T.MNG_ID) AS MNG_NM, 
+			TO_CHAR(TO_DATE(STRT_DT,'YYYYMMDD'),'YYYY-MM-DD') as STRT_DT2,
+			TO_CHAR(TO_DATE(END_DT,'YYYYMMDD'),'YYYY-MM-DD') as END_DT2,
+			TO_CHAR(CREAT_DTTM,'YYYY-MM-DD') as CREAT_DTTM2 ,
+			TO_CHAR(TO_DATE(T.PCHS_STRT_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS PCHS_STRT_DT2,
+			TO_CHAR(TO_DATE(T.PCHS_END_DT, 'YYYYMMDD'), 'YYYY-MM-DD') AS PCHS_END_DT2,
+            FN_CM05M01_CD_TO_NM(T.CLMN_DIV_CD) AS CLMN_DIV_NM,
+            FN_CM05M01_CD_TO_NM(T.CLMN_DIV_CD) AS CLMN_DIV_NM,
+            (SELECT CLNT_NM FROM TB_BM02M01 BM02 WHERE BM02.CLNT_CD = T.PCHS_CLNT_CD) AS PCHS_CLNT_NM,
+            (SELECT MAX(TNKEY_CF_YN) FROM TB_SD09M01 SD09 WHERE T.PRJCT_CD = SD09.PRJCT_CD ) AS  TNKEY_CF_YN,
+            (SELECT MAX(TNKEY_CF_DT) FROM TB_SD09M01 SD09 WHERE T.PRJCT_CD = SD09.PRJCT_CD ) AS  TNKEY_CF_DT
+		FROM TB_SD05M01 T
+		WHERE PRJCT_CD = #{prjctCd}
+	</select>
+	
+	<select id="selectOrdDetail" parameterType="Map" resultType="camelMap">
+		SELECT TO_CHAR(TO_DATE(REQ_DT,'YYYYMMDD'),'YYYY-MM-DD') AS ORD_REQ_DT
+			  ,B.CLNT_CD AS ORD_CLNT_CD
+			  ,A.WH_CD AS ORD_WH_CD
+ 			  ,A.SCND_WH_CD
+			  ,A.THRD_WH_CD
+			  ,ADDR_MAIN AS ORD_ADDR_MAIN
+			  ,ADDR_SUB AS ORD_ADDR_SUB
+			  ,CONCAT(CONCAT(B.ADDR_MAIN,' '),B.ADDR_SUB) AS ORD_ADDR
+			  ,TO_CHAR(B.ORDRG_PROC_DTTM,'YYYY-MM-DD') AS ORD_ORDRG_PROC_DTTM
+			  ,C.ORDRG_WT AS ORD_ORDRG_WT
+			  ,C.REAL_DLVR_WT AS ORD_REAL_DLVR_WT
+		FROM TB_SD05M01 A, TB_OD01M01 B, TB_OD01D01 C
+		WHERE 1=1
+		  AND A.PRJCT_CD = B.PRJCT_CD
+		  AND B.ORDRG_SEQ = C.ORDRG_SEQ
+		  AND B.PRJCT_CD = #{prjctCd}
+	</select>
+	
+	<select id="selectShipmentDetail" parameterType="Map" resultType="camelMap">
+		SELECT TO_CHAR(TO_DATE(REQ_DT,'YYYYMMDD'),'YYYY-MM-DD') AS SMT_REQ_DT
+			  ,A.WH_CD AS SMT_WH_CD
+			  ,ADDR_MAIN AS SMT_ADDR_MAIN
+			  ,ADDR_SUB AS SMT_ADDR_SUB
+			  ,CONCAT(CONCAT(B.ADDR_MAIN,' '),B.ADDR_SUB) AS SMT_ADDR
+			  ,TO_CHAR(B.SHIP_DTTM,'YYYY-MM-DD') AS SMT_SHIP_DTTM
+			  ,C.SHIP_WT AS SMT_SHIP_WT
+			  ,C.REAL_SHIP_WT AS SMT_REAL_SHIP_WT
+		FROM TB_SD05M01 A, TB_AR01M01 B, TB_AR01D01 C
+		WHERE 1=1
+		AND A.PRJCT_CD = B.PRJCT_CD
+		AND B.SHIP_SEQ = C.SHIP_SEQ
+		  AND B.PRJCT_CD = #{prjctCd}
+	</select>
+	
+	<select id="selectProjectDtl" parameterType="Map" resultType="camelMap">
+	SELECT T.CO_CD
+		 , T.PRJCT_CD
+		 , (SELECT PRJCT_NM FROM TB_SD05M01 WHERE PRJCT_CD = T.PRJCT_CD) AS PRJCT_NM
+		 , T.PRJCT_SEQ
+		 , T.PRDT_DIV PRDT_DIV_CD
+         , FN_CM05M01_CD_TO_NM(T.PRDT_DIV) AS PRDT_DIV_NM
+		 , T.PRDT_STKN PRDT_STKN_CD 
+         , FN_CM05M01_CD_TO_NM(T.PRDT_STKN) AS PRDT_STKN_NM
+		 , T.SIZE_LIST PRDT_SIZE_NM
+		 , T.LOSS_RATE
+		 , T.CPLR_UPR
+	  FROM TB_SD05D01 T
+	 WHERE T.PRJCT_CD = #{prjctCd}
+	</select>
+	
+	<select id="selectProjectClntList" parameterType="Map" resultType="CamelMap">
+		SELECT CLNT_CD, CLNT_NM FROM TB_BM02M01 WHERE 1=1
+		<if test="searchValue != null and !searchValue.equals('')">
+			AND CLNT_CD LIKE '${searchValue}%'
+			AND CLNT_NM LIKE '${searchType}%'
+		</if>
+	</select>
+	
+	<select id="selectProjectKeyList" parameterType="Map" resultType="CamelMap">
+		SELECT * FROM TB_SD05M01 WHERE 1=1 AND PRJCT_CD = #{prjctCd}
+	</select>
+	
+	<update id="updateProject" parameterType="Map">
+		UPDATE TB_SD05M01 
+			SET 
+			 COPRT_CD         = #{coprtCd}
+			, TNKEY_YN         = #{tnkeyYn}
+			, CLNT_CD          = #{clntCd}
+			, MAKR_CD          = #{makrCd}
+			, PRJCT_NM         = #{prjctNm}
+			, PRJCT_ADDR_ZIP   = #{prjctAddrZip}
+			, PRJCT_ADDR       = #{prjctAddr}
+			, PRJCT_ADDR_SUB   = #{prjctAddrSub}
+			, PRJCT_MNG_NM     = #{prjctMngNm}
+			, TEL_NO           = #{telNo}
+			, LOSS_RATE        = #{lossRate, jdbcType=VARCHAR}
+			, STRT_DT          = REPLACE(#{strtDt}, '-', '')
+			, END_DT           = REPLACE(#{endDt}, '-', '')
+			, TOT_WT           = TO_NUMBER(#{totWt}) * 1000
+			, MNG_ID           = #{mngId}
+			, USE_YN           = #{useYn}
+			, RMK              = #{rmk}
+			, OUTORD_RMK       = #{outordRmk}
+			, ORD_TYP          = #{ordTyp}                
+			, BILDNG_TYP       = #{bildngTyp}             
+			, ENGRK_TYP        = #{engrkTyp}              
+			, MAKR_MNG_NM      = #{makrMngNm}             
+			, CLNT_EMAIL       = #{clntEmail}             
+			, CLNT_FAX_NO      = #{clntFaxNo}             
+			, PRCSN_UPR        = #{prcsnUpr, jdbcType=VARCHAR}              
+			, DC_DIV           = #{dcDiv}                 
+			, PRDT_UPR         = #{prdtUpr}               
+			, CPLR_YN          = #{cplrYn}                
+			, PMNT_MTD_CD      = #{pmntMtdCd}             
+			, SHOP_CLNT_CD     = #{shopClntCd}            
+			, SHOP_UPR         = #{shopUpr}               
+			, CTRT_RMK         = #{ctrtRmk}            
+			, OUTORD_UPR       = #{outordUpr, jdbcType=VARCHAR}             
+			, OUTORD_LOSS_RATE = #{outordLossRate, jdbcType=VARCHAR}       
+			, OUTORD_MNG_ID    = #{outordMngId}           
+			, OUTORD_MNG_NM    = #{outordMngNm}           
+			, OUTORD_TEL_NO    = #{outordTelNo} 
+			, OUTORD_FAX_NO    = #{outordFaxNo}		
+			, WH_CD            = #{whCd}        	
+			, SCND_WH_CD       = #{scndWhCd}        	
+			, THRD_WH_CD       = #{thrdWhCd}            
+			, SALES_AREA_CD    = #{salesAreaCd} 
+			, UDT_ID           = #{userId}		 
+			, UDT_PGM          = #{pgmId}							
+			, UDT_DTTM         = SYSDATE	
+			, PCHS_STRT_DT     = REPLACE(#{pchsStrtDt}, '-', '')
+			, PCHS_END_DT      = REPLACE(#{pchsEndDt}, '-', '')	
+			, CLMN_DAY         = #{clmnDay}
+			, CLMN_RMK         = #{clmnRmk}
+			, CLMN_DIV_CD      = #{clmnDivCd}
+			, PCHS_CLNT_CD     = #{pchsClntCd}
+		WHERE PRJCT_CD         = #{prjctCd}
+		  AND CO_CD            = #{coCd}
+	</update>
+	
+	<update id="updatePrjctDtl" parameterType="Map">
+		UPDATE TB_SD05D01
+		   SET PRDT_DIV  = #{prdtDivCd}
+			 , PRDT_STKN = #{prdtStknCd}
+			 , SIZE_LIST = #{prdtSizeNm}
+			 , LOSS_RATE = #{lossRate}
+			 , CPLR_UPR  = #{cplrUpr} 
+			 , UDT_ID    = #{userId}		 
+			 , UDT_PGM   = #{pgmId}							
+			 , UDT_DTTM  = SYSDATE	
+		 WHERE CO_CD     = #{coCd}
+		   AND PRJCT_CD  = #{prjctCd}
+		   AND PRJCT_SEQ = #{prjctSeq}
+	</update>
+	
+	<delete id="deleteProjectDtl" parameterType="Map">
+		DELETE FROM TB_SD05D01
+		 WHERE CO_CD     = #{coCd}
+		   AND PRJCT_CD  = #{prjctCd}
+		   <if test= "prjctSeq != null and !prjctSeq.equals('')">
+		   AND PRJCT_SEQ = #{prjctSeq}
+		   </if>
+	</delete>
+	
+	<insert id="insertProject" parameterType="Map">
+		<selectKey keyProperty="prjctCd" resultType="String" order="BEFORE">
+			SELECT TO_CHAR(SYSDATE, 'YYYYMM')||LPAD(TB_SD05M01_SQ01.NEXTVAL,3,0) FROM DUAL
+		</selectKey>
+		INSERT INTO TB_SD05M01
+			(CO_CD
+			, PRJCT_CD
+			, COPRT_CD
+			, TNKEY_YN
+			, CLNT_CD
+			, MAKR_CD
+			, PRJCT_NM
+			, PRJCT_ADDR_ZIP
+			, PRJCT_ADDR
+			, PRJCT_ADDR_SUB
+			, PRJCT_MNG_NM
+			, TEL_NO
+			, LOSS_RATE
+			, STRT_DT
+			, END_DT
+			, TOT_WT
+			, MNG_ID
+			, USE_YN
+			, RMK
+			, OUTORD_RMK
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+			, ORD_TYP
+			, BILDNG_TYP
+			, ENGRK_TYP
+			, MAKR_MNG_NM
+			, CLNT_EMAIL
+			, CLNT_FAX_NO
+			, PRCSN_UPR
+			, DC_DIV
+			, PRDT_UPR
+			, CPLR_YN
+			, PMNT_MTD_CD
+			, SHOP_CLNT_CD
+			, SHOP_UPR
+			, CTRT_RMK
+			, OUTORD_UPR
+			, OUTORD_LOSS_RATE
+			, OUTORD_MNG_ID
+			, OUTORD_MNG_NM
+			, OUTORD_TEL_NO
+			, OUTORD_FAX_NO
+			, WH_CD
+			, SCND_WH_CD
+			, THRD_WH_CD
+			, SALES_AREA_CD
+			, PCHS_STRT_DT
+			, PCHS_END_DT
+			, CLMN_DAY
+			, CLMN_RMK
+			, CLMN_DIV_CD
+			, PCHS_CLNT_CD
+			)
+		VALUES 
+		(
+			  #{coCd}
+			, #{prjctCd}
+			, #{coprtCd}
+			, 'N'
+			, #{clntCd}
+			, #{makrCd}
+			, #{prjctNm}
+			, #{prjctAddrZip}
+			, #{prjctAddr}
+			, #{prjctAddrSub}
+			, #{prjctMngNm}
+			, #{telNo}
+		  , #{lossRate, jdbcType=VARCHAR}
+			, REPLACE(#{strtDt}, '-', '')
+			, REPLACE(#{endDt}, '-', '')
+		  , TO_NUMBER(#{totWt}) * 1000
+			, #{mngId}
+			, #{useYn}
+			, #{rmk}
+			, #{outordRmk}
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+			, #{ordTyp}
+			, #{bildngTyp}
+			, #{engrkTyp}
+			, #{makrMngNm}
+			, #{clntEmail}
+			, #{clntFaxNo}
+			, #{prcsnUpr, jdbcType=VARCHAR}
+			, #{dcDiv}
+			, #{prdtUpr}
+			, #{cplrYn}
+			, #{pmntMtdCd}
+			, #{shopClntCd}
+			, #{shopUpr}
+			, #{ctrtRmk}
+		    , #{outordUpr, jdbcType=VARCHAR}
+		    , #{outordLossRate, jdbcType=VARCHAR}
+			, #{outordMngId}
+			, #{outordMngNm}
+			, #{outordTelNo}
+			, #{outordFaxNo}
+			, #{whCd}
+			, #{scndWhCd}
+			, #{thrdWhCd}
+			, #{salesAreaCd}
+			, REPLACE(#{pchsStrtDt}, '-', '')
+			, REPLACE(#{pchsEndDt}, '-', '')
+			, #{clmnDay}
+			, #{clmnRmk}
+			, #{clmnDivCd}
+			, #{pchsClntCd}
+		)
+	</insert>
+	
+	<insert id="insertProjectDtl" parameterType="Map">
+		<selectKey keyProperty="prjctSeq" resultType="String" order="BEFORE">
+			SELECT TB_SD05M01_SQ01.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TB_SD05D01
+		(
+			  CO_CD
+			, PRJCT_CD
+			, PRJCT_SEQ
+			, PRDT_DIV
+			, PRDT_STKN
+			, SIZE_LIST
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+			, LOSS_RATE
+            , CPLR_UPR
+		)
+		VALUES
+		(
+			  #{coCd}
+			, #{prjctCd}
+			, #{prjctSeq}
+			, #{prdtDivCd}
+			, #{prdtStknCd}
+			, #{prdtSizeNm}
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+			, #{lossRate}
+            , #{cplrUpr}
+		)
+	</insert>
+	
+	<select id="selectConfirmCount" parameterType="Map" resultType="int">
+		SELECT COUNT(B.PRJCT_CD) + COUNT(C.PRJCT_CD) + COUNT(D.PRJCT_CD) + COUNT(E.PRJCT_CD) CNT 
+		FROM TB_SD05M01 A,
+			 TB_AR01M01 B, 
+			 TB_AR03M01 C,
+			 TB_OD01M01 D,
+			 TB_SD04M01 E
+		WHERE A.PRJCT_CD = B.PRJCT_CD(+)
+		  AND A.PRJCT_CD = C.PRJCT_CD(+)
+		  AND A.PRJCT_CD = D.PRJCT_CD(+)
+		  AND A.PRJCT_CD = E.PRJCT_CD(+)
+		  AND A.PRJCT_CD = #{prjctCd}
+	</select>
+	
+	<update id="deleteProject" parameterType="Map">
+		UPDATE TB_SD05M01 
+		SET USE_YN = 'N'
+		WHERE PRJCT_CD = #{prjctCd}
+	</update>
+	
+	<select id="selectPrdtDivCd" parameterType="Map" resultType="camelMap">
+		SELECT CODE_ID PRDT_DIV_CD, CODE_NM PRDT_DIV_NM
+		  FROM TB_CM05M01
+		 WHERE CODE_KIND = 'PRDTDIV'
+		   AND USE_YN = 'Y'
+		ORDER BY CODE_ID
+	</select>
+	
+	<select id="prdtDivCombo" parameterType="Map" resultType="camelMap">
+		SELECT FN_CM05M01_CD_TO_NM(PRDT_STKN) PRDT_STKN_NM , PRDT_STKN
+		  FROM TB_BM01M01
+		 WHERE PRDT_DIV = #{prdtDivCd}
+		   AND PRDT_STKN IS NOT NULL
+		   AND FN_CM05M01_CD_TO_NM(PRDT_STKN) IS NOT NULL
+		GROUP BY PRDT_STKN
+	</select>
+	
+	<select id="prdtSpecCombo" parameterType="Map" resultType="camelMap">
+		SELECT PRDT_SPEC
+		  FROM TB_BM01M01
+		 WHERE PRDT_DIV = 'PRDTDIV11'
+		 <if test= "prdtDivCd != null and !prdtDivCd.equals('')">
+		 AND PRDT_DIV = #{prdtDivCd}
+		 </if>
+		 <if test= "prdtStkn != null and !prdtStkn.equals('')">
+	     AND PRDT_STKN = #{prdtStkn} 
+		 </if>
+		 AND PRDT_SIZE IS NOT NULL
+		GROUP BY PRDT_SPEC
+		ORDER BY PRDT_SPEC
+	</select>
+	
+	<select id="selectMakerPchsClntCd" parameterType="Map" resultType="camelMap">
+		SELECT CM05.CODE_ETC AS CLNT_CD 
+		     , BM02.CLNT_NM
+		  FROM TB_CM05M01 CM05
+		  INNER JOIN TB_BM02M01 BM02 ON BM02.CLNT_CD = CM05.CODE_ETC
+		 WHERE CM05.CODE_ID = #{makrCd}
+	</select>
+	
+	<select id="selectPrjtMngTernKeyCount" parameterType="Map" resultType="int">
+	 	SELECT 
+	 		COUNT(*) 
+	 	 FROM (
+				SELECT
+						D.CO_CD
+				FROM(		
+				SELECT
+					  SD05.CO_CD 
+					,SD05.CLNT_CD 
+					,BM02.CLNT_NM
+					,SD05.PRJCT_CD 
+					,SD05.PRJCT_NM
+			   FROM TB_SD05M01 SD05
+			   LEFT JOIN  TB_BM02M01 BM02 ON BM02.CLNT_CD  = SD05.CLNT_CD
+			   LEFT JOIN  TB_CM06M01 CM06 ON CM06.ID       = SD05.MNG_ID
+				 <where>
+					 <if test= "coCd != null and !coCd.equals('')">
+			 			AND SD05.CO_CD = #{coCd}
+					 </if>
+					 <if test= "whCd != null and !whCd.equals('')">
+			 			AND SD05.WH_CD = #{whCd}
+					 </if>
+					 <if test= "clntCd != null and !clntCd.equals('')">
+			 			AND SD05.CLNT_CD = #{clntCd}
+					 </if>
+					 <if test= "clntNm != null and !clntNm.equals('')">
+			 			AND BM02.CLNT_NM LIKE '%${clntNm}%'
+					 </if>
+					<if test="searchValue != null and !searchValue.equals('') and searchType != null and !searchType.equals('')">
+						AND ${searchType} LIKE '%${searchValue}%'
+					</if>
+					<if test="ordTyp != null and !ordTyp.equals('')">
+						AND SD05.ORD_TYP = #{ordTyp}
+					</if>
+					<if test="taxivcCoprt != null and !taxivcCoprt.equals('')">
+						AND SD05.COPRT_CD = #{taxivcCoprt}
+					</if>
+					<if test="salesMng != null and !salesMng.equals('')">
+						AND SD05.MNG_ID = #{salesMng}
+					</if>
+					<if test= "salesMngNm != null and !salesMngNm.equals('')">
+			 			AND CM06.NAME LIKE '%${salesMngNm}%'
+					 </if>
+					<if test= "prjctNm != null and !prjctNm.equals('')">
+			 			AND SD05.PRJCT_NM LIKE '%${prjctNm}%'
+					</if>
+			   </where>
+				GROUP BY SD05.CO_CD 
+					,SD05.CLNT_CD 
+					,BM02.CLNT_NM
+					,SD05.PRJCT_CD 
+					,SD05.PRJCT_NM
+					,SD05.PRCSN_UPR 
+					,SD05.WH_CD 
+                    ,SD05.PCHS_CLNT_CD 
+					,SD05.MNG_ID 
+					,CM06.NAME
+					,SD05.TNKEY_YN     
+					,SD05.TOT_WT
+			) D
+		)
+	</select>
+	
+	<select id="selectPrjtMngTernKey" parameterType="Map" resultType="CamelMap">
+		SELECT *
+			FROM(
+				SELECT
+						ROWNUM AS RNUM, D.*
+						,FN_CM05M01_CD_TO_NM(D.CO_CD) AS CO_NM
+						,TO_NUMBER(D.TOT_WT) / 1000 AS TOT_WT
+						,FN_CM05M01_CD_TO_NM(D.WH_CD) AS WH_NM
+	                    ,(SELECT CLNT_NM FROM TB_BM02M01 BM02 WHERE BM02.CLNT_CD = D.PCHS_CLNT_CD) AS PCHS_CLNT_NM
+	                    ,(SELECT MAX(TNKEY_CF_YN) FROM TB_SD09M01 SD09 WHERE D.PRJCT_CD = SD09.PRJCT_CD ) AS  TNKEY_CF_YN
+						,NVL(D.TOT_WT,0) - NVL(D.TOT_CELL,0) AS TOT_REM 
+				FROM(		
+				SELECT
+					 SD05.CO_CD 
+					,SD05.CLNT_CD 
+					,BM02.CLNT_NM
+					,SD05.PRJCT_CD 
+					,SD05.PRJCT_NM
+					,SD05.PRCSN_UPR 
+					,SD05.WH_CD 
+                    ,SD05.PCHS_CLNT_CD 
+					,SD05.MNG_ID 
+					,CM06.NAME AS MNG_NM
+					,SD05.TNKEY_YN     
+					,SD05.TOT_WT AS TOT_WT
+	                ,SUM(DECODE(TRST_DT,'20210701',AR02.REAL_TRST_WT,0 )) AS REAL_TRST_WT   -- 거래날짜 기준날짜 자재 중량
+                    ,SUM(DECODE(TRST_DT,'20210701',AR02.PRCSN_WT,0 ))     AS PRCSN_WT       -- 거래날짜 기준날짜  가공 중량
+					,SUM(AR02.REAL_TRST_WT)/1000  AS TOT_CELL --잔량
+			   FROM TB_SD05M01 SD05
+			   LEFT JOIN  TB_AR02M01 AR02 ON AR02.PRJCT_CD = SD05.PRJCT_CD and AR02.SELPCH_CD='SELPCH2'
+			   LEFT JOIN  TB_BM02M01 BM02 ON BM02.CLNT_CD  = SD05.CLNT_CD
+			   LEFT JOIN  TB_CM06M01 CM06 ON CM06.ID       = SD05.MNG_ID
+			   <where>
+					 <if test= "coCd != null and !coCd.equals('')">
+			 			AND SD05.CO_CD = #{coCd}
+					 </if>
+					 <if test= "whCd != null and !whCd.equals('')">
+			 			AND SD05.WH_CD = #{whCd}
+					 </if>
+					 <if test= "clntCd != null and !clntCd.equals('')">
+			 			AND SD05.CLNT_CD = #{clntCd}
+					 </if>
+					 <if test= "clntNm != null and !clntNm.equals('')">
+			 			AND BM02.CLNT_NM LIKE '%${clntNm}%'
+					 </if>
+					<if test="searchValue != null and !searchValue.equals('') and searchType != null and !searchType.equals('')">
+						AND ${searchType} LIKE '%${searchValue}%'
+					</if>
+					<if test="ordTyp != null and !ordTyp.equals('')">
+						AND SD05.ORD_TYP = #{ordTyp}
+					</if>
+					<if test="taxivcCoprt != null and !taxivcCoprt.equals('')">
+						AND SD05.COPRT_CD = #{taxivcCoprt}
+					</if>
+					<if test="salesMng != null and !salesMng.equals('')">
+						AND SD05.MNG_ID = #{salesMng}
+					</if>
+					<if test= "salesMngNm != null and !salesMngNm.equals('')">
+			 			AND CM06.NAME LIKE '%${salesMngNm}%'
+					 </if>
+					<if test= "prjctNm != null and !prjctNm.equals('')">
+			 			AND SD05.PRJCT_NM LIKE '%${prjctNm}%'
+					</if>
+			   </where>
+				 GROUP BY SD05.CO_CD 
+					,SD05.CLNT_CD 
+					,BM02.CLNT_NM
+					,SD05.PRJCT_CD 
+					,SD05.PRJCT_NM
+					,SD05.PRCSN_UPR 
+					,SD05.WH_CD 
+                    ,SD05.PCHS_CLNT_CD 
+					,SD05.MNG_ID 
+					,CM06.NAME
+					,SD05.TNKEY_YN     
+					,SD05.TOT_WT
+			) D
+			ORDER BY  D.MNG_NM DESC, D.PRJCT_NM DESC
+		)
+		WHERE 
+			RNUM BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>
+	<select id="selectChkOrdrgYn" parameterType="Map" resultType="int">
+	   SELECT COUNT(*)
+		FROM TB_OD01M01 T
+		WHERE PRJCT_CD = #{prjctCd}
+		AND ORDRG_YN = 'N'
+	</select>	
+</mapper>

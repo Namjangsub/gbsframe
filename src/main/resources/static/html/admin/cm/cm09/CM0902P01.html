@@ -1,0 +1,281 @@
+<style>
+	.table tr th {
+		text-align: center;
+	}
+	
+	.modal_bottom {
+		position: fixed;
+		bottom: 5px;
+		width: 100%;
+	}
+</style>
+<div class="form-group">
+	<input type="file" id="notiFile" style="display:none" multiple="multiple" onchange="setNotiFile(this);"/>
+	<form id="popForm">
+		<table class="popup_table">
+			<colgroup>
+				<col style="width: 15%;">
+				<col style="width: 85%;">
+			</colgroup>
+			<tbody>
+				<tr>
+					<th>제목</th>
+					<td>
+						<input type="text" class="form-control input-sm" id="notiTitle" name="notiTitle" required>
+					</td>
+				</tr>
+				<tr>
+					<th>내용</th>
+					<td>
+						<textarea rows="8" cols="78" id="notiCnts" name="notiCnts"></textarea>
+					</td>
+				</tr>
+				<tr>
+					<th>
+						<button type="button" class="btn btn-primary btn-sm" style="height: 25px; line-height: 15px;" onclick="notiFile.click();">첨부파일</button>
+					</th>
+					<td>
+						<div data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 150px; width: 100%"></div>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+		<table class="popup_table"> 
+			<colgroup>
+				<col style="width: 17%;">
+				<col style="width: 33%;">
+				<col style="width: 17%;">
+				<col style="width: 33%;">
+			</colgroup>
+			<tbody>
+				<tr>
+					<th>팝업 기능</th>
+					<td>
+						<input type="radio" name="popupYn" value="N" checked="checked">사용 안함
+						<input type="radio" name="popupYn" value="Y">사용
+					</td>
+					<th>사용 여부</th>
+					<td>
+						<input type="radio" name="useYn" value="N" checked="checked">사용 안함
+						<input type="radio" name="useYn" value="Y">사용
+					</td>
+				</tr>
+				<tr>
+					<th>만료 기능</th>
+					<td>
+						<input type="radio" name="exprtnYn" value="N" checked="checked">사용 안함
+						<input type="radio" name="exprtnYn" value="Y">사용
+					</td>
+					<th>만료일</th>
+					<td>
+						<div class="input-group date" id="exprtnDatePicker">
+		                    <input type="text" class="form-control input-sm" id="exprtnDt" name="exprtnDt" style="text-align: center;"/>
+		                    <span class="input-group-addon" style="padding: 0px 5px;">
+		                        <span class="glyphicon glyphicon-calendar" style="cursor: pointer;"></span>
+		                    </span>
+		                </div>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+		<input type="hidden" id="notiKey" name="notiKey">
+		<input type="hidden" id="userId" name="userId">
+		<input type="hidden" id="pgmId" name="pgmId" value="CM0902P01">
+		<input type="hidden" id="coCd" name="coCd">
+	</form>
+</div>
+<div class="bottom_btn">
+	<button type="button" class="btn btn-default btn-sm" id="actionBtn"></button>
+	<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫기</button>
+</div>
+<script type="text/javascript">
+	//등록시 직급코드 중복체크 여부
+	var isChecked = false;
+	var notiFileArr = [];
+	var deleteFileArr = [];
+	var fileGridView = {
+		initView: function(){
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				target: $('[data-ax5grid="file-grid"]'),
+				showLineNumber: true,
+				showRowSelector: false,
+	        	multipleSelect: false,
+				header: {selector: false},
+				body: {
+		        	onClick: function () {
+		                this.self.select(this.dindex);
+		            },
+		            onDBLClick: function () {
+		            	downloadFile(this.dindex);
+		            },
+		        	},
+				columns: [
+						{key: "fileName", label: "파일명", width: 240},
+						{key: "fileType", label: "파일타입", width: 80, align: "center"},
+						{key: "fileSize", label: "파일크기", width: 80,  align: "right", formatter: "money"},
+						{key:"fileDelete", label: "삭제", width:50,
+							formatter:function() {return '<button type="button" onclick="deleteFile('+this.dindex+');">삭제</button>';}
+						}
+				]
+			});
+		},
+		setData: function(){
+			var targetObj = this.target;
+			targetObj.setData({
+				list: notiFileArr,
+				page : {
+					totalElements : notiFileArr.length
+				}
+			});
+		}
+	}
+	
+	$(document).ready(function() {
+		fileGridView.initView();
+		$("input[name='popupYn']").on("change", function(){
+			if($(this).val() == "N") {
+				$('input:radio[name=exprtnYn]:input[value="N"]').prop("checked", true);
+			} 
+		});
+		$("input[name='exprtnYn']").on("change", function(){
+			if($("input[name='popupYn']:checked").val() == "N") {
+				$('input:radio[name=exprtnYn]:input[value="N"]').prop("checked", true);
+			} 
+		});
+		
+		var actionType = modalStack.last().paramObj.actionType;
+		if(actionType == "C"){
+			$('#actionBtn').on("click", function(){insertNoti();});
+			$('#actionBtn').text("등록");
+		} else if(actionType == "U") {
+			selectNotiInfo();
+			$('#actionBtn').on("click", function(){updateNoti();});
+			$('#actionBtn').text("수정");
+		}
+	});
+	
+	// 만료일 데이트피커 set
+	$('#exprtnDatePicker').datepicker({
+		format: "yyyy-mm-dd",
+		language : "ko",
+		autoclose : true
+	});
+	
+	function insertNoti() {
+		if(inputValidation($('input[required]'))) {
+			var formData = makeFormData();
+			filePostAjax("/admin/cm/cm09/insertNoti", formData, function(data){
+				alert(data.resultMessage);           
+				gridView.setData(0);
+				modalStack.close();
+			});
+		}
+	}
+
+	function updateNoti() {
+		debugger;
+		if(inputValidation($('input[required]'))){
+			var formData = makeFormData();
+			filePutAjax("/admin/cm/cm09/updateNoti", formData, function(data){
+				alert(data.resultMessage);
+				if(data.resultCode == 200){
+					gridView.setData(0);
+					modalStack.close();
+				}
+			});
+		}
+	}
+	
+	function selectNotiInfo(){
+		var row = gridView.target.getList("selected")[0];
+		var paramObj = {"notiKey": row.notiKey};
+		postAjax("/admin/cm/cm09/selectNotiInfo", paramObj, null, function(data){
+			setNotiInfo(data.result.notiInfo);
+			setNotiFileInfo(data.result.fileList);
+		});
+	}
+	
+	
+	function makeFormData() {
+		$("#userId").val(jwt.userId)              ;
+		$("#popForm").find("#coCd").val($('#mainForm').find("#coCd option:selected").val());
+		$("#exprtnDt").val($("#exprtnDt").val().replace(/-/g, ""));
+		var formData = new FormData($("#popForm")[0]);
+		// 첨부파일 추가
+		$.each(notiFileArr, function(idx, obj){
+			// 신규파일만 추가
+			if(obj.fileKey == 0){
+				formData.append("files", obj.file);
+			}
+		});
+		
+		var actionType = modalStack.last().paramObj.actionType;
+		if(actionType == "U"){
+			formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
+		}
+		
+		return formData;
+	}
+	
+	function setNotiInfo(notiInfo){
+		$.each(notiInfo, function(key, value){
+			$('#'+key).val(value);
+		});
+		$('input:radio[name=popupYn]:input[value=' + notiInfo.popupYn + ']').prop("checked", true);
+		$('input:radio[name=useYn]:input[value=' + notiInfo.useYn + ']').prop("checked", true);
+		$('input:radio[name=exprtnYn]:input[value=' + notiInfo.exprtnYn + ']').prop("checked", true);
+	}
+	
+	function downloadFile(idx) {
+		postAjax("/admin/cm/cm08/fileDownInfo", {"fileKey": notiFileArr[idx].fileKey}, null, function(data){
+			var fileInfo = data.fileInfo;
+			var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName , "UTF-8");
+			location.href = "/admin/cm/cm08/fileDownload?filePath="+filePath;
+		});
+	}
+	
+	function setNotiFileInfo(fileInfo) {
+		// 첨부파일 set
+		debugger;
+		$.each(fileInfo, function(idx, obj){
+			notiFileArr.push({
+				'fileKey' : obj.fileKey,
+		      	'fileName' : obj.fileName,
+		      	'fileType' : obj.fileType,
+		      	'fileSize' : obj.fileSize,
+		      	'file' : obj
+			});
+		});
+		
+		// 첨부파일 그리드 set
+		fileGridView.setData();
+	}
+	
+	function setNotiFile(elem){
+		var tempFiles = elem.files;
+		$.each(tempFiles, function(idx, obj){
+			var testArr = obj.name.split(".");
+			notiFileArr.push({
+				'fileKey' : 0,
+		      	'fileName' : obj.name,
+		      	'fileType' : testArr[testArr.length-1],
+		      	'fileSize' : obj.size,
+		      	'file' : obj
+			});
+		});
+		fileGridView.setData();
+		$(elem).val("");
+	}
+	
+	function deleteFile(rowIndex) {
+		fileGridView.target.removeRow(rowIndex);
+		
+		if(notiFileArr[rowIndex].fileKey){
+		// 기 등록되어 있는 파일 삭제시
+			deleteFileArr.push(notiFileArr[rowIndex].fileKey);
+		}
+		
+		notiFileArr.splice(rowIndex, 1);
+	}
+</script>

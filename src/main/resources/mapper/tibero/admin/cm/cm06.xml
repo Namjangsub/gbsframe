@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.admin.cm.cm06.mapper.CM06Mapper">
+	
+	<select id="selectUserCount" resultType="int">
+		SELECT
+			COUNT(*)
+		FROM
+			TB_CM06M01
+		WHERE
+			ID = #{userId}
+	</select>
+	
+	<select id="selectUserList" resultType="CamelMap">
+		SELECT
+			ID,
+			EMP_NO,
+			NAME,
+			(SELECT LEVEL_NM FROM TB_CM07M01 WHERE LEVEL_CD = U.LEVEL_CD) AS LEVEL_NM,
+			EMAIL,
+			TEL_NO,
+			USE_YN,
+			TO_CHAR(CREAT_DTTM, 'yyyy-MM-dd') CREAT_DTTM,
+			TO_CHAR(UDT_DTTM, 'yyyy-MM-dd') UDT_DTTM,
+			MNG_CO_CD,
+			FN_CM05M01_CD_TO_NM(MNG_CO_CD) MNG_CO_CD_NM
+		FROM
+			TB_CM06M01 U
+		WHERE 1=1
+		<if test="deptId !='' and deptId != null">
+			AND DEPT_ID = #{deptId}
+		</if>
+		<if test='useYn !="" and useYn != null'>
+			AND USE_YN = #{useYn}
+		</if>
+		<if test='searchValue !="" and searchValue != null'>
+			AND NAME = #{searchValue}
+		</if>
+	</select>
+	
+	<select id="selectUserInfo" resultType="CamelMap">
+		SELECT
+			ID,
+			EMP_NO, 
+			NAME, 
+			DEPT_ID,
+			(SELECT DEPT_NM FROM TB_CM04M01 WHERE DEPT_ID = U.DEPT_ID) DEPT_NM,
+			LEVEL_CD,
+			EMAIL, 
+			TEL_NO,
+			AUTH_INFO,
+			TO_CHAR(ENTER_DT, 'yyyy-MM-dd') ENTER_DT,
+			TO_CHAR(LEAVE_DT, 'yyyy-MM-dd') LEAVE_DT,
+			USE_YN,
+			TO_CHAR(CREAT_DTTM, 'yyyy-MM-dd') CREAT_DTTM,
+			TO_CHAR(UDT_DTTM, 'yyyy-MM-dd') UDT_DTTM,
+			MNG_CO_CD,
+			FN_CM05M01_CD_TO_NM(MNG_CO_CD) MNG_CO_CD_NM,
+			PASS_ERR_CNT,
+			PWD_DTTM,
+			SALES_AREA,
+  	        NVL((SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = 'PASSYN'),'N') PASS_YN , --암호규칙사용여부
+		    <![CDATA[CASE WHEN (PWD_DTTM < ADD_MONTHS(SYSDATE, (-1 * NVL((SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = 'PASSCHG'),9999)))) THEN 1 ELSE 0 END PASS_CHG,]]>  --암호변경주기(월)
+		    NVL((SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = 'PASSERRCNT'),10) PASS_CHK_CNT --암호오류허용횟수
+		FROM
+			TB_CM06M01 U
+		WHERE
+			ID = #{userId}
+	</select>
+	
+	<select id="selectUserTree" resultType="CamelMap">
+		SELECT
+			A.ID AS ID,
+			A.NAME AS TEXT,
+			A.DEPT_ID AS PARENT,
+			'person' AS TYPE,
+			B.DEPT_NM
+		FROM
+			TB_CM06M01 A 
+			INNER JOIN TB_CM04M01 B on A.DEPT_ID = B.DEPT_ID	
+		<where>
+			<if test="useYn != null and !useYn.equals('')">
+				A.USE_YN = #{useYn}
+			</if>
+			<if test="coCd != null and !coCd.equals('')">
+				AND CO_CD = #{coCd}
+			</if>
+		</where>
+	</select>
+	
+	<insert id="insertUser">
+		INSERT INTO TB_CM06M01 (
+			ID,
+			PASSWORD, 
+			EMP_NO, 
+			NAME, 
+			CO_CD,
+			DEPT_ID,
+			LEVEL_CD,
+			EMAIL, 
+			AUTH_INFO,
+			ENTER_DT,
+			USE_YN,
+			CREAT_ID,  
+			CREAT_PGM,  
+			CREAT_DTTM, 
+			UDT_DTTM,
+			TEL_NO,
+			MNG_CO_CD,
+			PASS_ERR_CNT,
+			PWD_DTTM,
+			SALES_AREA 	
+		)VALUES(
+			#{userId},
+			#{password},
+			#{empNo},
+			#{userNm},
+			SUBSTR(#{deptId}, 1, 3),
+			#{deptId},
+			#{levelCd},
+			#{email},
+			#{authInfo},
+			#{enterDt},
+			#{useYn},
+			'admin',
+			'admin',
+			SYSDATE,
+			SYSDATE,
+			#{telNo},
+			#{mngCoCd},
+			0,
+			SYSDATE,
+			#{salesArea}
+		)
+	</insert>
+	
+	<insert id="insertUserOauth">
+		INSERT INTO OAUTH_CLIENT_DETAILS 
+		(
+			CLIENT_ID,
+		    RESOURCE_IDS,
+		    CLIENT_SECRET,
+		    SCOPE,
+		    AUTHORIZED_GRANT_TYPES,
+		    WEB_SERVER_REDIRECT_URI,
+		    AUTHORITIES,
+		    ACCESS_TOKEN_VALIDITY,
+		    REFRESH_TOKEN_VALIDITY,
+		    ADDITIONAL_INFORMATION,
+		    AUTOAPPROVE
+		)
+		VALUES
+		(
+			#{userId},
+		    '',
+		    #{password},
+		    'read,write',
+		    'authorization_code,password,implicit,refresh_token',
+		    'http://localhost/static/index.html',
+		    'ROLE_USER',
+		    36000,
+		    2592000,
+		    '',
+		    ''
+		);
+	</insert>
+	
+	<insert id="insertPgmHistory">
+		<selectKey keyProperty="hisNo" resultType="String" order="BEFORE">
+			SELECT TB_CM06H02_SQ01.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TB_CM06H02 
+		(
+			HIS_NO,
+			ID,
+		    NAME,
+		    PGM_ID,
+		    ACCS_DT
+		)
+		VALUES
+		(
+			#{hisNo},
+			#{id},
+		    #{name},
+		    #{pgmId},
+		    SYSDATE	
+		)
+	</insert>
+	
+	<update id="updateUser">
+		UPDATE
+			TB_CM06M01
+		SET
+			EMP_NO = #{empNo},
+			NAME = #{userNm},
+			CO_CD = SUBSTR(#{deptId}, 1, 3),
+			DEPT_ID = #{deptId},
+			<if test="levelCd !='' and levelCd != null">
+			LEVEL_CD = #{levelCd},
+			</if>
+			EMAIL = #{email},
+			AUTH_INFO = #{authInfo},
+			ENTER_DT = #{enterDt},
+			USE_YN = #{useYn},
+			UDT_DTTM = SYSDATE,
+			TEL_NO = #{telNo},
+			<if test="leaveDt !='' and leaveDt != null">
+			LEAVE_DT = NVL(#{leaveDt},NULL),
+			</if>
+			<if test="salesArea !='' and salesArea != null">
+			SALES_AREA = NVL(#{salesArea},NULL),
+			</if>
+			MNG_CO_CD= #{mngCoCd}
+		WHERE
+			ID = #{userId}
+	</update>
+	
+	<update id="updatePw">
+		UPDATE
+			TB_CM06M01
+		SET
+			PASSWORD = #{password},
+			UDT_DTTM = SYSDATE,
+			PASS_ERR_CNT = 0,
+			PWD_DTTM = SYSDATE
+		WHERE
+			ID = #{userId}
+	</update>
+	
+	<update id="updateTokenPw">
+		UPDATE
+			OAUTH_CLIENT_DETAILS
+		SET
+			CLIENT_SECRET = #{password}
+		WHERE
+			CLIENT_ID = #{userId}
+	</update>
+	
+	<update id="updatePwErrCnt">
+		UPDATE 
+			TB_CM06M01
+		SET 
+			<if test="isPwErr != null and !isPwErr.equals('') and isPwErr.equals('Y'.toString())">
+				PASS_ERR_CNT = NVL(PASS_ERR_CNT,0)+1,
+			</if>
+			<if test="isPwErr != null and !isPwErr.equals('') and isPwErr.equals('N'.toString())">
+				PASS_ERR_CNT = 0,
+			</if>
+	    	UDT_DTTM = SYSDATE
+		WHERE ID = #{userId}
+	</update>
+	
+	<select id="selectRuleCheckList" resultType="CamelMap">
+		SELECT 
+		      (SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = 'PASSYN') PASS_YN ,  --암호규칙사용여부
+		      (SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = 'PASSLEN') PASS_LEN , -- 암호최소길이
+		      (SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = 'PASSCHG') PASS_CHG , --암호변경주기(월)
+		      (SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = 'PASSERRCNT') PASS_ERR_CNT --암호오류허용횟수
+		  FROM DUAL 
+	</select>
+	
+	<update id="updateUserN">
+		UPDATE 
+			TB_CM06M01
+		SET
+			USE_YN = 'N'
+		WHERE 
+			ID = #{userId}
+	</update>
+	
+	<!-- 테스트를 위한 코드이므로 추후 삭제할것. -->
+	<update id="updateUserName">
+		UPDATE 
+			TB_CM06M01
+		SET
+			NAME = '김대연1'
+		WHERE
+			ID = 'daeyeon.kim'
+	</update>	
+</mapper>

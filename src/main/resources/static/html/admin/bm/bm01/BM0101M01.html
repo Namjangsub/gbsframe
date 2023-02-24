@@ -1,0 +1,203 @@
+<div class="row">
+	<span style="font-size: 25px; font-weight: bold;">제품코드 관리</span>
+</div>
+<div class="row"> 
+	<div class="form-group form-inline">
+		<select class="form-control input-sm" data-kind="PRDTDIV" data-search="prdtGrp" onchange="setPrdtDiv(this, 'main'); gridView.setData(0);">
+			<option value="">전체</option>
+		</select>
+		<select class="form-control input-sm" data-search="prdtDiv" onchange="gridView.setData(0);">
+			<option value="">전체</option>
+		</select>
+		<select class="form-control input-sm" data-search="useYn" onchange="gridView.setData(0);">
+			<option value="Y">사용</option>
+			<option value="N">미사용</option>
+		</select> 
+		<select class="form-control input-sm" data-search="searchType">
+			<option value="PRDT_NM">제품명</option>
+			<option value="PRDT_CD">제품코드</option>
+		</select>
+		<input type="text" class="form-control input-sm" data-search="searchValue" onkeypress="if(event.keyCode == 13){gridView.setData(0);}"> 
+		<button type="button" class="btn btn-primary btn-sm" onclick="gridView.setData(0);">검색</button>
+		<div style="float: right;">
+			<a class="btn btn-default btn-sm" onclick="detailMaterial('C');">등록</a>
+			<a class="btn btn-default btn-sm" onclick="detailMaterial('U');">수정</a>
+			<a class="btn btn-default btn-sm" onclick="deleteMaterial();">삭제</a>
+			<a class="btn btn-default btn-sm" onclick="excelDown();"><i class="fas fa-file-excel"></i>엑셀다운로드</a>
+
+		</div>
+	</div>
+</div>
+<div class="row">
+	<div data-ax5grid="first-grid" data-ax5grid-config="{}" style="height: 600px; width: 100%"></div>
+	<div data-ax5grid="excel-grid" data-ax5grid-config="{}" style="display: none;"></div>
+</div>
+
+<script type="text/javascript">
+	var prdtStknTarget = null;
+	var gridView = {
+		initView: function(){
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+					showRowSelector: true,
+					multipleSelect: false,
+					sortable: true,
+					target: $('[data-ax5grid="first-grid"]'),
+					header: {
+						align: "center",
+						selector: false
+		        }, 
+					body: {
+						onClick: function () {
+									this.self.select(this.dindex);
+							},
+							onDBLClick: function () {
+								detailMaterial("U");
+							},
+		        },
+					page: {
+							navigationItemCount: 10,
+							height: 30,
+							display: true,
+							firstIcon: '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+							prevIcon: '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+							nextIcon: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+							lastIcon: '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+							onChange: function () {
+								gridView.setData(this.page.selectPage);
+							}
+		        },
+					columns: [
+						{key: "prdtCd",       label: "제품코드",		  align: "center",	width:70},
+						{key: "prdtNm",       label: "제품명",	      align: "left",	width:320},
+						{key: "prdtUnitNm",   label: "단위",			  align: "center",	width:50},
+						{key: "prdtGrpNm",    label: "제품그룹",		  align: "center",	width:150},
+						{key: "prdtDivNm",    label: "제품구분",		  align: "left",	width:250},
+						{key: "prdtFrnNm",    label: "FRN구분",		  align: "center",	width:100},
+						{key: "prdtSpec",     label: "제품규격",		  align: "left",	width:100},
+						{key: "prdtSize",     label: "사이즈",	      align: "left",	width:100},
+						{key: "prdtWt",       label: "중량",		     align: "right",	width:80, formatter: "money" },
+						{key: "prdtUpr",      label: "기준단가",		 align: "right",  width:90, formatter: "money" },
+						{key: "prdtDt",       label: "기준일자",		 align: "center",  width:80},
+						{key: "useYn",        label: "사용",			  align: "center",	width:60},
+						]
+		    });
+			return this;
+		},
+
+		setData: function(_pageNo) {
+			var targetObj = this.target;
+			var paramObj = {"pageNo": _pageNo + 1};
+			
+			$.each($('[data-search]'), function(idx, elem){
+				paramObj[$(elem).data("search")] = $(elem).val();
+			});
+			
+			postAjax("/admin/bm/bm01/selectMaterialList", paramObj, null, function(data){
+				var list = data.materialList;
+				targetObj.setData({
+					list : list,
+					page : {
+						currentPage : _pageNo,
+						pageSize : data.paginationInfo.pageSize,
+						totalElements : data.paginationInfo.totalRecordCount,
+						totalPages : data.paginationInfo.totalPageCount
+					}
+				});
+			});
+		}
+	}
+	var excelView = {
+			initView: function(){
+				this.target = new ax5.ui.grid();
+				this.target.setConfig({
+						target: $('[data-ax5grid="excel-grid"]'),
+						columns: [
+							{key: "prdtCd",       label: "제품코드",		  align: "center"},
+							{key: "prdtNm",       label: "제품명",	      align: "left",	width:160},
+							{key: "prdtUnitNm",   label: "단위",			  align: "center",	width:50},
+							{key: "prdtGrpNm",    label: "제품그룹",		  align: "center",	width:70},
+							{key: "prdtDivNm",    label: "제품구분",		  align: "center",	width:70},
+							{key: "prdtSpec",     label: "제품규격",		  align: "left",	width:100},
+							{key: "prdtSize",     label: "사이즈",	      align: "left",	width:100},
+							{key: "prdtSpec",     label: "SPEC",	      align: "left",	width:100},
+							{key: "prdtWt",       label: "단위중량",		  align: "right",	width:80},
+							{key: "prdtUpr",      label: "기준단가",		  align: "right"},
+							{key: "prdtDt",       label: "기준일자",		  align: "center"},
+							{key: "useYn",        label: "사용",			  align: "center",	width:60},
+							{key: "prdtUnit",     label: "단위코드",			  align: "center",	width:60},
+							{key: "prdtGrp",      label: "제품그룹코드",		  align: "center",	width:70},
+							{key: "prdtDiv",   	  label: "제품구분코드",		  align: "center",	width:70},
+						]
+				});
+				return this;
+		}
+	}
+	$(document).ready(function() {
+		setCommonSelect($('select[data-kind]'));
+		
+		gridView.initView().setData(0);
+		excelView.initView();
+	})
+	
+	function setPrdtDiv(elem, target){
+		prdtDivTarget = target;
+
+		var paramObj = {"codeKind" : $(elem).val()};
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", paramObj, null, function(data){
+			var optionHtml = '<option value="">전체</option>';
+			var childCodeList = data.childCodeList;
+			$.each(childCodeList, function(index, obj){
+				optionHtml += '<option value='+obj.codeId+'>';
+				optionHtml += obj.codeNm;
+				optionHtml += '</option>';
+			});
+			if(prdtDivTarget == "main"){
+				$('[data-search="prdtDiv"]').html(optionHtml);
+			} else if(prdtDivTarget == "popup"){
+				$('#prdtDiv').html(optionHtml);
+			}
+		});
+	}
+	
+	function detailMaterial(type) {
+		var paramObj = {"actionType": type};
+		openModal("/static/html/admin/bm/bm01/BM0102P01.html", 800, 420, "제품코드", paramObj);
+	}
+	
+	function deleteMaterial() {
+		if (selectGridValidation(gridView.target)) return false;
+		if (!confirm("삭제하시겠습니까?")) return false;
+		
+		var paramObj = {
+			"prdtCd" : gridView.target.getList("selected")[0].prdtCd
+		}
+		
+		deleteAjax("/admin/bm/bm01/deleteMaterial", paramObj, null, function(data) {
+			if (data.resultCode == 200) {
+				alert(data.resultMessage);
+				gridView.setData(gridView.target.page.currentPage);
+			}
+		});
+	}
+	
+	function excelDown() {
+		var paramObj = {"pageNo":  1};
+		
+		$.each($('[data-search]'), function(idx, elem){
+			paramObj[$(elem).data("search")] = $(elem).val();
+		});
+		paramObj["recordCnt"] =  9999999;		
+		postAjax("/admin/bm/bm01/selectMaterialList", paramObj, null, function(data){
+			var list = data.materialList;
+			excelView.target.setData({
+				list : list,
+				page : {
+					totalElements : data.paginationInfo.totalRecordCount
+				}
+			});
+			var todayDate = new Date().format('yyyyMMddHHmmss');
+			excelView.target.exportExcel("제품목록_"+todayDate+".xls");
+		});
+	}
+</script>
