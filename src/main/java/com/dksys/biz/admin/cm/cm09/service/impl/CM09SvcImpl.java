@@ -65,6 +65,19 @@ public class CM09SvcImpl implements CM09Svc {
 	}
 
 	@Override
+	public int uploadFile(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
+		cm08Svc.uploadFile("TB_CM99M99", paramMap.get("notiKey"), mRequest);
+		// Gson gson = new Gson();
+		// String[] deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), String[].class);
+		// List<String> deleteFileList = Arrays.asList(deleteFileArr);
+		// for(String fileKey : deleteFileList) {
+		// 	cm08Svc.deleteFile(fileKey);
+		// }
+		// return result;
+		return 1;
+	}
+
+	@Override
 	public List<String> selectNotiPopList() {
 //		List<String> keyList = cm09Mapper.selectNotiPopList();
 //		List<Map<String, Object>> resultList = new ArrayList<Map<String, Object>>();

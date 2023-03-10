@@ -65,9 +65,9 @@ public class CM08SvcImpl implements CM08Svc {
             	File f = new File(path);
             	if(!f.isDirectory()) f.mkdirs();
             	
-            	if(fileTrgtTyp.equals("TB_OD01M01") || fileTrgtTyp.equals("TB_BM02M01") || fileTrgtTyp.equals("TB_OD02M01") || fileTrgtTyp.equals("TB_AR14M01")) {
+            	// if(fileTrgtTyp.equals("TB_OD01M01") || fileTrgtTyp.equals("TB_BM02M01") || fileTrgtTyp.equals("TB_OD02M01") || fileTrgtTyp.equals("TB_AR14M01")) {
             		mf.transferTo(new File(path+saveFile));
-            	}
+            	// }
             	
             } catch (IllegalStateException e) {
                 e.printStackTrace();

@@ -80,4 +80,18 @@ public class CM09Ctr {
     	return "jsonView";
     }
     
+    @PutMapping("/uploadFile")
+    public String uploadFile(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+    	try {
+    		cm09Svc.uploadFile(paramMap, mRequest);
+    		model.addAttribute("resultCode", 200);
+    		model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+    	}catch(Exception e){
+    		model.addAttribute("resultCode", 500);
+    		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+    	}
+    	
+    	return "jsonView";
+    }
+    
 }
