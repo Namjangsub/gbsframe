@@ -15,8 +15,7 @@ public interface CR01Svc {
 	
 	Map<String, Object> selectEstInfo(Map<String, String> paramMap);
 	
-	List<Map<String, Object>> selectEstDetail(Map<String, String> paramMap);
-	
+
 	
 	void insertEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 

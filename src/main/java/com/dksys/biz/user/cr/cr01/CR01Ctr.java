@@ -44,11 +44,7 @@ public class CR01Ctr {
     
     @PostMapping(value = "/selectEstInfo")
     public String selectEstInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    	  Map<String, Object> estInfo = cr01svc.selectEstInfo(paramMap);
-    	    List<Map<String, Object>> estDetail = cr01svc.selectEstDetail(paramMap);
-    	    
-    	    estInfo.put("estDetail", estDetail); // estInfo 맵에 estDetail 추가
-			System.out.println(estDetail);
+    	  	Map<String, Object> estInfo = cr01svc.selectEstInfo(paramMap);
     	    model.addAttribute("estInfo", estInfo);
     	return "jsonView";
     }

@@ -38,18 +38,22 @@ public class CR01Svcmpl implements CR01Svc {
 
 	@Override
 	public List<Map<String, Object>> selectEstList(Map<String, String> param) {
+
 		return sd03Mapper.selectEstList(param);
 	}
 	
 	@Override
 	public Map<String, Object> selectEstInfo(Map<String, String> paramMap) {
-		return sd03Mapper.selectEstInfo(paramMap);
+
+		Map<String, Object> estInfo = sd03Mapper.selectEstInfo(paramMap);
+		List<Map<String, Object>> estList = sd03Mapper.selectEstDetail(paramMap);
+		estInfo.put("list", estList);
+
+
+		return estInfo;
+
 	}
-	@Override
-	public List<Map<String, Object>> selectEstDetail(Map<String, String> paramMap) {
-	    return sd03Mapper.selectEstDetail(paramMap);
-	}
-	
+
 	@Override
 	public void insertEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
 		System.out.println(paramMap+"여기1");
