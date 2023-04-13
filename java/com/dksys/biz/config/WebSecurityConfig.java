@@ -36,17 +36,19 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 
 	@Override
     protected void configure(HttpSecurity security) throws Exception {
-        security
-                .csrf().disable()
-                .headers().frameOptions().disable().and()
-                .authorizeRequests().antMatchers("/oauth/**", "/oauth/token", "/oauth2/callback", "/h2-console/*").permitAll().and()                
-                .formLogin().and()                
-                .cors().and()                
-                
-              // .logout().logoutUrl("/logout").logoutSuccessUrl("/login")
-               // .invalidateHttpSession(true)
-              //  .deleteCookies("jwtToken").and()
-                .httpBasic().disable();
-        
+		security
+	        .csrf().disable()
+	        .headers()
+	            .frameOptions()
+	            .sameOrigin() // X-Frame-Options를 SAMEORIGIN으로 설정
+	            .and()
+	        .authorizeRequests()
+	            .antMatchers("/oauth/**", "/oauth/token", "/oauth2/callback", "/h2-console/*").permitAll()
+	            .and()
+	        .formLogin().and()
+	        .cors().and()
+	        .httpBasic().disable();
+
     }
+
 } 
