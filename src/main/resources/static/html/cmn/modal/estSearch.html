@@ -1,0 +1,173 @@
+<body>
+    <div class="popup_area" style="width: 100%;">
+    	<div class="popup_table">
+			<table>
+				<colgroup>
+					<col width="20%">
+					<col width="20%">
+					<col width="">
+				</colgroup>
+				<tr>
+					<td>
+						<select data-kind="CLNTDIV" data-search="clntDivCd" onchange="gridView.setData(0);">
+							<option value="">전체</option>
+						</select>
+					</td>
+					<td>
+						<select data-search="useYn" onchange="gridView.setData(0);">
+							<option value="">전체</option>
+							<option value="Y" selected>사용</option>
+							<option value="N">미사용</option>
+						</select>
+					</td>
+					<td>
+						<select data-search="searchType">
+							<option value="CLNT_NM">거래처명</option>
+							<option value="CLNT_CD">거래처코드</option>
+							<option value="CRN">사업자번호</option>
+						</select>
+					</td>
+					<td>
+						<div class="search_form">
+							<input type="text" data-search="searchValue" onkeypress="if(event.keyCode == 13){gridView.setData(0);}">
+							<a onclick="gridView.setData(0);">
+								<i class="i_search_w"></i>
+							</a>
+						</div>
+					</td>
+				</tr>
+			</table>
+    		<div class="ax5_grid" data-ax5grid="second-grid" data-ax5grid-config="{}" style="height: 320px;"></div>
+    	</div>
+    </div>
+    <div class="popup_bottom_btn">
+		<button type="button" onclick="executeCallback();">선택</button>
+    	<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+    </div>
+</body>
+<script type="text/javascript">
+
+	var gridView = {
+		initView: function(){
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				height:"200px",
+				showRowSelector: true,
+				multipleSelect: false,
+				sortable: true,
+				target: $('[data-ax5grid="second-grid"]'),
+				header: {
+					align: "center",
+					selector: false
+				},
+				body: {
+					onClick : function() {
+						this.self.select(this.dindex);
+					},
+
+					onDBLClick: function () {
+						executeCallback();
+						this.self.select(this.dindex);
+						var item = this.item; // 선택된 행의 데이터
+						var coCd = item.coCd; // 선택된 행의 coCd 값
+						var estNo = item.estNo; // 선택된 행의 coCd 값
+						// selectEstInfo 함수 호출
+						var paramObj = {
+							"coCd": coCd,
+							"estNo": estNo
+						};
+						handleClickEvent(this.item);
+
+					},
+				},
+				page: {
+					navigationItemCount: 9,
+					height: 30,
+					display: true,
+					firstIcon: '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+					prevIcon: '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+					nextIcon: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+					lastIcon: '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+					onChange: function () {
+						gridView.setData(this.page.selectPage);
+					}
+				},
+				columns: [
+
+					{key: "estNo", label: "견적번호", align: "center", width: 100,	enableFilter: true,},
+					{key: "estClntCd", label: "고객사", align: "center", width: 100},
+					{key: "estClntNm", label: "고객사명", align: "center", width: 100},
+					{key: "estDt", label: "작성일", align: "center", width: 100},
+					{key: "estsDt", label: "발행일", align: "center", width: 120},
+					{key: "cstmMngNm", label: "고객담당자", align: "center", width: 100},
+					{key: "cstmMngHp", label: "고객담당자 연락처", align: "center", width: 150},
+					{key: "estNm", label: "공사명", align: "center", width: 100},
+					{key: "estAmt", label: "견적금액", align: "right", width: 100, formatter:"money"},
+					{key: "estExcept", label: "견적 제외 사항", align: "left", width: 150},
+					{key: "estStdDt", label: "견적기준일자", align: "center", width: 120},
+					{key: "estDlvrCndt", label: "납 품 조 건", align: "left", width: 180},
+					{key: "estPmntCndt", label: "결 재 조 건", align: "left", width: 180},
+					{key: "estDudt", label: "납 기", align: "center", width: 100},
+					{key: "estRmk", label: "비고", align: "left", width: 150}
+
+				],
+				footSum: [
+					[
+						{label: "총합계", 	 align:"center",	  colspan:6},
+						{key: "estQty",     collector: "sum",   formatter:"money",  align: "right"},
+						{key: "estWt",      collector: "sum",   formatter:"money",     align: "right"},
+						{key: "estAmt",     collector: "sum",   formatter:"money",  align: "right"},
+					]
+				]
+			});
+			return this;
+		},
+		setData : function(_pageNo) {
+			var targetObj = this.target;
+			var paramObj = {};
+			paramObj.pageNo = _pageNo + 1;
+			paramObj.recordCnt = 10;
+
+			for(var i=0;i<$('.popup_area [data-search]').length;i++){
+				var tempElem = $('.popup_area [data-search]')[i];
+				paramObj[$(tempElem).data("search")] = $(tempElem).val();
+			}
+
+			if(_pageNo !== 999){
+				/* 검색어 숫자인지 문자인지 확인 (거래처명 코드 검색 시 사용)
+				 * isNaN true이면 문자 아니면 숫자
+				 */
+				var searchValue = paramObj.searchValue;
+				var searchType  = paramObj.searchType;
+				var isSearchValueNaN = isNaN(searchValue);
+				if(searchType == 'CLNT_CD' && isSearchValueNaN && searchValue != ''){
+					alert("거래처 코드는 숫자만 입력해주세요.");
+					return;
+				}
+				postAjax("/user/cr/cr01/selectEstList", paramObj, null, function(data) {
+					var list = data.estList;
+					targetObj.setData({
+						list : list,
+						page : {
+							currentPage : _pageNo,
+							pageSize : data.paginationInfo.pageSize,
+							totalElements : data.paginationInfo.totalRecordCount,
+							totalPages : data.paginationInfo.totalPageCount
+						}
+					});
+				});
+			}
+		}
+	}
+
+	$(document).ready(function() {
+		$('[data-search="searchValue"]').focus();
+		gridView.initView().setData(0);
+	});
+
+	function executeCallback(){
+		if(selectGridValidation(gridView.target)) return;
+		modalStack.last().callback(gridView);
+		modalStack.close();
+	}
+</script>
