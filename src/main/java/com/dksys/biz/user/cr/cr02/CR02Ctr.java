@@ -1,12 +1,14 @@
 package com.dksys.biz.user.cr.cr02;
 
 import com.dksys.biz.cmn.vo.PaginationInfo;
+import com.dksys.biz.user.cr.cr01.service.CR01Svc;
 import com.dksys.biz.user.cr.cr02.service.CR02Svc;
 import com.dksys.biz.util.MessageUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import java.util.List;
 import java.util.Map;
@@ -16,7 +18,8 @@ public class CR02Ctr {
 
 	@Autowired
 	MessageUtils messageUtils;
-
+	@Autowired
+	CR01Svc cr01Svc;
 	@Autowired
 	CR02Svc cr02Svc;
 
@@ -38,5 +41,33 @@ public class CR02Ctr {
 		model.addAttribute("ordrsInfo", ordrsInfo);
 		return "jsonView";
 	}
+
+	@PostMapping(value = "/selectClntInfo")
+	public String selectClntInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, Object> estInfo = cr01Svc.selectEstInfo(paramMap);
+		System.out.println(estInfo+"error");
+		model.addAttribute("clntInfo", estInfo.get("estClntCd"));
+		return "jsonView";
+	}
 	// ...
+
+	@PostMapping(value = "/maxOrdrsNo")
+	public String getMaxOrdrsNo(@RequestBody Map<String, String> param, ModelMap model) {
+		String maxOrdrsNo = cr02Svc.selectMaxOrdrsNo(param);
+		model.addAttribute("maxOrdrsNo", maxOrdrsNo);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/insertOrdrs")
+	public String insertOrdrs(@RequestParam Map<String, String> param, MultipartHttpServletRequest mRequest, ModelMap model) {
+		cr02Svc.insertOrdrs(param,mRequest);
+		return "jsonView";
+	}
+
+
+	@PostMapping(value = "/updateOrdrs")
+	public String updateOrdrs(@RequestParam Map<String, String> param,MultipartHttpServletRequest mRequest, ModelMap model) {
+		cr02Svc.updateOrdrs(param);
+		return "jsonView";
+	}
 }

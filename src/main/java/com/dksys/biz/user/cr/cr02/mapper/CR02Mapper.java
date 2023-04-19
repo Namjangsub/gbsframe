@@ -19,5 +19,13 @@ public interface CR02Mapper {
 
 	List<Map<String, Object>> selectPmntPlan(Map<String, String> paramMap);
 
-	// 추가 필요한 메서드들을 여기에 선언해주세요.
+	String selectMaxOrdrsNo(Map<String, String> param);
+	int insertOrdrs(Map<String, String> param);
+	int insertOrdrsDetail(Map<String, String> param);
+	int insertClmnPlan(Map<String, String> param);
+
+	int insertClmnPlanHis(Map<String, String> param);
+
+
+
 }

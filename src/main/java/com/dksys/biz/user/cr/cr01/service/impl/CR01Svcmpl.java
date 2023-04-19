@@ -21,33 +21,32 @@ import java.util.Map;
 public class CR01Svcmpl implements CR01Svc {
 	
     @Autowired
-	CR01Mapper sd03Mapper;
+	CR01Mapper cr01Mapper;
     
     @Autowired
     CM08Svc cm08Svc; 
     
     @Override
     public String selectMaxEstNo() {
-        return sd03Mapper.selectMaxEstNo();
+        return cr01Mapper.selectMaxEstNo();
     }
     
 	@Override
 	public int selectEstCount(Map<String, String> param) {
-		return sd03Mapper.selectEstCount(param);
+		return cr01Mapper.selectEstCount(param);
 	}
 
 	@Override
 	public List<Map<String, Object>> selectEstList(Map<String, String> param) {
 
-		return sd03Mapper.selectEstList(param);
+		return cr01Mapper.selectEstList(param);
 	}
 	
 	@Override
 	public Map<String, Object> selectEstInfo(Map<String, String> paramMap) {
 
-		Map<String, Object> estInfo = sd03Mapper.selectEstInfo(paramMap);
-		List<Map<String, Object>> estList = sd03Mapper.selectEstDetail(paramMap);
-		estInfo.put("list", estList);
+		Map<String, Object> estInfo = cr01Mapper.selectEstInfo(paramMap);
+
 
 
 		return estInfo;
@@ -64,7 +63,7 @@ public class CR01Svcmpl implements CR01Svc {
 			
 			
 		// 견적서 insert
-		sd03Mapper.insertEst(paramMap);
+		cr01Mapper.insertEst(paramMap);
 
 		List<Map<String, String>> detailArr = gson.fromJson(removeEmptyObjects(paramMap.get("detailArr")), mapList);
 		
@@ -78,7 +77,7 @@ public class CR01Svcmpl implements CR01Svc {
 			    detailMap.put("userId", paramMap.get("userId"));
 			    detailMap.put("pgmId", paramMap.get("pgmId"));
 		
-			    sd03Mapper.insertEstDetail(detailMap);
+			    cr01Mapper.insertEstDetail(detailMap);
 			}
 			cm08Svc.uploadFile("TB_SD03M01", paramMap.get("estNo"), mRequest);
 			List<String> deleteFileList = gson.fromJson(paramMap.get("deleteFileArr"),stringList);
@@ -108,17 +107,17 @@ public class CR01Svcmpl implements CR01Svc {
 		Type stringList = new TypeToken<ArrayList<String>>() {}.getType();
 		
 		// 견적 update
-		int result = sd03Mapper.updateEst(paramMap);
+		int result = cr01Mapper.updateEst(paramMap);
 		
 		// 견적상세 delete
-		sd03Mapper.deleteEstDetail(paramMap);
+		cr01Mapper.deleteEstDetail(paramMap);
 		// 견적상세 insert
 		List<Map<String, String>> detailList = gson.fromJson(paramMap.get("detailArr"), mapList);
 		for(Map<String, String> estMap : detailList) {
 			estMap.put("estNo", paramMap.get("estNo"));
 			estMap.put("userId", paramMap.get("userId"));
 			estMap.put("pgmId", paramMap.get("pgmId"));
-			sd03Mapper.insertEstDetail(estMap);
+			cr01Mapper.insertEstDetail(estMap);
 		}
 		
 		/*
@@ -132,8 +131,8 @@ public class CR01Svcmpl implements CR01Svc {
 	
 	@Override
 	public int deleteEst(Map<String, String> paramMap) {
-		int result = sd03Mapper.deleteEst(paramMap);
-		result += sd03Mapper.deleteEstDetail(paramMap);
+		int result = cr01Mapper.deleteEst(paramMap);
+		result += cr01Mapper.deleteEstDetail(paramMap);
 		return result;
 	}
 }
