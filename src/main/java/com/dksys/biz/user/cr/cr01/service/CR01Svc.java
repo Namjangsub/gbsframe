@@ -7,7 +7,7 @@ import java.util.Map;
 
 public interface CR01Svc {
 	
-	String selectMaxEstNo();
+	String selectMaxEstNo(Map<String, String> paramMap);
 	
 	public int selectEstCount(Map<String, String> param);
 	

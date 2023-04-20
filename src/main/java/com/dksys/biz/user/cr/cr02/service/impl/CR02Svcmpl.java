@@ -55,10 +55,8 @@ public class CR02Svcmpl implements CR02Svc {
 		Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 		Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 
-
+		param.put("ordrsNo",selectMaxOrdrsNo(param));
 		cr02Mapper.insertOrdrs(param);
-		System.out.println("리스트보기"+param.get("planArr"));
-		System.out.println("제거후"+removeEmptyObjects(param.get("planArr")));
 
 
 
@@ -91,8 +89,14 @@ public class CR02Svcmpl implements CR02Svc {
 			cr02Mapper.insertOrdrsDetail(detailMap);
 		}
 
+		// 각 파일과 관련된 nodeId를 얻습니다.
+		for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
+			String nodeIdKey = "nodeId_" + i;
+			String nodeId = mRequest.getParameter(nodeIdKey);
 
-
+			// 각 파일에 대해 uploadFile 메소드를 호출하며, nodeId를 인자로 전달합니다.
+			cm08Svc.uploadFile("TB_CR02M01",param.get("ordrsNo"), mRequest,nodeId);
+		}
 
 
 
