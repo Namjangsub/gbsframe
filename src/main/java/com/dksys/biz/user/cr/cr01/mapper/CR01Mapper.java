@@ -9,7 +9,7 @@ import java.util.Map;
 public interface CR01Mapper {
 	
 	
-	String selectMaxEstNo();
+	String selectMaxEstNo(Map<String, String> paramMap);
 	
 	String selectEstNo();
 	

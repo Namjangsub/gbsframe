@@ -27,8 +27,8 @@ public class CR01Svcmpl implements CR01Svc {
     CM08Svc cm08Svc; 
     
     @Override
-    public String selectMaxEstNo() {
-        return cr01Mapper.selectMaxEstNo();
+    public String selectMaxEstNo(Map<String, String> paramMap) {
+        return cr01Mapper.selectMaxEstNo(paramMap);
     }
     
 	@Override
@@ -55,24 +55,26 @@ public class CR01Svcmpl implements CR01Svc {
 
 	@Override
 	public void insertEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
-		System.out.println(paramMap+"여기1");
+
 		Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 		Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		Type stringList = new TypeToken<ArrayList<String>>() {}.getType();
 		try {
-			
-			
+
+		paramMap.put("estNo",selectMaxEstNo(paramMap));
+		System.out.println(selectMaxEstNo(paramMap)+"coCd값");
 		// 견적서 insert
 		cr01Mapper.insertEst(paramMap);
 
 		List<Map<String, String>> detailArr = gson.fromJson(removeEmptyObjects(paramMap.get("detailArr")), mapList);
 		
 		System.out.println(detailArr+"여기2");
-		
+
 	
 			for (Map<String, String> detailMap : detailArr) {
 			    System.out.println("여기실행");
 			    detailMap.put("coCd", paramMap.get("coCd"));
+				detailMap.put("estNo", selectMaxEstNo(paramMap));
 			    detailMap.put("estNo", paramMap.get("estNo"));
 			    detailMap.put("userId", paramMap.get("userId"));
 			    detailMap.put("pgmId", paramMap.get("pgmId"));

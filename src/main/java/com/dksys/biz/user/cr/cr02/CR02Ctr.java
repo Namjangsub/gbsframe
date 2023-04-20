@@ -61,6 +61,9 @@ public class CR02Ctr {
 	@PostMapping(value = "/insertOrdrs")
 	public String insertOrdrs(@RequestParam Map<String, String> param, MultipartHttpServletRequest mRequest, ModelMap model) {
 		cr02Svc.insertOrdrs(param,mRequest);
+
+
+
 		return "jsonView";
 	}
 

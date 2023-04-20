@@ -11,7 +11,9 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 public interface CM08Svc {
 
 	public int uploadFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest);
-	
+
+	int uploadFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest, String nodeId);
+
 	public List<Map<String, String>> selectFileList(Map<String, String> paramMap);
 	
 	public void setDisposition(HttpServletRequest request, HttpServletResponse response, String fileName);

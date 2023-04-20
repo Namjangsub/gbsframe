@@ -10,7 +10,7 @@ import org.apache.ibatis.annotations.Mapper;
 public interface CM08Mapper {
 
 	int insertFile(HashMap<String, String> param);
-
+	int insertTreeFile(HashMap<String, String> param);
 	List<Map<String, String>> selectFileList(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectTreeFileList(Map<String, String> paramMap);

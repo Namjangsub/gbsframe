@@ -25,7 +25,7 @@ public class CR01Ctr {
 
     @PostMapping("/maxEst")
     public String showEstimationForm(@RequestBody Map<String, String> param, ModelMap model) {
-        String maxEstNo = cr01svc.selectMaxEstNo();
+        String maxEstNo = cr01svc.selectMaxEstNo(param);
         model.addAttribute("maxEstNo", maxEstNo);
         return "jsonView";
     }
