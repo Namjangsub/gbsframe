@@ -164,7 +164,7 @@ public class AR01Ctr {
     		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
     		logger.error("==================== ERROR ====================", e);
 		}
-    	return "jsonView";
+    	return "jsonView"; 
     }
 	
 }
