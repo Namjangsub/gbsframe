@@ -51,7 +51,7 @@ public class CR02Svcmpl implements CR02Svc {
 	public void insertOrdrs(Map<String, String> param,MultipartHttpServletRequest mRequest){
 		Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 		Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		param.put("ordrsNo",selectMaxOrdrsNo(param));
+		param.put("fileTrgtKey",selectMaxOrdrsNo(param));
 		cr02Mapper.insertOrdrs(param);
 		List<Map<String, String>> planArr = gson.fromJson(removeEmptyObjects(param.get("planArr")), mapList);
 		for (Map<String, String> planMap : planArr) {
@@ -88,7 +88,8 @@ public class CR02Svcmpl implements CR02Svc {
 			String fileTrgtTyp = mRequest.getParameter("fileTrgtTyp_" + i);
 
 			// 각 파일에 대해 uploadFile 메소드를 호출하며, nodeId와 fileTrgtKey를 인자로 전달합니다.
-			cm08Svc.uploadFile(fileTrgtTyp, param.get("ordrsNo"), mRequest, nodeId);
+			cm08Svc.uploadFile(fileTrgtTyp, param.get("fileTrgtKey"), mRequest, nodeId);
+
 		}
 
 
