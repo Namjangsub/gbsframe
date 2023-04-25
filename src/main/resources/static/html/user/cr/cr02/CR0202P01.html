@@ -6,7 +6,7 @@
     <div class="popup_table">
         <input type="file" id="file" style="display: none" multiple="multiple" onchange="addFileToTree(this);"/>
         <form id="popForm">
-            <input type="hidden" id="pgmId" name="pgmId" value="CR0101M01">
+            <input type="hidden" id="pgmId" name="pgmId" value="CR0202P01">
 
             <table>
                 <tr>
@@ -183,23 +183,9 @@
 <script type="text/javascript">
 
     /* 견적서함수 */
-    //수주 번호 조회 함수
-    function getMaxOrdrsNumber() {
-        let coCd = $("#coCd").val();
-        let paramObj = {
-            coCd: coCd
-        };
-        /*      // Add any parameters needed for the request
-              postAjax("/user/cr/cr02/maxOrdrsNo", paramObj, null, function (data) {
-                  // Set the received maximum estimation number to the input field
-                  $("#ordrsNo").val(data.maxOrdrsNo);
-              });*/
-    }
 
-    $("#coCd").on("change", function () {
-        getMaxOrdrsNumber();
 
-    });
+
 
     // 견적 정보 조회 함수
     function selectEstInfo() {
@@ -444,6 +430,7 @@
             // 신규파일만 추가
             if (obj.fileKey == 0) {
                 formData.append("nodeId_" + idx, obj.nodeId);
+                formData.append("fileTrgtTyp_" + idx, obj.fileTrgtTyp);
                 formData.append("files", obj.file);
             }
         });
@@ -555,6 +542,7 @@
 
     /* 파일관련함수 */
     var selectedNodeId="";
+    var fileTrgtTyp="";
     function addFileToTree(elem) {
 
         var tempFiles = elem.files;
@@ -566,7 +554,10 @@
                 'fileType': testArr[testArr.length - 1],
                 'fileSize': obj.size,
                 'nodeId': selectedNodeId,
+                'fileTrgtTyp': fileTrgtTyp,
+                'coCd': coCd,
                 'file': obj
+
             });
         });
 
@@ -590,6 +581,25 @@
             buttonFile.style.backgroundColor = "gray"; // 회색 배경색으로 변경 (옵션)
         }
         selectedNodeId = data.node.id;
+
+
+        switch (selectedNodeId) {
+            case "FITR0204":
+                fileTrgtTyp = "TB_CR02M01";
+                break;
+            case "FITR0205":
+                fileTrgtTyp = "TB_CR02D01";
+                break;
+            case "FITR0206":
+                fileTrgtTyp = "TB_CR02D02";
+                break;
+            // 추가적인 case들이 필요하면 여기에 추가하세요.
+            default:
+                // 선택한 노드에 대한 처리가 필요 없는 경우 여기에 default 처리를 추가하세요.
+                break;
+        }
+
+        //표시하는 부분
         var relatedFiles = fileArr.filter(function (file) {
             return file.nodeId === selectedNodeId;
         });
@@ -637,7 +647,7 @@
 
     $(document).ready(function () {
         mainDefaultLoad("영업관리", "수주 등록");
-        getMaxOrdrsNumber();
+
         $('#fwdExchJoinDt').datepicker({
             format: "yyyy-mm-dd",
             language: "ko",
@@ -657,8 +667,6 @@
 
             button.addEventListener("click", handleButtonClick);
         });
-
-
 
 
         const ordrsDiv = document.getElementById('ordrsDiv');
@@ -1046,6 +1054,7 @@
 
 
     var actionType = modalStack.last().paramObj.actionType;
+    var paramObj = modalStack.last().paramObj;
     if (actionType == "C") {
 
         $('#actionBtn').on("click", function () {
@@ -1054,6 +1063,46 @@
 
     } else if (actionType == "U") {
         alert("수정")
+
+        postAjax("/user/cr/cr02/selectOrdrsInfo", paramObj, null, function (data) {
+            var parsedData = data;
+
+            // Set the input field values with the received data
+            Object.keys(parsedData.ordrsInfo).forEach(function (key) {
+                var inputField = document.getElementById(key);
+                if (inputField) {
+
+                    inputField.value = parsedData.ordrsInfo[key] || '';
+                }
+            });
+
+            var pmntPlan = data.ordrsInfo.plan;
+
+            gridOrdrsPlan.setData({
+                list: pmntPlan,
+                page: {
+                    totalElements: pmntPlan.length
+                }
+            });
+
+            var ordrsDetails = data.ordrsInfo.details;
+
+            gridOrdrsDetail.setData({
+                list: ordrsDetails,
+                page: {
+                    totalElements: ordrsDetails.length
+                }
+            });
+
+
+
+
+        gridView.setData(0);
+
+
+
+
+        });
         $('#actionBtn').on("click", function () {
             updateOrdrs();
         });
@@ -1127,7 +1176,16 @@
             $('#deptTree').jstree(true).deselect_all();
             $('#deptTree').jstree(true).select_node(selectedId);
         }).on("select_node.jstree", function (e, data) {
-            // 노드 선택 시 발생 이벤트
+
+            var clickedId = data.node.id;
+            alert('Data:'+ clickedId);
+
+            paramObj.fileTrgtKey = paramObj.ordrsNo;
+            paramObj.comonCd = clickedId;
+            postAjax("/admin/cm/cm08/selectTreeFileList", paramObj, null, function (data) {
+                alert(data.fileList);
+                fileGridView.reqSetData(data.fileList);
+            });
 
             //파일정보 show
             if (!$('#deptTree').is(":visible")) {
@@ -1136,7 +1194,7 @@
 
             // 파일정보 set
             // selectFileList(data.node.id);
-            selectFileList();
+            //selectFileList();
 
         }).on('open_node.jstree', function (e, data) {
             // 노드 열릴 때
@@ -1151,8 +1209,8 @@
     function selectDeptTree() {
         var deptTree = null;
         var paramObj = {
-            "coCd": $('#coCd_S').val(), //"GUN",
-            "useYn": $("#useYn_S").val()
+
+
         };
         postAjaxSync("/admin/cm/cm05/selectDocTreeList", paramObj, null, function (data) {
             deptTree = data.docTreeList.filter(function (node) {
@@ -1162,22 +1220,62 @@
         return deptTree;
     }
 
+    // 노드가 'FITR02'와 관련이 있는지 확인하는 함수입니다.
     function isRelatedToFitr02(node, nodeList) {
+        // 노드의 ID가 'FILETREE'이거나 'FITR02'이거나 부모의 ID가 'FITR02'인 경우 true를 반환합니다.
         if (node.deptId === 'FILETREE' || node.deptId === 'FITR02' || node.parent === 'FITR02') {
             return true;
         }
 
+        // 부모 노드를 찾습니다.
         var parentNode = nodeList.find(function (parentNode) {
             return parentNode.deptId === node.parentDeptId;
         });
 
+        // 부모 노드가 없는 경우 false를 반환합니다.
         if (!parentNode) {
             return false;
         }
 
+        // 재귀적으로 부모 노드가 'FITR02'와 관련이 있는지 확인합니다.
         return isRelatedToFitr02(parentNode, nodeList);
     }
 
+
+
+    var coCd;
+    var coCdChanged = false;
+
+    // 모달 초기화 함수
+    function resetModal() {
+        // 모달 내부의 모든 입력 필드 초기화
+        var modalInputs = document.querySelectorAll(" input,  textarea,  select:not(#coCd)");
+        modalInputs.forEach(function (input) {
+            input.value = "";
+        });
+    }
+
+    // coCd 변경 이벤트 리스너
+    document.getElementById("coCd").addEventListener("change", function (event) {
+        var newCoCd = event.target.value;
+        console.log("coCd 변경됨: ", newCoCd);
+
+        // 처음 변경하는 경우
+        if (!coCdChanged) {
+            coCd = newCoCd;
+            coCdChanged = true;
+        }
+        // 사용자에게 변경 확인
+        else if (confirm("회사 코드를 변경하시겠습니까? 이 경우 모달의 모든 값이 초기화됩니다.")) {
+            coCd = newCoCd;
+
+            // 모달 초기화
+            resetModal();
+        } else {
+            // 사용자가 변경을 취소한 경우, coCdSelect 값을 원래대로 되돌림
+            event.target.value = coCd;
+        }
+    });
 
 </script>
 

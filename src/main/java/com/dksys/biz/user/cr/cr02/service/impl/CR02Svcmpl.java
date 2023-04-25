@@ -37,10 +37,7 @@ public class CR02Svcmpl implements CR02Svc {
 	@Override
 	public Map<String, Object> selectOrdrsInfo(Map<String, String> paramMap) {
 
-
 		Map<String, Object> ordrsInfo = cr02Mapper.selectOrdrsInfo(paramMap);
-
-
 
 		return ordrsInfo;
 
@@ -54,16 +51,10 @@ public class CR02Svcmpl implements CR02Svc {
 	public void insertOrdrs(Map<String, String> param,MultipartHttpServletRequest mRequest){
 		Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 		Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-
 		param.put("ordrsNo",selectMaxOrdrsNo(param));
 		cr02Mapper.insertOrdrs(param);
-
-
-
 		List<Map<String, String>> planArr = gson.fromJson(removeEmptyObjects(param.get("planArr")), mapList);
-
 		for (Map<String, String> planMap : planArr) {
-
 			planMap.put("coCd", param.get("coCd"));
 			planMap.put("ordrsNo", param.get("ordrsNo"));
 			planMap.put("estNo", param.get("estNo"));
@@ -89,15 +80,16 @@ public class CR02Svcmpl implements CR02Svc {
 			cr02Mapper.insertOrdrsDetail(detailMap);
 		}
 
-		// 각 파일과 관련된 nodeId를 얻습니다.
 		for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
 			String nodeIdKey = "nodeId_" + i;
 			String nodeId = mRequest.getParameter(nodeIdKey);
 
-			// 각 파일에 대해 uploadFile 메소드를 호출하며, nodeId를 인자로 전달합니다.
-			cm08Svc.uploadFile("TB_CR02M01",param.get("ordrsNo"), mRequest,nodeId);
-		}
+			// 각 파일에 대한 fileTrgtKey를 가져옵니다.
+			String fileTrgtTyp = mRequest.getParameter("fileTrgtTyp_" + i);
 
+			// 각 파일에 대해 uploadFile 메소드를 호출하며, nodeId와 fileTrgtKey를 인자로 전달합니다.
+			cm08Svc.uploadFile(fileTrgtTyp, param.get("ordrsNo"), mRequest, nodeId);
+		}
 
 
 

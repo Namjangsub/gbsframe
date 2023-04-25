@@ -88,7 +88,6 @@ public class CM08SvcImpl implements CM08Svc {
 		for (MultipartFile mf : fileList) {
 			String originFileName = mf.getOriginalFilename(); // 원본 파일 명
 			// long fileSize = mf.getSize(); // 파일 사이즈
-
 			HashMap<String, String> param = new HashMap<String, String>();
 			param.put("fileSize", String.valueOf(mf.getSize()));
 			if (originFileName != null) {
