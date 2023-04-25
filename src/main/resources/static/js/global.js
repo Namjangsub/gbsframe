@@ -935,3 +935,4 @@ function resetSiteCd(){
 	$('#siteCd_S').val("");
 }
 
+
