@@ -873,29 +873,32 @@ $.urlParam = function(name){
 }
 
 function authChk(menuUrl){
+	$(".bg_gray").hide();
 	if(!menuUrl){
 		var url = window.location.href;
 		menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
 	}
-	var arr = JSON.parse(getCookie("authArr"));
-	var saveYn = "N";
-	for(var i = 0; i < arr.length; i++){
-		if(arr[i].menuUrl == menuUrl){
-			saveYn = arr[i].saveYn;
-			break;
-		}
-	}
-	$.each($("[authchk]"), function(idx, elem){
-		if(saveYn == "Y"){
-			$(elem).show();
-		} else {
-			$(elem).hide();
-		}
-	});
-	
+	/*	var arr = JSON.parse(getCookie("authArr"));
+        var saveYn = "N";
+        for(var i = 0; i < arr.length; i++){
+            if(arr[i].menuUrl == menuUrl){
+                saveYn = arr[i].saveYn;
+                break;
+            }
+        }
+        $.each($("[authchk]"), function(idx, elem){
+            if(saveYn == "Y"){
+                $(elem).show();
+            } else {
+                $(elem).hide();
+            }
+        });*/
+
 //	// select 회사코드 disable (감사용 임시코드)
-//	$('select[data-kind="CO"]').prop("disabled", true); 
+//	$('select[data-kind="CO"]').prop("disabled", true);
+
 }
+
 
 // 버튼 컨펌
 function confirmBefore(btnElem){
@@ -931,4 +934,5 @@ function resetPrjctCd(){
 function resetSiteCd(){
 	$('#siteCd_S').val("");
 }
+
 

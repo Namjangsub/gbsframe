@@ -36,7 +36,6 @@ public class CR02Ctr {
 
 	@PostMapping(value = "/selectOrdrsInfo")
 	public String selectOrdrsInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-
 		Map<String, Object> ordrsInfo = cr02Svc.selectOrdrsInfo(paramMap);
 		model.addAttribute("ordrsInfo", ordrsInfo);
 		return "jsonView";
