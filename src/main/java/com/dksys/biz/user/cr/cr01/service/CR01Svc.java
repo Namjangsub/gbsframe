@@ -17,7 +17,7 @@ public interface CR01Svc {
 	
 
 	
-	void insertEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+	String insertEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
 
 	
