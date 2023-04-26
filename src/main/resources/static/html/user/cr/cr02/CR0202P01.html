@@ -99,7 +99,7 @@
     </div>
 
     <br>
-    <div class="popup_table" style="margin-top: 15px;">
+    <div class="popup_table" >
 
         <div class="" style="padding-left: 0;">
             <div class="contents" style="margin:0px; padding:0px; height: 300px; width: 100%; min-width: 200px">
@@ -180,11 +180,11 @@
                         authchk>
                     첨부파일
                 </button>
-                <button  type="button" id="zip_down" class=""
+     <!--           <button  type="button" id="zip_down" class=""
                         style="display:none;height: 25px; line-height: 15px;"
                         authchk>
                     파일 전체 다운로드
-                </button>
+                </button>-->
                 <div class="ax5_grid" data-ax5grid="file-grid" data-ax5grid-config="{}"
                      style="height: 400px; width: 100%"></div>
             </div>
@@ -393,7 +393,6 @@
             // 신규파일만 추가
             if (obj.fileKey == 0) {
                 formData.append("nodeId_" + idx, obj.nodeId);
-                formData.append("fileTrgtTyp_" + idx, obj.fileTrgtTyp);
                 formData.append("files", obj.file);
             }
         });
@@ -571,7 +570,8 @@
 
 
     });
-
+    var thisGridRow = "";
+    var thisGridCol = "";
 /* 그리드 관련 함수 */
     // 그리드 생성
     const gridOrdrsPlan = new ax5.ui.grid();
@@ -607,7 +607,7 @@
                 this.self.clearSelect();
                 this.self.select(this.dindex);
             }
-        },
+        },           
         contextMenu: {
             iconWidth: 20,
             acceleratorWidth: 100,
@@ -619,7 +619,7 @@
                 {type: 1, label: "붙여넣기"},
                 {divide: true},
                 {
-                    label: "작업선택",
+                    label : "작업선택",
                     items: [
                         {type: 1, label: "줄추가"},
                         {type: 1, label: "내용 삭제"},
@@ -629,9 +629,9 @@
             ],
             popupFilter: function (item, param) {
                 //console.log(item, param);
-                if (param.element) {
+                if(param.element) {
                     return true;
-                } else {
+                }else{
                     return item.type == 1;
                 }
             },
@@ -641,29 +641,34 @@
                 thisGridCol = param.colIndex;
 
                 if (item.label == "붙여넣기") {
-                    gridPaste(thisGridRow, thisGridCol);
+                    gridPaste(thisGridRow,thisGridCol);
                 } else if (item.label == "줄추가") {
                     console.log('추가 인덱스 :', param.dindex);
                     //.addRow(추가할 내용, 삽인할위치(생략시 마지막),갯수)
-                    gridOrdrsPlan.addRow($.extend({}, gridOrdrsPlan.list[param.dindex], {__index: undefined}), param.dindex + 1,);
+                    gridOrdrsPlan.addRow($.extend({}, gridOrdrsPlan.list[param.dindex], {__index: undefined}),param.dindex+1,);
+                    gridOrdrsPlan.setValue(param.dindex, 'updcheck', 1);
+
                 } else if (item.label == "내용 삭제") {
                     console.log('내용삭제 인덱스 :', param.dindex);
 
                     gridOrdrsPlan.config.columns.forEach((column) => {
                         gridOrdrsPlan.setValue(param.dindex, column.key, '');
+                        gridOrdrsPlan.setValue(param.dindex, 'updcheck', 1);
                         console.log('내용삭제 :', param.dindex, column.key);
                     });
 
                 } else if (item.label == "줄삭제") {
                     console.log('삭제 인덱스 :', param.dindex);
                     gridOrdrsPlan.removeRow(param.dindex);
+                    //삭제시에는 그리드에서 사라지므로 별도 처리 필요함  메모리에 담았다가 최종 DB단 삭제 로직 처리 해야함.
+// 		                		gridOrdrsPlan.setValue(param.dindex, 'delcheck', 1);
                 }
 
 
-                return true;
+                gridOrdrsPlan.contextMenu.close();
                 //또는 return true;
             }
-        }
+        },
     });
 
     // 그리드 생성
@@ -707,8 +712,83 @@
                       {key: "estAmt", collector: "sum", formatter: "money", align: "right"},
                   ]*/
         ],
+        body: {
+            onClick: function () {
+                this.self.select(this.dindex);
+                thisGridRow = this.dindex;
+                thisGridCol = this.colIndex;
+            },
+            columnHeight: 26,
+            onDataChanged: function () {
+                if (this.key == 'isChecked') {
+                    this.self.updateChildRows(this.dindex, {isChecked: this.item.isChecked});
+                }
+                else if(this.key == '__selected__'){
+                    this.self.updateChildRows(this.dindex, {__selected__: this.item.__selected__});
+                }
+            }
+        },
+        contextMenu: {
+            iconWidth: 20,
+            acceleratorWidth: 100,
+            itemClickAndClose: false,
+            icons: {
+                'arrow': '<i class="fa fa-caret-right"></i>'
+            },
+            items: [
+                {type: 1, label: "붙여넣기"},
+                {divide: true},
+                {
+                    label : "작업선택",
+                    items: [
+                        {type: 1, label: "줄추가"},
+                        {type: 1, label: "내용 삭제"},
+                        {type: 2, label: "줄삭제"},
+                    ]
+                },
+            ],
+            popupFilter: function (item, param) {
+                //console.log(item, param);
+                if(param.element) {
+                    return true;
+                }else{
+                    return item.type == 1;
+                }
+            },
+            onClick: function (item, param) {
+                console.log(item, param);
+                thisGridRow = param.dindex;
+                thisGridCol = param.colIndex;
 
-    });
+                if (item.label == "붙여넣기") {
+                    gridPaste(thisGridRow,thisGridCol);
+                } else if (item.label == "줄추가") {
+                    console.log('추가 인덱스 :', param.dindex);
+                    //.addRow(추가할 내용, 삽인할위치(생략시 마지막),갯수)
+                    gridOrdrsDetail.addRow($.extend({}, gridOrdrsDetail.list[param.dindex], {__index: undefined}),param.dindex+1,);
+                    gridOrdrsDetail.setValue(param.dindex, 'updcheck', 1);
+
+                } else if (item.label == "내용 삭제") {
+                    console.log('내용삭제 인덱스 :', param.dindex);
+
+                    gridOrdrsDetail.config.columns.forEach((column) => {
+                        gridOrdrsDetail.setValue(param.dindex, column.key, '');
+                        gridOrdrsDetail.setValue(param.dindex, 'updcheck', 1);
+                        console.log('내용삭제 :', param.dindex, column.key);
+                    });
+
+                } else if (item.label == "줄삭제") {
+                    console.log('삭제 인덱스 :', param.dindex);
+                    gridOrdrsDetail.removeRow(param.dindex);
+                    //삭제시에는 그리드에서 사라지므로 별도 처리 필요함  메모리에 담았다가 최종 DB단 삭제 로직 처리 해야함.
+// 		                		gridOrdrsDetail.setValue(param.dindex, 'delcheck', 1);
+                }
+
+
+                gridOrdrsDetail.contextMenu.close();
+                //또는 return true;
+            }
+        }    });
 
 
     var actionType = modalStack.last().paramObj.actionType;
@@ -763,14 +843,8 @@
 
 
     }
-    const fileTrgtTypMapping = {
-        "FITR0204": "TB_CR02M01",
-        "FITR0205": "TB_CR02D01",
-        "FITR0206": "TB_CR02D02",
-    };
-    treeModule.initAll('deptTree', 'file-grid', paramObj, fileTrgtTypMapping);
 
-
+    treeModule.initAll('deptTree', 'file-grid','FITR02', paramObj);
 
     function validateRequiredFields() {
         // gridOrdrsDetail 리스트 검사

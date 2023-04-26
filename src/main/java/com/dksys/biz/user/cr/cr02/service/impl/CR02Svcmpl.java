@@ -86,7 +86,7 @@ public class CR02Svcmpl implements CR02Svc {
 			// 각 파일에 대한 fileTrgtKey를 가져옵니다.
 			String fileTrgtTyp = mRequest.getParameter("fileTrgtTyp_" + i);
 			// 각 파일에 대해 uploadFile 메소드를 호출하며, nodeId와 fileTrgtKey를 인자로 전달합니다.
-			cm08Svc.uploadFile(fileTrgtTyp, param.get("ordrsNo"), mRequest, nodeId);
+			cm08Svc.uploadFile("TB_CR02M01", param.get("ordrsNo"), mRequest, nodeId);
 
 		}
 

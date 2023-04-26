@@ -24,6 +24,7 @@ var fileTreeGridView = {
                 },
             },
             columns: [
+
                 {key: "fileTrgtKey", label: "파일타겟키", hidden: true},
                 {key: "fileKey", label: "파일키", hidden: true},
                 {key: "fileName", label: "파일명", width: 260, align: "left"},
@@ -65,10 +66,11 @@ var fileTreeGridView = {
 }
 var treeModule = (function () {
     var paramObj;
-    var fileTrgtTypMapping;
-    function init(params,fileMapping) {
+    var codeIdVal;
+    function init(codeId,params) {
+        codeIdVal=codeId;
         paramObj = params;
-        fileTrgtTypMapping = fileMapping;
+
     }
     function initDeptTree(selector) {
         $('#'+selector).jstree("destroy");
@@ -107,8 +109,6 @@ var treeModule = (function () {
             .on("select_node.jstree", function (e, data) {
                 var clickedId = data.node.id;
 
-
-
                 paramObj.comonCd = clickedId;
 
                 // 선택한 노드의 모든 하위 노드를 가져옵니다.
@@ -133,14 +133,10 @@ var treeModule = (function () {
                 }
 
 
-
-
-
-
                 if (!$('#'+selector).is(":visible")) {
                     $('#'+selector).show();
                 }
-
+                const buttonFile = document.getElementById("button_file");
 
                 // 합쳐진 코드 부분 시작
                 // const buttonFile = document.getElementById("button_file");
@@ -159,11 +155,6 @@ var treeModule = (function () {
 
                 }
 
-                if (fileTrgtTypMapping.hasOwnProperty(selectedNodeId)) {
-                    fileTrgtTyp = fileTrgtTypMapping[selectedNodeId];
-                } else {
-                    // 선택한 노드에 대한 처리가 필요 없는 경우 여기에 default 처리를 추가하세요.
-                }
 
 
                 $("#file_tit").html($('#'+selector).jstree('get_selected', true)[0].text);
@@ -179,8 +170,8 @@ var treeModule = (function () {
         })
     }
 
-    function initAll(selector, gridSelector, params, fileMapping) {
-        init(params, fileMapping);
+    function initAll(selector, gridSelector,codeId, params) {
+        init(codeId,params);
         initDeptTree(selector);
         fileTreeGridView.init(gridSelector);
     }
@@ -227,18 +218,15 @@ var treeModule = (function () {
     }
 
     function isRelatedToFitr02(node, nodeList) {
-        if (node.deptId === 'FILETREE' || node.deptId === 'FITR02' || node.parent === 'FITR02') {
+        if (node.deptId === 'FILETREE' || node.deptId === codeIdVal || node.parent === codeIdVal) {
             return true;
         }
-
         var parentNode = nodeList.find(function (parentNode) {
             return parentNode.deptId === node.parentDeptId;
         });
-
         if (!parentNode) {
             return false;
         }
-
         return isRelatedToFitr02(parentNode, nodeList);
     }
 
@@ -263,7 +251,6 @@ function addFileToTree(elem) {
             'fileType': testArr[testArr.length - 1],
             'fileSize': obj.size,
             'nodeId': selectedNodeId,
-            'fileTrgtTyp': fileTrgtTyp,
             'coCd': coCd,
             'file': obj
 
