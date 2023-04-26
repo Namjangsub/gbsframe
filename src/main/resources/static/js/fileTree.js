@@ -24,6 +24,7 @@ var fileTreeGridView = {
                 },
             },
             columns: [
+
                 {key: "fileTrgtKey", label: "파일타겟키", hidden: true},
                 {key: "fileKey", label: "파일키", hidden: true},
                 {key: "fileName", label: "파일명", width: 260, align: "left"},
@@ -65,10 +66,11 @@ var fileTreeGridView = {
 }
 var treeModule = (function () {
     var paramObj;
-    var fileTrgtTypMapping;
-    function init(params,fileMapping) {
+    var codeIdVal;
+    function init(codeId,params) {
+        codeIdVal=codeId;
         paramObj = params;
-        fileTrgtTypMapping = fileMapping;
+
     }
     function initDeptTree(selector) {
         $('#'+selector).jstree("destroy");
@@ -107,26 +109,42 @@ var treeModule = (function () {
             .on("select_node.jstree", function (e, data) {
                 var clickedId = data.node.id;
 
-
-
                 paramObj.comonCd = clickedId;
 
                 // 선택한 노드의 모든 하위 노드를 가져옵니다.
                 var childrenNodes = getAllChildrenNodes(data.instance, clickedId);
 
-                // 선택한 노드와 하위 노드에 관련된 파일 목록을 불러옵니다.
-                var allNodes = [clickedId].concat(childrenNodes);
-                getAllFilesForNodes(allNodes, function (allFiles) {
 
-                    fileTreeGridView.reqSetData(allFiles);
-                });
+                selectedNodeId = data.node.id;
+                isEditMode= paramObj.actionType ==='U'
+                if (isEditMode) {
+                    var allNodes = [clickedId].concat(childrenNodes);
+                    // 수정 화면인 경우, 데이터베이스에서 파일 목록을 가져옵니다.
+                    getAllFilesForNodes(allNodes, function (allFiles) {
+                        fileTreeGridView.reqSetData(allFiles);
+                    });
+                } else {
+                    //표시하는 부분
+                    var relatedFiles = fileArr.filter(function (file) {
+                        return file.nodeId === selectedNodeId;
+                    });
+                    fileTreeGridView.reqSetData(relatedFiles);
+
+                }
+
 
                 if (!$('#'+selector).is(":visible")) {
                     $('#'+selector).show();
                 }
+                const buttonFile = document.getElementById("button_file");
 
                 // 합쳐진 코드 부분 시작
-                const buttonFile = document.getElementById("button_file");
+                // const buttonFile = document.getElementById("button_file");
+                // document.getElementById('zip_down').addEventListener('click', function() {
+                //     downloadAllFilesInGrid();
+                // });
+
+
                 if (data.node.id.length < 7 || data.node.id=="FILETREE") {
 
                     buttonFile.disabled = true; // 비활성화
@@ -136,21 +154,11 @@ var treeModule = (function () {
                     buttonFile.style.backgroundColor = ""; // 기본 배경색으로 변경 (옵션)
 
                 }
-                selectedNodeId = data.node.id;
 
 
-                if (fileTrgtTypMapping.hasOwnProperty(selectedNodeId)) {
-                    fileTrgtTyp = fileTrgtTypMapping[selectedNodeId];
-                } else {
-                    // 선택한 노드에 대한 처리가 필요 없는 경우 여기에 default 처리를 추가하세요.
-                }
 
-                //표시하는 부분
-                var relatedFiles = fileArr.filter(function (file) {
-                    return file.nodeId === selectedNodeId;
-                });
                 $("#file_tit").html($('#'+selector).jstree('get_selected', true)[0].text);
-                fileTreeGridView.reqSetData(relatedFiles);
+
                 // 합쳐진 코드 부분 끝
             })
             .on('open_node.jstree', function (e, data) {
@@ -162,8 +170,8 @@ var treeModule = (function () {
         })
     }
 
-    function initAll(selector, gridSelector, params, fileMapping) {
-        init(params, fileMapping);
+    function initAll(selector, gridSelector,codeId, params) {
+        init(codeId,params);
         initDeptTree(selector);
         fileTreeGridView.init(gridSelector);
     }
@@ -210,18 +218,15 @@ var treeModule = (function () {
     }
 
     function isRelatedToFitr02(node, nodeList) {
-        if (node.deptId === 'FILETREE' || node.deptId === 'FITR02' || node.parent === 'FITR02') {
+        if (node.deptId === 'FILETREE' || node.deptId === codeIdVal || node.parent === codeIdVal) {
             return true;
         }
-
         var parentNode = nodeList.find(function (parentNode) {
             return parentNode.deptId === node.parentDeptId;
         });
-
         if (!parentNode) {
             return false;
         }
-
         return isRelatedToFitr02(parentNode, nodeList);
     }
 
@@ -246,7 +251,6 @@ function addFileToTree(elem) {
             'fileType': testArr[testArr.length - 1],
             'fileSize': obj.size,
             'nodeId': selectedNodeId,
-            'fileTrgtTyp': fileTrgtTyp,
             'coCd': coCd,
             'file': obj
 
@@ -278,3 +282,65 @@ function downloadFile(fileKey) {
         location.href = "/admin/cm/cm08/fileDownload?filePath=" + filePath;
     });
 }
+
+function downloadAllFiles(fileKeys) {
+    if (fileKeys.length === 0) return;
+
+    var fileKey = fileKeys.shift();
+    downloadFile(fileKey);
+
+    setTimeout(function () {
+        downloadAllFiles(fileKeys);
+    }, 1000); // 1초 간격으로 다운로드 (이 시간은 필요에 따라 조절 가능)
+}
+async function downloadAllFilesInGrid() {
+    var zip = new JSZip();
+    var gridData = fileTreeGridView.target.getList();
+    var filesDownloaded = 0;
+
+    for (const item of gridData) {
+        if (item.fileKey) {
+            try {
+                const fileBlob = await getFileBlob(item.fileKey);
+                zip.file(item.fileName, fileBlob);
+                filesDownloaded++;
+            } catch (error) {
+                console.error("Error downloading file:", item.fileName, error);
+            }
+        }
+    }
+
+    if (filesDownloaded > 0) {
+        zip.generateAsync({ type: "blob" }).then(function (blob) {
+            var link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "files.zip";
+            link.click();
+        });
+    } else {
+        alert("No files to download");
+    }
+}
+
+function getFileBlob(fileKey) {
+    return new Promise(function (resolve, reject) {
+        postAjax("/admin/cm/cm08/fileDownInfo", { fileKey: fileKey }, null, function (data) {
+            var fileInfo = data.fileInfo;
+            var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName, "UTF-8");
+            fetch("/admin/cm/cm08/fileDownload?filePath=" + filePath)
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error("Network response was not ok");
+                    }
+                    return response.blob();
+                })
+                .then((blob) => {
+                    resolve(blob);
+                })
+                .catch((error) => {
+                    reject(error);
+                });
+        });
+    });
+}
+

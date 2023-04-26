@@ -47,14 +47,12 @@ public class CR01Svcmpl implements CR01Svc {
 
 		Map<String, Object> estInfo = cr01Mapper.selectEstInfo(paramMap);
 
-
-
 		return estInfo;
 
 	}
 
 	@Override
-	public void insertEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
+	public String insertEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
 
 		Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 		Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -62,7 +60,6 @@ public class CR01Svcmpl implements CR01Svc {
 		try {
 
 		paramMap.put("estNo",selectMaxEstNo(paramMap));
-		System.out.println(selectMaxEstNo(paramMap)+"coCd값");
 		// 견적서 insert
 		cr01Mapper.insertEst(paramMap);
 
@@ -90,6 +87,7 @@ public class CR01Svcmpl implements CR01Svc {
 		}catch(Exception e) {
 			System.out.println(e.getMessage()+"에러명");
 		}
+		return paramMap.get("estNo");
 	
 	}
 	public static String removeEmptyObjects(String jsonArrayString) {

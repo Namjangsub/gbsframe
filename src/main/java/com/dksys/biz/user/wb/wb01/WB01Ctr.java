@@ -33,23 +33,55 @@ public class WB01Ctr {
     @Autowired
     WB01Svc wb01Svc;
 	
-	  @PostMapping(value = "/selectWbsList") public String
-	  selectWbsList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	  @PostMapping(value = "/selectWbsPlanList") public String
+	  selectWbsPlanList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		  
-		  int totalCnt = wb01Svc.selectWbsCount(paramMap); 
+		  int totalCnt = wb01Svc.selectWbsPlanCount(paramMap); 
 		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		  model.addAttribute("paginationInfo", paginationInfo);
 		  
-		  List<Map<String, String>> resultList = wb01Svc.selectWbsList(paramMap);
+  		  List<Map<String, String>> resultList = wb01Svc.selectWbsPlanList(paramMap);
 		  model.addAttribute("resultList", resultList); return "jsonView"; 
 		  
 	  }
 	 
-	  @PostMapping(value = "/selectWbsList01") public String
-	  selectWbsList01(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	  @PostMapping(value = "/selectWbsPlanLvl1List") public String
+	  selectWbsPlanLvl1List(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		  
-		  List<Map<String, String>> resultList = wb01Svc.selectWbsList01(paramMap);
+		  List<Map<String, String>> resultList = wb01Svc.selectWbsPlanLvl1List(paramMap);
 		  model.addAttribute("resultList", resultList); return "jsonView"; 
+		  
+	  }
+	  
+	  @PostMapping(value = "/selectWbsPlanLvlCboList") public String
+	  selectWbsPlanLvlCboList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  
+		  List<Map<String, String>> codeInfoList = wb01Svc.selectWbsPlanLvlCboList(paramMap);
+		  model.addAttribute("codeInfoList", codeInfoList); return "jsonView"; 
+		  
+	  }
+	  
+	  @PostMapping(value = "/selectWbsPlanSubLvlCboList") public String
+	  selectWbsPlanSubLvlCboList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  
+		  List<Map<String, String>> codeInfoList = wb01Svc.selectWbsPlanSubLvlCboList(paramMap);
+		  model.addAttribute("codeInfoList", codeInfoList); return "jsonView"; 
+		  
+	  }
+	  
+	  @PostMapping(value = "/selectWbsPlanNoList") public String
+	  selectWbsPlanNoList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  
+		  List<Map<String, String>> codeInfoList = wb01Svc.selectWbsPlanNoList(paramMap);
+		  model.addAttribute("codeInfoList", codeInfoList); return "jsonView"; 
+		  
+	  }
+	  
+	  @PostMapping(value = "/selectWbsSalesCodeList") public String
+	  selectWbsSalesCodeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  
+		  List<Map<String, String>> codeInfoList = wb01Svc.selectWbsSalesCodeList(paramMap);
+		  model.addAttribute("codeInfoList", codeInfoList); return "jsonView"; 
 		  
 	  }
     
