@@ -4,54 +4,171 @@
 <mapper namespace="com.dksys.biz.user.wb.wb01.mapper.WB01Mapper">
 
 
-          <select id="selectWbsCount" parameterType="Map" resultType="int">
+          <select id="selectWbsPlanCount" parameterType="Map" resultType="int">
                     SELECT 
                       COUNT(*) 
                     FROM TB_WB01M01 WB01
           </select>
           
-          <select id="selectWbsList" parameterType="Map" resultType="camelMap">
-          
-          SELECT * FROM (
-		SELECT 
-		    ROWNUM AS RN,
-		    CO_CD,
-		    SALES_CD,
-		    CASE WHEN LEVEL = '1' THEN WBS_PLAN_CNTS ELSE '' END LVL1,
-		    CASE WHEN LEVEL = '2' THEN WBS_PLAN_CNTS ELSE '' END LVL2,
-		    CASE WHEN LEVEL = '3' THEN WBS_PLAN_CNTS ELSE '' END LVL3,
-		    WBS_PLAN_CNTS,
-		    WBS_PLAN_EMP_NO, 
-		    WBS_PLAN_MNG_EMP_NO,
-		    WBS_PLANS_DT, 
-                        WBS_PLANE_DT,
-		    WBS_PLAN_RMK 
-		FROM TB_WB01M01
-		START WITH WBS_PLAN_CNTS IN ('영업','생산')
-		CONNECT BY PRIOR WBS_PLAN_CODE_ID  =  WBS_PLAN_CODE_KIND
-		ORDER SIBLINGS BY WBS_PLAN_CODE_ID ASC )
-		WHERE RN BETWEEN ${firstIndex} AND ${lastIndex}
+          <select id="selectWbsPlanList" parameterType="Map" resultType="camelMap">   
+			SELECT ROWNUM AS RN, Z.* FROM (
+		        SELECT 
+	               X.CO_CD, -- 회사코드
+	               (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.CO_CD) AS CO_CD_NM,
+	               X.SALES_CD,-- SALES_CODE
+	               X.WBS_PLAN_NO, -- WBS계획번호
+	               Y.LVL1, -- WBS 레벨 1
+	               Y.LVL2, -- WBS 레벨 2
+	               Y.LVL3, -- WBS 레벨 3
+	               X.WBS_PLAN_CNTS, -- 주요내용
+	               TO_CHAR(X.WBS_PLAN_DT, 'YYYY-MM-DD') AS WBS_PLAN_DT, -- 작성일
+	               X.WBS_PLAN_ID, -- 작성자
+	               (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.WBS_PLAN_ID) AS WBS_PLAN_NM,
+	               X.WBS_PLAN_MNG_ID, -- 담당자
+	               (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.WBS_PLAN_MNG_ID) AS WBS_PLAN_MNG_NM,
+	               TO_CHAR(X.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT, -- 시작일자
+	               TO_CHAR(X.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT, -- 종료일자
+	               X.WBS_PLAN_RMK, -- 비고
+	               X.WBS_PLAN_STS_CODE_ID, -- 계획상태코드
+	               (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_STS_CODE_ID) AS WBS_PLAN_STS_NM,
+	               X.DSGN_DIF_CODE_ID, -- 설계난이도코드
+	               (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.DSGN_DIF_CODE_ID) AS DSGN_DIF_CODE_NM,
+	               X.DSGN_PLAN_HOUR, -- 설계계획공수
+	               X.PRDCTN_DIF_CODE_ID, -- 생산난이도코드
+	               (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.PRDCTN_DIF_CODE_ID) AS PRDCTN_DIF_CODE_NM,
+	               X.PRDCTN_PLAN_HOUR, -- 생산계획공수
+	               X.WBS_PLAN_OS_YN, -- 계획외주코드
+	               (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_OS_YN) AS WBS_PLAN_OS_NM,
+	               X.CREAT_ID, -- 생성자
+	               (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.CREAT_ID) AS CREAT_NM,
+	               X.CREAT_PGM, -- 셍성프로그램ID
+	               TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM, -- 생성일시
+	               X.UDT_ID, -- 최종변경자
+	               (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.UDT_ID) AS UDT_NM,
+	               X.UDT_PGM, -- 최종수정프로그램ID
+	               TO_CHAR(UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM -- 최종변경일시
+	                  FROM TB_WB01M01 X
+	                   INNER JOIN (
+	                                SELECT 
+	                                CODE_KIND,
+	                                CODE_ID,
+	                                CODE_RPRC,
+	                                CODE_NM,
+	                                CASE WHEN LEVEL = '1' THEN CODE_NM ELSE '' END LVL1,
+	                                CASE WHEN LEVEL = '2' THEN CODE_NM ELSE '' END LVL2,
+	                                CASE WHEN LEVEL = '3' THEN CODE_NM ELSE '' END LVL3,
+	                                LPAD(' ', 3*LEVEL-1) || SYS_CONNECT_BY_PATH(CODE_NM, '>') PATH
+	                            FROM TB_CM05M01
+	                            START WITH CODE_KIND = 'WBSDIV'
+	                            CONNECT BY PRIOR CODE_ID  =  CODE_KIND ) Y
+	                    ON X.WBS_PLAN_CODE_KIND = Y.CODE_KIND
+	                    AND X.WBS_PLAN_CODE_ID = Y.CODE_ID      
+		         ORDER BY X.SALES_CD, X.WBS_PLAN_CODE_ID ASC) Z
+		     WHERE ROWNUM BETWEEN ${firstIndex} AND ${lastIndex}
+		     <if test="coCd != null and !coCd.equals('')">
+                 AND Z.CO_CD = '${coCd}'                
+             </if>
           </select>
           
-          <select id="selectWbsList01" parameterType="Map" resultType="camelMap">
-          
-         SELECT 
-            CO_CD,
-            SALES_CD,
-            CASE WHEN LEVEL = '1' THEN WBS_PLAN_CNTS ELSE '' END LVL1,
-            CASE WHEN LEVEL = '2' THEN WBS_PLAN_CNTS ELSE '' END LVL2,
-            CASE WHEN LEVEL = '3' THEN WBS_PLAN_CNTS ELSE '' END LVL3,
-            WBS_PLAN_CNTS,
-            WBS_PLAN_EMP_NO, 
-            WBS_PLAN_MNG_EMP_NO,
-            WBS_PLANS_DT, 
-            WBS_PLANE_DT,
-            WBS_PLAN_RMK 
-        FROM TB_WB01M01
-        START WITH WBS_PLAN_CNTS IN ('영업','생산')
-        CONNECT BY PRIOR WBS_PLAN_CODE_ID  =  WBS_PLAN_CODE_KIND
-        ORDER SIBLINGS BY WBS_PLAN_CODE_ID ASC 
+          <select id="selectWbsPlanLvl1List" parameterType="Map" resultType="camelMap">
+		       SELECT * FROM (
+		             SELECT 
+			            ROWNUM AS RN,
+			            CO_CD,
+			            SALES_CD,
+			            LEVEL,
+			            CASE WHEN LEVEL = '1' THEN WBS_PLAN_CNTS ELSE '' END LVL1,
+			            CASE WHEN LEVEL = '2' THEN WBS_PLAN_CNTS ELSE '' END LVL2,
+			            CASE WHEN LEVEL = '3' THEN WBS_PLAN_CNTS ELSE '' END LVL3,
+			            LPAD(' ', 3*LEVEL-1) || SYS_CONNECT_BY_PATH(WBS_PLAN_CNTS, '>') PATH,
+			            WBS_PLAN_CNTS,
+			            WBS_PLAN_EMP_NO, 
+			            WBS_PLAN_MNG_EMP_NO,
+			            WBS_PLANS_DT, 
+			            WBS_PLANE_DT,
+			            WBS_PLAN_RMK 
+		        FROM TB_WB01M01
+		        START WITH LENGTH(WBS_PLAN_CODE_KIND) = 7
+		        CONNECT BY PRIOR WBS_PLAN_CODE_ID  =  WBS_PLAN_CODE_KIND
+		        ORDER SIBLINGS BY WBS_PLAN_CODE_ID ASC )
           </select>
           
+          <select id="selectWbsPlanLvlCboList" parameterType="Map" resultType="camelMap">
+                SELECT * FROM (
+		             SELECT 
+		                WBS_PLAN_CNTS
+		        FROM TB_WB01M01
+		        WHERE LEVEL = 1
+		        START WITH LENGTH(WBS_PLAN_CODE_KIND) = 7
+		        CONNECT BY PRIOR WBS_PLAN_CODE_ID  =  WBS_PLAN_CODE_KIND
+		        ORDER SIBLINGS BY WBS_PLAN_CODE_ID ASC )    
+          </select>
+          
+          <select id="selectWbsPlanSubLvlCboList" parameterType="Map" resultType="camelMap">
+                SELECT * FROM (
+			        SELECT 
+			            ROWNUM AS RN,
+			            CO_CD,
+			            SALES_CD,
+			            LEVEL,
+			            CASE WHEN LEVEL = '1' THEN WBS_PLAN_CNTS ELSE '' END LVL1,
+			            CASE WHEN LEVEL = '2' THEN WBS_PLAN_CNTS ELSE '' END LVL2,
+			            CASE WHEN LEVEL = '3' THEN WBS_PLAN_CNTS ELSE '' END LVL3,
+			            LPAD(' ', 3*LEVEL-1) || SYS_CONNECT_BY_PATH(WBS_PLAN_CNTS, '>') PATH,
+			            WBS_PLAN_CNTS
+			        FROM TB_WB01M01
+			        WHERE LEVEL = 2
+			        START WITH LENGTH(WBS_PLAN_CODE_KIND) = 7
+			        CONNECT BY PRIOR WBS_PLAN_CODE_ID  =  WBS_PLAN_CODE_KIND
+			        ORDER SIBLINGS BY WBS_PLAN_CODE_ID ASC )
+		        WHERE REGEXP_LIKE(PATH,'${codeKind}')
+          </select>
+          
+          <select id="selectWbsPlanNoList" parameterType="Map" resultType="camelMap">
+                SELECT DISTINCT * 
+                  FROM (
+		               SELECT 
+		                   X.CO_CD, 
+		                   (SELECT Y.CODE_NM FROM TB_CM05M01 Y WHERE Y.CODE_ID = X.CO_CD) AS CO_CD_NM,                  
+		                   X.SALES_CD, 
+		                   X.WBS_PLAN_NO
+		                   FROM TB_WB01M01 X
+		                   WHERE X.CO_CD = '${coCd}'
+		                   <if test="salesCd != null and !salesCd.equals('')">
+		                      AND X.SALES_CD = '${salesCd}'                
+		                   </if>     
+                          )
+                 ORDER BY WBS_PLAN_NO ASC         
+          </select>
+          
+          <select id="selectWbsSalesCodeList" parameterType="Map" resultType="camelMap">
+                    SELECT X.CO_CD, -- 회사코드
+                           (SELECT Y.CODE_NM FROM TB_CM05M01 Y WHERE Y.CODE_ID = X.CO_CD) AS CO_CD_NM, --회사명
+				           X.ORDRS_NO, -- 수주번호
+				           X.SALES_CD, -- SALES CODE
+				           Y.ORGN_SALES_CD, -- 원천 SALES CODE
+				           Y.ORDRS_CLNT_CD, -- 고객사
+				           Y.CLNT_PJT, -- 고객사 PJT
+				           X.ORDRS_DTL_DIV, -- 상세구분
+				           X.PRDT_DIV, -- 제품구분
+				           X.ITEM_DIV, -- 아이템구분
+				           X.EQ_NM -- 설비명
+				          FROM (
+				                SELECT CO_CD, -- 회사코드
+				                       ORDRS_NO, -- 수주번호
+				                       SALES_CD, -- SALES CODE
+				                       ORDRS_DTL_DIV, -- 상세구분
+				                       PRDT_DIV, -- 제품구분
+				                       ITEM_DIV, -- 아이템구분
+				                       EQ_NM -- 설비명
+				                       FROM TB_CR02D02) X
+				                INNER JOIN TB_CR02M01 Y
+				                ON X.CO_CD = Y.CO_CD
+				                AND X.ORDRS_NO = Y.ORDRS_NO 
+				          WHERE X.CO_CD = '${coCd}'
+                           <if test="salesCd != null and !salesCd.equals('')">
+                              AND X.SALES_CD = '${salesCd}'                
+                           </if>                     
+          </select>
           
  </mapper>

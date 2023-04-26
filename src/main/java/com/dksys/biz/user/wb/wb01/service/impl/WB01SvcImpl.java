@@ -37,18 +37,39 @@ public class WB01SvcImpl implements WB01Svc {
     @Autowired
     ExceptionThrower thrower;
     
-	@Override
-	public List<Map<String, String>> selectWbsList(Map<String, String> paramMap) {
-		return wb01Mapper.selectWbsList(paramMap);
+    @Override
+	public int selectWbsPlanCount(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsPlanCount(paramMap);
 	}
-
+    
 	@Override
-	public List<Map<String, String>> selectWbsList01(Map<String, String> paramMap) {
-		return wb01Mapper.selectWbsList01(paramMap);
+	public List<Map<String, String>> selectWbsPlanList(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsPlanList(paramMap);
 	}
 	
 	@Override
-	public int selectWbsCount(Map<String, String> paramMap) {
-		return wb01Mapper.selectWbsCount(paramMap);
+	public List<Map<String, String>> selectWbsPlanLvl1List(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsPlanLvl1List(paramMap);
 	}
+
+	@Override
+	public List<Map<String, String>> selectWbsPlanLvlCboList(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsPlanLvlCboList(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectWbsPlanSubLvlCboList(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsPlanSubLvlCboList(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectWbsPlanNoList(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsPlanNoList(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectWbsSalesCodeList(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsSalesCodeList(paramMap);
+	}
+	
 }

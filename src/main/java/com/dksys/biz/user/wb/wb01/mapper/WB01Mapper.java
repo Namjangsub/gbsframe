@@ -7,10 +7,18 @@ import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface WB01Mapper {
-	int selectWbsCount(Map<String, String> paramMap);
+	int selectWbsPlanCount(Map<String, String> paramMap);
 
-	List<Map<String, String>> selectWbsList(Map<String, String> paramMap);
+	List<Map<String, String>> selectWbsPlanList(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectWbsList01(Map<String, String> paramMap);
-
+	List<Map<String, String>> selectWbsPlanLvl1List(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectWbsPlanLvlCboList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectWbsPlanSubLvlCboList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectWbsPlanNoList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectWbsSalesCodeList(Map<String, String> paramMap);
+	
 }
