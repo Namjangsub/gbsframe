@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import com.dksys.biz.admin.cm.cm02.service.CM02Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.util.MessageUtils;
 
 @Controller
@@ -122,6 +123,10 @@ public class CM08Ctr {
     //카테고리별 파일정보 리스트 조회
     @PostMapping("/selectTreeFileList")
     public String selectTreeFileList(@RequestBody Map<String, String> param, ModelMap model) {
+    	int totalCnt = cm08Svc.selectTreeFileCount(param);
+		PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
+    	model.addAttribute("paginationInfo", paginationInfo);
+    	
     	List<Map<String, String>> fileList = cm08Svc.selectTreeFileList(param);
     	model.addAttribute("fileList", fileList);
         return "jsonView";

@@ -13,6 +13,8 @@ public interface CM08Mapper {
 	int insertTreeFile(HashMap<String, String> param);
 	List<Map<String, String>> selectFileList(Map<String, String> paramMap);
 
+	int selectTreeFileCount(Map<String, String> paramMap);
+	
 	List<Map<String, String>> selectTreeFileList(Map<String, String> paramMap);
 
 	Map<String, String> selectFileInfo(String fileKey);

@@ -24,6 +24,8 @@ public interface CM08Svc {
 
 	public String excelDownload(List<Map<String, String>> resultList, String string);
 
+	public int selectTreeFileCount(Map<String, String> paramMap);
+	
 	public List<Map<String, String>> selectTreeFileList(Map<String, String> paramMap);
 	
 }
