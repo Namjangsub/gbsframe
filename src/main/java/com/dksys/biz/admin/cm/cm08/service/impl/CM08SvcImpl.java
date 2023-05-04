@@ -29,15 +29,15 @@ import com.dksys.biz.util.DateUtil;
 
 @Service
 public class CM08SvcImpl implements CM08Svc {
-	
+
     @Autowired
     CM08Mapper cm08Mapper;
 
-	@Override
-	public int uploadFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest) {
-		List<MultipartFile> fileList = mRequest.getFiles("files");
-		String year = DateUtil.getCurrentYyyy();
-		String month = DateUtil.getCurrentMm();
+    @Override
+    public int uploadFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest) {
+        List<MultipartFile> fileList = mRequest.getFiles("files");
+        String year = DateUtil.getCurrentYyyy();
+        String month = DateUtil.getCurrentMm();
         String path = "C:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
         for (MultipartFile mf : fileList) {
             String originFileName = mf.getOriginalFilename(); // 원본 파일 명
@@ -46,137 +46,140 @@ public class CM08SvcImpl implements CM08Svc {
             HashMap<String, String> param = new HashMap<String, String>();
             param.put("fileSize", String.valueOf(mf.getSize()));
             if (originFileName != null) {
-            	   // originFileName으로 작업 수행
-	            	param.put("fileType", originFileName.split("\\.")[originFileName.split("\\.").length-1]);
-	            	param.put("fileName", originFileName);
-            	} else {
-            		// originFileName이 null인 경우 처리
-            		param.put("fileType", "err");
-            		param.put("fileName", "error");
-            	}
+                // originFileName으로 작업 수행
+                param.put("fileType", originFileName.split("\\.")[originFileName.split("\\.").length - 1]);
+                param.put("fileName", originFileName);
+            } else {
+                // originFileName이 null인 경우 처리
+                param.put("fileType", "err");
+                param.put("fileName", "error");
+            }
             param.put("filePath", path);
             param.put("fileTrgtTyp", fileTrgtTyp);
             param.put("fileTrgtKey", fileTrgtKey);
             param.put("userId", mRequest.getParameter("userId"));
             param.put("pgmId", fileTrgtTyp);
-			param.put("coCd", mRequest.getParameter("coCd"));
+            param.put("coCd", mRequest.getParameter("coCd"));
             try {
-            	cm08Mapper.insertFile(param);
-            	String saveFile = param.get("fileKey") + "_" + originFileName;
-            	File f = new File(path);
-            	if(!f.isDirectory()) f.mkdirs();
-            	
-            	// if(fileTrgtTyp.equals("TB_OD01M01") || fileTrgtTyp.equals("TB_BM02M01") || fileTrgtTyp.equals("TB_OD02M01") || fileTrgtTyp.equals("TB_AR14M01")) {
-            		mf.transferTo(new File(path+saveFile));
-            	// }
-            	
+                cm08Mapper.insertFile(param);
+                String saveFile = param.get("fileKey") + "_" + originFileName;
+                File f = new File(path);
+                if (!f.isDirectory()) f.mkdirs();
+
+                // if(fileTrgtTyp.equals("TB_OD01M01") || fileTrgtTyp.equals("TB_BM02M01") || fileTrgtTyp.equals("TB_OD02M01") || fileTrgtTyp.equals("TB_AR14M01")) {
+                mf.transferTo(new File(path + saveFile));
+                // }
+
             } catch (IllegalStateException e) {
                 e.printStackTrace();
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-		return 0;
-	}
+        return 0;
+    }
+    @Override
+    public int uploadTreeFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest) {
+        List<MultipartFile> fileList = mRequest.getFiles("files");
+        String year = DateUtil.getCurrentYyyy();
+        String month = DateUtil.getCurrentMm();
+        String path = "C:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
 
-	@Override
-	public int uploadFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest,String nodeId) {
-		List<MultipartFile> fileList = mRequest.getFiles("files");
-		String year = DateUtil.getCurrentYyyy();
-		String month = DateUtil.getCurrentMm();
-		String path = "C:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
-		for (MultipartFile mf : fileList) {
-			String originFileName = mf.getOriginalFilename(); // 원본 파일 명
-			// long fileSize = mf.getSize(); // 파일 사이즈
-			HashMap<String, String> param = new HashMap<String, String>();
-			param.put("fileSize", String.valueOf(mf.getSize()));
-			if (originFileName != null) {
-				// originFileName으로 작업 수행
-				param.put("fileType", originFileName.split("\\.")[originFileName.split("\\.").length-1]);
-				param.put("fileName", originFileName);
-			} else {
-				// originFileName이 null인 경우 처리
-				param.put("fileType", "err");
-				param.put("fileName", "error");
-			}
-			param.put("filePath", path);
-			param.put("fileTrgtTyp", fileTrgtTyp);
-			param.put("fileTrgtKey", fileTrgtKey);
-			param.put("userId", mRequest.getParameter("userId"));
-			param.put("pgmId", fileTrgtTyp);
-			param.put("coCd", mRequest.getParameter("coCd"));
-			param.put("comonCd", nodeId);
+        for (int i = 0; i < fileList.size(); i++) {
+            try {
+                MultipartFile mf = fileList.get(i);
+                String originFileName = mf.getOriginalFilename(); // 원본 파일 명
 
-			try {
-				cm08Mapper.insertTreeFile(param);
-				String saveFile = param.get("fileKey") + "_" + originFileName;
-				File f = new File(path);
-				if(!f.isDirectory()) f.mkdirs();
+                HashMap<String, String> param = new HashMap<String, String>();
+                param.put("fileSize", String.valueOf(mf.getSize()));
+                if (originFileName != null) {
+                    // originFileName으로 작업 수행
+                    param.put("fileType", originFileName.split("\\.")[originFileName.split("\\.").length - 1]);
+                    param.put("fileName", originFileName);
+                } else {
+                    // originFileName이 null인 경우 처리
+                    param.put("fileType", "err");
+                    param.put("fileName", "error");
+                }
+                param.put("filePath", path);
+                param.put("fileTrgtTyp", fileTrgtTyp);
+                param.put("fileTrgtKey", fileTrgtKey);
+                param.put("userId", mRequest.getParameter("userId"));
+                param.put("pgmId", fileTrgtTyp);
+                param.put("coCd", mRequest.getParameter("coCd"));
+                // comonCd 처리
+                String comonCdKey = "comonCd_" + i;
+                String comonCd = mRequest.getParameter(comonCdKey);
+                param.put("comonCd", comonCd);
 
-				// if(fileTrgtTyp.equals("TB_OD01M01") || fileTrgtTyp.equals("TB_BM02M01") || fileTrgtTyp.equals("TB_OD02M01") || fileTrgtTyp.equals("TB_AR14M01")) {
-				mf.transferTo(new File(path+saveFile));
-				// }
+                cm08Mapper.insertTreeFile(param);
+                String saveFile = param.get("fileKey") + "_" + originFileName;
+                File f = new File(path);
+                if (!f.isDirectory()) f.mkdirs();
 
-			} catch (IllegalStateException e) {
-				e.printStackTrace();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-		return 0;
-	}
+                // if(fileTrgtTyp.equals("TB_OD01M01") || fileTrgtTyp.equals("TB_BM02M01") || fileTrgtTyp.equals("TB_OD02M01") || fileTrgtTyp.equals("TB_AR14M01")) {
+                mf.transferTo(new File(path + saveFile));
+                // }
 
-	@Override
-	public List<Map<String, String>> selectFileList(Map<String, String> paramMap) {
-		return cm08Mapper.selectFileList(paramMap);
-	}
+            } catch (IllegalStateException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return 0;
+    }
+    @Override
+    public List<Map<String, String>> selectFileList(Map<String, String> paramMap) {
+        return cm08Mapper.selectFileList(paramMap);
+    }
 
-	@Override
-	public List<Map<String, String>> selectTreeFileList(Map<String, String> paramMap) {
-		return cm08Mapper.selectTreeFileList(paramMap);
-	}
-	
-	@Override
-	public void setDisposition(HttpServletRequest request, HttpServletResponse response, String fileName) {
-		try {
-			String browser = getBrowser(request);
-			String dispositionPrefix = "attachment; filename=";
-			String encodedFilename = null;
-			if (browser.equals("MSIE")) {
-			    encodedFilename = URLEncoder.encode(fileName, "UTF-8").replaceAll("\\+", "%20");
-			} else if (browser.equals("Trident")) { // IE11 문자열 깨짐 방지
-			    encodedFilename = URLEncoder.encode(fileName, "UTF-8").replaceAll("\\+", "%20");
-			} else if (browser.equals("Firefox")) {
-			    encodedFilename = "\"" + new String(fileName.getBytes("UTF-8"), "8859_1") + "\"";
-			} else if (browser.equals("Opera")) {
-			    encodedFilename = "\"" + new String(fileName.getBytes("UTF-8"), "8859_1") + "\"";
-			} else if (browser.equals("Chrome")) {
-			    StringBuffer sb = new StringBuffer();
-			    for (int i = 0; i < fileName.length(); i++) {
-			        char c = fileName.charAt(i);
-			        if (c > '~') {
-			            sb.append(URLEncoder.encode("" + c, "UTF-8"));
-			        } else {
-			            sb.append(c);
-			        }
-			    }
-			    encodedFilename = "\"" + sb.toString() + "\"";
-			} else {
-			    throw new IOException("Not supported browser");
-			}
-			response.setHeader("Content-Disposition", dispositionPrefix + encodedFilename);
-			if ("Opera".equals(browser)) {
-			    response.setContentType("application/octet-stream;charset=UTF-8");
-			}
-			response.setHeader("Content-Transfer-Encoding", "binary");
-		} catch (UnsupportedEncodingException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
+    @Override
+    public List<Map<String, String>> selectTreeFileList(Map<String, String> paramMap) {
+        return cm08Mapper.selectTreeFileList(paramMap);
+    }
 
-	public String getBrowser(HttpServletRequest request) {
+    @Override
+    public void setDisposition(HttpServletRequest request, HttpServletResponse response, String fileName) {
+        try {
+            String browser = getBrowser(request);
+            String dispositionPrefix = "attachment; filename=";
+            String encodedFilename = null;
+            if (browser.equals("MSIE")) {
+                encodedFilename = URLEncoder.encode(fileName, "UTF-8").replaceAll("\\+", "%20");
+            } else if (browser.equals("Trident")) { // IE11 문자열 깨짐 방지
+                encodedFilename = URLEncoder.encode(fileName, "UTF-8").replaceAll("\\+", "%20");
+            } else if (browser.equals("Firefox")) {
+                encodedFilename = "\"" + new String(fileName.getBytes("UTF-8"), "8859_1") + "\"";
+            } else if (browser.equals("Opera")) {
+                encodedFilename = "\"" + new String(fileName.getBytes("UTF-8"), "8859_1") + "\"";
+            } else if (browser.equals("Chrome")) {
+                StringBuffer sb = new StringBuffer();
+                for (int i = 0; i < fileName.length(); i++) {
+                    char c = fileName.charAt(i);
+                    if (c > '~') {
+                        sb.append(URLEncoder.encode("" + c, "UTF-8"));
+                    } else {
+                        sb.append(c);
+                    }
+                }
+                encodedFilename = "\"" + sb.toString() + "\"";
+            } else {
+                throw new IOException("Not supported browser");
+            }
+            response.setHeader("Content-Disposition", dispositionPrefix + encodedFilename);
+            if ("Opera".equals(browser)) {
+                response.setContentType("application/octet-stream;charset=UTF-8");
+            }
+            response.setHeader("Content-Transfer-Encoding", "binary");
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public String getBrowser(HttpServletRequest request) {
         String header = request.getHeader("User-Agent");
         if (header.indexOf("MSIE") > -1) {
             return "MSIE";
@@ -190,66 +193,66 @@ public class CM08SvcImpl implements CM08Svc {
         return "Firefox";
     }
 
-	@Override
-	public Map<String, String> selectFileInfo(String fileKey) {
-		return cm08Mapper.selectFileInfo(fileKey);
-	}
+    @Override
+    public Map<String, String> selectFileInfo(String fileKey) {
+        return cm08Mapper.selectFileInfo(fileKey);
+    }
 
-	@Override
-	public int deleteFile(String fileKey) {
-		Map<String, String> fileInfo = selectFileInfo(fileKey);
-		String filePath = fileInfo.get("filePath") + fileKey + "_" + fileInfo.get("fileName");
-		int result = cm08Mapper.deleteFileInfo(fileKey);
-		try {
-			File f = new File(filePath);
-			f.delete();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return result;
-	}
+    @Override
+    public int deleteFile(String fileKey) {
+        Map<String, String> fileInfo = selectFileInfo(fileKey);
+        String filePath = fileInfo.get("filePath") + fileKey + "_" + fileInfo.get("fileName");
+        int result = cm08Mapper.deleteFileInfo(fileKey);
+        try {
+            File f = new File(filePath);
+            f.delete();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return result;
+    }
 
-	@Override
-	public String excelDownload(List<Map<String, String>> list, String fileName) {
-		if(list.size() == 0) return "noData";
-		try (XSSFWorkbook xWorkbook = new XSSFWorkbook()) {
-			XSSFCellStyle numberCellStyle = xWorkbook.createCellStyle();
-			XSSFDataFormat numberDataFormat = xWorkbook.createDataFormat();
-			numberCellStyle.setDataFormat(numberDataFormat.getFormat("#,##0"));
-			XSSFSheet sheet = xWorkbook.createSheet("sheet1");
-			Row row = null;
-			int j = 0;
-			//컬럼 생성
-			row = sheet.createRow(0);
-			Map<String, String> map = list.get(0);
-			//컬럼 생성
-			for(String key : map.keySet()) {
-				Cell cell = row.createCell(j);
-				cell.setCellValue(key);
-				j++;
-			}
-			//행 데이터 생성
-			for (int i = 0; i < list.size(); i++) {
-				j = 0;
-				map = list.get(i);
-				row = sheet.createRow(i+1);
-				for(String key : map.keySet()) {
-					Cell cell = row.createCell(j);
-					cell.setCellValue(map.get(key));
-					j++;
-				}
-			}
-			FileOutputStream fileOut = null;
-	        String path = "C:\\upload\\" + fileName;
-			File f = new File(path);
+    @Override
+    public String excelDownload(List<Map<String, String>> list, String fileName) {
+        if (list.size() == 0) return "noData";
+        try (XSSFWorkbook xWorkbook = new XSSFWorkbook()) {
+            XSSFCellStyle numberCellStyle = xWorkbook.createCellStyle();
+            XSSFDataFormat numberDataFormat = xWorkbook.createDataFormat();
+            numberCellStyle.setDataFormat(numberDataFormat.getFormat("#,##0"));
+            XSSFSheet sheet = xWorkbook.createSheet("sheet1");
+            Row row = null;
+            int j = 0;
+            //컬럼 생성
+            row = sheet.createRow(0);
+            Map<String, String> map = list.get(0);
+            //컬럼 생성
+            for (String key : map.keySet()) {
+                Cell cell = row.createCell(j);
+                cell.setCellValue(key);
+                j++;
+            }
+            //행 데이터 생성
+            for (int i = 0; i < list.size(); i++) {
+                j = 0;
+                map = list.get(i);
+                row = sheet.createRow(i + 1);
+                for (String key : map.keySet()) {
+                    Cell cell = row.createCell(j);
+                    cell.setCellValue(map.get(key));
+                    j++;
+                }
+            }
+            FileOutputStream fileOut = null;
+            String path = "C:\\upload\\" + fileName;
+            File f = new File(path);
 //        	if(!f.isDirectory()) f.mkdirs();
-        	fileOut = new FileOutputStream(f);
-        	xWorkbook.write(fileOut);
-      		f.deleteOnExit();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		return fileName;
-	}
+            fileOut = new FileOutputStream(f);
+            xWorkbook.write(fileOut);
+            f.deleteOnExit();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return fileName;
+    }
 
 }
