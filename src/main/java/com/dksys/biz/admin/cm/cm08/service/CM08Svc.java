@@ -12,7 +12,7 @@ public interface CM08Svc {
 
 	public int uploadFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest);
 
-	int uploadFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest, String nodeId);
+	int uploadTreeFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest);
 
 	public List<Map<String, String>> selectFileList(Map<String, String> paramMap);
 	
