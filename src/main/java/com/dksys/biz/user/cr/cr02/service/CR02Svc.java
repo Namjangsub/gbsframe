@@ -16,7 +16,7 @@ public interface CR02Svc {
 	String selectMaxOrdrsNo(Map<String, String> param);
 
 	void insertOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest);
-	void updateOrdrs(Map<String, String> param);
+	void updateOrdrs(Map<String, String> param,MultipartHttpServletRequest mRequest);
 
 
 

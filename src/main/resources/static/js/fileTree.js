@@ -281,12 +281,9 @@ var treeModule = (function () {
 
     function deleteFile(rowIndex) {
         fileTreeGridView.target.removeRow(rowIndex);
-
         if (fileArr[rowIndex].fileKey) {
-
             deleteFileArr.push(fileArr[rowIndex].fileKey);
         }
-
         fileArr.splice(rowIndex, 1);
         fileTreeGridView.setData();
     }

@@ -21,10 +21,15 @@ public interface CR02Mapper {
 
 	String selectMaxOrdrsNo(Map<String, String> param);
 	int insertOrdrs(Map<String, String> param);
+	void updateOrdrs(Map<String, String> param);
 	int insertOrdrsDetail(Map<String, String> param);
+	void updateOrdrsDetail(Map<String, String> param);
 	int insertClmnPlan(Map<String, String> param);
+	void updateClmnPlan(Map<String, String> param);
+
 
 	int insertClmnPlanHis(Map<String, String> param);
+
 
 
 

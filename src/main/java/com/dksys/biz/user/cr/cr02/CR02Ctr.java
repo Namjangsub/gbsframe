@@ -61,15 +61,13 @@ public class CR02Ctr {
 	public String insertOrdrs(@RequestParam Map<String, String> param, MultipartHttpServletRequest mRequest, ModelMap model) {
 		cr02Svc.insertOrdrs(param,mRequest);
 
-
-
 		return "jsonView";
 	}
 
 
 	@PostMapping(value = "/updateOrdrs")
 	public String updateOrdrs(@RequestParam Map<String, String> param,MultipartHttpServletRequest mRequest, ModelMap model) {
-		cr02Svc.updateOrdrs(param);
+		cr02Svc.updateOrdrs(param,mRequest);
 		return "jsonView";
 	}
 }

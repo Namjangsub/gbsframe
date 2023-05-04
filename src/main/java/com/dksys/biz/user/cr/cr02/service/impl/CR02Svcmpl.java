@@ -106,17 +106,57 @@ public class CR02Svcmpl implements CR02Svc {
             }
 
         }
-
-
     }
-
     @Override
-    public void updateOrdrs(Map<String, String> param) {
+    public void updateOrdrs(Map<String, String> param,MultipartHttpServletRequest mRequest) {
+        Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+        Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {
+        }.getType();
+        cr02Mapper.updateOrdrs(param);
+        List<Map<String, String>> planArr = gson.fromJson(removeEmptyObjects(param.get("planArr")), mapList);
+        for (Map<String, String> planMap : planArr) {
+            try {
+                planMap.put("coCd", param.get("coCd"));
+                planMap.put("ordrsNo", param.get("ordrsNo"));
+                planMap.put("estNo", param.get("estNo"));
+                planMap.put("userId", param.get("userId"));
+                planMap.put("pgmId", param.get("pgmId"));
+                planMap.put("currUnit", param.get("currUnit"));
+                cr02Mapper.updateClmnPlan(planMap);
 
-        cr02Mapper.insertOrdrs(param);
-        cr02Mapper.insertOrdrsDetail(param);
-        cr02Mapper.insertClmnPlan(param);
+            } catch (Exception e) {
+                System.out.println("error2"+e.getMessage());
 
+
+            }
+        }
+
+        List<Map<String, String>> detailArr = gson.fromJson(removeEmptyObjects(param.get("detailArr")), mapList);
+
+        for (Map<String, String> detailMap : detailArr) {
+            try {
+                detailMap.put("coCd", param.get("coCd"));
+                detailMap.put("ordrsNo", param.get("ordrsNo"));
+                detailMap.put("estNo", param.get("estNo"));
+                detailMap.put("userId", param.get("userId"));
+                detailMap.put("pgmId", param.get("pgmId"));
+                detailMap.put("currUnit", param.get("currUnit"));
+                cr02Mapper.updateOrdrsDetail(detailMap);
+            } catch (Exception e) {
+                System.out.println("error3"+e.getMessage());
+            }
+        }
+
+/*        for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
+            try {
+                cm08Svc.uploadTreeFile("TB_CR02M01", param.get("ordrsNo"), mRequest);
+            } catch (Exception e) {
+                System.out.println("error4"+e.getMessage());
+
+
+            }
+
+        }  */
 
     }
 
