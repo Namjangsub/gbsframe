@@ -11,6 +11,7 @@ public interface CM08Mapper {
 
 	int insertFile(HashMap<String, String> param);
 	int insertTreeFile(HashMap<String, String> param);
+	String selectNextFileTrgtKey();
 	List<Map<String, String>> selectFileList(Map<String, String> paramMap);
 
 	int selectTreeFileCount(Map<String, String> paramMap);
@@ -20,6 +21,7 @@ public interface CM08Mapper {
 	Map<String, String> selectFileInfo(String fileKey);
 
 	int deleteFileInfo(String fileKey);
-	
+
+
 	
 }
