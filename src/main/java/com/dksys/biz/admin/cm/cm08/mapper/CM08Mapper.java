@@ -22,6 +22,8 @@ public interface CM08Mapper {
 
 	int deleteFileInfo(String fileKey);
 
-
+	int selectConfirmCount(Map<String, String> paramMap);
 	
+	int moveFile(Map<String, String> paramMap);
+
 }

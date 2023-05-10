@@ -4,7 +4,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Type;
 import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +28,9 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import com.dksys.biz.admin.cm.cm08.mapper.CM08Mapper;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.util.DateUtil;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 
 @Service
 public class CM08SvcImpl implements CM08Svc {
@@ -261,4 +266,19 @@ public class CM08SvcImpl implements CM08Svc {
         return fileName;
     }
 
+	
+	@Override
+	public int selectConfirmCount(Map<String, String> paramMap) {
+		return cm08Mapper.selectConfirmCount(paramMap);
+	}
+    
+	@Override
+	public int moveFile(Map<String, String> paramMap) {
+		
+		// update
+		int result = cm08Mapper.moveFile(paramMap);
+		
+		return result;
+	}
+	
 }

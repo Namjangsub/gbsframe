@@ -27,5 +27,9 @@ public interface CM08Svc {
 	public int selectTreeFileCount(Map<String, String> paramMap);
 	
 	public List<Map<String, String>> selectTreeFileList(Map<String, String> paramMap);
+
+	int selectConfirmCount(Map<String, String> paramMap);
+	
+	int moveFile(Map<String, String> paramMap);
 	
 }

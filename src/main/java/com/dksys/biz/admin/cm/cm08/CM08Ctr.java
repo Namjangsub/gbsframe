@@ -18,9 +18,11 @@ import org.springframework.ui.ModelMap;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.admin.cm.cm02.service.CM02Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
@@ -132,5 +134,25 @@ public class CM08Ctr {
         return "jsonView";
     }
 
+	
+	@PostMapping(value = "/selectConfirmCount")
+	public String selectConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int result = cm08Svc.selectConfirmCount(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 
+	@PostMapping(value = "/moveFile")
+	public String moveFile(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			cm08Svc.moveFile(paramMap);
+	    	model.addAttribute("resultCode", 200);
+	    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+		}catch(Exception e) {
+			model.addAttribute("resultCode", 500);
+    		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		}
+    	return "jsonView";
+    }
+		
 }
