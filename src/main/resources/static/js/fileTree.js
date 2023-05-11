@@ -289,7 +289,8 @@ var treeModule = (function () {
         fileArr = fileArr.filter(function (item) {
             return item &&
                 typeof item === 'object' &&
-                'fileKey' in item
+                'fileKey' in item &&
+                item.fileKey == 0;
         });
         console.log(JSON.stringify(fileArr))
 
