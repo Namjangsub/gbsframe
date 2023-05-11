@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.util.FileCopyUtils;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -155,4 +156,17 @@ public class CM08Ctr {
     	return "jsonView";
     }
 		
+    @DeleteMapping(value = "/deleteFileCall")
+    public String deleteFileCall(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+	    	int result = cm08Svc.deleteFileCall(paramMap);
+	    	model.addAttribute("deleteCount", result);
+	    	model.addAttribute("resultCode", 200);
+	    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+		}catch(Exception e) {
+			model.addAttribute("resultCode", 500);
+    		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		}
+    	return "jsonView";
+    }
 }

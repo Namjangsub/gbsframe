@@ -274,11 +274,24 @@ public class CM08SvcImpl implements CM08Svc {
     
 	@Override
 	public int moveFile(Map<String, String> paramMap) {
-		
 		// update
 		int result = cm08Mapper.moveFile(paramMap);
-		
 		return result;
+	}
+	
+	@Override
+	public int deleteFileCall(Map<String, String> paramMap) {
+		String fileKey = paramMap.get("fileKey");
+        Map<String, String> fileInfo = selectFileInfo(fileKey);
+        String filePath = fileInfo.get("filePath") + fileKey + "_" + fileInfo.get("fileName");
+        int result = cm08Mapper.deleteFileInfo(fileKey);
+        try {
+            File f = new File(filePath);
+            f.delete();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return result;		
 	}
 	
 }

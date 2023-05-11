@@ -26,4 +26,6 @@ public interface CM08Mapper {
 	
 	int moveFile(Map<String, String> paramMap);
 
+	int deleteFileCall(Map<String, String> paramMap);
+	
 }
