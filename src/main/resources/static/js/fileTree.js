@@ -275,7 +275,6 @@ var treeModule = (function () {
             if (!uploadedFiles[selectedNodeId]) {
                 uploadedFiles[selectedNodeId] = [];
             }
-
             uploadedFiles[selectedNodeId].push(newFile);
         });
 
@@ -283,8 +282,17 @@ var treeModule = (function () {
     }
 
     function updateFileTreeGridView() {
+
         var nodeUploadedFiles = uploadedFiles[selectedNodeId] || [];
         fileArr = fileArr.concat(nodeUploadedFiles);
+        console.log(JSON.stringify(fileArr));
+        fileArr = fileArr.filter(function (item) {
+            return item &&
+                typeof item === 'object' &&
+                'fileKey' in item
+        });
+        console.log(JSON.stringify(fileArr))
+
         fileTreeGridView.reqSetData(nodeUploadedFiles);
     }
 
