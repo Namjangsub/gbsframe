@@ -130,6 +130,7 @@ var treeModule = (function () {
                 var allNodes = [clickedId].concat(childrenNodes);
                 getAllFilesForNodes(allNodes, function (allFiles) {
                     if (!uploadedFiles[selectedNodeId]) {
+                        uploadedFiles[selectedNodeId] = allFiles;
                     }
                     updateFileTreeGridView();
                 });
