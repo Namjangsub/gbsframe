@@ -67,7 +67,6 @@ public class CR01Svcmpl implements CR01Svc {
             paramMap.put("estNo", maxEstNo);
             String fileTrgtKey;
             fileTrgtKey = cm08Mapper.selectNextFileTrgtKey();
-            System.out.println("최대값:"+fileTrgtKey);
             paramMap.put("fileTrgtKey", fileTrgtKey);
             cr01Mapper.insertEst(paramMap);
 
@@ -153,7 +152,8 @@ public class CR01Svcmpl implements CR01Svc {
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
         Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 
-        int result = cr01Mapper.updateEst(paramMap);
+        System.out.println(paramMap);
+        //int result = cr01Mapper.updateEst(paramMap);
 
     // 데이터베이스에서 현재 견적 상세 목록 가져오기
         List<Map<String, Object>> dbDetailListRaw = cr01Mapper.selectEstDetail(paramMap);
@@ -223,7 +223,7 @@ public class CR01Svcmpl implements CR01Svc {
         System.out.println(paramMap.get("fileTrgtKey")+"해당위치");
         cm08Svc.uploadTreeFile("TB_CR01M01", paramMap.get("fileTrgtKey"), mRequest);
 
-        return result;
+        return 1;
     }
 
     @Override

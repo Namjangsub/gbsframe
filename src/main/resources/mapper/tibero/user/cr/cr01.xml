@@ -2,327 +2,182 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.dksys.biz.user.cr.cr01.mapper.CR01Mapper">
-	<select id="selectMaxEstNo" parameterType="map" resultType="string">
-		SELECT
-				'EST' || TO_CHAR(SYSDATE, 'YYYY') || '-' ||
-				LPAD(
-						NVL(
-								(SELECT
-									 TO_NUMBER(SUBSTR(MAX(EST_NO), 9)) + 1
-								 FROM
-									 TB_CR01M01
-								 WHERE
-									 SUBSTR(EST_NO, 4, 4) = TO_CHAR(SYSDATE, 'YYYY')
-								   AND CO_CD = #{coCd}
-								),
-								1
-							),
-						4,
-						'0'
-					) AS max_est_no
-		FROM
-			DUAL
-	</select>
+
+    <select id="selectMaxEstNo" parameterType="map" resultType="string">
+        SELECT 'EST' || TO_CHAR(SYSDATE, 'YY') || '-' ||
+               LPAD(
+                       NVL(
+                               (SELECT TO_NUMBER(SUBSTR(MAX(EST_NO), 7)) + 1
+                                FROM TB_CR01M01
+                                WHERE SUBSTR(EST_NO, 4, 2) = TO_CHAR(SYSDATE, 'YY')
+                                  AND CO_CD = #{coCd}),
+                               1
+                           ),
+                       4,
+                       '0'
+                   ) AS max_est_no
+        FROM DUAL
+    </select>
+
+    <select id="selectEstCount" resultType="int">
+        SELECT COUNT(*)
+        FROM TB_CR01M01 A
+        WHERE 1 = 1
+
+    </select>
+
+    <select id="selectEstList" resultType="CamelMap">
+        SELECT *
+        FROM (
+        SELECT
+        TO_CHAR(T.EST_DT, 'YYYY-MM-DD') AS EST_DT,
+--         TO_CHAR(T.EST_STD_DT, 'YYYY-MM-DD') AS EST_STD_DT,
+        ROWNUM AS RNUM,
+        T.*
+        FROM (
+        SELECT A.*, B.CLNT_NM
+        FROM TB_CR01M01 A
+        LEFT JOIN TB_BM02M01 B ON A.EST_CLNT_CD = B.CLNT_CD
+        <where>
+            <if test="strtDt != null and !strtDt.equals('')">
+                AND A.EST_DT BETWEEN #{strtDt} AND #{endDt}
+            </if>
+            <if test="coCd != null and !coCd.equals('')">
+                AND A.CO_CD = #{coCd}
+            </if>
+            <if test="searchType != null and searchType.equals('EST_NO')">
+                AND A.EST_NO LIKE '%' || #{searchValue} || '%'
+            </if>
+            <if test="searchType != null and searchType.equals('CLNT_NM')">
+                AND B.CLNT_NM LIKE '%' || #{searchValue} || '%'
+            </if>
+            <if test="estNm != null and !estNm.equals('')">
+                AND A.EST_NM LIKE '%' || #{estNm} || '%'
+            </if>
+            <if test="searchType == null or (!searchType.equals('EST_NO') and !searchType.equals('CLNT_NM'))">
+                <if test="estNo != null and !estNo.equals('')">
+                    AND A.EST_NO = #{estNo}
+                </if>
+            </if>
+            <if test="estDeg != null and !estDeg.equals('')">
+                AND A.EST_DEG = #{estDeg}
+            </if>
+            <if test="clntCd != null and !clntCd.equals('')">
+                AND B.CLNT_CD = #{clntCd}
+            </if>
+        </where>
+        ) T
+        )
+        WHERE RNUM BETWEEN #{firstIndex} AND #{lastIndex}
+    </select>
+
+    <resultMap id="resultInfoMap" type="CamelMap">
+        <collection select="selectEstDetail" property="list" column="{coCd=CO_CD,estNo=EST_NO,estDeg=EST_DEG}" ofType="CamelMap"/>
+    </resultMap>
+
+    <select id="selectEstInfo" resultMap="resultInfoMap">
+        SELECT
+            TO_CHAR(B.EST_DT, 'YYYY-MM-DD') AS EST_DT,
+--             TO_CHAR(B.EST_STD_DT, 'YYYY-MM-DD') AS EST_STD_DT,
+            B.*,
+            B.MAX_EST_DEG
+        FROM (
+                 SELECT
+                     A.*,
+                     MAX(A.EST_DEG) OVER (PARTITION BY A.CO_CD, A.EST_NO) AS MAX_EST_DEG
+                 FROM TB_CR01M01 A
+             ) B
+        WHERE
+            B.CO_CD = #{coCd}
+          AND B.EST_NO = #{estNo}
+          AND B.EST_DEG = #{estDeg}
+    </select>
 
 
-	<select id="selectEstCount" resultType="int">
-	    SELECT
-	        COUNT(*)
-	    FROM
-	        TB_CR01M01 A
-	    WHERE 1=1
+    <select id="selectEstDetail" parameterType="map" resultType="CamelMap">
+        SELECT *
+        FROM TB_CR01D01
+        WHERE
+            1 = 1
+            AND CO_CD = #{coCd}
+            AND EST_NO = #{estNo}
+            AND EST_DEG = #{estDeg}
+    </select>
+    <insert id="insertEst">
+        INSERT INTO TB_CR01M01
+            (CO_CD, EST_NO, EST_CLNT_CD, EST_DT,
+            CSTM_MNG_NM, CSTM_MNG_HP, EST_NM, EST_AMT, EST_EXCEPT,
+             EST_DLVR_CNDT, EST_PMNT_CNDT, EST_DUDT, EST_DEG, FILE_TRGT_KEY)
+        VALUES
+            (#{coCd}, #{estNo}, #{estClntCd}, #{estDt},
+            #{cstmMngNm}, #{cstmMngHp}, #{estNm}, #{estAmt}, #{estExcept},
+             #{estDlvrCndt}, #{estPmntCndt}, #{estDudt}, #{estDeg}, #{fileTrgtKey})
+    </insert>
 
-	</select>
+    <insert id="insertEstDetail" parameterType="map">
+        INSERT INTO TB_CR01D01
+            (CO_CD, EST_NO, EST_DTL_DIV, EST_SEQ,
+            EST_COMM, EST_SPEC, EST_UNIT, EST_QTY,
+            EST_UPR, EST_DEG)
+        VALUES
+            (#{coCd}, #{estNo}, #{estDtlDiv}, #{estSeq},
+            #{estComm}, #{estSpec}, #{estUnit}, #{estQty},
+            #{estUpr}, #{estDeg})
+    </insert>
 
-	<select id="selectEstList" resultType="CamelMap">
-	    SELECT
-	        *
-	    FROM
-	    (
-	        SELECT
-	            ROWNUM AS RNUM, T.*
-	        FROM
-	        (
-	            SELECT
-	            *
-	            FROM
-	                TB_CR01M01 A
+    <delete id="deleteEst">
+        DELETE
+        FROM TB_CR01M01
+        WHERE 1 = 1
+            AND CO_CD = #{coCd}
+            AND EST_NO = #{estNo}
+            AND EST_DEG = #{estDeg}
+    </delete>
 
-	        ) T
-	    )
-	    WHERE RNUM BETWEEN #{firstIndex} AND #{lastIndex}
-	</select>
-
-	<resultMap id="resultInfoMap" type="CamelMap">
-		<collection select="selectEstDetail" property="list" column="{coCd=CO_CD,estNo=EST_NO,estDeg=EST_DEG}" ofType="CamelMap"/>
-	</resultMap>
-
-	<select id="selectEstInfo" resultMap="resultInfoMap">
-		SELECT
-			TO_CHAR(A.EST_DT, 'YYYY-MM-DD') AS EST_DT,
-			A.*
-		FROM
-			TB_CR01M01 A
-		WHERE
-		    CO_CD = #{coCd}
-		AND
-			EST_NO = #{estNo}
-	  	AND
-			EST_DEG = #{estDeg}
-	</select>
-
-
-	<select id="selectEstDetail"  parameterType="map"  resultType="CamelMap">
-		SELECT
-			CO_CD, EST_NO, EST_DTL_DIV, EST_SEQ,
-			EST_COMM, EST_SPEC, EST_UNIT, EST_QTY,
-			EST_UPR, EST_AMT, EST_RMK
-		FROM
-			TB_CR01D01
-		WHERE
-			1=1
-	    AND
-			CO_CD = #{coCd}
-		AND
-			EST_NO = #{estNo}
-	  	AND
-			EST_DEG = #{estDeg}
-	</select>
+    <delete id="deleteEstDetail">
+        DELETE
+        FROM TB_CR01D01
+        WHERE 1 = 1
+            AND CO_CD = #{coCd}
+            AND EST_NO = #{estNo}
+            AND EST_DEG = #{estDeg}
+            AND EST_SEQ = #{estSeq}
+    </delete>
 
 
-	<insert id="insertEst">
-	    INSERT INTO TB_CR01M01 (
-	        CO_CD, EST_NO, EST_CLNT_CD, EST_DT,
-	       CSTM_MNG_NM, CSTM_MNG_HP, EST_NM, EST_AMT, EST_EXCEPT,
-	        EST_STD_DT, EST_DLVR_CNDT, EST_PMNT_CNDT, EST_DUDT,EST_DEG
-	    )
-	    VALUES (
-	        #{coCd}, #{estNo},#{estClntCd}, #{estDt},
-	      #{custMngr}, #{contact}, #{prjctNm}, #{estAmount}, #{estExclusions},
-	        #{estBaseDate}, #{dlvrCndt}, #{pmntCndt}, #{dueDate},#{estDeg}
-	    )
-	</insert>
+    <update id="updateEst" parameterType="map">
+        UPDATE TB_CR01M01
+        SET EST_CLNT_CD   = #{estClntCd},
+            EST_DT        = #{estDt},
+            CSTM_MNG_NM   = #{cstmMngNm},
+            CSTM_MNG_HP   = #{cstmMngHp},
+            EST_NM        = #{estNm},
+            EST_AMT       = #{estAmt},
 
-	<insert id="insertEstDetail" parameterType="map">
-		 INSERT INTO TB_CR01D01 (
-		    CO_CD, EST_NO, EST_DTL_DIV , EST_SEQ ,
-		     EST_COMM, EST_SPEC, EST_UNIT, EST_QTY,
-		    EST_UPR , EST_DEG
-		)
-		VALUES (
-		    #{coCd}, #{estNo}, #{estDtlDiv}, #{estSeq},
-	 	    #{estComm}, #{estSpec}, #{estUnit}, #{estQty},
-		    #{estUpr},#{estDeg}
-		)
-	</insert>
+            EST_EXCEPT    = #{estExcept},
+--             EST_STD_DT    = #{estStdDt},
 
+            EST_DLVR_CNDT = #{estDlvrCndt},
+            EST_PMNT_CNDT = #{estPmntCndt},
+            EST_DUDT      = #{estDudt},
+            FILE_TRGT_KEY = #{fileTrgtKey}
+        WHERE CO_CD = #{coCd}
+            AND EST_NO = #{estNo}
+            AND EST_DEG = #{estDeg}
 
-	<!--
-	<resultMap id="resultInfoMap" type="CamelMap">
-		<collection select="selectEstDetailList" property="EST_DETAIL_LIST" column="{estNo=EST_NO}" ofType="CamelMap"/>
-		<collection select="selectEstFileList" property="EST_FILE_LIST" column="{fileTrgtKey=EST_NO}" ofType="CamelMap"/>
-	</resultMap>
+    </update>
 
-	<select id="selectEstInfo" resultMap="resultInfoMap">
-		SELECT
-			EST_NO,
-			CO_CD,
-			FN_CM05M01_CD_TO_NM(T.CO_CD) AS CO_NM,
-			SALES_EMP_ID,
-			(SELECT NAME FROM TB_CM06M01 WHERE ID = T.SALES_EMP_ID) AS SALES_EMP_NM,
-			EST_COPRT,
-			(SELECT NAME FROM TB_CM06M01 WHERE ID = T.EST_COPRT) AS EST_COPRT_NM,
-			EST_CLNT_CD,
-			EST_CLNT_NM,
-			EST_RPRC,
-			BIZ_TEL_NO,
-			BIZ_FAX_NO,
-			MNG_EMAIL,
-			PRJCT_NM,
-			EST_DT,
-			RMK,
-			T.WINBD_YN,
-			nvl2(T.WINBD_DT,TO_CHAR(TO_DATE(T.WINBD_DT, 'YYYYMMDD'),'YYYY-MM-DD'),'') AS WINBD_DT
-		FROM
-			TB_SD03M01 T
-		WHERE
-			EST_NO = #{estNo}
-	</select>
+    <update id="updateEstDetail" parameterType="map">
+        UPDATE TB_CR01D01
+        SET EST_DTL_DIV = #{estDtlDiv},
+            EST_COMM    = #{estComm},
+            EST_SPEC    = #{estSpec},
+            EST_UNIT    = #{estUnit},
+            EST_QTY     = #{estQty},
+            EST_UPR     = #{estUpr}
+        WHERE CO_CD = #{coCd}
+            AND EST_NO = #{estNo}
+            AND EST_SEQ = #{estSeq}
+    </update>
 
-	<select id="selectEstDetailList" resultType="CamelMap">
-		SELECT
-			T.EST_NO,
-			T.EST_PRDT_SEQ,
-			T.PRDT_DIV,
-			T.PRDT_STKN,
-			FN_CM05M01_CD_TO_NM(T.PRDT_STKN) AS PRDT_STKN_NM,
-			T.PRDT_SIZE,
-			T.PRDT_SPEC,
-			T.PRDT_LEN,
-			T.PRDT_CD,
-			B.PRDT_NM,
-			T.PRDT_UNIT,
-			FN_CM05M01_CD_TO_NM(T.PRDT_UNIT) AS PRDT_UNIT_NM,
-			T.EST_QTY,
-			T.EST_WT,
-			T.EST_UPR,
-			T.EST_AMT,
-			(T.EST_AMT - T.EST_QTY * T.STOCK_UPR) AS EXP_AMT,
-			T.STOCK_UPR,
-			T.RMK,
-	        B.PRDT_DIV,
-	        B.PRDT_STKN,
-	        B.PRDT_STOCK_CD,
-	        B.PRDT_COIL_YN,
-	        B.PRDT_CNVRSN_WT,
-	        B.PRDT_DT
-		FROM
-			TB_SD03D01 T
-		LEFT JOIN TB_BM01M01 B
-		   ON B.PRDT_CD = T.PRDT_CD
-		WHERE
-			T.EST_NO = #{estNo}
-	</select>
-
-	<select id="selectEstFileList" resultType="CamelMap">
-		SELECT * FROM TB_CM08M01 WHERE FILE_TRGT_TYP = 'TB_SD03M01' AND FILE_TRGT_KEY = #{fileTrgtKey}
-	</select>
-
-	<select id="selectEstNo" resultType="String">
-		SELECT TO_CHAR(SYSDATE, 'YYYYMM') || LPAD(NVL(TO_NUMBER(MAX(SUBSTR(EST_NO, -4))), 0) + 1, 4, 0) FROM TB_SD03M01 WHERE SUBSTR(EST_NO, 0, 6) = TO_CHAR(SYSDATE, 'YYYYMM')
-	</select>
-
-	<insert id="insertEst">
-		INSERT INTO TB_SD03M01 (
-			EST_NO,
-			CO_CD,
-			SALES_EMP_ID,
-			EST_COPRT,
-			EST_CLNT_CD,
-			EST_CLNT_NM,
-			EST_RPRC,
-			BIZ_TEL_NO,
-			BIZ_FAX_NO,
-			MNG_EMAIL,
-			PRJCT_NM,
-			EST_DT,
-			RMK,
-			CREAT_ID,
-			CREAT_PGM,
-			CREAT_DTTM,
-			UDT_ID,
-			UDT_PGM,
-			UDT_DTTM,
-			WINBD_YN,
-			WINBD_DT
-		)VALUES(
-			#{estNo},
-			#{coCd},
-			#{salesEmpId},
-			#{estCoprt},
-			#{estClntCd},
-			#{estClntNm},
-			#{estRprc},
-			#{bizTelNo},
-			#{bizFaxNo},
-			#{mngEmail},
-			#{prjctNm},
-			#{estDt},
-			#{rmk},
-			#{userId},
-			#{pgmId},
-			SYSDATE,
-			#{userId},
-			#{pgmId},
-			SYSDATE,
-			#{winbdYn},
-			#{winbdDt}
-		)
-	</insert>
-
-	<insert id="insertEstDetail">
-		<selectKey keyProperty="estPrdtSeq" resultType="String" order="BEFORE">
-			SELECT TB_SD03D01_SQ01.NEXTVAL FROM DUAL
-		</selectKey>
-		INSERT INTO TB_SD03D01 (
-			EST_NO,
-			EST_PRDT_SEQ,
-			PRDT_DIV,
-			PRDT_STKN,
-			PRDT_SIZE,
-			PRDT_SPEC,
-			PRDT_LEN,
-			PRDT_CD,
-			PRDT_UNIT,
-			EST_QTY,
-			EST_WT,
-			EST_UPR,
-			EST_AMT,
-			STOCK_UPR,
-			RMK,
-			CREAT_ID,
-			CREAT_PGM,
-			CREAT_DTTM,
-			UDT_ID,
-			UDT_PGM,
-			UDT_DTTM
-		)VALUES(
-			#{estNo},
-			#{estPrdtSeq},
-			#{prdtDiv},
-			#{prdtStkn},
-			#{prdtSize},
-			#{prdtSpec},
-			#{prdtLen},
-			#{prdtCd},
-			#{prdtUnit},
-			#{estQty},
-			#{estWt},
-			#{estUpr},
-			#{estAmt},
-			#{stockUpr},
-			#{rmk},
-			#{userId},
-			#{pgmId},
-			SYSDATE,
-			#{userId},
-			#{pgmId},
-			SYSDATE
-		)
-	</insert>
-
-	<update id="updateEst">
-		UPDATE
-			TB_SD03M01
-		SET
-			CO_CD = #{coCd},
-			SALES_EMP_ID = #{salesEmpId},
-			EST_COPRT = #{estCoprt},
-			EST_CLNT_CD = #{estClntCd},
-			EST_CLNT_NM = #{estClntNm},
-			EST_RPRC = #{estRprc},
-			BIZ_TEL_NO = #{bizTelNo},
-			BIZ_FAX_NO = #{bizFaxNo},
-			MNG_EMAIL = #{mngEmail},
-			PRJCT_NM = #{prjctNm},
-			EST_DT = #{estDt},
-			RMK = #{rmk},
-			UDT_ID = #{userId},
-			UDT_PGM = #{pgmId},
-			UDT_DTTM = SYSDATE,
-			WINBD_YN = #{winbdYn},
-			WINBD_DT = #{winbdDt}
-		WHERE
-			EST_NO = #{estNo}
-	</update>
-
-	<delete id="deleteEst">
-		DELETE FROM TB_SD03M01
-		WHERE EST_NO = #{estNo}
-	</delete>
-
-	<delete id="deleteEstDetail">
-		DELETE FROM TB_SD03D01
-		WHERE EST_NO = #{estNo}
-	</delete> -->
 </mapper>
