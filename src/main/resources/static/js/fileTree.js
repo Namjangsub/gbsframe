@@ -219,7 +219,7 @@ var treeModule = (function () {
         fileArrOri=[];
         function getFileListForNode(index) {
             if (index >= nodeIds.length) {
-                callback(fileArrOri); // fileArr를 전달
+                callback(fileArrOri);
                 return;
             }
 
@@ -264,6 +264,7 @@ var treeModule = (function () {
             var testArr = obj.name.split(".");
             var newFile = {
                 'fileKey': 0,
+                'tempId': new Date().getTime() + idx,
                 'fileName': obj.name,
                 'fileType': testArr[testArr.length - 1],
                 'fileSize': obj.size,
@@ -293,7 +294,6 @@ var treeModule = (function () {
                 item.fileKey == 0;
         });
         console.log(JSON.stringify(fileArr))
-
         fileTreeGridView.reqSetData(nodeUploadedFiles);
     }
 
@@ -309,24 +309,53 @@ var treeModule = (function () {
 
 
     function deleteFile(rowIndex) {
-        if(fileArrOri[rowIndex].fileKey){
-            deleteFileArr.push(fileArrOri[rowIndex].fileKey);
+        if(fileArrOri[rowIndex]){
 
+            deleteFileArr.push(fileArrOri[rowIndex].fileKey);
+            fileArrOri.splice(rowIndex, 1);
+
+        }else if(fileArr[rowIndex]) {
+
+            removeUnsavedFile(fileArr[rowIndex].tempId);
         }
 
         fileTreeGridView.target.removeRow(rowIndex);
-        fileArrOri.splice(rowIndex, 1);
-        // 선택된 파일 가져오기
-        var deletedFile = fileTreeGridView.getValue(rowIndex);
 
-        // uploadedFiles[selectedNodeId]에서 삭제된 파일 제거
+
+
+
+    }
+
+    function removeUnsavedFile(tempId) {
+
+        // selectedNodeId에 대한 파일 목록에서 해당 tempId를 가진 파일을 찾아 제거
         if (uploadedFiles[selectedNodeId]) {
             uploadedFiles[selectedNodeId] = uploadedFiles[selectedNodeId].filter(function (uploadedFile) {
-                return uploadedFile.fileKey !== deletedFile.fileKey;
+                if (uploadedFile) {
+                    return uploadedFile.tempId !== tempId;
+                } else {
+                    return false;
+                }
             });
         }
+        // fileArr에서 해당 tempId를 가진 파일을 제거
+        fileArr = fileArr.filter(function (item) {
+
+            if (item) {
+                return item.tempId !== tempId;
+            } else {
+                // uploadedFile이 정의되지 않았다면, false를 반환
+                return false;
+            }
 
 
+
+
+        });
+
+
+        // 화면에 보이는 목록도 업데이트
+        updateFileTreeGridView();
     }
 
     function downloadFile(fileKey) {
