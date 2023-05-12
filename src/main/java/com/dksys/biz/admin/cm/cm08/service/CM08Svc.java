@@ -31,5 +31,7 @@ public interface CM08Svc {
 	int selectConfirmCount(Map<String, String> paramMap);
 	
 	int moveFile(Map<String, String> paramMap);
-	
+
+	int deleteFileCall(Map<String, String> paramMap);
+
 }
