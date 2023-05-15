@@ -29,8 +29,15 @@ public interface CR01Mapper {
 	int updateEst(Map<String, String> paramMap);
 
 	int deleteEstDetail(Map<String, String> paramMap);
-	
+
+	int deleteAllEstDetails(Map<String, String> paramMap);
+
 	int deleteEst(Map<String, String> paramMap);
 
 	int updateEstDetail(Map<String, String> paramMap);
+
+	String selectMaxEstDeg(Map<String, String> paramMap);
+
+
+
 }

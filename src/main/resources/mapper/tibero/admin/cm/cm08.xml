@@ -256,6 +256,99 @@
 
 
 	</select>
+	<select id="selectTreeFileModule" parameterType="Map" resultType="CamelMap">
+		WITH b1 AS (SELECT  CODE_ID ID,
+		CODE_NM TEXT,
+		CODE_KIND PARENT,
+		CODE_DESC PARENT_NM,
+		SORT_NO,
+		USE_YN,
+		LPAD(' ', 3*(LEVEL-1)) || LEVEL lvl,
+		REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_NM, '/'), '^\s+\-\>\s+', '') as LPATH
+		, CONNECT_BY_ISLEAF AS IS_LEAF
+		FROM TB_CM05M01
+		START WITH CODE_ID ='FILETREE'
+		CONNECT BY PRIOR CODE_ID = CODE_KIND
+		ORDER SIBLINGS BY CODE_ID ASC)
+
+
+		SELECT
+		ROWNUM AS RNUM, A.*
+		FROM
+		(
+		SELECT
+		T.CO_CD,
+		T.FILE_KEY,
+		T.FILE_SIZE,
+		T.FILE_TYPE,
+		T.FILE_NAME,
+		T.FILE_PATH,
+		T.FILE_TRGT_TYP,
+		T.FILE_TRGT_KEY,
+		T.USE_YN,
+		T.CREAT_ID,
+		D.NAME CREAT_NM,
+		T.CREAT_PGM,
+		TO_CHAR(T.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM,
+		T.CLNT_CD,
+		A.CLNT_NM,
+		T.PRDT_CD,
+		E.PRDT_NM,
+		T.ITEM_CD,
+		F.CODE_NM AS ITEM_NM,
+		T.SALES_CD,
+		T.PRJCT_CD,
+		C.PRJCT_NM PRJCT_NM,
+		T.COMON_CD,
+		B1.TEXT AS COMON_NM,
+		B1.LPATH
+		FROM
+		TB_CM08M01 T left outer join TB_BM02M01 A on T.CLNT_CD = A.CLNT_CD
+		LEFT OUTER JOIN B1 ON T.COMON_CD = B1.ID
+		LEFT OUTER JOIN TB_BM06M01 C ON T.PRJCT_CD = C.PRJCT_SEQ
+		LEFT OUTER JOIN TB_CM06M01 D ON T.CREAT_ID = D.ID
+		LEFT OUTER JOIN TB_BM01M01 E ON T.PRDT_CD = E.PRDT_CD
+		LEFT OUTER JOIN TB_CM05M01 F ON T.ITEM_CD = F.CODE_ID
+		WHERE 1=1
+		AND T.FILE_TRGT_KEY=  #{fileTrgtKey}
+		<if test="comonCd != null and !comonCd.equals('')">
+			AND T.COMON_CD = #{comonCd}
+		</if>
+		<if test="coCd != null and !coCd.equals('')">
+			AND T.CO_CD LIKE #{coCd}
+		</if>
+		<if test="fileTrgtType != null and !fileTrgtType.equals('')">
+			AND T.FILE_TRGT_TYP=  #{fileTrgtType}
+		</if>
+		<if test="creatId != null and !creatId.equals('')">
+			AND T.CREAT_ID=  #{creatId}
+		</if>
+		<if test="creatNm != null and !creatNm.equals('')">
+			AND D.NAME LIKE '%${creatNm}%'
+		</if>
+		<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+			AND T.CREAT_DTTM BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+		</if>
+		<if test="prdtCd != null and !prdtCd.equals('')">
+			AND T.PRDT_CD = #{prdtCd}
+		</if>
+		<if test="prdtNm != null and !prdtNm.equals('')">
+			AND E.PRDT_NM LIKE '%${prdtNm}%'
+		</if>
+		<if test= "searchValue != null and !searchValue.equals('') and searchName != null and !searchName.equals('')">
+			AND ${searchValue} LIKE '%${searchName}%'
+		</if>
+		<if test="clntNm != null and !clntNm.equals('')">
+			AND A.CLNT_NM LIKE '%${clntNm}%'
+		</if>
+		) A
+		WHERE
+		1=1
+		AND ROWNUM BETWEEN #{firstIndex} AND #{lastIndex}
+
+
+
+	</select>
 
 
 	

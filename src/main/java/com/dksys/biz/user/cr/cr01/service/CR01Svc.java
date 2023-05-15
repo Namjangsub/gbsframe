@@ -19,7 +19,7 @@ public interface CR01Svc {
 	
 	String insertEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
-	String insertEstDeg(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+	Map<String, String> insertEstDeg(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
 	
 	int updateEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);

@@ -225,7 +225,7 @@ var treeModule = (function () {
 
             var nodeId = nodeIds[index];
             paramObj.comonCd = nodeId;
-            postAjax("/admin/cm/cm08/selectTreeFileList", paramObj, null, function (data) {
+            postAjax("/admin/cm/cm08/selectTreeFileModule", paramObj, null, function (data) {
                 fileArrOri = fileArrOri.concat(data.fileList);
                 getFileListForNode(index + 1);
             });

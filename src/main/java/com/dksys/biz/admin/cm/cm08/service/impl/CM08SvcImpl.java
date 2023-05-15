@@ -94,7 +94,6 @@ public class CM08SvcImpl implements CM08Svc {
             try {
                 MultipartFile mf = fileList.get(i);
                 String originFileName = mf.getOriginalFilename(); // 원본 파일 명
-
                 HashMap<String, String> param = new HashMap<String, String>();
                 param.put("fileSize", String.valueOf(mf.getSize()));
                 if (originFileName != null) {
@@ -116,7 +115,6 @@ public class CM08SvcImpl implements CM08Svc {
                 String comonCdKey = "comonCd_" + i;
                 String comonCd = mRequest.getParameter(comonCdKey);
                 param.put("comonCd", comonCd);
-
                 cm08Mapper.insertTreeFile(param);
                 String saveFile = param.get("fileKey") + "_" + originFileName;
                 File f = new File(path);
@@ -139,7 +137,6 @@ public class CM08SvcImpl implements CM08Svc {
         return cm08Mapper.selectFileList(paramMap);
     }
 
-
 	@Override
 	public int  selectTreeFileCount(Map<String, String> paramMap) {
 		return cm08Mapper.selectTreeFileCount(paramMap);
@@ -148,6 +145,10 @@ public class CM08SvcImpl implements CM08Svc {
     @Override
     public List<Map<String, String>> selectTreeFileList(Map<String, String> paramMap) {
         return cm08Mapper.selectTreeFileList(paramMap);
+    }
+    @Override
+    public List<Map<String, String>> selectTreeFileModule(Map<String, String> paramMap) {
+        return cm08Mapper.selectTreeFileModule(paramMap);
     }
 
     @Override

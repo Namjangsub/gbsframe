@@ -68,11 +68,11 @@ public class CR01Ctr {
 	public String insertEstDeg(@RequestParam Map<String, String> paramMap , MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {
 			System.out.println(paramMap+"여기0");
-			String newEstNo = cr01svc.insertEstDeg(paramMap, mRequest);
+			Map<String, String> newEst = cr01svc.insertEstDeg(paramMap, mRequest);
 
 			model.addAttribute("resultCode", 200);
 			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-			model.addAttribute("newEstNo", newEstNo);
+			model.addAttribute("newEst", newEst);
 		}catch(Exception e) {
 			model.addAttribute("resultCode", 500);
 			model.addAttribute("resultMessage", e.getLocalizedMessage());

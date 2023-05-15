@@ -18,6 +18,12 @@ public interface CM08Mapper {
 	
 	List<Map<String, String>> selectTreeFileList(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectTreeFileModule(Map<String, String> paramMap);
+
+
+
+
+
 	Map<String, String> selectFileInfo(String fileKey);
 
 	int deleteFileInfo(String fileKey);

@@ -134,6 +134,18 @@ public class CM08Ctr {
     	model.addAttribute("fileList", fileList);
         return "jsonView";
     }
+	@PostMapping("/selectTreeFileModule")
+	public String selectTreeFileModule(@RequestBody Map<String, String> param, ModelMap model) {
+		int totalCnt = cm08Svc.selectTreeFileCount(param);
+		PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+
+		List<Map<String, String>> fileList = cm08Svc.selectTreeFileModule(param);
+		model.addAttribute("fileList", fileList);
+		return "jsonView";
+	}
+
+
 
 	
 	@PostMapping(value = "/selectConfirmCount")
