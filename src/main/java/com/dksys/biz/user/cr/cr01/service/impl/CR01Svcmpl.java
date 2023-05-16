@@ -123,14 +123,9 @@ public class CR01Svcmpl implements CR01Svc {
                 detailMap.put("pgmId", paramMap.get("pgmId"));
                 cr01Mapper.insertEstDetail(detailMap);
             }
-            cm08Svc.uploadTreeFile("TB_CR02M01", fileTrgtKey, mRequest);
+            cm08Svc.copyTreeFile("TB_CR01M01", fileTrgtKey, mRequest);
 
-       /*     List<String> deleteFileList = gson.fromJson(paramMap.get("deleteFileArr"), stringList);
 
-            for (String fileKey :
-                    deleteFileList) {
-                cm08Svc.deleteFile(fileKey);
-            }*/
             responseMap.put("estNo", paramMap.get("estNo"));
             responseMap.put("estDeg", paramMap.get("estDeg"));
         } catch (Exception e) {
@@ -226,6 +221,16 @@ public class CR01Svcmpl implements CR01Svc {
         }
         System.out.println(paramMap.get("fileTrgtKey")+"해당위치");
         cm08Svc.uploadTreeFile("TB_CR01M01", paramMap.get("fileTrgtKey"), mRequest);
+
+        return 1;
+    }
+
+
+    public int updateEstConfirm(Map<String, String> paramMap) {
+
+        Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+        Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+        int result = cr01Mapper.updateEstConfirm(paramMap);
 
         return 1;
     }

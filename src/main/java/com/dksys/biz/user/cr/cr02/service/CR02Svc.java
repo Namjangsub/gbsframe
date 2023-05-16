@@ -14,7 +14,7 @@ public interface CR02Svc {
 	Map<String, Object> selectOrdrsInfo(Map<String, String> paramMap);
 
 
-	int selectOrdrsWithEst(Map<String, String> params);
+	Map<String, Object>  selectOrdrsWithEst(Map<String, String> params);
 
 	String selectMaxOrdrsNo(Map<String, String> param);
 

@@ -3,6 +3,7 @@ package com.dksys.biz.user.cr.cr02.service.impl;
 import com.dksys.biz.admin.cm.cm08.mapper.CM08Mapper;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.user.cr.cr01.mapper.CR01Mapper;
+import com.dksys.biz.user.cr.cr01.service.CR01Svc;
 import com.dksys.biz.user.cr.cr02.mapper.CR02Mapper;
 import com.dksys.biz.user.cr.cr02.service.CR02Svc;
 import com.google.gson.*;
@@ -20,8 +21,13 @@ import java.util.Map;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class CR02Svcmpl implements CR02Svc {
+
+    @Autowired
+    CR01Svc cr01Svc;
     @Autowired
     CR02Mapper cr02Mapper;
+
+
     @Autowired
     CM08Mapper cm08Mapper;
 
@@ -48,7 +54,7 @@ public class CR02Svcmpl implements CR02Svc {
 
     }
     @Override
-    public int selectOrdrsWithEst(Map<String, String> params) {
+    public Map<String, Object>  selectOrdrsWithEst(Map<String, String> params) {
         return cr02Mapper.selectOrdrsWithEst(params);
     }
 
@@ -63,11 +69,14 @@ public class CR02Svcmpl implements CR02Svc {
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
         Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {
         }.getType();
+        param.put("estNo",param.get("estNoOrdrs"));
         param.put("ordrsNo", selectMaxOrdrsNo(param));
         String fileTrgtKey;
         fileTrgtKey = cm08Mapper.selectNextFileTrgtKey();
         param.put("fileTrgtKey", fileTrgtKey);
-        System.out.println(selectMaxOrdrsNo(param)+"최대값");
+        System.out.println(param+"배열값");
+        
+        cr01Svc.updateEstConfirm(param);
         cr02Mapper.insertOrdrs(param);
         List<Map<String, String>> planArr = gson.fromJson(removeEmptyObjects(param.get("planArr")), mapList);
         for (Map<String, String> planMap : planArr) {
@@ -78,7 +87,7 @@ public class CR02Svcmpl implements CR02Svc {
                 planMap.put("userId", param.get("userId"));
                 planMap.put("pgmId", param.get("pgmId"));
                 planMap.put("currCd", param.get("currCd"));
-
+                System.out.println(planMap+"총합1");
                 cr02Mapper.insertClmnPlanHis(planMap);
                 cr02Mapper.insertClmnPlan(planMap);
 
@@ -100,6 +109,13 @@ public class CR02Svcmpl implements CR02Svc {
                 detailMap.put("pgmId", param.get("pgmId"));
                 detailMap.put("currCd", param.get("currCd"));
 
+
+                if(detailMap.get("ordrsDtlDiv10").equals("설비")){
+                    System.out.println("시작;dtl");
+                    String newSalesCode = param.get("ordrsNo") + detailMap.get("ordrsSeq") + detailMap.get("prdtCd") + detailMap.get("itemDiv");
+                    detailMap.put("salesCd", newSalesCode);
+                }
+                System.out.println(detailMap+"총합2");
                 cr02Mapper.insertOrdrsDetail(detailMap);
             } catch (Exception e) {
                 System.out.println("error3"+e.getMessage());
@@ -116,12 +132,16 @@ public class CR02Svcmpl implements CR02Svc {
 
             }
 
+
+
+
     }
     @Override
     public void updateOrdrs(Map<String, String> param,MultipartHttpServletRequest mRequest) {
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
         Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {
         }.getType();
+        param.put("estNo",param.get("estNoOrdrs"));
         cr02Mapper.updateOrdrs(param);
         List<Map<String, String>> planArr = gson.fromJson(removeEmptyObjects(param.get("planArr")), mapList);
         for (Map<String, String> planMap : planArr) {
@@ -145,12 +165,22 @@ public class CR02Svcmpl implements CR02Svc {
 
         for (Map<String, String> detailMap : detailArr) {
             try {
+
+
                 detailMap.put("coCd", param.get("coCd"));
                 detailMap.put("ordrsNo", param.get("ordrsNo"));
                 detailMap.put("estNo", param.get("estNo"));
                 detailMap.put("userId", param.get("userId"));
                 detailMap.put("pgmId", param.get("pgmId"));
                 detailMap.put("currCd", param.get("currCd"));
+                System.out.println("최종"+detailMap);
+
+                if(detailMap.get("ordrsDtlDiv10").equals("설비")){
+                    String newSalesCode = param.get("ordrsNo") + detailMap.get("ordrsSeq") + detailMap.get("prdtCd") + detailMap.get("itemDiv");
+                    detailMap.put("salesCd", newSalesCode);
+                }
+
+
                 cr02Mapper.updateOrdrsDetail(detailMap);
             } catch (Exception e) {
                 System.out.println("error3"+e.getMessage());

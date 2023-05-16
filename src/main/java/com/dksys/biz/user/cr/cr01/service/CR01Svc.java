@@ -23,6 +23,6 @@ public interface CR01Svc {
 
 	
 	int updateEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
-	
+	int updateEstConfirm(Map<String, String> paramMap);
 	int deleteEst(Map<String, String> paramMap);
 }

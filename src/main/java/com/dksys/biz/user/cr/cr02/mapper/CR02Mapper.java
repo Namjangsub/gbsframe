@@ -17,7 +17,7 @@ public interface CR02Mapper {
 
 	Map<String, Object> selectOrdrsInfo(Map<String, String> paramMap);
 
-	int selectOrdrsWithEst(Map<String, String> paramMap);
+	Map<String, Object>  selectOrdrsWithEst(Map<String, String> paramMap);
 
 	List<Map<String, Object>> selectPmntPlan(Map<String, String> paramMap);
 

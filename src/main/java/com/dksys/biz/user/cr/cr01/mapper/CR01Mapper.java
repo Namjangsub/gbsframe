@@ -27,7 +27,7 @@ public interface CR01Mapper {
 	int insertEstDetail(Map<String, String> detailMap);
 	
 	int updateEst(Map<String, String> paramMap);
-
+	int updateEstConfirm(Map<String, String> paramMap);
 	int deleteEstDetail(Map<String, String> paramMap);
 
 	int deleteAllEstDetails(Map<String, String> paramMap);

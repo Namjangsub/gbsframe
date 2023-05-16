@@ -14,6 +14,9 @@ public interface CM08Svc {
 
 	int uploadTreeFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest);
 
+	int copyTreeFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest);
+
+
 	public List<Map<String, String>> selectFileList(Map<String, String> paramMap);
 	
 	public void setDisposition(HttpServletRequest request, HttpServletResponse response, String fileName);

@@ -290,10 +290,9 @@ var treeModule = (function () {
         fileArr = fileArr.filter(function (item) {
             return item &&
                 typeof item === 'object' &&
-                'fileKey' in item &&
-                item.fileKey == 0;
+                'fileKey' in item
         });
-        console.log(JSON.stringify(fileArr))
+        console.log("해당위치"+JSON.stringify(fileArr))
         fileTreeGridView.reqSetData(nodeUploadedFiles);
     }
 

@@ -4,12 +4,13 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Type;
 import java.net.URLEncoder;
-import java.util.ArrayList;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -28,9 +29,6 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import com.dksys.biz.admin.cm.cm08.mapper.CM08Mapper;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.util.DateUtil;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 
 @Service
 public class CM08SvcImpl implements CM08Svc {
@@ -132,6 +130,72 @@ public class CM08SvcImpl implements CM08Svc {
         }
         return 0;
     }
+
+    @Override
+    public int copyTreeFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest) {
+        System.out.println("copyTreeFile 실행");
+        String year = DateUtil.getCurrentYyyy();
+        String month = DateUtil.getCurrentMm();
+        String path = "D:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
+
+        int i = 0;
+        while (true) {
+            String comonCdKey = "comonCd_" + i;
+            String filePathKey = "filePath_" + i;
+            String fileNameKey = "fileName_" + i;
+            String fileKey = "fileKey_" + i;
+
+            String comonCd = mRequest.getParameter(comonCdKey);
+            String filePath = mRequest.getParameter(filePathKey);
+            String fileName = mRequest.getParameter(fileNameKey);
+            String filePKey = mRequest.getParameter(fileKey);
+            if (comonCd == null || filePath == null || fileName == null) {
+                break; // 해당 키로부터 정보를 얻지 못한 경우, 더 이상의 처리를 멈춥니다.
+            }
+
+            // 복사된 파일에 대한 정보를 DB에 저장
+            HashMap<String, String> param = new HashMap<>();
+            param.put("fileSize", "0");
+            param.put("fileType", fileName.substring(fileName.lastIndexOf(".") + 1));
+            param.put("fileName", fileName);
+            param.put("filePath", path);
+            param.put("fileTrgtTyp", fileTrgtTyp);
+            param.put("fileTrgtKey", fileTrgtKey);
+            param.put("userId", mRequest.getParameter("userId"));
+            param.put("pgmId", fileTrgtTyp);
+            param.put("coCd", mRequest.getParameter("coCd"));
+            param.put("comonCd", comonCd);
+           String nowFileKey= cm08Mapper.selectNextFileKey();
+           System.out.println(mRequest.getParameter("userId")+"이게 제로?");
+            param.put("fileKey", nowFileKey);
+            cm08Mapper.insertTreeFileWithDeg(param);
+
+
+            File sourceFile = new File(filePath +filePKey+"_"+fileName);
+            System.out.println("최종 키 값;"+nowFileKey);
+            String saveFile = nowFileKey + "_" + fileName;
+            File targetFile = new File(path + saveFile);
+
+            if (!targetFile.getParentFile().exists()) { // 타겟 경로가 존재하지 않으면 생성
+                targetFile.getParentFile().mkdirs();
+            }
+
+            try {
+                Files.copy(sourceFile.toPath(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                e.printStackTrace();
+                return -1; // 파일 복사에 실패한 경우 -1을 반환
+            }
+
+
+            i++;
+        }
+
+        return 0;
+    }
+
+
+
     @Override
     public List<Map<String, String>> selectFileList(Map<String, String> paramMap) {
         return cm08Mapper.selectFileList(paramMap);

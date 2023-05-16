@@ -36,7 +36,7 @@
 
                     <th class="hit">발행일자</th>
                     <td>
-                        <input type="text" class="input_calendar" autocomplete="off" id="issueDate" name="issueDate"
+                        <input type="text" class="input_calendar" autocomplete="off" id="issueDate" name="issueDate" value="2022-05-04"
                                date required>
                     </td>
                     <th class="hit">고객사</th>
@@ -55,7 +55,7 @@
                         <input type="hidden" id="estClntCd" name="estClntCd">
                         <div class="search_form">
                             <input onclick="openSecondClntSearch();" type="text" id="estClntNm" name="estClntNm"
-                                   readonly required>
+                                   readonly required value="0">
                             <a onclick="openSecondClntSearch();">
                                 <i class="i_search_w"></i>
                             </a>
@@ -94,7 +94,7 @@
                     </td>
                     <th class="hit">통화단위</th>
                     <td>
-                        <input type="text" id="estNm" name="estNm" required>
+                        <select id="currCd" name="currCd" data-kind="CURR" onchange="setByCoCd(this.value)" required></select>
                     </td>
                     <th class="hit">견적금액</th>
                     <td>
@@ -132,12 +132,12 @@
                 <tr>
                     <th class="">수주확정여부</th>
                     <td>
-                        <input type="text" id="estDlvrCndt" name="estDlvrCndt" readonly>
+                        <input type="text" id="ordrsYn" name="ordrsYn" readonly>
                     </td>
 
                     <th class="">수주확정일자</th>
                     <td>
-                        <input type="text" id="estPmntCndt" name="estPmntCndt" readonly>
+                        <input type="text" id="ordrsDt" name="ordrsDt" readonly>
                     </td>
                     <th class="">견적NEGO금액</th>
                     <td>
@@ -446,12 +446,89 @@
         formData.append("userId", jwt.userId);
         formData.append("fileTrgtKey", paramObj.fileTrgtKey);
         // 첨부파일 추가
+
         $.each(treeModule.getFileArr(), function (idx, obj) {
             // 신규파일만 추가
             if (obj.fileKey == 0) {
                 formData.append("comonCd_" + idx, obj.nodeId);
                 formData.append("files", obj.file);
             }
+        });
+
+        formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
+
+
+        treeModule.initFileArrays();
+
+        // 상세내역 추가
+        var detailArr = [];
+        $.each($('#detailTable tr[name="detailRow"]'), function (idx, elem) {
+            var detailObj = {};
+            $.each($(elem).find('[name]'), function (idx, elem) {
+                alert(elem);
+                formData.append(elem, JSON.elem.value);
+            });
+
+        });
+
+        var rowList = grid.getList();
+        if (rowList.length == 0) {
+            alert("추가할 항목을 선택해주세요_");
+            return;
+        }
+        var detailArr = [];
+
+        $.each(rowList, function (idx, elem) {
+            var detailObj = {};
+            detailObj["estSeq"] = idx + 1;
+            detailObj["estDtlDiv"] = elem.estDtlDiv;
+            detailObj["estComm"] = elem.estComm;
+            detailObj["estSpec"] = elem.estSpec;
+            detailObj["estUnit"] = elem.estUnit;
+            detailObj["estQty"] = elem.estQty;
+            detailObj["estUpr"] = elem.estUpr;
+            detailObj["estRmk"] = elem.estRmk;
+
+            detailArr.push(detailObj);
+
+        });
+
+
+        formData.append("detailArr", JSON.stringify(detailArr));
+
+
+        return formData;
+    }
+
+    function makeFormDataWithDeg() {
+        // 금액 콤마 제거
+        $.each($('.popup_area input[comma]'), function (idx, elem) {
+            deleteComma(elem);
+        });
+
+        // 날짜 하이픈 제거
+        $.each($('.popup_area input[date]'), function (idx, elem) {
+            deleteHyphen(elem);
+        });
+
+        // 폼데이터 생성
+        var formData = new FormData($("#popForm")[0]);
+
+        // 유저아이디 추가
+        formData.append("userId", jwt.userId);
+        formData.append("fileTrgtKey", paramObj.fileTrgtKey);
+        // 첨부파일 추가
+        console.log("현재위치"+JSON.stringify(treeModule.getFileArr()));
+        $.each(treeModule.getFileArr(), function (idx, obj) {
+            // 신규파일만 추가
+            formData.append("comonCd_" + idx, obj.comonCd);
+            formData.append("filePath_" + idx, obj.filePath);
+            formData.append("fileName_" + idx, obj.fileName);
+            formData.append("fileKey_" + idx, obj.fileKey);
+
+
+
+
         });
 
         formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
@@ -606,33 +683,52 @@
         }).trigger('change');
     });
 
-    function fetchCurrencyData(callback) {
-        var paramObj = {"codeKind":"CURR","useYn":"Y"}; // 필요한 매개변수를 추가해주세요.
-        postAjax("/admin/cm/cm05/selectCodeList", paramObj, null, function(data) {
-            if(data && data.codeList) {
-                var codeList = data.codeList;
+    function fetchCurrencyData() {
+        var paramObj = {"codeKind":"UNITDIV","useYn":"Y"};
+        var paramObj2 = {"codeKind":"ESTDIV","useYn":"Y"};
 
-                // codeList를 AX5UI grid의 옵션 배열로 변환합니다
-                var options = codeList.map(function(code) {
-                    return {
-                        value: code.codeNm,  // 실제 데이터의 필드 이름으로 'codeId'와 'codeNm'을 사용했습니다.
-                        text: code.codeNm
-                    };
-                });
-
-                callback(options);
-            } else {
-                console.error("codeList is undefined. Check the AJAX response:", data);
-            }
+        var promise1 = new Promise(function(resolve, reject) {
+            postAjax("/admin/cm/cm05/selectCodeList", paramObj, null, function(data) {
+                if(data && data.codeList) {
+                    var codeList = data.codeList;
+                    var options = codeList.map(function(code) {
+                        return {
+                            value: code.codeNm,
+                            text: code.codeNm
+                        };
+                    });
+                    resolve(options);
+                } else {
+                    console.error("codeList is undefined. Check the AJAX response:", data);
+                    reject(data);
+                }
+            });
         });
+
+        var promise2 = new Promise(function(resolve, reject) {
+            postAjax("/admin/cm/cm05/selectCodeList", paramObj2, null, function(data) {
+                if(data && data.codeList) {
+                    var codeList = data.codeList;
+                    var options2 = codeList.map(function(code) {
+                        return {
+                            value: code.codeNm,
+                            text: code.codeNm
+                        };
+                    });
+                    resolve(options2);
+                } else {
+                    console.error("codeList is undefined. Check the AJAX response:", data);
+                    reject(data);
+                }
+            });
+        });
+
+        return Promise.all([promise1, promise2]);
     }
     let selectedRowKey;
 
     const grid = new ax5.ui.grid();
-    fetchCurrencyData(function(options) {
-        // 그리드 생성
-
-
+    fetchCurrencyData().then(function([options, options2]) {
         grid.setConfig({
             target: $('[data-ax5grid="est-grid"]'),
             columns: [
@@ -649,11 +745,7 @@
                                 optionValue: 'value',
                                 optionText: 'text'
                             },
-                            options: [
-                                {value: "선택", text: "선택"},
-                                {value: "제작품", text: "제작품"},
-                                {value: "기타경비", text: "기타경비"},
-                            ]
+                            options:options2
                         }
                     }
                 },
@@ -677,8 +769,10 @@
                 {key: "estUpr", label: "단가", align: "right", width: "12.5%", editor: {type: "text"}},
                 {
                     key: "estAmt", label: "합계", width: "12.5%", align: "right", formatter: function () {
+                        color = '#0000FF';
                         const sum = this.item.estQty * this.item.estUpr;
-                        return sum.toLocaleString('en-US');
+                        return '<div style="color: ' + color + '">'+sum.toLocaleString('en-US')+'</div>';
+
                     }
                 },
                 {key: "estRmk", label: "비고", align: "center", width: "12.5%", editor: {type: "text"}},
@@ -783,6 +877,9 @@
                 }
             }
         });
+        grid.setColumnSort({
+            "estSeq": {orderBy: "asc", seq: 0},
+        });
         let isUpdating = false;  // isUpdating 플래그 선언
         grid.onDataChanged = function () {
             if(this.item.estDtlDiv == undefined || isUpdating) {
@@ -825,9 +922,6 @@
         const data = grid.getList();
         grid.setData([...data, ...estDtlDivData]);
 
-
-
-
         updateRowTotals();
     }
     let currentDivCount = 0;
@@ -840,7 +934,7 @@
                 estDtlDiv: row.estDtlDiv,
                 estComm: "",
                 estSpec: "",
-                estUnit: "WON",
+                estUnit: "선택",
                 estQty: "",
                 estUpr: "",
             };
@@ -862,21 +956,38 @@
 
         const estDtlDivData = [
             {
-                estDtlDiv: "기타경비",
+                estDtlDiv: "제작품",
                 estComm: "",
                 estSpec: "",
-                estUnit: "WON",
+                estUnit: "선택",
                 estQty: "",
                 estUpr: "",
             },
             {
-                estDtlDiv: "제작품",
+                estDtlDiv: "기타경비",
                 estComm: "",
                 estSpec: "",
-                estUnit: "WON",
+                estUnit: "선택",
                 estQty: "",
                 estUpr: "",
-            }
+            },
+            {
+                estDtlDiv: "기타경비",
+                estComm: "",
+                estSpec: "",
+                estUnit: "선택",
+                estQty: "",
+                estUpr: "",
+            },
+            {
+                estDtlDiv: "기타경비",
+                estComm: "",
+                estSpec: "",
+                estUnit: "선택",
+                estQty: "",
+                estUpr: "",
+            },
+
 
         ];
 
@@ -938,26 +1049,27 @@
         var parsedDataInfo
         postAjax("/user/cr/cr02/selectOrdrsWithEst", paramObj, null, function (data) {
             parsedDataInfo = data.info;
-            // Set the input field values with the received data
-            Object.keys(parsedDataInfo).forEach(function (key) {
-                var inputField = document.getElementById(key);
-                if (inputField) {
-                    inputField.value = parsedDataInfo[key] || '';
-                }
-            });
-
+            // // Set the input field values with the received data
+            // ordrsDt = document.getElementById('ordrsDt');
+            // ordrsDt.value=parsedDataInfo.ordrsDt;
+            // ordrsYn = document.getElementById('ordrsYn');
+            // if(ordrsDt){
+            // ordrsYn.value='확정'
+            // }else{
+            //     ordrsYn.value=''
+            // }
             var myButton = document.getElementById("degUpBtn");
             var myButton2 = document.getElementById("ordrsBtn");
             if (parsedDataInfo) {
-                // myButton.style.backgroundColor = "gray"; // 버튼 색상을 회색으로 변경
-                // myButton.disabled = true; // 버튼을 비활성화
+                myButton.style.backgroundColor = "gray"; // 버튼 색상을 회색으로 변경
+                myButton.disabled = true; // 버튼을 비활성화
                 myButton2.style.backgroundColor = "gray"; // 버튼 색상을 회색으로 변경
                 myButton2.disabled = true; // 버튼을 비활성화
 
 
             } else {
-                // myButton.style.backgroundColor = ""; // 버튼 색상을 기본값으로 설정
-                // myButton.disabled = false; // 버튼을 활성화
+                myButton.style.backgroundColor = ""; // 버튼 색상을 기본값으로 설정
+                myButton.disabled = false; // 버튼을 활성화
                 myButton2.style.backgroundColor = ""; // 버튼 색상을 기본값으로 설정
                 myButton2.disabled = false; // 버튼을 활성화
             }
@@ -1049,7 +1161,7 @@
     function insertEstNew() {
         return new Promise((resolve, reject) => {
             if (inputValidation($('.popup_area [required]'))) {
-                var formData = makeFormData();
+                var formData = makeFormDataWithDeg();
 
                 filePostAjax("/user/cr/cr01/insertEstDeg", formData, function (data) {
                     if (data.resultCode == 200) {
@@ -1075,7 +1187,6 @@
             "estNo": $("#estNo").val()
         };
         modal = new ax5.ui.modal();
-        showMask();
         openModal("/static/html/user/cr/cr02/CR0202P01.html", 1400, 736, "", paramObj);
     }
 
@@ -1106,5 +1217,9 @@
         // Append mask to body
         document.body.appendChild(mask);
     }
+
+
+
+
 </script>
 </html>
