@@ -26,6 +26,52 @@
 
     </select>
 
+    <select id="selectEstListNotOrdrs" resultType="CamelMap">
+        SELECT *
+        FROM (
+        SELECT
+        TO_CHAR(T.EST_DT, 'YYYY-MM-DD') AS EST_DT,
+        ROWNUM AS RNUM,
+        T.*
+        FROM (
+        SELECT A.*, B.CLNT_NM
+        FROM TB_CR01M01 A
+        LEFT JOIN TB_BM02M01 B ON A.EST_CLNT_CD = B.CLNT_CD
+        <where>
+            <if test="strtDt != null and !strtDt.equals('')">
+                AND A.EST_DT BETWEEN #{strtDt} AND #{endDt}
+            </if>
+            <if test="coCd != null and !coCd.equals('')">
+                AND A.CO_CD = #{coCd}
+            </if>
+            <if test="searchType != null and searchType.equals('EST_NO')">
+                AND A.EST_NO LIKE '%' || #{searchValue} || '%'
+            </if>
+            <if test="searchType != null and searchType.equals('CLNT_NM')">
+                AND B.CLNT_NM LIKE '%' || #{searchValue} || '%'
+            </if>
+            <if test="estNm != null and !estNm.equals('')">
+                AND A.EST_NM LIKE '%' || #{estNm} || '%'
+            </if>
+            <if test="searchType == null or (!searchType.equals('EST_NO') and !searchType.equals('CLNT_NM'))">
+                <if test="estNo != null and !estNo.equals('')">
+                    AND A.EST_NO = #{estNo}
+                </if>
+            </if>
+            <if test="estDeg != null and !estDeg.equals('')">
+                AND A.EST_DEG = #{estDeg}
+            </if>
+            <if test="clntCd != null and !clntCd.equals('')">
+                AND B.CLNT_CD = #{clntCd}
+            </if>
+            AND A.EST_NO NOT IN (
+            SELECT EST_NO FROM TB_CR01M01 WHERE ORDRS_YN = 'Y'
+            )
+        </where>
+        ) T
+        )
+        WHERE RNUM BETWEEN #{firstIndex} AND #{lastIndex}
+    </select>
     <select id="selectEstList" resultType="CamelMap">
         SELECT *
         FROM (
@@ -104,15 +150,16 @@
             AND EST_NO = #{estNo}
             AND EST_DEG = #{estDeg}
     </select>
-    <insert id="insertEst">
+    <insert id="insertEst" parameterType="map">
         INSERT INTO TB_CR01M01
-            (CO_CD, EST_NO, EST_CLNT_CD, EST_DT,
-            CSTM_MNG_NM, CSTM_MNG_HP, EST_NM, EST_AMT, EST_EXCEPT,
-             EST_DLVR_CNDT, EST_PMNT_CNDT, EST_DUDT, EST_DEG, FILE_TRGT_KEY)
+        (CO_CD, EST_NO, EST_CLNT_CD, EST_DT,
+         CSTM_MNG_NM, CSTM_MNG_HP, EST_NM, EST_AMT, EST_EXCEPT,
+         EST_DLVR_CNDT, EST_PMNT_CNDT, EST_DUDT, EST_DEG, FILE_TRGT_KEY, EXRATE, MNG_ID, EST_NEGO_AMT, EST_STD)
         VALUES
-            (#{coCd}, #{estNo}, #{estClntCd}, #{estDt},
-            #{cstmMngNm}, #{cstmMngHp}, #{estNm}, #{estAmt}, #{estExcept},
-             #{estDlvrCndt}, #{estPmntCndt}, #{estDudt}, #{estDeg}, #{fileTrgtKey})
+            (#{coCd, jdbcType=VARCHAR}, #{estNo, jdbcType=VARCHAR}, #{estClntCd, jdbcType=NUMERIC}, #{estDt, jdbcType=DATE},
+             #{cstmMngNm, jdbcType=VARCHAR}, #{cstmMngHp, jdbcType=VARCHAR}, #{estNm, jdbcType=VARCHAR}, #{estAmt, jdbcType=NUMERIC}, #{estExcept, jdbcType=VARCHAR},
+             #{estDlvrCndt, jdbcType=VARCHAR}, #{estPmntCndt, jdbcType=VARCHAR}, #{estDudt, jdbcType=VARCHAR}, #{estDeg, jdbcType=NUMERIC}, #{fileTrgtKey, jdbcType=VARCHAR},
+             #{exrate, jdbcType=NUMERIC}, #{mngId, jdbcType=VARCHAR}, #{estNegoAmt, jdbcType=NUMERIC}, #{estStd, jdbcType=VARCHAR})
     </insert>
 
     <insert id="insertEstDetail" parameterType="map">
@@ -157,43 +204,44 @@
 
     <update id="updateEst" parameterType="map">
         UPDATE TB_CR01M01
-        SET EST_CLNT_CD   = #{estClntCd},
-            EST_DT        = #{estDt},
-            CSTM_MNG_NM   = #{cstmMngNm},
-            CSTM_MNG_HP   = #{cstmMngHp},
-            EST_NM        = #{estNm},
-            EST_AMT       = #{estAmt},
-
-            EST_EXCEPT    = #{estExcept},
---             EST_STD_DT    = #{estStdDt},
-
-            EST_DLVR_CNDT = #{estDlvrCndt},
-            EST_PMNT_CNDT = #{estPmntCndt},
-            EST_DUDT      = #{estDudt},
-            FILE_TRGT_KEY = #{fileTrgtKey}
-        WHERE CO_CD = #{coCd}
-            AND EST_NO = #{estNo}
-            AND EST_DEG = #{estDeg}
-
+        SET EST_CLNT_CD   = #{estClntCd, jdbcType=NUMERIC},
+            EST_DT        = #{estDt, jdbcType=DATE},
+            CSTM_MNG_NM   = #{cstmMngNm, jdbcType=VARCHAR},
+            CSTM_MNG_HP   = #{cstmMngHp, jdbcType=VARCHAR},
+            EST_NM        = #{estNm, jdbcType=VARCHAR},
+            EST_AMT       = #{estAmt, jdbcType=NUMERIC},
+            EST_EXCEPT    = #{estExcept, jdbcType=VARCHAR},
+            EST_DLVR_CNDT = #{estDlvrCndt, jdbcType=VARCHAR},
+            EST_PMNT_CNDT = #{estPmntCndt, jdbcType=VARCHAR},
+            EST_DUDT      = #{estDudt, jdbcType=VARCHAR},
+            FILE_TRGT_KEY = #{fileTrgtKey, jdbcType=VARCHAR},
+            EXRATE        = #{exrate, jdbcType=NUMERIC},
+            MNG_ID        = #{mngId, jdbcType=VARCHAR},
+            EST_NEGO_AMT  = #{estNegoAmt, jdbcType=NUMERIC},
+            EST_STD       = #{estStd, jdbcType=VARCHAR}
+        WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+          AND EST_NO = #{estNo, jdbcType=VARCHAR}
+          AND EST_DEG = #{estDeg, jdbcType=NUMERIC}
     </update>
     <update id="updateEstConfirm" parameterType="map">
         UPDATE TB_CR01M01
-        SET ORDRS_DT = #{ordrsDt}
+        SET ORDRS_YN = 'Y',
+            ORDRS_DT = #{ordrsDt}
+
         WHERE CO_CD = #{coCd}
           AND EST_NO = #{estNo}
     </update>
-
     <update id="updateEstDetail" parameterType="map">
         UPDATE TB_CR01D01
-        SET EST_DTL_DIV = #{estDtlDiv},
-            EST_COMM    = #{estComm},
-            EST_SPEC    = #{estSpec},
-            EST_UNIT    = #{estUnit},
-            EST_QTY     = #{estQty},
-            EST_UPR     = #{estUpr}
-        WHERE CO_CD = #{coCd}
-            AND EST_NO = #{estNo}
-            AND EST_SEQ = #{estSeq}
+        SET EST_DTL_DIV = #{estDtlDiv, jdbcType=VARCHAR},    <!-- EST_DTL_DIV: VARCHAR(20) -->
+        EST_COMM    = #{estComm, jdbcType=VARCHAR},       <!-- EST_COMM: VARCHAR(1000) -->
+        EST_SPEC    = #{estSpec, jdbcType=VARCHAR},       <!-- EST_SPEC: VARCHAR(1000) -->
+        EST_UNIT    = #{estUnit, jdbcType=VARCHAR},       <!-- EST_UNIT: VARCHAR(20) -->
+        EST_QTY     = #{estQty, jdbcType=NUMERIC},        <!-- EST_QTY: NUMBER(13) -->
+        EST_UPR     = #{estUpr, jdbcType=NUMERIC}         <!-- EST_UPR: NUMBER(15,2) -->
+        WHERE CO_CD = #{coCd, jdbcType=VARCHAR}              <!-- CO_CD: VARCHAR(20) -->
+        AND EST_NO = #{estNo, jdbcType=VARCHAR}           <!-- EST_NO: VARCHAR(20) -->
+        AND EST_SEQ = #{estSeq, jdbcType=NUMERIC}         <!-- EST_SEQ: NUMBER -->
     </update>
     <select id="selectMaxEstDeg" parameterType="java.util.Map" resultType="java.lang.String">
         SELECT MAX(EST_DEG)

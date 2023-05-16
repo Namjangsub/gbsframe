@@ -12,7 +12,11 @@ public interface CR01Svc {
 	public int selectEstCount(Map<String, String> param);
 	
 	public List<Map<String, Object>> selectEstList(Map<String, String> param);
-	
+
+	public List<Map<String, Object>> selectEstListNotOrdrs(Map<String, String> param);
+
+
+
 	Map<String, Object> selectEstInfo(Map<String, String> paramMap);
 	
 

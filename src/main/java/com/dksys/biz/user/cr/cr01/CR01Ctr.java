@@ -41,6 +41,15 @@ public class CR01Ctr {
     	model.addAttribute("estList", estList);
         return "jsonView";
     }
+	@PostMapping("/selectEstListNotOrdrs")
+	public String selectEstListNotOrdrs(@RequestBody Map<String, String> param, ModelMap model) {
+		int totalCnt = cr01svc.selectEstCount(param);
+		PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, Object>> estList = cr01svc.selectEstListNotOrdrs(param);
+		model.addAttribute("estList", estList);
+		return "jsonView";
+	}
     
     @PostMapping(value = "/selectEstInfo")
     public String selectEstInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {

@@ -16,7 +16,10 @@ public interface CR01Mapper {
 	int selectEstCount(Map<String, String> param);
 	
 	List<Map<String, Object>> selectEstList(Map<String, String> param);
-	
+	List<Map<String, Object>> selectEstListNotOrdrs(Map<String, String> param);
+
+
+
 	Map<String, Object> selectEstInfo(Map<String, String> paramMap);
 	
 	   

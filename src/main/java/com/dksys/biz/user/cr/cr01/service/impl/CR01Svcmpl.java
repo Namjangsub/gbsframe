@@ -44,6 +44,12 @@ public class CR01Svcmpl implements CR01Svc {
     }
 
     @Override
+    public List<Map<String, Object>> selectEstListNotOrdrs(Map<String, String> param) {
+
+        return cr01Mapper.selectEstListNotOrdrs(param);
+    }
+
+    @Override
     public Map<String, Object> selectEstInfo(Map<String, String> paramMap) {
 
         Map<String, Object> estInfo = cr01Mapper.selectEstInfo(paramMap);
@@ -66,7 +72,6 @@ public class CR01Svcmpl implements CR01Svc {
             fileTrgtKey = cm08Mapper.selectNextFileTrgtKey();
             paramMap.put("fileTrgtKey", fileTrgtKey);
             cr01Mapper.insertEst(paramMap);
-
             List<Map<String, String>> detailArr = gson.fromJson(removeEmptyObjects(paramMap.get("detailArr")), mapList);
 
 
@@ -152,7 +157,7 @@ public class CR01Svcmpl implements CR01Svc {
         Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 
         System.out.println(paramMap);
-        //int result = cr01Mapper.updateEst(paramMap);
+        int result = cr01Mapper.updateEst(paramMap);
 
     // 데이터베이스에서 현재 견적 상세 목록 가져오기
         List<Map<String, Object>> dbDetailListRaw = cr01Mapper.selectEstDetail(paramMap);
@@ -199,6 +204,7 @@ public class CR01Svcmpl implements CR01Svc {
                 estDetail.put("estDeg", paramMap.get("estDeg"));
 
                 // 업데이트 쿼리를 실행해야 합니다.
+                System.out.println(estDetail+"최종123412");
                 cr01Mapper.updateEstDetail(estDetail);
             } else {
                 // 견적 상세 삽입
@@ -222,7 +228,7 @@ public class CR01Svcmpl implements CR01Svc {
         System.out.println(paramMap.get("fileTrgtKey")+"해당위치");
         cm08Svc.uploadTreeFile("TB_CR01M01", paramMap.get("fileTrgtKey"), mRequest);
 
-        return 1;
+        return result;
     }
 
 
