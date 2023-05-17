@@ -41,4 +41,9 @@ public interface CM08Svc {
 
 	int deleteFileCall(Map<String, String> paramMap);
 
+	public Map<String, String> selectFileInfoUser(Map<String, String> paramMap);
+
+	int uploadFile(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+
+
 }

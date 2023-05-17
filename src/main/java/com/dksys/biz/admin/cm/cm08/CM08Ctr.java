@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -44,6 +45,29 @@ public class CM08Ctr {
 	public String fileDownInfo(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
 		Map<String, String> fileInfo = cm08Svc.selectFileInfo(param.get("fileKey"));
 		model.addAttribute("fileInfo", fileInfo);
+		return "jsonView";
+	}
+	
+	@PostMapping(value="/fileDownInfoUser")
+	public String fileDownInfoUser(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
+    	Map<String, String> tempParam = new HashMap<String, String>();
+    	
+    	tempParam.putAll(param);
+    	tempParam.put("fileDown", "Y");
+    	
+		Map<String, String> fileInfo = cm08Svc.selectFileInfoUser(tempParam);
+
+    	//
+    	if (null != fileInfo.get("fileName")) {
+    		model.addAttribute("resultCode", 200);
+    		model.addAttribute("resultMessage", messageUtils.getMessage("excute"));
+    		model.addAttribute("fileInfo", fileInfo);
+    		model.addAttribute("fileInfo", fileInfo);
+    	}else {
+			model.addAttribute("resultCode", 500);
+    		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+    	}
+    	
 		return "jsonView";
 	}
 	

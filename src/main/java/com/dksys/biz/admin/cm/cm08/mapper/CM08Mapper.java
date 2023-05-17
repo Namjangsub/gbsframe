@@ -34,4 +34,6 @@ public interface CM08Mapper {
 
 	int deleteFileCall(Map<String, String> paramMap);
 	
+	Map<String, String> selectFileInfoUser(Map<String, String> paramMap);
+
 }

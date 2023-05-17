@@ -14,8 +14,10 @@ public interface CM15Mapper {
 	
 	List<Map<String, String>> selectTreeAuthList(Map<String, String> paramMap);
 
-//	Map<String, String> selectFileAutoInfo(String fileKey);
-//
+	Map<String, String> selectFileAuthInfo(Map<String, String> paramMap);
+
+	int selectFileAuthCheck(String fileKey);
+	
 //	int deleteFileAuthInfo(Map<String, String> paramMap);
 //	
 }
