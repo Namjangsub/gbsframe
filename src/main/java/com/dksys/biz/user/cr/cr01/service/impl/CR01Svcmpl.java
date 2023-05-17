@@ -153,82 +153,93 @@ public class CR01Svcmpl implements CR01Svc {
     @Override
     public int updateEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
 
-        Gson gson = new GsonBuilder().disableHtmlEscaping().create();
-        Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-
-        System.out.println(paramMap);
-        int result = cr01Mapper.updateEst(paramMap);
-
-    // 데이터베이스에서 현재 견적 상세 목록 가져오기
-        List<Map<String, Object>> dbDetailListRaw = cr01Mapper.selectEstDetail(paramMap);
-
-    // 데이터베이스 목록의 Object를 String으로 변환
-        List<Map<String, String>> dbDetailList = dbDetailListRaw.stream()
-                .map(rawMap -> rawMap.entrySet().stream()
-                        .collect(Collectors.toMap(Map.Entry::getKey, e -> String.valueOf(e.getValue()))))
-                .collect(Collectors.toList());
-
-    // 클라이언트에서 전달된 견적 상세 목록
-        List<Map<String, String>> detailList = gson.fromJson(paramMap.get("detailArr"), mapList);
-
-    // 삭제된 견적 상세 처리
-        for (Map<String, String> dbDetail : dbDetailList) {
-            boolean found = false;
-            for (Map<String, String> estDetail : detailList) {
-                if (dbDetail.get("estSeq").equals(estDetail.get("estSeq"))) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                cr01Mapper.deleteEstDetail(dbDetail);
-            }
+        Map<String, Object> estData = cr01Mapper.selectEstInfo(paramMap);
+        System.out.println("yn값"+estData.get("ordrsYn"));
+        if ("Y".equals(estData.get("ordrsYn"))) {
+            return 0;
         }
+        else {
 
-                // 견적 상세 목록 처리
-        for (Map<String, String> estDetail : detailList) {
-            boolean found = false;
+
+            Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+            Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {
+            }.getType();
+
+            System.out.println(paramMap);
+            int result = cr01Mapper.updateEst(paramMap);
+
+            // 데이터베이스에서 현재 견적 상세 목록 가져오기
+            List<Map<String, Object>> dbDetailListRaw = cr01Mapper.selectEstDetail(paramMap);
+
+            // 데이터베이스 목록의 Object를 String으로 변환
+            List<Map<String, String>> dbDetailList = dbDetailListRaw.stream()
+                    .map(rawMap -> rawMap.entrySet().stream()
+                            .collect(Collectors.toMap(Map.Entry::getKey, e -> String.valueOf(e.getValue()))))
+                    .collect(Collectors.toList());
+
+            // 클라이언트에서 전달된 견적 상세 목록
+            List<Map<String, String>> detailList = gson.fromJson(paramMap.get("detailArr"), mapList);
+
+            // 삭제된 견적 상세 처리
             for (Map<String, String> dbDetail : dbDetailList) {
-                // 조건을 검사할 때 detailList 대신 dbDetailList를 사용해야 합니다.
-                if (dbDetail.get("estSeq").equals(estDetail.get("estSeq"))) {
-                    found = true;
-                    break;
+                boolean found = false;
+                for (Map<String, String> estDetail : detailList) {
+                    if (dbDetail.get("estSeq").equals(estDetail.get("estSeq"))) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    cr01Mapper.deleteEstDetail(dbDetail);
                 }
             }
-            if (found) {
-                // 견적 상세 업데이트
-                estDetail.put("coCd", paramMap.get("coCd"));
-                estDetail.put("estNo", paramMap.get("estNo"));
-                estDetail.put("userId", paramMap.get("userId"));
-                estDetail.put("pgmId", paramMap.get("pgmId"));
-                estDetail.put("estDeg", paramMap.get("estDeg"));
 
-                // 업데이트 쿼리를 실행해야 합니다.
-                System.out.println(estDetail+"최종123412");
-                cr01Mapper.updateEstDetail(estDetail);
-            } else {
-                // 견적 상세 삽입
-                estDetail.put("coCd", paramMap.get("coCd"));
-                estDetail.put("estNo", paramMap.get("estNo"));
-                estDetail.put("userId", paramMap.get("userId"));
-                estDetail.put("pgmId", paramMap.get("pgmId"));
-                estDetail.put("estDeg", paramMap.get("estDeg"));
+            // 견적 상세 목록 처리
+            for (Map<String, String> estDetail : detailList) {
+                boolean found = false;
+                for (Map<String, String> dbDetail : dbDetailList) {
+                    // 조건을 검사할 때 detailList 대신 dbDetailList를 사용해야 합니다.
+                    if (dbDetail.get("estSeq").equals(estDetail.get("estSeq"))) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    // 견적 상세 업데이트
+                    estDetail.put("coCd", paramMap.get("coCd"));
+                    estDetail.put("estNo", paramMap.get("estNo"));
+                    estDetail.put("userId", paramMap.get("userId"));
+                    estDetail.put("pgmId", paramMap.get("pgmId"));
+                    estDetail.put("estDeg", paramMap.get("estDeg"));
 
-                cr01Mapper.insertEstDetail(estDetail);
+                    // 업데이트 쿼리를 실행해야 합니다.
+                    System.out.println(estDetail + "최종123412");
+                    cr01Mapper.updateEstDetail(estDetail);
+                } else {
+                    // 견적 상세 삽입
+                    estDetail.put("coCd", paramMap.get("coCd"));
+                    estDetail.put("estNo", paramMap.get("estNo"));
+                    estDetail.put("userId", paramMap.get("userId"));
+                    estDetail.put("pgmId", paramMap.get("pgmId"));
+                    estDetail.put("estDeg", paramMap.get("estDeg"));
+
+                    cr01Mapper.insertEstDetail(estDetail);
+                }
             }
+            System.out.println("여기까지2" + paramMap.get("deleteFileArr"));
+            String[] deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), String[].class);
+            List<String> deleteFileList = Arrays.asList(deleteFileArr);
+
+            for (String fileKey : deleteFileList) {
+
+                cm08Svc.deleteFile(fileKey);
+            }
+
+            System.out.println(paramMap.get("fileTrgtKey") + "해당위치");
+            cm08Svc.uploadTreeFile("TB_CR01M01", paramMap.get("fileTrgtKey"), mRequest);
+
+            return 200;
         }
-        System.out.println("여기까지2"+paramMap.get("deleteFileArr"));
-        String[] deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), String[].class);
-        List<String> deleteFileList = Arrays.asList(deleteFileArr);
-
-        for(String fileKey : deleteFileList) {
-
-            cm08Svc.deleteFile(fileKey);
-        }
-        System.out.println(paramMap.get("fileTrgtKey")+"해당위치");
-        cm08Svc.uploadTreeFile("TB_CR01M01", paramMap.get("fileTrgtKey"), mRequest);
-
-        return result;
     }
 
 
@@ -243,8 +254,15 @@ public class CR01Svcmpl implements CR01Svc {
 
     @Override
     public int deleteEst(Map<String, String> paramMap) {
-        int result = cr01Mapper.deleteEst(paramMap);
-        result += cr01Mapper.deleteAllEstDetails(paramMap);
-        return result;
+        Map<String, Object> estData = cr01Mapper.selectEstInfo(paramMap);
+        System.out.println("yn값"+estData.get("ordrsYn"));
+        if ("Y".equals(estData.get("ordrsYn"))) {
+            return 0;
+        }
+        else {
+            int result = cr01Mapper.deleteEst(paramMap);
+            result += cr01Mapper.deleteAllEstDetails(paramMap);
+            return result;
+        }
     }
 }

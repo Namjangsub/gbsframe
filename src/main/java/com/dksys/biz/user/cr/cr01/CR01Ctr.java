@@ -95,8 +95,7 @@ public class CR01Ctr {
 	@PutMapping(value = "/updateEst")
 	public String updateEst(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {
-			cr01svc.updateEst(paramMap, mRequest);
-	    	model.addAttribute("resultCode", 200);
+	    	model.addAttribute("resultCode", cr01svc.updateEst(paramMap, mRequest));
 	    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 		}catch(Exception e) {
 			model.addAttribute("resultCode", 500);
@@ -107,8 +106,10 @@ public class CR01Ctr {
 	
 	@DeleteMapping(value = "/deleteEst")
     public String deleteEst(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    	cr01svc.deleteEst(paramMap);
-    	model.addAttribute("resultCode", 200);
+
+
+
+    	model.addAttribute("resultCode", cr01svc.deleteEst(paramMap));
     	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
     	return "jsonView";
     }
