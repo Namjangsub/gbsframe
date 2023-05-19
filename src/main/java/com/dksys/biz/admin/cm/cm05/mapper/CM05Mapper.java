@@ -28,4 +28,6 @@ public interface CM05Mapper {
 
 	List<Map<String, String>> selectDocTreeList(Map<String, String> param);
 
+	List<Map<String, String>> selectDocTreeListAuth(Map<String, String> param); 
+
 }

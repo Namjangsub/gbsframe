@@ -52,7 +52,7 @@ public class CM09SvcImpl implements CM09Svc {
 	    if (fileList.size() > 0) {
 			//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
 			paramMap.put("comonCd", "FITR9901");
-			paramMap.put("jobType", "UPLOAD");
+			paramMap.put("jobType", "fileUp");
 			cm15Svc.selectFileAuthCheck(paramMap);
 			cm08Svc.uploadFile("TB_CM09M01", paramMap.get("notiKey"), mRequest);
 	    }
@@ -80,7 +80,7 @@ public class CM09SvcImpl implements CM09Svc {
 		if (fileList.size() > 0) {
 			//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
 			paramMap.put("comonCd", "FITR9901");
-			paramMap.put("jobType", "UPLOAD");
+			paramMap.put("jobType", "fileUp");
 			cm15Svc.selectFileAuthCheck(paramMap);
 		}
 		
@@ -91,7 +91,7 @@ public class CM09SvcImpl implements CM09Svc {
 		if (deleteFileList.size() > 0) {
 			//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
 			paramMap.put("comonCd", "FITR9901");
-			paramMap.put("jobType", "DELETE");
+			paramMap.put("jobType", "fileDelete");
 			cm15Svc.selectFileAuthCheck(paramMap);
 		}
 
@@ -114,7 +114,7 @@ public class CM09SvcImpl implements CM09Svc {
 	    if (fileList.size() > 0) {
 			//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
 			paramMap.put("comonCd", "FITR9901");
-			paramMap.put("jobType", "UPLOAD");
+			paramMap.put("jobType", "fileUp");
 			cm15Svc.selectFileAuthCheck(paramMap);
 			
 	    	paramMap.put("fileTrgtTyp", "TB_CM09M01");

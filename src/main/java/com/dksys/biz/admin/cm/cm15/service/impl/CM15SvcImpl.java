@@ -59,7 +59,7 @@ public class CM15SvcImpl implements CM15Svc {
     //  파라메터 jobType = 작업유형 전달
     //        userId = 사용자 ID
     //        comonCd = 파일트리 ID( 현재 공통코드로 관리되는  CODE_ID)
-    // 결과 Return 1은 접근 가능 0은 접근 통제
+    //  접근 통제는 Exception 발생
 	@Override
 	public void selectFileAuthCheck(Map<String, String> paramMap) throws Exception {
         Map<String, String> fileInfo = selectFileAuthInfo(paramMap);
@@ -67,16 +67,16 @@ public class CM15SvcImpl implements CM15Svc {
 			case "LIST":
 				if (!fileInfo.get("fileList").equals("Y")) thrower.throwCommonException("noFileList");
 				break;
-			case "UPLOAD":
+			case "fileUp":
 				if (!fileInfo.get("fileUp").equals("Y")) thrower.throwCommonException("noFileUp");
 				break;
-			case "DOWNLOAD":
+			case "fileDown":
 				if (!fileInfo.get("fileDown").equals("Y")) thrower.throwCommonException("noFileDown");
 				break;
-			case "UPDATE":
+			case "fileUpdate":
 				if (!fileInfo.get("fileUpdate").equals("Y")) thrower.throwCommonException("noFileUpdate");
 				break;
-			case "DELETE":
+			case "fileDelete":
 				if (!fileInfo.get("fileDelete").equals("Y")) thrower.throwCommonException("noFileDelete");
 				break;
 			default:
