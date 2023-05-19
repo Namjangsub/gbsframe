@@ -34,6 +34,7 @@ public class CR01Ctr {
     @PostMapping("/selectEstList")
     public String selectEstList(@RequestBody Map<String, String> param, ModelMap model) {
     	int totalCnt = cr01svc.selectEstCount(param);
+		System.out.println(totalCnt+"총로우");
     	PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
     	model.addAttribute("paginationInfo", paginationInfo);
     
@@ -53,6 +54,10 @@ public class CR01Ctr {
     
     @PostMapping(value = "/selectEstInfo")
     public String selectEstInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+			int totalCnt = cr01svc.selectEstDetailCount(paramMap);
+			PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+			model.addAttribute("paginationInfo", paginationInfo);
+			System.out.println(totalCnt+"총로우");
     	  	Map<String, Object> estInfo = cr01svc.selectEstInfo(paramMap);
     	    model.addAttribute("estInfo", estInfo);
     	return "jsonView";
@@ -76,12 +81,10 @@ public class CR01Ctr {
 	@PostMapping(value = "/insertEstDeg")
 	public String insertEstDeg(@RequestParam Map<String, String> paramMap , MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {
-			System.out.println(paramMap+"여기0");
-			Map<String, String> newEst = cr01svc.insertEstDeg(paramMap, mRequest);
-
+			String newEst  = cr01svc.insertEstDeg(paramMap, mRequest);
 			model.addAttribute("resultCode", 200);
 			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-			model.addAttribute("newEst", newEst);
+			model.addAttribute("newEst", newEst );
 		}catch(Exception e) {
 			model.addAttribute("resultCode", 500);
 			model.addAttribute("resultMessage", e.getLocalizedMessage());

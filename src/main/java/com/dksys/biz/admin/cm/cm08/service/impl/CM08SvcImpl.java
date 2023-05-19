@@ -1,5 +1,6 @@
 package com.dksys.biz.admin.cm.cm08.service.impl;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -7,6 +8,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +34,7 @@ import com.dksys.biz.util.DateUtil;
 
 @Service
 public class CM08SvcImpl implements CM08Svc {
+    private static final Logger logger = LoggerFactory.getLogger(CM08SvcImpl.class);
 
     @Autowired
     CM08Mapper cm08Mapper;
@@ -82,7 +85,7 @@ public class CM08SvcImpl implements CM08Svc {
         return 0;
     }
     @Override
-    public int uploadTreeFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest) {
+    public synchronized int uploadTreeFile(String fileTrgtTyp,Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
         List<MultipartFile> fileList = mRequest.getFiles("files");
         String year = DateUtil.getCurrentYyyy();
         String month = DateUtil.getCurrentMm();
@@ -105,14 +108,20 @@ public class CM08SvcImpl implements CM08Svc {
                 }
                 param.put("filePath", path);
                 param.put("fileTrgtTyp", fileTrgtTyp);
-                param.put("fileTrgtKey", fileTrgtKey);
                 param.put("userId", mRequest.getParameter("userId"));
                 param.put("pgmId", fileTrgtTyp);
                 param.put("coCd", mRequest.getParameter("coCd"));
-                // comonCd 처리
                 String comonCdKey = "comonCd_" + i;
                 String comonCd = mRequest.getParameter(comonCdKey);
                 param.put("comonCd", comonCd);
+                param.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+
+
+
+                String userId = mRequest.getParameter("userId");
+                param.put("creatId", userId);
+                param.put("creatPgm", fileTrgtTyp);
+
                 cm08Mapper.insertTreeFile(param);
                 String saveFile = param.get("fileKey") + "_" + originFileName;
                 File f = new File(path);
@@ -123,16 +132,15 @@ public class CM08SvcImpl implements CM08Svc {
                 // }
 
             } catch (IllegalStateException e) {
-                e.printStackTrace();
+                logger.error("IllegalStateException occurred: ", e);
             } catch (IOException e) {
-                e.printStackTrace();
+                logger.error("IOException occurred: ", e);
             }
         }
         return 0;
     }
-
     @Override
-    public int copyTreeFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest) {
+    public int copyTreeFile(String fileTrgtTyp, Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
         System.out.println("copyTreeFile 실행");
         String year = DateUtil.getCurrentYyyy();
         String month = DateUtil.getCurrentMm();
@@ -160,19 +168,18 @@ public class CM08SvcImpl implements CM08Svc {
             param.put("fileName", fileName);
             param.put("filePath", path);
             param.put("fileTrgtTyp", fileTrgtTyp);
-            param.put("fileTrgtKey", fileTrgtKey);
             param.put("userId", mRequest.getParameter("userId"));
             param.put("pgmId", fileTrgtTyp);
             param.put("coCd", mRequest.getParameter("coCd"));
             param.put("comonCd", comonCd);
-           String nowFileKey= cm08Mapper.selectNextFileKey();
-           System.out.println(mRequest.getParameter("userId")+"이게 제로?");
-            param.put("fileKey", nowFileKey);
+            param.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+            String userId = mRequest.getParameter("userId");
+            param.put("creatId", userId);
+            param.put("creatPgm", fileTrgtTyp);
             cm08Mapper.insertTreeFileWithDeg(param);
-
+            String nowFileKey = param.get("fileKey");
 
             File sourceFile = new File(filePath +filePKey+"_"+fileName);
-            System.out.println("최종 키 값;"+nowFileKey);
             String saveFile = nowFileKey + "_" + fileName;
             File targetFile = new File(path + saveFile);
 
@@ -193,28 +200,23 @@ public class CM08SvcImpl implements CM08Svc {
 
         return 0;
     }
-
-
-
     @Override
     public List<Map<String, String>> selectFileList(Map<String, String> paramMap) {
         return cm08Mapper.selectFileList(paramMap);
     }
-
 	@Override
 	public int  selectTreeFileCount(Map<String, String> paramMap) {
 		return cm08Mapper.selectTreeFileCount(paramMap);
 	}
-	
     @Override
     public List<Map<String, String>> selectTreeFileList(Map<String, String> paramMap) {
         return cm08Mapper.selectTreeFileList(paramMap);
     }
     @Override
     public List<Map<String, String>> selectTreeFileModule(Map<String, String> paramMap) {
+        System.out.println(paramMap+"트리Log");
         return cm08Mapper.selectTreeFileModule(paramMap);
     }
-
     @Override
     public void setDisposition(HttpServletRequest request, HttpServletResponse response, String fileName) {
         try {
@@ -254,7 +256,6 @@ public class CM08SvcImpl implements CM08Svc {
             e.printStackTrace();
         }
     }
-
     public String getBrowser(HttpServletRequest request) {
         String header = request.getHeader("User-Agent");
         if (header.indexOf("MSIE") > -1) {
@@ -268,12 +269,10 @@ public class CM08SvcImpl implements CM08Svc {
         }
         return "Firefox";
     }
-
     @Override
     public Map<String, String> selectFileInfo(String fileKey) {
         return cm08Mapper.selectFileInfo(fileKey);
     }
-
     @Override
     public int deleteFile(String fileKey) {
         Map<String, String> fileInfo = selectFileInfo(fileKey);
@@ -287,7 +286,6 @@ public class CM08SvcImpl implements CM08Svc {
         }
         return result;
     }
-
     @Override
     public String excelDownload(List<Map<String, String>> list, String fileName) {
         if (list.size() == 0) return "noData";
@@ -319,7 +317,7 @@ public class CM08SvcImpl implements CM08Svc {
                 }
             }
             FileOutputStream fileOut = null;
-            String path = "C:\\upload\\" + fileName;
+            String path = "D:\\upload\\" + fileName;
             File f = new File(path);
 //        	if(!f.isDirectory()) f.mkdirs();
             fileOut = new FileOutputStream(f);
@@ -330,20 +328,16 @@ public class CM08SvcImpl implements CM08Svc {
         }
         return fileName;
     }
-
-	
 	@Override
 	public int selectConfirmCount(Map<String, String> paramMap) {
 		return cm08Mapper.selectConfirmCount(paramMap);
 	}
-    
 	@Override
 	public int moveFile(Map<String, String> paramMap) {
 		// update
 		int result = cm08Mapper.moveFile(paramMap);
 		return result;
 	}
-	
 	@Override
 	public int deleteFileCall(Map<String, String> paramMap) {
 		String fileKey = paramMap.get("fileKey");

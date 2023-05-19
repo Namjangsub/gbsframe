@@ -127,7 +127,7 @@ public class CR02Svcmpl implements CR02Svc {
         }
 
             try {
-                cm08Svc.uploadTreeFile("TB_CR02M01", fileTrgtKey, mRequest);
+                cm08Svc.uploadTreeFile("TB_CR02M01",param, mRequest);
             } catch (Exception e) {
                 System.out.println("error4"+e.getMessage());
 
@@ -268,7 +268,7 @@ public class CR02Svcmpl implements CR02Svc {
             cm08Svc.deleteFile(fileKey);
         }
         System.out.println(param.get("fileTrgtKey")+"해당위치");
-        cm08Svc.uploadTreeFile("TB_CR02M01", param.get("fileTrgtKey"), mRequest);
+        cm08Svc.uploadTreeFile("TB_CR02M01", param,mRequest);
  /*
 
  for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
@@ -285,8 +285,6 @@ public class CR02Svcmpl implements CR02Svc {
  */
 
     }
-
-
 
 
     public static String removeEmptyObjects(String jsonArrayString) {

@@ -150,14 +150,13 @@ var treeModule = (function () {
                 // });
 
 
-                if (data.node.id.length < 7 || data.node.id == "FILETREE") {
-
-                    buttonFile.disabled = true; // 비활성화
-                    buttonFile.style.backgroundColor = "gray"; // 회색 배경색으로 변경 (옵션)
-                } else {
+                // Check if the selected node is a leaf node
+                if ($('#' + selector).jstree(true).is_leaf(data.node)) {
                     buttonFile.disabled = false; // 활성화
                     buttonFile.style.backgroundColor = ""; // 기본 배경색으로 변경 (옵션)
-
+                } else {
+                    buttonFile.disabled = true; // 비활성화
+                    buttonFile.style.backgroundColor = "gray"; // 회색 배경색으로 변경 (옵션)
                 }
 
 
