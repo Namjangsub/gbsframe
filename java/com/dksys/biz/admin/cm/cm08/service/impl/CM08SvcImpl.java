@@ -38,7 +38,7 @@ public class CM08SvcImpl implements CM08Svc {
 		List<MultipartFile> fileList = mRequest.getFiles("files");
 		String year = DateUtil.getCurrentYyyy();
 		String month = DateUtil.getCurrentMm();
-        String path = "D:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
+        String path = "C:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
         for (MultipartFile mf : fileList) {
             String originFileName = mf.getOriginalFilename(); // 원본 파일 명
             // long fileSize = mf.getSize(); // 파일 사이즈
