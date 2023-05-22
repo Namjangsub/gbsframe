@@ -156,7 +156,7 @@ public class WB01SvcImpl implements WB01Svc {
 		int result = wb01Mapper.insertToDoList(paramMap);
 		return result;
 	}
-	
+
 	public int wbsLevel1PlanInsert(Map<String, String> paramMap , MultipartHttpServletRequest mRequest) {
 		Gson gson = new Gson();
 		Type stringList = new TypeToken<ArrayList<String>>() {}.getType();
@@ -164,7 +164,7 @@ public class WB01SvcImpl implements WB01Svc {
 		for(String fileKey : deleteFileList) {
 			cm08Svc.deleteFile(fileKey);
 		}
-		for (int i = 0; i < mRequest.getFiles("files").size(); i++) { 
+		for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
 			try {
 				cm08Svc.uploadTreeFile("TB_WB01P01", paramMap.get("fileTrgtKey"), mRequest);
 			}
@@ -172,9 +172,9 @@ public class WB01SvcImpl implements WB01Svc {
 				System.out.println("error4"+e.getMessage());
 			}
 		}
-		
+
 		int result = wb01Mapper.wbsLevel1PlanInsert(paramMap);
-		
+
 		return result;
 	}
 
@@ -185,7 +185,7 @@ public class WB01SvcImpl implements WB01Svc {
 		for(String fileKey : deleteFileList) {
 			cm08Svc.deleteFile(fileKey);
 		}
-		for (int i = 0; i < mRequest.getFiles("files").size(); i++) { 
+		for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
 			try {
 				cm08Svc.uploadTreeFile("TB_WB01P01", paramMap.get("fileTrgtKey"), mRequest);
 			}
@@ -209,7 +209,7 @@ public class WB01SvcImpl implements WB01Svc {
 		for(String fileKey : deleteFileList) {
 			cm08Svc.deleteFile(fileKey);
 		}
-		for (int i = 0; i < mRequest.getFiles("files").size(); i++) { 
+		for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
 			try {
 				cm08Svc.uploadTreeFile("TB_WB01P01", paramMap.get("fileTrgtKey"), mRequest);
 			}
@@ -228,7 +228,7 @@ public class WB01SvcImpl implements WB01Svc {
 		for(String fileKey : deleteFileList) {
 			cm08Svc.deleteFile(fileKey);
 		}
-		for (int i = 0; i < mRequest.getFiles("files").size(); i++) { 
+		for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
 			try {
 				cm08Svc.uploadTreeFile("TB_WB01P01", paramMap.get("fileTrgtKey"), mRequest);
 			}
@@ -236,7 +236,7 @@ public class WB01SvcImpl implements WB01Svc {
 				System.out.println("error4"+e.getMessage());
 			}
 		}
-		
+
 		int result = wb01Mapper.wbsLevel2PlanUpdate(paramMap);
 		return result;
 	}
@@ -248,7 +248,7 @@ public class WB01SvcImpl implements WB01Svc {
 		for(String fileKey : deleteFileList) {
 			cm08Svc.deleteFile(fileKey);
 		}
-		for (int i = 0; i < mRequest.getFiles("files").size(); i++) { 
+		for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
 			try {
 				cm08Svc.uploadTreeFile("TB_WB01P01", paramMap.get("fileTrgtKey"), mRequest);
 			}
@@ -256,7 +256,7 @@ public class WB01SvcImpl implements WB01Svc {
 				System.out.println("error4"+e.getMessage());
 			}
 		}
-		
+
 		int result = wb01Mapper.wbsLevel3PlanInsert(paramMap);
 
 		return result;
@@ -269,7 +269,7 @@ public class WB01SvcImpl implements WB01Svc {
 		for(String fileKey : deleteFileList) {
 			cm08Svc.deleteFile(fileKey);
 		}
-		for (int i = 0; i < mRequest.getFiles("files").size(); i++) { 
+		for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
 			try {
 				cm08Svc.uploadTreeFile("TB_WB01P01", paramMap.get("fileTrgtKey"), mRequest);
 			}
@@ -277,11 +277,11 @@ public class WB01SvcImpl implements WB01Svc {
 				System.out.println("error4"+e.getMessage());
 			}
 		}
-		
+
 		int result = wb01Mapper.wbsLevel3PlanUpdate(paramMap);
 		return result;
 	}
-	
+
 	@Override
 	public int selectMaxTrgtKey(Map<String, String> paramMap) {
 		return wb01Mapper.selectMaxTrgtKey(paramMap);
@@ -291,12 +291,12 @@ public class WB01SvcImpl implements WB01Svc {
 	public int selectWbsPlanChk(Map<String, String> paramMap) {
 		return wb01Mapper.selectWbsPlanChk(paramMap);
 	}
-	
+
 	@Override
 	public List<Map<String, String>> selectWbsPlanInfoSelect(Map<String, String> paramMap) {
 		return wb01Mapper.selectWbsPlanInfoSelect(paramMap);
 	}
-	
+
 	@Override
 	public int selectWbsPlanConfirmCount(Map<String, String> paramMap) {
 		return wb01Mapper.selectWbsPlanConfirmCount(paramMap);

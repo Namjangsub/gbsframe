@@ -31,24 +31,26 @@ public class CR01Svcmpl implements CR01Svc {
     public String selectMaxEstNo(Map<String, String> paramMap) {
         return cr01Mapper.selectMaxEstNo(paramMap);
     }
+    @Override
+    public String selectMaxEstDeg(Map<String, String> paramMap) {
+        return cr01Mapper.selectMaxEstDeg(paramMap);
+    }
 
     @Override
     public int selectEstCount(Map<String, String> param) {
         return cr01Mapper.selectEstCount(param);
     }
-
+    public int selectEstDetailCount(Map<String, String> param) {return cr01Mapper.selectEstDetailCount(param);}
     @Override
     public List<Map<String, Object>> selectEstList(Map<String, String> param) {
 
         return cr01Mapper.selectEstList(param);
     }
-
     @Override
     public List<Map<String, Object>> selectEstListNotOrdrs(Map<String, String> param) {
 
         return cr01Mapper.selectEstListNotOrdrs(param);
     }
-
     @Override
     public Map<String, Object> selectEstInfo(Map<String, String> paramMap) {
 
@@ -57,7 +59,6 @@ public class CR01Svcmpl implements CR01Svc {
         return estInfo;
 
     }
-
     @Override
     public String insertEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
@@ -68,10 +69,9 @@ public class CR01Svcmpl implements CR01Svc {
         try {
             String maxEstNo=selectMaxEstNo(paramMap);
             paramMap.put("estNo", maxEstNo);
-            String fileTrgtKey;
-            fileTrgtKey = cm08Mapper.selectNextFileTrgtKey();
-            paramMap.put("fileTrgtKey", fileTrgtKey);
+
             cr01Mapper.insertEst(paramMap);
+            System.out.println(paramMap.get("fileTrgtKey")+"여기 리턴값");
             List<Map<String, String>> detailArr = gson.fromJson(removeEmptyObjects(paramMap.get("detailArr")), mapList);
 
 
@@ -85,7 +85,7 @@ public class CR01Svcmpl implements CR01Svc {
 
                 cr01Mapper.insertEstDetail(detailMap);
             }
-            cm08Svc.uploadTreeFile("TB_CR01M01", fileTrgtKey, mRequest);
+            cm08Svc.uploadTreeFile("TB_CR01M01",paramMap, mRequest);
 
         } catch (Exception e) {
             System.out.println(e.getMessage() + "에러명");
@@ -93,31 +93,23 @@ public class CR01Svcmpl implements CR01Svc {
         return paramMap.get("estNo");
 
     }
-
     @Override
-    public Map<String, String> insertEstDeg(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
+    public String insertEstDeg(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
         Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {
         }.getType();
         Type stringList = new TypeToken<ArrayList<String>>() {
         }.getType();
-        Map<String, String> responseMap = new HashMap<>();
+        Map<String, Object> responseMap = new HashMap<>();
         try {
-            String fileTrgtKey;
-            fileTrgtKey = cm08Mapper.selectNextFileTrgtKey();
-            paramMap.put("fileTrgtKey", fileTrgtKey);
-
             String maxEstDeg = cr01Mapper.selectMaxEstDeg(paramMap);
             System.out.println(maxEstDeg+"맥스값");
             int newEstDeg = (maxEstDeg != null ? Integer.parseInt(maxEstDeg) : 0) + 1;
             paramMap.put("estDeg", String.valueOf(newEstDeg));
 
-            System.out.println(    String.valueOf(newEstDeg)+"맥스값2");
-
 
             cr01Mapper.insertEst(paramMap);
             List<Map<String, String>> detailArr = gson.fromJson(removeEmptyObjects(paramMap.get("detailArr")), mapList);
-            System.out.println(detailArr + "여기2");
 
 
             for (Map<String, String> detailMap : detailArr) {
@@ -128,18 +120,19 @@ public class CR01Svcmpl implements CR01Svc {
                 detailMap.put("pgmId", paramMap.get("pgmId"));
                 cr01Mapper.insertEstDetail(detailMap);
             }
-            cm08Svc.copyTreeFile("TB_CR01M01", fileTrgtKey, mRequest);
+            cm08Svc.copyTreeFile("TB_CR01M01", paramMap, mRequest);
 
+            responseMap.put("resultCode", true); // 결과 코드를 성공으로 설정합니다.
+            Map<String, String> newEst = new HashMap<>();
+            newEst.put("estNo", paramMap.get("estNo"));
+            newEst.put("estDeg", paramMap.get("estDeg"));
+            responseMap.put("newEst", newEst);
 
-            responseMap.put("estNo", paramMap.get("estNo"));
-            responseMap.put("estDeg", paramMap.get("estDeg"));
         } catch (Exception e) {
-            System.out.println(e.getMessage() + "에러명");
         }
-        return responseMap;
+        return gson.toJson(responseMap);
 
     }
-
     public static String removeEmptyObjects(String jsonArrayString) {
         String nullAndEmptyObjectPattern = "(\\{\\s*\\}|null),?";
         String resultString = jsonArrayString.replaceAll(nullAndEmptyObjectPattern, "");
@@ -149,7 +142,6 @@ public class CR01Svcmpl implements CR01Svc {
         }
         return resultString;
     }
-
     @Override
     public int updateEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
 
@@ -213,7 +205,6 @@ public class CR01Svcmpl implements CR01Svc {
                     estDetail.put("estDeg", paramMap.get("estDeg"));
 
                     // 업데이트 쿼리를 실행해야 합니다.
-                    System.out.println(estDetail + "최종123412");
                     cr01Mapper.updateEstDetail(estDetail);
                 } else {
                     // 견적 상세 삽입
@@ -234,15 +225,12 @@ public class CR01Svcmpl implements CR01Svc {
 
                 cm08Svc.deleteFile(fileKey);
             }
-
-            System.out.println(paramMap.get("fileTrgtKey") + "해당위치");
-            cm08Svc.uploadTreeFile("TB_CR01M01", paramMap.get("fileTrgtKey"), mRequest);
+            paramMap.get("fileTrgtKey");
+            cm08Svc.uploadTreeFile("TB_CR01M01", paramMap,mRequest);
 
             return 200;
         }
     }
-
-
     public int updateEstConfirm(Map<String, String> paramMap) {
 
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
