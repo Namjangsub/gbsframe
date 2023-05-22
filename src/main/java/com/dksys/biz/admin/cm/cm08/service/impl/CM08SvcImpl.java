@@ -204,10 +204,11 @@ public class CM08SvcImpl implements CM08Svc {
         System.out.println("copyTreeFile 실행");
         String year = DateUtil.getCurrentYyyy();
         String month = DateUtil.getCurrentMm();
-        String path = "D:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
+        String path = "C:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
 
         int i = 0;
         while (true) {
+            System.out.println("카운트: "+i);
             String comonCdKey = "comonCd_" + i;
             String filePathKey = "filePath_" + i;
             String fileNameKey = "fileName_" + i;
@@ -217,6 +218,8 @@ public class CM08SvcImpl implements CM08Svc {
             String filePath = mRequest.getParameter(filePathKey);
             String fileName = mRequest.getParameter(fileNameKey);
             String filePKey = mRequest.getParameter(fileKey);
+
+            System.out.println("카운트: "+i +"||"+comonCd+"||"+filePath+"||"+fileName);
             if (comonCd == null || filePath == null || fileName == null) {
                 break; // 해당 키로부터 정보를 얻지 못한 경우, 더 이상의 처리를 멈춥니다.
             }
@@ -377,7 +380,7 @@ public class CM08SvcImpl implements CM08Svc {
                 }
             }
             FileOutputStream fileOut = null;
-            String path = "D:\\upload\\" + fileName;
+            String path = "C:\\upload\\" + fileName;
             File f = new File(path);
 //        	if(!f.isDirectory()) f.mkdirs();
             fileOut = new FileOutputStream(f);

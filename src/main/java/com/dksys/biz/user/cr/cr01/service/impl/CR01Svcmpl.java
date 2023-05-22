@@ -32,6 +32,11 @@ public class CR01Svcmpl implements CR01Svc {
         return cr01Mapper.selectMaxEstNo(paramMap);
     }
     @Override
+    public String selectMaxEstDeg(Map<String, String> paramMap) {
+        return cr01Mapper.selectMaxEstDeg(paramMap);
+    }
+
+    @Override
     public int selectEstCount(Map<String, String> param) {
         return cr01Mapper.selectEstCount(param);
     }
@@ -97,19 +102,14 @@ public class CR01Svcmpl implements CR01Svc {
         }.getType();
         Map<String, Object> responseMap = new HashMap<>();
         try {
-
-
             String maxEstDeg = cr01Mapper.selectMaxEstDeg(paramMap);
             System.out.println(maxEstDeg+"맥스값");
             int newEstDeg = (maxEstDeg != null ? Integer.parseInt(maxEstDeg) : 0) + 1;
             paramMap.put("estDeg", String.valueOf(newEstDeg));
 
-            System.out.println(    String.valueOf(newEstDeg)+"맥스값2");
-
 
             cr01Mapper.insertEst(paramMap);
             List<Map<String, String>> detailArr = gson.fromJson(removeEmptyObjects(paramMap.get("detailArr")), mapList);
-            System.out.println(detailArr + "여기2");
 
 
             for (Map<String, String> detailMap : detailArr) {
@@ -129,7 +129,6 @@ public class CR01Svcmpl implements CR01Svc {
             responseMap.put("newEst", newEst);
 
         } catch (Exception e) {
-            System.out.println(e.getMessage() + "에러명");
         }
         return gson.toJson(responseMap);
 

@@ -29,6 +29,16 @@ public class CR01Ctr {
         model.addAttribute("maxEstNo", maxEstNo);
         return "jsonView";
     }
+
+	@PostMapping("/selectMaxEstDeg")
+	public String selectMaxEstDeg(@RequestBody Map<String, String> param, ModelMap model) {
+		String maxEstDeg = cr01svc.selectMaxEstDeg(param);
+		model.addAttribute("maxEstDeg", maxEstDeg);
+		return "jsonView";
+	}
+
+
+
     
     
     @PostMapping("/selectEstList")
