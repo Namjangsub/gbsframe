@@ -17,7 +17,6 @@ public interface CM15Mapper {
 	Map<String, String> selectFileAuthInfo(Map<String, String> paramMap);
 
 	int selectFileAuthCheck(String fileKey);
-	
-//	int deleteFileAuthInfo(Map<String, String> paramMap);
-//	
+
+	int deleteFileAuthInfo(Map<String, String> detailMap);
 }

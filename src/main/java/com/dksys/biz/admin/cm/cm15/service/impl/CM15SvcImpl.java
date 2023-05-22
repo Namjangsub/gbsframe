@@ -89,12 +89,16 @@ public class CM15SvcImpl implements CM15Svc {
     public Map<String, String> selectFileAuthInfo(Map<String, String> paramMap) {
         return cm15Mapper.selectFileAuthInfo(paramMap);
     }
-//
-//	@Override
-//	public int deleteFileAuthInfo(Map<String, String> paramMap) {
-//        Map<String, String> fileInfo = selectFileAutoInfo(paramMap);
-//        int result = cm15Mapper.deleteFileAuthInfo(paramMap);
-//        return result;		
-//	}
+
+	@Override
+	@SuppressWarnings("all")
+	public int deleteFileAuthInfo(Map<String, Object> param) {
+		int result = 0;
+		List<Map<String, String>> detailList = (List<Map<String, String>>) param.get("detailArr");
+		for(Map<String, String> detailMap : detailList) {
+			result += cm15Mapper.deleteFileAuthInfo(detailMap);
+		}
+		return result;
+	}
 	
 }

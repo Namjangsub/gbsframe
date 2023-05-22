@@ -14,12 +14,7 @@ public interface CM15Svc {
 	Map<String, String> selectFileAuthInfo(Map<String, String> paramMap);
 	
 	void selectFileAuthCheck(Map<String, String> paramMap) throws Exception;
-//
-//	int selectConfirmCount(Map<String, String> paramMap);
-//	
-//	int moveFile(Map<String, String> paramMap);
-//
-//	int deleteFileCall(Map<String, String> paramMap);
 
+	int deleteFileAuthInfo(Map<String, Object> param);
 	
 }

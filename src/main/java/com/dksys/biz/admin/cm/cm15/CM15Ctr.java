@@ -47,8 +47,9 @@ public class CM15Ctr {
 	@PutMapping(value = "/updateFileAuth")
     public String updateFileAuth(@RequestBody Map<String, Object> param, ModelMap model) {
 		try {
-			cm15Svc.updateFileAuth(param);
+			int result = cm15Svc.updateFileAuth(param);
 	    	model.addAttribute("resultCode", 200);
+	    	model.addAttribute("updateCount", result);
 	    	model.addAttribute("resultMessage", messageUtils.getMessage("save"));
 		}catch (Exception e) {
 			model.addAttribute("resultCode", 500);
@@ -69,18 +70,17 @@ public class CM15Ctr {
         return "jsonView";
     }
 
-//		
-//    @DeleteMapping(value = "/deleteFileAuthInfo")
-//    public String deleteFileAuthInfo(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
-//		try {
-//	    	int result = cm15Svc.deleteFileAuthInfo(paramMap);
-//	    	model.addAttribute("deleteCount", result);
-//	    	model.addAttribute("resultCode", 200);
-//	    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-//		}catch(Exception e) {
-//			model.addAttribute("resultCode", 500);
-//    		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-//		}
-//    	return "jsonView";
-//    }
+    @DeleteMapping(value = "/deleteFileAuthInfo")
+    public String deleteFileAuthInfo(@RequestBody Map<String, Object> paramMap, ModelMap model){
+		try {
+	    	int result = cm15Svc.deleteFileAuthInfo(paramMap);
+	    	model.addAttribute("deleteCount", result);
+	    	model.addAttribute("resultCode", 200);
+	    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+		}catch(Exception e) {
+			model.addAttribute("resultCode", 500);
+    		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		}
+    	return "jsonView";
+    }
 }
