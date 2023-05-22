@@ -296,7 +296,9 @@ function postAjax(url, data, contentType, callback) {
 	});
 }
 
+
 function postAjaxSync(url, data, contentType, callback) {
+
 	console.log(`postAjaxSync url = ${url} `);
 	if(contentType == null) {
 		contentType = "application/json; charset=utf-8";

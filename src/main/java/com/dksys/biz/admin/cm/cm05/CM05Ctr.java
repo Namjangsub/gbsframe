@@ -107,5 +107,12 @@ public class CM05Ctr {
         return "jsonView";
     }
     
+    // 공통코드 정보 리스트 조회
+    @PostMapping("/selectDocTreeListAuth")
+    public String selectDocTreeListAuth(@RequestBody Map<String, String> param, ModelMap model) {
+    	List<Map<String, String>> docTreeList = cm05Svc.selectDocTreeListAuth(param);
+    	model.addAttribute("docTreeList", docTreeList);
+    	return "jsonView";
+    }
     
 }

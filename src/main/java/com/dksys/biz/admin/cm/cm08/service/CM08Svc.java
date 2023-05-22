@@ -14,6 +14,8 @@ public interface CM08Svc {
 
 	int uploadTreeFile(String fileTrgtTyp,Map<String, String> paramMap,MultipartHttpServletRequest mRequest);
 
+	int uploadTreeFile(String fileTrgtTyp,String fileTrgtKey, MultipartHttpServletRequest mRequest);
+
 	int copyTreeFile(String fileTrgtTyp, Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
 
@@ -40,5 +42,10 @@ public interface CM08Svc {
 	int moveFile(Map<String, String> paramMap);
 
 	int deleteFileCall(Map<String, String> paramMap);
+
+	public Map<String, String> selectFileInfoUser(Map<String, String> paramMap);
+
+	int uploadFile(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+
 
 }

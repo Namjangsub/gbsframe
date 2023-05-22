@@ -1,5 +1,6 @@
 package com.dksys.biz.admin.cm.cm09.service.impl;
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -7,11 +8,15 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm09.mapper.CM09Mapper;
 import com.dksys.biz.admin.cm.cm09.service.CM09Svc;
+import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.util.DateUtil;
+import com.dksys.biz.util.ExceptionThrower;
 import com.google.gson.Gson;
 
 @Service
@@ -22,6 +27,12 @@ public class CM09SvcImpl implements CM09Svc {
     
     @Autowired
     CM08Svc cm08Svc;
+    
+    @Autowired
+    CM15Svc cm15Svc;
+
+    @Autowired
+    ExceptionThrower thrower;
 
 	@Override
 	public List<Map<String, String>> selectNotiList(Map<String, String> paramMap) {
@@ -34,9 +45,19 @@ public class CM09SvcImpl implements CM09Svc {
 	}
 
 	@Override
-	public int insertNoti(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
-		int result = cm09Mapper.insertNoti(paramMap);
-		cm08Svc.uploadFile("TB_CM09M01", paramMap.get("notiKey"), mRequest);
+	public int insertNoti(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+		int result;
+		
+		List<MultipartFile> fileList = mRequest.getFiles("files");
+	    if (fileList.size() > 0) {
+			//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
+			paramMap.put("comonCd", "FITR9901");
+			paramMap.put("jobType", "fileUp");
+			cm15Svc.selectFileAuthCheck(paramMap);
+			cm08Svc.uploadFile("TB_CM09M01", paramMap.get("notiKey"), mRequest);
+	    }
+	    result = cm09Mapper.insertNoti(paramMap);
+	    
 		return result;
 	}
 
@@ -52,28 +73,55 @@ public class CM09SvcImpl implements CM09Svc {
 	}
 
 	@Override
-	public int updateNoti(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
-		int result = cm09Mapper.updateNoti(paramMap);
-		cm08Svc.uploadFile("TB_CM09M01", paramMap.get("notiKey"), mRequest);
+	public int updateNoti(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+		int result;
+		
+		List<MultipartFile> fileList = mRequest.getFiles("files");
+		if (fileList.size() > 0) {
+			//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
+			paramMap.put("comonCd", "FITR9901");
+			paramMap.put("jobType", "fileUp");
+			cm15Svc.selectFileAuthCheck(paramMap);
+		}
+		
 		Gson gson = new Gson();
 		String[] deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), String[].class);
 		List<String> deleteFileList = Arrays.asList(deleteFileArr);
+		
+		if (deleteFileList.size() > 0) {
+			//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
+			paramMap.put("comonCd", "FITR9901");
+			paramMap.put("jobType", "fileDelete");
+			cm15Svc.selectFileAuthCheck(paramMap);
+		}
+
+		result = cm09Mapper.updateNoti(paramMap);
+ 
+		paramMap.put("fileTrgtTyp", "TB_CM09M01");
+		paramMap.put("fileTrgtKey", paramMap.get("notiKey"));
+		cm08Svc.uploadFile(paramMap, mRequest);
+
 		for(String fileKey : deleteFileList) {
 			cm08Svc.deleteFile(fileKey);
 		}
+
 		return result;
 	}
 
 	@Override
-	public int uploadFile(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
-		cm08Svc.uploadFile("TB_CM99M99", paramMap.get("notiKey"), mRequest);
-		// Gson gson = new Gson();
-		// String[] deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), String[].class);
-		// List<String> deleteFileList = Arrays.asList(deleteFileArr);
-		// for(String fileKey : deleteFileList) {
-		// 	cm08Svc.deleteFile(fileKey);
-		// }
-		// return result;
+	public int uploadFile(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+		List<MultipartFile> fileList = mRequest.getFiles("files");
+	    if (fileList.size() > 0) {
+			//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
+			paramMap.put("comonCd", "FITR9901");
+			paramMap.put("jobType", "fileUp");
+			cm15Svc.selectFileAuthCheck(paramMap);
+			
+	    	paramMap.put("fileTrgtTyp", "TB_CM09M01");
+	    	paramMap.put("fileTrgtKey", paramMap.get("notiKey"));
+	 
+	    	cm08Svc.uploadFile(paramMap, mRequest);
+	    }
 		return 1;
 	}
 

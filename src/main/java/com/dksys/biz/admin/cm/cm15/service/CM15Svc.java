@@ -10,6 +10,10 @@ public interface CM15Svc {
 	public int selectTreeAuthCount(Map<String, String> paramMap);
 	
 	public List<Map<String, String>> selectTreeAuthList(Map<String, String> paramMap);
+
+	Map<String, String> selectFileAuthInfo(Map<String, String> paramMap);
+	
+	void selectFileAuthCheck(Map<String, String> paramMap) throws Exception;
 //
 //	int selectConfirmCount(Map<String, String> paramMap);
 //	
@@ -17,5 +21,5 @@ public interface CM15Svc {
 //
 //	int deleteFileCall(Map<String, String> paramMap);
 
-
+	
 }

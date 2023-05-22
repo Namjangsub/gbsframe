@@ -44,7 +44,7 @@ public class CM08SvcImpl implements CM08Svc {
         List<MultipartFile> fileList = mRequest.getFiles("files");
         String year = DateUtil.getCurrentYyyy();
         String month = DateUtil.getCurrentMm();
-        String path = "D:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
+        String path = "C:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
         for (MultipartFile mf : fileList) {
             String originFileName = mf.getOriginalFilename(); // 원본 파일 명
             // long fileSize = mf.getSize(); // 파일 사이즈
@@ -84,12 +84,72 @@ public class CM08SvcImpl implements CM08Svc {
         }
         return 0;
     }
+
+    //CLNT_CD,PRDT_CD,ITEM_CD,SALES_CD,PRJCT_CD,CO_CD,COMON_CD-->paramMap 으로 처리
+    //화일관리 추가 구현
+    @Override
+    public int uploadFile(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
+		String fileTrgtTyp = String.valueOf(paramMap.get("fileTrgtTyp"));
+    	String fileTrgtKey = String.valueOf(paramMap.get("fileTrgtKey"));
+    	
+    	List<MultipartFile> fileList = mRequest.getFiles("files");
+    	String year = DateUtil.getCurrentYyyy();
+    	String month = DateUtil.getCurrentMm();
+    	String path = "D:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
+    	for (MultipartFile mf : fileList) {
+    		String originFileName = mf.getOriginalFilename(); // 원본 파일 명
+    		// long fileSize = mf.getSize(); // 파일 사이즈
+    		
+    		HashMap<String, String> param = new HashMap<String, String>(paramMap);
+    		
+    		param.put("fileSize", String.valueOf(mf.getSize()));
+    		if (originFileName != null) {
+    			// originFileName으로 작업 수행
+    			param.put("fileType", originFileName.split("\\.")[originFileName.split("\\.").length - 1]);
+    			param.put("fileName", originFileName);
+    		} else {
+    			// originFileName이 null인 경우 처리
+    			param.put("fileType", "err");
+    			param.put("fileName", "error");
+    		}
+    		param.put("filePath", path);
+    		param.put("fileTrgtTyp", fileTrgtTyp);
+    		param.put("fileTrgtKey", fileTrgtKey);
+    		param.put("pgmId", fileTrgtTyp);
+       		if (!"".equals(mRequest.getParameter("userId"))) {
+       			param.put("userId", mRequest.getParameter("userId"));
+    		}
+    		if (!"".equals(mRequest.getParameter("coCd"))) {
+    			param.put("coCd", mRequest.getParameter("coCd"));
+    		}
+            try {
+    			cm08Mapper.insertFile(param);
+    			String saveFile = param.get("fileKey") + "_" + originFileName;
+    			File f = new File(path);
+    			if (!f.isDirectory()) f.mkdirs();
+    			
+    			// if(fileTrgtTyp.equals("TB_OD01M01") || fileTrgtTyp.equals("TB_BM02M01") || fileTrgtTyp.equals("TB_OD02M01") || fileTrgtTyp.equals("TB_AR14M01")) {
+    			mf.transferTo(new File(path + saveFile));
+    			// }
+    			
+    		} catch (IllegalStateException e) {
+    			e.printStackTrace();
+    		} catch (IOException e) {
+    			e.printStackTrace();
+    		}
+    	}
+    	return 0;
+    }
+    @Override
+    public  int uploadTreeFile(String fileTrgtTyp,String fileTrgtKey, MultipartHttpServletRequest mRequest) {
+        return 1;
+    }
     @Override
     public synchronized int uploadTreeFile(String fileTrgtTyp,Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
         List<MultipartFile> fileList = mRequest.getFiles("files");
         String year = DateUtil.getCurrentYyyy();
         String month = DateUtil.getCurrentMm();
-        String path = "D:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
+        String path = "C:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
 
         for (int i = 0; i < fileList.size(); i++) {
             try {
@@ -353,4 +413,9 @@ public class CM08SvcImpl implements CM08Svc {
         return result;		
 	}
 	
+    @Override
+    public Map<String, String> selectFileInfoUser(Map<String, String> paramMap) {
+        return cm08Mapper.selectFileInfoUser(paramMap);
+    }
+    
 }

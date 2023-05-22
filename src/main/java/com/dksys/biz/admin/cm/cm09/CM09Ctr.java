@@ -55,12 +55,16 @@ public class CM09Ctr {
     @PostMapping("/insertNoti")
     public String insertNoti(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
     	try {
-    		cm09Svc.insertNoti(paramMap, mRequest);
-    		model.addAttribute("resultCode", 200);
-    		model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+    		if (cm09Svc.insertNoti(paramMap, mRequest) != 0 ) {
+    			model.addAttribute("resultCode", 200);
+    			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+    		} else {
+    			model.addAttribute("resultCode", 500);
+    			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+    		};
     	}catch(Exception e){
     		model.addAttribute("resultCode", 500);
-    		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+    		model.addAttribute("resultMessage", e.getMessage());
     	}
     	
     	return "jsonView";
@@ -69,12 +73,16 @@ public class CM09Ctr {
     @PutMapping("/updateNoti")
     public String updateNoti(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
     	try {
-    		cm09Svc.updateNoti(paramMap, mRequest);
-    		model.addAttribute("resultCode", 200);
-    		model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+    		if (cm09Svc.updateNoti(paramMap, mRequest) != 0 ) {
+	    		model.addAttribute("resultCode", 200);
+	    		model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+    		} else {
+    			model.addAttribute("resultCode", 500);
+    			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+    		}
     	}catch(Exception e){
     		model.addAttribute("resultCode", 500);
-    		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+    		model.addAttribute("resultMessage", e.getMessage());
     	}
     	
     	return "jsonView";
@@ -88,7 +96,7 @@ public class CM09Ctr {
     		model.addAttribute("resultMessage", messageUtils.getMessage("save"));
     	}catch(Exception e){
     		model.addAttribute("resultCode", 500);
-    		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+    		model.addAttribute("resultMessage", e.getMessage());
     	}
     	
     	return "jsonView";

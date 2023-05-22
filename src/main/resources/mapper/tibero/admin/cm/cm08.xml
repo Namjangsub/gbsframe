@@ -22,7 +22,9 @@
 			PRDT_CD,
 			ITEM_CD,
 			SALES_CD,
-			PRJCT_CD			
+			PRJCT_CD,			
+			CO_CD,			
+			COMON_CD			
 		) VALUES(
 			#{fileKey, jdbcType=NUMERIC},
 			#{fileSize,jdbcType=NUMERIC},
@@ -39,7 +41,9 @@
 			#{prdtCd, jdbcType=VARCHAR},
 			#{itemCd, jdbcType=VARCHAR},
 			#{salesCd, jdbcType=VARCHAR},
-			#{prjctCd, jdbcType=VARCHAR}			
+			#{prjctCd, jdbcType=VARCHAR},			
+			#{coCd, jdbcType=VARCHAR},			
+			#{comonCd, jdbcType=VARCHAR}			
 		)
 	</insert>
 	<select id="selectNextFileKey" resultType="string">
@@ -63,13 +67,11 @@
 		CREAT_ID,
 		CREAT_PGM,
 		CREAT_DTTM,
-		UDT_ID,
-		UDT_PGM,
 		COMON_CD,
 		CO_CD
 		) VALUES (
 		#{fileKey},
-		NULL,  --
+		#{fileSize},
 		#{fileType},
 		#{fileName},
 		#{filePath},
@@ -84,12 +86,12 @@
 		#{creatId,jdbcType=VARCHAR},
 		#{creatPgm,jdbcType=VARCHAR},
 		sysdate,
-		NULL,  --
-		NULL,  --
 		#{comonCd,jdbcType=VARCHAR},
 		#{coCd,jdbcType=VARCHAR}
 		)
 	</insert>
+
+
 
 
 
@@ -109,13 +111,11 @@
 		CREAT_ID,
 		CREAT_PGM,
 		CREAT_DTTM,
-		UDT_ID,
-		UDT_PGM,
 		COMON_CD,
 		CO_CD
 		) VALUES (
 		#{fileKey},
-		NULL,
+		#{fileSize},
 		#{fileType},
 		#{fileName},
 		#{filePath},
@@ -130,10 +130,11 @@
 		#{creatId,jdbcType=VARCHAR},
 		#{creatPgm,jdbcType=VARCHAR},
 		sysdate,
-		NULL,
-		NULL, 
 		#{comonCd,jdbcType=VARCHAR},
 		#{coCd,jdbcType=VARCHAR}
+
+
+
 		)
 	</insert>
 
@@ -403,7 +404,9 @@
 	
 	<select id="selectConfirmCount" parameterType="Map" resultType="int">
 		SELECT COUNT(*) CNT 
-          FROM TB_CM08M01
+          FROM TB_CM08M01 A
+               LEFT INNER JOIN TB_CM15M01 B ON A.COMON_CD = B.COMON_CD
+                                           AND B.USER_ID = #{userId, jdbcType=VARCHAR}
          WHERE FILE_KEY = #{fileKey}
 	</select>
 
@@ -450,5 +453,33 @@
       WHERE FILE_KEY = #{fileKey}
 	</update>
 	
+<!-- 	디렉토리 접근권한 관리 (사용자별 접근권한 체크로 임의의 값이 오면 해당 폴더 권한이 있어야 조회됨 -->
+    <select id="selectFileInfoUser" parameterType="Map" resultType="CamelMap">
+        SELECT A.*
+          FROM TB_CM08M01 A
+               INNER JOIN TB_CM15M01 B ON A.COMON_CD = B.COMON_CD
+                                      AND B.USER_ID  = #{userId}
+							    <choose>
+									<when test='jobType == "fileList"'>
+										AND B.FILE_LIST = 'Y' 
+									</when>
+									<when test='jobType == "fileUp"'>
+										AND B.FILE_UP = 'Y' 
+									</when>
+									<when test='jobType == "fileDown"'>
+										AND B.FILE_DOWN = 'Y' 
+									</when>
+									<when test='jobType == "fileUpdate"'>
+										AND B.FILE_UPDATE = 'Y' 
+									</when>
+									<when test='jobType == "fileDelete"'>
+										AND B.FILE_DELETE = 'Y' 
+									</when>
+									<otherwise>
+									    AND 1 = 0
+									</otherwise>
+								</choose>								
+         WHERE FILE_KEY = #{fileKey}
+    </select>
 
 </mapper>

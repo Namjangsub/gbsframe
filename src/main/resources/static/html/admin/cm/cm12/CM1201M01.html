@@ -337,36 +337,41 @@
 			// 								+ ');">삭제</button>';
 			// 					}
 			// 				} 
-							],
-							page : {
-								navigationItemCount : 10,
-								height : 30,
-								display : true,
-								firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
-								prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
-								nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
-								lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
-								onChange : function() {
-									gridView.setData(this.page.selectPage);
-								}
-							},
+					],
+					page : {
+						navigationItemCount : 10,
+						height : 30,
+						display : true,
+						firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+						prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+						nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+						lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+						onChange : function() {
+							gridView.setData(this.page.selectPage);
+						}
+					},
 				});
 				return this;
 			},
 			setData : function(_pageNo) {
 				var targetObj = this.target;
 				let comonCd="";
-				if ($('#deptTree').jstree('get_selected',true)[0] == undefined) {
-					$("#file_tag").html("파일저장Tree");
+				let targetTree = $('#deptTree').jstree('get_selected',true)[0];
+				if (targetTree == undefined) {
+					$("#file_tag").html("파일저장Tree에는 문서를 저장할 수 없습니다.");
 					comonCd = "FILETREE";
 				} else {
-					$("#file_tag").html($('#deptTree').jstree('get_selected',true)[0].text);
+					let txt = targetTree.text + ( (targetTree.original.codeEtc =="N") ? "에는 저장할 수 없습니다." : "" );
+					$("#file_tag").html(txt);
 					comonCd =  $('#deptTree').jstree('get_selected',true)[0].id;
 				}
 				
 				//Tree 첫번째인경우 전체 파일 현황 출력하기위함
 				comonCd = (comonCd == "FILETREE") ? "" : comonCd; 
-				var paramObj = {"comonCd": comonCd};
+				var paramObj = {
+						"comonCd": comonCd,
+						"userId" : jwt.userId		
+				};
 				$.each($('[data-search]'), function(idx, elem){
 					paramObj[$(elem).data("search")] = $(elem).val();
 				});		
@@ -386,10 +391,10 @@
 								totalPages : data.paginationInfo.totalPageCount
 							}
 						});
-					});
-				}
+				});
 			}
-		
+		}
+	
 
 	$(document.body).ready(function() {
 		//순서 맨 처음
@@ -507,17 +512,25 @@
 			$('#deptTree').jstree(true).select_node(selectedId);
 		}).on("select_node.jstree", function(e, data) {
 		// 노드 선택 시 발생 이벤트
-			
-			//파일정보 show
-			if(!$('#deptTree').is(":visible")){
-				$('#deptTree').show();
-			}
-		
+			if (data.node.original.codeEtc == 'N') {
+// 				alert("자료를 저장할 수 없는 폴더입니다.");
+				$("#"+data.node.id).attr("title","자료를 저장할 수 없는 폴더입니다.");
+			} else {			
+				//파일정보 show
+				if(!$('#deptTree').is(":visible")){
+					$('#deptTree').show();
+				}
+			}			
 			// 파일정보 set
-			// selectFileList(data.node.id);
 			gridView.setData(0);
-			
-		}).on('open_node.jstree', function(e, data) {
+		}).on('hover_node.jstree',function(e, data){
+			// 마우스 위치할때
+			if (data.node.original.codeEtc == 'N') {
+				$("#"+data.node.id).attr("title","자료를 저장할 수 없는 폴더입니다.");
+			} else {
+				$("#"+data.node.id).attr("title","");
+			}
+  		}).on('open_node.jstree', function(e, data) {
 		// 노드 열릴 때
 			data.instance.set_type(data.node, 'unit-open');
 		}).on('close_node.jstree', function(e, data) {
@@ -530,9 +543,10 @@
 		var deptTree = null;
 		var paramObj = {
 			"coCd": $('#coCd_S').val(), //"GUN",
-			"useYn": $("#useYn_S").val()
+			"useYn": $("#useYn_S").val(),
+			"userId" : jwt.userId
 		};
-		postAjaxSync("/admin/cm/cm05/selectDocTreeList", paramObj, null, function(data){
+		postAjaxSync("/admin/cm/cm05/selectDocTreeListAuth", paramObj, null, function(data){
 			deptTree = data.docTreeList;
 		});
 		return deptTree;
@@ -640,9 +654,9 @@
 		var row = gridView.target.getList("selected")[0];
 		var fileKey = row.fileKey;
 		var paramObj = {
-			"fileKey" : fileKey
+			"fileKey" : fileKey,
+			"userId" : jwt.userId
 		}	
-		
 		openSecondModal("/static/html/cmn/modal/treeSearch.html", 500, 720, "파일트리 검색", paramObj, function (tree) {
 			var checkedId = tree.get_checked()[0];
 			var checkedNode = tree.get_node(checkedId);
@@ -650,24 +664,17 @@
 			paramObj.comonCdText = checkedNode.text;
 			
 			if(confirm( '"' + checkedNode.text + '" 폴더로 이동 하시겠습니까?')){
-				postAjax("/admin/cm/cm08/selectConfirmCount", paramObj, null, function(data){
-					if(data.result == 1) {
-						postAjax("/admin/cm/cm08/moveFile", paramObj, null, function(data){
-							if(data.resultCode == 200){
-								alert(data.resultMessage);
-								gridView.setData(0);
-							} else {
-								alert(row.fileName & " 파일 이동 작업에 오류가 발생하였습니다.");	
-							}
-						});
+				postAjax("/admin/cm/cm08/moveFile", paramObj, null, function(data){
+					if(data.resultCode == 200){
+						alert(data.resultMessage);
+						gridView.setData(0);
 					} else {
-						alert("이동 할 수 없는 자료 입니다.");	
+						alert(data.resultMessage);	
 					}
-				});		
+				});
 			}
 		});
 
-		
 	}
 		
 	function deleteFile(fileKey) {
@@ -682,32 +689,38 @@
 		
 		var row = gridView.target.getList("selected")[0];
 		var paramObj = {
-			"fileKey" : row.fileKey
+			"fileKey" : row.fileKey,
+			"userId" : jwt.userId
 		}		
-		postAjax("/admin/cm/cm08/selectConfirmCount", paramObj, null, function(data){
-			if(data.result > 0) {
-				if(confirm(row.fileName + " 삭제하시겠습니까?")){
-// 					deleteAjax("/admin/cm/cm08/deleteFileCall", Number(row.fileKey), null, function(data){
-					deleteAjax("/admin/cm/cm08/deleteFileCall", paramObj, null, function(data){
-						if(data.resultCode == 200){
-							alert(data.deleteCount + '건 ' +  data.resultMessage);
-							gridView.setData(0);
-						} else {
-							alert(row.fileName & " 파일 삭제 작업에 오류가 발생하였습니다.");	
-						}
-					});
+		if(confirm(row.fileName + " 삭제하시겠습니까?")){
+			deleteAjax("/admin/cm/cm08/deleteFileCallAuth", paramObj, null, function(data){
+				if(data.resultCode == 200){
+					alert(data.deleteCount + '건 ' +  data.resultMessage);
+					gridView.setData(0);
+				} else if(data.resultCode == 500){
+					alert(" 파일 삭제 작업에 오류가 발생하였습니다.");	
+				} else if(data.resultCode == 900){
+					alert(data.resultMessage);	
 				}
-			} else {
-				alert("삭제할 수 없는 데이터 입니다.");	
-			}
-		});		
+			});
+		}
 	}
 	
 	function downloadFile(fileKey) {
-		postAjax("/admin/cm/cm08/fileDownInfo", {"fileKey": fileKey}, null, function(data){
-			var fileInfo = data.fileInfo;
-			var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName , "UTF-8");
-			location.href = "/admin/cm/cm08/fileDownload?filePath="+filePath;
+		var paramObj = {
+				"fileKey" : fileKey,
+				"userId" : jwt.userId
+			}
+// 		postAjax("/admin/cm/cm08/fileDownInfo", {"fileKey": fileKey}, null, function(data){
+		postAjax("/admin/cm/cm08/fileDownInfoUser", paramObj, null, function(data){
+			if(data.resultCode == 200){
+				var fileInfo = data.fileInfo;
+// 				var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName , "UTF-8");
+// 				location.href = "/admin/cm/cm08/fileDownloadAuth?filePath="+filePath+"&userId="+jwt.userId;
+				location.href = "/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId;
+			} else {
+				alert("다운로드 권한이 없습니다.");	
+			}
 		});
 	}
 	

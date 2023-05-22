@@ -32,6 +32,8 @@ public class CM15SvcImpl implements CM15Svc {
     @Autowired
     AR01Mapper ar01Mapper;
     
+    @Autowired
+    ExceptionThrower thrower;
 
 	@Override
 	@SuppressWarnings("all")
@@ -44,7 +46,7 @@ public class CM15SvcImpl implements CM15Svc {
 		return result;
 	}
 	@Override
-	public int  selectTreeAuthCount(Map<String, String> paramMap) {
+	public int selectTreeAuthCount(Map<String, String> paramMap) {
 		return cm15Mapper.selectTreeAuthCount(paramMap);
 	}
 	
@@ -53,10 +55,40 @@ public class CM15SvcImpl implements CM15Svc {
         return cm15Mapper.selectTreeAuthList(paramMap);
     }
 
-//    @Override
-//    public Map<String, String> selectFileAutoInfo(Map<String, String> paramMap) {
-//        return cm15Mapper.selectFileAutoInfo(fileKey);
-//    }
+    //파잁트리 접근 권한관리
+    //  파라메터 jobType = 작업유형 전달
+    //        userId = 사용자 ID
+    //        comonCd = 파일트리 ID( 현재 공통코드로 관리되는  CODE_ID)
+    //  접근 통제는 Exception 발생
+	@Override
+	public void selectFileAuthCheck(Map<String, String> paramMap) throws Exception {
+        Map<String, String> fileInfo = selectFileAuthInfo(paramMap);
+		switch(paramMap.get("jobType")) {
+			case "LIST":
+				if (!fileInfo.get("fileList").equals("Y")) thrower.throwCommonException("noFileList");
+				break;
+			case "fileUp":
+				if (!fileInfo.get("fileUp").equals("Y")) thrower.throwCommonException("noFileUp");
+				break;
+			case "fileDown":
+				if (!fileInfo.get("fileDown").equals("Y")) thrower.throwCommonException("noFileDown");
+				break;
+			case "fileUpdate":
+				if (!fileInfo.get("fileUpdate").equals("Y")) thrower.throwCommonException("noFileUpdate");
+				break;
+			case "fileDelete":
+				if (!fileInfo.get("fileDelete").equals("Y")) thrower.throwCommonException("noFileDelete");
+				break;
+			default:
+				thrower.throwCommonException("noFileAuth");
+				break;
+		}
+	}
+	
+    @Override
+    public Map<String, String> selectFileAuthInfo(Map<String, String> paramMap) {
+        return cm15Mapper.selectFileAuthInfo(paramMap);
+    }
 //
 //	@Override
 //	public int deleteFileAuthInfo(Map<String, String> paramMap) {
