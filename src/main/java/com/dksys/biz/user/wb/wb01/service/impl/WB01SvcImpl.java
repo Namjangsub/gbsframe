@@ -53,6 +53,11 @@ public class WB01SvcImpl implements WB01Svc {
 	public List<Map<String, String>> selectWbsPlanList(Map<String, String> paramMap) {
 		return wb01Mapper.selectWbsPlanList(paramMap);
 	}
+	
+	@Override
+	public List<Map<String, String>> selectWbsPlanExcelList(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsPlanExcelList(paramMap);
+	}
 
 	@Override
 	public List<Map<String, String>> selectWbsPlanNoList(Map<String, String> paramMap) {
@@ -290,5 +295,10 @@ public class WB01SvcImpl implements WB01Svc {
 	@Override
 	public List<Map<String, String>> selectWbsPlanInfoSelect(Map<String, String> paramMap) {
 		return wb01Mapper.selectWbsPlanInfoSelect(paramMap);
+	}
+	
+	@Override
+	public int selectWbsPlanConfirmCount(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsPlanConfirmCount(paramMap);
 	}
 }
