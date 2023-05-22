@@ -48,6 +48,18 @@ public class WB01Ctr {
 		  return "jsonView"; 
 		  
 	  }
+	  
+	//<!-- WBS 일정계획 등록 메인 화면 조회 리스트  -->
+	  @PostMapping(value = "/selectWbsPlanExcelList") 
+	  public String selectWbsPlanExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  
+  		  List<Map<String, String>> resultList = wb01Svc.selectWbsPlanExcelList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+		  
+	  }
+	  
+	  
 	 
 	  //<!-- 관리번호(WBS계획번호) 조회 조건 팝업 리스트  -->
 	  @PostMapping(value = "/selectWbsPlanNoList") 
@@ -296,5 +308,11 @@ public class WB01Ctr {
 		  return "jsonView";  
 	  }
 
-	  
+	  //<!-- /* WBS 상위레벨 데이터 체크 */ -->  
+	  @PostMapping(value = "/selectWbsPlanConfirmCount")
+	  public String selectWbsPlanConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int result = wb01Svc.selectWbsPlanConfirmCount(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	  }
 }

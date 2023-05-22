@@ -11,7 +11,9 @@ public interface WB01Svc {
 	int selectWbsPlanCount(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectWbsPlanList(Map<String, String> paramMap);
-
+	
+	List<Map<String, String>> selectWbsPlanExcelList(Map<String, String> paramMap);
+	
 	List<Map<String, String>> selectWbsPlanNoList(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectWbsSalesCodeList(Map<String, String> paramMap);
@@ -68,4 +70,6 @@ public interface WB01Svc {
 	int selectWbsPlanChk(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectWbsPlanInfoSelect(Map<String, String> paramMap);
+	
+	int selectWbsPlanConfirmCount(Map<String, String> paramMap);
 }
