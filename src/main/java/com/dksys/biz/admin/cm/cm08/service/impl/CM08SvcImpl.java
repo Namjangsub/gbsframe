@@ -145,12 +145,11 @@ public class CM08SvcImpl implements CM08Svc {
         return 1;
     }
     @Override
-    public synchronized int uploadTreeFile(String fileTrgtTyp,Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
+    public  int uploadTreeFile(String fileTrgtTyp,Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
         List<MultipartFile> fileList = mRequest.getFiles("files");
         String year = DateUtil.getCurrentYyyy();
         String month = DateUtil.getCurrentMm();
         String path = "C:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
-
         for (int i = 0; i < fileList.size(); i++) {
             try {
                 MultipartFile mf = fileList.get(i);
@@ -175,18 +174,13 @@ public class CM08SvcImpl implements CM08Svc {
                 String comonCd = mRequest.getParameter(comonCdKey);
                 param.put("comonCd", comonCd);
                 param.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-
-
-
                 String userId = mRequest.getParameter("userId");
                 param.put("creatId", userId);
                 param.put("creatPgm", fileTrgtTyp);
-
                 cm08Mapper.insertTreeFile(param);
                 String saveFile = param.get("fileKey") + "_" + originFileName;
                 File f = new File(path);
                 if (!f.isDirectory()) f.mkdirs();
-
                 // if(fileTrgtTyp.equals("TB_OD01M01") || fileTrgtTyp.equals("TB_BM02M01") || fileTrgtTyp.equals("TB_OD02M01") || fileTrgtTyp.equals("TB_AR14M01")) {
                 mf.transferTo(new File(path + saveFile));
                 // }
