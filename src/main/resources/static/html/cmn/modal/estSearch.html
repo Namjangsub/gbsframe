@@ -9,8 +9,10 @@
     			<tr>	
     				<td>
 	   					<select data-search="searchType">
-		                  	<option value="SITE_NM">현장명</option>
-		                </select>    
+<!--		                  	<option value="SITE_NM">고객사</option>-->
+							<option value="EST_NO">견적번호</option>
+							<option value="CLNT_NM">고객사</option>
+						</select>
     				</td>
     				<td>
 					 	<div class="search_form">
@@ -64,22 +66,12 @@
 		        },
 		        columns: [
 
-				{
-					key: "companyJson['대표자명']",
-					label: "필드A",
-					width: 80,
-					styleClass: function () {
-						return "ABC";
-					},
-					enableFilter: true,
-					align: "center",
-					editor: {type:"text"}
-				},
+
 				{key: "estNo", label: "견적번호", align: "center", width: 100,	enableFilter: true,},
-				{key: "estClntCd", label: "고객사", align: "center", width: 100},
+				{key: "estDeg", label: "견적차수", align: "center", width: 100,	enableFilter: true,},
 				{key: "estClntNm", label: "고객사명", align: "center", width: 100},
 				{key: "estDt", label: "작성일", align: "center", width: 100},
-				{key: "estsDt", label: "발행일", align: "center", width: 120},
+				// {key: "estsDt", label: "발행일", align: "center", width: 120},
 				{key: "cstmMngNm", label: "고객담당자", align: "center", width: 100},
 				{key: "cstmMngHp", label: "고객담당자 연락처", align: "center", width: 150},
 				{key: "estNm", label: "공사명", align: "center", width: 100},
@@ -104,30 +96,90 @@
 				var tempElem = $('.popup_area [data-search]')[i];
 				paramObj[$(tempElem).data("search")] = $(tempElem).val();
 			}
-			
+
 			postAjax("/user/cr/cr01/selectEstList", paramObj, null, function(data){
+
+
+
 				var list = data.estList;
-				targetObj.setData({
-					list : list,
-					page : {
-						currentPage : _pageNo,
-						pageSize : data.paginationInfo.pageSize,
-						totalElements : data.paginationInfo.totalRecordCount,
-						totalPages : data.paginationInfo.totalPageCount
-					}
-				});
+
+				originalData = list;
+
+				function getClientNameByCode(ordrsClntCd, callback) {
+					var paramObj = {
+						"clntCd": ordrsClntCd
+					};
+
+					postAjax("/admin/bm/bm02/selectClntInfo", paramObj, null, function(data) {
+						if (data && data.clntInfo) {
+							callback(data.clntInfo.clntNm);
+						} else {
+							callback('');
+						}
+					});
+				}
+
+				var completedRequests = 0;
+
+				for (var i = 0; i < list.length; i++) {
+					(function(index) {
+						getClientNameByCode(list[index].estClntCd, function(clientName) {
+							list[index].estClntNm = clientName;
+							completedRequests++;
+
+							if (completedRequests === list.length) {
+								targetObj.setData({
+									list: list,
+									page: {
+										currentPage: _pageNo,
+										pageSize: data.paginationInfo.pageSize,
+										totalElements: data.paginationInfo.totalRecordCount,
+										totalPages: data.paginationInfo.totalPageCount
+									}
+								});
+							}
+						});
+					})(i);
+				}
+
+
+
+
+
+
+
+
+
+
 			});
 		}
 	}
-	
+
 	$(document).ready(function() {
+		$('[data-search="searchValue"]').focus();
+		$('[data-search="searchValue"]').val(modalStack.last().paramObj.searchValue);
+
+
+		if(modalStack.last().paramObj.searchValue == '' || modalStack.last().paramObj.searchValue == undefined){
+			orderGridView.initView().setData(999);
+		}else{
+			orderGridView.initView().setData(0);
+		}
+
+		setCommonSelect($('#commonPopup select[data-kind]'));
 		$('[data-search="searchValue"]').focus();
 		orderGridView.initView().setData(0);
 	});
+	
+	
 	
 	function executeCallback(){
 		if(selectGridValidation(orderGridView.target)) return;
 		modalStack.last().callback(orderGridView);
 		modalStack.close();
 	}
+	
+	
+	
+	
 </script>

@@ -24,5 +24,7 @@ public interface CM05Svc {
 	public int deleteCode(Map<String, String> param);
 
 	public List<Map<String, String>> selectDocTreeList(Map<String, String> param);
+
+	public List<Map<String, String>> selectDocTreeListAuth(Map<String, String> param); 
 	
 }

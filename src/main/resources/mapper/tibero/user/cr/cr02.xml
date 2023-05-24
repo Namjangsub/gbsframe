@@ -2,198 +2,211 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.dksys.biz.user.cr.cr02.mapper.CR02Mapper">
-    <!-- ... -->
-
     <select id="selectOrdrsCount" resultType="int">
-        SELECT
-        COUNT(*)
-        FROM
-        TB_CR02M01 A
-        WHERE 1=1
-        <!-- Add any necessary conditions here -->
+        SELECT COUNT(*)
+        FROM TB_CR02M01 A
+        WHERE 1 = 1
     </select>
-
     <select id="selectOrdrsList" resultType="CamelMap">
         SELECT
-        *
-        FROM
-        (
-        SELECT
-        ROWNUM AS RNUM, T.*
-        FROM
-        (
-        SELECT
-        *
-        FROM
-        TB_CR02M01 A
-        <!-- Add any necessary conditions here -->
+        TO_CHAR(T.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT,
+        TO_CHAR(T.FWD_EXCH_JOIN_DT, 'YYYY-MM-DD') AS FWD_EXCH_JOIN_DT,
+        ROWNUM AS RNUM,
+        T.*
+        FROM (
+        SELECT * FROM TB_CR02M01 A
+        LEFT JOIN TB_BM02M01 B ON A.ORDRS_CLNT_CD = B.CLNT_CD
         ) T
-        )
-        WHERE RNUM BETWEEN #{firstIndex} AND #{lastIndex}
+        WHERE 1=1
+
+        <if test="strtDt != null and !strtDt.equals('')">
+            AND T.ORDRS_DT BETWEEN #{strtDt} AND #{endDt}
+        </if>
+        <if test="coCd != null and !coCd.equals('')">
+            AND T.CO_CD = #{coCd}
+        </if>
+        <if test="clntCd != null and !clntCd.equals('')">
+            AND T.ORDRS_CLNT_CD = #{clntCd}
+        </if>
+        <if test="ctrtNm != null and !ctrtNm.equals('')">
+            AND T.CTRT_NM = #{ctrtNm}
+        </if>
+        <if test="searchType != null and searchType.equals('ORDRS_NO')">
+            AND T.ORDRS_NO LIKE '%' || #{searchValue} || '%'
+        </if>
+        <if test="ordrsNo != null and !ordrsNo.equals('')">
+            AND T.ORDRS_NO = #{ordrsNo}
+        </if>
+        <if test="clntPjt != null and !clntPjt.equals('')">
+            AND T.CLNT_PJT = #{clntPjt}
+        </if>
+
+
     </select>
     <resultMap id="resultInfoMap" type="CamelMap">
         <collection select="selectPmntPlan" property="plan" column="{coCd=CO_CD, ordrsNo=ORDRS_NO}" ofType="CamelMap"/>
-        <collection select="selectOrdrsDetails" property="details" column="{coCd=CO_CD, ordrsNo=ORDRS_NO}" ofType="CamelMap"/>
+        <collection select="selectOrdrsDetails" property="details" column="{coCd=CO_CD, ordrsNo=ORDRS_NO}"
+                    ofType="CamelMap"/>
     </resultMap>
-
     <select id="selectOrdrsInfo" parameterType="map" resultMap="resultInfoMap">
-        SELECT
-            TO_CHAR(T.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT,
-            TO_CHAR(T.FWD_EXCH_JOIN_DT, 'YYYY-MM-DD') AS FWD_EXCH_JOIN_DT,
-
-            T.*
-        FROM (
-                 SELECT * FROM TB_CR02M01
-                 WHERE CO_CD = #{coCd} AND ORDRS_NO = #{ordrsNo}
-             ) T
+        SELECT TO_CHAR(T.ORDRS_DT, 'YYYY-MM-DD')         AS ORDRS_DT,
+               TO_CHAR(T.FWD_EXCH_JOIN_DT, 'YYYY-MM-DD') AS FWD_EXCH_JOIN_DT,
+               T.*
+        FROM (SELECT *
+              FROM TB_CR02M01
+              WHERE CO_CD = #{coCd}
+                AND ORDRS_NO = #{ordrsNo}) T
     </select>
     <select id="selectPmntPlan" parameterType="map" resultType="CamelMap">
-        SELECT
-
-            TO_CHAR(T.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT,
-            TO_CHAR(T.BILL_PBLS_DT, 'YYYY-MM-DD') AS BILL_PBLS_DT,
-            T.*
-        FROM (
-                 SELECT * FROM TB_CR02D01
-                 WHERE CO_CD = #{coCd} AND ORDRS_NO = #{ordrsNo}
-             ) T
+        SELECT TO_CHAR(T.CLMN_DT, 'YYYY-MM-DD')      AS CLMN_DT,
+               TO_CHAR(T.BILL_PBLS_DT, 'YYYY-MM-DD') AS BILL_PBLS_DT,
+               T.*
+        FROM (SELECT *
+              FROM TB_CR02D01
+              WHERE CO_CD = #{coCd}
+                AND ORDRS_NO = #{ordrsNo}) T
     </select>
-
     <select id="selectOrdrsDetails" parameterType="map" resultType="CamelMap">
-        SELECT * FROM TB_CR02D02
-        WHERE CO_CD = #{coCd} AND ORDRS_NO = #{ordrsNo}
+        SELECT *
+        FROM TB_CR02D02
+        WHERE CO_CD = #{coCd}
+          AND ORDRS_NO = #{ordrsNo}
     </select>
-
     <select id="selectMaxOrdrsNo" resultType="java.lang.String">
-        SELECT CONCAT(SUBSTR(TO_CHAR(CURRENT_DATE, 'YY'), 1, 2), LPAD(COUNT(*) + 1, 3, '0')) as maxOrdrsNo
+        SELECT CONCAT(SUBSTR(TO_CHAR(CURRENT_DATE, 'YY'), 1, 2),
+                      LPAD(NVL(MAX(SUBSTR(ordrs_no, 3, 3)), 0) + 1, 3, '0')) as maxOrdrsNo
         FROM TB_CR02M01
         WHERE CO_CD = #{coCd}
+          AND SUBSTR(ordrs_no, 1, 2) = SUBSTR(TO_CHAR(CURRENT_DATE, 'YY'), 1, 2)
     </select>
-
-
-
     <insert id="insertOrdrs" parameterType="map">
-        INSERT INTO TB_CR02M01 (
-            CO_CD, ORDRS_NO, EST_NO, ORDRS_CLNT_CD, ORDRS_DT, ORDRS_DIV, CLNT_PJT, CTRT_NM,
-            CURR_UNIT, ORDRS_AMT, FWD_EXCH_JOIN_DT, FWD_EXCH_CHK_LIST, ORDRGER,  EXRATE, MGR, CTRT_DOC,
-            PMNT_MTD, ORDRS_RMK, ORGN_SALES_CD
-        )
-        VALUES (
-           #{coCd}, #{ordrsNo}, #{estNo}, #{ordrsClntCd}, #{ordrsDt}, #{ordrsDiv}, #{clntPjt}, #{ctrtNm},
-           #{currUnit}, #{ordrsAmt}, #{fwdExchJoinDt}, #{fwdExchChkList}, #{ordrger},  #{exrate}  , #{mgr}, #{ctrtDoc},
-           #{pmntMtd}, #{ordrsRmk}, #{orgnSalesCd}
-
-
-               )
+        INSERT INTO TB_CR02M01
+        (CO_CD, ORDRS_NO, EST_NO, ORDRS_CLNT_CD, ORDRS_DT, ORDRS_DIV, CLNT_PJT, CTRT_NM,
+         CURR_CD, ORDRS_AMT, FWD_EXCH_JOIN_DT, FWD_EXCH_CHK_LIST, ORDRGER, EXRATE, MNG_ID,
+         CTRT_DOC,
+         PMNT_MTD, ORDRS_RMK, ORGN_SALES_CD, FILE_TRGT_KEY)
+        VALUES (#{coCd, jdbcType=VARCHAR}, #{ordrsNo, jdbcType=VARCHAR}, #{estNo, jdbcType=VARCHAR},
+                #{ordrsClntCd, jdbcType=NUMERIC},
+                #{ordrsDt, jdbcType=DATE}, #{ordrsDiv, jdbcType=VARCHAR}, #{clntPjt, jdbcType=VARCHAR},
+                #{ctrtNm, jdbcType=VARCHAR},
+                #{currCd, jdbcType=VARCHAR}, #{ordrsAmt, jdbcType=NUMERIC}, #{fwdExchJoinDt, jdbcType=DATE},
+                #{fwdExchChkList, jdbcType=VARCHAR},
+                #{ordrger, jdbcType=VARCHAR}, #{exrate, jdbcType=NUMERIC}, #{mngId, jdbcType=VARCHAR},
+                #{ctrtDoc, jdbcType=VARCHAR},
+                #{pmntMtd, jdbcType=VARCHAR}, #{ordrsRmk, jdbcType=VARCHAR}, #{orgnSalesCd, jdbcType=VARCHAR},
+                #{fileTrgtKey, jdbcType=VARCHAR})
     </insert>
-
     <update id="updateOrdrs" parameterType="map">
         UPDATE TB_CR02M01
-        SET
-            EST_NO = #{estNo},
-            ORDRS_CLNT_CD = #{ordrsClntCd},
-            ORDRS_DT = #{ordrsDt},
-            ORDRS_DIV = #{ordrsDiv},
-            CLNT_PJT = #{clntPjt},
-            CTRT_NM = #{ctrtNm},
-            CURR_UNIT = #{currUnit},
-            ORDRS_AMT = #{ordrsAmt},
-            FWD_EXCH_JOIN_DT = #{fwdExchJoinDt},
-            FWD_EXCH_CHK_LIST = #{fwdExchChkList},
-            ORDRGER = #{ordrger},
-            exrate= #{exrate} ,
-            MGR = #{mgr},
-            CTRT_DOC = #{ctrtDoc},
-            PMNT_MTD = #{pmntMtd},
-            ORDRS_RMK = #{ordrsRmk},
-            ORGN_SALES_CD = #{orgnSalesCd}
-        WHERE
-            CO_CD = #{coCd} AND
-            ORDRS_NO = #{ordrsNo}
+        SET EST_NO            = #{estNo, jdbcType=VARCHAR},
+            ORDRS_CLNT_CD     = #{ordrsClntCd, jdbcType=NUMERIC},
+            ORDRS_DT          = #{ordrsDt, jdbcType=DATE},
+            ORDRS_DIV         = #{ordrsDiv, jdbcType=VARCHAR},
+            CLNT_PJT          = #{clntPjt, jdbcType=VARCHAR},
+            CTRT_NM           = #{ctrtNm, jdbcType=VARCHAR},
+            CURR_CD           = #{currCd, jdbcType=VARCHAR},
+            ORDRS_AMT         = #{ordrsAmt, jdbcType=NUMERIC},
+            FWD_EXCH_JOIN_DT  = #{fwdExchJoinDt, jdbcType=DATE},
+            FWD_EXCH_CHK_LIST = #{fwdExchChkList, jdbcType=VARCHAR},
+            ORDRGER           = #{ordrger, jdbcType=VARCHAR},
+            EXRATE            = #{exrate, jdbcType=NUMERIC},
+            MNG_ID            = #{mngId, jdbcType=VARCHAR},
+            CTRT_DOC          = #{ctrtDoc, jdbcType=VARCHAR},
+            PMNT_MTD          = #{pmntMtd, jdbcType=VARCHAR},
+            ORDRS_RMK         = #{ordrsRmk, jdbcType=VARCHAR},
+            ORGN_SALES_CD     = #{orgnSalesCd, jdbcType=VARCHAR}
+        WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+          AND ORDRS_NO = #{ordrsNo, jdbcType=VARCHAR}
+          AND FILE_TRGT_KEY = #{fileTrgtKey, jdbcType=VARCHAR}
     </update>
-
-
     <insert id="insertClmnPlan" parameterType="map">
-        INSERT INTO TB_CR02D01 (
-           CO_CD,ORDRS_NO, CLMN_PLAN_SEQ, CLMN_PLAN_DIV, CLMN_DIV_SEQ, CLMN_RATE, CLMN_AMT,
-            BILL_PBLS_DT, CLMN_DT, PMNT_DT_AFTER_BILL, CURR_UNIT, RMK
-        )
-        VALUES (
-
-             #{coCd}, #{ordrsNo},   #{clmnPlanSeq},  #{clmnPlanDiv}, #{clmnDivSeq}, #{clmnRate}, #{clmnAmt},
-               #{billPblsDt}, #{clmnDt}, #{pmntDtAfterBill}, #{currUnit}, #{rmk}
-
-
-               )
+        INSERT INTO TB_CR02D01
+        (CO_CD, ORDRS_NO, CLMN_PLAN_SEQ, CLMN_PLAN_DIV, CLMN_DIV_SEQ, CLMN_RATE, CLMN_AMT,
+         BILL_PBLS_DT, CLMN_DT, PMNT_DT_AFTER_BILL, CURR_CD, CLMN_PLAN_RMK)
+        VALUES
+            (#{coCd, jdbcType=VARCHAR}, #{ordrsNo, jdbcType=VARCHAR}, #{clmnPlanSeq, jdbcType=NUMERIC},
+            #{clmnPlanDiv, jdbcType=VARCHAR}, #{clmnDivSeq, jdbcType=NUMERIC}, #{clmnRate, jdbcType=NUMERIC},
+            #{clmnAmt, jdbcType=NUMERIC}, #{billPblsDt, jdbcType=DATE}, #{clmnDt, jdbcType=DATE},
+            #{pmntDtAfterBill, jdbcType=NUMERIC}, #{currCd, jdbcType=VARCHAR}, #{clmnPlanRmk, jdbcType=VARCHAR})
     </insert>
     <update id="updateClmnPlan" parameterType="map">
         UPDATE TB_CR02D01
-        SET
-            CLMN_PLAN_DIV = #{clmnPlanDiv},
-            CLMN_DIV_SEQ = #{clmnDivSeq},
-            CLMN_RATE = #{clmnRate},
-            CLMN_AMT = #{clmnAmt},
-            BILL_PBLS_DT = #{billPblsDt},
-            CLMN_DT = #{clmnDt},
-            PMNT_DT_AFTER_BILL = #{pmntDtAfterBill},
-            CURR_UNIT = #{currUnit},
-            RMK = #{rmk}
-        WHERE
-            CO_CD = #{coCd} AND
-            ORDRS_NO = #{ordrsNo} AND
-            CLMN_PLAN_SEQ = #{clmnPlanSeq}
+        SET CLMN_PLAN_DIV      = #{clmnPlanDiv, jdbcType=VARCHAR},
+            CLMN_DIV_SEQ       = #{clmnDivSeq, jdbcType=NUMERIC},
+            CLMN_RATE          = #{clmnRate, jdbcType=NUMERIC},
+            CLMN_AMT           = #{clmnAmt, jdbcType=NUMERIC},
+            BILL_PBLS_DT       = #{billPblsDt, jdbcType=DATE},
+            CLMN_DT            = #{clmnDt, jdbcType=DATE},
+            PMNT_DT_AFTER_BILL = #{pmntDtAfterBill, jdbcType=NUMERIC},
+            CURR_CD            = #{currCd, jdbcType=VARCHAR},
+            CLMN_PLAN_RMK      = #{clmnPlanRmk, jdbcType=VARCHAR}
+        WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+          AND ORDRS_NO = #{ordrsNo, jdbcType=VARCHAR}
+          AND CLMN_PLAN_SEQ = #{clmnPlanSeq, jdbcType=NUMERIC}
     </update>
     <insert id="insertClmnPlanHis" parameterType="map">
-        INSERT INTO TB_CR02D01HIST (
-            CO_CD,ORDRS_NO, CLMN_PLAN_SEQ, CLMN_PLAN_DIV, CLMN_DIV_SEQ, CLMN_RATE, CLMN_AMT,
-            BILL_PBLS_DT, CLMN_DT, PMNT_DT_AFTER_BILL, CURR_UNIT, RMK,CREAT_DTTM
-
-        )
-        VALUES (
-
-           #{coCd}, #{ordrsNo},   #{clmnPlanSeq},  #{clmnPlanDiv}, #{clmnDivSeq}, #{clmnRate}, #{clmnAmt},
-           #{billPblsDt}, #{clmnDt}, #{pmntDtAfterBill}, #{currUnit}, #{rmk}, SYSDATE
-
-
-               )
+        INSERT INTO TB_CR02D01HIST
+        (CO_CD, ORDRS_NO, CLMN_PLAN_SEQ, CLMN_PLAN_DEG, CLMN_PLAN_DIV, CLMN_DIV_SEQ, CLMN_RATE, CLMN_AMT,
+         BILL_PBLS_DT, CLMN_DT, PMNT_DT_AFTER_BILL, CURR_CD, CLMN_PLAN_RMK, CREAT_DTTM)
+        VALUES (#{coCd, jdbcType=VARCHAR}, #{ordrsNo, jdbcType=VARCHAR}, #{clmnPlanSeq, jdbcType=NUMERIC},
+                #{clmnPlanSeq, jdbcType=NUMERIC}, #{clmnPlanDiv, jdbcType=VARCHAR}, #{clmnDivSeq, jdbcType=NUMERIC},
+                #{clmnRate, jdbcType=NUMERIC}, #{clmnAmt, jdbcType=NUMERIC}, #{billPblsDt, jdbcType=DATE},
+                #{clmnDt, jdbcType=DATE}, #{pmntDtAfterBill, jdbcType=NUMERIC}, #{currCd, jdbcType=VARCHAR},
+                #{clmnPlanRmk, jdbcType=VARCHAR}, SYSDATE)
     </insert>
     <insert id="insertOrdrsDetail" parameterType="map">
-        INSERT INTO TB_CR02D02 (
-            CO_CD, ORDRS_NO, ORDRS_SEQ, ORDRS_DTL_DIV, PRDT_DIV, ITEM_DIV, SALES_CD, EQ_NM,
-            ORDRS_PRC_MACH, ORDRS_PRC_ELCTY, ORDRS_PRC, ORDRS_QTY, EST_EPCT_MAT_PRC, TRGT_PCHS_PCOST_MACH,
-            TRGT_PCHS_PCOST_ELCTY, TRGT_PCHS_PCOST_IN_HOUSE_PRCSN, LABOR_COST_MFG_COST
-        )
-        VALUES (
-            #{coCd}, #{ordrsNo}, #{ordrsSeq}, #{ordrsDtlDiv}, #{prdtDiv}, #{itemDiv}, #{salesCd}, #{eqNm},
-            #{ordrsPrcMach}, #{ordrsPrcElcty}, #{ordrsPrc}, #{ordrsQty}, #{estEpctMatPrc}, #{trgtPchsPcostMach},
-            #{trgtPchsPcostElcty}, #{trgtPchsPcostInHousePrcsn}, #{laborCostMfgCost}
-
-
-               )
+        INSERT INTO TB_CR02D02
+        (CO_CD, ORDRS_NO, ORDRS_SEQ, ORDRS_DTL_DIV10, PRDT_CD, ITEM_DIV, SALES_CD, EQP_NM,
+         ORDRS_PRC_MACH, ORDRS_PRC_ELCTY, ORDRS_PRC, ORDRS_QTY, EST_EPCT_MAT_PRC,
+         TRGT_PCHS_PCOST_MACH,
+         TRGT_PCHS_PCOST_ELCTY, TRGT_PCHS_PCOST_IN_HOUSE_PRCSN, LABOR_COST_MFG_COST)
+        VALUES (#{coCd}, #{ordrsNo}, #{ordrsSeq}, #{ordrsDtlDiv10, jdbcType=VARCHAR}, #{prdtCd},
+                #{itemDiv}, #{salesCd,jdbcType=VARCHAR}, #{eqpNm}, #{ordrsPrcMach, jdbcType=NUMERIC}, #{ordrsPrcElcty, jdbcType=NUMERIC},
+                #{ordrsPrc, jdbcType=NUMERIC}, #{ordrsQty, jdbcType=NUMERIC}, #{estEpctMatPrc, jdbcType=NUMERIC},
+                #{trgtPchsPcostMach, jdbcType=NUMERIC}, #{trgtPchsPcostElcty, jdbcType=NUMERIC},
+                #{trgtPchsPcostInHousePrcsn, jdbcType=NUMERIC}, #{laborCostMfgCost, jdbcType=NUMERIC})
     </insert>
     <update id="updateOrdrsDetail" parameterType="map">
         UPDATE TB_CR02D02
-        SET
-            ORDRS_DTL_DIV = #{ordrsDtlDiv},
-            PRDT_DIV = #{prdtDiv},
-            ITEM_DIV = #{itemDiv},
-            SALES_CD = #{salesCd},
-            EQ_NM = #{eqNm},
-            ORDRS_PRC_MACH = #{ordrsPrcMach},
-            ORDRS_PRC_ELCTY = #{ordrsPrcElcty},
-            ORDRS_PRC = #{ordrsPrc},
-            ORDRS_QTY = #{ordrsQty},
-            EST_EPCT_MAT_PRC = #{estEpctMatPrc},
-            TRGT_PCHS_PCOST_MACH = #{trgtPchsPcostMach},
-            TRGT_PCHS_PCOST_ELCTY = #{trgtPchsPcostElcty},
-            TRGT_PCHS_PCOST_IN_HOUSE_PRCSN = #{trgtPchsPcostInHousePrcsn},
-            LABOR_COST_MFG_COST = #{laborCostMfgCost}
-        WHERE
-            CO_CD = #{coCd} AND
-            ORDRS_NO = #{ordrsNo} AND
-            ORDRS_SEQ = #{ordrsSeq}
+        SET ORDRS_DTL_DIV10                = #{ordrsDtlDiv10, jdbcType=VARCHAR},
+
+            PRDT_CD                        = #{prdtCd},
+            ITEM_DIV                       = #{itemDiv},
+            SALES_CD                       = #{salesCd, jdbcType=VARCHAR},
+            EQP_NM                         = #{eqpNm},
+
+            ORDRS_PRC_MACH                 = #{ordrsPrcMach, jdbcType=NUMERIC},
+            ORDRS_PRC_ELCTY                = #{ordrsPrcElcty, jdbcType=NUMERIC},
+            ORDRS_PRC                      = #{ordrsPrc, jdbcType=NUMERIC},
+            ORDRS_QTY                      = #{ordrsQty, jdbcType=NUMERIC},
+            EST_EPCT_MAT_PRC               = #{estEpctMatPrc, jdbcType=NUMERIC},
+            TRGT_PCHS_PCOST_MACH           = #{trgtPchsPcostMach, jdbcType=NUMERIC},
+            TRGT_PCHS_PCOST_ELCTY          = #{trgtPchsPcostElcty, jdbcType=NUMERIC},
+            TRGT_PCHS_PCOST_IN_HOUSE_PRCSN = #{trgtPchsPcostInHousePrcsn, jdbcType=NUMERIC},
+            LABOR_COST_MFG_COST            = #{laborCostMfgCost, jdbcType=NUMERIC}
+        WHERE CO_CD = #{coCd}
+          AND ORDRS_NO = #{ordrsNo}
+          AND ORDRS_SEQ = #{ordrsSeq}
     </update>
-
-
-    <!-- ... -->
+    <delete id="deleteOrdrs">
+        DELETE
+        FROM TB_CR02M01
+        WHERE 1 = 1
+          AND CO_CD = #{coCd}
+          AND ORDRS_NO = #{ordrsNo}
+    </delete>
+    <delete id="deleteOrdrsPlan">
+        DELETE
+        FROM TB_CR02D01
+        WHERE 1 = 1
+          AND CO_CD = #{coCd}
+          AND ORDRS_NO = #{ordrsNo}
+    </delete>
+    <delete id="deleteOrdrsDetail">
+        DELETE
+        FROM TB_CR02D02
+        WHERE 1 = 1
+          AND CO_CD = #{coCd}
+          AND ORDRS_NO = #{ordrsNo}
+    </delete>
 </mapper>

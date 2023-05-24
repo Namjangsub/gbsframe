@@ -13,13 +13,16 @@ public interface CR02Svc {
 
 	Map<String, Object> selectOrdrsInfo(Map<String, String> paramMap);
 
+
+	Map<String, Object>  selectOrdrsWithEst(Map<String, String> params);
+
 	String selectMaxOrdrsNo(Map<String, String> param);
 
 	void insertOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest);
 	void updateOrdrs(Map<String, String> param,MultipartHttpServletRequest mRequest);
 
 
-
+	 int deleteOrdrs(Map<String, String> paramMap);
 
 
 

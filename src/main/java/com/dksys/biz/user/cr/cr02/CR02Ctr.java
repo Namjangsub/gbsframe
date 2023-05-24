@@ -40,6 +40,11 @@ public class CR02Ctr {
 		model.addAttribute("ordrsInfo", ordrsInfo);
 		return "jsonView";
 	}
+	@PostMapping(value = "/selectOrdrsWithEst")
+	public String selectOrdrsWithEst(@RequestBody Map<String, String> params,ModelMap model) {
+		model.addAttribute("info", cr02Svc.selectOrdrsWithEst(params));
+		return "jsonView";
+	}
 
 	@PostMapping(value = "/selectClntInfo")
 	public String selectClntInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -68,6 +73,14 @@ public class CR02Ctr {
 	@PostMapping(value = "/updateOrdrs")
 	public String updateOrdrs(@RequestParam Map<String, String> param,MultipartHttpServletRequest mRequest, ModelMap model) {
 		cr02Svc.updateOrdrs(param,mRequest);
+		return "jsonView";
+	}
+
+	@DeleteMapping(value = "/deleteOrdrs")
+	public String deleteOrdrs(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		cr02Svc.deleteOrdrs(paramMap);
+		model.addAttribute("resultCode", 200);
+		model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
 		return "jsonView";
 	}
 }
