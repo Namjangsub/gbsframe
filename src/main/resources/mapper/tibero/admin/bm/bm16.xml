@@ -134,10 +134,11 @@
 
 
   <select id="selectItemList" resultType="CamelMap">
-  SELECT nvl2(b.PRJCT_PRDT_CD,'Y','N') IS_CHK,
-         B.PRJCT_ITEM_CD,
-         B.*,
-         A.*
+
+   SELECT nvl2(b.PRJCT_PRDT_CD,'Y','N') IS_CHK
+        , B.PRJCT_ITEM_CD
+        , B.*
+        , A.*
       FROM (SELECT *
                FROM TB_CM05M01
               WHERE CODE_KIND = 'ITEMLIST'
@@ -145,11 +146,30 @@
             (SELECT *
                FROM TB_BM06D01
               WHERE PRJCT_SEQ = #{prjctSeq}
-<!--                  AND PRJCT_PRDT_CD = 1 -->
-<!--            AND PRJCT_PRDT_CD = #{prjctPrdtCd} -->
              ) b
          ON a. CODE_ID = b.PRJCT_ITEM_CD
-      WHERE nvl2(b.PRJCT_ITEM_CD,'Y','N') != 'N';
+      WHERE nvl2(b.PRJCT_ITEM_CD,'Y','N') != 'N'
+<!--         and b.PRJCT_PRDT_CD = #{prjctPrdtCd}; -->
+
+
+<!--   SELECT nvl2(b.PRJCT_PRDT_CD,'Y','N') IS_CHK, -->
+<!--          B.PRJCT_ITEM_CD, -->
+<!--          B.*, -->
+<!--          A.* -->
+<!--       FROM (SELECT * -->
+<!--                FROM TB_CM05M01 -->
+<!--               WHERE CODE_KIND = 'ITEMLIST' -->
+<!--              ) a LEFT OUTER join -->
+<!--             (SELECT * -->
+<!--                FROM TB_BM06D01 -->
+<!--               WHERE PRJCT_SEQ = #{prjctSeq} -->
+<!--                  AND PRJCT_PRDT_CD = 1 -->
+<!--          AND PRJCT_PRDT_CD = #{prjctPrdtCd} -->
+<!--              ) b -->
+<!--          ON a. CODE_ID = b.PRJCT_ITEM_CD -->
+<!--       WHERE nvl2(b.PRJCT_ITEM_CD,'Y','N') != 'N' -->
+
+<!--       and   prjct_prdt_cd = #{prjct_prdt_cd}; -->
 
 <!-- TB_CM05M01에서 CODE_KIND가 'ITEMLIST'인 모든 데이터를 가져온 후,
  TB_BM06D01에서 PRJCT_SEQ가 #{prjctSeq}인 데이터를 왼쪽 외부 조인(LEFT OUTER JOIN).
@@ -180,26 +200,33 @@
           a.PRJCT_SEQ
         , a.PRJCT_PRDT_CD
         , b.PRDT_NM
-     FROM tb_bm06d01 a LEFT OUTER JOIN TB_BM01M01 b
+
+     FROM TB_BM06D01 a LEFT OUTER JOIN TB_BM01M01 b
        ON a.PRJCT_PRDT_CD = b.PRDT_CD
 
     WHERE a.PRJCT_SEQ = #{prjctSeq}
 
-<!-- 최신 레코드를 반환하는 max함수를 SD06에서 참조 적용해 봤으나
-JDBC-8006:Missing FROM keyword.메세지가 뜨면서 적용되지 않음.
-좀더 확인 필요-->
+<!--'tb_bm06d01' 테이블에서 'PRJCT_SEQ' 값이 '#{prjctSeq}'와 일치하는 모든 데이터를 선택. 'a'로 표시.
 
-<!--    SELECT -->
-<!--           max(PRJCT_SEQ) AS a.PRJCT_SEQ -->
-<!--         , max(PRJCT_PRDT_CD) AS a.PRJCT_PRDT_CD -->
-<!--         , max(PRDT_NM) AS b.PRDT_NM -->
-<!--      FROM tb_bm06d01 a LEFT OUTER JOIN TB_BM01M01 b -->
-<!--        ON a.PRJCT_PRDT_CD = b.PRDT_CD -->
-<!--     WHERE a.PRJCT_SEQ = #{prjctSeq} -->
+'a'와 'TB_BM01M01' 테이블을 'PRJCT_PRDT_CD' 컬럼을 기준으로 왼쪽 외부 조인
+이는 'a'의 'PRJCT_PRDT_CD'와 일치하는 'TB_BM01M01'의 데이터를 가져오며,
+'TB_BM01M01'의 데이터가 없는 경우 NULL 값을 가짐. 'TB_BM01M01'의 'PRDT_NM' 열을 'b'로 표시.
+
+조인된 결과에서 다음 열을 선택
+
+'a.PRJCT_SEQ' 열은 'a' 테이블의 'PRJCT_SEQ' 값
+'a.PRJCT_PRDT_CD' 열은 'a' 테이블의 'PRJCT_PRDT_CD' 값
+'b.PRDT_NM' 열은 'b' 테이블의 'PRDT_NM' 값
+중복된 행을 제거하기 위해 SELECT DISTINCT 문을 사용
+
+따라서 결과는 'a.PRJCT_SEQ', 'a.PRJCT_PRDT_CD', 'b.PRDT_NM' 열로 구성된 행의 목록입니다. -->
   </select>
 
   <select id="selectFileList" resultType="CamelMap">
-    SELECT * FROM TB_CM08M01 WHERE FILE_TRGT_TYP = 'TB_BM06M01' AND FILE_TRGT_KEY = #{fileTrgtKey}
+    SELECT *
+      FROM TB_CM08M01
+     WHERE FILE_TRGT_TYP = 'TB_BM06M01'
+       AND FILE_TRGT_KEY = #{fileTrgtKey}
   </select>
 
 <update id="updatePrjct" parameterType="Map">
@@ -369,8 +396,6 @@ JDBC-8006:Missing FROM keyword.메세지가 뜨면서 적용되지 않음.
       FROM TB_BM06M01
      WHERE PRJCT_SEQ = #{prjctSeq}
   </select>
-
-
 
     <update id="updatePrdtDtl" parameterType="Map">
     UPDATE TB_BM06D01

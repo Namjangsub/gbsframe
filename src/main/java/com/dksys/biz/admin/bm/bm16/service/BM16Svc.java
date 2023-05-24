@@ -13,7 +13,7 @@ public interface BM16Svc {
 
   List<Map<String, String>> selectItemList(Map<String, String> paramMap);
 
-  List<Map<String, String>> selectPrdtList(Map<String, String> param);
+  List<Map<String, String>> selectPrdtList(Map<String, String> paramMap);
 
   Map<String, String> selectPrjctInfo(Map<String, String> paramMap);
 
@@ -31,21 +31,17 @@ public interface BM16Svc {
 
 //  이하 PRDT 추가
 
-  public int selectPrdtCount(Map<String, String> param);
- 
+  int selectPrdtCount(Map<String, String> param);
+
   public Map<String, String> seletOneMaster(Map<String, String> param);
 //
-//  int insertUpr(Map<String, String> param);
-//
-//  int deleteUpr(Map<String, String> param);
-//
-//  int updateUpr(Map<String, String> param);
+
 //
 //  int selectOneMasterCount(Map<String, String> param);
 
   public int insertOneMaster(Map<String, String> param);
-  
-  public int selectOneMasterCount(Map<String, String>  param);
+
+  public int selectOneMasterCount(Map<String, String> param);
 
   public int insertOneDetail01(Map<String, String> param);
 
@@ -57,19 +53,16 @@ public interface BM16Svc {
 
   public Map<String, String> seletOneDetail01(Map<String, String> param);
 
-Map<String, String> selectPrdtInfo(Map<String, String> param);
+  Map<String, String> selectPrdtInfo(Map<String, String> param);
 
-int selectPrdtClntCount(Map<String, String> param);
+  int selectPrdtClntCount(Map<String, String> param);
 
-Map<String, String> seletOneMasterClnt(Map<String, String> param);
+  Map<String, String> seletOneMasterClnt(Map<String, String> param);
 
-int insertOneMasterClnt(Map<String, String> param);
+  int insertOneMasterClnt(Map<String, String> param);
 
-List<Map<String, String>> selectPrdtClntList(Map<String, String> param);
+  List<Map<String, String>> selectPrdtClntList(Map<String, String> param);
 
-int selectOneMasterClntCount(Map<String, String> param);
-
- 
-
+  int selectOneMasterClntCount(Map<String, String> param);
 
 }

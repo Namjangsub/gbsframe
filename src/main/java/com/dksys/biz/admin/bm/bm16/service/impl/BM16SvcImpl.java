@@ -39,8 +39,8 @@ public class BM16SvcImpl implements BM16Svc {
   }
 
   @Override
-  public List<Map<String, String>> selectPrdtList(Map<String, String> param) {
-    return bm16Mapper.selectPrdtList(param);
+  public List<Map<String, String>> selectPrdtList(Map<String, String> paramMap) {
+    return bm16Mapper.selectPrdtList(paramMap);
   }
 
   @Override
@@ -49,9 +49,9 @@ public class BM16SvcImpl implements BM16Svc {
   }
 
   @Override
-  public Map<String, String> selectPrdtInfo(Map<String, String> param) {
+  public Map<String, String> selectPrdtInfo(Map<String, String> paramMap) {
 
-    return bm16Mapper.selectPrdtInfo(param);
+    return bm16Mapper.selectPrdtInfo(paramMap);
   }
 
   @Override

@@ -31,11 +31,11 @@ public class BM16Ctr {
 
 //   프로젝트 리스트 조회
   @PostMapping(value = "/selectPrjctList")
-  public String selectPrjctList(@RequestBody Map<String, String> param, ModelMap model) {
-    int totalCnt = bm16Svc.selectPrjctCount(param);
-    PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
+  public String selectPrjctList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    int totalCnt = bm16Svc.selectPrjctCount(paramMap);
+    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
     model.addAttribute("paginationInfo", paginationInfo);
-    List<Map<String, String>> bm1601m01 = bm16Svc.selectPrjctList(param);
+    List<Map<String, String>> bm1601m01 = bm16Svc.selectPrjctList(paramMap);
     model.addAttribute("bm1601m01", bm1601m01);
     return "jsonView";
   }
@@ -50,13 +50,23 @@ public class BM16Ctr {
 
   // 아이템 정보조회
   @PostMapping("/selectItemList")
-  public String selectItemList(@RequestBody Map<String, String> param, ModelMap model) {
-    List<Map<String, String>> itemList = bm16Svc.selectItemList(param);
+  public String selectItemList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    List<Map<String, String>> itemList = bm16Svc.selectItemList(paramMap);
     model.addAttribute("itemList", itemList);
     return "jsonView";
   }
 
+  // 대상설비 리스트 조회
+  @PostMapping("/selectPrdtList")
+  public String selectPrdtList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    int totalCnt = bm16Svc.selectPrdtCount(paramMap);
+    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+    model.addAttribute("paginationInfo", paginationInfo);
 
+    List<Map<String, String>> prdtList = bm16Svc.selectPrdtList(paramMap);
+    model.addAttribute("prdtList", prdtList);
+    return "jsonView";
+  }
 
   @PostMapping(value = "/selectConfirmCount")
   public String selectConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -105,87 +115,72 @@ public class BM16Ctr {
   }
 
 //이하 PRDT 추가
-  
-  
-  
-  
-  // 대상설비 리스트 조회
-  @PostMapping("/selectPrdtList")
-  public String selectPrdtList(@RequestBody Map<String, String> param, ModelMap model) {
-    int totalCnt = bm16Svc.selectPrdtCount(param);
-    PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
-    model.addAttribute("paginationInfo", paginationInfo);
 
-    List<Map<String, String>> prdtList = bm16Svc.selectPrdtList(param);
-    model.addAttribute("prdtList", prdtList);
-    return "jsonView";
-  }  
 //대상설비 중복 조회
   @PostMapping("/checkOverLapMaster")
   public String checkOverLapMaster(@RequestBody Map<String, String> param, ModelMap model) {
-  	int result = bm16Svc.selectOneMasterCount(param);
-  	if(result > 0) {
-			model.addAttribute("resultCode", 500);
-			model.addAttribute("resultMessage", messageUtils.getMessage("exist"));
-		} else {
-			model.addAttribute("resultCode", 200);
-			model.addAttribute("resultMessage", messageUtils.getMessage("check"));
-		}
-		model.addAttribute("result", result);
-  	
-		return "jsonView";
+    int result = bm16Svc.selectOneMasterCount(param);
+    if (result > 0) {
+      model.addAttribute("resultCode", 500);
+      model.addAttribute("resultMessage", messageUtils.getMessage("exist"));
+    } else {
+      model.addAttribute("resultCode", 200);
+      model.addAttribute("resultMessage", messageUtils.getMessage("check"));
+    }
+    model.addAttribute("result", result);
+
+    return "jsonView";
   }
-  //강종별 할증금액 리스트 조회
+
+//  // 리스트 조회
   @PostMapping("/checkOverLapDetail01")
   public String checkOverLapDetail01(@RequestBody Map<String, String> param, ModelMap model) {
-  	int result = bm16Svc.selectDetail01Count(param);
-  	if(result > 0) {
-			model.addAttribute("resultCode", 500);
-			model.addAttribute("resultMessage", messageUtils.getMessage("exist"));
-		} else {
-			model.addAttribute("resultCode", 200);
-			model.addAttribute("resultMessage", messageUtils.getMessage("check"));
-		}
-		model.addAttribute("result", result);
-  	
-		return "jsonView";
+    int result = bm16Svc.selectDetail01Count(param);
+    if (result > 0) {
+      model.addAttribute("resultCode", 500);
+      model.addAttribute("resultMessage", messageUtils.getMessage("exist"));
+    } else {
+      model.addAttribute("resultCode", 200);
+      model.addAttribute("resultMessage", messageUtils.getMessage("check"));
+    }
+    model.addAttribute("result", result);
+
+    return "jsonView";
   }
-  
-  //PDRT ITEM 상세조회
+
+  // PDRT ITEM 상세조회
   @PostMapping("/seletOneMaster")
   public String seletOneMaster(@RequestBody Map<String, String> param, ModelMap model) {
-  	Map<String, String> itemInfo = bm16Svc.seletOneMaster(param);
-  	model.addAttribute("itemInfo", itemInfo);
-  	return "jsonView";
+    Map<String, String> itemInfo = bm16Svc.seletOneMaster(param);
+    model.addAttribute("itemInfo", itemInfo);
+    return "jsonView";
   }
-  
-  //PDRT ITEM  수정 및 등록
+
+  // PDRT ITEM 수정 및 등록
   @PutMapping("/insertOneMaster")
   public String insertOneMaster(@RequestBody Map<String, String> param, ModelMap model) {
-  	
-  	Map<String, String> tempParam = new HashMap<String, String>();
-  	
-  	tempParam.putAll(param);
-  	tempParam.put("prdtDt", "");
-  	
-  	int count = bm16Svc.selectOneMasterCount(tempParam);
-  	//기존 설비 row가 있을 시, ITEM detail 자동저장
-  	if(count > 0) {
-  		bm16Svc.insertOneMaster(param);
-  		bm16Svc.updateOneDetail01(param);
-  		
-  	}else {
-  		
-  		bm16Svc.insertOneMaster(param);
-      	
-  	}
-  	
-  	model.addAttribute("resultCode", 200);
-  	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-  	return "jsonView";
-  }
-  
 
+    Map<String, String> tempParam = new HashMap<String, String>();
+
+    tempParam.putAll(param);
+    tempParam.put("prdtDt", "");
+
+    int count = bm16Svc.selectOneMasterCount(tempParam);
+    // 기존 설비 row가 있을 시, ITEM detail 자동저장
+    if (count > 0) {
+      bm16Svc.insertOneMaster(param);
+      bm16Svc.updateOneDetail01(param);
+
+    } else {
+
+      bm16Svc.insertOneMaster(param);
+
+    }
+
+    model.addAttribute("resultCode", 200);
+    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+    return "jsonView";
+  }
 
 //  // 중복 조회
 //  @PostMapping("/checkOverLapMaster")
@@ -202,6 +197,5 @@ public class BM16Ctr {
 //
 //    return "jsonView";
 //  }
-//
 
 }
