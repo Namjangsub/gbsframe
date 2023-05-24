@@ -1,9 +1,12 @@
-
+var fileTreeGridView
 var treeModule = (function () {
     var fileArr = [];
+    var fileArrOri=[];
+    var uploadedFiles= {};
+    var deleteFileArr = [];
     var paramObj;
     var codeIdVal;
-    var fileTreeGridView = {
+    fileTreeGridView = {
         target: new ax5.ui.grid(),
 
         init: function (gridSelector) {
@@ -32,31 +35,30 @@ var treeModule = (function () {
 
                     {key: "fileTrgtKey", label: "파일타겟키", hidden: true},
                     {key: "fileKey", label: "파일키", hidden: true},
-                    {key: "fileName", label: "파일명", width: 260, align: "left"},
+                    {key: "fileName", label: "파일명", width: 360, align: "center"},
                     {key: "fileType", label: "파일타입", width: 60, align: "center"},
                     {key: "fileSize", label: "파일크기", width: 100, align: "right", formatter: "money"},
-                    {key: "creatDttm", label: "생성일자", width: 130, align: "center",},
-                    {key: "creatId", label: "생성자", width: 100, align: "center"},
-                    {key: "clntCd", label: "거래처", width: 50, align: "center", hidden: true},
-                    {key: "clntNm", label: "거래처명", width: 110, align: "center"},
-                    {key: "prdtCd", label: "제품코드", width: 50, align: "center", hidden: true},
-                    {key: "prdtNm", label: "제품명", width: 100, align: "center"},
-                    {key: "itemCd", label: "아이템", width: 50, align: "center"},
-                    {key: "salesCd", label: "Sales코드", width: 110, align: "center"},
-                    {key: "prjctCd", label: "프로젝트", width: 50, align: "center", hidden: true},
-                    {key: "prjctNm", label: "프로젝트명", width: 110, align: "center"},
+                    {key: "creatDttm", label: "생성일자", width: 460, align: "center",},
+
+                    // {key: "prjctCd", label: "프로젝트", width: 50, align: "center", hidden: true},
+                    // {key: "prjctNm", label: "프로젝트명", width: 110, align: "center"},
                     {
                         key: "fileDelete", label: "삭제", width: 80, align: "center",
                         formatter: function () {
-                            return '<button style="height: 18px; padding:0px;" type="button" onclick="deleteFile('
+                            return '<button style="height: 18px; padding:0px;" type="button" data-delete-row="'
                                 + this.dindex
-                                + ');">삭제</button>';
+                                + '">삭제</button>';
                         }
                     }],
                 page: {
                     display: false
                 }
             });
+            this.target.$target.on("click", "[data-delete-row]", function (event) {
+                const rowIndex = parseInt(event.target.getAttribute("data-delete-row"), 10);
+                deleteFile(rowIndex);
+            });
+
             return this;
         },
         reqSetData: function (list) {
@@ -64,7 +66,7 @@ var treeModule = (function () {
             targetObj.setData({
                 list: list,
                 page: {
-                    totalElements: fileArr.length
+                    totalElements: list.length
                 }
             });
         }
@@ -114,26 +116,20 @@ var treeModule = (function () {
 
                 paramObj.comonCd = clickedId;
 
-                // 선택한 노드의 모든 하위 노드를 가져옵니다.
                 var childrenNodes = getAllChildrenNodes(data.instance, clickedId);
 
-
                 selectedNodeId = data.node.id;
-                isEditMode = paramObj.actionType === 'U'
-                if (isEditMode) {
-                    var allNodes = [clickedId].concat(childrenNodes);
-                    // 수정 화면인 경우, 데이터베이스에서 파일 목록을 가져옵니다.
-                    getAllFilesForNodes(allNodes, function (allFiles) {
-                        fileTreeGridView.reqSetData(allFiles);
-                    });
-                } else {
-                    //표시하는 부분
-                    var relatedFiles = fileArr.filter(function (file) {
-                        return file.nodeId === selectedNodeId;
-                    });
-                    fileTreeGridView.reqSetData(relatedFiles);
 
-                }
+
+                var allNodes = [clickedId].concat(childrenNodes);
+                getAllFilesForNodes(allNodes, function (allFiles) {
+                    if (!uploadedFiles[selectedNodeId]) {
+                        uploadedFiles[selectedNodeId] = allFiles;
+                    }
+                    updateFileTreeGridView();
+                });
+
+
 
 
                 if (!$('#' + selector).is(":visible")) {
@@ -147,19 +143,29 @@ var treeModule = (function () {
                 //     downloadAllFilesInGrid();
                 // });
 
+                var deleteButtons = document.querySelectorAll('button[data-delete-row]'); // Replace with your delete button selector
 
-                if (data.node.id.length < 7 || data.node.id == "FILETREE") {
-
-                    buttonFile.disabled = true; // 비활성화
-                    buttonFile.style.backgroundColor = "gray"; // 회색 배경색으로 변경 (옵션)
-                } else {
+                // Check if the selected node is a leaf node
+                if ($('#' + selector).jstree(true).is_leaf(data.node)) {
                     buttonFile.disabled = false; // 활성화
                     buttonFile.style.backgroundColor = ""; // 기본 배경색으로 변경 (옵션)
+
+
+
+                } else {
+                    buttonFile.disabled = true; // 비활성화
+                    buttonFile.style.backgroundColor = "gray"; // 회색 배경색으로 변경 (옵션)
+
 
                 }
 
 
                 $("#file_tit").html($('#' + selector).jstree('get_selected', true)[0].text);
+
+
+
+
+
 
                 // 합쳐진 코드 부분 끝
             })
@@ -192,6 +198,7 @@ var treeModule = (function () {
             addFileToTree(this);
         });
 
+
         // 생성된 input 요소를 grid 요소 바로 다음에 추가
         var gridElement = document.querySelector('[data-ax5grid="' + gridSelector + '"]');
         if (gridElement) {
@@ -213,18 +220,17 @@ var treeModule = (function () {
     }
 
     function getAllFilesForNodes(nodeIds, callback) {
-        var allFiles = [];
-
+        fileArrOri=[];
         function getFileListForNode(index) {
             if (index >= nodeIds.length) {
-                callback(allFiles);
+                callback(fileArrOri);
                 return;
             }
 
             var nodeId = nodeIds[index];
             paramObj.comonCd = nodeId;
-            postAjax("/admin/cm/cm08/selectTreeFileList", paramObj, null, function (data) {
-                allFiles = allFiles.concat(data.fileList);
+            postAjax("/admin/cm/cm08/selectTreeFileModule", paramObj, null, function (data) {
+                fileArrOri = fileArrOri.concat(data.fileList);
                 getFileListForNode(index + 1);
             });
         }
@@ -260,32 +266,105 @@ var treeModule = (function () {
         var tempFiles = elem.files;
         $.each(tempFiles, function (idx, obj) {
             var testArr = obj.name.split(".");
-            fileArr.unshift({
+            var newFile = {
                 'fileKey': 0,
+                'tempId': new Date().getTime() + idx,
                 'fileName': obj.name,
                 'fileType': testArr[testArr.length - 1],
                 'fileSize': obj.size,
                 'nodeId': selectedNodeId,
                 'coCd': coCd,
                 'file': obj
+            };
 
-            });
+            if (!uploadedFiles[selectedNodeId]) {
+                uploadedFiles[selectedNodeId] = [];
+            }
+            uploadedFiles[selectedNodeId].push(newFile);
         });
 
-        var relatedFiles = fileArr.filter(function (file) {
-            return file.nodeId === selectedNodeId;
+        updateFileTreeGridView();
+    }
+
+    function updateFileTreeGridView() {
+
+        var nodeUploadedFiles = uploadedFiles[selectedNodeId] || [];
+        fileArr = fileArr.concat(nodeUploadedFiles);
+        console.log(JSON.stringify(fileArr));
+        fileArr = fileArr.filter(function (item) {
+            return item &&
+                typeof item === 'object' &&
+                'fileKey' in item
         });
-        fileTreeGridView.reqSetData(relatedFiles);
+        console.log("해당위치"+JSON.stringify(fileArr))
+        fileTreeGridView.reqSetData(nodeUploadedFiles);
+    }
+
+
+    function getFileArr() {
+
+        return fileArr; // fileArr를 반환하는 함수
+    }
+
+    function getFileArrOri() {
+
+        return fileArrOri; // fileArr를 반환하는 함수
+    }
+
+
+    function getDeleteFileArr() {
+        return deleteFileArr; // fileArr를 반환하는 함수
+    }
+
+
+    function deleteFile(rowIndex) {
+        if(fileArrOri[rowIndex]){
+
+            deleteFileArr.push(fileArrOri[rowIndex].fileKey);
+            fileArrOri.splice(rowIndex, 1);
+
+        }else if(fileArr[rowIndex]) {
+
+            removeUnsavedFile(fileArr[rowIndex].tempId);
+        }
+
+        fileTreeGridView.target.removeRow(rowIndex);
+
+
+
 
     }
 
-    function deleteFile(rowIndex) {
-        fileTreeGridView.target.removeRow(rowIndex);
-        if (fileArr[rowIndex].fileKey) {
-            deleteFileArr.push(fileArr[rowIndex].fileKey);
+    function removeUnsavedFile(tempId) {
+
+        // selectedNodeId에 대한 파일 목록에서 해당 tempId를 가진 파일을 찾아 제거
+        if (uploadedFiles[selectedNodeId]) {
+            uploadedFiles[selectedNodeId] = uploadedFiles[selectedNodeId].filter(function (uploadedFile) {
+                if (uploadedFile) {
+                    return uploadedFile.tempId !== tempId;
+                } else {
+                    return false;
+                }
+            });
         }
-        fileArr.splice(rowIndex, 1);
-        fileTreeGridView.setData();
+        // fileArr에서 해당 tempId를 가진 파일을 제거
+        fileArr = fileArr.filter(function (item) {
+
+            if (item) {
+                return item.tempId !== tempId;
+            } else {
+                // uploadedFile이 정의되지 않았다면, false를 반환
+                return false;
+            }
+
+
+
+
+        });
+
+
+        // 화면에 보이는 목록도 업데이트
+        updateFileTreeGridView();
     }
 
     function downloadFile(fileKey) {
@@ -296,9 +375,11 @@ var treeModule = (function () {
             location.href = "/admin/cm/cm08/fileDownload?filePath=" + filePath;
         });
     }
+    function initFileArrays() {
+        fileArr = [];
+        uploadedFiles = {};
+        deleteFileArr = [];
 
-    function getFileArr() {
-        return fileArr; // fileArr를 반환하는 함수
     }
     return {
         initDeptTree: initDeptTree,
@@ -309,15 +390,16 @@ var treeModule = (function () {
         init: init,
         initAll: initAll,
         addFileToTree: addFileToTree,
-        deleteFile: deleteFile,
-        downloadFile: downloadFile,
-        getFileArr:getFileArr
-
+        getFileArr:getFileArr,
+        getFileArrOri:getFileArrOri,
+        getDeleteFileArr:getDeleteFileArr,
+        deleteFile:deleteFile,
+        downloadFile:downloadFile,
+        initFileArrays:initFileArrays
     };
 
 
 })();
-
 
 
 

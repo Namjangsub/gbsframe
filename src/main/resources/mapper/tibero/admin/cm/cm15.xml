@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.dksys.biz.admin.cm.cm15.mapper.CM15Mapper">
+
+	<insert id="updateFileAuth">
+		MERGE INTO TB_CM15M01 A
+			USING DUAL
+			ON (A.USER_ID = #{userId}
+			AND A.COMON_CD = #{comonCd})
+		WHEN MATCHED THEN
+			UPDATE SET
+				FILE_LIST = nvl(#{fileList, jdbcType=VARCHAR},'N'),
+				FILE_UP = nvl(#{fileUp, jdbcType=VARCHAR},'N'),
+				FILE_DOWN = nvl(#{fileDown, jdbcType=VARCHAR},'N'),
+				FILE_UPDATE = nvl(#{fileUpdate, jdbcType=VARCHAR},'N'),
+				FILE_DELETE = nvl(#{fileDelete, jdbcType=VARCHAR},'N'),
+				UDT_ID = #{creatId},
+				UDT_PGM = #{pgmId},  
+				UDT_DTTM = SYSDATE
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				USER_ID,
+				COMON_CD,
+				FILE_LIST,
+				FILE_UP,
+				FILE_DOWN,
+				FILE_UPDATE,
+				FILE_DELETE,
+				CREAT_ID,
+				CREAT_PGM,
+				CREAT_DTTM
+			)
+			VALUES(
+				#{userId},
+				#{comonCd},
+				nvl(#{fileList, jdbcType=VARCHAR},'N'),
+				nvl(#{fileUp, jdbcType=VARCHAR},'N'),
+				nvl(#{fileDown, jdbcType=VARCHAR},'N'),
+				nvl(#{fileUpdate, jdbcType=VARCHAR},'N'),
+				nvl(#{fileDelete, jdbcType=VARCHAR},'N'),
+				#{creatId}, 
+				#{pgmId}, 
+				SYSDATE
+			)
+	</insert>
+	
+
+    <select id="selectFileAuthInfo" parameterType="Map" resultType="CamelMap">
+        SELECT *
+        FROM TB_CM15M01
+        WHERE USER_ID = #{userId}
+          AND COMON_CD = #{comonCd}
+    </select>
+
+    <delete id="deleteFileAuthInfo" parameterType="Map">
+        DELETE
+        FROM TB_CM15M01
+        WHERE USER_ID = #{userId}
+          AND COMON_CD = #{comonCd}
+    </delete>
+
+
+	<select id="selectTreeAuthCount" parameterType="Map" resultType="int">
+		SELECT 
+	 		    COUNT(*)
+	 	  FROM 
+			  (SELECT *
+			    FROM TB_CM05M01
+					START WITH CODE_ID ='FILETREE'
+				  CONNECT BY PRIOR CODE_ID = CODE_KIND
+				    ORDER SIBLINGS BY CODE_ID ASC) AS A 
+				       LEFT OUTER JOIN TB_CM15M01 AS B ON A.CODE_ID = B.COMON_CD
+			                                      AND B.USER_ID = #{userId}
+	</select>
+
+
+	<select id="selectTreeAuthList" parameterType="Map" resultType="CamelMap">
+			SELECT
+				  A.*, ROWNUM AS RNUM
+			FROM
+			(
+				SELECT  A.*, 
+				        B.* , 
+				        CASE WHEN (FILE_LIST='Y' AND FILE_UP='Y' AND FILE_DOWN='Y' AND FILE_UPDATE='Y' AND FILE_DELETE='Y') THEN 'Y' ELSE 'N' END ALL_CHECK 
+				  FROM ( SELECT 
+								CASE WHEN CODE_KIND = '#' THEN '' ELSE CODE_KIND END PID,
+				  				CODE_ID ID,
+								CODE_NM TEXT,
+								CODE_ID DEPT_ID,
+								CODE_NM DEPT_NM,
+						        CODE_KIND UP_DEPT_ID,
+						        CODE_DESC UP_DEPT_NM,
+						        SORT_NO,
+						        CODE_ETC,
+						        USE_YN,
+						        LPAD(' ', 3*(LEVEL-1)) || LEVEL lvl,
+								REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_ID, ' -> '), '^\s+\-\>\s+', '') as LPATH
+						     , CONNECT_BY_ISLEAF AS IS_LEAF
+						     , CASE WHEN CONNECT_BY_ISLEAF = 0 THEN 'unit' ELSE 'leaf' END TYPE
+						FROM TB_CM05M01
+						START WITH CODE_ID ='FILETREE'
+						CONNECT BY PRIOR CODE_ID = CODE_KIND
+						 ORDER SIBLINGS BY CODE_ID ASC) AS A 
+			       LEFT OUTER JOIN TB_CM15M01 AS B ON A.ID = B.COMON_CD
+			                                      AND B.USER_ID = #{userId}
+			) A
+		WHERE
+		1=1
+		AND ROWNUM BETWEEN #{firstIndex} AND #{lastIndex}
+
+	</select>
+
+
+</mapper>

@@ -37,6 +37,7 @@
 	<script src="/static/js/global.js"></script>
 <link rel="stylesheet" type="text/css" href="https://cdn.rawgit.com/ax5ui/ax5ui-menu/master/dist/ax5menu.css">
 <script type="text/javascript" src="https://cdn.rawgit.com/ax5ui/ax5ui-menu/master/dist/ax5menu.min.js"></script>
+<!-- 	<script src="/static/js/fileTree2.js"></script> -->
 
 </head>
 <body>
@@ -102,22 +103,48 @@
           </table>
         </div>
       </div>
-      <!-- // 콘텐츠 -->
+		<!-- 콘텐츠 -->
+		<div class="contents no_bg">
+			<!-- 콘텐츠 타이틀 -->
+			<div class="contents_tit">
+				<div class="add_btn_small pdl10">
+		               <a onclick="addRow();" style="height: 30px; line-height: 28px;" authchk>+</a>
+		               <a onclick="removeRow();" style="height: 30px; line-height: 28px;" authchk>-</a>
+		               <a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+		        </div>
+			</div>
+		</div>
+		<!-- // 콘텐츠 -->
       
-                <div class="contents" style="margin:0px;padding:0 5px;height:100%; width:100%; min-width:300px">
-            <div data-ax5grid="first-grid" data-ax5grid-config="{}" style="height: 300px;"></div>
-          </div>
+      <div class="contents" style="margin:0px;padding:0 5px;height:350px; width:100%; min-width:300px">
+        <div data-ax5grid="first-grid" data-ax5grid-config="{}" style="height: 350px;"></div>
+      </div>
+          
+    <!-- // File list 영역 -->
+    <div id="file_area"></div>
 
-    <script>
-    var thisGridRow; // 선택된 행 정보 저장할 변수
-    var thisGridCol; // 선택된 열 정보 저장할 변수
+
+<script>
+console.log("excellPaste.html start");
+    var thisGridRow=0; // 선택된 행 정보 저장할 변수
+    var thisGridCol=0; // 선택된 열 정보 저장할 변수
+    var thisStrRow=0; // 선택된 행 정보 저장할 변수
+    var thisStrCol=0; // 선택된 열 정보 저장할 변수
+    var thisEndRow=0; // 선택된 행 정보 저장할 변수
+    var thisEndCol=0; // 선택된 열 정보 저장할 변수
     var selectedRowsCount = 0; // 선택된 행 개수를 저장할 변수
+		ax5.ui.grid.formatter["jobYn"] = function () {
+			var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
+			return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
+		};
     
         var myColumns = [
-            {key: "name", label: "Name", align: "left", width: 250},
-            {key: "age", label: "Age", align: "left", width: 80},
-            {key: "gender", label: "Gender", align: "left", width: 80},
-            {key: "check", label: "check", align: "left", width: 40},
+            {key: "name", 	label: "Name", 		align: "left", width: 250, 	editor: {type: "text"}},
+            {key: "age", 		label: "Age", 		align: "left", width: 80, 	formatter:"money", editor: {type: "number"}, align: "right"},
+            {key: "amt", 		label: "Amt", 		align: "left", width: 80, 	formatter:"money", editor: {type: "number"}, align: "right"},
+            {key: "gender", label: "Gender", 	align: "left", width: 80, 	editor: {type: "text"}},
+       		{key: "jobYn",  label: "완료",     align: "center",	width: 50,	formatter: "jobYn"},
+            {key: "check", 	label: "check", 	align: "left", width: 40},
         ];
 
         var myGrid = new ax5.ui.grid({
@@ -125,22 +152,68 @@
             columns: myColumns,
             showLineNumber: true,
             showRowSelector: true,
+        	multipleSelect: false,
             virtualScrollX: true,
             virtualScrollY: true,  
-            frozenColumnIndex: 1,
+            frozenColumnIndex: 0,
 		        body: {
 		        	 onClick: function () {
 		                this.self.select(this.dindex); 
 		                thisGridRow = this.dindex;   // 선택된 행 정보 가져오기
 		                thisGridCol = this.colIndex; // 선택된 열 정보 가져오기
-// 		            },
-// 		            onDataChanged: function () {
-// 		                var selectedRows = this.selection.get(); // 선택된 행 정보 가져오기
-// 		                selectedRowsCount = selectedRows ? selectedRows.length : 0; // 선택된 행 개수 저장
 
-		            	}
+		            	},
+		             onMouseDown: function () {
+			                thisStrRow = this.dindex;   // 선택된 행 정보 가져오기
+			                thisStrCol = this.colIndex;
+		             },
+		             onMouseUp: function () {
+			                thisEndRow = this.dindex;   // 선택된 행 정보 가져오기
+			                thisEndCol = this.colIndex;
+		             },
+		             onKeyDown: function () {
+			                thisEndRow = this.dindex;   // 선택된 행 정보 가져오기
+			                thisEndCol = this.colIndex;
+		             },
 
+		             onDataChanged: function () {
+		                	if (this.item.__selected__ == true) {
+		                		var index = this.dindex;
+		                            // do something
+		                		myGrid.setValue(index, "check", "1");
+		                		this.item.age="50";
+		                	}
+		                	
+		                	myGrid.setData(sampleData);
+		             },
+		             tooltip: function () {
+		                 return this.item[this.column.key];
+		             },
+					grouping: {
+					     by: ["name"],
+					     columns: [
+					         {
+					             label: function () {
+					                 return this.groupBy.labels.join(", ") + " SUM";
+					             }, colspan: 1, align: "center"
+					         },
+					         {key: "age", collector: "avg", formatter: "money", align: "right"},
+					         {key: "amt", collector: "sum", formatter: "money", align: "right"},
+					     ]
+					 }				 
 		        },
+		        scroller: {
+                    size: 15,
+                    barMinSize: 15,
+                    trackPadding: 4
+                },
+                footSum: [
+                    [
+                        {label: "SUMMARY", colspan: 1, align: "center"},
+                        {key: "age", collector: "avg", formatter: "money", align: "right"},
+                        {key: "amt", collector: "sum", formatter: "money", align: "right"},
+                    ]]	                
+                ,
             contextMenu: {
                 iconWidth: 20,
                 acceleratorWidth: 100,
@@ -161,7 +234,9 @@
                     },
                 ],
                 popupFilter: function (item, param) {
-                    //console.log(item, param);
+//                     console.log(item, param);
+			                thisEndRow = param.dindex;   // 선택된 행 정보 가져오기
+			                thisEndCol = param.colIndex;
                     if(param.element) {
                         return true;
                     }else{
@@ -169,16 +244,27 @@
                     }
                 },
                 onClick: function (item, param) {
-                    console.log(item, param);
-		                thisGridRow = param.dindex;
-		                thisGridCol = param.colIndex;
-	                
+//                     console.log(item, param);
+                    thisEndRow = param.dindex;
+                    thisEndCol = param.colIndex;
+		          	  console.log( " thisGridRow: ", thisGridRow, " thisGridCol: ", thisGridCol, " thisEndRow: ", thisEndRow, " thisEndCol: ", thisEndCol);	                
                     if (item.label == "붙여넣기") {
-		                    gridPaste(thisGridRow,thisGridCol);
+                    		thisGridRow = param.dindex;
+                    		thisGridCol = param.colIndex;
+      		          	  	console.log( " thisGridRow: ", thisGridRow, " thisGridCol: ", thisGridCol, " thisEndRow: ", thisEndRow, " thisEndCol: ", thisEndCol);	                
+		                    gridPaste(myGrid, thisGridRow, thisGridCol);
 		                } else if (item.label == "줄추가") {
 		                	  console.log('추가 인덱스 :', param.dindex);
 		        	        	//.addRow(추가할 내용, 삽인할위치(생략시 마지막),갯수)
-		         	        	myGrid.addRow($.extend({}, myGrid.list[param.dindex], {__index: undefined}),param.dindex+1,);		                		
+// 		         	        	myGrid.addRow({},param.dindex+1,5);		
+		         	        	sampleData[sampleData.length]={
+		         	        			"name":myGrid.list[param.dindex].name,
+		         	        			"age":myGrid.list[param.dindex].age,
+		         	        			"amt":myGrid.list[param.dindex].amt,
+		         	        			"gender":myGrid.list[param.dindex].gender,
+		         	        			"jobYn":myGrid.list[param.dindex].jobYn,
+		         	        			"check":''
+		         	        	};		        	        	
 		                } else if (item.label == "내용 삭제") {
 		                	  console.log('내용삭제 인덱스 :', param.dindex);
 
@@ -189,24 +275,42 @@
 
 		                } else if (item.label == "줄삭제") {
 		                	  console.log('삭제 인덱스 :', param.dindex);
-		                		myGrid.removeRow(param.dindex);
+// 		                		myGrid.removeRow(param.dindex);   //removeRow()는 삭제된 내역이 없음
+// 		                		myGrid.deleteRow(param.dindex);		//myGrid.getList("deleted") 에서 삭제내역을 추출할수 있음
+		                		sampleData.splice(param.dindex, 1);
+
 		                }
                 
-                    
                     myGrid.contextMenu.close();
+     	        	myGrid.setData(sampleData);
+
                     //또는 return true;
                 }
-            }
-            
+                
+            },
+    		page : {
+                navigationItemCount: 9,
+                height: 30,
+                display: true,
+                firstIcon: '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+                prevIcon: '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+                nextIcon: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+                lastIcon: '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+                onChange: function () {
+                	myGrid.setData(this.page.selectPage);
+                }
+    		}
 
             });
         var sampleData = [
-            {name: "rkske", age: "10", gender: "여"},
-            {name: "bbbb", age: "20", gender: "남"},
-            {name: "ccccc", age: "30", gender: "남"},
-            {name: "dddd", age: "40", gender: "남"},
+            {jobYn:"Y", name: "rkske", age: "10", amt: 1000, gender: "여"},
+            {jobYn:"Y", name: "rkske", age: "40", amt: 5000, gender: "여"},
+            {jobYn:"N", name: "bbbb", age: "20",  amt: 2000, gender: "남"},
+            {jobYn:"Y", name: "ccccc", age: "30",  amt: 3000, gender: "남"},
+            {jobYn:"N", name: "dddd", age: "40",  amt: 4000, gender: "남"},
         ];
         myGrid.setData(sampleData);
+				authChk();
         debugger;
         // 그리드 내용을 클립보드에 복사하기 위한 이벤트 처리
 //         myGrid.$target.on("copy", function (e) {
@@ -227,18 +331,92 @@
 //             e.preventDefault();
 //         });
 
-		        
+var menu = new ax5.ui.menu({
+    theme: 'primary',
+    items: [
+        {type: 1, label: "붙여넣기"},
+        {divide: true},
+        {
+        		label : "작업선택",
+            items: [
+                {type: 1, label: "줄추가"},
+                {type: 1, label: "내용 삭제"},
+                {type: 2, label: "줄삭제"},
+            ]
+        },
+    ],
+});
+menu.onClick = function () {
+    console.log(this);
+    if (this.label == "붙여넣기") {
+        gridPaste(myGrid, thisGridRow, thisGridCol);
+    } else if (this.label == "줄추가") {
+    	  console.log('추가 인덱스 :', thisGridRow);
+        	//.addRow(추가할 내용, 삽인할위치(생략시 마지막),갯수)
+	        	myGrid.addRow({},thisGridRow+1);		                		
+
+    } else if (this.label == "내용 삭제") {
+    	  console.log('내용삭제 인덱스 :', thisGridRow);
+
+    	  myGrid.config.columns.forEach((column) => {
+    			  myGrid.setValue(thisGridRow, column.key, '');
+    			  console.log('내용삭제 :', thisGridRow, column.key);
+    			});
+
+    } else if (this.label == "줄삭제") {
+    	  console.log('삭제 인덱스 :', thisGridRow);
+    		myGrid.deleteRow(thisGridRow);
+    }
+
+				myGrid.setData(myGrid.list);
+};
+
+myGrid.$target.on("body.click", function () {
+    this.self.tooltip.close();
+  });
+  myGrid.$target.on("body.out", function () {
+    this.self.tooltip.close();
+  });
+  myGrid.$target.on("item.mouseenter", function () {
+    this.self.tooltip.open(this.dindex, this.column.key, this);
+  });
+
+
+$('#coCd_S').bind("contextmenu", function (e) {
+    menu.popup(e); // e || {left: 'Number', top: 'Number', direction: '', width: 'Number'}
+    ax5.util.stopEvent(e) ;
+    console.log(e);
+});		        
         // 그리드 내용 붙여넣기 이벤트 처리-->간헐적 실행으로 오작동~~~ 원인을 모르겠음 아래이벤트로 대체
         // Ctrl + V 단축키 이벤트 처리
 	myGrid.$target.on("paste", function (e) {
-		   gridPaste(thisGridRow,thisGridCol);
+		   gridPaste(myGrid, thisGridRow, thisGridCol);
 	});
+        
+        
+	var startX, startY, endX, endY;
 
+	myGrid.$target.on("mousedown",  function (e) {
+		startX = endX = parseInt($(this).attr("data-colindex"));
+		startY = endY = parseInt($(this).attr("data-rowindex"));
+		console.log("startX: ", startX, " startY : ", startY, " thisGridRow: ", thisGridRow, " thisGridCol: ", thisGridCol, " button: ", e.button, " buttons: ", e.buttons);
+	});
+// 	myGrid.$target.on('mousedown', function (e) {
+// // 		  if (e.targetType === 'cell' && e.inputEvent.buttons === 1) {
+// 		    console.log('Mouse Down Event Occured', Object.getOwnPropertyNames(myGrid.focusedColumn));
+// 		    // 원하는 코드 실행
+// // 		  }
+// 		});
+// 	myGrid.$target.on('mouseup', function (e) {
+// // 		  if (e.targetType === 'cell' && e.inputEvent.buttons === 1) {
+// 		    console.log('Mouse Up Event Occured', Object.getOwnPropertyNames(myGrid.focusedColumn));
+// 		    // 원하는 코드 실행
+// // 		  }
+// 		});
 // 	myGrid.$target.on('ax5grid-selected', function () {
 // 		  var selectedRows = myGrid.getSelectedData().length;
 // 		  console.log(selectedRows);
 // 		});
-// 	myGrid.onMouseDown(function(e) {    if (e.targetType === "cell") {        console.log("ssss : ", e.dindex);    }});
 	
         // Ctrl + V 단축키 이벤트 처리
 // 		document.addEventListener('keydown', function(event) {
@@ -253,7 +431,7 @@
 // // 		    }
 		
 // 		    // 붙여넣기된 값을 셀에 적용
-// 		    gridPaste(thisGridRow,thisGridCol)
+// 		    gridPaste(myGrid, thisGridRow,thisGridCol)
 		
 // 		    // 이벤트 기본 동작 차단
 // 		    event.preventDefault();
@@ -271,63 +449,100 @@
 //     return "";
 //   }
 // }        
+// Set up the drag event listener
      
-        
-function  gridPaste(thisGridRow,thisGridCol ) {
+function  gridPaste(thisGrid, thisGridRow, thisGridCol ) {
 	var pasteData = "";
 	
    
 	navigator.clipboard.readText().then(pasteData => {
         console.log('클립보드에 저장된 값:', pasteData);
-				if (pasteData==undefined ||pasteData=="" || thisGridRow===undefined) {
-					return;
-				}
+		if (pasteData==undefined ||pasteData=="" || thisGridRow===undefined) {
+			return;
+		}
 
-			  // 붙여넣기할 데이터를 배열로 변환한다.
-			  var pasteRows = pasteData.split("\n").map(function(row) {
-			    return row.split("\t");
-			  });
+		// 붙여넣기할 데이터를 배열로 변환한다.
+		var pasteRows = pasteData.split("\n").map(function(row) {
+			return row.split("\t");
+		});
+		
+		// 붙여넣기를 시작할 셀의 인덱스를 구한다.
+		var startRowIndex = thisGridRow;
+		var startColIndex = thisGridCol;
+		
+		// 붙여넣을 데이터의 행과 열 개수를 구한다.
+		var numRows = pasteRows.length;
+		var numCols = pasteRows[0].length;
+		
+		// 붙여넣을 데이터가 그리드의 범위를 벗어나면 에러 메시지를 출력한다.
+		//   if (startRowIndex + numRows > myGrid.getList().length || startColIndex + numCols > myGrid.config.columns.length) {
+		//     alert("The pasted data is out of the grid's range.");
+		//     return;
+		//   }
+		
+		// 붙여넣기할 셀을 한 개씩 돌면서 값을 설정한다.
+		for (var i = 0; i < numRows-1; i++) {
+			for (var j = 0; j < numCols; j++) {
+			  	//carriage return 문자 삭제
+			    var cellData = pasteRows[i][j].replace(new RegExp('\r', 'ig'), '');
 			
-			  // 붙여넣기를 시작할 셀의 인덱스를 구한다.
-			  var startRowIndex = thisGridRow;
-			  var startColIndex = thisGridCol;
-				
-			  // 붙여넣을 데이터의 행과 열 개수를 구한다.
-			  var numRows = pasteRows.length;
-			  var numCols = pasteRows[0].length;
-			
-			  // 붙여넣을 데이터가 그리드의 범위를 벗어나면 에러 메시지를 출력한다.
-			//   if (startRowIndex + numRows > myGrid.getList().length || startColIndex + numCols > myGrid.config.columns.length) {
-			//     alert("The pasted data is out of the grid's range.");
-			//     return;
-			//   }
-			
-			  // 붙여넣기할 셀을 한 개씩 돌면서 값을 설정한다.
-			  for (var i = 0; i < numRows-1; i++) {
-			    for (var j = 0; j < numCols; j++) {
-			    	//carriage return 문자 삭제
-			      var cellData = pasteRows[i][j].replace(new RegExp('\r', 'ig'), '');
-			
-			      calRow = startRowIndex + i;
-			      calCol = startColIndex + j;
-				        if (calRow >= myGrid.getList().length) {
-				        	myGrid.addRow($.extend({}, myGrid.list[thisGridRow], {__index: undefined}));
-				        }
-				        if (calCol >= myGrid.config.columns.length) {
-				        	myGrid.addColumn();
-				        }
-			      myGrid.setValue(calRow, myGrid.columns[calCol].key, cellData);
-			    }
-			    myGrid.setValue(calRow, 'check', 1);
-			  }
-			  myGrid.setData(myGrid.list);
+			    calRow = startRowIndex + i;
+				calCol = startColIndex + j;
+				if (calRow >= thisGrid.getList().length) {
+// 				       	for (var k = 0; k < 4; k++) {
+// 					  	    thisGrid.addRow({}, calRow+k+1);
+// 				  		}
+
+				        	thisGrid.addRow({}, calRow);
+		        }
+		        if (calCol >= thisGrid.config.columns.length) {
+		        	thisGrid.addColumn();
+		        }
+		        thisGrid.setValue(calRow, thisGrid.columns[calCol].key, cellData);
+		    }
+		    thisGrid.setValue(calRow, 'check', 1);
+		    thisGrid.setValue(calRow, '__selected__',  true);
+		}
+		thisGrid.setData(thisGrid.list);
   
 	});	  
 };        
         
+console.log("excellPaste.html first");
+mainDefaultLoad("영업관리", "수주 등록");
+// treeModule.initAll("deptTree","file-grid","FITR02", ""); 
+console.log("excellPaste.html done");
 
 
-    </script>
+// 사업부 추가 
+function addRow(){
+	var row = myGrid.getList("selected")[0];
+	var index = row.__index;
+	
+	console.log('추가 인덱스 :', index);
+   	sampleData[sampleData.length]={  
+   			"name":row.name,
+   			"age":row.age,
+   			"amt":row.amt,
+   			"gender":row.gender,
+   			"jobYn":row.jobYn,
+   			"check":''
+   	};
+   	myGrid.setData(sampleData);
+}
+
+function removeRow(){
+	var row = myGrid.getList("selected")[0];
+	var index = row.__index;
+	
+	console.log('삭제 인덱스 :', index);
+	sampleData.splice(index, 1);
+
+   	myGrid.setData(sampleData);
+
+}
+
+</script>
 </body>
 </html>
 
