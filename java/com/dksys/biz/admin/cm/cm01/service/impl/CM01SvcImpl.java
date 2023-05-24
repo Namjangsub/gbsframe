@@ -12,7 +12,7 @@ import com.dksys.biz.admin.cm.cm01.mapper.CM01Mapper;
 import com.dksys.biz.admin.cm.cm01.service.CM01Svc;
 import com.tmax.tibero.Debug;
 
-@Service 
+@Service
 @Transactional(rollbackFor = Exception.class)
 public class CM01SvcImpl implements CM01Svc {
 	

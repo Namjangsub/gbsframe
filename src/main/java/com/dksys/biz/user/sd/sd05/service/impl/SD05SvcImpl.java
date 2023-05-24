@@ -219,7 +219,7 @@ public class SD05SvcImpl implements SD05Svc {
 		paramMap.put("exprtnDt", DateUtil.dateToString(DateUtil.getNextDate(new Date()), "yyyyMMdd"));
 		paramMap.put("popupYn", "Y");
 		paramMap.put("useYn", "Y");
-		//cm09Svc.insertNoti(paramMap, mRequest);
+		cm09Svc.insertNoti(paramMap, mRequest);
 		return paramMap;
 	}
 

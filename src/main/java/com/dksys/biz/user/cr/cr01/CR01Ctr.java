@@ -29,22 +29,11 @@ public class CR01Ctr {
         model.addAttribute("maxEstNo", maxEstNo);
         return "jsonView";
     }
-
-	@PostMapping("/selectMaxEstDeg")
-	public String selectMaxEstDeg(@RequestBody Map<String, String> param, ModelMap model) {
-		String maxEstDeg = cr01svc.selectMaxEstDeg(param);
-		model.addAttribute("maxEstDeg", maxEstDeg);
-		return "jsonView";
-	}
-
-
-
     
     
     @PostMapping("/selectEstList")
     public String selectEstList(@RequestBody Map<String, String> param, ModelMap model) {
     	int totalCnt = cr01svc.selectEstCount(param);
-		System.out.println(totalCnt+"총로우");
     	PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
     	model.addAttribute("paginationInfo", paginationInfo);
     
@@ -52,22 +41,9 @@ public class CR01Ctr {
     	model.addAttribute("estList", estList);
         return "jsonView";
     }
-	@PostMapping("/selectEstListNotOrdrs")
-	public String selectEstListNotOrdrs(@RequestBody Map<String, String> param, ModelMap model) {
-		int totalCnt = cr01svc.selectEstCount(param);
-		PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
-		model.addAttribute("paginationInfo", paginationInfo);
-		List<Map<String, Object>> estList = cr01svc.selectEstListNotOrdrs(param);
-		model.addAttribute("estList", estList);
-		return "jsonView";
-	}
     
     @PostMapping(value = "/selectEstInfo")
     public String selectEstInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-			int totalCnt = cr01svc.selectEstDetailCount(paramMap);
-			PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-			model.addAttribute("paginationInfo", paginationInfo);
-			System.out.println(totalCnt+"총로우");
     	  	Map<String, Object> estInfo = cr01svc.selectEstInfo(paramMap);
     	    model.addAttribute("estInfo", estInfo);
     	return "jsonView";
@@ -91,10 +67,12 @@ public class CR01Ctr {
 	@PostMapping(value = "/insertEstDeg")
 	public String insertEstDeg(@RequestParam Map<String, String> paramMap , MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {
-			String newEst  = cr01svc.insertEstDeg(paramMap, mRequest);
+			System.out.println(paramMap+"여기0");
+			String newEstNo = cr01svc.insertEstDeg(paramMap, mRequest);
+
 			model.addAttribute("resultCode", 200);
 			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-			model.addAttribute("newEst", newEst );
+			model.addAttribute("newEstNo", newEstNo);
 		}catch(Exception e) {
 			model.addAttribute("resultCode", 500);
 			model.addAttribute("resultMessage", e.getLocalizedMessage());
@@ -108,7 +86,8 @@ public class CR01Ctr {
 	@PutMapping(value = "/updateEst")
 	public String updateEst(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {
-	    	model.addAttribute("resultCode", cr01svc.updateEst(paramMap, mRequest));
+			cr01svc.updateEst(paramMap, mRequest);
+	    	model.addAttribute("resultCode", 200);
 	    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 		}catch(Exception e) {
 			model.addAttribute("resultCode", 500);
@@ -119,10 +98,8 @@ public class CR01Ctr {
 	
 	@DeleteMapping(value = "/deleteEst")
     public String deleteEst(@RequestBody Map<String, String> paramMap, ModelMap model) {
-
-
-
-    	model.addAttribute("resultCode", cr01svc.deleteEst(paramMap));
+    	cr01svc.deleteEst(paramMap);
+    	model.addAttribute("resultCode", 200);
     	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
     	return "jsonView";
     }

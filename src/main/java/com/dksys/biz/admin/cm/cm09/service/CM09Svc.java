@@ -7,7 +7,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface CM09Svc {
 
-	public int insertNoti(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	public int insertNoti(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
 	public List<Map<String, String>> selectNotiList(Map<String, String> paramMap);
 
@@ -15,9 +15,9 @@ public interface CM09Svc {
 
 	public Map<String, Object> selectNotiInfo(Map<String, String> paramMap);
 
-	public int updateNoti(Map<String, String> paramMap, MultipartHttpServletRequest mRequest)  throws Exception ;
+	public int updateNoti(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
-	public int uploadFile(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	public int uploadFile(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
 	public List<String> selectNotiPopList();
 

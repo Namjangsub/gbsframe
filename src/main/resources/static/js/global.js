@@ -296,9 +296,7 @@ function postAjax(url, data, contentType, callback) {
 	});
 }
 
-
 function postAjaxSync(url, data, contentType, callback) {
-
 	console.log(`postAjaxSync url = ${url} `);
 	if(contentType == null) {
 		contentType = "application/json; charset=utf-8";
@@ -938,29 +936,3 @@ function resetSiteCd(){
 }
 
 
-
-// 함수 재귀호출을 이용한 저장가능한 자식노드가 없으면 트리 삭제 처리
-// jstree 자식노드중에 isLeaf인 1인 자식인 없는 트리 삭제처리
-// 파라메터 : 트리 인스턴스, nodeId, 최상위트리ID
-function searchAndDelete(jstreeInstance, nodeId, topNode) {
-	const node = jstreeInstance.get_node(nodeId)
-    var children = node.children;
-	if (!children) {
-		jstreeInstance.delete_node(nodeId);
-	} else {
-	    if (children.length == 0) {
-	    	if (node.original.isLeaf == 0) {
-	    		jstreeInstance.delete_node(node.id);
-	        	if (node.parent != topNode) {
-	        		searchAndDelete(jstreeInstance, node.parent, topNode);
-	    		}
-	    	}
-	    } else {
-			// 자식노드로 재검색
-			for (var i = children.length - 1; i >= 0; i--) {
-				var childId = children[i];
-				searchAndDelete(jstreeInstance, childId, topNode);
-			}
-	    }
-	}
-}	
