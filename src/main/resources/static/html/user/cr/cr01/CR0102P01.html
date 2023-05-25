@@ -55,7 +55,7 @@
 
                         <th class="hit" title="발행일자를 확인합니다">발행일자</th>
                         <td>
-                            <input type="text" class="input_calendar" autocomplete="off" id="issueDate" name="issueDate"
+                            <input type="text" class="input_calendar" autocomplete="off" id="pblsDt" name="pblsDt"
 
                                    date required>
                         </td>
@@ -74,7 +74,7 @@
                         <td>
                             <div class="search_form">
                                 <input onclick="" type="text" id="clntPjt" name="clntPjt"
-                                       value="고객사PJT">
+                                       value="">
                             </div>
                         </td>
                     </tr>
@@ -458,13 +458,21 @@
         if (validateRequiredFields() && inputValidation($('.popup_area [required]'))) {
             var formData = makeFormData();
 
+
+
             filePostAjax("/user/cr/cr01/insertEst", formData, function (data) {
                 modalStack.close();
 
                 if (data.resultCode==200) {
+                    alert(data.resultMessage);
                     var newEstData = data.newEst // 문자열을 JSON으로 변환합니다
+
+
+                    document.getElementById("coCd_S").value = document.getElementById("coCd").value
                     document.getElementById("estNo_S").value = data.param.newEst.estNo;
-                    document.getElementById("estDeg_S").value =data.param.newEst.estDeg;
+                    document.getElementById("estDeg_S").value = data.param.newEst.estDeg;
+                    document.getElementById("strtDt_S").value="0001-01-01";
+                    document.getElementById("endDt_S").value="9999-12-31";
                     gridView.setData(0);
                 }
             });
@@ -481,9 +489,11 @@
                     alert("수주가 등록된 견적은 업데이트할 수 없습니다.");
                 } else if (data.resultCode) {
                     alert(data.resultMessage);
-
+                    document.getElementById("coCd_S").value = document.getElementById("coCd").value
                     document.getElementById("estNo_S").value = data.param.updateEst.estNo;
                     document.getElementById("estDeg_S").value = data.param.updateEst.estDeg;
+                    document.getElementById("strtDt_S").value="0001-01-01";
+                    document.getElementById("endDt_S").value="9999-12-31";
                     gridView.setData(0);
                     modalStack.close();
                 }
@@ -808,7 +818,7 @@
             autoclose: true
         });
 
-        $('#issueDate').datepicker({
+        $('#pblsDt').datepicker({
             format: "yyyy-mm-dd",
             language: "ko",
             autoclose: true
@@ -816,7 +826,7 @@
 
         setCurrentDateToDatePicker('#estDt');
 
-        setCurrentDateToDatePicker('#issueDate');
+        setCurrentDateToDatePicker('#pblsDt');
 
         /*    var today = new Date();
             var dd = String(today.getDate()).padStart(2, '0');
@@ -950,6 +960,16 @@
                                 optionText: 'text'
                             },
                             options: options // 서버에서 가져온 데이터를 사용
+                        },
+                        event: {
+                            'blur': function () {
+                                // logic to select the next input field and focus it
+                            },
+                            'keydown': function (e) {
+                                if (e.keyCode == 9) { // tab key
+                                    // logic to select the next input field and focus it
+                                }
+                            }
                         }
                     }
                 },
@@ -1171,9 +1191,9 @@
 
         // 첫 번째 경우: 선택된 행이 있는 경우
         if (selectedRowKey !== undefined) {
-            row = grid.getList("selected")[0];
-            newRowData.estDtlDiv = row.estDtlDiv;
-            grid.addRow(newRowData, selectedRowKey);
+            let row = grid.getList("selected")[0];
+            let newRowData = $.extend({}, row, {__index: undefined});
+            grid.addRow(newRowData, row.__index + 1);
         }
         // 두 번째 경우: 그리드가 비어 있는 경우
         else if (grid.getList().length === 0) {
@@ -1234,21 +1254,14 @@
                 estUpr: "",
             },
             {
-                estDtlDiv: "운송비",
+                estDtlDiv: "기타경비",
                 estComm: "",
                 estSpec: "",
                 estUnit: "",
                 estQty: "",
                 estUpr: "",
             },
-            {
-                estDtlDiv: "포장비",
-                estComm: "",
-                estSpec: "",
-                estUnit: "",
-                estQty: "",
-                estUpr: "",
-            },
+
 
 
         ];
@@ -1267,6 +1280,8 @@
         var degUpBtn = document.getElementById("degUpBtn");
         var ordrsBtn = document.getElementById("ordrsBtn");
 
+
+
         if (actionType === "U") {
             degUpBtn.style.display = "inline-block";
             ordrsBtn.style.display = "inline-block";
@@ -1276,6 +1291,19 @@
             ordrsBtn.style.display = "none";
 
         }
+
+        $("#degUpBtn").click(function(){
+
+            if (actionType === "U") {
+                alert("수주가 등록된 경우, 차수를 올릴 수 없습니다.");
+            }
+        })
+        $("#ordrsBtn").click(function(){
+
+            if (actionType === "U") {
+                alert("수주가 등록된 경우, 추가로 수주를 등록할 수 없습니다.");
+            }
+        })
     }
 
     updateButtonVisibility(actionType);
@@ -1391,20 +1419,25 @@
             event.preventDefault();
             var estDegInput = document.getElementById("estDeg");
             var currentValue = parseInt(estDegInput.value, 10) || 0;
-
             var tempEstDtValue = $("#estDt").val();
             var tempIssueDateValue = $("#estDt").val();
             insertEstNew().then((response) => {
-                if (response) {
+                if (response && response.hasOwnProperty('estDeg') && !isNaN(parseInt(response.estDeg))) {
+                    alert(JSON.stringify(response));
                     alert("차수가 업데이트 되었습니다.");
+                    treeModule.initFileArrays();
+
                     $("#estDt").val(tempEstDtValue);
                     $("#issueDate").val(tempIssueDateValue);
-                    document.getElementById("estNo").value = response.estNo;
                     document.getElementById("estDeg").value = response.estDeg;
                     loadEstDegrees();
-                    document.getElementById("estNo_S").value = response.estNo;
+                    document.getElementById("coCd_S").value = document.getElementById("coCd").value
+                    document.getElementById("estNo_S").value = $("#estNo").val();
                     document.getElementById("estDeg_S").value = response.estDeg;
-
+                    document.getElementById("strtDt_S").value="0001-01-01";
+                    document.getElementById("endDt_S").value="9999-12-31";
+                    gridView.setData(0);
+                    modalStack.close();
 
 
                 } else {
@@ -1426,7 +1459,7 @@
                 filePostAjax("/user/cr/cr01/insertEstDeg", formData, function (data) {
                     if (data.resultCode == 200) {
 
-                        resolve({estNo: data.param.estNo, estDeg: data.param.estDeg}); //
+                        resolve({estDeg: data.param.newEst}); //
                         loadEstDegrees()
 
                     } else {
@@ -1450,7 +1483,7 @@
             "clntPjt": $("#estClntNm").val(),
             "mngId": $("#cstmMngNm").val(),
             "exrate": $("#cstmMngHp").val(),
-
+            "clntPjt": $("#clntPjt").val()
 
         };
         mask = new ax5.ui.mask();
