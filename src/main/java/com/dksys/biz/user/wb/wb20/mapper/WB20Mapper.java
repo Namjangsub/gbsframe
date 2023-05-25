@@ -13,4 +13,6 @@ public interface WB20Mapper {
 
 	List<Map<String, String>> selectToDoList(Map<String, String> paramMap);
 	
+	int toDoCfDtUpdate(Map<String, String> paramMap);
+	
 }

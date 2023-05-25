@@ -7,8 +7,8 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface WB02Svc {
 
-	
-	List<Map<String, String>> selectToDoList(Map<String, String> paramMap);
+	int selectWbsRsltsPlanListCount(Map<String, String> paramMap);
+	List<Map<String, String>> selectWbsRsltsPlanList(Map<String, String> paramMap);
 
 	
 }

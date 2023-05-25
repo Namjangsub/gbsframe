@@ -48,4 +48,12 @@ public class WB20Ctr {
 		  return "jsonView"; 
 	  }
 	 
+	  @PutMapping(value = "/toDoCfDtUpdate")
+      public String toDoCfDtUpdate(@RequestParam Map<String, String> paramMap, ModelMap model) {
+		wb20Svc.toDoCfDtUpdate(paramMap);
+    	model.addAttribute("resultCode", 200);
+    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+    	return "jsonView";
+     }
+	  
 }

@@ -72,4 +72,8 @@ public interface WB01Svc {
 	List<Map<String, String>> selectWbsPlanInfoSelect(Map<String, String> paramMap);
 	
 	int selectWbsPlanConfirmCount(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectFileCodeSelect(Map<String, String> paramMap);
+	
+	
 }

@@ -38,9 +38,9 @@ public class WB02SvcImpl implements WB02Svc {
     ExceptionThrower thrower;
     
     
-	@Override
-	public List<Map<String, String>> selectToDoList(Map<String, String> paramMap) {
-		return wb02Mapper.selectToDoList(paramMap);
+    @Override
+	public List<Map<String, String>> selectWbsRsltsPlanList(Map<String, String> paramMap) {
+		return wb02Mapper.selectWbsRsltsPlanList(paramMap);
 	}
 
 }

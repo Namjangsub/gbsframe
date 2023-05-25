@@ -315,4 +315,13 @@ public class WB01Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	  }
+	  
+	  //<!-- /* 파일트리 구분코드 조회 */ -->  
+	  @PostMapping(value = "/selectFileCodeSelect")
+	  public String selectFileCodeSelect(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    List<Map<String, String>> result = wb01Svc.selectFileCodeSelect(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	  }
+	  
 }

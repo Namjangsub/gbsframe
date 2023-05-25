@@ -35,15 +35,17 @@ public class WB02Ctr {
     @Autowired
     WB02Svc wb02Svc;
 
-    //<!-- WBS 일정계획 등록 메인 화면 조회 리스트  -->
-	  @PostMapping(value = "/selectToDoList") 
-	  public String selectToDoList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+  //<!-- WBS 일정계획 등록 메인 화면 조회 리스트  -->
+	  @PostMapping(value = "/selectWbsRsltsPlanList") 
+	  public String selectWbsRsltsPlanList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 
-		  List<Map<String, String>> resultList = wb02Svc.selectToDoList(paramMap);
-		  model.addAttribute("resultList", resultList); 
-		  return "jsonView";
-		 
+		  int totalCnt = wb02Svc.selectWbsRsltsPlanListCount(paramMap); 
+		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		  model.addAttribute("paginationInfo", paginationInfo);
 		  
+  		  List<Map<String, String>> resultList = wb02Svc.selectWbsRsltsPlanList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
 	  }
 	 
 }
