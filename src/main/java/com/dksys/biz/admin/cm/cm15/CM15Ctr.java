@@ -83,4 +83,12 @@ public class CM15Ctr {
 		}
     	return "jsonView";
     }
+
+    // 파일트리 사용자 권한 정보 리스트 조회
+    @PostMapping(value = "/selectTreeAuthUserList")
+    public String selectTreeAuthUserList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, String>> userList = cm15Svc.selectTreeAuthUserList(paramMap);
+    	model.addAttribute("userList", userList);
+        return "jsonView";
+    }
 }

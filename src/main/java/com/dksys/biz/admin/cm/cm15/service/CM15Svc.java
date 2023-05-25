@@ -16,5 +16,7 @@ public interface CM15Svc {
 	void selectFileAuthCheck(Map<String, String> paramMap) throws Exception;
 
 	int deleteFileAuthInfo(Map<String, Object> param);
+
+	List<Map<String, String>> selectTreeAuthUserList(Map<String, String> paramMap);
 	
 }
