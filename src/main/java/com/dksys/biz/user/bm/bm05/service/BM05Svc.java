@@ -10,7 +10,7 @@ public interface BM05Svc {
 
 	List<Map<String, String>> selectBmMstrList(Map<String, String> paramMap);
 
-	String insertBmMstr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+	int insertBmMstr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
 	int updateBmMstr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
