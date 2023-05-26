@@ -10,9 +10,9 @@ import org.apache.ibatis.annotations.Mapper;
 public interface CM08Mapper {
 
 	int insertFile(HashMap<String, String> param);
-	int insertTreeFile(HashMap<String, String> param);
-	int insertTreeFileWithDeg(HashMap<String, String> param);
-	String selectNextFileTrgtKey();
+//	int insertTreeFile(HashMap<String, String> param);
+//	int insertTreeFileWithDeg(HashMap<String, String> param);
+//	String selectNextFileTrgtKey();
 	List<Map<String, String>> selectFileList(Map<String, String> paramMap);
 
 	int selectTreeFileCount(Map<String, String> paramMap);
@@ -26,7 +26,7 @@ public interface CM08Mapper {
 
 	Map<String, String> selectFileInfo(String fileKey);
 
-	int deleteFileInfo(String fileKey);
+	int deleteFile(String fileKey);
 
 	int selectConfirmCount(Map<String, String> paramMap);
 	
