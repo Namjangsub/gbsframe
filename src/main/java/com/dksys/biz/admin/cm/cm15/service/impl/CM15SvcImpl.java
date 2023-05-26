@@ -101,4 +101,10 @@ public class CM15SvcImpl implements CM15Svc {
 		return result;
 	}
 	
+	
+    @Override
+    public List<Map<String, String>> selectTreeAuthUserList(Map<String, String> paramMap) {
+        return cm15Mapper.selectTreeAuthUserList(paramMap);
+    }
+
 }

@@ -78,7 +78,7 @@ public class CR01Svcmpl implements CR01Svc {
             paramMap.put("estNo", maxEstNo);
 
             // issueDate가 'yyyyMMdd' 형식으로 들어온다고 가정합니다
-            String issueDateStringOriginal = paramMap.get("issueDate");
+            String issueDateStringOriginal = paramMap.get("pblsDt");
             DateTimeFormatter incomingFormat = DateTimeFormatter.ofPattern("yyyyMMdd");
 
             // incomingFormat을 사용하여 issueDate를 파싱합니다
@@ -126,7 +126,7 @@ public class CR01Svcmpl implements CR01Svc {
             newEst.put("estDeg", paramMap.get("estDeg"));
             responseMap.put("newEst", newEst);
         } catch (Exception e) {
-            System.out.println(e.getMessage() + "에러명");
+            System.out.println( e+ "에러명");
         }
 
         return responseMap;
@@ -145,7 +145,7 @@ public class CR01Svcmpl implements CR01Svc {
             int newEstDeg = (maxEstDeg != null ? Integer.parseInt(maxEstDeg) : 0) + 1;
             paramMap.put("estDeg", String.valueOf(newEstDeg));
             // issueDate가 'yyyyMMdd' 형식으로 들어온다고 가정합니다
-            String issueDateStringOriginal = paramMap.get("issueDate");
+            String issueDateStringOriginal = paramMap.get("pblsDt");
             DateTimeFormatter incomingFormat = DateTimeFormatter.ofPattern("yyyyMMdd");
 
             // incomingFormat을 사용하여 issueDate를 파싱합니다
@@ -184,7 +184,7 @@ public class CR01Svcmpl implements CR01Svc {
             newEst.put("estNo", paramMap.get("estNo"));
             newEst.put("estDeg", String.valueOf(newEstDeg));
             responseMap.put("newEst", paramMap.get("estDeg"));
-            System.out.println(paramMap.get("estDeg")+"최종");
+            System.out.println(paramMap.get("estDeg")+"최종+"+paramMap.get("estNo"));
 
         } catch (Exception e) {
 
@@ -219,7 +219,7 @@ public class CR01Svcmpl implements CR01Svc {
             Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {
             }.getType();
             // issueDate가 'yyyyMMdd' 형식으로 들어온다고 가정합니다
-            String issueDateStringOriginal = paramMap.get("issueDate");
+            String issueDateStringOriginal = paramMap.get("pblsDt");
             DateTimeFormatter incomingFormat = DateTimeFormatter.ofPattern("yyyyMMdd");
 
             // incomingFormat을 사용하여 issueDate를 파싱합니다

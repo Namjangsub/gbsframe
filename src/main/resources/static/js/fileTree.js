@@ -35,21 +35,15 @@ var treeModule = (function () {
 
                     {key: "fileTrgtKey", label: "파일타겟키", hidden: true},
                     {key: "fileKey", label: "파일키", hidden: true},
-                    {key: "fileName", label: "파일명", width: 260, align: "left"},
+                    {key: "fileName", label: "파일명", width: 460, align: "center"},
                     {key: "fileType", label: "파일타입", width: 60, align: "center"},
-                    {key: "fileSize", label: "파일크기", width: 100, align: "right", formatter: "money"},
-                    {key: "creatDttm", label: "생성일자", width: 130, align: "center",},
-                    {key: "creatId", label: "생성자", width: 100, align: "center"},
-                    {key: "clntCd", label: "거래처", width: 50, align: "center", hidden: true},
-                    {key: "clntNm", label: "거래처명", width: 110, align: "center"},
-                    {key: "prdtCd", label: "제품코드", width: 50, align: "center", hidden: true},
-                    {key: "prdtNm", label: "제품명", width: 100, align: "center"},
-                    {key: "itemCd", label: "아이템", width: 50, align: "center"},
-                    {key: "salesCd", label: "Sales코드", width: 110, align: "center"},
+                    {key: "creatDttm", label: "생성일자", width: 230, align: "center",},
+                    {key: "creatId", label: "생성자", width: 180, align: "center"},
+
                     // {key: "prjctCd", label: "프로젝트", width: 50, align: "center", hidden: true},
                     // {key: "prjctNm", label: "프로젝트명", width: 110, align: "center"},
                     {
-                        key: "fileDelete", label: "삭제", width: 80, align: "center",
+                        key: "fileDelete", label: "삭제", width: 110, align: "center",
                         formatter: function () {
                             return '<button style="height: 18px; padding:0px;" type="button" data-delete-row="'
                                 + this.dindex
@@ -149,18 +143,29 @@ var treeModule = (function () {
                 //     downloadAllFilesInGrid();
                 // });
 
+                var deleteButtons = document.querySelectorAll('button[data-delete-row]'); // Replace with your delete button selector
 
                 // Check if the selected node is a leaf node
                 if ($('#' + selector).jstree(true).is_leaf(data.node)) {
                     buttonFile.disabled = false; // 활성화
                     buttonFile.style.backgroundColor = ""; // 기본 배경색으로 변경 (옵션)
+
+
+
                 } else {
                     buttonFile.disabled = true; // 비활성화
                     buttonFile.style.backgroundColor = "gray"; // 회색 배경색으로 변경 (옵션)
+
+
                 }
 
 
                 $("#file_tit").html($('#' + selector).jstree('get_selected', true)[0].text);
+
+
+
+
+
 
                 // 합쳐진 코드 부분 끝
             })
@@ -301,6 +306,12 @@ var treeModule = (function () {
         return fileArr; // fileArr를 반환하는 함수
     }
 
+    function getFileArrOri() {
+
+        return fileArrOri; // fileArr를 반환하는 함수
+    }
+
+
     function getDeleteFileArr() {
         return deleteFileArr; // fileArr를 반환하는 함수
     }
@@ -366,8 +377,8 @@ var treeModule = (function () {
     }
     function initFileArrays() {
         fileArr = [];
-        fileArrOri = [];
         uploadedFiles = {};
+        fileArrOri = [];
         deleteFileArr = [];
 
     }
@@ -381,6 +392,7 @@ var treeModule = (function () {
         initAll: initAll,
         addFileToTree: addFileToTree,
         getFileArr:getFileArr,
+        getFileArrOri:getFileArrOri,
         getDeleteFileArr:getDeleteFileArr,
         deleteFile:deleteFile,
         downloadFile:downloadFile,

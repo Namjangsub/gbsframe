@@ -19,4 +19,6 @@ public interface CM15Mapper {
 	int selectFileAuthCheck(String fileKey);
 
 	int deleteFileAuthInfo(Map<String, String> detailMap);
+
+	List<Map<String, String>> selectTreeAuthUserList(Map<String, String> paramMap);
 }
