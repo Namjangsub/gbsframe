@@ -66,8 +66,12 @@ public class CM09SvcImpl implements CM09Svc {
 	public Map<String, Object> selectNotiInfo(Map<String, String> paramMap) {
 		Map<String, Object> returnMap = new HashMap<String, Object>();
 		Map<String, String> fileMap = new HashMap<String, String>();
+		fileMap.putAll(paramMap);
+		//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
+		fileMap.put("comonCd", "FITR9901");
 		fileMap.put("fileTrgtType", "TB_CM09M01");
 		fileMap.put("fileTrgtKey", paramMap.get("notiKey"));
+		fileMap.put("jobType", "fileList");
 		returnMap.put("fileList", cm08Svc.selectFileList(fileMap));
 		returnMap.put("notiInfo", cm09Mapper.selectNotiInfo(paramMap));
 		return returnMap; 
