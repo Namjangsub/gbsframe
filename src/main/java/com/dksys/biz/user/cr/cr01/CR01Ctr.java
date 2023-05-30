@@ -115,11 +115,20 @@ public class CR01Ctr {
 	@DeleteMapping(value = "/deleteEst")
     public String deleteEst(@RequestBody Map<String, String> paramMap, ModelMap model) {
 
-
-
-    	model.addAttribute("resultCode", cr01svc.deleteEst(paramMap));
-    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-    	return "jsonView";
+		try {
+			int result = cr01svc.deleteEst(paramMap);
+			if (result == 0) {
+				model.addAttribute("resultCode", result);
+				model.addAttribute("resultMessage", "수주가 등록된 견적은 삭제가 되지않습니다.");
+			} else {
+				model.addAttribute("resultCode", result);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			}
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		}
+		return "jsonView"; // return your view name here
     }
     
 }
