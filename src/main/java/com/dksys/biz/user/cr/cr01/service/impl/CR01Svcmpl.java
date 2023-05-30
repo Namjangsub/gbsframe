@@ -124,7 +124,7 @@ public class CR01Svcmpl implements CR01Svc {
 
                 cr01Mapper.insertEstDetail(detailMap);
             }
-            cm08Svc.uploadTreeFile("TB_CR01M01",paramMap, mRequest);
+           // cm08Svc.uploadTreeFile("TB_CR01M01",paramMap, mRequest);
             responseMap.put("resultCode", true); // 결과 코드를 성공으로 설정합니다.
             Map<String, String> newEst = new HashMap<>();
             newEst.put("estNo", maxEstNo);
@@ -185,7 +185,7 @@ public class CR01Svcmpl implements CR01Svc {
                 detailMap.put("pgmId", paramMap.get("pgmId"));
                 cr01Mapper.insertEstDetail(detailMap);
             }
-            cm08Svc.copyTreeFile("TB_CR01M01", paramMap, mRequest);
+          //  cm08Svc.copyTreeFile("TB_CR01M01", paramMap, mRequest);
 
             responseMap.put("resultCode", true); // 결과 코드를 성공으로 설정합니다.
             Map<String, String> newEst = new HashMap<>();
@@ -322,6 +322,8 @@ public class CR01Svcmpl implements CR01Svc {
             for (String fileKey : deleteFileList) {
 
                 cm08Svc.deleteFile(fileKey);
+
+
             }
             paramMap.get("fileTrgtKey");
             responseMap.put("resultCode",200);
@@ -330,7 +332,12 @@ public class CR01Svcmpl implements CR01Svc {
             newEst.put("estDeg", paramMap.get("estDeg"));
             responseMap.put("updateEst", newEst);
 
-            cm08Svc.uploadTreeFile("TB_CR01M01", paramMap,mRequest);
+
+
+
+            //cm08Svc.uploadTreeFile("TB_CR01M01", paramMap,mRequest);
+
+
 
             return responseMap;
         }
