@@ -1,32 +1,31 @@
-package com.dksys.biz.user.cr.cr01.service.impl;
-
-import com.dksys.biz.admin.cm.cm08.mapper.CM08Mapper;
-import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
-import com.dksys.biz.user.cr.cr01.mapper.CR01Mapper;
-import com.dksys.biz.user.cr.cr01.service.CR01Svc;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
+package com.dksys.biz.user.cr.cr03.service.impl;
 
 import java.lang.reflect.Type;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
+import com.dksys.biz.admin.cm.cm08.mapper.CM08Mapper;
+import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.user.cr.cr03.mapper.CR03Mapper;
+import com.dksys.biz.user.cr.cr03.service.CR03Svc;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
-public class CR01Svcmpl implements CR01Svc {
-    private static final Logger logger = LoggerFactory.getLogger(CR01Svcmpl.class);
-
+public class CR03Svcmpl  implements CR03Svc {
     @Autowired
-    CR01Mapper cr01Mapper;
+    CR03Mapper cr03Mapper;
     @Autowired
     CM08Mapper cm08Mapper;
 
@@ -36,34 +35,34 @@ public class CR01Svcmpl implements CR01Svc {
     @Override
     public String selectMaxEstNo(Map<String, String> paramMap) {
 
-        return cr01Mapper.selectMaxEstNo(paramMap);
+        return cr03Mapper.selectMaxEstNo(paramMap);
     }
     @Override
     public String selectMaxEstDeg(Map<String, String> paramMap) {
 
-        return cr01Mapper.selectMaxEstDeg(paramMap);
+        return cr03Mapper.selectMaxEstDeg(paramMap);
     }
 
     @Override
     public int selectEstCount(Map<String, String> param) {
-        return cr01Mapper.selectEstCount(param);
+        return cr03Mapper.selectEstCount(param);
     }
     public int selectEstDetailCount(Map<String, String> param) {
-        return cr01Mapper.selectEstDetailCount(param);}
+        return cr03Mapper.selectEstDetailCount(param);}
     @Override
     public List<Map<String, Object>> selectEstList(Map<String, String> param) {
 
-        return cr01Mapper.selectEstList(param);
+        return cr03Mapper.selectEstList(param);
     }
     @Override
     public List<Map<String, Object>> selectEstListNotOrdrs(Map<String, String> param) {
 
-        return cr01Mapper.selectEstListNotOrdrs(param);
+        return cr03Mapper.selectEstListNotOrdrs(param);
     }
     @Override
     public Map<String, Object> selectEstInfo(Map<String, String> paramMap) {
 
-        Map<String, Object> estInfo = cr01Mapper.selectEstInfo(paramMap);
+        Map<String, Object> estInfo = cr03Mapper.selectEstInfo(paramMap);
 
         return estInfo;
 
@@ -103,18 +102,17 @@ public class CR01Svcmpl implements CR01Svc {
             paramMap.put("estsDt", issueDateString);
             paramMap.put("esteDt", expiryDateString);
             // 데이터베이스 작업을 계속합니다
-            System.out.println(paramMap.get("userId")+"리턴전값");
-            paramMap.put("creatId",paramMap.get("userId"));
-            paramMap.put("creatPgm","TB_CR01M01");
-            cr01Mapper.insertEst(paramMap);
+            System.out.println(paramMap.get("fileTrgtKey")+"리턴전값");
+
+            cr03Mapper.insertEst(paramMap);
 
             System.out.println(paramMap.get("fileTrgtKey")+"여기 리턴값");
 
 
-            List<Map<String, Object>> detailArr = gson.fromJson(removeEmptyObjects(paramMap.get("detailArr")), mapList);
+            List<Map<String, String>> detailArr = gson.fromJson(removeEmptyObjects(paramMap.get("detailArr")), mapList);
 
 
-            for (Map<String, Object> detailMap : detailArr) {
+            for (Map<String, String> detailMap : detailArr) {
                 System.out.println("여기실행");
                 detailMap.put("coCd", paramMap.get("coCd"));
                 detailMap.put("estNo", maxEstNo);
@@ -122,9 +120,9 @@ public class CR01Svcmpl implements CR01Svc {
                 detailMap.put("userId", paramMap.get("userId"));
                 detailMap.put("pgmId", paramMap.get("pgmId"));
 
-                cr01Mapper.insertEstDetail(detailMap);
+                cr03Mapper.insertEstDetail(detailMap);
             }
-           // cm08Svc.uploadTreeFile("TB_CR01M01",paramMap, mRequest);
+            cm08Svc.uploadTreeFile("TB_CR01M01",paramMap, mRequest);
             responseMap.put("resultCode", true); // 결과 코드를 성공으로 설정합니다.
             Map<String, String> newEst = new HashMap<>();
             newEst.put("estNo", maxEstNo);
@@ -146,7 +144,7 @@ public class CR01Svcmpl implements CR01Svc {
         }.getType();
         Map<String, Object> responseMap = new HashMap<>();
         try {
-            String maxEstDeg = cr01Mapper.selectMaxEstDeg(paramMap);
+            String maxEstDeg = cr03Mapper.selectMaxEstDeg(paramMap);
             int newEstDeg = (maxEstDeg != null ? Integer.parseInt(maxEstDeg) : 0) + 1;
             paramMap.put("estDeg", String.valueOf(newEstDeg));
             // issueDate가 'yyyyMMdd' 형식으로 들어온다고 가정합니다
@@ -166,26 +164,23 @@ public class CR01Svcmpl implements CR01Svc {
             // java.sql.Date를 문자열로 변환합니다
             String issueDateString = sqlIssueDate.toString();
             String expiryDateString = sqlExpiryDate.toString();
-            System.out.println(paramMap.get("userId")+"리턴전값");
+
             // 정확한 형식의 날짜를 paramMap에 넣습니다
             paramMap.put("estsDt", issueDateString);
             paramMap.put("esteDt", expiryDateString);
-            paramMap.put("creatId",paramMap.get("userId"));
-            paramMap.put("creatPgm","TB_CR01M01");
-
-            cr01Mapper.insertEst(paramMap);
-            List<Map<String, Object>> detailArr = gson.fromJson(removeEmptyObjects(paramMap.get("detailArr")), mapList);
+            cr03Mapper.insertEst(paramMap);
+            List<Map<String, String>> detailArr = gson.fromJson(removeEmptyObjects(paramMap.get("detailArr")), mapList);
 
 
-            for (Map<String, Object> detailMap : detailArr) {
+            for (Map<String, String> detailMap : detailArr) {
                 detailMap.put("coCd", paramMap.get("coCd"));
                 detailMap.put("estNo", paramMap.get("estNo"));
                 detailMap.put("estDeg", paramMap.get("estDeg"));
                 detailMap.put("userId", paramMap.get("userId"));
                 detailMap.put("pgmId", paramMap.get("pgmId"));
-                cr01Mapper.insertEstDetail(detailMap);
+                cr03Mapper.insertEstDetail(detailMap);
             }
-          //  cm08Svc.copyTreeFile("TB_CR01M01", paramMap, mRequest);
+            cm08Svc.copyTreeFile("TB_CR01M01", paramMap, mRequest);
 
             responseMap.put("resultCode", true); // 결과 코드를 성공으로 설정합니다.
             Map<String, String> newEst = new HashMap<>();
@@ -212,7 +207,7 @@ public class CR01Svcmpl implements CR01Svc {
     @Override
     public Map<String, Object> updateEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
 
-        Map<String, Object> estData = cr01Mapper.selectEstInfo(paramMap);
+        Map<String, Object> estData = cr03Mapper.selectEstInfo(paramMap);
         System.out.println("yn값"+estData.get("ordrsYn"));
         Map<String, Object> responseMap = new HashMap<>();
         if ("Y".equals(estData.get("ordrsYn"))) {
@@ -248,13 +243,10 @@ public class CR01Svcmpl implements CR01Svc {
             paramMap.put("estsDt", issueDateString);
             paramMap.put("esteDt", expiryDateString);
             System.out.println(paramMap);
-
-            paramMap.put("udtId",paramMap.get("userId"));
-            paramMap.put("udtPgm","TB_CR01M01");
-            int result = cr01Mapper.updateEst(paramMap);
+            int result = cr03Mapper.updateEst(paramMap);
 
             // 데이터베이스에서 현재 견적 상세 목록 가져오기
-            List<Map<String, Object>> dbDetailListRaw = cr01Mapper.selectEstDetail(paramMap);
+            List<Map<String, Object>> dbDetailListRaw = cr03Mapper.selectEstDetail(paramMap);
 
             // 데이터베이스 목록의 Object를 String으로 변환
             List<Map<String, String>> dbDetailList = dbDetailListRaw.stream()
@@ -263,24 +255,24 @@ public class CR01Svcmpl implements CR01Svc {
                     .collect(Collectors.toList());
 
             // 클라이언트에서 전달된 견적 상세 목록
-            List<Map<String, Object>> detailList = gson.fromJson(paramMap.get("detailArr"), mapList);
+            List<Map<String, String>> detailList = gson.fromJson(paramMap.get("detailArr"), mapList);
 
             // 삭제된 견적 상세 처리
             for (Map<String, String> dbDetail : dbDetailList) {
                 boolean found = false;
-                for (Map<String, Object> estDetail : detailList) {
+                for (Map<String, String> estDetail : detailList) {
                     if (dbDetail.get("estSeq").equals(estDetail.get("estSeq"))) {
                         found = true;
                         break;
                     }
                 }
                 if (!found) {
-                    cr01Mapper.deleteEstDetail(dbDetail);
+                    cr03Mapper.deleteEstDetail(dbDetail);
                 }
             }
 
             // 견적 상세 목록 처리
-            for (Map<String, Object> estDetail : detailList) {
+            for (Map<String, String> estDetail : detailList) {
                 boolean found = false;
                 for (Map<String, String> dbDetail : dbDetailList) {
                     // 조건을 검사할 때 detailList 대신 dbDetailList를 사용해야 합니다.
@@ -290,20 +282,15 @@ public class CR01Svcmpl implements CR01Svc {
                     }
                 }
                 if (found) {
-
                     // 견적 상세 업데이트
                     estDetail.put("coCd", paramMap.get("coCd"));
                     estDetail.put("estNo", paramMap.get("estNo"));
-                    estDetail.put("estDeg", paramMap.get("estDeg"));
-
                     estDetail.put("userId", paramMap.get("userId"));
                     estDetail.put("pgmId", paramMap.get("pgmId"));
-                    estDetail.put("udtId", paramMap.get("userId"));
-                    estDetail.put("udtPgm", "TB_CR01M01");
+                    estDetail.put("estDeg", paramMap.get("estDeg"));
 
-                    System.out.println("23232"+ estDetail.toString());
                     // 업데이트 쿼리를 실행해야 합니다.
-                    cr01Mapper.updateEstDetail(estDetail);
+                    cr03Mapper.updateEstDetail(estDetail);
                 } else {
                     // 견적 상세 삽입
                     estDetail.put("coCd", paramMap.get("coCd"));
@@ -312,7 +299,7 @@ public class CR01Svcmpl implements CR01Svc {
                     estDetail.put("pgmId", paramMap.get("pgmId"));
                     estDetail.put("estDeg", paramMap.get("estDeg"));
 
-                    cr01Mapper.insertEstDetail(estDetail);
+                    cr03Mapper.insertEstDetail(estDetail);
                 }
             }
             System.out.println("여기까지2" + paramMap.get("deleteFileArr"));
@@ -322,8 +309,6 @@ public class CR01Svcmpl implements CR01Svc {
             for (String fileKey : deleteFileList) {
 
                 cm08Svc.deleteFile(fileKey);
-
-
             }
             paramMap.get("fileTrgtKey");
             responseMap.put("resultCode",200);
@@ -332,12 +317,7 @@ public class CR01Svcmpl implements CR01Svc {
             newEst.put("estDeg", paramMap.get("estDeg"));
             responseMap.put("updateEst", newEst);
 
-
-
-
-            //cm08Svc.uploadTreeFile("TB_CR01M01", paramMap,mRequest);
-
-
+            cm08Svc.uploadTreeFile("TB_CR01M01", paramMap,mRequest);
 
             return responseMap;
         }
@@ -346,21 +326,22 @@ public class CR01Svcmpl implements CR01Svc {
 
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
         Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-        int result = cr01Mapper.updateEstConfirm(paramMap);
+        int result = cr03Mapper.updateEstConfirm(paramMap);
 
         return result;
     }
 
     @Override
     public int deleteEst(Map<String, String> paramMap) {
-        Map<String, Object> estData = cr01Mapper.selectEstInfo(paramMap);
+        Map<String, Object> estData = cr03Mapper.selectEstInfo(paramMap);
+        System.out.println("yn값"+estData.get("ordrsYn"));
         if ("Y".equals(estData.get("ordrsYn"))) {
             return 0;
         }
         else {
-           cr01Mapper.deleteEst(paramMap);
-           cr01Mapper.deleteAllEstDetails(paramMap);
-            return 200;
+            int result = cr03Mapper.deleteEst(paramMap);
+            result += cr03Mapper.deleteAllEstDetails(paramMap);
+            return result;
         }
     }
 }

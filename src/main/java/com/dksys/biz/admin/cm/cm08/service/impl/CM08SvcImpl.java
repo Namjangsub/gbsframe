@@ -95,7 +95,7 @@ public class CM08SvcImpl implements CM08Svc {
     	List<MultipartFile> fileList = mRequest.getFiles("files");
     	String year = DateUtil.getCurrentYyyy();
     	String month = DateUtil.getCurrentMm();
-    	String path = "C:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
+    	String path = "D:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
     	for (MultipartFile mf : fileList) {
     		String originFileName = mf.getOriginalFilename(); // 원본 파일 명
     		// long fileSize = mf.getSize(); // 파일 사이즈
@@ -177,7 +177,7 @@ public class CM08SvcImpl implements CM08Svc {
                 String userId = mRequest.getParameter("userId");
                 param.put("creatId", userId);
                 param.put("creatPgm", fileTrgtTyp);
-                cm08Mapper.insertTreeFile(param);
+                cm08Mapper.insertFile(param);
                 String saveFile = param.get("fileKey") + "_" + originFileName;
                 File f = new File(path);
                 if (!f.isDirectory()) f.mkdirs();
@@ -233,7 +233,7 @@ public class CM08SvcImpl implements CM08Svc {
             String userId = mRequest.getParameter("userId");
             param.put("creatId", userId);
             param.put("creatPgm", fileTrgtTyp);
-            cm08Mapper.insertTreeFileWithDeg(param);
+            cm08Mapper.insertFile(param);
             String nowFileKey = param.get("fileKey");
 
             File sourceFile = new File(filePath +filePKey+"_"+fileName);
@@ -334,7 +334,7 @@ public class CM08SvcImpl implements CM08Svc {
     public int deleteFile(String fileKey) {
         Map<String, String> fileInfo = selectFileInfo(fileKey);
         String filePath = fileInfo.get("filePath") + fileKey + "_" + fileInfo.get("fileName");
-        int result = cm08Mapper.deleteFileInfo(fileKey);
+        int result = cm08Mapper.deleteFile(fileKey);
         try {
             File f = new File(filePath);
             f.delete();
@@ -400,7 +400,7 @@ public class CM08SvcImpl implements CM08Svc {
 		String fileKey = paramMap.get("fileKey");
         Map<String, String> fileInfo = selectFileInfo(fileKey);
         String filePath = fileInfo.get("filePath") + fileKey + "_" + fileInfo.get("fileName");
-        int result = cm08Mapper.deleteFileInfo(fileKey);
+        int result = cm08Mapper.deleteFile(fileKey);
         try {
             File f = new File(filePath);
             f.delete();

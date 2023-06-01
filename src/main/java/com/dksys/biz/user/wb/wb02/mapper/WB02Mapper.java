@@ -9,6 +9,6 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 @Mapper
 public interface WB02Mapper {
 
-	List<Map<String, String>> selectToDoList(Map<String, String> paramMap);
+	List<Map<String, String>> selectWbsRsltsPlanList(Map<String, String> paramMap);
 
 }

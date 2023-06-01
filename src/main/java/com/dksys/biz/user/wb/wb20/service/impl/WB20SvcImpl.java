@@ -48,6 +48,9 @@ public class WB20SvcImpl implements WB20Svc {
 		return wb20Mapper.selectToDoList(paramMap);
 	}
 	
-	
+	public int toDoCfDtUpdate(Map<String, String> paramMap) {
+		int result = wb20Mapper.toDoCfDtUpdate(paramMap);
+		return result;
+	}
 
 }

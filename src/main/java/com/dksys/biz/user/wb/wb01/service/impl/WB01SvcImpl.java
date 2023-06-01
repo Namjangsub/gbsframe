@@ -166,7 +166,7 @@ public class WB01SvcImpl implements WB01Svc {
 		}
 		for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
 			try {
-				cm08Svc.uploadTreeFile("TB_WB01P01", paramMap.get("fileTrgtKey"), mRequest);
+				cm08Svc.uploadTreeFile("TB_WB01M01", paramMap, mRequest);
 			}
 			catch(Exception e){
 				System.out.println("error4"+e.getMessage());
@@ -187,7 +187,7 @@ public class WB01SvcImpl implements WB01Svc {
 		}
 		for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
 			try {
-				cm08Svc.uploadTreeFile("TB_WB01P01", paramMap.get("fileTrgtKey"), mRequest);
+				cm08Svc.uploadTreeFile("TB_WB01M01", paramMap, mRequest);
 			}
 			catch(Exception e){
 				System.out.println("error4"+e.getMessage());
@@ -211,7 +211,7 @@ public class WB01SvcImpl implements WB01Svc {
 		}
 		for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
 			try {
-				cm08Svc.uploadTreeFile("TB_WB01P01", paramMap.get("fileTrgtKey"), mRequest);
+				cm08Svc.uploadTreeFile("TB_WB01M01", paramMap, mRequest);
 			}
 			catch(Exception e){
 				System.out.println("error4"+e.getMessage());
@@ -230,7 +230,7 @@ public class WB01SvcImpl implements WB01Svc {
 		}
 		for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
 			try {
-				cm08Svc.uploadTreeFile("TB_WB01P01", paramMap.get("fileTrgtKey"), mRequest);
+				cm08Svc.uploadTreeFile("TB_WB01M01", paramMap, mRequest);
 			}
 			catch(Exception e){
 				System.out.println("error4"+e.getMessage());
@@ -250,7 +250,7 @@ public class WB01SvcImpl implements WB01Svc {
 		}
 		for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
 			try {
-				cm08Svc.uploadTreeFile("TB_WB01P01", paramMap.get("fileTrgtKey"), mRequest);
+				cm08Svc.uploadTreeFile("TB_WB01M01", paramMap, mRequest);
 			}
 			catch(Exception e){
 				System.out.println("error4"+e.getMessage());
@@ -271,7 +271,7 @@ public class WB01SvcImpl implements WB01Svc {
 		}
 		for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
 			try {
-				cm08Svc.uploadTreeFile("TB_WB01P01", paramMap.get("fileTrgtKey"), mRequest);
+				cm08Svc.uploadTreeFile("TB_WB01M01", paramMap, mRequest);
 			}
 			catch(Exception e){
 				System.out.println("error4"+e.getMessage());
@@ -301,4 +301,11 @@ public class WB01SvcImpl implements WB01Svc {
 	public int selectWbsPlanConfirmCount(Map<String, String> paramMap) {
 		return wb01Mapper.selectWbsPlanConfirmCount(paramMap);
 	}
+	
+	@Override
+	public List<Map<String, String>> selectFileCodeSelect(Map<String, String> paramMap) {
+		return wb01Mapper.selectFileCodeSelect(paramMap);
+	}
+	
+	
 }

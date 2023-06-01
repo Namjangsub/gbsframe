@@ -73,4 +73,7 @@ public interface WB01Mapper {
 	
 	int selectWbsPlanConfirmCount(Map<String, String> paramMap);
 	
+	List<Map<String, String>> selectFileCodeSelect(Map<String, String> paramMap);
+	
+	
 }

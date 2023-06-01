@@ -32,7 +32,7 @@
 				</tr>
 				<tr>
 					<th>
-						<button type="button" class="btn btn-primary btn-sm" style="height: 25px; line-height: 15px;" onclick="notiFile.click();">첨부파일</button>
+						<button type="button" id="buttonFile" class="btn btn-primary btn-sm" style="height: 25px; line-height: 15px;" onclick="notiFile.click();">첨부파일</button>
 					</th>
 					<td>
 						<div data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 150px; width: 100%"></div>
@@ -114,9 +114,14 @@
 						{key: "fileName", label: "파일명", width: 240},
 						{key: "fileType", label: "파일타입", width: 80, align: "center"},
 						{key: "fileSize", label: "파일크기", width: 80,  align: "right", formatter: "money"},
-						{key:"fileDelete", label: "삭제", width:50,
-							formatter:function() {return '<button type="button" onclick="deleteFile('+this.dindex+');">삭제</button>';}
-						}
+						{key: "fileDelBtn", label: "삭제", width:50,
+							formatter:function() {return (this.item.fileDelete == "Y") ? '<button type="button" onclick="deleteFile('+this.dindex+')">삭제</button>' : '불가'}
+						},
+						{key : "fileList",  label : "list",	 width : 60, align: "center", hidden: true},
+						{key : "fileUp",  label : "up",	 width : 60, align: "center", hidden: true},
+						{key : "fileDown",  label : "down",	 width : 60, align: "center", hidden: true},
+						{key : "fileUpdate",  label : "update",	 width : 60, align: "center", hidden: true},
+						{key : "fileDelete",  label : "delete",	 width : 60, align: "center", hidden: true},
 				]
 			});
 		},
@@ -189,11 +194,27 @@
 	
 	function selectNotiInfo(){
 		var row = gridView.target.getList("selected")[0];
-		var paramObj = {"notiKey": row.notiKey};
+		var paramObj = {
+				"notiKey": row.notiKey,
+				"userId" : jwt.userId
+				};
 		postAjax("/admin/cm/cm09/selectNotiInfo", paramObj, null, function(data){
 			setNotiInfo(data.result.notiInfo);
 			setNotiFileInfo(data.result.fileList);
 		});
+
+		//파일 등록 권한이 없으면 버튼 비활성화
+		paramObj.comonCd = 'FITR9901';
+		postAjax("/admin/cm/cm15/selectTreeAuthUserList", paramObj, null, function(data){
+			if (data.userList[0].fileUp == 'Y') {
+	            buttonFile.disabled = false; // 활성화
+	            buttonFile.style.backgroundColor = ""; // 기본 배경색으로 변경 (옵션)
+	        } else {
+	            buttonFile.disabled = true; // 비활성화
+	            buttonFile.style.backgroundColor = "gray"; // 회색 배경색으로 변경 (옵션)
+	        }	
+		});
+		
 	}
 	
 	
@@ -228,10 +249,24 @@
 	}
 	
 	function downloadFile(idx) {
-		postAjax("/admin/cm/cm08/fileDownInfo", {"fileKey": notiFileArr[idx].fileKey}, null, function(data){
-			var fileInfo = data.fileInfo;
-			var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName , "UTF-8");
-			location.href = "/admin/cm/cm08/fileDownload?filePath="+filePath;
+        if (notiFileArr[idx].fileDown != 'Y') {
+        	alert('파일 다운로드 권한이 없습니다.')
+        	return false;
+        };
+		
+		var fileKey = notiFileArr[idx].fileKey;
+		var paramObj = {
+				"fileKey" : fileKey,
+				"userId" : jwt.userId
+			}		
+		
+		postAjax("/admin/cm/cm08/fileDownInfoUser", paramObj, null, function(data){
+			if(data.resultCode == 200){
+				var fileInfo = data.fileInfo;
+				location.href = "/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId;
+			} else {
+				alert("다운로드 권한이 없습니다.");	
+			}
 		});
 	}
 	
@@ -244,6 +279,11 @@
 		      	'fileName' : obj.fileName,
 		      	'fileType' : obj.fileType,
 		      	'fileSize' : obj.fileSize,
+		      	'fileList' : obj.fileList,
+		      	'fileUp' : obj.fileUp,
+		      	'fileDown' : obj.fileDown,
+		      	'fileDelete' : obj.fileDelete,
+		      	'fileUpdate' : obj.fileUpdate,
 		      	'file' : obj
 			});
 		});
@@ -269,6 +309,11 @@
 	}
 	
 	function deleteFile(rowIndex) {
+        if (notiFileArr[rowIndex].fileDelete != 'Y') {
+        	alert('파일 삭제 권한이 없습니다.')
+        	return false;
+        };
+		
 		fileGridView.target.removeRow(rowIndex);
 		
 		if(notiFileArr[rowIndex].fileKey){
