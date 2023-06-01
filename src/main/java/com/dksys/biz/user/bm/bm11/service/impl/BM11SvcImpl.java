@@ -50,5 +50,10 @@ public class BM11SvcImpl implements BM11Svc {
 		return bm11Mapper.UpdateBmUprMstr(paramMap);
 		
 	}
+	
+	@Override
+	public List<Map<String, String>> selectMsExcelList(Map<String, String> paramMap) {
+		return bm11Mapper.selectMsExcelList(paramMap);
+	}
 
 }

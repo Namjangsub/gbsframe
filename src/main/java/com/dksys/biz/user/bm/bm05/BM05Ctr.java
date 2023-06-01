@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.ui.Model;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -33,6 +34,7 @@ public class BM05Ctr {
 	@Autowired
 	BM05Svc bm05Svc;
 	
+	// 자재마스터 그리드 조회
 	@PostMapping(value = "/selectBmMstrList")
 	public String selectBmMstrList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		int totalCnt = bm05Svc.selectBmMstrCount(paramMap);
@@ -45,24 +47,61 @@ public class BM05Ctr {
 		return "jsonView";
 	}
 	
-	@PostMapping(value = "/insertBmMstr")
-	public String insertBmMstr(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+	// 품번 팝업 그리드 조회
+	@PostMapping(value = "/selectMatList")
+	public String selectMatList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = bm05Svc.selectBmMstrCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		
+		List<Map<String, String>> resultList = bm05Svc.selectMatList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+	
+	
+	// 품번 가져오기
+	@PostMapping(value = "/selectMatrCd")
+	public String selectMatrCd(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = bm05Svc.selectMatrCd(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
+	// 자재마스터 품번 중복 체크 조회
+	@PostMapping(value = "/selectMatrCdChk")
+	public String selectMatrCdChk(@RequestBody Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {
-			String newBmMstr = bm05Svc.insertBmMstr(paramMap, mRequest);
+			String result = bm05Svc.selectMatrCdChk(paramMap);
+			model.addAttribute("result", result);
 			model.addAttribute("resultCode", 200);
-			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-			model.addAttribute("newBmMstr", newBmMstr);
+			model.addAttribute("resultMessage", messageUtils.getMessage("check"));
 		} catch (Exception e) {
 			model.addAttribute("resultCode", 500);
-			model.addAttribute("resultMessage", e.getLocalizedMessage());
+			model.addAttribute("resultMessage", messageUtils.getMessage("exist"));
 		}
 		return "jsonView";
 	}
 	
-	@PutMapping(value = "/updateBmMstr")
-	public String updateBmMstr(@RequestBody Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+	
+	
+	@PostMapping(value = "/insertBmMstr")
+	public String insertBmMstr(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {
-			bm05Svc.updateBmMstr(paramMap, mRequest);
+			bm05Svc.insertBmMstr(paramMap);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		}
+		return "jsonView";
+	}
+	
+	@PutMapping(value = "/updateBmMstr")// RequestParam 으로 바꾸기
+	public String updateBmMstr(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+		try {
+			bm05Svc.updateBmMstr(paramMap);
 			model.addAttribute("resultCode", 200);
 			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 		} catch (Exception e) {

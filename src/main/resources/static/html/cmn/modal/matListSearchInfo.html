@@ -1,0 +1,165 @@
+<div id="commonPopup">
+	<div class="popup_area">
+		<div class="popup_table">
+			<table>
+				<colgroup>
+					<col width="20%">
+					<col width="20%">
+					<col width="">
+				</colgroup>
+				<tr>
+					<td>
+						<select data-kind="MATRCLNTDIV" data-search="matrClntDiv" onchange="matListGridView.setData(0);">
+							<option value="">전체</option>
+						</select>    
+					</td>
+						<!--  
+							MATR_CD	자재코드
+							MATR_NM	자재명
+							
+							CLNT_NM 품번
+							CLNT_CD 품명
+						-->
+					<td>
+						<select data-search="searchType">
+							<option value="MATR_CD">품번</option>
+							<option value="MATR_NM">품명</option>
+						</select>
+					</td>
+					<td>
+						<div class="search_form">
+							<input type="text" data-search="searchValue" onkeypress="if(event.keyCode == 13){matListGridView.setData(0);}">
+							<a onclick="matListGridView.setData(0);">
+								<i class="i_search_w"></i>
+							</a>
+						</div>
+					</td>
+				</tr>
+			</table>
+			<div class="ax5_grid" data-ax5grid="matList-grid" data-ax5grid-config="{}" style="height: 320px; width: 100%"></div>
+		</div>
+	</div>
+	<div class="popup_bottom_btn">
+		<button type="button" onclick="executeCallback();">선택</button>
+		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+<script type="text/javascript">
+	var matListGridView = {
+		initView : function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showRowSelector : true,
+				multipleSelect : false,
+				target : $('[data-ax5grid="matList-grid"]'),
+				header : {
+					align : "center",
+					selector : false
+				},
+				body : {
+					onClick : function() {
+						this.self.select(this.dindex);
+					},
+					onDBLClick: function () {
+						executeCallback();
+					}
+				},
+				page : {
+					navigationItemCount : 10,
+					height : 30,
+					display : true,
+					firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+					prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+					nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+					lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+					onChange : function() {
+						matListGridView.setData(this.page.selectPage);
+					}
+				},
+				columns : [
+					{key: "rn",      label: "No.",          align: "center",   width: 60},
+					{key: "matrCd",      label: "품번",	align: "center",   width: 130},
+					{key: "matrNm",      label: "품명",      align: "center",   width: 130},
+					{key: "goodsDivNm",      label: "품목구분",      align: "center",   width: 130},
+					{key: "matrDivNm",      label: "자재유형",      align: "center",   width: 130},
+					{key: "matrGrpNm",      label: "자재그룹",      align: "center",   width: 100},
+					{key: "matrMat",      label: "재질",      align: "left",   width: 130},
+					{key: "matrMakrNm",      label: "Maker",      align: "left",   width: 130},
+					{key: "matrMno",      label: "형번",      align: "left",   width: 200},
+					{key: "matrSpec",      label: "규격",      align: "left",   width: 100},
+					{key: "matrGrpNm",      label: "자재그룹",      align: "left",   width: 100},
+					{key: "matrTestDivNm",      label: "입고검사구분",   align: "left",   width: 100}, 
+					{key: "matrUnitNm",      label: "관리단위",      align: "left",   width: 100},
+					{key: "dlvrRqmDay",      label: "리드타임",      align: "right",   width: 100},
+					{key: "minOrdrgQty",      label: "최소발주량",      align: "right",   width: 100},
+					{key: "matrSaftQty",      label: "안전재고",      align: "right",   width: 100}
+				]
+			});
+			return this;
+		},
+		setData : function(_pageNo) {
+			var targetObj = this.target;
+			var paramObj = {};
+			paramObj.pageNo = _pageNo + 1;
+			paramObj.recordCnt = 10;
+			
+			for(var i=0;i<$('.popup_area [data-search]').length;i++){
+				var tempElem = $('.popup_area [data-search]')[i];
+				
+				paramObj[$(tempElem).data("search")] = $(tempElem).val();
+			}
+			//debugger;
+			if(_pageNo !== 999){
+				/* 검색어 숫자인지 문자인지 확인 (자재 코드 검색 시 사용)
+				 * isNaN true이면 문자 아니면 숫자
+				 */ 
+				var searchValue = paramObj.searchValue;
+				var searchType  = paramObj.searchType;
+// 				var isSearchValueNaN = isNaN(searchValue);
+// 				if(searchType == 'MATR_CD' && isSearchValueNaN && searchValue != ''){
+// 					// alert("거래처 코드는 숫자만 입력해주세요.");
+// 					return;
+// 				}
+				//debugger;
+				postAjax("/user/bm/bm05/selectMatList", paramObj, null, function(data) {
+					//debugger;
+					var list = data.resultList;
+					targetObj.setData({
+						list : list,
+						page : {
+							currentPage : _pageNo,
+							pageSize : data.paginationInfo.pageSize,
+							totalElements : data.paginationInfo.totalRecordCount,
+							totalPages : data.paginationInfo.totalPageCount
+						}
+					});
+				});
+			}
+		}
+	}
+
+	$(document).ready(function() {
+		$('[data-search="searchValue"]').focus();
+		$('[data-search="searchValue"]').val(modalStack.last().paramObj.searchValue);
+		
+		
+		if(modalStack.last().paramObj.searchValue == '' || modalStack.last().paramObj.searchValue == undefined){
+			matListGridView.initView().setData(999);
+		}else{
+			matListGridView.initView().setData(0);
+		}
+		
+		setCommonSelect($('#commonPopup select[data-kind]'));
+		$('[data-search="searchValue"]').focus();
+		matListGridView.initView().setData(0);
+	});
+
+	function executeCallback(){
+		if(selectGridValidation(matListGridView.target)) return;
+		modalStack.last().callback(matListGridView);
+		modalStack.close();
+	}
+</script>
+
+
+

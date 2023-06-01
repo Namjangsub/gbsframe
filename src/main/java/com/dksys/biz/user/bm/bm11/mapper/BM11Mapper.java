@@ -19,4 +19,6 @@ public interface BM11Mapper {
 
 	int UpdateBmUprMstr(Map<String, String> paramMap);
 	
+	List<Map<String, String>> selectMsExcelList(Map<String, String> paramMap);
+	
 }

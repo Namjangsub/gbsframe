@@ -10,11 +10,18 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 public interface BM05Mapper {
 	
 	int selectBmMstrCount(Map<String, String> paramMap);
-
 	List<Map<String, String>> selectBmMstrList(Map<String, String> paramMap);
+	List<Map<String, String>> selectMatrCd(Map<String, String> paramMap);
+	
+//	int insertBmMstr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
-	String insertBmMstr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+	int insertBmMstr(Map<String, String> paramMap);
 
-	int updateBmMstr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+//	int updateBmMstr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+	int updateBmMstr(Map<String, String> paramMap);
+	
+	String selectMatrCdChk(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectMatList(Map<String, String> paramMap);
 	
 }

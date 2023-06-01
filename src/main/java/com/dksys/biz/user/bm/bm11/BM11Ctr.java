@@ -36,8 +36,8 @@ public class BM11Ctr {
 	@PostMapping(value = "/selectBmUprMstrList")
 	public String selectBmUprMstrList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		
-		  int totalCnt = bm11Svc.selectBmUprMstrCount(paramMap); PaginationInfo
-		  paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		  int totalCnt = bm11Svc.selectBmUprMstrCount(paramMap); 
+		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		  model.addAttribute("paginationInfo", paginationInfo);
 		  
 		  List<Map<String, String>> resultList = bm11Svc.selectBmUprMstrList(paramMap);
@@ -78,7 +78,7 @@ public class BM11Ctr {
 	}
 	
 	@PutMapping(value = "/UpdateBmUprMstr")
-	public String UpdateBmUprMstr(@RequestBody Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+	public String UpdateBmUprMstr(@RequestParam Map<String, String> paramMap,  ModelMap model) {
 		try {
 			bm11Svc.UpdateBmUprMstr(paramMap);
 			model.addAttribute("resultCode", 200);
@@ -89,5 +89,15 @@ public class BM11Ctr {
 		}
 		return "jsonView";
 	}
+	
+	//<!-- WBS 일정계획 등록 메인 화면 조회 리스트  -->
+	  @PostMapping(value = "/selectMsExcelList") 
+	  public String selectMsExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  
+		  List<Map<String, String>> resultList = bm11Svc.selectMsExcelList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+		  
+	  }
 
 }

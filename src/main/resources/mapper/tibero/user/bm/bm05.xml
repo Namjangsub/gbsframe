@@ -8,7 +8,7 @@
 			COUNT(*)
 		FROM TB_BM05M01 BM05
 	</select>
-
+	
 	<select id="selectBmMstrList" parameterType="Map" resultType="camelMap">
 		SELECT * FROM (
 			SELECT
@@ -16,7 +16,7 @@
 				-- 자재마스터 TB_BM05M01 AS X 
 				-- 공통에서 가져와야하는 컬럼 검색 시 사용 TB_CM05M01
 				X.FILE_TRGT_KEY,	-- 파일대상KEY
-				X.CO_CD AS CO, 		-- 회사코드
+				X.CO_CD, 		-- 회사코드
 				(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.CO_CD) AS CO_CD_NM,
 				X.GOODS_DIV, 	-- 품목구분
 				(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.GOODS_DIV) AS GOODS_DIV_NM,
@@ -24,7 +24,7 @@
 				(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.MATR_DIV) AS MATR_DIV_NM,
 				X.MATR_GRP,	-- 자재그룹
 				(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.MATR_GRP) AS MATR_GRP_NM,
-				X.MATR_NO,		-- 품번
+				X.MATR_CD,		-- 품번
 				X.MATR_NM,		-- 품명
 				X.MATR_CLNT_DIV,	-- 거래처분류
 				(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.MATR_CLNT_DIV) AS MATR_CLNT_DIV_NM,
@@ -61,10 +61,13 @@
 				X.PRDCTN_RQM_MD,	-- 최종생산소요일
 				X.PRDCTN_AVRG_MD,	-- 평균생산소요일
 				X.PCHS_CLNT_CD1,	-- 구매업체1
+				(SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD = X.PCHS_CLNT_CD1) AS PCHS_CLNT_CD1_NM,
 				X.PCHS_CLNT_PCT1,	-- 발주비율1 디폴트값 0 -> 구매업체1%
 				X.PCHS_CLNT_CD2,	-- 구매업체2 
+				(SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD = X.PCHS_CLNT_CD2) AS PCHS_CLNT_CD2_NM,
 				X.PCHS_CLNT_PCT2,	-- 발주비율2 -> 구매업체2%
 				X.PCHS_CLNT_CD3,	-- 구매업체3
+				(SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD = X.PCHS_CLNT_CD3) AS PCHS_CLNT_CD3_NM,
 				X.PCHS_CLNT_PCT3,	-- 발주비율3 -> 구매업체3%
 				X.MATR_UPR,			-- 최종구매단가	
 				X.MATR_AVRG_UPR,	-- 평균구매단가
@@ -79,138 +82,240 @@
 				X.USE_YN,			-- 사용여부
 				X.MATR_RMK			-- 비고
 			FROM TB_BM05M01 X 
-		) Y
-	<!-- 	<if test="coCd != null and !coCd.equals('')">
-            AND X.CO_CD = ${coCd}'                
-       	</if>
-       	<if test="goodsDiv != null and !goodsDiv.equals('')">
-       		AND X.GOODS_DIV = ${goodsDiv}'
-       	</if> -->
+				<!-- ORDER BY RN ASC -->
+			) Y
+		WHERE RN BETWEEN ${firstIndex} AND ${lastIndex}
+			<if test="coCd != null and !coCd.equals('')">
+				AND Y.CO_CD LIKE '${coCd}' 
+			</if>
+			<if test="goodsDiv != null and !goodsDiv.equals('')">
+				AND Y.GOODS_DIV LIKE '%${goodsDiv}%'--품목구분
+			</if>
+			<if test="matrDiv != null and !matrDiv.equals('')">
+				AND Y.MATR_DIV LIKE '${matrDiv}'--자재유형
+			</if>
+			<if test="matrGrp != null and !matrGrp.equals('')">
+				AND Y.MATR_GRP LIKE '${matrGrp}'--자재그룹
+			</if>
+			<if test="matrCd != null and !matrCd.equals('')">
+				AND Y.MATR_CD LIKE '%'||'${matrCd}'||'%' --자재코드 품번
+			</if>
+			<if test="matrNm != null and !matrNm.equals('')">
+				AND Y.MATR_NM LIKE '%'||'${matrNm}'||'%'--품명
+			</if>
+			<if test="matrMno != null and !matrMno.equals('')">
+				AND Y.MATR_MNO LIKE '%'||'${matrMno}'||'%'--형번(Model No)
+			</if>
+			<if test="matrSpec != null and !matrSpec.equals('')">
+				AND Y.MATR_SPEC LIKE '%'||'${matrSpec}'||'%'--규격
+			</if>
+				
+	</select>
+	
+	<select id="selectMatList" parameterType="Map" resultType="camelMap">
+		SELECT * FROM (
+			SELECT
+				ROWNUM AS RN,	-- No.
+				-- 자재마스터 TB_BM05M01 AS X 
+				-- 공통에서 가져와야하는 컬럼 검색 시 사용 TB_CM05M01
+				X.FILE_TRGT_KEY,	-- 파일대상KEY
+				X.CO_CD, 		-- 회사코드
+				(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.CO_CD) AS CO_CD_NM,
+				X.GOODS_DIV, 	-- 품목구분
+				(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.GOODS_DIV) AS GOODS_DIV_NM,
+				X.MATR_DIV,	-- 자재유형
+				(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.MATR_DIV) AS MATR_DIV_NM,
+				X.MATR_GRP,	-- 자재그룹
+				(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.MATR_GRP) AS MATR_GRP_NM,
+				X.MATR_CD,		-- 품번
+				X.MATR_NM,		-- 품명
+				X.MATR_CLNT_DIV,	-- 거래처분류
+				(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.MATR_CLNT_DIV) AS MATR_CLNT_DIV_NM,
+				X.MATR_MAT,	-- 재질
+				X.MATR_MAKR_NM,	-- Maker
+				X.MATR_MNO,	-- 형번
+				X.MATR_SPEC,	-- 규격
+				X.MATR_SIZE,	-- 크기	
+				X.MATR_TEST_DIV,	-- 입고검사구분
+				(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.MATR_TEST_DIV) AS MATR_TEST_DIV_NM,
+				X.DLVR_RQM_DAY,		-- 리드타임 -> 19번 납품소요일자
+				X.MIN_ORDRG_QTY,	-- 최소발주량
+				X.MATR_SAFT_QTY,	-- 안전재고
+				X.MATR_WT,		-- 중량
+				X.MATR_UNIT,	-- 관리단위
+				(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.MATR_UNIT) AS MATR_UNIT_NM
+			FROM TB_BM05M01 X
+			) Y
+		WHERE
+			RN BETWEEN #{firstIndex} AND #{lastIndex}
+			<if test="searchValue != null and !searchValue.equals('') and !searchType.equals('MATR_CD')">
+	     	 	AND ${searchType} LIKE '%${searchValue}%'
+	     	</if>
+	     	<if test="searchValue != null and !searchValue.equals('') and searchType.equals('MATR_CD')">
+	      		AND Y.MATR_CD = #{searchValue}
+	     	</if>
+			<if test="matrCd != null and !matrCd.equals('')">
+				AND Y.MATR_CD LIKE '%'||'${matrCd}'||'%' --자재코드 품번
+			</if>
+			<if test="matrNm != null and !matrNm.equals('')">
+	      		AND A.MATR_NM LIKE '%${matrNm}%'
+	     	</if>
+	</select>
+	
+	<!-- 품번 부모코드, 최대값 가져오기 -->
+	<select id="selectMatrCd" parameterType="Map" resultType="camelMap">
+		SELECT 
+			(SELECT T.CODE_RPRC FROM TB_CM05M01 T WHERE CODE_ID = 'MATRCLNTDIV200') AS CODE_RPRC,	-- 부모코드
+			(SELECT NVL(MAX(SUBSTR(MATR_CD,5,5)), 0) + 1 FROM TB_BM05M01) AS MATR_CD_MAX			-- 최대값
+ 		FROM DUAL
+	</select>
+	
+	<!-- 자재마스터 품번 중복 체크 -->
+	<select id="selectMatrCdChk" parameterType="Map" resultType="String">
+		SELECT 
+			FN_BM05M01_DUP_CHK(
+				'GUN',
+				'MATRCLNTDIV200',
+				'Ball Bush200-2',
+				't 소재',
+				'thk',
+				'HR2012',
+				'100x100x45',
+				'100'
+				) AS CHK_RESULT
+			FROM DUAL
 	</select>
 	
 	<insert id="insertBmMstr" parameterType="Map">
-	<!-- 	
-		<selectKey keyProperty="fileTrgtKey" resultType="String" order="BEFORE">
-			SELECT SEQ_FILE_TRGT_KEY.NEXTVAL FROM DUAL
-		</selectKey>
-	 -->
-		INSERT INTO TB_BM05M01 
-		(
-			FILE_TRGT_KEY,	-- 시퀀스 안씀
-			CO_CD, -- 회사
-			MATR_CD,
-			MATR_NM,
-			GOODS_DIV,
-			MATR_CLNT_DIV,
-			MATR_DIV,
-			MATR_GRP,
-			MATR_MAT,
-			MATR_SIZE,
-			MATR_SPEC,
-			MATR_MAKR_NM,
-			MATR_MNO,
-			MATR_WT,
-			MATR_UNIT,
-			ORIGIN_NM,
-			MATR_DRW_NO,
-			MATR_TEST_DIV,
-			DLVR_RQM_DAY,
-			MATR_PURC_DIV,
-			MIN_ORDRG_QTY,
-			MATR_SAFT_QTY,
-			MATR_STOCK_CD,
-			DSGN_2D_MD,
-			AVRG_2D_MD,
-			DSGN_3D_MD,
-			AVRG_3D_MD,
-			PRDCTN_RQM_MD,
-			PRDCTN_AVRG_MD,
-			USE_YN,
-			MATR_PART_NO,
-			MATR_NO,
-			PCHS_CLNT_CD1,
-			PCHS_CLNT_PCT1,
-			PCHS_CLNT_CD2,
-			PCHS_CLNT_PCT2,
-			PCHS_CLNT_CD3,
-			PCHS_CLNT_PCT3,
-			MATR_UPR,
-			MATR_AVRG_UPR,
-			MATR_RMK,
-			MATR_LAST_TRST_DT,
-			MATR_ATNT_CD,
-			ETC_FIELD1,
-			ETC_FIELD2,
-			ETC_FIELD3,
-			CREAT_ID,
-			CREAT_PGM,
-			CREAT_DTTM,
-			UDT_ID,
-			UDT_PGM,
-			UDT_DTTM
-		)
-		VALUES
-		(
-			#{fileTrgtKey},
-			#{coCd},
-			#{matrCd},
-			#{matrNm},
-			#{goodsDiv},
-			#{matrClntDiv},
-			#{matrDiv},
-			#{matrGrp},
-			#{matrMat},
-			#{matrSize},
-			#{matrSpec},
-			#{matrMakrNm},
-			#{matrMno},
-			#{matrWt},
-			#{matrUnit},
-			#{originNm},
-			#{matrDrwNo},
-			#{matrTestDiv},
-			#{DlvrRqmDay},
-			#{matrPurcDiv},
-			#{minOrdrgQty},
-			#{matrSaftQty},
-			#{matrStockCd},
-			#{dsgn2dMd},
-			#{avrg2dMd},
-			#{dsgn3dMd},
-			#{avrg3dMd},
-			#{prdctnRqmMd},
-			#{prdctnAvrgMd},
-			#{useYn},
-			#{matrPartNo},
-			#{matrNo},
-			#{pchsClntCd1},
-			#{pchsClntPct1},
-			#{pchsClntCd2},
-			#{pchsClntPct2},
-			#{pchsClntCd3},
-			#{pchsClntPct3},
-			#{matrUpr},
-			#{matrAvrgUpr},
-			#{matrRmk},
-			#{matrLastTrstDt},
-			#{matrAtntCd},
-			#{etcField1},
-			#{etcField2},
-			#{etcField3},
-			#{creatId},
-			#{creatPgm},
-			#{creatDttm},
-			#{udtId},
-			#{udtPgm},
-			#{udtDttm}
-		)
+	    <selectKey keyProperty="fileTrgtKey" resultType="int" order="BEFORE">
+	        SELECT NVL(MAX(TO_NUMBER(FILE_TRGT_KEY)), 0) + 1 FROM TB_BM05M01
+	    </selectKey>
+	    INSERT INTO TB_BM05M01 
+	    (
+	        FILE_TRGT_KEY,
+	        CO_CD, -- 회사
+	        MATR_CD,	-- 자재코드 -> 자재번호(품번)
+	        MATR_NM,	-- 자재명(품명)
+	        GOODS_DIV,	-- 품목구분
+	        MATR_CLNT_DIV, 	-- 거래처구분
+	        MATR_DIV,		-- 자재유형
+	        MATR_GRP,		-- 자재분류-자재그룹
+	        MATR_MAT,
+	        MATR_SIZE,
+	        MATR_SPEC,
+	        MATR_MAKR_NM,
+	        MATR_MNO,
+	        MATR_WT,
+	        MATR_UNIT,
+	        ORIGIN_NM,
+	        MATR_DRW_NO,
+	        MATR_TEST_DIV,
+	        DLVR_RQM_DAY,
+	        MATR_PURC_DIV,
+	        MIN_ORDRG_QTY,
+	        MATR_SAFT_QTY,
+	        MATR_STOCK_CD,
+	        DSGN_2D_MD,
+	        AVRG_2D_MD,
+	        DSGN_3D_MD,
+	        AVRG_3D_MD,
+	        PRDCTN_RQM_MD,
+            PRDCTN_AVRG_MD,
+	        PCHS_CLNT_CD1,
+	        PCHS_CLNT_PCT1,
+	        PCHS_CLNT_CD2,
+	        PCHS_CLNT_PCT2,
+	        PCHS_CLNT_CD3,
+	        PCHS_CLNT_PCT3,
+        	DSGN_TRGT_YN,	-- 설계대상구분
+	        CREAT_ID,
+	        CREAT_PGM,
+	        CREAT_DTTM
+	    )
+	    VALUES
+	    (
+	        #{fileTrgtKey},
+	        #{coCd},
+	        #{matrCd}, -- 자재코드(품번) 부모코드 + MAX + 1 채번 되도록 만들기
+	        #{matrNm},
+	        #{goodsDiv},
+	        #{matrClntDiv},
+	        #{matrDiv},
+	        #{matrGrp},
+	        #{matrMat},
+	        #{matrSize},
+	        #{matrSpec},
+	        #{matrMakrNm},
+	        #{matrMno},
+	        #{matrWt},
+	        #{matrUnit},
+	        #{originNm},
+	        #{matrDrwNo},
+	        #{matrTestDiv},
+	        #{dlvrRqmDay},
+	        #{matrPurcDiv},
+	        #{minOrdrgQty},
+	        #{matrSaftQty},
+	        #{matrStockCd},
+	        #{dsgn2dMd},
+	        #{avrg2dMd},
+	        #{dsgn3dMd},
+	        #{avrg3dMd},
+	        #{prdctnRqmMd},
+            #{prdctnAvrgMd},
+	        #{pchsClntCd1},
+	        #{pchsClntPct1},
+	        #{pchsClntCd2},
+	        #{pchsClntPct2},
+	        #{pchsClntCd3},
+	        #{pchsClntPct3},
+       		#{dsgnTrgtYn},
+	        #{creatId},
+	        #{creatPgm},
+	        SYSDATE
+	    )
 	</insert>
-<!-- 	
+	
 	<update id="updateBmMstr" parameterType="Map">
 		UPDATE TB_BM05M01
-		SET
+			SET
+				MATR_DIV = #{matrDiv},
+				MATR_GRP = #{matrGrp},		-- 자재분류-자재그룹
+				MATR_MAT = #{matrMat},		-- 소재
+				MATR_SIZE = #{matrSize},	-- 사이즈
+				MATR_SPEC = #{matrSpec},	-- 규격
+				MATR_MAKR_NM = #{matrMakrNm},	-- 제조사
+				MATR_MNO = #{matrMno},	-- 형번
+				MATR_WT = #{matrWt},	-- 중량
+				MATR_UNIT = #{matrUnit},	-- 관리단위
+				ORIGIN_NM = #{originNm},	-- 원산지
+				MATR_DRW_NO = #{matrDrwNo},	-- 대표도번
+				MATR_TEST_DIV = #{matrTestDiv},	-- 입고검사구분
+				DLVR_RQM_DAY = #{dlvrRqmDay},	-- 리드타임(납품소요일자)
+				MATR_PURC_DIV = #{matrPurcDiv},	-- 구매/외주구분
+				MIN_ORDRG_QTY = #{minOrdrgQty},	-- 최소발주량
+				MATR_SAFT_QTY = #{matrSaftQty},	-- 안전재고
+				MATR_STOCK_CD = #{matrStockCd},	-- 재고관리여부
+				DSGN_2D_MD = #{dsgn2dMd},	-- 2D설계소요일
+				AVRG_2D_MD = #{avrg2dMd},	-- 2D평균소요일
+				DSGN_3D_MD = #{dsgn3dMd},	-- 3D설계소요일
+				AVRG_3D_MD = #{avrg3dMd},	-- 3D평균소요일
+				PRDCTN_RQM_MD = #{prdctnRqmMd}, 	-- 생산소요일(최종)
+				PRDCTN_AVRG_MD = #{prdctnAvrgMd},	-- 생산평균소요일
+				PCHS_CLNT_CD1 = #{pchsClntCd1},		-- 구매업체1
+				PCHS_CLNT_PCT1 = #{pchsClntPct1},	-- 구매업체1%(발주비율1)
+				PCHS_CLNT_CD2 = #{pchsClntCd2},		-- 구매업체2
+				PCHS_CLNT_PCT2 = #{pchsClntPct2},	-- 구매업체2%(발주비율2)
+				PCHS_CLNT_CD3 = #{pchsClntCd3},		-- 구매업체3
+				PCHS_CLNT_PCT3 = #{pchsClntPct3},	-- 구매업체3%(발주비율3)
+       			DSGN_TRGT_YN = #{dsgnTrgtYn},
+				UDT_ID = #{creatId},
+	            UDT_PGM = #{creatPgm},
+	            UDT_DTTM = SYSDATE
 		WHERE 
+		<!-- 	 	CO_CD = #{coCd}, -->
+			 	FILE_TRGT_KEY = #{fileTrgtKey}
 	
 	</update>
-	 -->
+
 </mapper>

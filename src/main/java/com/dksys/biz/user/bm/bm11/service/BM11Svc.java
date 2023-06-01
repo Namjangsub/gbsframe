@@ -15,5 +15,7 @@ public interface BM11Svc {
 	int insertBmUprMstr(Map<String, String> paramMap);
 
 	int UpdateBmUprMstr(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectMsExcelList(Map<String, String> paramMap);
 
 }

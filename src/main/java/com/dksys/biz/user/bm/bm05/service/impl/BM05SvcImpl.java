@@ -36,14 +36,41 @@ public class BM05SvcImpl implements BM05Svc {
 	}
 
 	@Override
-	public String insertBmMstr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
-		return bm05Mapper.insertBmMstr(paramMap, mRequest);
+	public List<Map<String, String>> selectMatrCd(Map<String, String> paramMap) {
+		return bm05Mapper.selectMatrCd(paramMap);
 	}
+	
+	@Override
+	public String selectMatrCdChk(Map<String, String> paramMap) {
+		String result = bm05Mapper.selectMatrCdChk(paramMap);
+		System.out.println(result);
+		return result;
+	}
+	
+	@Override
+	public List<Map<String, String>> selectMatList(Map<String, String> paramMap) {
+		return bm05Mapper.selectMatList(paramMap);
+	}
+	
+//	@Override
+//	public int insertBmMstr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
+//		int result = bm05Mapper.insertBmMstr(paramMap, mRequest);
+//		System.out.println(result);
+//		return result;
+//	}
 
 	@Override
-	public int updateBmMstr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
-		return bm05Mapper.updateBmMstr(paramMap, mRequest);
-		
+	public int insertBmMstr(Map<String, String> paramMap) {
+		int result = bm05Mapper.insertBmMstr(paramMap);
+		System.out.println(result + "입력성공");
+		return result;
 	}
-
+	
+	@Override
+	public int updateBmMstr(Map<String, String> paramMap) {
+		int result = bm05Mapper.updateBmMstr(paramMap);
+		System.out.println(result + "수정성공");
+		return result; 
+	
+	}
 }
