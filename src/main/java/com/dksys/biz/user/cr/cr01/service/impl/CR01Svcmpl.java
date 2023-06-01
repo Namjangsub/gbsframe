@@ -121,6 +121,8 @@ public class CR01Svcmpl implements CR01Svc {
                 detailMap.put("estDeg", paramMap.get("estDeg"));
                 detailMap.put("userId", paramMap.get("userId"));
                 detailMap.put("pgmId", paramMap.get("pgmId"));
+                detailMap.put("creatId", paramMap.get("userId"));
+                detailMap.put("creatPgm", "TB_CR01M01");
 
                 cr01Mapper.insertEstDetail(detailMap);
             }
@@ -183,6 +185,9 @@ public class CR01Svcmpl implements CR01Svc {
                 detailMap.put("estDeg", paramMap.get("estDeg"));
                 detailMap.put("userId", paramMap.get("userId"));
                 detailMap.put("pgmId", paramMap.get("pgmId"));
+                detailMap.put("creatId", paramMap.get("userId"));
+                detailMap.put("creatPgm", "TB_CR01M01");
+
                 cr01Mapper.insertEstDetail(detailMap);
             }
           //  cm08Svc.copyTreeFile("TB_CR01M01", paramMap, mRequest);
@@ -311,6 +316,10 @@ public class CR01Svcmpl implements CR01Svc {
                     estDetail.put("userId", paramMap.get("userId"));
                     estDetail.put("pgmId", paramMap.get("pgmId"));
                     estDetail.put("estDeg", paramMap.get("estDeg"));
+                    estDetail.put("creatId", paramMap.get("userId"));
+                    estDetail.put("creatPgm", "TB_CR01M01");
+
+
 
                     cr01Mapper.insertEstDetail(estDetail);
                 }

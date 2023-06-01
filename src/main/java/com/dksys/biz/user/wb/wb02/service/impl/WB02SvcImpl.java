@@ -36,8 +36,13 @@ public class WB02SvcImpl implements WB02Svc {
 
     @Autowired
     ExceptionThrower thrower;
-    
-    
+
+
+    @Override
+    public int selectWbsRsltsPlanListCount(Map<String, String> paramMap) {
+        return 0;
+    }
+
     @Override
 	public List<Map<String, String>> selectWbsRsltsPlanList(Map<String, String> paramMap) {
 		return wb02Mapper.selectWbsRsltsPlanList(paramMap);
