@@ -11,7 +11,8 @@ import org.apache.ibatis.annotations.Mapper;
 public interface CR02Mapper {
 
 	int selectOrdrsCount(Map<String, String> param);
-
+	
+	int selectOrdrsPlanHisCount(Map<String, String> param);
 	List<Map<String, Object>> selectOrdrsList(Map<String, String> param);
 
 
@@ -32,16 +33,12 @@ public interface CR02Mapper {
 	void updateOrdrsDetail(Map<String, String> param);
 	int insertClmnPlan(Map<String, String> param);
 	void updateClmnPlan(Map<String, String> param);
-
-
 	int insertClmnPlanHis(Map<String, String> param);
-
-
 	int deleteOrdrs(Map<String, String> param);
-
 	int deleteOrdrsPlan(Map<String, String> param);
 	int deleteOrdrsDetail(Map<String, String> param);
 
 
+	List<Map<String, Object>> selectOrdrsPlanHis(Map<String, String> param);
 
 }

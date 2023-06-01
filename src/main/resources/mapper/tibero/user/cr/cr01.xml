@@ -81,6 +81,8 @@
             TO_CHAR(T.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT,
             TO_CHAR(T.ESTS_DT, 'YYYY-MM-DD') AS ESTS_DT,
             TO_CHAR(T.ESTE_DT, 'YYYY-MM-DD') AS ESTE_DT,
+            TO_CHAR(T.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM,
+            TO_CHAR(T.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM,
             -- TO_CHAR(T.EST_STD_DT, 'YYYY-MM-DD') AS EST_STD_DT,
             ROWNUM AS RNUM,
             T.*,
@@ -97,8 +99,11 @@
                     <if test="strtDt != null and !strtDt.equals('')">
                         AND A.EST_DT BETWEEN #{strtDt} AND #{endDt}
                     </if>
-                    <if test="coCd != null and !coCd.equals('')">
-                        AND A.CO_CD = #{coCd}
+                    <if test="estNm != null and !estNm.equals('CO_CD')">
+                        AND UPPER(A.CO_CD) LIKE '%' || UPPER(#{coCd}) || '%'
+                    </if>
+                    <if test="searchType != null and searchType.equals('CO_NM')">
+                        AND UPPER( FN_CM05M01_CD_TO_NM(A.CO_CD) ) LIKE '%' || UPPER(#{searchValue}) || '%'
                     </if>
                     <if test="searchType != null and searchType.equals('EST_NO')">
                         AND UPPER(A.EST_NO) LIKE '%' || UPPER(#{searchValue}) || '%'
@@ -121,6 +126,7 @@
                     <if test="clntNm != null and !clntNm.equals('')">
                         AND UPPER(B.CLNT_NM) LIKE '%' || UPPER(#{clntNm}) || '%'
                     </if>
+
                 </where>
                  ) T
         )
@@ -151,9 +157,8 @@
           AND A.EST_DEG = #{estDeg}
     </select>
     <select id="selectEstDetail" parameterType="map" resultType="CamelMap">
-        SELECT A.*,
-               FN_CM05M01_CD_TO_NM(A.EST_UNIT) AS EST_UNIT_NM   ,
-               FN_CM05M01_CD_TO_NM(A.EST_DTL_DIV) AS EST_DTL_DIV_NM
+        SELECT A.*
+
         FROM TB_CR01D01 A
         WHERE 1 = 1
           AND A.CO_CD = #{coCd}
@@ -168,32 +173,39 @@
         </selectKey>
         INSERT INTO
             TB_CR01M01
-            (CO_CD, EST_NO, EST_CLNT_CD, EST_DT,
-            CSTM_MNG_NM, CSTM_MNG_HP, EST_NM, CURR_CD,EST_AMT, EST_EXCEPT,
-            EST_DLVR_CNDT, EST_PMNT_CNDT, EST_DUDT, EST_DEG, FILE_TRGT_KEY, EXRATE, MNG_ID, EST_NEGO_AMT, EST_STD, ORDRS_YN
-            ,ESTS_DT,ESTE_DT,CLNT_PJT
-            ,PBLS_DT ,CREAT_ID,CREAT_PGM
-        )
+            (
+                CO_CD, EST_NO, EST_CLNT_CD, EST_DT,
+                CSTM_MNG_NM, CSTM_MNG_HP, EST_NM, CURR_CD,EST_AMT, EST_EXCEPT,
+                EST_DLVR_CNDT, EST_PMNT_CNDT, EST_DUDT, EST_DEG, FILE_TRGT_KEY,
+                EXRATE, MNG_ID, EST_NEGO_AMT, EST_STD, ORDRS_YN
+                ,ESTS_DT,ESTE_DT,CLNT_PJT
+                ,PBLS_DT ,CREAT_ID,CREAT_PGM
+            )
 
         VALUES
-            (#{coCd, jdbcType=VARCHAR}, #{estNo, jdbcType=VARCHAR}, #{estClntCd, jdbcType=NUMERIC}, #{estDt},
-            #{cstmMngNm, jdbcType=VARCHAR}, #{cstmMngHp, jdbcType=VARCHAR}, #{estNm, jdbcType=VARCHAR},
-            #{currCd, jdbcType=VARCHAR}, #{estAmt, jdbcType=NUMERIC}, #{estExcept, jdbcType=VARCHAR},
-            #{estDlvrCndt, jdbcType=VARCHAR}, #{estPmntCndt, jdbcType=VARCHAR}, #{estDudt, jdbcType=VARCHAR},
-            #{estDeg, jdbcType=NUMERIC}, #{fileTrgtKey, jdbcType=VARCHAR},
-            #{exrate, jdbcType=NUMERIC}, #{mngId, jdbcType=VARCHAR}, #{estNegoAmt, jdbcType=NUMERIC},
-            #{estStd, jdbcType=VARCHAR} ,#{ordrsYn, jdbcType=VARCHAR},#{estsDt},#{esteDt},#{clntPjt, jdbcType=VARCHAR}
-            ,#{pblsDt}, #{creatId},#{creatPgm}
-        )
+            (
+                #{coCd}, #{estNo}, #{estClntCd}, #{estDt},
+                #{cstmMngNm}, #{cstmMngHp}, #{estNm},
+                #{currCd}, #{estAmt}, #{estExcept},
+                #{estDlvrCndt}, #{estPmntCndt}, #{estDudt},
+                #{estDeg}, #{fileTrgtKey},
+                #{exrate}, #{mngId}, #{estNegoAmt},
+                #{estStd} ,#{ordrsYn},#{estsDt},#{esteDt},#{clntPjt}
+                ,#{pblsDt}, #{creatId},#{creatPgm}
+             )
     </insert>
     <insert id="insertEstDetail" parameterType="map">
-        INSERT INTO TB_CR01D01
-            (CO_CD, EST_NO, EST_DTL_DIV, EST_SEQ,
-             EST_COMM, EST_SPEC, EST_UNIT, EST_QTY,
-             EST_UPR, EST_DEG)
-        VALUES (#{coCd}, #{estNo}, #{estDtlDiv}, #{estSeq},
+    INSERT INTO TB_CR01D01
+           (
+                CO_CD, EST_NO, EST_DTL_DIV, EST_SEQ,
+                EST_COMM, EST_SPEC, EST_UNIT, EST_QTY,
+                EST_UPR, EST_DEG , CREAT_ID , CREAT_PGM
+             )
+    VALUES (
+                #{coCd}, #{estNo}, #{estDtlDiv}, #{estSeq},
                 #{estComm}, #{estSpec}, #{estUnit}, #{estQty},
-                #{estUpr}, #{estDeg})
+                #{estUpr}, #{estDeg} ,  #(creatId), #{creatPgm}
+            )
     </insert>
     <delete id="deleteEst">
         DELETE
@@ -222,31 +234,31 @@
     </delete>
     <update id="updateEst" parameterType="map">
         UPDATE TB_CR01M01
-        SET EST_CLNT_CD   = #{estClntCd, jdbcType=NUMERIC},
+        SET EST_CLNT_CD   = #{estClntCd},
             EST_DT        = #{estDt, jdbcType=DATE},
-            CSTM_MNG_NM   = #{cstmMngNm, jdbcType=VARCHAR},
-            CSTM_MNG_HP   = #{cstmMngHp, jdbcType=VARCHAR},
-            EST_NM        = #{estNm, jdbcType=VARCHAR},
-            CURR_CD       = #{currCd, jdbcType=VARCHAR},
-            EST_AMT       = #{estAmt, jdbcType=NUMERIC},
-            EST_EXCEPT    = #{estExcept, jdbcType=VARCHAR},
-            EST_DLVR_CNDT = #{estDlvrCndt, jdbcType=VARCHAR},
-            EST_PMNT_CNDT = #{estPmntCndt, jdbcType=VARCHAR},
-            EST_DUDT      = #{estDudt, jdbcType=VARCHAR},
-            EXRATE        = #{exrate, jdbcType=NUMERIC},
-            MNG_ID        = #{mngId, jdbcType=VARCHAR},
-            EST_NEGO_AMT  = #{estNegoAmt, jdbcType=NUMERIC},
-            EST_STD       = #{estStd, jdbcType=VARCHAR},
+            CSTM_MNG_NM   = #{cstmMngNm},
+            CSTM_MNG_HP   = #{cstmMngHp},
+            EST_NM        = #{estNm},
+            CURR_CD       = #{currCd},
+            EST_AMT       = #{estAmt},
+            EST_EXCEPT    = #{estExcept},
+            EST_DLVR_CNDT = #{estDlvrCndt},
+            EST_PMNT_CNDT = #{estPmntCndt},
+            EST_DUDT      = #{estDudt},
+            EXRATE        = #{exrate},
+            MNG_ID        = #{mngId},
+            EST_NEGO_AMT  = #{estNegoAmt},
+            EST_STD       = #{estStd},
             ESTS_DT       = #{estsDt},
             ESTE_DT       = #{esteDt},
-            CLNT_PJT      = #{clntPjt, jdbcType=VARCHAR},
+            CLNT_PJT      = #{clntPjt},
             PBLS_DT       = #{pblsDt},
             UDT_ID        = #{udtId},
             UDT_PGM       = #{udtPgm},
             UDT_DTTM      = SYSDATE
-        WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
-          AND EST_NO = #{estNo, jdbcType=VARCHAR}
-          AND EST_DEG = #{estDeg, jdbcType=NUMERIC}
+        WHERE CO_CD = #{coCd}
+          AND EST_NO = #{estNo}
+          AND EST_DEG = #{estDeg}
     </update>
     <update id="updateEstConfirm" parameterType="map">
         UPDATE TB_CR01M01

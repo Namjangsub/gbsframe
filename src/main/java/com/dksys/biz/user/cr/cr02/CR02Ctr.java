@@ -28,7 +28,6 @@ public class CR02Ctr {
 		int totalCnt = cr02Svc.selectOrdrsCount(param);
 		PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
-
 		List<Map<String, Object>> ordrsList = cr02Svc.selectOrdrsList(param);
 		model.addAttribute("ordrsList", ordrsList);
 		return "jsonView";
@@ -64,7 +63,16 @@ public class CR02Ctr {
 
 	@PostMapping(value = "/insertOrdrs")
 	public String insertOrdrs(@RequestParam Map<String, String> param, MultipartHttpServletRequest mRequest, ModelMap model) {
-		cr02Svc.insertOrdrs(param,mRequest);
+
+		try {
+			cr02Svc.insertOrdrs(param,mRequest);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+		}catch(Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", e.getLocalizedMessage());
+		}
+
 
 		return "jsonView";
 	}
@@ -72,15 +80,44 @@ public class CR02Ctr {
 
 	@PostMapping(value = "/updateOrdrs")
 	public String updateOrdrs(@RequestParam Map<String, String> param,MultipartHttpServletRequest mRequest, ModelMap model) {
-		cr02Svc.updateOrdrs(param,mRequest);
+
+		try {
+			cr02Svc.updateOrdrs(param,mRequest);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+		}catch(Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", e.getLocalizedMessage());
+		}
+
+
+
+
 		return "jsonView";
 	}
 
 	@DeleteMapping(value = "/deleteOrdrs")
 	public String deleteOrdrs(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		cr02Svc.deleteOrdrs(paramMap);
-		model.addAttribute("resultCode", 200);
-		model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+
+		try {
+			cr02Svc.deleteOrdrs(paramMap);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+		}catch(Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", e.getLocalizedMessage());
+		}
+		return "jsonView";
+
+	}
+
+	@PostMapping("/selectOrdrsPlanHis")
+	public String selectOrdrsPlanHis(@RequestBody Map<String, String> param, ModelMap model) {
+		int totalCnt = cr02Svc.selectOrdrsPlanHisCount(param);
+		PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, Object>> ordrsPlanHisList = cr02Svc.selectOrdrsPlanHis(param);
+		model.addAttribute("ordrsPlanHisList", ordrsPlanHisList);
 		return "jsonView";
 	}
 }

@@ -22,7 +22,6 @@ public class CR03Ctr {
     @Autowired
     CR03Svc cr03svc;
 
-
     @PostMapping("/maxEst")
     public String showEstimationForm(@RequestBody Map<String, String> param, ModelMap model) {
         String maxEstNo = cr03svc.selectMaxEstNo(param);
@@ -48,6 +47,7 @@ public class CR03Ctr {
         model.addAttribute("estList", estList);
         return "jsonView";
     }
+    
     @PostMapping("/selectEstListNotOrdrs")
     public String selectEstListNotOrdrs(@RequestBody Map<String, String> param, ModelMap model) {
         int totalCnt = cr03svc.selectEstCount(param);
