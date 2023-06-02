@@ -324,7 +324,7 @@ public class CR01Svcmpl implements CR01Svc {
                     cr01Mapper.insertEstDetail(estDetail);
                 }
             }
-            System.out.println("여기까지2" + paramMap.get("deleteFileArr"));
+    /*        System.out.println("여기까지2" + paramMap.get("deleteFileArr"));
             String[] deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), String[].class);
             List<String> deleteFileList = Arrays.asList(deleteFileArr);
 
@@ -333,7 +333,7 @@ public class CR01Svcmpl implements CR01Svc {
                 cm08Svc.deleteFile(fileKey);
 
 
-            }
+            }*/
             paramMap.get("fileTrgtKey");
             responseMap.put("resultCode",200);
             Map<String, String> newEst = new HashMap<>();

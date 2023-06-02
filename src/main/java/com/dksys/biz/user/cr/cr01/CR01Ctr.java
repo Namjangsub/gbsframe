@@ -106,6 +106,7 @@ public class CR01Ctr {
 	    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 			model.addAttribute("param", updateEstMap );
 		}catch(Exception e) {
+			System.out.println(e.getMessage());
 			model.addAttribute("resultCode", 500);
     		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
 		}
