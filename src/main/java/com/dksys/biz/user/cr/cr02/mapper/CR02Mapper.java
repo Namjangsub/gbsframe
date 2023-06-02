@@ -6,39 +6,48 @@ import java.util.Map;
 import org.apache.ibatis.annotations.Mapper;
 
 
-
 @Mapper
 public interface CR02Mapper {
 
-	int selectOrdrsCount(Map<String, String> param);
-	
-	int selectOrdrsPlanHisCount(Map<String, String> param);
-	List<Map<String, Object>> selectOrdrsList(Map<String, String> param);
+    int selectOrdrsCount(Map<String, String> param);
+
+    int selectOrdrsPlanHisCount(Map<String, String> param);
+
+    List<Map<String, Object>> selectOrdrsList(Map<String, String> param);
 
 
-	Map<String, Object> selectOrdrsInfo(Map<String, String> paramMap);
+    Map<String, Object> selectOrdrsInfo(Map<String, String> paramMap);
 
-	Map<String, Object>  selectOrdrsWithEst(Map<String, String> paramMap);
+    Map<String, Object> selectOrdrsWithEst(Map<String, String> paramMap);
 
-	List<Map<String, Object>>   selectOrdrsDetails(Map<String, String> paramMap);
-
-
-
-	List<Map<String, Object>> selectPmntPlan(Map<String, String> paramMap);
-
-	String selectMaxOrdrsNo(Map<String, String> param);
-	int insertOrdrs(Map<String, String> param);
-	void updateOrdrs(Map<String, String> param);
-	int insertOrdrsDetail(Map<String, String> param);
-	void updateOrdrsDetail(Map<String, String> param);
-	int insertClmnPlan(Map<String, String> param);
-	void updateClmnPlan(Map<String, String> param);
-	int insertClmnPlanHis(Map<String, String> param);
-	int deleteOrdrs(Map<String, String> param);
-	int deleteOrdrsPlan(Map<String, String> param);
-	int deleteOrdrsDetail(Map<String, String> param);
+    List<Map<String, Object>> selectOrdrsDetails(Map<String, String> paramMap);
 
 
-	List<Map<String, Object>> selectOrdrsPlanHis(Map<String, String> param);
+    List<Map<String, Object>> selectPmntPlan(Map<String, String> paramMap);
+
+    String selectMaxOrdrsNo(Map<String, String> param);
+
+    int insertOrdrs(Map<String, String> param);
+
+    void updateOrdrs(Map<String, String> param);
+
+    int insertOrdrsDetail(Map<String, String> param);
+
+    void updateOrdrsDetail(Map<String, String> param);
+
+    int insertClmnPlan(Map<String, String> param);
+
+    void updateClmnPlan(Map<String, String> param);
+
+    int insertClmnPlanHis(Map<String, String> param);
+
+    int deleteOrdrs(Map<String, String> param);
+
+    int deleteOrdrsPlan(Map<String, String> param);
+
+    int deleteOrdrsDetail(Map<String, String> param);
+
+
+    List<Map<String, Object>> selectOrdrsPlanHis(Map<String, String> param);
 
 }

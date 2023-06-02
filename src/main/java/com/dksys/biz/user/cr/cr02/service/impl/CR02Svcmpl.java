@@ -198,7 +198,7 @@ public class CR02Svcmpl implements CR02Svc {
                     String newSalesCode = param.get("ordrsNo") + ordrsDetail.get("ordrsSeq") + ordrsDetail.get("prdtCd") + ordrsDetail.get("itemDiv");
                     ordrsDetail.put("salesCd", newSalesCode);
                 }
-                System.out.println("23232"+ ordrsDetail.toString());
+                System.out.println("23232" + ordrsDetail.toString());
                 cr02Mapper.updateOrdrsDetail(ordrsDetail);
             } else {
                 // 수주 상세 삽입
@@ -327,6 +327,7 @@ public class CR02Svcmpl implements CR02Svc {
         result += cr02Mapper.deleteOrdrsDetail(paramMap);
         return result;
     }
+
     @Override
     public int selectOrdrsPlanHisCount(Map<String, String> param) {
 

@@ -111,6 +111,7 @@ public class CR02Ctr {
 
 	}
 
+
 	@PostMapping("/selectOrdrsPlanHis")
 	public String selectOrdrsPlanHis(@RequestBody Map<String, String> param, ModelMap model) {
 		int totalCnt = cr02Svc.selectOrdrsPlanHisCount(param);

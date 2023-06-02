@@ -7,25 +7,26 @@ import java.util.Map;
 
 public interface CR02Svc {
 
-	int selectOrdrsCount(Map<String, String> param);
+    int selectOrdrsCount(Map<String, String> param);
 
-	List<Map<String, Object>> selectOrdrsList(Map<String, String> param);
+    List<Map<String, Object>> selectOrdrsList(Map<String, String> param);
 
-	Map<String, Object> selectOrdrsInfo(Map<String, String> paramMap);
-
-
-	Map<String, Object>  selectOrdrsWithEst(Map<String, String> params);
-
-	String selectMaxOrdrsNo(Map<String, String> param);
-
-	void insertOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest);
-	void updateOrdrs(Map<String, String> param,MultipartHttpServletRequest mRequest);
+    Map<String, Object> selectOrdrsInfo(Map<String, String> paramMap);
 
 
-	 int deleteOrdrs(Map<String, String> paramMap);
+    Map<String, Object> selectOrdrsWithEst(Map<String, String> params);
+
+    String selectMaxOrdrsNo(Map<String, String> param);
+
+    void insertOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest);
+
+    void updateOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest);
 
 
-	int selectOrdrsPlanHisCount(Map<String, String> param);
+    int deleteOrdrs(Map<String, String> paramMap);
 
-	List<Map<String, Object>> selectOrdrsPlanHis(Map<String, String> param);
+
+    int selectOrdrsPlanHisCount(Map<String, String> param);
+
+    List<Map<String, Object>> selectOrdrsPlanHis(Map<String, String> param);
 }
