@@ -49,22 +49,6 @@ public class BM16SvcImpl implements BM16Svc {
   }
 
   @Override
-  public Map<String, String> selectPrdtInfo(Map<String, String> paramMap) {
-
-    return bm16Mapper.selectPrdtInfo(paramMap);
-  }
-
-  @Override
-  public int selectDetail01Count(Map<String, String> param) {
-    return bm16Mapper.selectDetail01Count(param);
-  }
-
-  @Override
-  public List<Map<String, String>> selectDetail01List(Map<String, String> param) {
-    return bm16Mapper.selectDetail01List(param);
-  }
-
-  @Override
   public int selectConfirmCount(Map<String, String> paramMap) {
     return bm16Mapper.selectConfirmCount(paramMap);
   }
@@ -83,6 +67,29 @@ public class BM16SvcImpl implements BM16Svc {
     Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {
     }.getType();
 
+    List<Map<String, String>> dtlPrdt = gsonDtl.fromJson(paramMap.get("prdtArr"), dtlMap);
+    for (Map<String, String> dtl : dtlPrdt) {
+    	//  dtlParam 리스트의 각 맵 요소에 대해 반복문을 실행
+    	
+    	dtl.put("userId", paramMap.get("userId"));
+    	dtl.put("pgmId", paramMap.get("pgmId"));
+    	//      반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
+    	String dtaChk = dtl.get("prjctCrudChk").toString();
+    	/* "dtaChk" 값을 확인하여
+    	 * "I"인 경우 bm16Mapper.insertPrjctDtl(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
+    	 * "U"인 경우 bm16Mapper.updatePrjctDtl(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
+    	 * "D"인 경우 * bm16Mapper.deletePrjctDtl(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
+    	if ("I".equals(dtaChk)) {
+    		dtl.put("prjctSeq", paramMap.get("prjctSeq"));
+    		bm16Mapper.insertPrjctPrdt(dtl);
+    	} else if ("U".equals(dtaChk)) {
+    		bm16Mapper.updatePrjctPrdt(dtl);
+    	} else if ("D".equals(dtaChk)) {
+    		bm16Mapper.deletePrjctPrdt(dtl);
+    		bm16Mapper.deletePrjctDtlPrdtAll(dtl);
+    	}
+    }
+    
     List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
     for (Map<String, String> dtl : dtlParam) {
     	//  dtlParam 리스트의 각 맵 요소에 대해 반복문을 실행
@@ -114,101 +121,36 @@ public class BM16SvcImpl implements BM16Svc {
 	//    Gson을 사용하여 paramMap의 "detailArr" 값을 가져와서 dtlParam 변수에 ArrayList<Map<String, String>> 형식으로 변환
     Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {
     }.getType();
-    List<Map<String, String>> dtlParam = gson.fromJson(paramMap.get("detailArr"), dtlMap);
-    for (Map<String, String> dtl : dtlParam) {
+    List<Map<String, String>> dtlPrdt = gson.fromJson(paramMap.get("prdtArr"), dtlMap);
+    for (Map<String, String> dtl : dtlPrdt) {
 
       dtl.put("userId", paramMap.get("userId"));
       dtl.put("pgmId", paramMap.get("pgmId"));
       //반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-      String dtaChk = dtl.get("dtaChk").toString();
-		/* "dtaChk" 값을 확인하여
-		 * "I"인 경우 bm16Mapper.insertPrjctDtl(dtl)을 호출하여 프로젝트 세부정보를 삽입 */
-      if ("I".equals(dtaChk)) {
-        bm16Mapper.insertPrjctDtl(dtl);
-      }
+      bm16Mapper.insertPrjctPrdt(dtl);
+    }
+    List<Map<String, String>> dtlParam = gson.fromJson(paramMap.get("detailArr"), dtlMap);
+    for (Map<String, String> dtl : dtlParam) {
+    	
+    	dtl.put("userId", paramMap.get("userId"));
+    	dtl.put("pgmId", paramMap.get("pgmId"));
+    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
+    	String dtaChk = dtl.get("dtaChk").toString();
+    	/* "dtaChk" 값을 확인하여
+    	 * "I"인 경우 bm16Mapper.insertPrjctDtl(dtl)을 호출하여 프로젝트 세부정보를 삽입 */
+    	if ("I".equals(dtaChk)) {
+    		bm16Mapper.insertPrjctDtl(dtl);
+    	} 
     }
     return result;
   }
 
   @Override
   public int deletePrjct(Map<String, String> param) {
-    int result = bm16Mapper.deletePrjctDtlAll(param);
-    return bm16Mapper.deletePrjct(param);
-  }
-	/* bm16Mapper.deletePrjctDtlAll(param)을 호출하여 param을 사용하여 프로젝트 세부정보를 모두 삭제하고 그
-	 * 결과를 result 변수에 저장*/
-
-  @Override
-  public void deletePrjctDtl(List<Map<String, String>> paramList) {
-    for (Map<String, String> param : paramList) {
-      bm16Mapper.deletePrjctDtl(param);
-    }
-  }
-	/* bm16Mapper.deletePrjctDtlAll(param)을 호출하여 param을 사용하여 프로젝트 세부정보를 모두 삭제하고 그
-	 * 결과를 result 변수에 저장합니다. bm16Mapper.deletePrjct(param)을 호출하여 param을 사용하여 프로젝트를
-	 * 삭제합니다. 삭제된 결과는 반환하지만, 해당 결과는 result 변수에 저장되지 않고 반환되지 않습니다.*/
-
-
-//  이하 PRDT 추가
-
-  @Override
-  public int selectPrdtCount(Map<String, String> param) {
-    return bm16Mapper.selectPrdtCount(param);
+	  int result = bm16Mapper.deletePrjctPrdtSeqAll(param);
+	  result = bm16Mapper.deletePrjctDtlSeqAll(param);
+	  result = bm16Mapper.deletePrjct(param);
+    return result;
   }
 
-  @Override
-  public int selectPrdtClntCount(Map<String, String> param) {
-    return bm16Mapper.selectPrdtClntCount(param);
-  }
-
-  @Override
-  public List<Map<String, String>> selectPrdtClntList(Map<String, String> param) {
-    return bm16Mapper.selectPrdtClntList(param);
-  }
-
-  @Override
-  public int selectOneMasterClntCount(Map<String, String> param) {
-    return bm16Mapper.selectOneMasterClntCount(param);
-  }
-
-  @Override
-  public Map<String, String> seletOneMasterClnt(Map<String, String> param) {
-    return bm16Mapper.seletOneMasterClnt(param);
-  }
-
-  @Override
-  public int insertOneMasterClnt(Map<String, String> param) {
-    return bm16Mapper.insertOneMasterClnt(param);
-
-  }
-
-  @Override
-  public Map<String, String> seletOneMaster(Map<String, String> param) {
-    return bm16Mapper.seletOneMaster(param);
-  }
-
-  @Override
-  public int insertOneMaster(Map<String, String> param) {
-    return bm16Mapper.insertOneMaster(param);
-  }
-
-  @Override
-  public int selectOneMasterCount(Map<String, String> param) {
-    return bm16Mapper.selectOneMasterCount(param);
-  }
-
-  @Override
-  public int insertOneDetail01(Map<String, String> param) {
-    return bm16Mapper.insertOneDetail01(param);
-  }
-
-  @Override
-  public int updateOneDetail01(Map<String, String> param) {
-    return bm16Mapper.updateOneDetail01(param);
-  }
-
-  @Override
-  public Map<String, String> seletOneDetail01(Map<String, String> param) {
-    return bm16Mapper.seletOneDetail01(param);
-  }
 }
