@@ -227,6 +227,10 @@ public class WB01Ctr {
 	  
 	  @PostMapping(value = "/wbsLevel1PlanInsert")
       public String wbsLevel1PlanInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+	    List<Map<String, String>> sharngChk = wb01Svc.deleteWbsSharngListChk(paramMap);
+		if (sharngChk.size() > 0) {
+			wb01Svc.deleteWbsSharngList(paramMap);	
+		}
 		wb01Svc.wbsLevel1PlanInsert(paramMap, mRequest);
     	model.addAttribute("resultCode", 200);
     	model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
@@ -235,6 +239,10 @@ public class WB01Ctr {
 	 
 	  @PutMapping(value = "/wbsLevel1PlanUpdate")
       public String wbsLevel1PlanUpdate(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+		List<Map<String, String>> sharngChk = wb01Svc.deleteWbsSharngListChk(paramMap);
+		if (sharngChk.size() > 0) {
+				wb01Svc.deleteWbsSharngList(paramMap);	
+		}
 		wb01Svc.wbsLevel1PlanUpdate(paramMap, mRequest);
     	model.addAttribute("resultCode", 200);
     	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
@@ -322,6 +330,16 @@ public class WB01Ctr {
 	    List<Map<String, String>> result = wb01Svc.selectFileCodeSelect(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
+	  }
+	  
+	  //<!-- 사용자 정보 테이블 조회  -->  
+	  @PostMapping(value = "/selectPlanSharngList") 
+	  public String selectPlanSharngList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  
+		  List<Map<String, String>> resultList = wb01Svc.selectPlanSharngList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+		  
 	  }
 	  
 }

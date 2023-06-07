@@ -37,7 +37,13 @@ public interface WB01Svc {
 	List<Map<String, String>> selectWbsPopupLevel3PlanList(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectWbsPopupSharngList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectPlanSharngList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> deleteWbsSharngListChk(Map<String, String> paramMap);
 
+	
+	int deleteWbsSharngList(Map<String, String> paramMap);
 	
 	int deleteWbsSharngUser(Map<String, String> paramMap);
 	
