@@ -84,7 +84,8 @@
 			FROM TB_BM05M01 X 
 				<!-- ORDER BY RN ASC -->
 			) Y
-		WHERE RN BETWEEN ${firstIndex} AND ${lastIndex}
+		WHERE 
+			RN BETWEEN ${firstIndex} AND ${lastIndex}
 			<if test="coCd != null and !coCd.equals('')">
 				AND Y.CO_CD LIKE '${coCd}' 
 			</if>
@@ -109,9 +110,31 @@
 			<if test="matrSpec != null and !matrSpec.equals('')">
 				AND Y.MATR_SPEC LIKE '%'||'${matrSpec}'||'%'--규격
 			</if>
-				
 	</select>
 	
+	<select id="selectMatListCount" parameterType="Map" resultType="int">
+		SELECT COUNT(*)
+			FROM TB_BM05M01	
+		<where>
+			<if test="coCd != null and !coCd.equals('')">
+				CO_CD = #{coCd} 
+			</if>
+			<if test="searchValue != null and !searchValue.equals('') and !searchType.equals('MATR_CD')">
+	     	 	AND ${searchType} LIKE '%${searchValue}%'
+	     	</if>
+	     	<if test="searchValue != null and !searchValue.equals('') and searchType.equals('MATR_CD')">
+	      		AND MATR_CD = #{searchValue}
+	     	</if>
+			<if test="matrCd != null and !matrCd.equals('')">
+				AND MATR_CD = #{matrCd} -- 자재코드 품번
+			</if>
+			<if test="matrNm != null and !matrNm.equals('')">
+	      		AND MATR_NM LIKE '%${matrNm}%' -- 자재명
+	     	</if>
+	     </where>
+	</select>
+	
+	<!-- 자재마스터 품번 팝업 그리드 조회 -->
 	<select id="selectMatList" parameterType="Map" resultType="camelMap">
 		SELECT * FROM (
 			SELECT
@@ -146,8 +169,11 @@
 				(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.MATR_UNIT) AS MATR_UNIT_NM
 			FROM TB_BM05M01 X
 			) Y
-		WHERE
-			RN BETWEEN #{firstIndex} AND #{lastIndex}
+		WHERE 
+			<!-- RN BETWEEN ${firstIndex} AND ${lastIndex} -->
+			<if test="coCd != null and !coCd.equals('')">
+				CO_CD = #{coCd}
+			</if>
 			<if test="searchValue != null and !searchValue.equals('') and !searchType.equals('MATR_CD')">
 	     	 	AND ${searchType} LIKE '%${searchValue}%'
 	     	</if>
@@ -155,10 +181,13 @@
 	      		AND Y.MATR_CD = #{searchValue}
 	     	</if>
 			<if test="matrCd != null and !matrCd.equals('')">
-				AND Y.MATR_CD LIKE '%'||'${matrCd}'||'%' --자재코드 품번
+				AND Y.MATR_CD LIKE '%'||#{matrCd}||'%' -- 자재코드 품번
 			</if>
 			<if test="matrNm != null and !matrNm.equals('')">
-	      		AND A.MATR_NM LIKE '%${matrNm}%'
+	      		AND Y.MATR_NM LIKE '%'||#{matrNm}||'%' -- 자재명
+	     	</if>
+	     	<if test="matrClntDiv != null and !matrClntDiv.equals('')">
+	     		AND Y.MATR_CLNT_DIV LIKE '%'||#{matrClntDiv}||'%' -- 자재거래처분류
 	     	</if>
 	</select>
 	
@@ -177,7 +206,7 @@
 				'GUN',
 				'MATRCLNTDIV200',
 				'Ball Bush200-2',
-				't 소재',
+				't소재',
 				'thk',
 				'HR2012',
 				'100x100x45',
@@ -189,6 +218,7 @@
 	<insert id="insertBmMstr" parameterType="Map">
 	    <selectKey keyProperty="fileTrgtKey" resultType="int" order="BEFORE">
 	        SELECT NVL(MAX(TO_NUMBER(FILE_TRGT_KEY)), 0) + 1 FROM TB_BM05M01
+		<!--	SELECT MAX(TO_NUMBER(FILE_TRGT_KEY)) + 1 INTO HOST_FILE_TRGT_KEY FROM TB_BM11M01	-->
 	    </selectKey>
 	    INSERT INTO TB_BM05M01 
 	    (
@@ -199,7 +229,7 @@
 	        GOODS_DIV,	-- 품목구분
 	        MATR_CLNT_DIV, 	-- 거래처구분
 	        MATR_DIV,		-- 자재유형
-	        MATR_GRP,		-- 자재분류-자재그룹
+	        MATR_GRP,		-- 자재그룹
 	        MATR_MAT,
 	        MATR_SIZE,
 	        MATR_SPEC,
@@ -227,7 +257,7 @@
 	        PCHS_CLNT_PCT2,
 	        PCHS_CLNT_CD3,
 	        PCHS_CLNT_PCT3,
-        	DSGN_TRGT_YN,	-- 설계대상구분
+        	DSGN_TRGT_YN,	
 	        CREAT_ID,
 	        CREAT_PGM,
 	        CREAT_DTTM
@@ -279,7 +309,7 @@
 	<update id="updateBmMstr" parameterType="Map">
 		UPDATE TB_BM05M01
 			SET
-				MATR_DIV = #{matrDiv},
+				MATR_DIV = #{matrDiv},		-- 자재유형
 				MATR_GRP = #{matrGrp},		-- 자재분류-자재그룹
 				MATR_MAT = #{matrMat},		-- 소재
 				MATR_SIZE = #{matrSize},	-- 사이즈
@@ -315,7 +345,6 @@
 		WHERE 
 		<!-- 	 	CO_CD = #{coCd}, -->
 			 	FILE_TRGT_KEY = #{fileTrgtKey}
-	
 	</update>
 
 </mapper>

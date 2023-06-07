@@ -40,7 +40,7 @@ public class BM05Ctr {
 		int totalCnt = bm05Svc.selectBmMstrCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
-		
+
 		List<Map<String, String>> resultList = bm05Svc.selectBmMstrList(paramMap);
 		model.addAttribute("resultList", resultList);
 		
@@ -50,7 +50,7 @@ public class BM05Ctr {
 	// 품번 팝업 그리드 조회
 	@PostMapping(value = "/selectMatList")
 	public String selectMatList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = bm05Svc.selectBmMstrCount(paramMap);
+		int totalCnt = bm05Svc.selectMatListCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
 		
@@ -58,7 +58,6 @@ public class BM05Ctr {
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
 	}
-	
 	
 	// 품번 가져오기
 	@PostMapping(value = "/selectMatrCd")
@@ -70,7 +69,7 @@ public class BM05Ctr {
 	
 	// 자재마스터 품번 중복 체크 조회
 	@PostMapping(value = "/selectMatrCdChk")
-	public String selectMatrCdChk(@RequestBody Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+	public String selectMatrCdChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		try {
 			String result = bm05Svc.selectMatrCdChk(paramMap);
 			model.addAttribute("result", result);
@@ -83,8 +82,7 @@ public class BM05Ctr {
 		return "jsonView";
 	}
 	
-	
-	
+	// 상세 입력
 	@PostMapping(value = "/insertBmMstr")
 	public String insertBmMstr(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {
@@ -98,6 +96,7 @@ public class BM05Ctr {
 		return "jsonView";
 	}
 	
+	// 상세 수정
 	@PutMapping(value = "/updateBmMstr")// RequestParam 으로 바꾸기
 	public String updateBmMstr(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {
