@@ -235,15 +235,18 @@
 var actionType = null;
 var paramPrjctSeq = null;
 var prdtArr = [];
-var prdtDeleteArr = [];
-var detailArr = []; 
+var prdtDeleteArr = [];//제품코드 삭제 내용 저장
+var prdtItemArr = [];  //제품코드:상세아이템 그리드내용,...로 임시저장, 변경된건만 저장
+var detailArr = [];
 var firstGrid = null;
 var secondGrid = null;
 var prdtIdx = null;		//제품선택병경 체크용 인덱스	
 var saveWork = false;	//제품 아이템 수정 내역 체크
 var savePrdtCd = null;	//제품선택변경 체크용
+var savePrdtNewCd = null;	//제품선택변경 체크용
 var itemArr = [];
 var deleteItemArr = [];
+var isFirst = true;
 
 var PD01GridView = {
 		initView: function(){
@@ -260,19 +263,14 @@ var PD01GridView = {
 		         body: {
 			        	 onClick: function () {
 			                this.self.select(this.dindex);
-			                prdtIdx = this.dindex;
-			                if ((savePrdtCd != this.item.prjctPrdtCd) && saveWork) {
-		                		if(confirm('아이템 수정내역이 있습니다. 저장하시겠습니다까?')){	
-				                	if (actionType == "C") {
-			                			insertPrjct();
-				                	} else {
-			                			updatePrjct();
-			                		}
-			                	}
+			                if (saveWork) {
+		                		prdtItemArr[prdtIdx] = PJ01GridView.target.list;
 		                		saveWork = false;
 			                }
-			                PJ01GridView.setData(this.item.prjctPrdtCd);
+			                prdtIdx = this.dindex;
 			                savePrdtCd = this.item.prjctPrdtCd;
+			                savePrdtNewCd = this.item.prjctPrdtNewCd;
+			                PJ01GridView.setData(savePrdtCd, savePrdtNewCd);
 			        	 },
 						 onDBLClick: function () {
 						 	updatePrdtList('U');
@@ -280,8 +278,9 @@ var PD01GridView = {
 
 			             onDataChanged: function () {
 			            	 if (this.item.__selected__ == true) {
-// 			                		var index = this.dindex;
+			                		prdtIdx = this.dindex;
 			                		savePrdtCd = this.item.prjctPrdtCd;
+			                		savePrdtNewCd = this.item.prjctPrdtNewCd;
 			                }
 			            	 //제품내역 수정이 있으면 저장 필요
 // 			            	saveWork = true;
@@ -291,7 +290,7 @@ var PD01GridView = {
 		        columns : [
 		            {key : "prjctSeq",  		label : "프로젝트시퀀스",   width : 30,	hidden: true}
 		           ,{key : "prjctInpexpCd",  	label : "국내외",     width : 60,	hidden: true}
-		           ,{key : "prjctInpexpNm",  	label : "국내외",     width : 50,	hidden: false}
+		           ,{key : "prjctInpexpNm",  	label : "국내외",     width : 50,	hidden: true}
 		           ,{key : "prjctPrdtNewCd",  	label : "신규",    width : 50,	hidden: true}
 		           ,{key : "prjctPrdtNewNm",  	label : "신규여부",    width : 50,	hidden: false}
 		           ,{key : "prjctPrdtCd",  		label : "제품코드",   width : 60,	hidden: true}
@@ -308,24 +307,25 @@ var PD01GridView = {
 
 
         setData: function(){
-			 var target = this.target;
-       		 var formData = {
+//         	if (isFirst && savePrdtCd) {
+				var target = this.target;
+				var formData = {
 					"prjctSeq" 		: paramPrjctSeq,
-//       				"pageNo" 		: _pageNo + 1,
-//       				"recordCnt" 	: $("#recordCnt").val()
-       		 }
-
-    		postAjax("/admin/bm/bm16/selectPrdtList", formData, null, function(data) {
-				var list = data.prdtList;
-				target.setData({
-            		list : list,
-            		page : {
-            			totalElements : list.length				 	//그리드 하단 파일 수 표시용
-            		}
-       			 });
-    	 	});
-     	   }
-        }
+				}
+	
+	    		postAjax("/admin/bm/bm16/selectPrdtList", formData, null, function(data) {
+					var list = data.prdtList;
+					target.setData({
+	            		list : list,
+	            		page : {
+	            			totalElements : list.length				 	//그리드 하단 파일 수 표시용
+	            		}
+	       			 });
+	    	 	});
+// 				isFirst = false;
+//         	}
+     	} //setData
+     }
 
 
 var PJ01GridView = {
@@ -355,39 +355,50 @@ var PJ01GridView = {
 			            },
 		        },
 		        columns : [
-		               {key : "isChk",    		label : "선택",   		width : 80,
+		               {key : "isChk",    			label : "선택",   		width : 80,
 	          	  			editor: {type: "checkbox",	config: {trueValue : "Y",	falseValue : "N"}}}
-	                  ,{key : "prjctSeq",  		label : "프로젝트시퀀스", 	width : 40,   hidden: true}
-	                  ,{key : "prjctPrdtCd",  	label : "제품코드", 	hidden: true}
-		              ,{key : "codeId",			label : "코드아이디",  hidden: true}
-		              ,{key : "prjctItemCd", 	label : "등록아이템코드", 	width : 100,   hidden: true}
-		              ,{key : "codeNm",  	  	label : "아이템내역",     	width : 200,}
-		              ,{key : "prjctItemRmk", 	label : "비고",   		width : 300,  editor: {type: "textarea"}}
+	                  ,{key : "prjctSeq",  			label : "프로젝트시퀀스", 	width : 40,   hidden: true}
+	                  ,{key : "prjctPrdtCd",  		label : "제품코드", 		hidden: true}
+		              ,{key : "codeId",				label : "코드아이디",  	hidden: true}
+		              ,{key : "prjctItemCd", 		label : "등록아이템코드", 	width : 100,   hidden: true}
+		              ,{key : "codeNm",  	  		label : "아이템내역",     	width : 200,}
+			          ,{key : "prjctPrdtNewCd",  	label : "신규",    		width : 50,	hidden: true}
+		              ,{key : "prjctItemRmk", 		label : "비고",   		width : 300,  editor: {type: "textarea"}}
 		         	]
 		    });
 			return this;
 		},
 
-		setData: function(prdtCd){
+		setData: function(prdtCd,  prdtNewCd){
 			secondGrid = this.target;
-// 			var row = PD01GridView.target.getList("selected")[0];
 			
-			if (prdtCd) {
-	   		 	var formData = {
-					"prjctSeq" 		: paramPrjctSeq,
-	        		"prjctPrdtCd" 	: prdtCd  
-	   		 	}
-	
-				postAjax("/admin/bm/bm16/selectItemList", formData, null, function(data) {
-						var list = data.itemList;
-						secondGrid.setData({
-							list : list,
-							page : {
-								totalElements : list.length
-							}
-				     	});
-				});
-			}
+			if (prdtItemArr[prdtIdx]) {
+				var list = prdtItemArr[prdtIdx];
+				secondGrid.setData({
+					list : list,
+					page : {
+						totalElements : list.length
+					}
+		     	});
+			} else {
+				if (prdtCd) {
+		   		 	var formData = {
+						"prjctSeq" 		: paramPrjctSeq,
+		        		"prjctPrdtCd" 	: prdtCd,  
+		        		"prjctPrdtNewCd": prdtNewCd  
+		   		 	}
+		
+					postAjax("/admin/bm/bm16/selectItemList", formData, null, function(data) {
+							var list = data.itemList;
+							secondGrid.setData({
+								list : list,
+								page : {
+									totalElements : list.length
+								}
+					     	});
+					});
+				} //if (prdtCd) {
+			}  //if (prdtItemArr[prdtIdx]
 		}
 }
 
@@ -455,7 +466,7 @@ var PJ01GridView = {
 		actionType = modalStack.last().paramObj.actionType;
 		paramPrjctSeq = modalStack.last().paramObj.prjctSeq;
 		savePrdtCd = '';
-		
+		savePrdtNewCd = '';
 
 		PD01GridView.initView();
 		PJ01GridView.initView();
@@ -494,12 +505,13 @@ var PJ01GridView = {
 					}
 				});
 				var prdtList = data.result.prdtList;
-// 				var itemList = data.result.itemList;
 				
 				if (prdtList.length) {
 					PD01GridView.setData(0); 		//첫 번째 그리드의 데이터를 불러오기
-					PJ01GridView.setData(prdtList[0].prjctPrdtCd); 
 					savePrdtCd = prdtList[0].prjctPrdtCd;
+					savePrdtNewCd = prdtList[0].prjctPrdtNewCd;
+					PJ01GridView.setData(savePrdtCd, savePrdtNewCd); 
+// 					PD01GridView.target.focus("HOME");
 				}
 				prdtIdx = 0;
 		});
@@ -510,6 +522,11 @@ var PJ01GridView = {
     //--  SD0601M01 복사 수정 본 참고자료-----  //
 
 	function updatePrdtList(type){
+		
+        if (saveWork) {
+       		prdtItemArr[prdtIdx] = PJ01GridView.target.list;
+       		saveWork = false;
+		}		
 		
 		if ( type == 'U') {
 			if (selectGridValidation(PD01GridView.target))
@@ -531,10 +548,11 @@ var PJ01GridView = {
 				idx = PD01GridView.target.getList().length;
 				crudChk = 'I';
 			}
+			prdtIdx = idx;
 			
 			PD01GridView.target.list[idx] = {
 				  prjctSeq			: 0,  //처음 파라메터 프로젝트 키값
-				  prjctInpexpCd		: rtnData.prjctInpexpCd,
+				  prjctInpexpCd		: $("#inpexpCd").val(),
 				  prjctInpexpNm		: rtnData.prjctInpexpNm,
 				  prjctPrdtNewCd	: rtnData.prjctPrdtNewCd,
 				  prjctPrdtNewNm	: rtnData.prjctPrdtNewNm,
@@ -550,6 +568,10 @@ var PJ01GridView = {
 			};
 //            	saveWork = true;
 			PD01GridView.target.repaint();
+			PD01GridView.target.focus("END");
+			savePrdtCd = rtnData.prjctPrdtCd;
+			savePrdtNewCd = rtnData.prjctPrdtNewCd;
+			PJ01GridView.setData(savePrdtCd, savePrdtNewCd); 			
 				
 		});
 	}
@@ -591,9 +613,9 @@ var PJ01GridView = {
 						alert(data.resultMessage);
 						if (data.resultCode == 200) {
 							gridView.setData(0);
-// 							modalStack.close();
-							selectPrjctInfo();
 							saveWork = false;
+// 							selectPrjctInfo();
+							modalStack.close();
 						}
 					});
 		}
@@ -645,35 +667,42 @@ var PJ01GridView = {
 		
 		formData.append("prdtArr", JSON.stringify(prdtArr));
 		//제품-설비자료  끝		
-debugger;
+
 		//세부 아이템 자료 준비
-		var list = PJ01GridView.target.list;
+        if (saveWork) {
+			prdtItemArr[prdtIdx] = PJ01GridView.target.list;
+       		saveWork = false;
+        }
+		
 		detailArr = [];
-		$.each(list,function(idx, obj) {
-			if (obj.itemUpd == 'U') {
-				if (!obj.prjctItemCd && obj.isChk == 'Y') {
-					obj.dtaChk = 'I';
-					obj.prjctSeq = $("#prjctSeq").val();
-					obj.prjctPrdtCd = savePrdtCd;
-					obj.prjctItemCd = obj.codeId;
-					
-					detailArr.push(obj);
-				} else if (obj.prjctItemCd && obj.isChk == 'Y') {
-					obj.dtaChk = 'U';
-					detailArr.push(obj);
-				} else if (obj.prjctItemCd && obj.isChk == 'N') {
-					obj.dtaChk = 'D';
-					detailArr.push(obj);
-				}
+		$.each(prdtItemArr,function(prdtIdx, list) {
+			if (list) {
+// 			var list = PJ01GridView.target.list;
+				$.each(list,function(idx, obj) {
+					if (obj.itemUpd == 'U') {
+						if (!obj.prjctItemCd && obj.isChk == 'Y') {
+							obj.dtaChk = 'I';
+							obj.prjctSeq = $("#prjctSeq").val();
+							obj.prjctItemCd = obj.codeId;
+							detailArr.push(obj);
+						} else if (obj.prjctItemCd && obj.isChk == 'Y') {
+							obj.dtaChk = 'U';
+							detailArr.push(obj);
+						} else if (obj.prjctItemCd && obj.isChk == 'N') {
+							obj.dtaChk = 'D';
+							detailArr.push(obj);
+						}
+					}
+				});
 			}
-		});
+		});		
 
 		formData.append("detailArr", JSON.stringify(detailArr));//선택된 ROW 만 formData에 저장
 		//세부 아이템 자료 끝
 		
 		return formData;
 	}
-debugger;
+
 	//  업체명 검색 //
 	function clntSearch() {
 		openSecondModal("/static/html/cmn/modal/clntSearch.html", 600, 420,

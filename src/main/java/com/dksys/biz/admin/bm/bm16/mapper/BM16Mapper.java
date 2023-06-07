@@ -30,15 +30,15 @@ public interface BM16Mapper {
   
   int updatePrjct(Map<String, String> paramMap);
 
-  int updatePrjctPrdt(Map<String, String> param);
+  int updatePrjctPrdt(Map<String, String> paramMap);
   
-  int updatePrjctDtl(Map<String, String> param);
+  int updatePrjctDtl(Map<String, String> paramMap);
 
-  int deletePrjct(Map<String, String> param);
+  int deletePrjct(Map<String, String> paramMap);
   
-  int deletePrjctPrdtSeqAll(Map<String, String> param);
+  int deletePrjctPrdtSeqAll(Map<String, String> paramMap);
   
-  int deletePrjctDtlSeqAll(Map<String, String> param);
+  int deletePrjctDtlSeqAll(Map<String, String> paramMap);
 
   int deletePrjctPrdt(Map<String, String> paramMap);
   

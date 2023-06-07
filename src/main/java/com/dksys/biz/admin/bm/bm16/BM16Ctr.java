@@ -90,8 +90,8 @@ public class BM16Ctr {
   }
 
   @PutMapping(value = "/deletePrjct")
-  public String deletePrjct(@RequestBody Map<String, String> param, ModelMap model) {
-    bm16Svc.deletePrjct(param);
+  public String deletePrjct(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    bm16Svc.deletePrjct(paramMap);
     model.addAttribute("resultCode", 200);
     model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
     return "jsonView";

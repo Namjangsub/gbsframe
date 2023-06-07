@@ -146,10 +146,10 @@ public class BM16SvcImpl implements BM16Svc {
   }
 
   @Override
-  public int deletePrjct(Map<String, String> param) {
-	  int result = bm16Mapper.deletePrjctPrdtSeqAll(param);
-	  result = bm16Mapper.deletePrjctDtlSeqAll(param);
-	  result = bm16Mapper.deletePrjct(param);
+  public int deletePrjct(Map<String, String> paramMap) {
+	  int result = bm16Mapper.deletePrjctPrdtSeqAll(paramMap);
+	  result = bm16Mapper.deletePrjctDtlSeqAll(paramMap);
+	  result = bm16Mapper.deletePrjct(paramMap);
     return result;
   }
 

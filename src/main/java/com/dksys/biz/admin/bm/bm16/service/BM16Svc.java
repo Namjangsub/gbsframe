@@ -25,6 +25,6 @@ public interface BM16Svc {
 
   int updatePrjct(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
-  int deletePrjct(Map<String, String> param);
+  int deletePrjct(Map<String, String> paramMap);
 
 }
