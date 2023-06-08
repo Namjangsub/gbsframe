@@ -875,12 +875,12 @@ $.urlParam = function(name){
 }
 
 function authChk(menuUrl){
-	$(".bg_gray").hide();
+//	$(".bg_gray").hide();
 	if(!menuUrl){
 		var url = window.location.href;
 		menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
 	}
-	/*	var arr = JSON.parse(getCookie("authArr"));
+		var arr = JSON.parse(getCookie("authArr"));
         var saveYn = "N";
         for(var i = 0; i < arr.length; i++){
             if(arr[i].menuUrl == menuUrl){
@@ -894,7 +894,7 @@ function authChk(menuUrl){
             } else {
                 $(elem).hide();
             }
-        });*/
+        });
 
 //	// select 회사코드 disable (감사용 임시코드)
 //	$('select[data-kind="CO"]').prop("disabled", true);
