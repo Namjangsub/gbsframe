@@ -16,4 +16,6 @@ public interface BM10Svc {
 
 	int updateBmPrdtMstr(Map<String, String> paramMap);
 
+	int selectBmProdCount(Map<String, String> paramMap);
+
 }

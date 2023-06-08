@@ -19,4 +19,6 @@ public interface BM10Mapper {
 
 	int updateBmPrdtMstr(Map<String, String> paramMap);
 
+	int selectBmProdCount(Map<String, String> paramMap);
+
 }

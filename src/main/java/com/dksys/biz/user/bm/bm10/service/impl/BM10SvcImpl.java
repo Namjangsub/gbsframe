@@ -28,12 +28,18 @@ public class BM10SvcImpl implements BM10Svc {
 //	@Override
 //	public int selectBmPrdtMstrCount(Map<String, String> paramMap) {
 //		return bm10Mapper.selectBmPrdtMstrCount(paramMap);
-//	} 
+//	}  
 
 	@Override
 	public int selectBmPrdtMstrCount(Map<String, String> paramMap) {
 		// TODO Auto-generated method stub
 		return bm10Mapper.selectBmPrdtMstrCount(paramMap);
+	}
+
+	@Override
+	public int selectBmProdCount(Map<String, String> paramMap) {
+		// TODO Auto-generated method stub
+		return bm10Mapper.selectBmProdCount(paramMap);
 	}
 
 	@Override

@@ -47,7 +47,7 @@ public class BM10Ctr {
 
 	@PostMapping(value = "/selectBmProdSearchList")
 	public String selectBmProdSearchList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = bm10Svc.selectBmPrdtMstrCount(paramMap);
+		int totalCnt = bm10Svc.selectBmProdCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
 
