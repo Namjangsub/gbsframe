@@ -74,4 +74,11 @@ public interface WB02Mapper {
 	List<Map<String, String>> selectWbsPlanInfoSelect(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectWbsPlanConfirmCount(Map<String, String> paramMap);
+	
+	int selectWbsPlanDeleteConfirmCount(Map<String, String> paramMap);
+	
+	int deleteWbsPlanlist(Map<String, String> paramMap);
+	
+	
+	
 }

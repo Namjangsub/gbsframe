@@ -242,4 +242,22 @@ public class WB02Ctr {
 		  
 	  }
 	  
+	 //<!-- WBS일정실적 메인화면 삭제 시 삭제유무 체크  -->
+	 @PostMapping(value = "/selectWbsPlanDeleteConfirmCount")
+	 public String selectWbsPlanDeleteConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int result = wb02Svc.selectWbsPlanDeleteConfirmCount(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	 }
+	 
+	 @DeleteMapping(value = "/deleteWbsPlanlist")
+     public String deleteWbsPlanlist(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		wb02Svc.deleteWbsPlanlist(paramMap);
+    	model.addAttribute("resultCode", 200);
+    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+    	return "jsonView";
+     } 
+	 
+	 
+		 
 }

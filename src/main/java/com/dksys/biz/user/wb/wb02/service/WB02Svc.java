@@ -69,4 +69,8 @@ public interface WB02Svc {
 	
 	//  <!-- WBS 실적 상위공정 유무체크  -->
     List<Map<String, String>>  selectWbsPlanConfirmCount(Map<String, String> paramMap);
+    
+    int selectWbsPlanDeleteConfirmCount(Map<String, String> paramMap);
+    
+    int deleteWbsPlanlist(Map<String, String> paramMap);
 }

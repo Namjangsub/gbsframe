@@ -259,6 +259,10 @@ public class WB01Ctr {
 	  
 	  @PostMapping(value = "/wbsLevel2PlanInsert")
       public String wbsLevel2PlanInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+	    List<Map<String, String>> sharngChk = wb01Svc.deleteWbsSharngListChk(paramMap);
+	    if (sharngChk.size() > 0) {
+		   wb01Svc.deleteWbsSharngList(paramMap);	
+	    }
 		wb01Svc.wbsLevel2PlanInsert(paramMap, mRequest);
     	model.addAttribute("resultCode", 200);
     	model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
@@ -267,6 +271,10 @@ public class WB01Ctr {
 	 
 	  @PutMapping(value = "/wbsLevel2PlanUpdate")
       public String wbsLevel2PlanUpdate(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+		List<Map<String, String>> sharngChk = wb01Svc.deleteWbsSharngListChk(paramMap);
+		if (sharngChk.size() > 0) {
+				wb01Svc.deleteWbsSharngList(paramMap);	
+		}
 		wb01Svc.wbsLevel2PlanUpdate(paramMap, mRequest);
     	model.addAttribute("resultCode", 200);
     	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
@@ -275,6 +283,10 @@ public class WB01Ctr {
 
 	  @PostMapping(value = "/wbsLevel3PlanInsert")
       public String wbsLevel3PlanInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+	    List<Map<String, String>> sharngChk = wb01Svc.deleteWbsSharngListChk(paramMap);
+	    if (sharngChk.size() > 0) {
+		   wb01Svc.deleteWbsSharngList(paramMap);	
+	    }
 		wb01Svc.wbsLevel3PlanInsert(paramMap, mRequest);
     	model.addAttribute("resultCode", 200);
     	model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
@@ -283,6 +295,10 @@ public class WB01Ctr {
 	 
 	  @PutMapping(value = "/wbsLevel3PlanUpdate")
       public String wbsLevel3PlanUpdate(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+	    List<Map<String, String>> sharngChk = wb01Svc.deleteWbsSharngListChk(paramMap);
+	    if (sharngChk.size() > 0) {
+		   wb01Svc.deleteWbsSharngList(paramMap);	
+	    }
 		wb01Svc.wbsLevel3PlanUpdate(paramMap, mRequest);
     	model.addAttribute("resultCode", 200);
     	model.addAttribute("resultMessage", messageUtils.getMessage("update"));

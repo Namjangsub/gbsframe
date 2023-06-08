@@ -196,19 +196,13 @@ public class WB01SvcImpl implements WB01Svc {
 			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
 	            try {
-						sharngMap.put("coCd", paramMap.get("coCd"));
-						sharngMap.put("todoDiv1CodeId", paramMap.get("todoDiv1CodeId"));
-						sharngMap.put("todoDiv2CodeId", paramMap.get("todoDiv2CodeId"));
-						sharngMap.put("wbsSharngUserId", paramMap.get("wbsSharngUserId"));
-						sharngMap.put("salesCd", paramMap.get("salesCd"));
-						sharngMap.put("pgPath", paramMap.get("pgPath"));
-						sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-						sharngMap.put("wbsPlancoCd", paramMap.get("wbsPlancoCd"));
-						sharngMap.put("wbsPlanNo", paramMap.get("wbsPlanNo"));
-						sharngMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
-						sharngMap.put("wbsPlanCodeId", paramMap.get("wbsPlanCodeId"));
-						sharngMap.put("creatId", paramMap.get("creatId"));
-						sharngMap.put("creatPgm", paramMap.get("creatPgm"));                                        
+		            	sharngMap.put("coCd", paramMap.get("coCd"));
+		            	sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		            	sharngMap.put("todoDiv1CodeId", paramMap.get("S_todoDiv1CodeId"));
+		            	sharngMap.put("todoDiv2CodeId", paramMap.get("S_todoDiv2CodeId"));	
+		            	sharngMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
+		            	sharngMap.put("creatId", paramMap.get("creatId"));
+		            	sharngMap.put("creatPgm", paramMap.get("creatPgm"));                                      
 	            	    wb01Mapper.insertWbsSharngList(sharngMap);
        		
 	            	i++;
@@ -217,10 +211,7 @@ public class WB01SvcImpl implements WB01Svc {
 	            }
 	        }
 		}
-		
-		
-		
-		
+
 		int result = wb01Mapper.wbsLevel1PlanInsert(paramMap);
 
 		return result;
@@ -248,11 +239,13 @@ public class WB01SvcImpl implements WB01Svc {
 			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
 	            try {
-						sharngMap.put("coCd", paramMap.get("coCd"));
-						sharngMap.put("todoDiv1CodeId", paramMap.get("S_todoDiv1CodeId"));
-						sharngMap.put("todoDiv2CodeId", paramMap.get("S_todoDiv2CodeId"));
-						sharngMap.put("creatId", paramMap.get("creatId"));
-						sharngMap.put("creatPgm", paramMap.get("creatPgm"));                                        
+		            	sharngMap.put("coCd", paramMap.get("coCd"));
+		            	sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		            	sharngMap.put("todoDiv1CodeId", paramMap.get("S_todoDiv1CodeId"));
+		            	sharngMap.put("todoDiv2CodeId", paramMap.get("S_todoDiv2CodeId"));	
+		            	sharngMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
+		            	sharngMap.put("creatId", paramMap.get("creatId"));
+		            	sharngMap.put("creatPgm", paramMap.get("creatPgm"));                                       
 	            	    wb01Mapper.insertWbsSharngList(sharngMap);
        		
 	            	i++;
@@ -286,6 +279,30 @@ public class WB01SvcImpl implements WB01Svc {
 				System.out.println("error4"+e.getMessage());
 			}
 		}
+		
+		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
+		if (sharngArr != null && sharngArr.size() > 0 ) {
+			int i = 0;
+	        for (Map<String, String> sharngMap : sharngArr) {
+	            try {
+		            	sharngMap.put("coCd", paramMap.get("coCd"));
+		            	sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		            	sharngMap.put("todoDiv1CodeId", paramMap.get("S_todoDiv1CodeId"));
+		            	sharngMap.put("todoDiv2CodeId", paramMap.get("S_todoDiv2CodeId"));	
+		            	sharngMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
+		            	sharngMap.put("creatId", paramMap.get("creatId"));
+		            	sharngMap.put("creatPgm", paramMap.get("creatPgm"));                                       
+	            	    wb01Mapper.insertWbsSharngList(sharngMap);
+       		
+	            	i++;
+	            } catch (Exception e) {
+	                System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
+		
+		
 		int result = wb01Mapper.wbsLevel2PlanInsert(paramMap);
 		return result;
 	}
@@ -306,6 +323,30 @@ public class WB01SvcImpl implements WB01Svc {
 			}
 		}
 
+		
+		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
+		if (sharngArr != null && sharngArr.size() > 0 ) {
+			int i = 0;
+	        for (Map<String, String> sharngMap : sharngArr) {
+	            try {
+		            	sharngMap.put("coCd", paramMap.get("coCd"));
+		            	sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		            	sharngMap.put("todoDiv1CodeId", paramMap.get("S_todoDiv1CodeId"));
+		            	sharngMap.put("todoDiv2CodeId", paramMap.get("S_todoDiv2CodeId"));	
+		            	sharngMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
+		            	sharngMap.put("creatId", paramMap.get("creatId"));
+		            	sharngMap.put("creatPgm", paramMap.get("creatPgm"));                                       
+	            	    wb01Mapper.insertWbsSharngList(sharngMap);
+       		
+	            	i++;
+	            } catch (Exception e) {
+	                System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
+		
+		
 		int result = wb01Mapper.wbsLevel2PlanUpdate(paramMap);
 		return result;
 	}
@@ -326,6 +367,28 @@ public class WB01SvcImpl implements WB01Svc {
 			}
 		}
 
+		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
+		if (sharngArr != null && sharngArr.size() > 0 ) {
+			int i = 0;
+	        for (Map<String, String> sharngMap : sharngArr) {
+	            try {
+		            	sharngMap.put("coCd", paramMap.get("coCd"));
+		            	sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		            	sharngMap.put("todoDiv1CodeId", paramMap.get("S_todoDiv1CodeId"));
+		            	sharngMap.put("todoDiv2CodeId", paramMap.get("S_todoDiv2CodeId"));	
+		            	sharngMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
+		            	sharngMap.put("creatId", paramMap.get("creatId"));
+		            	sharngMap.put("creatPgm", paramMap.get("creatPgm"));                                      
+	            	    wb01Mapper.insertWbsSharngList(sharngMap);
+       		
+	            	i++;
+	            } catch (Exception e) {
+	                System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
+		
 		int result = wb01Mapper.wbsLevel3PlanInsert(paramMap);
 
 		return result;
@@ -347,6 +410,28 @@ public class WB01SvcImpl implements WB01Svc {
 			}
 		}
 
+		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
+		if (sharngArr != null && sharngArr.size() > 0 ) {
+			int i = 0;
+	        for (Map<String, String> sharngMap : sharngArr) {
+	            try {
+		            	sharngMap.put("coCd", paramMap.get("coCd"));
+		            	sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		            	sharngMap.put("todoDiv1CodeId", paramMap.get("S_todoDiv1CodeId"));
+		            	sharngMap.put("todoDiv2CodeId", paramMap.get("S_todoDiv2CodeId"));	
+		            	sharngMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
+		            	sharngMap.put("creatId", paramMap.get("creatId"));
+		            	sharngMap.put("creatPgm", paramMap.get("creatPgm"));                                      
+	            	    wb01Mapper.insertWbsSharngList(sharngMap);
+       		
+	            	i++;
+	            } catch (Exception e) {
+	                System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
+		
 		int result = wb01Mapper.wbsLevel3PlanUpdate(paramMap);
 		return result;
 	}

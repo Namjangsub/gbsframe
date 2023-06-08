@@ -362,4 +362,17 @@ public class WB02SvcImpl implements WB02Svc {
 		return wb02Mapper.selectWbsPlanConfirmCount(paramMap);
 	}
     
+    @Override
+	public int selectWbsPlanDeleteConfirmCount(Map<String, String> paramMap) {
+		return wb02Mapper.selectWbsPlanDeleteConfirmCount(paramMap);
+	}
+    
+    
+    @Override
+	public int deleteWbsPlanlist(Map<String, String> paramMap) {
+		return wb02Mapper.deleteWbsPlanlist(paramMap);
+	}
+    
+    
+    
 }
