@@ -21,6 +21,8 @@ public interface CM08Svc {
 
 	public List<Map<String, String>> selectFileList(Map<String, String> paramMap);
 	
+	public List<Map<String, String>> selectFileListAll(Map<String, String> paramMap);
+	
 	public void setDisposition(HttpServletRequest request, HttpServletResponse response, String fileName);
 
 	public Map<String, String> selectFileInfo(String fileKey);

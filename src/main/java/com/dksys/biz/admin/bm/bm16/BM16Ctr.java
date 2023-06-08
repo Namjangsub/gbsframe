@@ -72,29 +72,54 @@ public class BM16Ctr {
   }
 
   @PostMapping(value = "/insertPrjct")
-  public String insertPrjct(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest,
-      ModelMap model) {
-    bm16Svc.insertPrjct(paramMap, mRequest);
-    model.addAttribute("resultCode", 200); 
-    model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-    return "jsonView";
+  public String insertPrjct(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (bm16Svc.insertPrjct(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
   }
 
   @PostMapping(value = "/updatePrjct")
-  public String updatePrjct(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest,
-      ModelMap model) {
-    bm16Svc.updatePrjct(paramMap, mRequest);
-    model.addAttribute("resultCode", 200);
-    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-    return "jsonView";
+  public String updatePrjct(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	  	try {
+			if (bm16Svc.updatePrjct(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
   }
 
   @PutMapping(value = "/deletePrjct")
-  public String deletePrjct(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    bm16Svc.deletePrjct(paramMap);
-    model.addAttribute("resultCode", 200);
-    model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-    return "jsonView";
+  public String deletePrjct(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+	  	try {
+			if (bm16Svc.deletePrjct(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
   }
 
 }

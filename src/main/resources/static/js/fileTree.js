@@ -197,10 +197,10 @@ var treeModule = (function () {
     //   4. params 첨부자료가 저장된 타입과 일련번호를 전달한다.
     //      4-1. fileTrgtType  = 파일저장타입(프로그램명 또는 테이블명으로 프로젝트내에서 유니크한 값 지정) ex)TB_BM0101M01
     //      4-2. fileTrgtKey   = 파일저장일련번호 (프로그램명 또는 테이블명에서 관리되는 유니크한 일련번호 ex) 1, 2, 3, 4
-    //'deptTree', 'file-grid', 'FITR09', paramTreeObj);
+    //'deptTree', 'file-grid', 'FILETREE', paramTreeObj);
     function initAll(selector, gridSelector, codeId, params) {
         createFileInput(gridSelector);
-        codeId = 'FIRETREE';                  //최상위 트리 강제로 할당 (파라메터값 무시)
+        codeId = 'FILETREE';                  //최상위 트리 강제로 할당 (파라메터값 무시)
 		params["comonCd"] = codeId;           //comonCd는 xML 쿼리에서 트리ID 보관 필드명 
 		params["userId"] = jwt.userId;        //쿠키에 담아 캐시에 보관된 사용자 ID
         
@@ -277,7 +277,7 @@ var treeModule = (function () {
                 'fileSize': obj.size,
                 'nodeId': selectedNodeId,
                 'lpath': selectedNodeText,
-		      	'coCd': coCd,
+		      	'coCd': $('#coCd').val(),
                 'file': obj
             });
         });
@@ -296,6 +296,9 @@ var treeModule = (function () {
         return deleteFileArr; // fileArr를 반환하는 함수
     }
 
+    function getFileNodeId() {
+    	return selectedNodeId; // file tree nodeId를 반환하는 함수
+    }
 
     function deleteFile(rowIndex) {
     	//서버에 등록된 화일인 경우에는 삭제권한이 있어야 삭제 가능함
@@ -342,6 +345,7 @@ var treeModule = (function () {
         addFileToTree: addFileToTree,
         getFileArr:getFileArr,
         getDeleteFileArr:getDeleteFileArr,
+        getFileNodeId:getFileNodeId,
         deleteFile:deleteFile,
         downloadFile:downloadFile,
     };

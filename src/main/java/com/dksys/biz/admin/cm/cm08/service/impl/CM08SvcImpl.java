@@ -414,5 +414,10 @@ public class CM08SvcImpl implements CM08Svc {
     public Map<String, String> selectFileInfoUser(Map<String, String> paramMap) {
         return cm08Mapper.selectFileInfoUser(paramMap);
     }
+
+	@Override
+	public List<Map<String, String>> selectFileListAll(Map<String, String> paramMap) {
+		return cm08Mapper.selectFileListAll(paramMap);
+	}
     
 }

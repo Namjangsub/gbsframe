@@ -15,6 +15,8 @@ public interface CM08Mapper {
 //	String selectNextFileTrgtKey();
 	List<Map<String, String>> selectFileList(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectFileListAll(Map<String, String> paramMap);
+	
 	int selectTreeFileCount(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectTreeFileList(Map<String, String> paramMap);

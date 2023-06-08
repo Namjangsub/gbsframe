@@ -22,6 +22,8 @@ public interface BM16Mapper {
 
   List<Map<String, String>> selectFileList(Map<String, String> paramMap);
 
+  int selectPrjctSeqNext(Map<String, String> paramMap);
+  
   int insertPrjct(Map<String, String> paramMap);
 
   int insertPrjctPrdt(Map<String, String> paramMap);

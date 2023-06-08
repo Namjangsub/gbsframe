@@ -21,10 +21,10 @@ public interface BM16Svc {
 
   List<Map<String, String>> selectFileList(Map<String, String> paramMap);
 
-  int insertPrjct(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+  int insertPrjct(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
-  int updatePrjct(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+  int updatePrjct(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
-  int deletePrjct(Map<String, String> paramMap);
+  int deletePrjct(Map<String, String> paramMap) throws Exception;
 
 }
