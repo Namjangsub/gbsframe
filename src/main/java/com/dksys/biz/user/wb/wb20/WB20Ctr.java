@@ -46,6 +46,8 @@ public class WB20Ctr {
   		  List<Map<String, String>> resultList = wb20Svc.selectToDoList(paramMap);
 		  model.addAttribute("resultList", resultList); 
 		  return "jsonView"; 
+		  
+		  
 	  }
 	 
 	  @PutMapping(value = "/toDoCfDtUpdate")
@@ -54,6 +56,23 @@ public class WB20Ctr {
     	model.addAttribute("resultCode", 200);
     	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
     	return "jsonView";
-     }
+      }
+	  
+	  @PutMapping(value = "/updateRsltsApproval")
+      public String updateRsltsApproval(@RequestParam Map<String, String> paramMap, ModelMap model) {
+		wb20Svc.updateRsltsApproval(paramMap);
+    	model.addAttribute("resultCode", 200);
+    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+    	return "jsonView";
+      }
+	  
+	  @PostMapping(value = "/selectToDoExcelList") 
+	  public String selectToDoExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+  		  List<Map<String, String>> resultList = wb20Svc.selectToDoExcelList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+		  
+		  
+	  }
 	  
 }

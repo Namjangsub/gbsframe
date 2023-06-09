@@ -13,4 +13,8 @@ public interface WB20Svc {
 	List<Map<String, String>> selectToDoList(Map<String, String> paramMap);
 
 	int toDoCfDtUpdate(Map<String, String> paramMap);
+	
+	int updateRsltsApproval(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectToDoExcelList(Map<String, String> paramMap);
 }
