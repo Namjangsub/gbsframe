@@ -240,6 +240,9 @@ var treeModule = (function () {
 
     //트리 선택시 서버에 등록된 첨부 화일을 가져와서 그리드에 출력하기 위한 작업 
     function getAllFilesForNodes(nodeId) {
+    	if (!paramObj.fileTrgtType || !paramObj.fileTrgtKey) {
+    		return false;
+    	}
         fileArr=[];
 		tempObj = paramObj;
 		tempObj["pageNo"] = 1;
@@ -248,7 +251,6 @@ var treeModule = (function () {
 			tempObj["comonCd"] = nodeId;
 		}
 //		tempObj["userId"] = jwt.userId; //initAll에서 처리
-        
         postAjax("/admin/cm/cm08/selectTreeFileList", tempObj, null, function (data) {
             fileArr = data.fileList;
             fileTreeGridView.reqSetData(fileArr);
