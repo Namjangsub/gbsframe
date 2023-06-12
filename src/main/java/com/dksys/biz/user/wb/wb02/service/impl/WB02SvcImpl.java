@@ -207,7 +207,6 @@ public class WB02SvcImpl implements WB02Svc {
 	        }
 		}
 		
-		
 		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
 		if (approvalArr != null && approvalArr.size() > 0 ) {
@@ -373,6 +372,9 @@ public class WB02SvcImpl implements WB02Svc {
 		return wb02Mapper.deleteWbsPlanlist(paramMap);
 	}
     
-    
+    @Override
+	public int wbsPlanStsCodeUpdate(Map<String, String> paramMap) {
+		return wb02Mapper.wbsPlanStsCodeUpdate(paramMap);
+	}
     
 }

@@ -258,6 +258,14 @@ public class WB02Ctr {
     	return "jsonView";
      } 
 	 
+	 @PutMapping(value = "/wbsPlanStsCodeUpdate")
+     public String wbsPlanStsCodeUpdate(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+        wb02Svc.wbsPlanStsCodeUpdate(paramMap);
+   	    model.addAttribute("resultCode", 200);
+   	    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+   	 return "jsonView";
+    }
+	 
 	 
 		 
 }

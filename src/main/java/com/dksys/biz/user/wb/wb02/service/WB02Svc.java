@@ -73,4 +73,8 @@ public interface WB02Svc {
     int selectWbsPlanDeleteConfirmCount(Map<String, String> paramMap);
     
     int deleteWbsPlanlist(Map<String, String> paramMap);
+    
+    int wbsPlanStsCodeUpdate(Map<String, String> paramMap);
+    
+    
 }
