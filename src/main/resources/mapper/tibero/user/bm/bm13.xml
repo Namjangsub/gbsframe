@@ -1,0 +1,1143 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.bm.bm13.mapper.BM13Mapper">
+
+	<!-- WBS 결재선 조회 리스트  카운트 -->
+	<select id="selectApprovalListCount" parameterType="Map" resultType="int">
+		SELECT COUNT(*) 
+			FROM TB_BM13M01
+		WHERE 1=1
+		<!-- 작성일자 -->         
+		<if test="wbsFromDt != null and !wbsFromDt.equals('')">
+			<if test="wbsEndDt != null and !wbsEndDt.equals('')">
+            			AND WBS_PLAN_DT BETWEEN '${wbsFromDt}' AND '${wbsEndDt}'
+            		</if>   
+		</if>								
+		<!-- 생성자 id 필수 -->         
+		<if test="id != null and !id.equals('')">
+			AND ID = ${id}   
+		</if>	
+	</select>
+	
+	<!-- 결재선번호 max -->
+	<select id="selectMaxAppNo" parameterType="Map" resultType="String">
+		SELECT DECODE(INSTR(APP_NO, 'test01-'), 0, 'test01-01'
+				, 'test01-'||LPAD( MAX( TO_NUMBER(SUBSTRING( APP_NO, -2)) ) OVER()+1, 2, '0')
+			   )
+		FROM TB_BM13M01
+		WHERE 1=1								
+		<!-- 생성자 id 필수 -->         
+		<if test="id != null and !id.equals('')">
+			AND ID = ${id}   
+		</if>	
+	</select>
+	          
+	<!-- WBS 결재선 조회 리스트  -->
+	<select id="selectApprovalList" parameterType="Map" resultType="camelMap">   
+		/* No. 내림차순 */
+		SELECT *
+			FROM
+			(
+			SELECT X.*
+					, ROWNUM AS RN
+					FROM
+						(
+						SELECT CO_CD
+							, APP_NO
+							, APP_SEQ
+							, ID
+							,
+							(
+								SELECT NAME
+									FROM TB_CM06M01 B
+								WHERE A.ID = B.ID
+							) AS USER_NAME
+							,
+							(
+								SELECT FN_CM05M01_CD_TO_NM(A.APP_DIV)
+									FROM DUAL							
+							) AS APP_DIV
+							, APP_LINE_NM
+							, APP_ID
+							, USE_YN
+							, PG_PATH
+							, ETC_FIELD1
+							, ETC_FIELD2
+							, ETC_FIELD3
+							, CREAT_ID
+							, CREAT_PGM
+							, NVL(UDT_DTTM, CREAT_DTTM) AS CREAT_DTTM
+							, UDT_ID
+							, UDT_PGM
+							, UDT_DTTM
+							FROM TB_BM13M01 A
+						WHERE 1=1
+						<!-- 작성일자 -->         
+						<if test="wbsFromDt != null and !wbsFromDt.equals('')">
+							<if test="wbsEndDt != null and !wbsEndDt.equals('')">
+		              			AND WBS_PLAN_DT BETWEEN '${wbsFromDt}' AND '${wbsEndDt}'
+		              		</if>   
+						</if>								
+						<!-- 생성자 id 필수 -->         
+						<if test="id != null and !id.equals('')">
+							AND ID = ${id}   
+						</if>																	
+						ORDER BY CREAT_DTTM DESC				
+						) X		
+			)							
+			WHERE 1=1
+				AND RN BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>
+
+
+          <!-- WBS 일정계획 등록 메인 화면 엑셀 조회 리스트  -->
+          <select id="selectWbsApprovalExcelList" parameterType="Map" resultType="camelMap">   
+            SELECT * FROM (
+                    SELECT ROWNUM AS RN, Z.*, 
+                                   S.ORDRS_NO, -- 수주번호
+                                   S.ORGN_SALES_CD, -- 원천 SALES CODE
+                                   S.ORDRS_CLNT_CD, -- 고객사
+                                   (SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD =S.ORDRS_CLNT_CD) AS ORDRS_CLNT_NM,
+                                   S.CLNT_PJT, -- 고객사 PJT
+                                   S.ORDRS_DTL_DIV20, -- 신작구분
+                                   (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+                                   S.PRDT_CD, -- 제품구분
+                                   (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.PRDT_CD) AS PRDT_CD_NM,
+                                   S.ITEM_DIV, -- 아이템구분
+                                   (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.ITEM_DIV) AS ITEM_DIV_NM,
+                                   S.EQP_NM -- 설비명
+                                   FROM (
+                                    SELECT 
+                                       X.FILE_TRGT_KEY,
+                                       X.CO_CD, -- 회사코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.CO_CD) AS CO_CD_NM,
+                                       X.SALES_CD,-- SALES_CODE
+                                       X.WBS_PLAN_NO, -- WBS계획번호
+                                       Y.LVL1, -- WBS 레벨 1
+                                       Y.LVL2, -- WBS 레벨 2
+                                       Y.LVL3, -- WBS 레벨 3
+                                       Y.CODE_KIND, -- 계획항목분류
+                                       Y.CODE_ID, -- 계획항목코드
+                                       X.LOCK_YN,
+                                       X.CLOSE_YN,
+                                       X.WBS_PLAN_CNTS, -- 주요내용
+                                       TO_CHAR(X.WBS_PLAN_DT, 'YYYY-MM-DD') AS WBS_PLAN_DT, -- 작성일
+                                       X.WBS_PLAN_ID, -- 작성자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.WBS_PLAN_ID) AS WBS_PLAN_NM,
+                                       X.WBS_PLAN_MNG_ID, -- 담당자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.WBS_PLAN_MNG_ID) AS WBS_PLAN_MNG_NM,
+                                       TO_CHAR(X.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT, -- 시작일자
+                                       TO_CHAR(X.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT, -- 종료일자
+                                       X.WBS_PLAN_RMK, -- 비고
+                                       X.WBS_PLAN_STS_CODE_ID, -- 계획상태코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_STS_CODE_ID) AS WBS_PLAN_STS_NM,
+                                       X.DSGN_DIF_CODE_ID, -- 설계난이도코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.DSGN_DIF_CODE_ID) AS DSGN_DIF_CODE_NM,
+                                       X.DSGN_PLAN_HOUR, -- 설계계획공수
+                                       X.PRDCTN_DIF_CODE_ID, -- 생산난이도코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.PRDCTN_DIF_CODE_ID) AS PRDCTN_DIF_CODE_NM,
+                                       X.PRDCTN_PLAN_HOUR, -- 생산계획공수
+                                       X.WBS_PLAN_OS_YN, -- 계획외주코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_OS_YN) AS WBS_PLAN_OS_NM,
+                                       X.CREAT_ID, -- 생성자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.CREAT_ID) AS CREAT_NM,
+                                       X.CREAT_PGM, -- 셍성프로그램ID
+                                       TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM, -- 생성일시
+                                       X.UDT_ID, -- 최종변경자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.UDT_ID) AS UDT_NM,
+                                       X.UDT_PGM, -- 최종수정프로그램ID
+                                       TO_CHAR(UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM -- 최종변경일시
+                                          FROM TB_WB01M01 X
+                                           INNER JOIN (
+                                                        SELECT 
+                                                        CODE_KIND,
+                                                        CODE_ID,
+                                                        CODE_RPRC,
+                                                        CODE_NM,
+                                                        CASE WHEN LEVEL = '1' THEN CODE_NM ELSE '' END LVL1,
+                                                        CASE WHEN LEVEL = '2' THEN CODE_NM ELSE '' END LVL2,
+                                                        CASE WHEN LEVEL = '3' THEN CODE_NM ELSE '' END LVL3,
+                                                        LPAD(' ', 3*LEVEL-1) || SYS_CONNECT_BY_PATH(CODE_NM, '>') PATH
+                                                    FROM TB_CM05M01
+                                                    START WITH CODE_KIND = 'WBSDIV'
+                                                    CONNECT BY PRIOR CODE_ID  =  CODE_KIND ) Y
+                                            ON X.WBS_PLAN_CODE_KIND = Y.CODE_KIND
+                                            AND X.WBS_PLAN_CODE_ID = Y.CODE_ID     
+                                     ORDER BY X.SALES_CD, X.WBS_PLAN_CODE_ID ASC) Z 
+                         INNER JOIN (
+                           SELECT  X.CO_CD, -- 회사코드
+                                   X.ORDRS_NO, -- 수주번호
+                                   X.SALES_CD, -- SALES CODE
+                                   Y.ORGN_SALES_CD, -- 원천 SALES CODE
+                                   Y.ORDRS_CLNT_CD, -- 고객사
+                                   Y.CLNT_PJT, -- 고객사 PJT
+                                   X.ORDRS_DTL_DIV20, -- 신작구분
+                                   X.PRDT_CD, -- 제품구분
+                                   X.ITEM_DIV, -- 아이템구분
+                                   X.EQP_NM -- 설비명
+                                   FROM TB_CR02D02 X
+                            INNER JOIN TB_CR02M01 Y
+                            ON X.CO_CD = Y.CO_CD
+                            AND X.ORDRS_NO = Y.ORDRS_NO ) S
+                          ON Z.CO_CD = S.CO_CD
+                          AND Z.SALES_CD = S.SALES_CD 
+                )                
+             WHERE CO_CD LIKE '%${coCd}%'
+              AND WBS_PLAN_DT BETWEEN '${wbsPlansDt}' AND '${wbsPlaneDt}'           
+             <if test="salesCd != null and !salesCd.equals('')">
+                AND SALES_CD LIKE '%${salesCd}%' <!--  salescode 검색    -->  
+             </if>
+             <if test="!clntCd.equals('') and !clntNm.equals('')">
+                 AND ORDRS_CLNT_CD LIKE '%${clntCd}%' <!--  고객사 검색    -->               
+             </if>
+             <if test="clntCd.equals('') and !clntNm.equals('')">
+                 AND ORDRS_CLNT_NM LIKE '%${clntNm}%' <!--  고객사명검색    -->               
+             </if>
+             <if test="!prdtDiv.equals('') and !prdtDivNm.equals('')">
+                AND PRDT_CD LIKE '%${prdtDiv}%' <!--  제품구분 검색    -->               
+             </if>
+             
+             <if test="prdtDiv.equals('') and !prdtDivNm.equals('')">
+                AND PRDT_CD_NM LIKE '%${prdtDivNm}%' <!--  제품구분명 검색    -->               
+             </if>
+             <if test="prdtItem != null and !prdtItem.equals('')">
+                AND ITEM_DIV LIKE '%${prdtItem}%'  <!--  아이템구분 검색    -->              
+             </if> 
+             <if test="wbsClntPjt != null and !wbsClntPjt.equals('')">
+                AND CLNT_PJT LIKE '%${wbsClntPjt}%'  <!--  고객사 PJT 검색    -->              
+             </if> 
+             <if test="eqp_nm != null and !eqp_nm.equals('')">
+                AND EQP_NM LIKE '%${eqp_nm}%'   <!--  설비명 검색    -->             
+             </if>
+             <if test="wbsPlanNo != null and !wbsPlanNo.equals('')">
+                AND WBS_PLAN_NO LIKE '%${wbsPlanNo}%'   <!--  관리번호 검색    -->             
+             </if>
+             <if test="!salesMngId.equals('') and !salesMngNm.equals('')"> 
+                 AND CODE_ID IN (
+                      SELECT X.WBS_PLAN_CODE_ID
+                         FROM TB_WB20M01 X
+                         INNER JOIN TB_CM06M01 Y
+                         ON X.TODO_ID = Y.ID
+                         WHERE X.WBS_PLANCO_CD = '${coCd}' 
+                         <if test="wbsPlanNo != null and !wbsPlanNo.equals('')">
+                            AND X.WBS_PLAN_NO LIKE '%${wbsPlanNo}%'
+                         </if>
+                         <if test="salesCd != null and !salesCd.equals('')">
+                            AND X.SALES_CD LIKE '%${salesCd}%'
+                         </if>   
+                            AND X.TODO_ID LIKE '%${salesMngId}%' )
+              </if>  
+              <if test="salesMngId.equals('') and !salesMngNm.equals('')">
+                 AND CODE_ID IN (
+                      SELECT X.WBS_PLAN_CODE_ID
+                         FROM TB_WB20M01 X
+                         INNER JOIN TB_CM06M01 Y
+                         ON X.TODO_ID = Y.ID
+                         WHERE X.WBS_PLANCO_CD = '${coCd}' 
+                         <if test="wbsPlanNo != null and !wbsPlanNo.equals('')">
+                            AND X.WBS_PLAN_NO LIKE '%${wbsPlanNo}%'
+                         </if>
+                         <if test="salesCd != null and !salesCd.equals('')">
+                            AND X.SALES_CD LIKE '%${salesCd}%'
+                         </if>   
+                            AND Y.NAME LIKE '%${salesMngNm}%' )
+              </if>   
+          </select>
+
+
+          <!-- 관리번호(WBS계획번호) 조회 조건 팝업 리스트  -->
+          <select id="selectWbsPlanNoList" parameterType="Map" resultType="camelMap">
+                SELECT DISTINCT * 
+                  FROM (
+                       SELECT 
+                           X.CO_CD, 
+                           (SELECT Y.CODE_NM FROM TB_CM05M01 Y WHERE Y.CODE_ID = X.CO_CD) AS CO_CD_NM,                  
+                           X.SALES_CD, 
+                           X.WBS_PLAN_NO
+                           FROM TB_WB01M01 X
+                           WHERE X.CO_CD = '${coCd}'
+                           <if test="wbsPlanNo != null and !wbsPlanNo.equals('')">
+                              AND X.WBS_PLAN_NO like '%${wbsPlanNo}%'                
+                           </if>     
+                          )
+                 ORDER BY WBS_PLAN_NO ASC         
+          </select>
+          
+           <!-- SalesCode 조회 조건 팝업 리스트  -->
+           <select id="selectWbsSalesCodeList" parameterType="Map" resultType="camelMap">          
+                SELECT  X.CO_CD, -- 회사코드
+                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.CO_CD) AS CO_CD_NM,
+                       X.ORDRS_NO, -- 수주번호
+                       X.SALES_CD, -- SALES CODE
+                       Y.ORGN_SALES_CD, -- 원천 SALES CODE
+                       Y.ORDRS_CLNT_CD, -- 고객사
+                       (SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD = Y.ORDRS_CLNT_CD) AS ORDRS_CLNT_NM,
+                       Y.CLNT_PJT, -- 고객사 PJT
+                       X.ORDRS_DTL_DIV20, -- 신작구분
+                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+                       X.PRDT_CD, -- 제품구분
+                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.PRDT_CD) AS PRDT_CD_NM,
+                       X.ITEM_DIV, -- 아이템구분
+                       X.EQP_NM -- 설비명
+                       FROM TB_CR02D02 X
+                INNER JOIN TB_CR02M01 Y
+                ON X.CO_CD = Y.CO_CD
+                AND X.ORDRS_NO = Y.ORDRS_NO
+                WHERE X.CO_CD = '${coCd}'
+               <if test="salesCd != null and !salesCd.equals('')">
+                  AND X.SALES_CD like '%${salesCd}%'                
+               </if>                               
+           </select>
+           
+          <!-- 신작구분 조회 조건 리스트 Combobox  -->          
+          <select id="selectWbsPlanDivList" parameterType="Map" resultType="camelMap">
+              SELECT CODE_ID, CODE_NM FROM TB_CM05M01 WHERE CODE_KIND = 'ORDRSDTLDIV20'  
+              ORDER BY CODE_ID ASC  
+          </select>
+ 
+           <!-- WBS Level1관련 공통코드 리스트 Combobox 처리 -->          
+          <select id="selectWbsLevel1List" parameterType="Map" resultType="camelMap">
+               SELECT CODE_ID, CODE_NM FROM TB_CM05M01 WHERE CODE_KIND = 'WBSDIV' 
+               ORDER BY CODE_ID ASC  
+          </select>
+  
+          <!-- WBS 설계난이도 Combobox 처리 -->          
+          <select id="selectWbsDsgnDifList" parameterType="Map" resultType="camelMap">
+               SELECT CODE_ID, CODE_NM FROM TB_CM05M01 WHERE CODE_KIND = 'DSGNDIF'
+               ORDER BY CODE_ID ASC 
+          </select>
+  
+          <!-- WBS 생산난이도 Combobox 처리 -->          
+          <select id="selectWbsPrdctnDifList" parameterType="Map" resultType="camelMap">
+               SELECT CODE_ID, CODE_NM FROM TB_CM05M01 WHERE CODE_KIND = 'PRDCTNDIF'
+               ORDER BY CODE_ID ASC
+          </select>
+          
+          <!-- WBS Level2관련 공통코드 리스트 Combobox 처리 -->          
+          <select id="selectWbsLevel2List" parameterType="Map" resultType="camelMap">
+               SELECT CODE_ID, CODE_NM FROM TB_CM05M01 WHERE CODE_KIND = '${codeKind}'
+               ORDER BY CODE_ID ASC  
+          </select>
+          
+           <!-- WBS Level3관련 공통코드 리스트 Combobox 처리 -->          
+          <select id="selectWbsLevel3List" parameterType="Map" resultType="camelMap">
+               SELECT CODE_ID, CODE_NM FROM TB_CM05M01 WHERE CODE_KIND = '${codeKind}'
+               ORDER BY CODE_ID ASC  
+          </select>
+                
+            <!-- WBS 계획상태 관련 공통코드 리스트 Combobox 처리 -->          
+          <select id="selectWbsPlanStsList" parameterType="Map" resultType="camelMap">
+               SELECT CODE_ID, CODE_NM FROM TB_CM05M01 WHERE CODE_KIND = '${codeKind}'
+               ORDER BY CODE_ID ASC  
+          </select>
+ 
+           <!-- WBS 일정계획 등록 Level1 등록 팝업 화면 Level2 조회 리스트  -->
+          <select id="selectWbsPopupLevel2PlanList" parameterType="Map" resultType="camelMap">   
+            SELECT * FROM (
+                    SELECT ROWNUM AS RN, Z.*, 
+                                   S.ORDRS_NO, -- 수주번호
+                                   S.ORGN_SALES_CD, -- 원천 SALES CODE
+                                   S.ORDRS_CLNT_CD, -- 고객사
+                                   (SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD =S.ORDRS_CLNT_CD) AS ORDRS_CLNT_NM,
+                                   S.CLNT_PJT, -- 고객사 PJT
+                                   S.ORDRS_DTL_DIV20, -- 신작구분
+                                   (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+                                   S.PRDT_CD, -- 제품구분
+                                   (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.PRDT_CD) AS PRDT_CD_NM,
+                                   S.ITEM_DIV, -- 아이템구분
+                                   (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.ITEM_DIV) AS ITEM_DIV_NM,
+                                   S.EQP_NM -- 설비명
+                                   FROM (
+                                    SELECT 
+                                       X.FILE_TRGT_KEY,
+                                       X.CO_CD, -- 회사코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.CO_CD) AS CO_CD_NM,
+                                       X.SALES_CD,-- SALES_CODE
+                                       X.WBS_PLAN_NO, -- WBS계획번호
+                                       Y.LVL1, -- WBS 레벨 1
+                                       Y.LVL2, -- WBS 레벨 2
+                                       Y.LVL3, -- WBS 레벨 3
+                                       Y.CODE_KIND,
+                                       Y.CODE_ID,
+                                       X.WBS_PLAN_CNTS, -- 주요내용
+                                       TO_CHAR(X.WBS_PLAN_DT, 'YYYY-MM-DD') AS WBS_PLAN_DT, -- 작성일
+                                       X.WBS_PLAN_ID, -- 작성자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.WBS_PLAN_ID) AS WBS_PLAN_NM,
+                                       X.WBS_PLAN_MNG_ID, -- 담당자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.WBS_PLAN_MNG_ID) AS WBS_PLAN_MNG_NM,
+                                       TO_CHAR(X.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT, -- 시작일자
+                                       TO_CHAR(X.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT, -- 종료일자
+                                       X.WBS_PLAN_RMK, -- 비고
+                                       X.WBS_PLAN_STS_CODE_ID, -- 계획상태코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_STS_CODE_ID) AS WBS_PLAN_STS_NM,
+                                       X.DSGN_DIF_CODE_ID, -- 설계난이도코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.DSGN_DIF_CODE_ID) AS DSGN_DIF_CODE_NM,
+                                       X.DSGN_PLAN_HOUR, -- 설계계획공수
+                                       X.PRDCTN_DIF_CODE_ID, -- 생산난이도코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.PRDCTN_DIF_CODE_ID) AS PRDCTN_DIF_CODE_NM,
+                                       X.PRDCTN_PLAN_HOUR, -- 생산계획공수
+                                       X.WBS_PLAN_OS_YN, -- 계획외주코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_OS_YN) AS WBS_PLAN_OS_NM,
+                                       X.CREAT_ID, -- 생성자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.CREAT_ID) AS CREAT_NM,
+                                       X.CREAT_PGM, -- 셍성프로그램ID
+                                       TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM, -- 생성일시
+                                       X.UDT_ID, -- 최종변경자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.UDT_ID) AS UDT_NM,
+                                       X.UDT_PGM, -- 최종수정프로그램ID
+                                       TO_CHAR(UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM -- 최종변경일시
+                                          FROM TB_WB01M01 X
+                                           INNER JOIN (
+                                                        SELECT 
+                                                        CODE_KIND,
+                                                        CODE_ID,
+                                                        CODE_RPRC,
+                                                        CODE_NM,
+                                                        CASE WHEN LEVEL = '1' THEN CODE_NM ELSE '' END LVL1,
+                                                        CASE WHEN LEVEL = '2' THEN CODE_NM ELSE '' END LVL2,
+                                                        CASE WHEN LEVEL = '3' THEN CODE_NM ELSE '' END LVL3,
+                                                        LPAD(' ', 3*LEVEL-1) || SYS_CONNECT_BY_PATH(CODE_NM, '>') PATH
+                                                    FROM TB_CM05M01
+                                                    START WITH CODE_KIND = 'WBSDIV'
+                                                    CONNECT BY PRIOR CODE_ID  =  CODE_KIND ) Y
+                                            ON X.WBS_PLAN_CODE_KIND = Y.CODE_KIND
+                                            AND X.WBS_PLAN_CODE_ID = Y.CODE_ID     
+                                     ORDER BY X.SALES_CD, X.WBS_PLAN_CODE_ID ASC) Z 
+                         INNER JOIN (
+                           SELECT  X.CO_CD, -- 회사코드
+                                   X.ORDRS_NO, -- 수주번호
+                                   X.SALES_CD, -- SALES CODE
+                                   Y.ORGN_SALES_CD, -- 원천 SALES CODE
+                                   Y.ORDRS_CLNT_CD, -- 고객사
+                                   Y.CLNT_PJT, -- 고객사 PJT
+                                   X.ORDRS_DTL_DIV20, -- 상세구분
+                                   X.PRDT_CD, -- 제품구분
+                                   X.ITEM_DIV, -- 아이템구분
+                                   X.EQP_NM -- 설비명
+                                   FROM TB_CR02D02 X
+                            INNER JOIN TB_CR02M01 Y
+                            ON X.CO_CD = Y.CO_CD
+                            AND X.ORDRS_NO = Y.ORDRS_NO ) S
+                          ON Z.CO_CD = S.CO_CD
+                          AND Z.SALES_CD = S.SALES_CD 
+                )                
+               WHERE CODE_KIND = '${codeKind}' 
+                  AND CO_CD = '${coCd}'                
+                  AND SALES_CD = '${salesCd}'                
+            
+          </select>
+
+
+           <!-- WBS 일정계획 등록 Level1 등록 팝업 화면 Level3 조회 리스트  -->
+          <select id="selectWbsPopupLevel3PlanList" parameterType="Map" resultType="camelMap">   
+            SELECT * FROM (
+                    SELECT ROWNUM AS RN, Z.*, 
+                                   S.ORDRS_NO, -- 수주번호
+                                   S.ORGN_SALES_CD, -- 원천 SALES CODE
+                                   S.ORDRS_CLNT_CD, -- 고객사
+                                   (SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD =S.ORDRS_CLNT_CD) AS ORDRS_CLNT_NM,
+                                   S.CLNT_PJT, -- 고객사 PJT
+                                   S.ORDRS_DTL_DIV20, -- 신작구분
+                                   (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+                                   S.PRDT_CD, -- 제품구분
+                                   (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.PRDT_CD) AS PRDT_CD_NM,
+                                   S.ITEM_DIV, -- 아이템구분
+                                   (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.ITEM_DIV) AS ITEM_DIV_NM,
+                                   S.EQP_NM -- 설비명
+                                   FROM (
+                                    SELECT 
+                                       X.FILE_TRGT_KEY,
+                                       X.CO_CD, -- 회사코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.CO_CD) AS CO_CD_NM,
+                                       X.SALES_CD,-- SALES_CODE
+                                       X.WBS_PLAN_NO, -- WBS계획번호
+                                       Y.LVL1, -- WBS 레벨 1
+                                       Y.LVL2, -- WBS 레벨 2
+                                       Y.LVL3, -- WBS 레벨 3
+                                       Y.CODE_KIND, -- 계획항목뷴류
+                                       Y.CODE_ID,  -- 계획항목코드
+                                       X.WBS_PLAN_CNTS, -- 주요내용
+                                       TO_CHAR(X.WBS_PLAN_DT, 'YYYY-MM-DD') AS WBS_PLAN_DT, -- 작성일
+                                       X.WBS_PLAN_ID, -- 작성자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.WBS_PLAN_ID) AS WBS_PLAN_NM,
+                                       X.WBS_PLAN_MNG_ID, -- 담당자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.WBS_PLAN_MNG_ID) AS WBS_PLAN_MNG_NM,
+                                       TO_CHAR(X.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT, -- 시작일자
+                                       TO_CHAR(X.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT, -- 종료일자
+                                       X.WBS_PLAN_RMK, -- 비고
+                                       X.WBS_PLAN_STS_CODE_ID, -- 계획상태코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_STS_CODE_ID) AS WBS_PLAN_STS_NM,
+                                       X.DSGN_DIF_CODE_ID, -- 설계난이도코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.DSGN_DIF_CODE_ID) AS DSGN_DIF_CODE_NM,
+                                       X.DSGN_PLAN_HOUR, -- 설계계획공수
+                                       X.PRDCTN_DIF_CODE_ID, -- 생산난이도코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.PRDCTN_DIF_CODE_ID) AS PRDCTN_DIF_CODE_NM,
+                                       X.PRDCTN_PLAN_HOUR, -- 생산계획공수
+                                       X.WBS_PLAN_OS_YN, -- 계획외주코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_OS_YN) AS WBS_PLAN_OS_NM,
+                                       X.CREAT_ID, -- 생성자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.CREAT_ID) AS CREAT_NM,
+                                       X.CREAT_PGM, -- 셍성프로그램ID
+                                       TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM, -- 생성일시
+                                       X.UDT_ID, -- 최종변경자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.UDT_ID) AS UDT_NM,
+                                       X.UDT_PGM, -- 최종수정프로그램ID
+                                       TO_CHAR(UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM -- 최종변경일시
+                                          FROM TB_WB01M01 X
+                                           INNER JOIN (
+                                                        SELECT 
+                                                        CODE_KIND,
+                                                        CODE_ID,
+                                                        CODE_RPRC,
+                                                        CODE_NM,
+                                                        CASE WHEN LEVEL = '1' THEN CODE_NM ELSE '' END LVL1,
+                                                        CASE WHEN LEVEL = '2' THEN CODE_NM ELSE '' END LVL2,
+                                                        CASE WHEN LEVEL = '3' THEN CODE_NM ELSE '' END LVL3,
+                                                        LPAD(' ', 3*LEVEL-1) || SYS_CONNECT_BY_PATH(CODE_NM, '>') PATH
+                                                    FROM TB_CM05M01
+                                                    START WITH CODE_KIND = 'WBSDIV'
+                                                    CONNECT BY PRIOR CODE_ID  =  CODE_KIND ) Y
+                                            ON X.WBS_PLAN_CODE_KIND = Y.CODE_KIND
+                                            AND X.WBS_PLAN_CODE_ID = Y.CODE_ID     
+                                     ORDER BY X.SALES_CD, X.WBS_PLAN_CODE_ID ASC) Z 
+                         INNER JOIN (
+                           SELECT  X.CO_CD, -- 회사코드
+                                   X.ORDRS_NO, -- 수주번호
+                                   X.SALES_CD, -- SALES CODE
+                                   Y.ORGN_SALES_CD, -- 원천 SALES CODE
+                                   Y.ORDRS_CLNT_CD, -- 고객사
+                                   Y.CLNT_PJT, -- 고객사 PJT
+                                   X.ORDRS_DTL_DIV20, -- 상세구분
+                                   X.PRDT_CD, -- 제품구분
+                                   X.ITEM_DIV, -- 아이템구분
+                                   X.EQP_NM -- 설비명
+                                   FROM TB_CR02D02 X
+                            INNER JOIN TB_CR02M01 Y
+                            ON X.CO_CD = Y.CO_CD
+                            AND X.ORDRS_NO = Y.ORDRS_NO ) S
+                          ON Z.CO_CD = S.CO_CD
+                          AND Z.SALES_CD = S.SALES_CD 
+                )                
+             WHERE CODE_KIND = '${codeKind}' 
+                 AND CO_CD = '${coCd}'                
+                 AND SALES_CD = '${salesCd}'                
+                      
+          </select>
+          
+           <!-- 공유대상자 리스트 조회  -->          
+          <select id="selectWbsPopupSharngList" parameterType="Map" resultType="camelMap">
+               SELECT ROWNUM AS RN,
+                      X.SALES_CD, 
+                      X.WBS_PLAN_CODE_ID,
+                      (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_CODE_ID) AS WBS_PLAN_CODE_NM,
+                      X.WBS_PLAN_NO,
+                      X.WBS_PLANCO_CD,
+                      (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.CO_CD) AS WBS_PLANCO_CD_NM,                      
+                      Y.ID,
+                      Y.EMP_NO,
+                      Y.NAME,
+                      Y.TEL_NO,
+                      Y.EMAIL
+                      FROM TB_WB20M01 X
+                      INNER JOIN TB_CM06M01 Y
+                      ON X.CO_CD = Y.CO_CD
+                      AND X.TODO_ID = Y.ID
+                      WHERE X.CO_CD = '${coCd}'
+                      AND X.WBS_PLAN_CODE_ID = '${codeKind}' 
+                      AND X.SALES_CD = '${salesCd}'
+                      AND X.WBS_PLAN_NO = '${wbsPlanNo}'
+                      AND X.TODO_DIV2_CODE_ID = 'TODODIV1010'
+                      ORDER BY ROWNUM ASC
+          </select>
+          
+          <!-- 결재대상자 리스트 조회  -->          
+          <select id="selectWbsPopupApprovalList" parameterType="Map" resultType="camelMap">
+               SELECT ROWNUM AS RN,
+                      X.SALES_CD, 
+                      X.WBS_PLAN_CODE_ID,
+                      (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_CODE_ID) AS WBS_PLAN_CODE_NM,
+                      X.WBS_PLAN_NO,
+                      X.CO_CD,
+                      (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.CO_CD) AS CO_CD_NM,                      
+                      Y.ID,
+                      Y.EMP_NO,
+                      Y.NAME,
+                      Y.TEL_NO,
+                      Y.EMAIL
+                      FROM TB_WB20M01 X
+                      INNER JOIN TB_CM06M01 Y
+                      ON X.CO_CD = Y.CO_CD
+                      AND X.TODO_ID = Y.ID
+                      WHERE X.CO_CD = '${coCd}'
+                      AND X.WBS_PLAN_CODE_ID = '${codeKind}' 
+                      AND X.SALES_CD = '${salesCd}'
+                      AND X.WBS_PLAN_NO = '${wbsPlanNo}'
+                      AND X.TODO_DIV2_CODE_ID = 'TODODIV2010'
+                      ORDER BY ROWNUM ASC
+          </select>
+          
+          
+
+           <!-- 공유대상자 등록  -->   
+	      <insert id="insertWbsSharngUser" parameterType="Map">
+
+				INSERT INTO TB_WB01P01
+				(
+				       SALES_CD,
+				       WBS_PLAN_CODE_ID,
+				       WBS_PLAN_NO,
+				       ID,
+				       CO_CD                    
+				) 
+				VALUES
+				(
+				    #{salesCd},
+				    #{wbsLevel1},
+				    #{wbsPlanNo},
+				    #{wbsSharngUserId},
+				    #{coCd}
+				)
+				
+	     </insert>   
+	     
+          <!-- ToDoList 등록  -->   
+         <insert id="insertToDoList" parameterType="Map">
+		        <selectKey keyProperty="toDoKey" resultType="Int" order="BEFORE">
+		            SELECT NVL(MAX(TODO_KEY), 0) + 1 FROM TB_WB20M01
+		        </selectKey>
+		        INSERT INTO TB_WB20M01
+		        (
+                    TODO_KEY,
+					CO_CD,
+					TODO_DIV1_CODE_ID,
+					TODO_DIV2_CODE_ID,
+					TODO_ID,
+					SALES_CD,
+					PG_PATH,
+					WBS_PLANCO_CD,
+					WBS_PLAN_NO,
+					WBS_PLAN_CODE_KIND,
+					WBS_PLAN_CODE_ID,
+					CREAT_ID,
+					CREAT_PGM,
+					CREAT_DTTM
+		        ) 
+		        VALUES
+		        (
+		            #{toDoKey},
+		            #{coCd},
+		            'TODODIV10',
+		            'TODODIV1010',
+		            #{wbsSharngUserId},
+		            #{salesCd},
+		            #{pgPath},
+		            #{coCd},
+		            #{wbsPlanNo},
+		            #{wbsLevel},
+		            #{wbsLevel1},
+		            #{creatId},
+		            #{creatPgm},
+		            SYSDATE
+		        )
+		 </insert>
+        
+        
+	     <!-- 공유대상자 삭제  -->  
+	    <delete id="deleteWbsSharngUser" parameterType="Map">
+               DELETE FROM TB_WB01P01
+	               WHERE SALES_CD = '${salesCd}' 
+	               AND WBS_PLAN_CODE_ID = '${wbsPlanCodeId}' 
+	               AND WBS_PLAN_NO = '${wbsPlanNo}' 
+	               AND ID = '${id}' 
+	               AND CO_CD = '${coCd}' 
+        </delete>
+    
+    
+        <!-- WBS일정계획 메인화면 삭제 시 삭제유무 체크  -->
+        <select id="selectWbsPlanDeleteConfirmCount" parameterType="Map" resultType="int">
+               SELECT COUNT(*)
+                  FROM TB_WB01M01 
+                   WHERE CO_CD = '${coCd}'
+                   AND SALES_CD = '${salesCd}'
+                   AND WBS_PLAN_CODE_ID IN (SELECT CODE_ID FROM TB_CM05M01 WHERE CODE_KIND ='${codeId}')
+        </select>
+    
+        <!-- WBS일정계획 메인화면 삭제  -->  
+        <delete id="deleteWbsPlanlist" parameterType="Map">
+               DELETE FROM TB_WB01M01
+                   WHERE CO_CD = '${coCd}'
+                   AND SALES_CD = '${salesCd}'
+                   AND WBS_PLAN_NO = '${wbsPlanNo}' 
+                   AND WBS_PLAN_CODE_ID = '${codeId}'
+        </delete>
+        
+        <!-- WBS Plan No Max값 가져오기  -->
+        <select id="selectMaxWbsPlanNo" parameterType="Map" resultType="int">
+              SELECT MAX(SUBSTR(WBS_PLAN_NO,4,4)) + 1  FROM TB_WB01M01 
+                   WHERE SUBSTR(WBS_PLAN_NO,1,3) ='${year}' and CO_CD = '${coCd}'   
+        </select>
+   
+        <insert id="wbsLevel1PlanInsert" parameterType="Map">
+                INSERT INTO TB_WB01M01
+                (
+                       FILE_TRGT_KEY,
+                       CO_CD,
+                       WBS_PLAN_NO,
+                       WBS_PLAN_CODE_KIND,
+                       WBS_PLAN_CODE_ID,
+                       SALES_CD,
+                       WBS_PLAN_DT,
+                       WBS_PLAN_ID,
+                       WBS_PLAN_MNG_ID,
+                       WBS_PLAN_CNTS,
+                       WBS_PLANS_DT,
+                       WBS_PLANE_DT,   
+                       WBS_PLAN_RMK,
+                       WBS_PLAN_STS_CODE_ID,
+                       DSGN_DIF_CODE_ID,
+                       DSGN_PLAN_HOUR,
+                       PRDCTN_DIF_CODE_ID,
+                       PRDCTN_PLAN_HOUR,
+                       WBS_PLAN_OS_YN,
+                       CREAT_ID,
+                       CREAT_PGM,
+                       CREAT_DTTM
+                ) 
+                VALUES
+                (
+	                    #{fileTrgtKey},
+	                    #{coCd},
+	                    #{wbsPlanNo},
+	                    #{wbsPlanCodeKind},
+	                    #{wbsPlanCodeId},
+	                    #{salesCd},
+	                    #{wbsPlanDt},
+	                    #{wbsPlanId},
+	                    #{wbsPlanMngId},
+	                    #{wbsPlanCnts},
+	                    #{wbsPlansDt},
+	                    #{wbsPlaneDt},
+	                    #{wbsPlanRmk},
+	                    #{wbsPlanStsCodeId},
+	                    #{dsgnDifCodeId},
+	                    #{dsgnPlanHour},
+	                    #{prdctnDifCodeId},
+	                    #{prdctnPlanHour},
+	                    #{wbsPlanOsYn},
+	                    #{creatId},
+	                    #{creatPgm},
+	                    SYSDATE  
+                ) 
+        </insert>   
+         
+        <update id="wbsLevel1PlanUpdate" parameterType="Map">
+                UPDATE TB_WB01M01
+                   SET 
+                       SALES_CD = #{salesCd},
+                       WBS_PLAN_DT = #{wbsPlanDt},
+                       WBS_PLAN_ID = #{wbsPlanId},
+                       WBS_PLAN_MNG_ID = #{wbsPlanMngId},
+                       WBS_PLAN_CNTS = #{wbsPlanCnts},
+                       WBS_PLANS_DT = #{wbsPlansDt},
+                       WBS_PLANE_DT = #{wbsPlaneDt},   
+                       WBS_PLAN_RMK = #{wbsPlanRmk},
+                       WBS_PLAN_STS_CODE_ID = #{wbsPlanStsCodeId},
+                       DSGN_DIF_CODE_ID = #{dsgnDifCodeId},
+                       DSGN_PLAN_HOUR =  #{dsgnPlanHour},
+                       PRDCTN_DIF_CODE_ID =  #{prdctnDifCodeId},
+                       PRDCTN_PLAN_HOUR =  #{prdctnPlanHour},
+                       WBS_PLAN_OS_YN =  #{wbsPlanOsYn},
+                       UDT_ID = #{creatId},
+                       UDT_PGM = #{creatPgm},
+                       UDT_DTTM = SYSDATE
+                 
+                 WHERE 
+                       CO_CD = #{coCd}
+                       AND WBS_PLAN_NO = #{wbsPlanNo}
+                       AND WBS_PLAN_CODE_KIND = #{wbsPlanCodeKind}
+                       AND WBS_PLAN_CODE_ID = #{wbsPlanCodeId}
+        </update>   
+        
+        <!-- WBS 1,2Level 정보 조회 리스트  -->
+          <select id="selectWbsInfoList" parameterType="Map" resultType="camelMap">
+                SELECT WBS_PLAN_CODE_KIND,
+                       WBS_PLAN_CODE_ID,
+                       WBS_PLAN_MNG_ID,
+                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.WBS_PLAN_MNG_ID) AS WBS_PLAN_MNG_NM,
+                       TO_CHAR(WBS_PLANS_DT, 'yyyy-MM-dd') AS WBS_PLANS_DT,
+                       TO_CHAR(WBS_PLANE_DT, 'yyyy-MM-dd') AS WBS_PLANE_DT
+                       FROM  TB_WB01M01 X
+                       WHERE CO_CD = '${coCd}'
+                       AND WBS_PLAN_CODE_ID = '${wbsPlanCodeId}'
+                       AND SALES_CD = '${salesCd}'    
+          </select>
+          
+
+       <insert id="wbsLevel2PlanInsert" parameterType="Map">
+                INSERT INTO TB_WB01M01
+                (
+                       FILE_TRGT_KEY,
+                       CO_CD,
+                       WBS_PLAN_NO,
+                       WBS_PLAN_CODE_KIND,
+                       WBS_PLAN_CODE_ID,
+                       SALES_CD,
+                       WBS_PLAN_DT,
+                       WBS_PLAN_ID,
+                       WBS_PLAN_MNG_ID,
+                       WBS_PLAN_CNTS,
+                       WBS_PLANS_DT,
+                       WBS_PLANE_DT,   
+                       WBS_PLAN_RMK,
+                       WBS_PLAN_STS_CODE_ID,
+                       WBS_PLAN_OS_YN,
+                       CREAT_ID,
+                       CREAT_PGM,
+                       CREAT_DTTM
+                ) 
+                VALUES
+                (
+                    #{fileTrgtKey},
+                    #{coCd},
+                    #{wbsPlanNo},
+                    #{wbsPlanCodeKind},
+                    #{wbsPlanCodeId},
+                    #{salesCd},
+                    #{wbsPlanDt},
+                    #{wbsPlanId},
+                    #{wbsPlanMngId2},
+                    #{wbsPlanCnts},
+                    #{wbsPlansDt2},
+                    #{wbsPlaneDt2},
+                    #{wbsPlanRmk},
+                    #{wbsPlanStsCodeId},
+                    #{wbsPlanOsYn},
+                    #{creatId},
+                    #{creatPgm},
+                    SYSDATE  
+                ) 
+        </insert>   
+         
+        <update id="wbsLevel2PlanUpdate" parameterType="Map">
+                UPDATE TB_WB01M01
+                   SET 
+                       SALES_CD = #{salesCd},
+                       WBS_PLAN_DT = #{wbsPlanDt},
+                       WBS_PLAN_ID = #{wbsPlanId},
+                       WBS_PLAN_MNG_ID = #{wbsPlanMngId2},
+                       WBS_PLAN_CNTS = #{wbsPlanCnts},
+                       WBS_PLANS_DT = #{wbsPlansDt2},
+                       WBS_PLANE_DT = #{wbsPlaneDt2},   
+                       WBS_PLAN_RMK = #{wbsPlanRmk},
+                       WBS_PLAN_STS_CODE_ID = #{wbsPlanStsCodeId},
+                       WBS_PLAN_OS_YN =  #{wbsPlanOsYn},
+                       UDT_ID = #{creatId},
+                       UDT_PGM = #{creatPgm},
+                       UDT_DTTM = SYSDATE
+                 
+                 WHERE 
+                       CO_CD = #{coCd}
+                       AND WBS_PLAN_NO = #{wbsPlanNo}
+                       AND WBS_PLAN_CODE_KIND = #{wbsPlanCodeKind}
+                       AND WBS_PLAN_CODE_ID = #{wbsPlanCodeId}
+        </update>  
+  
+       <insert id="wbsLevel3PlanInsert" parameterType="Map">
+                INSERT INTO TB_WB01M01
+                (
+                       FILE_TRGT_KEY,
+                       CO_CD,
+                       WBS_PLAN_NO,
+                       WBS_PLAN_CODE_KIND,
+                       WBS_PLAN_CODE_ID,
+                       SALES_CD,
+                       WBS_PLAN_DT,
+                       WBS_PLAN_ID,
+                       WBS_PLAN_MNG_ID,
+                       WBS_PLAN_CNTS,
+                       WBS_PLANS_DT,
+                       WBS_PLANE_DT,   
+                       WBS_PLAN_RMK,
+                       WBS_PLAN_STS_CODE_ID,
+                       WBS_PLAN_OS_YN,
+                       CREAT_ID,
+                       CREAT_PGM,
+                       CREAT_DTTM
+                ) 
+                VALUES
+                (
+                    #{fileTrgtKey},
+                    #{coCd},
+                    #{wbsPlanNo},
+                    #{wbsPlanCodeKind},
+                    #{wbsPlanCodeId},
+                    #{salesCd},
+                    #{wbsPlanDt},
+                    #{wbsPlanId},
+                    #{wbsPlanMngId3},
+                    #{wbsPlanCnts},
+                    #{wbsPlansDt3},
+                    #{wbsPlaneDt3},
+                    #{wbsPlanRmk},
+                    #{wbsPlanStsCodeId},
+                    #{wbsPlanOsYn},
+                    #{creatId},
+                    #{creatPgm},
+                    SYSDATE  
+                ) 
+        </insert>   
+         
+        <update id="wbsLevel3PlanUpdate" parameterType="Map">
+                UPDATE TB_WB01M01
+                   SET 
+                       SALES_CD = #{salesCd},
+                       WBS_PLAN_DT = #{wbsPlanDt},
+                       WBS_PLAN_ID = #{wbsPlanId},
+                       WBS_PLAN_MNG_ID = #{wbsPlanMngId3},
+                       WBS_PLAN_CNTS = #{wbsPlanCnts},
+                       WBS_PLANS_DT = #{wbsPlansDt3},
+                       WBS_PLANE_DT = #{wbsPlaneDt3},   
+                       WBS_PLAN_RMK = #{wbsPlanRmk},
+                       WBS_PLAN_STS_CODE_ID = #{wbsPlanStsCodeId},
+                       WBS_PLAN_OS_YN =  #{wbsPlanOsYn},
+                       UDT_ID = #{creatId},
+                       UDT_PGM = #{creatPgm},
+                       UDT_DTTM = SYSDATE
+                 
+                 WHERE 
+                       CO_CD = #{coCd}
+                       AND WBS_PLAN_NO = #{wbsPlanNo}
+                       AND WBS_PLAN_CODE_KIND = #{wbsPlanCodeKind}
+                       AND WBS_PLAN_CODE_ID = #{wbsPlanCodeId}
+        </update>  
+  
+        <select id="selectMaxTrgtKey" parameterType="Map" resultType="int">
+               SELECT NVL(MAX(TO_NUMBER(FILE_TRGT_KEY)),0) + 1 FROM TB_WB01M01
+        </select>
+        
+        <select id="selectWbsPlanChk" parameterType="Map" resultType="int">
+                SELECT COUNT(*)
+                  FROM TB_WB01M01 
+                   WHERE CO_CD = '${coCd}'
+                   AND SALES_CD = '${salesCd}'
+                   AND WBS_PLAN_CODE_ID = '${codeId}'
+        </select>
+        
+        
+        
+        <select id="selectWbsPlanInfoSelect" parameterType="Map" resultType="camelMap">
+                SELECT * FROM (
+                    SELECT ROWNUM AS RN, Z.*, 
+                                   S.ORDRS_NO, -- 수주번호
+                                   S.ORGN_SALES_CD, -- 원천 SALES CODE
+                                   S.ORDRS_CLNT_CD, -- 고객사
+                                   (SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD =S.ORDRS_CLNT_CD) AS ORDRS_CLNT_NM,
+                                   S.CLNT_PJT, -- 고객사 PJT
+                                   S.ORDRS_DTL_DIV20, -- 신작구분
+                                   (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+                                   S.PRDT_CD, -- 제품구분
+                                   (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.PRDT_CD) AS PRDT_CD_NM,
+                                   S.ITEM_DIV, -- 아이템구분
+                                   (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.ITEM_DIV) AS ITEM_DIV_NM,
+                                   S.EQP_NM -- 설비명
+                                   FROM (
+                                    SELECT 
+                                       X.FILE_TRGT_KEY,
+                                       X.CO_CD, -- 회사코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.CO_CD) AS CO_CD_NM,
+                                       X.SALES_CD,-- SALES_CODE
+                                       X.WBS_PLAN_NO, -- WBS계획번호
+                                       Y.LVL1, -- WBS 레벨 1
+                                       Y.LVL2, -- WBS 레벨 2
+                                       Y.LVL3, -- WBS 레벨 3
+                                       Y.CODE_KIND, -- 계획항목분류
+                                       Y.CODE_ID, -- 계획항목코드
+                                       X.WBS_PLAN_CNTS, -- 주요내용
+                                       TO_CHAR(X.WBS_PLAN_DT, 'YYYY-MM-DD') AS WBS_PLAN_DT, -- 작성일
+                                       X.WBS_PLAN_ID, -- 작성자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.WBS_PLAN_ID) AS WBS_PLAN_NM,
+                                       X.WBS_PLAN_MNG_ID, -- 담당자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.WBS_PLAN_MNG_ID) AS WBS_PLAN_MNG_NM,
+                                       TO_CHAR(X.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT, -- 시작일자
+                                       TO_CHAR(X.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT, -- 종료일자
+                                       X.WBS_PLAN_RMK, -- 비고
+                                       X.WBS_PLAN_STS_CODE_ID, -- 계획상태코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_STS_CODE_ID) AS WBS_PLAN_STS_NM,
+                                       X.DSGN_DIF_CODE_ID, -- 설계난이도코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.DSGN_DIF_CODE_ID) AS DSGN_DIF_CODE_NM,
+                                       X.DSGN_PLAN_HOUR, -- 설계계획공수
+                                       X.PRDCTN_DIF_CODE_ID, -- 생산난이도코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.PRDCTN_DIF_CODE_ID) AS PRDCTN_DIF_CODE_NM,
+                                       X.PRDCTN_PLAN_HOUR, -- 생산계획공수
+                                       X.WBS_PLAN_OS_YN, -- 계획외주코드
+                                       (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_OS_YN) AS WBS_PLAN_OS_NM,
+                                       X.CREAT_ID, -- 생성자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.CREAT_ID) AS CREAT_NM,
+                                       X.CREAT_PGM, -- 셍성프로그램ID
+                                       TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM, -- 생성일시
+                                       X.UDT_ID, -- 최종변경자
+                                       (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.UDT_ID) AS UDT_NM,
+                                       X.UDT_PGM, -- 최종수정프로그램ID
+                                       TO_CHAR(UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM -- 최종변경일시
+                                          FROM TB_WB01M01 X
+                                           INNER JOIN (
+                                                        SELECT 
+                                                        CODE_KIND,
+                                                        CODE_ID,
+                                                        CODE_RPRC,
+                                                        CODE_NM,
+                                                        CASE WHEN LEVEL = '1' THEN CODE_NM ELSE '' END LVL1,
+                                                        CASE WHEN LEVEL = '2' THEN CODE_NM ELSE '' END LVL2,
+                                                        CASE WHEN LEVEL = '3' THEN CODE_NM ELSE '' END LVL3,
+                                                        LPAD(' ', 3*LEVEL-1) || SYS_CONNECT_BY_PATH(CODE_NM, '>') PATH
+                                                    FROM TB_CM05M01
+                                                    START WITH CODE_KIND = 'WBSDIV'
+                                                    CONNECT BY PRIOR CODE_ID  =  CODE_KIND ) Y
+                                            ON X.WBS_PLAN_CODE_KIND = Y.CODE_KIND
+                                            AND X.WBS_PLAN_CODE_ID = Y.CODE_ID     
+                                     ORDER BY X.SALES_CD, X.WBS_PLAN_CODE_ID ASC) Z 
+                         INNER JOIN (
+                           SELECT  X.CO_CD, -- 회사코드
+                                   X.ORDRS_NO, -- 수주번호
+                                   X.SALES_CD, -- SALES CODE
+                                   Y.ORGN_SALES_CD, -- 원천 SALES CODE
+                                   Y.ORDRS_CLNT_CD, -- 고객사
+                                   Y.CLNT_PJT, -- 고객사 PJT
+                                   X.ORDRS_DTL_DIV20, -- 신작구분
+                                   X.PRDT_CD, -- 제품구분
+                                   X.ITEM_DIV, -- 아이템구분
+                                   X.EQP_NM -- 설비명
+                                   FROM TB_CR02D02 X
+                            INNER JOIN TB_CR02M01 Y
+                            ON X.CO_CD = Y.CO_CD
+                            AND X.ORDRS_NO = Y.ORDRS_NO ) S
+                          ON Z.CO_CD = S.CO_CD
+                          AND Z.SALES_CD = S.SALES_CD 
+                )                
+             WHERE CO_CD = '${coCd}'
+             AND CODE_KIND = '${codeKind}'
+             AND CODE_ID = '${codeId}'
+             AND SALES_CD = '${salesCd}'
+             AND WBS_PLAN_NO = '${wbsPlanNo}'
+        </select>
+                  
+                  
+       <!-- WBS일정계획 상위공정 유무체크  -->
+        <select id="selectWbsPlanConfirmCount" parameterType="Map" resultType="int">
+               SELECT COUNT(*)
+                  FROM TB_WB01M01 
+                   WHERE CO_CD = '${coCd}'
+                   AND SALES_CD = '${salesCd}'
+                   AND WBS_PLAN_CODE_ID = '${codeId}'
+        </select>
+        
+        
+        <select id="selectFileCodeSelect" parameterType="Map" resultType="camelMap">
+                SELECT CODE_ID
+                  FROM TB_CM05M01 
+                   WHERE CODE_DESC = '${codeId}'
+        </select>
+        
+        
+        <!-- 공유대상자 리스트 조회  -->          
+          <select id="selectPlanSharngList" parameterType="Map" resultType="camelMap">
+               SELECT ROWNUM AS RN,
+                      X.SALES_CD, 
+                      X.WBS_PLAN_CODE_ID,
+                      (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_CODE_ID) AS WBS_PLAN_CODE_NM,
+                      X.WBS_PLAN_NO,
+                      X.WBS_PLANCO_CD,
+                      TO_CHAR(X.TODO_CF_DT, 'YYYY-MM-DD') AS TODO_CF_DT,
+                      X.TODO_CF_OPN,
+                      (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.CO_CD) AS WBS_PLANCO_CD_NM,                      
+                      Y.ID AS WBS_SHARNG_USER_ID, 
+                      Y.EMP_NO,
+                      Y.NAME,
+                      Y.TEL_NO,
+                      Y.EMAIL
+                      FROM TB_WB20M01 X
+                      INNER JOIN TB_CM06M01 Y
+                      ON X.CO_CD = Y.CO_CD
+                      AND X.TODO_ID = Y.ID
+                      WHERE X.CO_CD = '${coCd}'
+                      AND X.WBS_PLAN_CODE_ID = '${codeId}' 
+                      AND X.SALES_CD = '${salesCd}'
+                      AND X.TODO_DIV2_CODE_ID = 'TODODIV1010'
+                      ORDER BY ROWNUM ASC
+          </select>
+          
+          
+        <!-- 공유 테이블 삭제 전 확인 -->
+         <select id="deleteWbsSharngListChk" parameterType="Map" resultType="camelMap">
+               SELECT *  FROM TB_WB20M01
+                   WHERE WBS_PLANCO_CD  = #{coCd}
+                         AND SALES_CD  = #{salesCd}
+                         AND WBS_PLAN_NO  = #{wbsPlanNo}
+                         AND WBS_PLAN_CODE_KIND  = #{wbsPlanCodeKind}
+                         AND WBS_PLAN_CODE_ID  = #{wbsPlanCodeId}
+                         AND TODO_DIV1_CODE_ID  = #{S_todoDiv1CodeId}
+                         AND TODO_DIV2_CODE_ID  = #{S_todoDiv2CodeId}
+        </select>
+        
+        
+        <!-- 공유 테이블 삭제  -->
+         <delete id="deleteWbsSharngList" parameterType="Map">
+               DELETE FROM TB_WB20M01
+                   WHERE WBS_PLANCO_CD  = #{coCd}
+                         AND SALES_CD  = #{salesCd}
+                         AND WBS_PLAN_NO  = #{wbsPlanNo}
+                         AND WBS_PLAN_CODE_KIND  = #{wbsPlanCodeKind}
+                         AND WBS_PLAN_CODE_ID  = #{wbsPlanCodeId}
+                         AND TODO_DIV1_CODE_ID  = #{S_todoDiv1CodeId}
+                         AND TODO_DIV2_CODE_ID  = #{S_todoDiv2CodeId}
+        </delete>
+        
+        
+         <!-- 공유 테이블 등록  -->
+         <insert id="insertWbsSharngList" parameterType="Map">
+                <selectKey keyProperty="toDoKey" resultType="Int" order="BEFORE">
+                    SELECT NVL(MAX(TODO_KEY), 0) + 1 FROM TB_WB20M01
+                </selectKey>
+                INSERT INTO TB_WB20M01
+                (
+                    TODO_KEY,
+                    CO_CD,
+                    TODO_DIV1_CODE_ID,
+                    TODO_DIV2_CODE_ID,
+                    TODO_ID,
+                    SALES_CD,
+                    PG_PATH,
+                    WBS_RSLTS_FILE_TRGT_KEY,
+                    WBS_PLANCO_CD,
+                    WBS_PLAN_NO,
+                    WBS_PLAN_CODE_KIND,
+                    WBS_PLAN_CODE_ID,
+                    CREAT_ID,
+                    CREAT_PGM,
+                    CREAT_DTTM
+                ) 
+                VALUES
+                (
+                    #{toDoKey},
+                    #{coCd},
+                    #{todoDiv1CodeId},
+                    #{todoDiv2CodeId},
+                    #{wbsSharngUserId},
+                    #{salesCd},
+                    #{pgPath},
+                    #{fileTrgtKey},
+                    #{wbsPlancoCd},
+                    #{wbsPlanNo},
+                    #{wbsPlanCodeKind},
+                    #{wbsPlanCodeId},
+                    #{creatId},
+                    #{creatPgm},
+                    SYSDATE
+                )
+         </insert>
+         
+         
+        
+         
+ </mapper>
