@@ -195,7 +195,7 @@ var treeModule = (function () {
     //   2. 그리드명  = 각 화면의 ax5-grid Html Tag ID  ex) <div id="my-grid" data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 100%; width: 100%"></div>
     //   3. 파일트리 최상위코드값  =  FIRETREE : 파일트리 최상위 값
     //   4. params 첨부자료가 저장된 타입과 일련번호를 전달한다.
-    //      4-1. fileTrgtType  = 파일저장타입(프로그램명 또는 테이블명으로 프로젝트내에서 유니크한 값 지정) ex)TB_BM0101M01
+    //      4-1. fileTrgtTyp   = 파일저장타입(프로그램명 또는 테이블명으로 프로젝트내에서 유니크한 값 지정) ex)TB_BM0101M01
     //      4-2. fileTrgtKey   = 파일저장일련번호 (프로그램명 또는 테이블명에서 관리되는 유니크한 일련번호 ex) 1, 2, 3, 4
     //'deptTree', 'file-grid', 'FILETREE', paramTreeObj);
     function initAll(selector, gridSelector, codeId, params) {
@@ -240,7 +240,7 @@ var treeModule = (function () {
 
     //트리 선택시 서버에 등록된 첨부 화일을 가져와서 그리드에 출력하기 위한 작업 
     function getAllFilesForNodes(nodeId) {
-    	if (!paramObj.fileTrgtType || !paramObj.fileTrgtKey) {
+    	if (!paramObj.fileTrgtTyp || !paramObj.fileTrgtKey) {
     		return false;
     	}
         fileArr=[];

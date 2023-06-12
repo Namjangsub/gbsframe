@@ -122,6 +122,21 @@ public class CM08SvcImpl implements CM08Svc {
     		if (!"".equals(mRequest.getParameter("coCd"))) {
     			param.put("coCd", mRequest.getParameter("coCd"));
     		}
+    		if (!"".equals(mRequest.getParameter("clntCd"))) {
+    			param.put("clntCd", mRequest.getParameter("clntCd"));
+    		}
+    		if (!"".equals(mRequest.getParameter("prdtCd"))) {
+    			param.put("prdtCd", mRequest.getParameter("prdtCd"));
+    		}
+    		if (!"".equals(mRequest.getParameter("itemCd"))) {
+    			param.put("itemCd", mRequest.getParameter("itemCd"));
+    		}
+    		if (!"".equals(mRequest.getParameter("salesCd"))) {
+    			param.put("salesCd", mRequest.getParameter("salesCd"));
+    		}
+    		if (!"".equals(mRequest.getParameter("prjctCd"))) {
+    			param.put("prjctCd", mRequest.getParameter("prjctCd"));
+    		}
             try {
     			cm08Mapper.insertFile(param);
     			String saveFile = param.get("fileKey") + "_" + originFileName;
