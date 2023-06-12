@@ -62,26 +62,34 @@ public class CM15SvcImpl implements CM15Svc {
     //  접근 통제는 Exception 발생
 	@Override
 	public void selectFileAuthCheck(Map<String, String> paramMap) throws Exception {
-        Map<String, String> fileInfo = selectFileAuthInfo(paramMap);
-		switch(paramMap.get("jobType")) {
-			case "LIST":
-				if (!fileInfo.get("fileList").equals("Y")) thrower.throwCommonException("noFileList");
-				break;
-			case "fileUp":
-				if (!fileInfo.get("fileUp").equals("Y")) thrower.throwCommonException("noFileUp");
-				break;
-			case "fileDown":
-				if (!fileInfo.get("fileDown").equals("Y")) thrower.throwCommonException("noFileDown");
-				break;
-			case "fileUpdate":
-				if (!fileInfo.get("fileUpdate").equals("Y")) thrower.throwCommonException("noFileUpdate");
-				break;
-			case "fileDelete":
-				if (!fileInfo.get("fileDelete").equals("Y")) thrower.throwCommonException("noFileDelete");
-				break;
-			default:
-				thrower.throwCommonException("noFileAuth");
-				break;
+		if (paramMap.get("userId").isEmpty()) {
+				thrower.throwCommonException("userNotFound");
+//		} else if (paramMap.get("pgmId").isEmpty()) {
+//				thrower.throwCommonException("pgmNotFound");
+		} else if (paramMap.get("comonCd").isEmpty()) {
+			thrower.throwCommonException("treeNotFound");
+		} else {
+	        Map<String, String> fileInfo = cm15Mapper.selectFileAuthInfo(paramMap);
+			switch(paramMap.get("jobType")) {
+				case "LIST":
+					if (!fileInfo.get("fileList").equals("Y")) thrower.throwCommonException("noFileList");
+					break;
+				case "fileUp":
+					if (!fileInfo.get("fileUp").equals("Y")) thrower.throwCommonException("noFileUp");
+					break;
+				case "fileDown":
+					if (!fileInfo.get("fileDown").equals("Y")) thrower.throwCommonException("noFileDown");
+					break;
+				case "fileUpdate":
+					if (!fileInfo.get("fileUpdate").equals("Y")) thrower.throwCommonException("noFileUpdate");
+					break;
+				case "fileDelete":
+					if (!fileInfo.get("fileDelete").equals("Y")) thrower.throwCommonException("noFileDelete");
+					break;
+				default:
+					thrower.throwCommonException("noFileAuth");
+					break;
+			}
 		}
 	}
 	

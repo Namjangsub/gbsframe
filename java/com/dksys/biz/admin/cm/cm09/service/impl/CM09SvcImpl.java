@@ -45,7 +45,7 @@ public class CM09SvcImpl implements CM09Svc {
 	public Map<String, Object> selectNotiInfo(Map<String, String> paramMap) {
 		Map<String, Object> returnMap = new HashMap<String, Object>();
 		Map<String, String> fileMap = new HashMap<String, String>();
-		fileMap.put("fileTrgtType", "TB_CM09M01");
+		fileMap.put("fileTrgtTyp", "TB_CM09M01");
 		fileMap.put("fileTrgtKey", paramMap.get("notiKey"));
 		returnMap.put("fileList", cm08Svc.selectFileList(fileMap));
 		returnMap.put("notiInfo", cm09Mapper.selectNotiInfo(paramMap));

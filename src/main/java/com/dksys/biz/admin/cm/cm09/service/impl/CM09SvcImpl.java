@@ -69,7 +69,7 @@ public class CM09SvcImpl implements CM09Svc {
 		fileMap.putAll(paramMap);
 		//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
 		fileMap.put("comonCd", "FITR9901");
-		fileMap.put("fileTrgtType", "TB_CM09M01");
+		fileMap.put("fileTrgtTyp", "TB_CM09M01");
 		fileMap.put("fileTrgtKey", paramMap.get("notiKey"));
 		fileMap.put("jobType", "fileList");
 		returnMap.put("fileList", cm08Svc.selectFileList(fileMap));
