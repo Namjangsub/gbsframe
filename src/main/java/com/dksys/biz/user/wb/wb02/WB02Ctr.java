@@ -264,7 +264,97 @@ public class WB02Ctr {
    	    model.addAttribute("resultCode", 200);
    	    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
    	 return "jsonView";
-    }
+     }
+	 
+	 
+	 
+	 @PutMapping(value = "/updateWbsPlanLockYnLvl1")
+     public String updateWbsPlanLockYnLvl1(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+        wb02Svc.updateWbsPlanLockYnLvl1(paramMap);
+   	    model.addAttribute("resultCode", 200);
+   	    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+   	 return "jsonView";
+     }
+
+	 
+	 
+	 @PutMapping(value = "/updateWbsPlanLockYnLvl2")
+     public String updateWbsPlanLockYnLvl2(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+        wb02Svc.updateWbsPlanLockYnLvl2(paramMap);
+   	    model.addAttribute("resultCode", 200);
+   	    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+   	 return "jsonView";
+     }
+
+	 
+	 
+	 @PutMapping(value = "/updateWbsPlanLockYnLvl3")
+     public String updateWbsPlanLockYnLvl3(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+        wb02Svc.updateWbsPlanLockYnLvl3(paramMap);
+   	    model.addAttribute("resultCode", 200);
+   	    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+   	 return "jsonView";
+     }
+	 
+	 
+	 
+	 
+	 
+	 
+	 @PutMapping(value = "/updateWbsPlanCloseYn")
+     public String updateWbsPlanCloseYn(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+        wb02Svc.updateWbsPlanCloseYn(paramMap);
+        //wb02Svc.updateWbsRsltsMasterCloseYn(paramMap);
+        //wb02Svc.updateWbsRsltsDetailCloseYn(paramMap);
+   	    model.addAttribute("resultCode", 200);
+   	    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+   	 return "jsonView";
+     }
+
+	 
+	/*
+	 * @PutMapping(value = "/updateWbsRsltsMasterCloseYn") public String
+	 * updateWbsRsltsMasterCloseYn(@RequestParam Map<String, String> paramMap,
+	 * MultipartHttpServletRequest mRequest, ModelMap model) {
+	 * wb02Svc.updateWbsRsltsMasterCloseYn(paramMap);
+	 * model.addAttribute("resultCode", 200); model.addAttribute("resultMessage",
+	 * messageUtils.getMessage("update")); return "jsonView"; }
+	 * 
+	 * 
+	 * 
+	 * @PutMapping(value = "/updateWbsRsltsDetailCloseYn") public String
+	 * updateWbsRsltsDetailCloseYn(@RequestParam Map<String, String> paramMap,
+	 * MultipartHttpServletRequest mRequest, ModelMap model) {
+	 * wb02Svc.updateWbsPlanCloseYn(paramMap); model.addAttribute("resultCode",
+	 * 200); model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+	 * return "jsonView"; }
+	 */
+	 
+	 
+	 
+	 
+
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
 	 
 	 
 		 
