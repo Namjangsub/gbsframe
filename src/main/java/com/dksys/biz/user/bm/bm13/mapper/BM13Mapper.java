@@ -13,5 +13,7 @@ public interface BM13Mapper {
 	int selectApprovalListCount(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectApprovalList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectApprovalExcelList(Map<String, String> paramMap);
 	
 }

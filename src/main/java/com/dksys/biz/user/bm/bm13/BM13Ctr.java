@@ -48,6 +48,15 @@ public class BM13Ctr {
 		return "jsonView"; 
     }
 	  
+	//<!-- WBS 결재선관리 엑셀 리스트  -->
+    @PostMapping(value = "/selectApprovalExcelList") 
+	public String selectMsExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  
+		  List<Map<String, String>> resultList = bm13Svc.selectApprovalExcelList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+		  
+	  }    
 
 	  
 }

@@ -49,5 +49,8 @@ public class BM13SvcImpl implements BM13Svc {
 		return bm13Mapper.selectApprovalList(paramMap);
 	}
 	
-
+	@Override
+	public List<Map<String, String>> selectApprovalExcelList(Map<String, String> paramMap) {
+		return bm13Mapper.selectApprovalExcelList(paramMap);
+	}
 }
