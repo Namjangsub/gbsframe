@@ -377,4 +377,40 @@ public class WB02SvcImpl implements WB02Svc {
 		return wb02Mapper.wbsPlanStsCodeUpdate(paramMap);
 	}
     
+    
+    
+    
+    @Override
+	public int updateWbsPlanLockYnLvl1(Map<String, String> paramMap) {
+		return wb02Mapper.updateWbsPlanLockYnLvl1(paramMap);
+	}
+    
+    @Override
+	public int updateWbsPlanLockYnLvl2(Map<String, String> paramMap) {
+		return wb02Mapper.updateWbsPlanLockYnLvl2(paramMap);
+	}
+    
+    @Override
+	public int updateWbsPlanLockYnLvl3(Map<String, String> paramMap) {
+		return wb02Mapper.updateWbsPlanLockYnLvl3(paramMap);
+	}
+    
+    
+    
+    @Override
+	public int updateWbsPlanCloseYn(Map<String, String> paramMap) {
+    	wb02Mapper.updateWbsRsltsMasterCloseYn(paramMap);
+    	wb02Mapper.updateWbsRsltsDetailCloseYn(paramMap);
+		return wb02Mapper.updateWbsPlanCloseYn(paramMap);
+	}
+    
+	/*
+	 * @Override public int updateWbsRsltsMasterCloseYn(Map<String, String>
+	 * paramMap) { return wb02Mapper.updateWbsRsltsMasterCloseYn(paramMap); }
+	 * 
+	 * @Override public int updateWbsRsltsDetailCloseYn(Map<String, String>
+	 * paramMap) { return wb02Mapper.updateWbsRsltsDetailCloseYn(paramMap); }
+	 */
+    
+    
 }

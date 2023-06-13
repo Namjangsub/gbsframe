@@ -77,4 +77,27 @@ public interface WB02Svc {
     int wbsPlanStsCodeUpdate(Map<String, String> paramMap);
     
     
+    
+    
+    
+    int updateWbsPlanLockYnLvl1(Map<String, String> paramMap);
+    
+    int updateWbsPlanLockYnLvl2(Map<String, String> paramMap);
+    
+    int updateWbsPlanLockYnLvl3(Map<String, String> paramMap);
+    
+    
+    
+    int updateWbsPlanCloseYn(Map<String, String> paramMap);
+    
+	/*
+	 * int updateWbsRsltsMasterCloseYn(Map<String, String> paramMap);
+	 * 
+	 * int updateWbsRsltsDetailCloseYn(Map<String, String> paramMap);
+	 */
+    
+    
+    
+    
+    
 }
