@@ -876,6 +876,7 @@ $.urlParam = function(name){
 
 function authChk(menuUrl){
 //	$(".bg_gray").hide();
+	debugger;
 	if(!menuUrl){
 		var url = window.location.href;
 		menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
@@ -883,8 +884,8 @@ function authChk(menuUrl){
 		var arr = JSON.parse(getCookie("authArr"));
         var saveYn = "N";
         for(var i = 0; i < arr.length; i++){
-            if(arr[i].menuUrl == menuUrl){
-                saveYn = arr[i].saveYn;
+            if(arr[i].m == menuUrl){
+                saveYn = arr[i].s;
                 break;
             }
         }

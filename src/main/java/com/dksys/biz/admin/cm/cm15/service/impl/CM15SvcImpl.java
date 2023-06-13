@@ -17,7 +17,6 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.admin.cm.cm15.mapper.CM15Mapper;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
-import com.dksys.biz.user.ar.ar01.mapper.AR01Mapper;
 import com.dksys.biz.util.ExceptionThrower;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -29,9 +28,6 @@ public class CM15SvcImpl implements CM15Svc {
     @Autowired
     CM15Mapper cm15Mapper;
 
-    @Autowired
-    AR01Mapper ar01Mapper;
-    
     @Autowired
     ExceptionThrower thrower;
 

@@ -77,7 +77,11 @@ public class HomeController {
 	    	    			}
     	    			}
     	    			Object value = sValue;
-    					json.put(key, value);
+    	    			if(key.equals("menuUrl")) {
+    	    				json.put("m", value);
+    	    			} else if(key.equals("saveYn")) {
+    	    				json.put("s", value);
+    	    			}
         			}
 				} catch (JSONException e) {
 					// TODO Auto-generated catch block
