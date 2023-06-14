@@ -104,9 +104,9 @@ var treeModule = (function () {
             }).on("loaded.jstree", function () {
             // 루트 노드 로드 완료 시
             //전체 노드 펼침
-            $('#' + selector).jstree("open_all");
+//            $('#' + selector).jstree("open_all");
             // 최상위 노드 펼침
-//            $('#' + selector).jstree(true).open_node($('#' + selector + ' li[aria-level="1"]').eq(0).attr('id'));
+            $('#' + selector).jstree(true).open_node($('#' + selector + ' li[aria-level="1"]').eq(0).attr('id'));
 //            $('#' + selector).jstree(true).open_node($('#' + selector + ' li[aria-level="2"]').eq(0).attr('id'));
 
             var topLevelNode = $('#' + selector + ' li[aria-level="1"]').eq(0).attr('id');
@@ -261,6 +261,7 @@ var treeModule = (function () {
 		var deptTree = null;
 		paramObj["coCd"] = $('#coCd').val(); 
 		paramObj["userId"] = jwt.userId; 
+		paramObj["useYn"] = 'Y'; 
 
 		postAjaxSync("/admin/cm/cm05/selectDocTreeListAuth", paramObj, null, function(data){
 			deptTree = data.docTreeList;

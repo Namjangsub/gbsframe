@@ -78,21 +78,34 @@
     <select id="selectTreeFileCount" parameterType="Map" resultType="int">
         SELECT
         	COUNT(*)
-        FROM
-        	TB_CM08M01 T LEFT OUTER JOIN TB_BM02M01 A ON T.CLNT_CD = A.CLNT_CD
-<!-- 				         LEFT OUTER JOIN TB_BM06M01 C ON T.PRJCT_CD = C.PRJCT_SEQ -->
-				         LEFT OUTER JOIN TB_CM06M01 D ON T.CREAT_ID = D.ID
-				         LEFT OUTER JOIN TB_BM01M01 E ON T.PRDT_CD = E.PRDT_CD
-				         LEFT OUTER JOIN TB_CM05M01 F ON T.ITEM_CD = F.CODE_ID
-			             INNER JOIN      TB_CM15M01 G ON T.COMON_CD = G.COMON_CD
-	        								    AND G.USER_ID = #{userId}
-	        								    AND G.FILE_LIST = 'Y'        
-        WHERE 1=1
- 		        <if test="coCd != null and !coCd.equals('')">
+		    FROM
+		        TB_CM08M01 T left outer join TB_BM02M01 A ON T.CLNT_CD = A.CLNT_CD
+					            LEFT OUTER JOIN (
+											        SELECT  CODE_ID ID,
+											                CODE_NM TEXT,
+											                CODE_KIND PARENT,
+											                CODE_DESC PARENT_NM,
+											                SORT_NO,
+											                USE_YN,
+											                LPAD(' ', 3*(LEVEL-1)) || LEVEL lvl,
+											                REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_NM, '\'), '^\s+\-\>\s+', '') as LPATH,
+											                CONNECT_BY_ISLEAF AS IS_LEAF
+											        FROM TB_CM05M01
+											        START WITH CODE_ID ='FILETREE'
+											        CONNECT BY PRIOR CODE_ID = CODE_KIND
+											        ORDER SIBLINGS BY CODE_ID ASC) B1 ON T.COMON_CD = B1.ID
+<!-- 		            LEFT OUTER JOIN TB_BM06M01 C ON T.PRJCT_CD = C.PRJCT_SEQ -->
+		            LEFT OUTER JOIN TB_CM06M01 D ON T.CREAT_ID = D.ID
+		            LEFT OUTER JOIN TB_BM01M01 E ON T.PRDT_CD = E.PRDT_CD
+		            LEFT OUTER JOIN TB_CM05M01 F ON T.ITEM_CD = F.CODE_ID
+		            LEFT OUTER JOIN TB_CM15M01 G ON T.COMON_CD = G.COMON_CD
+        								        AND G.USER_ID = #{userId}
+		        WHERE 1=1
+		        <if test="coCd != null and !coCd.equals('')">
 		            AND T.CO_CD = #{coCd}
 		        </if>
 		        <if test="comonCd.equals('FITR90')">	        
-		        	AND (T.COMON_CD IS NULL OR T.COMON_CD = '')
+		        	AND (T.COMON_CD IS NULL OR T.COMON_CD = '' OR B1.ID IS NULL)
 		        </if>
 		        <if test="!comonCd.equals('FITR90')">	        
 					AND G.FILE_LIST = 'Y'
@@ -137,25 +150,9 @@
 		        <if test="salesCd != null and !salesCd.equals('')">
 		            AND T.SALES_CD LIKE '%${salesCd}%'
 		        </if>
-
     </select>
 
     <select id="selectTreeFileList" parameterType="Map" resultType="CamelMap">
-        WITH b1 AS (
-        SELECT  CODE_ID ID,
-                CODE_NM TEXT,
-                CODE_KIND PARENT,
-                CODE_DESC PARENT_NM,
-                SORT_NO,
-                USE_YN,
-                LPAD(' ', 3*(LEVEL-1)) || LEVEL lvl,
-                REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_NM, '\'), '^\s+\-\>\s+', '') as LPATH,
-                CONNECT_BY_ISLEAF AS IS_LEAF
-        FROM TB_CM05M01
-        START WITH CODE_ID ='FILETREE'
-        CONNECT BY PRIOR CODE_ID = CODE_KIND
-        ORDER SIBLINGS BY CODE_ID ASC)
-
 		SELECT *
 		  FROM (     
 	        SELECT
@@ -187,15 +184,27 @@
 		            FN_CM05M01_CD_TO_NM(T.PRJCT_CD) PRJCT_NM,
 		            T.COMON_CD,
 		            B1.TEXT AS COMON_NM,
-		            B1.LPATH,
+		            NVL(B1.LPATH, NVL2(T.COMON_CD, T.COMON_CD, 'null'))  AS LPATH,
 		            G.FILE_UP,
 		            G.FILE_DOWN,
 		            G.FILE_UPDATE,
 		            G.FILE_DELETE
-		        FROM
-		        TB_CM08M01 T left outer join TB_BM02M01 A
-		            on T.CLNT_CD = A.CLNT_CD
-		            LEFT OUTER JOIN B1 ON T.COMON_CD = B1.ID
+		    FROM
+		        TB_CM08M01 T left outer join TB_BM02M01 A ON T.CLNT_CD = A.CLNT_CD
+					            LEFT OUTER JOIN (
+											        SELECT  CODE_ID ID,
+											                CODE_NM TEXT,
+											                CODE_KIND PARENT,
+											                CODE_DESC PARENT_NM,
+											                SORT_NO,
+											                USE_YN,
+											                LPAD(' ', 3*(LEVEL-1)) || LEVEL lvl,
+											                REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_NM, '\'), '^\s+\-\>\s+', '') as LPATH,
+											                CONNECT_BY_ISLEAF AS IS_LEAF
+											        FROM TB_CM05M01
+											        START WITH CODE_ID ='FILETREE'
+											        CONNECT BY PRIOR CODE_ID = CODE_KIND
+											        ORDER SIBLINGS BY CODE_ID ASC) B1 ON T.COMON_CD = B1.ID
 <!-- 		            LEFT OUTER JOIN TB_BM06M01 C ON T.PRJCT_CD = C.PRJCT_SEQ -->
 		            LEFT OUTER JOIN TB_CM06M01 D ON T.CREAT_ID = D.ID
 		            LEFT OUTER JOIN TB_BM01M01 E ON T.PRDT_CD = E.PRDT_CD
@@ -207,7 +216,7 @@
 		            AND T.CO_CD = #{coCd}
 		        </if>
 		        <if test="comonCd.equals('FITR90')">	        
-		        	AND (T.COMON_CD IS NULL OR T.COMON_CD = '')
+		        	AND (T.COMON_CD IS NULL OR T.COMON_CD = '' OR B1.ID IS NULL) --저장위치 없는 파일
 		        </if>
 		        <if test="!comonCd.equals('FITR90')">	        
 					AND G.FILE_LIST = 'Y'
