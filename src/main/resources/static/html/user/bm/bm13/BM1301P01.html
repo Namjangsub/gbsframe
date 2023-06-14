@@ -32,9 +32,11 @@
           </td>
           <th class="hit">작성자</th>
 			<td>
-				<input type="hidden" id="userId_P" name="userId_P"  data-search="userId_P">
-				<input type="text"	id="userName_P"   data-search="userName_P"  onkeyup="">
-				<a onclick="openUserSearchPop();"><i class="i_search_w" id="userIdBtn"></i></a>
+				<div class="search_form">
+					<input type="hidden" id="userId_P" name="userId_P"  data-search="userId_P">
+					<input type="text"	id="userName_P"   data-search="userName_P"  onkeyup="">
+					<a onclick="openUserSearchPop();"><i class="i_search_w"></i></a>
+				</div>
           </td>
 
           <th class="hit">결재선 구분</th>
@@ -53,8 +55,8 @@
           <th>사용여부</th>
           <td>
             <select id="useYn" name="useYn" data-search="useYn" required msg="사용여부">
-            	<option value="">Y</option>
-            	<option value="">N</option>
+            	<option value="Y">Y</option>
+            	<option value="N">N</option>
              </select>
           </td>
         </tr>
@@ -72,8 +74,8 @@
                 <div id="est_grid" class="contents"
                      style="margin:0px; padding:0px; height: 380px; width: 100%; min-width: 200px;border-radius:0;">
                     <div style="float:right" style="" class="add_btn pdl10">
-                        <a id="addProductButton" style="margin-top:8px">+</a>
-                        <a id="deleteProductButton" style="margin-top:8px;margin-right:8px;">-</a>
+                        <a id="addDetailButton" style="margin-top:8px">+</a>
+                        <a id="deleteDetailButton" style="margin-top:8px;margin-right:8px;">-</a>
                     </div>
 
                     <h3 class="location">
@@ -101,16 +103,20 @@
 
 <script type="text/javascript">
 
+//전역 초기화
 var actionType = null;
+var userId = null;
+var userNm = null;
+var coCd = null;
 
 //결재대상자 그리드
 var gridView = {
 	  	initView: function(){
 		this.target = new ax5.ui.grid();
 		this.target.setConfig({
-			showRowSelector: true,
+			showRowSelector: false,
 			multipleSelect: false,
-			sortable: true,
+			sortable: false,
 			target: $('[data-ax5grid="approval-grid-modal"]'),
 			header: {
 	             align: "center",
@@ -143,7 +149,7 @@ var gridView = {
 	          columns: [
 	       	   {key: "rn",      label: "No.",          align: "center",   width: 60},
 	              {key: "coCd",      			label: "회사",          hidden: true},
-	              {key: "appUserNm"   			label: "결재자",      align: "center",   width: 150},	              
+	              {key: "appUserNm",      		label: "결재자명",      align: "center",   width: 130},
 	              {key: "appId",      			label: "결재자ID",      align: "center",   width: 130,		hidden: true},
 	              {key: "deptNm",      			label: "부서",      align: "center",   width: 130},
 	              {key: "levelNm",      		label: "직급",      align: "center",   width: 130},
@@ -159,8 +165,7 @@ var gridView = {
 	     },
 	       setData: function(_pageNo) {
 	     	    var targetObj = this.target;
-	     	    var userId = "";
-	     	    userId = jwt.userId;
+	     	    var userId = $("#userId").val();
 	     	    var formData = {
 	     	    		   "userId" : userId,	//userId - 작성자
 	     	               "coCd" : $("#coCd").val(), //회사코드
@@ -188,12 +193,15 @@ $(document).ready(function() {
 	setCommonSelect($(".popup_area select[data-kind]"));
 	//회사명 콤보 set
 	$("#popForm #userId").val(jwt.userId);
-	var coCd = modalStack.last().paramObj.coCd;
+	coCd = modalStack.last().paramObj.coCd;	
 	$("#coCd").val(coCd);
 
 	//작성자 readonly 등 set
-    $("#userId_P").val(jwt.userId);
-    $("#userName_P").val(jwt.userNm);
+	userId = modalStack.last().paramObj.userId;
+	userNm  = modalStack.last().paramObj.userNm;
+    $("#userId_P").val(userId);
+    $(".popup_area #userId").val(userId);
+    $("#userName_P").val(userNm);
 	$("#userName_P").attr("readonly", true);    
     	
     //관리자권한 체크후 없으면 readonly
@@ -205,6 +213,7 @@ $(document).ready(function() {
     	$("#userIdBtn").hide();
     	$("#appIdBtn").hide();    	
     }	
+
 	
  	// 권한체크    
 	authChk();						
@@ -232,6 +241,70 @@ $(document).ready(function() {
 	//결재선 그리드
 	gridView.initView().setData(0);	
 	
+	//결재선 목록 그리드 추가
+    $("#addDetailButton").on("click", function () {
+
+        var paramObj = {
+                "coCd" : $(".popup_area #coCd").val(),
+                "userId": $(".popup_area #userId").val(),
+                "useYn": "Y"
+            };
+            openSecondModal("/static/html/cmn/modal/userSearch.html", 300, 500, "담당자 검색", paramObj, function (tree){
+               var checkedId = tree.get_checked()[0];
+               var checkedNode = tree.get_node(checkedId);   
+
+               var paramObj = {"coCd" : $(".popup_area #coCd").val(), "userId" : checkedId};
+               
+               postAjax("/user/wb/wb02/selectRsltsMemberList", paramObj, null, function(data){
+            	   gridView.target.addRow($.extend({}, "last", false));                             
+                      
+                       var row = gridView.target.getList().length - 1;
+                       gridView.target.setValue(row, "coCd", $("#coCd").val());
+                       gridView.target.setValue(row, "appUserNm", data.resultList[0].name);
+                       gridView.target.setValue(row, "deptNm", data.resultList[0].deptNm);
+                       gridView.target.setValue(row, "levelNm", data.resultList[0].levelNm);
+                       gridView.target.setValue(row, "email", data.resultList[0].email);
+                       gridView.target.setValue(row, "telNo", data.resultList[0].telNo);
+                       gridView.target.setValue(row, "faxNo", data.resultList[0].faxNo);
+               });                 
+               //row set end
+            });  
+            //second 사용자검색 모달 end
+    	
+    });
+	//click function end
+
+	//결재선 그리드 삭제
+    $("#deleteDetailButton").on("click", function () {
+    	
+        if (selectedRowKey2 !== undefined) {
+        	approval-grid-modal.removeRow(selectedRowKey2);
+            const data = approval-grid-modal.getList();
+            gridOrdrsDetail.setData({
+                list: data,
+                page: {
+                    totalElements: data.length
+                }
+            });
+
+            // 선택된 행을 업데이트합니다.
+            if (data.length > 0) { // 아직 데이터가 있는지 확인합니다.
+                if (selectedRowKey2 < data.length) { // 선택된 행이 마지막 행이 아니라면 다음 행을 선택합니다.
+                    gridOrdrsDetail.select(selectedRowKey2);
+                } else { // 선택된 행이 마지막 행이었다면 이전 행을 선택합니다.
+                    selectedRowKey2 = selectedRowKey2 - 1;
+                    gridOrdrsDetail.select(selectedRowKey2);
+                }
+            } else { // 데이터가 없다면 선택된 행을 초기화합니다.
+                selectedRowKey2 = undefined;
+                // 이 경우 삭제 버튼을 비활성화할 수 있습니다.
+                // 예: $("#deleteProductButton").prop("disabled", true);
+            }
+        } else {
+            alert("삭제를 위해 선택된 행이 없습니다.");
+        }
+    });	
+	
 });
 //ready end
 
@@ -253,11 +326,10 @@ function openUserSearchPop() {
 			});
 }
 
- // 등록
+ // 등록 - done
 function insertApproval() {
 	if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 		var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
-		debugger;
 		filePostAjax("/user/bm/bm13/insertApproval", formData,				// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행
 				
 				function(data) {
@@ -298,34 +370,10 @@ function makeFormData() {
 	// 폼데이터 생성
 	var formData = new FormData($("#popForm")[0]);
 	
-	//---------------------------------------------------------------  
-	//-------itemarr  --첨부화일 처리를 위한 부분 시작
-	//---------------------------------------------------------------  
-	// 유저아이디 추가
+	// 기본값 set
 	formData.append("userId", jwt.userId);
 	formData.append("clntCd", $('#vendCd').val());			//첨부화일용
-	formData.append("prdtCd", $('#prdtCd').val());			//첨부화일용
-	formData.append("itemCd", $('#itemDiv').val());			//첨부화일용
-	formData.append("prjctCd", $('#clntPjt').val());		//첨부화일용
-	formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용
-	var fileUploadArr = [];
-	var tempArr = [];
-	
-	tempArr = treeModule.getFileArr();
-	$.each(tempArr, function(idx, obj) {
-		if (obj.fileKey == 0) {
-            formData.append("files", obj.file);
-            obj.file = '';
-            fileUploadArr.push(obj);
-		}
-	});
-
-	formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
-	formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
-	//---------------------------------------------------------------  
-	//--첨부화일 처리를 위한 부분 끝
-	//--------------------------------------------------------------- 
-
+	 
 	return formData;
 }
 

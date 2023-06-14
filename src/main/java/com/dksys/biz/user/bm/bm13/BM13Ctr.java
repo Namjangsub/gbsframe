@@ -60,7 +60,7 @@ public class BM13Ctr {
 
 	//기준관리 결재선 등록
     @PostMapping(value = "/insertApproval")
-    public String insertPchsCost(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+    public String insertApproval(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
   		try {
   			System.out.println(">>>paramMap>>" + paramMap + "<<<");
   			if (bm13Svc.insertApproval(paramMap, mRequest) != 0 ) {
@@ -76,4 +76,40 @@ public class BM13Ctr {
   		}
   		return "jsonView";
     }	  
+    
+	//기준관리 결재선 수정    
+    @PostMapping(value = "/updateApproval")
+    public String updatePchsCost(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  	  	try {
+  			if (bm13Svc.updateApproval(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  	  	return "jsonView";
+    } 
+    
+	//기준관리 결재선 삭제    
+    @PutMapping(value = "/deleteApproval")
+    public String deletePchsCost(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+  	  	try {
+  			if (bm13Svc.deleteApproval(paramMap) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  	  	return "jsonView";
+    }    
 }
