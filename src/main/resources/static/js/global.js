@@ -875,8 +875,6 @@ $.urlParam = function(name){
 }
 
 function authChk(menuUrl){
-//	$(".bg_gray").hide();
-	debugger;
 	if(!menuUrl){
 		var url = window.location.href;
 		menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
