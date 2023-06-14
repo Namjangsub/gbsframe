@@ -53,4 +53,41 @@ public class BM13SvcImpl implements BM13Svc {
 	public List<Map<String, String>> selectApprovalExcelList(Map<String, String> paramMap) {
 		return bm13Mapper.selectApprovalExcelList(paramMap);
 	}
+	
+	@Override
+	public int insertApproval(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		    		
+		int result = bm13Mapper.insertApproval(paramMap);
+		  		
+		return result;
+	  }	
+	
+	@Override
+	public int updateApproval(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		    		
+		int result = bm13Mapper.updateApproval(paramMap);
+		
+		//---------------------------------------------------------------  		
+		return result;
+	  }	
+	
+	@Override
+	public int deleteApproval(Map<String, String> paramMap) throws Exception {
+
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		    		
+		int result = bm13Mapper.deleteApproval(paramMap);
+		
+		//---------------------------------------------------------------  		
+		return result;
+	  }	
+	
+	
 }

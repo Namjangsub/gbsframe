@@ -3,7 +3,7 @@
 
 <mapper namespace="com.dksys.biz.user.bm.bm13.mapper.BM13Mapper">
 
-	<!-- WBS 결재선 조회 리스트  조회조건 -->
+	<!-- 기준관리 - 결재선 조회 리스트  조회조건 -->
 	<sql id="selectApprovalListCondition">
 		<!-- 작성자 id 필수 -->         
 		<if test="userId != null and !userId.equals('')">
@@ -19,8 +19,7 @@
 		</if>							
 	</sql>	
 		
-	
-	<!-- WBS 결재선 조회 리스트  카운트 -->
+	<!-- 기준관리 - 결재선 조회 리스트  카운트 -->
 	<select id="selectApprovalListCount" parameterType="Map" resultType="int">
 		SELECT COUNT(*) 
 			FROM TB_BM13M01
@@ -40,7 +39,7 @@
 		</if>												
 	</select>
 	          
-	<!-- WBS 결재선 조회 리스트  -->
+	<!-- 기준관리 - 결재선 조회 리스트  -->
 	<select id="selectApprovalList" parameterType="Map" resultType="camelMap">   
 		/* No. 내림차순 */
 		SELECT *
@@ -63,6 +62,7 @@
 							, FN_CM05M01_CD_TO_NM(A.APP_DIV) AS APP_DIV		/* 결재선구분 */
 							, APP_LINE_NM			/* 결재자명 */
 							, APP_ID				/* 결재자 id */
+							, B.APP_USER_NM			/* 결재자명 */							
 							, USE_YN				/*사용여부 */
 							, B.DEPT_NM			/* 부서명  */
 							, (SELECT D.LEVEL_NM FROM TB_CM07M01 D WHERE D.LEVEL_CD=B.LEVEL_CD) AS LEVEL_NM		/* 직급 */
@@ -84,6 +84,7 @@
 							LEFT OUTER JOIN
 							(
 							SELECT BB.ID AS USER_ID
+									, BB.NAME AS APP_USER_NM							
 									, BB.LEVEL_CD
 									, BB.EMAIL
 									, BB.TEL_NO
@@ -104,7 +105,7 @@
 	</select>
 
 
-	<!-- WBS 일정계획 등록 메인 화면 엑셀 조회 리스트  -->
+	<!-- 기준관리 - 일정계획 등록 메인 화면 엑셀 조회 리스트  -->
 	<select id="selectApprovalExcelList" parameterType="Map" resultType="camelMap">   
 		/* No. 내림차순 */
 		SELECT *
@@ -125,8 +126,9 @@
 								WHERE A.ID = B.ID
 							) AS USER_NAME		/* 작성자 이름 */
 							, FN_CM05M01_CD_TO_NM(A.APP_DIV) AS APP_DIV		/* 결재선구분 */
-							, APP_LINE_NM			/* 결재자명 */
+							, APP_LINE_NM			/* 결재선명 */
 							, APP_ID				/* 결재자 id */
+							, B.APP_USER_NM			/* 결재자명 */
 							, USE_YN				/*사용여부 */
 							, B.DEPT_NM			/* 부서명  */
 							, (SELECT D.LEVEL_NM FROM TB_CM07M01 D WHERE D.LEVEL_CD=B.LEVEL_CD) AS LEVEL_NM		/* 직급 */
@@ -148,6 +150,7 @@
 							LEFT OUTER JOIN
 							(
 							SELECT BB.ID AS USER_ID
+									, BB.NAME AS APP_USER_NM
 									, BB.LEVEL_CD
 									, BB.EMAIL
 									, BB.TEL_NO
@@ -160,14 +163,95 @@
 							) B ON(A.APP_ID=B.USER_ID)
 						WHERE 1=1						
 						<include refid="selectApprovalListCondition"></include>
-						ORDER BY CREAT_DTTM DESC				
+						ORDER BY APP_NO DESC, APP_SEQ DESC, CREAT_DTTM DESC				
 						) X		
 			)							
 			WHERE 1=1
 			/* 엑셀은 전체 조회 */
 	</select>
 
-         
-        
-         
+	<!-- 기준관리 - 결재선관리 등록 -->
+	<insert id="insertApproval" parameterType="Map">
+	    <selectKey keyProperty="selAppNo" resultType="String" order="BEFORE">
+			SELECT DECODE(INSTR(APP_NO, #{userId}||'-'), 0, 'test01-01'
+					, #{userId}||'-'||LPAD( MAX( TO_NUMBER(SUBSTRING( APP_NO, -2)) ) OVER()+1, 2, '0')
+				   )
+			FROM TB_BM13M01
+			WHERE 1=1  
+	    </selectKey>
+	    
+	    INSERT INTO TB_BM13M01
+	      (
+			CO_CD
+			, APP_NO
+			, APP_SEQ
+			, ID
+			, APP_DIV
+			, APP_LINE_NM
+			, APP_ID
+			, USE_YN
+			, PG_PATH
+			, ETC_FIELD1
+			, ETC_FIELD2
+			, ETC_FIELD3
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM    
+	      )
+	    VALUES
+	    (
+			coCd
+			, #{selAppNo}
+			, #{appSeq}
+			, #{userId}
+			, #{appDiv}
+			, #{appLineNm}
+			, #{appId}
+			, #{useYn}
+			, #{pgPath}
+			, #{etcField1}
+			, #{etcField2}
+			, #{etcField3}
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE  
+	    )
+	</insert>
+    
+	<!-- 기준관리 - 결재선관리 수정 -->
+	<update id="updateApproval" parameterType="Map">
+		UPDATE TB_BM13M01
+			SET
+			CO_CD						= #{coCd}
+			, APP_NO					= #{appNo}	
+			, APP_SEQ					= #{appSeq}	
+			, ID						= #{userId}
+			, APP_DIV					= #{appDiv}
+			, APP_LINE_NM				= #{appLineNm}
+			, APP_ID					= #{appId}	
+			, USE_YN					= #{useYn}	
+			, PG_PATH					= #{pgPath}	
+			, ETC_FIELD1				= #{etcField1}
+			, ETC_FIELD2				= #{etcField2}	
+			, ETC_FIELD3				= #{etcField3}
+			, UDT_ID					= #{userId}
+			, UDT_PGM					= #{pgmId}	
+			, UDT_DTTM					= SYSDATE
+		WHERE 1=1
+			AND CO_CD = #{coCd}
+			AND APP_NO = #{appNo}
+			AND APP_SEQ = #{appSeq}
+	</update>        
+
+	<!-- 기준관리 - 결재선관리 삭제 -->         
+	<delete id="deleteApproval" parameterType="Map">
+		DELETE 
+			FROM TB_BM13M01
+		WHERE 1=1
+			AND CO_CD = #{coCd}
+			AND APP_NO = #{appNo}
+			AND APP_SEQ = #{appSeq}	
+	</delete>
+	
+		
  </mapper>

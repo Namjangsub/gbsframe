@@ -35,7 +35,7 @@ public class BM13Ctr {
     @Autowired
     BM13Svc bm13Svc;
 
-    //<!-- WBS 결재선관리 메인 화면 조회 리스트  -->
+	//기준관리 결재선관리 메인 화면 조회 리스트  -->
     @PostMapping(value = "/selectApprovalList") 
     public String selectApplovalList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		  
@@ -48,7 +48,7 @@ public class BM13Ctr {
 		return "jsonView"; 
     }
 	  
-	//<!-- WBS 결재선관리 엑셀 리스트  -->
+	//기준관리 결재선관리 엑셀 리스트  -->
     @PostMapping(value = "/selectApprovalExcelList") 
 	public String selectMsExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		  
@@ -58,5 +58,22 @@ public class BM13Ctr {
 		  
 	  }    
 
-	  
+	//기준관리 결재선 등록
+    @PostMapping(value = "/insertApproval")
+    public String insertPchsCost(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			System.out.println(">>>paramMap>>" + paramMap + "<<<");
+  			if (bm13Svc.insertApproval(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }	  
 }
