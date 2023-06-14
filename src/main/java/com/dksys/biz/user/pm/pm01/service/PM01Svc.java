@@ -11,15 +11,9 @@ public interface PM01Svc {
 
   List<Map<String, String>> selectDailyWorkList(Map<String, String> paramMap);
 
-  List<Map<String, String>> selectItemList(Map<String, String> paramMap);
-
-  List<Map<String, String>> selectPrdtList(Map<String, String> paramMap);
-
   Map<String, String> selectDailyWorkInfo(Map<String, String> paramMap);
 
   int selectConfirmCount(Map<String, String> paramMap);
-
-  List<Map<String, String>> selectFileList(Map<String, String> paramMap);
 
   int insertDailyWork(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 

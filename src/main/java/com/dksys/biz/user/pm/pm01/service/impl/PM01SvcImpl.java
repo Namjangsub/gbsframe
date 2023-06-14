@@ -46,16 +46,6 @@ public class PM01SvcImpl implements PM01Svc {
   }
 
   @Override
-  public List<Map<String, String>> selectItemList(Map<String, String> paramMap) {
-    return pm01Mapper.selectItemList(paramMap);
-  }
-
-  @Override
-  public List<Map<String, String>> selectPrdtList(Map<String, String> paramMap) {
-    return pm01Mapper.selectPrdtList(paramMap);
-  }
-
-  @Override
   public Map<String, String> selectDailyWorkInfo(Map<String, String> paramMap) {
     return pm01Mapper.selectDailyWorkInfo(paramMap);
   }
@@ -63,11 +53,6 @@ public class PM01SvcImpl implements PM01Svc {
   @Override
   public int selectConfirmCount(Map<String, String> paramMap) {
     return pm01Mapper.selectConfirmCount(paramMap);
-  }
-
-  @Override
-  public List<Map<String, String>> selectFileList(Map<String, String> paramMap) {
-    return pm01Mapper.selectFileList(paramMap);
   }
 
   @Override
@@ -104,59 +89,13 @@ public class PM01SvcImpl implements PM01Svc {
 	//---------------------------------------------------------------  
 
 	int result = pm01Mapper.updateDailyWork(paramMap);
-    	//  pm01Mapper.updateDailyWork(paramMap)을 호출하여 paramMap을 사용하여 프로젝트를 업데이트하고 그 결과를 result 변수에 저장.
 
-
-    List<Map<String, String>> dtlPrdt = gsonDtl.fromJson(paramMap.get("prdtArr"), dtlMap);
-    for (Map<String, String> dtl : dtlPrdt) {
-    	//  dtlParam 리스트의 각 맵 요소에 대해 반복문을 실행
-    	
-    	dtl.put("userId", paramMap.get("userId"));
-    	dtl.put("pgmId", paramMap.get("pgmId"));
-    	//      반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-    	String dtaChk = dtl.get("prjctCrudChk").toString();
-    	/* "dtaChk" 값을 확인하여
-    	 * "I"인 경우 pm01Mapper.insertDailyWorkDtl(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
-    	 * "U"인 경우 pm01Mapper.updateDailyWorkDtl(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
-    	 * "D"인 경우 * pm01Mapper.deleteDailyWorkDtl(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
-    	if ("I".equals(dtaChk)) {
-    		dtl.put("prjctSeq", paramMap.get("prjctSeq"));
-    		pm01Mapper.insertDailyWorkPrdt(dtl);
-    	} else if ("U".equals(dtaChk)) {
-    		pm01Mapper.updateDailyWorkPrdt(dtl);
-    	} else if ("D".equals(dtaChk)) {
-    		pm01Mapper.deleteDailyWorkPrdt(dtl);
-    		pm01Mapper.deleteDailyWorkDtlPrdtAll(dtl);
-    	}
-    }
-    
-    List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("prdtItemArr"), dtlMap);
-    for (Map<String, String> dtl : dtlParam) {
-    	//  dtlParam 리스트의 각 맵 요소에 대해 반복문을 실행
-
-      dtl.put("userId", paramMap.get("userId"));
-      dtl.put("pgmId", paramMap.get("pgmId"));
-      //      반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-      String dtaChk = dtl.get("dtaChk").toString();
-		/* "dtaChk" 값을 확인하여
-		 * "I"인 경우 pm01Mapper.insertDailyWorkDtl(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
-		 * "U"인 경우 pm01Mapper.updateDailyWorkDtl(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
-		 * "D"인 경우 * pm01Mapper.deleteDailyWorkDtl(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
-      if ("I".equals(dtaChk)) {
-	        pm01Mapper.insertDailyWorkDtl(dtl);
-	      } else if ("U".equals(dtaChk)) {
-	        pm01Mapper.updateDailyWorkDtl(dtl);
-	      } else if ("D".equals(dtaChk)) {
-	        pm01Mapper.deleteDailyWorkDtl(dtl);
-	      }
-    }
-    
 	//---------------------------------------------------------------  
 	//첨부 화일 처리 시작 
 	//---------------------------------------------------------------  
     if (uploadFileList.size() > 0) {
 	    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-	    paramMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
+	    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 	    cm08Svc.uploadFile(paramMap, mRequest);
     }
     
@@ -189,38 +128,19 @@ public class PM01SvcImpl implements PM01Svc {
 		//---------------------------------------------------------------  
 		//첨부 화일 권한체크  끝 
 		//---------------------------------------------------------------  
-		String  newPrjctSeq = String.valueOf(pm01Mapper.selectDailyWorkSeqNext(paramMap));
-		paramMap.put("prjctSeq", newPrjctSeq);
+
+		
+		int fileTrgtKey = pm01Mapper.selectDailyWorkSeqNext(paramMap);
+		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+		
 		int result = pm01Mapper.insertDailyWork(paramMap);
 	
-	    List<Map<String, String>> dtlPrdt = gsonDtl.fromJson(paramMap.get("prdtArr"), dtlMap);
-	    for (Map<String, String> dtl : dtlPrdt) {
-	    	dtl.put("prjctSeq", newPrjctSeq);
-	    	dtl.put("userId", paramMap.get("userId"));
-	    	dtl.put("pgmId", paramMap.get("pgmId"));
-	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-	    	pm01Mapper.insertDailyWorkPrdt(dtl);
-	    }
-	    List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("prdtItemArr"), dtlMap);
-	    for (Map<String, String> dtl : dtlParam) {
-	    	dtl.put("prjctSeq", newPrjctSeq);
-	    	dtl.put("userId", paramMap.get("userId"));
-	    	dtl.put("pgmId", paramMap.get("pgmId"));
-	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-	    	String dtaChk = dtl.get("dtaChk").toString();
-	    	/* "dtaChk" 값을 확인하여
-	    	 * "I"인 경우 pm01Mapper.insertDailyWorkDtl(dtl)을 호출하여 프로젝트 세부정보를 삽입 */
-	    	if ("I".equals(dtaChk)) {
-	    		pm01Mapper.insertDailyWorkDtl(dtl);
-	    	} 
-	    }
-	    
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------  
 		if (uploadFileList.size() > 0) {
 		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
+		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 		    cm08Svc.uploadFile(paramMap, mRequest);
 		}
 		//---------------------------------------------------------------  
@@ -252,9 +172,7 @@ public class PM01SvcImpl implements PM01Svc {
 		//첨부 화일 권한체크 끝 
 		//---------------------------------------------------------------  
 	  
-	  int result = pm01Mapper.deleteDailyWorkPrdtSeqAll(paramMap);
-		  result = pm01Mapper.deleteDailyWorkDtlSeqAll(paramMap);
-		  result = pm01Mapper.deleteDailyWork(paramMap);
+	  int result = pm01Mapper.deleteDailyWork(paramMap);
 	  
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)

@@ -35,34 +35,19 @@ public class PM01Ctr {
     int totalCnt = pm01Svc.selectDailyWorkCount(paramMap);
     PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
     model.addAttribute("paginationInfo", paginationInfo);
-    List<Map<String, String>> resultList = pm01Svc.selectDailyWorkList(paramMap);
-    model.addAttribute("resultList", resultList);
+    List<Map<String, String>> result = pm01Svc.selectDailyWorkList(paramMap);
+    model.addAttribute("result", result);
     return "jsonView";
   }
 
   // 작업일보 정보 조회
   @PostMapping(value = "/selectDailyWorkInfo")
   public String selectDailyWorkInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    Map<String, String> result = pm01Svc.selectDailyWorkInfo(paramMap);
+	Map<String, String> result = pm01Svc.selectDailyWorkInfo(paramMap);
     model.addAttribute("result", result);
     return "jsonView";
   }
   
-  // 대상설비 리스트 조회
-  @PostMapping("/selectPrdtList")
-  public String selectPrdtList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	  List<Map<String, String>> prdtList = pm01Svc.selectPrdtList(paramMap);
-	  model.addAttribute("prdtList", prdtList);
-	  return "jsonView";
-  }
-
-  // 아이템 정보조회
-  @PostMapping("/selectItemList")
-  public String selectItemList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    List<Map<String, String>> itemList = pm01Svc.selectItemList(paramMap);
-    model.addAttribute("itemList", itemList);
-    return "jsonView";
-  }
 
   @PostMapping(value = "/selectConfirmCount")
   public String selectConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
