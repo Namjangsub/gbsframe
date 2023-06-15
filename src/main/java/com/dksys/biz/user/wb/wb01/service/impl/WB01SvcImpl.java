@@ -146,12 +146,6 @@ public class WB01SvcImpl implements WB01Svc {
 	}
 
 	@Override
-	public int deleteWbsPlanlist(Map<String, String> paramMap) {
-		int result = wb01Mapper.deleteWbsPlanlist(paramMap);
-		return result;
-	}
-	
-	@Override
 	public int deleteWbsSharngList(Map<String, String> paramMap) {
 		int result = wb01Mapper.deleteWbsSharngList(paramMap);
 		return result;
@@ -460,6 +454,24 @@ public class WB01SvcImpl implements WB01Svc {
 	public List<Map<String, String>> selectFileCodeSelect(Map<String, String> paramMap) {
 		return wb01Mapper.selectFileCodeSelect(paramMap);
 	}
+	
+	
+	@Override
+	public int deleteWbsPlanlist(Map<String, String> paramMap) {
+		wb01Mapper.deleteWbsSharngListSub(paramMap);
+		int result = wb01Mapper.deleteWbsPlanlist(paramMap);
+		return result;
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 }

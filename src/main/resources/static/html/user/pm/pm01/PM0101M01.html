@@ -1,28 +1,5 @@
 <!DOCTYPE html>
 <html lang="ko">
-<style>
-.grid-cell-blue {
-	background: #dcf0f8;
-}
-
-.add_btn_small {
-	display: inline-block;
-	/*       float: right;  */
-	padding: 0px;
-}
- 			
-.add_btn_small a {
-	display: inline-block;
-	width: 33px;
-	height: 20px;
-	line-height: 20px;
-	text-align: center;
-	/*         bShip: 1px solid #dbdbdb; */
-	color: #444;
-	background: #ffffff;
-	box-shadow: 1px 1px rgba(0, 0, 0, 0.15);
-}
-</style>
 <head>
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -42,7 +19,7 @@
 <link rel="stylesheet" href="/static/css/main.css">
 <link rel="stylesheet" href="/static/css/sub.css">
 <link rel="stylesheet" href="/static/css/common.css">
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.13.0/css/all.min.css" rel="stylesheet">
+
 <script src="/static/js/jquery-latest.min.js"></script>
 <script src="/static/js/jquery.serializeObject.js"></script>
 <script src="/static/bootstrap/js/bootstrap.min.js"></script>
@@ -55,6 +32,7 @@
 <script src="/static/js/ax5/ax5modal.min.js"></script>
 <script src="/static/js/ax5/ax5toast.min.js"></script>
 <script src="/static/js/jstree/jstree.min.js"></script>
+<script type="text/javascript" src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <script src="/static/js/global.js"></script>
 <script src="/static/js/fileTree.js"></script>
 </head>
@@ -119,16 +97,16 @@
 			
 				<th>제품 구분</th>
 				<td>
-				    <input type="hidden" id="prdtDiv_S" name="prdtDiv_S" data-search="prdtDiv_S" >
+				    <input type="hidden" id="prdtCd_S" name="prdtCd_S" data-search="prdtCd_S" >
                     <div class="search_form">
-                      <input type="text" id="prdtDivNm_S" name="prdtDivNm_S" data-search="prdtDivNm_S" onkeyUp="if(window.event.keyCode == 8){prdtDiv_S.value = ''}  else if(window.event.keyCode == 13){gridView.setData(0);};"> 
+                      <input type="text" id="prdtNm_S" name="prdtNm_S" data-search="prdtNm_S" onkeyUp="if(window.event.keyCode == 8){prdtCd_S.value = ''}  else if(window.event.keyCode == 13){gridView.setData(0);};"> 
                         <a onclick="openPrdtSearch();"><i class="i_search_w"></i></a>
                     </div>			
 				</td>
 				
 				<th>아이템 구분</th>
 				<td>
-					<select  id="prdtItem_S" name="prdtItem_S" data-kind="ITEMLIST" style="width: 100%;">
+					<select  id="itemDiv_S" name="itemDiv_S" data-kind="ITEMLIST" onchange="gridView.setData(0);">
 					   <option value="">선택</option>
 					</select>
 				</td>
@@ -165,7 +143,7 @@
 
     <div class="contents no_bg">
       <div class="contents_tit">
-      	<span  style="height: 30px; line-height: 30px;font-size: 15px;">작업일보 리스트</span>
+      	<span style="height: 30px; line-height: 30px;font-size: 15px;margin-left: 15px">작업일보 리스트</span>
         <div class="add_btn_small pdl10">
           <a onclick="insertDailyWorkModal('C');" style="height: 30px; line-height: 28px;" authchk>+</a>
           <a onclick="deleteDailyWork();" style="height: 30px; line-height: 28px;" authchk>-</a>
@@ -184,6 +162,7 @@
     <div class="contents">
       <div class="ax5_grid">
         <div data-ax5grid="first-grid" data-ax5grid-config="{}" style="height: 680px; width: 100%"></div>
+        <div data-ax5grid="excel-grid" data-ax5grid-config="{}" style="display: none;"></div>
       </div>
     </div>
 </body>
@@ -191,59 +170,126 @@
 
 
 <script type="text/javascript">
-	var actionType = null;
-	var firstGrid = null;
-	var isFirst = true;
-	ax5.ui.grid.formatter["winYn"] = function () {
-		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
-		if (this.value == "E"){
-			return 'E';
-		} else {
-			return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
+var isFirst = true;
+ax5.ui.grid.formatter["bilgYn"] = function () {
+	var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
+	if (this.value == "E"){
+		return 'E';
+	} else {
+		return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
+	}
+};
+
+var gridView = {
+	initView : function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+		    	showRowSelector: true,
+		    	multipleSelect: false,
+		    	sortable: true,
+		        target: $('[data-ax5grid="first-grid"]'),
+		        header: {
+		        	align: "center",
+		        	selector: true
+		        },
+		        body: {
+		        	mergeCells : ["coNm","workRptIdNm","workRptDt","workRptLNm","workRptMNm","workRptSNm","salesCd"],
+		        	 onClick: function () {
+		                this.self.select(this.dindex);
+		            },
+		            onDBLClick: function () {
+		            	insertDailyWorkModal("U");
+		            },
+		        },
+
+			page : {
+				navigationItemCount : 10,
+				height : 30,
+				display : true,
+				firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+				prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+				nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+				lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+				onChange : function() {
+					gridView.setData(this.page.selectPage);
+				}
+			},
+
+			/*
+			footSum: [
+			    	[
+			    		{label: "총계", colspan:12, align:"center"},
+					{key: "costAmt", 		collector: "sum", formatter:"money", align: "right"}
+	                 ]
+			    ],
+			*/
+
+	    	columns : [
+					 {key: "fileTrgtKey",	label: "파일대상KEY",		width: 50,		align: "center", 	hidden:true}
+					,{key: "coCd",	    	label: "회사코드",			width: 100,		align: "center", 	hidden:true}
+					,{key: "coNm",	    	label: "회사",			width: 70,		align: "center", 	hidden:true}
+					,{key: "workRptNo",		label: "작업일보번호", 	    width: 130,		align: "center"}
+					,{key: "workRptId",	    label: "작성자ID",			width: 100,		align: "center", 	hidden:true}
+					,{key: "workRptIdNm",	label: "작성자",			width: 100,		align: "center"}
+					,{key: "workRptDt", 	label: "작성일자", 		width: 100,		align: "center"}
+					,{key: "workRptLNm", 	label: "대분류", 			width: 140,		align: "left"}
+					,{key: "workRptMNm",  	label: "중분류", 			width: 140,		align: "left"}
+					,{key: "workRptSNm",  	label: "소분류", 			width: 140,		align: "left"}
+					,{key: "workRptHour",	label: "작업시간",			width: 70,		align: "right" }
+					,{key: "salesCd", 		label: "Sales Code", 	width: 120,		align: "center"}
+					,{key: "workRptRmk", 	label: "비고", 			width: 200,		align: "left"}
+					,{key: "creatNm", 		label: "생성자", 			width: 100,		align: "center"}
+					,{key: "creatDttm", 	label: "생성일시", 		width: 140,		align: "center"}
+					,{key: "udtNm", 		label: "변경자", 			width: 100,		align: "center"}
+					,{key: "udtDttm", 		label: "변경일시", 		width: 140,		align: "center"}
+	            ]
+
+						});
+    			return this;
+    		},
+
+	setData : function(_pageNo) {
+		if (isFirst) return;
+		var targetObj = this.target;
+		if (inputValidation($('input[required]'))) {
+			var formData = {
+				"pageNo" 		: _pageNo + 1,
+				"recordCnt" 	: $("#recordCnt").val(),
+				"coCd" 			: $("#coCd_S").val(),
+				"reqDtFrom"	 	: $("#reqDtFrom_S").val().replace(/\-/g, ''),
+				"reqDtTo" 		: $("#reqDtTo_S").val().replace(/\-/g, ''),
+				"workRptId" 	: $("#workRptId_S").val(),
+				"salesCd" 		: $("#salesCd_S").val(),
+				"prdtCd" 		: $("#prdtCd_S").val(),
+				"itemDiv" 		: $("#itemDiv_S").val(),
+				"workRptL" 		: $("#workRptL_S").val(),
+				"workRptM" 		: $("#workRptM_S").val(),
+				"workRptS" 		: $("#workRptS_S").val(),
+			}
+			
+			postAjax("/user/pm/pm01/selectDailyWorkList", formData, null, function(data){
+			var list = data.result;
+				targetObj.setData({
+						list : list,
+						page : {
+							currentPage   : _pageNo,
+							pageSize      : data.paginationInfo.pageSize,
+							totalElements : data.paginationInfo.totalRecordCount,
+							totalPages    : data.paginationInfo.totalPageCount
+						}
+					});
+				});
+			}
 		}
-	};
-	
-	var gridView = {
-		initView : function() {
-  			this.target = new ax5.ui.grid();
-  			this.target.setConfig({
-  		    	showRowSelector: true,
-  		    	multipleSelect: false,
-  		    	sortable: true,
-  		        target: $('[data-ax5grid="first-grid"]'),
-  		        header: {
-  		        	align: "center",
-  		        	selector: false
-  		        },
-  		        body: {
-  		        	mergeCells : ["coNm"],
-  		        	onClick: function () {
-  		                this.self.select(this.dindex);
-  		            },
-  		            onDBLClick: function () {
-  		            	insertDailyWorkModal("U");
-  		            },
-  		        },
+	}
 
-				page : {
-					navigationItemCount : 9,
-					height : 30,
-					display : true,
-					firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
-					prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
-					nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
-					lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
-					onChange : function() {
-						gridView.setData(this.page.selectPage);
-					}
-				},
-
-		    	columns : [
-						 {key: "fileTrgtKey",	label: "파일대상KEY",		width: 50,		align: "center", 	hidden:true}
-						,{key: "coCd",	    	label: "회사코드",			width: 100,		align: "center", 	hidden:true}
-						,{key: "coNm",	    	label: "회사",			width: 70,		align: "center", 	hidden:true}
-						,{key: "workRptNo",		label: "작업일보번호", 	    width: 130,		align: "center"}
-						,{key: "workRptId",	    label: "작성자ID",			width: 100,		align: "center", 	hidden:true}
+	var excelView = {
+			initView: function(){
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+					target: $('[data-ax5grid="excel-grid"]'),
+					columns: [
+						 {key: "workRptNo",		label: "작업일보번호", 	    width: 130,		align: "center"}
 						,{key: "workRptIdNm",	label: "작성자",			width: 100,		align: "center"}
 						,{key: "workRptDt", 	label: "작성일자", 		width: 100,		align: "center"}
 						,{key: "workRptLNm", 	label: "대분류", 			width: 140,		align: "left"}
@@ -256,61 +302,12 @@
 						,{key: "creatDttm", 	label: "생성일시", 		width: 150,		align: "center"}
 						,{key: "udtNm", 		label: "변경자", 			width: 100,		align: "center"}
 						,{key: "udtDttm", 		label: "변경일시", 		width: 150,		align: "center"}
-    	            ]
+					]
+			});
+			return this;
+		}
+	}
 
-							});
-        			return this;
-        		},
-
-		setData : function(_pageNo) {
-			if (isFirst) return;
-	    firstGrid = this.target;
-			if (inputValidation($('input[required]'))) {
-				var prjctNm = $("#prjctNm_S").val();
-
-				var formData = {
-					"pageNo" 		: _pageNo + 1,
-					"recordCnt" 	: $("#recordCnt").val(),
-					"coCd" 			: $("#coCd_S").val(),
-					"reqDtFrom"	 	: $("#reqDtFrom_S").val().replace(/\-/g, ''),
-					"reqDtTo" 		: $("#reqDtTo_S").val().replace(/\-/g, ''),
-					"workRptId" 	: $("#workRptId_S").val(),
-					"workRptIdNm" 	: $("#workRptIdNm_S").val(),
-					/*
-					"searchType" 	: $("#searchType").val(),
-					"searchValue" 	: $("#searchValue").val(),
-					"prjctCd" 		: $("#prjctCd_S").val(),
-					"prjctNm" 		: $("#prjctNm_S").val(),
-					"odrCd" 		: $("#odrCd_S").val(),
-					"winbdCd" 		: $("#winbdCd").val(),
-					*/
-				}
-
-// 				var formData = {};
-// 				$.each($('[data-search]'), function(idx, elem){
-// 					formData[$(elem).data("search")] = $(elem).val();
-// 				});		
-// 				paramObj["searchValue"]  = $("#searchValue_S").val();
-// 				paramObj["searchName"]   = $("#searchName_S").val();
-// 				paramObj["pageNo"] = _pageNo + 1;
-// 				paramObj["userId"] = jwt.userId;
-				
-				
-				postAjax("/user/pm/pm01/selectDailyWorkList", formData, null, function(data){
-					var list = data.result;
-  					firstGrid.setData({
-  						list : list,
-  						page : {
-  							currentPage   : _pageNo,
-  							pageSize      : data.paginationInfo.pageSize,
-  							totalElements : data.paginationInfo.totalRecordCount,
-  							totalPages    : data.paginationInfo.totalPageCount
-  						}
-  					});
-  				});
-  			}
-  		}
-  	}
 
   	$(document).ready(function() {
 
@@ -361,6 +358,7 @@
         isFirst = false;    
         
   		gridView.initView().setData(0);
+  		excelView.initView();
   		//권한체크
 
   		authChk();
@@ -376,11 +374,11 @@
 // 			}
 			var row = gridView.target.getList("selected")[0];
 			var paramObj = {
-				"actionType" : type,
-				"fileTrgtKey" : row.fileTrgtKey,
-				"coCd" 	   : row.coCd,
-		       	"userId"   : jwt.userId,
-		       	"pgmId"    : "SM1001M001"
+					"actionType" : type,
+					"fileTrgtKey" : row.fileTrgtKey,
+					"coCd" 	   : row.coCd,
+			       	"userId"   : jwt.userId,
+			       	"pgmId"    : "PM0101M01"
 			};
 		} else {
 			var paramObj = {
@@ -388,7 +386,7 @@
 					"fileTrgtKey" : 0,
 					"coCd" 	   : jwt.coCd,
 			       	"userId"   : jwt.userId,
-			       	"pgmId"    : "SM1001M001"
+			       	"pgmId"    : "PM0101M01"
 			}
 		}
 		openModal("/static/html/user/pm/pm01/PM0101P01.html", 1500, 750, "", paramObj, function(data) {
@@ -400,12 +398,10 @@
 	function deleteDailyWork() {
 		var row = gridView.target.getList("selected")[0];
 		var formData = {
-				"prjctSeq" 		: row.prjctSeq,
+				"fileTrgtKey" 	: row.fileTrgtKey,
 				"coCd" 	   		: row.coCd,
 		       	"userId"   		: jwt.userId,
-		       	"fileTrgtType"  : $('#pgmId').val(),
-		       	"fileTrgtKey"   : row.prjctSeq
-		       	
+		       	"fileTrgtTyp"  : $('#pgmId').val(),
 		}
 		if (confirm("삭제하시겠습니까?")) {
 			putAjax("/user/pm/pm01/deleteDailyWork", formData, null, function(data) {
@@ -422,7 +418,16 @@
 	function initSearch() {
 		$(".contents.search input[type='text']").val("");
 		$("#coCd_S").val(jwt.coCd);
-		//$("#searchType option").eq(0).prop("selected", true);
+		$("#workRptId_S").val("");
+		$("#prdtCd_S").val("");
+		
+		$('#workRptM_S option[value!=""]').remove();
+		$('#workRptS_S option[value!=""]').remove();
+		$("#workRptL_S option").eq(0).prop("selected", true);
+		$("#workRptM_S option").eq(0).prop("selected", true);
+		$("#workRptS_S option").eq(0).prop("selected", true);
+		$("#itemDiv_S option").eq(0).prop("selected", true);
+		
 		$("#reqDtFrom_S").val(dateToStr(moment(new Date()).startOf("month").toDate()));
 		$("#reqDtTo_S").val(dateToStr(moment(new Date()).endOf("month").toDate()));
 		gridView.initView().setData(0);
@@ -457,7 +462,6 @@
 	//Sales Code (수주마스터, 수주상세테이블 조인) 검색
 	function wbsSalesCodeSearch() {
 		
-		console.log("============>>"+$('#coCd_S').val());
 	    var paramObj = {
 	       "coCd" : $('#coCd_S').val(),
 	       "salesCd": $('#salesCd_S').val()
@@ -467,12 +471,13 @@
 	        var row = grid.target.getList("selected")[0];
 	        $('#salesCd_S').val(row.salesCd);
 	        //$('#wbsClntPjt').val(row.clntPjt); // 고객사 PJT
-	        $('#prdtDiv_S').val(row.prdtCd); // 제품구분
-	        $('#prdtDivNm_S').val(row.prdtCdNm); // 제품구분
-	        $('#prdtItem_S').val(row.itemDiv); // 아이템 구분
+	        //$('#prdtCd_S').val(row.prdtCd); // 제품구분
+	        //$('#prdtNm_S').val(row.prdtCdNm); // 제품구분
+	        //$('#itemDiv_S').val(row.itemDiv); // 아이템 구분
 	        //$('#eqp_nm').val(row.eqpNm); // 설비명
 	        //$('#clntCd').val(row.ordrsClntCd); // 고객사코드
 	        //$('#clntNm').val(row.ordrsClntNm); // 고객사명
+	        gridView.setData(0);
 	    });
 	}
 	
@@ -480,14 +485,15 @@
 	function openPrdtSearch(){
 	    var paramObj = {
 	            "coCd": $('#coCd_S').val(),
-	            "prdtCd": $('#prdtDiv_S').val(),
-	            "prdtNm": $('#prdtDivNm_S').val(),
+	            "prdtCd": $('#prdtCd_S').val(),
+	            "prdtNm": $('#prdtNm_S').val(),
 	            "useYn" : "Y"
 	    }
 	    openSecondModal("/static/html/cmn/modal/prdtSearch.html", 800, 600, "제품 검색", paramObj, function (grid) {
 	        var row = grid.target.getList("selected")[0];
-	        $("#prdtDiv_S").val(row.prdtCd);
-	        $("#prdtDivNm_S").val(row.prdtNm);
+	        $("#prdtCd_S").val(row.prdtCd);
+	        $("#prdtNm_S").val(row.prdtNm);
+	        gridView.setData(0);
 	    });
 	}
 	
@@ -518,34 +524,28 @@
 		});
 	}
 
-	function selectChildCodeList(obj) {
+	//엑셀다운로드
+	function excelDown() {
+		var paramObj = {"pageNo":  1};
 		
-		var codeKind = $(obj).val();
-		var target = $(obj).next('select.division');
-		var paramObj = {"codeKind": codeKind};
+		$.each($('[data-search]'), function(idx, elem){
+			paramObj[$(elem).data("search")] = $(elem).val();
+		});
+		paramObj["recordCnt"] =  9999999;
 		
-		postAjaxSync("/admin/cm/cm05/selectChildCodeList", paramObj, null, function(data){
-			var optionHtml = '';
-			var childCodeList = data.childCodeList;
-			$.each(childCodeList, function(index, item){
-				optionHtml += '<option value='+item.codeId+'>';
-				optionHtml += item.codeNm;
-				optionHtml += '</option>';
+		paramObj["reqDtFrom"] =  $("#reqDtFrom_S").val().replace(/\-/g, '');
+		paramObj["reqDtTo"] =  $("#reqDtTo_S").val().replace(/\-/g, '');
+		
+		postAjax("/user/pm/pm01/selectDailyWorkList", paramObj, null, function(data){
+			var list = data.result;
+			excelView.target.setData({
+				list : list,
+				page : {
+					totalElements : data.paginationInfo.totalRecordCount
+				}
 			});
-			initDivision(obj);
-			$(target).append(optionHtml);
+			var todayDate = new Date().format('yyyyMMddHHmmss');
+			excelView.target.exportExcel("작업일보목록_"+todayDate+".xls");
 		});
 	}
-	
-	function initDivision(obj){
-		var divSiblings = $(obj).siblings('select.division');
-		for(var i=0;i<divSiblings.length;i++){
-			var divSibling = divSiblings[i];
-			if($(obj).data('depth') < $(divSibling).data('depth')){
-				$(divSibling).find('option[value!=""]').remove();
-			}
-		}
-	}
-	
-
 </script>

@@ -21,6 +21,7 @@ import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.exc.LogicException;
 import com.dksys.biz.util.MessageUtils;
 import com.dksys.biz.user.wb.wb01.service.WB01Svc;
+import com.dksys.biz.user.wb.wb02.service.WB02Svc;
 
 @Controller
 @Transactional(rollbackFor = Exception.class)
@@ -34,6 +35,9 @@ public class WB01Ctr {
     
     @Autowired
     WB01Svc wb01Svc;
+    
+    @Autowired
+    WB02Svc wb02Svc;
 
     //<!-- WBS 일정계획 등록 메인 화면 조회 리스트  -->
 	  @PostMapping(value = "/selectWbsPlanList") 
@@ -357,5 +361,17 @@ public class WB01Ctr {
 		  return "jsonView"; 
 		  
 	  }
+	  
+	  
+	  //<!-- 실적 마스터 테이블 조회  --> 
+	  @PostMapping(value = "/selectWbsRsltsMasterList") 
+	  public String selectWbsRsltsMasterList(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
+		  List<Map<String, String>> resultList = wb02Svc.selectWbsRsltsMasterList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+		  
+	  }
+	  
+	  
 	  
 }

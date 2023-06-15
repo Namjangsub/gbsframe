@@ -369,11 +369,15 @@ public class WB02SvcImpl implements WB02Svc {
     
     @Override
 	public int deleteWbsPlanlist(Map<String, String> paramMap) {
+    	wb02Mapper.deleteWbsRsltsDetailSub(paramMap);
+    	wb02Mapper.deleteWbsSharngListSub(paramMap);
+    	wb02Mapper.deleteWbsApprovalListSub(paramMap);
 		return wb02Mapper.deleteWbsPlanlist(paramMap);
 	}
     
     @Override
 	public int wbsPlanStsCodeUpdate(Map<String, String> paramMap) {
+    	
 		return wb02Mapper.wbsPlanStsCodeUpdate(paramMap);
 	}
     
@@ -404,13 +408,23 @@ public class WB02SvcImpl implements WB02Svc {
 		return wb02Mapper.updateWbsPlanCloseYn(paramMap);
 	}
     
-	/*
-	 * @Override public int updateWbsRsltsMasterCloseYn(Map<String, String>
-	 * paramMap) { return wb02Mapper.updateWbsRsltsMasterCloseYn(paramMap); }
-	 * 
-	 * @Override public int updateWbsRsltsDetailCloseYn(Map<String, String>
-	 * paramMap) { return wb02Mapper.updateWbsRsltsDetailCloseYn(paramMap); }
-	 */
     
     
+    
+    /* WBS 실적메인화면 실적조회 부분 수정 추가 */
+    @Override
+	public int selectWbsRsltsResultCountM(Map<String, String> paramMap) {
+		return wb02Mapper.selectWbsRsltsResultCountM(paramMap);
+	}
+    
+    @Override
+	public List<Map<String, String>> selectWbsRsltsResultListM(Map<String, String> paramMap) {
+		return wb02Mapper.selectWbsRsltsResultListM(paramMap);
+	}
+    
+    @Override
+	public List<Map<String, String>> selectWbsRsltsResultExcelListM(Map<String, String> paramMap) {
+		return wb02Mapper.selectWbsRsltsResultExcelListM(paramMap);
+	}
+    /* WBS 실적메인화면 실적조회 부분 수정 추가 END */
 }

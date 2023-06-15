@@ -86,18 +86,12 @@ public interface WB02Svc {
     
     int updateWbsPlanLockYnLvl3(Map<String, String> paramMap);
     
-    
-    
     int updateWbsPlanCloseYn(Map<String, String> paramMap);
-    
-	/*
-	 * int updateWbsRsltsMasterCloseYn(Map<String, String> paramMap);
-	 * 
-	 * int updateWbsRsltsDetailCloseYn(Map<String, String> paramMap);
-	 */
+
     
     
-    
-    
+    List<Map<String, String>> selectWbsRsltsResultListM(Map<String, String> paramMap);
+    int selectWbsRsltsResultCountM(Map<String, String> paramMap);
+    List<Map<String, String>> selectWbsRsltsResultExcelListM(Map<String, String> paramMap);
     
 }
