@@ -52,8 +52,6 @@ public interface WB01Mapper {
 	
 	int selectWbsPlanDeleteConfirmCount(Map<String, String> paramMap);
 
-	int deleteWbsPlanlist(Map<String, String> paramMap);
-	
 	int selectMaxWbsPlanNo(Map<String, String> paramMap);
 
 	int insertWbsSharngUser(Map<String, String> paramMap);
@@ -83,6 +81,21 @@ public interface WB01Mapper {
 	int selectWbsPlanConfirmCount(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectFileCodeSelect(Map<String, String> paramMap);
+	
+	
+	
+	
+	
+	
+	
+	int deleteWbsPlanlist(Map<String, String> paramMap);
+	int deleteWbsSharngListSub(Map<String, String> paramMap);
+
+	
+	
+	
+	
+	
 	
 	
 }

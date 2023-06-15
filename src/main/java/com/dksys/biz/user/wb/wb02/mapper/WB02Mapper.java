@@ -93,6 +93,16 @@ public interface WB02Mapper {
 	int updateWbsRsltsDetailCloseYn(Map<String, String> paramMap);
 	
 	
+	int deleteWbsRsltsDetailSub(Map<String, String> paramMap);
+	int deleteWbsSharngListSub(Map<String, String> paramMap);
+	int deleteWbsApprovalListSub(Map<String, String> paramMap);
+	
+	
+	/* WBS 실적메인화면 실적조회 부분 수정 추가 */
+    int selectWbsRsltsResultCountM(Map<String, String> paramMap);	
+	List<Map<String, String>> selectWbsRsltsResultListM(Map<String, String> paramMap);		
+	List<Map<String, String>> selectWbsRsltsResultExcelListM(Map<String, String> paramMap);
+	/* WBS 실적메인화면 실적조회 부분 수정 추가 END */
 	
 	
 }

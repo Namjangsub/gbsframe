@@ -61,16 +61,10 @@ public class WB02Ctr {
 		  return "jsonView"; 
 	  }
 	  
-	//<!-- WBS 일정계획 실적 메인 화면 조회 엑셀 리스트  -->
-	  @PostMapping(value = "/selectWbsRsltsResultExcelList1") 
-	  public String selectWbsRsltsResultExcelList1(@RequestBody Map<String, String> paramMap, ModelMap model) {
-  		  List<Map<String, String>> resultList = wb02Svc.selectWbsRsltsResultExcelList1(paramMap);
-		  model.addAttribute("resultList", resultList); 
-		  return "jsonView"; 
-	  }
 	  
 	  
-	//<!-- WBS 일정실적 등록 메인 화면 조회 리스트  -->
+	  
+	  //<!-- WBS 일정실적 등록 메인 화면 조회 리스트  -->
 	  @PostMapping(value = "/selectWbsRsltsResultList1") 
 	  public String selectWbsRsltsResultList1(@RequestBody Map<String, String> paramMap, ModelMap model) {
 
@@ -298,9 +292,6 @@ public class WB02Ctr {
 	 
 	 
 	 
-	 
-	 
-	 
 	 @PutMapping(value = "/updateWbsPlanCloseYn")
      public String updateWbsPlanCloseYn(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
         wb02Svc.updateWbsPlanCloseYn(paramMap);
@@ -311,31 +302,26 @@ public class WB02Ctr {
    	 return "jsonView";
      }
 
-	 
-	/*
-	 * @PutMapping(value = "/updateWbsRsltsMasterCloseYn") public String
-	 * updateWbsRsltsMasterCloseYn(@RequestParam Map<String, String> paramMap,
-	 * MultipartHttpServletRequest mRequest, ModelMap model) {
-	 * wb02Svc.updateWbsRsltsMasterCloseYn(paramMap);
-	 * model.addAttribute("resultCode", 200); model.addAttribute("resultMessage",
-	 * messageUtils.getMessage("update")); return "jsonView"; }
-	 * 
-	 * 
-	 * 
-	 * @PutMapping(value = "/updateWbsRsltsDetailCloseYn") public String
-	 * updateWbsRsltsDetailCloseYn(@RequestParam Map<String, String> paramMap,
-	 * MultipartHttpServletRequest mRequest, ModelMap model) {
-	 * wb02Svc.updateWbsPlanCloseYn(paramMap); model.addAttribute("resultCode",
-	 * 200); model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-	 * return "jsonView"; }
-	 */
-	 
-	 
-	 
-	 
+	  //<!-- WBS 일정 실적 메인 화면 조회 리스트  -->
+	  @PostMapping(value = "/selectWbsRsltsResultListM") 
+	  public String selectWbsRsltsResultListM(@RequestBody Map<String, String> paramMap, ModelMap model) {
 
+		  int totalCnt = wb02Svc.selectWbsRsltsResultCountM(paramMap); 
+		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		  model.addAttribute("paginationInfo", paginationInfo);
+		  
+ 		  List<Map<String, String>> resultList = wb02Svc.selectWbsRsltsResultListM(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+	  }
 	 
-	 
+	  //<!-- WBS 일정 실적 메인 화면 조회 엑셀 리스트  -->	                         
+	  @PostMapping(value = "/selectWbsRsltsResultExcelListM") 
+	  public String selectWbsRsltsResultExcelListM(@RequestBody Map<String, String> paramMap, ModelMap model) {
+  		  List<Map<String, String>> resultList = wb02Svc.selectWbsRsltsResultExcelListM(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+	  }
 	 
 	 
 	 
