@@ -117,7 +117,7 @@ public class CR02Svcmpl implements CR02Svc {
                     detailMap.put("salesCd", newSalesCode);
                 }
                 System.out.println(detailMap + "총합2");
-                cr02Mapper.insertOrdrsDetail(detailMap);
+//                cr02Mapper.insertOrdrsDetail(detailMap);
             } catch (Exception e) {
                 System.out.println("error3" + e.getMessage());
 
@@ -125,13 +125,13 @@ public class CR02Svcmpl implements CR02Svc {
             }
         }
 
-        try {
+    /*    try {
             cm08Svc.uploadTreeFile("TB_CR02M01", param, mRequest);
         } catch (Exception e) {
             System.out.println("error4" + e.getMessage());
 
 
-        }
+        }*/
 
 
     }
@@ -194,11 +194,11 @@ public class CR02Svcmpl implements CR02Svc {
                 ordrsDetail.put("udtPgm", "TB_CR02M01");
 
 
-                if (ordrsDetail.get("ordrsDtlDiv10").equals("설비")) {
-                    String newSalesCode = param.get("ordrsNo") + ordrsDetail.get("ordrsSeq") + ordrsDetail.get("prdtCd") + ordrsDetail.get("itemDiv");
-                    ordrsDetail.put("salesCd", newSalesCode);
-                }
-                System.out.println("23232" + ordrsDetail.toString());
+//                if (ordrsDetail.get("ordrsDtlDiv10").equals("설비")) {
+//                    String newSalesCode = param.get("ordrsNo") + ordrsDetail.get("ordrsSeq") + ordrsDetail.get("prdtCd") + ordrsDetail.get("itemDiv");
+//                    ordrsDetail.put("salesCd", newSalesCode);
+//                }
+                System.out.println("23232" + ordrsDetail);
                 cr02Mapper.updateOrdrsDetail(ordrsDetail);
             } else {
                 // 수주 상세 삽입
@@ -215,7 +215,7 @@ public class CR02Svcmpl implements CR02Svc {
 
 
                 System.out.println("최종231541" + ordrsDetail);
-                cr02Mapper.insertOrdrsDetail(ordrsDetail);
+             cr02Mapper.insertOrdrsDetail(ordrsDetail);
             }
         }
         // Similarly, for planArr
@@ -243,45 +243,54 @@ public class CR02Svcmpl implements CR02Svc {
         }
 
         for (Map<String, String> plan : planArr) {
-            boolean found = false;
-            for (Map<String, String> dbPlan : dbPlanList) {
-                if (dbPlan.get("clmnPlanSeq").equals(plan.get("clmnPlanSeq"))) {
-                    found = true;
-                    break;
+            try {
+                boolean found = false;
+                for (Map<String, String> dbPlan : dbPlanList) {
+                    if (dbPlan.get("clmnPlanSeq").equals(plan.get("clmnPlanSeq"))) {
+                        found = true;
+                        break;
+                    }
                 }
-            }
-            if (found) {
-                // Update plan
-                plan.put("coCd", param.get("coCd"));
-                plan.put("ordrsNo", param.get("ordrsNo"));
-                plan.put("estNo", param.get("estNo"));
-                plan.put("userId", param.get("userId"));
-                plan.put("pgmId", param.get("pgmId"));
-                plan.put("currCd", param.get("currCd"));
+                if (found) {
+                    // Update plan
+                    plan.put("coCd", param.get("coCd"));
+                    plan.put("ordrsNo", param.get("ordrsNo"));
+                    plan.put("estNo", param.get("estNo"));
+                    plan.put("userId", param.get("userId"));
+                    plan.put("pgmId", param.get("pgmId"));
+                    plan.put("currCd", param.get("currCd"));
 
-                cr02Mapper.updateClmnPlan(plan);
-            } else {
-                // Insert new plan
-                plan.put("coCd", param.get("coCd"));
-                plan.put("ordrsNo", param.get("ordrsNo"));
-                plan.put("estNo", param.get("estNo"));
-                plan.put("userId", param.get("userId"));
-                plan.put("pgmId", param.get("pgmId"));
-                plan.put("currCd", param.get("currCd"));
+                    cr02Mapper.updateClmnPlan(plan);
+                } else {
+                    // Insert new plan
+                    plan.put("coCd", param.get("coCd"));
+                    plan.put("ordrsNo", param.get("ordrsNo"));
+                    plan.put("estNo", param.get("estNo"));
+                    plan.put("userId", param.get("userId"));
+                    plan.put("pgmId", param.get("pgmId"));
+                    plan.put("currCd", param.get("currCd"));
 
-                cr02Mapper.insertClmnPlan(plan);
+                    cr02Mapper.insertClmnPlan(plan);
+                }
+            }catch(Exception e){
+                e.getStackTrace();
             }
         }
-        String[] deleteFileArr = gson.fromJson(param.get("deleteFileArr"), String[].class);
-        List<String> deleteFileList = Arrays.asList(deleteFileArr);
+/*        String[] deleteFileArr = gson.fromJson(param.get("deleteFileArr"), String[].class);
+        List<String> deleteFileList = Arrays.asList(deleteFileArr);*/
 
-        for (String fileKey : deleteFileList) {
+
+ /*       for (String fileKey : deleteFileList) {
             cm08Svc.deleteFile(fileKey);
-        }
-        System.out.println(param.get("fileTrgtKey") + "해당위치");
-        cm08Svc.uploadTreeFile("TB_CR02M01", param, mRequest);
+        }*/
 
-        for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
+
+ /*       System.out.println(param.get("fileTrgtKey") + "해당위치");
+        cm08Svc.uploadTreeFile("TB_CR02M01", param, mRequest);
+*/
+
+
+/*        for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
             try {
                 cm08Svc.uploadTreeFile("TB_CR02M01", param.get("ordrsNo"), mRequest);
             } catch (Exception e) {
@@ -290,7 +299,7 @@ public class CR02Svcmpl implements CR02Svc {
 
             }
 
-        }
+        }*/
 
 
     }

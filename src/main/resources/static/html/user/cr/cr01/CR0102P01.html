@@ -9,7 +9,7 @@
         <h4 class="tit">견적 등록</h4>
     </div>
     <div id="overlay2"
-         style="z-index:100;display: none; position: absolute; width: 100%; height: 630px; top: 0; left: 0; background-color: rgba(0,0,0,0); pointer-events: auto;"></div>
+         style="z-index:100;display: none; position: absolute; width: 100%; height: 670px; top: 0; left: 0; background-color: rgba(0,0,0,0); pointer-events: auto;"></div>
     <div style="text-align: right;background:#e6e6e6">
         <a class="tbody_more_btn"></a>
     </div>
@@ -208,6 +208,7 @@
         </div>
     </div>
     <br>
+
     <div style="text-align: right;background:#e6e6e6">
         <a class="tbody_more_btn"></a>
     </div>
@@ -260,6 +261,14 @@
 
 <script type="text/javascript">
 
+    fileParam = {
+        fileTrgtType: $("#pgmId").val(),
+        fileTrgtKey: paramPrjctSeq
+    }
+
+    treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
+
+
     /* 견적서함수 */
     //견적 번호 조회 함수
     function getMaxEstNumber() {
@@ -299,7 +308,8 @@
 
 
         $.each(estInfo.estDetailList, function (idx, obj) {
-            if (idx != 0) addRow();
+            if (idx != 0)
+                addRow();
             $addedRow = $("tr[name='detailRow']:last");
 
             $.each($addedRow.find('[name]'), function (idx, elem) {
@@ -514,26 +524,24 @@
         // 폼데이터 생성
         var formData = new FormData($("#popForm")[0]);
 
-        // 유저아이디 추가
+
         formData.append("userId", jwt.userId);
-        formData.append("fileTrgtKey", paramObj.fileTrgtKey);
-        // 첨부파일 추가
-        /*
+        formData.append("comonCd", treeModule.getFileNodeId());
 
-                var newFiles = treeModule.getFileArr().filter(function (obj) {
-                    return obj.fileKey == 0;
-                });
-        */
+        var fileUploadArr = [];
+        var tempArr = [];
+        tempArr = treeModule.getFileArr();
 
-        /*     $.each(newFiles, function (idx, obj) {
-                 formData.append("comonCd_" + idx, obj.nodeId);
-                 formData.append("files", obj.file);
-             });*/
+        $.each(tempArr, function(idx, obj) {
+            if (obj.fileKey == 0) {
+                formData.append("files", obj.file);
+                obj.file = '';
+                fileUploadArr.push(obj);
+            }
+        });
 
-        // formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
-
-
-        // treeModule.initFileArrays();
+        formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
+        formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
 
         // 상세내역 추가
         var detailArr = [];
@@ -715,7 +723,6 @@
     /* document.ready */
     $(document).ready(function () {
 
-
         $("#coCd").val(jwt.coCd)
 
         try {
@@ -880,7 +887,6 @@
                 break;
             }
         }
-        console.log('key:', key, 'return value:', rtnNm); //
         return rtnNm;
     }
 
@@ -928,10 +934,10 @@
     }
 
     let selectedRowKey;
-
     const grid = new ax5.ui.grid();
     fetchCurrencyData().then(function ([options, options2]) {
         grid.setConfig({
+            multipleSelect: false,
             target: $('[data-ax5grid="est-grid-modal"]'),
             header: {
                 align: "center",
@@ -1084,7 +1090,6 @@
                 },
 
                 onClick: function (item, param) {
-                    console.log(item, param);
                     thisGridRow = param.dindex;
                     thisGridCol = param.colIndex;
 
@@ -1122,35 +1127,50 @@
         });
 
 
+
+
+
+
+
+
+
+
+
+
+
+
         grid.setColumnSort({
             "estSeq": {orderBy: "asc", seq: 0},
         });
         let isUpdating = false;  // isUpdating 플래그 선언
         grid.onDataChanged = function () {
-
-
             if (this.item.estDtlDiv == undefined || isUpdating) {
-                return;
-            } else {
-                isUpdating = true;  // 업데이트 시작을 표시
 
+
+            } else {
+
+                isUpdating = true;  // mark the beginning of an update
                 const data = grid.getList();
+
                 data.forEach((item, index) => {
+                    item.estAmtAll = item.estQty * item.estUpr;  // calculate and set the total
                 });
-                data.forEach((item, index) => {
-                    item.estAmtAll = item.estQty * item.estUpr;  // 합계 계산 및 설정
-                });
+                grid.repaint()
+                var estAmtAllArray = data.map(item => item.estAmtAll);
+                var sum = estAmtAllArray.reduce((a, b) => a + b, 0);
+                this.item.estAmtAll = sum; // Assign the sum to estAmtAll
+                isUpdating = false;  // mark the end of an update
                 grid.setData({
                     list: data,
                     page: {
                         totalElements: data.length
                     }
                 });
-                isUpdating = false;  // 업데이트 종료를 표시
+                grid.repaint()
+
             }
-
-
         };
+
         let checkDataInterval = null;
 
         grid.onLoad = function () {
@@ -1297,8 +1317,11 @@
 
     var actionType = modalStack.last().paramObj.actionType;
     var paramObj = modalStack.last().paramObj;
-
-    // treeModule.initAll('deptTree', 'file-grid-popup', 'FITR01', paramObj);
+    fileParam = {
+        fileTrgtType	: $("#pgmId").val(),
+        fileTrgtKey		: paramObj.fileTrgtKey
+    }
+    treeModule.initAll('deptTree', 'file-grid-popup', 'FILETREE', fileParam);
 
     function updateButtonVisibility(actionType) {
 
@@ -1346,58 +1369,64 @@
 
     } else if (actionType == "U") {
 
+        fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
 
         $("#coCd").prop("disabled", true);
 
         var parsedDataInfo
         postAjax("/user/cr/cr01/selectEstInfo", paramObj, null, function (data) {
             var parsedData = data;
+                // Object.keys를 통해 parsedData.estInfo의 모든 키에 대해 반복
             Object.keys(parsedData.estInfo).forEach(function (key) {
+
+                // 현재 키와 일치하는 id를 가진 요소를 찾음
                 var inputField = document.getElementById(key);
-                if (inputField) {
-                    if (key == 'mngId') {
+
+                // 요소가 존재하지 않으면 다음 반복으로 이동
+                if (!inputField) return;
+
+                // 현재 키에 대응하는 값을 얻음
+                var value = parsedData.estInfo[key];
+
+                // 키의 값에 따라 다른 작업을 수행
+                switch (key) {
+                    case 'mngId':
+                        // 키가 'mngId'일 때
                         var mngIdField = document.getElementById('mngId');
                         var mngIdVisibleField = document.getElementById('mngIdVisible');
-                        mngIdField.value = parsedData.estInfo[key];
+                        mngIdField.value = value;
                         if (mngIdVisibleField) {
-                            var paramObj = {
-                                "userId": parsedData.estInfo[key],
-                            };
+                            var paramObj = { "userId": value };
                             postAjaxSync("/admin/cm/cm06/selectUserInfo", paramObj, null, function (data) {
                                 mngIdVisibleField.value = data.userInfo.name;
                             });
                         }
-                    } else if (key == 'estClntCd') {
+                        break;
+                    case 'estClntCd':
+                        // 키가 'estClntCd'일 때
                         var estClntNmField = document.getElementById('estClntNm');
                         var estClntCdField = document.getElementById('estClntCd');
-                        estClntCdField.value = parsedData.estInfo[key];
+                        estClntCdField.value = value;
                         if (estClntNmField) {
-
-                            var paramObj = {
-                                "clntCd": parsedData.estInfo[key],
-                            };
+                            var paramObj = { "clntCd": value };
                             postAjax("/admin/bm/bm02/selectClntInfo", paramObj, null, function (data) {
                                 estClntNmField.value = data.clntInfo.clntNm;
                             });
-
                         }
-                    } else {
-                        if (key == 'estAmt' || key == 'estNegoAmt' || key == 'exrate') {
-                            // If the key is one of the specified ones, add commas every three digits.
-                            var value = parsedData.estInfo[key];
-                            if (value != null && value != '') {
-                                value = value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-                            }
-                            inputField.value = value || '';
-                        } else {
-                            inputField.value = parsedData.estInfo[key] || '';
-                        }
-
-                    }
-
-
+                        break;
+                    case 'estAmt':
+                    case 'estNegoAmt':
+                    case 'exrate':
+                        // 키가 'estAmt', 'estNegoAmt', 또는 'exrate'일 때
+                        // 값이 존재하면 세 자리수 마다 쉼표를 추가함
+                        inputField.value = (value != null && value != '') ? value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : '';
+                        break;
+                    default:
+                        // 그 외의 키일 때
+                        inputField.value = value || '';
+                        break;
                 }
-            });
+            });;
             var degUpBtn = document.getElementById("degUpBtn");
             var ordrsBtn = document.getElementById("ordrsBtn");
 
@@ -1414,14 +1443,14 @@
                 $('#estDt').datepicker('destroy');
                 $('#pblsDt').datepicker('destroy');
                 // 모든 input 태그를 선택합니다.
-                let inputs = document.querySelectorAll('input');
+                let inputs = document.querySelectorAll('input:not(.search input)');
                 // 선택된 모든 input 태그에 대해 순환하며 속성과 스타일을 적용합니다.
                 for (let i = 0; i < inputs.length; i++) {
                     inputs[i].setAttribute('readonly', true);
                 }
 
                 // 모든 textarea 태그를 선택합니다.
-                let textareas = document.querySelectorAll('textarea');
+                let textareas = document.querySelectorAll('textarea:not(.search textarea)');
                 // 선택된 모든 textarea 태그에 대해 순환하며 속성과 스타일을 적용합니다.
                 for (let i = 0; i < textareas.length; i++) {
                     textareas[i].setAttribute('readonly', true);

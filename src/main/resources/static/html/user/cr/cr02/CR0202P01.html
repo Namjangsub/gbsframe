@@ -53,11 +53,8 @@
                                    required></td>
                         <th class="hit">수주구분</th>
                         <td>
-                            <select id="ordrsDiv" name="ordrsDiv" required>
-                                <option value="">선택하세요</option>
-                                <option value="normal">정상</option>
-                                <option value="paidAS">유상AS</option>
-                                <option value="freeAS">무상AS</option>
+                            <select id="ordrsDiv" name="ordrsDiv" data-kind="ORDRSDIV" required>
+
                             </select>
                         </td>
                         <th class="hit">고객사</th>
@@ -92,8 +89,18 @@
                                     onchange="setByCoCd(this.value)"></select>
                         <th class="">발주자</th>
                         <td><input type="text" id="ordrger" name="ordrger">
-                        <th class="">담당자</th>
-                        <td><input type="text" id="mngId" name="mngId"></td>
+                        <th class="hit" title="견적제출자 정보를 확인합니다">견적제출자</th>
+                        <td>
+                            <div class="search_form">
+                                <input onkeydown="if(event.keyCode==13)openSecondUserSearch( this.value);" type="text"
+                                       id="mngIdVisible" name="mngIdVisible" required>
+                                <input type="hidden" id="mngId" name="mngId">
+                                <a onclick="openSecondUserSearch( document.getElementById('mngIdVisible').value);">
+                                    <i class="i_search_w"></i>
+                                </a>
+                            </div>
+                        </td>
+
                         <!--                     <th class="">발주자</th>
                                              <td><input type="text" id="ordrger" name="ordrger"></td>-->
                         <th class="">환율</th>
@@ -477,9 +484,34 @@
             planObj["clmnDivSeq"] = elem.clmnDivSeq;
             planObj["clmnRate"] = elem.clmnRate;
             planObj["clmnAmt"] = elem.clmnAmt;
-            planObj["billPblsDt"] = elem.billPblsDt;
+
+
+            let clmnDt = new Date(elem.clmnDt);
+            let pmntDtAfterBill = parseInt(elem.pmntDtAfterBill, 10); // 문자열을 숫자로 변환
+
+            // clmnDt에서 pmntDtAfterBill를 뺍니다.
+            clmnDt.setDate(clmnDt.getDate() - pmntDtAfterBill);
+
+            // Date 객체를 YYYY-MM-DD 형식의 문자열로 변환
+            let convertDateToString = function (dateObj) {
+                let month = '' + (dateObj.getMonth() + 1),
+                    day = '' + dateObj.getDate(),
+                    year = dateObj.getFullYear();
+
+                if (month.length < 2)
+                    month = '0' + month;
+                if (day.length < 2)
+                    day = '0' + day;
+
+                return [year, month, day].join('-');
+            };
+
+            // 계산된 날짜를 billPblsDt에 할당
+            planObj["billPblsDt"] = convertDateToString(clmnDt);
+
+
             planObj["clmnDt"] = elem.clmnDt;
-            planObj["pmntDtAfterBill"] = elem.pmntDtAfterBill;
+            planObj["pmntDtAfterBill"] = pmntDtAfterBill;
             planObj["clmnPlanRmk"] = elem.clmnPlanRmk;
 
             planArr.push(planObj);
@@ -489,17 +521,13 @@
         // clmnAmt 합계 계산
         var totalClmnAmt = 0;
         $.each(planArr, function (idx, elem) {
-            alert(elem.clmnAmt);
-            totalClmnAmt += parseFloat(elem.clmnAmt);
-            alert("몇번")
+            totalClmnAmt += parseFloat(elem.clmnAmt.replace(/,/g, ''));
         });
 
 
         // input box 값과 비교
-        var inputAmtVal = parseFloat($("#ordrsAmt").val());  // inputAmt는 입력박스의 id입니다. 실제 입력박스의 id로 변경해주세요.
+        var inputAmtVal = parseFloat($("#ordrsAmt").val());
 
-
-        alert(totalClmnAmt + "||||" + inputAmtVal);
         if (totalClmnAmt !== inputAmtVal) {
             alert("합계가 입력 금액과 일치하지 않습니다(수금계획)");
             return false
@@ -520,28 +548,45 @@
             detailObj["eqpNm"] = elem.eqpNm;
             detailObj["ordrsPrcMach"] = elem.ordrsPrcMach;
             detailObj["ordrsPrcElcty"] = elem.ordrsPrcElcty;
-            detailObj["ordrsPrc"] = elem.ordrsPrcMach + elem.ordrsPrcElcty;
+            detailObj["ordrsPrc"] = parseFloat(elem.ordrsPrcMach.replace(/,/g, '')) + parseFloat(elem.ordrsPrcElcty.replace(/,/g, ''));
             detailObj["ordrsQty"] = elem.ordrsQty;
             detailObj["estEpctMatPrc"] = elem.estEpctMatPrc;
             detailObj["trgtPchsPcostMach"] = elem.trgtPchsPcostMach;
             detailObj["trgtPchsPcostElcty"] = elem.trgtPchsPcostElcty;
             detailObj["trgtPchsPcostInHousePrcsn"] = elem.trgtPchsPcostInHousePrcsn;
             detailObj["dtlRmk"] = elem.dtlRmk;
+            detailObj["machineValueAfterDeduction"] = elem.trgtPchsPcostMach - elem.trgtPchsPcostInHousePrcsn;
+
+            var laborCostMfgCost = elem.laborCostMfgCost ? parseFloat(elem.laborCostMfgCost.replace(/,/g, '')) : 0;
+            var machineValueAfterDeduction = detailObj["machineValueAfterDeduction"] ? parseFloat(detailObj["machineValueAfterDeduction"].toString().replace(/<[^>]*>|,/g, '')) : 0;
+
+            if (isNaN(laborCostMfgCost)) {
+                laborCostMfgCost = 0; // 또는 다른 기본값
+            }
+
+            if (isNaN(machineValueAfterDeduction)) {
+                machineValueAfterDeduction = 0; // 또는 다른 기본값
+            }
 
 
-            detailObj["laborCostMfgCost"] = elem.laborCostMfgCost;
-            detailObj["machineValueAfterDeduction"] = elem.machineValueAfterDeduction;
+            detailObj["laborCostMfgCost"] = laborCostMfgCost;
+            detailObj["machineValueAfterDeduction"] = machineValueAfterDeduction;
 
-            totalLaborCostMfgCost += parseFloat(detailObj["laborCostMfgCost"]);
-            totalMachineValueAfterDeduction += parseFloat(detailObj["machineValueAfterDeduction"]);
+            totalLaborCostMfgCost += laborCostMfgCost;
+            totalMachineValueAfterDeduction += machineValueAfterDeduction;
 
 
             detailArr.push(detailObj);
 
         });
-        var totalSum = totalLaborCostMfgCost + totalMachineValueAfterDeduction;
-        var ordrsAmtVal = parseFloat($("#ordrsAmt").val());
 
+
+        var totalSum = totalLaborCostMfgCost + totalMachineValueAfterDeduction;
+        var ordrsAmtVal = parseFloat($("#ordrsAmt").val().replace(/,/g, ''));
+
+        if (isNaN(ordrsAmtVal)) {
+            ordrsAmtVal = 0; // 또는 다른 기본값
+        }
 
         if (totalSum !== ordrsAmtVal) {
             alert("합계가 입력 금액과 일치하지 않습니다(수금상세)");
@@ -567,7 +612,9 @@
 
     /* document.ready */
 
+    let updating = false;
     $(document).ready(function () {
+        setCommonSelect($(".popup_area select[data-kind]"));
 
         /*    $("#ordrsAmt").change(function () {
 
@@ -605,7 +652,7 @@
                 if (/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/.test(input)) {
                     alertDebounced();
                     e.target.value = pureNumber;
-                    return;
+
 
                 } else {
                     // 숫자와 콤마만 입력되도록 정규식을 사용하여 필터링합니다.
@@ -641,14 +688,6 @@
             e.preventDefault();
         });
 
-        $('#ordrsDiv').on('change', function () {
-            var selectedValue = $(this).val();
-            if (selectedValue === 'normal') {
-                $('#orgnSalesCd').prop('required', false);
-            } else {
-                $('#orgnSalesCd').prop('required', true);
-            }
-        })
 
         document.querySelectorAll(".custom-btn").forEach((button) => {
 
@@ -663,7 +702,7 @@
 
         function toggleOrgnSalesCd() {
 
-            if (ordrsDiv.value === 'normal') {
+            if (ordrsDiv.value === 'ORDRSDIV1') {
                 orgnSalesCdTd.style.display = 'none';
                 orgnSalesCdTh.style.display = 'none';
 
@@ -677,11 +716,19 @@
         // 페이지 로드 시 초기 상태 설정
         toggleOrgnSalesCd();
 
+        $('#ordrsDiv').on('change', function () {
+            var selectedValue = $(this).val();
+            if (selectedValue === 'ORDRSDIV1') {
+                $('#orgnSalesCd').prop('required', false);
+            } else {
+                $('#orgnSalesTh').addClass('hit');
+                $('#orgnSalesCd').prop('required', true);
+            }
+        })
 
         /*     fileGridView.init(); */
         /*    fileGridView.setData(); */
         // 공통코드 selectBox set
-        setCommonSelect($(".popup_area select[data-kind]"));
         // 견적일자 datepicker bind
         $('#estDt').datepicker({
             format: "yyyy-mm-dd",
@@ -778,218 +825,33 @@
     });
 
 
-    var thisGridRow = "";
-    var thisGridCol = "";
-    var originalValues = {};
-    /* 그리드 관련 함수 */
-    // 그리드 생성
-    const gridOrdrsPlan = new ax5.ui.grid();
-    gridOrdrsPlan.setConfig({
-        target: $('[data-ax5grid="ordrs-plan"]'),
-        header: {
-            align: "center",
-            selector: false
-        },
-        columns: [
-            {
-                key: "seq", label: "번호", width: 60, align: "center", formatter: function () {
-                    return this.item.__index + 1;
-                },
-            },
-
-            {
-                key: "clmnPlanDiv",
-                label: "수금구분",
-                width: 60,
-                align: "center",
-                editor: {
-                    type: "select",
-                    config: {
-                        columnKeys: {
-                            optionValue: 'value',
-                            optionText: 'text'
-                        },
-                        options: [
-                            {value: "계약금", text: "계약금"},
-                            {value: "중도금", text: "중도금"},
-                            {value: "잔금", text: "잔금"},
-                            {value: "선급금", text: "선급금"}
-                        ]
-                    }
-                }
-            },
-            {key: "clmnDivSeq", label: "차수", width: 60, align: "center", editor: {type: "text"}},
-            {
-                key: "clmnRate",
-                label: "비율",
-                width: 60,
-                align: "center",
-                editor: {type: "number"},
-                formatter: function () {
-                    // 셀 값 뒤에 '%'를 추가합니다.
-                    const ordrsAmt = parseFloat($("#ordrsAmt").val().replace(/,/g, '')) || 0;
-                    const clmnRate = parseFloat(this.item.clmnRate) || 0;
-                    if (isNaN(ordrsAmt) || isNaN(clmnRate)) {
-                        return '<div style="">Invalid input</div>';
-                    }
-                    const price = ordrsAmt * (clmnRate / 100);
-                    this.item.clmnAmt = price;
-                    return clmnRate + '%</div>';
-                }
-            },
-            {
-                key: "clmnAmt",
-                label: "수금금액",
-                width: 95,
-                align: "right",
-                editor: {type: "number"},
-                formatter: function () {
-                    const ordrsAmt = parseFloat($("#ordrsAmt").val().replace(/,/g, '')) || 0;
-                    const clmnAmt = parseFloat(this.item.clmnAmt) || 0;
-                    return clmnAmt;
-                }
-
-
-            },
-            {
-                key: "billPblsDt",
-                label: "계산서발행일자",
-                width: 120,
-                align: "center",
-                editor: {type: "date", value: new Date()},
-                formatter: function () {
-                    var clmnDt = new Date(this.item.clmnDt || new Date());
-                    clmnDt.setDate(clmnDt.getDate() - (this.item.pmntDtAfterBill || 0));
-                    var month = String(clmnDt.getMonth() + 1).padStart(2, '0');
-                    var day = String(clmnDt.getDate()).padStart(2, '0');
-                    var year = clmnDt.getFullYear();
-                    return `${year}-${month}-${day}`;  // returns date in 'YYYY-MM-DD' format
-                }
-            },
-            {key: "clmnDt", label: "수주수금일자", width: 120, align: "center", editor: {type: "date"}},
-            {
-                key: "pmntDtAfterBill",
-                label: "계산서 발행 후 지급시기(단위: 일)",
-                width: 240,
-                align: "center",
-                editor: {type: "text"}
-            },
-
-            {key: "clmnPlanRmk", label: "수금관리상황", width: 590, align: "left", editor: {type: "text"}},
-
-        ],
-        footSum: [
-            /*     [
-                     {label: "총합계", align: "center", colspan: 7},
-                     {key: "estAmt", collector: "sum", formatter: "money", align: "right"},
-                 ]*/
-        ],
-        body: {
-
-            onClick: function () {
-                this.self.clearSelect();
-                this.self.select(this.dindex);
-                selectedRowKey = this.dindex;
-            },
-
-            onDataChanged: function () {
-
-                const data = gridOrdrsPlan.getList();  // 현재 그리드 데이터 가져오기
-
-                var totalRate = 0;
-                for (var i = 0; i < data.length; i++) {
-                    totalRate += parseFloat(data[i].clmnRate);
-                }
-
-                if (totalRate > 100) {
-                    alert('비율의 합계는 100%를 초과할 수 없습니다.');
-                    for (var i = 0; i < data.length; i++) {
-                        data[i].clmnRate = 0; // set clmnRate to zero for all data items
-                    }
-                }
-                gridOrdrsPlan.setData(data);
+    //Select 선택 코드값 체크하여 명을 출력
+    function baseOptionChk(key, option) {
+        rtnNm = "";
+        for (var element of option) {
+            if (key.value == element.CD) {
+                rtnNm = element.NM;
+                break;
             }
-        },
-        contextMenu: {
-            iconWidth: 20,
-            acceleratorWidth: 100,
-            itemClickAndClose: false,
-            icons: {
-                'arrow': '<i class="fa fa-caret-right"></i>'
-            },
-            items: [
-                {type: 1, label: "붙여넣기"},
-                {divide: true},
-                {
-                    label: "작업선택",
-                    items: [
-                        {type: 1, label: "줄추가"},
-                        {type: 1, label: "내용 삭제"},
-                        {type: 2, label: "줄삭제"},
-                    ]
-                },
-            ],
-            popupFilter: function (item, param) {
-                //console.log(item, param);
-                if (param.element) {
-                    return true;
-                } else {
-                    return item.type == 1;
-                }
-            },
-            onClick: function (item, param) {
-                console.log(item, param);
-                thisGridRow = param.dindex;
-                thisGridCol = param.colIndex;
-
-                if (item.label == "붙여넣기") {
-                    gridPaste(thisGridRow, thisGridCol);
-                } else if (item.label == "줄추가") {
-                    console.log('추가 인덱스 :', param.dindex);
-                    //.addRow(추가할 내용, 삽인할위치(생략시 마지막),갯수)
-                    gridOrdrsPlan.addRow($.extend({}, gridOrdrsPlan.list[param.dindex], {__index: undefined}), param.dindex + 1,);
-                    gridOrdrsPlan.setValue(param.dindex, 'updcheck', 1);
-
-                } else if (item.label == "내용 삭제") {
-                    console.log('내용삭제 인덱스 :', param.dindex);
-
-                    gridOrdrsPlan.config.columns.forEach((column) => {
-                        gridOrdrsPlan.setValue(param.dindex, column.key, '');
-                        gridOrdrsPlan.setValue(param.dindex, 'updcheck', 1);
-                        console.log('내용삭제 :', param.dindex, column.key);
-                    });
-
-                } else if (item.label == "줄삭제") {
-                    console.log('삭제 인덱스 :', param.dindex);
-                    gridOrdrsPlan.removeRow(param.dindex);
-                    //삭제시에는 그리드에서 사라지므로 별도 처리 필요함  메모리에 담았다가 최종 DB단 삭제 로직 처리 해야함.
-// 		                		gridOrdrsPlan.setValue(param.dindex, 'delcheck', 1);
-                }
-
-
-                gridOrdrsPlan.contextMenu.close();
-                //또는 return true;
-            }
-        },
-
-
-    });
-
+        }
+        console.log('key:', key, 'return value:', rtnNm); //
+        return rtnNm;
+    }
 
     function fetchCurrencyData() {
         var paramObj = {"codeKind": "ORDRSDTLDIV10", "useYn": "Y"};
         var paramObj2 = {"codeKind": "ITEMLIST", "useYn": "Y"};
         var paramObj3 = {"codeKind": "ORDRSDTLDIV20", "useYn": "Y"};
         var paramObj4 = {"codeKind": "ORDRSDTLDIV30", "useYn": "Y"};
-
+        var paramObj5 = {"codeKind": "CLMNPLANDIV", "useYn": "Y"};
         var promise1 = new Promise(function (resolve, reject) {
             postAjax("/admin/cm/cm05/selectCodeList", paramObj, null, function (data) {
                 if (data && data.codeList) {
                     var codeList = data.codeList;
                     var options = codeList.map(function (code) {
                         return {
-                            value: code.codeId,
-                            text: code.codeNm
+                            CD: code.codeId,
+                            NM: code.codeNm
                         };
                     });
                     resolve(options);
@@ -1006,8 +868,8 @@
                     var codeList = data.codeList;
                     var options2 = codeList.map(function (code) {
                         return {
-                            value: code.codeId,
-                            text: code.codeNm
+                            CD: code.codeId,
+                            NM: code.codeNm
                         };
                     });
                     resolve(options2);
@@ -1023,8 +885,8 @@
                     var codeList = data.codeList;
                     var options3 = codeList.map(function (code) {
                         return {
-                            value: code.codeId,
-                            text: code.codeNm
+                            CD: code.codeId,
+                            NM: code.codeNm
                         };
                     });
                     resolve(options3);
@@ -1040,8 +902,8 @@
                     var codeList = data.codeList;
                     var options4 = codeList.map(function (code) {
                         return {
-                            value: code.codeId,
-                            text: code.codeNm
+                            CD: code.codeId,
+                            NM: code.codeNm
                         };
                     });
                     resolve(options4);
@@ -1051,13 +913,348 @@
                 }
             });
         });
+        var promise5 = new Promise(function (resolve, reject) {
+            postAjax("/admin/cm/cm05/selectCodeList", paramObj5, null, function (data) {
+                if (data && data.codeList) {
+                    var codeList = data.codeList;
+                    var options5 = codeList.map(function (code) {
+                        return {
+                            CD: code.codeId,
+                            NM: code.codeNm
+                        };
+                    });
+                    resolve(options5);
+                } else {
+                    console.error("codeList is undefined. Check the AJAX response:", data);
+                    reject(data);
+                }
+            });
+        });
+        return Promise.all([promise1, promise2, promise3, promise4,promise5]);
 
-        return Promise.all([promise1, promise2, promise3, promise4]);
     }
 
+
+
+    var thisGridRow = "";
+    var thisGridCol = "";
+    var originalValues = {};
+    /* 그리드 관련 함수 */
+    // 그리드 생성
+    var data = null;
+    const gridOrdrsPlan = new ax5.ui.grid();
+    fetchCurrencyData().then(function ([options, options2, options3, options4,options5]) {
+
+        gridOrdrsPlan.setConfig({
+                    target: $('[data-ax5grid="ordrs-plan"]'),
+                    header: {
+                        align: "center",
+                        selector: false
+                    },
+                    columns: [
+                        {
+                            key: "seq", label: "번호", width: 60, align: "center", formatter: function () {
+                                return this.item.__index + 1;
+                            },
+                        },
+
+                        {
+                            key: "clmnPlanDiv",
+                            label: "수금구분",
+                            width: 60,
+                            align: "center",
+                            editor: {
+                                type: "select",
+                                config: {
+                                    columnKeys: {
+                                        optionValue: 'CD',
+                                        optionText: 'NM'
+                                    },
+                                    options: options5
+                                }
+                            }, formatter: function () {
+                                return baseOptionChk(this, options5);
+                            }
+                        },
+                        {key: "clmnDivSeq", label: "차수", width: 60, align: "center", editor: {type: "text"}},
+                        {
+                            key: "clmnRate",
+                            label: "비율",
+                            width: 60,
+                            align: "center",
+                            editor: {type: "number"}
+
+                        },
+                        {
+                            key: "clmnAmt",
+                            label: "수금금액",
+                            width: 95,
+                            align: "right",
+                            editor: {type: "number"}, formatter: "money"
+
+
+                        },
+                        {
+                            key: "billPblsDt",
+                            label: "계산서발행일자",
+                            width: 120,
+                            align: "center",
+                            editor: {type: "date", value: new Date()},
+                            formatter: function () {
+                                var clmnDt = new Date(this.item.clmnDt || new Date());
+                                clmnDt.setDate(clmnDt.getDate() - (this.item.pmntDtAfterBill || 0));
+                                var month = String(clmnDt.getMonth() + 1).padStart(2, '0');
+                                var day = String(clmnDt.getDate()).padStart(2, '0');
+                                var year = clmnDt.getFullYear();
+                                return `${year}-${month}-${day}`;  // returns date in 'YYYY-MM-DD' format
+                            }
+                        },
+                        {key: "clmnDt", label: "수주수금일자", width: 120, align: "center", editor: {type: "date"}},
+                        {
+                            key: "pmntDtAfterBill",
+                            label: "계산서 발행 후 지급시기(단위: 일)",
+                            width: 240,
+                            align: "center",
+                            editor: {type: "number"}
+                        },
+
+                        {key: "clmnPlanRmk", label: "수금관리상황", width: 590, align: "left", editor: {type: "text"}},
+
+                    ],
+                    footSum: [
+                        /*     [
+                             {label: "총합계", align: "center", colspan: 7},
+                             {key: "estAmt", collector: "sum", formatter: "money", align: "right"},
+                         ]*/
+                    ],
+                    body: {
+
+
+                        onClick: function () {
+                            this.self.clearSelect();
+                            this.self.select(this.dindex);
+                            selectedRowKey = this.dindex;
+                            const data = gridOrdrsPlan.getList();  // 현재 그리드 데이터 가져오기
+                            if (isFirstExecution) {
+                                isFirstExecution = false;
+                            }
+                        },
+
+
+                        onDataChanged: function () {
+                            var data = gridOrdrsPlan.getList();
+                            var totalRate = 0;
+                            var totalAmt = 0;
+                            for (var i = 0; i < data.length; i++) {
+                                totalRate += parseFloat(data[i].clmnRate);
+                            }
+                            for (var i = 0; i < data.length; i++) {
+                                totalAmt += parseFloat(data[i].clmnAmt);
+                            }
+
+                            var ordVal = $("#ordrsAmt").val().replace(/,/g, '');
+                            var ordrsAmt = parseFloat(ordVal) || 0;
+
+                            if (totalRate > 100 || totalAmt > ordrsAmt) {
+                                if (totalRate > 100) {
+                                    alert('비율의 합계는 100%를 초과할 수 없습니다.');
+                                    // 비율의 합계가 100%를 초과하면, 원래의 데이터로 복원
+                                    for (var i = 0; i < data.length; i++) {
+                                        if (prevData[i]) {
+
+                                            data[i].clmnRate = prevData[i].clmnRate;
+                                            gridOrdrsPlan.getList()[i].clmnRate = prevData[i].clmnRate;
+                                        }
+                                    }
+                                }
+
+                                if (totalAmt > ordrsAmt) {
+                                    alert('수금금액의 합계는 주문 금액을 초과할 수 없습니다.');
+                                }
+
+                                for (var i = 0; i < data.length; i++) {
+                                    if (prevData[i]) {
+                                        data[i].clmnAmt = prevData[i].clmnAmt;
+                                        gridOrdrsPlan.getList()[i].clmnAmt = prevData[i].clmnAmt;
+                                    }
+                                }
+
+                            } else {
+
+                                for (let i = 0; i < data.length; i++) {
+                                    let currData = data[i];
+                                    // 현재 행이 이전에 변경되었는지 확인
+                                    if (prevData[i]) {
+                                        let prevAmt = parseFloat(prevData[i].clmnAmt || 0);
+                                        let currAmt = parseFloat(currData.clmnAmt || 0);
+                                        let prevRate = parseFloat(prevData[i].clmnRate || 0);
+                                        let currRate = parseFloat(currData.clmnRate || 0);
+
+                                        if (prevAmt !== currAmt) {
+                                            // clmnAmt가 변경되었으면 clmnRate를 업데이트
+                                            currData.clmnRate = calculateRate(currData.clmnAmt);
+                                            // 현재 clmnRate와 clmnAmt를 이전 데이터로 저장
+                                            if (!prevData[i]) {
+                                                prevData[i] = {};
+                                            }
+                                            prevData[i].clmnAmt = currData.clmnAmt;
+                                            prevData[i].clmnRate = currData.clmnRate // store the updated rate too
+                                        } else if (prevRate !== currRate) {
+                                            // clmnRate가 변경되었으면 clmnAmt를 업데이트
+                                            currData.clmnAmt = calculateAmt(currData.clmnRate).toLocaleString();
+                                            // 현재 clmnRate와 clmnAmt를 이전 데이터로 저장
+                                            if (!prevData[i]) {
+                                                prevData[i] = {};
+                                            }
+                                            prevData[i].clmnRate = currData.clmnRate;
+                                            prevData[i].clmnAmt = currData.clmnAmt; // store the updated amt too
+                                        }
+                                    }
+                                }
+
+
+                            }
+
+
+                            gridOrdrsPlan.setData(data);
+                        }
+                    },
+                    contextMenu: {
+                        iconWidth: 20,
+                        acceleratorWidth: 100,
+                        itemClickAndClose: false,
+                        icons: {
+                            'arrow': '<i class="fa fa-caret-right"></i>'
+                        },
+                        items: [
+                            {type: 1, label: "붙여넣기"},
+                            {divide: true},
+                            {
+                                label: "작업선택",
+                                items: [
+                                    {type: 1, label: "줄추가"},
+                                    {type: 1, label: "내용 삭제"},
+                                    {type: 2, label: "줄삭제"},
+                                ]
+                            },
+                        ],
+                        popupFilter: function (item, param) {
+                            //console.log(item, param);
+                            if (param.element) {
+                                return true;
+                            } else {
+                                return item.type == 1;
+                            }
+                        },
+                        onClick: function (item, param) {
+                            console.log(item, param);
+                            thisGridRow = param.dindex;
+                            thisGridCol = param.colIndex;
+
+                            if (item.label == "붙여넣기") {
+                                gridPaste(thisGridRow, thisGridCol);
+                            } else if (item.label == "줄추가") {
+                                console.log('추가 인덱스 :', param.dindex);
+                                //.addRow(추가할 내용, 삽인할위치(생략시 마지막),갯수)
+                                gridOrdrsPlan.addRow($.extend({}, gridOrdrsPlan.list[param.dindex], {__index: undefined}), param.dindex + 1,);
+                                gridOrdrsPlan.setValue(param.dindex, 'updcheck', 1);
+
+                            } else if (item.label == "내용 삭제") {
+                                console.log('내용삭제 인덱스 :', param.dindex);
+
+                                gridOrdrsPlan.config.columns.forEach((column) => {
+                                    gridOrdrsPlan.setValue(param.dindex, column.key, '');
+                                    gridOrdrsPlan.setValue(param.dindex, 'updcheck', 1);
+                                    console.log('내용삭제 :', param.dindex, column.key);
+                                });
+
+                            } else if (item.label == "줄삭제") {
+                                console.log('삭제 인덱스 :', param.dindex);
+                                gridOrdrsPlan.removeRow(param.dindex);
+                                //삭제시에는 그리드에서 사라지므로 별도 처리 필요함  메모리에 담았다가 최종 DB단 삭제 로직 처리 해야함.
+// 		                		gridOrdrsPlan.setValue(param.dindex, 'delcheck', 1);
+                            }
+
+
+                            gridOrdrsPlan.contextMenu.close();
+                            //또는 return true;
+                        }
+                    },
+
+
+                });
+
+
+    })
+
+
+    let isFirstExecution = true;
+    let prevData = [];
+    let checkDataInterval = null;
+
+    checkDataInterval = setInterval(() => {
+        let data = gridOrdrsPlan.getList();
+        if (data.length > 0) {
+            prevData = JSON.parse(JSON.stringify(data));
+            clearInterval(checkDataInterval);
+            // 여기에서 그리드 데이터가 준비된 후 실행하려는 코드를 추가할 수 있습니다.
+        }
+    }, 100);
+
+
+    function getOrdrsAmt() {
+        var ordVal = $("#ordrsAmt").val().replace(/,/g, '');
+        return parseFloat(ordVal) || 0;
+    }
+
+    // 수금비율을 사용해 수금금액을 계산하는 함수
+    function calculateAmt(rate) {
+        const clmnRateFloat = parseFloat(rate) || 0;
+        const ordrsAmt = getOrdrsAmt();
+        if (isNaN(ordrsAmt) || isNaN(clmnRateFloat)) {
+            console.error("Invalid input");
+            return;
+        }
+        return ordrsAmt * (clmnRateFloat / 100);
+    }
+
+    // 수금금액을 사용해 수금비율을 계산하는 함수
+    function calculateRate(amt) {
+        const clmnAmtFloat = parseFloat(amt) || 0;
+        const ordrsAmt = getOrdrsAmt();
+        if (isNaN(ordrsAmt) || isNaN(clmnAmtFloat)) {
+            console.error("Invalid input");
+            return;
+        }
+        return (clmnAmtFloat / ordrsAmt) * 100;
+    }
+
+    function calculateNewAmt(ordrsAmt, clmnRate) {
+        return (ordrsAmt * clmnRate / 100).toLocaleString();
+    }
+
+    $("#ordrsAmt").change(function () {
+        // Get the new value
+        var ordVal = $("#ordrsAmt").val().replace(/,/g, '');
+        var ordrsAmt = parseFloat(ordVal) || 0;
+
+        // Get the current data from the grid
+        const data = gridOrdrsPlan.getList();
+
+        // Recalculate the grid data based on the new ordrsAmt
+        // (This depends on how you want to adjust the grid data)
+        for (var i = 0; i < data.length; i++) {
+            // Update clmnAmt based on new ordrsAmt value
+            data[i].clmnAmt = calculateNewAmt(ordrsAmt, data[i].clmnRate); // Assume you have a function to do this
+        }
+
+        // Set the data back to the grid
+        gridOrdrsPlan.setData(data);
+    });
+
+
     const gridOrdrsDetail = new ax5.ui.grid();
-    fetchCurrencyData().then(function ([options, options2, options3, options4]) {
-        // 그리드 생성
+    fetchCurrencyData().then(function ([options, options2, options3, options4, options5]) {
 
         gridOrdrsDetail.setConfig({
             multipleSelect: false,
@@ -1082,11 +1279,13 @@
                         type: "select",
                         config: {
                             columnKeys: {
-                                optionValue: 'value',
-                                optionText: 'text'
+                                optionValue: 'CD',
+                                optionText: 'NM'
                             },
                             options: options
                         }
+                    }, formatter: function () {
+                        return baseOptionChk(this, options);
                     }
                 },
 
@@ -1098,11 +1297,13 @@
                         type: "select",
                         config: {
                             columnKeys: {
-                                optionValue: 'value',
-                                optionText: 'text'
+                                optionValue: 'CD',
+                                optionText: 'NM'
                             },
                             options: options2
                         }
+                    }, formatter: function () {
+                        return baseOptionChk(this, options2);
                     }
                 },
 
@@ -1112,128 +1313,160 @@
                         type: "select",
                         config: {
                             columnKeys: {
-                                optionValue: 'value',
-                                optionText: 'text'
+                                optionValue: 'CD',
+                                optionText: 'NM'
                             },
                             options: options3
                         }
+                    }, formatter: function () {
+                        return baseOptionChk(this, options3);
                     }
                 },
                 {
-                    key: "ordrsDtlDiv80", label: "자체구분", align: "center", width: 60,
+                    key: "ordrsDtlDiv30", label: "자체구분", align: "center", width: 60,
                     editor: {
                         type: "select",
                         config: {
                             columnKeys: {
-                                optionValue: 'value',
-                                optionText: 'text'
+                                optionValue: 'CD',
+                                optionText: 'NM'
                             },
                             options: options4
                         }
+                    }, formatter: function () {
+                        return baseOptionChk(this, options4);
                     }
                 },
 
 
                 // {key: "salesCd", label: "영업코드", align: "center", width: 80, editor: {type: "text"}},
                 {key: "eqpNm", label: "설비명", align: "center", width: 295, editor: {type: "text"}},
+
                 {
-                    key: "ordrsPrcMach",
-                    label: "기계 가격",
-                    align: "right",
-                    width: 80,
-                    editor: {type: "number"},
-                    formatter: "money"
+                    key: undefined, label: "수주가(단위:천원)", columns: [
+
+                        {
+                            key: "ordrsPrcMach",
+                            label: "기계PART",
+                            align: "right",
+                            width: 80,
+                            editor: {type: "number"},
+                            formatter: "money"
+                        },
+                        {
+                            key: "ordrsPrcElcty",
+                            label: "전기PART",
+                            align: "right",
+                            width: 80,
+                            editor: {type: "number"},
+                            formatter: "money"
+                        },
+                        {
+                            key: "ordrsPrc", label: "합계", align: "right", width: 80,
+                            formatter: function () {
+                                color = '#0000FF';
+                                const ordrsPrcMach = isNaN(parseFloat(this.item.ordrsPrcMach)) ? 0 : parseFloat(this.item.ordrsPrcMach);
+                                const ordrsPrcElcty = isNaN(parseFloat(this.item.ordrsPrcElcty)) ? 0 : parseFloat(this.item.ordrsPrcElcty);
+                                const sum = ordrsPrcMach + ordrsPrcElcty;
+                                return '<div style="color: ' + color + '">' + sum.toLocaleString() + '</div>';
+                            }
+                        },
+
+                    ]
                 },
-                {
-                    key: "ordrsPrcElcty",
-                    label: "전기 가격",
-                    align: "right",
-                    width: 80,
-                    editor: {type: "number"},
-                    formatter: "money"
-                },
-                {
-                    key: "ordrsPrc", label: "합계", align: "right", width: 80,
-                    formatter: function () {
-                        color = '#0000FF';
-                        const ordrsPrcMach = isNaN(parseFloat(this.item.ordrsPrcMach)) ? 0 : parseFloat(this.item.ordrsPrcMach);
-                        const ordrsPrcElcty = isNaN(parseFloat(this.item.ordrsPrcElcty)) ? 0 : parseFloat(this.item.ordrsPrcElcty);
-                        const sum = ordrsPrcMach + ordrsPrcElcty;
-                        return '<div style="color: ' + color + '">' + sum.toLocaleString() + '</div>';
-                    }
-                },
+
+
                 {key: "ordrsQty", label: "수량", align: "right", width: 40, editor: {type: "number"}},
                 {
                     key: "estEpctMatPrc",
-                    label: "견적 예상 재료비",
+                    label: "견적 예상 재료비(단위:천원)",
                     align: "right",
-                    width: 100,
+                    width: 180,
                     editor: {type: "number"},
                     formatter: "money"
                 },
 
+                {
+                    key: undefined, label: "목표구매원가(단위:천원)", columns: [
+
+                        {
+                            key: undefined, label: "목표구매원가", columns: [{
+                                key: "trgtPchsPcostMach",
+                                label: "기계",
+                                align: "right",
+                                width: 140,
+                                editor: {type: "number"},
+                                formatter: "money"
+                            },
+                                {
+                                    key: "trgtPchsPcostElcty",
+                                    label: "전기",
+                                    align: "right",
+                                    width: 120,
+                                    editor: {type: "number"}
+                                    , formatter: "money"
+                                },
+                                {
+                                    key: "sum",
+                                    label: "합계",
+                                    align: "right",
+                                    width: 80,
+                                    formatter: function () {
+                                        color = '#0000FF';
+                                        const trgtPchsPcostMach = isNaN(parseFloat(this.item.trgtPchsPcostMach)) ? 0 : parseFloat(this.item.trgtPchsPcostMach);
+                                        const trgtPchsPcostElcty = isNaN(parseFloat(this.item.trgtPchsPcostElcty)) ? 0 : parseFloat(this.item.trgtPchsPcostElcty);
+                                        const sum = trgtPchsPcostMach + trgtPchsPcostElcty;
+                                        return '<div style="color: ' + color + '">' + sum.toLocaleString() + '</div>';
+                                    }
+                                },
+
+                            ]
+                        },
+                        {
+                            key: undefined, label: "자체가공 투입시 기계부문 목표원가", columns: [
+
+                                {
+                                    key: "trgtPchsPcostInHousePrcsn",
+                                    label: "자체 가공",
+                                    align: "right",
+                                    width: 200,
+                                    editor: {type: "number"}
+                                    , formatter: "money"
+                                },
+                                {
+                                    key: "machineValueAfterDeduction",
+                                    label: "차감 후 기계값",
+                                    align: "right",
+                                    width: 120,
+                                    formatter: function () {
+                                        color = '#0000FF';
+                                        const trgtPchsPcostMach = isNaN(parseFloat(this.item.trgtPchsPcostMach)) ? 0 : parseFloat(this.item.trgtPchsPcostMach);
+                                        const trgtPchsPcostInHousePrcsn = isNaN(parseFloat(this.item.trgtPchsPcostInHousePrcsn)) ? 0 : parseFloat(this.item.trgtPchsPcostInHousePrcsn);
+                                        const sum = trgtPchsPcostMach - trgtPchsPcostInHousePrcsn;
+                                        return '<div style="color: ' + color + '">' + sum.toLocaleString() + '</div>';
+                                    }
+                                },
+                            ]
+                        }
+                    ]
+                },
 
                 {
-                    key: "trgtPchsPcostMach",
-                    label: "목표 구매 원가 기계",
-                    align: "right",
-                    width: 140,
-                    editor: {type: "number"},
-                    formatter: "money"
-                },
-                {
-                    key: "trgtPchsPcostElcty",
-                    label: "목표 구매 원가 전기",
-                    align: "right",
-                    width: 120,
-                    editor: {type: "number"}
-                    , formatter: "money"
-                },
-                {
-                    key: "sum",
-                    label: "합계",
-                    align: "right",
-                    width: 80,
-                    formatter: function () {
-                        color = '#0000FF';
-                        const trgtPchsPcostMach = isNaN(parseFloat(this.item.trgtPchsPcostMach)) ? 0 : parseFloat(this.item.trgtPchsPcostMach);
-                        const trgtPchsPcostElcty = isNaN(parseFloat(this.item.trgtPchsPcostElcty)) ? 0 : parseFloat(this.item.trgtPchsPcostElcty);
-                        const sum = trgtPchsPcostMach + trgtPchsPcostElcty;
-                        return '<div style="color: ' + color + '">' + sum.toLocaleString() + '</div>';
-                    }
-                },
-                {
-                    key: "trgtPchsPcostInHousePrcsn",
-                    label: "목표 구매 원가 자체가공",
-                    align: "right",
-                    width: 140,
-                    editor: {type: "number"}
-                    , formatter: "money"
-                },
-                {
-                    key: "machineValueAfterDeduction",
-                    label: "차감 후 기계값",
-                    align: "right",
-                    width: 120,
-                    formatter: function () {
-                        color = '#0000FF';
-                        const trgtPchsPcostMach = isNaN(parseFloat(this.item.trgtPchsPcostMach)) ? 0 : parseFloat(this.item.trgtPchsPcostMach);
-                        const trgtPchsPcostInHousePrcsn = isNaN(parseFloat(this.item.trgtPchsPcostInHousePrcsn)) ? 0 : parseFloat(this.item.trgtPchsPcostInHousePrcsn);
-                        const sum = trgtPchsPcostMach - trgtPchsPcostInHousePrcsn;
-                        return '<div style="color: ' + color + '">' + sum.toLocaleString() + '</div>';
-                    }
-                },
-
-
-                {
-                    key: "laborCostMfgCost",
-                    label: "금액(노무비 제조경비)",
-                    align: "right",
-                    width: 140,
-                    editor: {type: "number"},
-                    formatter: "money"
-                },
-
+                    key: undefined, label: "실집행 원가", columns: [
+                        {
+                            key: undefined, label: "노무비 및 제조경비(판관비 제외)", columns: [
+                                {
+                                    key: "laborCostMfgCost",
+                                    label: "금액",
+                                    align: "right",
+                                    width: 180,
+                                    editor: {type: "number"},
+                                    formatter: "money"
+                                },
+                            ]
+                        }
+                    ]
+                }
             ],
             footSum: [
                 /*      [
@@ -1268,9 +1501,10 @@
                 iconWidth: 20,
                 acceleratorWidth: 100,
                 itemClickAndClose: false,
-                icons: {
-                    'arrow': '<i class="fa fa-caret-right"></i>'
-                },
+                icons:
+                    {
+                        'arrow': '<i class="fa fa-caret-right"></i>'
+                    },
                 items: [
                     {type: 1, label: "붙여넣기"},
                     {divide: true},
@@ -1283,14 +1517,16 @@
                         ]
                     },
                 ],
-                popupFilter: function (item, param) {
-                    //console.log(item, param);
-                    if (param.element) {
-                        return true;
-                    } else {
-                        return item.type == 1;
-                    }
-                },
+                popupFilter:
+
+                    function (item, param) {
+                        //console.log(item, param);
+                        if (param.element) {
+                            return true;
+                        } else {
+                            return item.type == 1;
+                        }
+                    },
                 onClick: function (item, param) {
                     console.log(item, param);
                     thisGridRow = param.dindex;
@@ -1371,7 +1607,7 @@
         $("#clntPjt").val(modalStack.last().paramObj.clntPjt)
         $("#mngId").val(modalStack.last().paramObj.mngId)
         $("#exrate").val(modalStack.last().paramObj.exrate)
-        $("#ordrsDiv").val("normal");
+        $("#ordrsDiv").val("ORDRSDIV1");
         $("#pmntMtd").val("현금");
         $(".clntPjtOrdrs").val(modalStack.last().paramObj.clntPjt);
 
@@ -1405,6 +1641,8 @@
         setCurrentDateToDatePicker('.input_calendar');
 
     } else if (actionType == "U") {
+
+
         $("#ordrsPlanHis").show();
         $('#pmntMtd').val('PMNTMTD01');
         $('#zip_down').show();
@@ -1413,41 +1651,46 @@
             // Set the input field values with the received data
             Object.keys(parsedData.ordrsInfo).forEach(function (key) {
 
-                var inputField;
-                if (key == 'estNo') {
-                    inputField = document.getElementById('estNoOrdrs');
-                } else {
-                    inputField = document.getElementById(key);
-                }
-                if (inputField) {
-                    if (key == 'ordrsClntCd') {
+                var inputField = document.getElementById(key == 'estNo' ? 'estNoOrdrs' : key);
+
+                if (!inputField) return;
+
+                var value = parsedData.ordrsInfo[key];
+
+                switch (key) {
+                    case 'ordrsClntCd':
                         var clntNmField = document.getElementById('ordrsClntNm');
+                        var clntCdField = document.getElementById('ordrsClntCd');
                         if (clntNmField) {
-
-                            var paramObj = {
-                                "clntCd": parsedData.ordrsInfo[key],
-
-                            };
-                            postAjax("/admin/bm/bm02/selectClntInfo", paramObj, null, function (data) {
+                            postAjax("/admin/bm/bm02/selectClntInfo", {"clntCd": value}, null, function (data) {
                                 clntNmField.value = data.clntInfo.clntNm;
                             });
-
                         }
-                    }
-
-
-                    if (key == 'ordrsAmt') {
-                        // If the key is one of the specified ones, add commas every three digits.
-                        var value = parsedData.ordrsInfo[key];
-                        if (value != null && value != '') {
-                            value = value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                        break;
+                    case 'ordrsDiv':
+                        if (value == 'ORDRSDIV1') {
+                            $('#orgnSalesCdTd,#orgnSalesCdTh').hide();
                         }
+                        break;
+                    case 'ordrsAmt':
+                        inputField.value = (value != null && value != '') ? value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : '';
+                        break;
+                    case 'mngId':
+                        var mngIdField = document.getElementById('mngId');
+                        var mngIdVisibleField = document.getElementById('mngIdVisible');
+                        mngIdField.value = parsedData.ordrsInfo[key];
+                        if (mngIdVisibleField) {
+                            var paramObj = {
+                                "userId": parsedData.ordrsInfo[key],
+                            };
+                            postAjaxSync("/admin/cm/cm06/selectUserInfo", paramObj, null, function (data) {
+                                mngIdVisibleField.value = data.userInfo.name;
+                            });
+                        }
+                        break;
+                    default:
                         inputField.value = value || '';
-                    } else {
-                        inputField.value = parsedData.ordrsInfo[key] || '';
-                    }
-
-
+                        break;
                 }
             });
 
@@ -1482,7 +1725,7 @@
     }
 
 
-    treeModule.initAll('deptTreeOrdars', 'file-grid', 'FITR02', paramObj);
+    // treeModule.initAll('deptTreeOrdars', 'file-grid', 'FITR02', paramObj);
 
     //type ,key  2개를 넘기는 것으로 권한 체크 용도
     function validateRequiredFields() {
@@ -1566,7 +1809,7 @@
         // 첫 번째 경우: 선택된 행이 있는 경우
         if (selectedRowKey !== undefined) {
             let row = gridOrdrsPlan.getList("selected")[0];
-            let newRowData = $.extend({}, row, {__index: undefined});
+            let newRowData = $.extend({}, row, {__index: undefined, clmnRate: 0, clmnAmt: 0});
             gridOrdrsPlan.addRow(newRowData, row.__index + 1);
         }
         // 두 번째 경우: 그리드가 비어 있는 경우
@@ -1586,6 +1829,10 @@
                 totalElements: data.length
             }
         });
+
+        prevData = JSON.parse(JSON.stringify(gridOrdrsPlan.getList()));
+        // 여기에서 그리드 데이터가 준비된 후 실행하려는 코드를 추가할 수 있습니다.
+
     });
 
     $("#deletePaymentButton").on("click", function () {
@@ -1729,7 +1976,8 @@
 
 
     function insertOrdrs() {
-        if (validateRequiredFields() && inputValidation($('.popup_area [required]').not('#frameTable [required], #nonStockTable [required]'))) {
+        // validateRequiredFields() && inputValidation($('.popup_area [required]').not('#frameTable [required], #nonStockTable [required]'))
+        if (true) {
             var formData = makeFormData();
             if (formData) {
                 filePostAjax("/user/cr/cr02/insertOrdrs", formData, function (data) {
@@ -1851,6 +2099,30 @@
 
 
     })
+
+    // 사용자 검색 함수
+    function openSecondUserSearch(searchValue) {
+
+        if (event && event.keyCode === 13) {
+            event.preventDefault();  // prevent form from submitting
+        }
+        var paramObj = {
+            "coCd": "GUN", //$('#coCd').val(),
+            "userId": $('#salesEmpId').val(),
+            "useYn": "Y",
+            "searchValue": searchValue
+        };
+
+        openSecondModal("/static/html/cmn/modal/userSearch.html", 300, 500, "사용자 검색", paramObj, function (tree) {
+            var checkedId = tree.get_checked()[0];
+            var checkedNode = tree.get_node(checkedId);
+            $("#mngId").val(checkedNode.id);
+            $("#mngIdVisible").val(checkedNode.text);
+            // $("#salesEmpNm").val(checkedNode.text);
+            $("#mngId").focus();
+            $("#mngId").trigger("click");
+        });
+    }
 
 
 </script>

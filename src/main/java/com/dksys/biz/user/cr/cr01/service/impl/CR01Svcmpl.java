@@ -2,6 +2,7 @@ package com.dksys.biz.user.cr.cr01.service.impl;
 
 import com.dksys.biz.admin.cm.cm08.mapper.CM08Mapper;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.cr.cr01.mapper.CR01Mapper;
 import com.dksys.biz.user.cr.cr01.service.CR01Svc;
 import com.google.gson.Gson;
@@ -30,6 +31,8 @@ public class CR01Svcmpl implements CR01Svc {
     CR01Mapper cr01Mapper;
     @Autowired
     CM08Mapper cm08Mapper;
+    @Autowired
+    CM15Svc cm15Svc;
 
     @Autowired
     CM08Svc cm08Svc;
@@ -75,7 +78,25 @@ public class CR01Svcmpl implements CR01Svc {
         return estInfo;
 
     }
+    private Map<String, String> processIssueDate(String issueDateStringOriginal) {
+        DateTimeFormatter incomingFormat = DateTimeFormatter.ofPattern("yyyyMMdd");
+        // incomingFormat을 사용하여 issueDate를 파싱합니다
+        LocalDate issueDate = LocalDate.parse(issueDateStringOriginal, incomingFormat);
+        // issueDate에 1개월을 추가합니다
+        LocalDate expiryDate = issueDate.plusMonths(1);
+        // issueDate와 expiryDate를 java.sql.Date 형식으로 변환합니다
+        java.sql.Date sqlIssueDate = java.sql.Date.valueOf(issueDate);
+        java.sql.Date sqlExpiryDate = java.sql.Date.valueOf(expiryDate);
+        // java.sql.Date를 문자열로 변환합니다
+        String issueDateString = sqlIssueDate.toString();
+        String expiryDateString = sqlExpiryDate.toString();
+        // 날짜들을 Map에 넣고 반환합니다
+        Map<String, String> dateMap = new HashMap<>();
+        dateMap.put("estsDt", issueDateString);
+        dateMap.put("esteDt", expiryDateString);
 
+        return dateMap;
+    }
     @Override
     public Map<String, Object> insertEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
@@ -86,42 +107,39 @@ public class CR01Svcmpl implements CR01Svc {
         Map<String, Object> responseMap = new HashMap<>();
         try {
 
+
+
+            Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+            Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+            //---------------------------------------------------------------
+            //첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+            //   필수값 :  jobType, userId, comonCd
+            //---------------------------------------------------------------
+            List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
+
+            if (uploadFileList.size() > 0) {
+                //접근 권한 없으면 Exception 발생
+                paramMap.put("jobType", "fileUp");
+                cm15Svc.selectFileAuthCheck(paramMap);
+            }
+
+            //---------------------------------------------------------------
+            //첨부 화일 권한체크  끝
+            //---------------------------------------------------------------
+
+
             String maxEstNo = selectMaxEstNo(paramMap);
             paramMap.put("estNo", maxEstNo);
-
-            // issueDate가 'yyyyMMdd' 형식으로 들어온다고 가정합니다
-            String issueDateStringOriginal = paramMap.get("pblsDt");
-            DateTimeFormatter incomingFormat = DateTimeFormatter.ofPattern("yyyyMMdd");
-
-            // incomingFormat을 사용하여 issueDate를 파싱합니다
-            LocalDate issueDate = LocalDate.parse(issueDateStringOriginal, incomingFormat);
-
-            // issueDate에 1개월을 추가합니다
-            LocalDate expiryDate = issueDate.plusMonths(1);
-
-            // issueDate와 expiryDate를 java.sql.Date 형식으로 변환합니다
-            java.sql.Date sqlIssueDate = java.sql.Date.valueOf(issueDate);
-            java.sql.Date sqlExpiryDate = java.sql.Date.valueOf(expiryDate);
-
-            // java.sql.Date를 문자열로 변환합니다
-            String issueDateString = sqlIssueDate.toString();
-            String expiryDateString = sqlExpiryDate.toString();
-
+            Map<String, String> dateMap = processIssueDate(paramMap.get("pblsDt"));
             // 정확한 형식의 날짜를 paramMap에 넣습니다
-            paramMap.put("estsDt", issueDateString);
-            paramMap.put("esteDt", expiryDateString);
+            paramMap.put("estsDt", dateMap.get("estsDt"));
+            paramMap.put("esteDt", dateMap.get("esteDt"));
             // 데이터베이스 작업을 계속합니다
-            System.out.println(paramMap.get("userId") + "리턴전값");
             paramMap.put("creatId", paramMap.get("userId"));
             paramMap.put("creatPgm", "TB_CR01M01");
             cr01Mapper.insertEst(paramMap);
 
-            System.out.println(paramMap.get("fileTrgtKey") + "여기 리턴값");
-
-
             List<Map<String, Object>> detailArr = gson.fromJson(removeEmptyObjects(paramMap.get("detailArr")), mapList);
-
-
             for (Map<String, Object> detailMap : detailArr) {
                 System.out.println("여기실행");
                 detailMap.put("coCd", paramMap.get("coCd"));
@@ -134,7 +152,22 @@ public class CR01Svcmpl implements CR01Svc {
 
                 cr01Mapper.insertEstDetail(detailMap);
             }
-            // cm08Svc.uploadTreeFile("TB_CR01M01",paramMap, mRequest);
+
+
+
+            //---------------------------------------------------------------
+            //첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
+            //---------------------------------------------------------------
+            if (uploadFileList.size() > 0) {
+                paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+                paramMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
+                cm08Svc.uploadFile(paramMap, mRequest);
+            }
+            //---------------------------------------------------------------
+            //첨부 화일 처리  끝
+            //---------------------------------------------------------------
+
+
             responseMap.put("resultCode", true); // 결과 코드를 성공으로 설정합니다.
             Map<String, String> newEst = new HashMap<>();
             newEst.put("estNo", maxEstNo);
@@ -226,7 +259,39 @@ public class CR01Svcmpl implements CR01Svc {
     }
 
     @Override
-    public Map<String, Object> updateEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
+    public Map<String, Object> updateEst(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+
+        Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+        Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+
+        //---------------------------------------------------------------
+        //첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+        //   필수값 :  jobType, userId, comonCd
+        //---------------------------------------------------------------
+        HashMap<String, String> param = new HashMap<>();
+        param.put("userId", paramMap.get("userId"));
+        param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
+
+        List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
+        if (uploadFileList.size() > 0) {
+            //접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
+            param.put("jobType", "fileUp");
+            cm15Svc.selectFileAuthCheck(param);
+        }
+        String[] deleteFileArr = gsonDtl.fromJson(paramMap.get("deleteFileArr"), String[].class);
+        List<String> deleteFileList = Arrays.asList(deleteFileArr);
+        for(String fileKey : deleteFileList) {  // 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
+            Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
+            //접근 권한 없으면 Exception 발생
+            param.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
+            param.put("jobType", "fileDelete");
+            cm15Svc.selectFileAuthCheck(param);
+        }
+        //---------------------------------------------------------------
+        //첨부 화일 권한체크  끝
+        //---------------------------------------------------------------
+
+
 
         Map<String, Object> estData = cr01Mapper.selectEstInfo(paramMap);
         System.out.println("yn값" + estData.get("ordrsYn"));
@@ -316,7 +381,7 @@ public class CR01Svcmpl implements CR01Svc {
                     estDetail.put("udtId", paramMap.get("userId"));
                     estDetail.put("udtPgm", "TB_CR01M01");
 
-                    System.out.println("23232" + estDetail.toString());
+                    System.out.println("23232" + estDetail);
                     // 업데이트 쿼리를 실행해야 합니다.
                     cr01Mapper.updateEstDetail(estDetail);
                 } else {
@@ -333,25 +398,22 @@ public class CR01Svcmpl implements CR01Svc {
                     cr01Mapper.insertEstDetail(estDetail);
                 }
             }
-    /*        System.out.println("여기까지2" + paramMap.get("deleteFileArr"));
-            String[] deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), String[].class);
-            List<String> deleteFileList = Arrays.asList(deleteFileArr);
 
-            for (String fileKey : deleteFileList) {
+            //---------------------------------------------------------------
+            //첨부 화일 처리 시작
+            //---------------------------------------------------------------
+            if (uploadFileList.size() > 0) {
+                paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+                paramMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
+                cm08Svc.uploadFile(paramMap, mRequest);
+            }
 
+            for(String fileKey : deleteFileList) {
                 cm08Svc.deleteFile(fileKey);
-
-
-            }*/
-            paramMap.get("fileTrgtKey");
-            responseMap.put("resultCode", 200);
-            Map<String, String> newEst = new HashMap<>();
-            newEst.put("estNo", paramMap.get("estNo"));
-            newEst.put("estDeg", paramMap.get("estDeg"));
-            responseMap.put("updateEst", newEst);
-
-
-            //cm08Svc.uploadTreeFile("TB_CR01M01", paramMap,mRequest);
+            }
+            //---------------------------------------------------------------
+            //첨부 화일 처리  끝
+            //---------------------------------------------------------------
 
 
             return responseMap;
@@ -369,14 +431,56 @@ public class CR01Svcmpl implements CR01Svc {
     }
 
     @Override
-    public int deleteEst(Map<String, String> paramMap) {
+    public int deleteEst(Map<String, String> paramMap) throws Exception {
+
+        //---------------------------------------------------------------
+        //첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
+        //   필수값 :  jobType, userId, comonCd
+        //---------------------------------------------------------------
+        List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
+        HashMap<String, String> param = new HashMap<>();
+        param.put("jobType", "fileDelete");
+        param.put("userId", paramMap.get("userId"));
+        if (deleteFileList.size() > 0) {
+            for (Map<String, String> dtl : deleteFileList) {
+                //접근 권한 없으면 Exception 발생
+                param.put("comonCd",  dtl.get("comonCd"));
+
+                cm15Svc.selectFileAuthCheck(param);
+            }
+        }
+        //---------------------------------------------------------------
+        //첨부 화일 권한체크 끝
+        //---------------------------------------------------------------
+
+
+        int returnValue = 200;
+
         Map<String, Object> estData = cr01Mapper.selectEstInfo(paramMap);
         if ("Y".equals(estData.get("ordrsYn"))) {
-            return 0;
+            returnValue = 0;
         } else {
             cr01Mapper.deleteEst(paramMap);
             cr01Mapper.deleteAllEstDetails(paramMap);
-            return 200;
+            returnValue = 200;
         }
+
+        //---------------------------------------------------------------
+        //첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
+        //---------------------------------------------------------------
+        if (deleteFileList.size() > 0) {
+            for (Map<String, String> deleteDtl : deleteFileList) {
+                String fileKey = deleteDtl.get("fileKey").toString();
+                cm08Svc.deleteFile( fileKey );
+            }
+        }
+        //---------------------------------------------------------------
+        //첨부 화일 처리  끝
+        //---------------------------------------------------------------
+
+        return returnValue;
+
+
+
     }
 }

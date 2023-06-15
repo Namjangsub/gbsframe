@@ -1,0 +1,143 @@
+<div id="commonPopup">
+	<div class="popup_area">
+		<div class="popup_table">
+			<table>
+				<colgroup>
+					<col width="20%">
+					<col width="80%">
+				</colgroup>
+				<tr>
+					<td>
+						<select id="coCd_PS" data-kind="CO" data-search="coCd" onchange="orderGridView.setData(0);"
+								required>
+						</select>
+					</td>
+					<td>
+						<div class="search_form">
+							<input type="text" data-search="searchValue" onkeypress="if(event.keyCode == 13){clntGridView.setData(0);}">
+							<a onclick="clntGridView.setData(0);">
+								<i class="i_search_w"></i>
+							</a>
+						</div>
+					</td>
+				</tr>
+			</table>
+			<div class="ax5_grid" data-ax5grid="clnt-grid" data-ax5grid-config="{}" style="height: 320px; width: 100%"></div>
+		</div>
+	</div>
+	<div class="popup_bottom_btn">
+		<button type="button" onclick="executeCallback();">선택</button>
+		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+<script type="text/javascript">
+	var clntGridView = {
+		initView : function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showRowSelector : true,
+				multipleSelect : false,
+				target : $('[data-ax5grid="clnt-grid"]'),
+				header : {
+					align : "center",
+					selector : false
+				},
+				body : {
+					onClick : function() {
+						this.self.select(this.dindex);
+					},
+					onDBLClick: function () {
+						executeCallback();
+					}
+				},
+				page : {
+					navigationItemCount : 10,
+					height : 30,
+					display : true,
+					firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+					prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+					nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+					lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+					onChange : function() {
+						clntGridView.setData(this.page.selectPage);
+					}
+				},
+				columns : [
+					{key: "fileTrgtKey", label: "파일 대상 키", align: "center", width: 100, enableFilter: true, hidden: true},
+					{key: "salesCd", label: "Sales Code", align: "center", width: 160,},
+					{key: "salesCd", label: "ASSY", align: "center", width: 160},//?
+					{key: "unitNo", label: "UNIT", align: "center", width: 80},//?
+					{key: "partNo", label: "Part", align: "center", width: 80},
+					{key: "revNo", label: "Rev", align: "center", width: 80},
+					{key: "revNo", label: "품번", align: "center", width: 80},//?matrCd 자재코드
+					{key: "revNo", label: "품명", align: "center", width: 300},//?matrNm 자재명
+					{key: "matrMat", label: "소재", align: "center", width: 80},//MATR_MAT 소재
+					{key: "matrMakrNm", label: "MAKER", align: "center", width: 80},//MATR_MAKR_NM 제조사
+					{key: "matrMno", label: "형번", align: "center", width: 80},
+					{key: "matrSpec", label: "규격", align: "center", width: 80},
+					{key: "matrSaftQty", label: "수량", align: "center", width: 80},//MATR_SAFT_QTY 임시 안전재고
+				]
+			});
+			return this;
+		},
+		setData : function(_pageNo) {
+			var targetObj = this.target;
+			var paramObj = {};
+			paramObj.pageNo = _pageNo + 1;
+			paramObj.recordCnt = 10;
+			
+			for(var i=0;i<$('.popup_area [data-search]').length;i++){
+				var tempElem = $('.popup_area [data-search]')[i];
+				paramObj[$(tempElem).data("search")] = $(tempElem).val();
+			}
+
+			if(_pageNo !== 999){
+				/* 검색어 숫자인지 문자인지 확인 (거래처명 코드 검색 시 사용)
+				 * isNaN true이면 문자 아니면 숫자
+				 */ 
+				var searchValue = paramObj.searchValue;
+				var searchType  = paramObj.searchType;
+				var isSearchValueNaN = isNaN(searchValue);
+				if(searchType == 'CLNT_CD' && isSearchValueNaN && searchValue != ''){
+					alert("거래처 코드는 숫자만 입력해주세요.");
+					return;
+				}
+				postAjax("/user/sm/sm01/selectBomList", paramObj, null, function(data) {
+					var list = data.resultList;
+					targetObj.setData({
+						list : list,
+						page : {
+							currentPage : _pageNo,
+							pageSize : data.paginationInfo.pageSize,
+							totalElements : data.paginationInfo.totalRecordCount,
+							totalPages : data.paginationInfo.totalPageCount
+						}
+					});
+				});
+			}
+		}
+	}
+
+	$(document).ready(function() {
+		console.log("documentReady Sales Cd search"  )
+		$('[data-search="searchValue"]').focus();
+		$('[data-search="searchValue"]').val(modalStack.last().paramObj.searchValue);
+		
+		
+		if(modalStack.last().paramObj.searchValue == '' || modalStack.last().paramObj.searchValue == undefined){
+			clntGridView.initView().setData(999);
+		}else{
+			clntGridView.initView().setData(0);
+		}
+		
+		setCommonSelect($('#commonPopup select[data-kind]'));
+		$('[data-search="searchValue"]').focus();
+		clntGridView.initView().setData(0);
+	});
+
+	function executeCallback(){
+		if(selectGridValidation(clntGridView.target)) return;
+		modalStack.last().callback(clntGridView);
+		modalStack.close();
+	}
+</script>
