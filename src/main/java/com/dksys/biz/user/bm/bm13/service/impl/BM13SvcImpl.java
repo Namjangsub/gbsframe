@@ -53,17 +53,43 @@ public class BM13SvcImpl implements BM13Svc {
 	public List<Map<String, String>> selectApprovalExcelList(Map<String, String> paramMap) {
 		return bm13Mapper.selectApprovalExcelList(paramMap);
 	}
+
+	
 	
 	@Override
 	public int insertApproval(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
-		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		    		
-		int result = bm13Mapper.insertApproval(paramMap);
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
+		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);		
+
+		int result = 0;	    
+		//selectKey 가 안먹어서 임시로 처리
+	    String maxAppNo = bm13Mapper.selectMaxAppNo(paramMap);		
+	    	    
+		
+		for(Map<String, String> dtl : detailMap) {
+			dtl.put("coCd", paramMap.get("coCd"));
+			dtl.put("userId", paramMap.get("userId_P"));
+			dtl.put("appDiv", paramMap.get("appDiv"));
+			dtl.put("appLineNm", paramMap.get("app_line_nm"));
+			dtl.put("useYn", paramMap.get("useYn"));
+			dtl.put("pgmId", paramMap.get("pgmId"));
+			dtl.put("creatId", paramMap.get("userId"));
+			dtl.put("creatPgm", paramMap.get("pgmId"));
+			dtl.put("selAppNo", maxAppNo);
+			
+		    //MAX APP_SEQ
+		    paramMap.put("maxAppNo", maxAppNo);
+		    String maxAppSeq = bm13Mapper.selectMaxAppSeq(paramMap);			
+			dtl.put("appSeq", maxAppSeq);		
+	
+			//System.out.println(">>dtl svcimpl>>" + dtl.toString() +"<<<<<");			
+    		result += bm13Mapper.insertApproval(dtl);			
+		}	
 		  		
 		return result;
-	  }	
+	}
 	
 	@Override
 	public int updateApproval(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
