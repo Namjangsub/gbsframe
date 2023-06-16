@@ -87,7 +87,7 @@ public class CR02Svcmpl implements CR02Svc {
 
 
                 System.out.println(planMap + "총합1");
-                cr02Mapper.insertClmnPlanHis(planMap);
+//                cr02Mapper.insertClmnPlanHis(planMap);
                 cr02Mapper.insertClmnPlan(planMap);
 
             } catch (Exception e) {
@@ -117,7 +117,7 @@ public class CR02Svcmpl implements CR02Svc {
                     detailMap.put("salesCd", newSalesCode);
                 }
                 System.out.println(detailMap + "총합2");
-//                cr02Mapper.insertOrdrsDetail(detailMap);
+                cr02Mapper.insertOrdrsDetail(detailMap);
             } catch (Exception e) {
                 System.out.println("error3" + e.getMessage());
 
