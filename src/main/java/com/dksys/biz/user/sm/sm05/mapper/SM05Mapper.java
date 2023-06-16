@@ -8,24 +8,24 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface SM05Mapper {
 
-	int selectPchsCount(Map<String, String> paramMap);
+	int selectIoCount(Map<String, String> paramMap);
 
-	List<Map<String, String>> selectPchsList(Map<String, String> paramMap);
+	List<Map<String, String>> selectIoList(Map<String, String> paramMap);
 
-	int selectPchsDetailCount(Map<String, String> paramMap);
+//	int selectPchsDetailCount(Map<String, String> paramMap);
 
-	List<Map<String, String>> selectPchsDetail(Map<String, String> paramMap);
+//	List<Map<String, String>> selectPchsDetail(Map<String, String> paramMap);
 
-	Map<String, String> selectPchsCostInfo(Map<String, String> paramMap);
+	Map<String, String> selectIoCostInfo(Map<String, String> paramMap);
 
-	int selectConfirmCount(Map<String, String> paramMap);
-
-	int selectPchsCostSeqNext(Map<String, String> paramMap);
-
-	int insertPchsCost(Map<String, String> paramMap);
-
-	int updatePchsCost(Map<String, String> paramMap);
-
-	int deletePchsCost(Map<String, String> paramMap);
+//	int selectConfirmCount(Map<String, String> paramMap);
+//
+//	int selectPchsCostSeqNext(Map<String, String> paramMap);
+//
+//	int insertPchsCost(Map<String, String> paramMap);
+//
+//	int updatePchsCost(Map<String, String> paramMap);
+//
+//	int deletePchsCost(Map<String, String> paramMap);
 
 }
