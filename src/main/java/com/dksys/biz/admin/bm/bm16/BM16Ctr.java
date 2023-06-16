@@ -35,8 +35,8 @@ public class BM16Ctr {
     int totalCnt = bm16Svc.selectPrjctCount(paramMap);
     PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
     model.addAttribute("paginationInfo", paginationInfo);
-    List<Map<String, String>> bm1601m01 = bm16Svc.selectPrjctList(paramMap);
-    model.addAttribute("bm1601m01", bm1601m01);
+    List<Map<String, String>> result = bm16Svc.selectPrjctList(paramMap);
+    model.addAttribute("result", result);
     return "jsonView";
   }
 
@@ -122,4 +122,47 @@ public class BM16Ctr {
 	  	return "jsonView";
   }
 
+
+  // 프로젝트 이슈정보 조회
+  @PostMapping(value = "/selectPrjctIssueInfo")
+  public String selectPrjctIssueInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    Map<String, String> result = bm16Svc.selectPrjctIssueInfo(paramMap);
+    model.addAttribute("result", result);
+    return "jsonView";
+  }
+    
+  @PostMapping(value = "/insertPrjctIssue")
+  public String insertPrjctIssue(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	  try {
+		  if (bm16Svc.insertPrjctIssue(paramMap, mRequest) != 0 ) {
+			  model.addAttribute("resultCode", 200);
+			  model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+		  } else {
+			  model.addAttribute("resultCode", 500);
+			  model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		  };
+	  }catch(Exception e){
+		  model.addAttribute("resultCode", 900);
+		  model.addAttribute("resultMessage", e.getMessage());
+	  }
+	  return "jsonView";
+  }
+  
+  @PostMapping(value = "/updatePrjctIssue")
+  public String updatePrjctIssue(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	  try {
+		  if (bm16Svc.updatePrjctIssue(paramMap, mRequest) != 0 ) {
+			  model.addAttribute("resultCode", 200);
+			  model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+		  } else {
+			  model.addAttribute("resultCode", 500);
+			  model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		  };
+	  }catch(Exception e){
+		  model.addAttribute("resultCode", 900);
+		  model.addAttribute("resultMessage", e.getMessage());
+	  }
+	  return "jsonView";
+  }
+  
 }

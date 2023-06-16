@@ -26,5 +26,11 @@ public interface BM16Svc {
   int updatePrjct(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
   int deletePrjct(Map<String, String> paramMap) throws Exception;
+  
+  Map<String, String> selectPrjctIssueInfo(Map<String, String> paramMap);
+  
+  int insertPrjctIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+  
+  int updatePrjctIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
 }

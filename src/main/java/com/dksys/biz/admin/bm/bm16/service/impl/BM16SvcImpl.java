@@ -271,4 +271,22 @@ public class BM16SvcImpl implements BM16Svc {
 	    return result;
   }
 
+  
+  @Override
+  public Map<String, String> selectPrjctIssueInfo(Map<String, String> paramMap) {
+	  return bm16Mapper.selectPrjctIssueInfo(paramMap);
+  }
+ 
+  @Override
+  public int insertPrjctIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	  int result = bm16Mapper.insertPrjctIssue(paramMap);
+	  return result;
+  }
+  
+  @Override
+  public int updatePrjctIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	  int result = bm16Mapper.updatePrjctIssue(paramMap);
+	  return result;
+  }
+  
 }
