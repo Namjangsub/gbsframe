@@ -47,12 +47,12 @@
         </tr>
 
         <tr>
-          <th>결재선 명칭</th>
+          <th class="hit">결재선 명칭</th>
           <td colspan="3">
-          <input type="text" id=""app_line_nm"" name="app_line_nm" required msg="결재선명">
+          <input type="text" id="app_line_nm" name="app_line_nm" required msg="결재선명">
           </td>
 
-          <th>사용여부</th>
+          <th class="hit">사용여부</th>
           <td>
             <select id="useYn" name="useYn" data-search="useYn" required msg="사용여부">
             	<option value="Y">Y</option>
@@ -110,7 +110,7 @@ var userNm = null;
 var coCd = null;
 
 //결재대상자 그리드
-var gridView = {
+var gridViewPop = {
 	  	initView: function(){
 		this.target = new ax5.ui.grid();
 		this.target.setConfig({
@@ -143,21 +143,22 @@ var gridView = {
 				nextIcon: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
 				lastIcon: '<i class="fa fa-step-forward" aria-hidden="true"></i>',
 				onChange: function () {
-					gridView.setData(this.page.selectPage); 
+					gridViewPop.setData(this.page.selectPage); 
 				}
 	          },
 	          columns: [
-	       	   {key: "rn",      label: "No.",          align: "center",   width: 60},
+	       	   {key: "rn",      label: "No.",          align: "center",   width: 40},
 	              {key: "coCd",      			label: "회사",          hidden: true},
-	              {key: "appUserNm",      		label: "결재자명",      align: "center",   width: 130},
+	              {key: "actFlag",     			label: "상태",		align: "center",   width: 50, 	styleClass: "grid-font-blue-bold" },
+	              {key: "appUserNm",      		label: "결재자명",      align: "center",   width: 100},
 	              {key: "appId",      			label: "결재자ID",      align: "center",   width: 130,		hidden: true},
-	              {key: "deptNm",      			label: "부서",      align: "center",   width: 130},
-	              {key: "levelNm",      		label: "직급",      align: "center",   width: 130},
-	              {key: "email",      			label: "E-mail",      align: "center",   width: 130},              
+	              {key: "deptNm",      			label: "부서",      align: "center",   width: 100},
+	              {key: "levelNm",      		label: "직급",      align: "center",   width: 80},
+	              {key: "email",      			label: "E-mail",      align: "center",   width: 200},              
 	              {key: "telNo",    	  		label: "전화번호",      align: "center",   width: 100},
 	              {key: "offTelNo",      		label: "회사번호",      align: "center",   width: 100},
 	              {key: "faxNo",      			label: "Fax번호",      align: "center",   width: 100},              
-	              {key: "creatDttm",			label: "변경일시",      align: "center",   width: 140}
+	              {key: "creatDttm",			label: "변경일시",      align: "center",   width: 130}
 	             ]
 	       });
 	       return this;
@@ -188,6 +189,7 @@ var gridView = {
 	        } 
 	}
 	
+
 	
 $(document).ready(function() {
 	setCommonSelect($(".popup_area select[data-kind]"));
@@ -199,10 +201,12 @@ $(document).ready(function() {
 	//작성자 readonly 등 set
 	userId = modalStack.last().paramObj.userId;
 	userNm  = modalStack.last().paramObj.userNm;
+	appLineNm  = modalStack.last().paramObj.appLineNm;
     $("#userId_P").val(userId);
     $(".popup_area #userId").val(userId);
     $("#userName_P").val(userNm);
 	$("#userName_P").attr("readonly", true);    
+	$("#app_line_nm").val(appLineNm);
     	
     //관리자권한 체크후 없으면 readonly
     var authInfo = jwt.authInfo;
@@ -213,7 +217,6 @@ $(document).ready(function() {
     	$("#userIdBtn").hide();
     	$("#appIdBtn").hide();    	
     }	
-
 	
  	// 권한체크    
 	authChk();						
@@ -230,7 +233,8 @@ $(document).ready(function() {
 	} else if (actionType == "U") {
 		$('.tit').text('결재선 수정')
 		
-		selectPchsCostInfo();
+		//그리드 load
+		gridViewPop.initView().setData(0);
 
 		$('#actionBtn').text("수정");
 		$('#actionBtn').on("click", function() {
@@ -238,75 +242,131 @@ $(document).ready(function() {
 		});
 	}	
 	
-	//결재선 그리드
-	gridView.initView().setData(0);	
+	//결재선 그리드 - 신규등록은 기존데이터가 의미가 없음(결재선 번호가 없기때문)
+	gridViewPop.initView();	
 	
-	//결재선 목록 그리드 추가
-    $("#addDetailButton").on("click", function () {
+	
+	//결재선 목록 그리드 추가(등록)
+    $("#addDetailButton").on("click", function (tempRun) {
 
         var paramObj = {
                 "coCd" : $(".popup_area #coCd").val(),
-                "userId": $(".popup_area #userId").val(),
+                /* "userId": $(".popup_area #userId").val(), */
                 "useYn": "Y"
-            };
+            }; 
             openSecondModal("/static/html/cmn/modal/userSearch.html", 300, 500, "담당자 검색", paramObj, function (tree){
                var checkedId = tree.get_checked()[0];
                var checkedNode = tree.get_node(checkedId);   
 
                var paramObj = {"coCd" : $(".popup_area #coCd").val(), "userId" : checkedId};
                
-               postAjax("/user/wb/wb02/selectRsltsMemberList", paramObj, null, function(data){
-            	   gridView.target.addRow($.extend({}, "last", false));                             
-                      
-                       var row = gridView.target.getList().length - 1;
-                       gridView.target.setValue(row, "coCd", $("#coCd").val());
-                       gridView.target.setValue(row, "appUserNm", data.resultList[0].name);
-                       gridView.target.setValue(row, "deptNm", data.resultList[0].deptNm);
-                       gridView.target.setValue(row, "levelNm", data.resultList[0].levelNm);
-                       gridView.target.setValue(row, "email", data.resultList[0].email);
-                       gridView.target.setValue(row, "telNo", data.resultList[0].telNo);
-                       gridView.target.setValue(row, "faxNo", data.resultList[0].faxNo);
-               });                 
-               //row set end
+				postAjax("/user/wb/wb02/selectRsltsMemberList", paramObj, null, function(data) {
+					var dupChk = true;		//중복 check flag
+					var appId = data.resultList[0].id;
+					dupChk = $.dupUserChk(gridViewPop, appId);
+					if( dupChk ) {
+			        	alert("이미 지정된 결재자 입니다.");
+			        	return;
+					} else {
+						gridViewPop.target.addRow($.extend({}, "last", false));                             
+						var row = gridViewPop.target.getList().length - 1;
+						gridViewPop.target.setValue(row, "rn", "");
+						gridViewPop.target.setValue(row, "coCd", $("#coCd").val());
+						//등록플래그
+						gridViewPop.target.setValue(row, "actFlag", "I");
+						gridViewPop.target.setValue(row, "appUserNm", data.resultList[0].name);
+						gridViewPop.target.setValue(row, "appId", data.resultList[0].id);
+						gridViewPop.target.setValue(row, "deptNm", data.resultList[0].deptNm);
+						gridViewPop.target.setValue(row, "levelNm", data.resultList[0].levelNm);
+						gridViewPop.target.setValue(row, "email", data.resultList[0].email);
+						gridViewPop.target.setValue(row, "telNo", data.resultList[0].telNo);
+						gridViewPop.target.setValue(row, "offTelNo", data.resultList[0].offTelNo);
+						gridViewPop.target.setValue(row, "faxNo", data.resultList[0].faxNo);					
+					}
+				});                 
+				//postAjax set end
             });  
             //second 사용자검색 모달 end
-    	
+        //No. set -- line 추가시 실행되게 수정
+        $.gridNoSet(gridViewPop);            
     });
 	//click function end
 
+	//그리드 추가 중복처리
+	$.dupUserChk = function(gridObj, appId) {
+		var gridList = gridObj.target.getList();
+		if( gridList.length > 0 ) {
+			var idArr = [];			
+	        $.each(gridList, function (idx, elem) {
+        		idArr.push(elem.appId);
+	        });			
+	        if( idArr.indexOf(appId) > -1 ) {
+	        	return true;
+	        } else {
+	        	return false;
+	        }
+		}
+	}
+	
 	//결재선 그리드 삭제
     $("#deleteDetailButton").on("click", function () {
-    	
-        if (selectedRowKey2 !== undefined) {
-        	approval-grid-modal.removeRow(selectedRowKey2);
-            const data = approval-grid-modal.getList();
-            gridOrdrsDetail.setData({
-                list: data,
-                page: {
-                    totalElements: data.length
-                }
-            });
 
-            // 선택된 행을 업데이트합니다.
-            if (data.length > 0) { // 아직 데이터가 있는지 확인합니다.
-                if (selectedRowKey2 < data.length) { // 선택된 행이 마지막 행이 아니라면 다음 행을 선택합니다.
-                    gridOrdrsDetail.select(selectedRowKey2);
-                } else { // 선택된 행이 마지막 행이었다면 이전 행을 선택합니다.
-                    selectedRowKey2 = selectedRowKey2 - 1;
-                    gridOrdrsDetail.select(selectedRowKey2);
-                }
-            } else { // 데이터가 없다면 선택된 행을 초기화합니다.
-                selectedRowKey2 = undefined;
-                // 이 경우 삭제 버튼을 비활성화할 수 있습니다.
-                // 예: $("#deleteProductButton").prop("disabled", true);
-            }
-        } else {
-            alert("삭제를 위해 선택된 행이 없습니다.");
-        }
+ 		var selRow = parseInt(gridViewPop.target.selectedDataIndexs);
+		if( typeof(selRow) != NaN && selRow > -1 ) {
+			//신규 추가한 행일 경우만 삭제
+			if ( typeof(gridViewPop.target.getList()[selRow].actFlag) != "undefined" ) {
+				gridViewPop.target.removeRow(selRow);
+				$.gridNoSet(gridViewPop);					
+			} 				
+		} else if( typeof(selRow) != NaN ) {
+		          alert("삭제를 위해 선택된 행이 없습니다.");				
+		}
     });	
 	
+	//입력그리드 No. 재정립
+	$.gridNoSet = function(gridObj) {
+		console.log('---gridNoset run ---');		
+		var gridList = gridObj.target.getList();
+		if( gridList.length > 0 ) {
+	        $.each(gridList, function (idx, elem) {
+	        	//flag I인것만 처리
+	        	if( elem.actFlag == "I" ) {
+		            var detailObj = {};	 
+		            gridObj.target.setValue(idx, "rn", idx+1);
+	        	}
+	        });			
+		}		
+	}
+	
+	//등록시 그리드값 배열 저장
+	$.gridPutArr = function(gridObj) {
+		var gridList = gridObj.target.getList();
+		var detailArr = [];    			
+		if( gridList.length > 0 ) {
+	        $.each(gridList, function (idx, elem) {
+	        	//flag I인것만 처리
+	        	if( elem.actFlag == "I" ) {
+		            var detailObj = {};
+		            detailObj["idx"] = idx + 1;
+		            detailObj["actFlag"] = elem.actFlag;
+		            detailObj["appId"] = elem.appId;		            
+		            detailObj["appUserNm"] = elem.appUserNm;
+		            console.log('---' + detailObj);
+		            detailArr.push(detailObj);	        		
+	        	}
+	        });			
+		}
+		return detailArr;
+	}
+
 });
 //ready end
+
+function tempRun() {
+		console.log('----temRun---');
+        //No. set -- line 추가시 실행되게 수정
+        //$.gridNoSet(gridViewPop);		
+	}
 
 // 작성자 검색 //
 function openUserSearchPop() {
@@ -322,7 +382,7 @@ function openUserSearchPop() {
 				var checkedNode = tree.get_node(checkedId);
 				$('#userId_P').val(checkedNode.id);
 				$('#userName_P').val(checkedNode.text);
-				 gridView.setData(0);
+				 gridViewPop.setData(0);
 			});
 }
 
@@ -330,26 +390,36 @@ function openUserSearchPop() {
 function insertApproval() {
 	if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 		var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
-		filePostAjax("/user/bm/bm13/insertApproval", formData,				// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행
-				
-				function(data) {
-					alert(data.resultMessage);								// 결과 메시지를 alert으로 출력
-					if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridView.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
-						gridView.setData(0);
-						modalStack.close();									// 모달을 닫음
-					}
-				});
+		var makeArr = {};
+        //저장용 배열 push
+		makeArr = $.gridPutArr(gridViewPop);		
+        
+		if(makeArr.length<1) {
+			alert("결재선 항목은 최소 1개 이상이어야 합니다.");
+			return;
+		} else {
+			formData.append("makeArr", JSON.stringify(makeArr));
+		}        
+
+		filePostAjax("/user/bm/bm13/insertApproval", formData,				// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
+			function(data) {
+				alert(data.resultMessage);								// 결과 메시지를 alert으로 출력
+				if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
+					gridView.setData(0);
+					modalStack.close();									// 모달을 닫음
+				}
+		});
 	}
 }
 
 // 수정
-function updatePchsCost() {
+function updateApproval() {
 	if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 		var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
       	filePostAjax("/user/sm/sm10/updatePchsCost", formData,function(data) {
 					alert(data.resultMessage);
 					if (data.resultCode == 200) {
-						gridView.setData(0);
+						gridViewPop.setData(0);
 						modalStack.close();
 					}
 				});
@@ -372,46 +442,11 @@ function makeFormData() {
 	
 	// 기본값 set
 	formData.append("userId", jwt.userId);
-	formData.append("clntCd", $('#vendCd').val());			//첨부화일용
 	 
 	return formData;
 }
 
 
-
-		
-
-//  업체명 검색 //
-function clntSearch() {
-	openSecondModal("/static/html/cmn/modal/clntSearch.html", 600, 420,
-			"업체명 검색", {}, function(grid) {
-				var row = grid.target.getList("selected")[0];
-				$('#pchsClntCd').val(row.clntCd);
-				$('#pchsClntNm').val(row.clntNm);
-//					$('#mngId').val(row.salesEmpId);
-//					$('#mngNm').val(row.salesEmpNm);
-
-//					var paramObj = {
-//						"coCd" : $('#coCd').val(),
-//						"clntCd" : row.clntCd
-//					}
-//					setMngInfo(paramObj);
-			});
-}
-
-// 영업담당자 set
-//	function setMngInfo(paramObj) {
-//		postAjax("/admin/bm/bm02/selectMngInfo", paramObj, null,
-//				function(data) {
-//					if (data.mngInfo) {
-//						$('#mngId').val(data.mngInfo.salesEmpId);
-//						$('#mngNm').val(data.mngInfo.salesEmpNm);
-//					} else {
-//						$('#mngId').val("");
-//						$('#mngNm').val("");
-//					}
-//				});
-//	}
 
 
 

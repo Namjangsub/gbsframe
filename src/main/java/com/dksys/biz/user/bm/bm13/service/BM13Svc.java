@@ -12,8 +12,8 @@ public interface BM13Svc {
 	
 	List<Map<String, String>> selectApprovalList(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectApprovalExcelList(Map<String, String> paramMap);	
-	
+	List<Map<String, String>> selectApprovalExcelList(Map<String, String> paramMap);
+		
 	//결재선 등록, 수정, 삭제
 	int insertApproval(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;	
 		

@@ -48,4 +48,10 @@ public interface BM16Mapper {
 
   int deletePrjctDtl(Map<String, String> paramMap);
   
+  Map<String, String> selectPrjctIssueInfo(Map<String, String> paramMap);
+  
+  int insertPrjctIssue(Map<String, String> paramMap);
+
+  int updatePrjctIssue(Map<String, String> paramMap);
+  
 }
