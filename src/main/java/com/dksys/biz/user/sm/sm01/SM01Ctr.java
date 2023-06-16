@@ -15,10 +15,8 @@ import java.util.Map;
 public class SM01Ctr {
     @Autowired
     SM01Svc sm01svc;
-    
     @Autowired
     MessageUtils messageUtils;
-    
     @PostMapping("/selectBomList")
     public String selectBomList(@RequestBody Map<String, String> param, ModelMap model) {
         int totalCnt = sm01svc.selectBomCount(param);
@@ -37,7 +35,6 @@ public class SM01Ctr {
         model.addAttribute("resultList", resultList);
         return "jsonView";
     }
-
     @PostMapping("/selectBomInfo")
     public String selectBomInfo(@RequestBody Map<String, String> param, ModelMap model) {
 
@@ -45,25 +42,12 @@ public class SM01Ctr {
         model.addAttribute("result", result);
         return "jsonView";
     }
-    
-    @PostMapping("/selectBomDetailList")
-    public String selectBomDetailList(@RequestBody Map<String, String> param, ModelMap model) {
-        int totalCnt = sm01svc.selectBomDetailCount(param);
-        System.out.println(totalCnt+" 총 로우");
-        PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
-        model.addAttribute("paginationInfo", paginationInfo);
-        List<Map<String, Object>> estList = sm01svc.selectBomDetailList(param);
-        model.addAttribute("estList", estList);
-        return "jsonView";
-    }
-    
     @DeleteMapping(value = "/deleteBom")
     public String deleteBom(@RequestBody Map<String, String> paramMap, ModelMap model) {
         model.addAttribute("resultCode", sm01svc.deleteBom(paramMap));
         model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
         return "jsonView";
     }
-    
     @PostMapping(value = "/updateBom")
     public String updateBom(@RequestBody Map<String, String> paramMap, ModelMap model) {
         System.out.println(paramMap.get("detailArr"));
@@ -79,18 +63,5 @@ public class SM01Ctr {
         return "jsonView";
     }
     
-    @PostMapping(value = "/insertBomDetail")
-    public String insertBomDetailList(@RequestParam Map<String, String> paramMap, ModelMap model) {
-        try {
-            Map<String, Object> newBomMap  = sm01svc.insertBomDetailList(paramMap);
-            System.out.println(newBomMap+"최종");
-            model.addAttribute("resultCode", 200);
-            model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-            model.addAttribute("param", newBomMap );
-        }catch(Exception e) {
-            model.addAttribute("resultCode", 500);
-            model.addAttribute("resultMessage", e.getLocalizedMessage());
-        }
-        return "jsonView";
-    }
+
 }
