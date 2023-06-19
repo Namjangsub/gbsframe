@@ -4,16 +4,20 @@ import java.util.List;
 import java.util.Map;
 
 public interface SM01Svc {
-    public int selectBomCount(Map<String, String> param);
-    public int selectBomDetailCount(Map<String, String> param);
-    public List<Map<String, Object>> selectBomList(Map<String, String> param);
-    public List<Map<String, Object>> selectBomDetailList(Map<String, String> param);
-    Map<String, Object> insertBomDetailList(Map<String, String> param);
-    Map<String, Object> updateBom(Map<String, String> param);
-    int deleteBom(Map<String, String> paramMap);
+	// 수주리스트
+	int selectBomSalesCount(Map<String, String> paramMap);
+	List<Map<String, String>> selectBomSalesList(Map<String, String> paramMap);
 
-    Map<String, Object> selectBomInfo(Map<String, String> param);
+	// BOM내역상세 조회
+	int selectBomMakerCount(Map<String, String> paramMap);
+	List<Map<String, String>> selectBomMakerList(Map<String, String> paramMap);
+	
+	// 매출확정등록 조회
+	int addSellDscnCount(Map<String, String> paramMap);
+	List<Map<String, String>> addSellDscnList(Map<String, String> paramMap);
+	
+	// 매출확정등록 입력
+	int insertSellDscn(Map<String, String> paramMap);
+	
 
-    List<Map<String, Object>> selectBomListMatr(Map<String, String> param);
-    //Map<String, Object> updateBom(Map<String, String> paramMap);
 }

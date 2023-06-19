@@ -1,22 +1,23 @@
 package com.dksys.biz.user.sm.sm01.mapper;
 
-import org.apache.ibatis.annotations.Mapper;
-
 import java.util.List;
 import java.util.Map;
 
+import org.apache.ibatis.annotations.Mapper;
+
 @Mapper
 public interface SM01Mapper {
-    int selectBomCount(Map<String, String> param);
-    int selectBomDetailCount(Map<String, String> param);
-    List<Map<String, Object>> selectBomList(Map<String, String> param);
-    List<Map<String, Object>> selectBomDetailList(Map<String, String> param);
-    Map<String, Object> insertBomDetailList(Map<String, String> param);
-    int updateBom(Map<String, String> param);
-    int deleteBom(Map<String, String> paramMap);
-    int deleteAllBomDetails(Map<String, String> paramMap);
-
-    Map<String, Object> selectBomInfo(Map<String, String> param);
-
-    List<Map<String, Object>> selectBomListMatr(Map<String, String> param);
+	// 수주리스트 조회
+	int selectBomSalesCount(Map<String, String> paramMap);
+	List<Map<String, String>> selectBomSalesList(Map<String, String> paramMap);
+	// BOM내역상세 조회
+	int selectBomMakerCount(Map<String, String> paramMap);
+	List<Map<String, String>> selectBomMakerList(Map<String, String> paramMap);
+	// 매출확정등록 조회
+	int addSellDscnCount(Map<String, String> paramMap);
+	List<Map<String, String>> addSellDscnList(Map<String, String> paramMap);
+	// 매출확정등록 입력
+	int insertSellDscn(Map<String, String> paramMap);
+	
+	
 }
