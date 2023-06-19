@@ -1,10 +1,14 @@
 package com.dksys.biz.user.cr.cr07;
 
+import org.slf4j.LoggerFactory;
+
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,10 +19,13 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.cr.cr07.service.CR07Svc;
 import com.dksys.biz.util.MessageUtils;
+import com.fasterxml.jackson.annotation.JacksonInject.Value;
 
 @Controller
 @RequestMapping("/user/cr/cr07")
 public class CR07Ctr {
+	
+	private Logger logger = LoggerFactory.getLogger(CR07Ctr.class);
 	
 	@Autowired
 	MessageUtils messageUtils;
@@ -36,6 +43,7 @@ public class CR07Ctr {
 		List<Map<String, String>> resultList = cr07Svc.selectOrdrsDcsnList(paramMap);
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
+		
 	}
 	
 	// 매출확정리스트 조회
