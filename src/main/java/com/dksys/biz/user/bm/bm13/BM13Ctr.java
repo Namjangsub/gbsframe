@@ -38,7 +38,7 @@ public class BM13Ctr {
 	//기준관리 결재선관리 메인 화면 조회 리스트  -->
     @PostMapping(value = "/selectApprovalList") 
     public String selectApplovalList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  
+    	System.out.println(">>>paramMap>>>" + paramMap);
     	int totalCnt = bm13Svc.selectApprovalListCount(paramMap); 
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
