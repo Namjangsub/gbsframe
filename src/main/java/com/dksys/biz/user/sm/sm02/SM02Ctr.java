@@ -1,0 +1,94 @@
+package com.dksys.biz.user.sm.sm02;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
+
+import com.dksys.biz.cmn.vo.PaginationInfo;
+import com.dksys.biz.user.sm.sm02.service.SM02Svc;
+import com.dksys.biz.util.MessageUtils;
+
+@Controller
+@RequestMapping("/user/sm/sm02")
+public class SM02Ctr {
+
+	@Autowired
+	MessageUtils messageUtils;
+
+	@Autowired
+	SM02Svc sm02Svc;
+
+	// 매입관리 발주 조회
+	@PostMapping(value = "/selectOrderList")
+	public String selectPchsList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = sm02Svc.selectOrderListCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = sm02Svc.selectOrderList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	//발주 등록
+    @PostMapping(value = "/insertOrderMaster")
+    public String insertOrderMaster(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (sm02Svc.insertOrderMaster(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }	  
+
+	//기준관리 결재선 수정    
+    @PostMapping(value = "/updatederMaster")
+    public String updateApproval(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  	  	try {
+  			if (sm02Svc.updateOrderMaster(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  	  	return "jsonView";
+    } 
+    
+	//기준관리 결재선 삭제    
+    @PutMapping(value = "/deleteApproval")
+    public String deleteApproval(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+  	  	try {
+  			if (sm02Svc.deleteOrderMaster(paramMap) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  	  	return "jsonView";
+    }       
+}
