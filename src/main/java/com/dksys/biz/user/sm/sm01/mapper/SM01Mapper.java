@@ -11,8 +11,8 @@ public interface SM01Mapper {
 	int selectBomSalesCount(Map<String, String> paramMap);
 	List<Map<String, String>> selectBomSalesList(Map<String, String> paramMap);
 	// BOM내역상세 조회
-	int selectBomMakerCount(Map<String, String> paramMap);
-	List<Map<String, String>> selectBomMakerList(Map<String, String> paramMap);
+	int selectBomDetailCount(Map<String, String> paramMap);
+	List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);
 	// 매출확정등록 조회
 	int addSellDscnCount(Map<String, String> paramMap);
 	List<Map<String, String>> addSellDscnList(Map<String, String> paramMap);

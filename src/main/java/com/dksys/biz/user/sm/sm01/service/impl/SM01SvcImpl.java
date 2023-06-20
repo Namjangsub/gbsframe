@@ -25,13 +25,13 @@ public class SM01SvcImpl implements SM01Svc {
 	ExceptionThrower thrower;
 	
 	@Override
-	public int selectBomMakerCount(Map<String, String> paramMap) {
-		return sm01Mapper.selectBomMakerCount(paramMap);
+	public int selectBomDetailCount(Map<String, String> paramMap) {
+		return sm01Mapper.selectBomDetailCount(paramMap);
 	}
 	
 	@Override
-	public List<Map<String, String>> selectBomMakerList(Map<String, String> paramMap) {
-		return sm01Mapper.selectBomMakerList(paramMap);
+	public List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap) {
+		return sm01Mapper.selectBomDetailList(paramMap);
 	}
 	
 	@Override
