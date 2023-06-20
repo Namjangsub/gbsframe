@@ -4,21 +4,26 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.ibatis.annotations.Mapper;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 @Mapper
 public interface BM10Mapper {
 
-	int selectBmPrdtMstrCount(Map<String, String> paramMap);
+  // int selectPchsCostCount(Map<String, String> paramMap);
+  int grid1_selectCount(Map<String, String> paramMap);
+  
+  // List<Map<String, String>> selectPchsCostList(Map<String, String> paramMap);
+  List<Map<String, String>> grid1_selectList(Map<String, String> paramMap);
 
-	List<Map<String, String>> selectBmPrdtMstrList(Map<String, String> paramMap);
+  Map<String, String> select_bm10_Info(Map<String, String> paramMap);
+  
+  // int selectConfirmCount(Map<String, String> paramMap);
 
-	List<Map<String, String>> selectBmProdSearchList(Map<String, String> paramMap);
+  int select_bm10_SeqNext(Map<String, String> paramMap);
+  
+  int insert_bm10(Map<String, String> paramMap);
 
-	String insertBmPrdtMstr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+  int update_bm10(Map<String, String> paramMap);
 
-	int updateBmPrdtMstr(Map<String, String> paramMap);
-
-	int selectBmProdCount(Map<String, String> paramMap);
-
+  int delete_bm10(Map<String, String> paramMap);
+  
 }
