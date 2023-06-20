@@ -23,6 +23,15 @@ public class CR07SvcImpl implements CR07Svc {
 	
 	@Autowired
 	ExceptionThrower thrower;
+	@Override
+	public int selectOrdrsDcsnCount(Map<String, String> paramMap) {
+		return cr07Mapper.selectOrdrsDcsnCount(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectOrdrsDcsnList(Map<String, String> paramMap) {
+		return cr07Mapper.selectOrdrsDcsnList(paramMap);
+	}
 	
 	@Override
 	public int selectSellDcsnCount(Map<String, String> paramMap) {
@@ -34,15 +43,6 @@ public class CR07SvcImpl implements CR07Svc {
 		return cr07Mapper.selectSellDcsnList(paramMap);
 	}
 	
-	@Override
-	public int selectOrdrsDcsnCount(Map<String, String> paramMap) {
-		return cr07Mapper.selectOrdrsDcsnCount(paramMap);
-	}
-	
-	@Override
-	public List<Map<String, String>> selectOrdrsDcsnList(Map<String, String> paramMap) {
-		return cr07Mapper.selectOrdrsDcsnList(paramMap);
-	}
 	
 	@Override
 	public int addSellDscnCount(Map<String, String> paramMap) {

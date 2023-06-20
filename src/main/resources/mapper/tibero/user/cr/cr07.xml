@@ -4,37 +4,67 @@
 <mapper namespace="com.dksys.biz.user.cr.cr07.mapper.CR07Mapper">
 	<!-- 수주리스트 -->
 	<select id="selectOrdrsDcsnCount" parameterType="Map" resultType="int">
-		SELECT COUNT(*) AS RESULT_COUNT
-			FROM TB_CR02M01 AS ORDRS
-			JOIN (
-			    SELECT CO_CD, ORDRS_NO, MAX(CURR_CD) AS CLMN_CURR_CD, NVL(MAX(EXRATE), 1) AS CLMN_EXRATE, NVL(SUM(CLMN_AMT), 0) AS CLMN_AMT
-			    FROM TB_CR02D01
-			    GROUP BY CO_CD, ORDRS_NO
-			) AS CLMN ON CLMN.CO_CD = ORDRS.CO_CD AND CLMN.ORDRS_NO = ORDRS.ORDRS_NO
-			JOIN (
-			    SELECT CM.CO_CD, CD.ORDRS_NO, MAX(CD.CURR_CD) AS CONF_CURR_CD, NVL(SUM(CD.SELL_DCSN_DTL_AMT), 0) AS CONF_AMT
-			    FROM TB_CR03M01 AS CM
-			    JOIN TB_CR03D01 AS CD ON CD.CO_CD = CM.CO_CD AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
-			    WHERE CM.SELL_DCSN_DT BETWEEN #{strtDt} AND #{endDt}
-			    GROUP BY CM.CO_CD, CD.ORDRS_NO
-			) AS CONF ON CONF.CO_CD = ORDRS.CO_CD AND CONF.ORDRS_NO = ORDRS.ORDRS_NO
-			LEFT JOIN TB_BM02M01 AS C ON C.CLNT_CD = ORDRS.ORDRS_CLNT_CD
-			LEFT JOIN TB_CM05M01 AS R ON R.CODE_ID = ORDRS.CO_CD
-			LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = ORDRS.ORDRS_DIV
-			LEFT JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = ORDRS.CURR_CD
-			WHERE ORDRS.CO_CD LIKE '%${coCd}%'
-			AND NVL(TO_CHAR(ORDRS.ORDRS_CLNT_CD), '.') LIKE '%${ordrsClntCd}%'
-			AND NVL(C.CLNT_NM, '.') LIKE '%${clntNm}%'
-			AND NVL(ORDRS.ORDRS_NO, '.') LIKE '%${ordrsNo}%'
-			AND NVL(ORDRS.CLNT_PJT, '.') LIKE '%${clntPjt}%'
-			AND NVL(ORDRS.CTRT_NM, '.') LIKE '%${ctrtNm}%'
-			AND NVL(ORDRS.ORDRS_DIV, '.') LIKE '%${ordrsDiv}%'
+		SELECT 
+			COUNT(*) 
+		FROM TB_CR02M01 ORDRS	-- 수주마스터
+			LEFT OUTER JOIN (
+				SELECT CO_CD	--회사
+               		, ORDRS_NO	--수주번호
+                  	, MAX(CURR_CD)          AS CLMN_CURR_CD		--통화단위
+                  	, NVL(MAX(EXRATE)  , 1) AS CLMN_EXRATE  	--환율
+                  	, NVL(SUM(CLMN_AMT), 0) AS CLMN_AMT     	--수금금액
+		 	FROM TB_CR02D01 
+		 	GROUP BY CO_CD, ORDRS_NO
+		) AS CLMN  -- 수주수금계획
+			ON CLMN.CO_CD = ORDRS.CO_CD
+		 	AND CLMN.ORDRS_NO = ORDRS.ORDRS_NO
+		JOIN (
+			SELECT CM.CO_CD                                        
+            	, CD.ORDRS_NO                                
+                , MAX(CD.CURR_CD) AS CONF_CURR_CD
+                , NVL(SUM(CD.SELL_DCSN_DTL_AMT), 0) AS CONF_AMT 
+            FROM  TB_CR03M01 AS CM	-- 매출확정
+            	JOIN TB_CR03D01 AS CD	-- 매출확정상세
+                ON CD.CO_CD = CM.CO_CD
+				AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
+			WHERE  1 = 1
+          	AND CM.CO_CD = #{coCd}
+          	AND TO_CHAR(CM.SELL_DCSN_DT, 'YYYYMMDD') BETWEEN #{strtDt} AND #{endDt}
+            GROUP BY CM.CO_CD, CD.ORDRS_NO
+            ) AS CONF ON CONF.CO_CD = ORDRS.CO_CD
+		    		AND CONF.ORDRS_NO = ORDRS.ORDRS_NO
+     		LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = ORDRS.ORDRS_CLNT_CD
+     		LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = ORDRS.CO_CD
+     		LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = ORDRS.ORDRS_DIV
+     		LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = ORDRS.CURR_CD
+			WHERE  1 = 1 
+			<if test="coCd != null and !coCd.equals('')">
+				AND	ORDRS.CO_CD = '${coCd}' --회사
+			</if>
+			<if test="ordrsClntCd != null and !ordrsClntCd.equals('')"> 
+				AND NVL(TO_CHAR(ORDRS.ORDRS_CLNT_CD), '.') LIKE '%${ordrsClntCd}%' --고객사
+			</if>
+			<if test="clntNm != null and !clntNm.equals('')">
+				AND NVL(C.CLNT_NM, '.') LIKE '%${clntNm}%' --고객사명
+			</if>
+			<if test="ordrsNo != null and !ordrsNo.equals('')">
+				AND NVL(ORDRS.ORDRS_NO , '.') LIKE '%${ordrsNo}%' --수주번호
+			</if>
+			<if test="clntPjt != null and !clntPjt.equals('')">
+				AND NVL(ORDRS.CLNT_PJT , '.') LIKE '%${clntPjt}%' --고객사PJT
+			</if>
+			<if test="ctrtNm != null and !ctrtNm.equals('')">
+				AND NVL(ORDRS.CTRT_NM  , '.') LIKE '%${ctrtNm}%' --계약명
+			</if>
+			<if test="ordrsDiv != null and !ordrsDiv.equals('')">
+				AND NVL(ORDRS.ORDRS_DIV, '.') LIKE '%${ordrsDiv}%' --수주구분
+			</if>
 	</select>
 	
 	<select id="selectOrdrsDcsnList" parameterType="Map" resultType="camelMap">
-		SELECT DISTINCT 
-			ORDRS.FILE_TRGT_KEY AS FILE_TRGT_KEY --파일대상KEY
-			, ROWNUM AS RN
+		SELECT * FROM (
+			SELECT ROWNUM AS RN
+			,ORDRS.FILE_TRGT_KEY AS FILE_TRGT_KEY --파일대상KEY
 			, ORDRS.CO_CD             AS CO_CD             --회사코드
 		    , R.CODE_NM               AS CO_CD_NM          --회사명
 		    , ORDRS.ORDRS_NO          AS ORDRS_NO          --수주번호
@@ -64,7 +94,7 @@
 		    , ORDRS.ORGN_SALES_CD     AS ORGN_SALES_CD     --원천Sales Code
 		FROM  TB_CR02M01 AS ORDRS
 		       <!-- 수주수금계획 -->
-				JOIN (
+				LEFT OUTER JOIN (
 		             SELECT CO_CD                                 --회사
 		                  , ORDRS_NO                              --수주번호
 		                  , MAX(CURR_CD)          AS CLMN_CURR_CD --통화단위
@@ -82,47 +112,64 @@
 		                  , NVL(SUM(CD.SELL_DCSN_DTL_AMT), 0) AS CONF_AMT     --확정금액
 		             FROM   TB_CR03M01 AS CM
 		                    JOIN TB_CR03D01 AS CD ON CD.CO_CD        = CM.CO_CD
-								                 AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
-		             WHERE CM.SELL_DCSN_DT BETWEEN #{strtDt} AND #{endDt} -- 확정일자
+								AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
+		             WHERE  1 = 1
+		             AND CM.CO_CD = #{coCd}
+		             AND TO_CHAR(CM.SELL_DCSN_DT, 'YYYYMMDD') BETWEEN #{strtDt} AND #{endDt} -- 확정일자
 		             GROUP BY CM.CO_CD, CD.ORDRS_NO
-		             ) AS CONF  ON CONF.CO_CD    = ORDRS.CO_CD
+		             ) AS CONF  ON CONF.CO_CD = ORDRS.CO_CD
 						AND CONF.ORDRS_NO = ORDRS.ORDRS_NO
 		       LEFT JOIN TB_BM02M01 AS C ON C.CLNT_CD = ORDRS.ORDRS_CLNT_CD --고객사
-		       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = ORDRS.CO_CD   --회사
-		       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = ORDRS.ORDRS_DIV    --수주구분
-		       LEFT JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = ORDRS.CURR_CD   --통화단위
-			WHERE ORDRS.CO_CD LIKE '%${coCd}%' --회사
-			<!-- 확정일자 -->
-	<!--		AND	CM.SELL_DCSN_DT BETWEEN #{strtDt} AND #{endDt} -->
-			AND NVL(TO_CHAR(ORDRS.ORDRS_CLNT_CD), '.') LIKE '%${ordrsClntCd}%' --고객사
-			AND NVL(C.CLNT_NM, '.') LIKE '%${clntNm}%' --고객사명
-			AND NVL(ORDRS.ORDRS_NO , '.') LIKE '%${ordrsNo}%' --수주번호
-			AND NVL(ORDRS.CLNT_PJT , '.') LIKE '%${clntPjt}%' --고객사PJT
-			AND NVL(ORDRS.CTRT_NM  , '.') LIKE '%${ctrtNm}%' --계약명
-			AND NVL(ORDRS.ORDRS_DIV, '.') LIKE '%${ordrsDiv}%' --수주구분
+		       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = ORDRS.CO_CD   	--회사
+		       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = ORDRS.ORDRS_DIV   --수주구분
+		       LEFT JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = ORDRS.CURR_CD   	--통화단위
+			WHERE 1 = 1
+			<if test="coCd != null and !coCd.equals('')">
+				AND	ORDRS.CO_CD = '${coCd}' --회사
+			</if>
+			<if test="ordrsClntCd != null and !ordrsClntCd.equals('')"> 
+				AND NVL(TO_CHAR(ORDRS.ORDRS_CLNT_CD), '.') LIKE '%${ordrsClntCd}%' --고객사
+			</if>
+			<if test="clntNm != null and !clntNm.equals('')">
+				AND NVL(C.CLNT_NM, '.') LIKE '%${clntNm}%' --고객사명
+			</if>
+			<if test="ordrsNo != null and !ordrsNo.equals('')">
+				AND NVL(ORDRS.ORDRS_NO , '.') LIKE '%${ordrsNo}%' --수주번호
+			</if>
+			<if test="clntPjt != null and !clntPjt.equals('')">
+				AND NVL(ORDRS.CLNT_PJT , '.') LIKE '%${clntPjt}%' --고객사PJT
+			</if>
+			<if test="ctrtNm != null and !ctrtNm.equals('')">
+				AND NVL(ORDRS.CTRT_NM  , '.') LIKE '%${ctrtNm}%' --계약명
+			</if>
+			<if test="ordrsDiv != null and !ordrsDiv.equals('')">
+				AND NVL(ORDRS.ORDRS_DIV, '.') LIKE '%${ordrsDiv}%' --수주구분
+			</if>
+				) T
+               	WHERE RN BETWEEN #{firstIndex} AND #{lastIndex}
 	</select>
 	
 	<!-- 매출확정리스트 -->
 	<select id="selectSellDcsnCount" parameterType="Map" resultType="int">
-	<!-- 	SELECT 
-			COUNT(*)
+		SELECT 
+			COUNT(*)	
 		FROM TB_CR03M01 AS CM
-			LEFT JOIN TB_CR03D01 AS CD
-				ON CD.SELL_DCSN_NO = CM.SELL_DCSN_NO -->
-		SELECT COUNT(*) AS RESULT_COUNT
-			FROM TB_CR03M01 AS CM
-			JOIN TB_CR03D01 AS CD ON CD.CO_CD = CM.CO_CD AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
-			LEFT JOIN TB_CM06M01 AS U1 ON U1.ID = CM.CREAT_ID
-			LEFT JOIN TB_CM06M01 AS U2 ON U2.ID = CM.UDT_ID
-			LEFT JOIN TB_BM02M01 AS C ON C.CLNT_CD = CM.ORDRS_CLNT_CD
-			LEFT JOIN TB_CM05M01 AS R ON R.CODE_ID = CM.CO_CD
-			LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = CM.CURR_CD
-			WHERE NVL(CD.ORDRS_NO, '.') LIKE '%${ordrsNo}%';
+		JOIN TB_CR03D01 AS CD ON CD.CO_CD = CM.CO_CD
+				AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
+				LEFT JOIN TB_CM06M01 AS U1 ON U1.ID = CM.CREAT_ID 	--생성자
+				LEFT JOIN TB_CM06M01 AS U2 ON U2.ID = CM.UDT_ID		--최종변경자
+				LEFT JOIN TB_BM02M01 AS C ON C.CLNT_CD = CM.ORDRS_CLNT_CD --고객사
+				LEFT JOIN TB_CM05M01 AS R ON R.CODE_ID = CM.CO_CD --회사
+				LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = CM.CURR_CD --통화단위
+		WHERE 1 = 1 
+		AND	CD.CO_CD LIKE '%${coCd}%'
+		AND CD.ORDRS_NO LIKE '%${ordrsNo}%' --수주번호
 	</select>
 	
 	<select id="selectSellDcsnList" parameterType="Map" resultType="camelMap">
 		SELECT DISTINCT CM.FILE_TRGT_KEY --파일대상KEY
-			, ROWNUM AS RN
+			, ROWNUM AS RNUM
+			, CD.SELL_BILL_NO	-- 매출계산서 번호
 			, CM.CO_CD --회사코드
 			, R.CODE_NM AS CO_CD_NM --회사명
 			, CD.ORDRS_NO
@@ -151,30 +198,44 @@
 			LEFT JOIN TB_BM02M01 AS C ON C.CLNT_CD = CM.ORDRS_CLNT_CD --고객사
 			LEFT JOIN TB_CM05M01 AS R ON R.CODE_ID = CM.CO_CD --회사
 			LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = CM.CURR_CD --통화단위
-		WHERE NVL(CD.ORDRS_NO, '.') LIKE '%${ordrsNo}%' --수주번호
+		WHERE 1 = 1 
+		AND	CD.CO_CD LIKE '%${coCd}%'
+		AND CD.ORDRS_NO LIKE '%${ordrsNo}%' --수주번호
 	</select>
 
 	<!-- 매출등록팝업 -->
 	<select id="addSellDscnCount" parameterType="Map" resultType="int">
-		SELECT COUNT(*) AS RESULT_COUNT
-			FROM TB_CR02M01 AS ORDRS
-			JOIN TB_CR02D01 AS CLMN ON CLMN.CO_CD = ORDRS.CO_CD AND CLMN.ORDRS_NO = ORDRS.ORDRS_NO
-			LEFT JOIN (
-			    SELECT CM.CO_CD, CD.ORDRS_NO, CD.CLMN_PLAN_SEQ, MAX(CD.CURR_CD) AS CONF_CURR_CD, NVL(SUM(CD.SELL_DCSN_DTL_AMT), 0) AS CONF_AMT
-			    FROM TB_CR03M01 AS CM
-			    JOIN TB_CR03D01 AS CD ON CD.CO_CD = CM.CO_CD AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
-			    GROUP BY CM.CO_CD, CD.ORDRS_NO, CD.CLMN_PLAN_SEQ
-			) AS CONF ON CONF.CO_CD = CLMN.CO_CD AND CONF.ORDRS_NO = CLMN.ORDRS_NO AND CONF.CLMN_PLAN_SEQ = CLMN.CLMN_PLAN_SEQ
-			LEFT JOIN TB_BM02M01 AS C ON C.CLNT_CD = ORDRS.ORDRS_CLNT_CD
-			LEFT JOIN TB_CM05M01 AS R ON R.CODE_ID = ORDRS.CO_CD
-			LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = ORDRS.ORDRS_DIV
-			LEFT JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = ORDRS.CURR_CD
-			LEFT JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = CLMN.CLMN_PLAN_DIV
-			LEFT JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = CLMN.CURR_CD
-			WHERE ORDRS.CO_CD LIKE '%${coCd}%' --회사
-			AND NVL(TO_CHAR(ORDRS.ORDRS_CLNT_CD), '.') LIKE '%${ordrsClntCd}%' --고객사
-			AND NVL(C.CLNT_NM, '.') LIKE '%${ordrsClntNm}%' --고객사명
-
+		SELECT
+			COUNT(*)	
+		FROM TB_CR02M01 AS ORDRS
+		<!-- 수주수금계획 -->
+	   		JOIN TB_CR02D01 
+	   			AS CLMN ON CLMN.CO_CD = ORDRS.CO_CD
+                AND CLMN.ORDRS_NO = ORDRS.ORDRS_NO
+	    	<!-- 매출확정 -->
+		  	LEFT JOIN (
+		              SELECT CM.CO_CD                                          --회사코드
+		                   , CD.ORDRS_NO                                       --수주번호
+		                   , CD.CLMN_PLAN_SEQ                                  --수금계획순번
+		                   , MAX(CD.CURR_CD)                   AS CONF_CURR_CD --통화단위
+		                   , NVL(SUM(CD.SELL_DCSN_DTL_AMT), 0) AS CONF_AMT     --확정금액
+		              FROM   TB_CR03M01 AS CM
+		                     JOIN TB_CR03D01 AS CD ON CD.CO_CD        = CM.CO_CD
+								                  AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
+		              GROUP BY CM.CO_CD, CD.ORDRS_NO, CD.CLMN_PLAN_SEQ
+		             ) AS CONF ON CONF.CO_CD = CLMN.CO_CD
+				               AND CONF.ORDRS_NO = CLMN.ORDRS_NO
+				               AND CONF.CLMN_PLAN_SEQ = CLMN.CLMN_PLAN_SEQ
+		       LEFT JOIN TB_BM02M01 AS C ON C.CLNT_CD = ORDRS.ORDRS_CLNT_CD     --고객사
+		       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = ORDRS.CO_CD	--회사
+		       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = ORDRS.ORDRS_DIV	--수주구분
+		       LEFT JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = ORDRS.CURR_CD		--통화단위
+		       LEFT JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = CLMN.CLMN_PLAN_DIV	--수금구분
+		       LEFT JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = CLMN.CURR_CD	--통화단위
+		WHERE  ORDRS.CO_CD LIKE '%${coCd}%' --회사
+		AND    NVL(TO_CHAR(ORDRS.ORDRS_CLNT_CD), '.') LIKE '%${ordrsClntCd}%' --고객사
+		AND    NVL(C.CLNT_NM      , '.') LIKE '%${ordrsClntNm}%' --고객사명
+		ORDER BY ORDRS.CO_CD, ORDRS.ORDRS_NO, CLMN.CLMN_PLAN_SEQ
 	</select>
 	
 	<select id="addSellDscnList" parameterType="Map" resultType="camelMap">
