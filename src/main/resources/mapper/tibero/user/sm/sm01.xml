@@ -15,25 +15,13 @@
 	       LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = B.ORDRS_DTL_DIV20
 	       LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = B.ORDRS_DTL_DIV30
 		   WHERE  1 = 1
-		     AND NVL(A.CO_CD,'') = #{coCd}
-        <if test="salesCd != null and !salesCd.equals('')">
-            AND T.SALES_CD LIKE '%${salesCd}%'
-        </if>
-        <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
-            AND A.CLNT_NM LIKE '%${ordrsClntNm}%'
-        </if>
-        <if test="clntPjt != null and !clntPjt.equals('')">
-            AND A.CLNT_PJT LIKE '%${clntPjt}%'
-        </if>
-        <if test="prdtNm != null and !prdtNm.equals('')">
-            AND A.PRDT_NM LIKE '%${prdtNm}%'
-        </if>
-        <if test="itemDiv != null and !itemDiv.equals('')">
-            AND A.ITEM_DIV = #{itemDiv}
-        </if>
-        <if test="eqpNm != null and !eqpNm.equals('')">
-            AND A.EQP_NM LIKE '%${eqpNm}%'
-        </if>
+		     AND NVL2(#{coCd},A.CO_CD,'.') = NVL(#{coCd},'.')
+		     AND NVL2(#{itemDiv},B.ITEM_DIV,'.') = NVL(#{itemDiv},'.')
+		     AND NVL(B.SALES_CD, '.') LIKE '%'||#{salesCd}||'%'
+		     AND NVL(C.CLNT_NM, '.') LIKE '%'||#{clntNm}||'%'
+		     AND NVL(A.CLNT_PJT, '.') LIKE '%'||#{clntPjt}||'%'
+		     AND NVL(P.PRDT_NM, '.') LIKE '%'||#{prdtNm}||'%'
+		     AND NVL(B.EQP_NM, '.') LIKE '%'||#{eqpNm}||'%'
 	</select>
 	
 	<select id="selectBomSalesList" parameterType="Map" resultType="camelMap">
@@ -45,7 +33,7 @@
 
         FROM
         (
-        SELECT A.FILE_TRGT_KEY
+        SELECT BOM.FILE_TRGT_KEY
 		     , A.CO_CD                    --회사코드
 		     , R.CODE_NM       AS CO_NM
 		     , A.ORDRS_NO                 --수주번호
@@ -63,6 +51,8 @@
 		     , R3.CODE_NM       AS ORDRS_DTL_DIV30_NM
 		     , B.DUDT_INTEND_DT           --납기예정일
 		     , B.EQP_NM                   --설비명
+		     , (SELECT COUNT(*) FROM TB_SM01M01NEW WHERE CO_CD = A.CO_CD AND SALES_CD = B.SALES_CD) AS BOM_CNT
+		     , (SELECT COUNT(*) FROM TB_SM01D01NEW WHERE CO_CD = A.CO_CD AND SALES_CD = B.SALES_CD) AS MATR_CNT
         FROM TB_CR02M01 AS A
 	       JOIN TB_CR02D02 AS B  ON B.CO_CD    = A.CO_CD AND B.ORDRS_NO = A.ORDRS_NO
 	       LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = A.ORDRS_CLNT_CD
@@ -71,28 +61,22 @@
 	       LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = B.ITEM_DIV
 	       LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = B.ORDRS_DTL_DIV20
 	       LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = B.ORDRS_DTL_DIV30
+	       LEFT OUTER JOIN (
+				SELECT FILE_TRGT_KEY, CO_CD, SALES_CD 
+				  FROM TB_SM01M01NEW X1
+				 WHERE LEVEL = 1
+		        START WITH X1.UPPER_CD = '.'
+		        CONNECT BY PRIOR X1.LOWER_CD = X1.UPPER_CD
+	       ) AS BOM ON A.CO_CD = BOM.CO_CD AND B.SALES_CD = BOM.SALES_CD
 		   WHERE  1 = 1
-		     AND NVL(A.CO_CD,'') = #{coCd}
-        <if test="salesCd != null and !salesCd.equals('')">
-            AND T.SALES_CD LIKE '%${salesCd}%'
-        </if>
-        <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
-            AND A.CLNT_NM LIKE '%${ordrsClntNm}%'
-        </if>
-        <if test="clntPjt != null and !clntPjt.equals('')">
-            AND A.CLNT_PJT LIKE '%${clntPjt}%'
-        </if>
-        <if test="prdtNm != null and !prdtNm.equals('')">
-            AND A.PRDT_NM LIKE '%${prdtNm}%'
-        </if>
-        <if test="itemDiv != null and !itemDiv.equals('')">
-            AND A.ITEM_DIV = #{itemDiv}
-        </if>
-        <if test="eqpNm != null and !eqpNm.equals('')">
-            AND A.EQP_NM LIKE '%${eqpNm}%'
-        </if>
-
-        ORDER BY A.CO_CD
+		     AND NVL2(#{coCd},A.CO_CD,'.') = NVL(#{coCd},'.')
+		     AND NVL2(#{itemDiv},B.ITEM_DIV,'.') = NVL(#{itemDiv},'.')
+		     AND NVL(B.SALES_CD, '.') LIKE '%'||#{salesCd}||'%'
+		     AND NVL(C.CLNT_NM, '.') LIKE '%'||#{clntNm}||'%'
+		     AND NVL(A.CLNT_PJT, '.') LIKE '%'||#{clntPjt}||'%'
+		     AND NVL(P.PRDT_NM, '.') LIKE '%'||#{prdtNm}||'%'
+		     AND NVL(B.EQP_NM, '.') LIKE '%'||#{eqpNm}||'%'
+        ORDER BY A.CO_CD, CASE WHEN MATR_CNT = 0 THEN 1 ELSE 0 END, CASE WHEN BOM_CNT = 0 THEN 1 ELSE 0 END, B.SALES_CD
         ) AS a
         ) A
         WHERE RNUM BETWEEN #{firstIndex} AND #{lastIndex}
@@ -111,11 +95,6 @@
 	<select id="selectBomDetailList" parameterType="Map" resultType="camelMap">
         SELECT T.FILE_TRGT_KEY
         , T.LVL
-        , LPAD(' ', 4*(T.LVL-1)) ||
-	          T.SALES_CD || 
-	          CASE WHEN T.PART_NO IS NULL THEN '' ELSE '-' || T.PART_NO END ||
-	          CASE WHEN T.UNIT_NO IS NULL THEN '' ELSE '-' || T.UNIT_NO END ||
-	          CASE WHEN T.REV_NO IS NULL THEN '' ELSE '-' || T.REV_NO END AS TITLE
         , T.CO_CD
         , FN_CM05M01_CD_TO_NM(T.CO_CD) CO_NM
 		, T.SALES_CD
@@ -225,8 +204,8 @@
 			LEFT JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = CLMN.CLMN_PLAN_DIV
 			LEFT JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = CLMN.CURR_CD
 			WHERE ORDRS.CO_CD LIKE '%${coCd}%' --회사
-			AND NVL(TO_CHAR(ORDRS.ORDRS_CLNT_CD), '.') LIKE '%${ordrsClntCd}%' --고객사
-			AND NVL(C.CLNT_NM, '.') LIKE '%${ordrsClntNm}%' --고객사명
+			AND NVL(TO_CHAR(ORDRS.ORDRS_CLNT_CD), '.') LIKE '%${clntCd}%' --고객사
+			AND NVL(C.CLNT_NM, '.') LIKE '%${clntNm}%' --고객사명
 
 	</select>
 	
@@ -291,8 +270,8 @@
 		       LEFT JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = CLMN.CLMN_PLAN_DIV	--수금구분
 		       LEFT JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = CLMN.CURR_CD	--통화단위
 		WHERE  ORDRS.CO_CD LIKE '%${coCd}%' --회사
-		AND    NVL(TO_CHAR(ORDRS.ORDRS_CLNT_CD), '.') LIKE '%${ordrsClntCd}%' --고객사
-		AND    NVL(C.CLNT_NM      , '.') LIKE '%${ordrsClntNm}%' --고객사명
+		AND    NVL(TO_CHAR(ORDRS.ORDRS_CLNT_CD), '.') LIKE '%${clntCd}%' --고객사
+		AND    NVL(C.CLNT_NM      , '.') LIKE '%${clntNm}%' --고객사명
 		ORDER BY ORDRS.CO_CD, ORDRS.ORDRS_NO, CLMN.CLMN_PLAN_SEQ
 	</select>
 
