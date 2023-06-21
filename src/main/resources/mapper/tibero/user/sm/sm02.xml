@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.sm.sm02.mapper.SM02Mapper">
+
+	<!-- 매입관리 - 발주관리 조회 리스트  조회조건 -->
+	<sql id="selectOrderListCondition">
+
+		<!-- 회사코드 -->         
+		<if test="coCd != null and !coCd.equals('')">
+			AND CO_CD = #{coCd}   
+		</if>
+		<!-- 발주일자 -->         
+		<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')">
+			<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
+            			AND ORDRG_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+            		</if>   
+		</if>							
+		<!-- 고객사 -->         
+		<if test="clntCd != null and !clntCd.equals('')">
+			AND CLNT_CD = #{clntCd}   
+		</if>							
+	</sql>	
+		
+	<!-- 기준관리 - 결재선 조회 리스트  카운트 -->
+	<select id="selectOrderListCount" parameterType="Map" resultType="int">
+		SELECT COUNT(*) 
+			FROM TB_SM02M01
+		WHERE 1=1
+		<include refid="selectOrderListCondition"></include>
+	</select>
+	
+	<!-- 기준관리 - 발주관리 리스트  -->
+	<select id="selectOrderList" parameterType="Map" resultType="camelMap">   
+		/* No. 내림차순 */
+		SELECT *
+			FROM
+			(
+			SELECT X.*
+					, ROWNUM AS RN
+					FROM
+						(
+						SELECT A.FILE_TRGT_KEY
+								, A.CO_CD
+								, A.ORDRG_NO
+								, A.REQ_NO
+								, A.SALES_CD
+								, A.PCHS_CLNT_CD
+								, B.CLNT_NM								
+								, TO_CHAR(A.ORDRG_DT, 'YYYY-MM-DD') ORDRG_DT
+								, A.ORDRG_DIV10					/* 발주구분 */
+								, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV10) AS ORDRG_DIV10_NM	/* 발주구분명 */
+								, A.ORDRG_DIV20					/* 용도구분 */
+								, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV20) AS ORDRG_DIV20_NM	/* 용도구분명 */
+								, A.ORDRG_DIV30					/* 특성구분 */
+								, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV30) AS ORDRG_DIV30_NM	/* 특성구분명 */								
+								, A.CURR_CD						/* 통화단위 */
+								, A.EXRATE
+								, A.ORDRG_AMT
+								, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
+								, A.ORDRG_RMK
+								, A.IN_CMPLET_YN
+								, A.ETC_FIELD1
+								, A.ETC_FIELD2
+								, A.ETC_FIELD3
+								, A.CREAT_ID
+								, A.CREAT_PGM
+								, A.CREAT_DTTM
+							FROM TB_SM02M01 A
+							LEFT OUTER JOIN TB_BM02M01 B ON(A.PCHS_CLNT_CD=B.CLNT_CD)						
+						WHERE 1=1						
+						<include refid="selectOrderListCondition"></include>
+						ORDER BY CO_CD DESC, ORDRG_NO DESC			
+						) X		
+			)							
+			WHERE 1=1
+				AND RN BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>
+
+
+	<!-- 기준관리 - 일정계획 등록 메인 화면 엑셀 조회 리스트  -->
+	<select id="selectApprovalExcelList" parameterType="Map" resultType="camelMap">   
+		/* No. 내림차순 */
+		SELECT *
+			FROM
+			(
+			SELECT X.*
+					, ROWNUM AS RN
+					FROM
+						(
+						SELECT CO_CD
+							, APP_NO			/* 결재선 번호 */
+							, APP_SEQ			/* 결재 순번 */
+							, ID				/* 작성자 ID */
+							,
+							(
+								SELECT NAME
+									FROM TB_CM06M01 B
+								WHERE A.ID = B.ID
+							) AS USER_NAME		/* 작성자 이름 */
+							, A.APP_DIV			/* 결재선 구분 */							
+							, FN_CM05M01_CD_TO_NM(A.APP_DIV) AS APP_DIV_NM		/* 결재선구분 명  */
+							, APP_LINE_NM			/* 결재선명 */
+							, APP_ID				/* 결재자 id */
+							, B.APP_USER_NM			/* 결재자명 */
+							, USE_YN				/*사용여부 */
+							, B.DEPT_NM			/* 부서명  */
+							, (SELECT D.LEVEL_NM FROM TB_CM07M01 D WHERE D.LEVEL_CD=B.LEVEL_CD) AS LEVEL_NM		/* 직급 */
+							, B.EMAIL			/* E-mail  */
+							, B.TEL_NO			/* 전화번호  */
+							, B.OFF_TEL_NO			/* 회사번호 */
+							, B.FAX_NO			/* fax번호 */																																										
+							, PG_PATH
+							, ETC_FIELD1
+							, ETC_FIELD2
+							, ETC_FIELD3
+							, CREAT_ID
+							, CREAT_PGM
+							, NVL(TO_CHAR(UDT_DTTM, 'YYYY-MM-DD'), TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD')) AS CREAT_DTTM
+							, UDT_ID
+							, UDT_PGM
+							, UDT_DTTM
+							FROM TB_BM13M01 A
+							LEFT OUTER JOIN
+							(
+							SELECT BB.ID AS USER_ID
+									, BB.NAME AS APP_USER_NM
+									, BB.LEVEL_CD
+									, BB.EMAIL
+									, BB.TEL_NO
+									, BB.OFF_TEL_NO
+									, BB.FAX_NO
+									, CC.DEPT_NM
+								FROM TB_CM06M01 BB
+								INNER JOIN TB_CM04M01 CC ON(BB.DEPT_ID=CC.DEPT_ID)
+							WHERE 1=1
+							) B ON(A.APP_ID=B.USER_ID)
+						WHERE 1=1						
+						<include refid="selectOrderListCondition"></include>
+						ORDER BY CO_CD DESC, APP_NO DESC, APP_DIV DESC, ID DESC, CREAT_DTTM DESC, UDT_DTTM DESC				
+						) X		
+			)							
+			WHERE 1=1
+			/* 엑셀은 전체 조회 */
+	</select>
+	
+	
+	
+	
+		
+ </mapper>
