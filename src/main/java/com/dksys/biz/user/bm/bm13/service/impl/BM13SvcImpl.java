@@ -93,39 +93,35 @@ public class BM13SvcImpl implements BM13Svc {
 
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		Type dtl2Map = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	   								
+		Type dtl2Map = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	   		
+		List<Map<String, String>> insertMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);				
+		
 		int result = 0;
-
-		if( paramMap.containsKey("makeArr") ) {		
-			List<Map<String, String>> insertMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);			
-		    //입력처리
-			for(Map<String, String> dtl : insertMap) {
-				dtl.put("coCd", paramMap.get("coCd"));
-				dtl.put("userId", paramMap.get("userId_P"));
-				dtl.put("appDiv", paramMap.get("appDiv"));
-				dtl.put("appLineNm", paramMap.get("app_line_nm"));
-				dtl.put("useYn", paramMap.get("useYn"));
-				dtl.put("pgmId", paramMap.get("pgmId"));
-				dtl.put("creatId", paramMap.get("userId"));
-				dtl.put("creatPgm", paramMap.get("pgmId"));
+		
+	    //입력처리
+		for(Map<String, String> dtl : insertMap) {
+			dtl.put("coCd", paramMap.get("coCd"));
+			dtl.put("userId", paramMap.get("userId_P"));
+			dtl.put("appDiv", paramMap.get("appDiv"));
+			dtl.put("appLineNm", paramMap.get("app_line_nm"));
+			dtl.put("useYn", paramMap.get("useYn"));
+			dtl.put("pgmId", paramMap.get("pgmId"));
+			dtl.put("creatId", paramMap.get("userId"));
+			dtl.put("creatPgm", paramMap.get("pgmId"));
 				
-				System.out.println(">>dtl svcimpl result>>" + dtl.toString()+"<<<<<");	
-			    //MAX APP_SEQ - Insert 시만 실행
-				if( dtl.get("actFlag").equals("I") ) {
-				    paramMap.put("maxAppNo", dtl.get("appNo"));
-				    String maxAppSeq = bm13Mapper.selectMaxAppSeq(paramMap);			
-					dtl.put("appSeq", maxAppSeq);						
-				} else if( dtl.get("actFlag").equals("U") ) {
-					
-				}
-	    		result += bm13Mapper.updateApproval(dtl);			
-			}	
-		}
+		    //MAX APP_SEQ - Insert 시만 실행
+			if( dtl.get("actFlag").equals("I") ) {
+			    paramMap.put("maxAppNo", dtl.get("appNo"));
+			    String maxAppSeq = bm13Mapper.selectMaxAppSeq(paramMap);			
+				dtl.put("appSeq", maxAppSeq);						
+			} else if( dtl.get("actFlag").equals("U") ) {
+				
+			}
+    		result += bm13Mapper.updateApproval(dtl);			
+		}	
 		//삭제 처리
 		if( paramMap.containsKey("delArr") ) {
-			System.out.println(">>dtl2 delArr svcimpl >>>>>" + paramMap.get("delArr").toString()+"<<<<<");			
-			List<Map<String, String>> deleteMap = gsonDtl.fromJson(paramMap.get("delArr"), dtl2Map);
-			System.out.println(">>dtl delArr svcimpl paramMap>>>>>" + paramMap.get("delArr").toString()+"<<<<<");		
+			List<Map<String, String>> deleteMap = gsonDtl.fromJson(paramMap.get("delArr"), dtl2Map);		
 			//삭제처리 
 			for(Map<String, String> dtl2 : deleteMap) {			
 	    		result += bm13Mapper.deleteApproval(dtl2);			
