@@ -39,6 +39,25 @@ public class BM10Ctr {
 		return "jsonView";
 	}
 
+	//팝업 그리드 리스트
+	@PostMapping(value = "/ProdModal_selectList")
+	public String ProdModal_selectList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = bm10Svc.grid1_selectCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = bm10Svc.ProdModal_selectList(paramMap);
+		model.addAttribute("ProdModalList", result);
+		return "jsonView";
+	}
+
+	//정보 조회
+	@PostMapping(value = "/select_bm10_Info")
+	public String select_bm10_Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = bm10Svc.select_bm10_Info(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
 	//INSERT
 	@PostMapping(value = "/insert_bm10")
 	public String insertBM10M01(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
@@ -56,21 +75,6 @@ public class BM10Ctr {
 		}
 		return "jsonView";
 	}
-	
-	//정보 조회
-	@PostMapping(value = "/select_bm10_Info")
-	public String select_bm10_Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		Map<String, String> result = bm10Svc.select_bm10_Info(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-	}
-	
-	// @PostMapping(value = "/selectConfirmCount")
-	// public String selectConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	// 	int result = bm10Svc.selectConfirmCount(paramMap);
-	// 	model.addAttribute("result", result);
-	// 	return "jsonView";
-	// }
 	
 	//UPDATE
 	@PostMapping(value = "/update_bm10")

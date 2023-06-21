@@ -34,26 +34,31 @@ public class BM10SvcImpl implements BM10Svc {
 	@Autowired
 	CM08Svc cm08Svc;
 	
+	// 그리드 카운트
 	@Override
 	public int grid1_selectCount(Map<String, String> paramMap) {
 		return bm10Mapper.grid1_selectCount(paramMap);
 	}
 	
+	// 그리드 리스트
 	@Override
 	public List<Map<String, String>> grid1_selectList(Map<String, String> paramMap) {
 		return bm10Mapper.grid1_selectList(paramMap);
 	}
+
+	// 팝업 그리드 리스트
+	@Override
+	public List<Map<String, String>> ProdModal_selectList(Map<String, String> paramMap) {
+		return bm10Mapper.ProdModal_selectList(paramMap);
+	}
 	
+	// 수정화면 정보
 	@Override
 	public Map<String, String> select_bm10_Info(Map<String, String> paramMap) {
 		return bm10Mapper.select_bm10_Info(paramMap);
 	}
 	
-	// @Override
-	// public int selectConfirmCount(Map<String, String> paramMap) {
-	// 	return bm10Mapper.selectConfirmCount(paramMap);
-	// }
-	
+	//DATA UPDATE
 	@Override
 	public int update_bm10(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		//Gson gson = new Gson();
@@ -110,6 +115,7 @@ public class BM10SvcImpl implements BM10Svc {
 		return result;
 	}
 	
+	//DATA INSERT
 	@Override
 	public int insert_bm10(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
@@ -147,6 +153,7 @@ public class BM10SvcImpl implements BM10Svc {
 		return result;
 	}
 	
+	//DATA DELETE
 	@Override
 	public int delete_bm10(Map<String, String> paramMap) throws Exception {
 		//---------------------------------------------------------------
