@@ -12,11 +12,17 @@ public interface SM05Mapper {
 
 	List<Map<String, String>> selectIoList(Map<String, String> paramMap);
 
-//	int selectPchsDetailCount(Map<String, String> paramMap);
+	int selectIoDetailCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectIoDetailList(Map<String, String> paramMap);
+
+	// int selectIoOutWhCount(Map<String, String> paramMap);
+
+	// List<Map<String, String>> selectIoOutWhList(Map<String, String> paramMap);
+
+//	int selectPchsDetailCount(Map<String, String> paramMap);  
 
 //	List<Map<String, String>> selectPchsDetail(Map<String, String> paramMap);
-
-	Map<String, String> selectIoCostInfo(Map<String, String> paramMap);
 
 //	int selectConfirmCount(Map<String, String> paramMap);
 //
@@ -26,6 +32,6 @@ public interface SM05Mapper {
 //
 //	int updatePchsCost(Map<String, String> paramMap);
 //
-//	int deletePchsCost(Map<String, String> paramMap);
+//	int deleteIoCost(Map<String, String> paramMap);
 
 }

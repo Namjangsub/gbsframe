@@ -9,11 +9,17 @@ public interface SM05Svc {
 
 	List<Map<String, String>> selectIoList(Map<String, String> paramMap);
 
+	int selectIoDetailCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectIoDetailList(Map<String, String> paramMap);
+
+	// int selectIoOutWhCount(Map<String, String> paramMap);
+
+	// List<Map<String, String>> selectIoOutWhList(Map<String, String> paramMap);
+
 //	int selectPchsDetailCount(Map<String, String> paramMap);
 
 //	List<Map<String, String>> selectPchsDetail(Map<String, String> paramMap);
-
-	Map<String, String> selectIoCostInfo(Map<String, String> paramMap);
 
 //	int selectConfirmCount(Map<String, String> paramMap);
 //
@@ -21,6 +27,6 @@ public interface SM05Svc {
 //
 //	int updatePchsCost(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 //
-//	int deletePchsCost(Map<String, String> paramMap) throws Exception;
+//	int deleteIoCost(Map<String, String> paramMap) throws Exception;
 
 }

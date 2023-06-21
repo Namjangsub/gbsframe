@@ -35,6 +35,21 @@ public class SM05SvcImpl implements SM05Svc {
 		return sm05Mapper.selectIoList(paramMap);
 	}
 
+	@Override
+	public int selectIoDetailCount(Map<String, String> paramMap) {
+		return sm05Mapper.selectIoDetailCount(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectIoDetailList(Map<String, String> paramMap) {
+		return sm05Mapper.selectIoDetailList(paramMap);
+	}
+
+//	@Override
+//	public List<Map<String, String>> selectIoOutWhList(Map<String, String> paramMap) {
+//		return sm05Mapper.selectIoOutWhList(paramMap);
+//	}
+
 //	@Override
 //	public int selectPchsDetailCount(Map<String, String> paramMap) {
 //		return sm05Mapper.selectPchsDetailCount(paramMap);
@@ -44,11 +59,6 @@ public class SM05SvcImpl implements SM05Svc {
 //	public List<Map<String, String>> selectPchsDetail(Map<String, String> paramMap) {
 //		return sm05Mapper.selectPchsDetail(paramMap);
 //	}
-
-	@Override
-	public Map<String, String> selectIoCostInfo(Map<String, String> paramMap) {
-		return sm05Mapper.selectIoCostInfo(paramMap);
-	}
 
 //	@Override
 //	public int selectConfirmCount(Map<String, String> paramMap) {
@@ -152,7 +162,7 @@ public class SM05SvcImpl implements SM05Svc {
 //	}
 
 //	@Override
-//	public int deletePchsCost(Map<String, String> paramMap) throws Exception {
+//	public int deleteIoCost(Map<String, String> paramMap) throws Exception {
 //		// ---------------------------------------------------------------
 //		// 첨부 화일 권한체크 시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
 //		// 필수값 : jobType, userId, comonCd
@@ -173,7 +183,7 @@ public class SM05SvcImpl implements SM05Svc {
 //		// 첨부 화일 권한체크 끝
 //		// ---------------------------------------------------------------
 //
-//		int result = sm05Mapper.deletePchsCost(paramMap);
+//		int result = sm05Mapper.deleteIoCost(paramMap);
 //
 //		// ---------------------------------------------------------------
 //		// 첨부 화일 처리 시작 (처음 등록시에는 화일 삭제할게 없음)

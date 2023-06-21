@@ -26,11 +26,28 @@ public class SM05Ctr {
 
 	// 프로젝트 리스트 조회 - 폐기내역 조회
 	@PostMapping(value = "/selectIoList")
-	public String selectPchsList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	public String selectIoList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		// System.out.println("도칙 : " + paramMap);
 		int totalCnt = sm05Svc.selectIoCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		// System.out.println("중간 : " + totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
 		List<Map<String, String>> result = sm05Svc.selectIoList(paramMap);
+		// System.out.println("끝 : " + result);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	// 프로젝트 리스트 조회 - 폐기상세 조회
+	@PostMapping(value = "/selectIoDetailList")
+	public String selectIoDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		// System.out.println("도칙 : " + paramMap);
+		int totalCnt = sm05Svc.selectIoDetailCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		// System.out.println("중간 : " + totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = sm05Svc.selectIoDetailList(paramMap);
+		// System.out.println("끝 : " + result);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
@@ -45,14 +62,6 @@ public class SM05Ctr {
 //		model.addAttribute("result", result);
 //		return "jsonView";
 //	}
-
-	// 프로젝트 정보 조회
-	@PostMapping(value = "/selectIoCostInfo")
-	public String selectIoCostInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		Map<String, String> result = sm05Svc.selectIoCostInfo(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-	}
 
 //	@PostMapping(value = "/selectConfirmCount")
 //	public String selectConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -99,10 +108,10 @@ public class SM05Ctr {
 //		return "jsonView";
 //	}
 
-//	@PutMapping(value = "/deletePchsCost")
-//	public String deletePchsCost(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+//	@PutMapping(value = "/deleteIoCost")
+//	public String deleteIoCost(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 //		try {
-//			if (sm05Svc.deletePchsCost(paramMap) != 0) {
+//			if (sm05Svc.deleteIoCost(paramMap) != 0) {
 //				model.addAttribute("resultCode", 200);
 //				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
 //			} else {
