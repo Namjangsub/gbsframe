@@ -82,10 +82,10 @@ public class SM04Ctr {
         return "jsonView";
     }
     
-    @PostMapping(value = "/insertIo")
-    public String insertIo(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+    @PostMapping(value = "/insert_sm04")
+    public String insert_sm04(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
-			if (sm04svc.insertIo(paramMap, mRequest) != 0 ) {
+			if (sm04svc.insert_sm04(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
 			} else {
@@ -98,7 +98,22 @@ public class SM04Ctr {
 		}
 		return "jsonView";
 	}
-
+    
+    @PostMapping(value = "/insert_sm04Info")
+	public String insert_sm04Info(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+		try {
+			int newBmMstr = sm04svc.insert_sm04Info(paramMap);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			model.addAttribute("newBmMstr", newBmMstr);
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", e.getLocalizedMessage());
+		}
+		
+    	return "jsonView";
+		
+	}
     @PostMapping(value = "/insertEstDeg")
     public String insertEstDeg(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
         try {

@@ -202,13 +202,7 @@ public class WB01Ctr {
 		return "jsonView";
 	 }
 
-	 @DeleteMapping(value = "/deleteWbsPlanlist")
-     public String deleteWbsPlanlist(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		wb01Svc.deleteWbsPlanlist(paramMap);
-    	model.addAttribute("resultCode", 200);
-    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-    	return "jsonView";
-     } 	
+	 
 	
 	 //<!-- WBS Plan No Max값 가져오기  -->
 	 @PostMapping(value = "/selectMaxWbsPlanNo")
@@ -371,6 +365,124 @@ public class WB01Ctr {
 		  return "jsonView"; 
 		  
 	  }
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  //<!-- 실적 마스터 테이블 조회  --> 
+	  @PostMapping(value = "/selectWbsPlanTreeList") 
+	  public String selectWbsPlanTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
+		int totalCnt = wb01Svc.selectWbsPlanTreeListCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+    	model.addAttribute("paginationInfo", paginationInfo);
+    	
+    	List<Map<String, String>> fileList = wb01Svc.selectWbsPlanTreeList(paramMap);
+    	model.addAttribute("fileList", fileList);
+        return "jsonView";
+		  
+	  }
+	  
+	  @DeleteMapping(value = "/deleteWbsPlanlist")
+	     public String deleteWbsPlanlist(@RequestBody Map<String, String> paramMap, ModelMap model) {
+			wb01Svc.deleteWbsPlanlist(paramMap);
+	    	model.addAttribute("resultCode", 200);
+	    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+	    	return "jsonView";
+	     } 	
+	  
+	  
+	  @PostMapping(value = "/selectWbsPlanInfo") 
+	  public String selectWbsPlanInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
+		  Map<String, String> result = wb01Svc.selectWbsPlanInfo(paramMap);
+		  model.addAttribute("result", result); 
+		  return "jsonView"; 
+	  }
+	  
+	  @PostMapping(value = "/insertWbsPlan")
+	  public String insertWbsPlan(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+			try {
+				
+				if (wb01Svc.insertWbsPlan(paramMap, mRequest) != 0 ) {
+					model.addAttribute("resultCode", 200);
+					model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+				} else {
+					model.addAttribute("resultCode", 500);
+					model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+				};
+			}catch(Exception e){
+				model.addAttribute("resultCode", 900);
+				model.addAttribute("resultMessage", e.getMessage());
+			}
+			return "jsonView";
+	  }
+	  
+	  @PostMapping(value = "/updateWbsPlan")
+	  public String updatePchsCost(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		  	try {
+				if (wb01Svc.updateWbsPlan(paramMap, mRequest) != 0 ) {
+					model.addAttribute("resultCode", 200);
+					model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+				} else {
+					model.addAttribute("resultCode", 500);
+					model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+				};
+			}catch(Exception e){
+				model.addAttribute("resultCode", 900);
+				model.addAttribute("resultMessage", e.getMessage());
+			}
+		  	return "jsonView";
+	  }
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
+	  
 	  
 	  
 	  

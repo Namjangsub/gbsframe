@@ -27,9 +27,13 @@ public interface SM04Mapper {
 
     List<Map<String, Object>> selectEstDetail(Map<String, String> paramMap);
 
-    int insertIo(Map<String, String> paramMap);
+    int insert_sm04(Map<String, String> paramMap);
     
     int select_sm04_SeqNext(Map<String, String> paramMap);
+    
+    int insert_sm04Info(Map<String, String> paramMap);
+    
+    int select_sm04_Seq(Map<String, String> paramMap);
 
     int insertEstDetail(Map<String, Object> detailMap);
 
