@@ -9,12 +9,18 @@ import org.apache.ibatis.annotations.Mapper;
 public interface CR08Mapper {
 	
 	 int selectPchsCostCount(Map<String, String> paramMap);
+	 
+	 int selectSalesStmtCalCount(Map<String, String> paramMap);
 
-	  List<Map<String, String>> selectPchsCostList(Map<String, String> paramMap);
-
+	  List<Map<String, String>> selectSalesStmtList(Map<String, String> paramMap);
+	  
+	  List<Map<String, String>> selectSalesStmtCalList(Map<String, String> paramMap);
+	  
 	  Map<String, String> selectPchsCostInfo(Map<String, String> paramMap);
 	  
-	  List<Map<String, String>> selectApprovalExcelList(Map<String, String> paramMap);
+	  List<Map<String, String>> selectSalesStmtExcelList(Map<String, String> paramMap);
+	  
+	  List<Map<String, String>> selectSalesStmtCalExcelList(Map<String, String> paramMap);
 	  
 	  int selectConfirmCount(Map<String, String> paramMap);
 
