@@ -2,19 +2,24 @@ package com.dksys.biz.user.cr.cr08.mapper;
 
 import java.util.List;
 import java.util.Map;
-
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface CR08Mapper {
 	
 	 int selectPchsCostCount(Map<String, String> paramMap);
+	 
+	 int selectSalesStmtCalCount(Map<String, String> paramMap);
 
-	  List<Map<String, String>> selectPchsCostList(Map<String, String> paramMap);
-
+	  List<Map<String, String>> selectSalesStmtList(Map<String, String> paramMap);
+	  
+	  List<Map<String, String>> selectSalesStmtCalList(Map<String, String> paramMap);
+	  
 	  Map<String, String> selectPchsCostInfo(Map<String, String> paramMap);
 	  
-	  List<Map<String, String>> selectApprovalExcelList(Map<String, String> paramMap);
+	  List<Map<String, String>> selectSalesStmtExcelList(Map<String, String> paramMap);
+	  
+	  List<Map<String, String>> selectSalesStmtCalExcelList(Map<String, String> paramMap);
 	  
 	  int selectConfirmCount(Map<String, String> paramMap);
 
@@ -25,6 +30,5 @@ public interface CR08Mapper {
 	  int updatePchsCost(Map<String, String> paramMap);
 
 	  int deletePchsCost(Map<String, String> paramMap);
-
 
 }

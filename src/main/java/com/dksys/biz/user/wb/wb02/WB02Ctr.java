@@ -324,7 +324,18 @@ public class WB02Ctr {
 	  }
 	 
 	 
-	 
+	  //<!-- 계획  테이블 조회  --> 
+	  @PostMapping(value = "/selectWbsRsltsList") 
+	  public String selectWbsRsltsList(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
+		int totalCnt = wb02Svc.selectWbsRsltsListCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+    	model.addAttribute("paginationInfo", paginationInfo);
+    	
+    	List<Map<String, String>> fileList = wb02Svc.selectWbsRsltsList(paramMap);
+    	model.addAttribute("fileList", fileList);
+        return "jsonView";
+		  
+	  }
 	 
 	 
 	 

@@ -52,7 +52,6 @@ public interface WB01Svc {
 	
 	int selectWbsPlanDeleteConfirmCount(Map<String, String> paramMap);
 	
-	int deleteWbsPlanlist(Map<String, String> paramMap);
 	
 	int selectMaxWbsPlanNo(Map<String, String> paramMap);
 	
@@ -83,6 +82,34 @@ public interface WB01Svc {
 	int selectWbsPlanConfirmCount(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectFileCodeSelect(Map<String, String> paramMap);
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	List<Map<String, String>> selectWbsPlanTreeList(Map<String, String> paramMap);
+	int selectWbsPlanTreeListCount(Map<String, String> paramMap);
+	Map<String, String> selectWbsPlanInfo(Map<String, String> paramMap);
+	int insertWbsPlan(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	int updateWbsPlan(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	int deleteWbsPlanlist(Map<String, String> paramMap);
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 }

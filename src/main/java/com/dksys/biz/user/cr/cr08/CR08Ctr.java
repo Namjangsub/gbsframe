@@ -21,8 +21,7 @@ import com.dksys.biz.util.MessageUtils;
 
 @Controller
 @RequestMapping("/user/cr/cr08")
-public class CR08Ctr {
-	
+public class CR08Ctr {	
 	
 	  @Autowired
 	  MessageUtils messageUtils;
@@ -30,13 +29,24 @@ public class CR08Ctr {
 	  @Autowired
 	  CR08Svc cr08Svc;
 
-	//   프로젝트 리스트 조회
-	  @PostMapping(value = "/selectPchsCostList")
-	  public String selectPchsCostList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	//  수주 리스트 조회
+	  @PostMapping(value = "/selectSalesStmtList")
+	  public String selectSalesStmtList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 	    int totalCnt = cr08Svc.selectPchsCostCount(paramMap);
 	    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 	    model.addAttribute("paginationInfo", paginationInfo);
-	    List<Map<String, String>> result = cr08Svc.selectPchsCostList(paramMap);
+	    List<Map<String, String>> result = cr08Svc.selectSalesStmtList(paramMap);
+	    model.addAttribute("result", result);
+	    return "jsonView";
+	  }
+	  
+	// 매출계산서 리스트 조회
+	  @PostMapping(value = "/selectSalesStmtCalList")
+	  public String selectSalesStmtCalList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    int totalCnt = cr08Svc.selectSalesStmtCalCount(paramMap);
+	    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+	    model.addAttribute("paginationInfo", paginationInfo);
+	    List<Map<String, String>> result = cr08Svc.selectSalesStmtCalList(paramMap);
 	    model.addAttribute("result", result);
 	    return "jsonView";
 	  }
@@ -109,14 +119,25 @@ public class CR08Ctr {
 	  }
 	  
 	//기준관리 결재선관리 엑셀 리스트  -->
-    @PostMapping(value = "/selectApprovalExcelList") 
+    @PostMapping(value = "/selectSalesStmtExcelList") 
 	public String selectMsExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		  
-		  List<Map<String, String>> resultList = cr08Svc.selectApprovalExcelList(paramMap);
+		  List<Map<String, String>> resultList = cr08Svc.selectSalesStmtExcelList(paramMap);
 		  	  model.addAttribute("resultList", resultList); 
 		     System.out.println("resultList==?"+resultList);
 		  return "jsonView"; 
 		  
 	  }  
-
+    
+  //기준관리 결재선관리 엑셀 리스트  -->
+    @PostMapping(value = "/selectSalesStmtCalExcelList") 
+	public String selectSalesStmtCalExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  
+		  List<Map<String, String>> resultList = cr08Svc.selectSalesStmtCalExcelList(paramMap);
+		  	  model.addAttribute("resultList", resultList); 
+		     System.out.println("resultList==?"+resultList);
+		  return "jsonView"; 
+		  
+	  }  
+ 
 }

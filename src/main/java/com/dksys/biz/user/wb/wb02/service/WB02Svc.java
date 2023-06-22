@@ -94,4 +94,11 @@ public interface WB02Svc {
     int selectWbsRsltsResultCountM(Map<String, String> paramMap);
     List<Map<String, String>> selectWbsRsltsResultExcelListM(Map<String, String> paramMap);
     
+    
+    
+    int selectWbsRsltsListCount(Map<String, String> paramMap);	
+	List<Map<String, String>> selectWbsRsltsList(Map<String, String> paramMap);
+	
+	
+    
 }

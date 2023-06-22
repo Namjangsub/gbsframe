@@ -427,4 +427,21 @@ public class WB02SvcImpl implements WB02Svc {
 		return wb02Mapper.selectWbsRsltsResultExcelListM(paramMap);
 	}
     /* WBS 실적메인화면 실적조회 부분 수정 추가 END */
+    
+    
+    
+    
+    
+    @Override
+	public int selectWbsRsltsListCount(Map<String, String> paramMap) {
+		return wb02Mapper.selectWbsRsltsListCount(paramMap);
+	}
+    
+    @Override
+	public List<Map<String, String>> selectWbsRsltsList(Map<String, String> paramMap) {
+		return wb02Mapper.selectWbsRsltsList(paramMap);
+	}
+    
+    
+    
 }
