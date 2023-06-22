@@ -44,11 +44,16 @@ public class SM05SvcImpl implements SM05Svc {
 	public List<Map<String, String>> selectIoDetailList(Map<String, String> paramMap) {
 		return sm05Mapper.selectIoDetailList(paramMap);
 	}
+	
+	@Override
+	public int selectIoOutWhCount(Map<String, String> paramMap) {
+		return sm05Mapper.selectIoOutWhCount(paramMap);
+	}
 
-//	@Override
-//	public List<Map<String, String>> selectIoOutWhList(Map<String, String> paramMap) {
-//		return sm05Mapper.selectIoOutWhList(paramMap);
-//	}
+	@Override
+	public List<Map<String, String>> selectIoOutWhList(Map<String, String> paramMap) {
+		return sm05Mapper.selectIoOutWhList(paramMap);
+	}
 
 //	@Override
 //	public int selectPchsDetailCount(Map<String, String> paramMap) {

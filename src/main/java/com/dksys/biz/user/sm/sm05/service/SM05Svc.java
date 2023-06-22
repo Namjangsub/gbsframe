@@ -13,9 +13,9 @@ public interface SM05Svc {
 
 	List<Map<String, String>> selectIoDetailList(Map<String, String> paramMap);
 
-	// int selectIoOutWhCount(Map<String, String> paramMap);
+	int selectIoOutWhCount(Map<String, String> paramMap);
 
-	// List<Map<String, String>> selectIoOutWhList(Map<String, String> paramMap);
+	List<Map<String, String>> selectIoOutWhList(Map<String, String> paramMap);
 
 //	int selectPchsDetailCount(Map<String, String> paramMap);
 
