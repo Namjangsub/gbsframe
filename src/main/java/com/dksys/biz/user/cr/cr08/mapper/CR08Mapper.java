@@ -32,5 +32,4 @@ public interface CR08Mapper {
 
 	  int deletePchsCost(Map<String, String> paramMap);
 
-
 }

@@ -21,8 +21,7 @@ import com.dksys.biz.util.MessageUtils;
 
 @Controller
 @RequestMapping("/user/cr/cr08")
-public class CR08Ctr {
-	
+public class CR08Ctr {	
 	
 	  @Autowired
 	  MessageUtils messageUtils;
