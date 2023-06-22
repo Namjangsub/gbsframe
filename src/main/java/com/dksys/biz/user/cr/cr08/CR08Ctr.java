@@ -29,7 +29,7 @@ public class CR08Ctr {
 	  @Autowired
 	  CR08Svc cr08Svc;
 
-	//   수주 리스트 조회
+	//  수주 리스트 조회
 	  @PostMapping(value = "/selectSalesStmtList")
 	  public String selectSalesStmtList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 	    int totalCnt = cr08Svc.selectPchsCostCount(paramMap);
@@ -40,7 +40,7 @@ public class CR08Ctr {
 	    return "jsonView";
 	  }
 	  
-	//   매출계산서 리스트 조회
+	// 매출계산서 리스트 조회
 	  @PostMapping(value = "/selectSalesStmtCalList")
 	  public String selectSalesStmtCalList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 	    int totalCnt = cr08Svc.selectSalesStmtCalCount(paramMap);
