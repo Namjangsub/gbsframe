@@ -40,10 +40,21 @@ public class CR08SvcImpl implements CR08Svc{
 	  public int selectPchsCostCount(Map<String, String> paramMap) {
 	    return CR08Mapper.selectPchsCostCount(paramMap);
 	  }
+	  
+	  @Override
+	  public int selectSalesStmtCalCount(Map<String, String> paramMap) {
+	    return CR08Mapper.selectSalesStmtCalCount(paramMap);
+	  }
+	  
 
 	  @Override
-	  public List<Map<String, String>> selectPchsCostList(Map<String, String> paramMap) {
-	    return CR08Mapper.selectPchsCostList(paramMap);
+	  public List<Map<String, String>> selectSalesStmtList(Map<String, String> paramMap) {
+	    return CR08Mapper.selectSalesStmtList(paramMap);
+	  }
+	  
+	  @Override
+	  public List<Map<String, String>> selectSalesStmtCalList(Map<String, String> paramMap) {
+	    return CR08Mapper.selectSalesStmtCalList(paramMap);
 	  }
 
 	  @Override
@@ -191,8 +202,13 @@ public class CR08SvcImpl implements CR08Svc{
 	  }
 	  
 	  @Override
-	  public List<Map<String, String>> selectApprovalExcelList(Map<String, String> paramMap) {
-			return CR08Mapper.selectApprovalExcelList(paramMap);
+	  public List<Map<String, String>> selectSalesStmtExcelList(Map<String, String> paramMap) {
+			return CR08Mapper.selectSalesStmtExcelList(paramMap);
+	  }
+	  
+	  @Override
+	  public List<Map<String, String>> selectSalesStmtCalExcelList(Map<String, String> paramMap) {
+			return CR08Mapper.selectSalesStmtCalExcelList(paramMap);
 	  }
 
 }
