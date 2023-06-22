@@ -81,10 +81,21 @@ public class SM04Svcmpl implements SM04Svc {
 
         return sm04Mapper.selectWhCd(param);
     }
+    
+
+	public int insert_sm04Info(Map<String, String> paramMap) {
+		
+		int fileTrgtKey = sm04Mapper.select_sm04_Seq(paramMap);
+		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+		
+		int result = sm04Mapper.insert_sm04Info(paramMap);
+		
+		return result;
+	}
 
     
 	@Override 
-	public int insertIo(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	public int insert_sm04(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
     	Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		
@@ -105,7 +116,7 @@ public class SM04Svcmpl implements SM04Svc {
 		int fileTrgtKey = sm04Mapper.select_sm04_SeqNext(paramMap);
 		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
 		
-		int result = sm04Mapper.insertIo(paramMap);
+		int result = sm04Mapper.insert_sm04(paramMap);
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------
@@ -120,6 +131,9 @@ public class SM04Svcmpl implements SM04Svc {
 		return result;
 
     }
+	
+
+	
 
 	/* @Override */
     public Map<String, Object> insertEstDeg(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
@@ -157,7 +171,7 @@ public class SM04Svcmpl implements SM04Svc {
             paramMap.put("creatId", paramMap.get("userId"));
             paramMap.put("creatPgm", "TB_CR01M01");
 
-            sm04Mapper.insertIo(paramMap);
+            sm04Mapper.insert_sm04(paramMap);
             List<Map<String, Object>> detailArr = gson.fromJson(removeEmptyObjects(paramMap.get("detailArr")), mapList);
 
 
