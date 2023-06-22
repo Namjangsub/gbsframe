@@ -74,7 +74,6 @@ public interface WB01Mapper {
 	
 	int selectMaxTrgtKey(Map<String, String> paramMap);
 	
-	int selectWbsPlanChk(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectWbsPlanInfoSelect(Map<String, String> paramMap);
 	
@@ -88,9 +87,53 @@ public interface WB01Mapper {
 	
 	
 	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	List<Map<String, String>> selectWbsPlanTreeList(Map<String, String> paramMap);
+	int selectWbsPlanTreeListCount(Map<String, String> paramMap);
+	Map<String, String> selectWbsPlanInfo(Map<String, String> paramMap);
+	int selectWbsPlanSeqNext(Map<String, String> paramMap);
+	int insertWbsPlan(Map<String, String> paramMap);
 	int deleteWbsPlanlist(Map<String, String> paramMap);
 	int deleteWbsSharngListSub(Map<String, String> paramMap);
-
+	int selectWbsPlanChk(Map<String, String> paramMap);
+	int updateWbsPlan(Map<String, String> paramMap);
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 	

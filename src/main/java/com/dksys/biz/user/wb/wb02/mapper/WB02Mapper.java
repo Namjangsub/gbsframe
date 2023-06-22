@@ -104,5 +104,8 @@ public interface WB02Mapper {
 	List<Map<String, String>> selectWbsRsltsResultExcelListM(Map<String, String> paramMap);
 	/* WBS 실적메인화면 실적조회 부분 수정 추가 END */
 	
+	int selectWbsRsltsListCount(Map<String, String> paramMap);	
+	List<Map<String, String>> selectWbsRsltsList(Map<String, String> paramMap);
+	
 	
 }
