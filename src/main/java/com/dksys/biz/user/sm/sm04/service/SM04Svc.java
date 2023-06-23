@@ -22,10 +22,12 @@ public interface SM04Svc {
     public List<Map<String, Object>> selectStInfo(Map<String, String> param);
     
     public List<Map<String, Object>> selectWhCd(Map<String, String> param);
+    
 
+    //DATA INSERT
     int insert_sm04(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
-    int insert_sm04Info(Map<String, String> paramMap);
+    int insert_sm04_Info(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
     Map<String, Object> insertEstDeg(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
