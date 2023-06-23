@@ -22,11 +22,10 @@ import com.dksys.biz.util.MessageUtils;
 import com.fasterxml.jackson.annotation.JacksonInject.Value;
 
 @Controller
-@Transactional(rollbackFor = Exception.class)
 @RequestMapping("/user/cr/cr07")
 public class CR07Ctr {
 	
-	private Logger logger = LoggerFactory.getLogger(CR07Ctr.class);
+//	private Logger logger = LoggerFactory.getLogger(CR07Ctr.class);
 	
 	@Autowired
 	MessageUtils messageUtils;
