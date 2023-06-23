@@ -25,7 +25,7 @@ public interface CR08Mapper {
 
 	  int selectPchsCostSeqNext(Map<String, String> paramMap);
 	  
-	  int insertPchsCost(Map<String, String> paramMap);
+	  int insertSalesStmtCal(Map<String, String> paramMap);
 
 	  int updatePchsCost(Map<String, String> paramMap);
 

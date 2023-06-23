@@ -67,10 +67,10 @@ public class CR08Ctr {
 	    return "jsonView";
 	  }
 
-	  @PostMapping(value = "/insertPchsCost")
-	  public String insertPchsCost(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	  @PostMapping(value = "/insertSalesStmtCal")
+	  public String insertSalesStmtCal(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 			try {
-				if (cr08Svc.insertPchsCost(paramMap, mRequest) != 0 ) {
+				if (cr08Svc.insertSalesStmtCal(paramMap, mRequest) != 0 ) {
 					model.addAttribute("resultCode", 200);
 					model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
 				} else {

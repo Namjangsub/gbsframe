@@ -23,7 +23,7 @@ public interface CR08Svc {
 
 	  int selectConfirmCount(Map<String, String> paramMap);
 
-	  int insertPchsCost(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	  int insertSalesStmtCal(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
 	  int updatePchsCost(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 

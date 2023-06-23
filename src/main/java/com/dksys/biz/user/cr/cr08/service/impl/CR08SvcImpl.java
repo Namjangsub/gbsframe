@@ -122,7 +122,7 @@ public class CR08SvcImpl implements CR08Svc{
 	  }
 
 	  @Override
-	  public int insertPchsCost(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	  public int insertSalesStmtCal(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
 		    Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -142,10 +142,13 @@ public class CR08SvcImpl implements CR08Svc{
 			//---------------------------------------------------------------  
 
 			
-			int fileTrgtKey = CR08Mapper.selectPchsCostSeqNext(paramMap);
-			paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+			//int fileTrgtKey = CR08Mapper.selectPchsCostSeqNext(paramMap);
+			///paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+			//int result = CR08Mapper.insertSalesStmtCal(paramMap);
 			
-			int result = CR08Mapper.insertPchsCost(paramMap);
+			String fileTrgtKey = "BILL23-0003"; //test code!!!
+			paramMap.put("fileTrgtKey", fileTrgtKey);
+			int result = CR08Mapper.insertSalesStmtCal(paramMap);
 		
 			//---------------------------------------------------------------  
 			//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
