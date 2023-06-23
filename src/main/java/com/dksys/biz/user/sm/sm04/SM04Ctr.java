@@ -99,21 +99,41 @@ public class SM04Ctr {
 		return "jsonView";
 	}
     
-    @PostMapping(value = "/insert_sm04Info")
-	public String insert_sm04Info(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+    
+    
+    @PostMapping(value = "/insert_sm04_Info")
+    public String insert_sm04_Info(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model)  {
 		try {
-			int newBmMstr = sm04svc.insert_sm04Info(paramMap);
-			model.addAttribute("resultCode", 200);
-			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-			model.addAttribute("newBmMstr", newBmMstr);
-		} catch (Exception e) {
-			model.addAttribute("resultCode", 500);
-			model.addAttribute("resultMessage", e.getLocalizedMessage());
+			if (sm04svc.insert_sm04_Info(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
 		}
-		
-    	return "jsonView";
-		
+		return "jsonView";
 	}
+    
+	/*
+	 * @PostMapping(value = "/insert_sm04_Info") public String
+	 * insert_sm04_Info(@RequestParam Map<String, String> paramMap,
+	 * MultipartHttpServletRequest mRequest, ModelMap model) { try { int newBmMstr =
+	 * sm04svc.insert_sm04_Info(paramMap); model.addAttribute("resultCode", 200);
+	 * model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+	 * model.addAttribute("newBmMstr", newBmMstr); } catch (Exception e) {
+	 * model.addAttribute("resultCode", 500); model.addAttribute("resultMessage",
+	 * e.getLocalizedMessage()); }
+	 * 
+	 * return "jsonView";
+	 * 
+	 * }
+	 */
+    
+    
     @PostMapping(value = "/insertEstDeg")
     public String insertEstDeg(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
         try {

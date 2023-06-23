@@ -82,56 +82,52 @@ public class SM04Svcmpl implements SM04Svc {
         return sm04Mapper.selectWhCd(param);
     }
     
-
-	public int insert_sm04Info(Map<String, String> paramMap) {
-		
-		int fileTrgtKey = sm04Mapper.select_sm04_Seq(paramMap);
-		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
-		
-		int result = sm04Mapper.insert_sm04Info(paramMap);
+    @Override
+	public int insert_sm04_Info(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
+		int result = sm04Mapper.insert_sm04_Info(paramMap);
 		
 		return result;
 	}
-
     
-	@Override 
-	public int insert_sm04(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-    	Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
-		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		
-		//---------------------------------------------------------------
-		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
-		//   필수값 :  jobType, userId, comonCd
-		//---------------------------------------------------------------
-		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
-		if (uploadFileList.size() > 0) {
-			//접근 권한 없으면 Exception 발생
-			paramMap.put("jobType", "fileUp");
-			cm15Svc.selectFileAuthCheck(paramMap);
-		}
-		//---------------------------------------------------------------
-		//첨부 화일 권한체크  끝
-		//---------------------------------------------------------------
-		
-		int fileTrgtKey = sm04Mapper.select_sm04_SeqNext(paramMap);
-		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
-		
-		int result = sm04Mapper.insert_sm04(paramMap);
-		//---------------------------------------------------------------
-		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
-		//---------------------------------------------------------------
-		if (uploadFileList.size() > 0) {
-			paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-			paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-			cm08Svc.uploadFile(paramMap, mRequest);
-		}
-		//---------------------------------------------------------------
-		//첨부 화일 처리  끝
-		//---------------------------------------------------------------
-		return result;
-
-    }
-	
+    
+  //DATA INSERT
+  	@Override
+  	public int insert_sm04(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+  		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+  		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+  		
+  		//---------------------------------------------------------------
+  		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+  		//   필수값 :  jobType, userId, comonCd
+  		//---------------------------------------------------------------
+  		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
+  		if (uploadFileList.size() > 0) {
+  			//접근 권한 없으면 Exception 발생
+  			paramMap.put("jobType", "fileUp");
+  			cm15Svc.selectFileAuthCheck(paramMap);
+  		}
+  		//---------------------------------------------------------------
+  		//첨부 화일 권한체크  끝
+  		//---------------------------------------------------------------
+  		
+  		int fileTrgtKey = sm04Mapper.select_sm04_SeqNext(paramMap);
+  		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+  		
+  		int result = sm04Mapper.insert_sm04(paramMap);
+  		//---------------------------------------------------------------
+  		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
+  		//---------------------------------------------------------------
+  		if (uploadFileList.size() > 0) {
+  			paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+  			paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+  			cm08Svc.uploadFile(paramMap, mRequest);
+  		}
+  		//---------------------------------------------------------------
+  		//첨부 화일 처리  끝
+  		//---------------------------------------------------------------
+  		return result;
+  	}
+  	
 
 	
 
