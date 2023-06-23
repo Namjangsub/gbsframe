@@ -202,16 +202,14 @@ public class WB01Ctr {
 		return "jsonView";
 	 }
 
+	 @PostMapping(value = "/selectMaxWbsPlanNo") 
+	  public String selectMaxWbsPlanNo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  List<Map<String, String>> result = wb01Svc.selectMaxWbsPlanNo(paramMap);
+		  model.addAttribute("result", result); 
+		  return "jsonView"; 
+		  
+	  }
 	 
-	
-	 //<!-- WBS Plan No Max값 가져오기  -->
-	 @PostMapping(value = "/selectMaxWbsPlanNo")
-	 public String selectMaxWbsPlanNo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int result = wb01Svc.selectMaxWbsPlanNo(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-	 }
-
 	  @PostMapping(value = "/insertWbsSharngUser")
       public String insertWbsSharngUser(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
 		wb01Svc.insertWbsSharngUser(paramMap);

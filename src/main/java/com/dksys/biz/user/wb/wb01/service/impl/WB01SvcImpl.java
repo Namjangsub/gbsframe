@@ -156,10 +156,10 @@ public class WB01SvcImpl implements WB01Svc {
 	
 
 	@Override
-	public int selectMaxWbsPlanNo(Map<String, String> paramMap) {
-		int result = wb01Mapper.selectMaxWbsPlanNo(paramMap);
-		return result;
+	public List<Map<String, String>> selectMaxWbsPlanNo(Map<String, String> paramMap) {
+		return wb01Mapper.selectMaxWbsPlanNo(paramMap);
 	}
+	
 
 	public int insertWbsSharngUser(Map<String, String> paramMap) {
 		int result = wb01Mapper.insertWbsSharngUser(paramMap);

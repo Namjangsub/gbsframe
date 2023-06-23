@@ -52,8 +52,7 @@ public interface WB01Svc {
 	
 	int selectWbsPlanDeleteConfirmCount(Map<String, String> paramMap);
 	
-	
-	int selectMaxWbsPlanNo(Map<String, String> paramMap);
+	List<Map<String, String>> selectMaxWbsPlanNo(Map<String, String> paramMap);
 	
 	int insertWbsSharngUser(Map<String, String> paramMap);
 
