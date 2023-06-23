@@ -33,4 +33,6 @@ public interface BM16Svc {
   
   int updatePrjctIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
+  List<Map<String, String>> selectPrjctOrderBillChart(Map<String, String> paramMap);
+
 }

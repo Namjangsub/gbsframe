@@ -288,5 +288,10 @@ public class BM16SvcImpl implements BM16Svc {
 	  int result = bm16Mapper.updatePrjctIssue(paramMap);
 	  return result;
   }
+
+  @Override
+  public List<Map<String, String>> selectPrjctOrderBillChart(Map<String, String> paramMap) {
+	  return bm16Mapper.selectPrjctOrderBillChart(paramMap);
+  }
   
 }

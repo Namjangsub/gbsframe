@@ -529,4 +529,83 @@
            AND ISS_NO   		= #{issNo}
   </update>
   
+  
+	
+	<select id="selectPrjctOrderBillChart" parameterType="Map" resultType="CamelMap">
+	WITH COLLECT AS ( 
+			SELECT   FN_CM05M01_CD_TO_NM(CODE_ID) CODE_NM
+					 , A.YYYYMM
+					 , SUM(NVL(EPCT_AMT, 0)) / TO_NUMBER(#{searchUnit}) EPCT_AMT --예상물량
+					 , SUM(NVL(DECODE(INPEXP_CD, 'INPEXP02', ORDRS_PLAN_AMT), 0)) / TO_NUMBER(#{searchUnit}) INPEXP02 --해외수주목표
+					 , SUM(NVL(DECODE(NEW_PRDT_CD, 'BIZDIV01', ORDRS_PLAN_AMT), 0)) / TO_NUMBER(#{searchUnit}) BIZDIV01 --신규수주목표
+					 , SUM(NVL(DECODE(NEW_PRDT_CD, 'BIZDIV01', 0, (DECODE(INPEXP_CD, 'INPEXP02',0, ORDRS_PLAN_AMT)) ),0)) / TO_NUMBER(#{searchUnit}) INPEXP01 --국내수주목표
+					 , SUM(NVL(B.ORDRS_PLAN_AMT, 0)) / TO_NUMBER(#{searchUnit}) ORDRS_PLAN_AMT --전체수주목표
+					 , SUM(NVL(B.ORDRS_AMT, 0)) / TO_NUMBER(#{searchUnit}) ORDRS_AMT --전체수주완료
+				FROM
+						(SELECT CODE_ID, SORT_NO, YYYYMM
+						  FROM (
+									SELECT  #{searchYear} || '01' AS YYYYMM FROM DUAL 
+									UNION ALL 
+									SELECT  #{searchYear} || '02' AS YYYYMM FROM DUAL 
+									UNION ALL 
+									SELECT  #{searchYear} || '03' AS YYYYMM FROM DUAL 
+									UNION ALL 
+									SELECT  #{searchYear} || '04' AS YYYYMM FROM DUAL 
+									UNION ALL 
+									SELECT  #{searchYear} || '05' AS YYYYMM FROM DUAL 
+									UNION ALL 
+									SELECT  #{searchYear} || '06' AS YYYYMM FROM DUAL 
+									UNION ALL 
+									SELECT  #{searchYear} || '07' AS YYYYMM FROM DUAL 
+									UNION ALL 
+									SELECT  #{searchYear} || '08' AS YYYYMM FROM DUAL 
+									UNION ALL 
+									SELECT  #{searchYear} || '09' AS YYYYMM FROM DUAL 
+									UNION ALL 
+									SELECT  #{searchYear} || '10' AS YYYYMM FROM DUAL 
+									UNION ALL 
+									SELECT  #{searchYear} || '11' AS YYYYMM FROM DUAL 
+									UNION ALL 
+									SELECT  #{searchYear} || '12' AS YYYYMM FROM DUAL 
+								) AS YM ,  
+								(	SELECT CODE_ID, SORT_NO FROM TB_CM05M01 
+									 WHERE CODE_KIND = 'CO' 
+									   AND CODE_ID = #{coCd}
+									 ORDER BY SORT_NO ) AS CO 
+						) AS A
+				 		,(	SELECT CO_CD, YYYYMM, INPEXP_CD, NEW_PRDT_CD, sum(EPCT_AMT) EPCT_AMT, sum(ORDRS_PLAN_AMT) ORDRS_PLAN_AMT, sum(ORDRS_AMT) ORDRS_AMT
+							  FROM TB_BM06M01
+							 WHERE CO_CD = #{coCd}
+							 GROUP BY CO_CD, YYYYMM, INPEXP_CD, NEW_PRDT_CD
+						)  AS B
+				 WHERE A.CODE_ID = B.CO_CD(+)
+				   AND A.YYYYMM  = B.YYYYMM(+)
+				GROUP BY  A.CODE_ID, A.YYYYMM
+				ORDER BY A.YYYYMM
+		) 
+			SELECT  CODE_NM, 
+					SUBSTR(YYYYMM, 0, 4) || '-' || SUBSTR(YYYYMM, 5, 2) YYYYMM, 
+					EPCT_AMT, 
+					INPEXP02, 
+					BIZDIV01, 
+					INPEXP01, 
+					ORDRS_PLAN_AMT, 
+					ORDRS_AMT,
+					SUM(ORDRS_PLAN_AMT+ORDRS_AMT) OVER (ORDER BY YYYYMM) AS MM_TOT
+			FROM COLLECT AS A
+		UNION ALL 
+			SELECT 
+				'' CODE_NM,
+				'합  계' AS YYYYMM, 
+				sum(EPCT_AMT) EPCT_AMT, 
+				sum(INPEXP02) INPEXP02, 
+				sum(BIZDIV01) BIZDIV01, 
+				sum(INPEXP01) INPEXP01, 
+				sum(ORDRS_PLAN_AMT) ORDRS_PLAN_AMT, 
+				sum(ORDRS_AMT) ORDRS_AMT,
+				sum(ORDRS_PLAN_AMT+ORDRS_AMT) MM_TOT
+			FROM COLLECT AS A
+			GROUP BY CODE_NM
+	</select>  
+  
 </mapper>

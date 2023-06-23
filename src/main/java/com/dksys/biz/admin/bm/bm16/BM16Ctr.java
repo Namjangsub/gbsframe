@@ -19,6 +19,9 @@ import com.dksys.biz.admin.bm.bm16.service.BM16Svc;
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.util.MessageUtils;
 
+import net.minidev.json.JSONArray;
+import net.minidev.json.JSONObject;
+
 @Controller
 @RequestMapping("/admin/bm/bm16")
 public class BM16Ctr {
@@ -165,4 +168,89 @@ public class BM16Ctr {
 	  return "jsonView";
   }
   
+  // 수주목표 물량 그래프용
+  @PostMapping("/selectPrjctOrderBillChart")
+  public String selectPrjctOrderBillChart(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	  List<Map<String, String>> result = bm16Svc.selectPrjctOrderBillChart(paramMap);
+	  model.addAttribute("result", result);
+
+//	   	List<Map<String, String>> selectPalBillSalesPrftChart = fi02Svc.selectPalBillSalesPrftChart(paramMap);
+    	JSONObject data = new JSONObject();
+    	JSONObject objCols1 = new JSONObject();
+    	JSONObject objCols2 = new JSONObject();
+    	JSONObject objCols3 = new JSONObject();
+    	JSONObject objCols4 = new JSONObject();
+    	JSONObject objCols5 = new JSONObject();
+    	JSONObject objCols6 = new JSONObject();
+    	JSONObject objCols7 = new JSONObject();
+    	JSONArray arryCols = new JSONArray();
+    	JSONArray arryRows = new JSONArray();
+
+    	objCols1.put("type", "string");
+    	objCols2.put("type", "number");
+    	objCols2.put("label", "해외수주");
+    	objCols3.put("type", "number");
+    	objCols3.put("label", "국내수주");
+    	objCols4.put("type", "number");
+    	objCols4.put("label", "신규수주");
+    	objCols5.put("type", "number");
+    	objCols5.put("label", "목표합계");
+    	objCols6.put("type", "number");
+    	objCols6.put("label", "수주완료");
+    	objCols6.put("type", "number");
+    	objCols6.put("label", "수주완료");
+    	objCols7.put("type", "number");
+    	objCols7.put("label", "수주.수주목표누계");
+
+    	arryCols.add(objCols1);
+    	arryCols.add(objCols2);
+    	arryCols.add(objCols3);
+    	arryCols.add(objCols4);
+    	arryCols.add(objCols5);
+    	arryCols.add(objCols6);
+    	arryCols.add(objCols7);
+    	for(int i = 0; i < result.size(); i++) {
+    		JSONObject legend = new JSONObject();
+    		legend.put("v", result.get(i).get("yyyymm"));
+    		legend.put("f", null);
+    		JSONObject value1 = new JSONObject();
+    		value1.put("v", result.get(i).get("inpexp02"));
+    		value1.put("f", null);
+    		JSONObject value2 = new JSONObject();
+    		value2.put("v", result.get(i).get("bizdiv01"));
+    		value2.put("f", null);
+    		JSONObject value3 = new JSONObject();
+    		value3.put("v", result.get(i).get("inpexp01"));
+    		value3.put("f", null);
+    		JSONObject value4 = new JSONObject();
+    		value4.put("v", result.get(i).get("epctAmt"));
+    		value4.put("f", null);
+    		JSONObject value5 = new JSONObject();
+    		value5.put("v", result.get(i).get("ordrsAmt"));
+    		value5.put("f", null);
+    		JSONObject value6 = new JSONObject();
+    		value6.put("v", result.get(i).get("mmTot"));
+    		value6.put("f", null);
+    		
+    		JSONArray cValueArry = new JSONArray();
+    		cValueArry.add(legend);
+    		cValueArry.add(value1);
+    		cValueArry.add(value2);
+    		cValueArry.add(value3);
+    		cValueArry.add(value4);
+    		cValueArry.add(value5);
+    		cValueArry.add(value6);
+    		
+    		JSONObject cValueObj = new JSONObject();
+    		cValueObj.put("c", cValueArry);
+    		
+    		arryRows.add(cValueObj);
+    	}
+    	
+    	data.put("cols", arryCols);
+    	data.put("rows", arryRows);
+    	model.addAttribute("chartData1", data);
+	  return "jsonView";
+  }
+
 }

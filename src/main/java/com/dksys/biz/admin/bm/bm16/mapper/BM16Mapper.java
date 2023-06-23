@@ -54,4 +54,6 @@ public interface BM16Mapper {
 
   int updatePrjctIssue(Map<String, String> paramMap);
   
+  List<Map<String, String>> selectPrjctOrderBillChart(Map<String, String> paramMap);
+
 }
