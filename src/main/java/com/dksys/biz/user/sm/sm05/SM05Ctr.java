@@ -61,8 +61,43 @@ public class SM05Ctr {
 		List<Map<String, String>> result = sm05Svc.selectIoOutWhList(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
+	}  
+  
+	//정보 조회
+	@PostMapping(value = "/selectIoInfo")
+	public String selectIoInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = sm05Svc.selectIoInfo(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
 	}
-
+	
+	//폐기창고 selectbox 선택시 값 나타내기
+	@PostMapping("/selectOutWhNm")
+    public String selectOutWhNm(@RequestBody Map<String, String> param, ModelMap model) {
+        List<Map<String, Object>> whList = sm05Svc.selectOutWhNm(param);
+        model.addAttribute("whList", whList);
+        return "jsonView";
+    }
+	
+	// 폐기창고재고정보 - 모달창
+	@PostMapping(value = "/selectIoModalList")
+	public String selectIoModalList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = sm05Svc.selectIoModalCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		
+		List<Map<String, String>> resultList = sm05Svc.selectIoModalList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+	
+	// 프로젝트 정보 조회 - popup 부분
+//	  @PostMapping(value = "/selectIoInfo")
+//	  public String selectIoInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+//		Map<String, String> result = sm05Svc.selectIoInfo(paramMap);
+//	    model.addAttribute("result", result);
+//	    return "jsonView";
+//	  }
 //	@PostMapping(value = "/selectConfirmCount")
 //	public String selectConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
 //		int result = sm05Svc.selectConfirmCount(paramMap);

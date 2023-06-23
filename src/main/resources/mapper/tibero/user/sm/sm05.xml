@@ -6,17 +6,99 @@
 	<select id="selectIoCount" parameterType="Map" resultType="int">
 		SELECT 
 			COUNT(*)
-		FROM TB_SM05M01 SM05
-	</select>
-	
-	<select id="selectIoDetailCount" parameterType="Map" resultType="int">
-		SELECT 
-			COUNT(*)
-		FROM TB_SM05D01 SM05D01
-	</select>
+		FROM TB_SM05M01 AS A --폐기
+			       <!-- 폐기상세 조인 -->
+			       JOIN TB_SM05D01 AS B  ON B.CO_CD = A.CO_CD
+			                            AND B.IO_NO = A.IO_NO
+			      <!-- 사용자 조인(생성자용) --> 
+			       LEFT JOIN TB_CM06M01 AS U1 ON U1.ID = A.CREAT_ID
+			      <!-- 사용자 조인(변경자용) -->
+			       LEFT JOIN TB_CM06M01 AS U2 ON U2.ID = A.UDT_ID
+			      <!-- 수주정보 조인 -->
+			       JOIN (
+			             SELECT DISTINCT SM.CO_CD    --회사
+			                  , SM.ORDRS_NO          --수주번호
+			                  , SM.ORDRS_CLNT_CD     --고객사
+			                  , C.CLNT_NM AS CLNT_NM --고객사명
+			                  , SD.PRDT_CD           --제품구분
+			                  , SD.ITEM_DIV          --아이템구분
+			                  , SD.SALES_CD          --SalesCode
+			             FROM   TB_CR02M01 AS SM --수주마스터
+			                    <!-- 수주상세 조인 -->
+			                    JOIN TB_CR02D02 AS SD  ON SD.CO_CD    = SM.CO_CD
+							                          AND SD.ORDRS_NO = SM.ORDRS_NO
+							    <!-- 거래처 조인 -->
+							    JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD
+			            ) AS O  ON O.CO_CD    = A.CO_CD
+			                   AND O.SALES_CD = A.SALES_CD
+			       <!-- 자재마스터 조인 -->
+			       JOIN (
+			             SELECT M.CO_CD
+			                  , M.MATR_CD
+			                  , M.MATR_NM
+			                  , NVL(M.MATR_SPEC, '.')     AS MATR_SPEC
+			                  , NVL(M.MATR_CLNT_DIV, '.') AS MATR_CLNT_DIV
+			                  , NVL(M.MATR_MAT, '.')      AS MATR_MAT
+			                  , NVL(M.MATR_MAKR_NM, '.')  AS MATR_MAKR_NM
+			                  , NVL(M.MATR_MNO, '.')      AS MATR_MNO
+			             FROM   TB_BM05M01 AS M
+			            ) AS M  ON M.CO_CD   = B.CO_CD
+			                   AND M.MATR_CD = B.MATR_CD
+			       <!-- 회사코드 조인 -->
+			       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = A.CO_CD
+			       <!-- 출고창고 조인 -->
+			       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.OUT_WH_CD
+			       <!-- 수불구분 조인 -->
+			       LEFT JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.IO_DIV
+			WHERE  1 = 1
+				
+				AND    A.CO_CD LIKE '${coCd}'  
+				
+				<if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')" >
+				AND    A.IO_DT BETWEEN #{strtDt} AND  #{endDt} 
+				</if>
+				<if test="ordrsClntCd != null and !ordrsClntCd.equals('')">	
+				AND    O.ORDRS_CLNT_CD      LIKE '%${ordrsClntCd}%'	
+				</if>
+				<if test="clntNm != null and !clntNm.equals('')">				
+				AND     O.CLNT_NM LIKE '%${clntNm}%'    
+				</if>
+				<if test="salesCd != null and !salesCd.equals('')">
+				AND    A.SALES_CD      LIKE '%${salesCd}%' 
+				</if>
+				<if test="prdtCd != null and !prdtCd.equals('')">
+				AND    O.PRDT_CD      LIKE '%${prdtCd}%' 
+				</if>
+				<if test="itemDiv != null and !itemDiv.equals('')">
+				AND    O.ITEM_DIV      LIKE '%${itemDiv}%' 
+				</if>
+				<if test="outWhCd != null and !outWhCd.equals('')">
+				AND    A.OUT_WH_CD     LIKE '%${outWhCd}%' 
+				</if>				
+				<if test="matrCd != null and !matrCd.equals('')">				
+				AND B.MATR_CD LIKE  '%${matrCd}%'    
+				</if>
+				<if test="matrNm != null and !matrNm.equals('')">
+				AND    M.MATR_NM       LIKE '%${matrNm}%' 
+				</if>
+				<if test="matrSpec != null and !matrSpec.equals('')">
+				AND    M.MATR_SPEC     LIKE '%${matrSpec}%' 
+				</if>
+				<if test="matrClntDiv != null and !matrClntDiv.equals('')">
+				AND    M.MATR_CLNT_DIV LIKE '%${matrClntDiv}%' 
+				</if>
+				<if test="matrMat != null and !matrMat.equals('')">
+				AND    M.MATR_MAT      LIKE '%${matrMat}%' 
+				</if>
+				<if test="matrMakrNm != null and !matrMakrNm.equals('')">
+				AND    M.MATR_MAKR_NM  LIKE '%${matrMakrNm}%' 
+				</if>
+				<if test="matrMno != null and !matrMno.equals('')">
+				AND    M.MATR_MNO      LIKE '%${matrMno}%' 
+				</if>				
+	</select>	
 
 	<select id="selectIoList" parameterType="Map" resultType="CamelMap">
-		
 			SELECT DISTINCT A.FILE_TRGT_KEY --파일대상KEY
 				     , A.CO_CD                 --회사코드
 				     , R.CODE_NM AS CO_CD_NM   --회사명
@@ -108,7 +190,7 @@
 				</if>
 				<if test="outWhCd != null and !outWhCd.equals('')">
 				AND    A.OUT_WH_CD     LIKE '%${outWhCd}%' 
-				</if>
+				</if>				
 				<if test="matrCd != null and !matrCd.equals('')">				
 				AND B.MATR_CD LIKE  '%${matrCd}%'    
 				</if>
@@ -130,11 +212,62 @@
 				<if test="matrMno != null and !matrMno.equals('')">
 				AND    M.MATR_MNO      LIKE '%${matrMno}%' 
 				</if>
-		
+					
 	</select>
   
-  <select id="selectIoDetailList" resultType="CamelMap">
-  	SELECT * FROM ( 
+   <select id="selectIoDetailCount" parameterType="Map" resultType="int">
+		SELECT 
+			COUNT(*)
+		FROM TB_SM05M01 AS A --폐기
+		       <!-- 폐기상세 조인 -->
+		       JOIN TB_SM05D01 AS B  ON B.CO_CD = A.CO_CD
+		                            AND B.IO_NO = A.IO_NO
+		       <!-- 사용자 조인(생성자용) -->
+		       LEFT JOIN TB_CM06M01 AS U1 ON U1.ID = B.CREAT_ID
+		       <!-- 사용자 조인(변경자용) -->
+		       LEFT JOIN TB_CM06M01 AS U2 ON U2.ID = B.UDT_ID
+		       <!-- 수주정보 조인 -->
+		       JOIN (
+		             SELECT DISTINCT SM.CO_CD    --회사
+		                  , SM.ORDRS_NO          --수주번호
+		                  , SM.ORDRS_CLNT_CD     --고객사
+		                  , C.CLNT_NM AS CLNT_NM --고객사명
+		                  , SD.PRDT_CD           --제품구분
+		                  , SD.ITEM_DIV          --아이템구분
+		                  , SD.SALES_CD          --SalesCode
+		             FROM   TB_CR02M01 AS SM --수주마스터
+		                    <!-- 수주상세 조인 -->
+		                    JOIN TB_CR02D02 AS SD  ON SD.CO_CD    = SM.CO_CD
+						                          AND SD.ORDRS_NO = SM.ORDRS_NO
+						    <!-- 거래처 조인 -->
+						    JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD
+		            ) AS O  ON O.CO_CD    = A.CO_CD
+		                   AND O.SALES_CD = A.SALES_CD
+		       <!-- 자재마스터 조인 -->
+		       JOIN (
+		             SELECT M.CO_CD
+		                  , M.MATR_CD
+		                  , M.MATR_NM
+		                  , NVL(M.MATR_SPEC, '.')     AS MATR_SPEC
+		                  , NVL(M.MATR_CLNT_DIV, '.') AS MATR_CLNT_DIV
+		                  , NVL(M.MATR_MAT, '.')      AS MATR_MAT
+		                  , NVL(M.MATR_MAKR_NM, '.')  AS MATR_MAKR_NM
+		                  , NVL(M.MATR_MNO, '.')      AS MATR_MNO
+		             FROM   TB_BM05M01 AS M
+		            ) AS M  ON M.CO_CD   = B.CO_CD
+		                   AND M.MATR_CD = B.MATR_CD
+		       <!-- 회사코드 조인 -->
+		       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = A.CO_CD
+		       <!-- 출고창고 조인 -->
+		       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.OUT_WH_CD 
+		WHERE  1 = 1		
+		AND    A.CO_CD LIKE '${coCd}'
+		<if test="ioNo != null and !ioNo.equals('')">
+		AND    A.IO_NO = #{ioNo}
+		</if>
+	</select>
+	
+  <select id="selectIoDetailList" parameterType="Map" resultType="CamelMap">
 		SELECT DISTINCT B.CO_CD        --회사코드
 		     , R.CODE_NM AS CO_CD_NM   --회사명		     
 		     , B.IO_NO                 --폐기번호
@@ -201,18 +334,109 @@
 		       <!-- 회사코드 조인 -->
 		       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = A.CO_CD
 		       <!-- 출고창고 조인 -->
-		       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.OUT_WH_CD ) Z
+		       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.OUT_WH_CD 
 		WHERE  1 = 1		
-		AND    Z.CO_CD LIKE '${coCd}'
+		AND    A.CO_CD LIKE '${coCd}'
 		<if test="ioNo != null and !ioNo.equals('')">
-		AND    Z.IO_NO = #{ioNo}
+		AND    A.IO_NO = #{ioNo}
 		</if>
   </select>
-
   
-  <select id="selectIoOutWhList" resultType="CamelMap">
-	SELECT * FROM (
-  		SELECT I.SALES_CD      --Sales Code
+  <!-- 수정화면에 해당 값 뿌려주기 -->
+  <select id="selectIoInfo" parameterType="Map" resultType="CamelMap">
+		
+			SELECT DISTINCT A.FILE_TRGT_KEY --파일대상KEY
+				     , A.CO_CD                 --회사코드
+				     , R.CODE_NM AS CO_CD_NM   --회사명
+				     , O.ORDRS_CLNT_CD         --고객사 코드
+     		 		 , O.CLNT_NM               --고객사명
+				     , O.CLNT_PJT
+     		 		 , O.ITEM_DIV
+				     , O.EQP_NM
+     		 		 , O.PRDT_CD               --제품구분
+     		 		 , D.PRDT_NM 
+				     , A.IO_NO                 --폐기번호
+				     , A.IO_DIV                --수불구분
+				     , R2.CODE_NM AS IO_DIV_NM --수불구분명
+				     , A.SALES_CD              --SalesCode
+				     , A.OUT_WH_CD             --출고창고코드
+				     , R1.CODE_NM AS OUT_WH_NM --출고창고명     
+				     , TO_CHAR(A.IO_DT, 'YYYY-MM-DD') AS IO_DT --폐기일자
+				     , A.IO_RESN              --폐기사유
+				     , A.IO_RMK               --비고     
+				     , A.CREAT_ID             --생성자
+				     , U1.NAME AS CREAT_ID_NM --생성자명
+				     , A.CREAT_PGM            --생성프로그램ID
+				     , TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM --생성일시
+				     , A.UDT_ID               --변경자
+				     , U2.NAME AS UDT_ID_NM   --변경자명
+				     , A.UDT_PGM              --최종수정프로그램ID
+				     , TO_CHAR(A.UDT_DTTM, 'YYYY-MM-DD')   AS UDT_DTTM   --최종변경일시
+			FROM   TB_SM05M01 AS A --폐기
+			       <!-- 폐기상세 조인 -->
+			       JOIN TB_SM05D01 AS B  ON B.CO_CD = A.CO_CD
+			                            AND B.IO_NO = A.IO_NO
+			      <!-- 사용자 조인(생성자용) --> 
+			       LEFT JOIN TB_CM06M01 AS U1 ON U1.ID = A.CREAT_ID
+			      <!-- 사용자 조인(변경자용) -->
+			       LEFT JOIN TB_CM06M01 AS U2 ON U2.ID = A.UDT_ID
+			      <!-- 수주정보 조인 -->
+			       JOIN (
+			             SELECT DISTINCT SM.CO_CD    --회사
+			                  , SM.ORDRS_NO          --수주번호
+			                  , SM.ORDRS_CLNT_CD     --고객사
+			                  , C.CLNT_NM AS CLNT_NM --고객사명
+			                  , SD.PRDT_CD           --제품구분
+			                  , SD.ITEM_DIV          --아이템구분
+			                  , SD.SALES_CD          --SalesCode
+				     		  , SD.EQP_NM
+			                  , SM.CLNT_PJT
+			             FROM   TB_CR02M01 AS SM --수주마스터
+			                    <!-- 수주상세 조인 -->
+			                    JOIN TB_CR02D02 AS SD  ON SD.CO_CD    = SM.CO_CD
+							                          AND SD.ORDRS_NO = SM.ORDRS_NO
+							    <!-- 거래처 조인 -->
+							    JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD
+			            ) AS O  ON O.CO_CD    = A.CO_CD
+			                   AND O.SALES_CD = A.SALES_CD
+			       <!-- 자재마스터 조인 -->
+			       JOIN (
+			             SELECT M.CO_CD
+			                  , M.MATR_CD
+			                  , M.MATR_NM
+			                  , NVL(M.MATR_SPEC, '.')     AS MATR_SPEC
+			                  , NVL(M.MATR_CLNT_DIV, '.') AS MATR_CLNT_DIV
+			                  , NVL(M.MATR_MAT, '.')      AS MATR_MAT
+			                  , NVL(M.MATR_MAKR_NM, '.')  AS MATR_MAKR_NM
+			                  , NVL(M.MATR_MNO, '.')      AS MATR_MNO
+			             FROM   TB_BM05M01 AS M
+			            ) AS M  ON M.CO_CD   = B.CO_CD
+			                   AND M.MATR_CD = B.MATR_CD
+							    JOIN TB_BM01M01 AS D ON D.PRDT_CD = O.PRDT_CD 
+			       <!-- 회사코드 조인 -->
+			       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = A.CO_CD
+			       <!-- 출고창고 조인 -->
+			       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.OUT_WH_CD
+			       <!-- 수불구분 조인 -->
+			       LEFT JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.IO_DIV
+			WHERE  
+				A.FILE_TRGT_KEY LIKE '%${fileTrgtKey}%'		
+	</select>
+	
+	<!-- 폐기창고 selectbox 선택시 값 나오게 -->
+	<select id="selectOutWhNm" resultType="CamelMap">
+		SELECT B.CODE_NM
+			 , A.CODE_ETC
+		FROM TB_CM05M01 A, TB_CM05M01 B
+		         
+		WHERE  A.CODE_KIND =#{outWhNm}
+		         AND A.CODE_RPRC = #{coCd}
+		         AND A.CODE_ETC = B.CODE_ID
+	</select>
+	
+	<!-- 모달창 리스트 --> 
+	<select id="selectIoModalList" parameterType="Map" resultType="camelMap">
+		SELECT I.SALES_CD      --Sales Code
 		     , I.DSGN_NO       --도번
 		     , I.MATR_CD       --재고품번
 		     , M.MATR_NM       --자재품명
@@ -239,6 +463,7 @@
 				     , I.DSGN_NO     --도번
 				     , I.GOODS_DIV   --제품/자재구분
 				     , R1.CODE_NM    AS GOODS_DIV_NM
+				     , I.STOCK_QTY   --재고수량
 				     , I.STOCK_PRC   --재고평균단가
 				     , I.STOCK_AMT   --재고금액
 				     , I.SALES_CD    --Sales Code
@@ -247,13 +472,10 @@
 				       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = I.GOODS_DIV
 		       ) AS I
 		       LEFT JOIN TB_BM05M01 AS M  ON M.CO_CD   = I.CO_CD
-		                                 AND M.MATR_CD = I.MATR_CD ) Z
-		WHERE  Z.WH_CD    LIKE '${whCd}'
-		AND    Z.SALES_CD LIKE '${salesCd}'
-  </select>
-	
-
-
+		                                 AND M.MATR_CD = I.MATR_CD
+		WHERE  I.WH_CD    LIKE '%${whCd}%' 
+		AND    I.SALES_CD LIKE '%${salesCd}%' 	
+	</select>
 
  
 </mapper> 

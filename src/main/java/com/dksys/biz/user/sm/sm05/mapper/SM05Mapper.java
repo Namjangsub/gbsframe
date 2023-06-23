@@ -19,6 +19,17 @@ public interface SM05Mapper {
 	int selectIoOutWhCount(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectIoOutWhList(Map<String, String> paramMap);
+	
+	// 수정화면 정보
+	Map<String, String> selectIoInfo(Map<String, String> paramMap);
+	
+	List<Map<String, Object>> selectOutWhNm(Map<String, String> paramMap);
+	
+	// 폐기창고재고정보 - 모달창 
+	int selectIoModalCount(Map<String, String> paramMap);
+	List<Map<String, String>> selectIoModalList(Map<String, String> paramMap);
+
+	//Map<String, String> selectIoInfo(Map<String, String> paramMap);
 
 //	int selectPchsDetailCount(Map<String, String> paramMap);  
 

@@ -55,6 +55,28 @@ public class SM05SvcImpl implements SM05Svc {
 		return sm05Mapper.selectIoOutWhList(paramMap);
 	}
 
+	// 수정화면 정보
+	@Override
+	public Map<String, String> selectIoInfo(Map<String, String> paramMap) {
+		return sm05Mapper.selectIoInfo(paramMap);
+	}
+	
+	/* @Override */
+    public List<Map<String, Object>> selectOutWhNm(Map<String, String> param) {
+
+        return sm05Mapper.selectOutWhNm(param);
+    }
+    
+    @Override
+	public int selectIoModalCount(Map<String, String> paramMap) {
+		return sm05Mapper.selectIoModalCount(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectIoModalList(Map<String, String> paramMap) {
+		return sm05Mapper.selectIoModalList(paramMap);
+	}
+
 //	@Override
 //	public int selectPchsDetailCount(Map<String, String> paramMap) {
 //		return sm05Mapper.selectPchsDetailCount(paramMap);
