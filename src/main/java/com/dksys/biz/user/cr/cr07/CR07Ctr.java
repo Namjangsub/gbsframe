@@ -71,19 +71,46 @@ public class CR07Ctr {
 		return "jsonView";
 	}
 
-	// 매출확정등록 입력
+	// 수정 시 정보 조회
+	@PostMapping(value = "/select_cr10_Info")
+	public String select_cr10_Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = cr07Svc.select_cr07_Info(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
+	// 매출확정 입력
 	@PostMapping(value = "/insertSellDscn")
-	public String insertSellDscn(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+	public String insertSellDscn(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
-			cr07Svc.insertSellDscn(paramMap);
-			model.addAttribute("resultCode", 200);
-			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			if (cr07Svc.insertSellDscn(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
 		} catch (Exception e) {
-			model.addAttribute("resultCode", 500);
-			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
 		}
 		return "jsonView";
 	}
+	
+	// 매출확정상세 입력
+	@PostMapping(value = "/insertSellDscnDetail")
+	public String insertSellDscnDetail(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+			try {
+				cr07Svc.insertSellDscnDetail(paramMap);
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} catch (Exception e) {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			return "jsonView";
+	}
+
 	
 	// 매출확정등록 수정
 	
