@@ -40,10 +40,17 @@ public class BM10SvcImpl implements BM10Svc {
 		return bm10Mapper.grid1_selectCount(paramMap);
 	}
 	
-	// 그리드 리스트
+    // 그리드 리스트
 	@Override
 	public List<Map<String, String>> grid1_selectList(Map<String, String> paramMap) {
 		return bm10Mapper.grid1_selectList(paramMap);
+	}
+	
+	// 팝업 그리드 카운트
+	@Override
+	public int ProdModal_selectCount(Map<String, String> paramMap) {
+		int result = bm10Mapper.ProdModal_selectCount(paramMap);
+		return result;
 	}
 
 	// 팝업 그리드 리스트
@@ -61,10 +68,9 @@ public class BM10SvcImpl implements BM10Svc {
 	//DATA UPDATE
 	@Override
 	public int update_bm10(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-		//Gson gson = new Gson();
+		// Gson gson = new Gson();
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
-		
 		//---------------------------------------------------------------
 		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
 		//   필수값 :  jobType, userId, comonCd
@@ -79,12 +85,9 @@ public class BM10SvcImpl implements BM10Svc {
 			param.put("jobType", "fileUp");
 			cm15Svc.selectFileAuthCheck(param);
 		}
-		
 		String[] deleteFileArr = gsonDtl.fromJson(paramMap.get("deleteFileArr"), String[].class);
 		List<String> deleteFileList = Arrays.asList(deleteFileArr);
-		
-		for(String fileKey : deleteFileList) {
-			// 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
+		for(String fileKey : deleteFileList) {  // 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
 			Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
 			//접근 권한 없으면 Exception 발생
 			param.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보

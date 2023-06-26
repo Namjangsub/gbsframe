@@ -6,12 +6,14 @@ import java.util.Map;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface BM10Svc {
-
   // 그리드 카운트
   int grid1_selectCount(Map<String, String> paramMap);
 
   // 그리드 리스트
   List<Map<String, String>> grid1_selectList(Map<String, String> paramMap);
+
+  // 팝업 그리드 카운트
+  int ProdModal_selectCount(Map<String, String> paramMap);
 
   // 팝업 그리드 리스트
   List<Map<String, String>> ProdModal_selectList(Map<String, String> paramMap);
