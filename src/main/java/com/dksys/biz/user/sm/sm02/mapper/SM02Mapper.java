@@ -15,6 +15,10 @@ public interface SM02Mapper {
 	
 	List<Map<String, String>> selectOrderExcelList(Map<String, String> paramMap);	
 	
+	int selectMaxTrgtKey(Map<String, String> paramMap);	
+	
+	String selectMaxOrdrgNo(Map<String, String> paramMap);		
+	
 	//결재선 등록, 수정, 삭제
 	int insertOrderMaster(Map<String, String> paramMap);
 	

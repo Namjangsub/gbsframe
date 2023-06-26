@@ -12,7 +12,11 @@ public interface SM02Svc {
 	
 	List<Map<String, String>> selectOrderList(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectOrderExcelList(Map<String, String> paramMap);	
+	List<Map<String, String>> selectOrderExcelList(Map<String, String> paramMap);
+	
+	int selectMaxTrgtKey(Map<String, String> paramMap);
+	
+	String selectMaxOrdrgNo(Map<String, String> paramMap);	
 
 	//발주마스터 등록, 수정, 삭제
 	int insertOrderMaster(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;	
