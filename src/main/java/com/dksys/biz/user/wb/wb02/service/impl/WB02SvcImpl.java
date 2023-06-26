@@ -25,6 +25,7 @@ import com.dksys.biz.util.ExceptionThrower;
 import com.dksys.biz.user.wb.wb02.mapper.WB02Mapper;
 import com.dksys.biz.user.wb.wb02.service.WB02Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -47,6 +48,9 @@ public class WB02SvcImpl implements WB02Svc {
     
     @Autowired
     CM08Svc cm08Svc;
+	
+	@Autowired
+	  CM15Svc cm15Svc;
     
 
     @Autowired
@@ -75,7 +79,7 @@ public class WB02SvcImpl implements WB02Svc {
     
     
     @Override
-	public List<Map<String, String>> selectWbsRsltsMasterList(Map<String, String> paramMap) {
+	public Map<String, String> selectWbsRsltsMasterList(Map<String, String> paramMap) {
 		return wb02Mapper.selectWbsRsltsMasterList(paramMap);
 	}
 	
@@ -110,8 +114,8 @@ public class WB02SvcImpl implements WB02Svc {
 	}
 	
 	@Override
-	public int selectWbsPlanChk(Map<String, String> paramMap) {
-		return wb02Mapper.selectWbsPlanChk(paramMap);
+	public int selectWbsRsltsChk(Map<String, String> paramMap) {
+		return wb02Mapper.selectWbsRsltsChk(paramMap);
 	}
 	
 	// 실적 상세 테이블 삭제전 확인
@@ -157,7 +161,13 @@ public class WB02SvcImpl implements WB02Svc {
 	
 	
 	
-	public int wbsLevel1RsltsInsert(Map<String, String> paramMap , MultipartHttpServletRequest mRequest) {
+	public int wbsLevel1RsltsInsert(Map<String, String> paramMap , MultipartHttpServletRequest mRequest) throws Exception {
+		int fileTrgtKey = wb02Mapper.selectWbsRstlsSeqNext(paramMap);
+		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+		
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+	    
 		int result = wb02Mapper.wbsRsltsMasterInsert(paramMap);	
 		Gson gson = new Gson();		
 		Type stringList1 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -228,19 +238,34 @@ public class WB02SvcImpl implements WB02Svc {
 	            }
 	        }
 		}
-		
-		
-		/*
-		 * Type stringList = new TypeToken<ArrayList<String>>() {}.getType();
-		 * List<String> deleteFileList = gson.fromJson(paramMap.get("deleteFileArr"),
-		 * stringList); for(String fileKey : deleteFileList) {
-		 * cm08Svc.deleteFile(fileKey); } for (int i = 0; i <
-		 * mRequest.getFiles("files").size(); i++) { try {
-		 * cm08Svc.uploadTreeFile("TB_WB02M01", paramMap, mRequest); } catch(Exception
-		 * e){ System.out.println("error4"+e.getMessage()); } }
-		 */
 
 		
+	    
+		//---------------------------------------------------------------  
+		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+	  	//   필수값 :  jobType, userId, comonCd
+		//---------------------------------------------------------------  
+		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
+		if (uploadFileList.size() > 0) {
+				//접근 권한 없으면 Exception 발생
+				paramMap.put("jobType", "fileUp");
+				cm15Svc.selectFileAuthCheck(paramMap);
+		}
+		//---------------------------------------------------------------  
+		//첨부 화일 권한체크  끝 
+		//---------------------------------------------------------------  
+		//---------------------------------------------------------------  
+		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
+		//---------------------------------------------------------------  
+		if (uploadFileList.size() > 0) {
+		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		    cm08Svc.uploadFile(paramMap, mRequest);
+		}
+		//---------------------------------------------------------------  
+		//첨부 화일 처리  끝 
+		//---------------------------------------------------------------  
+				
 		return result;
 	}
 	
@@ -249,11 +274,16 @@ public class WB02SvcImpl implements WB02Svc {
 		return wb02Mapper.selectWbsRsltsResultCount(paramMap);
 	}
     
+	
     @Override
 	public List<Map<String, String>> selectWbsRsltsResultList(Map<String, String> paramMap) {
 		return wb02Mapper.selectWbsRsltsResultList(paramMap);
 	}
  
+    @Override
+   	public Map<String, String> selectWbsRsltsInfo(Map<String, String> paramMap) {
+   		return wb02Mapper.selectWbsRsltsInfo(paramMap);
+   	}
     
     @Override
 	public List<Map<String, String>> selectWbsPlanInfoSelect(Map<String, String> paramMap) {
@@ -268,9 +298,40 @@ public class WB02SvcImpl implements WB02Svc {
     
     
     
-    public int wbsLevel1RsltsUpdate(Map<String, String> paramMap , MultipartHttpServletRequest mRequest) {
-		int result = wb02Mapper.wbsRsltsMasterUpdate(paramMap);	
+    public int wbsLevel1RsltsUpdate(Map<String, String> paramMap , MultipartHttpServletRequest mRequest) throws Exception {
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+	    
+	    //---------------------------------------------------------------  
+  		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+  	  	//   필수값 :  jobType, userId, comonCd
+  		//---------------------------------------------------------------  
+  	    HashMap<String, String> param = new HashMap<>();
+     	param.put("userId", paramMap.get("userId"));
+  	    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
+  	    
+  		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
+  		if (uploadFileList.size() > 0) {
+  				//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
+  				param.put("jobType", "fileUp");
+  				cm15Svc.selectFileAuthCheck(param);
+  		}
+  		String[] deleteFileArr = gsonDtl.fromJson(paramMap.get("deleteFileArr"), String[].class);
+  		List<String> deleteFileList = Arrays.asList(deleteFileArr);
+  	    for(String fileKey : deleteFileList) {  // 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
+  			    Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
+  				//접근 권한 없으면 Exception 발생
+  			    param.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
+  			    param.put("jobType", "fileDelete");
+  				cm15Svc.selectFileAuthCheck(param);
+  		}
+  		//---------------------------------------------------------------  
+  		//첨부 화일 권한체크  끝  
+  		//---------------------------------------------------------------  
+	  	    
+	    int result = wb02Mapper.wbsRsltsMasterUpdate(paramMap);	
 		Gson gson = new Gson();		
+			
 		Type stringList1 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> rsltsArr = gson.fromJson(paramMap.get("rowRsltsListArr"), stringList1);
 		if (rsltsArr != null && rsltsArr.size() > 0 ) {
@@ -318,7 +379,6 @@ public class WB02SvcImpl implements WB02Svc {
 	        }
 		}
 		
-		
 		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
 		if (approvalArr != null && approvalArr.size() > 0 ) {
@@ -340,19 +400,25 @@ public class WB02SvcImpl implements WB02Svc {
 	            }
 	        }
 		}
-		
-		
-		/*
-		 * Type stringList = new TypeToken<ArrayList<String>>() {}.getType();
-		 * List<String> deleteFileList = gson.fromJson(paramMap.get("deleteFileArr"),
-		 * stringList); for(String fileKey : deleteFileList) {
-		 * cm08Svc.deleteFile(fileKey); } for (int i = 0; i <
-		 * mRequest.getFiles("files").size(); i++) { try {
-		 * cm08Svc.uploadTreeFile("TB_WB02M01", paramMap, mRequest); } catch(Exception
-		 * e){ System.out.println("error4"+e.getMessage()); } }
-		 */
 
 		
+	    
+		//---------------------------------------------------------------  
+		//첨부 화일 처리 시작 
+		//---------------------------------------------------------------  
+	    if (uploadFileList.size() > 0) {
+		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		    cm08Svc.uploadFile(paramMap, mRequest);
+	    }
+	    
+	    for(String fileKey : deleteFileList) {
+	    	cm08Svc.deleteFile(fileKey);
+	    }
+		//---------------------------------------------------------------  
+		//첨부 화일 처리  끝 
+		//---------------------------------------------------------------  
+	    
 		return result;
 	}
     

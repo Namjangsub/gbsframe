@@ -72,8 +72,8 @@ public class CR07Ctr {
 	}
 
 	// 수정 시 정보 조회
-	@PostMapping(value = "/select_cr10_Info")
-	public String select_cr10_Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	@PostMapping(value = "/select_cr07_Info")
+	public String select_cr07_Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		Map<String, String> result = cr07Svc.select_cr07_Info(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
@@ -113,5 +113,21 @@ public class CR07Ctr {
 
 	
 	// 매출확정등록 수정
+	@PostMapping(value = "/updateSellDscn")
+	public String update_bm10(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (cr07Svc.updateSellDscn(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+	}
 	
 }

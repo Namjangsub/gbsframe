@@ -576,7 +576,7 @@ public class WB01SvcImpl implements WB01Svc {
 	public Map<String, String> selectWbsPlanInfo(Map<String, String> paramMap) {
 		return wb01Mapper.selectWbsPlanInfo(paramMap);
 	}
-	
+
 	
 	@Override
 	public int insertWbsPlan(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
@@ -698,7 +698,7 @@ public class WB01SvcImpl implements WB01Svc {
 	
 	    Gson gson = new Gson();
 		// 공유테이블 등록  
-		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+	    Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
 		if (sharngArr != null && sharngArr.size() > 0 ) {
 			int i = 0;

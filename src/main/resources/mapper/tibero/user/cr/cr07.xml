@@ -171,8 +171,10 @@
 	</select>
 	
 	<select id="selectSellDcsnList" parameterType="Map" resultType="camelMap">
-		SELECT DISTINCT 
+		SELECT * FROM (
+			SELECT -- DISTINCT 
 			CM.FILE_TRGT_KEY --파일대상KEY
+			, CD.ETC_FIELD1 AS BILG_YN	-- 사용여부(여분필드1)
 			, ROWNUM AS RNUM
 			, CD.SELL_BILL_NO		-- 매출계산서 번호
 			, CM.CO_CD 				--회사코드
@@ -210,6 +212,8 @@
 		<if test="ordrsNo != null and !ordrsNo.equals('')">
 		AND CD.ORDRS_NO LIKE '%${ordrsNo}%' --수주번호
 		</if>
+		) T
+        WHERE RNUM BETWEEN #{firstIndex} AND #{lastIndex}
 	</select>
 
 	<!-- 매출등록팝업 -->
@@ -251,6 +255,7 @@
 		SELECT DISTINCT 
 				ORDRS.FILE_TRGT_KEY AS FILE_TRGT_KEY --파일대상KEY
 				, ROWNUM	AS 	RNUM
+				, CONF.SELL_DCSN_NO		  AS SELL_DCSN_NO		-- 매출확정번호 추가
 			    , ORDRS.CO_CD             AS CO_CD             --회사코드
 			    , R.CODE_NM               AS CO_CD_NM          --회사명
 			    , ORDRS.ORDRS_NO          AS ORDRS_NO          --수주번호
@@ -293,12 +298,13 @@
 			              SELECT CM.CO_CD                                          --회사코드
 			                   , CD.ORDRS_NO                                       --수주번호
 			                   , CD.CLMN_PLAN_SEQ                                  --수금계획순번
+			                   , CD.SELL_DCSN_NO								   -- 매출확정번호
 			                   , MAX(CD.CURR_CD)                   AS CONF_CURR_CD --통화단위
 			                   , NVL(SUM(CD.SELL_DCSN_DTL_AMT), 0) AS CONF_AMT     --확정금액
 			              FROM   TB_CR03M01 AS CM
 			                     JOIN TB_CR03D01 AS CD ON CD.CO_CD        = CM.CO_CD
 									                  AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
-			              GROUP BY CM.CO_CD, CD.ORDRS_NO, CD.CLMN_PLAN_SEQ
+			              GROUP BY CM.CO_CD, CD.ORDRS_NO, CD.CLMN_PLAN_SEQ, CD.SELL_DCSN_NO	
 			             ) AS CONF  ON CONF.CO_CD         = CLMN.CO_CD
 					               AND CONF.ORDRS_NO      = CLMN.ORDRS_NO
 					               AND CONF.CLMN_PLAN_SEQ = CLMN.CLMN_PLAN_SEQ
@@ -314,7 +320,7 @@
 		ORDER BY ORDRS.CO_CD, ORDRS.ORDRS_NO, CLMN.CLMN_PLAN_SEQ
 	</select>
 
-	<select id="select_cr10_Info" resultType="CamelMap">
+	<select id="select_cr07_Info" parameterType="Map" resultType="CamelMap">
 		SELECT	
 			ORDRS.FILE_TRGT_KEY AS FILE_TRGT_KEY --파일대상KEY
 			, ROWNUM	AS 	RNUM
@@ -362,11 +368,11 @@
 		                   , CD.CLMN_PLAN_SEQ                                  --수금계획순번
 		                   , MAX(CD.CURR_CD)                   AS CONF_CURR_CD --통화단위
 		                   , NVL(SUM(CD.SELL_DCSN_DTL_AMT), 0) AS CONF_AMT     --확정금액
-		                   , CM.FILE_TRGT_KEY					-- 매출확정 파일대상키
+		                   
 		              FROM   TB_CR03M01 AS CM
 		                     JOIN TB_CR03D01 AS CD ON CD.CO_CD        = CM.CO_CD
 								                  AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
-		              GROUP BY CM.CO_CD, CD.ORDRS_NO, CD.CLMN_PLAN_SEQ, CM.FILE_TRGT_KEY
+		              GROUP BY CM.CO_CD, CD.ORDRS_NO, CD.CLMN_PLAN_SEQ
 		             ) AS CONF  ON CONF.CO_CD         = CLMN.CO_CD
 				               AND CONF.ORDRS_NO      = CLMN.ORDRS_NO
 				               AND CONF.CLMN_PLAN_SEQ = CLMN.CLMN_PLAN_SEQ
@@ -376,7 +382,7 @@
 	       LEFT JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = ORDRS.CURR_CD		--통화단위
 	       LEFT JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = CLMN.CLMN_PLAN_DIV	--수금구분
 	       LEFT JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = CLMN.CURR_CD	--통화단위
-		WHERE CONF.FILE_TRGT_KEY = #{fileTrgtKey}
+		WHERE ORDRS.FILE_TRGT_KEY = #{fileTrgtKey}
 	</select>
 	
 	<select id="select_cr07_SeqNext" parameterType="Map" resultType="int">
@@ -429,7 +435,11 @@
 	 INSERT INTO TB_CR03D01 -- 매출확정
 	    (
 	    	<!-- 	매출확정번호     -->
-	    	<!-- SELL_DCSN_NO, -->	
+	    	SELL_DCSN_NO,
+	    	<!-- 수주번호 -->
+	    	ORDRS_NO,
+	    	<!-- 수금계획순번 -->
+	    	CLMN_PLAN_SEQ,		
 	    	SELL_DCSN_DTL_AMT,	-- 매출확정금액
 	    	CREAT_ID,
 			CREAT_PGM,
@@ -437,13 +447,28 @@
 	    )
 		VALUES
 		(
-			<!-- #{sellDcsnNo}, -->
-			#{confAmt},
+			#{sellDcsnNo},
+			#{ordrsNo},
+			#{clmnPlanSeq},
+			#{unconfAmt},
 			#{userId},
 			#{pgmId},
 	        SYSDATE	
 		)
 	</insert>
+	
+	<update id="updateSellDscn" parameterType="Map">
+		UPDATE TB_CR03M01	
+		SET 
+			SELL_DCSN_NO   	=	#{sellDcsnNo}, 		-- 확정일자
+			EXRATE			=	#{ordrsExrate},		-- 환율		
+			SELL_DCSN_RMK	=	#{sellDcsnRmk}, 	-- 비고
+			UDT_ID          = 	#{userId},
+			UDT_PGM         = 	#{pgmId},
+			UDT_DTTM        = 	SYSDATE
+		WHERE  FILE_TRGT_KEY = #{fileTrgtKey}
+			
+	</update>               			
 	
 
 </mapper>

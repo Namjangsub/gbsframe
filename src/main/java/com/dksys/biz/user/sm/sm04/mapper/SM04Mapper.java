@@ -1,18 +1,14 @@
 package com.dksys.biz.user.sm.sm04.mapper;
 
-import org.apache.ibatis.annotations.Mapper;
-
 import java.util.List;
 import java.util.Map;
 
+import org.apache.ibatis.annotations.Mapper;
+
 @Mapper
 public interface SM04Mapper {
-
-
-    String selectMaxEstNo(Map<String, String> paramMap);
-
-    String selectEstNo();
-
+	
+	
     int selectIoCount(Map<String, String> param);
 
     int selectIoDetailCount(Map<String, String> param);
@@ -22,17 +18,21 @@ public interface SM04Mapper {
     List<Map<String, Object>> selectIoDetail(Map<String, String> param);
 
     List<Map<String, Object>> selectStInfo(Map<String, String> param);
-
+    
+    // 창고 코드 검색
     List<Map<String, Object>> selectWhCd(Map<String, String> paramMap);
 
-    List<Map<String, Object>> selectEstDetail(Map<String, String> paramMap);
+    // 수정화면 정보
+    Map<String, String> select_sm04_info(Map<String, String> paramMap);
 
-    //DATA INSERT
+	//기본정보 & 불출정보 등록
     int insert_sm04(Map<String, String> paramMap);
-    
-    int select_sm04_SeqNext(Map<String, String> paramMap);
-    
+
+	//출고창고 재고정보 등록
     int insert_sm04_Info(Map<String, String> paramMap);
+
+	// fileTrgtKey 생성
+    int select_sm04_SeqNext(Map<String, String> paramMap);
     
     int select_sm04_Seq(Map<String, String> paramMap);
 
@@ -50,6 +50,6 @@ public interface SM04Mapper {
     String selectMaxEstDeg(Map<String, String> paramMap);
 
     String selectMaxFileTrgtKey();
-
-
+	
+	
 }

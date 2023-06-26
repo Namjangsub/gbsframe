@@ -3,21 +3,6 @@
 
 <mapper namespace="com.dksys.biz.user.sm.sm04.mapper.SM04Mapper">
 
-    <select id="selectMaxEstNo" parameterType="map" resultType="string">
-        SELECT 'EST' || TO_CHAR(SYSDATE, 'YY') || '-' ||
-               LPAD(
-                       NVL(
-                               (SELECT TO_NUMBER(SUBSTR(MAX(EST_NO), 7)) + 1
-                                FROM TB_CR01M01
-                                WHERE SUBSTR(EST_NO, 4, 2) = TO_CHAR(SYSDATE, 'YY')
-                                  AND CO_CD = #{coCd}),
-                               1
-                           ),
-                       4,
-                       '0'
-                   ) AS max_est_no
-        FROM DUAL
-    </select>
     <select id="selectIoCount" resultType="int">
         SELECT COUNT(*) FROM (
 			SELECT ROWNUM AS RN
@@ -392,6 +377,7 @@
 		
 		ORDER BY IO_SEQ
     </select>
+    
     <select id="selectIoDetailCount" resultType="int">
       	SELECT COUNT(*)
         FROM TB_SM04D01 A
@@ -443,6 +429,105 @@
 		AND    I.SALES_CD = #{salesCd} --'23001-01HTFUP'
     </select>
     
+    <select id="select_sm04_info" resultType="CamelMap">
+	    SELECT * FROM (
+				SELECT ROWNUM AS RN
+				 , A.FILE_TRGT_KEY --파일대상KEY
+			     , A.CO_CD         --회사코드
+			     , O.CLNT_PJT
+			     , O.CLNT_NM
+			     , O.ITEM_DIV
+			     , O.PRDT_CD
+				, O.EQP_NM                --설비명
+			     , B.MATR_CD
+			     , B.IO_SEQ 
+			     , B.IO_QTY    
+			     , B.DSGN_NO      
+			     , A.SALES_CD      --SalesCode
+			     , R.CODE_NM AS CO_CD_NM
+			     , A.IO_NO         --불출번호
+			     , A.IO_DIV        --수불구분
+			     , R3.CODE_NM AS IO_DIV_NM
+			     , A.OUT_WH_CD     --출고창고코드
+			     , R1.CODE_NM AS OUT_WH_NM
+			     , A.IN_WH_CD      --입고창고코드
+			     , R2.CODE_NM AS IN_WH_NM
+			     , TO_CHAR(A.IO_DT, 'YYYY-MM-DD') AS IO_DT --불출일자
+			     , A.SOC_YN        --사급여부
+			     , A.IO_RMK        --불출비고
+			     , A.CREAT_ID      --생성자
+			     , U1.NAME AS CREAT_ID_NM
+			     , A.CREAT_PGM     --생성프로그램ID
+			     , TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM --생성일시
+			     , A.UDT_ID        --최종변경자
+			     , U2.NAME AS UDT_ID_NM
+			     , A.UDT_PGM       --최종수정프로그램ID
+			     , TO_CHAR(A.UDT_DTTM, 'YYYY-MM-DD')   AS UDT_DTTM   --최종변경일시
+			FROM   TB_SM04M01 AS A
+			       JOIN TB_SM04D01 AS B  ON B.CO_CD = A.CO_CD
+			                            AND B.IO_NO = A.IO_NO
+			       LEFT JOIN TB_CM06M01 AS U1 ON U1.ID = A.CREAT_ID
+			       LEFT JOIN TB_CM06M01 AS U2 ON U2.ID = A.UDT_ID
+			       LEFT JOIN (
+			                  SELECT SM.FILE_TRGT_KEY     --파일대상KEY
+							       , SM.CO_CD             --회사코드
+							       , SM.ORDRS_NO          --수주번호
+							       , SM.EST_NO            --견적서번호
+							       , SM.EST_DEG           --견적차수
+							       , SM.ORDRS_CLNT_CD     --고객사
+							       , C.CLNT_NM     --고객사
+							       , SM.ORDRS_DT          --수주일자
+							       , SM.ORDRS_DIV         --수주구분
+							       , SM.CLNT_PJT          --고객사PJT
+							       , SM.CTRT_NM           --계약명
+							       , SM.CURR_CD           --통화단위
+							       , SM.EXRATE            --환율
+							       , SM.ORDRS_AMT         --수주금액
+							       , SM.FWD_EXCH_JOIN_DT  --선물환가입일
+							       , SM.FWD_EXCH_CHK_LIST --선물환 Check List
+							       , SM.ORDRGER           --발주자
+							       , SM.MNG_ID            --담당자
+							       , SM.CTRT_DOC          --계약문서
+							       , SM.PMNT_MTD          --결제방법
+							       , SM.ORDRS_RMK         --수주비고
+							       , SM.ORGN_SALES_CD     --원천Sales Code     
+							       , SD.ORDRS_SEQ             --수주순번
+							       , SD.ORDRS_DTL_DIV10       --수주설비입력구분
+							       , SD.PRDT_CD               --제품구분
+							       , SD.ITEM_DIV              --아이템구분
+							       , SD.ORDRS_DTL_DIV20       --수주설비작업구분
+							       , SD.ORDRS_DTL_DIV30       --수주설비자체구분
+							       , SD.SALES_CD              --SalesCode
+							       , SD.EQP_NM                --설비명
+							       , SD.DUDT_INTEND_DT        --납기예정일
+							       , SD.ORDRS_PRC_MACH        --수주가-기계파트
+							       , SD.ORDRS_PRC_ELCTY       --수주가-전기파트
+							       , SD.ORDRS_PRC             --수주가
+							       , SD.ORDRS_QTY             --수주수량
+							       , SD.EST_EPCT_MAT_PRC      --견적예상재료비
+							       , SD.TRGT_PCHS_PCOST_MACH  --목표구매원가-기계
+							       , SD.TRGT_PCHS_PCOST_ELCTY --목표구매원가-전기
+							       , SD.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN --목표원가-기계자체가공
+							       , SD.LABOR_COST_MFG_COST   --노무비 및 제조경비
+							       , SD.DTL_RMK               --상세비고
+							  FROM   TB_CR02M01 AS SM
+							         JOIN TB_CR02D02 AS SD  ON SD.CO_CD    = SM.CO_CD
+							                               AND SD.ORDRS_NO = SM.ORDRS_NO
+							         LEFT JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD
+			                 ) AS O ON O.SALES_CD = A.SALES_CD
+			       LEFT JOIN TB_BM05M01 AS M  ON M.CO_CD   = B.CO_CD
+			                                 AND M.MATR_CD = B.MATR_CD
+			       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = A.CO_CD
+			       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.OUT_WH_CD
+			       LEFT JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.IN_WH_CD
+			       LEFT JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.IO_DIV 
+			       
+			       WHERE 
+			       A.FILE_TRGT_KEY = #{fileTrgtKey}
+			       
+			       ) T
+    </select>
+    
     
 	<!-- 창고 코드 가져오기 -->
 	<select id="selectWhCd" parameterType="Map" resultType="camelMap">
@@ -467,18 +552,20 @@
 	</select>
 	
     
-    <insert id="insert_sm04" parameterType="map">
-        <selectKey keyProperty="ioNo" resultType="String" order="BEFORE">
+	<!-- 기본정보 : TB_SM04M01 데이터 생성  -->
+    <insert id="insert_sm04" parameterType="Map">
+        <selectKey keyProperty="ioNo"  resultType="String" order="BEFORE">
             	SELECT CASE WHEN MAX(IO_NO) IS NULL THEN 'IO'||SUBSTR(#{ioDt}, 3, 2)||'00001'
                         ELSE 'IO'||SUBSTR(#{ioDt}, 3, 2)||LPAD(TO_NUMBER(SUBSTR(MAX(IO_NO), -5)) + 1, 5, 0)
-				       END AS IO_NO
+				       END AS MNGM_NO
 				FROM   TB_SM04M01
 				WHERE  CO_CD = #{coCd} --'GUN'
 				AND    IO_DT LIKE SUBSTR(#{ioDt}, 0, 4)||'%'
-        </selectKey>
-        INSERT INTO TB_SM04M01
-            (
-                FILE_TRGT_KEY,
+        </selectKey> 
+        
+        INSERT INTO TB_SM04M01 
+	    	(
+	    		FILE_TRGT_KEY,
                 CO_CD, 
                 SALES_CD, 
                 IO_NO, 
@@ -487,34 +574,36 @@
                 SOC_YN, 
                 OUT_WH_CD, 
                 IN_WH_CD, 
-                IO_RMK,       
-				ETC_FIELD1,     
-				ETC_FIELD2,     
-				ETC_FIELD3,  
-                CREAT_ID, 
-                CREAT_PGM,
-                CREAT_DTTM 
-            )
-
-        VALUES
-            (
-                #{fileTrgtKey}, 
-                #{coCd}, 
-                #{salesCd}, 
-                #{ioNo} , 
-                #{ioDt}, 
-                #{ioDiv},
-                #{socYn}, 
-                #{outWhNm}, 
-                #{inWhNm}, 
-                #{ioRmk}, 
-                #{etcField1, jdbcType=VARCHAR}, 
-                #{etcField2, jdbcType=VARCHAR}, 
-                #{etcField3, jdbcType=VARCHAR},
-                #{creatId},  
-                #{creatPgm}, 
-                SYSDATE
-             )
+                IO_RMK,
+				ETC_FIELD1,
+				ETC_FIELD2,
+				ETC_FIELD3,
+				CREAT_ID,
+				CREAT_PGM,
+				CREAT_DTTM
+		)
+		
+		VALUES
+		(
+			#{fileTrgtKey}, 
+            #{coCd}, 
+            #{salesCd}, 
+            #{ioNo} , 
+            #{ioDt},  
+            #{ioDiv},
+            #{socYn}, 
+            #{outWhNm}, 
+            #{inWhNm}, 
+            #{ioRmk}, 
+			#{etcField1, jdbcType=VARCHAR},
+			#{etcField2, jdbcType=VARCHAR},
+			#{etcField3, jdbcType=VARCHAR},
+            #{userId},  
+            #{pgmId}, 
+            SYSDATE
+			
+		)
+        
     </insert>
     
     <insert id="insert_sm04_Info" parameterType="map">
@@ -526,12 +615,30 @@
         INSERT INTO
             TB_SM04D01
             (
-                  CO_CD, DSGN_NO, MATR_CD,  IO_QTY, OUT_INOUT_KEY, IN_INOUT_KEY CREAT_ID, CREAT_DTTM, CREAT_PGM
+                  CO_CD
+                 ,IO_NO
+                 ,IO_SEQ
+                 ,DSGN_NO
+                 ,SALES_CD
+                 ,MATR_CD
+                 ,IO_QTY
+                 ,CREAT_ID
+                 ,CREAT_PGM
+                 ,CREAT_DTTM
             )
 
         VALUES
             (
-                #{coCd}, #{DsgnNo}, #{MatrCd}, #{ioQty}, NULL,NULL #{creatId}, SYSDATE, #{creatPgm}
+                 #{coCd}
+                ,#{ioNo}
+                ,#{ioSeq}
+                ,#{dsgnNo}
+                ,#{salesCd}
+                ,#{matrCd}
+                ,#{ioQty}
+                ,#{userId}
+                ,#{pgmId}
+                ,SYSDATE
              )
     </insert>
     

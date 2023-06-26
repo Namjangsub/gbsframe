@@ -83,7 +83,7 @@ public class WB02Ctr {
 	  @PostMapping(value = "/selectWbsRsltsMasterList") 
 	  public String selectWbsRsltsMasterList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		  
-		  List<Map<String, String>> resultList = wb02Svc.selectWbsRsltsMasterList(paramMap);
+		  Map<String, String> resultList = wb02Svc.selectWbsRsltsMasterList(paramMap);
 		  model.addAttribute("resultList", resultList); 
 		  return "jsonView"; 
 		  
@@ -152,9 +152,9 @@ public class WB02Ctr {
 	  }
 	  
 	  //<!-- /* WBS 데이터 중복 체크 조회 */ -->  
-	  @PostMapping(value = "/selectWbsPlanChk")
-	  public String selectWbsPlanChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int result = wb02Svc.selectWbsPlanChk(paramMap);
+	  @PostMapping(value = "/selectWbsRsltsChk")
+	  public String selectWbsRsltsChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int result = wb02Svc.selectWbsRsltsChk(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
 	  }
@@ -163,25 +163,32 @@ public class WB02Ctr {
 	  
 	  @PostMapping(value = "/wbsLevel1RsltsInsert")
       public String wbsLevel1RsltsInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {		
-		
-		List<Map<String, String>> detailChk = wb02Svc.deleteWbsRsltsDetailChk(paramMap);
-		if (detailChk.size() > 0) {
-			wb02Svc.deleteWbsRsltsDetail(paramMap);	
+		try {
+			List<Map<String, String>> detailChk = wb02Svc.deleteWbsRsltsDetailChk(paramMap);
+			if (detailChk.size() > 0) {
+				wb02Svc.deleteWbsRsltsDetail(paramMap);	
+			}
+			
+			List<Map<String, String>> sharngChk = wb02Svc.deleteWbsSharngListChk(paramMap);
+			if (sharngChk.size() > 0) {
+				wb02Svc.deleteWbsSharngList(paramMap);	
+			}
+			
+			List<Map<String, String>> approvalChk = wb02Svc.deleteWbsApprovalListChk(paramMap);
+			if (approvalChk.size() > 0) {
+				wb02Svc.deleteWbsApprovalList(paramMap);	
+			}
+			if (wb02Svc.wbsLevel1RsltsInsert(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
 		}
-		
-		List<Map<String, String>> sharngChk = wb02Svc.deleteWbsSharngListChk(paramMap);
-		if (sharngChk.size() > 0) {
-			wb02Svc.deleteWbsSharngList(paramMap);	
-		}
-		
-		List<Map<String, String>> approvalChk = wb02Svc.deleteWbsApprovalListChk(paramMap);
-		if (approvalChk.size() > 0) {
-			wb02Svc.deleteWbsApprovalList(paramMap);	
-		}
-		
-		wb02Svc.wbsLevel1RsltsInsert(paramMap, mRequest);
-    	model.addAttribute("resultCode", 200);
-    	model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
     	return "jsonView";
      }
 
@@ -195,8 +202,19 @@ public class WB02Ctr {
 		  
 	  } 
 	  
+	  
+	//<!-- WBS 실적관리 메인화면에서 선택한 실적에 대한 계획정보 세부 조회  -->     
+	  @PostMapping(value = "/selectWbsRsltsInfo") 
+	  public String selectWbsRsltsInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  Map<String, String> result= wb02Svc.selectWbsRsltsInfo(paramMap);
+		  model.addAttribute("result", result); 
+		  return "jsonView"; 
+		  
+	  } 
+	  
+	  
 	  @PutMapping(value = "/wbsLevel1RsltsUpdate")
-      public String wbsLevel1RsltsUpdate(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+      public String wbsLevel1RsltsUpdate(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 	    List<Map<String, String>> detailChk = wb02Svc.deleteWbsRsltsDetailChk(paramMap);
 	    if (detailChk.size() > 0) {
 			wb02Svc.deleteWbsRsltsDetail(paramMap);	

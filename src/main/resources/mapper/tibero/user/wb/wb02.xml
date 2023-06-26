@@ -482,7 +482,7 @@
           <select id="selectWbsRsltsMasterList" parameterType="Map" resultType="camelMap">
                 SELECT  FILE_TRGT_KEY, 
                         CO_CD ,
-                        WBS_PLAN_NO,
+                        WBS_PLAN_NO AS WBS_RSLTS_NO,
                         WBS_PLAN_CODE_KIND,
                         WBS_PLAN_CODE_ID ,
                         SALES_CD ,
@@ -529,10 +529,10 @@
                         X.CLOSE_YN ,
                         X.CREAT_ID,
                         (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.CREAT_ID) AS CREAT_NM,  
-                        X.CREAT_DTTM,
+                        TO_CHAR(X.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM,
                         X.UDT_ID,
                         (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.UDT_ID) AS UDT_NM,  
-                        X.UDT_DTTM
+                        TO_CHAR(X.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM 
                         FROM TB_WB02D01 X
                         INNER JOIN TB_WB02M01 Y
                         ON X.CO_CD = Y.CO_CD  
@@ -665,8 +665,8 @@
           </select>
         
            <!-- 실적 마스터 데이터 유무 체크  -->     
-           <select id="selectWbsPlanChk" parameterType="Map" resultType="int">
-                SELECT *
+           <select id="selectWbsRsltsChk" parameterType="Map" resultType="int">
+                SELECT COUNT(*)
                   FROM TB_WB02M01 
                    WHERE CO_CD = '${coCd}'
                    AND SALES_CD = '${salesCd}'
@@ -1676,13 +1676,13 @@
           
           
          
-          <select id="selectWbsPlanInfoSelect" parameterType="Map" resultType="camelMap">
+          <select id="selectWbsRsltsInfo" parameterType="Map" resultType="camelMap">
                 SELECT * FROM (
                     SELECT ROWNUM AS RN, Z.*, 
                                    S.ORDRS_NO, -- 수주번호
                                    S.ORGN_SALES_CD, -- 원천 SALES CODE
                                    S.ORDRS_CLNT_CD, -- 고객사
-                                   (SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD =S.ORDRS_CLNT_CD) AS ORDRS_CLNT_NM,
+                                   (SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD =S.ORDRS_CLNT_CD) AS CLNT_NM,
                                    S.CLNT_PJT, -- 고객사 PJT
                                    S.ORDRS_DTL_DIV20, -- 신작구분
                                    (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
@@ -1690,7 +1690,8 @@
                                    (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.PRDT_CD) AS PRDT_CD_NM,
                                    S.ITEM_DIV, -- 아이템구분
                                    (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.ITEM_DIV) AS ITEM_DIV_NM,
-                                   S.EQP_NM -- 설비명
+                                   S.EQP_NM, -- 설비명
+                                   M.FILE_TRGT_KEY AS M_FILE_TRGT_KEY
                                    FROM (
                                     SELECT 
                                        X.FILE_TRGT_KEY,
@@ -1764,6 +1765,12 @@
                             AND X.ORDRS_NO = Y.ORDRS_NO ) S
                           ON Z.CO_CD = S.CO_CD
                           AND Z.SALES_CD = S.SALES_CD 
+                        LEFT OUTER JOIN TB_WB02M01 M
+                        ON Z.CO_CD = M.CO_CD
+                        AND Z.SALES_CD = M.SALES_CD
+                        AND Z.CODE_KIND = M.WBS_PLAN_CODE_KIND
+                        AND Z.CODE_ID = M.WBS_PLAN_CODE_ID
+                        AND Z.WBS_PLAN_NO = M.WBS_PLAN_NO   
                 )                
              WHERE CO_CD = '${coCd}'
              AND CODE_KIND = '${codeKind}'
@@ -2082,7 +2089,9 @@
                                    
        </select>
  
- 
+       <select id="selectWbsRstlsSeqNext" parameterType="Map" resultType="int">
+             SELECT TO_CHAR(SYSDATE, 'YYYYMM')||LPAD(TB_WB02M01_SQ01.NEXTVAL,3,0) FROM DUAL
+         </select>
  
  
  

@@ -20,7 +20,7 @@ public interface WB02Mapper {
 	List<Map<String, String>> selectWbsRsltsResultExcelList1(Map<String, String> paramMap);
 	
 
-    List<Map<String, String>> selectWbsRsltsMasterList(Map<String, String> paramMap);
+    Map<String, String> selectWbsRsltsMasterList(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectWbsRsltsDetailList(Map<String, String> paramMap);
 	
@@ -43,7 +43,7 @@ public interface WB02Mapper {
 	
 	int selectMaxTrgtKey(Map<String, String> paramMap);
 	
-	int selectWbsPlanChk(Map<String, String> paramMap);
+	int selectWbsRsltsChk(Map<String, String> paramMap);
 		
 	int wbsRsltsMasterInsert(Map<String, String> paramMap);
 	
@@ -70,6 +70,8 @@ public interface WB02Mapper {
     int selectWbsRsltsResultCount(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectWbsRsltsResultList(Map<String, String> paramMap);
+	
+	Map<String, String> selectWbsRsltsInfo(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectWbsPlanInfoSelect(Map<String, String> paramMap);
 	
@@ -107,5 +109,5 @@ public interface WB02Mapper {
 	int selectWbsRsltsListCount(Map<String, String> paramMap);	
 	List<Map<String, String>> selectWbsRsltsList(Map<String, String> paramMap);
 	
-	
+	int selectWbsRstlsSeqNext(Map<String, String> paramMap);
 }

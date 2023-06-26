@@ -54,6 +54,16 @@ public class SM02SvcImpl implements SM02Svc {
 	public List<Map<String, String>> selectOrderExcelList(Map<String, String> paramMap) {
 		return sm02Mapper.selectOrderExcelList(paramMap);
 	}		
+
+	@Override
+	public int selectMaxTrgtKey(Map<String, String> paramMap) {
+		return sm02Mapper.selectMaxTrgtKey(paramMap);
+	}	
+	
+	@Override
+	public String selectMaxOrdrgNo(Map<String, String> paramMap) {
+		return sm02Mapper.selectMaxOrdrgNo(paramMap);
+	}		
 	
 	@Override
 	public int insertOrderMaster(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
@@ -63,15 +73,21 @@ public class SM02SvcImpl implements SM02Svc {
 		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);		
 
 		int result = 0;	    
-	
-	    	    
-		for(Map<String, String> dtl : detailMap) {
-			dtl.put("coCd", paramMap.get("coCd"));
-
-
-				
-    		result += sm02Mapper.insertOrderMaster(dtl);			
-		}	
+		//FILE TARGET KEY
+		int fileTrgtKey = sm02Svc.selectMaxTrgtKey(paramMap);	
+	    paramMap.put("fileTrgtKey", String.valueOf(fileTrgtKey));
+	    
+	    //MAX ORDGR_NO
+	    String maxOrdrgNo = sm02Svc.selectMaxOrdrgNo(paramMap);	    
+	    paramMap.put("maxOrdrgNo", maxOrdrgNo);
+	    
+	    //insert orderMaster
+		result += sm02Mapper.insertOrderMaster(paramMap);
+	    
+		/*
+		 * for(Map<String, String> dtl : detailMap) { dtl.put("coCd",
+		 * paramMap.get("coCd")); result += sm02Mapper.insertOrderMaster(dtl); }
+		 */
 		  		
 		return result;
 	}
@@ -86,8 +102,7 @@ public class SM02SvcImpl implements SM02Svc {
 		List<Map<String, String>> insertMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);				
 		
 		int result = 0;
-
-		System.out.println(">>dtl svcimpl paramMap>>" + paramMap.toString()+"<<<<<");		
+		
 	    //입력처리
 		for(Map<String, String> dtl : insertMap) {
 

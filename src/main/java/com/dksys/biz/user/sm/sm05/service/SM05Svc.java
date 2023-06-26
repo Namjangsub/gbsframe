@@ -6,15 +6,12 @@ import java.util.Map;
 public interface SM05Svc {
 
 	int selectIoCount(Map<String, String> paramMap);
-
 	List<Map<String, String>> selectIoList(Map<String, String> paramMap);
 
 	int selectIoDetailCount(Map<String, String> paramMap);
-
 	List<Map<String, String>> selectIoDetailList(Map<String, String> paramMap);
 
 	int selectIoOutWhCount(Map<String, String> paramMap);
-
 	List<Map<String, String>> selectIoOutWhList(Map<String, String> paramMap);
 
 	Map<String, String> selectIoInfo(Map<String, String> paramMap);

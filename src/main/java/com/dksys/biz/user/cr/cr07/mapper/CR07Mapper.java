@@ -26,5 +26,8 @@ public interface CR07Mapper {
 	// fileTrgtKey 생성
 	int select_cr07_SeqNext(Map<String, String> paramMap);
 	
+	// 매출확정 수정
+	int updateSellDscn(Map<String, String> paramMap);
+	
 	
 }

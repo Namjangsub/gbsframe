@@ -50,6 +50,17 @@ public class CR08Ctr {
 	    model.addAttribute("result", result);
 	    return "jsonView";
 	  }
+	  
+	//  매출계산서 리스트 기본정보
+	  @PostMapping(value = "/selectSalesStmtConList")
+	  public String selectSalesStmtConList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    int totalCnt = cr08Svc.selectSalesStmtConCount(paramMap);
+	    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+	   model.addAttribute("paginationInfo", paginationInfo);
+	    List<Map<String, String>> result = cr08Svc.selectSalesStmtConList(paramMap);
+	    model.addAttribute("result", result);
+	    return "jsonView";
+	  }
 
 	  // 프로젝트 정보 조회
 	  @PostMapping(value = "/selectPchsCostInfo")
@@ -66,16 +77,18 @@ public class CR08Ctr {
 	    model.addAttribute("result", result);
 	    return "jsonView";
 	  }
-
-	  @PostMapping(value = "/insertSalesStmtCal")
-	  public String insertSalesStmtCal(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	  
+	  @PostMapping(value = "/insertSalesStmt")
+	  public String insertSalesStmt(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 			try {
-				if (cr08Svc.insertSalesStmtCal(paramMap, mRequest) != 0 ) {
+				if (cr08Svc.insertSalesStmt(paramMap, mRequest) != 0) {
 					model.addAttribute("resultCode", 200);
 					model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+					System.out.println("200");
 				} else {
 					model.addAttribute("resultCode", 500);
 					model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+					System.out.println("500");
 				};
 			}catch(Exception e){
 				model.addAttribute("resultCode", 900);
@@ -83,6 +96,7 @@ public class CR08Ctr {
 			}
 			return "jsonView";
 	  }
+	 
 
 	  @PostMapping(value = "/updatePchsCost")
 	  public String updatePchsCost(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
