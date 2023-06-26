@@ -16,7 +16,7 @@ public interface WB02Svc {
 	List<Map<String, String>> selectWbsRsltsResultExcelList1(Map<String, String> paramMap);
 	
 
-    List<Map<String, String>> selectWbsRsltsMasterList(Map<String, String> paramMap);
+    Map<String, String> selectWbsRsltsMasterList(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectWbsRsltsDetailList(Map<String, String> paramMap);
 	
@@ -30,11 +30,11 @@ public interface WB02Svc {
 	
 	int selectMaxTrgtKey(Map<String, String> paramMap);
 	
-	int selectWbsPlanChk(Map<String, String> paramMap);
+	int selectWbsRsltsChk(Map<String, String> paramMap);
 	
-	int wbsLevel1RsltsInsert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+	int wbsLevel1RsltsInsert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
-	int wbsLevel1RsltsUpdate(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+	int wbsLevel1RsltsUpdate(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
     int selectWbsRsltsResultCount(Map<String, String> paramMap);
 	
@@ -58,6 +58,8 @@ public interface WB02Svc {
     // 결재 테이블 삭제
     int deleteWbsApprovalList(Map<String, String> paramMap);
     
+    // 공유테이블 삭제전 확인
+    Map<String, String>  selectWbsRsltsInfo(Map<String, String> paramMap);
     
     
 	List<Map<String, String>> selectWbsRsltsResultList(Map<String, String> paramMap);
