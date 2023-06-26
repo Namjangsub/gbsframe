@@ -26,14 +26,11 @@ public class SM05Ctr {
 
 	// 프로젝트 리스트 조회 - 폐기내역 조회
 	@PostMapping(value = "/selectIoList")
-	public String selectIoList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		// System.out.println("도칙 : " + paramMap);
+	public String selectIoList(@RequestBody Map<String, String> paramMap, ModelMap model) {		
 		int totalCnt = sm05Svc.selectIoCount(paramMap);
-		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		// System.out.println("중간 : " + totalCnt);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);		
 		model.addAttribute("paginationInfo", paginationInfo);
-		List<Map<String, String>> result = sm05Svc.selectIoList(paramMap);
-		// System.out.println("끝 : " + result);
+		List<Map<String, String>> result = sm05Svc.selectIoList(paramMap);		
 		model.addAttribute("result", result);
 		return "jsonView";
 	}

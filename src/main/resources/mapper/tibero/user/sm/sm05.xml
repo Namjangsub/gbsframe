@@ -4,9 +4,32 @@
 <mapper namespace="com.dksys.biz.user.sm.sm05.mapper.SM05Mapper">
 
 	<select id="selectIoCount" parameterType="Map" resultType="int">
-		SELECT 
-			COUNT(*)
-		FROM TB_SM05M01 AS A --폐기
+		SELECT COUNT(*) FROM (
+			SELECT  DISTINCT
+					  A.FILE_TRGT_KEY --파일대상KEY
+				     , A.CO_CD                 --회사코드
+				     , R.CODE_NM AS CO_CD_NM   --회사명
+				     , O.ORDRS_CLNT_CD         --고객사 코드
+     		 		 , O.CLNT_NM               --고객사명
+     		 		 , O.PRDT_CD               --제품구분
+				     , A.IO_NO                 --폐기번호
+				     , A.IO_DIV                --수불구분
+				     , R2.CODE_NM AS IO_DIV_NM --수불구분명
+				     , A.SALES_CD              --SalesCode
+				     , A.OUT_WH_CD             --출고창고코드
+				     , R1.CODE_NM AS OUT_WH_NM --출고창고명     
+				     , TO_CHAR(A.IO_DT, 'YYYY-MM-DD') AS IO_DT --폐기일자
+				     , A.IO_RESN              --폐기사유
+				     , A.IO_RMK               --비고     
+				     , A.CREAT_ID             --생성자
+				     , U1.NAME AS CREAT_ID_NM --생성자명
+				     , A.CREAT_PGM            --생성프로그램ID
+				     , TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM --생성일시
+				     , A.UDT_ID               --변경자
+				     , U2.NAME AS UDT_ID_NM   --변경자명
+				     , A.UDT_PGM              --최종수정프로그램ID
+				     , TO_CHAR(A.UDT_DTTM, 'YYYY-MM-DD')   AS UDT_DTTM   --최종변경일시
+			FROM   TB_SM05M01 AS A --폐기
 			       <!-- 폐기상세 조인 -->
 			       JOIN TB_SM05D01 AS B  ON B.CO_CD = A.CO_CD
 			                            AND B.IO_NO = A.IO_NO
@@ -16,7 +39,7 @@
 			       LEFT JOIN TB_CM06M01 AS U2 ON U2.ID = A.UDT_ID
 			      <!-- 수주정보 조인 -->
 			       JOIN (
-			             SELECT DISTINCT SM.CO_CD    --회사
+			             SELECT  SM.CO_CD    --회사
 			                  , SM.ORDRS_NO          --수주번호
 			                  , SM.ORDRS_CLNT_CD     --고객사
 			                  , C.CLNT_NM AS CLNT_NM --고객사명
@@ -24,10 +47,10 @@
 			                  , SD.ITEM_DIV          --아이템구분
 			                  , SD.SALES_CD          --SalesCode
 			             FROM   TB_CR02M01 AS SM --수주마스터
-			                    <!-- 수주상세 조인 -->
+			                    -- 수주상세 조인 -->
 			                    JOIN TB_CR02D02 AS SD  ON SD.CO_CD    = SM.CO_CD
 							                          AND SD.ORDRS_NO = SM.ORDRS_NO
-							    <!-- 거래처 조인 -->
+							    -- 거래처 조인 -->
 							    JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD
 			            ) AS O  ON O.CO_CD    = A.CO_CD
 			                   AND O.SALES_CD = A.SALES_CD
@@ -49,11 +72,11 @@
 			       <!-- 출고창고 조인 -->
 			       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.OUT_WH_CD
 			       <!-- 수불구분 조인 -->
-			       LEFT JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.IO_DIV
+			       LEFT JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.IO_DIV			
 			WHERE  1 = 1
-				
+				<if test="coCd != null and !coCd.equals('')">	
 				AND    A.CO_CD LIKE '${coCd}'  
-				
+				</if>
 				<if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')" >
 				AND    A.IO_DT BETWEEN #{strtDt} AND  #{endDt} 
 				</if>
@@ -95,7 +118,8 @@
 				</if>
 				<if test="matrMno != null and !matrMno.equals('')">
 				AND    M.MATR_MNO      LIKE '%${matrMno}%' 
-				</if>				
+				</if>
+				) T
 	</select>	
 
 	<select id="selectIoList" parameterType="Map" resultType="CamelMap">
@@ -167,9 +191,9 @@
 			       <!-- 수불구분 조인 -->
 			       LEFT JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.IO_DIV
 			WHERE  1 = 1
-				
+				<if test="coCd != null and !coCd.equals('')">	
 				AND    A.CO_CD LIKE '${coCd}'  
-				
+				</if>
 				<if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')" >
 				AND    A.IO_DT BETWEEN #{strtDt} AND  #{endDt} 
 				</if>
@@ -433,6 +457,37 @@
 		         AND A.CODE_RPRC = #{coCd}
 		         AND A.CODE_ETC = B.CODE_ID
 	</select>
+	<!-- 모달창 리스트 -  --> 
+	<select id="selectIoModalCount" parameterType="Map" resultType="int">
+		SELECT 
+			COUNT(*)
+		FROM (
+		        SELECT R.CODE_DESC   AS CO_CD --회사코드
+				     , I.WH_CD       --창고코드
+				     , R.CODE_NM     AS WH_NM
+				     , I.PART_NUMBER AS MATR_CD --재고품번
+				     , I.DSGN_NO     --도번
+				     , I.GOODS_DIV   --제품/자재구분
+				     , R1.CODE_NM    AS GOODS_DIV_NM
+				     , I.STOCK_QTY   --재고수량
+				     , I.STOCK_PRC   --재고평균단가
+				     , I.STOCK_AMT   --재고금액
+				     , I.SALES_CD    --Sales Code
+				FROM   TB_BM20M01 AS I
+				       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = I.WH_CD
+				       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = I.GOODS_DIV
+		       ) AS I
+		       LEFT JOIN TB_BM05M01 AS M  ON M.CO_CD   = I.CO_CD
+		                                 AND M.MATR_CD = I.MATR_CD
+		WHERE  
+		<if test="whCd != null and !whCd.equals('')">
+		I.WH_CD    LIKE '%${whCd}%' 
+		</if>
+		<if test="salesCd != null and !salesCd.equals('')">
+		AND    I.SALES_CD LIKE '%${salesCd}%' 	
+		</if>
+		
+	</select>
 	
 	<!-- 모달창 리스트 --> 
 	<select id="selectIoModalList" parameterType="Map" resultType="camelMap">
@@ -473,8 +528,14 @@
 		       ) AS I
 		       LEFT JOIN TB_BM05M01 AS M  ON M.CO_CD   = I.CO_CD
 		                                 AND M.MATR_CD = I.MATR_CD
-		WHERE  I.WH_CD    LIKE '%${whCd}%' 
+		WHERE  
+		
+		<if test="whCd != null and !whCd.equals('')">
+		I.WH_CD    LIKE '%${whCd}%' 
+		</if>
+		<if test="salesCd != null and !salesCd.equals('')">
 		AND    I.SALES_CD LIKE '%${salesCd}%' 	
+		</if>
 	</select>
 
  
