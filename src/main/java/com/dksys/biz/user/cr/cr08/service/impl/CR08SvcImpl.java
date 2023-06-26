@@ -7,6 +7,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -42,6 +45,12 @@ public class CR08SvcImpl implements CR08Svc{
 	  }
 	  
 	  @Override
+	  public int selectSalesStmtConCount(Map<String, String> paramMap) {
+	    return CR08Mapper.selectSalesStmtConCount(paramMap);
+	  }
+	  
+	  
+	  @Override
 	  public int selectSalesStmtCalCount(Map<String, String> paramMap) {
 	    return CR08Mapper.selectSalesStmtCalCount(paramMap);
 	  }
@@ -55,6 +64,11 @@ public class CR08SvcImpl implements CR08Svc{
 	  @Override
 	  public List<Map<String, String>> selectSalesStmtCalList(Map<String, String> paramMap) {
 	    return CR08Mapper.selectSalesStmtCalList(paramMap);
+	  }
+	  
+	  @Override
+	  public List<Map<String, String>> selectSalesStmtConList(Map<String, String> paramMap) {
+	    return CR08Mapper.selectSalesStmtConList(paramMap);
 	  }
 
 	  @Override
@@ -121,12 +135,14 @@ public class CR08SvcImpl implements CR08Svc{
 	     return result;
 	  }
 
+	  
 	  @Override
-	  public int insertSalesStmtCal(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	  public int insertSalesStmt(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
 		    Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		    
+			System.out.println("insertSalesStmt_Svcimpl");
 			//---------------------------------------------------------------  
 			//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
 		  	//   필수값 :  jobType, userId, comonCd
@@ -140,16 +156,15 @@ public class CR08SvcImpl implements CR08Svc{
 			//---------------------------------------------------------------  
 			//첨부 화일 권한체크  끝 
 			//---------------------------------------------------------------  
-
+			int fileTrgtKey = CR08Mapper.selectSalesStmtSeqNext(paramMap);
+			String sellDcsnNo = "CONF23-0003" ; //SELL_DCSN_NO//test code!!!
 			
-			//int fileTrgtKey = CR08Mapper.selectPchsCostSeqNext(paramMap);
-			///paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
-			//int result = CR08Mapper.insertSalesStmtCal(paramMap);
+			paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+			paramMap.put("sellDcsnNo", sellDcsnNo);
 			
-			String fileTrgtKey = "BILL23-0003"; //test code!!!
-			paramMap.put("fileTrgtKey", fileTrgtKey);
-			int result = CR08Mapper.insertSalesStmtCal(paramMap);
-		
+			int result = CR08Mapper.insertSalesStmt(paramMap);
+			
+			System.out.println("fileTrgtKey===?"+fileTrgtKey);
 			//---------------------------------------------------------------  
 			//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 			//---------------------------------------------------------------  
@@ -164,6 +179,8 @@ public class CR08SvcImpl implements CR08Svc{
 		    
 		    return result;
 	  }
+	  
+
 
 	  @Override
 	  public int deletePchsCost(Map<String, String> paramMap) throws Exception {

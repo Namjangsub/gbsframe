@@ -9,11 +9,15 @@ public interface CR08Mapper {
 	
 	 int selectPchsCostCount(Map<String, String> paramMap);
 	 
+	 int selectSalesStmtConCount(Map<String, String> paramMap);
+	 
 	 int selectSalesStmtCalCount(Map<String, String> paramMap);
 
 	  List<Map<String, String>> selectSalesStmtList(Map<String, String> paramMap);
 	  
 	  List<Map<String, String>> selectSalesStmtCalList(Map<String, String> paramMap);
+	  
+	  List<Map<String, String>> selectSalesStmtConList(Map<String, String> paramMap);
 	  
 	  Map<String, String> selectPchsCostInfo(Map<String, String> paramMap);
 	  
@@ -25,7 +29,9 @@ public interface CR08Mapper {
 
 	  int selectPchsCostSeqNext(Map<String, String> paramMap);
 	  
-	  int insertSalesStmtCal(Map<String, String> paramMap);
+	  int selectSalesStmtSeqNext(Map<String, String> paramMap);
+	  
+	  int insertSalesStmt(Map<String, String> paramMap);
 
 	  int updatePchsCost(Map<String, String> paramMap);
 
