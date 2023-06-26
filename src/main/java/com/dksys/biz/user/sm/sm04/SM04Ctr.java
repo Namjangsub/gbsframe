@@ -1,13 +1,15 @@
 package com.dksys.biz.user.sm.sm04;
 
 import com.dksys.biz.cmn.vo.PaginationInfo;
-import com.dksys.biz.user.cr.cr01.service.CR01Svc;
 import com.dksys.biz.user.sm.sm04.service.SM04Svc;
 import com.dksys.biz.util.MessageUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import java.util.List;
@@ -23,20 +25,6 @@ public class SM04Ctr {
     @Autowired
     SM04Svc sm04svc;
 
-
-    @PostMapping("/maxEst")
-    public String showEstimationForm(@RequestBody Map<String, String> param, ModelMap model) {
-        String maxEstNo = sm04svc.selectMaxEstNo(param);
-        model.addAttribute("maxEstNo", maxEstNo);
-        return "jsonView";
-    }
-
-    @PostMapping("/selectMaxEstDeg")
-    public String selectMaxEstDeg(@RequestBody Map<String, String> param, ModelMap model) {
-        String maxEstDeg = sm04svc.selectMaxEstDeg(param);
-        model.addAttribute("maxEstDeg", maxEstDeg);
-        return "jsonView";
-    }
 
     @PostMapping("/selectIoList")
     public String selectIoList(@RequestBody Map<String, String> param, ModelMap model) {
@@ -82,6 +70,18 @@ public class SM04Ctr {
         return "jsonView";
     }
     
+
+	//정보 조회
+	@PostMapping(value = "/select_sm04_info")
+	public String select_sm04_info(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = sm04svc.select_sm04_info(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+    
+
+	//기본정보 & 불출정보 등록
     @PostMapping(value = "/insert_sm04")
     public String insert_sm04(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
@@ -100,7 +100,8 @@ public class SM04Ctr {
 	}
     
     
-    
+
+	//출고창고 재고정보 등록
     @PostMapping(value = "/insert_sm04_Info")
     public String insert_sm04_Info(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model)  {
 		try {
@@ -134,21 +135,6 @@ public class SM04Ctr {
 	 */
     
     
-    @PostMapping(value = "/insertEstDeg")
-    public String insertEstDeg(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
-        try {
-            Map<String, Object> newEstMap = sm04svc.insertEstDeg(paramMap, mRequest);
-            System.out.println(newEstMap + "최종");
-            model.addAttribute("resultCode", 200);
-            model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-            model.addAttribute("param", newEstMap);
-        } catch (Exception e) {
-            model.addAttribute("resultCode", 500);
-            model.addAttribute("resultMessage", e.getLocalizedMessage());
-        }
-        return "jsonView";
-    }
-
 
 	/*
 	 * @PutMapping(value = "/updateEst") public String updateEst(@RequestParam

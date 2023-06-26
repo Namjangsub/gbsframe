@@ -28,7 +28,7 @@
 							<select id="coCd" name="coCd" data-kind="CO" required msg="회사">
 							</select>
                         </td>
-                        <th class="" title="Sales Code를 확인하거나,입력합니다">Sales Code</th>
+                        <th class="" >Sales Code</th>
                         <td>
 							<div class="search_form" >
 							<input type="text"  id="salesCd" name="salesCd"  data-search="salesCd" required msg="Sales Code">
@@ -217,9 +217,9 @@
 					onDataChanged: function () {
 						var index = this.dindex;
 						var item = this.item;
-						var self = this.self;
+						var self = this.self;	
 						ckQty(item, index, self);
-						
+					
 					}
 			   },
 	           page: {
@@ -363,9 +363,11 @@
 	function ckQty(item, index, self) {
 	//debugger;
 		var row = gridView3.target.getList("selected")[index];
+		
 		//체크박스 유무에 따른 행 update
 		if (item.chk == "Y") {
-			if(item.outQty != item.stockQty && item.outQty != "0"){}
+			if(item.outQty != item.stockQty && item.outQty != "0"){
+			}
 			else {
 				self.updateRow($.extend({}, item, 
 						{
@@ -403,6 +405,34 @@
 
 			//self.updateColumn({key: "matrMat", label: "소재", align: "center", width: 80}, 6);
 	    } 
+		
+		console.log("outQty : " + Number(item.outQty));
+		console.log("stockQty : "+item.stockQty);
+		debugger;
+		
+		var stockQty = parseInt(item.stockQty, 10);
+		var outQty = parseInt(item.outQty, 10);
+		
+		if(stockQty < outQty ) {
+			
+			alert("출고수량이 재고수량 보다 많습니다.");
+
+	    	self.updateRow($.extend({}, item, 
+					{
+						dsgnNo: item.dsgnNo,
+						matrCd: item.matrCd,
+						matrNm: item.matrNm,
+						matrSpec: item.matrSpec,
+						matrMat: item.matrMat,
+						matrMakrNm: item.matrMakrNm,
+						matrMno: item.matrMno,
+						stockQty: item.stockQty,
+						chk :'N',
+						outQty: 0
+					}
+			), index); 
+			
+		} 
 	}
 
 
@@ -464,57 +494,105 @@
 	if (actionType == "C") {
         $('#actionIoBtn').on("click", function () {
             insertIo();
-			//alert("insert");
         });
         //setCurrentDateToDatePicker('#fwdExchJoinDt');
         //setCurrentDateToDatePicker('.input_calendar');
 
-    }
+	} else if (actionType == "U") {
+		
+		//타이틀명 변경
+		$('.tit').text('자재불출 수정')
+		
+		//회사
+		$("#coCd").prop("disabled", true);			
+		//Sales Code
+		$("#salesCd").prop("readonly", true);
+		//고객사
+		$("#vendCd").prop("readonly", true);
+		//고객사 PJT
+		$("#clntPjtCd").prop("disabled", true);
+		//제품구분
+		$("#prdtCd").prop("readonly", true);
+		$("#prdtNm").prop("readonly", true);
+		//아이템구분
+		$("#itemDiv").prop("disabled", true);
+		//설비명
+		$("#eqpNm").prop("disabled", true);
+		//불출번호
+		$("#ioNo").prop("disabled", true);
+		//불출일자
+		$("#ioDt").prop("readonly", true);
+		//사급구분
+		$("#socYn").prop("readonly", true);
+		//출고창고
+		$("#outWhNm").prop("readonly", true);
+		//입고창고
+		$("#inWhNm").prop("readonly", true);
+		//비고
+		$("#ioRmk").prop("readonly", true);
+
+		//수정 모드 데이터 가져오기
+		select_sm04_info();
+		
+		//버튼명 변경
+		$('#actionBtn').text("수정");
+
+		//버튼 클릭 시
+		/* $('#actionBtn').on("click", function() {
+			update_sm10();
+		});
+		 */
+	}
+	
+	//그리드에 뿌리는 데이터
+	function select_sm04_info() {
+		var formData = {
+			"fileTrgtKey" : fileTrgtKey,
+			"coCd" :  $('#coCd_S').val()
+		}
+		
+		postAjax("/user/sm/sm04/select_sm04_info", formData, null, function(data) {
+			$.each(data.result, function(key, value) {
+				if ($('#popForm #' + key)[0]) {
+					$('#popForm #' + key).val(value);
+					
+					if ($('#popForm #' + key).is('[comma]')) {
+						onlyNumber($('#popForm #' + key)[0]);
+					}
+				}
+			});
+		});
+	}
 	
 	// 기본정보 & 불출정보 INSERT
 	function insertIo() {
 		
 		var outWhNm = $('#outWhNm').val();
 		var inWhNm = $('#inWhNm').val();
-		
+        var formData = makeFormData(); //SM0401M01
+        var entries = formData.entries();
 		
 		if(outWhNm == inWhNm) {
 	        alert("출고창고와 입고 창고를 다르게 입력하세요.");
 	        return;
 		}
 		
-		
-         var formData = makeFormData(); //SM0401M01
-         
-         var entries = formData.entries();
-			
-			//formData  값 확인
-	 	    console.log("시작"); 
-	        for (const pair of entries) {
-	       	    console.log("Key : " + pair[0]+ " value : " + pair[1]); 
-	       	}
-         debugger;
-         
-       	 filePostAjax("/user/sm/sm04/insert_sm04", formData, function(data) {	
-			alert(data.resultMessage);			
-			if (data.resultCode == 200) {
-
-		         debugger;
-				StockInfoInsert();
-				//gridView.setData(0);
-				//modalStack.close();				
-				}
-			}
-		);
+         if(inputValidation($('.popup_area [required]'))) {
+        	 filePostAjax("/user/sm/sm04/insert_sm04", formData, function(data) {	
+     			if (data.resultCode == 200) {
+     				StockInfoInsert();
+     				//gridView.setData(0);
+     				//modalStack.close();				
+     				}
+     			});
+         }
+       	 
     }
 	
 	// 출고창고 재고정보 INSERT
 	function StockInfoInsert() {
-		//debugger;
-		//var formDataInfo = new FormData();
-        var formDataInfo = makeInfoFormData();
-        //var entries = formData.entries();
 		
+        var formDataInfo = makeInfoFormData();
 		
 	}
 	
@@ -522,93 +600,69 @@
 		
 		var formDataInfo = new FormData();
 		var row = gridView3.target.getList();
-		formDataInfo.append("coCd", 'GUN');
-		formDataInfo.append("dsgnNo", '23001-01HTFUP-1000-100-R1');
-		formDataInfo.append("matrCd", '200-00001');
-		formDataInfo.append("ioQty", '2');
-		formDataInfo.append("outInoutKey", null);
-		formDataInfo.append("inInoutKey", null);
-		formDataInfo.append("creatId", jwt.userId);
-		formDataInfo.append("creatpgm", $("#pgmId").val());
 		
-		var entries = formDataInfo.entries();
-		
-		//formData  값 확인
- 	    console.log("시작"); 
-        for (const pair of entries) {
-       	    console.log("Key : " + pair[0]+ " value : " + pair[1]); 
-       	}
+   	    console.log("ioNo : " + $("#ioNo").val()); 
+   	    console.log("salesCd : " + $("#salesCd").val()); 
 
-		
-		
-		  for(var i=0; i<row.length; i++) {
+	    var a = 0;
+	    
+		for(var i=0; i<row.length; i++) {
+	    	console.log("i+1 : " + (i+1)); 
 			 if(row[i].chk == "Y" ) {
-				//formDataInfo.append("list["+i+"]", gridView3.target.getList()[i] );	
-				//console.log("list["+i+"]", gridView3.target.getList()[i]);
-				
-				formDataInfo.append("coCd", row[i].coCd);
-				formDataInfo.append("dsgnNo", row[i].dsgnNo);
-				formDataInfo.append("matrCd", row[i].matrCd);
-				formDataInfo.append("ioQty", row[i].outQty);
-				formDataInfo.append("outInoutKey", row[i].outInoutKey);
-				formDataInfo.append("inInoutKey", row[i].inInoutKey);
-				formDataInfo.append("creatId", jwt.userId);
-				formDataInfo.append("creatpgm", $("#pgmId").val());
-				
-				var entries = formDataInfo.entries();
-				
-				//formData  값 확인
-		 	    console.log("시작"); 
-		        for (const pair of entries) {
-		       	    console.log("Key : " + pair[0]+ " value : " + pair[1]); 
-		       	}
-
-		         debugger;
-		        filePostAjax("/user/sm/sm04/insert_sm04_Info", formDataInfo, function(data) {	
-					alert(data.resultMessage);			
-					if (data.resultCode == 200) {
-
-				 	    console.log("확인");
-
-				         debugger;
-						formDataInfo.delete("coCd");
-						formDataInfo.delete("dsgnNo");
-						formDataInfo.delete("matrCd");
-						formDataInfo.delete("ioQty");
-						formDataInfo.delete("outQty");
-						formDataInfo.delete("outInoutKey");
-						formDataInfo.delete("inInoutKey");
-						formDataInfo.delete("creatId");
-						formDataInfo.delete("creatpgm");
-						
-						}
+			 //formDataInfo.append("list["+i+"]", gridView3.target.getList()[i] );	
+			 //console.log("list["+i+"]", gridView3.target.getList()[i]);
+					
+			 var cnt = ++a;
+				 
+			 console.log(i+" 번 삭제 시작 ");
+			 formDataInfo.delete('coCd');
+			 formDataInfo.delete('ioNo');
+			 formDataInfo.delete('dsgnNo');
+			 formDataInfo.delete('matrCd');
+			 formDataInfo.delete('ioQty');
+			 formDataInfo.delete("ioSeq");
+			 formDataInfo.delete('salesCd');
+			 formDataInfo.delete('userId');
+			 formDataInfo.delete('pgmId'); 
+			
+   	    	 console.log("i+1 : " + (i+1)); 
+			 formDataInfo.append("coCd", row[i].coCd);
+			 formDataInfo.append("ioNo", $("#ioNo").val());
+			 formDataInfo.append("dsgnNo", row[i].dsgnNo);
+			 formDataInfo.append("matrCd", row[i].matrCd);
+			 formDataInfo.append("ioQty", row[i].outQty);
+			 formDataInfo.append("ioSeq", cnt);
+			 formDataInfo.append("salesCd", $("#salesCd").val());
+			 formDataInfo.append("userId", jwt.userId);
+			 formDataInfo.append("pgmId", $("#pgmId").val());
+			
+			 var entries = formDataInfo.entries();
+			
+			 //formData  값 확인
+	 	     console.log(i+" 번 조회 시작"); 
+	         for (const pair of entries) {
+	       	     console.log("Key : " + pair[0]+ " value : " + pair[1]); 
+	       	 }
+			
+	         filePostAjax("/user/sm/sm04/insert_sm04_Info", formDataInfo, function(data) {	
+				//alert(data.resultMessage);
+       			debugger;
+				if (data.resultCode == 200) {
+					if(i == row.length) {
+						gridView.setData(0);
+						modalStack.close();	
+						return alert(data.resultMessage);
 					}
-				);
-
-			} 
-		}  
-		
-		//return formDataInfo;
+				} else { 
+					alert("등록에 실패하였습니다."); 
+				}
+			});
+		} 
+	 };  
 	}
-	
-	//formData  값 확인
-	function forment () {
-		
-
-		var entries = formDataInfo.entries();
-		
-		//formData  값 확인
- 	    console.log("시작"); 
-        for (const pair of entries) {
-       	    console.log("Key : " + pair[0]+ " value : " + pair[1]); 
-       	}
-		
-	}
-	
 	
 	function makeFormData() {
 		
-
 		// 날짜 하이픈 제거
 		$.each($('.popup_area input[date]'), function(idx, elem) {
 			deleteHyphen(elem);
@@ -620,23 +674,15 @@
 		//-------itemarr  --첨부화일 처리를 위한 부분 시작
 		//---------------------------------------------------------------
 		// 유저아이디 추가
-		formData.append("creatId", jwt.userId);
-		formData.append("creatPgm", $("#pgmId").val());
+		formData.append("userId", jwt.userId);
+		formData.append("pgmId", $("#pgmId").val());
+		//formData.append("ioNo", "IO2300003");
 		formData.append("ioDiv", "INOUTDIV_O03");
-		//formData.append("clntCd", $('#vendCd').val());			//첨부화일용
+		formData.append("clntCd", $('#vendCd').val());			//첨부화일용
 		formData.append("prdtCd", $('#prdtCd').val());			//첨부화일용
 		formData.append("itemCd", $('#itemDiv').val());			//첨부화일용
 		formData.append("prjctCd", $('#clntPjt').val());		//첨부화일용
-		formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용
-		
-		var entries = formData.entries();
-		
-		//formData  값 확인
- 	    console.log("시작"); 
-        for (const pair of entries) {
-       	    console.log("Key : " + pair[0]+ " value : " + pair[1]); 
-       	}
-		
+		formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용 
 		
 		var fileUploadArr = [];
 		var tempArr = [];
@@ -687,123 +733,6 @@
 	}
 	
 
-    // 담당자 정보 설정 함수
-    function setMngInfo(paramObj) {
-        postAjax("/admin/bm/bm02/selectMngInfo", paramObj, null, function (data) {
-            if (data.mngInfo) {
-                $('#salesEmpId').val(data.mngInfo.salesEmpId);
-                $('#salesEmpNm').val(data.mngInfo.salesEmpNm);
-            } else {
-                $('#salesEmpId').val("");
-                $('#salesEmpNm').val("");
-            }
-        });
-    }
-
-    // 사용자 검색 함수
-    function openSecondUserSearch(searchValue) {
-
-        if (event && event.keyCode === 13) {
-            event.preventDefault();  // prevent form from submitting
-        }
-        var paramObj = {
-            "coCd": "GUN", //$('#coCd').val(),
-            "userId": $('#salesEmpId').val(),
-            "useYn": "Y",
-            "searchValue": searchValue
-        };
-
-        openSecondModal("/static/html/cmn/modal/userSearch.html", 300, 500, "사용자 검색", paramObj, function (tree) {
-            var checkedId = tree.get_checked()[0];
-            var checkedNode = tree.get_node(checkedId);
-            $("#mngId").val(checkedNode.id);
-            $("#mngIdVisible").val(checkedNode.text);
-            // $("#salesEmpNm").val(checkedNode.text);
-            $("#mngId").focus();
-            $("#mngId").trigger("click");
-        });
-    }
-
-
-    // 제품 검색 함수
-    function openSecondPrdtSearch(elem) {
-        $targetRow = $(elem).closest('tr[name="detailRow"]');
-        // selpchCd - SELPCH2: 매출
-        var paramObj = {
-            "coCd": $("#coCd").val(),
-            "selpchCd": "SELPCH2",
-            "impYn": "N",
-            "clntCd": $("#estClntCd").val(),
-            "prjctCd": $("#prjctCd").val(),
-            "useYn": "Y"
-        };
-
-        openSecondModal("/static/html/cmn/modal/prdtSearch.html", 800, 600, "제품 검색", paramObj, function (grid) {
-            var row = grid.target.getList("selected")[0];
-            // 값 초기화
-            $targetRow.find('input[name]').val("");
-            // input 제어
-            if (row.prdtStockCd == "Y") {
-                $targetRow.find('input[name="prdtSize"]').attr("readonly", false);
-                $targetRow.find('input[name="prdtSpec"]').attr("readonly", false);
-                $targetRow.find('input[name="estQty"]').attr("readonly", false);
-                $targetRow.find('input[name="estWt"]').attr("readonly", false);
-            } else {
-                $targetRow.find('input[name="prdtSize"]').attr("readonly", true);
-                $targetRow.find('input[name="prdtSpec"]').attr("readonly", true);
-            }
-            $.each(row, function (key, value) {
-                if ($targetRow.find('[name="' + key + '"]')[0]) {
-                    $targetRow.find('[name="' + key + '"]').val(value);
-                }
-            });
-            $targetRow.find('input[name="estUpr"]').val(row.ordrgUpr);
-
-            countTot();
-        });
-    }
-
-    /* 기타함수 */
-
-    // 문자열을 주어진 바이트 길이로 자르는 함수
-    function cutStr(str, maxByte) {
-
-        for (b = i = 0; c = str.charCodeAt(i);) {
-            b += c >> 7 ? 2 : 1;
-            if (b > maxByte)
-                break;
-            i++;
-        }
-        return str.substring(0, i);
-    }
-
-    // 체크박스 전체 선택/해제 함수
-    function allChk(elem) {
-        if ($(elem).prop("checked")) {
-            $("[name='detailChkBox']").prop("checked", true);
-        } else {
-            $("[name='detailChkBox']").prop("checked", false);
-        }
-    }
-
-    
-
-
-
-    /* 파일관련함수 */
-
-
-    /* 리스너 */
-    /* $(document).on("change", "input[name='estQty'], input[name='estWt'], input[name='estAmt'], input[name='expAmt']", function () {
-
-    }); */
-
-   /*  $(document).on("click", "#fileBtn", function () {
-        $("#file").click();
-    });
- */
-
-    
 
 </script>
 </html>

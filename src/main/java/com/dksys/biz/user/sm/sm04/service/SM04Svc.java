@@ -7,9 +7,6 @@ import java.util.Map;
 
 public interface SM04Svc {
 
-    String selectMaxEstNo(Map<String, String> paramMap);
-
-    String selectMaxEstDeg(Map<String, String> paramMap);
 
     public int selectIoCount(Map<String, String> param);
 
@@ -22,15 +19,15 @@ public interface SM04Svc {
     public List<Map<String, Object>> selectStInfo(Map<String, String> param);
     
     public List<Map<String, Object>> selectWhCd(Map<String, String> param);
-    
 
-    //DATA INSERT
+    // 수정화면 정보
+    Map<String, String> select_sm04_info(Map<String, String> paramMap);
+
+	//기본정보 & 불출정보 등록
     int insert_sm04(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
+	//출고창고 재고정보 등록
     int insert_sm04_Info(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
-    Map<String, Object> insertEstDeg(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
-
-    int updateEstConfirm(Map<String, String> paramMap);
 
 }
