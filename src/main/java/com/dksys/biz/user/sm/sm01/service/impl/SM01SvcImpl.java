@@ -46,11 +46,6 @@ public class SM01SvcImpl implements SM01Svc {
   }
 	
   @Override
-  public int selectBomDetailCount(Map<String, String> paramMap) {
-	return sm01Mapper.selectBomDetailCount(paramMap);
-  }
-	
-  @Override
   public List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap) {
     return sm01Mapper.selectBomDetailList(paramMap);
   }
@@ -91,13 +86,23 @@ public class SM01SvcImpl implements SM01Svc {
 		//---------------------------------------------------------------  
 		//String  newPrjctSeq = String.valueOf(sm01Mapper.selectPrjctSeqNext(paramMap));
 		//paramMap.put("prjctSeq", newPrjctSeq);
-		int result = sm01Mapper.insertBom(paramMap);
+		//int result = sm01Mapper.insertBom(paramMap);
+		int result = 200;
 	
 	    List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
 	    for (Map<String, String> dtl : bomList) {
 	    	//dtl.put("prjctSeq", newPrjctSeq);
 	    	dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
+	    	String dtaChk = dtl.get("dtaChk").toString();
+	    	if ("I".equals(dtaChk)) {
+	    		sm01Mapper.insertBom(dtl);
+	    	} else if ("U".equals(dtaChk)) {
+	    		sm01Mapper.updateBom(dtl);
+	    	} else if ("D".equals(dtaChk)) {
+	    		sm01Mapper.deleteBomMatrAll(dtl);
+	    		sm01Mapper.deleteBom(dtl);
+	    	}
 	    }
 	    List<Map<String, String>> matrList = gsonDtl.fromJson(paramMap.get("matrArr"), dtlMap);
 	    for (Map<String, String> dtl : matrList) {
@@ -160,7 +165,7 @@ public class SM01SvcImpl implements SM01Svc {
 	//첨부 화일 권한체크  끝 
 	//---------------------------------------------------------------  
 
-	int result = sm01Mapper.updateBom(paramMap);
+	int result = 200;//sm01Mapper.updateBom(paramMap);
     	//  sm01Mapper.updateBom(paramMap)을 호출하여 paramMap을 사용하여 프로젝트를 업데이트하고 그 결과를 result 변수에 저장.
 
     List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
@@ -170,13 +175,13 @@ public class SM01SvcImpl implements SM01Svc {
     	dtl.put("userId", paramMap.get("userId"));
     	dtl.put("pgmId", paramMap.get("pgmId"));
     	//      반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-    	String dtaChk = dtl.get("prjctCrudChk").toString();
+    	String dtaChk = dtl.get("dtaChk").toString();
     	/* "dtaChk" 값을 확인하여
     	 * "I"인 경우 sm01Mapper.insertBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
     	 * "U"인 경우 sm01Mapper.updateBomMatr(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
     	 * "D"인 경우 * sm01Mapper.deleteBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
     	if ("I".equals(dtaChk)) {
-    		dtl.put("prjctSeq", paramMap.get("prjctSeq"));
+    		//dtl.put("prjctSeq", paramMap.get("prjctSeq"));
     		sm01Mapper.insertBom(dtl);
     	} else if ("U".equals(dtaChk)) {
     		sm01Mapper.updateBom(dtl);

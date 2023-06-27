@@ -43,9 +43,6 @@ public class SM01Ctr {
 	// BOM내역상세 조회
 	@PostMapping(value = "/selectBomDetailList")
 	public String selectBomDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = sm01Svc.selectBomDetailCount(paramMap);
-		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		model.addAttribute("paginationInfo", paginationInfo);
 		List<Map<String, String>> resultList = sm01Svc.selectBomDetailList(paramMap);
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
