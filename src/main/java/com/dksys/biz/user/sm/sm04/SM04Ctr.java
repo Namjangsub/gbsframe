@@ -53,6 +53,7 @@ public class SM04Ctr {
         return "jsonView";
     }
 
+    //PopupGrid 조회
     @PostMapping("/selectStInfo")
     public String selectStInfo(@RequestBody Map<String, String> param, ModelMap model) {
         //int totalCnt = sm04svc.selectIoCount(param);
