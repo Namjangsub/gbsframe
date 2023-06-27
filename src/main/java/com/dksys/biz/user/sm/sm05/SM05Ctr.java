@@ -50,15 +50,15 @@ public class SM05Ctr {
 	}
 
 	//  폐기창고 재고정보 - 모달 
-	@PostMapping(value = "/selectIoOutWhList")
-	public String selectIoOutWhList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = sm05Svc.selectIoOutWhCount(paramMap);
-		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		model.addAttribute("paginationInfo", paginationInfo);
-		List<Map<String, String>> result = sm05Svc.selectIoOutWhList(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-	}  
+//	@PostMapping(value = "/selectIoOutWhList")
+//	public String selectIoOutWhList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+//		int totalCnt = sm05Svc.selectIoOutWhCount(paramMap);
+//		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+//		model.addAttribute("paginationInfo", paginationInfo);
+//		List<Map<String, String>> result = sm05Svc.selectIoOutWhList(paramMap);
+//		model.addAttribute("result", result);
+//		return "jsonView";
+//	}  
   
 	//정보 조회
 	@PostMapping(value = "/selectIoInfo")

@@ -11,16 +11,16 @@ public interface SM05Svc {
 	int selectIoDetailCount(Map<String, String> paramMap);
 	List<Map<String, String>> selectIoDetailList(Map<String, String> paramMap);
 
-	int selectIoOutWhCount(Map<String, String> paramMap);
-	List<Map<String, String>> selectIoOutWhList(Map<String, String> paramMap);
+//	int selectIoOutWhCount(Map<String, String> paramMap);
+//	List<Map<String, String>> selectIoOutWhList(Map<String, String> paramMap);
 
 	Map<String, String> selectIoInfo(Map<String, String> paramMap);
 	
 	public List<Map<String, Object>> selectOutWhNm(Map<String, String> param);
 	
 	// 폐기창고재고정보 - 모달창 
-	public int selectIoModalCount(Map<String, String> paramMap);
-	public List<Map<String, String>> selectIoModalList(Map<String, String> paramMap);
+	int selectIoModalCount(Map<String, String> paramMap);
+	List<Map<String, String>> selectIoModalList(Map<String, String> paramMap);
 
 	//Map<String, String> selectIoInfo(Map<String, String> paramMap);
 
