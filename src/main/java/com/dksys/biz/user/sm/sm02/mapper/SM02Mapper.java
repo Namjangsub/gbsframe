@@ -19,8 +19,10 @@ public interface SM02Mapper {
 	
 	String selectMaxOrdrgNo(Map<String, String> paramMap);		
 	
-	//결재선 등록, 수정, 삭제
+	//발주 등록, 수정, 삭제
 	int insertOrderMaster(Map<String, String> paramMap);
+	
+	int insertOrderDetail(Map<String, String> paramMap);	
 	
 	int updateOrderMaster(Map<String, String> paramMap);
 	

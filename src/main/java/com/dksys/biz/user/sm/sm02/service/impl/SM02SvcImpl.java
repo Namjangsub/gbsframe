@@ -25,6 +25,8 @@ import com.dksys.biz.user.sm.sm02.service.SM02Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -35,6 +37,12 @@ public class SM02SvcImpl implements SM02Svc {
 	
 	@Autowired
 	SM02Svc sm02Svc;
+	
+	@Autowired
+	CM15Svc cm15Svc;
+	
+	@Autowired
+	CM08Svc cm08Svc;	
 
 	@Autowired
 	ExceptionThrower thrower;
@@ -72,6 +80,33 @@ public class SM02SvcImpl implements SM02Svc {
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
 		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);		
 
+		//---------------------------------------------------------------  
+		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+	  	//   필수값 :  jobType, userId, comonCd
+		//---------------------------------------------------------------  
+	    HashMap<String, String> param = new HashMap<>();
+	    param.put("userId", paramMap.get("userId"));
+	    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
+	    
+		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
+		if (uploadFileList.size() > 0) {
+				//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
+				param.put("jobType", "fileUp");
+				cm15Svc.selectFileAuthCheck(param);
+		}
+		String[] deleteFileArr = gsonDtl.fromJson(paramMap.get("deleteFileArr"), String[].class);
+		List<String> deleteFileList = Arrays.asList(deleteFileArr);
+	    for(String fileKey : deleteFileList) {  // 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
+			    Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
+				//접근 권한 없으면 Exception 발생
+			    param.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
+			    param.put("jobType", "fileDelete");
+				cm15Svc.selectFileAuthCheck(param);
+		}
+		//---------------------------------------------------------------  
+		//첨부 화일 권한체크  끝 
+		//---------------------------------------------------------------  		
+		
 		int result = 0;	    
 		//FILE TARGET KEY
 		int fileTrgtKey = sm02Svc.selectMaxTrgtKey(paramMap);	
@@ -84,11 +119,33 @@ public class SM02SvcImpl implements SM02Svc {
 	    //insert orderMaster
 		result += sm02Mapper.insertOrderMaster(paramMap);
 	    
-		/*
-		 * for(Map<String, String> dtl : detailMap) { dtl.put("coCd",
-		 * paramMap.get("coCd")); result += sm02Mapper.insertOrderMaster(dtl); }
-		 */
+		for(Map<String, String> dtl : detailMap) {
+			dtl.put("coCd", paramMap.get("coCd"));
+			dtl.put("userId", paramMap.get("userId"));
+			dtl.put("pgmId", paramMap.get("pgmId"));
+			dtl.put("creatId", paramMap.get("userId"));
+			dtl.put("maxOrdrgNo", maxOrdrgNo);
+			
+    		result += sm02Mapper.insertOrderDetail(dtl);			
+		}			
 		  		
+		
+		//---------------------------------------------------------------  
+		//첨부 화일 처리 시작 
+		//---------------------------------------------------------------  
+	    if (uploadFileList.size() > 0) {
+		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		    cm08Svc.uploadFile(paramMap, mRequest);
+	    }
+	    
+	    for(String fileKey : deleteFileList) {
+	    	cm08Svc.deleteFile(fileKey);
+	    }
+		//---------------------------------------------------------------  
+		//첨부 화일 처리  끝 
+		//---------------------------------------------------------------  
+	    
 		return result;
 	}
 	
