@@ -3,21 +3,32 @@ package com.dksys.biz.user.sm.sm01.service;
 import java.util.List;
 import java.util.Map;
 
-public interface SM01Svc {
-	// 수주리스트
-	int selectBomSalesCount(Map<String, String> paramMap);
-	List<Map<String, String>> selectBomSalesList(Map<String, String> paramMap);
+import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-	// BOM내역상세 조회
-	int selectBomDetailCount(Map<String, String> paramMap);
-	List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);
-	
-	// 매출확정등록 조회
-	int addSellDscnCount(Map<String, String> paramMap);
-	List<Map<String, String>> addSellDscnList(Map<String, String> paramMap);
-	
-	// 매출확정등록 입력
-	int insertSellDscn(Map<String, String> paramMap);
-	
+public interface SM01Svc {
+
+  int selectBomSalesCount(Map<String, String> paramMap);
+
+  List<Map<String, String>> selectBomSalesList(Map<String, String> paramMap);
+  
+  List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);
+
+  List<Map<String, String>> selectBuyBomList(Map<String, String> paramMap);
+
+  List<Map<String, String>> selectBomMatrList(Map<String, String> paramMap);
+
+  Map<String, String> selectPrjctInfo(Map<String, String> paramMap);
+
+  int insertBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
+  int updateBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
+  int deleteBom(Map<String, String> paramMap) throws Exception;
+  
+  Map<String, String> selectPrjctIssueInfo(Map<String, String> paramMap);
+  
+  int insertBomIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+  
+  int updateBomIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
 }

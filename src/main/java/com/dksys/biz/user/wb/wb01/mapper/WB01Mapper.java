@@ -131,6 +131,8 @@ public interface WB01Mapper {
 	
 	
 	
+	List<Map<String, String>> selectNewWbsPlanTreeList(Map<String, String> paramMap);
+	List<Map<String, String>> selectWbsLeftSalesCodeList(Map<String, String> paramMap);
 	
 	
 	

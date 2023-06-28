@@ -80,9 +80,9 @@
 	      <!-- 리스트 -->
 	      <div class="ax5_grid" style="width: 100%">
 	        <ul class="ul_list" style="height:350px; width: 100%">
-	            <li style="width: 30%;">
+	            <li style="width: 35%;">
 	                <div class="table_list_tit" style="width: 100%;">
-	                	<h5 class="tit" style="float:left; margin-left: 8px; margin-top: 8px; margin-bottom: 8px;">구매 BOM</h5>
+	                	<h5 style="color: #444;font-size: 16px;float:left; margin-left: 8px; margin-top: 8px; margin-bottom: 8px;">구매 BOM</h5>
 		                <div class="add_btn pdl10" style="margin-right:8px; margin-top: 8px;">
 		                    <a onclick="addRowBom()" style="" authchk>+</a>
 		                    <a onclick="delRowBom()" style="" authchk>-</a>
@@ -92,9 +92,9 @@
 	                	<div data-ax5grid="bom-grid" data-ax5grid-config="{}" style="height:300px; width: 100%" ></div>
 	                </div>
 	            </li>
-	            <li style="width: 68%; margin-left: 8px;">
+	            <li style="width: 63%; margin-left: 8px;">
 	                <div class="table_list_tit">
-	                	<h5 class="tit" style="float:left; margin-left: 8px; margin-top: 8px; margin-bottom: 8px;">하위 자재정보</h5>
+	                	<h5 style="color: #444;font-size: 16px;float:left; margin-left: 8px; margin-top: 8px; margin-bottom: 8px;">자재정보</h5>
 		                <div class="add_btn pdl10" style="margin-right:8px; margin-top: 8px;">
 		                    <a onclick="addRowMatr()" style="" authchk>+</a>
 		                    <a onclick="delRowMatr()" style="" authchk>-</a>
@@ -147,20 +147,30 @@
 <script type="text/javascript">
   
 var actionType = null;
-var param_SalesCd = null;
 
 var firstGrid = null;
 var secondGrid = null;
 
-var prdtArr = [];
-var prdtDeleteArr = [];//제품코드 삭제 내용 저장
-var prdtItemArr = [];  //제품코드:상세아이템 그리드내용,...로 임시저장, 변경된건만 저장
+var bomArr = []; //bom
+var bomDeleteArr = [];//삭제 내용 저장
 var detailArr = [];
 
-var prdtIdx = null;		//제품선택병경 체크용 인덱스	
-var saveWork = false;	//제품 아이템 수정 내역 체크
-var savePrdtCd = null;	//제품선택변경 체크용
+var matrArr = [];  //자재 데이타
+
+var before_bomIdx = -1; //제품선택병경 체크용 인덱스
+var before_dsgnNo = null;
+
+var select_bomIdx = -1; //제품선택병경 체크용 인덱스
+var select_dsgnNo = null;
+
+
+var saveWork = false;	 //제품 아이템 수정 내역 체크
+var savePrdtCd = null;	 //제품선택변경 체크용
 var savePrdtNewCd = null;	//제품선택변경 체크용
+
+
+
+var bomGridView_notchange = false;
 
 let selectedRowKey;
 let previousSelectedRowKey;
@@ -182,12 +192,22 @@ var bomGridView = {
 		         body: {
 			        	 onClick: function () {
 			             	this.self.select(this.dindex);
+			             	select_bomIdx = this.dindex;
+			             	select_dsgnNo = bomGridView.target.getList("selected")[0].dsgnNo;
+			             	
+			             	//원본데이타에서 화면데이터 제거 --> 화면데이타 put 원본데이타에.
+			             	matrGridView.selectGrid(select_dsgnNo);
+			             	before_bomIdx = this.dindex;
+			             	before_dsgnNo = bomGridView.target.getList("selected")[0].dsgnNo;
+			             	
+			             	//matrGridView.initView();
+			             	//matrGridView.setData(0);
 			                /*
 			                if (saveWork) {
-		                		prdtItemArr[prdtIdx] = matrGridView.target.list;
+		                		matrArr[before_bomIdx] = matrGridView.target.list;
 		                		saveWork = false;
 			                }
-			                prdtIdx = this.dindex;
+			                
 			                savePrdtCd = this.item.prjctPrdtCd;
 			                savePrdtNewCd = this.item.prjctPrdtNewCd;
 			                matrGridView.setData(savePrdtCd, savePrdtNewCd);
@@ -199,66 +219,215 @@ var bomGridView = {
 						 },
 						 */
 			             onDataChanged: function () {
+			            	//if(bomGridView_notchange) return;
+			            	
 			            	if (this.item.__selected__ == true) {
-			                	prdtIdx = this.dindex;
+			                	//before_bomIdx = this.dindex;
 			                	//savePrdtCd = this.item.prjctPrdtCd;
 			                	//savePrdtNewCd = this.item.prjctPrdtNewCd;
 			                }
-			            	 //제품내역 수정이 있으면 저장 필요
-// 			            	saveWork = true;
-			            	if(this.item.prdtUpd != "I") {
-				            	this.item.prdtUpd = 'U';
+			            	
+			            	if(this.key == "partNo" || this.key == "unitNo" || this.key == "revNo"){//입력항목일때
+			            		//console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>["+(this.item.dtaChk != "I")+"] "+(this.item.dtaChk != "I"));
+				            	if(this.item.dtaChk != "I") {
+				            		this.item.dtaChk = "U";
+				            		//bomGridView.target.setValue(this.dindex, "dtaChk", "U");
+				            	}
 			            	}
-			             },
+
+			            	//입력후 partNo, unitNo, revNo 입력 문자크기 잘못 입력시 지움
+			            	if(this.item.lvl == 1 && this.key == "partNo" && this.value != "" && (""+this.item.partNo).length < 4){
+			            		this.item.partNo = "";
+			            	}
+			            	else if(this.item.lvl == 2 && this.key == "unitNo" && this.value != "" && (""+this.item.partNo).length < 3){
+			            		this.item.unitNo = "";
+			            	}
+			            	else if(this.item.lvl == 3 && this.key == "revNo" && this.value != "" && (""+this.item.partNo).length < 2){
+			            		this.item.revNo = "";
+			            	}
+			            	
+			            	//입력후 partNo, unitNo, revNo 로  dsgnNo,lowerCd 생성
+			            	if(this.item.lvl == 1 && this.key == "partNo"){
+			            		this.item.dsgnNo = this.item.salesCd + adPer(this.item.partNo);
+			            	}
+			            	else if(this.item.lvl == 2 && this.key == "unitNo"){
+			            		this.item.dsgnNo = this.item.salesCd + adPer(this.item.partNo) + adPer(this.item.unitNo);
+			            	}
+			            	else if(this.item.lvl == 3 && this.key == "revNo"){
+			            		this.item.dsgnNo = this.item.salesCd + adPer(this.item.partNo) + adPer(this.item.unitNo) + adPer(this.item.revNo);
+			            	}
+			            	this.item.lowerCd = this.item.dsgnNo;
+			            	
+			            	//Mast 삭제시 자재삭제 실데이타는 deleteBomMatrAll -> deleteBom 으로 삭제시 모든 자재삭제
+			            	if(this.key == "dtaChk" && this.value != ""){
+				            	if(this.item.dtaChk == "D") {
+				            		var delIdxArray = findIndexArray(matrArr, "dsgnNo", this.item.dsgnNo);
+				        			for(var i=delIdxArray.length-1; i >= 0; i--){
+				        				matrArr.splice(delIdxArray[i],1);
+				        			}
+				        			var list = getFilterData(this.item.dsgnNo);
+				        			matrGridView.target.setData({
+				                		list : list,
+				                		page : {
+				                			totalElements : list.length
+				                		}
+				           			});
+				            	}
+			            	}
+			            	
+			            	//PART, UNIT 변경시 하위정보 변경 >>> 하위 찾기 메소드 필요..
+			            	if(this.key == "partNo"||this.key == "unitNo"){
+			            		/*
+			            		var new_partNo = this.item.partNo;
+			            		var new_unitNo = this.item.unitNo;
+			            		var new_revNo = this.item.revNo;
+			            		var new_lowerCd = this.item.lowerCd;//변경된 값
+			            		var old_lowerCd = this.item.oldLowerCd;
+
+			            		var bomGridView_oldPartNo = this.item.oldPartNo;
+			            		console.log("======oldPartNo====>"+bomGridView_oldPartNo);
+			            		//var bomGridView_oldUnitNo = this.item.oldUnitNo;
+			            		//var bomGridView_oldRevNo  = this.item.oldRevNo;
+			            		//var bomGridView_lowerCd = this.item.lowerCd;//변경된 값
+			            		//var bomGridView_upperCd = this.item.upperCd;//변경된 값
+			            		var bomGridList = bomGridView.target.getList();
+			            		//bomGridView_notchange = true;
+		        				$.each(bomGridList, function (idx, elem) {
+		        					if(elem.oldLowerCd.indexOf(old_lowerCd) == 0) {
+		        						//var new_lowerCd = elem.salesCd + adPer(new_partNo) + adPer(new_unitNo) + adPer(new_revNo);
+		        						var set_lowerCd = elem.lowerCd.replace(old_lowerCd,new_lowerCd);
+		        						console.log("===========partNo>> onChange ########"+idx+"   >>>"+elem.lowerCd+ ">>> "+set_lowerCd);
+		        						
+		        						bomGridView.target.setValue(idx, "partNo", new_partNo);
+		        						bomGridView.target.setValue(idx, "lowerCd",set_lowerCd);
+		        						bomGridView.target.setValue(idx, "dsgnNo", set_lowerCd);
+		        					}
+		        				});
+		        				//bomGridView_notchange = false;
+		        				*/
+			            	}
+			            	
+			            	//자재정보의 dsgnNo,lowerCd Change
+			            	if(this.key == "partNo"||this.key == "unitNo"||this.key == "revNo"){
+			            		//console.log("===========partNo>> onChange 2222222");
+			            		var matrGridList = matrGridView.target.getList();
+			            		if(matrGridList.length > 0) {
+			            			var matrGridView_dsgnNo = "";
+			            			var matrGridView_upperCd = "";
+			            			var matrGridView_lowerCd = "";
+			            			if((this.key == "partNo" && this.item.partNo != "")
+					            			||(this.key == "unitNo" && this.item.unitNo != "")
+					            			||(this.key == "revNo" && this.item.revNo != "")){//입력항목 && 입력값이 있을때
+			            				matrGridView_dsgnNo = this.item.dsgnNo;
+			            				matrGridView_lowerCd = this.item.lowerCd;
+			            				matrGridView_upperCd = this.item.upperCd;
+			            			}
+			            			
+			            			//현재편집중인 자재정보 반영
+			        				$.each(matrGridList, function (idx, elem) {
+			        					elem.dsgnNo = matrGridView_dsgnNo;
+			        					elem.lowerCd = matrGridView_lowerCd;
+			        					elem.upperCd = matrGridView_upperCd;
+			        					elem.dtaChk = "U";
+			        				});
+				        			matrGridView.target.setData({
+				                		list : matrGridList,
+				                		page : {
+				                			totalElements : matrGridList.length
+				                		}
+				           			});
+			            		}
+			            	}//end if//자재정보
+			            	bomGridView.target.repaint();
+			             }//,
 	             },
 		        columns : [
 		        	//,hidden:true
-		        	{key: "prdtUpd",label: " ", width: 30},
+		        	{key: "dtaChk",label: " ", width: 30, 	styleClass: "grid-font-blue-bold"},
 		        	{key: "fileTrgtKey",label: "k", width: 30,hidden:true},
 		        	{key: "coCd", label: "CO", width: 50},
-		        	{key: "salesCd", label: "Sales Code", width: 100},
+		        	{key: "salesCd", label: "Sales Code", width: 120},
 		        	{key: "lvl", label: "LVL", width: 50},
 	                {key: "partNo", label: "PART", width: 80, 
-		        		editor: {type: "number",
-				        			disabled: function () {
+		        		editor:{type:  "number",
+			        			disabled: function () {
+			        				if(this.item.lvl >= 1){
 				        		        return false;
-				        		    },
-				        		    attributes: {
-				        		        'maxlength': 4, 'data-maxlength': 4
-				        		    }
-	                			}
+			        				} else {
+			        					return true;
+			        				}
+			        		    },
+			        		    attributes: {
+			        		        'maxlength': 4, 'data-maxlength': 4
+			        		    }
+        				}
 	                },
 	                {key: "unitNo", label: "UNIT", width: 80,
-		        		editor: {type: "number",
-		        			disabled: function () {
-		        		        return false;
-		        		    },
-		        		    attributes: {
-		        		        'maxlength': 3, 'data-maxlength': 3
-		        		    }
+		        		editor:{type: "number",
+			        			disabled: function () {
+			        				if(this.item.lvl >= 2){
+				        		        return false;
+			        				} else {
+			        					return true;
+			        				}
+			        		    },
+			        		    attributes: {
+			        		        'maxlength': 3, 'data-maxlength': 3
+			        		    }
 	        			}
 	                },
 	                {key: "revNo", label: "REV", width: 80,
 		        		editor: {type: "text",
 		        			disabled: function () {
-		        		        return false;
+		        				if(this.item.lvl >= 3){
+			        		        return false;
+		        				} else {
+		        					return true;
+		        				}
 		        		    },
 		        		    attributes: {
 		        		        'maxlength': 2
 		        		    }
             			}
 	                },
-		        	{key: "dsgnNo", label: "도번",width: 120},
-					{key: "upperCd", label: "상위코드", editor: {type: "text"}},
-					{key: "lowerCd", label: "하위코드", editor: {type: "text"}}
+		        	{key: "dsgnNo" , label: "도번" 	,width: 180,align: "left"},
+					{key: "upperCd", label: "상위코드" ,width: 160,align: "left"},
+					{key: "lowerCd", label: "하위코드" ,width: 180,align: "left"}
 			     ]
 		    });
 			return this;
 		},
 
 
-        setData: function(chk){
+        setData: function(_pageNo){
+			var target = this.target;
+			var formData = {
+				"salesCd" 		: $("#salesCd").val(),
+			}
 
+    		postAjax("/user/sm/sm01/selectBuyBomList", formData, null, function(data) {
+				var list = data.resultList;
+				target.setData({
+            		list : list,
+            		page : {
+            			totalElements : list.length
+            		}
+       			});
+				if(list.length > 0){
+					bomGridView.target.clearSelect();
+					//bomGridView.target.focus("HOME")
+					bomGridView.target.select(0);
+					bomGridView.target.focused = true;
+					select_bomIdx = 0;
+					before_bomIdx = 0;
+					select_dsgnNo = bomGridView.target.getList("selected")[0].dsgnNo;
+					before_dsgnNo = select_dsgnNo;
+					
+					//자재정보 조회
+					matrGridView.setData('A');
+				}
+    	 	});
+        	/*
 			if (chk) {
 				var target = this.target;
 				var list = bomGridView.target.list
@@ -271,11 +440,11 @@ var bomGridView = {
         	} else {
 				var target = this.target;
 				var formData = {
-					"prjctSeq" 		: param_SalesCd,
+					"salesCd" 		: $("#salesCd").val(),
 				}
 	
-	    		postAjax("/admin/bm/bm16/selectPrdtList", formData, null, function(data) {
-					var list = data.prdtList;
+	    		postAjax("/user/sm/sm01/selectBuyBomList", formData, null, function(data) {
+					var list = data.resultList;
 					target.setData({
 	            		list : list,
 	            		page : {
@@ -284,6 +453,7 @@ var bomGridView = {
 	       			 });
 	    	 	});
         	}
+        	*/
      	} //setData
      }
 
@@ -293,7 +463,7 @@ var matrGridView = {
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
 		    	 showRowSelector: false,
-		    	 multipleSelect: true,
+		    	 multipleSelect: false,
 		    	 sortable: false,
 		         target: $('[data-ax5grid="matr-grid"]'),
 		         header: {
@@ -309,18 +479,24 @@ var matrGridView = {
 			          },
 			          onDataChanged: function () {
 			            	//아이템 상세내역이 수정이 있으면 저장 필요
-			            	saveWork = true;
-			            	this.item.itemUpd = 'U';
+			            	//saveWork = true;
+			            	
+			            	if(this.key != "dtaChk"){//입력항목일때
+				            	if(this.item.dtaChk != "I") {
+				            		this.item.dtaChk = "U";
+				            	}
+			            	}
+			            	matrGridView.target.repaint();
 			          },
 		        },
 		        columns : [
-		        		 {key: "itemUpd",label: " ", width: 30}
-			 	 	 	,{key: "coCd", 				label: "회사코드", 		width: 100,	align: "left"}
-						,{key: "salesCd", 			label: "Sales Code", 	width: 100,	align: "left"}
-						,{key: "dsgnNo", 			label: "도번", 			width: 100,	align: "left"}
-						,{key: "matrSeq", 			label: "자재순번", 		width: 100,	align: "left"}
-						,{key: "upperCd", 			label: "상위코드", 		width: 100,	align: "left"}
-						,{key: "lowerCd", 			label: "하위코드", 		width: 100,	align: "left"}
+		        		 {key: "dtaChk",label: " ", width: 30, 	styleClass: "grid-font-blue-bold"}
+						,{key: "dsgnNo", 			label: "도번", 			width: 180,	align: "left"}
+			 	 	 	,{key: "coCd", 				label: "CO", 			width: 50,	align: "center"}
+						,{key: "salesCd", 			label: "Sales Code", 	width: 120,	align: "left"}
+						,{key: "matrSeq", 			label: "순번", 			width: 70,	align: "center"}
+						,{key: "upperCd", 			label: "상위코드", 		width: 160,	align: "left"}
+						,{key: "lowerCd", 			label: "하위코드", 		width: 180,	align: "left"}
 						,{key: "ordrgDiv10", 		label: "발주용도", 		width: 100,	align: "left"}
 						,{key: "ordrgDiv20", 		label: "발주유형", 		width: 100,	align: "left"}
 						,{key: "nextPrcsnNm", 		label: "후행업체", 		width: 100,	align: "left"}
@@ -366,27 +542,74 @@ var matrGridView = {
 						,{key: "matrLastTrstDt", 	label: "최종거래일자", 		width: 100,	align: "left"}
 						,{key: "matrAtntCd", 		label: "대체자재코드", 		width: 100,	align: "left"}
 						,{key: "matrNo", 			label: "자재번호", 		width: 100,	align: "left"}
-		        	/*
-		               {key : "isChk",    			label : "선택",   		width : 80,
-	          	  			editor: {type: "checkbox",	config: {trueValue : "Y",	falseValue : "N"}}}
-	                  ,{key : "prjctSeq",  			label : "프로젝트시퀀스", 	width : 40,		hidden: true}
-	                  ,{key : "prjctPrdtCd",  		label : "제품코드", 		hidden: true}
-		              ,{key : "codeId",				label : "코드아이디",  	hidden: true}
-		              ,{key : "prjctItemCd", 		label : "등록아이템코드", 	width : 100,	hidden: true}
-		              ,{key : "codeNm",  	  		label : "아이템내역",     	width : 200,}
-			          ,{key : "prjctPrdtNewCd",  	label : "신규",    		width : 50,		hidden: true}
-		              ,{key : "prjctItemRmk", 		label : "비고",   		width : 300,  	editor: {type: "textarea"}}
-		              */
 		         	]
 		    });
 			return this;
 		},
-
-		setData: function(prdtCd,  prdtNewCd){
-			secondGrid = this.target;
+		
+		selectGrid : function(click_dsgnNo) {
+			if(before_bomIdx == select_bomIdx) return; //선택행 변경없을때 사용안함.
 			
-			if (prdtItemArr[prdtIdx]) {
-				var list = prdtItemArr[prdtIdx];
+			//console.log("===선택행 변경 >>before_bomIdx>"+before_bomIdx+"  select_bomIdx>"+select_bomIdx);
+			//console.log(matrArr);
+			
+			var delIdxArray = findIndexArray(matrArr, "dsgnNo", before_dsgnNo);
+			
+			var af_gridList = this.target.getList();
+			if(af_gridList.length > 0) {
+				$.each(af_gridList, function (idx, elem) {
+					matrArr.push(elem);
+				});
+			}
+			//행삭제는 index가 변경되므로 아래에서 삭제
+			for(var i=delIdxArray.length-1; i >= 0; i--){
+				matrArr.splice(delIdxArray[i],1);
+			}
+			
+			//var target = this.target;
+			var list = getFilterData(click_dsgnNo);
+			this.target.setData({
+        		list : list,
+        		page : {
+        			totalElements : list.length
+        		}
+   			});
+		},
+		
+		setData: function(_mod){
+			if(_mod != "A"){
+				var target = this.target;
+				var sel_dsgnNo = bomGridView.target.getList("selected")[0].dsgnNo;
+				var list = getFilterData(sel_dsgnNo);
+				target.setData({
+            		list : list,
+            		page : {
+            			totalElements : list.length
+            		}
+       			});
+			} else {
+				var target = this.target;
+				var formData = {
+					"salesCd" 		: $("#salesCd").val(),
+				}
+
+	    		postAjax("/user/sm/sm01/selectBomMatrList", formData, null, function(data) {
+	    			matrArr = data.resultList;//원본데이타
+	    			var sel_dsgnNo = bomGridView.target.getList("selected")[0].dsgnNo;
+					var list = getFilterData(sel_dsgnNo);
+					target.setData({
+	            		list : list,
+	            		page : {
+	            			totalElements : list.length
+	            		}
+	       			});
+	    	 	});				
+			}
+			
+			/*
+			secondGrid = this.target;			
+			if (matrArr[before_bomIdx]) {
+				var list = matrArr[before_bomIdx];
 				secondGrid.setData({
 					list : list,
 					page : {
@@ -396,12 +619,9 @@ var matrGridView = {
 			} else {
 				if (prdtCd) {
 		   		 	var formData = {
-						"prjctSeq" 		: param_SalesCd,
-		        		"prjctPrdtCd" 	: prdtCd,  
-		        		"prjctPrdtNewCd": prdtNewCd  
+						"salesCd" 		: $("#salesCd").val()
 		   		 	}
-		
-					postAjax("/admin/bm/bm16/selectItemList", formData, null, function(data) {
+					postAjax("/user/sm/sm01/selectBomMatrList", formData, null, function(data) {
 							var list = data.itemList;
 							secondGrid.setData({
 								list : list,
@@ -410,8 +630,9 @@ var matrGridView = {
 								}
 					     	});
 					});
-				} //if (prdtCd) {
-			}  //if (prdtItemArr[prdtIdx]
+				}
+			}
+			*/
 		}
 }
 
@@ -433,7 +654,6 @@ var matrGridView = {
 		authChk();// 권한체크
 
 		actionType = modalStack.last().paramObj.actionType;
-		param_SalesCd = modalStack.last().paramObj.prjctSeq;
 		savePrdtCd = '';
 		savePrdtNewCd = '';
 
@@ -449,11 +669,19 @@ var matrGridView = {
 			$('#actionBtn').on("click", function() {
 				insertBomMatr();
 			});
-
+			//등록시 ROOT 데이타 생성
+			var newRow = {};
+			newRow = {dtaChk:"I",coCd: $("#coCd").val(), salesCd: $("#salesCd").val() , lvl:0, partNo:"", unitNo:"", revNo:"", dsgnNo:$("#salesCd").val(), upperCd:".", lowerCd:$("#salesCd").val()};
+			bomGridView.target.addRow($.extend({}, newRow), "last");
+			bomGridView.target.clearSelect();
+			bomGridView.target.select(0);
+			bomGridView.target.focused = true;
 		} else if (actionType == "U") {
 			$('.tit').text('구매BOM 수정')
 			
-			selectPrjctInfo();//수정시 조회
+			//selectBuyBomList();//수정시 조회
+			
+			bomGridView.setData(0);
 
 			$('#actionBtn').text("수정");
 			$('#actionBtn').on("click", function() {
@@ -473,17 +701,15 @@ var matrGridView = {
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 끝
 		//---------------------------------------------------------------  
-
-		
 	});
 	
-	function selectPrjctInfo() {						//그리드에 뿌리는 데이터
+	function selectBuyBom333333List() {						//그리드에 뿌리는 데이터
 		var formData = {
-			"prjctSeq" : param_SalesCd,
+			"salesCd" : $("#salesCd").val()
 		}
-		postAjax("/admin/bm/bm16/selectPrjctInfo", formData, null, function(data) {
-				$('#popForm #dudtPlanDt').val('');  //기본 오늘날자이므로 clear
-				$('#popForm #ordrsPlanDt').val(''); //기본 오늘날자이므로 clear
+	
+		return;
+		postAjax("/user/sm/sm01/selectBuyBomList", formData, null, function(data) {
 				$.each(data.result, function(key, value) {
 					if ($('#popForm #' + key)[0]) {
 						$('#popForm #' + key).val(value);
@@ -493,16 +719,16 @@ var matrGridView = {
 					}
 				});
 				
-				var prdtList = data.result.prdtList;
+				var prdtList = data.result;
 				
 				if (prdtList.length) {
-					bomGridView.setData(0); 		//첫 번째 그리드의 데이터를 불러오기
-					savePrdtCd = prdtList[0].prjctPrdtCd;
-					savePrdtNewCd = prdtList[0].prjctPrdtNewCd;
-					matrGridView.setData(savePrdtCd, savePrdtNewCd); 
+					//bomGridView.setData(0); 		//첫 번째 그리드의 데이터를 불러오기
+					//savePrdtCd = prdtList[0].prjctPrdtCd;
+					//savePrdtNewCd = prdtList[0].prjctPrdtNewCd;
+					//matrGridView.setData(savePrdtCd, savePrdtNewCd); 
 // 					bomGridView.target.focus("HOME");
 				}
-				prdtIdx = 0;
+				//before_bomIdx = 0;
 		});
 	}
 
@@ -513,7 +739,7 @@ var matrGridView = {
 	function updatePrdtList(type){
 		
         if (saveWork) {
-       		prdtItemArr[prdtIdx] = matrGridView.target.list;
+       		matrArr[before_bomIdx] = matrGridView.target.list;
        		saveWork = false;
 		}		
 		
@@ -526,7 +752,7 @@ var matrGridView = {
 			var paramObj = {prdtActionType : type};
 		}
 		
-		openSecondModal("/static/html/admin/bm/bm16/bm1602d01.html", 690, 280, "대상설비", paramObj, function (rtnData) {
+		openSecondModal("/static/html/user/sm/sm01/bm1602d01.html", 690, 280, "대상설비", paramObj, function (rtnData) {
 			var idx; //수정이면 이전 인덱스에 해당하는 값을 대체, 아니면 추가
 			var crudChk;
 			
@@ -537,7 +763,7 @@ var matrGridView = {
 				idx = bomGridView.target.getList().length;
 				crudChk = 'I';
 			}
-			prdtIdx = idx;
+			before_bomIdx = idx;
 			
 			bomGridView.target.list[idx] = {
 				  prjctSeq			: (type =="U") ? rtnData.prjctSeq : 0,  //처음 파라메터 프로젝트 키값
@@ -553,14 +779,16 @@ var matrGridView = {
 				  prjctPrdtRmk		: rtnData.prjctPrdtRmk,
 				  __index			: idx,
 				  prjctCrudChk		: crudChk,
-        		  prdtUpd			:'U'
+        		  dtaChk			:'U'
 			};
 // 			bomGridView.target.repaint();
+/*
 			bomGridView.setData('chk');
 			bomGridView.target.focus("END");
 			savePrdtCd = rtnData.prjctPrdtCd;
 			savePrdtNewCd = rtnData.prjctPrdtNewCd;
-			matrGridView.setData(savePrdtCd, savePrdtNewCd); 			
+			matrGridView.setData(savePrdtCd, savePrdtNewCd); 		
+			*/
 				
 		});
 	}
@@ -572,7 +800,7 @@ var matrGridView = {
 		var obj = bomGridView.target.getList("selected")[0];
 		if (obj.prjctSeq) {
 			obj.prjctCrudChk = 'D';   //DB에 등록된 자료인 경우 삭제 로 저장
-			prdtDeleteArr.push(obj);
+			bomDeleteArr.push(obj);
 		}
 		bomGridView.target.list.splice(idx,1);
 		bomGridView.target.repaint();
@@ -583,11 +811,11 @@ var matrGridView = {
 	function insertBomMatr() {
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 			var formData = makeFormData();															// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
-			filePostAjax("/admin/bm/bm16/insertPrjct", formData,				// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행
+			filePostAjax("/user/sm/sm01/insertBom", formData,				// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행
 					function(data) {
 						alert(data.resultMessage);														// 결과 메시지를 alert으로 출력
 						if (data.resultCode == 200) {													//  요청이 성공(200)한 경우, gridView.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
-							gridView.setData(0);																// 결과갑시 200인 경우 리드 뷰를 업데이트
+							gridView1.setData(0);																// 결과갑시 200인 경우 리드 뷰를 업데이트
 							modalStack.close();																  // 모달을 닫음
 						}
 					});
@@ -598,11 +826,11 @@ var matrGridView = {
 	function updateBomMatr() {
 		if (inputValidation($('.popup_area [required]'))) {									// 필수 필드의 유효성 검사
 			var formData = makeFormData();													// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
-	      	filePostAjax("/admin/bm/bm16/updatePrjct", formData,function(data) {
+	      	filePostAjax("/user/sm/sm01/updateBom", formData,function(data) {
 						alert(data.resultMessage);
 						if (data.resultCode == 200) {
-							gridView.setData(0);
-							saveWork = false;
+							gridView1.setData(0);
+							//saveWork = false;
 // 							selectPrjctInfo();
 							modalStack.close();
 						}
@@ -613,7 +841,6 @@ var matrGridView = {
 	 /* 프로젝트 인서트, 업데이트 조건에 따른 간섭이 없는지 재확인 할 것 */
 
 	//----------------------------------------------//
-
 	function makeFormData() {
 		// 금액 콤마 제거
 		$.each($('.popup_area input[comma]'), function(idx, elem) {
@@ -650,51 +877,40 @@ var matrGridView = {
 		//--첨부화일 처리를 위한 부분 끝
 		//--------------------------------------------------------------- 
 
-		//제품-설비자료 준비
-		prdtArr = prdtDeleteArr.slice(0);
-		var list = bomGridView.target.list;
-		$.each(list,function(idx, obj) {
-			if (obj.prdtUpd == 'U') {
-				if (obj.prjctCrudChk != 'I') {
-					obj.prjctCrudChk = 'U';
-				}
-				prdtArr.push(obj);
+		//bomlist = bomGridView.target.getList());
+		bomArr = [];
+		//bomArr = bomDeleteArr.slice(0);
+		var bomlist = bomGridView.target.list;
+		$.each(bomlist,function(idx, obj) {
+			if(isEmpty(obj.dtaChk)){
+				obj.dtaChk = "";
 			}
 		});
+		formData.append("bomArr", JSON.stringify(bomlist));
 		
-		formData.append("prdtArr", JSON.stringify(prdtArr));
-		//제품-설비자료  끝		
-
-		//세부 아이템 자료 준비
-        if (saveWork) {
-			prdtItemArr[prdtIdx] = matrGridView.target.list;
-       		saveWork = false;
-        }
-		
-		detailArr = [];
-		$.each(prdtItemArr,function(prdtIdx, list) {
-			if (list) {
-// 			var list = matrGridView.target.list;
-				$.each(list,function(idx, obj) {
-					if (obj.itemUpd == 'U') {
-						if (!obj.prjctItemCd && obj.isChk == 'Y') {
-							obj.dtaChk = 'I';
-							obj.prjctSeq = $("#prjctSeq").val();
-							obj.prjctItemCd = obj.codeId;
-							detailArr.push(obj);
-						} else if (obj.prjctItemCd && obj.isChk == 'Y') {
-							obj.dtaChk = 'U';
-							detailArr.push(obj);
-						} else if (obj.prjctItemCd && obj.isChk == 'N') {
-							obj.dtaChk = 'D';
-							detailArr.push(obj);
-						}
-					}
-				});
+		//현재 자재정보 그리드정보를 matrArr에  update 한다
+		var matrGridList = matrGridView.target.list;
+		if(matrGridList.length > 0){
+			var delIdxArray = [];
+			if(!isEmpty(before_dsgnNo)){
+				delIdxArray = findIndexArray(matrArr, "dsgnNo", before_dsgnNo);
 			}
-		});		
+			$.each(matrGridList, function (idx, elem) {
+				matrArr.push(elem);
+			});
+			if(!isEmpty(before_dsgnNo)){
+				for(var i=delIdxArray.length-1; i >= 0; i--){
+					matrArr.splice(delIdxArray[i],1);
+				}
+			}
+		}
 
-		formData.append("prdtItemArr", JSON.stringify(detailArr));//선택된 ROW 만 formData에 저장
+		$.each(matrArr,function(idx, obj) {
+			if(isEmpty(obj.dtaChk)){
+				obj.dtaChk = "";
+			}
+		});
+		formData.append("matrArr", JSON.stringify(matrArr));
 		//세부 아이템 자료 끝
 		return formData;
 	}
@@ -702,105 +918,152 @@ var matrGridView = {
 	function setByCoCd(value) {
 		$('#coCd option:not([value="'+value+'"])').remove();		
 	}
-	
+
+	//Bom 추가
 	function addRowBom(){
-		let param = {dindex: selectedRowKey};
-		
-		//bomGridView.addRow($.extend({}, {...}), "first");
-     	//firstGrid.addRow($.extend({}, firstGrid.list[param.dindex], {__index: undefined}),param.dindex+1,);		
-     	//firstGrid.setValue(param.dindex, 'updcheck', 1);
-		//bomGridView.addRow($.extend({}, bomGridView.list[param.dindex], {__index: undefined}),param.dindex+1,);
-		//bomGridView.target.addRow($.extend({}, bomGridView.target.list[param.dindex], {__index: undefined}),param.dindex+1,);
-		
-		//let newRow = {__index: undefined, prdtUpd:"I"};
-		//console.log(bomGridView.target.list.length);
-		//console.log(bomGridView.target.getList("selected")[0]);
-		var selBomData = bomGridView.target.getList("selected")[0];
+		var selData = bomGridView.target.getList("selected")[0];
 		var bomLength = bomGridView.target.list.length;
-		var isBomSelect = !isEmpty(selBomData);
-		//console.log("bomLength>>"+bomLength+"  isBomSelect>>"+isBomSelect);
+		var isBomSelect = !isEmpty(selData);
 		let newRow = {};
 		if(bomGridView.target.list.length != 0 && isBomSelect == false){
 			alert("구매 BOM 행추가시 상위목록을 선택하여야 합니다.");
 			return -1;
 		}
-		else if(bomGridView.target.list.length == 0) {
-			newRow = {__index: undefined, prdtUpd:"I",coCd: $("#coCd").val(), salesCd: $("#salesCd").val() , lvl:1};
+		else if(bomGridView.target.list.length == 0 && isBomSelect == false ) {
+			//ROOT 데이타 생성
+			newRow = {dtaChk:"I", coCd: $("#coCd").val(), salesCd: $("#salesCd").val() , lvl:0, partNo:"", unitNo:"", revNo:"", dsgnNo:$("#salesCd").val(), upperCd:".", lowerCd:$("#salesCd").val()};
+			bomGridView.target.addRow($.extend({}, newRow), "last");
 			//1레벨 데이타 생성
-			bomGridView.target.addRow(newRow);
-			newRow = {__index: undefined, prdtUpd:"I",coCd: $("#coCd").val(), salesCd: $("#salesCd").val() , lvl:2, partNo : ""};		
+			newRow = {dtaChk:"I", coCd: $("#coCd").val(), salesCd: $("#salesCd").val() , lvl:1, partNo:"", unitNo:"", revNo:"", dsgnNo:$("#salesCd").val(), upperCd:$("#salesCd").val(), lowerCd:""};	
+			bomGridView.target.addRow($.extend({}, newRow), "last");
 		}
-		else {
-			newRow = {__index: undefined, prdtUpd:"I",coCd: $("#coCd").val(), salesCd: $("#salesCd").val() , lvl:2};			
+		else if(isBomSelect == true ){
+			var selLevel = Number(selData.lvl);
+			var targetLevel = selLevel+1;
+			if(targetLevel > 3) targetLevel = 3;//3레벨까지 가능 -- SalesCd > PART > UNIT > REV
+			newRow = {    dtaChk:"I"
+						, coCd: $("#coCd").val()
+						, salesCd: $("#salesCd").val()
+						, lvl: targetLevel
+						, partNo: selData.partNo
+						, unitNo: selData.unitNo
+						, revNo:  selData.revNo
+						, dsgnNo:""
+						, upperCd:$("#salesCd").val()
+						, lowerCd: ""
+					};
+			//_this.target.updateRow($.extend({}, _this.target.list[_selthis.dindex], {data1: data.value}), _selthis.dindex);
+			//_dindex = 2;
+			//bomGridView.target.addRow($.extend({}, newRow));
+			//var dindex = 1;
+			//.$.extend({}, 추가할 내용),삽인할위치,갯수);
+			bomGridView.target.addRow($.extend({}, newRow),selData.__index+1,);
+			//bomGridView.target.addRow($.extend({}, bomGridView.target.list[dindex], newRow),0,);
+			//bomGridView.target.addRow(newRow);
+        	//.addRow(추가할 내용, 삽인할위치(생략시 마지막),갯수)
+	        //firstGrid.addRow($.extend({}, firstGrid.list[param.dindex], {__index: undefined}),param.dindex+1,);		
+	        //firstGrid.setValue(param.dindex, 'updcheck', 1);
 		}
-		
-		bomGridView.target.addRow(newRow);
-		console.log(bomGridView.target.getList());
-	}
-	function delRowBom() {
-		bomGridView.target.removeRow(1);
+		//console.log(bomGridView.target.getList());
 	}
 	
-	function addRow() {
-		let param = {dindex: selectedRowKey};
-
-		// 행이 없거나 셀렉트키가 없는 경우에는 새로운 행을 추가하고 종료
-		if (bomGridView.list.length === 0 || typeof selectedRowKey === 'undefined') {
-			let newRow = {__index: undefined, upperCd: "", lowerCd: "", partNo: "", unitNo: ""};
-			bomGridView.addRow(newRow);
+	//Bom 삭제
+	function delRowBom() {
+		var selData = bomGridView.target.getList("selected")[0];
+		var isBomSelect = !isEmpty(selData);
+		if(bomGridView.target.list.length != 0 && isBomSelect == false){
+			alert("삭제 행을 선택하여야 합니다.");
+			return -1;
+		}
+		var selLevel = selData.lvl;
+		if(selLevel == 0){
+			alert("최상위는 삭제 할 수 없습니다.");
+			return -1;
+		}
+		var bomDtaChk = selData.dtaChk;
+		if(bomDtaChk == "I"){
+			bomGridView.target.removeRow(selData.__index);
+		}
+		else {
+			bomGridView.target.setValue(selData.__index, "dtaChk", "D");
+		}
+	}
+	
+	//자재추가
+	this.addRowMatr = function() {
+		var bomData = bomGridView.target.getList("selected")[0];
+		var matrLength = matrGridView.target.list.length;
+		let newRow = {};
+		newRow = { dtaChk:"I"
+			, coCd: bomData.coCd
+			, salesCd: bomData.salesCd
+			, dsgnNo: bomData.dsgnNo
+			, upperCd: bomData.upperCd
+			, lowerCd: bomData.lowerCd
+			, matrSeq: matrLength+1
+		};
+		
+		matrGridView.target.addRow($.extend({}, newRow), "last");
+	}
+	
+	//자재삭제
+	this.delRowMatr = function() {
+		var selData = matrGridView.target.getList("selected")[0];
+		if(isEmpty(selData)){
+			alert("삭제 행을 선택하여야 합니다.");
 			return;
 		}
-
-		console.log('추가 인덱스 :', param.dindex);
-
-		let lastRow = bomGridView.list[param.dindex];
-		let newRow = $.extend({}, lastRow, {__index: undefined, upperCd: "", lowerCd: "", partNo: "", unitNo: ""});
-
-		if (lastRow.matrDrwNo && !lastRow.partNo) {
-			newRow.upperCd = lastRow.matrDrwNo;
-			newRow.matrDrwNo ="";
-			let maxPartNo = Math.max(...bomGridView.list.map(row => row.partNo ? parseInt(row.partNo) : 0), 0);
-			newRow.partNo = String(maxPartNo + 1000);
-			newRow.lowerCd = newRow.partNo;
-			bomGridView.addRow(newRow, bomGridView.list.length);
-			bomGridView.setValue(param.dindex, 'updcheck', bomGridView.list.length);
+		var matrDtaChk = selData.dtaChk;
+		if(matrDtaChk == "I"){
+			matrGridView.target.removeRow(selData.__index);
 		}
-		else if (lastRow.partNo && !lastRow.unitNo) {
-			newRow.upperCd = lastRow.partNo;
-			let maxUnitNo = Math.max(
-					...bomGridView.list
-							.filter(row => row.upperCd === lastRow.partNo)
-							.map(row => row.unitNo ? parseInt(row.unitNo) : 0),
-					0
-			);
-			newRow.unitNo = String(maxUnitNo + 100);
-			newRow.lowerCd = newRow.unitNo;
-			let partNoIndices = bomGridView.list
-					.map((row, index) => row.partNo === lastRow.partNo ? index : -1)
-					.filter(index => index !== -1)
-					.reverse();
-
-			let maxPartNoIndex = partNoIndices.length > 0 ? partNoIndices[0] : -1;
-
-			if (maxPartNoIndex + 1 <= bomGridView.list.length) {
-				bomGridView.addRow(newRow, maxPartNoIndex + 2);
-			} else {
-				bomGridView.addRow(newRow);
-			}
-			bomGridView.setValue(param.dindex, 'updcheck', partNoIndices+1);
+		else {
+			matrGridView.target.setValue(selData.__index, "dtaChk", "D");
 		}
-
-
-
 	}
-	function addRightGridRow() {
-		let newRow = {__index: undefined};
-		matrGridView.addRow(newRow);
-	}
-	function removeRightGridRow() {
-
-		matrGridView.removeRow();
+	
+	this.getFilterData = function(sel_dsgnNo) {
+		const resultData = matrArr.filter(function(element){
+			return sel_dsgnNo == element.dsgnNo;
+		});
+		return resultData;
 	}
 
+	this.findIndexArray = function(gridObj, column, value) {
+		var resultArray = [];
+		if( gridObj.length > 0 ) {
+	        $.each($.extend({}, gridObj), function (idx, elem) {
+				if(elem[column] == value) {
+					resultArray.push(idx);
+				}
+	        });			
+		}
+		return resultArray;
+	}
+	
+	this.findIndex = function(gridObj, appId) {
+		var gridList = gridObj.target.getList();
+		if( gridList.length > 0 ) {
+			var idArr = [];			
+	        $.each(gridList, function (idx, elem) {
+        		//idArr.push(elem.appId);
+	        });			
+	        if( idArr.indexOf(appId) > -1 ) {
+	        	//return true;
+	        } else {
+	        	//return false;
+	        }
+	        return 0;
+		}
+		return -1;
+	}
+	
+	
+	function adPer(str){
+		if(typeof str == "undefined" || str == null || str == "") {
+			return "";
+		}
+		return "-"+str ;
+	}	
 
 </script>

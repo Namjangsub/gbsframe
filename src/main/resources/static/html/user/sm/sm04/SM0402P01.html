@@ -106,7 +106,7 @@
                     <tr>
 						<th class="hit" >출고창고</th>
 						<td>
-							<select  id="outWhNm" name="outWhNm" onchange="getGrid();" style="width: 100%;" required msg="출고창고" >
+							<select  id="outWhCd" name="outWhCd" onchange="getGrid();" style="width: 100%;" required msg="출고창고" >
 							   <option value="">선택</option>
 							</select>
 						</td>					
@@ -114,7 +114,7 @@
 						<th class="hit" >입고 창고</th>
 						<td>
 							<!-- <input id="inWhCd" name="inWhCd" data-kind="inWhCd" /> -->
-							<select  id="inWhNm" name="inWhNm" style="width: 100%;" required msg="입고창고">
+							<select  id="inWhCd" name="inWhCd" style="width: 100%;" required msg="입고창고">
 							   <option value="">선택</option>
 							</select>
 						</td> 
@@ -185,6 +185,7 @@
     <div class="popup_bottom_btn">
         <button type="button" id="actionIoBtn" authchk>등록</button>
         <button type="button" class="close_btn" onclick="  modalStack.close();">닫기</button>
+		<button class="btn btn-default"  data-grid-control="column-add">열 추가</button>
     </div>
 
 <script type="text/javascript">
@@ -219,7 +220,7 @@
 						var item = this.item;
 						var self = this.self;	
 						ckQty(item, index, self);
-					
+						
 					}
 			   },
 	           page: {
@@ -239,6 +240,7 @@
 	        	    {key: "No",      label: "No.", align: "center",   width: 40,hidden: true},
 	                {key: "dsgnNo", label: "도번", align: "center", width: 200,},
 	                {key: "matrCd", label: "품번", align: "center", width: 110,},
+	                {key: "matrClntDiv", label: "품번", align: "center", width: 110,hidden: true},
 	                {key: "matrNm", label: "품명", align: "center", width: 120 },
 	                {key: "matrSpec", label: "규격", align: "center", width: 110 },
 	                {key: "matrMat", label: "소재", align: "center", width: 80},
@@ -267,23 +269,34 @@
 
         	   var targetObj = this.target;
            	   var formData = new FormData();
-           	   var formData = {
-       	    		// 조회조건 수정하기            	    			                    
-       	    		   "whCd": $('#outWhNm').val(),
-                       "salesCd": $('#salesCd').val()
-         
+           	   var formData = {         	    			                    
+   	    		   "whCd": $('#outWhCd').val(),
+                   "salesCd": $('#salesCd').val()         
        	        }
-        	 	
+           	   
+           	   console.log("outWhCd : "+$('#outWhCd').val());
+           	   console.log("salesCd : "+$('#salesCd').val());
+
                 postAjax("/user/sm/sm04/selectStInfo", formData, null,  function(data){
                     var list = data.stList;
-                   	
+
 					targetObj.setData({
 						list : list,
 						page: {
 		                    totalElements: list.length
 		                }
 					});
-                }); 
+	                
+	                if(actionType == "U"){
+	                	gridUpgrade();
+	                	
+	                }
+					
+					
+                });
+                
+                
+                
            }  
      }
 
@@ -294,9 +307,11 @@
 	    setCommonSelect($(".popup_area select[data-kind]"));
 		$("#popForm #userId").val(jwt.userId);
 	    $("#coCd").val(jwt.coCd);
-		$("#socYn").val("N");
 		
 		authChk(); //권한체크
+
+		getWhNm();
+		getinWhNm();		
 		
 		actionType = modalStack.last().paramObj.actionType;
 		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
@@ -315,32 +330,75 @@
             $(selector).datepicker('setUTCDate', new Date(formattedDate));
         }
 		
-		$('#ioDt').datepicker({
-            format: "yyyy-mm-dd",
-            language: "ko",
-            autoclose: true
-        });
-
-        setCurrentDateToDatePicker('#ioDt');
-		
-		getWhNm();
-		getinWhNm();
-		
-	   /*  try {
-	        $("#coCd").focus();
-	        $("#coCd").trigger("click");
-	        console.error("현재위치 로그::1");
-	    } catch (error) {
-	        console.error("현재위치 로그::2" + error); // 콘솔에 에러 메시지를 출력합니다.
-	    }*/
-	    
 	    $('.tbody_more_btn').click(function () {
 	        $(this).toggleClass('on');
 	        $(this).parent().next('.toggle-div').toggle();
 	    }); 
-	
+	    
+	    if (actionType == "C") {
 
-	    gridView3.initView().setData(0);
+			$("#socYn").val("N");
+			
+			$('#ioDt').datepicker({
+	            format: "yyyy-mm-dd",
+	            language: "ko",
+	            autoclose: true
+	        });
+
+	        setCurrentDateToDatePicker('#ioDt');
+			
+	        $('#actionIoBtn').on("click", function () {
+	            insertIo();
+	        });
+
+		} else if (actionType == "U") {
+			
+			//수정 모드 데이터 가져오기
+			select_sm04_info();
+
+			//타이틀명 변경
+			$('.tit').text('자재불출 수정');
+			//회사
+			$("#coCd").prop("disabled", true);			
+			//Sales Code
+			$("#salesCd").prop("readonly", true);
+			//고객사
+			$("#vendCd").prop("readonly", true);
+			$("#vendNm").prop("readonly", true);
+			//고객사 PJT
+			$("#clntPjtCd").prop("readonly", true);
+			$("#clntPjt").prop("readonly", true);
+			//제품구분
+			$("#prdtCd").prop("readonly", true);
+			$("#prdtNm").prop("readonly", true);
+			//아이템구분
+			$("#itemDiv").prop("readonly", true);
+			$("#itemDivNm").prop("readonly", true);
+			//설비명
+			$("#eqpNm").prop("readonly", true);
+			//불출번호
+			$("#ioNo").prop("readonly", true);
+			//불출일자
+			$("#ioDt").prop("readonly", true);
+			//사급구분
+			$("#socYn").prop("disabled", true);
+			//출고창고
+			$("#outWhCd").prop("disabled", true);
+			//입고창고
+			$("#inWhCd").prop("disabled", true);
+			//비고
+			$("#ioRmk").prop("readonly", true);
+			//버튼명 변경
+			$('#actionBtn').text("수정");
+
+			//버튼 클릭 시
+			/* $('#actionBtn').on("click", function() {
+				update_sm10();
+			});
+			 */
+		
+		}
+
 	    
 	  	//---------------------------------------------------------------
 		//첨부 화일 처리 시작
@@ -354,7 +412,7 @@
 		//---------------------------------------------------------------
 		//첨부 화일 처리 끝
 		//---------------------------------------------------------------
-		
+
 	});
 
 
@@ -363,7 +421,7 @@
 	function ckQty(item, index, self) {
 	//debugger;
 		var row = gridView3.target.getList("selected")[index];
-		
+		debugger;
 		//체크박스 유무에 따른 행 update
 		if (item.chk == "Y") {
 			if(item.outQty != item.stockQty && item.outQty != "0"){
@@ -406,10 +464,6 @@
 			//self.updateColumn({key: "matrMat", label: "소재", align: "center", width: 80}, 6);
 	    } 
 		
-		console.log("outQty : " + Number(item.outQty));
-		console.log("stockQty : "+item.stockQty);
-		debugger;
-		
 		var stockQty = parseInt(item.stockQty, 10);
 		var outQty = parseInt(item.outQty, 10);
 		
@@ -447,7 +501,7 @@
 		{
 			gridView3.initView().setData();
 			
-		} else {  }
+		} 
 	
 	
 	}
@@ -463,11 +517,12 @@
 	    	   var row = data.whList;
 	    	   
 				for(var i=0;  i<row.length; i++) {
-				    $('#outWhNm').append($('<option>', { 
+				    $('#outWhCd').append($('<option>', { 
 				        value: row[i].codeEtc,
 				        text : row[i].codeNm 
 				    }));					
 				}
+				
 				
 	        });
 	}
@@ -482,7 +537,7 @@
 	    	   var row = data.whList;
 	    	   
 				for(var i=0;  i<row.length; i++) {
-				    $('#inWhNm').append($('<option>', { 
+				    $('#inWhCd').append($('<option>', { 
 				        value: row[i].codeEtc,
 				        text : row[i].codeNm 
 				    }));					
@@ -491,88 +546,66 @@
 	        });
 	}
 	
-	if (actionType == "C") {
-        $('#actionIoBtn').on("click", function () {
-            insertIo();
-        });
-        //setCurrentDateToDatePicker('#fwdExchJoinDt');
-        //setCurrentDateToDatePicker('.input_calendar');
-
-	} else if (actionType == "U") {
-		
-		//타이틀명 변경
-		$('.tit').text('자재불출 수정')
-		
-		//회사
-		$("#coCd").prop("disabled", true);			
-		//Sales Code
-		$("#salesCd").prop("readonly", true);
-		//고객사
-		$("#vendCd").prop("readonly", true);
-		//고객사 PJT
-		$("#clntPjtCd").prop("disabled", true);
-		//제품구분
-		$("#prdtCd").prop("readonly", true);
-		$("#prdtNm").prop("readonly", true);
-		//아이템구분
-		$("#itemDiv").prop("disabled", true);
-		//설비명
-		$("#eqpNm").prop("disabled", true);
-		//불출번호
-		$("#ioNo").prop("disabled", true);
-		//불출일자
-		$("#ioDt").prop("readonly", true);
-		//사급구분
-		$("#socYn").prop("readonly", true);
-		//출고창고
-		$("#outWhNm").prop("readonly", true);
-		//입고창고
-		$("#inWhNm").prop("readonly", true);
-		//비고
-		$("#ioRmk").prop("readonly", true);
-
-		//수정 모드 데이터 가져오기
-		select_sm04_info();
-		
-		//버튼명 변경
-		$('#actionBtn').text("수정");
-
-		//버튼 클릭 시
-		/* $('#actionBtn').on("click", function() {
-			update_sm10();
-		});
-		 */
-	}
+	
 	
 	//그리드에 뿌리는 데이터
 	function select_sm04_info() {
-		var formData = {
-			"fileTrgtKey" : fileTrgtKey,
-			"coCd" :  $('#coCd_S').val()
-		}
 		
+		var formData = {
+			"fileTrgtKey" : fileTrgtKey
+		}
+
 		postAjax("/user/sm/sm04/select_sm04_info", formData, null, function(data) {
+			
 			$.each(data.result, function(key, value) {
 				if ($('#popForm #' + key)[0]) {
-					$('#popForm #' + key).val(value);
-					
-					if ($('#popForm #' + key).is('[comma]')) {
-						onlyNumber($('#popForm #' + key)[0]);
-					}
+					$('#popForm #' + key).val(value);					
 				}
 			});
+			
+			console.log("ioNo : "+$('#ioNo').val());
+			console.log("SalesCd : "+$('#salesCd').val());
+
+			
+			 gridView3.initView().setData();
+
 		});
+		
+
 	}
+	
+	function gridUpgrade() {
+		
+		var item = gridView3.target.getList();
+
+		debugger;
+		gridView3.target.removeColumn(11);
+		gridView3.target.removeColumn(10);
+		gridView3.target.addColumn({key: "creatId", label: "생성자", align: "center", width: 80});
+		gridView3.target.addColumn({key: "creatDttm", label: "생성일시", align: "center", width: 80});
+		gridView3.target.addColumn({key: "udtId", label: "변경자", align: "center", width: 80});
+		gridView3.target.addColumn({key: "udtDttm", label: "변경일시", align: "center", width: 80});
+		
+
+	  /*  for(var i=0; i<item.length; i++)
+		{ 		    			
+   			gridView3.target.addRow($.extend({}, item[i], i));
+		}   */
+		
+
+	}
+	
+	
 	
 	// 기본정보 & 불출정보 INSERT
 	function insertIo() {
 		
-		var outWhNm = $('#outWhNm').val();
-		var inWhNm = $('#inWhNm').val();
-        var formData = makeFormData(); //SM0401M01
-        var entries = formData.entries();
+		var outWhCd = $('#outWhCd').val();
+		var inWhCd = $('#inWhCd').val();
 		
-		if(outWhNm == inWhNm) {
+        var formData = makeFormData(); //SM0401M01
+		
+		if(outWhCd == inWhCd) {
 	        alert("출고창고와 입고 창고를 다르게 입력하세요.");
 	        return;
 		}
@@ -588,6 +621,51 @@
          }
        	 
     }
+	
+	function makeFormData() {
+		
+		// 날짜 하이픈 제거
+		$.each($('.popup_area input[date]'), function(idx, elem) {
+			deleteHyphen(elem);
+		});
+		
+        var formData = new FormData($("#popForm")[0]);
+        
+		//---------------------------------------------------------------
+		//-------itemarr  --첨부화일 처리를 위한 부분 시작
+		//---------------------------------------------------------------
+		// 유저아이디 추가
+		formData.append("userId", jwt.userId);
+		formData.append("pgmId", $("#pgmId").val());
+		formData.append("ioDiv", "INOUTDIV_O03");
+		formData.append("clntCd", $('#vendCd').val());			//첨부화일용
+		formData.append("prdtCd", $('#prdtCd').val());			//첨부화일용
+		formData.append("itemCd", $('#itemDiv').val());			//첨부화일용
+		formData.append("prjctCd", $('#clntPjt').val());		//첨부화일용
+		formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용 
+		
+		var fileUploadArr = [];
+		var tempArr = [];
+		
+		tempArr = treeModule.getFileArr();
+		
+		$.each(tempArr, function(idx, obj) {
+			if (obj.fileKey == 0) {
+				formData.append("files", obj.file);
+				obj.file = '';
+				fileUploadArr.push(obj);
+			}
+		});
+		
+		formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
+		formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
+		//---------------------------------------------------------------
+		//--첨부화일 처리를 위한 부분 끝\
+		//---------------------------------------------------------------
+		
+		return formData;
+        
+	}
 	
 	// 출고창고 재고정보 INSERT
 	function StockInfoInsert() {
@@ -661,51 +739,7 @@
 	 };  
 	}
 	
-	function makeFormData() {
-		
-		// 날짜 하이픈 제거
-		$.each($('.popup_area input[date]'), function(idx, elem) {
-			deleteHyphen(elem);
-		});
-		
-        var formData = new FormData($("#popForm")[0]);
-        
-		//---------------------------------------------------------------
-		//-------itemarr  --첨부화일 처리를 위한 부분 시작
-		//---------------------------------------------------------------
-		// 유저아이디 추가
-		formData.append("userId", jwt.userId);
-		formData.append("pgmId", $("#pgmId").val());
-		//formData.append("ioNo", "IO2300003");
-		formData.append("ioDiv", "INOUTDIV_O03");
-		formData.append("clntCd", $('#vendCd').val());			//첨부화일용
-		formData.append("prdtCd", $('#prdtCd').val());			//첨부화일용
-		formData.append("itemCd", $('#itemDiv').val());			//첨부화일용
-		formData.append("prjctCd", $('#clntPjt').val());		//첨부화일용
-		formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용 
-		
-		var fileUploadArr = [];
-		var tempArr = [];
-		
-		tempArr = treeModule.getFileArr();
-		
-		$.each(tempArr, function(idx, obj) {
-			if (obj.fileKey == 0) {
-				formData.append("files", obj.file);
-				obj.file = '';
-				fileUploadArr.push(obj);
-			}
-		});
-		
-		formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
-		formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
-		//---------------------------------------------------------------
-		//--첨부화일 처리를 위한 부분 끝\
-		//---------------------------------------------------------------
-		
-		return formData;
-        
-	}
+	
 	
 	
 	//Sales Code (수주마스터, 수주상세테이블 조인) 검색

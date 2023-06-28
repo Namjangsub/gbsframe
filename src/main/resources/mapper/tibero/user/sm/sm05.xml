@@ -367,18 +367,18 @@
   </select>
   
   <!-- 수정화면에 해당 값 뿌려주기 -->
-  <select id="selectIoInfo" parameterType="Map" resultType="CamelMap">
+  <select id="select_sm05_IoInfo" parameterType="Map" resultType="CamelMap">
 		
 			SELECT DISTINCT A.FILE_TRGT_KEY --파일대상KEY
 				     , A.CO_CD                 --회사코드
 				     , R.CODE_NM AS CO_CD_NM   --회사명
 				     , O.ORDRS_CLNT_CD         --고객사 코드
      		 		 , O.CLNT_NM               --고객사명
-				     , O.CLNT_PJT
-     		 		 , O.ITEM_DIV
-				     , O.EQP_NM
-     		 		 , O.PRDT_CD               --제품구분
-     		 		 , D.PRDT_NM 
+				     , O.CLNT_PJT              --고객사PJT
+     		 		 , O.ITEM_DIV              --아이템구분
+				     , O.EQP_NM                --설비명
+     		 		 , O.PRDT_CD               --제품구분코드
+     		 		 , D.PRDT_NM               --제품구분명
 				     , A.IO_NO                 --폐기번호
 				     , A.IO_DIV                --수불구분
 				     , R2.CODE_NM AS IO_DIV_NM --수불구분명
@@ -447,13 +447,13 @@
 				A.FILE_TRGT_KEY LIKE '%${fileTrgtKey}%'		
 	</select>
 	
-	<!-- 폐기창고 selectbox 선택시 값 나오게 -->
-	<select id="selectOutWhNm" resultType="CamelMap">
+	<!-- 폐기창고 가져오기 -->
+	<select id="selectOutWhNm" parameterType="Map" resultType="CamelMap">
 		SELECT B.CODE_NM
 			 , A.CODE_ETC
 		FROM TB_CM05M01 A, TB_CM05M01 B
 		         
-		WHERE  A.CODE_KIND =#{outWhNm}
+		WHERE  A.CODE_KIND =#{WhNm}
 		         AND A.CODE_RPRC = #{coCd}
 		         AND A.CODE_ETC = B.CODE_ID
 	</select>
@@ -462,81 +462,168 @@
 		SELECT 
 			COUNT(*)
 		FROM (
-		        SELECT R.CODE_DESC   AS CO_CD --회사코드
-				     , I.WH_CD       --창고코드
-				     , R.CODE_NM     AS WH_NM
-				     , I.PART_NUMBER AS MATR_CD --재고품번
-				     , I.DSGN_NO     --도번
-				     , I.GOODS_DIV   --제품/자재구분
-				     , R1.CODE_NM    AS GOODS_DIV_NM
-				     , I.STOCK_QTY   --재고수량
-				     , I.STOCK_PRC   --재고평균단가
-				     , I.STOCK_AMT   --재고금액
-				     , I.SALES_CD    --Sales Code
-				FROM   TB_BM20M01 AS I
-				       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = I.WH_CD
-				       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = I.GOODS_DIV
-		       ) AS I
-		       LEFT JOIN TB_BM05M01 AS M  ON M.CO_CD   = I.CO_CD
-		                                 AND M.MATR_CD = I.MATR_CD
-		WHERE  
-		<if test="whCd != null and !whCd.equals('')">
-		I.WH_CD    LIKE '%${whCd}%' 
+        SELECT R.CODE_DESC   AS CO_CD --회사코드
+		     , I.WH_CD       --창고코드
+		     , R.CODE_NM     AS WH_NM
+		     , I.PART_NUMBER AS MATR_CD --재고품번
+		     , I.DSGN_NO     --도번
+		     , I.GOODS_DIV   --제품/자재구분
+		     , R1.CODE_NM    AS GOODS_DIV_NM
+		     , I.STOCK_QTY   --재고수량
+		     , I.STOCK_PRC   --재고평균단가
+		     , I.STOCK_AMT   --재고금액
+		     , I.SALES_CD    --Sales Code
+		FROM   TB_BM20M01 AS I
+		       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = I.WH_CD
+		       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = I.GOODS_DIV
+       ) AS I
+       LEFT JOIN TB_BM05M01 AS M  ON M.CO_CD   = I.CO_CD
+                                 AND M.MATR_CD = I.MATR_CD
+        <if test="whCd != null and !whCd.equals('')">                         
+		WHERE  I.WH_CD    = #{whCd}
 		</if>
 		<if test="salesCd != null and !salesCd.equals('')">
-		AND    I.SALES_CD LIKE '%${salesCd}%' 	
+		AND    I.SALES_CD = #{salesCd} 
 		</if>
-		
 	</select>
 	
 	<!-- 모달창 리스트 --> 
 	<select id="selectIoModalList" parameterType="Map" resultType="camelMap">
-		SELECT I.SALES_CD      --Sales Code
-		     , I.DSGN_NO       --도번
-		     , I.MATR_CD       --재고품번
-		     , M.MATR_NM       --자재품명
-		     , M.MATR_SPEC     --자재규격
-		     , M.MATR_MAT      --자재소재
-		     , M.MATR_MAKR_NM  --자재메이커
-		     , M.MATR_MNO      --자재형번
-		     , I.STOCK_QTY     --재고수량
-		     , 'N' AS CHK      --체크여부
-		     , 0   AS OUT_QTY  --출고수량
-		     , I.CO_CD         --회사코드
-		     , I.WH_CD         --창고코드
-		     , I.WH_NM         --창고명
-		     , M.MATR_CLNT_DIV --자재거래처분류
-		     , I.GOODS_DIV     --제품/자재구분
-		     , I.GOODS_DIV_NM  --제품/자재구분명     
-		     , I.STOCK_PRC     --재고평균단가
-		     , I.STOCK_AMT     --재고금액
-		FROM   (
-		        SELECT R.CODE_DESC   AS CO_CD --회사코드
-				     , I.WH_CD       --창고코드
-				     , R.CODE_NM     AS WH_NM
-				     , I.PART_NUMBER AS MATR_CD --재고품번
-				     , I.DSGN_NO     --도번
-				     , I.GOODS_DIV   --제품/자재구분
-				     , R1.CODE_NM    AS GOODS_DIV_NM
-				     , I.STOCK_QTY   --재고수량
-				     , I.STOCK_PRC   --재고평균단가
-				     , I.STOCK_AMT   --재고금액
-				     , I.SALES_CD    --Sales Code
-				FROM   TB_BM20M01 AS I
-				       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = I.WH_CD
-				       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = I.GOODS_DIV
-		       ) AS I
-		       LEFT JOIN TB_BM05M01 AS M  ON M.CO_CD   = I.CO_CD
-		                                 AND M.MATR_CD = I.MATR_CD
-		WHERE  
-		
-		<if test="whCd != null and !whCd.equals('')">
-		I.WH_CD    LIKE '%${whCd}%' 
-		</if>
-		<if test="salesCd != null and !salesCd.equals('')">
-		AND    I.SALES_CD LIKE '%${salesCd}%' 	
-		</if>
+		SELECT * FROM (
+			SELECT ROWNUM AS RN
+				 , I.SALES_CD      --Sales Code
+			     , I.DSGN_NO       --도번
+			     , I.MATR_CD       --재고품번
+			     , M.MATR_NM       --자재품명
+			     , M.MATR_SPEC     --자재규격
+			     , M.MATR_MAT      --자재소재
+			     , M.MATR_MAKR_NM  --자재메이커
+			     , M.MATR_MNO      --자재형번
+			     , I.STOCK_QTY     --재고수량
+			     , 'N' AS CHK      --체크여부
+			     , 0   AS OUT_QTY  --출고수량
+			     , I.CO_CD         --회사코드
+			     , I.WH_CD         --창고코드
+			     , I.WH_NM         --창고명
+			     , M.MATR_CLNT_DIV --자재거래처분류
+			     , I.GOODS_DIV     --제품/자재구분
+			     , I.GOODS_DIV_NM  --제품/자재구분명     
+			     , I.STOCK_PRC     --재고평균단가
+			     , I.STOCK_AMT     --재고금액
+			FROM   (
+			        SELECT R.CODE_DESC   AS CO_CD --회사코드
+					     , I.WH_CD       --창고코드
+					     , R.CODE_NM     AS WH_NM
+					     , I.PART_NUMBER AS MATR_CD --재고품번
+					     , I.DSGN_NO     --도번
+					     , I.GOODS_DIV   --제품/자재구분
+					     , R1.CODE_NM    AS GOODS_DIV_NM
+					     , I.STOCK_QTY   --재고수량
+					     , I.STOCK_PRC   --재고평균단가
+					     , I.STOCK_AMT   --재고금액
+					     , I.SALES_CD    --Sales Code
+					FROM   TB_BM20M01 AS I
+					       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = I.WH_CD
+					       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = I.GOODS_DIV
+			       ) AS I
+			       LEFT JOIN TB_BM05M01 AS M  ON M.CO_CD   = I.CO_CD
+			                                 AND M.MATR_CD = I.MATR_CD
+			WHERE  	1 = 1
+			<if test="whCd != null and !whCd.equals('')">
+			I.WH_CD   LIKE '%${whCd}%' 
+			</if>
+			<if test="salesCd != null and !salesCd.equals('')"> 
+			AND    I.SALES_CD LIKE '%${salesCd}%' 
+			</if>
+			) T
+		WHERE RN BETWEEN #{firstIndex} AND #{lastIndex}
 	</select>
 
+	
+	<select id="select_sm05_SeqNext" parameterType="Map" resultType="int">
+		SELECT MAX(TO_NUMBER(FILE_TRGT_KEY)) + 1
+		FROM   TB_SM05M01
+	</select>
+	
+	<!-- 폐기창고 insert - 불출정보 --> 
+	<insert id="insert_sm05" parameterType="Map">
+		<selectKey keyProperty="ioNo"  resultType="String" order="BEFORE">
+            	SELECT CASE WHEN MAX(IO_NO) IS NULL THEN 'DIS'||SUBSTR(#{ioDt}, 3, 2)||'00001'
+                        ELSE 'DIS'||SUBSTR(#{ioDt}, 3, 2)||LPAD(TO_NUMBER(SUBSTR(MAX(IO_NO), -5)) + 1, 5, 0)
+				       END AS MNGM_NO
+				FROM   TB_SM05M01
+				WHERE  CO_CD = #{coCd}
+				AND    IO_DT LIKE SUBSTR(#{ioDt}, 0, 4)||'%'
+        </selectKey> 
+        
+	    INSERT INTO TB_SM05M01
+	      (
+			FILE_TRGT_KEY,  
+			CO_CD,                 --회사코드		
+			SALES_CD,              --SALES CODE
+			IO_NO,                 --폐기번호
+			IO_DT,                 --폐기일자
+			OUT_WH_CD,             --폐기창고코드	
+			IO_RESN,		       --폐기사유
+			IO_RMK,                --비고
+			ETC_FIELD1,     
+			ETC_FIELD2,     
+			ETC_FIELD3,     
+			CREAT_ID,       
+			CREAT_PGM,      
+			CREAT_DTTM  
+		)
+		VALUES
+		(
+			#{fileTrgtKey},
+			#{coCd},
+			#{salesCd},
+			#{ioNo},
+			#{ioDt},
+			#{outWhCd},
+			#{ioResn}, 
+			#{ioRmk},
+			#{etcField1, jdbcType=VARCHAR},
+			#{etcField2, jdbcType=VARCHAR},
+			#{etcField3, jdbcType=VARCHAR},
+			#{userId},
+			#{pgmId},
+			SYSDATE
+	    )
+  </insert>
+  
+  <!-- 폐기창고 insert - 폐기창고 재고정보   --> 
+  <insert id="insert_sm05_IoInfo" parameterType="Map">
+		<selectKey  keyProperty="ioNo" resultType="String" order="BEFORE">
+			SELECT IO_NO FROM( SELECT * FROM TB_SM05M01 ORDER BY CREAT_DTTM DESC )
+			WHERE ROWNUM = 1
+		</selectKey>        
+	    INSERT INTO TB_SM05D01
+	      (
+      		  CO_CD
+             ,IO_NO
+             ,IO_SEQ
+             ,DSGN_NO
+             ,SALES_CD
+             ,MATR_CD
+             ,IO_QTY
+             ,CREAT_ID
+             ,CREAT_PGM
+             ,CREAT_DTTM
+		)
+		VALUES
+		(
+			#{coCd}
+           ,#{ioNo}
+           ,#{ioSeq}
+           ,#{dsgnNo}
+           ,#{salesCd}
+           ,#{matrCd}
+           ,#{ioQty}
+           ,#{userId}
+           ,#{pgmId}
+           ,SYSDATE			
+	    )
+  </insert>
  
 </mapper> 

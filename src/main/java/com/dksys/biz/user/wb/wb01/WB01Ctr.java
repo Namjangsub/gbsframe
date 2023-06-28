@@ -527,7 +527,22 @@ public class WB01Ctr {
 	  
 	  
 	  
+	  //<!-- 실적 마스터 테이블 조회  --> 
+	  @PostMapping(value = "/selectNewWbsPlanTreeList") 
+	  public String selectNewWbsPlanTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
+    	List<Map<String, String>> fileList = wb01Svc.selectNewWbsPlanTreeList(paramMap);
+    	model.addAttribute("fileList", fileList);
+        return "jsonView";
+	  }	  
 	  
+	  
+	  //<!-- 실적 마스터 테이블 조회  --> 
+	  @PostMapping(value = "/selectWbsLeftSalesCodeList") 
+	  public String selectWbsLeftSalesCodeList(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
+		  List<Map<String, String>> fileList = wb01Svc.selectWbsLeftSalesCodeList(paramMap);
+		  model.addAttribute("fileList", fileList);
+		  return "jsonView";
+	  }	 	  
 	  
 	  
 	  

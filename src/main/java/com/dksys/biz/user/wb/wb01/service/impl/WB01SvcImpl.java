@@ -755,6 +755,15 @@ public class WB01SvcImpl implements WB01Svc {
 	
 	
 	
+	@Override
+	public List<Map<String, String>> selectNewWbsPlanTreeList(Map<String, String> paramMap) {
+		return wb01Mapper.selectNewWbsPlanTreeList(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectWbsLeftSalesCodeList(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsLeftSalesCodeList(paramMap);
+	}
 	
 	
 	

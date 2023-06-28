@@ -42,7 +42,7 @@ public class BM10Ctr {
 	//팝업 그리드 리스트
 	@PostMapping(value = "/ProdModal_selectList")
 	public String ProdModal_selectList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = bm10Svc.grid1_selectCount(paramMap);
+		int totalCnt = bm10Svc.ProdModal_selectCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
 		List<Map<String, String>> result = bm10Svc.ProdModal_selectList(paramMap);
@@ -60,7 +60,7 @@ public class BM10Ctr {
 
 	//INSERT
 	@PostMapping(value = "/insert_bm10")
-	public String insertBM10M01(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	public String insert_bm10(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
 			if (bm10Svc.insert_bm10(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);

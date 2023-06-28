@@ -7,17 +7,39 @@ import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface SM01Mapper {
-	// 수주리스트 조회
-	int selectBomSalesCount(Map<String, String> paramMap);
-	List<Map<String, String>> selectBomSalesList(Map<String, String> paramMap);
-	// BOM내역상세 조회
-	int selectBomDetailCount(Map<String, String> paramMap);
-	List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);
-	// 매출확정등록 조회
-	int addSellDscnCount(Map<String, String> paramMap);
-	List<Map<String, String>> addSellDscnList(Map<String, String> paramMap);
-	// 매출확정등록 입력
-	int insertSellDscn(Map<String, String> paramMap);
-	
-	
+
+  int selectBomSalesCount(Map<String, String> paramMap);
+
+  List<Map<String, String>> selectBomSalesList(Map<String, String> paramMap);
+  
+  List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);
+
+  List<Map<String, String>> selectBuyBomList(Map<String, String> paramMap);
+
+  List<Map<String, String>> selectBomMatrList(Map<String, String> paramMap);
+  
+  Map<String, String> selectPrjctInfo(Map<String, String> paramMap);
+  
+  int selectPrjctSeqNext(Map<String, String> paramMap);
+  
+  int insertBom(Map<String, String> paramMap);
+
+  int insertBomMatr(Map<String, String> paramMap);
+  
+  int updateBom(Map<String, String> paramMap);
+
+  int updateBomMatr(Map<String, String> paramMap);
+
+  int deleteBom(Map<String, String> paramMap);
+  
+  int deleteBomMatrAll(Map<String, String> paramMap);
+
+  int deleteBomMatr(Map<String, String> paramMap);
+  
+  Map<String, String> selectPrjctIssueInfo(Map<String, String> paramMap);
+  
+  int insertBomIssue(Map<String, String> paramMap);
+
+  int updateBomIssue(Map<String, String> paramMap);
+  
 }

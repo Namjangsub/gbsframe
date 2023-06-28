@@ -114,7 +114,10 @@ public class CR07SvcImpl implements CR07Svc {
 	
 	@Override
 	public int insertSellDscnDetail(Map<String, String> paramMap) {
-		return cr07Mapper.insertSellDscnDetail(paramMap);
+		String sellBillNo = cr07Mapper.select_cr07_sellBillNo(paramMap);
+		paramMap.put("sellBillNo", sellBillNo);
+		int result = cr07Mapper.insertSellDscnDetail(paramMap);
+		return result;
 	}
 	
 	// UPDATE
