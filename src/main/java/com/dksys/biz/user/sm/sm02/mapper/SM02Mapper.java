@@ -2,6 +2,10 @@ package com.dksys.biz.user.sm.sm02.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
 
+import com.google.gson.reflect.TypeToken;
+
+import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -13,7 +17,9 @@ public interface SM02Mapper {
 
 	List<Map<String, String>> selectOrderList(Map<String, String> paramMap);	
 	
-	List<Map<String, String>> selectOrderExcelList(Map<String, String> paramMap);	
+	List<Map<String, String>> selectOrderExcelList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);
 	
 	int selectMaxTrgtKey(Map<String, String> paramMap);	
 	
