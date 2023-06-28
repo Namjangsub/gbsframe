@@ -33,6 +33,8 @@ public interface CR08Mapper {
 	  
 	  int selectSalesStmtSeqNext(Map<String, String> paramMap);
 	  
+	  String selectSalesStmtCalNext(Map<String, String> paramMap);
+	  
 	  int insertSalesStmt(Map<String, String> paramMap);
 
 	  int updatePchsCost(Map<String, String> paramMap);

@@ -216,10 +216,14 @@ public class CR08SvcImpl implements CR08Svc{
 			//첨부 화일 권한체크  끝 
 			//---------------------------------------------------------------  
 			int fileTrgtKey = CR08Mapper.selectSalesStmtSeqNext(paramMap);
-			String sellDcsnNo = "CONF23-0003" ; //SELL_DCSN_NO//test code!!!
+			//String sellDcsnNo = "CONF23-0003" ; //SELL_DCSN_NO//test code!!!
+			
+			String sellBillNo = CR08Mapper.selectSalesStmtCalNext(paramMap);
+			
+			System.out.println("계산서 번호==?"+sellBillNo);
 			
 			paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
-			paramMap.put("sellDcsnNo", sellDcsnNo);
+			paramMap.put("sellBillNo", sellBillNo);
 			
 			int result = CR08Mapper.insertSalesStmt(paramMap);
 			
