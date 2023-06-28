@@ -28,6 +28,8 @@ public interface CR07Mapper {
 	
 	// 매출확정 수정
 	int updateSellDscn(Map<String, String> paramMap);
+	// 계산서 번호 생성
+	String select_cr07_sellBillNo(Map<String, String> paramMap);
 	
 	
 }
