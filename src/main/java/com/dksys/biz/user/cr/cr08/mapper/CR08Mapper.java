@@ -21,6 +21,8 @@ public interface CR08Mapper {
 	  
 	  Map<String, String> selectPchsCostInfo(Map<String, String> paramMap);
 	  
+	  Map<String, String> selectSalesStmtInfo(Map<String, String> paramMap);	  
+	  
 	  List<Map<String, String>> selectSalesStmtExcelList(Map<String, String> paramMap);
 	  
 	  List<Map<String, String>> selectSalesStmtCalExcelList(Map<String, String> paramMap);
@@ -34,6 +36,9 @@ public interface CR08Mapper {
 	  int insertSalesStmt(Map<String, String> paramMap);
 
 	  int updatePchsCost(Map<String, String> paramMap);
+	  
+	  int updateSalesStmt(Map<String, String> paramMap);
+	  
 
 	  int deletePchsCost(Map<String, String> paramMap);
 

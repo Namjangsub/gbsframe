@@ -162,7 +162,7 @@
 						     , ORDRS.PMNT_MTD          AS PMNT_MTD          
 						     , ORDRS.ORDRS_RMK         AS ORDRS_RMK        
 						     , ORDRS.ORGN_SALES_CD     AS ORGN_SALES_CD   
-						     , BILL.SELL_BILL_DT   
+						 --    , BILL.SELL_BILL_DT   
 				FROM   TB_CR02M01 AS ORDRS
 				       LEFT OUTER JOIN (
 				             SELECT CO_CD                                 
@@ -190,12 +190,14 @@
 				                  , BD.ORDRS_NO                                       
 				                  , MAX(BD.CURR_CD)                   AS BILL_CURR_CD 
 				                  , NVL(SUM(BD.SELL_BILL_DTL_AMT), 0) AS BILL_AMT 
-				                  , TO_CHAR(BM.SELL_BILL_DT,'YYYYMMDD') AS SELL_BILL_DT    
+				              --    , TO_CHAR(BM.SELL_BILL_DT,'YYYYMMDD') AS SELL_BILL_DT    
 				             FROM   TB_CR04M01 AS BM
 				                    JOIN TB_CR04D01 AS BD ON BD.CO_CD        = BM.CO_CD
 				                                   AND BD.SELL_BILL_NO = BM.SELL_BILL_NO
 				             WHERE  1 = 1  
-				             GROUP BY BM.CO_CD, BD.ORDRS_NO,BM.SELL_BILL_DT
+				                AND  BM.CO_CD = #{coCd} 
+				                AND  BM.SELL_BILL_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD') + 1
+				             GROUP BY BM.CO_CD, BD.ORDRS_NO--,BM.SELL_BILL_DT
 				             ) AS BILL  ON BILL.CO_CD    = ORDRS.CO_CD
 				                     AND BILL.ORDRS_NO = ORDRS.ORDRS_NO
 				       LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = ORDRS.ORDRS_CLNT_CD
@@ -206,9 +208,9 @@
 			<if test="coCd !=null and !coCd.equals('')">
 				 AND  ORDRS.CO_CD = #{coCd}
 			</if>
-			<if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
+		<!-- <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
 				 AND BILL.SELL_BILL_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD') +1
-			</if>
+			</if> -->
 			<if test="ordrsClntCd !=null and !ordrsClntCd.equals('')">
 			     AND  ORDRS.ORDRS_CLNT_CD LIKE '%${ordrsClntCd}%'  
 			</if>
@@ -329,6 +331,12 @@
 		     , U2.NAME AS UDT_ID_NM
 		     , BM.UDT_PGM      
 		     , TO_CHAR(BM.UDT_DTTM, 'YYYY-MM-DD')   AS UDT_DTTM 
+		     , BD.SELL_DCSN_NO
+		     , BD.CLMN_PLAN_SEQ
+		     , BD. CREAT_PGM
+		     , BD.CREAT_ID
+		     , BD.UDT_ID
+		     , BD.UDT_PGM
 		FROM   TB_CR04M01 AS BM
 		       JOIN TB_CR04D01 AS BD ON BD.CO_CD        = BM.CO_CD
 		                             AND BD.SELL_BILL_NO = BM.SELL_BILL_NO
@@ -360,7 +368,8 @@
 	</select>
 
 	<select id="selectSalesStmtConList" parameterType="Map" resultType="CamelMap">
-	 SELECT DISTINCT ORDRS.FILE_TRGT_KEY  AS FILE_TRGT_KEY             
+	 SELECT DISTINCT ORDRS.FILE_TRGT_KEY  AS FILE_TRGT_KEY  
+	                     , ROWNUM	               AS RNUM           
 					     , ORDRS.CO_CD             AS CO_CD            
 					     , R.CODE_NM               AS CO_CD_NM          
 					     , TO_CHAR(ORDRS.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT 
@@ -450,7 +459,41 @@
 	  </if>
 	ORDER BY ORDRS.CO_CD, ORDRS.ORDRS_NO, CLMN.CLMN_PLAN_SEQ, CONF.SELL_DCSN_NO
 	</select>
-
+  
+  <select id="selectSalesStmtInfo" resultType="CamelMap">
+  	   SELECT DISTINCT BM.FILE_TRGT_KEY 
+		     , BM.CO_CD_S1        
+		     , R.CODE_NM AS CO_CD_NM 
+		     , BD.ORDRS_NO
+		     , BM.SELL_BILL_NO  
+		     , BM.ORDRS_CLNT_CD_S1 
+		     , C.CLNT_NM AS ORDRS_CLNT_NM_S1
+		     , TO_CHAR(BM.SELL_BILL_DT, 'YYYY-MM-DD') AS SELL_BILL_DT  
+		     , BM.CURR_CD       
+		     , R1.CODE_NM AS CURR_NM 
+		     , BM.EXRATE       
+		     , BM.SELL_BILL_AMT 
+		     , BM.SELL_BILL_SUMRMK 
+		     , BM.SELL_BILL_RMK 
+		     , BM.CREAT_ID     
+		     , U1.NAME AS CREAT_ID_NM
+		     , BM.CREAT_PGM   
+		     , TO_CHAR(BM.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM 
+		     , BM.UDT_ID      
+		     , U2.NAME AS UDT_ID_NM
+		     , BM.UDT_PGM      
+		     , TO_CHAR(BM.UDT_DTTM, 'YYYY-MM-DD')   AS UDT_DTTM 
+		FROM   TB_CR04M01 AS BM
+		       JOIN TB_CR04D01 AS BD ON BD.CO_CD        = BM.CO_CD
+		                             AND BD.SELL_BILL_NO = BM.SELL_BILL_NO
+		       LEFT OUTER JOIN TB_CM06M01 AS U1 ON U1.ID = BM.CREAT_ID
+		       LEFT OUTER JOIN TB_CM06M01 AS U2 ON U2.ID = BM.UDT_ID
+		       LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = BM.ORDRS_CLNT_CD
+		       LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = BM.CO_CD
+		       LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = BM.CURR_CD
+		WHERE  BM.FILE_TRGT_KEY = #{fileTrgtKey}	
+  </select>
+  
   <select id="selectPchsCostInfo" resultType="CamelMap">
           SELECT
 					T.FILE_TRGT_KEY,
@@ -535,6 +578,19 @@
 <!-- 		AND	COST_NO                	= #{costNo}, -->
 
   </update>
+    
+  <update id="updateSalesStmt" parameterType="Map">
+   UPDATE TB_CR04M01
+   SET   SELL_BILL_DT   = to_date(#{sellBillDt}, 'YYYY-MM-DD')
+        ,CURR_CD        = #{currCd}
+        ,SELL_BILL_AMT  = #{sellBillDtlAmt}
+        ,EXRATE         = #{exrate} 
+        ,SELL_BILL_RMK  = #{sellBillDtlRmk}
+	    ,SELL_BILL_SUMRMK = #{sellBillSumrmk}
+	    ,UDT_ID           = #{udtId}      
+	    ,UDT_PGM          = #{udtPgm}   
+   WHERE  FILE_TRGT_KEY   = #{fileTrgtKey}
+  </update>
   
   <select id="selectPchsCostSeqNext" parameterType="Map" resultType="int">
 		SELECT TO_CHAR(SYSDATE, 'YYYYMM')||LPAD(TB_SM10M01_SQ01.NEXTVAL,3,0) FROM DUAL
@@ -615,7 +671,7 @@
         SELL_BILL_DTL_AMT, 
         SELL_BILL_DTL_RMK 
 	)VALUES(
-		#{coCd}, 
+		#{coCdS1}, 
 		#{sellBillNo}, 
 		#{sellDcsnNo}, 
 		#{ordrsNo},
@@ -627,35 +683,35 @@
 		#{sellBillDtlAmt}, 
 		#{sellBillDtlRmk}
 	)INTO TB_CR04M01(
-					FILE_TRGT_KEY, 
-					CO_CD,          
-					SELL_BILL_NO,   
-		            CREAT_ID, 
-		            CREAT_PGM, 
-		            CURR_CD,
-		            EXRATE, 
-					ORDRS_CLNT_CD, 
-					SELL_BILL_AMT, 
-					SELL_BILL_DT,
-					SELL_BILL_RMK,
-					SELL_BILL_SUMRMK,
-					UDT_ID,      
-					UDT_PGM   
-		)VALUES(
-					#{fileTrgtKey},
-					#{coCd},
-					#{sellBillNo},
-		            #{creatId},
-		            #{creatPgm},
-		            #{currCd}, 
-		            #{exrate}, 
-					#{ordrsClntCd},
-					#{sellBillDtlAmt},
-					to_date(#{sellBillDt}, 'YYYY-MM-DD'),
-					#{sellBillDtlRmk}, 
-					#{sellBillSumrmk}, 
-					#{udtId},      
-					#{udtPgm}  
+		FILE_TRGT_KEY, 
+		CO_CD,          
+		SELL_BILL_NO,   
+        CREAT_ID, 
+        CREAT_PGM, 
+        CURR_CD,
+        EXRATE, 
+		ORDRS_CLNT_CD, 
+		SELL_BILL_AMT, 
+		SELL_BILL_DT,
+		SELL_BILL_RMK,
+		SELL_BILL_SUMRMK,
+		UDT_ID,      
+		UDT_PGM   
+	)VALUES(
+		#{fileTrgtKey},
+		#{coCdS1},
+		#{sellBillNo},
+        #{creatId},
+        #{creatPgm},
+        #{currCd}, 
+        #{exrate}, 
+		#{ordrsClntCdS1},
+		#{sellBillDtlAmt},
+		to_date(#{sellBillDt}, 'YYYY-MM-DD'),
+		#{sellBillDtlRmk}, 
+		#{sellBillSumrmk}, 
+		#{udtId},      
+		#{udtPgm}  
 		)SELECT * FROM DUAL
   </insert>
   

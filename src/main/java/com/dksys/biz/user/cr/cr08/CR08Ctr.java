@@ -70,6 +70,13 @@ public class CR08Ctr {
 	    return "jsonView";
 	  }
 	  
+	  @PostMapping(value = "/selectSalesStmtInfo")
+	  public String selectSalesStmtInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = cr08Svc.selectSalesStmtInfo(paramMap);
+	    model.addAttribute("result", result);
+	    return "jsonView";
+	  }
+	  
 
 	  @PostMapping(value = "/selectConfirmCount")
 	  public String selectConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -96,7 +103,23 @@ public class CR08Ctr {
 			}
 			return "jsonView";
 	  }
-	 
+	  
+	  @PostMapping(value = "/updateSalesStmt")
+	  public String updateSalesStmt(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		  	try {
+				if (cr08Svc.updateSalesStmt(paramMap, mRequest) != 0 ) {
+					model.addAttribute("resultCode", 200);
+					model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+				} else {
+					model.addAttribute("resultCode", 500);
+					model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+				};
+			}catch(Exception e){
+				model.addAttribute("resultCode", 900);
+				model.addAttribute("resultMessage", e.getMessage());
+			}
+		  	return "jsonView";
+	  }
 
 	  @PostMapping(value = "/updatePchsCost")
 	  public String updatePchsCost(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
