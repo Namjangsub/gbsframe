@@ -215,8 +215,7 @@ public class CR08SvcImpl implements CR08Svc{
 			//---------------------------------------------------------------  
 			//첨부 화일 권한체크  끝 
 			//---------------------------------------------------------------  
-			int fileTrgtKey = CR08Mapper.selectSalesStmtSeqNext(paramMap);
-			//String sellDcsnNo = "CONF23-0003" ; //SELL_DCSN_NO//test code!!!
+			int fileTrgtKey = CR08Mapper.selectSalesStmtSeqNext(paramMap);			
 			
 			String sellBillNo = CR08Mapper.selectSalesStmtCalNext(paramMap);
 			
