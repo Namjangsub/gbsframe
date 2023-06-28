@@ -335,13 +335,16 @@
 	</select>
 
 	<select id="select_cr07_Info" parameterType="Map" resultType="CamelMap">
-		SELECT	
-			ORDRS.FILE_TRGT_KEY AS FILE_TRGT_KEY --파일대상KEY
-			, ROWNUM	AS 	RNUM
-		    , ORDRS.CO_CD             AS CO_CD             --회사코드
+		SELECT * FROM (
+			SELECT ROWNUM AS RNUM
+			, CONF.SELL_DCSN_NO 	-- 매출확정번호 추가
+			, TO_CHAR(CONF.SELL_DCSN_DT, 'YYYY-MM-DD') AS SELL_DCSN_DT	-- 매출확정일자
+			, CONF.SELL_DCSN_AMT	-- 매출확정금액
+			, CONF.SELL_DCSN_RMK	-- 매출확정비고
+			, ORDRS.FILE_TRGT_KEY AS FILE_TRGT_KEY 	--파일대상KEY
+			, ORDRS.CO_CD             AS CO_CD             --회사코드
 		    , R.CODE_NM               AS CO_CD_NM          --회사명
 		    , ORDRS.ORDRS_NO          AS ORDRS_NO          --수주번호
-			, CONF.SELL_DCSN_NO		  AS SELL_DCSN_NO	   -- 매출확정번호	
 		    , TO_CHAR(ORDRS.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT --수주일자
 		    , ORDRS.ORDRS_CLNT_CD     AS ORDRS_CLNT_CD     --고객사
 		    , C.CLNT_NM               AS ORDRS_CLNT_NM     --고객사명
@@ -349,55 +352,61 @@
 		    , ORDRS.CTRT_NM           AS CTRT_NM           --계약명
 		    , ORDRS.CURR_CD           AS ORDRS_CURR_CD     --통화단위
 		    , R2.CODE_NM              AS ORDRS_CURR_NM     --통화단위명
-		    , NVL(ORDRS.EXRATE, 1)    AS ORDRS_EXRATE      --환율
-		    <!-- 수주수금계획 -->
-		    , CLMN.CLMN_PLAN_SEQ      AS CLMN_PLAN_SEQ     --수금계획순번
-		    , CLMN.CLMN_PLAN_DIV      AS CLMN_PLAN_DIV     --수금구분
-		    , R3.CODE_NM              AS CLMN_PLAN_DIV_NM  --수금구분명
-		    , CLMN.CLMN_DIV_SEQ       AS CLMN_DIV_SEQ      --수금구분차수
-		    , CLMN.CLMN_RATE          AS CLMN_RATE         --수금비율
-		    , CLMN.CURR_CD            AS CLMN_CURR_CD      --통화단위
-		    , R4.CODE_NM              AS CLMN_CURR_NM      --통화단위명
-		    , NVL(CLMN.EXRATE, 1)     AS CLMN_EXRATE       --환율
-		    , CLMN.CLMN_AMT           AS CLMN_AMT          --수금금액
-		    , TO_CHAR(CLMN.BILL_PBLS_DT, 'YYYY-MM-DD') AS CLMN_BILL_PBLS_DT --계산서발행일자
-		    , TO_CHAR(CLMN.CLMN_DT, 'YYYY-MM-DD')      AS CLMN_DT           --수금일자
-		    , CONF.CONF_AMT                 AS BEF_CONF_AMT --기 확정금액
-		    , CLMN.CLMN_AMT - CONF.CONF_AMT AS UNCONF_AMT   --미 확정금액
-		    , 'N'                           AS CHK          --체크여부
-		    , 0                             AS CONF_AMT     --확정금액
-	     <!-- 계산서 발행 후 지급시기 -->
-	     <!-- , CLMN.PMNT_DT_AFTER_BILL AS CLMN_PMNT_DT_AFTER_BILL  -->
-	     <!-- 비고 -->
-	     <!-- , CLMN.CLMN_PLAN_RMK      AS CLMN_PLAN_RMK      -->
-	     <!--  수금관리상황 -->
-	     <!-- , CLMN.CLMN_MGMT_STATUS   AS CLMN_MGMT_STATUS -->  
-	FROM   TB_CR02M01 AS ORDRS
-	       <!-- 수주수금계획 -->
-	       JOIN TB_CR02D01 AS CLMN  ON CLMN.CO_CD    = ORDRS.CO_CD
-			                       AND CLMN.ORDRS_NO = ORDRS.ORDRS_NO
-	       <!-- 매출확정 -->
-	       LEFT JOIN (
-		              SELECT CM.CO_CD                                          --회사코드
-		                   , CD.ORDRS_NO                                       --수주번호
-		                   , CD.CLMN_PLAN_SEQ                                  --수금계획순번
-		                   , MAX(CD.CURR_CD)                   AS CONF_CURR_CD --통화단위
-		                   , NVL(SUM(CD.SELL_DCSN_DTL_AMT), 0) AS CONF_AMT     --확정금액
-		                   , CD.SELL_DCSN_NO
-		              FROM   TB_CR03M01 AS CM
-		                     JOIN TB_CR03D01 AS CD ON CD.CO_CD        = CM.CO_CD
-								                  AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
-		              GROUP BY CM.CO_CD, CD.ORDRS_NO, CD.CLMN_PLAN_SEQ, CD.SELL_DCSN_NO
-		             ) AS CONF  ON CONF.CO_CD         = CLMN.CO_CD
-				               AND CONF.ORDRS_NO      = CLMN.ORDRS_NO
-				               AND CONF.CLMN_PLAN_SEQ = CLMN.CLMN_PLAN_SEQ
-	       LEFT JOIN TB_BM02M01 AS C ON C.CLNT_CD = ORDRS.ORDRS_CLNT_CD     --고객사
-	       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = ORDRS.CO_CD	--회사
-	       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = ORDRS.ORDRS_DIV	--수주구분
-	       LEFT JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = ORDRS.CURR_CD		--통화단위
-	       LEFT JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = CLMN.CLMN_PLAN_DIV	--수금구분
-	       LEFT JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = CLMN.CURR_CD	--통화단위
-		WHERE ORDRS.FILE_TRGT_KEY = #{fileTrgtKey}
+		    , ORDRS.EXRATE            AS ORDRS_EXRATE      --환율
+		    , CLMN.CLMN_AMT           AS CLMN_AMT          --수주수금계획금액
+		    , CONF.CONF_AMT           AS CONF_AMT          --매출확정금액
+		    , CLMN.CLMN_AMT - CONF.CONF_AMT AS UNCONF_AMT  --매출미확정금액
+		    , ORDRS.ORDRS_DIV         AS ORDRS_DIV         --수주구분
+		    , R1.CODE_NM              AS ORDRS_DIV_NM      --수주구분명
+		    , ORDRS.EST_NO            AS EST_NO            --견적서번호
+		    , ORDRS.EST_DEG           AS EST_DEG           --견적차수
+		    , ORDRS.ORDRS_AMT         AS ORDRS_AMT         --수주금액
+		    , ORDRS.FWD_EXCH_JOIN_DT  AS FWD_EXCH_JOIN_DT  --선물환가입일
+		    , ORDRS.FWD_EXCH_CHK_LIST AS FWD_EXCH_CHK_LIST --선물환 Check List
+		    , ORDRS.ORDRGER           AS ORDRGER           --발주자
+		    , ORDRS.MNG_ID            AS MNG_ID            --담당자
+		    , ORDRS.CTRT_DOC          AS CTRT_DOC          --계약문서
+		    , ORDRS.PMNT_MTD          AS PMNT_MTD          --결제방법
+		    , ORDRS.ORDRS_RMK         AS ORDRS_RMK         --수주비고
+		    , ORDRS.ORGN_SALES_CD     AS ORGN_SALES_CD     --원천Sales Code
+		FROM  TB_CR02M01 AS ORDRS
+		       <!-- 수주수금계획 -->
+				LEFT OUTER JOIN (
+		             SELECT CO_CD                                 --회사
+		                  , ORDRS_NO                              --수주번호
+		                  , MAX(CURR_CD)          AS CLMN_CURR_CD --통화단위
+		                  , NVL(MAX(EXRATE)  , 1) AS CLMN_EXRATE  --환율
+		                  , NVL(SUM(CLMN_AMT), 0) AS CLMN_AMT     --수금금액                  
+		             FROM   TB_CR02D01
+		             GROUP BY CO_CD, ORDRS_NO
+		            ) AS CLMN ON CLMN.CO_CD    = ORDRS.CO_CD
+				              AND CLMN.ORDRS_NO = ORDRS.ORDRS_NO
+				<!-- 매출확정 -->
+		       JOIN (
+		             SELECT CM.CO_CD                                          --회사코드
+		                  , CD.ORDRS_NO                                       --수주번호
+		                  , MAX(CD.CURR_CD)                   AS CONF_CURR_CD --통화단위
+		                  , NVL(SUM(CD.SELL_DCSN_DTL_AMT), 0) AS CONF_AMT     --확정금액
+		                  , CD.SELL_DCSN_NO 				-- 매출확정번호
+		                  , CM.SELL_DCSN_DT					-- 매출확정일자
+		                  , CM.SELL_DCSN_AMT				-- 매출확정금액
+		                  , CM.SELL_DCSN_RMK				-- 매출확정비고
+		             FROM   TB_CR03M01 AS CM
+		                    JOIN TB_CR03D01 AS CD ON CD.CO_CD        = CM.CO_CD
+								AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
+		             WHERE  1 = 1
+		             AND CM.CO_CD = 'GUN'
+		             AND TO_CHAR(CM.SELL_DCSN_DT, 'YYYYMMDD') BETWEEN '20230601' AND '20230630' -- 확정일자
+		             GROUP BY CM.CO_CD, CD.ORDRS_NO, CD.SELL_DCSN_NO, CM.SELL_DCSN_DT, CM.SELL_DCSN_AMT,  CM.SELL_DCSN_RMK	
+		             ) AS CONF  ON CONF.CO_CD = ORDRS.CO_CD
+						AND CONF.ORDRS_NO = ORDRS.ORDRS_NO
+		       LEFT JOIN TB_BM02M01 AS C ON C.CLNT_CD = ORDRS.ORDRS_CLNT_CD --고객사
+		       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = ORDRS.CO_CD   	--회사
+		       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = ORDRS.ORDRS_DIV   --수주구분
+		       LEFT JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = ORDRS.CURR_CD   	--통화단위
+		       WHERE ROWNUM = 1
+		       ) A
+		       WHERE A.FILE_TRGT_KEY = #{fileTrgtKey}
 	</select>
 	
 	<select id="select_cr07_SeqNext" parameterType="Map" resultType="int">
