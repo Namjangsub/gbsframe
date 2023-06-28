@@ -197,8 +197,6 @@ public class BM16Ctr {
     	objCols5.put("label", "목표합계");
     	objCols6.put("type", "number");
     	objCols6.put("label", "수주완료");
-    	objCols6.put("type", "number");
-    	objCols6.put("label", "수주완료");
     	objCols7.put("type", "number");
     	objCols7.put("label", "수주.수주목표누계");
 
@@ -217,13 +215,13 @@ public class BM16Ctr {
     		value1.put("v", result.get(i).get("inpexp02"));
     		value1.put("f", null);
     		JSONObject value2 = new JSONObject();
-    		value2.put("v", result.get(i).get("bizdiv01"));
+    		value2.put("v", result.get(i).get("inpexp01"));
     		value2.put("f", null);
     		JSONObject value3 = new JSONObject();
-    		value3.put("v", result.get(i).get("inpexp01"));
+    		value3.put("v", result.get(i).get("inpexp03"));
     		value3.put("f", null);
     		JSONObject value4 = new JSONObject();
-    		value4.put("v", result.get(i).get("epctAmt"));
+    		value4.put("v", result.get(i).get("ordrsPlanAmt"));
     		value4.put("f", null);
     		JSONObject value5 = new JSONObject();
     		value5.put("v", result.get(i).get("ordrsAmt"));

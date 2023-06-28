@@ -8,7 +8,6 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,7 +18,6 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.cr.cr07.service.CR07Svc;
 import com.dksys.biz.util.MessageUtils;
-import com.fasterxml.jackson.annotation.JacksonInject.Value;
 
 @Controller
 @RequestMapping("/user/cr/cr07")
@@ -75,6 +73,7 @@ public class CR07Ctr {
 	@PostMapping(value = "/select_cr07_Info")
 	public String select_cr07_Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		Map<String, String> result = cr07Svc.select_cr07_Info(paramMap);
+		System.out.println(result);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
@@ -111,7 +110,6 @@ public class CR07Ctr {
 			return "jsonView";
 	}
 
-	
 	// 매출확정등록 수정
 	@PostMapping(value = "/updateSellDscn")
 	public String update_bm10(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {

@@ -9,6 +9,8 @@ import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.sm.sm05.service.SM05Svc;
@@ -38,13 +40,11 @@ public class SM05Ctr {
 	// 프로젝트 리스트 조회 - 폐기상세 조회
 	@PostMapping(value = "/selectIoDetailList")
 	public String selectIoDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		// System.out.println("도칙 : " + paramMap);
+		
 		int totalCnt = sm05Svc.selectIoDetailCount(paramMap);
-		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		// System.out.println("중간 : " + totalCnt);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);		
 		model.addAttribute("paginationInfo", paginationInfo);
-		List<Map<String, String>> result = sm05Svc.selectIoDetailList(paramMap);
-		// System.out.println("끝 : " + result);
+		List<Map<String, String>> result = sm05Svc.selectIoDetailList(paramMap);		
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
@@ -61,9 +61,9 @@ public class SM05Ctr {
 //	}  
   
 	//정보 조회
-	@PostMapping(value = "/selectIoInfo")
-	public String selectIoInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		Map<String, String> result = sm05Svc.selectIoInfo(paramMap);
+	@PostMapping(value = "/select_sm05_IoInfo")
+	public String select_sm05_IoInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = sm05Svc.select_sm05_IoInfo(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
@@ -88,6 +88,42 @@ public class SM05Ctr {
 		return "jsonView";
 	}
 	
+	//폐기창고 insert - 불출정보
+    @PostMapping(value = "/insert_sm05")
+    public String insert_sm05(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model)  {
+		try {
+			if (sm05Svc.insert_sm05(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+    
+    //폐기창고 insert - 폐기창고 재고정보
+    @PostMapping(value = "/insert_sm05_IoInfo")
+    public String insert_sm05_IoInfo(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model)  {
+		try {
+			if (sm05Svc.insert_sm05_IoInfo(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+	
 	// 프로젝트 정보 조회 - popup 부분
 //	  @PostMapping(value = "/selectIoInfo")
 //	  public String selectIoInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -99,25 +135,6 @@ public class SM05Ctr {
 //	public String selectConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
 //		int result = sm05Svc.selectConfirmCount(paramMap);
 //		model.addAttribute("result", result);
-//		return "jsonView";
-//	}
-
-//	@PostMapping(value = "/insertPchsCost")
-//	public String insertPchsCost(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest,
-//			ModelMap model) throws Exception {
-//		try {
-//			if (sm05Svc.insertPchsCost(paramMap, mRequest) != 0) {
-//				model.addAttribute("resultCode", 200);
-//				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-//			} else {
-//				model.addAttribute("resultCode", 500);
-//				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-//			}
-//			;
-//		} catch (Exception e) {
-//			model.addAttribute("resultCode", 900);
-//			model.addAttribute("resultMessage", e.getMessage());
-//		}
 //		return "jsonView";
 //	}
 

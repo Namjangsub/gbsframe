@@ -21,20 +21,27 @@ public interface CR08Mapper {
 	  
 	  Map<String, String> selectPchsCostInfo(Map<String, String> paramMap);
 	  
+	  Map<String, String> selectSalesStmtInfo(Map<String, String> paramMap);	  
+	  
 	  List<Map<String, String>> selectSalesStmtExcelList(Map<String, String> paramMap);
 	  
 	  List<Map<String, String>> selectSalesStmtCalExcelList(Map<String, String> paramMap);
 	  
 	  int selectConfirmCount(Map<String, String> paramMap);
-
+	
 	  int selectPchsCostSeqNext(Map<String, String> paramMap);
 	  
 	  int selectSalesStmtSeqNext(Map<String, String> paramMap);
 	  
+	  String selectSalesStmtCalNext(Map<String, String> paramMap);
+	  
 	  int insertSalesStmt(Map<String, String> paramMap);
-
+	
 	  int updatePchsCost(Map<String, String> paramMap);
-
+	  
+	  int updateSalesStmt(Map<String, String> paramMap);
+	  
+	
 	  int deletePchsCost(Map<String, String> paramMap);
 
 }
