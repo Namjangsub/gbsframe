@@ -32,7 +32,7 @@ public class CR08Ctr {
 	//  수주 리스트 조회
 	  @PostMapping(value = "/selectSalesStmtList")
 	  public String selectSalesStmtList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	    int totalCnt = cr08Svc.selectPchsCostCount(paramMap);
+	    int totalCnt = cr08Svc.selectSalesStmtCount(paramMap);
 	    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 	    model.addAttribute("paginationInfo", paginationInfo);
 	    List<Map<String, String>> result = cr08Svc.selectSalesStmtList(paramMap);
@@ -61,14 +61,7 @@ public class CR08Ctr {
 	    model.addAttribute("result", result);
 	    return "jsonView";
 	  }
-
-	  // 프로젝트 정보 조회
-	  @PostMapping(value = "/selectPchsCostInfo")
-	  public String selectPchsCostInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		Map<String, String> result = cr08Svc.selectPchsCostInfo(paramMap);
-	    model.addAttribute("result", result);
-	    return "jsonView";
-	  }
+	  
 	  
 	  @PostMapping(value = "/selectSalesStmtInfo")
 	  public String selectSalesStmtInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -120,28 +113,12 @@ public class CR08Ctr {
 			}
 		  	return "jsonView";
 	  }
+	
 
-	  @PostMapping(value = "/updatePchsCost")
-	  public String updatePchsCost(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	  @PutMapping(value = "/deleteSalesStmt")
+	  public String deleteSalesStmt(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 		  	try {
-				if (cr08Svc.updatePchsCost(paramMap, mRequest) != 0 ) {
-					model.addAttribute("resultCode", 200);
-					model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-				} else {
-					model.addAttribute("resultCode", 500);
-					model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-				};
-			}catch(Exception e){
-				model.addAttribute("resultCode", 900);
-				model.addAttribute("resultMessage", e.getMessage());
-			}
-		  	return "jsonView";
-	  }
-
-	  @PutMapping(value = "/deletePchsCost")
-	  public String deletePchsCost(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
-		  	try {
-				if (cr08Svc.deletePchsCost(paramMap) != 0 ) {
+				if (cr08Svc.deleteSalesStmt(paramMap) != 0 ) {
 					model.addAttribute("resultCode", 200);
 					model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
 				} else {

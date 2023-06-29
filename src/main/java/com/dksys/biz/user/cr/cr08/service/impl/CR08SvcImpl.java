@@ -37,22 +37,21 @@ public class CR08SvcImpl implements CR08Svc{
 	  CM15Svc cm15Svc;
 	  
 	  @Autowired
-	  CM08Svc cm08Svc;
-	  
-	  @Override
-	  public int selectPchsCostCount(Map<String, String> paramMap) {
-	    return CR08Mapper.selectPchsCostCount(paramMap);
-	  }
+	  CM08Svc cm08Svc;	 
 	  
 	  @Override
 	  public int selectSalesStmtConCount(Map<String, String> paramMap) {
 	    return CR08Mapper.selectSalesStmtConCount(paramMap);
 	  }
 	  
-	  
 	  @Override
 	  public int selectSalesStmtCalCount(Map<String, String> paramMap) {
 	    return CR08Mapper.selectSalesStmtCalCount(paramMap);
+	  }
+	  
+	  @Override
+	  public int selectSalesStmtCount(Map<String, String> paramMap) {
+	    return CR08Mapper.selectSalesStmtCount(paramMap);
 	  }
 	  
 
@@ -70,11 +69,7 @@ public class CR08SvcImpl implements CR08Svc{
 	  public List<Map<String, String>> selectSalesStmtConList(Map<String, String> paramMap) {
 	    return CR08Mapper.selectSalesStmtConList(paramMap);
 	  }
-
-	  @Override
-	  public Map<String, String> selectPchsCostInfo(Map<String, String> paramMap) {
-	    return CR08Mapper.selectPchsCostInfo(paramMap);
-	  }
+	  
 	  
 	  @Override
 	  public Map<String, String> selectSalesStmtInfo(Map<String, String> paramMap) {
@@ -86,60 +81,7 @@ public class CR08SvcImpl implements CR08Svc{
 	  public int selectConfirmCount(Map<String, String> paramMap) {
 	    return CR08Mapper.selectConfirmCount(paramMap);
 	  }
-
-	  @Override
-	  public int updatePchsCost(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-//		Gson gson = new Gson();
-		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
-		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
-
-		//---------------------------------------------------------------  
-		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
-	  	//   필수값 :  jobType, userId, comonCd
-		//---------------------------------------------------------------  
-	    HashMap<String, String> param = new HashMap<>();
-	    param.put("userId", paramMap.get("userId"));
-	    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
-	    
-		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
-		if (uploadFileList.size() > 0) {
-				//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
-				param.put("jobType", "fileUp");
-				cm15Svc.selectFileAuthCheck(param);
-		}
-		String[] deleteFileArr = gsonDtl.fromJson(paramMap.get("deleteFileArr"), String[].class);
-		List<String> deleteFileList = Arrays.asList(deleteFileArr);
-	    for(String fileKey : deleteFileList) {  // 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
-			    Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
-				//접근 권한 없으면 Exception 발생
-			    param.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
-			    param.put("jobType", "fileDelete");
-				cm15Svc.selectFileAuthCheck(param);
-		}
-		//---------------------------------------------------------------  
-		//첨부 화일 권한체크  끝 
-		//---------------------------------------------------------------  
-
-		int result = CR08Mapper.updatePchsCost(paramMap);
-
-		//---------------------------------------------------------------  
-		//첨부 화일 처리 시작 
-		//---------------------------------------------------------------  
-	    if (uploadFileList.size() > 0) {
-		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-		    cm08Svc.uploadFile(paramMap, mRequest);
-	    }
-	    
-	    for(String fileKey : deleteFileList) {
-	    	cm08Svc.deleteFile(fileKey);
-	    }
-		//---------------------------------------------------------------  
-		//첨부 화일 처리  끝 
-		//---------------------------------------------------------------  
-	    
-	     return result;
-	  }
+	 
 
 	  @Override
 	  public int updateSalesStmt(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
@@ -175,6 +117,9 @@ public class CR08SvcImpl implements CR08Svc{
 		//---------------------------------------------------------------  
 
 		int result = CR08Mapper.updateSalesStmt(paramMap);
+		int result1 = CR08Mapper.updateSalesStmt2(paramMap);
+		System.out.println("result==="+result);
+		System.out.println("result1==="+result);
 
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작 
@@ -193,6 +138,7 @@ public class CR08SvcImpl implements CR08Svc{
 		//---------------------------------------------------------------  
 	    
 	     return result;
+	     
 	  }
 
 	  @Override
@@ -245,7 +191,7 @@ public class CR08SvcImpl implements CR08Svc{
 
 
 	  @Override
-	  public int deletePchsCost(Map<String, String> paramMap) throws Exception {
+	  public int deleteSalesStmt(Map<String, String> paramMap) throws Exception {
 		    //---------------------------------------------------------------  
 			//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
 		  	//   필수값 :  jobType, userId, comonCd
@@ -265,9 +211,11 @@ public class CR08SvcImpl implements CR08Svc{
 			//---------------------------------------------------------------  
 			//첨부 화일 권한체크 끝 
 			//---------------------------------------------------------------  
-		  
-		  int result = CR08Mapper.deletePchsCost(paramMap);
-		  
+		  int result = CR08Mapper.deleteSalesStmt(paramMap);
+		  int result1 = CR08Mapper.deleteSalesStmt2(paramMap);
+		 
+		  System.out.println("result=?"+result);
+		  System.out.println("result1=?"+result1); 
 			//---------------------------------------------------------------  
 			//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 			//---------------------------------------------------------------  

@@ -182,7 +182,7 @@
                     </a>
                 </div>
                <div class="add_btn_small pdl10" style="margin-right:8px;">
-               		<a onclick="updateBomAndMatrModal();" style="height: 30px; line-height: 28px; width: 80px;" title="BOM 편집 합니다." authchk><i class="fas fa-money-check"></i> BOM 편집</a>
+               		<a onclick="updateBomAndMatrModal();" style="height: 30px; line-height: 28px; width: 80px;" title="BOM 편집 합니다." authchk><i class="fas fa-money-check"></i> BOM 추가</a>
                     <a onclick="deleteBomAndMatr()" style="height: 30px; line-height: 28px; width: 80px;" title="BOM 삭제 합니다." authchk><i class="fas fa-trash"></i> BOM 삭제 </a>
                 </div>
             </div>
@@ -217,9 +217,9 @@
 					                    </a>
 					                </div>
 					         		 <div class="add_btn_small pdl10" style="margin-right:8px;">
-				                        <a onclick= "insertMtrlModal()" style="height: 30px; line-height: 28px; width: 80px;" authchk><i class="fas fa-folder-plus"></i> 자재 등록</a>
-				                        <a onclick= "updateMtrlModal()" style="height: 30px; line-height: 28px; width: 50px;" authchk><i class="fas fa-money-check"></i> 수정 </a>
-				                        <a onclick= "deleteMtrl()" style="height: 30px; line-height: 28px; width: 50px;" authchk><i class="fas fa-trash"></i> 삭제 </a>
+				                        <a onclick= "insertProdModal('C')" style="height: 30px; line-height: 28px; width: 120px;" authchk><i class="fas fa-folder-plus"></i> 자재마스트 등록</a>
+				                        <a onclick= "updateMtrlModal()" style="height: 30px; line-height: 28px; width: 80px;" authchk><i class="fas fa-money-check"></i> 자재 수정 </a>
+				                        <a onclick= "deleteMtrl()" style="height: 30px; line-height: 28px; width: 80px;" authchk><i class="fas fa-trash"></i> 자재 삭제 </a>
 					                    <!-- 
 					                    <a onclick="insertBomMatrModal('C')" style="height: 30px; line-height: 28px;" authchk>+</a>
 					                    <a onclick="deleteEst()" style="height: 30px; line-height: 28px;" authchk>-</a>
@@ -257,6 +257,9 @@
 </body>
 <script type="text/javascript">
 var isFirst = true;
+var this_options1 = [];
+var this_options2 = [];
+
 	var gridView1 = {
     	initView: function(){
 			this.target = new ax5.ui.grid();
@@ -502,11 +505,10 @@ var gridView2 = {
 		setData: function(_pageNo) {
 		var targetObj = this.target;
         	var formData = new FormData();
-        	//var fileTrgtKey = gridView1.target.getList("selected")[0].fileTrgtKey;
         	var salesCd = gridView1.target.getList("selected")[0].salesCd;
-        	//var fileTrgtKey = gridView1.target.getList("selected")[0].fileTrgtKey;
+        	var fileTrgtKey = gridView1.target.getList("selected")[0].fileTrgtKey;
         	var formData = {
-				"fileTrgtKey" : 1,
+				"fileTrgtKey" : fileTrgtKey,
 				"salesCd" : salesCd
     			//"pageNo" : 1,
     			//"recordCnt" : 99999999
@@ -528,7 +530,55 @@ var gridView2 = {
       	   
 		} 
 	}
-	
+
+	fetchCurrencyData().then(function ([options, options2]) {
+		this_options1 = options;
+		this_options2 = options2;
+	});
+
+	function fetchCurrencyData() {
+	    var paramObj = {"codeKind": "ORDRGDIV10", "useYn": "Y"};
+	    var paramObj2 = {"codeKind": "ORDRGDIV20", "useYn": "Y"};
+
+	    var promise1 = new Promise(function (resolve, reject) {
+	        postAjax("/admin/cm/cm05/selectCodeList", paramObj, null, function (data) {
+	            if (data && data.codeList) {
+	                var codeList = data.codeList;
+	                var options = codeList.map(function (code) {
+	                    return {
+	                        value: code.codeId,
+	                        text: code.codeNm
+	                    };
+	                });
+	                resolve(options);
+	            } else {
+	                console.error("codeList is undefined. Check the AJAX response:", data);
+	                reject(data);
+	            }
+	        });
+	    });
+
+	    var promise2 = new Promise(function (resolve, reject) {
+	        postAjax("/admin/cm/cm05/selectCodeList", paramObj2, null, function (data) {
+	            if (data && data.codeList) {
+	                var codeList = data.codeList;
+	                var options2 = codeList.map(function (code) {
+	                    return {
+	                        value: code.codeId,
+	                        text: code.codeNm
+	                    };
+	                });
+	                resolve(options2);
+	            } else {
+	                console.error("codeList is undefined. Check the AJAX response:", data);
+	                reject(data);
+	            }
+	        });
+	    });
+
+	    return Promise.all([promise1, promise2]);
+	}
+
 	 var excelView = {
 	        initView: function () {
 	            this.target = new ax5.ui.grid();
@@ -694,17 +744,40 @@ var gridView2 = {
 		
 	}
 
-	//자재 추가
-	function insertMtrlModal() {
+	//자재마스트 등록
+	function insertProdModal(type) {
+		//debugger;
+		if (type == 'U') {			
+			var row = gridView.target.getList("selected")[0];
+			var paramObj = {
+				"actionType"  : type,
+				"fileTrgtKey" : row.fileTrgtKey,
+				"coCd" 	      : row.coCd,
+				"userId"      : jwt.userId,
+				"pgmId"       : "BM0501M001"
+			};
+		} else {
+			var paramObj = {
+				"actionType"  : type,
+				"fileTrgtKey" : 0,
+				"coCd" 	      : jwt.coCd,
+				"userId"      : jwt.userId,
+				"pgmId"       : "BM0501M001"
+			}
+		}
 		
+		openModal("/static/html/user/bm/bm05/BM0501P01.html", 1600, 850, "", paramObj, function(data) {
+			alert("자재 마스트 관리에 등록되었습니다.");
+			//BM05M_DataSearch();
+		});
 	}
 
-	//자재 수정
+	//Bom-자재 수정
 	function updateMtrlModal() {
 		
 	}
 
-	//자재 삭제
+	//Bom-자재 삭제
 	function deleteMtrl() {
 		
 	}

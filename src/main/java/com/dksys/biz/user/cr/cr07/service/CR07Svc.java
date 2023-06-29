@@ -29,6 +29,9 @@ public interface CR07Svc {
 	// 매출확정 수정
 	int updateSellDscn(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
+	// 매출확정번호 조회
+	List<Map<String, String>> select_cr07_sellDcsnNo(Map<String, String> paramMap);
+	
 	
 
 }

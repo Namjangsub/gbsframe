@@ -77,7 +77,14 @@ public class CR07Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
-	
+
+	// 매출확정번호 조회
+	@PostMapping(value = "/select_cr07_sellDcsnNo")
+    public String select_cr07_sellDcsnNo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = cr07Svc.select_cr07_sellDcsnNo(paramMap);
+        model.addAttribute("result", result);
+        return "jsonView";
+    }
 	// 매출확정 입력
 	@PostMapping(value = "/insertSellDscn")
 	public String insertSellDscn(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {

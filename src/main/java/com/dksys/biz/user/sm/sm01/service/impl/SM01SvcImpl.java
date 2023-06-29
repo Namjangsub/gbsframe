@@ -211,13 +211,12 @@ public class SM01SvcImpl implements SM01Svc {
 	        sm01Mapper.deleteBomMatr(dtl);
 	      }
     }
-    
 	//---------------------------------------------------------------  
 	//첨부 화일 처리 시작 
 	//---------------------------------------------------------------  
     if (uploadFileList.size() > 0) {
 	    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-	    paramMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
+	    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 	    cm08Svc.uploadFile(paramMap, mRequest);
     }
     
