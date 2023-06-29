@@ -6,6 +6,107 @@ const MINUTE = 'minute';
 const SECOND = 'second';
 const MILLISECOND = 'millisecond';
 
+const month_names = {
+    en: [
+    	'1월',
+        '2월',
+        '3월',
+        '4월',
+        '5월',
+        '6월',
+        '7월',
+        '8월',
+        '9월',
+        '10월',
+        '11월',
+        '12월',
+    ],
+    es: [
+        'Enero',
+        'Febrero',
+        'Marzo',
+        'Abril',
+        'Mayo',
+        'Junio',
+        'Julio',
+        'Agosto',
+        'Septiembre',
+        'Octubre',
+        'Noviembre',
+        'Diciembre',
+    ],
+    ru: [
+        'Январь',
+        'Февраль',
+        'Март',
+        'Апрель',
+        'Май',
+        'Июнь',
+        'Июль',
+        'Август',
+        'Сентябрь',
+        'Октябрь',
+        'Ноябрь',
+        'Декабрь',
+    ],
+    ptBr: [
+        'Janeiro',
+        'Fevereiro',
+        'Março',
+        'Abril',
+        'Maio',
+        'Junho',
+        'Julho',
+        'Agosto',
+        'Setembro',
+        'Outubro',
+        'Novembro',
+        'Dezembro',
+    ],
+    fr: [
+        'Janvier',
+        'Février',
+        'Mars',
+        'Avril',
+        'Mai',
+        'Juin',
+        'Juillet',
+        'Août',
+        'Septembre',
+        'Octobre',
+        'Novembre',
+        'Décembre',
+    ],
+    tr: [
+        'Ocak',
+        'Şubat',
+        'Mart',
+        'Nisan',
+        'Mayıs',
+        'Haziran',
+        'Temmuz',
+        'Ağustos',
+        'Eylül',
+        'Ekim',
+        'Kasım',
+        'Aralık',
+    ],
+    zh: [
+        '一月',
+        '二月',
+        '三月',
+        '四月',
+        '五月',
+        '六月',
+        '七月',
+        '八月',
+        '九月',
+        '十月',
+        '十一月',
+        '十二月',
+    ],
+};
+
 export default {
     parse(date, date_separator = '-', time_separator = /[.:]/) {
         if (date instanceof Date) {
@@ -60,14 +161,7 @@ export default {
     },
 
     format(date, format_string = 'YYYY-MM-DD HH:mm:ss.SSS', lang = 'en') {
-        const dateTimeFormat = new Intl.DateTimeFormat(lang, {
-            month: 'long'
-        });
-        const month_name = dateTimeFormat.format(date);
-        const month_name_capitalized =
-            month_name.charAt(0).toUpperCase() + month_name.slice(1);
-
-        const values = this.get_date_values(date).map(d => padStart(d, 2, 0));
+        const values = this.get_date_values(date).map((d) => padStart(d, 2, 0));
         const format_map = {
             YYYY: values[0],
             MM: padStart(+values[1] + 1, 2, 0),
@@ -77,8 +171,8 @@ export default {
             ss: values[5],
             SSS: values[6],
             D: values[2],
-            MMMM: month_name_capitalized,
-            MMM: month_name_capitalized,
+            MMMM: month_names[lang][+values[1]],
+            MMM: month_names[lang][+values[1]],
         };
 
         let str = format_string;

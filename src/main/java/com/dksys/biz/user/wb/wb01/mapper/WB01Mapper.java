@@ -114,7 +114,7 @@ public interface WB01Mapper {
 	int deleteWbsSharngListSub(Map<String, String> paramMap);
 	int selectWbsPlanChk(Map<String, String> paramMap);
 	int updateWbsPlan(Map<String, String> paramMap);
-	
+	Map<String, String> selectWbsPlanFileTrgtKeyInfo(Map<String, String> paramMap);
 	
 	
 	

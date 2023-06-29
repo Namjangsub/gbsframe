@@ -92,9 +92,10 @@ export default class Gantt {
     }
 
     setup_tasks(tasks) {
-        // prepare tasks
+    	
         this.tasks = tasks.map((task, i) => {
             // convert to Date objects
+        	alert(task.start);
             task._start = date_utils.parse(task.start);
             task._end = date_utils.parse(task.end);
 
@@ -391,7 +392,10 @@ export default class Gantt {
                 tick_class += ' thick';
             }
             // thick ticks for quarters
-            if (this.view_is(VIEW_MODE.MONTH) && date.getMonth() % 3 === 0) {
+            if (
+                this.view_is(VIEW_MODE.MONTH) &&
+                (date.getMonth() + 1) % 3 === 0
+            ) {
                 tick_class += ' thick';
             }
 
