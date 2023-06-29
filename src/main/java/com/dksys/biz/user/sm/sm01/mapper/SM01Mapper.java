@@ -18,17 +18,13 @@ public interface SM01Mapper {
 
   List<Map<String, String>> selectBomMatrList(Map<String, String> paramMap);
   
-  Map<String, String> selectPrjctInfo(Map<String, String> paramMap);
+  Map<String, String> selectBomMatrInfo(Map<String, String> paramMap);
   
   int selectPrjctSeqNext(Map<String, String> paramMap);
   
   int insertBom(Map<String, String> paramMap);
 
-  int insertBomMatr(Map<String, String> paramMap);
-  
   int updateBom(Map<String, String> paramMap);
-
-  int updateBomMatr(Map<String, String> paramMap);
 
   int deleteBom(Map<String, String> paramMap);
   
@@ -36,10 +32,10 @@ public interface SM01Mapper {
 
   int deleteBomMatr(Map<String, String> paramMap);
   
-  Map<String, String> selectPrjctIssueInfo(Map<String, String> paramMap);
+  int updateBomMatr(Map<String, String> paramMap);
   
-  int insertBomIssue(Map<String, String> paramMap);
-
-  int updateBomIssue(Map<String, String> paramMap);
+  int insertBomMatr(Map<String, String> paramMap);
+  
+  Map<String, String> selectPrjctIssueInfo(Map<String, String> paramMap);
   
 }

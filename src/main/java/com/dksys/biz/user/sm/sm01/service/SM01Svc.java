@@ -17,7 +17,7 @@ public interface SM01Svc {
 
   List<Map<String, String>> selectBomMatrList(Map<String, String> paramMap);
 
-  Map<String, String> selectPrjctInfo(Map<String, String> paramMap);
+  Map<String, String> selectBomMatrInfo(Map<String, String> paramMap);
 
   int insertBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
@@ -25,10 +25,12 @@ public interface SM01Svc {
 
   int deleteBom(Map<String, String> paramMap) throws Exception;
   
+  int insertBomMatr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
+  int updateBomMatr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+  
+  int deleteBomMatr(Map<String, String> paramMap) throws Exception;
+
   Map<String, String> selectPrjctIssueInfo(Map<String, String> paramMap);
   
-  int insertBomIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
-  
-  int updateBomIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
-
 }

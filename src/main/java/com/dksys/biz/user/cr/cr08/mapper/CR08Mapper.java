@@ -7,9 +7,9 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface CR08Mapper {
 	 
-	 int selectSalesStmtConCount(Map<String, String> paramMap);
+	 int selectSalesStmtConCount(Map<String, String> paramMap);	
 	 
-	 int selectSalesStmtCalCount(Map<String, String> paramMap);
+	 int selectSalesStmtCalCount(Map<String, String> paramMap);	 
 	 
 	 int selectSalesStmtCount(Map<String, String> paramMap);
 
@@ -40,5 +40,6 @@ public interface CR08Mapper {
 	  int deleteSalesStmt(Map<String, String> paramMap);
 	  
 	  int deleteSalesStmt2(Map<String, String> paramMap);
+	  
 
 }

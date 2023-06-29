@@ -70,7 +70,6 @@ public class CR08SvcImpl implements CR08Svc{
 	    return CR08Mapper.selectSalesStmtConList(paramMap);
 	  }
 	  
-	  
 	  @Override
 	  public Map<String, String> selectSalesStmtInfo(Map<String, String> paramMap) {
 	    return CR08Mapper.selectSalesStmtInfo(paramMap);

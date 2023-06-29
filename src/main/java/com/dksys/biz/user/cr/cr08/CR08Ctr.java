@@ -112,8 +112,7 @@ public class CR08Ctr {
 				model.addAttribute("resultMessage", e.getMessage());
 			}
 		  	return "jsonView";
-	  }
-	
+	  }	
 
 	  @PutMapping(value = "/deleteSalesStmt")
 	  public String deleteSalesStmt(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
