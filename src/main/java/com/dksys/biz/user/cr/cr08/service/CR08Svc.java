@@ -32,4 +32,5 @@ public interface CR08Svc {
 	  int updateSalesStmt(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	  
 	  int deleteSalesStmt(Map<String, String> paramMap) throws Exception;
+	  
 }
