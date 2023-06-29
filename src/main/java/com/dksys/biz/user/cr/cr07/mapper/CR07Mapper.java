@@ -32,6 +32,7 @@ public interface CR07Mapper {
 	String select_cr07_sellBillNo(Map<String, String> paramMap);
 	// 매출확정번호 조회
 	List<Map<String, String>> select_cr07_sellDcsnNo(Map<String, String> paramMap);
-	
+	// 매출확정 삭제
+	int delete_cr07(Map<String, String> paramMap);
 	
 }
