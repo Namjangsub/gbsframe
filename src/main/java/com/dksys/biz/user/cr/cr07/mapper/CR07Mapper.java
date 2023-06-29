@@ -30,6 +30,8 @@ public interface CR07Mapper {
 	int updateSellDscn(Map<String, String> paramMap);
 	// 계산서 번호 생성
 	String select_cr07_sellBillNo(Map<String, String> paramMap);
+	// 매출확정번호 조회
+	List<Map<String, String>> select_cr07_sellDcsnNo(Map<String, String> paramMap);
 	
 	
 }

@@ -75,6 +75,11 @@ public class CR07SvcImpl implements CR07Svc {
 	}
 	
 	@Override
+	public List<Map<String, String>> select_cr07_sellDcsnNo(Map<String, String> paramMap) {
+		return cr07Mapper.select_cr07_sellDcsnNo(paramMap); 
+	}
+	
+	@Override
 	public int insertSellDscn(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
