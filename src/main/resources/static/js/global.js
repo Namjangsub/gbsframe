@@ -462,12 +462,16 @@ function inputValidation(inputList) {
 
 // 양수, 음수, 소수점 포함 원단위 포맷 적용
 function onlyNumber(elem){
-	var regExp = /^(-?)([0-9]*)(\.?[0-9]*)([^0-9]*)/g;
-	if(elem.value.trim()){
-		$(elem).val(addCommaStr(deleteCommaStr($(elem).val().replace(regExp, "$1$2$3"))));
-	}else{
-		$(elem).val(0);
-	}
+	  var regExp = /^(-?)([0-9]*)([^0-9]*)/g;
+	  var value = deleteCommaStr(elem.value.trim());
+	  
+	  if (value) {
+	    value = addCommaStr(value.replace(regExp, "$1$2"));
+	  } else {
+	    value = 0;
+	  }
+	  
+	  $(elem).val(value);
 }
 
 // 양수, 음수 포함 원단위 포맷 적용
