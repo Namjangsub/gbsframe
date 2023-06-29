@@ -6,10 +6,10 @@ import java.util.Map;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface CR08Svc {	  
-	
-	  int selectPchsCostCount(Map<String, String> paramMap);
 	  
 	  int  selectSalesStmtConCount(Map<String, String> paramMap);
+	  
+	  int selectSalesStmtCount(Map<String, String> paramMap);
 	  
 	  int selectSalesStmtCalCount(Map<String, String> paramMap);
 
@@ -18,8 +18,6 @@ public interface CR08Svc {
 	  List<Map<String, String>> selectSalesStmtCalList(Map<String, String> paramMap);
 	  
 	  List<Map<String, String>> selectSalesStmtConList(Map<String, String> paramMap);
-
-	  Map<String, String> selectPchsCostInfo(Map<String, String> paramMap);
 	  
 	  Map<String, String> selectSalesStmtInfo(Map<String, String> paramMap);	  
 	  
@@ -33,7 +31,5 @@ public interface CR08Svc {
 	  
 	  int updateSalesStmt(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	  
-	  int updatePchsCost(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
-	  
-	  int deletePchsCost(Map<String, String> paramMap) throws Exception;
+	  int deleteSalesStmt(Map<String, String> paramMap) throws Exception;
 }
