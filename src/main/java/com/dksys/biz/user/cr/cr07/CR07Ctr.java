@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -77,6 +78,7 @@ public class CR07Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+	
 
 	// 매출확정번호 조회
 	@PostMapping(value = "/select_cr07_sellDcsnNo")
@@ -85,6 +87,7 @@ public class CR07Ctr {
         model.addAttribute("result", result);
         return "jsonView";
     }
+	
 	// 매출확정 입력
 	@PostMapping(value = "/insertSellDscn")
 	public String insertSellDscn(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
@@ -135,4 +138,21 @@ public class CR07Ctr {
 	  	return "jsonView";
 	}
 	
+	// 매출확정등록 삭제
+	@PutMapping(value = "/delete_cr07")
+	public String delete_cr07(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+	  	try {
+			if (cr07Svc.delete_cr07(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+	}
 }

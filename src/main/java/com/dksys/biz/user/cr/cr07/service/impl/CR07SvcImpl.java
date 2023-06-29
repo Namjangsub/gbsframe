@@ -183,5 +183,42 @@ public class CR07SvcImpl implements CR07Svc {
 				return result;
 	}
 	
+	@Override
+	public int delete_cr07(Map<String, String> paramMap) throws Exception {
+		//---------------------------------------------------------------
+				//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
+				//   필수값 :  jobType, userId, comonCd
+				//---------------------------------------------------------------
+				List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
+				HashMap<String, String> param = new HashMap<>();
+				param.put("jobType", "fileDelete");
+				param.put("userId", paramMap.get("userId"));
+				if (deleteFileList.size() > 0) {
+					for (Map<String, String> dtl : deleteFileList) {
+						//접근 권한 없으면 Exception 발생
+						param.put("comonCd",  dtl.get("comonCd"));
+						cm15Svc.selectFileAuthCheck(param);
+					}
+				}
+				//---------------------------------------------------------------
+				//첨부 화일 권한체크 끝
+				//---------------------------------------------------------------
+				
+				int result = cr07Mapper.delete_cr07(paramMap);
+				//---------------------------------------------------------------
+				//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
+				//---------------------------------------------------------------
+				if (deleteFileList.size() > 0) {
+					for (Map<String, String> deleteDtl : deleteFileList) {
+						String fileKey = deleteDtl.get("fileKey").toString();
+						cm08Svc.deleteFile( fileKey );
+					}
+				}
+				//---------------------------------------------------------------
+				//첨부 화일 처리  끝
+				//---------------------------------------------------------------
+		
+		return  result;
+	}
 	
 }
