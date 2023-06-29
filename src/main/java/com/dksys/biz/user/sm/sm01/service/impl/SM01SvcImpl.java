@@ -61,8 +61,8 @@ public class SM01SvcImpl implements SM01Svc {
   }
 
   @Override
-  public Map<String, String> selectPrjctInfo(Map<String, String> paramMap) {
-    return sm01Mapper.selectPrjctInfo(paramMap);
+  public Map<String, String> selectBomMatrInfo(Map<String, String> paramMap) {
+    return sm01Mapper.selectBomMatrInfo(paramMap);
   }
 
   @Override
@@ -271,20 +271,26 @@ public class SM01SvcImpl implements SM01Svc {
   }
 
   @Override
+  public int insertBomMatr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	  int result = sm01Mapper.insertBomMatr(paramMap);
+	  return result;
+  }
+
+  @Override
+  public int updateBomMatr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	  int result = sm01Mapper.updateBomMatr(paramMap);
+	  return result;
+  }
+
+  @Override
+  public int deleteBomMatr(Map<String, String> paramMap) throws Exception {
+	  int result = sm01Mapper.deleteBomMatr(paramMap);
+	  return result;
+  }
+
+  @Override
   public Map<String, String> selectPrjctIssueInfo(Map<String, String> paramMap) {
 	  return sm01Mapper.selectPrjctIssueInfo(paramMap);
   }
- 
-  @Override
-  public int insertBomIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-	  int result = sm01Mapper.insertBomIssue(paramMap);
-	  return result;
-  }
-  
-  @Override
-  public int updateBomIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-	  int result = sm01Mapper.updateBomIssue(paramMap);
-	  return result;
-  }
-  
+   
 }

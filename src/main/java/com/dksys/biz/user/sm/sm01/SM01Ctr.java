@@ -59,20 +59,21 @@ public class SM01Ctr {
 	// 자재 리스트 조회
 	@PostMapping("/selectBomMatrList")
 	public String selectBomMatrList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> prdtList = sm01Svc.selectBomMatrList(paramMap);
-		model.addAttribute("resultList", prdtList);
+		List<Map<String, String>> resultList = sm01Svc.selectBomMatrList(paramMap);
+		model.addAttribute("resultList", resultList);
 		return "jsonView";
 	}
-  // 프로젝트 정보 조회
-  @PostMapping(value = "/selectPrjctInfo")
-  public String selectPrjctInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    Map<String, String> result = sm01Svc.selectPrjctInfo(paramMap);
-    model.addAttribute("result", result);
-    return "jsonView";
-  }
+	
+	// Bom 자재 Map 조회
+	@PostMapping(value = "/selectBomMatrInfo")
+		public String selectBomMatrInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = sm01Svc.selectBomMatrInfo(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
   
-  @PostMapping(value = "/insertBom")
-  public String insertBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	@PostMapping(value = "/insertBom")
+	public String insertBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
 			if (sm01Svc.insertBom(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
@@ -86,10 +87,10 @@ public class SM01Ctr {
 			model.addAttribute("resultMessage", e.getMessage());
 		}
 		return "jsonView";
-  }
+	}
 
-  @PostMapping(value = "/updateBom")
-  public String updateBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	@PostMapping(value = "/updateBom")
+	public String updateBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 	  	try {
 			if (sm01Svc.updateBom(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
@@ -103,10 +104,10 @@ public class SM01Ctr {
 			model.addAttribute("resultMessage", e.getMessage());
 		}
 	  	return "jsonView";
-  }
+	}
 
-  @PutMapping(value = "/deleteBom")
-  public String deleteBom(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+	@PutMapping(value = "/deleteBom")
+	public String deleteBom(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 	  	try {
 			if (sm01Svc.deleteBom(paramMap) != 0 ) {
 				model.addAttribute("resultCode", 200);
@@ -120,21 +121,12 @@ public class SM01Ctr {
 			model.addAttribute("resultMessage", e.getMessage());
 		}
 	  	return "jsonView";
-  }
+	}
 
-
-  // 프로젝트 이슈정보 조회
-  @PostMapping(value = "/selectPrjctIssueInfo")
-  public String selectPrjctIssueInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    Map<String, String> result = sm01Svc.selectPrjctIssueInfo(paramMap);
-    model.addAttribute("result", result);
-    return "jsonView";
-  }
-    
-  @PostMapping(value = "/insertBomIssue")
-  public String insertBomIssue(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	@PostMapping(value = "/insertBomMatr")
+	public String insertBomMatr(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 	  try {
-		  if (sm01Svc.insertBomIssue(paramMap, mRequest) != 0 ) {
+		  if (sm01Svc.insertBomMatr(paramMap, mRequest) != 0 ) {
 			  model.addAttribute("resultCode", 200);
 			  model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
 		  } else {
@@ -146,14 +138,14 @@ public class SM01Ctr {
 		  model.addAttribute("resultMessage", e.getMessage());
 	  }
 	  return "jsonView";
-  }
+	}
   
-  @PostMapping(value = "/updateBomIssue")
-  public String updateBomIssue(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	@PostMapping(value = "/updateBomMatr")
+	public String updateBomMatr(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 	  try {
-		  if (sm01Svc.updateBomIssue(paramMap, mRequest) != 0 ) {
+		  if (sm01Svc.updateBomMatr(paramMap, mRequest) != 0 ) {
 			  model.addAttribute("resultCode", 200);
-			  model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			  model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
 		  } else {
 			  model.addAttribute("resultCode", 500);
 			  model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -163,6 +155,31 @@ public class SM01Ctr {
 		  model.addAttribute("resultMessage", e.getMessage());
 	  }
 	  return "jsonView";
-  }
+	}
+
+	@PutMapping(value = "/deleteBomMatr")
+	public String deleteBomMatr(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+	  	try {
+			if (sm01Svc.deleteBomMatr(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+	}
+	
+	//
+	@PostMapping(value = "/selectPrjctIssueInfo")
+	public String selectPrjctIssueInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = sm01Svc.selectPrjctIssueInfo(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
   
 }
