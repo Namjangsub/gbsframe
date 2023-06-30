@@ -97,6 +97,8 @@
         },
         init: function (_root, _columnKey, _editor, _$parent, _value) {
             var $el;
+            _value = _value ? _value : new Date().format("yyyy-MM-dd");
+            
             _$parent.append($el = jQuery(this.getHtml(_root, _columnKey, _editor, _value)));
             this.bindUI(_root, _columnKey, $el, _editor, _$parent, _value);
             return $el;
@@ -108,7 +110,7 @@
             _$el.datepicker($.extend(true, {
             	dateFormat: "yy-mm-dd",
     			language : "ko",
-    			autoclose : true,            	
+    			autoclose : true,
             }, _editor.config));
             
             _$el.on("change", function () {
