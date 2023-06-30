@@ -56,7 +56,12 @@
 								, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV30) AS ORDRG_DIV30_NM	/* 특성구분명 */								
 								, A.CURR_CD						/* 통화단위 */
 								, A.EXRATE
-								, A.ORDRG_AMT
+								, 
+								(
+									SELECT SUM(D.ORDRG_AMT)
+										FROM TB_SM02D01 D
+									WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
+								) AS ORDRG_AMT
 								, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
 								, A.ORDRG_RMK
 								, A.IN_CMPLET_YN
@@ -78,7 +83,7 @@
 	</select>
 
 	<!-- 기준관리 - 일정계획 등록 메인 화면 엑셀 조회 리스트  -->
-	<select id="selectApprovalExcelList" parameterType="Map" resultType="camelMap">   
+	<select id="selectOrderExcelList" parameterType="Map" resultType="camelMap">   
 		/* No. 내림차순 */
 		SELECT *
 			FROM
@@ -103,7 +108,12 @@
 								, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV30) AS ORDRG_DIV30_NM	/* 특성구분명 */								
 								, A.CURR_CD						/* 통화단위 */
 								, A.EXRATE
-								, A.ORDRG_AMT
+								, 
+								(
+									SELECT SUM(D.ORDRG_AMT)
+										FROM TB_SM02D01 D
+									WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
+								) AS ORDRG_AMT
 								, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
 								, A.ORDRG_RMK
 								, A.IN_CMPLET_YN
@@ -117,7 +127,7 @@
 							LEFT OUTER JOIN TB_BM02M01 B ON(A.PCHS_CLNT_CD=B.CLNT_CD)						
 						WHERE 1=1						
 						<include refid="selectOrderListCondition"></include>
-						ORDER BY A.CO_CD DESC, A.ORDRG_NO DESC, A.CREAT_DTTM DESC, A.UDT_DTTM DESC					
+						ORDER BY A.CO_CD DESC, A.ORDRG_NO DESC, A.CREAT_DTTM DESC, A.UDT_DTTM DESC		
 						) X		
 			)							
 			WHERE 1=1
@@ -144,6 +154,52 @@
 			)		
 			WHERE MAX_ORDRG_NO IS NOT NULL OR ROWNUM = 1	
 	</select>		
+	
+	<!-- 발주 DETAIL SELECT -->
+	<select id="selectOrderDetailList" parameterType="Map" resultType="camelMap">	
+		SELECT CO_CD
+			, ORDRG_NO
+			, ORDRG_SEQ
+			, SALES_CD
+			, PART_NO
+			, UNIT_NO
+			, REV_NO
+			, DSGN_NO
+			, MATR_CD
+			, FN_CM05M01_CD_TO_NM(D.MATR_TEST_DIV) MATR_TEST_DIV    
+			, ORDRG_PRC
+			, ORDRG_QTY
+			, ORDRG_AMT
+			, TO_CHAR(D.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
+			, TO_CHAR(D.DUDT_INTEND_DT, 'YYYY-MM-DD') DUDT_INTEND_DT
+			, ORDRG_DTL_RMK
+			, ETC_FIELD1
+			, ETC_FIELD2
+			, ETC_FIELD3
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+			, UDT_ID
+			, UDT_PGM
+			, UDT_DTTM
+			, IN_CMPLET_YN
+	        , D.WH_CD AS MATR_WH_CD		/* 입고창고  */
+	        , FN_CM05M01_CD_TO_NM(D.WH_CD) AS MATR_WH_NM		/* 입고창고  */			
+		FROM TB_SM02D01 D
+		WHERE 1=1
+		<if test="coCd != null and !coCd.equals('')">
+			AND D.CO_CD = #{coCd}   
+		</if>		
+		<if test="ordrgNo != null and !ordrgNo.equals('')">
+			AND D.ORDRG_NO = #{ordrgNo}   
+		</if>	
+		<if test="ordrgSeq != null and !ordrgSeq.equals('')">
+			AND D.ORDRG_SEQ = #{ordrgSeq}   
+		</if>		
+		<if test="salesCd != null and !salesCd.equals('')">
+			AND D.SALES_CD = #{salesCd}   
+		</if>							
+	</select>
 	
 	<!-- bom detail list -->
 	<select id="selectBomDetailList" parameterType="Map" resultType="camelMap">
@@ -178,7 +234,7 @@
 		, D.MATR_UNIT
 		, D.ORIGIN_NM
 		, D.MATR_DRW_NO
-		, D.MATR_TEST_DIV
+		, FN_CM05M01_CD_TO_NM(D.MATR_TEST_DIV) MATR_TEST_DIV    
 		, D.DLVR_RQM_DAY
 		, D.MATR_PURC_DIV
 		, D.MIN_ORDRG_QTY
@@ -246,7 +302,7 @@
 		        LEFT JOIN TB_BM02M01 AS T3 ON T3.CLNT_CD = T1.ORDRS_CLNT_CD
         ) A
         ON T.CO_CD = A.CO_CD AND T.SALES_CD = A.SALES_CD
-		WHERE 1=1
+		WHERE 1=1	
 		ORDER BY T.CO_CD, NVL(T.PART_NO,'0'), NVL(T.UNIT_NO,'0'), NVL(T.REV_NO,'0'),T.LOWER_CD, T.UPPER_CD
 		         , D.MATR_SEQ
 	</select>	
@@ -365,8 +421,19 @@
 			, #{pgmId}
 			, SYSDATE
 			, #{inCmpletYn,			jdbcType=VARCHAR}			
-			, #{whCd,  				jdbcType=VARCHAR}	 			   
+			, #{matrWhCd,			jdbcType=VARCHAR}	 			   
 	    )
 	</insert>	
+	
+	
+	<!-- 발주 디테일  삭제 -->         
+	<delete id="deleteOrderDetail" parameterType="Map">
+		DELETE 
+			FROM TB_SM02D01
+		WHERE 1=1
+			AND CO_CD = #{coCd}
+			AND ORDRG_NO = #{ordrgNo}
+			AND ORDRG_SEQ = #{ordrgSeq}	
+	</delete>	
 		
  </mapper>

@@ -14,7 +14,9 @@ public interface SM02Svc {
 	
 	List<Map<String, String>> selectOrderExcelList(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);	
+	List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectOrderDetailList(Map<String, String> paramMap);		
 	
 	int selectMaxTrgtKey(Map<String, String> paramMap);
 	
@@ -25,5 +27,7 @@ public interface SM02Svc {
 		
 	int updateOrderMaster(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
-	int deleteOrderMaster(Map<String, String> paramMap) throws Exception;	
+	int deleteOrderMaster(Map<String, String> paramMap) throws Exception;
+	
+	int deleteOrderDetail(Map<String, String> param);	
 }

@@ -544,7 +544,12 @@ public class WB01Ctr {
 		  return "jsonView";
 	  }	 	  
 	  
-	  
+	  @PostMapping(value = "/selectWbsPlanFileTrgtKeyInfo") 
+	  public String selectWbsPlanFileTrgtKeyInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
+		  Map<String, String> result = wb01Svc.selectWbsPlanFileTrgtKeyInfo(paramMap);
+		  model.addAttribute("result", result); 
+		  return "jsonView"; 
+	  }
 	  
 	  
 	  

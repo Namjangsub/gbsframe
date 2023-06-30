@@ -109,7 +109,7 @@ public interface WB01Svc {
 	
 	List<Map<String, String>> selectNewWbsPlanTreeList(Map<String, String> paramMap);	
 	List<Map<String, String>> selectWbsLeftSalesCodeList(Map<String, String> paramMap);	
-	
+	Map<String, String> selectWbsPlanFileTrgtKeyInfo(Map<String, String> paramMap);
 	
 	
 }

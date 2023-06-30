@@ -766,6 +766,9 @@ public class WB01SvcImpl implements WB01Svc {
 	}
 	
 	
-	
+	@Override
+	public Map<String, String> selectWbsPlanFileTrgtKeyInfo(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsPlanFileTrgtKeyInfo(paramMap);
+	}
 	
 }
