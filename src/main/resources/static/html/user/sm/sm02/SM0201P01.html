@@ -39,8 +39,9 @@
 
   <form id="popForm" onSubmit="return false;">
     <div class="form-group popup_table">
-      <input type="hidden" id="ordrgNo"  name="ordrgNo">
-      <input type="hidden" id="pgmId"     name="pgmId" value="SM0201M01">
+		<input type="hidden" id="userId"     	name="userId">
+		<input type="hidden" id="pgmId"     	name="pgmId" value="SM0201M01">
+		<input type="hidden" id="fileTrgtKey"	name="fileTrgtKey" value="">		<!-- file target key -->
       <table>
 
         <colgroup>
@@ -113,7 +114,7 @@
         <tr>
 			<th>발주번호</th>
 			<td>
-			  <input type="text" id="ordrgNo" name="ordrgNo_P" msg="" disabled="disabled">
+			  <input type="text" id="ordrgNo" name="ordrgNo" msg="발주번호" disabled="disabled">
 			</td>
 			<th class="hit">구매처</th>
 			<td>
@@ -141,19 +142,19 @@
         <tr>
 			<th class="hit">발주구분</th>
 			<td>
-				<select id="ordrgdiv10" name="ordrgdiv10" data-kind="ORDRGDIV10" data-search="ordrgdiv10"  required="required" msg="발주구분">
+				<select id="ordrgDiv10" name="ordrgDiv10" data-kind="ORDRGDIV10" data-search="ordrgDiv10"  required="required" msg="발주구분">
 			      <option value="">전체</option>
 				</select>									  
 			</td>
 			<th class="hit">용도구분</th>
 			<td>
-				<select id="ordrgdiv20" name="ordrgdiv20" data-kind="ORDRGDIV20" data-search="ordrgdiv20" required="required" msg="용도구분">
+				<select id="ordrgDiv20" name="ordrgDiv20" data-kind="ORDRGDIV20" data-search="ordrgDiv20" required="required" msg="용도구분">
 			      <option value="">전체</option>
 				</select>	
 			</td>
 			<th class="hit">특성구분</th>
 			<td>
-				<select id="ordrgdiv30" name="ordrgdiv30" data-kind="ORDRGDIV30" data-search="ordrgdiv30" required="required" msg="특성구분">
+				<select id="ordrgDiv30" name="ordrgDiv30" data-kind="ORDRGDIV30" data-search="ordrgDiv30" required="required" msg="특성구분">
 			      <option value="">전체</option>
 				</select>				
 			</td>
@@ -184,15 +185,11 @@
 
 	<div class="" style="height: 10px;">
 	</div>	    
-  
-
-	<!-- 공통 파일 영역 -->
-	<div id="fileList_area"></div>
         	
 
 <!-- 하단 디테일그리드 -->
 		<!-- 콘텐츠 -->
-	  <div class="contents2" style="margin-top: 00px;">
+	  <div class="contents2" style="margin-bottom: 50px;">
 	      <!-- 리스트 -->
 	      <div class="ax5_grid" style="width: 100%">
 	        <ul class="ul_list" style="height:250px; width: 100%">
@@ -200,8 +197,8 @@
 	                <div class="table_list_tit" style="width: 100%;">
 	                	<h5 class="tit" style="float:left; margin-left: 8px; margin-top: 8px; margin-bottom: 8px;">구매 BOM</h5>
 		                <div class="add_btn pdl10" style="margin-right:8px; margin-top: 8px;">
-		                    <a onclick="addRowBom()" style="" authchk>+</a>
-		                    <a onclick="delRowBom()" style="" authchk>-</a>
+		                    <!--  <a onclick="addRowBom()" style="" authchk>+</a> -->
+		                    <a id="deleteDetailButton" style="" authchk>-</a>
 		                </div>
 	                </div>
 	                <div>
@@ -213,6 +210,9 @@
 	  </div>
 	</div>
 <!-- 하단 디테일그리드 end -->
+
+	<!-- 공통 파일 영역 -->
+	<div id="fileList_area"></div>
 
     <!-- 하단 버튼 -->
 	<div class ="popup_bottom_btn">
@@ -226,10 +226,11 @@
 //전역초기화  
 var actionType = null;
 var paramPrjctSeq = null;
-
 var firstGrid = null;
 var secondGrid = null;
-
+var userId = null;
+var userNm = null;
+var fileTrgtKeyU = null;
 
 var gridViewPop = {
     	initView: function(){
@@ -254,15 +255,34 @@ var gridViewPop = {
                         //체크박스일 경우 실행
                         if( col == 14 ) {
                         	//chk, 수량, 기발주수량, row번호 
-
-                        	//imsi
-                        	if( row == 0) {
-                        		$.setOrdrgQty(gridViewPop, this.item.userChk , 20, 2, row);
-                        	} else {
-                            	$.setOrdrgQty(gridViewPop, this.item.userChk , this.item.bomQty, this.item.preBomQty, row);                        		
-                        	}
+                            $.setOrdrgQty(gridViewPop, this.item.userChk , this.item.bomQty, this.item.preBomQty, row);                        		
                         }
 					},
+					//그리드값 변경시 실행
+		            onDataChanged: function () {
+					    var row = this.dindex;
+					    var col = this.colIndex;		
+		            	// 발주단가 변경시
+		            	if ( this.key == "ordrgPrc") {   
+		            		if( this.item.ordrgQty != "" && this.item.ordrgQty > 0  ) {
+		            			var ordrgAmt = parseInt( deleteCommaStr(this.item.ordrgQty) * deleteCommaStr(this.item.ordrgPrc) );
+		            			gridViewPop.target.setValue(row, "ordrgAmt", ordrgAmt);		            			
+		            		} else {
+							    gridViewPop.target.setValue(row, "ordrgAmt", "");		            			
+		            		}
+		            	}
+						//발주수량 OVER CHK
+		            	if ( this.key == "ordrgQty") {
+		            		var calcuOrdrgQty = parseInt( deleteCommaStr(this.item.bomQty) - deleteCommaStr(this.item.preBomQty) );
+		            		if( calcuOrdrgQty < this.item.ordrgQty   ) {
+							    gridViewPop.target.setValue(row, "ordrgQty", "");            			
+							    alert("발주수량은 수량은 "+ calcuOrdrgQty+" 과 같거나 작아야 합니다");
+							    return;
+		            		}
+		            	}						
+		            	
+		            	 
+		            },					
 					onDBLClick: function() {
 						//this.self.clearSelect();
                         //this.self.select(this.dindex);
@@ -295,6 +315,7 @@ var gridViewPop = {
 						,{key: "matrMno", 			label: "형번(Model No)", 		width: 100,		align: "center"}
 						,{key: "matrSpec", 			label: "규격", 				width: 100,		align: "center"}
 						,{key: "matrTestDiv", 		label: "검사구분", 			width: 100,		align: "center"}	/* 검사구분 */
+						,{key: "matrWhCd", 			label: "입고창고Cd", 			width: 100,		align: "center", 	hidden:true}	/* 자재창고 Cd*/						
 						,{key: "matrWhNm", 			label: "입고창고", 			width: 100,		align: "center"}	/* 자재창고 */						
 						,{key: "bomQty", 			label: "수량", 				width: 80,		align: "center"}			/*수량 */						
 						,{key: "preBomQty", 		label: "기발주 수량", 			width: 80,		align: "center"}			/*기발주 수량 */						
@@ -311,9 +332,11 @@ var gridViewPop = {
 							   		  } 
 						}
 						,{key: "ordrgAmt", 			label: "발주금액", 			width: 110,		align: "right", formatter: "money"
+							/*
 							, editor: {type:"number" 
 											, attributes: { 'maxlength': 13, 'data-maxlength': 15}
-							          } 
+							          }
+							*/
 						}							
 						,{key: "dudtDeqDt", 		label: "납기요청일", 			width:  80,		align: "center"
 							, editor: {type: "date"
@@ -333,19 +356,21 @@ var gridViewPop = {
 		var targetObj = this.target;
         	var formData = new FormData();
         	var salesCd = $('#salesCd').val();
+        	var fileTrgtKey = (fileTrgtKeyU) ? fileTrgtKeyU : 0;
+        	var ordrgNo = $('#ordrgNo').val();
         	var formData = {
-				"fileTrgtKey" : 0,
+				"fileTrgtKey" : fileTrgtKey,
 				"salesCd" : salesCd,
+				"ordrgNo" : ordrgNo,
 			}
-			postAjax("/user/sm/sm02/selectBomDetailList", formData, null, function(data){
+        	//등록과 수정 URL 다르게
+        	var url = "selectBomDetailList";
+        	if( actionType == "U" ) url = "selectOrderDetailList";
+			postAjax("/user/sm/sm02/" + url, formData, null, function(data){
 			var list = data.resultList;
 			targetObj.setData({
 				list : list,
 			    page : {
-                	//currentPage : _pageNo,
-                    //pageSize : data.paginationInfo.pageSize,
-                    //totalElements : data.paginationInfo.totalRecordCount,
-                    //totalPages : data.paginationInfo.totalPageCount
 			    		totalElements : list.length,
 			    	} 
 				});
@@ -372,9 +397,6 @@ if (actionType == "C") {
 } else if (actionType == "U") {
 	$('.tit').text('발주 수정')
 	
-	//그리드 load
-	gridViewPop.initView().setData(0);
-
 	$('#actionBtn').text("수정");
 	$('#actionBtn').on("click", function() {
 		updateOrder();
@@ -383,15 +405,15 @@ if (actionType == "C") {
 
 // 등록 - done
 function insertOrder() {
-	
-    //저장용 배열 push
-	makeArr = $.gridInsertArr(gridViewPop);	
-	
+		
 	if (inputValidation($('.popup_area [required]'))) {					// 필수 필드의 유효성 검사
 		var formData = makeFormData();									// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
 		var makeArr = {};
         //저장용 배열 push
 		makeArr = $.gridInsertArr(gridViewPop);
+        if( !makeArr ) {
+        	return;
+        }
         
 		if(makeArr.length<1) {
 			alert("구매 BOM 항목은 최소 1개 이상이어야 합니다.");
@@ -400,7 +422,6 @@ function insertOrder() {
 			formData.append("makeArr", JSON.stringify(makeArr));
 		}          
         
-		//debugger;
 		filePostAjax("/user/sm/sm02/insertOrderMaster", formData,		// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
 			function(data) {
 				alert(data.resultMessage);								// 결과 메시지를 alert으로 출력
@@ -422,8 +443,8 @@ function wbsSalesCodeSearchP() {
         var row = grid.target.getList("selected")[0];
         $('#salesCd').val(row.salesCd);
         //임시 set
-        alert('임시데이터용 set');
-        $('#salesCd').val('23001-01HTFUP');
+        //alert('임시데이터용 set');
+        //$('#salesCd').val('23001-01HTFUP');
         
     	gridViewPop.initView().setData(0);
     });
@@ -518,26 +539,44 @@ function makeFormData() {
 $(document).ready(function() {
 	//combo set
 	setCommonSelect($(".popup_area select[data-kind]"));
+	userId = modalStack.last().paramObj.userId;
+	fileTrgtKeyU = modalStack.last().paramObj.fileTrgtKey;
+	//modal 넘어온값만큼 만큼 루프 
+	$.each(modalStack.last().paramObj, function (key, val) {		
+		if( $("#popForm").find("#"+key).length > 0 ) {
+			$("#popForm").find("#"+key).val(val);
+		}
+	});
+	$("#popForm #userId").val(userId);	
+	//작성자 readonly 등 set
+	$("#salesCd").attr("readonly", true);
+	
 	//formatter
 	$('[data-ax5formatter]').ax5formatter();
-
 	let today = moment(new Date());
 	let yesterday = moment(new Date()).add(-1, 'days');	
-	// 발주일자
-	$('#ordrgDt').datepicker({
-			format : "yyyy-mm-dd",
-			language : "ko",
-			autoclose : true
-		})
-	.datepicker("setDate", today.toDate());
-			
-	// 납기요청일자
-	$('#dudtDeqDt').datepicker({
-			format : "yyyy-mm-dd",
-			language : "ko",
-			autoclose : true
-		})
-	.datepicker("setDate", yesterday.toDate())	
+	//등록일때만 set
+	if(actionType == "C") {
+		// 발주일자
+		$('#ordrgDt').datepicker({
+				format : "yyyy-mm-dd",
+				language : "ko",
+				autoclose : true
+			})
+		.datepicker("setDate", today.toDate());
+				
+		// 납기요청일자
+		$('#dudtDeqDt').datepicker({
+				format : "yyyy-mm-dd",
+				language : "ko",
+				autoclose : true
+			})
+		.datepicker("setDate", yesterday.toDate())			
+	} else if(actionType == "U") {
+		//그리드 load
+		gridViewPop.initView().setData(0);
+	}
+
 	
 	var param_fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
 	//---------------------------------------------------------------  
@@ -581,26 +620,33 @@ $(document).ready(function() {
 					//type number 시 콤마제거
 					if( typeof(gridColumns[i].editor) != "undefined" && gridColumns[i].editor.type == "number" && val != "" ) {
 						val = deleteCommaStr(val); 
-					}
-		            detailObj["idx"] = i + 1;
-		            //발주순번 은 select key로  ORDRG_SEQ  
-		            detailObj[key] = val;		            
+					}	     
+					
+					detailObj["idx"] = i + 1;
+					//발주순번 은 select key로  ORDRG_SEQ  
+					detailObj[key] = val;			            			            
 	        	}
 	            //필수값 체크를 여기서 한다. 발주수량, 납기요청일 - 체크된 항목만 
 	            if( detailObj['userChk'] == "Y" ) {
 	            	//발주수량
 		            if( detailObj['ordrgQty'] =="" || detailObj['ordrgQty'] =="0" ) {
 		            	msgArr.push((idx+1)+" 행의 발주수량을 입력해 주십시오.")	;
-		            	console.log('--msgArr--' + msgArr);
 		            }	 
 		            //납기요청일
 		            if(detailObj['dudtDeqDt'] == "" ) {
-		            	msgArr.push((idx+1)+" 행의 납기요청일을 입력해 주십시오.")	;
-		            	console.log('--msgArr--' + msgArr);		            	
+		            	msgArr.push((idx+1)+" 행의 납기요청일을 입력해 주십시오.")	;		            	
 		            }
+		            //발주단가 체크 없음??
+		            /*
+		            if( detailObj['ordrgPrc'] =="" || detailObj['ordrgPrc'] =="0" ) {
+		            	msgArr.push((idx+1)+" 행의 발주단가를 입력해 주십시오.")	;
+		            	console.log('--msgArr--' + msgArr);
+		            }
+		            */		
+		            //체크된 항목만 저장		            
+		            detailArr.push(detailObj);		            
 	            }		
-	            
-	            detailArr.push(detailObj);		
+	            		
 	        });			
 	        //error alert 후 종료
 	        if( msgArr.length > 0 ) {
@@ -609,7 +655,50 @@ $(document).ready(function() {
 	        }
 		}
 		return detailArr;
-	}	
+	}
+	
+	// bom 그리드 삭제
+	$("#deleteDetailButton").on("click", function () {
+ 		var selRow = parseInt(gridViewPop.target.selectedDataIndexs);
+ 		if( isNaN(selRow) ) {
+ 			alert("선택된 행이 없습니다.");
+ 			return;
+ 		} else {
+ 			
+ 			var actFlag = gridViewPop.target.getList()[selRow].actFlag;	
+ 	    	//등록상태
+ 			if( actionType == "C" ) {		
+				//신규 추가한 행일 경우만 삭제 				
+ 				if( selRow > -1 && actFlag == "I") {
+ 					gridViewPop.target.removeRow(selRow);
+ 					$.gridNoSet(gridViewPop);					 				
+ 				}
+			//수정시 FLAG D 처리
+ 			} else if(actionType == "U") { 				
+ 				if( selRow > -1 ) {
+ 					//기존값이면 D 처리 아니면 row 삭제
+ 					var coCd = gridViewPop.target.getList()[selRow].coCd;
+ 					var ordrgNo = gridViewPop.target.getList()[selRow].ordrgNo;
+ 					var ordrgSeq = gridViewPop.target.getList()[selRow].ordrgSeq;
+ 					var paramObj = {
+ 							"coCd" : coCd
+ 							, "ordrgNo" : ordrgNo
+ 							, "ordrgSeq" : ordrgSeq
+ 						} 					
+
+					if( confirm("선택행을 삭제하시겠습니까?\n\n그리드에 변경중인 내용이 초기화 됩니다.")) {
+						deleteAjax("/user/sm/sm02/deleteOrderDetail", paramObj, null, function(data) {
+							if (data.resultCode == 200) {
+								alert(data.resultMessage);
+								gridViewPop.setData(0);
+							}
+						});
+ 	 					//gridViewPop.target.removeRow(selRow); 						
+ 					}				 							 				
+ 				} 				
+ 			} 			
+ 		}		
+	});
 	
 	//bom 발주수량 set
 	$.setOrdrgQty = function(gridObj, chkVal, bomQty, preBomQty, row ) {
@@ -628,9 +717,11 @@ $(document).ready(function() {
         			gridObj.target.setValue(row, "ordrgQty", 0);        			
         		}
         	} else if(chkVal == "N") {
-    			gridObj.target.setValue(row, "ordrgQty", "");        		
+    			gridObj.target.setValue(row, "ordrgQty", "");
+    			gridObj.target.setValue(row, "ordrgPrc", "");     
+    			gridObj.target.setValue(row, "ordrgAmt", "");     
         	}
-        	console.log('---chkVal:' + chkVal+'=======>bomQty:' + bomQty + "====>preBomQty:" + preBomQty+'===ordrgQty:' + ordrgQty);
+        	//console.log('---chkVal:' + chkVal+'=======>bomQty:' + bomQty + "====>preBomQty:" + preBomQty+'===ordrgQty:' + ordrgQty);
 	}
 	
 });

@@ -73,13 +73,17 @@ public class SM02SvcImpl implements SM02Svc {
 		return sm02Mapper.selectMaxOrdrgNo(paramMap);
 	}		
 	
-	/* 발주등록수정시 bom list */
+	/* 발주등록시 bom list */
 	@Override
 	public List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap) {
 		return sm02Mapper.selectBomDetailList(paramMap);
 	}		
 	  
-
+	/* 발주등록수정시 bom list */
+	@Override
+	public List<Map<String, String>> selectOrderDetailList(Map<String, String> paramMap) {
+		return sm02Mapper.selectOrderDetailList(paramMap);
+	}		
 	
 	@Override
 	public int insertOrderMaster(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
@@ -189,4 +193,9 @@ public class SM02SvcImpl implements SM02Svc {
 		//---------------------------------------------------------------  		
 		return result;
 	  }		
+	
+	@Override
+	public int deleteOrderDetail(Map<String, String> param) {
+		return sm02Mapper.deleteOrderDetail(param);
+	}	
 }

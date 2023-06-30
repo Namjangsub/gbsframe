@@ -6,6 +6,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -37,11 +38,27 @@ public class SM02Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+	
+	// 매입관리 발주 조회 엑셀
+	@PostMapping(value = "/selectOrderExcelList")
+	public String selectOrderExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = sm02Svc.selectOrderExcelList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}	
 
 	// BOM내역상세 조회
 	@PostMapping(value = "/selectBomDetailList")
 	public String selectBomDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> resultList = sm02Svc.selectBomDetailList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+	
+	// 발주상세 조회
+	@PostMapping(value = "/selectOrderDetailList")
+	public String selectOrderDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = sm02Svc.selectOrderDetailList(paramMap);
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
 	}	
@@ -82,21 +99,12 @@ public class SM02Ctr {
   	  	return "jsonView";
     } 
     
-	//기준관리 결재선 삭제    
-    @PutMapping(value = "/deleteApproval")
-    public String deleteApproval(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
-  	  	try {
-  			if (sm02Svc.deleteOrderMaster(paramMap) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-  			} else {
-  				model.addAttribute("resultCode", 500);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  			model.addAttribute("resultMessage", e.getMessage());
-  		}
-  	  	return "jsonView";
-    }       
+	//발주 detail 삭제    
+	@DeleteMapping(value = "/deleteOrderDetail")
+	public String deleteOrderDetail(@RequestBody Map<String, String> param, ModelMap model) {
+		sm02Svc.deleteOrderDetail(param);
+		model.addAttribute("resultCode", 200);
+    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+		return "jsonView";
+	} 
 }

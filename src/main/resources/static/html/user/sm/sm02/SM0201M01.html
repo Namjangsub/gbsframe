@@ -62,6 +62,8 @@
 <script src="/static/js/ax5/ax5calendar.min.js"></script>
 <script src="/static/js/ax5/ax5picker.min.js"></script>
 <script src="/static/js/ax5/ax5select.min.js"></script>
+<script src="/static/js/ax5/ax5grid-inline-editor.js"></script>
+
 <!-- <script src="/static/js/ax5/ax5combobox.min.js"></script> -->	
 </head>
 
@@ -218,9 +220,9 @@
 		<div class="contents no_bg">
 		<!-- 콘텐츠 타이틀 -->
 		<div class="contents_tit">
-			<span  style="height: 30px; line-height: 30px;font-size: 15px;">결재선 리스트 </span>
+			<span  style="height: 30px; line-height: 30px;font-size: 15px;">발주 리스트 </span>
 			<div class="add_btn_small pdl10">
-				<a onclick="insertApprovalModal('C');" style="height: 30px; line-height: 28px;" authchk>+</a>
+				<a onclick="inserOrderModal('C');" style="height: 30px; line-height: 28px;" authchk>+</a>
 				<!-- <a onclick="deleteAproval();" style="height: 30px; line-height: 28px;" authchk>-</a> -->
 				<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 			    </div>
@@ -269,7 +271,7 @@
                       this.self.select(this.dindex);
                       var row = this.dindex;
                       var paramObj = {"flag":"M","row":row}; */
-                      insertApprovalModal("U");
+                      inserOrderModal("U");
 			},
 	   },
           page: {
@@ -289,8 +291,8 @@
               {key: "salesCd",  				label: "Sales Code",      align: "center",   width: 110},
               {key: "ordrgNo",      			label: "발주번호",      align: "center",   width: 100},
               {key: "reqNo",    				label: "요청번호",      align: "center",   width: 120, hidden: true},  
-              {key: "pchsClntCd",    			label: "구매처",      align: "center",   width: 120},
-              {key: "clntNm",      				label: "구매처명",      align: "center",   width: 130},
+              {key: "pchsClntCd",    			label: "구매처",      align: "center",   width: 120, hidden: true},  
+              {key: "clntNm",      				label: "구매처명",      align: "left",   width: 150},
               {key: "ordrgDt",      			label: "발주일자",      align: "center",   width: 110},
               {key: "dudtDeqDt",    			label: "납기요청일",      align: "center",   width: 100},
               {key: "ordrgDiv10",      			label: "발주구분",      align: "center",   width: 130, hidden: true},
@@ -299,6 +301,7 @@
               {key: "ordrgDiv20Nm",    			label: "용도구분",      align: "center",   width: 130},
               {key: "ordrgDiv30",      			label: "발주구분",      align: "center",   width: 130, hidden: true},
               {key: "ordrgDiv30Nm",    			label: "특성구분",      align: "center",   width: 130},
+              {key: "exrate",    			label: "환율",      align: "center",   width: 130, hidden: true},
              ]
        });
        return this;
@@ -375,8 +378,7 @@ $(document).ready(function() {
 	
 	// 접속자 회사 set
 	$("#coCd_S").val(jwt.coCd);
-	
-	$("#coCd_S_S").val(jwt.coCd);
+    $("#userId").val(jwt.userId);
 
 	// 시작일 (현재날짜의 월 첫일)
 	$('#ordrgDtFrom_S').datepicker({
@@ -462,23 +464,38 @@ $(document).ready(function() {
     
  
 	/*수정 or 등록 버튼 클릭 시*/
-	function insertApprovalModal(type) {
+	function inserOrderModal(type) {
 		//수정
 		if (type == 'U') {
 			
-			var row = gridView.target.getList("selected")[0];
+			var gridList = gridView.target.getList("selected")[0];
+			var gridColumns = gridView.target.columns;
+			
+			//그리드 col , row 만큼 배열 만든다.
 			var paramObj = {
-				"actionType" : type,
-				"coCd" 	   : $("#coCd_S").val(),
-				"appNo" : row.appNo,
-				"appSeq" : row.appSeq,
-				"appDiv" : row.appDiv,
-				"appLineNm" : row.appLineNm,
-		       	"userId"   : row.id,
-		       	"userNm"   : row.userName,
-		       	"useYn"   : row.useYn,	       	
+				"actionType" : type,	
+				"userId"    : jwt.userId,
 		       	"pgmId"    : "SM0201M01"
 			};
+
+			if( gridList.fileTrgtKey > 0 ) {
+		        $.each(gridList, function (key, val) {
+		        	console.log('key:' + key+'=-====>val:' + val);			     	        	
+					if( typeof(val) == "undefined") val = "";					  
+					paramObj[key] = val;			            			            		
+		        });			
+			}			
+			
+			
+/* 			"coCd" 	   : $("#coCd_S").val(),
+			"appNo" : row.appNo,
+			"appSeq" : row.appSeq,
+			"appDiv" : row.appDiv,
+			"appLineNm" : row.appLineNm,
+	       	"userId"   : row.id,
+	       	"userNm"   : row.userName,
+	       	"useYn"   : row.useYn, */
+	       	
 		} else {
 			var paramObj = {
 					"actionType" : type,
@@ -581,7 +598,7 @@ function excelDown() {
 	    		   "userId" : $("#userId").val(),	//userId - 작성자
  	               "coCd" : $("#coCd_S").val(), //회사코드    		   
     }
-    postAjax("/user/bm/bm13/selectApprovalExcelList", formData, null, function(data){
+    postAjax("/user/sm/sm02/selectOrderExcelList", formData, null, function(data){
 	
     var list = data.resultList;
 	excelView.target.setData({
