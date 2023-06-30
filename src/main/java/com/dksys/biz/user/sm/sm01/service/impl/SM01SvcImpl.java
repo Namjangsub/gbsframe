@@ -231,7 +231,7 @@ public class SM01SvcImpl implements SM01Svc {
   }
 
   @Override
-  public int deleteBom(Map<String, String> paramMap) throws Exception {
+  public int deleteBomAll(Map<String, String> paramMap) throws Exception {
 	    //---------------------------------------------------------------  
 		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
 	  	//   필수값 :  jobType, userId, comonCd
@@ -253,7 +253,7 @@ public class SM01SvcImpl implements SM01Svc {
 		//---------------------------------------------------------------  
 	  
 	  int result = sm01Mapper.deleteBomMatrAll(paramMap);
-		  result = sm01Mapper.deleteBom(paramMap);
+	  result = sm01Mapper.deleteBomAll(paramMap);
 	  
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)

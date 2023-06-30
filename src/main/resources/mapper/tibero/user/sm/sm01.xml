@@ -51,7 +51,7 @@
 		     , R3.CODE_NM       AS ORDRS_DTL_DIV30_NM
 		     , B.DUDT_INTEND_DT           --납기예정일
 		     , B.EQP_NM                   --설비명
-		     , (SELECT COUNT(*) FROM TB_SM01M01 WHERE CO_CD = A.CO_CD AND SALES_CD = B.SALES_CD) AS BOM_CNT
+		     , NVL(TO_CHAR(T3.BOM_CNT),'0') AS BOM_CNT
 		     , (SELECT COUNT(*) FROM TB_SM01D01 WHERE CO_CD = A.CO_CD AND SALES_CD = B.SALES_CD) AS MATR_CNT
         FROM TB_CR02M01 AS A
 	       JOIN TB_CR02D02 AS B  ON B.CO_CD    = A.CO_CD AND B.ORDRS_NO = A.ORDRS_NO
@@ -68,6 +68,9 @@
 		        START WITH X1.UPPER_CD = '.'
 		        CONNECT BY PRIOR X1.LOWER_CD = X1.UPPER_CD
 	       ) AS BOM ON A.CO_CD = BOM.CO_CD AND B.SALES_CD = BOM.SALES_CD
+	       LEFT OUTER JOIN (
+				SELECT CO_CD, SALES_CD, COUNT(*) AS BOM_CNT FROM TB_SM01M01 GROUP BY CO_CD, SALES_CD
+	       ) AS T3 ON A.CO_CD = T3.CO_CD AND B.SALES_CD = T3.SALES_CD
 		   WHERE  1 = 1
 		     AND NVL2(#{coCd},A.CO_CD,'.') = NVL(#{coCd},'.')
 		     AND NVL2(#{itemDiv},B.ITEM_DIV,'.') = NVL(#{itemDiv},'.')
@@ -76,6 +79,7 @@
 		     AND NVL(A.CLNT_PJT, '.') LIKE '%'||#{clntPjt}||'%'
 		     AND NVL(P.PRDT_NM, '.') LIKE '%'||#{prdtNm}||'%'
 		     AND NVL(B.EQP_NM, '.') LIKE '%'||#{eqpNm}||'%'
+		     AND NVL2(#{bomCnt},TO_CHAR(NVL(T3.BOM_CNT,'0')),'.') = NVL(#{bomCnt},'.')
         ORDER BY A.CO_CD, CASE WHEN MATR_CNT = 0 THEN 1 ELSE 0 END, CASE WHEN BOM_CNT = 0 THEN 1 ELSE 0 END, B.SALES_CD
         ) AS a
         ) A
@@ -93,6 +97,8 @@
 		, T.UNIT_NO
 		, T.REV_NO
 		, T.DSGN_NO
+		, T.UPPER_CD AS OLD_UPPER_CD
+		, T.LOWER_CD AS OLD_LOWER_CD
 		, T.UPPER_CD
 		, T.LOWER_CD
 		, D.MATR_SEQ
@@ -204,10 +210,12 @@
 	<select id="selectBomMatrList" resultType="CamelMap">
 		SELECT CO_CD
 			, SALES_CD
-			, MATR_SEQ
 			, UPPER_CD
 			, LOWER_CD
+			, UPPER_CD AS OLD_UPPER_CD
+			, LOWER_CD AS OLD_LOWER_CD
 			, LOWER_CD AS DSGN_NO
+			, MATR_SEQ
 			, ORDRG_DIV_10
 			, ORDRG_DIV_20
 			, NEXT_PRCSN_NM
@@ -300,14 +308,13 @@
     </insert>
 
     <update id="updateBom" parameterType="Map">
-        UPDATE TB_PM01M01
+        UPDATE TB_SM01M01
         SET   CO_CD 		= #{coCd}
 			, SALES_CD 		= #{salesCd}
 			, PART_NO 		= #{partNo, jdbcType=VARCHAR}
 			, UNIT_NO 		= #{unitNo, jdbcType=VARCHAR}
 			, REV_NO 		= #{revNo, jdbcType=VARCHAR}
 			, DSGN_NO 		= #{dsgnNo}
-			, MATR_SEQ 		= #{matrSeq}
 			, UPPER_CD 		= #{upperCd}
 			, LOWER_CD 		= #{lowerCd}
             , ETC_FIELD1    = #{etcField1, jdbcType=VARCHAR}
@@ -320,7 +327,8 @@
     </update>
 
 	<delete id="deleteBom" parameterType="Map">
-	  DELETE TB_SM01M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+	  DELETE TB_SM01M01
+	   WHERE FILE_TRGT_KEY = #{fileTrgtKey}
 	</delete>
 	
 	<delete id="deleteBomMatrAll" parameterType="Map">
@@ -329,6 +337,12 @@
 	    AND SALES_CD = #{salesCd}
 	</delete>
 	
+	<delete id="deleteBomAll" parameterType="Map">
+	  DELETE TB_SM01M01
+	  WHERE CO_CD = #{coCd}
+	    AND SALES_CD = #{salesCd}
+	</delete>
+
     <insert id="insertBomMatr" parameterType="Map">
         <selectKey keyProperty="matrSeq" resultType="String" order="BEFORE">
 			SELECT NVL(MAX(MATR_SEQ), 0) + 1 FROM TB_SM01D01
@@ -457,7 +471,9 @@
 	
     <update id="updateBomMatr" parameterType="Map">
         UPDATE TB_SM01D01
-        SET   ORDRG_DIV_10 		= #{ordrgDiv10, jdbcType=VARCHAR}
+        SET   UPPER_CD 			= #{upperCd, jdbcType=VARCHAR}
+			, LOWER_CD 			= #{lowerCd, jdbcType=VARCHAR}
+			, ORDRG_DIV_10 		= #{ordrgDiv10, jdbcType=VARCHAR}
 			, ORDRG_DIV_20 		= #{ordrgDiv20, jdbcType=VARCHAR}
 			, NEXT_PRCSN_NM 	= #{nextPrcsnNm, jdbcType=VARCHAR}
 			, DLVPLC_NM 		= #{dlvplcNm, jdbcType=VARCHAR}
@@ -512,9 +528,11 @@
 	  WHERE CO_CD = #{coCd}
 	    AND SALES_CD = #{salesCd}
 	    AND MATR_SEQ = #{matrSeq}
-	    AND UPPER_CD = #{upperCd}
-	    AND LOWER_CD = #{lowerCd}
-
+	    AND UPPER_CD = #{oldUpperCd}
+	    AND LOWER_CD = #{oldLowerCd}
+	    <!-- 
+	    UPPER_CD, LOWER_CD 가 Key 수정을 MultiLine 으로 작업시 에러발생.
+	     -->
     </update>
 
 	<delete id="deleteBomMatr" parameterType="Map">

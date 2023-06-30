@@ -106,10 +106,10 @@ public class SM01Ctr {
 	  	return "jsonView";
 	}
 
-	@PutMapping(value = "/deleteBom")
-	public String deleteBom(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+	@PutMapping(value = "/deleteBomAll")
+	public String deleteBomAll(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 	  	try {
-			if (sm01Svc.deleteBom(paramMap) != 0 ) {
+			if (sm01Svc.deleteBomAll(paramMap) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
 			} else {

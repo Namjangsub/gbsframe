@@ -26,6 +26,8 @@ public interface SM01Mapper {
 
   int updateBom(Map<String, String> paramMap);
 
+  int deleteBomAll(Map<String, String> paramMap);
+
   int deleteBom(Map<String, String> paramMap);
   
   int deleteBomMatrAll(Map<String, String> paramMap);
