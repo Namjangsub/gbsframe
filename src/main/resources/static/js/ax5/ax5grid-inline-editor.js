@@ -112,10 +112,26 @@
     			language : "ko",
     			autoclose : true,
             }, _editor.config));
-            
+            var rtnFalg = true;
+            // Datepicker 클릭 시 원하는 동작 수행
+            _$el.on("click", function () {
+            	GRID.body.inlineEdit.deActive.call(_root, "RETURN", _columnKey, this.value);
+            	rtnFalg = false;
+            });
             _$el.on("change", function () {
-                GRID.body.inlineEdit.deActive.call(self, "RETURN", _columnKey);
+            	GRID.body.inlineEdit.deActive.call(_root, "RETURN", _columnKey, this.value);
+            	rtnFalg = false;
+            });
+            _$el.keydown(function (event) {
+                if (event.keyCode === 27) { // ESC 키 코드: 27
+                	GRID.body.inlineEdit.deActive.call(_root, "CANCEL", _columnKey);
+                	ax5.util.stopEvent(event.originalEvent);
+                }
               });
+            _$el.on("blur", function (e) {
+                GRID.body.inlineEdit.deActive.call(_root, "RETURN", _columnKey, this.value);
+                ax5.util.stopEvent(e.originalEvent);
+            });            
             
             _$el.focus().select();
         }
