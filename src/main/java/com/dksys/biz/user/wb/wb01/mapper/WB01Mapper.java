@@ -108,6 +108,10 @@ public interface WB01Mapper {
 	List<Map<String, String>> selectWbsPlanTreeList(Map<String, String> paramMap);
 	int selectWbsPlanTreeListCount(Map<String, String> paramMap);
 	Map<String, String> selectWbsPlanInfo(Map<String, String> paramMap);
+	
+	Map<String, String> selectWbsLevelPlanInfo(Map<String, String> paramMap);
+	Map<String, String> selectWbsRsltsInfo(Map<String, String> paramMap);
+	
 	int selectWbsPlanSeqNext(Map<String, String> paramMap);
 	int insertWbsPlan(Map<String, String> paramMap);
 	int deleteWbsPlanlist(Map<String, String> paramMap);

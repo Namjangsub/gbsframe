@@ -576,7 +576,17 @@ public class WB01SvcImpl implements WB01Svc {
 	public Map<String, String> selectWbsPlanInfo(Map<String, String> paramMap) {
 		return wb01Mapper.selectWbsPlanInfo(paramMap);
 	}
+	
+	@Override
+	public Map<String, String> selectWbsLevelPlanInfo(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsLevelPlanInfo(paramMap);
+	}
 
+	@Override
+	public Map<String, String> selectWbsRsltsInfo(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsRsltsInfo(paramMap);
+	}
+	
 	
 	@Override
 	public int insertWbsPlan(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
