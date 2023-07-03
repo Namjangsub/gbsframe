@@ -235,7 +235,7 @@ public class FI02Ctr {
     		value1.put("v", gunValue);
     		value1.put("f", null);
     		JSONObject value2 = new JSONObject();
-    		trnValue = selectPalBillSalesPrftChart.get(i).get("trn");
+    		trnValue = selectPalBillBfrxPrftChart.get(i).get("trn");
     		value2.put("v", trnValue);
     		value2.put("f", null);
     		JSONObject value3 = new JSONObject();
