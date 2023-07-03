@@ -289,8 +289,42 @@ public class SM01SvcImpl implements SM01Svc {
   }
 
   @Override
-  public Map<String, String> selectPrjctIssueInfo(Map<String, String> paramMap) {
-	  return sm01Mapper.selectPrjctIssueInfo(paramMap);
+  public int insertCopyBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+		int result = 200;
+	
+	    List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
+	    for (Map<String, String> dtl : bomList) {
+	    	//dtl.put("prjctSeq", newPrjctSeq);
+	    	dtl.put("userId", paramMap.get("userId"));
+	    	dtl.put("pgmId", paramMap.get("pgmId"));
+	    	String dtaChk = dtl.get("dtaChk").toString();
+	    	if ("I".equals(dtaChk)) {
+	    		sm01Mapper.insertBom(dtl);
+	    	} else if ("U".equals(dtaChk)) {
+	    		sm01Mapper.updateBom(dtl);
+	    	} else if ("D".equals(dtaChk)) {
+	    		sm01Mapper.deleteBomMatrAll(dtl);
+	    		sm01Mapper.deleteBom(dtl);
+	    	}
+	    }
+	    List<Map<String, String>> matrList = gsonDtl.fromJson(paramMap.get("matrArr"), dtlMap);
+	    for (Map<String, String> dtl : matrList) {
+	    	//dtl.put("prjctSeq", newPrjctSeq);
+	    	dtl.put("userId", paramMap.get("userId"));
+	    	dtl.put("pgmId", paramMap.get("pgmId"));
+	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
+	    	String dtaChk = dtl.get("dtaChk").toString();
+	    	/* "dtaChk" 값을 확인하여
+	    	 * "I"인 경우 sm01Mapper.insertBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삽입 */
+	    	if ("I".equals(dtaChk)) {
+	    		sm01Mapper.insertBomMatr(dtl);
+	    	} 
+	    }
+	    
+	    return result;
   }
-   
+
 }

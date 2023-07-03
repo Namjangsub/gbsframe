@@ -30,7 +30,7 @@ public interface SM01Svc {
   int updateBomMatr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
   
   int deleteBomMatr(Map<String, String> paramMap) throws Exception;
-
-  Map<String, String> selectPrjctIssueInfo(Map<String, String> paramMap);
   
+  int insertCopyBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
 }
