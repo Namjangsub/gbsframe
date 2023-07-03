@@ -347,6 +347,11 @@ public class CR02Svcmpl implements CR02Svc {
     public List<Map<String, Object>> selectOrdrsPlanHis(Map<String, String> param) {
         return cr02Mapper.selectOrdrsPlanHis(param);
     }
+    
+    @Override
+    public List<Map<String, Object>> selectWbsLeftSalesCodeTreeList(Map<String, String> param) {
+    	return cr02Mapper.selectWbsLeftSalesCodeTreeList(param);
+    }
 
 
 }

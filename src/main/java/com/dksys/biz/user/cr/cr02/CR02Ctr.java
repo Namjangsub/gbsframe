@@ -121,4 +121,12 @@ public class CR02Ctr {
 		model.addAttribute("ordrsPlanHisList", ordrsPlanHisList);
 		return "jsonView";
 	}
+	
+	  //SalesCode Search modal폼 사용 조회
+	  @PostMapping(value = "/selectWbsLeftSalesCodeTreeList") 
+	  public String selectWbsLeftSalesCodeTreeList(@RequestBody Map<String, String> param, ModelMap model) {		  
+		  List<Map<String, Object>> fileList = cr02Svc.selectWbsLeftSalesCodeTreeList(param);
+		  model.addAttribute("fileList", fileList);
+		  return "jsonView";
+	  }	 	
 }

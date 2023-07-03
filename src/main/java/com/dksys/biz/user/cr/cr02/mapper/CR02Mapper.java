@@ -49,5 +49,7 @@ public interface CR02Mapper {
 
 
     List<Map<String, Object>> selectOrdrsPlanHis(Map<String, String> param);
+    
+    List<Map<String, Object>> selectWbsLeftSalesCodeTreeList(Map<String, String> param);
 
 }
