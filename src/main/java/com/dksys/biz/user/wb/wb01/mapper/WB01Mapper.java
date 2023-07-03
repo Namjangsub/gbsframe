@@ -81,7 +81,7 @@ public interface WB01Mapper {
 	
 	List<Map<String, String>> selectFileCodeSelect(Map<String, String> paramMap);
 	
-	
+	int updateWbsPlanLockYn(Map<String, String> paramMap);
 	
 	
 	
@@ -119,7 +119,7 @@ public interface WB01Mapper {
 	int selectWbsPlanChk(Map<String, String> paramMap);
 	int updateWbsPlan(Map<String, String> paramMap);
 	Map<String, String> selectWbsPlanFileTrgtKeyInfo(Map<String, String> paramMap);
-	
+	List<Map<String, String>> selectNewWbsPlanExcelList(Map<String, String> paramMap);
 	
 	
 	

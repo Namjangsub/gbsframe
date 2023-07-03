@@ -114,5 +114,7 @@ public interface WB01Svc {
 	List<Map<String, String>> selectWbsLeftSalesCodeList(Map<String, String> paramMap);	
 	Map<String, String> selectWbsPlanFileTrgtKeyInfo(Map<String, String> paramMap);
 	
+	List<Map<String, String>> selectNewWbsPlanExcelList(Map<String, String> paramMap);	
+	int updateWbsPlanLockYn(Map<String, String> paramMap);
 	
 }

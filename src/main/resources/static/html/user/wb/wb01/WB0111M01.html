@@ -168,20 +168,19 @@
 		            <!-- 검색조건 END -->
 	            </table>
 	            <input type="hidden" id="userId"    name="userId">
-                <input type="hidden" id="pgmId"     name="pgmId" value="WB0101M02">
+                <input type="hidden" id="pgmId"     name="pgmId" value="WB0111M01">
             </div>
         </div>
         <!-- 콘텐츠 -->
 		<div class="contents no_bg">
 		      <div class="contents_tit">
 		        <div class="add_btn_small pdl10">
-		          <!-- <a onclick="insertWbsPlanModal('C', '1', 0);" style="height: 30px; line-height: 28px;">1레벨</a>
-		          <a onclick="insertWbsPlanModal('C', '2', 0);" style="height: 30px; line-height: 28px;">2레벨</a>
-                  <a onclick="insertWbsPlanModal('C', '3', 0);" style="height: 30px; line-height: 28px;">3레벨</a> -->
-                  <a onclick="" style="height: 30px; line-height: 28px; width: 60px;">계획마감</a>
-                  <a onclick="" style="height: 30px; line-height: 28px; width: 60px;">계획삭제</a>
+                  <a onclick="lockYn();" style="height: 30px; line-height: 28px; width: 60px;">계획잠금</a>
+                  <a onclick="unLockYn();" style="height: 30px; line-height: 28px; width: 70px;">계획잠금취소</a>
+                  <a onclick="deleteWbsPlan();" style="height: 30px; line-height: 28px; width: 60px;">계획삭제</a>
                   <a onclick="" style="height: 30px; line-height: 28px; width: 60px;">실적마감</a>
-                  <a onclick="" style="height: 30px; line-height: 28px; width: 60px;">실적삭제</a>
+                  <a onclick="" style="height: 30px; line-height: 28px; width: 70px;">실적마감취소</a>
+                  <a onclick="deleteWbsRslts();" style="height: 30px; line-height: 28px; width: 60px;">실적삭제</a>
 		          <a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 		          
 		        </div>
@@ -221,6 +220,7 @@
 </html>
 
 <script type="text/javascript">
+    var salesCd = null;
 	var isFirst = true;
 	var beforeIndex ='';
 	ax5.ui.grid.formatter["chkYn"] = function () {
@@ -254,7 +254,9 @@
                             });		                	
 		                    this.self.select(this.dindex);
 		                    if (this.item.dataGbn == 'D') {
+		                    	salesCd = this.item.salesCd;
 			                    gridView.setData(0, this.item.salesCd);
+			                    salesCd = this.item.salesCd;
 		                    }
 		                    
 		                },
@@ -266,6 +268,7 @@
 		                    this.self.select(this.dindex);
 		                    //debugger;
 		                    if (this.item.dataGbn == 'D') {
+		                    	salesCd = this.item.salesCd;
 			                    gridView.setData(0, this.item.salesCd);
 		                    }
 		                    
@@ -448,10 +451,12 @@
 		                    	this.column.key=='lockYn' || 
 		                    	this.column.key=='closeYn') {
 		                    	//계획 입력 또는 수정 작업
-			                    var insUpd = this.item.fileTrgtKey ? 'U' : 'C';
-			                    insertWbsPlanModal(insUpd, this.item.lvl-1, this.dindex);
+		                    	if (this.item.codeId.length > 6) {
+		                    	    var insUpd = this.item.fileTrgtKey ? 'U' : 'C';
+		                    	    insertWbsPlanModal(insUpd, this.item.lvl-1, this.dindex);
+		                    	}
 							} else if (
-			                    	this.column.key=='wbsRsltsChkYn' ||
+									this.column.key=='wbsRsltsChkYn' ||
 			                    	this.column.key=='wbsRsltsRate' || 
 			                    	this.column.key=='wbsRsltssDt' || 
 			                    	this.column.key=='wbsRsltseDt' || 
@@ -460,12 +465,22 @@
 			                    	this.column.key=='wbsPlanMh' || 
 			                    	this.column.key=='wbsRsltsMh') {
 								//실적 입력 또는 수정 작업
-			                    var insUpd = this.item.rsltsFileTrgtKey ? 'U' : 'C';
-			                    insertWbsRsltsModal(insUpd, this.item.lvl-1, this.dindex);
+								if (this.item.codeId.length > 6) {
+					                    var insUpd = this.item.rsltsFileTrgtKey ? 'U' : 'C';
+					                    insertWbsRsltsModal(insUpd, this.item.lvl-1, this.dindex);
+								}
 							}
 		                    
 		                    beforeIndex = this.dindex;
 		                },
+		                onDataChanged: function () {
+		                    if (this.key == 'isChecked') {
+		                        this.self.updateChildRows(this.dindex, {isChecked: this.item.isChecked});
+		                    }
+		                    else if(this.key == '__selected__'){
+		                        this.self.updateChildRows(this.dindex, {__selected__: this.item.__selected__});
+		                    }
+		                }
 		           },
 		           page : {
 	                    navigationItemCount : 10,
@@ -506,6 +521,7 @@
                       "salesCd" : paramSalesCode,
                       "pageNo" : _pageNo + 1,
                       "recordCnt" : $('#recordCnt').val()};
+	           // debugger;
 	            postAjax("/user/wb/wb01/selectNewWbsPlanTreeList", paramObj, null, function(data){
 	                var list = data.fileList;
 	                    targetObj.setData({
@@ -525,59 +541,81 @@
 	        this.target.setConfig({
 	        target: $('[data-ax5grid="excel-grid"]'),
 	        columns: [
-	        	 {key: "rnum",  label: "NO.", hidden:true},
-	        	 {key: "fileTreeKey",  label: "fileTreeKey", hidden:true},
-                 {key: "id",  label: "id", hidden:true},
-                 {key: "pid",  label: "pid", hidden:true},
-                 {key: "coCd",  label: "회사코드", hidden:true},
-                 {key: "coCdNm",  label: "회사명", width: 80, align: "center"},
-                 {key: "salesCd",  label: "SALES CD", width: 100, align: "center"},
-                 {key: "codeNm",  label: "WBS 계획구분", align: "left", width: 130, enableFilter: true, treeControl: true},
-                 {key: "wbsPlanStsCodeId",      label: "계획상태코드",      hidden: true},
-                 {key: "wbsPlanStsNm",      label: "계획상태",      align: "center",   width: 70}, 
-                 {key: "wbsPlansDt",      label: "시작일자",      align: "center",   width: 100},
-                 {key: "wbsPlaneDt",      label: "종료일자",      align: "center",   width: 100},
-                 {key: "wbsPlanMngId",      label: "담당자",      hidden: true},
-                 {key: "wbsPlanMngNm",      label: "담당자",      align: "center",   width: 80},                   
-                 {key: "lockYn",      label: "잠금",      align: "center",   width: 40},
-                 {key: "closeYn",      label: "마감",      align: "center",   width: 40},
-                 {key: "wbsRsltsDt",      label: "실적",      align: "center",   width: 40},  
-                 {key: "ordrsClntCd",      label: "고객사",     hidden: true},
-                 {key: "ordrsClntNm",      label: "고객사",      align: "center",   width: 130},
-                 {key: "clntPjt",      label: "고객사PJT",      align: "center",   width: 100},
-                 {key: "ordrsDtlDiv20",      label: "신작구분",      hidden: true},
-                 {key: "ordrsDtlDiv20Nm",      label: "신작",      align: "center",   width: 40},
-                 {key: "prdtCd",      label: "제품구분",      hidden: true},
-                 {key: "prdtCdNm",      label: "제품",      align: "center",   width: 130},
-                 {key: "itemDiv",      label: "ITEM구분",      hidden: true},
-                 {key: "itemDivNm",      label: "ITEM",      align: "center",   width: 100},     
-                 {key: "wbsPlanCnts",      label: "주요내용",      align: "left",   width: 200},
-                 {key: "wbsPlanRmk",      label: "비고",      align: "left",   width: 100},                   
-                 {key: "wbsPlanId",      label: "작성자",      hidden: true},
-                 {key: "wbsPlanNm",      label: "작성자",      align: "center",   width: 80},
-                 {key: "wbsPlanDt",      label: "작성일",   align: "center",   width: 80}, 
-                 {key: "creatId",      label: "생성자",      hidden: true},
-                 {key: "creatNm",      label: "생성자",      align: "center",   width: 80},
-                 {key: "creatPgm",      label: "생성프로그램ID",      hidden: true},
-                 {key: "creatDttm",      label: "생성일시",      align: "center",   width: 80},                   
-                 {key: "udtId",      label: "최종변경자",      hidden: true},
-                 {key: "udtNm",      label: "최종변경자",      align: "center",   width: 80},
-                 {key: "udtPgm",      label: "최종수정프로그램ID",      hidden: true},
-                 {key: "udtDttm",      label: "최종변경일자",      align: "center",   width: 80},
-                 {key: "dsgnDifCodeId",      label: "설계난이도코드",      hidden: true},
-                 {key: "dsgnDifCodeNm",      label: "설계난이드명",      hidden: true},
-                 {key: "dsgnPlanHour",      label: "설계계획공수",      hidden: true},                   
-                 {key: "prdctnDifCodeId",      label: "생산난이도코드",      hidden: true},
-                 {key: "prdctnDifCodeNm",      label: "생산난이도명",      hidden: true},
-                 {key: "prdctnPlanHour",      label: "생산계획공수",      hidden: true},                   
-                 {key: "wbsPlanOsYn",      label: "계획외주코드",      hidden: true},
-                 {key: "wbsPlanOsNm",      label: "계획외주유무",      hidden: true},   
-                 {key: "wbsPlanCodeKind",      label: "WBS 상위코드",      hidden: true},
-                 {key: "wbsPlanCodeId",      label: "WBS 코드",      hidden: true},
-                 {key: "wbsPlanNo",      label: "WBS NO",      hidden: true}
-	                 ]
+	                {key: "rnum",  label: "NO.", hidden:true},
+	                {key: "lvl",  label: "lvl", hidden:true},
+	                {key: "codeId",  label: "codeId", align: "left", width: 200, hidden:true, treeControl: true},
+	                {key: "codeKind",  label: "codeKind", hidden:true},
+	                {key: "coCd",  label: "회사코드", hidden:true},
+	                {key: "coCdNm",  label: "회사명", width: 80, hidden:true, align: "center"},
+	                {key: "salesCd",  label: "SALES CD", width: 100, hidden:true, align: "center"},
+	                {key: "codeNm",  label: "WBS 계획구분", align: "left", width: 200,  treeControl: true},
+	
+	                {key: "fileTreeKey",        label: "fileTreeKey", hidden:true},
+	                {key: "wbsPlanNo",          label: "wbsPlanNo", hidden:true},
+	                {key: "wbsPlanStsCodeId",   label: "계획상태코드",   hidden: true},
+	                {key: "rsltsFileTrgtKey",   label: "rsltsFileTrgtKey", hidden:true},
+	                {key: "rsltsWbsPlanNo",     label: "rsltsWbsPlanNo", hidden:true},
+	                {key: "wbsPlanId",          label: "담당자",      hidden:true},
+	                {key: "wbsPlanNm",            label: "담당자",      hidden:true},
+	                {key: "wbsPlanDt",            label: "담당자",      hidden:true},
+	                {key: "wbsPlanStsNm",       label: "계획상태",      hidden:true}, 
+	                {key: "wbsPlanMngId",     label: "담당자",      hidden:true}, 
+	                {key: "wbsPlanMngNm",     label: "담당자",      align: "center",   width: 80}, 
+	                {key: "wbsPlanCnts",      label: "주요내용",      align: "left",   width: 100},
+	                {key: "wbsPlanRmk",      label: "비고",      align: "left",   width: 100},    
+	                {label: "계획", columns: [  
+	                    {key: "wbsPlanChkYn",       label: "계획",      align: "center",   width: 40},  
+	                    {key: "wbsPlansDt",         label: "시작일자",      align: "center",   width: 80},
+	                    {key: "wbsPlaneDt",         label: "종료일자",      align: "center",   width: 80},
+	                    {key: "lockYn",             label: "잠금",      align: "center",   width: 40},
+	                    {key: "closeYn",            label: "마감",      align: "center",   width: 40},
+	                    ]},
+	                {label: "실적", columns: [ 
+	                	{key: "wbsRsltsChkYn",      label: "실적",      align: "center",   width: 40},  
+	                    {key: "wbsRsltsRate",       label: "진행율",      align: "center",   width: 60},                   
+	                    {key: "wbsRsltssDt",        label: "시작일자",      align: "center",   width: 80},
+	                    {key: "wbsRsltseDt",        label: "종료일자",      align: "center",   width: 80},
+	                    {key: "rsltsLockYn",        label: "잠금",      align: "center",   width: 40},
+	                    {key: "rsltsCloseYn",       label: "마감",      align: "center",   width: 40},
+	                    {key: "wbsPlanMh",          label: "계획공수",      align: "center",   width: 80},                   
+	                    {key: "wbsRsltsMh",         label: "실적공수",      align: "center",   width: 80},
+	                    {key: "wbsRsltsCnts",      label: "주요내용",      align: "left",   width: 100},
+	                    {key: "wbsRsltsRmk",      label: "비고",      align: "left",   width: 100},    
+	                ]},
+	                {key: "wbsRsltsId",         label: "담당자",      align: "center",   width: 80},                   
+	                {key: "wbsRsltsDt",         label: "실적일자",      align: "center",   width: 80},
+	                {key: "ordrsClntCd",      label: "고객사",     hidden: true},
+	                {key: "ordrsClntNm",      label: "고객사",      align: "center",   width: 130},
+	                {key: "clntPjt",      label: "고객사PJT",      align: "center",   width: 100},
+	                {key: "ordrsDtlDiv20",      label: "신작구분",      hidden: true},
+	                {key: "ordrsDtlDiv20Nm",      label: "신작",      align: "center",   width: 40},
+	                {key: "prdtCd",      label: "제품구분",      hidden: true},
+	                {key: "prdtCdNm",      label: "제품",      align: "center",   width: 130},
+	                {key: "itemDiv",      label: "ITEM구분",      hidden: true},
+	                {key: "itemDivNm",      label: "ITEM",      align: "center",   width: 100},  
+	                
+	                {key: "creatId",      label: "생성자", align: "center",   width: 80},
+	                {key: "creatPgm",      label: "생성프로그램ID",      hidden: true},
+	                {key: "creatDttm",      label: "생성일시",      align: "center",   width: 80},                   
+	                {key: "udtId",      label: "최종변경자",      align: "center",   width: 80},
+	                {key: "udtPgm",      label: "최종수정프로그램ID",      hidden: true},
+	                {key: "udtDttm",      label: "최종변경일자",      align: "center",   width: 80},
+	                
+	                {key: "dsgnDifCodeId",      label: "설계난이도코드",      hidden: true},
+	                {key: "dsgnDifCodeNm",      label: "설계난이드명",      hidden: true},
+	                {key: "dsgnPlanHour",      label: "설계계획공수",      hidden: true},                   
+	                {key: "prdctnDifCodeId",      label: "생산난이도코드",      hidden: true},
+	                {key: "prdctnDifCodeNm",      label: "생산난이도명",      hidden: true},
+	                {key: "prdctnPlanHour",      label: "생산계획공수",      hidden: true},                   
+	                {key: "wbsPlanOsYn",      label: "계획외주코드",      hidden: true},
+	                {key: "wbsPlanOsNm",      label: "계획외주유무",      hidden: true},   
+	                {key: "wbsPlanCodeKind",      label: "WBS 상위코드",    hidden: true},
+	                {key: "wbsPlanCodeId",      label: "WBS 코드",      hidden: true},
+	                {key: "wbsPlanNo",      label: "WBS NO",      hidden: true},
+	                {key: "isLeaf", label: "isLeaf", align: "left", width: 60, hidden: true }
+	           ]
 	        });
-	           return this;
+	        return this;
 	    }
 	}        
 	
@@ -725,7 +763,7 @@
                     "reqDtTo": $("#reqDtTo_S").val().replace(/\-/g, ''),
                     "clntCd" : $("#clntCd_S").val(),
                     "clntNm" : $("#clntNm_S").val(),
-                    "salesCd" : $("#salesCd_S").val(),
+                    "salesCd" : salesCd,
                     "prdtCd" : $("#prdtCd_S").val(),
                     "prdtNm" : $("#prdtNm_S").val(),
                     "itemCd" : $("#itemCd_S").val(),
@@ -735,8 +773,8 @@
                     "salesMngNm" : $("#salesMngNm_S").val(),
                     "wbsPlanNo" : $("#wbsPlanNo_S").val()
                     };
-	        postAjax("/user/wb/wb01/selectWbsPlanExcelList", paramObj, null, function(data){
-	            var list = data.resultList;
+	        postAjax("/user/wb/wb01/selectNewWbsPlanExcelList", paramObj, null, function(data){
+	            var list = data.fileList;
 	            excelView.target.setData({
 	               list : list,
 	               page : {
@@ -744,44 +782,9 @@
 	               }
 	            });
 	            var todayDate = new Date().format('yyyyMMddHHmmss');
-	            excelView.target.exportExcel("일정계획등록_"+todayDate+".xls");
+	            excelView.target.exportExcel("WBS_계획실적 리스트"+todayDate+".xls");
 	         });   
-	    }
-	    
-	    function deleteWbs() {
-	        var row = gridView.target.getList("selected")[0];
-	        if (row != undefined) {
-	            //계획 미마감, 미잠금 상태, 실적 데이터 없을 경우에서 삭제 가능, 삭제 시 해당 SALES코드와 같은 계획, TODO-LIST 계획 공유 삭제 
-	            if (row.closeYn == "Y" || row.lockYn == "Y") {
-	              alert("선택된 WBS 계획은 잠금 또는 마감된 상태입니다. 삭제할  수 없습니다.");  
-	              return;
-	            } 
-	        }
-
-	        var formData = {	       
-	            "coCd" : row.coCd,
-	            "salesCd" : row.salesCd,
-	            "wbsPlanNo" : row.wbsPlanNo,
-	            "codeKind" : row.wbsPlanCodeKind,
-	            "codeId" : row.wbsPlanCodeId,
-	            "S_todoDiv1CodeId" : "TODODIV10",
-	            "S_todoDiv2CodeId" : "TODODIV1010"
-	        };           
-	        postAjax("/user/wb/wb01/selectWbsPlanDeleteConfirmCount", formData, null, function(data){
-	            if(data.result == 0) {
-	                if(confirm("삭제하시겠습니까?")){
-	                    deleteAjax("/user/wb/wb01/deleteWbsPlanlist", formData, null, function(data){
-	                        if(data.resultCode == 200){
-	                            alert(data.resultMessage);
-	                            gridView.setData(0);
-	                        }
-	                    });
-	                }
-	            } else {
-	                alert("하위 레벨 데이터가 존재합니다."); 
-	            }
-	        });          
-	  }	  
+	    }	    
 	    
 	  /*계획 수정 or 등록 버튼 클릭 시*/
 	  function insertWbsPlanModal(type, lvl, idx) {	
@@ -878,44 +881,44 @@
 	            var idx3 = null;
 	            var salesCd = row.salesCd;
 	            
-	            if (lvl == 1) {
-	            	idx1 = idx;
-	            }
-	            else if (lvl == 2) {
-	            	idx2 = idx;
-	            	
-	            	//1레벨 조회
-	            	var list1 = gridView.target.getList();
-                    $.each(list1, function(idx, obj){
-                    	var row1 = gridView.target.select(obj.__index);
-                    	if (row1.coCd == row.coCd && row1.salesCd == row.salesCd && row1.codeId == row.codeKind) {
-                    		idx1 = obj.__index;                    		
-                    	}
-                    });
-	            }
-                else if (lvl == 3) {
-                	idx3 = idx;
-                	//2레벨 조회
-                    var list1 = gridView.target.getList();
-                    $.each(list1, function(idx, obj){
-                        var row1 = gridView.target.select(obj.__index);
-                        if (row1.coCd == row.coCd && row1.salesCd == row.salesCd && row1.codeId == row.codeKind) {
-                            idx2 = obj.__index;                         
-                        }
-                    });
+	              if (lvl == 1) {
+	                  idx1 = idx;
+	              }
+	              else if (lvl == 2) {
+	                  idx2 = idx;
+	                  
+	                  //1레벨 조회
+	                  var list1 = gridView.target.getList();
+	                  $.each(list1, function(idx, obj){
+	                      var row1 = gridView.target.getList()[obj.__index];
+	                      if (row1.coCd == row.coCd && row1.salesCd == row.salesCd && row1.codeId == row.codeKind) {
+	                          idx1 = obj.__index;                         
+	                      }
+	                  });
+	              }
+	              else if (lvl == 3) {
+	                  idx3 = idx;
+	                  //2레벨 조회
+	                  var list1 = gridView.target.getList();
+	                  $.each(list1, function(idx, obj){
+	                      var row1 = gridView.target.getList()[obj.__index];
+	                      if (row1.coCd == row.coCd && row1.salesCd == row.salesCd && row1.codeId == row.codeKind) {
+	                          idx2 = obj.__index;                         
+	                      }
+	                  });
 
-                    //1레벨 조회
-                    var row2 = gridView.target.getList()[idx2];                    
-                    var list2 = gridView.target.getList();
-                    $.each(list2, function(idx, obj){
-                        var row3 = gridView.target.select(obj.__index);
-                        if (row3.coCd == row2.coCd && row3.salesCd == row2.salesCd && row3.codeId == row2.codeKind) {
-                            idx1 = obj.__index;                         
-                        }
-                    });
-                }
+	                  //1레벨 조회
+	                  var row2 = gridView.target.getList()[idx2];                    
+	                  var list2 = gridView.target.getList();
+	                  $.each(list2, function(idx, obj){
+	                      var row3 = gridView.target.getList()[obj.__index];
+	                      if (row3.coCd == row2.coCd && row3.salesCd == row2.salesCd && row3.codeId == row2.codeKind) {
+	                          idx1 = obj.__index;                         
+	                      }
+	                  });
+	              }
 
-	            //alert("lvl:" + lvl + "idx1:" +  idx1 +  "idx2:" +  idx2  + "idx3:"  + idx3 + "  salesCd:"  + salesCd);
+	           // alert("lvl:" + lvl + "idx1:" +  idx1 +  "idx2:" +  idx2  + "idx3:"  + idx3 + "  salesCd:"  + salesCd);
 	            if (type == 'U') {
 	                var paramObj = {
 	                		"actionType" : actionType,
@@ -944,5 +947,285 @@
 	            });
 		    }
 	 }
+
+	  
+	 // 계획 삭제
+     function deleteWbsPlan() {
+         var list = gridView.target.getList("selected");
+         if(confirm("계획을 삭제하시겠습니까?")){
+        	 $.each(list, function(idx, obj){
+        		 var row = gridView.target.getList()[obj.__index];
+        		 //debugger;
+        		 if (row != undefined && row.fileTrgtKey != undefined) {
+        			 var formData = {           
+                             "coCd" : row.coCd,
+                             "salesCd" : row.salesCd,
+                             "wbsPlanNo" : row.wbsPlanNo,
+                             "codeKind" : row.codeKind,
+                             "codeId" : row.codeId,
+                             "S_todoDiv1CodeId" : "TODODIV10",
+                             "S_todoDiv2CodeId" : "TODODIV1010"
+                     }; 
+                     deleteAjax("/user/wb/wb01/deleteWbsPlanlist", formData, null, function(data){
+                         if(data.resultCode == 200){
+                        	 gridView.setData(0, salesCd);
+                         }
+                     });
+        		 }
+             });
+        	 alert("계획 삭제 완료되었습니다.");             
+         }
+   }
+     
+   // 실적 삭제	 
+   function deleteWbsRslts() {	   
+       var S_todoDiv1CodeId = "TODODIV10";
+       var S_todoDiv2CodeId = "TODODIV1020";
+       var A_todoDiv1CodeId = "TODODIV20";
+       var A_todoDiv2CodeId = "TODODIV2010"; 
+       
+       var list = gridView.target.getList("selected");
+       if(confirm("실적을 삭제하시겠습니까?")){
+           $.each(list, function(idx, obj){
+               var row = gridView.target.getList()[obj.__index];
+               if (row != undefined && row.rsltsFileTrgtKey != undefined) {
+            	   var formData = {
+                           "coCd" : row.coCd,
+                           "salesCd" : row.salesCd,
+                           "wbsPlanNo" : row.rsltsWbsPlanNo,
+                           "codeKind" : row.codeKind,
+                           "codeId" : row.codeId,
+                           "S_todoDiv1CodeId" : S_todoDiv1CodeId,
+                           "S_todoDiv2CodeId" : S_todoDiv2CodeId,
+                           "A_todoDiv1CodeId" : A_todoDiv1CodeId,
+                           "A_todoDiv2CodeId" : A_todoDiv2CodeId   
+                   };
+                   deleteAjax("/user/wb/wb02/deleteWbsPlanlist", formData, null, function(data){
+                       if(data.resultCode == 200){
+                    	   gridView.setData(0, salesCd);
+                       }
+                   });   
+               }               
+           });
+           alert("실적 삭제 완료되었습니다.");           
+       }	   
+   }
+   
+   
+   function lockYn() { //잠금처리
+	   var list = gridView.target.getList("selected");
+       if(confirm("잠금처리 하시겠습니까?")){
+           $.each(list, function(idx, obj){
+               var row = gridView.target.getList()[obj.__index];
+               if (row != undefined && row.fileTrgtKey != undefined) {
+            	  //debugger;
+            	   var formData = new FormData();
+                   formData.append("coCd", row.coCd); 
+                   formData.append("codeId", row.codeId);
+                   formData.append("salesCd", row.salesCd);
+                   formData.append("state", "Y");
+                   filePutAjax("/user/wb/wb01/updateWbsPlanLockYn", formData, function(data){
+                	 //alert(data.resultCode);
+                     if(data.resultCode == 200){
+                    	 
+                     }
+                  });    
+               }               
+           });
+           alert("잠금처리 완료되었습니다.");       
+           gridView.setData(0, salesCd);   
+       }    
+   }   
+   
+   function unLockYn() { //잠금해제
+       var list = gridView.target.getList("selected");
+       var rowListArr = [];
+       if(list.length > 0) {
+	       if(confirm("잠금해제 하시겠습니까?")){
+	    	   var formData = new FormData();
+	           $.each(list, function(idx, elem){
+	               var row = gridView.target.getList()[elem.__index];
+	               if (row != undefined && row.fileTrgtKey != undefined) {
+	            	   const MyObject = {coCd: row.coCd, codeId: row.codeId, salesCd:row.salesCd, state:"N"};
+	            	   rowListArr.push(MyObject);
+	               }               
+	           });
+	           formData.append("rowListArr", JSON.stringify(rowListArr));
+	           filePutAjax("/user/wb/wb01/updateWbsPlanLockYn", formData, function(data){
+	               if(data.resultCode == 200){
+	            	   alert("잠금해제 완료되었습니다.");       
+	                   gridView.setData(0, salesCd);
+	               }
+	            }); 
+	       } 
+       }
+   }   
+   
+	   
+	   
+       /* row = gridView.target.getList("selected");
+       if (row != undefined) {     
+               var lvl = "";
+               var codeId = "";
+               if (row.wbsPlanCodeId.length == 8){ // 1레벨
+                   lvl = "1";
+                   codeId = row.wbsPlanCodeId;
+                   
+                   var formData = new FormData();
+                   formData.append("coCd", row.coCd); 
+                   formData.append("lvl", lvl);
+                   formData.append("codeId", codeId);
+                   formData.append("salesCd", row.salesCd);
+                   formData.append("state", "Y");
+                   
+                   filePutAjax("/user/wb/wb02/updateWbsPlanLockYnLvl1", formData, function(data){                 
+                      if(data.resultCode == 200){
+                          alert(data.resultMessage);
+                          gridView.setData(0);
+                          gridView2.setData(0); 
+                      }
+                   });    
+               }
+               else if (row.wbsPlanCodeId.length == 10){ // 2레벨
+                   lvl = "2";
+                   codeId = row.wbsPlanCodeId.substring(0,8);
+                   
+                   var formData = new FormData();
+                   formData.append("coCd", row.coCd); 
+                   formData.append("lvl", lvl);
+                   formData.append("codeId", codeId);
+                   formData.append("salesCd", row.salesCd);
+                   formData.append("state", "Y");
+                  
+                   filePutAjax("/user/wb/wb02/updateWbsPlanLockYnLvl2", formData, function(data){
+                     if(data.resultCode == 200){
+                         alert(data.resultMessage);
+                         gridView.setData(0);
+                         gridView2.setData(0); 
+                     }
+                  });    
+               }
+               else if (row.wbsPlanCodeId.length == 12){ // 3레벨
+                   lvl = "3";
+                   codeId = row.wbsPlanCodeId.substring(0,10);
+                   
+                   var formData = new FormData();
+                   formData.append("coCd", row.coCd); 
+                   formData.append("lvl", lvl);
+                   formData.append("codeId", codeId);
+                   formData.append("salesCd", row.salesCd);
+                   formData.append("state", "Y");
+                  
+                   filePutAjax("/user/wb/wb02/updateWbsPlanLockYnLvl3", formData, function(data){
+                     if(data.resultCode == 200){
+                         alert(data.resultMessage);
+                         gridView.setData(0);
+                         gridView2.setData(0);  
+                     }
+                  });    
+               }                   
+       } */
+
+
+/*    function unlockYn() { //잠금해제처리
+       row = gridView.target.getList("selected")[0];
+       if (row != undefined) {     
+               var lvl = "";
+               var codeId = "";
+               if (row.wbsPlanCodeId.length == 8){ // 1레벨
+                   lvl = "1";
+                   codeId = row.wbsPlanCodeId;
+                   
+                   var formData = new FormData();
+                   formData.append("coCd", row.coCd); 
+                   formData.append("lvl", lvl);
+                   formData.append("codeId", codeId);
+                   formData.append("salesCd", row.salesCd);
+                   formData.append("state", "N");
+                   
+                   filePutAjax("/user/wb/wb02/updateWbsPlanLockYnLvl1", formData, function(data){
+                      if(data.resultCode == 200){
+                          alert(data.resultMessage);
+                          gridView.setData(0);
+                      }
+                   });    
+               }
+               else if (row.wbsPlanCodeId.length == 10){ // 2레벨
+                   lvl = "2";
+                   codeId = row.wbsPlanCodeId.substring(0,8);
+                   
+                   var formData = new FormData();
+                   formData.append("coCd", row.coCd); 
+                   formData.append("lvl", lvl);
+                   formData.append("codeId", codeId);
+                   formData.append("salesCd", row.salesCd);
+                   formData.append("state", "N");
+                   
+                  filePutAjax("/user/wb/wb02/updateWbsPlanLockYnLvl2", formData, function(data){
+                     if(data.resultCode == 200){
+                         alert(data.resultMessage);
+                         gridView.setData(0);
+                     }
+                  });    
+               }
+               else if (row.wbsPlanCodeId.length == 12){ // 3레벨
+                   lvl = "3";
+                   codeId = row.wbsPlanCodeId.substring(0,10);
+                  
+                   var formData = new FormData();
+                   formData.append("coCd", row.coCd); 
+                   formData.append("lvl", lvl);
+                   formData.append("codeId", codeId);
+                   formData.append("salesCd", row.salesCd);
+                   formData.append("state", "N");
+                   
+                  filePutAjax("/user/wb/wb02/updateWbsPlanLockYnLvl3", formData, function(data){
+                     if(data.resultCode == 200){
+                         alert(data.resultMessage);
+                         gridView.setData(0);
+                     }
+                  });    
+               }                           
+       }
+   } */
+
+
+
+   function closeYn() { //마감처리
+
+       /* row = gridView2.target.getList("selected")[0];
+       if (row != undefined) {     
+           var formData = new FormData();
+           formData.append("coCd", row.coCd); 
+           formData.append("salesCd", row.salesCd);
+           formData.append("state", "Y");
+          
+           filePutAjax("/user/wb/wb02/updateWbsPlanCloseYn", formData, function(data){
+               if(data.resultCode == 200){
+                   //debugger;
+                   alert(data.resultMessage);
+                   gridView.setData(0);
+               }
+           });
+       } */
+   }
+
+   function unCloseYn() { //마감해제처리
+
+       /* row = gridView2.target.getList("selected")[0];
+       if (row != undefined) {     
+           var formData = new FormData();
+           formData.append("coCd", row.coCd); 
+           formData.append("salesCd", row.salesCd);
+           formData.append("state", "N");
+           filePutAjax("/user/wb/wb02/updateWbsPlanCloseYn", formData, function(data){
+               if(data.resultCode == 200){
+                  // debugger;
+                   alert(data.resultMessage);
+                   gridView.setData(0);
+               }
+           });
+       } */
+   }
 
 </script>

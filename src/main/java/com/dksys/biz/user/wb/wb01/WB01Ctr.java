@@ -566,6 +566,28 @@ public class WB01Ctr {
 		  return "jsonView"; 
 	  }
 	  
+	  @PostMapping(value = "/selectNewWbsPlanExcelList") 
+	  public String selectNewWbsPlanExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
+		  List<Map<String, String>> fileList = wb01Svc.selectNewWbsPlanExcelList(paramMap);
+		  model.addAttribute("fileList", fileList); 
+		  return "jsonView"; 
+	  }
 	  
+	  @PutMapping(value = "/updateWbsPlanLockYn")
+	  public String updateWbsPlanLockYn(@RequestParam Map<String, String> paramMap, ModelMap model) throws Exception {
+		  	try {
+				if (wb01Svc.updateWbsPlanLockYn(paramMap) != 0 ) {
+					model.addAttribute("resultCode", 200);
+					model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+				} else {
+					model.addAttribute("resultCode", 500);
+					model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+				};
+			}catch(Exception e){
+				model.addAttribute("resultCode", 900);
+				model.addAttribute("resultMessage", e.getMessage());
+			}
+		  	return "jsonView";
+	  }
 	  
 }

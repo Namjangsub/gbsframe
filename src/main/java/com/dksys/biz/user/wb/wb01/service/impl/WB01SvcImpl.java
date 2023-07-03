@@ -781,4 +781,32 @@ public class WB01SvcImpl implements WB01Svc {
 		return wb01Mapper.selectWbsPlanFileTrgtKeyInfo(paramMap);
 	}
 	
+	@Override
+	public List<Map<String, String>> selectNewWbsPlanExcelList(Map<String, String> paramMap) {
+		return wb01Mapper.selectNewWbsPlanExcelList(paramMap);
+	}
+	
+	
+	public int updateWbsPlanLockYn(Map<String, String> paramMap) {
+		
+		
+		int result = 0;
+		Gson gson = new Gson();
+	    Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> arr = gson.fromJson(paramMap.get("rowListArr"), stringList);
+		if (arr != null && arr.size() > 0 ) {
+			int i = 0;
+			for (Map<String, String> arrMap : arr) {
+	            try {                                    
+	            	 wb01Mapper.updateWbsPlanLockYn(arrMap);
+	            	 i++;
+	            } catch (Exception e) {
+	                 System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
+		return result;
+	}
+	
+	
 }
