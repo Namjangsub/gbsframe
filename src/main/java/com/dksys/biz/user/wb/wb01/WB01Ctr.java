@@ -471,6 +471,21 @@ public class WB01Ctr {
 		  return "jsonView"; 
 	  }
 	  
+	  @PostMapping(value = "/selectWbsLevelPlanInfo") 
+	  public String selectWbsLevelPlanInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
+		  Map<String, String> result = wb01Svc.selectWbsLevelPlanInfo(paramMap);
+		  model.addAttribute("result", result); 
+		  return "jsonView"; 
+	  }
+	  
+	  @PostMapping(value = "/selectWbsRsltsInfo") 
+	  public String selectWbsRsltsInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
+		  Map<String, String> result = wb01Svc.selectWbsRsltsInfo(paramMap);
+		  model.addAttribute("result", result); 
+		  return "jsonView"; 
+	  }
+	  
+	  
 	  @PostMapping(value = "/insertWbsPlan")
 	  public String insertWbsPlan(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 			try {
@@ -493,7 +508,7 @@ public class WB01Ctr {
 	  }
 	  
 	  @PostMapping(value = "/updateWbsPlan")
-	  public String updatePchsCost(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	  public String updateWbsPlan(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		  	try {
 		  		List<Map<String, String>> sharngChk = wb01Svc.deleteWbsSharngListChk(paramMap);
 				if (sharngChk.size() > 0) {

@@ -29,4 +29,6 @@ public interface CR02Svc {
     int selectOrdrsPlanHisCount(Map<String, String> param);
 
     List<Map<String, Object>> selectOrdrsPlanHis(Map<String, String> param);
+    
+    List<Map<String, Object>> selectWbsLeftSalesCodeTreeList(Map<String, String> param);
 }
