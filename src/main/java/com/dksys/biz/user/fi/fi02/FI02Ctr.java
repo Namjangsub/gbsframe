@@ -159,24 +159,29 @@ public class FI02Ctr {
     	objCols3.put("type", "number");
     	objCols3.put("label", "투루넷");
     	objCols4.put("type", "number");
-    	objCols4.put("label", "테스트");
+    	objCols4.put("label", "합계");
 
     	arryCols.add(objCols1);
     	arryCols.add(objCols2);
     	arryCols.add(objCols3);
     	arryCols.add(objCols4);
+    	Object gunValue = "";
+    	Object trnValue = "";
+    	
     	for(int i = 0; i < selectPalBillSalesPrftChart.size(); i++) {
     		JSONObject legend = new JSONObject();
     		legend.put("v", selectPalBillSalesPrftChart.get(i).get("prftYm"));
     		legend.put("f", null);
     		JSONObject value1 = new JSONObject();
-    		value1.put("v", selectPalBillSalesPrftChart.get(i).get("gun"));
+    		gunValue = selectPalBillSalesPrftChart.get(i).get("gun");
+    		value1.put("v", gunValue);
     		value1.put("f", null);
     		JSONObject value2 = new JSONObject();
-    		value2.put("v", selectPalBillSalesPrftChart.get(i).get("trn"));
+    		trnValue = selectPalBillSalesPrftChart.get(i).get("trn");
+    		value2.put("v", trnValue);
     		value2.put("f", null);
     		JSONObject value3 = new JSONObject();
-    		value3.put("v", selectPalBillSalesPrftChart.get(i).get("tst"));
+    		value3.put("v", Double.parseDouble(gunValue.toString()) +  Double.parseDouble(trnValue.toString()));
     		value3.put("f", null);
     		
     		JSONArray cValueArry = new JSONArray();
@@ -215,7 +220,7 @@ public class FI02Ctr {
     	objCols3.put("type", "number");
     	objCols3.put("label", "투루넷");
     	objCols4.put("type", "number");
-    	objCols4.put("label", "테스트");
+    	objCols4.put("label", "합계");
 
     	arryCols.add(objCols1);
     	arryCols.add(objCols2);
@@ -226,13 +231,15 @@ public class FI02Ctr {
     		legend.put("v", selectPalBillBfrxPrftChart.get(i).get("prftYm"));
     		legend.put("f", null);
     		JSONObject value1 = new JSONObject();
-    		value1.put("v", selectPalBillBfrxPrftChart.get(i).get("gun"));
+    		gunValue = selectPalBillBfrxPrftChart.get(i).get("gun");
+    		value1.put("v", gunValue);
     		value1.put("f", null);
     		JSONObject value2 = new JSONObject();
-    		value2.put("v", selectPalBillBfrxPrftChart.get(i).get("trn"));
+    		trnValue = selectPalBillBfrxPrftChart.get(i).get("trn");
+    		value2.put("v", trnValue);
     		value2.put("f", null);
     		JSONObject value3 = new JSONObject();
-    		value3.put("v", selectPalBillBfrxPrftChart.get(i).get("tst"));
+    		value3.put("v",  Double.parseDouble(gunValue.toString()) +  Double.parseDouble(trnValue.toString()));
     		value3.put("f", null);
     		
     		JSONArray cValueArry = new JSONArray();

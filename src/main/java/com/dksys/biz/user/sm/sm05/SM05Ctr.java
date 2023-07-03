@@ -79,9 +79,9 @@ public class SM05Ctr {
 	// 폐기창고재고정보 - 모달창
 	@PostMapping(value = "/selectIoModalList")
 	public String selectIoModalList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = sm05Svc.selectIoModalCount(paramMap);
-		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		model.addAttribute("paginationInfo", paginationInfo);
+//		int totalCnt = sm05Svc.selectIoModalCount(paramMap);
+//		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+//		model.addAttribute("paginationInfo", paginationInfo);
 		
 		List<Map<String, String>> resultList = sm05Svc.selectIoModalList(paramMap);
 		model.addAttribute("resultList", resultList);
