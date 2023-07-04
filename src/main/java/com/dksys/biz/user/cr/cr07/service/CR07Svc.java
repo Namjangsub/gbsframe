@@ -20,7 +20,6 @@ public interface CR07Svc {
 	
 	// 매출확정 입력
 	int insertSellDscn(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
-
 	// 매출확정 상세입력
 	int insertSellDscnDetail(Map<String, String> paramMap);
 
@@ -34,5 +33,7 @@ public interface CR07Svc {
 	
 	// 매출확정 삭제
 	int delete_cr07(Map<String, String> paramMap) throws Exception;
+	// 매출확정 상세삭제
+	int delete_cr07_detail(Map<String, String> paramMap);
 
 }
