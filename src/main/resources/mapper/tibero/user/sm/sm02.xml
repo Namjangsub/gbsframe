@@ -217,9 +217,9 @@
 			, ORDRG_NO
 			, ORDRG_SEQ
 			, SALES_CD
-			, PART_NO
-			, UNIT_NO
-			, REV_NO
+			, MATR_SEQ
+			, UPPER_CD
+			, LOWER_CD
 			, DSGN_NO
 			, MATR_CD
 			, FN_CM05M01_CD_TO_NM(D.MATR_TEST_DIV) MATR_TEST_DIV    
@@ -253,20 +253,13 @@
 	        ) AS PRE_BOM_QTY			/* 구매 BOM 기발주 수량 임시 */      
 	        ,
 	        (
-	        	SELECT C.BOM_QTY			/* 구매 BOM 수량 */
-	        		FROM
-	        		( 
-	        		SELECT X1.*, LEVEL AS LVL FROM TB_SM01M01 X1
-	        			START WITH X1.UPPER_CD = '.' AND X1.SALES_CD = D.SALES_CD
-	        		CONNECT BY PRIOR X1.LOWER_CD = X1.UPPER_CD
-        			) T
-        			LEFT OUTER JOIN TB_SM01D01 C ON(
-        										T.CO_CD = C.CO_CD AND T.SALES_CD = C.SALES_CD AND T.UPPER_CD = C.UPPER_CD AND T.LOWER_CD = C.LOWER_CD
-        										   )	        		
+	        	SELECT CC.BOM_QTY			/* 구매 BOM 수량 */
+	        		FROM TB_SM01D01 CC 						        		
 				WHERE 1=1
-	        		AND D.CO_CD=C.CO_CD AND D.SALES_CD = C.SALES_CD AND D.MATR_CD = C.MATR_CD
-        			AND D.PART_NO=T.PART_NO  AND D.UNIT_NO=T.UNIT_NO AND D.REV_NO=T.REV_NO 	        		
+	        		AND D.SALES_CD = CC.SALES_CD AND D.MATR_SEQ = CC.MATR_SEQ
+        			AND D.UPPER_CD=CC.UPPER_CD  AND D.LOWER_CD=CC.LOWER_CD       		
 	        ) BOM_QTY /* 구매 BOM 수량 */
+	        , 'Y' AS USER_CHK_V		/* 수정시 CHK값 SET */
 		FROM TB_SM02D01 D
 		WHERE 1=1
 		<if test="coCd != null and !coCd.equals('')">
@@ -359,8 +352,7 @@
         	SELECT NVL(SUM(ORDRG_QTY), 0) 
         		FROM TB_SM02D01 CC
         	WHERE D.CO_CD = CC.CO_CD AND D.SALES_CD = CC.SALES_CD AND D.MATR_CD = CC.MATR_CD
-        			AND T.PART_NO = CC.PART_NO AND T.UNIT_NO = CC.UNIT_NO AND T.REV_NO = CC.REV_NO
-        	/* 회사, SALES_CD, PART_NO, UNIT_NO, REV_NO  */
+        		AND D.UPPER_CD=CC.UPPER_CD  AND D.LOWER_CD=CC.LOWER_CD
         ) AS PRE_BOM_QTY			/* 구매 BOM 기발주 수량 임시 */        
         FROM
   		( SELECT X1.*, LEVEL AS LVL FROM TB_SM01M01 X1
@@ -457,10 +449,10 @@
 			, ORDRG_NO
 			, ORDRG_SEQ
 			, SALES_CD
-			, PART_NO
-			, UNIT_NO
-			, REV_NO
-			, DSGN_NO
+			, MATR_SEQ
+			, UPPER_CD
+			, LOWER_CD
+			, DSGN_NO 
 			, MATR_CD
 			, MATR_TEST_DIV
 			, ORDRG_PRC
@@ -476,7 +468,7 @@
 			, CREAT_PGM
 			, CREAT_DTTM
 			, IN_CMPLET_YN
-			, WH_CD
+			, WH_CD			
 	      )
 	    VALUES
 	    (
@@ -484,12 +476,12 @@
 			, #{maxOrdrgNo}
 			, #{ordrgSeq}
 			, #{salesCd}
-			, #{partNo}
-			, #{unitNo}
-			, #{revNo}
-			, #{dsgnNo,  jdbcType=VARCHAR}	  
+			, #{matrSeq}
+			, #{upperCd}
+			, #{lowerCd}
+			, #{dsgnNo}
 			, #{matrCd}
-			, #{matrTestDiv}
+			, #{matrTestDiv}			
 			, #{ordrgPrc,  jdbcType=VARCHAR}	  
 			, #{ordrgQty,  jdbcType=VARCHAR}	  
 			, #{ordrgAmt,  jdbcType=VARCHAR}	   
@@ -507,6 +499,59 @@
 	    )
 	</insert>	
 	
+	<!-- 발주관리 마스터 수정 -->
+	<update id="updateOrderMaster" parameterType="Map">
+		UPDATE TB_SM02D01
+			SET 
+		SALES_CD = #{salesCd}
+		, MATR_SEQ = #{matrSeq}
+		, UPPER_CD = #{upperCd}
+		, LOWER_CD = #{lowerCd}
+		, DSGN_NO = #{dsgnNo}
+		, MATR_CD = #{matrCd}
+		, MATR_TEST_DIV = #{matrTestDiv}
+		, ORDRG_PRC = #{ordrgPrc}
+		, ORDRG_QTY = #{ordrgQty}
+		, ORDRG_AMT = #{ordrgAmt}
+		, DUDT_DEQ_DT = #{dudtDeqDt}
+		, DUDT_INTEND_DT = #{dudtIntendDt}
+		, ORDRG_DTL_RMK = #{ordrgDtlRmk,			jdbcType=VARCHAR}	
+		, UDT_ID = #{userId}
+		, UDT_PGM = #{pgmId}
+		, UDT_DTTM = SYSDATE	
+		, WH_CD = #{matrWhCd}		
+		WHERE CO_CD = #{coCd} 
+		 AND ORDRG_NO = #{ordrgNo} 
+		 AND ORDRG_SEQ = #{ordrgSeq} 
+	</update>
+		
+	<!-- 발주관리 상세 수정 -->
+	<update id="updateOrderDetail" parameterType="Map">
+		UPDATE TB_SM02D01
+			SET 
+		SALES_CD = #{salesCd}
+		, MATR_SEQ = #{matrSeq}
+		, UPPER_CD = #{upperCd}
+		, LOWER_CD = #{lowerCd}
+		, DSGN_NO = #{dsgnNo}
+		, MATR_CD = #{matrCd}
+		, MATR_TEST_DIV = #{matrTestDiv}
+		, ORDRG_PRC = #{ordrgPrc}
+		, ORDRG_QTY = #{ordrgQty}
+		, ORDRG_AMT = #{ordrgAmt}
+		, DUDT_DEQ_DT = #{dudtDeqDt}
+		, DUDT_INTEND_DT = #{dudtIntendDt}
+		, ORDRG_DTL_RMK = #{ordrgDtlRmk,			jdbcType=VARCHAR}	
+		, UDT_ID = #{userId}
+		, UDT_PGM = #{pgmId}
+		, UDT_DTTM = SYSDATE	
+		, WH_CD = #{matrWhCd}		
+		WHERE CO_CD = #{coCd} 
+		 AND ORDRG_NO = #{ordrgNo} 
+		 AND ORDRG_SEQ = #{ordrgSeq} 
+	</update>
+	
+		
 	
 	<!-- 발주 디테일  삭제 -->         
 	<delete id="deleteOrderDetail" parameterType="Map">

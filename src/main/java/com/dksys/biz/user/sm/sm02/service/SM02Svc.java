@@ -25,9 +25,11 @@ public interface SM02Svc {
 	//발주마스터 등록, 수정, 삭제
 	int insertOrderMaster(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;	
 		
-	int updateOrderMaster(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	int updateOrder(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+		
+	int updateOrderDetail(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
-	int deleteOrderMaster(Map<String, String> paramMap) throws Exception;
+	int deleteOrderMaster(Map<String, String> param);			
 	
 	int deleteOrderDetail(Map<String, String> param);	
 }
