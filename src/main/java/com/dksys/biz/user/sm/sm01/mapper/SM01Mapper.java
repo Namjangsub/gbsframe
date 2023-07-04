@@ -38,4 +38,10 @@ public interface SM01Mapper {
   
   int insertBomMatr(Map<String, String> paramMap);
   
+
+
+  List<Map<String, String>> bomTreeList(Map<String, String> paramMap);
+
+
+
 }
