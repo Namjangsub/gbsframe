@@ -29,7 +29,9 @@ public interface SM05Svc {
 	//폐기창고 insert
 	int insert_sm05_IoInfo(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
-
+	//수정
+	int update_sm05(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	
 	//Map<String, String> selectIoInfo(Map<String, String> paramMap);
 
 //	int selectPchsDetailCount(Map<String, String> paramMap);

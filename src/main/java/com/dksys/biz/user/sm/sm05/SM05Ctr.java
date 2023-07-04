@@ -79,9 +79,9 @@ public class SM05Ctr {
 	// 폐기창고재고정보 - 모달창
 	@PostMapping(value = "/selectIoModalList")
 	public String selectIoModalList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-//		int totalCnt = sm05Svc.selectIoModalCount(paramMap);
-//		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-//		model.addAttribute("paginationInfo", paginationInfo);
+		int totalCnt = sm05Svc.selectIoModalCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
 		
 		List<Map<String, String>> resultList = sm05Svc.selectIoModalList(paramMap);
 		model.addAttribute("resultList", resultList);
@@ -123,6 +123,26 @@ public class SM05Ctr {
 		}
 		return "jsonView";
 	}
+
+    //수정
+	@PostMapping(value = "/update_sm05")
+	public String update_sm05(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest,
+			ModelMap model) throws Exception {
+		try {
+			if (sm05Svc.update_sm05(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 	
 	// 프로젝트 정보 조회 - popup 부분
 //	  @PostMapping(value = "/selectIoInfo")
@@ -138,24 +158,7 @@ public class SM05Ctr {
 //		return "jsonView";
 //	}
 
-//	@PostMapping(value = "/updatePchsCost")
-//	public String updatePchsCost(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest,
-//			ModelMap model) throws Exception {
-//		try {
-//			if (sm05Svc.updatePchsCost(paramMap, mRequest) != 0) {
-//				model.addAttribute("resultCode", 200);
-//				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-//			} else {
-//				model.addAttribute("resultCode", 500);
-//				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-//			}
-//			;
-//		} catch (Exception e) {
-//			model.addAttribute("resultCode", 900);
-//			model.addAttribute("resultMessage", e.getMessage());
-//		}
-//		return "jsonView";
-//	}
+
 
 //	@PutMapping(value = "/deleteIoCost")
 //	public String deleteIoCost(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {

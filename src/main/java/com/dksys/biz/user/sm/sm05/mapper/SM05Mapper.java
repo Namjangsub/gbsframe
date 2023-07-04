@@ -33,6 +33,9 @@ public interface SM05Mapper {
 	
 	//페기창고 재고정보 insert
 	int insert_sm05_IoInfo(Map<String, String> paramMap);
+	
+	//수정
+	int update_sm05(Map<String, String> paramMap);
     
 	//Map<String, String> selectIoInfo(Map<String, String> paramMap);
 

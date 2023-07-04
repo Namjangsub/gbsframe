@@ -20,12 +20,12 @@ public interface CR07Mapper {
 	int insertSellDscn(Map<String, String> paramMap);
 	// 매출확정 상세 입력
 	int insertSellDscnDetail(Map<String, String> paramMap);
+	
 	// 수정 시 정보 조회 
 	Map<String, String> select_cr07_Info(Map<String, String> paramMap);
 	
 	// fileTrgtKey 생성
 	int select_cr07_SeqNext(Map<String, String> paramMap);
-	
 	// 매출확정 수정
 	int updateSellDscn(Map<String, String> paramMap);
 	// 계산서 번호 생성
@@ -34,5 +34,7 @@ public interface CR07Mapper {
 	List<Map<String, String>> select_cr07_sellDcsnNo(Map<String, String> paramMap);
 	// 매출확정 삭제
 	int delete_cr07(Map<String, String> paramMap);
+	// 매출확정 상세삭제
+	int delete_cr07_detail(Map<String, String> paramMap);
 	
 }
