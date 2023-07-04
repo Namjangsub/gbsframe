@@ -80,14 +80,14 @@ public class SM02Ctr {
   		}
   		return "jsonView";
     }	  
-
-	//기준관리 결재선 수정    
-    @PostMapping(value = "/updatederMaster")
-    public String updateApproval(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  	  	try {
-  			if (sm02Svc.updateOrderMaster(paramMap, mRequest) != 0 ) {
+    
+	//발주 수정
+    @PostMapping(value = "/updateOrder")
+    public String updateOrder(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (sm02Svc.updateOrderDetail(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
   			} else {
   				model.addAttribute("resultCode", 500);
   				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -96,8 +96,27 @@ public class SM02Ctr {
   			model.addAttribute("resultCode", 900);
   			model.addAttribute("resultMessage", e.getMessage());
   		}
-  	  	return "jsonView";
-    } 
+  		return "jsonView";
+    }         
+
+	//발주 수정
+    @PostMapping(value = "/updateOrderDetail")
+    public String updateOrderDetail(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (sm02Svc.updateOrderDetail(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }    
+
     
 	//발주 detail 삭제    
 	@DeleteMapping(value = "/deleteOrderDetail")
