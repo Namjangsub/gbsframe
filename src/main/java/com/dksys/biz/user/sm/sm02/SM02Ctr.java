@@ -105,7 +105,7 @@ public class SM02Ctr {
   		try {
   			if (sm02Svc.updateOrderDetail(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
   			} else {
   				model.addAttribute("resultCode", 500);
   				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
