@@ -327,4 +327,14 @@ public class SM01SvcImpl implements SM01Svc {
 	    return result;
   }
 
+  
+  
+  
+  
+  @Override
+  public List<Map<String, String>> bomTreeList(Map<String, String> paramMap) {
+    return sm01Mapper.bomTreeList(paramMap);
+  }
+
+  
 }

@@ -33,4 +33,10 @@ public interface SM01Svc {
   
   int insertCopyBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
+  
+  
+  
+  List<Map<String, String>> bomTreeList(Map<String, String> paramMap);
+
+  
 }

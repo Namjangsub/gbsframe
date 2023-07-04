@@ -191,5 +191,17 @@ public class SM01Ctr {
 		}
 		return "jsonView";
 	}
+
+	
+	
+	
+	@PostMapping("/bomTreeList")
+	public String bomTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = sm01Svc.bomTreeList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+
   
+	
 }
