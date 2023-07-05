@@ -1,13 +1,3 @@
-<style>
-* input[comma] {
-  text-align: right;
- }
-.grid-cell-gray {
-	background: #d3d3d3;
-}
-	
-</style>
-
 <div class="popup_area of_a" style="width: 100%; height: 100%;">
     <div class="tit_contents">
       <h4 class="tit">구매BOM 등록</h4>
@@ -89,8 +79,11 @@
 	                <div class="table_list_tit">
 	                	<h5 style="color: #444;font-size: 16px;float:left; margin-left: 8px; margin-top: 8px; margin-bottom: 8px;">BOM 자재정보</h5>
 		                <div class="add_btn pdl10" style="margin-right:8px; margin-top: 8px;">
-		                    <a onclick="openMatListSearch()" style="width: 50px;" authchk><i class="fas fa-folder-plus"></i> 등록</a>
-		                    <a onclick="modRowMatr()" style="width: 50px;" authchk><i class="fas fa-money-check"></i> 수정 </a>
+		                	<!-- 
+		                    <a onclick="insertProdSecondModal('C')" style="width: 120px;" authchk><i class="fas fa-folder-plus"></i> 자재마스터 등록</a>
+		                     -->
+		                    <a onclick="openMatListSearch()" style="width: 80px;" authchk><i class="fas fa-folder-plus"></i> 자재검색</a>
+		                    <a onclick="updateBomMtrlSecondModal()" style="width: 50px;" authchk><i class="fas fa-money-check"></i> 수정 </a>
 		                    <a onclick="delRowMatr()" style="width: 50px;" authchk><i class="fas fa-trash"></i> 삭제 </a>
 		                </div>
 	                </div>
@@ -122,6 +115,8 @@ var actionType = null;
 var firstGrid = null;
 var secondGrid = null;
 
+var popBomLevelList = [];
+
 var matrArr = [];  //자재 데이타
 
 var before_bomIdx = -1;
@@ -136,17 +131,20 @@ var bomGridView = {
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
 		    	 showRowSelector: true,
-		    	 multipleSelect: false,
+		    	 multipleSelect: true,
 		    	 sortable: false,
 		         target: $('[data-ax5grid="bom-grid"]'),
 		         header: {
 		        		 align: "center",
-		        		 selector: false
+		        		 selector: true
 		         },
 		         body: {
 		        	 	 mergeCells : ["partNo", "unitNo", "revNo"],//editor 는 merge 안됨
 			        	 onClick: function () {
-			        		this.self.clearSelect();
+		                	var list = bomGridView.target.getList("selected");
+		                	$.each(list, function(idx, obj){
+		                		bomGridView.target.select(obj.__index, {selected: false});
+	                        });
 			             	this.self.select(this.dindex);
 			             	select_bomIdx = this.dindex;
 			             	select_dsgnNo = bomGridView.target.getList("selected")[0].dsgnNo;
@@ -155,13 +153,9 @@ var bomGridView = {
 			             	matrGridView.selectGrid(select_dsgnNo);
 			             	before_bomIdx = this.dindex;
 			             	before_dsgnNo = bomGridView.target.getList("selected")[0].dsgnNo;
-			             	
 			        	 },
-			        	 /*
 						 onDBLClick: function () {
-						 	//updatePrdtList('U');
 						 },
-						 */
 			             onDataChanged: function () {
 			            	//if(bomGridView_notchange) return;
 			            	
@@ -169,201 +163,54 @@ var bomGridView = {
 			                	//before_bomIdx = this.dindex;
 			                }
 			            	
-			            	if(this.key == "partNo" || this.key == "unitNo" || this.key == "revNo"){//입력항목일때
+			            	if(this.key == "dsgnNo" || this.key == "upperCd" || this.key == "lowerCd"){//입력항목일때
 				            	if(this.item.dtaChk != "I") {
 				            		this.item.dtaChk = "U";
 				            	}
 			            	}
 
-			            	//입력후 partNo, unitNo, revNo 입력 문자크기 잘못 입력시 지움
-			            	if(this.item.lvl >= 1 && this.key == "partNo" && this.value != "" && (this.item.partNo).length < 4){
-			            		this.item.partNo = "";
-			            		this.item.upperCd = "";
-			            		this.item.lowerCd = "";
-			            		this.item.dsgnNo = "";
-			            		this.item.unitNo = "";
-			            		this.item.revNo = "";
-			            	}
-			            	else if(this.item.lvl >= 2 && this.key == "unitNo" && this.value != "" && (this.item.unitNo).length < 3){
-			            		this.item.unitNo = "";
-			            		this.item.upperCd = "";
-			            		this.item.lowerCd = "";
-			            		this.item.dsgnNo = "";
-			            		this.item.revNo = "";
-			            	}
-			            	else if(this.item.lvl >= 3 && this.key == "revNo" && this.value != "" && (this.item.revNo).length < 2){
-			            		this.item.revNo = "";
-			            		this.item.upperCd = "";
-			            		this.item.lowerCd = "";
-			            		this.item.dsgnNo = "";
-			            	}
-			            	
-			            	//입력후 partNo, unitNo, revNo 로  dsgnNo,lowerCd 생성
-			            	if(this.item.lvl == 1 && this.key == "partNo" && this.item.partNo != ""){
-			            		this.item.upperCd = this.item.salesCd;
-			            		this.item.lowerCd = this.item.salesCd + adPer(this.item.partNo);
-			            	}
-			            	else if(this.item.lvl == 2 && this.key == "unitNo" && this.item.partNo != "" && this.item.unitNo != ""){
-			            		this.item.upperCd = this.item.salesCd + adPer(this.item.partNo);
-			            		this.item.lowerCd = this.item.salesCd + adPer(this.item.partNo) + adPer(this.item.unitNo);
-			            	}
-			            	else if(this.item.lvl == 3 && this.key == "revNo" && this.item.partNo != "" && this.item.unitNo != "" && this.item.revNo != ""){
-			            		this.item.upperCd = this.item.salesCd + adPer(this.item.partNo) + adPer(this.item.unitNo);
-			            		this.item.lowerCd = this.item.salesCd + adPer(this.item.partNo) + adPer(this.item.unitNo) + adPer(this.item.revNo);
-			            	}
-			            	this.item.dsgnNo = this.item.lowerCd;
-			            	
-			            	//Mast 삭제시 자재삭제 실데이타는 deleteBomMatrAll -> deleteBom 으로 삭제시 모든 자재삭제
-			            	if(this.key == "dtaChk" && this.value != ""){
-				            	if(this.item.dtaChk == "D") {
-				            		var delIdxArray = findIndexArray(matrArr, "dsgnNo", this.item.dsgnNo);
-				        			for(var i=delIdxArray.length-1; i >= 0; i--){
-				        				matrArr.splice(delIdxArray[i],1);
-				        			}
-				        			var list = getFilterData(this.item.dsgnNo);
-				        			matrGridView.target.setData({
-				                		list : list,
-				                		page : {
-				                			totalElements : list.length
-				                		}
-				           			});
-				            	}
-			            	}
-			            	
-			            	//PART, UNIT 변경시 하위정보 변경 >>> 하위 찾기 메소드 필요..
-			            	if(this.key == "partNo"||this.key == "unitNo"){
-			            		/*
-			            		var new_partNo = this.item.partNo;
-			            		var new_unitNo = this.item.unitNo;
-			            		var new_revNo = this.item.revNo;
-			            		var new_lowerCd = this.item.lowerCd;//변경된 값
-			            		var old_lowerCd = this.item.oldLowerCd;
-
-			            		var bomGridView_oldPartNo = this.item.oldPartNo;
-			            		console.log("======oldPartNo====>"+bomGridView_oldPartNo);
-			            		//var bomGridView_oldUnitNo = this.item.oldUnitNo;
-			            		//var bomGridView_oldRevNo  = this.item.oldRevNo;
-			            		//var bomGridView_lowerCd = this.item.lowerCd;//변경된 값
-			            		//var bomGridView_upperCd = this.item.upperCd;//변경된 값
-			            		var bomGridList = bomGridView.target.getList();
-			            		//bomGridView_notchange = true;
-		        				$.each(bomGridList, function (idx, elem) {
-		        					if(elem.oldLowerCd.indexOf(old_lowerCd) == 0) {
-		        						//var new_lowerCd = elem.salesCd + adPer(new_partNo) + adPer(new_unitNo) + adPer(new_revNo);
-		        						var set_lowerCd = elem.lowerCd.replace(old_lowerCd,new_lowerCd);
-		        						console.log("===========partNo>> onChange ########"+idx+"   >>>"+elem.lowerCd+ ">>> "+set_lowerCd);
-		        						
-		        						bomGridView.target.setValue(idx, "partNo", new_partNo);
-		        						bomGridView.target.setValue(idx, "lowerCd",set_lowerCd);
-		        						bomGridView.target.setValue(idx, "dsgnNo", set_lowerCd);
-		        					}
-		        				});
-		        				//bomGridView_notchange = false;
-		        				*/
-			            	}
-			            	
 			            	//BOM 입력(partNo,unitNo,revNo)시 자재정보의 dsgnNo,lowerCd,upperCd Change
-			            	if(this.key == "partNo"||this.key == "unitNo"||this.key == "revNo"){
-			            		//console.log("===========partNo>> onChange 2222222");
-			            		var matrGridList = matrGridView.target.getList();
-			            		if(matrGridList.length > 0) {
-			            			var matrGridView_dsgnNo = "";
-			            			var matrGridView_upperCd = "";
-			            			var matrGridView_lowerCd = "";
-			            			if((this.key == "partNo" && this.item.partNo != "")
-					            			||(this.key == "unitNo" && this.item.unitNo != "")
-					            			||(this.key == "revNo" && this.item.revNo != "")){//입력항목 && 입력값이 있을때
-			            				matrGridView_dsgnNo = this.item.dsgnNo;
-			            				matrGridView_lowerCd = this.item.lowerCd;
-			            				matrGridView_upperCd = this.item.upperCd;
-			            			}
-			            			
-			            			//현재편집중인 자재정보 반영
-			        				$.each(matrGridList, function (idx, elem) {
-			        					elem.dsgnNo = matrGridView_dsgnNo;
-			        					elem.lowerCd = matrGridView_lowerCd;
-			        					elem.upperCd = matrGridView_upperCd;
-			        					elem.dtaChk = "U";
-			        				});
-				        			matrGridView.target.setData({
-				                		list : matrGridList,
-				                		page : {
-				                			totalElements : matrGridList.length
-				                		}
-				           			});
-			            		}
+			            	if(this.key == "dsgnNo" || this.key == "upperCd" || this.key == "lowerCd"){
 				            }//end if//자재정보
 				            
 			            	bomGridView.target.repaint();
 			             }//,
 	             },
-		        columns : [
+		         columns : [
 		        	//,hidden:true
 		        	{key: "dtaChk",label: " ", width: 30, 	styleClass: "grid-font-blue-bold"},
 		        	{key: "coCd", label: "CO", width: 50,hidden:true},
 		        	{key: "salesCd", label: "Sales Code", width: 120,hidden:true},
 		        	{key: "lvl", label: "LVL", width: 50},
-	                {key: "partNo", label: "PART", width: 80, 
-		        		editor:{type:  "number",
-			        			disabled: function () {
-			        				if(this.item.lvl >= 1){
-				        		        return false;
-			        				} else {
-			        					return true;
-			        				}
-			        		    },
-			        		    attributes: {
-			        		        'maxlength': 4, 'data-maxlength': 4
-			        		    }
-        				},
-        				styleClass: function () {
-        					if(this.item.lvl < 1){
-        						return "grid-cell-gray"
-        					}
-        				}
-	                },
-	                {key: "unitNo", label: "UNIT", width: 80,
-		        		editor:{type: "number",
-			        			disabled: function () {
-			        				if(this.item.lvl >= 2){
-				        		        return false;
-			        				} else {
-			        					return true;
-			        				}
-			        		    },
-			        		    attributes: {
-			        		        'maxlength': 3, 'data-maxlength': 3
-			        		    }
-	        			},
-        				styleClass: function () {
-        					if(this.item.lvl < 2){
-        						return "grid-cell-gray"
-        					}
-        				}
-	                },
-	                {key: "revNo", label: "REV", width: 80,
-		        		editor: {type: "text",
-		        			disabled: function () {
-		        				if(this.item.lvl >= 3){
-			        		        return false;
-		        				} else {
-		        					return true;
-		        				}
-		        		    },
-		        		    attributes: {
-		        		        'maxlength': 2
-		        		    }
-            			},
-        				styleClass: function () {
-        					if(this.item.lvl < 3){
-        						return "grid-cell-gray"
-        					}
-        				}
-	                },
-		        	{key: "dsgnNo" , label: "도번" 	,width: 200,align: "left"},
-					{key: "upperCd", label: "상위코드" ,width: 160,align: "left",hidden:true},
-					{key: "lowerCd", label: "하위코드" ,width: 180,align: "left",hidden:true}
-			     ]
+		        	{key: "partNo" , label: "PART"	, width: 80,align: "left",hidden:true},
+		        	{key: "unitNo" , label: "UNIT"	, width: 80,align: "left",hidden:true},
+		        	{key: "revNo"  , label: "REV" 	, width: 80,align: "left",hidden:true},
+		        	{key: "dsgnNo" , label: "도번" 	,width: 300,align: "left" ,  treeControl: true},
+		        	{key: "lastDsgnNo", label: "입력" 	, width: 50,align: "left",hidden:false},
+					{key: "dsgnNm" , label: "명칭" 	,width: 160,align: "left",hidden:false},
+					{key: "bomQty" , label: "수량" 	,width: 80,align: "right",hidden:false},
+					{key: "upperCd", label: "upperCd" ,width: 160,align: "left",hidden:false},
+					{key: "lowerCd", label: "lowerCd" ,width: 180,align: "left",hidden:false},
+					{key: "oldUpperCd", label: "oldUpperCd" ,width: 160,align: "left",hidden:false},
+					{key: "oldLowerCd", label: "oldLowerCd" ,width: 180,align: "left",hidden:false},
+			     ],
+	              tree: {
+	                    use: true,
+	                    indentWidth: 15,
+	                    arrowWidth: 15,
+	                    iconWidth: 18,
+	                    icons: {
+	                        openedArrow: '<i class="fa fa-caret-down" aria-hidden="true"></i>',
+	                        collapsedArrow: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+	                        groupIcon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+	                        collapsedGroupIcon: '<i class="fa fa-folder" aria-hidden="true"></i>',
+	                        itemIcon: '<i class="fa fa-file" aria-hidden="true"></i>'
+	                    },
+		                columnKeys: {
+		                parentKey: "upperCd",
+		                selfKey: "lowerCd",
+		               }
+		           }
 		    });
 			return this;
 		},
@@ -384,7 +231,7 @@ var bomGridView = {
             		}
        			});
 				if(list.length > 0){
-					bomGridView.target.clearSelect();
+					//bomGridView.target.clearSelect();
 					//bomGridView.target.focus("HOME")
 					bomGridView.target.select(0);
 					bomGridView.target.focused = true;
@@ -419,7 +266,8 @@ var matrGridView = {
   			               this.self.select(this.dindex);
 			          },
 			          onDBLClick: function () {
-			        	  modRowMatr();
+			        	  //modRowMatr();
+			        	  updateBomMtrlSecondModal();
 			          },
 			          onDataChanged: function () {
 			            	//아이템 상세내역이 수정이 있으면 저장 필요
@@ -693,7 +541,7 @@ var matrGridView = {
 			var newRow = {};
 			newRow = {dtaChk:"I",coCd: $("#coCd").val(), salesCd: $("#salesCd").val() , lvl:0, partNo:"", unitNo:"", revNo:"", dsgnNo:$("#salesCd").val(), upperCd:".", lowerCd:$("#salesCd").val()};
 			bomGridView.target.addRow($.extend({}, newRow), "last");
-			bomGridView.target.clearSelect();
+			//bomGridView.target.clearSelect();
 			bomGridView.target.select(0);
 			bomGridView.target.focused = true;
 		} else if (actionType == "U") {
@@ -726,7 +574,7 @@ var matrGridView = {
 	
 	// 등록
 	function insertBomMatr() {
-		if(gridDataValidation(bomGridView.target)) return;
+		//if(gridDataValidation(bomGridView.target)) return;
 		if (inputValidation($('.popup_area [required]'))) {					// 필수 필드의 유효성 검사
 			var formData = makeFormData();									// 요청이 통과하면 formData를 생성
 			filePostAjax("/user/sm/sm01/insertBom", formData,				// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행
@@ -742,7 +590,7 @@ var matrGridView = {
 
 	// 수정
 	function updateBomMatr() {
-		if(gridDataValidation(bomGridView.target)) return;
+		//if(gridDataValidation(bomGridView.target)) return;
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 			var formData = makeFormData();										// 요청이 통과하면 formData를 생성
 	      	filePostAjax("/user/sm/sm01/updateBom", formData,function(data) {
@@ -754,9 +602,7 @@ var matrGridView = {
 					});
 		}
 	}
-	 /* 기존 저장과 중복 될 수 있음. 개별 저장 완료 후 수정 필요 */
-	 /* 프로젝트 인서트, 업데이트 조건에 따른 간섭이 없는지 재확인 할 것 */
-
+	
 	//----------------------------------------------//
 	function makeFormData() {
 		// 금액 콤마 제거
@@ -794,14 +640,9 @@ var matrGridView = {
 		//--첨부화일 처리를 위한 부분 끝
 		//--------------------------------------------------------------- 
 
-		var bomArr = [];
 		var bomlist = bomGridView.target.list;
-		$.each(bomlist,function(idx, obj) {
-			if(isEmpty(obj.dtaChk)){
-				obj.dtaChk = "";
-			}
-		});
-		formData.append("bomArr", JSON.stringify(bomlist));
+		var bomArr = getTreeBomData(bomlist);
+		formData.append("bomArr", JSON.stringify(bomArr));
 		
 		//현재 자재정보 그리드정보를 matrArr에  update 한다
 		var matrGridList = matrGridView.target.list;
@@ -834,11 +675,68 @@ var matrGridView = {
 		$('#coCd option:not([value="'+value+'"])').remove();		
 	}
 
+	//자재품번 검색
+	function addRowBom() {
+		var selData = bomGridView.target.getList("selected")[0];
+		var isBomSelect = !isEmpty(selData);
+		if(bomGridView.target.list.length != 0 && isBomSelect == false){
+			alert("구매 BOM 행추가시 상위목록을 선택하여야 합니다.");
+			return;
+		}
+		var targetLevel = Number(selData.lvl)+1;
+		let bom_List = JSON.parse(JSON.stringify(bomGridView.target.list));
+		//console.log("bom_List>>>",bom_List);
+		let bom_Arr = getTreeBomData(bom_List);
+		//console.log("bom_Arr>>>",bom_Arr);
+		let sendData = getFilterLevelData(bom_Arr, targetLevel, selData.lowerCd);
+		//console.log("sendData>>>",sendData);
+		popBomLevelList = sendData;
+		var paramObj = {};
+		paramObj.salesCd = selData.salesCd;
+		paramObj.upperCd = selData.lowerCd;
+		paramObj.lvl = targetLevel;
+		paramObj.sendData = JSON.stringify(sendData);
+		openSecondModal("/static/html/user/sm/sm01/SM0101P04.html", 830, 500, "", paramObj, function (data) {
+			//matrGridView.target.addRow($.extend({}, newRow), "last");
+		});
+	}
+
+	this.getFilterLevelData = function(obj, sel_lvl, sel_upperCd) {
+		const resultData = obj.filter(function(element){
+			return sel_lvl == element.lvl && sel_upperCd == element.upperCd;
+		});
+		return resultData;
+	}
+	//그리드가 트리일경우 사용
+	function getTreeBomData(bom_list) {
+		var resultBomArr = [];
+		$.each(bom_list, function (idx, elem) {
+			if(isEmpty(elem.dtaChk)){
+				elem.dtaChk = "";
+			}
+			var bomData = {};
+			bomData.dtaChk = elem.dtaChk;
+			bomData.lvl = elem.lvl;
+			bomData.coCd = elem.coCd;
+			bomData.salesCd = elem.salesCd;
+			bomData.partNo = elem.partNo;
+			bomData.unitNo = elem.unitNo;
+			bomData.revNo = elem.revNo;
+			bomData.dsgnNo = elem.dsgnNo;
+			bomData.lastDsgnNo = elem.lastDsgnNo;
+			bomData.dsgnNm = elem.dsgnNm;
+			bomData.bomQty = elem.bomQty;
+			bomData.upperCd = elem.upperCd;
+			bomData.lowerCd = elem.lowerCd;
+			resultBomArr.push(bomData);
+		});
+		
+		return resultBomArr;
+	}
 	//Bom 추가
-	function addRowBom(){
+	function addRowBom222(){
 		//if(selectGridValidation(bomGridView.target)) return;
 		var selData = bomGridView.target.getList("selected")[0];
-		var bomLength = bomGridView.target.list.length;
 		var isBomSelect = !isEmpty(selData);
 		let newRow = {};
 		if(bomGridView.target.list.length != 0 && isBomSelect == false){
@@ -994,7 +892,7 @@ var matrGridView = {
 		for(i=0; i<dataList.length; i++){
 			if(dataList[i]["lvl"] >= "1"){ //1,2,3 레벨체크
 				if(empty(dataList[i]["partNo"])){
-					gridObj.clearSelect();
+					//gridObj.clearSelect();
 					gridObj.select(i);
 					gridObj.focused = true;
 					alert("구매 BOM의 [PART]는 필수입력 항목입니다.");
@@ -1003,7 +901,7 @@ var matrGridView = {
 			}
 			if(dataList[i]["lvl"] >= "2"){
 				if(empty(dataList[i]["unitNo"])){
-					gridObj.clearSelect();
+					//gridObj.clearSelect();
 					gridObj.select(i);
 					gridObj.focused = true;
 					alert("구매 BOM의 [UNIT]는 필수입력 항목입니다.");
@@ -1012,7 +910,7 @@ var matrGridView = {
 			}
 			if(dataList[i]["lvl"] >= "3"){
 				if(empty(dataList[i]["revNo"])){
-					gridObj.clearSelect();
+					//gridObj.clearSelect();
 					gridObj.select(i);
 					gridObj.focused = true;
 					alert("구매 BOM의 [REV]는 필수입력 항목입니다.");
@@ -1021,7 +919,7 @@ var matrGridView = {
 			}
 			if(dataList[i]["lvl"] >= "1"){ //1,2,3 레벨체크
 				if(empty(dataList[i]["upperCd"])||empty(dataList[i]["lowerCd"])||empty(dataList[i]["dsgnNo"])){
-					gridObj.clearSelect();
+					//gridObj.clearSelect();
 					gridObj.select(i);
 					gridObj.focused = true;
 					alert("구매 BOM의 [PART][UNIT][REV]으로 레벨을 구성하지 못했습니다  삭제후 제입력 하세요.");
@@ -1031,6 +929,52 @@ var matrGridView = {
 		}
 		return false;
 	}
+
+	//자재마스트 등록
+	function insertProdSecondModal(type) {
+		//debugger;
+		if (type == 'U') {			
+			var row = matrGridView.target.getList("selected")[0];
+			var paramObj = {
+				"actionType"  : type,
+				"fileTrgtKey" : row.fileTrgtKey,
+				"coCd" 	      : row.coCd,
+				"userId"      : jwt.userId,
+				"pgmId"       : "BM0501M001"
+			};
+		} else {
+			var paramObj = {
+				"actionType"  : type,
+				"fileTrgtKey" : 0,
+				"coCd" 	      : jwt.coCd,
+				"userId"      : jwt.userId,
+				"pgmId"       : "BM0501M001"
+			}
+		}
+		
+		openSecondModal("/static/html/user/bm/bm05/BM0501P01.html", 1600, 850, "", paramObj, function (grid) {
+		});
+		/*
+		openModal("/static/html/user/bm/bm05/BM0501P01.html", 1600, 850, "", paramObj, function(data) {
+			//alert("자재 마스트 관리에 등록되었습니다.");
+			//BM05M_DataSearch();
+		}); */
+	}
+
+	//Bom-자재 수정
+	function updateBomMtrlSecondModal() {
+		if(selectGridValidation(matrGridView.target)) return;
+		var selData = matrGridView.target.getList("selected")[0];
+		var paramObj = selData;
+        //var fileTrgtKey = selData.fileTrgtKey;
+        var fileTrgtKey = selData.fileTrgtKey;
+        //paramObj.actionType = isEmpty(fileTrgtKey) ? "C":"U";
+        paramObj.actionType = "U";
+        openSecondModal("/static/html/user/sm/sm01/SM0101P02.html", 1300, 550, "", paramObj, function(grid) {
+			//gridView2.setData(0);
+		});
+	}
+	
 	function empty(str){
 		if(typeof str == "undefined" || str == null || str == "")
 			return true;
