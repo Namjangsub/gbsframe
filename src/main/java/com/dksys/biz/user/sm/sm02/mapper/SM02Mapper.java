@@ -34,6 +34,8 @@ public interface SM02Mapper {
 	
 	int updateOrderMaster(Map<String, String> paramMap);
 	
+	int updateOrderDetail(Map<String, String> paramMap);
+	
 	int deleteOrderMaster(Map<String, String> paramMap);
 	
 	int deleteOrderDetail(Map<String, String> param);	

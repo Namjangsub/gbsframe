@@ -1,11 +1,8 @@
 package com.dksys.biz.user.cr.cr07;
 
-import org.slf4j.LoggerFactory;
-
 import java.util.List;
 import java.util.Map;
 
-import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -23,8 +20,6 @@ import com.dksys.biz.util.MessageUtils;
 @Controller
 @RequestMapping("/user/cr/cr07")
 public class CR07Ctr {
-	
-//	private Logger logger = LoggerFactory.getLogger(CR07Ctr.class);
 	
 	@Autowired
 	MessageUtils messageUtils;
@@ -55,7 +50,6 @@ public class CR07Ctr {
 		List<Map<String, String>> resultList = cr07Svc.selectSellDcsnList(paramMap);
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
-		
 	}
 	
 	// 매출확정등록 조회
@@ -74,11 +68,9 @@ public class CR07Ctr {
 	@PostMapping(value = "/select_cr07_Info")
 	public String select_cr07_Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		Map<String, String> result = cr07Svc.select_cr07_Info(paramMap);
-		System.out.println(result);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
-	
 
 	// 매출확정번호 조회
 	@PostMapping(value = "/select_cr07_sellDcsnNo")
@@ -154,5 +146,20 @@ public class CR07Ctr {
 			model.addAttribute("resultMessage", e.getMessage());
 		}
 	  	return "jsonView";
+	}
+	
+	// 매출확정등록 상세삭제
+	@PutMapping(value = "/delete_cr07_detail")
+	public String delete_cr07_detail(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			cr07Svc.delete_cr07_detail(paramMap);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+		} catch(Exception e){
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		}
+		return "jsonView";
+
 	}
 }

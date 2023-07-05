@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -26,25 +27,25 @@ public class SM05Ctr {
 	@Autowired
 	SM05Svc sm05Svc;
 
-	// 프로젝트 리스트 조회 - 폐기내역 조회
-	@PostMapping(value = "/selectIoList")
-	public String selectIoList(@RequestBody Map<String, String> paramMap, ModelMap model) {		
-		int totalCnt = sm05Svc.selectIoCount(paramMap);
+	// 프로젝트 리스트 조회 - 폐기내역 조회  
+	@PostMapping(value = "/select_sm05_ioList")
+	public String select_sm05_ioList(@RequestBody Map<String, String> paramMap, ModelMap model) {		
+		int totalCnt = sm05Svc.select_sm05_ioCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);		
 		model.addAttribute("paginationInfo", paginationInfo);
-		List<Map<String, String>> result = sm05Svc.selectIoList(paramMap);		
+		List<Map<String, String>> result = sm05Svc.select_sm05_ioList(paramMap);		
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
 
 	// 프로젝트 리스트 조회 - 폐기상세 조회
-	@PostMapping(value = "/selectIoDetailList")
-	public String selectIoDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	@PostMapping(value = "/select_sm05_ioDetailList")
+	public String select_sm05_ioDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		
-		int totalCnt = sm05Svc.selectIoDetailCount(paramMap);
+		int totalCnt = sm05Svc.select_sm05_ioDetailCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);		
 		model.addAttribute("paginationInfo", paginationInfo);
-		List<Map<String, String>> result = sm05Svc.selectIoDetailList(paramMap);		
+		List<Map<String, String>> result = sm05Svc.select_sm05_ioDetailList(paramMap);		
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
@@ -61,9 +62,9 @@ public class SM05Ctr {
 //	}  
   
 	//정보 조회
-	@PostMapping(value = "/select_sm05_IoInfo")
-	public String select_sm05_IoInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		Map<String, String> result = sm05Svc.select_sm05_IoInfo(paramMap);
+	@PostMapping(value = "/select_sm05_ioInfo")
+	public String select_sm05_ioInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = sm05Svc.select_sm05_ioInfo(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
@@ -77,13 +78,13 @@ public class SM05Ctr {
     }
 	
 	// 폐기창고재고정보 - 모달창
-	@PostMapping(value = "/selectIoModalList")
-	public String selectIoModalList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-//		int totalCnt = sm05Svc.selectIoModalCount(paramMap);
-//		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-//		model.addAttribute("paginationInfo", paginationInfo);
+	@PostMapping(value = "/select_sm05_ioModalList")
+	public String select_sm05_ioModalList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = sm05Svc.select_sm05_ioModalCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
 		
-		List<Map<String, String>> resultList = sm05Svc.selectIoModalList(paramMap);
+		List<Map<String, String>> resultList = sm05Svc.select_sm05_ioModalList(paramMap);
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
 	}
@@ -123,6 +124,77 @@ public class SM05Ctr {
 		}
 		return "jsonView";
 	}
+
+    //수정
+	@PostMapping(value = "/update_sm05")
+	public String update_sm05(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest,
+			ModelMap model) throws Exception {
+		try {
+			if (sm05Svc.update_sm05(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+	
+	@PostMapping(value = "/update_sm05_IoInfo")
+	public String update_sm05_IoInfo(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest,
+			ModelMap model) throws Exception {
+		try {
+			if (sm05Svc.update_sm05_IoInfo(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+	//삭제
+	@PutMapping(value = "/delete_sm05M_io")
+	public String delete_sm05M_io(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (sm05Svc.delete_sm05M_io(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+	
+	@PutMapping(value = "/delete_sm05D_io")
+	public String delete_sm05D_io(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+				sm05Svc.delete_sm05D_io(paramMap);
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+		} catch (Exception e) {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		}
+		return "jsonView";
+	}
+	
 	
 	// 프로젝트 정보 조회 - popup 부분
 //	  @PostMapping(value = "/selectIoInfo")
@@ -138,41 +210,7 @@ public class SM05Ctr {
 //		return "jsonView";
 //	}
 
-//	@PostMapping(value = "/updatePchsCost")
-//	public String updatePchsCost(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest,
-//			ModelMap model) throws Exception {
-//		try {
-//			if (sm05Svc.updatePchsCost(paramMap, mRequest) != 0) {
-//				model.addAttribute("resultCode", 200);
-//				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-//			} else {
-//				model.addAttribute("resultCode", 500);
-//				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-//			}
-//			;
-//		} catch (Exception e) {
-//			model.addAttribute("resultCode", 900);
-//			model.addAttribute("resultMessage", e.getMessage());
-//		}
-//		return "jsonView";
-//	}
 
-//	@PutMapping(value = "/deleteIoCost")
-//	public String deleteIoCost(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
-//		try {
-//			if (sm05Svc.deleteIoCost(paramMap) != 0) {
-//				model.addAttribute("resultCode", 200);
-//				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-//			} else {
-//				model.addAttribute("resultCode", 500);
-//				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-//			}
-//			;
-//		} catch (Exception e) {
-//			model.addAttribute("resultCode", 900);
-//			model.addAttribute("resultMessage", e.getMessage());
-//		}
-//		return "jsonView";
-//	}
+
 
 }

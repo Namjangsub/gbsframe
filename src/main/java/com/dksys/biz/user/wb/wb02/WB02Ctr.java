@@ -25,7 +25,7 @@ import com.dksys.biz.util.MessageUtils;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.dksys.biz.user.wb.wb02.service.WB02Svc;
-
+import com.dksys.biz.user.wb.wb01.service.WB01Svc;
 @Controller
 @Transactional(rollbackFor = Exception.class)
 @RequestMapping("/user/wb/wb02")
@@ -35,71 +35,61 @@ public class WB02Ctr {
 	
 	@Autowired
 	MessageUtils messageUtils;
-    
+
+	@Autowired
+    WB01Svc wb01Svc;
+	
     @Autowired
     WB02Svc wb02Svc;
 
-     //<!-- WBS 일정계획 등록 메인 화면 조회 리스트  -->
-	  @PostMapping(value = "/selectWbsRsltsPlanList") 
-	  public String selectWbsRsltsPlanList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    @PutMapping(value = "/deleteWbsRsltslist")
+    public String deleteWbsRsltslist(@RequestParam Map<String, String> paramMap, ModelMap model) {
+		try {
+				if (wb02Svc.deleteWbsRsltslist(paramMap) != 0 ) {
+					model.addAttribute("resultCode", 200);
+					model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+				} else {
+					model.addAttribute("resultCode", 500);
+					model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+				};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";		 
+    } 
+    
+    @PutMapping(value = "/updateWbsRsltsCloseYn")
+    public String updateWbsRsltsCloseYn(@RequestParam Map<String, String> paramMap, ModelMap model) throws Exception {
+	  	try {
+			if (wb02Svc.updateWbsRsltsCloseYn(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+    }
 
-		  int totalCnt = wb02Svc.selectWbsRsltsPlanListCount(paramMap); 
-		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		  model.addAttribute("paginationInfo", paginationInfo);
-		  
-  		  List<Map<String, String>> resultList = wb02Svc.selectWbsRsltsPlanList(paramMap);
-		  model.addAttribute("resultList", resultList); 
-		  return "jsonView"; 
-	  }
-	  
-	  
-	  //<!-- WBS 일정계획 등록 메인 화면 조회 엑셀 리스트  -->
-	  @PostMapping(value = "/selectWbsRsltsPlanExcelList") 
-	  public String selectWbsRsltsPlanExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-  		  List<Map<String, String>> resultList = wb02Svc.selectWbsRsltsPlanExcelList(paramMap);
-		  model.addAttribute("resultList", resultList); 
-		  return "jsonView"; 
-	  }
-	  
-	  
-	  
-	  
-	  //<!-- WBS 일정실적 등록 메인 화면 조회 리스트  -->
-	  @PostMapping(value = "/selectWbsRsltsResultList1") 
-	  public String selectWbsRsltsResultList1(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	@PostMapping(value = "/selectRsltsMemberList") 
+	public String selectRsltsMemberList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    List<Map<String, String>> resultList = wb02Svc.selectRsltsMemberList(paramMap);
+	    model.addAttribute("resultList", resultList); 
+	    return "jsonView"; 		 
+    }
 
-		  int totalCnt = wb02Svc.selectWbsRsltsResultCount(paramMap); 
-		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		  model.addAttribute("paginationInfo", paginationInfo);
-		  
-  		  List<Map<String, String>> resultList = wb02Svc.selectWbsRsltsResultList(paramMap);
-		  model.addAttribute("resultList", resultList); 
-		  return "jsonView"; 
-	  }
-	  
-	  
-	  
-	  //<!-- 실적 마스터 테이블 조회  --> 
-	  @PostMapping(value = "/selectWbsRsltsMasterList") 
-	  public String selectWbsRsltsMasterList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  
-		  Map<String, String> resultList = wb02Svc.selectWbsRsltsMasterList(paramMap);
-		  model.addAttribute("resultList", resultList); 
-		  return "jsonView"; 
-		  
-	  }
-	  
-	  //<!-- 실적 상세 테이블 조회  -->  
-	  @PostMapping(value = "/selectWbsRsltsDetailList") 
-	  public String selectWbsRsltsDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  
-		  List<Map<String, String>> resultList = wb02Svc.selectWbsRsltsDetailList(paramMap);
-		  model.addAttribute("resultList", resultList); 
-		  return "jsonView"; 
-		  
-	  }
-	  
-	  //<!-- 공유 테이블 조회  -->  
+	@PostMapping(value = "/selectWbsRsltsDetailList") 
+	public String selectWbsRsltsDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    List<Map<String, String>> resultList = wb02Svc.selectWbsRsltsDetailList(paramMap);
+	    model.addAttribute("resultList", resultList); 
+	    return "jsonView";   
+    }
+
 	  @PostMapping(value = "/selectRsltsSharngList") 
 	  public String selectRsltsSharngList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		  
@@ -108,7 +98,8 @@ public class WB02Ctr {
 		  return "jsonView"; 
 		  
 	  }
-	  
+
+
 	  //<!-- 결재 테이블 조회  -->  
 	  @PostMapping(value = "/selectRsltsApprovalList") 
 	  public String selectRsltsApprovalList(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -118,49 +109,17 @@ public class WB02Ctr {
 		  return "jsonView"; 
 		  
 	  }
-	  
-	  //<!-- 사용자 정보 테이블 조회  -->  
-	  @PostMapping(value = "/selectRsltsMemberList") 
-	  public String selectRsltsMemberList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  
-		  List<Map<String, String>> resultList = wb02Svc.selectRsltsMemberList(paramMap);
-		  model.addAttribute("resultList", resultList); 
-		  return "jsonView"; 
-		  
-	  }
-	  
-	  
-	  //<!-- 공유, 결재선 조회  -->     
-	  @PostMapping(value = "/selectApprovalList") 
-	  public String selectApprovalList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  
-		  List<Map<String, String>> resultList = wb02Svc.selectApprovalList(paramMap);
-		  model.addAttribute("resultList", resultList); 
-		  return "jsonView"; 
-		  
-	  }
-	  
-	 
-	  //<!-- /* 파일업로드를 위한 FielTreeKey Max값 조회 */ -->  
-	  @PostMapping(value = "/selectMaxTrgtKey") 
-	  public String selectMaxTrgtKey(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  
-		  int result = wb02Svc.selectMaxTrgtKey(paramMap);
+
+   
+	  @PostMapping(value = "/selectWbsRsltsInfo") 
+	  public String selectWbsRsltsInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  Map<String, String> result= wb02Svc.selectWbsRsltsInfo(paramMap);
 		  model.addAttribute("result", result); 
 		  return "jsonView"; 
 		  
-	  }
-	  
-	  //<!-- /* WBS 데이터 중복 체크 조회 */ -->  
-	  @PostMapping(value = "/selectWbsRsltsChk")
-	  public String selectWbsRsltsChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int result = wb02Svc.selectWbsRsltsChk(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-	  }
-	  
-	  
-	  
+	  } 
+
+
 	  @PostMapping(value = "/wbsLevel1RsltsInsert")
       public String wbsLevel1RsltsInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {		
 		try {
@@ -192,27 +151,15 @@ public class WB02Ctr {
     	return "jsonView";
      }
 
-	  //<!-- WBS 실적관리 메인화면에서 선택한 실적에 대한 계획정보 세부 조회  -->     
-	  @PostMapping(value = "/selectWbsPlanInfoSelect") 
-	  public String deleteWbsRsltsDetailChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  
-		  List<Map<String, String>> resultList = wb02Svc.selectWbsPlanInfoSelect(paramMap);
-		  model.addAttribute("resultList", resultList); 
-		  return "jsonView"; 
-		  
-	  } 
-	  
-	  
-	//<!-- WBS 실적관리 메인화면에서 선택한 실적에 대한 계획정보 세부 조회  -->     
-	  @PostMapping(value = "/selectWbsRsltsInfo") 
-	  public String selectWbsRsltsInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  Map<String, String> result= wb02Svc.selectWbsRsltsInfo(paramMap);
-		  model.addAttribute("result", result); 
-		  return "jsonView"; 
-		  
-	  } 
-	  
-	  
+
+     @PutMapping(value = "/wbsPlanStsCodeUpdate")
+     public String wbsPlanStsCodeUpdate(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+        wb02Svc.wbsPlanStsCodeUpdate(paramMap);
+   	    model.addAttribute("resultCode", 200);
+   	    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+   	 return "jsonView";
+     }
+
 	  @PutMapping(value = "/wbsLevel1RsltsUpdate")
       public String wbsLevel1RsltsUpdate(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 	    List<Map<String, String>> detailChk = wb02Svc.deleteWbsRsltsDetailChk(paramMap);
@@ -235,142 +182,20 @@ public class WB02Ctr {
     	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
     	return "jsonView";
      }
-	  
-	 //<!-- WBS Plan No Max값 가져오기  -->
-	 @PostMapping(value = "/selectMaxWbsPlanNo")
-	 public String selectMaxWbsPlanNo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> result = wb02Svc.selectMaxWbsPlanNo(paramMap);
-		model.addAttribute("result", result); 
-	    return "jsonView"; 
-	 } 
-	  
-	   // <!-- WBS 실적 상위공정 유무체크  -->
-	  @PostMapping(value = "/selectWbsPlanConfirmCount") 
-	  public String selectWbsPlanConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
+
+
+
+      @PostMapping(value = "/selectApprovalList") 
+	  public String selectApprovalList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		  
-		  List<Map<String, String>> result = wb02Svc.selectWbsPlanConfirmCount(paramMap);
-		  model.addAttribute("result", result); 
-		  return "jsonView"; 
-		  
-	  }
-	  
-	 //<!-- WBS일정실적 메인화면 삭제 시 삭제유무 체크  -->
-	 @PostMapping(value = "/selectWbsPlanDeleteConfirmCount")
-	 public String selectWbsPlanDeleteConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int result = wb02Svc.selectWbsPlanDeleteConfirmCount(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-	 }
-	 
-	 @DeleteMapping(value = "/deleteWbsPlanlist")
-     public String deleteWbsPlanlist(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		wb02Svc.deleteWbsPlanlist(paramMap);
-    	model.addAttribute("resultCode", 200);
-    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-    	return "jsonView";
-     } 
-	 
-	 @PutMapping(value = "/wbsPlanStsCodeUpdate")
-     public String wbsPlanStsCodeUpdate(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
-        wb02Svc.wbsPlanStsCodeUpdate(paramMap);
-   	    model.addAttribute("resultCode", 200);
-   	    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-   	 return "jsonView";
-     }
-	 
-	 
-	 
-	 @PutMapping(value = "/updateWbsPlanLockYnLvl1")
-     public String updateWbsPlanLockYnLvl1(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
-        wb02Svc.updateWbsPlanLockYnLvl1(paramMap);
-   	    model.addAttribute("resultCode", 200);
-   	    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-   	 return "jsonView";
-     }
-
-	 
-	 
-	 @PutMapping(value = "/updateWbsPlanLockYnLvl2")
-     public String updateWbsPlanLockYnLvl2(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
-        wb02Svc.updateWbsPlanLockYnLvl2(paramMap);
-   	    model.addAttribute("resultCode", 200);
-   	    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-   	 return "jsonView";
-     }
-
-	 
-	 
-	 @PutMapping(value = "/updateWbsPlanLockYnLvl3")
-     public String updateWbsPlanLockYnLvl3(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
-        wb02Svc.updateWbsPlanLockYnLvl3(paramMap);
-   	    model.addAttribute("resultCode", 200);
-   	    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-   	 return "jsonView";
-     }
-	 
-	 
-	 
-	 @PutMapping(value = "/updateWbsPlanCloseYn")
-     public String updateWbsPlanCloseYn(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
-        wb02Svc.updateWbsPlanCloseYn(paramMap);
-        //wb02Svc.updateWbsRsltsMasterCloseYn(paramMap);
-        //wb02Svc.updateWbsRsltsDetailCloseYn(paramMap);
-   	    model.addAttribute("resultCode", 200);
-   	    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-   	 return "jsonView";
-     }
-
-	  //<!-- WBS 일정 실적 메인 화면 조회 리스트  -->
-	  @PostMapping(value = "/selectWbsRsltsResultListM") 
-	  public String selectWbsRsltsResultListM(@RequestBody Map<String, String> paramMap, ModelMap model) {
-
-		  int totalCnt = wb02Svc.selectWbsRsltsResultCountM(paramMap); 
-		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		  model.addAttribute("paginationInfo", paginationInfo);
-		  
- 		  List<Map<String, String>> resultList = wb02Svc.selectWbsRsltsResultListM(paramMap);
+		  List<Map<String, String>> resultList = wb02Svc.selectApprovalList(paramMap);
 		  model.addAttribute("resultList", resultList); 
 		  return "jsonView"; 
-	  }
-	 
-	  //<!-- WBS 일정 실적 메인 화면 조회 엑셀 리스트  -->	                         
-	  @PostMapping(value = "/selectWbsRsltsResultExcelListM") 
-	  public String selectWbsRsltsResultExcelListM(@RequestBody Map<String, String> paramMap, ModelMap model) {
-  		  List<Map<String, String>> resultList = wb02Svc.selectWbsRsltsResultExcelListM(paramMap);
-		  model.addAttribute("resultList", resultList); 
-		  return "jsonView"; 
-	  }
-	 
-	 
-	  //<!-- 계획  테이블 조회  --> 
-	  @PostMapping(value = "/selectWbsRsltsList") 
-	  public String selectWbsRsltsList(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
-		int totalCnt = wb02Svc.selectWbsRsltsListCount(paramMap);
-		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-    	model.addAttribute("paginationInfo", paginationInfo);
-    	
-    	List<Map<String, String>> fileList = wb02Svc.selectWbsRsltsList(paramMap);
-    	model.addAttribute("fileList", fileList);
-        return "jsonView";
 		  
 	  }
-	 
-	 
-	 
-	 
-	 
-	 
-	 
-	 
-	 
-	 
-	 
-	 
-	 
-	 
-	 
-	 
-	 
-	 
-		 
+
+
+	  
 }
+
+

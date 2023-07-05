@@ -10,14 +10,13 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.cr.cr07.mapper.CR07Mapper;
 import com.dksys.biz.user.cr.cr07.service.CR07Svc;
-import com.dksys.biz.util.ExceptionThrower;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -78,15 +77,17 @@ public class CR07SvcImpl implements CR07Svc {
 		return cr07Mapper.select_cr07_sellDcsnNo(paramMap); 
 	}
 	
+	// INSERT
 	@Override
 	public int insertSellDscn(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		
+	
 		//---------------------------------------------------------------
 		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
 		//   필수값 :  jobType, userId, comonCd
 		//---------------------------------------------------------------
+		
 		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
 		if (uploadFileList.size() > 0) {
 			//접근 권한 없으면 Exception 발생
@@ -113,9 +114,9 @@ public class CR07SvcImpl implements CR07Svc {
 		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
 		return result;
-		
 	}
 	
+	// 매출확정 상세입력
 	@Override
 	public int insertSellDscnDetail(Map<String, String> paramMap) {
 		String sellBillNo = cr07Mapper.select_cr07_sellBillNo(paramMap);
@@ -182,6 +183,7 @@ public class CR07SvcImpl implements CR07Svc {
 		return result;
 	}
 	
+	// DELETE
 	@Override
 	public int delete_cr07(Map<String, String> paramMap) throws Exception {
 		//---------------------------------------------------------------
@@ -220,4 +222,10 @@ public class CR07SvcImpl implements CR07Svc {
 		return  result;
 	}
 	
+	// 매출확정 상세삭제
+	@Override
+	public int delete_cr07_detail(Map<String, String> paramMap) {
+		int result = cr07Mapper.delete_cr07_detail(paramMap);
+		return result;
+	}
 }
