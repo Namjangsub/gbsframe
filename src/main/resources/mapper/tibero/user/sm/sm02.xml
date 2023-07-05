@@ -15,11 +15,24 @@
 			<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
             			AND A.ORDRG_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
             		</if>   
-		</if>							
+		</if>	
+		
 		<!-- 구매처 -->         
 		<if test="pchsClntCd != null and !pchsClntCd.equals('')">
 			AND A.PCHS_CLNT_CD = #{pchsClntCd}   
-		</if>							
+		</if>
+		<!-- 발주구분 -->
+		<if test="ordrgdiv10 != null and !ordrgdiv10.equals('')">
+			AND A.ORDRG_DIV10 = #{ordrgdiv10}   
+		</if>				
+		<!-- 용도구분 -->
+		<if test="ordrgdiv20 != null and !ordrgdiv20.equals('')">
+			AND A.ORDRG_DIV20 = #{ordrgdiv20}   
+		</if>
+		<!-- 특성구분 -->
+		<if test="ordrgdiv30 != null and !ordrgdiv30.equals('')">
+			AND A.ORDRG_DIV30 = #{ordrgdiv30}   
+		</if>			
 	</sql>	
 		
 	<!-- 기준관리 - 결재선 조회 리스트  카운트 -->
@@ -71,10 +84,16 @@
 								, A.EXRATE
 								, 
 								(
+									SELECT SUM(ORDRG_QTY)
+										FROM TB_SM02D01 D
+									WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
+								) AS ORDRG_QTY			/* 발주수량 */								
+								, 
+								(
 									SELECT SUM(D.ORDRG_AMT)
 										FROM TB_SM02D01 D
 									WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
-								) AS ORDRG_AMT
+								) AS ORDRG_AMT			/* 발주금액 */								
 								, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
 								, A.ORDRG_RMK
 								, A.IN_CMPLET_YN
@@ -151,10 +170,16 @@
 								, A.EXRATE
 								, 
 								(
+									SELECT SUM(ORDRG_QTY)
+										FROM TB_SM02D01 D
+									WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
+								) AS ORDRG_QTY			/* 발주수량 */								
+								, 
+								(
 									SELECT SUM(D.ORDRG_AMT)
 										FROM TB_SM02D01 D
 									WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
-								) AS ORDRG_AMT
+								) AS ORDRG_AMT			/* 발주금액 */								
 								, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
 								, A.ORDRG_RMK
 								, A.IN_CMPLET_YN
@@ -180,7 +205,7 @@
 			                        INNER JOIN TB_CR02M01 Y ON(X.CO_CD = Y.CO_CD AND X.ORDRS_NO = Y.ORDRS_NO)	/* 수주마스터 */
 			                        LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD /* 거래처마스터 */
 			                        LEFT OUTER JOIN TB_BM01M01 E ON(X.PRDT_CD=E.PRDT_CD)							
-							) B ON(A.CO_CD=B.CO_CD AND A.SALES_CD=B.SALES_CD)											
+							) B ON(A.CO_CD=B.CO_CD AND A.SALES_CD=B.SALES_CD)														
 						WHERE 1=1								
 						<include refid="selectOrderListCondition"></include>
 						ORDER BY A.CO_CD DESC, A.ORDRG_NO DESC, A.CREAT_DTTM DESC, A.UDT_DTTM DESC		
@@ -223,9 +248,9 @@
 			, DSGN_NO
 			, MATR_CD
 			, FN_CM05M01_CD_TO_NM(D.MATR_TEST_DIV) MATR_TEST_DIV    
-			, ORDRG_PRC
-			, ORDRG_QTY
-			, ORDRG_AMT
+			, ORDRG_PRC			/* 발주단가		*/
+			, ORDRG_QTY			/* 발주수량 */
+			, ORDRG_AMT			/* 발주금액  */
 			, TO_CHAR(D.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
 			, TO_CHAR(D.DUDT_INTEND_DT, 'YYYY-MM-DD') DUDT_INTEND_DT
 			, ORDRG_DTL_RMK
@@ -352,7 +377,6 @@
         	SELECT NVL(SUM(ORDRG_QTY), 0) 
         		FROM TB_SM02D01 CC
         	WHERE D.CO_CD = CC.CO_CD 
-	        		AND D.ORDRG_NO != CC.ORDRG_NO
 	        		AND D.SALES_CD = CC.SALES_CD 
 	        		AND D.LOWER_CD = CC.LOWER_CD
 	        		AND D.MATR_CD = CC.MATR_CD        		
@@ -504,28 +528,27 @@
 	
 	<!-- 발주관리 마스터 수정 -->
 	<update id="updateOrderMaster" parameterType="Map">
-		UPDATE TB_SM02D01
-			SET 
-		SALES_CD = #{salesCd}
-		, MATR_SEQ = #{matrSeq}
-		, UPPER_CD = #{upperCd}
-		, LOWER_CD = #{lowerCd}
-		, DSGN_NO = #{dsgnNo}
-		, MATR_CD = #{matrCd}
-		, MATR_TEST_DIV = #{matrTestDiv}
-		, ORDRG_PRC = #{ordrgPrc}
-		, ORDRG_QTY = #{ordrgQty}
+		UPDATE TB_SM02M01
+			SET
+		REQ_NO = #{reqNo} 
+		, SALES_CD = #{salesCd}
+		, PCHS_CLNT_CD = #{pchsClntCd}
+		, ORDRG_DT = #{ordrgDt}
+		, ORDRG_DIV10 = #{ordrgDiv10}
+		, ORDRG_DIV20 = #{ordrgDiv20}
+		, ORDRG_DIV30 = #{ordrgDiv30}
+		, CURR_CD = #{currCd}
+		, EXRATE = #{exrate}
 		, ORDRG_AMT = #{ordrgAmt}
 		, DUDT_DEQ_DT = #{dudtDeqDt}
-		, DUDT_INTEND_DT = #{dudtIntendDt}
-		, ORDRG_DTL_RMK = #{ordrgDtlRmk,			jdbcType=VARCHAR}	
+		, ORDRG_RMK = #{ordrgRmk,			jdbcType=VARCHAR}	 	
+		, IN_CMPLET_YN = #{inCmpletYn,			jdbcType=VARCHAR}
 		, UDT_ID = #{userId}
 		, UDT_PGM = #{pgmId}
-		, UDT_DTTM = SYSDATE	
-		, WH_CD = #{matrWhCd}		
-		WHERE CO_CD = #{coCd} 
-		 AND ORDRG_NO = #{ordrgNo} 
-		 AND ORDRG_SEQ = #{ordrgSeq} 
+		, UDT_DTTM = SYSDATE
+		WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			AND CO_CD = #{coCd}
+			AND ORDRG_NO = #{ordrgNo}
 	</update>
 		
 	<!-- 발주관리 상세 수정 -->

@@ -85,9 +85,9 @@ public class SM02Ctr {
     @PostMapping(value = "/updateOrder")
     public String updateOrder(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
   		try {
-  			if (sm02Svc.updateOrderDetail(paramMap, mRequest) != 0 ) {
+  			if (sm02Svc.updateOrder(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
   			} else {
   				model.addAttribute("resultCode", 500);
   				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));

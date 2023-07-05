@@ -42,6 +42,7 @@
 		<input type="hidden" id="userId"     	name="userId">
 		<input type="hidden" id="pgmId"     	name="pgmId" value="SM0201M01">
 		<input type="hidden" id="fileTrgtKey"	name="fileTrgtKey" value="">		<!-- file target key -->
+	
       <table>
 
         <colgroup>
@@ -106,11 +107,11 @@
 			</td>
 			<th>설비명</th>
 			<td colspan="0">
-				<input type="text" id="eqpNm" name="eqpNm" data-search="reqNo" msg="설비명" readonly="readonly">
+				<input type="text" id="eqpNm" name="eqpNm" data-search="eqpNm" msg="설비명" readonly="readonly">
 			</td>
 			<th>요인별요청번호</th>
 			<td>
-				<input type="text" id="reqNo" name="reqNo" data-search="reqNo" msg="설비명">
+				<input type="text" id="reqNo" name="reqNo" data-search="reqNo" msg="요인별요청번호">
 			</td>			
         </tr>
         
@@ -267,33 +268,42 @@ var gridViewPop = {
 					//그리드값 변경시 실행
 		            onDataChanged: function () {
 					    var row = this.dindex;
-					    var col = this.colIndex;		
-		            	// 발주단가, 발주수량  변경시
-		            	if ( this.key == "ordrgPrc" || this.key == "ordrgQty" ) {   
-		            		if( this.item.ordrgQty != "" && this.item.ordrgQty > 0  ) {
-		            			var ordrgPrc = (this.item.ordrgPrc=="" )? 0 : this.item.ordrgPrc;
-		            			var ordrgAmt = parseInt( deleteCommaStr(String(this.item.ordrgQty)) * deleteCommaStr(ordrgPrc) );
-		            			gridViewPop.target.setValue(row, "ordrgAmt", ordrgAmt);
-		            			console.log('---여기실행---단가계산' + ordrgAmt)		            			
-		            		} else {
-							    gridViewPop.target.setValue(row, "ordrgAmt", "");		            			
-		            		}
-		            	}           	
-						//발주수량 OVER CHK
-		            	if ( this.key == "ordrgQty") {
-		            		if( this.item.ordrgQty != "" && this.item.ordrgQty > 0  ) {		            		
-			            		var calcuOrdrgQty = parseInt( deleteCommaStr(this.item.bomQty) - deleteCommaStr(this.item.preBomQty) );
-			            		if( calcuOrdrgQty < this.item.ordrgQty   ) {
-			            			//등록일때만 값 초기화
-			            			if( actionType == "C" ) gridViewPop.target.setValue(row, "ordrgQty", "");            			
-								    alert("발주수량은 "+ calcuOrdrgQty+" (와)과 같거나 작아야 합니다");
-								    return;
-			            		} else if( this.item.ordrgQty == 0 ) {
-								    alert("발주수량은 0 보다 커야 합니다.");
-								    return;			            			
+					    var col = this.colIndex;
+					    var ordrgPrc = 0;
+					    //체크박스 변경 제외
+					    if( this.key != "userChk" ) {
+
+	            			var ordrgPrc = (this.item.ordrgPrc=="" || typeof(this.item.ordrgPrc)=="undefined")? 0 : this.item.ordrgPrc;
+			            	// 발주단가, 발주수량  변경시
+			            	if ( this.key == "ordrgPrc" || this.key == "ordrgQty" ) {   			            		
+			            		if( this.item.ordrgQty != "" && this.item.ordrgQty > 0  ) {
+			            			var ordrgAmt = parseInt( deleteCommaStr(this.item.ordrgQty) * deleteCommaStr(ordrgPrc) );
+			            			gridViewPop.target.setValue(row, "ordrgAmt", ordrgAmt);		            			
+			            		} else {
+								    gridViewPop.target.setValue(row, "ordrgAmt", "");		            			
 			            		}
-		            		}
-		            	}						
+			            	}           	
+							//발주수량 OVER CHK
+			            	if ( this.key == "ordrgQty") {			            		
+			            		if( this.item.ordrgQty != "" && this.item.ordrgQty > 0  ) {			            			
+				            		var calcuOrdrgQty = parseInt( deleteCommaStr(this.item.bomQty) - deleteCommaStr(this.item.preBomQty) );
+			            			if( this.item.ordrgQty == 0 ) {
+									    alert("발주수량은 0 보다 커야 합니다.");
+									    gridViewPop.target.setValue(row, "ordrgQty", "");	
+									    return;			        
+			            			} else if( calcuOrdrgQty == 0 ) {
+									    alert("발주 가능 수량이 0입니다.");
+									    gridViewPop.target.setValue(row, "ordrgQty", "");	
+									    return;		 			            				
+			            			} else if( calcuOrdrgQty < this.item.ordrgQty   ) {
+				            			//등록일때만 값 초기화
+				            			if( actionType == "C" ) gridViewPop.target.setValue(row, "ordrgQty", "");            			
+									    alert("발주수량은 "+ calcuOrdrgQty+" (와)과 같거나 작아야 합니다");
+									    return;
+				            		}
+			            		}
+			            	}	
+					    }
 		            	
 		            	 
 		            },					
@@ -475,7 +485,7 @@ function updateOrder() {
 	        formData.append("ordrgNo", $("#ordrgNo").val());			
 			formData.append("makeArr", JSON.stringify(makeArr));
 		}          
-		filePostAjax("/user/sm/sm02/updateOrderDetail", formData,		// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
+		filePostAjax("/user/sm/sm02/updateOrder", formData,		// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
 			function(data) {
 				alert(data.resultMessage);								// 결과 메시지를 alert으로 출력
 				if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
@@ -702,8 +712,8 @@ $(document).ready(function() {
 					//발주순번 은 select key로  ORDRG_SEQ  
 					detailObj[key] = val;			            			            
 	        	}
-	            //필수값 체크를 여기서 한다. 발주수량, 납기요청일 - 체크된 항목만 
-	            if( actionType == "C" && detailObj['userChk'] == "Y" ) {
+	            //필수값 체크를 여기서 한다. 발주수량, 납기요청일 - 체크된 항목만	            
+	            //if( actionType == "C" && detailObj['userChk'] == "Y" ) {
 	            	//발주수량
 		            if( detailObj['ordrgQty'] =="" || detailObj['ordrgQty'] =="0" ) {
 		            	msgArr.push((idx+1)+" 행의 발주수량을 입력해 주십시오.")	;
@@ -713,17 +723,19 @@ $(document).ready(function() {
 		            	msgArr.push((idx+1)+" 행의 납기요청일을 입력해 주십시오.")	;		            	
 		            }
 		            //발주단가 체크 없음??
-		            /*
 		            if( detailObj['ordrgPrc'] =="" || detailObj['ordrgPrc'] =="0" ) {
 		            	msgArr.push((idx+1)+" 행의 발주단가를 입력해 주십시오.")	;
-		            	console.log('--msgArr--' + msgArr);
 		            }
-		            */		
+		            //발주수량
+		            if( Number(detailObj['bomQty']) < Number(detailObj['preBomQty']) + Number(detailObj['ordrgQty']) ) {
+		            	var calQty = parseInt( Number(detailObj['bomQty']) - Number(detailObj['preBomQty']) );
+		            	msgArr.push((idx+1)+" 행의 발주수량은 " + calQty + "보다 작거나 같아야 합니다.")	;
+		            }		
 		            //체크된 항목만 저장		            
-		            detailArr.push(detailObj);		            
-	            } else if( actionType == "U" ) {
-		            detailArr.push(detailObj);	            	
-	            }
+		            detailArr.push(detailObj);	
+	            //} else if( actionType == "U" ) {
+		            //detailArr.push(detailObj);	            	
+	            //}
 	            		
 	        });			
 	        //error alert 후 종료
@@ -790,12 +802,16 @@ $(document).ready(function() {
 		
 			var bomQty = parseInt(bomQty);
 			var preBomQty = parseInt(preBomQty);
-			var ordrgQty = parseInt(bomQty - preBomQty);		
+			var ordrgQty = parseInt(bomQty - preBomQty);			
+		    //발주금액 없을경우 0 셋
+		    if( gridList[row].ordrgPrc == "" || typeof(gridList[row].ordrgPrc) == "undefined" ) {
+		    	gridObj.target.setValue(row, "ordrgPrc", 0);  
+		    }			
         	//수량
         	if(chkVal == "Y") {
         		if( ordrgQty > 0 ) {
         			gridObj.target.setValue(row, "ordrgQty", ordrgQty);  
-        		} else if( isNaN(ordrgQty) ) {
+        		} else if( isNaN(ordrgQty) || ordrgQty == 0 ) {
         			gridObj.target.setValue(row, "ordrgQty", 0);        			
         		}
         	} else if(chkVal == "N") {

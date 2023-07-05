@@ -171,7 +171,10 @@ public class SM02SvcImpl implements SM02Svc {
   				
 		int result = 0;	    	    
 	    //upate
-		result = sm02Mapper.updateOrderMaster(paramMap);		
+		result = sm02Mapper.updateOrderMaster(paramMap);	
+		
+		result += sm02Svc.updateOrderDetail(paramMap, mRequest);
+		
 		return result;
 	}	
 	
