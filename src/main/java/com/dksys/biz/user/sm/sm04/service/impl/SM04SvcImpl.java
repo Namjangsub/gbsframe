@@ -242,9 +242,9 @@ public class SM04SvcImpl implements SM04Svc {
 		
 		int result = 0;
 		
-		String pid = paramMap.get("pid").toString();		
+		String lvl = paramMap.get("lvl").toString();		
 		
-		if ("top".equals(pid)) {
+		if ("1".equals(lvl)) {
 			//데이터 처리
 			result = sm04Mapper.delete_sm04_Dtl_All(paramMap);
 			result = sm04Mapper.delete_sm04(paramMap);
