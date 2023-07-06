@@ -164,10 +164,10 @@ public class SM05Ctr {
 		return "jsonView";
 	}
 	//삭제
-	@PutMapping(value = "/delete_sm05M_io")
-	public String delete_sm05M_io(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+	@PutMapping(value = "/delete_sm05")
+	public String delete_sm05(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 		try {
-			if (sm05Svc.delete_sm05M_io(paramMap) != 0) {
+			if (sm05Svc.delete_sm05(paramMap) != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
 			} else {
@@ -185,15 +185,17 @@ public class SM05Ctr {
 	@PutMapping(value = "/delete_sm05D_io")
 	public String delete_sm05D_io(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		try {
-				sm05Svc.delete_sm05D_io(paramMap);
-				model.addAttribute("resultCode", 200);
-				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-		} catch (Exception e) {
-				model.addAttribute("resultCode", 500);
-				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			sm05Svc.delete_sm05D_io(paramMap);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+		} catch(Exception e){
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
 		}
 		return "jsonView";
+
 	}
+	
 	
 	
 	// 프로젝트 정보 조회 - popup 부분

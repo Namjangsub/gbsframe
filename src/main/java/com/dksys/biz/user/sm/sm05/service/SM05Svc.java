@@ -35,20 +35,8 @@ public interface SM05Svc {
 	int update_sm05_IoInfo(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 	
 	//삭제
-	int delete_sm05M_io(Map<String, String> paramMap) throws Exception;
+	int delete_sm05(Map<String, String> paramMap) throws Exception;
 	int delete_sm05D_io(Map<String, String> paramMap);
-	//Map<String, String> selectIoInfo(Map<String, String> paramMap);
-
-//	int selectPchsDetailCount(Map<String, String> paramMap);
-
-//	List<Map<String, String>> selectPchsDetail(Map<String, String> paramMap);
-
-//	int selectConfirmCount(Map<String, String> paramMap);
-//
-	
-//
-//	int updatePchsCost(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
-//
 	
 
 }

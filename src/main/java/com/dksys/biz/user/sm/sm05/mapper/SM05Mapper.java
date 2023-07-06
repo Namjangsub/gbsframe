@@ -38,9 +38,13 @@ public interface SM05Mapper {
 	int update_sm05(Map<String, String> paramMap); 
 	
 	int update_sm05_IoInfo(Map<String, String> paramMap);
+	
 	//삭제
-	int delete_sm05M_io(Map<String, String> paramMap);
+	int delete_sm05(Map<String, String> paramMap);
+//	int delete_sm05_Dtl(Map<String, String> paramMap);    
+//  int delete_sm05_Dtl_All(Map<String, String> paramMap);
 	int delete_sm05D_io(Map<String, String> paramMap);
+	
     
 	//Map<String, String> selectIoInfo(Map<String, String> paramMap);
 
