@@ -7,13 +7,8 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface WB04Svc {
 	
-    List<Map<String, String>> selectWbsPlanNoList(Map<String, String> paramMap);
+	List<Map<String, String>> selectWbsPlanTreeList(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectWbsSalesCodeList(Map<String, String> paramMap);
-	
-	List<Map<String, String>> selectWbsPlanCloseYnNTreeList(Map<String, String> paramMap);
-	
-	int selectWbsPlanCloseYnNTreeListCount(Map<String, String> paramMap);
-	
-	List<Map<String, String>> selectWbsPlanCloseYnNTreeListSub(Map<String, String> paramMap);
+    List<Map<String, String>> selectGanttList(Map<String, String> paramMap);
+
 }

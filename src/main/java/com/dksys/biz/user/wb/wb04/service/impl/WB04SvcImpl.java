@@ -39,31 +39,16 @@ public class WB04SvcImpl implements WB04Svc {
 	@Autowired
 	ExceptionThrower thrower;
 
-
 	@Override
-	public List<Map<String, String>> selectWbsPlanNoList(Map<String, String> paramMap) {
-		return wb04Mapper.selectWbsPlanNoList(paramMap);
-	}
-	
-	
-	@Override
-	public List<Map<String, String>> selectWbsSalesCodeList(Map<String, String> paramMap) {
-		return wb04Mapper.selectWbsSalesCodeList(paramMap);
+	public List<Map<String, String>> selectWbsPlanTreeList(Map<String, String> paramMap) {
+		return wb04Mapper.selectWbsPlanTreeList(paramMap);
 	}
 
 	@Override
-	public int selectWbsPlanCloseYnNTreeListCount(Map<String, String> paramMap) {
-		return wb04Mapper.selectWbsPlanCloseYnNTreeListCount(paramMap);
+	public List<Map<String, String>> selectGanttList(Map<String, String> paramMap) {
+		return wb04Mapper.selectGanttList(paramMap);
 	}
 	
-	@Override
-	public List<Map<String, String>> selectWbsPlanCloseYnNTreeList(Map<String, String> paramMap) {
-		return wb04Mapper.selectWbsPlanCloseYnNTreeList(paramMap);
-	}
-	
-	@Override
-	public List<Map<String, String>> selectWbsPlanCloseYnNTreeListSub(Map<String, String> paramMap) {
-		return wb04Mapper.selectWbsPlanCloseYnNTreeListSub(paramMap);
-	}
+
 	
 }

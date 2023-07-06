@@ -36,41 +36,22 @@ public class WB04Ctr {
     @Autowired
     WB04Svc wb04Svc;
     
-    //<!-- 관리번호(WBS계획번호) 조회 조건 팝업 리스트  -->
-	@PostMapping(value = "/selectWbsPlanNoList") 
-	public String selectWbsPlanNoList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	  List<Map<String, String>> codeInfoList = wb04Svc.selectWbsPlanNoList(paramMap); 
-	  model.addAttribute("codeInfoList", codeInfoList); 
+    @PostMapping(value = "/selectWbsPlanTreeList") 
+	public String selectWbsPlanTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	  List<Map<String, String>> fileList = wb04Svc.selectWbsPlanTreeList(paramMap); 
+	  model.addAttribute("fileList", fileList); 
+	  return "jsonView";
+	  
+    }
+    
+	@PostMapping(value = "/selectGanttList") 
+	public String selectGanttList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	  List<Map<String, String>> fileList = wb04Svc.selectGanttList(paramMap); 
+	  model.addAttribute("fileList", fileList); 
 	  return "jsonView";
 	  
     }
 	  
-	//<!-- 수주번호 조회 조건 팝업 리스트  -->
-	@PostMapping(value = "/selectWbsSalesCodeList") 
-	public String selectWbsSalesCodeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	  List<Map<String, String>> codeInfoList = wb04Svc.selectWbsSalesCodeList(paramMap); 
-	  model.addAttribute("codeInfoList",
-	  codeInfoList); 
-	  return "jsonView";  
-	}
-	  
-    //<!-- 일정 미마감 조회 리스트   --> 
-	@PostMapping(value = "/selectWbsPlanCloseYnNTreeList") 
-	public String selectWbsPlanCloseYnNTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
-	  int totalCnt = wb04Svc.selectWbsPlanCloseYnNTreeListCount(paramMap);
-      PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-  	  model.addAttribute("paginationInfo", paginationInfo);
-  	  List<Map<String, String>> fileList = wb04Svc.selectWbsPlanCloseYnNTreeList(paramMap);
-  	  model.addAttribute("fileList", fileList);
-      return "jsonView";
-	}  
-	  
-	@PostMapping(value = "/selectWbsPlanCloseYnNTreeListSub") 
-	public String selectWbsPlanCloseYnNTreeListSub(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
-  	  List<Map<String, String>> fileList = wb04Svc.selectWbsPlanCloseYnNTreeListSub(paramMap);
-  	  model.addAttribute("fileList", fileList);
-      return "jsonView";
-	}   
 	  
 	  
 	  

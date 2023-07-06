@@ -2,858 +2,156 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.dksys.biz.user.wb.wb04.mapper.WB04Mapper">
-          <select id="selectWbsPlanNoList" parameterType="Map" resultType="camelMap">
-                SELECT DISTINCT * 
-                  FROM (
-                       SELECT 
-                           X.CO_CD, 
-                           (SELECT Y.CODE_NM FROM TB_CM05M01 Y WHERE Y.CODE_ID = X.CO_CD) AS CO_CD_NM,                  
-                           X.SALES_CD, 
-                           X.WBS_PLAN_NO
-                           FROM TB_WB01M01 X
-                           WHERE X.CO_CD = #{coCd}
-                           <if test="wbsPlanNo != null and !wbsPlanNo.equals('')">
-                              AND X.WBS_PLAN_NO like '%${wbsPlanNo}%'                
-                           </if>     
-                          )
-                 ORDER BY WBS_PLAN_NO ASC         
-          </select>
-          
-           <select id="selectWbsSalesCodeList" parameterType="Map" resultType="camelMap">          
-                SELECT  X.CO_CD,
-                       FN_CM05M01_CD_TO_NM(X.CO_CD) AS CO_CD_NM,
-                       X.ORDRS_NO,
-                       X.SALES_CD, -- SALES CODE
-                       Y.ORGN_SALES_CD,
-                       Y.ORDRS_CLNT_CD,
-                       A.CLNT_NM  AS ORDRS_CLNT_NM,
-                       Y.CLNT_PJT,
-                       X.ORDRS_DTL_DIV20,
-                       FN_CM05M01_CD_TO_NM(X.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
-                       X.PRDT_CD, 
-                       P.PRDT_NM  PRDT_CD_NM,
-                       X.ITEM_DIV, 
-                       FN_CM05M01_CD_TO_NM(X.ITEM_DIV) ITEM_DIV_NM,
-                       X.EQP_NM 
-                  FROM TB_CR02D02 X
-                        INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
-                                                AND X.ORDRS_NO = Y.ORDRS_NO
-                        LEFT OUTER JOIN TB_BM01M01 P ON X.PRDT_CD = P.PRDT_CD 
-                        LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD 
-                WHERE X.CO_CD = #{coCd}
-               <if test="salesCd != null and !salesCd.equals('')">
-                  AND X.SALES_CD like '%${salesCd}%'                
-               </if>                               
-           </select>
+
+<select id="selectWbsPlanTreeList" parameterType="Map" resultType="CamelMap">
+            SELECT  
+                    T.*,
+                    FN_CM05M01_CD_TO_NM(T.CO_CD) AS CO_CD_NM,
+                    CASE WHEN W01.FILE_TRGT_KEY  IS NULL  THEN 'N' ELSE 'Y' END WBS_PLAN_CHK_YN,
+                    CASE WHEN W02.FILE_TRGT_KEY  IS NULL  THEN 'N' ELSE 'Y' END WBS_RSLTS_CHK_YN,
+                    TO_CHAR(W01.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT, -- 계획시작일자
+                    TO_CHAR(W01.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT, -- 계획종료일자
+                    TO_CHAR(W02.WBS_RSLTSS_DT, 'YYYY-MM-DD') AS WBS_RSLTSS_DT, -- 실적시작일자
+                    TO_CHAR(W02.WBS_RSLTSE_DT, 'YYYY-MM-DD') AS WBS_RSLTSE_DT, -- 실적종료일자
+                    W01.WBS_PLAN_ID,
+                    TO_CHAR(W01.WBS_PLAN_DT, 'YYYY-MM-DD') AS  WBS_PLAN_DT,
+                    FN_CM06M01_ID_TO_NM(W01.WBS_PLAN_ID) WBS_PLAN_NM,
+                    FN_CM06M01_ID_TO_NM(W01.CREAT_ID)  CREAT_ID,
+                    TO_CHAR(W01.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM,
+                    FN_CM06M01_ID_TO_NM(W01.UDT_ID)  UDT_ID,
+                    TO_CHAR(W01.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM,
+                    W02.WBS_PLAN_MH,        --계획공수
+                    W02.WBS_RSLTS_MH,       --실적공수
+                    W01.FILE_TRGT_KEY,
+                    W01.WBS_PLAN_NO,
+                    W01.WBS_PLAN_CNTS,
+                    W01.WBS_PLAN_RMK,
+                    W01.WBS_PLAN_STS_CODE_ID,
+                    W01.WBS_PLAN_OS_YN,
+                    W01.LOCK_YN,
+                    W01.CLOSE_YN,
+                    DSGN_DIF_CODE_ID,
+                    DSGN_PLAN_HOUR,
+                    PRDCTN_DIF_CODE_ID,
+                    PRDCTN_PLAN_HOUR,    
+                    WBS_PLAN_MNG_ID,
+                    FN_CM06M01_ID_TO_NM(W01.WBS_PLAN_MNG_ID) WBS_PLAN_MNG_NM,
+                    W02.FILE_TRGT_KEY AS RSLTS_FILE_TRGT_KEY,
+                    W02.WBS_PLAN_NO   AS RSLTS_WBS_PLAN_NO,
+                    W02.WBS_RSLTS_RATE,
+                    W02.LOCK_YN  AS RSLTS_LOCK_YN,
+                    W02.CLOSE_YN AS RSLTS_CLOSE_YN,
+                    W02.WBS_RSLTS_CNTS,
+                    W02.WBS_RSLTS_RMK,
+                    TO_CHAR(W02.WBS_RSLTS_DT, 'YYYY-MM-DD') AS WBS_RSLTS_DT,
+                    FN_CM06M01_ID_TO_NM(W02.WBS_RSLTS_ID)  AS WBS_RSLTS_ID,
+                    W02.*
+               FROM         
+                    (SELECT  
+                           CR.CO_CD, 
+                           CR.ORDRS_NO,
+                           CR.SALES_CD, 
+                           Y.ORDRS_CLNT_CD, 
+                           (SELECT P.CLNT_NM FROM TB_BM02M01 P WHERE P.CLNT_CD = Y.ORDRS_CLNT_CD) AS ORDRS_CLNT_NM,
+                           Y.CLNT_PJT, 
+                           CR.ORDRS_DTL_DIV20, 
+                           (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = CR.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+                           CR.PRDT_CD, 
+                           (SELECT T.PRDT_NM FROM TB_BM01M01 T WHERE T.PRDT_CD = CR.PRDT_CD) AS PRDT_CD_NM,
+                           CR.ITEM_DIV, 
+                           (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = CR.ITEM_DIV) AS ITEM_DIV_NM,
+                           CR.EQP_NM ,
+                           CD.*
+                      FROM TB_CR02D02 CR INNER JOIN TB_CR02M01 Y  ON CR.CO_CD = Y.CO_CD
+                                                                 AND CR.ORDRS_NO = Y.ORDRS_NO
+                           , (
+                                                SELECT 
+                                                         CASE WHEN CODE_KIND = 'ROOT' THEN '' ELSE CODE_KIND END CODE_KIND,
+                                                         CODE_ID,
+                                                         CODE_RPRC,
+                                                         CODE_NM,
+                                                         CASE WHEN LEVEL = '1' THEN CODE_NM ELSE '' END LVL1,
+                                                         CASE WHEN LEVEL = '2' THEN CODE_NM ELSE '' END LVL2,
+                                                         CASE WHEN LEVEL = '3' THEN CODE_NM ELSE '' END LVL3,
+                                                         LPAD('', 3*(LEVEL-1)) || LEVEL LVL,
+                                                         REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_ID, ' -> '), '^\s+\-\>\s+', '') as PATH,
+                                                         CONNECT_BY_ISLEAF AS IS_LEAF,
+                                                         CASE WHEN CONNECT_BY_ISLEAF = 0 THEN 'unit' ELSE 'leaf' END TYPE
+                                                 FROM TB_CM05M01
+                                                 START WITH CODE_ID = 'WBSDIV'
+                                                 CONNECT BY PRIOR CODE_ID  =  CODE_KIND 
+                                )  CD 
+                       WHERE CR.CO_CD = #{coCd}
+                         AND CR.SALES_CD = #{salesCd} 
+                      ORDER BY  CR.SALES_CD, PATH                 
+                     ) AS T LEFT OUTER JOIN TB_WB01M01 W01 ON T.CO_CD    = W01.CO_CD
+                                                          AND T.SALES_CD = W01.SALES_CD
+                                                          AND T.CODE_ID  = W01.WBS_PLAN_CODE_ID
+                            LEFT OUTER JOIN TB_WB02M01 W02 ON T.CO_CD    = W02.CO_CD
+                                                          AND T.SALES_CD = W02.SALES_CD
+                                                          AND T.CODE_ID  = W02.WBS_PLAN_CODE_ID
+                                                          
+        </select>        
 
 
-        <select id="selectWbsPlanCloseYnNTreeListCount" parameterType="Map" resultType="int">
-          SELECT COUNT(*) FROM (
-                                SELECT ROWNUM AS RNUM, T.*,
-                                                          Z1.CODE_NM AS CO_CD_NM,
-                                                          Z2.CLNT_NM AS  ORDRS_CLNT_NM,
-                                                          Z3.CODE_NM AS ORDRS_DTL_DIV20_NM,
-                                                          Z4.PRDT_NM AS PRDT_CD_NM ,      
-                                                          Z5.CODE_NM AS ITEM_DIV_NM,
-                                                          Z6.NAME AS WBS_PLAN_NM,
-                                                          Z7.NAME AS WBS_PLAN_MNG_NM,
-                                                          Z8.CODE_NM  AS WBS_PLAN_STS_NM,
-                                                          Z9.CODE_NM  AS DSGN_DIF_CODE_NM,
-                                                          Z10.CODE_NM  AS PRDCTN_DIF_CODE_NM,
-                                                          Z11.CODE_NM  AS  WBS_PLAN_OS_NM,
-                                                          Z12.NAME   AS   CREAT_NM,
-                                                          Z13.NAME   AS  UDT_NM,
-                                                          CASE WHEN Z14.WBS_RSLTS_DT != '' THEN 'Y' ELSE 'N' END AS WBS_RSLTS_DT
-                                                           FROM (              
-                                                                SELECT  
-                                                                   X.CO_CD,
-                                                                   X.SALES_CD,                       
-                                                                   Y.LVL1 || Y.LVL2 || Y.LVL3 AS CODE_NM,
-                                                                   X.SALES_CD ||'_'|| X.WBS_PLAN_CODE_KIND AS PID,
-                                                                   X.SALES_CD ||'_'|| X.WBS_PLAN_CODE_ID AS ID,
-                                                                   X.LOCK_YN,
-                                                                   X.CLOSE_YN,
-                                                                   X.WBS_PLAN_CODE_KIND,
-                                                                   X.WBS_PLAN_CODE_ID,
-                                                                   X.WBS_PLAN_NO,
-                                                                   X.WBS_PLAN_DT, 
-                                                                   X.WBS_PLAN_ID,
-                                                                   X.WBS_PLAN_MNG_ID,
-                                                                   X.WBS_PLAN_CNTS,
-                                                                   X.WBS_PLANS_DT,
-                                                                   X.WBS_PLANE_DT, 
-                                                                   X.WBS_PLAN_RMK,
-                                                                   X.WBS_PLAN_STS_CODE_ID,
-                                                                   X.DSGN_DIF_CODE_ID,
-                                                                   X.DSGN_PLAN_HOUR,
-                                                                   X.PRDCTN_DIF_CODE_ID,
-                                                                   X.PRDCTN_PLAN_HOUR,
-                                                                   X.WBS_PLAN_OS_YN,
-                                                                   X.CREAT_ID,
-                                                                   X.CREAT_PGM,
-                                                                   X.CREAT_DTTM, 
-                                                                   X.UDT_ID,
-                                                                   X.UDT_PGM,
-                                                                   X.UDT_DTTM,
-                                                                   S.ORDRS_NO,
-                                                                   S.ORDRS_CLNT_CD,
-                                                                   S.CLNT_PJT,
-                                                                   S.ORDRS_DTL_DIV20,
-                                                                   S.PRDT_CD,
-                                                                   S.ITEM_DIV,
-                                                                   S.EQP_NM 
-                                                                   FROM  TB_WB01M01 X
-                                                                   INNER JOIN (
-                                                                             SELECT 
-                                                                             CODE_KIND,
-                                                                             CODE_ID,
-                                                                             CODE_RPRC,
-                                                                             CODE_NM,
-                                                                             CASE WHEN LEVEL = '1' THEN CODE_NM ELSE '' END LVL1,
-                                                                             CASE WHEN LEVEL = '2' THEN CODE_NM ELSE '' END LVL2,
-                                                                             CASE WHEN LEVEL = '3' THEN CODE_NM ELSE '' END LVL3,
-                                                                             LEVEL LVL,
-                                                                             REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_ID, ' -> '), '^\s+\-\>\s+', '') as PATH
-                                                                         FROM TB_CM05M01
-                                                                         START WITH CODE_KIND = 'WBSDIV'
-                                                                         CONNECT BY PRIOR CODE_ID  =  CODE_KIND) Y
-                                                                   ON X.WBS_PLAN_CODE_ID = Y.CODE_ID 
-                                                                   INNER JOIN 
-                                                                    (
-                                                                       SELECT  X.CO_CD, 
-                                                                               X.ORDRS_NO,
-                                                                               X.SALES_CD, 
-                                                                               Y.ORDRS_CLNT_CD, 
-                                                                               Y.CLNT_PJT, 
-                                                                               X.ORDRS_DTL_DIV20, 
-                                                                               X.PRDT_CD, 
-                                                                               X.ITEM_DIV, 
-                                                                               X.EQP_NM 
-                                                                               FROM TB_CR02D02 X
-                                                                        INNER JOIN TB_CR02M01 Y
-                                                                        ON X.CO_CD = Y.CO_CD
-                                                                        AND X.ORDRS_NO = Y.ORDRS_NO ) S
-                                                                       ON X.CO_CD = S.CO_CD
-                                                                       AND X.SALES_CD = S.SALES_CD                       
-                                                                     ORDER BY SALES_CD, ID ASC ) T 
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z1 ON Z1.CODE_ID = T.CO_CD
-                                                                    LEFT OUTER JOIN TB_BM02M01 Z2 ON Z2.CLNT_CD = T.ORDRS_CLNT_CD
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z3 ON Z3.CODE_ID = T.ORDRS_DTL_DIV20
-                                                                    LEFT OUTER JOIN TB_BM01M01 Z4 ON Z4.PRDT_CD = T.PRDT_CD
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z5 ON Z5.CODE_ID = T.ITEM_DIV
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z6 ON Z6.ID = T.WBS_PLAN_ID
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z7 ON Z7.ID = T.WBS_PLAN_MNG_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z8 ON Z8.CODE_ID = T.WBS_PLAN_STS_CODE_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z9 ON Z9.CODE_ID = T.DSGN_DIF_CODE_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z10 ON Z10.CODE_ID = T.PRDCTN_DIF_CODE_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z11 ON Z11.CODE_ID = T.WBS_PLAN_OS_YN
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z12 ON Z12.ID = T.CREAT_ID
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z13 ON Z13.ID = T.UDT_ID
-                                                                    LEFT OUTER JOIN TB_WB02M01 Z14 ON Z14.CO_CD =  T.CO_CD
-                                                                                                      AND Z14.WBS_PLAN_CODE_KIND = T.WBS_PLAN_CODE_KIND
-                                                                                                      AND Z14.WBS_PLAN_CODE_ID =  T.WBS_PLAN_CODE_ID
-                                                                                                      AND Z14.SALES_CD =  T.SALES_CD
-                                
-                      WHERE T.CO_CD = #{coCd}
-                      <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
-                         AND T.WBS_PLAN_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD') +1
-                      </if>
-                      <if test="salesCd != null and !salesCd.equals('')">
-                         AND T.SALES_CD = #{salesCd}
-                     </if>
-                     <if test="!clntCd.equals('') and !clntNm.equals('')">
-                         AND T.ORDRS_CLNT_CD = #{clntCd}              
-                     </if>
-                     <if test="clntCd.equals('') and !clntNm.equals('')">
-                         AND T.ORDRS_CLNT_NM LIKE '%${clntNm}%'                
-                     </if>
-                     <if test="!prdtCd.equals('') and !prdtNm.equals('')">
-                        AND T.PRDT_CD = #{prdtCd}             
-                     </if>             
-                     <if test="prdtCd.equals('') and !prdtNm.equals('')">
-                        AND T.PRDT_CD_NM LIKE '%${prdtNm}%'             
-                     </if>
-                     <if test="itemCd != null and !itemCd.equals('')">
-                        AND T.ITEM_DIV = #{itemCd}               
-                     </if> 
-                     <if test="clntPjt != null and !clntPjt.equals('')">
-                        AND T.CLNT_PJT LIKE '%${ClntPjt}%'            
-                     </if> 
-                     <if test="eqpNm != null and !eqpNm.equals('')">
-                        AND T.EQP_NM LIKE '%${eqpNm}%'         
-                     </if>
-                     <if test="wbsPlanNo != null and !wbsPlanNo.equals('')">
-                        AND T.WBS_PLAN_NO = #{wbsPlanNo}       
-                     </if>
-                     <if test="!salesMngId.equals('') and !salesMngNm.equals('')"> 
-                         AND T.WBS_PLAN_CODE_ID IN (
-                              SELECT WBS_PLAN_CODE_ID
-                                 FROM TB_WB20M01
-                                 WHERE WBS_PLANCO_CD = #{coCd}
-                                 <if test="wbsPlanNo != null and !wbsPlanNo.equals('')">
-                                    AND WBS_PLAN_NO = #{wbsPlanNo}
-                                 </if>
-                                 <if test="salesCd != null and !salesCd.equals('')">
-                                    AND SALES_CD = #{salesCd}
-                                 </if>   
-                                    AND TODO_ID = #{salesMngId})
-                      </if>  
-                      <if test="salesMngId.equals('') and !salesMngNm.equals('')">
-                         AND T.WBS_PLAN_CODE_ID IN (
-                              SELECT X.WBS_PLAN_CODE_ID
-                                 FROM TB_WB20M01 X
-                                 INNER JOIN TB_CM06M01 Y
-                                 ON X.TODO_ID = Y.ID
-                                 WHERE X.WBS_PLANCO_CD = #{coCd} 
-                                 <if test="wbsPlanNo != null and !wbsPlanNo.equals('')">
-                                    AND X.WBS_PLAN_NO = #{wbsPlanNo}#
-                                 </if>
-                                 <if test="salesCd != null and !salesCd.equals('')">
-                                    AND X.SALES_CD = #{salesCd}
-                                 </if>   
-                                    AND Y.NAME LIKE '%${salesMngNm}%')
-                      </if>
-                       
-                  ) T1                      
-        </select>
-         
-        <select id="selectWbsPlanCloseYnNTreeList" parameterType="Map" resultType="camelMap">
-          SELECT RNUM,
-                  FILE_TRGT_KEY,
-                  CO_CD_NM,
-                  LVL,
-                  ORDRS_CLNT_NM,
-                  ORDRS_DTL_DIV20_NM,
-                  PRDT_CD_NM ,      
-                  ITEM_DIV_NM,
-                  WBS_PLAN_NM,
-                  WBS_PLAN_MNG_NM,
-                  WBS_PLAN_STS_NM,
-                  DSGN_DIF_CODE_NM,
-                  PRDCTN_DIF_CODE_NM,
-                  WBS_PLAN_OS_NM,
-                  CREAT_NM,
-                  UDT_NM,
-                  WBS_RSLTS_DT,
-                  CO_CD,
-                  SALES_CD,                       
-                  CODE_NM,
-                  PID,
-                  ID,
-                  LOCK_YN,
-                  CLOSE_YN,
-                  WBS_PLAN_CODE_KIND,
-                  WBS_PLAN_CODE_ID,
-                  WBS_PLAN_NO,
-                  TO_CHAR(WBS_PLAN_DT, 'YYYY-MM-DD') AS WBS_PLAN_DT, 
-                  WBS_PLAN_ID,
-                  WBS_PLAN_MNG_ID,
-                  WBS_PLAN_CNTS,
-                  TO_CHAR(WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT,
-                  TO_CHAR(WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT,
-                  WBS_PLAN_RMK,
-                  WBS_PLAN_STS_CODE_ID,
-                  DSGN_DIF_CODE_ID,
-                  DSGN_PLAN_HOUR,
-                  PRDCTN_DIF_CODE_ID,
-                  PRDCTN_PLAN_HOUR,
-                  WBS_PLAN_OS_YN,
-                  CREAT_ID,
-                  CREAT_PGM,
-                  TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM,
-                  UDT_ID,
-                  UDT_PGM,
-                  TO_CHAR(UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM,
-                  ORDRS_NO,
-                  ORDRS_CLNT_CD,
-                  CLNT_PJT,
-                  ORDRS_DTL_DIV20,
-                  PRDT_CD,
-                  ITEM_DIV,
-                  EQP_NM,
-                  NVL(WBS_RSLTS_RATE,0) AS WBS_RSLTS_RATE
-                    FROM (
-                                SELECT ROWNUM AS RNUM, T.*,
-                                                          Z1.CODE_NM AS CO_CD_NM,
-                                                          Z2.CLNT_NM AS  ORDRS_CLNT_NM,
-                                                          Z3.CODE_NM AS ORDRS_DTL_DIV20_NM,
-                                                          Z4.PRDT_NM AS PRDT_CD_NM ,      
-                                                          Z5.CODE_NM AS ITEM_DIV_NM,
-                                                          Z6.NAME AS WBS_PLAN_NM,
-                                                          Z7.NAME AS WBS_PLAN_MNG_NM,
-                                                          Z8.CODE_NM  AS WBS_PLAN_STS_NM,
-                                                          Z9.CODE_NM  AS DSGN_DIF_CODE_NM,
-                                                          Z10.CODE_NM  AS PRDCTN_DIF_CODE_NM,
-                                                          Z11.CODE_NM  AS  WBS_PLAN_OS_NM,
-                                                          Z12.NAME   AS   CREAT_NM,
-                                                          Z13.NAME   AS  UDT_NM,
-                                                          CASE WHEN Z14.WBS_RSLTS_DT != '' THEN 'Y' ELSE 'N' END AS WBS_RSLTS_DT,
-                                                          Z14.WBS_RSLTS_RATE
-                                                           FROM (              
-                                                                SELECT  
-                                                                   X.FILE_TRGT_KEY,
-                                                                   X.CO_CD,
-                                                                   X.SALES_CD,                       
-                                                                   Y.LVL1 || Y.LVL2 || Y.LVL3 AS CODE_NM,
-                                                                   Y.LVL,
-                                                                   X.SALES_CD ||'_'|| X.WBS_PLAN_CODE_KIND AS PID,
-                                                                   X.SALES_CD ||'_'|| X.WBS_PLAN_CODE_ID AS ID,
-                                                                   X.LOCK_YN,
-                                                                   X.CLOSE_YN,
-                                                                   X.WBS_PLAN_CODE_KIND,
-                                                                   X.WBS_PLAN_CODE_ID,
-                                                                   X.WBS_PLAN_NO,
-                                                                   X.WBS_PLAN_DT, 
-                                                                   X.WBS_PLAN_ID,
-                                                                   X.WBS_PLAN_MNG_ID,
-                                                                   X.WBS_PLAN_CNTS,
-                                                                   X.WBS_PLANS_DT,
-                                                                   X.WBS_PLANE_DT, 
-                                                                   X.WBS_PLAN_RMK,
-                                                                   X.WBS_PLAN_STS_CODE_ID,
-                                                                   X.DSGN_DIF_CODE_ID,
-                                                                   X.DSGN_PLAN_HOUR,
-                                                                   X.PRDCTN_DIF_CODE_ID,
-                                                                   X.PRDCTN_PLAN_HOUR,
-                                                                   X.WBS_PLAN_OS_YN,
-                                                                   X.CREAT_ID,
-                                                                   X.CREAT_PGM,
-                                                                   X.CREAT_DTTM, 
-                                                                   X.UDT_ID,
-                                                                   X.UDT_PGM,
-                                                                   X.UDT_DTTM,
-                                                                   S.ORDRS_NO,
-                                                                   S.ORDRS_CLNT_CD,
-                                                                   S.CLNT_PJT,
-                                                                   S.ORDRS_DTL_DIV20,
-                                                                   S.PRDT_CD,
-                                                                   S.ITEM_DIV,
-                                                                   S.EQP_NM 
-                                                                   FROM  TB_WB01M01 X
-                                                                   INNER JOIN (
-                                                                             SELECT 
-                                                                             CODE_KIND,
-                                                                             CODE_ID,
-                                                                             CODE_RPRC,
-                                                                             CODE_NM,
-                                                                             CASE WHEN LEVEL = '1' THEN CODE_NM ELSE '' END LVL1,
-                                                                             CASE WHEN LEVEL = '2' THEN CODE_NM ELSE '' END LVL2,
-                                                                             CASE WHEN LEVEL = '3' THEN CODE_NM ELSE '' END LVL3,
-                                                                             LPAD('', 3*(LEVEL-1)) || LEVEL LVL,
-                                                                             REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_ID, ' -> '), '^\s+\-\>\s+', '') as PATH
-                                                                         FROM TB_CM05M01
-                                                                         START WITH CODE_KIND = 'WBSDIV'
-                                                                         CONNECT BY PRIOR CODE_ID  =  CODE_KIND) Y
-                                                                   ON X.WBS_PLAN_CODE_ID = Y.CODE_ID 
-                                                                   INNER JOIN 
-                                                                    (
-                                                                       SELECT  X.CO_CD, 
-                                                                               X.ORDRS_NO,
-                                                                               X.SALES_CD, 
-                                                                               Y.ORDRS_CLNT_CD, 
-                                                                               Y.CLNT_PJT, 
-                                                                               X.ORDRS_DTL_DIV20, 
-                                                                               X.PRDT_CD, 
-                                                                               X.ITEM_DIV, 
-                                                                               X.EQP_NM 
-                                                                               FROM TB_CR02D02 X
-                                                                        INNER JOIN TB_CR02M01 Y
-                                                                        ON X.CO_CD = Y.CO_CD
-                                                                        AND X.ORDRS_NO = Y.ORDRS_NO ) S
-                                                                       ON X.CO_CD = S.CO_CD
-                                                                       AND X.SALES_CD = S.SALES_CD                       
-                                                                     ORDER BY SALES_CD, ID ASC ) T 
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z1 ON Z1.CODE_ID = T.CO_CD
-                                                                    LEFT OUTER JOIN TB_BM02M01 Z2 ON Z2.CLNT_CD = T.ORDRS_CLNT_CD
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z3 ON Z3.CODE_ID = T.ORDRS_DTL_DIV20
-                                                                    LEFT OUTER JOIN TB_BM01M01 Z4 ON Z4.PRDT_CD = T.PRDT_CD
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z5 ON Z5.CODE_ID = T.ITEM_DIV
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z6 ON Z6.ID = T.WBS_PLAN_ID
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z7 ON Z7.ID = T.WBS_PLAN_MNG_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z8 ON Z8.CODE_ID = T.WBS_PLAN_STS_CODE_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z9 ON Z9.CODE_ID = T.DSGN_DIF_CODE_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z10 ON Z10.CODE_ID = T.PRDCTN_DIF_CODE_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z11 ON Z11.CODE_ID = T.WBS_PLAN_OS_YN
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z12 ON Z12.ID = T.CREAT_ID
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z13 ON Z13.ID = T.UDT_ID
-                                                                    LEFT OUTER JOIN TB_WB02M01 Z14 ON Z14.CO_CD =  T.CO_CD
-                                                                                                      AND Z14.WBS_PLAN_CODE_KIND = T.WBS_PLAN_CODE_KIND
-                                                                                                      AND Z14.WBS_PLAN_CODE_ID =  T.WBS_PLAN_CODE_ID
-                                                                                                      AND Z14.SALES_CD =  T.SALES_CD
-                                
-                     WHERE T.CO_CD = #{coCd}
-                      <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
-                         AND T.WBS_PLAN_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD') +1
-                      </if>
-                      <if test="salesCd != null and !salesCd.equals('')">
-                         AND T.SALES_CD = #{salesCd}
-                     </if>
-                     <if test="!clntCd.equals('') and !clntNm.equals('')">
-                         AND T.ORDRS_CLNT_CD = #{clntCd}              
-                     </if>
-                     <if test="clntCd.equals('') and !clntNm.equals('')">
-                         AND T.ORDRS_CLNT_NM LIKE '%${clntNm}%'                
-                     </if>
-                     <if test="!prdtCd.equals('') and !prdtNm.equals('')">
-                        AND T.PRDT_CD = #{prdtCd}             
-                     </if>             
-                     <if test="prdtCd.equals('') and !prdtNm.equals('')">
-                        AND T.PRDT_CD_NM LIKE '%${prdtNm}%'             
-                     </if>
-                     <if test="itemCd != null and !itemCd.equals('')">
-                        AND T.ITEM_DIV = #{itemCd}               
-                     </if> 
-                     <if test="clntPjt != null and !clntPjt.equals('')">
-                        AND T.CLNT_PJT LIKE '%${ClntPjt}%'            
-                     </if> 
-                     <if test="eqpNm != null and !eqpNm.equals('')">
-                        AND T.EQP_NM LIKE '%${eqpNm}%'         
-                     </if>
-                     <if test="wbsPlanNo != null and !wbsPlanNo.equals('')">
-                        AND T.WBS_PLAN_NO = #{wbsPlanNo}       
-                     </if>
-                     <if test="!salesMngId.equals('') and !salesMngNm.equals('')"> 
-                         AND T.WBS_PLAN_CODE_ID IN (
-                              SELECT WBS_PLAN_CODE_ID
-                                 FROM TB_WB20M01
-                                 WHERE WBS_PLANCO_CD = #{coCd}
-                                 <if test="wbsPlanNo != null and !wbsPlanNo.equals('')">
-                                    AND WBS_PLAN_NO = #{wbsPlanNo}
-                                 </if>
-                                 <if test="salesCd != null and !salesCd.equals('')">
-                                    AND SALES_CD = #{salesCd}
-                                 </if>   
-                                    AND TODO_ID = #{salesMngId})
-                      </if>  
-                      <if test="salesMngId.equals('') and !salesMngNm.equals('')">
-                         AND T.WBS_PLAN_CODE_ID IN (
-                              SELECT X.WBS_PLAN_CODE_ID
-                                 FROM TB_WB20M01 X
-                                 INNER JOIN TB_CM06M01 Y
-                                 ON X.TODO_ID = Y.ID
-                                 WHERE X.WBS_PLANCO_CD = #{coCd} 
-                                 <if test="wbsPlanNo != null and !wbsPlanNo.equals('')">
-                                    AND X.WBS_PLAN_NO = #{wbsPlanNo}#
-                                 </if>
-                                 <if test="salesCd != null and !salesCd.equals('')">
-                                    AND X.SALES_CD = #{salesCd}
-                                 </if>   
-                                    AND Y.NAME LIKE '%${salesMngNm}%')
-                      </if>
-                       
-                  ) T1
-                  WHERE RNUM BETWEEN #{firstIndex} AND #{lastIndex}       
-         </select>
-
-       <select id="selectWbsPlanCloseYnNTreeListExcel" parameterType="Map" resultType="camelMap">
-          SELECT RNUM,
-                  FILE_TRGT_KEY,
-                  CO_CD_NM,
-                  LVL,
-                  ORDRS_CLNT_NM,
-                  ORDRS_DTL_DIV20_NM,
-                  PRDT_CD_NM ,      
-                  ITEM_DIV_NM,
-                  WBS_PLAN_NM,
-                  WBS_PLAN_MNG_NM,
-                  WBS_PLAN_STS_NM,
-                  DSGN_DIF_CODE_NM,
-                  PRDCTN_DIF_CODE_NM,
-                  WBS_PLAN_OS_NM,
-                  CREAT_NM,
-                  UDT_NM,
-                  WBS_RSLTS_DT,
-                  CO_CD,
-                  SALES_CD,                       
-                  CODE_NM,
-                  PID,
-                  ID,
-                  LOCK_YN,
-                  CLOSE_YN,
-                  WBS_PLAN_CODE_KIND,
-                  WBS_PLAN_CODE_ID,
-                  WBS_PLAN_NO,
-                  TO_CHAR(WBS_PLAN_DT, 'YYYY-MM-DD') AS WBS_PLAN_DT, 
-                  WBS_PLAN_ID,
-                  WBS_PLAN_MNG_ID,
-                  WBS_PLAN_CNTS,
-                  TO_CHAR(WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT,
-                  TO_CHAR(WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT,
-                  WBS_PLAN_RMK,
-                  WBS_PLAN_STS_CODE_ID,
-                  DSGN_DIF_CODE_ID,
-                  DSGN_PLAN_HOUR,
-                  PRDCTN_DIF_CODE_ID,
-                  PRDCTN_PLAN_HOUR,
-                  WBS_PLAN_OS_YN,
-                  CREAT_ID,
-                  CREAT_PGM,
-                  TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM,
-                  UDT_ID,
-                  UDT_PGM,
-                  TO_CHAR(UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM,
-                  ORDRS_NO,
-                  ORDRS_CLNT_CD,
-                  CLNT_PJT,
-                  ORDRS_DTL_DIV20,
-                  PRDT_CD,
-                  ITEM_DIV,
-                  EQP_NM  FROM (
-                                SELECT ROWNUM AS RNUM, T.*,
-                                                          Z1.CODE_NM AS CO_CD_NM,
-                                                          Z2.CLNT_NM AS  ORDRS_CLNT_NM,
-                                                          Z3.CODE_NM AS ORDRS_DTL_DIV20_NM,
-                                                          Z4.PRDT_NM AS PRDT_CD_NM ,      
-                                                          Z5.CODE_NM AS ITEM_DIV_NM,
-                                                          Z6.NAME AS WBS_PLAN_NM,
-                                                          Z7.NAME AS WBS_PLAN_MNG_NM,
-                                                          Z8.CODE_NM  AS WBS_PLAN_STS_NM,
-                                                          Z9.CODE_NM  AS DSGN_DIF_CODE_NM,
-                                                          Z10.CODE_NM  AS PRDCTN_DIF_CODE_NM,
-                                                          Z11.CODE_NM  AS  WBS_PLAN_OS_NM,
-                                                          Z12.NAME   AS   CREAT_NM,
-                                                          Z13.NAME   AS  UDT_NM,
-                                                          CASE WHEN Z14.WBS_RSLTS_DT != '' THEN 'Y' ELSE 'N' END AS WBS_RSLTS_DT
-                                                           FROM (              
-                                                                SELECT  
-                                                                   X.FILE_TRGT_KEY,
-                                                                   X.CO_CD,
-                                                                   X.SALES_CD,                       
-                                                                   Y.LVL1 || Y.LVL2 || Y.LVL3 AS CODE_NM,
-                                                                   Y.LVL,
-                                                                   X.SALES_CD ||'_'|| X.WBS_PLAN_CODE_KIND AS PID,
-                                                                   X.SALES_CD ||'_'|| X.WBS_PLAN_CODE_ID AS ID,
-                                                                   X.LOCK_YN,
-                                                                   X.CLOSE_YN,
-                                                                   X.WBS_PLAN_CODE_KIND,
-                                                                   X.WBS_PLAN_CODE_ID,
-                                                                   X.WBS_PLAN_NO,
-                                                                   X.WBS_PLAN_DT, 
-                                                                   X.WBS_PLAN_ID,
-                                                                   X.WBS_PLAN_MNG_ID,
-                                                                   X.WBS_PLAN_CNTS,
-                                                                   X.WBS_PLANS_DT,
-                                                                   X.WBS_PLANE_DT, 
-                                                                   X.WBS_PLAN_RMK,
-                                                                   X.WBS_PLAN_STS_CODE_ID,
-                                                                   X.DSGN_DIF_CODE_ID,
-                                                                   X.DSGN_PLAN_HOUR,
-                                                                   X.PRDCTN_DIF_CODE_ID,
-                                                                   X.PRDCTN_PLAN_HOUR,
-                                                                   X.WBS_PLAN_OS_YN,
-                                                                   X.CREAT_ID,
-                                                                   X.CREAT_PGM,
-                                                                   X.CREAT_DTTM, 
-                                                                   X.UDT_ID,
-                                                                   X.UDT_PGM,
-                                                                   X.UDT_DTTM,
-                                                                   S.ORDRS_NO,
-                                                                   S.ORDRS_CLNT_CD,
-                                                                   S.CLNT_PJT,
-                                                                   S.ORDRS_DTL_DIV20,
-                                                                   S.PRDT_CD,
-                                                                   S.ITEM_DIV,
-                                                                   S.EQP_NM 
-                                                                   FROM  TB_WB01M01 X
-                                                                   INNER JOIN (
-                                                                             SELECT 
-                                                                             CODE_KIND,
-                                                                             CODE_ID,
-                                                                             CODE_RPRC,
-                                                                             CODE_NM,
-                                                                             CASE WHEN LEVEL = '1' THEN CODE_NM ELSE '' END LVL1,
-                                                                             CASE WHEN LEVEL = '2' THEN CODE_NM ELSE '' END LVL2,
-                                                                             CASE WHEN LEVEL = '3' THEN CODE_NM ELSE '' END LVL3,
-                                                                             LPAD('', 3*(LEVEL-1)) || LEVEL LVL,
-                                                                             REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_ID, ' -> '), '^\s+\-\>\s+', '') as PATH
-                                                                         FROM TB_CM05M01
-                                                                         START WITH CODE_KIND = 'WBSDIV'
-                                                                         CONNECT BY PRIOR CODE_ID  =  CODE_KIND) Y
-                                                                   ON X.WBS_PLAN_CODE_ID = Y.CODE_ID 
-                                                                   INNER JOIN 
-                                                                    (
-                                                                       SELECT  X.CO_CD, 
-                                                                               X.ORDRS_NO,
-                                                                               X.SALES_CD, 
-                                                                               Y.ORDRS_CLNT_CD, 
-                                                                               Y.CLNT_PJT, 
-                                                                               X.ORDRS_DTL_DIV20, 
-                                                                               X.PRDT_CD, 
-                                                                               X.ITEM_DIV, 
-                                                                               X.EQP_NM 
-                                                                               FROM TB_CR02D02 X
-                                                                        INNER JOIN TB_CR02M01 Y
-                                                                        ON X.CO_CD = Y.CO_CD
-                                                                        AND X.ORDRS_NO = Y.ORDRS_NO ) S
-                                                                       ON X.CO_CD = S.CO_CD
-                                                                       AND X.SALES_CD = S.SALES_CD                       
-                                                                     ORDER BY SALES_CD, ID ASC ) T 
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z1 ON Z1.CODE_ID = T.CO_CD
-                                                                    LEFT OUTER JOIN TB_BM02M01 Z2 ON Z2.CLNT_CD = T.ORDRS_CLNT_CD
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z3 ON Z3.CODE_ID = T.ORDRS_DTL_DIV20
-                                                                    LEFT OUTER JOIN TB_BM01M01 Z4 ON Z4.PRDT_CD = T.PRDT_CD
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z5 ON Z5.CODE_ID = T.ITEM_DIV
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z6 ON Z6.ID = T.WBS_PLAN_ID
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z7 ON Z7.ID = T.WBS_PLAN_MNG_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z8 ON Z8.CODE_ID = T.WBS_PLAN_STS_CODE_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z9 ON Z9.CODE_ID = T.DSGN_DIF_CODE_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z10 ON Z10.CODE_ID = T.PRDCTN_DIF_CODE_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z11 ON Z11.CODE_ID = T.WBS_PLAN_OS_YN
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z12 ON Z12.ID = T.CREAT_ID
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z13 ON Z13.ID = T.UDT_ID
-                                                                    LEFT OUTER JOIN TB_WB02M01 Z14 ON Z14.CO_CD =  T.CO_CD
-                                                                                                      AND Z14.WBS_PLAN_CODE_KIND = T.WBS_PLAN_CODE_KIND
-                                                                                                      AND Z14.WBS_PLAN_CODE_ID =  T.WBS_PLAN_CODE_ID
-                                                                                                      AND Z14.SALES_CD =  T.SALES_CD
-                                
-                      WHERE T.CO_CD = #{coCd}
-                      <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
-                         AND T.WBS_PLAN_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD') +1
-                      </if>
-                      <if test="salesCd != null and !salesCd.equals('')">
-                         AND T.SALES_CD = #{salesCd}
-                     </if>
-                     <if test="!clntCd.equals('') and !clntNm.equals('')">
-                         AND T.ORDRS_CLNT_CD = #{clntCd}              
-                     </if>
-                     <if test="clntCd.equals('') and !clntNm.equals('')">
-                         AND T.ORDRS_CLNT_NM LIKE '%${clntNm}%'                
-                     </if>
-                     <if test="!prdtCd.equals('') and !prdtNm.equals('')">
-                        AND T.PRDT_CD = #{prdtCd}             
-                     </if>             
-                     <if test="prdtCd.equals('') and !prdtNm.equals('')">
-                        AND T.PRDT_CD_NM LIKE '%${prdtNm}%'             
-                     </if>
-                     <if test="itemCd != null and !itemCd.equals('')">
-                        AND T.ITEM_DIV = #{itemCd}               
-                     </if> 
-                     <if test="clntPjt != null and !clntPjt.equals('')">
-                        AND T.CLNT_PJT LIKE '%${ClntPjt}%'            
-                     </if> 
-                     <if test="eqpNm != null and !eqpNm.equals('')">
-                        AND T.EQP_NM LIKE '%${eqpNm}%'         
-                     </if>
-                     <if test="wbsPlanNo != null and !wbsPlanNo.equals('')">
-                        AND T.WBS_PLAN_NO = #{wbsPlanNo}       
-                     </if>
-                     <if test="!salesMngId.equals('') and !salesMngNm.equals('')"> 
-                         AND T.WBS_PLAN_CODE_ID IN (
-                              SELECT WBS_PLAN_CODE_ID
-                                 FROM TB_WB20M01
-                                 WHERE WBS_PLANCO_CD = #{coCd}
-                                 <if test="wbsPlanNo != null and !wbsPlanNo.equals('')">
-                                    AND WBS_PLAN_NO = #{wbsPlanNo}
-                                 </if>
-                                 <if test="salesCd != null and !salesCd.equals('')">
-                                    AND SALES_CD = #{salesCd}
-                                 </if>   
-                                    AND TODO_ID = #{salesMngId})
-                      </if>  
-                      <if test="salesMngId.equals('') and !salesMngNm.equals('')">
-                         AND T.WBS_PLAN_CODE_ID IN (
-                              SELECT X.WBS_PLAN_CODE_ID
-                                 FROM TB_WB20M01 X
-                                 INNER JOIN TB_CM06M01 Y
-                                 ON X.TODO_ID = Y.ID
-                                 WHERE X.WBS_PLANCO_CD = #{coCd} 
-                                 <if test="wbsPlanNo != null and !wbsPlanNo.equals('')">
-                                    AND X.WBS_PLAN_NO = #{wbsPlanNo}#
-                                 </if>
-                                 <if test="salesCd != null and !salesCd.equals('')">
-                                    AND X.SALES_CD = #{salesCd}
-                                 </if>   
-                                    AND Y.NAME LIKE '%${salesMngNm}%')
-                      </if>
-                       
-                  ) T1    
-         </select>
-         
-         <select id="selectWbsPlanCloseYnNTreeListSub" parameterType="Map" resultType="camelMap">
-          SELECT RNUM,
-                  FILE_TRGT_KEY,
-                  CO_CD_NM,
-                  LVL,
-                  ORDRS_CLNT_NM,
-                  ORDRS_DTL_DIV20_NM,
-                  PRDT_CD_NM ,      
-                  ITEM_DIV_NM,
-                  WBS_PLAN_NM,
-                  WBS_PLAN_MNG_NM,
-                  WBS_PLAN_STS_NM,
-                  DSGN_DIF_CODE_NM,
-                  PRDCTN_DIF_CODE_NM,
-                  WBS_PLAN_OS_NM,
-                  CREAT_NM,
-                  UDT_NM,
-                  WBS_RSLTS_DT,
-                  CO_CD,
-                  SALES_CD,                       
-                  CODE_NM,
-                  PID,
-                  ID,
-                  LOCK_YN,
-                  CLOSE_YN,
-                  WBS_PLAN_CODE_KIND,
-                  WBS_PLAN_CODE_ID,
-                  WBS_PLAN_NO,
-                  TO_CHAR(WBS_PLAN_DT, 'YYYY-MM-DD') AS WBS_PLAN_DT, 
-                  WBS_PLAN_ID,
-                  WBS_PLAN_MNG_ID,
-                  WBS_PLAN_CNTS,
-                  TO_CHAR(WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT,
-                  TO_CHAR(WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT,
-                  WBS_PLAN_RMK,
-                  WBS_PLAN_STS_CODE_ID,
-                  DSGN_DIF_CODE_ID,
-                  DSGN_PLAN_HOUR,
-                  PRDCTN_DIF_CODE_ID,
-                  PRDCTN_PLAN_HOUR,
-                  WBS_PLAN_OS_YN,
-                  CREAT_ID,
-                  CREAT_PGM,
-                  TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM,
-                  UDT_ID,
-                  UDT_PGM,
-                  TO_CHAR(UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM,
-                  ORDRS_NO,
-                  ORDRS_CLNT_CD,
-                  CLNT_PJT,
-                  ORDRS_DTL_DIV20,
-                  PRDT_CD,
-                  ITEM_DIV,
-                  EQP_NM  FROM (
-                                SELECT ROWNUM AS RNUM, T.*,
-                                                          Z1.CODE_NM AS CO_CD_NM,
-                                                          Z2.CLNT_NM AS  ORDRS_CLNT_NM,
-                                                          Z3.CODE_NM AS ORDRS_DTL_DIV20_NM,
-                                                          Z4.PRDT_NM AS PRDT_CD_NM ,      
-                                                          Z5.CODE_NM AS ITEM_DIV_NM,
-                                                          Z6.NAME AS WBS_PLAN_NM,
-                                                          Z7.NAME AS WBS_PLAN_MNG_NM,
-                                                          Z8.CODE_NM  AS WBS_PLAN_STS_NM,
-                                                          Z9.CODE_NM  AS DSGN_DIF_CODE_NM,
-                                                          Z10.CODE_NM  AS PRDCTN_DIF_CODE_NM,
-                                                          Z11.CODE_NM  AS  WBS_PLAN_OS_NM,
-                                                          Z12.NAME   AS   CREAT_NM,
-                                                          Z13.NAME   AS  UDT_NM,
-                                                          CASE WHEN Z14.WBS_RSLTS_DT != '' THEN 'Y' ELSE 'N' END AS WBS_RSLTS_DT
-                                                           FROM (              
-                                                                SELECT  
-                                                                   X.FILE_TRGT_KEY,
-                                                                   X.CO_CD,
-                                                                   X.SALES_CD,                       
-                                                                   Y.LVL1 || Y.LVL2 || Y.LVL3 AS CODE_NM,
-                                                                   Y.LVL,
-                                                                   X.SALES_CD ||'_'|| X.WBS_PLAN_CODE_KIND AS PID,
-                                                                   X.SALES_CD ||'_'|| X.WBS_PLAN_CODE_ID AS ID,
-                                                                   X.LOCK_YN,
-                                                                   X.CLOSE_YN,
-                                                                   X.WBS_PLAN_CODE_KIND,
-                                                                   X.WBS_PLAN_CODE_ID,
-                                                                   X.WBS_PLAN_NO,
-                                                                   X.WBS_PLAN_DT, 
-                                                                   X.WBS_PLAN_ID,
-                                                                   X.WBS_PLAN_MNG_ID,
-                                                                   X.WBS_PLAN_CNTS,
-                                                                   X.WBS_PLANS_DT,
-                                                                   X.WBS_PLANE_DT, 
-                                                                   X.WBS_PLAN_RMK,
-                                                                   X.WBS_PLAN_STS_CODE_ID,
-                                                                   X.DSGN_DIF_CODE_ID,
-                                                                   X.DSGN_PLAN_HOUR,
-                                                                   X.PRDCTN_DIF_CODE_ID,
-                                                                   X.PRDCTN_PLAN_HOUR,
-                                                                   X.WBS_PLAN_OS_YN,
-                                                                   X.CREAT_ID,
-                                                                   X.CREAT_PGM,
-                                                                   X.CREAT_DTTM, 
-                                                                   X.UDT_ID,
-                                                                   X.UDT_PGM,
-                                                                   X.UDT_DTTM,
-                                                                   S.ORDRS_NO,
-                                                                   S.ORDRS_CLNT_CD,
-                                                                   S.CLNT_PJT,
-                                                                   S.ORDRS_DTL_DIV20,
-                                                                   S.PRDT_CD,
-                                                                   S.ITEM_DIV,
-                                                                   S.EQP_NM 
-                                                                   FROM  TB_WB01M01 X
-                                                                   INNER JOIN (
-                                                                             SELECT 
-                                                                             CODE_KIND,
-                                                                             CODE_ID,
-                                                                             CODE_RPRC,
-                                                                             CODE_NM,
-                                                                             CASE WHEN LEVEL = '1' THEN CODE_NM ELSE '' END LVL1,
-                                                                             CASE WHEN LEVEL = '2' THEN CODE_NM ELSE '' END LVL2,
-                                                                             CASE WHEN LEVEL = '3' THEN CODE_NM ELSE '' END LVL3,
-                                                                             LPAD('', 3*(LEVEL-1)) || LEVEL LVL,
-                                                                             REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_ID, ' -> '), '^\s+\-\>\s+', '') as PATH
-                                                                         FROM TB_CM05M01
-                                                                         START WITH CODE_KIND = 'WBSDIV'
-                                                                         CONNECT BY PRIOR CODE_ID  =  CODE_KIND) Y
-                                                                   ON X.WBS_PLAN_CODE_ID = Y.CODE_ID 
-                                                                   INNER JOIN 
-                                                                    (
-                                                                       SELECT  X.CO_CD, 
-                                                                               X.ORDRS_NO,
-                                                                               X.SALES_CD, 
-                                                                               Y.ORDRS_CLNT_CD, 
-                                                                               Y.CLNT_PJT, 
-                                                                               X.ORDRS_DTL_DIV20, 
-                                                                               X.PRDT_CD, 
-                                                                               X.ITEM_DIV, 
-                                                                               X.EQP_NM 
-                                                                               FROM TB_CR02D02 X
-                                                                        INNER JOIN TB_CR02M01 Y
-                                                                        ON X.CO_CD = Y.CO_CD
-                                                                        AND X.ORDRS_NO = Y.ORDRS_NO ) S
-                                                                       ON X.CO_CD = S.CO_CD
-                                                                       AND X.SALES_CD = S.SALES_CD                       
-                                                                     ORDER BY SALES_CD, ID ASC ) T 
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z1 ON Z1.CODE_ID = T.CO_CD
-                                                                    LEFT OUTER JOIN TB_BM02M01 Z2 ON Z2.CLNT_CD = T.ORDRS_CLNT_CD
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z3 ON Z3.CODE_ID = T.ORDRS_DTL_DIV20
-                                                                    LEFT OUTER JOIN TB_BM01M01 Z4 ON Z4.PRDT_CD = T.PRDT_CD
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z5 ON Z5.CODE_ID = T.ITEM_DIV
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z6 ON Z6.ID = T.WBS_PLAN_ID
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z7 ON Z7.ID = T.WBS_PLAN_MNG_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z8 ON Z8.CODE_ID = T.WBS_PLAN_STS_CODE_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z9 ON Z9.CODE_ID = T.DSGN_DIF_CODE_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z10 ON Z10.CODE_ID = T.PRDCTN_DIF_CODE_ID
-                                                                    LEFT OUTER JOIN TB_CM05M01 Z11 ON Z11.CODE_ID = T.WBS_PLAN_OS_YN
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z12 ON Z12.ID = T.CREAT_ID
-                                                                    LEFT OUTER JOIN TB_CM06M01 Z13 ON Z13.ID = T.UDT_ID
-                                                                    LEFT OUTER JOIN TB_WB02M01 Z14 ON Z14.CO_CD =  T.CO_CD
-                                                                                                      AND Z14.WBS_PLAN_CODE_KIND = T.WBS_PLAN_CODE_KIND
-                                                                                                      AND Z14.WBS_PLAN_CODE_ID =  T.WBS_PLAN_CODE_ID
-                                                                                                      AND Z14.SALES_CD =  T.SALES_CD
-                                
-                      WHERE T.CO_CD = #{coCd}
-                      AND T.SALES_CD = #{salesCd}
-                     
-                  ) T1     
-         </select>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+          <select id="selectGanttList" parameterType="Map" resultType="CamelMap">
+              SELECT  
+                    T.CODE_NM,
+                    T.CODE_ID,
+                    NVL(TO_CHAR(W01.WBS_PLANS_DT, 'YYYY-MM-DD'),'') AS WBS_PLANS_DT,
+                    NVL(TO_CHAR(W01.WBS_PLANE_DT, 'YYYY-MM-DD'),'')  AS WBS_PLANE_DT,
+                    NVL(W02.WBS_RSLTS_RATE,0) AS WBS_RSLTS_RATE,
+                    NVL(FN_CM06M01_ID_TO_NM(W01.WBS_PLAN_MNG_ID),' ') WBS_PLAN_MNG_NM,
+                    T.ORDRS_CLNT_NM,
+                    NVL(W01.WBS_PLAN_CNTS,' ') AS WBS_PLAN_CNTS ,
+                    T.LVL
+                    
+               FROM         
+                    (SELECT  
+                           CR.CO_CD, 
+                           CR.ORDRS_NO,
+                           CR.SALES_CD, 
+                           Y.ORDRS_CLNT_CD, 
+                           (SELECT P.CLNT_NM FROM TB_BM02M01 P WHERE P.CLNT_CD = Y.ORDRS_CLNT_CD) AS ORDRS_CLNT_NM,
+                           Y.CLNT_PJT, 
+                           CR.ORDRS_DTL_DIV20, 
+                           (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = CR.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+                           CR.PRDT_CD, 
+                           (SELECT T.PRDT_NM FROM TB_BM01M01 T WHERE T.PRDT_CD = CR.PRDT_CD) AS PRDT_CD_NM,
+                           CR.ITEM_DIV, 
+                           (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = CR.ITEM_DIV) AS ITEM_DIV_NM,
+                           CR.EQP_NM ,
+                           CD.*
+                      FROM TB_CR02D02 CR INNER JOIN TB_CR02M01 Y  ON CR.CO_CD = Y.CO_CD
+                                                                 AND CR.ORDRS_NO = Y.ORDRS_NO
+                           , (
+                                                SELECT 
+                                                         CASE WHEN CODE_KIND = 'ROOT' THEN '' ELSE CODE_KIND END CODE_KIND,
+                                                         CODE_ID,
+                                                         CODE_RPRC,
+                                                         CODE_NM,
+                                                         CASE WHEN LEVEL = '1' THEN CODE_NM ELSE '' END LVL1,
+                                                         CASE WHEN LEVEL = '2' THEN CODE_NM ELSE '' END LVL2,
+                                                         CASE WHEN LEVEL = '3' THEN CODE_NM ELSE '' END LVL3,
+                                                         LPAD('', 3*(LEVEL-1)) || LEVEL LVL,
+                                                         REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_ID, ' -> '), '^\s+\-\>\s+', '') as PATH,
+                                                         CONNECT_BY_ISLEAF AS IS_LEAF,
+                                                         CASE WHEN CONNECT_BY_ISLEAF = 0 THEN 'unit' ELSE 'leaf' END TYPE
+                                                 FROM TB_CM05M01
+                                                 START WITH CODE_ID = 'WBSDIV'
+                                                 CONNECT BY PRIOR CODE_ID  =  CODE_KIND 
+                                )  CD 
+                       WHERE CR.CO_CD = #{coCd}
+                         AND CR.SALES_CD = #{salesCd} 
+                      ORDER BY  CR.SALES_CD, PATH                 
+                     ) AS T LEFT OUTER JOIN TB_WB01M01 W01 ON T.CO_CD    = W01.CO_CD
+                                                          AND T.SALES_CD = W01.SALES_CD
+                                                          AND T.CODE_ID  = W01.WBS_PLAN_CODE_ID
+                            LEFT OUTER JOIN TB_WB02M01 W02 ON T.CO_CD    = W02.CO_CD
+                                                          AND T.SALES_CD = W02.SALES_CD
+                                                          AND T.CODE_ID  = W02.WBS_PLAN_CODE_ID  
+           WHERE  T.CODE_ID != 'WBSDIV'                                                                                                                                                                       
+        </select>        
 
 
 
