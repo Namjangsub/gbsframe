@@ -43,9 +43,24 @@ public class CR05SvcImpl implements CR05Svc {
 	
 	@Override
 	public List<Map<String, String>> selectClmnList(Map<String, String> paramMap) {
-		return cr05Mapper.selectClmnList(paramMap);
+		List<Map<String, String>> result = new ArrayList<Map<String,String>>();
+		result = cr05Mapper.selectClmnList(paramMap);
+		System.out.println(result);
+		return result;
 	}
 
+	
+	@Override
+	public int selectClmnInfoCount(Map<String, String> paramMap) {
+		return cr05Mapper.selectClmnInfoCount(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectClmnInfo(Map<String, String> paramMap) {
+		
+		return cr05Mapper.selectClmnInfo(paramMap);
+	}
+	
 	//DATA INSERT
 	@Override
 	public int insert_cr05(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {

@@ -40,6 +40,18 @@ public class CR05Ctr {
 		return "jsonView";
 	}
 	
+	// 수금정보 조회
+	@PostMapping(value = "/selectClmnInfo")
+	public String selectClmnInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = cr05Svc.selectClmnInfoCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = cr05Svc.selectClmnInfo(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
+	
 	// 수금번호 조회
 	
 	// 수금등록 입력

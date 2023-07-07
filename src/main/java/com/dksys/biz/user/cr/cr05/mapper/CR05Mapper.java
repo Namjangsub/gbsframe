@@ -12,6 +12,10 @@ public interface CR05Mapper {
 	int selectClmnListCount(Map<String, String> paramMap);
 	List<Map<String, String>> selectClmnList(Map<String, String> paramMap);
 	
+	// 수금정보 조회
+	int selectClmnInfoCount(Map<String, String> paramMap);
+	List<Map<String, String>> selectClmnInfo(Map<String, String> paramMap);
+
 	int insert_cr05(Map<String, String> paramMap);
 	
 	int select_cr05_SeqNext(Map<String, String> paramMap);
@@ -23,5 +27,6 @@ public interface CR05Mapper {
 	int delete_cr05_Dtl_All(Map<String, String> paramMap);
 	int delete_cr05(Map<String, String> paramMap);
 	int delete_cr05_Dtl(Map<String, String> paramMap);
+	
 
 }
