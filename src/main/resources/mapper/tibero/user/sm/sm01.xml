@@ -65,7 +65,7 @@
 				SELECT FILE_TRGT_KEY, CO_CD, SALES_CD 
 				  FROM TB_SM01M01 X1
 				 WHERE LEVEL = 1
-		        START WITH X1.UPPER_CD = '.'
+		        START WITH X1.UPPER_CD = 'top'
 		        CONNECT BY PRIOR X1.LOWER_CD = X1.UPPER_CD
 	       ) AS BOM ON A.CO_CD = BOM.CO_CD AND B.SALES_CD = BOM.SALES_CD
 	       LEFT OUTER JOIN (
@@ -160,7 +160,7 @@
         , TO_CHAR(T.UDT_DTTM,'YYYY-MM-DD HH24:MM:SS') AS UDT_DTTM
         FROM
   		( SELECT X1.*, LEVEL AS LVL FROM TB_SM01M01 X1
-           START WITH X1.UPPER_CD = '.' AND X1.SALES_CD = #{salesCd}
+           START WITH X1.UPPER_CD = 'top' AND X1.SALES_CD = #{salesCd}
           CONNECT BY PRIOR X1.LOWER_CD = X1.UPPER_CD
         ) T
         LEFT OUTER JOIN TB_SM01D01 D
@@ -181,13 +181,14 @@
         ) A
         ON T.CO_CD = A.CO_CD AND T.SALES_CD = A.SALES_CD
 		WHERE 1=1
-		ORDER BY T.CO_CD, NVL(T.PART_NO,'0'), NVL(T.UNIT_NO,'0'), NVL(T.REV_NO,'0'),T.LOWER_CD, T.UPPER_CD
+		ORDER BY T.CO_CD,T.LOWER_CD, T.UPPER_CD
 		         , D.MATR_SEQ
 	</select>
 
 	<!-- 구매 BOM 조회 -->
 	<select id="selectBuyBomList" resultType="CamelMap">
-		SELECT LEVEL - 1 AS LVL
+		SELECT  '' AS DTA_CHK
+			, LEVEL - 1 AS LVL
 			, T.FILE_TRGT_KEY
 			, T.CO_CD
 			, T.SALES_CD
@@ -196,21 +197,22 @@
 			, T.REV_NO
 			, T.DSGN_NO
 			, SUBSTR(REPLACE(T.DSGN_NO,T.SALES_CD,''), INSTR(REPLACE(T.DSGN_NO,T.SALES_CD,''), '-', -1) + 1) AS LAST_DSGN_NO
-			, CASE WHEN T.UPPER_CD = '.' THEN '' ELSE T.UPPER_CD END AS UPPER_CD
+			, T.UPPER_CD
 			, T.LOWER_CD
 			, T.UPPER_CD AS OLD_UPPER_CD
 			, T.LOWER_CD AS OLD_LOWER_CD
 			, T.DSGN_NM
 			, T.BOM_QTY
 		FROM TB_SM01M01 T
-		START WITH T.UPPER_CD = '.' AND T.SALES_CD = #{salesCd}
+		START WITH T.UPPER_CD = 'top' AND T.SALES_CD = #{salesCd}
 		CONNECT BY PRIOR T.LOWER_CD = T.UPPER_CD
-		ORDER BY T.CO_CD, NVL(T.PART_NO,'0'), NVL(T.UNIT_NO,'0'), NVL(T.REV_NO,'0'),T.LOWER_CD, T.UPPER_CD
+		ORDER BY T.CO_CD, T.LOWER_CD, T.UPPER_CD
 	</select>
 
 	<!-- BOM 자재정보 조회 -->
 	<select id="selectBomMatrList" resultType="CamelMap">
-		SELECT CO_CD
+		SELECT  '' AS DTA_CHK
+			, CO_CD
 			, SALES_CD
 			, UPPER_CD
 			, LOWER_CD
@@ -489,7 +491,7 @@
 			, NEXT_PRCSN_NM 	= #{nextPrcsnNm, jdbcType=VARCHAR}
 			, DLVPLC_NM 		= #{dlvplcNm, jdbcType=VARCHAR}
 			, BOM_QTY 			= #{bomQty, jdbcType=VARCHAR}
-			, POS_QTY 			= #{bomQty, jdbcType=VARCHAR}
+			, POS_QTY 			= #{posQty, jdbcType=VARCHAR}
 			, MATR_CD 			= #{matrCd, jdbcType=VARCHAR}
 			, MATR_NM 			= #{matrNm, jdbcType=VARCHAR}
 			, GOODS_DIV 		= #{goodsDiv, jdbcType=VARCHAR}
@@ -556,12 +558,6 @@
 	    AND LOWER_CD = #{lowerCd}
 	</delete>
 
-	<!--
-	<resultMap id="resultInfoMap" type="CamelMap">
-		<collection select="selectBomMatrList" property="BOM_MATR_LIST" column="{matrSeq=MATR_SEQ}" ofType="CamelMap"/>
-	</resultMap>
-		<select id="selectBomMatrInfo" resultMap="resultInfoMap">
-	 -->
 	<select id="selectBomMatrInfo" resultType="camelMap">
 		SELECT CO_CD
 			, SALES_CD
