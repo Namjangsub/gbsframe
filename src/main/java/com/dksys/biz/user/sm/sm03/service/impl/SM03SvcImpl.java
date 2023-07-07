@@ -22,6 +22,7 @@ import com.dksys.biz.util.DateUtil;
 import com.dksys.biz.util.ExceptionThrower;
 import com.dksys.biz.user.sm.sm03.mapper.SM03Mapper;
 import com.dksys.biz.user.sm.sm03.service.SM03Svc;
+import com.dksys.biz.user.sm.sm02.service.SM02Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -39,6 +40,9 @@ public class SM03SvcImpl implements SM03Svc {
 	SM03Svc sm03Svc;
 	
 	@Autowired
+	SM02Svc sm02Svc;	
+	
+	@Autowired
 	CM15Svc cm15Svc;
 	
 	@Autowired
@@ -52,11 +56,20 @@ public class SM03SvcImpl implements SM03Svc {
 	public int selectWareHousingListCount(Map<String, String> paramMap) {
 		return sm03Mapper.selectWareHousingListCount(paramMap);
 	}
+	
+
+	public int selectOrderListCount(Map<String, String> paramMap) {
+		return sm02Svc.selectOrderListCount(paramMap);
+	}	
 
 	@Override
 	public List<Map<String, String>> selectWareHousingList(Map<String, String> paramMap) {
 		return sm03Mapper.selectWareHousingList(paramMap);
 	}	
+	
+	public List<Map<String, String>> selectOrderList(Map<String, String> paramMap) {
+		return sm02Svc.selectOrderList(paramMap);
+	}		
 	
 	@Override
 	public List<Map<String, String>> selectWareHousingExcelList(Map<String, String> paramMap) {

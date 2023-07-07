@@ -26,11 +26,11 @@ public class SM03Ctr {
 	MessageUtils messageUtils;
 
 	@Autowired
-	SM03Svc sm03Svc;
+	SM03Svc sm03Svc;	
 
-	// 매입관리 발주 조회
+	// 매입관리 입고 조회
 	@PostMapping(value = "/selectWareHousingList")
-	public String selectPchsList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	public String selectWareHousingList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		int totalCnt = sm03Svc.selectWareHousingListCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
@@ -38,6 +38,18 @@ public class SM03Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+	
+	// 매입관리 발주 조회
+	@PostMapping(value = "/selectOrderList")
+	public String selectOrderList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = sm03Svc.selectOrderListCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = sm03Svc.selectOrderList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}	
+	
 	
 	// 매입관리 발주 조회 엑셀
 	@PostMapping(value = "/selectWareHousingExcelList")

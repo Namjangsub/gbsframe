@@ -14,7 +14,9 @@ public interface SM03Mapper {
 	
 
 	int selectWareHousingListCount(Map<String, String> paramMap);
-
+	
+	int selectOrderListCount(Map<String, String> paramMap);	
+	
 	List<Map<String, String>> selectWareHousingList(Map<String, String> paramMap);	
 	
 	List<Map<String, String>> selectWareHousingExcelList(Map<String, String> paramMap);

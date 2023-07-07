@@ -11,10 +11,10 @@
 			AND A.CO_CD = #{coCd}   
 		</if>
 		<!-- 발주일자 -->         
-		<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')">
-			<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
-            			AND A.IN_DT BETWEEN #{inDtFrom} AND #{inDtTo}
-            		</if>   
+		<if test="inDtFrom != null and !inDtFrom.equals('')">
+			<if test="inDtTo != null and !inDtTo.equals('')">
+            			AND A.IN_DT BETWEEN TO_DATE(#{inDtFrom}) AND TO_DATE(#{inDtTo})
+            </if>   
 		</if>	
 		
 		<!-- 구매처 -->         
@@ -39,7 +39,23 @@
 	<select id="selectWareHousingListCount" parameterType="Map" resultType="int">
 		SELECT COUNT(*) 
 			FROM TB_SM03M01 A
-			INNER JOIN TB_SM02M01 B ON(A.CO_CD=B.CO_CD AND A.SALES_CD=B.SALES_CD AND A.REQ_NO=B.REQ_NO)			
+			INNER JOIN TB_SM02M01 B ON(A.CO_CD=B.CO_CD AND A.SALES_CD=B.SALES_CD AND A.REQ_NO=B.REQ_NO)
+			LEFT OUTER JOIN
+			(
+			 SELECT  X.CO_CD 					/* 회사코드 */
+			 		, Y.ORDRS_CLNT_CD 			/* 고객사 */
+                       , A.CLNT_NM  AS ORDRS_CLNT_NM		/* 고객사명 */
+                       , X.SALES_CD
+                       , Y.CLNT_PJT		/* 고객사PJT */
+                       , X.PRDT_CD			/* 제품구분 */
+                       , E.PRDT_NM			/* 제품구분명 */
+                       , X.ITEM_DIV		/* 아이템 구분 */
+                       , X.EQP_NM			/* 설비명 */
+                 FROM TB_CR02D02 X		/* 수주상세 */
+                       INNER JOIN TB_CR02M01 Y ON(X.CO_CD = Y.CO_CD AND X.ORDRS_NO = Y.ORDRS_NO)	/* 수주마스터 */
+                       LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD /* 거래처마스터 */
+                       LEFT OUTER JOIN TB_BM01M01 E ON(X.PRDT_CD=E.PRDT_CD)													
+			) C ON(B.CO_CD=C.CO_CD AND B.SALES_CD=C.SALES_CD)						
 		WHERE 1=1
 		<include refid="selectWareHousingListCondition"></include>
 	</select>
@@ -109,7 +125,8 @@
 			                        INNER JOIN TB_CR02M01 Y ON(X.CO_CD = Y.CO_CD AND X.ORDRS_NO = Y.ORDRS_NO)	/* 수주마스터 */
 			                        LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD /* 거래처마스터 */
 			                        LEFT OUTER JOIN TB_BM01M01 E ON(X.PRDT_CD=E.PRDT_CD)													
-							) C ON(A.CO_CD=C.CO_CD AND A.SALES_CD=C.SALES_CD)		
+							) C ON(B.CO_CD=C.CO_CD AND B.SALES_CD=C.SALES_CD)
+						WHERE 1=1	
 						<include refid="selectWareHousingListCondition"></include>
 						ORDER BY A.CO_CD DESC, A.IN_NO DESC, A.CREAT_DTTM DESC, A.UDT_DTTM DESC		
 						) X		
@@ -130,8 +147,10 @@
 						(
 						SELECT A.FILE_TRGT_KEY
 								, A.CO_CD
-								, A.ORDRG_NO
-								, A.REQ_NO
+								, A.IN_NO			/* 입고번호	*/
+								, A.IO_DIV AS IO_DIV_CD		/* 수불구분 */
+			                    , FN_CM05M01_CD_TO_NM(A.IO_DIV) AS IO_DIV_NM	/* 아이템 구분명 */								
+								, A.REQ_NO			/* 요인별 요청번호 */								
 								, A.SALES_CD
 								, A.PCHS_CLNT_CD				/* 구매처cd */
                        			,
@@ -140,45 +159,32 @@
                        					FROM TB_BM02M01 D
                        				WHERE A.PCHS_CLNT_CD=D.CLNT_CD
                        			) AS PCHS_CLNT_NM		/* 구매처명 */
-                       			, B.ORDRS_CLNT_CD				 /* 고객사 */
-								, B.ORDRS_CLNT_NM				/* 고객사명 */
-                       			, B.CLNT_PJT					 /* 고객사 PJT */
-			                    , B.PRDT_CD			/* 제품구분 */
-			                    , B.PRDT_NM			/* 제품구분명 */			                    
-			                    , B.ITEM_DIV		/* 아이템 구분 */                		
-			                    , FN_CM05M01_CD_TO_NM(B.ITEM_DIV) AS ITEM_DIV_NM	/* 아이템 구분명 */			
-                       			, B.EQP_NM						/* 설비명 */
-								, TO_CHAR(A.ORDRG_DT, 'YYYY-MM-DD') ORDRG_DT		/* 발주일자 */
-								, A.ORDRG_DIV10					/* 발주구분 */
-								, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV10) AS ORDRG_DIV10_NM	/* 발주구분명 */
-								, A.ORDRG_DIV20					/* 용도구분 */
-								, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV20) AS ORDRG_DIV20_NM	/* 용도구분명 */
-								, A.ORDRG_DIV30					/* 특성구분 */
-								, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV30) AS ORDRG_DIV30_NM	/* 특성구분명 */								
+                       			, C.ORDRS_CLNT_CD				 /* 고객사 */
+								, C.ORDRS_CLNT_NM				/* 고객사명 */
+                       			, C.CLNT_PJT					 /* 고객사 PJT */
+			                    , C.PRDT_CD			/* 제품구분 */
+			                    , C.PRDT_NM			/* 제품구분명 */			                    
+			                    , C.ITEM_DIV		/* 아이템 구분 */                		
+			                    , FN_CM05M01_CD_TO_NM(C.ITEM_DIV) AS ITEM_DIV_NM	/* 아이템 구분명 */			
+								, TO_CHAR(A.IN_DT, 'YYYY-MM-DD') IN_DT		/* 압고일자 */
+								, B.ORDRG_DIV10					/* 발주구분 */
+								, FN_CM05M01_CD_TO_NM(B.ORDRG_DIV10) AS ORDRG_DIV10_NM	/* 발주구분명 */
+								, B.ORDRG_DIV20					/* 용도구분 */
+								, FN_CM05M01_CD_TO_NM(B.ORDRG_DIV20) AS ORDRG_DIV20_NM	/* 용도구분명 */
+								, B.ORDRG_DIV30					/* 특성구분 */
+								, FN_CM05M01_CD_TO_NM(B.ORDRG_DIV30) AS ORDRG_DIV30_NM	/* 특성구분명 */								
 								, A.CURR_CD						/* 통화단위 */
 								, A.EXRATE
-								, 
-								(
-									SELECT SUM(ORDRG_QTY)
-										FROM TB_SM02D01 D
-									WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
-								) AS ORDRG_QTY			/* 발주수량 */								
-								, 
-								(
-									SELECT SUM(D.ORDRG_AMT)
-										FROM TB_SM02D01 D
-									WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
-								) AS ORDRG_AMT			/* 발주금액 */								
-								, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
-								, A.ORDRG_RMK
-								, A.IN_CMPLET_YN
+								, IN_AMT		/* 입고금액 */							
+								, TO_CHAR(A.IN_DT, 'YYYY-MM-DD') IN_DT			/* 입고일자 */ 
 								, A.ETC_FIELD1
 								, A.ETC_FIELD2
 								, A.ETC_FIELD3
 								, A.CREAT_ID
 								, A.CREAT_PGM
 								, A.CREAT_DTTM
-							FROM TB_SM02M01 A
+							FROM TB_SM03M01 A
+							INNER JOIN TB_SM02M01 B ON(A.CO_CD=B.CO_CD AND A.SALES_CD=B.SALES_CD AND A.REQ_NO=B.REQ_NO)
 							LEFT OUTER JOIN
 							(
 							 SELECT  X.CO_CD 					/* 회사코드 */
@@ -193,9 +199,9 @@
 			                  FROM TB_CR02D02 X		/* 수주상세 */
 			                        INNER JOIN TB_CR02M01 Y ON(X.CO_CD = Y.CO_CD AND X.ORDRS_NO = Y.ORDRS_NO)	/* 수주마스터 */
 			                        LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD /* 거래처마스터 */
-			                        LEFT OUTER JOIN TB_BM01M01 E ON(X.PRDT_CD=E.PRDT_CD)							
-							) B ON(A.CO_CD=B.CO_CD AND A.SALES_CD=B.SALES_CD)														
-						WHERE 1=1								
+			                        LEFT OUTER JOIN TB_BM01M01 E ON(X.PRDT_CD=E.PRDT_CD)													
+							) C ON(B.CO_CD=C.CO_CD AND B.SALES_CD=C.SALES_CD)		
+						WHERE 1=1
 						<include refid="selectWareHousingListCondition"></include>
 						ORDER BY A.CO_CD DESC, A.IN_NO DESC, A.CREAT_DTTM DESC, A.UDT_DTTM DESC		
 						) X		
