@@ -88,10 +88,22 @@ public class SM01SvcImpl implements SM01Svc {
 		//paramMap.put("prjctSeq", newPrjctSeq);
 		//int result = sm01Mapper.insertBom(paramMap);
 		int result = 200;
-	
+
+		List<Map<String, String>> matrList = gsonDtl.fromJson(paramMap.get("matrArr"), dtlMap);
+	    for (Map<String, String> dtl : matrList) {
+	    	dtl.put("userId", paramMap.get("userId"));
+	    	dtl.put("pgmId", paramMap.get("pgmId"));
+	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
+	    	String dtaChk = dtl.get("dtaChk").toString();
+	    	/* "dtaChk" 값을 확인하여
+	    	 * "I"인 경우 sm01Mapper.insertBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삽입 */
+	    	if ("I".equals(dtaChk)) {
+	    		sm01Mapper.insertBomMatr(dtl);
+	    	} 
+	    }
+		
 	    List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
 	    for (Map<String, String> dtl : bomList) {
-	    	//dtl.put("prjctSeq", newPrjctSeq);
 	    	dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
 	    	String dtaChk = dtl.get("dtaChk").toString();
@@ -103,19 +115,6 @@ public class SM01SvcImpl implements SM01Svc {
 	    		sm01Mapper.deleteBomMatrAll(dtl);
 	    		sm01Mapper.deleteBom(dtl);
 	    	}
-	    }
-	    List<Map<String, String>> matrList = gsonDtl.fromJson(paramMap.get("matrArr"), dtlMap);
-	    for (Map<String, String> dtl : matrList) {
-	    	//dtl.put("prjctSeq", newPrjctSeq);
-	    	dtl.put("userId", paramMap.get("userId"));
-	    	dtl.put("pgmId", paramMap.get("pgmId"));
-	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-	    	String dtaChk = dtl.get("dtaChk").toString();
-	    	/* "dtaChk" 값을 확인하여
-	    	 * "I"인 경우 sm01Mapper.insertBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삽입 */
-	    	if ("I".equals(dtaChk)) {
-	    		sm01Mapper.insertBomMatr(dtl);
-	    	} 
 	    }
 	    
 		//---------------------------------------------------------------  
@@ -134,7 +133,6 @@ public class SM01SvcImpl implements SM01Svc {
   }
   @Override
   public int updateBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-//	Gson gson = new Gson();
 	Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
 
@@ -168,20 +166,28 @@ public class SM01SvcImpl implements SM01Svc {
 	int result = 200;//sm01Mapper.updateBom(paramMap);
     	//  sm01Mapper.updateBom(paramMap)을 호출하여 paramMap을 사용하여 프로젝트를 업데이트하고 그 결과를 result 변수에 저장.
 
+    List<Map<String, String>> matrList = gsonDtl.fromJson(paramMap.get("matrArr"), dtlMap);
+    for (Map<String, String> dtl : matrList) {
+
+      dtl.put("userId", paramMap.get("userId"));
+      dtl.put("pgmId", paramMap.get("pgmId"));
+      String dtaChk = dtl.get("dtaChk").toString();
+      if ("I".equals(dtaChk)) {
+	        sm01Mapper.insertBomMatr(dtl);
+	      } else if ("U".equals(dtaChk)) {
+	        sm01Mapper.updateBomMatr(dtl);
+	      } else if ("D".equals(dtaChk)) {
+	        sm01Mapper.deleteBomMatr(dtl);
+	      }
+    }
+
     List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
     for (Map<String, String> dtl : bomList) {
-    	//  matrList 리스트의 각 맵 요소에 대해 반복문을 실행
     	
     	dtl.put("userId", paramMap.get("userId"));
     	dtl.put("pgmId", paramMap.get("pgmId"));
-    	//      반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
     	String dtaChk = dtl.get("dtaChk").toString();
-    	/* "dtaChk" 값을 확인하여
-    	 * "I"인 경우 sm01Mapper.insertBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
-    	 * "U"인 경우 sm01Mapper.updateBomMatr(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
-    	 * "D"인 경우 * sm01Mapper.deleteBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
     	if ("I".equals(dtaChk)) {
-    		//dtl.put("prjctSeq", paramMap.get("prjctSeq"));
     		sm01Mapper.insertBom(dtl);
     	} else if ("U".equals(dtaChk)) {
     		sm01Mapper.updateBom(dtl);
@@ -191,26 +197,6 @@ public class SM01SvcImpl implements SM01Svc {
     	}
     }
     
-    List<Map<String, String>> matrList = gsonDtl.fromJson(paramMap.get("matrArr"), dtlMap);
-    for (Map<String, String> dtl : matrList) {
-    	//  matrList 리스트의 각 맵 요소에 대해 반복문을 실행
-
-      dtl.put("userId", paramMap.get("userId"));
-      dtl.put("pgmId", paramMap.get("pgmId"));
-      //      반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-      String dtaChk = dtl.get("dtaChk").toString();
-		/* "dtaChk" 값을 확인하여
-		 * "I"인 경우 sm01Mapper.insertBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
-		 * "U"인 경우 sm01Mapper.updateBomMatr(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
-		 * "D"인 경우 * sm01Mapper.deleteBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
-      if ("I".equals(dtaChk)) {
-	        sm01Mapper.insertBomMatr(dtl);
-	      } else if ("U".equals(dtaChk)) {
-	        sm01Mapper.updateBomMatr(dtl);
-	      } else if ("D".equals(dtaChk)) {
-	        sm01Mapper.deleteBomMatr(dtl);
-	      }
-    }
 	//---------------------------------------------------------------  
 	//첨부 화일 처리 시작 
 	//---------------------------------------------------------------  
@@ -295,24 +281,8 @@ public class SM01SvcImpl implements SM01Svc {
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
 		int result = 200;
 	
-	    List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
-	    for (Map<String, String> dtl : bomList) {
-	    	//dtl.put("prjctSeq", newPrjctSeq);
-	    	dtl.put("userId", paramMap.get("userId"));
-	    	dtl.put("pgmId", paramMap.get("pgmId"));
-	    	String dtaChk = dtl.get("dtaChk").toString();
-	    	if ("I".equals(dtaChk)) {
-	    		sm01Mapper.insertBom(dtl);
-	    	} else if ("U".equals(dtaChk)) {
-	    		sm01Mapper.updateBom(dtl);
-	    	} else if ("D".equals(dtaChk)) {
-	    		sm01Mapper.deleteBomMatrAll(dtl);
-	    		sm01Mapper.deleteBom(dtl);
-	    	}
-	    }
 	    List<Map<String, String>> matrList = gsonDtl.fromJson(paramMap.get("matrArr"), dtlMap);
 	    for (Map<String, String> dtl : matrList) {
-	    	//dtl.put("prjctSeq", newPrjctSeq);
 	    	dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
 	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
@@ -322,6 +292,15 @@ public class SM01SvcImpl implements SM01Svc {
 	    	if ("I".equals(dtaChk)) {
 	    		sm01Mapper.insertBomMatr(dtl);
 	    	} 
+	    }
+	    List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
+	    for (Map<String, String> dtl : bomList) {
+	    	dtl.put("userId", paramMap.get("userId"));
+	    	dtl.put("pgmId", paramMap.get("pgmId"));
+	    	String dtaChk = dtl.get("dtaChk").toString();
+	    	if ("I".equals(dtaChk)) {
+	    		sm01Mapper.insertBom(dtl);
+	    	}
 	    }
 	    
 	    return result;

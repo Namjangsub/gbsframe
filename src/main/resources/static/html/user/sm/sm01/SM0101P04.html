@@ -8,7 +8,7 @@
       <h4 class="tit">구매BOM 하위도번</h4>
     </div>
   <div class="form-group popup_table">
-   <form id="popForm" onSubmit="return false;">
+   <form id="pop04Form" onSubmit="return false;">
 		<input type="hidden" id="userId"     	name="userId">
 		<input type="hidden" id="pgmId"     	name="pgmId"	value="SM0101M01">      
 		<input type="hidden" id="coCd_SSS" name="coCd_SSS">
@@ -91,6 +91,7 @@
 <script type="text/javascript">
 
 var selectBomArr = [];
+var original_bomLevelArr = [];
 var bomLevelArr = [];
 var delRowIndexArr = [];
 
@@ -122,8 +123,26 @@ const lowLvlGridView = {
 			            	}
 			            	
 							if(this.key == "lastDsgnNo" && this.value != ""){
-								this.item.lowerCd = this.item.upperCd + adPer(this.value);
-								this.item.dsgnNo = this.item.lowerCd;
+								this.item.lastDsgnNo = this.value.replace(/[^A-Za-z0-9]/g, ""); //입력은 영문,숫자만
+								var this_dindex = this.dindex;
+								var this_lastDsgnNo = this.item.lastDsgnNo;
+								var isOverLap = false;
+								if(this.item.lastDsgnNo != "") {
+									$.each($.extend({}, this.list), function (idx, obj) {
+										if(this_dindex != obj.__index && obj.lastDsgnNo != "" && obj.lastDsgnNo == this_lastDsgnNo){
+											isOverLap = true;
+										}
+									});
+								}
+								if(isOverLap) {
+									this.item.lastDsgnNo = "";
+									this.item.lowerCd = "";
+									this.item.dsgnNo = "";
+								}
+								else {
+									this.item.lowerCd = this.item.upperCd + adPer(this.item.lastDsgnNo);
+									this.item.dsgnNo = this.item.lowerCd;
+								}
 							}
 							
 							this.self.repaint();
@@ -137,7 +156,7 @@ const lowLvlGridView = {
 		        	{key: "partNo" , label: "PART"	, width: 80,align: "left",hidden:true},
 		        	{key: "unitNo" , label: "UNIT"	, width: 80,align: "left",hidden:true},
 		        	{key: "revNo"  , label: "REV" 	, width: 80,align: "left",hidden:true},
-		        	{key: "lastDsgnNo"  , label: "도번", width: 90,align: "left", 
+		        	{key: "lastDsgnNo"  , label: "도번", width: 90,align: "left",
 		        		editor:{type:  "text",
 		        			disabled: function () {
 		        				if(this.item.lvl >= 1){
@@ -168,12 +187,21 @@ const lowLvlGridView = {
 		    });
 			return this;
 		},
+		
+		initData: function(){
+			var list = original_bomLevelArr;
+			this.target.setData({
+				list : list,
+			    page : {
+			    		totalElements : list.length
+			    	   } 
+			});
+		},
 
 
         setData: function(_pageNo){
-			var targetObj = this.target;
 			var list = bomLevelArr;
-			targetObj.setData({
+			this.target.setData({
 				list : list,
 			    page : {
 			    		totalElements : list.length
@@ -214,16 +242,16 @@ const lowLvlGridView = {
 		 * grid 초기화
 		*/
 		var sendLowData = modalStack.last().paramObj.sendLowData;
-		bomLevelArr = JSON.parse(sendLowData);
-		console.log("====bomLevelArr>>>",bomLevelArr);
+		original_bomLevelArr = JSON.parse(sendLowData);
+		bomLevelArr = JSON.parse(JSON.stringify(original_bomLevelArr));
 		
 		var sendSelectData = modalStack.last().paramObj.sendSelectData;
 		selectBomArr = JSON.parse(sendSelectData);
-		console.log("====selectBomArr>>>",selectBomArr);
 		$("#dsgnNm_SSS").val(selectBomArr.dsgnNm);
 		$("#bomQty_SSS").val(selectBomArr.bomQty);
 		
 		lowLvlGridView.initView().setData(0);
+		console.log("====lowLvlGridView>>",lowLvlGridView);
 		
 		$('#actionBtnLevel').on("click", function() {
 			sendBomLevel();
@@ -233,10 +261,7 @@ const lowLvlGridView = {
  	
  	//그리드 입력 초기화
  	this.initGridLowBom = function () {
-		$.each(bomLevelArr,function(idx, obj) {
-			obj.dtaChk = "";
-		});
-		lowLvlGridView.initView().setData(0);
+		lowLvlGridView.initData();
  	}
  	
  	this.addRowLevel = function () {
