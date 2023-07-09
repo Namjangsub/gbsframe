@@ -115,9 +115,9 @@ public class SM04SvcImpl implements SM04Svc {
 			dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
 			
-			String dtaChk = dtl.get("dtaChk").toString();	    	
-			//"dtaChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
-	    	if ("I".equals(dtaChk)) {
+			String dataChk = dtl.get("dataChk").toString();	    	
+			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
+	    	if ("I".equals(dataChk)) {
 				outInoutKey = sm04Mapper.select_sm04_Ioseq(paramMap);
 				dtl.put("outInoutKey", Integer.toString(outInoutKey));
 	    		dtl.put("ioSeq", Integer.toString(i));
@@ -191,9 +191,9 @@ public class SM04SvcImpl implements SM04Svc {
 			dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
 			
-			String dtaChk = dtl.get("dtaChk").toString();	    	
-			//"dtaChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
-	    	if ("U".equals(dtaChk)) {
+			String dataChk = dtl.get("dataChk").toString();	    	
+			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
+	    	if ("U".equals(dataChk)) {
 				//데이터 처리
 				sm04Mapper.update_sm04_Dtl(dtl);
 	    	} 
