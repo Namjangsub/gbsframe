@@ -18,7 +18,9 @@ public interface SM01Svc {
   List<Map<String, String>> selectBomMatrList(Map<String, String> paramMap);
 
   Map<String, String> selectBomMatrInfo(Map<String, String> paramMap);
-
+  
+  List<Map<String, String>> selectBomMatrTreeList(Map<String, String> paramMap);
+  
   int insertBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
   int updateBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;

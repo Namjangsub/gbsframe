@@ -18,6 +18,8 @@ public interface SM01Mapper {
 
   List<Map<String, String>> selectBomMatrList(Map<String, String> paramMap);
   
+  List<Map<String, String>> selectBomMatrTreeList(Map<String, String> paramMap);
+  
   Map<String, String> selectBomMatrInfo(Map<String, String> paramMap);
   
   int selectPrjctSeqNext(Map<String, String> paramMap);
@@ -29,6 +31,8 @@ public interface SM01Mapper {
   int deleteBomAll(Map<String, String> paramMap);
 
   int deleteBom(Map<String, String> paramMap);
+  
+  int deleteBomAllMatrAll(Map<String, String> paramMap);
   
   int deleteBomMatrAll(Map<String, String> paramMap);
 

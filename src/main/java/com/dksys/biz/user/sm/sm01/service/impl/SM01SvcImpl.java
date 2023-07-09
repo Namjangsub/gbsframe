@@ -66,6 +66,11 @@ public class SM01SvcImpl implements SM01Svc {
   }
 
   @Override
+  public List<Map<String, String>> selectBomMatrTreeList(Map<String, String> paramMap) {
+    return sm01Mapper.selectBomMatrTreeList(paramMap);
+  }
+
+  @Override
   public int insertBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
 	    Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
@@ -238,7 +243,7 @@ public class SM01SvcImpl implements SM01Svc {
 		//첨부 화일 권한체크 끝 
 		//---------------------------------------------------------------  
 	  
-	  int result = sm01Mapper.deleteBomMatrAll(paramMap);
+	  int result = sm01Mapper.deleteBomAllMatrAll(paramMap);
 	  result = sm01Mapper.deleteBomAll(paramMap);
 	  
 		//---------------------------------------------------------------  

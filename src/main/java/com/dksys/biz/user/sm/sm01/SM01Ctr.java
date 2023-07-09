@@ -72,6 +72,14 @@ public class SM01Ctr {
 		return "jsonView";
 	}
   
+	// BOM Tree 조회
+	@PostMapping(value = "/selectBomMatrTreeList")
+	public String selectBomMatrTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = sm01Svc.selectBomMatrTreeList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+
 	@PostMapping(value = "/insertBom")
 	public String insertBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
