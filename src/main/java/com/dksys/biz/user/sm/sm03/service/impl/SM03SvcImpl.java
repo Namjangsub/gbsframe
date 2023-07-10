@@ -92,11 +92,12 @@ public class SM03SvcImpl implements SM03Svc {
 		return sm03Mapper.selectBomDetailList(paramMap);
 	}		
 	  
-	/* 발주등록수정시 bom list */
+		
+	/* 입고 등록시 발주 list */
 	@Override
 	public List<Map<String, String>> selectWareHousingDetailList(Map<String, String> paramMap) {
 		return sm03Mapper.selectWareHousingDetailList(paramMap);
-	}		
+	}			
 	
 	@Override
 	public int insertWareHousingMaster(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
