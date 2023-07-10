@@ -60,7 +60,7 @@ public class HomeController {
     public String selectMenuAuth(@RequestBody Map<String, Object> param, Model model) {
     	String[] authArray = {"AUTH000"};
     	authArray = param.get("authInfo") != null ? param.get("authInfo").toString().split(",") : authArray;
-    	List<Map<String, Object>> accessList = cm01Svc.selectMenuAuth(authArray);
+    	List<Map<String, Object>> accessList = cm01Svc.selectMenuAuth(authArray);    	
     	model.addAttribute("accessList", accessList);
     	JSONArray jsonArray = new JSONArray();
     	
@@ -70,10 +70,10 @@ public class HomeController {
     			try {
     				if(entry.getKey().equals("menuUrl") || entry.getKey().equals("saveYn")) {
     	    			String key = entry.getKey();
-    	    			String sValue = entry.getValue().toString();
+    	    			String sValue = entry.getValue().toString();    	    			
     	    			if(key.equals("menuUrl")) {
 	    	    			if(sValue.lastIndexOf("/") > 0) {
-	    	    				sValue = sValue.substring(sValue.lastIndexOf("/")+1, sValue.lastIndexOf("."));
+	    	    				sValue = sValue.substring(sValue.lastIndexOf("/")+1, sValue.lastIndexOf("."));	    	    				
 	    	    			}
     	    			}
     	    			Object value = sValue;

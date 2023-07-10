@@ -55,12 +55,15 @@ public class CM01SvcImpl implements CM01Svc {
 			roleStr += roleList.get(i) + ",";
 		}
 		String[] roleArray = roleStr.split(",");
-		roleArray = Arrays.stream(roleArray).distinct().toArray(String[]::new);
+		roleArray = Arrays.stream(roleArray).distinct().toArray(String[]::new);	
+		
+		System.out.println("roleArray==?"+roleArray);
 		
 		// role에 해당하는 menuId, 저장권한 조회
 		List<Map<String, String>> menuList = cm01Mapper.selectMenuFromRole(roleArray);
 		for (int i = 0; i < menuList.size(); i++) {
 			menuStr += menuList.get(i).get("roleMenu") + ",";
+			System.out.println("menuStr==?"+menuStr);
 		}
 		String[] menuArray = menuStr.split(",");
 		
