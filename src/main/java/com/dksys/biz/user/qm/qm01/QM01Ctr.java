@@ -29,16 +29,26 @@ public class QM01Ctr {
   @Autowired
   QM01Svc qm01Svc;
 
-//   프로젝트 리스트 조회
-  @PostMapping(value = "/selectPchsCostList")
-  public String selectPchsCostList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    int totalCnt = qm01Svc.selectPchsCostCount(paramMap);
+// 발주 및 출장 요청서 리스트 조회
+  @PostMapping(value = "/selectQualityReqList")
+  public String selectQualityReqList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    int totalCnt = qm01Svc.selectQualityReqCount(paramMap);
     PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
     model.addAttribute("paginationInfo", paginationInfo);
-    List<Map<String, String>> result = qm01Svc.selectPchsCostList(paramMap);
+    List<Map<String, String>> result = qm01Svc.selectQualityReqList(paramMap);
     model.addAttribute("result", result);
     return "jsonView";
   }
+   
+//발주 및 출장 요청서 리스트엑셀 리스트  -->
+  @PostMapping(value = "/selectQualityReqExList") 
+	public String selectMsExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
+		  List<Map<String, String>> resultList = qm01Svc.selectQualityReqExList(paramMap);
+		  	  model.addAttribute("resultList", resultList); 
+		     System.out.println("resultList==?"+resultList);
+		  return "jsonView"; 
+		  
+	}  
 
   // 프로젝트 정보 조회
   @PostMapping(value = "/selectPchsCostInfo")

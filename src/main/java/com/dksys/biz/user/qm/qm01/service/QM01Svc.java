@@ -7,9 +7,11 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface QM01Svc {
 
-  int selectPchsCostCount(Map<String, String> paramMap);
+  int selectQualityReqCount(Map<String, String> paramMap);
 
-  List<Map<String, String>> selectPchsCostList(Map<String, String> paramMap);
+  List<Map<String, String>> selectQualityReqList(Map<String, String> paramMap);
+  
+  List<Map<String, String>> selectQualityReqExList(Map<String, String> paramMap);
 
   Map<String, String> selectPchsCostInfo(Map<String, String> paramMap);
 

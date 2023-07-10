@@ -8,9 +8,11 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface QM01Mapper {
 
-  int selectPchsCostCount(Map<String, String> paramMap);
+  int selectQualityReqCount(Map<String, String> paramMap);
 
-  List<Map<String, String>> selectPchsCostList(Map<String, String> paramMap);
+  List<Map<String, String>> selectQualityReqList(Map<String, String> paramMap);
+  
+  List<Map<String, String>> selectQualityReqExList(Map<String, String> paramMap);
 
   Map<String, String> selectPchsCostInfo(Map<String, String> paramMap);
   

@@ -27,7 +27,7 @@ import com.google.gson.reflect.TypeToken;
 public class QM01SvcImpl implements QM01Svc {
 
   @Autowired
-  QM01Mapper qm01Mapper;
+  QM01Mapper QM01Mapper;
 
   @Autowired
   CM15Svc cm15Svc;
@@ -36,23 +36,23 @@ public class QM01SvcImpl implements QM01Svc {
   CM08Svc cm08Svc;
   
   @Override
-  public int selectPchsCostCount(Map<String, String> paramMap) {
-    return qm01Mapper.selectPchsCostCount(paramMap);
+  public int selectQualityReqCount(Map<String, String> paramMap) {
+    return QM01Mapper.selectQualityReqCount(paramMap);
   }
 
   @Override
-  public List<Map<String, String>> selectPchsCostList(Map<String, String> paramMap) {
-    return qm01Mapper.selectPchsCostList(paramMap);
+  public List<Map<String, String>> selectQualityReqList(Map<String, String> paramMap) {
+    return QM01Mapper.selectQualityReqList(paramMap);
   }
 
   @Override
   public Map<String, String> selectPchsCostInfo(Map<String, String> paramMap) {
-    return qm01Mapper.selectPchsCostInfo(paramMap);
+    return QM01Mapper.selectPchsCostInfo(paramMap);
   }
 
   @Override
   public int selectConfirmCount(Map<String, String> paramMap) {
-    return qm01Mapper.selectConfirmCount(paramMap);
+    return QM01Mapper.selectConfirmCount(paramMap);
   }
 
   @Override
@@ -88,7 +88,7 @@ public class QM01SvcImpl implements QM01Svc {
 	//첨부 화일 권한체크  끝 
 	//---------------------------------------------------------------  
 
-	int result = qm01Mapper.updatePchsCost(paramMap);
+	int result = QM01Mapper.updatePchsCost(paramMap);
 
 	//---------------------------------------------------------------  
 	//첨부 화일 처리 시작 
@@ -130,10 +130,10 @@ public class QM01SvcImpl implements QM01Svc {
 		//---------------------------------------------------------------  
 
 		
-		int fileTrgtKey = qm01Mapper.selectPchsCostSeqNext(paramMap);
+		int fileTrgtKey = QM01Mapper.selectPchsCostSeqNext(paramMap);
 		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
 		
-		int result = qm01Mapper.insertPchsCost(paramMap);
+		int result = QM01Mapper.insertPchsCost(paramMap);
 	
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
@@ -172,7 +172,7 @@ public class QM01SvcImpl implements QM01Svc {
 		//첨부 화일 권한체크 끝 
 		//---------------------------------------------------------------  
 	  
-	  int result = qm01Mapper.deletePchsCost(paramMap);
+	  int result = QM01Mapper.deletePchsCost(paramMap);
 	  
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
@@ -187,6 +187,11 @@ public class QM01SvcImpl implements QM01Svc {
 		//첨부 화일 처리  끝 
 		//---------------------------------------------------------------  	  
 	    return result;
+  }
+  
+  @Override
+  public List<Map<String, String>> selectQualityReqExList(Map<String, String> paramMap) {
+		return QM01Mapper.selectQualityReqExList(paramMap);
   }
 
 }
