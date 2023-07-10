@@ -30,166 +30,19 @@ public class WB03Ctr {
   WB03Svc wb03Svc;
 
     //Paging 조회
-	@PostMapping(value = "/selectWbsIssuePageList")
-	public String selectWbsIssuePageList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = wb03Svc.selectWbsIssuePagingCount(paramMap);
-		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		model.addAttribute("paginationInfo", paginationInfo);
-		List<Map<String, String>> result = wb03Svc.selectWbsIssuePageList(paramMap);
-		model.addAttribute("resultList", result);
-		return "jsonView";
-	}
-
-	// BOM내역상세 조회
-	@PostMapping(value = "/selectBomDetailList")
-	public String selectBomDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> resultList = wb03Svc.selectBomDetailList(paramMap);
-		model.addAttribute("resultList", resultList);
-		return "jsonView";
-	}
-
-	//Bom 리스트
-	@PostMapping("/selectBuyBomList")
-	public String selectBuyBomList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> resultList = wb03Svc.selectBuyBomList(paramMap);
-		model.addAttribute("resultList", resultList);
-		return "jsonView";
-	}
-
-	// 자재 리스트 조회
-	@PostMapping("/selectBomMatrList")
-	public String selectBomMatrList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> resultList = wb03Svc.selectBomMatrList(paramMap);
-		model.addAttribute("resultList", resultList);
+	@PostMapping(value = "/selectWbsPlanTreeIssueList")
+	public String selectWbsPlanTreeIssueList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> fileList = wb03Svc.selectWbsPlanTreeIssueList(paramMap);
+		model.addAttribute("fileList", fileList);
 		return "jsonView";
 	}
 	
-	// Bom 자재 Map 조회
-	@PostMapping(value = "/selectBomMatrInfo")
-		public String selectBomMatrInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		Map<String, String> result = wb03Svc.selectBomMatrInfo(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-	}
-  
-	@PostMapping(value = "/insertBom")
-	public String insertBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-		try {
-			if (wb03Svc.insertBom(paramMap, mRequest) != 0 ) {
-				model.addAttribute("resultCode", 200);
-				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-			} else {
-				model.addAttribute("resultCode", 500);
-				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-			};
-		}catch(Exception e){
-			model.addAttribute("resultCode", 900);
-			model.addAttribute("resultMessage", e.getMessage());
-		}
-		return "jsonView";
-	}
-
-	@PostMapping(value = "/updateBom")
-	public String updateBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-	  	try {
-			if (wb03Svc.updateBom(paramMap, mRequest) != 0 ) {
-				model.addAttribute("resultCode", 200);
-				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-			} else {
-				model.addAttribute("resultCode", 500);
-				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-			};
-		}catch(Exception e){
-			model.addAttribute("resultCode", 900);
-			model.addAttribute("resultMessage", e.getMessage());
-		}
-	  	return "jsonView";
-	}
-
-	@PutMapping(value = "/deleteBomAll")
-	public String deleteBomAll(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
-	  	try {
-			if (wb03Svc.deleteBomAll(paramMap) != 0 ) {
-				model.addAttribute("resultCode", 200);
-				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-			} else {
-				model.addAttribute("resultCode", 500);
-				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-			};
-		}catch(Exception e){
-			model.addAttribute("resultCode", 900);
-			model.addAttribute("resultMessage", e.getMessage());
-		}
-	  	return "jsonView";
-	}
-
-	@PostMapping(value = "/insertBomMatr")
-	public String insertBomMatr(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-	  try {
-		  if (wb03Svc.insertBomMatr(paramMap, mRequest) != 0 ) {
-			  model.addAttribute("resultCode", 200);
-			  model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-		  } else {
-			  model.addAttribute("resultCode", 500);
-			  model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-		  };
-	  }catch(Exception e){
-		  model.addAttribute("resultCode", 900);
-		  model.addAttribute("resultMessage", e.getMessage());
-	  }
-	  return "jsonView";
-	}
-  
-	@PostMapping(value = "/updateBomMatr")
-	public String updateBomMatr(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-	  try {
-		  if (wb03Svc.updateBomMatr(paramMap, mRequest) != 0 ) {
-			  model.addAttribute("resultCode", 200);
-			  model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-		  } else {
-			  model.addAttribute("resultCode", 500);
-			  model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-		  };
-	  }catch(Exception e){
-		  model.addAttribute("resultCode", 900);
-		  model.addAttribute("resultMessage", e.getMessage());
-	  }
-	  return "jsonView";
-	}
-
-	@PutMapping(value = "/deleteBomMatr")
-	public String deleteBomMatr(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
-	  	try {
-			if (wb03Svc.deleteBomMatr(paramMap) != 0 ) {
-				model.addAttribute("resultCode", 200);
-				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-			} else {
-				model.addAttribute("resultCode", 500);
-				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-			};
-		}catch(Exception e){
-			model.addAttribute("resultCode", 900);
-			model.addAttribute("resultMessage", e.getMessage());
-		}
-	  	return "jsonView";
-	}
-	
-	  
-	@PostMapping(value = "/insertCopyBom")
-	public String insertCopyBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-		try {
-			if (wb03Svc.insertCopyBom(paramMap, mRequest) != 0 ) {
-				model.addAttribute("resultCode", 200);
-				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-			} else {
-				model.addAttribute("resultCode", 500);
-				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-			};
-		}catch(Exception e){
-			model.addAttribute("resultCode", 900);
-			model.addAttribute("resultMessage", e.getMessage());
-		}
-		return "jsonView";
-	}
-  
+    @PostMapping(value = "/selectMaxWbsIssueNo") 
+    public String selectMaxWbsPlanNo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    List<Map<String, String>> result = wb03Svc.selectMaxWbsIssueNo(paramMap);
+	    model.addAttribute("result", result); 
+	    return "jsonView"; 		 
+    }
+	   
+	   
 }
