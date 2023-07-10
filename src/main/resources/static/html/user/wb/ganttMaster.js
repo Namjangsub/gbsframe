@@ -113,9 +113,9 @@ GanttMaster.prototype.init = function (workSpace) {
   this.gantt = new Ganttalendar(new Date().getTime() - 3600000 * 24 * 2, new Date().getTime() + 3600000 * 24 * 5, this, place.width() * .6);
 
   //setup splitter
-  self.splitter = $.splittify.init(place, this.editor.gridified, this.gantt.element, 60);
-  self.splitter.firstBoxMinWidth = 5;
-  self.splitter.secondBoxMinWidth = 20;
+  self.splitter = $.splittify.init(place, this.editor.gridified, this.gantt.element, 50);
+  self.splitter.firstBoxMinWidth = 1;
+  self.splitter.secondBoxMinWidth = 50;
 
   //prepend buttons
   var ganttButtons = $.JST.createFromTemplate({}, "GANTBUTTONS");
@@ -259,7 +259,8 @@ GanttMaster.prototype.init = function (workSpace) {
 
   //resize
   $(window).resize(function () {
-    place.css({width: "100%", height: $(window).height() - place.position().top});
+    place.css({width: "100%", height: $("#gantSpace").height()});
+//    place.css({width: "100%", height: $(window).height() - 210});
     place.trigger("resize.gantt");
   }).oneTime(2, "resize", function () {$(window).trigger("resize")});
 
@@ -530,7 +531,7 @@ GanttMaster.prototype.loadTasks = function (tasks, selectedRow) {
           var err = this.__currentTransaction.errors.pop();
           msg = msg + err.msg + "\n\n";
         }
-        alert(msg);
+//        alert(msg);
       }
       this.__removeAllLinks(task, false);
     }
@@ -1319,7 +1320,7 @@ GanttMaster.prototype.endTransaction = function () {
       var err = this.__currentTransaction.errors[i];
       msg = msg + err.msg + "\n\n";
     }
-    alert(msg);
+//    alert(msg);
 
 
     //try to restore changed tasks
@@ -1647,29 +1648,29 @@ GanttMaster.prototype.manageSaveRequired=function(ev, showSave) {
   function checkChanges() {
     var changes = false;
     //there is somethin in the redo stack?
-    if (self.__undoStack.length > 0) {
-      var oldProject = JSON.parse(self.__undoStack[0]);
-      //si looppano i "nuovi" task
-      for (var i = 0; !changes && i < self.tasks.length; i++) {
-        var newTask = self.tasks[i];
-        //se è un task che c'erà già
-        if (!(""+newTask.id).startsWith("tmp_")) {
-          //si recupera il vecchio task
-          var oldTask;
-          for (var j = 0; j < oldProject.tasks.length; j++) {
-            if (oldProject.tasks[j].id == newTask.id) {
-              oldTask = oldProject.tasks[j];
-              break;
-            }
-          }
-          // chack only status or dateChanges
-          if (oldTask && (oldTask.status != newTask.status || oldTask.start != newTask.start || oldTask.end != newTask.end)) {
-            changes = true;
-            break;
-          }
-        }
-      }
-    }
+//    if (self.__undoStack.length > 0) {
+//      var oldProject = JSON.parse(self.__undoStack[0]);
+//      //si looppano i "nuovi" task
+//      for (var i = 0; !changes && i < self.tasks.length; i++) {
+//        var newTask = self.tasks[i];
+//        //se è un task che c'erà già
+//        if (!(""+newTask.id).startsWith("tmp_")) {
+//          //si recupera il vecchio task
+//          var oldTask;
+//          for (var j = 0; j < oldProject.tasks.length; j++) {
+//            if (oldProject.tasks[j].id == newTask.id) {
+//              oldTask = oldProject.tasks[j];
+//              break;
+//            }
+//          }
+//          // chack only status or dateChanges
+//          if (oldTask && (oldTask.status != newTask.status || oldTask.start != newTask.start || oldTask.end != newTask.end)) {
+//            changes = true;
+//            break;
+//          }
+//        }
+//      }
+//    }
     $("#LOG_CHANGES_CONTAINER").css("display", changes ? "inline-block" : "none");
   }
 

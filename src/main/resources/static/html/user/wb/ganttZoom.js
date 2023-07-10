@@ -130,7 +130,7 @@
       date.setDate(date.getDate() - 1);
       var inc=date.getDate()-start.getDate()+1;
       date.setDate(date.getDate() + 1);
-      self.createHeadCell(1,this,tr1,start.format("MMMM yyyy"), inc,"",start,date); //spans mumber of dayn in the month
+      self.createHeadCell(1,this,tr1,start.format("yyyy/MM"), inc,"",start,date); //spans mumber of dayn in the month
     },
     row2:        function (date, tr2, trBody) {
       var start = new Date(date.getTime());

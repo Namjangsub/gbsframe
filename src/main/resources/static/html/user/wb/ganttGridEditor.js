@@ -511,7 +511,13 @@ GridEditor.prototype.bindRowInputEvents = function (task, taskRow) {
 
 GridEditor.prototype.openFullEditor = function (task, editOnlyAssig) {
   var self = this;
-
+  var paramObj = {
+          "coCd" : "GUN",
+          "salesCd": ""
+       };
+       openSecondModal("/static/html/cmn/modal/SalesCodeTreeSearch.html", 1000, 540, "SALES CODE 검색", paramObj, function (grid){
+       });
+       return;    
   if (!self.master.permissions.canSeePopEdit)
     return;
 
