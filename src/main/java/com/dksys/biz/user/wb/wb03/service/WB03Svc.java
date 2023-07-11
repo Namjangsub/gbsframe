@@ -9,4 +9,7 @@ public interface WB03Svc {
 
   List<Map<String, String>> selectWbsPlanTreeIssueList(Map<String, String> paramMap);
   List<Map<String, String>> selectMaxWbsIssueNo(Map<String, String> paramMap);
+  int insertWbsPlanIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+  int updateWbsPlanIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+  
 }

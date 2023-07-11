@@ -45,4 +45,21 @@ public class WB03SvcImpl implements WB03Svc {
 		return wb03Mapper.selectMaxWbsIssueNo(paramMap);
   }
   
+  @Override
+  public int insertWbsPlanIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	
+		int fileTrgtKey = wb03Mapper.selectWbsPlanIssueSeqNext(paramMap);
+		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+	    int result = wb03Mapper.insertWbsPlanIssue(paramMap);	
+	    return result;
+  }
+  
+  @Override
+  public int updateWbsPlanIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	
+	    int result = wb03Mapper.updateWbsPlanIssue(paramMap);	
+	    return result;
+  }
+  
+  
 }

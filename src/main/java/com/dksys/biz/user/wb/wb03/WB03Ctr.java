@@ -33,6 +33,7 @@ public class WB03Ctr {
 	@PostMapping(value = "/selectWbsPlanTreeIssueList")
 	public String selectWbsPlanTreeIssueList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> fileList = wb03Svc.selectWbsPlanTreeIssueList(paramMap);
+		
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
 	}
@@ -44,5 +45,38 @@ public class WB03Ctr {
 	    return "jsonView"; 		 
     }
 	   
-	   
+    @PostMapping(value = "/insertWbsPlanIssue")
+    public String insertWbsPlanIssue(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (wb03Svc.insertWbsPlanIssue(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  		} else {
+  			model.addAttribute("resultCode", 500);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  		    model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }   
+    
+    @PutMapping(value = "/updateWbsPlanIssue")
+    public String updateWbsPlanIssue(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+ 		try {
+ 			if (wb03Svc.updateWbsPlanIssue(paramMap, mRequest) != 0 ) {
+ 				model.addAttribute("resultCode", 200);
+ 			    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+ 		} else {
+ 			    model.addAttribute("resultCode", 500);
+ 			    model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+ 			};
+ 		}catch(Exception e){
+ 			model.addAttribute("resultCode", 900);
+ 		    model.addAttribute("resultMessage", e.getMessage());
+ 		}
+ 		return "jsonView";
+    }
+    
 }
