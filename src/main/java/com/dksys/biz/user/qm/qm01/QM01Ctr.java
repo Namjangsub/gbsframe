@@ -45,7 +45,7 @@ public class QM01Ctr {
 	public String selectMsExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
 		  List<Map<String, String>> resultList = qm01Svc.selectQualityReqExList(paramMap);
 		  	  model.addAttribute("resultList", resultList); 
-		     System.out.println("resultList==?"+resultList);
+		   //  System.out.println("resultList==?"+resultList);
 		  return "jsonView"; 
 		  
 	}  
