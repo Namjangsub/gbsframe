@@ -8,9 +8,9 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface CR10Mapper {
 
-  int selectWbsIssuePageCount(Map<String, String> paramMap);
+  int selectLgistReqPageCount(Map<String, String> paramMap);
 
-  List<Map<String, String>> selectWbsIssuePageList(Map<String, String> paramMap);
+  List<Map<String, String>> selectLgistReqPageList(Map<String, String> paramMap);
   
   List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);
 

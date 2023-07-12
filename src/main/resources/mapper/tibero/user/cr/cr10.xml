@@ -3,93 +3,82 @@
 
 <mapper namespace="com.dksys.biz.user.cr.cr10.mapper.CR10Mapper">
 
-	<sql id="selectWbsIssueList">
+	<sql id="selectLgistReqList">
         SELECT LEVEL AS LEV
         	 , FN_CM05M01_CD_TO_NM(T.CO_CD) CO_NM
         	 ,T.*
 		  FROM (
-		  	 	/* top */
-                SELECT 'top' UPPER_CD,
-                	   'GUN' LOWER_CD,
-                	   'GUN' CO_CD,
-                       '전체' ORDRS_NO,
-                       '전체 현황' AS SALES_CD,
-                       '' ORDRS_CLNT_CD,
-                       '전체' AS ORDRS_CLNT_NM
-                       , '' AS WBS_PLAN_FILE_TRGT_KEY
-                       , '' AS WBS_PLAN_NO
-                       , '' AS WBS_PLAN_CODE_KIND
-                       , '' AS WBS_PLAN_CODE_ID
+		  	 	/* top -> 회사*/
+                SELECT 'top' AS UPPER_CD
+                	   , #{coCd} AS LOWER_CD
+                	   , #{coCd} AS CO_CD
+                       , '' AS ORDRS_NO
+                       , '전체 현황' AS TITLE
+                       , '' ORDRS_CLNT_CD
+                       , '전체' AS ORDRS_CLNT_NM
+                       , '' AS CLNT_PJT
                   FROM DUAL
            UNION ALL
          		/* top -> 회사 -> 고객사 */
                 SELECT DISTINCT
-                	   X.CO_CD UPPER_CD,
-                	   TO_CHAR(Y.ORDRS_CLNT_CD) LOWER_CD,
-                	   X.CO_CD,
-                       A.CLNT_NM,
-                       A.CLNT_NM  AS SALES_CD,
-                       Y.ORDRS_CLNT_CD ,
-                       A.CLNT_NM  AS ORDRS_CLNT_NM
-                       , '' AS WBS_PLAN_FILE_TRGT_KEY
-                       , '' AS WBS_PLAN_NO
-                       , '' AS WBS_PLAN_CODE_KIND
-                       , '' AS WBS_PLAN_CODE_ID
+                	   X.CO_CD UPPER_CD
+                	   , TO_CHAR(Y.ORDRS_CLNT_CD) LOWER_CD
+                	   , X.CO_CD
+                       , '' AS ORDRS_NO
+                       , A.CLNT_NM AS TITLE
+                       , Y.ORDRS_CLNT_CD
+                       , A.CLNT_NM  AS ORDRS_CLNT_NM
+                       , Y.CLNT_PJT
                   FROM TB_CR02D02 X
                         INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
                                                 AND X.ORDRS_NO = Y.ORDRS_NO
                         LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD
-                WHERE X.CO_CD = 'GUN'
+				 WHERE 1=1
+				   AND X.CO_CD = #{coCd}
            UNION ALL
                 /* top -> 고객사 -> 수주번호 */
                 SELECT DISTINCT
-                	   TO_CHAR(Y.ORDRS_CLNT_CD) UPPER_CD,
-                	   X.ORDRS_NO LOWER_CD,
-                	   X.CO_CD,
-                       X.ORDRS_NO AS ORDRS_NO,
-                       X.ORDRS_NO AS SALES_CD,
-                       Y.ORDRS_CLNT_CD,
-                       A.CLNT_NM  AS ORDRS_CLNT_NM
-                       , '' AS WBS_PLAN_FILE_TRGT_KEY
-                       , '' AS WBS_PLAN_NO
-                       , '' AS WBS_PLAN_CODE_KIND
-                       , '' AS WBS_PLAN_CODE_ID
+                	   TO_CHAR(Y.ORDRS_CLNT_CD) UPPER_CD
+                	   , X.ORDRS_NO LOWER_CD
+                	   , X.CO_CD
+                       , X.ORDRS_NO
+                       , X.ORDRS_NO AS TITLE
+                       , Y.ORDRS_CLNT_CD
+                       , A.CLNT_NM AS ORDRS_CLNT_NM
+                       , Y.CLNT_PJT
                   FROM TB_CR02D02 X
                         INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
                                                 AND X.ORDRS_NO = Y.ORDRS_NO
                         LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD
-				 WHERE X.CO_CD = 'GUN'
+				 WHERE 1=1
+				   AND X.CO_CD = #{coCd}
            UNION ALL
-                /* top -> 고객사 -> 수주번호 -> SALES CODE ->*/
-				SELECT X.ORDRS_NO UPPER_CD
-                	   , X.SALES_CD LOWER_CD
-                	   , X.CO_CD
+                /* top -> 고객사 -> 수주번호 -> 물류번호 */
+				SELECT   X.ORDRS_NO AS UPPER_CD
+				       , X.ORDRS_NO||'-'||TRIM(TO_CHAR(X.FILE_TRGT_KEY,'0000')) AS LOWER_CD
+                 	   , X.CO_CD
                        , X.ORDRS_NO
-                       , X.SALES_CD
-                       , Y.ORDRS_CLNT_CD AS ORDRS_CLNT_CD
-                       , A.CLNT_NM  AS ORDRS_CLNT_NM
-                       , W.FILE_TRGT_KEY AS WBS_PLAN_FILE_TRGT_KEY
-                       , W.WBS_PLAN_NO
-                       , W.WBS_PLAN_CODE_KIND
-                       , W.WBS_PLAN_CODE_ID
-                  FROM TB_CR02D02 X
-                        INNER JOIN TB_CR02M01 Y  ON X.CO_CD    = Y.CO_CD
-                                                AND X.ORDRS_NO = Y.ORDRS_NO
-                        LEFT OUTER JOIN TB_WB01M01 W  ON X.CO_CD    = W.CO_CD
-                                                     AND X.SALES_CD = W.SALES_CD
-                        LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD
-              ) T
-              START WITH UPPER_CD = 'top' CONNECT BY PRIOR LOWER_CD = UPPER_CD
+                       , X.ORDRS_NO||'-'||TRIM(TO_CHAR(X.FILE_TRGT_KEY,'0000')) AS TITLE
+                       , A.ORDRS_CLNT_CD
+                       , B.CLNT_NM AS ORDRS_CLNT_NM
+                       , X.CLNT_PJT
+                 FROM TB_CR11M01 X
+                 LEFT OUTER JOIN TB_CR02M01 A ON X.CO_CD = A.CO_CD AND X.ORDRS_NO = A.ORDRS_NO
+                 LEFT OUTER JOIN TB_BM02M01 B ON A.ORDRS_CLNT_CD = B.CLNT_CD
+				 WHERE 1=1
+				   AND X.CO_CD = #{coCd}
+           ) T
+           START WITH UPPER_CD = 'top' CONNECT BY PRIOR LOWER_CD = UPPER_CD
 	</sql>
 
-	<select id="selectWbsIssuePageCount" parameterType="Map" resultType="int">
+	<select id="selectLgistReqPageCount" parameterType="Map" resultType="int">
         SELECT
         COUNT(*)
         FROM (
-        	<include refid="selectWbsIssueList"></include>
+        	<include refid="selectLgistReqList"></include>
         )
 	</select>
-	<select id="selectWbsIssuePageList" parameterType="Map" resultType="CamelMap">
+	<select id="selectLgistReqPageList" parameterType="Map" resultType="CamelMap">
         SELECT
         *
         FROM(
@@ -97,7 +86,7 @@
         ROWNUM AS RNUM, A.*
         FROM
         (
-        <include refid="selectWbsIssueList"></include>
+        <include refid="selectLgistReqList"></include>
         ) AS a
         ) A
         WHERE RNUM BETWEEN #{firstIndex} AND #{lastIndex}

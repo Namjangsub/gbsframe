@@ -36,13 +36,13 @@ public class CR10SvcImpl implements CR10Svc {
   CM08Svc cm08Svc;
   
   @Override
-  public int selectWbsIssuePageCount(Map<String, String> paramMap) {
-    return cr10Mapper.selectWbsIssuePageCount(paramMap);
+  public int selectLgistReqPageCount(Map<String, String> paramMap) {
+    return cr10Mapper.selectLgistReqPageCount(paramMap);
   }
 
   @Override
-  public List<Map<String, String>> selectWbsIssuePageList(Map<String, String> paramMap) {
-    return cr10Mapper.selectWbsIssuePageList(paramMap);
+  public List<Map<String, String>> selectLgistReqPageList(Map<String, String> paramMap) {
+    return cr10Mapper.selectLgistReqPageList(paramMap);
   }
 	
   @Override

@@ -7,9 +7,9 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface CR10Svc {
 
-  int selectWbsIssuePageCount(Map<String, String> paramMap);
+  int selectLgistReqPageCount(Map<String, String> paramMap);
 
-  List<Map<String, String>> selectWbsIssuePageList(Map<String, String> paramMap);
+  List<Map<String, String>> selectLgistReqPageList(Map<String, String> paramMap);
   
   List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);
 

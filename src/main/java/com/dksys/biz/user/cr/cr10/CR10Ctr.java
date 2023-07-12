@@ -30,12 +30,12 @@ public class CR10Ctr {
   CR10Svc cr10Svc;
 
     //Paging 조회
-	@PostMapping(value = "/selectWbsIssuePageList")
-	public String selectWbsIssuePageList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = cr10Svc.selectWbsIssuePageCount(paramMap);
+	@PostMapping(value = "/selectLgistReqPageList")
+	public String selectLgistReqPageList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = cr10Svc.selectLgistReqPageCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
-		List<Map<String, String>> result = cr10Svc.selectWbsIssuePageList(paramMap);
+		List<Map<String, String>> result = cr10Svc.selectLgistReqPageList(paramMap);
 		model.addAttribute("resultList", result);
 		return "jsonView";
 	}
