@@ -55,4 +55,6 @@ public interface SM06Mapper {
 	    
 	    int delete_sm06_Dtl_All(Map<String, String> paramMap);
 
+	    //inNumberSearch 팝업 SELECT
+	    List<Map<String, String>> selectInNumberCodeList(Map<String, String> paramMap);
 }

@@ -269,7 +269,9 @@ public class SM06SvcImpl implements SM06Svc {
 		if ("1".equals(lvl)) {
 			//데이터 처리
 			result = sm06Mapper.delete_sm06_Dtl_All(paramMap);
+			System.out.println("delete_sm06_Dtl_All==============");
 			result = sm06Mapper.delete_sm06(paramMap);
+			System.out.println("delete_sm06======================");
     	} else {
     		result = sm06Mapper.delete_sm06_Dtl(paramMap);
     	}
@@ -287,6 +289,12 @@ public class SM06SvcImpl implements SM06Svc {
 		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
 		return result;
+	}
+	
+	//inNumberSearch 팝업 SELECT
+	@Override
+	public List<Map<String, String>> selectInNumberCodeList(Map<String, String> paramMap) {
+		return sm06Mapper.selectInNumberCodeList(paramMap);
 	}
 	
 }

@@ -603,8 +603,8 @@
 	</select>
 
 	<select id="select_whin_modal" parameterType="Map" resultType="camelMap">
-	 SELECT X.* 
-	      FROM (
+	 SELECT Z.* 
+	   FROM (
 			SELECT '' AS FILE_TRGT_KEY
 			     , I.CO_NM         --회사명
 				 , I.CO_CD
@@ -618,11 +618,12 @@
 				 , I.REV_NO      -- rev
 				 , I.DSGN_NO     --도번
 			     , I.MATR_CD     -- 품번
+			     , I.CURR_CD
+				 , I.EXRATE
 			     , I.WH_CD       -- 입고창고
 			     , I.MATR_WH_NM  -- 입고창고명
 				 , I.IN_QTY      -- 입고수량
-				 , NVL(I.IN_QTY - (SELECT SUM(RET_QTY) FROM TB_SM06D01 X WHERE X.IN_NO = I.IN_NO AND X.IN_SEQ = I.IN_SEQ ), I.IN_QTY) AS QTY    -- 반품할수 있는 수량
-			     , M.MATR_NM       --자재품명
+				 , M.MATR_NM       --자재품명
 			     , M.MATR_SPEC     --자재규격
 			     , M.MATR_MAT      --자재소재
 			     , M.MATR_MAKR_NM  --자재메이커
@@ -630,6 +631,7 @@
 			     , 'N' AS CHK      --체크여부
 			     , I.RETURN_PRC  --반품단가
 			     , 0   AS RETURN_SUM  --반품긍액
+			     , (SELECT count(*) FROM TB_SM06D01 T WHERE T.IN_NO = I.IN_NO AND T.IN_SEQ = I.IN_SEQ) AS CNT 
 			FROM   ( 
 			        SELECT R.CODE_DESC   AS CO_NM --회사코드
 			             , I.CO_CD
@@ -647,6 +649,8 @@
 					     , I.MATR_CD     -- 품번
 					     , I.WH_CD       -- 입고창고
 					     , FN_CM05M01_CD_TO_NM(I.WH_CD ) AS MATR_WH_NM -- 입고창고명
+					     , I.CURR_CD
+				         , I.EXRATE
 					     , I.IN_QTY      -- 입고수량
 					     , I.IN_PRC AS RETURN_PRC     -- 입고단가
 					FROM   TB_SM03D01 AS I
@@ -660,8 +664,9 @@
 			WHERE  1 = 1
 			AND    I.SALES_CD = #{salesCd}
 			AND    I.PCHS_CLNT_CD = #{pchsClntCd}
-		) AS X
-		WHERE X.QTY != 0
+			AND    I.IN_NO = #{inNumber}
+			) AS Z
+		WHERE Z.CNT = 0
     </select>
 	
     <!-- 수정팝업 조회 -->
@@ -683,7 +688,8 @@
 		     , O.EQP_NM
 		     , A.RET_NO
 		     , TO_CHAR(A.RET_DT, 'YYYY-MM-DD') AS IO_DT
-		     , A.RET_RMK
+		     , A.RET_RMK AS IO_RMK
+		     , B.IN_NO AS IN_NUM   --입고번호
 		     , B.RET_SEQ
 		     , B.DSGN_NO
 		     , B.MATR_CD
@@ -693,7 +699,7 @@
 		     , M.MATR_MAKR_NM  --자재메이커
 		     , M.MATR_MNO      --자재형번
 		     , B.RET_QTY
-		     , B.RET_DTL_RMK
+		     , B.RET_DTL_AMT AS RETURN_SUM
 		     , B.INOUT_KEY
 		     
 		     , 0  AS RETURN_QTY --재고수량
@@ -752,7 +758,8 @@
 		     , O.EQP_NM
 		     , A.RET_NO
 		     , TO_CHAR(A.RET_DT, 'YYYY-MM-DD') AS IO_DT
-		     , A.RET_RMK
+		     , A.RET_RMK AS IO_RMK
+		     , B.IN_NO  --입고번호
 		     , B.RET_SEQ
 		     , B.DSGN_NO
 		     , B.MATR_CD
@@ -762,7 +769,7 @@
 		     , M.MATR_MAKR_NM  --자재메이커
 		     , M.MATR_MNO      --자재형번
 		     , B.RET_QTY AS OUT_QTY
-		     , B.RET_DTL_RMK AS RETURN_SUM
+		     , B.RET_DTL_AMT AS RETURN_SUM
 		     , B.INOUT_KEY
 		     , X.IN_QTY  -- 입고수량
 		     , X.IN_PRC AS RETURN_PRC  -- 입고단가
@@ -828,7 +835,7 @@
 
 	<!-- 업데이트시 합계생성 -->
 	<select id="select_sm06_Sum" parameterType="Map" resultType="int">
-		SELECT sum(RET_DTL_RMK) 
+		SELECT sum(RET_DTL_AMT) 
 		  FROM TB_SM06D01
 		  WHERE RET_NO = #{retNo}
 	</select>
@@ -901,9 +908,11 @@
 			, DSGN_NO			
 			, MATR_CD
 			, WH_CD
+			, CURR_CD
+			, EXRATE
 			, RET_PRC
 			, RET_QTY
-			, RET_DTL_RMK
+			, RET_DTL_AMT
 			, INOUT_KEY
 			, ETC_FIELD1
 			, ETC_FIELD2
@@ -926,6 +935,8 @@
 			, #{dsgnNo}
 			, #{matrCd}
 			, #{whCd}
+			, #{currCd}
+			, #{exrate}
 			, #{returnPrc}
 			, #{outQty}
 			, #{returnSum}
@@ -982,4 +993,50 @@
 		AND    RET_NO  = #{retNo}
 	</delete>
 
+	<!-- inNumberSearch 팝업 SELECT -->
+	 <select id="selectInNumberCodeList" parameterType="Map" resultType="camelMap">          
+               SELECT A.CO_CD     --회사코드
+		      , FN_CM05M01_CD_TO_NM(A.CO_CD) AS CO_CD_NM  --회사명
+		      , A.IN_NO --입고번호
+		      , A.SALES_CD  --SALES_CD
+		      , A.IN_DT     --입고날짜
+		      , A.CURR_CD   --통화단위
+		      , A.EXRATE    --외환
+		      , A.PCHS_CLNT_CD      --거래처코드
+			  , (SELECT D.CLNT_NM
+                       			FROM TB_BM02M01 D
+                       			WHERE A.PCHS_CLNT_CD=D.CLNT_CD) AS PCHS_CLMN_NM --거래처명
+		      , B.ORDRS_CLNT_CD  --고객사코드
+		      , B.ORDRS_CLNT_NM  --고객사이름
+		      , B.CLNT_PJT       --고객사PJT
+		      , B.PRDT_CD        --제품구분코드
+		      , B.PRDT_CD_NM     --제품구분이름
+			  , B.ITEM_DIV       --아이템구분 코드
+			  , B.ITEM_DIV_NM    --아이템구분 이름
+			  , B.EQP_NM         --설비명
+		      FROM TB_SM03M01 A
+		  LEFT OUTER JOIN     (
+				         SELECT  X.CO_CD, -- 회사코드
+			                       FN_CM05M01_CD_TO_NM(X.CO_CD) AS CO_CD_NM,
+			                       X.ORDRS_NO, -- 수주번호
+			                       X.SALES_CD, -- SALES CODE
+			                       Y.ORGN_SALES_CD, -- 원천 SALES CODE
+			                       Y.ORDRS_CLNT_CD, -- 고객사
+			                       A.CLNT_NM  AS ORDRS_CLNT_NM,
+			                       Y.CLNT_PJT, -- 고객사 PJT
+			                       X.ORDRS_DTL_DIV20, -- 신작구분
+			                       FN_CM05M01_CD_TO_NM(X.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+			                       X.PRDT_CD, -- 제품구분
+			                       P.PRDT_NM  PRDT_CD_NM,
+			                       X.ITEM_DIV, -- 아이템구분
+			                       FN_CM05M01_CD_TO_NM(X.ITEM_DIV) ITEM_DIV_NM,
+			                       X.EQP_NM -- 설비명
+			                  FROM TB_CR02D02 X
+			                        INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
+			                                                AND X.ORDRS_NO = Y.ORDRS_NO
+			                        LEFT OUTER JOIN TB_BM01M01 P ON X.PRDT_CD = P.PRDT_CD  --제품마스터
+			                        LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터
+	                        ) AS B ON B.CO_CD = A.CO_CD 
+	                              AND B.SALES_CD = A.SALES_CD 
+           </select>
 </mapper>

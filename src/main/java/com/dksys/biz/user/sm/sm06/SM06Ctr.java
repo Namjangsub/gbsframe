@@ -125,4 +125,11 @@ public class SM06Ctr {
 		}
 	  	return "jsonView";
 	}
+	
+	//inNumberSearch 팝업 SELECT
+	  @PostMapping(value = "/selectInNumberCodeList") 
+	  public String selectInNumberCodeList(@RequestBody Map<String, String> paramMap, ModelMap model) { 
+	     List<Map<String, String>> codeInfoList = sm06svc.selectInNumberCodeList(paramMap); 
+	     model.addAttribute("codeInfoList", codeInfoList); return "jsonView";
+	  }
 }
