@@ -46,8 +46,8 @@ public class CR10SvcImpl implements CR10Svc {
   }
 	
   @Override
-  public List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap) {
-    return cr10Mapper.selectBomDetailList(paramMap);
+  public List<Map<String, String>> selectSelesCdList(Map<String, String> paramMap) {
+    return cr10Mapper.selectSelesCdList(paramMap);
   }
 
   @Override
@@ -66,7 +66,7 @@ public class CR10SvcImpl implements CR10Svc {
   }
 
   @Override
-  public int insertBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+  public int insertLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
 	    Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -84,38 +84,24 @@ public class CR10SvcImpl implements CR10Svc {
 		//---------------------------------------------------------------  
 		//첨부 화일 권한체크  끝 
 		//---------------------------------------------------------------  
-		//String  newPrjctSeq = String.valueOf(cr10Mapper.selectPrjctSeqNext(paramMap));
-		//paramMap.put("prjctSeq", newPrjctSeq);
-		//int result = cr10Mapper.insertBom(paramMap);
-		int result = 200;
+		String  fileTrgtKey = String.valueOf(cr10Mapper.selectFileTrgtKeyNext(paramMap));
+		paramMap.put("fileTrgtKey", fileTrgtKey);
+		int result = cr10Mapper.insertLgistMast(paramMap);
 	
 	    List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
 	    for (Map<String, String> dtl : bomList) {
-	    	//dtl.put("prjctSeq", newPrjctSeq);
+	    	dtl.put("fileTrgtKey", fileTrgtKey);
 	    	dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
 	    	String dtaChk = dtl.get("dtaChk").toString();
 	    	if ("I".equals(dtaChk)) {
-	    		cr10Mapper.insertBom(dtl);
+	    		cr10Mapper.insertLgistMast(dtl);
 	    	} else if ("U".equals(dtaChk)) {
-	    		cr10Mapper.updateBom(dtl);
+	    		cr10Mapper.updateLgistMast(dtl);
 	    	} else if ("D".equals(dtaChk)) {
 	    		cr10Mapper.deleteBomMatrAll(dtl);
 	    		cr10Mapper.deleteBom(dtl);
 	    	}
-	    }
-	    List<Map<String, String>> matrList = gsonDtl.fromJson(paramMap.get("matrArr"), dtlMap);
-	    for (Map<String, String> dtl : matrList) {
-	    	//dtl.put("prjctSeq", newPrjctSeq);
-	    	dtl.put("userId", paramMap.get("userId"));
-	    	dtl.put("pgmId", paramMap.get("pgmId"));
-	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-	    	String dtaChk = dtl.get("dtaChk").toString();
-	    	/* "dtaChk" 값을 확인하여
-	    	 * "I"인 경우 cr10Mapper.insertBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삽입 */
-	    	if ("I".equals(dtaChk)) {
-	    		cr10Mapper.insertBomMatr(dtl);
-	    	} 
 	    }
 	    
 		//---------------------------------------------------------------  
@@ -133,7 +119,7 @@ public class CR10SvcImpl implements CR10Svc {
 	    return result;
   }
   @Override
-  public int updateBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+  public int updateLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 //	Gson gson = new Gson();
 	Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
@@ -165,8 +151,7 @@ public class CR10SvcImpl implements CR10Svc {
 	//첨부 화일 권한체크  끝 
 	//---------------------------------------------------------------  
 
-	int result = 200;//cr10Mapper.updateBom(paramMap);
-    	//  cr10Mapper.updateBom(paramMap)을 호출하여 paramMap을 사용하여 프로젝트를 업데이트하고 그 결과를 result 변수에 저장.
+	int result = cr10Mapper.updateLgistMast(paramMap);
 
     List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
     for (Map<String, String> dtl : bomList) {
@@ -177,40 +162,20 @@ public class CR10SvcImpl implements CR10Svc {
     	//      반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
     	String dtaChk = dtl.get("dtaChk").toString();
     	/* "dtaChk" 값을 확인하여
-    	 * "I"인 경우 cr10Mapper.insertBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
-    	 * "U"인 경우 cr10Mapper.updateBomMatr(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
+    	 * "I"인 경우 cr10Mapper.insertLgistMastMatr(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
+    	 * "U"인 경우 cr10Mapper.updateLgistMastMatr(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
     	 * "D"인 경우 * cr10Mapper.deleteBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
     	if ("I".equals(dtaChk)) {
     		//dtl.put("prjctSeq", paramMap.get("prjctSeq"));
-    		cr10Mapper.insertBom(dtl);
+    		cr10Mapper.insertLgistMast(dtl);
     	} else if ("U".equals(dtaChk)) {
-    		cr10Mapper.updateBom(dtl);
+    		cr10Mapper.updateLgistMast(dtl);
     	} else if ("D".equals(dtaChk)) {
     		cr10Mapper.deleteBomMatrAll(dtl);
     		cr10Mapper.deleteBom(dtl);
     	}
     }
     
-    List<Map<String, String>> matrList = gsonDtl.fromJson(paramMap.get("matrArr"), dtlMap);
-    for (Map<String, String> dtl : matrList) {
-    	//  matrList 리스트의 각 맵 요소에 대해 반복문을 실행
-
-      dtl.put("userId", paramMap.get("userId"));
-      dtl.put("pgmId", paramMap.get("pgmId"));
-      //      반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-      String dtaChk = dtl.get("dtaChk").toString();
-		/* "dtaChk" 값을 확인하여
-		 * "I"인 경우 cr10Mapper.insertBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
-		 * "U"인 경우 cr10Mapper.updateBomMatr(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
-		 * "D"인 경우 * cr10Mapper.deleteBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
-      if ("I".equals(dtaChk)) {
-	        cr10Mapper.insertBomMatr(dtl);
-	      } else if ("U".equals(dtaChk)) {
-	        cr10Mapper.updateBomMatr(dtl);
-	      } else if ("D".equals(dtaChk)) {
-	        cr10Mapper.deleteBomMatr(dtl);
-	      }
-    }
 	//---------------------------------------------------------------  
 	//첨부 화일 처리 시작 
 	//---------------------------------------------------------------  
@@ -271,14 +236,14 @@ public class CR10SvcImpl implements CR10Svc {
   }
 
   @Override
-  public int insertBomMatr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-	  int result = cr10Mapper.insertBomMatr(paramMap);
+  public int insertLgistMastMatr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	  int result = cr10Mapper.insertLgistMastMatr(paramMap);
 	  return result;
   }
 
   @Override
-  public int updateBomMatr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-	  int result = cr10Mapper.updateBomMatr(paramMap);
+  public int updateLgistMastMatr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	  int result = cr10Mapper.updateLgistMastMatr(paramMap);
 	  return result;
   }
 
@@ -302,26 +267,13 @@ public class CR10SvcImpl implements CR10Svc {
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
 	    	String dtaChk = dtl.get("dtaChk").toString();
 	    	if ("I".equals(dtaChk)) {
-	    		cr10Mapper.insertBom(dtl);
+	    		cr10Mapper.insertLgistMast(dtl);
 	    	} else if ("U".equals(dtaChk)) {
-	    		cr10Mapper.updateBom(dtl);
+	    		cr10Mapper.updateLgistMast(dtl);
 	    	} else if ("D".equals(dtaChk)) {
 	    		cr10Mapper.deleteBomMatrAll(dtl);
 	    		cr10Mapper.deleteBom(dtl);
 	    	}
-	    }
-	    List<Map<String, String>> matrList = gsonDtl.fromJson(paramMap.get("matrArr"), dtlMap);
-	    for (Map<String, String> dtl : matrList) {
-	    	//dtl.put("prjctSeq", newPrjctSeq);
-	    	dtl.put("userId", paramMap.get("userId"));
-	    	dtl.put("pgmId", paramMap.get("pgmId"));
-	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-	    	String dtaChk = dtl.get("dtaChk").toString();
-	    	/* "dtaChk" 값을 확인하여
-	    	 * "I"인 경우 cr10Mapper.insertBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삽입 */
-	    	if ("I".equals(dtaChk)) {
-	    		cr10Mapper.insertBomMatr(dtl);
-	    	} 
 	    }
 	    
 	    return result;

@@ -11,7 +11,7 @@ public interface CR10Svc {
 
   List<Map<String, String>> selectLgistReqPageList(Map<String, String> paramMap);
   
-  List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);
+  List<Map<String, String>> selectSelesCdList(Map<String, String> paramMap);
 
   List<Map<String, String>> selectBuyBomList(Map<String, String> paramMap);
 
@@ -19,15 +19,15 @@ public interface CR10Svc {
 
   Map<String, String> selectBomMatrInfo(Map<String, String> paramMap);
 
-  int insertBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+  int insertLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
-  int updateBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+  int updateLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
   int deleteBomAll(Map<String, String> paramMap) throws Exception;
   
-  int insertBomMatr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+  int insertLgistMastMatr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
-  int updateBomMatr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+  int updateLgistMastMatr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
   
   int deleteBomMatr(Map<String, String> paramMap) throws Exception;
   
