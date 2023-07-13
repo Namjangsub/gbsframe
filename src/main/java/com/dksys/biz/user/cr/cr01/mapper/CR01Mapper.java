@@ -8,7 +8,6 @@ import java.util.Map;
 @Mapper
 public interface CR01Mapper {
 
-
     String selectMaxEstNo(Map<String, String> paramMap);
 
     String selectEstNo();
@@ -21,9 +20,7 @@ public interface CR01Mapper {
 
     List<Map<String, Object>> selectEstListNotOrdrs(Map<String, String> param);
 
-
     Map<String, Object> selectEstInfo(Map<String, String> paramMap);
-
 
     List<Map<String, Object>> selectEstDetail(Map<String, String> paramMap);
 
@@ -46,6 +43,5 @@ public interface CR01Mapper {
     String selectMaxEstDeg(Map<String, String> paramMap);
 
     String selectMaxFileTrgtKey();
-
-
+    
 }
