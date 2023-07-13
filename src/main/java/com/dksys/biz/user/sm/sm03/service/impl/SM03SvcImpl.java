@@ -82,16 +82,10 @@ public class SM03SvcImpl implements SM03Svc {
 	}	
 	
 	@Override
-	public String selectMaxOrdrgNo(Map<String, String> paramMap) {
-		return sm03Mapper.selectMaxOrdrgNo(paramMap);
+	public String selectMaxInNo(Map<String, String> paramMap) {
+		return sm03Mapper.selectMaxInNo(paramMap);
 	}		
-	
-	/* 발주등록시 bom list */
-	@Override
-	public List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap) {
-		return sm03Mapper.selectBomDetailList(paramMap);
-	}		
-	  
+		  
 		
 	/* 입고 등록시 발주 list */
 	@Override
@@ -100,7 +94,7 @@ public class SM03SvcImpl implements SM03Svc {
 	}			
 	
 	@Override
-	public int insertWareHousingMaster(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	public int insertWareHousing(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
@@ -139,19 +133,17 @@ public class SM03SvcImpl implements SM03Svc {
 	    paramMap.put("fileTrgtKey", String.valueOf(fileTrgtKey));
 	    
 	    //MAX ORDGR_NO
-	    String maxOrdrgNo = sm03Svc.selectMaxOrdrgNo(paramMap);	    
-	    paramMap.put("maxOrdrgNo", maxOrdrgNo);
-	    
-	    //insert WareHousingMaster
-		result += sm03Mapper.insertWareHousingMaster(paramMap);
-	    
+	    String maxInNo = sm03Svc.selectMaxInNo(paramMap);	    
+	    paramMap.put("maxInNo", maxInNo);
+	   
 		for(Map<String, String> dtl : detailMap) {
-			dtl.put("coCd", paramMap.get("coCd"));
 			dtl.put("userId", paramMap.get("userId"));
 			dtl.put("pgmId", paramMap.get("pgmId"));
 			dtl.put("creatId", paramMap.get("userId"));
-			dtl.put("maxOrdrgNo", maxOrdrgNo);
-			
+			dtl.put("maxInNo", maxInNo);
+			dtl.put("ioDiv", paramMap.get("ioDiv"));
+			dtl.put("currCd", paramMap.get("currCd"));
+			dtl.put("exrate", paramMap.get("exrate"));
     		result += sm03Mapper.insertWareHousingDetail(dtl);			
 		}			
 		  		

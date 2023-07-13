@@ -27,7 +27,7 @@ public interface SM03Mapper {
 	
 	int selectMaxTrgtKey(Map<String, String> paramMap);	
 	
-	String selectMaxOrdrgNo(Map<String, String> paramMap);		
+	String selectMaxInNo(Map<String, String> paramMap);		
 	
 	//입고 등록, 수정, 삭제
 	int insertWareHousingMaster(Map<String, String> paramMap);
