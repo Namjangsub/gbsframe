@@ -966,3 +966,185 @@ function searchAndDelete(jstreeInstance, nodeId, topNode) {
 	    }
 	}
 }	
+
+/* *
+ * input, textarea에 아래의 요소를 load 이벤트를 등록한다.
+ * only-number : 숫자만사용
+ * comma : 금액사용
+ * data-maxlength : byte크기만큼 입력막기.
+ * date, date="toDay"
+ * 겹치게 사용할 수 없음.
+ * */
+function initLoadFormArea(_form){
+	$.each($(_form+" textarea"), function (idx, elem) {
+		if($(elem).is('[data-maxlength]')){
+			var data_maxlength = $(elem).attr('data-maxlength');
+			if(!isEmpty(data_maxlength)){
+				if(!isEmpty($(elem).val())){
+					$(elem).val(dataMaxLength($(elem).val(),data_maxlength));
+				}
+				$(elem).on("input", function() {
+					$(elem).val(dataMaxLength($(elem).val(),data_maxlength));
+				});					
+			}
+		}
+	});
+	
+	$.each($(_form+"  input"), function (idx, elem) {
+		//date
+		if($(elem).is('[date]')){
+			var set_date = $(elem).attr('date');
+			if(isEmpty(set_date)){
+				$(elem).datepicker({
+					format : "yyyy-mm-dd",
+					language : "ko",
+					autoclose : true
+				});
+			}else {
+				$(elem).datepicker({
+					format : "yyyy-mm-dd",
+					language : "ko",
+					autoclose : true
+				}).datepicker("setDate", "today");
+			}
+		}
+		//data-maxlength
+		else
+		if($(elem).is('[data-maxlength]')){
+			var data_maxlength = $(elem).attr('data-maxlength');
+			if(!isEmpty(data_maxlength)){
+				if(!isEmpty($(elem).val())){
+					$(elem).val(dataMaxLength($(elem).val(),data_maxlength));
+				}
+				$(elem).on("input", function() {
+					$(elem).val(dataMaxLength($(elem).val(),data_maxlength));
+				});					
+			}
+		}
+		//comma
+		else
+		if($(elem).is('[comma]')){
+			$(elem).css("text-align","right");
+			if(!isEmpty($(elem).val())){
+				$(elem).val($(elem).val().replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+			}
+			$(elem).on("input", function() {
+				$(elem).val($(elem).val().replace(/[^0-9]/g, ""));
+			});
+			$(elem).on("focus", function() {
+				$(elem).val($(elem).val().replace(/[^0-9]/g, ""));
+			});
+			$(elem).on("blur", function() {
+				$(elem).val($(elem).val().replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+			});
+		}
+		//only-number
+		else
+		if($(elem).is('[only-number]')){
+			$(elem).css("text-align","right");
+			if(!isEmpty($(elem).val())){
+				$(elem).val(Number($(elem).val().replace(/[^0-9]/g, "")));
+			}
+			$(elem).on("input", function() {
+				$(elem).val($(elem).val().replace(/[^0-9]/g, ""));
+			});
+			$(elem).on("focus", function() {
+				if(!isEmpty($(elem).val())){
+					$(elem).val(Number($(elem).val().replace(/[^0-9]/g, "")));
+				}
+			});
+			$(elem).on("blur", function() {
+				if(!isEmpty($(elem).val())){
+					$(elem).val(Number($(elem).val().replace(/[^0-9]/g, "")));
+				}
+			});
+		}
+	});	
+}
+
+//byte 크기만큼 입력
+function dataMaxLength(value , maxLength){
+	if(isEmpty(value)) return "";
+	var byte_length = getByteLength(value);
+	var max_hangul_length = maxLength;
+	if(byte_length > maxLength){
+		var hangul_length = get_hangul_length(value);//현재 한글수
+		var non_hangul_length = value.length - hangul_length;
+		max_hangul_length = Math.ceil(maxLength/3) + non_hangul_length; //최대 글자수 
+		if(hangul_length > 0) {
+			return value.substring(0,max_hangul_length-3);
+			var last_string = value.substring(value.length-1,value.length);
+			if(is_hangul_char(last_string)){
+				return value.substring(0,max_hangul_length-1);
+			}
+			else {
+				return value.substring(0,max_hangul_length-2);
+			}
+		}
+		return value.substring(0,maxLength);
+	}
+	
+	return value.substring(0,maxLength);
+}
+
+//해당글자가 한글인지
+function is_hangul_char(ch) {
+	var c = ch.charCodeAt(0);
+	if( 0x1100<=c && c<=0x11FF ) return true;
+	if( 0x3130<=c && c<=0x318F ) return true;
+	if( 0xAC00<=c && c<=0xD7A3 ) return true;
+	return false;
+}
+
+//한글입력수
+function get_hangul_length(text_val){
+	if(isEmpty(text_val)) return 0;
+    const text_len = text_val.length;
+    
+    let totalByte=0;
+    for(let i=0; i<text_len; i++){
+    	const each_char = text_val.charAt(i);
+        const uni_char = escape(each_char);
+        if(uni_char.length>4){
+            totalByte += 1;
+        }
+    }
+    return totalByte ;
+}
+
+//전체 byte수 오라클3byte 기준
+function getByteLength(text_val){
+	if(isEmpty(text_val)) return 0;
+    const text_len = text_val.length;
+    let totalByte=0;
+    for(let i=0; i<text_len; i++){
+    	const each_char = text_val.charAt(i);
+        const uni_char = escape(each_char);
+        if(uni_char.length>4){
+        	// 한글 : 3Byte
+            totalByte += 3;
+        }else{
+        	// 영문,숫자,특수문자 : 1Byte
+            totalByte += 1;
+        }
+    }
+    return totalByte ;
+}
+
+//값체크
+function isEmpty(str){
+	if(typeof str == "undefined" || str == null || str == "")
+		return true;
+	else
+		return false ;
+}
+
+//form Load
+function loadFormData(_form, _data, _callback) {
+	$.each(_data, function(key, value) {
+		if(!isEmpty(value)) {
+			$(_form+" [name="+key+"]").val(value);
+		}
+	});
+	if(!isEmpty(_callback)){ _callback(_data); }
+}

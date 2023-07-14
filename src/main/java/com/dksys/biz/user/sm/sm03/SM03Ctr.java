@@ -59,13 +59,6 @@ public class SM03Ctr {
 		return "jsonView";
 	}	
 
-	// BOM내역상세 조회
-	@PostMapping(value = "/selectBomDetailList")
-	public String selectBomDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> resultList = sm03Svc.selectBomDetailList(paramMap);
-		model.addAttribute("resultList", resultList);
-		return "jsonView";
-	}
 	
 	// 발주상세 조회
 	@PostMapping(value = "/selectWareHousingDetailList")
@@ -76,10 +69,10 @@ public class SM03Ctr {
 	}	
 	
 	//발주 등록
-    @PostMapping(value = "/insertWareHousingMaster")
-    public String insertWareHousingMaster(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+    @PostMapping(value = "/insertWareHousing")
+    public String insertWareHousing(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
   		try {
-  			if (sm03Svc.insertWareHousingMaster(paramMap, mRequest) != 0 ) {
+  			if (sm03Svc.insertWareHousing(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
   				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
   			} else {

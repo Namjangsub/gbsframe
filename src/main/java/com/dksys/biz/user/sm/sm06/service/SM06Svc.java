@@ -34,4 +34,7 @@ public interface SM06Svc {
 		//DATA DELETE
 		int delete_sm06(Map<String, String> paramMap) throws Exception;
 		
+		//inNumberSearch 팝업 SELECT
+		List<Map<String, String>> selectInNumberCodeList(Map<String, String> paramMap);
+		
 }

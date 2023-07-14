@@ -9,6 +9,8 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 @Mapper
 public interface WB04Mapper {
 	
+	List<Map<String, String>> selectWbsLeftSalesCodeTreeList(Map<String, String> paramMap);
+	
 	List<Map<String, String>> selectWbsPlanTreeList(Map<String, String> paramMap);
 	
     List<Map<String, String>> selectGanttList(Map<String, String> paramMap);

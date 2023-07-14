@@ -18,16 +18,14 @@ public interface SM03Svc {
 	
 	List<Map<String, String>> selectWareHousingExcelList(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);
-	
 	List<Map<String, String>> selectWareHousingDetailList(Map<String, String> paramMap);			
 	
 	int selectMaxTrgtKey(Map<String, String> paramMap);
 	
-	String selectMaxOrdrgNo(Map<String, String> paramMap);	
+	String selectMaxInNo(Map<String, String> paramMap);	
 
 	//발주마스터 등록, 수정, 삭제
-	int insertWareHousingMaster(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;	
+	int insertWareHousing(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;	
 		
 	int updateWareHousing(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 		

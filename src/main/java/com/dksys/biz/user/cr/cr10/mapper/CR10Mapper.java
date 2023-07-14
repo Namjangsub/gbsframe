@@ -8,34 +8,32 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface CR10Mapper {
 
-  int selectWbsIssuePageCount(Map<String, String> paramMap);
+  int selectLgistReqPageCount(Map<String, String> paramMap);
 
-  List<Map<String, String>> selectWbsIssuePageList(Map<String, String> paramMap);
+  List<Map<String, String>> selectLgistReqPageList(Map<String, String> paramMap);
   
-  List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);
+  List<Map<String, String>> selectSelesCdList(Map<String, String> paramMap);
 
   List<Map<String, String>> selectBuyBomList(Map<String, String> paramMap);
 
-  List<Map<String, String>> selectBomMatrList(Map<String, String> paramMap);
+  List<Map<String, String>> selectLgistSalesCdList(Map<String, String> paramMap);
   
-  Map<String, String> selectBomMatrInfo(Map<String, String> paramMap);
+  Map<String, String> selectLgistMastInfo(Map<String, String> paramMap);
   
-  int selectPrjctSeqNext(Map<String, String> paramMap);
+  String selectFileTrgtKeyNext(Map<String, String> paramMap);
   
-  int insertBom(Map<String, String> paramMap);
+  int insertLgistMast(Map<String, String> paramMap);
 
-  int updateBom(Map<String, String> paramMap);
+  int updateLgistMast(Map<String, String> paramMap);
 
-  int deleteBomAll(Map<String, String> paramMap);
+  int deleteLgistMast(Map<String, String> paramMap);
 
-  int deleteBom(Map<String, String> paramMap);
-  
-  int deleteBomMatrAll(Map<String, String> paramMap);
+  int deleteLgistSalesCdAll(Map<String, String> paramMap);
 
-  int deleteBomMatr(Map<String, String> paramMap);
+  int deleteLgistSalesCd(Map<String, String> paramMap);
   
-  int updateBomMatr(Map<String, String> paramMap);
+  int updateLgistSalesCd(Map<String, String> paramMap);
   
-  int insertBomMatr(Map<String, String> paramMap);
+  int insertLgistSalesCd(Map<String, String> paramMap);
   
 }

@@ -2,7 +2,169 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.dksys.biz.user.wb.wb04.mapper.WB04Mapper">
+       <select id="selectWbsLeftSalesCodeTreeList" parameterType="Map" resultType="camelMap">                              
+                SELECT DISTINCT  
+                       '' PID,
+                       #{coCd} ID,
+                       #{coCd} CO_CD, -- 회사코드
+                       FN_CM05M01_CD_TO_NM(#{coCd}) AS CO_CD_NM,
+                       '전체' ORDRS_NO,
+                       '전사 현황' AS SALES_CD,
+                       '' ORGN_SALES_CD,
+                       '' ORDRS_CLNT_CD, -- 고객사
+                       '전체' AS ORDRS_CLNT_NM,
+                       '' CLNT_PJT,
+                       '' ORDRS_DTL_DIV20, -- 신작구분
+                       '' AS ORDRS_DTL_DIV20_NM,
+                       '' EQP_NM, -- 설비명
+                       0 PLAN_CNT,
+                       'E' WBS_PLAN_OS_YN,
+                       'E' PLAN_LOCK_YN,
+                       'E' PLAN_CLOSE_YN,
+                       0 RSULT_CNT,
+                       'E' RSULT_LOCK_YN,
+                       'E' RSULT_CLOSE_YN,
+                       '' PRDT_CD,
+                       '' AS PRDT_CD_NM,
+                       '' ITEM_DIV,
+                       '' ITEM_DIV_NM,
+                       '' DATA_GBN
+                  FROM DUAL
 
+              UNION ALL  --회사명을 Top LEVEL 생성
+                SELECT DISTINCT  
+                       X.CO_CD PID,
+                       TO_CHAR(Y.ORDRS_CLNT_CD) ID,
+                       X.CO_CD, -- 회사코드
+                       FN_CM05M01_CD_TO_NM(X.CO_CD) AS CO_CD_NM,
+                       A.CLNT_NM,
+                       A.CLNT_NM  AS SALES_CD,
+                       '' ORGN_SALES_CD,
+                       Y.ORDRS_CLNT_CD , -- 고객사
+                       A.CLNT_NM  AS ORDRS_CLNT_NM,
+                       '' CLNT_PJT,
+                       '' ORDRS_DTL_DIV20, -- 신작구분
+                       '' AS ORDRS_DTL_DIV20_NM,
+                       '', -- 설비명
+                       0 PLAN_CNT,
+                       'E' WBS_PLAN_OS_YN,
+                       'E' PLAN_LOCK_YN,
+                       'E' PLAN_CLOSE_YN,
+                       0 RSULT_CNT,
+                       'E' RSULT_LOCK_YN,
+                       'E' RSULT_CLOSE_YN,
+                       '' PRDT_CD,
+                       '' AS PRDT_CD_NM,
+                       '' ITEM_DIV,
+                       '' ITEM_DIV_NM,
+                       '' DATA_GBN
+                  FROM TB_CR02D02 X
+                        INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
+                                                AND X.ORDRS_NO = Y.ORDRS_NO
+                        LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터
+                WHERE X.CO_CD = #{coCd}
+               <if test="salesCd != null and !salesCd.equals('')">
+                  AND X.SALES_CD like '%${salesCd}%'                
+               </if>
+                 
+               UNION ALL --오더번호로 1 LEVEL 생성
+                SELECT DISTINCT  
+                       TO_CHAR(Y.ORDRS_CLNT_CD) PID,
+                       X.ORDRS_NO ID,
+                       X.CO_CD, -- 회사코드
+                       FN_CM05M01_CD_TO_NM(X.CO_CD) AS CO_CD_NM,
+                       X.ORDRS_NO AS ORDRS_NO,
+                       X.ORDRS_NO AS SALES_CD,
+                       '',
+                       Y.ORDRS_CLNT_CD, -- 고객사
+                       A.CLNT_NM  AS ORDRS_CLNT_NM,
+                       '',
+                       '',
+                       '',
+                       '', -- 설비명
+                       0 PLAN_CNT,
+                       'E' WBS_PLAN_OS_YN,
+                       'E' PLAN_LOCK_YN,
+                       'E' PLAN_CLOSE_YN,
+                       0 RSULT_CNT,
+                       'E' RSULT_LOCK_YN,
+                       'E' RSULT_CLOSE_YN,
+                       '' PRDT_CD,
+                       '' AS PRDT_CD_NM,
+                       '' ITEM_DIV,
+                       '' ITEM_DIV_NM,
+                       '' DATA_GBN
+                  FROM TB_CR02D02 X
+                        INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
+                                                AND X.ORDRS_NO = Y.ORDRS_NO
+                        LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터
+                 WHERE X.CO_CD = #{coCd}
+               <if test="salesCd != null and !salesCd.equals('')">
+                  AND X.SALES_CD like '%${salesCd}%'                
+               </if>
+
+               UNION ALL
+                SELECT   --Sales 코드 추출
+                       X.ORDRS_NO PID,
+                       X.SALES_CD ID,
+                       X.CO_CD, -- 회사코드
+                       FN_CM05M01_CD_TO_NM(X.CO_CD) AS CO_CD_NM,
+                       X.ORDRS_NO, -- 수주번호
+                       X.SALES_CD, -- SALES CODE
+                       max(Y.ORGN_SALES_CD), -- 원천 SALES CODE
+                       max(Y.ORDRS_CLNT_CD), -- 고객사
+                       max(A.CLNT_NM)  AS ORDRS_CLNT_NM,
+                       max(Y.CLNT_PJT), -- 고객사 PJT
+                       max(X.ORDRS_DTL_DIV20), -- 신작구분
+                       FN_CM05M01_CD_TO_NM(max(X.ORDRS_DTL_DIV20)) AS ORDRS_DTL_DIV20_NM,
+                       max(X.EQP_NM), -- 설비명
+                       COUNT(W.FILE_TRGT_KEY) PLAN_CNT,
+                       NVL(max(W.WBS_PLAN_OS_YN),'N') WBS_PLAN_OS_YN,
+                       NVL(max(W.LOCK_YN),'N') PLAN_LOCK_YN,
+                       NVL(max(W.CLOSE_YN),'N') PLAN_CLOSE_YN,
+                       COUNT(Z.FILE_TRGT_KEY) RSULT_CNT,
+                       NVL(max(Z.LOCK_YN),'N') RSULT_LOCK_YN,
+                       NVL(max(Z.CLOSE_YN),'N') RSULT_CLOSE_YN,
+                       max(X.PRDT_CD) PRDT_CD,
+                       FN_BM01M01_ID_TO_NM(max(X.PRDT_CD)) AS PRDT_CD_NM,
+                       max(X.ITEM_DIV) ITEM_DIV,
+                       FN_CM05M01_CD_TO_NM(max(X.ITEM_DIV)) AS ITEM_DIV_NM,
+                       'D' DATA_GBN  --원시데이타
+                  FROM TB_CR02D02 X
+                        INNER JOIN TB_CR02M01 Y  ON X.CO_CD    = Y.CO_CD
+                                                AND X.ORDRS_NO = Y.ORDRS_NO
+                                                AND X.CO_CD = #{coCd}
+                                               <if test="salesCd != null and !salesCd.equals('')">
+                                                AND X.SALES_CD like '%${salesCd}%'                
+                                               </if>
+                        CROSS JOIN (
+                                                SELECT 
+                                                         CASE WHEN CODE_KIND = 'ROOT' THEN '' ELSE CODE_KIND END CODE_KIND,
+                                                         CODE_ID,
+                                                         CODE_RPRC,
+                                                         CODE_NM,
+                                                         CASE WHEN LEVEL = '1' THEN CODE_NM ELSE '' END LVL1,
+                                                         CASE WHEN LEVEL = '2' THEN CODE_NM ELSE '' END LVL2,
+                                                         CASE WHEN LEVEL = '3' THEN CODE_NM ELSE '' END LVL3,
+                                                         LPAD('', 3*(LEVEL-1)) || LEVEL LVL,
+                                                         REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_ID, ' -> '), '^\s+\-\>\s+', '') as PATH,
+                                                         CONNECT_BY_ISLEAF AS IS_LEAF,
+                                                         CASE WHEN CONNECT_BY_ISLEAF = 0 THEN 'unit' ELSE 'leaf' END TYPE
+                                                 FROM TB_CM05M01
+                                                 START WITH CODE_ID = 'WBSDIV'
+                                                 CONNECT BY PRIOR CODE_ID  =  CODE_KIND 
+                                ) CD  
+                        LEFT OUTER JOIN TB_WB01M01 W  ON X.CO_CD    = W.CO_CD
+                                                     AND X.SALES_CD = w.SALES_CD  
+                                                     AND CD.CODE_ID = W.WBS_PLAN_CODE_ID
+                        LEFT OUTER JOIN TB_WB02M01 Z  ON X.CO_CD    = Z.CO_CD
+                                                     AND X.SALES_CD = Z.SALES_CD  
+                                                     AND CD.CODE_ID = Z.WBS_PLAN_CODE_ID
+                        LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터                             
+                GROUP BY X.ORDRS_NO, X.SALES_CD, X.CO_CD,Y.ORGN_SALES_CD,Y.ORDRS_CLNT_CD, Y.CLNT_PJT                    
+
+           </select> 
+           
 <select id="selectWbsPlanTreeList" parameterType="Map" resultType="CamelMap">
             SELECT  
                     T.*,
@@ -95,62 +257,77 @@
 
 
           <select id="selectGanttList" parameterType="Map" resultType="CamelMap">
-              SELECT  
-                    T.CODE_NM,
-                    T.CODE_ID,
-                    NVL(TO_CHAR(W01.WBS_PLANS_DT, 'YYYY-MM-DD'),'') AS WBS_PLANS_DT,
-                    NVL(TO_CHAR(W01.WBS_PLANE_DT, 'YYYY-MM-DD'),'')  AS WBS_PLANE_DT,
-                    NVL(W02.WBS_RSLTS_RATE,0) AS WBS_RSLTS_RATE,
-                    NVL(FN_CM06M01_ID_TO_NM(W01.WBS_PLAN_MNG_ID),' ') WBS_PLAN_MNG_NM,
-                    T.ORDRS_CLNT_NM,
-                    NVL(W01.WBS_PLAN_CNTS,' ') AS WBS_PLAN_CNTS ,
-                    T.LVL
-                    
-               FROM         
-                    (SELECT  
-                           CR.CO_CD, 
-                           CR.ORDRS_NO,
-                           CR.SALES_CD, 
-                           Y.ORDRS_CLNT_CD, 
-                           (SELECT P.CLNT_NM FROM TB_BM02M01 P WHERE P.CLNT_CD = Y.ORDRS_CLNT_CD) AS ORDRS_CLNT_NM,
-                           Y.CLNT_PJT, 
-                           CR.ORDRS_DTL_DIV20, 
-                           (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = CR.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
-                           CR.PRDT_CD, 
-                           (SELECT T.PRDT_NM FROM TB_BM01M01 T WHERE T.PRDT_CD = CR.PRDT_CD) AS PRDT_CD_NM,
-                           CR.ITEM_DIV, 
-                           (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = CR.ITEM_DIV) AS ITEM_DIV_NM,
-                           CR.EQP_NM ,
-                           CD.*
-                      FROM TB_CR02D02 CR INNER JOIN TB_CR02M01 Y  ON CR.CO_CD = Y.CO_CD
-                                                                 AND CR.ORDRS_NO = Y.ORDRS_NO
-                           , (
-                                                SELECT 
-                                                         CASE WHEN CODE_KIND = 'ROOT' THEN '' ELSE CODE_KIND END CODE_KIND,
-                                                         CODE_ID,
-                                                         CODE_RPRC,
-                                                         CODE_NM,
-                                                         CASE WHEN LEVEL = '1' THEN CODE_NM ELSE '' END LVL1,
-                                                         CASE WHEN LEVEL = '2' THEN CODE_NM ELSE '' END LVL2,
-                                                         CASE WHEN LEVEL = '3' THEN CODE_NM ELSE '' END LVL3,
-                                                         LPAD('', 3*(LEVEL-1)) || LEVEL LVL,
-                                                         REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_ID, ' -> '), '^\s+\-\>\s+', '') as PATH,
-                                                         CONNECT_BY_ISLEAF AS IS_LEAF,
-                                                         CASE WHEN CONNECT_BY_ISLEAF = 0 THEN 'unit' ELSE 'leaf' END TYPE
-                                                 FROM TB_CM05M01
-                                                 START WITH CODE_ID = 'WBSDIV'
-                                                 CONNECT BY PRIOR CODE_ID  =  CODE_KIND 
-                                )  CD 
-                       WHERE CR.CO_CD = #{coCd}
-                         AND CR.SALES_CD = #{salesCd} 
-                      ORDER BY  CR.SALES_CD, PATH                 
-                     ) AS T LEFT OUTER JOIN TB_WB01M01 W01 ON T.CO_CD    = W01.CO_CD
-                                                          AND T.SALES_CD = W01.SALES_CD
-                                                          AND T.CODE_ID  = W01.WBS_PLAN_CODE_ID
-                            LEFT OUTER JOIN TB_WB02M01 W02 ON T.CO_CD    = W02.CO_CD
-                                                          AND T.SALES_CD = W02.SALES_CD
-                                                          AND T.CODE_ID  = W02.WBS_PLAN_CODE_ID  
-           WHERE  T.CODE_ID != 'WBSDIV'                                                                                                                                                                       
+              
+			SELECT 
+			            CODE_NM,
+			            CODE_ID,
+			            DUR,
+			            WBS_PLANS_DT,
+			            WBS_PLANE_DT,
+			            WBS_RSLTS_RATE,
+			            WBS_PLAN_MNG_NM,
+			            ORDRS_CLNT_NM,
+			            WBS_PLAN_CNTS,
+			            LVL
+			            FROM (
+			                    SELECT  
+			                                        T.CODE_NM,
+			                                        T.CODE_ID,
+			                                        TO_DATE(TO_CHAR( W01.WBS_PLANE_DT,'YYYYMMDD'),'YYYYMMDD') - TO_DATE(TO_CHAR(W01.WBS_PLANS_DT,'YYYYMMDD'),'YYYYMMDD') AS DUR,
+			                                        W01.WBS_PLANS_DT,
+			                                        W01.WBS_PLANE_DT,
+			                                        NVL(W02.WBS_RSLTS_RATE,0) AS WBS_RSLTS_RATE,
+			                                        NVL(FN_CM06M01_ID_TO_NM(W01.WBS_PLAN_MNG_ID),' ') WBS_PLAN_MNG_NM,
+			                                        T.ORDRS_CLNT_NM,
+			                                        NVL(W01.WBS_PLAN_CNTS,' ') AS WBS_PLAN_CNTS ,
+			                                        T.LVL-1 AS LVL
+			                    
+			                                   FROM         
+			                                        (SELECT  
+			                                               CR.CO_CD, 
+			                                               CR.ORDRS_NO,
+			                                               CR.SALES_CD, 
+			                                               Y.ORDRS_CLNT_CD, 
+			                                               (SELECT P.CLNT_NM FROM TB_BM02M01 P WHERE P.CLNT_CD = Y.ORDRS_CLNT_CD) AS ORDRS_CLNT_NM,
+			                                               Y.CLNT_PJT, 
+			                                               CR.ORDRS_DTL_DIV20, 
+			                                               (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = CR.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+			                                               CR.PRDT_CD, 
+			                                               (SELECT T.PRDT_NM FROM TB_BM01M01 T WHERE T.PRDT_CD = CR.PRDT_CD) AS PRDT_CD_NM,
+			                                               CR.ITEM_DIV, 
+			                                               (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = CR.ITEM_DIV) AS ITEM_DIV_NM,
+			                                               CR.EQP_NM ,
+			                                               CD.*
+			                                          FROM TB_CR02D02 CR INNER JOIN TB_CR02M01 Y  ON CR.CO_CD = Y.CO_CD
+			                                                                                     AND CR.ORDRS_NO = Y.ORDRS_NO
+			                                               , (
+			                                                                    SELECT 
+			                                                                             CASE WHEN CODE_KIND = 'ROOT' THEN '' ELSE CODE_KIND END CODE_KIND,
+			                                                                             CODE_ID,
+			                                                                             CODE_RPRC,
+			                                                                             CODE_NM,
+			                                                                             CASE WHEN LEVEL = '1' THEN CODE_NM ELSE '' END LVL1,
+			                                                                             CASE WHEN LEVEL = '2' THEN CODE_NM ELSE '' END LVL2,
+			                                                                             CASE WHEN LEVEL = '3' THEN CODE_NM ELSE '' END LVL3,
+			                                                                             LPAD('', 3*(LEVEL-1)) || LEVEL LVL,
+			                                                                             REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_ID, ' -> '), '^\s+\-\>\s+', '') as PATH,
+			                                                                             CONNECT_BY_ISLEAF AS IS_LEAF,
+			                                                                             CASE WHEN CONNECT_BY_ISLEAF = 0 THEN 'unit' ELSE 'leaf' END TYPE
+			                                                                     FROM TB_CM05M01
+			                                                                     START WITH CODE_ID = 'WBSDIV'
+			                                                                     CONNECT BY PRIOR CODE_ID  =  CODE_KIND 
+			                                                    )  CD 
+			                                           WHERE CR.CO_CD = #{coCd}
+			                                             AND CR.SALES_CD = #{salesCd}
+			                                          ORDER BY  CR.SALES_CD, PATH                 
+			                                         ) AS T LEFT OUTER JOIN TB_WB01M01 W01 ON T.CO_CD    = W01.CO_CD
+			                                                                              AND T.SALES_CD = W01.SALES_CD
+			                                                                              AND T.CODE_ID  = W01.WBS_PLAN_CODE_ID
+			                                                LEFT OUTER JOIN TB_WB02M01 W02 ON T.CO_CD    = W02.CO_CD
+			                                                                              AND T.SALES_CD = W02.SALES_CD
+			                                                                              AND T.CODE_ID  = W02.WBS_PLAN_CODE_ID  
+			                               WHERE  T.CODE_ID != 'WBSDIV' ) X
+			      WHERE DUR >=0                                                                                                                                                       
         </select>        
 
 

@@ -40,6 +40,11 @@ public class WB04SvcImpl implements WB04Svc {
 	ExceptionThrower thrower;
 
 	@Override
+	public List<Map<String, String>> selectWbsLeftSalesCodeTreeList(Map<String, String> paramMap) {
+		return wb04Mapper.selectWbsLeftSalesCodeTreeList(paramMap);
+	}
+	
+	@Override
 	public List<Map<String, String>> selectWbsPlanTreeList(Map<String, String> paramMap) {
 		return wb04Mapper.selectWbsPlanTreeList(paramMap);
 	}
