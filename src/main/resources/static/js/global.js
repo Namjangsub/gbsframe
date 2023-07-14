@@ -1140,8 +1140,11 @@ function isEmpty(str){
 }
 
 //form Load
-function loadFormData(_form, _data) {
+function loadFormData(_form, _data, _callback) {
 	$.each(_data, function(key, value) {
-		$(_form+" input[name="+key+"]").val(value);
+		if(!isEmpty(value)) {
+			$(_form+" [name="+key+"]").val(value);
+		}
 	});
+	if(!isEmpty(_callback)){ _callback(_data); }
 }

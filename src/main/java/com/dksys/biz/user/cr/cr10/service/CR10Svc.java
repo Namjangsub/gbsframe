@@ -15,22 +15,14 @@ public interface CR10Svc {
 
   List<Map<String, String>> selectBuyBomList(Map<String, String> paramMap);
 
-  List<Map<String, String>> selectBomMatrList(Map<String, String> paramMap);
+  List<Map<String, String>> selectLgistSalesCdList(Map<String, String> paramMap);
 
-  Map<String, String> selectBomMatrInfo(Map<String, String> paramMap);
+  Map<String, String> selectLgistMastInfo(Map<String, String> paramMap);
 
   int insertLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
   int updateLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
-  int deleteBomAll(Map<String, String> paramMap) throws Exception;
+  int deleteLgistMast(Map<String, String> paramMap) throws Exception;
   
-  int insertLgistMastMatr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
-
-  int updateLgistMastMatr(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
-  
-  int deleteBomMatr(Map<String, String> paramMap) throws Exception;
-  
-  int insertCopyBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
-
 }

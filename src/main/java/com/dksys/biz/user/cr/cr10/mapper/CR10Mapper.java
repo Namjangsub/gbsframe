@@ -16,9 +16,9 @@ public interface CR10Mapper {
 
   List<Map<String, String>> selectBuyBomList(Map<String, String> paramMap);
 
-  List<Map<String, String>> selectBomMatrList(Map<String, String> paramMap);
+  List<Map<String, String>> selectLgistSalesCdList(Map<String, String> paramMap);
   
-  Map<String, String> selectBomMatrInfo(Map<String, String> paramMap);
+  Map<String, String> selectLgistMastInfo(Map<String, String> paramMap);
   
   String selectFileTrgtKeyNext(Map<String, String> paramMap);
   
@@ -26,16 +26,14 @@ public interface CR10Mapper {
 
   int updateLgistMast(Map<String, String> paramMap);
 
-  int deleteBomAll(Map<String, String> paramMap);
+  int deleteLgistMast(Map<String, String> paramMap);
 
-  int deleteBom(Map<String, String> paramMap);
-  
-  int deleteBomMatrAll(Map<String, String> paramMap);
+  int deleteLgistSalesCdAll(Map<String, String> paramMap);
 
-  int deleteBomMatr(Map<String, String> paramMap);
+  int deleteLgistSalesCd(Map<String, String> paramMap);
   
-  int updateLgistMastMatr(Map<String, String> paramMap);
+  int updateLgistSalesCd(Map<String, String> paramMap);
   
-  int insertLgistMastMatr(Map<String, String> paramMap);
+  int insertLgistSalesCd(Map<String, String> paramMap);
   
 }
