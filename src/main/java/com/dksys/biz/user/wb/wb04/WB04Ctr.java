@@ -36,6 +36,15 @@ public class WB04Ctr {
     @Autowired
     WB04Svc wb04Svc;
     
+    @PostMapping(value = "/selectWbsLeftSalesCodeTreeList") 
+	public String selectWbsLeftSalesCodeTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	  List<Map<String, String>> fileList = wb04Svc.selectWbsLeftSalesCodeTreeList(paramMap); 
+	  model.addAttribute("fileList", fileList); 
+	  return "jsonView";
+	  
+    }
+    
+    
     @PostMapping(value = "/selectWbsPlanTreeList") 
 	public String selectWbsPlanTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 	  List<Map<String, String>> fileList = wb04Svc.selectWbsPlanTreeList(paramMap); 

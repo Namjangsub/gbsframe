@@ -19,27 +19,27 @@
 					, ORDRS_M.ORDRS_AMT 	AS ORDRS_AMT-- 수주금액
 					, CONF.CONF_AMT         AS CONF_AMT -- 기매출확정금액  TB_CR03D01
 					, ORDRS_CP.CLMN_AMT - CONF.CONF_AMT AS UNCONF_AMT  -- 매출미확정금액
-					, SELL_BD.SELL_BILL_DTL_AMT  -- 기계산서발행금액 TB_CR04D01
+					, SELL_BD.SELL_BILL_DTL_AMT AS SELL_BILL_AMT -- 기계산서발행금액 TB_CR04D01
 					<!-- 계산서미발행금액 -->
 					<!-- , NVL(SUM(ORDRS_CP.CLMN_AMT), 0) AS CLMN_AMT -->     -- 기 수금금액
 					<!-- 미수금금액 -->
 					, ORDRS_CP.CLMN_PLAN_DIV				-- 수금구분
 					, R3.CODE_NM AS CLMN_PLAN_DIV_NM		-- 수금구분명
-					<!-- , TO_CHAR(CLMN_D.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT	 --> -- 수금일자
-					<!-- , SELL_BD.CLMN_NO -->				-- 수금번호
+					, TO_CHAR(CLMN_T.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT	 -- 수금일자
+					, CLMN_T.CLMN_NO				-- 수금번호
 					, SELL_BD.CLMN_PLAN_SEQ					-- 수금계획순번
 					, ORDRS_M.CURR_CD	AS ORDRS_CURR_CD	-- 통화코드
 					, R2.CODE_NM  		AS ORDRS_CURR_NM	-- 통화코드명
 					, SELL_BD.SELL_BILL_NO					-- 계산서 번호
-					, CLMN_D.CLMN_DTL_AMT					-- 수금금액
+					, CLMN_T.CLMN_DTL_AMT					-- 수금금액
 					, ORDRS_CP.CLMN_AMT     				-- 기수금금액     
-					<!-- , CLMN_D.BKAC_CD 	 -->			-- 계좌번호 TB_CR05M01
-					<!-- , CLMN_D.PMNTMTD_CD -->			-- 수금유형
-					<!-- , CLMN_D.EXRATE -->				-- 환율	
-					<!-- , CLMN_D.CLMN_RMK -->				-- 비고
-					
-					, U1.NAME AS CREAT_ID_NM
-					, U2.NAME AS UDT_ID_NM
+					, CLMN_T.BKAC_CD 				-- 계좌번호 TB_CR05M01
+					, CLMN_T.PMNTMTD_CD				-- 수금유형
+					, CLMN_T.EXRATE					-- 환율	
+					, CLMN_T.CLMN_RMK				-- 비고
+
+					<!-- , U1.NAME AS CREAT_ID_NM -->
+					<!-- , U2.NAME AS UDT_ID_NM  -->
 			FROM TB_CR02M01 ORDRS_M	-- 수주마스터
 			<!--  1. 수주마스터 LEFT JOIN 수금수금계획 -->
 			LEFT OUTER JOIN (
@@ -57,11 +57,26 @@
 				AND SELL_BD.ORDRS_NO = ORDRS_CP.ORDRS_NO
 				AND SELL_BD.CLMN_PLAN_SEQ = ORDRS_CP.CLMN_PLAN_SEQ
 			<!--  3. 매출계산서상세 LEFT JOIN 수금내역 -->	
-			LEFT OUTER JOIN TB_CR05D01 CLMN_D ON CLMN_D.CO_CD  = SELL_BD.CO_CD 
-				AND CLMN_D.ORDRS_NO = SELL_BD.ORDRS_NO 
-				AND CLMN_D.CLMN_PLAN_SEQ = SELL_BD.CLMN_PLAN_SEQ 
-				LEFT JOIN TB_CM06M01 AS U1 ON U1.ID = CLMN_D.CREAT_ID 	--생성자
-				LEFT JOIN TB_CM06M01 AS U2 ON U2.ID = CLMN_D.UDT_ID		--최종변경자
+			LEFT OUTER JOIN ( 
+			SELECT CLMN.CLMN_NO		-- 수금번호	
+				, CLMN.CO_CD      	-- 회사	
+				, CLMN_D.ORDRS_NO	-- 수주번호	
+				, CLMN.CLMN_DT      -- 수금일자	
+				, CLMN.BKAC_CD      -- 계좌번호 	
+				, CLMN.EXRATE       -- 환율		
+				, CLMN.PMNTMTD_CD   -- 수금유형	
+				, CLMN.CLMN_RMK     -- 비고 		
+				, CLMN_D.CLMN_DTL_AMT					-- 수금금액
+				, CLMN_D.CLMN_PLAN_SEQ					-- 수금계획순번
+			FROM TB_CR05M01 	AS	CLMN				-- 수금
+			INNER JOIN TB_CR05D01 	AS		CLMN_D		-- 수금상세
+				ON CLMN_D. CO_CD = CLMN.CO_CD 
+				AND CLMN_D.CLMN_NO = CLMN.CLMN_NO 
+			) AS CLMN_T ON CLMN_T.CO_CD  = SELL_BD.CO_CD
+				AND CLMN_T.ORDRS_NO = SELL_BD.ORDRS_NO
+				AND CLMN_T.CLMN_PLAN_SEQ = SELL_BD.CLMN_PLAN_SEQ
+			<!-- 	LEFT JOIN TB_CM06M01 AS U1 ON U1.ID = CLMN_.CREAT_ID  -->	--생성자
+			<!-- 	LEFT JOIN TB_CM06M01 AS U2 ON U2.ID = CLMN_T.UDT_ID	  -->	--최종변경자
 			<!-- 매출확정 INNER JOIN 매출확정상세 -->
 			 LEFT JOIN (
 		      SELECT SELL_D.CO_CD                                  			-- 회사코드
@@ -75,25 +90,34 @@
 		      GROUP BY SELL_D.CO_CD, SELL_DD.ORDRS_NO, SELL_DD.CLMN_PLAN_SEQ
 		     ) AS CONF  ON CONF.CO_CD   = ORDRS_CP.CO_CD
 		               AND CONF.ORDRS_NO   = ORDRS_CP.ORDRS_NO
-		               AND CONF.CLMN_PLAN_SEQ =ORDRS_CP.CLMN_PLAN_SEQ
+		               AND CONF.CLMN_PLAN_SEQ = ORDRS_CP.CLMN_PLAN_SEQ
 				
 			LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = ORDRS_M.ORDRS_CLNT_CD	-- 거래처 마스터 					
 			LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = ORDRS_M.CO_CD   		--회사
 			LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = ORDRS_M.ORDRS_DIV   	--수주구분
 			LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = ORDRS_M.CURR_CD   	    --통화단위
 			LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = ORDRS_CP.CLMN_PLAN_DIV	-- 수금구분
-			
-			ORDER BY ORDRS_M.ORDRS_NO , CLMN_D.CLMN_PLAN_SEQ
+			ORDER BY ORDRS_M.ORDRS_NO , CLMN_T.CLMN_PLAN_SEQ
 			) AS T
 			WHERE  1 = 1
 	</select>
 	
 	<select id="selectClmnList" parameterType="Map" resultType="camelMap">
+		<!-- 
+			 TB_CR02M01		AS		ORDRS_M		수주마스터       
+			 TB_CR02D01		AS		ORDRS_CP 	수금수금계획  
+			 TB_CR04M01 	AS		SELL_B		매출계산서   
+			 TB_CR04D01 	AS		SELL_BD		매출계산서상세 
+			 TB_CR05M01 	AS		CLMN		수금  
+			 TB_CR05D01 	AS		CLMN_D		수금상세    
+			 TB_CR03M01 	AS		SELL_D		매출확정    
+			 TB_CR03D01 	AS		SELL_DD		매출확정상세 
+		-->
 		SELECT T.*
 			FROM(	
 			SELECT ROWNUM AS RNUM
 					, ORDRS_M.FILE_TRGT_KEY 			-- 파일대상KEY
-					, ORDRS_M.CO_CD 						-- 회사
+					, ORDRS_M.CO_CD 					-- 회사
 					, R.CODE_NM	AS CO_NM				-- 회사명 
 					, TO_CHAR(ORDRS_M.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT 	--수주일자
 					, ORDRS_M.ORDRS_CLNT_CD	AS ORDRS_CLNT_CD	-- 고객사 코드
@@ -105,27 +129,29 @@
 					, ORDRS_M.ORDRS_AMT 	AS ORDRS_AMT-- 수주금액
 					, CONF.CONF_AMT         AS CONF_AMT -- 기매출확정금액  TB_CR03D01
 					, ORDRS_CP.CLMN_AMT - CONF.CONF_AMT AS UNCONF_AMT  -- 매출미확정금액
-					, SELL_BD.SELL_BILL_DTL_AMT  -- 기계산서발행금액 TB_CR04D01
+					, SELL_BD.SELL_BILL_DTL_AMT AS SELL_BILL_AMT -- 기계산서발행금액 TB_CR04D01
 					<!-- 계산서미발행금액 -->
 					<!-- , NVL(SUM(ORDRS_CP.CLMN_AMT), 0) AS CLMN_AMT -->     -- 기 수금금액
 					<!-- 미수금금액 -->
 					, ORDRS_CP.CLMN_PLAN_DIV				-- 수금구분
 					, R3.CODE_NM AS CLMN_PLAN_DIV_NM		-- 수금구분명
-					<!-- , TO_CHAR(CLMN_D.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT	 --> -- 수금일자
-					<!-- , SELL_BD.CLMN_NO -->				-- 수금번호
+					, TO_CHAR(CLMN_T.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT	 -- 수금일자
+					, CLMN_T.CLMN_NO				-- 수금번호
 					, SELL_BD.CLMN_PLAN_SEQ					-- 수금계획순번
 					, ORDRS_M.CURR_CD	AS ORDRS_CURR_CD	-- 통화코드
 					, R2.CODE_NM  		AS ORDRS_CURR_NM	-- 통화코드명
 					, SELL_BD.SELL_BILL_NO					-- 계산서 번호
-					, CLMN_D.CLMN_DTL_AMT					-- 수금금액
+					, CLMN_T.CLMN_DTL_AMT					-- 수금금액
 					, ORDRS_CP.CLMN_AMT     				-- 기수금금액     
-					<!-- , CLMN_D.BKAC_CD 	 -->			-- 계좌번호 TB_CR05M01
-					<!-- , CLMN_D.PMNTMTD_CD -->			-- 수금유형
-					<!-- , CLMN_D.EXRATE -->				-- 환율	
-					<!-- , CLMN_D.CLMN_RMK -->				-- 비고
-					
+					, CLMN_T.BKAC_CD 				-- 계좌번호 TB_CR05M01
+					, R4.CODE_NM AS BKAC_NM			-- 계좌번호명
+					, CLMN_T.PMNTMTD_CD			-- 수금유형
+					, CLMN_T.EXRATE				-- 환율	
+					, CLMN_T.CLMN_RMK				-- 비고
 					, U1.NAME AS CREAT_ID_NM
+					, TO_CHAR(CLMN_T.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM --생성일시
 					, U2.NAME AS UDT_ID_NM
+					, TO_CHAR(CLMN_T.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM --최종변경일시
 			FROM TB_CR02M01 ORDRS_M	-- 수주마스터
 			<!--  1. 수주마스터 LEFT JOIN 수금수금계획 -->
 			LEFT OUTER JOIN (
@@ -134,20 +160,39 @@
 					, CLMN_PLAN_SEQ
 					, CLMN_PLAN_DIV
 					, NVL(SUM(CLMN_AMT), 0) AS CLMN_AMT     --수금금액      
-			FROM TB_CR02D01
+			FROM TB_CR02D01			-- 수금수금계획
 			GROUP BY CO_CD, ORDRS_NO	, CLMN_PLAN_SEQ	, CLMN_PLAN_DIV
-			) AS ORDRS_CP ON ORDRS_CP.CO_CD = ORDRS_M.CO_CD 			-- 수금수금계획
+			) AS ORDRS_CP ON ORDRS_CP.CO_CD = ORDRS_M.CO_CD 	
 							AND ORDRS_CP.ORDRS_NO = ORDRS_M.ORDRS_NO 
 			<!--  2. 수주수금계획 LEFT JOIN 매출계산서상세 --> 			
 			LEFT OUTER JOIN TB_CR04D01 SELL_BD ON SELL_BD.CO_CD = ORDRS_CP.CO_CD -- 계산서
 				AND SELL_BD.ORDRS_NO = ORDRS_CP.ORDRS_NO
 				AND SELL_BD.CLMN_PLAN_SEQ = ORDRS_CP.CLMN_PLAN_SEQ
 			<!--  3. 매출계산서상세 LEFT JOIN 수금내역 -->	
-			LEFT OUTER JOIN TB_CR05D01 CLMN_D ON CLMN_D.CO_CD  = SELL_BD.CO_CD 
-				AND CLMN_D.ORDRS_NO = SELL_BD.ORDRS_NO 
-				AND CLMN_D.CLMN_PLAN_SEQ = SELL_BD.CLMN_PLAN_SEQ 
-				LEFT JOIN TB_CM06M01 AS U1 ON U1.ID = CLMN_D.CREAT_ID 	--생성자
-				LEFT JOIN TB_CM06M01 AS U2 ON U2.ID = CLMN_D.UDT_ID		--최종변경자
+			LEFT OUTER JOIN ( 
+			SELECT CLMN.CLMN_NO		-- 수금번호	
+				, CLMN.CO_CD      	-- 회사	
+				, CLMN_D.ORDRS_NO	-- 수주번호	
+				, CLMN.CLMN_DT      -- 수금일자	
+				, CLMN.BKAC_CD      -- 계좌번호 	
+				, CLMN.EXRATE       -- 환율		
+				, CLMN.PMNTMTD_CD   -- 수금유형	
+				, CLMN.CLMN_RMK     -- 비고 		
+				, CLMN_D.CLMN_DTL_AMT					-- 수금금액
+				, CLMN_D.CLMN_PLAN_SEQ					-- 수금계획순번
+				, CLMN.CREAT_ID			
+				, CLMN.UDT_ID	
+				, CLMN.CREAT_DTTM						-- 생성일시
+				, CLMN.UDT_DTTM							-- 최종변경일시
+			FROM TB_CR05M01 	AS	CLMN				-- 수금
+			INNER JOIN TB_CR05D01 	AS		CLMN_D		-- 수금상세
+				ON CLMN_D. CO_CD = CLMN.CO_CD 
+				AND CLMN_D.CLMN_NO = CLMN.CLMN_NO 
+			) AS CLMN_T ON CLMN_T.CO_CD  = SELL_BD.CO_CD
+				AND CLMN_T.ORDRS_NO = SELL_BD.ORDRS_NO
+				AND CLMN_T.CLMN_PLAN_SEQ = SELL_BD.CLMN_PLAN_SEQ
+			<!-- 	LEFT JOIN TB_CM06M01 AS U1 ON U1.ID = CLMN_.CREAT_ID  -->	--생성자
+			<!-- 	LEFT JOIN TB_CM06M01 AS U2 ON U2.ID = CLMN_T.UDT_ID	  -->	--최종변경자
 			<!-- 매출확정 INNER JOIN 매출확정상세 -->
 			 LEFT JOIN (
 		      SELECT SELL_D.CO_CD                                  			-- 회사코드
@@ -161,15 +206,18 @@
 		      GROUP BY SELL_D.CO_CD, SELL_DD.ORDRS_NO, SELL_DD.CLMN_PLAN_SEQ
 		     ) AS CONF  ON CONF.CO_CD   = ORDRS_CP.CO_CD
 		               AND CONF.ORDRS_NO   = ORDRS_CP.ORDRS_NO
-		               AND CONF.CLMN_PLAN_SEQ =ORDRS_CP.CLMN_PLAN_SEQ
+		               AND CONF.CLMN_PLAN_SEQ = ORDRS_CP.CLMN_PLAN_SEQ
 				
 			LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = ORDRS_M.ORDRS_CLNT_CD	-- 거래처 마스터 					
 			LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = ORDRS_M.CO_CD   		--회사
 			LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = ORDRS_M.ORDRS_DIV   	--수주구분
 			LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = ORDRS_M.CURR_CD   	    --통화단위
 			LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = ORDRS_CP.CLMN_PLAN_DIV	-- 수금구분
-			
-			ORDER BY ORDRS_M.ORDRS_NO , CLMN_D.CLMN_PLAN_SEQ
+			LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = CLMN_T.BKAC_CD			-- 계좌번호
+			LEFT OUTER JOIN TB_CM06M01 AS U1 ON U1.ID = CLMN_T.CREAT_ID 			--생성자
+			LEFT OUTER JOIN TB_CM06M01 AS U2 ON U2.ID = CLMN_T.UDT_ID	 			--최종변경자	
+	
+			ORDER BY ORDRS_M.ORDRS_NO , CLMN_T.CLMN_PLAN_SEQ
 			) AS T
 			WHERE  1 = 1
 			AND    T.RNUM BETWEEN ${firstIndex} AND ${lastIndex}
