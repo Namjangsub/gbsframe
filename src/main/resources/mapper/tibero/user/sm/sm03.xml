@@ -342,7 +342,22 @@
 				, SUM(A.ORDRG_AMT) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_AMT	/* 발주금액 */	
 				, SUM(A.ORDRG_PRC) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_PRC	/* 발주단가 */	
 				, NVL(SUM(C.IN_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ), 0)  PRE_IN_QTY 	/* 기입고수량 */
-				, NVL(IN_QTY, 0)  IN_QTY 	/* 입고(합격)수량 */
+				<if test='actionType == "U" '>
+				, C.IN_NO		/* 입고번호 */
+				, C.IN_SEQ		/* 입고순번 */				
+				, 'Y' AS USER_CHK 	/* chk 값 */   	
+				, NVL(C.IN_QTY, 0) AS IN_QTY 	/* 입고(합격)수량 */	
+				, NVL(C.BAD_QTY, 0) AS BAD_QTY		/*불량수량 */   				
+				, NVL(C.IN_PRC, 0) AS IN_PRC		/* 입고단가 */
+				, NVL(C.IN_DTL_AMT, 0) AS IN_DTL_AMT		/* 입고금액 */
+				, NVL(C.IN_QTY+C.BAD_QTY, 0) AS S_INSPEC_QTY		/* 검사수량 */
+				, NVL(C.IN_QTY, 0) AS S_IN_QTY		/* 입고수량 */					
+				, TO_CHAR(C.IN_DT, 'YYYY-MM-DD') IN_DT		/* 입고일자 */	
+				, C.IN_DTL_RMK				/* 상세비고 */						
+				</if>				
+				<if test='actionType == "C" '>
+   				   
+				</if>								
 				, 
 				  SUM(A.ORDRG_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) 
 				  - NVL(SUM(IN_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ), 0) AS NOT_IN_QTY			/* 미입고수량 */	
@@ -353,7 +368,11 @@
 			FROM TB_SM02D01 A
 			INNER JOIN TB_SM02M01 B ON(A.CO_CD=B.CO_CD AND A.ORDRG_NO=B.ORDRG_NO)
 			LEFT OUTER JOIN TB_SM01D01 D ON(A.CO_CD = D.CO_CD AND A.SALES_CD = D.SALES_CD AND A.UPPER_CD = D.UPPER_CD AND A.LOWER_CD = D.LOWER_CD 
-											AND A.MATR_SEQ=D.MATR_SEQ AND A.MATR_CD=D.MATR_CD)			
+											AND A.MATR_SEQ=D.MATR_SEQ AND A.MATR_CD=D.MATR_CD)
+				<if test='actionType == "U" '>
+			INNER JOIN TB_SM03D01 C ON(A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ)				
+				</if>							
+				<if test='actionType == "C" '>											
 							LEFT OUTER JOIN
 							(
 								SELECT C.ORDRG_NO
@@ -362,6 +381,7 @@
 									FROM TB_SM03D01 C
 								GROUP BY C.ORDRG_NO, C.ORDRG_SEQ
 							) C ON( A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ)
+				</if>									
 		WHERE 1=1					
 		<if test="coCd != null and !coCd.equals('')">
 			AND A.CO_CD = #{coCd}   
@@ -523,40 +543,37 @@
 		
 	<!-- 입고관리 상세 수정 -->
 	<update id="updateWareHousingDetail" parameterType="Map">
-		UPDATE TB_SM02D01
+		UPDATE TB_SM03D01
 			SET 
-		SALES_CD = #{salesCd}
-		, MATR_SEQ = #{matrSeq}
-		, UPPER_CD = #{upperCd}
-		, LOWER_CD = #{lowerCd}
-		, DSGN_NO = #{dsgnNo}
-		, MATR_CD = #{matrCd}
-		, MATR_TEST_DIV = #{matrTestDiv}
-		, ORDRG_PRC = #{ordrgPrc}
-		, ORDRG_QTY = #{ordrgQty}
-		, ORDRG_AMT = #{ordrgAmt}
-		, DUDT_DEQ_DT = #{dudtDeqDt}
-		, DUDT_INTEND_DT = #{dudtIntendDt}
-		, ORDRG_DTL_RMK = #{ordrgDtlRmk,			jdbcType=VARCHAR}	
-		, UDT_ID = #{userId}
-		, UDT_PGM = #{pgmId}
-		, UDT_DTTM = SYSDATE	
-		, WH_CD = #{matrWhCd}		
-		WHERE CO_CD = #{coCd} 
-		 AND ORDRG_NO = #{ordrgNo} 
-		 AND ORDRG_SEQ = #{ordrgSeq} 
+			MATR_CD = #{matrCd}
+			, MATR_TEST_DIV = #{matrTestDiv}
+			, IN_PRC = #{inPrc}
+			, ARR_QTY = #{arrQty,			jdbcType=VARCHAR}
+			, IN_QTY = #{inQty}
+			, BAD_QTY = #{badQty}
+			, IN_DTL_AMT = #{inDtlAmt}
+			, CURR_CD = #{currCd}
+			, EXRATE = #{exrate}
+			, IN_DTL_RMK = #{inDtlRmk,			jdbcType=VARCHAR}	 	
+			, UDT_ID = #{userId}
+			, UDT_PGM = #{pgmId}
+			, UDT_DTTM = SYSDATE
+			, IO_DIV = #{ioDiv}
+			, IN_DT = #{inDt}
+			, WH_CD = #{matrWhCd}
+		WHERE CO_CD = #{coCd}
+			AND IN_NO = #{inNo}
+			AND IN_SEQ = #{inSeq}
 	</update>
 	
-		
-	
 	<!-- 발주 디테일  삭제 -->         
-	<delete id="deletWareHousingDetail" parameterType="Map">
+	<delete id="deleteWareHousingDetail" parameterType="Map">
 		DELETE 
-			FROM TB_SM02D01
+			FROM TB_SM03D01
 		WHERE 1=1
 			AND CO_CD = #{coCd}
-			AND ORDRG_NO = #{ordrgNo}
-			AND ORDRG_SEQ = #{ordrgSeq}	
+			AND IN_NO = #{inNo}
+			AND IN_SEQ = #{inSeq}	
 	</delete>	
 		
  </mapper>

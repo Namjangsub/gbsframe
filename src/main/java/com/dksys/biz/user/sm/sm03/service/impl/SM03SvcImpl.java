@@ -222,11 +222,12 @@ public class SM03SvcImpl implements SM03Svc {
 		int result = 0;	    	    
 	    //upate
 		for(Map<String, String> dtl : detailMap) {
-			dtl.put("coCd", paramMap.get("coCd"));
 			dtl.put("userId", paramMap.get("userId"));
 			dtl.put("pgmId", paramMap.get("pgmId"));
 			dtl.put("creatId", paramMap.get("userId"));
-			dtl.put("ordrgNo", paramMap.get("ordrgNo"));
+			dtl.put("ioDiv", paramMap.get("ioDiv"));
+			dtl.put("currCd", paramMap.get("currCd"));
+			dtl.put("exrate", paramMap.get("exrate"));
 			
     		result += sm03Mapper.updateWareHousingDetail(dtl);			
 		}			
