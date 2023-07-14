@@ -102,6 +102,10 @@ public class SM06SvcImpl implements SM06Svc {
 		String newMNGM_NO = sm06Mapper.select_sm06_Next_MNGM_NO(paramMap);
 		paramMap.put("retNo", newMNGM_NO);
 		
+		//마스터입력
+		//paramMap.put("returnSum", Integer.toString(sumReturnSum));
+		int result = sm06Mapper.insert_sm06(paramMap);
+		
 		//상세입력
 		int i = 1;
 		int outInoutKey = 0;
@@ -134,10 +138,6 @@ public class SM06SvcImpl implements SM06Svc {
 		    }
 		}
 		//데이터 처리 끝
-
-		//마스터입력
-		paramMap.put("returnSum", Integer.toString(sumReturnSum));
-		int result = sm06Mapper.insert_sm06(paramMap);
 
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)

@@ -4,473 +4,223 @@
 <mapper namespace="com.dksys.biz.user.cr.cr05.mapper.CR05Mapper">
 	<select id="selectClmnListCount" parameterType="Map" resultType="int">
 		SELECT COUNT(*)
-		FROM   (
-				SELECT A.*
-					, ROWNUM AS RN
-				FROM	(
-						SELECT DISTINCT
-							 A.FILE_TRGT_KEY
-							, T.PID
-							, T.ID
-							, T.CO_CD
-							, T.CO_NM
-							, T.LVL
-							, CASE WHEN T.CLMN_PLAN_SEQ IS NULL OR T.CLMN_PLAN_SEQ = '' THEN A.FILE_TRGT_KEY
-												ELSE A.FILE_TRGT_KEY||'-'||T.CLMN_PLAN_SEQ
-					  							END AS TREE_ID
-					 		, T.CLMN_PLAN_SEQ				-- 수금계획순번
-					 		, T.CLMN_NO						-- 수금번호
-					 		, T.CLMN_PLAN_DIV				-- 수금구분	
-					 		, T.CLMN_PLAN_DIV_NM 			-- 수금구분명		
-					 		, T.CLMN_DT						-- 수금일자	
-							, T.ORDRS_DIV					-- 수주구분
-					 		, T.ORDRS_NO 					-- 수주번호
-					 		, T.ORDRS_DT 					-- 수주일자
-					 		, T.CLNT_CD AS ORDRS_CLNT_CD    -- 고객사
-							, T.CLNT_NM  AS ORDRS_CLNT_NM   -- 고객사명
-							, T.CLNT_PJT      				-- 고객사PJT
-							, T.CTRT_NM						-- 계약명
-							, T.CURR_CD  AS ORDRS_CURR_CD   -- 통화단위
-		    				, T.CURR_NM  AS ORDRS_CURR_NM   -- 통화단위명
-		    				, T.ORDRS_AMT 				    -- 수주금액
-		    				, T.BKAC_CD						-- 계좌번호
-							, T.EXRATE						-- 환율
-							, T.PMNTMTD_CD					-- 수금유형
-							, T.CLMN_DTL_AMT				-- 수금금액
-							, T.CLMN_RMK 					-- 비고
-							, T.CREAT_PGM 
-							, T.CREAT_ID
-							, T.CREAT_ID_NM
-							, T.CREAT_DTTM
-							, T.UDT_PGM
-							, T.UDT_ID
-							, T.UDT_ID_NM
-							, T.UDT_DTTM
-			FROM   
-			(	
-			
-				SELECT DISTINCT A.FILE_TRGT_KEY --파일대상KEY
-				FROM   TB_CR05M01 AS A
-				LEFT OUTER JOIN (
-								 SELECT DISTINCT SM.CO_CD
-								, SM.ORDRS_NO				--수주번호
-								, TO_CHAR(SM.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT --수주일자
-								, TO_CHAR(SM.ORDRS_CLNT_CD) AS CLNT_CD --고객사
-								, C.CLNT_NM                 AS CLNT_NM --고객사명
-								, SM.CLNT_PJT          		--고객사PJT							
-								, SM.CTRT_NM
-								, SM.ORDRS_DIV
-								, SM.CURR_CD			AS  ORDRS_CURR_CD   -- 통화단위
-								, R2.CODE_NM            AS  ORDRS_CURR_NM   -- 통화단위명
-								, SM.ORDRS_AMT          AS ORDRS_AMT 		-- 수주금액
-								, SD.CLMN_PLAN_DIV	  						-- 수금구분	
-								, R3.CODE_NM 			AS CLMN_PLAN_DIV_NM	-- 수금구분명 
-								FROM   TB_CR02M01 AS SM		--수주마스터
-								LEFT OUTER JOIN TB_CR02D01 AS SD  ON SD.CO_CD    = SM.CO_CD		--수주상세 조인
-									AND SD.ORDRS_NO = SM.ORDRS_NO
-									
-								LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD	--거래처 조인
-					        	LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = SM.CO_CD   	-- 회사
-								LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = SM.ORDRS_DIV   -- 수주구분
-						    	LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = SD.CLMN_PLAN_DIV	-- 수금구분
-						    	LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = SM.CURR_CD   	-- 통화단위	
-				) AS O ON  O.CO_CD    = A.CO_CD
-				LEFT OUTER JOIN TB_CR05D01 AS B  ON B.CO_CD = A.CO_CD
-				AND B.CLMN_NO	= A.CLMN_NO
-				WHERE  1 = 1
+		FROM(	
+			SELECT ROWNUM AS RNUM
+					, ORDRS_M.FILE_TRGT_KEY 			-- 파일대상KEY
+					, ORDRS_M.CO_CD 						-- 회사
+					, R.CODE_NM	AS CO_NM				-- 회사명 
+					, TO_CHAR(ORDRS_M.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT 	--수주일자
+					, ORDRS_M.ORDRS_CLNT_CD	AS ORDRS_CLNT_CD	-- 고객사 코드
+					, C.CLNT_NM	AS ORDRS_CLNT_NM		-- 고객사명
+					, ORDRS_M.ORDRS_NO					-- 수주번호
+					, ORDRS_M.CLNT_PJT					-- 고객사 PJT
+					, ORDRS_M.CTRT_NM					-- 계약명
+					, ORDRS_M.ORDRS_DIV					-- 수주구분
+					, ORDRS_M.ORDRS_AMT 	AS ORDRS_AMT-- 수주금액
+					, CONF.CONF_AMT         AS CONF_AMT -- 기매출확정금액  TB_CR03D01
+					, ORDRS_CP.CLMN_AMT - CONF.CONF_AMT AS UNCONF_AMT  -- 매출미확정금액
+					, SELL_BD.SELL_BILL_DTL_AMT AS SELL_BILL_AMT -- 기계산서발행금액 TB_CR04D01
+					<!-- 계산서미발행금액 -->
+					<!-- , NVL(SUM(ORDRS_CP.CLMN_AMT), 0) AS CLMN_AMT -->     -- 기 수금금액
+					<!-- 미수금금액 -->
+					, ORDRS_CP.CLMN_PLAN_DIV				-- 수금구분
+					, R3.CODE_NM AS CLMN_PLAN_DIV_NM		-- 수금구분명
+					, TO_CHAR(CLMN_T.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT	 -- 수금일자
+					, CLMN_T.CLMN_NO				-- 수금번호
+					, SELL_BD.CLMN_PLAN_SEQ					-- 수금계획순번
+					, ORDRS_M.CURR_CD	AS ORDRS_CURR_CD	-- 통화코드
+					, R2.CODE_NM  		AS ORDRS_CURR_NM	-- 통화코드명
+					, SELL_BD.SELL_BILL_NO					-- 계산서 번호
+					, CLMN_T.CLMN_DTL_AMT					-- 수금금액
+					, ORDRS_CP.CLMN_AMT     				-- 기수금금액     
+					, CLMN_T.BKAC_CD 				-- 계좌번호 TB_CR05M01
+					, CLMN_T.PMNTMTD_CD				-- 수금유형
+					, CLMN_T.EXRATE					-- 환율	
+					, CLMN_T.CLMN_RMK				-- 비고
+
+					<!-- , U1.NAME AS CREAT_ID_NM -->
+					<!-- , U2.NAME AS UDT_ID_NM  -->
+			FROM TB_CR02M01 ORDRS_M	-- 수주마스터
+			<!--  1. 수주마스터 LEFT JOIN 수금수금계획 -->
+			LEFT OUTER JOIN (
+			SELECT CO_CD
+					, ORDRS_NO
+					, CLMN_PLAN_SEQ
+					, CLMN_PLAN_DIV
+					, NVL(SUM(CLMN_AMT), 0) AS CLMN_AMT     --수금금액      
+			FROM TB_CR02D01
+			GROUP BY CO_CD, ORDRS_NO	, CLMN_PLAN_SEQ	, CLMN_PLAN_DIV
+			) AS ORDRS_CP ON ORDRS_CP.CO_CD = ORDRS_M.CO_CD 			-- 수금수금계획
+							AND ORDRS_CP.ORDRS_NO = ORDRS_M.ORDRS_NO 
+			<!--  2. 수주수금계획 LEFT JOIN 매출계산서상세 --> 			
+			LEFT OUTER JOIN TB_CR04D01 SELL_BD ON SELL_BD.CO_CD = ORDRS_CP.CO_CD -- 계산서
+				AND SELL_BD.ORDRS_NO = ORDRS_CP.ORDRS_NO
+				AND SELL_BD.CLMN_PLAN_SEQ = ORDRS_CP.CLMN_PLAN_SEQ
+			<!--  3. 매출계산서상세 LEFT JOIN 수금내역 -->	
+			LEFT OUTER JOIN ( 
+			SELECT CLMN.CLMN_NO		-- 수금번호	
+				, CLMN.CO_CD      	-- 회사	
+				, CLMN_D.ORDRS_NO	-- 수주번호	
+				, CLMN.CLMN_DT      -- 수금일자	
+				, CLMN.BKAC_CD      -- 계좌번호 	
+				, CLMN.EXRATE       -- 환율		
+				, CLMN.PMNTMTD_CD   -- 수금유형	
+				, CLMN.CLMN_RMK     -- 비고 		
+				, CLMN_D.CLMN_DTL_AMT					-- 수금금액
+				, CLMN_D.CLMN_PLAN_SEQ					-- 수금계획순번
+			FROM TB_CR05M01 	AS	CLMN				-- 수금
+			INNER JOIN TB_CR05D01 	AS		CLMN_D		-- 수금상세
+				ON CLMN_D. CO_CD = CLMN.CO_CD 
+				AND CLMN_D.CLMN_NO = CLMN.CLMN_NO 
+			) AS CLMN_T ON CLMN_T.CO_CD  = SELL_BD.CO_CD
+				AND CLMN_T.ORDRS_NO = SELL_BD.ORDRS_NO
+				AND CLMN_T.CLMN_PLAN_SEQ = SELL_BD.CLMN_PLAN_SEQ
+			<!-- 	LEFT JOIN TB_CM06M01 AS U1 ON U1.ID = CLMN_.CREAT_ID  -->	--생성자
+			<!-- 	LEFT JOIN TB_CM06M01 AS U2 ON U2.ID = CLMN_T.UDT_ID	  -->	--최종변경자
+			<!-- 매출확정 INNER JOIN 매출확정상세 -->
+			 LEFT JOIN (
+		      SELECT SELL_D.CO_CD                                  			-- 회사코드
+		           , SELL_DD.ORDRS_NO                           		    -- 수주번호
+		           , SELL_DD.CLMN_PLAN_SEQ            			         	-- 수금계획순번
+		 	       <!-- , MAX(CD.CURR_CD)						AS CONF_CURR_CD --> -- 통화단위
+		           , NVL(SUM(SELL_DD.SELL_DCSN_DTL_AMT), 0) AS CONF_AMT     -- 확정금액
+		      FROM   TB_CR03M01 SELL_D
+		             INNER JOIN TB_CR03D01 SELL_DD ON SELL_DD.CO_CD = SELL_D.CO_CD
+						AND SELL_DD.SELL_DCSN_NO = SELL_D.SELL_DCSN_NO
+		      GROUP BY SELL_D.CO_CD, SELL_DD.ORDRS_NO, SELL_DD.CLMN_PLAN_SEQ
+		     ) AS CONF  ON CONF.CO_CD   = ORDRS_CP.CO_CD
+		               AND CONF.ORDRS_NO   = ORDRS_CP.ORDRS_NO
+		               AND CONF.CLMN_PLAN_SEQ = ORDRS_CP.CLMN_PLAN_SEQ
 				
-				<!-- 검색조건 -->
-				<if test="coCd != null and !coCd.equals('')">
-					AND	 A.CO_CD = '${coCd}' --회사
-				</if>
-				<if test="ordrsClntCd != null and !ordrsClntCd.equals('')"> 
-					AND NVL(TO_CHAR(O.ORDRS_CLNT_CD), '.') LIKE '%${ordrsClntCd}%' --고객사
-				</if>
-				<if test="clntNm != null and !clntNm.equals('')">
-					AND NVL(C.CLNT_NM, '.') LIKE '%${clntNm}%' --고객사명
-				</if>
-				<if test="ordrsNo != null and !ordrsNo.equals('')">
-					AND NVL(SM.ORDRS_NO , '.') LIKE '%${ordrsNo}%' --수주번호
-				</if>
-				<if test="clntPjt != null and !clntPjt.equals('')">
-					AND NVL(SM.CLNT_PJT , '.') LIKE '%${clntPjt}%' --고객사PJT
-				</if>
-				<if test="ctrtNm != null and !ctrtNm.equals('')">
-					AND NVL(SM.CTRT_NM  , '.') LIKE '%${ctrtNm}%' --계약명
-				</if>
-				<if test="ordrsDiv != null and !ordrsDiv.equals('')">
-					AND NVL(SM.ORDRS_DIV, '.') LIKE '%${ordrsDiv}%' --수주구분
-				</if>
-				)AS A -- 조회 결과 1
-				<!-- ) -->
-				<!--★맨위에서 조회할 것 여기 아래에 추가해야함 -->
-		LEFT OUTER JOIN (
-			SELECT
-				DISTINCT 
-				T.PID
-				, T.ID
-				, T.FILE_TRGT_KEY
-				, T.CO_CD
-				, T.CLMN_PLAN_SEQ
-				, R.CODE_NM AS CO_NM
-				, T.CLMN_NO					-- 수금번호
-				, T.CLMN_DT					-- 수금일자				
-				, O.ORDRS_NO AS ORDRS_NO    -- 수주번호
-				, O.ORDRS_DT AS ORDRS_DT	-- 수주일자
-				, O.CLNT_CD  AS CLNT_CD    	-- 고객사
-				, O.CLNT_NM  AS CLNT_NM     -- 고객사명
-				, O.CLNT_PJT AS CLNT_PJT  	-- 고객사PJT
-				, O.CTRT_NM	 AS CTRT_NM 	-- 계약명
-				, O.ORDRS_DIV AS ORDRS_DIV 	-- 수주구분
-				, O.ORDRS_AMT AS ORDRS_AMT 	-- 수주금액
-				, T.CURR_CD					-- 통화코드
-				, R2.CODE_NM AS CURR_NM 	-- 통화코드명
-				, T.BKAC_CD					-- 계좌번호
-				, T.EXRATE					-- 환율
-				, T.PMNTMTD_CD				-- 수금유형
-				, T.CLMN_DTL_AMT 			-- 수금금액
-				, T.CLMN_RMK 				-- 비고
-				, O.CLMN_PLAN_DIV	 AS CLMN_PLAN_DIV	-- 수금구분
-				, O.CLMN_PLAN_DIV_NM AS CLMN_PLAN_DIV_NM -- 수금구분명
-				<!-- 수금구분명 -->
-				<!-- , R3.CODE_NM AS CLMN_PLAN_DIV_NM   -->
-				, T.CREAT_PGM
-				, T.CREAT_ID
-				, U1.NAME AS CREAT_ID_NM
-				, T.CREAT_DTTM
-				, T.UDT_PGM
-				, T.UDT_ID
-				, U2.NAME AS UDT_ID_NM
-				, T.UDT_DTTM
-				, T.LVL
-		FROM ( 
-			SELECT '' AS PID
-					, M.CO_CD ||'_'|| M.CLMN_NO AS ID
-					, M.FILE_TRGT_KEY AS FILE_TRGT_KEY
-					, M.CO_CD
-					, '' AS ORDRS_NO		-- 수주번호
-					, '' AS CLMN_PLAN_SEQ	-- 수금계획순번
-					, M.CLMN_NO	  -- 수금번호
-					, TO_CHAR(M.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT	-- 수금일자
-					, M.PMNTMTD_CD -- 수금유형
-					, M.CURR_CD -- 통화단위
-					, M.EXRATE  -- 환율
-					, M.BKAC_CD -- 계좌번호
-					, '' AS CLMN_DTL_AMT -- 수금금액
-					, M.CLMN_RMK -- 비고
-					, M.CREAT_PGM
-					, M.CREAT_ID
-					, TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM
-					, M.UDT_PGM
-					, M.UDT_ID
-					, TO_CHAR(M.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM
-					, '1' AS LVL
-			FROM   TB_CR05M01 AS M
-			UNION ALL
-			SELECT 	D.CO_CD ||'_'|| D.CLMN_NO AS PID
-				, D.CO_CD ||'_'|| D.CLMN_NO || D.CLMN_PLAN_SEQ  AS ID
-				, M.FILE_TRGT_KEY AS FILE_TRGT_KEY
-				, D.CO_CD
-				, D.ORDRS_NO		-- 수주번호
-				, D.CLMN_PLAN_SEQ	--수금계획순번
-				, M.CLMN_NO	  -- 수금번호
-				, TO_CHAR(M.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT	-- 수금일자
-				, M.PMNTMTD_CD -- 수금유형
-				, M.CURR_CD -- 통화단위
-				, M.EXRATE  -- 환율
-				, M.BKAC_CD -- 계좌번호
-				, D.CLMN_DTL_AMT -- 수금금액
-				, M.CLMN_RMK -- 비고
-				, D.CREAT_PGM
-				, D.CREAT_ID
-				, TO_CHAR(D.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM
-				, D.UDT_PGM
-				, D.UDT_ID
-				, TO_CHAR(D.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM
-				, '2' AS LVL
-			FROM TB_CR05D01 AS D
-			LEFT OUTER JOIN TB_CR05M01 AS M ON	M.CO_CD = D.CO_CD
-					AND M.CLMN_NO	= D.CLMN_NO
-				 	WHERE  1 = 1
-		    ) AS T  
-	<!-- ) AS C -->
-	<!-- 수주마스터 조인 -->
-		LEFT OUTER JOIN (
-						SELECT DISTINCT SM.CO_CD
-							, SM.ORDRS_NO          --수주번호
-							, TO_CHAR(SM.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT --수주일자
-							, TO_CHAR(SM.ORDRS_CLNT_CD) AS CLNT_CD --고객사
-							, C.CLNT_NM                 AS CLNT_NM --고객사명
-							, SM.CLNT_PJT							--고객사PJT							
-							, SM.CTRT_NM
-							, SM.ORDRS_DIV
-							, SM.CURR_CD						-- 통화단위
-							, R2.CODE_NM		AS CURR_NM    	-- 통화단위명
-							, SM.ORDRS_AMT      AS ORDRS_AMT 	-- 수주금액
-							, SD.CLMN_PLAN_DIV						-- 수금구분
-							, R3.CODE_NM		AS CLMN_PLAN_DIV_NM -- 수금구분명
-							FROM TB_CR02M01 AS SM	-- 수주마스터
-							LEFT OUTER JOIN TB_CR02D01 AS SD  ON SD.CO_CD    = SM.CO_CD			--수주상세 조인
-								AND SD.ORDRS_NO = SM.ORDRS_NO		
-							LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD	 	--거래처 조인
-							<!-- 추가 -->
-				       		LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = SM.CO_CD   		-- 회사
-							LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = SM.ORDRS_DIV   	-- 수주구분
-					    	LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = SM.CURR_CD   		-- 통화단위
-							LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = SD.CLMN_PLAN_DIV	-- 수금구분
-					    	<!-- 추가 -->
-							) AS O  ON O.CO_CD    = T.CO_CD
-							AND O.ORDRS_NO = T.ORDRS_NO <!--  ★O LEFT JOIN T -->
-							LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = T.CO_CD
-							<!-- 통화단위  -->
-							LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = T.CURR_CD
-					    	<!-- 생성자 -->
-							LEFT OUTER JOIN TB_CM06M01 AS U1 ON U1.ID = T.CREAT_ID
-							<!--변경자 -->
-							LEFT OUTER JOIN TB_CM06M01 AS U2 ON U2.ID = T.UDT_ID
-							) AS T ON T.FILE_TRGT_KEY = A.FILE_TRGT_KEY
-						WHERE  1 = 1
-						ORDER BY A.FILE_TRGT_KEY, T.PID DESC, T.ID
-						) AS A
-					WHERE  1 = 1
-		       ) AS A
+			LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = ORDRS_M.ORDRS_CLNT_CD	-- 거래처 마스터 					
+			LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = ORDRS_M.CO_CD   		--회사
+			LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = ORDRS_M.ORDRS_DIV   	--수주구분
+			LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = ORDRS_M.CURR_CD   	    --통화단위
+			LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = ORDRS_CP.CLMN_PLAN_DIV	-- 수금구분
+			ORDER BY ORDRS_M.ORDRS_NO , CLMN_T.CLMN_PLAN_SEQ
+			) AS T
 			WHERE  1 = 1
 	</select>
 	
 	<select id="selectClmnList" parameterType="Map" resultType="camelMap">
-		SELECT A.*
-		FROM   (
-				SELECT A.*
-					, ROWNUM AS RN
-				FROM	(
-						SELECT DISTINCT
-							 A.FILE_TRGT_KEY
-							, T.PID
-							, T.ID
-							, T.CO_CD
-							, T.CO_NM
-							, T.LVL
-							, CASE WHEN T.CLMN_PLAN_SEQ IS NULL OR T.CLMN_PLAN_SEQ = '' THEN A.FILE_TRGT_KEY
-												ELSE A.FILE_TRGT_KEY||'-'||T.CLMN_PLAN_SEQ
-					  							END AS TREE_ID
-					 		, T.CLMN_PLAN_SEQ				-- 수금계획순번
-					 		, T.CLMN_NO						-- 수금번호
-					 		, T.CLMN_PLAN_DIV				-- 수금구분	
-					 		, T.CLMN_PLAN_DIV_NM 			-- 수금구분명		
-					 		, T.CLMN_DT						-- 수금일자	
-							, T.ORDRS_DIV					-- 수주구분
-					 		, T.ORDRS_NO 					-- 수주번호
-					 		, T.ORDRS_DT 					-- 수주일자
-					 		, T.CLNT_CD AS ORDRS_CLNT_CD    -- 고객사
-							, T.CLNT_NM  AS ORDRS_CLNT_NM   -- 고객사명
-							, T.CLNT_PJT      				-- 고객사PJT
-							, T.CTRT_NM						-- 계약명
-							, T.CURR_CD  AS ORDRS_CURR_CD   -- 통화단위
-		    				, T.CURR_NM  AS ORDRS_CURR_NM   -- 통화단위명
-		    				, T.ORDRS_AMT 				    -- 수주금액
-		    				, T.BKAC_CD						-- 계좌번호
-							, T.EXRATE						-- 환율
-							, T.PMNTMTD_CD					-- 수금유형
-							, T.CLMN_DTL_AMT				-- 수금금액
-							, T.CLMN_RMK 					-- 비고
-							, T.CREAT_PGM 
-							, T.CREAT_ID
-							, T.CREAT_ID_NM
-							, T.CREAT_DTTM
-							, T.UDT_PGM
-							, T.UDT_ID
-							, T.UDT_ID_NM
-							, T.UDT_DTTM
-			FROM   
-			(	
-			
-				SELECT DISTINCT A.FILE_TRGT_KEY --파일대상KEY
-				FROM   TB_CR05M01 AS A
-				LEFT OUTER JOIN (
-								 SELECT DISTINCT SM.CO_CD
-								, SM.ORDRS_NO				--수주번호
-								, TO_CHAR(SM.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT --수주일자
-								, TO_CHAR(SM.ORDRS_CLNT_CD) AS CLNT_CD --고객사
-								, C.CLNT_NM                 AS CLNT_NM --고객사명
-								, SM.CLNT_PJT          		--고객사PJT							
-								, SM.CTRT_NM
-								, SM.ORDRS_DIV
-								, SM.CURR_CD			AS  ORDRS_CURR_CD   -- 통화단위
-								, R2.CODE_NM            AS  ORDRS_CURR_NM   -- 통화단위명
-								, SM.ORDRS_AMT          AS ORDRS_AMT 		-- 수주금액
-								, SD.CLMN_PLAN_DIV	  						-- 수금구분	
-								, R3.CODE_NM 			AS CLMN_PLAN_DIV_NM	-- 수금구분명 
-								FROM   TB_CR02M01 AS SM		--수주마스터
-								LEFT OUTER JOIN TB_CR02D01 AS SD  ON SD.CO_CD    = SM.CO_CD		--수주상세 조인
-									AND SD.ORDRS_NO = SM.ORDRS_NO
-									
-								LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD	--거래처 조인
-					        	LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = SM.CO_CD   	-- 회사
-								LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = SM.ORDRS_DIV   -- 수주구분
-						    	LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = SD.CLMN_PLAN_DIV	-- 수금구분
-						    	LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = SM.CURR_CD   	-- 통화단위	
-				) AS O ON  O.CO_CD    = A.CO_CD
-				LEFT OUTER JOIN TB_CR05D01 AS B  ON B.CO_CD = A.CO_CD
-				AND B.CLMN_NO	= A.CLMN_NO
-				WHERE  1 = 1
+		<!-- 
+			 TB_CR02M01		AS		ORDRS_M		수주마스터       
+			 TB_CR02D01		AS		ORDRS_CP 	수금수금계획  
+			 TB_CR04M01 	AS		SELL_B		매출계산서   
+			 TB_CR04D01 	AS		SELL_BD		매출계산서상세 
+			 TB_CR05M01 	AS		CLMN		수금  
+			 TB_CR05D01 	AS		CLMN_D		수금상세    
+			 TB_CR03M01 	AS		SELL_D		매출확정    
+			 TB_CR03D01 	AS		SELL_DD		매출확정상세 
+		-->
+		SELECT T.*
+			FROM(	
+			SELECT ROWNUM AS RNUM
+					, ORDRS_M.FILE_TRGT_KEY 			-- 파일대상KEY
+					, ORDRS_M.CO_CD 					-- 회사
+					, R.CODE_NM	AS CO_NM				-- 회사명 
+					, TO_CHAR(ORDRS_M.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT 	--수주일자
+					, ORDRS_M.ORDRS_CLNT_CD	AS ORDRS_CLNT_CD	-- 고객사 코드
+					, C.CLNT_NM	AS ORDRS_CLNT_NM		-- 고객사명
+					, ORDRS_M.ORDRS_NO					-- 수주번호
+					, ORDRS_M.CLNT_PJT					-- 고객사 PJT
+					, ORDRS_M.CTRT_NM					-- 계약명
+					, ORDRS_M.ORDRS_DIV					-- 수주구분
+					, ORDRS_M.ORDRS_AMT 	AS ORDRS_AMT-- 수주금액
+					, CONF.CONF_AMT         AS CONF_AMT -- 기매출확정금액  TB_CR03D01
+					, ORDRS_CP.CLMN_AMT - CONF.CONF_AMT AS UNCONF_AMT  -- 매출미확정금액
+					, SELL_BD.SELL_BILL_DTL_AMT AS SELL_BILL_AMT -- 기계산서발행금액 TB_CR04D01
+					<!-- 계산서미발행금액 -->
+					<!-- , NVL(SUM(ORDRS_CP.CLMN_AMT), 0) AS CLMN_AMT -->     -- 기 수금금액
+					<!-- 미수금금액 -->
+					, ORDRS_CP.CLMN_PLAN_DIV				-- 수금구분
+					, R3.CODE_NM AS CLMN_PLAN_DIV_NM		-- 수금구분명
+					, TO_CHAR(CLMN_T.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT	 -- 수금일자
+					, CLMN_T.CLMN_NO				-- 수금번호
+					, SELL_BD.CLMN_PLAN_SEQ					-- 수금계획순번
+					, ORDRS_M.CURR_CD	AS ORDRS_CURR_CD	-- 통화코드
+					, R2.CODE_NM  		AS ORDRS_CURR_NM	-- 통화코드명
+					, SELL_BD.SELL_BILL_NO					-- 계산서 번호
+					, CLMN_T.CLMN_DTL_AMT					-- 수금금액
+					, ORDRS_CP.CLMN_AMT     				-- 기수금금액     
+					, CLMN_T.BKAC_CD 				-- 계좌번호 TB_CR05M01
+					, R4.CODE_NM AS BKAC_NM			-- 계좌번호명
+					, CLMN_T.PMNTMTD_CD			-- 수금유형
+					, CLMN_T.EXRATE				-- 환율	
+					, CLMN_T.CLMN_RMK				-- 비고
+					, U1.NAME AS CREAT_ID_NM
+					, TO_CHAR(CLMN_T.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM --생성일시
+					, U2.NAME AS UDT_ID_NM
+					, TO_CHAR(CLMN_T.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM --최종변경일시
+			FROM TB_CR02M01 ORDRS_M	-- 수주마스터
+			<!--  1. 수주마스터 LEFT JOIN 수금수금계획 -->
+			LEFT OUTER JOIN (
+			SELECT CO_CD
+					, ORDRS_NO
+					, CLMN_PLAN_SEQ
+					, CLMN_PLAN_DIV
+					, NVL(SUM(CLMN_AMT), 0) AS CLMN_AMT     --수금금액      
+			FROM TB_CR02D01			-- 수금수금계획
+			GROUP BY CO_CD, ORDRS_NO	, CLMN_PLAN_SEQ	, CLMN_PLAN_DIV
+			) AS ORDRS_CP ON ORDRS_CP.CO_CD = ORDRS_M.CO_CD 	
+							AND ORDRS_CP.ORDRS_NO = ORDRS_M.ORDRS_NO 
+			<!--  2. 수주수금계획 LEFT JOIN 매출계산서상세 --> 			
+			LEFT OUTER JOIN TB_CR04D01 SELL_BD ON SELL_BD.CO_CD = ORDRS_CP.CO_CD -- 계산서
+				AND SELL_BD.ORDRS_NO = ORDRS_CP.ORDRS_NO
+				AND SELL_BD.CLMN_PLAN_SEQ = ORDRS_CP.CLMN_PLAN_SEQ
+			<!--  3. 매출계산서상세 LEFT JOIN 수금내역 -->	
+			LEFT OUTER JOIN ( 
+			SELECT CLMN.CLMN_NO		-- 수금번호	
+				, CLMN.CO_CD      	-- 회사	
+				, CLMN_D.ORDRS_NO	-- 수주번호	
+				, CLMN.CLMN_DT      -- 수금일자	
+				, CLMN.BKAC_CD      -- 계좌번호 	
+				, CLMN.EXRATE       -- 환율		
+				, CLMN.PMNTMTD_CD   -- 수금유형	
+				, CLMN.CLMN_RMK     -- 비고 		
+				, CLMN_D.CLMN_DTL_AMT					-- 수금금액
+				, CLMN_D.CLMN_PLAN_SEQ					-- 수금계획순번
+				, CLMN.CREAT_ID			
+				, CLMN.UDT_ID	
+				, CLMN.CREAT_DTTM						-- 생성일시
+				, CLMN.UDT_DTTM							-- 최종변경일시
+			FROM TB_CR05M01 	AS	CLMN				-- 수금
+			INNER JOIN TB_CR05D01 	AS		CLMN_D		-- 수금상세
+				ON CLMN_D. CO_CD = CLMN.CO_CD 
+				AND CLMN_D.CLMN_NO = CLMN.CLMN_NO 
+			) AS CLMN_T ON CLMN_T.CO_CD  = SELL_BD.CO_CD
+				AND CLMN_T.ORDRS_NO = SELL_BD.ORDRS_NO
+				AND CLMN_T.CLMN_PLAN_SEQ = SELL_BD.CLMN_PLAN_SEQ
+			<!-- 	LEFT JOIN TB_CM06M01 AS U1 ON U1.ID = CLMN_.CREAT_ID  -->	--생성자
+			<!-- 	LEFT JOIN TB_CM06M01 AS U2 ON U2.ID = CLMN_T.UDT_ID	  -->	--최종변경자
+			<!-- 매출확정 INNER JOIN 매출확정상세 -->
+			 LEFT JOIN (
+		      SELECT SELL_D.CO_CD                                  			-- 회사코드
+		           , SELL_DD.ORDRS_NO                           		    -- 수주번호
+		           , SELL_DD.CLMN_PLAN_SEQ            			         	-- 수금계획순번
+		 	       <!-- , MAX(CD.CURR_CD)						AS CONF_CURR_CD --> -- 통화단위
+		           , NVL(SUM(SELL_DD.SELL_DCSN_DTL_AMT), 0) AS CONF_AMT     -- 확정금액
+		      FROM   TB_CR03M01 SELL_D
+		             INNER JOIN TB_CR03D01 SELL_DD ON SELL_DD.CO_CD = SELL_D.CO_CD
+						AND SELL_DD.SELL_DCSN_NO = SELL_D.SELL_DCSN_NO
+		      GROUP BY SELL_D.CO_CD, SELL_DD.ORDRS_NO, SELL_DD.CLMN_PLAN_SEQ
+		     ) AS CONF  ON CONF.CO_CD   = ORDRS_CP.CO_CD
+		               AND CONF.ORDRS_NO   = ORDRS_CP.ORDRS_NO
+		               AND CONF.CLMN_PLAN_SEQ = ORDRS_CP.CLMN_PLAN_SEQ
 				
-				<!-- 검색조건 -->
-				<if test="coCd != null and !coCd.equals('')">
-					AND	 A.CO_CD = '${coCd}' --회사
-				</if>
-				<if test="ordrsClntCd != null and !ordrsClntCd.equals('')"> 
-					AND NVL(TO_CHAR(O.ORDRS_CLNT_CD), '.') LIKE '%${ordrsClntCd}%' --고객사
-				</if>
-				<if test="clntNm != null and !clntNm.equals('')">
-					AND NVL(C.CLNT_NM, '.') LIKE '%${clntNm}%' --고객사명
-				</if>
-				<if test="ordrsNo != null and !ordrsNo.equals('')">
-					AND NVL(SM.ORDRS_NO , '.') LIKE '%${ordrsNo}%' --수주번호
-				</if>
-				<if test="clntPjt != null and !clntPjt.equals('')">
-					AND NVL(SM.CLNT_PJT , '.') LIKE '%${clntPjt}%' --고객사PJT
-				</if>
-				<if test="ctrtNm != null and !ctrtNm.equals('')">
-					AND NVL(SM.CTRT_NM  , '.') LIKE '%${ctrtNm}%' --계약명
-				</if>
-				<if test="ordrsDiv != null and !ordrsDiv.equals('')">
-					AND NVL(SM.ORDRS_DIV, '.') LIKE '%${ordrsDiv}%' --수주구분
-				</if>
-				)AS A -- 조회 결과 1
-				<!-- ) -->
-				<!--★맨위에서 조회할 것 여기 아래에 추가해야함 -->
-		LEFT OUTER JOIN (
-			SELECT
-				DISTINCT 
-				T.PID
-				, T.ID
-				, T.FILE_TRGT_KEY
-				, T.CO_CD
-				, T.CLMN_PLAN_SEQ
-				, R.CODE_NM AS CO_NM
-				, T.CLMN_NO					-- 수금번호
-				, T.CLMN_DT					-- 수금일자				
-				, O.ORDRS_NO AS ORDRS_NO    -- 수주번호
-				, O.ORDRS_DT AS ORDRS_DT	-- 수주일자
-				, O.CLNT_CD  AS CLNT_CD    	-- 고객사
-				, O.CLNT_NM  AS CLNT_NM     -- 고객사명
-				, O.CLNT_PJT AS CLNT_PJT  	-- 고객사PJT
-				, O.CTRT_NM	 AS CTRT_NM 	-- 계약명
-				, O.ORDRS_DIV AS ORDRS_DIV 	-- 수주구분
-				, O.ORDRS_AMT AS ORDRS_AMT 	-- 수주금액
-				, T.CURR_CD					-- 통화코드
-				, R2.CODE_NM AS CURR_NM 	-- 통화코드명
-				, T.BKAC_CD					-- 계좌번호
-				, T.EXRATE					-- 환율
-				, T.PMNTMTD_CD				-- 수금유형
-				, T.CLMN_DTL_AMT 			-- 수금금액
-				, T.CLMN_RMK 				-- 비고
-				, O.CLMN_PLAN_DIV	 AS CLMN_PLAN_DIV	-- 수금구분
-				, O.CLMN_PLAN_DIV_NM AS CLMN_PLAN_DIV_NM -- 수금구분명
-				<!-- 수금구분명 -->
-				<!-- , R3.CODE_NM AS CLMN_PLAN_DIV_NM   -->
-				, T.CREAT_PGM
-				, T.CREAT_ID
-				, U1.NAME AS CREAT_ID_NM
-				, T.CREAT_DTTM
-				, T.UDT_PGM
-				, T.UDT_ID
-				, U2.NAME AS UDT_ID_NM
-				, T.UDT_DTTM
-				, T.LVL
-		FROM ( 
-			SELECT '' AS PID
-					, M.CO_CD ||'_'|| M.CLMN_NO AS ID
-					, M.FILE_TRGT_KEY AS FILE_TRGT_KEY
-					, M.CO_CD
-					, '' AS ORDRS_NO		-- 수주번호
-					, '' AS CLMN_PLAN_SEQ	-- 수금계획순번
-					, M.CLMN_NO	  -- 수금번호
-					, TO_CHAR(M.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT	-- 수금일자
-					, M.PMNTMTD_CD -- 수금유형
-					, M.CURR_CD -- 통화단위
-					, M.EXRATE  -- 환율
-					, M.BKAC_CD -- 계좌번호
-					, '' AS CLMN_DTL_AMT -- 수금금액
-					, M.CLMN_RMK -- 비고
-					, M.CREAT_PGM
-					, M.CREAT_ID
-					, TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM
-					, M.UDT_PGM
-					, M.UDT_ID
-					, TO_CHAR(M.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM
-					, '1' AS LVL
-			FROM   TB_CR05M01 AS M
-			UNION ALL
-			SELECT 	D.CO_CD ||'_'|| D.CLMN_NO AS PID
-				, D.CO_CD ||'_'|| D.CLMN_NO || D.CLMN_PLAN_SEQ  AS ID
-				, M.FILE_TRGT_KEY AS FILE_TRGT_KEY
-				, D.CO_CD
-				, D.ORDRS_NO		-- 수주번호
-				, D.CLMN_PLAN_SEQ	--수금계획순번
-				, M.CLMN_NO	  -- 수금번호
-				, TO_CHAR(M.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT	-- 수금일자
-				, M.PMNTMTD_CD -- 수금유형
-				, M.CURR_CD -- 통화단위
-				, M.EXRATE  -- 환율
-				, M.BKAC_CD -- 계좌번호
-				, D.CLMN_DTL_AMT -- 수금금액
-				, M.CLMN_RMK -- 비고
-				, D.CREAT_PGM
-				, D.CREAT_ID
-				, TO_CHAR(D.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM
-				, D.UDT_PGM
-				, D.UDT_ID
-				, TO_CHAR(D.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM
-				, '2' AS LVL
-			FROM TB_CR05D01 AS D
-			LEFT OUTER JOIN TB_CR05M01 AS M ON	M.CO_CD = D.CO_CD
-					AND M.CLMN_NO	= D.CLMN_NO
-				 	WHERE  1 = 1
-		    ) AS T  
-	<!-- ) AS C -->
-	<!-- 수주마스터 조인 -->
-		LEFT OUTER JOIN (
-						SELECT DISTINCT SM.CO_CD
-							, SM.ORDRS_NO          --수주번호
-							, TO_CHAR(SM.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT --수주일자
-							, TO_CHAR(SM.ORDRS_CLNT_CD) AS CLNT_CD --고객사
-							, C.CLNT_NM                 AS CLNT_NM --고객사명
-							, SM.CLNT_PJT							--고객사PJT							
-							, SM.CTRT_NM
-							, SM.ORDRS_DIV
-							, SM.CURR_CD						-- 통화단위
-							, R2.CODE_NM		AS CURR_NM    	-- 통화단위명
-							, SM.ORDRS_AMT      AS ORDRS_AMT 	-- 수주금액
-							, SD.CLMN_PLAN_DIV						-- 수금구분
-							, R3.CODE_NM		AS CLMN_PLAN_DIV_NM -- 수금구분명
-							FROM TB_CR02M01 AS SM	-- 수주마스터
-							LEFT OUTER JOIN TB_CR02D01 AS SD  ON SD.CO_CD    = SM.CO_CD			--수주상세 조인
-								AND SD.ORDRS_NO = SM.ORDRS_NO		
-							LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD	 	--거래처 조인
-							<!-- 추가 -->
-				       		LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = SM.CO_CD   		-- 회사
-							LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = SM.ORDRS_DIV   	-- 수주구분
-					    	LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = SM.CURR_CD   		-- 통화단위
-							LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = SD.CLMN_PLAN_DIV	-- 수금구분
-					    	<!-- 추가 -->
-							) AS O  ON O.CO_CD    = T.CO_CD
-							AND O.ORDRS_NO = T.ORDRS_NO <!--  ★O LEFT JOIN T -->
-							LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = T.CO_CD
-							<!-- 통화단위  -->
-							LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = T.CURR_CD
-					    	<!-- 생성자 -->
-							LEFT OUTER JOIN TB_CM06M01 AS U1 ON U1.ID = T.CREAT_ID
-							<!--변경자 -->
-							LEFT OUTER JOIN TB_CM06M01 AS U2 ON U2.ID = T.UDT_ID
-							) AS T ON T.FILE_TRGT_KEY = A.FILE_TRGT_KEY
-						WHERE  1 = 1
-						ORDER BY A.FILE_TRGT_KEY, T.PID DESC, T.ID
-						) AS A
-					WHERE  1 = 1
-		       ) AS A
+			LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = ORDRS_M.ORDRS_CLNT_CD	-- 거래처 마스터 					
+			LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = ORDRS_M.CO_CD   		--회사
+			LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = ORDRS_M.ORDRS_DIV   	--수주구분
+			LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = ORDRS_M.CURR_CD   	    --통화단위
+			LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = ORDRS_CP.CLMN_PLAN_DIV	-- 수금구분
+			LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = CLMN_T.BKAC_CD			-- 계좌번호
+			LEFT OUTER JOIN TB_CM06M01 AS U1 ON U1.ID = CLMN_T.CREAT_ID 			--생성자
+			LEFT OUTER JOIN TB_CM06M01 AS U2 ON U2.ID = CLMN_T.UDT_ID	 			--최종변경자	
+	
+			ORDER BY ORDRS_M.ORDRS_NO , CLMN_T.CLMN_PLAN_SEQ
+			) AS T
 			WHERE  1 = 1
-			AND    A.RN BETWEEN ${firstIndex} AND ${lastIndex}
+			AND    T.RNUM BETWEEN ${firstIndex} AND ${lastIndex}
 	</select>
 	
 	<select id="selectClmnInfoCount" parameterType="Map" resultType="int">

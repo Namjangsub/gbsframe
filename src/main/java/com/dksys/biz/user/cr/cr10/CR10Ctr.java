@@ -41,9 +41,9 @@ public class CR10Ctr {
 	}
 
 	// BOM내역상세 조회
-	@PostMapping(value = "/selectBomDetailList")
-	public String selectBomDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> resultList = cr10Svc.selectBomDetailList(paramMap);
+	@PostMapping(value = "/selectSelesCdList")
+	public String selectSelesCdList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = cr10Svc.selectSelesCdList(paramMap);
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
 	}
@@ -72,10 +72,10 @@ public class CR10Ctr {
 		return "jsonView";
 	}
   
-	@PostMapping(value = "/insertBom")
-	public String insertBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	@PostMapping(value = "/insertLgistMast")
+	public String insertLgistMast(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
-			if (cr10Svc.insertBom(paramMap, mRequest) != 0 ) {
+			if (cr10Svc.insertLgistMast(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
 			} else {
@@ -89,10 +89,10 @@ public class CR10Ctr {
 		return "jsonView";
 	}
 
-	@PostMapping(value = "/updateBom")
-	public String updateBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	@PostMapping(value = "/updateLgistMast")
+	public String updateLgistMast(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 	  	try {
-			if (cr10Svc.updateBom(paramMap, mRequest) != 0 ) {
+			if (cr10Svc.updateLgistMast(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 			} else {
@@ -123,10 +123,10 @@ public class CR10Ctr {
 	  	return "jsonView";
 	}
 
-	@PostMapping(value = "/insertBomMatr")
-	public String insertBomMatr(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	@PostMapping(value = "/insertLgistMastMatr")
+	public String insertLgistMastMatr(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 	  try {
-		  if (cr10Svc.insertBomMatr(paramMap, mRequest) != 0 ) {
+		  if (cr10Svc.insertLgistMastMatr(paramMap, mRequest) != 0 ) {
 			  model.addAttribute("resultCode", 200);
 			  model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
 		  } else {
@@ -140,10 +140,10 @@ public class CR10Ctr {
 	  return "jsonView";
 	}
   
-	@PostMapping(value = "/updateBomMatr")
-	public String updateBomMatr(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	@PostMapping(value = "/updateLgistMastMatr")
+	public String updateLgistMastMatr(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 	  try {
-		  if (cr10Svc.updateBomMatr(paramMap, mRequest) != 0 ) {
+		  if (cr10Svc.updateLgistMastMatr(paramMap, mRequest) != 0 ) {
 			  model.addAttribute("resultCode", 200);
 			  model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
 		  } else {
