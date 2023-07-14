@@ -15,6 +15,8 @@ public interface CM05Svc {
     
     public List<Map<String, String>> selectChildCodeList(Map<String, String> param);
     
+    public List<Map<String, String>> selectPtchildCodeList(Map<String, String> param);
+    
     public Map<String, String> selectCodeInfo(Map<String, String> param);
     
     public List<Map<String, String>> selectCodeInfoList(Map<String, String> param);

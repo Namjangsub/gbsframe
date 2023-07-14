@@ -41,6 +41,11 @@ public class CM05SvcImpl implements CM05Svc {
 	}
 	
 	@Override
+	public List<Map<String, String>> selectPtchildCodeList(Map<String, String> param) {
+		return cm05Mapper.selectPtchildCodeList(param);
+	}
+	
+	@Override
 	public Map<String, String> selectCodeInfo(Map<String, String> param) {
 		return cm05Mapper.selectCodeInfo(param);
 	}

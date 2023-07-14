@@ -627,6 +627,57 @@ function setCommonSelect(selectArr){
 	})
 }
 
+function setCommonDiv(inputCd){
+	$.each(inputCd, function(idx, elem){
+		var param = {
+			"codeKind" : $(elem).data('kind')
+		};
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", param , null,  function(data){
+			var inputHtml = '';
+			var codeList = data.childCodeList;				
+				$.each(codeList, function (index, item){	
+					inputHtml += '<td style="border:0px;font-size:13px;">';
+					inputHtml += '<input type="radio" id="'+item.codeKind+'"  name="'+item.codeKind+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
+					inputHtml += ' ' +item.codeNm;
+					inputHtml += '</td>';
+				});
+				$(elem).append(inputHtml);
+			 
+		})
+	})
+}
+
+function setCommonItem(inputCd){
+	$.each(inputCd, function(idx, elem){		
+		var param = {
+			"codeKind" : $(elem).data('kind')
+		};		
+		postAjaxSync("/admin/cm/cm05/selectPtchildCodeList", param , null,  function(data){
+			var inputHtml = '';
+			var codeList = data.PtchildCodeList;	
+			var	icd ;
+			$.each(codeList, function (index, item){	
+				icd = item.midCd;
+				inputHtml += '<tr>';
+			    inputHtml += '<th>';
+				inputHtml += '<input type="hidden" name="'+item.codeKind+'" id="'+item.codeKind+'" value="'+item.midCd+'">';
+				inputHtml += item.midNm;
+				inputHtml += '</th>';
+				inputHtml += '<td>';
+				inputHtml += ' ';
+				inputHtml += '<input type="checkbox" id="'+item.midCd+'" name="'+item.midCd+'" value="'+item.subCd+'">';
+				inputHtml += ' ';
+				inputHtml += item.subNm;
+				inputHtml += '</td>';
+				inputHtml += '</tr>';
+				
+			});		
+			$(elem).append(inputHtml);	
+		})
+	})
+}
+
+
 function mainDefaultLoad(menuNm, subMenuNm) {
 	// left
 	$("#head_area").load("/static/html/header.html", function(){

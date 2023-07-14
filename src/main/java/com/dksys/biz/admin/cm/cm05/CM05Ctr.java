@@ -60,6 +60,14 @@ public class CM05Ctr {
         return "jsonView";
     }
     
+    // 하위코드 리스트 조회2
+    @PostMapping("/selectPtchildCodeList")
+    public String selectPtchildCodeList(@RequestBody Map<String, String> param, ModelMap model) {
+    	List<Map<String, String>> PtchildCodeList = cm05Svc.selectPtchildCodeList(param);
+    	model.addAttribute("PtchildCodeList", PtchildCodeList);
+        return "jsonView";
+    }
+    
     // 공통코드 정보 조회
     @PostMapping("/selectCodeInfo")
     public String selectCodeInfo(@RequestBody Map<String, String> param, ModelMap model) {

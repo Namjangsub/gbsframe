@@ -56,7 +56,17 @@ public class CM05Ctr {
     @PostMapping("/selectChildCodeList")
     public String selectChildCodeList(@RequestBody Map<String, String> param, ModelMap model) {
     	List<Map<String, String>> childCodeList = cm05Svc.selectChildCodeList(param);
+        System.out.println("childCodeList==?"+childCodeList);
     	model.addAttribute("childCodeList", childCodeList);
+        return "jsonView";
+    }
+    
+    // 하위코드 리스트 조회
+    @PostMapping("/selectPtchildCodeList")
+    public String selectPtchildCodeList(@RequestBody Map<String, String> param, ModelMap model) {
+    	List<Map<String, String>> PtchildCodeList = cm05Svc.selectPtchildCodeList(param);
+    	System.out.println("PtchildCodeList==?"+PtchildCodeList);
+    	model.addAttribute("PtchildCodeList", PtchildCodeList);
         return "jsonView";
     }
     
