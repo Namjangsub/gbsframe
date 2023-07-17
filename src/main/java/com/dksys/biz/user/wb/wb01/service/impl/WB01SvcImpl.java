@@ -314,4 +314,28 @@ public class WB01SvcImpl implements WB01Svc {
 		return result;
 	}
 	
+    @Override
+    public int deleteWbsRsltslist(Map<String, String> paramMap) {
+	    int result = 0;
+	    Gson gson = new Gson();
+	    Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> arr = gson.fromJson(paramMap.get("rowListArr"), stringList);
+		if (arr != null && arr.size() > 0 ) {
+			for (Map<String, String> arrMap : arr) {
+	            try {
+	            	 wb01Mapper.deleteWbsRsltsDetailSub(arrMap);
+	            	 wb01Mapper.deleteWbsSharngListSub(arrMap);
+	            	 wb01Mapper.deleteWbsApprovalListSub(arrMap);
+	        	     wb01Mapper.deleteWbsRsltslist(arrMap);
+	        	 result++;
+	            } catch (Exception e) {
+	                 System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
+		return result;
+    }
+    
+    
+	
 }

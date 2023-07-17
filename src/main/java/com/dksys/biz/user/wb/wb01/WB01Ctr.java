@@ -191,6 +191,22 @@ public class WB01Ctr {
      model.addAttribute("codeInfoList",codeInfoList); return "jsonView";  
   }
   
-  
+  @PutMapping(value = "/deleteWbsRsltslist")
+  public String deleteWbsRsltslist(@RequestParam Map<String, String> paramMap, ModelMap model) {
+		try {
+			if (wb01Svc.deleteWbsRsltslist(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+  } 
+
   
 }	  

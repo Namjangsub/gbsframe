@@ -46,11 +46,13 @@
     adjustDates: function (start, end) {
       start.setFirstDayOfThisWeek();
       end.setFirstDayOfThisWeek();
-      end.setDate(end.getDate() + 6);
+      //end.setDate(end.getDate() + 6);
+      end.setDate(end.getDate());
     },
     row1:        function (date, ctxHead) {
       var start = new Date(date.getTime());
-      date.setDate(date.getDate() + 6);
+      //date.setDate(date.getDate() + 6);
+      date.setDate(date.getDate());
       self.createHeadCell(1,this,ctxHead,start.format("MMMM d") + " - " + date.format("MMMM d yyyy")+ " ("+start.format("w")+")",7,"", start,date);
       date.setDate(date.getDate() + 1);
     },

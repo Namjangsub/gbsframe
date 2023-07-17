@@ -512,11 +512,13 @@ GridEditor.prototype.bindRowInputEvents = function (task, taskRow) {
 GridEditor.prototype.openFullEditor = function (task, editOnlyAssig) {
   var self = this;
   var paramObj = {
-          "coCd" : "GUN",
-          "salesCd": ""
+          "coCd" : $('#coCd_S').val(),
+          "salesCd": salesCd,
+          "codeId" : task.typeId
        };
-       openSecondModal("/static/html/cmn/modal/SalesCodeTreeSearch.html", 1000, 540, "SALES CODE 검색", paramObj, function (grid){
-       });
+       openSecondModal("/static/html/user/wb/wb04/WB0401P01.html", 1600, 850, "", paramObj, function(data) {
+           //gridView1.setData(0);
+       }); 
        return;    
   if (!self.master.permissions.canSeePopEdit)
     return;

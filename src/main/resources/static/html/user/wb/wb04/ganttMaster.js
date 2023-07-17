@@ -1646,7 +1646,6 @@ GanttMaster.prototype.manageSaveRequired=function(ev, showSave) {
 
   var self=this;
   function checkChanges() {
-	
     var changes = false;
     //there is somethin in the redo stack?
 //    if (self.__undoStack.length > 0) {
