@@ -135,7 +135,12 @@ public class SM03SvcImpl implements SM03Svc {
 	    //MAX ORDGR_NO
 	    String maxInNo = sm03Svc.selectMaxInNo(paramMap);	    
 	    paramMap.put("maxInNo", maxInNo);
-	   
+		//master 용
+		//paramMap.put("coCd", paramMap.get("coCd_I"));
+		//paramMap.put("salesCd", paramMap.get("salesCd_I"));
+		
+		result += sm03Mapper.insertWareHousingMaster(paramMap);	 
+		
 		for(Map<String, String> dtl : detailMap) {
 			dtl.put("userId", paramMap.get("userId"));
 			dtl.put("pgmId", paramMap.get("pgmId"));
@@ -167,7 +172,7 @@ public class SM03SvcImpl implements SM03Svc {
 		return result;
 	}
 	
-	//발주관리 구매 bom 수정
+	//입고 master 수정 - 사용안함
 	@Override
 	public int updateWareHousing(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
