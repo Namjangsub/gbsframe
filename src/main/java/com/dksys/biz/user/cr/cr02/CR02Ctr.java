@@ -32,6 +32,16 @@ public class CR02Ctr {
 		model.addAttribute("ordrsList", ordrsList);
 		return "jsonView";
 	}
+	
+	@PostMapping("/selectOrdrsListPop")
+	public String selectOrdrsListPop(@RequestBody Map<String, String> param, ModelMap model) {
+		int totalCnt = cr02Svc.selectOrdrsCount(param);
+		PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, Object>> ordrsList = cr02Svc.selectOrdrsListPop(param);
+		model.addAttribute("ordrsList", ordrsList);
+		return "jsonView";
+	}
 
 	@PostMapping(value = "/selectOrdrsInfo")
 	public String selectOrdrsInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {

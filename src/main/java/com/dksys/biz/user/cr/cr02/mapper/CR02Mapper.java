@@ -14,6 +14,8 @@ public interface CR02Mapper {
     int selectOrdrsPlanHisCount(Map<String, String> param);
 
     List<Map<String, Object>> selectOrdrsList(Map<String, String> param);
+    
+    List<Map<String, Object>> selectOrdrsListPop(Map<String, String> param);
 
 
     Map<String, Object> selectOrdrsInfo(Map<String, String> paramMap);
@@ -40,6 +42,10 @@ public interface CR02Mapper {
     void updateClmnPlan(Map<String, String> param);
 
     int insertClmnPlanHis(Map<String, String> param);
+    
+    int selectDegKey(Map<String, String> param);
+    
+    int insertUpdatePlanHis(Map<String, String> param);
 
     int deleteOrdrs(Map<String, String> param);
 

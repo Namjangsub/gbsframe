@@ -10,6 +10,8 @@ public interface CR02Svc {
     int selectOrdrsCount(Map<String, String> param);
 
     List<Map<String, Object>> selectOrdrsList(Map<String, String> param);
+    
+    List<Map<String, Object>> selectOrdrsListPop(Map<String, String> param);
 
     Map<String, Object> selectOrdrsInfo(Map<String, String> paramMap);
 
@@ -18,7 +20,7 @@ public interface CR02Svc {
 
     String selectMaxOrdrsNo(Map<String, String> param);
 
-    void insertOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest);
+    void insertOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception;
 
     void updateOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest);
 
