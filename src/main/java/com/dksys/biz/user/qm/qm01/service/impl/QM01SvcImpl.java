@@ -46,8 +46,8 @@ public class QM01SvcImpl implements QM01Svc {
   }
 
   @Override
-  public Map<String, String> selectPchsCostInfo(Map<String, String> paramMap) {
-    return QM01Mapper.selectPchsCostInfo(paramMap);
+  public Map<String, String> selectQtyReqInfo(Map<String, String> paramMap) {
+    return QM01Mapper.selectQtyReqInfo(paramMap);
   }
 
   @Override
@@ -56,7 +56,7 @@ public class QM01SvcImpl implements QM01Svc {
   }
 
   @Override
-  public int updatePchsCost(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+  public int updateQualityReq(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 //	Gson gson = new Gson();
 	Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
@@ -87,8 +87,7 @@ public class QM01SvcImpl implements QM01Svc {
 	//---------------------------------------------------------------  
 	//첨부 화일 권한체크  끝 
 	//---------------------------------------------------------------  
-
-	int result = QM01Mapper.updatePchsCost(paramMap);
+	int result = QM01Mapper.updateQualityReq(paramMap);
 
 	//---------------------------------------------------------------  
 	//첨부 화일 처리 시작 

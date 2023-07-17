@@ -13,13 +13,13 @@ public interface QM01Svc {
   
   List<Map<String, String>> selectQualityReqExList(Map<String, String> paramMap);
 
-  Map<String, String> selectPchsCostInfo(Map<String, String> paramMap);
+  Map<String, String> selectQtyReqInfo(Map<String, String> paramMap);
 
   int selectConfirmCount(Map<String, String> paramMap);
 
   int insertPchsCost(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
-  int updatePchsCost(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+  int updateQualityReq(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
   int deletePchsCost(Map<String, String> paramMap) throws Exception;
 

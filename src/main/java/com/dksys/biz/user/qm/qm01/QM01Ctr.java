@@ -51,9 +51,9 @@ public class QM01Ctr {
 	}  
 
   // 프로젝트 정보 조회
-  @PostMapping(value = "/selectPchsCostInfo")
+  @PostMapping(value = "/selectQtyReqInfo")
   public String selectPchsCostInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	Map<String, String> result = qm01Svc.selectPchsCostInfo(paramMap);
+	Map<String, String> result = qm01Svc.selectQtyReqInfo(paramMap);
     model.addAttribute("result", result);
     return "jsonView";
   }
@@ -83,10 +83,10 @@ public class QM01Ctr {
 		return "jsonView";
   }
 
-  @PostMapping(value = "/updatePchsCost")
-  public String updatePchsCost(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  @PostMapping(value = "/updateQualityReq")
+  public String updateQualityReq(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 	  	try {
-			if (qm01Svc.updatePchsCost(paramMap, mRequest) != 0 ) {
+			if (qm01Svc.updateQualityReq(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 			} else {

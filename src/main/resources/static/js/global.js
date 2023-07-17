@@ -634,10 +634,13 @@ function setCommonDiv(inputCd){
 		};
 		postAjaxSync("/admin/cm/cm05/selectChildCodeList", param , null,  function(data){
 			var inputHtml = '';
-			var codeList = data.childCodeList;				
-				$.each(codeList, function (index, item){	
+			var codeList = data.childCodeList;	
+			var i = "CP";
+			var j = 0;	
+			   $.each(codeList, function (index, item){	
+					j = j+1;
 					inputHtml += '<td style="border:0px;font-size:13px;">';
-					inputHtml += '<input type="radio" id="'+item.codeKind+'"  name="'+item.codeKind+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
+					inputHtml += '<input type="radio" id="'+item.codeKind+j+'" name="'+item.codeKind+i+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
 					inputHtml += ' ' +item.codeNm;
 					inputHtml += '</td>';
 				});
@@ -648,30 +651,41 @@ function setCommonDiv(inputCd){
 }
 
 function setCommonItem(inputCd){
-	$.each(inputCd, function(idx, elem){		
+	$.each(inputCd, function(idx, elem){
 		var param = {
 			"codeKind" : $(elem).data('kind')
 		};		
 		postAjaxSync("/admin/cm/cm05/selectPtchildCodeList", param , null,  function(data){
 			var inputHtml = '';
 			var codeList = data.PtchildCodeList;	
-			var	icd ;
-			$.each(codeList, function (index, item){	
-				icd = item.midCd;
+			var i = "CP";
+			var j = 0;	
+			$.each(codeList, function (index, item){
+				j = j+1;
 				inputHtml += '<tr>';
-			    inputHtml += '<th>';
-				inputHtml += '<input type="hidden" name="'+item.codeKind+'" id="'+item.codeKind+'" value="'+item.midCd+'">';
-				inputHtml += item.midNm;
+				if(item.midNm2 == ' '){
+				    inputHtml += ' ';
+				}else{
+				    inputHtml += '<th rowspan="'+item.subCnt+'">';
+				}	
+				inputHtml += item.midNm2;
 				inputHtml += '</th>';
-				inputHtml += '<td>';
+				inputHtml += '<td style="text-align:left;height:20px;">';
 				inputHtml += ' ';
-				inputHtml += '<input type="checkbox" id="'+item.midCd+'" name="'+item.midCd+'" value="'+item.subCd+'">';
+				inputHtml += '<input type="checkbox" id="'+item.midCd+j+'" name="'+item.midCd+i+'" value="'+item.subCd+'">';
 				inputHtml += ' ';
 				inputHtml += item.subNm;
 				inputHtml += '</td>';
 				inputHtml += '</tr>';
-				
-			});		
+			});	
+			if(i < 16){
+			  for (i; i < 15; i++) { 
+				inputHtml += '<tr style="height:20px;">';
+				inputHtml += '<th> </th>';
+				inputHtml += '<td> </th>';
+				inputHtml += '</tr>'; 
+			  }
+			}
 			$(elem).append(inputHtml);	
 		})
 	})

@@ -14,7 +14,7 @@ public interface QM01Mapper {
   
   List<Map<String, String>> selectQualityReqExList(Map<String, String> paramMap);
 
-  Map<String, String> selectPchsCostInfo(Map<String, String> paramMap);
+  Map<String, String> selectQtyReqInfo(Map<String, String> paramMap);
   
   int selectConfirmCount(Map<String, String> paramMap);
 
@@ -22,7 +22,7 @@ public interface QM01Mapper {
   
   int insertPchsCost(Map<String, String> paramMap);
 
-  int updatePchsCost(Map<String, String> paramMap);
+  int updateQualityReq(Map<String, String> paramMap);
 
   int deletePchsCost(Map<String, String> paramMap);
   
