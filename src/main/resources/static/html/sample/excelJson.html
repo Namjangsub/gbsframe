@@ -1,55 +1,88 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+	<script src="https://unpkg.com/exceljs/dist/exceljs.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+
 </head>
 <body>
-  <input type="file" id="fileInput">
-  <div id="tableContainer"></div>
+	<button onclick="exportJSONToExcel()">Export to Excel</button>
+	
 
-  <script>
-  $(document).ready(function() {
-	  $('#fileInput').on('change', function(e) {
-	    var file = e.target.files[0];
-	    var reader = new FileReader();
-
-	    reader.onload = function(e) {
-	      var data = new Uint8Array(e.target.result);
-	      var workbook = XLSX.read(data, {type: 'array'});
-
-	      var sheetName = workbook.SheetNames[0];
-	      var worksheet = workbook.Sheets[sheetName];
-	      var jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
-
-	      var tableContainer = $('#tableContainer');
-	      var table = $('<table>');
-
-	      // 헤더 생성
-	      var headerRow = $('<tr>');
-	      for (var i = 0; i < jsonData[0].length; i++) {
-	        var th = $('<th>').text(jsonData[0][i]);
-	        headerRow.append(th);
-	      }
-	      table.append(headerRow);
-
-	      // 데이터 행 생성
-	      for (var j = 1; j < jsonData.length; j++) {
-	        var dataRow = $('<tr>');
-	        for (var k = 0; k < jsonData[j].length; k++) {
-	          var td = $('<td>').text(jsonData[j][k]);
-	          dataRow.append(td);
-	        }
-	        table.append(dataRow);
-	      }
-
-	      tableContainer.empty();
-	      tableContainer.append(table);
-	    };
-
-	    reader.readAsArrayBuffer(file);
-	  });
-	});
-  </script>
+	<script>
+	function exportJSONToExcel (excelJsonData='', fileName = 'excel') {
+		if (!excelJsonData) {
+			alert('엑셀로 변환할 자료가 없습니다.')
+			return false;
+		}
+		// 예시 JSON 데이터
+// 		let excelJsonData = [
+// 			{ Name: "John Doe", Age: 30, Email: "johndoe@example.com" },
+// 			{ Name: "Jane Smith", Age: 25, Email: "janesmith@example.com" },
+// 			{ Name: "Bob Johnson", Age: 35, Email: "bobjohnson@example.com" }
+// 		];
+		
+		// 엑셀 워크북 생성
+		let workbook = new ExcelJS.Workbook();
+		let worksheet = workbook.addWorksheet(fileName+"Sheet1");
+		
+		// 헤더 스타일 설정
+		let headerFill = {
+			type: "pattern",
+			pattern: "solid",
+			fgColor: { argb: "C0C0C0" } // 그레이 색상
+		};
+		
+		let headerFont = {
+			color: { argb: "000000" } // 검은색 글자
+		};
+		
+		let headerBorder = {
+			top: { style: "thin" },
+			bottom: { style: "thin" },
+			left: { style: "thin" },
+			right: { style: "thin" }
+		};
+		
+		// 헤더 셀 생성
+		var headers = Object.keys(excelJsonData[0]);
+		for (let i = 0; i < headers.length; i++) {
+			let cell = worksheet.getCell(1, i + 1);
+			cell.value = headers[i];
+			cell.fill = headerFill;
+			cell.font = headerFont;
+			cell.border = headerBorder;
+		}
+		
+		// 데이터 삽입
+		for (let row = 0; row < excelJsonData.length; row++) {
+			let data = Object.values(excelJsonData[row]);
+			for (let col = 0; col < data.length; col++) {
+				let cell = worksheet.getCell(row + 2, col + 1);
+				cell.value = data[col];
+				cell.border = headerBorder;
+				let cellWidth = Math.min(40, data[col].toString().length * 1.5);
+				worksheet.getColumn(col + 1).width = cellWidth;
+			}
+		}
+		
+		// 파일 저장
+		workbook.xlsx.writeBuffer().then(function(buffer) {
+			let blob = new Blob([buffer], { type: "application/octet-stream" });
+			let dt = moment(new Date()).format('YYYYMMDD'); 
+			let excelFileName = fileName + '_' + dt + '.xlsx';
+			if (window.navigator.msSaveBlob) {
+				// IE 10+
+				window.navigator.msSaveBlob(blob, excelFileName);
+			} else {
+				let link = document.createElement("a");
+				link.href = window.URL.createObjectURL(blob);
+				link.download = excelFileName;
+				link.click();
+			}
+		});
+	}
+	</script>
 </body>
 </html>

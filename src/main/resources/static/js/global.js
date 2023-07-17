@@ -1199,3 +1199,133 @@ function loadFormData(_form, _data, _callback) {
 	});
 	if(!isEmpty(_callback)){ _callback(_data); }
 }
+
+
+//---------------------------------------------------------------------------------
+//그리드 엑셀 export 작업용
+//메인화면 스크립트 삽입 필요
+//<script src="https://unpkg.com/exceljs/dist/exceljs.min.js"></script>
+//format --> 엑셀문서는 자동으로  엑셀문서이름_yyyymmdd.xlsx로 생성됨
+//exportJSONToExcel(json Data, 헤더 정의 자료, 엑셀문서이름);
+//
+//	function jsonToExcel (grid) {
+// 		let targetJson = grid.target.getList();
+// 		let targetHeader = grid.target.columns;
+// 		exportJSONToExcel(targetJson, targetHeader, '프로젝트이슈');
+// 	}
+//---------------------------------------------------------------------------------
+function exportJSONToExcel (_grid, _excelFileName = 'excel') {
+	if (!_grid) {
+		alert('엑셀로 변환할 자료가 없습니다.')
+		return false;
+	}
+	let _excelJsonData = _grid.target.getList();
+	let _excelHeader = _grid.target.columns;
+	// 엑셀 워크북 생성
+	let workbook = new ExcelJS.Workbook();
+	let worksheet = workbook.addWorksheet(_excelFileName+"Sheet1");
+	
+	// 헤더 스타일 설정
+	let headerFill = {
+		type: "pattern",
+		pattern: "solid",
+		fgColor: { argb: "C0C0C0" } // 그레이 색상
+	};
+	
+	let headerFont = {
+		color: { argb: "000000" } // 검은색 글자
+	};
+	
+	let headerBorder = {
+		top: { style: "thin" },
+		bottom: { style: "thin" },
+		left: { style: "thin" },
+		right: { style: "thin" }
+	};
+	let headerAlignment = {
+		horizontal: "center" // 가운데 정렬
+	};
+
+	// 헤더 셀 생성
+	let outFieldArr = [];
+	let outCellNo = 0;
+	let lastRow = 0;
+	$.each(_excelHeader, function(i, header) {
+		if (!_excelHeader[i].hidden) {
+		    outCellNo += 1;
+		    outFieldArr.push(_excelHeader[i].key);
+		    let cell = worksheet.getCell(1, outCellNo);
+		    cell.value = _excelHeader[i].label;
+		    cell.fill = headerFill;
+		    cell.font = headerFont;
+		    cell.border = headerBorder;
+		    cell.alignment = headerAlignment;
+		    let cellWidth = typeof _excelHeader[i].width === 'number' ? _excelHeader[i].width / 8 : 10;
+		    worksheet.getColumn(outCellNo).width = cellWidth;
+		}
+	});
+	
+	// 데이터 삽입
+	for (let row = 0; row < _excelJsonData.length; row++) {
+		let key = Object.keys(_excelJsonData[row]);
+		var data = _excelJsonData[row];
+		
+		$.each(outFieldArr, function(col, cellKey) {		
+			let cell = worksheet.getCell(row + 2, col + 1);
+			let number = data[cellKey];	
+			let lcCellKey = cellKey.toLowerCase();
+			if (lcCellKey.indexOf('qty') !== -1 || lcCellKey.indexOf('amt') !== -1 || lcCellKey.indexOf('seq') !== -1 || lcCellKey.indexOf('upr') !== -1
+				|| lcCellKey.indexOf('rate') !== -1 || lcCellKey.indexOf('cost') !== -1 || lcCellKey.indexOf('size') !== -1 || lcCellKey.indexOf('pct') !== -1) {
+				if (/^\d+$/.test(data[cellKey])) {
+					number = parseFloat(data[cellKey]);
+				}
+
+			}
+
+			cell.value = number;
+			if (typeof number === 'number') {
+				cell.numFmt = '#,##0'; // 숫자 형식 지정
+				cell.alignment = { horizontal: 'right' }; // 오른쪽 정렬
+			}
+			cell.border = headerBorder;		
+			
+		});
+		
+		for (let col = 0; col < data.length; col++) {
+			if (outFieldArr.includes(col + 1)) { // outFieldArr 배열에 col 값이 있는지 확인
+				let cell = worksheet.getCell(row + 2, col + 1);
+				cell.value = data[col];
+				cell.border = headerBorder;
+			}
+		}
+		
+		lastRow = row + 2;
+	}
+	
+	//Sum row 색성  ????필요할까?
+//	lastRow += 1
+//	let cell = worksheet.getCell(lastRow, 1);
+//	cell.value = '합계'
+//	cell.alignment = { horizontal: 'center' }; // 오른쪽 정렬
+//	worksheet.mergeCells(lastRow , 1, lastRow, 4);
+//	
+//	let cell = worksheet.getCell(lastRow, 7);
+//	cell.value = { formula: 'SUM(A1:D1)' };
+	
+	// 파일 저장
+	workbook.xlsx.writeBuffer().then(function(buffer) {
+		let blob = new Blob([buffer], { type: "application/octet-stream" });
+		let dt = moment(new Date()).format('YYYYMMDD'); 
+		let excelFileName = _excelFileName + '_' + dt + '.xlsx';
+		if (window.navigator.msSaveBlob) {
+			// IE 10+
+			window.navigator.msSaveBlob(blob, excelFileName);
+		} else {
+			let link = document.createElement("a");
+			link.href = window.URL.createObjectURL(blob);
+			link.download = excelFileName;
+			link.click();
+		}
+	});
+	
+}
