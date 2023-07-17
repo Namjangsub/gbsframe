@@ -60,7 +60,7 @@ public class CR10Ctr {
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
 	}
-	
+
 	// Bom 자재 Map 조회
 	@PostMapping(value = "/selectLgistMastInfo")
 		public String selectLgistMastInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -68,7 +68,7 @@ public class CR10Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
-  
+
 	@PostMapping(value = "/insertLgistMast")
 	public String insertLgistMast(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {

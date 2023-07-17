@@ -1018,15 +1018,22 @@ function searchAndDelete(jstreeInstance, nodeId, topNode) {
 	}
 }	
 
-/* *
+/**
  * input, textarea에 아래의 요소를 load 이벤트를 등록한다.
- * only-number : 숫자만사용
- * comma : 금액사용
- * data-maxlength : byte크기만큼 입력막기.
+ * @param _form
+ * @returns
+ * oninput {
+ 	data-positive : 양수
+ 	data-number : 양수, 음수, 소수점
+ 	data-integer : 양수, 음수
+ 	comma or money : 양수 comma
+   }
+   onkeyup {
+   	data-maxlength : byte크기만큼 입력막기
+   }
  * date, date="toDay"
- * 겹치게 사용할 수 없음.
  * */
-function initLoadFormArea(_form){
+function initLoadForm(_form){
 	$.each($(_form+" textarea"), function (idx, elem) {
 		if($(elem).is('[data-maxlength]')){
 			var data_maxlength = $(elem).attr('data-maxlength');
@@ -1034,7 +1041,7 @@ function initLoadFormArea(_form){
 				if(!isEmpty($(elem).val())){
 					$(elem).val(dataMaxLength($(elem).val(),data_maxlength));
 				}
-				$(elem).on("input", function() {
+				$(elem).on("keyup", function() {
 					$(elem).val(dataMaxLength($(elem).val(),data_maxlength));
 				});					
 			}
@@ -1044,6 +1051,14 @@ function initLoadFormArea(_form){
 	$.each($(_form+"  input"), function (idx, elem) {
 		//date
 		if($(elem).is('[date]')){
+			if(!isEmpty($(elem).val())){
+				var val_date = $(elem).val();
+				if(val_date.length == 8){
+					val_date = val_date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+				}
+				var set_date = new Date(val_date).format("yyyy-MM-dd");//날짜검사.
+				$(elem).val(set_date);
+			}
 			var set_date = $(elem).attr('date');
 			if(isEmpty(set_date)){
 				$(elem).datepicker({
@@ -1056,25 +1071,25 @@ function initLoadFormArea(_form){
 					format : "yyyy-mm-dd",
 					language : "ko",
 					autoclose : true
-				}).datepicker("setDate", "today");
+				}).datepicker("setDate", set_date);
 			}
 		}
+		
 		//data-maxlength
-		else
 		if($(elem).is('[data-maxlength]')){
 			var data_maxlength = $(elem).attr('data-maxlength');
 			if(!isEmpty(data_maxlength)){
 				if(!isEmpty($(elem).val())){
 					$(elem).val(dataMaxLength($(elem).val(),data_maxlength));
 				}
-				$(elem).on("input", function() {
+				$(elem).on("keyup", function() {
 					$(elem).val(dataMaxLength($(elem).val(),data_maxlength));
 				});					
 			}
 		}
-		//comma
-		else
-		if($(elem).is('[comma]')){
+
+		//comma or money
+		if($(elem).is('[comma]') || $(elem).is('[money]')){
 			$(elem).css("text-align","right");
 			if(!isEmpty($(elem).val())){
 				$(elem).val($(elem).val().replace(/\B(?=(\d{3})+(?!\d))/g, ","));
@@ -1089,9 +1104,9 @@ function initLoadFormArea(_form){
 				$(elem).val($(elem).val().replace(/\B(?=(\d{3})+(?!\d))/g, ","));
 			});
 		}
-		//only-number
+		//data-positive
 		else
-		if($(elem).is('[only-number]')){
+		if($(elem).is('[data-positive]')){
 			$(elem).css("text-align","right");
 			if(!isEmpty($(elem).val())){
 				$(elem).val(Number($(elem).val().replace(/[^0-9]/g, "")));
@@ -1110,6 +1125,48 @@ function initLoadFormArea(_form){
 				}
 			});
 		}
+		//data-number
+		else
+		if($(elem).is('[data-number]')){
+			$(elem).css("text-align","right");
+			if(!isEmpty($(elem).val())){
+				$(elem).val(Number($(elem).val().replace(/[^-\.0-9]/g, "")));
+			}
+			$(elem).on("input", function() {
+				$(elem).val($(elem).val().replace(/[^-\.0-9]/g, "").replace(/^(-?)([0-9]*)(\.?)([^0-9]*)([0-9]*)([^0-9]*)/,"$1$2$3$5"));
+			});
+			$(elem).on("focus", function() {
+				if(!isEmpty($(elem).val())){
+					$(elem).val(Number($(elem).val().replace(/[^-\.0-9]/g, "")));
+				}
+			});
+			$(elem).on("blur", function() {
+				if(!isEmpty($(elem).val())){
+					$(elem).val(Number($(elem).val().replace(/[^-\.0-9]/g, "")));
+				}
+			});
+		}
+		//data-integer
+		else
+		if($(elem).is('[data-integer]')){
+			$(elem).css("text-align","right");
+			if(!isEmpty($(elem).val())){
+				$(elem).val(Number($(elem).val().replace(/[^0-9-]/g, "")));
+			}
+			$(elem).on("input", function() {
+				$(elem).val($(elem).val().replace(/[^0-9-]/g, "").replace(/^(-?)([0-9]*)([^0-9]*)/g,"$1$2"));
+			});
+			$(elem).on("focus", function() {
+				if(!isEmpty($(elem).val())){
+					$(elem).val(Number($(elem).val().replace(/[^0-9-]/g, "")));
+				}
+			});
+			$(elem).on("blur", function() {
+				if(!isEmpty($(elem).val())){
+					$(elem).val(Number($(elem).val().replace(/[^0-9-]/g, "")));
+				}
+			});
+		}
 	});	
 }
 
@@ -1123,7 +1180,7 @@ function dataMaxLength(value , maxLength){
 		var non_hangul_length = value.length - hangul_length;
 		max_hangul_length = Math.ceil(maxLength/3) + non_hangul_length; //최대 글자수 
 		if(hangul_length > 0) {
-			return value.substring(0,max_hangul_length-3);
+			//return value.substring(0,max_hangul_length-3);
 			var last_string = value.substring(value.length-1,value.length);
 			if(is_hangul_char(last_string)){
 				return value.substring(0,max_hangul_length-1);
@@ -1190,14 +1247,70 @@ function isEmpty(str){
 		return false ;
 }
 
-//form Load
+/**
+ * 화면 load 시 사용
+ * @param _form
+ * @param _data
+ * @param _callback
+ * @returns
+ * 예1) loadFormData("#popForm", data.result);
+ * 예2) loadFormData("#popForm", data.result, function(data){ $('#trnsDiv').trigger('change'); });
+ */
 function loadFormData(_form, _data, _callback) {
 	$.each(_data, function(key, value) {
 		if(!isEmpty(value)) {
 			$(_form+" [name="+key+"]").val(value);
 		}
 	});
+	initLoadForm(_form);
 	if(!isEmpty(_callback)){ _callback(_data); }
+}
+
+/**
+ * 화면 에서 검색 param return 
+ * @param _form
+ * @param _pageNo
+ * @param _recordCnt
+ * @returns
+ * 예1) var formData = getSearchParam("#popForm");
+ * 예2) var paramObj = getSearchParam(".table_input", 1, 99999999);
+ */
+function getSearchParam(_form, _pageNo, _recordCnt){
+	let resultParam = {};
+	$.each($(_form+" input"), function (idx, elem) {
+		var _id = $(elem).attr('id');
+		if(!isEmpty(_id)){
+			var _idrxIndex = _id.indexOf("_");
+			if(_idrxIndex != -1) {
+				var set_id = _id.substring(0,_idrxIndex);
+				resultParam[set_id] = $(elem).val();
+			}
+			else {
+				resultParam[_id] = $(elem).val();
+			}
+		}
+	});
+	$.each($(_form+" select"), function (idx, elem) {
+		var _id = $(elem).attr('id');
+		if(!isEmpty(_id)){
+			var _idrxIndex = _id.indexOf("_");
+			if(_idrxIndex != -1) {
+				var set_id = _id.substring(0,_idrxIndex);
+				resultParam[set_id] = $(elem).val();
+			}
+			else {
+				resultParam[_id] = $(elem).val();
+			}
+		}
+	});
+	
+	if(!isEmpty(_pageNo)){
+		resultParam["pageNo"] = _pageNo;
+	}
+	if(!isEmpty(_recordCnt)){
+		resultParam["recordCnt"] = _recordCnt;
+	}
+	return resultParam;
 }
 
 
