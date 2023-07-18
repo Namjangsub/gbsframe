@@ -66,10 +66,10 @@ public class QM01Ctr {
     return "jsonView";
   }
 
-  @PostMapping(value = "/insertPchsCost")
-  public String insertPchsCost(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  @PostMapping(value = "/insertQualityReq")
+  public String insertQualityReq(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
-			if (qm01Svc.insertPchsCost(paramMap, mRequest) != 0 ) {
+			if (qm01Svc.insertQualityReq(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
 			} else {
@@ -100,10 +100,10 @@ public class QM01Ctr {
 	  	return "jsonView";
   }
 
-  @PutMapping(value = "/deletePchsCost")
-  public String deletePchsCost(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+  @PutMapping(value = "/deleteQualityReq")
+  public String deleteQualityReq(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 	  	try {
-			if (qm01Svc.deletePchsCost(paramMap) != 0 ) {
+			if (qm01Svc.deleteQualityReq(paramMap) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
 			} else {

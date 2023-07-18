@@ -644,11 +644,13 @@ function setCommonDiv(inputCd){
 					inputHtml += ' ' +item.codeNm;
 					inputHtml += '</td>';
 				});
+			   alert(inputHtml);
 				$(elem).append(inputHtml);
 			 
 		})
 	})
 }
+
 
 function setCommonItem(inputCd){
 	$.each(inputCd, function(idx, elem){
