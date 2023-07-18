@@ -1,6 +1,7 @@
 package com.dksys.biz.user.cr.cr07.service.impl;
 
 import java.lang.reflect.Type;
+import java.text.Format.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -13,10 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
-import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.cr.cr07.mapper.CR07Mapper;
 import com.dksys.biz.user.cr.cr07.service.CR07Svc;
+import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -33,61 +34,56 @@ public class CR07SvcImpl implements CR07Svc {
 	
 	@Autowired
 	CM15Svc cm15Svc;
-	
+
 	@Autowired
 	CM08Svc cm08Svc;
-	
+
+	// 그리드 카운트
 	@Override
-	public int selectOrdrsDcsnCount(Map<String, String> paramMap) {
-		return cr07Mapper.selectOrdrsDcsnCount(paramMap);
+	public int grid1_selectCount(Map<String, String> paramMap) {
+		return cr07Mapper.grid1_selectCount(paramMap);
+	}
+
+	// 그리드 리스트
+	@Override
+	public List<Map<String, String>> grid1_selectList(Map<String, String> paramMap) {
+		return cr07Mapper.grid1_selectList(paramMap);
 	}
 	
+	// 창고 코드 검색
 	@Override
-	public List<Map<String, String>> selectOrdrsDcsnList(Map<String, String> paramMap) {
-		return cr07Mapper.selectOrdrsDcsnList(paramMap);
+	public List<Map<String, Object>> selectWhCd(Map<String, String> paramMap) {
+		return cr07Mapper.selectWhCd(paramMap);
+	}
+
+	// 팝업 입력대상 검색
+	@Override
+	public List<Map<String, String>> select_insert_target_modal(Map<String, String> paramMap) {
+		return cr07Mapper.select_insert_target_modal(paramMap);
 	}
 	
-	@Override
-	public int selectSellDcsnCount(Map<String, String> paramMap) {
-		return cr07Mapper.selectSellDcsnCount(paramMap);
-	}
-	
-	@Override
-	public List<Map<String, String>> selectSellDcsnList(Map<String, String> paramMap) {
-		return cr07Mapper.selectSellDcsnList(paramMap);
-	}
-	
+	// 수정화면 정보
 	@Override
 	public Map<String, String> select_cr07_Info(Map<String, String> paramMap) {
 		return cr07Mapper.select_cr07_Info(paramMap);
 	}
 	
+	// 수정화면 상세정보
 	@Override
-	public int addSellDscnCount(Map<String, String> paramMap) {
-		return cr07Mapper.addSellDscnCount(paramMap);
+	public List<Map<String, String>> select_cr07_Info_Dtl(Map<String, String> paramMap) {
+		return cr07Mapper.select_cr07_Info_Dtl(paramMap);
 	}
 	
+	//DATA INSERT
 	@Override
-	public List<Map<String, String>> addSellDscnList(Map<String, String> paramMap) {
-		return cr07Mapper.addSellDscnList(paramMap);
-	}
-	
-	@Override
-	public List<Map<String, String>> select_cr07_sellDcsnNo(Map<String, String> paramMap) {
-		return cr07Mapper.select_cr07_sellDcsnNo(paramMap); 
-	}
-	
-	// INSERT
-	@Override
-	public int insertSellDscn(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	public int insert_cr07(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-	
+		
 		//---------------------------------------------------------------
 		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
 		//   필수값 :  jobType, userId, comonCd
 		//---------------------------------------------------------------
-		
 		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
 		if (uploadFileList.size() > 0) {
 			//접근 권한 없으면 Exception 발생
@@ -98,9 +94,40 @@ public class CR07SvcImpl implements CR07Svc {
 		//첨부 화일 권한체크  끝
 		//---------------------------------------------------------------
 		
+		//데이터 처리 시작
 		int fileTrgtKey = cr07Mapper.select_cr07_SeqNext(paramMap);
 		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
-		int result = cr07Mapper.insertSellDscn(paramMap);
+
+		String newMNGM_NO = cr07Mapper.select_cr07_Next_MNGM_NO(paramMap);
+		paramMap.put("sellDcsnNo", newMNGM_NO);
+		
+		//마스터입력
+		int result = cr07Mapper.insert_cr07(paramMap);
+
+		//상세입력
+		//int i = 1;
+		//int outInoutKey = 0;
+
+		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+	    for (Map<String, String> dtl : dtlParam) {
+	    	dtl.put("sellDcsnNo", newMNGM_NO);
+	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
+			dtl.put("userId", paramMap.get("userId"));
+	    	dtl.put("pgmId", paramMap.get("pgmId"));
+			
+			String dataChk = dtl.get("dataChk").toString();
+			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
+	    	if ("I".equals(dataChk)) {
+				dtl.put("ordrsNo", dtl.get("ordrsNo").toString());
+				dtl.put("clmnPlanSeq", dtl.get("clmnPlanSeq").toString());
+				dtl.put("sellDcsnDtlAmt", dtl.get("confAmt").toString());				
+
+				//데이터 처리
+				cr07Mapper.insert_cr07_Dtl(dtl);
+				//i++;
+	    	}
+	    }
+		//데이터 처리 끝
 
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
@@ -115,19 +142,10 @@ public class CR07SvcImpl implements CR07Svc {
 		//---------------------------------------------------------------
 		return result;
 	}
-	
-	// 매출확정 상세입력
+
+	//DATA UPDATE
 	@Override
-	public int insertSellDscnDetail(Map<String, String> paramMap) {
-		String sellBillNo = cr07Mapper.select_cr07_sellBillNo(paramMap);
-		paramMap.put("sellBillNo", sellBillNo);
-		int result = cr07Mapper.insertSellDscnDetail(paramMap);
-		return result;
-	}
-	
-	// UPDATE
-	@Override
-	public int updateSellDscn(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	public int update_cr07(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		//Gson gson = new Gson();
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
@@ -162,7 +180,25 @@ public class CR07SvcImpl implements CR07Svc {
 		//첨부 화일 권한체크  끝
 		//---------------------------------------------------------------
 		
-		int result = cr07Mapper.updateSellDscn(paramMap);
+		//데이터처리 시작
+		//마스터 수정
+		int result = cr07Mapper.update_cr07(paramMap);
+
+		//상세수정
+		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+	    for (Map<String, String> dtl : dtlParam) {
+	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
+			dtl.put("userId", paramMap.get("userId"));
+	    	dtl.put("pgmId", paramMap.get("pgmId"));
+			
+			String dataChk = dtl.get("dataChk").toString();	    	
+			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
+	    	if ("U".equals(dataChk)) {
+				//데이터 처리
+				cr07Mapper.update_cr07_Dtl(dtl);
+	    	} 
+	    }
+		//데이터 처리 끝
 		
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작
@@ -179,11 +215,10 @@ public class CR07SvcImpl implements CR07Svc {
 		//---------------------------------------------------------------
 		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
-		
 		return result;
 	}
 	
-	// DELETE
+	//DATA DELETE
 	@Override
 	public int delete_cr07(Map<String, String> paramMap) throws Exception {
 		//---------------------------------------------------------------
@@ -205,7 +240,23 @@ public class CR07SvcImpl implements CR07Svc {
 		//첨부 화일 권한체크 끝
 		//---------------------------------------------------------------
 		
-		int result = cr07Mapper.delete_cr07(paramMap);
+		int result = 0;
+		
+		result = cr07Mapper.delete_cr07_Dtl_All(paramMap);
+		result = cr07Mapper.delete_cr07(paramMap);
+		
+		// String lvl = paramMap.get("lvl").toString();		
+		
+		// if ("1".equals(lvl)) {
+		// 	//데이터 처리
+		// 	result = cr07Mapper.delete_cr07_Dtl_All(paramMap);
+		// 	result = cr07Mapper.delete_cr07(paramMap);
+    	// } else {
+    	// 	result = cr07Mapper.delete_cr07_Dtl(paramMap);
+    	// }
+		
+		//int result = cr07Mapper.delete_cr07(paramMap);
+		
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------
@@ -218,14 +269,6 @@ public class CR07SvcImpl implements CR07Svc {
 		//---------------------------------------------------------------
 		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
-		
-		return  result;
-	}
-	
-	// 매출확정 상세삭제
-	@Override
-	public int delete_cr07_detail(Map<String, String> paramMap) {
-		int result = cr07Mapper.delete_cr07_detail(paramMap);
 		return result;
 	}
 }
