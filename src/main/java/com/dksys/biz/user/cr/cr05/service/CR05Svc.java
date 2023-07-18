@@ -20,5 +20,7 @@ public interface CR05Svc {
 	// 수금정보 조회
 	int selectClmnInfoCount(Map<String, String> paramMap);
 	List<Map<String, String>> selectClmnInfo(Map<String, String> paramMap);
+	// 수금번호 조회
+	List<Map<String, String>> select_cr05_clmnNo(Map<String, String> paramMap);
 
 }

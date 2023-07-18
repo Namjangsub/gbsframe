@@ -53,7 +53,12 @@ public class CR05Ctr {
 	
 	
 	// 수금번호 조회
-	
+	@PostMapping(value = "/select_cr05_clmnNo")
+	public String select_cr05_clmnNo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = cr05Svc.select_cr05_clmnNo(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 	
 	
 	// 수금등록 입력
