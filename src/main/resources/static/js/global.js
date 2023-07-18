@@ -15,11 +15,11 @@ if(ax5.ui.grid){
 		    let regExpPattern = new RegExp('([0-9])([0-9][0-9][0-9][,.])');
 		    let arrNumber = val.split('.');
 		    arrNumber[0] += '.';
-		    
+
 		    do {
 		        arrNumber[0] = arrNumber[0].replace(regExpPattern, '$1,$2');
 		    } while (regExpPattern.test(arrNumber[0]));
-		    
+
 		    return (arrNumber.length > 1) ? arrNumber[0] + arrNumber[1] : arrNumber[0].split('.')[0];
 		}else{
 			return "";
@@ -42,7 +42,7 @@ var deleteCookie = function (name) {
 	var temp = getCookie(name);
 	if(temp){
 		setCookie(name, temp, 0);
-	} 
+	}
 }
 
 var DOMAIN_URL = "";
@@ -91,7 +91,7 @@ if(jwt){
 	switch (jwt.serverType){
     case "real" :
         ubiprefix = "http://erp.gunyangitt.com:8090/ubi4/ubihtml.jsp";
-        
+
         //ubiprefix = "http://localhost:8090/ubi4/ubihtml.jsp";
         break;
     case "dev" :
@@ -138,7 +138,7 @@ var openModal = function(url, width, height, title, paramObj, callback) {
         }
     }, function () {
     	var targetEl = this.$["body-frame"];
-    	$.get(url, function(data) {    	        
+    	$.get(url, function(data) {
     		targetEl.append(data);
       	});
     });
@@ -172,7 +172,7 @@ var openSecondModal = function(url, width, height, title, paramObj, callback) {
         }
     }, function () {
     	var targetEl = this.$["body-frame"];
-    	$.get(url, function(data) {    	        
+    	$.get(url, function(data) {
     		targetEl.append(data);
       	});
     });
@@ -206,17 +206,17 @@ var openThirdModal = function(url, width, height, title, paramObj, callback) {
         }
     }, function () {
     	var targetEl = this.$["body-frame"];
-    	$.get(url, function(data) {    	        
+    	$.get(url, function(data) {
     		targetEl.append(data);
       	});
     });
 };
 
 function parseJwt(token) {
-	
+
 	console.log('parseJwt !!!');
 	if(token == null) {
-		if(location.href.search("/static/index.html") != -1  || location.href.search("/static/mobile/index.html") != -1 )  {			
+		if(location.href.search("/static/index.html") != -1  || location.href.search("/static/mobile/index.html") != -1 )  {
 			return;
 		}else{
 			if(isMobile()){
@@ -224,7 +224,7 @@ function parseJwt(token) {
 			}else{
 				location.href = "/static/index.html";
 			}
-		}		
+		}
 	}
     var base64Url = token.split('.')[1];
     var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -253,7 +253,7 @@ function checkGridRow(grid, type){
 		alert("선택된 데이터가 없습니다.");
 		isValid = false;
 	}
-	
+
 	if(type == "single"){
 		if(grid.getList("selected").length > 1){
 			alert("한건 만 선택해주세요.");
@@ -293,7 +293,7 @@ function postAjax(url, data, contentType, callback) {
 					location.href = "/static/mobile/index.html";
 				}else{
 					location.href = "/static/index.html";
-				}        		
+				}
         	}
         }
 	});
@@ -328,7 +328,7 @@ function postAjaxSync(url, data, contentType, callback) {
 					location.href = "/static/mobile/index.html";
 				}else{
 					location.href = "/static/index.html";
-				}        		
+				}
         	}
         }
 	});
@@ -536,11 +536,11 @@ function addCommaStr(value) {
     let regExpPattern = new RegExp('([0-9])([0-9][0-9][0-9][,.])');
     let arrNumber = val.split('.');
     arrNumber[0] += '.';
-    
+
     do {
         arrNumber[0] = arrNumber[0].replace(regExpPattern, '$1,$2');
     } while (regExpPattern.test(arrNumber[0]));
-    
+
     // 입력시 소수점 밑 세자리수 제한을 위하여 substring(0, 3) 필요.
     return (arrNumber.length > 1) ? arrNumber[0] + arrNumber[1].substring(0, 3) : arrNumber[0].split('.')[0];
 }
@@ -571,7 +571,7 @@ function setMenuAuth() {
 		checkMenuAuth(data.accessList);
 	});
 }
-	
+
 function checkMenuAuth(accessList) {
 		var html = "";
 		var imgIdx = 1;
@@ -588,9 +588,9 @@ function checkMenuAuth(accessList) {
 			}
 		});
 		$('.menu').html(html);
-		
+
 		$.each(accessList, function(idx, item){
-			if(item.menuType == "HTML" && item.useYn == 'Y') { 
+			if(item.menuType == "HTML" && item.useYn == 'Y') {
 				html = '<dl><dd><a href="'+item.menuUrl+'" onclick="setCookie(\'menuSaveYn\', \''+item.saveYn+'\', 1); insertPgmHistory(\''+item.menuUrl+'\');">'+item.menuNm+'</a></dd></dl>';
 				//html = '<dl><dd><a href="'+item.menuUrl+'" onclick="insertPgmHistory(\''+item.menuUrl+'\');">'+item.menuNm+'</a></dd></dl>';
 				$("#"+item.upMenuId).append(html);
@@ -598,14 +598,14 @@ function checkMenuAuth(accessList) {
 		});
 	}
 
-//로그아웃 
+//로그아웃
 function logoutClick(){
 		deleteCookie("jwtToken");
 		deleteCookie("menuIdx");
 		location.href = "/";
 }
 
-//공통코드 검색 함수 
+//공통코드 검색 함수
 function setCommonSelect(selectArr){
 	$.each(selectArr, function(idx, elem){
 		var param = {
@@ -622,7 +622,7 @@ function setCommonSelect(selectArr){
 				optionHtml += item.codeNm;
 				optionHtml += '</option>';
 			});
-			$(elem).append(optionHtml);	
+			$(elem).append(optionHtml);
 		})
 	})
 }
@@ -634,10 +634,10 @@ function setCommonDiv(inputCd){
 		};
 		postAjaxSync("/admin/cm/cm05/selectChildCodeList", param , null,  function(data){
 			var inputHtml = '';
-			var codeList = data.childCodeList;	
+			var codeList = data.childCodeList;
 			var i = "CP";
-			var j = 0;	
-			   $.each(codeList, function (index, item){	
+			var j = 0;
+			   $.each(codeList, function (index, item){
 					j = j+1;
 					inputHtml += '<td style="border:0px;font-size:13px;">';
 					inputHtml += '<input type="radio" id="'+item.codeKind+j+'" name="'+item.codeKind+i+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
@@ -646,7 +646,7 @@ function setCommonDiv(inputCd){
 				});
 			   alert(inputHtml);
 				$(elem).append(inputHtml);
-			 
+
 		})
 	})
 }
@@ -656,12 +656,12 @@ function setCommonItem(inputCd){
 	$.each(inputCd, function(idx, elem){
 		var param = {
 			"codeKind" : $(elem).data('kind')
-		};		
+		};
 		postAjaxSync("/admin/cm/cm05/selectPtchildCodeList", param , null,  function(data){
 			var inputHtml = '';
-			var codeList = data.PtchildCodeList;	
+			var codeList = data.PtchildCodeList;
 			var i = "CP";
-			var j = 0;	
+			var j = 0;
 			$.each(codeList, function (index, item){
 				j = j+1;
 				inputHtml += '<tr>';
@@ -669,7 +669,7 @@ function setCommonItem(inputCd){
 				    inputHtml += ' ';
 				}else{
 				    inputHtml += '<th rowspan="'+item.subCnt+'">';
-				}	
+				}
 				inputHtml += item.midNm2;
 				inputHtml += '</th>';
 				inputHtml += '<td style="text-align:left;height:20px;">';
@@ -679,16 +679,16 @@ function setCommonItem(inputCd){
 				inputHtml += item.subNm;
 				inputHtml += '</td>';
 				inputHtml += '</tr>';
-			});	
+			});
 			if(i < 16){
-			  for (i; i < 15; i++) { 
+			  for (i; i < 15; i++) {
 				inputHtml += '<tr style="height:20px;">';
 				inputHtml += '<th> </th>';
 				inputHtml += '<td> </th>';
-				inputHtml += '</tr>'; 
+				inputHtml += '</tr>';
 			  }
 			}
-			$(elem).append(inputHtml);	
+			$(elem).append(inputHtml);
 		})
 	})
 }
@@ -815,7 +815,7 @@ String.prototype.zf = function(len){return "0".string(len - this.length) + this;
 Number.prototype.zf = function(len){return this.toString().zf(len);};
 
 
-// 양수만 입력 
+// 양수만 입력
 function naturalNumber(elem){
 	$(elem).val($(elem).val().replace(/[^0-9]/g,""));
 }
@@ -823,9 +823,9 @@ function naturalNumber(elem){
 
 // 날짜 입력 (hypen 없이 8숫자입력)
 function dateMask(elem){
-	
+
 	naturalNumber(elem);
-  
+
 	var date = elem.value;
 
     if (date == "" || date == null || date.length < 5) {
@@ -836,7 +836,7 @@ function dateMask(elem){
     var DataFormat = "";
     var RegPhonNum = "";
 
-    // 날짜 포맷(yyyy-mm-dd) 만들기 
+    // 날짜 포맷(yyyy-mm-dd) 만들기
     if (date.length <= 6) {
       DataFormat = "$1-$2"; // 포맷을 바꾸려면 이곳을 변경
       RegPhonNum = /([0-9]{4})([0-9]+)/;
@@ -848,7 +848,7 @@ function dateMask(elem){
     date = date.replace(RegPhonNum, DataFormat);
 
     elem.value = date;
-	
+
     // 모두 입력됐을 경우 날짜 유효성 확인
     if (date.length == 10) {
 
@@ -897,7 +897,7 @@ function insertPgmHistory(url) {
 		"pgmId" : url.substr(url.lastIndexOf("/")+1,9)
 	}
 	postAjax("/admin/cm/cm06/insertPgmHistory", formData, null, function(data){
-		
+
 	});
 }
 
@@ -906,12 +906,12 @@ function callReport(fileName, arg, width, height) {
 	url += "?file="+fileName;
 	url += "&arg="+encodeURIComponent(arg);
 	if (width ==""){
-		width = 900;	
+		width = 900;
 	}
 	if (height ==""){
-		height = 900;	
+		height = 900;
 	}
-	popCenter(url, "report", width, height, "yes");	
+	popCenter(url, "report", width, height, "yes");
 }
 
 function popCenter(url, name, width, height, scroll) {
@@ -935,7 +935,7 @@ function popCenter(url, name, width, height, scroll) {
 }
 
 // 주소창 파라미터 받기
-$.urlParam = function(name){  
+$.urlParam = function(name){
     var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
     if(results){
      return results[1] || 0;
@@ -1032,7 +1032,7 @@ function searchAndDelete(jstreeInstance, nodeId, topNode) {
 			}
 	    }
 	}
-}	
+}
 
 /**
  * input, textarea에 아래의 요소를 load 이벤트를 등록한다.
@@ -1059,11 +1059,11 @@ function initLoadForm(_form){
 				}
 				$(elem).on("keyup", function() {
 					$(elem).val(dataMaxLength($(elem).val(),data_maxlength));
-				});					
+				});
 			}
 		}
 	});
-	
+
 	$.each($(_form+"  input"), function (idx, elem) {
 		//date
 		if($(elem).is('[date]')){
@@ -1075,22 +1075,24 @@ function initLoadForm(_form){
 				var set_date = new Date(val_date).format("yyyy-MM-dd");//날짜검사.
 				$(elem).val(set_date);
 			}
-			var set_date = $(elem).attr('date');
-			if(isEmpty(set_date)){
-				$(elem).datepicker({
-					format : "yyyy-mm-dd",
-					language : "ko",
-					autoclose : true
-				});
-			}else {
-				$(elem).datepicker({
-					format : "yyyy-mm-dd",
-					language : "ko",
-					autoclose : true
-				}).datepicker("setDate", set_date);
+			else {
+				var set_date = $(elem).attr('date');
+				if(isEmpty(set_date)){
+					$(elem).datepicker({
+						format : "yyyy-mm-dd",
+						language : "ko",
+						autoclose : true
+					});
+				}else {
+					$(elem).datepicker({
+						format : "yyyy-mm-dd",
+						language : "ko",
+						autoclose : true
+					}).datepicker("setDate", set_date);
+				}
 			}
 		}
-		
+
 		//data-maxlength
 		if($(elem).is('[data-maxlength]')){
 			var data_maxlength = $(elem).attr('data-maxlength');
@@ -1100,7 +1102,7 @@ function initLoadForm(_form){
 				}
 				$(elem).on("keyup", function() {
 					$(elem).val(dataMaxLength($(elem).val(),data_maxlength));
-				});					
+				});
 			}
 		}
 
@@ -1183,7 +1185,7 @@ function initLoadForm(_form){
 				}
 			});
 		}
-	});	
+	});
 }
 
 //byte 크기만큼 입력
@@ -1194,7 +1196,7 @@ function dataMaxLength(value , maxLength){
 	if(byte_length > maxLength){
 		var hangul_length = get_hangul_length(value);//현재 한글수
 		var non_hangul_length = value.length - hangul_length;
-		max_hangul_length = Math.ceil(maxLength/3) + non_hangul_length; //최대 글자수 
+		max_hangul_length = Math.ceil(maxLength/3) + non_hangul_length; //최대 글자수
 		if(hangul_length > 0) {
 			//return value.substring(0,max_hangul_length-3);
 			var last_string = value.substring(value.length-1,value.length);
@@ -1207,7 +1209,7 @@ function dataMaxLength(value , maxLength){
 		}
 		return value.substring(0,maxLength);
 	}
-	
+
 	return value.substring(0,maxLength);
 }
 
@@ -1224,7 +1226,7 @@ function is_hangul_char(ch) {
 function get_hangul_length(text_val){
 	if(isEmpty(text_val)) return 0;
     const text_len = text_val.length;
-    
+
     let totalByte=0;
     for(let i=0; i<text_len; i++){
     	const each_char = text_val.charAt(i);
@@ -1283,7 +1285,7 @@ function loadFormData(_form, _data, _callback) {
 }
 
 /**
- * 화면 에서 검색 param return 
+ * 화면 에서 검색 param return
  * @param _form
  * @param _pageNo
  * @param _recordCnt
@@ -1319,7 +1321,7 @@ function getSearchParam(_form, _pageNo, _recordCnt){
 			}
 		}
 	});
-	
+
 	if(!isEmpty(_pageNo)){
 		resultParam["pageNo"] = _pageNo;
 	}
@@ -1353,18 +1355,18 @@ function exportJSONToExcel (_grid, _excelFileName = 'excel') {
 	// 엑셀 워크북 생성
 	let workbook = new ExcelJS.Workbook();
 	let worksheet = workbook.addWorksheet(_excelFileName+"Sheet1");
-	
+
 	// 헤더 스타일 설정
 	let headerFill = {
 		type: "pattern",
 		pattern: "solid",
 		fgColor: { argb: "C0C0C0" } // 그레이 색상
 	};
-	
+
 	let headerFont = {
 		color: { argb: "000000" } // 검은색 글자
 	};
-	
+
 	let headerBorder = {
 		top: { style: "thin" },
 		bottom: { style: "thin" },
@@ -1393,15 +1395,15 @@ function exportJSONToExcel (_grid, _excelFileName = 'excel') {
 		    worksheet.getColumn(outCellNo).width = cellWidth;
 		}
 	});
-	
+
 	// 데이터 삽입
 	for (let row = 0; row < _excelJsonData.length; row++) {
 		let key = Object.keys(_excelJsonData[row]);
 		var data = _excelJsonData[row];
-		
-		$.each(outFieldArr, function(col, cellKey) {		
+
+		$.each(outFieldArr, function(col, cellKey) {
 			let cell = worksheet.getCell(row + 2, col + 1);
-			let number = data[cellKey];	
+			let number = data[cellKey];
 			let lcCellKey = cellKey.toLowerCase();
 			if (lcCellKey.indexOf('qty') !== -1 || lcCellKey.indexOf('amt') !== -1 || lcCellKey.indexOf('seq') !== -1 || lcCellKey.indexOf('upr') !== -1
 				|| lcCellKey.indexOf('rate') !== -1 || lcCellKey.indexOf('cost') !== -1 || lcCellKey.indexOf('size') !== -1 || lcCellKey.indexOf('pct') !== -1) {
@@ -1416,10 +1418,10 @@ function exportJSONToExcel (_grid, _excelFileName = 'excel') {
 				cell.numFmt = '#,##0'; // 숫자 형식 지정
 				cell.alignment = { horizontal: 'right' }; // 오른쪽 정렬
 			}
-			cell.border = headerBorder;		
-			
+			cell.border = headerBorder;
+
 		});
-		
+
 		for (let col = 0; col < data.length; col++) {
 			if (outFieldArr.includes(col + 1)) { // outFieldArr 배열에 col 값이 있는지 확인
 				let cell = worksheet.getCell(row + 2, col + 1);
@@ -1427,24 +1429,24 @@ function exportJSONToExcel (_grid, _excelFileName = 'excel') {
 				cell.border = headerBorder;
 			}
 		}
-		
+
 		lastRow = row + 2;
 	}
-	
+
 	//Sum row 색성  ????필요할까?
 //	lastRow += 1
 //	let cell = worksheet.getCell(lastRow, 1);
 //	cell.value = '합계'
 //	cell.alignment = { horizontal: 'center' }; // 오른쪽 정렬
 //	worksheet.mergeCells(lastRow , 1, lastRow, 4);
-//	
+//
 //	let cell = worksheet.getCell(lastRow, 7);
 //	cell.value = { formula: 'SUM(A1:D1)' };
-	
+
 	// 파일 저장
 	workbook.xlsx.writeBuffer().then(function(buffer) {
 		let blob = new Blob([buffer], { type: "application/octet-stream" });
-		let dt = moment(new Date()).format('YYYYMMDD'); 
+		let dt = moment(new Date()).format('YYYYMMDD');
 		let excelFileName = _excelFileName + '_' + dt + '.xlsx';
 		if (window.navigator.msSaveBlob) {
 			// IE 10+
@@ -1456,5 +1458,5 @@ function exportJSONToExcel (_grid, _excelFileName = 'excel') {
 			link.click();
 		}
 	});
-	
+
 }

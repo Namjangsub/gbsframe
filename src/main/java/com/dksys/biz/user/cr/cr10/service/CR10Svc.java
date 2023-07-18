@@ -10,10 +10,10 @@ public interface CR10Svc {
   int selectLgistReqPageCount(Map<String, String> paramMap);
 
   List<Map<String, String>> selectLgistReqPageList(Map<String, String> paramMap);
-  
+
   List<Map<String, String>> selectSelesCdList(Map<String, String> paramMap);
 
-  List<Map<String, String>> selectBuyBomList(Map<String, String> paramMap);
+  List<Map<String, String>> selectSelesCdViewList(Map<String, String> paramMap);
 
   List<Map<String, String>> selectLgistSalesCdList(Map<String, String> paramMap);
 
@@ -24,5 +24,5 @@ public interface CR10Svc {
   int updateLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
   int deleteLgistMast(Map<String, String> paramMap) throws Exception;
-  
+
 }

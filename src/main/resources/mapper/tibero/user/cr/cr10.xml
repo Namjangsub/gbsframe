@@ -12,6 +12,11 @@
         	 ,(SELECT LISTAGG(SALES_CD, ' , ') WITHIN GROUP (ORDER BY SALES_CD ASC) FROM TB_CR11D01 WHERE FILE_TRGT_KEY = T.FILE_TRGT_KEY) AS SALES_CD_LIST
         	 ,CASE WHEN FILE_TRGT_KEY IS NULL THEN '' ELSE (SELECT COUNT(*) FROM TB_CR11D01 WHERE FILE_TRGT_KEY = T.FILE_TRGT_KEY) END AS SALES_CD_CNT
         	 ,REGEXP_REPLACE(SYS_CONNECT_BY_PATH(T.LOWER_CD, ' -> '), '^\s+\-\>\s+', '') AS PATH
+			 ,CASE WHEN FILE_TRGT_KEY IS NULL THEN '' ELSE (  SELECT CASE WHEN COUNT(*) = 0 THEN 'N' ELSE 'Y' END CF_YN
+																FROM TB_WB20M01
+																WHERE TODO_DIV1_CODE_ID = T.TODO_DIV1_CODE_ID
+																  AND TODO_DIV2_CODE_ID = T.TODO_DIV2_CODE_ID
+																  AND TODO_CF_DT IS NOT NULL) END AS APP_PROGESS_YN
 		  FROM (
 		  	 	/* top -> 회사*/
                 SELECT 'top' AS UPPER_CD
@@ -57,7 +62,8 @@
 						, '' AS SHIPMNT_DT
 						, '' AS HOPE_ARVL_DT
 						, '' AS LGIST_RMK
-						, '' AS TODO_KEY
+						, '' AS TODO_DIV1_CODE_ID
+						, '' AS TODO_DIV2_CODE_ID
                   FROM DUAL
            UNION ALL
          		/* top -> 회사 -> 고객사 */
@@ -105,7 +111,8 @@
 						, '' AS SHIPMNT_DT
 						, '' AS HOPE_ARVL_DT
 						, '' AS LGIST_RMK
-						, '' AS TODO_KEY
+						, '' AS TODO_DIV1_CODE_ID
+						, '' AS TODO_DIV2_CODE_ID
                   FROM TB_CR02D02 X
                         INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
                                                 AND X.ORDRS_NO = Y.ORDRS_NO
@@ -158,7 +165,8 @@
 						, '' AS SHIPMNT_DT
 						, '' AS HOPE_ARVL_DT
 						, '' AS LGIST_RMK
-						, '' AS TODO_KEY
+						, '' AS TODO_DIV1_CODE_ID
+						, '' AS TODO_DIV2_CODE_ID
                   FROM TB_CR02D02 X
                         INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
                                                 AND X.ORDRS_NO = Y.ORDRS_NO
@@ -168,7 +176,7 @@
 				   AND NVL(Y.CLNT_PJT, '.') LIKE '%'||#{clntPjt}||'%'
            UNION ALL
                 /* top -> 고객사 -> 수주번호 -> 물류번호 */
-								SELECT   T.ORDRS_NO AS UPPER_CD
+				 SELECT   T.ORDRS_NO AS UPPER_CD
 						, T.ORDRS_NO||'-'||TRIM(TO_CHAR(ROW_NUMBER() OVER(PARTITION BY T.ORDRS_NO ORDER BY T.ORDRS_NO, T.FILE_TRGT_KEY),'0000')) AS LOWER_CD
 						, T.CO_CD
 						, T.ORDRS_NO
@@ -213,7 +221,8 @@
 						, T.SHIPMNT_DT
 						, T.HOPE_ARVL_DT
 						, T.LGIST_RMK
-						, T.TODO_KEY
+						, T.TODO_DIV1_CODE_ID
+						, T.TODO_DIV2_CODE_ID
                  FROM TB_CR11M01 T
                  LEFT OUTER JOIN TB_CR02M01 A ON T.CO_CD = A.CO_CD AND T.ORDRS_NO = A.ORDRS_NO
                  LEFT OUTER JOIN TB_BM02M01 B ON A.ORDRS_CLNT_CD = B.CLNT_CD
@@ -250,7 +259,7 @@
         ) A
         WHERE RNUM BETWEEN #{firstIndex} AND #{lastIndex}
 	</select>
-	
+
 	<select id="selectSelesCdList" parameterType="Map" resultType="camelMap">
        SELECT '' AS DTA_CHK,
        		  X.CO_CD,
@@ -279,6 +288,37 @@
                LEFT OUTER JOIN TB_CR11D01 T ON X.SALES_CD = T.SALES_CD AND T.FILE_TRGT_KEY = #{fileTrgtKey}
 		WHERE X.CO_CD = #{coCd}
 		  AND X.ORDRS_NO = #{ordrsNo}
+	</select>
+
+	<select id="selectSelesCdViewList" parameterType="Map" resultType="camelMap">
+       SELECT '' AS DTA_CHK,
+       		  X.CO_CD,
+              X.ORDRS_NO,
+              X.SALES_CD,
+              X.ORDRS_NO, -- 수주번호
+              X.SALES_CD, -- SALES CODE
+              #{fileTrgtKey} AS FILE_TRGT_KEY,
+              T.SALES_SEQ,
+              CASE WHEN T.SALES_SEQ IS NOT NULL THEN 'Y'
+              ELSE 'N' END AS CHK_YN,
+              Y.ORDRS_CLNT_CD, -- 고객사
+              A.CLNT_NM  AS ORDRS_CLNT_NM,
+              Y.CLNT_PJT, -- 고객사 PJT
+              FN_CM05M01_CD_TO_NM(X.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM, -- 신작구분
+              X.PRDT_CD, -- 제품구분
+              P.PRDT_NM  PRDT_CD_NM,
+              X.ITEM_DIV, -- 아이템구분
+              FN_CM05M01_CD_TO_NM(X.ITEM_DIV) ITEM_DIV_NM,
+              X.EQP_NM -- 설비명
+         FROM TB_CR02D02 X
+               INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
+                                       AND X.ORDRS_NO = Y.ORDRS_NO
+               LEFT OUTER JOIN TB_BM01M01 P ON X.PRDT_CD = P.PRDT_CD  --제품마스터
+               LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터
+               LEFT OUTER JOIN TB_CR11D01 T ON X.SALES_CD = T.SALES_CD AND T.FILE_TRGT_KEY = #{fileTrgtKey}
+		WHERE X.CO_CD = #{coCd}
+		  AND X.ORDRS_NO = #{ordrsNo}
+		  AND T.FILE_TRGT_KEY = #{fileTrgtKey}
 	</select>
 
 	<select id="selectLgistMastInfo" resultType="camelMap">
@@ -318,7 +358,13 @@
 		, SHIPMNT_DT
 		, HOPE_ARVL_DT
 		, LGIST_RMK
-		, TODO_KEY
+		, TODO_DIV1_CODE_ID
+		, TODO_DIV2_CODE_ID
+		, (SELECT CASE WHEN COUNT(*) = 0 THEN 'N' ELSE 'Y' END CF_YN
+			FROM TB_WB20M01
+			WHERE TODO_DIV1_CODE_ID = T.TODO_DIV1_CODE_ID
+			  AND TODO_DIV2_CODE_ID = T.TODO_DIV2_CODE_ID
+			  AND TODO_CF_DT IS NOT NULL) AS APP_PROGESS_YN
 		, FN_CM05M01_CD_TO_NM(CLAS_DIV) AS CLAS_DIV_NM
 		, FN_CM05M01_CD_TO_NM(TRNS_DIV) AS TRNS_DIV_NM
 		, FN_CM05M01_CD_TO_NM(DMS_TRNS_AREA_DIV) AS DMS_TRNS_AREA_DIV_NM
@@ -341,12 +387,12 @@
         , TO_CHAR(T.UDT_DTTM, 'YYYY-MM-DD') UDT_DTTM
 		FROM TB_CR11M01 T
 	  WHERE FILE_TRGT_KEY = #{fileTrgtKey, jdbcType=VARCHAR}
-  </select>
+	</select>
 
 
-  <select id="selectFileTrgtKeyNext" parameterType="Map" resultType="String">
+	<select id="selectFileTrgtKeyNext" parameterType="Map" resultType="String">
 		SELECT TO_NUMBER(NVL(MAX(FILE_TRGT_KEY),'0')) + 1 FROM TB_CR11M01
-  </select>
+	</select>
 
     <insert id="insertLgistMast" parameterType="Map">
         INSERT INTO TB_CR11M01
@@ -384,7 +430,6 @@
 		, SHIPMNT_DT
 		, HOPE_ARVL_DT
 		, LGIST_RMK
-		, TODO_KEY
         , ETC_FIELD1
         , ETC_FIELD2
         , ETC_FIELD3
@@ -427,7 +472,6 @@
 		, #{shipmntDt, jdbcType=VARCHAR}
 		, #{hopeArvlDt, jdbcType=VARCHAR}
 		, #{lgistRmk, jdbcType=VARCHAR}
-		, #{todoKey, jdbcType=VARCHAR}
         , #{etcField1, jdbcType=VARCHAR}
         , #{etcField2, jdbcType=VARCHAR}
         , #{etcField3, jdbcType=VARCHAR}
@@ -472,7 +516,6 @@
 			, SHIPMNT_DT = #{shipmntDt, jdbcType=VARCHAR}
 			, HOPE_ARVL_DT = #{hopeArvlDt, jdbcType=VARCHAR}
 			, LGIST_RMK = #{lgistRmk, jdbcType=VARCHAR}
-			, TODO_KEY = #{todoKey, jdbcType=VARCHAR}
             , ETC_FIELD1    = #{etcField1, jdbcType=VARCHAR}
             , ETC_FIELD2    = #{etcField2, jdbcType=VARCHAR}
             , ETC_FIELD3    = #{etcField3, jdbcType=VARCHAR}
@@ -486,7 +529,7 @@
 	  DELETE TB_CR11M01
 	   WHERE FILE_TRGT_KEY = #{fileTrgtKey}
 	</delete>
-	
+
     <insert id="insertLgistSalesCd" parameterType="Map">
         <selectKey keyProperty="salesSeq" resultType="int" order="BEFORE">
 			SELECT NVL(MAX(SALES_SEQ), 0) + 1 FROM TB_CR11D01
@@ -515,7 +558,7 @@
         , SYSDATE
         )
     </insert>
-	
+
     <update id="updateLgistSalesCd" parameterType="Map">
         UPDATE TB_CR11D01
         SET   SALES_CD 			= #{salesCd, jdbcType=VARCHAR}
@@ -540,35 +583,102 @@
 	  WHERE FILE_TRGT_KEY = #{fileTrgtKey}
 	</delete>
 
-
-
-
-
-
-
-
-
-	<!-- 구매 BOM 조회 -->
-	<select id="selectBuyBomList" resultType="CamelMap">
-		SELECT LEVEL - 1 AS LVL
-			, T.FILE_TRGT_KEY
-			, T.CO_CD
-			, T.SALES_CD
-			, T.PART_NO
-			, T.UNIT_NO
-			, T.REV_NO
-			, T.DSGN_NO
-			, T.UPPER_CD
-			, T.LOWER_CD
-			, T.PART_NO AS OLD_PART_NO
-			, T.UNIT_NO AS OLD_UNIT_NO
-			, T.REV_NO AS OLD_REV_NO
-			, T.LOWER_CD AS OLD_LOWER_CD
-		FROM TB_CR11M01 T
-		START WITH T.UPPER_CD = '.' AND T.SALES_CD = #{salesCd}
-		CONNECT BY PRIOR T.LOWER_CD = T.UPPER_CD
-		ORDER BY T.CO_CD, NVL(T.PART_NO,'0'), NVL(T.UNIT_NO,'0'), NVL(T.REV_NO,'0'),T.LOWER_CD, T.UPPER_CD
+	<!-- 결재요청 목록 조회 -->
+	<select id="selectTodoAppReqList" resultType="CamelMap">
+		SELECT CO_CD
+			, A.APP_DIV AS TODO_DIV1_CODE_ID
+			, A.APP_DIV||TRIM(TO_CHAR(#{fileTrgtKey},'00000')) AS TODO_DIV2_CODE_ID
+			, APP_ID AS TODO_ID
+			, '' AS PG_PATH
+			, '' AS PG_PARAM
+			, '' AS SALES_CD
+			, '' AS WBS_PLANCO_CD
+			, '' AS WBS_PLAN_NO
+			, '' AS WBS_PLAN_CODE_KIND
+			, '' AS WBS_PLAN_CODE_ID
+			, '' AS WBS_RSLTS_FILE_TRGT_KEY
+			, '' AS WBS_RSLTS_CO_CD
+			, '' AS WBS_RSLTS_PLAN_NO
+			, '' AS WBS_RSLTS_PLAN_CODE_KIND
+			, '' AS WBS_RSLTS_PLAN_CODE_ID
+			FROM TB_BM13M01 A
+		WHERE CO_CD = #{coCd}
+		AND APP_DIV = #{appDiv}
+		ORDER BY APP_SEQ
 	</select>
+
+	<!-- ToDoList 등록  -->
+    <insert id="insertTodoAppList" parameterType="Map">
+        <selectKey keyProperty="todoKey" resultType="int" order="BEFORE">
+			SELECT NVL(MAX(TODO_KEY), 0) + 1 FROM TB_WB20M01
+        </selectKey>
+        INSERT INTO TB_WB20M01
+        ( TODO_KEY
+		, CO_CD
+		, TODO_DIV1_CODE_ID
+		, TODO_DIV2_CODE_ID
+		, TODO_ID
+		, PG_PATH
+		, PG_PARAM
+		, SALES_CD
+		, WBS_PLANCO_CD
+		, WBS_PLAN_NO
+		, WBS_PLAN_CODE_KIND
+		, WBS_PLAN_CODE_ID
+		, WBS_RSLTS_FILE_TRGT_KEY
+		, WBS_RSLTS_CO_CD
+		, WBS_RSLTS_PLAN_NO
+		, WBS_RSLTS_PLAN_CODE_KIND
+		, WBS_RSLTS_PLAN_CODE_ID
+		, ETC_FIELD1
+		, ETC_FIELD2
+		, ETC_FIELD3
+		, CREAT_ID
+		, CREAT_PGM
+		, CREAT_DTTM
+        )
+        VALUES
+        ( #{todoKey}
+        , #{coCd}
+        , #{todoDiv1CodeId}
+        , #{todoDiv2CodeId}
+        , #{todoId}
+        , #{pgPath, jdbcType=VARCHAR}
+        , #{pgParam, jdbcType=VARCHAR}
+        , #{salesCd, jdbcType=VARCHAR}
+        , #{wbsPlancoCd, jdbcType=VARCHAR}
+        , #{wbsPlanNo, jdbcType=VARCHAR}
+        , #{wbsPlanCodeKind, jdbcType=VARCHAR}
+        , #{wbsPlanCodeId, jdbcType=VARCHAR}
+        , #{wbsRsltsFileTrgtKey, jdbcType=VARCHAR}
+        , #{wbsRsltsCoCd, jdbcType=VARCHAR}
+        , #{wbsRsltsPlanNo, jdbcType=VARCHAR}
+        , #{wbsRsltsPlanCodeKind, jdbcType=VARCHAR}
+        , #{wbsRsltsPlanCodeId, jdbcType=VARCHAR}
+        , #{etcField1, jdbcType=VARCHAR}
+        , #{etcField2, jdbcType=VARCHAR}
+        , #{etcField3, jdbcType=VARCHAR}
+        , #{userId}
+        , #{pgmId}
+        , SYSDATE
+        )
+    </insert>
+
+    <update id="updateLgistMastTodoApp" parameterType="Map">
+        UPDATE TB_CR11M01
+        SET   TODO_DIV1_CODE_ID = #{todoDiv1CodeId, jdbcType=VARCHAR}
+            , TODO_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
+            , UDT_ID        = #{userId, jdbcType=VARCHAR}
+            , UDT_PGM       = #{pgmId, jdbcType=VARCHAR}
+            , UDT_DTTM      = SYSDATE
+        WHERE FILE_TRGT_KEY = #{fileTrgtKey, jdbcType=VARCHAR}
+    </update>
+
+
+
+
+
+
 
 	<!-- BOM 자재정보 조회 -->
 	<select id="selectLgistSalesCdList" resultType="CamelMap">
@@ -636,5 +746,5 @@
 
 
 
-  
+
 </mapper>

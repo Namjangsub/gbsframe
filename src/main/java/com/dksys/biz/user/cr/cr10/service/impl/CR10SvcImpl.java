@@ -1,6 +1,7 @@
 package com.dksys.biz.user.cr.cr10.service.impl;
 
 import java.lang.reflect.Type;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -49,8 +50,8 @@ public class CR10SvcImpl implements CR10Svc {
   }
 
   @Override
-  public List<Map<String, String>> selectBuyBomList(Map<String, String> paramMap) {
-    return cr10Mapper.selectBuyBomList(paramMap);
+  public List<Map<String, String>> selectSelesCdViewList(Map<String, String> paramMap) {
+    return cr10Mapper.selectSelesCdViewList(paramMap);
   }
 
   @Override
@@ -111,6 +112,30 @@ public class CR10SvcImpl implements CR10Svc {
 		}
 		//---------------------------------------------------------------
 		//첨부 화일 처리  끝
+		//---------------------------------------------------------------
+
+		//---------------------------------------------------------------
+		//결재 처리 시작
+		//---------------------------------------------------------------
+	    List<Map<String, String>> reqList = cr10Mapper.selectTodoAppReqList(paramMap);
+	    List<Map<String, String>> toDoAppList = gsonDtl.fromJson(reqList.toString(), dtlMap);
+	    DecimalFormat df = new DecimalFormat("00000");
+	    int numKey = Integer.valueOf(paramMap.get("fileTrgtKey"));
+	    String todoDiv2CodeId = paramMap.get("appDiv")+df.format(numKey);
+	    for (Map<String, String> dtl : toDoAppList) {
+	    	dtl.put("userId", paramMap.get("userId"));
+	    	dtl.put("pgmId", paramMap.get("pgmId"));
+	    	dtl.put("pgPath", paramMap.get("pgPath"));
+	    	dtl.put("pgParam", paramMap.get("pgParam"));
+	    	dtl.put("todoDiv2CodeId", todoDiv2CodeId);
+	    	cr10Mapper.insertTodoAppList(dtl);
+	    }
+
+	    paramMap.put("todoDiv1CodeId", paramMap.get("appDiv"));
+	    paramMap.put("todoDiv2CodeId", todoDiv2CodeId);
+	    cr10Mapper.updateLgistMastTodoApp(paramMap);
+		//---------------------------------------------------------------
+		//결재 처리  끝
 		//---------------------------------------------------------------
 
 	    return result;
@@ -188,7 +213,7 @@ public class CR10SvcImpl implements CR10Svc {
 	//첨부 화일 처리  끝
 	//---------------------------------------------------------------
 
-     return result;
+    return result;
   }
 
   @Override

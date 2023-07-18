@@ -39,7 +39,7 @@
 			</td>
 			<th class="hit">고객사PJT</th>
 			<td>
-				<input type="text" id="clntPjt" name="clntPjt" msg="고객사PJT" class="form-control" readonly="readonly" required> 
+				<input type="text" id="clntPjt" name="clntPjt" msg="고객사PJT" class="form-control" readonly="readonly" required>
 			</td>
         </tr>
 
@@ -48,7 +48,7 @@
 			<td>
 	             <input type="hidden" id="reqId" name="reqId" msg="요청자">
 	             <div class="search_form">
-	                 <input type="text" id="reqIdNm" name="reqIdNm" msg="작성자" class="form-control" required>
+	                 <input type="text" id="reqIdNm" name="reqIdNm" msg="요청자" class="form-control" required>
 	                 <a onclick="openUserTree('reqId');">
 	                <i class="i_search_w"></i>
 	              </a></div>
@@ -73,7 +73,7 @@
 				<div style="width: 100%; height: 320px;margin-left:5px;">
 					<div class="add_btn pdl10" style="width: 100%;">
 						<span style="margin-right:93%;"></span>
-					    <a onclick="salescdGridView.setData(0)" style="width: 60px;">초기화</a>
+					    <a onclick="initSalesCode();" style="width: 60px;">초기화</a>
 					</div>
 	                <div data-ax5grid="salescd-grid" data-ax5grid-config="{}" style="height:280px; width: 99%;">
 	                </div>
@@ -232,7 +232,7 @@
 			</td>
 			<th>희망도착일</th>
 			<td>
-				<input id="hopeArvlDt" name="hopeArvlDt" class="input_calendar form-control" autocomplete="off" onkeyup="dateMask(this);"  msg="희망도착일" date>
+				<input id="hopeArvlDt" name="hopeArvlDt" class="input_calendar form-control" autocomplete="off" onkeyup="dateMask(this);" msg="희망도착일" date>
 			</td>
         </tr>
 
@@ -264,7 +264,10 @@
 <script type="text/javascript">
 	var actionType = null;
 	var fileTrgtKey = null;
-	
+
+	var appProgessYn = "N";// 결재 진행 유무
+	let loadData = {};
+
 	var salescdGridView = {
 			initView: function(){
 				this.target = new ax5.ui.grid();
@@ -281,7 +284,9 @@
 			        body: {
 			        	  //mergeCells : ["coCd","salesCd", "dsgnNo", "upperCd","lowerCd","ordrgDiv10"],
 			              onClick: function () {
-	  			               this.self.select(this.dindex);
+			            	  if(appProgessYn == "N"){
+	  			              	this.self.select(this.dindex);
+			            	  }
 	  			               //console.log("====>>",this.list);
 				          },
 				          onDBLClick: function () {
@@ -309,7 +314,7 @@
 			    });
 				return this;
 			},
-			
+
 			setData: function(_page){
 				var target = this.target;
 				/*
@@ -319,7 +324,7 @@
 					"fileTrgtKey": $("#fileTrgtKey").val(),
 				}
 				*/
-				
+
 				var formData = getSearchParam("#popForm");
 	    		postAjax("/user/cr/cr10/selectSelesCdList", formData, null, function(data) {
 					var list = data.resultList;
@@ -338,23 +343,19 @@
 	    	 	});
 			}
 		}
-	
+
 
 	$(document).ready(function() {
 		setCommonSelect($(".popup_area select[data-kind]"));
 		setByCoCd(modalStack.last().paramObj.coCd);
 		$("#popForm #userId").val(jwt.userId);
-		
+
 		authChk();						// 권한체크
 
 		actionType = modalStack.last().paramObj.actionType;
 		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
-		//$("#fileTrgtKey").val(fileTrgtKey);
-		//console.log("====actionType>>",actionType);
-		//console.log("====fileTrgtKey>>",fileTrgtKey);
-		
-		/*
-		let loadData = {
+
+		loadData = {
 				"fileTrgtKey" : modalStack.last().paramObj.fileTrgtKey,
 				"coCd" : modalStack.last().paramObj.coCd,
 				"ordrsNo" : modalStack.last().paramObj.ordrsNo,
@@ -364,30 +365,33 @@
 				"ordrsClntNm" : modalStack.last().paramObj.ordrsClntNm,
 				"ordrsClntCd" : modalStack.last().paramObj.ordrsClntCd,
 		};
-		*/
-		
-		loadFormData("#popForm", modalStack.last().paramObj);
-		
+
+		//loadFormData("#popForm", modalStack.last().paramObj);
+		if(actionType == "C"){
+			loadData.staPlace = modalStack.last().paramObj.staPlace; //출발장소를 기본 회사명으로.
+		}
+		loadFormData("#popForm", loadData);
+
 		/**
 		 * grid 초기화
 		*/
 		salescdGridView.initView().setData(0);
-	    
+
 		if (actionType == "C") {
 			$("#actionBtn").text("등록");
 			$('#actionBtn').on("click", function() {
 				insertLgistMast();
 			});
-			
+
 			$('#trnsDiv').trigger('change');
 
 			//initLoadForm("#popForm");
 			//initLoadForm(".popup_area");//input,select,textarea 기능활성화
-			
+
 		} else if (actionType == "U") {
-		    
+
 			$('.tit').text('물류진행요청 수정')
-			
+
 			selectLgistMastInfo();
 
 			$('#actionBtn').text("수정");
@@ -395,21 +399,21 @@
 				updateLgistMast();
 			});
 		}
-		
-		//---------------------------------------------------------------  
-		//첨부 화일 처리 시작 
-		//---------------------------------------------------------------  
+
+		//---------------------------------------------------------------
+		//첨부 화일 처리 시작
+		//---------------------------------------------------------------
 		fileParam = {
 				fileTrgtTyp	: $("#pgmId").val(),
 				fileTrgtKey		:fileTrgtKey
 		}
   		treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
-		//---------------------------------------------------------------  
+		//---------------------------------------------------------------
 		//첨부 화일 처리 끝
-		//---------------------------------------------------------------  
+		//---------------------------------------------------------------
 		$(".fileList_height").hide();//없으면 버튼 안나옴.
 	});
-	
+
 	function trnsDivChangeSetValue(){
 		var trnsDiv_value = $("#trnsDiv").val();
 		if(trnsDiv_value == "LGISTDIV0301"){
@@ -425,18 +429,18 @@
 			$("select[name=dmsPackKindDiv]").val("");
 		}
 	}
-	
+
 	//운송구분이 바뀔때 값셋팅
 	function trnsDivChange(_value) {
 		if(_value == "LGISTDIV0301") { //국내
 			$('#dmsTran').show();
 			$('#ovsTran').hide();
-			
+
 			$(".dmsClass").addClass('hit');
 			$("select[name=dmsTrnsAreaDiv]").attr('required', 'required');
 			$("select[name=dmsSendCndDiv]").attr('required', 'required');
 			$("select[name=dmsPackKindDiv]").attr('required', 'required');
-			
+
 			$(".ovsClass").removeClass('hit');
 			$("select[name=ovsTrnsAreaDiv]").removeAttr('required');
 			$("select[name=ovsSendCndDiv]").removeAttr('required');
@@ -445,7 +449,7 @@
 		else if(_value == "LGISTDIV0302") { //해외
 			$('#dmsTran').hide();
 			$('#ovsTran').show();
-			
+
 			$(".dmsClass").removeClass('hit');
 			$("select[name=dmsTrnsAreaDiv]").removeAttr('required');
 			$("select[name=dmsSendCndDiv]").removeAttr('required');
@@ -460,7 +464,7 @@
 			$('#ovsTran').hide();
 			changeSetEtc("x","dmsSendCndDiv");
 			changeSetEtc("x","ovsSendCndDiv");
-			
+
 			$(".dmsClass").removeClass('hit');
 			$("select[name=dmsTrnsAreaDiv]").removeAttr('required');
 			$("select[name=dmsSendCndDiv]").removeAttr('required');
@@ -471,7 +475,7 @@
 			$("select[name=ovsPackKindDiv]").removeAttr('required');
 		}
 	}
-	
+
 	//기타입력
 	function changeSetEtc(_value,_name){
 		if(!isEmpty(_value) && _value.indexOf("99") != -1){//기타
@@ -486,19 +490,19 @@
 			//$('#popForm .'+_name).removeClass('hit');
 		}
 	}
-	
+
 
 	//Sales Code 필수 변경
 	function selectSalesCodeSet() {
 		if ($('#workRptS').find('option:selected').data('etc') === 'Y') {
 			$('#popForm .Sales_Code').addClass('hit');
-			$('#popForm input#salesCd').attr('required', 'required');			
+			$('#popForm input#salesCd').attr('required', 'required');
 		} else {
 			$('#popForm .Sales_Code').removeClass('hit');
 			$('#popForm input#salesCd').removeAttr('required');
 		}
-	}		
-	
+	}
+
 	function selectLgistMastInfo() {						//그리드에 뿌리는 데이터
 		var formData = {
 			"fileTrgtKey" : fileTrgtKey,
@@ -509,11 +513,17 @@
 				//발송조건구분기타 활성/비활성
 				changeSetEtc(data.dmsSendCndDiv,"dmsSendCndDiv");
 				changeSetEtc(data.ovsSendCndDiv,"ovsSendCndDiv");
+
+				appProgessYn = data.appProgessYn;
+				if(appProgessYn == "Y"){
+					//결재중 일때 화면잠금.
+					setDisplayLock();
+				}
 			});
 		});
 	}
 
-	 // 등록
+	// 등록
 	function insertLgistMast() {
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 			var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
@@ -530,6 +540,11 @@
 
 	// 수정
 	function updateLgistMast() {
+		if(appProgessYn == "Y"){
+			alert("결재진행중 입니다. 결재진행중인 내역은 수정 할 수 없습니다.");
+			return;
+		}
+
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 			var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성\
 			for (let key of formData.keys()) {
@@ -558,22 +573,22 @@
 			deleteHyphen(elem);
 		});
 		*/
-		
-		//formData 생성전 운송구분에 따라 필요없는값제거	
+
+		//formData 생성전 운송구분에 따라 필요없는값제거
 		trnsDivChangeSetValue();
-		
+
 		// 폼데이터 생성
 		var formData = new FormData($("#popForm")[0]);
-		//---------------------------------------------------------------  
+		//---------------------------------------------------------------
 		//  disabled 처리시 값 전송안됨 아래에서 폼데이터 추가
 		//---------------------------------------------------------------
 		formData.append("coCd", $('#coCd').val());
 		//formData.append("workRptNo", $('#workRptNo').val());
 		//formData.append("reqIdNm", $('#reqIdNm').val());
 		//formData.append("pblicteDt", $('#pblicteDt').val());
-		//---------------------------------------------------------------  
+		//---------------------------------------------------------------
 		//-------itemarr  --첨부화일 처리를 위한 부분 시작
-		//---------------------------------------------------------------  
+		//---------------------------------------------------------------
 		var ordrsClntCd = $("input[name=ordrsClntCd]").val();
 		// 유저아이디 추가
 		formData.append("userId", jwt.userId);
@@ -581,16 +596,16 @@
 		formData.append("prdtCd", "");			//첨부화일용
 		formData.append("itemCd", "");			//첨부화일용
 		formData.append("prjctCd","");			//첨부화일용
-		
+
 		//-------itemarr  --첨부화일 처리를 위한 부분 시작
 		formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용
-		
-		//---------------------------------------------------------------  
-        
-        //---------------------------------------------------------------  
+
+		//---------------------------------------------------------------
+
+        //---------------------------------------------------------------
 		var fileUploadArr = [];
 		var tempArr = [];
-		
+
 		tempArr = treeModule.getFileArr();
 		$.each(tempArr, function(idx, obj) {
 			if (obj.fileKey == 0) {
@@ -602,25 +617,61 @@
 
 		formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
 		formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
-		//---------------------------------------------------------------  
+		//---------------------------------------------------------------
 		//--첨부화일 처리를 위한 부분 끝
-		//--------------------------------------------------------------- 
-		
+		//---------------------------------------------------------------
+
 		let selected_list = salescdGridView.target.getList("selected"); //선택항목을 가져온다.
 		//let selected_list = JSON.parse(JSON.stringify(salescdGridView.target.list));
-		
+
 		//체크 항목을 chkYn = Y 로 셋팅
  		$.each($.extend({}, selected_list), function (idx, elem) {
 			elem.chkYn = "Y";
 			elem.dtaChk = "I";
 		});
-		
+
 		formData.append("salesCdArr", JSON.stringify(selected_list));
+
+		//---------------------------------------------------------------
+		//--결재 처리를 위한 부분 시작
+		//---------------------------------------------------------------
+		formData.append("appDiv", "APPDIV03");
+		formData.append("pgPath", "/static/html/user/cr/cr10/CR1001P02.html");
+		formData.append("pgParam", JSON.stringify(loadData));
+		//---------------------------------------------------------------
+		//--결재 처리를 위한 부분 끝
+		//---------------------------------------------------------------
 
 		return formData;
 	}
-	
-	
+
+	function initSalesCode(){
+		if(appProgessYn == "Y"){
+			return;
+		}
+		salescdGridView.setData(0);
+	}
+
+	function setDisplayLock(){
+		setDisabledInput("#popForm" , true);
+		$('.tit').text('물류진행요청 수정 (결재진행중)');
+
+		//$("#actionBtn").prop("disabled", true);
+	}
+
+	function setDisabledInput(_form , _status){
+		$.each($(_form+" input"), function (idx, elem) {
+			$(elem).prop("readonly", _status);
+		});
+		$.each($(_form+" textarea"), function (idx, elem) {
+			$(elem).prop("readonly", _status);
+		});
+		$.each($(_form+" select"), function (idx, elem) {
+			$(elem).prop("readonly", _status);
+			$(elem).prop("disabled", _status);
+		});
+	}
+
 	//  업체명 검색 //
 	function clntSearch() {
 		openSecondModal("/static/html/cmn/modal/clntSearch.html", 600, 420,
@@ -638,10 +689,10 @@
 // 					setMngInfo(paramObj);
 				});
 	}
-	
+
 	function openUserTree(_id) {
 		if($('#reqIdNm').prop("disabled")) return false;
-		
+
 		var paramObj = {
 			"coCd" : $('#coCd').val(),
 			"userId": $('#mngId').val(),
@@ -656,7 +707,7 @@
 // 			$("#deptId_S").val(checkedNode.parent);
 		});
 	}
-	
+
 	function setWorkRptHour(_value) {
 		var value = _value.replace(/[^0-9]/g,'');
 		if(value != "" && value > 24) {
@@ -665,9 +716,9 @@
 		}
 		return value;
 	}
-	
+
 	function setByCoCd(value) {
 		$('#coCd option:not([value="'+value+'"])').remove();
 	}
-	
+
 </script>

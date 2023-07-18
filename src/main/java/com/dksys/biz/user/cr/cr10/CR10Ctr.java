@@ -45,16 +45,15 @@ public class CR10Ctr {
 		return "jsonView";
 	}
 
-	//Bom 리스트
-	@PostMapping("/selectBuyBomList")
-	public String selectBuyBomList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> resultList = cr10Svc.selectBuyBomList(paramMap);
+	@PostMapping(value = "/selectSelesCdViewList")
+	public String selectSelesCdViewList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = cr10Svc.selectSelesCdViewList(paramMap);
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
 	}
 
 	// 자재 리스트 조회
-	@PostMapping("/selectLgistSalesCdList")
+	@PostMapping(value = "/selectLgistSalesCdList")
 	public String selectLgistSalesCdList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> resultList = cr10Svc.selectLgistSalesCdList(paramMap);
 		model.addAttribute("resultList", resultList);
