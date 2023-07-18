@@ -9,13 +9,9 @@ public interface SM03Svc {
 
 	// 발주 리스트 카운트	
 	int selectWareHousingListCount(Map<String, String> paramMap);
-	
-	int selectOrderListCount(Map<String, String> paramMap);	
-	
+		
 	List<Map<String, String>> selectWareHousingList(Map<String, String> paramMap);
-	
-	List<Map<String, String>> selectOrderList(Map<String, String> paramMap);	
-	
+		
 	List<Map<String, String>> selectWareHousingExcelList(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectWareHousingDetailList(Map<String, String> paramMap);			

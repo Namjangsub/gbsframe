@@ -38,19 +38,7 @@ public class SM03Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
-	
-	// 매입관리 발주 조회
-	@PostMapping(value = "/selectOrderList")
-	public String selectOrderList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = sm03Svc.selectOrderListCount(paramMap);
-		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		model.addAttribute("paginationInfo", paginationInfo);
-		List<Map<String, String>> result = sm03Svc.selectOrderList(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-	}	
-	
-	
+			
 	// 매입관리 발주 조회 엑셀
 	@PostMapping(value = "/selectWareHousingExcelList")
 	public String selectWareHousingExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
