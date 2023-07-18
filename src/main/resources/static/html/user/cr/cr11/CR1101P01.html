@@ -1,0 +1,658 @@
+<style>
+	.popup_bottom_btn {
+		bottom: 30px;
+	}
+</style>
+<div class="popup_area of_a" style="height: 100%;">
+	<div id="first-focus" class="tit_contents">
+		<h4 class="tit">실행원가 등록</h4>
+	</div>
+
+	<div id="overlay2" style="z-index: 100; display: none; position: absolute; width: 100%; height: 670px; top: 0; left: 0; background-color: rgba(0, 0, 0, 0); pointer-events: auto;"></div>
+
+	<div class="toggle-div" style="padding-left: 0;">
+		<div class="popup_table">
+			<form id="popForm">
+				<input type="hidden" id="fileTrgtKey" name="fileTrgtKey">
+				<input type="hidden" id="userId" name="userId">
+				<input type="hidden" id="pgmId" name="pgmId" value="CR1101M01">
+				<table>
+
+					<tr>
+						<th class="hit coCd">회사</th>
+						<td>
+							<select id="coCd" name="coCd" data-kind="CO" class="form-control input-sm" required msg="회사"></select>
+						</td>
+						<th>수주일자</th>
+						<td>
+							<input id="ordrsDt" name="ordrsDt" class="input_calendar form-control" autocomplete="off" onkeyup="dateMask(this);" date>
+						</td>
+						<th>고객사</th>
+						<td>
+							<input type="hidden" id="clntCd" name="clntCd" msg="고객사" readonly="readonly">
+							<input type="text" id="clntNm" name="clntNm" msg="고객사" readonly="readonly">
+						</td>
+						<th>고객사PJT</th>
+						<td>
+							<input type="hidden" id="clntPjtCd" name="clntPjtCd" msg="고객사PJT" readonly="readonly">
+							<input type="text" id="clntPjt" name="clntPjt" msg="고객사PJT" readonly="readonly">
+						</td>
+					</tr>
+					<tr>
+						<th>SalesCode</th>
+						<td>
+							<div class="search_form">
+								<input type="text" id="salesCd" name="salesCd" onkeyup="event.keyCode == 13 ? SalesCodeSearch() : ''">
+								<a onclick="SalesCodeSearch();"><i class="i_search_w"></i></a>
+							</div>
+						</td>
+						<th>제품구분</th>
+						<td>
+							<input type="text" id="prdtCd" name="prdtCd" readonly="readonly">
+							<input type="hidden" id="prdtNm" name="prdtNm" readonly="readonly">
+<!-- 							<input type="hidden" id="prdtCd" name="prdtCd" readonly="readonly"> -->
+<!-- 							<input type="text" id="prdtNm" name="prdtNm" readonly="readonly"> -->
+						</td>
+						<th>아이템구분</th>
+						<td>
+							<input type="hidden" id="itemDiv" name="itemDiv" readonly="readonly">
+							<input type="text" id="itemDivNm" name="itemDivNm" readonly="readonly">
+						</td>
+						<th>작업구분</th>
+						<td>
+							<input type="hidden" id="ordrsDtlDiv20" name="ordrsDtlDiv20" readonly="readonly">
+							<input type="text" id="ordrsDtlDiv20Nm" name="ordrsDtlDiv20Nm" readonly="readonly">
+						</td>
+					</tr>
+					<tr>
+						<th>자체구분</th>
+						<td>
+							<input type="hidden" id="ordrsDtlDiv30" name="ordrsDtlDiv30" readonly="readonly">
+							<input type="text" id="ordrsDtlDiv30Nm" name="ordrsDtlDiv30Nm" readonly="readonly">
+						</td>
+						<th>설비명</th>
+						<td colspan="5">
+							<input type="text" id="eqpNm" name="eqpNm" readonly="readonly">
+						</td>
+					</tr>
+				</table>
+			</form>
+		</div>
+	</div>
+
+	<br>
+	<!-- 콘텐츠 -->
+	<div class="contents">
+		<!-- 리스트 -->
+		<div class="ax5_grid">
+			<div>
+				<div data-ax5grid="first-grid-modal" data-ax5grid-config="{}" style="height:300px; width: 100%"></div>
+			</div>
+		</div>
+	</div>
+	
+	<br>
+	<!-- 공통 파일 영역 -->
+	<div id="fileList_area"></div>
+
+	<!-- 하단 버튼 -->
+	<div class="popup_bottom_btn">
+		<button type="button" id="actionBtn" authchk>등록</button>
+		<button type="button" class="close_btn" onclick="  modalStack.close();">닫기</button>
+	</div>
+</div>
+
+<script type="text/javascript">
+	//var isFirst = true;
+	var actionType  = null;
+	var fileTrgtKey = null;
+	//var detailArr   = []; // 상세 그리드내용
+
+
+	var ModalgridView = {
+		initView : function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				//frozenColumnIndex : 2,      //2개의 값이 화면에 고정된다. (회사/ salesCode)
+				showLineNumber    : true,   //라인 넘버 유무(1, 2, 3 ...)
+				//showRowSelector   : false,  //체크박스 유무
+				multipleSelect    : false,   //체크박스 멀티체크
+				sortable          : true,  //드래그해서 순서 바꿈
+				target : $('[data-ax5grid="first-grid-modal"]'),
+				header : {
+					align: "center",
+					selector: true
+				},
+
+				body: {
+					//columnHeight: 26, //컬럼 높이
+					mergeCells : ["coNm", "clntNm", "ordrsNo", "ordrsDt", "clntPjt"], //병합
+					onClick: function () {
+						var list = ModalgridView.target.getList("selected");
+                        $.each(list, function(idx, obj){
+                        	ModalgridView.target.select(obj.__index, {selected: false});
+                        });
+	                    this.self.select(this.dindex);
+					},
+					onDBLClick: function () {
+						//this.self.select(this.dindex);
+						//update_cr11_Modal("U");
+
+					},
+					onDataChanged: function () {
+						//changeCheck(this);
+					}
+				},
+
+				columns : [
+					{key: "rn"         , label: "No."        , align: "center", width: 60 , hidden: true},
+					{key: "fileTrgtKey", label: "파일대상KEY", align: "center", width: 50 , hidden: true},
+					{key: "coCd"       , label: "회사코드"   , align: "center", width: 70 , hidden: true},
+					{key: "coNm"       , label: "회사"       , align: "center", width: 80 , hidden: true},
+
+					{key: "clntCd"     , label: "고객사코드"     , align: "center", width: 100, hidden: true},
+					{key: "clntNm"     , label: "고객사"     , align: "left"  , width: 120, hidden: true},
+					{key: "ordrsNo"     , label: "수주번호"     , align: "left"  , width: 120, hidden: true},
+					{key: "ordrsDt"     , label: "수주일자"     , align: "center"  , width: 120, hidden: true},
+					{key: "clntPjt"    , label: "고객사PJT"  , align: "left"  , width: 80 , hidden: true},
+
+					{key: "salesCd"    , label: "SalesCode", align: "center", width: 110 , hidden: true},
+					{key: "prdtCd"     , label: "제품구분"    , align: "center", width: 80, hidden: true},
+					{key: "prdtNm"     , label: "제품구분"   , align: "center", width: 150, hidden: true},
+					{key: "itemDiv"    , label: "아이템구분" , align: "center", width: 100, hidden: true},
+					{key: "itemDivNm"  , label: "아이템구분" , align: "center", width: 100, hidden: true},
+					{key: "ordrsDtlDiv20"    , label: "작업구분" , align: "center", width: 100, hidden: true},
+					{key: "ordrsDtlDiv20Nm"    , label: "작업구분" , align: "center", width: 100, hidden: true},
+					{key: "ordrsDtlDiv30"  , label: "자체구분" , align: "center", width: 100, hidden: true},
+					{key: "ordrsDtlDiv30Nm" , label: "자체구분" , align: "center", width: 100, hidden: true},
+					{key: "eqpNm"      , label: "설비명"     , align: "left"  , width: 200, hidden: true},
+					{key: "ctrtNm"      , label: "계약명"     , align: "left"  , width: 200, hidden: true},
+					{key: "ordrsDiv"      , label: "수주구분"     , align: "left"  , width: 200, hidden: true},
+
+					{key: "execution"      , label: "실집행"     , align: "center", width: 70 , hidden: true, formatter: "useYn"},
+
+					{
+	                    label: "수주가(단위:천원)",columns: [
+
+	                        {
+	                            key: "ordrsPrcMach",
+	                            label: "기계PART",
+	                            align: "right",
+	                            width: 80,
+	                            //editor: {type: "number"},
+	                            formatter: "money"
+	                        },
+	                        {
+	                            key: "ordrsPrcElcty",
+	                            label: "전기PART",
+	                            align: "right",
+	                            width: 80,
+	                            //editor: {type: "number"},
+	                            formatter: "money"
+	                        },
+	                        {
+	                            key: "ordrsPrc", label: "합계", align: "right", width: 80,
+	                            formatter: function () {
+	                                color = '#0000FF';
+ 	                                const ordrsPrcMach = isNaN(parseFloat(this.item.ordrsPrcMach)) ? 0 : parseFloat(this.item.ordrsPrcMach);
+ 	                                const ordrsPrcElcty = isNaN(parseFloat(this.item.ordrsPrcElcty)) ? 0 : parseFloat(this.item.ordrsPrcElcty);
+ 	                                const sum = ordrsPrcMach + ordrsPrcElcty;
+	                                return '<div style="color: ' + color + '">' + sum.toLocaleString() + '</div>';
+	                            }
+	                        },
+
+	                    ]
+	                },
+	                //{key: "ordrsQty", label: "수량", align: "right", width: 60, editor: {type: "number"}},
+	                {key: "ordrsQty", label: "수량", align: "right", width: 60 },
+
+	                {
+	                    key: "estEpctMatPrc",
+	                    label: "견적 예상 재료비(단위:천원)",
+	                    align: "right",
+	                    width: 180,
+	                    //editor: {type: "number"},
+	                    formatter: "money"
+	                },
+
+	                {
+	                     label: "목표구매원가(단위:천원)", columns: [
+
+	                        {
+	                             label: "목표구매원가", columns: [{
+	                                key: "trgtPchsPcostMach",
+	                                label: "기계",
+	                                align: "right",
+	                                width: 80,
+	                                //editor: {type: "number"},
+	                                formatter: "money"
+	                            },
+	                                {
+	                                    key: "trgtPchsPcostElcty",
+	                                    label: "전기",
+	                                    align: "right",
+	                                    width: 80,
+	                                    //editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+	                                {
+	                                    key: "sum",
+	                                    label: "합계",
+	                                    align: "right",
+	                                    width: 80,
+	                                    formatter: function () {
+	                                        color = '#0000FF';
+ 	                                        const trgtPchsPcostMach = isNaN(parseFloat(this.item.trgtPchsPcostMach)) ? 0 : parseFloat(this.item.trgtPchsPcostMach);
+ 	                                        const trgtPchsPcostElcty = isNaN(parseFloat(this.item.trgtPchsPcostElcty)) ? 0 : parseFloat(this.item.trgtPchsPcostElcty);
+ 	                                        const sum = trgtPchsPcostMach + trgtPchsPcostElcty;
+	                                        return '<div style="color: ' + color + '">' + sum.toLocaleString() + '</div>';
+	                                    }
+	                                },
+	                                {
+	                                    key: "proportion",
+	                                    label: "비율",
+	                                    align: "right",
+	                                    width: 50,
+	                                    formatter: function () {
+	                                    	//수주가 합계
+	                                    	const ordrsPrc = isNaN(parseFloat(this.item.ordrsPrc)) ? 0 : parseFloat(this.item.ordrsPrc);
+	                                    	//목표구매원가 합계
+	                                    	const trgtPchsPcostMach = isNaN(parseFloat(this.item.trgtPchsPcostMach)) ? 0 : parseFloat(this.item.trgtPchsPcostMach);
+ 	                                        const trgtPchsPcostElcty = isNaN(parseFloat(this.item.trgtPchsPcostElcty)) ? 0 : parseFloat(this.item.trgtPchsPcostElcty);
+ 	                                        const sum = trgtPchsPcostMach + trgtPchsPcostElcty;
+ 	                                        //비율 계산
+	                                    	const proportion = ordrsPrc <= 0 ? 0 : sum / ordrsPrc * 100;
+	                                    	//리턴으로 데이터 넣어주기
+	                                    	return proportion.toLocaleString() + "%";
+	                                    }
+	                                },
+
+	                            ]
+	                        },
+	                        {
+	                             label: "자체가공 투입시 기계부문 목표원가", columns: [
+
+	                                {
+	                                    key: "trgtPchsPcostInHousePrcsn",
+	                                    label: "자체 가공",
+	                                    align: "right",
+	                                    width: 120,
+	                                    //editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+	                                {
+	                                    key: "machineValueAfterDeduction",
+	                                    label: "차감 후 기계값",
+	                                    align: "right",
+	                                    width: 120,
+	                                    formatter: function () {
+	                                        color = '#0000FF';
+	                                        const trgtPchsPcostMach = isNaN(parseFloat(this.item.trgtPchsPcostMach)) ? 0 : parseFloat(this.item.trgtPchsPcostMach);
+	                                        const trgtPchsPcostInHousePrcsn = isNaN(parseFloat(this.item.trgtPchsPcostInHousePrcsn)) ? 0 : parseFloat(this.item.trgtPchsPcostInHousePrcsn);
+	                                        const sum = trgtPchsPcostMach - trgtPchsPcostInHousePrcsn;
+	                                        return '<div style="color: ' + color + '">' + sum.toLocaleString() + '</div>';
+	                                    }
+	                                },
+	                            ]
+	                        }
+	                	]
+	                },
+
+	                {
+	                     label: "실집행 원가", columns: [
+	                    	{
+	                            label: "기계", columns: [
+	                                {
+	                                    key: "executionPcostMach",
+	                                    label: "정상",
+	                                    align: "right",
+	                                    width: 50,
+	                                    editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+	                                {
+	                                    key: "troubleMach",
+	                                    label: "장애",
+	                                    align: "right",
+	                                    width: 50,
+	                                    editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+	                                {
+	                                    key: "totalMach",
+	                                    label: "합계",
+	                                    align: "right",
+	                                    width: 50,
+	                                    //editor: {type: "number"},
+	                                    formatter: "money"
+	                                    
+	                                    
+	                                },
+	                                {
+	                                    key: "proportionMach",
+	                                    label: "비율",
+	                                    align: "right",
+	                                    width: 50,
+	                                    //editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+
+	                            ]
+	                        },
+	                        {
+	                             label: "전기", columns: [
+	                                {
+	                                    key: "executionPcostElcty",
+	                                    label: "정상",
+	                                    align: "right",
+	                                    width: 50,
+	                                    editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+	                                {
+	                                    key: "troubleElcty",
+	                                    label: "장애",
+	                                    align: "right",
+	                                    width: 50,
+	                                    editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+	                                {
+	                                    key: "totalElcty",
+	                                    label: "합계",
+	                                    align: "right",
+	                                    width: 50,
+	                                    //editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+	                                {
+	                                    key: "cElcty",
+	                                    label: "비율",
+	                                    align: "right",
+	                                    width: 50,
+	                                    //editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+
+	                            ]
+	                        },
+	                        {
+	                             label: "구매/외주 종합계", columns: [
+	                                {
+	                                    key: "sumMachElcty",
+	                                    label: "TOTAL",
+	                                    align: "right",
+	                                    width: 50,
+	                                    //editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+	                                {
+	                                    key: "proportionSumMachElcty",
+	                                    label: "비율",
+	                                    align: "right",
+	                                    width: 50,
+	                                    //editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+
+	                            ]
+	                        },
+	                        {
+	                             label: "달성율", columns: [
+	                                {
+	                                    key: "achievementRate",
+	                                    label: "목표집행가",
+	                                    align: "right",
+	                                    width: 80,
+	                                    //editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+	                            ]
+	                        },
+	                        {
+	                             label: "노무비 및 제조경비(판관비 제외)", columns: [
+	                                {
+	                                    key: "laborCostMfgCost",
+	                                    label: "금액",
+	                                    align: "right",
+	                                    width: 180,
+	                                    //editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+	                            ]
+	                        },
+	                        {
+	                            label: "판관비", columns: [
+	                                {
+	                                    key: "SGAexpenses",
+	                                    label: "경비 및 관리비",
+	                                    align: "right",
+	                                    width: 100,
+	                                    editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+	                                {
+	                                    key: "CIR",
+	                                    label: "비율",
+	                                    align: "right",
+	                                    width: 50,
+	                                    //editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+
+	                            ]
+	                        },
+	                        {
+	                             label: "원가 총 합계(판관비 제외) ", columns: [
+	                                {
+	                                    key: "sumPcost",
+	                                    label: "TOTAL",
+	                                    align: "right",
+	                                    width: 100,
+	                                    //editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+	                                {
+	                                    key: "sumPcostProportion",
+	                                    label: "비율",
+	                                    align: "right",
+	                                    width: 50,
+	                                    //editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+
+	                            ]
+	                        },
+	                        {
+	                             label: "영업이익(판관비 포함)", columns: [
+	                                {
+	                                    key: "EBIT",
+	                                    label: "영엽이익",
+	                                    align: "right",
+	                                    width: 80,
+	                                    //editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+	                                {
+	                                    key: "EBITProportion",
+	                                    label: "비율",
+	                                    align: "right",
+	                                    width: 50,
+	                                    //editor: {type: "number"},
+	                                    formatter: "money"
+	                                },
+
+	                            ]
+	                        },
+	                    ]
+	                }
+				],
+				page: {
+	                navigationItemCount: 10,
+	                height: 30,
+	                display: true,
+	                firstIcon: '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+	                prevIcon: '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+	                nextIcon: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+	                lastIcon: '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+	                onChange: function () {
+	                	ModalgridView.setData(this.page.selectPage);
+	                }
+	            }
+			});
+			return this;
+		},
+
+		setData : function(_pageNo) {
+
+			//if (isFirst) return;
+			var targetObj = this.target; 
+
+			var coCd = $('#coCd').val();
+			
+			formData = {
+					"coCd": $('#coCd').val()
+			}
+			postAjax("/user/cr/cr11/grid1_selectList", formData, null, function(data) {
+				var list = data.result;
+				//debugger;
+				targetObj.setData({
+					list : list,
+					page : {
+						totalElements: list.length
+					}
+				});
+			});
+// 			if (inputValidation($('input[required]'))) { //셀렉터로 선택된 필수 입력 필드(input field)에 대한 유효성 검사를 수행
+// 				var formData = {};
+// 				$.each($('[data-search]'), function(idx, elem){// data-search를 가진 요소에 대해 반복문 실행
+// 					formData[$(elem).data("search")] = $(elem).val();
+// 				});
+// 				//formData 객체의 endDt 속성에 $("#endDt_S") 요소의 값(value)을 할당합니다.
+// 				//문자를 빈 문자열('')로 대체합니다.
+// 				formData["strtDt"]    = $("#strtDt_S").val().replace(/\-/g, '');
+// 				formData["endDt"]     = $("#endDt_S").val().replace(/\-/g, '');
+// 				formData["pageNo"]    = _pageNo + 1;
+// 				formData["recordCnt"] = $('#recordCnt').val();
+// 				//postAjax함수를 호출하여 서버에 AJAX POST 요청을 보낸다
+// 				postAjax("/user/cr/cr11/grid1_selectList", formData, null, function(data) {
+// 					//응답 데이터인 data 객체의 result 속성 값을 list 변수에 할당
+// 					var list = data.result;
+// 					//debugger;
+// 					targetObj.setData({
+// 						list : list,
+// 						page : {
+// 							currentPage   : _pageNo,
+// 							pageSize      : data.paginationInfo.pageSize,
+// 							totalElements : data.paginationInfo.totalRecordCount,
+// 							totalPages    : data.paginationInfo.totalPageCount
+// 						}
+// 					});
+// 				});
+//   			}
+  		}
+  	}
+
+	//화면로드시
+	$(document).ready(function() {
+		//mainDefaultLoad("영업관리", "실행원가 등록"); // 페이지 타이틀 설정
+		setCommonSelect($(".popup_area select[data-kind]"));// 공통코드 set
+		setByCoCd(modalStack.last().paramObj.coCd);
+
+		$("#popForm #userId").val(jwt.userId);
+
+		//일자
+		$('#ordrsDt').datepicker({
+			format : "yyyy-mm-dd",
+			language : "ko",
+			autoclose : true
+		}).datepicker("setDate", "today");
+
+
+		//그리드 초기화
+		ModalgridView.initView();
+
+  		//권한체크
+  		authChk();
+
+  		actionType = modalStack.last().paramObj.actionType;
+		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
+
+		if (actionType == "C") {
+
+		}else if (actionType == "U") {
+
+			//수정 모드 데이터 가져오기(해당 값 더블클릭시)
+			select_cr11_Info();
+
+			//버튼 클릭 시
+			$('#actionBtn').on("click", function() {
+				//update_cr11();
+			});
+		}
+		//---------------------------------------------------------------
+		//첨부 화일 처리 시작
+		//---------------------------------------------------------------
+		fileParam = {
+			fileTrgtTyp	: $("#pgmId").val(),
+			fileTrgtKey : fileTrgtKey
+		}
+
+		treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
+		//---------------------------------------------------------------
+		//첨부 화일 처리 끝
+		//---------------------------------------------------------------
+
+	});
+
+
+	// 팝업 그리드 조회
+	function Modal_DataSearch() {
+		ModalgridView.setData(0);
+	}
+
+	function setByCoCd(value) {
+		$('#coCd option:not([value="'+value+'"])').remove();
+	}
+
+	//그리드에 뿌리는 데이터
+	function select_cr11_Info() {
+		var formData = {
+			"fileTrgtKey" : fileTrgtKey,
+		}
+
+		postAjax("/user/cr/cr11/select_cr11_Info", formData, null, function(data) {
+			$.each(data.result, function(key, value) {
+				if ($('#popForm #' + key)[0]) {
+					$('#popForm #' + key).val(value);
+
+					if ($('#popForm #' + key).is('[comma]')) {
+						onlyNumber($('#popForm #' + key)[0]);
+					}
+				}
+			});
+		});
+		Modal_DataSearch()
+	}
+
+
+	//수정 버튼 클릭 시
+// 	function update_cr11_Modal() {
+// 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
+// 			var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
+
+// 			filePostAjax("/user/cr/cr11/CR1101P01.html", formData,function(data) {
+// 				alert(data.resultMessage);
+
+// 				if (data.resultCode == 200) {
+// 					gridView.setData(0);
+// 					modalStack.close();
+// 				}
+// 			});
+// 		}
+// 	}
+
+
+
+
+</script>
