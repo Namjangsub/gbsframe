@@ -57,6 +57,12 @@ public class CR11SvcImpl implements CR11Svc {
  	public List<Map<String, String>> grid1_selectList(Map<String, String> paramMap) {
  		return cr11Mapper.grid1_selectList(paramMap);
  	}
+ 	
+ 	//모달 그리드 조회 -수정화면 정보
+ 	@Override
+	public Map<String, String> select_cr11_Info(Map<String, String> paramMap) {
+		return cr11Mapper.select_cr11_Info(paramMap);
+	}
 
   
 

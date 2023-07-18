@@ -13,5 +13,6 @@ public interface CR11Svc {
 	// 그리드 리스트
 	List<Map<String, String>> grid1_selectList(Map<String, String> paramMap);
   
-
+	//모달 그리드 조회 -수정화면 정보
+	Map<String, String> select_cr11_Info(Map<String, String> paramMap);
 }

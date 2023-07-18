@@ -40,5 +40,15 @@ public class CR11Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+	
+	//모달 그리드 조회
+	@PostMapping(value = "/select_cr11_Info")
+	public String select_cr11_Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = cr11Svc.select_cr11_Info(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
   
+	
+	
 }
