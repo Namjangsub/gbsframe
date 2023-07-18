@@ -14,9 +14,8 @@
     </div>
     <!-- 하단 버튼 -->
     <div class ="popup_bottom_btn">
-        <button type="button" id="actionBtn" >등록</button>
-        <button type="button" class="close_btn"
-            onclick="modalStack.close();">닫기</button>
+        <button type="button" id="actionBtn" onclick="updateWbsPlanDate();">수정</button>
+        <button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
     </div>
 </div>
 
@@ -72,8 +71,25 @@ var gridView1 = {
                     {key: "wbsPlanRmk",      label: "비고",      align: "left",   width: 100},    
                     {label: "계획", columns: [  
                         {key: "wbsPlanChkYn",       label: "계획",      align: "center",   width: 40, formatter: "chkYn"},  
-                        {key: "wbsPlansDt",         label: "시작일자",      align: "center",   width: 80},
-                        {key: "wbsPlaneDt",         label: "종료일자",      align: "center",   width: 80},
+                        {key: "wbsPlansDt",         label: "시작일자",      align: "center",   width: 80, 
+                        	editor: {type: "date"
+                                        , config: {
+                                                content: {
+                                                             config: { mode: "day", selectMode: "day" }
+                                                         }
+                                                   }
+                        	        }
+                        },
+                        {key: "wbsPlaneDt",         label: "종료일자",      align: "center",   width: 80,
+                            editor: {type: "date"
+                                , config: {
+                                        content: {
+                                                     config: { mode: "day", selectMode: "day" }
+                                                 }
+                                           }
+                            }
+                        	
+                        },
                         {key: "lockYn",             label: "잠금",      align: "center",   width: 40, formatter: "chkYn"},
                         {key: "closeYn",            label: "마감",      align: "center",   width: 40, formatter: "chkYn"},
                         ]},
@@ -130,6 +146,10 @@ var gridView1 = {
                         	gridView1.target.select(obj.__origin_index__, {__selected__: false});
                         });     
                     	this.self.select(this.dindex);
+                    	if (this.item.closeYn == "Y" || this.item.lockYn == "Y") {
+                            alert("WBS일정이 잠금 또는 마감되었습니다.");
+                            return;
+                        }
                     },
                     
                     onDBLClick: function () {
@@ -138,7 +158,19 @@ var gridView1 = {
                             gridView1.target.select(obj.__origin_index__, {__selected__: false});
                         });  
                         this.self.select(this.dindex);
+                        if (this.item.closeYn == "Y" || this.item.lockYn == "Y") {
+                            alert("WBS일정이 잠금 또는 마감되었습니다.");
+                            return;
+                        }
                     },
+                    onDataChanged: function () {
+                    	
+                    	if(this.item.wbsPlansDt > this.item.wbsPlaneDt) { 
+                    		alert("날짜를 확인해주세요");
+                    		this.item.wbsPlansDt = this.item.wbsPlaneDt;
+                    		return;
+                    	}
+                    },                    
                },
                page : {
                     navigationItemCount : 10,
@@ -202,7 +234,34 @@ $(document).ready(function() {
     setCommonSelect($("#main_area select[data-kind]"));     // 공통코드 set
     gridView1.initView().setData(0, coCd, salesCd);
     authChk();
-    gridView1
 });
-    
+
+
+function updateWbsPlanDate() {
+    var list = gridView1.target.getList();
+    var rowListArr = [];
+    if(list.length > 0) {
+        if(confirm("일정 수정 하시겠습니까?")){
+            var formData = new FormData();
+            $.each(list, function(idx, elem){
+                var row = gridView1.target.getList()[elem.__index];
+                if (row != undefined && row.__modified__) {
+                    const obj = {coCd: row.coCd, codeId: row.codeId, salesCd:row.salesCd, wbsPlansDt:row.wbsPlansDt, wbsPlaneDt:row.wbsPlaneDt};
+                    rowListArr.push(obj);
+                }               
+            });
+            formData.append("rowListArr", JSON.stringify(rowListArr));
+            filePutAjax("/user/wb/wb04/updateWbsPlanDate", formData, function(data){
+                if(data.resultCode == 200){
+                    alert("일정변경처리 완료되었습니다.");       
+                    gridView1.setData(0, coCd, salesCd);
+                    //modal.close();
+                    gantt(salesCd);
+                }
+            });  
+        } 
+    }
+} 
+
+
 </script>
