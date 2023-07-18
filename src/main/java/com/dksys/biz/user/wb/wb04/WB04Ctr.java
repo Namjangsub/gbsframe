@@ -60,7 +60,23 @@ public class WB04Ctr {
 	  return "jsonView";
 	  
     }
-	  
+	
+    @PutMapping(value = "/updateWbsPlanDate")
+    public String updateWbsPlanDate(@RequestParam Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (wb04Svc.updateWbsPlanDate(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+			    model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+		} else {
+			    model.addAttribute("resultCode", 500);
+			    model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+		    model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+    }
 	  
 	  
 	  

@@ -15,4 +15,6 @@ public interface WB04Mapper {
 	
     List<Map<String, String>> selectGanttList(Map<String, String> paramMap);
 
+    int updateWbsPlanDate(Map<String, String> paramMap);
+    
 }

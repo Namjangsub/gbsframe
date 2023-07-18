@@ -13,4 +13,6 @@ public interface WB04Svc {
 	
     List<Map<String, String>> selectGanttList(Map<String, String> paramMap);
 
+    int updateWbsPlanDate(Map<String, String> paramMap);
+    
 }
