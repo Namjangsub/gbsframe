@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -72,6 +73,11 @@ public class CR02Svcmpl implements CR02Svc {
     }
 
     @Override
+    public String selectItemDivEtc(Map<String, String> param) {
+        return cr02Mapper.selectItemDivEtc(param);
+    }
+    
+    @Override
     public void insertOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception {
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
         Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -94,7 +100,8 @@ public class CR02Svcmpl implements CR02Svc {
         param.put("estNo", param.get("estNoOrdrs"));
         param.put("ordrsNo", selectMaxOrdrsNo(param));
         String fileTrgtKey;
-
+        String OrderSeq = "";
+        
         cr01Svc.updateEstConfirm(param);
         cr02Mapper.insertOrdrs(param);
 
@@ -134,14 +141,25 @@ public class CR02Svcmpl implements CR02Svc {
                 detailMap.put("pgmId", param.get("pgmId"));
                 detailMap.put("udtId", param.get("userId"));
                 detailMap.put("udtPgm", "TB_CR02M01");
-
-
-                if (detailMap.get("ordrsDtlDiv10").equals("설비")) {
-                    System.out.println("시작;dtl");
-                    String newSalesCode = param.get("ordrsNo") + detailMap.get("ordrsSeq") + detailMap.get("prdtCd") + detailMap.get("itemDiv");
+                
+                //Sales Cd 만들떄 ITEM_DIV의 CODE_ETC 값 추출
+                String ItemDoov = (selectItemDivEtc(detailMap));
+                String Salad = detailMap.get("salesCd");
+                
+                if ("".equals(Salad) || Salad == null || Salad.length() == 0) {
+                	if (detailMap.get("ordrsSeq").length() == 1) {
+                		OrderSeq = '0'+ detailMap.get("ordrsSeq");
+                		System.out.println("OrderSeq :" + OrderSeq);
+                	}
+                	else {
+                		OrderSeq = detailMap.get("ordrsSeq");
+                		System.out.println("OrderSeq :" + OrderSeq);
+                	}
+                	
+                    String newSalesCode = param.get("ordrsNo") + "-" + OrderSeq + detailMap.get("prdtCd") + ItemDoov;
                     detailMap.put("salesCd", newSalesCode);
                 }
-                System.out.println(detailMap + "총합2");
+
                 cr02Mapper.insertOrdrsDetail(detailMap);
             } catch (Exception e) {
                 System.out.println("error3" + e.getMessage());
@@ -383,10 +401,56 @@ public class CR02Svcmpl implements CR02Svc {
     }
 
     @Override
-    public int deleteOrdrs(Map<String, String> paramMap) {
-        int result = cr02Mapper.deleteOrdrs(paramMap);
-        result += cr02Mapper.deleteOrdrsPlan(paramMap);
-        result += cr02Mapper.deleteOrdrsDetail(paramMap);
+    public int deleteOrdrs(Map<String, String> paramMap) throws Exception {
+    	//---------------------------------------------------------------
+		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
+		//   필수값 :  jobType, userId, comonCd
+		//---------------------------------------------------------------
+		List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
+		HashMap<String, String> param = new HashMap<>();
+		param.put("jobType", "fileDelete");
+		param.put("userId", paramMap.get("userId"));
+		if (deleteFileList.size() > 0) {
+			for (Map<String, String> dtl : deleteFileList) {
+				//접근 권한 없으면 Exception 발생
+				param.put("comonCd",  dtl.get("comonCd"));
+				cm15Svc.selectFileAuthCheck(param);
+			}
+		}
+		//---------------------------------------------------------------
+		//첨부 화일 권한체크 끝
+		//---------------------------------------------------------------
+		
+		//데이터 처리
+		int result = 0;
+		String lvl = paramMap.get("lvl").toString();
+		String onNumber = paramMap.get("ordrsSeq");
+		
+		if ("1".equals(lvl)) {
+			result = cr02Mapper.deleteOrdrs(paramMap);
+	        result += cr02Mapper.deleteOrdrsPlan(paramMap);
+	        result += cr02Mapper.deleteOrdrsDetail(paramMap);
+	        result += cr02Mapper.updateEstDeleteConfirm(paramMap);
+    	} else {
+    		 result += cr02Mapper.deleteOrdrsDetail(paramMap);
+    	}
+        //int result = cr02Mapper.deleteOrdrs(paramMap);
+        //result += cr02Mapper.deleteOrdrsPlan(paramMap);
+        //result += cr02Mapper.deleteOrdrsDetail(paramMap);
+        
+        //---------------------------------------------------------------
+		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
+		//---------------------------------------------------------------
+		if (deleteFileList.size() > 0) {
+			for (Map<String, String> deleteDtl : deleteFileList) {
+				String fileKey = deleteDtl.get("fileKey").toString();
+				cm08Svc.deleteFile( fileKey );
+			}
+		}
+		//---------------------------------------------------------------
+		//첨부 화일 처리  끝
+		//---------------------------------------------------------------
+      		
         return result;
     }
 
@@ -404,6 +468,15 @@ public class CR02Svcmpl implements CR02Svc {
     @Override
     public List<Map<String, Object>> selectWbsLeftSalesCodeTreeList(Map<String, String> param) {
     	return cr02Mapper.selectWbsLeftSalesCodeTreeList(param);
+    }
+    
+    public int updateEstDeleteConfirm(Map<String, String> paramMap) {
+        Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+        Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {
+        }.getType();
+        int result = cr02Mapper.updateEstDeleteConfirm(paramMap);
+
+        return result;
     }
 
 
