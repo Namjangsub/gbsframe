@@ -128,17 +128,21 @@ public class SM03SvcImpl implements SM03Svc {
 		//---------------------------------------------------------------  		
 		
 		int result = 0;	    
-		//FILE TARGET KEY
-		int fileTrgtKey = sm03Svc.selectMaxTrgtKey(paramMap);	
-	    paramMap.put("fileTrgtKey", String.valueOf(fileTrgtKey));
-	    
-	    //MAX ORDGR_NO
-	    String maxInNo = sm03Svc.selectMaxInNo(paramMap);	    
-	    paramMap.put("maxInNo", maxInNo);
-		//master 용
-		//paramMap.put("coCd", paramMap.get("coCd_I"));
-		//paramMap.put("salesCd", paramMap.get("salesCd_I"));
+		//FILE TARGET KEY - 
+		if( paramMap.get("fileTrgtKey").equals("0") ) {
+			int fileTrgtKey = sm03Svc.selectMaxTrgtKey(paramMap);	
+		    paramMap.put("fileTrgtKey", String.valueOf(fileTrgtKey));
+		}	    
 		
+	    //MAX ORDGR_NO - 최조 입력일 경우만
+		String maxInNo = "";
+		if( !paramMap.get("inNo").equals("") ) {
+		    maxInNo = paramMap.get("inNo");
+		} else {
+		    maxInNo = sm03Svc.selectMaxInNo(paramMap);			
+		}
+	    paramMap.put("maxInNo", maxInNo);
+		//master 용		
 		result += sm03Mapper.insertWareHousingMaster(paramMap);	 
 		
 		for(Map<String, String> dtl : detailMap) {

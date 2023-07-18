@@ -71,8 +71,7 @@
 					, ROWNUM AS RN
 					FROM
 						(
-						SELECT B.FILE_TRGT_KEY
-								, A.CO_CD
+						SELECT A.CO_CD
 								, FN_CM05M01_CD_TO_NM(A.CO_CD) AS CO_CD_NM	/* 회사명 */								
 								, B.ORDRG_NO			/* 발주번호 */
 								, B.REQ_NO				/* 요인별 요청번호 */
@@ -106,8 +105,22 @@
 								  SUM(A.ORDRG_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) 
 								  - NVL(SUM(IN_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ), 0) AS REAMIN_IN_QTY			/* 잔여수량 */				
 			                    /*, FN_CM05M01_CD_TO_NM(C.IO_DIV) AS IO_DIV_NM */	/* 아이템 구분명 */														
-								/*, C.IO_DIV AS IO_DIV_CD */		/* 수불구분 */		
-								, C.IN_NO	                    
+								/*, C.IO_DIV AS IO_DIV_CD */		/* 수불구분 */			 
+								, NVL(
+										( 
+											SELECT DISTINCT MAX(D.FILE_TRGT_KEY) OVER() AS FILE_TRGT_KEY 
+												FROM TB_SM03M01 D
+												INNER JOIN TB_SM03D01 CC ON(CC.IN_NO=D.IN_NO)
+											WHERE A.ORDRG_NO=CC.ORDRG_NO		
+										) 
+								  , 0) AS FILE_TRGT_KEY								
+								, 
+								( 
+									SELECT DISTINCT MAX(D.IN_NO) OVER() AS IN_NO 
+										FROM TB_SM03M01 D
+										INNER JOIN TB_SM03D01 CC ON(CC.IN_NO=D.IN_NO)
+									WHERE A.ORDRG_NO=CC.ORDRG_NO		
+								) AS IN_NO														  														                   								                   
 							FROM TB_SM02D01 A
 							INNER JOIN TB_SM02M01 B ON(A.CO_CD=B.CO_CD AND A.ORDRG_NO=B.ORDRG_NO)
 							LEFT OUTER JOIN
@@ -115,8 +128,8 @@
 								SELECT C.ORDRG_NO
 										, C.ORDRG_SEQ
 										, NVL(SUM(IN_QTY), 0) AS IN_QTY
-										, C.IN_NO
 									FROM TB_SM03D01 C
+									INNER JOIN TB_SM03M01 D ON(D.IN_NO=C.IN_NO)
 								GROUP BY C.ORDRG_NO, C.ORDRG_SEQ, C.IN_NO
 							) C ON( A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ)
 						WHERE 1=1								
@@ -288,7 +301,7 @@
 		SELECT NVL(MAX_IN_NO, 'IN'||TO_CHAR(SYSDATE, 'YY')||'00001') AS MAX_IN_NO
 			FROM
 			(
-			SELECT DISTINCT DECODE( INSTR(ORDRG_NO, 'IN'||TO_CHAR(SYSDATE, 'YY')), 0, 'IN'||TO_CHAR(SYSDATE, 'YY')||'00001'
+			SELECT DISTINCT DECODE( INSTR(IN_NO, 'IN'||TO_CHAR(SYSDATE, 'YY')), 0, 'IN'||TO_CHAR(SYSDATE, 'YY')||'00001'
 							, 'IN' || MAX( TO_CHAR(SYSDATE, 'YY')|| LPAD( SUBSTRING(IN_NO, -5)+1, 5, '0') ) OVER()
 						  ) AS MAX_IN_NO
 				FROM TB_SM03D01
