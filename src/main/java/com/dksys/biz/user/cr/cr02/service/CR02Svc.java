@@ -19,15 +19,18 @@ public interface CR02Svc {
     Map<String, Object> selectOrdrsWithEst(Map<String, String> params);
 
     String selectMaxOrdrsNo(Map<String, String> param);
+    
+    String selectItemDivEtc(Map<String, String> param);
 
     void insertOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception;
 
     void updateOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest);
 
 
-    int deleteOrdrs(Map<String, String> paramMap);
+    int deleteOrdrs(Map<String, String> paramMap) throws Exception;
 
-
+    int updateEstDeleteConfirm(Map<String, String> paramMap);
+    
     int selectOrdrsPlanHisCount(Map<String, String> param);
 
     List<Map<String, Object>> selectOrdrsPlanHis(Map<String, String> param);

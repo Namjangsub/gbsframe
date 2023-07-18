@@ -109,7 +109,7 @@ public class QM01SvcImpl implements QM01Svc {
   }
 
   @Override
-  public int insertPchsCost(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+  public int insertQualityReq(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
 	    Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -129,10 +129,13 @@ public class QM01SvcImpl implements QM01Svc {
 		//---------------------------------------------------------------  
 
 		
-		int fileTrgtKey = QM01Mapper.selectPchsCostSeqNext(paramMap);
-		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+		int fileTrgtKey = QM01Mapper.selectQualityReqSeqNext(paramMap);
+		String reqNo = QM01Mapper.selectQualityReqCalNext(paramMap);
+		System.out.println("요청관리 번호==?"+reqNo);
 		
-		int result = QM01Mapper.insertPchsCost(paramMap);
+		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+		paramMap.put("reqNo", reqNo);
+		int result = QM01Mapper.insertQualityReq(paramMap);
 	
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
@@ -150,7 +153,7 @@ public class QM01SvcImpl implements QM01Svc {
   }
 
   @Override
-  public int deletePchsCost(Map<String, String> paramMap) throws Exception {
+  public int deleteQualityReq(Map<String, String> paramMap) throws Exception {
 	    //---------------------------------------------------------------  
 		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
 	  	//   필수값 :  jobType, userId, comonCd
@@ -171,7 +174,7 @@ public class QM01SvcImpl implements QM01Svc {
 		//첨부 화일 권한체크 끝 
 		//---------------------------------------------------------------  
 	  
-	  int result = QM01Mapper.deletePchsCost(paramMap);
+	  int result = QM01Mapper.deleteQualityReq(paramMap);
 	  
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)

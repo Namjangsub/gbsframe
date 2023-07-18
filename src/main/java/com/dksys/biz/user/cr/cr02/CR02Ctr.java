@@ -70,6 +70,13 @@ public class CR02Ctr {
 		model.addAttribute("maxOrdrsNo", maxOrdrsNo);
 		return "jsonView";
 	}
+	
+	@PostMapping(value = "/ItemDivEtc")
+	public String getItemDivEtc(@RequestBody Map<String, String> param, ModelMap model) {
+		String itemDivEtc = cr02Svc.selectItemDivEtc(param);
+		model.addAttribute("itemDivEtc", itemDivEtc);
+		return "jsonView";
+	}
 
 	@PostMapping(value = "/insertOrdrs")
 	public String insertOrdrs(@RequestParam Map<String, String> param, MultipartHttpServletRequest mRequest, ModelMap model) {
@@ -107,7 +114,7 @@ public class CR02Ctr {
 	}
 
 	@DeleteMapping(value = "/deleteOrdrs")
-	public String deleteOrdrs(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	public String deleteOrdrs(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 
 		try {
 			cr02Svc.deleteOrdrs(paramMap);

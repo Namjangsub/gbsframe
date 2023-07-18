@@ -28,6 +28,8 @@ public interface CR02Mapper {
     List<Map<String, Object>> selectPmntPlan(Map<String, String> paramMap);
 
     String selectMaxOrdrsNo(Map<String, String> param);
+    
+    String selectItemDivEtc(Map<String, String> param);
 
     int insertOrdrs(Map<String, String> param);
 
@@ -53,6 +55,7 @@ public interface CR02Mapper {
 
     int deleteOrdrsDetail(Map<String, String> param);
 
+    int updateEstDeleteConfirm(Map<String, String> param);
 
     List<Map<String, Object>> selectOrdrsPlanHis(Map<String, String> param);
     

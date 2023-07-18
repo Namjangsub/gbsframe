@@ -18,12 +18,14 @@ public interface QM01Mapper {
   
   int selectConfirmCount(Map<String, String> paramMap);
 
-  int selectPchsCostSeqNext(Map<String, String> paramMap);
+  int selectQualityReqSeqNext(Map<String, String> paramMap);
   
-  int insertPchsCost(Map<String, String> paramMap);
+  String selectQualityReqCalNext(Map<String, String> paramMap);
+  
+  int insertQualityReq(Map<String, String> paramMap);
 
   int updateQualityReq(Map<String, String> paramMap);
 
-  int deletePchsCost(Map<String, String> paramMap);
+  int deleteQualityReq(Map<String, String> paramMap);
   
 }
