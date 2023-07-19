@@ -712,6 +712,16 @@ function mainDefaultLoad(menuNm, subMenuNm) {
 		$("#topUserNm").text(jwt.userNm);
 		setMenuAuth();
 	});
+
+	//메뉴 off 시 메인그리드 리플레쉬 그리드 이름 gridView 사용시 적용
+	$(".menu_off").on("click",function(){
+		if($(".menu_off").css("left") == "0px") {
+			try {
+				gridView.initView().setData(0);
+			} catch (err){
+			}
+		}
+	});
 }
 
 function dateToStr(str) {
