@@ -78,7 +78,13 @@ public class WB04Ctr {
 		return "jsonView";
     }
 	  
+    @PostMapping(value = "/selectGanttAllList") 
+	public String selectGanttAllList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	  List<Map<String, String>> fileList = wb04Svc.selectGanttAllList(paramMap); 
+	  model.addAttribute("fileList", fileList); 
+	  return "jsonView";
 	  
+    }  
 	  
 	  
 	  
