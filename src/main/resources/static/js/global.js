@@ -643,8 +643,7 @@ function setCommonDiv(inputCd){
 					inputHtml += '<input type="radio" id="'+item.codeKind+j+'" name="'+item.codeKind+i+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
 					inputHtml += ' ' +item.codeNm;
 					inputHtml += '</td>';
-				});
-			   alert(inputHtml);
+				});			   
 				$(elem).append(inputHtml);
 
 		})

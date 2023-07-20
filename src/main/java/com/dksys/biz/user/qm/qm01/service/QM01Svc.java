@@ -8,10 +8,16 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 public interface QM01Svc {
 
   int selectQualityReqCount(Map<String, String> paramMap);
+  
+  int selectShareUserCount(Map<String, String> paramMap);  
 
   List<Map<String, String>> selectQualityReqList(Map<String, String> paramMap);
   
   List<Map<String, String>> selectQualityReqExList(Map<String, String> paramMap);
+  
+  List<Map<String, String>> selectShareUserlst(Map<String, String> paramMap);
+  
+  List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap);
 
   Map<String, String> selectQtyReqInfo(Map<String, String> paramMap);
 

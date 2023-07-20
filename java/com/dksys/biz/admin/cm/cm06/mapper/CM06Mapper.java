@@ -14,7 +14,7 @@ public interface CM06Mapper {
 
 	Map<String, String> selectUserInfo(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectUserTree(Map<String, String> paramMap);
+	List<Map<String, String>> selectUserTree(Map<String, String> paramMap);	
 
 	int insertUser(Map<String, String> paramMap);
 	
