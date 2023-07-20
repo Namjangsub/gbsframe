@@ -40,16 +40,24 @@ public class CR05Ctr {
 		return "jsonView";
 	}
 	
-	// 수금정보 조회
-	@PostMapping(value = "/selectClmnInfo")
-	public String selectClmnInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = cr05Svc.selectClmnInfoCount(paramMap);
-		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		model.addAttribute("paginationInfo", paginationInfo);
-		List<Map<String, String>> result = cr05Svc.selectClmnInfo(paramMap);
+	// 정보 조회
+	@PostMapping(value = "/select_cr05_Info")
+	public String select_cr05_Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = cr05Svc.select_cr05_Info(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+	
+	// 상세정보 조회
+	@PostMapping(value = "select_cr05_Info_Dtl")
+	public String select_cr05_Info_Dtl(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = cr05Svc.select_cr05_Info_Dtl(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	
+	// 계좌번호 가져오기
 	
 	
 	// 수금번호 조회
