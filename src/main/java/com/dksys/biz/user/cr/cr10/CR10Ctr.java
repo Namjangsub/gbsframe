@@ -38,6 +38,13 @@ public class CR10Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/selectLgistReqList")
+	public String selectLgistReqList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = cr10Svc.selectLgistReqList(paramMap);
+		model.addAttribute("resultList", result);
+		return "jsonView";
+	}
+
 	@PostMapping(value = "/selectSelesCdList")
 	public String selectSelesCdList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> resultList = cr10Svc.selectSelesCdList(paramMap);
@@ -60,7 +67,6 @@ public class CR10Ctr {
 		return "jsonView";
 	}
 
-	// Bom 자재 Map 조회
 	@PostMapping(value = "/selectLgistMastInfo")
 		public String selectLgistMastInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		Map<String, String> result = cr10Svc.selectLgistMastInfo(paramMap);
@@ -108,6 +114,23 @@ public class CR10Ctr {
 			if (cr10Svc.deleteLgistMast(paramMap) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+	}
+
+	@PostMapping(value = "/updateTodoAppConfirm")
+	public String updateTodoAppConfirm(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	  	try {
+			if (cr10Svc.updateTodoAppConfirm(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));

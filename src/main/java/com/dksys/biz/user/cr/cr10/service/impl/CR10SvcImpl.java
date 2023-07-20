@@ -45,6 +45,11 @@ public class CR10SvcImpl implements CR10Svc {
   }
 
   @Override
+  public List<Map<String, String>> selectLgistReqList(Map<String, String> paramMap) {
+    return cr10Mapper.selectLgistReqList(paramMap);
+  }
+
+  @Override
   public List<Map<String, String>> selectSelesCdList(Map<String, String> paramMap) {
     return cr10Mapper.selectSelesCdList(paramMap);
   }
@@ -212,6 +217,32 @@ public class CR10SvcImpl implements CR10Svc {
 	//---------------------------------------------------------------
 	//첨부 화일 처리  끝
 	//---------------------------------------------------------------
+    //---------------------------------------------------------------
+    //결재 처리 시작 -수정시에도 처리 한 내역이 없다면 결재 처리한다.
+    //---------------------------------------------------------------
+    String ckTodoDiv2CodeId = paramMap.get("todoDiv2CodeId");
+    if(ckTodoDiv2CodeId != null && "".equals(ckTodoDiv2CodeId)) {
+	    List<Map<String, String>> reqList = cr10Mapper.selectTodoAppReqList(paramMap);
+	    List<Map<String, String>> toDoAppList = gsonDtl.fromJson(reqList.toString(), dtlMap);
+	    DecimalFormat df = new DecimalFormat("00000");
+	    int numKey = Integer.valueOf(paramMap.get("fileTrgtKey"));
+	    String todoDiv2CodeId = paramMap.get("appDiv")+df.format(numKey);
+	    for (Map<String, String> dtl : toDoAppList) {
+	    	dtl.put("userId", paramMap.get("userId"));
+	    	dtl.put("pgmId", paramMap.get("pgmId"));
+	    	dtl.put("pgPath", paramMap.get("pgPath"));
+	    	dtl.put("pgParam", paramMap.get("pgParam"));
+	    	dtl.put("todoDiv2CodeId", todoDiv2CodeId);
+	    	cr10Mapper.insertTodoAppList(dtl);
+	    }
+
+	    paramMap.put("todoDiv1CodeId", paramMap.get("appDiv"));
+	    paramMap.put("todoDiv2CodeId", todoDiv2CodeId);
+	    cr10Mapper.updateLgistMastTodoApp(paramMap);
+    }
+    //---------------------------------------------------------------
+    //결재 처리  끝
+    //---------------------------------------------------------------
 
     return result;
   }
@@ -254,6 +285,11 @@ public class CR10SvcImpl implements CR10Svc {
 		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
 	    return result;
+  }
+
+  @Override
+  public int updateTodoAppConfirm(Map<String, String> paramMap) throws Exception {
+	  return cr10Mapper.updateTodoAppConfirm(paramMap);
   }
 
 }

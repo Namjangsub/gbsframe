@@ -139,8 +139,8 @@
 	                    <a class="btn btn-default btn-sm" onclick="setReportMain();">
 	                    	<i class="fas fa-print"></i>출력
 	                    </a>
-	                    <a class="btn btn-default btn-sm" onclick="viewLgistModal();">
-	                    	view
+	                    <a class="btn btn-default btn-sm" onclick="appLgistModal();">
+	                    	결재
 	                    </a>
 	                </div>
 	                <div class="add_btn_small pdl10" style="margin-right:8px;">
@@ -172,6 +172,9 @@
 </html>
 <script type="text/javascript">
 	var isFirst = true;
+
+	var approvalAuthorityIgnore = false; //결재기능무시(true) 결재하기.
+
 	ax5.ui.grid.formatter["chkYn"] = function () {
 	    var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
 	    if(this.value == "Y" || this.value == "N") {
@@ -273,9 +276,21 @@
 					{key: "frmlcAfterWt", 		label: "포장후무게", 		width: 100,		align: "right"},
 					{key: "shipmntDt", 			label: "출하일정일", 		width: 100,		align: "center"},
 					{key: "hopeArvlDt", 		label: "희망도착일", 		width: 100,		align: "center"},
-					{key: "lgistRmk", 			label: "비고", 			width: 140,		align: "left"},
+					{key: "lgistRmk", 			label: "비고", 			width: 140,		align: "left", hidden: true},
 					{key: "todoDiv1CodeId", 	label: "app 1", 		width: 120,		align: "left", hidden: true},
 					{key: "todoDiv2CodeId", 	label: "app 2", 		width: 120,		align: "left", hidden: true},
+					{key: "appUser1Id", 		label: "id 1", 			width: 70,		align: "center", hidden: true},
+					{key: "appUser1IdNm", 		label: "nm 1", 			width: 60,		align: "center", hidden: true},
+					{key: "appUser1CfYn", 		label: "cf 1", 			width: 40,		align: "center", hidden: true},
+					{key: "appUser2Id", 		label: "id 2", 			width: 70,		align: "center", hidden: true},
+					{key: "appUser2IdNm", 		label: "nm 2", 			width: 60,		align: "center", hidden: true},
+					{key: "appUser2CfYn", 		label: "cf 2", 			width: 40,		align: "center", hidden: true},
+					{key: "appUser3Id", 		label: "id 3", 			width: 70,		align: "center", hidden: true},
+					{key: "appUser3IdNm", 		label: "nm 3", 			width: 60,		align: "center", hidden: true},
+					{key: "appUser3CfYn", 		label: "cf 3", 			width: 40,		align: "center", hidden: true},
+					{key: "appUser4Id", 		label: "id 4", 			width: 70,		align: "center", hidden: true},
+					{key: "appUser4IdNm", 		label: "nm 4", 			width: 60,		align: "center", hidden: true},
+					{key: "appUser4CfYn", 		label: "cf 4", 			width: 40,		align: "center", hidden: true},
 			   ],
 	           page : {
                     navigationItemCount : 10,
@@ -314,16 +329,19 @@
         	if (inputValidation($('.table_input [required]'))) {
 
         		var paramObj = getSearchParam(".table_input", 1, 99999999);
-                postAjax("/user/cr/cr10/selectLgistReqPageList", paramObj, null, function(data){
+                postAjax("/user/cr/cr10/selectLgistReqList", paramObj, null, function(data){
                     var list = data.resultList;
                         targetObj.setData({
                             list : list,
+                            page : { pageSize : list.length }
+                            /* 트리에선 페이징 불가
                             page : {
     							currentPage   : _pageNo,
     							pageSize      : data.paginationInfo.pageSize,
     							totalElements : data.paginationInfo.totalRecordCount,
     							totalPages    : data.paginationInfo.totalPageCount
                             }
+                        	*/
                         });
                 });
         	}
@@ -481,8 +499,78 @@
             paramObj.staPlace = selData.coNm;
         }
 
+        openModal("/static/html/user/cr/cr10/CR1001P03.html", 1000, 600, "", paramObj, function(grid) {
+		});
+	}
+
+	//결재 기능
+	function appLgistModal(){
+		if(selectGridValidation(gridView.target)) return;
+		var selData = gridView.target.getList("selected")[0];
+
+		if(isEmpty(selData.ordrsNo)){
+			return;
+		}
+
+		var realStepAppUserId = getRealStepAppUser(selData);
+		if(realStepAppUserId == "!"){
+			alert("결재완료된 내역입니다.");
+			return;
+		}
+		if(realStepAppUserId == "!!"){
+			alert("결재처리가 잘못된 내역입니다.");
+			return;
+		}
+		var isIgnore = false;
+		try {
+			isIgnore = approvalAuthorityIgnore;
+		} catch (err){
+		}
+		if(realStepAppUserId != jwt.userId && isIgnore == false){
+			alert("결재 권한을 가진 사용자가 아닙니다. 결재자 ["+realStepAppUserId+"]");
+			return;
+		}
+
+        var paramObj = selData;
+        var fileTrgtKey = selData.fileTrgtKey;
+        paramObj.actionType = isEmpty(fileTrgtKey) ? "C":"U";
+
+        if(paramObj.actionType == "C"){
+            paramObj.reqId = jwt.userId;
+            paramObj.reqIdNm = jwt.userNm;
+            paramObj.staPlace = selData.coNm;
+        }
+
         openModal("/static/html/user/cr/cr10/CR1001P02.html", 1000, 600, "", paramObj, function(grid) {
 		});
+	}
+
+	//현재단계의 결재자 정보 추출
+	function getRealStepAppUser(_appData){
+		var appUserId = "";
+
+		if(_appData["appUser4CfYn"] == "Y") {
+			//결재 완료
+			appUserId = "!";
+		}
+		else if(_appData["appUser1CfYn"] == "Y" && _appData["appUser2CfYn"] == "Y" && _appData["appUser3CfYn"] == "Y") {
+			appUserId = _appData["appUser4Id"];
+		}
+		else if(_appData["appUser1CfYn"] == "Y" && _appData["appUser2CfYn"] == "Y") {
+			appUserId = _appData["appUser3Id"];
+		}
+		else if(_appData["appUser1CfYn"] == "Y") {
+			appUserId = _appData["appUser2Id"];
+		}
+		else if(_appData["appUser1CfYn"] == "N") {
+			appUserId = _appData["appUser1Id"];
+		}
+		else{
+			//순서가 잘못 결재된 경우
+			appUserId = "!!";
+		}
+
+		return appUserId;
 	}
 
 	//물류 삭제
@@ -568,6 +656,23 @@
             var todayDate = new Date().format('yyyyMMddHHmmss');
             excelView.target.exportExcel("물류진행요청_"+todayDate+".xls");
          });
+	}
+
+	function setReportMain() {
+		if(selectGridValidation(gridView.target)) return;
+		var selData = gridView.target.getList("selected")[0];
+
+		var fileName = "BM1602M01.jrf";
+		var arg =
+			  "coCd#"		+  $('#coCd_S').val()
+        	+ "#reqDtFrom#"	+  $("#pblicteDtFr_S").val().replace(/\-/g, '')
+        	+ "#reqDtTo#"	+  $("#pblicteDtTo_S").val().replace(/\-/g, '')
+//         	+ "#prjctCd#"	+  $("#prjctCd_S").val()
+//         	+ "#prjctNm#"	+  $("#prjctNm_S").val()
+//         	+ "#mngId#"	    +  $("#mngId_S").val()
+//         	+ "#issSts#"	+  $("#issSts_S").val()
+        	+ "#";
+		callReport(fileName, arg, 1150, 720);
 	}
 
 </script>

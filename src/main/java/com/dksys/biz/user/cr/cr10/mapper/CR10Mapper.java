@@ -12,6 +12,8 @@ public interface CR10Mapper {
 
   List<Map<String, String>> selectLgistReqPageList(Map<String, String> paramMap);
 
+  List<Map<String, String>> selectLgistReqList(Map<String, String> paramMap);
+
   List<Map<String, String>> selectSelesCdList(Map<String, String> paramMap);
 
   List<Map<String, String>> selectSelesCdViewList(Map<String, String> paramMap);
@@ -41,5 +43,7 @@ public interface CR10Mapper {
   int insertTodoAppList(Map<String, String> paramMap);
 
   int updateLgistMastTodoApp(Map<String, String> paramMap);
+
+  int updateTodoAppConfirm(Map<String, String> paramMap);
 
 }
