@@ -39,6 +39,11 @@ public class QM01SvcImpl implements QM01Svc {
   public int selectQualityReqCount(Map<String, String> paramMap) {
     return QM01Mapper.selectQualityReqCount(paramMap);
   }
+  
+  @Override
+  public int selectShareUserCount(Map<String, String> paramMap) {
+    return QM01Mapper.selectShareUserCount(paramMap);
+  }
 
   @Override
   public List<Map<String, String>> selectQualityReqList(Map<String, String> paramMap) {
@@ -48,6 +53,16 @@ public class QM01SvcImpl implements QM01Svc {
   @Override
   public Map<String, String> selectQtyReqInfo(Map<String, String> paramMap) {
     return QM01Mapper.selectQtyReqInfo(paramMap);
+  }
+  
+  @Override
+  public List<Map<String, String>> selectShareUserlst(Map<String, String> paramMap) {
+    return QM01Mapper.selectShareUserlst(paramMap);
+  }
+  
+  @Override
+  public List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap) {
+    return QM01Mapper.selectShareUserInfo(paramMap);
   }
 
   @Override

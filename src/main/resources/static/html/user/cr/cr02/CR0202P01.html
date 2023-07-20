@@ -156,7 +156,7 @@
 		<!-- 리스트 -->
 		<div class="ax5_grid">
 			<div>
-				<div data-ax5grid="first-grid-modal" data-ax5grid-config="{}" style="height:300px; width: 100%" ></div>
+				<div data-ax5grid="first-grid-modal" data-ax5grid-config="{}" style="height:230px; width: 100%" ></div>
 			</div>
 		</div>
 	</div>
@@ -289,7 +289,6 @@
     $(document).ready(function () {
         setCommonSelect($(".popup_area select[data-kind]"));
         fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
-
         /*    $("#ordrsAmt").change(function () {
 
 
@@ -400,6 +399,9 @@
             }
         })
 
+        //오픈시 로그인한 사용자 처리
+        $('#ordrger').val(jwt.userNm);
+        
         /*     fileGridView.init(); */
         /*    fileGridView.setData(); */
         // 공통코드 selectBox set
@@ -578,9 +580,11 @@
 		if (actionType == "C") {
 	        openSecondModal("/static/html/cmn/modal/clntSearch.html", 600, 420, "거래처 검색", {searchValue: searchValue}, function (grid) {
 	            var row = grid.target.getList("selected")[0];
+
 	            $('#ordrsClntCd').val(row.clntCd);
 	            $('#ordrsClntNm').val(row.clntNm);
-
+	            //$('#clntPjt').val(row.clntPjt);
+	            
 	            var paramObj = {
 	                "coCd": $('#coCd').val(),
 	                "clntCd": row.clntCd
@@ -601,11 +605,14 @@
 	            $('#coCd').val(row.coCd);
 	            $('#estDeg').val(row.estDeg);
 	            $('#currCd').val(row.currCd);
+	            $('#ordrsClntCd').val(row.estClntCd);
+	            $('#ordrsClntNm').val(row.estClntNm);
+	            $('#clntPjt').val(row.clntPjt);
 	            var paramObj = {
 	                "coCd": $('#coCd').val(),
-	                "clntCd": row.clntCd
+	                "clntCd": row.estClntCd
 	            }
-	            setMngInfo(paramObj);
+	           setMngInfo(paramObj);
 	        });
 		}
     }
@@ -615,7 +622,8 @@
         postAjax("/admin/bm/bm02/selectMngInfo", paramObj, null, function (data) {
             if (data.mngInfo) {
 
-                $('#mngId').val(data.mngInfo.salesEmpNm);
+                $('#mngId').val(data.mngInfo.salesEmpId);
+                $('#mngIdVisible').val(data.mngInfo.salesEmpNm);
             } else {
 
                 $('#mngId').val("");
@@ -708,9 +716,9 @@
 		//---------------------------------------------------------------
 		// 유저아이디 추가
 		formData.append("userId" , jwt.userId);
-		formData.append("clntCd" , $('#clntCd').val());			//첨부화일용
-		formData.append("prdtCd" , $('#prdtCd').val());			//첨부화일용
-		formData.append("itemCd" , $('#itemDiv').val());			//첨부화일용
+		formData.append("clntCd" , $('#ordrsClntCd').val());			//첨부화일용
+		formData.append("prdtCd" , $('#prdtCd').val(""));			//첨부화일용
+		formData.append("itemCd" , $('#itemDiv').val(""));			//첨부화일용
 		formData.append("prjctCd", $('#clntPjt').val());		//첨부화일용
 		formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용
 		
@@ -760,7 +768,8 @@
             planObj["clmnPlanDiv"] = elem.clmnPlanDiv;
             planObj["clmnDivSeq"] = elem.clmnDivSeq;
             planObj["clmnRate"] = elem.clmnRate;
-            planObj["clmnAmt"] = elem.clmnAmt;
+            //planObj["clmnAmt"] = elem.clmnAmt;
+            planObj["clmnAmt"] = parseInt(elem.clmnAmt.replace(/,/g, ''));
 
 
             let clmnDt = new Date(elem.clmnDt);
@@ -798,7 +807,7 @@
         // clmnAmt 합계 계산
         var totalClmnAmt = 0;
         $.each(planArr, function (idx, elem) {
-            totalClmnAmt += parseFloat(elem.clmnAmt.replace(/,/g, ''));
+            totalClmnAmt += parseFloat(elem.clmnAmt);
         });
 
 
@@ -834,7 +843,8 @@
             detailObj["eqpNm"] = elem.eqpNm;
             detailObj["ordrsPrcMach"] = elem.ordrsPrcMach;
             detailObj["ordrsPrcElcty"] = elem.ordrsPrcElcty;
-            detailObj["ordrsPrc"] = parseFloat(elem.ordrsPrcMach.replace(/,/g, '')) + parseFloat(elem.ordrsPrcElcty.replace(/,/g, ''));
+//          detailObj["ordrsPrc"] = parseFloat(elem.ordrsPrcMach.replace(/,/g, '')) + parseFloat(elem.ordrsPrcElcty.replace(/,/g, ''));
+			detailObj["ordrsPrc"] = parseInt(elem.ordrsPrcMach) + parseInt(elem.ordrsPrcElcty);
             detailObj["ordrsQty"] = elem.ordrsQty;
             detailObj["estEpctMatPrc"] = elem.estEpctMatPrc;
             detailObj["trgtPchsPcostMach"] = elem.trgtPchsPcostMach;
@@ -867,23 +877,23 @@
         });
 
 
-        var totalSum = totalLaborCostMfgCost + totalMachineValueAfterDeduction;
-        var ordrsAmtVal = parseFloat($("#ordrsAmt").val().replace(/,/g, ''));
-
+        var totalSum = totalLaborCostMfgCost + totalMachineValueAfterDeduction; //laborCostMfgCost(금액)+machineVVauleAfterDeduction(차감 후 기계값)
+        var ordrsAmtVal = parseFloat($("#ordrsAmt").val().replace(/,/g, '')); //수주금액에 적힌 값
+ 
         if (isNaN(ordrsAmtVal)) {
             ordrsAmtVal = 0; // 또는 다른 기본값
         }
 
-        if (totalSum != ordrsAmtVal) {
-            alert("합계가 입력 금액과 일치하지 않습니다(수금상세)");
-            return false
-        }
+//         if (totalSum != ordrsAmtVal) {
+//             alert("합계가 입력 금액과 일치하지 않습니다(수금상세)");
+//             return false
+//         }
 
 
         formData.append("planArr", JSON.stringify(planArr));
         formData.append("detailArr", JSON.stringify(detailArr));
 
-
+		debugger;
         return formData;
     }
 
@@ -1105,7 +1115,6 @@
                     ],
                     body: {
 
-
                         onClick: function () {
                             this.self.clearSelect();
                             this.self.select(this.dindex);
@@ -1121,6 +1130,7 @@
                             var data = gridOrdrsPlan.getList();
                             var totalRate = 0;
                             var totalAmt = 0;
+
                             for (var i = 0; i < data.length; i++) {
                                 totalRate += parseFloat(data[i].clmnRate);
                             }
@@ -1130,67 +1140,72 @@
 
                             var ordVal = $("#ordrsAmt").val().replace(/,/g, '');
                             var ordrsAmt = parseFloat(ordVal) || 0;
+			                            if (totalRate > 100 || totalAmt > ordrsAmt) {
+			                                if (totalRate > 100) {
+			                                    alert('비율의 합계는 100%를 초과할 수 없습니다.');
+			                                    // 비율의 합계가 100%를 초과하면, 원래의 데이터로 복원
+			//                                     for (var i = 0; i < data.length; i++) {
+			//                                         if (prevData[i]) {
+			
+			//                                             data[i].clmnRate = prevData[i].clmnRate;
+			//                                             gridOrdrsPlan.getList()[i].clmnRate = prevData[i].clmnRate;
+			//                                         }
+			//                                     }
+			                                }
+			
+			                                if (totalAmt > ordrsAmt) {
+			                                    alert('수금금액의 합계는 주문 금액을 초과할 수 없습니다.');
+			                                }
+			
+			                                for (var i = 0; i < data.length; i++) {
+			                                    if (prevData[i]) {
+			                                        data[i].clmnAmt = prevData[i].clmnAmt;
+			                                        gridOrdrsPlan.getList()[i].clmnAmt = prevData[i].clmnAmt;
+			                                    }
+			                                }
+			
+			                            } else {
+											
+			                                for (let i = 0; i < data.length; i++) {
+			                                    let currData = data[i];
+			                                    ////////////////////////////////
+			                                    // 현재 행이 이전에 변경되었는지 확인
+// 			                                    if (prevData[i]) {
+			                                    	
+			                                       // let prevAmt = parseFloat(prevData[i].clmnAmt || 0);
+			                                       // let currAmt = parseFloat(currData.clmnAmt || 0);
+			                                       // let prevRate = parseFloat(prevData[i].clmnRate || 0);
+			                                        //let currRate = parseFloat(currData.clmnRate || 0);
 
-                            if (totalRate > 100 || totalAmt > ordrsAmt) {
-                                if (totalRate > 100) {
-                                    alert('비율의 합계는 100%를 초과할 수 없습니다.');
-                                    // 비율의 합계가 100%를 초과하면, 원래의 데이터로 복원
-                                    for (var i = 0; i < data.length; i++) {
-                                        if (prevData[i]) {
+// 			                                        if (prevAmt !== currAmt) {
+			                                        	if( this.key == "clmnAmt" ) {
+				                                            //clmnAmt가 변경되었으면 clmnRate를 업데이트
+				                                            currData.clmnRate = parseInt(calculateRate((currData.clmnAmt).replace(/,/g, '')));
+				                                            
+			                                        	}
+// 			                                            // 현재 clmnRate와 clmnAmt를 이전 데이터로 저장
+// 			                                            if (!prevData[i]) {
+// 			                                                prevData[i] = {};
+// 			                                            }
+// 			                                            prevData[i].clmnAmt = currData.clmnAmt;
+// 			                                            prevData[i].clmnRate = currData.clmnRate // store the updated rate too
+// 			                                        } else if (prevRate !== currRate) {
+														 if( this.key == "clmnRate" ) {
+				                                           	 //clmnRate가 변경되었으면 clmnAmt를 업데이트
+				                                            currData.clmnAmt = calculateAmt(currData.clmnRate).toLocaleString();
+														 }
+			                                            // 현재 clmnRate와 clmnAmt를 이전 데이터로 저장
+// 			                                            if (!prevData[i]) {
+// 			                                                prevData[i] = {};
+// 			                                            }
+// 			                                            prevData[i].clmnRate = currData.clmnRate;
+// 			                                            prevData[i].clmnAmt = currData.clmnAmt; // store the updated amt too
+// 			                                        }
+// 			                                    }
+			                                    //////////////////
+			                                }
 
-                                            data[i].clmnRate = prevData[i].clmnRate;
-                                            gridOrdrsPlan.getList()[i].clmnRate = prevData[i].clmnRate;
-                                        }
-                                    }
-                                }
-
-                                if (totalAmt > ordrsAmt) {
-                                    alert('수금금액의 합계는 주문 금액을 초과할 수 없습니다.');
-                                }
-
-                                for (var i = 0; i < data.length; i++) {
-                                    if (prevData[i]) {
-                                        data[i].clmnAmt = prevData[i].clmnAmt;
-                                        gridOrdrsPlan.getList()[i].clmnAmt = prevData[i].clmnAmt;
-                                    }
-                                }
-
-                            } else {
-
-                                for (let i = 0; i < data.length; i++) {
-                                    let currData = data[i];
-                                    // 현재 행이 이전에 변경되었는지 확인
-                                    if (prevData[i]) {
-                                        let prevAmt = parseFloat(prevData[i].clmnAmt || 0);
-                                        let currAmt = parseFloat(currData.clmnAmt || 0);
-                                        let prevRate = parseFloat(prevData[i].clmnRate || 0);
-                                        let currRate = parseFloat(currData.clmnRate || 0);
-
-                                        if (prevAmt !== currAmt) {
-                                            // clmnAmt가 변경되었으면 clmnRate를 업데이트
-                                            currData.clmnRate = calculateRate(currData.clmnAmt);
-                                            // 현재 clmnRate와 clmnAmt를 이전 데이터로 저장
-                                            if (!prevData[i]) {
-                                                prevData[i] = {};
-                                            }
-                                            prevData[i].clmnAmt = currData.clmnAmt;
-                                            prevData[i].clmnRate = currData.clmnRate // store the updated rate too
-                                        } else if (prevRate !== currRate) {
-                                            // clmnRate가 변경되었으면 clmnAmt를 업데이트
-                                            currData.clmnAmt = calculateAmt(currData.clmnRate).toLocaleString();
-                                            // 현재 clmnRate와 clmnAmt를 이전 데이터로 저장
-                                            if (!prevData[i]) {
-                                                prevData[i] = {};
-                                            }
-                                            prevData[i].clmnRate = currData.clmnRate;
-                                            prevData[i].clmnAmt = currData.clmnAmt; // store the updated amt too
-                                        }
-                                    }
-                                }
-
-
-                            }
-
+			                            }
 
                             gridOrdrsPlan.setData(data);
                         }
@@ -1287,7 +1302,8 @@
     function calculateAmt(rate) {
         const clmnRateFloat = parseFloat(rate) || 0;
         const ordrsAmt = getOrdrsAmt();
-        if (isNaN(ordrsAmt) || isNaN(clmnRateFloat)) {
+
+        if (isNaN(ordrsAmt) || isNaN(clmnRateFloat)) {        	
             console.error("Invalid input");
             return;
         }
@@ -1298,6 +1314,7 @@
     function calculateRate(amt) {
         const clmnAmtFloat = parseFloat(amt) || 0;
         const ordrsAmt = getOrdrsAmt();
+
         if (isNaN(ordrsAmt) || isNaN(clmnAmtFloat)) {
             console.error("Invalid input");
             return;
@@ -1326,6 +1343,15 @@
 
         // Set the data back to the grid
         gridOrdrsPlan.setData(data);
+    });
+    
+    //견적서번호 지울경우 견적차수도 지워지게 처리
+    $("#estNoOrdrs").change(function () {
+    	var ordNo = $("#estNoOrdrs").val()
+    	if (isNaN(ordNo) || ordNo == ""){
+    		$("#estDeg").val("");
+    	}
+			
     });
 
 
@@ -1371,7 +1397,7 @@
                 {
                     key: "itemDiv", label: "아이템구분", align: "center", width: 80,
                     editor: {
-                        type: "select", disabled: function () { return this.item.dataChk == "U"; },
+                        type: "select", disabled: function () { return this.item.dataChk == "U" || this.item.ordrsDtlDiv10 !== 'ORDRSDTLDIV1010'; },
                         config: {
                             columnKeys: {
                                 optionValue: 'CD',
@@ -1387,7 +1413,7 @@
                 {
                     key: "ordrsDtlDiv20", label: "작업구분", align: "center", width: 80,
                     editor: {
-                        type: "select",
+                        type: "select", disabled: function () { return this.item.ordrsDtlDiv10 !== 'ORDRSDTLDIV1010'; },
                         config: {
                             columnKeys: {
                                 optionValue: 'CD',
@@ -1402,7 +1428,7 @@
                 {
                     key: "ordrsDtlDiv30", label: "자체구분", align: "center", width: 60,
                     editor: {
-                        type: "select",
+                        type: "select", disabled: function () { return this.item.ordrsDtlDiv10 !== 'ORDRSDTLDIV1010'; },
                         config: {
                             columnKeys: {
                                 optionValue: 'CD',
@@ -1559,8 +1585,8 @@
                     selectedRowKey2 = this.dindex;
                    
                     // 제품구분(prdtCd)이거나 등록일 경우에만 실행하도록
-                    if (this.column.key == 'prdtCd' && actionType == 'C') {
-                        openSecondPrdtSearch();     
+                    if (this.column.key == 'prdtCd' && actionType == 'C' && this.item.ordrsDtlDiv10 == 'ORDRSDTLDIV1010') {
+                        openSecondPrdtSearch();       
                     }
 
                 },
@@ -1904,39 +1930,56 @@
 
     $("#addPaymentButton").on("click", function () {
         var row;
-        var newRowData = {
-            estDtlDiv: "",
-            estComm: "",
-            estSpec: "",
-            estUnit: "",
-            estQty: "",
-            estUpr: "",
-        };
+//         var newRowData = {
+//             estDtlDiv: "",
+//             estComm: "",
+//             estSpec: "",
+//             estUnit: "",
+//             estQty: "",
+//             estUpr: "",
+//         };
+		var newRowData = {
+				clmnPlanDiv: "",
+				clmnDivSeq : 1,
+				clmnRate : 0,
+				clmnAmt : 0,
+				clmnDt : "",
+				pmntDtAfterBill : "",
+				billPblsDt : "",
+				clmnMgmtStatus : "",
+		};
 
-        // 첫 번째 경우: 선택된 행이 있는 경우
-        if (selectedRowKey !== undefined) {
-            let row = gridOrdrsPlan.getList("selected")[0];
-            let newRowData = $.extend({}, row, {__index: undefined, clmnRate: 0, clmnAmt: 0});
-            gridOrdrsPlan.addRow(newRowData, row.__index + 1);
+        var ordrsAmtVal = parseFloat($("#ordrsAmt").val().replace(/,/g, '')); //수주금액에 적힌 값
+
+        if (ordrsAmtVal == 0 || ordrsAmtVal == ""){
+        	alert("수주금액을 입력바랍니다.");
+        	return false;
         }
-        // 두 번째 경우: 그리드가 비어 있는 경우
-        else if (gridOrdrsPlan.getList().length === 0) {
-            gridOrdrsPlan.addRow(newRowData, 0);
-        }
-        // 세 번째 경우: 그리드에 행은 있지만 선택된 행이 없는 경우
         else {
-            gridOrdrsPlan.addRow(newRowData, gridOrdrsPlan.length);
-            return;
+		        // 첫 번째 경우: 선택된 행이 있는 경우
+		        if (selectedRowKey !== undefined) {
+		            let row = gridOrdrsPlan.getList("selected")[0];
+		            let newRowData = $.extend({}, row, {__index: undefined, clmnRate: 0, clmnAmt: 0});
+		            gridOrdrsPlan.addRow(newRowData, row.__index + 1);
+		        }
+		        // 두 번째 경우: 그리드가 비어 있는 경우
+		        else if (gridOrdrsPlan.getList().length === 0) {
+		            gridOrdrsPlan.addRow(newRowData, 0);
+		        }
+		        // 세 번째 경우: 그리드에 행은 있지만 선택된 행이 없는 경우
+		        else {
+		            gridOrdrsPlan.addRow(newRowData, gridOrdrsPlan.length);
+		            return;
+		        }
+		
+			        const data = gridOrdrsPlan.getList();
+			        gridOrdrsPlan.setData({
+			            list: data,
+			            page: {
+			                totalElements: data.length
+			            }
+			        });
         }
-
-//         const data = gridOrdrsPlan.getList();
-//         gridOrdrsPlan.setData({
-//             list: data,
-//             page: {
-//                 totalElements: data.length
-//             }
-//         });
-
         prevData = JSON.parse(JSON.stringify(gridOrdrsPlan.getList()));
         // 여기에서 그리드 데이터가 준비된 후 실행하려는 코드를 추가할 수 있습니다.
 
@@ -1974,38 +2017,62 @@
 
     $("#addDetailButton").on("click", function () {
         var row;
-        var newRowData = {
-            estDtlDiv: "",
-            estComm: "",
-            estSpec: "",
-            estUnit: "",
-            estQty: "",
-            estUpr: "",
-        };
+//         var newRowData = {
+//             estDtlDiv: "",
+//             estComm: "",
+//             estSpec: "",
+//             estUnit: "",
+//             estQty: "",
+//             estUpr: "",
+//         };
+		var newRowData = {
+			ordrsDtlDiv10 : "",
+			prdtCd : "",
+			itemDiv : "",
+			ordrsDtlDiv20 : "",
+			ordrsDtlDiv30 : "",
+			salesCd : "",
+			eqpNm : "",
+			ordrsPrcMach : 0,
+			ordrsPrcElcty : 0,
+			ordrsQty : 0,
+			estEpctMatPrc : 0,
+			trgtPchsPcostMach : 0,
+			trgtPchsPcostElcty : 0,
+			trgtPchsPcostInHousePrcsn : 0,
+			laborCostMfgCost : 0,
+		};
+        var ordrsAmtVal = parseFloat($("#ordrsAmt").val().replace(/,/g, '')); //수주금액에 적힌 값
 
-        // 첫 번째 경우: 선택된 행이 있는 경우
-        if (selectedRowKey2 !== undefined) {
-            let row = gridOrdrsDetail.getList("selected")[0];
-            let newRowData = $.extend({}, row, {__index: undefined});
-            gridOrdrsDetail.addRow(newRowData, row.__index + 1);
+        if (ordrsAmtVal == 0 || ordrsAmtVal == ""){
+        	alert("수주금액을 입력바랍니다.");
+        	return false;
         }
-        // 두 번째 경우: 그리드가 비어 있는 경우
-        else if (gridOrdrsDetail.getList().length === 0) {
-            gridOrdrsDetail.addRow(newRowData, 0);
-        }
-        // 세 번째 경우: 그리드에 행은 있지만 선택된 행이 없는 경우
         else {
-            gridOrdrsDetail.addRow(newRowData, gridOrdrsDetail.length);
-            return;
+		       	// 첫 번째 경우: 선택된 행이 있는 경우
+		        if (selectedRowKey2 !== undefined) {
+		            let row = gridOrdrsDetail.getList("selected")[0];
+		            let newRowData = $.extend({}, row, {__index: undefined});
+		            gridOrdrsDetail.addRow(newRowData, row.__index + 1);
+		        }
+		        // 두 번째 경우: 그리드가 비어 있는 경우
+		        else if (gridOrdrsDetail.getList().length === 0) {
+		            gridOrdrsDetail.addRow(newRowData, 0);
+		        }
+		        // 세 번째 경우: 그리드에 행은 있지만 선택된 행이 없는 경우
+		        else {
+		            gridOrdrsDetail.addRow(newRowData, gridOrdrsDetail.length);
+		            return;
+		        }
+		
+		        const data = gridOrdrsDetail.getList();
+		        gridOrdrsDetail.setData({
+		            list: data,
+		            page: {
+		                totalElements: data.length
+		            }
+		        });
         }
-
-        const data = gridOrdrsDetail.getList();
-        gridOrdrsDetail.setData({
-            list: data,
-            page: {
-                totalElements: data.length
-            }
-        });
     });
 
 

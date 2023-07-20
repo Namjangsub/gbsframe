@@ -67,6 +67,7 @@ public class CM06Ctr {
     	model.addAttribute("userTree", userTree);
     	return "jsonView";
     }
+       
     
     // 사용자아이디 중복확인
     @PostMapping("/checkUserId")

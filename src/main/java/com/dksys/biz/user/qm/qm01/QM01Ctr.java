@@ -40,6 +40,7 @@ public class QM01Ctr {
     return "jsonView";
   }
    
+   
 //발주 및 출장 요청서 리스트엑셀 리스트  -->
   @PostMapping(value = "/selectQualityReqExList") 
 	public String selectMsExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
@@ -50,11 +51,28 @@ public class QM01Ctr {
 		  
 	}  
 
-  // 프로젝트 정보 조회
+  //요청 정보 
   @PostMapping(value = "/selectQtyReqInfo")
-  public String selectPchsCostInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+  public String selectQtyReqInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
 	Map<String, String> result = qm01Svc.selectQtyReqInfo(paramMap);
     model.addAttribute("result", result);
+    return "jsonView";
+  }
+  
+  @PostMapping(value = "/selectShareUserlst")
+  public String selectShareUserlst(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    int totalCnt = qm01Svc.selectShareUserCount(paramMap);
+    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+    model.addAttribute("paginationInfo", paginationInfo);
+    List<Map<String, String>> result = qm01Svc.selectShareUserlst(paramMap);
+    model.addAttribute("result", result);
+    return "jsonView";
+  }
+  
+  @PostMapping(value = "/selectShareUserInfo")
+  public String selectShareUserInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	List<Map<String, String>> resultList = qm01Svc.selectShareUserInfo(paramMap);
+    model.addAttribute("resultList", resultList);
     return "jsonView";
   }
   
@@ -88,7 +106,7 @@ public class QM01Ctr {
 	  	try {
 			if (qm01Svc.updateQualityReq(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
-				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));				
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));

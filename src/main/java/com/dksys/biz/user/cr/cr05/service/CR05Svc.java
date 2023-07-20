@@ -18,8 +18,9 @@ public interface CR05Svc {
 	int delete_cr05(Map<String, String> paramMap, MultipartHttpServletRequest mRequset) throws Exception;
 	
 	// 수금정보 조회
-	int selectClmnInfoCount(Map<String, String> paramMap);
-	List<Map<String, String>> selectClmnInfo(Map<String, String> paramMap);
+	Map<String, String> select_cr05_Info(Map<String, String> paramMap);
+	// 상세정보 조회
+	List<Map<String, String>> select_cr05_Info_Dtl(Map<String, String> paramMap);
 	// 수금번호 조회
 	List<Map<String, String>> select_cr05_clmnNo(Map<String, String> paramMap);
 

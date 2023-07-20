@@ -24,7 +24,7 @@ public interface CR02Svc {
 
     void insertOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception;
 
-    void updateOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest);
+    void updateOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception;
 
 
     int deleteOrdrs(Map<String, String> paramMap) throws Exception;

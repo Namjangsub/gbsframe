@@ -30,22 +30,21 @@
 					<td>
 						<div class="search_form">
 						<input type="text" id="clmnNo" name="clmnNo" readonly="readonly">
-							<a onclick="clntSearch();"><i class="i_search_w"></i></a>
 						</div>
 					</td>
 
 					<th class="hit ordrsClntNm">고객사</th>
 					<td>
-                  	<input type="hidden" id="ordrsClntCd" class="form-control" name="ordrsClntCd" required msg="고객사" readonly="readonly" onkeyup="if(window.event.keyCode == 13){gridView.setData(0)};">
+                  	<input type="hidden" id="ordrsClntCd" class="form-control" name="ordrsClntCd" required msg="고객사" onkeyup="event.keyCode == 13 ? ClntSearch() : ''">
 						<div class="search_form">
-						<input type="text" id="ordrsClntNm" class="form-control" name="ordrsClntNm" required msg="고객사" readonly="readonly" onkeyup="if(window.event.keyCode == 13){gridView.setData(0)};">
+						<input type="text" id="ordrsClntNm" class="form-control" name="ordrsClntNm" required msg="고객사" onkeyup="event.keyCode == 13 ? ClntSearch() : ''">
 							<a onclick="clntSearch();"><i class="i_search_w"></i></a>
                        </div>
                    	</td>
 
 					<th class="hit clmnDt">수금일자</th>
 					<td>
-						<input type="text" id="clmnDt" name="clmnDt" class="input_calendar" autocomplete="off" required msg="수금일자" date>							
+						<input type="text" id="clmnDt" name="clmnDt" class="input_calendar form-control" autocomplete="off" onkeyup="dateMask(this);" msg="수금일자" required date>							
 					</td>
 				</tr>
 				
@@ -53,16 +52,16 @@
 				<tr>
 					<th class="hit currCd">통화단위</th>
                    	<td>
-                   		<select id="currCd" class="form-control input-sm" name="currCd"  data-kind="CURR">
+                   		<select id="currCd" class="form-control input-sm" name="currCd"  data-kind="CURR" onchange="Chk_currCd();">
                        	</select>
                    	</td>
                    	<th>환율</th>
                    	<td>
-                    	<input type="text" id="exrate" class="form-control" name="exrate">
+                    	<input type="text" id="exrate" class="form-control" name="exrate" maxlength="10" onkeyup="onlyNumber(this)" comma onchange="Chk_Exrate();">
                    	</td>
                    	<th class="hit clmnAmt">수금금액</th>
                    	<td>
-                    	<input type="text" id="clmnAmt" class="form-control" name="clmnAmt" comma>
+                    	<input type="text" id="clmnAmt" class="form-control" name="clmnAmt" comma readonly="readonly">
                    	</td>
                    	<th colspan="2"></th>
 				</tr>
@@ -140,22 +139,23 @@
 						var paramObj = {"row" : row};
 						//체크박스일 경우 실행
 						if( key == "chk" ) {
-							setoutQty(ModalgridView, this.item.chk , this.item.stockQty, row);                        		
+							setAmt(ModalgridView, this.item.chk , this.item.miConfAmt, row); 
 						}
 					},
 					onDBLClick: function () {
 						//this.self.select(this.dindex);
 					},
 					onDataChanged: function () {
-						var stockQty = 0;
-						var outQty = 0;
-						if (this.key == "outQty") {
-							stockQty = this.item.stockQty;
-							outQty = this.item.outQty;
-							if (parseFloat(outQty) > parseFloat(stockQty)) {
-								alert('불출수량은 재고수량을 초과할 수 없습니다.');
-								this.item.outQty = stockQty;
+						var miConfAmt = 0;
+						var confAmt = 0;
+						if (this.key == "confAmt") {
+							miConfAmt = this.item.miConfAmt;
+							confAmt = this.item.confAmt;
+							if (parseFloat(confAmt) > parseFloat(miConfAmt)) {
+								alert('매출확정금액은 미확정금액을 초과할 수 없습니다.');
+								this.item.confAmt = miConfAmt;
 							}
+							setSumAmt();
 						}
 					},
 				},
@@ -174,7 +174,7 @@
 				},
 				
 				columns : [
-					{key: "fileTrgtKey", label: "첨부파일키",	align: "center", 	width: 80 , hidden: true},
+					{key: "fileTrgtKey", 	label: "첨부파일키",	align: "center", 	width: 80 , hidden: true},
 					{key: "coCd",        	label: "회사",      	align: "center",	width: 80 , hidden: true},
 					{key: "ordrsNo",	 	label: "수주번호", 	align: "center", 	width: 100, hidden: false},
 					{key: "ordrsClntCd",      	label: "고객사",     align: "center", 	width: 80 , hidden: true},
@@ -214,17 +214,19 @@
 		
 		setData: function(_pageNo) {
 			var targetObj = this.target;
-// 			var coCd = $('#coCd').val();
-// 			var ioNo = $('#ioNo').val();
+			var coCd = $('#coCd').val();
+			var clmnNo = $('#clmnNo').val();
 
 			var formData = new FormData();
-// 			if (ioNo == "") {
-// 				formData = {
-// 					"whCd": $('#outWhCd').val(),
-// 					"salesCd": $('#salesCd').val()
-// 				}
+			if (clmnNo == "") {
+				formData = {
+					"coCd": $('#coCd').val(),
+					"ordrsClntCd": $('#ordrsClntCd').val(),
+					"currCd": $('#currCd').val()
+				}
 				// /user/cr/cr05/selectClmnInfo
-				postAjax("/user/cr/cr05/selectClmnInfo", formData, null, function(data) {
+				// 입력대상
+				postAjax("/user/cr/cr05/select_insert_target_modal", formData, null, function(data) {
 					var list = data.result;					
 					targetObj.setData({
 						list : list,
@@ -233,27 +235,28 @@
 						}
 					});
 				});
-// 			} else {
-// 				formData = {
-// 					"coCd": $('#coCd').val(),
-// 					"ioNo": $('#ioNo').val()
-// 				}
-// 				postAjax("/user/sm/sm04/select_sm04_Info_Dtl", formData, null, function(data) {
-// 					var list = data.result;
-// 					//debugger;
-// 					targetObj.setData({
-// 						list : list,
-// 						page : {
-// 							totalElements: list.length
-// 						}
-// 					});
-// 				});
-// 			}
+			} else {
+				formData = {
+					"coCd": $('#coCd').val(),
+					"clmnNo": $('#clmnNo').val()
+				}
+				postAjax("/user/cr/cr05/select_cr05_Info_Dtl", formData, null, function(data) {
+					var list = data.result;
+					//debugger;
+					targetObj.setData({
+						list : list,
+						page : {
+							totalElements: list.length
+						}
+					});
+				});
+			}
 		}
  	}
 	
 	//화면 초기 설정
 	$(document).ready(function() {
+		debugger;
 		setCommonSelect($(".popup_area select[data-kind]"));
 		setByCoCd(modalStack.last().paramObj.coCd);
 
@@ -276,12 +279,14 @@
 		
 		actionType = modalStack.last().paramObj.actionType;
 		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
+		clmnNo = modalStack.last().paramObj.clmnNo;
 		
 		if (actionType == "C") {
 		//	debugger;
 			$('#popForm .coCd').addClass('hit');
 			$('#popForm input#coCd').attr('required', 'required');
 			
+			$("#popForm #exrate").val("1");
 			//버튼명 변경
 			$("#actionBtn").text("등록");
 			
@@ -290,11 +295,9 @@
 
 			//버튼 클릭 시
 			$('#actionBtn').on("click", function() {
-			//	insert_sm04();
+				insert_cr05();
 			});
-			
 			ModalgridView.initView().setData(0);
-			
 		} else if (actionType == "U") {
 			//타이틀명 변경
 			$('.tit').text('수금 수정')
@@ -303,38 +306,39 @@
 			$('#popForm .coCd').removeClass('hit');
 			$('#coCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
 			
-			//SalesCode 비활성화
-			$('#popForm .salesCd').removeClass('hit');
-			$('#salesCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+			//고객사 비활성화
+			$('#popForm .ordrsClntNm').removeClass('hit');
+			$('#ordrsClntNm').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
 			
-			//불출일자 비활성화
-			$('#popForm .ioDt').removeClass('hit');
-			$('#ioDt').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+			//수금일자 비활성화
+			$('#popForm clmnDt').removeClass('hit');
+			$('#clmnDt').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
 			
-			//출고창고 비활성화
-			$('#popForm .outWhCd').removeClass('hit');
-			$('#outWhCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+			//통화 비활성화
+			$('#popForm .currCd').removeClass('hit');
+			$('#currCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
 			
-			//입고창고 비활성화
-			$('#popForm .inWhCd').removeClass('hit');
-			$('#inWhCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+			//환율 비활성화
+			$('#popForm .exrate').removeClass('hit');
+			$('#exrate').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+
 						
 			// outQty 출고수량 컬럼 삭제
-			ModalgridView.target.removeColumn(29);
+		//	ModalgridView.target.removeColumn(29);
 			// chk 선택 컬럼 삭제
-			ModalgridView.target.removeColumn(28);
+		//	ModalgridView.target.removeColumn(28);
 			// stockQty 재고수량 컬럼 삭제
-			ModalgridView.target.removeColumn(27);
+		//	ModalgridView.target.removeColumn(27);
 
 			//수정 모드 데이터 가져오기
-			select_sm04_Info();
+			select_cr05_Info();
 			
 			//버튼명 변경
 			$('#actionBtn').text("수정");
 
 			//버튼 클릭 시
 			$('#actionBtn').on("click", function() {
-				update_sm04();
+				update_cr05();
 			});
 		}
 		
@@ -353,13 +357,19 @@
 	});
 	
 	//입력정보
-	function select_sm04_Info() {
+	function select_cr05_Info() {
+		debugger;	
+		var row = gridView.target.getList("selected")[0];
 		var formData = {
 			"fileTrgtKey" : fileTrgtKey,
+		//	"sellBillNo" : row.sellBillNo,
+			"clmnNo" : row.clmnNo
 		}
 		
-		postAjaxSync("/user/cr/cr05/selectClmnInfo", formData, null, function(data) {
+		postAjaxSync("/user/cr/cr05/select_cr05_Info", formData, null, function(data) {
+			debugger;
 			$.each(data.result, function(key, value) {
+				debugger;
 				if ($('#popForm #' + key)[0]) {
 					$('#popForm #' + key).val(value);
 					
@@ -475,30 +485,47 @@
 		return formData;
 	}
 
-	//Sales Code
-    function SalesCodeSearch() {
-		//등록일 경우만 팝업처리
+	// 금액지정
+	function setAmt(gridObj, chkVal, Amt, row) {
+		//등록일 경우만 처리
 		if (actionType == "C") {
-				var paramObj = {
-				"coCd" : $('#coCd').val(),
-				"salesCd": $('#salesCd').val()
-			};
-			openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1000, 430, "SALES CODE 검색", paramObj, function (grid) {
-				var row = grid.target.getList("selected")[0];
-				$('#salesCd').val(row.salesCd);
-				$('#clntCd').val(row.ordrsClntCd);
-				$('#clntNm').val(row.ordrsClntNm);
-				$('#clntPjt').val(row.clntPjt);
-				$('#prdtCd').val(row.prdtCd);
-				$('#prdtNm').val(row.prdtCdNm);
-				$('#itemDiv').val(row.itemDiv);
-				$('#itemDivNm').val(row.itemDivNm);
-				$('#eqpNm').val(row.eqpNm);
-				
-				Modal_DataSearch();
-			});
+			var gridList = gridObj.target.getList();
+			var gridColumns = gridObj.target.columns;
+			
+			var Amt = parseInt(Amt);
+			//debugger;
+			if(chkVal == "Y") {
+				if( Amt > 0 ) {
+					gridObj.target.setValue(row, "confAmt", Amt);
+				} else if( isNaN(Amt) ) {
+					gridObj.target.setValue(row, "confAmt", 0);
+				}
+			} else if(chkVal == "N") {
+				gridObj.target.setValue(row, "confAmt", 0);
+			}
+			setSumAmt();
+			//gridObj.target.focusedColumn.valueOf("confAmt")
 		}
-    }
+	}
+
+	// 금액지정
+	function setSumAmt() {
+		//등록일 경우만 처리
+		if (actionType == "C") {
+			var SumAmt = 0;
+			var list = ModalgridView.target.list;
+			//debugger;
+			$.each(list,function(idx, obj) {
+				//신규
+				if (parseFloat(obj.confAmt) > 0 && obj.chk == 'Y') {
+					SumAmt = SumAmt + parseFloat(obj.confAmt);
+				}
+			});
+
+			$("#popForm #sellDcsnAmt").val(SumAmt);
+		}
+	}
+
 	
 	// 창고 콤보 설정 -> 콤보에 값넣기 참고
 	function ModalgetWhNm(ColId) {
@@ -532,6 +559,22 @@
 			}
 		});
 	}
+	
+	
+	// 계좌번호 설정
+// 	function getBkac() {
+// 		var paramObj = {
+// 				"codeKind" : "BKAC"
+// 		};
+		
+// 		postAjax("/user/cr/cr05/selectBkac", paramObj, null, function(data) {
+// 			var row = data.result;
+// 			for(var i=0; i<row.length; i++) {
+				
+// 			}
+// 		});
+// 	}
+	
 	
 	// 수량지정
 	function setoutQty(gridObj, chkVal, stockQty, row) {
@@ -572,19 +615,44 @@
 			ModalgridView.setData(0);
 		}
 	}
+	
+	// 환율체크
+	function Chk_Exrate() {
+		var currCd = $('#currCd').val();
+
+		//원화인 경우 1 고정
+		if (currCd == 'CURR01') {
+			$("#popForm #exrate").val("1");
+		}
+	}
+	
+	// 통화단위 체크
+	function Chk_currCd() {
+		var currCd = $('#currCd').val();
+
+		//원화인 경우 1 고정
+		if (currCd == 'CURR01') {
+			$("#popForm #exrate").val("1");
+		}
+		Modal_DataSearch();
+	}
 
 	function setByCoCd(value) {
 		$('#coCd option:not([value="'+value+'"])').remove();
 	}
 	
 	// 거래처 검색 함수
-	function clntSearch() {
-		openSecondModal("/static/html/cmn/modal/clntSearch.html", 600, 420, "고객사 검색", {}, function(grid) {
-			var row = grid.target.getList("selected")[0];
-			$('#ordrsClntCd').val(row.clntCd);
-			$('#ordrsClntNm').val(row.clntNm);
-			gridView.setData(0); // 그리드 재검색
-		});
+	function clntSearch(inputValue) {
+		//등록일 경우만 팝업처리
+		if (actionType == "C") {
+			openSecondModal("/static/html/cmn/modal/clntSearch.html", 600, 420, "거래처 검색", {searchValue : inputValue}, function(grid) {
+				var row = grid.target.getList("selected")[0];
+				$('#OrdrsClntCd').val(row.clntCd);
+				$('#ordrsClntNm').val(row.clntNm);
+				
+				Modal_DataSearch();
+			});
+		}
 	}
 
 </script>

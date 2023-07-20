@@ -47,13 +47,13 @@ public class CR05SvcImpl implements CR05Svc {
 	}
 	
 	@Override
-	public int selectClmnInfoCount(Map<String, String> paramMap) {
-		return cr05Mapper.selectClmnInfoCount(paramMap);
+	public Map<String, String> select_cr05_Info(Map<String, String> paramMap) {
+		return cr05Mapper.select_cr05_Info(paramMap);
 	}
 	
 	@Override
-	public List<Map<String, String>> selectClmnInfo(Map<String, String> paramMap) {
-		return cr05Mapper.selectClmnInfo(paramMap);
+	public List<Map<String, String>> select_cr05_Info_Dtl(Map<String, String> paramMap) {
+		return cr05Mapper.select_cr05_Info_Dtl(paramMap);
 	}
 	
 	@Override

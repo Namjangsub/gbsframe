@@ -104,9 +104,9 @@ public class CR02Svcmpl implements CR02Svc {
         
         cr01Svc.updateEstConfirm(param);
         cr02Mapper.insertOrdrs(param);
-
-      
-        List<Map<String, String>> planArr = gson.fromJson(removeEmptyObjects(param.get("planArr")), mapList);
+        
+        //List<Map<String, String>> planArr = gson.fromJson(removeEmptyObjects(param.get("planArr")), mapList);
+        List<Map<String, String>> planArr = gson.fromJson(param.get("planArr"), mapList);
         for (Map<String, String> planMap : planArr) {
             try {
                 planMap.put("coCd", param.get("coCd"));
@@ -116,7 +116,7 @@ public class CR02Svcmpl implements CR02Svc {
                 planMap.put("userId", param.get("userId"));
                 planMap.put("pgmId", param.get("pgmId"));
                 planMap.put("udtId", param.get("userId"));
-                planMap.put("udtPgm", "TB_CR02M01");
+                planMap.put("udtPgm", "TB_CR02P01");
 
                 
                 cr02Mapper.insertClmnPlanHis(planMap);
@@ -129,8 +129,9 @@ public class CR02Svcmpl implements CR02Svc {
             }
         }
 
-        List<Map<String, String>> detailArr = gson.fromJson(removeEmptyObjects(param.get("detailArr")), mapList);
-
+//        List<Map<String, String>> detailArr = gson.fromJson(removeEmptyObjects(param.get("detailArr")), mapList);
+        List<Map<String, String>> detailArr = gson.fromJson(param.get("detailArr"), mapList);
+        
         for (Map<String, String> detailMap : detailArr) {
             try {
                 detailMap.put("coCd", param.get("coCd"));
@@ -145,21 +146,22 @@ public class CR02Svcmpl implements CR02Svc {
                 //Sales Cd 만들떄 ITEM_DIV의 CODE_ETC 값 추출
                 String ItemDoov = (selectItemDivEtc(detailMap));
                 String Salad = detailMap.get("salesCd");
-                
-                if ("".equals(Salad) || Salad == null || Salad.length() == 0) {
-                	if (detailMap.get("ordrsSeq").length() == 1) {
-                		OrderSeq = '0'+ detailMap.get("ordrsSeq");
-                		System.out.println("OrderSeq :" + OrderSeq);
-                	}
-                	else {
-                		OrderSeq = detailMap.get("ordrsSeq");
-                		System.out.println("OrderSeq :" + OrderSeq);
-                	}
-                	
-                    String newSalesCode = param.get("ordrsNo") + "-" + OrderSeq + detailMap.get("prdtCd") + ItemDoov;
-                    detailMap.put("salesCd", newSalesCode);
+                //입력구분이 '설비'코드 일때 sales_cd 만들기(sales_cd 값이 빈칸, null, 길이 0 일떄)
+                if (detailMap.get("ordrsDtlDiv10").equals("ORDRSDTLDIV1010")) {
+	                if ("".equals(Salad) || Salad == null || Salad.length() == 0) {
+	                	if (detailMap.get("ordrsSeq").length() == 1) {
+	                		OrderSeq = '0'+ detailMap.get("ordrsSeq");
+	                		System.out.println("OrderSeq :" + OrderSeq);
+	                	}
+	                	else {
+	                		OrderSeq = detailMap.get("ordrsSeq");
+	                		System.out.println("OrderSeq :" + OrderSeq);
+	                	}
+	                	
+	                    String newSalesCode = param.get("ordrsNo") + "-" + OrderSeq + detailMap.get("prdtCd") + ItemDoov;
+	                    detailMap.put("salesCd", newSalesCode);
+	                }
                 }
-
                 cr02Mapper.insertOrdrsDetail(detailMap);
             } catch (Exception e) {
                 System.out.println("error3" + e.getMessage());
@@ -191,11 +193,42 @@ public class CR02Svcmpl implements CR02Svc {
     }
 
     @Override
-    public void updateOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) {
+    public void updateOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception {
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
         Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {
         }.getType();
-
+        String OrderSeq = "";
+        
+        //---------------------------------------------------------------
+		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+		//   필수값 :  jobType, userId, comonCd
+		//---------------------------------------------------------------
+		HashMap<String, String> paramMap = new HashMap<>();
+		paramMap.put("userId", param.get("userId"));
+		paramMap.put("comonCd", param.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
+		paramMap.put("uploadFileArr", param.get("uploadFileArr"));
+		
+		List<Map<String, String>> uploadFileList = gson.fromJson(paramMap.get("uploadFileArr"), mapList);
+		if (uploadFileList.size() > 0) {
+			//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
+			paramMap.put("jobType", "fileUp");
+			cm15Svc.selectFileAuthCheck(paramMap);
+		}
+		
+		String[] deleteFileArr = gson.fromJson(param.get("deleteFileArr"), String[].class);
+		List<String> deleteFileList = Arrays.asList(deleteFileArr);
+		
+		for(String fileKey : deleteFileList) {
+			// 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
+			Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
+			//접근 권한 없으면 Exception 발생
+			paramMap.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
+			paramMap.put("jobType", "fileDelete");
+			cm15Svc.selectFileAuthCheck(paramMap);
+		}
+		//---------------------------------------------------------------
+		//첨부 화일 권한체크  끝
+		//---------------------------------------------------------------
 
         param.put("udtId", param.get("userId"));
         param.put("udtPgm", "TB_CR02M01");
@@ -272,9 +305,28 @@ public class CR02Svcmpl implements CR02Svc {
                 ordrsDetail.put("udtId", param.get("userId"));
                 ordrsDetail.put("udtPgm", "TB_CR02M01");
 
+              //Sales Cd 만들떄 ITEM_DIV의 CODE_ETC 값 추출
+                String ItemDoov = (selectItemDivEtc(ordrsDetail));
+                String Salad = ordrsDetail.get("salesCd");
+                //입력구분이 '설비'코드 일때 sales_cd 만들기(sales_cd 값이 빈칸, null, 길이 0 일떄)
+                if (ordrsDetail.get("ordrsDtlDiv10").equals("ORDRSDTLDIV1010")) {
+	                if ("".equals(Salad) || Salad == null || Salad.length() == 0) {
+	                	if (ordrsDetail.get("ordrsSeq").length() == 1) {
+	                		OrderSeq = '0'+ ordrsDetail.get("ordrsSeq");
+	                		System.out.println("OrderSeq :" + OrderSeq);
+	                	}
+	                	else {
+	                		OrderSeq = ordrsDetail.get("ordrsSeq");
+	                		System.out.println("OrderSeq :" + OrderSeq);
+	                	}
+	                	
+	                    String newSalesCode = param.get("ordrsNo") + "-" + OrderSeq + ordrsDetail.get("prdtCd") + ItemDoov;
+	                    ordrsDetail.put("salesCd", newSalesCode);
+	                }
+                }
 
                 System.out.println("최종231541" + ordrsDetail);
-             cr02Mapper.insertOrdrsDetail(ordrsDetail);
+                cr02Mapper.insertOrdrsDetail(ordrsDetail);
             }
         }
         // Similarly, for planArr
@@ -343,6 +395,22 @@ public class CR02Svcmpl implements CR02Svc {
                     cr02Mapper.insertClmnPlan(plan);
                     cr02Mapper.insertUpdatePlanHis(plan);
                 }
+                
+             //---------------------------------------------------------------
+    		//첨부 화일 처리 시작
+    		//---------------------------------------------------------------
+    		if (uploadFileList.size() > 0) {
+    			paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+    			paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+    			cm08Svc.uploadFile(paramMap, mRequest);
+    		}
+    		
+    		for(String fileKey : deleteFileList) {
+    			cm08Svc.deleteFile(fileKey);
+    		}
+    		//---------------------------------------------------------------
+    		//첨부 화일 처리  끝
+    		//---------------------------------------------------------------
             }catch(Exception e){
                 e.getStackTrace();
             }
@@ -425,12 +493,17 @@ public class CR02Svcmpl implements CR02Svc {
 		int result = 0;
 		String lvl = paramMap.get("lvl").toString();
 		String onNumber = paramMap.get("ordrsSeq");
+		String estNo = paramMap.get("estNo");
 		
 		if ("1".equals(lvl)) {
 			result = cr02Mapper.deleteOrdrs(paramMap);
 	        result += cr02Mapper.deleteOrdrsPlan(paramMap);
+	        result += cr02Mapper.deleteOrdrsPlanHis(paramMap);
 	        result += cr02Mapper.deleteOrdrsDetail(paramMap);
-	        result += cr02Mapper.updateEstDeleteConfirm(paramMap);
+	        if (!"".equals(estNo) && estNo != null) {
+	        	result += cr02Mapper.updateEstDeleteConfirm(paramMap);
+	        }
+
     	} else {
     		 result += cr02Mapper.deleteOrdrsDetail(paramMap);
     	}
