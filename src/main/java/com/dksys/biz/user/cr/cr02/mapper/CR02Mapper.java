@@ -52,6 +52,8 @@ public interface CR02Mapper {
     int deleteOrdrs(Map<String, String> param);
 
     int deleteOrdrsPlan(Map<String, String> param);
+    
+    int deleteOrdrsPlanHis(Map<String, String> param);
 
     int deleteOrdrsDetail(Map<String, String> param);
 
