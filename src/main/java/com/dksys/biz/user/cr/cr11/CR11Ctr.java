@@ -48,6 +48,32 @@ public class CR11Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+	
+	
+	//모달창 안에 그리드 grid-modal
+	@PostMapping(value = "/grid_Modal_selectList")
+	public String grid_Modal_selectList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = cr11Svc.grid_Modal_selectList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	//UPDATE
+	@PostMapping(value = "/update_cr11_Modal")
+	public String update_cr11_Modal(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (cr11Svc.update_cr11_Modal(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+	}
   
 	
 	
