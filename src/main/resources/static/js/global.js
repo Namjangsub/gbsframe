@@ -89,8 +89,8 @@ var modalStack = new ModalStack();
 var ubiprefix = "";
 if(jwt){
 	switch (jwt.serverType){
-    case "real" :
-        ubiprefix = "http://erp.gunyangitt.com:8090/ubi4/ubihtml.jsp";
+    case "prod" :
+        ubiprefix = "http://gbs.gunyangitt.co.kr:8090/ubi4/ubihtml.jsp";
 
         //ubiprefix = "http://localhost:8090/ubi4/ubihtml.jsp";
         break;
@@ -101,7 +101,7 @@ if(jwt){
         ubiprefix = "http://localhost:8090/ubi4/ubihtml.jsp";
         break;
     default :
-        ubiprefix = "http://erp.gunyangitt.com:8090/ubi4/ubihtml.jsp";
+        ubiprefix = "http://gbs.gunyangitt.co.kr:8090/ubi4/ubihtml.jsp";
     	//ubiprefix = "http://localhost:8090/ubi4/ubihtml.jsp";
 	}
 }
