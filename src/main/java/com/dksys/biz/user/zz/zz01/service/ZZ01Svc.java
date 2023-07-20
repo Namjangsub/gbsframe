@@ -14,6 +14,8 @@ public interface ZZ01Svc {
 	List<Map<String, String>> selectBomAllLevelList(Map<String, String> paramMap);
 
 	Map<String, String> selectBomTreInfo(Map<String, String> paramMap);
+	
+//	Map<String, String> checkBomRootSalesCdInfo(Map<String, String> paramMap);
 
 	int checkBomId(Map<String, String> paramMap);
 
@@ -24,7 +26,11 @@ public interface ZZ01Svc {
 	int deleteBom(Map<String, String> paramMap);
 	
 	int copyBomTree(List<Map<String, String>> paramList);
+	
+	int copyBomRootSalesCdTree(Map<String, String> paramList);
 
 	List<Map<String, String>> getAllChildNodeInfos(Map<String, String> paramMap);
+	
+	int checkBomInfo(Map<String, String> paramMap);
 
 }

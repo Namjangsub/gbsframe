@@ -13,6 +13,8 @@ public interface ZZ01Mapper {
 	List<Map<String, String>> selectBomlevelList(Map<String, String> paramMap);
 	
 	Map<String, String> selectBomTreInfo(Map<String, String> paramMap);
+	
+	Map<String, String> selectBomRootSalesCdTree(Map<String, String> paramMap);
 
 	int selectBomSeqNext(Map<String, String> paramMap);
 	
@@ -30,5 +32,7 @@ public interface ZZ01Mapper {
 
 	Map<String, String> selectBomInfo(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectBomAllLevelList(Map<String, String> paramMap);	
+	List<Map<String, String>> selectBomAllLevelList(Map<String, String> paramMap);
+	
+	int checkBomInfo(Map<String, String> paramMap);
 }

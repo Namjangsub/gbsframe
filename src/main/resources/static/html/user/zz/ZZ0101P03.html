@@ -1,0 +1,151 @@
+<div class="popup_area of_a" style="width: 100%; height: 100%;">
+	<div class="tit_contents">
+		<h4 class="tit">설계 BOM 복사 선택</h4>
+	</div>
+	<div class="popup_table">
+		<div class="form-group">
+			<form id="dsgnBomForm">
+				<!-- 기본정보 테이블 -->
+				<table class="popup_table">
+					<colgroup>
+						<col width="25%">
+						<col width="75%">
+					</colgroup>
+					<tbody>
+						<tr>
+							<th style="height: 50px;">원본 BOM</th>
+							<td>
+							    <div class="search_form">
+							    	<input type="text" id="salesCd_from" name="salesCd_from" readonly>
+							    </div>
+							</td>
+						</tr>
+						<tr>
+							<th class="hit" style="height: 50px;">대상 BOM</th>
+							<td>
+							    <div class="search_form">
+							    	<input type="text" id="salesCd_to" name="salesCd_to">
+							    	<a onclick="wbsSalesCodeSearch1(this);"><i class="i_search_w"></i></a>
+							    </div>
+							</td>
+						</tr>
+						<tr>
+							<th style="height: 50px;">프로젝트내용</th>
+							<td>
+								<div>
+								    <input type="text" id="clntNm_to" name="clntNm_to" readonly>
+								    <input type="text" id="clntPjt_to" name="clntPjt_to" readonly>
+								    <input type="text" id="prdtCdNm_to" name="prdtCdNm_to" readonly>
+								    <input type="text" id="itemDivNm_to" name="itemDivNm_to" readonly>
+								    <input type="text" id="eqpNm_to" name="eqpNm_to" readonly>
+							    </div>
+							</td>
+						</tr>
+						<tr>
+							<th style="height: 50px;">세일즈 코드 변경</th>
+							<td class="tl" style="padding: 5px 0px 5px 20px;">
+								<input type="radio" id="changeYn" name="changeYn" value="Y" checked>
+								<label for="changeY">예</label>
+								<input type="radio" id="changeYn" name="changeYn" value="N" style="margin-left: 15px;">
+								<label for="changeN">아니오</label>
+							</td>
+						</tr>
+						<tr>
+							<th>주의사항</th>
+							<td>
+								<div class="tl" style="margin-left: 20px; color: red;">
+									1. 대상 BOM이 하나라도 존재하면 복사 할 수 없습니다.
+									<br>
+									2. 세일즈코드 변경 여부에 따라 원본 SalesCd를 대상 SalesCd로<br>  도면번호를 변경해서 저장 합니다.
+									<br>
+								</div>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</form>
+			<br>
+		</div>
+	</div>
+	<div>
+		<button type="button" class="btn btn-default btn-sm" onclick="copySalesCdBomExec();" authchk>BOM 복사 실행</button>
+	</div>
+</div>
+<script type="text/javascript">	
+	$(document).ready(function() {
+		$('#salesCd_from').val($('#salesCd_S').val());
+		
+		authChk("ZZ0101M01");
+	});
+	debugger;
+	function copySalesCdBomExec(){
+		if(checkSalseCdData()){
+			var callbackObj = $('#dsgnBomForm').serializeObject();
+			
+			var paramObj = {
+					"coCd"	 	: $('#coCd_S').val(),
+					"salesCd"	: $('#salesCd_from').val(),
+					"salesCdTo"	: $('#salesCd_to').val(),
+					"changeYn"	: $("input[name='changeYn']:checked").val(),
+		  			"userId"	: jwt.userId,
+  					"pgmId"		: $('#pgmId').val()
+			}
+  			postAjax("/user/zz/zz01/copyBomRootSalesCdTree", paramObj, null, function(data){
+  				alert(data.resultMessage);
+ 				if(data.resultCode == 200){
+	  				$('#deptTree').jstree(true).settings.core.data = selectDeptTree();
+				} else {
+					//오류처리 트리를 원복해야함
+				}
+  				$('#deptTree').jstree(true).refresh();
+  			});  				
+			
+			
+			
+			
+// 	 		modalStack.last().callback(callbackObj);
+		}
+	}
+	
+	function checkSalseCdData(){
+		var isValid = true;
+		var tempSalesCd = $('#salesCd_from').val();
+		var paramObj = {
+				"coCd"	 : $('#coCd_S').val(),
+				"salesCd": tempSalesCd,
+				"salesCdTo": $('#salesCd_to').val()
+		}
+		postAjaxSync("/user/zz/zz01/checkBomInfo", paramObj, null, function(data) {
+			let chkCnt = data.resultCount;
+			if (chkCnt == 1){
+				alert(tempSalesCd + "에 복사 가능합니다.");
+				isValid = true;
+			} else if (chkCnt > 1) {
+				alert(tempSalesCd + "에는 BOM 등록된 자료가 있습니다. \n" + chkCnt + "건 등록 되어 있읍니다.");
+				isValid = false;
+			} else {
+				alert(tempSalesCd + "가 존재하지 않습니다.");
+				isValid = false;
+			}
+		});		
+		return isValid;
+	}
+	
+	
+    //Sales Code (수주마스터, 수주상세테이블 조인) 검색
+    function wbsSalesCodeSearch1() {
+        var paramObj = {
+           "coCd" : $('#coCd_S').val(),
+           "salesCd": $('#salesCd_to').val()
+        };
+        openSecondModal("/static/html/cmn/modal/SalesCodeTreeSearch.html", 1000, 540, "SALES CODE 검색", paramObj, function (grid){
+            var row = grid.target.getList("selected")[0];
+            $('#salesCd_to').val(row.salesCd);
+            $('#prdtCdNm_to').val(row.prdtCdNm);
+            $('#itemDivNm_to').val(row.itemDivNm);
+            $('#eqpNm_to').val(row.eqpNm);
+            $('#clntPjt_to').val(row.clntPjt);
+            $('#clntNm_to').val(row.ordrsClntNm);
+        });
+    }	
+</script>

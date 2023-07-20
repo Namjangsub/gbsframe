@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.zz.zz01.service.ZZ01Svc;
 import com.dksys.biz.util.MessageUtils;
 
@@ -52,7 +53,7 @@ public class ZZ01Ctr {
     	return "jsonView";
     }
     
-    // 부서정보 조회
+    // BOM 조회
     @PostMapping("/selectBomTreInfo")
     public String selectBomTreInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
     	Map<String, String> deptInfo = zz01Svc.selectBomTreInfo(paramMap);
@@ -60,7 +61,7 @@ public class ZZ01Ctr {
     	return "jsonView";
     }
     
-    // 부서아이디 중복확인
+    // BOM 중복확인
     @PostMapping("/checkBomId")
     public String checkBomId(@RequestBody Map<String, String> paramMap, ModelMap model) {
     	int deptCount = zz01Svc.checkBomId(paramMap);
@@ -119,7 +120,7 @@ public class ZZ01Ctr {
     	}
     	return "jsonView";
     }
-    // BOM 복사
+    // BOM Node 복사
     @PostMapping("/copyBomTree")
     public String copyBomTree(@RequestBody List<Map<String, String>> paramList, ModelMap model) {
     	try {
@@ -136,4 +137,37 @@ public class ZZ01Ctr {
     	}
     	return "jsonView";
     }
+    
+    // BOM Sales Code 단위 복사
+    @PostMapping("/copyBomRootSalesCdTree")
+    public String copyBomRootSalesCdTree(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	try {
+    		if (zz01Svc.copyBomRootSalesCdTree(paramMap) != 0 ) {
+    			model.addAttribute("resultCode", 200);
+    			model.addAttribute("resultMessage", messageUtils.getMessage("copy"));
+    		} else {
+    			model.addAttribute("resultCode", 500);
+    			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));    			
+    		}
+    	}catch(Exception e) {
+    		model.addAttribute("resultCode", 900);
+    		model.addAttribute("resultMessage", e.getMessage());
+    	}
+    	return "jsonView";
+    }
+    
+	@PostMapping("/checkBomInfo")
+    public String checkBomInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+		    int resultCount = zz01Svc.checkBomInfo(paramMap);
+		    model.addAttribute("resultCount", resultCount);
+		    model.addAttribute("resultCode", 200);
+		    model.addAttribute("resultMessage", messageUtils.getMessage("check"));
+		} catch (Exception e) {
+			model.addAttribute("resultCount", 0);
+		    model.addAttribute("resultCode", 900);
+		    model.addAttribute("resultMessage", e.getMessage());
+		}
+        return "jsonView";
+    } 
 }
