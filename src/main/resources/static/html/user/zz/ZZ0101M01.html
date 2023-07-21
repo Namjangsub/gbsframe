@@ -405,7 +405,7 @@
   		$("#deptTree").jstree("destroy");
   		$("#deptTree").jstree(
   		{
-  			plugins : ['types', 'dnd', 'contextmenu' ],
+  			plugins : ['types', 'dnd', 'contextmenu', 'search' ],
   			core : {
   				"check_callback": checkOperation,
   				dblclick_toggle: false,
@@ -478,12 +478,18 @@
   			var node = $(this).jstree(true).get_node(this);
   			createBom('U');
   		}).on('copy_node.jstree', function(e, data) {
+  			if (data.old_parent == data.parent){
+  				alert("같은자리에는 복사할 수 없습니다.");
+  				$('#deptTree').jstree(true).refresh();
+  				return false;
+  			}
   		    var copiedNodeId = data.original.id;
   		    var targetNodeId = data.parent;
   			var copiedNode = $("#deptTree").jstree(true).get_node(copiedNodeId);
   			var targetNode = $("#deptTree").jstree(true).get_node(targetNodeId);
   			if (confirm('"' + copiedNode.text + '" 를' + targetNode.text + '"에 복사 하시겠습니까?')) {
-	  		    console.log("노드 복사 완료: " + copiedNodeId);
+
+  				//console.log("노드 복사 완료: " + copiedNodeId);
 	  			var nodeInfoArr = [];
 	  			var nodeInfo = {};
 	  			nodeInfo.coCd		= $('#coCd_S').val();
@@ -517,7 +523,7 @@
   		    
   		}).on('move_node.jstree', function(e, data){
   		// 노드 이동완료 시
-  			
+ 
   			$('#deptTree').jstree(true).deselect_all();
   			$('#deptTree').jstree(true).select_node(data.node.id);
   			
@@ -570,7 +576,6 @@
   				$('#deptTree').jstree(true).settings.core.data = selectDeptTree();
   				$('#deptTree').jstree(true).refresh();
   			});
-  			
   		});
   	}
 
@@ -604,32 +609,50 @@
 		
 	// Tree dnd check
 	function checkOperation(operation, node, parent, position, more){
-		console.log(operation, node, parent, position, more);
-		if(operation == "move_node"){
-			if (more && more.core) {
-			// 노드가 드랍되었을 때
+// 		console.log(operation, node, parent, position, "more:", more, "more.core:", more.core);
+		if (more && more.core) { // 노드가 드랍되었을 때
+			if(operation == "move_node"){
+// 				console.log(operation, node, parent, position, "more:", more, "more.core:", more.core);
+			
 				if(node.id == "new"){
 					alert("신규로 추가한 BOM을 저장해 주세요.");
 					return false;
 				}else{
+					// 자식노드중에 같은게 있는지 확인
+					const result = isNodeNameExists(parent, node.text);
+		    		if (result) {
+		    			$("#deptTree").jstree().search(node.text,true,false,parent.id);
+		    			alert("동일한 아이템이 존재합니다.");
+		    			$('#deptTree').jstree(true).refresh();
+		  				return false;
+			   		} 	
+		    		
 					var confirmMessage = "BOM을 이동하시겠습니까?";
 					if(!confirm(confirmMessage)){
 						return false;
 					}
 				}
+			} else if(operation == "create_node"){
+			} else if(operation == "copy_node"){
+// 				console.log(operation, node, parent, position, "more:", more, "more.core:", more.core);
+
+				// 노드가 드랍되었을 때
+				// 자식노드중에 같은게 있는지 확인
+				const result = isNodeNameExists(parent, node.text);
+	    		if (result) {
+	    			$("#deptTree").jstree().search(node.text,true,false,parent.id);
+	    			alert("동일한 아이템이 존재합니다.");
+	    			$('#deptTree').jstree(true).refresh();
+	  				return false;
+		   		} 			
+			
 			}
-		}
-		if(operation == "create_node"){
-		}
-		if(operation == "copy_node"){
-		}
-	}  	
+		} //if (more && more.core)
+	}  	// function
 
 	// 신규조직 생성
 	function createBom(actionType){
 		var $deptTree = $("#deptTree").jstree(true);
-
-		
 		if(!$deptTree.get_node('new')){
 			var bomId = $deptTree.get_selected()[0];
 			var parentNode = $deptTree.get_node(bomId);
@@ -673,7 +696,7 @@
 	            });				
 		}
 	}	
-	
+
 	function  deleteBom() {
   	    var node = $('#deptTree').jstree(true).get_selected()[0];
 		var currNode = $("#deptTree").jstree(true).get_node(node);
@@ -720,10 +743,10 @@
     	// 특정 노드의 펼침/접힘 상태 확인
     	var isOpen = $('#' + selector).jstree("is_open", node);
     	if (isOpen) {
-    	  console.log("노드가 펼쳐져 있습니다.");
+    	  //console.log("노드가 펼쳐져 있습니다.");
     	  $('#' + selector).jstree("close_all", node)
     	} else {
-    	  console.log("노드가 접혀 있습니다.");
+    	  //console.log("노드가 접혀 있습니다.");
     	  $('#' + selector).jstree("open_all", node)
     	}
 
@@ -739,6 +762,25 @@
 		}    	
     	
     }
+
+    
+	// 특정 노드 아래에 있는 자식 노드들 중에서 특정 노드명이 있는지 체크
+    function isNodeNameExists(node, nodeName) {
+		if (!node || !node.children.length) { // 해당 노드가 없거나 자식 노드가 없는 경우
+			return false;
+		}
+		
+		let result = false;
+		node.children.forEach(childNodeId => {
+		    const childNode = $("#deptTree").jstree(true).get_node(childNodeId);
+		    if (childNode.text === nodeName) {
+		      result = true;
+		      return false; // break the loop
+		    } 
+		});
+		
+		return result;
+	}    
     
 //  	// 특정 노드의 모든 하위 노드 ID 구하기 ---백엔드에서 처리함
 // 	function getAllChildNodeIds(nodeId) {
