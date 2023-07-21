@@ -400,8 +400,8 @@ public class CR02Svcmpl implements CR02Svc {
     		//첨부 화일 처리 시작
     		//---------------------------------------------------------------
     		if (uploadFileList.size() > 0) {
-    			paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-    			paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+    			paramMap.put("fileTrgtTyp", param.get("pgmId"));
+    			paramMap.put("fileTrgtKey", param.get("fileTrgtKey"));
     			cm08Svc.uploadFile(paramMap, mRequest);
     		}
     		
