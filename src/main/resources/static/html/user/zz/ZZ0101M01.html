@@ -142,7 +142,6 @@
 				</td>
 				<th>고객사</th>
 				<td>
-					<input type="hidden" id="clntCd_S" name="clntCd_S">
 					<input type="text" id="clntNm_S" name="clntNm_S">
 				</td>
 			</tr>
@@ -169,15 +168,17 @@
         </div>
       </div>
       <!-- // 콘텐츠 -->
+		<input type="hidden" id="pgmId" name="pgmId">
   
       <!-- 콘텐츠 --> 
       <div class="contents no_bg">
         <!-- 콘텐츠 타이틀 -->
         <div class="contents_tit" style="margin: 0px;">
           <div class="add_btn_small pdl10" style="margin: 0px; padding: 0px;">
-            <a onclick="updateRecptYnGrid();" style="height: 30px; line-height: 28px; width: 40px;" authchk> 접수</a> 
-            <a onclick="insertShipModal();" style="height: 30px; line-height: 28px;" authchk>+</a> 
-            <a onclick="deleteShip();" style="height: 30px; line-height: 28px;" authchk>-</a> 
+            <a onclick="copyBom();" style="height: 30px; line-height: 28px; width: 50px;" authchk><i class="fas fa-clone"></i> 복사</a> 
+<!--             <a onclick="updateRecptYnGrid();" style="height: 30px; line-height: 28px; width: 40px;" authchk> 접수</a>  -->
+<!--             <a onclick="insertShipModal();" style="height: 30px; line-height: 28px;" authchk>+</a>  -->
+<!--             <a onclick="deleteShip();" style="height: 30px; line-height: 28px;" authchk>-</a>  -->
             <a onclick="excelFile();" style="height: 30px; line-height: 28px; width: 50px;" authChk>생성</a>
 		    <a onclick="jsonToExcel(firstGrid);" style="height: 30px; line-height: 28px; width: 50px;"><i class="fas fa-file-excel"></i> 엑셀</a>
           </div>
@@ -231,6 +232,7 @@
 			this.target.setConfig({
 	           target: $('[data-ax5grid="first-grid"]'),
 	           showLineNumber: true,
+	           lineNumberColumnWidth: 40,
 	           showRowSelector: false,  
 		       multipleSelect: false,
 	           header: {align:'center'}, 
@@ -259,7 +261,7 @@
 	               {key: "matrUnitCd",	label: "자재단위", 	width: 50,align: "center",  hidden: true},
 	               {key: "lvl", 		label: "단계", 		width: 40,align: "center"},
 	               {key: "upperCd", 	label: "상위", 		width: 40,align: "center",  hidden: true},
-	               {key: "dsgnNo", 		label: "도번", 		width: 40,align: "center",  hidden: true},
+	               {key: "dsgnNo", 		label: "도번", 		width: 200,align: "left",  hidden: false},
 	               {key: "matrUnitCd", 	label: "단위", 		width: 40,align: "center",  hidden: true},
 	               {key: "matrUnitCdNm",label: "단위", 		width: 40,align: "center",  hidden: true},
 // 	               {key: "price", 		label: "단가", 		width: 50,align: "right", formatter:"money"},
@@ -332,6 +334,7 @@
 	  	    //권한체크
 	  	    authChk();
 			mainDefaultLoad("구매", "BOM 관리");
+			$('#pgmId').val("ZZ0101M01");
 			setCommonSelect($("#main_area select[data-kind]"));
 			//수주일//
 			$('#reqDtFrom').datepicker({
@@ -485,20 +488,28 @@
 	  			var nodeInfo = {};
 	  			nodeInfo.coCd		= $('#coCd_S').val();
 	  			nodeInfo.salesCd	= $('#salesCd_S').val();
+	  			nodeInfo.salesCdTo	= $('#salesCd_S').val();  //Target sales Code 230720 추가
 	  			nodeInfo.parentId	= targetNodeId;
 	  			nodeInfo.upperCd	= targetNode.original.lowerCd;
 	  			nodeInfo.upperKey	= targetNodeId;
 	  			nodeInfo.childId	= copiedNodeId;
 	  			nodeInfo.lowerCd	= copiedNode.original.lowerCd;
 	  			nodeInfo.lowerKey	= copiedNodeId;
-	  			
-// 				var getAllChilds = getAllChildNodeIds(copiedNodeId);
+	  			nodeInfo.changeYn	= "N";    // 도면번호에 SalesCd 변경 여부임 변경없을경우 'N'
+	  			nodeInfo.userId		= jwt.userId;
+	  			nodeInfo.pgmId		= $('#pgmId').val();
+	  			//백엔드 서비스단에서 재귀호출을 통합 하위 복사로 대체함
+// 				var getAllChilds = getAllChildNodeIds(copiedNodeId); //재귀호출 기능을 백단으로 이동 처리함
 				nodeInfoArr.push(nodeInfo);
 // 				nodeInfoArr = nodeInfoArr.concat(getAllChilds);
 		
 	  			postAjax("/user/zz/zz01/copyBomTree", nodeInfoArr, null, function(data){
 	  				alert(data.resultMessage);
-	  				$('#deptTree').jstree(true).settings.core.data = selectDeptTree();
+	 				if(data.resultCode == 200){
+		  				$('#deptTree').jstree(true).settings.core.data = selectDeptTree();
+					} else {
+						//오류처리 트리를 원복해야함
+					}
 	  				$('#deptTree').jstree(true).refresh();
 	  			});  
   			}
@@ -529,10 +540,13 @@
   			$.each(oldParent.children, function(idx, item){
   				var childNode = $('#deptTree').jstree(true).get_node(item);
   				var deptInfo = {};
-  				deptInfo.deptId = childNode.id;
-  				deptInfo.upDeptId = childNode.parent;
-  				deptInfo.sortNo = childNode.original.sortNo;
-  				deptInfo.upperCd = childNode.original.upperCd;
+  				deptInfo.deptId 	= childNode.id;
+  				deptInfo.upDeptId 	= childNode.parent;
+  				deptInfo.sortNo 	= childNode.original.sortNo;
+  				deptInfo.upperCd 	= childNode.original.upperCd;
+  				deptInfo.userId		= jwt.userId;
+  				deptInfo.pgmId		= $('#pgmId').val();
+  				
   				deptInfoArr.push(deptInfo);
   			});
   			
@@ -540,10 +554,13 @@
   				$.each(curParent.children, function(idx, item){
   					var childNode = $('#deptTree').jstree(true).get_node(item);
   					var deptInfo = {};
-  					deptInfo.deptId = childNode.id;
-  					deptInfo.upDeptId = childNode.parent;
-  					deptInfo.sortNo = childNode.original.sortNo;
-	  				deptInfo.upperCd = childNode.original.upperCd;
+  					deptInfo.deptId 	= childNode.id;
+  					deptInfo.upDeptId 	= childNode.parent;
+  					deptInfo.sortNo 	= childNode.original.sortNo;
+	  				deptInfo.upperCd 	= childNode.original.upperCd;
+	  				deptInfo.userId		= jwt.userId;
+	  				deptInfo.pgmId		= $('#pgmId').val();
+	  				
   					deptInfoArr.push(deptInfo);
   				});				
   			}
@@ -723,42 +740,64 @@
     	
     }
     
- 	// 특정 노드의 모든 하위 노드 ID 구하기
-	function getAllChildNodeIds(nodeId) {
-		var tree = $('#deptTree').jstree(true);
-		var nodeInfo = [];
+//  	// 특정 노드의 모든 하위 노드 ID 구하기 ---백엔드에서 처리함
+// 	function getAllChildNodeIds(nodeId) {
+// 		var tree = $('#deptTree').jstree(true);
+// 		var nodeInfo = [];
 		
-		var currNode = tree.get_node(nodeId);
-		var childNodesArr = tree.get_node(nodeId).children;
+// 		var currNode = tree.get_node(nodeId);
+// 		var childNodesArr = tree.get_node(nodeId).children;
 		
-		for (var i = 0; i < childNodesArr.length; i++) {
-			var childNodeId = childNodesArr[i];
-			var childNode = tree.get_node(childNodeId);
+// 		for (var i = 0; i < childNodesArr.length; i++) {
+// 			var childNodeId = childNodesArr[i];
+// 			var childNode = tree.get_node(childNodeId);
 			
-			var childInfo = {
-				coCd: $('#coCd_S').val(),
-				salesCd: $('#salesCd_S').val(),
-				parentId: nodeId,
-				upperCd: currNode.original.lowerCd,
-				upperKey: currNode.original.fileTrgtKey,
-				childId: childNodeId,
-				lowerCd: childNode.original.lowerCd,
-				lowerKey: childNode.original.fileTrgtKey
-			};
+// 			var childInfo = {
+// 				coCd: $('#coCd_S').val(),
+// 				salesCd: $('#salesCd_S').val(),
+// 				parentId: nodeId,
+// 				upperCd: currNode.original.lowerCd,
+// 				upperKey: currNode.original.fileTrgtKey,
+// 				childId: childNodeId,
+// 				lowerCd: childNode.original.lowerCd,
+// 				lowerKey: childNode.original.fileTrgtKey
+// 			};
 		
-			nodeInfo.push(childInfo);
-			
-			var grandChildNodeInfo = getAllChildNodeIds(childNodeId);
-			nodeInfo = nodeInfo.concat(grandChildNodeInfo);
-		}
+// 			nodeInfo.push(childInfo);
+// 			//재귀호출
+// 			var grandChildNodeInfo = getAllChildNodeIds(childNodeId);
+// 			nodeInfo = nodeInfo.concat(grandChildNodeInfo);
+// 		}
 		
-		return nodeInfo;
-    }    
+// 		return nodeInfo;
+//     }    
  	
  	function jsonToExcel (grid) {
  		exportJSONToExcel(grid, '설계BOM(' + $('#salesCd_S').val() + ')');
  	}
- 	
+
+ 	//세일즈코드 단위로 복사할때 사용함
+	function copyBom() {
+		var paramObj = {
+			"coCd"			: $('#coCd_S').val(),
+			"salesCd_from"  : $('#salesCd_S').val()
+		}
+		openModal("/static/html/user/zz/ZZ0101P03.html", 600, 470, "", paramObj, (callbackObj) => {
+			Object.assign(callbackObj, {
+				bilgCertNoArr : '',
+				userId : jwt.userId,
+				userNm : jwt.userNm,
+				deptId : jwt.deptId,
+			});			
+// 			postAjax("/user/ar/ar04/insertTaxHdUpdate", callbackObj, null, function(data){
+// 				alert(data.resultMessage);
+// 				if(data.resultCode == 200){
+// 					gridView.setData(0);
+	 				modalStack.close();
+// 				}
+// 			});
+		});		
+	}
 	</script>
   </body>
 </html>

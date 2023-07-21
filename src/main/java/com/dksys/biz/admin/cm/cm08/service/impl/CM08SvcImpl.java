@@ -24,6 +24,7 @@ import org.apache.poi.xssf.usermodel.XSSFDataFormat;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
@@ -39,12 +40,15 @@ public class CM08SvcImpl implements CM08Svc {
     @Autowired
     CM08Mapper cm08Mapper;
 
+    @Value("${file.uploadDir}")
+    private String uploadDir;
+
     @Override
     public int uploadFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest) {
         List<MultipartFile> fileList = mRequest.getFiles("files");
         String year = DateUtil.getCurrentYyyy();
         String month = DateUtil.getCurrentMm();
-        String path = "C:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
+        String path = uploadDir + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
         for (MultipartFile mf : fileList) {
             String originFileName = mf.getOriginalFilename(); // 원본 파일 명
             // long fileSize = mf.getSize(); // 파일 사이즈
@@ -95,7 +99,7 @@ public class CM08SvcImpl implements CM08Svc {
     	List<MultipartFile> fileList = mRequest.getFiles("files");
     	String year = DateUtil.getCurrentYyyy();
     	String month = DateUtil.getCurrentMm();
-    	String path = "D:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
+    	String path = uploadDir + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
     	for (MultipartFile mf : fileList) {
     		String originFileName = mf.getOriginalFilename(); // 원본 파일 명
     		// long fileSize = mf.getSize(); // 파일 사이즈
@@ -164,7 +168,7 @@ public class CM08SvcImpl implements CM08Svc {
         List<MultipartFile> fileList = mRequest.getFiles("files");
         String year = DateUtil.getCurrentYyyy();
         String month = DateUtil.getCurrentMm();
-        String path = "C:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
+        String path = uploadDir + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
         for (int i = 0; i < fileList.size(); i++) {
             try {
                 MultipartFile mf = fileList.get(i);
@@ -213,7 +217,7 @@ public class CM08SvcImpl implements CM08Svc {
         System.out.println("copyTreeFile 실행");
         String year = DateUtil.getCurrentYyyy();
         String month = DateUtil.getCurrentMm();
-        String path = "C:\\gunyang\\upload" + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
+        String path = uploadDir + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
 
         int i = 0;
         while (true) {

@@ -124,6 +124,7 @@ public class ZZ01SvcImpl implements ZZ01Svc {
 			//신규등록 키값 할당
 			fileTrgtKey = Integer.toString(zz01Mapper.selectBomSeqNext(paramMap));
 			paramMap.put("fileTrgtKey", fileTrgtKey);
+			paramMap.put("salesCdTo", paramMap.get("salesCd"));
 			//트리 복사
 			result += zz01Mapper.copyBomTree(paramMap);
 			
@@ -131,9 +132,21 @@ public class ZZ01SvcImpl implements ZZ01Svc {
 //			for(Map<String, String> NodeInfo : allChildNodeInfos) {
 //			}
 			
-			/*
-			 * {coCd=GUN, salesCd=23010-99TVFTE, parentId=114, upperCd=2000, upperKey=114, childId=129, lowerCd=4200, lowerKey=129, fileTrgtKey=216}
+			/*{coCd=GUN, salesCd=23010-99TVFTE, salesCdTo=23010-99TVFTE, 
+			 * 복사하고자하는 대상 부모코드 : parentId=114, upperCd=2000, upperKey=114, 
+			 * 붙여넣기할 대상코드 하위코드 : childId=244, lowerCd=0050, lowerKey=244, 
+			 * 새로 생성할 키값 : fileTrgtKey=1630} --> 신규생성된 lowerKey값도 동일하게 처리함
 			 * 
+			 * {coCd=GUN, salesCd=23010-99TVFTE, salesCdTo=23010-99TVFTE,
+			 *  parentId=114, upperCd=2000, upperKey=114,
+			 *  childId=244, lowerCd=0050, lowerKey=244, 
+			 *  fileTrgtKey=1633}
+			 * 
+			 * {coCd=GUN, salesCd=23010-99TVFTE, salesCdTo=23010-99TVFTE,
+			 *  parentId=114, upperCd=2000, upperKey=114, 
+			 *  childId=244, lowerCd=0050, lowerKey=244, 
+			 *  userId=jangsub.nam, pgmId=ZZ0101M01, 
+			 *  fileTrgtKey=1634}
 			 */
 		}
 		return result;	
@@ -147,11 +160,16 @@ public class ZZ01SvcImpl implements ZZ01Svc {
 		
 		int result = 0;
 		String fileTrgtKey = "";
-		
+		/*
+		 * 파라메테 체크 필요
+		 * {upperCd=0050, coCd=GUN, salesCdTo=23010-99TVFTE, salesCd=23010-99TVFTE, upperKey=244}
+		 */
 		param.put("upperKey", paramMap.get("lowerKey"));
 		param.put("upperCd", paramMap.get("lowerCd"));
 		param.put("coCd", paramMap.get("coCd"));
 		param.put("salesCd", paramMap.get("salesCd"));
+		param.put("salesCdTo", paramMap.get("salesCdTo"));
+		 System.out.println("변수 salesCdTo의 값: " + paramMap.get("salesCdTo"));
 		List<Map<String, String>> topNodeInfo = zz01Mapper.selectBomlevelList(param);
 	    if (topNodeInfo.size() > 0) {
 		    for (Map<String, String> dtl : topNodeInfo) {
@@ -160,6 +178,12 @@ public class ZZ01SvcImpl implements ZZ01Svc {
 				dtl.put("FILE_TRGT_KEY",fileTrgtKey);
 				dtl.put("UPPER_KEY", paramMap.get("fileTrgtKey") );
 				dtl.put("UPPER_CD", paramMap.get("lowerCd") );
+				dtl.put("SALES_CD_TO", paramMap.get("salesCdTo"));
+				dtl.put("CHANGE_YN", paramMap.get("changeYn"));
+				dtl.put("USER_ID", paramMap.get("userId"));
+				dtl.put("PGM_ID", paramMap.get("pgmId"));
+				
+				//lowerKey를 가지고 fileTrgtKey로 추가하는 작업
 				result += zz01Mapper.copyBomTree(dtl);
 				
 //		    	nodeInfos.add(dtl);
@@ -172,5 +196,48 @@ public class ZZ01SvcImpl implements ZZ01Svc {
 
         return nodeInfos;
     }	
+
+	@Override
+	public int checkBomInfo(Map<String, String> paramMap) {
+		return zz01Mapper.checkBomInfo(paramMap);
+	}
 	
+	
+	@Override
+	public int copyBomRootSalesCdTree(Map<String, String> paramMap) {
+		int result = 1;
+		String fileTrgtKey = "";
+		allChildNodeInfos = new ArrayList<>();
+
+		//프론트엔드에서 넘어오는 값
+		// 회사코드          : coCd 
+		// SalseCd    : salesCd  <--원본 SalseCd
+		// 복사 SalseCd : salesCdTo
+		//-----------------------------------------------------------------
+		//타겟 SalesCode의 관련 정보 DB에서 fileTrgtKey 키값을 읽어서 파라미터에 저장
+		Map<String, String> paramMapTarget = new HashMap<>(paramMap);
+		paramMapTarget.put("salesCd", paramMap.get("salesCdTo") );
+		Map<String, String> rootInfo = zz01Mapper.selectBomRootSalesCdTree(paramMapTarget);
+		paramMap.put("fileTrgtKey", rootInfo.get("fileTrgtKey") );
+		paramMap.put("upperCd", rootInfo.get("lowerCd") );
+		paramMap.put("upperKey", rootInfo.get("lowerKey") );
+		
+		//타겟 SalesCode의 관련 정보 DB에서 읽어서 파라미터에 저장
+		rootInfo = zz01Mapper.selectBomRootSalesCdTree(paramMap);
+		paramMap.put("lowerCd", rootInfo.get("lowerCd") );
+		paramMap.put("lowerKey", rootInfo.get("lowerKey") );
+
+		//자식노드 재귀호출을 통한 복사작업 수행함
+		allChildNodeInfos = getAllChildNodeInfos(paramMap);
+//		for(Map<String, String> NodeInfo : allChildNodeInfos) {
+//			allChildNodeInfos 함수내에서 트랜잭션 처리하므로 여기서는 패스함
+//		}
+			
+		/*
+		 * {coCd=GUN, salesCd=23010-99TVFTE, parentId=114, upperCd=2000, upperKey=114, childId=129, lowerCd=4200, lowerKey=129, fileTrgtKey=216}
+		 * 
+		 */
+		return result;	
+	}
+		
 }
