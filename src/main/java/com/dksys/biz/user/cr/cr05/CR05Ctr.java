@@ -56,6 +56,14 @@ public class CR05Ctr {
 		return "jsonView";
 	}
 
+	// 팝업 입력대상 검색
+	@PostMapping(value = "/select_insert_target_modal")
+	public String select_insert_target_modal(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = cr05Svc.select_insert_target_modal(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
 	
 	// 계좌번호 가져오기
 	

@@ -15,7 +15,8 @@ public interface CR05Mapper {
 	// 수금정보 조회
 	Map<String, String> select_cr05_Info(Map<String, String> paramMap);
 	List<Map<String, String>> select_cr05_Info_Dtl(Map<String, String> paramMap);
-	
+	// 팝업 입력대상 검색
+	List<Map<String, String>> select_insert_target_modal(Map<String, String> paramMap);
 	// 수금번호 조회
 	List<Map<String, String>> select_cr05_clmnNo(Map<String, String> paramMap);
 
@@ -30,6 +31,7 @@ public interface CR05Mapper {
 	int delete_cr05_Dtl_All(Map<String, String> paramMap);
 	int delete_cr05(Map<String, String> paramMap);
 	int delete_cr05_Dtl(Map<String, String> paramMap);
+	
 	
 
 }

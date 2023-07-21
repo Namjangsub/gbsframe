@@ -23,5 +23,7 @@ public interface CR05Svc {
 	List<Map<String, String>> select_cr05_Info_Dtl(Map<String, String> paramMap);
 	// 수금번호 조회
 	List<Map<String, String>> select_cr05_clmnNo(Map<String, String> paramMap);
+	// 팝업 입력대상 검색
+	List<Map<String, String>> select_insert_target_modal(Map<String, String> paramMap);
 
 }
