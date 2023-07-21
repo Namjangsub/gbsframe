@@ -20,8 +20,6 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.util.DateUtil;
 import com.dksys.biz.util.ExceptionThrower;
-import com.dksys.biz.user.sm.sm03.mapper.SM03Mapper;
-import com.dksys.biz.user.sm.sm03.service.SM03Svc;
 import com.dksys.biz.user.sm.sm12.mapper.SM12Mapper;
 import com.dksys.biz.user.sm.sm12.service.SM12Svc;
 import com.google.gson.Gson;
@@ -68,12 +66,12 @@ public class SM12SvcImpl implements SM12Svc {
 
 	@Override
 	public int selectMaxTrgtKey(Map<String, String> paramMap) {
-		return sm12Mapper.selectMaxTrgtKey(paramMap);
+		return sm12Mapper.selectMaxTrgtKey22(paramMap);
 	}	
 	
 	@Override
 	public String selectMaxInNo(Map<String, String> paramMap) {
-		return sm12Mapper.selectMaxInNo(paramMap);
+		return sm12Mapper.selectMaxInNo22(paramMap);
 	}		
 		  
 		
