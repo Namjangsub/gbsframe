@@ -91,7 +91,7 @@ GridEditor.prototype.addTask = function (task, row, hideIfParentCollapsed) {
   //var prof = new Profiler("ganttGridEditor.addTask");
 
   //remove extisting row
-  this.element.find("#tid_" + task.id).remove();
+ this.element.find("#tid_" + task.id).remove();
 
   var taskRow = $.JST.createFromTemplate(task, "TASKROW");
 

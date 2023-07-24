@@ -417,11 +417,13 @@ function computeStart(start) {
  */
 function computeStartDate(start) {
   var d;
-  d = new Date(start + 3600000 * 12);
+  //d = new Date(start + 3600000 * 12);
+  d = new Date(start);
   d.setHours(0, 0, 0, 0);
   //move to next working day
   while (isHoliday(d)) {
-    d.setDate(d.getDate() + 1);
+    //d.setDate(d.getDate() + 1);
+	  d.setDate(d.getDate());
   }
   d.setHours(0, 0, 0, 0);
   return d;
@@ -436,11 +438,13 @@ function computeEnd(end) {
  * @returns {Date} the closest end date
  */
 function computeEndDate(end) {
-  var d = new Date(end - 3600000 * 12);
+  //var d = new Date(end - 3600000 * 12);
+  var d = new Date(end);
   d.setHours(23, 59, 59, 999);
   //move to next working day
   while (isHoliday(d)) {
-    d.setDate(d.getDate() + 1);
+    //d.setDate(d.getDate() + 1);
+	  d.setDate(d.getDate());
   }
   d.setHours(23, 59, 59, 999);
   return d;

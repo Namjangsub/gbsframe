@@ -30,10 +30,13 @@ function TaskFactory() {
   /**
    * Build a new Task
    */
-  this.build = function (id, name, code, level, start, duration, collapsed) {
+  this.build = function (id, name, code, level, start, end, duration, collapsed) {
     // Set at beginning of day
-    var adjusted_start = computeStart(start);
-    var calculated_end = computeEndByDuration(adjusted_start, duration);
+    //var adjusted_start = computeStart(start);
+    //var calculated_end = computeEndByDuration(adjusted_start, duration);
+	  
+	var adjusted_start = start;
+	var calculated_end = end;
     return new Task(id, name, code, level, adjusted_start, calculated_end, duration, collapsed);
   };
 
@@ -52,7 +55,6 @@ function Task(id, name, code, level, start, end, duration, collapsed) {
   this.level = level;
   this.status = "STATUS_UNDEFINED";
   this.depends = "";
-
   this.start = start;
   this.duration = duration;
   this.end = end;
@@ -151,20 +153,22 @@ Task.prototype.setPeriod = function (start, end) {
     start = chPeriod.start;
     end = chPeriod.end;
   }
-
-
+  //07.24 수정완료
+  //debugger;
   //cannot start after end
   if (start > end) {
-    start = end;
+  //  start = end;
   }
 
+  //07.24  수정완료
   //if there are dependencies compute the start date and eventually moveTo
-  var startBySuperiors = this.computeStartBySuperiors(start);
-  if (startBySuperiors != start) {
-    return this.moveTo(startBySuperiors, false,true);
-  }
+  //var startBySuperiors = this.computeStartBySuperiors(start);
+ //if (startBySuperiors != start) {
+  //  return this.moveTo(startBySuperiors, false,true);
+  //}
 
-  var somethingChanged = false;
+//07.24  수정완료  
+/*var somethingChanged = false;
 
   if (this.start != start || this.start != wantedStartMillis) {
     this.start = start;
@@ -198,11 +202,13 @@ Task.prototype.setPeriod = function (start, end) {
     this.master.setErrorOnTransaction("\"" + this.name + "\"\n" + GanttMaster.messages["TASK_HAS_EXTERNAL_DEPS"], this);
     return false;
   }
-
+*/
   var todoOk = true;
 
+  
+//07.24   수정완료 
   //I'm restricting
-  var deltaPeriod = originalPeriod.duration - this.duration;
+/*var deltaPeriod = originalPeriod.duration - this.duration;
   var restricting = deltaPeriod > 0;
   var enlarging = deltaPeriod < 0;
   var restrictingStart = restricting && (originalPeriod.start < this.start);
@@ -248,7 +254,7 @@ Task.prototype.setPeriod = function (start, end) {
 
   if (todoOk) {
     todoOk = this.propagateToInferiors(end);
-  }
+  }*/
   return todoOk;
 };
 
@@ -374,9 +380,10 @@ Task.prototype.propagateToInferiors = function (end) {
 
 //<%---------- COMPUTE START BY SUPERIORS ---------------------- --%>
 Task.prototype.computeStartBySuperiors = function (proposedStart) {
+	//debugger;
   //if depends -> start is set to max end + lag of superior
   var supEnd=proposedStart;
-  var sups = this.getSuperiors();
+  /*var sups = this.getSuperiors();
   if (sups && sups.length > 0) {
     supEnd=0;
     for (var i = 0; i < sups.length; i++) {
@@ -384,7 +391,8 @@ Task.prototype.computeStartBySuperiors = function (proposedStart) {
       supEnd = Math.max(supEnd, incrementDateByUnits(new Date(link.from.end), link.lag));
     }
     supEnd+=1;
-  }
+  }*/
+
   return computeStart(supEnd);
 };
 

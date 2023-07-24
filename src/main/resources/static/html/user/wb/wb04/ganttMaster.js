@@ -110,6 +110,7 @@ GanttMaster.prototype.init = function (workSpace) {
   place.append(this.editor.gridified);
 
   //create gantt
+  //debugger;
   this.gantt = new Ganttalendar(new Date().getTime() - 3600000 * 24 * 2, new Date().getTime() + 3600000 * 24 * 5, this, place.width() * .6);
 
   //setup splitter
@@ -452,7 +453,7 @@ GanttMaster.prototype.loadProject = function (project) {
   this.checkButtonPermissions();
 
 
-
+  
   if (project.minEditableDate)
     this.minEditableDate = computeStart(project.minEditableDate);
   else
@@ -470,10 +471,12 @@ GanttMaster.prototype.loadProject = function (project) {
   //shift dates in order to have client side the same hour (e.g.: 23:59) of the server side
   for (var i = 0; i < project.tasks.length; i++) {
     var task = project.tasks[i];
-    //task.start += this.serverClientTimeOffset; 07.21
-    //task.end += this.serverClientTimeOffset; 07.21
+    
+    //task.start += this.serverClientTimeOffset;
+    //task.end += this.serverClientTimeOffset;
     //set initial collapsed status
     task.collapsed=collTasks.indexOf(task.id)>=0;
+    //console.log(task.start + "//" + task.end);
   }
 
 
@@ -481,6 +484,7 @@ GanttMaster.prototype.loadProject = function (project) {
   this.deletedTaskIds = [];
 
 
+  
   //recover saved zoom level
   if (project.zoom){
     this.gantt.zoom = project.zoom;
@@ -491,8 +495,11 @@ GanttMaster.prototype.loadProject = function (project) {
 
 
   this.endTransaction();
+  
+
   var self = this;
   this.gantt.element.oneTime(200, function () {self.gantt.centerOnToday()});
+ 
 };
 
 
@@ -507,7 +514,7 @@ GanttMaster.prototype.loadTasks = function (tasks, selectedRow) {
   for (var i = 0; i < tasks.length; i++) {
     var task = tasks[i];
     if (!(task instanceof Task)) {
-      var t = factory.build(task.id, task.name, task.code, task.level, task.start, task.duration, task.collapsed);
+      var t = factory.build(task.id, task.name, task.code, task.level, task.start, task.end, task.duration, task.collapsed);
       for (var key in task) {
         if (key != "end" && key != "start")
           t[key] = task[key]; //copy all properties
@@ -518,14 +525,12 @@ GanttMaster.prototype.loadTasks = function (tasks, selectedRow) {
     this.tasks.push(task);  //append task at the end
   }
 
-  for (var i = 0; i < this.tasks.length; i++) {
+ for (var i = 0; i < this.tasks.length; i++) {
     var task = this.tasks[i];
-
-
     var numOfError = this.__currentTransaction && this.__currentTransaction.errors ? this.__currentTransaction.errors.length : 0;
     //add Link collection in memory
     while (!this.updateLinks(task)) {  // error on update links while loading can be considered as "warning". Can be displayed and removed in order to let transaction commits.
-      if (this.__currentTransaction && numOfError != this.__currentTransaction.errors.length) {
+     	if (this.__currentTransaction && numOfError != this.__currentTransaction.errors.length) {
         var msg = "ERROR:\n";
         while (numOfError < this.__currentTransaction.errors.length) {
           var err = this.__currentTransaction.errors.pop();
@@ -535,7 +540,8 @@ GanttMaster.prototype.loadTasks = function (tasks, selectedRow) {
       }
       this.__removeAllLinks(task, false);
     }
-
+    //debugger;
+    
     if (!task.setPeriod(task.start, task.end)) {
       alert(GanttMaster.messages.GANNT_ERROR_LOADING_DATA_TASK_REMOVED + "\n" + task.name );
       //remove task from in-memory collection
