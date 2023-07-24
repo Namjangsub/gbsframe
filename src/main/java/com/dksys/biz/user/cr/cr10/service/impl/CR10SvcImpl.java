@@ -70,6 +70,11 @@ public class CR10SvcImpl implements CR10Svc {
   }
 
   @Override
+  public List<Map<String, String>> selectLgistAppList(Map<String, String> paramMap) {
+    return cr10Mapper.selectLgistAppList(paramMap);
+  }
+
+  @Override
   public int insertLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
 	    Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();

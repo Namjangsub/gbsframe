@@ -173,7 +173,8 @@
 <script type="text/javascript">
 	var isFirst = true;
 
-	var approvalAuthorityIgnore = false; //결재기능무시(true) 결재하기.
+	var approvalAuthorityIgnore = false; //결재기능무시(true) 결재하기. 기본: false
+	var approvalAppInfoView = true; //결재상태보기
 
 	ax5.ui.grid.formatter["chkYn"] = function () {
 	    var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
@@ -234,15 +235,15 @@
 	           columns: [
 	                {key: "upperCd",  			label: "upperCd", 		width: 120, 	hidden: true},
 	                {key: "lowerCd",  			label: "lowerCd", 		width: 120, 	hidden: true},
-	                {key: "coNm",				label: "회사",			width: 100, 	align: "center", hidden: true},
+	                {key: "coNm",				label: "회사",			width:  80, 	align: "center"},
 	                {key: "ordrsClntNm",		label: "고객사",			width: 150, 	align: "left"},
 	                {key: "title",  			label: "수주물류현황", 		width: 220, 	align: "left",  treeControl: true},
 	                {key: "clntPjt",			label: "고객 PJT",		width:  80, 	align: "center"},
 	                {key: "ordrsNo",			label: "수주번호",			width:  80, 	align: "center"},
-	                {key: "gNo", 				label: "No", 			width:  40,		align: "center"},
+	                {key: "fileTrgtKey", 		label: "No", 			width:  40,		align: "center"},
+	                {key: "gNo", 				label: "No", 			width:  40,		align: "center", hidden: true},
 					{key: "appStatus", 			label: "결재",			width:  50,		align: "center", formatter: "appStatus"},
 					{key: "salesCdCnt", 		label: "salesCdCnt", 	width:  80,		align: "center", hidden: true},
-	                {key: "fileTrgtKey", 		label: "파일Key", 		width:  60,		align: "center", hidden: true},
 					{key: "salesCdList", 		label: "SALES CD LIST", width: 120,		align: "left"  , hidden: true},
 					{key: "pblicteDt", 			label: "발행일자", 		width: 100,		align: "center"},
 					{key: "reqIdNm", 			label: "요청자", 			width: 80,		align: "center"},
@@ -262,10 +263,10 @@
 					{key: "ovsSendCndDivEtc", 	label: "해외발송조건구분기타", 	width: 100,		align: "center", hidden: true},
 					{key: "ovsPackKindDivNm", 	label: "해외포장종류구분", 	width: 100,		align: "center", hidden: true},
 					{key: "staPlace", 			label: "출발장소", 		width: 100,		align: "left"},
-					{key: "staAddr", 			label: "출발주소", 		width: 140,		align: "left"},
+					{key: "staAddr", 			label: "주소", 		width: 140,		align: "left"},
 					{key: "staChrgIdNm", 		label: "출발담당자", 		width: 80,		align: "center"},
 					{key: "arvlPlace", 			label: "도착장소", 		width: 140,		align: "left"},
-					{key: "arvlAddr", 			label: "도착주소", 		width: 140,		align: "left"},
+					{key: "arvlAddr", 			label: "주소", 		width: 140,		align: "left"},
 					{key: "arvlChrgCont", 		label: "도착담당자", 		width: 140,		align: "left"},
 					{key: "prdlstCont", 		label: "품목내용", 		width: 100,		align: "left"},
 					{key: "prdAmt", 			label: "제품금액", 		width: 100,		align: "right", formatter: "money"},
@@ -291,6 +292,8 @@
 					{key: "appUser4Id", 		label: "id 4", 			width: 70,		align: "center", hidden: true},
 					{key: "appUser4IdNm", 		label: "nm 4", 			width: 60,		align: "center", hidden: true},
 					{key: "appUser4CfYn", 		label: "cf 4", 			width: 40,		align: "center", hidden: true},
+					{key: "coAddr", 			label: "coAddr", 		width: 120,		align: "center", hidden: true},
+					{key: "clntAddr", 			label: "clntAddr", 		width: 120,		align: "center", hidden: true},
 			   ],
 	           page : {
                     navigationItemCount : 10,
@@ -477,6 +480,8 @@
             paramObj.reqIdNm = jwt.userNm;
             paramObj.staPlace = selData.coNm;
         }
+        paramObj.coAddr = selData.coAddr;
+        paramObj.clntAddr = selData.clntAddr;
 
         openModal("/static/html/user/cr/cr10/CR1001P01.html", 1400, 850, "", paramObj, function(grid) {
 		});
@@ -511,66 +516,63 @@
 		if(isEmpty(selData.ordrsNo)){
 			return;
 		}
-
-		var realStepAppUserId = getRealStepAppUser(selData);
-		if(realStepAppUserId == "!"){
-			alert("결재완료된 내역입니다.");
-			return;
-		}
-		if(realStepAppUserId == "!!"){
-			alert("결재처리가 잘못된 내역입니다.");
-			return;
-		}
-		var isIgnore = false;
-		try {
-			isIgnore = approvalAuthorityIgnore;
-		} catch (err){
-		}
-		if(realStepAppUserId != jwt.userId && isIgnore == false){
-			alert("결재 권한을 가진 사용자가 아닙니다. 결재자 ["+realStepAppUserId+"]");
+		if(isEmpty(selData.fileTrgtKey)){
 			return;
 		}
 
-        var paramObj = selData;
-        var fileTrgtKey = selData.fileTrgtKey;
-        paramObj.actionType = isEmpty(fileTrgtKey) ? "C":"U";
+		var formData = {
+				"fileTrgtKey" : selData.fileTrgtKey
+		}
+		postAjax("/user/cr/cr10/selectLgistAppList", formData, null, function(data) {
+			var realStepAppUserInfo = getRealStepAppUserInfo(data.resultList);
+			if(realStepAppUserInfo == null) return;
 
-        if(paramObj.actionType == "C"){
-            paramObj.reqId = jwt.userId;
-            paramObj.reqIdNm = jwt.userNm;
-            paramObj.staPlace = selData.coNm;
-        }
+			var realStepAppUserId = realStepAppUserInfo.todoId;
+			var isIgnore = false;
+			try {
+				isIgnore = approvalAuthorityIgnore;
+			} catch (err){
+			}
+			if(realStepAppUserId != jwt.userId && isIgnore == false){
+				alert("결재 권한을 가진 사용자가 아닙니다. 결재 [순번:"+realStepAppUserInfo.appSeq+" 결재자:"+realStepAppUserInfo.todoIdNm+"]");
+				return;
+			}
 
-        openModal("/static/html/user/cr/cr10/CR1001P02.html", 1000, 600, "", paramObj, function(grid) {
+	        var paramObj = selData;
+	        var fileTrgtKey = selData.fileTrgtKey;
+	        paramObj.actionType = isEmpty(fileTrgtKey) ? "C":"U";
+
+	        if(paramObj.actionType == "C"){
+	            paramObj.reqId = jwt.userId;
+	            paramObj.reqIdNm = jwt.userNm;
+	            paramObj.staPlace = selData.coNm;
+	        }
+
+	        openModal("/static/html/user/cr/cr10/CR1001P02.html", 1000, 600, "", paramObj, function(grid) {
+			});
 		});
 	}
 
-	//현재단계의 결재자 정보 추출
-	function getRealStepAppUser(_appData){
-		var appUserId = "";
+	//현재단계의 결재자  정보 return;
+	function getRealStepAppUserInfo(appDataList){
+		if(appDataList.length == 0) return null;
+		var todoCfYCount = 0;
+		var resultInfo = null;
+		$.each(appDataList, function (idx, elem) {
+			if(elem.todoCfYn=="Y") {
+				todoCfYCount += 1;
+			}
+		});
 
-		if(_appData["appUser4CfYn"] == "Y") {
-			//결재 완료
-			appUserId = "!";
+		if(todoCfYCount == appDataList.length){
+			alert("결재완료된 내역입니다.");
+			return null;
 		}
-		else if(_appData["appUser1CfYn"] == "Y" && _appData["appUser2CfYn"] == "Y" && _appData["appUser3CfYn"] == "Y") {
-			appUserId = _appData["appUser4Id"];
-		}
-		else if(_appData["appUser1CfYn"] == "Y" && _appData["appUser2CfYn"] == "Y") {
-			appUserId = _appData["appUser3Id"];
-		}
-		else if(_appData["appUser1CfYn"] == "Y") {
-			appUserId = _appData["appUser2Id"];
-		}
-		else if(_appData["appUser1CfYn"] == "N") {
-			appUserId = _appData["appUser1Id"];
-		}
-		else{
-			//순서가 잘못 결재된 경우
-			appUserId = "!!";
+		else {
+			resultInfo = appDataList[todoCfYCount];
 		}
 
-		return appUserId;
+		return resultInfo;
 	}
 
 	//물류 삭제
@@ -624,6 +626,7 @@
 		openSecondModal("/static/html/cmn/modal/userSearch.html", 300, 500, "사용자 검색", paramObj, function (tree){
 	        var checkedId = tree.get_checked()[0];
 	        var checkedNode = tree.get_node(checkedId);
+	        //console.log("====checkedNode>>",checkedNode);
 	        //$('#'+userId).val(checkedNode.id);
 	        $('#'+userNm).val(checkedNode.text);
 	        //$("#deptNm").val(checkedNode.original.deptNm);
@@ -661,17 +664,20 @@
 	function setReportMain() {
 		if(selectGridValidation(gridView.target)) return;
 		var selData = gridView.target.getList("selected")[0];
+		if(selData.appStatus != "APP9"){
+			alert("[결재완료]된 내역만 출력 가능합니다.");
+			return;
+		}
 
-		var fileName = "BM1602M01.jrf";
-		var arg =
-			  "coCd#"		+  $('#coCd_S').val()
-        	+ "#reqDtFrom#"	+  $("#pblicteDtFr_S").val().replace(/\-/g, '')
-        	+ "#reqDtTo#"	+  $("#pblicteDtTo_S").val().replace(/\-/g, '')
-//         	+ "#prjctCd#"	+  $("#prjctCd_S").val()
-//         	+ "#prjctNm#"	+  $("#prjctNm_S").val()
-//         	+ "#mngId#"	    +  $("#mngId_S").val()
-//         	+ "#issSts#"	+  $("#issSts_S").val()
-        	+ "#";
+		var fileName = "CR1001M01.jrf";
+		var arg = "docTitle#"+"물류 진행 요청서";
+			/*
+	        $.each(selData, function(key, value){
+	        	arg += "#"+key+"#" +  value;
+	        });
+			*/
+		    arg += "#fileTrgtKey#" +  selData.fileTrgtKey;
+        	arg += "#";
 		callReport(fileName, arg, 1150, 720);
 	}
 

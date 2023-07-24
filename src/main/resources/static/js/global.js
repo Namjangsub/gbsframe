@@ -643,7 +643,7 @@ function setCommonDiv(inputCd){
 					inputHtml += '<input type="radio" id="'+item.codeKind+j+'" name="'+item.codeKind+i+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
 					inputHtml += ' ' +item.codeNm;
 					inputHtml += '</td>';
-				});			   
+				});
 				$(elem).append(inputHtml);
 
 		})
@@ -1115,8 +1115,8 @@ function initLoadForm(_form){
 			}
 		}
 
-		//comma or money
-		if($(elem).is('[comma]') || $(elem).is('[money]')){
+		//comma
+		if($(elem).is('[comma]')){
 			$(elem).css("text-align","right");
 			if(!isEmpty($(elem).val())){
 				$(elem).val($(elem).val().replace(/\B(?=(\d{3})+(?!\d))/g, ","));
@@ -1129,6 +1129,23 @@ function initLoadForm(_form){
 			});
 			$(elem).on("blur", function() {
 				$(elem).val($(elem).val().replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+			});
+		}
+		//money
+		else
+		if($(elem).is('[money]')){
+			$(elem).css("text-align","right");
+			if(!isEmpty($(elem).val())){
+				$(elem).val($(elem).val().replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+			}
+			$(elem).on("input", function() {
+				$(elem).val($(elem).val().replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+			});
+			$(elem).on("focus", function() {
+				$(elem).val($(elem).val().replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+			});
+			$(elem).on("blur", function() {
+				$(elem).val($(elem).val().replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","));
 			});
 		}
 		//data-positive

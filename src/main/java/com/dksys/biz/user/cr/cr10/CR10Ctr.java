@@ -71,8 +71,18 @@ public class CR10Ctr {
 		public String selectLgistMastInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		Map<String, String> result = cr10Svc.selectLgistMastInfo(paramMap);
 		model.addAttribute("result", result);
+		List<Map<String, String>> resultList = cr10Svc.selectLgistAppList(paramMap);
+		model.addAttribute("resultAppList", resultList);
 		return "jsonView";
 	}
+
+	@PostMapping(value = "/selectLgistAppList")
+	public String selectLgistAppList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = cr10Svc.selectLgistAppList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+
 
 	@PostMapping(value = "/insertLgistMast")
 	public String insertLgistMast(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
