@@ -148,9 +148,11 @@
 						</td>						 
 					</tr>			     
 	            </table>
-				<!-- 검색조건 END -->	            
+				<!-- 검색조건 END -->	      
+<form id="mainForm" onSubmit="return false;">				      
 		<input type="hidden" id="userId"    name="userId">
-		<input type="hidden" id="pgmId"     name="pgmId" value="SM1201M01">	            
+		<input type="hidden" id="pgmId"     name="pgmId" value="SM1201M01">
+</form>			        
             </div>
         </div>        
         <!-- 콘텐츠 -->
@@ -161,7 +163,7 @@
 		<div class="contents_tit">
 			<span  style="height: 30px; line-height: 30px;font-size: 15px;">매입 확정 리스트 </span>
 			<div class="add_btn_small pdl10">
-				<a onclick="inserPurchaseModal('C');" style="height: 30px; line-height: 28px;" authchk>+</a>
+				<a onclick="inserPurchase('C');" style="height: 30px; line-height: 28px;" authchk>+</a>
 				<!-- <a onclick="deleteAproval();" style="height: 30px; line-height: 28px;" authchk>-</a> -->
 				<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 			    </div>
@@ -231,15 +233,12 @@ var yesterday = moment(new Date()).add(-1, 'days');
                     return;
                 } 
                 */
-                if(this.column.key == "cmpletYn" && this.item.userChkV != "Y") {
-            		console.log('1');                	
+                if(this.column.key == "cmpletYn" && this.item.userChkV != "Y") {                	
                 	if( typeof(this.item.pchsAmt) == "undefined" ) {
-                		gridView.target.setValue(row, "pchsAmt", this.item.ordrgAmt);
-                		console.log('2');                		
+                		gridView.target.setValue(row, "pchsAmt", this.item.ordrgAmt);                		
                 	}
                 	if( typeof(this.item.pchsDt) == "undefined" ) {
                 		gridView.target.setValue(row, "pchsDt", today);
-                		console.log('3');
                 	}
                 }     
 			    
@@ -248,7 +247,7 @@ var yesterday = moment(new Date()).add(-1, 'days');
 				//this.self.clearSelect();
 				//this.self.select(this.dindex);
 				var row = this.dindex;
-				//inserPurchaseModal("U");
+				//inserPurchase("U");
 				//초기값은 발주금액으로 세팅 
 				if( this.column.key == "pchsAmt") {
                 	//chk, 수량, 기입고수량, row번호 
@@ -270,10 +269,10 @@ var yesterday = moment(new Date()).add(-1, 'days');
           },
           columns: [
               {key: "coCd",      				label: "회사",          	hidden: true},
-              {key: "coCdNm",      				label: "회사명",          hidden: true},
+              {key: "coCdNm",      				label: "회사명",          hidden: true},              
               {key: "ordrgNo", 					label: "발주번호",      	align: "center",	width: 110},
               {key: "ordrgSeq", 				label: "발주순번",      	align: "center",	width: 70},              
-              {key: "pchsNo", 					label: "확정번호",      	align: "center",	width: 110},              
+              {key: "pchsNo", 					label: "매입번호",      	align: "center",	width: 110},              
               {key: "trgtDiv",    				label: "발생구분",      	align: "center",	width: 120, hidden: true},                
               {key: "trgtDivNm",    			label: "발생구분",      	align: "center",	width: 100},
               {key: "salesCd",  				label: "Sales Code",    align: "center",	width: 110},              
@@ -466,7 +465,7 @@ var yesterday = moment(new Date()).add(-1, 'days');
 	}  
    
 	/*수정 or 등록 버튼 클릭 시*/
-	function inserPurchaseModal(type) {
+	function inserPurchase(type) {
 		//수정
 		if (type == 'U') {
 			var paramObj = {
@@ -479,22 +478,98 @@ var yesterday = moment(new Date()).add(-1, 'days');
 					
 		//등록
 		} else if(type == 'C') {
-	 		var selRow = parseInt(gridView.target.selectedDataIndexs);
-	 		if( isNaN(selRow) ) {
-	 			alert("발주항목을 선택해 주십시오.");
-	 			return;
-	 		} else {
-				var paramObj = {
-						"actionType" : type,
-				       	"userId"   : jwt.userId,
-				       	"userNm"   : jwt.userNm,				
-				       	"pgmId"    : "SM1201M01"			       	
-				};	
-				var param = {};
-				param = $.setGridValParam(gridView, paramObj);
-	 		}
+			//그리드 매입금액 매입일자 확인
+			var gridList = gridView.target.getList();
+			var gridColumns = gridView.target.columns;			
+			var detailArr = [];    	
+			var msgArr = [];    	
+			var inCnt = 0;
+			if( gridList.length > 0 ) {
+	        	var msgArr = [];			
+		        $.each(gridList, function (idx, elem) {
+		            var detailObj = {};
+		            
+		        	//컬럼수 루프 
+		        	for(var i=0; i<gridColumns.length; i++) {
+						var key = gridColumns[i].key;
+						var val = elem[key];
+						if( typeof(val) == "undefined") val = "";
+						//console.log('key:' + key+'=-====>val:' + val);					
+						//type number 시 콤마제거
+						if( typeof(gridColumns[i].editor) != "undefined" && gridColumns[i].editor.type == "number" && val != "" ) {
+							val = deleteCommaStr(val); 
+						}	     
+						
+						detailObj["idx"] = i + 1;
+						//발주순번 은 select key로  ORDRG_SEQ  
+						detailObj[key] = val;			            			            
+		        	}		            
+		            
+		        	//매입금액 
+		        	if( typeof(elem.pchsAmt)!="undefined" ) {
+		        		inCnt++;
+						//detailObj["pchsAmt"] = elem.pchsAmt;
+		        	}
+		        	//매입일자
+		        	if( typeof(elem.pchsDt)!="undefined" ) {
+		        		inCnt++;
+						//detailObj["pchsDt"] = elem.pchsDt;		        		
+		        	}
+		        	//매입금액 체크
+		        	if( typeof(elem.pchsAmt)==="undefined" && typeof(elem.pchsDt)!="undefined" ) {
+		            	msgArr.push((idx+1)+" 행의 매입금액을 입력해 주십시오.")	;		        		
+		        	}		        	
+		        	//매입일자 체크
+		        	if( typeof(elem.pchsAmt)!="undefined" && typeof(elem.pchsDt)==="undefined" ) {
+		            	msgArr.push((idx+1)+" 행의 매입일자를 입력해 주십시오.")	;		        		
+		        	}
+		        	//매입금액 over 체크
+		        	if( typeof(elem.pchsAmt) != "undefined" ) {
+
+			        	var balAmt = Number(deleteCommaStr(elem.ordrgAmt));
+			        	var pchsAmt = Number(deleteCommaStr(elem.pchsAmt));	        	
+			        	if( pchsAmt > balAmt) {
+			            	msgArr.push((idx+1)+" 행의 매입금액은 발주금액을 초과할 수 없습니다.")	;
+			        	} else {
+			        		//상태플래그
+							if( detailObj["pchsNo"] == "PC2300000") {
+								detailObj["actFlag"] = "I"
+							} else {
+								detailObj["actFlag"] = "U"								
+							}
+			        		//조건 만족시 배열 set
+				        	if( detailObj["pchsAmt"] && detailObj["pchsDt"] ) {
+					            detailArr.push(detailObj);		        		
+				        	}			            				        		
+			        	}			        	
+		        	}
+		        });
+		        //each end
+			}
+		
+	        //error alert 후 종료
+	        if( msgArr.length > 0 ) {
+	        	alert(msgArr.join("\r\n"));
+	        	return;
+	        } else {
+				if( inCnt == 0 ) {
+					alert("매입금액/매입일자 입력항목은 한개 이상이어야 합니다.");
+					return;
+				} else {
+					var formData = new FormData($("#mainForm")[0]);								
+					formData.append("makeArr", JSON.stringify(detailArr));
+					filePostAjax("/user/sm/sm12/insertPurchaseDetail", formData,		// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
+							function(data) {
+								alert("처리 되었습니다.");								// 결과 메시지를 alert으로 출력
+								if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
+									gridView.setData(0);
+								}
+						});					
+				}		        	
+	        }		
+	        
 		}
-		openModal("/static/html/user/sm/sm03/SM0301P01.html", 1600, 850, "", param);		
+		//if end
 	}
 	//func end 
 	

@@ -15,19 +15,13 @@ public interface SM12Svc {
 	List<Map<String, String>> selectPurchaseExcelList(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectPurchaseDetailList(Map<String, String> paramMap);			
-	
-	int selectMaxTrgtKey(Map<String, String> paramMap);
-	
-	String selectMaxInNo(Map<String, String> paramMap);	
+		
+	String selectMaxPchsNo(Map<String, String> paramMap);	
 
 	//발주마스터 등록, 수정, 삭제
-	int insertPurchase(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;	
+	int insertPurchaseDetail(Map<String, String> paramMap) throws Exception;	
 		
-	int updatePurchase(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
-		
-	int updatePurchaseDetail(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
-	
-	int deletePurchaseMaster(Map<String, String> param);			
+	int updatePurchaseDetail(Map<String, String> paramMap) throws Exception;			
 	
 	int deletePurchaseDetail(Map<String, String> param);	
 }

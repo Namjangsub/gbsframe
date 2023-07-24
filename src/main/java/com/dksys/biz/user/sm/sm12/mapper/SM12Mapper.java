@@ -21,20 +21,12 @@ public interface SM12Mapper {
 	
 	List<Map<String, String>> selectPurchaseDetailList(Map<String, String> paramMap);	
 	
-	int selectMaxTrgtKey22(Map<String, String> paramMap);	
+	String selectMaxPchsNo(Map<String, String> paramMap);		
 	
-	String selectMaxInNo22(Map<String, String> paramMap);		
-	
-	//입고 등록, 수정, 삭제
-	int insertPurchaseMaster(Map<String, String> paramMap);
-	
+	//입고 등록, 수정, 삭제	
 	int insertPurchaseDetail(Map<String, String> paramMap);	
 	
-	int updatePurchaseMaster(Map<String, String> paramMap);
-	
 	int updatePurchaseDetail(Map<String, String> paramMap);
-	
-	int deletePurchaseMaster(Map<String, String> paramMap);
 	
 	int deletePurchaseDetail(Map<String, String> param);	
 }

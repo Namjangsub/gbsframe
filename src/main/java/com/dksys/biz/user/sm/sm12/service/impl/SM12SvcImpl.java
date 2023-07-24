@@ -65,16 +65,10 @@ public class SM12SvcImpl implements SM12Svc {
 	}		
 
 	@Override
-	public int selectMaxTrgtKey(Map<String, String> paramMap) {
-		return sm12Mapper.selectMaxTrgtKey22(paramMap);
-	}	
-	
-	@Override
-	public String selectMaxInNo(Map<String, String> paramMap) {
-		return sm12Mapper.selectMaxInNo22(paramMap);
+	public String selectMaxPchsNo(Map<String, String> paramMap) {
+		return sm12Mapper.selectMaxPchsNo(paramMap);
 	}		
 		  
-		
 	/* 입고 등록시 발주 list */
 	@Override
 	public List<Map<String, String>> selectPurchaseDetailList(Map<String, String> paramMap) {
@@ -82,108 +76,39 @@ public class SM12SvcImpl implements SM12Svc {
 	}			
 	
 	@Override
-	public int insertPurchase(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	public int insertPurchaseDetail(Map<String, String> paramMap) throws Exception {
 
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
 		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);		
-
-		//---------------------------------------------------------------  
-		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
-	  	//   필수값 :  jobType, userId, comonCd
-		//---------------------------------------------------------------  
-	    HashMap<String, String> param = new HashMap<>();
-	    param.put("userId", paramMap.get("userId"));
-	    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
-	    
-		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
-		if (uploadFileList.size() > 0) {
-				//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
-				param.put("jobType", "fileUp");
-				cm15Svc.selectFileAuthCheck(param);
-		}
-		String[] deleteFileArr = gsonDtl.fromJson(paramMap.get("deleteFileArr"), String[].class);
-		List<String> deleteFileList = Arrays.asList(deleteFileArr);
-	    for(String fileKey : deleteFileList) {  // 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
-			    Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
-				//접근 권한 없으면 Exception 발생
-			    param.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
-			    param.put("jobType", "fileDelete");
-				cm15Svc.selectFileAuthCheck(param);
-		}
-		//---------------------------------------------------------------  
-		//첨부 화일 권한체크  끝 
-		//---------------------------------------------------------------  		
 		
 		int result = 0;	    
-		//FILE TARGET KEY - 
-		if( paramMap.get("fileTrgtKey").equals("0") ) {
-			int fileTrgtKey = sm12Svc.selectMaxTrgtKey(paramMap);	
-		    paramMap.put("fileTrgtKey", String.valueOf(fileTrgtKey));
-		}	    
-		
+
 	    //MAX ORDGR_NO - 최조 입력일 경우만
-		String maxInNo = "";
-		if( !paramMap.get("inNo").equals("") ) {
-		    maxInNo = paramMap.get("inNo");
-		} else {
-		    maxInNo = sm12Svc.selectMaxInNo(paramMap);			
-		}
-	    paramMap.put("maxInNo", maxInNo);
-		//master 용		
-		result += sm12Mapper.insertPurchaseMaster(paramMap);	 
-		
+		String maxPchsNo = "";
+		String pchsNo = "";	 		
 		for(Map<String, String> dtl : detailMap) {
 			dtl.put("userId", paramMap.get("userId"));
 			dtl.put("pgmId", paramMap.get("pgmId"));
 			dtl.put("creatId", paramMap.get("userId"));
-			dtl.put("maxInNo", maxInNo);
-			dtl.put("ioDiv", paramMap.get("ioDiv"));
-			dtl.put("currCd", paramMap.get("currCd"));
-			dtl.put("exrate", paramMap.get("exrate"));
-    		result += sm12Mapper.insertPurchaseDetail(dtl);			
+			dtl.put("maxPchsNo", maxPchsNo);
+			pchsNo = dtl.get("pchsNo").toString();
+			//뒤 5자리
+			pchsNo = pchsNo.substring(pchsNo.length()-5, pchsNo.length());
+			if( pchsNo.equals("00000") ) {
+				maxPchsNo = sm12Svc.selectMaxPchsNo(paramMap);
+				dtl.put("maxPchsNo", maxPchsNo);
+	    		result += sm12Mapper.insertPurchaseDetail(dtl);				
+			} else if( dtl.get("actFlag").equals("U") ) {
+	    		result += sm12Mapper.updatePurchaseDetail(dtl);				
+			}
 		}			
-		  		
-		
-		//---------------------------------------------------------------  
-		//첨부 화일 처리 시작 
-		//---------------------------------------------------------------  
-	    if (uploadFileList.size() > 0) {
-		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-		    cm08Svc.uploadFile(paramMap, mRequest);
-	    }
-	    
-	    for(String fileKey : deleteFileList) {
-	    	cm08Svc.deleteFile(fileKey);
-	    }
-		//---------------------------------------------------------------  
-		//첨부 화일 처리  끝 
-		//---------------------------------------------------------------  
-	    
 		return result;
 	}
 	
-	//입고 master 수정 - 사용안함
+	//매입확정 DETAIL 수정
 	@Override
-	public int updatePurchase(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-
-		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
-		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
-		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);		
-  				
-		int result = 0;	    	    
-	    //upate
-		result = sm12Mapper.updatePurchaseMaster(paramMap);	
-		
-		result += sm12Svc.updatePurchaseDetail(paramMap, mRequest);
-		
-		return result;
-	}	
-	
-	//발주관리 구매 bom 수정
-	@Override
-	public int updatePurchaseDetail(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	public int updatePurchaseDetail(Map<String, String> paramMap) throws Exception {
 
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
@@ -196,62 +121,19 @@ public class SM12SvcImpl implements SM12Svc {
 	    HashMap<String, String> param = new HashMap<>();
 	    param.put("userId", paramMap.get("userId"));
 	    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
-	    
-		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
-		if (uploadFileList.size() > 0) {
-				//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
-				param.put("jobType", "fileUp");
-				cm15Svc.selectFileAuthCheck(param);
-		}
-		String[] deleteFileArr = gsonDtl.fromJson(paramMap.get("deleteFileArr"), String[].class);
-		List<String> deleteFileList = Arrays.asList(deleteFileArr);
-	    for(String fileKey : deleteFileList) {  // 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
-			    Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
-				//접근 권한 없으면 Exception 발생
-			    param.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
-			    param.put("jobType", "fileDelete");
-				cm15Svc.selectFileAuthCheck(param);
-		}
-		//---------------------------------------------------------------  
-		//첨부 화일 권한체크  끝 
-		//---------------------------------------------------------------  		
-		
+	    	
 		int result = 0;	    	    
 	    //upate
 		for(Map<String, String> dtl : detailMap) {
 			dtl.put("userId", paramMap.get("userId"));
 			dtl.put("pgmId", paramMap.get("pgmId"));
 			dtl.put("creatId", paramMap.get("userId"));
-			dtl.put("ioDiv", paramMap.get("ioDiv"));
-			dtl.put("currCd", paramMap.get("currCd"));
-			dtl.put("exrate", paramMap.get("exrate"));
 			
     		result += sm12Mapper.updatePurchaseDetail(dtl);			
 		}			
-		  		
-		
-		//---------------------------------------------------------------  
-		//첨부 화일 처리 시작 
-		//---------------------------------------------------------------  
-	    if (uploadFileList.size() > 0) {
-		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-		    cm08Svc.uploadFile(paramMap, mRequest);
-	    }
-	    
-	    for(String fileKey : deleteFileList) {
-	    	cm08Svc.deleteFile(fileKey);
-	    }
-		//---------------------------------------------------------------  
-		//첨부 화일 처리  끝 
-		//---------------------------------------------------------------  
+
 	    
 		return result;
-	}	
-	
-	@Override
-	public int deletePurchaseMaster(Map<String, String> param) {
-		return sm12Mapper.deletePurchaseMaster(param);
 	}	
 	
 	@Override

@@ -94,14 +94,14 @@
 							, A.ORDRG_AMT	
 							, A.ORDRG_DT	
 							, A.PCHS_AMT
-							, A.PCHS_DT
+							, TO_CHAR(A.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT
 							, A.CMPLET_YN
 							, A.USER_CHK_V
 						  FROM
 						  (
 						  	/* 발주 완료되지 않은 건 + 완료된건 */
 							SELECT E.CO_CD
-								, NVL(D.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'0000') AS PCHS_NO	/*매입확정번호 */
+								, NVL(D.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00000') AS PCHS_NO	/*매입확정번호 */
 								, E.ORDRG_NO 
 								, E.ORDRG_SEQ 
 								, E.SALES_CD
@@ -147,99 +147,84 @@
 					, ROWNUM AS RN
 					FROM
 						(
-						SELECT A.CO_CD
-								, FN_CM05M01_CD_TO_NM(A.CO_CD) AS CO_CD_NM	/* 회사명 */								
-								, B.ORDRG_NO			/* 발주번호 */
-								, B.REQ_NO				/* 요인별 요청번호 */
-								, A.SALES_CD
+						SELECT A.CO_CD	
+							, A.PCHS_NO			/* 매입번호 */
+							, A.TRGT_DIV	
+							, FN_CM05M01_CD_TO_NM(A.TRGT_DIV) AS TRGT_DIV_NM	
+							, A.ORDRG_NO
+							, A.ORDRG_SEQ
+							, A.SALES_CD
+							, A.PCHS_CLNT_CD
+							, A.PCHS_CLNT_NM		/* 구매처명 */
+							, A.MATR_CD	
+							, A.MATR_NM		
+							, A.ORDRG_AMT	
+							, A.ORDRG_DT	
+							, A.PCHS_AMT
+							, A.PCHS_DT
+							, A.CMPLET_YN
+							, A.USER_CHK_V
+						  FROM
+						  (
+						  	/* 발주 완료되지 않은 건 + 완료된건 */
+							SELECT E.CO_CD
+								, NVL(D.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'0000') AS PCHS_NO	/*매입확정번호 */
+								, E.ORDRG_NO 
+								, E.ORDRG_SEQ 
+								, E.SALES_CD
 								, B.PCHS_CLNT_CD				/* 구매처cd */
-                       			,
-                       			(
-                       				SELECT D.CLNT_NM
-                       					FROM TB_BM02M01 D
-                       				WHERE B.PCHS_CLNT_CD=D.CLNT_CD
-                       			) AS PCHS_CLNT_NM		/* 구매처명 */            		
-								, TO_CHAR(B.ORDRG_DT, 'YYYY-MM-DD') ORDRG_DT		/* 발주일자 */
-								, B.ORDRG_DIV10					/* 발주구분 */
-								, FN_CM05M01_CD_TO_NM(B.ORDRG_DIV10) AS ORDRG_DIV10_NM	/* 발주구분명 */
-								, B.ORDRG_DIV20					/* 용도구분 */
-								, FN_CM05M01_CD_TO_NM(B.ORDRG_DIV20) AS ORDRG_DIV20_NM	/* 용도구분명 */
-								, B.ORDRG_DIV30					/* 특성구분 */
-								, FN_CM05M01_CD_TO_NM(B.ORDRG_DIV30) AS ORDRG_DIV30_NM	/* 특성구분명 */								
-								, B.CURR_CD						/* 통화단위 */
-								, B.EXRATE
-								, SUM(A.ORDRG_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_QTY	/* 발주수량 */									
-								, SUM(A.ORDRG_AMT) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_AMT	/* 발주금액 */								
-								, TO_CHAR(B.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
-								, B.CREAT_ID
-								, B.CREAT_PGM
-								, B.CREAT_DTTM
-								, A.ORDRG_SEQ
-								, B.ORDRG_DT
-								, NVL(SUM(IN_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ), 0)  IN_QTY 	/* 입고수량 */
-								, 
-								  SUM(A.ORDRG_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) 
-								  - NVL(SUM(IN_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ), 0) AS REAMIN_IN_QTY			/* 잔여수량 */				
-			                    /*, FN_CM05M01_CD_TO_NM(C.IO_DIV) AS IO_DIV_NM */	/* 아이템 구분명 */														
-								/*, C.IO_DIV AS IO_DIV_CD */		/* 수불구분 */			 
-								, NVL(
-										( 
-											SELECT DISTINCT MAX(D.FILE_TRGT_KEY) OVER() AS FILE_TRGT_KEY 
-												FROM TB_SM03M01 D
-												INNER JOIN TB_SM03D01 CC ON(CC.IN_NO=D.IN_NO)
-											WHERE A.ORDRG_NO=CC.ORDRG_NO		
-										) 
-								  , 0) AS FILE_TRGT_KEY								
-								, 
-								( 
-									SELECT DISTINCT MAX(D.IN_NO) OVER() AS IN_NO 
-										FROM TB_SM03M01 D
-										INNER JOIN TB_SM03D01 CC ON(CC.IN_NO=D.IN_NO)
-									WHERE A.ORDRG_NO=CC.ORDRG_NO		
-								) AS IN_NO														  														                   								                   
-							FROM TB_SM02D01 A
-							INNER JOIN TB_SM02M01 B ON(A.CO_CD=B.CO_CD AND A.ORDRG_NO=B.ORDRG_NO)
-							LEFT OUTER JOIN
-							(
-								SELECT C.ORDRG_NO
-										, C.ORDRG_SEQ
-										, NVL(SUM(IN_QTY), 0) AS IN_QTY
-									FROM TB_SM03D01 C
-									INNER JOIN TB_SM03M01 D ON(D.IN_NO=C.IN_NO)
-								GROUP BY C.ORDRG_NO, C.ORDRG_SEQ, C.IN_NO
-							) C ON( A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ)
-						WHERE 1=1								
+								,
+								(
+									SELECT D.CLNT_NM
+										FROM TB_BM02M01 D
+									WHERE B.PCHS_CLNT_CD=D.CLNT_CD
+								) AS PCHS_CLNT_NM		/* 구매처명 */		
+								, F.MATR_CD
+								, F.MATR_NM			/* 자재명 */
+								, E.ORDRG_AMT		/*발주 금액 */
+								, 'TRGTDIV03' AS TRGT_DIV
+								, B.ORDRG_DT		/* 발주일자 */
+								, D.PCHS_AMT		/* 매입금액 */
+								, D.PCHS_DT
+								, D.CMPLET_YN
+								, 'N' AS USER_CHK_V
+								FROM TB_SM02D01 E		/* 매입 DETAIL */
+								INNER JOIN TB_SM02M01 B ON(E.CO_CD=B.CO_CD AND E.ORDRG_NO=B.ORDRG_NO AND E.SALES_CD=B.SALES_CD)
+								LEFT OUTER JOIN TB_SM12D01 D ON(D.ORDRG_NO=E.ORDRG_NO AND D.ORDRG_SEQ=E.ORDRG_SEQ)	/* 발주 DETAIL */ 
+								LEFT OUTER JOIN TB_SM01D01 F ON(E.CO_CD=F.CO_CD AND E.SALES_CD=F.SALES_CD AND E.UPPER_CD=F.UPPER_CD 
+								 								AND E.LOWER_CD=F.LOWER_CD AND E.MATR_SEQ=F.MATR_SEQ AND E.MATR_CD=F.MATR_CD)	/* 구매BOM 자재 */
+							WHERE 1=1  
+						  ) A		/* 발주+매입 내역 */
+						  WHERE 1=1 
 						<include refid="selectPurchaseListCondition"></include>
-						ORDER BY A.CO_CD DESC, A.IN_NO DESC, A.CREAT_DTTM DESC, A.UDT_DTTM DESC		
+						  ORDER BY A.CO_CD, A.ORDRG_NO DESC, A.ORDRG_SEQ DESC, A.SALES_CD DESC		
 						) X		
 			)							
 			WHERE 1=1
 			/* 엑셀은 전체 조회 */
 	</select>
-	
-	<!--  file target key -->
-	<select id="selectMaxTrgtKey" parameterType="Map" resultType="int">
-    	SELECT NVL(MAX(TO_NUMBER(FILE_TRGT_KEY)),0) + 1 FROM TB_SM03M01
-	</select>	
-	
-	<!-- 발주번호 max -->	
-	<select id="selectMaxInNo" parameterType="Map" resultType="String">
-		SELECT NVL(MAX_IN_NO, 'IN'||TO_CHAR(SYSDATE, 'YY')||'00001') AS MAX_IN_NO
+		
+	<!-- 매입번호 max -->	
+	<select id="selectMaxPchsNo" parameterType="Map" resultType="String">
+		SELECT NVL(MAX_PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00001') AS MAX_IN_NO
 			FROM
 			(
-			SELECT DISTINCT DECODE( INSTR(IN_NO, 'IN'||TO_CHAR(SYSDATE, 'YY')), 0, 'IN'||TO_CHAR(SYSDATE, 'YY')||'00001'
-							, 'IN' || MAX( TO_CHAR(SYSDATE, 'YY')|| LPAD( SUBSTRING(IN_NO, -5)+1, 5, '0') ) OVER()
-						  ) AS MAX_IN_NO
-				FROM TB_SM03D01
+			SELECT DISTINCT DECODE( INSTR(PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')), 0, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00001'
+							, 'PC' || MAX( TO_CHAR(SYSDATE, 'YY')|| LPAD( SUBSTRING(PCHS_NO, -5)+1, 5, '0') ) OVER()
+						  ) AS MAX_PCHS_NO
+				FROM TB_SM12D01
 			WHERE 1=1
 			<if test="coCd != null and !coCd.equals('')">
 				AND CO_CD = #{coCd}   
-			</if>			
+			</if>	
+			<if test="ordrgNo != null and !ordrgNo.equals('')">
+				AND ORDRG_NO = #{ordrgNo}   
+			</if>					
 			UNION ALL
-			SELECT NULL AS MAX_IN_NO
+			SELECT NULL AS MAX_PCHS_NO
 				FROM DUAL		
 			)		
-			WHERE MAX_IN_NO IS NOT NULL OR ROWNUM = 1	
+			WHERE MAX_PCHS_NO IS NOT NULL OR ROWNUM = 1	
 	</select>		
 	
 	<!-- 발주 DETAIL SELECT -->
@@ -311,7 +296,7 @@
 			LEFT OUTER JOIN TB_SM01D01 D ON(A.CO_CD = D.CO_CD AND A.SALES_CD = D.SALES_CD AND A.UPPER_CD = D.UPPER_CD AND A.LOWER_CD = D.LOWER_CD 
 											AND A.MATR_SEQ=D.MATR_SEQ AND A.MATR_CD=D.MATR_CD)
 				<if test='actionType == "U" '>
-			INNER JOIN TB_SM03D01 C ON(A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ)				
+			INNER JOIN TB_SM12D01 C ON(A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ)				
 				</if>							
 				<if test='actionType == "C" '>											
 							LEFT OUTER JOIN
@@ -319,7 +304,7 @@
 								SELECT C.ORDRG_NO
 										, C.ORDRG_SEQ
 										, NVL(SUM(IN_QTY), 0) AS IN_QTY
-									FROM TB_SM03D01 C
+									FROM TB_SM12D01 C
 								GROUP BY C.ORDRG_NO, C.ORDRG_SEQ
 							) C ON( A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ)
 				</if>									
@@ -338,173 +323,65 @@
 		</if>							
 	</select>
 	
-
-	
-	<!-- 입고관리 - 입고마스터 등록 사용안함 -->
-	<insert id="insertPurchaseMaster" parameterType="Map">	
-		MERGE INTO TB_SM03M01 A
-			USING DUAL
-			ON (
-			A.FILE_TRGT_KEY = #{fileTrgtKey}
-			AND A.CO_CD = #{coCd}
-			AND A.IN_NO = #{maxInNo}
-				)	
-		WHEN MATCHED THEN
-			UPDATE SET	
-				REQ_NO						= #{reqNo,  jdbcType=VARCHAR}
-				, SALES_CD					= #{salesCd}
-				, ETC_FIELD1				= #{etcField1,  jdbcType=VARCHAR}
-				, ETC_FIELD2				= #{etcField2,  jdbcType=VARCHAR}
-				, ETC_FIELD3				= #{etcField3,  jdbcType=VARCHAR}
-				, UDT_ID					= #{userId}
-				, UDT_PGM					= #{pgmId}	
-				, UDT_DTTM					= SYSDATE
-		WHEN NOT MATCHED THEN											
-		INSERT 
-	      (
-			FILE_TRGT_KEY
-			 , CO_CD
-			 , IN_NO
-			 , REQ_NO
-			 , SALES_CD
-			 , CREAT_ID
-			 , CREAT_PGM
-			 , CREAT_DTTM
-	      )
-	    VALUES
-	    (
-			#{fileTrgtKey}
-			, #{coCd}
-			, #{maxInNo}
-			, #{reqNo,  jdbcType=VARCHAR}
-			, #{salesCd}
-			, #{userId}
-			, #{pgmId}
-			, SYSDATE
-	    )
-	</insert>	
-	
-	<!-- 발주 detail 등록   -->
-	<insert id="insertPurchaseDetail" parameterType="Map">
-	    <selectKey keyProperty="inSeq" resultType="String" order="BEFORE">
-			SELECT NVL(MAX(IN_SEQ)+1, 1) FROM TB_SM03D01 
-				WHERE CO_CD = #{coCd}
-						AND IN_NO = #{maxInNo}
-	    </selectKey>		        
-		INSERT INTO TB_SM03D01
+	<!-- 매입확정관리 detail 등록   -->
+	<insert id="insertPurchaseDetail" parameterType="Map">        
+		INSERT INTO TB_SM12D01
 		  (
 			CO_CD
-			, IN_NO
-			, IN_SEQ
+			, PCHS_NO
 			, ORDRG_NO
 			, ORDRG_SEQ
-			, REQ_NO
-			, SALES_CD
-			, MATR_CD
-			, MATR_TEST_DIV
-			, IN_PRC
-			, ARR_QTY
-			, IN_QTY
-			, BAD_QTY
-			, IN_DTL_AMT
-			, CURR_CD
-			, EXRATE
-			, IN_DTL_RMK
-			, INOUT_KEY
+			, TRGT_DIV
+			, PCHS_AMT
+			, PCHS_DT
+			, CMPLET_YN
 			, CREAT_ID
 			, CREAT_PGM
 			, CREAT_DTTM
-			, IO_DIV
-			, IN_DT
-			, WH_CD
 		  )
 		VALUES
 		  (
 			 #{coCd}
-			, #{maxInNo}
-			, #{inSeq}
+			, #{maxPchsNo}
 			, #{ordrgNo}
 			, #{ordrgSeq}
-			, #{reqNo}
-			, #{salesCd}
-			, #{matrCd}
-			, #{matrTestDiv}
-			, #{inPrc}
-			, #{arrQty,  jdbcType=VARCHAR}
-			, #{inQty}
-			, #{badQty}
-			, #{inDtlAmt}
-			, #{currCd}
-			, #{exrate}
-			, #{inDtlRmk,  jdbcType=VARCHAR}
-			, (SELECT NVL(MAX(INOUT_KEY)+1, 1) FROM TB_SM03D01 )
+			, #{trgtDiv}
+			, #{pchsAmt}
+			, #{pchsDt}
+			, #{cmpletYn,			jdbcType=VARCHAR}	 
 			, #{userId}
 			, #{pgmId}
 			, SYSDATE
-			, #{ioDiv}
-			, #{inDt}
-			, #{matrWhCd}
 	      )
 	</insert>	
-	
-	<!-- 입고관리 마스터 수정 사용안함  -->
-	<update id="updatePurchaseMaster" parameterType="Map">
-		UPDATE TB_SM02M01
-			SET
-		REQ_NO = #{reqNo} 
-		, SALES_CD = #{salesCd}
-		, PCHS_CLNT_CD = #{pchsClntCd}
-		, ORDRG_DT = #{ordrgDt}
-		, ORDRG_DIV10 = #{ordrgDiv10}
-		, ORDRG_DIV20 = #{ordrgDiv20}
-		, ORDRG_DIV30 = #{ordrgDiv30}
-		, CURR_CD = #{currCd}
-		, EXRATE = #{exrate}
-		, ORDRG_AMT = #{ordrgAmt}
-		, DUDT_DEQ_DT = #{dudtDeqDt}
-		, ORDRG_RMK = #{ordrgRmk,			jdbcType=VARCHAR}	 	
-		, IN_CMPLET_YN = #{inCmpletYn,			jdbcType=VARCHAR}
-		, UDT_ID = #{userId}
-		, UDT_PGM = #{pgmId}
-		, UDT_DTTM = SYSDATE
-		WHERE FILE_TRGT_KEY = #{fileTrgtKey}
-			AND CO_CD = #{coCd}
-			AND ORDRG_NO = #{ordrgNo}
-	</update>
 		
 	<!-- 입고관리 상세 수정 -->
 	<update id="updatePurchaseDetail" parameterType="Map">
-		UPDATE TB_SM03D01
-			SET 
-			MATR_CD = #{matrCd}
-			, MATR_TEST_DIV = #{matrTestDiv}
-			, IN_PRC = #{inPrc}
-			, ARR_QTY = #{arrQty,			jdbcType=VARCHAR}
-			, IN_QTY = #{inQty}
-			, BAD_QTY = #{badQty}
-			, IN_DTL_AMT = #{inDtlAmt}
-			, CURR_CD = #{currCd}
-			, EXRATE = #{exrate}
-			, IN_DTL_RMK = #{inDtlRmk,			jdbcType=VARCHAR}	 	
+		UPDATE TB_SM12D01
+			SET  
+			PCHS_AMT = #{pchsAmt}
+			, PCHS_DT = #{pchsDt}
+			, CMPLET_YN = #{cmpletYn,			jdbcType=VARCHAR}
 			, UDT_ID = #{userId}
 			, UDT_PGM = #{pgmId}
 			, UDT_DTTM = SYSDATE
-			, IO_DIV = #{ioDiv}
-			, IN_DT = #{inDt}
-			, WH_CD = #{matrWhCd}
 		WHERE CO_CD = #{coCd}
-			AND IN_NO = #{inNo}
-			AND IN_SEQ = #{inSeq}
+			AND PCHS_NO = #{pchsNo}
+			AND ORDRG_NO = #{ordrgNo}
+			AND ORDRG_SEQ = #{ordrgSeq}
+			AND TRGT_DIV = #{trgtDiv}
 	</update>
 	
 	<!-- 발주 디테일  삭제 -->         
 	<delete id="deletePurchaseDetail" parameterType="Map">
 		DELETE 
-			FROM TB_SM03D01
+			FROM TB_SM12D01
 		WHERE 1=1
 			AND CO_CD = #{coCd}
-			AND IN_NO = #{inNo}
-			AND IN_SEQ = #{inSeq}	
+			AND PCHS_NO = #{pchsNo}
+			AND ORDRG_NO = #{ordrgNo}
+			AND ORDRG_SEQ = #{ordrgSeq}
+			AND TRGT_DIV = #{trgtDiv}
 	</delete>	
 		
  </mapper>

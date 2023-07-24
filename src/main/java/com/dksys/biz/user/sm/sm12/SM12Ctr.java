@@ -56,11 +56,11 @@ public class SM12Ctr {
 		return "jsonView";
 	}	
 	
-	//발주 등록
-    @PostMapping(value = "/insertPurchase")
+	//매입확정관리 등록
+    @PostMapping(value = "/insertPurchaseDetail")
     public String insertPurchase(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
   		try {
-  			if (sm12Svc.insertPurchase(paramMap, mRequest) != 0 ) {
+  			if (sm12Svc.insertPurchaseDetail(paramMap) != 0 ) {
   				model.addAttribute("resultCode", 200);
   				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
   			} else {
@@ -74,29 +74,13 @@ public class SM12Ctr {
   		return "jsonView";
     }	  
     
-	//발주 수정
-    @PostMapping(value = "/updatePurchase")
-    public String updatePurchase(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  		try {
-  			if (sm12Svc.updatePurchase(paramMap, mRequest) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-  			} else {
-  				model.addAttribute("resultCode", 500);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  			model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }         
+   
 
 	//발주 수정
     @PostMapping(value = "/updatePurchaseDetail")
     public String updatePurchaseDetail(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
   		try {
-  			if (sm12Svc.updatePurchaseDetail(paramMap, mRequest) != 0 ) {
+  			if (sm12Svc.updatePurchaseDetail(paramMap) != 0 ) {
   				model.addAttribute("resultCode", 200);
   				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
   			} else {
