@@ -146,4 +146,11 @@ public class CR02Ctr {
 		  model.addAttribute("fileList", fileList);
 		  return "jsonView";
 	  }	 	
+	//SalesCode Search사용 조회
+	  @PostMapping(value = "/selectItemSalesCodeTreeList") 
+	  public String selectItemSalesCodeTreeList(@RequestBody Map<String, String> param, ModelMap model) {		  
+		  List<Map<String, Object>> fileList = cr02Svc.selectItemSalesCodeTreeList(param);
+		  model.addAttribute("fileList", fileList);
+		  return "jsonView";
+	  }	 
 }

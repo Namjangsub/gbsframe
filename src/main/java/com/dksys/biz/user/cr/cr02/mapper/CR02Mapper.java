@@ -29,6 +29,8 @@ public interface CR02Mapper {
 
     String selectMaxOrdrsNo(Map<String, String> param);
     
+    String selectAsMaxOrdrsNo(Map<String, String> param);
+    
     String selectItemDivEtc(Map<String, String> param);
 
     int insertOrdrs(Map<String, String> param);
@@ -62,5 +64,7 @@ public interface CR02Mapper {
     List<Map<String, Object>> selectOrdrsPlanHis(Map<String, String> param);
     
     List<Map<String, Object>> selectWbsLeftSalesCodeTreeList(Map<String, String> param);
+    
+    List<Map<String, Object>> selectItemSalesCodeTreeList(Map<String, String> param);
 
 }

@@ -20,6 +20,8 @@ public interface CR02Svc {
 
     String selectMaxOrdrsNo(Map<String, String> param);
     
+    String selectAsMaxOrdrsNo(Map<String, String> param);
+    
     String selectItemDivEtc(Map<String, String> param);
 
     void insertOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception;
@@ -36,4 +38,6 @@ public interface CR02Svc {
     List<Map<String, Object>> selectOrdrsPlanHis(Map<String, String> param);
     
     List<Map<String, Object>> selectWbsLeftSalesCodeTreeList(Map<String, String> param);
+    
+    List<Map<String, Object>> selectItemSalesCodeTreeList(Map<String, String> param);
 }

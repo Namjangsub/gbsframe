@@ -71,6 +71,11 @@ public class CR02Svcmpl implements CR02Svc {
     public String selectMaxOrdrsNo(Map<String, String> param) {
         return cr02Mapper.selectMaxOrdrsNo(param);
     }
+    
+    @Override
+    public String selectAsMaxOrdrsNo(Map<String, String> param) {
+        return cr02Mapper.selectAsMaxOrdrsNo(param);
+    }
 
     @Override
     public String selectItemDivEtc(Map<String, String> param) {
@@ -103,7 +108,7 @@ public class CR02Svcmpl implements CR02Svc {
         	param.put("ordrsNo", selectMaxOrdrsNo(param));
         }
         else {
-        	String orderNo = selectMaxOrdrsNo(param);
+        	String orderNo = selectAsMaxOrdrsNo(param);
         	param.put("ordrsNo", "AS"+orderNo);
         }
         
@@ -243,11 +248,9 @@ public class CR02Svcmpl implements CR02Svc {
         param.put("estNo", param.get("estNoOrdrs"));
         cr02Mapper.updateOrdrs(param);
 
-        //데이터 처리 시작
+        //데이터 처리 시작   
         int clmnPlanDegKey = cr02Mapper.selectDegKey(param);
         param.put("clmnPlanDegKey", Integer.toString(clmnPlanDegKey));
-        System.out.println(clmnPlanDegKey + "clmnPlanDegKey==============");
-        
         
         // 데이터베이스에서 현재 수주 상세 목록 가져오기
         List<Map<String, Object>> dbDetailListRaw = cr02Mapper.selectOrdrsDetails(param);
@@ -404,21 +407,7 @@ public class CR02Svcmpl implements CR02Svc {
                     cr02Mapper.insertUpdatePlanHis(plan);
                 }
                 
-             //---------------------------------------------------------------
-    		//첨부 화일 처리 시작
-    		//---------------------------------------------------------------
-    		if (uploadFileList.size() > 0) {
-    			paramMap.put("fileTrgtTyp", param.get("pgmId"));
-    			paramMap.put("fileTrgtKey", param.get("fileTrgtKey"));
-    			cm08Svc.uploadFile(paramMap, mRequest);
-    		}
-    		
-    		for(String fileKey : deleteFileList) {
-    			cm08Svc.deleteFile(fileKey);
-    		}
-    		//---------------------------------------------------------------
-    		//첨부 화일 처리  끝
-    		//---------------------------------------------------------------
+           
             }catch(Exception e){
                 e.getStackTrace();
             }
@@ -447,7 +436,21 @@ public class CR02Svcmpl implements CR02Svc {
             }
 
         }*/
-
+        //---------------------------------------------------------------
+		//첨부 화일 처리 시작
+		//---------------------------------------------------------------
+		if (uploadFileList.size() > 0) {
+			paramMap.put("fileTrgtTyp", param.get("pgmId"));
+			paramMap.put("fileTrgtKey", param.get("fileTrgtKey"));
+			cm08Svc.uploadFile(paramMap, mRequest);
+		}
+		
+		for(String fileKey : deleteFileList) {
+			cm08Svc.deleteFile(fileKey);
+		}
+		//---------------------------------------------------------------
+		//첨부 화일 처리  끝
+		//---------------------------------------------------------------
 
     }
 
@@ -549,6 +552,11 @@ public class CR02Svcmpl implements CR02Svc {
     @Override
     public List<Map<String, Object>> selectWbsLeftSalesCodeTreeList(Map<String, String> param) {
     	return cr02Mapper.selectWbsLeftSalesCodeTreeList(param);
+    }
+    
+    @Override
+    public List<Map<String, Object>> selectItemSalesCodeTreeList(Map<String, String> param) {
+    	return cr02Mapper.selectItemSalesCodeTreeList(param);
     }
     
     public int updateEstDeleteConfirm(Map<String, String> paramMap) {
