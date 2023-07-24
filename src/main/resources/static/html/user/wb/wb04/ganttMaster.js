@@ -470,8 +470,8 @@ GanttMaster.prototype.loadProject = function (project) {
   //shift dates in order to have client side the same hour (e.g.: 23:59) of the server side
   for (var i = 0; i < project.tasks.length; i++) {
     var task = project.tasks[i];
-    task.start += this.serverClientTimeOffset;
-    task.end += this.serverClientTimeOffset;
+    //task.start += this.serverClientTimeOffset; 07.21
+    //task.end += this.serverClientTimeOffset; 07.21
     //set initial collapsed status
     task.collapsed=collTasks.indexOf(task.id)>=0;
   }
@@ -541,6 +541,8 @@ GanttMaster.prototype.loadTasks = function (tasks, selectedRow) {
       //remove task from in-memory collection
       this.tasks.splice(task.getRow(), 1);
     } else {
+        //alert(task.start); //07.21
+        //alert(task.end); //07.21
       //append task to editor
       this.editor.addTask(task, null, true);
       //append task to gantt
