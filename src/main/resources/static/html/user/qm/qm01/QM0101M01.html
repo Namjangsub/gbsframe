@@ -153,7 +153,7 @@
           <a onclick="insertQualityReqModal('C');" style="height: 30px; line-height: 28px;" authchk>+</a>
           <a onclick="deleteQualityReq();" style="height: 30px; line-height: 28px;" authchk>-</a>
           <a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a> 
-          <a onclick="insertQualityRespModal('U');" style="height: 30px; line-height: 28px; width: 90px;"><i></i>결과등록</a>    
+          <a onclick="insertQualityRespModal();" style="height: 30px; line-height: 28px; width: 90px;"><i></i>결과등록</a>    
         </div>
         <select id="recordCnt" class="prae_select" onchange="gridView.setData(0);">
           <option value="10">10</option>
@@ -182,7 +182,7 @@
 		if (this.value == "E"){
 			return 'E';
 		} else {
-			return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
+			return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;" onClick="insertQualityRespModal();"></img>';
 		}
 	};
 	
@@ -202,29 +202,33 @@
   		        	 onClick: function () {
   		                this.self.select(this.dindex);
   		            },
-  		            onDBLClick: function () {
-  		              insertQualityReqModal('U');
-  		               var index = this.dindex;
-	  	               var targetObj = this.target;
-	  	      	       var row = gridView.target.getList()[index];
-	  	               var reqSt = row.reqSt;
-	  	               var rsltYn = row.rsltYn;	
-	  	           //결과등록여부 value 값 선택시 만 팝업이 뜨도록 수정 할것......
-	  	           
-	  	             /*    if(reqSt == "REQST02"){       //진행(todo 결제 승인)
-	  	            	 if(rsltYn == 'Y'){          //결과 등록
-	  	            		insertQualityRespModal('U'); 
-	  	            	 }else if(rsltYn == 'N'){    //결과 미등록
-	  	            		insertQualityRespModal('C'); 
-	  	            	 } 
-	  	               }else if(reqSt == "REQST01"){ //접수
-	  	            	    insertQualityReqModal('U');  
-	  	               }else if(reqSt == "REQST03"){ //완료 (결과 등록 후 todo 결제 승인)
-	  	            	    insertQualityRespModal('U'); 
-	  	               }
-	  	             */ 
-	  	           
-  		            },
+  		             onDBLClick: function () {
+  		           
+  		            var index = this.dindex;
+  	           	 	var item = this.item;
+  	                var self = this.self;
+	  	            var targetObj = this.target;
+		  	        var row = gridView.target.getList()[index]; //gridView.target.getList("selected")[0];gridView.target.selectedDataIndexs
+	  	            var reqSt = row.reqSt;
+	  	            var rsltYn = row.rsltYn;
+	  	            
+	  	            insertQualityReqModal('U');
+		  	       /*
+		  	  		var row = gridView.target.getList("selected")[0];
+		  	  		if(row.length > 0){
+		  	  			alert(row);
+		  	  			$.each(row, function(index, targetObj){
+		  	  				for(var i=0;i<$row.find('[rsltYn]').length;i++){
+		  	  					var rsltYn_ = $row.find('[rsltYn]')[i];
+		  	  					var itemValue = obj[rsltYn_.name];
+		  	  					if(itemValue){
+		  	  					  alert(itemValue);
+		  	  					}
+		  	  				}
+		  	  			});
+		  	  		}*/
+	  	  	         
+  		            }  		   
   		        },
 				page : {
 					navigationItemCount : 10,
@@ -243,6 +247,7 @@
 						,{key: "fileTrgtKey",	label: "파일대상KEY",		width: 50,		align: "center", 	hidden:true}
 						,{key: "coCd",	    	label: "회사코드",			width: 70,		align: "center", 	hidden:true}
 						,{key: "reqNo",	    	label: "관리번호",			width: 70,		align: "center", 	hidden:true}
+						,{key: "rsltNo",	    label: "실적번호",			width: 70,		align: "center", 	hidden:true}
 						,{key: "inwkCd",	   	label: "사내작업",			width: 70,		align: "center", 	hidden:true}
 						,{key: "bustCd",	   	label: "출장자",			width: 70,		align: "center", 	hidden:true}
 						,{key: "salesCd",	   	label: "salesCd",		width: 70,		align: "center", 	hidden:true}
@@ -485,37 +490,45 @@
 	/*삭제 버튼 클릭 시*/
 	function deleteQualityReq() {
 		var row = gridView.target.getList("selected")[0];
-		var formData = {
-				"fileTrgtKey" 	: row.fileTrgtKey,
-				"coCd" 	   		: row.coCd,
-		       	"userId"   		: jwt.userId,
-		       	"fileTrgtTyp"  : $('#pgmId').val()
-		}
-		if (confirm("삭제하시겠습니까?")) {
-			putAjax("/user/qm/qm01/deleteQualityReq", formData, null, function(data) {
-						alert(data.resultMessage);
-						if (data.resultCode == 200) {
-							gridView.setData(0);
-						}
-					});
-		}
-	}
-	
-	function insertQualityRespModal(type) {
-		var row = gridView.target.getList("selected")[0];
-		if(row.rsltYn == "N" && row.reqSt == "REQST02"){
-			var paramObj = {
-					"actionType" : type,
+		if(row.reqSt == "REQST01"){ //접수 상태(결제전 상태)에서만 삭제
+			var formData = {
 					"fileTrgtKey" 	: row.fileTrgtKey,
 					"coCd" 	   		: row.coCd,
 			       	"userId"   		: jwt.userId,
+			       	"fileTrgtTyp"  : $('#pgmId').val(),
+			        "rsltNo"   : row.rsltNo   //실적결과번호
+			}
+			if (confirm("삭제하시겠습니까?")) {
+				putAjax("/user/qm/qm01/deleteQualityReq", formData, null, function(data) {
+							alert(data.resultMessage);
+							if (data.resultCode == 200) {
+								gridView.setData(0);
+							}
+						});
+			}
+		}else{
+		  alert("접수상태가 진행 또는  완료상태 에서는 삭제 할수 없습니다.");
+		}
+	}
+	
+	function insertQualityRespModal() {
+		var row = gridView.target.getList("selected")[0];
+		//if(row.rsltYn == "N" && row.reqSt == "REQST02"){
+			if(row.reqSt == "REQST02"){  //접수 상태(결제후 진행상태)에서만 등록,수정
+			var paramObj = {
+					//"actionType" : type,
+					"fileTrgtKey" 	: row.fileTrgtKey,
+					"coCd" 	   		: row.coCd,
+			       	"userId"   		: jwt.userId,
+			       	"userName" : jwt.userNm,
 			       	"empNo"    : jwt.empNo,
 			       	"deptId"   : jwt.deptId,
 			       	"levelCd"  : jwt.levelCd,
 			     	"rsltYn"   : row.rsltYn,   //결과등록여부
 				    "reqSt"    : row.reqSt,    //todo진행상태
 				    "reqNo"    : row.reqNo,     //관리번호, 요청번호
-			       	"fileTrgtTyp"  : $('#pgmId').val()
+				    "midCd"    : row.midCd,
+				    "rsltNo"   : row.rsltNo   //실적결과번호
 			}
 			openModal("/static/html/user/qm/qm01/QM0101P02.html", 1600, 850, "", paramObj, function(data) {
 				gridView.setData(0);

@@ -59,12 +59,40 @@ public class QM01Ctr {
     return "jsonView";
   }
   
+//요청 정보2 
+  @PostMapping(value = "/selectQtyReqRespInfo")
+  public String selectQtyReqRespInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	Map<String, String> result = qm01Svc.selectQtyReqRespInfo(paramMap);
+    model.addAttribute("result", result);
+    return "jsonView";
+  }
+  
   @PostMapping(value = "/selectShareUserlst")
   public String selectShareUserlst(@RequestBody Map<String, String> paramMap, ModelMap model) {
     int totalCnt = qm01Svc.selectShareUserCount(paramMap);
     PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
     model.addAttribute("paginationInfo", paginationInfo);
     List<Map<String, String>> result = qm01Svc.selectShareUserlst(paramMap);
+    model.addAttribute("result", result);
+    return "jsonView";
+  }
+  
+ @PostMapping(value = "/selectSignResUserlst")
+  public String selectSignResUserlst(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    int totalCnt = qm01Svc.selectSignUserCount(paramMap);
+    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+    model.addAttribute("paginationInfo", paginationInfo);
+    List<Map<String, String>> result = qm01Svc.selectSignResUserlst(paramMap);
+    model.addAttribute("result", result);
+    return "jsonView";
+  }
+ 
+  @PostMapping(value = "/selectShareResUserlst")
+  public String selectShareResUserlst(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    int totalCnt = qm01Svc.selectShareUserResCount(paramMap);
+    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+    model.addAttribute("paginationInfo", paginationInfo);
+    List<Map<String, String>> result = qm01Svc.selectShareResUserlst(paramMap);
     model.addAttribute("result", result);
     return "jsonView";
   }
@@ -100,7 +128,27 @@ public class QM01Ctr {
 		}
 		return "jsonView";
   }
-
+  
+  
+  
+  @PostMapping(value = "/insertQualityResp")
+  public String insertQualityResp(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (qm01Svc.insertQualityResp(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+  } 
+  
+  
   @PostMapping(value = "/updateQualityReq")
   public String updateQualityReq(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 	  	try {
@@ -118,6 +166,24 @@ public class QM01Ctr {
 	  	return "jsonView";
   }
 
+  @PostMapping(value = "/updateQualityResp")
+  public String updateQualityResp(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	  	try {
+			if (qm01Svc.updateQualityResp(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));				
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+  }
+  
+  
   @PutMapping(value = "/deleteQualityReq")
   public String deleteQualityReq(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 	  	try {

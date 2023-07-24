@@ -643,7 +643,30 @@ function setCommonDiv(inputCd){
 					inputHtml += '<input type="radio" id="'+item.codeKind+j+'" name="'+item.codeKind+i+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
 					inputHtml += ' ' +item.codeNm;
 					inputHtml += '</td>';
-				});
+				});			   
+				$(elem).append(inputHtml);
+
+		})
+	})
+}
+
+function setCommonTd(inputCd,inputCd2,inputCd3){
+	$.each(inputCd, function(idx, elem){
+		var param = {
+			"codeId" : inputCd2,
+			"codeKind" : inputCd3
+		};
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", param , null,  function(data){
+			var inputHtml = '';
+			var codeList = data.childCodeList;
+			var i = "CP";
+			var j = 0;
+			   $.each(codeList, function (index, item){
+					j = j+1;
+					inputHtml += '<input type="checkbox" id="'+item.codeKind+j+'M" name="'+item.codeKind+i+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
+					inputHtml += ' ' +item.codeNm+' ';
+					
+				});		
 				$(elem).append(inputHtml);
 
 		})
