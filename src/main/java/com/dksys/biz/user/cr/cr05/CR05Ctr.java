@@ -65,7 +65,22 @@ public class CR05Ctr {
 	}
 	
 	
-	// 계좌번호 가져오기
+	// 수금유형 조회
+	@PostMapping(value = "/selectPmntmtdCd") 
+	public String selectPmntmtdCd(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, Object>> result = cr05Svc.selectPmntmtdCd(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
+	// 계좌번호 조회
+	@PostMapping(value = "/selectBkacCd")
+	public String selectBkacCd(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, Object>> result = cr05Svc.selectBkacCd(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
 	
 	
 	// 수금번호 조회

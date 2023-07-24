@@ -331,9 +331,9 @@
 			, S.CLNT_NM AS ORDRS_CLNT_NM	 		-- 고객사명
 			, TO_CHAR(CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT	 -- 수금일자
 			, B.CLMN_PLAN_SEQ						-- 수금계획순번
-			, A.CURR_CD								--통화단위
+			, A.CURR_CD								-- 통화단위
 			, R2.CODE_NM  		AS ORDRS_CURR_NM	-- 통화코드명
-			, NVL(A.EXRATE, 1) AS EXRATE			--환율
+			, NVL(A.EXRATE, 1) AS EXRATE			-- 환율
 			, A.PMNTMTD_CD							-- 수금유형코드
 			, P.CODE_NM AS	PMNTMTD_NM				-- 수금유형명
 			, A.BKAC_CD								-- 계좌번호코드
@@ -352,7 +352,7 @@
 			, U2.NAME AS UDT_ID_NM
 			, A.UDT_PGM
 			, TO_CHAR(A.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM
-		     , 'U' AS DATA_CHK
+		    , 'U' AS DATA_CHK
 		FROM TB_CR05M01 AS A
 			LEFT OUTER JOIN (
 					SELECT 
@@ -413,8 +413,10 @@
 			    , CLMN.CLMN_PLAN_SEQ      AS CLMN_PLAN_SEQ     --수금계획순번
 			    , CLMN.CLMN_PLAN_DIV      AS CLMN_PLAN_DIV     --수금구분
 			    , R3.CODE_NM              AS CLMN_PLAN_DIV_NM  --수금구분명
-			    , CLMN.CLMN_DIV_SEQ       AS CLMN_DIV_SEQ      --수금구분차수
-			    , CLMN.CLMN_RATE          AS CLMN_RATE         --수금비율
+			    , CLMN.CLMN_DIV_SEQ	  AS CLMN_DIV_SEQ	   --수금구분차수
+			    , TO_CHAR(NVL(CLMN.CLMN_DIV_SEQ, 1)) || ' 차' AS CLMN_DIV_SEQ_NM      --수금구분차수
+			    , NVL(CLMN.CLMN_RATE, 0) AS CLMN_RATE		   --수금비율
+			    , TO_CHAR(NVL(CLMN.CLMN_RATE, 0)) || ' %'  AS CLMN_RATE_NM
 			    , CLMN.CURR_CD            AS CLMN_CURR_CD      --통화단위
 			    , R4.CODE_NM              AS CLMN_CURR_NM      --통화단위명
 			    , NVL(CLMN.EXRATE, 1)     AS CLMN_EXRATE       --환율
@@ -426,11 +428,14 @@
 			    , 'N'                           AS CHK          --체크여부
 			    , 0                             AS CONF_AMT     --확정금액
 			    , SELL_T.SELL_BILL_AMT 					-- 기계산서발행금액
+			   	, 0 		AS	UN_SELL_BILL_AMT		-- 계산서 미발행금액
 				, SELL_T.CLMN_PLAN_SEQ					-- 수금계획순번
 				, SELL_T.SELL_BILL_NO					-- 계산서 번호
 				, CLMN_T.CLMN_NO		AS CLMN_NO		-- 수금번호
-				, CLMN_T.CLMN_AMT2		-- 수금의 수금금액
-				, 0 	AS UNCLMN_AMT2	-- 수금의 미수금액
+				, NVL(CLMN_T.CLMN_AMT2, 0) AS CLMN_AMT2	-- 수금의 수금금액(기수금금액)
+				, 0 	AS UNCLMN_AMT2					-- 수금의 미수금액
+				, NVL(CLMN_T.CLMN_AMT2, 0) AS CLMN_AMT3	-- 수금금액
+				, 'U'                         AS DATA_CHK
 			FROM   TB_CR02M01 AS ORDRS
 		       <!-- 수주수금계획 -->
 		       JOIN TB_CR02D01 AS CLMN  ON CLMN.CO_CD    = ORDRS.CO_CD
@@ -470,11 +475,11 @@
 				LEFT OUTER JOIN ( 
 				SELECT CLMN_M.CLMN_NO		-- 수금번호	
 					, CLMN_M.CO_CD      	-- 회사	
-					, CLMN_D.ORDRS_NO	-- 수주번호	
-					, CLMN_M.CLMN_DT      -- 수금일자	
-					, CLMN_M.BKAC_CD      -- 계좌번호 	
-					, CLMN_M.EXRATE       -- 환율		
-					, CLMN_M.PMNTMTD_CD   -- 수금유형
+					, CLMN_D.ORDRS_NO		-- 수주번호	
+					, CLMN_M.CLMN_DT      	-- 수금일자	
+					, CLMN_M.BKAC_CD      	-- 계좌번호 	
+					, CLMN_M.EXRATE       	-- 환율		
+					, CLMN_M.PMNTMTD_CD  	 -- 수금유형
 					, NVL(SUM(CLMN_D.CLMN_DTL_AMT), 0) AS CLMN_AMT2	-- 수금금액	
 					, CLMN_M.CLMN_RMK     -- 비고 		
 					, CLMN_D.CLMN_DTL_AMT					-- 수금금액
@@ -521,77 +526,133 @@
 				SELECT A.*
 					, ROWNUM AS RN
 				FROM	(
-						SELECT DISTINCT A.FILE_TRGT_KEY
-						     , A.CO_CD
-							 , R.CODE_NM AS CO_NM
-							 , A.ORDRS_CLNT_CD
-							 , S.CLNT_NM AS ORDRS_CLNT_NM
-							 , A.CLNT_PJT
-							 , A.ORDRS_NO
-							 , TO_CHAR(A.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT
-							 , A.ORDRS_DIV
-							 , R1.CODE_NM          AS ORDRS_DIV_NM
-							 , A.CTRT_NM
-							 , A.CURR_CD
-							 , R2.CODE_NM          AS CURR_NM
-							 , NVL(A.EXRATE, 1)    AS EXRATE
-							 , NVL(A.ORDRS_AMT, 0) AS ORDRS_AMT
-							 , P.CLMN_PLAN_SEQ
-							 , P.CLMN_PLAN_DIV
-							 , R3.CODE_NM          AS CLMN_PLAN_DIV_NM
-							 , P.CLMN_DIV_SEQ
-							 , TO_CHAR(NVL(P.CLMN_DIV_SEQ, 1)) || ' 차'  AS CLMN_DIV_SEQ_NM
-							 , NVL(P.CLMN_RATE, 0) AS CLMN_RATE
+						SELECT DISTINCT A.FILE_TRGT_KEY 	AS 	ORDRS_FILE_TRGT_KEY	-- 수주파일대상키
+						     , A.CO_CD					-- 회사
+							 , R.CODE_NM AS CO_NM		-- 회사명
+							 , CLMN_T.CLMN_NO	 	 	-- 수금번호
+							 , TO_CHAR(CLMN_T.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT		-- 수금일자
+							 , CLMN_T.PMNTMTD_CD   		-- 수금유형
+							 , A.ORDRS_CLNT_CD			-- 고객사코드
+							 , S.CLNT_NM AS ORDRS_CLNT_NM	-- 고객사명
+							 , A.CLNT_PJT				-- 고객사 PJT
+							 , A.ORDRS_NO				-- 수주번호
+							 , A.CTRT_NM				-- 계약명
+							 , A.CURR_CD		AS 	ORDRS_CURR_CD	-- 통화단위
+							 , R2.CODE_NM      	AS 	ORDRS_CURR_NM	-- 통화단위명
+							 , NVL(A.EXRATE, 1)    AS EXRATE		-- 환율
+							 , P.CLMN_PLAN_DIV						-- 수금구분
+							 , R3.CODE_NM          AS CLMN_PLAN_DIV_NM	-- 수금구분명
+							 , P.CLMN_DIV_SEQ		-- 수금계획차수
+							 , TO_CHAR(NVL(P.CLMN_DIV_SEQ, 1)) || ' 차'  AS CLMN_DIV_SEQ_NM -- 수금계획차수
+							 , NVL(P.CLMN_RATE, 0) AS CLMN_RATE	-- 수금비율
 							 , TO_CHAR(NVL(P.CLMN_RATE, 0)) || ' %'  AS CLMN_RATE_NM
-							 , NVL(P.CLMN_AMT, 0)  AS CLMN_AMT
-							 , TO_CHAR(P.BILL_PBLS_DT, 'YYYY-MM-DD') AS BILL_PBLS_DT
-							 , TO_CHAR(P.CLMN_DT, 'YYYY-MM-DD')      AS CLMN_DT
-							 , NVL(C.SELL_DCSN_DTL_AMT, 0) AS BEF_CONF_AMT
-							 , NVL(P.CLMN_AMT, 0) - NVL(C.SELL_DCSN_DTL_AMT, 0) AS MI_CONF_AMT
-							 , NVL(C.SELL_DCSN_DTL_AMT, 0) AS SELL_DCSN_DTL_AMT
-							 , ''  AS SELL_DCSN_NO
+							 , NVL(P.CLMN_AMT, 0)  AS CLMN_AMT	-- 수금금액
+							 , TO_CHAR(P.BILL_PBLS_DT, 'YYYY-MM-DD') AS CLMN_BILL_PBLS_DT	-- 계산서 발행일자
+							 , TO_CHAR(P.CLMN_DT, 'YYYY-MM-DD')      AS CLMN_DT -- 수금일자
+							 , NVL(C.SELL_DCSN_DTL_AMT, 0) AS BEF_CONF_AMT	-- 기매출확정금액
+							 , NVL(P.CLMN_AMT, 0) - NVL(C.SELL_DCSN_DTL_AMT, 0) AS UNCONF_AMT -- 미 매출확정금액
+							 <!--  매출확정번호 -->
+							 <!-- , ''  AS SELL_DCSN_NO -->		
+							 , SELL_T.SELL_BILL_AMT 							-- 기계산서발행금액
+							 , 0 		AS	UN_SELL_BILL_AMT					-- 계산서 미발행금액 
+							 , NVL(CLMN_T.CLMN_AMT2, 0) AS CLMN_AMT2			-- 수금의 수금금액(기수금금액)
+							 , 0 	AS UNCLMN_AMT2								-- 수금의 미수금액
+							 , NVL(CLMN_T.CLMN_AMT2, 0) AS CLMN_AMT3			-- 수금금액	
 							 , 'N' AS CHK      --체크여부
 							 , 0   AS CONF_AMT  --확정금액
 							 , 'I' AS DATA_CHK
-						FROM   TB_CR02M01 AS A --수주
-						       --수금계획
+						FROM   TB_CR02M01 AS A 
 							   JOIN TB_CR02D01 AS P  ON P.CO_CD    = A.CO_CD
-							                                   AND P.ORDRS_NO = A.ORDRS_NO
-							   --매출확정
+							                         AND P.ORDRS_NO = A.ORDRS_NO
 							   LEFT OUTER JOIN (
 								                SELECT DISTINCT CM.CO_CD
 												     , CD.ORDRS_NO
 													 , CD.CLMN_PLAN_SEQ
 													 , SUM(NVL(CD.SELL_DCSN_DTL_AMT, 0)) AS SELL_DCSN_DTL_AMT
 												FROM   TB_CR03M01 AS CM --매출확정
-												       --매출확정상세
 													   LEFT OUTER JOIN TB_CR03D01 AS CD  ON CD.CO_CD        = CM.CO_CD
 													                                    AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
 												GROUP BY CM.CO_CD, CD.ORDRS_NO, CD.CLMN_PLAN_SEQ
 											   ) AS C  ON C.CO_CD         = P.CO_CD
 											          AND C.ORDRS_NO      = P.ORDRS_NO
 													  AND C.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
-							   --회사
-							   LEFT OUTER JOIN TB_CM05M01 AS R ON R.CODE_ID = A.CO_CD
-							   --수주구분
-							   LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.ORDRS_DIV
-							   --통화단위
-							   LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.CURR_CD
-							   --수금계획구분
-							   LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = P.CLMN_PLAN_DIV
-							   --고객사
-							   LEFT OUTER JOIN TB_BM02M01 AS S ON S.CLNT_CD = A.ORDRS_CLNT_CD
+								LEFT OUTER JOIN (
+								SELECT 
+									SELL_BD.CO_CD, 
+									SELL_BD.ORDRS_NO,
+									SELL_B.SELL_BILL_NO, 
+									SELL_BD.CLMN_PLAN_SEQ,
+									NVL(SUM(SELL_BD.SELL_BILL_DTL_AMT), 0) AS SELL_BILL_AMT	-- 매출계산서금액
+								FROM TB_CR04D01 SELL_BD 
+								LEFT OUTER JOIN 
+									TB_CR04M01 SELL_B ON SELL_B.CO_CD = SELL_BD.CO_CD  
+									AND SELL_B.SELL_BILL_NO = SELL_BD.SELL_BILL_NO
+									GROUP BY SELL_BD.CO_CD, SELL_BD.ORDRS_NO, SELL_B.SELL_BILL_NO, SELL_BD.CLMN_PLAN_SEQ	
+								) AS SELL_T	ON SELL_T.CO_CD = C.CO_CD -- 계산서
+									AND SELL_T.ORDRS_NO = C.ORDRS_NO
+									AND SELL_T.CLMN_PLAN_SEQ = C.CLMN_PLAN_SEQ						  
+							LEFT OUTER JOIN ( 
+							SELECT CLMN_M.CLMN_NO		-- 수금번호	
+								, CLMN_M.CO_CD      	-- 회사	
+								, CLMN_D.ORDRS_NO		-- 수주번호	
+								, CLMN_M.CLMN_DT      	-- 수금일자	
+								, CLMN_M.BKAC_CD      	-- 계좌번호 	
+								, CLMN_M.EXRATE       	-- 환율		
+								, CLMN_M.PMNTMTD_CD  	 -- 수금유형
+								, NVL(SUM(CLMN_D.CLMN_DTL_AMT), 0) AS CLMN_AMT2	-- 수금금액	
+								, CLMN_M.CLMN_RMK     -- 비고 		
+								, CLMN_D.CLMN_DTL_AMT					-- 수금금액
+								, CLMN_D.CLMN_PLAN_SEQ					-- 수금계획순번
+								, CLMN_M.CREAT_ID			
+								, CLMN_M.UDT_ID	
+								, CLMN_M.CREAT_DTTM						-- 생성일시
+								, CLMN_M.UDT_DTTM						-- 최종변경일시
+							FROM TB_CR05M01 	AS	CLMN_M				-- 수금
+							LEFT JOIN TB_CR05D01 	AS		CLMN_D		-- 수금상세
+								ON CLMN_D. CO_CD = CLMN_M.CO_CD 
+								AND CLMN_D.CLMN_NO = CLMN_M.CLMN_NO 
+							GROUP BY  CLMN_M.CLMN_NO, CLMN_M.CO_CD, CLMN_D.ORDRS_NO, CLMN_M.CLMN_DT, CLMN_M.BKAC_CD, CLMN_M.EXRATE, CLMN_M.PMNTMTD_CD,
+				    		CLMN_M.CLMN_RMK, CLMN_D.CLMN_DTL_AMT, CLMN_D.CLMN_PLAN_SEQ, CLMN_M.CREAT_ID, CLMN_M.UDT_ID, CLMN_M.CREAT_DTTM, CLMN_M.UDT_DTTM			
+							) AS CLMN_T ON CLMN_T.CO_CD  = SELL_T.CO_CD
+								AND CLMN_T.ORDRS_NO = SELL_T.ORDRS_NO
+								AND CLMN_T.CLMN_PLAN_SEQ = SELL_T.CLMN_PLAN_SEQ									  
+							   LEFT OUTER JOIN TB_CM05M01 AS R ON R.CODE_ID = A.CO_CD			 -- 회사
+							   LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.ORDRS_DIV		 -- 수주구분	
+							   LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.CURR_CD		 -- 통화단위
+							   LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = P.CLMN_PLAN_DIV	 -- 수금계획구분
+							   LEFT OUTER JOIN TB_BM02M01 AS S ON S.CLNT_CD = A.ORDRS_CLNT_CD	 -- 고객사
 						WHERE  1 = 1
 						ORDER BY A.CO_CD, A.ORDRS_CLNT_CD, A.ORDRS_NO
 						) AS A
 				WHERE  1 = 1
-				AND    A.MI_CONF_AMT > 0
+				<!-- AND    A.MI_CONF_AMT > 0 -->
 		       ) AS A
 		WHERE  1 = 1
 		AND    A.CO_CD = #{coCd}
 		AND    A.ORDRS_CLNT_CD = #{ordrsClntCd}
-		AND    A.CURR_CD       = #{currCd}
+		AND    A.ORDRS_CURR_CD = #{ordrsCurrCd}
 	</select>
+	
+	<!-- 수금유형 -->		
+	<select id="selectPmntmtdCd" parameterType="Map" resultType="camelMap">
+		  SELECT CODE_ID AS CODE_ID, CODE_NM AS CODE_NM
+  	      FROM   TB_CM05M01 A
+     	 	WHERE  A.CODE_KIND = 'PMNTMTD'
+     	 	<if test="codeId != null and !codeId.equals('')">
+     	   		AND A.CODE_ID = #{codeId}
+     	   	</if>
+	</select>	
+	
+	<!-- 계좌번호 -->
+	<select id="selectBkacCd" parameterType="Map" resultType="camelMap">
+	    SELECT CODE_ID AS CODE_ID,
+ 		CODE_NM||CODE_DESC AS CODE_NM
+		FROM   TB_CM05M01 A
+ 		WHERE  A.CODE_KIND ='BKAC'
+ 		<if test="codeId != null and !codeId.equals('')">
+ 			AND  A.CODE_ID = #{codeId}
+ 		</if>
+	</select>	
 		
 	<!-- 수금번호 -->
 	<select id="select_cr05_clmnNo" parameterType="Map" resultType="String">

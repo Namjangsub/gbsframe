@@ -61,6 +61,16 @@ public class CR05SvcImpl implements CR05Svc {
 		return cr05Mapper.select_insert_target_modal(paramMap);
 	}
 	
+	@Override
+	public List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap) {
+		return cr05Mapper.selectPmntmtdCd(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, Object>> selectBkacCd(Map<String, String> paramMap) {
+		return cr05Mapper.selectBkacCd(paramMap);
+	}
+	
 	
 	@Override
 	public List<Map<String, String>> select_cr05_clmnNo(Map<String, String> paramMap) {
