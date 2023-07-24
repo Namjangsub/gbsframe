@@ -127,6 +127,7 @@ Task.prototype.setPeriod = function (start, end) {
 
 
   //compute legal start/end //todo mossa qui R&S 30/3/2016 perchè altrimenti il calcolo della durata, che è stato modificato sommando giorni, sbaglia
+  
   start = computeStart(start);
   end=computeEnd(end);
 
@@ -403,6 +404,7 @@ function updateTree(task) {
   var newEnd;
 
   //id shrink start and end are computed on children boundaries
+  
   if (task.master.shrinkParent) {
     var chPeriod= p.getChildrenBoudaries();
     newStart = chPeriod.start;

@@ -182,7 +182,7 @@
         <ul class="btn_ul">
 	<li class="btn_r">
 	  <a onclick="initSearch();"><button class="bg_gray">초기화</button></a> 
-	  <a onclick="gantt('0');"><button class="bg_gray">검 색</button>
+	  <a onclick="gantt();"><button class="bg_gray">검 색</button>
 	  </a>
 	</li>
         </ul>
@@ -195,7 +195,16 @@
 	  <tr>
 				<th class="hit">회사</th>
 				<td><select id="coCd_S" name="coCd_S" data-kind="CO" required="required" data-search="coCd" onchange="initDeptTree();">
-				</select></td>
+				</select>
+				</td>
+				<th>고객사</th>
+                        <td>
+                            <input type="hidden" id="clntCd_S" name="clntCd_S"  data-search="clntCd">
+                            <div class="search_form" style="width: 100%;">
+                                <input type="text" id="clntNm_S" name="clntNm_S"  data-search="clntNm" onkeyup="if(window.event.keyCode == 8){clntCd_S.value = ''}  else if(window.event.keyCode == 13){gantt()};"> 
+                                <a onclick="openClntSearch('P');"><i class="i_search_w"></i></a>
+                            </div>
+                        </td>
 				<th class="hit">Sales Code</th>
 				<td>
 				    <div class="search_form">
@@ -260,7 +269,7 @@
 		ge.loadProject(project);
 		ge.checkpoint(); //empty the undo stack */
 
-		gantt("0");
+		gantt();
 	});
 	
     //Sales Code (수주마스터, 수주상세테이블 조인) 검색
@@ -272,8 +281,24 @@
         openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1000, 430, "SALES CODE 검색", paramObj, function (grid){
             var row = grid.target.getList("selected")[0];
             $('#salesCd_S').val(row.salesCd);
-            salesCodeGridView.setData(0);
+            gantt();
         });
+        gantt();
+    }
+    
+    // 고객사 검색
+    function openClntSearch(openType) {
+        var paramObj = {
+                "searchValue" :  $("#clntNm_S").val()
+        }       
+        openSecondModal("/static/html/cmn/modal/clntSearch.html", 600, 420, "거래처 검색", paramObj, function (grid) {
+            var row = grid.target.getList("selected")[0];
+            if(openType == "P"){
+                $('#clntCd_S').val(row.clntCd);
+                $('#clntNm_S').val(row.clntNm);
+                gantt();
+            }
+        });        
     }
     
 	function getDemoProject() {
@@ -306,8 +331,8 @@
 		    <tr style="height:40px">
               <th class="gdfColHeader" style="width:35px; border-right: none"></th>
               <th class="gdfColHeader" style="width:35px;"></th>
-              <th class="gdfColHeader gdfResizable" style="width:100px;">수주/주요내용</th>
-              <th class="gdfColHeader gdfResizable" style="width:300px;">WBS구분명</th>
+              <th class="gdfColHeader gdfResizable" style="width:100px;">수주명/주요내용</th>
+              <th class="gdfColHeader gdfResizable" style="width:300px;">구분명</th>
               <th class="gdfColHeader"  align="center" style="width:17px;" title="Start date is a milestone."><span class="teamworkIcon" style="font-size: 8px;">^</span></th>
               <th class="gdfColHeader gdfResizable" style="width:80px;">시작일</th>
               <th class="gdfColHeader"  align="center" style="width:17px;" title="End date is a milestone."><span class="teamworkIcon" style="font-size: 8px;">^</span></th>
@@ -596,16 +621,16 @@
 </html>
 	
 <script type="text/javascript">
-function gantt(id) {
+function gantt() {
+	ge.reset();
 	var list = null; 
     dataArr = [];
-    var paramObj = {"coCd": $('#coCd_S').val(),"salesCd" : id};
-    salesCd =  id;
+    var paramObj = {"coCd": $('#coCd_S').val(),"clntCd": $('#clntCd_S').val(), "salesCd" : $('#salesCd_S').val()};
     postAjaxSync("/user/wb/wb04/selectGanttAllList", paramObj, null, function(data){                               
         list = data.fileList;                                
     });
     var i = 0;
-    if (list.length > 0) {
+    if (list.length > 1) {
         var i = 0;
         $.each(list, function(idx, elem){                 
             var sysdate1 = new Date(elem.wbsPlansDt); 
@@ -621,7 +646,7 @@ function gantt(id) {
                     type: "",
                     typeId: "",
                     description: "",
-                    code: elem.id,
+                    code: elem.clntNm,
                     level: elem.lvl,
                     status: "STATUS_ACTIVE",
                     depends: "",
@@ -631,9 +656,9 @@ function gantt(id) {
                     end: elem.wbsPlaneDt,
                     startIsMilestone: false,
                     endIsMilestone: false,
-                    collapsed: false,
+                    collapsed: true,
                     assigs: [],
-                    hasChild: true,    
+                    hasChild: false,    
              }  
             dataArr.push(task); 
             i++;

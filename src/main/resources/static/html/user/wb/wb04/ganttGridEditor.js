@@ -707,8 +707,9 @@ GridEditor.prototype.openFullEditor = function (task, editOnlyAssig) {
       });
 
       //change dates
-      task.setPeriod(Date.parseString(taskEditor.find("#start").val()).getTime(), Date.parseString(taskEditor.find("#end").val()).getTime() + (3600000 * 22));
-
+      //task.setPeriod(Date.parseString(taskEditor.find("#start").val()).getTime(), Date.parseString(taskEditor.find("#end").val()).getTime() + (3600000 * 22)); 07.21
+      task.setPeriod(Date.parseString(taskEditor.find("#start").val()).getTime(), Date.parseString(taskEditor.find("#end").val()).getTime());
+      
       //change status
       task.changeStatus(taskEditor.find("#status").val());
 
