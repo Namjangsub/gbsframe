@@ -110,22 +110,22 @@ public class CR11SvcImpl implements CR11Svc {
 		//첨부 화일 권한체크  끝
 		//---------------------------------------------------------------
 		
-		int result = cr11Mapper.update_cr11_Modal(paramMap);
+		int result = 0;
 		
 		//상세수정
-//		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
-//	    for (Map<String, String> dtl : dtlParam) {
-//	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-//			dtl.put("userId", paramMap.get("userId"));
-//	    	dtl.put("pgmId", paramMap.get("pgmId"));
-//			
-//			String dataChk = dtl.get("dataChk").toString();	    	
-//			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
-//	    	if ("U".equals(dataChk)) {
-//				//데이터 처리
-//	    		cr11Mapper.update_cr11_Modal(dtl);
-//	    	} 
-//	    }
+		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+	    for (Map<String, String> dtl : dtlParam) {
+	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
+			dtl.put("userId", paramMap.get("userId"));
+	    	dtl.put("pgmId", paramMap.get("pgmId"));
+			
+			String dataChk = dtl.get("dataChk").toString();	    	
+			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
+	    	if ("U".equals(dataChk)) {
+				//데이터 처리
+	    		result = cr11Mapper.update_cr11_Modal(dtl);
+	    	} 
+	    }
 			    
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작
