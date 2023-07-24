@@ -124,14 +124,12 @@ public class WB01SvcImpl implements WB01Svc {
 		
 	    Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-	    
-	    
-		
-	    // 공유테이블 기존 데이터 삭제
-	    List<Map<String, String>> sharngChk = wb01Mapper.deleteWbsSharngListChk(paramMap);
-		if (sharngChk.size() > 0) {
-			wb01Mapper.deleteWbsSharngList(paramMap);	
-		}
+
+		/*
+		 * // 공유테이블 기존 데이터 삭제 List<Map<String, String>> sharngChk =
+		 * wb01Mapper.deleteWbsSharngListChk(paramMap); if (sharngChk.size() > 0) {
+		 * wb01Mapper.deleteWbsSharngList(paramMap); }
+		 */
 		
 		Gson gson = new Gson();
 		// 공유테이블 등록  
