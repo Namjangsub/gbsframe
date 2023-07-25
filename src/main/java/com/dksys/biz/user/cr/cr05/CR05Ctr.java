@@ -84,12 +84,12 @@ public class CR05Ctr {
 	
 	
 	// 수금번호 조회
-	@PostMapping(value = "/select_cr05_clmnNo")
-	public String select_cr05_clmnNo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> result = cr05Svc.select_cr05_clmnNo(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-	}
+//	@PostMapping(value = "/select_cr05_clmnNo")
+//	public String select_cr05_clmnNo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+//		List<Map<String, String>> result = cr05Svc.select_cr05_clmnNo(paramMap);
+//		model.addAttribute("result", result);
+//		return "jsonView";
+//	}
 	
 	
 	// 수금등록 입력
@@ -106,6 +106,7 @@ public class CR05Ctr {
 		} catch (Exception e) {
 			model.addAttribute("resultCode", 900);
 			model.addAttribute("resultMessage", e.getMessage());
+			System.out.println(e.getMessage());
 		}
 		return "jsonView";
 	}
@@ -131,9 +132,9 @@ public class CR05Ctr {
 	
 	// 수금등록 삭제
 	@PutMapping(value = "/delete_cr05")
-	public String delete_cr05(@RequestBody Map<String, String> paramMap, MultipartHttpServletRequest mRequset, ModelMap model) throws Exception {
+	public String delete_cr05(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 		try {
-			if(cr05Svc.delete_cr05(paramMap, mRequset) !=0) {
+			if(cr05Svc.delete_cr05(paramMap) !=0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
 			} else {

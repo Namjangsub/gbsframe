@@ -72,10 +72,10 @@ public class CR05SvcImpl implements CR05Svc {
 	}
 	
 	
-	@Override
-	public List<Map<String, String>> select_cr05_clmnNo(Map<String, String> paramMap) {
-		return cr05Mapper.select_cr05_clmnNo(paramMap);
-	}
+//	@Override
+//	public List<Map<String, String>> select_cr05_clmnNo(Map<String, String> paramMap) {
+//		return cr05Mapper.select_cr05_clmnNo(paramMap);
+//	}
 	
 	//DATA INSERT
 	@Override
@@ -102,11 +102,29 @@ public class CR05SvcImpl implements CR05Svc {
 		int fileTrgtKey = cr05Mapper.select_cr05_SeqNext(paramMap);
 		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
 		
+		String newClmnNo = cr05Mapper.select_cr05_clmnNo(paramMap);
+		paramMap.put("clmnNo", newClmnNo);
+		
 		//마스터입력
 		int result = cr05Mapper.insert_cr05(paramMap);
 
 		//상세입력 ---------수정 중 
-		
+		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+		for(Map<String, String> dtl : dtlParam) {
+			dtl.put("clmnNo", newClmnNo);
+			dtl.put("userId", paramMap.get("userId"));
+			dtl.put("pgmId", paramMap.get("pgmId"));
+			
+			String dataChk = dtl.get("dataChk").toString();
+			// "dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
+			if("I".equals(dataChk)) {
+				dtl.put("ordrsNo", dtl.get("ordrsNo").toString());
+				dtl.put("clmnPlanSeq", dtl.get("clmnPlanSeq").toString());
+				dtl.put("clmnDtlAmt", dtl.get("clmnAmt3").toString());
+				
+				cr05Mapper.insert_cr05_Dtl(dtl);
+			}
+		}
 		//데이터 처리 끝
 
 		//---------------------------------------------------------------
@@ -162,18 +180,21 @@ public class CR05SvcImpl implements CR05Svc {
 		
 		//데이터처리 시작
 		//마스터 수정
-		int result = cr05Mapper.update_cr05(paramMap, mRequest);
+		int result = cr05Mapper.update_cr05(paramMap);
 		
 		//상세수정  ---------수정 중 
 		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+		
+		System.out.println(dtlParam); 
+		
 	    for (Map<String, String> dtl : dtlParam) {
 	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
 			dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
 			
-			String dtaChk = dtl.get("dtaChk").toString();	    	
+			String dataChk = dtl.get("dataChk").toString();	    	
 			//"dtaChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
-	    	if ("U".equals(dtaChk)) {
+	    	if ("U".equals(dataChk)) {
 				//데이터 처리
 				cr05Mapper.update_cr05_Dtl(dtl);
 	    	} 
@@ -200,7 +221,7 @@ public class CR05SvcImpl implements CR05Svc {
 	}
 	
 	@Override
-	public int delete_cr05(Map<String, String> paramMap, MultipartHttpServletRequest mRequset) throws Exception {
+	public int delete_cr05(Map<String, String> paramMap) throws Exception {
 		//---------------------------------------------------------------
 		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
 		//   필수값 :  jobType, userId, comonCd
@@ -222,15 +243,9 @@ public class CR05SvcImpl implements CR05Svc {
 		
 		int result = 0;
 		
-		String pid = paramMap.get("pid").toString();		
-		
-		if ("top".equals(pid)) {
-			//데이터 처리
-			result = cr05Mapper.delete_cr05_Dtl_All(paramMap);
-			result = cr05Mapper.delete_cr05(paramMap);
-    	} else {
-    		result = cr05Mapper.delete_cr05_Dtl(paramMap);
-    	}
+		result = cr05Mapper.delete_cr05_Dtl_All(paramMap);
+		result = cr05Mapper.delete_cr05(paramMap);
+	//	result = cr05Mapper.delete_cr05_Dtl(paramMap);
 		
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
@@ -244,9 +259,6 @@ public class CR05SvcImpl implements CR05Svc {
 		//---------------------------------------------------------------
 		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
-		
 		return result;
 	}
-	
-	
 }

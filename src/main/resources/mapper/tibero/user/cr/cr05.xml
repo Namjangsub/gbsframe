@@ -26,7 +26,7 @@
 				<!-- 수금리스트 -->
 				, CLMN_T.CLMN_NO						-- 수금번호
 				, TO_CHAR(CLMN_T.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT	 -- 수금일자
-				, SELL_T.CLMN_PLAN_SEQ					-- 수금계획순번
+				, OCP.CLMN_PLAN_SEQ						-- 수금계획순번
 				, OM.CURR_CD	AS ORDRS_CURR_CD		-- 통화코드
 				, R2.CODE_NM  	AS ORDRS_CURR_NM		-- 통화코드명
 				, SELL_T.SELL_BILL_NO					-- 계산서 번호
@@ -196,7 +196,7 @@
 				, OCP.CLMN_AMT     						-- 기수금금액    
 				, 0 		AS	UNCLMN_AMT				-- 미수금금액
 				, CLMN_T.BKAC_CD 						-- 계좌번호코드
-				, (SELECT  CODE_NM||' 계좌 : '||CODE_DESC AS CODE_NM
+				, (SELECT  CODE_NM||' '||CODE_DESC AS CODE_NM
      				 FROM   TB_CM05M01 A
      				 WHERE  A.CODE_KIND = 'BKAC'  AND CODE_ID =  CLMN_T.BKAC_CD)  AS BKAC_NM -- 계좌번호
 				<!-- , R4.CODE_NM AS BKAC_NM	 -->				
@@ -427,14 +427,14 @@
 			    , CLMN.CLMN_AMT - CONF.CONF_AMT AS UNCONF_AMT   --미 확정금액
 			    , 'N'                           AS CHK          --체크여부
 			    , 0                             AS CONF_AMT     --확정금액
-			    , SELL_T.SELL_BILL_AMT 					-- 기계산서발행금액
-			   	, 0 		AS	UN_SELL_BILL_AMT		-- 계산서 미발행금액
 				, SELL_T.CLMN_PLAN_SEQ					-- 수금계획순번
 				, SELL_T.SELL_BILL_NO					-- 계산서 번호
 				, CLMN_T.CLMN_NO		AS CLMN_NO		-- 수금번호
-				, NVL(CLMN_T.CLMN_AMT2, 0) AS CLMN_AMT2	-- 수금의 수금금액(기수금금액)
-				, 0 	AS UNCLMN_AMT2					-- 수금의 미수금액
-				, NVL(CLMN_T.CLMN_AMT2, 0) AS CLMN_AMT3	-- 수금금액
+			 	, NVL(SELL_T.SELL_BILL_DTL_AMT, 0) AS SELL_BILL_AMT 			-- 기계산서발행금액
+				, NVL(CLMN.CLMN_AMT, 0) - NVL(SELL_T.SELL_BILL_DTL_AMT, 0)	AS	UN_SELL_BILL_AMT 	-- 계산서 미발행금액 
+				, NVL(CLMN_T.CLMN_DTL_AMT, 0) AS CLMN_AMT2			-- 수금의 수금금액(기수금금액)
+				, NVL(CLMN.CLMN_AMT, 0) - NVL(CLMN_T.CLMN_DTL_AMT, 0)	AS UNCLMN_AMT2	-- 수금의 미수금액
+				, NVL(CLMN_T.CLMN_DTL_AMT, 0) AS CLMN_AMT3			-- 수금금액	
 				, 'U'                         AS DATA_CHK
 			FROM   TB_CR02M01 AS ORDRS
 		       <!-- 수주수금계획 -->
@@ -462,7 +462,7 @@
 					SELL_B.SELL_BILL_NO, 
 				<!-- SELL_BD.SELL_DCSN_NO, -->
 					SELL_BD.CLMN_PLAN_SEQ,
-					NVL(SUM(SELL_BD.SELL_BILL_DTL_AMT), 0) AS SELL_BILL_AMT	-- 매출계산서금액
+					NVL(SUM(SELL_BD.SELL_BILL_DTL_AMT), 0) AS SELL_BILL_DTL_AMT	-- 매출계산서금액
 				FROM TB_CR04D01 SELL_BD 
 				<!-- 추가 230718 매출계산서 LEFT JOIN 매출계산서상세  -->	
 					LEFT OUTER JOIN 
@@ -480,9 +480,8 @@
 					, CLMN_M.BKAC_CD      	-- 계좌번호 	
 					, CLMN_M.EXRATE       	-- 환율		
 					, CLMN_M.PMNTMTD_CD  	 -- 수금유형
-					, NVL(SUM(CLMN_D.CLMN_DTL_AMT), 0) AS CLMN_AMT2	-- 수금금액	
+					, NVL(SUM(CLMN_D.CLMN_DTL_AMT), 0) AS CLMN_DTL_AMT	-- 수금금액	
 					, CLMN_M.CLMN_RMK     -- 비고 		
-					, CLMN_D.CLMN_DTL_AMT					-- 수금금액
 					, CLMN_D.CLMN_PLAN_SEQ					-- 수금계획순번
 					, CLMN_M.CREAT_ID			
 					, CLMN_M.UDT_ID	
@@ -493,7 +492,7 @@
 					ON CLMN_D. CO_CD = CLMN_M.CO_CD 
 					AND CLMN_D.CLMN_NO = CLMN_M.CLMN_NO 
 				GROUP BY  CLMN_M.CLMN_NO, CLMN_M.CO_CD, CLMN_D.ORDRS_NO, CLMN_M.CLMN_DT, CLMN_M.BKAC_CD, CLMN_M.EXRATE, CLMN_M.PMNTMTD_CD,
-	    		CLMN_M.CLMN_RMK, CLMN_D.CLMN_DTL_AMT, CLMN_D.CLMN_PLAN_SEQ, CLMN_M.CREAT_ID, CLMN_M.UDT_ID, CLMN_M.CREAT_DTTM, CLMN_M.UDT_DTTM			
+	    		CLMN_M.CLMN_RMK, CLMN_D.CLMN_PLAN_SEQ, CLMN_M.CREAT_ID, CLMN_M.UDT_ID, CLMN_M.CREAT_DTTM, CLMN_M.UDT_DTTM			
 				) AS CLMN_T ON CLMN_T.CO_CD  = SELL_T.CO_CD
 					AND CLMN_T.ORDRS_NO = SELL_T.ORDRS_NO
 					AND CLMN_T.CLMN_PLAN_SEQ = SELL_T.CLMN_PLAN_SEQ
@@ -542,6 +541,7 @@
 							 , NVL(A.EXRATE, 1)    AS EXRATE		-- 환율
 							 , P.CLMN_PLAN_DIV						-- 수금구분
 							 , R3.CODE_NM          AS CLMN_PLAN_DIV_NM	-- 수금구분명
+							 , P.CLMN_PLAN_SEQ		-- 수금계획순번
 							 , P.CLMN_DIV_SEQ		-- 수금계획차수
 							 , TO_CHAR(NVL(P.CLMN_DIV_SEQ, 1)) || ' 차'  AS CLMN_DIV_SEQ_NM -- 수금계획차수
 							 , NVL(P.CLMN_RATE, 0) AS CLMN_RATE	-- 수금비율
@@ -553,11 +553,11 @@
 							 , NVL(P.CLMN_AMT, 0) - NVL(C.SELL_DCSN_DTL_AMT, 0) AS UNCONF_AMT -- 미 매출확정금액
 							 <!--  매출확정번호 -->
 							 <!-- , ''  AS SELL_DCSN_NO -->		
-							 , SELL_T.SELL_BILL_AMT 							-- 기계산서발행금액
-							 , 0 		AS	UN_SELL_BILL_AMT					-- 계산서 미발행금액 
-							 , NVL(CLMN_T.CLMN_AMT2, 0) AS CLMN_AMT2			-- 수금의 수금금액(기수금금액)
-							 , 0 	AS UNCLMN_AMT2								-- 수금의 미수금액
-							 , NVL(CLMN_T.CLMN_AMT2, 0) AS CLMN_AMT3			-- 수금금액	
+							 , NVL(SELL_T.SELL_BILL_DTL_AMT, 0) AS SELL_BILL_AMT 			-- 기계산서발행금액
+							 , NVL(P.CLMN_AMT, 0) - NVL(SELL_T.SELL_BILL_DTL_AMT, 0)	AS	UN_SELL_BILL_AMT 	-- 계산서 미발행금액 
+							 , NVL(CLMN_T.CLMN_DTL_AMT, 0) AS CLMN_AMT2			-- 수금의 수금금액(기수금금액)
+							 , NVL(P.CLMN_AMT, 0) - NVL(CLMN_T.CLMN_DTL_AMT, 0)	AS UNCLMN_AMT2	-- 수금의 미수금액
+							 , NVL(CLMN_T.CLMN_DTL_AMT, 0) AS CLMN_AMT3			-- 수금금액	
 							 , 'N' AS CHK      --체크여부
 							 , 0   AS CONF_AMT  --확정금액
 							 , 'I' AS DATA_CHK
@@ -582,7 +582,7 @@
 									SELL_BD.ORDRS_NO,
 									SELL_B.SELL_BILL_NO, 
 									SELL_BD.CLMN_PLAN_SEQ,
-									NVL(SUM(SELL_BD.SELL_BILL_DTL_AMT), 0) AS SELL_BILL_AMT	-- 매출계산서금액
+									NVL(SUM(SELL_BD.SELL_BILL_DTL_AMT), 0) AS SELL_BILL_DTL_AMT	-- 매출계산서금액
 								FROM TB_CR04D01 SELL_BD 
 								LEFT OUTER JOIN 
 									TB_CR04M01 SELL_B ON SELL_B.CO_CD = SELL_BD.CO_CD  
@@ -599,9 +599,8 @@
 								, CLMN_M.BKAC_CD      	-- 계좌번호 	
 								, CLMN_M.EXRATE       	-- 환율		
 								, CLMN_M.PMNTMTD_CD  	 -- 수금유형
-								, NVL(SUM(CLMN_D.CLMN_DTL_AMT), 0) AS CLMN_AMT2	-- 수금금액	
+								, NVL(SUM(CLMN_D.CLMN_DTL_AMT), 0) AS CLMN_DTL_AMT	-- 수금금액	
 								, CLMN_M.CLMN_RMK     -- 비고 		
-								, CLMN_D.CLMN_DTL_AMT					-- 수금금액
 								, CLMN_D.CLMN_PLAN_SEQ					-- 수금계획순번
 								, CLMN_M.CREAT_ID			
 								, CLMN_M.UDT_ID	
@@ -612,7 +611,7 @@
 								ON CLMN_D. CO_CD = CLMN_M.CO_CD 
 								AND CLMN_D.CLMN_NO = CLMN_M.CLMN_NO 
 							GROUP BY  CLMN_M.CLMN_NO, CLMN_M.CO_CD, CLMN_D.ORDRS_NO, CLMN_M.CLMN_DT, CLMN_M.BKAC_CD, CLMN_M.EXRATE, CLMN_M.PMNTMTD_CD,
-				    		CLMN_M.CLMN_RMK, CLMN_D.CLMN_DTL_AMT, CLMN_D.CLMN_PLAN_SEQ, CLMN_M.CREAT_ID, CLMN_M.UDT_ID, CLMN_M.CREAT_DTTM, CLMN_M.UDT_DTTM			
+				    		CLMN_M.CLMN_RMK, CLMN_D.CLMN_PLAN_SEQ, CLMN_M.CREAT_ID, CLMN_M.UDT_ID, CLMN_M.CREAT_DTTM, CLMN_M.UDT_DTTM			
 							) AS CLMN_T ON CLMN_T.CO_CD  = SELL_T.CO_CD
 								AND CLMN_T.ORDRS_NO = SELL_T.ORDRS_NO
 								AND CLMN_T.CLMN_PLAN_SEQ = SELL_T.CLMN_PLAN_SEQ									  
@@ -646,7 +645,7 @@
 	<!-- 계좌번호 -->
 	<select id="selectBkacCd" parameterType="Map" resultType="camelMap">
 	    SELECT CODE_ID AS CODE_ID,
- 		CODE_NM||CODE_DESC AS CODE_NM
+ 		CODE_NM||' '||CODE_DESC AS CODE_NM
 		FROM   TB_CM05M01 A
  		WHERE  A.CODE_KIND ='BKAC'
  		<if test="codeId != null and !codeId.equals('')">
@@ -656,12 +655,135 @@
 		
 	<!-- 수금번호 -->
 	<select id="select_cr05_clmnNo" parameterType="Map" resultType="String">
-		SELECT 'CLMN' || TO_CHAR(SYSDATE, 'YY') ||  LPAD((SELECT (TO_CHAR(MAX(TO_NUMBER(FILE_TRGT_KEY)))) + 1 FROM TB_CR05M01),4,0) FROM DUAL;
+		SELECT 'CLMN' || TO_CHAR(SYSDATE, 'YY') ||  LPAD((SELECT(TO_CHAR(NVL(MAX(TO_NUMBER(FILE_TRGT_KEY)), 0))) + 1 FROM TB_CR05M01),4,0) FROM DUAL
 	</select>
 	
 	<select id="select_cr05_SeqNext" parameterType="Map" resultType="int">
-		SELECT MAX(TO_NUMBER(FILE_TRGT_KEY)) + 1
+		SELECT NVL(MAX(TO_NUMBER(FILE_TRGT_KEY)), 0) + 1
 		FROM TB_CR05M01
 	</select>
+	
+	<insert id="insert_cr05" parameterType="Map">
+		INSERT INTO TB_CR05M01
+		(
+			  FILE_TRGT_KEY
+			, CO_CD
+			, CLMN_NO
+			, ORDRS_CLNT_CD
+			, CLMN_DT
+			, CURR_CD
+			, EXRATE
+			, PMNTMTD_CD
+			, BKAC_CD
+			, CLMN_AMT
+			, CLMN_RMK
+			, ETC_FIELD1
+			, ETC_FIELD2
+			, ETC_FIELD3
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+		)
+		VALUES
+		(
+			  #{fileTrgtKey}
+			, #{coCd}
+			, #{clmnNo}
+			, #{ordrsClntCd}
+			, #{clmnDt}
+			, #{currCd}
+			, #{exrate}
+			, #{pmntmtdCd}
+			, #{bkacCd}
+			, #{clmnAmt}
+			, #{clmnRmk}
+			, #{etcField1, jdbcType=VARCHAR}
+			, #{etcField2, jdbcType=VARCHAR}
+			, #{etcField3, jdbcType=VARCHAR}
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+			
+		
+		)
+	</insert>
+
+	<insert id="insert_cr05_Dtl" parameterType="Map">
+		INSERT INTO TB_CR05D01
+		(
+			  CO_CD
+			, CLMN_NO
+			, ORDRS_NO
+			, CLMN_PLAN_SEQ
+			, CURR_CD
+			, EXRATE
+			, CLMN_DTL_AMT
+			, CLMN_DTL_RMK
+			, ETC_FIELD1
+			, ETC_FIELD2
+			, ETC_FIELD3
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+		)
+		VALUES 
+		(
+			  #{coCd}
+			, #{clmnNo}
+			, #{ordrsNo}
+			, #{clmnPlanSeq}
+			, #{ordrsCurrCd}
+			, #{exrate}
+			, #{clmnDtlAmt}
+			, #{clmnDtlRmk, jdbcType=VARCHAR}
+			, #{etcField1, jdbcType=VARCHAR}
+			, #{etcField2, jdbcType=VARCHAR}
+			, #{etcField3, jdbcType=VARCHAR}
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+		)
+	</insert>
+	
+	<update id="update_cr05" parameterType="Map">
+		UPDATE TB_CR05M01
+		SET    CLMN_RMK	= #{clmnRmk}
+			 , UDT_ID   = #{userId}
+			 , UDT_PGM  = #{pgmId}
+			 , UDT_DTTM = SYSDATE
+		WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+	</update>
+
+	<update id="update_cr05_Dtl" parameterType="Map">
+		UPDATE TB_CR05D01
+		SET <!--  CLMN_DTL_RMK = #{clmnDtlRmk} -->
+			  UDT_ID   = #{userId}
+			, UDT_PGM  = #{pgmId}
+			, UDT_DTTM = SYSDATE
+		WHERE CO_CD = #{coCd}
+		AND CLMN_NO = #{clmnNo}
+		AND ORDRS_NO      = #{ordrsNo}
+		AND CLMN_PLAN_SEQ = #{clmnPlanSeq}
+	</update>
+	
+	<delete id="delete_cr05" parameterType="Map">
+		DELETE TB_CR05M01
+		WHERE CO_CD = #{coCd}
+		AND CLMN_NO	= #{clmnNo}
+	</delete>
+	
+	<delete id="delete_cr05_Dtl" parameterType="Map">
+		DELETE TB_CR05D01
+		WHERE CO_CD = #{coCd}
+		AND CLMN_NO	= #{clmnNo}
+		AND ORDRS_NO      = #{ordrsNo}
+		AND CLMN_PLAN_SEQ = #{clmnPlanSeq}
+	</delete>
+
+	<delete id="delete_cr05_Dtl_All" parameterType="Map">
+		DELETE TB_CR05D01
+		WHERE CO_CD = #{coCd}
+		AND CLMN_NO	= #{clmnNo}
+	</delete>
 	
 </mapper>

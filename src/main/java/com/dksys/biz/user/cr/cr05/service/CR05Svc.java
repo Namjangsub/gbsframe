@@ -15,14 +15,14 @@ public interface CR05Svc {
 	// UPDATE
 	int update_cr05(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	//DELETE
-	int delete_cr05(Map<String, String> paramMap, MultipartHttpServletRequest mRequset) throws Exception;
+	int delete_cr05(Map<String, String> paramMap) throws Exception;
 	
 	// 수금정보 조회
 	Map<String, String> select_cr05_Info(Map<String, String> paramMap);
 	// 상세정보 조회
 	List<Map<String, String>> select_cr05_Info_Dtl(Map<String, String> paramMap);
 	// 수금번호 조회
-	List<Map<String, String>> select_cr05_clmnNo(Map<String, String> paramMap);
+//	List<Map<String, String>> select_cr05_clmnNo(Map<String, String> paramMap);
 	// 팝업 입력대상 검색
 	List<Map<String, String>> select_insert_target_modal(Map<String, String> paramMap);
 	// 수금유형 조회
