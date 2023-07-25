@@ -993,7 +993,8 @@ function authChk(menuUrl){
             if(saveYn == "Y"){
                 $(elem).show();
             } else {
-                $(elem).hide();
+//                $(elem).hide();
+                $(elem).remove();
             }
         });
 
