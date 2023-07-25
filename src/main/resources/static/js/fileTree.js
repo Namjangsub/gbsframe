@@ -4,7 +4,7 @@
     var fileArr=[];
     var deleteFileArr = [];
     var paramObj;
-    
+    var currPgmAuthChk = true; // true:저장권한, false:저장권한 없음
     //최초 진입시점---
     //   1. 파일트리명 = 각 화면의 트리구조를 보여줄 div테그 ID ex) <div id="deptTree" ></div>
     //   2. 그리드명  = 각 화면의 ax5-grid Html Tag ID  ex) <div id="my-grid" data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 100%; width: 100%"></div>
@@ -27,8 +27,10 @@
         deleteFileArr = [];
         
         initDeptTree(selector);
+        
+        currPgmAuthChk = authChk(); // true:저장권한, false:저장권한 없음
+        
         fileTreeGridView.init(gridSelector);
-//        getAllFilesForNodes();
 
     }
     
@@ -81,7 +83,7 @@
                     // {key: "prjctNm", label: "프로젝트명", width: 110, align: "center"},
 					{key : "lpath",  label : "저장위치",	 width : 180, align: "center", hidden: false},
                     {key: "fileDelete", label: "삭제", width: 60, align: "center",
-                    	formatter:function() {return (this.item.fileDelete == "Y" || this.item.fileKey == 0 ) ? '<button style="height: 18px; padding:0px;" type="button" onclick="treeModule.deleteFile('+this.dindex+')">삭제</button>' : '불가'}                    	
+                    	formatter:function() {return (this.item.fileDelete == "Y" || this.item.fileKey == 0 ) && currPgmAuthChk ? '<button style="height: 18px; padding:0px;" type="button" onclick="treeModule.deleteFile('+this.dindex+')" authchk>삭제</button>' : '불가'}                    	
                     }],
                 page: {
                     display: false
@@ -160,7 +162,6 @@
             .on("select_node.jstree", function (e, data) {
         		// 노드 선택 시 발생 이벤트
 
-            	var buttonFile = document.getElementById("button_file");
         		let targetTree = $('#' + selector).jstree('get_selected',true)[0];
         		if (targetTree == undefined) {
         			$("#file_tag").html("파일저장Tree에는 문서를 저장할 수 없습니다.");
@@ -169,15 +170,14 @@
 	                selectedNodeId = data.node.id;
 	                selectedNodeText = data.node.text;
 	                selectedNodeEtc = data.node.original.codeEtc;
-	                
-	    			if (selectedNodeEtc == 'N') {
-	    				buttonFile.disabled = true; // 비활성화
-	    				buttonFile.style.backgroundColor = "gray"; // 회색 배경색으로 변경 (옵션)
-	    			} else {			
-	    				buttonFile.disabled = false; // 활성화
-	    				buttonFile.style.backgroundColor = ""; // 기본 배경색으로 변경 (옵션)
-	    			}
-
+	                var buttonFile = $("#button_file");
+	                if (buttonFile.length) {
+		    			if (selectedNodeEtc == 'N') {
+		    				buttonFile.hide();
+		    			} else {			
+		    				buttonFile.show();
+		    			}
+	                }
         			let txt = selectedNodeText + ( (selectedNodeEtc =="N") ? "에는 저장할 수 없습니다." : "" );
         			$("#file_tag").html(txt);
         			comonCd =  selectedNodeId;
@@ -353,13 +353,14 @@
 	function button_zoomUp( action ) {
 		//parseInt(문자열, 진법);
 		var heightValue = parseInt($(".ax5_grid[data-ax5grid='file-grid']").css("height"), 10);
-		minmaxValue = (action == '+') ? heightValue + 200 : heightValue - 200;
-		minmaxValue = (minmaxValue < 200) ? 200 : (minmaxValue > 1200) ? 1200 : minmaxValue;
+		minmaxValue = (action == '+') ? heightValue + 100 : heightValue - 100;
+		minmaxValue = (minmaxValue < 100) ? 100 : (minmaxValue > 1200) ? 1200 : minmaxValue;
 		if (heightValue!=minmaxValue) {
 			$("#treeview").css("height", minmaxValue);
 			$('[data-ax5grid="file-grid"]').css("height", minmaxValue);
 			$('[data-ax5grid="file-grid"] [data-ax5grid-container="root"] ').css("height", minmaxValue);
-			treeModule.getAllFilesForNodes(treeComonCd);
+//			treeModule.getAllFilesForNodes(treeComonCd);
+			fileTreeGridView.reqSetData(fileTreeGridView.target.list)
 		}
 	}
 	
@@ -373,7 +374,7 @@
 		        <h3 class="location">
 		          <span class="page_tit" style="text-align: left;"> 파일트리</span>
 		        </h3>
-		        <div id="treeview" style="height: 200px; padding: 5px">
+		        <div id="treeview" style="height: 100px; padding: 5px">
 		          <div id="deptTreeOrdars"></div>
 		        </div>
 		      </div>
@@ -384,12 +385,12 @@
 		          <a class="file_tag" id="file_tag" style="font-weight: bold; color: blue; padding-left: 20px; padding-right: 10px;"></a>
 		          <span class="page_tit" id="file_tit" style="text-align: right;"> 문서현황</span>
 		        </h3>
-		        <button disabled type="button" id="button_file" style="background-color: gray; height: 25px; line-height: 15px;" onclick="file.click();" authchk> 첨부파일</button>
+		        <button type="button" id="button_file" style="height: 25px; line-height: 15px;" onclick="file.click();" authchk> 첨부파일</button>
 		        <div class="add_btn_small pdl10">
-					<a onclick="treeModule.button_zoomUp('+');" style="height: 25px;">+</a>
-					<a onclick="treeModule.button_zoomUp('-');" style="height: 25px;">-</a>
+					<a onclick="treeModule.button_zoomUp('+');" style="height: 25px;"><i class="glyphicon glyphicon-zoom-in"></i>+</a>
+					<a onclick="treeModule.button_zoomUp('-');" style="height: 25px;"><i class="glyphicon glyphicon-zoom-out"></i>-</a>
 				</div>
-		        <div class="ax5_grid" data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 200px; width: 100%"></div>
+		        <div class="ax5_grid" data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 100px; width: 100%"></div>
 		      </div>
 		    </div>
 			<div class="col-xs-2" style="height: 70px;"></div>		    

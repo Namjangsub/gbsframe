@@ -983,24 +983,34 @@ function authChk(menuUrl){
 	}
 		var arr = JSON.parse(getCookie("authArr"));
         var saveYn = "N";
-        for(var i = 0; i < arr.length; i++){
-            if(arr[i].m == menuUrl){
-                saveYn = arr[i].s;
-                break;
-            }
+//        for(var i = 0; i < arr.length; i++){
+//            if(arr[i].m == menuUrl){
+//                saveYn = arr[i].s;
+//                break;
+//            }
+//        }
+//        $.each($("[authchk]"), function(idx, elem){
+//            if(saveYn == "Y"){
+//                $(elem).show();
+//            } else {
+////                $(elem).hide();
+//                $(elem).remove();
+//            }
+//        });
+        
+        //array함수로 기능 대체하고 버튼을 삭제함(버튼을 사용하는 프로그램은 오류 발생 가능)
+        // 버튼 숨김으로 하면 소스 편집하여 강제처리가능으로 위험
+        const foundMenu = arr.find(item => item.m === menuUrl);
+        saveYn = foundMenu.s;
+        if(saveYn != "Y"){
+        	const authElements = $("[authchk]");
+        	authElements.remove();
+        	return false;
         }
-        $.each($("[authchk]"), function(idx, elem){
-            if(saveYn == "Y"){
-                $(elem).show();
-            } else {
-//                $(elem).hide();
-                $(elem).remove();
-            }
-        });
 
 //	// select 회사코드 disable (감사용 임시코드)
 //	$('select[data-kind="CO"]').prop("disabled", true);
-
+    	return true;
 }
 
 
