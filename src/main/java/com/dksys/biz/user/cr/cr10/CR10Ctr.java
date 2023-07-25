@@ -59,14 +59,6 @@ public class CR10Ctr {
 		return "jsonView";
 	}
 
-	// 자재 리스트 조회
-	@PostMapping(value = "/selectLgistSalesCdList")
-	public String selectLgistSalesCdList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> resultList = cr10Svc.selectLgistSalesCdList(paramMap);
-		model.addAttribute("resultList", resultList);
-		return "jsonView";
-	}
-
 	@PostMapping(value = "/selectLgistMastInfo")
 		public String selectLgistMastInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		Map<String, String> result = cr10Svc.selectLgistMastInfo(paramMap);

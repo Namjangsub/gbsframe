@@ -1,7 +1,6 @@
-package com.dksys.biz.user.cr.cr10.service.impl;
+package com.dksys.biz.user.pm.pm03.service.impl;
 
 import java.lang.reflect.Type;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -15,18 +14,18 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
-import com.dksys.biz.user.cr.cr10.mapper.CR10Mapper;
-import com.dksys.biz.user.cr.cr10.service.CR10Svc;
+import com.dksys.biz.user.pm.pm03.mapper.PM03Mapper;
+import com.dksys.biz.user.pm.pm03.service.PM03Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
-public class CR10SvcImpl implements CR10Svc {
+public class PM03SvcImpl implements PM03Svc {
 
   @Autowired
-  CR10Mapper cr10Mapper;
+  PM03Mapper pm03Mapper;
 
   @Autowired
   CM15Svc cm15Svc;
@@ -35,42 +34,32 @@ public class CR10SvcImpl implements CR10Svc {
   CM08Svc cm08Svc;
 
   @Override
-  public int selectLgistReqPageCount(Map<String, String> paramMap) {
-    return cr10Mapper.selectLgistReqPageCount(paramMap);
+  public int selectDeliveryPageCount(Map<String, String> paramMap) {
+    return pm03Mapper.selectDeliveryPageCount(paramMap);
   }
 
   @Override
-  public List<Map<String, String>> selectLgistReqPageList(Map<String, String> paramMap) {
-    return cr10Mapper.selectLgistReqPageList(paramMap);
+  public List<Map<String, String>> selectDeliveryPageList(Map<String, String> paramMap) {
+    return pm03Mapper.selectDeliveryPageList(paramMap);
   }
 
   @Override
-  public List<Map<String, String>> selectLgistReqList(Map<String, String> paramMap) {
-    return cr10Mapper.selectLgistReqList(paramMap);
+  public List<Map<String, String>> selectDeliveryList(Map<String, String> paramMap) {
+    return pm03Mapper.selectDeliveryList(paramMap);
   }
 
   @Override
   public List<Map<String, String>> selectSelesCdList(Map<String, String> paramMap) {
-    return cr10Mapper.selectSelesCdList(paramMap);
+    return pm03Mapper.selectSelesCdList(paramMap);
   }
 
   @Override
-  public List<Map<String, String>> selectSelesCdViewList(Map<String, String> paramMap) {
-    return cr10Mapper.selectSelesCdViewList(paramMap);
+  public Map<String, String> selectDeliveryMastInfo(Map<String, String> paramMap) {
+    return pm03Mapper.selectDeliveryMastInfo(paramMap);
   }
 
   @Override
-  public Map<String, String> selectLgistMastInfo(Map<String, String> paramMap) {
-    return cr10Mapper.selectLgistMastInfo(paramMap);
-  }
-
-  @Override
-  public List<Map<String, String>> selectLgistAppList(Map<String, String> paramMap) {
-    return cr10Mapper.selectLgistAppList(paramMap);
-  }
-
-  @Override
-  public int insertLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+  public int insertDeliveryMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
 	    Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -88,23 +77,27 @@ public class CR10SvcImpl implements CR10Svc {
 		//---------------------------------------------------------------
 		//첨부 화일 권한체크  끝
 		//---------------------------------------------------------------
-		String  fileTrgtKey = String.valueOf(cr10Mapper.selectFileTrgtKeyNext(paramMap));
-		paramMap.put("fileTrgtKey", fileTrgtKey);
-		int result = cr10Mapper.insertLgistMast(paramMap);
+		String outNo = String.valueOf(pm03Mapper.selectOutNoNext(paramMap));
+		paramMap.put("outNo", outNo);
+		int result = pm03Mapper.insertDeliveryMast(paramMap);
+		pm03Mapper.deleteLgistSalesCdAll(paramMap);
 
 	    List<Map<String, String>> salesCdList = gsonDtl.fromJson(paramMap.get("salesCdArr"), dtlMap);
 	    for (Map<String, String> dtl : salesCdList) {
-	    	dtl.put("fileTrgtKey", fileTrgtKey);
+	    	dtl.put("outNo", outNo);
 	    	dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
+	    	pm03Mapper.insertLgistSalesCd(dtl);
+	    	/*
 	    	String dtaChk = dtl.get("dtaChk").toString();
 	    	if ("I".equals(dtaChk)) {
-	    		cr10Mapper.insertLgistSalesCd(dtl);
+	    		pm03Mapper.insertLgistSalesCd(dtl);
 	    	} else if ("U".equals(dtaChk)) {
-	    		cr10Mapper.updateLgistSalesCd(dtl);
+	    		pm03Mapper.updateLgistSalesCd(dtl);
 	    	} else if ("D".equals(dtaChk)) {
-	    		cr10Mapper.deleteLgistSalesCd(dtl);
+	    		pm03Mapper.deleteLgistSalesCd(dtl);
 	    	}
+	    	*/
 	    }
 
 		//---------------------------------------------------------------
@@ -119,34 +112,10 @@ public class CR10SvcImpl implements CR10Svc {
 		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
 
-		//---------------------------------------------------------------
-		//결재 처리 시작
-		//---------------------------------------------------------------
-	    List<Map<String, String>> reqList = cr10Mapper.selectTodoAppReqList(paramMap);
-	    List<Map<String, String>> toDoAppList = gsonDtl.fromJson(reqList.toString(), dtlMap);
-	    DecimalFormat df = new DecimalFormat("00000");
-	    int numKey = Integer.valueOf(paramMap.get("fileTrgtKey"));
-	    String todoDiv2CodeId = paramMap.get("appDiv")+df.format(numKey);
-	    for (Map<String, String> dtl : toDoAppList) {
-	    	dtl.put("userId", paramMap.get("userId"));
-	    	dtl.put("pgmId", paramMap.get("pgmId"));
-	    	dtl.put("pgPath", paramMap.get("pgPath"));
-	    	dtl.put("pgParam", paramMap.get("pgParam"));
-	    	dtl.put("todoDiv2CodeId", todoDiv2CodeId);
-	    	cr10Mapper.insertTodoAppList(dtl);
-	    }
-
-	    paramMap.put("todoDiv1CodeId", paramMap.get("appDiv"));
-	    paramMap.put("todoDiv2CodeId", todoDiv2CodeId);
-	    cr10Mapper.updateLgistMastTodoApp(paramMap);
-		//---------------------------------------------------------------
-		//결재 처리  끝
-		//---------------------------------------------------------------
-
 	    return result;
   }
   @Override
-  public int updateLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+  public int updateDeliveryMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 //	Gson gson = new Gson();
 	Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
@@ -178,28 +147,29 @@ public class CR10SvcImpl implements CR10Svc {
 	//첨부 화일 권한체크  끝
 	//---------------------------------------------------------------
 
-	int result = cr10Mapper.deleteLgistSalesCdAll(paramMap);
-		result = cr10Mapper.updateLgistMast(paramMap);
+	int result = pm03Mapper.updateDeliveryMast(paramMap);
+		pm03Mapper.deleteLgistSalesCdAll(paramMap);
 
 
     List<Map<String, String>> salesCdList = gsonDtl.fromJson(paramMap.get("salesCdArr"), dtlMap);
     for (Map<String, String> dtl : salesCdList) {
     	dtl.put("userId", paramMap.get("userId"));
     	dtl.put("pgmId", paramMap.get("pgmId"));
-    	//      반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-    	String dtaChk = dtl.get("dtaChk").toString();
+    	pm03Mapper.insertLgistSalesCd(dtl);
+    	//String dtaChk = dtl.get("dtaChk").toString();
     	/* "dtaChk" 값을 확인하여
-    	 * "I"인 경우 cr10Mapper.insertLgistSalesCd(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
-    	 * "U"인 경우 cr10Mapper.updateLgistSalesCd(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
-    	 * "D"인 경우 * cr10Mapper.deleteLgistSalesCd(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
+    	 * "I"인 경우 pm03Mapper.insertLgistSalesCd(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
+    	 * "U"인 경우 pm03Mapper.updateLgistSalesCd(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
+    	 * "D"인 경우 * pm03Mapper.deleteLgistSalesCd(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
+    	/*
     	if ("I".equals(dtaChk)) {
-    		//dtl.put("prjctSeq", paramMap.get("prjctSeq"));
-    		cr10Mapper.insertLgistSalesCd(dtl);
+    		pm03Mapper.insertLgistSalesCd(dtl);
     	} else if ("U".equals(dtaChk)) {
-    		cr10Mapper.updateLgistSalesCd(dtl);
+    		pm03Mapper.updateLgistSalesCd(dtl);
     	} else if ("D".equals(dtaChk)) {
-    		cr10Mapper.deleteLgistSalesCd(dtl);
+    		pm03Mapper.deleteLgistSalesCd(dtl);
     	}
+    	*/
     }
 
 	//---------------------------------------------------------------
@@ -217,38 +187,12 @@ public class CR10SvcImpl implements CR10Svc {
 	//---------------------------------------------------------------
 	//첨부 화일 처리  끝
 	//---------------------------------------------------------------
-    //---------------------------------------------------------------
-    //결재 처리 시작 -수정시에도 처리 한 내역이 없다면 결재 처리한다.
-    //---------------------------------------------------------------
-    String ckTodoDiv2CodeId = paramMap.get("todoDiv2CodeId");
-    if(ckTodoDiv2CodeId != null && "".equals(ckTodoDiv2CodeId)) {
-	    List<Map<String, String>> reqList = cr10Mapper.selectTodoAppReqList(paramMap);
-	    List<Map<String, String>> toDoAppList = gsonDtl.fromJson(reqList.toString(), dtlMap);
-	    DecimalFormat df = new DecimalFormat("00000");
-	    int numKey = Integer.valueOf(paramMap.get("fileTrgtKey"));
-	    String todoDiv2CodeId = paramMap.get("appDiv")+df.format(numKey);
-	    for (Map<String, String> dtl : toDoAppList) {
-	    	dtl.put("userId", paramMap.get("userId"));
-	    	dtl.put("pgmId", paramMap.get("pgmId"));
-	    	dtl.put("pgPath", paramMap.get("pgPath"));
-	    	dtl.put("pgParam", paramMap.get("pgParam"));
-	    	dtl.put("todoDiv2CodeId", todoDiv2CodeId);
-	    	cr10Mapper.insertTodoAppList(dtl);
-	    }
-
-	    paramMap.put("todoDiv1CodeId", paramMap.get("appDiv"));
-	    paramMap.put("todoDiv2CodeId", todoDiv2CodeId);
-	    cr10Mapper.updateLgistMastTodoApp(paramMap);
-    }
-    //---------------------------------------------------------------
-    //결재 처리  끝
-    //---------------------------------------------------------------
 
     return result;
   }
 
   @Override
-  public int deleteLgistMast(Map<String, String> paramMap) throws Exception {
+  public int deleteDeliveryMast(Map<String, String> paramMap) throws Exception {
 	    //---------------------------------------------------------------
 		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
 	  	//   필수값 :  jobType, userId, comonCd
@@ -269,8 +213,8 @@ public class CR10SvcImpl implements CR10Svc {
 		//첨부 화일 권한체크 끝
 		//---------------------------------------------------------------
 
-	  int result = cr10Mapper.deleteLgistSalesCdAll(paramMap);
-	  result = cr10Mapper.deleteLgistMast(paramMap);
+	  int result = pm03Mapper.deleteLgistSalesCdAll(paramMap);
+	  result = pm03Mapper.deleteDeliveryMast(paramMap);
 
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
@@ -285,11 +229,6 @@ public class CR10SvcImpl implements CR10Svc {
 		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
 	    return result;
-  }
-
-  @Override
-  public int updateTodoAppConfirm(Map<String, String> paramMap) throws Exception {
-	  return cr10Mapper.updateTodoAppConfirm(paramMap);
   }
 
 }
