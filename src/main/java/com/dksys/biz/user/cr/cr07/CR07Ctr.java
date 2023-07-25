@@ -40,10 +40,10 @@ public class CR07Ctr {
 		return "jsonView";
 	}
 
-	// 창고 코드 검색
-	@PostMapping(value = "/selectWhCd")
-    public String selectWhCd(@RequestBody Map<String, String> paramMap, ModelMap model) {
-        List<Map<String, Object>> result = cr07svc.selectWhCd(paramMap);
+	// 삭제 전 체크
+	@PostMapping(value = "/delete_Chk")
+    public String delete_Chk(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        List<Map<String, Object>> result = cr07svc.delete_Chk(paramMap);
         model.addAttribute("result", result);
         return "jsonView";
     }

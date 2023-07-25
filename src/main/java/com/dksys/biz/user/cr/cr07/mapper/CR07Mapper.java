@@ -14,8 +14,8 @@ public interface CR07Mapper {
 	// 그리드 리스트
 	List<Map<String, String>> grid1_selectList(Map<String, String> paramMap);
 
-    // 창고 코드 검색
-    List<Map<String, Object>> selectWhCd(Map<String, String> paramMap);
+    // 삭제 전 체크
+    List<Map<String, Object>> delete_Chk(Map<String, String> paramMap);
 
     // 팝업 입력대상 검색
 	List<Map<String, String>> select_insert_target_modal(Map<String, String> paramMap);
@@ -42,6 +42,8 @@ public interface CR07Mapper {
 	
 	//DATA UPDATE
 	int update_cr07(Map<String, String> paramMap);
+
+	int update_cr07_delete(Map<String, String> paramMap);
 
     int update_cr07_Dtl(Map<String, String> paramMap);
 

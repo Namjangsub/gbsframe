@@ -21,136 +21,100 @@ import com.dksys.biz.util.MessageUtils;
 
 @Controller
 @RequestMapping("/user/cr/cr08")
-public class CR08Ctr {	
+public class CR08Ctr {
+
+    @Autowired
+    MessageUtils messageUtils;
+
+    @Autowired
+    CR08Svc cr08svc;
+
+    //리스트 조회
+	@PostMapping(value = "/grid1_selectList")
+	public String grid1_selectList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = cr08svc.grid1_selectCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = cr08svc.grid1_selectList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	//팝업 입력대상 검색
+	@PostMapping(value = "/select_insert_target_modal")
+	public String select_stock_modal(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = cr08svc.select_insert_target_modal(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	//정보 조회
+	@PostMapping(value = "/select_cr08_Info")
+	public String select_cr08_Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = cr08svc.select_cr08_Info(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 	
-	  @Autowired
-	  MessageUtils messageUtils;
-
-	  @Autowired
-	  CR08Svc cr08Svc;
-
-	//  수주 리스트 조회
-	  @PostMapping(value = "/selectSalesStmtList")
-	  public String selectSalesStmtList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	    int totalCnt = cr08Svc.selectSalesStmtCount(paramMap);
-	    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-	    model.addAttribute("paginationInfo", paginationInfo);
-	    List<Map<String, String>> result = cr08Svc.selectSalesStmtList(paramMap);
-	    model.addAttribute("result", result);
-	    return "jsonView";
-	  }
-	  
-	// 매출계산서 리스트 조회
-	  @PostMapping(value = "/selectSalesStmtCalList")
-	  public String selectSalesStmtCalList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	    int totalCnt = cr08Svc.selectSalesStmtCalCount(paramMap);
-	    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-	    model.addAttribute("paginationInfo", paginationInfo);
-	    List<Map<String, String>> result = cr08Svc.selectSalesStmtCalList(paramMap);
-	    model.addAttribute("result", result);
-	    return "jsonView";
-	  }
-	  
-	//  매출계산서 리스트 기본정보
-	  @PostMapping(value = "/selectSalesStmtConList")
-	  public String selectSalesStmtConList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	    int totalCnt = cr08Svc.selectSalesStmtConCount(paramMap);
-	    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-	   model.addAttribute("paginationInfo", paginationInfo);
-	    List<Map<String, String>> result = cr08Svc.selectSalesStmtConList(paramMap);
-	    model.addAttribute("result", result);
-	    return "jsonView";
-	  }
-	  
-	  
-	  @PostMapping(value = "/selectSalesStmtInfo")
-	  public String selectSalesStmtInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		Map<String, String> result = cr08Svc.selectSalesStmtInfo(paramMap);
-	    model.addAttribute("result", result);
-	    return "jsonView";
-	  }
-	  
-
-	  @PostMapping(value = "/selectConfirmCount")
-	  public String selectConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	    int result = cr08Svc.selectConfirmCount(paramMap);
-	    model.addAttribute("result", result);
-	    return "jsonView";
-	  }
-	  
-	  @PostMapping(value = "/insertSalesStmt")
-	  public String insertSalesStmt(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-			try {
-				if (cr08Svc.insertSalesStmt(paramMap, mRequest) != 0) {
-					model.addAttribute("resultCode", 200);
-					model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-					System.out.println("200");
-				} else {
-					model.addAttribute("resultCode", 500);
-					model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-					System.out.println("500");
-				};
-			}catch(Exception e){
-				model.addAttribute("resultCode", 900);
-				model.addAttribute("resultMessage", e.getMessage());
-			}
-			return "jsonView";
-	  }
-	  
-	  @PostMapping(value = "/updateSalesStmt")
-	  public String updateSalesStmt(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-		  	try {
-				if (cr08Svc.updateSalesStmt(paramMap, mRequest) != 0 ) {
-					model.addAttribute("resultCode", 200);
-					model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-				} else {
-					model.addAttribute("resultCode", 500);
-					model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-				};
-			}catch(Exception e){
-				model.addAttribute("resultCode", 900);
-				model.addAttribute("resultMessage", e.getMessage());
-			}
-		  	return "jsonView";
-	  }	
-
-	  @PutMapping(value = "/deleteSalesStmt")
-	  public String deleteSalesStmt(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
-		  	try {
-				if (cr08Svc.deleteSalesStmt(paramMap) != 0 ) {
-					model.addAttribute("resultCode", 200);
-					model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-				} else {
-					model.addAttribute("resultCode", 500);
-					model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-				};
-			}catch(Exception e){
-				model.addAttribute("resultCode", 900);
-				model.addAttribute("resultMessage", e.getMessage());
-			}
-		  	return "jsonView";
-	  }
-	  
-	//기준관리 결재선관리 엑셀 리스트  -->
-    @PostMapping(value = "/selectSalesStmtExcelList") 
-	public String selectMsExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  
-		  List<Map<String, String>> resultList = cr08Svc.selectSalesStmtExcelList(paramMap);
-		  	  model.addAttribute("resultList", resultList); 
-		     System.out.println("resultList==?"+resultList);
-		  return "jsonView"; 
-		  
-	  }  
-    
-  //기준관리 결재선관리 엑셀 리스트  -->
-    @PostMapping(value = "/selectSalesStmtCalExcelList") 
-	public String selectSalesStmtCalExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  
-		  List<Map<String, String>> resultList = cr08Svc.selectSalesStmtCalExcelList(paramMap);
-		  	  model.addAttribute("resultList", resultList); 
-		     System.out.println("resultList==?"+resultList);
-		  return "jsonView"; 
-		  
-	  }  
- 
+	//상세정보 조회
+	@PostMapping(value = "/select_cr08_Info_Dtl")
+	public String select_cr08_Info_Dtl(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = cr08svc.select_cr08_Info_Dtl(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
+	//INSERT
+	@PostMapping(value = "/insert_cr08")
+	public String insert_cr08(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (cr08svc.insert_cr08(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+	
+	//UPDATE
+	@PostMapping(value = "/update_cr08")
+	public String update_cr08(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (cr08svc.update_cr08(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+	}
+	
+	//DELETE
+	@PutMapping(value = "/delete_cr08")
+	public String delete_cr08(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (cr08svc.delete_cr08(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+	}
 }

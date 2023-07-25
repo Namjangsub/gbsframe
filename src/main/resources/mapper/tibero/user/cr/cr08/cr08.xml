@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.dksys.biz.user.cr.cr07.mapper.CR07Mapper">
+<mapper namespace="com.dksys.biz.user.cr.cr08.mapper.CR08Mapper">
 	<!-- 그리드 조회 카운트-->
     <select id="grid1_selectCount" parameterType="Map" resultType="int">
 		SELECT count(*)
@@ -34,40 +34,19 @@
 							 , NVL(P.CLMN_AMT, 0)  AS CLMN_AMT
 							 , TO_CHAR(P.BILL_PBLS_DT, 'YYYY-MM-DD') AS BILL_PBLS_DT
 							 , TO_CHAR(P.CLMN_DT, 'YYYY-MM-DD')      AS CLMN_DT
-							 , NVL(C.FILE_TRGT_KEY, 0) AS FILE_TRGT_KEY
-							 , C.SELL_DCSN_NO      AS SELL_DCSN_NO
-							 , TO_CHAR(C.SELL_DCSN_DT, 'YYYY-MM-DD') AS SELL_DCSN_DT
-							 , C.SELL_DCSN_AMT     AS SELL_DCSN_AMT
-							 , C.SELL_DCSN_DTL_AMT AS SELL_DCSN_DTL_AMT
+							 , NVL(B.FILE_TRGT_KEY, 0) AS FILE_TRGT_KEY
+							 , B.SELL_BILL_NO               AS SELL_BILL_NO
+							 , B.SELL_BILL_DT               AS SELL_BILL_DT
+							 , NVL(B.SELL_BILL_AMT, 0)      AS SELL_BILL_AMT
+							 , NVL(B.SELL_BILL_DTL_AMT, 0)  AS SELL_BILL_DTL_AMT
 							 , NVL(CS.SELL_DCSN_DTL_AMT, 0) AS SELL_DCSN_AMT_SUM
-							 , CASE WHEN (NVL(P.CLMN_AMT, 0) - NVL(CS.SELL_DCSN_DTL_AMT, 0)) > 0 THEN 'N' ELSE 'Y' END AS CONF_YN
+							 , NVL(BS.SELL_BILL_DTL_AMT, 0) AS SELL_BILL_AMT_SUM
+							 , CASE WHEN (NVL(P.CLMN_AMT, 0) - NVL(CS.SELL_DCSN_DTL_AMT, 0)) > 0 THEN 'N' ELSE 'Y' END AS BILL_YN
 							 , NVL(P.CLMN_AMT, 0) - NVL(CS.SELL_DCSN_DTL_AMT, 0) AS MI_AMT
-							 , C.SELL_BILL_NO
 						FROM   TB_CR02M01 AS A --수주
 						       --수금계획
 							   LEFT OUTER JOIN TB_CR02D01 AS P  ON P.CO_CD    = A.CO_CD
 							                                   AND P.ORDRS_NO = A.ORDRS_NO
-							   --매출확정
-							   LEFT OUTER JOIN (
-								                SELECT DISTINCT CM.FILE_TRGT_KEY
-												     , CM.CO_CD
-													 , CM.SELL_DCSN_NO
-													 , CM.ORDRS_CLNT_CD
-													 , CM.SELL_DCSN_DT
-													 , CM.CURR_CD
-													 , NVL(CM.EXRATE, 1)            AS EXRATE
-													 , NVL(CM.SELL_DCSN_AMT, 0)     AS SELL_DCSN_AMT
-													 , CD.ORDRS_NO
-													 , CD.CLMN_PLAN_SEQ
-													 , NVL(CD.SELL_DCSN_DTL_AMT, 0) AS SELL_DCSN_DTL_AMT
-													 , CD.SELL_BILL_NO
-												FROM   TB_CR03M01 AS CM --매출확정
-												       --매출확정상세
-													   LEFT OUTER JOIN TB_CR03D01 AS CD  ON CD.CO_CD        = CM.CO_CD
-													                                    AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
-											   ) AS C  ON C.CO_CD         = P.CO_CD
-											          AND C.ORDRS_NO      = P.ORDRS_NO
-													  AND C.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
 							   --매출확정집계
 							   LEFT OUTER JOIN (
 								                SELECT DISTINCT CM.CO_CD
@@ -82,6 +61,38 @@
 											   ) AS CS  ON CS.CO_CD         = P.CO_CD
 											           AND CS.ORDRS_NO      = P.ORDRS_NO
 													   AND CS.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
+							   --매출계산서 집계
+							   LEFT OUTER JOIN (
+								                SELECT DISTINCT BM.CO_CD
+								                     , BD.ORDRS_NO
+								                     , BD.CLMN_PLAN_SEQ
+								                     , SUM(NVL(BD.SELL_BILL_DTL_AMT, 0)) AS SELL_BILL_DTL_AMT
+												FROM   TB_CR04M01 AS BM --매출계산서
+												       --매출계산서 상세
+													   LEFT OUTER JOIN TB_CR04D01 AS BD  ON BD.CO_CD        = BM.CO_CD
+													                                    AND BD.SELL_BILL_NO = BM.SELL_BILL_NO
+												GROUP BY BM.CO_CD, BD.ORDRS_NO, BD.CLMN_PLAN_SEQ
+											   ) AS BS  ON BS.CO_CD         = P.CO_CD
+											           AND BS.ORDRS_NO      = P.ORDRS_NO
+													   AND BS.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
+							   --매출계산서
+							   LEFT OUTER JOIN (
+								                SELECT DISTINCT BM.FILE_TRGT_KEY
+								                     , BM.CO_CD
+								                     , BM.SELL_BILL_NO
+								                     , MAX(TO_CHAR(BM.SELL_BILL_DT, 'YYYY-MM-DD')) AS SELL_BILL_DT
+								                     , MAX(NVL(BM.SELL_BILL_AMT, 0)) AS SELL_BILL_AMT
+								                     , BD.ORDRS_NO
+								                     , BD.CLMN_PLAN_SEQ
+								                     , SUM(NVL(BD.SELL_BILL_DTL_AMT, 0)) AS SELL_BILL_DTL_AMT
+												FROM   TB_CR04M01 AS BM --매출계산서
+												       --매출계산서 상세
+													   LEFT OUTER JOIN TB_CR04D01 AS BD  ON BD.CO_CD        = BM.CO_CD
+													                                    AND BD.SELL_BILL_NO = BM.SELL_BILL_NO
+												GROUP BY BM.FILE_TRGT_KEY, BM.CO_CD, BD.ORDRS_NO, BD.CLMN_PLAN_SEQ, BM.SELL_BILL_NO
+											   ) AS B  ON B.CO_CD         = P.CO_CD
+											          AND B.ORDRS_NO      = P.ORDRS_NO
+													  AND B.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
 							   --회사
 							   LEFT OUTER JOIN TB_CM05M01 AS R ON R.CODE_ID = A.CO_CD
 							   --수주구분
@@ -117,7 +128,7 @@
 						<if test="ordrsDiv != null and !ordrsDiv.equals('')">
 						AND    A.ORDRS_DIV = #{ordrsDiv}
 						</if>
-						ORDER BY A.CO_CD, A.ORDRS_CLNT_CD, A.ORDRS_NO, P.CLMN_PLAN_SEQ, C.SELL_DCSN_NO
+						ORDER BY A.CO_CD, A.ORDRS_CLNT_CD, A.ORDRS_NO, P.CLMN_PLAN_SEQ, B.SELL_BILL_NO
 						) AS A
 				WHERE  1 = 1
 		       ) AS A
@@ -156,40 +167,19 @@
 							 , NVL(P.CLMN_AMT, 0)  AS CLMN_AMT
 							 , TO_CHAR(P.BILL_PBLS_DT, 'YYYY-MM-DD') AS BILL_PBLS_DT
 							 , TO_CHAR(P.CLMN_DT, 'YYYY-MM-DD')      AS CLMN_DT
-							 , NVL(C.FILE_TRGT_KEY, 0) AS FILE_TRGT_KEY
-							 , C.SELL_DCSN_NO      AS SELL_DCSN_NO
-							 , TO_CHAR(C.SELL_DCSN_DT, 'YYYY-MM-DD') AS SELL_DCSN_DT
-							 , C.SELL_DCSN_AMT     AS SELL_DCSN_AMT
-							 , C.SELL_DCSN_DTL_AMT AS SELL_DCSN_DTL_AMT
+							 , NVL(B.FILE_TRGT_KEY, 0) AS FILE_TRGT_KEY
+							 , B.SELL_BILL_NO               AS SELL_BILL_NO
+							 , B.SELL_BILL_DT               AS SELL_BILL_DT
+							 , NVL(B.SELL_BILL_AMT, 0)      AS SELL_BILL_AMT
+							 , NVL(B.SELL_BILL_DTL_AMT, 0)  AS SELL_BILL_DTL_AMT
 							 , NVL(CS.SELL_DCSN_DTL_AMT, 0) AS SELL_DCSN_AMT_SUM
-							 , CASE WHEN (NVL(P.CLMN_AMT, 0) - NVL(CS.SELL_DCSN_DTL_AMT, 0)) > 0 THEN 'N' ELSE 'Y' END AS CONF_YN
+							 , NVL(BS.SELL_BILL_DTL_AMT, 0) AS SELL_BILL_AMT_SUM
+							 , CASE WHEN (NVL(P.CLMN_AMT, 0) - NVL(CS.SELL_DCSN_DTL_AMT, 0)) > 0 THEN 'N' ELSE 'Y' END AS BILL_YN
 							 , NVL(P.CLMN_AMT, 0) - NVL(CS.SELL_DCSN_DTL_AMT, 0) AS MI_AMT
-							 , C.SELL_BILL_NO
 						FROM   TB_CR02M01 AS A --수주
 						       --수금계획
 							   LEFT OUTER JOIN TB_CR02D01 AS P  ON P.CO_CD    = A.CO_CD
 							                                   AND P.ORDRS_NO = A.ORDRS_NO
-							   --매출확정
-							   LEFT OUTER JOIN (
-								                SELECT DISTINCT CM.FILE_TRGT_KEY
-												     , CM.CO_CD
-													 , CM.SELL_DCSN_NO
-													 , CM.ORDRS_CLNT_CD
-													 , CM.SELL_DCSN_DT
-													 , CM.CURR_CD
-													 , NVL(CM.EXRATE, 1)            AS EXRATE
-													 , NVL(CM.SELL_DCSN_AMT, 0)     AS SELL_DCSN_AMT
-													 , CD.ORDRS_NO
-													 , CD.CLMN_PLAN_SEQ
-													 , NVL(CD.SELL_DCSN_DTL_AMT, 0) AS SELL_DCSN_DTL_AMT
-													 , CD.SELL_BILL_NO
-												FROM   TB_CR03M01 AS CM --매출확정
-												       --매출확정상세
-													   LEFT OUTER JOIN TB_CR03D01 AS CD  ON CD.CO_CD        = CM.CO_CD
-													                                    AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
-											   ) AS C  ON C.CO_CD         = P.CO_CD
-											          AND C.ORDRS_NO      = P.ORDRS_NO
-													  AND C.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
 							   --매출확정집계
 							   LEFT OUTER JOIN (
 								                SELECT DISTINCT CM.CO_CD
@@ -204,6 +194,38 @@
 											   ) AS CS  ON CS.CO_CD         = P.CO_CD
 											           AND CS.ORDRS_NO      = P.ORDRS_NO
 													   AND CS.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
+							   --매출계산서 집계
+							   LEFT OUTER JOIN (
+								                SELECT DISTINCT BM.CO_CD
+								                     , BD.ORDRS_NO
+								                     , BD.CLMN_PLAN_SEQ
+								                     , SUM(NVL(BD.SELL_BILL_DTL_AMT, 0)) AS SELL_BILL_DTL_AMT
+												FROM   TB_CR04M01 AS BM --매출계산서
+												       --매출계산서 상세
+													   LEFT OUTER JOIN TB_CR04D01 AS BD  ON BD.CO_CD        = BM.CO_CD
+													                                    AND BD.SELL_BILL_NO = BM.SELL_BILL_NO
+												GROUP BY BM.CO_CD, BD.ORDRS_NO, BD.CLMN_PLAN_SEQ
+											   ) AS BS  ON BS.CO_CD         = P.CO_CD
+											           AND BS.ORDRS_NO      = P.ORDRS_NO
+													   AND BS.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
+							   --매출계산서
+							   LEFT OUTER JOIN (
+								                SELECT DISTINCT BM.FILE_TRGT_KEY
+								                     , BM.CO_CD
+								                     , BM.SELL_BILL_NO
+								                     , MAX(TO_CHAR(BM.SELL_BILL_DT, 'YYYY-MM-DD')) AS SELL_BILL_DT
+								                     , MAX(NVL(BM.SELL_BILL_AMT, 0)) AS SELL_BILL_AMT
+								                     , BD.ORDRS_NO
+								                     , BD.CLMN_PLAN_SEQ
+								                     , SUM(NVL(BD.SELL_BILL_DTL_AMT, 0)) AS SELL_BILL_DTL_AMT
+												FROM   TB_CR04M01 AS BM --매출계산서
+												       --매출계산서 상세
+													   LEFT OUTER JOIN TB_CR04D01 AS BD  ON BD.CO_CD        = BM.CO_CD
+													                                    AND BD.SELL_BILL_NO = BM.SELL_BILL_NO
+												GROUP BY BM.FILE_TRGT_KEY, BM.CO_CD, BD.ORDRS_NO, BD.CLMN_PLAN_SEQ, BM.SELL_BILL_NO
+											   ) AS B  ON B.CO_CD         = P.CO_CD
+											          AND B.ORDRS_NO      = P.ORDRS_NO
+													  AND B.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
 							   --회사
 							   LEFT OUTER JOIN TB_CM05M01 AS R ON R.CODE_ID = A.CO_CD
 							   --수주구분
@@ -239,7 +261,7 @@
 						<if test="ordrsDiv != null and !ordrsDiv.equals('')">
 						AND    A.ORDRS_DIV = #{ordrsDiv}
 						</if>
-						ORDER BY A.CO_CD, A.ORDRS_CLNT_CD, A.ORDRS_NO, P.CLMN_PLAN_SEQ, C.SELL_DCSN_NO
+						ORDER BY A.CO_CD, A.ORDRS_CLNT_CD, A.ORDRS_NO, P.CLMN_PLAN_SEQ, B.SELL_BILL_NO
 						) AS A
 				WHERE  1 = 1
 		       ) AS A
@@ -277,32 +299,57 @@
 							 , TO_CHAR(NVL(P.CLMN_RATE, 0)) || ' %'  AS CLMN_RATE_NM
 							 , NVL(P.CLMN_AMT, 0)  AS CLMN_AMT
 							 , TO_CHAR(P.BILL_PBLS_DT, 'YYYY-MM-DD') AS BILL_PBLS_DT
-							 , TO_CHAR(P.CLMN_DT, 'YYYY-MM-DD')      AS CLMN_DT
-							 , NVL(C.SELL_DCSN_DTL_AMT, 0) AS BEF_CONF_AMT
-							 , NVL(P.CLMN_AMT, 0) - NVL(C.SELL_DCSN_DTL_AMT, 0) AS MI_CONF_AMT
-							 , NVL(C.SELL_DCSN_DTL_AMT, 0) AS SELL_DCSN_DTL_AMT
-							 , ''  AS SELL_DCSN_NO
+							 , TO_CHAR(P.CLMN_DT, 'YYYY-MM-DD')      AS CLMN_DT							 
+							 , NVL(B.SELL_BILL_DTL_AMT, 0) AS BEF_BILL_AMT							 
+							 , NVL(P.CLMN_AMT, 0) - NVL(B.SELL_BILL_DTL_AMT, 0) AS MI_BILL_AMT							 
+							 , NVL(B.SELL_BILL_DTL_AMT, 0) AS SELL_BILL_DTL_AMT							 
+							 , C.SELL_DCSN_NO
+							 , NVL(C.SELL_DCSN_DTL_AMT, 0) AS SELL_DCSN_DTL_AMT							 
+							 , ''  AS SELL_BILL_NO
 							 , 'N' AS CHK      --체크여부
-							 , 0   AS CONF_AMT  --확정금액
+							 , 0   AS BILL_AMT  --확정금액
 							 , 'I' AS DATA_CHK
 						FROM   TB_CR02M01 AS A --수주
 						       --수금계획
 							   JOIN TB_CR02D01 AS P  ON P.CO_CD    = A.CO_CD
 							                                   AND P.ORDRS_NO = A.ORDRS_NO
 							   --매출확정
+							   JOIN (
+							         SELECT DISTINCT CM.FILE_TRGT_KEY
+							              , CM.CO_CD
+							              , CM.SELL_DCSN_NO
+							              , CM.ORDRS_CLNT_CD
+							              , CM.SELL_DCSN_DT
+							              , CM.CURR_CD
+							              , NVL(CM.EXRATE, 1)            AS EXRATE
+							              , NVL(CM.SELL_DCSN_AMT, 0)     AS SELL_DCSN_AMT
+							              , CD.ORDRS_NO
+							              , CD.CLMN_PLAN_SEQ
+							              , NVL(CD.SELL_DCSN_DTL_AMT, 0) AS SELL_DCSN_DTL_AMT
+							         FROM   TB_CR03M01 AS CM --매출확정
+							                --매출확정상세
+							                JOIN TB_CR03D01 AS CD  ON CD.CO_CD        = CM.CO_CD
+											                      AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
+									 WHERE  1 = 1
+									 AND    CD.SELL_BILL_NO IS NULL
+									) AS C  ON C.CO_CD         = P.CO_CD
+									       AND C.ORDRS_NO      = P.ORDRS_NO
+									       AND C.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
+							   --매출계산서
 							   LEFT OUTER JOIN (
-								                SELECT DISTINCT CM.CO_CD
-												     , CD.ORDRS_NO
-													 , CD.CLMN_PLAN_SEQ
-													 , SUM(NVL(CD.SELL_DCSN_DTL_AMT, 0)) AS SELL_DCSN_DTL_AMT
-												FROM   TB_CR03M01 AS CM --매출확정
-												       --매출확정상세
-													   LEFT OUTER JOIN TB_CR03D01 AS CD  ON CD.CO_CD        = CM.CO_CD
-													                                    AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO
-												GROUP BY CM.CO_CD, CD.ORDRS_NO, CD.CLMN_PLAN_SEQ
-											   ) AS C  ON C.CO_CD         = P.CO_CD
-											          AND C.ORDRS_NO      = P.ORDRS_NO
-													  AND C.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
+								                SELECT DISTINCT BM.CO_CD
+								                     , BD.ORDRS_NO
+								                     , BD.CLMN_PLAN_SEQ
+								                     , MAX(NVL(BM.SELL_BILL_AMT, 0)) AS SELL_BILL_AMT
+								                     , SUM(NVL(BD.SELL_BILL_DTL_AMT, 0)) AS SELL_BILL_DTL_AMT
+												FROM   TB_CR04M01 AS BM --매출계산서
+												       --매출계산서 상세
+													   LEFT OUTER JOIN TB_CR04D01 AS BD  ON BD.CO_CD        = BM.CO_CD
+													                                    AND BD.SELL_BILL_NO = BM.SELL_BILL_NO
+												GROUP BY BM.CO_CD, BD.ORDRS_NO, BD.CLMN_PLAN_SEQ
+											   ) AS B  ON B.CO_CD         = P.CO_CD
+											          AND B.ORDRS_NO      = P.ORDRS_NO
+													  AND B.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
 							   --회사
 							   LEFT OUTER JOIN TB_CM05M01 AS R ON R.CODE_ID = A.CO_CD
 							   --수주구분
@@ -314,29 +361,40 @@
 							   --고객사
 							   LEFT OUTER JOIN TB_BM02M01 AS S ON S.CLNT_CD = A.ORDRS_CLNT_CD
 						WHERE  1 = 1
-						ORDER BY A.CO_CD, A.ORDRS_CLNT_CD, A.ORDRS_NO, P.CLMN_PLAN_SEQ
+						ORDER BY A.CO_CD, A.ORDRS_CLNT_CD, A.ORDRS_NO, P.CLMN_PLAN_SEQ, C.SELL_DCSN_NO
 						) AS A
 				WHERE  1 = 1
-				AND    A.MI_CONF_AMT > 0
+				AND    A.MI_BILL_AMT > 0
 		       ) AS A
 		WHERE  1 = 1
-		AND    A.CO_CD = #{coCd}
+		AND    A.CO_CD         = #{coCd}
 		AND    A.ORDRS_CLNT_CD = #{ordrsClntCd}
 		AND    A.CURR_CD       = #{currCd}
     </select>
 	
     <!-- 수정팝업 조회 -->
-    <select id="select_cr07_Info" parameterType="Map" resultType="camelMap">
+    <select id="select_cr08_Info" parameterType="Map" resultType="camelMap">
 		SELECT DISTINCT A.FILE_TRGT_KEY
 		     , A.CO_CD
-		     , A.SELL_DCSN_NO
+		     , A.SELL_BILL_NO
 		     , A.ORDRS_CLNT_CD
 		     , S.CLNT_NM AS ORDRS_CLNT_NM
-		     , TO_CHAR(A.SELL_DCSN_DT, 'YYYY-MM-DD') AS SELL_DCSN_DT
+		     , TO_CHAR(A.SELL_BILL_DT, 'YYYY-MM-DD') AS SELL_BILL_DT
 		     , A.CURR_CD
 		     , NVL(A.EXRATE, 1) AS EXRATE
-		     , B.SELL_DCSN_AMT
-		     , A.SELL_DCSN_RMK
+		     , NVL(B.SELL_BILL_AMT, 0) AS SELL_BILL_AMT
+			 , NVL(B.SELL_BILL_AMT, 0) AS PRINT_AMT
+			 , NVL(A.SELL_BILL_VAT, 0) AS SELL_BILL_VAT
+			 , NVL(B.SELL_BILL_AMT, 0) + NVL(A.SELL_BILL_VAT, 0) AS PRINT_SUM_AMT
+		     , A.SELL_BILL_RMK
+		     , A.UDT_RESN
+		     , A.SELL_BILL_RMK1
+		     , A.SELL_BILL_RMK2
+		     , A.SELL_BILL_RMK3
+		     , A.SELL_BILL_GOODS
+		     , A.SELL_BILL_SPEC
+		     , NVL(A.SELL_BILL_QTY, 1) AS SELL_BILL_QTY
+		     , NVL(A.SELL_BILL_PRC, 0) AS SELL_BILL_PRC		     
 		     , A.ETC_FIELD1
 		     , A.ETC_FIELD2
 		     , A.ETC_FIELD3
@@ -349,17 +407,17 @@
 		     , TO_CHAR(A.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM
 		     , A.UDT_PGM
 		     , 'U' AS DATA_CHK
-		FROM   TB_CR03M01 AS A
+		FROM   TB_CR04M01 AS A
 		       LEFT OUTER JOIN (
 		                        SELECT CO_CD
-		                             , SELL_DCSN_NO
-		                             , SUM(NVL(SELL_DCSN_DTL_AMT, 0)) AS SELL_DCSN_AMT
-		                        FROM   TB_CR03D01
+		                             , SELL_BILL_NO
+		                             , SUM(NVL(SELL_BILL_DTL_AMT, 0)) AS SELL_BILL_AMT
+		                        FROM   TB_CR04D01
 		                        GROUP BY CO_CD
-		                               , SELL_DCSN_NO
+		                               , SELL_BILL_NO
 		                        
 		                       ) AS B  ON B.CO_CD        = A.CO_CD
-		                              AND B.SELL_DCSN_NO = A.SELL_DCSN_NO
+		                              AND B.SELL_BILL_NO = A.SELL_BILL_NO
                LEFT OUTER JOIN TB_BM02M01 AS S ON S.CLNT_CD = A.ORDRS_CLNT_CD
                LEFT OUTER JOIN TB_CM06M01 AS U1 ON U1.ID = A.CREAT_ID
                LEFT OUTER JOIN TB_CM06M01 AS U2 ON U2.ID = A.UDT_ID
@@ -368,7 +426,7 @@
     </select>
 
 	<!-- 수정팝업 그리드 조회 -->
-	<select id="select_cr07_Info_Dtl" parameterType="Map" resultType="camelMap">
+	<select id="select_cr08_Info_Dtl" parameterType="Map" resultType="camelMap">
 		SELECT A.*
 		FROM   (
 				SELECT A.*
@@ -399,16 +457,17 @@
 							 , O.CLMN_AMT                  AS CLMN_AMT
 							 , O.BILL_PBLS_DT              AS BILL_PBLS_DT
 							 , O.CLMN_DT                   AS CLMN_DT
-							 , O.BEF_CONF_AMT              AS BEF_CONF_AMT
-							 , O.MI_CONF_AMT               AS MI_CONF_AMT
-							 , NVL(A.SELL_DCSN_DTL_AMT, 0) AS SELL_DCSN_DTL_AMT
+							 , O.BEF_BILL_AMT              AS BEF_BILL_AMT
+							 , O.MI_BILL_AMT               AS MI_BILL_AMT
+							 , NVL(A.SELL_BILL_DTL_AMT, 0) AS SELL_BILL_DTL_AMT
+							 , A.SELL_BILL_NO              AS SELL_BILL_NO
 							 , A.SELL_DCSN_NO              AS SELL_DCSN_NO
 							 , 'N'                         AS CHK      --체크여부
-							 , NVL(A.SELL_DCSN_DTL_AMT, 0) AS CONF_AMT  --확정금액
+							 , NVL(A.SELL_BILL_DTL_AMT, 0) AS BILL_AMT  --확정금액
 							 , 'U'                         AS DATA_CHK
-						FROM   TB_CR03D01 AS A
-						       LEFT OUTER JOIN TB_CR03M01 AS B  ON B.CO_CD        = A.CO_CD
-						                                       AND B.SELL_DCSN_NO = A.SELL_DCSN_NO
+						FROM   TB_CR04D01 AS A
+						       LEFT OUTER JOIN TB_CR04M01 AS B  ON B.CO_CD        = A.CO_CD
+						                                       AND B.SELL_BILL_NO = A.SELL_BILL_NO
 						       LEFT OUTER JOIN (
 						                        SELECT DISTINCT A.FILE_TRGT_KEY                AS FILE_TRGT_KEY
 						                             , A.CO_CD                                 AS CO_CD
@@ -434,8 +493,8 @@
 						                             , NVL(P.CLMN_AMT, 0)                      AS CLMN_AMT
 						                             , TO_CHAR(P.BILL_PBLS_DT, 'YYYY-MM-DD')   AS BILL_PBLS_DT
 						                             , TO_CHAR(P.CLMN_DT, 'YYYY-MM-DD')        AS CLMN_DT
-						                             , NVL(C.SELL_DCSN_DTL_AMT, 0)             AS BEF_CONF_AMT
-						                             , NVL(P.CLMN_AMT, 0) - NVL(C.SELL_DCSN_DTL_AMT, 0) AS MI_CONF_AMT
+						                             , NVL(C.SELL_BILL_DTL_AMT, 0)             AS BEF_BILL_AMT
+						                             , NVL(P.CLMN_AMT, 0) - NVL(C.SELL_BILL_DTL_AMT, 0) AS MI_BILL_AMT
 						                        FROM   TB_CR02M01 AS A
 						                               JOIN TB_CR02D01 AS P  ON P.CO_CD    = A.CO_CD
 						                                                    AND P.ORDRS_NO = A.ORDRS_NO
@@ -443,8 +502,8 @@
 						                                                SELECT DISTINCT CO_CD
 						                                                     , ORDRS_NO
 						                                                     , CLMN_PLAN_SEQ
-						                                                     , SUM(NVL(SELL_DCSN_DTL_AMT, 0)) AS SELL_DCSN_DTL_AMT
-						                                                FROM   TB_CR03D01
+						                                                     , SUM(NVL(SELL_BILL_DTL_AMT, 0)) AS SELL_BILL_DTL_AMT
+						                                                FROM   TB_CR04D01
 						                                                GROUP BY CO_CD, ORDRS_NO, CLMN_PLAN_SEQ
 						                                               ) AS C  ON C.CO_CD         = P.CO_CD
 						                                                      AND C.ORDRS_NO      = P.ORDRS_NO
@@ -460,79 +519,58 @@
 						                             AND O.CLMN_PLAN_SEQ = A.CLMN_PLAN_SEQ
 						       LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = A.CO_CD
 						WHERE  1 = 1
-						ORDER BY A.CO_CD, O.ORDRS_CLNT_CD, O.ORDRS_NO, O.CLMN_PLAN_SEQ
 						) AS A
 				WHERE  1 = 1
 		       ) AS A
 		WHERE  1 = 1
 		AND    A.CO_CD        = #{coCd}
-		AND    A.SELL_DCSN_NO = #{sellDcsnNo}
+		AND    A.SELL_BILL_NO = #{sellBillNo}
     </select>
-    
-	<!-- 삭제 전 체크 -->
-	<select id="delete_Chk" parameterType="Map" resultType="camelMap">
-		SELECT NVL(MAX(A.CNT), 0)      AS CNT
-		     , NVL(MAX(A.BILL_CNT), 0) AS BILL_CNT
-		     , NVL(MAX(A.DEL_YN), 'N') AS DEL_YN
-		FROM   (
-		        SELECT COUNT(*) AS CNT
-		             , SUM(CASE WHEN B.SELL_BILL_NO IS NULL OR SELL_BILL_NO = '' THEN 0 ELSE 1 END) AS BILL_CNT
-				     , '' AS DEL_YN
-				FROM   TB_CR03M01 AS A
-				       JOIN TB_CR03D01 AS B  ON B.CO_CD        = A.CO_CD
-				                            AND B.SELL_DCSN_NO = A.SELL_DCSN_NO
-				WHERE  1 = 1
-				AND    A.CO_CD         = #{coCd}
-				AND    A.SELL_DCSN_NO  = #{sellDcsnNo}
-				UNION
-				SELECT 0 AS CNT
-				     , 0 AS BILL_CNT
-				     , CASE WHEN SELL_BILL_NO IS NULL OR SELL_BILL_NO = '' THEN 'Y' ELSE 'N' END AS DEL_YN
-				FROM   TB_CR03D01
-				WHERE  1 = 1
-				AND    CO_CD         = #{coCd}
-				AND    SELL_DCSN_NO  = #{sellDcsnNo}
-				AND    ORDRS_NO      = #{ordrsNo}
-				AND    CLMN_PLAN_SEQ = #{clmnPlanSeq}
-		       ) AS A
-		WHERE  1 = 1
-	</select>
 	
 	<!-- 파일키 MAX + 1 채번 -->
-	<select id="select_cr07_SeqNext" parameterType="Map" resultType="int">
+	<select id="select_cr08_SeqNext" parameterType="Map" resultType="int">
 		SELECT MAX(TO_NUMBER(FILE_TRGT_KEY)) + 1
-		FROM   TB_CR03M01
+		FROM   TB_CR04M01
 	</select>
 
 	<!-- 수불키 채번 -->
-	<select id="select_cr07_Ioseq" parameterType="Map" resultType="int">
+	<select id="select_cr08_Ioseq" parameterType="Map" resultType="int">
 		SELECT TB_BM30M01_SQ01.NEXTVAL
 		FROM   DUAL
 	</select>
 
 	<!-- 관리번호 채번 -->
-	<select id="select_cr07_Next_MNGM_NO" parameterType="java.util.Map" resultType="java.lang.String">
-		SELECT CASE WHEN MAX(SELL_DCSN_NO) IS NULL THEN 'CONF'||SUBSTR(#{sellDcsnDt}, 3, 2)||'00001'
-		                                           ELSE 'CONF'||SUBSTR(#{sellDcsnDt}, 3, 2)||LPAD(TO_NUMBER(SUBSTR(MAX(SELL_DCSN_NO), -5)) + 1, 5, 0)
+	<select id="select_cr08_Next_MNGM_NO" parameterType="java.util.Map" resultType="java.lang.String">
+		SELECT CASE WHEN MAX(SELL_BILL_NO) IS NULL THEN 'BILL'||SUBSTR(#{sellBillDt}, 3, 2)||'00001'
+		                                           ELSE 'BILL'||SUBSTR(#{sellBillDt}, 3, 2)||LPAD(TO_NUMBER(SUBSTR(MAX(SELL_BILL_NO), -5)) + 1, 5, 0)
 			   END AS MNGM_NO
-		FROM   TB_CR03M01
+		FROM   TB_CR04M01
 		WHERE  CO_CD = #{coCd}
-		AND    SELL_DCSN_DT LIKE SUBSTR(#{sellDcsnDt}, 0, 4)||'%'
+		AND    SELL_BILL_DT LIKE SUBSTR(#{sellBillDt}, 0, 4)||'%'
     </select>
 	
 	<!-- insert -->
-    <insert id="insert_cr07" parameterType="Map">
-        INSERT INTO TB_CR03M01
+    <insert id="insert_cr08" parameterType="Map">
+        INSERT INTO TB_CR04M01
 		(
 			  FILE_TRGT_KEY
 			, CO_CD
-			, SELL_DCSN_NO
+			, SELL_BILL_NO
 			, ORDRS_CLNT_CD
-			, SELL_DCSN_DT
+			, SELL_BILL_DT
 			, CURR_CD
 			, EXRATE
-			, SELL_DCSN_AMT
-			, SELL_DCSN_RMK
+			, SELL_BILL_AMT
+			, SELL_BILL_VAT
+			, UDT_RESN
+			, SELL_BILL_RMK1
+			, SELL_BILL_RMK2
+			, SELL_BILL_RMK3
+			, SELL_BILL_GOODS
+			, SELL_BILL_SPEC
+			, SELL_BILL_QTY
+			, SELL_BILL_PRC
+			, SELL_BILL_RMK
 			, ETC_FIELD1
 			, ETC_FIELD2
 			, ETC_FIELD3
@@ -544,13 +582,22 @@
 		(
 			  #{fileTrgtKey}
 			, #{coCd}
-			, #{sellDcsnNo}
+			, #{sellBillNo}
 			, #{ordrsClntCd}
-			, #{sellDcsnDt}
+			, #{sellBillDt}
 			, #{currCd}
 			, #{exrate}
-			, #{sellDcsnAmt}
-			, #{sellDcsnRmk}
+			, #{sellBillAmt}
+			, #{sellBillVat}
+			, #{udtResn}
+			, #{sellBillRmk1}
+			, #{sellBillRmk2}
+			, #{sellBillRmk3}
+			, #{sellBillGoods}
+			, #{sellBillSpec}
+			, #{sellBillQty}
+			, #{sellBillPrc}
+			, #{sellBillRmk}
 			, #{etcField1, jdbcType=VARCHAR}
 			, #{etcField2, jdbcType=VARCHAR}
 			, #{etcField3, jdbcType=VARCHAR}
@@ -560,17 +607,18 @@
 		)
     </insert>
 
-	<insert id="insert_cr07_Dtl" parameterType="Map">
-		INSERT INTO TB_CR03D01
+	<insert id="insert_cr08_Dtl" parameterType="Map">
+		INSERT INTO TB_CR04D01
 		(
 			  CO_CD
+			, SELL_BILL_NO
 			, SELL_DCSN_NO
 			, ORDRS_NO
 			, CLMN_PLAN_SEQ
 			, CURR_CD
 			, EXRATE
-			, SELL_DCSN_DTL_AMT
-			, SELL_DCSN_DTL_RMK
+			, SELL_BILL_DTL_AMT
+			, SELL_BILL_DTL_RMK
 			, ETC_FIELD1
 			, ETC_FIELD2
 			, ETC_FIELD3
@@ -581,13 +629,14 @@
 		VALUES
 		(
 			  #{coCd}
+			, #{sellBillNo}
 			, #{sellDcsnNo}
 			, #{ordrsNo}
 			, #{clmnPlanSeq}
-			, #{currCd}
-			, #{exrate}
-			, #{sellDcsnDtlAmt}
-			, #{sellDcsnDtlRmk, jdbcType=VARCHAR}
+			, #{currCdM}
+			, #{exrateM}
+			, #{sellBillDtlAmt}
+			, #{sellBillDtlRmk, jdbcType=VARCHAR}
 			, #{etcField1, jdbcType=VARCHAR}
 			, #{etcField2, jdbcType=VARCHAR}
 			, #{etcField3, jdbcType=VARCHAR}
@@ -598,54 +647,72 @@
 	</insert>
     
 	<!-- update -->
-    <update id="update_cr07" parameterType="map">
-		UPDATE TB_CR03M01
-		SET    SELL_DCSN_RMK = #{sellDcsnRmk}
+    <update id="update_cr08" parameterType="map">
+		UPDATE TB_CR04M01
+		SET    SELL_BILL_VAT   = #{sellBillVat}
+		     , UDT_RESN        = #{udtResn}
+		     , SELL_BILL_RMK1  = #{sellBillRmk1}
+		     , SELL_BILL_RMK2  = #{sellBillRmk2}
+		     , SELL_BILL_RMK3  = #{sellBillRmk3}
+		     , SELL_BILL_GOODS = #{sellBillGoods}
+		     , SELL_BILL_SPEC  = #{sellBillSpec}
+		     , SELL_BILL_QTY   = #{sellBillQty}
+		     , SELL_BILL_PRC   = #{sellBillPrc}
+		     , SELL_BILL_RMK   = #{sellBillRmk}
 			 , UDT_ID   = #{userId}
 			 , UDT_PGM  = #{pgmId}
 			 , UDT_DTTM = SYSDATE
 		WHERE  FILE_TRGT_KEY = #{fileTrgtKey}
     </update>
 
-	<update id="update_cr07_Dtl" parameterType="map">
-		UPDATE TB_CR03D01
+	<update id="update_cr08_Dtl" parameterType="map">
+		UPDATE TB_CR04D01
 		SET    UDT_ID   = #{userId}
 			 , UDT_PGM  = #{pgmId}
 			 , UDT_DTTM = SYSDATE
+		WHERE  CO_CD         = #{coCd}
+		AND    SELL_BILL_NO  = #{sellBillNo}
+		AND    SELL_DCSN_NO  = #{sellDcsnNo}
+		AND    ORDRS_NO      = #{ordrsNo}
+		AND    CLMN_PLAN_SEQ = #{clmnPlanSeq}
+    </update>
+
+	<update id="update_cr08_Conf" parameterType="map">
+		UPDATE TB_CR03D01
+		SET    SELL_BILL_NO = #{sellBillNo}
 		WHERE  CO_CD         = #{coCd}
 		AND    SELL_DCSN_NO  = #{sellDcsnNo}
 		AND    ORDRS_NO      = #{ordrsNo}
 		AND    CLMN_PLAN_SEQ = #{clmnPlanSeq}
     </update>
 
-	<update id="update_cr07_delete" parameterType="map">
-		UPDATE TB_CR03M01
-		SET    SELL_DCSN_AMT = SELL_DCSN_AMT - #{sellDcsnDtlAmt}
-			 , UDT_ID   = #{userId}
-			 , UDT_PGM  = #{pgmId}
-			 , UDT_DTTM = SYSDATE
-		WHERE  FILE_TRGT_KEY = #{fileTrgtKey}
+	<update id="update_cr08_Del" parameterType="map">
+		UPDATE TB_CR03D01
+		SET    SELL_BILL_NO = NULL
+		WHERE  CO_CD        = #{coCd}
+		AND    SELL_BILL_NO = #{sellBillNo}
     </update>
     
     <!-- delete -->    
-    <delete id="delete_cr07" parameterType="Map">
-		DELETE TB_CR03M01
-		WHERE  CO_CD         = #{coCd}
-		AND    SELL_DCSN_NO  = #{sellDcsnNo}
+    <delete id="delete_cr08" parameterType="Map">
+		DELETE TB_CR04M01
+		WHERE  CO_CD        = #{coCd}
+		AND    SELL_BILL_NO = #{sellBillNo}
 	</delete>
     
-    <delete id="delete_cr07_Dtl" parameterType="Map">
-		DELETE TB_CR03D01
+    <delete id="delete_cr08_Dtl" parameterType="Map">
+		DELETE TB_CR04D01
 		WHERE  CO_CD         = #{coCd}
+		AND    SELL_BILL_NO  = #{sellBillNo}
 		AND    SELL_DCSN_NO  = #{sellDcsnNo}
 		AND    ORDRS_NO      = #{ordrsNo}
 		AND    CLMN_PLAN_SEQ = #{clmnPlanSeq}
 	</delete>
 	
-	<delete id="delete_cr07_Dtl_All" parameterType="Map">
-		DELETE TB_CR03D01
-		WHERE  CO_CD         = #{coCd}
-		AND    SELL_DCSN_NO  = #{sellDcsnNo}
+	<delete id="delete_cr08_Dtl_All" parameterType="Map">
+		DELETE TB_CR04D01
+		WHERE  CO_CD        = #{coCd}
+		AND    SELL_BILL_NO = #{sellBillNo}
 	</delete>
 
 </mapper>

@@ -50,10 +50,10 @@ public class CR07SvcImpl implements CR07Svc {
 		return cr07Mapper.grid1_selectList(paramMap);
 	}
 	
-	// 창고 코드 검색
+	// 삭제 전 체크
 	@Override
-	public List<Map<String, Object>> selectWhCd(Map<String, String> paramMap) {
-		return cr07Mapper.selectWhCd(paramMap);
+	public List<Map<String, Object>> delete_Chk(Map<String, String> paramMap) {
+		return cr07Mapper.delete_Chk(paramMap);
 	}
 
 	// 팝업 입력대상 검색
@@ -241,19 +241,16 @@ public class CR07SvcImpl implements CR07Svc {
 		//---------------------------------------------------------------
 		
 		int result = 0;
+		String billCnt = paramMap.get("billCnt").toString();
 		
-		result = cr07Mapper.delete_cr07_Dtl_All(paramMap);
-		result = cr07Mapper.delete_cr07(paramMap);
-		
-		// String lvl = paramMap.get("lvl").toString();		
-		
-		// if ("1".equals(lvl)) {
-		// 	//데이터 처리
-		// 	result = cr07Mapper.delete_cr07_Dtl_All(paramMap);
-		// 	result = cr07Mapper.delete_cr07(paramMap);
-    	// } else {
-    	// 	result = cr07Mapper.delete_cr07_Dtl(paramMap);
-    	// }
+		if ("0".equals(billCnt)) {
+			//데이터 처리
+			result = cr07Mapper.delete_cr07_Dtl_All(paramMap);
+			result = cr07Mapper.delete_cr07(paramMap);
+    	} else {
+    		result = cr07Mapper.delete_cr07_Dtl(paramMap);
+			result = cr07Mapper.update_cr07_delete(paramMap);
+    	}
 		
 		//int result = cr07Mapper.delete_cr07(paramMap);
 		
