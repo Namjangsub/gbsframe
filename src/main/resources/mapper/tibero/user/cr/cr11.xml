@@ -7,12 +7,13 @@
    		SELECT COUNT(*)
    		FROM	(
 				SELECT  
-						  A.FILE_TRGT_KEY	
+						  A.FILE_TRGT_KEY							
 						, A.CO_CD                     --회사코드
 						, R.CODE_NM AS CO_NM          --회사이름
 						, A.ORDRS_CLNT_CD             --고객사코드
 						, BM.CLNT_NM AS CLNT_NM       --고객사명
-						, A.ORDRS_NO                  --수주번호		
+						, A.ORDRS_NO                  --수주번호	
+						, CRD.ORDRS_SEQ               --수주순번	
 						, TO_CHAR(A.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT  --수주일자
 						, A.ORDRS_DIV	              --수주구분
 						, A.CLNT_PJT	              --고객사PJT
@@ -38,15 +39,22 @@
 						, CRD.EST_EPCT_MAT_PRC        --견적예상재료비
 						
 						, CRD.TRGT_PCHS_PCOST_MACH          --기계PART(목표)
-						, CRD.TRGT_PCHS_PCOST_ELCTY         --전기PART(목표)			
+						, CRD.TRGT_PCHS_PCOST_ELCTY         --전기PART(목표)				
+						, CRD.TRGT_PCHS_PCOST_MACH +  CRD.TRGT_PCHS_PCOST_ELCTY AS TRGT_PCHS_SUM  --목표 합계
+						, CONCAT(ROUND(NVL(((CRD.TRGT_PCHS_PCOST_MACH + CRD.TRGT_PCHS_PCOST_ELCTY) / 
+							DECODE(CRD.ORDRS_PRC, 0, NULL, CRD.ORDRS_PRC)* 100 ), 0),3), '%') AS RATE   --목표 비율
 						, CRD.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN --자체가공
+						, CRD.ORDRS_PRC + CRD.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN AS MACHINE_VALUE_AFTER_DEDUCTION --차감 후 기계값
 						
 						, CRD.LABOR_COST_MFG_COST          --노무비 및 제조경비
-						, CRD.ACT_RGL_MACH                          --실행원가 기계 정상
-						, CRD.ACT_OBS_MACH                          --실행원가 기계 장애
-						, CRD.ACT_RGL_ELCTY                         --실행원가 전기 정상
-						, CRD.ACT_OBS_ELCTY                         --실행원가 전기 장애
-						, ACT_EXP_COST                            --경비 및 관리비
+						, NVL(CRD.ACT_RGL_MACH, 0) AS ACT_RGL_MACH      --실행원가 기계 정상
+						, NVL(CRD.ACT_OBS_MACH, 0) AS ACT_OBS_MACH      --실행원가 기계 장애
+						, NVL(CRD.ACT_RGL_ELCTY, 0) AS ACT_RGL_ELCTY    --실행원가 전기 정상
+						, NVL(CRD.ACT_OBS_ELCTY, 0) AS ACT_OBS_ELCTY    --실행원가 전기 장애
+						, NVL(CRD.ACT_EXP_COST, 0) AS ACT_EXP_COST      --경비 및 관리비
+						, CASE WHEN (NVL(CRD.ACT_RGL_MACH,0)+
+						  NVL(CRD.ACT_OBS_MACH,0)+
+						  NVL(CRD.ACT_RGL_ELCTY,0)+NVL(CRD.ACT_OBS_ELCTY,0)+NVL(CRD.LABOR_COST_MFG_COST,0)) > 0 THEN 'Y' ELSE 'N' END AS AAA
 					FROM TB_CR02M01 AS A 
 						<!-- 수주상세 조인 -->
 						LEFT OUTER JOIN TB_CR02D02 AS CRD ON CRD.CO_CD = A.CO_CD 
@@ -104,7 +112,8 @@
 				, R.CODE_NM AS CO_NM          --회사이름
 				, A.ORDRS_CLNT_CD             --고객사코드
 				, BM.CLNT_NM AS CLNT_NM       --고객사명
-				, A.ORDRS_NO                  --수주번호		
+				, A.ORDRS_NO                  --수주번호	
+				, CRD.ORDRS_SEQ               --수주순번	
 				, TO_CHAR(A.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT  --수주일자
 				, A.ORDRS_DIV	              --수주구분
 				, A.CLNT_PJT	              --고객사PJT
@@ -130,15 +139,67 @@
 				, CRD.EST_EPCT_MAT_PRC        --견적예상재료비
 				
 				, CRD.TRGT_PCHS_PCOST_MACH          --기계PART(목표)
-				, CRD.TRGT_PCHS_PCOST_ELCTY         --전기PART(목표)			
+				, CRD.TRGT_PCHS_PCOST_ELCTY         --전기PART(목표)				
+				, CRD.TRGT_PCHS_PCOST_MACH +  CRD.TRGT_PCHS_PCOST_ELCTY AS TRGT_PCHS_SUM  --목표 합계
+				, CONCAT(ROUND(NVL(((CRD.TRGT_PCHS_PCOST_MACH + CRD.TRGT_PCHS_PCOST_ELCTY) / 
+					DECODE(CRD.ORDRS_PRC, 0, NULL, CRD.ORDRS_PRC)* 100 ), 0),3), '%') AS RATE   --목표 비율
 				, CRD.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN --자체가공
+				, CRD.ORDRS_PRC + CRD.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN AS MACHINE_VALUE_AFTER_DEDUCTION --차감 후 기계값
+				
+				
+				<!--실집행 기계 -->
+				, CRD.ACT_RGL_MACH
+				, CRD.ACT_OBS_MACH
+				, CRD.ACT_RGL_MACH + CRD.ACT_OBS_MACH AS SUM_MACH--합계
+				, CONCAT(ROUND(NVL(((CRD.ACT_RGL_MACH + CRD.ACT_OBS_MACH) / 
+					DECODE(CRD.ORDRS_PRC, 0, NULL, CRD.ORDRS_PRC)* 100 ), 0),3), '%') AS RATE_MACH   --목표 비율
+				
+				<!--실집행 전기-->
+				, CRD.ACT_RGL_ELCTY
+				, CRD.ACT_OBS_ELCTY
+				, CRD.ACT_RGL_ELCTY + CRD.ACT_OBS_ELCTY AS SUM_ELCTY--합계
+				, CONCAT(ROUND(NVL(((CRD.ACT_RGL_ELCTY + CRD.ACT_OBS_ELCTY) / 
+					DECODE(CRD.ORDRS_PRC, 0, NULL, CRD.ORDRS_PRC)* 100 ), 0),3), '%') AS RATE_ELCTY   --목표 비율
+					
+				<!--실집행 구매외주-->
+				, (CRD.ACT_RGL_MACH + CRD.ACT_OBS_MACH)+(CRD.ACT_RGL_ELCTY + CRD.ACT_OBS_ELCTY) AS SUM_MACH_ELCTY  --TOTAL
+				, CONCAT(ROUND(NVL((((CRD.ACT_RGL_MACH + CRD.ACT_OBS_MACH)+(CRD.ACT_RGL_ELCTY + CRD.ACT_OBS_ELCTY)) / 
+					DECODE(CRD.ORDRS_PRC, 0, NULL, CRD.ORDRS_PRC)* 100 ), 0),3), '%') AS RATE_MACH_ELCTY --비율
+				
+				
+				<!--실집행 달성율-->
+				, CONCAT(ROUND(NVL(((CRD.TRGT_PCHS_PCOST_MACH +  CRD.TRGT_PCHS_PCOST_ELCTY) / 
+					DECODE(((CRD.ACT_RGL_MACH + CRD.ACT_OBS_MACH)+(CRD.ACT_RGL_ELCTY + CRD.ACT_OBS_ELCTY)), 0, NULL, ((CRD.ACT_RGL_MACH + CRD.ACT_OBS_MACH)+(CRD.ACT_RGL_ELCTY + CRD.ACT_OBS_ELCTY)))* 100 ), 0),3), '%') ACHIV--실집행 달성율
+				
+				<!--노무비 및 제조경비-->
+				, CRD.LABOR_COST_MFG_COST --금액
+				, CONCAT(ROUND(NVL((CRD.LABOR_COST_MFG_COST / 
+					DECODE(CRD.ORDRS_PRC, 0, NULL, CRD.ORDRS_PRC)* 100 ), 0),3), '%') AS LABOR_RATE_MFG_RATE   --비율			
+				
+				<!--판관비-->
+				, CRD.ACT_EXP_COST--경비 및 관리비
+				, CONCAT(ROUND(NVL((CRD.ACT_EXP_COST / 
+					DECODE(CRD.ORDRS_PRC, 0, NULL, CRD.ORDRS_PRC)* 100 ), 0),3), '%') AS RATE_EXP--비율
+				
+				<!--원가총합계-->
+				, ((CRD.ACT_RGL_MACH + CRD.ACT_OBS_MACH)+(CRD.ACT_RGL_ELCTY + CRD.ACT_OBS_ELCTY)) + CRD.LABOR_COST_MFG_COST AS SUM_PCOST  --TOTAL
+				, CONCAT(ROUND(NVL(((((CRD.ACT_RGL_MACH + CRD.ACT_OBS_MACH)+(CRD.ACT_RGL_ELCTY + CRD.ACT_OBS_ELCTY)) + CRD.LABOR_COST_MFG_COST) / 
+					DECODE(CRD.ORDRS_PRC, 0, NULL, CRD.ORDRS_PRC)* 100 ), 0),3), '%') AS RATE_SUM_PCOST--비율
+				
+				<!--영업이익-->
+				, CRD.ORDRS_PRC - 
+					(((CRD.ACT_RGL_MACH + CRD.ACT_OBS_MACH)+(CRD.ACT_RGL_ELCTY + CRD.ACT_OBS_ELCTY)) + CRD.LABOR_COST_MFG_COST) -
+						 CRD.ACT_EXP_COST AS BSN_PROFIT --영업이익
+						 
+				, CONCAT(ROUND(NVL(((CRD.ORDRS_PRC - (((CRD.ACT_RGL_MACH + CRD.ACT_OBS_MACH)+(CRD.ACT_RGL_ELCTY + CRD.ACT_OBS_ELCTY)) + CRD.LABOR_COST_MFG_COST) - CRD.ACT_EXP_COST) / 
+					DECODE(CRD.ORDRS_PRC, 0, NULL, CRD.ORDRS_PRC)* 100 ), 0),3), '%') AS RATE_BSN_PROFIT--비율				
 				
 				, CRD.LABOR_COST_MFG_COST          --노무비 및 제조경비
-				, CRD.ACT_RGL_MACH                          --실행원가 기계 정상
-				, CRD.ACT_OBS_MACH                          --실행원가 기계 장애
-				, CRD.ACT_RGL_ELCTY                         --실행원가 전기 정상
-				, CRD.ACT_OBS_ELCTY                         --실행원가 전기 장애
-				, ACT_EXP_COST                            --경비 및 관리비
+				, NVL(CRD.ACT_RGL_MACH, 0) AS ACT_RGL_MACH      --실행원가 기계 정상
+				, NVL(CRD.ACT_OBS_MACH, 0) AS ACT_OBS_MACH      --실행원가 기계 장애
+				, NVL(CRD.ACT_RGL_ELCTY, 0) AS ACT_RGL_ELCTY    --실행원가 전기 정상
+				, NVL(CRD.ACT_OBS_ELCTY, 0) AS ACT_OBS_ELCTY    --실행원가 전기 장애
+				, NVL(CRD.ACT_EXP_COST, 0) AS ACT_EXP_COST      --경비 및 관리비
 				, CASE WHEN (NVL(CRD.ACT_RGL_MACH,0)+
 				  NVL(CRD.ACT_OBS_MACH,0)+
 				  NVL(CRD.ACT_RGL_ELCTY,0)+NVL(CRD.ACT_OBS_ELCTY,0)+NVL(CRD.LABOR_COST_MFG_COST,0)) > 0 THEN 'Y' ELSE 'N' END AS AAA
@@ -202,7 +263,8 @@
 			, R.CODE_NM AS CO_NM          --회사이름
 			, A.ORDRS_CLNT_CD             --고객사코드
 			, BM.CLNT_NM AS CLNT_NM       --고객사명
-			, A.ORDRS_NO                  --수주번호		
+			, A.ORDRS_NO                  --수주번호	
+			, CRD.ORDRS_SEQ               --수주순번	
 			, TO_CHAR(A.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT  --수주일자
 			, A.ORDRS_DIV	              --수주구분
 			, A.CLNT_PJT	              --고객사PJT
@@ -232,11 +294,11 @@
 			, CRD.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN --자체가공
 			
 			, CRD.LABOR_COST_MFG_COST          --노무비 및 제조경비
-			, CRD.ACT_RGL_MACH                          --실행원가 기계 정상
-			, CRD.ACT_OBS_MACH                          --실행원가 기계 장애
-			, CRD.ACT_RGL_ELCTY                         --실행원가 전기 정상
-			, CRD.ACT_OBS_ELCTY                         --실행원가 전기 장애
-			, ACT_EXP_COST                            --경비 및 관리비
+			, NVL(CRD.ACT_RGL_MACH, 0) AS ACT_RGL_MACH      --실행원가 기계 정상
+			, NVL(CRD.ACT_OBS_MACH, 0) AS ACT_OBS_MACH      --실행원가 기계 장애
+			, NVL(CRD.ACT_RGL_ELCTY, 0) AS ACT_RGL_ELCTY    --실행원가 전기 정상
+			, NVL(CRD.ACT_OBS_ELCTY, 0) AS ACT_OBS_ELCTY    --실행원가 전기 장애
+			, NVL(CRD.ACT_EXP_COST, 0) AS ACT_EXP_COST      --경비 및 관리비
 			, CASE WHEN (NVL(CRD.ACT_RGL_MACH,0)+
 				  NVL(CRD.ACT_OBS_MACH,0)+
 				  NVL(CRD.ACT_RGL_ELCTY,0)+NVL(CRD.ACT_OBS_ELCTY,0)+NVL(CRD.LABOR_COST_MFG_COST,0)) > 0 THEN 'Y' ELSE 'N' END AS AAA
@@ -289,16 +351,69 @@
 						, A.ORDRS_PRC                             --수주가
 						, A.ORDRS_QTY                             --수주가 수량
 						, A.EST_EPCT_MAT_PRC                      --견적예상재료비
+						
+						, A.ORDRS_PRC + A.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN AS MACHINE_VALUE_AFTER_DEDUCTION --차감 후 기계값
+						
 						, A.TRGT_PCHS_PCOST_MACH                  --목표 기계
 						, A.TRGT_PCHS_PCOST_ELCTY                 --목표 전기
-						, A.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN        --목표 기계자체가공 
+						, A.TRGT_PCHS_PCOST_MACH +  A.TRGT_PCHS_PCOST_ELCTY AS TRGT_PCHS_SUM  --목표 합계
+						, CONCAT(ROUND(NVL(((A.TRGT_PCHS_PCOST_MACH + A.TRGT_PCHS_PCOST_ELCTY) / 
+							DECODE(A.ORDRS_PRC, 0, NULL, A.ORDRS_PRC)* 100 ), 0),3), '%') AS RATE   --목표 비율
+						, A.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN        --목표 자체가공 
+						
 						, A.LABOR_COST_MFG_COST                   --노무비 및 제조경비
 						, A.DTL_RMK                               --상세비고
-						, A.ACT_RGL_MACH                          --실행원가 기계 정상
-						, A.ACT_OBS_MACH                          --실행원가 기계 장애
-						, A.ACT_RGL_ELCTY                         --실행원가 전기 정상
-						, A.ACT_OBS_ELCTY                         --실행원가 전기 장애
-						, ACT_EXP_COST                            --경비 및 관리비
+						, NVL(A.ACT_RGL_MACH, 0) AS ACT_RGL_MACH      --실행원가 기계 정상
+						, NVL(A.ACT_OBS_MACH, 0) AS ACT_OBS_MACH      --실행원가 기계 장애
+						, NVL(A.ACT_RGL_ELCTY, 0) AS ACT_RGL_ELCTY    --실행원가 전기 정상
+						, NVL(A.ACT_OBS_ELCTY, 0) AS ACT_OBS_ELCTY    --실행원가 전기 장애
+						 
+						<!--실집행 기계 합계 비율-->
+						, A.ACT_RGL_MACH + A.ACT_OBS_MACH AS SUM_MACH--합계
+						, CONCAT(ROUND(NVL(((A.ACT_RGL_MACH + A.ACT_OBS_MACH) / 
+							DECODE(A.ORDRS_PRC, 0, NULL, A.ORDRS_PRC)* 100 ), 0),3), '%') AS RATE_MACH   --목표 비율
+
+						<!--실집행 전기 합계 비율-->
+						, A.ACT_RGL_ELCTY + A.ACT_OBS_ELCTY AS SUM_ELCTY--합계
+						, CONCAT(ROUND(NVL(((A.ACT_RGL_ELCTY + A.ACT_OBS_ELCTY) / 
+							DECODE(A.ORDRS_PRC, 0, NULL, A.ORDRS_PRC)* 100 ), 0),3), '%') AS RATE_ELCTY   --목표 비율 
+
+						<!--실집행 구매외주-->
+						, (A.ACT_RGL_MACH + A.ACT_OBS_MACH)+(A.ACT_RGL_ELCTY + A.ACT_OBS_ELCTY) AS SUM_MACH_ELCTY  --TOTAL
+						, CONCAT(ROUND(NVL((((A.ACT_RGL_MACH + A.ACT_OBS_MACH)+(A.ACT_RGL_ELCTY + A.ACT_OBS_ELCTY)) / 
+							DECODE(A.ORDRS_PRC, 0, NULL, A.ORDRS_PRC)* 100 ), 0),3), '%') AS RATE_MACH_ELCTY --비율
+				
+				
+						<!--실집행 달성율-->
+						, CONCAT(ROUND(NVL(((A.TRGT_PCHS_PCOST_MACH +  A.TRGT_PCHS_PCOST_ELCTY) / 
+							DECODE(((A.ACT_RGL_MACH + A.ACT_OBS_MACH)+(A.ACT_RGL_ELCTY + A.ACT_OBS_ELCTY)), 0, NULL, ((A.ACT_RGL_MACH + A.ACT_OBS_MACH)+(A.ACT_RGL_ELCTY + A.ACT_OBS_ELCTY)))* 100 ), 0),3), '%') ACHIV--실집행 달성율
+						
+						<!--노무비 및 제조경비-->
+						, A.LABOR_COST_MFG_COST --금액
+						, CONCAT(ROUND(NVL((A.LABOR_COST_MFG_COST / 
+							DECODE(A.ORDRS_PRC, 0, NULL, A.ORDRS_PRC)* 100 ), 0),3), '%') AS LABOR_RATE_MFG_RATE   --비율
+
+						<!--판관비-->
+						, A.ACT_EXP_COST--경비 및 관리비
+						, CONCAT(ROUND(NVL((A.ACT_EXP_COST / 
+							DECODE(A.ORDRS_PRC, 0, NULL, A.ORDRS_PRC)* 100 ), 0),3), '%') AS RATE_EXP--비율
+						
+						<!--원가총합계-->
+						, ((A.ACT_RGL_MACH + A.ACT_OBS_MACH)+(A.ACT_RGL_ELCTY + A.ACT_OBS_ELCTY)) + A.LABOR_COST_MFG_COST AS SUM_PCOST  --TOTAL
+						, CONCAT(ROUND(NVL(((((A.ACT_RGL_MACH + A.ACT_OBS_MACH)+(A.ACT_RGL_ELCTY + A.ACT_OBS_ELCTY)) + A.LABOR_COST_MFG_COST) / 
+							DECODE(A.ORDRS_PRC, 0, NULL, A.ORDRS_PRC)* 100 ), 0),3), '%') AS RATE_SUM_PCOST--비율
+						
+						<!--영업이익-->
+						, A.ORDRS_PRC - 
+							(((A.ACT_RGL_MACH + A.ACT_OBS_MACH)+(A.ACT_RGL_ELCTY + A.ACT_OBS_ELCTY)) + A.LABOR_COST_MFG_COST) -
+								A.ACT_EXP_COST AS BSN_PROFIT --영업이익
+								
+						, CONCAT(ROUND(NVL(((A.ORDRS_PRC - (((A.ACT_RGL_MACH + A.ACT_OBS_MACH)+(A.ACT_RGL_ELCTY + A.ACT_OBS_ELCTY)) + A.LABOR_COST_MFG_COST) - A.ACT_EXP_COST) / 
+							DECODE(A.ORDRS_PRC, 0, NULL, A.ORDRS_PRC)* 100 ), 0),3), '%') AS RATE_BSN_PROFIT--비율
+
+
+
+						, NVL(A.ACT_EXP_COST, 0) AS ACT_EXP_COST      --경비 및 관리비
 					FROM TB_CR02D02 AS A
 						<!-- 회사이름 조인 -->
 						LEFT OUTER JOIN TB_CM05M01 AS R ON R.CODE_ID = A.CO_CD	
@@ -317,6 +432,12 @@
 					</if>
 					<if test="salesCd != null and !salesCd.equals('')">
 		 				AND    A.SALES_CD = #{salesCd} 
+		 			</if>
+		 			<if test="ordrsNo != null and !ordrsNo.equals('')">
+		 				AND    A.ORDRS_NO = #{ordrsNo} 
+		 			</if>
+		 			<if test="ordrsSeq != null and !ordrsSeq.equals('')">
+		 				AND    A.ORDRS_SEQ = #{ordrsSeq} 
 		 			</if>
    </select>  
 
