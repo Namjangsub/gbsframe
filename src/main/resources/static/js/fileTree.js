@@ -383,9 +383,9 @@
 		      <div class="contents" style="margin: 0; padding: 0; width: 100%; min-width: 200px">
 		        <h3 class="location">
 		          <a class="file_tag" id="file_tag" style="font-weight: bold; color: blue; padding-left: 20px; padding-right: 10px;"></a>
-		          <span class="page_tit" id="file_tit" style="text-align: right;"> 문서현황</span>
+		          <span class="page_tit" id="file_tit" style="text-align: right;"> 문서현황 </span>
 		        </h3>
-		        <button type="button" id="button_file" style="height: 25px; line-height: 15px;" onclick="file.click();" authchk> 첨부파일</button>
+		        <button type="button" id="button_file" style="height: 20px; line-height: 10px;" onclick="file.click();" authchk> 첨부파일</button>
 		        <div class="add_btn_small pdl10">
 					<a onclick="treeModule.button_zoomUp('+');" style="height: 25px;"><i class="glyphicon glyphicon-zoom-in"></i>+</a>
 					<a onclick="treeModule.button_zoomUp('-');" style="height: 25px;"><i class="glyphicon glyphicon-zoom-out"></i>-</a>
