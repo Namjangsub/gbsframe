@@ -1400,49 +1400,55 @@ function getSearchParam(_form, _pageNo, _recordCnt){
 //exportJSONToExcel(json Data, 헤더 정의 자료, 엑셀문서이름);
 //
 //	function jsonToExcel (grid) {
-// 		let targetJson = grid.target.getList();
-// 		let targetHeader = grid.target.columns;
+// 		const targetJson = grid.target.getList();
+// 		const targetHeader = grid.target.columns;
 // 		exportJSONToExcel(targetJson, targetHeader, '프로젝트이슈');
 // 	}
 //---------------------------------------------------------------------------------
-function exportJSONToExcel (_grid, _excelFileName = 'excel') {
-	if (!_grid) {
+function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'excel', _hiddenField = false) {
+	if (!_excelJsonData) {
 		alert('엑셀로 변환할 자료가 없습니다.')
 		return false;
 	}
-	let _excelJsonData = _grid.target.getList();
-	let _excelHeader = _grid.target.columns;
+//	let _excelJsonData = _grid.target.getList();
+//	let _excelHeader = _grid.target.columns;
 	// 엑셀 워크북 생성
 	let workbook = new ExcelJS.Workbook();
 	let worksheet = workbook.addWorksheet(_excelFileName+"Sheet1");
 
 	// 헤더 스타일 설정
-	let headerFill = {
+	const headerFill = {
 		type: "pattern",
 		pattern: "solid",
 		fgColor: { argb: "C0C0C0" } // 그레이 색상
 	};
 
-	let headerFont = {
+	const headerFont = {
+		name: '나눔고딕',
+		size: 10,
+		bold: true,
 		color: { argb: "000000" } // 검은색 글자
 	};
 
-	let headerBorder = {
+	const headerBorder = {
 		top: { style: "thin" },
 		bottom: { style: "thin" },
 		left: { style: "thin" },
 		right: { style: "thin" }
 	};
-	let headerAlignment = {
+	const headerAlignment = {
 		horizontal: "center" // 가운데 정렬
 	};
-
+	const dataFont = {
+		name: '나눔고딕',
+		size: 10
+	};
 	// 헤더 셀 생성
 	let outFieldArr = [];
 	let outCellNo = 0;
 	let lastRow = 0;
 	$.each(_excelHeader, function(i, header) {
-		if (!_excelHeader[i].hidden) {
+		if (!_excelHeader[i].hidden || _hiddenField) {
 		    outCellNo += 1;
 		    outFieldArr.push(_excelHeader[i].key);
 		    let cell = worksheet.getCell(1, outCellNo);
@@ -1451,8 +1457,9 @@ function exportJSONToExcel (_grid, _excelFileName = 'excel') {
 		    cell.font = headerFont;
 		    cell.border = headerBorder;
 		    cell.alignment = headerAlignment;
-		    let cellWidth = typeof _excelHeader[i].width === 'number' ? _excelHeader[i].width / 8 : 10;
-		    worksheet.getColumn(outCellNo).width = cellWidth;
+		    //셀폭은 기본 그리드 헤드 넓이를 기준으로 70% 크기로 셀폭을 조정하고 이후 각 컬럼 자료를 전환하면서 문자길이에 따라 조정합니다. 
+		    let cellWidth = typeof _excelHeader[i].width === 'number' ? _excelHeader[i].width / 7 : 10;
+		    worksheet.getColumn(outCellNo).width =  Math.min(cellWidth, 10);
 		}
 	});
 
@@ -1465,11 +1472,20 @@ function exportJSONToExcel (_grid, _excelFileName = 'excel') {
 			let cell = worksheet.getCell(row + 2, col + 1);
 			let number = data[cellKey];
 			let lcCellKey = cellKey.toLowerCase();
-			if (lcCellKey.indexOf('qty') !== -1 || lcCellKey.indexOf('amt') !== -1 || lcCellKey.indexOf('seq') !== -1 || lcCellKey.indexOf('upr') !== -1
-				|| lcCellKey.indexOf('rate') !== -1 || lcCellKey.indexOf('cost') !== -1 || lcCellKey.indexOf('size') !== -1 || lcCellKey.indexOf('pct') !== -1) {
-				if (/^\d+$/.test(data[cellKey])) {
-					number = parseFloat(data[cellKey]);
-				}
+			//숫자 필드는 숫자형 자료로 전환합니다.
+			if (
+				lcCellKey.indexOf('qty') !== -1 ||
+				lcCellKey.indexOf('amt') !== -1 ||
+				lcCellKey.indexOf('seq') !== -1 ||
+				lcCellKey.indexOf('upr') !== -1 ||
+				lcCellKey.indexOf('rate') !== -1 ||
+				lcCellKey.indexOf('cost') !== -1 ||
+				lcCellKey.indexOf('size') !== -1 ||
+				lcCellKey.indexOf('pct') !== -1
+			) {
+					if (/^\d+$/.test(data[cellKey])) {
+						number = parseFloat(data[cellKey]);
+					}
 
 			}
 
@@ -1478,17 +1494,14 @@ function exportJSONToExcel (_grid, _excelFileName = 'excel') {
 				cell.numFmt = '#,##0'; // 숫자 형식 지정
 				cell.alignment = { horizontal: 'right' }; // 오른쪽 정렬
 			}
+
+		    cell.font = dataFont;
 			cell.border = headerBorder;
-
+			//셀폭은 기본 그리드 헤드 넓이를 기준으로 70% 크기의 셀폭을 최소 길이로 하고 컬럼 문자길이에 따라 조정합니다.
+			var cellValue = number !== undefined ? number.toString() : '';
+			const curWidth = worksheet.getColumn(col + 1).width;
+			worksheet.getColumn(col + 1).width = Math.max(curWidth, cellValue.toString().length * 1.0);
 		});
-
-		for (let col = 0; col < data.length; col++) {
-			if (outFieldArr.includes(col + 1)) { // outFieldArr 배열에 col 값이 있는지 확인
-				let cell = worksheet.getCell(row + 2, col + 1);
-				cell.value = data[col];
-				cell.border = headerBorder;
-			}
-		}
 
 		lastRow = row + 2;
 	}
