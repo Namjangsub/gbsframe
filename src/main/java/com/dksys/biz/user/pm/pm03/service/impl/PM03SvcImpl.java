@@ -80,7 +80,7 @@ public class PM03SvcImpl implements PM03Svc {
 		String outNo = String.valueOf(pm03Mapper.selectOutNoNext(paramMap));
 		paramMap.put("outNo", outNo);
 		int result = pm03Mapper.insertDeliveryMast(paramMap);
-		pm03Mapper.deleteLgistSalesCdAll(paramMap);
+		//pm03Mapper.deleteLgistSalesCdAll(paramMap);
 
 	    List<Map<String, String>> salesCdList = gsonDtl.fromJson(paramMap.get("salesCdArr"), dtlMap);
 	    for (Map<String, String> dtl : salesCdList) {
@@ -148,14 +148,14 @@ public class PM03SvcImpl implements PM03Svc {
 	//---------------------------------------------------------------
 
 	int result = pm03Mapper.updateDeliveryMast(paramMap);
-		pm03Mapper.deleteLgistSalesCdAll(paramMap);
+		//pm03Mapper.deleteLgistSalesCdAll(paramMap);
 
 
     List<Map<String, String>> salesCdList = gsonDtl.fromJson(paramMap.get("salesCdArr"), dtlMap);
     for (Map<String, String> dtl : salesCdList) {
     	dtl.put("userId", paramMap.get("userId"));
     	dtl.put("pgmId", paramMap.get("pgmId"));
-    	pm03Mapper.insertLgistSalesCd(dtl);
+    	pm03Mapper.updateLgistSalesCd(dtl);
     	//String dtaChk = dtl.get("dtaChk").toString();
     	/* "dtaChk" 값을 확인하여
     	 * "I"인 경우 pm03Mapper.insertLgistSalesCd(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
