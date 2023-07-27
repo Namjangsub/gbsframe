@@ -26,6 +26,8 @@ public interface CR10Mapper {
 
   String selectFileTrgtKeyNext(Map<String, String> paramMap);
 
+  int selectTodoAppCount(Map<String, String> paramMap);
+
   int insertLgistMast(Map<String, String> paramMap);
 
   int updateLgistMast(Map<String, String> paramMap);

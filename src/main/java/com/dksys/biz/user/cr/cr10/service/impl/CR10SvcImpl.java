@@ -220,8 +220,8 @@ public class CR10SvcImpl implements CR10Svc {
     //---------------------------------------------------------------
     //결재 처리 시작 -수정시에도 처리 한 내역이 없다면 결재 처리한다.
     //---------------------------------------------------------------
-    String ckTodoDiv2CodeId = paramMap.get("todoDiv2CodeId");
-    if(ckTodoDiv2CodeId != null && "".equals(ckTodoDiv2CodeId)) {
+    int todoAppCount = cr10Mapper.selectTodoAppCount(paramMap);
+    if(todoAppCount == 0) {
 	    List<Map<String, String>> reqList = cr10Mapper.selectTodoAppReqList(paramMap);
 	    List<Map<String, String>> toDoAppList = gsonDtl.fromJson(reqList.toString(), dtlMap);
 	    DecimalFormat df = new DecimalFormat("00000");
