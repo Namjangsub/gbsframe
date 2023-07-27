@@ -1,0 +1,227 @@
+<div class="container-fluid">
+	<div class="row">
+        <div class="popup_area">
+	 		<input type="file" id="clntFile" style="display:none" multiple="multiple" onchange="setClntFile(this);"/>
+	 		<form id="mailForm">
+			<table class="popup_table">
+				<colgroup>
+					<col style="width: 20%;">
+					<col style="width: 80%;">
+				</colgroup>
+				<tbody>
+					<tr>
+						<th>보내는 사람</th>
+						<td>
+							<input type="text" class="form-control input-sm" id="mailFrom" name="mailFrom" msg="보내는 사람" readonly>
+						</td>
+					</tr>
+					<tr>
+						<th class="hit">받는 사람</th>
+						<td>
+							<input type="text" class="form-control input-sm" id="mailTo" name="mailTo" msg="받는사람" required>
+						</td>
+					</tr>
+					<tr>
+						<th>참조 메일 주소</th>
+						<td>
+							<input type="text" class="form-control input-sm" id="mailCc" name="mailCc">
+						</td>
+					</tr>
+					<tr>
+						<th class="hit">제목</th>
+						<td>
+							<input type="text" class="form-control input-sm" id="mailTitle" name="mailTitle" msg="제목" required>
+						</td>
+					</tr>
+					<tr>
+						<th class="hit">내용</th>
+						<td>
+							<textarea rows="6" class="form-control input-sm" id="mailCnts" name="mailCnts" msg="내용" required></textarea>
+						</td>
+					</tr>
+					<tr>
+						<th>
+							<button type="button" id="buttonFile" class="btn btn-primary btn-sm" style="height: 25px; line-height: 15px;" onclick="clntFile.click();">첨부파일</button>
+						</th>
+						<td>
+							<div data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 150px; width: 100%"></div>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+			<input type="hidden" id="userId" name="userId">
+			<input type="hidden" id="pgmId" name="pgmId" value="maiSend">
+			<input type="hidden" id="coCd" name="coCd">
+			</form>
+		</div>
+		<div class="bottom_btn">
+			<button type="button" class="btn btn-default btn-sm" id="actionBtn"></button>
+			<button type="button" class="btn btn-default btn-sm" id="actionBtn2"></button>
+			<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫기</button>
+		</div>
+	</div>
+</div>
+<script type="text/javascript">
+debugger;
+	//등록시 직급코드 중복체크 여부
+	var clntFileArr = [];
+	var deleteFileArr = [];
+	var fileGridView = {
+		initView: function(){
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				target: $('[data-ax5grid="file-grid"]'),
+				showLineNumber: true,
+				showRowSelector: false,
+	        	multipleSelect: false,
+				header: {selector: false},
+				body: {
+		        	onClick: function () {
+		                this.self.select(this.dindex);
+		            },
+		            onDBLClick: function () {
+		            	downloadFile(this.dindex);
+		            },
+		        	},
+				columns: [
+						{key: "fileName", label: "파일명", width: 240, align: "left"},
+						{key: "fileType", label: "파일타입", width: 80, align: "center"},
+						{key: "fileSize", label: "파일크기", width: 80,  align: "right", formatter: "money"},
+						{key: "fileDelBtn", label: "삭제", width: 35,
+							formatter:function() {return '<a type="button" onclick="deleteFile('+this.dindex+')">삭제</a>'}
+						},
+				]
+			});
+		},
+		setData: function(){
+			var targetObj = this.target;
+			targetObj.setData({
+				list: clntFileArr,
+				page : {
+					totalElements : clntFileArr.length
+				}
+			});
+		}
+	}
+	
+	$(document).ready(function() {
+		fileGridView.initView();
+		
+		$('#actionBtn').text("메일발송");
+		$('#actionBtn').on("click", function(){executeMail();});
+		$('#actionBtn2').text("심플메일발송");
+		$('#actionBtn2').on("click", function(){executeSmpleMail();});
+		$('#mailForm #mailFrom').val(jwt.email);
+		$('#mailForm #userId').val(jwt.userId);
+		$('#mailForm #coCd').val(jwt.coCd);
+	});
+	
+
+	function executeMail () {
+		if(!inputValidation($('input[required]'))) {
+			return false;
+		}
+		var formData = new FormData($("#mailForm")[0]);
+		
+		// 첨부파일 추가
+		$.each(clntFileArr, function(idx, obj){
+			// 신규파일만 추가
+			if(obj.fileKey == 0){
+				formData.append("files", obj.file);
+			}
+		});
+		//추가 내용 파라메터에 추가
+// 		formData.append("coCd" 			, jwt.coCd);
+// 		formData.append("userId"		, jwt.userId);
+		formData.append("mailFrom"		, jwt.email);
+// 		const toArr = $("#mailTo").val().split(',');
+		const toArr = $("#mailTo").val();
+		formData.append("mailTo"		,  toArr);
+		formData.append("mailCc"		,  $("#mailCc").val().split(','));
+		formData.append("userNm"		, jwt.userNm);
+		formData.append("pgmId" 		, "textMail");
+		formData.append("sendType" 		, "textMail"); //고유한 프로그램명
+		formData.append("sendKey" 		, 0); //해당 프로그램에서 교유한 key 값
+		formData.append("mailAttach" 	, clntFileArr.map(fileObj => fileObj.fileName).join('\n'));
+
+		$("#mailForm input").each(function() {
+			  var name = $(this).attr("name");
+			  var value = $(this).val();
+			  console.log(name + ": " + value);
+			});		
+		
+		filePostAjax("/mail/sendJoinMail", formData ,function(data) {
+			alert(data.resultMessage);
+		});
+	}	
+	
+
+	function executeSmpleMail () {
+		if(!inputValidation($('input[required]'))) {
+			return false;
+		}
+		var formData = new FormData($("#mailForm")[0]);
+		
+		// 첨부파일 추가
+		$.each(clntFileArr, function(idx, obj){
+			// 신규파일만 추가
+			if(obj.fileKey == 0){
+				formData.append("files", obj.file);
+			}
+		});
+		//추가 내용 파라메터에 추가
+// 		formData.append("coCd" 			, jwt.coCd);
+// 		formData.append("userId"		, jwt.userId);
+		formData.append("mailFrom"		, jwt.email);
+// 		const toArr = $("#mailTo").val().split(',');
+		const toArr = $("#mailTo").val();
+		formData.append("mailTo"		,  toArr);
+		formData.append("mailCc"		,  $("#mailCc").val().split(','));
+		formData.append("userNm"		, jwt.userNm);
+		formData.append("pgmId" 		, "textMail");
+		formData.append("sendType" 		, "textMail"); //고유한 프로그램명
+		formData.append("sendKey" 		, 0); //해당 프로그램에서 교유한 key 값
+		formData.append("mailAttach" 	, clntFileArr.map(fileObj => fileObj.fileName).join('\n'));
+
+		$("#mailForm input").each(function() {
+			  var name = $(this).attr("name");
+			  var value = $(this).val();
+			  console.log(name + ": " + value);
+			});		
+		
+		filePostAjax("/mail/sendMailSimple", formData ,function(data) {
+			alert(data.resultMessage);
+		});
+	}	
+	
+	// 파일 추가
+	function setClntFile(elem) {
+		var tempFiles = elem.files;
+		// 전역변수 배열에 선택된 파일 추가 
+		$.each(tempFiles, function(idx, obj){
+			var typeArr = obj.name.split(".");
+			clntFileArr.push({
+				'fileKey' : 0,
+		      	'fileName' : obj.name,
+		      	'fileType' : typeArr[typeArr.length-1],
+		      	'fileSize' : obj.size,
+		      	'file' : obj
+			});
+		});
+		
+// 		$("#fileList").val(clntFileArr.map(fileObj => fileObj.fileName).join('\n'));
+		fileGridView.setData();
+		$(elem).val("");
+	}
+	
+	function deleteFile(rowIndex) {
+		fileGridView.target.removeRow(rowIndex);
+		
+		if(clntFileArr[rowIndex].fileKey){
+		// 기 등록되어 있는 파일 삭제시
+			deleteFileArr.push(clntFileArr[rowIndex].fileKey);
+		}
+		
+		notiFileArr.splice(rowIndex, 1);
+	}	
+</script>

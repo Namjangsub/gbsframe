@@ -1,0 +1,69 @@
+package com.dksys.biz.user.mail;
+
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
+
+import com.dksys.biz.cmn.vo.PaginationInfo;
+import com.dksys.biz.user.mail.service.EmailSvc;
+import com.dksys.biz.util.MessageUtils;
+
+@Controller
+@RequestMapping("/mail")
+public class EmailCtr {
+
+
+	@Autowired
+	MessageUtils messageUtils;
+	
+    @Autowired
+	EmailSvc emailSvc;
+    
+    //메일 전송 처리 컨트롤러 
+    @PostMapping(value = "/sendMailSimple")
+    public String sendMailSimple(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+    	try {
+    		int count = emailSvc.sendMailSimple(paramMap, mRequest);
+    		model.addAttribute("resultCode", 200);
+    		model.addAttribute("resultMessage", messageUtils.getMessage("mailSendComplete"));
+    	}catch(Exception e){
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", messageUtils.getMessage("mailSendFail"));
+    	}
+    	return "jsonView";
+    }        
+	
+	//메일 전송 처리 컨트롤러 
+    @PostMapping(value = "/sendJoinMail")
+    public String sendJoinMail(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+    	  try {
+    		  int count = emailSvc.sendMailHtml(paramMap, mRequest);
+    		  model.addAttribute("resultCode", 200);
+    		  model.addAttribute("resultMessage", messageUtils.getMessage("mailSendComplete"));
+      	  }catch(Exception e){
+      		  String errorMessage = e.getMessage() != null ? e.getMessage() : "알수 없는 오류 확인 필요";
+      		  paramMap.put("errorYn", "Y");
+      		  paramMap.put("errorText", errorMessage);
+      		  try {
+      			  int count = emailSvc.updateMailError(paramMap);
+      			  model.addAttribute("resultCode", 500);
+      			  model.addAttribute("resultMessage", messageUtils.getMessage("mailSendFail"));
+      		  }catch(Exception ex){	  
+      			  model.addAttribute("resultCode", 900);
+      			  model.addAttribute("resultMessage", ex.getMessage());
+      		  }
+      	  }
+      	  return "jsonView";
+    }        
+}

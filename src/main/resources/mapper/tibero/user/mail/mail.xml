@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.mail.mapper.MailMapper">
+	
+	<select id="selectUserInfo"  resultType="CamelMap">
+		SELECT
+			ID,
+			EMP_NO, 
+			NAME, 
+			DEPT_ID,
+			(SELECT DEPT_NM FROM TB_CM04M01 WHERE DEPT_ID = U.DEPT_ID) DEPT_NM,
+			LEVEL_CD,
+			EMAIL, 
+			TEL_NO,
+			TO_CHAR(ENTER_DT, 'yyyy-MM-dd') ENTER_DT,
+			TO_CHAR(LEAVE_DT, 'yyyy-MM-dd') LEAVE_DT,
+			USE_YN,
+			MNG_CO_CD,
+			FN_CM05M01_CD_TO_NM(MNG_CO_CD) MNG_CO_CD_NM,
+			SALES_AREA,
+			FAX_NO,
+			OFF_TEL_NO,
+			FN_CM05M01_CD_TO_NM(#{coCd}) CO_CD_NM
+		FROM
+			TB_CM06M01 U
+		WHERE
+			ID = #{userId}
+	</select>
+	
+	<select id="selectMailCount" resultType="int">
+	SELECT 
+ 		COUNT(*) 
+	  FROM TB_CM10M01 T
+	 	<where>
+	 	<if test="coCd != null and coCd != ''">
+	 	AND CO_CD = #{coCd}
+	 	</if>
+	 	<if test="creatId != null and creatId != ''">
+	 	AND CREAT_ID = #{creatId}
+	 	</if>				 	
+	 	</where>
+	</select>
+	
+	<select id="selectMailList" resultType="CamelMap">
+	SELECT
+		*
+	FROM
+	(
+		SELECT
+			ROWNUM AS RNUM, A.*
+		FROM
+		(
+				SELECT 
+						MAIL_KEY,
+						MAIL_FROM,
+						MAIL_TO,
+						MAIL_CC,
+						MAIL_BCC,
+						MAIL_TITLE,
+						MAIL_CNTS,
+						MAIL_ATTACH,
+						SEND_DTTM,
+						ERROR_YN,
+						ERROR_TEXT,
+						CO_CD,
+						SEND_TYPE,
+						SEND_KEY,
+						CREAT_ID,
+						CREAT_PGM,
+						CREAT_DTTM,
+						UDT_ID,
+						UDT_PGM,
+						UDT_DTTM,
+						MAIL_CODE
+				FROM TB_CM10M01 T
+			 	<where>
+			 	<if test="coCd != null and coCd != ''">
+			 	AND CO_CD = #{coCd}
+			 	</if>
+			 	<if test="creatId != null and creatId != ''">
+			 	AND CREAT_ID = #{creatId}
+			 	</if>				 	
+			 	</where>
+			 ORDER BY CO_CD, CREAT_ID, SEND_DTTM, MAIL_FROM
+		) A			
+	)
+	WHERE
+			RNUM BETWEEN #{firstIndex} AND #{lastIndex}
+	</select>
+	
+	<insert id="insertMail" parameterType="Map">
+		<selectKey keyProperty="mailKey" resultType="String" order="BEFORE">
+			SELECT max(MAIL_KEY) + 1 FROM TB_CM10M01
+		</selectKey>	
+	INSERT INTO TB_CM10M01
+	(
+		MAIL_KEY,
+		MAIL_FROM,
+		MAIL_TO,
+		MAIL_CC,
+		MAIL_BCC,
+		MAIL_TITLE,
+		MAIL_CNTS,
+		MAIL_ATTACH,
+		SEND_DTTM,
+		ERROR_YN,
+		ERROR_TEXT,
+		CO_CD,
+		SEND_TYPE,
+		SEND_KEY,
+		CREAT_ID,
+		CREAT_PGM,
+		CREAT_DTTM,
+		MAIL_CODE
+	 ) VALUES (
+		#{mailKey},
+		#{mailFrom},
+		#{mailTo},
+		#{mailCc, jdbcType=VARCHAR},
+		#{mailBcc, jdbcType=VARCHAR},
+		#{mailTitle},
+		#{mailCnts, jdbcType=VARCHAR},
+		#{mailAttach, jdbcType=VARCHAR},
+		SYSDATE,
+		'N',
+		'',
+		#{coCd},
+		#{sendType, jdbcType=VARCHAR},
+		#{sendKey, jdbcType=VARCHAR},
+		#{userId},
+		#{pgmId},
+		SYSDATE,
+		#{mailCode}
+	 )
+	</insert>
+	
+	<update id="updateMailError" parameterType="Map">
+		UPDATE 
+			TB_CM10M01
+		SET 
+			ERROR_YN = #{errorYn},
+			ERROR_TEXT = #{errorText},	
+		    UDT_ID = #{userId},
+		    UDT_PGM = #{pgmId},
+		    UDT_DTTM = SYSDATE
+		WHERE 
+			AND MAIL_KEY = #{mailKey}
+	</update>
+	
+	<delete id="deleteMail" parameterType="Map">
+	DELETE FROM TB_CM10M01 
+	 WHERE MAIL_KEY = #{mailKey}
+	</delete>
+</mapper>
