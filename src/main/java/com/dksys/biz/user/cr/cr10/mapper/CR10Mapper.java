@@ -24,7 +24,7 @@ public interface CR10Mapper {
 
   List<Map<String, String>> selectLgistAppList(Map<String, String> paramMap);
 
-  String selectFileTrgtKeyNext(Map<String, String> paramMap);
+  String selectLgistNoNext(Map<String, String> paramMap);
 
   int selectTodoAppCount(Map<String, String> paramMap);
 
@@ -34,13 +34,13 @@ public interface CR10Mapper {
 
   int deleteLgistMast(Map<String, String> paramMap);
 
-  int deleteLgistSalesCdAll(Map<String, String> paramMap);
+  int deleteLgistDetailAll(Map<String, String> paramMap);
 
-  int deleteLgistSalesCd(Map<String, String> paramMap);
+  int deleteLgistDetail(Map<String, String> paramMap);
 
-  int updateLgistSalesCd(Map<String, String> paramMap);
+  int updateLgistDetail(Map<String, String> paramMap);
 
-  int insertLgistSalesCd(Map<String, String> paramMap);
+  int insertLgistDetail(Map<String, String> paramMap);
 
   int insertTodoAppList(Map<String, String> paramMap);
 

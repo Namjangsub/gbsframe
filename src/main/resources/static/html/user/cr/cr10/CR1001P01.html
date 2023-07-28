@@ -5,10 +5,10 @@
 
  <div class="form-group popup_table">
   <form id="popForm" onSubmit="return false;">
-		<input type="hidden" id="userId"     	name="userId">
-		<input type="hidden" id="pgmId"     	name="pgmId"	value="CR1001M01">
-		<input type="hidden" id="fileTrgtKey"  	name="fileTrgtKey">
-		<input type="hidden" id="ordrsClntCd"  	name="ordrsClntCd">
+		<input type="hidden" id="userId" name="userId">
+		<input type="hidden" id="pgmId" name="pgmId" value="CR1001M01">
+		<input type="hidden" id="fileTrgtKey" name="fileTrgtKey">
+		<input type="hidden" id="ordrsClntCd" name="ordrsClntCd">
 	  	<input type="hidden" id="todoDiv1CodeId" name="todoDiv1CodeId">
 	  	<input type="hidden" id="todoDiv2CodeId" name="todoDiv2CodeId">
  		<table>
@@ -30,9 +30,11 @@
 				<select id="coCd" name="coCd" data-kind="CO" required msg="회사" class="form-control" readonly="readonly" required>
 				</select>
 			</td>
-			<th class="hit">수주번호</th>
+			<th class="hit">수주번호/물류번호</th>
 			<td>
-				<input type="text" id="ordrsNo" name="ordrsNo" msg="수주번호" class="form-control" readonly="readonly" required>
+				<input style="float:left;width:30%;" type="text" id="ordrsNo" name="ordrsNo" msg="수주번호" class="form-control" readonly="readonly" required>
+				<span style="float:left;width:10%;margin-top:3px;">/</span>
+				<input style="float:left;width:58%;" type="text" id="lgistNo" name="lgistNo" msg="물류번호" class="form-control" readonly="readonly">
 			</td>
 			<th class="hit">고객사</th>
 			<td>
@@ -276,7 +278,8 @@
 	var fileTrgtKey = null;
 
 	var appStatus = "APP0";// 결재상태
-	let loadData = {};
+	var grid_all_check = false;
+	var grid_onDataChanged = true;
 	let appList = {};
 
 	var salescdGridView = {
@@ -298,6 +301,7 @@
 			            	  if(appStatus == "APP0"){
 	  			              	this.self.select(this.dindex);
 	  			              	//useYn: 현재물류의 선택유무  , oldUseYn: 데이타사용유무
+	  			              	grid_onDataChanged = false;
 	  			              	if(this.item.chkYn == "Y" || this.item.oldUseYn == "N") {
 		  			              	if(this.item.useYn == "N") {
 		  			              		salescdGridView.target.setValue(this.dindex, "useYn", "Y");
@@ -306,12 +310,25 @@
 		  			              		salescdGridView.target.setValue(this.dindex, "useYn", "N");
 		  			              	}
 	  			              	}
+	  			              	grid_onDataChanged = true;
 			            	  }
-	  			               //console.log("====>>",this.list);
 				          },
 				          onDBLClick: function () {
 				          },
 				          onDataChanged: function () {
+				        	  if(grid_onDataChanged == false) return;
+			            	  if(appStatus == "APP0"){
+				        	  	  grid_onDataChanged = false;
+			            		  if(this.item.chkYn == "Y" || this.item.oldUseYn == "N") {
+			  			              	if(this.item.useYn == "N") {
+			  			              		salescdGridView.target.setValue(this.dindex, "useYn", "Y");
+			  			              	}
+			  			              	else {
+			  			              		salescdGridView.target.setValue(this.dindex, "useYn", "N");
+			  			              	}
+			            		  }
+				        	  	  grid_onDataChanged = true;
+				              }
 				          },
 			        },
 			        columns : [
@@ -361,10 +378,58 @@
 							salescdGridView.target.select(select_idx);
 						}
 					});
+					var header_col0_check_box = $('[data-ax5grid-panel="aside-header"] [data-ax5grid-column-col="0"] .checkBox');
+					header_col0_check_box.on("click", function() {
+						gridAllCheck();
+					});
+					/*
+					$.each($('[data-ax5grid-panel-scroll="aside-body"] [data-ax5grid-column-col="0"] .checkBox'), function (idx, elem) {
+						$(elem).on("click", function() {
+							//alert('col0======>>'+idx);
+						});
+					});
+					*/
 	    	 	});
 			}
 		}
 
+	function gridAllCheck(){
+		grid_all_check = !grid_all_check;
+
+		if(appStatus != "APP0"){return;}
+
+		grid_onDataChanged = false;
+
+		if(grid_all_check) {
+			$.each($.extend({}, salescdGridView.target.list), function (idx, elem) {
+				if(elem.useYn == "N") {
+					salescdGridView.target.setValue(Number(idx), "useYn", "Y");
+				}
+			});
+		} else {
+			$.each($.extend({}, salescdGridView.target.list), function (idx, elem) {
+				if(elem.chkYn == "N" && elem.oldUseYn == "N") {
+					if(elem.useYn == "N") {
+						salescdGridView.target.setValue(Number(idx), "useYn", "Y");
+					}
+					else {
+						salescdGridView.target.setValue(Number(idx), "useYn", "N");
+					}
+				}
+			});
+
+			setTimeout(function(){
+				//console.log("=====setTimeout>>");
+				$.each($.extend({}, salescdGridView.target.list), function (idx, elem) {
+					if(elem.useYn == "Y") {
+						salescdGridView.target.select(Number(idx));
+					}
+				});
+			}, 100);
+		}
+
+		grid_onDataChanged = true;
+	}
 
 	$(document).ready(function() {
 		setCommonSelect($(".popup_area select[data-kind]"));
@@ -394,7 +459,7 @@
 			//initLoadForm("#popForm");
 			//initLoadForm(".popup_area");//input,select,textarea 기능활성화
 
-			loadData = {
+			let loadData = {
 					"fileTrgtKey" : modalStack.last().paramObj.fileTrgtKey,
 					"coCd" : modalStack.last().paramObj.coCd,
 					"ordrsNo" : modalStack.last().paramObj.ordrsNo,
@@ -666,9 +731,21 @@
 		//---------------------------------------------------------------
 		//--결재 처리를 위한 부분 시작
 		//---------------------------------------------------------------
+		let popData = getSearchParam("#popForm");
+		let paramData = {
+				"fileTrgtKey" : popData.fileTrgtKey,
+				"coCd" : popData.coCd,
+				"ordrsNo" : popData.ordrsNo,
+				"clntPjt" : popData.clntPjt,
+				"reqId" : popData.reqId,
+				"reqIdNm" : popData.reqIdNm,
+				"ordrsClntNm" : popData.ordrsClntNm,
+				"ordrsClntCd" : popData.ordrsClntCd,
+				"clasDiv" : popData.clasDiv,
+		};
 		formData.append("appDiv", "APPDIV03");
 		formData.append("pgPath", "/user/cr/cr10/CR1001P02.html");
-		formData.append("pgParam", JSON.stringify(loadData));
+		formData.append("pgParam", JSON.stringify(paramData));
 		//---------------------------------------------------------------
 		//--결재 처리를 위한 부분 끝
 		//---------------------------------------------------------------
@@ -676,10 +753,12 @@
 		return formData;
 	}
 
+	//그리드초기화
 	function initSalesCode(){
 		if(appStatus != "APP0"){
 			return;
 		}
+
 		salescdGridView.setData(0);
 	}
 
