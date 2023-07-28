@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.sm.sm14.mapper.SM14Mapper">
+
+	<!-- 입고관리 조회 리스트  조회조건 -->
+	<sql id="selectPurchaseListCondition">
+
+		<!-- 회사코드 -->         
+		<if test="coCd != null and !coCd.equals('')">
+			AND A.CO_CD = #{coCd}   
+		</if>
+		<!-- 확정일자 -->         
+		<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')">
+			<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
+            			AND A.ORDRG_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+			</if>   
+		</if>	
+		
+		<!-- 구매처 -->         
+		<if test="pchsClntCd != null and !pchsClntCd.equals('')">
+			AND A.PCHS_CLNT_CD = #{pchsClntCd}   
+		</if>
+
+		<if test="salesCd != null and !salesCd.equals('')">
+			AND A.SALES_CD = #{salesCd}   
+		</if>		
+		<!-- 확정여부 -->
+		<if test="cmpletYn != null and !cmpletYn.equals('')">
+			AND NVL(A.CMPLET_YN, 'N') = #{cmpletYn}   
+		</if>																
+	</sql>	
+		
+	<!-- 매입확정 리스트  카운트 -->
+	<select id="selectPurchaseListCount" parameterType="Map" resultType="int">
+		SELECT COUNT(A.CO_CD)	
+		  FROM
+		  (
+		  	/* 발주 완료되지 않은 건 + 완료된건 */
+			SELECT E.CO_CD
+				, NVL(D.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'0000') AS PCHS_NO	/*매입확정번호 */
+				, E.ORDRG_NO 
+				, E.ORDRG_SEQ 
+				, E.SALES_CD
+				, B.PCHS_CLNT_CD				/* 구매처cd */
+				,
+				(
+					SELECT D.CLNT_NM
+						FROM TB_BM02M01 D
+					WHERE B.PCHS_CLNT_CD=D.CLNT_CD
+				) AS PCHS_CLNT_NM		/* 구매처명 */		
+				, F.MATR_CD
+				, F.MATR_NM			/* 자재명 */
+				, E.ORDRG_AMT		/*발주 금액 */
+				, B.ORDRG_DT		/* 발주일자 */
+				, D.PCHS_DT
+				, D.CMPLET_YN
+				FROM TB_SM02D01 E		/* 매입 DETAIL */
+				INNER JOIN TB_SM02M01 B ON(E.CO_CD=B.CO_CD AND E.ORDRG_NO=B.ORDRG_NO AND E.SALES_CD=B.SALES_CD)
+				LEFT OUTER JOIN TB_SM12D01 D ON(D.ORDRG_NO=E.ORDRG_NO AND D.ORDRG_SEQ=E.ORDRG_SEQ)	/* 발주 DETAIL */ 
+				LEFT OUTER JOIN TB_SM01D01 F ON(E.CO_CD=F.CO_CD AND E.SALES_CD=F.SALES_CD AND E.UPPER_CD=F.UPPER_CD 
+				 								AND E.LOWER_CD=F.LOWER_CD AND E.MATR_SEQ=F.MATR_SEQ AND E.MATR_CD=F.MATR_CD)	/* 구매BOM 자재 */
+			WHERE 1=1  
+		  ) A		/* 발주+매입 내역 */
+		  WHERE 1=1
+		<include refid="selectPurchaseListCondition"></include>		
+	</select>
+	
+	<!-- 매입확정 리스트  -->
+	<select id="selectPurchaseList" parameterType="Map" resultType="camelMap">
+		/* No. 내림차순 */
+		SELECT *
+			FROM
+			(
+			SELECT X.*
+					, ROWNUM AS RN
+					FROM
+						(
+						SELECT A.CO_CD	
+							, A.PCHS_NO			/* 매입번호 */
+							, A.PCHS_SEQ		/* 매입순번 */
+							, MAX(A.PCHS_SEQ) OVER(PARTITION BY A.PCHS_NO, A.PCHS_SEQ)+1	AS MAX_PCHS_SEQ
+							, A.ORDRG_NO
+							, A.ORDRG_SEQ
+							, A.SALES_CD
+							, A.PCHS_CLNT_CD
+							, A.PCHS_CLNT_NM		/* 구매처명 */
+							, A.MATR_CD	
+							, A.MATR_NM		
+							, A.ORDRG_AMT	
+							, A.ORDRG_DT	
+							, A.PCHS_AMT
+							, TO_CHAR(A.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT
+							, A.CMPLET_YN
+							, A.USER_CHK_V
+						  FROM
+						  (
+						  	/* 발주 완료되지 않은 건 + 완료된건 */
+							SELECT E.CO_CD
+								, NVL(D.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00000') AS PCHS_NO	/*매입확정번호 */
+								, D.PCHS_SEQ
+								, M12.CMPLET_YN								
+								, E.ORDRG_NO 
+								, E.ORDRG_SEQ 
+								, E.SALES_CD
+								, B.PCHS_CLNT_CD				/* 구매처cd */
+								,
+								(
+									SELECT D.CLNT_NM
+										FROM TB_BM02M01 D
+									WHERE B.PCHS_CLNT_CD=D.CLNT_CD
+								) AS PCHS_CLNT_NM		/* 구매처명 */		
+								, F.MATR_CD
+								, F.MATR_NM			/* 자재명 */
+								, E.ORDRG_AMT		/*발주 금액 */
+								, B.ORDRG_DT		/* 발주일자 */
+								, D.PCHS_AMT		/* 매입금액 */
+								, D.PCHS_DT
+								/* , D.CMPLET_YN */
+								, NVL(DECODE(M12.CMPLET_YN, 'Y', 'Y', 'N'), 'N') AS USER_CHK_V			
+								FROM TB_SM02D01 E		/* 매입 DETAIL */
+								INNER JOIN TB_SM02M01 B ON(E.CO_CD=B.CO_CD AND E.ORDRG_NO=B.ORDRG_NO AND E.SALES_CD=B.SALES_CD)
+								LEFT OUTER JOIN TB_SM12D01 D ON(D.ORDRG_NO=E.ORDRG_NO AND D.ORDRG_SEQ=E.ORDRG_SEQ)	/* 발주 DETAIL */
+								LEFT OUTER JOIN TB_SM12M01 M12 ON(D.CO_CD=M12.CO_CD AND D.PCHS_NO=M12.PCHS_NO)		/* 발주 MASTER */
+								LEFT OUTER JOIN TB_SM01D01 F ON(E.CO_CD=F.CO_CD AND E.SALES_CD=F.SALES_CD AND E.UPPER_CD=F.UPPER_CD 
+								 								AND E.LOWER_CD=F.LOWER_CD AND E.MATR_SEQ=F.MATR_SEQ AND E.MATR_CD=F.MATR_CD)	/* 구매BOM 자재 */
+							WHERE 1=1  
+						  ) A		/* 발주+매입 내역 */
+						  WHERE 1=1 
+						<include refid="selectPurchaseListCondition"></include>
+						  ORDER BY A.CO_CD, A.ORDRG_NO DESC, A.ORDRG_SEQ DESC, A.SALES_CD DESC, A.PCHS_SEQ DESC	
+						) X		
+			)							
+			WHERE 1=1
+				AND RN BETWEEN ${firstIndex} AND ${lastIndex}	
+	</select>	
+	
+	<!-- 기준관리 - 일정계획 등록 메인 화면 엑셀 조회 리스트  -->
+	<select id="selectOrderExcelList" parameterType="Map" resultType="camelMap">   
+		/* No. 내림차순 */
+		SELECT *
+			FROM
+			(
+			SELECT X.*
+					, ROWNUM AS RN
+					FROM
+						(
+						SELECT A.CO_CD	
+							, A.PCHS_NO			/* 매입번호 */	
+							, A.ORDRG_NO
+							, A.ORDRG_SEQ
+							, A.SALES_CD
+							, A.PCHS_CLNT_CD
+							, A.PCHS_CLNT_NM		/* 구매처명 */
+							, A.MATR_CD	
+							, A.MATR_NM		
+							, A.ORDRG_AMT	
+							, A.ORDRG_DT	
+							, A.PCHS_AMT
+							, A.PCHS_DT
+							, A.CMPLET_YN
+							, A.USER_CHK_V
+						  FROM
+						  (
+						  	/* 발주 완료되지 않은 건 + 완료된건 */
+							SELECT E.CO_CD
+								, NVL(D.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'0000') AS PCHS_NO	/*매입확정번호 */
+								, E.ORDRG_NO 
+								, E.ORDRG_SEQ 
+								, E.SALES_CD
+								, B.PCHS_CLNT_CD				/* 구매처cd */
+								,
+								(
+									SELECT D.CLNT_NM
+										FROM TB_BM02M01 D
+									WHERE B.PCHS_CLNT_CD=D.CLNT_CD
+								) AS PCHS_CLNT_NM		/* 구매처명 */		
+								, F.MATR_CD
+								, F.MATR_NM			/* 자재명 */
+								, E.ORDRG_AMT		/*발주 금액 */
+								, B.ORDRG_DT		/* 발주일자 */
+								, D.PCHS_AMT		/* 매입금액 */
+								, D.PCHS_DT
+								, D.CMPLET_YN
+								, 'N' AS USER_CHK_V
+								FROM TB_SM02D01 E		/* 매입 DETAIL */
+								INNER JOIN TB_SM02M01 B ON(E.CO_CD=B.CO_CD AND E.ORDRG_NO=B.ORDRG_NO AND E.SALES_CD=B.SALES_CD)
+								LEFT OUTER JOIN TB_SM12D01 D ON(D.ORDRG_NO=E.ORDRG_NO AND D.ORDRG_SEQ=E.ORDRG_SEQ)	/* 발주 DETAIL */ 
+								LEFT OUTER JOIN TB_SM01D01 F ON(E.CO_CD=F.CO_CD AND E.SALES_CD=F.SALES_CD AND E.UPPER_CD=F.UPPER_CD 
+								 								AND E.LOWER_CD=F.LOWER_CD AND E.MATR_SEQ=F.MATR_SEQ AND E.MATR_CD=F.MATR_CD)	/* 구매BOM 자재 */
+							WHERE 1=1  
+						  ) A		/* 발주+매입 내역 */
+						  WHERE 1=1 
+						<include refid="selectPurchaseListCondition"></include>
+						  ORDER BY A.CO_CD, A.ORDRG_NO DESC, A.ORDRG_SEQ DESC, A.SALES_CD DESC		
+						) X		
+			)							
+			WHERE 1=1
+			/* 엑셀은 전체 조회 */
+	</select>
+		
+	<!-- 매입번호 max -->	
+	<select id="selectMaxPchsNo" parameterType="Map" resultType="String">
+		SELECT NVL(MAX_PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00001') AS MAX_IN_NO
+			FROM
+			(
+			SELECT DISTINCT DECODE( INSTR(PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')), 0, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00001'
+							, 'PC' || MAX( TO_CHAR(SYSDATE, 'YY')|| LPAD( SUBSTRING(PCHS_NO, -5)+1, 5, '0') ) OVER()
+						  ) AS MAX_PCHS_NO
+				FROM TB_SM12D01
+			WHERE 1=1
+			<if test="coCd != null and !coCd.equals('')">
+				AND CO_CD = #{coCd}   
+			</if>	
+			<if test="ordrgNo != null and !ordrgNo.equals('')">
+				AND ORDRG_NO = #{ordrgNo}   
+			</if>					
+			UNION ALL
+			SELECT NULL AS MAX_PCHS_NO
+				FROM DUAL		
+			)		
+			WHERE MAX_PCHS_NO IS NOT NULL OR ROWNUM = 1	
+	</select>		
+	
+	<!-- 발주 DETAIL SELECT -->
+	<select id="selectPurchaseDetailList" parameterType="Map" resultType="camelMap">	
+		SELECT B.FILE_TRGT_KEY
+				, A.CO_CD
+				, FN_CM05M01_CD_TO_NM(A.CO_CD) AS CO_CD_NM	/* 회사명 */		
+				, A.MATR_CD						/* 자재코드 */
+				, FN_CM05M01_CD_TO_NM(A.MATR_CD) AS MATR_CD_NM	/* 자재명 */				
+				, A.ORDRG_NO			/* 발주번호 */
+				, A.ORDRG_SEQ			/* 발주순번 */
+				, B.REQ_NO				/* 요인별 요청번호 */
+				, A.SALES_CD
+				, A.MATR_CD 			/* 자재코드 */
+				, D.MATR_NM		/* 자재명 */
+				, D.MATR_SPEC		/* 규격 */								
+				, B.PCHS_CLNT_CD				/* 구매처cd */
+                   			,
+                   			(
+                   				SELECT D.CLNT_NM
+                   					FROM TB_BM02M01 D
+                   				WHERE B.PCHS_CLNT_CD=D.CLNT_CD
+                   			) AS PCHS_CLNT_NM		/* 구매처명 */            		
+				, TO_CHAR(B.ORDRG_DT, 'YYYY-MM-DD') ORDRG_DT		/* 발주일자 */
+				, B.ORDRG_DIV10					/* 발주구분 */
+				, FN_CM05M01_CD_TO_NM(B.ORDRG_DIV10) AS ORDRG_DIV10_NM	/* 발주구분명 */
+				, B.ORDRG_DIV20					/* 용도구분 */
+				, FN_CM05M01_CD_TO_NM(B.ORDRG_DIV20) AS ORDRG_DIV20_NM	/* 용도구분명 */
+				, B.ORDRG_DIV30					/* 특성구분 */
+				, FN_CM05M01_CD_TO_NM(B.ORDRG_DIV30) AS ORDRG_DIV30_NM	/* 특성구분명 */								
+				, 
+				(
+					SELECT SUM(D.ORDRG_AMT)
+						FROM TB_SM02D01 D
+					WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.ORDRG_SEQ=D.ORDRG_SEQ AND A.SALES_CD=D.SALES_CD
+				) AS ORDRG_AMT										
+				, SUM(A.ORDRG_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_QTY	/* 발주수량 */									
+				, SUM(A.ORDRG_AMT) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_AMT	/* 발주금액 */	
+				, SUM(A.ORDRG_PRC) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_PRC	/* 발주단가 */	
+				, NVL(SUM(C.IN_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ), 0)  PRE_IN_QTY 	/* 기입고수량 */
+				<if test='actionType == "U" '>
+				, C.IN_NO		/* 입고번호 */
+				, C.IN_SEQ		/* 입고순번 */				
+				, 'Y' AS USER_CHK 	/* chk 값 */   	
+				, NVL(C.IN_QTY, 0) AS IN_QTY 	/* 입고(합격)수량 */	
+				, NVL(C.BAD_QTY, 0) AS BAD_QTY		/*불량수량 */   				
+				, NVL(C.IN_PRC, 0) AS IN_PRC		/* 입고단가 */
+				, NVL(C.IN_DTL_AMT, 0) AS IN_DTL_AMT		/* 입고금액 */
+				, NVL(C.IN_QTY+C.BAD_QTY, 0) AS S_INSPEC_QTY		/* 검사수량 */
+				, NVL(C.IN_QTY, 0) AS S_IN_QTY		/* 입고수량 */					
+				, TO_CHAR(C.IN_DT, 'YYYY-MM-DD') IN_DT		/* 입고일자 */	
+				, C.IN_DTL_RMK				/* 상세비고 */				
+				, MAX(C.CURR_CD) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO)	AS CURR_CD				/* 통화단위 */
+				, MAX(C.EXRATE) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO) AS EXRATE				/* 환율 */						
+				</if>				
+				<if test='actionType == "C" '>
+				, B.CURR_CD						/* 통화단위 */
+				, B.EXRATE						/* 환율 */   				   
+				</if>								
+				, 
+				  SUM(A.ORDRG_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) 
+				  - NVL(SUM(IN_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ), 0) AS NOT_IN_QTY			/* 미입고수량 */	
+		        , A.WH_CD AS MATR_WH_CD		/* 입고창고  */
+		        , FN_CM05M01_CD_TO_NM(A.WH_CD) AS MATR_WH_NM		/* 입고창고  */								  
+				, A.MATR_TEST_DIV				/*검사구분 */				  
+				, FN_CM05M01_CD_TO_NM(A.MATR_TEST_DIV) MATR_TEST_DIV_NM				/*검사구분 */																								                    
+			FROM TB_SM02D01 A
+			INNER JOIN TB_SM02M01 B ON(A.CO_CD=B.CO_CD AND A.ORDRG_NO=B.ORDRG_NO)
+			LEFT OUTER JOIN TB_SM01D01 D ON(A.CO_CD = D.CO_CD AND A.SALES_CD = D.SALES_CD AND A.UPPER_CD = D.UPPER_CD AND A.LOWER_CD = D.LOWER_CD 
+											AND A.MATR_SEQ=D.MATR_SEQ AND A.MATR_CD=D.MATR_CD)
+				<if test='actionType == "U" '>
+			INNER JOIN TB_SM12D01 C ON(A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ)				
+				</if>							
+				<if test='actionType == "C" '>											
+							LEFT OUTER JOIN
+							(
+								SELECT C.ORDRG_NO
+										, C.ORDRG_SEQ
+										, NVL(SUM(IN_QTY), 0) AS IN_QTY
+									FROM TB_SM12D01 C
+								GROUP BY C.ORDRG_NO, C.ORDRG_SEQ
+							) C ON( A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ)
+				</if>									
+		WHERE 1=1					
+		<if test="coCd != null and !coCd.equals('')">
+			AND A.CO_CD = #{coCd}   
+		</if>		
+		<if test="ordrgNo != null and !ordrgNo.equals('')">
+			AND A.ORDRG_NO = #{ordrgNo}   
+		</if>	
+		<if test="ordrgSeq != null and !ordrgSeq.equals('')">
+			AND A.ORDRG_SEQ = #{ordrgSeq}   
+		</if>		
+		<if test="salesCd != null and !salesCd.equals('')">
+			AND A.SALES_CD = #{salesCd}   
+		</if>							
+	</select>
+	
+	<!-- 매입확정관리 detail 등록   -->
+	<insert id="insertPurchaseBillDetail" parameterType="Map">       
+		<selectKey keyProperty="pchsSeq" resultType="String" order="BEFORE">
+			SELECT NVL(MAX(PCHS_SEQ)+1, 1) FROM TB_SM12D01 
+				WHERE CO_CD = #{coCd}
+					AND ORDRG_NO = #{ordrgNo}
+					AND ORDRG_SEQ = #{ordrgSeq}
+					AND PCHS_NO = #{maxPchsNo}
+		</selectKey>
+		INSERT INTO TB_SM12D01
+		  (
+			CO_CD
+			, PCHS_NO
+			, PCHS_SEQ
+			, ORDRG_NO
+			, ORDRG_SEQ
+			, PCHS_AMT
+			, PCHS_DT
+			, CMPLET_YN
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+		  )
+		VALUES
+		  (
+			 #{coCd}
+			, #{maxPchsNo}
+			, #{pchsSeq}
+			, #{ordrgNo}
+			, #{ordrgSeq}
+			, #{pchsAmt}
+			, #{pchsDt}
+			, #{cmpletYn,			jdbcType=VARCHAR}	 
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+	      )
+	</insert>	
+		
+	<!-- 입고관리 상세 수정 -->
+	<update id="updatePurchaseBillDetail" parameterType="Map">
+		UPDATE TB_SM12D01
+			SET  
+			PCHS_AMT = #{pchsAmt}
+			, PCHS_DT = #{pchsDt}
+			, CMPLET_YN = #{cmpletYn,			jdbcType=VARCHAR}
+			, UDT_ID = #{userId}
+			, UDT_PGM = #{pgmId}
+			, UDT_DTTM = SYSDATE
+		WHERE CO_CD = #{coCd}
+			AND PCHS_NO = #{pchsNo}
+			AND PCHS_SEQ = #{pchsSeq}			
+			AND ORDRG_NO = #{ordrgNo}
+			AND ORDRG_SEQ = #{ordrgSeq}
+	</update>
+	
+	<!-- 발주 디테일  삭제 -->         
+	<delete id="deletePurchaseDetail" parameterType="Map">
+		DELETE 
+			FROM TB_SM12D01
+		WHERE 1=1
+			AND CO_CD = #{coCd}
+			AND PCHS_NO = #{pchsNo}
+			AND PCHS_SEQ = #{pchsSeq}
+			AND ORDRG_NO = #{ordrgNo}
+			AND ORDRG_SEQ = #{ordrgSeq}
+	</delete>	
+		
+ </mapper>
