@@ -71,14 +71,19 @@ public class WB20Ctr {
   		  List<Map<String, String>> resultList = wb20Svc.selectToDoExcelList(paramMap);
 		  model.addAttribute("resultList", resultList); 
 		  return "jsonView"; 
-		  
-		  
 	  }
-	  
 	  
 	  @PostMapping(value = "/selectApprovalChk") 
 	  public String selectApprovalChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
   		  List<Map<String, String>> resultList = wb20Svc.selectApprovalChk(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+	  }
+	  
+	  
+	  @PostMapping(value = "/selectTodoDivList") 
+	  public String selectTodoDivList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+  		  List<Map<String, String>> resultList = wb20Svc.selectTodoDivList(paramMap);
 		  model.addAttribute("resultList", resultList); 
 		  return "jsonView"; 
 	  }
