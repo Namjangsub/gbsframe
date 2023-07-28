@@ -69,6 +69,9 @@ public class WB20SvcImpl implements WB20Svc {
 		return wb20Mapper.selectApprovalChk(paramMap);
 	}
 	
-	
+	@Override
+	public List<Map<String, String>> selectTodoDivList(Map<String, String> paramMap) {
+		return wb20Mapper.selectTodoDivList(paramMap);
+	}
 	
 }

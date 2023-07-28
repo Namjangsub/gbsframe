@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.sm.sm07.mapper.SM07Mapper">
+	
+	<!-- 그리드 카운트 -->	
+   <select id="master_grid_selectCount" parameterType="Map" resultType="int">
+   		SELECT COUNT(*)
+   		FROM (
+   				SELECT 
+					A.FILE_TRGT_KEY                                  --파일대상KEY
+					, A.CO_CD                                        --회사코드
+					, CM.CODE_NM AS CO_NM                            --회사명
+					, A.ORDRG_NO                                     --발주번호
+					, A.REQ_NO                                       --요인별 요청 번호
+					, A.SALES_CD                                     --Sales Code
+					, A.PCHS_CLNT_CD                                 --구매업체
+					, BM.CLNT_NM AS  PCHS_CLNT_NM                    --구매업체명
+					, TO_CHAR(A.ORDRG_DT, 'YYYY-MM-DD') AS ORDRG_DT  --발주일자
+					, A.ORDRG_DIV10                                  --발주구분
+					, CM1.CODE_NM AS ORDRG_DIV10_NM                  --발주구분 명
+					, A.ORDRG_DIV20                                  --발주용도
+					, CM2.CODE_NM AS ORDRG_DIV20_NM                  --발주용도 명
+					, A.ORDRG_DIV30                                  --발주특성
+					, CM3.CODE_NM AS ORDRG_DIV30_NM                  --발주특성 명
+					, A.CURR_CD                                      --통화단위
+					, A.EXRATE                                       --환율
+					, A.ORDRG_AMT                                    --발주금액
+					, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD') AS DUDT_DEQ_DT --납기요청일					                               
+					, A.ORDRG_RMK                                    --발주비고
+					, A.IN_CMPLET_YN                                 --입고완료 여부
+					,(
+						SELECT SUM(ORDRG_QTY)
+							FROM TB_SM02D01 D
+						WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
+					  ) AS ORDRG_QTY               --발주수량 합
+				
+				FROM TB_SM02M01 AS A	
+					<!-- 회사명 조인 -->
+					LEFT JOIN TB_CM05M01 AS CM ON CM.CODE_ID = A.CO_CD 
+					
+					LEFT JOIN TB_CM05M01 AS CM1 ON CM1.CODE_ID =A.ORDRG_DIV10
+					LEFT JOIN TB_CM05M01 AS CM2 ON CM2.CODE_ID =A.ORDRG_DIV20
+					LEFT JOIN TB_CM05M01 AS CM3 ON CM3.CODE_ID =A.ORDRG_DIV30
+					
+					<!-- 구매업체명조인 -->
+					LEFT JOIN TB_BM02M01 AS BM ON BM.CLNT_CD = A.PCHS_CLNT_CD 
+				
+				WHERE 1 = 1			
+					<!-- 검색조건 --> 			
+					<if test="coCd != null and !coCd.equals('')">
+						AND    A.CO_CD = '${coCd}' --회사
+					</if>
+					
+					<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('') and ordrgDtTo != null and !ordrgDtTo.equals('')" >
+						AND    A.ORDRG_DT BETWEEN TO_DATE( #{ordrgDtFrom},'YYYYMMDD') AND TO_DATE( #{ordrgDtTo},'YYYYMMDD') --수주일자
+					</if>
+					
+					<if test="pchsClntCd != null and !pchsClntCd.equals('')"> 
+						AND    A.PCHS_CLNT_CD = '${pchsClntCd}' --구매처
+					</if>				
+					<if test="pchsClntNm != null and !pchsClntNm.equals('')"> 
+						AND    A.PCHS_CLNT_Nm = '${pchsClntNm}' --구매처명
+					</if>
+					
+					<if test="salesCd != null and !salesCd.equals('')">
+						AND    A.SALES_CD = '${salesCd}' 
+					</if>
+					
+					<if test="ordrgdiv10 != null and !ordrgdiv10.equals('')">
+						AND    A.ORDRG_DIV10 = '${ordrgdiv10}' --발주구분
+					</if>
+					<if test="ordrgdiv10Nm != null and !ordrgdiv10Nm.equals('')">
+						AND    A.ORDRG_DIV10_NM = '${ordrgdiv10Nm}' --발주구분
+					</if>
+					)T
+   </select>
+   
+	<!-- 마스터 페이지 리스트 조회 -->
+	<select id="master_grid_selectList" parameterType="Map" resultType="camelMap">
+		SELECT
+			*
+		FROM(
+		   	SELECT ROWNUM AS RN
+				, A.FILE_TRGT_KEY                                  --파일대상KEY
+				, A.CO_CD                                        --회사코드
+				, CM.CODE_NM AS CO_NM                            --회사명
+				, A.ORDRG_NO                                     --발주번호
+				, A.REQ_NO                                       --요인별 요청 번호
+				, A.SALES_CD                                     --Sales Code
+				, A.PCHS_CLNT_CD                                 --구매업체
+				, BM.CLNT_NM AS  PCHS_CLNT_NM                    --구매업체명
+				, TO_CHAR(A.ORDRG_DT, 'YYYY-MM-DD') AS ORDRG_DT  --발주일자
+				, A.ORDRG_DIV10                                  --발주구분
+				, CM1.CODE_NM AS ORDRG_DIV10_NM                  --발주구분 명
+				, A.ORDRG_DIV20                                  --발주용도
+				, CM2.CODE_NM AS ORDRG_DIV20_NM                  --발주용도 명
+				, A.ORDRG_DIV30                                  --발주특성
+				, CM3.CODE_NM AS ORDRG_DIV30_NM                  --발주특성 명
+				, A.CURR_CD                                      --통화단위
+				, A.EXRATE                                       --환율
+				, A.ORDRG_AMT                                    --발주금액
+				, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD') AS DUDT_DEQ_DT --납기요청일	
+				, A.ORDRG_RMK                                    --발주비고
+				, A.IN_CMPLET_YN                                 --입고완료 여부
+				,(
+					SELECT SUM(ORDRG_QTY)
+						FROM TB_SM02D01 D
+					WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
+				  ) AS ORDRG_QTY               --발주수량 합
+			
+			FROM TB_SM02M01 AS A	
+				<!-- 회사명 조인 -->
+				LEFT JOIN TB_CM05M01 AS CM ON CM.CODE_ID = A.CO_CD 
+				
+				LEFT JOIN TB_CM05M01 AS CM1 ON CM1.CODE_ID =A.ORDRG_DIV10
+				LEFT JOIN TB_CM05M01 AS CM2 ON CM2.CODE_ID =A.ORDRG_DIV20
+				LEFT JOIN TB_CM05M01 AS CM3 ON CM3.CODE_ID =A.ORDRG_DIV30
+				
+				<!-- 구매업체명조인 -->
+				LEFT JOIN TB_BM02M01 AS BM ON BM.CLNT_CD = A.PCHS_CLNT_CD 
+			
+			WHERE 1 = 1			
+				<!-- 검색조건 --> 			
+				<if test="coCd != null and !coCd.equals('')">
+					AND    A.CO_CD = '${coCd}' --회사
+				</if>
+				
+				<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('') and ordrgDtTo != null and !ordrgDtTo.equals('')" >
+					AND    A.ORDRG_DT BETWEEN TO_DATE( #{ordrgDtFrom},'YYYYMMDD') AND TO_DATE( #{ordrgDtTo},'YYYYMMDD') --발주일자
+				</if>
+				
+				<if test="pchsClntCd != null and !pchsClntCd.equals('')"> 
+					AND    A.PCHS_CLNT_CD = '${pchsClntCd}' --구매처
+				</if>				
+				<if test="pchsClntNm != null and !pchsClntNm.equals('')"> 
+					AND    A.PCHS_CLNT_Nm = '${pchsClntNm}' --구매처명
+				</if>
+				
+				<if test="salesCd != null and !salesCd.equals('')">
+					AND    A.SALES_CD = '${salesCd}' 
+				</if>
+				
+				<if test="ordrgdiv10 != null and !ordrgdiv10.equals('')">
+					AND    A.ORDRG_DIV10 = '${ordrgdiv10}' --발주구분
+				</if>
+				<if test="ordrgdiv10Nm != null and !ordrgdiv10Nm.equals('')">
+					AND    A.ORDRG_DIV10_NM = '${ordrgdiv10Nm}' --발주구분
+				</if>		
+					) Z
+					WHERE RN BETWEEN ${firstIndex} AND ${lastIndex}	
+    </select>
+
+
+	<!-- 모달창 검색조건 -->
+	<select id="select_sm07_Info" resultType="CamelMap"> 
+		SELECT 
+			A.CO_CD											--회사코드
+			, CM.CODE_NM AS CO_NM --회사이름
+			, A.ORDRG_NO									--발주번호
+			, A.ORDRG_SEQ									--발주순번
+			, A.SALES_CD									--SALES CODE
+			, A.MATR_SEQ									--파트번호
+			, A.UPPER_CD									--유닛번호
+			, A.LOWER_CD									--리버전번호
+			, A.DSGN_NO									--도번
+			, A.MATR_CD									--자재코드
+			, A.MATR_TEST_DIV								--입고검사구분
+			, A.ORDRG_PRC									--발주단가
+			, A.ORDRG_QTY									--발주수량
+			, A.ORDRG_AMT                                   --발주금액
+			, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD') AS DUDT_DEQ_DT							 --납기요청일			
+			, TO_CHAR(A.DUDT_INTEND_DT, 'YYYY-MM-DD') AS DUDT_INTEND_DT                      --납기예정일			
+			, A.ORDRG_DTL_RMK 							--상세비고
+			, A.IN_CMPLET_YN								--입고완료여부
+			, A.WH_CD										--입고창고
+
+			, --구매처
+			, --구매처명
+			, TO_CHAR(SM.ORDRG_DT, 'YYYY-MM-DD') AS ORDRG_DT  --발주일자
+			, SM.ORDRG_DIV10                                  --발주구분
+			, CM1.CODE_NM AS ORDRG_DIV10_NM                  --발주구분 명
+			, SM.ORDRG_DIV20                                  --발주용도
+			, CM2.CODE_NM AS ORDRG_DIV20_NM                  --발주용도 명
+			, SM.ORDRG_DIV30                                  --발주특성
+			, CM3.CODE_NM AS ORDRG_DIV30_NM                  --발주특성 명
+			, ASM.EXRATE                                       --환율
+			, SM.CURR_CD                                      --통화단위
+
+		FROM TB_SM02D01 AS A
+			LEFT JOIN TB_SM02M01 AS SM ON SM.CODE_ID = A.CO_CD		
+
+			LEFT JOIN TB_CM05M01 AS CM ON CM.CODE_ID = A.CO_CD
+			LEFT JOIN TB_CM05M01 AS CM1 ON CM1.CODE_ID =A.ORDRG_DIV10
+			LEFT JOIN TB_CM05M01 AS CM2 ON CM2.CODE_ID =A.ORDRG_DIV20
+			LEFT JOIN TB_CM05M01 AS CM3 ON CM3.CODE_ID =A.ORDRG_DIV30
+			
+
+		WHERE 1 = 1
+			<!-- 검색조건 --> 			
+			
+			<if test="pchsClntCd != null and !pchsClntCd.equals('')"> 
+				AND    A.PCHS_CLNT_CD = '${pchsClntCd}' --구매처
+			</if>				
+			<if test="pchsClntNm != null and !pchsClntNm.equals('')"> 
+				AND    A.PCHS_CLNT_Nm = '${pchsClntNm}' --구매처명
+			</if>
+			<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('') and ordrgDtTo != null and !ordrgDtTo.equals('')" >
+					AND    A.ORDRG_DT BETWEEN TO_DATE( #{ordrgDtFrom},'YYYYMMDD') AND TO_DATE( #{ordrgDtTo},'YYYYMMDD') --발주일자
+				</if>
+
+	</select>
+
+	
+ </mapper>

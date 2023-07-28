@@ -1,7 +1,6 @@
 package com.dksys.biz.user.cr.cr10.service.impl;
 
 import java.lang.reflect.Type;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -88,22 +87,22 @@ public class CR10SvcImpl implements CR10Svc {
 		//---------------------------------------------------------------
 		//첨부 화일 권한체크  끝
 		//---------------------------------------------------------------
-		String  fileTrgtKey = String.valueOf(cr10Mapper.selectFileTrgtKeyNext(paramMap));
-		paramMap.put("fileTrgtKey", fileTrgtKey);
+		String  lgistNo = String.valueOf(cr10Mapper.selectLgistNoNext(paramMap));
+		paramMap.put("lgistNo", lgistNo);
 		int result = cr10Mapper.insertLgistMast(paramMap);
 
 	    List<Map<String, String>> salesCdList = gsonDtl.fromJson(paramMap.get("salesCdArr"), dtlMap);
 	    for (Map<String, String> dtl : salesCdList) {
-	    	dtl.put("fileTrgtKey", fileTrgtKey);
+	    	dtl.put("lgistNo", lgistNo);
 	    	dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
 	    	String dtaChk = dtl.get("dtaChk").toString();
 	    	if ("I".equals(dtaChk)) {
-	    		cr10Mapper.insertLgistSalesCd(dtl);
+	    		cr10Mapper.insertLgistDetail(dtl);
 	    	} else if ("U".equals(dtaChk)) {
-	    		cr10Mapper.updateLgistSalesCd(dtl);
+	    		cr10Mapper.updateLgistDetail(dtl);
 	    	} else if ("D".equals(dtaChk)) {
-	    		cr10Mapper.deleteLgistSalesCd(dtl);
+	    		cr10Mapper.deleteLgistDetail(dtl);
 	    	}
 	    }
 
@@ -124,9 +123,11 @@ public class CR10SvcImpl implements CR10Svc {
 		//---------------------------------------------------------------
 	    List<Map<String, String>> reqList = cr10Mapper.selectTodoAppReqList(paramMap);
 	    List<Map<String, String>> toDoAppList = gsonDtl.fromJson(reqList.toString(), dtlMap);
+	    /*
 	    DecimalFormat df = new DecimalFormat("00000");
 	    int numKey = Integer.valueOf(paramMap.get("fileTrgtKey"));
-	    String todoDiv2CodeId = paramMap.get("appDiv")+df.format(numKey);
+	    */
+	    String todoDiv2CodeId = paramMap.get("lgistNo");
 	    for (Map<String, String> dtl : toDoAppList) {
 	    	dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
@@ -178,7 +179,7 @@ public class CR10SvcImpl implements CR10Svc {
 	//첨부 화일 권한체크  끝
 	//---------------------------------------------------------------
 
-	int result = cr10Mapper.deleteLgistSalesCdAll(paramMap);
+	int result = cr10Mapper.deleteLgistDetailAll(paramMap);
 		result = cr10Mapper.updateLgistMast(paramMap);
 
 
@@ -189,16 +190,16 @@ public class CR10SvcImpl implements CR10Svc {
     	//      반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
     	String dtaChk = dtl.get("dtaChk").toString();
     	/* "dtaChk" 값을 확인하여
-    	 * "I"인 경우 cr10Mapper.insertLgistSalesCd(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
-    	 * "U"인 경우 cr10Mapper.updateLgistSalesCd(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
-    	 * "D"인 경우 * cr10Mapper.deleteLgistSalesCd(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
+    	 * "I"인 경우 cr10Mapper.insertLgistDetail(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
+    	 * "U"인 경우 cr10Mapper.updateLgistDetail(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
+    	 * "D"인 경우 * cr10Mapper.deleteLgistDetail(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
     	if ("I".equals(dtaChk)) {
     		//dtl.put("prjctSeq", paramMap.get("prjctSeq"));
-    		cr10Mapper.insertLgistSalesCd(dtl);
+    		cr10Mapper.insertLgistDetail(dtl);
     	} else if ("U".equals(dtaChk)) {
-    		cr10Mapper.updateLgistSalesCd(dtl);
+    		cr10Mapper.updateLgistDetail(dtl);
     	} else if ("D".equals(dtaChk)) {
-    		cr10Mapper.deleteLgistSalesCd(dtl);
+    		cr10Mapper.deleteLgistDetail(dtl);
     	}
     }
 
@@ -224,9 +225,7 @@ public class CR10SvcImpl implements CR10Svc {
     if(todoAppCount == 0) {
 	    List<Map<String, String>> reqList = cr10Mapper.selectTodoAppReqList(paramMap);
 	    List<Map<String, String>> toDoAppList = gsonDtl.fromJson(reqList.toString(), dtlMap);
-	    DecimalFormat df = new DecimalFormat("00000");
-	    int numKey = Integer.valueOf(paramMap.get("fileTrgtKey"));
-	    String todoDiv2CodeId = paramMap.get("appDiv")+df.format(numKey);
+	    String todoDiv2CodeId = paramMap.get("lgistNo");
 	    for (Map<String, String> dtl : toDoAppList) {
 	    	dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
@@ -269,7 +268,7 @@ public class CR10SvcImpl implements CR10Svc {
 		//첨부 화일 권한체크 끝
 		//---------------------------------------------------------------
 
-	  int result = cr10Mapper.deleteLgistSalesCdAll(paramMap);
+	  int result = cr10Mapper.deleteLgistDetailAll(paramMap);
 	  result = cr10Mapper.deleteLgistMast(paramMap);
 
 		//---------------------------------------------------------------

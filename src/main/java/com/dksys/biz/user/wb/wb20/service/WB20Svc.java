@@ -19,4 +19,6 @@ public interface WB20Svc {
 	List<Map<String, String>> selectToDoExcelList(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectApprovalChk(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectTodoDivList(Map<String, String> paramMap);
 }
