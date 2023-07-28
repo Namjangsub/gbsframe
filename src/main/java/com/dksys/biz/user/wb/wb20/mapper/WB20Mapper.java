@@ -18,4 +18,6 @@ public interface WB20Mapper {
 	int updateRsltsApproval(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectToDoExcelList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectApprovalChk(Map<String, String> paramMap);
 }

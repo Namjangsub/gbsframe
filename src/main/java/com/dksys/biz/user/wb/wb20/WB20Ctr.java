@@ -75,4 +75,13 @@ public class WB20Ctr {
 		  
 	  }
 	  
+	  
+	  @PostMapping(value = "/selectApprovalChk") 
+	  public String selectApprovalChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
+  		  List<Map<String, String>> resultList = wb20Svc.selectApprovalChk(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+	  }
+	  
+	  
 }
