@@ -300,7 +300,7 @@ public class EmailSvcImpl implements EmailSvc {
 			
 	        String authNum = createCode();
 	        // html로 텍스트 설정
-	        String mailCnts = setHtmlContext(authNum, paramMap);
+	        String mailCnts = setHtmlContext(authNum, paramMap); 
 			
             bodyPart.setContent(mailCnts, "text/html; charset=utf-8");
             multipart.addBodyPart(bodyPart);
