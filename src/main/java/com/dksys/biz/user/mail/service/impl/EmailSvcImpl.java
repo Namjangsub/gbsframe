@@ -1,6 +1,7 @@
 package com.dksys.biz.user.mail.service.impl;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -52,16 +53,35 @@ public class EmailSvcImpl implements EmailSvc {
     @Autowired
     SpringTemplateEngine templateEngine;
     
-	
     @Autowired
     MailMapper mailMapper;
     
-    public int sendMailSimple (Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	@Value("${spring.mail.username}")
+	private String USERNAME;
+	
+	@Value("${spring.mail.password}")
+	private String PASSWORD;
+	
+	@Value("${spring.mail.host}")
+	private String HOSTNAME;
+
+	@Value("${spring.mail.port}")
+	private String STARTTLS_PORT;
+
+	@Value("${spring.mail.properties.mail.smtp.starttls.enable}")
+	private String STARTTLS;
+	
+	@Value("${spring.mail.properties.mail.smtp.auth}")
+	private String AUTH;
+	
+	public int sendGmailSimple (Map<String, String> paramMap) throws Exception {
     	String authNum = createCode();
         
         paramMap.put("mailCode", authNum);
 //        mailMapper.insertMail(paramMap);
+        //office365 용
         
+      //Gmail 용
     	SimpleMailMessage simpleMessage = new SimpleMailMessage();
     	
     	simpleMessage.setTo(paramMap.get("mailTo")); // 메일 수신자
@@ -69,36 +89,18 @@ public class EmailSvcImpl implements EmailSvc {
     	simpleMessage.setSubject(paramMap.get("mailTitle")); // 메일 제목
     	simpleMessage.setText(paramMap.get("mailCnts")); // 메일 본문 내용, HTML 여부
     	javaMailSender.send(simpleMessage);
-//    	sendGmail(paramMap.get("mailTitle"), paramMap.get("mailCnts"), paramMap.get("mailTo"));
     	
     	return 1;
     }
     
-    public int sendMailHtml(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-        String authNum = createCode();
-        LocalDate currentDate = LocalDate.now();
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
-        String dateString = currentDate.format(formatter);
-        Map<String, String> userInfo = mailMapper.selectUserInfo(paramMap);
-//        String[] mailToList = mRequest.getParameterValues("mailTo");
-//        String mailTo = String.join(",", mailToList);
+    public int sendGmailHtml(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
+        String authNum = createCode();
         // html로 텍스트 설정
-        String mailHtml = "<html><body><table><tbody><tr><td><img src='cid:logo'><p><b><span>발신정보</span></b></p></td></tr>"
-				+ "<tr><td><p><span>보낸회사</span></p></td>"
-				+ "<td><p><b><span>" + userInfo.get("coCdNm") + "</span></b></p></td>"
-				+ "</tr><tr><td><p><span>발행일자</span></p></td>"
-				+ "<td><p><b><span>" + dateString + "</span></b></p></td>"
-				+ "</tr><tr><td><p><span>Email</span></p></td>"
-				+ "<td><p><b><span><a href='mailto:" + paramMap.get("mailFrom") + "'>" + paramMap.get("mailFrom")+ "</a></span></b></p></td>"
-				+ "</tr><tr><td><p><span>연락처</span></p></td>"
-				+ "<td><p><b><span>" + userInfo.get("offTelNo") + " (fax." + userInfo.get("faxNo") + "</span></b></p></td></tr>"
-				+ "<tr><td><p><span >메모</span></p></td>"
-				+ "<td><p>" + paramMap.get("mailCnts") + "<br>비밀코드:" + authNum + "</p></td></tr>"
-				+ "</tbody></table></body></html>";
+        String mailCnts = setHtmlContext(authNum, paramMap);
 //        String mailHtml = setContext(authNum, "purchaseOrder.html") // 메일 본문 내용(템플릿 적용), HTML 여부
         
-        paramMap.put("mailCnts", mailHtml);
+        paramMap.put("mailCnts", mailCnts);
         paramMap.put("mailCode", authNum);
         mailMapper.insertMail(paramMap);
         
@@ -120,7 +122,7 @@ public class EmailSvcImpl implements EmailSvc {
         mimeMessageHelper.setSubject(paramMap.get("mailTitle")); // 메일 제목
         
         // html로 텍스트 설정
-        mimeMessageHelper.setText(mailHtml, true);
+        mimeMessageHelper.setText(mailCnts, true);
       
         mimeMessageHelper.addInline("logo", new ClassPathResource("static/img/Logo.png"));//템플릿에 들어가는 이미지 cid로 삽입
  
@@ -141,8 +143,7 @@ public class EmailSvcImpl implements EmailSvc {
     	    }
     	}
     	
-//        javaMailSender.send(mimeMessage);
-    	sendGmailHtml(paramMap.get("mailTitle"), paramMap.get("mailCnts"), paramMap.get("mailTo"), mRequest);
+        javaMailSender.send(mimeMessage);
         
         return 1;
     }
@@ -169,6 +170,27 @@ public class EmailSvcImpl implements EmailSvc {
         Context context = new Context();
         context.setVariable("code", code);
         return templateEngine.process(type, context);
+    }
+    // html 적용
+    public String setHtmlContext(String authNum, Map<String, String> paramMap) {
+        LocalDate currentDate = LocalDate.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+        String dateString = currentDate.format(formatter);
+        Map<String, String> userInfo = mailMapper.selectUserInfo(paramMap);
+
+        String mailHtml = "<html><body><table><tbody><tr><td><img src='cid:logo'><p><b><span>발신정보</span></b></p></td></tr>"
+				+ "<tr><td><p><span>보낸회사</span></p></td>"
+				+ "<td><p><b><span>" + userInfo.get("coCdNm") + "</span></b></p></td>"
+				+ "</tr><tr><td><p><span>발행일자</span></p></td>"
+				+ "<td><p><b><span>" + dateString + "</span></b></p></td>"
+				+ "</tr><tr><td><p><span>Email</span></p></td>"
+				+ "<td><p><b><span><a href='mailto:" + paramMap.get("mailFrom") + "'>" + paramMap.get("mailFrom")+ "</a></span></b></p></td>"
+				+ "</tr><tr><td><p><span>연락처</span></p></td>"
+				+ "<td><p><b><span>" + userInfo.get("offTelNo") + " (fax." + userInfo.get("faxNo") + "</span></b></p></td></tr>"
+				+ "<tr><td><p><span >메모</span></p></td>"
+				+ "<td><p>" + paramMap.get("mailCnts") + "<br>비밀코드:" + authNum + "</p></td></tr>"
+				+ "</tbody></table></body></html>";
+    	return mailHtml;
     }
 
 	@Override
@@ -199,16 +221,8 @@ public class EmailSvcImpl implements EmailSvc {
 	Properties properties;
 	Session session;
 	MimeMessage mimeMessage;
-
-	String USERNAME = "js.nam@gunyangitt.co.kr";
-	String PASSWORD = "skarjs1024@";
-	String HOSTNAME = "smtp.office365.com";
-	String STARTTLS_PORT = "587";
-	boolean STARTTLS = true;
-	boolean AUTH = true;
-	String FromAddress="js.nam@gunyangitt.co.kr";
 	
-	public void sendGmail(String EmailSubject, String EmailBody, String ToAddress) {
+	public int sendMailSimple(Map<String, String> paramMap) {
 		try {
 			properties = new Properties();
 			properties.put("mail.smtp.host", HOSTNAME);
@@ -233,26 +247,24 @@ public class EmailSvcImpl implements EmailSvc {
 			mimeMessage = new MimeMessage(session);
 			
 			//from address should exist in the domain
-			mimeMessage.setFrom(new InternetAddress(FromAddress));
-			mimeMessage.addRecipient(RecipientType.TO, new InternetAddress(ToAddress));
-			mimeMessage.setSubject(EmailSubject);
+			mimeMessage.setFrom(new InternetAddress(paramMap.get("mailFrom")));
+			mimeMessage.addRecipient(RecipientType.TO, new InternetAddress(paramMap.get("mailTo")));
+			mimeMessage.setSubject(paramMap.get("mailTitle"));
 
 			// setting text message body
-			mimeMessage.setText(EmailBody);
-
-            // setting HTML message body
-			//mimeMessage.setContent(EmailBody,"text/html; charset=utf-8");
+			mimeMessage.setText(paramMap.get("mailCnts"));
 
 			// sending mail
 			Transport.send(mimeMessage);
 			System.out.println("Mail Send Successfully");
-
+			return 1;
 		} catch (Exception e) {
 			e.printStackTrace();
+			return 0;
 		}
 	}	
 	
-	public void sendGmailHtml(String EmailSubject, String EmailBody, String ToAddress, MultipartHttpServletRequest mRequest ) {
+	public int sendMailHtml(Map<String, String> paramMap, MultipartHttpServletRequest mRequest ) throws Exception {
 		try {
 			properties = new Properties();
 			properties.put("mail.smtp.host", HOSTNAME);
@@ -276,18 +288,21 @@ public class EmailSvcImpl implements EmailSvc {
 			// create mime message
 			mimeMessage = new MimeMessage(session);
 			
-			//from address should exist in the domain
-			mimeMessage.setFrom(new InternetAddress(FromAddress));
-			mimeMessage.addRecipient(RecipientType.TO, new InternetAddress(ToAddress));
-			mimeMessage.setSubject(EmailSubject);
+			mimeMessage.setFrom(new InternetAddress(paramMap.get("mailFrom")));
+			mimeMessage.addRecipient(RecipientType.TO, new InternetAddress(paramMap.get("mailTo")));
+			mimeMessage.setSubject(paramMap.get("mailTitle"));
 			
 			// Multipart 객체 생성하여 본문과 첨부 파일 추가
 			Multipart multipart = new MimeMultipart();
 
 			// setting HTML message body
-//			mimeMessage.setContent(EmailBody,"text/html; charset=utf-8");
 			MimeBodyPart bodyPart = new MimeBodyPart();
-            bodyPart.setContent(EmailBody, "text/html; charset=utf-8");
+			
+	        String authNum = createCode();
+	        // html로 텍스트 설정
+	        String mailCnts = setHtmlContext(authNum, paramMap);
+			
+            bodyPart.setContent(mailCnts, "text/html; charset=utf-8");
             multipart.addBodyPart(bodyPart);
 
             // 첨부 파일 추가
@@ -313,9 +328,10 @@ public class EmailSvcImpl implements EmailSvc {
 			// sending mail
 			Transport.send(mimeMessage);
 			System.out.println("Mail Send Successfully");
-
+			return 1;
 		} catch (Exception e) {
 			e.printStackTrace();
+			return 0;
 		}
 	}
 

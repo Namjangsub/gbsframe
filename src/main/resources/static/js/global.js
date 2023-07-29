@@ -1430,6 +1430,15 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 		color: { argb: "000000" } // 검은색 글자
 	};
 
+	/*
+	 * thick: 굵은 선
+	 * medium: 중간 두께의 선
+	 * thin:  얇은 선
+	 * dotted: 점선
+	 * dashDot: 대시-점선
+	 * dashDotDot: 대시-점-점선
+	 * slantDashDot: 사선 대시-점선
+	 */
 	const headerBorder = {
 		top: { style: "thin" },
 		bottom: { style: "thin" },
