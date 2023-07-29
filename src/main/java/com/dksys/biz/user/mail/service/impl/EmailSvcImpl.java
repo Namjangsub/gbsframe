@@ -190,7 +190,7 @@ public class EmailSvcImpl implements EmailSvc {
 				+ "<tr><td><p><span >메모</span></p></td>"
 				+ "<td><p>" + paramMap.get("mailCnts") + "<br>비밀코드:" + authNum + "</p></td></tr>"
 				+ "</tbody></table></body></html>";
-    	return mailHtml;
+    	return mailHtml; 
     }
 
 	@Override
