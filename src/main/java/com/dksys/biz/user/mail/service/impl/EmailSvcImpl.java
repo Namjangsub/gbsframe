@@ -71,7 +71,7 @@ public class EmailSvcImpl implements EmailSvc {
 	@Value("${spring.mail.properties.mail.smtp.starttls.enable}")
 	private String STARTTLS;
 	
-	@Value("${spring.mail.properties.mail.smtp.auth}")
+	@Value("${spring.mail.properties.mail.smtp.auth}")  
 	private String AUTH;
 	
 	public int sendGmailSimple (Map<String, String> paramMap) throws Exception {
