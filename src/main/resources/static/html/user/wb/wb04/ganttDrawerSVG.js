@@ -216,7 +216,7 @@ Ganttalendar.prototype.drawTask = function (task) {
   var self = this;
   //var prof = new Profiler("ganttDrawTask");
 
-	if (self.master.showBaselines) {
+	/*if (self.master.showBaselines) {
 		var baseline = self.master.baselines[task.id];
 		if (baseline) {
 			//console.debug("baseLine",baseline)
@@ -225,8 +225,9 @@ Ganttalendar.prototype.drawTask = function (task) {
 			task.ganttBaselineElement = baseTask;
 		}
 	}
+*/
+  var taskBox = $(_createTaskSVG(task));
 
-	var taskBox = $(_createTaskSVG(task));
   task.ganttElement = taskBox;
 
 
@@ -234,9 +235,10 @@ Ganttalendar.prototype.drawTask = function (task) {
     taskBox.addClass("critical");
 
   if (this.master.permissions.canWrite || task.canWrite) {
-
+	  
     //bind all events on taskBox
     taskBox
+
       .click(function (e) { // manages selection
         e.stopPropagation();// to avoid body remove focused
         self.element.find("[class*=focused]").removeClass("focused");
@@ -252,6 +254,7 @@ Ganttalendar.prototype.drawTask = function (task) {
 
       }).dblclick(function () {
         if (self.master.permissions.canSeePopEdit)
+         
           self.master.editor.openFullEditor(task,false);
       }).mouseenter(function () {
         //bring to top
@@ -333,6 +336,7 @@ Ganttalendar.prototype.drawTask = function (task) {
 
     //binding for creating link
     taskBox.find("[class*=linkHandleSVG]").mousedown(function (e) {
+    	
       e.preventDefault();
       e.stopPropagation();
       var taskBox = $(this).closest(".taskBoxSVG");
@@ -392,6 +396,25 @@ Ganttalendar.prototype.drawTask = function (task) {
       })
     });
   }
+  // 07.31 추가
+  else {
+	  taskBox
+	  .dblclick(function () {
+		  //alert(task.type +"//"+task.description+"//"+task.level);
+		  if (task.type != undefined && task.description != undefined) {
+			  var paramObj = {
+			          "coCd" : $('#coCd_S').val(),
+			          "salesCd": task.type,
+			          "codeId" : task.description
+			       };
+			       openSecondModal("/static/html/user/wb/wb04/WB0401P01.html", 1600, 850, "", paramObj, function(data) {
+			           //gridView1.setData(0);
+			       }); 
+		  }
+		  
+	   })
+	   
+  }
   //ask for redraw link
   self.redrawLinks();
 
@@ -401,12 +424,19 @@ Ganttalendar.prototype.drawTask = function (task) {
 	function _createTaskSVG(task) {
     var svg = self.svg;
 
-		var dimensions = {
+		/*var dimensions = {
 			x     : Math.round((task.start - self.startMillis) * self.fx),
 			y     : task.rowElement.position().top + task.rowElement.offsetParent().scrollTop() + self.taskVertOffset,
 			width : Math.max(Math.round((task.end - task.start) * self.fx), 1),
 			height: (self.master.showBaselines ? self.taskHeight / 1.3 : self.taskHeight)
-		};
+		};*/
+    //debugger;
+	var dimensions = {
+			x     : Math.round((task.start - self.startMillis) * self.fx),
+			y     : task.rowElement.position().top + task.rowElement.offsetParent().scrollTop() + self.taskVertOffset,
+			width : Math.max(Math.round((task.end - task.start) * self.fx), 1),
+			height: (self.master.showBaselines ? self.taskHeight / 1.3 : self.taskHeight)
+		};	
     var taskSvg = svg.svg(self.tasksGroup, dimensions.x, dimensions.y, dimensions.width, dimensions.height, {class:"taskBox taskBoxSVG taskStatusSVG", status:task.status, taskid:task.id,fill:task.color||"#eee" });
 
     //svg.title(taskSvg, task.name);

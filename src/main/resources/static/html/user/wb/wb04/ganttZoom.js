@@ -123,7 +123,7 @@
       start.setDate(15);
       end.setDate(1);
       end.setMonth(end.getMonth() + 1);
-      end.setDate(end.getDate() + 14);
+      end.setDate(end.getDate() + 30); // 07.31
     },
     row1:        function (date, tr1) {
       var start = new Date(date.getTime());

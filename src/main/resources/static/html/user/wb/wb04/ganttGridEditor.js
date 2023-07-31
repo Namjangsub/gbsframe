@@ -511,15 +511,19 @@ GridEditor.prototype.bindRowInputEvents = function (task, taskRow) {
 
 GridEditor.prototype.openFullEditor = function (task, editOnlyAssig) {
   var self = this;
-  var paramObj = {
-          "coCd" : $('#coCd_S').val(),
-          "salesCd": salesCd,
-          "codeId" : task.typeId
-       };
-       openSecondModal("/static/html/user/wb/wb04/WB0401P01.html", 1600, 850, "", paramObj, function(data) {
-           //gridView1.setData(0);
-       }); 
-       return;    
+  //alert(openFlag); 07.28	
+  /*if (openFlag) {
+	  var paramObj = {
+	          "coCd" : $('#coCd_S').val(),
+	          "salesCd": salesCd,
+	          "codeId" : task.typeId
+	       };
+	  
+	       openSecondModal("/static/html/user/wb/wb04/WB0401P01.html", 1600, 850, "", paramObj, function(data) {
+	           //gridView1.setData(0);
+	       }); 
+  }	   */    
+  //return;    
   if (!self.master.permissions.canSeePopEdit)
     return;
 
@@ -543,7 +547,7 @@ GridEditor.prototype.openFullEditor = function (task, editOnlyAssig) {
     taskEditor.find("#taskFullEditor").remove();
   } else {
     taskEditor.bind("openFullEditor.gantt",function () {
-      window.location.href=contextPath+"/applications/teamwork/task/taskEditor.jsp?CM=ED&OBJID="+task.id;
+       window.location.href=contextPath+"/applications/teamwork/task/taskEditor.jsp?CM=ED&OBJID="+task.id;
     });
   }
 
@@ -721,12 +725,14 @@ GridEditor.prototype.openFullEditor = function (task, editOnlyAssig) {
     });
   }
 
-  taskEditor.attr("alertonchange","true");
-  var ndo = createModalPopup(800, 450).append(taskEditor);//.append("<div style='height:800px; background-color:red;'></div>")
+  
+  // 07.31
+  //taskEditor.attr("alertonchange","true");
+  //var ndo = createModalPopup(800, 450).append(taskEditor);//.append("<div style='height:800px; background-color:red;'></div>")
 
   //workload computation
-  if (typeof(workloadDatesChanged)=="function")
-    workloadDatesChanged();
+  //if (typeof(workloadDatesChanged)=="function")
+ //   workloadDatesChanged();
 
 
 
