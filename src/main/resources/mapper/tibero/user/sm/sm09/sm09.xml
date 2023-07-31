@@ -1,0 +1,925 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.sm.sm09.mapper.SM09Mapper">
+	<!-- 그리드 조회 카운트-->
+    <select id="grid1_selectCount" parameterType="Map" resultType="int">
+		SELECT count(*)
+		FROM   (
+				SELECT A.*
+					, ROWNUM AS RN
+				FROM	(
+						SELECT DISTINCT A.FILE_TRGT_KEY
+							, T.PID
+							, T.ID
+							, T.CO_CD
+							, T.CO_NM
+							, T.IO_NO
+							, CASE WHEN T.IO_SEQ IS NULL OR T.IO_SEQ = '' THEN A.FILE_TRGT_KEY
+																		ELSE A.FILE_TRGT_KEY||'-'||T.IO_SEQ
+							END AS TREE_ID
+							, T.IO_SEQ
+							, T.SALES_CD
+							, T.CLNT_CD       --고객사
+							, T.CLNT_NM       --고객사명
+							, T.CLNT_PJT      --고객사PJT
+							, T.PRDT_CD       --제품구분
+							, T.PRDT_NM       --제품구분명
+							, T.ITEM_DIV      --아이템구분
+							, T.ITEM_DIV_NM   --아이템구분명
+							, T.EQP_NM        --설비명
+							, T.OUT_WH_CD     --출고창고코드
+							, T.OUT_WH_NM
+							, T.IO_DT         --폐기일자
+							, T.IO_RESN       --폐기사유
+							, T.IO_RMK        --폐기비고
+							, T.DSGN_NO
+							, T.MATR_CD
+							, T.MATR_NM --자재품명
+							, T.MATR_SPEC --자재규격     
+							, T.MATR_MAT --자재소재
+							, T.MATR_MAKR_NM --자재메이커
+							, T.MATR_MNO --자재형번
+							, T.IO_QTY
+							, T.IO_DTL_RMK
+							, T.MATR_CLNT_DIV --자재거래처분류
+							, T.CREAT_PGM
+							, T.CREAT_ID
+							, T.CREAT_ID_NM
+							, T.CREAT_DTTM
+							, T.UDT_PGM
+							, T.UDT_ID
+							, T.UDT_ID_NM
+							, T.UDT_DTTM
+							, T.LVL
+						FROM   (
+								SELECT DISTINCT A.FILE_TRGT_KEY --파일대상KEY
+								FROM   TB_SM09M01 AS A
+									LEFT OUTER JOIN (
+														SELECT DISTINCT SM.CO_CD    --회사
+															, SM.ORDRS_NO          --수주번호
+															, TO_CHAR(SM.ORDRS_CLNT_CD) AS CLNT_CD --고객사
+															, C.CLNT_NM                 AS CLNT_NM --고객사명
+															, SM.CLNT_PJT          --고객사PJT
+															, SD.PRDT_CD           --제품구분
+															, P.PRDT_NM
+															, SD.ITEM_DIV          --아이템구분
+															, SD.SALES_CD          --SalesCode
+															, SD.EQP_NM            --설비명
+														FROM   TB_CR02M01 AS SM
+															LEFT OUTER JOIN TB_CR02D02 AS SD  ON SD.CO_CD    = SM.CO_CD
+																								AND SD.ORDRS_NO = SM.ORDRS_NO
+															LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD
+															LEFT OUTER JOIN TB_BM01M01 AS P ON P.PRDT_CD = SD.PRDT_CD
+													) AS O  ON O.CO_CD    = A.CO_CD
+															AND O.SALES_CD = A.SALES_CD
+									LEFT OUTER JOIN TB_SM09D01 AS B  ON B.CO_CD = A.CO_CD
+																	AND B.IO_NO = A.IO_NO
+									LEFT OUTER JOIN TB_BM05M01 AS M  ON M.CO_CD   = B.CO_CD
+																	AND M.MATR_CD = B.MATR_CD
+								WHERE  1 = 1
+								<if test="coCd != null and !coCd.equals('')">
+								AND    A.CO_CD = #{coCd}
+								</if>
+								<if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')" >
+								AND    A.IO_DT BETWEEN TO_DATE( #{strtDt},'YYYYMMDD') AND TO_DATE( #{endDt},'YYYYMMDD')
+								</if>
+								<if test="salesCd != null and !salesCd.equals('')">
+								AND    A.SALES_CD LIKE '%' || #{salesCd} || '%'
+								</if>
+								<if test="outWhCd != null and !outWhCd.equals('')">
+								AND    A.OUT_WH_CD = #{outWhCd}
+								</if>
+								<if test="OrdrsClntCd != null and !OrdrsClntCd.equals('')">
+								AND    O.CLNT_CD = #{OrdrsClntCd}
+								</if>
+								<if test="clntNm != null and !clntNm.equals('')">
+								AND    O.CLNT_NM LIKE '%' || #{clntNm} || '%'
+								</if>						
+								<if test="prdtCd != null and !prdtCd.equals('')">
+								AND    O.PRDT_CD = #{prdtCd}
+								</if>
+								<if test="itemDiv != null and !itemDiv.equals('')">
+								AND    O.ITEM_DIV = #{itemDiv}
+								</if>						
+								<if test="matrCd != null and !matrCd.equals('')">
+								AND    B.MATR_CD LIKE '%' || #{matrCd} || '%'
+								</if>
+								<if test="matrNm != null and !matrNm.equals('')">
+								AND    M.MATR_NM LIKE '%' || #{matrNm} || '%'
+								</if>
+								<if test="matrMno != null and !matrMno.equals('')">
+								AND    M.MATR_MNO LIKE '%' || #{matrMno} || '%'
+								</if>
+								<if test="matrSpec != null and !matrSpec.equals('')">
+								AND    M.MATR_SPEC LIKE '%' || #{matrSpec} || '%'
+								</if>
+								<if test="matrClntDiv != null and !matrClntDiv.equals('')">
+								AND    M.MATR_CLNT_DIV = #{matrClntDiv}
+								</if>
+								<if test="matrMat != null and !matrMat.equals('')">
+								AND    M.MATR_MAT LIKE '%' || #{matrMat} || '%'
+								</if>
+								<if test="matrMakrNm != null and !matrMakrNm.equals('')">
+								AND    M.MATR_MAKR_NM LIKE '%' || #{matrMakrNm} || '%'
+								</if>
+							) AS A
+							LEFT OUTER JOIN (
+												SELECT DISTINCT T.PID
+													, T.ID
+													, T.FILE_TRGT_KEY
+													, T.CO_CD
+													, R.CODE_NM AS CO_NM
+													, T.IO_NO
+													, T.IO_SEQ
+													, T.SALES_CD
+													, O.CLNT_CD       --고객사
+													, O.CLNT_NM       --고객사명
+													, O.CLNT_PJT      --고객사PJT
+													, O.PRDT_CD       --제품구분
+													, O.PRDT_NM       --제품구분명
+													, O.ITEM_DIV      --아이템구분
+													, O.ITEM_DIV_NM   --아이템구분명
+													, O.EQP_NM        --설비명
+													, T.OUT_WH_CD     --출고창고코드
+													, R1.CODE_NM AS OUT_WH_NM
+													, T.IO_DT         --폐기일자
+													, T.IO_RESN       --폐기사유
+													, T.IO_RMK        --폐기비고
+													, T.DSGN_NO
+													, T.MATR_CD
+													, T.MATR_NM       --자재품명
+													, T.MATR_SPEC     --자재규격     
+													, T.MATR_MAT      --자재소재
+													, T.MATR_MAKR_NM  --자재메이커
+													, T.MATR_MNO      --자재형번
+													, T.IO_QTY
+													, T.IO_DTL_RMK
+													, T.MATR_CLNT_DIV --자재거래처분류
+													, T.CREAT_PGM
+													, T.CREAT_ID
+													, U1.NAME AS CREAT_ID_NM
+													, T.CREAT_DTTM
+													, T.UDT_PGM
+													, T.UDT_ID
+													, U2.NAME AS UDT_ID_NM
+													, T.UDT_DTTM
+													, T.LVL
+												FROM  (
+													SELECT ''               AS PID
+															, M.CO_CD||'_'||M.IO_NO AS ID
+															, M.FILE_TRGT_KEY
+															, M.SALES_CD
+															, M.CO_CD
+															, M.IO_NO
+															, M.OUT_WH_CD
+															, TO_CHAR(M.IO_DT, 'YYYY-MM-DD') AS IO_DT
+															, M.IO_RESN
+															, M.IO_RMK
+															, '' AS IO_SEQ
+															, '' AS DSGN_NO
+															, '' AS MATR_CD
+															, '' AS MATR_NM       --자재품명
+															, '' AS MATR_SPEC     --자재규격
+															, '' AS MATR_MAT      --자재소재
+															, '' AS MATR_MAKR_NM  --자재메이커
+															, '' AS MATR_MNO      --자재형번
+															, '' AS MATR_CLNT_DIV --자재거래처분류
+															, '' AS IO_QTY
+															, '' AS IO_DTL_RMK
+															, M.CREAT_PGM
+															, M.CREAT_ID
+															, TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM
+															, M.UDT_PGM
+															, M.UDT_ID
+															, TO_CHAR(M.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM
+															, '1' AS LVL
+													FROM   TB_SM09M01 AS M
+													UNION ALL
+													SELECT D.CO_CD||'_'||D.IO_NO                AS PID
+															, D.CO_CD||'_'||D.IO_NO||'_'||D.IO_SEQ AS ID
+															, M.FILE_TRGT_KEY AS FILE_TRGT_KEY
+															, D.SALES_CD
+															, D.CO_CD
+															, D.IO_NO
+															, M.OUT_WH_CD
+															, TO_CHAR(M.IO_DT, 'YYYY-MM-DD') AS IO_DT
+															, M.IO_RESN
+															, M.IO_RMK
+															, TO_CHAR(D.IO_SEQ) AS IO_SEQ
+															, D.DSGN_NO
+															, D.MATR_CD
+															, J.MATR_NM       --자재품명
+															, J.MATR_SPEC     --자재규격
+															, J.MATR_MAT      --자재소재
+															, J.MATR_MAKR_NM  --자재메이커
+															, J.MATR_MNO      --자재형번
+															, J.MATR_CLNT_DIV --자재거래처분류
+															, TO_CHAR(D.IO_QTY) AS IO_QTY
+															, D.IO_DTL_RMK
+															, D.CREAT_PGM
+															, D.CREAT_ID
+															, TO_CHAR(D.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM
+															, D.UDT_PGM
+															, D.UDT_ID
+															, TO_CHAR(D.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM
+															, '2' AS LVL
+													FROM   TB_SM09D01 AS D
+															LEFT OUTER JOIN TB_SM09M01 AS M  ON M.CO_CD = D.CO_CD
+																							AND M.IO_NO = D.IO_NO
+															--자재
+															LEFT OUTER JOIN TB_BM05M01 AS J  ON J.CO_CD   = D.CO_CD
+																							AND J.MATR_CD = D.MATR_CD
+													WHERE  1 = 1
+													<if test="matrCd != null and !matrCd.equals('')">
+													AND    D.MATR_CD LIKE '%' || #{matrCd} || '%'
+													</if>
+													<if test="matrNm != null and !matrNm.equals('')">
+													AND    J.MATR_NM LIKE '%' || #{matrNm} || '%'
+													</if>
+													<if test="matrMno != null and !matrMno.equals('')">
+													AND    J.MATR_MNO LIKE '%' || #{matrMno} || '%'
+													</if>
+													<if test="matrSpec != null and !matrSpec.equals('')">
+													AND    J.MATR_SPEC LIKE '%' || #{matrSpec} || '%'
+													</if>
+													<if test="matrClntDiv != null and !matrClntDiv.equals('')">
+													AND    J.MATR_CLNT_DIV = #{matrClntDiv}
+													</if>
+													<if test="matrMat != null and !matrMat.equals('')">
+													AND    J.MATR_MAT LIKE '%' || #{matrMat} || '%'
+													</if>
+													<if test="matrMakrNm != null and !matrMakrNm.equals('')">
+													AND    J.MATR_MAKR_NM LIKE '%' || #{matrMakrNm} || '%'
+													</if>
+													) AS T
+													LEFT OUTER JOIN (
+																	SELECT DISTINCT SM.CO_CD    --회사
+																			, SM.ORDRS_NO          --수주번호
+																			, TO_CHAR(SM.ORDRS_CLNT_CD) AS CLNT_CD --고객사
+																			, C.CLNT_NM                 AS CLNT_NM --고객사명
+																			, SM.CLNT_PJT          --고객사PJT
+																			, SD.PRDT_CD           --제품구분
+																			, P.PRDT_NM
+																			, SD.ITEM_DIV          --아이템구분
+																			, R.CODE_NM AS ITEM_DIV_NM
+																			, SD.SALES_CD          --SalesCode
+																			, SD.EQP_NM            --설비명
+																		FROM   TB_CR02M01 AS SM --수주마스터
+																			--수주상세 조인
+																			LEFT OUTER JOIN TB_CR02D02 AS SD  ON SD.CO_CD    = SM.CO_CD
+																												AND SD.ORDRS_NO = SM.ORDRS_NO
+																			--거래처 조인
+																			LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD
+																			--제품구분
+																			LEFT OUTER JOIN TB_BM01M01 AS P ON P.PRDT_CD = SD.PRDT_CD
+																			--아이템구분
+																			LEFT OUTER JOIN TB_CM05M01 AS R ON R.CODE_ID = SD.ITEM_DIV
+																	
+																	) AS O  ON O.CO_CD    = T.CO_CD
+																			AND O.SALES_CD = T.SALES_CD
+													--회사
+													LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = T.CO_CD
+													--출고창고
+													LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = T.OUT_WH_CD
+													--생성자
+													LEFT OUTER JOIN TB_CM06M01 AS U1 ON U1.ID = T.CREAT_ID
+													--변경자
+													LEFT OUTER JOIN TB_CM06M01 AS U2 ON U2.ID = T.UDT_ID
+											) AS T ON A.FILE_TRGT_KEY = T.FILE_TRGT_KEY
+						WHERE  1 = 1
+						ORDER BY A.FILE_TRGT_KEY, T.PID DESC, T.ID
+						) AS A
+				WHERE  1 = 1
+			   ) AS A
+		WHERE  1 = 1
+    </select>
+
+	<!-- 그리드 조회 -->
+	<select id="grid1_selectList" parameterType="Map" resultType="camelMap">
+		SELECT A.*
+		FROM   (
+				SELECT A.*
+					, ROWNUM AS RN
+				FROM	(
+						SELECT DISTINCT A.FILE_TRGT_KEY
+							, T.PID
+							, T.ID
+							, T.CO_CD
+							, T.CO_NM
+							, T.IO_NO
+							, CASE WHEN T.IO_SEQ IS NULL OR T.IO_SEQ = '' THEN A.FILE_TRGT_KEY
+																		ELSE A.FILE_TRGT_KEY||'-'||T.IO_SEQ
+							END AS TREE_ID
+							, T.IO_SEQ
+							, T.SALES_CD
+							, T.CLNT_CD       --고객사
+							, T.CLNT_NM       --고객사명
+							, T.CLNT_PJT      --고객사PJT
+							, T.PRDT_CD       --제품구분
+							, T.PRDT_NM       --제품구분명
+							, T.ITEM_DIV      --아이템구분
+							, T.ITEM_DIV_NM   --아이템구분명
+							, T.EQP_NM        --설비명
+							, T.OUT_WH_CD     --출고창고코드
+							, T.OUT_WH_NM
+							, T.IO_DT         --폐기일자
+							, T.IO_RESN       --폐기사유
+							, T.IO_RMK        --폐기비고
+							, T.DSGN_NO
+							, T.MATR_CD
+							, T.MATR_NM --자재품명
+							, T.MATR_SPEC --자재규격     
+							, T.MATR_MAT --자재소재
+							, T.MATR_MAKR_NM --자재메이커
+							, T.MATR_MNO --자재형번
+							, T.IO_QTY
+							, T.IO_DTL_RMK
+							, T.MATR_CLNT_DIV --자재거래처분류
+							, T.CREAT_PGM
+							, T.CREAT_ID
+							, T.CREAT_ID_NM
+							, T.CREAT_DTTM
+							, T.UDT_PGM
+							, T.UDT_ID
+							, T.UDT_ID_NM
+							, T.UDT_DTTM
+							, T.LVL
+						FROM   (
+								SELECT DISTINCT A.FILE_TRGT_KEY --파일대상KEY
+								FROM   TB_SM09M01 AS A
+									LEFT OUTER JOIN (
+														SELECT DISTINCT SM.CO_CD    --회사
+															, SM.ORDRS_NO          --수주번호
+															, TO_CHAR(SM.ORDRS_CLNT_CD) AS CLNT_CD --고객사
+															, C.CLNT_NM                 AS CLNT_NM --고객사명
+															, SM.CLNT_PJT          --고객사PJT
+															, SD.PRDT_CD           --제품구분
+															, P.PRDT_NM
+															, SD.ITEM_DIV          --아이템구분
+															, SD.SALES_CD          --SalesCode
+															, SD.EQP_NM            --설비명
+														FROM   TB_CR02M01 AS SM
+															LEFT OUTER JOIN TB_CR02D02 AS SD  ON SD.CO_CD    = SM.CO_CD
+																								AND SD.ORDRS_NO = SM.ORDRS_NO
+															LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD
+															LEFT OUTER JOIN TB_BM01M01 AS P ON P.PRDT_CD = SD.PRDT_CD
+													) AS O  ON O.CO_CD    = A.CO_CD
+															AND O.SALES_CD = A.SALES_CD
+									LEFT OUTER JOIN TB_SM09D01 AS B  ON B.CO_CD = A.CO_CD
+																	AND B.IO_NO = A.IO_NO
+									LEFT OUTER JOIN TB_BM05M01 AS M  ON M.CO_CD   = B.CO_CD
+																	AND M.MATR_CD = B.MATR_CD
+								WHERE  1 = 1
+								<if test="coCd != null and !coCd.equals('')">
+								AND    A.CO_CD = #{coCd}
+								</if>
+								<if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')" >
+								AND    A.IO_DT BETWEEN TO_DATE( #{strtDt},'YYYYMMDD') AND TO_DATE( #{endDt},'YYYYMMDD')
+								</if>
+								<if test="salesCd != null and !salesCd.equals('')">
+								AND    A.SALES_CD LIKE '%' || #{salesCd} || '%'
+								</if>
+								<if test="outWhCd != null and !outWhCd.equals('')">
+								AND    A.OUT_WH_CD = #{outWhCd}
+								</if>
+								<if test="OrdrsClntCd != null and !OrdrsClntCd.equals('')">
+								AND    O.CLNT_CD = #{OrdrsClntCd}
+								</if>
+								<if test="clntNm != null and !clntNm.equals('')">
+								AND    O.CLNT_NM LIKE '%' || #{clntNm} || '%'
+								</if>						
+								<if test="prdtCd != null and !prdtCd.equals('')">
+								AND    O.PRDT_CD = #{prdtCd}
+								</if>
+								<if test="itemDiv != null and !itemDiv.equals('')">
+								AND    O.ITEM_DIV = #{itemDiv}
+								</if>						
+								<if test="matrCd != null and !matrCd.equals('')">
+								AND    B.MATR_CD LIKE '%' || #{matrCd} || '%'
+								</if>
+								<if test="matrNm != null and !matrNm.equals('')">
+								AND    M.MATR_NM LIKE '%' || #{matrNm} || '%'
+								</if>
+								<if test="matrMno != null and !matrMno.equals('')">
+								AND    M.MATR_MNO LIKE '%' || #{matrMno} || '%'
+								</if>
+								<if test="matrSpec != null and !matrSpec.equals('')">
+								AND    M.MATR_SPEC LIKE '%' || #{matrSpec} || '%'
+								</if>
+								<if test="matrClntDiv != null and !matrClntDiv.equals('')">
+								AND    M.MATR_CLNT_DIV = #{matrClntDiv}
+								</if>
+								<if test="matrMat != null and !matrMat.equals('')">
+								AND    M.MATR_MAT LIKE '%' || #{matrMat} || '%'
+								</if>
+								<if test="matrMakrNm != null and !matrMakrNm.equals('')">
+								AND    M.MATR_MAKR_NM LIKE '%' || #{matrMakrNm} || '%'
+								</if>
+							) AS A
+							LEFT OUTER JOIN (
+												SELECT DISTINCT T.PID
+													, T.ID
+													, T.FILE_TRGT_KEY
+													, T.CO_CD
+													, R.CODE_NM AS CO_NM
+													, T.IO_NO
+													, T.IO_SEQ
+													, T.SALES_CD
+													, O.CLNT_CD       --고객사
+													, O.CLNT_NM       --고객사명
+													, O.CLNT_PJT      --고객사PJT
+													, O.PRDT_CD       --제품구분
+													, O.PRDT_NM       --제품구분명
+													, O.ITEM_DIV      --아이템구분
+													, O.ITEM_DIV_NM   --아이템구분명
+													, O.EQP_NM        --설비명
+													, T.OUT_WH_CD     --출고창고코드
+													, R1.CODE_NM AS OUT_WH_NM
+													, T.IO_DT         --폐기일자
+													, T.IO_RESN       --폐기사유
+													, T.IO_RMK        --폐기비고
+													, T.DSGN_NO
+													, T.MATR_CD
+													, T.MATR_NM       --자재품명
+													, T.MATR_SPEC     --자재규격     
+													, T.MATR_MAT      --자재소재
+													, T.MATR_MAKR_NM  --자재메이커
+													, T.MATR_MNO      --자재형번
+													, T.IO_QTY
+													, T.IO_DTL_RMK
+													, T.MATR_CLNT_DIV --자재거래처분류
+													, T.CREAT_PGM
+													, T.CREAT_ID
+													, U1.NAME AS CREAT_ID_NM
+													, T.CREAT_DTTM
+													, T.UDT_PGM
+													, T.UDT_ID
+													, U2.NAME AS UDT_ID_NM
+													, T.UDT_DTTM
+													, T.LVL
+												FROM  (
+													SELECT ''               AS PID
+															, M.CO_CD||'_'||M.IO_NO AS ID
+															, M.FILE_TRGT_KEY
+															, M.SALES_CD
+															, M.CO_CD
+															, M.IO_NO
+															, M.OUT_WH_CD
+															, TO_CHAR(M.IO_DT, 'YYYY-MM-DD') AS IO_DT
+															, M.IO_RESN
+															, M.IO_RMK
+															, '' AS IO_SEQ
+															, '' AS DSGN_NO
+															, '' AS MATR_CD
+															, '' AS MATR_NM       --자재품명
+															, '' AS MATR_SPEC     --자재규격
+															, '' AS MATR_MAT      --자재소재
+															, '' AS MATR_MAKR_NM  --자재메이커
+															, '' AS MATR_MNO      --자재형번
+															, '' AS MATR_CLNT_DIV --자재거래처분류
+															, '' AS IO_QTY
+															, '' AS IO_DTL_RMK
+															, M.CREAT_PGM
+															, M.CREAT_ID
+															, TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM
+															, M.UDT_PGM
+															, M.UDT_ID
+															, TO_CHAR(M.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM
+															, '1' AS LVL
+															, M.ETC_FIELD1 ----추가부분
+													FROM   TB_SM09M01 AS M
+													UNION ALL
+													SELECT D.CO_CD||'_'||D.IO_NO                AS PID
+															, D.CO_CD||'_'||D.IO_NO||'_'||D.IO_SEQ AS ID
+															, M.FILE_TRGT_KEY AS FILE_TRGT_KEY
+															, D.SALES_CD
+															, D.CO_CD
+															, D.IO_NO
+															, M.OUT_WH_CD
+															, TO_CHAR(M.IO_DT, 'YYYY-MM-DD') AS IO_DT
+															, M.IO_RESN
+															, M.IO_RMK
+															, TO_CHAR(D.IO_SEQ) AS IO_SEQ
+															, D.DSGN_NO
+															, D.MATR_CD
+															, J.MATR_NM       --자재품명
+															, J.MATR_SPEC     --자재규격
+															, J.MATR_MAT      --자재소재
+															, J.MATR_MAKR_NM  --자재메이커
+															, J.MATR_MNO      --자재형번
+															, J.MATR_CLNT_DIV --자재거래처분류
+															, TO_CHAR(D.IO_QTY) AS IO_QTY
+															, D.IO_DTL_RMK
+															, D.CREAT_PGM
+															, D.CREAT_ID
+															, TO_CHAR(D.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM
+															, D.UDT_PGM
+															, D.UDT_ID
+															, TO_CHAR(D.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM
+															, '2' AS LVL
+															, '' AS ETC_FIELD1  --추가부분
+													FROM   TB_SM09D01 AS D
+															LEFT OUTER JOIN TB_SM09M01 AS M  ON M.CO_CD = D.CO_CD
+																							AND M.IO_NO = D.IO_NO
+															--자재
+															LEFT OUTER JOIN TB_BM05M01 AS J  ON J.CO_CD   = D.CO_CD
+																							AND J.MATR_CD = D.MATR_CD
+													WHERE  1 = 1
+													<if test="matrCd != null and !matrCd.equals('')">
+													AND    D.MATR_CD LIKE '%' || #{matrCd} || '%'
+													</if>
+													<if test="matrNm != null and !matrNm.equals('')">
+													AND    J.MATR_NM LIKE '%' || #{matrNm} || '%'
+													</if>
+													<if test="matrMno != null and !matrMno.equals('')">
+													AND    J.MATR_MNO LIKE '%' || #{matrMno} || '%'
+													</if>
+													<if test="matrSpec != null and !matrSpec.equals('')">
+													AND    J.MATR_SPEC LIKE '%' || #{matrSpec} || '%'
+													</if>
+													<if test="matrClntDiv != null and !matrClntDiv.equals('')">
+													AND    J.MATR_CLNT_DIV = #{matrClntDiv}
+													</if>
+													<if test="matrMat != null and !matrMat.equals('')">
+													AND    J.MATR_MAT LIKE '%' || #{matrMat} || '%'
+													</if>
+													<if test="matrMakrNm != null and !matrMakrNm.equals('')">
+													AND    J.MATR_MAKR_NM LIKE '%' || #{matrMakrNm} || '%'
+													</if>
+													) AS T
+													LEFT OUTER JOIN (
+																	SELECT DISTINCT SM.CO_CD    --회사
+																			, SM.ORDRS_NO          --수주번호
+																			, TO_CHAR(SM.ORDRS_CLNT_CD) AS CLNT_CD --고객사
+																			, C.CLNT_NM                 AS CLNT_NM --고객사명
+																			, SM.CLNT_PJT          --고객사PJT
+																			, SD.PRDT_CD           --제품구분
+																			, P.PRDT_NM
+																			, SD.ITEM_DIV          --아이템구분
+																			, R.CODE_NM AS ITEM_DIV_NM
+																			, SD.SALES_CD          --SalesCode
+																			, SD.EQP_NM            --설비명
+																		FROM   TB_CR02M01 AS SM --수주마스터
+																			--수주상세 조인
+																			LEFT OUTER JOIN TB_CR02D02 AS SD  ON SD.CO_CD    = SM.CO_CD
+																												AND SD.ORDRS_NO = SM.ORDRS_NO
+																			--거래처 조인
+																			LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD
+																			--제품구분
+																			LEFT OUTER JOIN TB_BM01M01 AS P ON P.PRDT_CD = SD.PRDT_CD
+																			--아이템구분
+																			LEFT OUTER JOIN TB_CM05M01 AS R ON R.CODE_ID = SD.ITEM_DIV
+																	
+																	) AS O  ON O.CO_CD    = T.CO_CD
+																			AND O.SALES_CD = T.SALES_CD
+																			AND O.CLNT_PJT = T.ETC_FIELD1 --추가부분
+													--회사
+													LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = T.CO_CD
+													--출고창고
+													LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = T.OUT_WH_CD
+													--생성자
+													LEFT OUTER JOIN TB_CM06M01 AS U1 ON U1.ID = T.CREAT_ID
+													--변경자
+													LEFT OUTER JOIN TB_CM06M01 AS U2 ON U2.ID = T.UDT_ID
+											) AS T ON A.FILE_TRGT_KEY = T.FILE_TRGT_KEY
+						WHERE  1 = 1
+						ORDER BY A.FILE_TRGT_KEY, T.PID DESC, T.ID
+						) AS A
+				WHERE  1 = 1
+		       ) AS A
+		WHERE  1 = 1
+		AND    A.RN BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>
+
+	<select id="select_stock_modal" parameterType="Map" resultType="camelMap">
+		SELECT '' AS FILE_TRGT_KEY
+		     , I.CO_CD         --회사코드
+		     , I.SALES_CD      --Sales Code
+		     , I.WH_CD
+		     , I.DSGN_NO       --도번
+		     , I.GOODS_DIV     --제품/자재구분
+		     , I.MATR_CD       --재고품번
+		     , M.MATR_NM       --자재품명
+		     , M.MATR_SPEC     --자재규격
+		     , M.MATR_MAT      --자재소재
+		     , M.MATR_MAKR_NM  --자재메이커
+		     , M.MATR_MNO      --자재형번
+		     , M.MATR_DIV      --자재유형
+		     , M.MATR_GRP      --자재그룹
+		     , M.MATR_SIZE     --자재사이즈
+			 , 0 AS IO_QTY
+		     , '' AS IO_DTL_RMK
+		     , '' AS OUT_INOUT_KEY
+		     , I.STOCK_QTY     --재고수량
+		     , 'N' AS CHK      --체크여부
+		     , 0   AS OUT_QTY  --출고수량
+			 , I.STOCK_PRC   --재고평균단가
+		     , I.STOCK_AMT   --재고금액
+			 , 'I' AS DATA_CHK
+		FROM   (
+		        SELECT R.CODE_DESC   AS CO_CD --회사코드
+				     , I.WH_CD       --창고코드
+				     , R.CODE_NM     AS WH_NM
+				     , I.PART_NUMBER AS MATR_CD --재고품번
+				     , I.DSGN_NO     --도번
+				     , I.GOODS_DIV   --제품/자재구분
+				     , R1.CODE_NM    AS GOODS_DIV_NM
+				     , NVL(I.STOCK_QTY, 0) AS STOCK_QTY --재고수량
+				     , I.STOCK_PRC   --재고평균단가
+				     , I.STOCK_AMT   --재고금액
+				     , I.SALES_CD    --Sales Code
+				FROM   TB_BM20M01 AS I
+				       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = I.WH_CD
+				       LEFT JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = I.GOODS_DIV
+		       ) AS I
+		       LEFT JOIN TB_BM05M01 AS M  ON M.CO_CD   = I.CO_CD
+		                                 AND M.MATR_CD = I.MATR_CD
+		WHERE  I.STOCK_QTY > 0
+		AND    I.WH_CD    = #{whCd} --'WH01'
+		AND    I.SALES_CD = #{salesCd} --'23001-01HTFUP'
+    </select>
+	
+    <!-- 수정팝업 조회 -->
+    <select id="select_sm09_Info" parameterType="Map" resultType="camelMap">
+		SELECT DISTINCT A.FILE_TRGT_KEY
+		     , A.CO_CD
+		     , A.SALES_CD
+		     , O.CLNT_CD
+		     , O.CLNT_NM
+		     , O.CLNT_PJT
+		     , O.PRDT_CD
+		     , O.PRDT_NM
+		     , O.ITEM_DIV
+		     , O.ITEM_DIV_NM
+		     , O.EQP_NM
+		     , A.IO_NO
+		     , A.OUT_WH_CD
+		     , TO_CHAR(A.IO_DT, 'YYYY-MM-DD') AS IO_DT
+		     , A.IO_RESN
+		     , A.IO_RMK
+		     , B.IO_SEQ
+		     , B.DSGN_NO
+		     , B.MATR_CD
+		     , M.MATR_NM       --자재품명
+		     , M.MATR_SPEC     --자재규격
+		     , M.MATR_MAT      --자재소재
+		     , M.MATR_MAKR_NM  --자재메이커
+		     , M.MATR_MNO      --자재형번
+		     , B.IO_QTY
+		     , B.IO_DTL_RMK
+		     , B.OUT_INOUT_KEY
+		     
+		     , 0  AS STOCK_QTY --재고수량
+		     , '' AS CHK       --체크여부
+		     , 0  AS OUT_QTY
+
+			 , '' AS DATA_CHK
+		FROM   TB_SM09M01 AS A
+		       LEFT OUTER JOIN TB_SM09D01 AS B  ON B.CO_CD = A.CO_CD
+		                                       AND B.IO_NO = A.IO_NO
+		       LEFT OUTER JOIN (
+		                        SELECT DISTINCT SM.CO_CD    --회사
+		                             , SM.ORDRS_NO          --수주번호
+		                             , TO_CHAR(SM.ORDRS_CLNT_CD) AS CLNT_CD --고객사
+		                             , C.CLNT_NM                 AS CLNT_NM --고객사명
+		                             , SM.CLNT_PJT          --고객사PJT
+		                             , SD.PRDT_CD           --제품구분
+		                             , P.PRDT_NM
+		                             , SD.ITEM_DIV          --아이템구분
+		                             , R.CODE_NM AS ITEM_DIV_NM
+		                             , SD.SALES_CD          --SalesCode
+		                             , SD.EQP_NM            --설비명
+		                        FROM   TB_CR02M01 AS SM
+		                               LEFT OUTER JOIN TB_CR02D02 AS SD  ON SD.CO_CD    = SM.CO_CD
+		                                                                AND SD.ORDRS_NO = SM.ORDRS_NO
+		                               LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD
+		                               LEFT OUTER JOIN TB_BM01M01 AS P ON P.PRDT_CD = SD.PRDT_CD
+		                               LEFT OUTER JOIN TB_CM05M01 AS R ON R.CODE_ID = SD.ITEM_DIV
+				               ) AS O  ON O.CO_CD    = A.CO_CD
+				                      AND O.SALES_CD = A.SALES_CD
+		       LEFT JOIN TB_BM05M01 AS M  ON M.CO_CD   = B.CO_CD
+		                                 AND M.MATR_CD = B.MATR_CD
+		WHERE  A.FILE_TRGT_KEY = #{fileTrgtKey}
+		AND    ROWNUM = 1
+    </select>
+
+	<!-- 수정팝업 그리드 조회 -->
+	<select id="select_sm09_Info_Dtl" parameterType="Map" resultType="camelMap">
+		SELECT DISTINCT A.FILE_TRGT_KEY
+		     , A.CO_CD
+		     , A.SALES_CD
+		     , O.CLNT_CD
+		     , O.CLNT_NM
+		     , O.CLNT_PJT
+		     , O.PRDT_CD
+		     , O.PRDT_NM
+		     , O.ITEM_DIV
+		     , O.ITEM_DIV_NM
+		     , O.EQP_NM
+		     , A.IO_NO
+		     , A.OUT_WH_CD
+		     , TO_CHAR(A.IO_DT, 'YYYY-MM-DD') AS IO_DT
+		     , A.IO_RESN
+		     , A.IO_RMK
+		     , B.IO_SEQ
+		     , B.DSGN_NO
+		     , B.MATR_CD
+		     , M.MATR_NM       --자재품명
+		     , M.MATR_SPEC     --자재규격
+		     , M.MATR_MAT      --자재소재
+		     , M.MATR_MAKR_NM  --자재메이커
+		     , M.MATR_MNO      --자재형번
+		     , B.IO_QTY
+		     , B.IO_DTL_RMK
+		     , B.OUT_INOUT_KEY
+		     
+		     , 0  AS STOCK_QTY --재고수량
+		     , '' AS CHK       --체크여부
+		     , 0  AS OUT_QTY
+
+			 , 'U' AS DATA_CHK
+		FROM   TB_SM09M01 AS A
+		       LEFT OUTER JOIN TB_SM09D01 AS B  ON B.CO_CD = A.CO_CD
+		                                       AND B.IO_NO = A.IO_NO
+		       LEFT OUTER JOIN (
+		                        SELECT DISTINCT SM.CO_CD    --회사
+		                             , SM.ORDRS_NO          --수주번호
+		                             , TO_CHAR(SM.ORDRS_CLNT_CD) AS CLNT_CD --고객사
+		                             , C.CLNT_NM                 AS CLNT_NM --고객사명
+		                             , SM.CLNT_PJT          --고객사PJT
+		                             , SD.PRDT_CD           --제품구분
+		                             , P.PRDT_NM
+		                             , SD.ITEM_DIV          --아이템구분
+		                             , R.CODE_NM AS ITEM_DIV_NM
+		                             , SD.SALES_CD          --SalesCode
+		                             , SD.EQP_NM            --설비명
+		                        FROM   TB_CR02M01 AS SM
+		                               LEFT OUTER JOIN TB_CR02D02 AS SD  ON SD.CO_CD    = SM.CO_CD
+		                                                                AND SD.ORDRS_NO = SM.ORDRS_NO
+		                               LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD
+		                               LEFT OUTER JOIN TB_BM01M01 AS P ON P.PRDT_CD = SD.PRDT_CD
+		                               LEFT OUTER JOIN TB_CM05M01 AS R ON R.CODE_ID = SD.ITEM_DIV
+				               ) AS O  ON O.CO_CD    = A.CO_CD
+				                      AND O.SALES_CD = A.SALES_CD
+				                      AND O.CLNT_PJT = A.ETC_FIELD1 
+		       LEFT JOIN TB_BM05M01 AS M  ON M.CO_CD   = B.CO_CD
+		                                 AND M.MATR_CD = B.MATR_CD
+		WHERE  1 = 1
+		AND    A.CO_CD = #{coCd}
+		AND    A.IO_NO = #{ioNo}
+    </select>
+    
+	<!-- 창고 코드 가져오기 -->
+	<select id="selectWhCd" parameterType="Map" resultType="camelMap">
+		SELECT A.CODE_ETC AS CODE_ID
+             , B.CODE_NM
+		FROM   TB_CM05M01 A, TB_CM05M01 B
+		WHERE  A.CODE_KIND = #{codeKind}
+		AND    A.CODE_RPRC = #{coCd}
+		AND    A.CODE_ETC  = B.CODE_ID
+	</select>
+	
+	<!-- 파일키 MAX + 1 채번 -->
+	<select id="select_sm09_SeqNext" parameterType="Map" resultType="int">
+		SELECT NVL(MAX(TO_NUMBER(FILE_TRGT_KEY)) + 1, 1)
+		FROM   TB_SM09M01
+	</select>
+
+	<!-- 수불키 채번 -->
+	<select id="select_sm09_Ioseq" parameterType="Map" resultType="int">
+		SELECT TB_BM30M01_SQ01.NEXTVAL
+		FROM   DUAL
+	</select>
+
+	<!-- 관리번호 채번 -->
+	<select id="select_sm09_Next_MNGM_NO" parameterType="java.util.Map" resultType="java.lang.String">
+		SELECT CASE WHEN MAX(IO_NO) IS NULL THEN 'ADJ'||SUBSTR(#{ioDt}, 3, 2)||'00001'
+		                                    ELSE 'ADJ'||SUBSTR(#{ioDt}, 3, 2)||LPAD(TO_NUMBER(SUBSTR(MAX(IO_NO), -5)) + 1, 5, 0)
+			   END AS MNGM_NO
+		FROM   TB_SM09M01
+		WHERE  CO_CD = #{coCd}
+		AND    IO_DT LIKE SUBSTR(#{ioDt}, 0, 4)||'%'
+    </select>
+	
+	<!-- insert -->
+    <insert id="insert_sm09" parameterType="Map">
+        INSERT INTO TB_SM09M01
+		(
+			  FILE_TRGT_KEY
+			, CO_CD
+			, IO_NO
+			, IO_DIV
+			, SALES_CD
+			, OUT_WH_CD
+			, IO_DT
+			, IO_RESN
+			, IO_RMK
+			, ETC_FIELD1
+			, ETC_FIELD2
+			, ETC_FIELD3
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+		)
+		VALUES
+		(
+			  #{fileTrgtKey}
+			, #{coCd}
+			, #{ioNo}
+			, 'INOUTDIV_O06'
+			, #{salesCd}
+			, #{outWhCd}
+			, #{ioDt}
+			, #{ioResn}
+			, #{ioRmk}
+			, #{clntPjt, jdbcType=VARCHAR}
+			, #{etcField2, jdbcType=VARCHAR}
+			, #{etcField3, jdbcType=VARCHAR}
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+		)
+    </insert>
+
+	<insert id="insert_sm09_Dtl" parameterType="Map">
+		INSERT INTO TB_SM09D01
+		(
+			  CO_CD
+			, IO_NO
+			, IO_SEQ
+			, SALES_CD
+			, MATR_CD
+			, DSGN_NO
+			, IO_QTY
+			, IO_DTL_RMK
+			, OUT_INOUT_KEY
+			, ETC_FIELD1
+			, ETC_FIELD2
+			, ETC_FIELD3
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+		)
+		VALUES
+		(
+			  #{coCd}
+			, #{ioNo}
+			, #{ioSeq}
+			, #{salesCd}
+			, #{matrCd}
+			, #{dsgnNo}
+			, #{outQty}
+			, #{ioDtlRmk, jdbcType=VARCHAR}
+			, #{outInoutKey}
+			, #{etcField1, jdbcType=VARCHAR}
+			, #{etcField2, jdbcType=VARCHAR}
+			, #{etcField3, jdbcType=VARCHAR}
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+		)
+	</insert>
+    
+	<!-- update -->
+    <update id="update_sm09" parameterType="map">
+		UPDATE TB_SM09M01
+		SET    IO_RESN  = #{ioResn}
+		     , IO_RMK   = #{ioRmk}
+			 , UDT_ID   = #{userId}
+			 , UDT_PGM  = #{pgmId}
+			 , UDT_DTTM = SYSDATE
+		WHERE  FILE_TRGT_KEY = #{fileTrgtKey}
+    </update>
+
+	<update id="update_sm09_Dtl" parameterType="map">
+		UPDATE TB_SM09D01
+		SET    IO_QTY   = #{outQty}
+		     , UDT_ID   = #{userId}
+			 , UDT_PGM  = #{pgmId}
+			 , UDT_DTTM = SYSDATE
+		WHERE  CO_CD  = #{coCd}
+		AND    IO_NO  = #{ioNo}
+		AND    IO_SEQ = #{ioSeq}
+    </update>
+    
+    <!-- delete -->    
+    <delete id="delete_sm09" parameterType="Map">
+		DELETE TB_SM09M01
+		WHERE  FILE_TRGT_KEY = #{fileTrgtKey}
+	</delete>
+    
+    <delete id="delete_sm09_Dtl" parameterType="Map">
+		DELETE TB_SM09D01
+		WHERE  CO_CD  = #{coCd}
+		AND    IO_NO  = #{ioNo}
+		AND    IO_SEQ = #{ioSeq}
+	</delete>
+	
+	<delete id="delete_sm09_Dtl_All" parameterType="Map">
+		DELETE TB_SM09D01
+		WHERE  CO_CD  = #{coCd}
+		AND    IO_NO  = #{ioNo}
+	</delete>
+
+</mapper>
