@@ -33,10 +33,10 @@ public class EmailCtr {
     public String sendMailSimple(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
     	try {
     		int count = 0;
-    		if (mailType.equals("office365")) {
+    		if (mailType.equals("SpringFramework")) {
     			count = emailSvc.sendMailSimple(paramMap);
     		} else {
-    			count = emailSvc.sendGmailSimple(paramMap);
+    			count = emailSvc.sendApiMailSimple(paramMap);
     		}
     		model.addAttribute("resultCode", 200);
     		model.addAttribute("resultMessage", messageUtils.getMessage("mailSendComplete"));
@@ -52,10 +52,10 @@ public class EmailCtr {
 	public String sendJoinMail(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
 			int count = 0;
-    		if (mailType.equals("office365")) {
+    		if (mailType.equals("SpringFramework")) {
     			count = emailSvc.sendMailHtml(paramMap, mRequest);
     		} else {
-    			count = emailSvc.sendGmailHtml(paramMap, mRequest);
+    			count = emailSvc.sendApiMailHtml(paramMap, mRequest);
     		}
 			model.addAttribute("resultCode", 200);
 			model.addAttribute("resultMessage", messageUtils.getMessage("mailSendComplete"));
@@ -64,7 +64,8 @@ public class EmailCtr {
 			paramMap.put("errorYn", "Y");
 			paramMap.put("errorText", errorMessage);
 			try {
-				int count = emailSvc.updateMailError(paramMap);
+//				int count = emailSvc.updateMailError(paramMap);
+				int count = emailSvc.insertMail(paramMap); //오류로그 남기기 Exception 발생시 rollback되어 초기등록된 자로가 없음~
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("mailSendFail"));
 			}catch(Exception ex){	  

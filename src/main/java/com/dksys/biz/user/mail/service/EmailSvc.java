@@ -7,9 +7,9 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface EmailSvc {
 	
-	int sendGmailSimple(Map<String, String> paramMap) throws Exception;
+	int sendApiMailSimple(Map<String, String> paramMap) throws Exception;
 
-	int sendGmailHtml(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	int sendApiMailHtml(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
 	int sendMailSimple(Map<String, String> paramMap) throws Exception;
 	

@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,8 +38,11 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.Properties;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -56,36 +60,32 @@ public class EmailSvcImpl implements EmailSvc {
     @Autowired
     MailMapper mailMapper;
     
-	@Value("${spring.mail.username}")
-	private String USERNAME;
-	
-	@Value("${spring.mail.password}")
-	private String PASSWORD;
-	
-	@Value("${spring.mail.host}")
-	private String HOSTNAME;
-
-	@Value("${spring.mail.port}")
-	private String STARTTLS_PORT;
-
-	@Value("${spring.mail.properties.mail.smtp.starttls.enable}")
-	private String STARTTLS;
-	
-	@Value("${spring.mail.properties.mail.smtp.auth}")  
-	private String AUTH;
-	
-	public int sendGmailSimple (Map<String, String> paramMap) throws Exception {
+	/*************************************************************************
+	 * Spring Boot는 Spring Framework이 제공하는 JavaMailSender로 mimemessage 객체 생성
+	 * Spring의 JavaMailSender를 사용하면
+	 * Session 설정을 자동으로 처리해주기 때문에
+	 * 별도로 Properties를 직접 설정하거나 Authenticator를 구현할 필요가 없다.
+	 **************************************************************************/
+	public int sendMailSimple (Map<String, String> paramMap) throws Exception {
     	String authNum = createCode();
         
         paramMap.put("mailCode", authNum);
-//        mailMapper.insertMail(paramMap);
-        //office365 용
-        
-      //Gmail 용
+        paramMap.put("mailType", "Simple");
+        mailMapper.insertMail(paramMap); //전송로그 남기기 Exception 발생시 rollback되어  없어짐 주의
+
     	SimpleMailMessage simpleMessage = new SimpleMailMessage();
     	
-    	simpleMessage.setTo(paramMap.get("mailTo")); // 메일 수신자
     	simpleMessage.setFrom(paramMap.get("mailFrom")); // 메일송신자
+        String toValue = paramMap.get("mailTo");
+        List<String> validToAddresses = filterValidEmailAddresses(toValue);
+        String[] toAddressesArray = validToAddresses.toArray(new String[0]);
+        simpleMessage.setTo(toAddressesArray);
+        String ccValue = paramMap.get("mailCc");
+        List<String> validCcAddresses = filterValidEmailAddresses(ccValue);
+        String[] ccAddressesArray = validCcAddresses.toArray(new String[0]);
+        simpleMessage.setCc(ccAddressesArray);
+        
+//        String bccValue = paramMap.get("mailBcc");
     	simpleMessage.setSubject(paramMap.get("mailTitle")); // 메일 제목
     	simpleMessage.setText(paramMap.get("mailCnts")); // 메일 본문 내용, HTML 여부
     	javaMailSender.send(simpleMessage);
@@ -93,7 +93,7 @@ public class EmailSvcImpl implements EmailSvc {
     	return 1;
     }
     
-    public int sendGmailHtml(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+    public int sendMailHtml(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
         String authNum = createCode();
         // html로 텍스트 설정
@@ -102,23 +102,52 @@ public class EmailSvcImpl implements EmailSvc {
         
         paramMap.put("mailCnts", mailCnts);
         paramMap.put("mailCode", authNum);
-        mailMapper.insertMail(paramMap);
+        paramMap.put("mailType", "Html");
+        mailMapper.insertMail(paramMap);  //전송로그 남기기 Exception 발생시 rollback되어  없어짐 주의
+    	/*************************************************************************
+    	 * Spring Framework이 제공하는 JavaMailSender로 mimemessage 객체 생성
+    	 * Properties, Authenticator 설정 필요없음
+    	 **************************************************************************/        
+//        // 메일 서버 속성 설정
+//        Properties properties = new Properties();
+//        properties.put("mail.smtp.host", HOSTNAME); // 메일 서버 호스트
+//        properties.put("mail.smtp.port", STARTTLS_PORT); // 메일 서버 포트
+//        properties.put("mail.smtp.auth", AUTH); // 인증 설정 (true 또는 false)
+//        properties.put("mail.smtp.starttls.enable", STARTTLS); // STARTTLS 사용 여부 (true 또는 false)
+//
+//        // JavaMailSender를 JavaMailSenderImpl로 형변환
+//        JavaMailSenderImpl mailSenderImpl = (JavaMailSenderImpl) javaMailSender;
+//
+//        // JavaMailProperties 설정
+//        mailSenderImpl.setJavaMailProperties(properties);  
         
         MimeMessage mimeMessage = javaMailSender.createMimeMessage();
-
         MimeMessageHelper mimeMessageHelper = new MimeMessageHelper(mimeMessage, true, "UTF-8"); //파일첨부 기능 상용여부 (true:사용, false:미사용)
+        mimeMessage.setFrom(new InternetAddress(paramMap.get("mailFrom")));
+//        String toValue = paramMap.get("mailTo");
+//        List<String> validToAddresses = filterValidEmailAddresses(toValue);
+//        for (String address : validToAddresses) {
+//        	mimeMessageHelper.addTo(address);
+//        }
+//        String ccValue = paramMap.get("mailCc");
+//        List<String> validCcAddresses = filterValidEmailAddresses(ccValue);
+//        for (String address : validCcAddresses) {
+//        	mimeMessageHelper.addCc(address);
+//        }    
         String toValue = paramMap.get("mailTo");
-        if (toValue != null && !toValue.isEmpty()) {
-        	String[] toArr = toValue.split(",");
-        	mimeMessageHelper.setTo(toArr); // 메일 수신자
-        }
+        List<String> validToAddresses = filterValidEmailAddresses(toValue);
+        String[] toAddressesArray = validToAddresses.toArray(new String[0]);
+        mimeMessageHelper.setTo(toAddressesArray);
+        
         String ccValue = paramMap.get("mailCc");
-        if (ccValue != null && !ccValue.isEmpty()) {
-            String[] ccArr = ccValue.split(",");
-            mimeMessageHelper.setCc(ccArr); // 메일 참조자
-        }
-//        toArr = paramMap.get("mailBcc").split(",");
-//        mimeMessageHelper.setBcc(toArr); // 메일 숨은참조자
+        List<String> validCcAddresses = filterValidEmailAddresses(ccValue);
+        String[] ccAddressesArray = validCcAddresses.toArray(new String[0]);
+        mimeMessageHelper.setCc(ccAddressesArray);        
+//        String bccValue = paramMap.get("mailBcc");
+//        List<String> validBccAddresses = filterValidEmailAddresses(bccValue);
+//        for (String address : validCcAddresses) {
+//        	mimeMessageHelper.setCc(address);
+//        } 
         mimeMessageHelper.setSubject(paramMap.get("mailTitle")); // 메일 제목
         
         // html로 텍스트 설정
@@ -193,6 +222,27 @@ public class EmailSvcImpl implements EmailSvc {
     	return mailHtml; 
     }
 
+    
+    public static List<String> filterValidEmailAddresses(String input) {
+        List<String> validEmailAddresses = new ArrayList<>();
+        if (input == null || input.isEmpty()) {
+            return validEmailAddresses;
+        }
+
+        Pattern emailPattern = Pattern.compile("\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b");
+        String[] addresses = input.split("[,;]");
+
+        for (String address : addresses) {
+            String trimmedAddress = address.trim();
+            Matcher matcher = emailPattern.matcher(trimmedAddress);
+            if (matcher.matches()) {
+                validEmailAddresses.add(trimmedAddress);
+            }
+        }
+
+        return validEmailAddresses;
+    }
+    
 	@Override
 	public int selectMailCount(java.util.Map<String, String> paramMap) {
 		return mailMapper.selectMailCount(paramMap);
@@ -217,41 +267,55 @@ public class EmailSvcImpl implements EmailSvc {
 	public int deleteMail(java.util.Map<String, String> paramMap) {
 		return mailMapper.deleteMail(paramMap);
 	}
-	
+
+	/*************************************************************************
+	 * JavaMail API를 사용한  mimemessage 객체 생성
+	 * 직접 Properties를 설정하고 Authenticator를 구현 필요	
+	 * (Spring Boot는 Spring Framework이 제공하는 JavaMailSender 사용)
+	 **************************************************************************/
 	Properties properties;
 	Session session;
 	MimeMessage mimeMessage;
+    
+	@Value("${spring.mail.username}")
+	private String USERNAME;
 	
-	public int sendMailSimple(Map<String, String> paramMap) {
+	@Value("${spring.mail.password}")
+	private String PASSWORD;
+	
+	@Value("${spring.mail.host}")
+	private String HOSTNAME;
+
+	@Value("${spring.mail.port}")
+	private String STARTTLS_PORT;
+
+	@Value("${spring.mail.properties.mail.smtp.starttls.enable}")
+	private String STARTTLS;
+	
+	@Value("${spring.mail.properties.mail.smtp.auth}")  
+	private String AUTH;
+	
+	public int sendApiMailSimple(Map<String, String> paramMap) {
 		try {
 			properties = new Properties();
 			properties.put("mail.smtp.host", HOSTNAME);
-			// Setting STARTTLS_PORT
 			properties.put("mail.smtp.port", STARTTLS_PORT);
-			// AUTH enabled
 			properties.put("mail.smtp.auth", AUTH);
-			// STARTTLS enabled
 			properties.put("mail.smtp.starttls.enable", STARTTLS);
-
-			// Authenticating
 			Authenticator auth = new Authenticator() {
 				protected PasswordAuthentication getPasswordAuthentication() {
 					return new PasswordAuthentication(USERNAME, PASSWORD);
 				}
 			};
 
-			// creating session
 			session = Session.getInstance(properties, auth);
-
-			// create mimemessage
-			mimeMessage = new MimeMessage(session);
-			
-			//from address should exist in the domain
+			mimeMessage = new MimeMessage(session);// JavaMail API를 사용한  mimemessage
 			mimeMessage.setFrom(new InternetAddress(paramMap.get("mailFrom")));
-			mimeMessage.addRecipient(RecipientType.TO, new InternetAddress(paramMap.get("mailTo")));
+			String[] toArr = paramMap.get("mailTo").split("[,;],");
+			for (String toAddress : toArr) {
+			    mimeMessage.addRecipient(RecipientType.TO, new InternetAddress(toAddress.trim()));
+			}
 			mimeMessage.setSubject(paramMap.get("mailTitle"));
-
-			// setting text message body
 			mimeMessage.setText(paramMap.get("mailCnts"));
 
 			// sending mail
@@ -264,44 +328,34 @@ public class EmailSvcImpl implements EmailSvc {
 		}
 	}	
 	
-	public int sendMailHtml(Map<String, String> paramMap, MultipartHttpServletRequest mRequest ) throws Exception {
+	public int sendApiMailHtml(Map<String, String> paramMap, MultipartHttpServletRequest mRequest ) throws Exception {
 		try {
 			properties = new Properties();
 			properties.put("mail.smtp.host", HOSTNAME);
-			// Setting STARTTLS_PORT
 			properties.put("mail.smtp.port", STARTTLS_PORT);
-			// AUTH enabled
 			properties.put("mail.smtp.auth", AUTH);
-			// STARTTLS enabled
 			properties.put("mail.smtp.starttls.enable", STARTTLS);
-
-			// Authenticating
 			Authenticator auth = new Authenticator() {
 				protected PasswordAuthentication getPasswordAuthentication() {
 					return new PasswordAuthentication(USERNAME, PASSWORD);
 				}
 			};
 
-			// creating session
 			session = Session.getInstance(properties, auth);
-
-			// create mime message
-			mimeMessage = new MimeMessage(session);
+			mimeMessage = new MimeMessage(session);// JavaMail API를 사용한  mimemessage
 			
 			mimeMessage.setFrom(new InternetAddress(paramMap.get("mailFrom")));
-			mimeMessage.addRecipient(RecipientType.TO, new InternetAddress(paramMap.get("mailTo")));
+			String[] toArr = paramMap.get("mailTo").split("[,;],");
+			for (String toAddress : toArr) {
+			    mimeMessage.addRecipient(RecipientType.TO, new InternetAddress(toAddress.trim()));
+			}
 			mimeMessage.setSubject(paramMap.get("mailTitle"));
 			
 			// Multipart 객체 생성하여 본문과 첨부 파일 추가
 			Multipart multipart = new MimeMultipart();
-
-			// setting HTML message body
-			MimeBodyPart bodyPart = new MimeBodyPart();
-			
-	        String authNum = createCode();
-	        // html로 텍스트 설정
-	        String mailCnts = setHtmlContext(authNum, paramMap);
-			
+			MimeBodyPart bodyPart = new MimeBodyPart();// HTML 텍스트 body
+	        String authNum = createCode(); // 비밀코드 생성
+	        String mailCnts = setHtmlContext(authNum, paramMap); // html로 텍스트 생성
             bodyPart.setContent(mailCnts, "text/html; charset=utf-8");
             multipart.addBodyPart(bodyPart);
 
