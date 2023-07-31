@@ -9,7 +9,6 @@
 	<input type="hidden" id="userId" name="userId">
 	<input type="hidden" id="pgmId" name="pgmId" value="CR1001M01">
   	<input type="hidden" id="coCd" name="coCd">
-  	<input type="hidden" id="lgistNo" name="lgistNo">
   	<input type="hidden" id="todoDiv1CodeId" name="todoDiv1CodeId">
   	<input type="hidden" id="todoDiv2CodeId" name="todoDiv2CodeId">
   	<input type="hidden" id="todoId" name="todoId">
@@ -64,6 +63,17 @@
         </tr>
 
         <tr>
+			<th>분류구분</th>
+			<td>
+				<input type="text" id="clasDivNm" name="clasDivNm">
+			</td>
+			<th>물류번호</th>
+			<td colspan="5">
+				<input type="text" id="lgistNo" name="lgistNo">
+			</td>
+        </tr>
+
+        <tr>
 			<th>Sales Code</th>
 			<td colspan="7" valign="top">
 				<div style="width: 100%; height: 240px;margin-left:5px;" id="salescd-grid-height">
@@ -72,13 +82,6 @@
 	                <div data-ax5grid="salescd-grid" data-ax5grid-config="{}" style="height:230px; width: 99%;">
 	                </div>
 				</div>
-			</td>
-        </tr>
-
-        <tr>
-			<th>분류구분</th>
-			<td colspan="7">
-				<input type="text" id="clasDivNm" name="clasDivNm">
 			</td>
         </tr>
 
@@ -197,12 +200,6 @@
     </form>
 	</div>
 
-	<div style="height:50px" class="fileList_height">
-	</div>
-	<!-- 공통 파일 영역
-	<div id="fileList_area"></div>
-	 -->
-
 </div>
     <!-- 하단 버튼 -->
 	<div class ="popup_bottom_btn">
@@ -212,7 +209,7 @@
 	</div>
 <script type="text/javascript">
 	var fileTrgtKey = null;
-	var realStepAppUserInfo = null;
+	let realAppList = {};
 
 	var salescdGridView = {
 		initView: function(){
@@ -264,7 +261,7 @@
             		}
        			});
 
-				if(list.length > 0) {
+				if(list.length > 2) {
 					var gridHeight = 66+(list.length * 26);
 					salescdGridView.target.setHeight(gridHeight);
 					//width: 100%; height: 240px;margin-left:5px;
@@ -272,8 +269,8 @@
 					$("#salescd-grid-height").css({"width":"100%", "height": _height, "margin-left": "5px"});
 				}
 				else {
-					salescdGridView.target.setHeight(100);
-					$("#salescd-grid-height").css({"width":"100%", "height": 120, "margin-left": "5px"});
+					salescdGridView.target.setHeight(150);
+					$("#salescd-grid-height").css({"width":"100%", "height": 170, "margin-left": "5px"});
 				}
     	 	});
 		}
@@ -302,38 +299,49 @@
 			loadFormData("#popForm", data.result, function(data){
 				setDisabledInput("#popForm" , true);
 			});
-			//현재 스텝의 결재자 정보를 realStepAppUserInfo 에 할당한다.
-			realStepAppUserInfo = getRealStepAppUserInfoPopup(data.resultAppList);
-			if(data.resultAppList){
-				createHtmlAppView(data.resultAppList);
+			realAppList = data.resultAppList;//현재 스텝의 결재자 정보
+			if(realAppList){
+				createHtmlAppView(realAppList);
 			}
 		});
 	}
 
-	//현재단계의 결재자  정보 return;
-	function getRealStepAppUserInfoPopup(appDataList){
-		if(appDataList.length == 0) return null;
-		var todoCfYCount = 0;
-		var resultInfo = null;
-		$.each(appDataList, function (idx, elem) {
-			if(elem.todoCfYn=="Y") {
-				todoCfYCount += 1;
+	function isAppUserCheck(appDataList) {
+		if(appDataList.length == 0) return false;
+		for(var i=0; i<appDataList.length; i++){
+			var elem = appDataList[i];
+			if(elem.todoCfYn=="N" && elem.todoId==jwt.userId){
+				return true;
 			}
-		});
+		}
+		return false;
+	}
 
-		if(todoCfYCount == appDataList.length){
+	//현재단계의 결재자  정보 return;
+	function getRealStepAppUserInfo(appDataList){
+		if(appDataList.length == 0) return null;
+		var todoCf_N_Index = -1;
+		var resultInfo = null;
+
+		for(var i=0; i<appDataList.length; i++){
+			var elem = appDataList[i];
+			if(elem.todoCfYn=="N") {
+				todoCf_N_Index = i;
+				break;
+			}
+		}
+		if(todoCf_N_Index == -1){
 			alert("결재완료된 내역입니다.");
 			return null;
 		}
 		else {
-			resultInfo = appDataList[todoCfYCount];
+			resultInfo = appDataList[todoCf_N_Index];
 		}
-
 		return resultInfo;
 	}
 
 	function createHtmlAppView(appDataList){
-		var isAppView = false;
+		var isAppView = true;
 		try {
 			isAppView = approvalAppInfoView;
 		} catch (e){
@@ -341,14 +349,14 @@
 		if(isAppView==false) return;
 		if(appDataList.length == 0) return;
 		var cHtml = '';
-		cHtml += ' 	<table style="width:500px;margin-bottom:10px;float:right;">\n';
-		cHtml += '		<tr>\n';
+		cHtml += ' 	<table style="width:500px;margin-bottom:15px;float:right;">\n';
+		cHtml += '		<tr style="height:25px;">\n';
 		cHtml += '			<th rowspan="2" style="width:50px;margin-left:0px">결재</th>\n';
 		$.each(appDataList, function (idx, elem) {
 			cHtml += '			<th style="text-align:center;margin-left:0px;">'+elem.levelNm+'</th>\n';
 		});
 		cHtml += '		</tr>\n';
-		cHtml += '		<tr>\n';
+		cHtml += '		<tr style="height:30px;">\n';
 		$.each(appDataList, function (idx, elem) {
 			var span_text =  '<span style="font-size:10px;color:gray;">(대기)</span>';
 			if(elem.todoCfYn=="Y") {
@@ -378,22 +386,19 @@
 
 	// 결재 확정 처리
 	function updateTodoAppConfirm() {
-		if(realStepAppUserInfo == null){
-			alert("잘못된 결재 내역입니다.");
-			return;
-		}
 		var isIgnore = false;
 		try {
 			isIgnore = approvalAuthorityIgnore;
 		} catch (e){
 		}
 
-		var realStepAppUserId = realStepAppUserInfo.todoId;
-		if(realStepAppUserId != jwt.userId && isIgnore == false){
-			alert("결재 권한을 가진 사용자가 아닙니다. 결재 [순번:"+realStepAppUserInfo.appSeq+" 결재자:"+realStepAppUserInfo.todoIdNm+"]");
+		if(isAppUserCheck(realAppList) == false && isIgnore == false){
+			alert("결재 권한을 가진 사용자가 아닙니다.");
 			return;
 		}
 
+		var realStepAppUserInfo = getRealStepAppUserInfo(realAppList);
+		var realStepAppUserId = realStepAppUserInfo.todoId;
 		if(isIgnore == true && !isEmpty(realStepAppUserId)) {
 			$("#popForm #userId").val(realStepAppUserId);
 			$("#popForm #todoId").val(realStepAppUserId);

@@ -7,8 +7,12 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface EmailSvc {
 	
-	int sendMailSimple(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	int sendApiMailSimple(Map<String, String> paramMap) throws Exception;
 
+	int sendApiMailHtml(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	
+	int sendMailSimple(Map<String, String> paramMap) throws Exception;
+	
 	int sendMailHtml(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
 	public int selectMailCount(Map<String, String> paramMap);
