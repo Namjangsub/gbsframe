@@ -247,6 +247,13 @@ function selectGridValidation(obj) {
 	}
 }
 
+function selectGridValidationM(obj) {
+	if(obj.getList("selected").length == 0) {
+		alert("선택된 데이터가 없습니다.");
+		return true;
+	}
+}
+
 function checkGridRow(grid, type){
 	var isValid = true;
 	if(grid.getList("selected").length == 0){
@@ -643,7 +650,7 @@ function setCommonDiv(inputCd){
 					inputHtml += '<input type="radio" id="'+item.codeKind+j+'" name="'+item.codeKind+i+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
 					inputHtml += ' ' +item.codeNm;
 					inputHtml += '</td>';
-				});			   
+				});
 				$(elem).append(inputHtml);
 
 		})
@@ -665,8 +672,8 @@ function setCommonTd(inputCd,inputCd2,inputCd3){
 					j = j+1;
 					inputHtml += '<input type="checkbox" id="'+item.codeKind+j+'M" name="'+item.codeKind+i+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
 					inputHtml += ' ' +item.codeNm+' ';
-					
-				});		
+
+				});
 				$(elem).append(inputHtml);
 
 		})
@@ -997,7 +1004,7 @@ function authChk(menuUrl){
 //                $(elem).remove();
 //            }
 //        });
-        
+
         //array함수로 기능 대체하고 버튼을 삭제함(버튼을 사용하는 프로그램은 오류 발생 가능)
         // 버튼 숨김으로 하면 소스 편집하여 강제처리가능으로 위험
         const foundMenu = arr.find(item => item.m === menuUrl);
@@ -1252,25 +1259,25 @@ function initLoadForm(_form){
 function dataMaxLength(value , maxLength){
 	if(isEmpty(value)) return "";
 	var byte_length = getByteLength(value);
-	var max_hangul_length = maxLength;
 	if(byte_length > maxLength){
-		var hangul_length = get_hangul_length(value);//현재 한글수
-		var non_hangul_length = value.length - hangul_length;
-		max_hangul_length = Math.ceil(maxLength/3) + non_hangul_length; //최대 글자수
-		if(hangul_length > 0) {
-			//return value.substring(0,max_hangul_length-3);
-			var last_string = value.substring(value.length-1,value.length);
-			if(is_hangul_char(last_string)){
-				return value.substring(0,max_hangul_length-1);
-			}
-			else {
-				return value.substring(0,max_hangul_length-2);
-			}
-		}
-		return value.substring(0,maxLength);
+		var last_cut_value = value.substring(0,value.length-1);
+		return dataMaxLength(last_cut_value , maxLength);
 	}
+	return value;
+}
 
-	return value.substring(0,maxLength);
+//row data
+function getRowData(gridObj, rowIdx) {
+	var _list = gridObj.target.list;
+	if(rowIdx < 0 || _list.length == 0) return null;
+	return _list[rowIdx];
+}
+
+//getValue
+function getValue(gridObj, rowIdx, column) {
+	var data = getRowData(gridObj, rowIdx);
+	if(data == null) return "";
+	return data[column];
 }
 
 //해당글자가 한글인지
@@ -1466,7 +1473,7 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 		    cell.font = headerFont;
 		    cell.border = headerBorder;
 		    cell.alignment = headerAlignment;
-		    //셀폭은 기본 그리드 헤드 넓이를 기준으로 70% 크기로 셀폭을 조정하고 이후 각 컬럼 자료를 전환하면서 문자길이에 따라 조정합니다. 
+		    //셀폭은 기본 그리드 헤드 넓이를 기준으로 70% 크기로 셀폭을 조정하고 이후 각 컬럼 자료를 전환하면서 문자길이에 따라 조정합니다.
 		    let cellWidth = typeof _excelHeader[i].width === 'number' ? _excelHeader[i].width / 7 : 10;
 		    worksheet.getColumn(outCellNo).width =  Math.min(cellWidth, 10);
 		}
