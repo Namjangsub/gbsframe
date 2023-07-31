@@ -9,7 +9,9 @@ import org.apache.ibatis.annotations.Mapper;
 public interface CM04Mapper {
 	
 	List<Map<String, String>> selectDeptTree(Map<String, String> paramMap);
-
+	
+	List<Map<String, String>> selectDeptSignTree(Map<String, String> paramMap);
+	
 	Map<String, String> selectDeptInfo(Map<String, String> paramMap);
 
 	int selectDeptCount(Map<String, String> paramMap);

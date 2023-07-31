@@ -10,6 +10,8 @@ public interface CM04Mapper {
 	
 	List<Map<String, String>> selectDeptTree(Map<String, String> paramMap);
 	
+	List<Map<String, String>> selectDeptSignTree(Map<String, String> paramMap);
+	
 	List<Map<String, String>> selectDeptLstTree(Map<String, String> paramMap);
 
 	Map<String, String> selectDeptInfo(Map<String, String> paramMap);

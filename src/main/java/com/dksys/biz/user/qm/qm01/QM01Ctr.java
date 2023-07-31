@@ -104,6 +104,13 @@ public class QM01Ctr {
     return "jsonView";
   }
   
+ /*@PostMapping(value = "/selectSignUserInfo")
+  public String selectSignUserInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	List<Map<String, String>> resultList = qm01Svc.selectSignUserInfo(paramMap);
+    model.addAttribute("resultList", resultList);
+    return "jsonView";
+  }
+ */
 
   @PostMapping(value = "/selectConfirmCount")
   public String selectConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {

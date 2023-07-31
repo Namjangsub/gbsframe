@@ -13,6 +13,8 @@ public interface CM06Svc {
 
 	public List<Map<String, String>> selectUserTree(Map<String, String> paramMap);
 	
+	public List<Map<String, String>> selectSignUserTree(Map<String, String> paramMap);
+	
 	public void insertUser(Map<String, String> paramMap) throws Exception;
 	
 	public void updateUser(Map<String, String> paramMap) throws Exception;

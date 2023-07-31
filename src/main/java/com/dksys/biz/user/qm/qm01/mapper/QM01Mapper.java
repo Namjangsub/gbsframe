@@ -27,6 +27,8 @@ public interface QM01Mapper {
   List<Map<String, String>> selectShareResUserlst(Map<String, String> paramMap);
   
   List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap);
+  
+ // List<Map<String, String>> selectSignUserInfo(Map<String, String> paramMap);
 
   Map<String, String> selectQtyReqInfo(Map<String, String> paramMap);
   

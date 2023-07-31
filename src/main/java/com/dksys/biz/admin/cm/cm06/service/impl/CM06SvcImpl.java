@@ -43,6 +43,14 @@ public class CM06SvcImpl implements CM06Svc {
 		deptTree.addAll(useTree);
 		return deptTree;
 	}
+	
+	@Override
+	public List<Map<String, String>> selectSignUserTree(Map<String, String> paramMap) {
+		List<Map<String, String>> deptTree = cm04Mapper.selectDeptSignTree(paramMap);
+		List<Map<String, String>> useSignTree = cm06Mapper.selectSignUserTree(paramMap);
+		deptTree.addAll(useSignTree);
+		return deptTree;
+	}
 
 	@Override
 	public void insertUser(Map<String, String> paramMap) throws Exception{

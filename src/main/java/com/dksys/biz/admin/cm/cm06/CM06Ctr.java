@@ -68,6 +68,14 @@ public class CM06Ctr {
     	return "jsonView";
     }
     
+    // 사용자 트리 조회
+    @PostMapping("/selectSignUserTree")
+    public String selectSignUserTree(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, String>> userSignTree = cm06Svc.selectSignUserTree(paramMap);
+    	model.addAttribute("userSignTree", userSignTree);
+    	return "jsonView";
+    }
+    
     // 사용자아이디 중복확인
     @PostMapping("/checkUserId")
     public String checkUserId(@RequestBody Map<String, String> paramMap, ModelMap model) {

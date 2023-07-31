@@ -91,6 +91,11 @@ public class QM01SvcImpl implements QM01Svc {
   public List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap) {
     return QM01Mapper.selectShareUserInfo(paramMap);
   }
+  /*
+  @Override
+  public List<Map<String, String>> selectSignUserInfo(Map<String, String> paramMap) {
+    return QM01Mapper.selectSignUserInfo(paramMap);
+  } */ 
 
   @Override
   public int selectConfirmCount(Map<String, String> paramMap) {
