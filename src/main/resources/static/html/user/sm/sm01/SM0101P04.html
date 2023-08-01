@@ -1,8 +1,3 @@
-<style>
-* input[comma] {
-  text-align: right;
- }
-</style>
 <div class="popup_area of_a" style="width: 100%; height: 100%;">
     <div class="tit_contents">
       <h4 class="tit">구매BOM 하위도번</h4>
@@ -20,7 +15,7 @@
           <col width="11%">
           <col width="20%">
           <col width="11%">
-          <col width="5%">
+          <col width="10%">
         </colgroup>
 
         <tr>
@@ -29,22 +24,22 @@
 				<input type="text" id="salesCd_SSS" name="salesCd_SSS" class="form-control" required="required" msg="Sales Code" readonly="readonly">
 			</td>
 			<th class="hit">상위코드</th>
-			<td colspan="3">
+			<td>
 				<input type="text" id="upperCd_SSS" name="upperCd_SSS" class="form-control" required="required" msg="Sales Code" readonly="readonly">
+			</td>
+			<th>적용레벨</th>
+			<td>
+				<input style="text-align: center;" type="text" id="lvl_SSS" name="lvl_SSS" class="form-control" readonly="readonly">
 			</td>
         </tr>
         <tr>
 			<th>BOM 수량</th>
 			<td>
-				<input type="text" id="dsgnBomQty_SSS" name="dsgnBomQty_SSS" class="form-control">
+				<input data-positive type="text" id="dsgnBomQty_SSS" name="dsgnBomQty_SSS" class="form-control">
 			</td>
 			<th>명칭</th>
-			<td>
-				<input type="text" id="dsgnNm_SSS" name="dsgnNm_SSS" class="form-control">
-			</td>
-			<th>적용레벨</th>
-			<td>
-				<input type="text" id="lvl_SSS" name="lvl_SSS" class="form-control" readonly="readonly">
+			<td colspan="3">
+				<input data-maxlength="100" type="text" id="dsgnNm_SSS" name="dsgnNm_SSS" class="form-control">
 			</td>
         </tr>
       </table>
@@ -65,7 +60,7 @@
 		                </div>
 	                </div>
 	                <div>
-	                	<div data-ax5grid="pop-bom-grid" data-ax5grid-config="{}" style="height:480px; width: 100%" ></div>
+	                	<div data-ax5grid="pop-bom-grid" data-ax5grid-config="{}" style="height:520px; width: 100%" ></div>
 	                </div>
 	            </li>
 	        </ul>
@@ -95,20 +90,22 @@ var original_bomLevelArr = [];
 var bomLevelArr = [];
 var delRowIndexArr = [];
 
+var lowLvl_ckColumn = "lastDsgnNo,dsgnNm,dsgnBomQty";
+
 const lowLvlGridView = {
 		initView: function(){
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
 		    	 showRowSelector: true,
-		    	 multipleSelect: false,
+		    	 multipleSelect: true,
 		    	 sortable: false,
 		         target: $('[data-ax5grid="pop-bom-grid"]'),
 		         header: {
 		        		 align: "center",
-		        		 selector: false
+		        		 selector: true
 		         },
 		         body: {
-		        	 	 //mergeCells : ["lvl", "salesCd","partNo", "unitNo", "revNo","dsgnNo","upperCd","lowerCd"],
+		        	 	 //mergeCells : ["lvl", "salesCd","dsgnNo","upperCd","lowerCd"],
 			        	 onClick: function () {
 				        		this.self.clearSelect();
 				             	this.self.select(this.dindex);
@@ -116,10 +113,17 @@ const lowLvlGridView = {
 						 onDBLClick: function () {
 						 },
 			             onDataChanged: function () {
-			            	if(this.key == "lastDsgnNo" || this.key == "dsgnNm" || this.key == "dsgnBomQty" || this.key == "dsgnNo" || this.key == "upperCd" || this.key == "lowerCd"){//입력항목일때
-				            	if(this.item.dtaChk != "I") {
-				            		this.item.dtaChk = "U";
-				            	}
+								/* * 입력항목이 이전데이타와 같다면 저장체크(dtaChk) 지움
+							   * 데이타조회 initGridDataNullValue 사용 , 이전데이타 조회
+							   */
+							if(isSameValue(this.list , this.dindex, lowLvl_ckColumn) == true){
+								this.item.__modified__ = false;
+							}
+			            	if(this.key != "dtaChk" && this.key != "__selected__" && this.item.__modified__){
+				            	this.item.dtaChk = "U";
+				            }
+			            	else if(this.key != "dtaChk" && this.key != "__selected__") {
+			            		this.item.dtaChk = "";
 			            	}
 
 							if(this.key == "lastDsgnNo" && this.value != ""){
@@ -154,16 +158,13 @@ const lowLvlGridView = {
 		        	{key: "coCd", label: "CO", width: 50,hidden:true},
 		        	{key: "salesCd", label: "Sales Code", width: 120,hidden:true},
 		        	{key: "lvl", label: "LVL", width: 50},
-		        	{key: "partNo" , label: "PART"	, width: 80,align: "left",hidden:true},
-		        	{key: "unitNo" , label: "UNIT"	, width: 80,align: "left",hidden:true},
-		        	{key: "revNo"  , label: "REV" 	, width: 80,align: "left",hidden:true},
 		        	{key: "lastDsgnNo"  , label: "도번", width: 90,align: "left",
 		        		editor:{type:  "text",
 		        			disabled: function () {
-		        				if(this.item.lvl >= 1){
-			        		        return false;
+		        				if(this.item.dtaChk == "D"){
+			        		        return true;
 		        				} else {
-		        					return true;
+		        					return false;
 		        				}
 		        		    },
 		        		    attributes: {
@@ -173,11 +174,25 @@ const lowLvlGridView = {
                     },
 					{key: "dsgnNm" , label: "명칭" 	,width: 280,align: "left",
 		        		editor:{type:  "text",
+		        			disabled: function () {
+		        				if(this.item.dtaChk == "D"){
+			        		        return true;
+		        				} else {
+		        					return false;
+		        				}
+		        		    },
 		        		    attributes: { 'maxlength': 30 }
     					}
                     },
 					{key: "dsgnBomQty" , label: "수량" 	,width: 60,align: "right",
 		        		editor:{type:  "number",
+		        			disabled: function () {
+		        				if(this.item.dtaChk == "D"){
+			        		        return true;
+		        				} else {
+		        					return false;
+		        				}
+		        		    },
 	        		    	attributes: { 'maxlength': 5 }
 						}
                 	},
@@ -201,6 +216,7 @@ const lowLvlGridView = {
 
 
         setData: function(_pageNo){
+        	bomLevelArr = initGridDataNullValue(bomLevelArr, this.target.columns, lowLvl_ckColumn);
 			var list = bomLevelArr;
 			this.target.setData({
 				list : list,
@@ -209,33 +225,19 @@ const lowLvlGridView = {
 			    	   }
 			});
 
-			/*
-        	var formData = new FormData();
-        	var salesCd = $('#salesCd').val();
-        	var formData = {
-				"salesCd" : salesCd
-			}
-			postAjax("/user/sm/sm01/selectBomDetailList", formData, null, function(data){
-			var list = data.resultList;
-			targetObj.setData({
-				list : list,
-			    page : {
-			    		totalElements : list.length,
-			    	}
-				});
-
-            });
-        	*/
      	} //setData
      }
 
 
 
  	$(document).ready(function() {
-		$("#coCd_SSS").val(modalStack.last().paramObj.coCd);
-		$("#salesCd_SSS").val(modalStack.last().paramObj.salesCd);
-		$("#upperCd_SSS").val(modalStack.last().paramObj.upperCd);
-		$("#lvl_SSS").val(modalStack.last().paramObj.lvl);
+		let loadData = {
+			coCd_SSS : modalStack.last().paramObj.coCd,
+			salesCd_SSS : modalStack.last().paramObj.salesCd,
+			upperCd_SSS : modalStack.last().paramObj.upperCd,
+			lvl_SSS : modalStack.last().paramObj.lvl,
+		};
+		loadFormData("#pop04Form", loadData);
 
 		authChk();// 권한체크
 
@@ -278,21 +280,25 @@ const lowLvlGridView = {
 		};
 		lowLvlGridView.target.addRow($.extend({}, newRow), "last");
  	}
+
  	this.delRowLevel = function () {
-		if(selectGridValidation(lowLvlGridView.target)) return;
-		var selData = lowLvlGridView.target.getList("selected")[0];
-		var selDtaChk = selData.dtaChk;
-		if(selDtaChk == "I"){
-			if(!isEmpty(selData.bom_index)) {
-				let delIndex = Number(selData.bom_index);
-				delRowIndexArr.push(delIndex);//두번째이상 팝업에서 입력됨
+		if(selectGridValidationM(lowLvlGridView.target)) return;
+		var selDataList = lowLvlGridView.target.getList("selected");
+		for(var i=selDataList.length-1; i >= 0; i--){
+			var selData = selDataList[i];
+			var selDtaChk = selData.dtaChk;
+			if(selDtaChk == "I"){
+				if(!isEmpty(selData.bom_index)) {
+					let delIndex = Number(selData.bom_index);
+					delRowIndexArr.push(delIndex);//두번째이상 팝업에서 입력됨
+				}
+				lowLvlGridView.target.removeRow(selData.__index);
 			}
-			lowLvlGridView.target.removeRow(selData.__index);
+			else {
+				lowLvlGridView.target.setValue(selData.__index, "dtaChk", "D");
+			}
 		}
-		else {
-			lowLvlGridView.target.setValue(selData.__index, "dtaChk", "D");
-		}
- 	}
+	}
 
 	this.gridDataValidation = function(gridObj){
 		var dataList = gridObj.getList();
@@ -316,10 +322,12 @@ const lowLvlGridView = {
 		var sel_dsgnBomQty = nvl(selectBomArr.dsgnBomQty,"");
 		var inp_dsgnBomQty = nvl($("#dsgnBomQty_SSS").val(),"");
 
-
 		if(sel_dsgnNm != inp_dsgnNm || sel_dsgnBomQty != inp_dsgnBomQty){
-			if(selectBomArr.dtaChk != "I") {
+			if(selectBomArr.dtaChk != "I" && selectBomArr.dtaChk != "D") {
 				selectBomArr.dtaChk = "U";
+			}
+			else {
+				selectBomArr.dtaChk = "";
 			}
 			if(sel_dsgnNm != inp_dsgnNm){
 				selectBomArr.dsgnNm = $("#dsgnNm_SSS").val();
