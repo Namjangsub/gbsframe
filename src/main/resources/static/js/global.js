@@ -453,6 +453,55 @@ function filePutAjax(url, data, callback) {
 	});
 }
 
+
+function ubiExportAjax(fileName, arg, callback) {
+	var url = "http://localhost:8090/ubi4/ubiexport.jsp";
+	url += "?file="+fileName;
+	url += "&arg="+encodeURIComponent(arg);
+	// Report 서버에 요청 보내기
+	$.ajax({
+	    url: url,
+	    method: "GET",
+	    dataType: "html",
+	    success: function(result) {
+	    	callback(JSON.parse(result));
+//	    	callback(result);
+	    },
+	    error: function(result) {
+	    	callback(JSON.parse(result));
+	    }
+	});
+}
+
+
+function downloadPDFFromBase64(base64Data, fileName) {
+	var byteCharacters = atob(base64Data); // Base64 디코딩
+	var byteNumbers = new Array(byteCharacters.length);
+	for (var i = 0; i < byteCharacters.length; i++) {
+		byteNumbers[i] = byteCharacters.charCodeAt(i);
+	}
+	var byteArray = new Uint8Array(byteNumbers);
+	var file = new Blob([byteArray], { type: 'application/pdf' });
+
+//		// 파일을 form 객체에 추가
+//	    var formData = new FormData();
+//	    formData.append('file', file, fileName);
+	
+	//받은 파일을 다운로드 하는작업임
+//	var url = URL.createObjectURL(file);
+//	var anchor = $('<a>');
+//	anchor.attr('href', url);
+//	anchor.attr('download', fileName);
+//	
+//	$('body').append(anchor);
+//	anchor[0].click();
+//	anchor.remove();
+//	
+//	URL.revokeObjectURL(url);
+	
+	return file;
+}	
+
 function inputValidation(inputList) {
 	var isValid = true;
 	$.each(inputList, function(idx, elem){
@@ -650,7 +699,7 @@ function setCommonDiv(inputCd){
 					inputHtml += '<input type="radio" id="'+item.codeKind+j+'" name="'+item.codeKind+i+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
 					inputHtml += ' ' +item.codeNm;
 					inputHtml += '</td>';
-				});
+				});			   
 				$(elem).append(inputHtml);
 
 		})
@@ -672,8 +721,8 @@ function setCommonTd(inputCd,inputCd2,inputCd3){
 					j = j+1;
 					inputHtml += '<input type="checkbox" id="'+item.codeKind+j+'M" name="'+item.codeKind+i+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
 					inputHtml += ' ' +item.codeNm+' ';
-
-				});
+					
+				});		
 				$(elem).append(inputHtml);
 
 		})
@@ -1004,7 +1053,7 @@ function authChk(menuUrl){
 //                $(elem).remove();
 //            }
 //        });
-
+        
         //array함수로 기능 대체하고 버튼을 삭제함(버튼을 사용하는 프로그램은 오류 발생 가능)
         // 버튼 숨김으로 하면 소스 편집하여 강제처리가능으로 위험
         const foundMenu = arr.find(item => item.m === menuUrl);
@@ -1473,7 +1522,7 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 		    cell.font = headerFont;
 		    cell.border = headerBorder;
 		    cell.alignment = headerAlignment;
-		    //셀폭은 기본 그리드 헤드 넓이를 기준으로 70% 크기로 셀폭을 조정하고 이후 각 컬럼 자료를 전환하면서 문자길이에 따라 조정합니다.
+		    //셀폭은 기본 그리드 헤드 넓이를 기준으로 70% 크기로 셀폭을 조정하고 이후 각 컬럼 자료를 전환하면서 문자길이에 따라 조정합니다. 
 		    let cellWidth = typeof _excelHeader[i].width === 'number' ? _excelHeader[i].width / 7 : 10;
 		    worksheet.getColumn(outCellNo).width =  Math.min(cellWidth, 10);
 		}

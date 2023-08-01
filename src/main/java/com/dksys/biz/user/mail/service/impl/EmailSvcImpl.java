@@ -97,7 +97,12 @@ public class EmailSvcImpl implements EmailSvc {
 
         String authNum = createCode();
         // html로 텍스트 설정
-        String mailCnts = setHtmlContext(authNum, paramMap);
+        String mailCnts = "";
+        if ("free".equals(paramMap.get("cntsType"))) {
+        	mailCnts = "<pre>" + paramMap.get("mailCnts") + "</pre>";
+        } else {        	
+        	mailCnts = setHtmlContext(authNum, paramMap);
+        }
 //        String mailHtml = setContext(authNum, "purchaseOrder.html") // 메일 본문 내용(템플릿 적용), HTML 여부
         
         paramMap.put("mailCnts", mailCnts);
@@ -217,7 +222,7 @@ public class EmailSvcImpl implements EmailSvc {
 				+ "</tr><tr><td><p><span>연락처</span></p></td>"
 				+ "<td><p><b><span>" + userInfo.get("offTelNo") + " (fax." + userInfo.get("faxNo") + "</span></b></p></td></tr>"
 				+ "<tr><td><p><span >메모</span></p></td>"
-				+ "<td><p>" + paramMap.get("mailCnts") + "<br>비밀코드:" + authNum + "</p></td></tr>"
+				+ "<td><p><pre>" + paramMap.get("mailCnts") + "</pre><br>비밀코드:" + authNum + "</p></td></tr>"
 				+ "</tbody></table></body></html>";
     	return mailHtml; 
     }

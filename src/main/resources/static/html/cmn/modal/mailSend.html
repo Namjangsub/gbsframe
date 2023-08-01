@@ -44,7 +44,7 @@
 <div class="container-fluid">
 	<div class="row">
         <div class="popup_area">
-	 		<input type="file" id="clntFile" style="display:none" multiple="multiple" onchange="setClntFile(this);"/>
+	 		<input type="file" id="mailFile" style="display:none" multiple="multiple" onchange="setMailFile(this);"/>
 	 		<form id="mailForm">
 			<table class="popup_table">
 				<colgroup>
@@ -84,10 +84,10 @@
 					</tr>
 					<tr>
 						<th>
-							<button type="button" id="buttonFile" class="btn btn-primary btn-sm" style="height: 25px; line-height: 15px;" onclick="clntFile.click();">첨부파일</button>
+							<button type="button" id="buttonFile" class="btn btn-primary btn-sm" style="height: 25px; line-height: 15px;" onclick="mailFile.click();">첨부파일</button>
 						</th>
 						<td>
-							<div data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 150px; width: 100%"></div>
+							<div data-ax5grid="mailFile-grid" data-ax5grid-config="{}" style="height: 150px; width: 100%"></div>
 						</td>
 					</tr>
 				</tbody>
@@ -98,8 +98,8 @@
 			</form>
 		</div>
 		<div class="bottom_btn">
-			<button type="button" class="btn btn-default btn-sm" id="actionBtn"></button>
-			<button type="button" class="btn btn-default btn-sm" id="actionBtn2"></button>
+			<button type="button" class="btn btn-default btn-sm" id="mailActionBtn"></button>
+			<button type="button" class="btn btn-default btn-sm" id="mailActionBtn2"></button>
 			<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫기</button>
 		</div>
 	</div>
@@ -107,20 +107,19 @@
 <!-- JSON 호출 시에 흐리게 덮을 모달 창 -->
 <div class="modal-container" id="modalContainer">
 	<div class="modal-content">
-		<div class="loading-spinner" style="width: 3rem; height: 3rem;" role="status"></div>
+		<div class="loading-spinner" ></div>
 		메일 전송중...
 	</div>
 </div>
 <script type="text/javascript">
-debugger;
 	//등록시 직급코드 중복체크 여부
-	var clntFileArr = [];
-	var deleteFileArr = [];
-	var fileGridView = {
+	var mailFileArr = [];
+	var deleteMailFileArr = [];
+	var mailFileGridView = {
 		initView: function(){
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
-				target: $('[data-ax5grid="file-grid"]'),
+				target: $('[data-ax5grid="mailFile-grid"]'),
 				showLineNumber: true,
 				showRowSelector: false,
 	        	multipleSelect: false,
@@ -130,7 +129,7 @@ debugger;
 		                this.self.select(this.dindex);
 		            },
 		            onDBLClick: function () {
-		            	downloadFile(this.dindex);
+// 		            	downloadFile(this.dindex);
 		            },
 		        	},
 				columns: [
@@ -146,24 +145,41 @@ debugger;
 		setData: function(){
 			var targetObj = this.target;
 			targetObj.setData({
-				list: clntFileArr,
+				list: mailFileArr,
 				page : {
-					totalElements : clntFileArr.length
+					totalElements : mailFileArr.length
 				}
 			});
 		}
 	}
-	
+	debugger;
 	$(document).ready(function() {
-		fileGridView.initView();
+		mailFileGridView.initView();
 		
-		$('#actionBtn').text("메일발송");
-		$('#actionBtn').on("click", function(){executeMail();});
-		$('#actionBtn2').text("심플메일발송");
-		$('#actionBtn2').on("click", function(){executeSmpleMail();});
+		$('#mailActionBtn').text("메일발송");
+		$('#mailActionBtn').on("click", function(){executeMail();});
+		$('#mailActionBtn2').text("심플메일발송");
+		$('#mailActionBtn2').on("click", function(){executeSmpleMail();});
 		$('#mailForm #mailFrom').val(jwt.email);
 		$('#mailForm #userId').val(jwt.userId);
-		$('#mailForm #coCd').val(jwt.coCd);
+		$('#mailForm #mailTitle').val(modalStack.last().paramObj.mailTitle);
+		$('#mailForm #mailCnts').val(modalStack.last().paramObj.mailCnts);
+		
+		if (modalStack.last() && modalStack.last().paramObj && modalStack.last().paramObj.fileName) {
+			var file = modalStack.last().paramObj.file
+			const fileName = modalStack.last().paramObj.fileName
+			file.name=fileName;
+			var typeArr = fileName.split(".");
+			mailFileArr.push({
+				'fileKey' : 0,
+		      	'fileName' : file.name,
+		      	'fileType' : typeArr[typeArr.length-1],
+		      	'fileSize' : file.size,
+		      	'file' : file
+			});
+			mailFileGridView.setData()
+		}
+		
 	});
 	
 
@@ -177,10 +193,10 @@ debugger;
 		var formData = new FormData($("#mailForm")[0]);
 		
 		// 첨부파일 추가
-		$.each(clntFileArr, function(idx, obj){
+		$.each(mailFileArr, function(idx, obj){
 			// 신규파일만 추가
 			if(obj.fileKey == 0){
-				formData.append("files", obj.file);
+				formData.append("files", obj.file, obj.file.name);
 			}
 		});
 		//추가 내용 파라메터에 추가
@@ -195,13 +211,14 @@ debugger;
 		formData.append("pgmId" 		, "textMail");
 		formData.append("sendType" 		, "textMail"); //고유한 프로그램명
 		formData.append("sendKey" 		, 0); //해당 프로그램에서 교유한 key 값
-		formData.append("mailAttach" 	, clntFileArr.map(fileObj => fileObj.fileName).join('\n'));
+		formData.append("cntsType" 		, "free"); //메일내용 포멧 적용 시 사용예정 (free:자유형식)
+		formData.append("mailAttach" 	, mailFileArr.map(fileObj => fileObj.fileName).join('\n'));
 
-		$("#mailForm input").each(function() {
-			  var name = $(this).attr("name");
-			  var value = $(this).val();
-			  console.log(name + ": " + value);
-			});		
+// 		$("#mailForm input").each(function() {
+// 			  var name = $(this).attr("name");
+// 			  var value = $(this).val();
+// 			  console.log(name + ": " + value);
+// 			});		
 		
 		filePostAjax("/mail/sendJoinMail", formData ,function(data) {
 			$("#modalContainer").hide();
@@ -220,10 +237,10 @@ debugger;
 		var formData = new FormData($("#mailForm")[0]);
 		
 		// 첨부파일 추가
-		$.each(clntFileArr, function(idx, obj){
+		$.each(mailFileArr, function(idx, obj){
 			// 신규파일만 추가
 			if(obj.fileKey == 0){
-				formData.append("files", obj.file);
+				formData.append("files", obj.file, obj.file.name);
 			}
 		});
 		//추가 내용 파라메터에 추가
@@ -238,7 +255,7 @@ debugger;
 		formData.append("pgmId" 		, "textMail");
 		formData.append("sendType" 		, "textMail"); //고유한 프로그램명
 		formData.append("sendKey" 		, 0); //해당 프로그램에서 교유한 key 값
-		formData.append("mailAttach" 	, clntFileArr.map(fileObj => fileObj.fileName).join('\n'));
+		formData.append("mailAttach" 	, mailFileArr.map(fileObj => fileObj.fileName).join('\n'));
 
 		$("#mailForm input").each(function() {
 			  var name = $(this).attr("name");
@@ -253,12 +270,12 @@ debugger;
 	}	
 	
 	// 파일 추가
-	function setClntFile(elem) {
+	function setMailFile(elem) {
 		var tempFiles = elem.files;
 		// 전역변수 배열에 선택된 파일 추가 
 		$.each(tempFiles, function(idx, obj){
 			var typeArr = obj.name.split(".");
-			clntFileArr.push({
+			mailFileArr.push({
 				'fileKey' : 0,
 		      	'fileName' : obj.name,
 		      	'fileType' : typeArr[typeArr.length-1],
@@ -267,17 +284,17 @@ debugger;
 			});
 		});
 		
-// 		$("#fileList").val(clntFileArr.map(fileObj => fileObj.fileName).join('\n'));
-		fileGridView.setData();
+// 		$("#fileList").val(mailFileArr.map(fileObj => fileObj.fileName).join('\n'));
+		mailFileGridView.setData();
 		$(elem).val("");
 	}
 	
 	function deleteFile(rowIndex) {
-		fileGridView.target.removeRow(rowIndex);
+		mailFileGridView.target.removeRow(rowIndex);
 		
-		if(clntFileArr[rowIndex].fileKey){
+		if(mailFileArr[rowIndex].fileKey){
 		// 기 등록되어 있는 파일 삭제시
-			deleteFileArr.push(clntFileArr[rowIndex].fileKey);
+			deleteMailFileArr.push(mailFileArr[rowIndex].fileKey);
 		}
 		
 		notiFileArr.splice(rowIndex, 1);
