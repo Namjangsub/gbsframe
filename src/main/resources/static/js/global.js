@@ -90,19 +90,16 @@ var ubiprefix = "";
 if(jwt){
 	switch (jwt.serverType){
     case "prod" :
-        ubiprefix = "http://gbs.gunyangitt.co.kr:8090/ubi4/ubihtml.jsp";
-
-        //ubiprefix = "http://localhost:8090/ubi4/ubihtml.jsp";
+        ubiprefix = "http://gbs.gunyangitt.co.kr:8090/ubi4";
         break;
     case "dev" :
-        ubiprefix = "http://localhost:8090/ubi4/ubihtml.jsp";
+        ubiprefix = "http://localhost:8090/ubi4";
         break;
     case "local" :
-        ubiprefix = "http://localhost:8090/ubi4/ubihtml.jsp";
+        ubiprefix = "http://localhost:8090/ubi4";
         break;
     default :
-        ubiprefix = "http://gbs.gunyangitt.co.kr:8090/ubi4/ubihtml.jsp";
-    	//ubiprefix = "http://localhost:8090/ubi4/ubihtml.jsp";
+        ubiprefix = "http://gbs.gunyangitt.co.kr:8090/ubi4";
 	}
 }
 
@@ -455,7 +452,7 @@ function filePutAjax(url, data, callback) {
 
 
 function ubiExportAjax(fileName, arg, callback) {
-	var url = "http://localhost:8090/ubi4/ubiexport.jsp";
+	var url = ubiprefix + "/ubiexport.jsp";
 	url += "?file="+fileName;
 	url += "&arg="+encodeURIComponent(arg);
 	// Report 서버에 요청 보내기
@@ -990,7 +987,7 @@ function insertPgmHistory(url) {
 }
 
 function callReport(fileName, arg, width, height) {
-	var url = ubiprefix;
+	var url = ubiprefix + "/ubihtml.jsp";
 	url += "?file="+fileName;
 	url += "&arg="+encodeURIComponent(arg);
 	if (width ==""){
