@@ -64,19 +64,19 @@ public class SM09SvcImpl implements SM09Svc {
 	
 	// 수정화면 정보
 	@Override
-	public Map<String, String> select_sm09_Info(Map<String, String> paramMap) {
-		return sm09Mapper.select_sm09_Info(paramMap);
+	public Map<String, String> select_sm07_Info(Map<String, String> paramMap) {
+		return sm09Mapper.select_sm07_Info(paramMap);
 	}
 	
 	// 수정화면 상세정보
 	@Override
-	public List<Map<String, String>> select_sm09_Info_Dtl(Map<String, String> paramMap) {
-		return sm09Mapper.select_sm09_Info_Dtl(paramMap);
+	public List<Map<String, String>> select_sm07_Info_Dtl(Map<String, String> paramMap) {
+		return sm09Mapper.select_sm07_Info_Dtl(paramMap);
 	}
 	
 	//DATA INSERT
 	@Override
-	public int insert_sm09(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	public int insert_sm07(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		
@@ -95,20 +95,21 @@ public class SM09SvcImpl implements SM09Svc {
 		//---------------------------------------------------------------
 		
 		//데이터 처리 시작
-		int fileTrgtKey = sm09Mapper.select_sm09_SeqNext(paramMap);
+		int fileTrgtKey = sm09Mapper.select_sm07_SeqNext(paramMap);
 		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
 
-		String newMNGM_NO = sm09Mapper.select_sm09_Next_MNGM_NO(paramMap);
+		String newMNGM_NO = sm09Mapper.select_sm07_Next_MNGM_NO(paramMap);
 		paramMap.put("ioNo", newMNGM_NO);
 		
 		//마스터입력
-		int result = sm09Mapper.insert_sm09(paramMap);
+		int result = sm09Mapper.insert_sm07(paramMap);
 
 		//상세입력
 		int i = 1;
 		int outInoutKey = 0;
 
 		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+		
 	    for (Map<String, String> dtl : dtlParam) {
 	    	dtl.put("ioNo", newMNGM_NO);
 	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
@@ -118,12 +119,12 @@ public class SM09SvcImpl implements SM09Svc {
 			String dataChk = dtl.get("dataChk").toString();	    	
 			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
 	    	if ("I".equals(dataChk)) {
-				outInoutKey = sm09Mapper.select_sm09_Ioseq(paramMap);
+				outInoutKey = sm09Mapper.select_sm07_Ioseq(paramMap);
 				dtl.put("outInoutKey", Integer.toString(outInoutKey));
 	    		dtl.put("ioSeq", Integer.toString(i));
 
 				//데이터 처리
-				sm09Mapper.insert_sm09_Dtl(dtl);
+				sm09Mapper.insert_sm07_Dtl(dtl);
 				i++;
 	    	}
 	    }
@@ -145,7 +146,7 @@ public class SM09SvcImpl implements SM09Svc {
 
 	//DATA UPDATE
 	@Override
-	public int update_sm09(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	public int update_sm07(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		//Gson gson = new Gson();
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
@@ -182,7 +183,7 @@ public class SM09SvcImpl implements SM09Svc {
 		
 		//데이터처리 시작
 		//마스터 수정
-		int result = sm09Mapper.update_sm09(paramMap);
+		int result = sm09Mapper.update_sm07(paramMap);
 
 		//상세수정
 		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
@@ -193,10 +194,10 @@ public class SM09SvcImpl implements SM09Svc {
 			
 			String dataChk = dtl.get("dataChk").toString();	    	
 			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
-	    	if ("U".equals(dataChk)) {
+//	    	if ("U".equals(dataChk)) {
 				//데이터 처리
-				sm09Mapper.update_sm09_Dtl(dtl);
-	    	} 
+				sm09Mapper.update_sm07_Dtl(dtl);
+//	    	} 
 	    }
 		//데이터 처리 끝
 		
@@ -220,7 +221,7 @@ public class SM09SvcImpl implements SM09Svc {
 	
 	//DATA DELETE
 	@Override
-	public int delete_sm09(Map<String, String> paramMap) throws Exception {
+	public int delete_sm07(Map<String, String> paramMap) throws Exception {
 		//---------------------------------------------------------------
 		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
 		//   필수값 :  jobType, userId, comonCd
@@ -246,10 +247,10 @@ public class SM09SvcImpl implements SM09Svc {
 		
 		if ("1".equals(lvl)) {
 			//데이터 처리
-			result = sm09Mapper.delete_sm09_Dtl_All(paramMap);
-			result = sm09Mapper.delete_sm09(paramMap);
+			result = sm09Mapper.delete_sm07_Dtl_All(paramMap);
+			result = sm09Mapper.delete_sm07(paramMap);
     	} else {
-    		result = sm09Mapper.delete_sm09_Dtl(paramMap);
+    		result = sm09Mapper.delete_sm07_Dtl(paramMap);
     	}
 		
 		//int result = sm05Mapper.delete_sm05(paramMap);
@@ -283,19 +284,18 @@ public class SM09SvcImpl implements SM09Svc {
 		paramMap.put("ioNo", newMNGM_NO);
 		
 		paramMap.put("salesCd", paramMap.get("selesCd"));
+		paramMap.put("userId", paramMap.get("userId"));
 		//마스터입력
 		int result = sm09Mapper.insert_sm09(paramMap);
 
 		//상세입력
-//		int i = 1;
+		int i = 1;
 		int outInoutKey = 0;
+		int outInoutKey1 = 0;
 		
 		outInoutKey = sm09Mapper.select_sm09_Ioseq(paramMap);
 		paramMap.put("outInoutKey", Integer.toString(outInoutKey));
 		paramMap.put("ioSeq", "1");
-		
-		//데이터 처리
-		sm09Mapper.insert_sm09_Dtl(paramMap);
 
 //		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
 //	    for (Map<String, String> dtl : dtlParam) {
@@ -305,19 +305,35 @@ public class SM09SvcImpl implements SM09Svc {
 //	    	dtl.put("pgmId", paramMap.get("pgmId"));
 //			
 //			String dataChk = dtl.get("dataChk").toString();	    	
-//			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
+			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
 //	    	if ("I".equals(dataChk)) {
-//		
+		
 //	    		dtl.put("ioSeq", Integer.toString(i));		outInoutKey = sm09Mapper.select_sm09_Ioseq(paramMap);
 //				dtl.put("outInoutKey", Integer.toString(outInoutKey));
-//
-//				//데이터 처리
-//				sm09Mapper.insert_sm09_Dtl(dtl);
+				int newPrice = sm09Mapper.select_bm02_price(paramMap);
+				//왼쪽 가격 생성
+				String sortQty = paramMap.get("stockQty");
+				int sumAmt = Integer.parseInt(sortQty) * newPrice;
+				paramMap.put("sumAmt", Integer.toString(sumAmt));
+				
+				//오른쪽 가격 생성
+				paramMap.put("newPrice", Integer.toString(newPrice));
+				
+				//데이터 처리
+				sm09Mapper.insert_sm09_Dtl(paramMap);
+				sm09Mapper.update_bm20_item(paramMap);
+				sm09Mapper.insert_bm30_item(paramMap);
+				sm09Mapper.insert_bm20_itemright(paramMap);
+				//outinoutkey 하나 더 생성
+				outInoutKey1 = sm09Mapper.select_sm09_Ioseq(paramMap);
+				paramMap.put("outInoutKey1", Integer.toString(outInoutKey1));
+				
+				sm09Mapper.insert_bm30_itemright(paramMap);
 //				i++;
-//	    	}
+////	    	}
 //	    }
 		//데이터 처리 끝
-
+		
 		return result;
 	}
 }

@@ -57,26 +57,26 @@ public class SM09Ctr {
 	}
 
 	//정보 조회
-	@PostMapping(value = "/select_sm09_Info")
+	@PostMapping(value = "/select_sm07_Info")
 	public String select_sm09_Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		Map<String, String> result = sm09svc.select_sm09_Info(paramMap);
+		Map<String, String> result = sm09svc.select_sm07_Info(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
 	
 	//상세정보 조회
-	@PostMapping(value = "/select_sm09_Info_Dtl")
-	public String select_sm09_Info_Dtl(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> result = sm09svc.select_sm09_Info_Dtl(paramMap);
+	@PostMapping(value = "/select_sm07_Info_Dtl")
+	public String select_sm07_Info_Dtl(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = sm09svc.select_sm07_Info_Dtl(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
 	
 	//INSERT
-	@PostMapping(value = "/insert_sm09")
-	public String insert_sm09(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	@PostMapping(value = "/insert_sm07")
+	public String insert_sm07(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
-			if (sm09svc.insert_sm09(paramMap, mRequest) != 0 ) {
+			if (sm09svc.insert_sm07(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
 			} else {
@@ -91,10 +91,10 @@ public class SM09Ctr {
 	}
 	
 	//UPDATE
-	@PostMapping(value = "/update_sm09")
-	public String update_sm09(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	@PostMapping(value = "/update_sm07")
+	public String update_sm07(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
-			if (sm09svc.update_sm09(paramMap, mRequest) != 0 ) {
+			if (sm09svc.update_sm07(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 			} else {
@@ -109,10 +109,10 @@ public class SM09Ctr {
 	}
 	
 	//DELETE
-	@PutMapping(value = "/delete_sm09")
-	public String delete_sm09(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+	@PutMapping(value = "/delete_sm07")
+	public String delete_sm07(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 		try {
-			if (sm09svc.delete_sm09(paramMap) != 0 ) {
+			if (sm09svc.delete_sm07(paramMap) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
 			} else {

@@ -20,19 +20,19 @@ public interface SM09Svc {
 	List<Map<String, String>> select_stock_modal(Map<String, String> paramMap);
 
     // 수정화면 정보
-	Map<String, String> select_sm09_Info(Map<String, String> paramMap);
+	Map<String, String> select_sm07_Info(Map<String, String> paramMap);
 	
 	// 수정화면 상세정보
-	List<Map<String, String>> select_sm09_Info_Dtl(Map<String, String> paramMap);
+	List<Map<String, String>> select_sm07_Info_Dtl(Map<String, String> paramMap);
 	
 	//DATA INSERT
-	int insert_sm09(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	int insert_sm07(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
 	//DATA UPDATE
-	int update_sm09(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	int update_sm07(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
 	//DATA DELETE
-	int delete_sm09(Map<String, String> paramMap) throws Exception;
+	int delete_sm07(Map<String, String> paramMap) throws Exception;
 	
 	//대체 품목 팝업창에서 DATA INSERT
 	int insert_sm091(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
