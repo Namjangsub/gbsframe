@@ -284,7 +284,7 @@ public class SM09SvcImpl implements SM09Svc {
 		paramMap.put("ioNo", newMNGM_NO);
 		
 		paramMap.put("salesCd", paramMap.get("selesCd"));
-		paramMap.put("userId", paramMap.get("userId"));
+		
 		//마스터입력
 		int result = sm09Mapper.insert_sm09(paramMap);
 
@@ -297,41 +297,31 @@ public class SM09SvcImpl implements SM09Svc {
 		paramMap.put("outInoutKey", Integer.toString(outInoutKey));
 		paramMap.put("ioSeq", "1");
 
-//		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
-//	    for (Map<String, String> dtl : dtlParam) {
-//	    	dtl.put("ioNo", newMNGM_NO);
-//	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-//			dtl.put("userId", paramMap.get("userId"));
-//	    	dtl.put("pgmId", paramMap.get("pgmId"));
-//			
-//			String dataChk = dtl.get("dataChk").toString();	    	
-			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
-//	    	if ("I".equals(dataChk)) {
+
+		int newPrice = sm09Mapper.select_bm02_price(paramMap);
+		//왼쪽 가격 생성
+		String sortQty = paramMap.get("stockQty");
+		int sumAmt = Integer.parseInt(sortQty) * newPrice;
+		paramMap.put("sumAmt", Integer.toString(sumAmt));
 		
-//	    		dtl.put("ioSeq", Integer.toString(i));		outInoutKey = sm09Mapper.select_sm09_Ioseq(paramMap);
-//				dtl.put("outInoutKey", Integer.toString(outInoutKey));
-				int newPrice = sm09Mapper.select_bm02_price(paramMap);
-				//왼쪽 가격 생성
-				String sortQty = paramMap.get("stockQty");
-				int sumAmt = Integer.parseInt(sortQty) * newPrice;
-				paramMap.put("sumAmt", Integer.toString(sumAmt));
-				
-				//오른쪽 가격 생성
-				paramMap.put("newPrice", Integer.toString(newPrice));
-				
-				//데이터 처리
-				sm09Mapper.insert_sm09_Dtl(paramMap);
-				sm09Mapper.update_bm20_item(paramMap);
-				sm09Mapper.insert_bm30_item(paramMap);
-				sm09Mapper.insert_bm20_itemright(paramMap);
-				//outinoutkey 하나 더 생성
-				outInoutKey1 = sm09Mapper.select_sm09_Ioseq(paramMap);
-				paramMap.put("outInoutKey1", Integer.toString(outInoutKey1));
-				
-				sm09Mapper.insert_bm30_itemright(paramMap);
-//				i++;
-////	    	}
-//	    }
+		//오른쪽 가격 생성
+		paramMap.put("newPrice", Integer.toString(newPrice));
+		
+		//대체품목시 GOODS_DIV 채굴
+		String goodsDiv = sm09Mapper.select_bm20_goodsdiv(paramMap);
+		paramMap.put("goodsDiv", goodsDiv);
+		
+		//데이터 처리
+		sm09Mapper.insert_sm09_Dtl(paramMap);
+		sm09Mapper.update_bm20_item(paramMap);
+		sm09Mapper.insert_bm30_item(paramMap);
+		sm09Mapper.insert_bm20_itemright(paramMap);
+		//outinoutkey 하나 더 생성
+		outInoutKey1 = sm09Mapper.select_sm09_Ioseq(paramMap);
+		paramMap.put("outInoutKey1", Integer.toString(outInoutKey1));
+		
+		sm09Mapper.insert_bm30_itemright(paramMap);
+
 		//데이터 처리 끝
 		
 		return result;
