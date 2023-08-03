@@ -1418,8 +1418,7 @@ function getByteLength(text_val){
 
 //값체크
 function isEmpty(str){
-	var chkStr = ""+str;//숫자일때 오류 수정
-	if(typeof chkStr == "undefined" || chkStr == null || chkStr == "")
+	if(typeof str == "undefined" || str == null || (str+"") == "")
 		return true;
 	else
 		return false ;
