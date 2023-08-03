@@ -80,4 +80,7 @@ public interface SM09Mapper {
     int insert_bm20_itemright(Map<String, String> paramMap);
     //대체품번시 오른쪽 폼  수불이력테이블 INSERT
     int insert_bm30_itemright(Map<String, String> paramMap);
+    
+    // 대체 품목시 GOODSDIV 값 채굴
+    String select_bm20_goodsdiv(Map<String, String> paramMap);
 }

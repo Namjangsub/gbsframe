@@ -483,21 +483,21 @@ function downloadPDFFromBase64(base64Data, fileName) {
 //		// 파일을 form 객체에 추가
 //	    var formData = new FormData();
 //	    formData.append('file', file, fileName);
-	
+
 	//받은 파일을 다운로드 하는작업임
 //	var url = URL.createObjectURL(file);
 //	var anchor = $('<a>');
 //	anchor.attr('href', url);
 //	anchor.attr('download', fileName);
-//	
+//
 //	$('body').append(anchor);
 //	anchor[0].click();
 //	anchor.remove();
-//	
+//
 //	URL.revokeObjectURL(url);
-	
+
 	return file;
-}	
+}
 
 function inputValidation(inputList) {
 	var isValid = true;
@@ -696,7 +696,7 @@ function setCommonDiv(inputCd){
 					inputHtml += '<input type="radio" id="'+item.codeKind+j+'" name="'+item.codeKind+i+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
 					inputHtml += ' ' +item.codeNm;
 					inputHtml += '</td>';
-				});			   
+				});
 				$(elem).append(inputHtml);
 
 		})
@@ -718,8 +718,8 @@ function setCommonTd(inputCd,inputCd2,inputCd3){
 					j = j+1;
 					inputHtml += '<input type="checkbox" id="'+item.codeKind+j+'M" name="'+item.codeKind+i+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
 					inputHtml += ' ' +item.codeNm+' ';
-					
-				});		
+
+				});
 				$(elem).append(inputHtml);
 
 		})
@@ -1050,7 +1050,7 @@ function authChk(menuUrl){
 //                $(elem).remove();
 //            }
 //        });
-        
+
         //array함수로 기능 대체하고 버튼을 삭제함(버튼을 사용하는 프로그램은 오류 발생 가능)
         // 버튼 숨김으로 하면 소스 편집하여 강제처리가능으로 위험
         const foundMenu = arr.find(item => item.m === menuUrl);
@@ -1313,17 +1313,63 @@ function dataMaxLength(value , maxLength){
 }
 
 //row data
-function getRowData(gridObj, rowIdx) {
-	var _list = gridObj.target.list;
+function getRowData(_list, rowIdx) {
 	if(rowIdx < 0 || _list.length == 0) return null;
 	return _list[rowIdx];
 }
 
 //getValue
-function getValue(gridObj, rowIdx, column) {
-	var data = getRowData(gridObj, rowIdx);
+function getValue(_list, rowIdx, column) {
+	var data = getRowData(_list, rowIdx);
 	if(data == null) return "";
 	return data[column];
+}
+
+//Grid Data Null value __modified__ 활용
+function initGridDataNullValue (_list , _columns, adColumnList) {
+	var adColumn = [];
+	if(!isEmpty(adColumnList)){
+		adColumn = adColumnList.split(",");
+    }
+	$.each(_list, function(idx, obj){
+		$.each(_columns, function(cidx, col){
+			if(isEmpty(obj[col.key])){
+				obj[col.key] = "";
+			}
+			for(var i=0; i<adColumn.length; i++){
+				if(col.key == adColumn[i]){
+					if(isEmpty(obj["__old__"+col.key])){
+						obj["__old__"+col.key] = obj[col.key];
+					}
+				}
+			}
+		});
+		if(isEmpty(obj["__modified__"])){
+			obj["__modified__"] = false;
+		}
+	});
+	return _list;
+}
+
+//값을 비교하여 이전데이타와 같으면 true return;
+function isSameValue(_list, rowIdx, adColumnList){
+	var result = false;
+	var adColumn = [];
+	if(!isEmpty(adColumnList)){
+		adColumn = adColumnList.split(",");
+  }
+	var data = getRowData(_list, rowIdx);
+	for(var i=0; i<adColumn.length; i++) {
+		var col_id = adColumn[i];
+		var old_col_id = "__old__"+col_id;
+		if(data[col_id] != data[old_col_id]){
+			return false;
+		}
+		else {
+			result = true;
+		}
+	}
+	return result;
 }
 
 //해당글자가 한글인지
@@ -1372,7 +1418,7 @@ function getByteLength(text_val){
 
 //값체크
 function isEmpty(str){
-	if(typeof str == "undefined" || str == null || str == "")
+	if(typeof str == "undefined" || str == null || (str+"") == "")
 		return true;
 	else
 		return false ;
@@ -1519,7 +1565,7 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 		    cell.font = headerFont;
 		    cell.border = headerBorder;
 		    cell.alignment = headerAlignment;
-		    //셀폭은 기본 그리드 헤드 넓이를 기준으로 70% 크기로 셀폭을 조정하고 이후 각 컬럼 자료를 전환하면서 문자길이에 따라 조정합니다. 
+		    //셀폭은 기본 그리드 헤드 넓이를 기준으로 70% 크기로 셀폭을 조정하고 이후 각 컬럼 자료를 전환하면서 문자길이에 따라 조정합니다.
 		    let cellWidth = typeof _excelHeader[i].width === 'number' ? _excelHeader[i].width / 7 : 10;
 		    worksheet.getColumn(outCellNo).width =  Math.min(cellWidth, 10);
 		}
