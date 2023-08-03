@@ -71,7 +71,7 @@
 						(
 						SELECT A.FILE_TRGT_KEY
 								, A.CO_CD
-								, FN_CM05M01_CD_TO_NM(A.CO_CD) AS CO_CD_NM	/* 회사명명 */
+								, FN_CM05M01_CD_TO_NM(A.CO_CD) AS CO_CD_NM	/* 회사명 */
 								, A.ORDRG_NO
 								, A.REQ_NO
 								, A.SALES_CD
@@ -145,6 +145,8 @@
 			WHERE 1=1
 				AND RN BETWEEN ${firstIndex} AND ${lastIndex}
 	</select>
+	
+	
 
 	<!-- 기준관리 - 일정계획 등록 메인 화면 엑셀 조회 리스트  -->
 	<select id="selectOrderExcelList" parameterType="Map" resultType="camelMap">   
@@ -427,6 +429,76 @@
 		WHERE 1=1	
 		ORDER BY T.CO_CD, NVL(T.PART_NO,'0'), NVL(T.UNIT_NO,'0'), NVL(T.REV_NO,'0'),T.LOWER_CD, T.UPPER_CD
 		         , D.MATR_SEQ
+	</select>	
+	
+	<!-- 발주상세 팝업 -->
+	<select id="selectOrderDetailView" parameterType="Map" resultType="camelMap">	
+		SELECT A.FILE_TRGT_KEY
+			, A.CO_CD
+			, A.ORDRG_NO
+			, B.ORDRG_SEQ
+			, A.SALES_CD			
+			, FN_CM05M01_CD_TO_NM(A.CO_CD) AS CO_CD_NM	/* 회사명 */
+			, A.PCHS_CLNT_CD				/* 구매처cd */
+   			,
+   			(
+   				SELECT D.CLNT_NM
+   					FROM TB_BM02M01 D
+   				WHERE A.PCHS_CLNT_CD=D.CLNT_CD
+   			) AS PCHS_CLNT_NM		/* 구매처명 */	
+			, C.ORDRS_CLNT_CD				 /* 고객사 */
+			, C.ORDRS_CLNT_NM				/* 고객사명 */
+			, C.CLNT_PJT					 /* 고객사 PJT */
+			, C.PRDT_CD			/* 제품구분 */
+			, C.PRDT_NM			/* 제품구분명 */			                    
+			, C.ITEM_DIV		/* 아이템 구분 */    
+            , FN_CM05M01_CD_TO_NM(C.ITEM_DIV) AS ITEM_DIV_NM	/* 아이템 구분명 */			
+   			, C.EQP_NM					/* 설비명 */				            		   					
+			, TO_CHAR(A.ORDRG_DT, 'YYYY-MM-DD') ORDRG_DT		/* 발주일자 */
+			, A.ORDRG_DIV10					/* 발주구분 */
+			, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV10) AS ORDRG_DIV10_NM	/* 발주구분명 */
+			, A.ORDRG_DIV20					/* 용도구분 */
+			, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV20) AS ORDRG_DIV20_NM	/* 용도구분명 */
+			, A.ORDRG_DIV30					/* 특성구분 */
+			, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV30) AS ORDRG_DIV30_NM	/* 특성구분명 */								
+			, A.CURR_CD						/* 통화단위 */
+			, A.EXRATE						/* 환율 */						
+			, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
+			, FN_CM05M01_CD_TO_NM(B.MATR_TEST_DIV) MATR_TEST_DIV    
+			, B.ORDRG_DTL_RMK
+			, B.IN_CMPLET_YN
+	        , B.WH_CD AS MATR_WH_CD		/* 입고창고  */ 	
+		FROM TB_SM02M01 A
+		INNER JOIN TB_SM02D01 B ON(A.CO_CD=B.CO_CD AND A.SALES_CD=B.SALES_CD AND A.ORDRG_NO=B.ORDRG_NO)
+		LEFT OUTER JOIN
+		(
+		 SELECT  X.CO_CD 					/* 회사코드 */
+		 		, Y.ORDRS_CLNT_CD 			/* 고객사 */
+                      , A.CLNT_NM  AS ORDRS_CLNT_NM		/* 고객사명 */
+                      , X.SALES_CD
+                      , Y.CLNT_PJT		/* 고객사PJT */
+                      , X.PRDT_CD			/* 제품구분 */
+                      , E.PRDT_NM			/* 제품구분명 */
+                      , X.ITEM_DIV		/* 아이템 구분 */
+                      , X.EQP_NM			/* 설비명 */
+                FROM TB_CR02D02 X		/* 수주상세 */
+                      INNER JOIN TB_CR02M01 Y ON(X.CO_CD = Y.CO_CD AND X.ORDRS_NO = Y.ORDRS_NO)	/* 수주마스터 */
+                      LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD /* 거래처마스터 */
+                      LEFT OUTER JOIN TB_BM01M01 E ON(X.PRDT_CD=E.PRDT_CD)							
+		) C ON(A.CO_CD=C.CO_CD AND A.SALES_CD=C.SALES_CD)					
+		WHERE 1=1
+		<if test="coCd != null and !coCd.equals('')">
+			AND A.CO_CD = #{coCd}   
+		</if>		
+		<if test="ordrgNo != null and !ordrgNo.equals('')">
+			AND A.ORDRG_NO = #{ordrgNo}   
+		</if>	
+		<if test="ordrgSeq != null and !ordrgSeq.equals('')">
+			AND B.ORDRG_SEQ = #{ordrgSeq}   
+		</if>		
+		<if test="salesCd != null and !salesCd.equals('')">
+			AND A.SALES_CD = #{salesCd}   
+		</if>							
 	</select>	
 	
 	<!-- 발주관리 - 발주마스터 등록 -->

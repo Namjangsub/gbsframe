@@ -63,6 +63,14 @@ public class SM02Ctr {
 		return "jsonView";
 	}	
 	
+	// 발주상세 팝업 조회
+	@PostMapping(value = "/selectOrderDetailView")
+	public String selectOrderDetailView(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = sm02Svc.selectOrderDetailView(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}		
+	
 	//발주 등록
     @PostMapping(value = "/insertOrderMaster")
     public String insertOrderMaster(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
