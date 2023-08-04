@@ -9,7 +9,7 @@ public interface UrlService {
 
 	String getLongUrlByshortUrl(String shortUrl);
 
-	String generateShortUrl(Map<String, String> paramMap);
+	Map<String, String> generateShortUrl(Map<String, String> paramMap);
 	
 	String shortUrlPromissChkCode(String shortUrl);
 }

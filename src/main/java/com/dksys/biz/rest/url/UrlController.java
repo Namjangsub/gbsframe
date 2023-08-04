@@ -21,8 +21,10 @@ public class UrlController {
     @PostMapping("/api/Shortening")
     public String Shortening(@RequestBody Map<String, String> paramMap, Model model) {
     	String longUrl = paramMap.get("longUrl");
+    	Map<String, String> returnUrl = urlService.generateShortUrl(paramMap);
         model.addAttribute("longUrl", longUrl);
-        model.addAttribute("shortUrl", urlService.generateShortUrl(paramMap));
+        model.addAttribute("shortUrl", returnUrl.get("shortUrl"));
+        model.addAttribute("chkCode", returnUrl.get("chkCode"));
         model.addAttribute("resultCode", 200);
     	return "jsonView";
     }

@@ -32,7 +32,7 @@ public class UrlServiceImpl implements UrlService{
     }
 
     @Override
-    public String generateShortUrl(Map<String, String> paramMap){
+    public Map<String, String> generateShortUrl(Map<String, String> paramMap){
     	String longUrl = paramMap.get("longUrl");
         if(!urlTypeValidation.valid(longUrl)){
             throw new IllegalArgumentException("잘못된 URL 타입입니다.");
@@ -47,7 +47,7 @@ public class UrlServiceImpl implements UrlService{
 //        	Map<String, String> paramMap = new HashMap<>();
         	paramMap.put("longUrl", longUrl);
             paramMap.put("chkCode", chkCode);
-        	id = urlMapper.insertLongUrl(paramMap);
+            id = urlMapper.insertLongUrl(paramMap);
 
         	Object paramValue = paramMap.get("id");
         	if (paramValue != null && paramValue instanceof Integer) {
@@ -65,7 +65,11 @@ public class UrlServiceImpl implements UrlService{
         }
         String shortUrl = base62Util.encoding(id);
 
-        return "http://localhost/s/"+shortUrl;
+    	Map<String, String> returnMap = new HashMap<>();
+    	returnMap.put("shortUrl", "http://localhost/s/"+shortUrl);
+    	returnMap.put("chkCode", urlMapper.getChkCodeById(id));
+    	
+        return returnMap;
     }
 
     @Override

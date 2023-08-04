@@ -99,7 +99,9 @@ public class EmailSvcImpl implements EmailSvc {
         // html로 텍스트 설정
         String mailCnts = "";
         if ("free".equals(paramMap.get("cntsType"))) {
-        	mailCnts = "<pre>" + paramMap.get("mailCnts") + "</pre>";
+        	mailCnts = "<pre>" + paramMap.get("mailCnts") + "</pre>" 
+				+ "<a href=" + paramMap.get("shortUrl") + " target='_blank' title='발주서 확인'>발주서</a>"
+				+ " <a> 비밀코드 : " + paramMap.get("chkCode") + "</a>";
         } else {        	
         	mailCnts = setHtmlContext(authCode, paramMap);
         }
@@ -222,7 +224,8 @@ public class EmailSvcImpl implements EmailSvc {
 				+ "</tr><tr><td><p><span>연락처</span></p></td>"
 				+ "<td><p><b><span>" + userInfo.get("offTelNo") + " (fax." + userInfo.get("faxNo") + "</span></b></p></td></tr>"
 				+ "<tr><td><p><span >메모</span></p></td>"
-				+ "<td><p><pre>" + paramMap.get("mailCnts") + "</pre><br>비밀코드:" + authCode + "</p></td></tr>"
+				+ "<td><p><pre>" + paramMap.get("mailCnts") + "</pre><br>비밀코드:" + paramMap.get("chkCode") + "</p></td></tr>"
+				+ "<tr><td><a href=" + paramMap.get("shortUrl") + "target='_blank'> title='발주서 확인'>발주서</a></td></tr>"
 				+ "</tbody></table></body></html>";
     	return mailHtml; 
     }
