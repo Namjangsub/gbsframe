@@ -14,10 +14,12 @@ import org.springframework.mobile.device.DeviceUtils;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import com.dksys.biz.admin.cm.cm01.service.CM01Svc;
+import com.dksys.biz.rest.url.service.UrlService;
 import com.dksys.biz.util.WebClientUtil;
 
 @Controller
@@ -27,6 +29,9 @@ public class HomeController {
     CM01Svc cm01Svc;
 	
     @Autowired
+    private UrlService urlService;
+    
+    @Autowired
     WebClientUtil webClientUtil;
     
     @GetMapping("/rest/get")
@@ -35,7 +40,32 @@ public class HomeController {
     	model.addAttribute("result", result);
     	return "jsonView";
     }
-    
+
+	// 단축URL처리
+	@PostMapping("/s/redirectChkCode")
+	public String redirectChkCode(HttpServletRequest request,  Model model){
+		String longUrl = request.getParameter("longUrl").toString();
+		String chkCode= urlService.shortUrlPromissChkCode(longUrl);
+		if(chkCode.equals(request.getParameter("chkCode").toString())) {
+			model.addAttribute("resultCode", 200);
+	        model.addAttribute("resultText", "코드확인완료!");
+		} else {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultText", "비밀코드 확인 바랍니다.");
+		}
+		return "jsonView";
+	}
+	
+	// 단축URL처리
+	@GetMapping("/s/{shortUrl}")
+	public String redirect(HttpServletRequest request, @PathVariable String shortUrl){
+		String longUrl= urlService.getLongUrlByshortUrl(shortUrl);
+		if(longUrl != null){
+			return "redirect:"+"http://"+longUrl;
+		}
+		return  "redirect:/";
+	}
+
 	// 웰컴 페이지
     @GetMapping("/")
     public String welcome(HttpServletRequest request) {
