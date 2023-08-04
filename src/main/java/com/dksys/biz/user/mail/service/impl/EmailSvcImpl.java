@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring5.SpringTemplateEngine;
 
+import com.dksys.biz.rest.url.service.UrlService;
 import com.dksys.biz.user.mail.mapper.MailMapper;
 import com.dksys.biz.user.mail.service.EmailSvc;
 
@@ -60,6 +61,9 @@ public class EmailSvcImpl implements EmailSvc {
     @Autowired
     MailMapper mailMapper;
     
+    @Autowired
+    private UrlService urlService;    
+    
 	/*************************************************************************
 	 * Spring Boot는 Spring Framework이 제공하는 JavaMailSender로 mimemessage 객체 생성
 	 * Spring의 JavaMailSender를 사용하면
@@ -96,6 +100,12 @@ public class EmailSvcImpl implements EmailSvc {
     public int sendMailHtml(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
         String authCode = createCode();
+        String targetUrl = "http://localhost/static/redirectChkCode.html?http://localhost:8090/ubi4/ubihtml.jsp" + paramMap.get("tempUrl");
+        paramMap.put("longUrl", targetUrl);
+    	Map<String, String> returnUrl = urlService.generateShortUrl(paramMap);
+    	paramMap.put("shortUrl", returnUrl.get("shortUrl"));
+    	paramMap.put("chkCode", returnUrl.get("chkCode"));
+        
         // html로 텍스트 설정
         String mailCnts = "";
         if ("free".equals(paramMap.get("cntsType"))) {
