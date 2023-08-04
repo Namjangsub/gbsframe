@@ -1,6 +1,7 @@
 package com.dksys.biz.user.cr.cr05.service.impl;
 
 import java.lang.reflect.Type;
+import java.text.Format.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -10,12 +11,13 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
-import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.cr.cr05.mapper.CR05Mapper;
 import com.dksys.biz.user.cr.cr05.service.CR05Svc;
+import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -23,6 +25,7 @@ import com.google.gson.reflect.TypeToken;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class CR05SvcImpl implements CR05Svc {
+	
 	@Autowired
 	CR05Mapper cr05Mapper;
 	
@@ -31,36 +34,46 @@ public class CR05SvcImpl implements CR05Svc {
 	
 	@Autowired
 	CM15Svc cm15Svc;
-	
+
 	@Autowired
 	CM08Svc cm08Svc;
-	
-	
+
+	// 그리드 카운트
 	@Override
-	public int selectClmnListCount(Map<String, String> paramMap) {
-		return cr05Mapper.selectClmnListCount(paramMap);
+	public int grid1_selectCount(Map<String, String> paramMap) {
+		return cr05Mapper.grid1_selectCount(paramMap);
 	}
-	
+
+	// 그리드 리스트
 	@Override
-	public List<Map<String, String>> selectClmnList(Map<String, String> paramMap) {
-		return cr05Mapper.selectClmnList(paramMap);
+	public List<Map<String, String>> grid1_selectList(Map<String, String> paramMap) {
+		return cr05Mapper.grid1_selectList(paramMap);
 	}
-	
+
+	// 삭제 전 체크
 	@Override
-	public Map<String, String> select_cr05_Info(Map<String, String> paramMap) {
-		return cr05Mapper.select_cr05_Info(paramMap);
+	public List<Map<String, Object>> delete_Chk(Map<String, String> paramMap) {
+		return cr05Mapper.delete_Chk(paramMap);
 	}
-	
-	@Override
-	public List<Map<String, String>> select_cr05_Info_Dtl(Map<String, String> paramMap) {
-		return cr05Mapper.select_cr05_Info_Dtl(paramMap);
-	}
-	
+
+	// 팝업 입력대상 검색
 	@Override
 	public List<Map<String, String>> select_insert_target_modal(Map<String, String> paramMap) {
 		return cr05Mapper.select_insert_target_modal(paramMap);
 	}
 	
+	// 수정화면 정보
+	@Override
+	public Map<String, String> select_cr05_Info(Map<String, String> paramMap) {
+		return cr05Mapper.select_cr05_Info(paramMap);
+	}
+	
+	// 수정화면 상세정보
+	@Override
+	public List<Map<String, String>> select_cr05_Info_Dtl(Map<String, String> paramMap) {
+		return cr05Mapper.select_cr05_Info_Dtl(paramMap);
+	}
+
 	@Override
 	public List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap) {
 		return cr05Mapper.selectPmntmtdCd(paramMap);
@@ -71,16 +84,9 @@ public class CR05SvcImpl implements CR05Svc {
 		return cr05Mapper.selectBkacCd(paramMap);
 	}
 	
-	
-//	@Override
-//	public List<Map<String, String>> select_cr05_clmnNo(Map<String, String> paramMap) {
-//		return cr05Mapper.select_cr05_clmnNo(paramMap);
-//	}
-	
 	//DATA INSERT
 	@Override
 	public int insert_cr05(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-		
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		
@@ -101,30 +107,44 @@ public class CR05SvcImpl implements CR05Svc {
 		//데이터 처리 시작
 		int fileTrgtKey = cr05Mapper.select_cr05_SeqNext(paramMap);
 		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
-		
-		String newClmnNo = cr05Mapper.select_cr05_clmnNo(paramMap);
-		paramMap.put("clmnNo", newClmnNo);
+
+		String newMNGM_NO = cr05Mapper.select_cr05_Next_MNGM_NO(paramMap);
+		paramMap.put("clmnNo", newMNGM_NO);
 		
 		//마스터입력
 		int result = cr05Mapper.insert_cr05(paramMap);
 
-		//상세입력 ---------수정 중 
+		//상세입력
+		//int i = 1;
+		//int outInoutKey = 0;
+
 		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
-		for(Map<String, String> dtl : dtlParam) {
-			dtl.put("clmnNo", newClmnNo);
+	    for (Map<String, String> dtl : dtlParam) {
+	    	dtl.put("clmnNo", newMNGM_NO);
+	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
 			dtl.put("userId", paramMap.get("userId"));
-			dtl.put("pgmId", paramMap.get("pgmId"));
-			
-			String dataChk = dtl.get("dataChk").toString();
-			// "dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
-			if("I".equals(dataChk)) {
+	    	dtl.put("pgmId", paramMap.get("pgmId"));
+
+	    	//마스터의 정보로 통화단위, 환율 변경
+	    	dtl.put("currCdM", paramMap.get("currCd"));
+	    	dtl.put("exrateM", paramMap.get("exrate"));
+	    	//dtl["currCd"] = paramMap.get("currCd");
+	    	//dtl["exrate"] = paramMap.get("exrate");
+	    	
+	    	String dataChk = dtl.get("dataChk").toString();
+			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
+	    	if ("I".equals(dataChk)) {
+				dtl.put("clmnNo", dtl.get("clmnNo").toString());
 				dtl.put("ordrsNo", dtl.get("ordrsNo").toString());
 				dtl.put("clmnPlanSeq", dtl.get("clmnPlanSeq").toString());
-				dtl.put("clmnDtlAmt", dtl.get("clmnAmt3").toString());
+				dtl.put("clmnDtlAmt", dtl.get("inputClmnDtlAmt").toString());
 				
+				//데이터 처리
 				cr05Mapper.insert_cr05_Dtl(dtl);
-			}
-		}
+				// cr05Mapper.update_cr05_Conf(dtl);
+				//i++;
+	    	}
+	    }
 		//데이터 처리 끝
 
 		//---------------------------------------------------------------
@@ -140,7 +160,7 @@ public class CR05SvcImpl implements CR05Svc {
 		//---------------------------------------------------------------
 		return result;
 	}
-	
+
 	//DATA UPDATE
 	@Override
 	public int update_cr05(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
@@ -181,45 +201,42 @@ public class CR05SvcImpl implements CR05Svc {
 		//데이터처리 시작
 		//마스터 수정
 		int result = cr05Mapper.update_cr05(paramMap);
-		
-		//상세수정  ---------수정 중 
+
+		//상세수정
 		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
-		
-		System.out.println(dtlParam); 
-		
 	    for (Map<String, String> dtl : dtlParam) {
 	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
 			dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
 			
 			String dataChk = dtl.get("dataChk").toString();	    	
-			//"dtaChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
+			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
 	    	if ("U".equals(dataChk)) {
 				//데이터 처리
 				cr05Mapper.update_cr05_Dtl(dtl);
 	    	} 
 	    }
-	    //데이터 처리 끝
+		//데이터 처리 끝
 		
-  		//---------------------------------------------------------------
-  		//첨부 화일 처리 시작
-  		//---------------------------------------------------------------
-  		if (uploadFileList.size() > 0) {
-  			paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-  			paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-  			cm08Svc.uploadFile(paramMap, mRequest);
-  		}
-  		
-  		for(String fileKey : deleteFileList) {
-  			cm08Svc.deleteFile(fileKey);
-  		}
-  		//---------------------------------------------------------------
-  		//첨부 화일 처리  끝
-  		//---------------------------------------------------------------
+		//---------------------------------------------------------------
+		//첨부 화일 처리 시작
+		//---------------------------------------------------------------
+		if (uploadFileList.size() > 0) {
+			paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+			paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+			cm08Svc.uploadFile(paramMap, mRequest);
+		}
 		
+		for(String fileKey : deleteFileList) {
+			cm08Svc.deleteFile(fileKey);
+		}
+		//---------------------------------------------------------------
+		//첨부 화일 처리  끝
+		//---------------------------------------------------------------
 		return result;
 	}
 	
+	//DATA DELETE
 	@Override
 	public int delete_cr05(Map<String, String> paramMap) throws Exception {
 		//---------------------------------------------------------------
@@ -240,12 +257,20 @@ public class CR05SvcImpl implements CR05Svc {
 		//---------------------------------------------------------------
 		//첨부 화일 권한체크 끝
 		//---------------------------------------------------------------
-		
 		int result = 0;
+		String delAll = paramMap.get("delAll").toString();
 		
-		result = cr05Mapper.delete_cr05_Dtl_All(paramMap);
-		result = cr05Mapper.delete_cr05(paramMap);
-	//	result = cr05Mapper.delete_cr05_Dtl(paramMap);
+		if ("Y".equals(delAll)) {
+			//전체 삭제
+			result = cr05Mapper.delete_cr05_Dtl(paramMap);
+			result = cr05Mapper.delete_cr05(paramMap);
+    	} else {
+    		result = cr05Mapper.delete_cr05_Dtl(paramMap);
+			result = cr05Mapper.update_cr05_Del(paramMap);
+    	}
+		// result = cr05Mapper.delete_cr05_Dtl_All(paramMap);
+		// result = cr05Mapper.delete_cr05(paramMap);
+		// result = cr05Mapper.update_cr05_Del(paramMap);
 		
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
