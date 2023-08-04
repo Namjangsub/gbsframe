@@ -67,9 +67,9 @@ public class EmailSvcImpl implements EmailSvc {
 	 * 별도로 Properties를 직접 설정하거나 Authenticator를 구현할 필요가 없다.
 	 **************************************************************************/
 	public int sendMailSimple (Map<String, String> paramMap) throws Exception {
-    	String authNum = createCode();
+    	String authCode = createCode();
         
-        paramMap.put("mailCode", authNum);
+        paramMap.put("mailCode", authCode);
         paramMap.put("mailType", "Simple");
         mailMapper.insertMail(paramMap); //전송로그 남기기 Exception 발생시 rollback되어  없어짐 주의
 
@@ -95,18 +95,18 @@ public class EmailSvcImpl implements EmailSvc {
     
     public int sendMailHtml(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
-        String authNum = createCode();
+        String authCode = createCode();
         // html로 텍스트 설정
         String mailCnts = "";
         if ("free".equals(paramMap.get("cntsType"))) {
         	mailCnts = "<pre>" + paramMap.get("mailCnts") + "</pre>";
         } else {        	
-        	mailCnts = setHtmlContext(authNum, paramMap);
+        	mailCnts = setHtmlContext(authCode, paramMap);
         }
-//        String mailHtml = setContext(authNum, "purchaseOrder.html") // 메일 본문 내용(템플릿 적용), HTML 여부
+//        String mailHtml = setContext(authCode, "purchaseOrder.html") // 메일 본문 내용(템플릿 적용), HTML 여부
         
         paramMap.put("mailCnts", mailCnts);
-        paramMap.put("mailCode", authNum);
+        paramMap.put("mailCode", authCode);
         paramMap.put("mailType", "Html");
         mailMapper.insertMail(paramMap);  //전송로그 남기기 Exception 발생시 rollback되어  없어짐 주의
     	/*************************************************************************
@@ -187,7 +187,7 @@ public class EmailSvcImpl implements EmailSvc {
         Random random = new Random();
         StringBuffer key = new StringBuffer();
 
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 5; i++) {
             int index = random.nextInt(4);
 
             switch (index) {
@@ -206,7 +206,7 @@ public class EmailSvcImpl implements EmailSvc {
         return templateEngine.process(type, context);
     }
     // html 적용
-    public String setHtmlContext(String authNum, Map<String, String> paramMap) {
+    public String setHtmlContext(String authCode, Map<String, String> paramMap) {
         LocalDate currentDate = LocalDate.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
         String dateString = currentDate.format(formatter);
@@ -222,7 +222,7 @@ public class EmailSvcImpl implements EmailSvc {
 				+ "</tr><tr><td><p><span>연락처</span></p></td>"
 				+ "<td><p><b><span>" + userInfo.get("offTelNo") + " (fax." + userInfo.get("faxNo") + "</span></b></p></td></tr>"
 				+ "<tr><td><p><span >메모</span></p></td>"
-				+ "<td><p><pre>" + paramMap.get("mailCnts") + "</pre><br>비밀코드:" + authNum + "</p></td></tr>"
+				+ "<td><p><pre>" + paramMap.get("mailCnts") + "</pre><br>비밀코드:" + authCode + "</p></td></tr>"
 				+ "</tbody></table></body></html>";
     	return mailHtml; 
     }
@@ -359,8 +359,8 @@ public class EmailSvcImpl implements EmailSvc {
 			// Multipart 객체 생성하여 본문과 첨부 파일 추가
 			Multipart multipart = new MimeMultipart();
 			MimeBodyPart bodyPart = new MimeBodyPart();// HTML 텍스트 body
-	        String authNum = createCode(); // 비밀코드 생성
-	        String mailCnts = setHtmlContext(authNum, paramMap); // html로 텍스트 생성
+	        String authCode = createCode(); // 비밀코드 생성
+	        String mailCnts = setHtmlContext(authCode, paramMap); // html로 텍스트 생성
             bodyPart.setContent(mailCnts, "text/html; charset=utf-8");
             multipart.addBodyPart(bodyPart);
 
