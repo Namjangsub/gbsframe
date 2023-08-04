@@ -53,10 +53,128 @@
 		
 	<!-- 기준관리 - 결재선 조회 리스트  카운트 -->
 	<select id="selectOrderListCount" parameterType="Map" resultType="int">
-		SELECT COUNT(*) 
-			FROM TB_SM02M01 A
-		WHERE 1=1
-		<include refid="selectOrderListCondition"></include>
+		SELECT COUNT(*)
+		FROM
+		(
+			SELECT Z.*
+			FROM
+			(	
+			SELECT Q.*
+					, (Q.ORDRG_QTY -  Q.IN_QTY)	AS REMAIN_QTY /*입고잔량 : 발주수량 - 입고수량*/
+			 FROM
+			(
+				SELECT A.FILE_TRGT_KEY
+						, A.CO_CD
+						, FN_CM05M01_CD_TO_NM(A.CO_CD) AS CO_CD_NM	/* 회사명명 */
+						, A.ORDRG_NO
+						, A.REQ_NO
+						,(
+							SELECT SUM(ORDRG_SEQ)
+								FROM TB_SM02D01 D
+							WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
+						  ) AS ORDRG_SEQ               --발주순번 합
+						, A.SALES_CD
+						, A.PCHS_CLNT_CD				/* 구매처cd */
+							,
+							(
+								SELECT D.CLNT_NM
+									FROM TB_BM02M01 D
+								WHERE A.PCHS_CLNT_CD=D.CLNT_CD
+							) AS PCHS_CLNT_NM		/* 구매처명 */
+							, B.ORDRS_CLNT_CD				 /* 고객사 */
+						, B.ORDRS_CLNT_NM				/* 고객사명 */
+							, B.CLNT_PJT					 /* 고객사 PJT */
+				        , B.PRDT_CD			/* 제품구분 */
+				        , B.PRDT_NM			/* 제품구분명 */			                    
+				        , B.ITEM_DIV		/* 아이템 구분 */                		
+				        , FN_CM05M01_CD_TO_NM(B.ITEM_DIV) AS ITEM_DIV_NM	/* 아이템 구분명 */			
+							, B.EQP_NM						/* 설비명 */
+						, TO_CHAR(A.ORDRG_DT, 'YYYY-MM-DD') ORDRG_DT		/* 발주일자 */
+						, A.ORDRG_DIV10					/* 발주구분 */
+						, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV10) AS ORDRG_DIV10_NM	/* 발주구분명 */
+						, A.ORDRG_DIV20					/* 용도구분 */
+						, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV20) AS ORDRG_DIV20_NM	/* 용도구분명 */
+						, A.ORDRG_DIV30					/* 특성구분 */
+						, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV30) AS ORDRG_DIV30_NM	/* 특성구분명 */								
+						, A.CURR_CD						/* 통화단위 */
+						, A.EXRATE
+						, 
+						(
+							SELECT SUM(ORDRG_QTY)
+								FROM TB_SM02D01 D
+							WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
+						) AS ORDRG_QTY			/* 발주수량 */								
+						, 
+						(
+							SELECT SUM(D.ORDRG_AMT)
+								FROM TB_SM02D01 D
+							WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
+						) AS ORDRG_AMT			/* 발주금액 */				
+						,
+						(
+							SELECT NVL(SUM(D.IN_QTY), 0)
+							FROM TB_SM03D01 D
+							WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD	
+						) AS  IN_QTY	    /*입고수량 합*/				
+						, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
+						, A.ORDRG_RMK
+						, A.IN_CMPLET_YN
+						, A.ETC_FIELD1
+						, A.ETC_FIELD2
+						, A.ETC_FIELD3
+						, A.CREAT_ID
+						, A.CREAT_PGM
+						, A.CREAT_DTTM
+					FROM TB_SM02M01 A
+					LEFT OUTER JOIN
+					(
+					 SELECT  X.CO_CD 					/* 회사코드 */
+					 		, Y.ORDRS_CLNT_CD 			/* 고객사 */
+				            , A.CLNT_NM  AS ORDRS_CLNT_NM		/* 고객사명 */
+				            , X.SALES_CD
+				            , Y.CLNT_PJT		/* 고객사PJT */
+				            , X.PRDT_CD			/* 제품구분 */
+				            , E.PRDT_NM			/* 제품구분명 */
+				            , X.ITEM_DIV		/* 아이템 구분 */
+				            , X.EQP_NM			/* 설비명 */
+				      FROM TB_CR02D02 X		/* 수주상세 */
+				            INNER JOIN TB_CR02M01 Y ON(X.CO_CD = Y.CO_CD AND X.ORDRS_NO = Y.ORDRS_NO)	/* 수주마스터 */
+				            LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD /* 거래처마스터 */
+				            LEFT OUTER JOIN TB_BM01M01 E ON(X.PRDT_CD=E.PRDT_CD)							
+					) B ON(A.CO_CD=B.CO_CD AND A.SALES_CD=B.SALES_CD)	
+					WHERE 1=1						
+					
+					ORDER BY A.CO_CD DESC, A.ORDRG_NO DESC, A.CREAT_DTTM DESC, A.UDT_DTTM DESC
+			) AS Q    /* 입고 잔량 계산하기 위함*/		
+			)AS Z     /*조건 사용 위함*/		
+			WHERE Z.REMAIN_QTY != 0		
+			<if test="coCd != null and !coCd.equals('')">
+					AND    Z.CO_CD = '${coCd}' --회사
+				</if>
+				
+				<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('') and ordrgDtTo != null and !ordrgDtTo.equals('')" >
+					AND    Z.ORDRG_DT BETWEEN TO_DATE( #{ordrgDtFrom},'YYYYMMDD') AND TO_DATE( #{ordrgDtTo},'YYYYMMDD') --발주일자
+				</if>
+				
+				<if test="pchsClntCd != null and !pchsClntCd.equals('')"> 
+					AND    Z.PCHS_CLNT_CD = '${pchsClntCd}' --구매처
+				</if>				
+				<if test="pchsClntNm != null and !pchsClntNm.equals('')"> 
+					AND    Z.PCHS_CLNT_Nm = '${pchsClntNm}' --구매처명
+				</if>
+				
+				<if test="salesCd != null and !salesCd.equals('')">
+					AND    Z.SALES_CD = '${salesCd}' 
+				</if>
+				
+				<if test="ordrgdiv10 != null and !ordrgdiv10.equals('')">
+					AND    Z.ORDRG_DIV10 = '${ordrgdiv10}' --발주구분
+				</if>
+				<if test="ordrgdiv10Nm != null and !ordrgdiv10Nm.equals('')">
+					AND    Z.ORDRG_DIV10_NM = '${ordrgdiv10Nm}' --발주구분
+				</if>				
+		)T				
+		
 	</select>
 	
 	<!-- 발주관리 리스트  -->
@@ -70,163 +188,183 @@
 					FROM
 						(
 						SELECT Z.*
-	FROM
-(	
-	SELECT Q.*
-			, (Q.ORDRG_QTY -  Q.IN_QTY)	AS REMAIN_QTY /*입고잔량 : 발주수량 - 입고수량*/
-	 FROM
-	(
-		SELECT A.FILE_TRGT_KEY
-				, A.CO_CD
-				, FN_CM05M01_CD_TO_NM(A.CO_CD) AS CO_CD_NM	/* 회사명명 */
-				, A.ORDRG_NO
-				, A.REQ_NO
-				,(
-					SELECT SUM(ORDRG_SEQ)
-						FROM TB_SM02D01 D
-					WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
-				  ) AS ORDRG_SEQ               --발주순번 합
-				, A.SALES_CD
-				, A.PCHS_CLNT_CD				/* 구매처cd */
-					,
-					(
-						SELECT D.CLNT_NM
-							FROM TB_BM02M01 D
-						WHERE A.PCHS_CLNT_CD=D.CLNT_CD
-					) AS PCHS_CLNT_NM		/* 구매처명 */
-					, B.ORDRS_CLNT_CD				 /* 고객사 */
-				, B.ORDRS_CLNT_NM				/* 고객사명 */
-					, B.CLNT_PJT					 /* 고객사 PJT */
-		        , B.PRDT_CD			/* 제품구분 */
-		        , B.PRDT_NM			/* 제품구분명 */			                    
-		        , B.ITEM_DIV		/* 아이템 구분 */                		
-		        , FN_CM05M01_CD_TO_NM(B.ITEM_DIV) AS ITEM_DIV_NM	/* 아이템 구분명 */			
-					, B.EQP_NM						/* 설비명 */
-				, TO_CHAR(A.ORDRG_DT, 'YYYY-MM-DD') ORDRG_DT		/* 발주일자 */
-				, A.ORDRG_DIV10					/* 발주구분 */
-				, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV10) AS ORDRG_DIV10_NM	/* 발주구분명 */
-				, A.ORDRG_DIV20					/* 용도구분 */
-				, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV20) AS ORDRG_DIV20_NM	/* 용도구분명 */
-				, A.ORDRG_DIV30					/* 특성구분 */
-				, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV30) AS ORDRG_DIV30_NM	/* 특성구분명 */								
-				, A.CURR_CD						/* 통화단위 */
-				, A.EXRATE
-				, 
-				(
-					SELECT SUM(ORDRG_QTY)
-						FROM TB_SM02D01 D
-					WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
-				) AS ORDRG_QTY			/* 발주수량 */								
-				, 
-				(
-					SELECT SUM(D.ORDRG_AMT)
-						FROM TB_SM02D01 D
-					WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
-				) AS ORDRG_AMT			/* 발주금액 */				
-				,
-				(
-					SELECT NVL(SUM(D.IN_QTY), 0)
-					FROM TB_SM03D01 D
-					WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD	
-				) AS  IN_QTY	    /*입고수량 합*/				
-				, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
-				, A.ORDRG_RMK
-				, A.IN_CMPLET_YN
-				, A.ETC_FIELD1
-				, A.ETC_FIELD2
-				, A.ETC_FIELD3
-				, A.CREAT_ID
-				, A.CREAT_PGM
-				, A.CREAT_DTTM
-			FROM TB_SM02M01 A
-			LEFT OUTER JOIN
-			(
-			 SELECT  X.CO_CD 					/* 회사코드 */
-			 		, Y.ORDRS_CLNT_CD 			/* 고객사 */
-		            , A.CLNT_NM  AS ORDRS_CLNT_NM		/* 고객사명 */
-		            , X.SALES_CD
-		            , Y.CLNT_PJT		/* 고객사PJT */
-		            , X.PRDT_CD			/* 제품구분 */
-		            , E.PRDT_NM			/* 제품구분명 */
-		            , X.ITEM_DIV		/* 아이템 구분 */
-		            , X.EQP_NM			/* 설비명 */
-		      FROM TB_CR02D02 X		/* 수주상세 */
-		            INNER JOIN TB_CR02M01 Y ON(X.CO_CD = Y.CO_CD AND X.ORDRS_NO = Y.ORDRS_NO)	/* 수주마스터 */
-		            LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD /* 거래처마스터 */
-		            LEFT OUTER JOIN TB_BM01M01 E ON(X.PRDT_CD=E.PRDT_CD)							
-			) B ON(A.CO_CD=B.CO_CD AND A.SALES_CD=B.SALES_CD)	
-			WHERE 1=1						
-			<include refid="selectOrderListCondition"></include>
-			ORDER BY A.CO_CD DESC, A.ORDRG_NO DESC, A.CREAT_DTTM DESC, A.UDT_DTTM DESC
-	) AS Q    /* 입고 잔량 계산하기 위함*/		
-)AS Z     /*조건 사용 위함*/		
-WHERE Z.REMAIN_QTY != 0							
-						) X		
-			)							
-			WHERE 1=1
-				AND RN BETWEEN ${firstIndex} AND ${lastIndex}
+						FROM
+						(	
+						SELECT Q.*
+								, (Q.ORDRG_QTY -  Q.IN_QTY)	AS REMAIN_QTY /*입고잔량 : 발주수량 - 입고수량*/
+						 FROM
+						(
+							SELECT A.FILE_TRGT_KEY
+									, A.CO_CD
+									, FN_CM05M01_CD_TO_NM(A.CO_CD) AS CO_CD_NM	/* 회사명명 */
+									, A.ORDRG_NO
+									, A.REQ_NO
+									,(
+										SELECT SUM(ORDRG_SEQ)
+											FROM TB_SM02D01 D
+										WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
+									  ) AS ORDRG_SEQ               --발주순번 합
+									, A.SALES_CD
+									, A.PCHS_CLNT_CD				/* 구매처cd */
+										,
+										(
+											SELECT D.CLNT_NM
+												FROM TB_BM02M01 D
+											WHERE A.PCHS_CLNT_CD=D.CLNT_CD
+										) AS PCHS_CLNT_NM		/* 구매처명 */
+										, B.ORDRS_CLNT_CD				 /* 고객사 */
+									, B.ORDRS_CLNT_NM				/* 고객사명 */
+										, B.CLNT_PJT					 /* 고객사 PJT */
+							        , B.PRDT_CD			/* 제품구분 */
+							        , B.PRDT_NM			/* 제품구분명 */			                    
+							        , B.ITEM_DIV		/* 아이템 구분 */                		
+							        , FN_CM05M01_CD_TO_NM(B.ITEM_DIV) AS ITEM_DIV_NM	/* 아이템 구분명 */			
+										, B.EQP_NM						/* 설비명 */
+									, TO_CHAR(A.ORDRG_DT, 'YYYY-MM-DD') ORDRG_DT		/* 발주일자 */
+									, A.ORDRG_DIV10					/* 발주구분 */
+									, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV10) AS ORDRG_DIV10_NM	/* 발주구분명 */
+									, A.ORDRG_DIV20					/* 용도구분 */
+									, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV20) AS ORDRG_DIV20_NM	/* 용도구분명 */
+									, A.ORDRG_DIV30					/* 특성구분 */
+									, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV30) AS ORDRG_DIV30_NM	/* 특성구분명 */								
+									, A.CURR_CD						/* 통화단위 */
+									, A.EXRATE
+									, 
+									(
+										SELECT SUM(ORDRG_QTY)
+											FROM TB_SM02D01 D
+										WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
+									) AS ORDRG_QTY			/* 발주수량 */								
+									, 
+									(
+										SELECT SUM(D.ORDRG_AMT)
+											FROM TB_SM02D01 D
+										WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD
+									) AS ORDRG_AMT			/* 발주금액 */				
+									,
+									(
+										SELECT NVL(SUM(D.IN_QTY), 0)
+										FROM TB_SM03D01 D
+										WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.SALES_CD=D.SALES_CD	
+									) AS  IN_QTY	    /*입고수량 합*/				
+									, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
+									, A.ORDRG_RMK
+									, A.IN_CMPLET_YN
+									, A.ETC_FIELD1
+									, A.ETC_FIELD2
+									, A.ETC_FIELD3
+									, A.CREAT_ID
+									, A.CREAT_PGM
+									, A.CREAT_DTTM
+								FROM TB_SM02M01 A
+								LEFT OUTER JOIN
+								(
+								 SELECT  X.CO_CD 					/* 회사코드 */
+								 		, Y.ORDRS_CLNT_CD 			/* 고객사 */
+							            , A.CLNT_NM  AS ORDRS_CLNT_NM		/* 고객사명 */
+							            , X.SALES_CD
+							            , Y.CLNT_PJT		/* 고객사PJT */
+							            , X.PRDT_CD			/* 제품구분 */
+							            , E.PRDT_NM			/* 제품구분명 */
+							            , X.ITEM_DIV		/* 아이템 구분 */
+							            , X.EQP_NM			/* 설비명 */
+							      FROM TB_CR02D02 X		/* 수주상세 */
+							            INNER JOIN TB_CR02M01 Y ON(X.CO_CD = Y.CO_CD AND X.ORDRS_NO = Y.ORDRS_NO)	/* 수주마스터 */
+							            LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD /* 거래처마스터 */
+							            LEFT OUTER JOIN TB_BM01M01 E ON(X.PRDT_CD=E.PRDT_CD)							
+								) B ON(A.CO_CD=B.CO_CD AND A.SALES_CD=B.SALES_CD)	
+								WHERE 1=1						
+								<include refid="selectOrderListCondition"></include>
+								ORDER BY A.CO_CD DESC, A.ORDRG_NO DESC, A.CREAT_DTTM DESC, A.UDT_DTTM DESC
+						) AS Q    /* 입고 잔량 계산하기 위함*/		
+					)AS Z     /*조건 사용 위함*/		
+					WHERE Z.REMAIN_QTY != 0							
+											) X		
+								)							
+								WHERE 1=1
+									AND RN BETWEEN ${firstIndex} AND ${lastIndex}
 	</select>
 	
 	<!-- 모달창 리스트 -->
 	<select id="selectOrderDetailList" parameterType="Map" resultType="camelMap">	
-		SELECT D.CO_CD
-			, D.ORDRG_NO
-			, D.ORDRG_SEQ
-			, D.SALES_CD
-			, D.MATR_SEQ
-			, D.UPPER_CD
-			, D.LOWER_CD
-			, DSGN_NO
-			, D.MATR_CD
-			, FN_CM05M01_CD_TO_NM(D.MATR_TEST_DIV) MATR_TEST_DIV    
-			, ORDRG_PRC			/* 발주단가		*/
-			, ORDRG_QTY			/* 발주수량 */
-			, ORDRG_AMT			/* 발주금액  */
-			, TO_CHAR(D.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
-			, TO_CHAR(D.DUDT_INTEND_DT, 'YYYY-MM-DD') DUDT_INTEND_DT
-			, ORDRG_DTL_RMK
-			, D.CREAT_ID
-			, D.CREAT_PGM
-			, D.CREAT_DTTM
-			, D.UDT_ID
-			, D.UDT_PGM
-			, D.UDT_DTTM
-			, D.IN_CMPLET_YN
-	        , D.WH_CD AS MATR_WH_CD		/* 입고창고  */
-	        , FN_CM05M01_CD_TO_NM(D.WH_CD) AS MATR_WH_NM		/* 입고창고  */
-	        , 
-	        (
-	        	SELECT NVL(SUM(ORDRG_QTY), 0) 
-	        		FROM TB_SM02D01 CC
-	        	WHERE D.CO_CD = CC.CO_CD 
-	        		AND D.ORDRG_NO != CC.ORDRG_NO
-	        		AND D.SALES_CD = CC.SALES_CD 
-	        		AND D.LOWER_CD = CC.LOWER_CD
-	        		AND D.MATR_CD = CC.MATR_CD
-	        ) AS PRE_BOM_QTY			/* 구매 BOM 기발주 수량 임시 */      
-	        ,
-	        (
-	        	SELECT CC.BOM_QTY			/* 구매 BOM 수량 */
-	        		FROM TB_SM01D01 CC 						        		
-				WHERE 1=1
-	        		AND D.SALES_CD = CC.SALES_CD AND D.MATR_SEQ = CC.MATR_SEQ
-        			AND D.UPPER_CD=CC.UPPER_CD  AND D.LOWER_CD=CC.LOWER_CD       		
-	        ) BOM_QTY /* 구매 BOM 수량 */
-	        , 'Y' AS USER_CHK_V		/* 수정시 CHK값 SET */
-	        , E.MATR_NM		/* 자재명 */
-	        , E.MATR_MAT		/* 소재 */
-	        , E.MATR_MAKR_NM
-	        , E.MATR_MNO
-	        , E.MATR_SPEC	        	
-		FROM TB_SM02D01 D
-		LEFT OUTER JOIN TB_SM01D01 E ON(D.CO_CD=E.CO_CD AND D.SALES_CD=E.SALES_CD AND D.UPPER_CD=E.UPPER_CD AND D.LOWER_CD=E.LOWER_CD
-										AND D.MATR_SEQ=E.MATR_SEQ AND D.MATR_CD=E.MATR_CD)		/*구매 BOM 자재 */		
-		WHERE 1=1
+		SELECT Z.* FROM
+		(
+			SELECT
+			
+					 D.CO_CD
+					, D.ORDRG_NO
+					, D.ORDRG_SEQ
+					, D.SALES_CD
+					, D.MATR_SEQ
+					, D.UPPER_CD
+					, D.LOWER_CD
+					, DSGN_NO
+					, D.MATR_CD
+					, FN_CM05M01_CD_TO_NM(D.MATR_TEST_DIV) MATR_TEST_DIV    
+					, D.ORDRG_PRC			/* 발주단가		*/
+					, D.ORDRG_QTY			/* 발주수량 */
+					, D.ORDRG_AMT			/* 발주금액  */
+					, TO_CHAR(D.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
+					, TO_CHAR(D.DUDT_INTEND_DT, 'YYYY-MM-DD') DUDT_INTEND_DT
+					, D.ORDRG_DTL_RMK
+					, D.CREAT_ID
+					, D.CREAT_PGM
+					, D.CREAT_DTTM
+					, D.UDT_ID
+					, D.UDT_PGM
+					, D.UDT_DTTM
+					, D.IN_CMPLET_YN
+			        , D.WH_CD AS MATR_WH_CD		/* 입고창고  */
+			        , FN_CM05M01_CD_TO_NM(D.WH_CD) AS MATR_WH_NM		/* 입고창고  */
+			        , 
+			        (
+			        	SELECT NVL(SUM(ORDRG_QTY), 0) 
+			        		FROM TB_SM02D01 CC
+			        	WHERE D.CO_CD = CC.CO_CD 
+			        		AND D.ORDRG_NO != CC.ORDRG_NO
+			        		AND D.SALES_CD = CC.SALES_CD 
+			        		AND D.LOWER_CD = CC.LOWER_CD
+			        		AND D.MATR_CD = CC.MATR_CD
+			        ) AS PRE_BOM_QTY			/* 구매 BOM 기발주 수량 임시 */      
+			        ,
+			        (
+			        	SELECT CC.BOM_QTY			/* 구매 BOM 수량 */
+			        		FROM TB_SM01D01 CC 						        		
+						WHERE 1=1
+			        		AND D.SALES_CD = CC.SALES_CD AND D.MATR_SEQ = CC.MATR_SEQ
+			    			AND D.UPPER_CD=CC.UPPER_CD  AND D.LOWER_CD=CC.LOWER_CD       		
+			        ) BOM_QTY /* 구매 BOM 수량 */
+			        , 'Y' AS USER_CHK_V		/* 수정시 CHK값 SET */
+			        , E.MATR_NM		/* 자재명 */
+			        , E.MATR_MAT		/* 소재 */
+			        , E.MATR_MAKR_NM
+			        , E.MATR_MNO
+			        , E.MATR_SPEC	
+					, SUM(D.ORDRG_QTY) OVER(PARTITION BY D.CO_CD, D.ORDRG_NO, D.ORDRG_SEQ) ORDRG_QTY_SUM	/* 발주수량 */																
+					, NVL(SUM(IN_QTY) OVER(PARTITION BY D.CO_CD, D.ORDRG_NO, D.ORDRG_SEQ), 0)  IN_QTY	/* 입고수량 */
+					, 
+					  SUM(D.ORDRG_QTY) OVER(PARTITION BY D.CO_CD, D.ORDRG_NO, D.ORDRG_SEQ) 
+					  - NVL(SUM(IN_QTY) OVER(PARTITION BY D.CO_CD, D.ORDRG_NO, D.ORDRG_SEQ), 0) AS REAMIN_IN_QTY			/* 잔여수량 */	
+				FROM TB_SM02D01 D
+				LEFT OUTER JOIN TB_SM01D01 E ON(D.CO_CD=E.CO_CD AND D.SALES_CD=E.SALES_CD AND D.UPPER_CD=E.UPPER_CD AND D.LOWER_CD=E.LOWER_CD
+													AND D.MATR_SEQ=E.MATR_SEQ AND D.MATR_CD=E.MATR_CD)		/*구매 BOM 자재 */	
+				INNER JOIN TB_SM02M01 B ON(D.CO_CD=B.CO_CD AND D.ORDRG_NO=B.ORDRG_NO)
+				LEFT OUTER JOIN
+				(
+				SELECT C.ORDRG_NO
+						, C.ORDRG_SEQ
+						, NVL(SUM(IN_QTY), 0) AS IN_QTY
+					FROM TB_SM03D01 C
+					INNER JOIN TB_SM03M01 D ON(D.IN_NO=C.IN_NO)
+				GROUP BY C.ORDRG_NO, C.ORDRG_SEQ, C.IN_NO
+				) C ON( D.ORDRG_NO=C.ORDRG_NO AND D.ORDRG_SEQ=C.ORDRG_SEQ)
+		) Z		
+		WHERE Z.REAMIN_IN_QTY !=0
 		<if test="coCd != null and !coCd.equals('')">
-			AND D.CO_CD = #{coCd}   
+			AND Z.CO_CD = #{coCd}   
 		</if>
 		<if test="ordrgNo != null and !ordrgNo.equals('')">
-			AND D.ORDRG_NO = #{ordrgNo}   
+			AND Z.ORDRG_NO = #{ordrgNo}   
 		</if>
 		<!-- <if test="ordrgSeq != null and !ordrgSeq.equals('')">
 			AND D.ORDRG_SEQ = #{ordrgSeq}   
