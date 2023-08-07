@@ -1,22 +1,34 @@
 package com.dksys.biz.user.sm.sm01;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.poifs.filesystem.NotOLE2FileException;
+import org.apache.poi.ss.usermodel.Row;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.user.sm.sm01.service.SM01Svc;
+import com.dksys.biz.cmn.service.CmnService;
 import com.dksys.biz.cmn.vo.PaginationInfo;
+import com.dksys.biz.user.sm.sm01.service.SM01Svc;
+import com.dksys.biz.util.DateUtil;
 import com.dksys.biz.util.MessageUtils;
 
 @Controller
@@ -29,7 +41,85 @@ public class SM01Ctr {
   @Autowired
   SM01Svc sm01Svc;
 
-    //구매BOM관리 Master 조회
+  @Autowired
+  CmnService cmnService;
+
+  @Value("${file.uploadDir}")
+  private String uploadDir;
+
+  private HSSFWorkbook workbook;
+
+	// 엑셀업로드
+	@PostMapping("/uploadExcelFile")
+	public String uploadExcelFile(MultipartHttpServletRequest request, ModelMap model) {
+		String dateTime = DateUtil.getCurrentDateTime();
+        String path = uploadDir + File.separator + "tmp_excel" + File.separator;
+        boolean isSaveExists = false;
+        MultipartFile file = null;
+        File saveFile = null;
+		Iterator<String> iterator = request.getFileNames();
+		String resultMessage = "";
+		if(iterator.hasNext()) {
+			file = request.getFile(iterator.next());
+			//String fileName = file.getOriginalFilename();
+			//String ext = fileName.substring(fileName.lastIndexOf(".") + 1);
+            try {
+                //String saveFileName = dateTime+"."+ext;
+                String saveFileName = dateTime;
+                File f = new File(path);
+                if (!f.isDirectory()) f.mkdirs();
+                saveFile = new File(path + saveFileName);
+                saveFile.createNewFile();
+                file.transferTo(saveFile);
+                isSaveExists = saveFile.exists();
+            } catch (IllegalStateException e) {
+            	if(isSaveExists) saveFile.delete();
+            	resultMessage = "파일 저장 실패 하였습니다. IllegalStateException";
+                e.printStackTrace();
+            } catch (IOException e) {
+            	if(isSaveExists) saveFile.delete();
+            	resultMessage = "파일 저장 실패 하였습니다. IOException";
+                e.printStackTrace();
+            }
+		}
+		List<Map<String, String>> list = new ArrayList<Map<String,String>>();
+		try {
+			workbook = new HSSFWorkbook(new FileInputStream(saveFile));
+			HSSFSheet sheet = workbook.getSheetAt(0);
+			for (int i = 0; i < sheet.getLastRowNum()+1; i++) {
+				Map<String, String> map = new HashMap<String, String>();
+				Row row = sheet.getRow(i);
+				if(null == row) {
+					continue;
+				}
+
+				for (int j = 0; j < row.getLastCellNum(); j++) {
+					map.put("key"+(j+1), row.getCell(j).toString());
+				}
+				list.add(map);
+			}
+		} catch (NotOLE2FileException e) {
+			if(isSaveExists) saveFile.delete();
+			resultMessage = "파일읽기 실패 하였습니다. 정상적인 엑셀 파일이 아닙니다.";
+			e.printStackTrace();
+		} catch (IOException e) {
+			if(isSaveExists) saveFile.delete();
+			resultMessage = "파일읽기 실패 하였습니다. IOException";
+			e.printStackTrace();
+		} catch (Exception e) {
+			if(isSaveExists) saveFile.delete();
+			resultMessage = "파일읽기 실패 하였습니다. Exception";
+			e.printStackTrace();
+		}
+
+		if(isSaveExists) saveFile.delete();
+
+		model.addAttribute("resultList", list);
+		model.addAttribute("resultMessage", resultMessage);
+		return "jsonView";
+	}
+
+	//구매BOM관리 Master 조회
 	@PostMapping(value = "/selectBomSalesList")
 	public String selectBomSalesList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		int totalCnt = sm01Svc.selectBomSalesCount(paramMap);
@@ -63,7 +153,7 @@ public class SM01Ctr {
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
 	}
-	
+
 	// Bom 자재 Map 조회
 	@PostMapping(value = "/selectBomMatrInfo")
 		public String selectBomMatrInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -71,7 +161,7 @@ public class SM01Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
-  
+
 	// BOM Tree 조회
 	@PostMapping(value = "/selectBomMatrTreeList")
 	public String selectBomMatrTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -147,7 +237,7 @@ public class SM01Ctr {
 	  }
 	  return "jsonView";
 	}
-  
+
 	@PostMapping(value = "/updateBomMatr")
 	public String updateBomMatr(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 	  try {
@@ -181,12 +271,11 @@ public class SM01Ctr {
 		}
 	  	return "jsonView";
 	}
-	
-	  
-	@PostMapping(value = "/insertCopyBom")
-	public String insertCopyBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+
+	@PostMapping(value = "/insertCrudMatrAndBom")
+	public String insertCrudMatrAndBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
-			if (sm01Svc.insertCopyBom(paramMap, mRequest) != 0 ) {
+			if (sm01Svc.insertCrudMatrAndBom(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
 			} else {
@@ -200,9 +289,26 @@ public class SM01Ctr {
 		return "jsonView";
 	}
 
-	
-	
-	
+	@PostMapping(value = "/insertUploadBom")
+	public String insertUploadBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (sm01Svc.insertUploadBom(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+
+
+
 	@PostMapping("/bomTreeList")
 	public String bomTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> resultList = sm01Svc.bomTreeList(paramMap);
@@ -210,6 +316,6 @@ public class SM01Ctr {
 		return "jsonView";
 	}
 
-  
-	
+
+
 }

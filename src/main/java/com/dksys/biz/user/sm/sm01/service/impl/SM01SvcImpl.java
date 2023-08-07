@@ -1,7 +1,6 @@
 package com.dksys.biz.user.sm.sm01.service.impl;
 
 import java.lang.reflect.Type;
-import java.text.Format.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -11,13 +10,12 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.user.sm.sm01.mapper.SM01Mapper;
-import com.dksys.biz.user.sm.sm01.service.SM01Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.user.sm.sm01.mapper.SM01Mapper;
+import com.dksys.biz.user.sm.sm01.service.SM01Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -31,10 +29,10 @@ public class SM01SvcImpl implements SM01Svc {
 
   @Autowired
   CM15Svc cm15Svc;
-  
+
   @Autowired
   CM08Svc cm08Svc;
-  
+
   @Override
   public int selectBomSalesCount(Map<String, String> paramMap) {
     return sm01Mapper.selectBomSalesCount(paramMap);
@@ -44,7 +42,7 @@ public class SM01SvcImpl implements SM01Svc {
   public List<Map<String, String>> selectBomSalesList(Map<String, String> paramMap) {
     return sm01Mapper.selectBomSalesList(paramMap);
   }
-	
+
   @Override
   public List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap) {
     return sm01Mapper.selectBomDetailList(paramMap);
@@ -75,20 +73,20 @@ public class SM01SvcImpl implements SM01Svc {
 
 	    Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-	    
-		//---------------------------------------------------------------  
+
+		//---------------------------------------------------------------
 		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
 	  	//   필수값 :  jobType, userId, comonCd
-		//---------------------------------------------------------------  
+		//---------------------------------------------------------------
 		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
 		if (uploadFileList.size() > 0) {
 				//접근 권한 없으면 Exception 발생
 				paramMap.put("jobType", "fileUp");
 				cm15Svc.selectFileAuthCheck(paramMap);
 		}
-		//---------------------------------------------------------------  
-		//첨부 화일 권한체크  끝 
-		//---------------------------------------------------------------  
+		//---------------------------------------------------------------
+		//첨부 화일 권한체크  끝
+		//---------------------------------------------------------------
 		//String  newPrjctSeq = String.valueOf(sm01Mapper.selectPrjctSeqNext(paramMap));
 		//paramMap.put("prjctSeq", newPrjctSeq);
 		//int result = sm01Mapper.insertBom(paramMap);
@@ -104,9 +102,9 @@ public class SM01SvcImpl implements SM01Svc {
 	    	 * "I"인 경우 sm01Mapper.insertBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삽입 */
 	    	if ("I".equals(dtaChk)) {
 	    		sm01Mapper.insertBomMatr(dtl);
-	    	} 
+	    	}
 	    }
-		
+
 	    List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
 	    for (Map<String, String> dtl : bomList) {
 	    	dtl.put("userId", paramMap.get("userId"));
@@ -121,19 +119,19 @@ public class SM01SvcImpl implements SM01Svc {
 	    		sm01Mapper.deleteBom(dtl);
 	    	}
 	    }
-	    
-		//---------------------------------------------------------------  
+
+		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
-		//---------------------------------------------------------------  
+		//---------------------------------------------------------------
 		if (uploadFileList.size() > 0) {
 		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
 		    paramMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
 		    cm08Svc.uploadFile(paramMap, mRequest);
 		}
-		//---------------------------------------------------------------  
-		//첨부 화일 처리  끝 
-		//---------------------------------------------------------------  
-	    
+		//---------------------------------------------------------------
+		//첨부 화일 처리  끝
+		//---------------------------------------------------------------
+
 	    return result;
   }
   @Override
@@ -141,14 +139,14 @@ public class SM01SvcImpl implements SM01Svc {
 	Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
 
-	//---------------------------------------------------------------  
+	//---------------------------------------------------------------
 	//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
   	//   필수값 :  jobType, userId, comonCd
-	//---------------------------------------------------------------  
+	//---------------------------------------------------------------
     HashMap<String, String> param = new HashMap<>();
     param.put("userId", paramMap.get("userId"));
     param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
-    
+
 	List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
 	if (uploadFileList.size() > 0) {
 			//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
@@ -164,9 +162,9 @@ public class SM01SvcImpl implements SM01Svc {
 		    param.put("jobType", "fileDelete");
 			cm15Svc.selectFileAuthCheck(param);
 	}
-	//---------------------------------------------------------------  
-	//첨부 화일 권한체크  끝 
-	//---------------------------------------------------------------  
+	//---------------------------------------------------------------
+	//첨부 화일 권한체크  끝
+	//---------------------------------------------------------------
 
 	int result = 200;//sm01Mapper.updateBom(paramMap);
     	//  sm01Mapper.updateBom(paramMap)을 호출하여 paramMap을 사용하여 프로젝트를 업데이트하고 그 결과를 result 변수에 저장.
@@ -188,7 +186,7 @@ public class SM01SvcImpl implements SM01Svc {
 
     List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
     for (Map<String, String> dtl : bomList) {
-    	
+
     	dtl.put("userId", paramMap.get("userId"));
     	dtl.put("pgmId", paramMap.get("pgmId"));
     	String dtaChk = dtl.get("dtaChk").toString();
@@ -201,32 +199,32 @@ public class SM01SvcImpl implements SM01Svc {
     		sm01Mapper.deleteBom(dtl);
     	}
     }
-    
-	//---------------------------------------------------------------  
-	//첨부 화일 처리 시작 
-	//---------------------------------------------------------------  
+
+	//---------------------------------------------------------------
+	//첨부 화일 처리 시작
+	//---------------------------------------------------------------
     if (uploadFileList.size() > 0) {
 	    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
 	    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 	    cm08Svc.uploadFile(paramMap, mRequest);
     }
-    
+
     for(String fileKey : deleteFileList) {
     	cm08Svc.deleteFile(fileKey);
     }
-	//---------------------------------------------------------------  
-	//첨부 화일 처리  끝 
-	//---------------------------------------------------------------  
-    
+	//---------------------------------------------------------------
+	//첨부 화일 처리  끝
+	//---------------------------------------------------------------
+
      return result;
   }
 
   @Override
   public int deleteBomAll(Map<String, String> paramMap) throws Exception {
-	    //---------------------------------------------------------------  
+	    //---------------------------------------------------------------
 		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
 	  	//   필수값 :  jobType, userId, comonCd
-		//---------------------------------------------------------------  
+		//---------------------------------------------------------------
 	    List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
 	    HashMap<String, String> param = new HashMap<>();
 	    param.put("jobType", "fileDelete");
@@ -235,29 +233,30 @@ public class SM01SvcImpl implements SM01Svc {
 		    for (Map<String, String> dtl : deleteFileList) {
 					//접근 권한 없으면 Exception 발생
 		            param.put("comonCd",  dtl.get("comonCd"));
-			    	
+
 					cm15Svc.selectFileAuthCheck(param);
 			}
 	    }
-		//---------------------------------------------------------------  
-		//첨부 화일 권한체크 끝 
-		//---------------------------------------------------------------  
-	  
-	  int result = sm01Mapper.deleteBomAllMatrAll(paramMap);
-	  result = sm01Mapper.deleteBomAll(paramMap);
-	  
-		//---------------------------------------------------------------  
+		//---------------------------------------------------------------
+		//첨부 화일 권한체크 끝
+		//---------------------------------------------------------------
+
+	  int result = 200;
+	  sm01Mapper.deleteBomAllMatrAll(paramMap);
+	  sm01Mapper.deleteBomAll(paramMap);
+
+		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
-		//---------------------------------------------------------------  
-		if (deleteFileList.size() > 0) {		  
+		//---------------------------------------------------------------
+		if (deleteFileList.size() > 0) {
 		    for (Map<String, String> deleteDtl : deleteFileList) {
 		    	String fileKey = deleteDtl.get("fileKey").toString();
 			    cm08Svc.deleteFile( fileKey );
 		    }
 		}
-		//---------------------------------------------------------------  
-		//첨부 화일 처리  끝 
-		//---------------------------------------------------------------  	  
+		//---------------------------------------------------------------
+		//첨부 화일 처리  끝
+		//---------------------------------------------------------------
 	    return result;
   }
 
@@ -280,45 +279,65 @@ public class SM01SvcImpl implements SM01Svc {
   }
 
   @Override
-  public int insertCopyBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+  public int insertCrudMatrAndBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
 		int result = 200;
-	
+
 	    List<Map<String, String>> matrList = gsonDtl.fromJson(paramMap.get("matrArr"), dtlMap);
 	    for (Map<String, String> dtl : matrList) {
+	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
 	    	dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
-	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-	    	String dtaChk = dtl.get("dtaChk").toString();
+
+	    	String dtaChk = "";
+	    	if(dtl.get("dtaChk") != null) dtaChk = dtl.get("dtaChk").toString();
 	    	/* "dtaChk" 값을 확인하여
 	    	 * "I"인 경우 sm01Mapper.insertBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삽입 */
 	    	if ("I".equals(dtaChk)) {
 	    		sm01Mapper.insertBomMatr(dtl);
-	    	} 
+	    	}
+	    	else if ("U".equals(dtaChk)) {
+		        sm01Mapper.updateBomMatr(dtl);
+		    }
+	    	else if ("D".equals(dtaChk)) {
+		        sm01Mapper.deleteBomMatr(dtl);
+		    }
+
 	    }
 	    List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
 	    for (Map<String, String> dtl : bomList) {
 	    	dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
-	    	String dtaChk = dtl.get("dtaChk").toString();
+
+	    	String dtaChk = "";
+	    	if(dtl.get("dtaChk") != null) dtaChk = dtl.get("dtaChk").toString();
 	    	if ("I".equals(dtaChk)) {
 	    		sm01Mapper.insertBom(dtl);
+	    	} else if ("U".equals(dtaChk)) {
+	    		sm01Mapper.updateBom(dtl);
+	    	} else if ("D".equals(dtaChk)) {
+	    		sm01Mapper.deleteBom(dtl);
 	    	}
 	    }
-	    
+
 	    return result;
   }
 
-  
-  
-  
-  
+  @Override
+  public int insertUploadBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	  deleteBomAll(paramMap);
+	  return insertCrudMatrAndBom(paramMap, mRequest);
+  }
+
+
+
+
   @Override
   public List<Map<String, String>> bomTreeList(Map<String, String> paramMap) {
     return sm01Mapper.bomTreeList(paramMap);
   }
 
-  
+
 }
