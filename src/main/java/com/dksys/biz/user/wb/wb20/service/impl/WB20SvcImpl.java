@@ -74,4 +74,21 @@ public class WB20SvcImpl implements WB20Svc {
 		return wb20Mapper.selectTodoDivList(paramMap);
 	}
 	
+	@Override
+	public List<Map<String, String>> selectApprovalYnList(Map<String, String> paramMap) {
+		return wb20Mapper.selectApprovalYnList(paramMap);
+	}
+	
+
+	public int updateRsltsQmApproval(Map<String, String> paramMap) {
+		int result = wb20Mapper.updateRsltsQmApproval(paramMap);		
+		/*
+		 * List<Map<String, String>> todoMaxChk =
+		 * wb20Mapper.selectApprovalMaxTodoKeyChk(paramMap); if (todoMaxChk.toString()
+		 * == paramMap.get("fileTrgtKey")) { wb20Mapper.updateQmQeqst(paramMap); }
+		 */
+				 
+		return result;
+	}
+	
 }

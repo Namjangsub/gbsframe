@@ -22,4 +22,14 @@ public interface WB20Mapper {
 	List<Map<String, String>> selectApprovalChk(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectTodoDivList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectApprovalYnList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectApprovalMaxTodoKeyChk(Map<String, String> paramMap);
+	
+	int updateRsltsQmApproval(Map<String, String> paramMap);
+	
+	int updateQmQeqst(Map<String, String> paramMap);
+	
+	
 }

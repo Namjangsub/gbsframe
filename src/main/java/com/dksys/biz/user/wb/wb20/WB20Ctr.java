@@ -88,5 +88,20 @@ public class WB20Ctr {
 		  return "jsonView"; 
 	  }
 	  
+	  @PostMapping(value = "/selectApprovalYnList") 
+	  public String selectApprovalYnList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+  		  List<Map<String, String>> resultList = wb20Svc.selectApprovalYnList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+	  }
+	  
+	  @PutMapping(value = "/updateRsltsQmApproval")
+      public String updateRsltsQmApproval(@RequestParam Map<String, String> paramMap, ModelMap model) {
+		wb20Svc.updateRsltsQmApproval(paramMap);
+    	model.addAttribute("resultCode", 200);
+    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+    	return "jsonView";
+      }
+	  
 	  
 }
