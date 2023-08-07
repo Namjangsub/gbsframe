@@ -1341,10 +1341,13 @@ function getValue(_list, rowIdx, column) {
 }
 
 //Grid Data Null value __modified__ 활용
-function initGridDataNullValue (_list , _columns, adColumnList) {
+function initGridDataNullValue (_list , _columns, adColumnObj) {
 	var adColumn = [];
-	if(!isEmpty(adColumnList)){
-		adColumn = adColumnList.split(",");
+	if(!isEmpty(adColumnObj) && Array.isArray(adColumnObj)) {
+		adColumn = adColumnObj;
+	}
+	else if(!isEmpty(adColumnObj)){
+		adColumn = adColumnObj.split(",");
     }
 	$.each(_list, function(idx, obj){
 		$.each(_columns, function(cidx, col){
@@ -1367,12 +1370,15 @@ function initGridDataNullValue (_list , _columns, adColumnList) {
 }
 
 //값을 비교하여 이전데이타와 같으면 true return;
-function isSameValue(_list, rowIdx, adColumnList){
+function isSameValue(_list, rowIdx, adColumnObj){
 	var result = false;
 	var adColumn = [];
-	if(!isEmpty(adColumnList)){
-		adColumn = adColumnList.split(",");
-  }
+	if(!isEmpty(adColumnObj) && Array.isArray(adColumnObj)) {
+		adColumn = adColumnObj;
+	}
+	else if(!isEmpty(adColumnObj)){
+		adColumn = adColumnObj.split(",");
+    }
 	var data = getRowData(_list, rowIdx);
 	for(var i=0; i<adColumn.length; i++) {
 		var col_id = adColumn[i];
@@ -1504,7 +1510,152 @@ function getSearchParam(_form, _pageNo, _recordCnt){
 	}
 	return resultParam;
 }
+//리스트 검색하여 일치한 Index return
+function findIndexArray(_list, column, value, _startIndex, _endIndex) {
+	var start_index = "0";
+	var end_index = _list.length;
+	if(!isEmpty(_startIndex)) start_index = ""+_startIndex;
+	if(!isEmpty(_endIndex)) end_index = ""+_endIndex;
 
+	var resultArray = [];
+	if( _list.length > 0 ) {
+        $.each($.extend({}, _list), function (idx, elem) {
+        	if(Number(idx) >= Number(start_index)
+        			&& Number(idx) <= Number(end_index)){
+				if(elem[column] == value) {
+					resultArray.push(idx);
+				}
+        	}
+        });
+	}
+	return resultArray;
+}
+
+//내림차순
+function ascSort(rArray){
+	rArray.sort(function(a, b) {
+		  return a - b;
+	});
+}
+
+//오름차순
+function descSort(rArray){
+	rArray.sort(function(a, b) {
+		  return b - a;
+	});
+}
+
+//그리드 중복체크 중복된값 set ""
+function gridOverLapCheckSetNull(gridObj, _column) {
+	var _list = gridObj.getList();
+	for(var idx=_list.length-2; idx >= 0; idx--){
+		_list = gridObj.getList();
+		var elem = _list[idx];
+		var value = elem[_column];
+		//var check_idx = _list.length - idx -2;
+		if(!isEmpty(value)) {
+			var idxArray = findIndexArray(_list, _column, value);
+			if(idxArray.length > 1){
+				var setIndex = idxArray[1];
+				gridObj.setValue(setIndex, _column, "");
+			}
+		}
+	}
+}
+
+//null체크 replace
+function xreplace(obj,str1,str2) {
+	if(isEmpty(obj)) return "";
+	return obj.replace(str1,str2);
+}
+
+//null체크 trim
+function trim(str) {
+	if(isEmpty(str)) return "";
+	return str.replace(/^\s+|\s+$/g,"");
+}
+
+//콤보데이타에서 text로 code return
+function getOptionsCode(options,text_value) {
+	for(var i=0; i<options.length; i++){
+		var elem = options[i];
+		if(elem.text == text_value){
+			return elem.value;
+		}
+	}
+	return "";
+}
+
+//콤보데이타에서code로 text return
+function getOptionsText(options,code_value) {
+	for(var i=0; i<options.length; i++){
+		var elem = options[i];
+		if(elem.value == code_value){
+			return elem.text;
+		}
+	}
+	return "";
+}
+
+//보이는 컬럼리스트
+function getViewColumnKey(gridObj, notPushColumns){
+	var viewColumnsKey = [];
+	var notPushColumnsKey = [];
+	if(!isEmpty(notPushColumns)) notPushColumnsKey = notPushColumns;
+	var gridColumns = gridObj.colGroup;
+	$.each(gridColumns, function (idx, elem) {
+		var isNotPushColumns = true;
+		for(var i=0; i<notPushColumnsKey.length; i++) {
+			if(notPushColumnsKey[i] == elem.key){
+				isNotPushColumns = false;
+				break;
+			}
+		}
+		if(isNotPushColumns){
+			viewColumnsKey.push(elem.key);
+		}
+	});
+	return viewColumnsKey;
+}
+
+//edit 컬럼리스트
+function getEditorColumnKey(gridObj, notPushColumns){
+	var editorColumnsKey = [];
+	var notPushColumnsKey = [];
+	if(!isEmpty(notPushColumns)) notPushColumnsKey = notPushColumns;
+	var gridColumns = gridObj.colGroup;
+	$.each(gridColumns, function (idx, elem) {
+		var isNotPushColumns = true;
+		for(var i=0; i<notPushColumnsKey.length; i++) {
+			if(notPushColumnsKey[i] == elem.key){
+				isNotPushColumns = false;
+				break;
+			}
+		}
+		if(!isEmpty(elem.editor) && isNotPushColumns){
+			editorColumnsKey.push(elem.key);
+		}
+	});
+	return editorColumnsKey;
+}
+
+//엑셀 데이타를 그리드 데이타로 return; /user/sm/sm01/uploadExcelFile 사용시 Excel 데이타를 그리드 데이타로 변환.
+function getGridExcelData(columnsKey, dataList){
+	var resultData = [];
+		$.each($.extend({}, dataList), function (idx, elem) {
+			if(idx != "0")
+			{
+	 			var data ={};
+	 			for(var i=0; i<columnsKey.length; i++){
+	 				var colKey = columnsKey[i];
+	 				var value = elem["key"+(i+1)];
+	 				data[colKey] = value;
+	 			}
+	 			resultData.push(data);
+			}
+	});
+	return resultData;
+}
 
 //---------------------------------------------------------------------------------
 //그리드 엑셀 export 작업용
