@@ -986,12 +986,25 @@ function insertPgmHistory(url) {
 	});
 }
 
-function callReport(fileName, arg, width, height, multicount, ismultireport){
+// function callReport(fileName, arg, width, height, multicount, ismultireport){
+// 	var url = ubiprefix + "/ubihtml.jsp";
+// 	url += "?file="+fileName;
+// 	url += "&arg="+encodeURIComponent(arg);
+// 	url += "&multicount=" + multicount;
+// 	url += "&ismultireport=" + ismultireport;
+// 	if (width ==""){
+// 		width = 900;
+// 	}
+// 	if (height ==""){
+// 		height = 900;
+// 	}
+// 	popCenter(url, "report", width, height, "yes");
+// }
+
+function callReport(fileName, arg, width, height){
 	var url = ubiprefix + "/ubihtml.jsp";
 	url += "?file="+fileName;
 	url += "&arg="+encodeURIComponent(arg);
-	url += "&multicount=" + multicount;
-	url += "&ismultireport=" + ismultireport;
 	if (width ==""){
 		width = 900;
 	}
