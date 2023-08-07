@@ -43,7 +43,14 @@ public class UrlServiceImpl implements UrlService{
         String strId = urlMapper.getUrlIdByLongUrl(longUrl);
         int id = 0;
         if (strId == null || strId.equals("")) {
+        	/******************************************************
+        	 * 비밀코드 생성 및 메일 자료에 첨부해서 이후 사용자가 자료 접근시 체크 사용
+        	 * 비밀코드의 길이는 5자리로 생성함 (필요시 길이 조절가능)
+        	 * URL최초 등록시 한번 생성, URL 생명주기 3주정도, 지정 필요--> DB스케쥴로 관리
+        	 * -------> DB procedure 작성 연계 -----------------------
+        	 */
         	String chkCode = base62Util.createCode(); // 비밀코드 생성
+        	/******************************************************/
 //        	Map<String, String> paramMap = new HashMap<>();
         	paramMap.put("longUrl", longUrl);
             paramMap.put("chkCode", chkCode);
@@ -81,7 +88,7 @@ public class UrlServiceImpl implements UrlService{
     
     @Override
     public String shortUrlPromissChkCode(String longUrl) {
-    	longUrl = longUrl.replaceFirst("^(https?://)", ""); //한번만 제거
+    	longUrl = longUrl.replaceFirst("^(https?://)", ""); // http://, https:// 한번만 제거
         String strId = urlMapper.getUrlIdByLongUrl(longUrl);
     	return urlMapper.getChkCodeById(Integer.parseInt(strId));
     }
