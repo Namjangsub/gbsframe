@@ -194,7 +194,8 @@
 			<div class="add_btn_small pdl10">
 				<a onclick="inserOrderModal('C');" style="height: 30px; line-height: 28px;" authchk>+</a>
 				<!-- <a onclick="deleteAproval();" style="height: 30px; line-height: 28px;" authchk>-</a> -->
-				<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+				<a onclick="setReportMulti();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-print"></i> 발주서발행</a>
+				<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;" authChk><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 			    </div>
 				<select id="recordCnt" class="prae_select" data-search="recordCnt" onchange="gridView.setData(0);">
 					<option value="10">10</option>
@@ -222,13 +223,13 @@
   	initView: function(){
 	this.target = new ax5.ui.grid();
 	this.target.setConfig({
-		/* showRowSelector: false, */
-		multipleSelect: false,
+		showRowSelector: true,
+		multipleSelect: true,
 		sortable: true,
 		target: $('[data-ax5grid="first-grid"]'),
 		header: {
              align: "center",
-             selector: false
+             selector: true
            },
            body: {
 		    mergeCells : ["salesCd"],        	   
@@ -540,5 +541,41 @@ function excelDown() {
 }
 
 
-      
+
+function setReportMulti(_type = "") {
+	if(selectGridValidationM(gridView.target)) return false;
+	var selDataList = gridView.target.getList("selected");
+
+	//동일거래처인지 체크
+    var clntValue = selDataList[0].pchsClntCd;
+    for (var i = 1; i < selDataList.length; i++) {
+		if (selDataList[i].pchsClntCd !== clntValue) {
+			// clnt 값이 다른 경우 오류 처리
+			alert('동일 거래처만 처리 가능합니다.');
+			return false;
+		}
+    }
+    
+	var fileName = "SM0201R03.jrf";  //여러 발주서 번호 처리 (in 처리)
+	var arg =  
+		  "coCd#"		+  $('#coCd_S').val()
+	    + "#ordrgNo#"	+  selDataList.map(item => item.ordrgNo).join(",") //여러건 출력
+    	+ "#userId#"	+  jwt.userId
+    	+ "#";                 
+	
+	if (_type == '' || _type == undefined ) {
+		callReport(fileName, arg, 1150, 720);
+	} else { //Export 작업
+		ubiExportAjax(fileName, arg, function(response) {
+			if (response.resultCode === 200) {
+				var base64FileData = response.base64FileData;
+				var fileName = response.exportFileName;
+				downloadPDFFromBase64(base64FileData, fileName);
+			} else {
+				alert('PDF 내보내기 실패: ' + response.resultText);
+			}
+
+		});
+	}
+}      
 </script>
