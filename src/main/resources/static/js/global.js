@@ -986,10 +986,12 @@ function insertPgmHistory(url) {
 	});
 }
 
-function callReport(fileName, arg, width, height) {
+function callReport(fileName, arg, width, height, multicount, ismultireport){
 	var url = ubiprefix + "/ubihtml.jsp";
 	url += "?file="+fileName;
 	url += "&arg="+encodeURIComponent(arg);
+	url += "&multicount=" + multicount;
+	url += "&ismultireport=" + ismultireport;
 	if (width ==""){
 		width = 900;
 	}
