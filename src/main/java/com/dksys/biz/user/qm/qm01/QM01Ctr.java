@@ -208,4 +208,13 @@ public class QM01Ctr {
 	  	return "jsonView";
   }
 
+  
+  @PostMapping(value = "/selectApprovalList")
+  public String selectApprovalList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	List<Map<String, String>> resultList = qm01Svc.selectApprovalList(paramMap);
+    model.addAttribute("resultList", resultList);
+    return "jsonView";
+  }
+  
+  
 }

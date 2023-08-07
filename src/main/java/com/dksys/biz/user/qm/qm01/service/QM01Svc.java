@@ -44,5 +44,8 @@ public interface QM01Svc {
   int updateQualityResp(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
   int deleteQualityReq(Map<String, String> paramMap) throws Exception;
+  
+  List<Map<String, String>> selectApprovalList(Map<String, String> paramMap);
+  
 
 }

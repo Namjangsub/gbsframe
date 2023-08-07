@@ -152,6 +152,33 @@ public class QM01SvcImpl implements QM01Svc {
 	//첨부 화일 처리  끝 
 	//---------------------------------------------------------------  
     
+    
+    Gson gson = new Gson();	
+	
+	List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
+	if (sharngChk.size() > 0) {
+		QM01Mapper.deleteWbsSharngList(paramMap); 
+	}
+					
+	Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+	List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
+	if (sharngArr != null && sharngArr.size() > 0 ) {
+		int i = 0;
+        for (Map<String, String> sharngMap : sharngArr) {
+            try {	 
+            	    sharngMap.put("reqNo", paramMap.get("reqNo"));
+            	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
+            	    sharngMap.put("userId", paramMap.get("userId"));
+                	QM01Mapper.insertWbsSharngList(sharngMap);       		
+            	i++;
+            } catch (Exception e) {
+                System.out.println("error2"+e.getMessage());
+            }
+        }
+	}
+	
+	
      return result;
   }
   
@@ -229,6 +256,9 @@ public class QM01SvcImpl implements QM01Svc {
 		//---------------------------------------------------------------  
 
 		
+		
+		
+		 
 		int fileTrgtKey = QM01Mapper.selectQualityReqSeqNext(paramMap);
 		String reqNo = QM01Mapper.selectQualityReqCalNext(paramMap);
 		System.out.println("요청관리 번호==?"+reqNo);
@@ -249,6 +279,51 @@ public class QM01SvcImpl implements QM01Svc {
 		//첨부 화일 처리  끝 
 		//---------------------------------------------------------------  
 	    
+		
+		Gson gson = new Gson();	
+		
+		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
+		if (sharngChk.size() > 0) {
+			QM01Mapper.deleteWbsSharngList(paramMap); 
+		}
+						
+		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
+		if (sharngArr != null && sharngArr.size() > 0 ) {
+			int i = 0;
+	        for (Map<String, String> sharngMap : sharngArr) {
+	            try {	 
+	            	    sharngMap.put("reqNo", paramMap.get("reqNo"));
+	            	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
+	            	    sharngMap.put("userId", paramMap.get("userId"));
+	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
+	            	i++;
+	            } catch (Exception e) {
+	                System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
+		
+		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
+		if (approvalArr != null && approvalArr.size() > 0 ) {
+			int i = 0;
+	        for (Map<String, String> approvalMap : approvalArr) {
+	            try {	 
+		            	approvalMap.put("reqNo", paramMap.get("reqNo"));
+		            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
+		            	approvalMap.put("userId", paramMap.get("userId"));
+	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
+	                	i++;
+	            } catch (Exception e) {
+	                System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
+		
+		
 	    return result;
   }
   
@@ -344,4 +419,11 @@ public class QM01SvcImpl implements QM01Svc {
 		return QM01Mapper.selectQualityReqExList(paramMap);
   }
 
+  
+  @Override
+  public List<Map<String, String>> selectApprovalList(Map<String, String> paramMap) {
+		return QM01Mapper.selectApprovalList(paramMap);
+  }
+  
+  
 }
