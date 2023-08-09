@@ -64,6 +64,11 @@ public class CR10SvcImpl implements CR10Svc {
   }
 
   @Override
+  public String selectLgistAppCount(Map<String, String> paramMap) {
+	  return cr10Mapper.selectLgistAppCount(paramMap);
+  }
+
+  @Override
   public List<Map<String, String>> selectLgistAppList(Map<String, String> paramMap) {
     return cr10Mapper.selectLgistAppList(paramMap);
   }

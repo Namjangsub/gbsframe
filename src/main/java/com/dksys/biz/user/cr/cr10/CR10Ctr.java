@@ -68,6 +68,13 @@ public class CR10Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/selectLgistAppCount")
+	public String selectLgistAppCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		String result = cr10Svc.selectLgistAppCount(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
 	@PostMapping(value = "/selectLgistAppList")
 	public String selectLgistAppList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> resultList = cr10Svc.selectLgistAppList(paramMap);

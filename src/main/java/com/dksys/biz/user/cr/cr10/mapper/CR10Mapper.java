@@ -22,6 +22,8 @@ public interface CR10Mapper {
 
   Map<String, String> selectLgistMastInfo(Map<String, String> paramMap);
 
+  String selectLgistAppCount(Map<String, String> paramMap);
+
   List<Map<String, String>> selectLgistAppList(Map<String, String> paramMap);
 
   String selectLgistNoNext(Map<String, String> paramMap);

@@ -1639,6 +1639,48 @@ function getEditorColumnKey(gridObj, notPushColumns){
 	return editorColumnsKey;
 }
 
+//해당 TreeGrid 의 __children__ 제거 , 이중배열제거, 저장가능 데이타로 변경한다.
+function deleteChildren(_list){
+	$.each(_list, function (idx, elem) {
+		delete elem.__children__;
+	});
+	return _list;
+}
+
+//현재데이타로 계층관계의 Index를 return 한다.
+//사용예) var lowIndexArray = findLowerArray(bom_Arr, "id_value"); //pid,id 계층관계 컬럼으로 사용시 생략
+//사용예) var lowIndexArray = findLowerArray(bom_Arr, "lowerCd","upperCd","lowerCd"); //upperCd,lowerCd 를 계층관계 컬럼으로 사용시
+findLowerArray = function(_list, _lowerCd, _upperCol, _lowerCol) {
+	var upperCol = "pid";
+	var lowerCol = "id";
+	if(!isEmpty(_upperCol)) upperCol = _upperCol;
+	if(!isEmpty(_lowerCol)) lowerCol = _lowerCol;
+	var resultArray = [];
+	selecLowerIndex(_list ,resultArray , _lowerCd, upperCol, lowerCol);
+	return resultArray;
+}
+
+//하위계층을 찾아 Index를 rArray 에 저장
+selecLowerIndex = function(_list, rArray, value, _upperCol, _lowerCol) {
+	if( _list.length > 0 ) {
+        $.each($.extend({}, _list), function (idx, elem) {
+        	var isIdx = true;
+        	for(var i=0; i<rArray.length; i++) {
+        		if(idx == rArray[i]) {
+        			isIdx = false;
+        			break;
+        		}
+        	}
+        	var upperCd = elem[_upperCol];
+        	var lowerCd = elem[_lowerCol];
+			if(elem[_upperCol] == value) {
+				if(isIdx) rArray.push(idx);
+				selecLowerIndex(_list, rArray, lowerCd, _upperCol, _lowerCol);//재귀메소드
+			}
+        });
+	}
+}
+
 //엑셀 데이타를 그리드 데이타로 return; /user/sm/sm01/uploadExcelFile 사용시 Excel 데이타를 그리드 데이타로 변환.
 function getGridExcelData(columnsKey, dataList){
 	var resultData = [];

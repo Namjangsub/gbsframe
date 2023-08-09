@@ -21,6 +21,8 @@ public interface CR10Svc {
 
   List<Map<String, String>> selectLgistAppList(Map<String, String> paramMap);
 
+  String selectLgistAppCount(Map<String, String> paramMap);
+
   int insertLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
   int updateLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
