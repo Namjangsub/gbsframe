@@ -4,9 +4,8 @@
     </div>
   <div class="form-group popup_table">
    <form id="pop04Form" onSubmit="return false;">
-		<input type="hidden" id="userId"     	name="userId">
-		<input type="hidden" id="pgmId"     	name="pgmId"	value="SM0101M01">
 		<input type="hidden" id="coCd_SSS" name="coCd_SSS">
+		<input type="hidden" id="ordrsNo_SSS" name="ordrsNo_SSS">
       <table>
 
         <colgroup>
@@ -103,8 +102,8 @@ var original_bomLevelArr = [];
 var bomLevelArr = [];
 var delRowIndexArr = [];
 
-var thisGridRow = -1; // 선택된 행 정보 저장할 변수
-var thisGridCol = -1; // 선택된 열 정보 저장할 변수
+var thisLowLvlGridRow = null; // 선택된 행 정보 저장할 변수
+var thisLowLvlGridCol = null; // 선택된 열 정보 저장할 변수
 var isOverLapCheck = true;
 
 const lowLvlGridView = {
@@ -122,12 +121,16 @@ const lowLvlGridView = {
 		         body: {
 		        	 	 //mergeCells : ["lvl", "salesCd","dsgnNo","upperCd","lowerCd"],
 			        	 onClick: function () {
-				                thisGridRow = this.dindex;   // 선택된 행 정보 가져오기
-				                thisGridCol = this.colIndex; // 선택된 열 정보 가져오기
+				                thisLowLvlGridRow = this.dindex;   // 선택된 행 정보 가져오기
+				                thisLowLvlGridCol = this.colIndex; // 선택된 열 정보 가져오기
 				        		this.self.clearSelect();
 				             	this.self.select(this.dindex);
 			        	 },
 						 onDBLClick: function () {
+				                thisLowLvlGridRow = this.dindex;   // 선택된 행 정보 가져오기
+				                thisLowLvlGridCol = this.colIndex; // 선택된 열 정보 가져오기
+				        		this.self.clearSelect();
+				             	this.self.select(this.dindex);
 						 },
 			             onDataChanged: function () {
 							/* * 입력항목이 이전데이타와 같다면 저장체크(dtaChk) 지움
@@ -243,14 +246,15 @@ const lowLvlGridView = {
 			          },
 			          onClick: function (item, param) {
 							thisTarget = lowLvlGridView.target;
-							thisGridRow = param.dindex;
-							thisGridCol = param.colIndex;
+							thisLowLvlGridRow = param.dindex;
+							thisLowLvlGridCol = param.colIndex;
 
 							if (item.label == "붙여넣기") {
-								gridPaste(thisGridRow,thisGridCol);
+								gridPaste();
 							} else if (item.label == "행추가") {
 					 			var newRow = {dtaChk:"I",
 					 	 				coCd: $("#coCd_SSS").val(),
+					 	 				ordrsNo: $("#ordrsNo_SSS").val(),
 					 	 				salesCd: $("#salesCd_SSS").val(),
 					 	 				lvl: $("#lvl_SSS").val(),
 					 	 				upperCd: $("#upperCd_SSS").val(),
@@ -301,6 +305,7 @@ const lowLvlGridView = {
  	$(document).ready(function() {
 		let loadData = {
 			coCd_SSS : modalStack.last().paramObj.coCd,
+			ordrsNo_SSS : modalStack.last().paramObj.ordrsNo,
 			salesCd_SSS : modalStack.last().paramObj.salesCd,
 			upperCd_SSS : modalStack.last().paramObj.upperCd,
 			lvl_SSS : modalStack.last().paramObj.lvl,
@@ -344,6 +349,7 @@ const lowLvlGridView = {
  		let newRow = {};
 		newRow = {dtaChk:"I"
 			, coCd: $("#coCd_SSS").val()
+			, ordrsNo: $("#ordrsNo_SSS").val()
 			, salesCd: $("#salesCd_SSS").val()
 			, lvl: $("#lvl_SSS").val()
 			, upperCd: $("#upperCd_SSS").val()
@@ -417,6 +423,7 @@ const lowLvlGridView = {
 
  			var newRow = {dtaChk:"I"
  				, coCd: $("#coCd_SSS").val()
+ 				, ordrsNo: $("#ordrsNo_SSS").val()
  				, salesCd: $("#salesCd_SSS").val()
  				, lvl: $("#lvl_SSS").val()
  				, upperCd: $("#upperCd_SSS").val()
@@ -502,7 +509,7 @@ const lowLvlGridView = {
 		modalStack.close();
 	}
 
-	this.gridPaste = function(thisGridRow,thisGridCol) {
+	this.gridPaste = function() {
 		var pasteData = "";
 		var this_target = lowLvlGridView.target;
 
@@ -518,12 +525,12 @@ const lowLvlGridView = {
 			  	return row.split("\t");
 			});
 
-			// 붙여넣기를 시작할 셀의 인덱스를 구한다.
-			var startRowIndex = thisGridRow;
-			var startColIndex = thisGridCol;
+			if(isEmpty(thisLowLvlGridRow)) thisLowLvlGridRow = 0;
+			if(isEmpty(thisLowLvlGridCol)) thisLowLvlGridCol = 0;
 
-			if(isEmpty(startRowIndex)) startRowIndex = 0;
-			if(isEmpty(startColIndex)) startColIndex = 0;
+			// 붙여넣기를 시작할 셀의 인덱스를 구한다.
+			var startRowIndex = thisLowLvlGridRow;
+			var startColIndex = thisLowLvlGridCol;
 
 			// 붙여넣을 데이터의 행과 열 개수를 구한다.
 			var numRows = pasteRows.length;
@@ -539,6 +546,7 @@ const lowLvlGridView = {
 				if (startRowIndex + i >= gridLength) {
 		 			var newRow = {dtaChk:"I",
 		 	 				coCd: $("#coCd_SSS").val(),
+		 	 				ordrsNo: $("#ordrsNo_SSS").val(),
 		 	 				salesCd: $("#salesCd_SSS").val(),
 		 	 				lvl: $("#lvl_SSS").val(),
 		 	 				upperCd: $("#upperCd_SSS").val(),
@@ -563,31 +571,15 @@ const lowLvlGridView = {
 			   		var cellData = pasteRows[i][j].replace(new RegExp('\r', 'ig'), '');
 			   		//시작점없는 붙여넣기, 빈칸 앞 붙여넣기
 			   		if(!isEmpty(cellData)) {
-				   		if(isEmpty(thisGridCol)){
-				   			if(editorColIndex < editorColumnsKey.length) {
-				   				//도번(Length:4) , 수량(숫자검사)
-				   				var col_Id = editorColumnsKey[editorColIndex];
-				   				if(col_Id == "lastDsgnNo" && cellData.length > 4){
-			   						alert("도번 입력 자리수가 큽니다. ["+cellData+"]");
-			   						return true;
-				   				}
-				   				if(col_Id == "dsgnBomQty" && isNaN(cellData) ){
-			   						alert("수량이 숫자가아닙니다. ["+cellData+"]");
-			   						return true;
-				   				}
-				   				this_target.setValue(calRow, col_Id, cellData);
-				   				editorColIndex++;
-				   			}
-				   		}
-				   		else if(!isEmpty(thisGridCol) && isEditorColum) { //시작점이 있는 붙여넣기(그리드에서 시작점 선택.)
+				   		if(!isEmpty(thisLowLvlGridCol) && isEditorColum) { //시작점이 있는 붙여넣기(그리드에서 시작점 선택.)
 				   			//도번(Length:4) , 수량(숫자검사)
 			   				var col_Id = viewColumnsKey[calCol];
 			   				if(col_Id == "lastDsgnNo" && cellData.length > 4){
-		   						alert("도번 입력 자리수가 큽니다. ["+cellData+"]");
+		   						alert("도번 입력 자리수가 큽니다. ["+col_Id+"]["+cellData+"]");
 		   						return true;
 			   				}
 			   				if(col_Id == "dsgnBomQty" && isNaN(cellData) ){
-			   					alert("수량이 숫자가아닙니다. ["+cellData+"]");
+			   					alert("수량이 숫자가아닙니다. ["+col_Id+"]["+cellData+"]");
 		   						return true;
 			   				}
 				   			//console.log("===========>","["+j+"]["+calCol+"]["+editorColumnsKey.length+"]  ["+viewColumnsKey[calCol]+"]");

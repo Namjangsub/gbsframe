@@ -3,17 +3,41 @@
 
 <mapper namespace="com.dksys.biz.user.sm.sm01.mapper.SM01Mapper">
 
-	<select id="selectBomSalesCount" parameterType="Map" resultType="int">
-        SELECT
-        COUNT(*)
+	<sql id="selectBomSalesSql">
+        SELECT BOM.FILE_TRGT_KEY
+		     , A.CO_CD
+		     , FN_CM05M01_CD_TO_NM(A.CO_CD)  AS CO_NM
+		     , A.ORDRS_NO
+		     , B.SALES_CD
+		     , A.ORDRS_CLNT_CD AS CLNT_CD
+		     , C.CLNT_NM
+		     , A.CLNT_PJT
+		     , B.PRDT_CD
+		     , P.PRDT_NM
+		     , B.ITEM_DIV
+		     , FN_CM05M01_CD_TO_NM(B.ITEM_DIV) AS ITEM_DIV_NM
+		     , B.ORDRS_DTL_DIV20
+		     , FN_CM05M01_CD_TO_NM(B.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM
+		     , B.ORDRS_DTL_DIV30
+		     , FN_CM05M01_CD_TO_NM(B.ORDRS_DTL_DIV30) AS ORDRS_DTL_DIV30_NM
+		     , B.DUDT_INTEND_DT
+		     , B.EQP_NM
+		     , NVL(TO_CHAR(T3.BOM_CNT),'0') AS BOM_CNT
+		     , (SELECT COUNT(*) FROM TB_SM01D01 WHERE CO_CD = A.CO_CD AND ORDRS_NO = A.ORDRS_NO AND SALES_CD = B.SALES_CD) AS MATR_CNT
         FROM TB_CR02M01 AS A
-	       JOIN TB_CR02D02 AS B  ON B.CO_CD    = A.CO_CD AND B.ORDRS_NO = A.ORDRS_NO
+	       JOIN TB_CR02D02 AS B  ON B.CO_CD = A.CO_CD AND A.ORDRS_NO = B.ORDRS_NO
 	       LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = A.ORDRS_CLNT_CD
 	       LEFT OUTER JOIN TB_BM01M01 AS P ON P.PRDT_CD = B.PRDT_CD
-	       LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = A.CO_CD
-	       LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = B.ITEM_DIV
-	       LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = B.ORDRS_DTL_DIV20
-	       LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = B.ORDRS_DTL_DIV30
+	       LEFT OUTER JOIN (
+				SELECT FILE_TRGT_KEY, CO_CD, ORDRS_NO, SALES_CD
+				  FROM TB_SM01M01 X1
+				 WHERE LEVEL = 1
+		        START WITH X1.UPPER_CD = 'top'
+		        CONNECT BY PRIOR X1.LOWER_CD = X1.UPPER_CD
+	       ) AS BOM ON A.CO_CD = BOM.CO_CD AND B.ORDRS_NO = BOM.ORDRS_NO AND B.SALES_CD = BOM.SALES_CD
+	       LEFT OUTER JOIN (
+				SELECT CO_CD, ORDRS_NO, SALES_CD, COUNT(*) AS BOM_CNT FROM TB_SM01M01 GROUP BY CO_CD, ORDRS_NO, SALES_CD
+	       ) AS T3 ON A.CO_CD = T3.CO_CD AND A.ORDRS_NO = T3.ORDRS_NO AND B.SALES_CD = T3.SALES_CD
 		   WHERE  B.SALES_CD IS NOT NULL
 		     AND NVL2(#{coCd},A.CO_CD,'.') = NVL(#{coCd},'.')
 		     AND NVL2(#{itemDiv},B.ITEM_DIV,'.') = NVL(#{itemDiv},'.')
@@ -22,6 +46,15 @@
 		     AND NVL(A.CLNT_PJT, '.') LIKE '%'||#{clntPjt}||'%'
 		     AND NVL(P.PRDT_NM, '.') LIKE '%'||#{prdtNm}||'%'
 		     AND NVL(B.EQP_NM, '.') LIKE '%'||#{eqpNm}||'%'
+		     AND NVL2(#{bomCnt},TO_CHAR(NVL(T3.BOM_CNT,'0')),'.') = NVL(#{bomCnt},'.')
+        ORDER BY A.CO_CD, A.ORDRS_CLNT_CD, A.CLNT_PJT, A.ORDRS_NO, B.SALES_CD
+	</sql>
+	<select id="selectBomSalesCount" parameterType="Map" resultType="int">
+        SELECT
+        COUNT(*)
+        FROM (
+        	<include refid="selectBomSalesSql"></include>
+        )
 	</select>
 
 	<select id="selectBomSalesList" parameterType="Map" resultType="CamelMap">
@@ -33,54 +66,7 @@
 
         FROM
         (
-        SELECT BOM.FILE_TRGT_KEY
-		     , A.CO_CD                    --회사코드
-		     , R.CODE_NM       AS CO_NM
-		     , A.ORDRS_NO                 --수주번호
-		     , B.SALES_CD                 --SalesCode
-		     , A.ORDRS_CLNT_CD AS CLNT_CD --고객사
-		     , C.CLNT_NM                  --고객사
-		     , A.CLNT_PJT                 --고객사PJT
-		     , B.PRDT_CD                  --제품구분
-		     , P.PRDT_NM
-		     , B.ITEM_DIV                 --아이템구분
-		     , R1.CODE_NM       AS ITEM_DIV_NM
-		     , B.ORDRS_DTL_DIV20          --수주설비작업구분
-		     , R2.CODE_NM       AS ORDRS_DTL_DIV20_NM
-		     , B.ORDRS_DTL_DIV30          --수주설비자체구분
-		     , R3.CODE_NM       AS ORDRS_DTL_DIV30_NM
-		     , B.DUDT_INTEND_DT           --납기예정일
-		     , B.EQP_NM                   --설비명
-		     , NVL(TO_CHAR(T3.BOM_CNT),'0') AS BOM_CNT
-		     , (SELECT COUNT(*) FROM TB_SM01D01 WHERE CO_CD = A.CO_CD AND SALES_CD = B.SALES_CD) AS MATR_CNT
-        FROM TB_CR02M01 AS A
-	       JOIN TB_CR02D02 AS B  ON B.CO_CD    = A.CO_CD AND B.ORDRS_NO = A.ORDRS_NO
-	       LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = A.ORDRS_CLNT_CD
-	       LEFT OUTER JOIN TB_BM01M01 AS P ON P.PRDT_CD = B.PRDT_CD
-	       LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID  = A.CO_CD
-	       LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = B.ITEM_DIV
-	       LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = B.ORDRS_DTL_DIV20
-	       LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = B.ORDRS_DTL_DIV30
-	       LEFT OUTER JOIN (
-				SELECT FILE_TRGT_KEY, CO_CD, SALES_CD
-				  FROM TB_SM01M01 X1
-				 WHERE LEVEL = 1
-		        START WITH X1.UPPER_CD = 'top'
-		        CONNECT BY PRIOR X1.LOWER_CD = X1.UPPER_CD
-	       ) AS BOM ON A.CO_CD = BOM.CO_CD AND B.SALES_CD = BOM.SALES_CD
-	       LEFT OUTER JOIN (
-				SELECT CO_CD, SALES_CD, COUNT(*) AS BOM_CNT FROM TB_SM01M01 GROUP BY CO_CD, SALES_CD
-	       ) AS T3 ON A.CO_CD = T3.CO_CD AND B.SALES_CD = T3.SALES_CD
-		   WHERE  B.SALES_CD IS NOT NULL
-		     AND NVL2(#{coCd},A.CO_CD,'.') = NVL(#{coCd},'.')
-		     AND NVL2(#{itemDiv},B.ITEM_DIV,'.') = NVL(#{itemDiv},'.')
-		     AND NVL(B.SALES_CD, '.') LIKE '%'||#{salesCd}||'%'
-		     AND NVL(C.CLNT_NM, '.') LIKE '%'||#{clntNm}||'%'
-		     AND NVL(A.CLNT_PJT, '.') LIKE '%'||#{clntPjt}||'%'
-		     AND NVL(P.PRDT_NM, '.') LIKE '%'||#{prdtNm}||'%'
-		     AND NVL(B.EQP_NM, '.') LIKE '%'||#{eqpNm}||'%'
-		     AND NVL2(#{bomCnt},TO_CHAR(NVL(T3.BOM_CNT,'0')),'.') = NVL(#{bomCnt},'.')
-        ORDER BY A.CO_CD, A.ORDRS_CLNT_CD,A.CLNT_PJT, B.SALES_CD
+        	<include refid="selectBomSalesSql"></include>
         ) AS a
         ) A
         WHERE RNUM BETWEEN #{firstIndex} AND #{lastIndex}
@@ -92,10 +78,8 @@
         , T.LVL
         , T.CO_CD
         , FN_CM05M01_CD_TO_NM(T.CO_CD) CO_NM
+        , T.ORDRS_NO
         , T.SALES_CD
-        , T.PART_NO
-        , T.UNIT_NO
-        , T.REV_NO
         , T.DSGN_NO
         , T.UPPER_CD AS OLD_UPPER_CD
         , T.LOWER_CD AS OLD_LOWER_CD
@@ -160,11 +144,11 @@
         , TO_CHAR(T.UDT_DTTM,'YYYY-MM-DD HH24:MM:SS') AS UDT_DTTM
         FROM
   		( SELECT X1.*, LEVEL AS LVL FROM TB_SM01M01 X1
-           START WITH X1.UPPER_CD = 'top' AND X1.CO_CD = #{coCd} AND X1.SALES_CD = #{salesCd}
+           START WITH X1.UPPER_CD = 'top' AND X1.CO_CD = #{coCd} AND X1.ORDRS_NO = #{ordrsNo} AND X1.SALES_CD = #{salesCd}
           CONNECT BY PRIOR X1.LOWER_CD = X1.UPPER_CD
         ) T
         LEFT OUTER JOIN TB_SM01D01 D
-		ON T.CO_CD = D.CO_CD AND T.SALES_CD = D.SALES_CD AND T.UPPER_CD = D.UPPER_CD AND T.LOWER_CD = D.LOWER_CD
+		ON T.CO_CD = D.CO_CD AND T.ORDRS_NO = D.ORDRS_NO AND T.SALES_CD = D.SALES_CD AND T.UPPER_CD = D.UPPER_CD AND T.LOWER_CD = D.LOWER_CD
         LEFT OUTER JOIN
         ( SELECT T1.CO_CD
 		        , T2.SALES_CD
@@ -196,18 +180,16 @@
 		        ,LOWER_CODE AS OLD_LOWER_CODE
 		       FROM (
 			SELECT   FILE_TRGT_KEY
-				    ,CO_CD
-					,SALES_CD
-					,PART_NO
-					,UNIT_NO
-					,REV_NO
-					,DSGN_NO
-					,UPPER_CD
-					,LOWER_CD
-					,DSGN_NM
-					,DSGN_BOM_QTY
-					,UPPER_CD AS UPPER_CODE
-					,LOWER_CD AS LOWER_CODE
+				    , CO_CD
+					, ORDRS_NO
+					, SALES_CD
+					, DSGN_NO
+					, UPPER_CD
+					, LOWER_CD
+					, DSGN_NM
+					, DSGN_BOM_QTY
+					, UPPER_CD AS UPPER_CODE
+					, LOWER_CD AS LOWER_CODE
 					,'N' AS MATR_YN
 					,'' AS MATR_SEQ
 					,'' AS ORDRG_DIV_10
@@ -259,14 +241,13 @@
 					,'' AS MATR_NO
 				FROM TB_SM01M01 A
 				WHERE A.CO_CD = #{coCd}
+				AND A.ORDRS_NO = #{ordrsNo}
 				AND A.SALES_CD = #{salesCd}
 			UNION ALL
 			   SELECT '' AS FILE_TRGT_KEY
 				    , CO_CD
+				    , ORDRS_NO
 					, SALES_CD
-					,'' AS PART_NO
-					,'' AS UNIT_NO
-					,'' AS REV_NO
 					,'' AS DSGN_NO
 					,UPPER_CD
 					,LOWER_CD
@@ -325,6 +306,7 @@
 					,MATR_NO
 			FROM TB_SM01D01 A
 			WHERE A.CO_CD = #{coCd}
+			AND A.ORDRS_NO = #{ordrsNo}
 			AND A.SALES_CD = #{salesCd}
 		) T
 		WHERE 1=1
@@ -339,10 +321,8 @@
 	        , LEVEL - 1 AS LVL
 	        , T.FILE_TRGT_KEY
 	        , T.CO_CD
+	        , T.ORDRS_NO
 	        , T.SALES_CD
-	        , T.PART_NO
-	        , T.UNIT_NO
-	        , T.REV_NO
 	        , T.DSGN_NO
 	        , SUBSTR(REPLACE(T.DSGN_NO,T.SALES_CD,''), INSTR(REPLACE(T.DSGN_NO,T.SALES_CD,''), '-', -1) + 1) AS LAST_DSGN_NO
 	        , T.UPPER_CD
@@ -352,7 +332,7 @@
 	        , T.DSGN_NM
 	        , T.DSGN_BOM_QTY
 		FROM TB_SM01M01 T
-		START WITH T.UPPER_CD = 'top' AND T.CO_CD = #{coCd} AND T.SALES_CD = #{salesCd}
+		START WITH T.UPPER_CD = 'top' AND T.CO_CD = #{coCd} AND T.ORDRS_NO = #{ordrsNo} AND T.SALES_CD = #{salesCd}
 		CONNECT BY PRIOR T.LOWER_CD = T.UPPER_CD
 		ORDER BY T.CO_CD, T.LOWER_CD, T.UPPER_CD
 	</select>
@@ -361,6 +341,7 @@
 	<select id="selectBomMatrList" resultType="CamelMap">
 		SELECT  '' AS DTA_CHK
 	        , CO_CD
+	        , ORDRS_NO
 	        , SALES_CD
 	        , UPPER_CD
 	        , LOWER_CD
@@ -416,6 +397,7 @@
 	        , MATR_ATNT_CD
 		FROM TB_SM01D01 T
 		WHERE CO_CD = #{coCd}
+		  AND ORDRS_NO = #{ordrsNo}
 		  AND SALES_CD = #{salesCd}
 		ORDER BY T.CO_CD, T.LOWER_CD, T.UPPER_CD, T.MATR_SEQ
 	</select>
@@ -427,10 +409,8 @@
         INSERT INTO TB_SM01M01
         ( FILE_TRGT_KEY
         , CO_CD
+        , ORDRS_NO
         , SALES_CD
-        , PART_NO
-        , UNIT_NO
-        , REV_NO
         , DSGN_NO
         , DSGN_NM
         , DSGN_BOM_QTY
@@ -446,10 +426,8 @@
         VALUES
         ( #{fileTrgtKey}
         , #{coCd}
+        , #{ordrsNo}
         , #{salesCd}
-        , #{partNo, jdbcType=VARCHAR}
-        , #{unitNo, jdbcType=VARCHAR}
-        , #{revNo, jdbcType=VARCHAR}
         , #{dsgnNo, jdbcType=VARCHAR}
         , #{dsgnNm, jdbcType=VARCHAR}
         , #{dsgnBomQty, jdbcType=VARCHAR}
@@ -467,10 +445,8 @@
     <update id="updateBom" parameterType="Map">
         UPDATE TB_SM01M01
         SET   CO_CD 		= #{coCd}
-	        , SALES_CD 		= #{salesCd}
-	        , PART_NO 		= #{partNo, jdbcType=VARCHAR}
-	        , UNIT_NO 		= #{unitNo, jdbcType=VARCHAR}
-	        , REV_NO 		= #{revNo, jdbcType=VARCHAR}
+	        , ORDRS_NO 		= #{ordrsNo, jdbcType=VARCHAR}
+	        , SALES_CD 		= #{salesCd, jdbcType=VARCHAR}
 	        , DSGN_NO 		= #{dsgnNo, jdbcType=VARCHAR}
 	        , DSGN_NM 		= #{dsgnNm, jdbcType=VARCHAR}
 	        , DSGN_BOM_QTY 	= #{dsgnBomQty, jdbcType=VARCHAR}
@@ -493,6 +469,7 @@
 	<delete id="deleteBomMatrAll" parameterType="Map">
 	  DELETE TB_SM01D01
 	  WHERE CO_CD = #{coCd}
+	    AND ORDRS_NO = #{ordrsNo}
 	    AND SALES_CD = #{salesCd}
 	    AND UPPER_CD = #{upperCd}
 	    AND LOWER_CD = #{lowerCd}
@@ -502,12 +479,14 @@
         <selectKey keyProperty="matrSeq" resultType="String" order="BEFORE">
 			SELECT NVL(MAX(MATR_SEQ), 0) + 1 FROM TB_SM01D01
 			 WHERE CO_CD = #{coCd}
+			   AND ORDRS_NO = #{ordrsNo}
 			   AND SALES_CD = #{salesCd}
 			   AND UPPER_CD = #{upperCd}
 			   AND LOWER_CD = #{lowerCd}
         </selectKey>
         INSERT INTO TB_SM01D01
         ( CO_CD
+        , ORDRS_NO
         , SALES_CD
         , MATR_SEQ
         , UPPER_CD
@@ -567,6 +546,7 @@
         )
         VALUES
         ( #{coCd}
+        , #{ordrsNo}
         , #{salesCd}
         , #{matrSeq}
         , #{upperCd}
@@ -684,6 +664,7 @@
             , UDT_PGM       = #{pgmId}
             , UDT_DTTM      = SYSDATE
 	  WHERE CO_CD = #{coCd}
+	    AND ORDRS_NO = #{ordrsNo}
 	    AND SALES_CD = #{salesCd}
 	    AND MATR_SEQ = #{matrSeq}
 	    AND UPPER_CD = #{oldUpperCd}
@@ -696,6 +677,7 @@
 	<delete id="deleteBomMatr" parameterType="Map">
 	  DELETE TB_SM01D01
 	  WHERE CO_CD = #{coCd}
+	    AND ORDRS_NO = #{ordrsNo}
 	    AND SALES_CD = #{salesCd}
 	    AND MATR_SEQ = #{matrSeq}
 	    AND UPPER_CD = #{upperCd}
@@ -707,17 +689,20 @@
 	<delete id="deleteBomAllMatrAll" parameterType="Map">
 	  DELETE TB_SM01D01
 	  WHERE CO_CD = #{coCd}
+	    AND ORDRS_NO = #{ordrsNo}
 	    AND SALES_CD = #{salesCd}
 	</delete>
 
 	<delete id="deleteBomAll" parameterType="Map">
 	  DELETE TB_SM01M01
 	  WHERE CO_CD = #{coCd}
+	    AND ORDRS_NO = #{ordrsNo}
 	    AND SALES_CD = #{salesCd}
 	</delete>
 
 	<select id="selectBomMatrInfo" resultType="camelMap">
 		SELECT CO_CD
+	        , ORDRS_NO
 	        , SALES_CD
 	        , MATR_SEQ
 	        , UPPER_CD
@@ -770,6 +755,7 @@
 	        , MATR_ATNT_CD
 		FROM TB_SM01D01 T
 	  WHERE CO_CD = #{coCd}
+	    AND ORDRS_NO = #{ordrsNo}
 	    AND SALES_CD = #{salesCd}
 	    AND MATR_SEQ = #{matrSeq}
 	    AND UPPER_CD = #{upperCd}
