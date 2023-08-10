@@ -219,13 +219,16 @@
 	</div>
 <!-- 하단 디테일그리드 end -->
 
+	<div id="approval_area"></div>
+
 	<!-- 공통 파일 영역 -->
 	<div id="fileList_area"></div>
-
+	
     <!-- 하단 버튼 -->
 	<div class ="popup_bottom_btn">
 		<button type="button" id="actionBtn" authChk>등록</button>
-		<button type="button" onclick="setReportMain('Report');" authChk>발주서발행</button>
+		<button type="button" id="approvalBtn" authChk>결재요청</button>
+		<button id="reportRegBtn" type="button" onclick="setReportMain('Report');" authChk>발주서발행</button>
 		<button type="button" onclick="sendMailCall();" authChk><i class="fas fa-envelope"></i> 메일</a></button>
 		<button type="button" class="close_btn"
 			onclick="modalStack.close();">닫기</button>
@@ -428,7 +431,10 @@ if (actionType == "C") {
 	$('#actionBtn').on("click", function() {
 		insertOrder();
 	});
-
+	//발주서발행 btn hide
+	$("#reportRegBtn").remove();
+	//결재상시 btn hide
+	$("#approvalBtn").remove();
 } else if (actionType == "U") {
 	$('.tit_contents .tit').text('발주 수정')
 	
@@ -822,11 +828,126 @@ $(document).ready(function() {
     			gridObj.target.setValue(row, "ordrgPrc", "");     
     			gridObj.target.setValue(row, "ordrgAmt", "");     
         	}
-        	console.log('---chkVal:' + chkVal+'=======>bomQty:' + bomQty + "====>preBomQty:" + preBomQty+'===ordrgQty:' + ordrgQty);
 	}
+	
+
+	
+		
 	
 });
 
+
+
+//div area id
+var htmlParam = {htmlArea:"approval_area"};
+//to-do 에서 넘어온 param;
+var approvalParam = {todoKey: "200", coCd: "GUN", todoDiv1CodeId: "TODODIV20", todoDiv2CodeId: "TODODIV2050"};
+var commApproval = new Approval(htmlParam, approvalParam);
+//결재요청
+$("#approvalBtn").on("click", function() {
+	console.log('--결재실행--');
+	commApproval.makeHtml();
+})	
+
+//결재승인 버튼
+function approvalConfirm() {
+	// todokey, CO_CD , div1 : TODODIV20 : 결재, div2 : TODODIV2050 :	발주서 
+	commApproval.confirmApproval();	
+}
+
+//결재 메인
+function Approval(htmlParam, param) {
+	
+	this.htmlParam = htmlParam;
+	this.param = param;
+	
+	//html make
+	this.makeHtml = function() {
+		if( htmlParam.htmlArea ) {
+			console.log('---html make');
+			var htmlId = htmlParam.htmlArea;
+			var htmlTable = `
+			<div class="" style="display: block; width: 420px; height: 100%; margin-bottom: 20px; border:1px solid #eee; overflow-y:scroll;">
+		        <h3 class="location">
+		          <span class="page_tit" style="text-align: left;">결재</span>
+		        </h3>
+				<!--결재 테이블 -->
+		        <div clss="contents" id="applist" style="height: 100%; padding: 5px">
+			    	<!-- 결재라인 table -->
+			    	<table border="1" id="appLine">
+			    		<colgroup>
+			    			<col width="15%">
+			    			<col width="35%">
+			    			<col width="15%">
+			    			<col width="35%">
+			    		</colgroup>
+			    		<tr id="appH" stye="text-align:center; border-bottom:1px solid #dbdbdb;">
+			    			<th class="appTh">순번</th>
+			    			<th class="appTh">결재자</th>
+			    			<th class="appTh">상태</th>
+			    			<th class="appTh">결재일자</th>		    			
+			    		</tr>
+			    	</table>
+			    	<div class="add_btn_small pdl10" style="float:right; padding-top:10px;" id="appBtnDiv">
+					<a style="height: 30px; line-height: 28px; width: 90px;" id="appConfirmAnchor" onclick="approvalConfirm();" >결재승인</a>
+					</div>
+		        </div>			        
+				<!--결재 테이블 end-->		        
+		    </div>		 			
+			`;
+			
+			$("#"+htmlId).html('');
+			$("#"+htmlId).append(htmlTable);
+			
+			//결재라인 read
+			postAjax("/user/wb/wb20/selectGetApprovalList", param, null
+				, function(data){
+					var list = data.resultList;
+	 				if( list[0].todoKey != "" ) {
+	 					
+	 					var html = commApproval.htmlTr();
+	 					var htmlTr = "";
+
+				        $.each(list, function (idx, data) {			     	        	
+							html = html.replace(/@@item1@@/gi, (idx+1));		//순번
+							html = html.replace(/@@item2@@/gi, data.todoNm);		//결재자명
+							html = html.replace(/@@item3@@/gi, data.sanctnSttusNm);		//상태명
+							html = html.replace(/@@item4@@/gi, data.creatDttm);		//일자
+							htmlTr += html;
+						});			
+					} 
+	 				$("#appLine tr").eq(0).next().remove()
+					$("#appLine").append(htmlTr);
+	 				//hide
+	 				$("#appBtnDiv").hide();
+	 				$("#appConfirmAnchor").removeAttr("onclick");
+	 				
+			});						
+		} else {
+			alert( '결재란 영역을 찾을수 없습니다. \r\nex) <div id="approval_area"></div>');
+		}
+	}
+	
+	this.htmlTr = function() {
+		var html = ` 
+    		<tr>
+    			<td>@@item1@@</td>
+    			<td>@@item2@@</td>
+    			<td>@@item3@@</td>
+    			<td>@@item4@@</td>
+    		</tr>		
+			`;
+		return html;
+	}
+	
+	//승인 ajax
+	this.confirmApproval = function(param) {
+		console.log('---승인 ajax---');
+		
+
+	}		
+	
+}
 
 function setReportMain(_type) {
 	var fileName = "SM0201R01.jrf";
