@@ -41,13 +41,11 @@ public class CR01Svcmpl implements CR01Svc {
 
     @Override
     public String selectMaxEstNo(Map<String, String> paramMap) {
-
         return cr01Mapper.selectMaxEstNo(paramMap);
     }
 
     @Override
     public String selectMaxEstDeg(Map<String, String> paramMap) {
-
         return cr01Mapper.selectMaxEstDeg(paramMap);
     }
 
@@ -56,14 +54,23 @@ public class CR01Svcmpl implements CR01Svc {
         return cr01Mapper.selectEstCount(param);
     }
 
+    @Override
+    public int selectEstCountModal(Map<String, String> param) {
+        return cr01Mapper.selectEstCountModal(param);
+    }
+
     public int selectEstDetailCount(Map<String, String> param) {
         return cr01Mapper.selectEstDetailCount(param);
     }
 
     @Override
     public List<Map<String, Object>> selectEstList(Map<String, String> param) {
-
         return cr01Mapper.selectEstList(param);
+    }
+
+    @Override
+    public List<Map<String, Object>> selectEstListModal(Map<String, String> param) {
+        return cr01Mapper.selectEstListModal(param);
     }
 
     @Override

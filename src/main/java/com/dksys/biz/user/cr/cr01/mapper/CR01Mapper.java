@@ -14,9 +14,13 @@ public interface CR01Mapper {
 
     int selectEstCount(Map<String, String> param);
 
+    int selectEstCountModal(Map<String, String> param);
+
     int selectEstDetailCount(Map<String, String> param);
 
     List<Map<String, Object>> selectEstList(Map<String, String> param);
+
+    List<Map<String, Object>> selectEstListModal(Map<String, String> param);
 
     List<Map<String, Object>> selectEstListNotOrdrs(Map<String, String> param);
 

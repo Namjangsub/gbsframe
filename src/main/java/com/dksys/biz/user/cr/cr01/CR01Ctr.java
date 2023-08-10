@@ -49,6 +49,18 @@ public class CR01Ctr {
         return "jsonView";
     }
 
+    @PostMapping("/selectEstListModal")
+    public String selectEstListModal(@RequestBody Map<String, String> param, ModelMap model) {
+        int totalCnt = cr01svc.selectEstCountModal(param);
+        System.out.println(totalCnt + "총로우");
+        PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
+        model.addAttribute("paginationInfo", paginationInfo);
+
+        List<Map<String, Object>> estList = cr01svc.selectEstListModal(param);
+        model.addAttribute("estList", estList);
+        return "jsonView";
+    }
+
     @PostMapping("/selectEstListNotOrdrs")
     public String selectEstListNotOrdrs(@RequestBody Map<String, String> param, ModelMap model) {
         int totalCnt = cr01svc.selectEstCount(param);
