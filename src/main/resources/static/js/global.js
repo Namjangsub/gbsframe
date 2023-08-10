@@ -1149,20 +1149,22 @@ function searchAndDelete(jstreeInstance, nodeId, topNode) {
  * input, textarea에 아래의 요소를 load 이벤트를 등록한다.
  * @param _form
  * @returns
+ * readonly 작동안함.
  * oninput {
  	data-positive : 양수
  	data-number : 양수, 음수, 소수점
  	data-integer : 양수, 음수
- 	comma or money : 양수 comma
+ 	data-money : 양수 comma
    }
    onkeyup {
+    comma
    	data-maxlength : byte크기만큼 입력막기
    }
  * date, date="toDay"
  * */
 function initLoadForm(_form){
 	$.each($(_form+" textarea"), function (idx, elem) {
-		if($(elem).is('[data-maxlength]')){
+		if($(elem).is('[data-maxlength]') && $(elem).is('[readonly=""]')){
 			var data_maxlength = $(elem).attr('data-maxlength');
 			if(!isEmpty(data_maxlength)){
 				if(!isEmpty($(elem).val())){
@@ -1176,8 +1178,8 @@ function initLoadForm(_form){
 	});
 
 	$.each($(_form+"  input"), function (idx, elem) {
-		//date
-		if($(elem).is('[date]')){
+		//date readonly
+		if($(elem).is('[date]') && $(elem).is('[readonly=""]')){
 			if(!isEmpty($(elem).val())){
 				var val_date = $(elem).val();
 				if(val_date.length == 8){
@@ -1185,9 +1187,14 @@ function initLoadForm(_form){
 				}
 				var set_date = new Date(val_date).format("yyyy-MM-dd");//날짜검사.
 				$(elem).val(set_date);
+				$(elem).datepicker({ //날짜팝업
+					format : "yyyy-mm-dd",
+					language : "ko",
+					autoclose : true
+				});
 			}
 			else {
-				var set_date = $(elem).attr('date');
+				var set_date = $(elem).attr('date');//today
 				if(isEmpty(set_date)){
 					$(elem).datepicker({
 						format : "yyyy-mm-dd",
@@ -1211,44 +1218,30 @@ function initLoadForm(_form){
 				if(!isEmpty($(elem).val())){
 					$(elem).val(dataMaxLength($(elem).val(),data_maxlength));
 				}
-				$(elem).on("keyup", function() {
-					$(elem).val(dataMaxLength($(elem).val(),data_maxlength));
-				});
+				if($(elem).is('[readonly=""]')) {
+					$(elem).on("keyup", function() {
+						$(elem).val(dataMaxLength($(elem).val(),data_maxlength));
+					});
+				}
 			}
 		}
 
-		//comma
-		if($(elem).is('[comma]')){
-			$(elem).css("text-align","right");
-			if(!isEmpty($(elem).val())){
-				$(elem).val($(elem).val().replace(/\B(?=(\d{3})+(?!\d))/g, ","));
-			}
-			$(elem).on("input", function() {
-				$(elem).val($(elem).val().replace(/[^0-9]/g, ""));
-			});
-			$(elem).on("focus", function() {
-				$(elem).val($(elem).val().replace(/[^0-9]/g, ""));
-			});
-			$(elem).on("blur", function() {
-				$(elem).val($(elem).val().replace(/\B(?=(\d{3})+(?!\d))/g, ","));
-			});
-		}
-		//money
-		else
-		if($(elem).is('[money]')){
+		if($(elem).is('[data-money]')){
 			$(elem).css("text-align","right");
 			if(!isEmpty($(elem).val())){
 				$(elem).val($(elem).val().replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","));
 			}
-			$(elem).on("input", function() {
-				$(elem).val($(elem).val().replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","));
-			});
-			$(elem).on("focus", function() {
-				$(elem).val($(elem).val().replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","));
-			});
-			$(elem).on("blur", function() {
-				$(elem).val($(elem).val().replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","));
-			});
+			if($(elem).is('[readonly=""]')) {
+				$(elem).on("input", function() {
+					$(elem).val($(elem).val().replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+				});
+				$(elem).on("focus", function() {
+					$(elem).val($(elem).val().replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+				});
+				$(elem).on("blur", function() {
+					$(elem).val($(elem).val().replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+				});
+			}
 		}
 		//data-positive
 		else
@@ -1257,40 +1250,44 @@ function initLoadForm(_form){
 			if(!isEmpty($(elem).val())){
 				$(elem).val(Number($(elem).val().replace(/[^0-9]/g, "")));
 			}
-			$(elem).on("input", function() {
-				$(elem).val($(elem).val().replace(/[^0-9]/g, ""));
-			});
-			$(elem).on("focus", function() {
-				if(!isEmpty($(elem).val())){
-					$(elem).val(Number($(elem).val().replace(/[^0-9]/g, "")));
-				}
-			});
-			$(elem).on("blur", function() {
-				if(!isEmpty($(elem).val())){
-					$(elem).val(Number($(elem).val().replace(/[^0-9]/g, "")));
-				}
-			});
+			if($(elem).is('[readonly=""]')) {
+				$(elem).on("input", function() {
+					$(elem).val($(elem).val().replace(/[^0-9]/g, ""));
+				});
+				$(elem).on("focus", function() {
+					if(!isEmpty($(elem).val())){
+						$(elem).val(Number($(elem).val().replace(/[^0-9]/g, "")));
+					}
+				});
+				$(elem).on("blur", function() {
+					if(!isEmpty($(elem).val())){
+						$(elem).val(Number($(elem).val().replace(/[^0-9]/g, "")));
+					}
+				});
+			}
 		}
 		//data-number
 		else
-		if($(elem).is('[data-number]')){
+		if($(elem).is('[data-number]') && $(elem).not('[comma]')){
 			$(elem).css("text-align","right");
 			if(!isEmpty($(elem).val())){
 				$(elem).val(Number($(elem).val().replace(/[^-\.0-9]/g, "")));
 			}
-			$(elem).on("input", function() {
-				$(elem).val($(elem).val().replace(/[^-\.0-9]/g, "").replace(/^(-?)([0-9]*)(\.?)([^0-9]*)([0-9]*)([^0-9]*)/,"$1$2$3$5"));
-			});
-			$(elem).on("focus", function() {
-				if(!isEmpty($(elem).val())){
-					$(elem).val(Number($(elem).val().replace(/[^-\.0-9]/g, "")));
-				}
-			});
-			$(elem).on("blur", function() {
-				if(!isEmpty($(elem).val())){
-					$(elem).val(Number($(elem).val().replace(/[^-\.0-9]/g, "")));
-				}
-			});
+			if($(elem).is('[readonly=""]')) {
+				$(elem).on("input", function() {
+					$(elem).val($(elem).val().replace(/[^-\.0-9]/g, "").replace(/^(-?)([0-9]*)(\.?)([^0-9]*)([0-9]*)([^0-9]*)/,"$1$2$3$5"));
+				});
+				$(elem).on("focus", function() {
+					if(!isEmpty($(elem).val())){
+						$(elem).val(Number($(elem).val().replace(/[^-\.0-9]/g, "")));
+					}
+				});
+				$(elem).on("blur", function() {
+					if(!isEmpty($(elem).val())){
+						$(elem).val(Number($(elem).val().replace(/[^-\.0-9]/g, "")));
+					}
+				});
+			}
 		}
 		//data-integer
 		else
@@ -1299,19 +1296,38 @@ function initLoadForm(_form){
 			if(!isEmpty($(elem).val())){
 				$(elem).val(Number($(elem).val().replace(/[^0-9-]/g, "")));
 			}
-			$(elem).on("input", function() {
-				$(elem).val($(elem).val().replace(/[^0-9-]/g, "").replace(/^(-?)([0-9]*)([^0-9]*)/g,"$1$2"));
-			});
-			$(elem).on("focus", function() {
-				if(!isEmpty($(elem).val())){
-					$(elem).val(Number($(elem).val().replace(/[^0-9-]/g, "")));
-				}
-			});
-			$(elem).on("blur", function() {
-				if(!isEmpty($(elem).val())){
-					$(elem).val(Number($(elem).val().replace(/[^0-9-]/g, "")));
-				}
-			});
+			if($(elem).is('[readonly=""]')) {
+				$(elem).on("input", function() {
+					$(elem).val($(elem).val().replace(/[^0-9-]/g, "").replace(/^(-?)([0-9]*)([^0-9]*)/g,"$1$2"));
+				});
+				$(elem).on("focus", function() {
+					if(!isEmpty($(elem).val())){
+						$(elem).val(Number($(elem).val().replace(/[^0-9-]/g, "")));
+					}
+				});
+				$(elem).on("blur", function() {
+					if(!isEmpty($(elem).val())){
+						$(elem).val(Number($(elem).val().replace(/[^0-9-]/g, "")));
+					}
+				});
+			}
+		}
+
+		if($(elem).is('[comma]') && $(elem).not('[data-money]')){
+			$(elem).css("text-align","right");
+			if(!isEmpty($(elem).val())){
+				$(elem).val($(elem).val().replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+			}
+			if($(elem).is('[data-number]') && $(elem).is('[readonly=""]')){
+				$(elem).on("blur", function() {
+					$(elem).val(addCommaStr(deleteCommaStr($(elem).val())));
+				});
+			}
+			else if($(elem).is('[readonly=""]')) {
+				$(elem).on("blur", function() {
+					$(elem).val($(elem).val().replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+				});
+			}
 		}
 	});
 }
@@ -1501,7 +1517,19 @@ function getSearchParam(_form, _pageNo, _recordCnt){
 			}
 		}
 	});
-
+	$.each($(_form+" textarea"), function (idx, elem) {
+		var _id = $(elem).attr('id');
+		if(!isEmpty(_id)){
+			var _idrxIndex = _id.indexOf("_");
+			if(_idrxIndex != -1) {
+				var set_id = _id.substring(0,_idrxIndex);
+				resultParam[set_id] = $(elem).val();
+			}
+			else {
+				resultParam[_id] = $(elem).val();
+			}
+		}
+	});
 	if(!isEmpty(_pageNo)){
 		resultParam["pageNo"] = _pageNo;
 	}
@@ -1509,6 +1537,75 @@ function getSearchParam(_form, _pageNo, _recordCnt){
 		resultParam["recordCnt"] = _recordCnt;
 	}
 	return resultParam;
+}
+//input,select,textarea 읽기
+function readFormData(_form){
+	let resultParam = {};
+	$.each($(_form+" input"), function (idx, elem) {
+		var _name = $(elem).attr('name');
+		if(!isEmpty(_name)){
+			resultParam[_name] = $(elem).val();
+		}
+	});
+	$.each($(_form+" select"), function (idx, elem) {
+		var _name = $(elem).attr('name');
+		if(!isEmpty(_name)){
+			resultParam[_name] = $(elem).val();
+		}
+	});
+	$.each($(_form+" textarea"), function (idx, elem) {
+		var _name = $(elem).attr('name');
+		if(!isEmpty(_name)){
+			resultParam[_name] = $(elem).val();
+		}
+	});
+	return resultParam;
+}
+//FormData 생성
+function getFormData(_form){
+	var formData = new FormData($(_form)[0]);
+	setDeleteCommaFormData(_form, formData);
+	return formData;
+}
+//FormData 로 data 생성
+function getSaveData(_form){
+	let data = {};
+	var formData = new FormData($(_form)[0]);
+	for (let key of formData.keys()) {
+		data[key] = formData.get(key);
+	}
+
+	setDeleteCommaFormData(_form, data);
+	return data;
+}
+//comma 제거
+function setDeleteCommaFormData(_form, _data){
+	$.each($(_form+"  input"), function (idx, elem) {
+		//date , data-money
+		if($(elem).is('[comma]') || $(elem).is('[data-money]') || $(elem).is('[money]')){
+			var _name = $(elem).attr('name');
+			if(!isEmpty(_name)) {
+				var value = _data[_name];
+				if(!isEmpty(value)) {
+					_data[_name] = value.replace(/,/g, "");
+				}
+			}
+		}
+	});
+}
+//readonly, disabled
+function setDisabledInput(_form , _status){
+	$.each($(_form+" input"), function (idx, elem) {
+		$(elem).prop("readonly", _status);
+	});
+	$.each($(_form+" textarea"), function (idx, elem) {
+		$(elem).prop("readonly", _status);
+		$(elem).addClass("form-control");
+	});
+	$.each($(_form+" select"), function (idx, elem) {
+		$(elem).prop("readonly", _status);
+		$(elem).prop("disabled", _status);
+	});
 }
 //리스트 검색하여 일치한 Index return
 function findIndexArray(_list, column, value, _startIndex, _endIndex) {
