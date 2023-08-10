@@ -91,4 +91,9 @@ public class WB20SvcImpl implements WB20Svc {
 		return result;
 	}
 	
+	@Override
+	public List<Map<String, String>> selectApprovalList(Map<String, String> paramMap) {
+		return wb20Mapper.selectApprovalList(paramMap);
+	}	
+	
 }

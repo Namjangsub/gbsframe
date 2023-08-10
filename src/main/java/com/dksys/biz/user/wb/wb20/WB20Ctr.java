@@ -103,5 +103,14 @@ public class WB20Ctr {
     	return "jsonView";
       }
 	  
+	  // 결재상태 불러오기 
+	  @PostMapping(value = "/selectGetApprovalList") 
+	  public String selectApprovalGetList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  
+  		  List<Map<String, String>> resultList = wb20Svc.selectApprovalList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+		  
+	  } 
 	  
 }

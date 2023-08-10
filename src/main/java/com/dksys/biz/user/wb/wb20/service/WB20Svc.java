@@ -26,4 +26,6 @@ public interface WB20Svc {
 	
 	int updateRsltsQmApproval(Map<String, String> paramMap);
 	
+	List<Map<String, String>> selectApprovalList(Map<String, String> paramMap);	
+	
 }
