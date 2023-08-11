@@ -2599,15 +2599,36 @@
 			, TODO_CF_DT
 			, TODO_CF_OPN
 			, SANCTN_STTUS
-			, DECODE(SANCTN_STTUS, 'Y', '승인', '미승인') AS SANCTN_STTUS_NM
+			, DECODE(SANCTN_STTUS, 'Y', '승인', 'N', '미승인', ' ') AS SANCTN_STTUS_NM
+			, 
+			(
+				SELECT SANCTN_STTUS
+					FROM
+					(
+					SELECT SANCTN_STTUS 
+						, ROWNUM RN
+						FROM TB_WB20M03 B
+					WHERE 1=1
+						  AND B.SANCTN_SN <![CDATA[ < ]]> A.SANCTN_SN
+						  AND A.CO_CD = B.CO_CD 
+						  AND A.TODO_KEY <![CDATA[ > ]]>  B.TODO_KEY
+						  AND A.TODO_ID <![CDATA[ <> ]]>  B.TODO_ID
+						AND A.CO_CD = B.CO_CD                                  
+						AND A.TODO_DIV1_CODE_ID = B.TODO_DIV1_CODE_ID                                  
+						AND A.TODO_DIV2_CODE_ID = B.TODO_DIV2_CODE_ID                                  
+						AND A.SALES_CD = B.SALES_CD				
+					)
+					WHERE RN=1
+			) AS PRE_STTUS 			/* 하위 완료여부 */			
 			, SALES_CD
 			, PG_PATH
+			, SUBSTR(PG_PATH, INSTR(PG_PATH, '/', -1)+1) AS DOC_NM		/* 문서명 pgmId */
 			, TODO_FILE_TRGT_KEY
 			, TODO_CO_CD
 			, TODO_NO
 			, TODO_CODE_KIND
 			, TODO_CODE_ID
-			, NVL(TO_CHAR(UDT_DTTM, 'YYYY-MM-DD'), TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD')) AS CREAT_DTTM
+			, NVL(NVL(TO_CHAR(UDT_DTTM, 'YYYY-MM-DD'), TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD')), ' ') AS CREAT_DTTM
 			, PG_PARAM
 			FROM TB_WB20M03 A
 		WHERE 1=1		
@@ -2625,7 +2646,25 @@
 			</if>
 			<if test="todoDiv2CodeId != null and !todoDiv2CodeId.equals('')">
 				AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}                                  
-			</if>			        			                      
+			</if>
+			<!-- TO_DO ~ 시작컬럼은 대상업무에서 넘어온 데이터 -->
+			<if test="salesCd != null and !salesCd.equals('')">
+				AND SALES_CD = #{salesCd}                                  
+			</if> 			
+			<if test="pgPath != null and !pgPath.equals('')">
+				<!-- / 로 SLIT 하여 마지막부분이 문서명 -->
+				AND PG_PATH = #{pgPath}                                  
+			</if>   					
+			<if test="todoFileTrgtKey != null and !todoFileTrgtKey.equals('')">
+				AND TODO_FILE_TRGT_KEY = #{todoFileTrgtKey}                                  
+			</if>
+			<if test="todoCoCd != null and !todoCoCd.equals('')">
+				AND TODO_CO_CD = #{todoCoCd}                                  
+			</if>   			   
+			<if test="todoNo != null and !todoNo.equals('')">
+				AND TODO_NO = #{todoNo}                                  
+			</if>   	
+		ORDER BY SANCTN_SN DESC																			        			                      
 	</select>             
            
  </mapper>
