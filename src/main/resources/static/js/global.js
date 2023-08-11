@@ -1164,7 +1164,7 @@ function searchAndDelete(jstreeInstance, nodeId, topNode) {
  * */
 function initLoadForm(_form){
 	$.each($(_form+" textarea"), function (idx, elem) {
-		if($(elem).is('[data-maxlength]') && $(elem).is('[readonly=""]')){
+		if($(elem).is('[data-maxlength]') && $(elem).is('[readonly]') && $(elem).attr('readonly') == "readonly"){
 			var data_maxlength = $(elem).attr('data-maxlength');
 			if(!isEmpty(data_maxlength)){
 				if(!isEmpty($(elem).val())){
@@ -1178,8 +1178,11 @@ function initLoadForm(_form){
 	});
 
 	$.each($(_form+"  input"), function (idx, elem) {
-		//date readonly
-		if($(elem).is('[date]') && $(elem).is('[readonly=""]')){
+		var not_readonly = true;
+		if($(elem).is('[readonly]') && $(elem).attr('readonly') == "readonly"){
+			not_readonly = false;
+		}
+		if($(elem).is('[date]') && not_readonly){
 			if(!isEmpty($(elem).val())){
 				var val_date = $(elem).val();
 				if(val_date.length == 8){
@@ -1218,7 +1221,7 @@ function initLoadForm(_form){
 				if(!isEmpty($(elem).val())){
 					$(elem).val(dataMaxLength($(elem).val(),data_maxlength));
 				}
-				if($(elem).is('[readonly=""]')) {
+				if(not_readonly) {
 					$(elem).on("keyup", function() {
 						$(elem).val(dataMaxLength($(elem).val(),data_maxlength));
 					});
@@ -1231,7 +1234,7 @@ function initLoadForm(_form){
 			if(!isEmpty($(elem).val())){
 				$(elem).val($(elem).val().replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","));
 			}
-			if($(elem).is('[readonly=""]')) {
+			if(not_readonly) {
 				$(elem).on("input", function() {
 					$(elem).val($(elem).val().replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","));
 				});
@@ -1250,7 +1253,7 @@ function initLoadForm(_form){
 			if(!isEmpty($(elem).val())){
 				$(elem).val(Number($(elem).val().replace(/[^0-9]/g, "")));
 			}
-			if($(elem).is('[readonly=""]')) {
+			if(not_readonly) {
 				$(elem).on("input", function() {
 					$(elem).val($(elem).val().replace(/[^0-9]/g, ""));
 				});
@@ -1273,7 +1276,7 @@ function initLoadForm(_form){
 			if(!isEmpty($(elem).val())){
 				$(elem).val(Number($(elem).val().replace(/[^-\.0-9]/g, "")));
 			}
-			if($(elem).is('[readonly=""]')) {
+			if(not_readonly) {
 				$(elem).on("input", function() {
 					$(elem).val($(elem).val().replace(/[^-\.0-9]/g, "").replace(/^(-?)([0-9]*)(\.?)([^0-9]*)([0-9]*)([^0-9]*)/,"$1$2$3$5"));
 				});
@@ -1296,7 +1299,7 @@ function initLoadForm(_form){
 			if(!isEmpty($(elem).val())){
 				$(elem).val(Number($(elem).val().replace(/[^0-9-]/g, "")));
 			}
-			if($(elem).is('[readonly=""]')) {
+			if(not_readonly) {
 				$(elem).on("input", function() {
 					$(elem).val($(elem).val().replace(/[^0-9-]/g, "").replace(/^(-?)([0-9]*)([^0-9]*)/g,"$1$2"));
 				});
@@ -1318,12 +1321,12 @@ function initLoadForm(_form){
 			if(!isEmpty($(elem).val())){
 				$(elem).val($(elem).val().replace(/\B(?=(\d{3})+(?!\d))/g, ","));
 			}
-			if($(elem).is('[data-number]') && $(elem).is('[readonly=""]')){
+			if($(elem).is('[data-number]') && not_readonly){
 				$(elem).on("blur", function() {
 					$(elem).val(addCommaStr(deleteCommaStr($(elem).val())));
 				});
 			}
-			else if($(elem).is('[readonly=""]')) {
+			else if(not_readonly) {
 				$(elem).on("blur", function() {
 					$(elem).val($(elem).val().replace(/[^0-9]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ","));
 				});
