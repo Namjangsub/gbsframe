@@ -1564,13 +1564,22 @@ function readFormData(_form){
 	});
 	return resultParam;
 }
-//FormData 생성
+//FormData 데이타에서 comma 제거
 function getFormData(_form){
 	var formData = new FormData($(_form)[0]);
-	setDeleteCommaFormData(_form, formData);
+	for (let key of formData.keys()) {
+		var _input = $(_form+' [name="'+key+'"]');
+		if(_input.is('[comma]') || _input.is('[data-money]') || _input.is('[money]')){
+			var value = formData.get(key);
+			if(!isEmpty(value)) {
+				var setValue = value.replace(/,/g, "");
+				formData.set(key,setValue);
+			}
+		}
+	}
 	return formData;
 }
-//FormData 로 data 생성
+//Json 로 data 생성
 function getSaveData(_form){
 	let data = {};
 	var formData = new FormData($(_form)[0]);
@@ -1581,7 +1590,7 @@ function getSaveData(_form){
 	setDeleteCommaFormData(_form, data);
 	return data;
 }
-//comma 제거
+//Json 데이타에서 comma 제거
 function setDeleteCommaFormData(_form, _data){
 	$.each($(_form+"  input"), function (idx, elem) {
 		//date , data-money
