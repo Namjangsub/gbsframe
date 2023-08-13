@@ -1458,10 +1458,18 @@ function getByteLength(text_val){
 
 //값체크
 function isEmpty(str){
-	if(typeof str == "undefined" || str == null || (str+"") == "")
+	try {
+		if(typeof str == "undefined" || str == null || (typeof str == "string" && (str+"") == "") ) {
+			return true;
+		}
+		else {
+			if(str) return false;
+			else return true;
+		}
+	} catch (e) {
+		console.log("====isEmpty error>>",e);
 		return true;
-	else
-		return false ;
+	}
 }
 
 /**
@@ -1788,6 +1796,140 @@ selecLowerIndex = function(_list, rArray, value, _upperCol, _lowerCol) {
 			}
         });
 	}
+}
+
+//array filter
+function getFilterData(_list, _column, _value) {
+	const resultData = _list.filter(function(element){
+		return _value == element[_column];
+	});
+	return resultData;
+}
+
+//그리드 콤보에서 사용
+/** 예)
+    function fetchCurrencyData() {
+	setComboGridOptions("ORDRGDIV10,ORDRGDIV20,GOODSDIV,MATRCLNTDIV,MATRDIV,MATRGRP,UNITDIV,MATRTESTDIV,MATRPURCDIV");
+	var options1 = getGridOptions(comboGridOptions, "ORDRGDIV10");
+*/
+function setComboGridOptions(codeKind){
+	var paramObj = {};
+	paramObj.codeKindList = codeKind;
+	postAjaxSync("/admin/cm/cm05/selectComboCodeList", paramObj, null, function(data) {
+		comboGridOptions = data.resultList;
+	});
+}
+
+//화면에 있는 콤보를 한번의 트랜잭션으로 조회한다. comboKindString
+function setComboKindOptions(selectArr) {
+	try {
+		var codeKind = "";
+		$.each(selectArr, function(idx, elem) {
+			var kindVal = $(elem).data('kind');
+			if(isEmpty(codeKind) || codeKind.indexOf(kindVal) == -1) {
+				if(isEmpty(codeKind)) codeKind += kindVal;
+				else codeKind += ","+kindVal;
+			}
+		});
+		var paramObj = {};
+		if(!isEmpty(codeKind)) paramObj.codeKindList = codeKind;
+		if(!isEmpty(codeKind)){
+			postAjaxSync("/admin/cm/cm05/selectComboCodeList", paramObj, null, function(data) {
+				setSelectOptions(selectArr, data.resultList);
+			});
+		}
+	} catch (e) {
+		return setCommonSelect(selectArr);
+	}
+}
+
+//메인화면에서 전체 Code를 조회하여 사용한다. var comboDataList = [] 필수 , Sync 조회
+function setComboOptions(selectArr) {
+	var isComboData = false;
+	try {
+		if(comboDataList){
+			isComboData = true;
+		}
+	} catch (e) {}
+	var isComboKind = false;
+	try {
+		if(comboKindString){
+			isComboKind = true;
+		}
+	} catch (e) {}
+
+	if(!isComboData) return setComboKindOptions(selectArr);
+
+	var codeKind = "";
+	var codeKindChange = false;
+	if(isComboKind){//comboKindString 있다면
+		codeKind = comboKindString;
+		$.each(selectArr, function(idx, elem) {
+			var kindVal = $(elem).data('kind');
+			if(isEmpty(codeKind) || codeKind.indexOf(kindVal) == -1) {
+				if(isEmpty(codeKind)) codeKind += kindVal;
+				else codeKind += ","+kindVal;
+			}
+		});
+		if(isEmpty(codeKind)) {
+			codeKindChange = true;
+			comboKindString = codeKind;
+		}
+	} else {
+		$.each(selectArr, function(idx, elem) {
+			var kindVal = $(elem).data('kind');
+			if(isEmpty(codeKind) || codeKind.indexOf(kindVal) == -1) {
+				if(isEmpty(codeKind)) codeKind += kindVal;
+				else codeKind += ","+kindVal;
+			}
+		});
+	}
+	var paramObj = {};
+	if(!isEmpty(codeKind)) paramObj.codeKindList = codeKind;
+
+	if(isEmpty(comboDataList) || comboDataList.length == 0 || codeKindChange){
+		postAjaxSync("/admin/cm/cm05/selectComboCodeList", paramObj, null, function(data) {
+			comboDataList = data.resultList;
+			setSelectOptions(selectArr, data.resultList);
+		});//postAjaxSync
+	}
+	else {
+		setSelectOptions(selectArr, comboDataList);
+	}
+}
+
+//화면의 select 변경
+function setSelectOptions(_selectArr, _comboList) {
+	$.each(_selectArr, function(idx, elem) {
+		var optionHtml = '';
+		var codeKind = $(elem).data('kind');
+		var codeList = getSelectData(_comboList, codeKind);
+		$.each(codeList, function (index, item){
+			optionHtml += '<option value="'+item.codeId+'">';
+			optionHtml += item.codeNm;
+			optionHtml += '</option>';
+		});
+		$(elem).append(optionHtml);
+	});
+}
+
+//데이타 copy and codeKind로 filter gridCombo return
+function getGridOptions(_comboList, _kind){
+	let copyList = JSON.parse(JSON.stringify(_comboList));
+	let resultList = getFilterData(copyList,"codeKind",_kind);
+	var resultData = [];
+	$.each(resultList, function(idx, elem) {
+		var options = {value:elem.codeId,  text:elem.codeNm};
+		resultData.push(options);
+	});
+	return resultData;
+}
+
+//데이타 copy and codeKind로 filter
+function getSelectData(_comboList, _kind){
+	let copyList = JSON.parse(JSON.stringify(_comboList));
+	let resultList = getFilterData(copyList,"codeKind",_kind);
+	return resultList;
 }
 
 //엑셀 데이타를 그리드 데이타로 return; /user/sm/sm01/uploadExcelFile 사용시 Excel 데이타를 그리드 데이타로 변환.

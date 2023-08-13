@@ -24,34 +24,34 @@ public class CM05Ctr {
 
 	@Autowired
 	MessageUtils messageUtils;
-	
+
     @Autowired
     CM05Svc cm05Svc;
-    
+
     // 공통코드 리스트 조회
     @PostMapping("/selectCodeList")
     public String selectCodeList(@RequestBody Map<String, String> param, ModelMap model) {
     	int totalCnt = cm05Svc.selectCodeCount(param);
     	PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
     	model.addAttribute("paginationInfo", paginationInfo);
-    	
+
     	List<Map<String, String>> codeList = cm05Svc.selectCodeList(param);
     	model.addAttribute("codeList", codeList);
         return "jsonView";
     }
-    
+
     // 공통코드 리스트 조회
     @PostMapping("/selectPdskCodeList")
     public String selectPdskCodeList(@RequestBody Map<String, String> param, ModelMap model) {
     	int totalCnt = cm05Svc.selectPdskCodeCount(param);
     	PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
     	model.addAttribute("paginationInfo", paginationInfo);
-    	
+
     	List<Map<String, String>> codeList = cm05Svc.selectPdskCodeList(param);
     	model.addAttribute("codeList", codeList);
         return "jsonView";
     }
-    
+
     // 하위코드 리스트 조회
     @PostMapping("/selectChildCodeList")
     public String selectChildCodeList(@RequestBody Map<String, String> param, ModelMap model) {
@@ -59,7 +59,15 @@ public class CM05Ctr {
     	model.addAttribute("childCodeList", childCodeList);
         return "jsonView";
     }
-    
+
+    // 코드 리스트 조회
+    @PostMapping("/selectComboCodeList")
+    public String selectComboCodeList(@RequestBody Map<String, String> param, ModelMap model) {
+    	List<Map<String, String>> resultList = cm05Svc.selectComboCodeList(param);
+    	model.addAttribute("resultList", resultList);
+        return "jsonView";
+    }
+
     // 하위코드 리스트 조회2
     @PostMapping("/selectPtchildCodeList")
     public String selectPtchildCodeList(@RequestBody Map<String, String> param, ModelMap model) {
@@ -67,7 +75,7 @@ public class CM05Ctr {
     	model.addAttribute("PtchildCodeList", PtchildCodeList);
         return "jsonView";
     }
-    
+
     // 공통코드 정보 조회
     @PostMapping("/selectCodeInfo")
     public String selectCodeInfo(@RequestBody Map<String, String> param, ModelMap model) {
@@ -75,7 +83,7 @@ public class CM05Ctr {
     	model.addAttribute("codeInfo", codeInfo);
         return "jsonView";
     }
-    
+
     // 공통코드 정보 리스트 조회
     @PostMapping("/selectCodeInfoList")
     public String selectCodeInfoList(@RequestBody Map<String, String> param, ModelMap model) {
@@ -83,7 +91,7 @@ public class CM05Ctr {
     	model.addAttribute("codeInfoList", codeInfoList);
         return "jsonView";
     }
-    
+
     // 공통코드 등록/수정
     @PostMapping("/insertCode")
     public String insertCode(@RequestBody Map<String, String> param, ModelMap model) {
@@ -97,7 +105,7 @@ public class CM05Ctr {
     	}
     	return "jsonView";
     }
-    
+
     // 공통코드삭제
     @PutMapping("/deleteCode")
     public String deleteCode(@RequestBody Map<String, String> param, ModelMap model) {
@@ -114,7 +122,7 @@ public class CM05Ctr {
     	model.addAttribute("docTreeList", docTreeList);
         return "jsonView";
     }
-    
+
     // 공통코드 정보 리스트 조회
     @PostMapping("/selectDocTreeListAuth")
     public String selectDocTreeListAuth(@RequestBody Map<String, String> param, ModelMap model) {
@@ -122,5 +130,5 @@ public class CM05Ctr {
     	model.addAttribute("docTreeList", docTreeList);
     	return "jsonView";
     }
-    
+
 }
