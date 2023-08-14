@@ -1798,10 +1798,10 @@ selecLowerIndex = function(_list, rArray, value, _upperCol, _lowerCol) {
 	}
 }
 
-//array filter
-function getFilterData(_list, _column, _value) {
+//array codeKind filter
+function getFilterDataKind(_list, _value) {
 	const resultData = _list.filter(function(element){
-		return _value == element[_column];
+		return _value == element.codeKind;
 	});
 	return resultData;
 }
@@ -1929,7 +1929,7 @@ function setSelectOptions(_selectArr, _comboList) {
 //데이타 copy and codeKind로 filter gridCombo return
 function getGridOptions(_comboList, _kind){
 	let copyList = JSON.parse(JSON.stringify(_comboList));
-	let resultList = getFilterData(copyList,"codeKind",_kind);
+	let resultList = getFilterDataKind(copyList,_kind);
 	var resultData = [];
 	$.each(resultList, function(idx, elem) {
 		var options = {value:elem.codeId,  text:elem.codeNm};
@@ -1941,7 +1941,7 @@ function getGridOptions(_comboList, _kind){
 //데이타 copy and codeKind로 filter
 function getSelectData(_comboList, _kind){
 	let copyList = JSON.parse(JSON.stringify(_comboList));
-	let resultList = getFilterData(copyList,"codeKind",_kind);
+	let resultList = getFilterDataKind(copyList,_kind);
 	return resultList;
 }
 
