@@ -1847,14 +1847,14 @@ function setComboKindOptions(selectArr) {
 
 /**
  * 메인화면에서 전체 Code를 한번의 트랜잭션으로 조회하며 코드조회목록을 재사용한다.
- * @param setComboOptions($("#main_area select[data-kind]"));
+ * @param $("#main_area select[data-kind]")
  * @returns
  * 기존 setCommonSelect: select의 숫자만큼 트랜잭션 개선 => setComboOptions 전체 select 를 한번의 트랜잭션으로 처리
+ * 재사용 조건: 코드조회목록을 재사용 하려면 아래의 변수 2개가 선언되어있어야 한다.
  * var comboDataList = []; //메인화면에 선언되어 있을경우 메인화면에 조회된 콤보데이타를 재사용한다.
+ * var comboKindString = "CO,ITEMLIST,ORDRGDIV20,ORDRGDIV10,GOODSDIV";
  * 처리방식
  * 1. comboDataList가 메인화면에 선언되어있다면 재사용하여 사용된다.
- *    재사용 조건: 아래처럼 전역변수 위치에 정의 해서 사용해야 함.
- *    예) var comboKindString = "CO,ITEMLIST,ORDRGDIV20,ORDRGDIV10,GOODSDIV";
  * 2. comboDataList가 전역변수에 없다면 setComboKindOptions(전체 Code를 한번의 트랜잭션으로 조회) 연결 =>에러시 기존 setCommonSelect 연결
  */
 function setComboOptions(selectArr) {
