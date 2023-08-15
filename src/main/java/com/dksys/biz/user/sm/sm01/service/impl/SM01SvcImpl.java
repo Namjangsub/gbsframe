@@ -327,6 +327,10 @@ public class SM01SvcImpl implements SM01Svc {
 
   @Override
   public int insertUploadBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	  	//fileTrgtTyp,fileTrgtKey,userId
+	    String fileTrgtTyp = paramMap.get("fileTrgtTyp");
+	    String fileTrgtKey = paramMap.get("fileTrgtKey");
+	    String userId = paramMap.get("userId");
 	  deleteBomAll(paramMap);
 	  return insertCrudMatrAndBom(paramMap, mRequest);
   }
