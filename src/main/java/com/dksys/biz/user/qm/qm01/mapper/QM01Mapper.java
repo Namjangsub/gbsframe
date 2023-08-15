@@ -64,4 +64,8 @@ public interface QM01Mapper {
   
   int insertWbsApprovalList(Map<String, String> paramMap);
   
+  int selectCodeMaxCount(Map<String, String> paramMap);
+  
+  List<Map<String, String>> selectMainCodeList(Map<String, String> param);
+  
 }
