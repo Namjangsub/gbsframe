@@ -20,5 +20,7 @@ public interface PM01Svc {
   int updateDailyWork(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
   int deleteDailyWork(Map<String, String> paramMap) throws Exception;
+  
+  List<Map<String, String>> selectMonthlyWorkList(Map<String, String> paramMap);
 
 }

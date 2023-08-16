@@ -24,4 +24,6 @@ public interface PM01Mapper {
 
   int deleteDailyWork(Map<String, String> paramMap);
   
+  List<Map<String, String>> selectMonthlyWorkList(Map<String, String> paramMap);
+  
 }

@@ -107,4 +107,13 @@ public class PM01Ctr {
 	  	return "jsonView";
   }
 
+
+  // 월 개인별 작업일보 집계 조회
+  @PostMapping(value = "/selectMonthlyWorkList")
+  public String selectMonthlyWorkList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    List<Map<String, String>> result = pm01Svc.selectMonthlyWorkList(paramMap);
+    model.addAttribute("result", result);
+    return "jsonView";
+  }
+
 }

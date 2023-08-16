@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+<link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
+<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-theme.min.css">
+<link rel="stylesheet" href="/static/bootstrap/css/dashboard.css">
+<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-datepicker.css">
+<link rel="stylesheet" href="/static/fontawesome/css/all.css">
+<link rel="stylesheet" href="/static/css/ax5/ax5grid.css">
+<link rel="stylesheet" href="/static/css/ax5/ax5mask.css">
+<link rel="stylesheet" href="/static/css/ax5/ax5modal.css">
+<link rel="stylesheet" href="/static/css/ax5/ax5toast.css">
+<link rel="stylesheet" href="/static/css/jstree/style.min.css">
+<link rel="stylesheet" href="/static/css/gnb.css">
+<link rel="stylesheet" href="/static/css/main.css">
+<link rel="stylesheet" href="/static/css/sub.css">
+<link rel="stylesheet" href="/static/css/common.css">
+
+<script src="/static/js/jquery-latest.min.js"></script>
+<script src="/static/js/jquery.serializeObject.js"></script>
+<script src="/static/bootstrap/js/bootstrap.min.js"></script>
+<script src="/static/bootstrap/js/bootstrap-datepicker.min.js"></script>
+<script src="/static/bootstrap/js/bootstrap-datepicker.ko.min.js"></script>
+<script src="/static/js/moment/moment-with-locales.js"></script>
+<script src="/static/js/ax5/ax5core.min.js"></script>
+<script src="/static/js/ax5/ax5grid.min.js"></script>
+<script src="/static/js/ax5/ax5mask.min.js"></script>
+<script src="/static/js/ax5/ax5modal.min.js"></script>
+<script src="/static/js/ax5/ax5toast.min.js"></script>
+<script src="/static/js/jstree/jstree.min.js"></script>
+<script type="text/javascript" src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<script src="/static/js/global.js"></script>
+<script src="/static/js/fileTree.js"></script>
+<!-- <script src="/static/js/calLuna.js"></script> -->
+<script src="/static/js/LunarCalendar.js"></script>
+</head>
+
+<body>
+  <div id="head_area"></div>
+  <div id="top_area"></div>
+  <div id="main_area">
+    <!-- 		  페이지 상단  -->
+    <div class="contents no_bg">
+        <ul class="btn_ul">
+            <li class="btn_r">
+                <a onclick="initSearch();"><button class="bg_gray">초기화</button></a>
+                <a onclick="gridView.setData(0);"><button class="bg_gray">검 색</button></a>
+            </li>
+        </ul>
+    </div>
+
+    <div class="contents search">
+      <div class="">
+        <!--  테이블 인풋 3분할  -->
+        <table class="table_input type03">
+          <tr>
+            <th class="hit">회사</th>
+            <td>
+              <select id="coCd_S" name="coCd_S" data-kind="CO" data-search="coCd" required>
+                <option value="">전체</option>
+              </select>
+            </td>
+
+			<th class="hit">작업년월</th>
+               <td>
+              	  <input type="month" id="workYm" name="workYm" class="month_calendar" data-search="workYm" required="required" msg="작업년월" style="height: 25px;">
+			</td>
+
+			  <th>부서</th>
+			  <td>
+			    <div class="search_form">
+					<input type="hidden" id="deptId_S" id="deptId_S" data-search="deptId">
+					<input type="text" id="deptNm_S" id="deptNm_S" data-search="deptNm" onkeyup="event.keyCode == 8 ? deptId_S.value = '' : ''">
+					<a onclick="openDeptTree();"><i class="i_search_w"></i></a>
+				</div>			    
+			  </td>
+			</tr>
+        </table>
+              <input type="hidden" id="userId"    name="userId" data-search="userId" >
+              <input type="hidden" id="pgmId"     name="pgmId" data-search="pgmId" value="PM0101M01">
+      </div>
+    </div>
+
+    <div class="contents no_bg">
+      <div class="contents_tit">
+      	<span style="height: 30px; line-height: 30px;font-size: 15px;margin-left: 15px">팀별 작업일보 월 집계현황</span>
+        <div class="add_btn_small pdl10">
+			<a onclick="prevNextCalendar('-');" style="height: 30px; line-height: 28px; width: 50px;" authChk>이전달</a>
+			<a onclick="prevNextCalendar('+');" style="height: 30px; line-height: 28px; width: 50px;" authChk>다음달</a>
+		    <a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="contents">
+      <div class="ax5_grid">
+        <div data-ax5grid="first-grid" data-ax5grid-config="{}" style="height: 680px; width: 100%"></div>
+        <div data-ax5grid="excel-grid" data-ax5grid-config="{}" style="display: none;"></div>
+      </div>
+    </div>
+</body>
+</html>
+
+
+<script type="text/javascript">
+var isFirst = true;
+var today = new Date();  //카렌더 생성용
+
+ax5.ui.grid.formatter["bilgYn"] = function () {
+	var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
+	if (this.value == "E"){
+		return 'E';
+	} else {
+		return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
+	}
+};
+
+var gridView = {
+		initView : function() {
+  			this.target = new ax5.ui.grid();
+  			this.target.setConfig({
+  		    	showRowSelector: true,
+  		    	multipleSelect: true,
+  		    	sortable: false,
+  		        target: $('[data-ax5grid="first-grid"]'),
+  		        header: {
+  		        	align: "center",
+  		        	selector: true
+  		        },
+  		        body: {
+  		        	columnHeight: 40,
+  		        	 onClick: function () {
+  		                this.self.select(this.dindex);
+  		            },
+  		            onDBLClick: function () {
+  		            },
+  		        },
+
+				footSum: [[
+  			    		{label: "총계", 	colspan:2, align:"center"},
+  			    		{key: "tot", 	collector: "sum", formatter:"money", align: "center"},
+  			    		{key: "1",		collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "2", 		collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "3", 		collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "4", 		collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "5", 		collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "6", 		collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "7", 		collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "8", 		collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "9", 		collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "10", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "11", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "12", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "13", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "14", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "15", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "16", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "17", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "18", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "19", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "20", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "21", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "22", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "23", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "24", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "25", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "26", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "27", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "28", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "29", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "30", 	collector: "sum", formatter:"money", align: "center"},
+  	            		{key: "31", 	collector: "sum", formatter:"money", align: "center"},
+  			    ]],
+
+		    	columns : [
+						 {key: "id",		label: "ID", 	    	width: 60,		align: "center",	hidden:true}
+						,{key: "name", 		label: "성명", 			width: 80,		align: "center"  }
+						,{key: "levelNm", 	label: "직위", 			width: 60,		align: "center"  }
+    	            ]
+
+			});
+        	return this;
+        },
+
+		setData : function(_pageNo) {
+	    firstGrid = this.target;
+			if (inputValidation($('input[required]'))) {
+				var paramObj = {};
+				$.each($('#main_area [data-search]'), function(idx, elem){
+					paramObj[$(elem).data("search")] = $(elem).val();
+				});		
+				paramObj["pageNo"] = _pageNo + 1;
+				paramObj["recordCnt"] =  9999999;
+				postAjax("/user/pm/pm01/selectMonthlyWorkList", paramObj, null, function(data){
+				var list = data.result;
+  					firstGrid.setData({
+  						list : list,
+  						page : {
+  							totalElements : list==undefined ? 0 : list.length
+  						}
+  					});
+  				});
+  			}
+  		}
+  	} 
+
+	var excelView = {
+			initView: function(){
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+					target: $('[data-ax5grid="excel-grid"]'),
+			    	columns : [
+						 {key: "id",		label: "ID", 	    	width: 60,		align: "center",	hidden:true}
+						,{key: "name", 		label: "성명", 			width: 80,		align: "center"  }
+						,{key: "levelNm", 	label: "직위", 			width: 60,		align: "center"  }
+   	            ]
+			});
+			return this;
+		}
+	}
+
+
+  	$(document).ready(function() {
+
+  		mainDefaultLoad("생산관리", "월작업일보집계현황");			// 페이지 타이틀 설정
+  		setCommonSelect($("#main_area select[data-kind]"));		// 공통코드 set
+
+		$("#coCd_S").val(jwt.coCd);
+		$("#deptId_S").val(jwt.deptId);
+		paramObj = {"deptId" : $("#deptId_S").val() };
+		postAjax("/admin/cm/cm04/selectDeptInfo", paramObj, null, function(data){
+			$("#deptNm_S").val(data.deptInfo.deptNm);
+		});
+	  	setByCoCd($("#coCd_S").val());
+
+	  	const today = new Date().toISOString();
+	  	$('#workYm').val(today.slice(0, 7));
+	  	
+		gridView.initView();
+		buildCalendar(gridView);
+		gridView.setData();
+  		excelView.initView();
+  		
+  		//권한체크
+  		authChk();
+
+        // 검색조건 이벤트 bind
+  		$('[data-search]').on("change", function(){
+  			gridView.setData(0);
+  		});
+  		$('#workYm').on("change", function(){
+  			setByMonth();
+  		});
+  		
+  	});
+
+	// 사용자에 따른 코드 설정 , 회사코드 set
+	function setByCoCd() {
+		$('#coCd_S option:not([value="'+jwt.coCd+'"])').remove();		//사용자 coCd 코드 외 제거
+
+	}
+
+	// 월이바뀌면 그리드 헤드부터 새로 그리기
+	function setByMonth() {
+		gridView.initView();
+		buildCalendar(gridView);
+		gridView.setData();
+	}
+
+	// 초기화 버튼용
+	function initSearch() {
+		$(".contents.search input[type='text']").val("");
+		$("#deptId_S").val(jwt.deptId);
+	  	setByCoCd($("#coCd_S").val());
+		$('#workYm').val(new Date().toISOString().slice(0, 7));
+
+		gridView.initView().setData(0);
+	}
+
+	// 작성자 검색 //
+// 	function openUserSearch() {
+// 		var paramObj = {
+// 			  "coCd" : $('#coCd_S').val(),
+// 			  "userId" : $('#userId_S').val(),
+// 		};
+
+// 		openSecondModal("/static/html/cmn/modal/userSearch.html", 300, 500,
+// 				"사용자 검색", paramObj, function(tree) {
+// 					var checkedId = tree.get_checked()[0];
+// 					var checkedNode = tree.get_node(checkedId);
+// 					$('#userId_S').val(checkedNode.id);
+// 					$('#userIdNm_S').val(checkedNode.text);
+// 					 gridView.setData(0);
+// 				});
+// 	}
+
+	//부서 검색
+	function openDeptTree() {
+		var paramObj = {
+			"coCd" : $('#coCd_S').val(),
+			"deptId": $('#deptId_S').val(),
+			"deptNm": $('#deptNm_S').val(),
+			"useYn": "Y"
+		};
+		openSecondModal("/static/html/cmn/modal/deptSearch.html", 300, 500, "부서 검색", paramObj, function (tree){
+			var checkedId = tree.get_checked()[0];
+			var checkedNode = tree.get_node(checkedId);
+			$('#deptId_S').val(checkedNode.id);
+			$('#deptNm_S').val(checkedNode.text);
+			gridView.setData(0);
+		});
+	}
+
+	//엑셀다운로드
+	function excelDown() {
+		var paramObj = {"pageNo":  1};
+
+		$.each($('[data-search]'), function(idx, elem){
+			paramObj[$(elem).data("search")] = $(elem).val();
+		});
+		paramObj["recordCnt"] =  9999999;
+		
+		postAjax("/user/pm/pm01/selectMonthlyWorkList", paramObj, null, function(data){
+			var list = data.result;
+			firstGrid.setData({
+				list : list,
+				page : {
+					totalElements : list==undefined ? 0 : list.length
+				}
+			});
+			var todayDate = new Date().format('yyyyMMddHHmmss');
+			excelView.target.exportExcel("월작업일보집계현황_"+todayDate+".xls");
+		});
+	}
+
+
+	  //today 에 Date객체를 넣어줌 //ex)5일 
+		function prevNextCalendar(_select) {
+			gridView.initView();
+			
+			const currentValue = $('#workYm').val(); // 현재 입력 박스의 값 (예: "2023-08")
+			const currentDate = new Date(currentValue + "-01"); // 값을 날짜 객체로 변환
+			
+			const monthOffset = (_select === "-") ? -1 : 1;
+			currentDate.setMonth(currentDate.getMonth() + monthOffset);
+			
+			$('#workYm').val(currentDate.toISOString().slice(0, 7)); // 입력 박스에 설정
+			
+			buildCalendar(gridView); // 달력을 새로 그려준다.
+			gridView.setData();
+		}
+	  
+	  function buildCalendar(__gridView) {// 현재 달fur
+	  	var week = [ '일', '월', '화', '수', '목', '금', '토', '일'];
+		const currentValue = $('#workYm').val(); // 현재 입력 박스의 값 (예: "2023-08")
+		today = new Date($('#workYm').val().substring(0, 4), $('#workYm').val().substring(5, 7)-1, today.getDate()); // month 를 조정해 해당 월을 변경함
+		
+	  	var nMonth = new Date(today.getFullYear(), today.getMonth(), 1); // 이번 달의 첫째 날
+	  	var lastDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); // 이번 달의 마지막 날
+	  	
+	  	var dayWeek = week[nMonth.getDay()]; //이번달 첫째날의 요일
+	  	var year = today.getFullYear();
+	  	var lastYear = 0;
+	  	
+	  	// year와 lastyear가 동일할경우 setLunaToSolar를 계산하지 않음;
+	  	var isSame = false;
+	  	if (year == lastYear)
+	  		isSame = true;
+	  	
+	  	var solarHolidays = [ "0101", "0301", "0505", "0606", "0717", "0815", "1003", "1009", "1225" ]; //양력휴일
+	  	var lunaHolidays = [ "0101", "0102", "0408", "0814", "0815", "0816" ]; //음력휴일, 설전날도 넣어야함.
+	  	
+	  	//대체공휴일 입력구간. 임시휴일이나 대체공휴일이 있을 경우 배열에 넣으면됨. yyyymmdd 입력
+	  	var alternativeHolidays = [ "20150929", "20160210", "20170130",
+	  	"20180926", "20180507", "20190506", "20200127", "20220912",
+	  	"20230124", "20240212", "20240506", "20251008", "20270209",
+	  	"20290924", "20290507", "20300205", "20300506", "20320921",
+	  	"20330202", "20340221", "20350918", "20360130" ];
+	  	
+	  	var setLunaToSolar = []; //당년도의 음력을 양력으로
+
+	  	var workDay = 0;
+	  	var cnt = nMonth.getDay();
+
+	  	//setLunaToSolar
+	  	///////////////////////////////////////////////////
+	  	if (!isSame) { //당년도의 음력휴일 양력으로 변환 
+	  		for (i = 0; i < lunaHolidays.length; i++) {
+	  			var solar = Resut(year + "" + lunaHolidays[i]);
+	  			if (i == 0) {
+	  				//var cDate = new Date();
+	  				var cMonth = solar.substring(0, 2);
+	  				var cDay = solar.substring(2, 4);
+	  				var cDate = new Date(parseInt(cMonth) + "/"
+	  				+ parseInt(cDay) + "/" + year);
+	  				cDate.setDate(cDate.getDate() - 1); // 하루전
+
+	  				/* cDate.setMonth(parseInt(cMonth-1)); // 월 설정
+	  				cDate.setDate(parseInt(cDay)); //일 설정
+	  				//cDate.setDate(-1); //하루전날 
+
+	  				//var sdate = cDate.setDate(cDate.getDate()-1); */
+	  				var sm = (cDate.getMonth() + 1);
+	  				if (sm < 10)
+	  					sm = "0" + sm;
+	  				var sd = (cDate.getDate());
+	  				if (sd < 10)
+	  					sd = "0" + sd;
+	  				sDate = sm + "" + sd;
+	  				setLunaToSolar.push(sDate);
+	  			}
+	  			setLunaToSolar.push(solar);
+	  		}
+	  		lastYear = today.getFullYear();
+	  	}
+
+	  	var year1 = today.getFullYear();
+	  	var month1 = (today.getMonth() + 1);
+	  	//console.log(dayWeek);
+	  	if ((today.getMonth() + 1) < 10) {
+	  		month1 = "0" + (today.getMonth() + 1);
+	  	}
+
+	  	var list = [];
+
+	  	for (i = 0; i < solarHolidays.length; i++) { // 양력휴일 넣음
+	  		if (solarHolidays[i].substring(0, 2) == month1) {
+	  			list.push(solarHolidays[i].substring(2, 4)); //휴일이 있을경우 list에 넣는다.
+	  		}
+	  	}
+
+	  	for (i = 0; i < setLunaToSolar.length; i++) { // 음력휴일 넣음
+	  		if (setLunaToSolar[i].substring(0, 2) == month1) {
+	  			list.push(setLunaToSolar[i].substring(2, 4)); //휴일이 있을경우 list에 넣는다.
+	  		}
+	  	}
+
+	  	for (i = 0; i < alternativeHolidays.length; i++) { //해당년도의 임시, 대체공휴일 추가
+	  		if (alternativeHolidays[i].substring(0, 4) == year) {//공휴년도가 해당년도와 일치할경우
+	  			if (alternativeHolidays[i].substring(4, 6) == month1) { //공휴년도가 해당월과 일치할경우
+	  				list.push(alternativeHolidays[i].substring(6, 8)); //일치하는 휴일이 있을경우 list에 넣는다.
+	  			}
+	  		}
+	  	}
+	  	
+		__gridView.target.addColumn({key: "tot", label: "합계", width: 80, align: "center", styleClass: function () {
+            return "grid-font-blue-bold";}}); 		  	
+
+	    var tempWeek = "";
+	  	for (i = 0; i < lastDate.getDate(); i++) {
+	  		var holiday = "";
+	  		var pass = false;
+	  		if (list.length > 0) { //휴일이 있을경우
+	  			for (j = 0; j < list.length; j++) {
+	  				if (list[j] == (i + 1)) {
+	  					holiday = "red"; //공휴일은 빨간날로
+	  					pass = true;
+	  					break; //공휴일을 그렸으면 토,일 검사를 하지 않음.
+	  				}
+	  			}
+	  		}
+	  		if (!pass) {
+	  			if (cnt % 7 == 6) {
+	  				holiday = "blue"; // 토요일은 파란색으로
+	  			}
+	  			if (cnt % 7 == 0) {
+	  				holiday = "red"; // 일요일은 빨간색으로
+	  			}
+	  		}
+	  		
+			tempWeek = week[(nMonth.getDay() + i) % 7];
+			
+			if (holiday=="red") {
+			__gridView.target.addColumn({label: tempWeek,  
+	  			columns:[{key: (i+1), label: i+1, width: 40, align: "center", styleClass: function () {
+	  	            return "grid-cell-red";
+	        	}}]});
+			} else if (holiday=="blue") {
+				__gridView.target.addColumn({label: tempWeek,  
+		  			columns:[{key: (i+1), label: i+1, width: 40, align: "center", styleClass: function () {
+		  	            return "grid-cell-blue";
+		        	}}]});				
+			} else {
+				__gridView.target.addColumn({label: tempWeek,  
+		  			columns:[{key: (i+1), label: i+1, width: 40, align: "center"}]});					
+			}
+	  		cnt++;
+	  	}
+
+		__gridView.target.addColumn({key: "rmk", label: "비고", width: 120, align: "center"}); 	
+	  }	
+	  
+</script>

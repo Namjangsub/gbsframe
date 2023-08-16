@@ -189,4 +189,9 @@ public class PM01SvcImpl implements PM01Svc {
 	    return result;
   }
 
+  @Override
+  public List<Map<String, String>> selectMonthlyWorkList(Map<String, String> paramMap) {
+    return pm01Mapper.selectMonthlyWorkList(paramMap);
+  }
+  
 }
