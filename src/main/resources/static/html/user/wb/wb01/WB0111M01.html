@@ -80,7 +80,7 @@
 						<td>
 	                         <div class="search_form">
                                 <input type="text" id="salesCd_S" name="salesCd_S" data-search="salesCd" onkeyup="event.keyCode == 13 ? salesGridView.setData(0) : ''">
-                                <a onclick="wbsSalesCodeSearch();"><i class="i_search_w"></i></a>
+                                <a onclick="wbsSalesCodeSearchM();"><i class="i_search_w"></i></a>
                             </div>
                             <input type="hidden" id="salesNm_S" name="salesNm_S" >
 						</td>
@@ -149,6 +149,7 @@
 
 <script type="text/javascript">
     var salesCd = null;
+    var ordrsNo = null;
 	var isFirst = true;
 	var beforeIndex ='';
 	ax5.ui.grid.formatter["chkYn"] = function () {
@@ -183,8 +184,8 @@
 		                    this.self.select(this.dindex);
 		                    if (this.item.dataGbn == 'D') {
 		                    	salesCd = this.item.salesCd;
-			                    gridView.setData(0, this.item.salesCd);
-			                    salesCd = this.item.salesCd;
+		                    	ordrsNo = this.item.ordrsNo;
+			                    gridView.setData(0, this.item.salesCd, this.item.ordrsNo);
 		                    }
 		                    
 		                },
@@ -197,7 +198,8 @@
 		                    //debugger;
 		                    if (this.item.dataGbn == 'D') {
 		                    	salesCd = this.item.salesCd;
-			                    gridView.setData(0, this.item.salesCd);
+		                    	ordrsNo = this.item.ordrsNo;
+			                    gridView.setData(0, this.item.salesCd, this.item.ordrsNo);
 		                    }
 		                    
 		                },
@@ -380,7 +382,7 @@
 		                    if (
 		                    	this.column.key=='wbsPlanChkYn' ||
 		                    	this.column.key=='wbsPlansDt' || 
-		                    	this.column.key=='wbsPlansDt' || 
+		                    	this.column.key=='wbsPlaneDt' || 
 		                    	this.column.key=='lockYn' || 
 		                    	this.column.key=='closeYn') {
 		                    	//계획 입력 또는 수정 작업
@@ -424,7 +426,7 @@
 	                    nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
 	                    lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
 	                    onChange : function() {
-	                        gridView.setData(this.page.selectPage);
+	                        gridView.setData(this.page.selectPage, salesCd, ordrsNo);
 	                    }
 	                },
 	                tree: {
@@ -447,11 +449,12 @@
 		        });
 		        return this;
 		    },
-		    setData : function(_pageNo, paramSalesCode) {
+		    setData : function(_pageNo, paramSalesCode, paramOrdrsNo) {
 		    	if (isFirst) return;
 	            var targetObj = this.target;
 	            var paramObj = {"coCd": $('#coCd_S').val(),
                       "salesCd" : paramSalesCode,
+                      "ordrsNo" : paramOrdrsNo,
                       "pageNo" : _pageNo + 1,
                       "recordCnt" : $('#recordCnt').val()};
 	           // debugger;
@@ -594,7 +597,7 @@
 	        excelView.initView();
 	          // 검색조건 이벤트 bind
 	        $('[data-search]').on("change", function(){
-	            gridView.setData(0);
+	            gridView.setData(0, salesCd, ordrsNo);
 	        });
 	        
 	        //권한체크
@@ -609,12 +612,8 @@
 	        $("#reqDtFrom_S").val(dateToStr(moment(new Date()).startOf("month").toDate()));
 	        $("#reqDtTo_S").val(dateToStr(moment(new Date()).endOf("month").toDate()));
 	        $("#coCd_S").val(jwt.coCd);
-	        // 검색조건 이벤트 bind
-	        $('[data-search]').on("change", function(){
-	            gridView.setData(0);
-	        });
+
 	        salesGridView.initView().setData(0);
-	        gridView.initView().setData(0);
 	    }
 	 
 	    // 고객사 검색
@@ -627,7 +626,7 @@
 	            if(openType == "P"){
 	                $('#clntCd_S').val(row.clntCd);
 	                $('#clntNm_S').val(row.clntNm);
-	                gridView.setData(0);
+	                gridView.setData(0, salesCd, ordrsNo);
 	            }else if(openType == "V"){
 	                $('#vendCd_S').val(row.clntCd);
 	                $('#vendNm_S').val(row.clntNm);
@@ -651,7 +650,7 @@
 	    }
 	    
 	    //Sales Code (수주마스터, 수주상세테이블 조인) 검색
-	    function wbsSalesCodeSearch() {
+	    function wbsSalesCodeSearchM() {
 	        var paramObj = {
 	           "coCd" : $('#coCd_S').val(),
 	           "salesCd": $('#salesCd_S').val()
@@ -729,59 +728,21 @@
               var fileTrgtKey = row.fileTrgtKey;
               var coCd = row.coCd;
               var lvl = lvl;
-              var idx1 = null;
-              var idx2 = null;
-              var idx3 = null;
+              var idx = idx;
               var salesCd = row.salesCd;
-              
-              if (lvl == 1) {
-                  idx1 = idx;
-              }
-              else if (lvl == 2) {
-                  idx2 = idx;
-                  
-                  //1레벨 조회
-                  var list1 = gridView.target.getList();
-                  $.each(list1, function(idx, obj){
-                      var row1 = gridView.target.getList()[obj.__index];
-                      if (row1.coCd == row.coCd && row1.salesCd == row.salesCd && row1.codeId == row.codeKind) {
-                          idx1 = obj.__index;                         
-                      }
-                  });
-              }
-              else if (lvl == 3) {
-                  idx3 = idx;
-                  //2레벨 조회
-                  var list1 = gridView.target.getList();
-                  $.each(list1, function(idx, obj){
-                      var row1 = gridView.target.getList()[obj.__index];
-                      if (row1.coCd == row.coCd && row1.salesCd == row.salesCd && row1.codeId == row.codeKind) {
-                          idx2 = obj.__index;                         
-                      }
-                  });
-
-                  //1레벨 조회
-                  var row2 = gridView.target.getList()[idx2];                    
-                  var list2 = gridView.target.getList();
-                  $.each(list2, function(idx, obj){
-                      var row3 = gridView.target.getList()[obj.__index];
-                      if (row3.coCd == row2.coCd && row3.salesCd == row2.salesCd && row3.codeId == row2.codeKind) {
-                          idx1 = obj.__index;                         
-                      }
-                  });
-              }
-
-              //alert("lvl:" + lvl + "idx1:" +  idx1 +  "idx2:" +  idx2  + "idx3:"  + idx3 + "  salesCd:"  + salesCd);
+              var codeKind = row.codeKind;
+              var codeId = row.codeId;  
               if (type == 'U') {
                   var paramObj = {
                       "actionType" : actionType,
                       "fileTrgtKey" : fileTrgtKey,
                       "coCd" : coCd,
                       "lvl"      : lvl,
-                      "idx1"      : idx1,
-                      "idx2"   : idx2,
-                      "idx3"  : idx3,
-                      "salesCd" : salesCd
+                      "idx"      : idx,
+                      "salesCd" : salesCd,
+                      "ordrsNo" : ordrsNo,
+                      "codeKind" : codeKind,
+                      "codeId" : codeId
                   };
               } else {
                   var paramObj = {
@@ -789,14 +750,15 @@
                           "fileTrgtKey" : 0,
                           "coCd" : coCd,
                           "lvl"      : lvl,
-                          "idx1"      : idx1,
-                          "idx2"   : idx2,
-                          "idx3"  : idx3,
-                          "salesCd" : salesCd
+                          "idx"      : idx,
+                          "salesCd" : salesCd,
+                          "ordrsNo" : ordrsNo,
+                          "codeKind" : codeKind,
+                          "codeId" : codeId
                   }
-              }
+              }              
               openModal("/static/html/user/wb/wb01/WB0111P01.html", 1600, 850, "", paramObj, function(data) {
-                  gridView.setData(0);
+            	  gridView.setData(0, salesCd, ordrsNo);
               }); 
           }
 	 }
@@ -805,16 +767,16 @@
 	  function insertWbsRsltsModal(type, lvl, idx) {
 		    var row = gridView.target.getList()[idx]; 
 		    if (row != undefined) {
-			    var actionType = type;
-			    var fileTrgtKey = row.rsltsFileTrgtKey;
-			    var coCd = row.coCd;
-			    var lvl = lvl;
-			    var idx1 = null;
-			    var idx2 = null;
-	            var idx3 = null;
-	            var salesCd = row.salesCd;
-	            
-	              if (lvl == 1) {
+		    	  var actionType = type;
+	              var fileTrgtKey = row.rsltsFileTrgtKey;
+	              var coCd = row.coCd;
+	              var lvl = lvl;
+	              var idx = idx;
+	              var salesCd = row.salesCd;
+	              var codeKind = row.codeKind;
+	              var codeId = row.codeId;  
+
+	              /* if (lvl == 1) {
 	                  idx1 = idx;
 	              }
 	              else if (lvl == 2) {
@@ -850,33 +812,34 @@
 	                      }
 	                  });
 	              }
-
-	           // alert("lvl:" + lvl + "idx1:" +  idx1 +  "idx2:" +  idx2  + "idx3:"  + idx3 + "  salesCd:"  + salesCd);
+ */
 	            if (type == 'U') {
 	                var paramObj = {
 	                		"actionType" : actionType,
 	                        "fileTrgtKey" : fileTrgtKey,
 	                        "coCd" : coCd,
 	                        "lvl"      : lvl,
-	                        "idx1"      : idx1,
-	                        "idx2"   : idx2,
-	                        "idx3"  : idx3,
-	                        "salesCd" : salesCd
+	                        "idx"      : idx,
+	                        "salesCd" : salesCd,
+	                        "ordrsNo" : ordrsNo,
+	                        "codeKind" : codeKind,
+	                        "codeId" : codeId
 	                };
 	            } else {
 	                var paramObj = {
 	                		"actionType" : actionType,
-	                        "fileTrgtKey" : 0,
-	                        "coCd" : coCd,
-	                        "lvl"      : lvl,
-	                        "idx1"      : idx1,
-	                        "idx2"   : idx2,
-	                        "idx3"  : idx3,
-	                        "salesCd" : salesCd
+	                          "fileTrgtKey" : 0,
+	                          "coCd" : coCd,
+	                          "lvl"      : lvl,
+	                          "idx"      : idx,
+	                          "salesCd" : salesCd,
+	                          "ordrsNo" : ordrsNo,
+	                          "codeKind" : codeKind,
+	                          "codeId" : codeId
 	                }
 	            }
 	            openModal("/static/html/user/wb/wb01/WB0111P02.html", 1600, 850, "", paramObj, function(data) {
-	                gridView.setData(0);
+	            	gridView.setData(0, salesCd, ordrsNo);
 	            });
 		    }
 	 }
@@ -900,7 +863,7 @@
                  filePutAjax("/user/wb/wb01/deleteWbsPlanlist", formData, function(data){
                      if(data.resultCode == 200){
                          alert("계획 삭제 완료되었습니다.");       
-                         gridView.setData(0, salesCd);
+                         gridView.setData(0, salesCd, ordrsNo);
                      }
                   }); 
              } 
@@ -925,7 +888,7 @@
                filePutAjax("/user/wb/wb01/deleteWbsRsltslist", formData, function(data){
                    if(data.resultCode == 200){
                        alert("실적 삭제 완료되었습니다.");       
-                       gridView.setData(0, salesCd);
+                       gridView.setData(0, salesCd, ordrsNo);
                    }
                 }); 
            } 
@@ -950,7 +913,7 @@
                filePutAjax("/user/wb/wb01/updateWbsPlanLockYn", formData, function(data){
                    if(data.resultCode == 200){
                        alert("잠금처리 완료되었습니다.");       
-                       gridView.setData(0, salesCd);
+                       gridView.setData(0, salesCd, ordrsNo);
                    }
                 }); 
            } 
@@ -974,7 +937,7 @@
 	           filePutAjax("/user/wb/wb01/updateWbsPlanLockYn", formData, function(data){
 	               if(data.resultCode == 200){
 	            	   alert("잠금해제 완료되었습니다.");       
-	                   gridView.setData(0, salesCd);
+	                   gridView.setData(0, salesCd, ordrsNo);
 	               }
 	            }); 
 	       } 
@@ -998,7 +961,7 @@
                filePutAjax("/user/wb/wb02/updateWbsRsltsCloseYn", formData, function(data){
                    if(data.resultCode == 200){
                        alert("마감처리 완료되었습니다.");       
-                       gridView.setData(0, salesCd);
+                       gridView.setData(0, salesCd, ordrsNo);
                    }
                 }); 
            } 
@@ -1022,7 +985,7 @@
                filePutAjax("/user/wb/wb02/updateWbsRsltsCloseYn", formData, function(data){
                    if(data.resultCode == 200){
                        alert("마감해제 완료되었습니다.");       
-                       gridView.setData(0, salesCd);
+                       gridView.setData(0, salesCd, ordrsNo);
                    }
                 }); 
            } 

@@ -274,15 +274,21 @@
     </div>
     
 <script type="text/javascript">
-	var actionType = null;
-	var fileTrgtKey = null;
-	var coCd = null;
-	var lvl = null;
-	var idx1 = null;
-	var idx2 = null;
-	var idx3 = null;
-	var salesCd = null;
-	
+    var actionType = null;
+    var fileTrgtKey = null;
+    var coCd = null;
+    var lvl = null;
+    var idx = null;
+    var salesCd = null;
+    var ordrsNo = null;
+    var codeKind = null;
+    var codeId = null;
+    
+    var idx1 = null;
+    var idx2 = null;
+    var idx3 = null;
+    
+    
     var sGridView = {
             initView: function(){
                 this.target = new ax5.ui.grid();
@@ -325,24 +331,11 @@
               },
               setData: function() {
                   var targetObj = this.target;
-                  var idx = null;
-                  if (lvl == 1) { 
-                	  idx = idx1;
-                  }
-                  else if (lvl == 2) { 
-                      idx = idx2;
-                  }
-                  else if (lvl == 3) { 
-                      idx = idx3;
-                  }
-                  var row = gridView.target.getList()[idx];
                   var paramObj = {};
-                  if (row != undefined) {
-                	  paramObj["coCd"] = row.coCd;
-                      paramObj["salesCd"] = row.salesCd;
-                      paramObj["codeKind"] = row.codeKind;
-                      paramObj["codeId"] = row.codeId;
-                  }
+                  paramObj["coCd"] = coCd;
+                  paramObj["salesCd"] = salesCd;
+                  paramObj["codeKind"] = codeKind;
+                  paramObj["codeId"] = codeId;
                   postAjax("/user/wb/wb01/selectPlanSharngList", paramObj, null, function(data){
                      var list = data.resultList;
                       targetObj.setData({
@@ -357,16 +350,19 @@
          }
     
     $(document).ready(function() {
-    	actionType = modalStack.last().paramObj.actionType;
+    	
+        actionType = modalStack.last().paramObj.actionType;
         fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
         coCd = modalStack.last().paramObj.coCd;
         lvl = modalStack.last().paramObj.lvl;
-        idx1 = modalStack.last().paramObj.idx1;
-        idx2 = modalStack.last().paramObj.idx2;
-        idx3 = modalStack.last().paramObj.idx3;
+        idx = modalStack.last().paramObj.idx;
         salesCd = modalStack.last().paramObj.salesCd;
+        ordrsNo = modalStack.last().paramObj.ordrsNo;
+        codeKind = modalStack.last().paramObj.codeKind;
+        codeId = modalStack.last().paramObj.codeId;
+        
         if (lvl == 1) {
-        	$("#popForm #level1Area").show();
+            $("#popForm #level1Area").show();
             $("#popForm #level2Area").hide();
             $("#popForm #level3Area").hide();
         }
@@ -384,9 +380,63 @@
         setCommonSelect($(".popup_area select[data-kind]"));
         setByCoCd(coCd);
         $("#popForm #userId").val(jwt.userId);
-        authChk();
+        
+        
+        //////////////////////////////////////////////////////////////////////////////
+        if (actionType == "C" || actionType == "U") {        	       
+	        if (lvl == 1) {
+	            idx1 = idx;
+	        }
+	        else if (lvl == 2) {
+	            idx2 = idx;
+	            
+	            //1레벨 조회
+	            var list1 = gridView.target.getList();
+	            $.each(list1, function(idx, obj){
+	                var row1 = gridView.target.getList()[obj.__index];
+	                if (row1.coCd == coCd && row1.salesCd == salesCd && row1.codeId == codeKind) {
+	                    idx1 = obj.__index;                         
+	                }
+	            });
+	        }
+	        else if (lvl == 3) {
+	            idx3 = idx;
+	            //2레벨 조회
+	            var list1 = gridView.target.getList();
+	            $.each(list1, function(idx, obj){
+	                var row1 = gridView.target.getList()[obj.__index];
+	                if (row1.coCd == coCd && row1.salesCd == salesCd && row1.codeId == codeKind) {
+	                    idx2 = obj.__index;                         
+	                }
+	            });
+	
+	            //1레벨 조회
+	            var row2 = gridView.target.getList()[idx2];                    
+	            var list2 = gridView.target.getList();
+	            $.each(list2, function(idx, obj){
+	                var row3 = gridView.target.getList()[obj.__index];
+	                if (row3.coCd == row2.coCd && row3.salesCd == row2.salesCd && row3.codeId == row2.codeKind) {
+	                    idx1 = obj.__index;                         
+	                }
+	            });
+	        }   
+        }
+        else if (actionType == "T") {
+        	var list1 = gridView.target.getList();
+            $.each(list1, function(idx, obj){
+            	var row1 = gridView.target.getList()[obj.__index];
+                if (row1.coCd == coCd && row1.salesCd == salesCd && row1.todoFileTrgtKey == fileTrgtKey) {
+                    idx1 = obj.__index;    
+                    idx2 = obj.__index;
+                    idx3 = obj.__index;
+                }
+            });
+        }
+        //////////////////////////////////////////////////////////////////////////////
+        
+        
         if (actionType == "C") {
-        	$('#actionBtn').text("등록");
+            $('#actionBtn').text("등록");
             $('#actionBtn').on("click", function() {
                 insertWbsPlan();
             });
@@ -410,7 +460,7 @@
              $("#popForm #wbsPlanNm").val(jwt.userNm);
              
              if (lvl == 1) {
-            	 $("#popForm #wbsPlansDt1").datepicker({
+                 $("#popForm #wbsPlansDt1").datepicker({
                      format : "yyyy-mm-dd",
                      language : "ko",
                      autoclose : true
@@ -425,7 +475,7 @@
                  $("#popForm #wbsPlanMngId1").val(jwt.userId);
                  $("#popForm #wbsPlanMngNm1").val(jwt.userNm);
                  
-            	 var row = gridView.target.getList()[idx1];
+                 var row = gridView.target.getList()[idx1];
                  if (row != undefined) {
                      $("#popForm #salesCd").val(row.salesCd);
                      $("#popForm #clntCd").val(row.ordrsClntCd);
@@ -439,7 +489,7 @@
                  }
              }
              else if (lvl == 2) {
-            	 $("#popForm #wbsPlansDt2").datepicker({
+                 $("#popForm #wbsPlansDt2").datepicker({
                      format : "yyyy-mm-dd",
                      language : "ko",
                      autoclose : true
@@ -453,11 +503,11 @@
                  
                  $("#popForm #wbsPlanMngId2").val(jwt.userId);
                  $("#popForm #wbsPlanMngNm2").val(jwt.userNm);
-            	 
+                 
                  
                  /////////////////////////////////////////////////////////////////////
-            	 var row1 = gridView.target.getList()[idx1];
-            	 $("#popForm #wbsLevel1").val(row1.codeId);
+                 var row1 = gridView.target.getList()[idx1];
+                 $("#popForm #wbsLevel1").val(row1.codeId);
                  $('#popForm #wbsLevel1 option[value!="' + row1.codeId + '"]').remove();
                  
                  $("#popForm #wbsPlanMngId1").val(row1.wbsPlanMngId);
@@ -465,9 +515,9 @@
                  $("#popForm #wbsPlansDt1").val(row1.wbsPlansDt);
                  $("#popForm #wbsPlaneDt1").val(row1.wbsPlaneDt);        
                  /////////////////////////////////////////////////////////////////////
-            	 var row2 = gridView.target.getList()[idx2];
+                 var row2 = gridView.target.getList()[idx2];
                  if (row2 != undefined) {
-                	 selectCodeList("#wbsLevel1",0);
+                     selectCodeList("#wbsLevel1",0);
                      $("#popForm #wbsLevel2").val(row2.codeId);  
                      $('#popForm #wbsLevel2 option[value!="' + row2.codeId + '"]').remove();
                      $("#popForm #salesCd").val(row2.salesCd);
@@ -521,7 +571,7 @@
                  
                  var row3 = gridView.target.getList()[idx3];
                  if (row3 != undefined) {
-                	 selectCodeList("#wbsLevel2",1);
+                     selectCodeList("#wbsLevel2",1);
                      $("#popForm #wbsLevel3").val(row3.codeId);  
                      $('#popForm #wbsLevel3 option[value!="' + row3.codeId + '"]').remove();
                      
@@ -535,9 +585,9 @@
              }
 
         }
-        else {
-        	$('.tit').text('WBS 일정계획 수정')
-        	$('#actionBtn').text("수정");
+        else if (actionType == "U"){
+            $('.tit').text('WBS 일정계획 수정')
+            $('#actionBtn').text("수정");
             $('#actionBtn').on("click", function() {
                 updateWbsPlan();
             });
@@ -557,7 +607,7 @@
                 
                 var row = gridView.target.getList()[idx1];
                 if (row != undefined) {
-                	$("#popForm #wbsLevel1").val(row.codeId);
+                    $("#popForm #wbsLevel1").val(row.codeId);
                     $('#popForm #wbsLevel1 option[value!="' + row.codeId + '"]').remove();                                            
                     rowFill(row);
                 }
@@ -649,10 +699,65 @@
                 }
             }
             
+        }        
+        // TODO 리스트에서 호출 시 공유 : actionType:T  결재: actionType:S 처리 부분 
+        else if (actionType == "T"){
+        	$('.tit').text('WBS 일정계획 공유')
+        	actionBtn.style.display = "none";
+        	var row = gridView.target.getList()[idx1];
+        	if (lvl == 1) {
+        		$("#popForm #wbsLevel1").val(row.todoCodeId01);
+                $('#popForm #wbsLevel1 option[value!="' + row.todoCodeId01 + '"]').remove();
+                $("#popForm #wbsPlanMngId1").val(row.wbsPlanMngId01);
+                $("#popForm #wbsPlanMngNm1").val(row.wbsPlanMngNm01);
+                $("#popForm #wbsPlansDt1").val(row.wbsPlansDt01);
+                $("#popForm #wbsPlaneDt1").val(row.wbsPlaneDt01);
+                rowFillT(row);
+        	}
+        	else if (lvl == 2) {
+        		$("#popForm #wbsLevel1").val(row.todoCodeId01);
+                $('#popForm #wbsLevel1 option[value!="' + row.todoCodeId01 + '"]').remove();
+                selectCodeList("#wbsLevel1",0);
+                $("#popForm #wbsLevel2").val(row.row.todoCodeId01);  
+                $('#popForm #wbsLevel2 option[value!="' + row.todoCodeId02 + '"]').remove();
+                $("#popForm #wbsPlanMngId1").val(row.wbsPlanMngId01);
+                $("#popForm #wbsPlanMngNm1").val(row.wbsPlanMngNm01);
+                $("#popForm #wbsPlansDt1").val(row.wbsPlansDt01);
+                $("#popForm #wbsPlaneDt1").val(row.wbsPlaneDt01);
+                $("#popForm #wbsPlanMngId2").val(row.wbsPlanMngId02);
+                $("#popForm #wbsPlanMngNm2").val(row.wbsPlanMngNm02);
+                $("#popForm #wbsPlansDt2").val(row.wbsPlansDt02);
+                $("#popForm #wbsPlaneDt2").val(row.wbsPlaneDt02);
+                rowFillT(row);
+        	}
+        	else if (lvl == 3) {
+                $("#popForm #wbsLevel1").val(row.todoCodeId01);
+                $('#popForm #wbsLevel1 option[value!="' + row.todoCodeId01 + '"]').remove();
+                selectCodeList("#wbsLevel1",0);
+                $("#popForm #wbsLevel2").val(row.todoCodeId01);  
+                $('#popForm #wbsLevel2 option[value!="' + row.todoCodeId02 + '"]').remove();
+                selectCodeList("#wbsLevel2",1);                
+                $("#popForm #wbsLevel3").val(row.todoCodeId03);  
+                $('#popForm #wbsLevel3 option[value!="' + row.todoCodeId03 + '"]').remove();
+                
+                $("#popForm #wbsPlanMngId1").val(row.wbsPlanMngId01);
+                $("#popForm #wbsPlanMngNm1").val(row.wbsPlanMngNm01);
+                $("#popForm #wbsPlansDt1").val(row.wbsPlansDt01);
+                $("#popForm #wbsPlaneDt1").val(row.wbsPlaneDt01);
+                $("#popForm #wbsPlanMngId2").val(row.wbsPlanMngId02);
+                $("#popForm #wbsPlanMngNm2").val(row.wbsPlanMngNm02);
+                $("#popForm #wbsPlansDt2").val(row.wbsPlansDt02);
+                $("#popForm #wbsPlaneDt2").val(row.wbsPlaneDt02);
+                $("#popForm #wbsPlanMngId3").val(row.wbsPlanMngId03);
+                $("#popForm #wbsPlanMngNm3").val(row.wbsPlanMngNm03);
+                $("#popForm #wbsPlansDt3").val(row.wbsPlansDt03);
+                $("#popForm #wbsPlaneDt3").val(row.wbsPlaneDt03);
+                rowFillT(row);
+            }            
         }
+        
         sGridView.initView().setData();
-        
-        
+                
         //---------------------------------------------------------------  
         //첨부 화일 처리 시작 
         //---------------------------------------------------------------
@@ -665,6 +770,9 @@
         //---------------------------------------------------------------  
         //첨부 화일 처리 끝
         //---------------------------------------------------------------   
+        
+        authChk();
+        
     });
     
     
@@ -673,14 +781,14 @@
     }
     
     function rowFill(row) {
-    	if (row.closeYn == "Y" || row.lockYn == "Y") {
+        /* if (row.closeYn == "Y" || row.lockYn == "Y") {
             actionBtn.style.display = "none";
-    	}
-    	//else if (row.closeYn == "N" && row.lockYn == "N") {
-    	//	actionBtn.style.display = "inline-block";
-    	//}
-    	
-    	$.each(row, function (key, val) {
+        } */
+        //else if (row.closeYn == "N" && row.lockYn == "N") {
+        //  actionBtn.style.display = "inline-block";
+        //}
+        
+        $.each(row, function (key, val) {
             if (lvl == 1 && key == "wbsPlanMngId") {
                 $("#popForm #wbsPlanMngId1").val(val);
             }
@@ -729,7 +837,33 @@
                  $('#wbsPlanStsCodeId option[value!="' + val + '"]').remove();
             }
             else if (key == "ordrsClntCd") {
-            	$("#popForm #clntCd").val(val);
+                $("#popForm #clntCd").val(val);
+            }
+            else if (key == "ordrsClntNm") {
+                $("#popForm #clntNm").val(val);
+            }
+            else {
+                $("#popForm #" + key).val(val);
+            }
+        }); 
+    }
+    
+    
+    function rowFillT(row) {
+        $.each(row, function (key, val) {
+            if (key == "wbsPlanOsYn" && val == "Y"){ 
+                $("#wbsPlanOsYn_Y").prop('checked',true);
+                $("#wbsPlanOsYn_N").prop('checked',false);
+            }
+            else if (key == "wbsPlanOsYn" && val == "N"){  
+                $("#wbsPlanOsYn_Y").prop('checked',false);
+                $("#wbsPlanOsYn_N").prop('checked',true);
+            }
+            else if (key == "wbsPlanStsCodeId") {
+                 $('#wbsPlanStsCodeId option[value!="' + val + '"]').remove();
+            }
+            else if (key == "ordrsClntCd") {
+                $("#popForm #clntCd").val(val);
             }
             else if (key == "ordrsClntNm") {
                 $("#popForm #clntNm").val(val);
@@ -835,7 +969,7 @@
             $('#wbsLevel2 option[value!=""]').remove();
             $('#wbsLevel3 option[value!=""]').remove();
         }else{
-        	target = $("#wbsLevel3");
+            target = $("#wbsLevel3");
             $('#wbsLevel3 option[value!=""]').remove();
         }
         var paramObj = {"codeKind": codeKind};
@@ -844,7 +978,7 @@
                 var optionHtml = '';
                 var childCodeList = data.childCodeList;
                 $.each(childCodeList, function(index, item){
-                	//debugger;
+                    //debugger;
                     optionHtml += '<option value='+item.codeId+'>';
                     optionHtml += item.codeNm;
                     optionHtml += '</option>';
@@ -858,7 +992,7 @@
    
    //공유대상자 팝업
    function opendModalSharngListList() { 
-	   //debugger;
+       //debugger;
        var formData = {};
        openSecondModal("/static/html/user/wb/wb02/WB0202P01.html", 1300, 780, "결재선 지정", formData, function (grid){
                var rowList = grid.target.getList("selected");
@@ -1030,7 +1164,7 @@
                         function(data) {
                             alert(data.resultMessage);                              
                             if (data.resultCode == 200) { 
-                            	gridView.setData(0, salesCd);
+                                gridView.setData(0, salesCd, ordrsNo);
                                 modalStack.close();                                 
                             }
                         });
@@ -1050,7 +1184,7 @@
                     function(data) {
                         alert(data.resultMessage);                              
                         if (data.resultCode == 200) {                          
-                            gridView.setData(0, salesCd);
+                            gridView.setData(0, salesCd, ordrsNo);
                             //gridView.target.select(idx);
                             modalStack.close();                                 
                         }
@@ -1059,7 +1193,7 @@
     }
     
     function makeFormData() {
-    	var wbsPlanCodeKind = null;
+        var wbsPlanCodeKind = null;
         var wbsPlanCodeId = null;
         var wbsPlanMngId = null;
         var wbsPlansDt = null;
@@ -1128,6 +1262,12 @@
        formData.append("creatId", jwt.userId);
        formData.append("creatPgm", $("#popForm #pgmId").val());
          
+       formData.append("actionType", actionType);
+       formData.append("lvl", lvl);
+       formData.append("idx", idx);
+       formData.append("ordrsNo", ordrsNo);
+       formData.append("codeKind", codeKind);
+       formData.append("codeId", codeId);
        
        var rowSharngList = sGridView.target.list;
        if(rowSharngList.length > 0) {
@@ -1148,7 +1288,7 @@
                rowSharngListObj["name"] = elem.name;
                rowSharngListObj["telNo"] = elem.telNo;
                rowSharngListObj["email"] = elem.email;   
-               rowSharngListObj["pgPath"] = "/user/wb/wb20/WB2001P11.html";
+               rowSharngListObj["pgPath"] = "/user/wb/wb01/WB0111P01.html";
                rowSharngListArr.push(rowSharngListObj);
            });
            formData.append("rowSharngListArr", JSON.stringify(rowSharngListArr));
@@ -1195,7 +1335,7 @@
     }
    
 /*     function insertWbsIssueModal() {
-    	var paramObj = {
+        var paramObj = {
                 "actionType" : "U",
                 "fileTrgtKey" : fileTrgtKey,
                 "coCd" : coCd,
@@ -1205,8 +1345,8 @@
                 "idx3"  : idx3,
                 "salesCd" : salesCd
         };
-    	modal.close();
-    	openModal("/static/html/user/wb/wb01/WB0111P03.html", 1600, 850, "", paramObj, function(data) {
+        modal.close();
+        openModal("/static/html/user/wb/wb01/WB0111P03.html", 1600, 850, "", paramObj, function(data) {
         });
     } */
 </script>

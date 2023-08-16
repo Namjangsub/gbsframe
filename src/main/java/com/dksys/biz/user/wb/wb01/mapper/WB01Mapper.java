@@ -56,6 +56,9 @@ public interface WB01Mapper {
     int deleteWbsRsltsDetailSub(Map<String, String> paramMap);
 
     int deleteWbsApprovalListSub(Map<String, String> paramMap);
+    
+    List<Map<String, String>> selectWbsInfo(Map<String, String> paramMap);
+    
 }
 
 

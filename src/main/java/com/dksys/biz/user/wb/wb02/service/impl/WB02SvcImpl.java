@@ -81,7 +81,7 @@ public class WB02SvcImpl implements WB02Svc {
 		return result;
     }
 
- @Override
+    @Override
      public int updateWbsRsltsCloseYn(Map<String, String> paramMap) {
 		int result = 0;
 		Gson gson = new Gson();
@@ -102,36 +102,38 @@ public class WB02SvcImpl implements WB02Svc {
 	}
 
 
-       @Override
+    @Override
 	public List<Map<String, String>> selectRsltsMemberList(Map<String, String> paramMap) {
 		return wb02Mapper.selectRsltsMemberList(paramMap);
 	}
 
 
-@Override
+    @Override
 	public List<Map<String, String>> selectWbsRsltsDetailList(Map<String, String> paramMap) {
 		return wb02Mapper.selectWbsRsltsDetailList(paramMap);
 	}
 
-@Override
+    @Override
 	public List<Map<String, String>> selectRsltsSharngList(Map<String, String> paramMap) {
 		return wb02Mapper.selectRsltsSharngList(paramMap);
 	}
 
 
-@Override
+    @Override
 	public List<Map<String, String>> selectRsltsApprovalList(Map<String, String> paramMap) {
 		return wb02Mapper.selectRsltsApprovalList(paramMap);
 	}
 
-@Override
+    @Override
    	public Map<String, String> selectWbsRsltsInfo(Map<String, String> paramMap) {
    		return wb02Mapper.selectWbsRsltsInfo(paramMap);
    	}
 
+    @Override
 	public int wbsLevel1RsltsInsert(Map<String, String> paramMap , MultipartHttpServletRequest mRequest) throws Exception {
 		int fileTrgtKey = wb02Mapper.selectWbsRstlsSeqNext(paramMap);
 		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+		
 		
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -152,7 +154,7 @@ public class WB02SvcImpl implements WB02Svc {
 	            	rsltsMap.put("wbsRsltsSeq", Integer.toString(i));
 	            	//rsltsMap.put("wbsRsltsRmk", paramMap.get("wbsRsltsRmk"));
 	            	rsltsMap.put("creatId", paramMap.get("creatId"));
-	            	rsltsMap.put("creatPgm", paramMap.get("creatPgm"));
+	            	rsltsMap.put("creatPgm", paramMap.get("creatPgm"));	            	
 	            	wb02Mapper.wbsRsltsDetailInsert(rsltsMap);          		
 	            	i++;
 	            } catch (Exception e) {
@@ -161,14 +163,23 @@ public class WB02SvcImpl implements WB02Svc {
 	        }
 		}
 		
-         
+		String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
+		pgParam1 += "\"fileTrgtKey\":\""+ fileTrgtKey +"\","; 
+		pgParam1 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
+		pgParam1 += "\"lvl\":\""+ paramMap.get("lvl") +"\",";
+		pgParam1 += "\"idx\":\""+ paramMap.get("idx") +"\",";
+		pgParam1 += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+		pgParam1 += "\"ordrsNo\":\""+ paramMap.get("ordrsNo") +"\",";
+		pgParam1 += "\"codeKind\":\""+ paramMap.get("codeKind") +"\",";
+		pgParam1 += "\"codeId\":\""+ paramMap.get("codeId") +"\"}";
+	    
+	    
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
 		if (sharngArr != null && sharngArr.size() > 0 ) {
 			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
 	            try {
-	            	
 	            	sharngMap.put("coCd", paramMap.get("coCd"));
 	            	sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 	            	sharngMap.put("todoDiv1CodeId", paramMap.get("S_todoDiv1CodeId"));
@@ -176,6 +187,8 @@ public class WB02SvcImpl implements WB02Svc {
 	            	sharngMap.put("wbsRsltsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
 	            	sharngMap.put("creatId", paramMap.get("creatId"));
 	            	sharngMap.put("creatPgm", paramMap.get("creatPgm"));
+	            	sharngMap.put("sanctnSn", Integer.toString(i+1));
+	            	sharngMap.put("pgParam", pgParam1);
 	            	wb02Mapper.insertWbsSharngList(sharngMap);
        		
 	            	i++;
@@ -185,6 +198,16 @@ public class WB02SvcImpl implements WB02Svc {
 	        }
 		}
 		
+		String pgParam2 = "{\"actionType\":\""+ "S" +"\",";
+		pgParam2 += "\"fileTrgtKey\":\""+ fileTrgtKey +"\","; 
+		pgParam2 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
+		pgParam2 += "\"lvl\":\""+ paramMap.get("lvl") +"\",";
+		pgParam2 += "\"idx\":\""+ paramMap.get("idx") +"\",";
+		pgParam2 += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+		pgParam2 += "\"ordrsNo\":\""+ paramMap.get("ordrsNo") +"\",";
+	    pgParam2 += "\"codeKind\":\""+ paramMap.get("codeKind") +"\",";
+	    pgParam2 += "\"codeId\":\""+ paramMap.get("codeId") +"\"}";
+	    
 		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
 		if (approvalArr != null && approvalArr.size() > 0 ) {
@@ -198,6 +221,8 @@ public class WB02SvcImpl implements WB02Svc {
 	            	approvalMap.put("wbsRsltsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
 	            	approvalMap.put("creatId", paramMap.get("creatId"));
 	            	approvalMap.put("creatPgm", paramMap.get("creatPgm"));
+	            	approvalMap.put("sanctnSn", Integer.toString(i+1));
+	            	approvalMap.put("pgParam", pgParam2);
 	            	wb02Mapper.insertWbsApprovalList(approvalMap);
        		
 	            	i++;
@@ -303,7 +328,19 @@ public class WB02SvcImpl implements WB02Svc {
 	        }
 		}
 		
-         
+		
+		String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
+		pgParam1 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
+		pgParam1 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
+		pgParam1 += "\"lvl\":\""+ paramMap.get("lvl") +"\",";
+		pgParam1 += "\"idx\":\""+ paramMap.get("idx") +"\",";
+		pgParam1 += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+		pgParam1 += "\"ordrsNo\":\""+ paramMap.get("ordrsNo") +"\",";
+		pgParam1 += "\"codeKind\":\""+ paramMap.get("codeKind") +"\",";
+		pgParam1 += "\"codeId\":\""+ paramMap.get("codeId") +"\"}";
+	    
+		
+		
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
 		if (sharngArr != null && sharngArr.size() > 0 ) {
@@ -318,6 +355,8 @@ public class WB02SvcImpl implements WB02Svc {
 	            	sharngMap.put("wbsRsltsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
 	            	sharngMap.put("creatId", paramMap.get("creatId"));
 	            	sharngMap.put("creatPgm", paramMap.get("creatPgm"));
+	            	sharngMap.put("sanctnSn", Integer.toString(i+1));
+	            	sharngMap.put("pgParam", pgParam1);
 	            	wb02Mapper.insertWbsSharngList(sharngMap);
        		
 	            	i++;
@@ -326,6 +365,18 @@ public class WB02SvcImpl implements WB02Svc {
 	            }
 	        }
 		}
+		
+		
+		String pgParam2 = "{\"actionType\":\""+ "S" +"\",";
+		pgParam2 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
+		pgParam2 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
+		pgParam2 += "\"lvl\":\""+ paramMap.get("lvl") +"\",";
+		pgParam2 += "\"idx\":\""+ paramMap.get("idx") +"\",";
+		pgParam2 += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+		pgParam2 += "\"ordrsNo\":\""+ paramMap.get("ordrsNo") +"\",";
+		pgParam2 += "\"codeKind\":\""+ paramMap.get("codeKind") +"\",";
+		pgParam2 += "\"codeId\":\""+ paramMap.get("codeId") +"\"}";
+		
 		
 		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
@@ -340,6 +391,8 @@ public class WB02SvcImpl implements WB02Svc {
 	            	approvalMap.put("wbsRsltsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
 	            	approvalMap.put("creatId", paramMap.get("creatId"));
 	            	approvalMap.put("creatPgm", paramMap.get("creatPgm"));
+	            	approvalMap.put("sanctnSn", Integer.toString(i+1));
+	            	approvalMap.put("pgParam", pgParam2);
 	            	wb02Mapper.insertWbsApprovalList(approvalMap);
        		
 	            	i++;

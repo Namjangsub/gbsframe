@@ -526,7 +526,7 @@
                       Y.NAME,
                       Y.TEL_NO,
                       Y.EMAIL
-                      FROM TB_WB20M02 X
+                      FROM TB_WB20M03 X
                       INNER JOIN TB_CM06M01 Y
                       ON X.TODO_CO_CD = Y.CO_CD
                       AND X.TODO_ID = Y.ID
@@ -553,7 +553,7 @@
 
 
          <select id="deleteWbsSharngListChk" parameterType="Map" resultType="camelMap">
-               SELECT *  FROM TB_WB20M02
+               SELECT *  FROM TB_WB20M03
                    WHERE TODO_CO_CD  = #{coCd}
                          AND SALES_CD  = #{salesCd}
                          AND TODO_NO  = #{wbsPlanNo}
@@ -564,7 +564,7 @@
         </select>    
 
          <delete id="deleteWbsSharngListSub" parameterType="Map">
-               DELETE FROM TB_WB20M02
+               DELETE FROM TB_WB20M03
                    WHERE TODO_CO_CD  = #{coCd}
                          AND SALES_CD  = #{salesCd}
                          AND TODO_NO  = #{wbsPlanNo}
@@ -577,12 +577,13 @@
 
          <insert id="insertWbsSharngList" parameterType="Map">
                 <selectKey keyProperty="toDoKey" resultType="Int" order="BEFORE">
-                    SELECT NVL(MAX(TODO_KEY), 0) + 1 FROM TB_WB20M02
+                    SELECT NVL(MAX(TODO_KEY), 0) + 1 FROM TB_WB20M03
                 </selectKey>
-                INSERT INTO TB_WB20M02
+                INSERT INTO TB_WB20M03
                 (
                     TODO_KEY,
-                    CO_CD,
+                    SANCTN_SN,
+                    CO_CD,                    
                     TODO_DIV1_CODE_ID,
                     TODO_DIV2_CODE_ID,
                     TODO_ID,
@@ -595,11 +596,13 @@
                     TODO_CODE_ID,
                     CREAT_ID,
                     CREAT_PGM,
-                    CREAT_DTTM
+                    CREAT_DTTM,
+                    PG_PARAM
                 ) 
                 VALUES
                 (
                     #{toDoKey},
+                    #{sanctnSn},
                     #{coCd},
                     #{todoDiv1CodeId},
                     #{todoDiv2CodeId},
@@ -613,7 +616,8 @@
                     #{wbsPlanCodeId},
                     #{creatId},
                     #{creatPgm},
-                    SYSDATE
+                    SYSDATE,
+                    #{pgParam}
                 )
          </insert>
          <insert id="insertWbsPlan" parameterType="Map">
@@ -710,7 +714,7 @@
           </update> 
 
        <delete id="deleteWbsSharngList" parameterType="Map">
-               DELETE FROM TB_WB20M02
+               DELETE FROM TB_WB20M03
                    WHERE TODO_CO_CD  = #{coCd}
                          AND SALES_CD  = #{salesCd}
                          AND TODO_NO  = #{wbsPlanNo}
@@ -775,7 +779,7 @@
          
          <!-- 실적 메인화면에서 실적 데이터 삭제 시 결재 테이블 삭제  --> 
         <delete id="deleteWbsApprovalListSub" parameterType="Map">
-               DELETE FROM TB_WB20M02
+               DELETE FROM TB_WB20M03
                    WHERE TODO_CO_CD  = '${coCd}'
                          AND SALES_CD  = '${salesCd}'
                          AND TODO_NO  = '${wbsPlanNo}'
@@ -796,6 +800,68 @@
                    AND WBS_PLAN_CODE_ID = '${codeId}'
         </delete>
         
+        
+          <select id="selectWbsInfo" parameterType="Map" resultType="camelMap">  
+				SELECT 
+				        X.FILE_TRGT_KEY,
+				        X.CO_CD,
+				        X.WBS_PLAN_CODE_KIND,
+				        X.WBS_PLAN_CODE_ID,
+				        X.WBS_PLAN_NO,
+				        X.SALES_CD,
+				        TO_CHAR(X.WBS_PLAN_DT, 'YYYY-MM-DD') AS WBS_PLAN_DT,
+				        X.WBS_PLAN_ID,
+				        (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.WBS_PLAN_ID) AS WBS_PLAN_NM,
+				        X.WBS_PLAN_MNG_ID,
+				        (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.WBS_PLAN_MNG_ID) AS WBS_PLAN_MNG_NM,
+				        X.WBS_PLAN_CNTS,
+				        TO_CHAR(X.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT,
+				        TO_CHAR(X.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT,
+				        X.WBS_PLAN_RMK,
+				        X.WBS_PLAN_STS_CODE_ID,
+				        (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_STS_CODE_ID) AS WBS_PLAN_STS_NM,
+				        X.DSGN_DIF_CODE_ID,
+				        (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.DSGN_DIF_CODE_ID) AS DSGN_DIF_CODE_NM,
+				        X.DSGN_PLAN_HOUR,
+				        X.PRDCTN_DIF_CODE_ID,
+				        (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.PRDCTN_DIF_CODE_ID) AS PRDCTN_DIF_CODE_NM,
+				        X.PRDCTN_PLAN_HOUR,
+				        X.WBS_PLAN_OS_YN,
+				        X.LOCK_YN,
+				        X.CLOSE_YN,
+				        S.ORDRS_NO,
+				        S.ORDRS_CLNT_CD,
+				        (SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD = S.ORDRS_CLNT_CD) AS ORDRS_CLNT_NM,
+				        S.CLNT_PJT,
+				        S.ORDRS_DTL_DIV20,
+				        (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+				        S.ITEM_DIV, 
+				        S.EQP_NM
+				        FROM TB_WB01M01 X
+				        LEFT OUTER JOIN (
+				           SELECT  X.CO_CD,
+				                   X.ORDRS_NO,
+				                   X.SALES_CD,
+				                   Y.ORDRS_CLNT_CD,
+				                   Y.CLNT_PJT,
+				                   X.ORDRS_DTL_DIV20,
+				                   X.PRDT_CD,
+				                   X.ITEM_DIV, 
+				                   X.EQP_NM 
+				                   FROM TB_CR02D02 X
+				            INNER JOIN TB_CR02M01 Y
+				            ON X.CO_CD = Y.CO_CD
+				            AND X.ORDRS_NO = Y.ORDRS_NO ) S
+				          ON X.CO_CD = S.CO_CD
+				          AND X.SALES_CD = S.SALES_CD 
+				          WHERE X.CO_CD = #{coCd}
+				          AND X.SALES_CD = #{salesCd}
+				          AND X.WBS_PLAN_CODE_KIND = #{codeKind}
+				          AND X.WBS_PLAN_CODE_ID = #{codeId}   
+				          AND S.ORDRS_NO = #{ordrsNo}
+			</select>	          
+          
+          
 </mapper>
 
 
