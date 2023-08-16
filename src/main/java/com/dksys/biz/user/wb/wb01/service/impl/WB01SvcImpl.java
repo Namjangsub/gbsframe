@@ -125,12 +125,17 @@ public class WB01SvcImpl implements WB01Svc {
 	    Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 
-		/*
-		 * // 공유테이블 기존 데이터 삭제 List<Map<String, String>> sharngChk =
-		 * wb01Mapper.deleteWbsSharngListChk(paramMap); if (sharngChk.size() > 0) {
-		 * wb01Mapper.deleteWbsSharngList(paramMap); }
-		 */
-		
+	    String pgParam = "{\"actionType\":\""+ "T" +"\",";
+	    pgParam += "\"fileTrgtKey\":\""+ fileTrgtKey +"\","; 
+	    pgParam += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
+	    pgParam += "\"lvl\":\""+ paramMap.get("lvl") +"\",";
+	    pgParam += "\"idx\":\""+ paramMap.get("idx") +"\",";
+	    pgParam += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+	    pgParam += "\"ordrsNo\":\""+ paramMap.get("ordrsNo") +"\",";
+	    pgParam += "\"codeKind\":\""+ paramMap.get("codeKind") +"\",";
+	    pgParam += "\"codeId\":\""+ paramMap.get("codeId") +"\"}";
+	    
+	    
 		Gson gson = new Gson();
 		// 공유테이블 등록  
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -145,7 +150,9 @@ public class WB01SvcImpl implements WB01Svc {
 		            	sharngMap.put("todoDiv2CodeId", paramMap.get("S_todoDiv2CodeId"));	
 		            	sharngMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
 		            	sharngMap.put("creatId", paramMap.get("userId"));
-		            	sharngMap.put("creatPgm", paramMap.get("pgmId"));                                      
+		            	sharngMap.put("creatPgm", paramMap.get("pgmId"));
+		            	sharngMap.put("sanctnSn", Integer.toString(i+1));
+		            	sharngMap.put("pgParam", pgParam);
 	            	    wb01Mapper.insertWbsSharngList(sharngMap);
 	            	i++;
 	            } catch (Exception e) {
@@ -219,6 +226,18 @@ public class WB01SvcImpl implements WB01Svc {
 		//첨부 화일 권한체크  끝 
 		//---------------------------------------------------------------  
 	
+	    
+	    String pgParam = "{\"actionType\":\""+ "T" +"\",";
+	    pgParam += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
+	    pgParam += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
+	    pgParam += "\"lvl\":\""+ paramMap.get("lvl") +"\",";
+	    pgParam += "\"idx\":\""+ paramMap.get("idx") +"\",";
+	    pgParam += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+	    pgParam += "\"ordrsNo\":\""+ paramMap.get("ordrsNo") +"\",";
+	    pgParam += "\"codeKind\":\""+ paramMap.get("codeKind") +"\",";
+	    pgParam += "\"codeId\":\""+ paramMap.get("codeId") +"\"}";
+	    
+	    
 	    Gson gson = new Gson();
 		// 공유테이블 등록  
 	    Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -234,7 +253,9 @@ public class WB01SvcImpl implements WB01Svc {
 		            	sharngMap.put("todoDiv2CodeId", paramMap.get("S_todoDiv2CodeId"));	
 		            	sharngMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
 		            	sharngMap.put("creatId", paramMap.get("userId"));
-		            	sharngMap.put("creatPgm", paramMap.get("pgmId"));                                      
+		            	sharngMap.put("creatPgm", paramMap.get("pgmId"));  
+		            	sharngMap.put("sanctnSn", Integer.toString(i+1)); 
+		            	sharngMap.put("pgParam", pgParam);
 	            	    wb01Mapper.insertWbsSharngList(sharngMap);
 	            	i++;
 	            } catch (Exception e) {
@@ -334,6 +355,9 @@ public class WB01SvcImpl implements WB01Svc {
 		return result;
     }
     
-    
+    @Override
+	public List<Map<String, String>> selectWbsInfo(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsInfo(paramMap);
+	}
 	
 }

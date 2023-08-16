@@ -216,5 +216,20 @@ public class QM01Ctr {
     return "jsonView";
   }
   
+  @PostMapping("/selectCodeMaxCount")
+  public String selectCodeMaxCount(@RequestBody Map<String, String> param, ModelMap model) {
+  	int result = qm01Svc.selectCodeMaxCount(param);
+  	model.addAttribute("result", result);
+      return "jsonView";
+  }
+
+  // 하위코드 리스트 조회
+  @PostMapping("/selectMainCodeList")
+  public String selectMainCodeList(@RequestBody Map<String, String> param, ModelMap model) {
+  	List<Map<String, String>> childCodeList = qm01Svc.selectMainCodeList(param);
+  	model.addAttribute("childCodeList", childCodeList);
+      return "jsonView";
+  }
+  
   
 }

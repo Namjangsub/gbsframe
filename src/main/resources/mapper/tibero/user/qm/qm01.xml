@@ -121,7 +121,8 @@
 		          T.REQ_RMK AS REQ_RMK, 
 		          TO_CHAR(P.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM,
 		          N3.NAME AS CREAT_NM,    
-		          NVL(P.RESLT_RST,' ')  AS RESLT_RST
+		          NVL(P.RESLT_RST,' ')  AS RESLT_RST,
+		          NVL(P.SUB_CD, '') AS RESLT_SUB_CD
 		FROM TB_QM01M01 T
 		 LEFT OUTER JOIN TB_QM01P01 P ON P.REQ_NO = T.REQ_NO
 		 LEFT OUTER JOIN TB_CR02D02 S ON T.SALES_CD = S.SALES_CD  
@@ -589,6 +590,7 @@
 
 <select id="selectShareUserInfo" parameterType="Map" resultType="camelMap">
     SELECT  A.CO_CD AS CO_CD,
+    		C.CODE_NM AS CO_NM,
 			A.ID AS ID,
 	        A.EMP_NO AS EMP_NO,
 			A.NAME AS USR_NM,
@@ -597,7 +599,8 @@
 			B.DEPT_NM AS DT_NM
 		FROM
 			TB_CM06M01 A 
-			INNER JOIN TB_CM04M01 B on A.DEPT_ID = B.DEPT_ID	
+			INNER JOIN TB_CM04M01 B on A.DEPT_ID = B.DEPT_ID
+			INNER JOIN TB_CM05M01 C ON A.CO_CD = C.CODE_ID 
 			AND	A.USE_YN = 'Y'
 		    AND A.CO_CD = '${coCd}'
 		    AND A.ID =  '${userId}' 
@@ -660,10 +663,10 @@
     UPDATE TB_QM01P01
 	SET CO_CD = #{resCoCd}, 
 	    RSLT_DT =  to_date(#{rsltDt}, 'YYYY-MM-DD'),
-		DEPT_CD = #{resDeptCd},
-		DEPT_CD2 = #{resDeptCd2},
+		DEPT_CD = '',
+		DEPT_CD2 = #{copArr},
 		MID_CD = #{resMidCd}, 
-		SUB_CD = #{resSubCd}, 
+		SUB_CD = #{copBgbDiv}, 
 		MEAS_RST = #{measRst}, 
 		RESLT_RST = #{resltRst}, 
 		THGH_RST = #{thghRst}, 
@@ -690,7 +693,8 @@
 		SHAR_ID10 = #{sharId10}, 
 		CREAT_ID = #{resRegId},<!-- 등록자 아이디 -->
 		UDT_ID = #{userId},
-		UDT_PGM = #{pgmId}
+		UDT_PGM = #{pgmId},
+		UDT_DTTM = SYSDATE
 	WHERE RSLT_NO = #{rsltNo}
 </update>
 
@@ -707,8 +711,8 @@
   
   <select id="selectQualityReqCalNext" parameterType="Map" resultType="String">
  <!--   SELECT 'REQ' || TO_CHAR(SYSDATE,'YY') || '-' || LPAD(NVL(MAX(REQ_NO),0)+1,4,0) -->
-   SELECT CASE WHEN MAX(REQ_NO) IS NULL THEN  'REQ' || TO_CHAR(SYSDATE,'YY') || '-' || '0001' 
-               ELSE 'REQ' || TO_CHAR(SYSDATE,'YY') || '-' || LPAD(SUBSTR(NVL(MAX(REQ_NO),0),7,10)+1,4,0) END AS REQ_NO
+   SELECT CASE WHEN MAX(REQ_NO) IS NULL THEN  'REQ' || TO_CHAR(SYSDATE,'YY') || '0001' 
+               ELSE 'REQ' || TO_CHAR(SYSDATE,'YY') || LPAD(SUBSTR(NVL(MAX(REQ_NO),0),7,10)+1,4,0) END AS REQ_NO
    FROM   TB_QM01M01
    WHERE  CO_CD = 'GUN'     
   </select>
@@ -853,10 +857,10 @@
 	#{resReqNo},  
 	#{resCoCd}, 
 	to_date(#{rsltDt}, 'YYYY-MM-DD'),
-	#{resDeptCd}, 
-	#{resDeptCd2},  
+	'', 
+	#{copArr},  
 	#{resMidCd},  
-	#{resSubCd},   
+	#{copBgbDiv},   
 	#{measRst}, 
 	#{resltRst}, 
 	#{thghRst}, 
@@ -925,11 +929,12 @@
   
   <insert id="insertWbsSharngList" parameterType="Map">
        <selectKey keyProperty="toDoKey" resultType="Int" order="BEFORE">
-           SELECT NVL(MAX(TODO_KEY), 0) + 1 FROM TB_WB20M02
+           SELECT NVL(MAX(TODO_KEY), 0) + 1 FROM TB_WB20M03
        </selectKey>
-       INSERT INTO TB_WB20M02
+       INSERT INTO TB_WB20M03
        (
            TODO_KEY,
+           SANCTN_SN,
            CO_CD,
            TODO_DIV1_CODE_ID,
            TODO_DIV2_CODE_ID,
@@ -947,10 +952,11 @@
        VALUES
        (
            #{toDoKey},
+           #{sanCtnSn},
            #{coCd},
            #{todoDiv1CodeId},
            #{todoDiv2CodeId},
-           #{todoId},
+           #{wbsSharngUserId},
            #{salesCd},
            #{pgPath},
            #{fileTrgtKey},
@@ -1003,6 +1009,68 @@
         )
   </insert>
                 
-         
+<select id="selectCodeMaxCount" parameterType="Map" resultType="int">
+    SELECT MAX(CNT) 
+      FROM 
+			(
+			     SELECT SUM(CNT) AS CNT
+			          , CODE1
+			       FROM 
+					     (
+							SELECT M.CODE_ID AS CODE_ID
+							     , (
+								        SELECT COUNT(*) FROM TB_CM05M01 S 
+								         WHERE S.CODE_KIND =  M.CODE_ID 
+								           AND LENGTH(S.CODE_ID) = 9
+							        ) AS CNT 
+							     , SUBSTR(M.CODE_ID,0, 6) AS CODE1
+							 FROM TB_CM05M01 M
+							WHERE M.CODE_KIND LIKE 'COBGB%'
+							  AND LENGTH(M.CODE_ID) = 7
+					     )
+			 
+			      GROUP BY CODE1 
+			  ) A
+</select>
+                
+      <select id="selectMainCodeList" resultType="CamelMap">
+		 SELECT ROWNUM AS RNUM, B.*
+        FROM(  
+          SELECT  
+                     A.CODE_KIND
+                     ,A.MID_CD
+                     ,A.MID_NM
+                     ,CASE WHEN A.SUB_CNT > 1 AND SUBSTR(A.SUB_CD,-1) > 1 THEN ' ' ELSE A.MID_NM END AS MID_NM2
+                     ,A.SUB_CD
+                     ,A.SUB_NM
+                     ,A.SUB_CNT
+	      FROM
+	      ( SELECT M.CODE_KIND AS CODE_KIND,
+	               M.CODE_ID AS MID_CD,
+			       M.CODE_NM AS MID_NM,
+			       S.CODE_ID AS SUB_CD,
+			       S.CODE_NM AS SUB_NM,
+			       M.CNT AS SUB_CNT
+			FROM TB_CM05M01 S,
+			(SELECT M.CODE_ID,
+				    M.CODE_NM,
+				    M.CODE_KIND
+				    ,(SELECT COUNT(*) FROM TB_CM05M01 S WHERE S.CODE_KIND =  M.CODE_ID) AS CNT 
+			 FROM TB_CM05M01 M
+			 WHERE 1=1 
+			       AND M.USE_YN = 'Y'
+			      <if test="codeKind != null and !codeKind.equals('')">
+					AND M.CODE_KIND = #{codeKind}
+				  </if>
+			)M
+			WHERE 1=1 
+			<if test="codeKind != null and !codeKind.equals('')">
+			AND S.CODE_KIND LIKE '${codeKind}%'
+			</if>
+			AND M.CODE_ID = S.CODE_KIND
+			AND S.USE_YN = 'Y'
+			ORDER BY M.CODE_ID,S.CODE_ID )A
+			)B
+	</select>   
         
 </mapper>

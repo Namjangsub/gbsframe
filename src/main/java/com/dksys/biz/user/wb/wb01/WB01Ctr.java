@@ -48,7 +48,6 @@ public class WB01Ctr {
 		return "jsonView";
     }	
 
-    //<!-- --> 
 	@PostMapping(value = "/selectNewWbsPlanTreeList") 
 	public String selectNewWbsPlanTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
     	List<Map<String, String>> fileList = wb01Svc.selectNewWbsPlanTreeList(paramMap);
@@ -208,5 +207,12 @@ public class WB01Ctr {
 	  	return "jsonView";
   } 
 
+  @PostMapping(value = "/selectWbsInfo") 
+	public String selectWbsInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
+  	List<Map<String, String>> result = wb01Svc.selectWbsInfo(paramMap);
+  	model.addAttribute("result", result);
+      return "jsonView";
+	}
+  
   
 }	  

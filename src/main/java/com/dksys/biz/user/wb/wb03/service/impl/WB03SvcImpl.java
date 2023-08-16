@@ -61,6 +61,19 @@ public class WB03SvcImpl implements WB03Svc {
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 	    
 		Gson gson = new Gson();
+		
+	    String pgParam = "{\"actionType\":\""+ "T" +"\",";
+	    pgParam += "\"wbsPlanFileTrgtKey\":\""+ paramMap.get("wbsPlanFileTrgtKey") +"\","; 
+	    pgParam += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
+	    pgParam += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
+	    pgParam += "\"lvl\":\""+ paramMap.get("lvl") +"\",";
+	    pgParam += "\"idx\":\""+ paramMap.get("idx") +"\",";
+	    pgParam += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+	    pgParam += "\"issueIdx\":\""+ paramMap.get("issueIdx") +"\",";
+	    pgParam += "\"codeKind\":\""+ paramMap.get("codeKind") +"\",";
+	    pgParam += "\"codeId\":\""+ paramMap.get("codeId") +"\"}";
+	    
+	    
 		// 공유테이블 등록  
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
@@ -72,7 +85,9 @@ public class WB03SvcImpl implements WB03Svc {
 		            	sharngMap.put("todoDiv1CodeId", paramMap.get("S_todoDiv1CodeId"));
 		            	sharngMap.put("todoDiv2CodeId", paramMap.get("S_todoDiv2CodeId"));	
 		            	sharngMap.put("creatId", paramMap.get("creatId"));	   
-		            	sharngMap.put("creatPgm", paramMap.get("creatPgm"));	   
+		            	sharngMap.put("creatPgm", paramMap.get("creatPgm"));
+		            	sharngMap.put("sanctnSn", Integer.toString(i+1)); 
+		            	sharngMap.put("pgParam", pgParam);
 	            	    wb03Mapper.insertIssueSharngList(sharngMap);
 	            	i++;
 	            } catch (Exception e) {
@@ -156,6 +171,19 @@ public class WB03SvcImpl implements WB03Svc {
 		//---------------------------------------------------------------  
 	
 	    Gson gson = new Gson();
+	    
+	    String pgParam = "{\"actionType\":\""+ "T" +"\",";
+	    pgParam += "\"wbsPlanFileTrgtKey\":\""+ paramMap.get("wbsPlanFileTrgtKey") +"\","; 
+	    pgParam += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
+	    pgParam += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
+	    pgParam += "\"lvl\":\""+ paramMap.get("lvl") +"\",";
+	    pgParam += "\"idx\":\""+ paramMap.get("idx") +"\",";
+	    pgParam += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+	    pgParam += "\"issueIdx\":\""+ paramMap.get("issueIdx") +"\",";
+	    pgParam += "\"codeKind\":\""+ paramMap.get("codeKind") +"\",";
+	    pgParam += "\"codeId\":\""+ paramMap.get("codeId") +"\"}";
+	    
+	    
 		// 공유테이블 등록  
 	    Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 
@@ -168,7 +196,9 @@ public class WB03SvcImpl implements WB03Svc {
 	            	sharngMap.put("todoDiv1CodeId", paramMap.get("S_todoDiv1CodeId"));
 	            	sharngMap.put("todoDiv2CodeId", paramMap.get("S_todoDiv2CodeId"));	
 	            	sharngMap.put("creatId", paramMap.get("creatId"));	   
-	            	sharngMap.put("creatPgm", paramMap.get("creatPgm"));	   
+	            	sharngMap.put("creatPgm", paramMap.get("creatPgm"));
+	            	sharngMap.put("sanctnSn", Integer.toString(i+1)); 
+	            	sharngMap.put("pgParam", pgParam);
             	    wb03Mapper.insertIssueSharngList(sharngMap);
 	            	i++;
 	            } catch (Exception e) {

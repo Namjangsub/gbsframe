@@ -47,5 +47,8 @@ public interface QM01Svc {
   
   List<Map<String, String>> selectApprovalList(Map<String, String> paramMap);
   
-
+  int selectCodeMaxCount(Map<String, String> paramMap);
+  
+  public List<Map<String, String>> selectMainCodeList(Map<String, String> param);
+  
 }
