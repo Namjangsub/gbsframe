@@ -90,10 +90,30 @@ public class WB20SvcImpl implements WB20Svc {
 				 
 		return result;
 	}
+		
+	public int updateQmMobileApproval(Map<String, String> paramMap) {
+		int result = wb20Mapper.updateQmMobileApproval(paramMap);
+		return result;
+	}
 	
+	@Override
+	public List<Map<String, String>> selectGetDeptList(Map<String, String> paramMap) {
+		return wb20Mapper.selectGetDeptList(paramMap);
+	}	
+	
+	/* 공통결재 라인 read */
 	@Override
 	public List<Map<String, String>> selectApprovalList(Map<String, String> paramMap) {
 		return wb20Mapper.selectApprovalList(paramMap);
 	}	
-	
+
+	/* 공통결재 라인 insert */
+	@Override
+	public int insertApprovalLine(Map<String, String> paramMap) {
+
+		int result = 0;	    
+		result += wb20Mapper.updateApprovalLine(paramMap);		
+	    	    		  		
+		return result;
+	}		
 }

@@ -130,8 +130,8 @@ Task.prototype.setPeriod = function (start, end) {
 
   //compute legal start/end //todo mossa qui R&S 30/3/2016 perchè altrimenti il calcolo della durata, che è stato modificato sommando giorni, sbaglia
   
-  start = computeStart(start);
-  end=computeEnd(end);
+  //start = computeStart(start);
+  //end=computeEnd(end);
 
   var newDuration = recomputeDuration(start, end);
 
@@ -140,25 +140,25 @@ Task.prototype.setPeriod = function (start, end) {
     return true;
   }
 
-  if (newDuration == this.duration) { // is shift
-    return this.moveTo(start, false,true);
-  }
+  //if (newDuration == this.duration) { // is shift
+  //  return this.moveTo(start, false,true);
+  //}
 
   var wantedStartMillis = start;
 
-  var children = this.getChildren();
+  //var children = this.getChildren();
 
-  if(this.master.shrinkParent && children.length>0) {
-    var chPeriod= this.getChildrenBoudaries();
-    start = chPeriod.start;
-    end = chPeriod.end;
-  }
+  //if(this.master.shrinkParent && children.length>0) {
+  //  var chPeriod= this.getChildrenBoudaries();
+  //  start = chPeriod.start;
+  //  end = chPeriod.end;
+  //}
   //07.24 수정완료
   //debugger;
   //cannot start after end
-  if (start > end) {
+  //if (start > end) {
   //  start = end;
-  }
+  //}
 
   //07.24  수정완료
   //if there are dependencies compute the start date and eventually moveTo

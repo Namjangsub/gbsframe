@@ -52,9 +52,10 @@ function Ganttalendar(startMillis, endMillis, master, minGanttSize) {
 
 
 Ganttalendar.prototype.zoomGantt = function (isPlus) {
+  
   var curLevel = this.zoom;
+  
   var pos = this.zoomLevels.indexOf(curLevel + "");
-
   var centerMillis=this.getCenterMillis();
   var newPos = pos;
   if (isPlus) {

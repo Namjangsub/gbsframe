@@ -102,8 +102,25 @@ public class WB20Ctr {
     	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
     	return "jsonView";
       }
+	  	  
+	  @PutMapping(value = "/updateQmMobileApproval")
+      public String updateQmMobileApproval(@RequestParam Map<String, String> paramMap, ModelMap model) {
+		wb20Svc.updateQmMobileApproval(paramMap);
+    	model.addAttribute("resultCode", 200);
+    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+    	return "jsonView";
+      }
 	  
-	  // 결재상태 불러오기 
+	  @PostMapping(value = "/selectGetDeptList") 
+	  public String selectGetDeptList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  
+  		  List<Map<String, String>> resultList = wb20Svc.selectGetDeptList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+		  
+	  } 
+	  
+	  // 공통 결재상태 불러오기 
 	  @PostMapping(value = "/selectGetApprovalList") 
 	  public String selectApprovalGetList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		  
@@ -112,5 +129,20 @@ public class WB20Ctr {
 		  return "jsonView"; 
 		  
 	  } 
+	  
+	  //공통 결재승인(등록)
+	  @PostMapping(value = "/insertApprovalLine")
+	  public String insertApprovalLine(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    	try {
+				wb20Svc.insertApprovalLine(paramMap);
+		    	model.addAttribute("resultCode", 200);
+		    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+	    	}catch(Exception e) {
+		    	 model.addAttribute("resultCode", 500);
+		 		 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+	    	}
+
+	    	return "jsonView";		  		  
+    }		  
 	  
 }
