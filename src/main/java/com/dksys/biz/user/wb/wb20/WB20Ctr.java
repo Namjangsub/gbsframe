@@ -113,4 +113,23 @@ public class WB20Ctr {
 		  
 	  } 
 	  
+	  @PutMapping(value = "/updateQmMobileApproval")
+      public String updateQmMobileApproval(@RequestParam Map<String, String> paramMap, ModelMap model) {
+		wb20Svc.updateQmMobileApproval(paramMap);
+    	model.addAttribute("resultCode", 200);
+    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+    	return "jsonView";
+      }
+	  
+	  @PostMapping(value = "/selectGetDeptList") 
+	  public String selectGetDeptList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  
+  		  List<Map<String, String>> resultList = wb20Svc.selectGetDeptList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+		  
+	  } 
+	  
+	  
+	  
 }

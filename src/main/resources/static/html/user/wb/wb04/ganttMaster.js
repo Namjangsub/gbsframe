@@ -59,16 +59,16 @@ function GanttMaster() {
 
 
   this.permissions = {
-    canWriteOnParent: true,
-    canWrite: true,
-    canAdd: true,
-    canDelete: true,
-    canInOutdent: true,
-    canMoveUpDown: true,
-    canSeePopEdit: true,
-    canSeeFullEdit: true,
-    canSeeDep: true,
-    canSeeCriticalPath: true,
+    canWriteOnParent: false,
+    canWrite: false,
+    canAdd: false,
+    canDelete: false,
+    canInOutdent: false,
+    canMoveUpDown: false,
+    canSeePopEdit: false,
+    canSeeFullEdit: false,
+    canSeeDep: false,
+    canSeeCriticalPath: false,
     canAddIssue: false,
     cannotCloseTaskIfIssueOpen: false
   };
@@ -562,7 +562,8 @@ GanttMaster.prototype.loadTasks = function (tasks, selectedRow) {
   // re-select old row if tasks is not empty
   if (this.tasks && this.tasks.length > 0) {
     selectedRow = selectedRow ? selectedRow : 0;
-    this.tasks[selectedRow].rowElement.click();
+    //this.tasks[selectedRow].rowElement.click();
+    
   }
 };
 

@@ -96,4 +96,15 @@ public class WB20SvcImpl implements WB20Svc {
 		return wb20Mapper.selectApprovalList(paramMap);
 	}	
 	
+	
+	public int updateQmMobileApproval(Map<String, String> paramMap) {
+		int result = wb20Mapper.updateQmMobileApproval(paramMap);
+		return result;
+	}
+	
+	@Override
+	public List<Map<String, String>> selectGetDeptList(Map<String, String> paramMap) {
+		return wb20Mapper.selectGetDeptList(paramMap);
+	}	
+	
 }

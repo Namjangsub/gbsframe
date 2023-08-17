@@ -31,6 +31,7 @@
   this.zoomLevels = [];
   this.zoomDrawers = {};
 
+   
 
   function _addZoom(zoom,zoomDrawer){
     self.zoomLevels.push(zoom);
@@ -46,12 +47,12 @@
     adjustDates: function (start, end) {
       start.setFirstDayOfThisWeek();
       end.setFirstDayOfThisWeek();
-      //end.setDate(end.getDate() + 6);
+      end.setDate(end.getDate() + 6);
       end.setDate(end.getDate());
     },
     row1:        function (date, ctxHead) {
       var start = new Date(date.getTime());
-      //date.setDate(date.getDate() + 6);
+      date.setDate(date.getDate() + 6);
       date.setDate(date.getDate());
       self.createHeadCell(1,this,ctxHead,start.format("MMMM d") + " - " + date.format("MMMM d yyyy")+ " ("+start.format("w")+")",7,"", start,date);
       date.setDate(date.getDate() + 1);
@@ -123,7 +124,7 @@
       start.setDate(15);
       end.setDate(1);
       end.setMonth(end.getMonth() + 1);
-      end.setDate(end.getDate() + 30); // 07.31
+      end.setDate(end.getDate() + 14);
     },
     row1:        function (date, tr1) {
       var start = new Date(date.getTime());

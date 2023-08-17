@@ -28,4 +28,8 @@ public interface WB20Svc {
 	
 	List<Map<String, String>> selectApprovalList(Map<String, String> paramMap);	
 	
+	int updateQmMobileApproval(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectGetDeptList(Map<String, String> paramMap);
+	
 }
