@@ -86,7 +86,6 @@ function Approval(htmlParam, param, popParam) {
 								if( data.sanctnSttus != "undefined" && data.sanctnSttus == "N"  ) {
 									if( data.sanctnSn == "1" || data.preSttus=="Y") {
 										applyBtn = true;
-										console.log('---1번일경우 승인 N')
 										approvalParam.todoKey = data.todoKey;
 										approvalParam.sanctnSn = data.sanctnSn;
 										approvalParam.coCd = data.coCd;
