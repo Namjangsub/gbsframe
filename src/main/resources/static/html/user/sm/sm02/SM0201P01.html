@@ -845,10 +845,11 @@ var popParam = modalStack.last().paramObj;
 //추가로 넣어줄 param
 var approvalParam = {
 					coCd: "GUN", todoDiv1CodeId: "TODODIV20", todoDiv2CodeId: "TODODIV2050"
-					, 
+					, pgmId: "SM0201P01"
 					};
 //삭제할 키가 있으면 쓴다.
 delete popParam.sanctnSn;
+delete popParam.pgmId;
 var commApproval = new Approval(htmlParam, approvalParam, popParam);
 //결재요청
 $("#approvalBtn").on("click", function() {
@@ -871,6 +872,7 @@ function Approval(htmlParam, param, popParam) {
 	this.boldFont = "font-weight:bold; color:blue;";
 	this.todoId = null;
 	this.applyBtn = false;
+	var approvalParam = {}
 	
 	//html make
 	this.makeHtml = function() {
@@ -879,6 +881,11 @@ function Approval(htmlParam, param, popParam) {
 		var boldFont = this.boldFont;
 		var todoId = this.todoId;
 		var applyBtn = this.applyBtn;
+		//sanctnSn reset
+		if( $("#appLine tr").length > 0 ) {
+			delete this.param.sanctnSn;
+			delete this.param.todoKey;
+		}
 		
 		if( htmlParam.htmlArea ) {
 			console.log('---html make');
@@ -917,7 +924,7 @@ function Approval(htmlParam, param, popParam) {
 			$("#"+htmlId).append(htmlTable);
 			
 			//결재라인 read
-			postAjaxSync("/user/wb/wb20/selectGetApprovalList", param, null
+			postAjaxSync("/user/wb/wb20/selectGetApprovalList", this.param, null
 				, function(data){
 					var list = data.resultList;
 					//var m = data.resultList.length;
@@ -933,19 +940,26 @@ function Approval(htmlParam, param, popParam) {
 							if( data.todoId != "undefined" && (data.todoId == jwt.userId ) ) {
 								html = html.replace(/@@bold@@/gi, boldFont);
 								todoId = data.todoId;
-								//btn -- 순번1일 경우  applyBtn
-							
-								if( data.sanctnSttus != "undefined" && data.sanctnSn == "1" && data.sanctnSttus == "N"  ) {
-									applyBtn = true;
-									console.log('---1번일경우 승인 N')
+								//applyBtn SHOW - 순번이 1이거나 이전 결재 상태가 Y일 경우							
+								if( data.sanctnSttus != "undefined" && data.sanctnSttus == "N"  ) {
+									if( data.sanctnSn == "1" || data.preSttus=="Y") {
+										applyBtn = true;
+										console.log('---1번일경우 승인 N')
+										approvalParam.todoKey = data.todoKey;
+										approvalParam.sanctnSn = data.sanctnSn;
+										approvalParam.coCd = data.coCd;
+										approvalParam.todoDiv1CodeId = data.todoDiv1CodeId;
+										approvalParam.todoDiv2CodeId = data.todoDiv2CodeId;										
+									} 
 								}
 							}
 							html = html.replace(/@@item3@@/gi, data.sanctnSttusNm);		//상태명
-							html = html.replace(/@@item4@@/gi, data.creatDttm);		//일자
+							html = html.replace(/@@item4@@/gi, data.todoCfDt);		//확인(결재)일자
 							htmlTr += html;
 						});			
 					} 
 	 				$("#appLine tr").eq(0).next().remove();
+	 				console.log('--htmlTr--'+htmlTr);
 					$("#appLine").append(htmlTr);
 	 				
 			});		//end ajax
@@ -953,7 +967,10 @@ function Approval(htmlParam, param, popParam) {
 			this.todoId = todoId;
 			this.applyBtn = applyBtn;
 			//btn control
-			this.applyBtnCtrl();			
+			this.applyBtnCtrl();		
+			if( this.applyBtn ) {
+				Object.assign(this.param, approvalParam);				
+			}			
 		} else {
 			alert( '결재란 영역을 찾을수 없습니다. \r\nex) <div id="approval_area"></div>');
 		}
@@ -961,7 +978,6 @@ function Approval(htmlParam, param, popParam) {
 	
 	//btn show & auth
 	this.applyBtnCtrl = function() {
-		console.log('---applyBtn---' + this.applyBtn);
 		if( this.applyBtn ) {
 			$("#appBtnDiv").show();
 			$("#appConfirmAnchor").attr("onclick", "approvalConfirm()");			
@@ -973,6 +989,7 @@ function Approval(htmlParam, param, popParam) {
 		return;
 	}
 	
+	//loop contents html
 	this.htmlTr = function() {
 		var html = ` 
     		<tr>
@@ -987,7 +1004,31 @@ function Approval(htmlParam, param, popParam) {
 	
 	//승인 ajax
 	this.confirmApproval = function(param) {
-		console.log('---승인 ajax---');
+		
+		var confirmYn = false;	
+		//승인 save
+		if( this.applyBtn ) {
+			var paramMap = {		
+					"todoId" : jwt.userId
+			}
+			Object.assign(paramMap, this.param);
+			
+			postAjaxSync("/user/wb/wb20/insertApprovalLine", paramMap, null, function(data){
+				if(data.resultCode == 200){
+					alert("승인 되었습니다.");
+					confirmYn = true;
+				} else {
+					alert("승인중 오류가 발생 되었습니다.");	
+				}
+			});	
+			if( confirmYn ) {
+				this.makeHtml();
+				this.applyBtn = false;
+				this.applyBtnCtrl();
+			}
+		} else {
+			return;
+		}        
 	}		
 	
 }
