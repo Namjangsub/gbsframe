@@ -449,6 +449,7 @@ public class QM01SvcImpl implements QM01Svc {
 		pgParam1 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
 		pgParam1 += "\"coCd\":\""+ paramMap.get("resCoCd") +"\","; 
 		pgParam1 += "\"salesCd\":\""+ paramMap.get("matrDrwNo") +"\",";
+		pgParam1 += "\"rsltSubCd\":\""+ paramMap.get("copBgbDiv") +"\",";
 		pgParam1 += "\"reqNo\":\""+ paramMap.get("rsltNo") +"\"}";
 						
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -457,7 +458,7 @@ public class QM01SvcImpl implements QM01Svc {
 			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
 	            try {	 
-	            	    sharngMap.put("reqNo", paramMap.get("reqNo"));
+	            	    sharngMap.put("reqNo", paramMap.get("rsltNo"));
 	            	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
 	            	    sharngMap.put("userId", paramMap.get("userId"));
@@ -476,6 +477,7 @@ public class QM01SvcImpl implements QM01Svc {
 		pgParam2 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
 		pgParam2 += "\"coCd\":\""+ paramMap.get("resCoCd") +"\","; 
 		pgParam2 += "\"salesCd\":\""+ paramMap.get("matrDrwNo") +"\",";
+		pgParam2 += "\"rsltSubCd\":\""+ paramMap.get("copBgbDiv") +"\",";
 		pgParam2 += "\"reqNo\":\""+ paramMap.get("rsltNo") +"\"}";
 		
 		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -484,7 +486,7 @@ public class QM01SvcImpl implements QM01Svc {
 			int i = 0;
 	        for (Map<String, String> approvalMap : approvalArr) {
 	            try {	 
-		            	approvalMap.put("reqNo", paramMap.get("reqNo"));
+		            	approvalMap.put("reqNo", paramMap.get("rsltNo"));
 		            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 		            	approvalMap.put("userId", paramMap.get("userId"));

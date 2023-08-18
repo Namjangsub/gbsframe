@@ -133,13 +133,16 @@ public class CR10SvcImpl implements CR10Svc {
 	    int numKey = Integer.valueOf(paramMap.get("fileTrgtKey"));
 	    */
 	    String todoDiv2CodeId = paramMap.get("lgistNo");
+	    int sanctnSn = cr10Mapper.selectTodoAppSanctnSn(paramMap);
 	    for (Map<String, String> dtl : toDoAppList) {
+	    	dtl.put("sanctnSn", String.valueOf(sanctnSn));
 	    	dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
 	    	dtl.put("pgPath", paramMap.get("pgPath"));
 	    	dtl.put("pgParam", paramMap.get("pgParam"));
 	    	dtl.put("todoDiv2CodeId", todoDiv2CodeId);
 	    	cr10Mapper.insertTodoAppList(dtl);
+	    	sanctnSn++;
 	    }
 
 	    paramMap.put("todoDiv1CodeId", paramMap.get("appDiv"));
@@ -231,13 +234,16 @@ public class CR10SvcImpl implements CR10Svc {
 	    List<Map<String, String>> reqList = cr10Mapper.selectTodoAppReqList(paramMap);
 	    List<Map<String, String>> toDoAppList = gsonDtl.fromJson(reqList.toString(), dtlMap);
 	    String todoDiv2CodeId = paramMap.get("lgistNo");
+	    int sanctnSn = cr10Mapper.selectTodoAppSanctnSn(paramMap);
 	    for (Map<String, String> dtl : toDoAppList) {
+	    	dtl.put("sanctnSn", String.valueOf(sanctnSn));
 	    	dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
 	    	dtl.put("pgPath", paramMap.get("pgPath"));
 	    	dtl.put("pgParam", paramMap.get("pgParam"));
 	    	dtl.put("todoDiv2CodeId", todoDiv2CodeId);
 	    	cr10Mapper.insertTodoAppList(dtl);
+	    	sanctnSn++;
 	    }
 
 	    paramMap.put("todoDiv1CodeId", paramMap.get("appDiv"));
