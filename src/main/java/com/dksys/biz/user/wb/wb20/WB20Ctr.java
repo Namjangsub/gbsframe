@@ -145,4 +145,19 @@ public class WB20Ctr {
 	    	return "jsonView";		  		  
     }		  
 	  
+	  // 결재라인 싱글 셀렉트 read
+	  @PostMapping(value = "/selectSignResUserlst")
+	  public String selectSignResUserlst(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    List<Map<String, String>> result = wb20Svc.selectSignResUserlst(paramMap);
+	    model.addAttribute("result", result);
+	    return "jsonView";
+	  }	 
+	  
+	  //결재라인 부서명등 select 
+	  @PostMapping(value = "/selectShareUserInfo")
+	  public String selectShareUserInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = wb20Svc.selectShareUserInfo(paramMap);
+	    model.addAttribute("resultList", resultList);
+	    return "jsonView";
+	  }	  
 }
