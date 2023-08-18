@@ -221,7 +221,8 @@
 
 	<div id="approval_area"></div>
 	
-		<!-- 결제대상자-->    
+	<!-- 결제대상자-->   
+	<div id="approval_trgt" style="display:none;"> 
          <table style="border:0px; width:50%; margin-bottom:20px; height:200px;">
             <tr style="height:30px;">
               <td style="text-align: LEFT; border-right: 0px;;font-size:13px;font-weight:bold;">※ 결제대상자</td>
@@ -241,7 +242,8 @@
 			  </td> 
 			</tr>  
         </table>
-		<!-- 결제대상자 end -->        
+	</div>        
+	<!-- 결제대상자 end -->        
 
 	<!-- 공통 파일 영역 -->
 	<div id="fileList_area"></div>
@@ -646,6 +648,142 @@ fileParam = {
 //---------------------------------------------------------------
 
 
+/* ######################### 
+ * 결재라인 추가 start
+ ######################### */
+	//결재라인 그리드
+	var gridViewPopApproval = {
+		initView : function() {
+			console.log('---initView--');
+  			this.target = new ax5.ui.grid();
+  			this.target.setConfig({
+  		    	showRowSelector: false,
+  		    	multipleSelect: false,
+  		    	sortable: true,
+  		        target: $('[data-ax5grid="first-grid-modal1"]'),
+  		        header: {
+  		        	align: "center",
+  		        	selector: true
+  		        },
+  		        body: {
+  		        	 onClick: function () {
+  		                this.self.select(this.dindex);
+  		            },
+  		            onDBLClick: function () {
+  		            },
+  		        },
+		    	columns : [
+		    		     {key: "rnum",	        label: "No.",	    width: 50,		align: "center", 	hidden:false}
+		    		    ,{key: "coCd",	        label: "회사코드",		width: 100,		align: "center", 	hidden:true}
+		    		    ,{key: "id",	        label: "아이디",		width: 100,		align: "center", 	hidden:true}
+						,{key: "empNo",	        label: "사번",		width: 100,		align: "center", 	hidden:false}
+						,{key: "usrNm",	        label: "성명",		width: 100,		align: "center", 	hidden:false}
+						,{key: "telNo",	        label: "전화번호",		width: 100,		align: "center", 	hidden:false}
+						,{key: "email",	        label: "E-mail",	width: 200,		align: "center", 	hidden:false}
+						,{key: "dtNm",	        label: "부서",		width: 100,		align: "center", 	hidden:true}
+						,{key: "rsltNo",	    label: "key",		width: 100,		align: "center", 	hidden:true}						
+    	              ]
+					});
+        			return this;
+        		},
+
+        		setData : function(_pageNo) {
+        			var targetObj = this.target;
+        			//이부분을 상황에 맞게 수정 
+        			var formData = {
+        					"salesCd": $('#salesCd').val()
+     	        			, "todoNo" : $('#ordrgNo').val() 
+     	        			, "todoDiv1CodeId" : "TODODIV20"
+     	        			, "todoDiv2CodeId" : "TODODIV2050"
+     	    		}
+        			
+   					postAjax("/user/wb/wb20/selectSignResUserlst", formData, null, function(data) {
+   						debugger;
+   					var list = data.result;
+   						targetObj.setData({
+   	  						list : list,
+	   	  				    page : {
+	   				    		totalElements : list.length,
+	   				    	} 
+   	  					});
+   	  				});
+          		}
+  	}
+	gridViewPopApproval.initView();
+  	
+	// 결제대상자 추가
+	function insertSignUserResModal() {   
+		var paramObj = {"coCd" : $('#coCd').val()	};	    
+		openSecondModal("/static/html/cmn/modal/userSearch.html", 300, 500, "사용자 검색", paramObj
+			, function(tree) {
+					var checkedId = tree.get_checked()[0];
+					var checkedNode = tree.get_node(checkedId);
+					var paramObj = {"coCd" : $(".popup_area #coCd").val(), "userId" : checkedId};
+					//사용자 id로 ajax 
+					 postAjax("/user/wb/wb20/selectShareUserInfo", paramObj, null
+						, function(data) {   						 
+							if(data.resultList.length > 0 ) {
+								var result = data.resultList[0];
+								gridViewPopApproval.target.addRow($.extend({}, "last", false));
+								var row = gridViewPopApproval.target.getList().length -1 ;
+								gridViewPopApproval.target.setValue(row, "rnum", row+1);
+								$.each(result, function (key, val) {
+									if( key != "" && key != "undefined" ) {
+										gridViewPopApproval.target.setValue(row, key, val);
+									}
+								});							
+							}
+					});     //user search ajax end 
+		});	//tree modal end
+	}       
+	
+	//결재라인 팝업
+	function opendModalApprovalListList() { 
+
+		var formData = {
+						"coCd" : $(".popup_area #coCd").val()
+						, "appDiv": "APPDIV01"
+						};
+			openSecondModal("/static/html/user/wb/wb02/WB0202P01.html", 1300, 780, "결재선 지정", formData, function (grid){
+				var rowList = grid.target.getList("selected");
+				var gridColumns = gridViewPopApproval.target.columns;
+				/* 공유라인 사용시 사용 x */
+				if (rowList.length > 0) {
+					/*
+					var chk = false;
+					$.each(rowList, function(idx, elem) { 
+						if (elem.check == "Y") { 
+						    var userId = elem.appId;
+						    var rowList1 = gridViewPop.target.getList();
+						    $.each(rowList1, function(idx, elem){
+						         if (elem.wbsSharngUserId == userId) {
+						            chk = true;
+						        }
+						    });
+						}
+					});
+					*/
+					for(var i=0; i<rowList.length; i++) {
+						gridViewPopApproval.target.addRow($.extend({}, "last", false));
+						$.each(gridColumns, function(idx, elem){
+							var key = gridColumns[idx].key;
+							if( typeof(rowList[i][key]) != "undefined" ) {
+								gridViewPopApproval.target.setValue(i, key, rowList[i][key]);
+							} 
+							//rnum insert
+							if( idx==0 ) gridViewPopApproval.target.setValue(i, "rnum", i+1);							
+						});
+
+					}	//for end
+				}	//rowList if end 						   
+	               
+	       });
+
+	}	
+
+/* ######################### 
+ * 결재라인 추가 script end 
+ ######################### */
 
 $(document).ready(function() {
 
@@ -700,6 +838,15 @@ $(document).ready(function() {
 			$("#salesCd").attr("readonly", true);
 			//wbsSalesCodeSearchP();
 			$("#salesCdAnchor").removeAttr("onclick");
+			
+			//toDo 등록여부 Y일 경우 결재대상자 창
+			if( modalStack.last().paramObj.todoYn == "Y") {
+				$("#approval_trgt").show();
+				$("#approvalReqBtn").hide();
+				$("#approvalReqBtn").removeAttr("onclick");
+				//결재대상자 load
+				gridViewPopApproval.initView().setData(0);
+			}
 		}		
 	}
 
@@ -961,171 +1108,5 @@ function sendMailCall() {
 	});
 }	
 
-/* ######################### 
- * 결재라인 추가 start
- ######################### */
-	//결재라인 그리드
-	var gridViewPop1 = {
-		initView : function() {
-			console.log('---initView--');
-  			this.target = new ax5.ui.grid();
-  			this.target.setConfig({
-  		    	showRowSelector: false,
-  		    	multipleSelect: false,
-  		    	sortable: true,
-  		        target: $('[data-ax5grid="first-grid-modal1"]'),
-  		        header: {
-  		        	align: "center",
-  		        	selector: true
-  		        },
-  		        body: {
-  		        	 onClick: function () {
-  		                this.self.select(this.dindex);
-  		            },
-  		            onDBLClick: function () {
-  		            },
-  		        },
-				page : {
-					navigationItemCount : 10,
-					height : 30,
-					display : true,
-					firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
-					prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
-					nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
-					lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
-					onChange : function() {
-						gridViewPop1.setData(this.page.selectPage);
-					}
-				},
-		    	columns : [
-		    		     {key: "rnum",	        label: "No.",	    width: 50,		align: "center", 	hidden:false}
-		    		    ,{key: "coCd",	        label: "회사코드",		width: 100,		align: "center", 	hidden:true}
-		    		    ,{key: "id",	        label: "아이디",		width: 100,		align: "center", 	hidden:true}
-						,{key: "empNo",	        label: "사번",		width: 100,		align: "center", 	hidden:false}
-						,{key: "usrNm",	        label: "성명",		width: 100,		align: "center", 	hidden:false}
-						,{key: "telNo",	        label: "전화번호",		width: 100,		align: "center", 	hidden:false}
-						,{key: "eMail",	        label: "E-mail",	width: 200,		align: "center", 	hidden:false}
-						,{key: "dtNm",	        label: "부서",		width: 100,		align: "center", 	hidden:true}
-						,{key: "rsltNo",	    label: "key",		width: 100,		align: "center", 	hidden:true}						
-    	              ]
-					});
-        			return this;
-        		},
 
-        		setData : function(_pageNo) {
-        			if (isFirst) return;
-        			var targetObj = this.target;
-        			var formData = {
-     	        			"rsltNo" : $('#rsltNo').val()     	        			
-     	    		}
-        			
-   					postAjax("/user/qm/qm01/selectSignResUserlst", formData, null, function(data){		
-   					var list = data.result;
-   						targetObj.setData({
-   	  						list : list,
-	   	  					page : {
-				                   totalElements : data.paginationInfo.totalRecordCount
-						    } 
-   	  					});
-   	  				});
-          		}
-  	}
-	gridViewPop1.initView();
-  	
-	// 결제대상자 추가
-	function insertSignUserResModal() {   
-		var paramObj = {"coCd" : $('#coCd').val()	};	    
-		openSecondModal("/static/html/cmn/modal/userSearch.html", 300, 500, "사용자 검색", paramObj
-			, function(tree) {
-					var checkedId = tree.get_checked()[0];
-					var checkedNode = tree.get_node(checkedId);
-					var paramObj = {"coCd" : $(".popup_area #coCd").val(), "userId" : checkedId};
-					//사용자 id로 ajax 
-					 postAjax("/user/qm/qm01/selectShareUserInfo", paramObj, null
-						, function(data) {   						 
-							if(data.resultList.length > 0 ) {
-								var result = data.resultList[0];
-								gridViewPop1.target.addRow($.extend({}, "last", false));
-								var row = gridViewPop1.target.getList().length -1 ;
-								gridViewPop1.target.setValue(row, "rnum", row+1);
-								$.each(result, function (key, val) {
-									if( key != "" && key != "undefined" ) {
-										gridViewPop1.target.setValue(row, key, val);
-									}
-								});							
-							}
-					});     //user search ajax end 
-		});	//tree modal end
-	}       
-	
-	//결재라인 팝업
-	function opendModalApprovalListList() { 
-
-		var formData = {"coCd" : $(".popup_area #coCd").val()};
-			openSecondModal("/static/html/user/wb/wb02/WB0202P01.html", 1300, 780, "결재선 지정", formData, function (grid){
-				var rowList = grid.target.getList("selected");
-				var gridColumns = gridViewPop1.target.columns;
-				/* 공유라인 사용시 사용 x */
-				if (rowList.length > 0) {
-					/*
-					var chk = false;
-					$.each(rowList, function(idx, elem) { 
-						if (elem.check == "Y") { 
-						    var userId = elem.appId;
-						    var rowList1 = gridViewPop.target.getList();
-						    $.each(rowList1, function(idx, elem){
-						         if (elem.wbsSharngUserId == userId) {
-						            chk = true;
-						        }
-						    });
-						}
-					});
-					*/
-					for(var i=0; i<rowList.length; i++) {
-						gridViewPop1.target.addRow($.extend({}, "last", false));
-						debugger;
-						$.each(gridColumns, function(idx, elem){
-							var key = gridColumns[idx].key;
-							//console.log('----un--' + typeof(rowList[i][key]))
-							if( typeof(rowList[i][key]) != "undefined" ) {
-								console.log('---i:'+i+'---key:'+ key+'----val:' + rowList[i][key]);
-								gridViewPop1.target.setValue(i, key, rowList[i][key]);
-							} 
-							//rnum insert
-							if( idx==0 ) gridViewPop1.target.setValue(i, "rnum", i+1);							
-						});
-
-					}	//for end
-				}	//rowList if end 						   
-	               
-	       });
-
-	}	
-	
-
-	//결재대상자 삭제
-	function deleteSignUser(){
-		var selRow = parseInt(gridViewPop1.target.selectedDataIndexs);    	
-			if( isNaN(selRow) ) {
-				alert("선택된 행이 없습니다.");
-				return;
-			} else {			
-					if( selRow > -1 ) {
-						gridViewPop1.target.removeRow(selRow); 					
-						if(selRow == 0){ $('#signId1').val($('#signIdNull').val()); }
-					if(selRow == 1){ $('#signId2').val($('#signIdNull').val()); }
-					if(selRow == 2){ $('#signId3').val($('#signIdNull').val()); }
-					if(selRow == 3){ $('#signId4').val($('#signIdNull').val()); }
-					if(selRow == 4){ $('#signId5').val($('#signIdNull').val()); }
-					if(selRow == 5){ $('#signId6').val($('#signIdNull').val()); }
-					if(selRow == 6){ $('#signId7').val($('#signIdNull').val()); }
-					if(selRow == 7){ $('#signId8').val($('#signIdNull').val()); }
-					if(selRow == 8){ $('#signId9').val($('#signIdNull').val()); }
-					if(selRow == 9){ $('#signId10').val($('#signIdNull').val()); }
-					}
-			}
-	}
-/* ######################### 
- * 결재라인 추가 script end 
- ######################### */
 </script>

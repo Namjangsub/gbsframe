@@ -32,6 +32,10 @@ public interface WB20Svc {
 	
 	List<Map<String, String>> selectApprovalList(Map<String, String> paramMap);	
 	
-	int insertApprovalLine(Map<String, String> paramMap);		
+	int insertApprovalLine(Map<String, String> paramMap);	
+	
+	List<Map<String, String>> selectSignResUserlst(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap);	  
 	
 }
