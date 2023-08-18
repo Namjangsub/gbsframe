@@ -116,4 +116,16 @@ public class WB20SvcImpl implements WB20Svc {
 	    	    		  		
 		return result;
 	}		
+	
+	  // 결재라인 싱글 셀렉트 read	
+	  @Override
+	  public List<Map<String, String>> selectSignResUserlst(Map<String, String> paramMap) {
+	    return wb20Mapper.selectSignResUserlst(paramMap);
+	  }
+	  
+	  //결재라인 부서명등 select 	  
+	  @Override
+	  public List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap) {
+	    return wb20Mapper.selectShareUserInfo(paramMap);
+	  }	
 }

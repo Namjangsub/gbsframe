@@ -22,11 +22,7 @@ public interface QM01Mapper {
   
   List<Map<String, String>> selectShareUserlst(Map<String, String> paramMap);
   
-  List<Map<String, String>> selectSignResUserlst(Map<String, String> paramMap);
-  
   List<Map<String, String>> selectShareResUserlst(Map<String, String> paramMap);
-  
-  List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap);
   
  // List<Map<String, String>> selectSignUserInfo(Map<String, String> paramMap);
 
