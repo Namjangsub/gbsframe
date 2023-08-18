@@ -33,6 +33,8 @@ public class CustomTokenConverter extends JwtAccessTokenConverter {
 			additionalInfo.put("enterDt", user.getEnterDt());
 			additionalInfo.put("authInfo", user.getAuthInfo());
 			additionalInfo.put("serverType", env.getActiveProfiles()[0]);
+			additionalInfo.put("userGrade", user.getUserGrade());
+			additionalInfo.put("clntCd", user.getClntCd());
 			
 			((DefaultOAuth2AccessToken) accessToken).setAdditionalInformation(additionalInfo);
 		}
