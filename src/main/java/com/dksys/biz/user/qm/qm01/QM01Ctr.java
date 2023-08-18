@@ -76,17 +76,7 @@ public class QM01Ctr {
     model.addAttribute("result", result);
     return "jsonView";
   }
-  
- @PostMapping(value = "/selectSignResUserlst")
-  public String selectSignResUserlst(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    int totalCnt = qm01Svc.selectSignUserCount(paramMap);
-    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-    model.addAttribute("paginationInfo", paginationInfo);
-    List<Map<String, String>> result = qm01Svc.selectSignResUserlst(paramMap);
-    model.addAttribute("result", result);
-    return "jsonView";
-  }
- 
+   
   @PostMapping(value = "/selectShareResUserlst")
   public String selectShareResUserlst(@RequestBody Map<String, String> paramMap, ModelMap model) {
     int totalCnt = qm01Svc.selectShareUserResCount(paramMap);
