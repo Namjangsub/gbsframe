@@ -76,21 +76,12 @@ public class QM01SvcImpl implements QM01Svc {
   public List<Map<String, String>> selectShareUserlst(Map<String, String> paramMap) {
     return QM01Mapper.selectShareUserlst(paramMap);
   }
-  
-  @Override
-  public List<Map<String, String>> selectSignResUserlst(Map<String, String> paramMap) {
-    return QM01Mapper.selectSignResUserlst(paramMap);
-  }
-  
+    
   @Override
   public List<Map<String, String>> selectShareResUserlst(Map<String, String> paramMap) {
     return QM01Mapper.selectShareResUserlst(paramMap);
   }
   
-  @Override
-  public List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap) {
-    return QM01Mapper.selectShareUserInfo(paramMap);
-  }
   /*
   @Override
   public List<Map<String, String>> selectSignUserInfo(Map<String, String> paramMap) {

@@ -87,12 +87,7 @@ public class QM01Ctr {
     return "jsonView";
   }
   
-  @PostMapping(value = "/selectShareUserInfo")
-  public String selectShareUserInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	List<Map<String, String>> resultList = qm01Svc.selectShareUserInfo(paramMap);
-    model.addAttribute("resultList", resultList);
-    return "jsonView";
-  }
+
   
  /*@PostMapping(value = "/selectSignUserInfo")
   public String selectSignUserInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
