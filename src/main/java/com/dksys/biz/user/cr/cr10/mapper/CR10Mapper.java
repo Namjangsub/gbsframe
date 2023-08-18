@@ -30,6 +30,8 @@ public interface CR10Mapper {
 
   int selectTodoAppCount(Map<String, String> paramMap);
 
+  int selectTodoAppSanctnSn(Map<String, String> paramMap);
+
   int insertLgistMast(Map<String, String> paramMap);
 
   int updateLgistMast(Map<String, String> paramMap);

@@ -11,7 +11,7 @@
 		            	ELSE 'APP0'
 		        END AS APP_STATUS
 			   FROM TB_BM13M01 A
-			   JOIN TB_WB20M02 B ON A.CO_CD = B.CO_CD AND A.APP_DIV = B.TODO_DIV1_CODE_ID AND A.APP_ID = B.TODO_ID
+			   JOIN TB_WB20M03 B ON A.CO_CD = B.CO_CD AND A.APP_DIV = B.TODO_DIV1_CODE_ID AND A.APP_ID = B.TODO_ID
 			  WHERE A.APP_DIV = 'APPDIV03'
 			  GROUP BY A.CO_CD, B.TODO_DIV1_CODE_ID, B.TODO_DIV2_CODE_ID
 		)
@@ -19,7 +19,7 @@
 			SELECT A.CO_CD, B.TODO_DIV1_CODE_ID, B.TODO_DIV2_CODE_ID, A.APP_SEQ,  B.TODO_ID,  FN_CM06M01_ID_TO_NM(B.TODO_ID) AS TODO_ID_NM , DECODE(B.TODO_CF_DT,NULL,'N','Y') AS TODO_CF_YN
 				   , X.DEPT_NM , (SELECT LEVEL_NM FROM TB_CM07M01 WHERE LEVEL_CD=X.LEVEL_CD) AS LEVEL_NM
 				   FROM TB_BM13M01 A
-				   JOIN TB_WB20M02 B ON A.CO_CD = B.CO_CD AND A.APP_DIV = B.TODO_DIV1_CODE_ID AND A.APP_ID = B.TODO_ID
+				   JOIN TB_WB20M03 B ON A.CO_CD = B.CO_CD AND A.APP_DIV = B.TODO_DIV1_CODE_ID AND A.APP_ID = B.TODO_ID
 				   LEFT OUTER JOIN (
 							SELECT BB.ID
 									, BB.NAME
@@ -347,7 +347,7 @@
 		            	ELSE 'APP0'
 		        END AS APP_STATUS
 			   FROM TB_BM13M01 A
-			   JOIN TB_WB20M02 B ON A.CO_CD = B.CO_CD AND A.APP_DIV = B.TODO_DIV1_CODE_ID AND A.APP_ID = B.TODO_ID
+			   JOIN TB_WB20M03 B ON A.CO_CD = B.CO_CD AND A.APP_DIV = B.TODO_DIV1_CODE_ID AND A.APP_ID = B.TODO_ID
 			  WHERE A.APP_DIV = 'APPDIV03'
 			  GROUP BY A.CO_CD, B.TODO_DIV1_CODE_ID, B.TODO_DIV2_CODE_ID
 		)
@@ -355,7 +355,7 @@
 			SELECT A.CO_CD, B.TODO_DIV1_CODE_ID, B.TODO_DIV2_CODE_ID, A.APP_SEQ,  B.TODO_ID,  FN_CM06M01_ID_TO_NM(B.TODO_ID) AS TODO_ID_NM , DECODE(B.TODO_CF_DT,NULL,'N','Y') AS TODO_CF_YN
 				   , X.DEPT_NM , (SELECT LEVEL_NM FROM TB_CM07M01 WHERE LEVEL_CD=X.LEVEL_CD) AS LEVEL_NM
 				   FROM TB_BM13M01 A
-				   JOIN TB_WB20M02 B ON A.CO_CD = B.CO_CD AND A.APP_DIV = B.TODO_DIV1_CODE_ID AND A.APP_ID = B.TODO_ID
+				   JOIN TB_WB20M03 B ON A.CO_CD = B.CO_CD AND A.APP_DIV = B.TODO_DIV1_CODE_ID AND A.APP_ID = B.TODO_ID
 				   LEFT OUTER JOIN (
 							SELECT BB.ID
 									, BB.NAME
@@ -454,7 +454,7 @@
 		SELECT A.APP_SEQ,  B.TODO_ID,  FN_CM06M01_ID_TO_NM(B.TODO_ID) AS TODO_ID_NM , DECODE(B.TODO_CF_DT,NULL,'N','Y') AS TODO_CF_YN
 			   , X.DEPT_NM , (SELECT LEVEL_NM FROM TB_CM07M01 WHERE LEVEL_CD=X.LEVEL_CD) AS LEVEL_NM
 			   FROM TB_BM13M01 A
-			   JOIN TB_WB20M02 B ON A.CO_CD = B.CO_CD AND A.APP_DIV = B.TODO_DIV1_CODE_ID AND A.APP_ID = B.TODO_ID
+			   JOIN TB_WB20M03 B ON A.CO_CD = B.CO_CD AND A.APP_DIV = B.TODO_DIV1_CODE_ID AND A.APP_ID = B.TODO_ID
 			   LEFT OUTER JOIN (
 						SELECT BB.ID
 								, BB.NAME
@@ -696,7 +696,14 @@
 	</select>
 
 	<select id="selectTodoAppCount" parameterType="Map" resultType="int">
-		SELECT COUNT(*) FROM TB_WB20M02
+		SELECT COUNT(*) FROM TB_WB20M03
+        WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+          AND TODO_DIV1_CODE_ID = #{todoDiv1CodeId, jdbcType=VARCHAR}
+          AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
+	</select>
+
+	<select id="selectTodoAppSanctnSn" parameterType="Map" resultType="int">
+		SELECT NVL(MAX(SANCTN_SN), 0) + 1 FROM TB_WB20M03
         WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
           AND TODO_DIV1_CODE_ID = #{todoDiv1CodeId, jdbcType=VARCHAR}
           AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId, jdbcType=VARCHAR}
@@ -705,10 +712,11 @@
 	<!-- ToDoList 등록  -->
     <insert id="insertTodoAppList" parameterType="Map">
         <selectKey keyProperty="todoKey" resultType="int" order="BEFORE">
-			SELECT NVL(MAX(TODO_KEY), 0) + 1 FROM TB_WB20M02
+			SELECT NVL(MAX(TODO_KEY), 0) + 1 FROM TB_WB20M03
         </selectKey>
-        INSERT INTO TB_WB20M02
+        INSERT INTO TB_WB20M03
         ( TODO_KEY
+        , SANCTN_SN
 		, CO_CD
 		, TODO_DIV1_CODE_ID
 		, TODO_DIV2_CODE_ID
@@ -726,6 +734,7 @@
         )
         VALUES
         ( #{todoKey}
+        , #{sanctnSn}
         , #{coCd}
         , #{todoDiv1CodeId}
         , #{todoDiv2CodeId}
@@ -754,8 +763,9 @@
     </update>
 
     <update id="updateTodoAppConfirm" parameterType="Map">
-        UPDATE TB_WB20M02
-        SET   TODO_CF_DT	= SYSDATE
+        UPDATE TB_WB20M03
+        SET   TODO_CF_DT	= #{todoCfDt}
+        	, TODO_CF_OPN	= #{todoCfOpn, jdbcType=VARCHAR}
             , UDT_ID        = #{userId, jdbcType=VARCHAR}
             , UDT_PGM       = #{pgmId, jdbcType=VARCHAR}
             , UDT_DTTM      = SYSDATE
