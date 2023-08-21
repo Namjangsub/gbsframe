@@ -88,6 +88,15 @@ public class QM01Ctr {
   }
   
 
+  @PostMapping(value = "/selectSignResUserlst")
+  public String selectSignResUserlst(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    int totalCnt = qm01Svc.selectSignResCount(paramMap);
+    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+    model.addAttribute("paginationInfo", paginationInfo);
+    List<Map<String, String>> result = qm01Svc.selectSignResUserlst(paramMap);
+    model.addAttribute("result", result);
+    return "jsonView";
+  }
   
  /*@PostMapping(value = "/selectSignUserInfo")
   public String selectSignUserInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
