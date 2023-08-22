@@ -517,7 +517,10 @@ function inputValidation(inputList) {
 function onlyNumber(elem){
 	var regExp = /^(-?)([0-9]*)(\.?[0-9]*)([^0-9]*)/g;
 	if(elem.value.trim()){
-		$(elem).val(addCommaStr(deleteCommaStr($(elem).val().replace(regExp, "$1$2$3"))));
+//		$(elem).val(addCommaStr(deleteCommaStr($(elem).val().replace(regExp, "$1$2$3"))));
+		var cleanedValue = elem.value.replace(regExp, "$1$2$3");
+        cleanedValue = cleanedValue.replace(/,/g, ''); 
+        $(elem).val(addCommaStr(cleanedValue));
 	}else{
 		$(elem).val(0);
 	}
@@ -545,23 +548,33 @@ function onlyPositive(elem){
 
 //0-9(십진수)만 허용
 function onlyDecimal(elem){
-	$(elem).val($(elem).val().replace(/[^0-9]/g,""));
+	if (elem && elem.value && typeof elem.value === "string") {
+	    elem.value = elem.value.replace(/[^0-9]/g, "");
+	}
+//	$(elem).val($(elem).val().replace(/[^0-9]/g,""));
 }
 
 // 한글 제거
 function exceptKorean(elem){
-	$(elem).val($(elem).val().replace(/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g,""));
+	if (elem && elem.value && typeof elem.value === "string") {
+		elem.value = elem.value.replace(/[a-h|a-ㅣ|ga-heh]/g, "");
+	}
+//	$(elem).val($(elem).val().replace(/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g,""));
 }
 
 // 계좌번호 (숫자, 하이픈만 허용)
 function onlyBkac(elem){
-	$(elem).val($(elem).val().replace(/^[-]|[^0-9-]/gi,""));
+	if (elem && elem.value && typeof elem.value === "string") {
+		$(elem).val($(elem).val().replace(/^[-]|[^0-9-]/gi,""));
+	}
 }
 
 // 전화번호 포맷 변경
 function telNumberFormatter(elem){
-	onlyDecimal(elem);
-	$(elem).val($(elem).val().replace(/(^02.{0}|^01.{1}|[0-9]{3})([0-9]+)([0-9]{4})/g,"$1-$2-$3"));
+	if (elem && elem.value && typeof elem.value === "string") {
+		onlyDecimal(elem);
+		$(elem).val($(elem).val().replace(/(^02.{0}|^01.{1}|[0-9]{3})([0-9]+)([0-9]{4})/g,"$1-$2-$3"));
+	}
 }
 
 // 사업자 등록번호 포맷 변경
@@ -577,7 +590,10 @@ function crnFormatter(elem){
 
 // 콤마 제거
 function deleteComma(elem) {
-	$(elem).val($(elem).val().replace(/,/g, ""));
+	if (elem && typeof elem.value === "string") {
+	    elem.value = elem.value.replace(/,/g, "");
+	}
+//	$(elem).val($(elem).val().replace(/,/g, ""));
 }
 
 // 원단위 콤마 추가 스트링변수용
@@ -600,7 +616,11 @@ function addCommaStr(value) {
 
 // 콤마 제거 스트링변수용
 function deleteCommaStr(value) {
-    return value.toString().replace(/,/g, "");
+	if (typeof value !== 'string') return value; 
+
+//    return value.toString().replace(/,/g, "");
+	let num = value.replace(/[^-0-9,.]/g, '');
+    return num.replace(/,/g, '');
 }
 
 // 하이픈 제거
