@@ -216,7 +216,7 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
            },
            body: {
 		    //mergeCells : ["coCdNm", "ordrgNo", "ordrgSeq", "pchsNo", "pchsSeq", "salesCd", "userChkV", "ordrgAmt", "pchsClntNm", "cmpletYn"],   
-		    mergeCells : ["ordrgNo", "", "salesCd", "pchsClntNm", "userChkV", "pchsNo", ""],
+		    mergeCells : ["ordrgNo", "ordrgSeq", "salesCd", "pchsClntNm", "userChkV", "pchsNo", ""],
 			onClick: function () {
 				this.self.clearSelect();				
 			    this.self.select(this.dindex);
@@ -229,12 +229,12 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
                 
                 //매입금액 클릭시
                 if( this.column.key == "pchsAmt"  ) {
-                	if( typeof(this.item.pchsAmt) == "undefined" ) gridView.target.setValue(row, "pchsAmt", this.item.ordrgAmt);
-                	if( typeof(this.item.pchsDt) == "undefined" ) gridView.target.setValue(row, "pchsDt", today);
+                	if( typeof(this.item.pchsAmt) == "undefined" || this.item.pchsAmt=="" ) gridView.target.setValue(row, "pchsAmt", this.item.ordrgAmt);
+                	if( typeof(this.item.pchsDt) == "undefined" || this.item.pchsDt=="" ) gridView.target.setValue(row, "pchsDt", today);
                 }
                 if( this.column.key == "pchsDt" ) {
-                	if( typeof(this.item.pchsAmt) == "undefined" ) gridView.target.setValue(row, "pchsAmt", this.item.ordrgAmt);
-                	if( typeof(this.item.pchsDt) == "undefined" ) {
+                	if( typeof(this.item.pchsAmt) == "undefined" || this.item.pchsAmt=="" ) gridView.target.setValue(row, "pchsAmt", this.item.ordrgAmt);
+                	if( typeof(this.item.pchsDt) == "undefined" || this.item.pchsDt=="" ) {
                 		gridView.target.setValue(row, "pchsDt", today);               		
                 	}
                 }                
@@ -281,6 +281,7 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
 	                 ]
 			    ],          
           columns: [
+        	  {key: "rn",      					label: "No.",          	align: "center",	width: 60},
               {key: "userChkV",    				label: "확정여부",      		align: "center",	width: 70,		formatter: "chkIcon"},        	  
               {key: "coCd",      				label: "회사",          	hidden: true},
               {key: "coCdNm",      				label: "회사명",          hidden: true},              
@@ -310,7 +311,7 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
 						  		}              
 							  }
 			  },			  
-			  {key: "cmpletYn", 				label: "완료",				align: "center", 	width: 50,		formatter: "chkIcon"
+			  {key: "cmpletYn", 				label: "완료",				align: "center", 	width: 50
 					, editor:{type: "checkbox"
 								, config: {trueValue: "Y", falseValue: "N"}
 		    					, disabled: function () {                            							
@@ -513,6 +514,7 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
  					}    			            		
  		        });
 				newRow.pchsSeq = "New"; 		        
+				newRow.cmpletYn = "N";
 				gridView.target.addRow($.extend({}, newRow), selRow+1, false);		
 				gridView.target.clearSelect();				
 				gridView.target.select(selRow+1);
@@ -536,14 +538,28 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
  					paramObj[key] = val; 						    			            		
  		        });		
  		        if(paramObj.coCd && paramObj.pchsNo && paramObj.ordrgNo && paramObj.ordrgSeq ) {
- 					if( confirm("선택행을 삭제하시겠습니까?\n\n그리드에 변경중인 내용이 초기화 됩니다.")) {
- 						deleteAjax("/user/sm/sm14/deletePurchaseDetail", paramObj, null, function(data) {
- 							if (data.resultCode == 200) {
- 								alert(data.resultMessage);
- 								gridView.setData(0);
- 							}
- 						}); 						
- 					}		 		        	
+ 		        	//1. 추가로 행만 삽인된 경우 메시지 없이 삭제
+ 		        	if( paramObj.pchsSeq == "New" ) {
+ 		        		gridView.target.deleteRow(selRow);
+ 		        	//2. 입력을 위한 매입금액과 매입일자가 찍힌경우
+ 		        	} else if( typeof(paramObj.pchsSeq) == "undefined" ) {
+ 		        		gridView.target.setValue(selRow, "pchsDt", "");     
+ 		        		gridView.target.setValue(selRow, "pchsAmt", "");
+ 		        		gridView.target.setValue(selRow, "cmpletYn", "N"); 
+ 		        		gridView.target.setValue(selRow, "pchsNo", );
+ 		        	//3.매입순번이 있는경우 data 존재
+ 		        	} else if( typeof(paramObj.pchsSeq)!="undefined" && paramObj.pchsSeq != "" ){
+ 	 					if( confirm("선택행을 삭제하시겠습니까?\n\n그리드에 변경중인 내용이 초기화 됩니다.")) {
+ 	 						deleteAjax("/user/sm/sm14/deletePurchaseDetail", paramObj, null, function(data) {
+ 	 							if (data.resultCode == 200) {
+ 	 								alert(data.resultMessage);
+ 	 								gridView.setData(0);
+ 	 							}
+ 	 						}); 						
+ 	 					}		 		        		
+ 		        	}
+ 		        	
+ 		        	
  		        }
  		        
 			} 	
@@ -582,18 +598,17 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
 	        	}		      
 	        	var amtChk = (typeof(elem.pchsAmt)==="undefined" || elem.pchsAmt=="") ? false : true;
 	        	var dtChk = (typeof(elem.pchsDt)==="undefined" || elem.pchsDt=="") ? false : true;
-	            //매입순번이 있는 항목만 체크       
-	            if( typeof(elem.pchsSeq)!="undefined" && elem.pchsSeq != "" ) {
-		        	//매입금액 
-		        	if( amtChk ) { 
-		        		inCnt++;
-		        	}
-		        	//매입일자
-		        	if( dtChk ) {
-		        		inCnt++;		        		
-		        	}
+	                   
+	            //console.log('----amtChk:' + amtChk+'----dtChk:' + dtChk);
+	            console.log('----elem.pchsNo:' + elem.pchsNo);
+	        	//매입금액 
+	        	if( amtChk ) inCnt++; 
+	        	//매입일자
+	        	if( dtChk ) inCnt++; 	            
+	            //매입번호가 있을경우 금액등 체크(수정시)
+	            if( elem.pchsNo != "PC2300000" || elem.pchsSeq == "New" ) {
 		        	//매입금액 체크
-		        	if( (!amtChk && dtChk) || Number(elem.pchsAmt) === 0 ) {
+		        	if( (!amtChk && dtChk) /* || Number(elem.pchsAmt) === 0 발주금액 chk X */ ) {
 		            	msgArr.push((idx+1)+" 행의 매입금액을 입력해 주십시오.")	;		        		
 		        	}		        	
 		        	//매입일자 체크
@@ -602,15 +617,18 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
 		        	}
 		        	if( !amtChk && !dtChk ) {
 		            	msgArr.push((idx+1)+" 행의 매입금액/매입일자를 입력해 주십시오.")	;		        		
-		        	}	        		            	
-	            }
+		        	}
 
+	            }
 	        	//매입금액 over 체크
 	        	if( amtChk ) {
 		        	var balAmt = Number(elem.ordrgAmt);
 		        	var pchsAmt = Number(elem.pchsAmt);	        	
 		        	if( pchsAmt > balAmt) {
 		            	msgArr.push((idx+1)+" 행의 매입금액은 발주금액을 초과할 수 없습니다.")	;
+			        //매입금액은 0이 될수 없다
+			        } else if( pchsAmt == "0" ) {
+		            	msgArr.push((idx+1)+" 행의 매입금액은 0보다 커야 합니다.")	;
 		        	} else {
 		        		
 		        		console.log('ordrgAmt::'+detailObj["ordrgAmt"]+'---seq--' + detailObj["pchsSeq"]);
@@ -643,12 +661,16 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
 			} else {
 				var formData = new FormData($("#mainForm")[0]);								
 				formData.append("makeArr", JSON.stringify(detailArr));
-				debugger;
+				//debugger;
 				filePostAjax("/user/sm/sm14/insertPurchaseBillDetail", formData,		// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
 						function(data) {
-							alert("처리 되었습니다.");								// 결과 메시지를 alert으로 출력
+
+
 							if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
+								alert("처리 되었습니다.");								// 결과 메시지를 alert으로 출력								
 								gridView.setData(0);
+							} else {
+								alert("등록중 오류가 발생 되었습니다.");								// 결과 메시지를 alert으로 출력								
 							}
 					});					
 			}		        	

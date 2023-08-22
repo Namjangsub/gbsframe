@@ -132,7 +132,7 @@
 						  ) A		/* 발주+매입 내역 */
 						  WHERE 1=1 
 						<include refid="selectPurchaseListCondition"></include>
-						  ORDER BY A.CO_CD, A.ORDRG_NO DESC, A.ORDRG_SEQ DESC, A.SALES_CD DESC, A.PCHS_SEQ DESC	
+						  ORDER BY A.CO_CD, A.ORDRG_NO DESC, A.ORDRG_SEQ DESC, A.SALES_CD DESC, A.PCHS_NO DESC, A.PCHS_SEQ DESC	
 						) X		
 			)							
 			WHERE 1=1
@@ -150,7 +150,9 @@
 					FROM
 						(
 						SELECT A.CO_CD	
-							, A.PCHS_NO			/* 매입번호 */	
+							, A.PCHS_NO			/* 매입번호 */
+							, A.PCHS_SEQ		/* 매입순번 */
+							, MAX(A.PCHS_SEQ) OVER(PARTITION BY A.PCHS_NO, A.PCHS_SEQ)+1	AS MAX_PCHS_SEQ
 							, A.ORDRG_NO
 							, A.ORDRG_SEQ
 							, A.SALES_CD
@@ -161,14 +163,17 @@
 							, A.ORDRG_AMT	
 							, A.ORDRG_DT	
 							, A.PCHS_AMT
-							, A.PCHS_DT
+							, TO_CHAR(A.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT
 							, A.CMPLET_YN
 							, A.USER_CHK_V
+							, A.FILE_TRGT_KEY
 						  FROM
 						  (
 						  	/* 발주 완료되지 않은 건 + 완료된건 */
 							SELECT E.CO_CD
-								, NVL(D.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'0000') AS PCHS_NO	/*매입확정번호 */
+								, NVL(D.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00000') AS PCHS_NO	/*매입확정번호 */
+								, D.PCHS_SEQ
+								, DECODE(M12.CMPLET_YN, 'Y', '', 'N') AS CMPLET_YN								
 								, E.ORDRG_NO 
 								, E.ORDRG_SEQ 
 								, E.SALES_CD
@@ -185,18 +190,20 @@
 								, B.ORDRG_DT		/* 발주일자 */
 								, D.PCHS_AMT		/* 매입금액 */
 								, D.PCHS_DT
-								, D.CMPLET_YN
-								, 'N' AS USER_CHK_V
+								/* , D.CMPLET_YN */
+								, NVL(DECODE(M12.CMPLET_YN, 'Y', 'Y', 'N'), 'N') AS USER_CHK_V
+								, B.FILE_TRGT_KEY	
 								FROM TB_SM02D01 E		/* 매입 DETAIL */
 								INNER JOIN TB_SM02M01 B ON(E.CO_CD=B.CO_CD AND E.ORDRG_NO=B.ORDRG_NO AND E.SALES_CD=B.SALES_CD)
-								LEFT OUTER JOIN TB_SM12D01 D ON(D.ORDRG_NO=E.ORDRG_NO AND D.ORDRG_SEQ=E.ORDRG_SEQ)	/* 발주 DETAIL */ 
+								LEFT OUTER JOIN TB_SM12D01 D ON(D.ORDRG_NO=E.ORDRG_NO AND D.ORDRG_SEQ=E.ORDRG_SEQ)	/* 발주 DETAIL */
+								LEFT OUTER JOIN TB_SM12M01 M12 ON(D.CO_CD=M12.CO_CD AND D.PCHS_NO=M12.PCHS_NO)		/* 발주 MASTER */
 								LEFT OUTER JOIN TB_SM01D01 F ON(E.CO_CD=F.CO_CD AND E.SALES_CD=F.SALES_CD AND E.UPPER_CD=F.UPPER_CD 
 								 								AND E.LOWER_CD=F.LOWER_CD AND E.MATR_SEQ=F.MATR_SEQ AND E.MATR_CD=F.MATR_CD)	/* 구매BOM 자재 */
 							WHERE 1=1  
 						  ) A		/* 발주+매입 내역 */
 						  WHERE 1=1 
 						<include refid="selectPurchaseListCondition"></include>
-						  ORDER BY A.CO_CD, A.ORDRG_NO DESC, A.ORDRG_SEQ DESC, A.SALES_CD DESC		
+						  ORDER BY A.CO_CD, A.ORDRG_NO DESC, A.ORDRG_SEQ DESC, A.SALES_CD DESC, A.PCHS_NO DESC, A.PCHS_SEQ DESC	
 						) X		
 			)							
 			WHERE 1=1
@@ -328,7 +335,7 @@
 			SELECT NVL(MAX(PCHS_SEQ)+1, 1) FROM TB_SM12D01 
 				WHERE CO_CD = #{coCd}
 					AND ORDRG_NO = #{ordrgNo}
-					AND ORDRG_SEQ = #{ordrgSeq}
+					AND ORDRG_SEQ = #{ordrgSeq}					
 					AND PCHS_NO = #{maxPchsNo}
 		</selectKey>
 		INSERT INTO TB_SM12D01
@@ -378,7 +385,42 @@
 			AND ORDRG_SEQ = #{ordrgSeq}
 	</update>
 	
-	<!-- 발주 디테일  삭제 -->         
+	<!-- 입고관리 마스터 CMPLET_YN 수정 -->
+	<update id="updatePurchaseMaster" parameterType="Map">
+		MERGE INTO TB_SM12M01 
+			USING DUAL
+			ON (
+			CO_CD = #{coCd}
+			AND PCHS_NO = #{maxPchsNo}
+				)		
+		WHEN MATCHED THEN
+			UPDATE SET	
+				CMPLET_YN = #{cmpletYn,			jdbcType=VARCHAR}
+				, UDT_ID = #{userId}
+				, UDT_PGM = #{pgmId}
+				, UDT_DTTM = SYSDATE
+		WHEN NOT MATCHED THEN					
+		INSERT 
+	      (
+			 CO_CD
+			 , PCHS_NO
+			 , CMPLET_YN
+			 , CREAT_ID
+			 , CREAT_PGM
+			 , CREAT_DTTM
+	      )
+	    VALUES
+	    (
+			#{coCd}
+			, #{maxPchsNo}
+			, #{cmpletYn,			jdbcType=VARCHAR}
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+	    )
+	</update>	
+	
+	<!-- 매입 master  삭제 -->         
 	<delete id="deletePurchaseDetail" parameterType="Map">
 		DELETE 
 			FROM TB_SM12D01
@@ -389,5 +431,14 @@
 			AND ORDRG_NO = #{ordrgNo}
 			AND ORDRG_SEQ = #{ordrgSeq}
 	</delete>	
+	
+	<!-- 매입 디테일  삭제 -->         
+	<delete id="deletePurchaseMaster" parameterType="Map">
+		DELETE 
+			FROM TB_SM12M01
+		WHERE 1=1
+			AND CO_CD = #{coCd}
+			AND PCHS_NO = #{pchsNo}
+	</delete>		
 		
  </mapper>

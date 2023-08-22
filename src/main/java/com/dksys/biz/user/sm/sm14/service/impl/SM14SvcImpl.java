@@ -87,6 +87,7 @@ public class SM14SvcImpl implements SM14Svc {
 	    //MAX ORDGR_NO - 최조 입력일 경우만
 		String maxPchsNo = "";
 		String pchsNo = "";	 		
+		String preOrdrgNo = "";
 		for(Map<String, String> dtl : detailMap) {
 			dtl.put("userId", paramMap.get("userId"));
 			dtl.put("pgmId", paramMap.get("pgmId"));
@@ -95,14 +96,31 @@ public class SM14SvcImpl implements SM14Svc {
 			pchsNo = dtl.get("pchsNo").toString();
 			//뒤 5자리
 			pchsNo = pchsNo.substring(pchsNo.length()-5, pchsNo.length());
+			//같은 발주번호인지 비교를 위해서 쓴다.
 			if( pchsNo.equals("00000") || dtl.get("actFlag").equals("I") ) {
-				maxPchsNo = sm14Svc.selectMaxPchsNo(paramMap);
+				//최초 실행이거나 이전발주번호 현재 발주번호가 다를때 신규매입번호 select
+				if( !preOrdrgNo.equals(dtl.get("ordrgNo")) || preOrdrgNo.equals("") ) {					
+					maxPchsNo = sm14Svc.selectMaxPchsNo(paramMap);					
+					preOrdrgNo = dtl.get("ordrgNo");			
+				} else if( preOrdrgNo.equals(dtl.get("ordrgNo")) ){
+
+				}
 				dtl.put("maxPchsNo", maxPchsNo);
-	    		result += sm14Mapper.insertPurchaseBillDetail(dtl);				
-			} else if( dtl.get("actFlag").equals("U") ) {
-	    		result += sm14Mapper.updatePurchaseBillDetail(dtl);				
-			}
-		}			
+	    		result += sm14Mapper.insertPurchaseBillDetail(dtl);
+				//TB_SM12M01 TB_SM12M01 UPDATE
+				if( dtl.get("cmpletYn").equals("Y") ) {
+		    		sm14Mapper.updatePurchaseMaster(dtl);    			
+				}
+			}	
+			if( dtl.get("actFlag").equals("U") ) {
+				dtl.put("maxPchsNo", dtl.get("pchsNo"));				
+	    		result += sm14Mapper.updatePurchaseBillDetail(dtl);			    		
+			}				
+			//TB_SM12M01 TB_SM12M01 UPDATE
+			if( dtl.get("cmpletYn").equals("Y") ) {
+	    		sm14Mapper.updatePurchaseMaster(dtl);    			
+			}				
+		}
 		return result;
 	}
 	
@@ -129,7 +147,12 @@ public class SM14SvcImpl implements SM14Svc {
 			dtl.put("pgmId", paramMap.get("pgmId"));
 			dtl.put("creatId", paramMap.get("userId"));
 			
-    		result += sm14Mapper.updatePurchaseBillDetail(dtl);			
+    		//result += sm14Mapper.updatePurchaseBillDetail(dtl);	
+    		
+    		//TB_SM12M01 TB_SM12M01 UPDATE
+    		if( paramMap.get("cmpletYn").equals("Y") ) {
+        		sm14Mapper.updatePurchaseMaster(dtl);    			
+    		}
 		}			
 
 	    
@@ -138,6 +161,9 @@ public class SM14SvcImpl implements SM14Svc {
 	
 	@Override
 	public int deletePurchaseDetail(Map<String, String> param) {
-		return sm14Mapper.deletePurchaseDetail(param);
+		int result = 0;
+		result += sm14Mapper.deletePurchaseDetail(param);
+		result += sm14Mapper.deletePurchaseMaster(param);
+		return result;
 	}	
 }
