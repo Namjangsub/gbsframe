@@ -92,6 +92,12 @@ public class QM01SvcImpl implements QM01Svc {
     return QM01Mapper.selectSignResUserlst(paramMap);
   }
   
+//결재라인 부서명등 select 	  
+  @Override
+  public List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap) {
+    return QM01Mapper.selectShareUserInfo(paramMap);
+  }	
+  
   /*
   @Override
   public List<Map<String, String>> selectSignUserInfo(Map<String, String> paramMap) {

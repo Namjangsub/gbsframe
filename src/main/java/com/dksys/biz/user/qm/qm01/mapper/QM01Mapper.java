@@ -72,4 +72,6 @@ public interface QM01Mapper {
   
   List<Map<String, String>> selectMainCodeList(Map<String, String> param);
   
+  List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap);
+  
 }

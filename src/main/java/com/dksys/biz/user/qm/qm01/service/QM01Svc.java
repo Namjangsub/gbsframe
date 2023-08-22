@@ -51,4 +51,6 @@ public interface QM01Svc {
   
   public List<Map<String, String>> selectMainCodeList(Map<String, String> param);
   
+  List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap);
+  
 }
