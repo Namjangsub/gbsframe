@@ -14,6 +14,8 @@ public interface QM01Svc {
   int selectSignUserCount(Map<String, String> paramMap); 
   
   int selectShareUserResCount(Map<String, String> paramMap); 
+  
+  int selectSignResCount(Map<String, String> paramMap); 
 
   List<Map<String, String>> selectQualityReqList(Map<String, String> paramMap);
   
@@ -22,6 +24,8 @@ public interface QM01Svc {
   List<Map<String, String>> selectShareUserlst(Map<String, String> paramMap);
   
   List<Map<String, String>> selectShareResUserlst(Map<String, String> paramMap);
+  
+  List<Map<String, String>> selectSignResUserlst(Map<String, String> paramMap);
   
   //List<Map<String, String>> selectSignUserInfo(Map<String, String> paramMap);  
 
@@ -46,5 +50,7 @@ public interface QM01Svc {
   int selectCodeMaxCount(Map<String, String> paramMap);
   
   public List<Map<String, String>> selectMainCodeList(Map<String, String> param);
+  
+  List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap);
   
 }
