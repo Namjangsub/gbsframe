@@ -9,7 +9,9 @@ public interface WB01Svc {
 
    List<Map<String, String>> selectWbsLeftSalesCodeList(Map<String, String> paramMap);	
 
-   List<Map<String, String>> selectNewWbsPlanTreeList(Map<String, String> paramMap);	
+   List<Map<String, String>> selectNewWbsPlanTreeList(Map<String, String> paramMap);
+   
+   List<Map<String, String>> selectNewWbsPlanTreeListSelect(Map<String, String> paramMap);
 
    List<Map<String, String>> selectNewWbsPlanExcelList(Map<String, String> paramMap);
 
@@ -42,5 +44,10 @@ public interface WB01Svc {
    int deleteWbsRsltslist(Map<String, String> paramMap);
    
    List<Map<String, String>> selectWbsInfo(Map<String, String> paramMap);
+   
+   int wbsPlanListInsert(Map<String, String> paramMap);
+   
+   int deleteWbsPlanTempList(Map<String, String> paramMap);
+   
    
 }

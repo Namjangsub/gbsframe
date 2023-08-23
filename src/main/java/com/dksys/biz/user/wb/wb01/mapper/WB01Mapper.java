@@ -12,7 +12,9 @@ public interface WB01Mapper {
 	List<Map<String, String>> selectWbsLeftSalesCodeList(Map<String, String> paramMap);
 	
     List<Map<String, String>> selectNewWbsPlanTreeList(Map<String, String> paramMap);
-	
+    
+    List<Map<String, String>> selectNewWbsPlanTreeListSelect(Map<String, String> paramMap);
+    	
     List<Map<String, String>> selectNewWbsPlanExcelList(Map<String, String> paramMap);
 	
     int deleteWbsPlanlist(Map<String, String> paramMap);
@@ -58,6 +60,12 @@ public interface WB01Mapper {
     int deleteWbsApprovalListSub(Map<String, String> paramMap);
     
     List<Map<String, String>> selectWbsInfo(Map<String, String> paramMap);
+    
+    int wbsPlanListInsert(Map<String, String> paramMap);
+    
+    List<Map<String, String>> wbsPlanListChk(Map<String, String> paramMap);
+    
+    int deleteWbsPlanTempList(Map<String, String> paramMap);
     
 }
 

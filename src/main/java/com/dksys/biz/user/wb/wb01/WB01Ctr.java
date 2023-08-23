@@ -54,6 +54,15 @@ public class WB01Ctr {
     	model.addAttribute("fileList", fileList);
         return "jsonView";
 	}
+	
+	@PostMapping(value = "/selectNewWbsPlanTreeListSelect") 
+	public String selectNewWbsPlanTreeListSelect(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
+    	List<Map<String, String>> fileList = wb01Svc.selectNewWbsPlanTreeListSelect(paramMap);
+    	model.addAttribute("fileList", fileList);
+        return "jsonView";
+	}
+	
+	
 
     @PostMapping(value = "/selectNewWbsPlanExcelList") 
 	public String selectNewWbsPlanExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
@@ -213,6 +222,40 @@ public class WB01Ctr {
   	model.addAttribute("result", result);
       return "jsonView";
 	}
+
+  @PostMapping(value = "/wbsPlanListInsert")
+  public String wbsPlanListInsert(@RequestParam Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (wb01Svc.wbsPlanListInsert(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+			    model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+		} else {
+			    model.addAttribute("resultCode", 500);
+			    model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+		    model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+ }
+  
+  @PutMapping(value = "/deleteWbsPlanTempList")
+  public String deleteWbsPlanTempList(@RequestParam Map<String, String> paramMap, ModelMap model) {
+		try {
+			if (wb01Svc.deleteWbsPlanTempList(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+  } 
   
   
 }	  
