@@ -57,5 +57,4 @@ public interface WB02Mapper {
    int deleteWbsSharngList(Map<String, String> paramMap);
  
    int deleteWbsApprovalList(Map<String, String> paramMap);
-
 }

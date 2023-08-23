@@ -40,6 +40,4 @@ public interface WB02Svc {
    List<Map<String, String>>  deleteWbsApprovalListChk(Map<String, String> paramMap);
 
    int deleteWbsApprovalList(Map<String, String> paramMap);
-
-
 }

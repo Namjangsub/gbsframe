@@ -58,6 +58,11 @@ public class WB01SvcImpl implements WB01Svc {
 	}
 
     @Override
+	public List<Map<String, String>> selectNewWbsPlanTreeListSelect(Map<String, String> paramMap) {
+		return wb01Mapper.selectNewWbsPlanTreeListSelect(paramMap);
+	}
+    
+    @Override
 	public List<Map<String, String>> selectNewWbsPlanExcelList(Map<String, String> paramMap) {
 		return wb01Mapper.selectNewWbsPlanExcelList(paramMap);
 	}
@@ -358,6 +363,50 @@ public class WB01SvcImpl implements WB01Svc {
     @Override
 	public List<Map<String, String>> selectWbsInfo(Map<String, String> paramMap) {
 		return wb01Mapper.selectWbsInfo(paramMap);
+	}
+    
+    @Override
+    public int wbsPlanListInsert(Map<String, String> paramMap) {
+		int result = 0;
+		Gson gson = new Gson();
+	    Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> arr = gson.fromJson(paramMap.get("rowListArr"), stringList);
+		if (arr != null && arr.size() > 0 ) {
+			for (Map<String, String> arrMap : arr) {
+	            try {        
+	            	List<Map<String, String>> listChk = wb01Mapper.wbsPlanListChk(arrMap);
+	    			if (listChk.size() == 0) {
+	    				wb01Mapper.wbsPlanListInsert(arrMap);
+		            	result++;
+	    			}	            	 
+	            } catch (Exception e) {
+	                 System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
+		return result;
+	}
+    
+    @Override
+    public int deleteWbsPlanTempList(Map<String, String> paramMap) {
+		int result = 0;
+		Gson gson = new Gson();
+	    Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> arr = gson.fromJson(paramMap.get("rowListArr"), stringList);
+		if (arr != null && arr.size() > 0 ) {
+			for (Map<String, String> arrMap : arr) {
+	            try {        
+	            	List<Map<String, String>> listChk = wb01Mapper.wbsPlanListChk(arrMap);
+	    			if (listChk.size() > 0) {
+	    				wb01Mapper.deleteWbsPlanTempList(arrMap);
+		            	result++;
+	    			}	            	 
+	            } catch (Exception e) {
+	                 System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
+		return result;
 	}
 	
 }

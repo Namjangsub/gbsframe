@@ -5,7 +5,7 @@
     
     <div class="popup_table">
         <div class="form-group">
-            <form id="popForm">
+            <form id="popFormApp">
                 <table class="popup_table">
                     <colgroup>
                          <col width="8%">
@@ -16,12 +16,11 @@
                          <col width="11%">
                          <col width="8%">
                          <col width="11%">
-                         <col width="6%">
                     </colgroup>
                     
                     <thead>
                         <tr>
-                           <td colspan="9" style="height:30px;text-align: left;">기본정보</td>                                                
+                           <td colspan="8" style="height:30px;text-align: left;">기본정보</td>                                                
                         </tr>
                     </thead>
                     
@@ -37,27 +36,19 @@
                              <th class="hit">작성자</th>
                             <td>
                                 <div class="search_form">
-                                    <input type="hidden" id="appId" name="appId">
-                                    <input type="text" id="appNm" name="appNm" msg="작성자"  onkeyUp="if(window.event.keyCode == 8){appId.value = ''};" readonly required>
-                                    <a onclick="openFirstWbsPlanUserSearch2();">
+                                    <input type="hidden" id="userId_S" name="userId_S">
+                                    <input type="text" id="userName_S" name="userName_S" msg="작성자" required>
+                                    <a onclick="openFirstWbsPlanUserSearch2();" id="userId_S_Btn">
                                         <i class="i_search_w"></i>
                                     </a>
                                 </div>
                             </td>
-                            <th>결재선 구분</th>
+                            <th class="hit">결재선 구분</th>
                             <td>
                                 <select  id="appDiv" name="appDiv" data-kind="APPDIV" style="width: 100%;">
                                   <option value="">선택</option>
                                 </select>
                             </td>
-                            <th class="hit">사용여부</th>
-                            <td>
-                                <select  id="useYn" name="useYn"  style="width: 100%;">
-                                  <option value="Y" checked>Y</option>
-                                  <option value="">N</option>
-                                </select>
-                            </td>
-                            <th rowspan="5" style="vertical-align:top;">
                           </th>
                         </tr>
                    </tbody>   
@@ -159,11 +150,17 @@ var ApprovalGridView1 = {
             return this;
           },
           setData: function() {   
-	              var targetObj = this.target;
-	              var formData = {
-	            		  "coCd" : $("#coCd").val()
-	            		  , "appDiv" : $("#appDiv").val()
-	              }
+				var targetObj = this.target;
+	       	    var userId = $("#popFormApp #userId_S").val();
+				var userName_S = $("#popFormApp #userName_S").val();	
+				var formData = {
+	     	    		   "userId" : userId,	//userId - 작성자
+	     	    		   "userNm" : userName_S,		//작성자명 검색
+	     	               "coCd" : $("#popFormApp #coCd").val(), //회사코드
+	     	               "appId" : $("#popFormApp #appId_S").val(), //결재자id
+	     	               "appName" : $("#popFormApp #appName_S").val(), //결재자이름검색시 활용
+							"appDiv" : $("#popFormApp #appDiv").val()	     	               
+				}
 	              postAjax("/user/wb/wb02/selectApprovalList", formData, null, function(data){
 	                  var list = data.resultList;
 	                  targetObj.setData({
@@ -181,17 +178,41 @@ var ApprovalGridView1 = {
 $(document).ready(function() {
     setCommonSelect($("#wbsPopup1 select[data-kind]"));
     	
-    // 접속자 회사 set
-    $("#coCd").val(jwt.coCd);
-    
+    // 접속자 회사 등 set
+    $("#popFormApp #coCd").val(modalStack.last().paramObj.coCd);
 	//공통결재시 SELECT SEL
 	appDiv = modalStack.last().paramObj.appDiv;
 	if( appDiv ) {
-		$("#appDiv").val(appDiv);
+		$("#popFormApp #appDiv").val(appDiv);
 	}
+	$("#popFormApp #userId_S").val(modalStack.last().paramObj.userId);
+    $("#popFormApp #userName_S").val(modalStack.last().paramObj.userNm);
 	
     ApprovalGridView1.initView().setData();
     
+    // 검색조건 이벤트 bind
+	$('[data-search], #appDiv').on("change", function(){
+		ApprovalGridView1.setData(0);
+	});    
+    
+	//작성자 결재자 keyup 이벤트
+	$("#popFormApp #userName_S").on("keyup", function () {
+		if(event.keyCode == 8) {
+			$("#popFormApp #userName_S").val('');
+			$("#popFormApp #userId_S").val('');
+			ApprovalGridView1.setData(0); 
+		} else if(event.keyCode == 13) { 
+			ApprovalGridView1.setData(0); 
+		}		
+	});    
+    //관리자일경우만 작성자 검색을 사용할지 결정
+    if( jwt.authInfo.indexOf('AUTH001') > -1 ) {
+	
+    } else {
+    	$("#popFormApp #userName_S").attr('readonly', true);
+		$("#popFormApp #userId_S_Btn").hide();
+		$("#popFormApp #userId_S_Btn").removeAttr("onclick");        	
+    }
 });
 
 
@@ -199,15 +220,16 @@ $(document).ready(function() {
 function openFirstWbsPlanUserSearch2() {
     var paramObj = {
         "coCd" : $('#coCd').val(),
-        "userId": $('#appId').val(),
+        "userId": $('#userId_S').val(),
         "useYn": "Y"
     };
     
-    openSecondModal("/static/html/cmn/modal/userSearch.html", 300, 500, "작성자 검색", paramObj, function (tree){
+    openThirdModal("/static/html/cmn/modal/userSearch.html", 300, 500, "작성자 검색", paramObj, function (tree){
         var checkedId = tree.get_checked()[0];
         var checkedNode = tree.get_node(checkedId);
-        $('#appId').val(checkedNode.id);
-        $('#appNm').val(checkedNode.text);
+        $('#userId_S').val(checkedNode.id);
+        $('#userName_S').val(checkedNode.text);
+        if( checkedNode.id && checkedNode.text) ApprovalGridView1.setData(0);
     });
 }
 
