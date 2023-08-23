@@ -33,6 +33,7 @@
 <script src="/static/js/ax5/ax5toast.min.js"></script>
 <script src="/static/js/jstree/jstree.min.js"></script>
 <script type="text/javascript" src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<script src="/static/js/exceljs.min.js"></script>
 <script src="/static/js/global.js"></script>
 <script src="/static/js/fileTree.js"></script>
 <!-- <script src="/static/js/calLuna.js"></script> -->
@@ -91,7 +92,7 @@
         <div class="add_btn_small pdl10">
 			<a onclick="prevNextCalendar('-');" style="height: 30px; line-height: 28px; width: 50px;" authChk>이전달</a>
 			<a onclick="prevNextCalendar('+');" style="height: 30px; line-height: 28px; width: 50px;" authChk>다음달</a>
-		    <a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+		    <a onclick="jsonToExcel(gridView);" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
         </div>
       </div>
     </div>
@@ -181,6 +182,8 @@ var gridView = {
 						 {key: "id",		label: "ID", 	    	width: 60,		align: "center",	hidden:true}
 						,{key: "name", 		label: "성명", 			width: 80,		align: "center"  }
 						,{key: "levelNm", 	label: "직위", 			width: 60,		align: "center"  }
+						,{key: "tot", 		label: "합계", 		width: 80, 		align: "center", styleClass: function () {return "grid-font-blue-bold";}}
+						,{key: "holyTime", 	label: "휴가", 		width: 40, 		align: "center", styleClass: function () {return "grid-font-blue";}}
     	            ]
 
 			});
@@ -215,10 +218,12 @@ var gridView = {
 			this.target.setConfig({
 					target: $('[data-ax5grid="excel-grid"]'),
 			    	columns : [
-						 {key: "id",		label: "ID", 	    	width: 60,		align: "center",	hidden:true}
-						,{key: "name", 		label: "성명", 			width: 80,		align: "center"  }
-						,{key: "levelNm", 	label: "직위", 			width: 60,		align: "center"  }
-   	            ]
+						 {key: "id",		label: "ID", 	    width: 60,		align: "center",	hidden:true}
+						,{key: "name", 		label: "성명", 		width: 80,		align: "center"  }
+						,{key: "levelNm", 	label: "직위", 		width: 60,		align: "center"  }
+						,{key: "tot", 		label: "합계", 		width: 80, 		align: "center", styleClass: function () {return "grid-font-blue-bold";}}
+						,{key: "holyTime", 	label: "휴가", 		width: 40, 		align: "center", styleClass: function () {return "grid-font-blue";}}
+						]
 			});
 			return this;
 		}
@@ -318,45 +323,29 @@ var gridView = {
 	}
 
 	//엑셀다운로드
-	function excelDown() {
-		var paramObj = {"pageNo":  1};
+ 	function jsonToExcel (grid) {
+ 		const list = grid.target.getList();
+ 		const header = grid.target.colGroup;
+ 		exportJSONToExcel(list, header, '월작업일보집계현황'); 		
+ 	}	
 
-		$.each($('[data-search]'), function(idx, elem){
-			paramObj[$(elem).data("search")] = $(elem).val();
-		});
-		paramObj["recordCnt"] =  9999999;
+	//today 에 Date객체를 넣어줌 //ex)5일 
+	function prevNextCalendar(_select) {
+		gridView.initView();
+			
+		const currentValue = $('#workYm').val(); // 현재 입력 박스의 값 (예: "2023-08")
+		const currentDate = new Date(currentValue + "-01"); // 값을 날짜 객체로 변환
+			
+		const monthOffset = (_select === "-") ? -1 : 1;
+		currentDate.setMonth(currentDate.getMonth() + monthOffset);
+			
+		$('#workYm').val(currentDate.toISOString().slice(0, 7)); // 입력 박스에 설정
 		
-		postAjax("/user/pm/pm01/selectMonthlyWorkList", paramObj, null, function(data){
-			var list = data.result;
-			excelView.target.setData({
-				list : list,
-				page : {
-					totalElements : list==undefined ? 0 : list.length
-				}
-			});
-			var todayDate = new Date().format('yyyyMMddHHmmss');
-			excelView.target.exportExcel("월작업일보집계현황_"+todayDate+".xls");
-		});
+		buildCalendar(gridView); // 달력을 새로 그려준다.
+		gridView.setData();
 	}
-
-
-	  //today 에 Date객체를 넣어줌 //ex)5일 
-		function prevNextCalendar(_select) {
-			gridView.initView();
-			
-			const currentValue = $('#workYm').val(); // 현재 입력 박스의 값 (예: "2023-08")
-			const currentDate = new Date(currentValue + "-01"); // 값을 날짜 객체로 변환
-			
-			const monthOffset = (_select === "-") ? -1 : 1;
-			currentDate.setMonth(currentDate.getMonth() + monthOffset);
-			
-			$('#workYm').val(currentDate.toISOString().slice(0, 7)); // 입력 박스에 설정
-			
-			buildCalendar(gridView); // 달력을 새로 그려준다.
-			gridView.setData();
-		}
 	  
-	  function buildCalendar() {// 현재 달력
+	function buildCalendar() {// 현재 달력
 	  	var week = [ '일', '월', '화', '수', '목', '금', '토', '일'];
 		const currentValue = $('#workYm').val(); // 현재 입력 박스의 값 (예: "2023-08")
 		today = new Date($('#workYm').val().substring(0, 4), $('#workYm').val().substring(5, 7)-1, today.getDate()); // month 를 조정해 해당 월을 변경함
@@ -449,16 +438,6 @@ var gridView = {
 	  		}
 	  	}
 	  	
-		gridView.target.addColumn({key: "tot", label: "합계", width: 80, align: "center", styleClass: function () {
-            return "grid-font-blue-bold";}}); 		  	
-		excelView.target.addColumn({key: "tot", label: "합계", width: 80, align: "center", styleClass: function () {
-            return "grid-font-blue-bold";}}); 	
-	  	
-		gridView.target.addColumn({key: "holyTime", label: "휴가", width: 40, align: "center", styleClass: function () {
-            return "grid-font-blue";}}); 		  	
-		excelView.target.addColumn({key: "holyTime", label: "휴가", width: 40, align: "center", styleClass: function () {
-            return "grid-font-blue";}}); 	
-		
 	    var tempWeek = "";
 	  	for (i = 0; i < lastDate.getDate(); i++) {
 	  		var holiday = "";
@@ -485,33 +464,18 @@ var gridView = {
 			
 			if (holiday=="red") {
 				gridView.target.addColumn({label: tempWeek,  
-		  			columns:[{key: (i+1), label: i+1, width: 40, align: "center", styleClass: function () {
-		  	            return "grid-cell-red";
-		        	}}]});
-				excelView.target.addColumn({label: tempWeek,  
-		  			columns:[{key: (i+1), label: i+1, width: 40, align: "center", styleClass: function () {
-		  	            return "grid-cell-red";
-		        	}}]});
+		  			columns:[{key: (i+1), label: i+1, width: 40, align: "center", styleClass: function () {return "grid-cell-red";}}]});
 			} else if (holiday=="blue") {
 				gridView.target.addColumn({label: tempWeek,  
-		  			columns:[{key: (i+1), label: i+1, width: 40, align: "center", styleClass: function () {
-		  	            return "grid-cell-blue";
-		        	}}]});				
-				excelView.target.addColumn({label: tempWeek,  
-		  			columns:[{key: (i+1), label: i+1, width: 40, align: "center", styleClass: function () {
-		  	            return "grid-cell-blue";
-		        	}}]});				
+		  			columns:[{key: (i+1), label: i+1, width: 40, align: "center", styleClass: function () {return "grid-cell-blue";}}]});				
 			} else {
 				gridView.target.addColumn({label: tempWeek,  
-		  			columns:[{key: (i+1), label: i+1, width: 40, align: "center"}]});					
-				excelView.target.addColumn({label: tempWeek,  
 		  			columns:[{key: (i+1), label: i+1, width: 40, align: "center"}]});					
 			}
 	  		cnt++;
 	  	}
 
 		gridView.target.addColumn({key: "rmk", label: "비고", width: 120, align: "center"}); 	
-		excelView.target.addColumn({key: "rmk", label: "비고", width: 120, align: "center"}); 	
 	  }	
 	  
 </script>

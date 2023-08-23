@@ -2071,7 +2071,7 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 		$.each(outFieldArr, function(col, cellKey) {
 			let cell = worksheet.getCell(row + 2, col + 1);
 			let number = data[cellKey];
-			let lcCellKey = cellKey.toLowerCase();
+			let lcCellKey = (typeof cellKey === 'string') ? cellKey.toLowerCase() : cellKey.toString();
 			//숫자 필드는 숫자형 자료로 전환합니다.
 			if (
 				lcCellKey.indexOf('qty') !== -1 ||
