@@ -1,6 +1,6 @@
 package com.dksys.biz.admin.bm.bm16;
 
-import java.util.HashMap;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
@@ -86,6 +86,7 @@ public class BM16Ctr {
 			};
 		}catch(Exception e){
 			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultDBError", ((SQLException) e.getCause()).getSQLState());
 			model.addAttribute("resultMessage", e.getMessage());
 		}
 		return "jsonView";
@@ -103,6 +104,7 @@ public class BM16Ctr {
 			};
 		}catch(Exception e){
 			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultDBError", ((SQLException) e.getCause()).getSQLState());
 			model.addAttribute("resultMessage", e.getMessage());
 		}
 	  	return "jsonView";
