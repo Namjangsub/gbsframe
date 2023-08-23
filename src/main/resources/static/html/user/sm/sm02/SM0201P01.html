@@ -221,11 +221,11 @@
 
 	<div id="approval_area"></div>
 	
-	<!-- 결제대상자-->   
+	<!-- 결재대상자-->   
 	<div id="approval_trgt" style="display:none;"> 
          <table style="border:0px; width:50%; margin-bottom:20px; height:200px;">
             <tr style="height:30px;">
-              <td style="text-align: LEFT; border-right: 0px;;font-size:13px;font-weight:bold;">※ 결제대상자</td>
+              <td style="text-align: LEFT; border-right: 0px;;font-size:13px;font-weight:bold;">※ 결재대상자</td>
               <td>
 	              <div class="add_btn_small pdl10">   
 	              	  <button type="button" class="btn btn-primary btn-sm" id="approvalBtn" onclick="opendModalApprovalListList();">결재라인</button>    
@@ -243,7 +243,7 @@
 			</tr>  
         </table>
 	</div>        
-	<!-- 결제대상자 end -->        
+	<!-- 결재대상자 end -->        
 
 	<!-- 공통 파일 영역 -->
 	<div id="fileList_area"></div>
@@ -498,6 +498,7 @@ function insertOrder() {
 	}
 }
 
+
 //수정 
 function updateOrder() {
 		
@@ -505,7 +506,7 @@ function updateOrder() {
 		var formData = makeFormData();									// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
 		var makeArr = {};
         //저장용 배열 push
-		makeArr = $.gridInsertArr(gridViewPop);
+		makeArr = $.gridInsertArr(gridViewPop);		
         if( !makeArr ) {
         	return;
         }
@@ -513,10 +514,42 @@ function updateOrder() {
 			alert("구매 BOM 항목은 최소 1개 이상이어야 합니다.");
 			return;
 		} else {
-	        //발주번호 set
-	        formData.append("ordrgNo", $("#ordrgNo").val());			
+	        //발주번호 set			
+	        formData.append("ordrgNo", $("#ordrgNo").val());	        
 			formData.append("makeArr", JSON.stringify(makeArr));
-		}          
+		}        
+		
+        /*
+        *	결재그리드 insert make start
+        */	
+        //각업무에 맞는 param insert - 하드코딩값
+		var addParam = {
+					coCd: $("#popForm #coCd").val(), todoDiv1CodeId: "TODODIV20", todoDiv2CodeId: "TODODIV2050"
+					, pgmId: "SM0201P01"
+					, pgPath: "/user/sm/sm02/SM0201P01SM0201P01"
+					, sanctnSttus: "N"
+					, salesCd: $("#popForm #salesCd").val()
+					, todoCoCd: $("#popForm #coCd").val()
+					, todoNo: $("#popForm #ordrgNo").val()
+					, todoFileTrgtKey: modalStack.last().paramObj.fileTrgtKey
+					, userId: jwt.userId
+					};
+		//부모창에서 넘어온값 - pgp
+		var modalParam = {}; 
+		$.each(modalStack.last().paramObj, function (key, val) {		
+			modalParam[key] = val;
+		});		
+		if( Object.keys(modalParam).length > 0 ) {
+			var pgParam = {pgParam: JSON.stringify(modalParam)}
+			Object.assign(addParam, pgParam);
+		}
+        approvalArr = $.approvalInsertArr(gridViewPopApproval, addParam);
+		//결재그리드
+		if(approvalArr.length > 0) {
+			formData.append("approvalArr", JSON.stringify(approvalArr));
+			debugger;
+		}
+        /* 결재그리드 insert make end */		
 		filePostAjax("/user/sm/sm02/updateOrder", formData,		// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
 			function(data) {
 				alert(data.resultMessage);								// 결과 메시지를 alert으로 출력
@@ -654,7 +687,6 @@ fileParam = {
 	//결재라인 그리드
 	var gridViewPopApproval = {
 		initView : function() {
-			console.log('---initView--');
   			this.target = new ax5.ui.grid();
   			this.target.setConfig({
   		    	showRowSelector: false,
@@ -673,23 +705,26 @@ fileParam = {
   		            },
   		        },
 		    	columns : [
-		    		     {key: "rnum",	        		label: "No.",	    width: 50,		align: "center", 				hidden:false}
+		    		     {key: "rnum",	        		label: "No.",	    width: 50,		align: "center", 				hidden:true}
+		    		    , {key: "sanctnSn",	        	label: "No.",	    width: 50,		align: "center", 				hidden:false}
 		    		    ,{key: "coCd",	        		label: "회사코드",		width: 100,		align: "center", 				hidden:true}
 		    		    ,{key: "id",	        		label: "아이디",		width: 100,		align: "center", 				hidden:true}
+		    		    ,{key: "todoId",	       		label: "todoId",		width: 100,		align: "center", 			hidden: false}
 						,{key: "empNo",	        		label: "사번",		width: 100,		align: "center", 				hidden:true}
-						,{key: "levelNm",	    		label: "직급",		width: 100,		align: "center"}
+						,{key: "levelNm",	    		label: "직급",		width: 100,		align: "center"}						
 						,{key: "usrNm",					label: "성명",		width: 100,		align: "center"}
-						,{key: "sanctnSttusNm",	        label: "결재상태",	width: 80,		align: "center"}						
-						,{key: "todoCfDt",	        	label: "결재일자",	width: 130,		align: "center"}
+						,{key: "sanctnSttusNm",	        label: "결재상태",	width: 80,		align: "center", 				hidden:false}						
+						,{key: "sanctnSttus",	        label: "결재상태",	width: 80,		align: "center", 				hidden:true}
+						,{key: "todoCfDt",	        	label: "결재일자",	width: 130,		align: "center", 				hidden:true}
 						,{key: "telNo",	       		 	label: "전화번호",		width: 100,		align: "center", 				hidden:true}
 						,{key: "email",	        		label: "E-mail",	width: 200,		align: "center", 				hidden:true}
 						,{key: "dtNm",	        		label: "부서",		width: 100,		align: "center", 				hidden:true}
-						,{key: "todoKey",	    		label: "todoKey",		width: 100,		align: "center", 			hidden:false}		
-						,{key: "sanctnSn",	    		label: "sanctnSn",		width: 100,		align: "center", 			hidden:false}
-						,{key: "todoDiv1CodeId",	    label: "todoDiv1CodeId",		width: 100,		align: "center", 	hidden:false}
-						,{key: "todoDiv2CodeId",	    label: "todoDiv2CodeId",		width: 100,		align: "center", 	hidden:false}
-						,{key: "salesCd",	    		label: "salesCd",		width: 100,		align: "center", 			hidden:false}
-						,{key: "todoFileTrgtKey",  		label: "todoFileTrgtKey",		width: 100,		align: "center", 	hidden:false}
+						,{key: "todoKey",	    		label: "todoKey",		width: 100,		align: "center", 			hidden:false}
+						,{key: "sanctnSn",	    		label: "sanctnSn",		width: 100,		align: "center", 			hidden:true}
+						,{key: "todoDiv1CodeId",	    label: "todoDiv1CodeId",		width: 100,		align: "center", 	hidden:true}
+						,{key: "todoDiv2CodeId",	    label: "todoDiv2CodeId",		width: 100,		align: "center", 	hidden:true}
+						,{key: "salesCd",	    		label: "salesCd",		width: 100,		align: "center", 			hidden:true}
+						,{key: "todoFileTrgtKey",  		label: "todoFileTrgtKey",		width: 100,		align: "center", 	hidden:true}
 						,{key: "pgParam",	    		label: "pgParam",		width: 100,		align: "center", 			hidden:false}
     	              ]
 					});
@@ -718,9 +753,27 @@ fileParam = {
           		}
   	}
 	gridViewPopApproval.initView();
+	
+	//결재 여부
+	function approvalYn() {
+		var gridList = gridViewPopApproval.target.getList();
+		var inCnt = 0;
+		if( gridList.length > 0 ) {
+        	var msgArr = [];			
+	        $.each(gridList, function (idx, elem) {		
+	        	if( elem.sanctnSttus == "Y" ) inCnt++;
+	        })
+		}
+		return inCnt;
+	}
   	
-	// 결제대상자 추가
+	// 결재대상자 추가(+버튼 수동)
 	function insertSignUserResModal() {   
+		if( approvalYn() ) {
+			alert("결재가 이미 진행중입니다.");
+			return;
+		}
+		
 		var paramObj = {"coCd" : $('#coCd').val()	};	    
 		openSecondModal("/static/html/cmn/modal/userSearch.html", 300, 500, "사용자 검색", paramObj
 			, function(tree) {
@@ -734,10 +787,14 @@ fileParam = {
 								var result = data.resultList[0];
 								gridViewPopApproval.target.addRow($.extend({}, "last", false));
 								var row = gridViewPopApproval.target.getList().length -1 ;
-								gridViewPopApproval.target.setValue(row, "rnum", row+1);
+								gridViewPopApproval.target.setValue(row, "sanctnSn", row+1);
 								$.each(result, function (key, val) {
 									if( key != "" && key != "undefined" ) {
 										gridViewPopApproval.target.setValue(row, key, val);
+									}
+									//todoId set
+									if( key == "id") {
+										gridViewPopApproval.target.setValue(row, "todoId", val);
 									}
 								});							
 							}
@@ -747,13 +804,21 @@ fileParam = {
 	
 	//결재라인 팝업
 	function opendModalApprovalListList() { 
-
+		//데이터 있을경우 추가불가
+		if( approvalYn() ) {
+			alert("결재가 이미 진행중입니다.");
+			return;
+		}
+		//결재라인 선택시 전체 삭제
 		var formData = {
 						"coCd" : $(".popup_area #coCd").val()
+						, "userId": jwt.userId
+						, "userNm": jwt.userNm
+						, "appDiv": "APPDIV01"
 						, "appDiv": "APPDIV01"
 						};
 			openSecondModal("/static/html/user/wb/wb02/WB0202P01.html", 1300, 780, "결재선 지정", formData, function (grid){
-				var rowList = grid.target.getList("selected");
+				var rowList = grid.target.getList("selected");	
 				var gridColumns = gridViewPopApproval.target.columns;
 				/* 공유라인 사용시 사용 x */
 				if (rowList.length > 0) {
@@ -771,17 +836,18 @@ fileParam = {
 						}
 					});
 					*/
+					//초기화
+					gridViewPopApproval.initView();
 					for(var i=0; i<rowList.length; i++) {
 						gridViewPopApproval.target.addRow($.extend({}, "last", false));
 						$.each(gridColumns, function(idx, elem){
 							var key = gridColumns[idx].key;
 							if( typeof(rowList[i][key]) != "undefined" ) {
-								gridViewPopApproval.target.setValue(i, key, rowList[i][key]);
+								gridViewPopApproval.target.setValue(i, key, rowList[i][key]);						
 							} 
 							//rnum insert
-							if( idx==0 ) gridViewPopApproval.target.setValue(i, "rnum", i+1);							
+							if( idx==0 ) gridViewPopApproval.target.setValue(i, "sanctnSn", i+1);							
 						});
-
 					}	//for end
 				}	//rowList if end 						   
 	               
@@ -789,15 +855,18 @@ fileParam = {
 	}	
 	
     function deleteSignUser(){
-    	
+		if( approvalYn() ) {
+			alert("결재가 이미 진행중입니다.");
+			return;
+		}    	
     	var selRow = parseInt(gridViewPopApproval.target.selectedDataIndexs);    	
  		if( isNaN(selRow) ) {
  			alert("선택된 행이 없습니다.");
  			return;
  		} else {			
- 				if( selRow > -1 ) {
- 					gridViewPopApproval.target.removeRow(selRow); 					
- 				}
+			if( selRow > -1 ) {
+				gridViewPopApproval.target.removeRow(selRow); 					
+			}
  		}
     }	
 
@@ -944,6 +1013,44 @@ $(document).ready(function() {
 		return detailArr;
 	}
 	
+	//등록시 그리드값 배열 저장
+	$.approvalInsertArr = function(gridObj, addParam) {
+		var gridList = gridObj.target.getList();
+		var gridColumns = gridObj.target.columns;
+		var detailArr = [];    	
+		var msgArr = [];    	
+		var errCnt = 0;
+		if( gridList.length > 0 ) {
+        	var msgArr = [];			
+	        $.each(gridList, function (idx, elem) {
+	            var detailObj = {};	     	        	
+	        	//컬럼수 루프 
+	        	for(var i=0; i<gridColumns.length; i++) {
+					var key = gridColumns[i].key;
+					var val = elem[key];
+					if( typeof(val) == "undefined") val = "";					
+					detailObj["idx"] = i + 1;
+					//발주순번 은 select key로  ORDRG_SEQ  
+					detailObj[key] = val;			            			            
+	        	}
+	            //필수값 체크를 여기서 한다. 발주수량, 납기요청일 - 체크된 항목만	    
+	            if( detailObj['sanctnSn'] != ""  ) {		            
+		            detailArr.push(detailObj);	        	
+	            }
+	            //추가할 param
+				$.each(addParam, function(key, val){
+					detailObj[key] = val;						
+				});		
+	        });	
+	        //error alert 후 종료
+	        if( msgArr.length > 0 ) {
+	        	alert(msgArr.join("\r\n"));
+	        	return false;
+	        }
+		}
+		return detailArr;
+	}	
+	
 	// bom 그리드 삭제
 	$("#deleteDetailButton").on("click", function () {
  		var selRow = parseInt(gridViewPop.target.selectedDataIndexs);
@@ -1044,9 +1151,9 @@ var commApproval = new Approval(htmlParam, approvalParam, popParam);
 $("#approvalReqBtn").on("click", function() {
 	console.log('--결재요청 -- TB_WB20M03');
 	//commApproval.makeHtml();
-	
-	//결재  INSERT
-
+	//결재  show
+	$("#approval_trgt").show();
+	gridViewPopApproval.initView();
 })	
 
 

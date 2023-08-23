@@ -463,5 +463,7 @@ public class WB02SvcImpl implements WB02Svc {
     public int deleteWbsApprovalList(Map<String, String> paramMap) {
 	    return wb02Mapper.deleteWbsApprovalList(paramMap);
     }     
+    
+    
 }
     

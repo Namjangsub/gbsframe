@@ -2735,10 +2735,12 @@
 					 , B.DEPT_NM AS DT_NM
 					 , C.TODO_NO AS RSLT_N
 					 , (SELECT D.LEVEL_NM FROM TB_CM07M01 D WHERE D.LEVEL_CD=A.LEVEL_CD) AS LEVEL_NM     /* 직급 */
+					 , C.SANCTN_STTUS
 					 , DECODE(C.SANCTN_STTUS, 'Y', '승인', 'N', '미승인', ' ') AS SANCTN_STTUS_NM
 					 , NVL(TO_CHAR(C.TODO_CF_DT, 'YYYY-MM-DD'), ' ') AS TODO_CF_DT		/* 승인일자 */
 					 , C.TODO_KEY
 					 , C.SANCTN_SN
+					 , C.TODO_ID
 					 , C.TODO_DIV1_CODE_ID
 					 , C.TODO_DIV2_CODE_ID
 					 , C.SALES_CD
@@ -2765,16 +2767,18 @@
 	  ) A
 	</select>
 	
-	<!-- 사용자 검색후 부서등 SELECT  -->
+	<!-- 결재 등록시 사용자 검색후 부서등 SELECT  -->
 	<select id="selectShareUserInfo" parameterType="Map" resultType="camelMap">
 	    SELECT  A.CO_CD AS CO_CD,
 	    		C.CODE_NM AS CO_NM,
 				A.ID AS ID,
+				A.ID AS TODO_ID,
 		        A.EMP_NO AS EMP_NO,
 				A.NAME AS USR_NM,
 				A.TEL_NO AS TEL_NO,
 				A.EMAIL AS EMAIL,
 				B.DEPT_NM AS DT_NM
+				, (SELECT T.LEVEL_NM FROM TB_CM07M01 T WHERE T.LEVEL_CD=A.LEVEL_CD) AS LEVEL_NM 
 			FROM
 				TB_CM06M01 A 
 				INNER JOIN TB_CM04M01 B on A.DEPT_ID = B.DEPT_ID
@@ -2783,5 +2787,88 @@
 			    AND A.CO_CD = '${coCd}'
 			    AND A.ID =  '${userId}' 
 	</select>	
+	
+	<select id="selectmaxTodoKey" parameterType="Map" resultType="String">
+		SELECT NVL(MAX(TODO_KEY)+1, 1) FROM TB_WB20M03 
+			WHERE 1=1 
+			AND CO_CD = #{coCd}
+			AND TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
+			AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}	
+	</select>
+		                 
+	<!-- todo insert -->
+	<insert id="insertTodoMaster" parameterType="Map">				
+		MERGE INTO TB_WB20M03 
+			USING DUAL
+			ON (
+				TODO_KEY = #{todoKey}
+				AND SANCTN_SN = #{sanctnSn} 
+				AND CO_CD = #{coCd}
+				AND TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
+				AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId} 
+				)		
+		WHEN MATCHED THEN
+			UPDATE SET	
+				TODO_ID = #{todoId,								jdbcType=VARCHAR}
+				, SALES_CD = #{salesCd,							jdbcType=VARCHAR}
+				, PG_PATH = #{pgPath,							jdbcType=VARCHAR}
+				, TODO_FILE_TRGT_KEY = #{todoFileTrgtKey,		jdbcType=VARCHAR}
+				, TODO_CO_CD = #{todoCoCd}
+				, TODO_NO = #{todoNo}
+				, TODO_CODE_KIND = #{todoCodeKind,				jdbcType=VARCHAR} 
+				, TODO_CODE_ID = #{todoCodeId,					jdbcType=VARCHAR}
+				, UDT_ID = #{userId}
+				, UDT_PGM = #{pgmId}
+				/* , UDT_DTTM = SYSDATE */
+				, PG_PARAM = #{pgParam,							jdbcType=VARCHAR}          
+		WHEN NOT MATCHED THEN						
+		INSERT 
+		(		
+			TODO_KEY
+			, SANCTN_SN
+			, CO_CD
+			, TODO_DIV1_CODE_ID
+			, TODO_DIV2_CODE_ID
+			, TODO_ID
+			, TODO_CF_DT
+			, TODO_CF_OPN
+			, SANCTN_STTUS
+			, SALES_CD
+			, PG_PATH
+			, TODO_FILE_TRGT_KEY
+			, TODO_CO_CD
+			, TODO_NO
+			, TODO_CODE_KIND
+			, TODO_CODE_ID
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+			, PG_PARAM                
+		) 
+		VALUES
+		(       
+			#{todoKey}
+			, #{sanctnSn}
+			, #{coCd}
+			, #{todoDiv1CodeId}
+			, #{todoDiv2CodeId}
+			, #{todoId,					jdbcType=VARCHAR}
+			, #{todoCfDt,				jdbcType=VARCHAR}
+			, #{todoCfOpn,				jdbcType=VARCHAR}
+			, #{sanctnSttus}
+			, #{salesCd,				jdbcType=VARCHAR}
+			, #{pgPath,					jdbcType=VARCHAR}
+			, #{todoFileTrgtKey,		jdbcType=VARCHAR}
+			, #{todoCoCd}
+			, #{todoNo}
+			, #{todoCodeKind,			jdbcType=VARCHAR}
+			, #{todoCodeId,				jdbcType=VARCHAR}
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+			, #{pgParam,				jdbcType=VARCHAR}    
+		)            
+	</insert>  
+	<!-- todo insert -->	                 
 	                 
  </mapper>

@@ -22,6 +22,7 @@ import com.dksys.biz.util.DateUtil;
 import com.dksys.biz.util.ExceptionThrower;
 import com.dksys.biz.user.sm.sm02.mapper.SM02Mapper;
 import com.dksys.biz.user.sm.sm02.service.SM02Svc;
+import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -43,6 +44,9 @@ public class SM02SvcImpl implements SM02Svc {
 	
 	@Autowired
 	CM08Svc cm08Svc;	
+	
+    @Autowired
+    WB20Svc wb20Svc;	
 
 	@Autowired
 	ExceptionThrower thrower;
@@ -190,7 +194,8 @@ public class SM02SvcImpl implements SM02Svc {
 
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
-		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);		
+		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);	
+
 
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
@@ -228,9 +233,20 @@ public class SM02SvcImpl implements SM02Svc {
 			dtl.put("creatId", paramMap.get("userId"));
 			dtl.put("ordrgNo", paramMap.get("ordrgNo"));
 			
-    		result += sm02Mapper.updateOrderDetail(dtl);			
+    		result += sm02Mapper.updateOrderDetail(dtl);		
 		}			
 		  		
+		//---------------------------------------------------------------  
+		// 결재라인 처리 시작 
+		//---------------------------------------------------------------		
+		Type dtl2Map = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();		
+		if( paramMap.containsKey("approvalArr") ) {		
+			//결제라인 insert
+			result += wb20Svc.insertTodoMaster(paramMap);							
+		}		
+		//---------------------------------------------------------------  
+		// 결재라인 처리 end
+		//---------------------------------------------------------------		
 		
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작 

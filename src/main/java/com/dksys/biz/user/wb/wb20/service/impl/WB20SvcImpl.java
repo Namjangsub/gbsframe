@@ -128,4 +128,35 @@ public class WB20SvcImpl implements WB20Svc {
 	  public List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap) {
 	    return wb20Mapper.selectShareUserInfo(paramMap);
 	  }	
+	  
+
+	  @Override	  
+	  public String selectmaxTodoKey(Map<String, String> paramMap) {
+		  return wb20Mapper.selectmaxTodoKey(paramMap);
+	  }		  
+		
+	  //wb20 결재 insert
+	  @Override
+	  public int insertTodoMaster(Map<String, String> paramMap) throws Exception {
+
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
+		
+		System.out.println(">>>approvalArr>>" + paramMap.get("approvalArr").toString()+"<<<");
+		int result = 0;
+		String maxTodoKey = "";
+		if( paramMap.containsKey("approvalArr") ) {		
+		//결제라인 insert
+			for(Map<String, String> dtl : detailMap) {
+				//입력, 수정 
+				if( dtl.get("todoKey").equals("") ) {
+					maxTodoKey = wb20Svc.selectmaxTodoKey(dtl);
+					dtl.put("todoKey", maxTodoKey);
+				}
+				result += wb20Mapper.insertTodoMaster(dtl);				
+			}		
+		}				
+		return result;
+	}  	  
 }

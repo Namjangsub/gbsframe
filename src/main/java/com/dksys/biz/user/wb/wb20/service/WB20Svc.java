@@ -38,4 +38,7 @@ public interface WB20Svc {
 	
 	List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap);	  
 	
+	String selectmaxTodoKey(Map<String, String> paramMap);
+	
+	int insertTodoMaster(Map<String, String> paramMap) throws Exception;	
 }
