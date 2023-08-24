@@ -160,4 +160,18 @@ public class WB20Ctr {
 	    model.addAttribute("resultList", resultList);
 	    return "jsonView";
 	  }	  
+	  
+		//todo 삭제    
+		@DeleteMapping(value = "/deleteTodoMaster")
+		public String deleteTodoMaster(@RequestBody Map<String, String> param, ModelMap model) {
+	    	try {			
+	    		wb20Svc.deleteTodoMaster(param);
+				model.addAttribute("resultCode", 200);
+	    		model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+	    	}catch(Exception e) {
+		    	 model.addAttribute("resultCode", 500);
+		 		 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+	    	}	    	
+			return "jsonView";
+		} 	  
 }

@@ -41,4 +41,6 @@ public interface WB20Svc {
 	String selectmaxTodoKey(Map<String, String> paramMap);
 	
 	int insertTodoMaster(Map<String, String> paramMap) throws Exception;	
+	
+	int deleteTodoMaster(Map<String, String> param);		
 }

@@ -47,4 +47,6 @@ public interface WB20Mapper {
 	
 	int insertTodoMaster(Map<String, String> paramMap);  
 	
+	int deleteTodoMaster(Map<String, String> param);		
+	
 }

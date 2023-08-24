@@ -547,7 +547,6 @@ function updateOrder() {
 		//결재그리드
 		if(approvalArr.length > 0) {
 			formData.append("approvalArr", JSON.stringify(approvalArr));
-			debugger;
 		}
         /* 결재그리드 insert make end */		
 		filePostAjax("/user/sm/sm02/updateOrder", formData,		// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
@@ -706,6 +705,7 @@ fileParam = {
   		        },
 		    	columns : [
 		    		     {key: "rnum",	        		label: "No.",	    width: 50,		align: "center", 				hidden:true}
+		    		    , {key: "todoKey",	        	label: "todoKey",	    width: 50,		align: "center", 			hidden:true}
 		    		    , {key: "sanctnSn",	        	label: "No.",	    width: 50,		align: "center", 				hidden:false}
 		    		    ,{key: "coCd",	        		label: "회사코드",		width: 100,		align: "center", 				hidden:true}
 		    		    ,{key: "id",	        		label: "아이디",		width: 100,		align: "center", 				hidden:true}
@@ -808,6 +808,16 @@ fileParam = {
 		if( approvalYn() ) {
 			alert("결재가 이미 진행중입니다.");
 			return;
+		} 
+		if( modalStack.last().paramObj.todoYn == "Y") {
+
+			if( gridViewPopApproval.target.getList().length == 0 ) {
+				gridView.setData(0);
+				modalStack.last().paramObj.todoYn = "N"
+			} else {
+				alert("전체 삭제후 추가 가능합니다.");
+				return;							
+			}
 		}
 		//결재라인 선택시 전체 삭제
 		var formData = {
@@ -864,12 +874,77 @@ fileParam = {
  			alert("선택된 행이 없습니다.");
  			return;
  		} else {			
+ 			//결재라인이 없을 경우 
 			if( selRow > -1 ) {
-				gridViewPopApproval.target.removeRow(selRow); 					
+				var todoKey = gridViewPopApproval.target.getList()[selRow].todoKey;
+				if( typeof(todoKey) == "undefined" ) {
+					gridViewPopApproval.target.removeRow(selRow);					
+				} else {
+					var paramObj = {}
+					var gridList = gridViewPopApproval.target.getList("selected")[0];	
+	 		        $.each(gridList, function (key, val) {			     	        	
+	 					if( typeof(val) == "undefined") val = "";
+	 					paramObj[key] = val; 						    			            		
+	 		        });		
+	 		        if(paramObj.todoKey && paramObj.sanctnSn && paramObj.coCd && paramObj.todoDiv1CodeId && paramObj.todoDiv2CodeId ) {
+ 	 					if( confirm("선택행을 삭제하시겠습니까?")) {
+ 	 						deleteAjax("/user/wb/wb20/deleteTodoMaster", paramObj, null, function(data) {
+ 	 							if (data.resultCode == 200) {
+ 	 								alert(data.resultMessage);
+ 	 								gridViewPopApproval.setData(0);
+ 	 								gridView.setData(0);
+ 	 							} else {
+ 	 								alert("삭제중 오류가 발생했습니다");	 	 								
+ 	 							}
+ 	 						}); 						
+ 	 					}		 		        			 		        	
+	 		        } else {
+	 		        	alert("삭제중 오류가 발생했습니다.")
+	 		        }		
+				}
+ 					
 			}
  		}
-    }	
+		//행선택 if end
+    }	//func end 
 
+	//등록시 그리드값 배열 저장
+	$.approvalInsertArr = function(gridObj, addParam) {
+		var gridList = gridObj.target.getList();
+		var gridColumns = gridObj.target.columns;
+		var detailArr = [];    	
+		var msgArr = [];    	
+		var errCnt = 0;
+		if( gridList.length > 0 ) {
+        	var msgArr = [];			
+	        $.each(gridList, function (idx, elem) {
+	            var detailObj = {};	     	        	
+	        	//컬럼수 루프 
+	        	for(var i=0; i<gridColumns.length; i++) {
+					var key = gridColumns[i].key;
+					var val = elem[key];
+					if( typeof(val) == "undefined") val = "";					
+					detailObj["idx"] = i + 1;
+					//발주순번 은 select key로  ORDRG_SEQ  
+					detailObj[key] = val;			            			            
+	        	}
+	            //필수값 체크를 여기서 한다.
+	            if( detailObj['sanctnSn'] != ""  ) {		            
+		            detailArr.push(detailObj);	        	
+	            }
+	            //추가할 param
+				$.each(addParam, function(key, val){
+					detailObj[key] = val;						
+				});		
+	        });	
+	        //error alert 후 종료
+	        if( msgArr.length > 0 ) {
+	        	alert(msgArr.join("\r\n"));
+	        	return false;
+	        }
+		}
+		return detailArr;
+	}	    
 /* ######################### 
  * 결재라인 추가 script end 
  ######################### */
@@ -934,6 +1009,12 @@ $(document).ready(function() {
 				$("#approvalReqBtn").removeAttr("onclick");
 				//결재대상자 load
 				gridViewPopApproval.initView().setData(0);
+			}
+			if( modalStack.last().paramObj.reOpen ) {
+				$("#approval_trgt").show();
+				gridViewPopApproval.initView();
+				opendModalApprovalListList();
+				reOpen = false;
 			}
 		}		
 	}
@@ -1012,45 +1093,7 @@ $(document).ready(function() {
 		}
 		return detailArr;
 	}
-	
-	//등록시 그리드값 배열 저장
-	$.approvalInsertArr = function(gridObj, addParam) {
-		var gridList = gridObj.target.getList();
-		var gridColumns = gridObj.target.columns;
-		var detailArr = [];    	
-		var msgArr = [];    	
-		var errCnt = 0;
-		if( gridList.length > 0 ) {
-        	var msgArr = [];			
-	        $.each(gridList, function (idx, elem) {
-	            var detailObj = {};	     	        	
-	        	//컬럼수 루프 
-	        	for(var i=0; i<gridColumns.length; i++) {
-					var key = gridColumns[i].key;
-					var val = elem[key];
-					if( typeof(val) == "undefined") val = "";					
-					detailObj["idx"] = i + 1;
-					//발주순번 은 select key로  ORDRG_SEQ  
-					detailObj[key] = val;			            			            
-	        	}
-	            //필수값 체크를 여기서 한다. 발주수량, 납기요청일 - 체크된 항목만	    
-	            if( detailObj['sanctnSn'] != ""  ) {		            
-		            detailArr.push(detailObj);	        	
-	            }
-	            //추가할 param
-				$.each(addParam, function(key, val){
-					detailObj[key] = val;						
-				});		
-	        });	
-	        //error alert 후 종료
-	        if( msgArr.length > 0 ) {
-	        	alert(msgArr.join("\r\n"));
-	        	return false;
-	        }
-		}
-		return detailArr;
-	}	
-	
+		
 	// bom 그리드 삭제
 	$("#deleteDetailButton").on("click", function () {
  		var selRow = parseInt(gridViewPop.target.selectedDataIndexs);

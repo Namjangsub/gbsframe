@@ -143,7 +143,6 @@ public class WB20SvcImpl implements WB20Svc {
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
 		
-		System.out.println(">>>approvalArr>>" + paramMap.get("approvalArr").toString()+"<<<");
 		int result = 0;
 		String maxTodoKey = "";
 		if( paramMap.containsKey("approvalArr") ) {		
@@ -158,5 +157,11 @@ public class WB20SvcImpl implements WB20Svc {
 			}		
 		}				
 		return result;
-	}  	  
+	}  	 
+	  
+	  //wb20 todo 삭제
+	  @Override
+	  public int deleteTodoMaster(Map<String, String> param) {
+		  return wb20Mapper.deleteTodoMaster(param);
+	  }
 }
