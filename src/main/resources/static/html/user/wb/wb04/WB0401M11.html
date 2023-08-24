@@ -46,7 +46,7 @@
 <script src="/static/js/ax5/ax5formatter.min.js"></script>
 <script src="/static/js/ax5/ax5calendar.min.js"></script>
 <script src="/static/js/ax5/ax5picker.min.js"></script>
-
+<script src="/static/js/fileTree.js"></script>
 
 <!-- <script src="/static/js/ax5/ax5toast.min.js"></script> -->
 <script src="/static/js/jstree/jstree.min.js"></script>
@@ -413,6 +413,7 @@
                       <button onclick="ge.splitter.resize(.1);return false;" class="button textual icon" ><span class="teamworkIcon">F</span></button>
                       <button onclick="ge.splitter.resize(50);return false;" class="button textual icon" ><span class="teamworkIcon">O</span></button>
                       <button onclick="ge.splitter.resize(100);return false;" class="button textual icon"><span class="teamworkIcon">R</span></button>
+                      <img src="state05.png">
                     </div>
                   </div>
                   -->
@@ -425,8 +426,8 @@
             <tr style="height:40px">
               <th style="width:35px;"></th>
               <th style="width:35px;"></th>
-              <th style="width:200px;text-align:center;">수주명/주요내용</th>
-              <th style="width:200px;text-align:center;">구분명</th>
+              <th style="width:200px;text-align:center;">구분명</th>              
+              <th style="width:200px;text-align:center;">주요내용</th>
               <th style="width:80px;text-align:center;">시작일</th>
               <th style="width:80px;text-align:center;">종료일</th>
               <th style="width:50px;text-align:center;">일수</th>
@@ -444,14 +445,14 @@
           <tr id="tid_(#=obj.id#)" taskId="(#=obj.id#)" class="taskEditRow (#=obj.isParent()?'isParent':''#) (#=obj.collapsed?'collapsed':''#)" level="(#=level#)">
             <td align="center" style="width:35px; border-right: none;">(#=obj.getRow()+1#)</td>
             <td align="left" style="width:35px;"><div class="taskStatus cvcColorSquare" status="(#=obj.status#)"></div></td>
+            <td style="padding-left:(#=obj.level*10+18#)px;"><div class="exp-controller" align="center" ></div>(#=obj.name#)</td>            
             <td>(#=obj.code#)</td>
-            <td style="padding-left:(#=obj.level*10+18#)px;"><div class="exp-controller" align="center" ></div>(#=obj.name#)</td>
-            <td><input type="text" name="start" value="" class="date" style="color:#000000;"></td>
-            <td><input type="text" name="end" value="" class="date" style="color:#000000;"></td>
+            <td><input type="text" name="start" value="" class="date" style="color:#000000;" onclick="wbsPlanView('(#=obj.type#)');"></td>
+            <td><input type="text" name="end" value="" class="date" style="color:#000000;" onclick="wbsPlanView('(#=obj.type#)');"></td>
             <td style="text-align:center;">(#=obj.duration#)</td>
             <td style="text-align:center;">(#=obj.progress#)</td>
-            <td style="text-align:center;font-size:30px;">●</td>
-            <td style="text-align:center;font-size:30px;">○</td>
+            <td style="text-align:center;font-size:30px;"><a onclick="wbsRsltsView('(#=obj.type#)');">(#=strSplit(obj.type,5)!='0'?'●':''#)</a></td>
+            <td style="text-align:center;font-size:30px;"><a onclick="wbsIssueView('(#=obj.type#)');">(#=strSplit(obj.type,6)!='0'?'●':''#)</a></td>
           </tr>
           -->
 		      </div>
@@ -799,19 +800,29 @@ function gantt(id) {
     if (list.length > 0) {
         var i = 0;
         $.each(list, function(idx, elem){                                       
-            var sysdate1 = new Date(elem.wbsPlansDt); 
-            //alert("wbsPlansDt : " + elem.wbsPlansDt + "//" + sysdate1);
+        	var sysdate1 = new Date(elem.wbsPlansDt); 
             var sysdate2 = new Date(elem.wbsPlaneDt); 
+            var state = "";
+             var today = new Date();
+            if (today < sysdate1) {
+                state = "STATUS_WAITING";
+            }
+            else if (today >= sysdate1 && today <= sysdate2) {
+                state = "STATUS_ACTIVE";
+            }
+            else if (today > sysdate2) {
+                state = "STATUS_DONE";
+            } 
             var task = {
                     "id": i+1,
                     name: elem.codeNm,
                     progress: parseInt(elem.wbsRsltsRate),
                     progressByWorklog: false,
                     relevance: 0,
-                    type: salesCd,
+                    type: elem.coCd+'/'+elem.salesCd+'/'+elem.wbsPlanCodeKind+'/'+elem.wbsPlanCodeId+'/'+elem.fileTrgtKeyP+'/'+elem.fileTrgtKeyR+'/'+elem.fileTrgtKeyI+"/"+elem.lvl,
                     typeId: elem.codeId,
                     description: elem.codeId,
-                    code: elem.ordrsClntNm,
+                    code: elem.wbsPlanCnts,
                     level: elem.lvl,
                     status: "STATUS_ACTIVE",
                     depends: "",
@@ -841,7 +852,7 @@ function gantt(id) {
     //ge.checkpoint();
 }
 
-function wbsPlanList(type, id) {
+function wbsPlanList(type) {
     //alert(type + id);
     if (type != undefined && id != undefined ) {
         var paramObj = {
@@ -854,6 +865,62 @@ function wbsPlanList(type, id) {
              });
         }
 }
+
+function strSplit(args, len) {
+	//debugger;
+	const arr = args.split("/", 8);
+	return arr[len];
+	
+}
+
+function wbsPlanView(args) {
+	var paramObj = {
+			"actionType":"G",	
+            "fileTrgtKey" : strSplit(args,4),
+            "salesCd": strSplit(args,1),
+            "coCd" : strSplit(args,0),
+            "lvl" : strSplit(args,7),
+            "codeKind" : strSplit(args,2),
+            "codeId" : strSplit(args,3)
+         };
+         openSecondModal("/static/html/user/wb/wb01/WB0111P01.html", 1600, 850, "", paramObj, function(data) {
+             //gridView1.setData(0);
+         });
+}
+
+
+function wbsRsltsView(args) {
+    var paramObj = {
+            "actionType":"G",   
+            "fileTrgtKey" : strSplit(args,4),
+            "salesCd": strSplit(args,1),
+            "coCd" : strSplit(args,0),
+            "lvl" : strSplit(args,7),
+            "codeKind" : strSplit(args,2),
+            "codeId" : strSplit(args,3)
+         };
+         openSecondModal("/static/html/user/wb/wb01/WB0111P02.html", 1600, 850, "", paramObj, function(data) {
+             //gridView1.setData(0);
+         });
+}
+
+function wbsIssueView(args) {
+    var paramObj = {
+            "actionType":"G",   
+            "fileTrgtKey" : strSplit(args,4),
+            "salesCd": strSplit(args,1),
+            "coCd" : strSplit(args,0),
+            "lvl" : strSplit(args,7),
+            "codeKind" : strSplit(args,2),
+            "codeId" : strSplit(args,3)
+         };
+         openSecondModal("/static/html/user/wb/wb03/WB0301P01.html", 1600, 850, "", paramObj, function(data) {
+             //gridView1.setData(0);
+         });
+}
+
+
+
 
 
 </script>

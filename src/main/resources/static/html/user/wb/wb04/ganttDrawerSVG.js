@@ -404,9 +404,9 @@ Ganttalendar.prototype.drawTask = function (task) {
 		  //alert(task.type +"//"+task.description+"//"+task.level);
 		  if (task.type != undefined && task.description != undefined) {
 			  var paramObj = {
-			          "coCd" : $('#coCd_S').val(),
-			          "salesCd": task.type,
-			          "codeId" : task.description
+			          "coCd" : strSplit(task.type,0),
+			          "salesCd": strSplit(task.type,1),
+			          "codeId" : strSplit(task.type,3)
 			       };
 			       openSecondModal("/static/html/user/wb/wb04/WB0401P01.html", 1600, 850, "", paramObj, function(data) {
 			           //gridView1.setData(0);

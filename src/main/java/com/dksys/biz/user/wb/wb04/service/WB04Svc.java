@@ -17,4 +17,6 @@ public interface WB04Svc {
     
     List<Map<String, String>> selectGanttAllList(Map<String, String> paramMap);
     
+    List<Map<String, String>> selectGanttInfo(Map<String, String> paramMap);
+    
 }
