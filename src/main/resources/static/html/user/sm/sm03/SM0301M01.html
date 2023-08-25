@@ -193,6 +193,7 @@
 				<a onclick="inserWareHousingModal('C');" style="height: 30px; line-height: 28px;" authchk>+</a>
 				<!-- <a onclick="deleteAproval();" style="height: 30px; line-height: 28px;" authchk>-</a> -->
 				<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+				<a onclick="setReportMain();" style="height: 30px; line-height: 28px; width: 80px;" title="내역서를 출력합니다."><i class="fas fa-print"></i>출력</a>
 			    </div>
 				<select id="recordCnt" class="prae_select" data-search="recordCnt" onchange="gridView.setData(0);">
 					<option value="10">10</option>
@@ -221,8 +222,8 @@
 	this.target = new ax5.ui.grid();
 	this.target.setConfig({
 		showRowSelector: true, 
-		multipleSelect: false,
-		sortable: true,
+		multipleSelect: true,
+		sortable: false,
 		target: $('[data-ax5grid="first-grid"]'),
 		header: {
              align: "center",
@@ -240,6 +241,16 @@
                       var row = this.dindex;
                       var paramObj = {"flag":"M","row":row}; */
                       inserWareHousingModal("U", this.item);
+                      
+                      //
+                      this.self.select(this.dindex);
+                      var item = this.item; // 선택된 행의 데이터
+                      var coCd = item.coCd; // 선택된 행의 coCd 값
+                      var ordrgNo = item.ordrgNo; // 선택된 행의 ordrgNo 값
+                      var paramObj = {
+                          "coCd": coCd,
+                          "ordrgNo": ordrgNo
+                      };
 			},
 	   },
           page: {
@@ -258,7 +269,16 @@
               {key: "coCd",      				label: "회사",          hidden: true},
               {key: "coCdNm",      				label: "회사명",          hidden: false},
               {key: "ordrgNo", 					label: "발주번호",      align: "center",   width: 110},
-              {key: "ordrgSeq", 					label: "발주순번",      align: "center",   width: 70},              
+              {key: "ordrgSeq", 					label: "발주순번",      align: "center",   width: 70},
+              {key: "prtChk"     , label: "출력"        , align: "center", width: 40 , sortable: false, 
+					editor: {
+						type   : "checkbox",
+						config : {
+							trueValue: "Y",
+							falseValue: "N"
+						}
+					}
+				},
               {key: "salesCd",  				label: "Sales Code",      align: "center",   width: 110},
               {key: "reqNo",    				label: "요청번호",      align: "center",   width: 120, hidden: true},                
               {key: "pchsClntCd",    			label: "구매처",      align: "center",   width: 120, hidden: true},  
@@ -278,7 +298,7 @@
             	  , 	styleClass: function () {
                   return ( parseInt(this.item.reaminInQty) > 0 ) ? "grid-font-blue-bold" : "";} 			},                 
               {key: "ioDivCd",    				label: "수불구분",      align: "center",   width: 100, hidden: true},
-              {key: "ioDivNm",    				label: "수불구분",      align: "center",   width: 130, hidden: true},                   
+              {key: "ioDivNm",    				label: "수불구분",      align: "center",   width: 130, hidden: true},  
              ]
        });
        return this;
@@ -589,13 +609,99 @@ $(document).ready(function() {
  		}
 	}
 
-		
  });
  //ready end
-    
  
+//report 출력
+/* function setReportMain(_type = "") {
+	
+	if(selectGridValidationM(gridView.target)) return false;
+	var selDataList = gridView.target.getList("selected");
+	debugger;
+	
+	//동일거래처인지 체크
+    var clntValue = selDataList[0].pchsClntCd;
+    for (var i = 1; i < selDataList.length; i++) {
+		if (selDataList[i].pchsClntCd !== clntValue) {
+			// clnt 값이 다른 경우 오류 처리
+			alert('동일 거래처만 처리 가능합니다.');
+			return false;
+		}
+    }
+    
+	var fileName = "SM0301R01.jrf";  //여러 발주서 번호 처리 (in 처리)
+	var arg =  
+		  "coCd#"		+  $('#coCd_S').val()
+	    + "#ordrgNo#"	+  "'"+selDataList.map(item => item.ordrgNo).join("','")+"'"//여러건 출력 => 배열의 값을 하나의 문자로 생성  
+    	+ "#";
+	    
+    var ordrgNoSpl = "'"+selDataList.map(item => item.ordrgNo).join("','")+"'"    //선택한 ordrgNo 문자열로 저장
+    //var AordrgNo = ordrgNoSpl.split("''",ordrgNoSpl.length); //선택한 ordrgNo 문자열을 배열로 
+    
+	if (_type == '' || _type == undefined ) {
+		callReport(fileName, arg, 1150, 720);
+	} else { //Export 작업
+		ubiExportAjax(fileName, arg, function(response) {
+			if (response.resultCode === 200) {
+				var base64FileData = response.base64FileData;
+				var fileName = response.exportFileName;
+				downloadPDFFromBase64(base64FileData, fileName);
+			} else {
+				alert('PDF 내보내기 실패: ' + response.resultText);
+			}
 
-
+		});
+	}
+}	 */
+function setReportMain() {
+	debugger;
+	//var print_estNo = '';
+	var print_ordrgSeq = '';
+	var print_ordrgNo = '';
+	var list = gridView.target.list;
+	$.each(list,function(idx, obj) {
+		if (obj.prtChk == 'Y') {
+			if (obj.ordrgNo !== undefined && obj.ordrgSeq !== undefined) {
+//				if (obj.ordrgNo !== undefined) {
+				if (print_ordrgNo == ''  && print_ordrgSeq == '') {
+//					if (print_ordrgNo == '') {
+					print_ordrgNo = obj.ordrgNo;
+				//	print_estNo = obj.estNo;
+					print_ordrgSeq = obj.ordrgSeq;
+				} else {
+					print_ordrgNo = print_ordrgNo + ',' + obj.ordrgNo;
+				//	print_estNo = print_estNo + ',' + obj.estNo;
+					print_ordrgSeq = print_ordrgSeq + ',' + obj.ordrgSeq;
+				}
+			}
+		}
+	});
+	var row = gridView.target.getList("selected")[0];
+	var fileName = "SM0301R01.jrf";
+	if(print_ordrgNo == "") {
+		alert("출력할 리스트를 선택하세요.");
+		return;
+	}
+	var arg =  
+		  "coCd#"			+  	$("#coCd_S").val()
+    	+ "#ordrgNo#"	+ 	print_ordrgNo
+    	+ "#ORDRG_SEQ#"	+ 	print_ordrgSeq
+    	+ "#salesCd#" 		+ 	 $("#salesCd_S").val()
+    //	+ "#estNo#"			+  	row.estNo//print_estNo
+    	//+ "#salesCd#" 		+ 	print_ordrgSeq//row.estDeg 
+    	// + "#prjctCd#"		+  	$("#prjctCd_S").val()
+    	// + "#prjctNm#"		+  	$("#prjctNm_S").val()
+    	// + "#mngId#"	    	+  	$("#mngId_S").val()
+    	// + "#issSts#"		+  	$("#issSts_S").val()
+    	+ "#";        
+	callReport(fileName, arg, 1150, 720);
+	debugger;
+	// if(row.sellBillNo !== undefined) {
+	// 	callReport(fileName, arg, 1150, 720);
+	// } else {
+	// 	alert("계산서번호가 없는 것은 출력할 수 없습니다.");
+	// }
+}	
 
       
 </script>
