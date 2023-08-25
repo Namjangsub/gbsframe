@@ -370,7 +370,7 @@ public class WB01SvcImpl implements WB01Svc {
 		int result = 0;
 		Gson gson = new Gson();
 	    Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> arr = gson.fromJson(paramMap.get("rowListArr"), stringList);
+	    List<Map<String, String>> arr = gson.fromJson(paramMap.get("rowListArr"), stringList);		
 		if (arr != null && arr.size() > 0 ) {
 			for (Map<String, String> arrMap : arr) {
 	            try {        
@@ -409,4 +409,9 @@ public class WB01SvcImpl implements WB01Svc {
 		return result;
 	}
 	
+    @Override
+	public List<Map<String, String>> wbsCodeList(Map<String, String> paramMap) {
+		return wb01Mapper.wbsCodeList(paramMap);
+	}
+    
 }

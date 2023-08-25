@@ -67,6 +67,8 @@ public interface WB01Mapper {
     
     int deleteWbsPlanTempList(Map<String, String> paramMap);
     
+    List<Map<String, String>> wbsCodeList(Map<String, String> paramMap);
+    
 }
 
 

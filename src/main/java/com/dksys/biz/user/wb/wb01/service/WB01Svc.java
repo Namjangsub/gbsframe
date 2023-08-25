@@ -49,5 +49,5 @@ public interface WB01Svc {
    
    int deleteWbsPlanTempList(Map<String, String> paramMap);
    
-   
+   List<Map<String, String>> wbsCodeList(Map<String, String> paramMap);
 }

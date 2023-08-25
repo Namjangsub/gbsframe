@@ -257,5 +257,10 @@ public class WB01Ctr {
 	  	return "jsonView";
   } 
   
-  
+  @PostMapping(value = "/wbsCodeList") 
+  public String wbsCodeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  List<Map<String, String>> resultList = wb01Svc.wbsCodeList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+  }
 }	  
