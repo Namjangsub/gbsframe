@@ -53,6 +53,11 @@
 	<script type="text/javascript" src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js" ></script>
 	<script src="/static/js/global.js"></script>
 	<script src="/static/js/fileTree.js"></script>
+	
+	<!-- 공통결재 -->
+    <script src="/static/js/commApproval.js"></script>
+
+
 </head>
 
 <body>
@@ -151,6 +156,7 @@
 		<div class="contents_tit">
 			<span  style="height: 30px; line-height: 30px;font-size: 15px;">TO-DO LIST </span>
 			<div class="add_btn_small pdl10">
+				<a onclick="toDoApproval();" style="height: 30px; line-height: 28px; width: 60px;"><i class="fas fa-file-excel"></i>결재</a>
 				<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 			    </div>
 				<select id="recordCnt" class="prae_select" data-search="recordCnt" onchange="gridView.setData(0);;">
@@ -211,7 +217,9 @@ var todoCoCd = null;
 			onDBLClick: function () {
 				      this.self.clearSelect();
 				      this.self.select(this.dindex);                
-		                if (this.item.todoId == jwt.userId && this.item.todoCfDt == undefined) {
+		                if (this.item.todoDiv1CodeNm == "공유" 
+		                	&& this.item.todoId == jwt.userId 
+		                	&& this.item.todoCfDt == undefined) {
 		                    toDoConfirm(this.dindex);
 		                    gridView.setData(pageNo);
 		                }
@@ -413,8 +421,6 @@ $(document).ready(function() {
 	gridView.initView().setData(0);    
 	excelView.initView();
     
-
-    
  })
     
  function openPrdtSearch(){
@@ -556,5 +562,71 @@ function selectCodeList() {
         $('#todoDiv').append(optionHtml);
     });
 }
+
+
+function wbsSalesCodeSearch() {
+    var paramObj = {
+       "coCd" : $('#coCd').val(),
+       "salesCd": $('#salesCd').val()
+    };
+    openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1000, 430, "SALES CODE 검색", paramObj, function (grid){
+        //sdebugger;
+        var row = grid.target.getList("selected")[0];
+        $('#salesCd').val(row.salesCd);
+        gridView.setData(0);
+    });
+}
+
+
+function toDoApproval(){
+	var row = gridView.target.getList("selected")[0];
+    if (row) {
+    	if (row.todoDiv1CodeNm == "결재" 
+    		&& row.todoId == jwt.userId  
+    		&& row.todoCfDt == undefined) {
+    		var paramObj = {
+                    "todoKey":row.todoKey, 
+                    "todoCoCd":row.todoCoCd,
+                    "salesCd":row.salesCd,
+                    "todoFileTrgtKey":row.todoFileTrgtKey,
+                    "todoDiv1CodeId":row.todoDiv1CodeId,
+                    "todoDiv2CodeId":row.todoDiv2CodeId
+             };
+             postAjaxSync("/user/wb/wb20/selectApprovalChk", paramObj, null, function(data){
+                  if (data.resultList[0]['cnt'] != '0') {
+                      alert("이전 결재자가 미결재 중입니다.");
+                         return;
+                  } 
+                 else {
+                     var paramObj = {
+                    		 "coCd":row.coCd,
+                    		 "salesCd":row.salesCd,
+                    		 "todoDiv1CodeId":row.todoDiv1CodeId,
+                             "todoDiv2CodeId":row.todoDiv2CodeId,
+                             "todoFileTrgtKey":row.todoFileTrgtKey,
+                             "pgmId":row.creatPgm
+                             };
+                     openSecondModal("/static/html/user/wb/wb20/WB2001P01.html", 430, 300, "", paramObj);
+                 }                
+             }); 
+    	}
+    	else if (row.todoDiv1CodeNm == "결재" 
+            && row.todoId != jwt.userId) {
+    		alert("결재 대상자가 아닙니다.");
+            return;
+    	}
+    	else if (row.todoDiv1CodeNm == "결재" 
+            && row.todoId == jwt.userId  
+            && row.todoCfDt != undefined) {
+            alert("결재가 완료된 데이터입니다.");
+            return;
+        }
+    }
+    else {
+    	alert("결재행을 선택하세요.");
+    	return;
+    }
+} 
+
 
 </script>
