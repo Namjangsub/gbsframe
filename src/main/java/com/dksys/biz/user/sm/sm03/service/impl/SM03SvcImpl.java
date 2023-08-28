@@ -113,8 +113,8 @@ public class SM03SvcImpl implements SM03Svc {
 		//첨부 화일 권한체크  끝 
 		//---------------------------------------------------------------  		
 		
-		int result = 0;	    
-		//FILE TARGET KEY - 
+		int result = 0;	  		
+		//FILE TARGET KEY  
 		if( paramMap.get("fileTrgtKey").equals("0") ) {
 			int fileTrgtKey = sm03Svc.selectMaxTrgtKey(paramMap);	
 		    paramMap.put("fileTrgtKey", String.valueOf(fileTrgtKey));
