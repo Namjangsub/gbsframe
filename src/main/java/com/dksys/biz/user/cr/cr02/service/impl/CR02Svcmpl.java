@@ -286,16 +286,17 @@ public class CR02Svcmpl implements CR02Svc {
                     break;
                 }
             }
+            ordrsDetail.put("coCd", param.get("coCd"));
+            ordrsDetail.put("ordrsNo", param.get("ordrsNo"));
+            ordrsDetail.put("estNo", param.get("estNo"));
+            ordrsDetail.put("currCd", param.get("currCd"));
+            ordrsDetail.put("userId", param.get("userId"));
+            ordrsDetail.put("pgmId", param.get("pgmId"));
+            ordrsDetail.put("udtId", param.get("userId"));
+            ordrsDetail.put("udtPgm", "TB_CR02M01");
+            
             if (found) {
                 // 수주 상세 업데이트
-                ordrsDetail.put("coCd", param.get("coCd"));
-                ordrsDetail.put("ordrsNo", param.get("ordrsNo"));
-                ordrsDetail.put("estNo", param.get("estNo"));
-                ordrsDetail.put("currCd", param.get("currCd"));
-                ordrsDetail.put("userId", param.get("userId"));
-                ordrsDetail.put("pgmId", param.get("pgmId"));
-                ordrsDetail.put("udtId", param.get("userId"));
-                ordrsDetail.put("udtPgm", "TB_CR02M01");
 
 //                if (ordrsDetail.get("ordrsDtlDiv10").equals("설비")) {
 //                    String newSalesCode = param.get("ordrsNo") + ordrsDetail.get("ordrsSeq") + ordrsDetail.get("prdtCd") + ordrsDetail.get("itemDiv");
@@ -305,17 +306,6 @@ public class CR02Svcmpl implements CR02Svc {
                 cr02Mapper.updateOrdrsDetail(ordrsDetail);
             } else {
                 // 수주 상세 삽입
-                ordrsDetail.put("coCd", param.get("coCd"));
-                ordrsDetail.put("ordrsNo", param.get("ordrsNo"));
-                ordrsDetail.put("estNo", param.get("estNo"));
-                ordrsDetail.put("currCd", param.get("currCd"));
-
-
-                ordrsDetail.put("userId", param.get("userId"));
-                ordrsDetail.put("pgmId", param.get("pgmId"));
-                ordrsDetail.put("udtId", param.get("userId"));
-                ordrsDetail.put("udtPgm", "TB_CR02M01");
-
               //Sales Cd 만들떄 ITEM_DIV의 CODE_ETC 값 추출
                 String ItemDoov = (selectItemDivEtc(ordrsDetail));
                 String Salad = ordrsDetail.get("salesCd");
@@ -385,23 +375,11 @@ public class CR02Svcmpl implements CR02Svc {
                 
                 if (found) {
                     // Update plan
-//                    plan.put("coCd", param.get("coCd"));
-//                    plan.put("ordrsNo", param.get("ordrsNo"));
-//                    plan.put("estNo", param.get("estNo"));
-//                    plan.put("userId", param.get("userId"));
-//                    plan.put("pgmId", param.get("pgmId"));
-//                    plan.put("currCd", param.get("currCd"));
 
                     cr02Mapper.updateClmnPlan(plan);
                     cr02Mapper.insertUpdatePlanHis(plan);
                 } else {
                     // Insert new plan
-//                    plan.put("coCd", param.get("coCd"));
-//                    plan.put("ordrsNo", param.get("ordrsNo"));
-//                    plan.put("estNo", param.get("estNo"));
-//                    plan.put("userId", param.get("userId"));
-//                    plan.put("pgmId", param.get("pgmId"));
-//                    plan.put("currCd", param.get("currCd"));
                     cr02Mapper.updateClmnPlan(plan);
                     cr02Mapper.insertClmnPlan(plan);
                     cr02Mapper.insertUpdatePlanHis(plan);
