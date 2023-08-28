@@ -1,0 +1,521 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.qm.qm02.mapper.QM02Mapper">
+	<!-- 그리드 조회 카운트-->
+    <select id="select_grid_Count" parameterType="Map" resultType="int">
+		SELECT count(*) 
+		  FROM (
+				SELECT ROWNUM AS RN
+				, A.FILE_TRGT_KEY
+				, A.RES_NO
+				, A.CO_CD
+				, A.ORDRG_ID
+				, C.NAME AS ORDRG_NM
+				, TO_CHAR(A.RES_DT, 'YYYY-MM-DD') AS RES_DT
+				, A.RES_RMK
+				, A.RES_DIV
+				, A.WRITE_DT
+				, A.WRITE_MONTH
+				, A.CREAT_ID
+				, A.CREAT_PGM
+				, A.CREAT_DTTM
+				FROM  TB_QM02M01 A
+				LEFT OUTER JOIN TB_CM06M01 C ON C.ID = A.ORDRG_ID  AND C.CO_CD =  A.CO_CD
+				) B
+		WHERE  1 = 1
+		<if test="coCd != null and !coCd.equals('')">
+		AND B.CO_CD = #{coCd}
+		</if>
+		<if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')" >
+		AND B.RES_DT BETWEEN TO_DATE( #{strtDt},'YYYYMMDD') AND TO_DATE( #{endDt},'YYYYMMDD')
+		</if>
+		<if test="ordrgId != null and !ordrgId.equals('')">
+		AND B.ORDRG_ID = #{ordrgId}
+		</if>
+		<if test="ordrgNm != null and !ordrgNm.equals('')">
+		AND B.ORDRG_NM LIKE '%' || #{ordrgNm} || '%'
+		</if>
+    </select>
+
+	<!-- 그리드 조회 -->
+	<select id="selectMainGridList" parameterType="Map" resultType="camelMap">
+		SELECT B.* 
+		  FROM (
+				SELECT ROWNUM AS RN
+				, A.FILE_TRGT_KEY
+				, A.RES_NO
+				, A.CO_CD
+				, A.ORDRG_ID
+				, C.NAME AS ORDRG_NM
+				, TO_CHAR(A.RES_DT, 'YYYY-MM-DD') AS RES_DT
+				, A.RES_RMK
+				, A.RES_DIV
+				, A.WRITE_DT
+				, A.WRITE_YEAR
+				, A.WRITE_MONTH
+				, A.CREAT_ID
+				, A.CREAT_PGM
+				, A.CREAT_DTTM
+				FROM  TB_QM02M01 A
+				LEFT OUTER JOIN TB_CM06M01 C ON C.ID = A.ORDRG_ID  AND C.CO_CD =  A.CO_CD
+				) B
+		WHERE  1 = 1
+		<if test="coCd != null and !coCd.equals('')">
+		AND B.CO_CD = #{coCd}
+		</if>
+		<if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')" >
+		AND B.RES_DT BETWEEN TO_DATE( #{strtDt},'YYYYMMDD') AND TO_DATE( #{endDt},'YYYYMMDD')
+		</if>
+		<if test="ordrgId != null and !ordrgId.equals('')">
+		AND B.ORDRG_ID = #{ordrgId}
+		</if>
+		<if test="ordrgNm != null and !ordrgNm.equals('')">
+		AND B.ORDRG_NM LIKE '%' || #{ordrgNm} || '%'
+		</if>
+		AND B.RN BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>
+
+	<select id="select_stock_modal" parameterType="Map" resultType="camelMap">
+		WITH PART_VE2 AS (
+       SELECT ROWNUM  AS RNUM, B.CODE_ID, B.CODE_NM, B.CNT
+         FROM ( 
+			   SELECT M.CODE_ID
+                    , M.CODE_NM
+                    , (SELECT COUNT(*) FROM TB_QM01M01 WHERE PART_CD = M.CODE_ID AND DEPT_CD = #{cobgb} AND ORDRG_ID = #{userId} ) AS CNT
+                 FROM TB_CM05M01 M
+                WHERE 1=1 
+                  AND M.CODE_KIND = 'COBTP'
+                  AND M.USE_YN='Y'
+                ORDER BY M.SORT_NO
+   				)B
+)
+SELECT M.CODE_ID,
+       M.CODE_NM,    
+      M1.CODE_ID AS CODE_VALUE,
+      M1.CODE_NM AS CODE_ERUM
+     , ( SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+	       FROM TB_QM01M01 T
+          WHERE 1=1 
+            AND T.SUB_CD = M1.CODE_ID
+            AND T.PART_CD IN ( SELECT CODE_ID
+								 FROM PART_VE2
+								WHERE RNUM = 1 )
+            AND T.ORDRG_ID = #{userId}
+            AND T.ORDRG_DT BETWEEN TO_DATE(#{strdate}, 'YYYYMMDD') AND TO_DATE(#{enddate}, 'YYYYMMDD')
+    	) AS PART_NM1   
+    , ( SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+	       FROM TB_QM01M01 T
+          WHERE 1=1 
+            AND T.SUB_CD = M1.CODE_ID
+            AND T.PART_CD IN ( SELECT CODE_ID
+								 FROM PART_VE2
+								WHERE RNUM = 2 )
+            AND T.ORDRG_ID = #{userId}
+      ) AS PART_NM2     
+    , ( SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+	       FROM TB_QM01M01 T
+          WHERE 1=1 
+            AND T.SUB_CD = M1.CODE_ID
+            AND T.PART_CD IN ( SELECT CODE_ID
+								 FROM PART_VE2
+								WHERE RNUM = 3 )
+            AND T.ORDRG_ID = #{userId}
+            AND T.ORDRG_DT BETWEEN TO_DATE(#{strdate}, 'YYYYMMDD') AND TO_DATE(#{enddate}, 'YYYYMMDD')
+    ) AS PART_NM3     
+   , ( SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+	       FROM TB_QM01M01 T
+          WHERE 1=1 
+            AND T.SUB_CD = M1.CODE_ID
+            AND T.PART_CD IN ( SELECT CODE_ID
+								 FROM PART_VE2
+								WHERE RNUM = 4 )
+            AND T.ORDRG_ID = #{userId}
+            AND T.ORDRG_DT BETWEEN TO_DATE(#{strdate}, 'YYYYMMDD') AND TO_DATE(#{enddate}, 'YYYYMMDD')
+    ) AS PART_NM4  
+   , ( SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+	       FROM TB_QM01M01 T
+          WHERE 1=1 
+            AND T.SUB_CD = M1.CODE_ID
+            AND T.PART_CD IN ( SELECT CODE_ID
+								 FROM PART_VE2
+								WHERE RNUM = 5 )
+            AND T.ORDRG_ID = #{userId}
+            AND T.ORDRG_DT BETWEEN TO_DATE(#{strdate}, 'YYYYMMDD') AND TO_DATE(#{enddate}, 'YYYYMMDD')
+    ) AS PART_NM5  
+    , ( SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+	       FROM TB_QM01M01 T
+          WHERE 1=1 
+            AND T.SUB_CD = M1.CODE_ID
+            AND T.PART_CD IN ( SELECT CODE_ID
+								 FROM PART_VE2
+								WHERE RNUM = 6 )
+            AND T.ORDRG_ID = #{userId}
+            AND T.ORDRG_DT BETWEEN TO_DATE(#{strdate}, 'YYYYMMDD') AND TO_DATE(#{enddate}, 'YYYYMMDD')
+    ) AS PART_NM6  
+    , ( SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+	       FROM TB_QM01M01 T
+          WHERE 1=1 
+            AND T.SUB_CD = M1.CODE_ID
+            AND T.PART_CD IN ( SELECT CODE_ID
+								 FROM PART_VE2
+								WHERE RNUM = 7 )
+            AND T.ORDRG_ID = #{userId}
+            AND T.ORDRG_DT BETWEEN TO_DATE(#{strdate}, 'YYYYMMDD') AND TO_DATE(#{enddate}, 'YYYYMMDD')
+    ) AS PART_NM7 
+    , ( SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+	       FROM TB_QM01M01 T
+          WHERE 1=1 
+            AND T.SUB_CD = M1.CODE_ID
+            AND T.PART_CD IN ( SELECT CODE_ID
+								 FROM PART_VE2
+								WHERE RNUM = 8 )
+            AND T.ORDRG_ID = #{userId}
+            AND T.ORDRG_DT BETWEEN TO_DATE(#{strdate}, 'YYYYMMDD') AND TO_DATE(#{enddate}, 'YYYYMMDD')
+    ) AS PART_NM8 
+    , ( SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+	       FROM TB_QM01M01 T
+          WHERE 1=1 
+            AND T.SUB_CD = M1.CODE_ID
+            AND T.PART_CD IN ( SELECT CODE_ID
+								 FROM PART_VE2
+								WHERE RNUM = 9 )
+            AND T.ORDRG_ID = #{userId}
+            AND T.ORDRG_DT BETWEEN TO_DATE(#{strdate}, 'YYYYMMDD') AND TO_DATE(#{enddate}, 'YYYYMMDD')
+    ) AS PART_NM9  
+    , ( SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+	       FROM TB_QM01M01 T
+          WHERE 1=1 
+            AND T.SUB_CD = M1.CODE_ID
+            AND T.PART_CD IN ( SELECT CODE_ID
+								 FROM PART_VE2
+								WHERE RNUM = 10 )
+            AND T.ORDRG_ID = #{userId}
+            AND T.ORDRG_DT BETWEEN TO_DATE(#{strdate}, 'YYYYMMDD') AND TO_DATE(#{enddate}, 'YYYYMMDD')
+    ) AS PART_NM10                     
+FROM TB_CM05M01 M
+LEFT OUTER JOIN TB_CM05M01 M1 ON M1.CODE_KIND = M.CODE_ID 
+                             AND M1.USE_YN='Y' 
+WHERE 1=1
+AND M.USE_YN='Y' 
+AND M.CODE_KIND = #{cobgb}
+ORDER BY M.SORT_NO ASC
+    </select>
+    
+    <select id="select_all_modal" parameterType="Map" resultType="camelMap">
+		WITH DEPT_TEAM_ AS (
+						   SELECT  ROWNUM AS RNUM, B.NAME,B.ID
+						   FROM( 
+						   SELECT A.NAME, A.DEPT_ID, A.LEVEL_CD, A.ID,
+						             (SELECT COUNT(*) FROM TB_CM06M01  WHERE DEPT_ID LIKE 'GUN30%') AS CNT
+						   FROM TB_CM06M01 A 
+						   WHERE A.DEPT_ID LIKE #{deps} || '%'
+						   ORDER BY A.DEPT_ID ASC, A.LEVEL_CD DESC
+  								)B
+ 							)  
+ 		SELECT NAME FROM DEPT_TEAM_
+    </select>
+    
+    <select id="select_zupiter_modal" parameterType="Map" resultType="camelMap">
+		WITH DEPT_TEAM AS (
+						   SELECT  ROWNUM AS RNUM, B.NAME,B.ID
+						   FROM( 
+						   SELECT A.NAME, A.DEPT_ID, A.LEVEL_CD, A.ID,
+						             (SELECT COUNT(*) FROM TB_CM06M01  WHERE DEPT_ID LIKE #{deps} || '%') AS CNT
+						   FROM TB_CM06M01 A 
+						   WHERE A.DEPT_ID LIKE #{deps} || '%'
+						   ORDER BY A.DEPT_ID ASC, A.LEVEL_CD DESC
+						  )B
+						 )  
+SELECT 
+        M.CODE_ID,
+        M.CODE_NM,    
+       M1.CODE_ID AS CODE_VALUE,
+       M1.CODE_NM AS CODE_ERUM
+       , (SELECT COUNT(*)
+            FROM TB_CM06M01
+           WHERE CO_CD = 'GUN' AND DEPT_ID LIKE #{deps} || '%') AS TEAM_CNT  --영업팀 인원  
+       , (SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+            FROM TB_QM01P01 T
+           WHERE 1=1 
+             AND T.SUB_CD = M1.CODE_ID 
+             AND T.DEPT_CD = M.CODE_KIND
+             AND T.CREAT_ID IN (SELECT ID FROM DEPT_TEAM WHERE RNUM = 1)
+         )AS USER1
+       , (SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+            FROM TB_QM01P01 T
+           WHERE 1=1 
+             AND T.SUB_CD = M1.CODE_ID 
+             AND T.DEPT_CD = M.CODE_KIND
+             AND T.CREAT_ID IN (SELECT ID FROM DEPT_TEAM WHERE RNUM = 2)
+         )AS USER2
+       , (SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+            FROM TB_QM01P01 T
+           WHERE 1=1 
+             AND T.SUB_CD = M1.CODE_ID 
+             AND T.DEPT_CD =M.CODE_KIND
+             AND T.CREAT_ID IN (SELECT ID FROM DEPT_TEAM WHERE RNUM = 3)
+         )AS USER3
+       , (SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+            FROM TB_QM01P01 T
+           WHERE 1=1 
+             AND T.SUB_CD = M1.CODE_ID 
+             AND T.DEPT_CD = M.CODE_KIND 
+             AND T.CREAT_ID IN (SELECT ID FROM DEPT_TEAM WHERE RNUM = 4)
+         )AS USER4
+      , (SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+           FROM TB_QM01P01 T
+          WHERE 1=1 
+            AND T.SUB_CD = M1.CODE_ID 
+            AND T.DEPT_CD =M.CODE_KIND
+            AND T.CREAT_ID IN (SELECT ID FROM DEPT_TEAM WHERE RNUM = 5)
+        )AS USER5
+      , (SELECT COUNT(T.SUB_CD) AS ITEM_CNT 
+           FROM TB_QM01P01 T
+          WHERE 1=1 
+            AND T.SUB_CD = M1.CODE_ID 
+            AND T.DEPT_CD = M.CODE_KIND 
+            AND T.CREAT_ID IN (SELECT ID FROM DEPT_TEAM WHERE RNUM = 6)
+         )AS USER6
+FROM TB_CM05M01 M
+ LEFT OUTER JOIN TB_CM05M01 M1 ON M1.CODE_KIND = M.CODE_ID AND M1.USE_YN='Y' 
+WHERE 1=1
+AND M.USE_YN='Y' AND M.CODE_KIND = #{cobgb}
+ORDER BY M.SORT_NO ASC
+    </select>
+	
+    <!-- 수정팝업 조회 -->
+    <select id="select_qm02_Info" parameterType="Map" resultType="camelMap">
+		SELECT ROWNUM AS RN
+				, A.FILE_TRGT_KEY
+				, A.RES_NO
+				, A.CO_CD
+				, A.ORDRG_ID
+				, C.NAME AS ORDRG_NM
+				, TO_CHAR(A.RES_DT, 'YYYY-MM-DD') AS RES_DT
+				, A.RES_RMK
+				, A.RES_DIV
+				, A.WRITE_DT
+				, A.WRITE_YEAR
+				, A.WRITE_MONTH
+				, A.CREAT_ID
+				, A.CREAT_PGM
+				, A.CREAT_DTTM
+				FROM  TB_QM02M01 A
+				LEFT OUTER JOIN TB_CM06M01 C ON C.ID = A.ORDRG_ID  AND C.CO_CD =  A.CO_CD
+		WHERE  FILE_TRGT_KEY = #{fileTrgtKey}
+		AND    ROWNUM = 1
+    </select>
+
+	<!-- 수정팝업 그리드 조회 -->
+	<select id="select_sm04_Info_Dtl" parameterType="Map" resultType="camelMap">
+		SELECT DISTINCT A.FILE_TRGT_KEY
+		     , A.CO_CD
+		     , A.SALES_CD
+		     , O.CLNT_CD
+		     , O.CLNT_NM
+		     , O.CLNT_PJT
+		     , O.PRDT_CD
+		     , O.PRDT_NM
+		     , O.ITEM_DIV
+		     , O.ITEM_DIV_NM
+		     , O.EQP_NM
+		     , A.IO_NO
+		     , A.OUT_WH_CD
+		     , A.IN_WH_CD
+		     , TO_CHAR(A.IO_DT, 'YYYY-MM-DD') AS IO_DT
+		     , A.SOC_YN
+		     , A.IO_RMK
+		     , B.IO_SEQ
+		     , B.DSGN_NO
+		     , B.MATR_CD
+		     , M.MATR_NM       --자재품명
+		     , M.MATR_SPEC     --자재규격
+		     , M.MATR_MAT      --자재소재
+		     , M.MATR_MAKR_NM  --자재메이커
+		     , M.MATR_MNO      --자재형번
+		     , B.IO_QTY
+		     , B.IO_DTL_RMK
+		     , B.OUT_INOUT_KEY
+		     , B.IN_INOUT_KEY
+		     
+		     , 0  AS STOCK_QTY --재고수량
+		     , '' AS CHK       --체크여부
+		     , 0  AS OUT_QTY
+
+			 , 'U' AS DATA_CHK
+		FROM   TB_SM04M01 AS A
+		       LEFT OUTER JOIN TB_SM04D01 AS B  ON B.CO_CD = A.CO_CD
+		                                       AND B.IO_NO = A.IO_NO
+		       LEFT OUTER JOIN (
+		                        SELECT DISTINCT SM.CO_CD    --회사
+		                             , SM.ORDRS_NO          --수주번호
+		                             , TO_CHAR(SM.ORDRS_CLNT_CD) AS CLNT_CD --고객사
+		                             , C.CLNT_NM                 AS CLNT_NM --고객사명
+		                             , SM.CLNT_PJT          --고객사PJT
+		                             , SD.PRDT_CD           --제품구분
+		                             , P.PRDT_NM
+		                             , SD.ITEM_DIV          --아이템구분
+		                             , R.CODE_NM AS ITEM_DIV_NM
+		                             , SD.SALES_CD          --SalesCode
+		                             , SD.EQP_NM            --설비명
+		                        FROM   TB_CR02M01 AS SM
+		                               LEFT OUTER JOIN TB_CR02D02 AS SD  ON SD.CO_CD    = SM.CO_CD
+		                                                                AND SD.ORDRS_NO = SM.ORDRS_NO
+		                               LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD
+		                               LEFT OUTER JOIN TB_BM01M01 AS P ON P.PRDT_CD = SD.PRDT_CD
+		                               LEFT OUTER JOIN TB_CM05M01 AS R ON R.CODE_ID = SD.ITEM_DIV
+				               ) AS O  ON O.CO_CD    = A.CO_CD
+				                      AND O.SALES_CD = A.SALES_CD
+		       LEFT JOIN TB_BM05M01 AS M  ON M.CO_CD   = B.CO_CD
+		                                 AND M.MATR_CD = B.MATR_CD
+		WHERE  1 = 1
+		AND    A.CO_CD = #{coCd}
+		AND    A.IO_NO = #{ioNo}
+    </select>
+    
+	
+	<!--해당월에 데이터 있는지 확인 -->
+	<select id="select_gochal_count" parameterType="Map" resultType="int">
+		SELECT count(*)
+		  FROM TB_QM02M01 
+		  WHERE WRITE_MONTH = #{writeMonth}
+		    AND ORDRG_ID = #{ordrgId}
+	</select>
+	
+	<!--해당월에 결과 데이터 있는지 확인 -->
+	<select id="select_result_count" parameterType="Map" resultType="int">
+		SELECT count(*)
+		  FROM TB_QM02M01 
+		  WHERE WRITE_MONTH = #{writeMonth}
+		    AND ORDRG_ID = #{ordrgId}
+		    AND RES_DIV = '팀'
+	</select>
+	
+	<!-- 파일키 MAX + 1 채번 -->
+	<select id="select_qm02_SeqNext" parameterType="Map" resultType="int">
+		SELECT NVL(MAX(TO_NUMBER(FILE_TRGT_KEY)),0) + 1
+		FROM   TB_QM02M01
+	</select>
+
+	<!-- 수불키 채번 -->
+	<select id="select_qm02_Ioseq" parameterType="Map" resultType="int">
+		SELECT TB_BM30M01_SQ01.NEXTVAL
+		FROM   DUAL
+	</select>
+
+	<!-- 관리번호 채번 -->
+	<select id="select_qm02_Next_MNGM_NO" parameterType="java.util.Map" resultType="java.lang.String">
+		SELECT CASE WHEN MAX(RES_NO) IS NULL THEN 'RES'||SUBSTR(#{writeDt}, 3, 2)||'00001'
+		                                    ELSE 'RES'||SUBSTR(#{writeDt}, 3, 2)||LPAD(TO_NUMBER(SUBSTR(MAX(RES_NO), -5)) + 1, 5, 0)
+			   END AS MNGM_NO
+		FROM   TB_QM02M01
+		WHERE  CO_CD = #{coCd}
+		AND    RES_DT LIKE SUBSTR(#{writeDt}, 0, 4)||'%'
+    </select>
+	
+	<!-- insert -->
+    <insert id="insert_qm02" parameterType="Map">
+        INSERT INTO TB_QM02M01
+		(
+			  FILE_TRGT_KEY
+			, RES_NO
+			, CO_CD
+			, ORDRG_ID
+			, RES_DT
+			, RES_RMK
+			, RES_DIV
+			, WRITE_DT
+			, WRITE_YEAR
+			, WRITE_MONTH
+			, ETC_FIELD1
+			, ETC_FIELD2
+			, ETC_FIELD3
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+		)
+		VALUES
+		(
+			  #{fileTrgtKey}
+			, #{resNo}
+			, #{coCd}
+			, #{ordrgId}
+			, #{writeDt}
+			, #{resRmk}
+			, #{resDiv}
+			, #{writeDt}
+			, #{writeYear}
+			, #{writeMonth}
+			, #{etcField1, jdbcType=VARCHAR}
+			, #{etcField2, jdbcType=VARCHAR}
+			, #{etcField3, jdbcType=VARCHAR}
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+		)
+    </insert>
+
+	<insert id="insert_sm04_Dtl" parameterType="Map">
+		<selectKey keyProperty="inInoutKey"  resultType="String" order="BEFORE">
+			SELECT TB_BM30M01_SQ01.NEXTVAL
+			FROM   DUAL
+        </selectKey>
+		INSERT INTO TB_SM04D01
+		(
+			  CO_CD
+			, IO_NO
+			, IO_SEQ
+			, SALES_CD
+			, MATR_CD
+			, DSGN_NO
+			, IO_QTY
+			, IO_DTL_RMK
+			, OUT_INOUT_KEY
+			, IN_INOUT_KEY
+			, ETC_FIELD1
+			, ETC_FIELD2
+			, ETC_FIELD3
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+		)
+		VALUES
+		(
+			  #{coCd}
+			, #{ioNo}
+			, #{ioSeq}
+			, #{salesCd}
+			, #{matrCd}
+			, #{dsgnNo}
+			, #{outQty}
+			, #{ioDtlRmk, jdbcType=VARCHAR}
+			, #{outInoutKey}
+			, #{inInoutKey}
+			, #{etcField1, jdbcType=VARCHAR}
+			, #{etcField2, jdbcType=VARCHAR}
+			, #{etcField3, jdbcType=VARCHAR}
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+		)
+	</insert>
+    
+	<!-- update -->
+    <update id="update_qm02" parameterType="map">
+		UPDATE TB_QM02M01
+		SET    RES_RMK  = #{resRmk}
+			 , UDT_ID   = #{userId}
+			 , UDT_PGM  = #{pgmId}
+			 , UDT_DTTM = SYSDATE
+		WHERE  FILE_TRGT_KEY = #{fileTrgtKey}
+    </update>
+    
+    <!-- delete -->    
+    <delete id="delete_qm02" parameterType="Map">
+		DELETE TB_QM02M01
+		WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+	</delete>
+    
+
+</mapper>
