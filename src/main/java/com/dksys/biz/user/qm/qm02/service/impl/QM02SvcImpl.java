@@ -43,18 +43,18 @@ public class QM02SvcImpl implements QM02Svc {
 	public int select_grid_Count(Map<String, String> paramMap) {
 		return qm02Mapper.select_grid_Count(paramMap);
 	}
+	
+	// 그리드 카운트
+	@Override
+	public int select_gochal_count(Map<String, String> paramMap) {
+		return qm02Mapper.select_gochal_count(paramMap);
+	}
 
 	// 그리드 리스트
 	@Override
 	public List<Map<String, String>> selectMainGridList(Map<String, String> paramMap) {
 		return qm02Mapper.selectMainGridList(paramMap);
 	}
-//	
-//	// 창고 코드 검색
-//	@Override
-//	public List<Map<String, Object>> selectWhCd(Map<String, String> paramMap) {
-//		return qm02Mapper.selectWhCd(paramMap);
-//	}
 
 	//그리드 검색
 	@Override

@@ -39,20 +39,17 @@ public class QM02Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
-//
-//	// 창고 코드 검색
-//	@PostMapping(value = "/selectWhCd")
-//    public String selectWhCd(@RequestBody Map<String, String> paramMap, ModelMap model) {
-//        List<Map<String, Object>> result = qm02svc.selectWhCd(paramMap);
-//        model.addAttribute("result", result);
-//        return "jsonView";
-//    }
 
 	//팝업 그리드 검색
 	@PostMapping(value = "/select_stock_modal")
 	public String select_stock_modal(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> result = qm02svc.select_stock_modal(paramMap);
+		int gochal = qm02svc.select_gochal_count(paramMap);
 		model.addAttribute("result", result);
+		if (gochal == 1) {
+			model.addAttribute("gochal", gochal);
+			model.addAttribute("message", "등록된 고찰 데이터가 있습니다.");
+		}
 		return "jsonView";
 	}
 	
