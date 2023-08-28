@@ -1,0 +1,497 @@
+<div class="popup_area of_a" style="width: 100%; height: 100%;">
+	<div class="tit_contents">
+		<h4 class="tit">발주 및 출장요청서 팀원 결과표 등록</h4>
+	</div>
+	
+	<form id="popForm" onSubmit="return false;">
+		<div class="form-group popup_table">
+			<input type="hidden" id="fileTrgtKey" name="fileTrgtKey">
+			<input type="hidden" id="userId"      name="userId">
+			<input type="hidden" id="pgmId"       name="pgmId" value="QM0201M01">
+			<table>
+				<colgroup>
+					<col width="11%">
+					<col width="14%">
+					<col width="11%">
+					<col width="14%">
+					<col width="11%">
+					<col width="14%">
+					<col width="11%">
+					<col width="14%">
+				</colgroup>
+				<!-- 1행 -->
+				<tr>
+					<th>발행자</th>
+					<td>
+		               <div class="search_form">
+		               	  <input type="hidden"	id="coCd" name = "coCd" readonly="readonly">						
+					      <input type="hidden" id="ordrgId" name="ordrgId"  data-search="ordrgId"  >
+		             	  <input type="text"	id="ordrgNm"  name="ordrgNm" readonly="readonly">
+		               </div>
+					</td>
+					<th>년월</th>
+					<td>
+						 <div class="date_input">
+						   <select id="writeYear" name="writeYear" data-search="writeYear" style="width:100px;">
+						   </select>
+						   <select id="writeMonth" name="writeMonth" data-search="writeMonth"  style="width:100px;" onchange="ModalgridView.setData();">
+						   </select>							
+						 </div>					
+					</td>
+					<th>고찰번호</th>
+					<td>
+						 <div class="search_form">
+						   
+						   <input type="text"	id="resNo" readonly="readonly">						
+						 </div>					
+					</td>
+					<th>고찰일자</th>
+					<td>
+						 <div class="search_form">	
+						   <input type="text" id="resDt" name = "resDt"  readonly="readonly">						
+						 </div>											
+					</td>
+				</tr>
+
+			</table>
+		</div>
+			<!-- 콘텐츠 -->
+			<div class="contents">
+				<!-- 리스트 -->
+				<div class="ax5_grid">
+					<div>
+						<div data-ax5grid="first-grid-modal" data-ax5grid-config="{}" style="height:400px; width: 100%" ></div>
+					</div>
+				</div>
+			</div>
+		<table>
+			<tr>
+				<th class="">고찰</th>
+				<td colspan="7">
+					<textarea class="form-control" id="resRmk" name="resRmk" style="height: 200px;" maxlength="1000"></textarea>
+				</td>
+			</tr>
+		</table>
+	
+	</form>
+	
+	<!-- 공통 파일 영역 -->
+	<div id="fileList_area"></div>
+</div>
+
+<!-- 하단 버튼 -->
+<div class ="popup_bottom_btn">
+	<button type="button" id="actionBtn" authChk>등록</button>
+	<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+</div>
+
+<script type="text/javascript">
+	
+	var actionType  = null;
+	var fileTrgtKey = null;
+	var detailArr   = []; // 상세 그리드내용
+
+	var ModalgridView = {
+		initView: function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showLineNumber : false,
+				// 체크박스
+				//showRowSelector: true,
+				multipleSelect : false,
+				sortable       : false,
+				target : $('[data-ax5grid="first-grid-modal"]'),
+				header : {
+					align   : "center",
+					selector: false
+				},
+				
+				body : {
+					onClick: function () {
+						this.self.select(this.dindex);
+						var row = this.dindex;
+						var col = this.colIndex;
+						var key = this.column.key;						
+						var paramObj = {"row" : row};
+						//체크박스일 경우 실행
+						if( key == "chk" ) {
+							setoutQty(ModalgridView, this.item.chk , this.item.stockQty, row);
+						}
+					},
+					onDBLClick: function () {
+						this.self.select(this.dindex);
+					},
+					onDataChanged: function () {
+
+					},
+				},
+				
+				page : {
+					display: false,
+				},
+				
+				columns : [
+
+					{key: "codeId",      label: "중분류코드",  align: "center", width: 80 , hidden : true},
+					{key: "codeNm",      label: "중분류",     align: "center", width: 80 },
+					{key: "codeValue",   label: "소분류코드",  align: "center", width: 80 , hidden : true},
+					{key: "codeErum",    label: "소분류",     align: "center", width: 140 }
+				]
+// 	            , footSum: [
+// 	                [
+// 	                    {label: "총합계", colspan: 2, align: "center"},
+// 	                    {key: "partNm1", collector: "sum", formatter: "money", align: "right"},
+// 	                    {key: "partNm2", collector: "sum", formatter: "money", align: "right"},
+// 	                    {key: "partNm3", collector: "sum", formatter: "money", align: "right"},
+// 	                    {key: "partNm4", collector: "sum", formatter: "money", align: "right"},
+// 	                    {key: "partNm5", collector: "sum", formatter: "money", align: "right"},
+// 	                    {key: "partNm6", collector: "sum", formatter: "money", align: "right"},
+// 	                    {key: "partNm7", collector: "sum", formatter: "money", align: "right"},
+// 	                    {key: "partNm8", collector: "sum", formatter: "money", align: "right"},
+// 	                    {key: "partNm9", collector: "sum", formatter: "money", align: "right"},
+// 	                    {key: "partNm10", collector: "sum", formatter: "money", align: "right"},
+
+// 	                ]
+// 	           ]
+			});
+			return this;
+		},
+		
+		setData: function(_pageNo) {
+			var targetObj = this.target;
+
+			var formData = new FormData();
+			var formData1 = new FormData();
+			////////////
+			var userDeptId = jwt.deptId;
+			var userDept = userDeptId.substr(0, 5);
+			var coBgB = '';
+			//영업 30, 기술연구소 40, 생산 60, 구매외주팀 50 
+			if(userDept == "GUN30"){		
+				coBgB = 'COBGB1';
+			}else if(userDept == "GUN40"){
+				coBgB = 'COBGB2';
+			}else if(userDept == "GUN50"){ 
+				coBgB = 'COBGB3';
+			}else if(userDept == "GUN60"){
+				coBgB = 'COBGB4';
+			}else{ //기타 부서
+				coBgB = 'COBGB9';
+			}
+			///////////
+				formData = {
+					"deps": userDept
+				}
+
+				postAjax("/user/qm/qm02/select_all_modal", formData, null, function(data) {
+					var list = data.result;	
+					 if (list.length > 0) {
+		                    var i = 0;
+		                    $.each(list, function(idx, elem){
+		                    	ModalgridView.target.addColumn({key: "user"+[idx+1], label:list[idx].name});
+
+		                    });
+					 }
+				});
+			
+			formData1 = {
+					"deps" : userDept,
+					"cobgb" : coBgB
+			}
+			postAjax("/user/qm/qm02/select_zupiter_modal", formData1, null, function(data) {
+				var list = data.result;	
+					targetObj.setData({
+						list : list,
+						page : {
+							totalElements: list.length
+						}
+					});
+			});
+		}
+	}
+	
+	//화면 초기 설정
+	$(document).ready(function() {
+		setCommonSelect($(".popup_area select[data-kind]"));
+		$("#coCd").val(modalStack.last().paramObj.coCd);
+
+		$("#popForm #userId").val(jwt.userId);
+		
+		//고찰일자//
+		$("#resDt").val(new Date().format('yyyy-MM-dd'));
+		
+		$('#writeYear').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+		
+		ModalgridView.initView();
+		
+		SetYm(); //월 셀렉트박스 세팅
+		
+		authChk(); //권한체크
+		
+		actionType = modalStack.last().paramObj.actionType;
+		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
+
+		if (actionType == "C") {
+			$('#popForm .coCd').addClass('hit');
+			$('#popForm input#coCd').attr('required', 'required');
+			
+			//버튼명 변경
+			$("#actionBtn").text("등록");
+			
+			//발행자 세팅
+			$("#ordrgId").val(jwt.userId);
+			$("#ordrgNm").val(jwt.userNm);
+			
+			// ioQty 폐기수량 컬럼 삭제
+			ModalgridView.target.removeColumn(24);
+			
+			ModalgridView.setData(0);
+			//버튼 클릭 시
+			$('#actionBtn').on("click", function() {
+				insert_qm02_p02();
+			});
+		} else if (actionType == "U") {
+			//타이틀명 변경
+			$('.tit').text('발주 및 출장요청서 팀원 결과표 수정')
+			
+			//회사 비활성화
+			$('#popForm .coCd').removeClass('hit');
+			$('#coCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+			
+			// outQty 출고수량 컬럼 삭제
+			ModalgridView.target.removeColumn(28);
+			// chk 선택 컬럼 삭제
+			ModalgridView.target.removeColumn(27);
+			// stockQty 재고수량 컬럼 삭제
+			ModalgridView.target.removeColumn(26);
+
+			//수정 모드 데이터 가져오기
+			select_sm05_Info();
+			//debugger;
+			//버튼명 변경
+			$('#actionBtn').text("수정");
+
+			//버튼 클릭 시
+			$('#actionBtn').on("click", function() {
+				update_sm05();
+			});
+		}
+		
+		//---------------------------------------------------------------
+		//첨부 화일 처리 시작
+		//---------------------------------------------------------------
+		fileParam = {
+			fileTrgtTyp	: $("#pgmId").val(),
+			fileTrgtKey : fileTrgtKey
+		}
+		
+		treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
+		//---------------------------------------------------------------
+		//첨부 화일 처리 끝
+		//---------------------------------------------------------------
+	});
+	
+	//입력정보
+	function select_sm05_Info() {
+		var formData = {
+			"fileTrgtKey" : fileTrgtKey,
+		}
+		
+		postAjaxSync("/user/sm/sm05/select_sm05_Info", formData, null, function(data) {
+			$.each(data.result, function(key, value) {
+				if ($('#popForm #' + key)[0]) {
+					$('#popForm #' + key).val(value);
+					
+					if ($('#popForm #' + key).is('[comma]')) {
+						onlyNumber($('#popForm #' + key)[0]);
+					}
+				}
+			});
+			//debugger;
+		});
+		ModalgridView.setData(0);
+	}
+	
+	// 등록
+	function insert_qm02_p02() {
+		if (inputValidation($('.popup_area [required]'))) {		// 필수 필드의 유효성 검사
+			var formData = makeFormData();						// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
+			//debugger;
+			filePostAjax("/user/qm/qm02/insert_qm02_p02", formData,	// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행
+			            function(data) {
+							alert(data.resultMessage);			// 결과 메시지를 alert으로 출력
+							
+							if (data.resultCode == 200) {		//  요청이 성공(200)한 경우, gridView.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
+								gridView.setData(0);
+								modalStack.close();				// 모달을 닫음
+							}
+						}
+			);
+		}
+	}
+	
+	// 수정
+	function update_sm05() {
+		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
+			var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
+			
+			filePostAjax("/user/sm/sm05/update_sm05", formData,function(data) {
+				alert(data.resultMessage);
+				
+				if (data.resultCode == 200) {
+					gridView.setData(0);
+					modalStack.close();
+				}
+			});
+		}
+	}
+	
+	function makeFormData() {
+		// 금액 콤마 제거
+		$.each($('.popup_area input[comma]'), function(idx, elem) {
+			deleteComma(elem);
+		});
+		
+		// 날짜 하이픈 제거
+		$.each($('.popup_area input[date]'), function(idx, elem) {
+			deleteHyphen(elem);
+		});
+		
+		//////오늘 날짜의 월의 고찰을 등록하려할떄 체크
+		var toDay = new Date().format("yyyyMM"); //오늘 날짜의 년월 체크
+		var resDay = $("#writeYear").val() + $("#writeMonth").val(); //사용자가 등록하려는 년월
+		
+		if (toDay == resDay){
+			alert("당일 월에 고찰 등록은 할 수 없습니다.");
+			return
+		}
+		
+		
+		// 폼데이터 생성
+		var formData = new FormData($("#popForm")[0]);
+		
+		var writeDt = $("#resDt").val().replace(/\-/g, '');
+		
+		formData.append("writeMonth", $("#writeMonth").val());
+		formData.append("writeDt", writeDt);
+		formData.append("resDiv", "팀");
+		
+		console.log(formData);
+		//---------------------------------------------------------------
+		//-------itemarr  --첨부화일 처리를 위한 부분 시작
+		//---------------------------------------------------------------
+		// 유저아이디 추가
+		formData.append("userId" , jwt.userId);
+		formData.append("clntCd" , $('#clntCd').val());			//첨부화일용
+		formData.append("prdtCd" , $('#prdtCd').val());			//첨부화일용
+		formData.append("itemCd" , $('#itemDiv').val());			//첨부화일용
+		formData.append("prjctCd", $('#clntPjt').val());		//첨부화일용
+		formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용
+		
+		var fileUploadArr = [];
+		var tempArr = [];
+		
+		tempArr = treeModule.getFileArr();
+		
+		$.each(tempArr, function(idx, obj) {
+			if (obj.fileKey == 0) {
+				formData.append("files", obj.file);
+				obj.file = '';
+				fileUploadArr.push(obj);
+			}
+		});
+		
+		formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
+		formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
+		//---------------------------------------------------------------
+		//--첨부화일 처리를 위한 부분 끝\
+		//---------------------------------------------------------------
+
+		//상세자료 준비
+        detailArr = [];
+
+		var list = ModalgridView.target.list;
+		//debugger;
+		$.each(list,function(idx, obj) {
+			//신규
+			if (parseFloat(obj.outQty) > 0 && obj.chk == 'Y') {
+				obj.dataChk = 'I';
+				detailArr.push(obj);
+			}
+			
+			//수정			
+			if (obj.dataChk == 'U') {
+				detailArr.push(obj);
+			}
+		});
+		//debugger;
+		formData.append("detailArr", JSON.stringify(detailArr));//선택된 ROW 만 formData에 저장
+		//상세자료 끝
+
+		return formData;
+	}
+
+	//Sales Code
+    function SalesCodeSearch() {
+		//등록일 경우만 팝업처리
+		if (actionType == "C") {
+				var paramObj = {
+				"coCd" : $('#coCd').val(),
+				"salesCd": $('#salesCd').val()
+			};
+			openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1000, 430, "SALES CODE 검색", paramObj, function (grid) {
+				var row = grid.target.getList("selected")[0];
+				$('#salesCd').val(row.salesCd);
+				$('#clntCd').val(row.ordrsClntCd);
+				$('#clntNm').val(row.ordrsClntNm);
+				$('#clntPjt').val(row.clntPjt);
+				$('#prdtCd').val(row.prdtCd);
+				$('#prdtNm').val(row.prdtCdNm);
+				$('#itemDiv').val(row.itemDiv);
+				$('#itemDivNm').val(row.itemDivNm);
+				$('#eqpNm').val(row.eqpNm);
+				
+				Modal_DataSearch();
+			});
+		}
+    }
+
+
+	// 팝업 그리드 조회
+	function Modal_DataSearch() {
+		ModalgridView.setData(0);
+	}
+
+	function setByCoCd(value) {
+		$('#coCd option:not([value="'+value+'"])').remove();
+	}
+	
+	function SetYm(){
+		var now = new Date();
+		var nyear = now.getFullYear();
+		var nmon =  (now.getMonth()+1) > 9 ? ''+(now.getMonth()+1) : '0'+(now.getMonth()+1);
+		
+		for(var sy = 2020; sy <= nyear; sy++){
+			$("#writeYear").append("<option value='" + sy + "'>" + sy + "년</option>");
+		}
+		for(var i=1; i <= 12; i++){
+			var sm = i > 9 ? i : "0" + i;
+			$("#writeMonth").append("<option value='" + sm + "'>" + i + "월</option>");
+		}
+
+		$("#writeYear option[value=" + nyear +"]").attr("selected", true);
+		$("#writeMonth option[value=" + nmon +"]").attr("selected", true);
+	}
+	
+    function gridResize(size) {
+	    if (beforeGridSize != size) {
+		    var tagHeight = (size) * 27 + 123 ;
+		    tagHeight = tagHeight > 300 ? tagHeight : 300;
+	
+		    $('[data-ax5grid="first-grid-modal"]').height(tagHeight);
+		    $('[data-ax5grid="first-grid-modal"] [data-ax5grid-container="root"]').height(tagHeight);
+		    beforeGridSize = size;
+	    }
+    }
+
+</script>
