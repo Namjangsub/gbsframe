@@ -165,7 +165,6 @@ function pasIntChk (value) {
 		num = value.replace(/[^-0-9,.]/g, '');
 		num.replace(/,/g, '');
 	}
-	num = parseInt(deleteCommaStr(num));
 	return isNaN(num) ? 1 : num;
 }
 
