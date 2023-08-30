@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.sm.sm18.mapper.SM18Mapper">
+	
+	<!-- 구매현황 공통 sql -->
+	<sql id="selectPchsSql">
+		<!-- 회사코드  --> 
+		<if test="coCd != null and !coCd.equals('')">
+			AND A.CO_CD = #{coCd}   
+		</if>
+		<!-- 일자  -->
+		<if test="pchsDtFrom_S != null and !pchsDtFrom_S.equals('') and pchsDtTo_S != null and !pchsDtTo_S.equals('')" >
+			AND D.PCHS_DT BETWEEN #{pchsDtFrom_S} AND #{pchsDtTo_S}
+		</if>
+		<!-- 마감년월  --> 
+		<!-- 마감일자 -->   
+	
+	</sql>
+	
+	<!-- 구매현황 카운트 -->
+	<select id="sm18_gridView_selectCount" parameterType="Map" resultType="int">
+		SELECT COUNT(*)	
+			FROM
+		 	(	
+			SELECT A.CO_CD
+				, NVL(D.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00000') AS PCHS_NO	--매입확정번호
+				, A.ORDRG_SEQ 
+				, A.SALES_CD
+				, SM02.PCHS_CLNT_CD				-- 구매처cd	
+				, TO_CHAR(SM02.ORDRG_DT, 'YYYY-MM-DD') ORDRG_DT			--발주일자
+				, 'TRGTDIV03' AS TRGT_DIV
+				
+				
+				
+				, BM2.CLNT_NM AS PCHS_CLNT_NM /*거래처명*/
+				, BM2.CRN  /*사업자등록번호*/	
+				, C.EQP_NM /*설비명 - 프로젝트명*/
+				, A.DSGN_NO /*도번*/
+				, BM5.MATR_NM  /*품목명 - 자재명*/
+				, BM5.MATR_MAT /*소재*/
+				, BM5.MATR_MAKR_NM  /*MAKER*/
+				, BM5.MATR_SPEC /*규격*/
+				, BM5.MATR_WT /*중량*/
+				, NVL(A.ORDRG_QTY, 0) AS ORDRG_QTY /*수량 - 발주수량*/
+				, NVL(A.ORDRG_PRC, 0) AS ORDRG_PRC /*단가-발주단가*/
+				, NVL(A.ORDRG_AMT, 0) AS ORDRG_AMT /*공급가액 -발주금액*/
+				, NVL(A.ORDRG_AMT * 0.1, 0) AS ORDRG_VAT --부가세
+				, NVL(A.ORDRG_AMT + (A.ORDRG_AMT * 0.1), 0) AS ORDRG_TOTAL --합계(VAT 포함)
+				, TO_CHAR(D.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT /*매입일자*/
+				, D.PCHS_AMT		--매입금액			
+				, BM2.PCHS_CLMN_RMK  /*결제일*/
+				, BM2.PCHS_PMNT_MTD_CD  --결제조건 코드
+			    , FN_CM05M01_CD_TO_NM(BM2.PCHS_PMNT_MTD_CD) AS PCHS_PMNT_MTD_NM /*결제조건명*/
+			FROM TB_SM02D01 AS A		/* 매입 DETAIL */			
+				INNER JOIN TB_SM02M01 AS SM02 ON(A.CO_CD=SM02.CO_CD AND A.ORDRG_NO=SM02.ORDRG_NO AND A.SALES_CD=SM02.SALES_CD) /*발주*/
+				LEFT OUTER JOIN TB_SM12D01 AS D ON(D.ORDRG_NO=A.ORDRG_NO AND D.ORDRG_SEQ=A.ORDRG_SEQ)	/* 발주 DETAIL */
+				LEFT OUTER JOIN TB_SM12M01 AS M ON(D.CO_CD=M.CO_CD AND D.PCHS_NO=M.PCHS_NO)		/* 발주 MASTER */
+				LEFT OUTER JOIN TB_BM02M01 AS BM2  ON BM2.CLNT_CD = SM02.PCHS_CLNT_CD /*거래처 마스터*/	
+				LEFT OUTER JOIN TB_BM05M01 AS BM5 ON(BM5.CO_CD = A.CO_CD AND BM5.MATR_CD = A.MATR_CD)   --자재마스터			
+				LEFT OUTER JOIN TB_CR02D02 AS C  ON(C.CO_CD = A.CO_CD AND C.SALES_CD = A.SALES_CD) /*수주상세*/	
+			WHERE 1=1
+			<if test="coCd != null and !coCd.equals('')">
+			AND A.CO_CD = #{coCd}   
+			</if>
+			<!-- 일자  -->
+			<if test="pchsDtFrom != null and !pchsDtFrom.equals('') and pchsDtTo != null and !pchsDtTo.equals('')" >
+				AND D.PCHS_DT BETWEEN TO_DATE( #{pchsDtFrom},'YYYYMMDD') AND TO_DATE( #{pchsDtTo},'YYYYMMDD')
+			</if>
+			) T
+	</select>
+	
+	<!-- 구매현황 리스트 -->
+	<select id="sm18_gridView_selectList" parameterType="Map" resultType="camelMap">
+		SELECT *
+			FROM
+			(	
+			SELECT X.*
+				, ROWNUM AS RN
+				FROM
+				(
+				SELECT A.CO_CD
+					, NVL(D.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00000') AS PCHS_NO	--매입확정번호
+					, A.ORDRG_SEQ 
+					, A.SALES_CD
+					, SM02.PCHS_CLNT_CD				-- 구매처cd	
+					, TO_CHAR(SM02.ORDRG_DT, 'YYYY-MM-DD') ORDRG_DT			--발주일자
+					, 'TRGTDIV03' AS TRGT_DIV
+					
+					, BM2.CLNT_NM AS PCHS_CLNT_NM /*거래처명*/
+					, BM2.CRN  /*사업자등록번호*/	
+					, C.EQP_NM /*설비명 - 프로젝트명*/
+					, A.DSGN_NO /*도번*/
+					, BM5.MATR_NM  /*품목명 - 자재명*/
+					, BM5.MATR_MAT /*소재*/
+					, BM5.MATR_MAKR_NM  /*MAKER*/
+					, BM5.MATR_SPEC /*규격*/
+					, BM5.MATR_WT /*중량*/
+					, NVL(A.ORDRG_QTY, 0) AS ORDRG_QTY /*수량 - 발주수량*/
+					, NVL(A.ORDRG_PRC, 0) AS ORDRG_PRC /*단가-발주단가*/
+					, NVL(A.ORDRG_AMT, 0) AS ORDRG_AMT /*공급가액 -발주금액*/
+					, NVL(A.ORDRG_AMT * 0.1, 0) AS ORDRG_VAT --부가세
+					, NVL(A.ORDRG_AMT + (A.ORDRG_AMT * 0.1), 0) AS ORDRG_TOTAL --합계(VAT 포함)
+					, TO_CHAR(D.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT /*매입일자*/
+					, D.PCHS_AMT		--매입금액			
+					, BM2.PCHS_CLMN_RMK  /*결제일*/
+					, BM2.PCHS_PMNT_MTD_CD  --결제조건 코드
+				    , FN_CM05M01_CD_TO_NM(BM2.PCHS_PMNT_MTD_CD) AS PCHS_PMNT_MTD_NM /*결제조건명*/
+				FROM TB_SM02D01 AS A		/* 매입 DETAIL */			
+					INNER JOIN TB_SM02M01 AS SM02 ON(A.CO_CD=SM02.CO_CD AND A.ORDRG_NO=SM02.ORDRG_NO AND A.SALES_CD=SM02.SALES_CD) /*발주*/
+					LEFT OUTER JOIN TB_SM12D01 AS D ON(D.ORDRG_NO=A.ORDRG_NO AND D.ORDRG_SEQ=A.ORDRG_SEQ)	/* 발주 DETAIL */
+					LEFT OUTER JOIN TB_SM12M01 AS M ON(D.CO_CD=M.CO_CD AND D.PCHS_NO=M.PCHS_NO)		/* 발주 MASTER */
+					LEFT OUTER JOIN TB_BM02M01 AS BM2  ON BM2.CLNT_CD = SM02.PCHS_CLNT_CD /*거래처 마스터*/	
+					LEFT OUTER JOIN TB_BM05M01 AS BM5 ON(BM5.CO_CD = A.CO_CD AND BM5.MATR_CD = A.MATR_CD)   --자재마스터			
+					LEFT OUTER JOIN TB_CR02D02 AS C  ON(C.CO_CD = A.CO_CD AND C.SALES_CD = A.SALES_CD) /*수주상세*/	
+				WHERE 1=1
+				<if test="coCd != null and !coCd.equals('')">
+				AND A.CO_CD = #{coCd}   
+				</if>
+				<!-- 일자  -->
+				<if test="pchsDtFrom != null and !pchsDtFrom.equals('') and pchsDtTo != null and !pchsDtTo.equals('')" >
+					AND D.PCHS_DT BETWEEN TO_DATE( #{pchsDtFrom},'YYYYMMDD') AND TO_DATE( #{pchsDtTo},'YYYYMMDD')
+				</if>
+				) X
+			)
+			WHERE 1=1
+			AND RN BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>
+</mapper>
