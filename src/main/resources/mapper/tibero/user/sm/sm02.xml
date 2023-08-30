@@ -4,7 +4,7 @@
 <mapper namespace="com.dksys.biz.user.sm.sm02.mapper.SM02Mapper">
 
 	<!-- 매입관리 - 발주관리 조회 리스트  조회조건 -->
-	<sql id="selectOrderListCondition">
+	<sql id="selectOrderListCondition_OLD">
 
 		<!-- 회사코드 -->         
 		<if test="coCd != null and !coCd.equals('')">
@@ -50,17 +50,252 @@
 			AND A.ORDRG_DIV30 = #{ordrgdiv30}   
 		</if>			
 	</sql>	
-		
-	<!-- 기준관리 - 결재선 조회 리스트  카운트 -->
+	
+	<sql id="selectOrderListCondition">	
+				<!-- 회사코드 -->         
+				<if test="coCd != null and !coCd.equals('')">
+					AND CO_CD = P_CO_CD
+				</if>		       
+				<!-- 발주일자 -->         
+				<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')">
+					<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
+            			AND ORDRG_DT BETWEEN TO_DATE(P_START_DT, 'YYYYMMDD') AND TO_DATE(P_END_DT, 'YYYYMMDD')
+            		</if>   
+				</if>					
+				<!-- 구매처 -->         
+				<if test="pchsClntCd != null and !pchsClntCd.equals('')">
+					AND PCHS_CLNT_CD = P_PCHS_CLNT_CD 
+				</if>		        
+				<!-- 고객사 -->     
+				<if test="clntCd != null and !clntCd.equals('')">
+					AND ORDRS_CLNT_CD = P_CLNT_CD  --고객사(거래처코드) 
+				</if>					  
+				<!-- salesCd -->     
+				<if test="salesCd != null and !salesCd.equals('')">
+					AND SALES_CD      = P_SALES_CD --SALES CODE 
+				</if>			       
+				<!-- 제품구분 -->     
+				<if test="prdtCd != null and !prdtCd.equals('')">
+					AND PRDT_CD       = P_PRDT_CD  --제품구분 
+				</if>			
+				<!-- 아이템구분 -->     
+				<if test="itemDiv != null and !itemDiv.equals('')">
+					AND ITEM_DIV      = P_ITEM_DIV --아이템구분 
+				</if>						       
+				<!-- 고객분류 -->     
+				<if test="clntDivCd != null and !clntDivCd.equals('')">
+					AND CLNT_DIV_CD   = P_CLNT_DIV --고객분류 
+				</if>		
+				<!-- 발주구분 -->     
+				<if test="ordrgdiv10 != null and !ordrgdiv10.equals('')">
+					AND ORDRG_DIV10 = P_ORDRG_DIV 
+				</if>	
+	</sql>					
+			
+	<!-- 발주관리 리스트 with -->
+	<sql id="selectOrderListWith">
+		WITH T_PARAM AS --조회조건 
+		     ( SELECT 
+					#{coCd				, jdbcType=VARCHAR}				AS P_CO_CD       -- 회사코드   
+		            , #{ordrgDtFrom		, jdbcType=VARCHAR}				AS P_START_DT    		--시작일자
+		            , #{ordrgDtTo		, jdbcType=VARCHAR}				AS P_END_DT      -- 종료일자
+		            , #{clntCd			, jdbcType=VARCHAR}			AS P_CLNT_CD     --거래처코드(고객사)
+		            , #{salesCd			, jdbcType=VARCHAR}				AS P_SALES_CD    --SALES CODE
+		            , #{prdtCd			, jdbcType=VARCHAR}			AS P_PRDT_CD     --제품구분
+		            , #{itemDiv			, jdbcType=VARCHAR}				AS P_ITEM_DIV    --아이템구분
+		            , #{ordrgdiv10		, jdbcType=VARCHAR}			AS P_ORDRG_DIV   --발주구분
+		            , #{pchsClntCd		, jdbcType=VARCHAR}			AS P_PCHS_CLNT_CD--구매처  
+		            , #{clntDivCd		, jdbcType=VARCHAR}			AS P_CLNT_DIV    --고객분류(거래처분류)							
+		          FROM DUAL
+		     )
+		   , BJM AS --발주마스터 
+		     ( 
+		       SELECT A.CO_CD                                               AS CO_CD          --회사코드
+					, (SELECT FN_CM05M01_CD_TO_NM(A.CO_CD) FROM DUAL)       AS CO_CD_NM	   --회사명
+					, A.ORDRG_NO                                             AS ORDRG_NO       --발주번호
+					, A.REQ_NO                                               AS REQ_NO         --요인별 요청번호
+					, A.SALES_CD                                             AS SALES_CD       --SALES CODE
+					, A.PCHS_CLNT_CD                                         AS PCHS_CLNT_CD   --구매처cd
+		            , C.CLNT_NM                                              AS PCHS_CLNT_NM   --구매처명
+					, TO_CHAR(A.ORDRG_DT, 'YYYY-MM-DD')                      AS ORDRG_DT       --발주일자
+					, A.ORDRG_DIV10                                          AS ORDRG_DIV10    --발주구분
+					, (SELECT FN_CM05M01_CD_TO_NM(A.ORDRG_DIV10) FROM DUAL) AS ORDRG_DIV10_NM --발주구분명
+					, A.ORDRG_DIV20                                          AS ORDRG_DIV20    --용도구분
+					, (SELECT FN_CM05M01_CD_TO_NM(A.ORDRG_DIV20) FROM DUAL) AS ORDRG_DIV20_NM --용도구분명
+					, A.ORDRG_DIV30                                          AS ORDRG_DIV30    --특성구분
+					, (SELECT FN_CM05M01_CD_TO_NM(A.ORDRG_DIV30) FROM DUAL) AS ORDRG_DIV30_NM --특성구분명
+					, A.CURR_CD	                                             AS CURR_CD        --통화단위
+					, A.EXRATE                                               AS EXRATE         --환율
+					, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD')                   AS DUDT_DEQ_DT    --납기요청일
+					, A.ORDRG_RMK                                            AS ORDRG_RMK      --비고 
+					, A.IN_CMPLET_YN                                         AS IN_CMPLET_YN   --입고완료여부
+					, A.ETC_FIELD1                                           AS ETC_FIELD1
+					, A.ETC_FIELD2                                           AS ETC_FIELD2
+					, A.ETC_FIELD3                                           AS ETC_FIELD3
+					, A.CREAT_ID                                             AS CREAT_ID
+					, A.CREAT_PGM                                            AS CREAT_PGM
+					, A.CREAT_DTTM                                           AS CREAT_DTTM
+					, A.UDT_ID                                               AS UDT_ID
+					, A.UDT_DTTM                                             AS UDT_DTTM
+					, A.FILE_TRGT_KEY                                        AS FILE_TRGT_KEY
+		        FROM TB_SM02M01 A
+		           , TB_BM02M01 C
+		           , T_PARAM    T
+		       WHERE 1=1
+					AND A.CO_CD = P_CO_CD
+            			AND A.ORDRG_DT BETWEEN TO_DATE(P_START_DT, 'YYYYMMDD') AND TO_DATE(P_END_DT, 'YYYYMMDD')
+		         AND A.PCHS_CLNT_CD = C.CLNT_CD
+		     )
+		   , SJD AS --수주상세 
+		     ( 
+		       SELECT X.CO_CD        AS CO_CD         --회사코드
+		            , Y.ORDRS_CLNT_CD AS ORDRS_CLNT_CD --고객사
+		            , A.CLNT_NM       AS ORDRS_CLNT_NM --고객사명
+		            , X.SALES_CD      AS SALES_CD      --SALES CODE
+		            , Y.CLNT_PJT      AS CLNT_PJT      --고객사PJT
+		            , X.PRDT_CD       AS PRDT_CD       --제품구분
+		            , E.PRDT_NM       AS PRDT_NM       --제품구분명
+		            , X.EQP_NM        AS EQP_NM        --설비명
+		            , X.ITEM_DIV      AS ITEM_DIV      --아이템구분
+		            , (SELECT FN_CM05M01_CD_TO_NM(X.ITEM_DIV) FROM DUAL) AS ITEM_DIV_NM --아이템 구분명
+		            , A.CLNT_DIV_CD
+		        FROM TB_CR02D02 X     --수주상세
+		           , TB_CR02M01 Y     --수주마스터
+		           , TB_BM02M01 A     --거래처마스터
+		           , TB_BM01M01 E     --제품마스터
+		           , T_PARAM    T     --조회조건 
+		       WHERE 1=1
+                 AND X.CO_CD         = P_CO_CD    --회사코드
+		         AND X.PRDT_CD       = E.PRDT_CD(+)
+		         AND Y.ORDRS_CLNT_CD = A.CLNT_CD
+		         AND X.CO_CD         = Y.CO_CD 
+		         AND X.ORDRS_NO      = Y.ORDRS_NO				
+		     )
+		   , MCH AS --매출 
+		     ( SELECT CO_CD
+		             , ORDRG_NO
+		             , SALES_CD
+		             , SUM(ORDRG_QTY)   ORDRG_QTY
+		             , SUM(ORDRG_AMT) ORDRG_AMT
+		         FROM TB_SM02D01 
+		             , T_PARAM   --조회조건 
+		        WHERE 1=1
+		          AND CO_CD = P_CO_CD--'GUN'
+		        GROUP BY CO_CD
+		                , ORDRG_NO
+		                , SALES_CD
+		     )
+		   , TDO AS --TODO 결재공유
+		     (SELECT SALES_CD 
+		           , TODO_NO
+		           , CASE WHEN (COUNT(TODO_KEY)>0) THEN 'Y'
+		                   ELSE 'N'
+		              END TODO_YN
+		        FROM TB_WB20M03 W20
+		       WHERE 1=1 
+		       GROUP BY SALES_CD 
+		               , TODO_NO     
+		     )	
+	</sql>
+	
+	<!-- 발주관리 리스트  카운트 -->
 	<select id="selectOrderListCount" parameterType="Map" resultType="int">
-		SELECT COUNT(*) 
-			FROM TB_SM02M01 A
-		WHERE 1=1
-		<include refid="selectOrderListCondition"></include>
-	</select>
+		<include refid="selectOrderListWith"></include>
+			SELECT COUNT(*)
+			  FROM (
+					SELECT A.CO_CD         --회사코드
+							, A.ORDRG_DT
+							, A.SALES_CD       --SALES CODE
+							, A.PCHS_CLNT_CD   --구매처cd
+							, B.PRDT_CD        --제품구분
+							, B.ITEM_DIV       --아이템 구분
+							, B.CLNT_DIV_CD
+							, A.ORDRG_DIV10    --발주구분
+							, A.ORDRG_DIV20    --용도구분
+							, A.ORDRG_DIV30    --특성구분							
+					  FROM BJM A
+					     , SJD B
+					     , MCH D
+					     , TDO T
+					 WHERE 1=1
+					   AND A.SALES_CD = T.SALES_CD(+)
+					   AND A.ORDRG_NO = T.TODO_NO(+)
+					   AND A.CO_CD    = B.CO_CD(+)
+					   AND A.SALES_CD = B.SALES_CD(+)
+					   AND A.CO_CD    = D.CO_CD 
+					   AND A.ORDRG_NO = D.ORDRG_NO 
+					   AND A.SALES_CD = D.SALES_CD
+					 ORDER BY A.CO_CD, A.ORDRG_NO DESC, A.CREAT_DTTM DESC  , A.UDT_DTTM DESC
+			     ) 
+			     , T_PARAM T
+			 WHERE 1=1
+		<include refid="selectOrderListCondition"></include>			 
+	</select>	
+	
+	<!-- 발주관리 리스트  NEW -->
+	<select id="selectOrderList" parameterType="Map" resultType="camelMap">
+			<include refid="selectOrderListWith"></include>
+			SELECT *
+			  FROM (
+					SELECT A.CO_CD         --회사코드
+					     , A.CO_CD_NM	    --회사명
+					     , A.ORDRG_NO       --발주번호
+					     , A.REQ_NO         --요인별 요청번호
+					     , A.SALES_CD       --SALES CODE
+					     , A.PCHS_CLNT_CD   --구매처cd
+					     , A.PCHS_CLNT_NM   --구매처명
+					     , B.ORDRS_CLNT_CD  --고객사
+					     , B.ORDRS_CLNT_NM  --고객사명
+					     , B.CLNT_PJT       --고객사PJT
+					     , B.PRDT_CD        --제품구분
+					     , B.PRDT_NM        --제품구분명
+					     , B.ITEM_DIV       --아이템 구분
+					     , B.ITEM_DIV_NM    --아이템 구분명
+					     , B.EQP_NM         --설비명
+					     , A.ORDRG_DT       --발주일자
+					     , A.ORDRG_DIV10    --발주구분
+					     , A.ORDRG_DIV10_NM --발주구분명
+					     , A.ORDRG_DIV20    --용도구분
+					     , A.ORDRG_DIV20_NM --용도구분명
+					     , A.ORDRG_DIV30    --특성구분
+					     , A.ORDRG_DIV30_NM --특성구분명
+					     , A.CURR_CD        --통화단위
+					     , A.EXRATE         --환율
+					     , D.ORDRG_QTY      --발주수량
+					     , D.ORDRG_AMT      --발주금액
+					     , A.DUDT_DEQ_DT    --납기요청일 
+					     , A.ORDRG_RMK      --비고 
+					     , A.IN_CMPLET_YN   --입고완료여부 
+					     , A.ETC_FIELD1
+					     , A.ETC_FIELD2
+					     , A.ETC_FIELD3
+					     , A.CREAT_ID
+					     , A.CREAT_PGM
+					     , A.CREAT_DTTM
+					     , A.FILE_TRGT_KEY
+					     , T.TODO_YN
+					     , B.CLNT_DIV_CD
+					  FROM BJM A
+					     , SJD B
+					     , MCH D
+					     , TDO T
+					 WHERE 1=1
+					   AND A.SALES_CD = T.SALES_CD(+)
+					   AND A.ORDRG_NO = T.TODO_NO(+)
+					   AND A.CO_CD    = B.CO_CD(+)
+					   AND A.SALES_CD = B.SALES_CD(+)
+					   AND A.CO_CD    = D.CO_CD 
+					   AND A.ORDRG_NO = D.ORDRG_NO 
+					   AND A.SALES_CD = D.SALES_CD
+					 ORDER BY A.CO_CD, A.ORDRG_NO DESC, A.CREAT_DTTM DESC  , A.UDT_DTTM DESC
+			     ) 
+			     , T_PARAM T
+			 WHERE 1=1
+		<include refid="selectOrderListCondition"></include>				
+	</select>	
 	
 	<!-- 발주관리 리스트  -->
-	<select id="selectOrderList" parameterType="Map" resultType="camelMap">   
+	<select id="selectOrderList_OLD" parameterType="Map" resultType="camelMap">   
 		/* No. 내림차순 */
 		SELECT *
 			FROM
@@ -71,7 +306,7 @@
 						(
 						SELECT A.FILE_TRGT_KEY
 								, A.CO_CD
-								, FN_CM05M01_CD_TO_NM(A.CO_CD) AS CO_CD_NM	/* 회사명 */
+								, ( SELECT FN_CM05M01_CD_TO_NM(A.CO_CD) FROM DUAL ) AS CO_CD_NM	/* 회사명 */
 								, A.ORDRG_NO
 								, A.REQ_NO
 								, A.SALES_CD
@@ -88,15 +323,15 @@
 			                    , B.PRDT_CD			/* 제품구분 */
 			                    , B.PRDT_NM			/* 제품구분명 */			                    
 			                    , B.ITEM_DIV		/* 아이템 구분 */                		
-			                    , FN_CM05M01_CD_TO_NM(B.ITEM_DIV) AS ITEM_DIV_NM	/* 아이템 구분명 */			
+			                    , ( SELECT FN_CM05M01_CD_TO_NM(B.ITEM_DIV) FROM DUAL ) AS ITEM_DIV_NM	/* 아이템 구분명 */			
                        			, B.EQP_NM						/* 설비명 */
 								, TO_CHAR(A.ORDRG_DT, 'YYYY-MM-DD') ORDRG_DT		/* 발주일자 */
 								, A.ORDRG_DIV10					/* 발주구분 */
-								, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV10) AS ORDRG_DIV10_NM	/* 발주구분명 */
+								, ( SELECT FN_CM05M01_CD_TO_NM(A.ORDRG_DIV10) FROM DUAL ) AS ORDRG_DIV10_NM	/* 발주구분명 */
 								, A.ORDRG_DIV20					/* 용도구분 */
-								, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV20) AS ORDRG_DIV20_NM	/* 용도구분명 */
+								, ( SELECT FN_CM05M01_CD_TO_NM(A.ORDRG_DIV20) FROM DUAL ) AS ORDRG_DIV20_NM	/* 용도구분명 */
 								, A.ORDRG_DIV30					/* 특성구분 */
-								, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV30) AS ORDRG_DIV30_NM	/* 특성구분명 */								
+								, ( SELECT FN_CM05M01_CD_TO_NM(A.ORDRG_DIV30) FROM DUAL ) AS ORDRG_DIV30_NM	/* 특성구분명 */								
 								, A.CURR_CD						/* 통화단위 */
 								, A.EXRATE
 								, 
@@ -188,15 +423,15 @@
 			                    , B.PRDT_CD			/* 제품구분 */
 			                    , B.PRDT_NM			/* 제품구분명 */			                    
 			                    , B.ITEM_DIV		/* 아이템 구분 */                		
-			                    , FN_CM05M01_CD_TO_NM(B.ITEM_DIV) AS ITEM_DIV_NM	/* 아이템 구분명 */			
+			                    , ( SELECT FN_CM05M01_CD_TO_NM(B.ITEM_DIV) FROM DUAL ) AS ITEM_DIV_NM	/* 아이템 구분명 */			
                        			, B.EQP_NM						/* 설비명 */
 								, TO_CHAR(A.ORDRG_DT, 'YYYY-MM-DD') ORDRG_DT		/* 발주일자 */
 								, A.ORDRG_DIV10					/* 발주구분 */
-								, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV10) AS ORDRG_DIV10_NM	/* 발주구분명 */
+								, ( SELECT FN_CM05M01_CD_TO_NM(A.ORDRG_DIV10) FROM DUAL ) AS ORDRG_DIV10_NM	/* 발주구분명 */
 								, A.ORDRG_DIV20					/* 용도구분 */
-								, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV20) AS ORDRG_DIV20_NM	/* 용도구분명 */
+								, ( SELECT FN_CM05M01_CD_TO_NM(A.ORDRG_DIV20) FROM DAUL ) AS ORDRG_DIV20_NM	/* 용도구분명 */
 								, A.ORDRG_DIV30					/* 특성구분 */
-								, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV30) AS ORDRG_DIV30_NM	/* 특성구분명 */								
+								, ( SELECT FN_CM05M01_CD_TO_NM(A.ORDRG_DIV30) FROM DUAL ) AS ORDRG_DIV30_NM	/* 특성구분명 */								
 								, A.CURR_CD						/* 통화단위 */
 								, A.EXRATE
 								, 
@@ -278,7 +513,7 @@
 			, D.LOWER_CD
 			, DSGN_NO
 			, D.MATR_CD
-			, FN_CM05M01_CD_TO_NM(D.MATR_TEST_DIV) MATR_TEST_DIV    
+			, ( SELECT FN_CM05M01_CD_TO_NM(D.MATR_TEST_DIV) FROM DUAL ) MATR_TEST_DIV    
 			, ORDRG_PRC			/* 발주단가		*/
 			, ORDRG_QTY			/* 발주수량 */
 			, ORDRG_AMT			/* 발주금액  */
@@ -293,7 +528,7 @@
 			, D.UDT_DTTM
 			, D.IN_CMPLET_YN
 	        , D.WH_CD AS MATR_WH_CD		/* 입고창고  */
-	        , FN_CM05M01_CD_TO_NM(D.WH_CD) AS MATR_WH_NM		/* 입고창고  */
+	        , ( SELECT FN_CM05M01_CD_TO_NM(D.WH_CD) FROM DUAL ) AS MATR_WH_NM		/* 입고창고  */
 	        , 
 	        (
 	        	SELECT NVL(SUM(ORDRG_QTY), 0) 
@@ -341,7 +576,7 @@
         SELECT T.FILE_TRGT_KEY
         , T.LVL
         , T.CO_CD
-        , FN_CM05M01_CD_TO_NM(T.CO_CD) CO_NM
+        , ( SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL ) CO_NM
 		, T.SALES_CD
 		, T.DSGN_NO
 		, T.UPPER_CD
@@ -366,7 +601,7 @@
 		, D.MATR_UNIT
 		, D.ORIGIN_NM
 		, D.MATR_DRW_NO
-		, FN_CM05M01_CD_TO_NM(D.MATR_TEST_DIV) MATR_TEST_DIV    
+		, ( SELECT FN_CM05M01_CD_TO_NM(D.MATR_TEST_DIV) FROM DUAL ) MATR_TEST_DIV    
 		, D.DLVR_RQM_DAY
 		, D.MATR_PURC_DIV
 		, D.MIN_ORDRG_QTY
@@ -426,7 +661,7 @@
 		        , T2.PRDT_CD
 		        , (SELECT X.PRDT_NM FROM TB_BM01M01 X WHERE X.PRDT_CD = T2.PRDT_CD) AS PRDT_NM
 		        , T2.ITEM_DIV
-		        , FN_CM05M01_CD_TO_NM(T2.ITEM_DIV) AS ITEM_DIV_NM
+		        , ( SELECT FN_CM05M01_CD_TO_NM(T2.ITEM_DIV) FROM DUAL ) AS ITEM_DIV_NM
 		        , T1.CLNT_PJT
 		        , T2.EQP_NM
 		        , T3.CLNT_NM
@@ -446,7 +681,7 @@
 			, A.ORDRG_NO
 			, B.ORDRG_SEQ
 			, A.SALES_CD			
-			, FN_CM05M01_CD_TO_NM(A.CO_CD) AS CO_CD_NM	/* 회사명 */
+			, ( SELECT FN_CM05M01_CD_TO_NM(A.CO_CD) FROM DUAL ) AS CO_CD_NM	/* 회사명 */
 			, A.PCHS_CLNT_CD				/* 구매처cd */
    			,
    			(
@@ -460,19 +695,19 @@
 			, C.PRDT_CD			/* 제품구분 */
 			, C.PRDT_NM			/* 제품구분명 */			                    
 			, C.ITEM_DIV		/* 아이템 구분 */    
-            , FN_CM05M01_CD_TO_NM(C.ITEM_DIV) AS ITEM_DIV_NM	/* 아이템 구분명 */			
+            , ( SELECT FN_CM05M01_CD_TO_NM(C.ITEM_DIV) FROM DUAL ) AS ITEM_DIV_NM	/* 아이템 구분명 */			
    			, C.EQP_NM					/* 설비명 */				            		   					
 			, TO_CHAR(A.ORDRG_DT, 'YYYY-MM-DD') ORDRG_DT		/* 발주일자 */
 			, A.ORDRG_DIV10					/* 발주구분 */
-			, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV10) AS ORDRG_DIV10_NM	/* 발주구분명 */
+			, ( SELECT FN_CM05M01_CD_TO_NM(A.ORDRG_DIV10) FROM DUAL ) AS ORDRG_DIV10_NM	/* 발주구분명 */
 			, A.ORDRG_DIV20					/* 용도구분 */
-			, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV20) AS ORDRG_DIV20_NM	/* 용도구분명 */
+			, ( SELECT FN_CM05M01_CD_TO_NM(A.ORDRG_DIV20) FROM DUAL ) AS ORDRG_DIV20_NM	/* 용도구분명 */
 			, A.ORDRG_DIV30					/* 특성구분 */
-			, FN_CM05M01_CD_TO_NM(A.ORDRG_DIV30) AS ORDRG_DIV30_NM	/* 특성구분명 */								
+			, ( SELECT FN_CM05M01_CD_TO_NM(A.ORDRG_DIV30) FROM DUAL ) AS ORDRG_DIV30_NM	/* 특성구분명 */								
 			, A.CURR_CD						/* 통화단위 */
 			, A.EXRATE						/* 환율 */						
 			, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
-			, FN_CM05M01_CD_TO_NM(B.MATR_TEST_DIV) MATR_TEST_DIV    
+			, ( SELECT FN_CM05M01_CD_TO_NM(B.MATR_TEST_DIV) FROM DUAL ) MATR_TEST_DIV    
 			, B.ORDRG_DTL_RMK
 			, B.IN_CMPLET_YN
 	        , B.WH_CD AS MATR_WH_CD		/* 입고창고  */ 	
