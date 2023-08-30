@@ -128,9 +128,10 @@ public class SM03SvcImpl implements SM03Svc {
 		    maxInNo = sm03Svc.selectMaxInNo(paramMap);			
 		}
 	    paramMap.put("maxInNo", maxInNo);
-		//master 용		
-		result += sm03Mapper.insertWareHousingMaster(paramMap);	 
-		
+	    if( paramMap.get("inNo").equals("") ) {
+			//master 용		
+			result += sm03Mapper.insertWareHousingMaster(paramMap);	    	
+	    }	 
 		for(Map<String, String> dtl : detailMap) {
 			dtl.put("userId", paramMap.get("userId"));
 			dtl.put("pgmId", paramMap.get("pgmId"));

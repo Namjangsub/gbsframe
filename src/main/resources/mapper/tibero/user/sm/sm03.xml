@@ -112,10 +112,10 @@
 								/*, C.IO_DIV AS IO_DIV_CD */		/* 수불구분 */			 
 								, NVL(
 										( 
-											SELECT DISTINCT MAX(D.FILE_TRGT_KEY) OVER() AS FILE_TRGT_KEY 
+											SELECT MAX(D.FILE_TRGT_KEY) AS FILE_TRGT_KEY 
 												FROM TB_SM03M01 D
 												INNER JOIN TB_SM03D01 CC ON(CC.IN_NO=D.IN_NO)
-											WHERE A.ORDRG_NO=CC.ORDRG_NO		
+											WHERE A.ORDRG_NO=CC.ORDRG_NO AND A.ORDRG_SEQ=CC.ORDRG_SEQ	
 										) 
 								  , 0) AS FILE_TRGT_KEY								
 								, 
@@ -138,7 +138,7 @@
 							) C ON( A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ)
 						WHERE 1=1								
 						<include refid="selectWareHousingListCondition"></include>
-						ORDER BY A.CO_CD DESC, A.ORDRG_NO DESC, A.ORDRG_SEQ DESC, A.CREAT_DTTM DESC, A.UDT_DTTM DESC		
+						ORDER BY A.CO_CD DESC, A.ORDRG_NO DESC, A.ORDRG_SEQ ASC, A.CREAT_DTTM DESC, A.UDT_DTTM DESC		
 						) X		
 			)							
 			WHERE 1=1
@@ -267,10 +267,10 @@
 								/*, C.IO_DIV AS IO_DIV_CD */		/* 수불구분 */			 
 								, NVL(
 										( 
-											SELECT DISTINCT MAX(D.FILE_TRGT_KEY) OVER() AS FILE_TRGT_KEY 
+											SELECT D.FILE_TRGT_KEY AS FILE_TRGT_KEY 
 												FROM TB_SM03M01 D
 												INNER JOIN TB_SM03D01 CC ON(CC.IN_NO=D.IN_NO)
-											WHERE A.ORDRG_NO=CC.ORDRG_NO		
+											WHERE A.ORDRG_NO=CC.ORDRG_NO AND A.ORDRG_SEQ=CC.ORDRG_SEQ		
 										) 
 								  , 0) AS FILE_TRGT_KEY								
 								, 
@@ -303,6 +303,10 @@
 	<!--  file target key -->
 	<select id="selectMaxTrgtKey" parameterType="Map" resultType="int">
     	SELECT NVL(MAX(TO_NUMBER(FILE_TRGT_KEY)),0) + 1 FROM TB_SM03M01
+    		WHERE 1=1
+			<if test="inNo != null and !inNo.equals('')">
+				AND IN_NO = #{inNo}   
+			</if>	    		
 	</select>	
 	
 	<!-- 발주번호 max -->	
@@ -394,7 +398,7 @@
 			LEFT OUTER JOIN TB_SM01D01 D ON(A.CO_CD = D.CO_CD AND A.SALES_CD = D.SALES_CD AND A.UPPER_CD = D.UPPER_CD AND A.LOWER_CD = D.LOWER_CD 
 											AND A.MATR_SEQ=D.MATR_SEQ AND A.MATR_CD=D.MATR_CD)
 				<if test='actionType == "U" '>
-			INNER JOIN TB_SM03D01 C ON(A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ)				
+			INNER JOIN TB_SM03D01 C ON(A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ AND A.SALES_CD=C.SALES_CD)				
 				</if>							
 				<if test='actionType == "C" '>											
 							LEFT OUTER JOIN
@@ -418,7 +422,11 @@
 		</if>		
 		<if test="salesCd != null and !salesCd.equals('')">
 			AND A.SALES_CD = #{salesCd}   
-		</if>							
+		</if>						
+		<!--등록시 기입고 항목제외 -->
+		<if test='actionType == "C" '>
+			AND NOT EXISTS ( SELECT CO_CD FROM TB_SM03D01 DD WHERE A.ORDRG_NO=DD.ORDRG_NO AND A.ORDRG_SEQ=DD.ORDRG_SEQ  )		
+		</if>				
 	</select>
 	
 
