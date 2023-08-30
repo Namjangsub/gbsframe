@@ -14,11 +14,14 @@
  *     
  ********************************************
  */
-
+		
 function calculateHoliday(startDate, duration=1) {
 //  const startDate = "2024-12-29"
-	const endDate = "2050-12-31"
-	const calendar = new KoreanLunarCalendar();
+	const endDate = "2050-12-31"				//변환가능 최대 날자
+	const calendar = new KoreanLunarCalendar();	//음력변화을 위한 라이브러리
+	const chkDuration = pasIntChk(duration);	//숫자만 추출
+	const addSubVal = chkDuration > 0 ? 1 : -1;	//증가할지 감소할지
+	const countDay = Math.abs(chkDuration);		//카운팅 날자수
 
   	//1949~1959년까지 식목일 공휴일지정, 1961~2005년까지 공휴일지정
   	//2006년까지는 0717(체헌절) 공휴일, 0405(식목일)
@@ -70,7 +73,8 @@ function calculateHoliday(startDate, duration=1) {
 		let lunaChkYear = 0;
 
 //		while (start <= end) {
-		while (workingDays < duration) {
+//		while (workingDays < chkDuration) {
+		do {
 			const day = start.getDay(); // 0:일요일, 6:토요일
 			const chkYear = start.getFullYear();
 			const chkMonth = start.getMonth() + 1;
@@ -129,29 +133,40 @@ function calculateHoliday(startDate, duration=1) {
 		            }
 		        }
 		     }
-		     
+			/**************************
+			 * 휴일여부체크 end
+			 *************************
+			 */
+			
 		     if (holDaySw) {
 		    	 holiDaysCnt++;
 		     } else {
 		    	 workingDays++;
 		     }
-			/**************************
-			 * 휴일여부체크 end
-			 *************************
-			 */
-
-			start.setDate(start.getDate() + 1);
-	     }
+			
+			start.setDate(start.getDate() + addSubVal);
+		     
+		} while (workingDays < countDay);
 
 		console.log('근무일:' + workingDays + '   휴일 :' + holiDaysCnt);
-		start.setDate(start.getDate() - 1);
-//		return moment(start).format('YYYY-MM-DD');
+		
+		start.setDate(start.getDate() + (addSubVal * -1));  //하루 차이 방지하기위함
 		
 		return new myDate(start, workingDays, holiDaysCnt);
 		
 	} catch (error) {
 		console.error(error);
 	}
+}
+
+function pasIntChk (value) {
+	let num = value;
+	if (typeof value === 'string'){ 
+		num = value.replace(/[^-0-9,.]/g, '');
+		num.replace(/,/g, '');
+	}
+	num = parseInt(deleteCommaStr(num));
+	return isNaN(num) ? 1 : num;
 }
 
 function myDate(start, workingDays, holiDaysCnt)
