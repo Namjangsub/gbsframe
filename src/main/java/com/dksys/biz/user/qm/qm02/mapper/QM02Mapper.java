@@ -1,5 +1,6 @@
 package com.dksys.biz.user.qm.qm02.mapper;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -21,14 +22,20 @@ public interface QM02Mapper {
 	List<Map<String, String>> select_stock_modal(Map<String, String> paramMap);
 
 	//그리드 검색
-	List<Map<String, String>> select_all_modal(Map<String, String> paramMap);
+	List<Map<String, String>> select_soojung_modal(Map<String, String> paramMap);
 		
 	//그리드 검색
-	List<Map<String, String>> select_zupiter_modal(Map<String, String> paramMap);
+	List<Map<String, String>> select_all_modal(Map<String, String> paramMap);
+	
+	//조건값 검색
+	List<String> select_userName(Map<String, String> paramMap);
+	
+	//그리드 검색
+	List<Map<String, Object>> select_zupiter_modal(HashMap<String, Object> map);
 		
 	// 수정화면 정보
 	Map<String, String> select_qm02_Info(Map<String, String> paramMap);
-	
+
 	// 해당 월에 데이터 확인
 	int select_gochal_count(Map<String, String> paramMap);
 	
@@ -44,6 +51,9 @@ public interface QM02Mapper {
     // 관리번호 생성
     String select_qm02_Next_MNGM_NO(Map<String, String> paramMap);
 	
+    //DATA UPDATE
+  	int update_statyy_qm01(Map<String, String> paramMap);
+    
 	//DATA INSERT
 	int insert_qm02(Map<String, String> paramMap);
 	
@@ -55,4 +65,11 @@ public interface QM02Mapper {
 
 	//DATA INSERT
 	int insert_qm02_p02(Map<String, String> paramMap);
+	
+	//DATA UPDATE
+	int update_qm02_p02(Map<String, String> paramMap);
+	
+	//DATA UPDATE
+	int update_delete_qm01(Map<String, String> paramMap);
+
 }

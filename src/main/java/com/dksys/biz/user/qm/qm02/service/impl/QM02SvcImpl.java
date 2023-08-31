@@ -64,14 +64,48 @@ public class QM02SvcImpl implements QM02Svc {
 	
 	//그리드 검색
 	@Override
+	public List<Map<String, String>> select_soojung_modal(Map<String, String> paramMap) {
+		return qm02Mapper.select_soojung_modal(paramMap);
+	}
+	
+//	//조건값 검색
+//	@Override
+//	public List<Map<String, String>> select_userName(Map<String, String> paramMap) {
+//		return qm02Mapper.select_userName(paramMap);
+//	}
+	
+	//그리드 검색
+	@Override
 	public List<Map<String, String>> select_all_modal(Map<String, String> paramMap) {
 		return qm02Mapper.select_all_modal(paramMap);
 	}
 	
 	//그리드 검색
 	@Override
-	public List<Map<String, String>> select_zupiter_modal(Map<String, String> paramMap) {
-		return qm02Mapper.select_zupiter_modal(paramMap);
+	public List<Map<String, Object>> select_zupiter_modal(Map<String, String> paramMap) {
+		String roleStr = "";
+		
+		HashMap<String, Object> map = new HashMap<String, Object>();
+		
+		String[] roleArray = paramMap.get("userName").split(",");
+		String test = "";
+		for (int i = 0; i < roleArray.length; i++) {
+			if ((roleArray.length -1) == i ) {
+				test += "'" + roleArray[i] +"' AS user"+ (i+1);
+			}
+			else {
+				test += "'" + roleArray[i] +"' AS user"+ (i+1) +  ",";
+			}
+		}
+
+		//map.put("userName", Arrays.toString(roleArray));
+		map.put("test", test);
+		map.put("userName", roleArray);
+		map.put("userId", paramMap.get("userId"));
+		map.put("strDate", paramMap.get("strDate"));
+		map.put("endDate",paramMap.get("endDate"));
+
+		return qm02Mapper.select_zupiter_modal(map);
 	}
 	
 	// 수정화면 정보
@@ -114,6 +148,9 @@ public class QM02SvcImpl implements QM02Svc {
 			
 			//마스터입력
 			result = qm02Mapper.insert_qm02(paramMap);
+			if (result > 0) {
+				qm02Mapper.update_statyy_qm01(paramMap);
+			}
 		}
 		else if (gochalIn == 1) {
 			result = 7;
@@ -259,7 +296,9 @@ public class QM02SvcImpl implements QM02Svc {
 		int result = 0;
 		
 		result = qm02Mapper.delete_qm02(paramMap);
-		
+		if (result == 1) {
+			qm02Mapper.update_delete_qm01(paramMap);
+		}
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------
@@ -308,7 +347,7 @@ public class QM02SvcImpl implements QM02Svc {
 				paramMap.put("resNo", newMNGM_NO);
 				
 				//마스터입력
-				result = qm02Mapper.insert_qm02(paramMap);
+				result = qm02Mapper.insert_qm02_p02(paramMap);
 			}
 			else if (resultIn == 1) {
 				result = 7;
@@ -323,6 +362,67 @@ public class QM02SvcImpl implements QM02Svc {
 				paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
 				paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 				cm08Svc.uploadFile(paramMap, mRequest);
+			}
+			//---------------------------------------------------------------
+			//첨부 화일 처리  끝
+			//---------------------------------------------------------------
+			return result;
+		}
+		
+		//DATA UPDATE
+		@Override
+		public int update_qm02_p02(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+			//Gson gson = new Gson();
+			Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+			Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+			
+			//---------------------------------------------------------------
+			//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+			//   필수값 :  jobType, userId, comonCd
+			//---------------------------------------------------------------
+			HashMap<String, String> param = new HashMap<>();
+			param.put("userId", paramMap.get("userId"));
+			param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
+			
+			List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
+			if (uploadFileList.size() > 0) {
+				//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
+				param.put("jobType", "fileUp");
+				cm15Svc.selectFileAuthCheck(param);
+			}
+			
+			String[] deleteFileArr = gsonDtl.fromJson(paramMap.get("deleteFileArr"), String[].class);
+			List<String> deleteFileList = Arrays.asList(deleteFileArr);
+			
+			for(String fileKey : deleteFileList) {
+				// 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
+				Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
+				//접근 권한 없으면 Exception 발생
+				param.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
+				param.put("jobType", "fileDelete");
+				cm15Svc.selectFileAuthCheck(param);
+			}
+			//---------------------------------------------------------------
+			//첨부 화일 권한체크  끝
+			//---------------------------------------------------------------
+			
+			//데이터처리 시작
+			//마스터 수정
+			int result = qm02Mapper.update_qm02(paramMap);
+
+			//데이터 처리 끝
+			
+			//---------------------------------------------------------------
+			//첨부 화일 처리 시작
+			//---------------------------------------------------------------
+			if (uploadFileList.size() > 0) {
+				paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+				paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+				cm08Svc.uploadFile(paramMap, mRequest);
+			}
+			
+			for(String fileKey : deleteFileList) {
+				cm08Svc.deleteFile(fileKey);
 			}
 			//---------------------------------------------------------------
 			//첨부 화일 처리  끝

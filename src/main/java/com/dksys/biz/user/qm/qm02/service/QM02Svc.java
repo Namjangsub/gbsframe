@@ -22,16 +22,18 @@ public interface QM02Svc {
     // 그리드 검색
 	List<Map<String, String>> select_stock_modal(Map<String, String> paramMap);
 	
+	// 그리드 검색
+	List<Map<String, String>> select_soojung_modal(Map<String, String> paramMap);
+		
 	 // 그리드  검색
 	List<Map<String, String>> select_all_modal(Map<String, String> paramMap);
 
 	// 그리드 검색
-	List<Map<String, String>> select_zupiter_modal(Map<String, String> paramMap);
+	List<Map<String, Object>> select_zupiter_modal(Map<String, String> paramMap);
 		
     // 수정화면 정보
 	Map<String, String> select_qm02_Info(Map<String, String> paramMap);
 	
-
 	//DATA INSERT
 	int insert_qm02(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
@@ -43,4 +45,7 @@ public interface QM02Svc {
 
 	//DATA INSERT
 	int insert_qm02_p02(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	
+	//DATA UPDATE
+	int update_qm02_p02(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 }
