@@ -33,7 +33,7 @@ function Approval(htmlParam, param, popParam) {
 			console.log('---html make');
 			var htmlId = htmlParam.htmlArea;
 			var htmlTable = `
-			<div class="" style="display: block; width: 420px; height: 100%; margin-bottom: 30px; border:1px solid #eee; overflow-y:scroll; padding-bottom:5px;">
+			<div class="" style="display: block; width: 700px; height: 100%; margin-bottom: 30px; border:1px solid #eee; padding-bottom:5px;">
 		        <h3 class="location">
 		          <span class="page_tit" style="text-align: left;">결재</span>
 		        </h3>
@@ -42,14 +42,16 @@ function Approval(htmlParam, param, popParam) {
 			    	<!-- 결재라인 table -->
 			    	<table border="1" id="appLine">
 			    		<colgroup>
-			    			<col width="15%">
-			    			<col width="35%">
-			    			<col width="15%">
-			    			<col width="35%">
+			    			<col width="10%">
+			    			<col width="20%">
+			    			<col width="40%">
+			    			<col width="10%">
+			    			<col width="20%">
 			    		</colgroup>
 			    		<tr id="appH" stye="text-align:center; border-bottom:1px solid #dbdbdb;">
 			    			<th class="appTh">순번</th>
 			    			<th class="appTh">결재자</th>
+			    			<th class="appTh">결재의견</th>			    			
 			    			<th class="appTh">상태</th>
 			    			<th class="appTh">결재일자</th>		    			
 			    		</tr>
@@ -78,6 +80,9 @@ function Approval(htmlParam, param, popParam) {
 							//html = html.replace(/@@item1@@/gi, (idx+1));		//순번
 							html = html.replace(/@@item1@@/gi, data.sanctnSn);		//순번
 							html = html.replace(/@@item2@@/gi, data.todoNm);		//결재자명
+							var todoCfOpn = data.todoCfOpn;
+							if( typeof(todoCfOpn)== "undefined" || todoCfOpn=="" ) todoCfOpn = "";
+							html = html.replace(/@@item3@@/gi, todoCfOpn);		//결재의견
 							//본인해당시 볼드처리 - button 활성화
 							if( data.todoId != "undefined" && (data.todoId == jwt.userId ) ) {
 								html = html.replace(/@@bold@@/gi, boldFont);
@@ -85,22 +90,29 @@ function Approval(htmlParam, param, popParam) {
 								//applyBtn SHOW - 순번이 1이거나 이전 결재 상태가 Y일 경우							
 								if( data.sanctnSttus != "undefined" && data.sanctnSttus == "N"  ) {
 									if( data.sanctnSn == "1" || data.preSttus=="Y") {
-										applyBtn = true;
-										approvalParam.todoKey = data.todoKey;
-										approvalParam.sanctnSn = data.sanctnSn;
-										approvalParam.coCd = data.coCd;
-										approvalParam.todoDiv1CodeId = data.todoDiv1CodeId;
-										approvalParam.todoDiv2CodeId = data.todoDiv2CodeId;										
+										applyBtn = true;										
 									} 
 								}
+								//다음순번이 미결재일 경우 결재의견 가능하게 변경
+								if( data.nextSttus=="Y") applyBtn = true;
+								//만족시 버튼 show
+								if( applyBtn = true ) {
+									approvalParam.todoKey = data.todoKey;
+									approvalParam.sanctnSn = data.sanctnSn;
+									approvalParam.coCd = data.coCd;
+									approvalParam.todoDiv1CodeId = data.todoDiv1CodeId;
+									approvalParam.todoDiv2CodeId = data.todoDiv2CodeId;		
+									html = html.replace(/@@readonly@@/gi, "");		//결재의견 input
+								} else {
+									html = html.replace(/@@readonly@@/gi, "readonly");		//결재의견 input
+								}								
 							}
-							html = html.replace(/@@item3@@/gi, data.sanctnSttusNm);		//상태명
-							html = html.replace(/@@item4@@/gi, data.todoCfDt);		//확인(결재)일자
+							html = html.replace(/@@item4@@/gi, data.sanctnSttusNm);		//상태명
+							html = html.replace(/@@item5@@/gi, data.todoCfDt);		//확인(결재)일자
 							htmlTr += html;
 						});			
 					} 
 	 				$("#appLine tr").eq(0).next().remove();
-	 				console.log('--htmlTr--'+htmlTr);
 					$("#appLine").append(htmlTr);
 	 				
 			});		//end ajax
@@ -121,11 +133,13 @@ function Approval(htmlParam, param, popParam) {
 	this.applyBtnCtrl = function() {
 		if( this.applyBtn ) {
 			$("#appBtnDiv").show();
-			$("#appConfirmAnchor").attr("onclick", "approvalConfirm()");			
+			$("#appConfirmAnchor").attr("onclick", "approvalConfirm()");
+			$("input[name='todoCfOpn']").attr("readonly", false);
 		} else {
 			//hide
 			$("#appBtnDiv").hide();
-			$("#appConfirmAnchor").removeAttr("onclick");			
+			$("#appConfirmAnchor").removeAttr("onclick");		
+			$("input[name='todoCfOpn']").attr("readonly", true);
 		}		
 		return;
 	}
@@ -136,8 +150,9 @@ function Approval(htmlParam, param, popParam) {
     		<tr>
     			<td>@@item1@@</td>
     			<td><font style="@@bold@@">@@item2@@</font></td>
-    			<td>@@item3@@</td>
+    			<td style='text-align:left; padding-left:5px; height:25px;'><input type='text' name='todoCfOpn' value="@@item3@@" @@readonly@@></td>
     			<td>@@item4@@</td>
+    			<td>@@item5@@</td>    			
     		</tr>		
 			`;
 		return html;
@@ -151,7 +166,9 @@ function Approval(htmlParam, param, popParam) {
 		if( this.applyBtn ) {
 			var paramMap = {		
 					"todoId" : jwt.userId
+					, "todoCfOpn" : $("input[name='todoCfOpn']").val()
 			}
+			debugger;
 			Object.assign(paramMap, this.param);
 			
 			postAjaxSync("/user/wb/wb20/insertApprovalLine", paramMap, null, function(data){
