@@ -62,15 +62,6 @@ public class WB01Ctr {
         return "jsonView";
 	}
 	
-	
-
-    @PostMapping(value = "/selectNewWbsPlanExcelList") 
-	public String selectNewWbsPlanExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
-		List<Map<String, String>> fileList = wb01Svc.selectNewWbsPlanExcelList(paramMap);
-		model.addAttribute("fileList", fileList); 
-		return "jsonView"; 
-	}
-
     @PutMapping(value = "/deleteWbsPlanlist")
     public String deleteWbsPlanlist(@RequestParam Map<String, String> paramMap, ModelMap model) {
 		try {

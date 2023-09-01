@@ -37,16 +37,7 @@ public class WB03Ctr {
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
 	}
-	
-	@PostMapping(value = "/selectWbsPlanTreeIssueExcelList")
-	public String selectWbsPlanTreeIssueExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> fileList = wb03Svc.selectWbsPlanTreeIssueExcelList(paramMap);
 		
-		model.addAttribute("fileList", fileList);
-		return "jsonView";
-	}
-
-	
     @PostMapping(value = "/selectMaxWbsIssueNo") 
     public String selectMaxWbsPlanNo(@RequestBody Map<String, String> paramMap, ModelMap model) {
 	    List<Map<String, String>> result = wb03Svc.selectMaxWbsIssueNo(paramMap);
