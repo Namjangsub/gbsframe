@@ -63,11 +63,6 @@ public class WB01SvcImpl implements WB01Svc {
 	}
     
     @Override
-	public List<Map<String, String>> selectNewWbsPlanExcelList(Map<String, String> paramMap) {
-		return wb01Mapper.selectNewWbsPlanExcelList(paramMap);
-	}
-
-    @Override
 	public int deleteWbsPlanlist(Map<String, String> paramMap) {
 		int result = 0;
 		Gson gson = new Gson();

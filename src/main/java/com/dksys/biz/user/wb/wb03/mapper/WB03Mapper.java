@@ -10,8 +10,6 @@ public interface WB03Mapper {
 
  
   List<Map<String, String>> selectWbsPlanTreeIssueList(Map<String, String> paramMap);
-  List<Map<String, String>> selectWbsPlanTreeIssueExcelList(Map<String, String> paramMap);
-  
   List<Map<String, String>> selectMaxWbsIssueNo(Map<String, String> paramMap);
   int selectWbsPlanIssueSeqNext(Map<String, String> paramMap);
   int insertWbsPlanIssue(Map<String, String> paramMap);
