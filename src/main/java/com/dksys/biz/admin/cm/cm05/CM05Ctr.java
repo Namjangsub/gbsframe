@@ -131,4 +131,12 @@ public class CM05Ctr {
     	return "jsonView";
     }
 
+    // 작업일보 checkbox하위 코드 리스트 조회
+    @PostMapping("/selectCheckboxList")
+    public String selectCheckboxList(@RequestBody Map<String, String> param, ModelMap model) {
+    	List<Map<String, String>> childCodeList = cm05Svc.selectCheckboxList(param);
+    	model.addAttribute("childCodeList", childCodeList);
+        return "jsonView";
+    }
+
 }

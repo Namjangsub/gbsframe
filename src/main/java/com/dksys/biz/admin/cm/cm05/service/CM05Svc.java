@@ -31,4 +31,6 @@ public interface CM05Svc {
 
 	public List<Map<String, String>> selectDocTreeListAuth(Map<String, String> param);
 
+    public List<Map<String, String>> selectCheckboxList(Map<String, String> param);
+
 }

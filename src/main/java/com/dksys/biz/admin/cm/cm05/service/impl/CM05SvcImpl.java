@@ -94,4 +94,9 @@ public class CM05SvcImpl implements CM05Svc {
 	public List<Map<String, String>> selectDocTreeListAuth(Map<String, String> param) {
 		return cm05Mapper.selectDocTreeListAuth(param);
 	}
+
+	@Override
+	public List<Map<String, String>> selectCheckboxList(Map<String, String> param) {
+		return cm05Mapper.selectCheckboxList(param);
+	}
 }
