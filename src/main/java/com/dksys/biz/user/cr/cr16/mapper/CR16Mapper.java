@@ -23,7 +23,25 @@ public interface CR16Mapper {
 	
 	List<Map<String, String>> selectSalesYearPlanD(Map<String, String> paramMap);
 	
+	int selectSalesYearPlanSeqNext(Map<String, String> paramMap);
 	
+	int salesPlanYearInsert(Map<String, String> paramMap);
+	
+	int salesPlanYearUpdate(Map<String, String> paramMap);
+	
+	List<Map<String, String>> salesYearPlanCloseChk(Map<String, String> paramMap);
+	
+	int salesYearPlanCloseInsert(Map<String, String> paramMap);
+	
+	int salesYearPlanCloseUpdate(Map<String, String> paramMap);
+	
+	int salesYearPlanCloseDelete(Map<String, String> paramMap);
+	
+	int salesYearPlanCloseChkUpdateY(Map<String, String> paramMap);
+	
+	int salesYearPlanCloseChkUpdateN(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectSalesYearPlanListHist(Map<String, String> paramMap);
 }
 
 

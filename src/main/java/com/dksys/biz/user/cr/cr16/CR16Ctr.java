@@ -39,14 +39,28 @@ public class CR16Ctr {
 	public String selectSalesYearPlanList(@RequestBody Map<String, String> paramMap, ModelMap model) {	
     	  int totalCnt = cr16Svc.selectSalesYearPlanListCount(paramMap); 
 		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		  model.addAttribute("paginationInfo", paginationInfo);
+		  model.addAttribute("paginationInfo", paginationInfo);		
 		  
-		  List<Map<String, String>> fileList = cr16Svc.selectSalesYearPlanList(paramMap);
-		  
-		  
+		  List<Map<String, String>> fileList = cr16Svc.selectSalesYearPlanList(paramMap);	  
 		  model.addAttribute("fileList", fileList);
 		  return "jsonView";
     }
+    
+    @PostMapping(value = "/selectSalesYearPlanListExcel") 
+	public String selectSalesYearPlanListExcel(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  List<Map<String, String>> fileList = cr16Svc.selectSalesYearPlanList(paramMap);
+		  model.addAttribute("fileList", fileList);
+		  return "jsonView";
+    }    
+    
+    @PostMapping(value = "/selectSalesYearPlanListHist") 
+	public String selectSalesYearPlanListHist(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  List<Map<String, String>> fileList = cr16Svc.selectSalesYearPlanListHist(paramMap);
+		  model.addAttribute("fileList", fileList);
+		  return "jsonView";
+    }  
+    
+    
     
     @PutMapping(value = "/deleteSalesYearPlanList")
     public String deleteSalesYearPlanList(@RequestParam Map<String, String> paramMap, ModelMap model) {
@@ -85,5 +99,75 @@ public class CR16Ctr {
 		  model.addAttribute("fileList", fileList);
 		  return "jsonView";
     }
+    
+    @PostMapping(value = "/salesPlanYearInsert")
+    public String salesPlanYearInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (cr16Svc.salesPlanYearInsert(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  	  	return "jsonView";
+    } 
+
+    @PostMapping(value = "/salesPlanYearUpdate")
+    public String salesPlanYearUpdate(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (cr16Svc.salesPlanYearUpdate(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  	  	return "jsonView";
+    }
+    
+    @PostMapping(value = "/salesYearPlanCloseY")
+    public String salesYearPlanCloseY(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (cr16Svc.salesYearPlanCloseY(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  	  	return "jsonView";
+    } 
+    
+    @PostMapping(value = "/salesYearPlanCloseN")
+    public String salesYearPlanCloseN(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (cr16Svc.salesYearPlanCloseN(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  	  	return "jsonView";
+    }
+    
+    
     
 }	  
