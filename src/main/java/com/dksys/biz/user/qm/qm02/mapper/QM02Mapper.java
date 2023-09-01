@@ -47,6 +47,9 @@ public interface QM02Mapper {
 
     // IOKey 생성
 	int select_sm07_Ioseq(Map<String, String> paramMap);
+	
+	// 팀장 고찰 데이터 체크
+	int selec_delete_result_count(Map<String, String> paramMap);
 
     // 관리번호 생성
     String select_qm02_Next_MNGM_NO(Map<String, String> paramMap);

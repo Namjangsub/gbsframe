@@ -139,10 +139,16 @@ public class QM02Ctr {
 	@PutMapping(value = "/delete_qm02")
 	public String delete_qm02(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 		try {
-			if (qm02svc.delete_qm02(paramMap) != 0 ) {
+			int result = qm02svc.delete_qm02(paramMap);
+			//if (qm02svc.delete_qm02(paramMap) != 0 ) {
+			if (result != 0 && result != 7) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-			} else {
+			} else if (result != 0 && result == 7) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", "해당 월의 팀장 고찰 등록 되어 있어 삭제가 불가합니다.");
+			}
+			else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
 			};

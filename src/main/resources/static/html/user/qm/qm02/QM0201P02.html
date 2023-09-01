@@ -34,7 +34,7 @@
 						 <div class="date_input">
 						   <select id="writeYear" name="writeYear" data-search="writeYear" style="width:100px;">
 						   </select>
-						   <select id="writeMonth" name="writeMonth" data-search="writeMonth"  style="width:100px;" onchange="ModalgridView.setData();">
+						   <select id="writeMonth" name="writeMonth" data-search="writeMonth"  style="width:100px;" onchange="Modal_DataSearch();">
 						   </select>							
 						 </div>					
 					</td>
@@ -94,8 +94,10 @@
 	var userName  = [];
 	var userName1 = null;
 	var userName2 = null;
+	var userDeptId = jwt.deptId; //소속부서
+	var userDept = userDeptId.substr(0, 5); //상위 소속부서
 
-	var ModalgridView = {
+	var ModalgridView1 = {
 		initView: function() {
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
@@ -118,10 +120,7 @@
 						var col = this.colIndex;
 						var key = this.column.key;						
 						var paramObj = {"row" : row};
-						//체크박스일 경우 실행
-						if( key == "chk" ) {
-							setoutQty(ModalgridView, this.item.chk , this.item.stockQty, row);
-						}
+
 					},
 					onDBLClick: function () {
 						this.self.select(this.dindex);
@@ -173,9 +172,10 @@
 
 			var strDate = moment(new Date(currentYear, currentMonth -1, 1)).format("YYYYMMDD");
 			var endDate = moment(new Date(currentYear, currentMonth, 0)).format("YYYYMMDD");
-	    	
-			var userDeptId = jwt.deptId;
-			var userDept = userDeptId.substr(0, 5);
+	    	var statyy = ($("#writeYear").val() + $("#writeMonth").val());
+	    		
+			//var userDeptId = jwt.deptId;
+			//var userDept = userDeptId.substr(0, 5);
 			var coBgB = '';
 			//영업 30, 기술연구소 40, 생산 60, 구매외주팀 50 
 			if(userDept == "GUN30"){		
@@ -189,41 +189,27 @@
 			}else{ //기타 부서
 				coBgB = 'COBGB9';
 			}
-			///////////
-				formData = {
-					"deps": userDept
-				}
 
-				postAjaxSync("/user/qm/qm02/select_all_modal", formData, null, function(data) {
-					var list = data.result;
-					 if (list.length > 0) {
-		                    var i = 0;
-		                    $.each(list, function(idx, elem){
-		                    	ModalgridView.target.addColumn({key: "user"+[idx+1], label:list[idx].name});
-		                    });
-		                    
-		                    //////
-		                    formData1 = {
-										"userId" : jwt.userId,
-										"strDate" : strDate,
-										"endDate" : endDate,
-										"userName" : userName
-							}
+            formData1 = {
+				"userId" : jwt.userId,
+				"strDate" : strDate,
+				"endDate" : endDate,
+				"statyy"  : statyy,
+				"userName" : userName
+			}
 
-						postAjax("/user/qm/qm02/select_zupiter_modal", formData1, null, function(data) {
-							var list = data.result;
-							
-							gridResize(list.length);
-								targetObj.setData({
-									list : list,
-									page : {
-			                               totalElements : list.length
-			                           }
-								});
-							});
-		                    /////
-					 }
+			postAjax("/user/qm/qm02/select_zupiter_modal", formData1, null, function(data) {
+				var list = data.result;
+				
+				gridResize(list.length);
+					targetObj.setData({
+						list : list,
+						page : {
+                               totalElements : list.length
+                           }
+					});
 				});
+                /////
 
 			
 		}
@@ -242,11 +228,11 @@
 
 		$('#writeYear').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
 		
-		ModalgridView.initView();
+		ModalgridView1.initView();
 		
 		SetYm(); //월 셀렉트박스 세팅
-		TestName();
-// 		ConvertSystemSourcetoHtml(JSON.stringify(userName));
+		DeptName(); //userName 배열 만들기
+		GridHeaderWrite(); //메인그리드 헤더 그리기
 
 		authChk(); //권한체크
 		
@@ -264,7 +250,7 @@
 			$("#ordrgId").val(jwt.userId);
 			$("#ordrgNm").val(jwt.userNm);
 
-			ModalgridView.setData(0);
+			ModalgridView1.setData(0);
 			//버튼 클릭 시
 			$('#actionBtn').on("click", function() {
 				insert_qm02_p02();
@@ -278,7 +264,7 @@
 			select_qm02_Info();
 			
 			//수정 모드 데이터 가져오기
-			ModalgridView.setData(0);
+			//ModalgridView.setData(0);
 			//debugger;
 			//버튼명 변경
 			$('#actionBtn').text("수정");
@@ -321,7 +307,7 @@
 			});
 			//debugger;
 		});
-		ModalgridView.setData(0);
+		ModalgridView1.setData(0);
 	}
 	
 	// 등록
@@ -373,8 +359,8 @@
 		var toDay = new Date().format("yyyyMM"); //오늘 날짜의 년월 체크
 		var resDay = $("#writeYear").val() + $("#writeMonth").val(); //사용자가 등록하려는 년월
 		
-		if (toDay == resDay){
-			alert("당일 월에 고찰 등록은 할 수 없습니다.");
+		if (toDay < resDay){
+			alert("해당 월에 고찰 등록은 할 수 없습니다.");
 			return
 		}
 		
@@ -387,6 +373,7 @@
 		formData.append("writeMonth", $("#writeMonth").val());
 		formData.append("writeDt", writeDt);
 		formData.append("resDiv", "팀");
+		formData.append("deptCd", userDept);
 		
 		console.log(formData);
 		//---------------------------------------------------------------
@@ -422,7 +409,7 @@
 		//상세자료 준비
         detailArr = [];
 
-		var list = ModalgridView.target.list;
+		var list = ModalgridView1.target.list;
 		//debugger;
 		$.each(list,function(idx, obj) {
 			//신규
@@ -446,7 +433,7 @@
 
 	// 팝업 그리드 조회
 	function Modal_DataSearch() {
-		ModalgridView.setData(0);
+		ModalgridView1.setData(0);
 	}
 	
 	function SetYm(){
@@ -477,15 +464,13 @@
 	    }
     }
 
-    function TestName(){
-    	var userDeptId = jwt.deptId;
-		var userDept = userDeptId.substr(0, 5);
-		var honda = [];
+    function DeptName(){
+    	//var userDeptId = jwt.deptId;
+		//var userDept = userDeptId.substr(0, 5);
     	var formData = {
     			"deps" : userDept
     		}
-    	
-    	//postAjaxSync("/user/qm/qm02/select_qm02_userName", formData, null, function(data) {
+
     	postAjaxSync("/user/qm/qm02/select_all_modal", formData, null, function(data) {
     		var list = data.result;
 			 if (list.length > 0) {
@@ -502,5 +487,41 @@
     }
     
 
-    	
+    function GridHeaderWrite(){
+		    const currentYear = $("#writeYear").val();
+			const currentMonth = $("#writeMonth").val();
+		
+			var strDate = moment(new Date(currentYear, currentMonth -1, 1)).format("YYYYMMDD");
+			var endDate = moment(new Date(currentYear, currentMonth, 0)).format("YYYYMMDD");
+			var statyy = ($("#writeYear").val() + $("#writeMonth").val());
+				
+			//var userDeptId = jwt.deptId;
+			//var userDept = userDeptId.substr(0, 5);
+			var coBgB = '';
+			//영업 30, 기술연구소 40, 생산 60, 구매외주팀 50 
+			if(userDept == "GUN30"){		
+				coBgB = 'COBGB1';
+			}else if(userDept == "GUN40"){
+				coBgB = 'COBGB2';
+			}else if(userDept == "GUN50"){ 
+				coBgB = 'COBGB3';
+			}else if(userDept == "GUN60"){
+				coBgB = 'COBGB4';
+			}else{ //기타 부서
+				coBgB = 'COBGB9';
+			}
+			
+			formData = {
+						 "deps": userDept
+			           }
+			postAjaxSync("/user/qm/qm02/select_all_modal", formData, null, function(data) {
+				var list = data.result;
+				 if (list.length > 0) {
+	                    var i = 0;
+	                    $.each(list, function(idx, elem){
+	                    	ModalgridView1.target.addColumn({key: "user"+[idx+1], label:list[idx].name});
+	                    });
+				 }
+			});
+    }
     </script>

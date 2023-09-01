@@ -104,6 +104,7 @@ public class QM02SvcImpl implements QM02Svc {
 		map.put("userId", paramMap.get("userId"));
 		map.put("strDate", paramMap.get("strDate"));
 		map.put("endDate",paramMap.get("endDate"));
+		map.put("statyy",paramMap.get("statyy"));
 
 		return qm02Mapper.select_zupiter_modal(map);
 	}
@@ -294,10 +295,20 @@ public class QM02SvcImpl implements QM02Svc {
 		//---------------------------------------------------------------
 		
 		int result = 0;
+		int sop_result = 0;
 		
-		result = qm02Mapper.delete_qm02(paramMap);
-		if (result == 1) {
-			qm02Mapper.update_delete_qm01(paramMap);
+		sop_result = qm02Mapper.selec_delete_result_count(paramMap);
+		
+		if (sop_result == 0) {
+			result = qm02Mapper.delete_qm02(paramMap);
+			if (result == 1) {
+				 if (paramMap.get("resDiv").equals("개인")) {
+					 qm02Mapper.update_delete_qm01(paramMap);
+				 }
+			}
+		}
+		else {
+			result = 7;
 		}
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
@@ -347,7 +358,7 @@ public class QM02SvcImpl implements QM02Svc {
 				paramMap.put("resNo", newMNGM_NO);
 				
 				//마스터입력
-				result = qm02Mapper.insert_qm02_p02(paramMap);
+				result = qm02Mapper.insert_qm02(paramMap);
 			}
 			else if (resultIn == 1) {
 				result = 7;
