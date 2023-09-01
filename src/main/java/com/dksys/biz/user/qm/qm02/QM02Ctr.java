@@ -54,6 +54,14 @@ public class QM02Ctr {
 	}
 	
 	//팝업 그리드 검색
+		@PostMapping(value = "/select_soojung_modal")
+		public String select_soojung_modal(@RequestBody Map<String, String> paramMap, ModelMap model) {
+			List<Map<String, String>> result = qm02svc.select_soojung_modal(paramMap);
+			model.addAttribute("result", result);
+			return "jsonView";
+		}
+	
+	//팝업 그리드 검색
 	@PostMapping(value = "/select_all_modal")
 	public String select_all_modal(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> result = qm02svc.select_all_modal(paramMap);
@@ -61,10 +69,18 @@ public class QM02Ctr {
 		return "jsonView";
 	}
 	
+//	//조건값 검색
+//	@PostMapping(value = "/select_userName")
+//	public String select_userName(@RequestBody Map<String, String> paramMap, ModelMap model) {
+//		List<Map<String, String>> result = qm02svc.select_userName(paramMap);
+//		model.addAttribute("result", result);
+//		return "jsonView";
+//	}
+	
 	//팝업 그리드 검색
 	@PostMapping(value = "/select_zupiter_modal")
 	public String select_zupiter_modal(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> result = qm02svc.select_zupiter_modal(paramMap);
+		List<Map<String, Object>> result = qm02svc.select_zupiter_modal(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
@@ -160,4 +176,22 @@ public class QM02Ctr {
 		}
 		return "jsonView";
 	}
+	
+	//UPDATE
+		@PostMapping(value = "/update_qm02_p02")
+		public String update_qm02_p02(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+			try {
+				if (qm02svc.update_qm02_p02(paramMap, mRequest) != 0 ) {
+					model.addAttribute("resultCode", 200);
+					model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+				} else {
+					model.addAttribute("resultCode", 500);
+					model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+				};
+			}catch(Exception e){
+				model.addAttribute("resultCode", 900);
+				model.addAttribute("resultMessage", e.getMessage());
+			}
+		  	return "jsonView";
+		}
 }
