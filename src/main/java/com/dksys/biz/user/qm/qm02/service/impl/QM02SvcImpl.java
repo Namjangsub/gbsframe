@@ -296,8 +296,9 @@ public class QM02SvcImpl implements QM02Svc {
 		
 		int result = 0;
 		int sop_result = 0;
-		
-		sop_result = qm02Mapper.selec_delete_result_count(paramMap);
+		if (paramMap.get("resDiv").equals("개인")) {
+			sop_result = qm02Mapper.selec_delete_result_count(paramMap);
+		}
 		
 		if (sop_result == 0) {
 			result = qm02Mapper.delete_qm02(paramMap);
