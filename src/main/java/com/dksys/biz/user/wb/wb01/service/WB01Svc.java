@@ -13,8 +13,6 @@ public interface WB01Svc {
    
    List<Map<String, String>> selectNewWbsPlanTreeListSelect(Map<String, String> paramMap);
 
-   List<Map<String, String>> selectNewWbsPlanExcelList(Map<String, String> paramMap);
-
    int deleteWbsPlanlist(Map<String, String> paramMap);
 
    int updateWbsPlanLockYn(Map<String, String> paramMap);

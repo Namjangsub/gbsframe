@@ -41,12 +41,6 @@ public class WB03SvcImpl implements WB03Svc {
   }
   
   @Override
-  public List<Map<String, String>> selectWbsPlanTreeIssueExcelList(Map<String, String> paramMap) {
-    return wb03Mapper.selectWbsPlanTreeIssueExcelList(paramMap);
-  }
-  
-
-  @Override
   public List<Map<String, String>> selectMaxWbsIssueNo(Map<String, String> paramMap) {
 		return wb03Mapper.selectMaxWbsIssueNo(paramMap);
   }

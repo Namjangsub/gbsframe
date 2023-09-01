@@ -58,11 +58,6 @@ public class WB20SvcImpl implements WB20Svc {
 		int result = wb20Mapper.updateRsltsApproval(paramMap);
 		return result;
 	}
-
-	@Override
-	public List<Map<String, String>> selectToDoExcelList(Map<String, String> paramMap) {
-		return wb20Mapper.selectToDoExcelList(paramMap);
-	}
 	
 	@Override
 	public List<Map<String, String>> selectApprovalChk(Map<String, String> paramMap) {

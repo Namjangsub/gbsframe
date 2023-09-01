@@ -16,9 +16,7 @@ public interface WB20Mapper {
 	int toDoCfDtUpdate(Map<String, String> paramMap);
 	
 	int updateRsltsApproval(Map<String, String> paramMap);
-	
-	List<Map<String, String>> selectToDoExcelList(Map<String, String> paramMap);
-	
+
 	List<Map<String, String>> selectApprovalChk(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectTodoDivList(Map<String, String> paramMap);

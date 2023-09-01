@@ -15,8 +15,6 @@ public interface WB01Mapper {
     
     List<Map<String, String>> selectNewWbsPlanTreeListSelect(Map<String, String> paramMap);
     	
-    List<Map<String, String>> selectNewWbsPlanExcelList(Map<String, String> paramMap);
-	
     int deleteWbsPlanlist(Map<String, String> paramMap);
 	
     int deleteWbsSharngListSub(Map<String, String> paramMap);
