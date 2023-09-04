@@ -6,7 +6,7 @@
 
 <div class="popup_area of_a" style="width: 100%; height: 100%;">
     <div class="tit_contents">
-      <h4 class="tit">프로젝트 등록</h4>
+      <h4 class="tit" id="popTit">프로젝트 등록</h4>
     </div>
 
   <form id="popForm" onSubmit="return false;">
@@ -97,7 +97,7 @@
 
           <th  class="hit">수량</th>
           <td>
-            <input type="text" id="eqpQty" name="eqpQty" class="form-control" style="text-align: right;" onkeyup="onlyNumber(this)" comma>
+            <input type="text" id="eqpQty" name="eqpQty" class="form-control" style="text-align: right;" onkeyup="pasIntComma(this)" comma>
           </td>
 
           <th  class="hit">예상물량</th>
@@ -289,6 +289,13 @@ var PD01GridView = {
 			            	this.item.prdtUpd = 'U';
 			             },
 	             },
+		        footSum: [
+	                [
+	                    {label: "합계 수량", align: "center", colspan: 2},
+	                    {key: "prjctPrdtQty", collector: "sum", formatter: "money", align: "center"},
+	                    {colspan: 3},
+	                ]
+      			],
 		        columns : [
 		            {key : "prjctSeq",  		label : "프로젝트시퀀스",   width : 30,		hidden: true}
 		           ,{key : "prjctInpexpCd",  	label : "국내외",     	width : 60,		hidden: true}
@@ -303,7 +310,7 @@ var PD01GridView = {
 		           ,{key : "prjctPrdtRmk", 		label : "특이사항",   		width : 165}
 		           ,{key : "prjctCrudChk", 		label : "CRUD",   		width : 100,	hidden: true}
 			     ]
-		    });
+			    });
 			return this;
 		},
 
@@ -430,14 +437,26 @@ var PJ01GridView = {
 		$('#dudtPlanDt').datepicker({
 			format : "yyyy-mm-dd",
 			language : "ko",
-			autoclose : true
-		}).datepicker("setDate", new Date());
+			autoclose : true,
+		}).datepicker("setDate", new Date())
+  		.on("changeDate", function(){
+  			if($('#ordrsPlanDt').val() > $('#dudtPlanDt').val()){
+  				alert("수주예정일이 납기일보다 작을 수 없습니다.");
+  				$('#dudtPlanDt').datepicker("setDate", new Date($('#ordrsPlanDt').val()));
+  			}
+  		});
 		//수주예정//
 		$('#ordrsPlanDt').datepicker({
 			format : "yyyy-mm-dd",
 			language : "ko",
 			autoclose : true
-		}).datepicker("setDate", new Date());
+		}).datepicker("setDate", new Date())
+  		.on("changeDate", function(){
+  			if($('#ordrsPlanDt').val() > $('#dudtPlanDt').val()){
+  				alert("수주예정일이 납기일보다 작을 수 없습니다.");
+  				$('#ordrsPlanDt').datepicker("setDate", new Date($('#dudtPlanDt').val()));
+  			}
+  		});
 		//수주일//
 // 		$('#ordrsDt').datepicker({
 // 			format : "yyyy-mm-dd",
@@ -452,7 +471,13 @@ var PJ01GridView = {
 					format : "yyyy-mm-dd",
 					language : "ko",
 					autoclose : true
-				}).datepicker("setDate", new Date());
+				}).datepicker("setDate", new Date())
+		  		.on("changeDate", function(){
+		  			if($('#ordrsDt').val() > $('#dudtPlanDt').val()){
+		  				alert("수주일이 납기일보다 작을 수 없습니다.");
+		  				$('#ordrsDt').datepicker("setDate", new Date($('#dudtPlanDt').val()));
+		  			}
+		  		});
 		   } else {
 		     $("#ordrsDt").prop("readonly", true);
 		     $("#ordrsDt").datepicker("destroy");
@@ -480,7 +505,7 @@ var PJ01GridView = {
 			});
 
 		} else if (actionType == "U") {
-			$('.tit').text('프로젝트 수정')
+			$('#popTit').text('프로젝트 수정')
 			
 			selectPrjctInfo();				//프로젝트 정보 호출
 
@@ -599,7 +624,8 @@ var PJ01GridView = {
 			PD01GridView.target.focus("END");
 			savePrdtCd = rtnData.prjctPrdtCd;
 			savePrdtNewCd = rtnData.prjctPrdtNewCd;
-			PJ01GridView.setData(savePrdtCd, savePrdtNewCd); 			
+			PJ01GridView.setData(savePrdtCd, savePrdtNewCd); 
+			prdtQtycount();			
 				
 		});
 	}
@@ -615,9 +641,20 @@ var PJ01GridView = {
 		}
 		PD01GridView.target.list.splice(idx,1);
 		PD01GridView.target.repaint();
+		prdtQtycount();
 	}
 
+	//프로젝트 제품의 기계수의 합계
+	function prdtQtycount() {
+		const targetPrdt =  PD01GridView.target.list;
+		let totalQty = 0;
 
+		targetPrdt.forEach(item => {
+			totalQty += pasFloatChk(item.prjctPrdtQty);
+		});
+		$('#eqpQty').val(totalQty);
+	}
+	
 	 // 등록
 	function insertPrjct() {
 		if (inputValidation($('.popup_area [required]'))) {
@@ -793,6 +830,7 @@ var PJ01GridView = {
 		var paramObj = {
 			"coCd" : $('#coCd').val(),
 			"userId": $('#mngId').val(),
+			"userNm": $('#mngNm').val(),
 			"useYn": "Y"
 		};
 		openSecondModal("/static/html/cmn/modal/userSearch.html", 300, 500, "사용자 검색", paramObj, function (tree){
@@ -810,4 +848,14 @@ var PJ01GridView = {
 		$('#coCd option:not([value="'+value+'"])').remove();
 	}
 
+	function pasFloatChk (value) {
+		const cvtValue = parseFloat(deleteCommaStr(value));
+		return isNaN(cvtValue) ? 0 : cvtValue;
+	}	
+
+	function pasIntComma (value) {
+		const cvtValue = parseFloat(deleteCommaStr(value));
+		return isNaN(cvtValue) ? 0 : addCommaStr(cvtValue);
+	}	
+	
 </script>
