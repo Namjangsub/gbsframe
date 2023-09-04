@@ -11,7 +11,9 @@ function Approval(htmlParam, param, popParam) {
 	this.param = param;				//ADD 한 param
 	this.popParam = popParam;		//부모창에서 공통팝업으로 전달한 param
 	Object.assign(this.param, this.popParam);
-	this.boldFont = "font-weight:bold; color:blue;";
+	//this.boldFont = "font-weight:bold; color:blue;";
+	this.boldFont = "<font style='font-weight:bold; color:blue;'>";
+	
 	this.todoId = null;
 	this.applyBtn = false;
 	var approvalParam = {}
@@ -71,7 +73,7 @@ function Approval(htmlParam, param, popParam) {
 			postAjaxSync("/user/wb/wb20/selectGetApprovalList", this.param, null
 				, function(data){
 					var list = data.resultList;
-					//var m = data.resultList.length;
+					var todoCfOpnHid = "";
 	 				if( data.resultList.length > 0 ) {
 	 					
 	 					var htmlTr = "";
@@ -94,9 +96,9 @@ function Approval(htmlParam, param, popParam) {
 									} 
 								}
 								//다음순번이 미결재일 경우 결재의견 가능하게 변경
-								if( data.nextSttus=="Y") applyBtn = true;
+								if( data.nextSttus=="N") applyBtn = true;
 								//만족시 버튼 show
-								if( applyBtn = true ) {
+								if( applyBtn == true ) {
 									approvalParam.todoKey = data.todoKey;
 									approvalParam.sanctnSn = data.sanctnSn;
 									approvalParam.coCd = data.coCd;
@@ -105,8 +107,13 @@ function Approval(htmlParam, param, popParam) {
 									html = html.replace(/@@readonly@@/gi, "");		//결재의견 input
 								} else {
 									html = html.replace(/@@readonly@@/gi, "readonly");		//결재의견 input
-								}								
+								}	
 							}
+							if(applyBtn == false) {
+								html = html.replace(/@@readonly@@/gi, "readonly");		//결재의견 input readonly
+								html = html.replace(/@@bold@@/gi, "");
+							}
+							console.log('--applyBtn--' + applyBtn);
 							html = html.replace(/@@item4@@/gi, data.sanctnSttusNm);		//상태명
 							html = html.replace(/@@item5@@/gi, data.todoCfDt);		//확인(결재)일자
 							htmlTr += html;
@@ -114,7 +121,6 @@ function Approval(htmlParam, param, popParam) {
 					} 
 	 				$("#appLine tr").eq(0).next().remove();
 					$("#appLine").append(htmlTr);
-	 				
 			});		//end ajax
 			
 			this.todoId = todoId;
@@ -149,7 +155,7 @@ function Approval(htmlParam, param, popParam) {
 		var html = ` 
     		<tr>
     			<td>@@item1@@</td>
-    			<td><font style="@@bold@@">@@item2@@</font></td>
+    			<td>@@bold@@@@item2@@</font></td>
     			<td style='text-align:left; padding-left:5px; height:25px;'><input type='text' name='todoCfOpn' value="@@item3@@" @@readonly@@></td>
     			<td>@@item4@@</td>
     			<td>@@item5@@</td>    			
@@ -164,11 +170,13 @@ function Approval(htmlParam, param, popParam) {
 		var confirmYn = false;	
 		//승인 save
 		if( this.applyBtn ) {
+			//본인 결재의견
+			var todoCfOpn = $("#appLine tr").find("font").closest("tr").find("input[name=todoCfOpn]").val();
+			//입력값 set			
 			var paramMap = {		
 					"todoId" : jwt.userId
-					, "todoCfOpn" : $("input[name='todoCfOpn']").val()
+					, "todoCfOpn" : todoCfOpn
 			}
-			debugger;
 			Object.assign(paramMap, this.param);
 			
 			postAjaxSync("/user/wb/wb20/insertApprovalLine", paramMap, null, function(data){
