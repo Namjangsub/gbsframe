@@ -1,4 +1,4 @@
-﻿// 숫자인지만 체크
+﻿﻿// 숫자인지만 체크
 function f_Number(str) {
        for (i=0; i< str.length; i++) {
                ch = str.charAt(i);
