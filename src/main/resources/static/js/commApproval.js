@@ -35,14 +35,16 @@ function Approval(htmlParam, param, popParam) {
 			console.log('---html make');
 			var htmlId = htmlParam.htmlArea;
 			var htmlTable = `
-			<div class="" style="display: block; width: 700px; height: 100%; margin-bottom: 30px; border:1px solid #eee; padding-bottom:5px;">
+			<div class="" style="display: block; width: 700px; height: 100%; margin-bottom: 30px; border:0px solid #eee; padding-bottom:5px;">
+				<!--
 		        <h3 class="location">
 		          <span class="page_tit" style="text-align: left;">결재</span>
 		        </h3>
+		        -->
 				<!--결재 테이블 -->
 		        <div clss="contents" id="applist" style="height: 100%; padding: 5px">
 			    	<!-- 결재라인 table -->
-			    	<table border="1" id="appLine">
+			    	<table id="appLine" style="border: 1px solid #dbdbdb; border-collapse: collapse" >
 			    		<colgroup>
 			    			<col width="10%">
 			    			<col width="20%">
@@ -50,7 +52,7 @@ function Approval(htmlParam, param, popParam) {
 			    			<col width="10%">
 			    			<col width="20%">
 			    		</colgroup>
-			    		<tr id="appH" stye="text-align:center; border-bottom:1px solid #dbdbdb;">
+			    		<tr id="appH" stye="text-align:center; border-bottom:1px solid #dbdbdb; height:25px;">
 			    			<th class="appTh">순번</th>
 			    			<th class="appTh">결재자</th>
 			    			<th class="appTh">결재의견</th>			    			
@@ -153,12 +155,12 @@ function Approval(htmlParam, param, popParam) {
 	//loop contents html
 	this.htmlTr = function() {
 		var html = ` 
-    		<tr>
-    			<td>@@item1@@</td>
-    			<td>@@bold@@@@item2@@</font></td>
-    			<td style='text-align:left; padding-left:5px; height:25px;'><input type='text' name='todoCfOpn' value="@@item3@@" @@readonly@@></td>
-    			<td>@@item4@@</td>
-    			<td>@@item5@@</td>    			
+    		<tr style="border-bottom:1px solid #dbdbdb;">
+    			<td class="appTd">@@item1@@</td>
+    			<td class="appTd">@@bold@@@@item2@@</font></td>
+    			<td class="appTd" style='text-align:left; padding-left:5px; height:25px;'><input type='text' name='todoCfOpn' value="@@item3@@" @@readonly@@></td>
+    			<td class="appTd">@@item4@@</td>
+    			<td class="appTd">@@item5@@</td>    			
     		</tr>		
 			`;
 		return html;
