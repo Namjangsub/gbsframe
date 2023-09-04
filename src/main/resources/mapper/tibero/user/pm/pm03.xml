@@ -3,7 +3,178 @@
 
 <mapper namespace="com.dksys.biz.user.pm.pm03.mapper.PM03Mapper">
 
-	<sql id="selectDeliverySql">
+<sql id="selectDeliverySql">
+/*제품출고*/
+WITH SJM AS  
+     ( 
+/*      SELECT *
+        FROM (
+               SELECT ROWNUM AS RRN, AA.* 
+                 FROM (  */
+		                SELECT M.*
+		                     , C.CLNT_NM 
+		                     , X.ORDRS_QTY  --수주수량
+		                  FROM TB_CR02M01  M 
+		                  LEFT OUTER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처 
+		                  INNER JOIN (SELECT CO_CD
+		                                   , ORDRS_NO
+		                                   , SUM(ORDRS_QTY) ORDRS_QTY
+		                                FROM TB_CR02D02 --수주상세 
+		                               WHERE CO_CD = #{coCd}
+		                            GROUP BY CO_CD, ORDRS_NO
+		                             ) AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO --수주마스터                           
+		                 WHERE 1=1
+		                   AND M.CO_CD = #{coCd}
+		                  <if test="clntNm != null and !clntNm.equals('')">
+		                   AND C.CLNT_NM LIKE '%'||#{clntNm}||'%'
+		                  </if>
+		                  <if test="clntPjt != null and !clntPjt.equals('')">
+		                   AND A.CLNT_PJT LIKE '%'||#{clntPjt}||'%'
+		                  </if>
+		                  <if test="ordrsDiv != null and !ordrsDiv.equals('')">
+		                   AND A.ORDRS_DIV = #{ordrsDiv}
+		                  </if>
+		                  <if test="ordrsNo != null and !ordrsNo.equals('')">
+		                   AND A.ORDRS_NO LIKE '%'||#{ordrsNo}||'%'
+		                  </if>
+		                  <if test="ctrtNm != null and !ctrtNm.equals('')">
+		                   AND A.CTRT_NM LIKE '%'||#{ctrtNm}||'%'
+		                  </if>
+/*		                  ORDER BY CO_CD, CLNT_CD, CLNT_PJT, ORDRS_NO, FILE_TRGT_KEY
+		                        ) AS AA
+		                 )
+		              WHERE RRN BETWEEN ${firstIndex} AND ${lastIndex} */
+
+	 )
+   , PCH AS
+     ( SELECT  TO_CHAR(A.ORDRS_CLNT_CD)||X.ORDRS_NO                  AS UPPER_CD        --상위코드
+             , X.ORDRS_NO||'-'||X.OUT_NO                              AS LOWER_CD       --하위코드
+             , X.CO_CD                                                AS CO_CD          --회사코드
+             , X.ORDRS_NO                                             AS ORDRS_NO       --수주번호
+             , TO_CHAR(A.ORDRS_DT,'YYYY-MM-DD')                       AS ORDRS_DT       --수주일자
+             , (SELECT FN_CM05M01_CD_TO_NM(A.ORDRS_DIV) FROM DUAL)   AS ORDRS_DIV_NM    --수주구분
+             , A.CTRT_NM                                              AS CTRT_NM        --계약명
+             , X.OUT_NO                                               AS TITLE          --고객명/수주번호/출고번호
+             , A.ORDRS_CLNT_CD                                        AS ORDRS_CLNT_CD  --고객코드
+             , A.CLNT_NM                                              AS ORDRS_CLNT_NM  --고객명
+             , A.CLNT_PJT                                             AS CLNT_PJT       --고객사PJT
+             , X.FILE_TRGT_KEY                                        AS FILE_TRGT_KEY  --FILE_TRGT_KEY
+             , X.OUT_CLNT_CD                                          AS OUT_CLNT_CD    --출고업체코드
+             , C.CLNT_NM                                              AS OUT_CLNT_CD_NM --출고업체명     
+             , X.OUT_NO                                               AS OUT_NO         --출고번호
+             , X.IO_DIV                                               AS IO_DIV         --수불구분
+             , TO_CHAR(X.OUT_DT,'YYYY-MM-DD')                         AS OUT_DT         --출고일자
+             , X.OUT_ID                                               AS OUT_ID         --출고자 ID
+             , (SELECT FN_CM06M01_ID_TO_NM(X.OUT_ID) FROM DUAL)      AS OUT_ID_NM      --출고자명
+             , X.OUT_RMK                                              AS OUT_RMK        --출고 비고 
+             , A.ORDRS_QTY                                            AS ORDRS_QTY      --수주수량
+             , SUM(D.OUT_QTY) OVER(PARTITION BY X.CO_CD, X.ORDRS_NO) AS OUT_QTY  --출고수량(수주번호별 출고번호의 SUM)
+          FROM TB_PM03M01 X --제품출고 
+                LEFT OUTER JOIN TB_BM02M01 AS C ON X.OUT_CLNT_CD = C.CLNT_CD --거래처 
+                LEFT OUTER JOIN SJM        AS A ON X.CO_CD = A.CO_CD AND X.ORDRS_NO = A.ORDRS_NO --수주마스터
+                LEFT OUTER JOIN (SELECT CO_CD
+                                       , OUT_NO
+                                       , SUM(OUT_QTY) OUT_QTY
+                                   FROM TB_PM03D01 --출고상세 
+                                  WHERE CO_CD = #{coCd}
+                                  GROUP BY CO_CD, OUT_NO
+                                ) AS D ON D.CO_CD = X.CO_CD AND D.OUT_NO = X.OUT_NO
+         WHERE X.CO_CD = #{coCd}
+           AND X.OUT_DT  <![CDATA[>=]]>TO_DATE(#{ordrsDtFr},'YYYY-MM-DD')
+           AND X.OUT_DT  <![CDATA[<=]]>TO_DATE(#{ordrsDtTo},'YYYY-MM-DD')
+           
+           <if test="userId != null and !userId.equals('')">
+           AND X.OUT_ID  = #{userId}                         --변경조건 
+           </if>
+
+     )
+	SELECT TX.UPPER_CD                                          AS UPPER_CD       --상위코드
+	      , TX.LOWER_CD                                          AS LOWER_CD      --하위코드
+	      , TX.CO_CD                                             AS CO_CD         --회사코드
+	      , (SELECT FN_CM05M01_CD_TO_NM(TX.CO_CD) FROM DUAL)    AS CO_NM          --회사명
+	      , TX.TITLE                                             AS TITLE         --고객명/수주번호/출고번호
+	      , TX.ORDRS_CLNT_CD                                     AS ORDRS_CLNT_CD --고객코드
+	      , TX.ORDRS_CLNT_NM                                     AS ORDRS_CLNT_NM --고객명
+	      , TX.CLNT_PJT                                          AS CLNT_PJT      --고객사PJT
+	      , (SELECT FN_CM05M01_CD_TO_NM(TX.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM    --고객사PJT명
+	      , TX.ORDRS_NO                                          AS ORDRS_NO      --수주번호
+	      , TX.ORDRS_DT                                          AS ORDRS_DT      --수주일자
+	      , TX.ORDRS_DIV_NM                                      AS ORDRS_DIV_NM  --수주구분
+	      , TX.CTRT_NM                                           AS CTRT_NM       --계약명
+	      , NVL(TX.ORDRS_QTY,0)                                  AS ORDRS_QTY     --수주수량
+	      , NVL(TX.OUT_QTY,0)                                    AS PRE_ORDRS_QTY --출고수량
+	      , NVL(TX.ORDRS_QTY,0) - NVL(TX.OUT_QTY,0)              AS REST_ORDRS_QTY--미출고수량
+	      , TX.FILE_TRGT_KEY                                     AS FILE_TRGT_KEY --FILE_TRGT_KEY
+	      , TX.OUT_CLNT_CD                                       AS OUT_CLNT_CD   --출고업체코드
+	      , TX.OUT_CLNT_CD_NM                                    AS OUT_CLNT_CD_NM--출고업체명   
+	      , TX.OUT_NO                                            AS OUT_NO        --출고번호
+	      , TX.IO_DIV                                            AS IO_DIV        --수불구분
+	      , TX.OUT_DT                                            AS OUT_DT        --출고일자
+	      , TX.OUT_ID                                            AS OUT_ID        --출고자 ID
+	      , TX.OUT_ID_NM                                         AS OUT_ID_NM     --출고자명
+	      , TX.OUT_RMK                                           AS OUT_RMK       --출고 비고 
+	      , REGEXP_REPLACE(SYS_CONNECT_BY_PATH(TX.LOWER_CD, ' -> '), '^\s+\-\>\s+', '') AS PATH --출고경로 
+	  FROM (-- LVL1 : TOP -> 고객사||수주번호
+	        SELECT DISTINCT  'TOP'                   AS UPPER_CD        --상위코드
+	              , TO_CHAR(B.ORDRS_CLNT_CD)||B.ORDRS_NO AS LOWER_CD       --하위코드
+	              , B.CO_CD                            AS CO_CD          --회사코드
+	              , B.ORDRS_NO                         AS ORDRS_NO       --수주번호
+	              , TO_CHAR(B.ORDRS_DT,'YYYY-MM-DD')   AS ORDRS_DT       --수주일자
+	              , FN_CM05M01_CD_TO_NM(B.ORDRS_DIV)   AS ORDRS_DIV_NM   --수주구분
+	              , B.CTRT_NM                          AS CTRT_NM        --계약명
+	              , B.ORDRS_NO                         AS TITLE          --출고번호 
+	              , B.ORDRS_CLNT_CD                    AS ORDRS_CLNT_CD  --고객코드
+	              , B.CLNT_NM                          AS ORDRS_CLNT_NM  --고객명
+	              , B.CLNT_PJT                         AS CLNT_PJT       --고객사PJT
+	              , ''                                 AS FILE_TRGT_KEY  --FILE_TRGT_KEY
+	              , ''                                 AS OUT_CLNT_CD    --출고업체코드
+	              , ''                                 AS OUT_CLNT_CD_NM --출고업체명     
+	              , ''                                 AS OUT_NO         --출고번호
+	              , ''                                 AS IO_DIV         --수불구분
+	              , ''                                 AS OUT_DT         --출고일자
+	              , ''                                 AS OUT_ID         --출고자 ID
+	              , ''                                 AS OUT_ID_NM      --출고자명
+	              , ''                                 AS OUT_RMK        --출고 비고 
+	              , NVL(ORDRS_QTY,0)                   AS ORDRS_QTY      --수주수량
+	              , (SELECT MAX(OUT_QTY) FROM PCH WHERE CO_CD = B.CO_CD AND ORDRS_NO = B.ORDRS_NO ) AS OUT_QTY --출고수량 (수주번호별 출고수량 중 1개)
+	          FROM SJM B
+	         WHERE 1=1
+
+           <if test="userId != null and !userId.equals('')">
+           AND ORDRS_NO IN  (SELECT ORDRS_NO FROM PCH WHERE OUT_ID = #{userId})
+           </if>
+
+	        UNION ALL
+	        SELECT UPPER_CD        AS UPPER_CD       --상위코드
+	              , LOWER_CD        AS LOWER_CD      --하위코드
+	              , CO_CD           AS CO_CD         --회사코드
+	              , ORDRS_NO        AS ORDRS_NO      --수주번호
+	              , ORDRS_DT        AS ORDRS_DT      --수주일자
+	              , ORDRS_DIV_NM    AS ORDRS_DIV_NM  --수주구분
+	              , CTRT_NM         AS CTRT_NM       --계약명
+	              , TITLE           AS TITLE         --출고번호 
+	              , ORDRS_CLNT_CD   AS ORDRS_CLNT_CD --고객코드
+	              , ORDRS_CLNT_NM   AS ORDRS_CLNT_NM --고객명
+	              , CLNT_PJT        AS CLNT_PJT      --고객사PJT
+	              , FILE_TRGT_KEY   AS FILE_TRGT_KEY --FILE_TRGT_KEY
+	              , OUT_CLNT_CD     AS OUT_CLNT_CD   --출고업체코드
+	              , OUT_CLNT_CD_NM  AS OUT_CLNT_CD_NM--출고업체명     
+	              , OUT_NO          AS OUT_NO        --출고번호
+	              , IO_DIV          AS IO_DIV        --수불구분
+	              , OUT_DT          AS OUT_DT        --출고일자
+	              , OUT_ID          AS OUT_ID        --출고자 ID
+	              , OUT_ID_NM       AS OUT_ID_NM     --출고자명
+	              , OUT_RMK         AS OUT_RMK       --출고 비고 
+	              , ORDRS_QTY       AS ORDRS_QTY     --수주수량
+	              , OUT_QTY         AS OUT_QTY       --출고수량
+	          FROM PCH C
+	       ) TX
+		  WHERE 1=1
+		  START WITH UPPER_CD = 'TOP' CONNECT BY PRIOR LOWER_CD = UPPER_CD
+		  ORDER BY PATH
+	</sql>
+	
+	<sql id="selectDeliverySql1">
 		SELECT    FN_CM05M01_CD_TO_NM(TX.CO_CD) CO_NM
 		    	 ,TX.UPPER_CD
 		    	 ,TX.LOWER_CD
