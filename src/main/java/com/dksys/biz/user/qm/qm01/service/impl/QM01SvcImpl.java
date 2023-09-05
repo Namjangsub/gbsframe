@@ -123,6 +123,10 @@ public class QM01SvcImpl implements QM01Svc {
     param.put("userId", paramMap.get("userId"));
     param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
     
+    String midCode = paramMap.get("CODECOBGB");
+	String midCd = midCode.substring(0, 7);
+	paramMap.put("midCd", midCd);
+    
 	List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
 	if (uploadFileList.size() > 0) {
 			//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
@@ -174,7 +178,7 @@ public class QM01SvcImpl implements QM01Svc {
 	pgParam1 += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
 	pgParam1 += "\"reqNo\":\""+ paramMap.get("reqNo") +"\"}";
 
-					
+	//공유				
 	Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 	List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
 	if (sharngArr != null && sharngArr.size() > 0 ) {
@@ -189,6 +193,33 @@ public class QM01SvcImpl implements QM01Svc {
             	    sharngMap.put("pgParam", pgParam1 );
                 	QM01Mapper.insertWbsSharngList(sharngMap);       		
             	i++;
+            } catch (Exception e) {
+                System.out.println("error2"+e.getMessage());
+            }
+        }
+	}
+	
+	String pgParam2 = "{\"actionType\":\""+ "S" +"\",";
+	pgParam2 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
+	pgParam2 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
+	pgParam2 += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+	pgParam2 += "\"reqNo\":\""+ paramMap.get("reqNo") +"\"}";
+	
+	//결재
+	Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+	List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
+	if (approvalArr != null && approvalArr.size() > 0 ) {
+		int i = 0;
+        for (Map<String, String> approvalMap : approvalArr) {
+            try {	 
+	            	approvalMap.put("reqNo", paramMap.get("reqNo"));
+	            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+	            	approvalMap.put("pgmId", paramMap.get("pgmId"));
+	            	approvalMap.put("userId", paramMap.get("userId"));
+	            	approvalMap.put("sanCtnSn", Integer.toString(i+1));
+	            	approvalMap.put("pgParam", pgParam2 );
+                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
+                	i++;
             } catch (Exception e) {
                 System.out.println("error2"+e.getMessage());
             }
@@ -341,8 +372,10 @@ public class QM01SvcImpl implements QM01Svc {
 		//---------------------------------------------------------------  
 		//첨부 화일 권한체크  끝 
 		//---------------------------------------------------------------  
-
-		 
+		String midCode = paramMap.get("CODECOBGB");
+		String midCd = midCode.substring(0, 7);
+		paramMap.put("midCd", midCd);
+		
 		int fileTrgtKey = QM01Mapper.selectQualityReqSeqNext(paramMap);
 		String reqNo = QM01Mapper.selectQualityReqCalNext(paramMap);
 		System.out.println("요청관리 번호==?"+reqNo);
@@ -376,7 +409,7 @@ public class QM01SvcImpl implements QM01Svc {
 		pgParam1 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
 		pgParam1 += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
 		pgParam1 += "\"reqNo\":\""+ paramMap.get("reqNo") +"\"}";
-						
+		//공유				
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
 		if (sharngArr != null && sharngArr.size() > 0 ) {
@@ -397,23 +430,31 @@ public class QM01SvcImpl implements QM01Svc {
 	        }
 		}
 		
-//		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-//		List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
-//		if (approvalArr != null && approvalArr.size() > 0 ) {
-//			int i = 0;
-//	        for (Map<String, String> approvalMap : approvalArr) {
-//	            try {	 
-//		            	approvalMap.put("reqNo", paramMap.get("reqNo"));
-//		            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-//		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
-//		            	approvalMap.put("userId", paramMap.get("userId"));
-//	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
-//	                	i++;
-//	            } catch (Exception e) {
-//	                System.out.println("error2"+e.getMessage());
-//	            }
-//	        }
-//		}
+		String pgParam2 = "{\"actionType\":\""+ "S" +"\",";
+		pgParam2 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
+		pgParam2 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
+		pgParam2 += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+		pgParam2 += "\"reqNo\":\""+ paramMap.get("reqNo") +"\"}";
+		//결재
+		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
+		if (approvalArr != null && approvalArr.size() > 0 ) {
+			int i = 0;
+	        for (Map<String, String> approvalMap : approvalArr) {
+	            try {	 
+		            	approvalMap.put("reqNo", paramMap.get("reqNo"));
+		            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
+		            	approvalMap.put("userId", paramMap.get("userId"));
+		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
+		            	approvalMap.put("pgParam", pgParam2);
+	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
+	                	i++;
+	            } catch (Exception e) {
+	                System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
 		
 		
 	    return result;

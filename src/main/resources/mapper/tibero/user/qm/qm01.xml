@@ -92,7 +92,8 @@
 		          T.ORDRG_ID AS ORDRG_ID, 
 		          T.DEPT_CD AS DEPT_CD, 
 		          T.MID_CD AS MID_CD,
-		          T.SUB_CD AS SUB_CD,	
+		          T.SUB_CD AS SUB_CD,
+		          T.STAT_YY,	
 		          T.EST_CLNT_CD AS CLNT_CD,
 		          P.CREAT_ID AS CREAT_ID,
 		          T.PART_CD AS COBTB_CD, 
@@ -332,7 +333,7 @@
           ,T.INWK_CD AS  INWK_CD 
           ,(SELECT X.CODE_NM FROM TB_CM05M01 X WHERE X.CODE_ID = T.INWK_CD) AS INWK_CD_NM 
           ,T.BUST_PE AS BUST_PE 
-          ,T.PART_CD AS PART_CD 
+          ,T.PART_CD AS PART_CD
           ,(SELECT X.CODE_NM FROM TB_CM05M01 X WHERE X.CODE_ID = T.PART_CD) AS PART_CD_NM 
           ,T.DEPT_CD AS DEPT_CD
           ,(SELECT X.CODE_NM FROM TB_CM05M01 X WHERE X.CODE_ID = T.DEPT_CD) AS DEPT_NM 
@@ -343,17 +344,7 @@
           ,T.SUB_CD AS SUB_CD
           ,(SELECT X.CODE_NM FROM TB_CM05M01 X WHERE X.CODE_ID = T.SUB_CD) AS SUB_NM
           ,T.REQ_RMK AS REQ_RMK
-          ,T.FILE_TRGT_KEY
-          ,T.SHAR_ID1 AS SHAR_ID1
-          ,T.SHAR_ID2 AS SHAR_ID2
-          ,T.SHAR_ID3 AS SHAR_ID3
-          ,T.SHAR_ID4 AS SHAR_ID4
-          ,T.SHAR_ID5 AS SHAR_ID5
-          ,T.SHAR_ID6 AS SHAR_ID6
-          ,T.SHAR_ID7 AS SHAR_ID7
-          ,T.SHAR_ID8 AS SHAR_ID8
-          ,T.SHAR_ID9 AS SHAR_ID9
-          ,T.SHAR_ID10 AS SHAR_ID10    
+          ,T.FILE_TRGT_KEY  
 	FROM TB_QM01M01 T
 	LEFT OUTER JOIN TB_CM06M01 N1 ON N1.ID = T.REG_ID  AND N1.CO_CD =  T.CO_CD
 	LEFT OUTER JOIN TB_CM06M01 N2 ON N2.ID = T.ORDRG_ID  AND N2.CO_CD =  T.CO_CD
@@ -462,14 +453,18 @@
 	(
 		SELECT   A.CO_CD AS WBS_PLANCO_CD,
 				 FN_CM05M01_CD_TO_NM(A.CO_CD) WBS_PLANCO_CD_NM,
-		         A.ID AS WBS_SHARNG_USER_ID,
+		         A.ID AS USR_NM,
 		         A.EMP_NO AS EMP_NO,
 				 A.NAME AS NAME,
 				 A.TEL_NO AS TEL_NO,
 				 A.EMAIL AS EMAIL,
-				 B.DEPT_NM AS DT_NM
+				 B.DEPT_NM AS DT_NM,
+				 D.LEVEL_NM AS JIK,
+				 C.TODO_DIV1_CODE_ID  AS TODO_DIV1_CODE_ID,
+				 DECODE(C.TODO_DIV1_CODE_ID, 'TODODIV10', '공유', 'TODODIV20', '결재', '') AS GB
 		FROM
-			TB_CM06M01 A 
+			TB_CM06M01 A
+			LEFT OUTER JOIN TB_CM07M01 D ON A.LEVEL_CD = D.LEVEL_CD 
 			INNER JOIN TB_CM04M01 B on A.DEPT_ID = B.DEPT_ID
 			INNER JOIN TB_WB20M03 C ON A.ID = C.TODO_ID
 			  AND C.TODO_FILE_TRGT_KEY = #{fileTrgtKey}
@@ -655,28 +650,16 @@
   
 <update id="updateQualityReq" parameterType="Map">
 		UPDATE TB_QM01M01
-		SET   MATR_DRW_NO = #{matrDrwNo}
-		     ,ORDRS_NO = #{ordrsNo}
-		     ,BUST_CD = #{bustCd}
-		     ,BUST_NM = #{bustNm}
-		     ,INWK_CD = #{inwkCd}
-		     ,BUST_PE = #{bustPe}
-		     ,PART_CD = #{partCd}
-		     ,DEPT_CD = #{deptCd}
-		     ,DEPT_CD2 = #{deptCd2} 
-		     ,MID_CD = #{midCd}
-		     ,SUB_CD = #{subCd} 
-		     ,REQ_RMK = #{reqRmk} 
-		     ,SHAR_ID1 = #{sharId1}
-		     ,SHAR_ID2 = #{sharId2}
-		     ,SHAR_ID3 = #{sharId3}
-		     ,SHAR_ID4 = #{sharId4}
-		     ,SHAR_ID5 = #{sharId5}
-		     ,SHAR_ID6 = #{sharId6}
-		     ,SHAR_ID7 = #{sharId7}
-		     ,SHAR_ID8 = #{sharId8}
-		     ,SHAR_ID9 = #{sharId9}
-		     ,SHAR_ID10 = #{sharId10} 
+		SET   MATR_DRW_NO = #{matrDrwNo} /*대표도번번호*/
+		     ,ORDRS_NO = #{ordrsNo} /*수주번호*/
+		     ,BUST_CD = #{bustCd} /*출장자*/
+		     ,BUST_NM = #{bustNm} /*출장자명*/
+		     ,INWK_CD = #{inwkCd} /*사내작업*/
+		     ,BUST_PE = #{bustPe} /*출장장소*/
+		     ,PART_CD = #{COBTP} /*분류*/
+		     ,MID_CD = #{midCd} /*중분류*/
+		     ,SUB_CD = #{CODECOBGB} /*소분류*/
+		     ,REQ_RMK = #{reqRmk} /*비고*/
 		     ,UDT_ID  = #{userId}
 			 ,UDT_PGM = #{pgmId}
 			 ,UDT_DTTM = SYSDATE
@@ -738,7 +721,7 @@
    SELECT CASE WHEN MAX(REQ_NO) IS NULL THEN  'REQ' || TO_CHAR(SYSDATE,'YY') || '00001' 
                ELSE 'REQ' || TO_CHAR(SYSDATE,'YY') || LPAD(SUBSTR(NVL(MAX(REQ_NO),0),7,10)+1,5,0) END AS REQ_NO
    FROM   TB_QM01M01
-   WHERE  CO_CD = 'GUN'     
+   WHERE  CO_CD = #{coCd}     
   </select>
   
 <insert id="insertQualityReq" parameterType="Map">
@@ -764,24 +747,8 @@
 	     BUST_PE,
 	     PART_CD,
 	     REQ_RMK,
-	     DEPT_CD,
-	     DEPT_CD2,
 	     MID_CD,
 	     SUB_CD,
-	    <!--  STMM_YN,
-	     STAT_YY,
-	     STAT_MM,
-	     REQ_ST,-->
-	     SHAR_ID1,
-	     SHAR_ID2,
-	     SHAR_ID3,
-	     SHAR_ID4,
-	     SHAR_ID5,
-	     SHAR_ID6,
-	     SHAR_ID7,
-	     SHAR_ID8,
-	     SHAR_ID9,
-	     SHAR_ID10,
 	     CREAT_ID,       
 		 CREAT_PGM,      
 		 CREAT_DTTM 
@@ -805,26 +772,10 @@
 	     #{bustNm},
 	     #{inwkCd},
 	     #{bustPe},
-	     #{partCd},
+	     #{COBTP},
 	     #{reqRmk}, <!--null #{reqRmk, jdbcType=VARCHAR}-->
-	     #{deptCd},
-	     #{deptCd2},
 	     #{midCd},
-	     #{subCd},
-	   <!--#{stmmYn},
-	     #{statYy},
-	     #{statMm},
-	     #{reqSt}, -->
-	     #{sharId1},
-	     #{sharId2},
-	     #{sharId3},
-	     #{sharId4},
-	     #{sharId5},
-	     #{sharId6},
-	     #{sharId7},
-	     #{sharId8},
-	     #{sharId9},
-	     #{sharId10},
+	     #{CODECOBGB},
 	     #{userId},       
 		 #{pgmId},      
 		 SYSDATE 
@@ -936,8 +887,6 @@
                    WHERE TODO_CO_CD  = #{coCd}
                          AND SALES_CD  = #{salesCd}
                          AND TODO_NO  = #{reqNo}
-                         AND TODO_DIV1_CODE_ID  = #{S_todoDiv1CodeId}
-                         AND TODO_DIV2_CODE_ID  = #{S_todoDiv2CodeId}
   </select>    
         
         
@@ -946,8 +895,6 @@
                    WHERE TODO_CO_CD  = #{coCd}
                          AND SALES_CD  = #{salesCd}
                          AND TODO_NO  = #{reqNo}
-                         AND TODO_DIV1_CODE_ID  = #{S_todoDiv1CodeId}
-                         AND TODO_DIV2_CODE_ID  = #{S_todoDiv2CodeId}
   </delete>
   
   <select id="deleteWbsApprovalListChk" parameterType="Map" resultType="camelMap">
@@ -999,7 +946,7 @@
            #{coCd},
            #{todoDiv1CodeId},
            #{todoDiv2CodeId},
-           #{wbsSharngUserId},
+           #{usrNm},
            #{salesCd},
            #{pgPath},
            #{fileTrgtKey},
@@ -1041,7 +988,7 @@
             #{coCd},
             #{todoDiv1CodeId},
             #{todoDiv2CodeId},
-            #{wbsSharngUserId},
+            #{usrNm},
             #{salesCd},
             #{pgPath},
             #{fileTrgtKey},
