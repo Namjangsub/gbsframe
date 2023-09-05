@@ -34,4 +34,6 @@ public interface SM02Svc {
 	int deleteOrderMaster(Map<String, String> param);			
 	
 	int deleteOrderDetail(Map<String, String> param);	
+	
+	List<Map<String, String>> selectCurrToday(Map<String, String> paramMap);	
 }

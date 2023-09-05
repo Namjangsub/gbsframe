@@ -40,7 +40,9 @@ public interface SM02Mapper {
 	
 	int deleteOrderMaster(Map<String, String> paramMap);
 	
-	int deleteOrderDetail(Map<String, String> param);	
+	int deleteOrderDetail(Map<String, String> param);
+	
+	List<Map<String, String>> selectCurrToday(Map<String, String> paramMap);	
 }
 
 

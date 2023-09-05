@@ -133,5 +133,13 @@ public class SM02Ctr {
 		model.addAttribute("resultCode", 200);
     	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
 		return "jsonView";
-	} 
+	}
+	
+	//발주 등록시 현재환율 조회
+	@PostMapping(value = "/selectCurrToday")
+	public String selectCurrToday(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = sm02Svc.selectCurrToday(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}	
 }
