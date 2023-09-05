@@ -277,4 +277,10 @@ public class SM02SvcImpl implements SM02Svc {
 	public int deleteOrderDetail(Map<String, String> param) {
 		return sm02Mapper.deleteOrderDetail(param);
 	}	
+	
+	/* 오늘자 환율 select  */
+	@Override
+	public List<Map<String, String>> selectCurrToday(Map<String, String> paramMap) {
+		return sm02Mapper.selectCurrToday(paramMap);
+	}	
 }
