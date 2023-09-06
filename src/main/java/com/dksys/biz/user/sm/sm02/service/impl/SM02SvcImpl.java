@@ -282,5 +282,11 @@ public class SM02SvcImpl implements SM02Svc {
 	@Override
 	public List<Map<String, String>> selectCurrToday(Map<String, String> paramMap) {
 		return sm02Mapper.selectCurrToday(paramMap);
-	}	
+	}
+	
+	/* 오늘자 구매단가관리  */
+	@Override
+	public String selectCurrMatrUpr(Map<String, String> paramMap) {
+		return sm02Mapper.selectCurrMatrUpr(paramMap);
+	}		
 }

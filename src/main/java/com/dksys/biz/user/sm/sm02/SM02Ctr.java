@@ -141,5 +141,13 @@ public class SM02Ctr {
 		List<Map<String, String>> resultList = sm02Svc.selectCurrToday(paramMap);
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
+	}
+	
+	//발주 등록시 구매단가 실시간 조회
+	@PostMapping(value = "/selectCurrMatrUpr")
+	public String selectCurrMatrUpr(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		String resultList = sm02Svc.selectCurrMatrUpr(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
 	}	
 }
