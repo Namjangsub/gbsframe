@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.wb.wb21.mapper.WB21Mapper">
+
+	    <select id="selectMaxSjNo" parameterType="Map"  resultType="camelMap">
+              SELECT  #{year} || trim(to_char(nvl(SUBSTR(MAX(SJ_NO), 6, 4),0) + 1, '0000')) AS SJ_NO FROM TB_WB21M01 
+              WHERE CO_CD = #{coCd}   
+        </select>
+        
+        <select id="selectCodeList" parameterType="Map"  resultType="camelMap">
+              SELECT CODE_ID AS CD, CODE_NM AS NM FROM TB_CM05M01 WHERE CODE_KIND = #{codeKind}
+              AND USE_YN = 'Y'
+              ORDER BY SORT_NO ASC
+        </select>
+        
+        <select id="selectSjListCount" parameterType="Map"  resultType="int">
+                SELECT
+                    COUNT(*)
+                    FROM TB_WB21M01
+                    WHERE CO_CD = #{coCd}
+                    AND BEGIN_DT BETWEEN #{beginDt} AND #{deDt}
+                    AND DE_DT BETWEEN #{beginDt} AND #{deDt}
+                    <if test="salesCd != null and !salesCd.equals('')">
+                     AND SALES_CD = #{salesCd}                
+                    </if>
+                    <if test="sjNm != null and !sjNm.equals('')">
+                     AND SJ_NM LIKE '%${sjNm}%'                
+                    </if>
+       </select>
+       
+       
+        <select id="selectSjList" parameterType="Map"  resultType="camelMap">
+           SELECT ROWNUM AS RN, X.* FROM (
+		            SELECT  X.FILE_TRGT_KEY,
+						    X.CO_CD,
+						    (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.CO_CD) AS CO_CD_NM,
+						    X.SJ_NO,
+						    X.SJ_NM,
+						    X.VER_NO,
+						    X.SALES_CD,
+						    X.MKER_DIV,
+						    X.MKER_CD,
+						    (SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD = X.MKER_CD) AS MKER_NM,
+						    X.SMRIZE_ID,
+						    (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.SMRIZE_ID) AS SMRIZE_NM,
+						    TO_CHAR(X.BEGIN_DT, 'YYYY-MM-DD') AS BEGIN_DT,
+						    TO_CHAR(X.DE_DT, 'YYYY-MM-DD') AS DE_DT,
+						    TO_CHAR(X.ACPTNC_DT, 'YYYY-MM-DD') AS ACPTNC_DT,
+						    X.REQRE_DAYCNT,
+						    X.DSGN_DIF_CODE_ID,
+						    (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.DSGN_DIF_CODE_ID) AS DSGN_DIF_CODE_NM,
+						    X.DSGN_PLAN_HOUR,
+						    X.PRDCTN_DIF_CODE_ID,
+						    (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.PRDCTN_DIF_CODE_ID) AS PRDCTN_DIF_CODE_NM,
+						    X.PRDCTN_PLAN_HOUR,
+						    X.SJ_RMK,
+						    X.CLOSE_YN,
+						    X.CREAT_ID,
+						    (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.CREAT_ID) AS CREAT_NM,
+						    X.CREAT_PGM,
+						    TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM,
+						    X.UDT_ID,
+						    (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.UDT_ID) AS UDT_NM,
+						    X.UDT_PGM,
+						    TO_CHAR(UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM,
+						    CR.CLNT_CD,
+		                    CR.CLNT_NM,
+		                    CR.PRDT_CD,
+		                    CR.PRDT_NM,
+		                    CR.CLNT_PJT,
+		                    (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = CR.CLNT_PJT) AS CLNT_PJT_NM,
+		                    CR.ORDRS_NO                                       
+						    FROM TB_WB21M01 X
+		                    LEFT OUTER JOIN (
+		                        SELECT  
+		                           CR.CO_CD, 
+		                           CR.ORDRS_NO,
+		                           CR.SALES_CD, 
+		                           Y.ORDRS_CLNT_CD AS CLNT_CD, 
+		                           (SELECT P.CLNT_NM FROM TB_BM02M01 P WHERE P.CLNT_CD = Y.ORDRS_CLNT_CD) AS CLNT_NM,
+		                           Y.CLNT_PJT, 
+		                           CR.ORDRS_DTL_DIV20, 
+		                           (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = CR.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+		                           CR.PRDT_CD, 
+		                           (SELECT T.PRDT_NM FROM TB_BM01M01 T WHERE T.PRDT_CD = CR.PRDT_CD) AS PRDT_NM,
+		                           CR.ITEM_DIV, 
+		                           (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = CR.ITEM_DIV) AS ITEM_DIV_NM,
+		                           CR.EQP_NM
+		                        FROM TB_CR02D02 CR INNER JOIN TB_CR02M01 Y  ON CR.CO_CD = Y.CO_CD
+		                                                                 AND CR.ORDRS_NO = Y.ORDRS_NO) CR
+		                ON CR.CO_CD = X.CO_CD
+		                AND CR.SALES_CD = X.SALES_CD 
+		                WHERE X.CO_CD = #{coCd}
+		                    AND X.BEGIN_DT BETWEEN #{beginDt} AND #{deDt}
+		                    AND X.DE_DT BETWEEN #{beginDt} AND #{deDt}
+		                    <if test="salesCd != null and !salesCd.equals('')">
+		                     AND X.SALES_CD = #{salesCd}                
+		                    </if>
+		                    <if test="sjNm != null and !sjNm.equals('')">
+		                     AND X.SJ_NM LIKE '%${sjNm}%'                
+		                    </if>  
+		               ) X       
+		         WHERE ROWNUM BETWEEN ${firstIndex} AND ${lastIndex}      
+       </select>
+       
+       <select id="selectSjSeqNext" parameterType="Map" resultType="int">
+             SELECT TB_WB21M01_SQ01.NEXTVAL FROM DUAL
+         </select>
+         
+       <insert id="insertSjDtlList" parameterType="Map">
+                <selectKey keyProperty="fileTrgtKey" resultType="Int" order="BEFORE">
+                    SELECT NVL(MAX(FILE_TRGT_KEY), 0) + 1 FROM TB_WB21D01
+                </selectKey>
+                INSERT INTO TB_WB21D01
+                (
+                    FILE_TRGT_KEY,
+                    CO_CD,
+				    SJ_NO,
+				    VER_NO,
+				    DUTY_SE,
+				    CHRG_SE,
+				    CHARGER_ID,
+				    CREAT_ID,
+				    CREAT_PGM,
+				    CREAT_DTTM
+                ) 
+                VALUES
+                (
+                    #{fileTrgtKey},
+                    #{coCd},
+                    #{sjNo},
+                    #{verNo},
+                    #{dutySe},
+                    #{chrgSe},
+                    #{chargerId},                    
+                    #{creatId},
+                    #{creatPgmId},
+                    SYSDATE
+                )
+         </insert>
+         
+         
+         <insert id="sjInsert" parameterType="Map">
+                INSERT INTO TB_WB21M01
+                (
+                    FILE_TRGT_KEY,
+                    CO_CD,
+                    SJ_NO,
+                    SJ_NM,
+                    VER_NO,
+                    SALES_CD,
+                    MKER_DIV,
+                    MKER_CD,
+                    SMRIZE_ID,
+                    BEGIN_DT,
+                    DE_DT,
+                    ACPTNC_DT,
+                    REQRE_DAYCNT,
+                    DSGN_DIF_CODE_ID,
+                    DSGN_PLAN_HOUR,
+                    PRDCTN_DIF_CODE_ID,
+                    PRDCTN_PLAN_HOUR,
+                    SJ_RMK,
+                    CLOSE_YN,
+                    CREAT_ID,
+                    CREAT_PGM,
+                    CREAT_DTTM
+                ) 
+                VALUES
+                (
+                    #{fileTrgtKey},
+                    #{coCd},
+                    #{sjNo},
+                    #{sjNm},
+                    #{verNo},
+                    #{salesCd},
+                    #{mkerDiv},
+                    #{mkerCd},
+                    #{smrizeId},
+                    #{beginDt},
+                    #{deDt},
+                    #{acptncDt},
+                    #{reqreDaycnt},
+                    #{dsgnDifCodeId},
+                    #{dsgnPlanHour},
+                    #{prdctnDifCodeId},
+                    #{prdctnPlanHour},
+                    #{sjRmk},
+                    'N',
+                    #{userId},
+                    #{pgmId},
+                    SYSDATE
+                )
+         </insert>
+         
+         <update id="sjUpdate" parameterType="Map">
+                UPDATE TB_WB21M01
+                 SET    
+                        SJ_NM = #{sjNm},
+	                    MKER_DIV = #{mkerDiv},
+	                    MKER_CD = #{mkerCd},
+	                    SMRIZE_ID = #{smrizeId},
+	                    BEGIN_DT = #{beginDt},
+	                    DE_DT = #{deDt},
+	                    ACPTNC_DT = #{acptncDt},
+	                    REQRE_DAYCNT = #{reqreDaycnt},
+	                    DSGN_DIF_CODE_ID = #{dsgnDifCodeId},
+	                    DSGN_PLAN_HOUR = #{dsgnPlanHour},
+	                    PRDCTN_DIF_CODE_ID = #{prdctnDifCodeId},
+	                    PRDCTN_PLAN_HOUR = #{prdctnPlanHour},
+	                    SJ_RMK =#{sjRmk}, 
+	                    UDT_ID = #{userId},
+	                    UDT_PGM = #{pgmId},
+	                    UDT_DTTM = SYSDATE
+                 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+         </update>
+         
+         <select id="deleteSjListChk" parameterType="Map" resultType="camelMap">
+               SELECT *  FROM TB_WB21D01
+                   WHERE CO_CD  = #{coCd}
+                         AND SJ_NO  = #{sjNo}
+                         AND VER_NO  = #{verNo}                         
+        </select>   
+        
+        <delete id="deleteSjList" parameterType="Map">
+               DELETE  FROM TB_WB21D01
+                   WHERE CO_CD  = #{coCd}
+                         AND SJ_NO  = #{sjNo}
+                         AND VER_NO  = #{verNo}       
+        </delete> 
+
+
+        <select id="selectSjDtlList" parameterType="Map" resultType="camelMap">
+               SELECT X.DUTY_SE,
+                      X.CHRG_SE,
+                      X.CHARGER_ID, 
+                      (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.CHARGER_ID)  AS CHARGER_NM  
+                   FROM TB_WB21D01 X
+                   WHERE X.CO_CD  = #{coCd}
+                   AND X.SJ_NO = #{sjNo}
+                   AND X.VER_NO = #{verNo}                      
+        </select>   
+        
+        <select id="selectSjInfo" parameterType="Map"  resultType="camelMap">
+            SELECT  X.FILE_TRGT_KEY,
+                    X.CO_CD,
+                    (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.CO_CD) AS CO_CD_NM,
+                    X.SJ_NO,
+                    X.SJ_NM,
+                    X.VER_NO,
+                    X.SALES_CD,
+                    X.MKER_DIV,
+                    X.MKER_CD,
+                    (SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD = X.MKER_CD) AS MKER_NM,
+                    X.SMRIZE_ID,
+                    (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.SMRIZE_ID) AS SMRIZE_NM,
+                    TO_CHAR(X.BEGIN_DT, 'YYYY-MM-DD') AS BEGIN_DT,
+                    TO_CHAR(X.DE_DT, 'YYYY-MM-DD') AS DE_DT,
+                    TO_CHAR(X.ACPTNC_DT, 'YYYY-MM-DD') AS ACPTNC_DT,
+                    X.REQRE_DAYCNT,
+                    X.DSGN_DIF_CODE_ID,
+                    (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.DSGN_DIF_CODE_ID) AS DSGN_DIF_CODE_NM,
+                    X.DSGN_PLAN_HOUR,
+                    X.PRDCTN_DIF_CODE_ID,
+                    (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.PRDCTN_DIF_CODE_ID) AS PRDCTN_DIF_CODE_NM,
+                    X.PRDCTN_PLAN_HOUR,
+                    X.SJ_RMK,
+                    X.CLOSE_YN,
+                    X.CREAT_ID,
+                    (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.CREAT_ID) AS CREAT_NM,
+                    X.CREAT_PGM,
+                    TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM,
+                    X.UDT_ID,
+                    (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.UDT_ID) AS UDT_NM,
+                    X.UDT_PGM,
+                    TO_CHAR(UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM,
+                    CR.CLNT_CD,
+                    CR.CLNT_NM,
+                    CR.PRDT_CD,
+                    CR.PRDT_NM,
+                    CR.CLNT_PJT,
+                    (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = CR.CLNT_PJT) AS CLNT_PJT_NM
+                    FROM TB_WB21M01 X
+                    LEFT OUTER JOIN (
+                        SELECT  
+                           CR.CO_CD, 
+                           CR.ORDRS_NO,
+                           CR.SALES_CD, 
+                           Y.ORDRS_CLNT_CD AS CLNT_CD, 
+                           (SELECT P.CLNT_NM FROM TB_BM02M01 P WHERE P.CLNT_CD = Y.ORDRS_CLNT_CD) AS CLNT_NM,
+                           Y.CLNT_PJT, 
+                           CR.ORDRS_DTL_DIV20, 
+                           (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = CR.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+                           CR.PRDT_CD, 
+                           (SELECT T.PRDT_NM FROM TB_BM01M01 T WHERE T.PRDT_CD = CR.PRDT_CD) AS PRDT_NM,
+                           CR.ITEM_DIV, 
+                           (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = CR.ITEM_DIV) AS ITEM_DIV_NM,
+                           CR.EQP_NM
+                        FROM TB_CR02D02 CR INNER JOIN TB_CR02M01 Y  ON CR.CO_CD = Y.CO_CD
+                                                                 AND CR.ORDRS_NO = Y.ORDRS_NO) CR
+                ON CR.CO_CD = X.CO_CD
+                AND CR.SALES_CD = X.SALES_CD          
+                WHERE FILE_TRGT_KEY = #{fileTrgtKey} 
+       </select>
+       
+      <insert id="sjConfirmY" parameterType="Map">
+               INSERT INTO TB_WB21M01_HIST
+                (
+                    FILE_TRGT_KEY,
+                    CO_CD,
+                    SJ_NO,
+                    SJ_NM,
+                    VER_NO,
+                    SALES_CD,
+                    MKER_DIV,
+                    MKER_CD,
+                    SMRIZE_ID,
+                    BEGIN_DT,
+                    DE_DT,
+                    ACPTNC_DT,
+                    REQRE_DAYCNT,
+                    DSGN_DIF_CODE_ID,
+                    DSGN_PLAN_HOUR,
+                    PRDCTN_DIF_CODE_ID,
+                    PRDCTN_PLAN_HOUR,
+                    SJ_RMK,
+                    CLOSE_YN,
+                    CREAT_ID,
+                    CREAT_PGM,
+                    CREAT_DTTM
+                ) 
+                VALUES
+                (
+                    #{fileTrgtKey},
+                    #{coCd},
+                    #{sjNo},
+                    #{sjNm},
+                    #{verNo},
+                    #{salesCd},
+                    #{mkerDiv},
+                    #{mkerCd},
+                    #{smrizeId},
+                    #{beginDt},
+                    #{deDt},
+                    #{acptncDt},
+                    #{reqreDaycnt},
+                    #{dsgnDifCodeId},
+                    #{dsgnPlanHour},
+                    #{prdctnDifCodeId},
+                    #{prdctnPlanHour},
+                    #{sjRmk},
+                    'Y',
+                    #{userId},
+                    #{pgmId},
+                    SYSDATE
+                )
+
+         </insert>
+      <update id="sjCloseY" parameterType="Map">
+                UPDATE TB_WB21M01
+                 SET  CLOSE_YN = 'Y',
+                      UDT_ID = #{userId},
+                      UDT_PGM = #{pgmId},
+                      UDT_DTTM = SYSDATE
+                 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+         </update>   
+         
+         <delete id="sjConfirmN" parameterType="Map">
+                DELETE FROM TB_WB21M01_HIST                
+                  WHERE FILE_TRGT_KEY = #{fileTrgtKey} 
+         </delete>
+         
+         <update id="sjCloseN" parameterType="Map">
+                UPDATE TB_WB21M01
+                 SET  CLOSE_YN = 'N',
+                      UDT_ID = #{userId},
+                      UDT_PGM = #{pgmId},
+                      UDT_DTTM = SYSDATE
+                 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+         </update>
+         
+</mapper>
