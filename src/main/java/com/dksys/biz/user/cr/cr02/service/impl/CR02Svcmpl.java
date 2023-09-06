@@ -375,7 +375,6 @@ public class CR02Svcmpl implements CR02Svc {
                 
                 if (found) {
                     // Update plan
-
                     cr02Mapper.updateClmnPlan(plan);
                     cr02Mapper.insertUpdatePlanHis(plan);
                 } else {

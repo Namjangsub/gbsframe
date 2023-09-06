@@ -68,9 +68,11 @@
 								<i class="i_search_w"></i>
 							</a>
 						</div></td>
-					<th class="hit">고객사PJT</th>
-					<td><input type="text" id="clntPjt" class="clntPjtOrdrs"
-						name="clntPjt" required></td>
+					<th>고객사PJT</th>
+					<td>
+						<select id="clntPjt" name="clntPjt" data-kind="PRJCTCD" required ></select>
+<!-- 						<input type="text" id="clntPjt" class="clntPjtOrdrs" name="clntPjt" required> -->
+					</td>
 				</tr>
 				<!-- 3행 -->
 				<tr>
@@ -193,6 +195,8 @@
     let selectedRowKey;
     let selectedRowKey2;
 
+    var currToday = [];
+  	
     var thisGridRow = "";
     var thisGridCol = "";
     var beforeGridSize = 0; //수주상세그리드의 갯수용 그리드컨텐츠 높이조절용
@@ -241,12 +245,6 @@
 			language : "ko",
 			autoclose : true
 		}).datepicker("setDate", new Date());
-
-      	//버튼명 변경
-		$('#actionOrdrsBtn').text("수정");
-        $('#actionOrdrsBtn').on("click", function () {
-            updateOrdrs();
-        });
 
         const ordrsDiv = document.getElementById('ordrsDiv');
         const orgnSalesCdTh = document.getElementById('orgnSalesCdTh');
@@ -347,7 +345,6 @@
     function setMngInfo(paramObj) {
         postAjax("/admin/bm/bm02/selectMngInfo", paramObj, null, function (data) {
             if (data.mngInfo) {
-
                 $('#mngId').val(data.mngInfo.salesEmpId);
                 $('#mngIdNm').val(data.mngInfo.salesEmpNm);
             } else {
@@ -496,10 +493,10 @@
         var inputAmtVal = pasFloatChk($("#ordrsAmt").val());
 
         if (totalClmnAmt != inputAmtVal) {
-            alert("합계가 입력 금액과 일치하지 않습니다(수금계획)");
-            return false
+            alert("수주급액과 수급계획금액 합계가 일치하지 않습니다.");
+            return false;
         }
-
+        
         var totalLaborCostMfgCost = 0;
         var totalMachineValueAfterDeduction = 0;
 
@@ -537,6 +534,21 @@
             detailArr.push(detailObj);
         });
 
+        // clmnAmt 합계 계산
+        var totalClmnAmt = 0;
+        $.each(detailArr, function (idx, elem) {
+            totalClmnAmt += parseFloat(elem.ordrsPrcMach);
+            totalClmnAmt += parseFloat(elem.ordrsPrcElcty);
+        });
+
+        // input box 값과 비교
+        var inputAmtVal = pasFloatChk($("#ordrsAmt").val());
+        
+        if (totalClmnAmt != inputAmtVal) {
+            alert("수주금액과 수주가합계가 일치하지 않습니다.");
+            return false;
+        }
+        
         var totalSum = totalLaborCostMfgCost + totalMachineValueAfterDeduction; //laborCostMfgCost(금액)+machineVVauleAfterDeduction(차감 후 기계값)
         var ordrsAmtVal = pasFloatChk($("#ordrsAmt").val()); //수주금액에 적힌 값
 
@@ -559,7 +571,7 @@
     /* 그리드 관련 함수 */
     // 그리드 생성
     const gridOrdrsPlan = new ax5.ui.grid();
-
+		
         gridOrdrsPlan.setConfig({
         			target : $('[data-ax5grid="first-grid-modal"]'),
                     header: {
@@ -689,7 +701,7 @@
                             }
                         },
                         onClick: function (item, param) {
-                            console.log(item, param);
+//                             console.log(item, param);
                             thisGridRow = param.dindex;
                             thisGridCol = param.colIndex;
 
@@ -730,6 +742,8 @@
             data[i].clmnAmt = calculateNewAmt(ordrsAmt, data[i].clmnRate); 
         }
         gridOrdrsPlan.setData(data);
+    
+
     });
     
     //견적서번호 지울경우 견적차수도 지워지게 처리
@@ -739,7 +753,21 @@
     		$("#estDeg").val("");
     	}
     });
-
+    
+    //선물환기입check리스트 NG일떄 계약문서칸 사용못하게 해야함
+    $("#fwdExchChkList").change(function () {
+	    var fwdExchChkList = $("#fwdExchChkList").val();
+	    if(fwdExchChkList == "NG"){
+			//내용 삭제 후 비활성화	    	
+	    	$("#ctrtDoc").val("");
+	    	$('#ctrtDoc').prop('disabled', true);
+	    }else{
+	    	$('#ctrtDoc').prop('disabled', false);
+	    }
+	    
+    });
+    
+    
     //Select 선택 코드값 체크하여 명을 출력
     function getComboName(comboArray, key) {
 	    let rtnNm = "";
@@ -844,7 +872,8 @@
                 selectedRowKey2 = this.dindex;
                
                 // 제품구분(prdtCd)이거나 등록일 경우에만 실행하도록
-                if (this.column.key == 'prdtCd' && this.item.ordrsDtlDiv10 == 'ORDRSDTLDIV1010' && this.item.dataChk != 'U') {
+                if (this.column.key == 'prdtCd' && this.item.ordrsDtlDiv10 == 'ORDRSDTLDIV1010') {
+//                 if (this.column.key == 'prdtCd' && this.item.ordrsDtlDiv10 == 'ORDRSDTLDIV1010' && this.item.dataChk != 'U') {
 //                 if (this.column.key == 'prdtCd' && actionType == 'C' && this.item.ordrsDtlDiv10 == 'ORDRSDTLDIV1010' && this.item.dataChk != 'U') {
                     openSecondPrdtSearch();       
                 }
@@ -897,12 +926,12 @@
 			    }
 			    gridOrdrsDetail.repaint();
 				
-							    function 합계(value1, value2) {
-							        return parseFloat(deleteCommaStr(value1)) + parseFloat(deleteCommaStr(value2));
-							    }
-							    function 차액(value1, value2) {
-							        return parseFloat(deleteCommaStr(value1)) - parseFloat(deleteCommaStr(value2));
-							    }	
+			    function 합계(value1, value2) {
+			        return parseFloat(deleteCommaStr(value1)) + parseFloat(deleteCommaStr(value2));
+			    }
+			    function 차액(value1, value2) {
+			        return parseFloat(deleteCommaStr(value1)) - parseFloat(deleteCommaStr(value2));
+			    }
 							    
                 if (this.key == 'isChecked') {
                     this.self.updateChildRows(this.dindex, {isChecked: this.item.isChecked});
@@ -1008,6 +1037,12 @@
     	//타이틀명 변경
 		$('.tit').text('수주 수정')
 		
+		//버튼명 변경
+		$('#actionOrdrsBtn').text("수정");
+        $('#actionOrdrsBtn').on("click", function () {
+            updateOrdrs();
+        });
+        
 		//회사 비활성화
 		$('#popForm .coCd').removeClass('hit');
 		$('#coCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
@@ -1234,9 +1269,8 @@
 
 
     function insertOrdrs() {
-        if (true) {
+    	if (inputValidation($('.popup_area [required]').not('#frameTable [required], #nonStockTable [required]'))) {
             var formData = makeFormData();
-     
             if (formData) {
                 filePostAjax("/user/cr/cr02/insertOrdrs", formData, function (data) {
                     alert(data.resultMessage);
@@ -1253,7 +1287,6 @@
     function updateOrdrs() {
         if (inputValidation($('.popup_area [required]').not('#frameTable [required], #nonStockTable [required]'))) {
             var formData = makeFormData();
-            
             if (formData) {
                 filePostAjax("/user/cr/cr02/updateOrdrs", formData, function (data) {
                     alert(data.resultMessage);
@@ -1473,7 +1506,36 @@
     	    });	  
     };        
  
-    
+    //환율 load
+	var paramObj = {
+					"userId" : jwt.userId
+					, "codeKind" : "CURR"
+				   };
+	postAjax("/user/sm/sm02/selectCurrToday", paramObj, null , function(data) {
+		if(data.resultList.length > 0 ) {
+			currToday = data.resultList;
+		}
+	});     //user search ajax end
+	
+	//등록시 통화단위에 따른 환율 SET
+	$('#popForm #currCd').on("change", function(){
+		if(actionType == "C" && $(this).val() != "" ) {
+			var selVal = $(this).val();
+			var exrate = currToday[selVal];
+			var find = currToday.find(e => e.codeId === selVal);
+			if( typeof(find.codeEtc) != "undefined" ) {
+				$('#popForm #exrate').val(find.codeEtc);	
+			}
+		} else if( actionType == "C" && $(this).val() == "" ) {
+			$('#popForm #exrate').val('');
+		}
+	});
+	
+ 	// Ctrl + V 단축키 이벤트 처리
+	gridOrdrsDetail.$target.on("paste", function (e, a) {
+		gridPaste(gridOrdrsDetail, thisGridRow, thisGridCol);
+	});
+ 	
 	function pasFloatChk (value) {
 		const cvtValue = parseFloat(deleteCommaStr(value));
 		return isNaN(cvtValue) ? 0 : cvtValue;

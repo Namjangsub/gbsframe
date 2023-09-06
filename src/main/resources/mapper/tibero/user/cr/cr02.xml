@@ -106,7 +106,8 @@
 					     , TO_CHAR(ORDRS_DT, 'YYYY-MM-DD') IO_DT                   --수주일자
 					     , ORDRS_CLNT_CD                 --고객사
 					     , CLNT_NM                 --고객사명
-					     , CLNT_PJT                --고객사PJT
+					     , CLNT_PJT AS CLNT_PJT             --고객사PJT
+					     , FN_CM05M01_CD_TO_NM(CLNT_PJT) AS CLNT_PJT_NM             --고객사PJT명
 					     , CTRT_NM                 --계약명
 					     , ORDRS_AMT               --수주금액
 					     , EST_NO                  --견적번호
@@ -246,11 +247,13 @@
 				     , TO_CHAR(ORDRS_DT, 'YYYY-MM-DD') IO_DT                   --수주일자
 				     , ORDRS_CLNT_CD                 --고객사
 				     , CLNT_NM                 --고객사명
-				     , CLNT_PJT                --고객사PJT
+				     , CLNT_PJT AS CLNT_PJT             --고객사PJT
+				     , FN_CM05M01_CD_TO_NM(CLNT_PJT) AS CLNT_PJT_NM           --고객사PJT명
 				     , CTRT_NM                 --계약명
 				     , ORDRS_AMT               --수주금액
 				     , EST_NO                  --견적번호
 				     , EST_DEG                 --견적차수
+				     , 1 AS LVL
 				     , '' PID                     --PID
 				     , CO_CD||'_'||ORDRS_NO ID  --ID
 				     , 0  IO_SEQ                  --IO_SEQ
@@ -294,11 +297,13 @@
 				     , IO_DT                --수주일자
 				     , CLNT_CD              --고객사
 				     , CLNT_NM              --고객사명
-				     , CLNT_PJT             --고객사PJT
+				     , CLNT_PJT AS CLNT_PJT             --고객사PJT
+				     , FN_CM05M01_CD_TO_NM(CLNT_PJT) AS CLNT_PJT_NM           --고객사PJT
 				     , CTRT_NM              --계약명
 				     , ORDRS_AMT            --수주금액
 				     , EST_NO               --견적번호
 				     , EST_DEG              --견적차수
+				     , 2 AS LVL
 				     , PID                  --PID
 				     , ID                   --ID
 				     , IO_SEQ               --IO_SEQ
@@ -577,11 +582,11 @@
              #{clmnDivSeq}, 
              #{clmnRate},
              #{clmnAmt}, 
-             #{billPblsDt}, 
-             #{clmnDt},
-             #{pmntDtAfterBill}, 
+             #{billPblsDt, jdbcType=VARCHAR}, 
+             #{clmnDt, jdbcType=VARCHAR},
+             #{pmntDtAfterBill, jdbcType=VARCHAR}, 
              #{currCd, jdbcType=VARCHAR}, 
-             #{clmnMgmtStatus},
+             #{clmnMgmtStatus, jdbcType=VARCHAR},
              #{userId},
 			 #{pgmId},
 			 SYSDATE
@@ -592,7 +597,6 @@
         UPDATE TB_CR01M01
         SET ORDRS_YN = 'N',
             ORDRS_DT = ''
-
         WHERE CO_CD = #{coCd}
           AND EST_NO = #{estNo}
     </update>
@@ -603,11 +607,11 @@
             CLMN_DIV_SEQ       = #{clmnDivSeq},  -- 수금계획순번
             CLMN_RATE          = #{clmnRate},    -- 수금비율
             CLMN_AMT           = #{clmnAmt},     -- 수금금액
-            BILL_PBLS_DT       = #{billPblsDt},  -- 계산서발행일자
-            CLMN_DT            = #{clmnDt},      -- 수금일자
-            PMNT_DT_AFTER_BILL = #{pmntDtAfterBill}, -- 계산서 발행 후 지급시기
-            CURR_CD            = #{currCd},      -- 환율
-            CLMN_MGMT_STATUS   = #{clmnMgmtStatus} -- 수금관리상황
+            BILL_PBLS_DT       = #{billPblsDt, jdbcType=VARCHAR},  -- 계산서발행일자
+            CLMN_DT            = #{clmnDt, jdbcType=VARCHAR},      -- 수금일자
+            PMNT_DT_AFTER_BILL = #{pmntDtAfterBill, jdbcType=VARCHAR}, -- 계산서 발행 후 지급시기
+            CURR_CD            = #{currCd, jdbcType=VARCHAR},      -- 환율
+            CLMN_MGMT_STATUS   = #{clmnMgmtStatus, jdbcType=VARCHAR} -- 수금관리상황
         WHERE CO_CD = #{coCd}
           AND ORDRS_NO = #{ordrsNo}
           AND CLMN_PLAN_SEQ = #{clmnPlanSeq}
@@ -782,7 +786,10 @@
     </insert>
     <update id="updateOrdrsDetail" parameterType="map">
         UPDATE TB_CR02D02
-        SET ORDRS_DTL_DIV20                = #{ordrsDtlDiv20, jdbcType=VARCHAR},  -- 작업구분
+        SET ORDRS_DTL_DIV10                = #{ordrsDtlDiv10, jdbcType=VARCHAR},  -- 작업구분
+	        PRDT_CD		                   = #{prdtCd, jdbcType=VARCHAR},  -- 제품코드
+	        ITEM_DIV                       = #{itemDiv, jdbcType=VARCHAR},  -- 항목분류
+	        ORDRS_DTL_DIV20                = #{ordrsDtlDiv20, jdbcType=VARCHAR},  -- 작업구분
             ORDRS_DTL_DIV30				   = #{ordrsDtlDiv30, jdbcType=VARCHAR},  -- 자체구분
             EQP_NM						   = #{eqpNm, jdbcType=VARCHAR},          -- 설비명
             ORDRS_PRC_MACH				   = #{ordrsPrcMach},   -- 기계Part
@@ -847,9 +854,8 @@
 
     </select>
 
-
        <select id="selectWbsLeftSalesCodeTreeList" parameterType="Map" resultType="camelMap">          
-               		 
+/*selectWbsLeftSalesCodeTreeList*/
                 SELECT DISTINCT  
                 	   '' PID,
                 	   #{coCd} ID,
@@ -1024,7 +1030,7 @@
 
            </select>      
     <select id="selectItemSalesCodeTreeList" parameterType="Map" resultType="camelMap">          
-               		 
+/*selectItemSalesCodeTreeList*/
                 SELECT DISTINCT  
                 	   '' PID,
                 	   #{coCd} ID,
