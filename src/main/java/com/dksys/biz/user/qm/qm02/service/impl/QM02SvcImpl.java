@@ -59,7 +59,30 @@ public class QM02SvcImpl implements QM02Svc {
 	//그리드 검색
 	@Override
 	public List<Map<String, String>> select_stock_modal(Map<String, String> paramMap) {
-		return qm02Mapper.select_stock_modal(paramMap);
+		String roleStr = "";
+		
+		HashMap<String, Object> map = new HashMap<String, Object>();
+		
+		String[] roleArray = paramMap.get("cobtp").split(",");
+		String test = "";
+		for (int i = 0; i < roleArray.length; i++) {
+			if ((roleArray.length -1) == i ) {
+				test += "'" + roleArray[i] +"' AS COBTP"+ (i+1);
+			}
+			else {
+				test += "'" + roleArray[i] +"' AS COBTP"+ (i+1) +  ",";
+			}
+		}
+
+		//map.put("userName", Arrays.toString(roleArray));
+		map.put("test", test);
+		map.put("userName", roleArray);
+		map.put("statym", paramMap.get("statym"));
+		map.put("actiontype", paramMap.get("actionType"));
+		map.put("userId", paramMap.get("userId"));
+		map.put("coCd", paramMap.get("coCd"));
+		
+		return qm02Mapper.select_stock_modal(map);
 	}
 	
 	//그리드 검색
@@ -68,11 +91,11 @@ public class QM02SvcImpl implements QM02Svc {
 		return qm02Mapper.select_soojung_modal(paramMap);
 	}
 	
-//	//조건값 검색
-//	@Override
-//	public List<Map<String, String>> select_userName(Map<String, String> paramMap) {
-//		return qm02Mapper.select_userName(paramMap);
-//	}
+	//그리드 검색
+	@Override
+	public List<Map<String, String>> select_cobtp_modal(Map<String, String> paramMap) {
+		return qm02Mapper.select_cobtp_modal(paramMap);
+	}
 	
 	//그리드 검색
 	@Override
@@ -102,6 +125,7 @@ public class QM02SvcImpl implements QM02Svc {
 		map.put("test", test);
 		map.put("userName", roleArray);
 		map.put("userId", paramMap.get("userId"));
+		map.put("coCd", paramMap.get("coCd"));
 		map.put("strDate", paramMap.get("strDate"));
 		map.put("endDate",paramMap.get("endDate"));
 		map.put("statyy",paramMap.get("statyy"));

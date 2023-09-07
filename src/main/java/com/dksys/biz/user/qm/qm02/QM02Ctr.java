@@ -62,6 +62,14 @@ public class QM02Ctr {
 		}
 	
 	//팝업 그리드 검색
+	@PostMapping(value = "/select_cobtp_modal")
+	public String select_cobtp_modal(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = qm02svc.select_cobtp_modal(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+		
+	//팝업 그리드 검색
 	@PostMapping(value = "/select_all_modal")
 	public String select_all_modal(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> result = qm02svc.select_all_modal(paramMap);

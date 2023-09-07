@@ -19,10 +19,13 @@ public interface QM02Mapper {
     List<Map<String, Object>> selectWhCd(Map<String, String> paramMap);
 
     //그리드 검색
-	List<Map<String, String>> select_stock_modal(Map<String, String> paramMap);
+	List<Map<String, String>> select_stock_modal(HashMap<String, Object> map);
 
 	//그리드 검색
 	List<Map<String, String>> select_soojung_modal(Map<String, String> paramMap);
+	
+	//그리드 검색
+	List<Map<String, String>> select_cobtp_modal(Map<String, String> paramMap);
 		
 	//그리드 검색
 	List<Map<String, String>> select_all_modal(Map<String, String> paramMap);

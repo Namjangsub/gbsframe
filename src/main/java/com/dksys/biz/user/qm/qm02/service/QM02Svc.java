@@ -24,6 +24,9 @@ public interface QM02Svc {
 	
 	// 그리드 검색
 	List<Map<String, String>> select_soojung_modal(Map<String, String> paramMap);
+	 
+	// 그리드  검색
+	List<Map<String, String>> select_cobtp_modal(Map<String, String> paramMap);
 		
 	 // 그리드  검색
 	List<Map<String, String>> select_all_modal(Map<String, String> paramMap);
