@@ -67,4 +67,6 @@ public interface CR02Mapper {
     
     List<Map<String, Object>> selectItemSalesCodeTreeList(Map<String, String> param);
 
+	void callUpdateOrdrsNo(Map<String, String> param);
+
 }
