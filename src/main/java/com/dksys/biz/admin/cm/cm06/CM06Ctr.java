@@ -5,6 +5,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
+import javax.servlet.http.HttpServletRequest;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
@@ -47,7 +49,9 @@ public class CM06Ctr {
     
     // 사용자 리스트 조회
     @PostMapping("/insertPgmHistory")
-    public String insertPgmHistory(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    public String insertPgmHistory(@RequestBody Map<String, String> paramMap, HttpServletRequest servletRequest, ModelMap model) {
+    	String clientIp = servletRequest.getRemoteAddr();
+    	paramMap.put("clientIp", clientIp);
     	cm06Svc.insertPgmHistory(paramMap);
     	return "jsonView";
     }

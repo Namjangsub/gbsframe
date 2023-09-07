@@ -999,7 +999,7 @@ function insertPgmHistory(url) {
 	var formData = {
 		"id" : jwt.userId,
 		"name" : jwt.userNm,
-		"pgmId" : url.substr(url.lastIndexOf("/")+1,9)
+		"pgmId" : url.substr(url.lastIndexOf("/")+1).replace(".html", "")
 	}
 	postAjax("/admin/cm/cm06/insertPgmHistory", formData, null, function(data){
 
