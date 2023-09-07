@@ -40,5 +40,5 @@ public interface WB21Mapper {
 	
 	int sjCloseN(Map<String, String> paramMap);
 	
-	
+	List<Map<String, String>> selectSjVerNoNext(Map<String, String> paramMap);
 }

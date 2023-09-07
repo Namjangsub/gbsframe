@@ -138,4 +138,34 @@ public class WB21SvcImpl implements WB21Svc {
 	    return result;
 	}
 	
+	@Override
+	public int sjVerUpInsert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	
+		int fileTrgtKey = wb21Mapper.selectSjSeqNext(paramMap);
+		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+		
+		Gson gson = new Gson(); 
+		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
+		if (sharngArr != null && sharngArr.size() > 0 ) {
+			int i = 0;
+	        for (Map<String, String> sharngMap : sharngArr) {
+	            try {
+	            	    wb21Mapper.insertSjDtlList(sharngMap);
+	            	i++;
+	            } catch (Exception e) {
+	                System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
+
+		int result = wb21Mapper.sjInsert(paramMap);
+	    return result;
+	}
+	
+	@Override
+    public List<Map<String, String>> selectSjVerNoNext(Map<String, String> paramMap) {
+  		return wb21Mapper.selectSjVerNoNext(paramMap);
+    }
+	
 }

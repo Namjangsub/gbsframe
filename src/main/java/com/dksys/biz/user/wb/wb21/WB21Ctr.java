@@ -151,4 +151,28 @@ public class WB21Ctr {
   		}
   		return "jsonView";
     }
+    
+    @PostMapping(value = "/sjVerUpInsert")
+    public String sjVerUpInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (wb21Svc.sjVerUpInsert(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  		} else {
+  			model.addAttribute("resultCode", 500);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  		    model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }
+    
+    @PostMapping(value = "/selectSjVerNoNext") 
+    public String selectSjVerNoNext(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    List<Map<String, String>> result = wb21Svc.selectSjVerNoNext(paramMap);
+	    model.addAttribute("result", result); 
+	    return "jsonView"; 		 
+    }
 }

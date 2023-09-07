@@ -33,5 +33,8 @@ public interface WB21Svc {
 	
 	int sjConfirmN(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
+	int sjVerUpInsert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	
+	List<Map<String, String>> selectSjVerNoNext(Map<String, String> paramMap);
 	
 }
