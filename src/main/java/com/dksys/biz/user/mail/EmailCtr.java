@@ -27,6 +27,9 @@ public class EmailCtr {
 
 	@Value("${spring.mailType}")
 	private String mailType;
+	
+    @Value("${spring.fileAttached}")
+    private String fileAttached;
 	    
     //메일 전송 처리 컨트롤러 
     @PostMapping(value = "/sendMailSimple")
@@ -74,5 +77,13 @@ public class EmailCtr {
 			}
 		}
 		return "jsonView";
-    }        
+    }
+	//메일에 파일 첨부 여부 체크 
+	@PostMapping(value = "/sendFilefileAttach")
+	public String sendFilefileAttach(@RequestParam Map<String, String> paramMap, ModelMap model) throws Exception {
+		model.addAttribute("resultCode", 200);
+		model.addAttribute("resultMessage", messageUtils.getMessage("check"));
+		model.addAttribute("fileAttached", fileAttached);
+		return "jsonView";
+    }                
 }

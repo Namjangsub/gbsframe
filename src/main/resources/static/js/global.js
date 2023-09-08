@@ -470,6 +470,26 @@ function ubiExportAjax(fileName, arg, callback) {
 	});
 }
 
+function ubiExportAjaxSync(fileName, arg, callback) {
+	var url = ubiprefix + "/ubiexport.jsp";
+	url += "?file="+fileName;
+	url += "&arg="+encodeURIComponent(arg);
+	// Report 서버에 요청 보내기
+	$.ajax({
+		url: url,
+		method: "GET",
+		dataType: "html",
+	    async: false,
+		success: function(result) {
+			callback(JSON.parse(result));
+//	    	callback(result);
+		},
+		error: function(result) {
+			callback(JSON.parse(result));
+		}
+	});
+}
+
 
 function downloadPDFFromBase64(base64Data, fileName) {
 	var byteCharacters = atob(base64Data); // Base64 디코딩

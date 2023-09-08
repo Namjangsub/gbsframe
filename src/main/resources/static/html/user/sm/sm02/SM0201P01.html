@@ -27,9 +27,27 @@
     cursor: pointer
 }
 
-* input[comma] {
-  text-align: right;
- }
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 9999; /* Adjust the z-index to position it above other content */
+}
+
+.modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: white;
+    padding: 20px;
+    border: 1px solid #ccc;
+    z-index: 10000; /* Adjust the z-index to position it above the overlay */
+}
 </style>
 
 <div class="popup_area of_a" style="width: 100%; height: 100%;">
@@ -260,7 +278,13 @@
 		<button type="button" class="close_btn"
 			onclick="modalStack.close();">닫기</button>
 	</div>
-
+	      
+	<!-- 메일발송중 -->      
+	<div class="modal-overlay" id="modalOverlay" style="display:none;"></div>
+    <!-- Modal content -->
+    <div class="modal-content" id="modalContent" style="display:none;">
+    	<h1><i class="fa fa-spinner fa-spin"></i> 메일자료 준비 중입니다...</h1>
+    </div>`
 <script type="text/javascript">
   
 //전역초기화  
@@ -1282,15 +1306,35 @@ function setReportMain(_type) {
 		});
 	}
 }	
+debugger;
 
 function sendMailCall() {
-	
-	const objChk = $('#modalContent').text();
-	//중복 생성 방지용
-	if (!objChk) progressBarModal();
-	//작업중 표시
 	$("#modalOverlay").show();
 	$("#modalContent").show();
+
+	try {
+        sendMailExec();
+    } catch (error) {
+    	console.log(error);
+    } finally {
+        $("#modalOverlay").hide();
+        $("#modalContent").hide();
+    }
+}
+
+async function sendMailExec() {
+	//작업중 표시
+// 	const objChk = $('#modalContent').text();
+// 	if (!objChk) progressBarModal();
+debugger;
+	//파일 첨부 여부(application.yml파일의 spring.fileAttached=YES or NO)
+	//****************************************************************
+	let fileAttached = false;
+	let paramData = {"coCd#":$('#coCd').val()};
+	postAjaxSync ("/mail/sendFilefileAttach", paramData, null, function(data) {
+		fileAttached = (data.resultCode == "200") ? data.fileAttached : true;
+	});
+	//****************************************************************
 	
 	var fileName = "SM0201R01.jrf";
 	var arg =  
@@ -1301,50 +1345,62 @@ function sendMailCall() {
 
 	var tempUrl = "?file="+fileName;
 		tempUrl += "&arg="+encodeURIComponent(arg);
-	ubiExportAjax(fileName, arg, function(response) {
-		var fileName = "";
-		var attachFile="";
+		
+	//****************************************************************
+	// Report 출력물을 PDF 파일로 변환
+	//****************************************************************	
+	var attachFile="";
+	if (fileAttached == "true") { //파일 첨부일 경우 PDF 변환
+		let response = "";
+		await ubiExportAjaxSync(fileName, arg, function(result) {
+			response=result;
+		});
 		if (response.resultCode === 200) {
 			const base64FileData = response.base64FileData;
 			fileName = response.exportFileName;
 			attachFile = downloadPDFFromBase64(base64FileData, fileName);
 		} else {
-// 			alert('PDF 내보내기 실패: ' + response.resultText);
 			console.log('PDF 내보내기 실패: ' + response.resultText);
-		}    		
-		const orderCnt = gridViewPop.target.getList().length;
-		var ordetTxt = gridViewPop.target.getList()[0].matrNm;
-		
-		ordetTxt = ordetTxt + ((orderCnt > 1) ? (" 외 " + (orderCnt - 1) + "건") : "");
+		}
+	}
+	//****************************************************************	
+	
+	const orderCnt = gridViewPop.target.getList().length;
+	var ordetTxt = gridViewPop.target.getList()[0].matrNm;
+	
+	ordetTxt = ordetTxt + ((orderCnt > 1) ? (" 외 " + (orderCnt - 1) + "건") : "");
 
-        var paramObj = {
-           "coCd" : $('#coCd_S').val(),
-           "file" : attachFile,
-           "fileName" : fileName,
-           "tempUrl" : tempUrl,
-           "mailTitle" : moment().format('YYYY-MM-DD HH:mm') + " 기준  발주번호 (" + $('#ordrgNo').val() + ")의 발주서 발송의 건",
-           "mailCnts" : ordetTxt + "의 발주서를 첨부와 같이 보내 드리오니 업무 참고 바랍니다.\n\n" +
-           				"        - 아 래 -\n\n" +
-                        " 1. 발주 번호 : " + $('#ordrgNo').val() + "\n\n" +            
-                        " 2. 발주 일자 : " + $('#ordrgDt').val() + "\n\n" + 
-                        " 3. 납기요청일자 : " + $('#dudtDeqDt').val() + "\n\n" + 
-                        " 3. 발주 업체 : " + $('#pchsClntNm').val() + "\n\n" + 
-                        " 4. 발주 금액 : " + $('#ordrgAmt').val() + "\n\n" + 
-                        " 5. 발주 내용 : " + ordetTxt + "\n\n" + 
-                        " 6. 발주 담당자 : " + jwt.userNm + "\n\n" + 
-                        " 내용 확인 후 처리 해 주시기 바랍니다.\n\n" +               
-                        " 감사합니다.",
-                        
-        };
-        
-        	
-        openSecondModal("/static/html/cmn/modal/mailSend.html", 640, 710, "메일 보내기", paramObj, function() {
-        });
-			//작업중 숨기기
-			$("#modalOverlay").hide();
-		    $("#modalContent").hide();
-	});
+    var paramObj = {
+       "coCd" : $('#coCd_S').val(),
+       "tempUrl" : tempUrl,
+       "mailTitle" : moment().format('YYYY-MM-DD HH:mm') + " 기준  발주번호 (" + $('#ordrgNo').val() + ")의 발주서 발송의 건",
+       "mailCnts" : ordetTxt + "의 발주서를 첨부와 같이 보내 드리오니 업무 참고 바랍니다.\n\n" +
+       				"        - 아 래 -\n\n" +
+                    " 1. 발주 번호 : " + $('#ordrgNo').val() + "\n\n" +            
+                    " 2. 발주 일자 : " + $('#ordrgDt').val() + "\n\n" + 
+                    " 3. 납기요청일자 : " + $('#dudtDeqDt').val() + "\n\n" + 
+                    " 3. 발주 업체 : " + $('#pchsClntNm').val() + "\n\n" + 
+                    " 4. 발주 금액 : " + $('#ordrgAmt').val() + "\n\n" + 
+                    " 5. 발주 내용 : " + ordetTxt + "\n\n" + 
+                    " 6. 발주 담당자 : " + jwt.userNm + "\n\n" + 
+                    " 내용 확인 후 처리 해 주시기 바랍니다.\n\n" +               
+                    " 감사합니다.",
+                    
+    };
+    
+   	//****************************************************************
+   	// 파일 첨부 여부에 따라 출력물 첨부
+   	//****************************************************************	   
+	if (fileAttached == "true") { //파일 첨부 여부
+		paramObj["file"]     = attachFile;
+		paramObj["fileName"] = fileName;
+	}
+   	//****************************************************************
+       	
+	openSecondModal("/static/html/cmn/modal/mailSend.html", 640, 710, "메일 보내기", paramObj, function() {});
+ 
 }	
+
 
 function progressBarModal () {
 
