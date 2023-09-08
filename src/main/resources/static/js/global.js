@@ -63,6 +63,7 @@ var mask = new ax5.ui.mask();
 var modal = new ax5.ui.modal();
 var secondModal = new ax5.ui.modal();
 var thirdModal = new ax5.ui.modal();
+var blindModal = new ax5.ui.modal();
 var commonModal = {};
 
 // 모달 스택
@@ -187,6 +188,34 @@ var openThirdModal = function(url, width, height, title, paramObj, callback) {
 	                }
 	            }
 	        }
+	    },
+        width: width,
+        height: height,
+        closeToEsc: false,
+        onStateChanged: function () {
+        	if (this.state === "open") {
+        		var modalObj = {
+                	"target": this.self,
+                	"paramObj": paramObj,
+                	"callback": callback
+                }
+                modalStack.push(modalObj);
+        	}
+        }
+    }, function () {
+    	var targetEl = this.$["body-frame"];
+    	$.get(url, function(data) {
+    		targetEl.append(data);
+      	});
+    });
+};
+
+var openBlindModal = function(url, width, height, title, paramObj, callback) {
+	blindModal.open({
+		header: {
+			title: title,
+			btns: {close: {}
+            }
 	    },
         width: width,
         height: height,
