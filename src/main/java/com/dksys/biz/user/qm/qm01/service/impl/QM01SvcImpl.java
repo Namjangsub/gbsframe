@@ -237,7 +237,7 @@ public class QM01SvcImpl implements QM01Svc {
 	Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
 
 	 paramMap.put("reqNo", paramMap.get("rsltNo")); //번호
-	 paramMap.put("coCd", paramMap.get("resCoCd")); //회사
+	 //paramMap.put("coCd", paramMap.get("resCoCd")); //회사
 	 paramMap.put("salesCd", paramMap.get("matrDrwNo")); //회사
 	//---------------------------------------------------------------  
 	//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
@@ -246,7 +246,7 @@ public class QM01SvcImpl implements QM01Svc {
     HashMap<String, String> param = new HashMap<>();
     param.put("userId", paramMap.get("userId"));
     param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
-    param.put("coCd", paramMap.get("resCoCd")); //회사
+    param.put("coCd", paramMap.get("coCd")); //회사
     
 	List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
 	if (uploadFileList.size() > 0) {
@@ -296,7 +296,7 @@ public class QM01SvcImpl implements QM01Svc {
             	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
             	    sharngMap.put("pgmId", paramMap.get("pgmId"));
             	    sharngMap.put("userId", paramMap.get("userId"));
-            	    sharngMap.put("todoCoCd", paramMap.get("resCoCd"));
+            	    sharngMap.put("todoCoCd", paramMap.get("coCd"));
             	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
             	    sharngMap.put("pgParam", pgParam1);
                 	QM01Mapper.insertWbsSharngList(sharngMap);       		
@@ -323,7 +323,7 @@ public class QM01SvcImpl implements QM01Svc {
 	            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 	            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 	            	approvalMap.put("userId", paramMap.get("userId"));
-	            	approvalMap.put("todoCoCd", paramMap.get("resCoCd"));
+	            	approvalMap.put("todoCoCd", paramMap.get("coCd"));
 	            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
 	            	approvalMap.put("pgParam", pgParam2);
                 	QM01Mapper.insertWbsApprovalList(approvalMap);       		
@@ -519,7 +519,7 @@ public class QM01SvcImpl implements QM01Svc {
 	            	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
 	            	    sharngMap.put("userId", paramMap.get("userId"));
-	            	    sharngMap.put("todoCoCd", paramMap.get("resCoCd"));
+	            	    sharngMap.put("todoCoCd", paramMap.get("coCd"));
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
 	            	    sharngMap.put("pgParam", pgParam1);
 	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
@@ -547,7 +547,7 @@ public class QM01SvcImpl implements QM01Svc {
 		            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 		            	approvalMap.put("userId", paramMap.get("userId"));
-		            	approvalMap.put("todoCoCd", paramMap.get("resCoCd"));
+		            	approvalMap.put("todoCoCd", paramMap.get("coCd"));
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
 		            	approvalMap.put("pgParam", pgParam2);
 	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
