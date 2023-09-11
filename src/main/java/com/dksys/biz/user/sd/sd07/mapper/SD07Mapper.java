@@ -8,23 +8,10 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface SD07Mapper {
 
-	Map<String, String> selectClose(Map<String, String> paramMap);
-	Map<String, String> selectMaxCloseDay(Map<String, String> paramMap);
-
+	List<Map<String, String>> selectCloseYmList(Map<String, String> paramMap);
+	
 	int saveClose(Map<String, String> paramMap);
 
-	int deleteStockClose(Map<String, String> paramMap);
-	
-	int insertStockClose(Map<String, String> paramMap);
-
-	int deleteCreditClose(Map<String, String> paramMap);
-
-	int insertCreditClose(Map<String, String> paramMap);
-
-	int insertCreditClosePur(Map<String, String> paramMap);
-
-	int chkBilgFlagYn(Map<String, String> paramMap);
-
-	List<Map<String, String>> selectCloseYmList(Map<String, String> paramMap);
+	List<Map<String, String>> selectCloseLastYm(Map<String, String> paramMap);
 
 }

@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.sm.sm19.mapper.SM19Mapper">
+	<!-- 그리드 조회 카운트-->
+    <select id="select_sm19_Count" parameterType="Map" resultType="int">
+		SELECT count(*)
+		FROM   (
+				SELECT A.*
+				     , ROWNUM AS RN
+				FROM   (
+						SELECT A.CO_CD
+							, A.CO_NM
+							, A.WH_CD
+							, A.WH_NM
+							, TO_CHAR(A.INOUT_DT, 'YYYY-MM-DD') AS INOUT_DT
+							, A.INOUT_DIV
+							, A.INOUT_DIV_NM
+							, A.CLNT_CD
+							, CASE WHEN A.INOUT_DIV IN ('INOUTDIV_I01', 'INOUTDIV_I02', 'INOUTDIV_O07', 'INOUTDIV_O08') THEN A.CLNT_NM
+									ELSE ''
+							END AS CLNT_NM
+							, A.SALES_CD
+							, A.DSGN_NO
+							, A.RECNPY_QTY
+							, A.PART_NUMBER
+							, CASE WHEN A.PART_GUBUN = 'P' THEN PROD_NM
+									WHEN A.PART_GUBUN = 'M' THEN MATR_NM
+															ELSE ''
+							END AS PART_NUMBER_NM
+							, CASE WHEN A.PART_GUBUN = 'P' THEN REPLACE(('['||R1.CODE_NM||'] ['||P.PRDT_NM||'] ['||R2.CODE_NM||'] ['||R3.CODE_NM||'] ['||R4.CODE_NM||']'), '[]', '')
+									WHEN A.PART_GUBUN = 'M' THEN REPLACE(('['||A.MATR_SPEC||'] ['||A.MATR_MAT||'] ['||A.MATR_MAKR_NM||'] ['||A.MATR_MNO||'] ['||A.MATR_SIZE||']'), '[]', '')
+															ELSE ''
+							END AS PART_NUMBER_INFO
+							, A.INOUT_PRC
+							, A.INOUT_AMT
+							, A.CURR_CD
+							, A.CURR_NM
+							, A.EXRATE
+							, A.ORDRG_NO
+							, A.ORDRG_SEQ
+							, A.IN_NO
+							, A.IN_SEQ
+							, A.RET_NO
+							, A.RET_SEQ
+							, A.ORDRS_NO
+							, A.ORDRS_SEQ
+							, A.OUT_NO
+							, A.OUT_SEQ
+							, A.IO_NO
+							, A.IO_SEQ
+							, A.ADJ_NO
+							, A.ADJ_SEQ
+							, A.CHG_NO
+							, R5.CODE_NM AS MATR_UNIT_NM
+						FROM   (
+								SELECT R1.CODE_NM AS CO_NM
+									, R2.CODE_NM AS INOUT_DIV_NM
+									, C.CLNT_NM
+									, R3.CODE_NM AS WH_NM
+									, R4.CODE_NM AS CURR_NM
+									, CASE WHEN NVL(M1.FILE_TRGT_KEY, 0) = 0 AND NVL(M2.FILE_TRGT_KEY, 0) = 0 THEN 'N'
+											WHEN NVL(M1.FILE_TRGT_KEY, 0) = 0                                  THEN 'M'
+											WHEN NVL(M2.FILE_TRGT_KEY, 0) = 0                                  THEN 'P'
+																											ELSE 'N'
+									END AS PART_GUBUN
+									, M1.PROD_NM
+									, M1.CLNT_PJT
+									, M1.GOODS_DIV
+									, M1.PRDT_CD
+									, M1.ITEM_DIV
+									, M1.PROD_DTL_DIV20
+									, M1.PROD_DTL_DIV30
+									, M2.MATR_NM
+									, M2.MATR_SPEC
+									, M2.MATR_MAT
+									, M2.MATR_MAKR_NM
+									, M2.MATR_MNO
+									, M2.MATR_SIZE
+									, M2.MATR_UNIT
+									, NVL(A.INOUT_QTY, 0) AS RECNPY_QTY
+									, A.*
+								FROM   TB_BM30M01 AS A
+									LEFT OUTER JOIN TB_BM02M01 AS C  ON A.CLNT_CD = C.CLNT_CD
+									LEFT OUTER JOIN TB_BM10M01 AS M1  ON M1.CO_CD   = A.CO_CD
+																		AND M1.PROD_CD = A.PART_NUMBER
+									LEFT OUTER JOIN TB_BM05M01 AS M2  ON M2.CO_CD   = A.CO_CD
+																		AND M2.MATR_CD = A.PART_NUMBER
+									LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.CO_CD 
+									LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.INOUT_DIV 
+									LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.WH_CD 
+									LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = A.CURR_CD 
+								WHERE  1 = 1
+								<if test="coCd != null and !coCd.equals('')">
+								AND    A.CO_CD = #{coCd}
+								</if>
+								<if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')" >
+								AND    A.INOUT_DT BETWEEN TO_DATE( #{strtDt},'YYYYMMDD') AND TO_DATE( #{endDt},'YYYYMMDD')
+								</if>
+								<if test="whCd != null and !whCd.equals('')">
+								AND    A.WH_CD = #{whCd}
+								</if>
+								<if test="inoutTyp != null and !inoutTyp.equals('')">
+								AND    A.INOUT_TYP = #{inoutTyp}
+								</if>
+								<if test="inoutDiv != null and !inoutDiv.equals('')">
+								AND    A.INOUT_DIV = #{inoutTyp}
+								</if>
+								<if test="salesCd != null and !salesCd.equals('')">
+								AND    A.SALES_CD LIKE '%' || #{salesCd} || '%'
+								</if>
+								ORDER BY A.CO_CD, A.WH_CD, A.INOUT_DT, A.INOUT_DIV, A.PART_NUMBER
+							) AS A
+							LEFT OUTER JOIN TB_BM01M01 AS P  ON P.PRDT_CD = A.PRDT_CD 
+							LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.CLNT_PJT 
+							LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.ITEM_DIV
+							LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.PROD_DTL_DIV20
+							LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = A.PROD_DTL_DIV30
+							LEFT OUTER JOIN TB_CM05M01 AS R5 ON R5.CODE_ID = A.MATR_UNIT
+						WHERE  1 = 1
+						AND    A.RECNPY_QTY > 0
+						ORDER BY A.CO_CD, A.WH_CD, A.INOUT_DT, A.INOUT_DIV, A.PART_NUMBER
+					   ) AS A
+				WHERE  1 = 1
+		       ) AS A
+		WHERE  1 = 1
+    </select>
+
+	<!-- 그리드 조회 -->
+	<select id="select_sm19_List" parameterType="Map" resultType="camelMap">
+		SELECT A.*
+		FROM   (
+				SELECT A.*
+				     , ROWNUM AS RN
+				FROM   (
+						SELECT A.CO_CD
+							, A.CO_NM
+							, A.WH_CD
+							, A.WH_NM
+							, TO_CHAR(A.INOUT_DT, 'YYYY-MM-DD') AS INOUT_DT
+							, A.INOUT_DIV
+							, A.INOUT_DIV_NM
+							, A.CLNT_CD
+							, CASE WHEN A.INOUT_DIV IN ('INOUTDIV_I01', 'INOUTDIV_I02', 'INOUTDIV_O07', 'INOUTDIV_O08') THEN A.CLNT_NM
+									ELSE ''
+							END AS CLNT_NM
+							, A.SALES_CD
+							, A.DSGN_NO
+							, A.RECNPY_QTY
+							, A.PART_NUMBER
+							, CASE WHEN A.PART_GUBUN = 'P' THEN PROD_NM
+									WHEN A.PART_GUBUN = 'M' THEN MATR_NM
+															ELSE ''
+							END AS PART_NUMBER_NM
+							, CASE WHEN A.PART_GUBUN = 'P' THEN REPLACE(('['||R1.CODE_NM||'] ['||P.PRDT_NM||'] ['||R2.CODE_NM||'] ['||R3.CODE_NM||'] ['||R4.CODE_NM||']'), '[]', '')
+									WHEN A.PART_GUBUN = 'M' THEN REPLACE(('['||A.MATR_SPEC||'] ['||A.MATR_MAT||'] ['||A.MATR_MAKR_NM||'] ['||A.MATR_MNO||'] ['||A.MATR_SIZE||']'), '[]', '')
+															ELSE ''
+							END AS PART_NUMBER_INFO
+							, A.INOUT_PRC
+							, A.INOUT_AMT
+							, A.CURR_CD
+							, A.CURR_NM
+							, A.EXRATE
+							, A.ORDRG_NO
+							, A.ORDRG_SEQ
+							, A.IN_NO
+							, A.IN_SEQ
+							, A.RET_NO
+							, A.RET_SEQ
+							, A.ORDRS_NO
+							, A.ORDRS_SEQ
+							, A.OUT_NO
+							, A.OUT_SEQ
+							, A.IO_NO
+							, A.IO_SEQ
+							, A.ADJ_NO
+							, A.ADJ_SEQ
+							, A.CHG_NO
+							, R5.CODE_NM AS MATR_UNIT_NM
+						FROM   (
+								SELECT R1.CODE_NM AS CO_NM
+									, R2.CODE_NM AS INOUT_DIV_NM
+									, C.CLNT_NM
+									, R3.CODE_NM AS WH_NM
+									, R4.CODE_NM AS CURR_NM
+									, CASE WHEN NVL(M1.FILE_TRGT_KEY, 0) = 0 AND NVL(M2.FILE_TRGT_KEY, 0) = 0 THEN 'N'
+											WHEN NVL(M1.FILE_TRGT_KEY, 0) = 0                                  THEN 'M'
+											WHEN NVL(M2.FILE_TRGT_KEY, 0) = 0                                  THEN 'P'
+																											ELSE 'N'
+									END AS PART_GUBUN
+									, M1.PROD_NM
+									, M1.CLNT_PJT
+									, M1.GOODS_DIV
+									, M1.PRDT_CD
+									, M1.ITEM_DIV
+									, M1.PROD_DTL_DIV20
+									, M1.PROD_DTL_DIV30
+									, M2.MATR_NM
+									, M2.MATR_SPEC
+									, M2.MATR_MAT
+									, M2.MATR_MAKR_NM
+									, M2.MATR_MNO
+									, M2.MATR_SIZE
+									, M2.MATR_UNIT
+									, NVL(A.INOUT_QTY, 0) AS RECNPY_QTY
+									, A.*
+								FROM   TB_BM30M01 AS A
+									LEFT OUTER JOIN TB_BM02M01 AS C  ON A.CLNT_CD = C.CLNT_CD
+									LEFT OUTER JOIN TB_BM10M01 AS M1  ON M1.CO_CD   = A.CO_CD
+																		AND M1.PROD_CD = A.PART_NUMBER
+									LEFT OUTER JOIN TB_BM05M01 AS M2  ON M2.CO_CD   = A.CO_CD
+																		AND M2.MATR_CD = A.PART_NUMBER
+									LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.CO_CD 
+									LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.INOUT_DIV 
+									LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.WH_CD 
+									LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = A.CURR_CD 
+								WHERE  1 = 1
+								<if test="coCd != null and !coCd.equals('')">
+								AND    A.CO_CD = #{coCd}
+								</if>
+								<if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')" >
+								AND    A.INOUT_DT BETWEEN TO_DATE( #{strtDt},'YYYYMMDD') AND TO_DATE( #{endDt},'YYYYMMDD')
+								</if>
+								<if test="whCd != null and !whCd.equals('')">
+								AND    A.WH_CD = #{whCd}
+								</if>
+								<if test="inoutTyp != null and !inoutTyp.equals('')">
+								AND    A.INOUT_TYP = #{inoutTyp}
+								</if>
+								<if test="inoutDiv != null and !inoutDiv.equals('')">
+								AND    A.INOUT_DIV = #{inoutDiv}
+								</if>
+								<if test="salesCd != null and !salesCd.equals('')">
+								AND    A.SALES_CD LIKE '%' || #{salesCd} || '%'
+								</if>
+								ORDER BY A.CO_CD, A.WH_CD, A.INOUT_DT, A.INOUT_DIV, A.PART_NUMBER
+							) AS A
+							LEFT OUTER JOIN TB_BM01M01 AS P  ON P.PRDT_CD = A.PRDT_CD 
+							LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.CLNT_PJT 
+							LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.ITEM_DIV
+							LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.PROD_DTL_DIV20
+							LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = A.PROD_DTL_DIV30
+							LEFT OUTER JOIN TB_CM05M01 AS R5 ON R5.CODE_ID = A.MATR_UNIT
+						WHERE  1 = 1
+						AND    A.RECNPY_QTY > 0
+						ORDER BY A.CO_CD, A.WH_CD, A.INOUT_DT, A.INOUT_DIV, A.SALES_CD, A.DSGN_NO, A.PART_NUMBER
+					   ) AS A
+				WHERE  1 = 1
+		       ) AS A
+		WHERE  1 = 1
+		AND    A.RN BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>
+
+	<!-- 수불유형 -->		
+	<select id="selectinoutDiv" parameterType="Map" resultType="camelMap">
+		SELECT CODE_ID AS CODE_ID
+		     , CODE_NM
+		FROM   TB_CM05M01
+		WHERE  1 = 1
+		AND    USE_YN    = 'Y'
+		AND    CODE_KIND = 'INOUTDIV'
+		<if test="codeDesc != null and !codeDesc.equals('')">
+		AND    CODE_DESC  = #{codeDesc}
+		</if>
+		ORDER BY SORT_NO
+	</select>
+
+	<!-- 창고 코드 가져오기 -->
+	<select id="selectWhCd" parameterType="Map" resultType="camelMap">
+		SELECT CODE_ID AS CODE_ID
+		     , CODE_NM
+		FROM   TB_CM05M01
+		WHERE  1 = 1
+		AND    USE_YN    = 'Y'
+		AND    CODE_KIND = 'WH'
+		AND    CODE_RPRC = 'WHDIV01'
+		<if test="codeDesc != null and !codeDesc.equals('')">
+		AND    CODE_DESC  = #{codeDesc}
+		</if>
+		ORDER BY SORT_NO
+	</select>
+
+</mapper>

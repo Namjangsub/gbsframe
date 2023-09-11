@@ -169,5 +169,18 @@ public class CR16Ctr {
     }
     
     
+    @PostMapping(value = "/selectSalesYearPlanMC2") 
+	public String selectSalesYearPlanMC2(@RequestBody Map<String, String> paramMap, ModelMap model) {	
+		  List<Map<String, String>> fileList = cr16Svc.selectSalesYearPlanMC2(paramMap);
+		  model.addAttribute("fileList", fileList);
+		  return "jsonView";
+    }
+    
+    @PostMapping(value = "/selectSalesYearPlanD2") 
+	public String selectSalesYearPlanD2(@RequestBody Map<String, String> paramMap, ModelMap model) {	
+		  List<Map<String, String>> fileList = cr16Svc.selectSalesYearPlanD2(paramMap);
+		  model.addAttribute("fileList", fileList);
+		  return "jsonView";
+    }
     
 }	  

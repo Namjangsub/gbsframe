@@ -42,6 +42,12 @@ public interface CR16Mapper {
 	int salesYearPlanCloseChkUpdateN(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectSalesYearPlanListHist(Map<String, String> paramMap);
+	
+	
+	List<Map<String, String>> selectSalesYearPlanMC2(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectSalesYearPlanD2(Map<String, String> paramMap);
+	
 }
 
 

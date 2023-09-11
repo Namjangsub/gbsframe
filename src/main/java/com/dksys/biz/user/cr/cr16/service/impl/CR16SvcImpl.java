@@ -279,4 +279,14 @@ public class CR16SvcImpl implements CR16Svc {
 	public List<Map<String, String>> selectSalesYearPlanListHist(Map<String, String> paramMap) {
 		return cr16Mapper.selectSalesYearPlanListHist(paramMap);
 	}
+    
+    @Override
+	public List<Map<String, String>> selectSalesYearPlanMC2(Map<String, String> paramMap) {
+		return cr16Mapper.selectSalesYearPlanMC2(paramMap);
+	}
+    
+    @Override
+	public List<Map<String, String>> selectSalesYearPlanD2(Map<String, String> paramMap) {
+		return cr16Mapper.selectSalesYearPlanD2(paramMap);
+	}
 }
