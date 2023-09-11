@@ -47,4 +47,6 @@ public interface WB20Mapper {
 	
 	int deleteTodoMaster(Map<String, String> param);		
 	
+	int deleteAllTodoMaster(Map<String, String> param);	
+	
 }

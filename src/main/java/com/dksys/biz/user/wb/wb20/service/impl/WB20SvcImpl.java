@@ -139,9 +139,12 @@ public class WB20SvcImpl implements WB20Svc {
 		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
 		
 		int result = 0;
-		String maxTodoKey = "";
+		String maxTodoKey = "";		
 		if( paramMap.containsKey("approvalArr") ) {		
-		//결제라인 insert
+			//수정된 부분 처리가 불가하여 전체 삭제후 저장
+			wb20Mapper.deleteTodoMaster(detailMap.get(0));
+			
+			//결제라인 insert			
 			for(Map<String, String> dtl : detailMap) {
 				//입력, 수정 
 				if( dtl.get("todoKey").equals("") ) {

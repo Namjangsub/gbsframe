@@ -1822,7 +1822,7 @@
     </select> 
                   
                   
-	<!-- 결재목록 및 결재상태 결재버튼 등 불러오기 -->
+	<!-- 결재목록 및 결재상태 결재버튼 등 불러오기 사용안함 -->
 	<select id="selectApprovalList" parameterType="Map" resultType="camelMap">
 		SELECT TODO_KEY
 			, SANCTN_SN
@@ -1943,54 +1943,47 @@
 			AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
 	</update>	 
 	
-	<!-- 결재대상자 SELECT  -->
-	<select id="selectSignResUserlst" parameterType="Map" resultType="camelMap"> 
-	  SELECT *
-	   FROM(
+	<select id="selectSignResUserlst" parameterType="Map" resultType="camelMap">	
+		SELECT *
+		  FROM(
 		SELECT
 			ROWNUM AS RNUM, A.*
 		FROM
 		(
-			SELECT   C.CO_CD
-			         , A.ID AS WBS_SHARNG_USER_ID
-			         , A.EMP_NO AS EMP_NO
-					 , A.NAME AS USR_NM
-					 , A.TEL_NO AS TEL_NO
-					 , A.EMAIL AS EMAIL
-					 , B.DEPT_NM AS DT_NM
-					 , C.TODO_NO AS RSLT_N
-					 , (SELECT D.LEVEL_NM FROM TB_CM07M01 D WHERE D.LEVEL_CD=A.LEVEL_CD) AS LEVEL_NM     /* 직급 */
+			SELECT   A.CO_CD AS WBS_PLANCO_CD,
+					 A.CO_CD,
+					 FN_CM05M01_CD_TO_NM(A.CO_CD) WBS_PLANCO_CD_NM,
+			         A.ID AS USR_NM,
+			         A.EMP_NO AS EMP_NO,
+					 A.NAME AS NAME,
+					 A.TEL_NO AS TEL_NO,
+					 A.EMAIL AS EMAIL,
+					 B.DEPT_NM AS DT_NM,
+					 D.LEVEL_NM AS JIK,
+					 C.TODO_DIV1_CODE_ID  AS TODO_DIV1_CODE_ID,
+					 DECODE(C.TODO_DIV1_CODE_ID, 'TODODIV10', '공유', 'TODODIV20', '결재', '') AS GB
 					 , C.SANCTN_STTUS
 					 , DECODE(C.SANCTN_STTUS, 'Y', '승인', 'N', '미승인', ' ') AS SANCTN_STTUS_NM
-					 , NVL(TO_CHAR(C.TODO_CF_DT, 'YYYY-MM-DD'), ' ') AS TODO_CF_DT		/* 승인일자 */
+					 , NVL(TO_CHAR(C.CREAT_DTTM, 'YYYY-MM-DD'), '') AS CREAT_DTTM		/* 요청일자 */
+					 , NVL(TO_CHAR(C.TODO_CF_DT, 'YYYY-MM-DD'), '') AS TODO_CF_DT		/* 승인일자 */
+					 , C.TODO_CF_OPN		/* 확인의견 */
 					 , C.TODO_KEY
 					 , C.SANCTN_SN
 					 , C.TODO_ID
 					 , C.TODO_DIV1_CODE_ID
 					 , C.TODO_DIV2_CODE_ID
-					 , C.SALES_CD
-					 , C.TODO_FILE_TRGT_KEY
-					 , C.PG_PARAM					 
+					 , C.SALES_CD	 
+					 , 'U' AS FLAG							 
 			FROM
-				TB_CM06M01 A 
+				TB_CM06M01 A
+				LEFT OUTER JOIN TB_CM07M01 D ON A.LEVEL_CD = D.LEVEL_CD 
 				INNER JOIN TB_CM04M01 B on A.DEPT_ID = B.DEPT_ID
-				INNER JOIN TB_WB20M03 C ON(A.ID = C.TODO_ID)
-			WHERE 1=1	
-			<if test="salesCd != null and !salesCd.equals('')">
-				AND SALES_CD = #{salesCd}                                  
-			</if>   		
-			<if test="todoNo != null and !todoNo.equals('')">
-				AND TODO_NO = #{todoNo}                                  
-			</if>   	
-			<if test="todoDiv1CodeId != null and !todoDiv1CodeId.equals('')">
-				AND C.TODO_DIV1_CODE_ID = #{todoDiv1CodeId}                                  
-			</if>  
-			<if test="todoDiv2CodeId != null and !todoDiv2CodeId.equals('')">
-				AND C.TODO_DIV2_CODE_ID = #{todoDiv2CodeId}                                  
-			</if>  														
+				INNER JOIN TB_WB20M03 C ON A.ID = C.TODO_ID
+				  AND C.TODO_FILE_TRGT_KEY = #{fileTrgtKey}
+				  AND C.TODO_NO = #{reqNo}
 			) AS a
-	  ) A
-	</select>
+		 ) A
+ 	</select>
 	
 	<!-- 결재 등록시 사용자 검색후 부서등 SELECT  -->
 	<select id="selectShareUserInfo" parameterType="Map" resultType="camelMap">
@@ -2107,5 +2100,16 @@
 			AND TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
 			AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId} 
 	</delete>			                 
-	                 
+	            
+	<!-- 결재 todo all 삭제 -->         
+	<delete id="deleteAllTodoMaster" parameterType="Map">
+		DELETE 
+			FROM TB_WB20M03
+		WHERE 1=1 
+			AND CO_CD = #{coCd}
+			AND TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
+			AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
+			AND SALES_CD = #{salesCd}
+			AND TODO_NO = #{todoNo} 
+	</delete>		                 
  </mapper>

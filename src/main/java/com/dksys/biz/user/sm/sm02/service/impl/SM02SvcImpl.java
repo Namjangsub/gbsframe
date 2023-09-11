@@ -240,7 +240,7 @@ public class SM02SvcImpl implements SM02Svc {
 		// 결재라인 처리 시작 
 		//---------------------------------------------------------------		
 		Type dtl2Map = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();		
-		if( paramMap.containsKey("approvalArr") ) {		
+		if( paramMap.containsKey("approvalArr") ) {	
 			//결제라인 insert
 			result += wb20Svc.insertTodoMaster(paramMap);							
 		}		

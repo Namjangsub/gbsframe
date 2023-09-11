@@ -113,7 +113,7 @@ public class WB20Ctr {
 		  
 	  } 
 	  
-	  // 공통 결재상태 불러오기 
+	  // 공통 결재상태 불러오기 - OLD 사용안함
 	  @PostMapping(value = "/selectGetApprovalList") 
 	  public String selectApprovalGetList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		  
