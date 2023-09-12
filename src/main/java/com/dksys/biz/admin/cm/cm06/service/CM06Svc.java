@@ -27,4 +27,8 @@ public interface CM06Svc {
 	
 	public List<Map<String, String>> selectRuleCheckList(Map<String, String> paramMap);
 	
+	public List<Map<String, String>> selectUserStatusList(Map<String, String> paramMap);
+
+	public int updateUserStatus(Map<String, String> paramMap);
+	
 }

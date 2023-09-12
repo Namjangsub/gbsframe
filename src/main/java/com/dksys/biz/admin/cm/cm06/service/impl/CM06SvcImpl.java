@@ -90,5 +90,17 @@ public class CM06SvcImpl implements CM06Svc {
 		}
 		return usrInfo;
 	}
+    
+	@Override
+	public List<Map<String, String>> selectUserStatusList(Map<String, String> paramMap) {
+		return cm06Mapper.selectUserStatusList(paramMap); 
+	}
+
+	@Override
+	public int updateUserStatus(Map<String, String> paramMap) {
+		int result = 0;
+		result += cm06Mapper.updateUserStatus(paramMap);
+		return result;
+	}
 	
 }

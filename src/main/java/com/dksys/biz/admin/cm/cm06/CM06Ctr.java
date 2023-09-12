@@ -195,4 +195,26 @@ public class CM06Ctr {
     	model.addAttribute("isExpired", "N");
     	return "jsonView";
     }
+    
+    // 개인별 상태정보
+    @PostMapping("/selectUserStatusList")
+    public String selectUserStatusList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, String>> result = cm06Svc.selectUserStatusList(paramMap);
+    	model.addAttribute("result", result);
+    	return "jsonView";
+    }
+    
+    // 개인별 상태정보 수정
+    @PutMapping("/updateUserStatus")
+    public String updateUserStatus(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int result = cm06Svc.updateUserStatus(paramMap);
+		if(result == 1) {
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+		} else {
+			model.addAttribute("resultCode", 500);
+    		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		}
+    	return "jsonView";
+    }
 }

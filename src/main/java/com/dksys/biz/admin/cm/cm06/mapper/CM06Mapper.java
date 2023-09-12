@@ -35,5 +35,9 @@ public interface CM06Mapper {
 	int updatePwErrCnt(Map<String, String> paramMap);
 
 	void updateUserN(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectUserStatusList(Map<String, String> paramMap);
+
+	int updateUserStatus(Map<String, String> paramMap);
 	
 }
