@@ -39,7 +39,7 @@ public class WB20SvcImpl implements WB20Svc {
     
 	
 	@Override
-	public int selectToDoCount(Map<String, String> paramMap) {
+	public int selectToDoCount(Map<String, String> paramMap) {;		
 		return wb20Mapper.selectToDoCount(paramMap);
 	}
 
@@ -129,7 +129,7 @@ public class WB20SvcImpl implements WB20Svc {
 	  public String selectmaxTodoKey(Map<String, String> paramMap) {
 		  return wb20Mapper.selectmaxTodoKey(paramMap);
 	  }		  
-		
+
 	  //wb20 결재 insert
 	  @Override
 	  public int insertTodoMaster(Map<String, String> paramMap) throws Exception {
@@ -141,8 +141,8 @@ public class WB20SvcImpl implements WB20Svc {
 		int result = 0;
 		String maxTodoKey = "";		
 		if( paramMap.containsKey("approvalArr") ) {		
-			//수정된 부분 처리가 불가하여 전체 삭제후 저장
-			wb20Mapper.deleteTodoMaster(detailMap.get(0));
+			//수정시 삭제된 부분만 처리가 불가하여 전체 삭제후 저장
+			wb20Mapper.deleteAllTodoMaster(detailMap.get(0));
 			
 			//결제라인 insert			
 			for(Map<String, String> dtl : detailMap) {
