@@ -1,32 +1,3 @@
-if(ax5.ui.grid){
-	// 그리드 총건수 표기 커스텀
-//	ax5.ui.grid.tmpl.page_status = function(){return '<span>총 {{totalElements}}건</span>';};
-	ax5.ui.grid.tmpl.page_status = function(){
-	    return '<span>{{{progress}}} {{fromRowIndex}} - {{toRowIndex}} of {{dataRowCount}} {{#dataRealRowCount}}  현재페이지 {{.}}{{/dataRealRowCount}} {{#totalElements}}  전체갯수 {{.}}{{/totalElements}}</span>';
-	  };
-
-	// 그리드 formatter money 커스텀
-	ax5.ui.grid.formatter["money"] = function () {
-		if (typeof this.value !== "undefined") {
-			if(typeof this.value == "number"){
-				this.value = String(parseFloat(this.value.toFixed(3)));
-			}
-		    let val = this.value;
-		    let regExpPattern = new RegExp('([0-9])([0-9][0-9][0-9][,.])');
-		    let arrNumber = val.split('.');
-		    arrNumber[0] += '.';
-
-		    do {
-		        arrNumber[0] = arrNumber[0].replace(regExpPattern, '$1,$2');
-		    } while (regExpPattern.test(arrNumber[0]));
-
-		    return (arrNumber.length > 1) ? arrNumber[0] + arrNumber[1] : arrNumber[0].split('.')[0];
-		}else{
-			return "";
-		}
-    };
-}
-
 var setCookie = function(name, value, exp) {
 	var date = new Date();
 	date.setTime(date.getTime() + exp * 24 * 60 * 60 * 1000);
@@ -59,11 +30,46 @@ var authorizationToken = getCookie("jwtToken");
 var jwt = parseJwt(authorizationToken);
 var menuIdx = getCookie("menuIdx");
 
-var mask = new ax5.ui.mask();
-var modal = new ax5.ui.modal();
-var secondModal = new ax5.ui.modal();
-var thirdModal = new ax5.ui.modal();
-var blindModal = new ax5.ui.modal();
+if (typeof ax5 !== 'undefined' && typeof ax5.ui !== 'undefined') {
+	if (typeof ax5.ui.mask === 'function') {
+		var mask = new ax5.ui.mask();
+	}
+	if (typeof ax5.ui.modal === 'function') {
+		var modal = new ax5.ui.modal();
+		var secondModal = new ax5.ui.modal();
+		var thirdModal = new ax5.ui.modal();
+		var blindModal = new ax5.ui.modal();
+	}
+	if (typeof ax5.ui.grid === 'function') {
+		// 그리드 총건수 표기 커스텀
+//		ax5.ui.grid.tmpl.page_status = function(){return '<span>총 {{totalElements}}건</span>';};
+		ax5.ui.grid.tmpl.page_status = function(){
+		    return '<span>{{{progress}}} {{fromRowIndex}} - {{toRowIndex}} of {{dataRowCount}} {{#dataRealRowCount}}  현재페이지 {{.}}{{/dataRealRowCount}} {{#totalElements}}  전체갯수 {{.}}{{/totalElements}}</span>';
+		  };
+
+		// 그리드 formatter money 커스텀
+		ax5.ui.grid.formatter["money"] = function () {
+			if (typeof this.value !== "undefined") {
+				if(typeof this.value == "number"){
+					this.value = String(parseFloat(this.value.toFixed(3)));
+				}
+			    let val = this.value;
+			    let regExpPattern = new RegExp('([0-9])([0-9][0-9][0-9][,.])');
+			    let arrNumber = val.split('.');
+			    arrNumber[0] += '.';
+
+			    do {
+			        arrNumber[0] = arrNumber[0].replace(regExpPattern, '$1,$2');
+			    } while (regExpPattern.test(arrNumber[0]));
+
+			    return (arrNumber.length > 1) ? arrNumber[0] + arrNumber[1] : arrNumber[0].split('.')[0];
+			}else{
+				return "";
+			}
+	    };
+	}
+
+}
 var commonModal = {};
 
 // 모달 스택
@@ -1054,21 +1060,6 @@ function insertPgmHistory(url) {
 
 	});
 }
-
-// function callReport(fileName, arg, width, height, multicount, ismultireport){
-// 	var url = ubiprefix + "/ubihtml.jsp";
-// 	url += "?file="+fileName;
-// 	url += "&arg="+encodeURIComponent(arg);
-// 	url += "&multicount=" + multicount;
-// 	url += "&ismultireport=" + ismultireport;
-// 	if (width ==""){
-// 		width = 900;
-// 	}
-// 	if (height ==""){
-// 		height = 900;
-// 	}
-// 	popCenter(url, "report", width, height, "yes");
-// }
 
 function callReport(fileName, arg, width, height){
 	var url = ubiprefix + "/ubihtml.jsp";
