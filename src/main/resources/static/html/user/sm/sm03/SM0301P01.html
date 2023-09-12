@@ -101,15 +101,15 @@
 				</div>			
 			</td>			
 			-->	
-			<th class="hit">환율</th>
-			<td>
-				<input type="text" id="exrate_I" name="exrate_I"  class="form-control" data-search="exrate" required="required" data-ax5formatter="money" maxlength="13"  msg="환율" comma />
-			</td>
 			<th class="hit">통화단위</th>
 			<td>
-				<select id="currCd_I" name="currCd_I" data-kind="CURR" class="form-control" data-search="currCd" required="required" msg="통화단위">
+				<select id="currCd" name="currCd" data-kind="CURR" class="form-control" data-search="currCd" required="required" msg="통화단위">
 			      <option value="">전체</option>
 				</select>	
+			</td>			
+			<th class="hit">환율</th>
+			<td>
+				<input type="text" id="exrate" name="exrate"  class="form-control" data-search="exrate" required="required" data-ax5formatter="money" maxlength="13"  msg="환율" comma />
 			</td>			
 		</tr>
 		<tr>		
@@ -170,6 +170,7 @@ var secondGrid = null;
 var userId = null;
 var userNm = null;
 var fileTrgtKeyU = null;
+var currToday = [];
 	
 var gridViewPop = {
     	initView: function(){
@@ -226,6 +227,9 @@ var gridViewPop = {
 					            		gridViewPop.target.setValue(row, "sInspecQty", sInspecQty);
 				            		}
 				            		*/
+		            				var sInQty = parseInt( this.item.inQty );
+				            		gridViewPop.target.setValue(row, "sInQty", sInQty);		
+				            		gridViewPop.target.setValue(row, "sInspecQty", sInQty);				            		
 			            		} else {
 								    gridViewPop.target.setValue(row, "inDtlAmt", "");		            			
 			            		}
@@ -486,8 +490,8 @@ function makeFormData() {
 	var formData = new FormData($("#popForm")[0]);
 	// 기본값 set
 	formData.append("userId", jwt.userId);
-	formData.append("currCd", $("#currCd_I").val());
-	formData.append("exrate", $("#exrate_I").val());
+	formData.append("currCd", $("#popForm #currCd").val());
+	formData.append("exrate", $("#popForm #exrate").val());
 	formData.append("ioDiv", $("#ioDiv_I").val());
 	formData.append("coCd", $("#coCd_I").val());
 	formData.append("salesCd", $("#salesCd_I").val());	
@@ -590,10 +594,23 @@ $(document).ready(function() {
 			//그리드 삭제버튼 hide
 			$(".add_btn.pdl10").show();			
 		}	
+		
+		//환율 load
+		var paramObj = {
+						"userId" : jwt.userId
+						, "codeKind" : "CURR"
+						/* , "codeId" : $("#popForm #currCd").val() */
+						};
+		postAjax("/user/sm/sm02/selectCurrToday", paramObj, null
+					, function(data) {   
+						if(data.resultList.length > 0 ) {
+							currToday = data.resultList;
+						}
+		});     //user search ajax end		
 	}
 
 	$.initViewPop();
-
+	
 	$.popViewInit = function() {
 		//입력모드 set
 		var gridList = gridViewPop.target.getList();
@@ -616,11 +633,24 @@ $(document).ready(function() {
 			if( gridList.length > 0 ) {
 				var exrate = gridViewPop.target.getList()[0].exrate;
 				var currCd = gridViewPop.target.getList()[0].currCd;
-				$("#exrate_I").val(exrate);
-				$("#currCd_I").val(currCd);							
+				$("#popForm #currCd").val(currCd);				
+				$("#popForm #exrate").val(exrate);							
 			}			
 		}
 	}
+	
+	//등록시 통화단위에 따른 환율 SET
+	$('#popForm #currCd').on("change", function(){
+		if(actionType == "C" && $(this).val() != "" ) {
+			var selVal = $(this).val();
+			var find = currToday.find(e => e.codeId === selVal);
+			if( typeof(find.codeEtc) != "undefined" ) {
+				$('#popForm #exrate').val(find.codeEtc);	
+			}
+		} else if( actionType == "C" && $(this).val() == "" ) {
+			$('#popForm #exrate').val('');
+		}
+	});	
 	
 	//수량/단가 금액 set
 	$.setInitGridData = function(gridObj, idx, elem) {
