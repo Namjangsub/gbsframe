@@ -22,39 +22,20 @@ public class CM11SvcImpl implements CM11Svc {
 		return cm11Mapper.selectSearchDttm();
 	}
     
+
 	@Override
-	public int selectPrdtSelpch2Count(Map<String, String> paramMap) {
-		return cm11Mapper.selectPrdtSelpch2Count(paramMap);
+	public List<Map<String, String>> selectPrjectDashList(Map<String, String> paramMap) {
+		return cm11Mapper.selectPrjectDashList(paramMap);
 	}
 
 	@Override
-	public List<Map<String, String>> selectPrdtSelpch2List(Map<String, String> paramMap) {
-		return cm11Mapper.selectPrdtSelpch2List(paramMap);
-	}
-    
-	@Override
-	public int selectClntSelpch2Count(Map<String, String> paramMap) {
-		return cm11Mapper.selectClntSelpch2Count(paramMap);
+	public List<Map<String, String>> selectClientTaxDashList(Map<String, String> paramMap) {
+		return cm11Mapper.selectClientTaxDashList(paramMap);
 	}
 
 	@Override
-	public List<Map<String, String>> selectClntSelpch2List(Map<String, String> paramMap) {
-		return cm11Mapper.selectClntSelpch2List(paramMap);
-	}
-    
-	@Override
-	public int selectClntSelpch1Count(Map<String, String> paramMap) {
-		return cm11Mapper.selectClntSelpch1Count(paramMap);
-	}
-
-	@Override
-	public List<Map<String, String>> selectClntSelpch1List(Map<String, String> paramMap) {
-		return cm11Mapper.selectClntSelpch1List(paramMap);
-	}
-
-	@Override
-	public List<Map<String, String>> selectClntSelpch1List2(Map<String, String> paramMap) {
-		return cm11Mapper.selectClntSelpch1List2(paramMap);
+	public List<Map<String, String>> selectClientPchsDashList(Map<String, String> paramMap) {
+		return cm11Mapper.selectClientPchsDashList(paramMap);
 	}
 
 	@Override
