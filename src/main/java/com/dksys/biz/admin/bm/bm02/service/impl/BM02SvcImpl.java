@@ -173,4 +173,14 @@ public class BM02SvcImpl implements BM02Svc {
 	public Map<String, String> selectCrnDupChk(Map<String, String> paramMap) {
 		return bm02Mapper.selectCrnDupChk(paramMap);
 	}
+
+	@Override
+	public int selectUserClntCount(Map<String, String> paramMap) {
+		return bm02Mapper.selectUserClntCount(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectUserClntList(Map<String, String> paramMap) {
+		return bm02Mapper.selectUserClntList(paramMap);
+	}
 }

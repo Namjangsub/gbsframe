@@ -134,4 +134,16 @@ public class BM02Ctr {
     	model.addAttribute("mngInfo", mngInfo);
         return "jsonView";
     }
+	
+	// 담당자 거래처 리스트 조회
+    @PostMapping("/selectUserClntList")
+    public String selectUserClntList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	int totalCnt = bm02Svc.selectUserClntCount(paramMap);
+    	PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+    	model.addAttribute("paginationInfo", paginationInfo);
+    	
+    	List<Map<String, String>> clntList = bm02Svc.selectUserClntList(paramMap);
+    	model.addAttribute("clntList", clntList);
+        return "jsonView";
+    }
 }

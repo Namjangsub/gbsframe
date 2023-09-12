@@ -41,5 +41,9 @@ public interface BM02Mapper {
 	// 동일 사업자 번호 체크
 	Map<String, String> selectCrnDupChk(Map<String, String> paramMap);
 
+	int selectUserClntCount(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectUserClntList(Map<String, String> paramMap);
+
 
 }
