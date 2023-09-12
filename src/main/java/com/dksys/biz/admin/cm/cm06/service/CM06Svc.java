@@ -31,4 +31,6 @@ public interface CM06Svc {
 
 	public int updateUserStatus(Map<String, String> paramMap);
 	
+	public List<Map<String, String>> selectEmployeeStatusList(Map<String, String> paramMap);
+	
 }

@@ -39,5 +39,7 @@ public interface CM06Mapper {
 	List<Map<String, String>> selectUserStatusList(Map<String, String> paramMap);
 
 	int updateUserStatus(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectEmployeeStatusList(Map<String, String> paramMap);
 	
 }

@@ -217,4 +217,12 @@ public class CM06Ctr {
 		}
     	return "jsonView";
     }
+    
+    // 개인별 상태정보
+    @PostMapping("/selectEmployeeStatusList")
+    public String selectEmployeeStatusList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, String>> result = cm06Svc.selectEmployeeStatusList(paramMap);
+    	model.addAttribute("result", result);
+    	return "jsonView";
+    }
 }
