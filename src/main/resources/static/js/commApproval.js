@@ -114,6 +114,9 @@ function Approval(htmlParam, param, popParam) {
 							if(applyBtn == false) {
 								html = html.replace(/@@readonly@@/gi, "readonly");		//결재의견 input readonly
 								html = html.replace(/@@bold@@/gi, "");
+							} else {
+								html = html.replace(/@@readonly@@/gi, "readonly");		//결재의견 input readonly
+								html = html.replace(/@@bold@@/gi, "");								
 							}
 							console.log('--applyBtn--' + applyBtn);
 							html = html.replace(/@@item4@@/gi, data.sanctnSttusNm);		//상태명
