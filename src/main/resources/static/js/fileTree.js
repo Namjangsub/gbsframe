@@ -375,7 +375,7 @@
 	function fileListArea_html_creation () {
 		var fileListArea = $('#fileList_area');
 		  fileListArea.append(`
-		    <div id="fileAttachTxt" style="display:block; cursor: pointer; text-align: right; font-weight:bold;"><i class="fas fa-file-import"></i> 파일첨부　　 </div>
+		    <div id="fileAttachTxt" style="display:block; cursor: pointer; text-align: right; font-weight:bold; height: 60px;"><i class="fas fa-file-import"></i> 파일첨부　　</div>
 		    <div id="fileAttachCnts" style="display:none">
 		    <div class="col-sm-2" style="padding-right: 5px;">
 		      <div class="contents" style="margin: 0; padding: 0; width: 100%; min-width: 200px">
