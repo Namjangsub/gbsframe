@@ -160,7 +160,11 @@ public class WB21SvcImpl implements WB21Svc {
 		}
 
 		int result = wb21Mapper.sjInsert(paramMap);
-	    return result;
+		if(result != 0) {
+			return fileTrgtKey;
+		}else {
+			return result;
+		}
 	}
 	
 	@Override

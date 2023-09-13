@@ -154,13 +154,16 @@ public class WB21Ctr {
     
     @PostMapping(value = "/sjVerUpInsert")
     public String sjVerUpInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+    	int fileTrgtKey;//버전업한 내용을 이어서 저장할 수 있기 위해 신규 fileTrgtKey 를 받아와서 리턴값에 넣어준다.
   		try {
-  			if (wb21Svc.sjVerUpInsert(paramMap, mRequest) != 0 ) {
+  			fileTrgtKey = wb21Svc.sjVerUpInsert(paramMap, mRequest);
+  			if (fileTrgtKey != 0 ) {
   				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-  		} else {
-  			model.addAttribute("resultCode", 500);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+	  			model.addAttribute("fileTrgtKey", fileTrgtKey);
+	  		} else {
+	  			model.addAttribute("resultCode", 500);
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
   			};
   		}catch(Exception e){
   			model.addAttribute("resultCode", 900);
