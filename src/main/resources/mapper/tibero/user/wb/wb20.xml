@@ -10,16 +10,16 @@
 			AND T.CO_CD = #{coCd}   
 		</if>
 		<if test="wbsPlansDt != null and !wbsPlansDt.equals('')" >                
-			AND T.CREAT_DTTM BETWEEN TO_DATE(#{wbsPlansDt}, 'YYYYMMDD') AND TO_DATE(#{wbsPlaneDt}, 'YYYYMMDD')  
+			AND T.CREAT_DTTM BETWEEN TO_DATE(#{wbsPlansDt}, 'YYYYMMDD') AND TO_DATE(#{wbsPlaneDt}, 'YYYYMMDD') --일자 
 		</if>
 		<if test="salesCd != null and !salesCd.equals('')">
-		 	AND T.SALES_CD LIKE '%'||#{salesCd}||'%' 
+		 	AND T.SALES_CD LIKE '%'||#{salesCd}||'%'  
 		</if>				             
 		<if test="!salesMngId != null and !salesMngId.equals('')"> 
-		 	AND T.TODO_ID = #{salesMngId}					                  
+		 	AND T.TODO_ID = #{salesMngId}				--공유대상자	                  
 		</if> 
 		 <if test="todoDiv != null and !todoDiv.equals('')">
-		 	AND T.TODO_DIV1_CODE_ID = #{todoDiv}                                  
+		 	AND T.TODO_DIV1_CODE_ID = #{todoDiv}                 --구분                 
 		 </if>		
 		<!-- todo 결재 관리자가 아닐경우 본인것만 표시 -->
 		<if test="todoDiv != null and !todoDiv.equals('')">
@@ -42,11 +42,44 @@
           
 	<!-- ToDo List 메인 화면 조회 리스트  -->
 	<select id="selectToDoList" parameterType="Map" resultType="camelMap">  
-		SELECT TODO_KEY
-		, (SELECT X.CODE_NM FROM TB_CM05M01 X WHERE X.CODE_ID = T.TODO_DIV2_CODE_ID) AS TODO_DIV2_CODE_NM	 
-				FROM TB_WB20M03 T
-		WHERE 1=1
-		<include refid="selectToDoListCondition"></include>		
+		SELECT Z.*
+		FROM
+		(
+			SELECT X.*
+					, ROWNUM AS RN
+			FROM
+			(
+				SELECT T.TODO_KEY  --TO DO KEY
+						, T.TODO_DIV1_CODE_ID --TO DO 구분(공유-결재)
+						, FN_CM05M01_CD_TO_NM(T.TODO_DIV1_CODE_ID) AS TODO_DIV1_CODE_NM --TO DO 구분(공유-결재) 명
+						, (SELECT X.CODE_NM FROM TB_CM05M01 X WHERE X.CODE_ID = T.TODO_DIV2_CODE_ID) AS TODO_DIV2_CODE_NM	 --발생프로그램 명
+						, T.SALES_CD --Sales Code
+						, T.TODO_NO  --관리번호
+						, T.SANCTN_SN  --결제순번
+						,T.TODO_ID 
+						,
+						(
+							SELECT A.NAME
+								FROM TB_CM06M01 AS A
+							WHERE A.ID = T.TODO_ID
+						) AS TODO_NM --대상자명
+						, TO_CHAR(T.TODO_CF_DT, 'YYYY-MM-DD') AS TODO_CF_DT  --확인일자
+						, T.TODO_CF_OPN  --확인의견
+						, T.CREAT_ID  --생성자명
+				
+						, TO_CHAR(T.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM  --생성일시
+						, T.UDT_ID  --최종변경자명
+						, TO_CHAR(T.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM  --최종변경일자
+	
+					FROM TB_WB20M03 T
+					WHERE 1 = 1
+						<include refid="selectToDoListCondition"></include>		
+					) AS X
+					WHERE 1 = 1
+				) AS Z
+				WHERE 1 = 1
+				AND	Z.RN BETWEEN ${firstIndex} AND ${lastIndex}
+				
 	</select>
 
 
