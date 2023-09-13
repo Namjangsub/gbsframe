@@ -1,0 +1,116 @@
+package com.dksys.biz.user.wb.wb22;
+
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
+
+import com.dksys.biz.cmn.vo.PaginationInfo;
+import com.dksys.biz.exc.LogicException;
+import com.dksys.biz.util.MessageUtils;
+import com.dksys.biz.user.wb.wb22.service.WB22Svc;
+
+@Controller
+@Transactional(rollbackFor = Exception.class)
+@RequestMapping("/user/wb/wb22")
+public class WB22Ctr {
+	
+	private Logger logger = LoggerFactory.getLogger(WB22Ctr.class);
+	
+	@Autowired
+	MessageUtils messageUtils;
+    
+    @Autowired
+    WB22Svc wb22Svc;
+    
+	@PostMapping(value = "/selectWbsLeftSalesCodeList") 
+	public String selectWbsLeftSalesCodeList(@RequestBody Map<String, String> paramMap, ModelMap model) {		
+		List<Map<String, String>> fileList = wb22Svc.selectWbsLeftSalesCodeList(paramMap);
+		model.addAttribute("fileList", fileList);
+		return "jsonView";
+    }	
+	
+	@PostMapping(value = "/selectSjInfo") 
+   	public String selectSjInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+   		  Map<String, String> resultList = wb22Svc.selectSjInfo(paramMap);
+   		  model.addAttribute("resultList", resultList); 
+   		  return "jsonView"; 
+   	}
+	
+	@PostMapping(value = "/selectWBS1Level") 
+	public String selectWBS1Level(@RequestBody Map<String, String> paramMap, ModelMap model) {		
+		List<Map<String, String>> fileList = wb22Svc.selectWBS1Level(paramMap);
+		model.addAttribute("fileList", fileList);
+		return "jsonView";
+    }	
+	
+	@PostMapping(value = "/wbsLevel1Insert")
+    public String wbsLevel1Insert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (wb22Svc.wbsLevel1Insert(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  		} else {
+  			model.addAttribute("resultCode", 500);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  		    model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }
+	
+	@PostMapping(value = "/wbsLevel1Update")
+    public String wbsLevel1Update(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (wb22Svc.wbsLevel1Update(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  		} else {
+  			model.addAttribute("resultCode", 500);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  		    model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }
+	
+	@PostMapping(value = "/selectWBS2Level") 
+	public String selectWBS2Level(@RequestBody Map<String, String> paramMap, ModelMap model) {		
+		List<Map<String, String>> fileList = wb22Svc.selectWBS2Level(paramMap);
+		model.addAttribute("fileList", fileList);
+		return "jsonView";
+    }	
+	
+	@PostMapping(value = "/wbsLevel2Insert")
+    public String wbsLevel2Insert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (wb22Svc.wbsLevel2Insert(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  		} else {
+  			model.addAttribute("resultCode", 500);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  		    model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }
+}
