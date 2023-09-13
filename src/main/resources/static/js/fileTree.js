@@ -98,6 +98,12 @@
         },
         reqSetData: function (list) {
             var targetObj = this.target;
+            //첨부 자료가 있으면 파일 영역 표시함
+            if (list.length > 0) {
+                $("#fileAttachTxt").hide();
+                $("#fileAttachCnts").show();
+            };
+            
             targetObj.setData({
                 list: list,
                 page: {
@@ -369,6 +375,8 @@
 	function fileListArea_html_creation () {
 		var fileListArea = $('#fileList_area');
 		  fileListArea.append(`
+		    <div id="fileAttachTxt" style="display:block; cursor: pointer; text-align: right; font-weight:bold;"><i class="fas fa-file-import"></i> 파일첨부　　 </div>
+		    <div id="fileAttachCnts" style="display:none">
 		    <div class="col-sm-2" style="padding-right: 5px;">
 		      <div class="contents" style="margin: 0; padding: 0; width: 100%; min-width: 200px">
 		        <h3 class="location">
@@ -393,8 +401,15 @@
 		        <div class="ax5_grid" data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 100px; width: 100%"></div>
 		      </div>
 		    </div>
-			<div class="col-xs-2" style="height: 70px;"></div>		    
+			<div class="col-xs-2" style="height: 70px;"></div>
+			</div>	    
 		  `);
+		  
+		  $("#fileAttachTxt").click(function() {
+              $("#fileAttachTxt").hide();
+              $("#fileAttachCnts").show();
+              getAllFilesForNodes(comonCd);
+          });
 	}
 	
     return {
