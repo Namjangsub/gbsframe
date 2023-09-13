@@ -86,7 +86,7 @@
                             </div>
                             <input type="hidden" id="salesNm_S" name="salesNm_S" >
                         </td> 
-                        <th style="width:100px;">시작/출고일</th>
+                        <th style="width:100px;">시작일</th>
                         <td >
                         <div style="width:400px;">
                           <input type="text" class="input_calendar" id="beginDt_S" name="beginDt_S" data-search="beginDt_S" autocomplete="off" date data-search="beginDt" >
@@ -317,6 +317,7 @@
 var isFirst = true;
 var actionType = null;
 var fileTrgtKey = null;
+var verNo_S = null;
 
 ax5.ui.grid.formatter["chkYn"] = function () {
     var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
@@ -331,7 +332,7 @@ var gridView = {
         initView : function() {
             this.target = new ax5.ui.grid();
             this.target.setConfig({
-                showRowSelector: true,
+                showRowSelector: false,
                 multipleSelect: false,
                 sortable: false,
                 target: $('[data-ax5grid="first-grid"]'),
@@ -451,6 +452,20 @@ var gridView = {
                            totalPages : data.paginationInfo.totalPageCount
                     } 
                 });
+                if(list.length > 0){
+					// 리스트의 길이를 얻어옵니다.
+					var listLength = list.length;
+					console.log("listLength : " + listLength);
+					console.log("verNo_S : " + verNo_S);
+					for (var i = 0; i < listLength; i++) {
+					    if (list[i].verNo === verNo_S) {
+					      	//그리드 선택
+		                    gridView.target.select(i);
+							gridView.target.focused = true;
+					    }
+					}
+
+				}
             });
         } 
 
@@ -612,6 +627,10 @@ function dateChk() {
  }
  
 function wbsSalesCodeSearch(flag) {
+	if(actionType == "U"){
+		alert("SALES CODE는 수정 불가합니다.");
+		return;
+	}
     var paramObj = {};
     if (flag == "S") {
     	paramObj["coCd"] = $('#coCd_S').val();
@@ -636,7 +655,6 @@ function wbsSalesCodeSearch(flag) {
             $('#clntPjt').val(row.clntPjt);
             $('#clntPjtNm').val(row.clntPjtNm);      
         }
-        
     });
 }
 
@@ -647,7 +665,7 @@ function calcDate() {
 	while(true) {  	
 	    var temp_date = date1;
 	    if(temp_date.getTime() > date2.getTime()) {
-	        console.log("count : " + count);
+// 	        console.log("count : " + count);
 	        break;
 	    } else {
 	        var tmp = temp_date.getDay();
@@ -704,7 +722,7 @@ function cretSjNo() {
 
 
 function makeFormData() {
-   var formData = new FormData($("#popForm")[0]);   
+   var formData = new FormData($("#popForm")[0]);
    if (actionType == "U") {
 	   formData.append("fileTrgtKey", fileTrgtKey);
    }
@@ -714,6 +732,10 @@ function makeFormData() {
 
 function saveSj() { 
 	var row = gridView.target.getList("selected")[0];
+	if (!actionType) {
+		alert("대상을 선택하세요");
+        return;
+	}
 	if (actionType == "U" && row == undefined) {
 		alert("대상을 선택하세요");
         return;
@@ -725,13 +747,17 @@ function saveSj() {
 	
     if (inputValidation($('.popup_area [required]'))) { 
         var codeId = null;
-        var formData = makeFormData();  
+        var formData = makeFormData();
+        
         if (actionType == "C") {
             filePostAjax("/user/wb/wb21/sjInsert", formData,             
                     function(data) {
                         alert(data.resultMessage);                              
-                        if (data.resultCode == 200) {                          
-                            gridView.setData(0);                  
+                        if (data.resultCode == 200) {
+                            var salesCd = $("#popForm #salesCd").val();
+                            var verNo = $("#popForm #verNo").val();
+                            afterSelect(salesCd, verNo);
+                            gridView.setData(0);
                         }
                     }); 
         }
@@ -739,8 +765,9 @@ function saveSj() {
         	filePostAjax("/user/wb/wb21/sjUpdate", formData,             
                     function(data) {
                         alert(data.resultMessage);                              
-                        if (data.resultCode == 200) {                          
-                            gridView.setData(0);                  
+                        if (data.resultCode == 200) {
+                        	afterSelect(row.salesCd, row.verNo);
+                        	gridView.setData(0);
                         }
                     }); 
         }
@@ -812,6 +839,7 @@ function confirmY() {
 	        filePutAjax("/user/wb/wb21/sjConfirmY", formData, function(data){
 	            if(data.resultCode == 200){
 	                alert("확정 되었습니다.");       
+	                afterSelect(row.salesCd, row.verNo);
 	                gridView.setData(0);
 	            }
 	         }); 
@@ -842,6 +870,7 @@ function confirmN() {
             filePutAjax("/user/wb/wb21/sjConfirmN", formData, function(data){
                 if(data.resultCode == 200){
                     alert("확정 취소 되었습니다.");       
+                    afterSelect(row.salesCd, row.verNo);
                     gridView.setData(0);
                 }
              }); 
@@ -862,7 +891,6 @@ function createVerUp() {
         alert("확정 상태입니다. 신규 버전을 생성할 수 없습니다.");
         return;
     }
-    
     var strYear = new Date().toISOString().substring(2, 4);
     var planData = {
              "coCd" : row.coCd,
@@ -879,8 +907,11 @@ function createVerUp() {
             filePostAjax("/user/wb/wb21/sjVerUpInsert", formData,             
                     function(data) {
                         alert(data.resultMessage);                              
-                        if (data.resultCode == 200) {                          
-                            gridView.setData(0);                  
+                        if (data.resultCode == 200) {
+                            var salesCd = $("#popForm #salesCd").val();
+                            var verNo = $("#popForm #verNo").val();
+                            afterSelect(salesCd, verNo);
+                            gridView.setData(0);
                         }
                     }); 
         }
@@ -888,4 +919,11 @@ function createVerUp() {
     
 }
 
+function afterSelect(salesCd, verNo) {
+	//1. 조회조건에 저장 한 Sales Code 를 입력해서 조회한다.
+	$("#salesCd_S").val(salesCd);
+	
+	//2. 저장 후 조회 시 행 선택을 위해 verNo 정보를 세팅.
+	verNo_S = verNo;
+}
 </script>
