@@ -96,28 +96,19 @@ public class HomeController {
     	
     	for (Map<String, Object> map : accessList) {
     		JSONObject json = new JSONObject();
-    		for(Map.Entry<String, Object> entry : map.entrySet()) {
-    			try {
-    				if(entry.getKey().equals("menuUrl") || entry.getKey().equals("saveYn")) {
-    	    			String key = entry.getKey();
-    	    			String sValue = entry.getValue().toString();
-    	    			if(key.equals("menuUrl")) {
-	    	    			if(sValue.lastIndexOf("/") > 0) {
-	    	    				sValue = sValue.substring(sValue.lastIndexOf("/")+1, sValue.lastIndexOf("."));
-	    	    			}
-    	    			}
-    	    			Object value = sValue;
-    	    			if(key.equals("menuUrl")) {
-    	    				json.put("m", value);
-    	    			} else if(key.equals("saveYn")) {
-    	    				json.put("s", value);
-    	    			}
-        			}
-				} catch (JSONException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-    		}
+			try {
+				String sValue = map.get("menuUrl").toString();
+				int lastDotIndex = sValue.lastIndexOf('.');
+				if (lastDotIndex != -1) {
+		            sValue = sValue.substring(sValue.lastIndexOf('/') + 1, lastDotIndex);
+		        } else {
+		            sValue = sValue.substring(sValue.lastIndexOf('/') + 1);
+		        }
+				json.put("m", sValue);
+				json.put("s", map.get("saveYn"));
+			} catch (JSONException e) {
+				e.printStackTrace();
+			}
     		jsonArray.put(json);
     	}
     	model.addAttribute("accessJSON", jsonArray.toString());
