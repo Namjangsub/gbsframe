@@ -1,0 +1,787 @@
+<div class="popup_area of_a" style="width: 100%; height: 100%;">
+    <div class="tit_contents">
+      <h4 class="tit">BOM 엑셀업로드</h4>
+    </div>
+  <div class="form-group popup_table">
+   <form id="popForm" onSubmit="return false;" method="post" enctype="multipart/form-data">
+		<input type="hidden" id="userId" name="userId">
+		<input type="hidden" id="fileTrgtTyp" name="fileTrgtTyp" value="SM0101M01">
+		<input type="hidden" id="fileTrgtKey" name="fileTrgtKey">
+		<input type="hidden" id="pgmId" name="pgmId" value="SM0101M01">
+      <table>
+
+        <colgroup>
+          <col width="10%">
+          <col width="8%">
+          <col width="10%">
+          <col width="8%">
+          <col width="10%">
+          <col width="10%">
+          <col width="10%">
+          <col width="14%">
+          <col width="10%">
+          <col width="14%">
+        </colgroup>
+
+        <tr>
+			<th class="hit">회사</th>
+			<td colspan="5">
+			  <select id="coCd" name="coCd" data-kind="CO" class="form-control" required="required" msg="회사" readonly="readonly">
+			  </select>
+			</td>
+			<th class="hit">Sales Code</th>
+			<td colspan="3">
+				<input type="text" id="salesCd" name="salesCd" class="form-control" required="required" msg="Sales Code" readonly="readonly">
+			</td>
+        </tr>
+
+        <tr>
+			<th>Excel Upload</th>
+			<td colspan="5" style="height:38px;">
+				<input type="file" style="width:400px;float:left;margin-left:20px;margin-top:3px;" class="form-control input-sm" id="fileInput" name="fileInput" multiple="multiple">
+				<button style="width:100px;float:left;margin-left:20px;" class="btn btn-primary btn-sm" type="button" disabled="disabled" id="actionExcel">업로드엑셀</button>
+			</td>
+			<th>Excel Download</th>
+			<td colspan="3" style="height:38px;">
+				<button style="width:100px;float:left;margin-left:20px;" class="btn btn-primary btn-sm" type="button" id="downloadExcel">다운로드</button>
+			</td>
+        </tr>
+
+      </table>
+    </form>
+
+	<!-- 콘텐츠 -->
+	  <div class="contents" style="margin-top: 10px;">
+	      <!-- 리스트 -->
+	      <div class="ax5_grid" style="width: 100%">
+	        <ul class="ul_list" style="height:350px; width: 100%">
+	            <li style="width: 100%;">
+	                <div class="table_list_tit" style="width: 100%;">
+	                	<h5 style="color: #444;font-size: 16px;float:left; margin-left: 8px; margin-top: 8px; margin-bottom: 8px;">BOM and 자재정보</h5>
+		                <div class="add_btn pdl10" style="margin-right:8px; margin-top: 8px;">
+<!-- 		                	<a onclick="initGrid()" style="width: 60px;" authchk><i class="fas fa-wrench"></i> 초기화</a> -->
+<!-- 		                	<a onclick="delRow()" style="width: 50px;" authchk><i class="fas fa-trash"></i> 삭제 </a> -->
+		                </div>
+	                </div>
+	                <div>
+	                	<div data-ax5grid="upload-grid" data-ax5grid-config="{}" style="height:600px; width: 100%" ></div>
+	                	<div data-ax5grid="upload-excel-grid" data-ax5grid-config="{}" style="display: none;"></div>
+	                </div>
+	            </li>
+	        </ul>
+	    </div>
+	  </div>
+	</div>
+ 	<div class="col-xs-2" style="height: 70px;">
+	</div>
+    <!-- 하단 버튼 -->
+	<div class ="popup_bottom_btn" style="margin-bottom:20px;">
+		<button type="button" id="actionBtnSave" authChk>수정</button>
+		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+
+<script type="text/javascript">
+var actionType = null;
+var excelInputData = [];
+var MatModalList = [];
+var isBeforeData = false;
+
+//"nextPrcsnNm",
+ax5.ui.grid.formatter["popupGrid1"] = function () {
+	if(this.item.matrYn == "N") {
+		return "";
+	}
+	var aHtml = "";
+	aHtml += '<a style="background:url(/static/img/svg/search.svg) no-repeat 50% 50%;background-size:18px 18px;opacity:0.5;" ';
+	aHtml += 'onclick="openClntSearchGrid(\'nextPrcsnNm\','+this.dindex+');" data-onclick="openClntSearchGrid(\'nextPrcsnNm\','+this.dindex+');">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a>';
+
+    return aHtml;
+};
+//dlvplcNm
+ax5.ui.grid.formatter["popupGrid2"] = function () {
+	if(this.item.matrYn == "N") {
+		return "";
+	}
+	var aHtml = "";
+	aHtml += '<a style="background:url(/static/img/svg/search.svg) no-repeat 50% 50%;background-size:18px 18px;opacity:0.5;" ';
+	aHtml += 'onclick="openClntSearchGrid(\'dlvplcNm\','+this.dindex+');" data-onclick="openClntSearchGrid(\'dlvplcNm\','+this.dindex+');">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a>';
+
+    return aHtml;
+};
+//openMatListSearch
+ax5.ui.grid.formatter["popupGrid3"] = function () {
+	if(this.item.matrYn == "N") {
+		return "";
+	}
+	var aHtml = "";
+	aHtml += '<a style="background:url(/static/img/svg/search.svg) no-repeat 50% 50%;background-size:18px 18px;opacity:0.5;" ';
+	aHtml += 'onclick="openMatListSearchGrid(\'matrCd\','+this.dindex+');" data-onclick="openMatListSearchGrid(\'matrCd\','+this.dindex+');">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a>';
+
+    return aHtml;
+};
+
+var uploadGridColKey = ["dsgnNm","dsgnBomQty","ordrgDiv20","ordrgDiv10","nextPrcsnNm","dlvplcNm","bomQty","posQty","matrCd"];
+
+var uploadGridView = {
+		initView: function(){
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+		    	 showRowSelector: false,
+		    	 showLineNumber: true,
+		    	 lineNumberColumnWidth: 40,
+		    	 multipleSelect: true,
+		    	 sortable: false,
+		         target: $('[data-ax5grid="upload-grid"]'),
+		         header: {
+		        		 align: "center",
+		        		 selector: false
+		         },
+		         body: {
+		        	 columnHeight: 23,
+					 mergeCells : ["salesCd"],//editor 는 merge 안됨
+	             },
+		         columns : [
+		        	   {key: "coCd",		label: "coCd",		width: 50,align: "left",  hidden: true},
+		               {key: "fileTrgtKey",	label: "key",		width: 50,align: "left",  hidden: true},
+		               {key: "salesCd",		label: "salesCd",	width: 160,align: "left",  hidden: false, treeControl: true},
+		               {key: "upperCd"	,	label: "상위코드"	,	width: 80,align: "left",  hidden: false},
+		               {key: "lowerCd"	,	label: "하위코드"	,	width: 80,align: "left",  hidden: false},
+		               {key: "pid",			label: "pid",		width: 50,align: "left",  hidden: true},
+		               {key: "id",			label: "id",		width: 50,align: "left",  hidden: true},
+		               {key: "matrCd", 		label: "자재품번", 	width: 80,align: "center"},
+		               {key: "matrNm", 		label: "품명", 		width: 200,align: "left"},
+		               {key: "matrMat", 	label: "소재", 		width: 150,align: "left"},
+		               {key: "lowerUnit", 	label: "단위", 		width: 50,align: "center"},
+		               {key: "lowerQty", 	label: "수량", 		width: 40,align: "right", formatter:"money"},
+		               {key: "matrMno", 	label: "형번", 		width: 80,align: "left"},
+		               {key: "matrSpec", 	label: "규격", 		width: 120,align: "left"},
+		               {key: "matrRmk", 	label: "비고", 		width: 200,align: "left"},
+		               {key: "matrMakrNm", 	label: "제조사", 		width: 100,align: "left"},
+		               {key: "matrYn", 		label: "자재", 		width: 50,align: "center", 	formatter: function () { return this.value == "Y" ? "자재" : ""} },
+		               {key: "dsgnNo", 		label: "도번", 		width: 200,align: "left",  hidden: false},
+		               {key: "excelUseYn", 		  label: "적용대상", 		width: 80 ,align: "left",  hidden: false},
+		               {key: "excelCheckResult",  label: "확인내용", 		width: 200,align: "left",  hidden: false},
+			     ],
+	              tree: {
+	                    use: true,
+	                    indentWidth: 15,
+	                    arrowWidth: 15,
+	                    iconWidth: 18,
+	                    icons: {
+	 	                   openedArrow: '<i class="fa fa-caret-down" aria-hidden="true"></i>',
+		                   collapsedArrow: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+		                   groupIcon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+		                   collapsedGroupIcon: '<i class="fa fa-folder" aria-hidden="true"></i>',
+		                   itemIcon: '<i class="fa fa-cog" aria-hidden="true"></i>'
+	                    },
+		                columnKeys: {
+		                parentKey: "upperCode",
+		                selfKey: "lowerCode",
+		               }
+		           }
+		    });
+			return this;
+		},
+
+        setLoadData: function(listData){
+        	let resultArr = initGridDataNullValue(listData, uploadGridView.target.columns, uploadGridColKey);
+        	excelInputData = JSON.parse(JSON.stringify(resultArr));
+			var target = this.target;
+			var list = listData;
+			target.setData({
+        		list : list,
+        		page : {
+        			totalElements : list.length
+        		}
+   			});
+     	},
+
+        setData: function(_pageNo){
+			var target = this.target;
+			var formData = {
+				"coCd" : jwt.coCd,
+				"ordrsNo" : $("#ordrsNo").val(),
+				"salesCd" : $("#salesCd").val(),
+			}
+
+    		postAjax("/user/bm/bm14/selectBomAllLevelTempList", formData, null, function(data) {
+    			var list = data.result;
+    			if(list){
+					target.setData({
+	            		list : list,
+	            		page : {
+	            			totalElements : list.length
+	            		}
+	       			});
+    			}
+    	 	});
+     	} //setData
+     }
+
+	var uploadExcelView = {
+	       initView: function () {
+	           this.target = new ax5.ui.grid();
+	           this.target.setConfig({
+	               target: $('[data-ax5grid="upload-excel-grid"]'),
+	               columns: [
+	            	   {key: "coCd",		label: "coCd",		width: 50,align: "left",  hidden: true},
+		               {key: "fileTrgtKey",	label: "key",		width: 50,align: "left",  hidden: true},
+		               {key: "salesCd",		label: "salesCd",	width: 160,align: "left",  hidden: false, treeControl: true},
+		               {key: "upperCd"	,	label: "상위코드"	,	width: 80,align: "left",  hidden: false},
+		               {key: "lowerCd"	,	label: "하위코드"	,	width: 80,align: "left",  hidden: false},
+		               {key: "pid",			label: "pid",		width: 50,align: "left",  hidden: true},
+		               {key: "id",			label: "id",		width: 50,align: "left",  hidden: true},
+		               {key: "matrCd", 		label: "자재품번", 	width: 80,align: "center"},
+		               {key: "matrNm", 		label: "품명", 		width: 200,align: "left"},
+		               {key: "matrMat", 	label: "소재", 		width: 150,align: "left"},
+		               {key: "lowerUnit", 	label: "단위", 		width: 50,align: "center"},
+		               {key: "lowerQty", 	label: "수량", 		width: 40,align: "right", formatter:"money"},
+		               {key: "matrMno", 	label: "형번", 		width: 80,align: "left"},
+		               {key: "matrSpec", 	label: "규격", 		width: 120,align: "left"},
+		               {key: "matrRmk", 	label: "비고", 		width: 200,align: "left"},
+		               {key: "matrMakrNm", 	label: "제조사", 		width: 100,align: "left"},
+		               {key: "matrYn", 		label: "자재", 		width: 50,align: "center", 	formatter: function () { return this.value == "Y" ? "자재" : ""} },
+		               {key: "dsgnNo", 		label: "도번", 		width: 200,align: "left",  hidden: false},
+		               {key: "excelUseYn", 		  label: "적용대상", 		width: 80 ,align: "left",  hidden: false},
+		               {key: "excelCheckResult",  label: "확인내용", 		width: 200,align: "left",  hidden: false},
+	               ],
+
+	           });
+	           return this;
+	    }
+	}
+
+ 	$(document).ready(function() {
+ 		//debugger;
+		setComboOptions($(".popup_area select[data-kind]"));
+		setByCoCd(jwt.coCd);
+
+		/**
+		 * grid 초기화
+		*/
+		uploadGridView.initView().setData(0);
+
+		$("#userId").val(jwt.userId);
+
+		$('#actionBtnSave').hide();
+
+		$('#fileInput').on("change", function() {
+			fileInputChange();
+		});
+		
+		$('#downloadExcel').on("click", function() {
+			downloadExcel();
+		});
+
+		authChk();// 권한체크
+
+ 	});
+
+ 	function actionBtnSaveClick(){
+ 		var actionText = $('#actionBtnSave').text();
+
+ 		if(actionText=="등록"){
+ 			insertUploadBom();
+ 		}
+ 		if(actionText=="수정"){
+ 			insertCrudMatrAndBom();
+ 		}
+ 	}
+
+	// 등록-삭제 후 등록한다.
+	function insertUploadBom() {
+		var isDeleteBefore = false;
+		if(isBeforeData){
+			if (!confirm("기등록된 데이타가 있습니다. 진행 하시겠습니까?")) {
+				isDeleteBefore = true;
+			}
+		}
+		if(isDeleteBefore) return;
+
+		if (inputValidation($('.popup_area [required]'))) {// 필수 필드의 유효성 검사
+			var formData = makeFormData();
+			setFormLock(".popup_area");
+
+			filePostAjax("/user/sm/sm01/insertUploadBom", formData, function(data) {
+				alert(data.resultMessage);
+				if (data.resultCode == 200) {
+					gridView.setData(main_pageNo,true);
+					modalStack.close();
+				}
+			});
+		}
+	}
+
+	function insertCrudMatrAndBom() {
+		if (inputValidation($('.popup_area [required]'))) {// 필수 필드의 유효성 검사
+			var formData = makeFormData();
+			setFormLock(".popup_area");
+
+			filePostAjax("/user/sm/sm01/insertCrudMatrAndBom", formData, function(data) {
+				if (data.resultCode == 900) {
+					alert("시스템 에러.");
+				}
+				else if (data.resultCode == 200){
+					alert("저장 되었습니다.");
+					gridView.setData(main_pageNo,true);
+					modalStack.close();
+				}
+				else {
+					alert(data.resultMessage);
+				}
+			});
+		}
+	}
+ 	//----------------------------------------------//
+	function makeFormData() {
+		// 금액 콤마 제거
+		$.each($('.popup_area input[comma]'), function(idx, elem) {
+			deleteComma(elem);
+		});
+		// 날짜 하이픈 제거
+		$.each($('.popup_area input[date]'), function(idx, elem) {
+			deleteHyphen(elem);
+		});
+		// 폼데이터 생성
+		var formData = getFormData("#popForm");
+		//var formData = new FormData($("#popForm")[0]);
+		var _fileTrgtKey = $('#fileTrgtKey').val();
+		if(isEmpty(_fileTrgtKey)){
+			_fileTrgtKey = "";
+		}
+
+		console.log("_fileTrgtKey","["+_fileTrgtKey+"]")
+		$('#fileTrgtKey').val(_fileTrgtKey);
+
+		let bom_dataList = JSON.parse(JSON.stringify(uploadGridView.target.list));
+		let bom_data = getFilterData(bom_dataList, "N");
+		let bomArr = deleteChildren(bom_data);
+		//console.log("====bomArr",bomArr);
+		formData.append("bomArr", JSON.stringify(bomArr));
+
+		let matr_dataList = JSON.parse(JSON.stringify(uploadGridView.target.list));
+		let matr_data = getFilterData(matr_dataList, "Y");
+		let matrArr = deleteChildren(matr_data);
+		//console.log("====matrArr",matrArr);
+		formData.append("matrArr", JSON.stringify(matrArr));
+		//세부 아이템 자료 끝
+		return formData;
+	}
+
+	this.getFilterData = function(obj, sel_matrYn) {
+		const resultData = obj.filter(function(element){
+			return sel_matrYn == element.matrYn;
+		});
+		return resultData;
+	}
+
+	//해당 TreeGrid 의 __children__ 제거 , 이중배열제거
+	function deleteChildren(_list){
+		$.each(_list, function (idx, elem) {
+			delete elem.__children__;
+		});
+		return _list;
+	}
+
+	function setByCoCd(value) {
+		$('#coCd option:not([value="'+value+'"])').remove();
+	}
+
+	function fileInputChange() {
+		if(!isEmpty($("#fileInput").val())) {
+			$("#actionExcel").prop("disabled", false);
+			$('#actionExcel').on("click", function() {
+				actionExcel();
+			});
+		}
+		else {
+			$("#actionExcel").prop("disabled", true);
+			$('#actionBtnSave').hide();
+		}
+		uploadGridView.initView();
+	}
+
+	function actionExcel() {
+		if(isEmpty($("#fileInput").val())) {
+			alert("파일을 선택하여야 합니다.");
+			return;
+		}
+
+		var formData = getFormData("#popForm");
+		//var formData = new FormData($("#popForm")[0]);
+		//formData.append("userId", jwt.userId);//파일삭제 필수
+
+		//아래의 주소로 공통으로 업로드 가능함.
+		filePostAjax("/user/sm/sm01/uploadExcelFile", formData, function(data){
+			if(!isEmpty(data.resultMessage)) {
+				alert(data.resultMessage);
+				return;
+			}
+			//upload 컬럼은 아래로 고정-수동컬럼지정
+			var uploadColumnsKey = ["salesCd","upperCd","lowerCd","matrCd","matrNm","matrMat","lowerUnit","lowerQty","matrMno","matrSpec","matrRmk","matrMakrNm","matrYn","dsgnNo","excelUseYn","excelCheckResult"];
+			
+			/*
+			//화면의 보이는 순서 사용시
+			//var uploadColumnsKey = getViewColumnKey(uploadGridView.target);
+
+			//edit컬럼 사용시
+			//var uploadColumnsKey = getEditorColumnKey(uploadGridView.target);
+			*/
+
+			var excelReadData = getGridExcelData(uploadColumnsKey, data.resultList);
+			var resultData = setExcelDataModify(excelReadData);
+			if(resultData == null) return;
+			uploadGridView.initView();
+
+			uploadGridView.setLoadData(resultData);
+
+			$('#actionBtnSave').text("등록");
+			$('#actionBtnSave').show();
+		});
+	}
+
+	function setMatModalList() {
+		var mat_param = {
+				coCd : $('#coCd').val(),
+				searchValue : "",
+				searchType : "MATR_CD",
+				matrClntDiv : "",
+				pageNo : 1,
+				recordCnt : 99999999,
+			};
+		postAjax("/user/bm/bm05/MatModal_selectList", mat_param, null, function(data) {
+			MatModalList = data.MatModalList;
+		});
+	}
+
+	//그리드 데이타를 포멧에 맞춰 수정 salesCd 교체
+	function setExcelDataModify(dataList){
+		if(dataList.length < 1) {
+			alert("Upload 데이타의 도번 [Sales Code]은 필수 입니다.");
+			return null;
+		}
+		var excel_salesCd = trim(dataList[0].lowerCode);
+		var set_matrSeq = 1;
+		$.each(dataList, function (idx, data) {
+			//그리드데이타 생성
+			data["dtaChk"] = "I";
+			data["lvl"] = xreplace(data.lvl,".0","");
+			data["dsgnBomQty"] = xreplace(data.dsgnBomQty,".0","");
+			data["bomQty"] = xreplace(data.bomQty,".0","");
+			data["posQty"] = xreplace(data.posQty,".0","");
+			data["matrSeq"] = xreplace(data.matrSeq,".0","");
+			data["coCd"] = $('#coCd').val();
+			data["ordrsNo"] = $('#ordrsNo').val();
+			var salesCd = $('#salesCd').val();
+			data["salesCd"] = salesCd;
+			var set_lowerCode = trim(data.lowerCode);
+			if(excel_salesCd != salesCd){
+				set_lowerCode = xreplace(set_lowerCode, excel_salesCd,salesCd);
+			}
+			if(isEmpty(data.lvl)){
+				var _lowerString = set_lowerCode.replace(salesCd,"");
+				var levelString = _lowerString.replace(/[^-]/g,"");
+				if(isEmpty(levelString)){
+					data["lvl"] = "0";
+				} else {
+					data["lvl"] = ""+levelString.length;
+				}
+			}
+			var upperCode = set_lowerCode.substring(0,set_lowerCode.lastIndexOf('-'));
+			if(set_lowerCode == salesCd || isEmpty(set_lowerCode)) {
+				upperCode = "top";
+			}
+			data["upperCode"] = upperCode;
+			data["lowerCode"] = set_lowerCode;
+
+			if(data.matrYn == "N") { //bom
+				data["upperCd"] = upperCode;
+				data["lowerCd"] = set_lowerCode;
+				data["dsgnNo"] = set_lowerCode;
+				var lastDsgnNo = set_lowerCode.substring(set_lowerCode.lastIndexOf('-')+1,set_lowerCode.length);
+				data["lastDsgnNo"] = lastDsgnNo;
+
+				data["matrSeq"] = "";
+				data["ordrgDiv20"] = "";
+				data["ordrgDiv10"] = "";
+				data["nextPrcsnNm"] = "";
+				data["dlvplcNm"] = "";
+				data["bomQty"] = "";
+				data["posQty"] = "";
+				data["matrCd"] = "";
+
+				setMatrDataInit(data);
+				set_matrSeq = 1;
+			} else {//matr
+				var matr_upperCode = upperCode.substring(0,upperCode.lastIndexOf('-'));
+				var ckmatr_upperCode = xreplace(upperCode, salesCd,"");
+				if(isEmpty(ckmatr_upperCode)) {
+					matr_upperCode = "top";
+				}
+				data["upperCd"] = matr_upperCode;
+
+				var matr_lowerCode = set_lowerCode.substring(0,set_lowerCode.lastIndexOf('-'));
+				if(matr_lowerCode == salesCd || isEmpty(matr_lowerCode)) {
+					matr_lowerCode = salesCd;
+				}
+				data["matrSeq"] = set_matrSeq++;//자재순번 채번
+				data["lowerCd"] = matr_lowerCode;
+
+				data["dsgnNo"] = "";
+				data["lastDsgnNo"] = "";
+				data["dsgnNm"] = "";
+				data["dsgnBomQty"] = "";
+				data["matrYn"] = "Y";
+
+				data["ordrgDiv20"] = getOptionsCode(options_02,data.ordrgDiv20);
+				data["ordrgDiv10"] = getOptionsCode(options_01,data.ordrgDiv10);
+
+				if(!isEmpty(data.matrCd)){
+					setMatrDataInfo(data, "matrCd");
+				}
+				else {
+					setMatrDataInit(data);
+				}
+			}
+		});
+		return dataList;
+	}
+
+	function setMatrDataInfo(data, column){
+		var idxArg = findIndexArray(MatModalList, column, data.matrCd);
+
+		if(idxArg.length == 1){
+			var idx = Number(idxArg[0]);
+			var felem = MatModalList[idx];
+			data["matrNm"]        = felem.matrNm;
+			data["goodsDiv"]      = felem.goodsDiv;
+			data["matrClntDiv"]   = felem.matrClntDiv;
+			data["matrDiv"]       = felem.matrDiv;
+			data["matrGrp"]       = felem.matrGrp;
+			data["matrMat"]       = felem.matrMat;
+			data["matrSize"]      = felem.matrSize;
+			data["matrSpec"]      = felem.matrSpec;
+			data["matrMakrNm"]    = felem.matrMakrNm;
+			data["matrMno"]       = felem.matrMno;
+			data["matrWt"]        = felem.matrWt;
+			data["matrUnit"]      = felem.matrUnit;
+			data["useYn"]         = felem.useYn;
+			data["matrStockCd"]   = felem.matrStockCd;
+			data["originNm"]      = felem.originNm;
+			data["matrDrwNo"]     = felem.matrDrwNo;
+			data["matrTestDiv"]   = felem.matrTestDiv;
+			data["dlvrRqmDay"]    = felem.dlvrRqmDay;
+			data["matrPurcDiv"]   = felem.matrPurcDiv;
+			data["minOrdrgQty"]   = felem.minOrdrgQty;
+			data["matrSaftQty"]   = felem.matrSaftQty;
+			data["dsgn2dMd"]      = felem.dsgn2dMd;
+			data["avrg2dMd"]      = felem.avrg2dMd;
+			data["dsgn3dMd"]      = felem.dsgn3dMd;
+			data["avrg3dMd"]      = felem.avrg3dMd;
+			data["prdctnRqmMd"]   = felem.prdctnRqmMd;
+			data["prdctnAvrgMd"]  = felem.prdctnAvrgMd;
+			data["matrPartNo"]    = felem.matrPartNo;
+			data["pchsClntCd1"]   = felem.pchsClntCd1;
+			data["pchsClntPct1"]  = felem.pchsClntPct1;
+			data["pchsClntCd2"]   = felem.pchsClntCd2;
+			data["pchsClntPct2"]  = felem.pchsClntPct2;
+			data["pchsClntCd3"]   = felem.pchsClntCd3;
+			data["pchsClntPct3"]  = felem.pchsClntPct3;
+			data["matrUpr"]       = felem.matrUpr;
+			data["matrAvrgUpr"]   = felem.matrAvrgUpr;
+			data["matrRmk"]       = felem.matrRmk;
+			data["matrLastTrstDt"]= felem.matrLastTrstDt;
+			data["matrAtntCd"]    = felem.matrAtntCd;
+			data["matrNo"]        = felem.matrNo;
+		}
+		else {
+			setMatrDataInit(data);
+		}
+	}
+
+	function setMatrDataInit(data) {
+		data["matrNm"]        = "";
+		data["goodsDiv"]      = "";
+		data["matrClntDiv"]   = "";
+		data["matrDiv"]       = "";
+		data["matrGrp"]       = "";
+		data["matrMat"]       = "";
+		data["matrSize"]      = "";
+		data["matrSpec"]      = "";
+		data["matrMakrNm"]    = "";
+		data["matrMno"]       = "";
+		data["matrWt"]        = "";
+		data["matrUnit"]      = "";
+		data["useYn"]         = "";
+		data["matrStockCd"]   = "";
+		data["originNm"]      = "";
+		data["matrDrwNo"]     = "";
+		data["matrTestDiv"]   = "";
+		data["dlvrRqmDay"]    = "";
+		data["matrPurcDiv"]   = "";
+		data["minOrdrgQty"]   = "";
+		data["matrSaftQty"]   = "";
+		data["dsgn2dMd"]      = "";
+		data["avrg2dMd"]      = "";
+		data["dsgn3dMd"]      = "";
+		data["avrg3dMd"]      = "";
+		data["prdctnRqmMd"]   = "";
+		data["prdctnAvrgMd"]  = "";
+		data["matrPartNo"]    = "";
+		data["pchsClntCd1"]   = "";
+		data["pchsClntPct1"]  = "";
+		data["pchsClntCd2"]   = "";
+		data["pchsClntPct2"]  = "";
+		data["pchsClntCd3"]   = "";
+		data["pchsClntPct3"]  = "";
+		data["matrUpr"]       = "";
+		data["matrAvrgUpr"]   = "";
+		data["matrRmk"]       = "";
+		data["matrLastTrstDt"]= "";
+		data["matrAtntCd"]    = "";
+		data["matrNo"]        = "";
+	}
+
+	function downloadExcel() {
+		var todayDate = new Date().format('yyyyMMddHHmmss');
+		uploadExcelView.initView();
+		var list = uploadGridView.target.list;
+		uploadExcelView.target.setData({
+			list : list,
+			page : {
+				totalElements : list.length,
+			}
+		});
+		uploadExcelView.target.exportExcel("설계Bom.xls");
+	}
+
+	function initGrid(){
+		uploadGridView.setLoadData(excelInputData);
+	}
+
+	function delRow(){
+		if(selectGridValidation(uploadGridView.target)) return;
+		var selData = uploadGridView.target.getList("selected")[0];
+		var bomDtaChk = selData.dtaChk;
+		let listData = JSON.parse(JSON.stringify(uploadGridView.target.list));
+		var lowIndexArray = findLowerArray(listData, selData.lowerCode, "upperCode", "lowerCode");
+		descSort(lowIndexArray);
+		//console.log("===========lowIndexArray>>",lowIndexArray);
+		setFormLock(".popup_area", true , function () {
+			$.each(lowIndexArray, function (idx, row) {
+				var rowIdx = Number(row);
+				var dtaChk = getValue(listData, rowIdx, "dtaChk");
+				if(dtaChk == "I") {
+					uploadGridView.target.removeRow(rowIdx);
+				}
+				else {
+					uploadGridView.target.setValue(rowIdx, "dtaChk", "D");
+				}
+			});
+			if(bomDtaChk == "I"){
+				uploadGridView.target.removeRow(selData.__index);
+			}
+			else {
+				uploadGridView.target.setValue(selData.__index, "dtaChk", "D");
+			}
+			setFormUnLock(".popup_area" , true);
+		});
+	}
+
+	//Bom-자재 수정
+	function updateBomMtrlSecondModal() {
+		if(selectGridValidation(uploadGridView.target)) return;
+		var selData = uploadGridView.target.getList("selected")[0];
+		if(selData.dtaChk == "D") return;
+
+		var paramObj = selData;
+        paramObj.actionType = "U";
+        paramObj.sendLowData = JSON.stringify(selData);
+        openSecondModal("/static/html/user/sm/sm01/SM0101P02.html", 1300, 550, "", paramObj, function(data) {
+        	//uploadGridView.target.updateRow($.extend({}, uploadGridView.target.list[selData.__index], data), selData.__index);
+        	$.each($.extend({}, data), function (key, value) {
+        		uploadGridView.target.setValue(selData.__index, key, value);
+        	});
+        	//if(isEmpty(selData.dtaChk)) {
+	        //	uploadGridView.target.setValue(selData.__index, "dtaChk", "U");
+        	//}
+		});
+	}
+
+	//그리드 거래처 검색
+	function openClntSearchGrid(column, rowIndex) {
+		var __select__  =  getValue(uploadGridView.target.list, rowIndex, "__selected__");
+		if(__select__ == true){
+			uploadGridView.target.select(rowIndex);
+		}
+
+		var searchValue = getValue(uploadGridView.target.list, rowIndex, column);
+		openSecondModal("/static/html/cmn/modal/clntSearch.html", 600, 420, "거래처 검색", {searchValue: searchValue}, function (grid) {
+			var row = grid.target.getList("selected")[0];
+			var set_clntNm = row.clntNm;
+			uploadGridView.target.setValue(rowIndex, column, set_clntNm);
+		});
+	}
+
+	//그리드 자재품번 검색
+	function openMatListSearchGrid(column, rowIndex) {
+		var __select__  =  getValue(uploadGridView.target.list, rowIndex, "__selected__");
+		if(__select__ == true){
+			uploadGridView.target.select(rowIndex);
+		}
+
+		var searchValue = getValue(uploadGridView.target.list, rowIndex, column);
+		var paramObj = {
+			"coCd" : $('#coCd').val(),
+			"searchValue" : searchValue
+		}
+
+		openSecondModal("/static/html/cmn/modal/matListSearch.html", 1200, 700, "자재 검색", paramObj, function (grid) {
+			var selData = uploadGridView.target.getList("selected")[0];
+			var gridRow = grid.target.getList("selected")[0];
+			gridRow.dtaChk = selData.dtaChk;
+			gridRow.coCd = selData.coCd;
+			gridRow.ordrsNo = selData.ordrsNo;
+			gridRow.salesCd = selData.salesCd;
+			gridRow.lvl = selData.lvl;
+			gridRow.dsgnNo = selData.dsgnNo;
+			gridRow.upperCode = selData.upperCode;
+			gridRow.lowerCode = selData.lowerCode;
+			gridRow.upperCd = selData.upperCd;
+			gridRow.lowerCd = selData.lowerCd;
+			gridRow.matrYn = selData.matrYn;
+			gridRow.dsgnBomQty = selData.dsgnBomQty;
+			gridRow.matrSeq = selData.matrSeq;
+			gridRow.ordrgDiv20 = selData.ordrgDiv20;
+			gridRow.ordrgDiv10 = selData.ordrgDiv10;
+			gridRow.nextPrcsnNm = selData.nextPrcsnNm;
+			gridRow.dlvplcNm = selData.dlvplcNm;
+			gridRow.bomQty = selData.bomQty;
+			gridRow.posQty = selData.posQty;
+
+			gridRow.__index = selData.__index;
+			gridRow.__origin_index__ = selData.__origin_index__;
+			gridRow.__modified__ = selData.__modified__;
+			gridRow.__selected__ = selData.__selected__;
+			var temp_matrCd = gridRow.matrCd;
+			gridRow.matrCd = selData.matrCd;
+
+
+			var gridList = [gridRow];
+			var selectList = initGridDataNullValue(gridList, uploadGridView.target.columns);
+			var newRow = selectList[0];
+
+			if(selData.dtaChk == "I"||selData.dtaChk == "D"){
+				newRow.dtaChk = selData.dtaChk;
+			}
+			uploadGridView.target.updateRow($.extend({}, uploadGridView.target.list[rowIndex], newRow), rowIndex);
+
+			//updateRow는 onchange 발생안함. matrSeq set올 호출..
+			uploadGridView.target.setValue(rowIndex, "matrCd", temp_matrCd);
+			if(getValue(uploadGridView.target.list, rowIndex, "dtaChk") == "U") {
+				uploadGridView.target.setValue(rowIndex, "dtaChk", "U");
+			}
+		});
+	}
+</script>
