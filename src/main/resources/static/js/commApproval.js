@@ -79,6 +79,7 @@ function Approval(htmlParam, param, popParam) {
 	 				if( data.resultList.length > 0 ) {
 	 					
 	 					var htmlTr = "";
+		 				$("#appLine tr").eq(0).next().remove();
 				        $.each(list, function (idx, data) {
 		 					var html = trTempl;				        	
 							//html = html.replace(/@@item1@@/gi, (idx+1));		//순번
@@ -106,25 +107,20 @@ function Approval(htmlParam, param, popParam) {
 									approvalParam.coCd = data.coCd;
 									approvalParam.todoDiv1CodeId = data.todoDiv1CodeId;
 									approvalParam.todoDiv2CodeId = data.todoDiv2CodeId;		
-									html = html.replace(/@@readonly@@/gi, "");		//결재의견 input
-								} else {
-									html = html.replace(/@@readonly@@/gi, "readonly");		//결재의견 input
-								}	
+									html = html.replace(/readonly/gi, "");		//결재의견 input
+								} 
 							}
 							if(applyBtn == false) {
-								html = html.replace(/@@readonly@@/gi, "readonly");		//결재의견 input readonly
 								html = html.replace(/@@bold@@/gi, "");
 							} else {
-								html = html.replace(/@@readonly@@/gi, "readonly");		//결재의견 input readonly
 								html = html.replace(/@@bold@@/gi, "");								
 							}
-							console.log('--applyBtn--' + applyBtn);
+							//console.log('--applyBtn--' + applyBtn);
 							html = html.replace(/@@item4@@/gi, data.sanctnSttusNm);		//상태명
 							html = html.replace(/@@item5@@/gi, data.todoCfDt);		//확인(결재)일자
 							htmlTr += html;
 						});			
 					} 
-	 				$("#appLine tr").eq(0).next().remove();
 					$("#appLine").append(htmlTr);
 			});		//end ajax
 			
@@ -145,12 +141,12 @@ function Approval(htmlParam, param, popParam) {
 		if( this.applyBtn ) {
 			$("#appBtnDiv").show();
 			$("#appConfirmAnchor").attr("onclick", "approvalConfirm()");
-			$("input[name='todoCfOpn']").attr("readonly", false);
+			//$("input[name='todoCfOpn']").attr("readonly", false);
 		} else {
 			//hide
 			$("#appBtnDiv").hide();
 			$("#appConfirmAnchor").removeAttr("onclick");		
-			$("input[name='todoCfOpn']").attr("readonly", true);
+			//$("input[name='todoCfOpn']").attr("readonly", true);
 		}		
 		return;
 	}
@@ -161,7 +157,7 @@ function Approval(htmlParam, param, popParam) {
     		<tr style="border-bottom:1px solid #dbdbdb;">
     			<td class="appTd">@@item1@@</td>
     			<td class="appTd">@@bold@@@@item2@@</font></td>
-    			<td class="appTd" style='text-align:left; padding-left:5px; height:25px;'><input type='text' name='todoCfOpn' value="@@item3@@" @@readonly@@></td>
+    			<td class="appTd" style='text-align:left; padding-left:5px; height:25px;'><input type='text' name='todoCfOpn' readonly="readonly"></td>
     			<td class="appTd">@@item4@@</td>
     			<td class="appTd">@@item5@@</td>    			
     		</tr>		
