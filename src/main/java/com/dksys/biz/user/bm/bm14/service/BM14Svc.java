@@ -7,12 +7,31 @@ import java.util.Map;
 
 public interface BM14Svc {
 
-    // 그리드 카운트
-	int select_bm14_Count(Map<String, String> paramMap);
+	List<Map<String, String>> selectBomTreeList(Map<String, String> paramMap);
 	
-	// 그리드 리스트
-	List<Map<String, String>> select_bm14_List(Map<String, String> paramMap);
+	List<Map<String, String>> selectBomlevelList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectBomAllLevelList(Map<String, String> paramMap);
 
-	// // 수금유형 조회
-	// List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap);
+	List<Map<String, String>> selectBomAllLevelTempList(Map<String, String> paramMap);
+	
+	Map<String, String> selectBomTreInfo(Map<String, String> paramMap);
+	
+//	Map<String, String> checkBomRootSalesCdInfo(Map<String, String> paramMap);
+
+	int checkBomId(Map<String, String> paramMap);
+
+	int insertBomTree(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	  
+	int moveBom(List<Map<String, String>> paramList);
+	
+	int deleteBom(Map<String, String> paramMap);
+	
+	int copyBomTree(List<Map<String, String>> paramList);
+	
+	int copyBomRootSalesCdTree(Map<String, String> paramList);
+
+	List<Map<String, String>> getAllChildNodeInfos(Map<String, String> paramMap);
+	
+	int checkBomInfo(Map<String, String> paramMap);
 }
