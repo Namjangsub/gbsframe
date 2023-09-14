@@ -100,6 +100,9 @@
 					, REAMIN_IN_QTY
 					, FILE_TRGT_KEY
 					, IN_NO
+					, MATR_CD 		/* 자재코드 */
+					, MATR_NM		/* 자재명 */
+					, MATR_SPEC		/* 규격 */				
 					FROM
 						(
 						SELECT A.CO_CD
@@ -150,22 +153,32 @@
 										FROM TB_SM03M01 D
 										INNER JOIN TB_SM03D01 CC ON(CC.IN_NO=D.IN_NO)
 									WHERE A.ORDRG_NO=CC.ORDRG_NO		
-								) AS IN_NO														  														                   								                   
+								) AS IN_NO
+								, A.MATR_CD 	/* 자재코드 */
+								, J.MATR_NM		/* 자재명 */
+								, J.MATR_SPEC	
+																						  														                   								                   
 							FROM TB_SM02D01 A
 							INNER JOIN TB_SM02M01 B ON(A.CO_CD=B.CO_CD AND A.ORDRG_NO=B.ORDRG_NO)
-							LEFT OUTER JOIN
-							(
-								SELECT C.ORDRG_NO
-										, C.ORDRG_SEQ
-										, NVL(SUM(IN_QTY), 0) AS IN_QTY
-									FROM TB_SM03D01 C
-									INNER JOIN TB_SM03M01 D ON(D.IN_NO=C.IN_NO)
-								GROUP BY C.ORDRG_NO, C.ORDRG_SEQ, C.IN_NO
-							) C ON( A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ)
+							LEFT OUTER JOIN TB_SM02M01 B ON(A.CO_CD=B.CO_CD AND A.ORDRG_NO=B.ORDRG_NO)
+							LEFT OUTER JOIN TB_BM05M01 J  ON  A.CO_CD    =  J.CO_CD
+							                             AND  A.MATR_CD  =  J.MATR_CD
+							LEFT OUTER JOIN (
+												SELECT C.ORDRG_NO
+														, C.ORDRG_SEQ
+														, NVL(SUM(IN_QTY), 0) AS IN_QTY
+													FROM TB_SM03D01 C
+													INNER JOIN TB_SM03M01 D ON(D.IN_NO=C.IN_NO)
+												GROUP BY C.ORDRG_NO, C.ORDRG_SEQ, C.IN_NO
+											) C ON( A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ)
 						WHERE 1=1								
 						<include refid="selectWareHousingListCondition"></include>
 						/* ORDER BY A.CO_CD DESC, A.SALES_CD DESC, A.ORDRG_NO DESC, A.ORDRG_SEQ ASC, A.CREAT_DTTM DESC, A.UDT_DTTM DESC */								
-						) X								
+						) X	
+						<if test="remainQty != null and !remainQty.equals('')">
+						WHERE REAMIN_IN_QTY <![CDATA[>]]> 0	 --입고잔량이 있는것만(데쉬보드용)	
+						  AND DUDT_DEQ_DT 	<![CDATA[<]]> #{ordrgDtTo}
+						</if>	  
 						ORDER BY CO_CD DESC, SALES_CD DESC, PCHS_CLNT_NM ASC, ORDRG_NO DESC, ORDRG_SEQ ASC						
 					) T							
 				) T
