@@ -74,7 +74,7 @@
 							</h3> <!-- <span id="ordrgTotCnt"></span> -->
 						</td>
 						<td style="text-align: left;">
-							<h3 class="location"><span class="page_tit">발주 미확정 현황</span>
+							<h3 class="location"><span class="page_tit">발주주요청서 미완료 현황</span>
 								<select id="coCd2" data-kind="CO" onchange="setByCoCd(this); ordrgGridView.setData();">
 									<option value="">전체</option>
 								</select>
@@ -202,14 +202,14 @@
 		}
 	}
 	
-	// 발주 그리드
+	// 발주요청서 그리드
 	var ordrgGridView = {
 		initView : function() {
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
-				showRowSelector : true,
+				showRowSelector : false,
 				multipleSelect : false,
-				sortable : true,
+				sortable : false,
 				target : $('[data-ax5grid="ordrg-grid"]'),
 				header : {
 					align : "center",
@@ -220,50 +220,44 @@
 						this.self.select(this.dindex);
 					},
 		            onDBLClick: function () {
-		            	viewOrderModal(this.item);
+		            	insertQualityRespModal(this.item);
 		            },
 				},
 				page : {
 					display : true,
 				},
-				footSum: [
-			    	[
-			    		{label: "합계", align: "center", colspan: 6},
-	                    {key: "ordrgQty", collector: "sum", formatter:"money", align: "right"},
-	                    {key: "realDlvrQty", collector: "sum", formatter:"money", align: "right"},
-	                    {key: "remainQty", collector: "sum", formatter:"money", align: "right"}
-			    	]
-			    ],
 				columns: [
-		          	{key: "ordrgSeq",   label: "발주일련번호",  align: "center",  hidden: true},
-		          	{key: "ordrgYn",    label: "확정",   		align: "center",  width: 50},
-		          	{key: "reqDt",      label: "요청일",   	align: "center",  width: 80},
-		          	{key: "clntNm",     label: "거래처",   	align: "left",    width: 120},
-		          	{key: "siteNm",     label: "현장",	   	align: "left",    width: 120},
-		          	{key: "whNm",     	label: "창고",   		align: "left",    width: 100},
-		          	{key: "odrCreatDiv",label: "구분",   		align: "center",  width: 60, styleClass: function () {return (this.item.odrCreatDiv == "MES") ? "grid-font-blue":"";}},
-		          	{key: "ordrgQty",   label: "요청량",   	align: "right",   width: 70, formatter: "money"},
-		          	{key: "realDlvrQty",label: "출하량",   	align: "right",   width: 70, formatter: "money"},
-		          	{key: "remainQty",  label: "잔량",   		align: "right",   width: 70, formatter: "money"}
-		        ]
+	    		     	 {key: "ordrgDt",	    label: "발행일",			width: 80,		align: "center", 	hidden:false}
+						,{key: "ordrgNm",	    label: "발행자",		    width: 70,		align: "center", 	hidden:false}						
+						,{key: "subNm",	    	label: "요청유형",		    width: 90,		align: "left", 	    hidden:false}						
+						,{key: "clntNm",	    label: "고객사",		    width: 140,		align: "left", formatter: function () {
+							return this.value.slice(0,8) + "(" + this.item.clntPjt + ")"}}
+						,{key: "codeNm",	    	label: "상태",			width: 50,		align: "center", 	hidden:false}
+						,{key: "matrDrwNo",	    label: "대표도번",		    width: 110,		align: "center", 	hidden:false}
+						,{key: "eqpNm",	    	label: "장비명",		    width: 120,		align: "left", 	    hidden:false}
+						,{key: "partNm",	    label: "분류",		    width: 70,		align: "center", 	hidden:false}
+						,{key: "reqRmk",	    label: "요청비고",		    width: 100,		align: "left", 	    hidden:false}
+ 	              ]
 			});
 			return this;
 		},
 		setData : function() {
 			var targetObj = this.target;
-			var paramObj = {
+			var formData = {
 					"coCd"       : $("#coCd2").val(),
-					"prdtGrp"     : $("#prdtGrp_S2").val(),
-					"taxivcCoprt" : $("#taxivcCoprt2").val()
+					"reqDtFrom"  : '19910101',
+					"reqDtTo" 	 : moment().add(3, 'days').format('YYYYMMDD'),
+					"rsltYn" 	 : 'N',
+					"pageNo"     : 1,
+					"recordCnt"  : 9999999
 			};
-			postAjax("/user/cm/cm10/selectOrdrgNList", paramObj, null, function(data) {
-				var list = data.resultList;
+			postAjax("/user/qm/qm01/selectQualityReqList", formData, null, function(data){  
+				var list = data.result;
 				if (list != undefined)
 				targetObj.setData({
 					list : list,
 					page : {
 						totalElements : list.length
-						/* totalElements : data.paginationInfo.totalRecordCount */
 					}
 				});
 			});				
@@ -450,7 +444,7 @@
 		clmnGridView.initView().setData();
 		gridView.initView().setData();
 		todoGridView.initView().setData();
-		ordrgGridView.initView();
+		ordrgGridView.initView().setData();
 		// grid init
 	});
 	
@@ -471,17 +465,9 @@
 		});
 	}
 	
-	
-	function viewOrderModal(item) {
-		var paramObj = {'fileTrgtKey' : item.fileTrgtKey, 'coCd': item.coCd, 'ordrgSeq' : item.ordrgSeq};
-		debugger;
-		openModal("/static/html/user/sm/sm02/SM0201P02.html", 1300, 780, "", paramObj);
-	}
-	
 
 	// 세금계산서 수정 화면
 	function insert_update_cr08_Modal(row, actionType) {
-		debugger;
 		var paramObj = {
 			"actionType"  : actionType,
 			"fileTrgtKey" : 0,
@@ -538,4 +524,54 @@
 			}
 		return;
 	} 	
+	
+	function insertQualityRespModal(row) {
+		// REQST 접수상태 - REQST01 : 접수, REQST02:진행, REQST03:완료
+		//if(row.rsltYn == "N" && row.reqSt == "REQST02"){
+			if(row.reqSt == "REQST02" || row.reqSt == "REQST03"){  //접수 상태(결제후 진행상태,결과 결제후 완료상태)에서만 등록,수정
+				if (row.resltSubCd == "" || row.resltSubCd == undefined ){//결과 등록할떄 체크
+					var paramObj = {
+							"actionType" : "C",
+							"fileTrgtKey" 	: row.fileTrgtKey,
+							"coCd" 	   		: row.coCd,
+					       	"userId"   		: jwt.userId,
+					       	"userName" : jwt.userNm,
+					       	"empNo"    : jwt.empNo,
+					       	"deptId"   : jwt.deptId,
+					       	"levelCd"  : jwt.levelCd,
+					     	"rsltYn"   : row.rsltYn,   //결과등록여부
+						    "reqSt"    : row.reqSt,    //todo진행상태
+						    "reqNo"    : row.reqNo,     //관리번호, 요청번호
+						    "midCd"    : row.midCd,
+						    "rsltNo"   : row.rsltNo,   //실적결과번호
+						    "rsltSubCd" : row.resltSubCd //결과테이블 소분류 코드
+					}
+				
+				}
+				else if (row.resltSubCd != "" ){//결과 수정할떄 체크
+					paramObj = {
+							"actionType" : "U",
+							"fileTrgtKey" 	: row.fileTrgtKey,
+							"coCd" 	   		: row.coCd,
+					       	"userId"   		: jwt.userId,
+					       	"userName" : jwt.userNm,
+					       	"empNo"    : jwt.empNo,
+					       	"deptId"   : jwt.deptId,
+					       	"levelCd"  : jwt.levelCd,
+					     	"rsltYn"   : row.rsltYn,   //결과등록여부
+						    "reqSt"    : row.reqSt,    //todo진행상태
+						    "reqNo"    : row.reqNo,     //관리번호, 요청번호
+						    "midCd"    : row.midCd,
+						    "rsltNo"   : row.rsltNo,   //실적결과번호
+						    "rsltSubCd" : row.resltSubCd //결과테이블 소분류 코드
+					}
+				}
+			
+			openModal("/static/html/user/qm/qm01/QM0101P03.html", 1600, 850, "", paramObj, function(data) {
+				//gridView.setData(0);
+			});
+		}else if(row.reqSt == "REQST01"){ 
+			alert("결재 승인후 결과 등록할 수 있습니다.");
+		}
+	}	
 </script>
