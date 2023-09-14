@@ -46,6 +46,8 @@
 	<script src="/static/js/jstree/jstree.min.js"></script>
 	<script src="/static/js/global.js"></script>
 	<script src="/static/js/fileTree.js"></script>
+	<!-- 공통결재 -->
+    <script src="/static/js/commApproval.js"></script>	
 </head>
 
 <body>
@@ -218,7 +220,7 @@
 						this.self.select(this.dindex);
 					},
 		            onDBLClick: function () {
-		            	viewOrderModal(this.item.ordrgSeq);
+		            	viewOrderModal(this.item);
 		            },
 				},
 				page : {
@@ -282,17 +284,18 @@
 					selector : false
 				},
 				body : {
-					onClick : function() {
+					onClick : function() {		
+						this.self.clearSelect();
 						this.self.select(this.dindex);
+		                if ( (this.column.key != "todoDiv2CodeNm" && this.column.key != "todoDiv1CodeNm")  ) {
+			                let paramObj = JSON.parse(this.item.pgParam);
+			                let addParam = {"viewMode": 1}
+			                Object.assign(paramObj, addParam);
+			                openSecondModal("/static/html" + this.item.pgPath, 1600, 850, "", paramObj);		                	
+		                }						
 					},
 		            onDBLClick: function () {    
-		            	debugger;
-		                if (this.item.todoDiv1CodeNm == "공유" ) {
-		                    toDoConfirm(this.dindex);
-		                }
-		                var paramObj = JSON.parse(this.item.pgParam);
-		                openSecondModal("/static/html" + this.item.pgPath, 1600, 850, "", paramObj);
-	                    todoGridView.setData();
+		            	toDoConfirmApproval(todoGridView);
 		            },
 		            mergeCells : ["todoDiv1CodeNm", "todoDiv2CodeNm", "creatNm"],
 				},
@@ -469,31 +472,12 @@
 	}
 	
 	
-	function viewOrderModal(ordrgSeq) {
-		var paramObj = {'ordrgSeq' : ordrgSeq};
-		openModal("/static/html/user/od/od01/OD0102V01.html", 1300, 780, "", paramObj);
+	function viewOrderModal(item) {
+		var paramObj = {'fileTrgtKey' : item.fileTrgtKey, 'coCd': item.coCd, 'ordrgSeq' : item.ordrgSeq};
+		debugger;
+		openModal("/static/html/user/sm/sm02/SM0201P02.html", 1300, 780, "", paramObj);
 	}
 	
-
-	function toDoConfirm(rowIdx){
-		var row = gridView.target.getList()[rowIdx];
-		//debugger;
-	    if (row.todoCfDt == undefined) {
-		 	 var today = new Date();
-		     var strDate = today.getFullYear()+"-"+('0'+(today.getMonth()+1)).slice(-2)+"-"+('0'+today.getDate()).slice(-2);
-		     
-		     var formData = new FormData();
-		     formData.append("todoKey", row.todoKey);
-		     formData.append("creatId", jwt.userId);
-		     formData.append("creatPgm", "WB2001M01");
-		     formData.append("todoCfDt", strDate);
-		     filePutAjax("/user/wb/wb20/toDoCfDtUpdate", formData, function(data){
-		         if(data.resultCode == 200){
-		             alert("공유 확인되었습니다.");      
-		         }
-		     }); 
-	    }    
-	}  
 
 	// 세금계산서 수정 화면
 	function insert_update_cr08_Modal(row, actionType) {
@@ -519,4 +503,39 @@
 		var dataType = typeof data;
 		var gridNum = '';
 	}
+	
+	// 공유확인/결재 처리
+	function toDoConfirmApproval(gridObj){
+		var selRow = parseInt(gridObj.target.selectedDataIndexs);    
+			if( isNaN(selRow) ) {
+				alert("선택된 행이 없습니다.");
+				return;
+			} else {			
+				if( selRow > -1 ) {
+					var row = gridObj.target.getList("selected")[0];	
+					if( row.todoDiv1CodeNm == "공유" ) {
+						if( row.sanctnSttus == "N" ) {
+							if( confirm("확인 처리 하시겠습니까?") ) {
+								toDoConfirm(selRow);
+							}
+						} else {
+							alert("이미 확인처리 하였습니다.");
+							return;
+						}
+					} else if( row.todoDiv1CodeNm == "결재" ) {
+						var paramObj = {
+								 "coCd":row.coCd
+								 , "salesCd":row.salesCd
+								 , "todoDiv1CodeId":row.todoDiv1CodeId
+								 , "todoDiv2CodeId":row.todoDiv2CodeId
+								 , "todoFileTrgtKey":row.todoFileTrgtKey
+								 , "pgmId": "WB2001M01"
+								 , "userId": jwt.userId
+						};
+						openSecondModal("/static/html/user/wb/wb20/WB2001P01.html", 730, 300, "", paramObj);					
+					}
+				}
+			}
+		return;
+	} 	
 </script>

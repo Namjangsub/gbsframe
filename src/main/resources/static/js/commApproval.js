@@ -141,12 +141,10 @@ function Approval(htmlParam, param, popParam) {
 		if( this.applyBtn ) {
 			$("#appBtnDiv").show();
 			$("#appConfirmAnchor").attr("onclick", "approvalConfirm()");
-			//$("input[name='todoCfOpn']").attr("readonly", false);
 		} else {
 			//hide
 			$("#appBtnDiv").hide();
 			$("#appConfirmAnchor").removeAttr("onclick");		
-			//$("input[name='todoCfOpn']").attr("readonly", true);
 		}		
 		return;
 	}
@@ -157,7 +155,7 @@ function Approval(htmlParam, param, popParam) {
     		<tr style="border-bottom:1px solid #dbdbdb;">
     			<td class="appTd">@@item1@@</td>
     			<td class="appTd">@@bold@@@@item2@@</font></td>
-    			<td class="appTd" style='text-align:left; padding-left:5px; height:25px;'><input type='text' name='todoCfOpn' readonly="readonly"></td>
+    			<td class="appTd" style='text-align:left; padding-left:5px; height:25px;'><input type='text' name='todoCfOpn' value="@@item3@@" readonly="readonly"></td>
     			<td class="appTd">@@item4@@</td>
     			<td class="appTd">@@item5@@</td>    			
     		</tr>		
