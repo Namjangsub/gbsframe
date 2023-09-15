@@ -63,6 +63,7 @@
 <script src="/static/js/ax5/ax5picker.min.js"></script>
 <script src="/static/js/ax5/ax5select.min.js"></script>
 <script src="/static/js/ax5/ax5grid-inline-editor.js"></script>
+<script src="/static/js/ax5/ax5combobox.min.js"></script>
 
 <!-- <script src="/static/js/ax5/ax5combobox.min.js"></script> -->	
 </head>
@@ -193,6 +194,7 @@ $('[data-ax5formatter]').ax5formatter();
 var today = moment(new Date()).format("YYYY-MM-DD");
 var yesterday = moment(new Date()).add(-1, 'days');	
 
+//확정여부
 ax5.ui.grid.formatter["chkIcon"] = function () {
 	var color = (this.value == "Y" || !this.value)? "√" : "";
 	if (this.value == "E"){
@@ -201,6 +203,14 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
 		return color;
 	}
 };
+
+//as여부 콤보코드
+var asYnOption = [];
+let optParam = {codeKind : "TROBLASCHK"};
+postAjaxSync("/user/wb/wb21/selectCodeList", optParam, null, function(data){
+	asYnOption = data.resultList; 
+});
+
 
   var gridView = {
   	initView: function(){
@@ -233,6 +243,7 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
                 		vatSet(row, this.item.ordrgAmt);
                 	}
                 	if( typeof(this.item.pchsDt) == "undefined" || this.item.pchsDt=="" ) gridView.target.setValue(row, "pchsDt", today);
+                	if( typeof(this.item.pchsWt) == "undefined" || this.item.pchsWt=="" ) gridView.target.setValue(row, "pchsWt", "0");        
                 }
                 if( this.column.key == "pchsDt" ) {
                 	if( typeof(this.item.pchsAmt) == "undefined" || this.item.pchsAmt=="" ) gridView.target.setValue(row, "pchsAmt", this.item.ordrgAmt);
@@ -318,8 +329,35 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
 					   		  } 
 			  },			    
 			  {key: "pchsSumAmt", 					label: "합계금액",			align: "right", 	width: 110,		 formatter: "money"
-			  },			    			  
-			  {key: "pchsDt", 				label: "확정일자", 			width:  80,		align: "center"
+			  },			    			  				    
+	  		  {key: "pchsWt", 					label: "중량",			align: "right", 	width: 50,		 formatter: "money"
+					, editor: {type:"number" 
+						, attributes: { 'maxlength': 13, 'data-maxlength': 15}
+		   		  } 				  
+			  },				
+              {key: "asYn",					        label: "AS여부",  align: "center",   width: 130
+                  , editor: {type: "select",
+                      config: {
+                          columnKeys: {optionValue: 'cd',optionText: 'nm'},
+                          options: asYnOption
+                      },
+                      disabled: function () {
+                          return false;
+                      }
+                  }
+                   , formatter: function () {
+                      var result_text = "";
+                      var itemValue = this.item.asYn;
+                      $.each(asYnOption, function (idx, elem) {
+                          if(itemValue == elem.cd)
+                          {
+                              result_text = elem.nm;
+                          }
+                      });
+                      return result_text;
+                  } 
+               },     		
+ 			  {key: "pchsDt", 				label: "확정일자", 			width:  80,		align: "center"
 					, editor: {type: "date"
 								, config: {
 											content: {
@@ -327,10 +365,10 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
 			                        				  }
 			                    			}
 								, disabled: function () {                            							
-									return this.item.u == "Y";
+									return this.item.userChkV == "Y";
 						  		}              
 							  }
-			  },			  
+			  },	               
 			  {key: "cmpletYn", 				label: "완료",				align: "center", 	width: 50,		formatter: "chkIcon"
 					, editor:{type: "checkbox"
 								, config: {trueValue: "Y", falseValue: "N"}
@@ -393,9 +431,11 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
           {key: "pchsSeq", 					label: "매입순번",      	align: "center",	width: 70},              
           {key: "maxPchsSeq", 				label: "next매입순번",    	align: "center",	width: 70, hidden: true},                     		
           {key: "ordrgAmt",     			label: "발주금액",      	align: "right",		width: 100, formatter: "money",          	hidden: false},              
-		  {key: "pchsAmt", 					label: "매입금액",			align: "right", 	width: 110,		 formatter: "money"},			    
-		  {key: "pchsVat", 					label: "부가세",			align: "right", 	width: 110,		 formatter: "money"},			    
-		  {key: "pchsSumAmt", 					label: "합계금액",			align: "right", 	width: 110,		 formatter: "money"},			    			  
+		  {key: "pchsAmt", 					label: "매입금액",			align: "right", 	width: 110,		 formatter: "money"},
+		  {key: "pchsVat", 					label: "부가세",			align: "right", 	width: 110,		 formatter: "money"},		  
+		  {key: "pchsSumAmt", 					label: "합계금액",			align: "right", 	width: 110,		 formatter: "money"},
+		  {key: "pchsWt", 					label: "중량",			align: "right", 	width: 110,		 formatter: "money"},
+		  {key: "asYn", 					label: "AS여부",			align: "right", 	width: 110,		 formatter: "money"},		  
 		  {key: "pchsDt", 				label: "확정일자", 			width:  80,		align: "center"},			  
 		  {key: "cmpletYn", 				label: "완료",				align: "center", 	width: 50,		formatter: "chkIcon"},			  
 		         ]
@@ -583,6 +623,7 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
  		        		gridView.target.setValue(selRow, "pchsSumAmt", "");
  		        		gridView.target.setValue(selRow, "cmpletYn", "N"); 
  		        		gridView.target.setValue(selRow, "pchsNo", "PC2300000");
+ 		        		gridView.target.setValue(selRow, "pchsWt", "");
  		        	//3.매입순번이 있는경우 data 존재
  		        	} else if( typeof(paramObj.pchsSeq)!="undefined" && paramObj.pchsSeq != "" ){
  	 					if( confirm("매입확정을 취소 하시겠습니까?\n\n그리드에 변경중인 내용이 초기화 됩니다.")) {
@@ -652,7 +693,9 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
 		        	if( !amtChk && !dtChk ) {
 		            	msgArr.push((idx+1)+" 행의 매입금액/매입일자를 입력해 주십시오.")	;		        		
 		        	}
-
+		        	if( !amtChk && !dtChk ) {
+		            	msgArr.push((idx+1)+" 행의 매입금액/매입일자를 입력해 주십시오.")	;		        		
+		        	}		        	
 	            }
 	        	//매입금액 over 체크
 	        	if( amtChk ) {
@@ -660,6 +703,7 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
 		        	var pchsAmt = Number(elem.pchsAmt);	     
 		        	var vatAmt = Number(elem.pchsVat);
 		        	var calcuVat = Math.floor(Number(pchsAmt / 10));
+		        	//금액체크
 		        	if( pchsAmt > balAmt && balAmt > 0 ) {
 		            	msgArr.push((idx+1)+" 행의 매입금액은 발주금액을 초과할 수 없습니다.");
 		        	//vat 10% 초과 불가
@@ -681,8 +725,15 @@ ax5.ui.grid.formatter["chkIcon"] = function () {
 		        		//조건 만족시 배열 set
 			        	if( detailObj["pchsAmt"] && detailObj["pchsDt"] ) {
 				            detailArr.push(detailObj);		        		
-			        	}			            				        		
-		        	}			        	
+			        	}
+		        		
+			        	//중량
+			        	if( typeof(elem.pchsWt)==="undefined" || elem.pchsWt=="") {
+			            	msgArr.push((idx+1)+" 행의 중량을 입력해 주십시오.")	;		        		
+			        	}
+			        	//업무구분				        		
+		        	}	        	
+		        	
 	        	}
 	        });
 	        //each end
