@@ -1,6 +1,5 @@
 package com.dksys.biz.admin.cm.cm11;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -12,7 +11,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import com.dksys.biz.admin.cm.cm11.service.CM11Svc;
-import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.util.MessageUtils;
 
 import net.minidev.json.JSONArray;
