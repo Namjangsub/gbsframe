@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.ibatis.annotations.Mapper;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 @Mapper
 public interface BM14Mapper {
@@ -38,5 +37,9 @@ public interface BM14Mapper {
 	List<Map<String, String>> selectBomAllLevelTempList(Map<String, String> paramMap);
 	
 	int checkBomInfo(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectBomAllEnterList(Map<String, String> paramMap);
+
+	int selectBomAllEnterListCount(Map<String, String> paramMap);
 	
 }

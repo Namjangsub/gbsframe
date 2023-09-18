@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.bm.bm14.service.BM14Svc;
 import com.dksys.biz.util.MessageUtils;
 
@@ -171,6 +172,18 @@ public class BM14Ctr {
     @PostMapping("/selectBomAllLevelTempList")
     public String selectBomAllLevelTempList(@RequestBody Map<String, String> paramMap, ModelMap model) {
     	List<Map<String, String>> result = bm14svc.selectBomAllLevelTempList(paramMap);
+    	model.addAttribute("result", result);
+    	return "jsonView";
+    }
+	
+    // 엑셀업로드 점검용 자식 트리 전체 리스트 조회
+    @PostMapping("/selectBomAllEnterList")
+    public String selectBomAllEnterList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        int totalCnt = bm14svc.selectBomAllEnterListCount(paramMap);
+        PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+        model.addAttribute("paginationInfo", paginationInfo);
+
+    	List<Map<String, String>> result = bm14svc.selectBomAllEnterList(paramMap);
     	model.addAttribute("result", result);
     	return "jsonView";
     }

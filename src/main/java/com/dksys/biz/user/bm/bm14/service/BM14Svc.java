@@ -34,4 +34,9 @@ public interface BM14Svc {
 	List<Map<String, String>> getAllChildNodeInfos(Map<String, String> paramMap);
 	
 	int checkBomInfo(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectBomAllEnterList(Map<String, String> paramMap);
+
+	int selectBomAllEnterListCount(Map<String, String> paramMap);
+	
 }
