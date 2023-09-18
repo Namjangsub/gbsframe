@@ -77,7 +77,14 @@ public class SM03SvcImpl implements SM03Svc {
 	@Override
 	public List<Map<String, String>> selectWareHousingDetailList(Map<String, String> paramMap) {
 		return sm03Mapper.selectWareHousingDetailList(paramMap);
-	}			
+	}		
+	
+
+	/* 입고 수정 상세 view  */
+	@Override
+	public List<Map<String, String>> selectOrderDetailView(Map<String, String> paramMap) {
+		return sm03Mapper.selectOrderDetailView(paramMap);
+	}	
 	
 	@Override
 	public int insertWareHousing(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
