@@ -420,6 +420,65 @@
 		</if>									
 	</select>
 	
+	
+	<!-- 상세  수정 팝업 0918-->
+	<select id="selectOrderDetailView" parameterType="Map" resultType="camelMap">
+	SELECT B.FILE_TRGT_KEY
+				, A.CO_CD
+				, ( SELECT FN_CM05M01_CD_TO_NM(A.CO_CD) FROM DUAL ) AS CO_CD_NM	/* 회사명 */		
+				
+				, B.REQ_NO				/* 요인별 요청번호 */
+				, A.SALES_CD
+									
+				, B.PCHS_CLNT_CD				/* 구매처cd */
+                   			,
+                   			(
+                   				SELECT D.CLNT_NM
+                   					FROM TB_BM02M01 D
+                   				WHERE B.PCHS_CLNT_CD=D.CLNT_CD
+                   			) AS PCHS_CLNT_NM		/* 구매처명 */            		
+											
+				, 
+				(
+					SELECT SUM(D.ORDRG_AMT)
+						FROM TB_SM02D01 D
+					WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.ORDRG_SEQ=D.ORDRG_SEQ AND A.SALES_CD=D.SALES_CD
+				) AS ORDRG_AMT										
+				, SUM(A.ORDRG_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_QTY	/* 발주수량 */									
+				, SUM(A.ORDRG_AMT) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_AMT	/* 발주금액 */	
+				, SUM(A.ORDRG_PRC) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_PRC	/* 발주단가 */	
+				, NVL(SUM(C.IN_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ), 0)  PRE_IN_QTY 	/* 기입고수량 */
+
+				, C.IN_NO		/* 입고번호 */
+				
+				, SUM(C.IN_DTL_AMT) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) SUM_IN_DTL_AMT  /* 입고금액 */
+				
+				, MAX(C.CURR_CD) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO)	AS CURR_CD				/* 통화단위 */
+				, MAX(C.EXRATE) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO) AS EXRATE				/* 환율 */						
+
+																										                    
+			FROM TB_SM02D01 A
+			INNER JOIN TB_SM02M01 B ON(A.CO_CD=B.CO_CD AND A.ORDRG_NO=B.ORDRG_NO)
+			LEFT OUTER JOIN TB_SM01D01 D ON(A.CO_CD = D.CO_CD AND A.SALES_CD = D.SALES_CD AND A.UPPER_CD = D.UPPER_CD AND A.LOWER_CD = D.LOWER_CD 
+											AND A.MATR_SEQ=D.MATR_SEQ AND A.MATR_CD=D.MATR_CD)
+
+			INNER JOIN TB_SM03D01 C ON(A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ AND A.SALES_CD=C.SALES_CD)				
+
+		WHERE 1=1
+		<if test="coCd != null and !coCd.equals('')">
+			AND A.CO_CD = #{coCd}   
+		</if>		
+		<if test="ordrgNo != null and !ordrgNo.equals('')">
+			AND A.ORDRG_NO = #{ordrgNo}   
+		</if>	
+		<if test="ordrgSeq != null and !ordrgSeq.equals('')">
+			AND A.ORDRG_SEQ = #{ordrgSeq}   
+		</if>		
+		<if test="salesCd != null and !salesCd.equals('')">
+			AND A.SALES_CD = #{salesCd}   
+		</if>
+	</select>
+	<!-- 상세  수정 팝업 0918-->
 
 	
 	<!-- 입고관리 - 입고마스터 등록 사용안함 -->
