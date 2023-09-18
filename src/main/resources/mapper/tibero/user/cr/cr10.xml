@@ -2,8 +2,256 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.dksys.biz.user.cr.cr10.mapper.CR10Mapper">
-	
-	<sql id="selectLgistReqSql">
+	<sql id = "selectLgistReqSql">
+	  /* 물류진행요청관리 */
+WITH SJD AS  
+     (
+      SELECT M.* 
+           , C.CLNT_NM
+           , C.BIZ_ADDR||DECODE(C.BIZ_ADDR_DTL,NULL,'',' '||C.BIZ_ADDR_DTL) AS CLNT_ADDR
+           , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)            AS CLNT_PJT_NM
+        FROM TB_CR02M01  M
+              INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD 
+            --INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세  
+       WHERE 1=1
+         AND M.CO_CD = #{coCd}
+         AND M.ORDRS_DT <![CDATA[>=]]> #{pblicteDtFr}
+         AND M.ORDRS_DT <![CDATA[<=]]> #{pblicteDtTo}
+          <if test="clntNm != null and !clntNm.equals('')">
+           AND C.CLNT_NM LIKE '%'||#{clntNm}||'%'
+          </if>
+          <if test="clntPjt != null and !clntPjt.equals('')">
+           AND M.CLNT_PJT LIKE '%'||#{clntPjt}||'%'
+          </if>
+          <if test="ordrsDiv != null and !ordrsDiv.equals('')">
+           AND M.ORDRS_DIV = #{ordrsDiv}
+          </if>
+          <if test="ordrsNo != null and !ordrsNo.equals('')">
+           AND M.ORDRS_NO LIKE '%'||#{ordrsNo}||'%'
+          </if>
+          <if test="ctrtNm != null and !ctrtNm.equals('')">
+           AND M.CTRT_NM LIKE '%'||#{ctrtNm}||'%'
+          </if>
+      )
+    , LGIST_LIST AS
+      (SELECT LGIST_NO 
+             , COUNT(*)                                                        AS SALES_CD_CNT
+             , LISTAGG(SALES_CD, ' , ') WITHIN GROUP (ORDER BY SALES_CD ASC) AS SALES_CD_LIST
+          FROM TB_CR11D01 
+         WHERE 1=1 
+         GROUP BY LGIST_NO		   
+      )
+   , SCR AS
+     (
+      SELECT TO_CHAR(A.ORDRS_CLNT_CD)||T.ORDRS_NO  AS UPPER_CD
+           , T.ORDRS_NO||'-'||TRIM(TO_CHAR(ROW_NUMBER() OVER(PARTITION BY T.ORDRS_NO ORDER BY T.ORDRS_NO, T.FILE_TRGT_KEY),'0000')) AS LOWER_CD
+           , T.CO_CD
+           , T.ORDRS_NO
+           , T.ORDRS_NO||'-'||TRIM(TO_CHAR(ROW_NUMBER() OVER(PARTITION BY T.ORDRS_NO ORDER BY T.ORDRS_NO, T.FILE_TRGT_KEY),'0000')) AS TITLE
+           , A.ORDRS_CLNT_CD
+           , A.CLNT_NM AS ORDRS_CLNT_NM
+           , A.CLNT_ADDR
+           , T.CLNT_PJT
+           , A.CLNT_PJT_NM
+           , T.FILE_TRGT_KEY
+           , T.LGIST_NO
+           , T.PBLICTE_DT
+           , T.REQ_ID
+           , (SELECT FN_CM06M01_ID_TO_NM(T.REQ_ID) FROM DUAL)   	      AS REQ_ID_NM
+           , T.PART_NO
+           , T.REQ_FX_DT
+           , (SELECT FN_CM05M01_CD_TO_NM(T.CLAS_DIV) FROM DUAL)          AS CLAS_DIV_NM
+           , (SELECT FN_CM05M01_CD_TO_NM(T.TRNS_DIV) FROM DUAL)          AS TRNS_DIV_NM
+           , (SELECT FN_CM05M01_CD_TO_NM(T.DMS_TRNS_AREA_DIV) FROM DUAL) AS DMS_TRNS_AREA_DIV_NM
+           , (SELECT FN_CM05M01_CD_TO_NM(T.DMS_SEND_CND_DIV) FROM DUAL)  AS DMS_SEND_CND_DIV_NM
+           , T.DMS_SEND_CND_DIV_ETC
+           , (SELECT FN_CM05M01_CD_TO_NM(T.DMS_PACK_KIND_DIV) FROM DUAL) AS DMS_PACK_KIND_DIV_NM
+           , (SELECT FN_CM05M01_CD_TO_NM(T.OVS_TRNS_AREA_DIV) FROM DUAL) AS OVS_TRNS_AREA_DIV_NM
+           , (SELECT FN_CM05M01_CD_TO_NM(T.OVS_SEND_CND_DIV) FROM DUAL)  AS OVS_SEND_CND_DIV_NM
+           , T.OVS_SEND_CND_DIV_ETC
+           , (SELECT FN_CM05M01_CD_TO_NM(T.OVS_PACK_KIND_DIV) FROM DUAL) AS OVS_PACK_KIND_DIV_NM
+           , (SELECT FN_CM05M01_CD_TO_NM(CASE WHEN TRNS_DIV = 'LGISTDIV0301' THEN DMS_TRNS_AREA_DIV ELSE OVS_TRNS_AREA_DIV END) FROM DUAL) AS TRNS_AREA_DIV_NM
+           , CASE WHEN INSTR(DMS_SEND_CND_DIV,'99') = 13 THEN DMS_SEND_CND_DIV_ETC
+                   WHEN INSTR(OVS_SEND_CND_DIV,'99') = 13 THEN OVS_SEND_CND_DIV_ETC
+                   ELSE FN_CM05M01_CD_TO_NM(CASE WHEN TRNS_DIV = 'LGISTDIV0301' THEN DMS_SEND_CND_DIV ELSE OVS_SEND_CND_DIV END)
+             END AS SEND_CND_DIV_NM
+           , (SELECT FN_CM05M01_CD_TO_NM(CASE WHEN TRNS_DIV = 'LGISTDIV0301' THEN DMS_PACK_KIND_DIV ELSE OVS_PACK_KIND_DIV END) FROM DUAL) AS PACK_KIND_DIV_NM
+           , T.STA_PLACE
+           , T.STA_ADDR
+           , T.STA_CHRG_ID
+           , (SELECT FN_CM06M01_ID_TO_NM(T.STA_CHRG_ID) FROM DUAL) AS STA_CHRG_ID_NM
+           , T.ARVL_PLACE
+           , T.ARVL_ADDR
+           , T.ARVL_CHRG_CONT
+           , T.PRDLST_CONT
+           , T.PRD_AMT
+           , T.WIDTH_SIZE
+           , T.VRTICL_SIZE
+           , T.HEIGHT_SIZE
+           , T.FRMLC_BEFORE_WT
+           , T.FRMLC_AFTER_WT
+           , T.SHIPMNT_DT
+           , T.HOPE_ARVL_DT
+           , T.LGIST_RMK
+           , T.TODO_DIV1_CODE_ID
+           , T.TODO_DIV2_CODE_ID
+           , L.SALES_CD_LIST
+           , L.SALES_CD_CNT
+        FROM TB_CR11M01 T
+              LEFT OUTER JOIN LGIST_LIST L ON T.LGIST_NO = L.LGIST_NO
+              INNER      JOIN SJD        A ON T.CO_CD = A.CO_CD AND T.ORDRS_NO = A.ORDRS_NO
+       WHERE  T.CO_CD = #{coCd}
+       -------------------------------------------------------------------------------------------------
+       -- 요청자, 분류구분, 운송구분, PART_NO 조건은 여기...
+       -------------------------------------------------------------------------------------------------
+      )
+    , CO_ADDR AS
+      ( 
+        SELECT BIZ_ADDR||DECODE(BIZ_ADDR_DTL,NULL,'',' '||BIZ_ADDR_DTL) AS BIZ_ADDR
+          FROM TB_BM02M01
+         WHERE ROWNUM = 1
+           AND CLNT_CD = ( SELECT CODE_ETC FROM TB_CM05M01
+                             WHERE USE_YN = 'Y' AND CODE_KIND = 'CO' AND CODE_ID = #{coCd}
+                          )
+      ) 
+    , APP_STATUS_LIST AS
+     (
+      SELECT A.CO_CD
+            , B.TODO_DIV1_CODE_ID
+            , B.TODO_DIV2_CODE_ID
+            , CASE WHEN SUM(CASE WHEN B.TODO_CF_DT IS NOT NULL THEN 1 ELSE 0 END) = SUM(CASE WHEN A.USE_YN = 'Y' THEN 1 ELSE 0 END) THEN 'APP9'
+                   WHEN SUM(CASE WHEN B.TODO_CF_DT IS NOT NULL THEN 1 ELSE 0 END) <![CDATA[>]]> 0 THEN 'APP1'
+                   ELSE 'APP0'
+               END AS APP_STATUS
+        FROM TB_BM13M01 A 
+              JOIN TB_WB20M03 B  ON A.CO_CD   = B.CO_CD AND A.APP_DIV = B.TODO_DIV1_CODE_ID AND A.APP_ID  = B.TODO_ID
+       WHERE  A.APP_DIV = 'APPDIV03'
+       GROUP BY A.CO_CD
+               , B.TODO_DIV1_CODE_ID
+               , B.TODO_DIV2_CODE_ID
+     )
+SELECT LEVEL                                            AS LEV
+      , (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
+      , T.*
+      , CASE WHEN T.FILE_TRGT_KEY IS NOT NULL THEN NVL(AP.APP_STATUS, 'APP0') END                                             AS APP_STATUS
+      , ( SELECT BIZ_ADDR FROM CO_ADDR )                                                                                     AS CO_ADDR   
+      , REGEXP_REPLACE(SYS_CONNECT_BY_PATH(T.LOWER_CD, ' -> '), '^\s+\-\>\s+', '')                                            AS PATH
+  FROM (
+		SELECT DISTINCT 'TOP'                      AS UPPER_CD 
+             , TO_CHAR(X.ORDRS_CLNT_CD)||X.ORDRS_NO  AS LOWER_CD  
+             , X.CO_CD                               AS CO_CD
+             , X.ORDRS_NO                            AS ORDRS_NO
+             , X.ORDRS_NO                            AS TITLE
+             , X.ORDRS_CLNT_CD                       AS ORDRS_CLNT_CD
+             , X.CLNT_NM                             AS ORDRS_CLNT_NM
+             , X.CLNT_PJT                            AS CLNT_PJT
+             , X.CLNT_PJT_NM                         AS CLNT_PJT_NM
+             , ''                                    AS FILE_TRGT_KEY
+             , ''                                    AS LGIST_NO
+             , ''                                    AS PBLICTE_DT
+             , ''                                    AS REQ_ID
+             , ''                                    AS REQ_ID_NM
+             , ''                                    AS PART_NO
+             , ''                                    AS REQ_FX_DT
+             , ''                                    AS CLAS_DIV_NM
+             , ''                                    AS TRNS_DIV_NM
+             , ''                                    AS DMS_TRNS_AREA_DIV_NM
+             , ''                                    AS DMS_SEND_CND_DIV_NM
+             , ''                                    AS DMS_SEND_CND_DIV_ETC
+             , ''                                    AS DMS_PACK_KIND_DIV_NM
+             , ''                                    AS OVS_TRNS_AREA_DIV_NM
+             , ''                                    AS OVS_SEND_CND_DIV_NM
+             , ''                                    AS OVS_SEND_CND_DIV_ETC
+             , ''                                    AS OVS_PACK_KIND_DIV_NM
+             , ''                                    AS TRNS_AREA_DIV_NM
+             , ''                                    AS SEND_CND_DIV_NM
+             , ''                                    AS PACK_KIND_DIV_NM
+             , ''                                    AS STA_PLACE
+             , ''                                    AS STA_ADDR
+             , ''                                    AS STA_CHRG_ID
+             , ''                                    AS STA_CHRG_ID_NM
+             , ''                                    AS ARVL_PLACE
+             , ''                                    AS ARVL_ADDR
+             , ''                                    AS ARVL_CHRG_CONT
+             , ''                                    AS PRDLST_CONT
+             , ''                                    AS PRD_AMT
+             , ''                                    AS WIDTH_SIZE
+             , ''                                    AS VRTICL_SIZE
+             , ''                                    AS HEIGHT_SIZE
+             , ''                                    AS FRMLC_BEFORE_WT
+             , ''                                    AS FRMLC_AFTER_WT
+             , ''                                    AS SHIPMNT_DT
+             , ''                                    AS HOPE_ARVL_DT
+             , ''                                    AS LGIST_RMK
+             , ''                                    AS TODO_DIV1_CODE_ID
+             , ''                                    AS TODO_DIV2_CODE_ID
+             , ''                                    AS SALES_CD_LIST
+             , ''                                    AS SALES_CD_CNT
+             , CLNT_ADDR                             AS CLNT_ADDR
+          FROM SJD X
+         WHERE 1=1
+        UNION ALL
+        SELECT R.UPPER_CD         
+             , R.LOWER_CD
+             , R.CO_CD
+             , R.ORDRS_NO
+             , R.TITLE
+             , R.ORDRS_CLNT_CD
+             , R.ORDRS_CLNT_NM
+             , R.CLNT_PJT
+             , R.CLNT_PJT_NM
+             , R.FILE_TRGT_KEY
+             , R.LGIST_NO
+             , R.PBLICTE_DT
+             , R.REQ_ID
+             , R.REQ_ID_NM     
+             , R.PART_NO
+             , R.REQ_FX_DT
+             , R.CLAS_DIV_NM
+             , R.TRNS_DIV_NM
+             , R.DMS_TRNS_AREA_DIV_NM
+             , R.DMS_SEND_CND_DIV_NM
+             , R.DMS_SEND_CND_DIV_ETC
+             , R.DMS_PACK_KIND_DIV_NM
+             , R.OVS_TRNS_AREA_DIV_NM
+             , R.OVS_SEND_CND_DIV_NM
+             , R.OVS_SEND_CND_DIV_ETC
+             , R.OVS_PACK_KIND_DIV_NM
+             , R.TRNS_AREA_DIV_NM
+             , R.SEND_CND_DIV_NM
+             , R.PACK_KIND_DIV_NM
+             , R.STA_PLACE
+             , R.STA_ADDR
+             , R.STA_CHRG_ID
+             , R.STA_CHRG_ID_NM
+             , R.ARVL_PLACE
+             , R.ARVL_ADDR
+             , R.ARVL_CHRG_CONT
+             , R.PRDLST_CONT
+             , R.PRD_AMT
+             , R.WIDTH_SIZE
+             , R.VRTICL_SIZE
+             , R.HEIGHT_SIZE
+             , R.FRMLC_BEFORE_WT
+             , R.FRMLC_AFTER_WT
+             , R.SHIPMNT_DT
+             , R.HOPE_ARVL_DT
+             , R.LGIST_RMK
+             , R.TODO_DIV1_CODE_ID
+             , R.TODO_DIV2_CODE_ID
+             , R.SALES_CD_LIST
+             , R.SALES_CD_CNT
+             , R.CLNT_ADDR
+        FROM  SCR R
+        WHERE 1=1
+       ) T
+         LEFT OUTER JOIN APP_STATUS_LIST AP  ON T.CO_CD = AP.CO_CD
+                                            AND T.TODO_DIV1_CODE_ID = AP.TODO_DIV1_CODE_ID
+                                            AND T.TODO_DIV2_CODE_ID = AP.TODO_DIV2_CODE_ID
+   START WITH UPPER_CD = 'TOP' CONNECT BY PRIOR LOWER_CD = UPPER_CD
+   ORDER BY PATH
+	</sql>
+	<sql id="selectLgistReqSql1">
 		WITH APP_STATUS_LIST AS (
 			SELECT A.CO_CD
 			     , B.TODO_DIV1_CODE_ID
