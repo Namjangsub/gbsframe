@@ -10,6 +10,8 @@ public interface QM01Mapper {
 
   int selectQualityReqCount(Map<String, String> paramMap);
   
+  int selectPurchaseListPopCount(Map<String, String> paramMap);
+  
   int selectShareUserCount(Map<String, String> paramMap);
   
   int selectSignUserCount(Map<String, String> paramMap);
@@ -19,6 +21,8 @@ public interface QM01Mapper {
   int selectSignResCount(Map<String, String> paramMap);
 
   List<Map<String, String>> selectQualityReqList(Map<String, String> paramMap);
+  
+  List<Map<String, String>> selectPurchaseListPop(Map<String, String> paramMap);
   
   List<Map<String, String>> selectQualityReqExList(Map<String, String> paramMap);
   

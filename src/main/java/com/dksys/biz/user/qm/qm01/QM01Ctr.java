@@ -39,6 +39,17 @@ public class QM01Ctr {
     model.addAttribute("result", result);
     return "jsonView";
   }
+  
+//발주 및 출장 요청서 팝업 리스트 조회
+ @PostMapping(value = "/selectPurchaseListPop")
+ public String selectPurchaseListPop(@RequestBody Map<String, String> paramMap, ModelMap model) {
+   int totalCnt = qm01Svc.selectPurchaseListPopCount(paramMap);
+   PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+   model.addAttribute("paginationInfo", paginationInfo);
+   List<Map<String, String>> result = qm01Svc.selectPurchaseListPop(paramMap);
+   model.addAttribute("result", result);
+   return "jsonView";
+ }
    
    
 //발주 및 출장 요청서 리스트엑셀 리스트  -->

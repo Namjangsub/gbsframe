@@ -42,6 +42,11 @@ public class QM01SvcImpl implements QM01Svc {
   }
   
   @Override
+  public int selectPurchaseListPopCount(Map<String, String> paramMap) {
+    return QM01Mapper.selectPurchaseListPopCount(paramMap);
+  }
+  
+  @Override
   public int selectShareUserCount(Map<String, String> paramMap) {
     return QM01Mapper.selectShareUserCount(paramMap);
   }
@@ -65,6 +70,11 @@ public class QM01SvcImpl implements QM01Svc {
   @Override
   public List<Map<String, String>> selectQualityReqList(Map<String, String> paramMap) {
     return QM01Mapper.selectQualityReqList(paramMap);
+  }
+  
+  @Override
+  public List<Map<String, String>> selectPurchaseListPop(Map<String, String> paramMap) {
+    return QM01Mapper.selectPurchaseListPop(paramMap);
   }
 
   @Override
