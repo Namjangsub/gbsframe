@@ -49,28 +49,32 @@ public class CM11Ctr {
     	arryCols.add(objCols1);
     	arryCols.add(objCols2);
     	arryCols.add(objCols3);
-    	for(int i = 0; i < resultList1.size(); i++) {
-    		JSONObject legend = new JSONObject();
-    		legend.put("v", resultList1.get(i).get("rowTit"));
-    		legend.put("f", null);
-    		JSONObject value1 = new JSONObject();
-    		value1.put("v", resultList1.get(i).get("planAmt"));
-    		value1.put("f", null);
-    		JSONObject value2 = new JSONObject();
-    		value2.put("v", resultList1.get(i).get("ordrsAmt"));
-    		value2.put("f", null);
-    		
-    		JSONArray cValueArry = new JSONArray();
-    		cValueArry.add(legend);
-    		cValueArry.add(value1);
-    		cValueArry.add(value2);
-    		
-    		JSONObject cValueObj = new JSONObject();
-    		cValueObj.put("c", cValueArry);
-    		
-    		arryRows.add(cValueObj);
-    	}
-    	
+    	try {
+	    	for(int i = 0; i < resultList1.size(); i++) {
+	    		JSONObject legend = new JSONObject();
+	    		legend.put("v", resultList1.get(i).get("rowTit"));
+	    		legend.put("f", null);
+	    		JSONObject value1 = new JSONObject();
+	    		value1.put("v", resultList1.get(i).get("planAmt"));
+	    		value1.put("f", null);
+	    		JSONObject value2 = new JSONObject();
+	    		value2.put("v", resultList1.get(i).get("ordrsAmt"));
+	    		value2.put("f", null);
+	    		
+	    		JSONArray cValueArry = new JSONArray();
+	    		cValueArry.add(legend);
+	    		cValueArry.add(value1);
+	    		cValueArry.add(value2);
+	    		
+	    		JSONObject cValueObj = new JSONObject();
+	    		cValueObj.put("c", cValueArry);
+	    		
+	    		arryRows.add(cValueObj);
+	    	}
+    	}catch(Exception e){
+    	    System.out.println("결과1 자료변환 중 오류 발생");
+        }
+        
     	data.put("cols", arryCols);
     	data.put("rows", arryRows);
     	model.addAttribute("chartData1", data);
@@ -94,27 +98,31 @@ public class CM11Ctr {
     	arryCols.add(objCols1);
     	arryCols.add(objCols2);
     	arryCols.add(objCols3);
-    	for(int i = 0; i < resultList2.size(); i++) {
-    		JSONObject legend = new JSONObject();
-    		legend.put("v", resultList2.get(i).get("clntNm"));
-    		legend.put("f", null);
-    		JSONObject value1 = new JSONObject();
-    		value1.put("v", resultList2.get(i).get("planAmt"));
-    		value1.put("f", null);
-    		JSONObject value2 = new JSONObject();
-    		value2.put("v", resultList2.get(i).get("salesAmt"));
-    		value2.put("f", null);
-    		
-    		JSONArray cValueArry = new JSONArray();
-    		cValueArry.add(legend);
-    		cValueArry.add(value1);
-    		cValueArry.add(value2);
-    		
-    		JSONObject cValueObj = new JSONObject();
-    		cValueObj.put("c", cValueArry);
-    		
-    		arryRows.add(cValueObj);
-    	}
+    	try {
+	    	for(int i = 0; i < resultList2.size(); i++) {
+	    		JSONObject legend = new JSONObject();
+	    		legend.put("v", resultList2.get(i).get("clntNm"));
+	    		legend.put("f", null);
+	    		JSONObject value1 = new JSONObject();
+	    		value1.put("v", resultList2.get(i).get("planAmt"));
+	    		value1.put("f", null);
+	    		JSONObject value2 = new JSONObject();
+	    		value2.put("v", resultList2.get(i).get("salesAmt"));
+	    		value2.put("f", null);
+	    		
+	    		JSONArray cValueArry = new JSONArray();
+	    		cValueArry.add(legend);
+	    		cValueArry.add(value1);
+	    		cValueArry.add(value2);
+	    		
+	    		JSONObject cValueObj = new JSONObject();
+	    		cValueObj.put("c", cValueArry);
+	    		
+	    		arryRows.add(cValueObj);
+	    	}
+    	}catch(Exception e){
+    	    System.out.println("결과2 자료변환 중 오류 발생");
+        }
     	
     	data.put("cols", arryCols);
     	data.put("rows", arryRows);
@@ -136,23 +144,27 @@ public class CM11Ctr {
 
     	arryCols.add(objCols1);
     	arryCols.add(objCols2);
-    	for(int i = 0; i < resultList3.size(); i++) {
-    		JSONObject legend = new JSONObject();
-    		legend.put("v", resultList3.get(i).get("rowTit"));
-    		legend.put("f", null);
-    		JSONObject value1 = new JSONObject();
-    		value1.put("v", Integer.parseInt(resultList3.get(i).get("pchsTot")));
-    		value1.put("f", null);
-    		
-    		JSONArray cValueArry = new JSONArray();
-    		cValueArry.add(legend);
-    		cValueArry.add(value1);
-    		
-    		JSONObject cValueObj = new JSONObject();
-    		cValueObj.put("c", cValueArry);
-    		
-    		arryRows.add(cValueObj);
-    	}
+    	try {
+	    	for(int i = 0; i < resultList3.size(); i++) {
+	    		JSONObject legend = new JSONObject();
+	    		legend.put("v", resultList3.get(i).get("rowTit"));
+	    		legend.put("f", null);
+	    		JSONObject value1 = new JSONObject();
+	    		value1.put("v", Integer.parseInt(resultList3.get(i).get("pchsTot")));
+	    		value1.put("f", null);
+	    		
+	    		JSONArray cValueArry = new JSONArray();
+	    		cValueArry.add(legend);
+	    		cValueArry.add(value1);
+	    		
+	    		JSONObject cValueObj = new JSONObject();
+	    		cValueObj.put("c", cValueArry);
+	    		
+	    		arryRows.add(cValueObj);
+	    	}
+    	}catch(Exception e){
+    	    System.out.println("결과3 자료변환 중 오류 발생");
+        }
     	
     	data.put("cols", arryCols);
     	data.put("rows", arryRows);
@@ -177,27 +189,31 @@ public class CM11Ctr {
     	arryCols.add(objCols1);
     	arryCols.add(objCols2);
     	arryCols.add(objCols3);
-    	for(int i = 0; i < resultList4.size(); i++) {
-    		JSONObject legend = new JSONObject();
-    		legend.put("v", resultList4.get(i).get("rowTit"));
-    		legend.put("f", null);
-    		JSONObject value1 = new JSONObject();
-    		value1.put("v", resultList4.get(i).get("planAmt"));
-    		value1.put("f", null);
-    		JSONObject value2 = new JSONObject();
-    		value2.put("v", resultList4.get(i).get("salesAmt"));
-    		value2.put("f", null);
-    		
-    		JSONArray cValueArry = new JSONArray();
-    		cValueArry.add(legend);
-    		cValueArry.add(value1);
-    		cValueArry.add(value2);
-    		
-    		JSONObject cValueObj = new JSONObject();
-    		cValueObj.put("c", cValueArry);
-    		
-    		arryRows.add(cValueObj);
-    	}
+    	try {
+	    	for(int i = 0; i < resultList4.size(); i++) {
+	    		JSONObject legend = new JSONObject();
+	    		legend.put("v", resultList4.get(i).get("rowTit"));
+	    		legend.put("f", null);
+	    		JSONObject value1 = new JSONObject();
+	    		value1.put("v", resultList4.get(i).get("planAmt"));
+	    		value1.put("f", null);
+	    		JSONObject value2 = new JSONObject();
+	    		value2.put("v", resultList4.get(i).get("salesAmt"));
+	    		value2.put("f", null);
+	    		
+	    		JSONArray cValueArry = new JSONArray();
+	    		cValueArry.add(legend);
+	    		cValueArry.add(value1);
+	    		cValueArry.add(value2);
+	    		
+	    		JSONObject cValueObj = new JSONObject();
+	    		cValueObj.put("c", cValueArry);
+	    		
+	    		arryRows.add(cValueObj);
+	    	}
+    	}catch(Exception e){
+    	    System.out.println("결과4 자료변환 중 오류 발생");
+        }
     	
     	data.put("cols", arryCols);
     	data.put("rows", arryRows);
@@ -222,27 +238,31 @@ public class CM11Ctr {
     	arryCols.add(objCols1);
     	arryCols.add(objCols2);
     	arryCols.add(objCols3);
-    	for(int i = 0; i < resultList5.size(); i++) {
-    		JSONObject legend = new JSONObject();
-    		legend.put("v", resultList5.get(i).get("trstDt"));
-    		legend.put("f", null);
-    		JSONObject value1 = new JSONObject();
-    		value1.put("v", resultList5.get(i).get("salesTot"));
-    		value1.put("f", null);
-    		JSONObject value2 = new JSONObject();
-    		value2.put("v", resultList5.get(i).get("pchsTot"));
-    		value2.put("f", null);
-    		
-    		JSONArray cValueArry = new JSONArray();
-    		cValueArry.add(legend);
-    		cValueArry.add(value1);
-    		cValueArry.add(value2);
-    		
-    		JSONObject cValueObj = new JSONObject();
-    		cValueObj.put("c", cValueArry);
-    		
-    		arryRows.add(cValueObj);
-    	}
+    	try {
+	    	for(int i = 0; i < resultList5.size(); i++) {
+	    		JSONObject legend = new JSONObject();
+	    		legend.put("v", resultList5.get(i).get("trstDt"));
+	    		legend.put("f", null);
+	    		JSONObject value1 = new JSONObject();
+	    		value1.put("v", resultList5.get(i).get("salesTot"));
+	    		value1.put("f", null);
+	    		JSONObject value2 = new JSONObject();
+	    		value2.put("v", resultList5.get(i).get("pchsTot"));
+	    		value2.put("f", null);
+	    		
+	    		JSONArray cValueArry = new JSONArray();
+	    		cValueArry.add(legend);
+	    		cValueArry.add(value1);
+	    		cValueArry.add(value2);
+	    		
+	    		JSONObject cValueObj = new JSONObject();
+	    		cValueObj.put("c", cValueArry);
+	    		
+	    		arryRows.add(cValueObj);
+	    	}
+    	}catch(Exception e){
+    	    System.out.println("결과5 자료변환 중 오류 발생");
+        }
     	
     	data.put("cols", arryCols);
     	data.put("rows", arryRows);
