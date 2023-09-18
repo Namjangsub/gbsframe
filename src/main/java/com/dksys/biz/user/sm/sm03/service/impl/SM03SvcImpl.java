@@ -80,10 +80,10 @@ public class SM03SvcImpl implements SM03Svc {
 	}		
 	
 
-	/* 입고 수정 상세 view  */
+	/* 입고정보 - 수정 팝업  */
 	@Override
-	public List<Map<String, String>> selectOrderDetailView(Map<String, String> paramMap) {
-		return sm03Mapper.selectOrderDetailView(paramMap);
+	public List<Map<String, String>> selectWareHousingDetailInfo(Map<String, String> paramMap) {
+		return sm03Mapper.selectWareHousingDetailInfo(paramMap);
 	}	
 	
 	@Override

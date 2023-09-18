@@ -25,7 +25,7 @@ public interface SM03Mapper {
 
 	List<Map<String, String>> selectWareHousingDetailList(Map<String, String> paramMap);	
 	
-	List<Map<String, String>> selectOrderDetailView(Map<String, String> paramMap);
+	List<Map<String, String>> selectWareHousingDetailInfo(Map<String, String> paramMap);
 	
 	int selectMaxTrgtKey(Map<String, String> paramMap);	
 	

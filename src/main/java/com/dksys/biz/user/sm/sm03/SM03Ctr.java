@@ -74,10 +74,10 @@ public class SM03Ctr {
   		return "jsonView";
     }	  
     
-    // 발주상세 팝업 조회 0918
-  	@PostMapping(value = "/selectOrderDetailView")
-  	public String selectOrderDetailView(@RequestBody Map<String, String> paramMap, ModelMap model) {
-  		List<Map<String, String>> resultList = sm03Svc.selectOrderDetailView(paramMap);
+    // 입고정보 - 수정 팝업
+  	@PostMapping(value = "/selectWareHousingDetailInfo")
+  	public String selectWareHousingDetailInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+  		List<Map<String, String>> resultList = sm03Svc.selectWareHousingDetailInfo(paramMap);
   		model.addAttribute("resultList", resultList);
   		return "jsonView";
   	} 
