@@ -164,6 +164,7 @@
                     X.VER_NO,
                     X.SALES_CD,
                     X.MKER_DIV,
+                    (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.MKER_DIV) AS MKER_DIV_NM,
                     X.MKER_CD,
                     (SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD = X.MKER_CD) AS MKER_NM,
                     X.SMRIZE_ID,
@@ -218,10 +219,18 @@
                 AND X.SALES_CD = #{salesCd}
                 AND X.VER_NO = (SELECT MAX(VER_NO) FROM TB_WB21M01 WHERE CO_CD = #{coCd} AND SALES_CD = #{salesCd})
         </select>
-       
-        <select id="selectMaxWbsPlanNo" parameterType="Map"  resultType="camelMap">
-              SELECT  #{year} || trim(to_char(nvl(SUBSTR(MAX(WBS_PLAN_NO), 4, 4),0) + 1, '0000')) AS WBS_PLAN_NO FROM TB_WB22M01 
+               
+        <select id="selectMaxWbsPlanNo" parameterType="Map"  resultType="int">
+              SELECT  #{year} || trim(to_char(nvl(SUBSTR(MAX(WBS_PLAN_NO), 5, 4),0) + 1, '0000')) AS WBS_PLAN_NO FROM TB_WB22M01 
               WHERE CO_CD = #{coCd}   
+        </select>
+                
+        <select id="selectMaxWbsCode" parameterType="Map"  resultType="int">
+             SELECT to_char(NVL(MAX(SUBSTR(WBS_PLAN_CODE_ID, 10, 2)),0) + 1,'00') FROM TB_WB22M01 
+             WHERE LENGTH(WBS_PLAN_CODE_ID) >9
+             AND CO_CD = #{coCd} 
+             AND SALES_CD = #{salesCd}
+             AND WBS_PLAN_CODE_KIND = #{wbsPlanCodeKind}  
         </select>
                 
         <select id="selectWbsSeqNext" parameterType="Map" resultType="int">
@@ -236,13 +245,15 @@
 		              Y.FILE_TRGT_KEY,
                       #{coCd} AS CO_CD,
                       Y.WBS_PLAN_NO,
+                      Y.VER_NO,
                       #{salesCd} AS SALES_CD,                                
-                      NVL(Y.WBS_PLAN_MNG_ID, ' ') AS WBS_PLAN_MNG_ID,
-                      NVL((SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = Y.WBS_PLAN_MNG_ID), ' ') AS WBS_PLAN_MNG_NM,
+                      NVL(Y.WBS_PLAN_MNG_ID, '') AS WBS_PLAN_MNG_ID,
+                      NVL((SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = Y.WBS_PLAN_MNG_ID), '') AS WBS_PLAN_MNG_NM,
                       NVL(Y.WBS_PLANS_DT, #{beginDt,  jdbcType=VARCHAR}) AS WBS_PLANS_DT,
                       NVL(Y.WBS_PLANE_DT, #{acptncDt,  jdbcType=VARCHAR}) AS WBS_PLANE_DT,
                       Y.DAYCNT,
                       NVL(Y.WBS_PLAN_STS_CODE_ID, 'WBSPLANSTS10') AS WBS_PLAN_STS_CODE_ID,
+                      (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = NVL(Y.WBS_PLAN_STS_CODE_ID, 'WBSPLANSTS10')) AS WBS_PLAN_STS_CODE_ID_NM,
                       Y.LOCK_YN,
                       Y.CLOSE_YN,
                       Y.CREAT_ID,
@@ -264,6 +275,7 @@
 					            FILE_TRGT_KEY,
 					            WBS_PLAN_CODE_ID,
 					            WBS_PLAN_NO,
+					            VER_NO,
 					            WBS_PLAN_MNG_ID,
 					            TO_CHAR(WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT,
 					            TO_CHAR(WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT,
@@ -283,6 +295,57 @@
 		            ON X.CODE_ID = Y.WBS_PLAN_CODE_ID
            </select>
 
+         <select id="selectWBS2Level" parameterType="Map"  resultType="camelMap"> 
+              SELECT ROWNUM AS RN,   
+                     X.FILE_TRGT_KEY,
+                     X.CO_CD,
+                     X.WBS_PLAN_NO,
+                     X.WBS_PLAN_CODE_KIND,
+                     (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_CODE_KIND) AS WBS_PLAN_CODE_KIND_NM,
+                     X.WBS_PLAN_CODE_ID,
+                     X.WBS_PLAN_CODE_NM,
+                     X.SALES_CD,
+                     X.SEQ,
+                     X.VER_NO,
+                     X.WBS_PLAN_MNG_ID,
+                     (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.WBS_PLAN_MNG_ID) AS WBS_PLAN_MNG_NM,
+                     TO_CHAR(X.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT,
+                     TO_CHAR(X.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT,
+                     X.DAYCNT,
+                     X.WBS_PLAN_STS_CODE_ID,
+                     (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_STS_CODE_ID) AS WBS_PLAN_STS_CODE_ID_NM,
+                     X.CLOSE_YN,
+                     X.CREAT_ID,
+                     X.CREAT_PGM,
+                     X.CREAT_DTTM,
+                     X.UDT_ID,
+                     X.UDT_PGM,
+                     X.UDT_DTTM,
+                     Y.FILE_TRGT_KEY AS RSLTS_FILE_TRGT_KEY,
+                     Y.WBS_RSLTS_NO,
+                     Y.WBS_RSLTS_ID,
+                     (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = Y.WBS_RSLTS_ID) AS WBS_RSLTS_NM,
+                     Y.WBS_RSLTS_RATE,
+                     Y.WBS_PLAN_MH AS WBS_RSLTS_PLAN_MH, 
+                     Y.WBS_RSLTS_MH,
+                     Y.WBS_RSLTS_CNTS,
+                     TO_CHAR(Y.WBS_RSLTSS_DT, 'YYYY-MM-DD') AS WBS_RSLTSS_DT,
+                     TO_CHAR(Y.WBS_RSLTSE_DT, 'YYYY-MM-DD') AS WBS_RSLTSE_DT,
+                     Y.DAYCNT AS RSLTS_DAYCNT,
+                     NVL(Y.CLOSE_YN,'N') AS RSLTS_CLOSE_YN
+                FROM TB_WB22M01 X
+                LEFT OUTER JOIN TB_WB23M01 Y
+                ON X.CO_CD = Y.CO_CD
+                AND X.SALES_CD = Y.SALES_CD
+                AND X.WBS_PLAN_CODE_KIND = Y.WBS_PLAN_CODE_KIND
+                AND X.WBS_PLAN_CODE_ID = Y.WBS_PLAN_CODE_ID           
+                AND X.WBS_PLAN_NO = Y.WBS_RSLTS_NO                
+                WHERE X.CO_CD = #{coCd}
+                AND X.SALES_CD = #{salesCd}
+                AND X.WBS_PLAN_CODE_KIND = #{wbsPlanCodeKind}               
+           </select>
+   
+   
            <insert id="wbsLevel1Insert" parameterType="Map">
                 INSERT INTO TB_WB22M01
                 (
@@ -292,6 +355,7 @@
 				    WBS_PLAN_CODE_KIND,
 				    WBS_PLAN_CODE_ID,
 				    SALES_CD,
+				    VER_NO,
 				    SEQ,
 				    WBS_PLAN_MNG_ID,
 				    WBS_PLANS_DT,
@@ -310,6 +374,7 @@
                     'WBSCODE',
                     #{wbsPlanCodeId},
                     #{salesCd},
+                    #{verNo},
                     #{sortNo},
                     #{wbsPlanMngId},
                     #{wbsPlansDt},
@@ -336,36 +401,7 @@
                WHERE FILE_TRGT_KEY = #{fileTrgtKey}      
          </update>
          
-         <select id="selectWBS2Level" parameterType="Map"  resultType="camelMap"> 
-		      SELECT ROWNUM AS RN,   
-		             X.FILE_TRGT_KEY,
-				     X.CO_CD,
-				     X.WBS_PLAN_NO,
-				     X.WBS_PLAN_CODE_KIND,
-				     (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.WBS_PLAN_CODE_KIND) AS WBS_PLAN_CODE_KIND_NM,
-				     X.WBS_PLAN_CODE_ID,
-				     X.WBS_PLAN_CODE_NM,
-				     X.SALES_CD,
-				     X.SEQ,
-				     X.WBS_PLAN_MNG_ID,
-				     (SELECT T.NAME FROM TB_CM06M01 T WHERE T.ID = X.WBS_PLAN_MNG_ID) AS WBS_PLAN_MNG_NM,
-				     TO_CHAR(X.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT,
-                     TO_CHAR(X.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT,
-				     X.DAYCNT,
-				     X.WBS_PLAN_STS_CODE_ID,
-				     X.CLOSE_YN,
-				     X.CREAT_ID,
-				     X.CREAT_PGM,
-				     X.CREAT_DTTM,
-				     X.UDT_ID,
-				     X.UDT_PGM,
-				     X.UDT_DTTM
-				FROM TB_WB22M01 X
-				WHERE X.CO_CD = #{coCd}
-                AND X.SALES_CD = #{salesCd}
-                AND X.WBS_PLAN_CODE_KIND = #{wbsPlanCodeKind}				
-           </select>
-           
+        
            <select id="wbsPlanListChk" parameterType="Map" resultType="camelMap">
                SELECT *  FROM TB_WB22M01
                    WHERE CO_CD  = #{coCd}
@@ -390,6 +426,7 @@
                     WBS_PLAN_CODE_ID,
                     WBS_PLAN_CODE_NM,
                     SALES_CD,
+                    VER_NO,
                     SEQ,
                     WBS_PLAN_MNG_ID,
                     WBS_PLANS_DT,
@@ -409,6 +446,7 @@
                     #{wbsPlanCodeId},
                     #{wbsPlanCodeNm},
                     #{salesCd},
+                    #{verNo},
                     #{seq},
                     #{wbsPlanMngId},
                     #{wbsPlansDt},
@@ -421,5 +459,236 @@
                 )
          </insert>
          
+          <update id="wbsLevel2Update" parameterType="Map">
+                UPDATE TB_WB22M01
+                    SET SEQ = #{seq},
+                        WBS_PLAN_CODE_NM = #{wbsPlanCodeNm},
+                        WBS_PLAN_MNG_ID = #{wbsPlanMngId},
+                        WBS_PLANS_DT = #{wbsPlansDt},
+                        WBS_PLANE_DT = #{wbsPlaneDt},
+                        DAYCNT = #{daycnt},
+                        WBS_PLAN_STS_CODE_ID = #{wbsPlanStsCodeId},
+                        UDT_ID = #{creatId},
+                        UDT_PGM = #{creatPgm},
+                        UDT_DTTM = SYSDATE 
+                    WHERE FILE_TRGT_KEY = #{fileTrgtKey}                
+         </update>
+         
+         
+         <delete id="wbsLevel2Delete" parameterType="Map">
+               DELETE FROM TB_WB22M01
+                   WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+         </delete>
+         
+         <select id="selectVerNoNext" parameterType="Map" resultType="camelMap">
+             SELECT NVL(MAX(VER_NO), 0) + 1 AS VER_NO FROM TB_WB22M01
+               WHERE CO_CD = #{coCd}
+               AND SALES_CD = #{salesCd}
+         </select>
            
+         <update id="wbsVerUpUpdate" parameterType="Map">
+                UPDATE TB_WB22M01
+                    SET VER_NO = #{newVerNo}
+                WHERE CO_CD = #{coCd}
+                AND SALES_CD = #{salesCd}
+                AND VER_NO = #{verNo}
+                      
+         </update>  
+         
+         <insert id="wbsVerUpInsert" parameterType="Map">
+                INSERT INTO TB_WB22M01_HIST
+                (
+                    FILE_TRGT_KEY,
+                    CO_CD,
+                    WBS_PLAN_NO,
+                    WBS_PLAN_CODE_KIND,
+                    WBS_PLAN_CODE_ID,
+                    SALES_CD,
+                    VER_NO,
+                    SEQ,
+                    WBS_PLAN_MNG_ID,
+                    WBS_PLANS_DT,
+                    WBS_PLANE_DT,
+                    DAYCNT,
+                    WBS_PLAN_STS_CODE_ID,
+                    CLOSE_YN,
+                    CLOSE_ID,
+                    CLOSE_DTTM
+                ) 
+                VALUES
+                (
+                    #{fileTrgtKey},
+                    #{coCd},
+                    #{wbsPlanNo},
+                    'WBSCODE',
+                    #{wbsPlanCodeId},
+                    #{salesCd},
+                    #{verNo},
+                    #{seq},
+                    #{wbsPlanMngId},
+                    #{wbsPlansDt},
+                    #{wbsPlaneDt},
+                    #{daycnt},
+                    #{wbsPlanStsCodeId},
+                    #{closeYn},
+                    #{creatId},
+                    SYSDATE
+                )
+         </insert>
+         
+         <update id="wbsLevel1confirm" parameterType="Map">
+                 UPDATE TB_WB22M01
+                  SET   WBS_PLAN_MNG_ID = #{wbsPlanMngId},
+	                    WBS_PLANS_DT = #{wbsPlansDt},
+	                    WBS_PLANE_DT = #{wbsPlaneDt},
+	                    DAYCNT = #{daycnt},
+	                    WBS_PLAN_STS_CODE_ID = #{wbsPlanStsCodeId},
+	                    CLOSE_YN = #{flag},
+	                    UDT_ID = #{creatId},
+	                    UDT_PGM = #{creatPgm},
+	                    UDT_DTTM = SYSDATE
+                 WHERE FILE_TRGT_KEY = #{fileTrgtKey}             
+         </update>
+         
+         <update id="wbsLevel2confirm" parameterType="Map">
+                UPDATE TB_WB22M01
+                    SET WBS_PLAN_CODE_NM = #{wbsPlanCodeNm},
+                        WBS_PLAN_MNG_ID = #{wbsPlanMngId},
+                        WBS_PLANS_DT = #{wbsPlansDt},
+                        WBS_PLANE_DT = #{wbsPlaneDt},
+                        DAYCNT = #{daycnt},
+                        WBS_PLAN_STS_CODE_ID = #{wbsPlanStsCodeId},
+                        CLOSE_YN = #{flag},
+                        UDT_ID = #{creatId},
+                        UDT_PGM = #{creatPgm},
+                        UDT_DTTM = SYSDATE 
+                    WHERE FILE_TRGT_KEY = #{fileTrgtKey}                       
+         </update>
+         
+         <select id="selectRsltsSharngList" parameterType="Map" resultType="camelMap">
+               SELECT ROWNUM AS RN,
+                      X.SALES_CD, 
+                      X.TODO_CODE_ID AS WBS_RSLTS_PLAN_CODE_ID,
+                      (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.TODO_CODE_ID) AS WBS_RSLTS_PLAN_CODE_NM,
+                      X.TODO_NO AS WBS_RSLTS_PLAN_NO,
+                      X.TODO_CO_CD AS WBS_RSLTS_CO_CD,
+                      (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.TODO_CO_CD) AS WBS_RSLTS_CO_CD_NM,                      
+                      Y.ID AS WBS_SHARNG_USER_ID, 
+                      Y.EMP_NO,
+                      Y.NAME,
+                      Y.TEL_NO,
+                      Y.EMAIL,
+                      TO_CHAR(X.TODO_CF_DT,'YYYY-MM-DD') AS TODO_CF_DT,
+                      X.TODO_CF_OPN
+                      FROM TB_WB20M03 X
+                      INNER JOIN TB_CM06M01 Y
+                      ON X.TODO_CO_CD = Y.CO_CD
+                      AND X.TODO_ID = Y.ID
+                      WHERE X.TODO_CO_CD = '${coCd}'
+                      AND X.TODO_CODE_ID = '${codeId}' 
+                      AND X.SALES_CD = '${salesCd}'
+                      AND X.TODO_DIV2_CODE_ID = 'TODODIV1020'
+                      ORDER BY ROWNUM ASC
+          </select>
+          
+          
+          <select id="selectRsltsApprovalList" parameterType="Map" resultType="camelMap">
+               SELECT ROWNUM AS RN,
+                      X.SALES_CD, 
+                      X.TODO_CODE_ID AS WBS_RSLTS_PLAN_CODE_ID,
+                      (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.TODO_CODE_ID) AS WBS_RSLTS_PLAN_CODE_NM,
+                      X.TODO_NO AS WBS_RSLTS_PLAN_NO, 
+                      X.TODO_CO_CD AS WBS_RSLTS_CO_CD,
+                      (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = X.TODO_CO_CD) AS WBS_RSLTS_CO_CD_NM,                   
+                      Y.ID AS WBS_SHARNG_USER_ID, 
+                      Y.EMP_NO,
+                      Y.NAME,
+                      Y.TEL_NO,
+                      Y.EMAIL,
+                      TO_CHAR(X.TODO_CF_DT,'YYYY-MM-DD') AS TODO_CF_DT,
+                      X.TODO_CF_OPN
+                      FROM TB_WB20M03 X
+                      INNER JOIN TB_CM06M01 Y
+                      ON X.TODO_CO_CD = Y.CO_CD
+                      AND X.TODO_ID = Y.ID
+                      WHERE X.TODO_CO_CD = '${coCd}'
+                      AND X.TODO_CODE_ID = '${codeId}' 
+                      AND X.SALES_CD = '${salesCd}'
+                      AND X.TODO_DIV2_CODE_ID = 'TODODIV2010'
+                      ORDER BY ROWNUM ASC
+          </select>
+          
+          <select id="selectWbsRstlsSeqNext" parameterType="Map" resultType="int">
+             SELECT TB_WB23M01_SQ01.NEXTVAL FROM DUAL
+          </select>
+          
+          <insert id="wbsRsltsInsert" parameterType="Map">
+                INSERT INTO TB_WB23M01
+                (
+                        FILE_TRGT_KEY,
+                        CO_CD,
+                        WBS_RSLTS_NO,
+                        WBS_PLAN_CODE_KIND,
+                        WBS_PLAN_CODE_ID,
+                        SALES_CD,
+                        WBS_RSLTS_ID,
+                        WBS_RSLTS_RATE,
+                        WBS_RSLTS_MH,
+                        WBS_RSLTS_CNTS,
+                        WBS_RSLTSS_DT,
+                        WBS_RSLTSE_DT,
+                        DAYCNT,
+                        LOCK_YN,
+                        CLOSE_YN,
+                        CREAT_ID,
+                        CREAT_PGM,
+                        CREAT_DTTM                 
+                ) 
+                VALUES
+                (       
+                        #{rsltsFileTrgtKey},
+                        #{coCd},
+                        #{wbsRsltsNo},
+                        #{wbsPlanCodeKind2_P},
+                        #{wbsPlanCodeId2_P},
+                        #{salesCd_P},
+                        #{wbsRsltsId},
+                        #{wbsRsltsRate},
+                        #{wbsRsltsMh},
+                        #{wbsRsltsCnts},
+                        #{wbsRsltssDt},
+                        #{wbsRsltseDt},
+                        #{rsltsDaycnt},
+                        'N',
+                        'N',
+                        #{userId},
+                        #{pgmId},
+                        SYSDATE  
+                )
+                
+         </insert>   
+         
+         <update id="wbsRsltsUpdate" parameterType="Map">
+                UPDATE TB_WB23M01
+                    SET WBS_RSLTS_RATE = #{wbsRsltsRate},
+                        WBS_RSLTS_MH = #{wbsRsltsMh},
+                        WBS_RSLTS_CNTS = #{wbsRsltsCnts},
+                        WBS_RSLTSS_DT = #{wbsRsltssDt},
+                        WBS_RSLTSE_DT = #{wbsRsltseDt},
+                        DAYCNT = #{rsltsDaycnt},
+                        UDT_ID = #{userId},
+                        UDT_PGM = #{pgmId},
+                        UDT_DTTM = SYSDATE     
+                    WHERE FILE_TRGT_KEY =  #{rsltsFileTrgtKey}   
+         </update>   
+         
+         <update id="wbsRsltsconfirm" parameterType="Map">
+                UPDATE TB_WB23M01
+                    SET CLOSE_YN = #{flag},
+                        UDT_ID = #{userId},
+                        UDT_PGM = #{pgmId},
+                        UDT_DTTM = SYSDATE     
+                    WHERE FILE_TRGT_KEY =  #{rsltsFileTrgtKey}   
+         </update>   
+         
 </mapper>

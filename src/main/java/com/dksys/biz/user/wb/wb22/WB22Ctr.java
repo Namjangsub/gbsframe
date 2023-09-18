@@ -113,4 +113,128 @@ public class WB22Ctr {
   		}
   		return "jsonView";
     }
+	
+	@PostMapping(value = "/selectVerNoNext") 
+    public String selectSjVerNoNext(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    List<Map<String, String>> result = wb22Svc.selectVerNoNext(paramMap);
+	    model.addAttribute("result", result); 
+	    return "jsonView"; 		 
+    }
+	
+	@PostMapping(value = "/wbsVerUpInsert")
+    public String sjVerUpInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (wb22Svc.wbsVerUpInsert(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  		} else {
+  			model.addAttribute("resultCode", 500);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  		    model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }
+	
+	@PostMapping(value = "/wbsLevel1confirm")
+    public String wbsLevel1confirm(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (wb22Svc.wbsLevel1confirm(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  		} else {
+  			model.addAttribute("resultCode", 500);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  		    model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }
+	
+	@PostMapping(value = "/wbsLevel2confirm")
+    public String wbsLevel2confirm(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (wb22Svc.wbsLevel2confirm(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  		} else {
+  			model.addAttribute("resultCode", 500);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  		    model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }
+	
+	@PostMapping(value = "/selectRsltsSharngList") 
+    public String selectRsltsSharngList(@RequestBody Map<String, String> paramMap, ModelMap model) {	  
+	  List<Map<String, String>> resultList = wb22Svc.selectRsltsSharngList(paramMap);
+	  model.addAttribute("resultList", resultList); 
+	  return "jsonView"; 		 
+    }
+	
+	@PostMapping(value = "/selectRsltsApprovalList") 
+    public String selectRsltsApprovalList(@RequestBody Map<String, String> paramMap, ModelMap model) {	  
+	  List<Map<String, String>> resultList = wb22Svc.selectRsltsApprovalList(paramMap);
+	  model.addAttribute("resultList", resultList); 
+	  return "jsonView"; 		 
+    }
+	
+	@PostMapping(value = "/wbsRsltsInsert")
+    public String wbsRsltsInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {		
+		try {
+			if (wb22Svc.wbsRsltsInsert(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+  	return "jsonView";
+   }
+
+	@PostMapping(value = "/wbsRsltsUpdate")
+    public String wbsRsltsUpdate(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {		
+		try {
+			if (wb22Svc.wbsRsltsUpdate(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+  	return "jsonView";
+   }	
+	
+	@PostMapping(value = "/wbsRsltsconfirm")
+    public String wbsRsltsconfirm(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (wb22Svc.wbsRsltsconfirm(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  		} else {
+  			model.addAttribute("resultCode", 500);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  		    model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }
+	
 }

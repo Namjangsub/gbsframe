@@ -20,5 +20,22 @@ public interface WB22Svc {
 	
 	int wbsLevel2Insert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
+	int wbsVerUpInsert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	
+	List<Map<String, String>> selectVerNoNext(Map<String, String> paramMap);
+	
+	int wbsLevel1confirm(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	
+	int wbsLevel2confirm(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;	
+	
+	List<Map<String, String>> selectRsltsSharngList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectRsltsApprovalList(Map<String, String> paramMap);
+	   
+	int wbsRsltsInsert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	
+	int wbsRsltsUpdate(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	
+	int wbsRsltsconfirm(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
 }

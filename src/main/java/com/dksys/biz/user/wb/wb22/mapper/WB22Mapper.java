@@ -14,9 +14,11 @@ public interface WB22Mapper {
 	
 	List<Map<String, String>> selectWBS1Level(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectMaxWbsPlanNo(Map<String, String> paramMap);
+	int selectMaxWbsPlanNo(Map<String, String> paramMap);
 	
 	int selectWbsSeqNext(Map<String, String> paramMap);
+	
+	int selectMaxWbsCode(Map<String, String> paramMap);
 	
 	int wbsLevel1Insert(Map<String, String> paramMap);
 	
@@ -26,8 +28,34 @@ public interface WB22Mapper {
 	
 	int wbsLevel2Insert(Map<String, String> paramMap);
 	
+	int wbsLevel2Update(Map<String, String> paramMap);
+	
 	List<Map<String, String>> wbsPlanListChk(Map<String, String> paramMap);
 	
 	int deleteWbsPlanlist(Map<String, String> paramMap);
+	
+	int wbsLevel2Delete(Map<String, String> paramMap);
+	
+	int wbsVerUpInsert(Map<String, String> paramMap);
+	
+	int wbsVerUpUpdate(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectVerNoNext(Map<String, String> paramMap);
+	
+	int wbsLevel1confirm(Map<String, String> paramMap);
+	
+	int wbsLevel2confirm(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectRsltsSharngList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectRsltsApprovalList(Map<String, String> paramMap);
+	   
+	int selectWbsRstlsSeqNext(Map<String, String> paramMap);
+	
+	int wbsRsltsInsert(Map<String, String> paramMap);
+	
+	int wbsRsltsUpdate(Map<String, String> paramMap);
+	
+	int wbsRsltsconfirm(Map<String, String> paramMap);
 	
 }
