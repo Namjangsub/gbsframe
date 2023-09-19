@@ -176,15 +176,32 @@ public class BM14Ctr {
     	return "jsonView";
     }
 	
-    // 엑셀업로드 점검용 자식 트리 전체 리스트 조회
-    @PostMapping("/selectBomAllEnterList")
-    public String selectBomAllEnterList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-        int totalCnt = bm14svc.selectBomAllEnterListCount(paramMap);
-        PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-        model.addAttribute("paginationInfo", paginationInfo);
-
-    	List<Map<String, String>> result = bm14svc.selectBomAllEnterList(paramMap);
+    // 엑셀업로드 점검용 temp테이블 입력
+    @PostMapping("/insertTempBom")
+    public String insertTempBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+    	try {
+    		String rtnStr = bm14svc.insertTempBom(paramMap);
+    		if (!rtnStr.isEmpty()) {
+    			model.addAttribute("rtnStr", rtnStr);
+    			model.addAttribute("resultCode", 200);
+    			model.addAttribute("resultMessage", "업로드 되었습니다.");
+    		} else {
+    			model.addAttribute("resultCode", 500);
+    			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));    			
+    		}
+    	}catch(Exception e) {
+    		model.addAttribute("resultCode", 900);
+    		model.addAttribute("resultMessage", e.getMessage());
+    	}
+    	return "jsonView";
+    }
+    
+    // 업로드 내용 적용 프로시져 호출
+    @PostMapping("/callDraftTempBom")
+    public String callDraftTempBom(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	Map<String, String> result = bm14svc.callDraftTempBom(paramMap);
     	model.addAttribute("result", result);
     	return "jsonView";
     }
+    
 }

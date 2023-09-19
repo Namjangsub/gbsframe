@@ -34,12 +34,20 @@ public interface BM14Mapper {
 	
 	List<Map<String, String>> selectBomAllLevelList(Map<String, String> paramMap);
 	
+	List<Map<String, String>> selectBomAllEnterList(Map<String, String> paramMap);
+
+	int selectBomAllEnterListCount(Map<String, String> paramMap);
+	
 	List<Map<String, String>> selectBomAllLevelTempList(Map<String, String> paramMap);
 	
 	int checkBomInfo(Map<String, String> paramMap);
 
-	List<Map<String, String>> selectBomAllEnterList(Map<String, String> paramMap);
-
-	int selectBomAllEnterListCount(Map<String, String> paramMap);
+	int deleteTempBom(Map<String, String> paramMap);
+	
+	int insertTempBom(Map<String, String> paramMap);
+	
+	void callCheckTempBom(Map<String, String> param);
+	
+	void callDraftTempBom(Map<String, String> param);
 	
 }
