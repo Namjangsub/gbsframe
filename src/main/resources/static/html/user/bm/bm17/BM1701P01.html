@@ -1,0 +1,234 @@
+<style>
+	* input[comma] {
+		text-align: right;
+	}
+</style>
+	
+	<div class="popup_area of_a" style="width: 100%; height: 100%;">
+		<div class="tit_contents">
+			<h4 class="tit">알림톡 등록</h4>
+		</div>
+		
+		<form id="popForm" onSubmit="return false;">
+			<div class="form-group popup_table">
+				<input type="hidden" id="userId" name="userId">
+				<input type="hidden" id="pgmId"  name="pgmId" value="BM1701M01">
+				
+				<table>
+					<colgroup>
+						<col width="15%">
+						<col width="18%">
+						<col width="15%">
+						<col width="18%">
+						<col width="15%">
+						<col width="19%">
+					</colgroup>
+					
+					<tr>
+						<th class="hit">회사</th>
+						<td>
+							<select id="coCd" name="coCd" data-kind="CO" required msg="회사"></select>
+						</td>
+								
+						<th class="hit">템플릿 구분</th>
+						<td>
+							<select id="tmplatDiv" name="tmplatDiv" data-kind="TMPLATDIV" data-search="TMPLATDIV" style="width:140px;" required msg="결재선명">
+						      <option value="">선택</option>
+							</select>
+						</td>
+						<th class="hit">사용여부</th>
+						<td>
+							<select id="useYn" name="useYn" data-search="useYn" required msg="사용여부">
+								<option value="Y">Y</option>
+								<option value="N">N</option>
+							</select>
+						</td>						
+					</tr>
+					<tr>				
+						<th class="hit">예약어</th>
+						<td id="reserveMsg" style="over-flow:auto; height:400px; vertical-align:top; ">
+						
+						</td>
+						<td colspan="4" style="vertical-align:top;">
+						<textarea name="mssageDesc" id="mssageDesc" style="width:98%; height:400px; margin:10px;" required msg="메시지내용"></textarea>
+						</td>	
+					</tr>
+				</table>
+				
+				<br>
+				<div class="popup_table" style="visibility:hidden;">
+					<!-- 예약어 공통 콤보용 -->
+					<select id="resveCombo" name="resveCombo" data-kind="RESVEMSSAGE" data-search="RESVEMSSAGE"  onchange="" style="width:140px;">
+					</select>
+				</div>
+			</div>
+		</form>
+	</div>
+	
+	<!-- 하단 버튼 -->
+	<div class ="popup_bottom_btn">
+		<button type="button" id="actionBtn" authChk>등록</button>
+		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+	</div>
+	
+<script type="text/javascript">
+	//전역 초기화
+	var actionType = null;
+	var userId = null;
+	var userNm = null;
+	var coCd = null;
+	var useYn = null;
+		
+$(document).ready(function() {
+	setCommonSelect($(".popup_area select[data-kind]"));
+	
+	//회사명 콤보 set	
+	coCd = modalStack.last().paramObj.coCd;
+	$("#coCd").val(coCd);
+	
+	//작성자
+	userId = modalStack.last().paramObj.userId;
+	userNm = modalStack.last().paramObj.userNm;		
+		
+	setByCoCd(modalStack.last().paramObj.coCd);
+	$("#coCd").prop("disabled", true);
+	
+	$.makeReserveDiv = function() {
+		//예약메시지 콤보 key(공통)
+		var options = $('#resveCombo option');
+		var optValues = $.map(options ,function(option) {
+		    return option.value;
+		});
+		//예약메시지 콤보 text(공통)
+		var optLabels = $.map(options ,function(option) {
+		    return option.label;
+		});
+		
+		var divTpl = `<div style="border:1px solid #000; width:90%; margin:10px; height:25px; cursor:pointer;" name="reserveDiv" data-key="@@divKey@@">@@label@@</div>`;
+		let htmlDiv = "";
+		for(var i=0; i<optLabels.length; i++) {
+			let html = divTpl;					
+			html = html.replace(/@@label@@/gi, optLabels[i]);				
+			html = html.replace(/@@divKey@@/gi, optValues[i]);
+			htmlDiv += html;
+		}
+		$("#reserveMsg").append(htmlDiv);			
+	}
+	
+	//등록/수정 버튼
+	actionType = modalStack.last().paramObj.actionType;
+	if (actionType == "C") {
+		$("#actionBtn").text("등록");
+
+		$('#actionBtn').on("click", function() {
+			insertMessageTempl();
+		});
+		
+	} else if (actionType == "U") {
+		$('.tit').text('알림톡 템플릿 수정');
+		
+		//그리드 load
+		gridViewPop.initView().setData(0);
+		$('#actionBtn').text("수정");
+
+		//수정시 readonly
+		//select hidden 처리, readonly input 생성
+		$("select[name=coCd] option").hide();			
+		$('#actionBtn').on("click", function() {
+			updateApproval();
+		});
+	}
+	
+	//divBtn
+	$.makeReserveDiv();
+	
+	//textarea 커서 위치에 예약어 삽입
+	$("div[name=reserveDiv]").click(function() {
+		let mssageDescVal = $("#mssageDesc").val();
+		let spos = $("#mssageDesc").prop("selectionStart");
+	    let epos = $("#mssageDesc").prop("selectionEnd");
+	    let msg1 = mssageDescVal.substring(0, spos);
+	    let msg2 = mssageDescVal.substring(epos, mssageDescVal.length);		
+
+		if( typeof($(this).data("key")) != "undefined" ) {
+			let addText = $(this).data("key");
+		    $("#mssageDesc").val(msg1 + addText + msg2);
+		    spos = spos + addText.length;
+		    $("#mssageDesc").prop("selectionEnd", spos).focus();			
+		}
+	});
+	
+		// 권한체크
+		authChk();
+});
+//ready end
+	
+
+	
+	 // 등록 - done
+	function insertMessageTempl() {
+		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
+			var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
+			var makeArr = {};
+			return;
+			//저장용 배열 push
+			filePostAjax("/user/bm/bm17/insertMessageTempl", formData,				// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
+				function(data) {
+					alert(data.resultMessage);								// 결과 메시지를 alert으로 출력
+					if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
+						gridView.setData(0);
+						modalStack.close();									// 모달을 닫음
+					}
+			});
+		}
+	}
+	
+	// 수정
+	function updateApproval() {
+		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
+			var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
+			//actFlag별 처리
+			var makeArr = {};		
+			//저장용 배열 push, appNo 지정
+			makeArr = $.gridInsertArr(gridViewPop, "U");		
+			if(makeArr.length > 0) {
+				formData.append("makeArr", JSON.stringify(makeArr));
+			}        
+			//삭제용 배열 push
+			delArr = $.gridDeleteArr(gridViewPop);
+			if(delArr.length > 0) {
+				formData.append("delArr", JSON.stringify(delArr));
+			}     	
+			filePostAjax("/user/bm/bm13/updateApproval", formData,				// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행
+				function(data) {
+					alert(data.resultMessage);								// 결과 메시지를 alert으로 출력
+					if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
+						gridView.setData(0);
+						modalStack.close();									// 모달을 닫음
+					}
+			});
+		}
+	}
+	
+	//----------------------------------------------//
+	
+	function makeFormData() {
+
+		// 날짜 하이픈 제거
+		$.each($('.popup_area input[date]'), function(idx, elem) {
+			deleteHyphen(elem);
+		});
+		// 폼데이터 생성
+		var formData = new FormData($("#popForm")[0]);
+		
+		// 기본값 set
+		formData.append("userId", jwt.userId);
+		 
+		return formData;
+	}
+	
+	function setByCoCd(value) {
+		$('#coCd option:not([value="'+value+'"])').remove();
+	}
+	
+</script>
