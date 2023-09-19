@@ -45,11 +45,6 @@ public class BM14SvcImpl implements BM14Svc {
 	}
 
 	@Override
-	public List<Map<String, String>> selectBomAllLevelTempList(Map<String, String> paramMap) {
-		return bm14Mapper.selectBomAllLevelTempList(paramMap);
-	}
-	
-	@Override
 	public Map<String, String> selectBomTreInfo(Map<String, String> paramMap) {
 		return bm14Mapper.selectBomTreInfo(paramMap);
 	}
@@ -237,12 +232,42 @@ public class BM14SvcImpl implements BM14Svc {
 	
 	
 	@Override
-	public List<Map<String, String>> selectBomAllEnterList(Map<String, String> paramMap) {
-		return bm14Mapper.selectBomAllEnterList(paramMap);
+	public List<Map<String, String>> selectBomAllLevelTempList(Map<String, String> paramMap) {
+		return bm14Mapper.selectBomAllLevelTempList(paramMap);
 	}
 	
 	@Override
-	public int selectBomAllEnterListCount(Map<String, String> paramMap) {
-		return bm14Mapper.selectBomAllEnterListCount(paramMap);
+	public String insertTempBom(Map<String, String> paramMap) {
+		String result = null;
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+		
+		List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
+	    for (Map<String, String> dtl : bomList) {
+	    	//재조회시 salesCd 획득을 위한 것
+	    	dtl.put("coCd", paramMap.get("coCd"));
+	    	dtl.put("userId", paramMap.get("userId"));
+	    	dtl.put("pgmId", paramMap.get("pgmId"));
+	    	
+	    	if (result == null || result.isEmpty()) {
+	    		result = dtl.get("salesCd");
+	    		//넣기 전 기존 데이터 삭제
+	    		bm14Mapper.deleteTempBom(dtl);
+	    	}
+	    	
+	    	bm14Mapper.insertTempBom(dtl);
+	    }
+	    
+	    paramMap.put("salesCd", result);
+	    bm14Mapper.callCheckTempBom(paramMap);
+	    
+		return result;	
 	}
+	
+	@Override
+	public Map<String, String> callDraftTempBom(Map<String, String> paramMap) {
+		bm14Mapper.callDraftTempBom(paramMap);
+		return paramMap;
+	}
+
 }

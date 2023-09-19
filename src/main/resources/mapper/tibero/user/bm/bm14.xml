@@ -285,29 +285,6 @@
 		     ORDER BY PATH
 	</select>	
 	
-	<select id="selectBomAllLevelTempList" parameterType="Map" resultType="CamelMap">
-	/* selectBomAllLevelTempList */
-				SELECT 	CASE WHEN T.LOWER_KEY = #{fileTrgtKey} THEN '' ELSE T.UPPER_KEY END PID,  
-					T.LOWER_KEY ID ,
-					(LEVEL-1)  LVL,
-					REGEXP_REPLACE(SYS_CONNECT_BY_PATH(T.LOWER_CD, ' -> '), '^\s+\-\>\s+', '') as PATH,
-					FN_CM05M01_CD_TO_NM(T.MATR_UNIT_CD) MATR_UNIT_CD_NM,
-					T.* 
-			       , M.MATR_WT
-			       , M.MATR_UPR   --최종구매단가
-			       , M.MATR_AVRG_UPR  --평균구매단가
-			       , M.MATR_LAST_TRST_DT  --최종거래일자
-			       , M.MATR_UPR * T.LOWER_QTY AS PART_AMT
-			  FROM TB_BM14M01_TMP T
-			  				LEFT OUTER JOIN  TB_BM05M01 AS M   ON T.CO_CD    = M.CO_CD 
-			  				                                  AND T.MATR_CD  = M.MATR_CD 
-			 WHERE T.SALES_CD = #{salesCd, jdbcType=VARCHAR}
-			   AND T.CO_CD    = #{coCd, jdbcType=VARCHAR}	 
-			 START WITH T.LOWER_KEY =  #{fileTrgtKey, jdbcType=VARCHAR}	
-		     CONNECT BY PRIOR T.LOWER_KEY = T.UPPER_KEY
-		     ORDER BY PATH
-	</select>
-	
 	<select id="selectBomAllEnterListCount" parameterType="Map" resultType="int">
 	/* selectBomAllEnterListCount */
 				SELECT 	count(*)
@@ -421,4 +398,203 @@
 		WHERE  RN BETWEEN ${firstIndex} AND ${lastIndex}
 	</select>	
 	
+	<select id="selectBomAllLevelTempList" parameterType="Map" resultType="CamelMap">
+	/* selectBomAllLevelTempList */
+				SELECT 	CASE WHEN T.LOWER_KEY = (SELECT LOWER_KEY FROM TB_BM14M01_TMP WHERE SALES_CD = T.SALES_CD AND CO_CD = T.CO_CD AND UPPER_CD = '#') THEN '' ELSE T.UPPER_KEY END PID,  
+					T.LOWER_KEY ID ,
+					(LEVEL-1)  LVL,
+					REGEXP_REPLACE(SYS_CONNECT_BY_PATH(T.LOWER_CD, ' -> '), '^\s+\-\>\s+', '') as PATH,
+					FN_CM05M01_CD_TO_NM(T.MATR_UNIT_CD) MATR_UNIT_CD_NM,
+					T.* 
+			       , M.MATR_WT
+			       , M.MATR_UPR   --최종구매단가
+			       , M.MATR_AVRG_UPR  --평균구매단가
+			       , M.MATR_LAST_TRST_DT  --최종거래일자
+			       , M.MATR_UPR * T.LOWER_QTY AS PART_AMT
+			  FROM TB_BM14M01_TMP T
+			  				LEFT OUTER JOIN  TB_BM05M01 AS M   ON T.CO_CD    = M.CO_CD 
+			  				                                  AND T.MATR_CD  = M.MATR_CD 
+			 WHERE T.SALES_CD = #{salesCd, jdbcType=VARCHAR}
+			   AND T.CO_CD    = #{coCd, jdbcType=VARCHAR}	 
+			 START WITH T.LOWER_KEY =  (SELECT LOWER_KEY FROM TB_BM14M01_TMP WHERE SALES_CD = T.SALES_CD AND CO_CD = T.CO_CD AND UPPER_CD = '#')
+		     CONNECT BY PRIOR T.LOWER_KEY = T.UPPER_KEY
+		     ORDER BY PATH
+	</select>
+	
+	<delete id="deleteTempBom" parameterType="Map">
+	  DELETE TB_BM14M01_TMP
+	   WHERE CO_CD = #{coCd, jdbcType=VARCHAR}
+	     AND SALES_CD = #{salesCd, jdbcType=VARCHAR}
+	</delete>
+	
+	<insert id="insertTempBom" parameterType="Map">
+		MERGE INTO TB_BM14M01_TMP t1
+		USING (
+		    SELECT
+		        #{coCd, jdbcType=VARCHAR} AS CO_CD,
+		        #{salesCd, jdbcType=VARCHAR} AS SALES_CD,
+		        #{upperCd, jdbcType=VARCHAR} AS UPPER_KEY,
+		        #{lowerCd, jdbcType=VARCHAR} AS LOWER_KEY,
+		        #{upperCd, jdbcType=VARCHAR} AS UPPER_CD,
+		        #{lowerCd, jdbcType=VARCHAR} AS LOWER_CD,
+		        #{dsgnNo, jdbcType=VARCHAR} AS DSGN_NO,
+		        #{bomSeq, jdbcType=VARCHAR} AS BOM_SEQ,
+		        #{partNo, jdbcType=VARCHAR} AS PART_NO,
+		        #{unitNo, jdbcType=VARCHAR} AS UNIT_NO,
+		        #{revNo, jdbcType=VARCHAR} AS REV_NO,
+		        #{matrSeq, jdbcType=VARCHAR} AS MATR_SEQ,
+		        #{matrCd, jdbcType=VARCHAR} AS MATR_CD,
+		        #{matrNm, jdbcType=VARCHAR} AS MATR_NM,
+		        #{matrMat, jdbcType=VARCHAR} AS MATR_MAT,
+		        #{matrMakrNm, jdbcType=VARCHAR} AS MATR_MAKR_NM,
+		        #{matrMno, jdbcType=VARCHAR} AS MATR_MNO,
+		        #{matrSpec, jdbcType=VARCHAR} AS MATR_SPEC,
+		        #{matrRmk, jdbcType=VARCHAR} AS MATR_RMK,
+		        TO_DATE(#{avlbStrtDt, jdbcType=VARCHAR}, 'YYYY-MM-DD') AS AVLB_STRT_DT,
+		        TO_DATE(#{avlbEndDt, jdbcType=VARCHAR}, 'YYYY-MM-DD') AS AVLB_END_DT,
+		        #{useYn, jdbcType=VARCHAR} AS USE_YN,
+		        #{matrYn, jdbcType=VARCHAR} AS MATR_YN,
+		        #{lowerQty, jdbcType=VARCHAR} AS LOWER_QTY,
+		        #{fileTrgtKey, jdbcType=VARCHAR} AS FILE_TRGT_KEY,
+		        #{lowerUnit, jdbcType=VARCHAR} AS LOWER_UNIT,
+		        #{matrUnitCd, jdbcType=VARCHAR} AS MATR_UNIT_CD,
+		        #{etcField1, jdbcType=VARCHAR} AS ETC_FIELD1,
+		        #{etcField2, jdbcType=VARCHAR} AS ETC_FIELD2,
+		        #{etcField3, jdbcType=VARCHAR} AS ETC_FIELD3,
+		        #{excelUseYn, jdbcType=VARCHAR} AS EXCEL_USE_YN,
+		        #{excelCheckResult, jdbcType=VARCHAR} AS EXCEL_CHECK_RESULT,
+		        #{userId, jdbcType=VARCHAR} AS CREAT_ID,
+		        #{pgmId, jdbcType=VARCHAR} AS CREAT_PGM
+		    FROM DUAL
+		) t2
+		ON (t1.SALES_CD = t2.SALES_CD AND t1.DSGN_NO = t2.DSGN_NO AND NVL(t1.MATR_CD,t1.DSGN_NO) = NVL(t2.MATR_CD,t2.DSGN_NO))
+		WHEN MATCHED THEN
+		    UPDATE SET
+		        t1.UPPER_KEY = t2.UPPER_KEY,
+		        t1.LOWER_KEY = t2.LOWER_KEY,
+		        t1.UPPER_CD = t2.UPPER_CD,
+		        t1.LOWER_CD = t2.LOWER_CD,
+		        t1.BOM_SEQ = t2.BOM_SEQ,
+		        t1.PART_NO = t2.PART_NO,
+		        t1.UNIT_NO = t2.UNIT_NO,
+		        t1.REV_NO = t2.REV_NO,
+		        t1.MATR_SEQ = t2.MATR_SEQ,
+		        t1.MATR_NM = t2.MATR_NM,
+		        t1.MATR_MAT = t2.MATR_MAT,
+		        t1.MATR_MAKR_NM = t2.MATR_MAKR_NM,
+		        t1.MATR_MNO = t2.MATR_MNO,
+		        t1.MATR_SPEC = t2.MATR_SPEC,
+		        t1.MATR_RMK = t2.MATR_RMK,
+		        t1.AVLB_STRT_DT = t2.AVLB_STRT_DT,
+		        t1.AVLB_END_DT = t2.AVLB_END_DT,
+		        t1.USE_YN = t2.USE_YN,
+		        t1.MATR_YN = t2.MATR_YN,
+		        t1.LOWER_QTY = t2.LOWER_QTY,
+		        t1.FILE_TRGT_KEY = t2.FILE_TRGT_KEY,
+		        t1.LOWER_UNIT = t2.LOWER_UNIT,
+		        t1.MATR_UNIT_CD = t2.MATR_UNIT_CD,
+		        t1.ETC_FIELD1 = t2.ETC_FIELD1,
+		        t1.ETC_FIELD2 = t2.ETC_FIELD2,
+		        t1.ETC_FIELD3 = t2.ETC_FIELD3,
+		        t1.EXCEL_USE_YN = t2.EXCEL_USE_YN,
+		        t1.EXCEL_CHECK_RESULT = t2.EXCEL_CHECK_RESULT,
+		        t1.UDT_ID = t2.CREAT_ID,
+		        t1.UDT_PGM = t2.CREAT_PGM
+		WHEN NOT MATCHED THEN
+		    INSERT (
+		        CO_CD,
+		        SALES_CD,
+		        UPPER_KEY,
+		        LOWER_KEY,
+		        UPPER_CD,
+		        LOWER_CD,
+		        DSGN_NO,
+		        BOM_SEQ,
+		        PART_NO,
+		        UNIT_NO,
+		        REV_NO,
+		        MATR_SEQ,
+		        MATR_CD,
+		        MATR_NM,
+		        MATR_MAT,
+		        MATR_MAKR_NM,
+		        MATR_MNO,
+		        MATR_SPEC,
+		        MATR_RMK,
+		        AVLB_STRT_DT,
+		        AVLB_END_DT,
+		        USE_YN,
+		        MATR_YN,
+		        LOWER_QTY,
+		        FILE_TRGT_KEY,
+		        LOWER_UNIT,
+		        MATR_UNIT_CD,
+		        ETC_FIELD1,
+		        ETC_FIELD2,
+		        ETC_FIELD3,
+		        EXCEL_USE_YN,
+		        EXCEL_CHECK_RESULT,
+		        CREAT_ID,
+		        CREAT_PGM
+		    ) VALUES (
+		        t2.CO_CD,
+		        t2.SALES_CD,
+		        t2.UPPER_KEY,
+		        t2.LOWER_KEY,
+		        t2.UPPER_CD,
+		        t2.LOWER_CD,
+		        t2.DSGN_NO,
+		        t2.BOM_SEQ,
+		        t2.PART_NO,
+		        t2.UNIT_NO,
+		        t2.REV_NO,
+		        t2.MATR_SEQ,
+		        t2.MATR_CD,
+		        t2.MATR_NM,
+		        t2.MATR_MAT,
+		        t2.MATR_MAKR_NM,
+		        t2.MATR_MNO,
+		        t2.MATR_SPEC,
+		        t2.MATR_RMK,
+		        t2.AVLB_STRT_DT,
+		        t2.AVLB_END_DT,
+		        t2.USE_YN,
+		        t2.MATR_YN,
+		        t2.LOWER_QTY,
+		        t2.FILE_TRGT_KEY,
+		        t2.LOWER_UNIT,
+		        t2.MATR_UNIT_CD,
+		        t2.ETC_FIELD1,
+		        t2.ETC_FIELD2,
+		        t2.ETC_FIELD3,
+		        t2.EXCEL_USE_YN,
+		        t2.EXCEL_CHECK_RESULT,
+		        t2.CREAT_ID,
+		        t2.CREAT_PGM
+		    )
+
+	</insert>
+	
+	<select id="callCheckTempBom" statementType="CALLABLE" parameterType="map">
+	/* callCheckTempBom */
+        {call SP_BM14M01_TMP_I(
+	        #{coCd      , mode=IN, jdbcType=VARCHAR},
+	        #{salesCd   , mode=IN, jdbcType=VARCHAR},
+	        #{userId    , mode=IN, jdbcType=VARCHAR},
+	        #{pgmId     , mode=IN, jdbcType=VARCHAR},
+	        #{errMsg     , mode=OUT, jdbcType=VARCHAR}
+	    )}
+    </select>
+    
+    <select id="callDraftTempBom" statementType="CALLABLE" parameterType="map">
+	/* callDraftTempBom */
+        {call SP_BM14M01_TMP_U(
+	        #{coCd      , mode=IN, jdbcType=VARCHAR},
+	        #{salesCd   , mode=IN, jdbcType=VARCHAR},
+	        #{userId    , mode=IN, jdbcType=VARCHAR},
+	        #{pgmId     , mode=IN, jdbcType=VARCHAR},
+	        #{errMsg     , mode=OUT, jdbcType=VARCHAR}
+	    )}
+    </select>
+    
 </mapper>

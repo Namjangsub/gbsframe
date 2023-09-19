@@ -13,8 +13,6 @@ public interface BM14Svc {
 	
 	List<Map<String, String>> selectBomAllLevelList(Map<String, String> paramMap);
 
-	List<Map<String, String>> selectBomAllLevelTempList(Map<String, String> paramMap);
-	
 	Map<String, String> selectBomTreInfo(Map<String, String> paramMap);
 	
 //	Map<String, String> checkBomRootSalesCdInfo(Map<String, String> paramMap);
@@ -35,8 +33,10 @@ public interface BM14Svc {
 	
 	int checkBomInfo(Map<String, String> paramMap);
 
-	List<Map<String, String>> selectBomAllEnterList(Map<String, String> paramMap);
+	List<Map<String, String>> selectBomAllLevelTempList(Map<String, String> paramMap);
 
-	int selectBomAllEnterListCount(Map<String, String> paramMap);
+	String insertTempBom(Map<String, String> paramMap);
+
+	Map<String, String> callDraftTempBom(Map<String, String> paramMap);
 	
 }
