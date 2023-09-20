@@ -395,8 +395,80 @@
         </if>  
           ORDER BY T.CO_CD, T.REQ_NO
   </select>
-  
   <select id="selectQtyReqInfo" resultType="CamelMap">
+  SELECT A.* 
+     , FN_CM05M01_CD_TO_NM(A.BUST_CD01) AS BUST_NM01
+     , FN_CM05M01_CD_TO_NM(A.BUST_CD02) AS BUST_NM02
+	 , FN_CM05M01_CD_TO_NM(A.INWK_CD01) AS INWK_CD01
+     , FN_CM05M01_CD_TO_NM(A.INWK_CD02) AS INWK_CD02
+FROM (
+		SELECT  T.CO_CD AS CO_CD 
+		           ,(SELECT X.CODE_NM FROM TB_CM05M01 X WHERE X.CODE_ID = T.CO_CD) AS CO_NM 
+		          ,T.REQ_NO AS REQ_NO 
+		          ,TO_CHAR(T.ORDRG_DT, 'YYYY-MM-DD') AS ORDRG_DT 
+		          ,T.ORDRG_ID AS ORDRG_ID 
+			      ,N2.NAME AS ORDRG_NM 
+			      ,SUBSTR(N2.DEPT_ID,0,5) AS DEPT_CD
+		          ,N3.DEPT_NM AS DEPT_NM
+		          ,T.REG_ID AS REG_ID 
+		          ,N1.NAME AS REG_NM 
+		          ,T.SALES_CD AS SALES_CD 
+		          ,T.SALES_CD AS MATR_DRW_NO 
+		          ,SM.ORDRS_CLNT_CD  AS CLNT_CD 
+		          ,CT.CLNT_NM AS CLNT_NM 
+		          ,SM.CLNT_PJT AS CLNT_PJT  
+		          ,T.REQ_CD AS REQ_CD
+		          , (SELECT FN_CM05M01_CD_TO_NM(T.REQ_CD) FROM DUAL) AS REQ_CD_NM
+		          ,TO_CHAR(T.REQ_DT, 'YYYY-MM-DD') AS REQ_DT 
+		          ,S.ORDRS_NO AS ORDRS_NO 
+		          ,SM.CTRT_NM AS PROJ_NM 
+		        , CASE WHEN INSTR(T.BUST_CD, ',', 1, 1) = 0 THEN T.BUST_CD
+		               ELSE SUBSTR(T.BUST_CD, 1, INSTR(T.BUST_CD, ',', 1, 1)-1)
+		               END BUST_CD01
+		        , CASE WHEN INSTR(T.BUST_CD, ',', 1, 2) = 0 THEN ''
+		               ELSE SUBSTR(T.BUST_CD, INSTR(T.BUST_CD, ',', 1, 1)+1, (INSTR(T.BUST_CD, ',', 1, 2)-1) - INSTR(T.BUST_CD, ',', 1, 1))
+		               END BUST_CD02
+		        , CASE WHEN INSTR(T.INWK_CD, ',', 1, 1) = 0 THEN T.INWK_CD
+		               ELSE SUBSTR(T.INWK_CD, 1, INSTR(T.INWK_CD, ',', 1, 1)-1)
+		               END INWK_CD01
+		        , CASE WHEN INSTR(T.INWK_CD, ',', 1, 2) = 0 THEN ''
+		               ELSE SUBSTR(T.INWK_CD, INSTR(T.INWK_CD, ',', 1, 1)+1, (INSTR(T.INWK_CD, ',', 1, 2)-1) - INSTR(T.INWK_CD, ',', 1, 1))
+		               END INWK_CD02
+		          ,T.BUST_NM AS BUST_NM     
+		          ,T.BUST_PE AS BUST_PE 
+		          ,T.PART_CD AS PART_CD
+		          , (SELECT FN_CM05M01_CD_TO_NM(T.PART_CD) FROM DUAL) AS PART_CD_NM        
+		          , (SELECT FN_CM05M01_CD_TO_NM(T.DEPT_CD2) FROM DUAL) AS DEPT2_NM
+		          ,T.MID_CD AS MID_CD
+		          , (SELECT FN_CM05M01_CD_TO_NM(T.MID_CD) FROM DUAL) AS MID_NM
+		          ,T.SUB_CD AS SUB_CD
+		          , (SELECT FN_CM05M01_CD_TO_NM(T.SUB_CD) FROM DUAL) AS SUB_CD_NM
+		          ,T.REQ_RMK AS REQ_RMK
+		          ,T.FILE_TRGT_KEY
+		          , S.ORDRS_DTL_DIV20 AS ORDRS_DTL_DIV20
+		          , (SELECT FN_CM05M01_CD_TO_NM(S.ordrs_dtl_div20) FROM DUAL) AS NEW_CD
+		          , (
+						SELECT CASE
+								WHEN (COUNT(TODO_KEY)>0)
+									THEN 'Y'
+								ELSE 'N'
+							   END
+							FROM TB_WB20M03 W20
+						WHERE 1=1
+							AND T.SALES_CD=W20.SALES_CD
+							AND T.REQ_NO=W20.TODO_NO										
+					) AS TODO_YN  
+			FROM TB_QM01M01 T
+			LEFT OUTER JOIN TB_CM06M01 N1 ON N1.ID = T.REG_ID  AND N1.CO_CD =  T.CO_CD
+			LEFT OUTER JOIN TB_CM06M01 N2 ON N2.ID = T.ORDRG_ID  AND N2.CO_CD =  T.CO_CD
+			LEFT OUTER JOIN TB_CM04M01 N3 ON N3.DEPT_ID = SUBSTR(N2.DEPT_ID, 0, 5) 
+			LEFT OUTER JOIN TB_CR02D02 S ON T.SALES_CD = S.SALES_CD  
+		    LEFT OUTER JOIN TB_CR02M01 SM ON S.CO_CD = SM.CO_CD  AND S.ORDRS_NO = SM.ORDRS_NO
+			LEFT OUTER JOIN TB_BM02M01 CT ON CT.CLNT_CD = SM.ORDRS_CLNT_CD AND CT.USE_YN = 'Y'
+	) AS A
+	WHERE A.FILE_TRGT_KEY = #{fileTrgtKey}
+  </select>
+  <select id="selectQtyReqInfo1" resultType="CamelMap">
    SELECT  T.CO_CD AS CO_CD 
            ,(SELECT X.CODE_NM FROM TB_CM05M01 X WHERE X.CODE_ID = T.CO_CD) AS CO_NM 
           ,T.REQ_NO AS REQ_NO 
@@ -442,7 +514,7 @@
 	LEFT OUTER JOIN TB_CR02D02 S ON T.SALES_CD = S.SALES_CD  
     LEFT OUTER JOIN TB_CR02M01 SM ON S.CO_CD = SM.CO_CD  AND S.ORDRS_NO = SM.ORDRS_NO
 	LEFT OUTER JOIN TB_BM02M01 CT ON CT.CLNT_CD = SM.ORDRS_CLNT_CD AND CT.USE_YN = 'Y'
-	WHERE T.FILE_TRGT_KEY = #{fileTrgtKey}
+	WHERE A.FILE_TRGT_KEY = #{fileTrgtKey}
  </select>
  
  <select id="selectQtyReqRespInfo" resultType="CamelMap">
@@ -463,6 +535,16 @@
         , A.CREAT_ID
         , A.CREAT_PGM
         , A.CREAT_DTTM
+        , (
+						SELECT CASE
+								WHEN (COUNT(TODO_KEY)>0)
+									THEN 'Y'
+								ELSE 'N'
+							   END
+							FROM TB_WB20M03 W20
+						WHERE 1=1
+							AND A.RSLT_NO=W20.TODO_NO										
+					) AS TODO_YN 
       FROM TB_QM01P01 A
       LEFT OUTER JOIN TB_CM06M01 B ON A.RES_REQ_ID = B.ID 	
 	WHERE A.RSLT_NO = #{rsltNo}
@@ -749,13 +831,14 @@
   
 <update id="updateQualityReq" parameterType="Map">
 		UPDATE TB_QM01M01
-		SET   BUST_CD = #{bustCd, jdbcType=VARCHAR} /*출장자*/
-		     ,BUST_NM = #{bustNm, jdbcType=VARCHAR} /*출장자명*/
+		SET   REQ_CD = #{REQCD}  /*요청구분*/
+			 ,BUST_CD = #{bustCd, jdbcType=VARCHAR} /*출장자*/
+			 ,BUST_NM = #{bustNm, jdbcType=VARCHAR} /*출장자명*/
 		     ,INWK_CD = #{inwkCd, jdbcType=VARCHAR} /*사내작업*/
 		     ,BUST_PE = #{bustPe, jdbcType=VARCHAR} /*출장장소*/
-		     ,PART_CD = #{COBTP, jdbcType=VARCHAR} /*분류*/
-		     ,MID_CD = #{midCd, jdbcType=VARCHAR} /*중분류*/
-		     ,SUB_CD = #{CODECOBGB, jdbcType=VARCHAR} /*소분류*/
+		     ,PART_CD = #{COBTP} /*분류*/
+		     ,MID_CD = #{midCd} /*중분류*/
+		     ,SUB_CD = #{CODECOBGB} /*소분류*/
 		     ,REQ_RMK = #{reqRmk, jdbcType=VARCHAR} /*비고*/
 		     ,UDT_ID  = #{userId}
 			 ,UDT_PGM = #{pgmId}
@@ -830,7 +913,7 @@
 	     #{ordrgId},
 	     #{regId},
 	     #{salesCd},
-	     #{reqCd, jdbcType=VARCHAR},
+	     #{REQCD},
 	     to_date(#{reqDt}, 'YYYY-MM-DD'),
 	     #{bustCd, jdbcType=VARCHAR},
 	     #{bustNm, jdbcType=VARCHAR},
