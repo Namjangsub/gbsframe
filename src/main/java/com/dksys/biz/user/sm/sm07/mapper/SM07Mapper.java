@@ -12,12 +12,6 @@ import java.util.Map;
 
 @Mapper
 public interface SM07Mapper {
-
-	int selectOrderListCount(Map<String, String> paramMap);
-
-	List<Map<String, String>> selectOrderList(Map<String, String> paramMap);
-	
-	List<Map<String, String>> selectOrderDetailList(Map<String, String> paramMap);	
 	
 	int updateOrderDetail(Map<String, String> paramMap);
 	/*

@@ -6,13 +6,6 @@ import java.util.Map;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface SM07Svc {
-
-	// 발주 리스트 카운트	
-	int selectOrderListCount(Map<String, String> paramMap);
-	
-	List<Map<String, String>> selectOrderList(Map<String, String> paramMap);
-	
-	List<Map<String, String>> selectOrderDetailList(Map<String, String> paramMap);	
 	
 	int updateOrderDetail(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	/*
