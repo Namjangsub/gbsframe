@@ -57,29 +57,27 @@ public class BM17Ctr {
 		  
 	  }    
 
-	//기준관리 결재선 등록
-    @PostMapping(value = "/insertMessageTempl")
-    public String insertMessageTempl(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  		try {
-  			if (bm17Svc.insertMessageTempl(paramMap, mRequest) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-  			} else {
-  				model.addAttribute("resultCode", 500);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  			model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }	  
-    
-	//기준관리 결재선 수정    
+	//알림톡 등록
+	  //공통 결재승인(등록)
+	@PostMapping(value = "/insertMessageTempl")
+	public String insertApprovalLine(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    	try {
+	    		bm17Svc.insertMessageTempl(paramMap);
+		    	model.addAttribute("resultCode", 200);
+		    	model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+	    	}catch(Exception e) {
+		    	 model.addAttribute("resultCode", 500);
+		 		 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+	    	}
+
+	    	return "jsonView";		  		  
+    }
+
+	//알림톡 수정    
     @PostMapping(value = "/updateMessageTempl")
-    public String updateMessageTempl(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+    public String updateMessageTempl(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
   	  	try {
-  			if (bm17Svc.updateMessageTempl(paramMap, mRequest) != 0 ) {
+  			if (bm17Svc.updateMessageTempl(paramMap) != 0 ) {
   				model.addAttribute("resultCode", 200);
   				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
   			} else {
@@ -93,7 +91,7 @@ public class BM17Ctr {
   	  	return "jsonView";
     } 
     
-	//기준관리 결재선 삭제    
+	//알림톡 삭제    
     @PutMapping(value = "/deleteMessageTempl")
     public String deleteMessageTempl(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
   	  	try {

@@ -55,75 +55,28 @@ public class BM17SvcImpl implements BM17Svc {
 	}
 
 	@Override
-	public int insertMessageTempl(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	public int insertMessageTempl(Map<String, String> paramMap) throws Exception {
 
-		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
-		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
-		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);		
-
-		int result = 0;	    
-		//selectKey 가 안먹어서 임시로 처리
-	    String maxAppNo = bm17Mapper.selectMaxFileTrgtKey(paramMap);		
-	    	    
-		for(Map<String, String> dtl : detailMap) {
-			dtl.put("coCd", paramMap.get("coCd"));
-			dtl.put("userId", paramMap.get("userId_P"));
-			dtl.put("appDiv", paramMap.get("appDiv"));
-			dtl.put("appLineNm", paramMap.get("app_line_nm"));
-			dtl.put("useYn", paramMap.get("useYn"));
-			dtl.put("pgmId", paramMap.get("pgmId"));
-			dtl.put("creatId", paramMap.get("userId"));
-			dtl.put("creatPgm", paramMap.get("pgmId"));
-			dtl.put("selAppNo", maxAppNo);
-	
-				
-    		result += bm17Mapper.insertMessageTempl(dtl);			
-		}	
-		  		
+		int result = 0;	    		
+	    String maxFileTrgtKey = bm17Mapper.selectMaxFileTrgtKey(paramMap);	
+	    paramMap.put("maxFileTrgtKey", maxFileTrgtKey);
+	    	    	    
+		result = bm17Mapper.insertMessageTempl(paramMap);
+		
 		return result;
 	}
 	
 	//결재선 수정시 입력과 삭제 분리하여 쿼리 실행
 	@Override
-	public int updateMessageTempl(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	public int updateMessageTempl(Map<String, String> paramMap) throws Exception {
 
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		Type dtl2Map = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	   						
 		
 		int result = 0;
-	    //입력처리		
-		if( paramMap.containsKey("makeArr") ) {		
-			List<Map<String, String>> insertMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);			
-			for(Map<String, String> dtl : insertMap) {
-				dtl.put("coCd", paramMap.get("coCd"));
-				dtl.put("userId", paramMap.get("userId_P"));
-				dtl.put("appDiv", paramMap.get("appDiv"));
-				dtl.put("appLineNm", paramMap.get("app_line_nm"));
-				dtl.put("useYn", paramMap.get("useYn"));
-				dtl.put("pgmId", paramMap.get("pgmId"));
-				dtl.put("creatId", paramMap.get("userId"));
-				dtl.put("creatPgm", paramMap.get("pgmId"));
-					
-			    //MAX APP_SEQ - Insert 시만 실행
-				if( dtl.get("actFlag").equals("I") ) {
-				    paramMap.put("maxAppNo", dtl.get("appNo"));
-				    String maxAppSeq = bm17Mapper.selectMaxFileTrgtKey(paramMap);			
-					dtl.put("appSeq", maxAppSeq);						
-				} else if( dtl.get("actFlag").equals("U") ) {
-					
-				}
-	    		result += bm17Mapper.updateMessageTempl(dtl);			
-			}	
-		}
-		//삭제 처리
-		if( paramMap.containsKey("delArr") ) {
-			List<Map<String, String>> deleteMap = gsonDtl.fromJson(paramMap.get("delArr"), dtl2Map);		
-			//삭제처리 
-			for(Map<String, String> dtl2 : deleteMap) {			
-	    		result += bm17Mapper.deleteMessageTempl(dtl2);			
-			}				
-		}
+		result = bm17Mapper.updateMessageTempl(paramMap);
+	   
 		return result;
 	  }	
 	
@@ -134,8 +87,7 @@ public class BM17SvcImpl implements BM17Svc {
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		    		
 		int result = bm17Mapper.deleteMessageTempl(paramMap);
-		
-		//---------------------------------------------------------------  		
+		  		
 		return result;
 	  }	
 	

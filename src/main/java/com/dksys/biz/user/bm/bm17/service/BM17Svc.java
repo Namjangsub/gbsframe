@@ -15,9 +15,9 @@ public interface BM17Svc {
 	List<Map<String, String>> selectMessageTemplExcelList(Map<String, String> paramMap);
 		
 	//결재선 등록, 수정, 삭제
-	int insertMessageTempl(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;	
+	int insertMessageTempl(Map<String, String> paramMap) throws Exception;	
 		
-	int updateMessageTempl(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	int updateMessageTempl(Map<String, String> paramMap) throws Exception;
 	
 	int deleteMessageTempl(Map<String, String> paramMap) throws Exception;
 	
