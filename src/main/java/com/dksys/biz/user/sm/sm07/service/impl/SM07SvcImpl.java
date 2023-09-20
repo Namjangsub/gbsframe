@@ -46,53 +46,6 @@ public class SM07SvcImpl implements SM07Svc {
 
 	@Autowired
 	ExceptionThrower thrower;
-
-	
-	@Override
-	public int selectOrderListCount(Map<String, String> paramMap) {
-		return sm07Mapper.selectOrderListCount(paramMap);
-	}
-
-	@Override
-	public List<Map<String, String>> selectOrderList(Map<String, String> paramMap) {
-		return sm07Mapper.selectOrderList(paramMap);
-	}	
-	
-	/* 발주등록수정시 bom list */
-	@Override
-	public List<Map<String, String>> selectOrderDetailList(Map<String, String> paramMap) {
-		return sm07Mapper.selectOrderDetailList(paramMap);
-	}	
-	
-	
-	//발주관리 구매 bom 수정	
-	/*@Override
-	public int updateOrderDetail(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-		// Gson gson = new Gson();
-		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
-		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
-		
-		int result = 0;
-		
-		//상세수정
-		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
-	    for (Map<String, String> dtl : dtlParam) {
-	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-			dtl.put("userId", paramMap.get("userId"));
-	    	dtl.put("pgmId", paramMap.get("pgmId"));
-			
-			String dataChk = dtl.get("dataChk").toString();	    	
-			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
-	    	if ("U".equals(dataChk)) {
-				//데이터 처리
-	    		result = sm07Mapper.updateOrderDetail(dtl);
-	    	} 
-	    }			   
-		
-		return result;
-	}*/
-	
-	
 	
 	@Override
 	public int updateOrderDetail(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {

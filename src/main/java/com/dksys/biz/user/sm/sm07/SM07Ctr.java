@@ -27,43 +27,6 @@ public class SM07Ctr {
 
 	@Autowired
 	SM07Svc sm07Svc;
-
-	// 매입관리 발주 조회
-	@PostMapping(value = "/selectOrderList")
-	public String selectPchsList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = sm07Svc.selectOrderListCount(paramMap);
-		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		model.addAttribute("paginationInfo", paginationInfo);
-		List<Map<String, String>> result = sm07Svc.selectOrderList(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-	}
-		
-	@PostMapping(value = "/selectOrderDetailList")
-	public String selectOrderDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> resultList = sm07Svc.selectOrderDetailList(paramMap);
-		model.addAttribute("resultList", resultList);
-		return "jsonView";
-	}
-	
-	
-  //발주 수정
-	/*@PostMapping(value = "/updateOrderDetail")
-    public String updateOrderDetail(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  		try {
-  			if (sm07Svc.updateOrderDetail(paramMap, mRequest) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-  			} else {
-  				model.addAttribute("resultCode", 500);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  			model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }    */
 	
 	@PostMapping(value = "/updateOrderDetail")
 	public String updateOrderDetail(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
