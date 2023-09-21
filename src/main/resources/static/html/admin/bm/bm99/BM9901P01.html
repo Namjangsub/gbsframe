@@ -1,0 +1,237 @@
+<style>
+	input[comma] {text-align: right;}
+</style>
+<div class="popup_area of_a" style="width: 100%; height: 100%;">
+	<div class="tit_contents">
+        <h4 class="tit">도움말</h4>
+    </div>
+
+	<div class="popup_table">
+		<div class="form-group">
+			<input type="hidden" id="fileTrgtKey"/>
+			<input type="file" id="clntFile" style="display:none" multiple="multiple" onchange="setFile(this);"/>
+			<form id="manualForm">
+				<!-- 내용 테이블 -->
+				<table class="popup_table">
+					<colgroup>
+						<col width="12%">
+						<col width="">
+					</colgroup>
+					<thead>
+						<tr>
+							<th>내용</th>
+							<td>
+								<textarea class="form-control" id="pgExpl" name="pgExpl" style="height: 200px;" maxlength="9000"></textarea>
+							</td>
+						</tr>
+						<tr>
+							<td style="text-align: left;">첨부파일</td>
+							<td style="text-align: right;">
+								<a class="tbody_more_btn"></a>
+							</td>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<th>
+								<button type="button" class="btn btn-primary btn-sm" style="height: 25px; line-height: 15px;" onclick="clntFile.click();" authchk>첨부파일</button>
+							</th>
+							<td>
+								<div data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 150px; width: 100%"></div>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</form>
+		</div>
+	</div>
+	
+    <!-- 하단 버튼 -->
+	<div class ="popup_bottom_btn">
+		<button type="button" id="actionBtn" onclick="updateClnt();">수정</button>
+		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+<script type="text/javascript">
+	var $targetRow = null;
+	var fileArr = [];
+	var deleteFileArr = [];
+	var fileGridView = {
+		initView: function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				target: $('[data-ax5grid="file-grid"]'),
+				showLineNumber: true,
+				showRowSelector: false,
+	        	multipleSelect: false,
+				header: {selector: false},
+				body: {
+		            onDBLClick: function () {
+		            	if(this.item.fileKey){
+							downloadFile(this.item.fileKey);
+						}
+		            }
+		        },
+	            columns: [
+	                {key: "fileName", label: "파일명", width: 500},
+	                {key: "fileType", label: "파일타입", width: 100},
+	                {key: "fileSize", label: "파일크기", width: 100},
+	                {
+						key:"fileDelete", label: "삭제", width:60,
+						formatter:function() {
+							return '<button type="button" class="btn btn-default btn-sm" style="height: 19px; padding: 0 0 0 0;" onclick="deleteFile('+this.dindex+');" authchk>삭제</button>'
+						}
+					}
+	            ]
+			});
+			return this;
+		},
+		setData: function() {
+			var targetObj = this.target;
+			targetObj.setData({
+				list: fileArr,
+				page : {
+					totalElements : fileArr.length
+				}
+			});
+		}
+	}
+	
+	$(document).ready(function() {
+		
+		//슈퍼사용자만 수정할 수 있도록
+		if(jwt.userGrade == "USERS"){
+			$('#actionBtn').show();
+		}else{
+			$('#actionBtn').hide();
+		}
+		
+		// 파일 그리드 초기화
+		fileGridView.initView().setData();
+		
+		// 도움말 정보 불러오기 
+		selectManualInfo();
+		
+		//권한체크
+		authChk();
+	});
+	
+	function selectManualInfo() {
+		
+		var paramObj = {
+				 "userId": modalStack.last().paramObj.userId
+				,"pgmId": modalStack.last().paramObj.pgmId
+				};
+		postAjax("/admin/bm/bm99/selectManualInfo", paramObj, null, function(data){
+			// 파일 정보 초기화
+			fileArr = [];
+			deleteFileArr = [];
+			setInfo(data.info);
+		});
+	}
+	
+	function setInfo(info) {
+// 		console.log(info);
+		//파일키
+		$('#fileTrgtKey').val(info.fileTrgtKey);
+		// 기본정보 set
+		$('#pgExpl').val(info.pgExpl);
+		
+		// 첨부파일 set
+		var fileList = info.fileList;
+		$.each(fileList, function(idx, obj){
+			fileArr.push({
+				'fileKey' : obj.fileKey,
+		      	'fileName' : obj.fileName,
+		      	'fileType' : obj.fileType,
+		      	'fileSize' : obj.fileSize,
+		      	'file' : obj
+			});
+		});
+		
+		// 첨부파일 그리드 set
+		fileGridView.setData();
+	}
+	
+	// 파일 추가
+	function setFile(elem) {
+		var tempFiles = elem.files;
+		// 전역변수 배열에 선택된 파일 추가 
+		$.each(tempFiles, function(idx, obj){
+			var typeArr = obj.name.split(".");
+			fileArr.push({
+				'fileKey' : 0,
+		      	'fileName' : obj.name,
+		      	'fileType' : typeArr[typeArr.length-1],
+		      	'fileSize' : obj.size,
+		      	'file' : obj
+			});
+		});
+		
+		// 첨부파일 그리드 set
+		fileGridView.setData();
+		
+		// input file 초기화
+		$(elem).val("");
+	}
+	
+	// 파일 삭제
+	function deleteFile(rowIndex) {
+		if(fileArr[rowIndex].fileKey){
+		// 기 등록되어 있는 파일 삭제시
+			deleteFileArr.push(fileArr[rowIndex].fileKey);
+		}
+		fileArr.splice(rowIndex, 1);
+		
+		// 첨부파일 그리드 set
+		fileGridView.setData();
+	}
+	
+	// 파일 다운로드
+	function downloadFile(fileKey) {
+		postAjax("/admin/cm/cm08/fileDownInfo", {"fileKey": fileKey}, null, function(data){
+			var fileInfo = data.fileInfo;
+			var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName , "UTF-8");
+			location.href = "/admin/cm/cm08/fileDownload?filePath="+filePath;
+		});
+	}
+	
+	// 수정
+	function updateClnt() {
+		var formData = makeFormData();
+		
+		filePutAjax("/admin/bm/bm99/updateManualInfo", formData, function(data){
+			alert(data.resultMessage);
+			if(data.resultCode == 200){
+// 				modalStack.close();
+				selectManualInfo();
+			}
+		});
+	}
+	
+	// 폼데이터 생성
+	function makeFormData() {
+		// 콤마 제거
+		$.each($('input[comma]'), function(idx, elem){deleteComma(elem);});
+		// 폼데이터 생성
+		var formData = new FormData($('#manualForm')[0]);
+		// 유저아이디 추가
+		formData.append("userId", modalStack.last().paramObj.userId);
+		// 대상 프로그램 ID 추가
+		formData.append("pgmId", modalStack.last().paramObj.pgmId);
+		// 파일키 추가
+		formData.append("fileTrgtKey", $('#fileTrgtKey').val());
+		
+		// 첨부파일 추가
+		$.each(fileArr, function(idx, obj){
+			// 신규파일만 추가
+			if(obj.fileKey == 0){
+				formData.append("files", obj.file);
+			}
+		});
+		
+		formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
+		return formData;
+	}
+	
+</script>
