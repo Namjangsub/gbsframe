@@ -31,7 +31,7 @@ public class SM02Ctr {
 	// 매입관리 발주 조회
 	@PostMapping(value = "/selectOrderList")
 	public String selectPchsList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = sm02Svc.selectOrderCount(paramMap);
+		int totalCnt = sm02Svc.selectOrderListCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
 		List<Map<String, String>> result = sm02Svc.selectOrderList(paramMap);

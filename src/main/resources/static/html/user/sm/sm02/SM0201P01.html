@@ -117,7 +117,7 @@
 			<td>
 				<div class="search_form">
 					<input type="text" id="reqNo" name="reqNo" onkeyup="event.keyCode == 8 ? reqNo1.value = '' : event.keyCode == 13 ? openPurchaseSearch() : ''" required="required" msg="요인별요청번호"> 
-					<a onclick="openPurchaseSearch();"><i class="i_search_w"></i></a>
+					<a id="reqNoBtn" onclick="openPurchaseSearch();"><i class="i_search_w"></i></a>
 				</div>
 			</td>			
         </tr>
@@ -271,7 +271,9 @@ var firstGrid = null;
 var secondGrid = null;
 var userId = null;
 var userNm = null;
-var fileTrgtKeyU = null;
+var fileTrgtKeyU = null;		//list에서 받은값
+var salesCdU = null;			//list에서 받은값
+var ordrgNoU =  null;			//list에서 받은값
 var currToday = [];
 
 var gridViewPop = {
@@ -422,12 +424,12 @@ var gridViewPop = {
 	        });
 			return this;
     	},
-		setData: function(_pageNo) {
+		setData: function(_pageNo, _newReqNo) {
 			var targetObj = this.target;
         	var formData = new FormData();
-        	var salesCd = ( actionType == "U" ) ? modalStack.last().paramObj.salesCd : $('#salesCd').val();
+        	var salesCd = ( actionType == "U" ) ? salesCdU : $('#popForm #salesCd').val();
         	var fileTrgtKey = (fileTrgtKeyU) ? fileTrgtKeyU : 0;
-        	var ordrgNo = ( actionType == "U" ) ? modalStack.last().paramObj.ordrgNo : $('#ordrgNo').val();
+        	var ordrgNo = ( actionType == "U" ) ? ordrgNoU : $('#popForm #ordrgNo').val();
         	var formData = {
 				"fileTrgtKey" : fileTrgtKey,
 				"salesCd" : salesCd,
@@ -435,8 +437,16 @@ var gridViewPop = {
 				/* "ordrgSeq" : ordrgSeq		단독수정은 없음*/
 			}
         	//등록과 수정 URL 다르게
-        	var url = "selectBomDetailList";
-        	if( actionType == "U" ) url = "selectOrderDetailList";
+        	let url = "";
+        	//수정모드시
+        	if( actionType == "U" && typeof(_newReqNo)== "undefined" ) {
+        		url = "selectOrderDetailList";
+        	//수정모드에서 요인별요청번호 새로 검색시
+        	} else if( actionType == "U" && typeof(_newReqNo)!= "undefined" ) {
+        		url = "selectBomDetailList";        		
+        	} else {
+        		url = "selectBomDetailList";
+        	}
 			postAjax("/user/sm/sm02/" + url, formData, null, function(data){
 			var list = data.resultList;
 			targetObj.setData({
@@ -1084,6 +1094,9 @@ $(document).ready(function() {
 				$("#popForm #coCd").val(modalStack.last().paramObj.coCd);	
 			} 
 		} else if(actionType == "U") {
+			//전역 set
+			salesCdU = modalStack.last().paramObj.salesCd;
+			ordrgNoU = modalStack.last().paramObj.ordrgNo;
 			//그리드 load
 			gridViewPop.initView().setData(0);
 			
@@ -1094,10 +1107,10 @@ $(document).ready(function() {
 			postAjaxSync("/user/sm/sm02/selectOrderDetailView", modalStack.last().paramObj, null
 				, function(data){
 					var list = data.resultList;
-	 				if( list[0].coCd != "" ) {
+	 				if( list.length > 0 ) {
 				        $.each(list[0], function (key, val) {			     	        	
 							//html element overwrite set
-							if( val && $("#"+key).attr("name") != "undefined" ) {
+							if( val && typeof($("#"+key).attr("name")) != "undefined" ) {
 								$("#popForm #"+key).val(val);
 								editVal[key] = val;
 							}
@@ -1108,14 +1121,21 @@ $(document).ready(function() {
 			
 			$("#salesCd").attr("readonly", true);
 			//wbsSalesCodeSearchP();
-			$("#salesCdAnchor").removeAttr("onclick");			
+			$("#salesCdAnchor").removeAttr("onclick");
+
+			
 			//toDo 등록여부 Y일 경우 결재대상자 창
-			if( editVal.todoYn == "Y") {
+			if( editVal.todoYn == "Y" ) {
 				$("#approval_trgt").show();
 				$("#approvalReqBtn").hide();
 				$("#approvalReqBtn").removeAttr("onclick");
 				//결재대상자 load
 				gridViewPopApproval.initView().setData(0);
+				
+				//요인별요청번호 hide
+				$("#reqNoBtn").removeAttr("onclick");
+				$("#reqNoBtn").hide();
+				$("#reqNo").attr("readonly", true);				
 			}
 			if( modalStack.last().paramObj.reOpen ) {
 				$("#approval_trgt").show();
@@ -1260,7 +1280,11 @@ $(document).ready(function() {
  			alert("선택된 행이 없습니다.");
  			return;
  		} else {
- 			
+ 			//전체를 지울수는 없다
+ 			if( gridViewPop.target.getList().length < 2 ) {
+ 	 			alert("구매 BOM 은 최소 1개 이상이어야 합니다.");
+ 	 			return; 				
+ 			}
  			var actFlag = gridViewPop.target.getList()[selRow].actFlag;	
  	    	//등록상태
  			if( actionType == "C" ) {		
@@ -1481,7 +1505,9 @@ function openPurchaseSearch() {
 		$("#ordrsClntCd").val(row.clntCd);
 		$("#ordrsClntNm").val(row.clntNm);
 		if( row.salesCd != "" ) {
-			gridViewPop.initView().setData(0);
+			//수정모드시 update 
+			if( actionType == "U" ) var _newReqNo = "U"
+			gridViewPop.initView().setData(0, _newReqNo);
 		}
 	});
 } 

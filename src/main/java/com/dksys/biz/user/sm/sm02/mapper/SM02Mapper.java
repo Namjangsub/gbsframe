@@ -13,7 +13,7 @@ import java.util.Map;
 public interface SM02Mapper {
 	
 
-	int selectOrderCount(Map<String, String> paramMap);
+	int selectOrderListCount(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectOrderList(Map<String, String> paramMap);	
 	
