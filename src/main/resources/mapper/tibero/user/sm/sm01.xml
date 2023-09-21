@@ -12,6 +12,7 @@
 		     , A.ORDRS_CLNT_CD AS CLNT_CD
 		     , C.CLNT_NM
 		     , A.CLNT_PJT
+			 , FN_CM05M01_CD_TO_NM(A.CLNT_PJT) AS CLNT_PJT_NM
 		     , B.PRDT_CD
 		     , P.PRDT_NM
 		     , B.ITEM_DIV
@@ -24,46 +25,59 @@
 		     , B.EQP_NM
 		     , NVL(TO_CHAR(T3.BOM_CNT),'0') AS BOM_CNT
 		     , (SELECT COUNT(*) FROM TB_SM01D01 WHERE CO_CD = A.CO_CD AND ORDRS_NO = A.ORDRS_NO AND SALES_CD = B.SALES_CD) AS MATR_CNT
-        FROM TB_CR02M01 AS A
-	       JOIN TB_CR02D02 AS B  ON B.CO_CD = A.CO_CD AND A.ORDRS_NO = B.ORDRS_NO
-	       LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = A.ORDRS_CLNT_CD
-	       LEFT OUTER JOIN TB_BM01M01 AS P ON P.PRDT_CD = B.PRDT_CD
-	       LEFT OUTER JOIN (
-				SELECT FILE_TRGT_KEY, CO_CD, ORDRS_NO, SALES_CD
-				  FROM TB_SM01M01 X1
-				 WHERE LEVEL = 1
-		        START WITH X1.UPPER_CD = 'top'
-		        CONNECT BY PRIOR X1.LOWER_CD = X1.UPPER_CD
-	       ) AS BOM ON A.CO_CD = BOM.CO_CD AND B.ORDRS_NO = BOM.ORDRS_NO AND B.SALES_CD = BOM.SALES_CD
-	       LEFT OUTER JOIN (
-				SELECT CO_CD, ORDRS_NO, SALES_CD, COUNT(*) AS BOM_CNT FROM TB_SM01M01 GROUP BY CO_CD, ORDRS_NO, SALES_CD
-	       ) AS T3 ON A.CO_CD = T3.CO_CD AND A.ORDRS_NO = T3.ORDRS_NO AND B.SALES_CD = T3.SALES_CD
-		   WHERE  B.SALES_CD IS NOT NULL
-		   <if test="coCd != null and !coCd.equals('')">
-		     AND A.CO_CD = #{coCd}
-		   </if>
-		   <if test="itemDiv != null and !itemDiv.equals('')">
-		     AND B.ITEM_DIV = #{itemDiv}
-		   </if>
-		   <if test="salesCd != null and !salesCd.equals('')">
-		     AND B.SALES_CD LIKE '%'||#{salesCd}||'%'
-		   </if>
-		   <if test="clntNm != null and !clntNm.equals('')">
-		     AND C.CLNT_NM LIKE '%'||#{clntNm}||'%'
-		   </if>
-		   <if test="clntPjt != null and !clntPjt.equals('')">
-		     AND A.CLNT_PJT LIKE '%'||#{clntPjt}||'%'
-		   </if>
-		   <if test="prdtNm != null and !prdtNm.equals('')">
-		     AND P.PRDT_NM LIKE '%'||#{prdtNm}||'%'
-		   </if>
-		   <if test="eqpNm != null and !eqpNm.equals('')">
-		     AND B.EQP_NM LIKE '%'||#{eqpNm}||'%'
-		   </if>
-		   <if test="bomCnt != null and !bomCnt.equals('')">
-		     AND TO_CHAR(NVL(T3.BOM_CNT,0)) = #{bomCnt}
-		   </if>
-        ORDER BY A.CO_CD, A.ORDRS_CLNT_CD, A.CLNT_PJT, A.ORDRS_NO, B.SALES_CD
+        FROM   TB_CR02M01 AS A
+               JOIN TB_CR02D02 AS B  ON B.CO_CD    = A.CO_CD
+                                    AND B.ORDRS_NO = A.ORDRS_NO
+               LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = A.ORDRS_CLNT_CD
+               LEFT OUTER JOIN TB_BM01M01 AS P ON P.PRDT_CD = B.PRDT_CD
+               LEFT OUTER JOIN (
+                                SELECT FILE_TRGT_KEY
+                                     , CO_CD
+                                     , ORDRS_NO
+                                     , SALES_CD
+                                FROM   TB_SM01M01 AS X1
+                                WHERE  LEVEL = 1
+                                START WITH X1.UPPER_CD = 'top'
+                                CONNECT BY PRIOR X1.LOWER_CD = X1.UPPER_CD
+                               ) AS BOM  ON A.CO_CD = BOM.CO_CD
+                                        AND B.ORDRS_NO = BOM.ORDRS_NO
+                                        AND B.SALES_CD = BOM.SALES_CD
+               LEFT OUTER JOIN (
+                                SELECT CO_CD
+                                     , ORDRS_NO
+                                     , SALES_CD
+                                     , COUNT(*) AS BOM_CNT
+                                FROM   TB_SM01M01
+                                GROUP BY CO_CD, ORDRS_NO, SALES_CD
+                               ) AS T3  ON A.CO_CD    = T3.CO_CD
+                                       AND A.ORDRS_NO = T3.ORDRS_NO
+                                       AND B.SALES_CD = T3.SALES_CD
+        WHERE  B.SALES_CD IS NOT NULL
+		<if test="coCd != null and !coCd.equals('')">
+		AND    A.CO_CD = #{coCd}
+		</if>
+		<if test="itemDiv != null and !itemDiv.equals('')">
+		AND    B.ITEM_DIV = #{itemDiv}
+		</if>
+		<if test="salesCd != null and !salesCd.equals('')">
+		AND    B.SALES_CD LIKE '%'||#{salesCd}||'%'
+		</if>
+		<if test="clntNm != null and !clntNm.equals('')">
+		AND    C.CLNT_NM LIKE '%'||#{clntNm}||'%'
+		</if>
+		<if test="clntPjt != null and !clntPjt.equals('')">
+		AND    A.CLNT_PJT LIKE '%'||#{clntPjt}||'%'
+		</if>
+		<if test="prdtNm != null and !prdtNm.equals('')">
+		AND    P.PRDT_NM LIKE '%'||#{prdtNm}||'%'
+		</if>
+		<if test="eqpNm != null and !eqpNm.equals('')">
+		AND    B.EQP_NM LIKE '%'||#{eqpNm}||'%'
+		</if>
+		<if test="bomCnt != null and !bomCnt.equals('')">
+		AND    TO_CHAR(NVL(T3.BOM_CNT,0)) = #{bomCnt}
+		</if>
+		ORDER BY A.CO_CD, A.ORDRS_CLNT_CD, A.CLNT_PJT, A.ORDRS_NO, B.SALES_CD
 	</sql>
 	<select id="selectBomSalesCount" parameterType="Map" resultType="int">
         SELECT
@@ -342,22 +356,41 @@
 
 	<!-- 구매 BOM 조회 -->
 	<select id="selectBuyBomList" resultType="CamelMap">
-		SELECT  '' AS DTA_CHK
-	        , LEVEL - 1 AS LVL
-	        , T.FILE_TRGT_KEY
-	        , T.CO_CD
-	        , T.ORDRS_NO
-	        , T.SALES_CD
-	        , T.DSGN_NO
-	        , SUBSTR(REPLACE(T.DSGN_NO,T.SALES_CD,''), INSTR(REPLACE(T.DSGN_NO,T.SALES_CD,''), '-', -1) + 1) AS LAST_DSGN_NO
-	        , T.UPPER_CD
-	        , T.LOWER_CD
-	        , T.UPPER_CD AS OLD_UPPER_CD
-	        , T.LOWER_CD AS OLD_LOWER_CD
-	        , T.DSGN_NM
-	        , T.DSGN_BOM_QTY
-		FROM TB_SM01M01 T
-		START WITH T.UPPER_CD = 'top' AND T.CO_CD = #{coCd} AND T.ORDRS_NO = #{ordrsNo} AND T.SALES_CD = #{salesCd}
+		SELECT '' AS DTA_CHK
+		     , LEVEL - 1 AS LVL
+		     , T.FILE_TRGT_KEY
+		     , T.CO_CD
+	         , T.ORDRS_NO
+	         , T.SALES_CD
+	         , T.LOWER_CD AS DSGN_NO --2023.09.19 김성욱 수정, T.DSGN_NO
+	         , T.UPPER_NM
+	         , T.LOWER_NM
+			 , T.LOWER_NM || '(' || T.MATR_NM || ')' AS TEXT
+	         , REGEXP_REPLACE(SYS_CONNECT_BY_PATH(T.LOWER_NM, ' > '), '^\s+\>\s+', '') AS PATH
+	         , SUBSTR(REPLACE(T.DSGN_NO,T.SALES_CD,''), INSTR(REPLACE(T.DSGN_NO,T.SALES_CD,''), '-', -1) + 1) AS LAST_DSGN_NO
+	         , T.UPPER_CD
+	         , T.LOWER_CD
+	         , T.UPPER_CD AS OLD_UPPER_CD
+	         , T.LOWER_CD AS OLD_LOWER_CD
+	         , T.DSGN_NM
+	         , T.DSGN_BOM_QTY
+			 , T.BOM_SEQ
+	         , T.PART_NO
+	         , T.UNIT_NO
+	         , T.REV_NO
+	         , T.MATR_SEQ
+	         , T.MATR_CD
+	         , T.MATR_NM
+	         , T.MATR_MAT
+	         , T.MATR_MAKR_NM
+	         , T.MATR_MNO
+	         , T.MATR_SPEC
+	         , T.MATR_RMK
+		FROM   TB_SM01M01 AS T
+		WHERE  T.CO_CD = #{coCd}
+		AND    T.ORDRS_NO = #{ordrsNo}
+		AND    T.SALES_CD = #{salesCd}
+		START WITH T.UPPER_CD = 'top' 
 		CONNECT BY PRIOR T.LOWER_CD = T.UPPER_CD
 		ORDER BY T.CO_CD, T.LOWER_CD, T.UPPER_CD
 	</select>
@@ -372,7 +405,7 @@
 	        , LOWER_CD
 	        , UPPER_CD AS OLD_UPPER_CD
 	        , LOWER_CD AS OLD_LOWER_CD
-	        , LOWER_CD AS DSGN_NO
+	        , UPPER_CD AS DSGN_NO  --2023.09.19 김성욱 수정, LOWER_CD AS DSGN_NO
 	        , MATR_SEQ
 	        , ORDRG_DIV_10
 	        , ORDRG_DIV_20
@@ -504,14 +537,21 @@
 	    AND LOWER_CD = #{lowerCd}
 	</delete>
 
+	<!-- 수불키 채번 -->
+	<select id="select_bm14_Key" parameterType="Map" resultType="int">
+		SELECT TB_BM14M01_SQ01.NEXTVAL
+		FROM   DUAL
+	</select>
+
     <insert id="insertBomMatr" parameterType="Map">
         <selectKey keyProperty="matrSeq" resultType="String" order="BEFORE">
-			SELECT NVL(MAX(MATR_SEQ), 0) + 1 FROM TB_SM01D01
-			 WHERE CO_CD = #{coCd}
-			   AND ORDRS_NO = #{ordrsNo}
-			   AND SALES_CD = #{salesCd}
-			   AND UPPER_CD = #{upperCd}
-			   AND LOWER_CD = #{lowerCd}
+			SELECT NVL(MAX(MATR_SEQ), 0) + 1
+			FROM   TB_SM01D01
+			WHERE  CO_CD = #{coCd}
+			AND    ORDRS_NO = #{ordrsNo}
+			AND    SALES_CD = #{salesCd}
+			AND    UPPER_CD = #{upperCd}
+			AND    LOWER_CD = #{lowerCd}
         </selectKey>
         INSERT INTO TB_SM01D01
         ( CO_CD
