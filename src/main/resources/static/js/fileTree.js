@@ -14,24 +14,30 @@
     //      4-2. fileTrgtKey   = 파일저장일련번호 (프로그램명 또는 테이블명에서 관리되는 유니크한 일련번호 ex) 1, 2, 3, 4
     //'deptTree', 'file-grid', 'FILETREE', paramTreeObj);
     function initAll(selector, gridSelector, codeId, params) {
-        // #fileList_area 요소의 자식으로 새로운 코드를 삽입합니다.
-        fileListArea_html_creation();
-        
-    	createFileInput(gridSelector);
-        codeId = 'FILETREE';                  //최상위 트리 강제로 할당 (파라메터값 무시)
-		params["comonCd"] = codeId;           //comonCd는 xML 쿼리에서 트리ID 보관 필드명 
-		params["userId"] = jwt.userId;        //쿠키에 담아 캐시에 보관된 사용자 ID
-        
-        paramObj = params;  //
-        fileArr=[];
-        deleteFileArr = [];
-        
-        initDeptTree(selector);
-        
-        currPgmAuthChk = authChk(); // true:저장권한, false:저장권한 없음
-        
-        fileTreeGridView.init(gridSelector);
 
+        if ($("#fileList_area #fileAttachTxt").length > 0) {
+            // console.log("#fileAttachTxt 요소가 존재합니다.");
+        } else {
+            // console.log("#fileAttachTxt 요소가 존재하지 않습니다.");
+            // #fileList_area 요소의 자식으로 새로운 코드를 삽입합니다.
+            fileListArea_html_creation();
+            
+            createFileInput(gridSelector);
+            codeId = 'FILETREE';                  //최상위 트리 강제로 할당 (파라메터값 무시)
+            params["comonCd"] = codeId;           //comonCd는 xML 쿼리에서 트리ID 보관 필드명 
+            params["userId"] = jwt.userId;        //쿠키에 담아 캐시에 보관된 사용자 ID
+            
+            paramObj = params;  //
+            fileArr=[];
+            deleteFileArr = [];
+            
+            initDeptTree(selector);
+            
+            currPgmAuthChk = authChk(); // true:저장권한, false:저장권한 없음
+            
+            fileTreeGridView.init(gridSelector);
+
+        }
     }
     
 
