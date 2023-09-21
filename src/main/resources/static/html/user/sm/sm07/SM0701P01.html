@@ -32,6 +32,9 @@
 	 }
 	</style>
 	
+	<!--  
+		div의 popup_area 클래스 하위인 form popForm ID에서 모든 html이 이루어진다.
+	-->
 	<div class="popup_area of_a" style="width: 100%; height: 100%;">
 		<div class="tit_contents">
 		  <h4 class="tit">발주 등록</h4>
@@ -40,8 +43,10 @@
 	  <form id="popForm" onSubmit="return false;">
 		<div class="form-group popup_table">
 			<input type="hidden" id="userId"     	name="userId">
+			
 			<input type="hidden" id="pgmId"     	name="pgmId" value="SM701M01">
 			<input type="hidden" id="fileTrgtKey"	name="fileTrgtKey" value="">		<!-- file target key -->
+			
 		
 		  <table>
 	
@@ -62,6 +67,7 @@
 				
 				<th>발주번호</th>
 				<td>
+				  <input type="hidden"	id="coCd" name = "coCd" readonly="readonly">
 				  <input type="text" id="ordrgNo" name="ordrgNo" msg="발주번호" disabled="disabled">
 				</td>
 				<th class="hit">구매처</th>
@@ -134,9 +140,8 @@
 	
 		<div class="" style="height: 10px;">
 		</div>	    
-				
-	
-	<!-- 하단 디테일그리드 -->
+
+		<!-- 하단 디테일그리드 -->
 			<!-- 콘텐츠 -->
 		  <div class="contents2" style="margin-bottom: 50px;">
 			  <!-- 리스트 -->
@@ -151,31 +156,30 @@
 							</div>
 						</div>
 						<div>
-							<div data-ax5grid="bom-grid-modal" data-ax5grid-config="{}" style="height:500px; width: 100%" ></div>
+							<div data-ax5grid="bom-grid-modal" data-ax5grid-config="{}" style="height:250px; width: 100%" ></div>
 						</div>
 					</li>
 				</ul>	
 			</div>
 		  </div>
-		</div>
-	<!-- 하단 디테일그리드 end -->
-	
-		<!-- 공통 파일 영역 -->
+		  
+ 		<!-- 공통 파일 영역 -->
 		<div id="fileList_area"></div>
-	
 		<!-- 하단 버튼 -->
 		<div class ="popup_bottom_btn">
-			<button type="button" id="actionBtn" authChk>등록</button>
+			<button type="button" id="actionBtn" authChk>수정</button>
 			<button type="button" class="close_btn"
 				onclick="modalStack.close();">닫기</button>
 		</div>
+		</div>
+	<!-- 하단 디테일그리드 end -->
+	
 	
 <script type="text/javascript">
-	  
+	/*전역 변수들은  상단에 작성*/  
 	//전역초기화  
 	var actionType = null;
 	var userId = null;
-	var userNm = null;
 	var fileTrgtKeyU = null;
 	
 	var gridViewPop = {
@@ -194,54 +198,11 @@
 					body: {
 						mergeCells : ["salesCd"],
 						onClick: function() {
-							this.self.select(this.dindex);
-							var row = this.dindex;
-							var paramObj = {"row" : row};
-							//체크박스일 경우 실행 - 등록모드만
-							if( this.column.key == "userChk" && actionType == "C" ) {
-								//chk, 수량, 기발주수량, row번호 
-								$.setOrdrgQty(gridViewPop, this.item.userChk , this.item.bomQty, this.item.preBomQty, row);                        		
-							}
+							
 						},
 						//그리드값 변경시 실행
 						onDataChanged: function () {
-							var row = this.dindex;
-							var col = this.colIndex;
-							var ordrgPrc = 0;
-							//체크박스 변경 제외
-							if( this.key != "userChk" ) {
-	
-								var ordrgPrc = (this.item.ordrgPrc=="" || typeof(this.item.ordrgPrc)=="undefined")? 0 : this.item.ordrgPrc;
-								// 발주단가, 발주수량  변경시
-								if ( this.key == "ordrgPrc" || this.key == "ordrgQty" ) {   			            		
-									if( this.item.ordrgQty != "" && this.item.ordrgQty > 0  ) {
-										var ordrgAmt = parseInt( deleteCommaStr(this.item.ordrgQty) * deleteCommaStr(ordrgPrc) );
-										gridViewPop.target.setValue(row, "ordrgAmt", ordrgAmt);		            			
-									} else {
-										gridViewPop.target.setValue(row, "ordrgAmt", "");		            			
-									}
-								}           	
-								//발주수량 OVER CHK
-								if ( this.key == "ordrgQty") {			            		
-									if( this.item.ordrgQty != "" && this.item.ordrgQty > 0  ) {			            			
-										var calcuOrdrgQty = parseInt( deleteCommaStr(this.item.bomQty) - deleteCommaStr(this.item.preBomQty) );
-										if( this.item.ordrgQty == 0 ) {
-											alert("발주수량은 0 보다 커야 합니다.");
-											gridViewPop.target.setValue(row, "ordrgQty", "");	
-											return;			        
-										} else if( calcuOrdrgQty == 0 ) {
-											alert("발주 가능 수량이 0입니다.");
-											gridViewPop.target.setValue(row, "ordrgQty", "");	
-											return;		 			            				
-										} else if( calcuOrdrgQty < this.item.ordrgQty   ) {
-											//등록일때만 값 초기화
-											if( actionType == "C" ) gridViewPop.target.setValue(row, "ordrgQty", "");            			
-											alert("발주수량은 "+ calcuOrdrgQty+" (와)과 같거나 작아야 합니다");
-											return;
-										}
-									}
-								}	
-							}
+							
 							
 							 
 						},					
@@ -287,14 +248,11 @@
 			},
 			setData: function(_pageNo) {
 				var targetObj = this.target;
-				var formData = new FormData();
-				var row = gridView.target.getList("selected")[0];  //파라미터 수정
-				var formData = {
-					"coCd"        : row.coCd,
-					"salesCd"     : row.salesCd,
-					"ordrgNo" 	  : row.ordrgNo,
-					"ordrgSeq"	  : row.ordrgSeq
-				}
+
+				//row ~ 이 작업은 해당 마스터 페이지에서 클릭한 값 이라 다른 페이지에서 값을 가지고 와야하므로 파라미터로 수정
+				//var row = gridView.target.getList("selected")[0];  //파라미터 수정
+				var formData = modalStack.last().paramObj;// 
+				
 				//등록과 수정 URL 다르게  
 				postAjax("/user/sm/sm02/selectOrderDetailList" , formData, null, function(data){	
 				var list = data.resultList;
@@ -309,10 +267,12 @@
 			} 
 		}
 
+	/*	body가 끝나고 나서  jquery의 실행스크립트를 시작*/
 	$(document).ready(function() {
-		
 		//combo set
 		setCommonSelect($(".popup_area select[data-kind]"));
+		$("#coCd").val(modalStack.last().paramObj.coCd);
+
 		userId = modalStack.last().paramObj.userId;
 		$("#popForm #userId").val(userId);
 		
@@ -326,33 +286,39 @@
 		if (actionType == "C") {
 				
 		} else if (actionType == "U") {
-			//debugger;
 			$('.tit_contents .tit').text('공급업체 확인')
 			
-			$('#actionBtn').text("수정");
 			$('#actionBtn').on("click", function() {
 				updateOrder();
 			});
-			
-			initViewPop(actionType);
-
+			initViewPop(actionType); //initViewPop호출
 		}
 		
-		//TR 아래 모든 자싯 inut 태그 입력 금지 처리
+		//TR 아래 모든 자식 input 태그 입력 금지 처리
 		$('.vendInquery').find('input').prop('disabled', true);
-		//TR 아래 모든 자싯 combo 태그 입력 금지 처리
+		//TR 아래 모든 자식 combox 태그 입력 금지 처리 
+		$('.vendInquery').find('select').prop('disabled', true);
+		// 권한체크
+		authChk();
 		
-		// 권한체크    
-		authChk();		
-			
-		
+		//---------------------------------------------------------------
+	   //첨부 화일 처리 시작
+	   //---------------------------------------------------------------
+	   fileParam = {
+		  fileTrgtTyp   : $("#pgmId").val(),
+		  fileTrgtKey : fileTrgtKeyU
+		  
+	   }
+	   treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
+	   //---------------------------------------------------------------
+	   //첨부 화일 처리 끝
+	   //---------------------------------------------------------------
 	});
 
 	function initViewPop(actionType) {
 		
 		if(actionType == "U") {
 			
-			let editVal = {};
 			postAjaxSync("/user/sm/sm02/selectOrderDetailView", modalStack.last().paramObj, null, function(data){
 				
 				var list = data.resultList;
@@ -361,38 +327,28 @@
 				        	//html element overwrite set								
 							if( val && typeof($("#popForm #"+key).attr("name")) != "undefined" ) {
 								$("#popForm #"+key).val(val);
-								editVal[key] = val;									
-
+								//양수, 음수, 소수점 포함 원단위 포맷 적용
+								if ($('#popForm #' + key).is('[comma]')) {
+									onlyNumber($('#popForm #' + key)[0]);
+								}
+								
 							}
 						});		
 				        
-				        
-// 				        $.each(data.result, function(key, value) {
-// 							if ($('#popForm #' + key)[0]) {
-// 								$('#popForm #' + key).val(value);
-// 								if ($('#popForm #' + key).is('[comma]')) {
-// 									onlyNumber($('#popForm #' + key)[0]);
-// 								}
-// 							}
-// 						});
 					} 
-			});	
-			
-
-			
-			
+	 				
+			});		
+			gridViewPop.setData();	
 		}
 		
 	}	
 	
 	//수정 
 	function updateOrder() {
-		//debugger;
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 			var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
 			
 			filePostAjax("/user/sm/sm07/updateOrderDetail", formData, function(data) {
-					//debugger;
 					alert(data.resultMessage);
 	
 					if (data.resultCode == 200) {
@@ -414,14 +370,44 @@
 		});
 		// 폼데이터 생성
 		var formData = new FormData($("#popForm")[0]);
+		console.log(formData);
 		// 기본값 set
-		formData.append("userId", jwt.userId);
-
+		//formData.append("userId", jwt.userId);
+		 
+		//---------------------------------------------------------------
+		//-------itemarr  --첨부화일 처리를 위한 부분 시작
+		//---------------------------------------------------------------
+		// 유저아이디 추가
+		formData.append("userId" , jwt.userId);
+		formData.append("clntCd" , $('#clntCd').val());			//첨부화일용
+		formData.append("prdtCd" , $('#prdtCd').val());			//첨부화일용
+		formData.append("itemCd" , $('#itemDiv').val());			//첨부화일용
+		formData.append("prjctCd", $('#clntPjt').val());		//첨부화일용
+		formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용
+		
+		var fileUploadArr = [];
+		var tempArr = [];
+		
+		tempArr = treeModule.getFileArr();
+		
+		$.each(tempArr, function(idx, obj) {
+		if (obj.fileKey == 0) {
+		formData.append("files", obj.file);
+		obj.file = '';
+		fileUploadArr.push(obj);
+		}
+		});
+		
+		formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
+		formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
+		//---------------------------------------------------------------
+		//--첨부화일 처리를 위한 부분 끝\
+		//---------------------------------------------------------------
+		   
 		//상세자료 준비
         detailArr = [];
 
 		var list = gridViewPop.target.list;
-		//debugger;
 		$.each(list,function(idx, obj) {
 			//신규
 			
@@ -434,8 +420,6 @@
  			 if (obj.dataChk == 'U') {				
 				detailArr.push(obj);
  			  } 
-		});
-		//debugger;
 		formData.append("detailArr", JSON.stringify(detailArr));//선택된 ROW 만 formData에 저장
 		//상세자료 끝
 

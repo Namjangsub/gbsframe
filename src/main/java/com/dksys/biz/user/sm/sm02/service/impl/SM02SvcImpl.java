@@ -53,8 +53,8 @@ public class SM02SvcImpl implements SM02Svc {
 
 
 	@Override
-	public int selectOrderListCount(Map<String, String> paramMap) {
-		return sm02Mapper.selectOrderListCount(paramMap);
+	public int selectOrderCount(Map<String, String> paramMap) {
+		return sm02Mapper.selectOrderCount(paramMap);
 	}
 
 	@Override
