@@ -7,7 +7,6 @@ import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface SM01Mapper {
-
   int selectBomSalesCount(Map<String, String> paramMap);
 
   List<Map<String, String>> selectBomSalesList(Map<String, String> paramMap);
@@ -23,6 +22,9 @@ public interface SM01Mapper {
   Map<String, String> selectBomMatrInfo(Map<String, String> paramMap);
   
   int selectPrjctSeqNext(Map<String, String> paramMap);
+
+  // LOWER_CD생성
+	int select_bm14_Key(Map<String, String> paramMap);
   
   int insertBom(Map<String, String> paramMap);
 
@@ -42,10 +44,5 @@ public interface SM01Mapper {
   
   int insertBomMatr(Map<String, String> paramMap);
   
-
-
   List<Map<String, String>> bomTreeList(Map<String, String> paramMap);
-
-
-
 }

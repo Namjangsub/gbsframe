@@ -1,11 +1,10 @@
 //공용 도움말 호출 팝업
-function manualPopup(userId,pgmId) {
+function manualPopup(pgmId) {
 
-	if(!userId)userId = $('#userId').val();
 	if(!pgmId)pgmId = $('#pgmId').val();
 	
 	var paramObj = {
-					"userId": userId,
+					"userId": jwt.userId,
 					"pgmId" : pgmId
 					};
 	

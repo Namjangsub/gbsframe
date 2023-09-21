@@ -101,6 +101,8 @@ public class SM01SvcImpl implements SM01Svc {
 	    	/* "dtaChk" 값을 확인하여
 	    	 * "I"인 경우 sm01Mapper.insertBomMatr(dtl)을 호출하여 프로젝트 세부정보를 삽입 */
 	    	if ("I".equals(dtaChk)) {
+				int lowerCd = sm01Mapper.select_bm14_Key(paramMap);
+				dtl.put("lowerCd", Integer.toString(lowerCd));
 	    		sm01Mapper.insertBomMatr(dtl);
 	    	}
 	    }
@@ -171,17 +173,18 @@ public class SM01SvcImpl implements SM01Svc {
 
     List<Map<String, String>> matrList = gsonDtl.fromJson(paramMap.get("matrArr"), dtlMap);
     for (Map<String, String> dtl : matrList) {
-
-      dtl.put("userId", paramMap.get("userId"));
-      dtl.put("pgmId", paramMap.get("pgmId"));
-      String dtaChk = dtl.get("dtaChk").toString();
-      if ("I".equals(dtaChk)) {
-	        sm01Mapper.insertBomMatr(dtl);
-	      } else if ("U".equals(dtaChk)) {
-	        sm01Mapper.updateBomMatr(dtl);
-	      } else if ("D".equals(dtaChk)) {
-	        sm01Mapper.deleteBomMatr(dtl);
-	      }
+    	dtl.put("userId", paramMap.get("userId"));
+    	dtl.put("pgmId", paramMap.get("pgmId"));
+    	String dtaChk = dtl.get("dtaChk").toString();
+    	if ("I".equals(dtaChk)) {
+    		int lowerCd = sm01Mapper.select_bm14_Key(paramMap);
+    		dtl.put("lowerCd", Integer.toString(lowerCd));
+    		sm01Mapper.insertBomMatr(dtl);
+    	} else if ("U".equals(dtaChk)) {
+    		sm01Mapper.updateBomMatr(dtl);
+    	} else if ("D".equals(dtaChk)) {
+    		sm01Mapper.deleteBomMatr(dtl);
+    	}
     }
 
     List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
