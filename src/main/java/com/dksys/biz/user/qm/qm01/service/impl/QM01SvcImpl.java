@@ -160,7 +160,7 @@ public class QM01SvcImpl implements QM01Svc {
 	//첨부 화일 권한체크  끝 
 	//---------------------------------------------------------------  
 	int result = QM01Mapper.updateQualityReq(paramMap);
-
+	
 	//---------------------------------------------------------------  
 	//첨부 화일 처리 시작 
 	//---------------------------------------------------------------  
@@ -619,20 +619,16 @@ public class QM01SvcImpl implements QM01Svc {
 		//---------------------------------------------------------------  
 		//첨부 화일 권한체크 끝 
 		//---------------------------------------------------------------  
-	  //String rsltNo =   paramMap.get("rsltNo");
-	  //  param.put("rsltNo", rsltNo);	  
-	 // System.out.println("rsltNo========?"+rsltNo);
-	  
-	  int result = QM01Mapper.deleteQualityReq(paramMap);
 
-	  List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
-		if (sharngChk.size() > 0) {
-			QM01Mapper.deleteWbsSharngList(paramMap); 
-		 }
 
-	 // int result1 = QM01Mapper.deleteQualityResp(paramMap);
+	  	int result = QM01Mapper.deleteQualityReq(paramMap);
+	  	
+		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
+			if (sharngChk.size() > 0) {
+				QM01Mapper.deleteWbsSharngList(paramMap); 
+			 }
 	  
-		//---------------------------------------------------------------  
+	  	//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------  
 		if (deleteFileList.size() > 0) {		  
@@ -643,7 +639,14 @@ public class QM01SvcImpl implements QM01Svc {
 		}
 		//---------------------------------------------------------------  
 		//첨부 화일 처리  끝 
-		//---------------------------------------------------------------  	  
+		//---------------------------------------------------------------  
+
+//	  List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
+//		if (sharngChk.size() > 0) {
+//			QM01Mapper.deleteWbsSharngList(paramMap); 
+//		 }
+
+		 	  
 	    return result;
   }
   
@@ -667,6 +670,26 @@ public class QM01SvcImpl implements QM01Svc {
   @Override
 	public List<Map<String, String>> selectMainCodeList(Map<String, String> param) {
 		return QM01Mapper.selectMainCodeList(param);
-	}	
+	}
+  
+  @Override
+  public List<Map<String, String>> selectApprovalChk(Map<String, String> paramMap) {
+		return QM01Mapper.selectApprovalChk(paramMap);
+  }
+  
+  @Override
+  public int updateReqStChk(Map<String, String> paramMap) {
+	  String rsltNo = paramMap.get("todoNo");
+	  if(rsltNo.substring(0, 3).equals("RES")) {
+		  paramMap.put("reqSt", "REQST03");
+	  }
+	  else {
+		  paramMap.put("reqSt", "REQST02");
+	  }
+	  
+	  int result = QM01Mapper.updateReqStChk(paramMap);
+	  
+     return result;
+  }
   
 }

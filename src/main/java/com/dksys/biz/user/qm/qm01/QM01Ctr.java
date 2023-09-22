@@ -116,6 +116,13 @@ public class QM01Ctr {
     return "jsonView";
   }
  */
+  
+  @PostMapping(value = "/selectApprovalChk")
+  public String selectApprovalChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	  List<Map<String, String>> result = qm01Svc.selectApprovalChk(paramMap);
+	  model.addAttribute("result", result);
+	  return "jsonView";
+  }
 
   @PostMapping(value = "/selectConfirmCount")
   public String selectConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -244,4 +251,17 @@ public class QM01Ctr {
     return "jsonView";
   }
   
+  @PostMapping(value = "/updateReqStChk")
+  public String updateReqStChk(@RequestBody Map<String, String> paramMap, ModelMap model){
+           int result = qm01Svc.updateReqStChk(paramMap);
+				if ( result != 0 ) {
+					model.addAttribute("resultCode", 200);
+					model.addAttribute("resultMessage", result);				
+				}
+				else {
+					model.addAttribute("resultCode", 500);
+					model.addAttribute("resultMessage", "QM01_updateReqStChk가 실행되지 않았습니다.");
+				}
+	  	return "jsonView";
+  }
 }
