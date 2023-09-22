@@ -106,7 +106,8 @@ function Approval(htmlParam, param, popParam) {
 									approvalParam.sanctnSn = data.sanctnSn;
 									approvalParam.coCd = data.coCd;
 									approvalParam.todoDiv1CodeId = data.todoDiv1CodeId;
-									approvalParam.todoDiv2CodeId = data.todoDiv2CodeId;		
+									approvalParam.todoDiv2CodeId = data.todoDiv2CodeId;
+									approvalParam.todoNo = data.todoNo;
 									html = html.replace(/readonly/gi, "");		//결재의견 input
 								} 
 							}
@@ -177,11 +178,15 @@ function Approval(htmlParam, param, popParam) {
 					, "todoCfOpn" : todoCfOpn
 			}
 			Object.assign(paramMap, this.param);
-			
 			postAjaxSync("/user/wb/wb20/insertApprovalLine", paramMap, null, function(data){
 				if(data.resultCode == 200){
-					alert("승인 되었습니다.");
-					confirmYn = true;
+					postAjaxSync("/user/qm/qm01/updateReqStChk", paramMap, null, function(data){
+						if(data.resultCode == 200){
+							console.log("QM01M01 접수컬럼상태가 바뀌었습니다");
+						}
+						alert("승인 되었습니다.");
+						confirmYn = true;
+					});
 				} else {
 					alert("승인중 오류가 발생 되었습니다.");	
 				}

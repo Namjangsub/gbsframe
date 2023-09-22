@@ -44,6 +44,8 @@ public interface QM01Mapper {
   
   String selectQualityReqCalNext(Map<String, String> paramMap);
   
+  List<Map<String, String>> selectApprovalChk(Map<String, String> paramMap);
+  
   int insertQualityReq(Map<String, String> paramMap);
   
   int insertQualityResp(Map<String, String> paramMap);
@@ -77,5 +79,16 @@ public interface QM01Mapper {
   List<Map<String, String>> selectMainCodeList(Map<String, String> param);
   
   List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap);
+  
+  String selectBaljooSttusChk(Map<String, String> paramMap);
+  
+  //List<Map<String, String>> selectApprovalAll(Map<String, String> paramMap);
+  Map<String, String> selectApprovalAll(Map<String, String> paramMap);
+  
+  int updateReqSt(Map<String, String> paramMap);
+  
+  int updateReqStRslt(Map<String, String> paramMap);
+  
+  int updateReqStChk(Map<String, String> paramMap);
   
 }

@@ -3,6 +3,7 @@ package com.dksys.biz.user.qm.qm01.service;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.ui.ModelMap;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface QM01Svc {
@@ -51,10 +52,14 @@ public interface QM01Svc {
   
   List<Map<String, String>> selectApprovalList(Map<String, String> paramMap);
   
+  List<Map<String, String>> selectApprovalChk(Map<String, String> paramMap);
+  
   int selectCodeMaxCount(Map<String, String> paramMap);
   
   public List<Map<String, String>> selectMainCodeList(Map<String, String> param);
   
   List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap);
   
+  int updateReqStChk(Map<String, String> paramMap);
+
 }
