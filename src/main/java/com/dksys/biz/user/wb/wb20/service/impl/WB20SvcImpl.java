@@ -39,7 +39,7 @@ public class WB20SvcImpl implements WB20Svc {
     
 	
 	@Override
-	public int selectToDoCount(Map<String, String> paramMap) {;		
+	public int selectToDoCount(Map<String, String> paramMap) {	
 		return wb20Mapper.selectToDoCount(paramMap);
 	}
 
