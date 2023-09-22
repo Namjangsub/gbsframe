@@ -1,16 +1,5 @@
 <!DOCTYPE html>
 <html lang="ko">
-	<style>
-		.th_title{
-		    text-align: left;
-		    position: relative;
-		    color: #888888;
-		    font-size: 13px;
-		    padding: 1px 0 1px 15px;
-		    font-weight: normal;
-		}
-	</style>
-<html lang="ko">
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -97,7 +86,7 @@
 						<td>
 							<div class="contents" style="margin:0px;padding:0px;width:100%;min-width:300px">
 								<div data-ax5grid="clmn-grid" data-ax5grid-config="{}" style="height: 365px; width: 100%"></div>
-								<h3><span class="page_tit">미청구 현황</span>
+								<h3><span class="page_tit1">미청구 현황</span>
 								<div data-ax5grid="tax-grid" data-ax5grid-config="{}" style="height: 365px; width: 100%"></div>
 							</div>
 						</td>
@@ -108,7 +97,9 @@
 						</td>
 						<td>
 							<div class="contents" style="margin:0px;padding:0px;width:100%; min-width:300px">
-								<div data-ax5grid="todo-grid" data-ax5grid-config="{}" style="height: 745px; width: 100%"></div>
+								<div data-ax5grid="todo-grid" data-ax5grid-config="{}" style="height: 365px; width: 100%"></div>
+								<h3><span class="page_tit3">완료 예정 업무</span>
+								<div data-ax5grid="work-grid" data-ax5grid-config="{}" style="height: 365px; width: 100%"></div>
 							</div>
 						</td>
 					</tr>
@@ -120,8 +111,6 @@
 </html>
 
 <script type="text/javascript">
-	var odrSeq = null;
-	var odrDtlSeqArr = [];
 	
 	ax5.ui.grid.formatter["bilgYn"] = function () {
 		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
@@ -318,12 +307,13 @@
 			});
 			return this;
 		},
-		setData : function(_pageNo) {
+		setData : function() {
 			var targetObj = this.target;
      	    var formData = {
     				"coCd"		: $("#coCd3").val(),
                     "salesMngId" : jwt.userId, // 공유대상자
                     "boardParam" : "BOARD",
+					"sanctnSttus" : "N",  //공유건은 미확인만 
                     "pageNo" :  1, 
     				"recordCnt" : 999999999,
      	           };
@@ -359,12 +349,9 @@
 						this.self.select(this.dindex);
 					},
 		            onDBLClick: function () {
-							var list = gridView.target.getList("selected");
-							$.each(list, function(idx, obj){
-								gridView.target.select(obj.__index);
-							});
-							this.self.select(this.dindex);
-							insert_update_cr08_Modal(this.item, "C");
+						this.self.clearSelect();
+						this.self.select(this.dindex);
+						insert_update_cr08_Modal(this.item, "C");
 		            },
 		            mergeCells : ["ordrsClntNm", "ctrtNm", "clmnPlanDivNm"],
 				},
@@ -395,7 +382,7 @@
 			});
 			return this;
 		},
-		setData : function(_pageNo) {
+		setData : function() {
 			var targetObj = this.target;
 			var formData = {
 				"coCd"		: $("#coCd1").val(),
@@ -413,6 +400,92 @@
 					}
 				});
 			});
+		}
+	}
+	
+	
+	// 완료예정업무 그리드
+	var workGridView = {
+		initView : function() {
+
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showRowSelector : false,
+				multipleSelect : false,
+				sortable : false,
+				target : $('[data-ax5grid="work-grid"]'),
+				header : {
+					align : "center",
+					selector : false
+				},
+				body : {
+					onClick : function() {
+						this.self.select(this.dindex);
+					},
+		            onDBLClick: function () {	
+						this.self.clearSelect();
+						this.self.select(this.dindex);
+						workModal(this.item, "C");
+		            },
+		            mergeCells : ["ordrsClntNm", "salesCd", "planCnts"],
+         trStyleClass: function(){
+            console.log(this.item);
+            return "grid-cell-blue";
+        },
+				},
+				page : {
+					display : true,
+				},
+			columns : [
+				{key: "ordrsClntNm", 	label: "고객사"     , 	align: "left"  , width: 140, formatter: function () {
+					return this.value.slice(0,8) + "(" + this.item.clntPjtNm + ")"},},
+				{key: "salesCd", 		label: "Sales Code",	align: "left"  , width: 130},
+				{key: "planCnts", 		label: "업무명",		align: "left" , width: 150},
+				{key: "resultPer", 		label: "%",				align: "center" , width: 50},
+				{key: "startDt" , 		label: "시작일", 		align: "center" , width: 80},
+				{key: "planEndDt", 		label: "종료예정일", 	align: "center", width: 80},
+				{key: "ctrtNm", 		label: "계약명", 		align: "left"  , width: 160},
+			]
+			});
+			return this;
+		},
+		setData : function() {
+			var targetObj = this.target;
+			var formData = {
+				"coCd"		: $("#coCd3").val(),
+				"strtDt"	: moment().add(3, 'days').format('YYYYMMDD'),
+				"recordCnt" : 999999999,
+			};
+			targetObj.setData([{
+					ordrsClntNm: "테스트회사",
+					clntPjtNm: "ME1",
+					salesCd: "23001-01HTFUP", 
+					planCnts: "일정관리 완료되면수정 필요",
+					resultPer: 10,
+					startDt: "2023-09-01",
+					planEndDt: "2023-09-26",
+					ctrtNm: "데시보드 테스트 자료임",
+				},{
+					ordrsClntNm: "테스트회사2",
+					clntPjtNm: "MX5a",
+					salesCd: "23042-02PRSAR", 
+					planCnts: "일정 지연건~~~",
+					resultPer: 50,
+					startDt: "2023-09-01",
+					planEndDt: "2023-09-20",
+					ctrtNm: "데시보드 테스트 자료임",
+				},
+			]);
+			// postAjax("/user/cr/cr12/select_cr12_List", formData, null, function(data) {
+			// 	var list = data.result;
+			// 	if (list != undefined)
+			// 	targetObj.setData({
+			// 		list : list,
+			// 		page : {
+			// 			totalElements : list.length
+			// 		}
+			// 	});
+			// });
 		}
 	}
 	
@@ -448,6 +521,7 @@
 		gridView.initView().setData();
 		todoGridView.initView().setData();
 		ordrgGridView.initView().setData();
+		workGridView.initView().setData();
 		// grid init
 	});
 	
@@ -505,11 +579,10 @@
 					if( row.todoDiv1CodeNm == "공유" ) {
 						if( row.sanctnSttus == "N" ) {
 							if( confirm("확인 처리 하시겠습니까?") ) {
-								toDoConfirm(selRow);
+								toDoConfirm(row);
 							}
 						} else {
 							alert("이미 확인처리 하였습니다.");
-							return;
 						}
 					} else if( row.todoDiv1CodeNm == "결재" ) {
 						var paramObj = {
@@ -524,9 +597,30 @@
 						openSecondModal("/static/html/user/wb/wb20/WB2001P01.html", 730, 300, "", paramObj);					
 					}
 				}
+
+				todoGridView.setData();
 			}
 		return;
 	} 	
+
+	function toDoConfirm(row){
+		if (row.todoKey != undefined) {
+			var today = new Date();
+			var strDate = today.getFullYear()+"-"+('0'+(today.getMonth()+1)).slice(-2)+"-"+('0'+today.getDate()).slice(-2);
+			
+			var formData = new FormData();
+			formData.append("todoKey", row.todoKey);
+			formData.append("creatId", jwt.userId);
+			formData.append("creatPgm", "WB2001M01");
+			//formData.append("todoCfDt", strDate);
+			filePutAjax("/user/wb/wb20/toDoCfDtUpdate", formData, function(data){
+				if(data.resultCode == 200){
+					alert("공유 확인되었습니다.");      
+					gridView.initView().setData(0);
+				}
+			}); 
+		}    
+	}  
 	
 	function insertQualityRespModal(row) {
 		// REQST 접수상태 - REQST01 : 접수, REQST02:진행, REQST03:완료
@@ -577,4 +671,19 @@
 			alert("결재 승인후 결과 등록할 수 있습니다.");
 		}
 	}	
+	
+	function workModal(row) {
+		
+		paramObj = {
+				"actionType" : "U",
+				"fileTrgtKey" 	: row.fileTrgtKey,
+				"coCd" 	   		: row.coCd,
+				"userId"   		: jwt.userId,
+				"userName" : jwt.userNm,
+		}
+			
+		openModal("/static/html/user/qm/qm01/QM0101P03.html", 1600, 850, "", paramObj, function(data) {
+			//gridView.setData(0);
+		});
+	}
 </script>
