@@ -2,6 +2,21 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.dksys.biz.user.cr.cr16.mapper.CR16Mapper"> 
+
+	<select id="selectSalesGunDeptList" resultType="CamelMap">
+		SELECT DEPT_ID AS CODE_ID
+		     , DEPT_NM AS CODE_NM
+		  FROM TB_CM04M01
+		 WHERE UP_DEPT_ID = 'GUN30'
+	</select>
+	
+	<select id="selectSalesTrnDeptList" resultType="CamelMap">
+		SELECT DEPT_ID AS CODE_ID
+		     , DEPT_NM AS CODE_NM
+		  FROM TB_CM04M01
+         WHERE UP_DEPT_ID = 'TRN50'
+	</select>
+ 
      <select id="selectSalesYearPlanListCount" parameterType="Map" resultType="int"> 
           SELECT COUNT(*)
              FROM  (
@@ -110,9 +125,9 @@
                    <if test="salesPlanClntNm != null and !salesPlanClntNm.equals('')">
                     AND SALES_PLAN_CLNT_NM LIKE '%${salesPlanClntNm}%'               
                    </if>
-                   <if test="salesPlanId != null and !salesPlanId.equals('')">
-                    AND SALES_PLAN_ID = #{salesPlanId}               
-                   </if>  
+                   <if test="salesPlanDeptCd != null and salesPlanDeptCd.equals('')">
+	                AND SALES_PLAN_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID = #{salesPlanDeptCd})               
+	               </if>
                    <if test="salesPlanNm != null and !salesPlanNm.equals('')">
                     AND SALES_PLAN_NM LIKE '%${salesPlanNm}%'               
                    </if>
@@ -122,10 +137,11 @@
                    
          </select>
                  
-         <select id="selectSalesYearPlanList" parameterType="Map" resultType="camelMap"> 
-          SELECT *
+         <select id="selectSalesYearPlanList" parameterType="Map" resultType="camelMap">
+         /* selectSalesYearPlanList */
+          SELECT ROWNUM AS RN, S.*
              FROM (
-			          SELECT ROWNUM AS RN, S.* 
+			          SELECT * 
 			             FROM  (
 				             SELECT CO_CD,
 				                    (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.CO_CD) AS CO_CD_NM,
@@ -224,7 +240,7 @@
 						                                 GROUP BY S.CO_CD, S.SALES_PLAN_CLNT_CD, S.SALES_PLAN_DIV, 
 						                                 S.SALES_PLAN_YY, S.SALES_PLAN_ID 
 						                                 ) S ) S
-						            WHERE CO_CD = #{coCd}
+						            WHERE CO_CD = NVL(#{coCd},CO_CD)
 			                          AND SALES_PLAN_YY = #{salesPlanYy}
 			                          <if test="salesPlanClntCd != null and !salesPlanClntCd.equals('')">
 			                           AND SALES_PLAN_CLNT_CD = #{salesPlanClntCd}               
@@ -232,9 +248,9 @@
 			                          <if test="salesPlanClntNm != null and !salesPlanClntNm.equals('')">
 			                           AND SALES_PLAN_CLNT_NM LIKE '%${salesPlanClntNm}%'               
 			                          </if>
-			                          <if test="salesPlanId != null and !salesPlanId.equals('')">
-			                           AND SALES_PLAN_ID = #{salesPlanId}               
-			                          </if>  
+			                          <if test="salesPlanDeptCd != null and !salesPlanDeptCd.equals('')">
+			                           AND SALES_PLAN_ID IN (SELECT ID FROM TB_CM06M01 WHERE DEPT_ID = #{salesPlanDeptCd})               
+			                          </if>
 			                          <if test="salesPlanNm != null and !salesPlanNm.equals('')">
 			                           AND SALES_PLAN_NM LIKE '%${salesPlanNm}%'               
 			                          </if>
@@ -251,7 +267,7 @@
                    WHERE CO_CD = #{coCd}
                    AND SUBSTR(SALES_PLAN_YM,0,4) = #{salesPlanYy}
                    AND SALES_PLAN_CLNT_CD = #{salesPlanClntCd} 
-                   AND SALES_PLAN_DIV = #{salesPlanDiv}
+<!--                    AND SALES_PLAN_DIV = #{salesPlanDiv} -->
         </delete>
         
         <delete id="deleteSalesYearPlanD" parameterType="Map">
@@ -269,8 +285,7 @@
                       S.SALES_PLAN_AMT, NVL(P1.ORDRS_TOT_AMT,0) AS ORDRS_TOT_AMT,
                       0 AS PRE_SALES_PLAN_AMT, 
                       S.SALES_PLAN_AMT- NVL(P1.ORDRS_TOT_AMT,0) AS DIF_TOT_AMT,
-                      S.SALES_PLAN_RMK, 'N' AS PLAN_CLOSE_YN,
-                      NVL(P2.SALES_PLAN_AMT,0) AS PRE_SALES_PLAN_AMT
+                      S.SALES_PLAN_RMK, 'N' AS PLAN_CLOSE_YN
 			FROM (
 				               SELECT '' AS FILE_TRGT_KEY, #{coCd} AS CO_CD, #{salesPlanClntCd} AS SALES_PLAN_CLNT_CD, #{salesPlanDiv} AS SALES_PLAN_DIV, 
 				               #{salesPlanId} AS SALES_PLAN_ID, #{salesPlanYy, jdbcType=VARCHAR}||'01' AS SALES_PLAN_YM, 0 AS SALES_PLAN_AMT, 
@@ -332,57 +347,28 @@
                                 AND S.SALES_PLAN_CLNT_CD = P1.ORDRS_CLNT_CD
                                 AND S.SALES_PLAN_YM = P1.ORDRS_DT
                            
-                           LEFT OUTER JOIN TB_CR10M01_HIST P2
-                                 ON S.CO_CD = P2.CO_CD
-                                AND S.SALES_PLAN_CLNT_CD = P2.SALES_PLAN_CLNT_CD
-                                AND S.SALES_PLAN_DIV = P2.SALES_PLAN_DIV
-                                AND S.SALES_PLAN_ID = P2.SALES_PLAN_ID
-                                AND TO_CHAR(TO_NUMBER(SUBSTR(S.SALES_PLAN_YM,0,4))-1)||SUBSTR(S.SALES_PLAN_YM,5,2) = P2.SALES_PLAN_CLOSE_MM    
-                           
                            ORDER BY  S.SALES_PLAN_YM ASC
         </select>
         
         <select id="selectSalesYearPlanMU" parameterType="Map" resultType="camelMap">
         /* selectSalesYearPlanMU */
-        
-               SELECT S.CO_CD, 
-                      S.FILE_TRGT_KEY,
-                      S.SALES_PLAN_CLNT_CD,
-                      (SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD = S.SALES_PLAN_CLNT_CD) AS SALES_PLAN_CLNT_NM,
-                      S.SALES_PLAN_DIV, 
-                      S.SALES_PLAN_ID, 
-                      S.SALES_PLAN_YM, 
-                      S.SALES_PLAN_AMT, 
-                      NVL(P1.ORDRS_TOT_AMT,0) AS ORDRS_TOT_AMT,
-                      0 AS PRE_SALES_PLAN_AMT, 
-                      S.SALES_PLAN_AMT- NVL(P1.ORDRS_TOT_AMT,0) AS DIF_TOT_AMT,
-                      S.SALES_PLAN_RMK, 
-                      S.PLAN_CLOSE_YN,
-                      NVL(P2.SALES_PLAN_AMT,0) AS PRE_SALES_PLAN_AMT
-                  FROM TB_CR10M01 S 
-                  LEFT OUTER JOIN (
-	                            SELECT CO_CD, ORDRS_CLNT_CD,  
-	                            TO_CHAR(ORDRS_DT, 'YYYYMM') AS ORDRS_DT, 
-	                            SUM(ORDRS_AMT) AS ORDRS_TOT_AMT   
-	                            FROM TB_CR02M01
-	                            WHERE ORDRS_DIV IN ('ORDRSDIV1','ORDRSDIV2')
-	                            GROUP BY CO_CD, ORDRS_CLNT_CD, TO_CHAR(ORDRS_DT, 'YYYYMM')
-                            ) P1 ON S.CO_CD = P1.CO_CD 
-                                AND S.SALES_PLAN_CLNT_CD = P1.ORDRS_CLNT_CD
-                                AND S.SALES_PLAN_YM = P1.ORDRS_DT
-                           
-	                       LEFT OUTER JOIN TB_CR10M01_HIST P2
-	                        ON S.CO_CD = P2.CO_CD
-	                        AND S.SALES_PLAN_CLNT_CD = P2.SALES_PLAN_CLNT_CD
-	                        AND S.SALES_PLAN_DIV = P2.SALES_PLAN_DIV
-	                        AND S.SALES_PLAN_ID = P2.SALES_PLAN_ID
-	                        AND TO_CHAR(TO_NUMBER(SUBSTR(S.SALES_PLAN_YM,0,4))-1)||SUBSTR(S.SALES_PLAN_YM,5,2) = P2.SALES_PLAN_CLOSE_MM    
-                           WHERE S.CO_CD = #{coCd}
-                           AND S.SALES_PLAN_CLNT_CD = #{salesPlanClntCd}   
-                           AND S.SALES_PLAN_DIV = #{salesPlanDiv}
-                           AND S.SALES_PLAN_ID = #{salesPlanId}
-                           AND SUBSTR(S.SALES_PLAN_YM,0,4) = #{salesPlanYy}
-                           ORDER BY  S.SALES_PLAN_YM ASC
+        SELECT S.CO_CD, 
+		       MAX(S.FILE_TRGT_KEY) AS FILE_TRGT_KEY,
+		       S.SALES_PLAN_CLNT_CD,
+		       (SELECT T.CLNT_NM FROM TB_BM02M01 T WHERE T.CLNT_CD = S.SALES_PLAN_CLNT_CD) AS SALES_PLAN_CLNT_NM,
+		       S.SALES_PLAN_ID, 
+		       S.SALES_PLAN_YM, 
+		       SUM(DECODE(SALES_PLAN_DIV,'SALESPLANDIV10',S.SALES_PLAN_AMT,0)) AS SALES_PLAN_AMT_10,
+		       SUM(DECODE(SALES_PLAN_DIV,'SALESPLANDIV20',S.SALES_PLAN_AMT,0)) AS SALES_PLAN_AMT_20,
+		       MAX(S.SALES_PLAN_RMK) AS SALES_PLAN_RMK, 
+		       S.PLAN_CLOSE_YN
+		  FROM TB_CR10M01 S 
+		 WHERE S.CO_CD = #{coCd}
+		   AND S.SALES_PLAN_CLNT_CD = #{salesPlanClntCd}   
+		   AND S.SALES_PLAN_ID = #{salesPlanId}
+		   AND SUBSTR(S.SALES_PLAN_YM,0,4) = #{salesPlanYy}
+		 GROUP BY S.CO_CD, S.SALES_PLAN_CLNT_CD,S.SALES_PLAN_ID,S.SALES_PLAN_YM,S.PLAN_CLOSE_YN
+		 ORDER BY  S.SALES_PLAN_YM ASC
         </select>   
                
         <select id="selectSalesYearPlanD" parameterType="Map" resultType="camelMap">
@@ -444,10 +430,14 @@
         </insert>  
         
         <update id="salesPlanYearUpdate" parameterType="Map">
-           UPDATE TB_CR10M01
+           UPDATE TB_CR10M01 S
                SET SALES_PLAN_AMT = #{salesPlanAmt},
                    SALES_PLAN_RMK = #{salesPlanRmk} 
-             WHERE FILE_TRGT_KEY = #{fileTrgtKey}      
+             WHERE S.CO_CD = #{coCd}
+			   AND S.SALES_PLAN_CLNT_CD = #{salesPlanClntCd}
+			   AND S.SALES_PLAN_ID 		= #{salesPlanId}
+			   AND S.SALES_PLAN_DIV 	= #{salesPlanDiv}
+			   AND S.SALES_PLAN_YM 		= #{salesPlanYm}
         </update>                  
         
         
@@ -543,7 +533,8 @@
                    AND SALES_PLAN_YM = #{salesPlanYm}   
         </update>  
                
-        <select id="selectSalesYearPlanListHist" parameterType="Map" resultType="camelMap"> 
+        <select id="selectSalesYearPlanListHist" parameterType="Map" resultType="camelMap">
+        /* selectSalesYearPlanListHist */
              SELECT ROWNUM AS RN, S.* 
                 FROM  (
                     SELECT CO_CD,
@@ -621,7 +612,7 @@
                                                 CREAT_DTTM,
                                                 UDT_ID,
                                                 UDT_DTTM
-                                                FROM TB_CR10M01 ) S
+                                                FROM TB_CR10M01_HIST ) S
                                                 LEFT OUTER JOIN 
                                                 ( SELECT CO_CD,
                                                 SALES_PLAN_CLNT_CD,
@@ -629,7 +620,7 @@
                                                 SALES_PLAN_ID,
                                                 SUBSTR(SALES_PLAN_YM,0,4) AS SALES_PLAN_YY,
                                                 SUM(SALES_PLAN_AMT) AS SALES_PLAN_TOT_AMT 
-                                                FROM TB_CR10M01
+                                                FROM TB_CR10M01_HIST
                                                 GROUP BY CO_CD,
                                                 SALES_PLAN_CLNT_CD,
                                                 SALES_PLAN_DIV,
@@ -641,7 +632,7 @@
                                                 AND S.SALES_PLAN_ID  = TOT_S.SALES_PLAN_ID
                                                 AND S.SALES_PLAN_YY = TOT_S.SALES_PLAN_YY
                                                 GROUP BY S.CO_CD, S.SALES_PLAN_CLNT_CD, S.SALES_PLAN_DIV, 
-                                                S.SALES_PLAN_YY, S.SALES_PLAN_ID 
+                                                S.SALES_PLAN_YY, S.SALES_PLAN_ID
                                                 ) S ) S
                            WHERE CO_CD = #{coCd}
                              AND SALES_PLAN_YY = #{salesPlanYy}
@@ -663,7 +654,8 @@
                              ORDER BY SALES_PLAN_YY ASC                                             
          </select>    
          
-         <select id="selectSalesYearPlanMC2" parameterType="Map" resultType="camelMap"> 
+         <select id="selectSalesYearPlanMC2" parameterType="Map" resultType="camelMap">
+         /* selectSalesYearPlanMC2 */
             SELECT  S.CO_CD, 
                     (SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = S.CO_CD) AS CO_CD_NM,
                     S.FILE_TRGT_KEY,
@@ -677,6 +669,8 @@
                     NVL(P1.ORDRS_AMT,0) AS PRE_ORDRS_AMT,
                     NVL(P2.SALES_PLAN_AMT,0) - NVL(P1.ORDRS_AMT,0) AS DIF_AMT,                    
                     S.SALES_PLAN_AMT, 
+                    0 AS SALES_PLAN_AMT10,
+                    0 AS SALES_PLAN_AMT20,
                     S.SALES_PLAN_RMK, 
                     'N' AS PLAN_CLOSE_YN                                                           
             FROM (
@@ -794,9 +788,25 @@
                           ORDER BY  CO_CD, CLNT_CD, ORDRS_YM, ORDRS_DT, PRJCT_CD, MNG_ID ASC
         </select>
         
-         
-         
-                     
+	<select id="callPlanClose" statementType="CALLABLE" parameterType="map">
+	/* callPlanClose */
+        {call SP_CR16M01_I(
+	        #{salesPlanYy  , mode=IN, jdbcType=VARCHAR},
+	        #{userId       , mode=IN, jdbcType=VARCHAR},
+	        #{pgmId        , mode=IN, jdbcType=VARCHAR},
+	        #{errMsg       , mode=OUT, jdbcType=VARCHAR}
+	    )}
+    </select>
+
+	<select id="selectSalesPlanHistList" resultType="CamelMap">
+		SELECT SUBSTR(SALES_PLAN_YM,0,4) AS SALES_PLAN_YY
+		      , SALES_PLAN_CLOSE_SEQ AS CODE_ID
+		      , SUBSTR(SALES_PLAN_YM,0,4) || ' 년간사업계획 ' || SALES_PLAN_CLOSE_SEQ || '차' AS CODE_NM
+		  FROM TB_CR10M01_HIST
+		 WHERE SUBSTR(SALES_PLAN_YM,0,4) = #{salesPlanYy}
+		 GROUP BY SUBSTR(SALES_PLAN_YM,0,4), SALES_PLAN_CLOSE_SEQ
+	</select>
+	   
 </mapper>
 
 

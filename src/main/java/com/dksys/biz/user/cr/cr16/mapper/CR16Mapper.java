@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.ibatis.annotations.Mapper;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 @Mapper
 public interface CR16Mapper {
@@ -47,6 +46,14 @@ public interface CR16Mapper {
 	List<Map<String, String>> selectSalesYearPlanMC2(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectSalesYearPlanD2(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectSalesGunDeptList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectSalesTrnDeptList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectSalesPlanHistList(Map<String, String> paramMap);
+	
+	void callPlanClose(Map<String, String> paramMap);
 	
 }
 

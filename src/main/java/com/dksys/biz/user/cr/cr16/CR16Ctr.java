@@ -183,4 +183,33 @@ public class CR16Ctr {
 		  return "jsonView";
     }
     
+    @PostMapping(value = "/selectSalesDeptList") 
+	public String selectSalesDeptList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  List<Map<String, String>> list = cr16Svc.selectSalesDeptList(paramMap);
+		  model.addAttribute("list", list);
+		  return "jsonView";
+    }
+    
+    @PostMapping(value = "/callPlanClose") 
+	public String callPlanClose(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	try {
+    		cr16Svc.callPlanClose(paramMap);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", "확정되었습니다.");
+			model.addAttribute("errMsg", paramMap.get("errMsg"));
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  			model.addAttribute("errMsg", paramMap.get("errMsg"));
+  		}
+		return "jsonView";
+    }
+    
+    @PostMapping(value = "/selectSalesPlanHistList") 
+	public String selectSalesPlanHistList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  List<Map<String, String>> list = cr16Svc.selectSalesPlanHistList(paramMap);
+		  model.addAttribute("list", list);
+		  return "jsonView";
+    }
+    
 }	  

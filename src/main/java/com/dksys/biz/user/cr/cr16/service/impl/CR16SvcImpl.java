@@ -1,29 +1,22 @@
 package com.dksys.biz.user.cr.cr16.service.impl;
 
-import java.io.File;
-import java.io.IOException;
 import java.lang.reflect.Type;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.collections4.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.util.DateUtil;
-import com.dksys.biz.util.ExceptionThrower;
-import com.dksys.biz.user.cr.cr16.mapper.CR16Mapper;
-import com.dksys.biz.user.cr.cr16.service.CR16Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.user.cr.cr16.mapper.CR16Mapper;
+import com.dksys.biz.user.cr.cr16.service.CR16Svc;
+import com.dksys.biz.util.ExceptionThrower;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -98,21 +91,24 @@ public class CR16SvcImpl implements CR16Svc {
 		Gson gson = new Gson();
 	    Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> arr = gson.fromJson(paramMap.get("rowListArr"), stringList);
+		int fileTrgtKey = cr16Mapper.selectSalesYearPlanSeqNext(paramMap);
 		if (arr != null && arr.size() > 0 ) {
 			for (Map<String, String> arrMap : arr) {
 	            try {   	            	    
-	            		int fileTrgtKey = cr16Mapper.selectSalesYearPlanSeqNext(arrMap);
-	            		arrMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
-	            		
-	            		String str1 = arrMap.get("salesPlanYm").toString();
-	            		String str2 = paramMap.get("fileKey").toString();
-	            		
-	            		if (str1.equals(str2) == true) {
-                        	paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
-	            	    }	            		
-		            	cr16Mapper.salesPlanYearInsert(arrMap);
-		            	
-		            	result++;	            	 
+	            	arrMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+	            	
+	            	//수주와 매출을 동시에 입력해야 하므로 한줄당 2번의 업데이트 발생
+            		//수주
+	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt10").toString());
+	            	arrMap.put("salesPlanDiv", "SALESPLANDIV10");
+	            	cr16Mapper.salesPlanYearInsert(arrMap);
+	            	
+	            	//매출
+	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt20").toString());
+	            	arrMap.put("salesPlanDiv", "SALESPLANDIV20");
+	            	cr16Mapper.salesPlanYearInsert(arrMap);
+	            	
+	            	result++;	            	 
 	            } catch (Exception e) {
 	                 System.out.println("error2"+e.getMessage());
 	            }
@@ -141,7 +137,7 @@ public class CR16SvcImpl implements CR16Svc {
 		//---------------------------------------------------------------  
 		if (uploadFileList.size() > 0) {
 		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		    paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
 		    cm08Svc.uploadFile(paramMap, mRequest);
 		}
 		//---------------------------------------------------------------  
@@ -160,15 +156,20 @@ public class CR16SvcImpl implements CR16Svc {
 		List<Map<String, String>> arr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (arr != null && arr.size() > 0 ) {
 			for (Map<String, String> arrMap : arr) {
-	            try {   	 
-		            	String str1 = arrMap.get("salesPlanYm").toString();
-	            		String str2 = paramMap.get("fileKey").toString();
-	            		
-	            		if (str1.equals(str2) == true) {
-	                    	paramMap.put("fileTrgtKey", arrMap.get("fileTrgtKey").toString());
-	            	    }
-		            	cr16Mapper.salesPlanYearUpdate(arrMap);
-		            	result++;	            	 
+	            try {   
+	            	
+            		//수주와 매출을 동시에 입력해야 하므로 한줄당 2번의 업데이트 발생
+            		//수주
+	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt10").toString());
+	            	arrMap.put("salesPlanDiv", "SALESPLANDIV10");
+	            	cr16Mapper.salesPlanYearUpdate(arrMap);
+	            	
+	            	//매출
+	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt20").toString());
+	            	arrMap.put("salesPlanDiv", "SALESPLANDIV20");
+	            	cr16Mapper.salesPlanYearUpdate(arrMap);
+	            	
+	            	result++;	            	 
 	            } catch (Exception e) {
 	                 System.out.println("error2"+e.getMessage());
 	            }
@@ -288,5 +289,28 @@ public class CR16SvcImpl implements CR16Svc {
     @Override
 	public List<Map<String, String>> selectSalesYearPlanD2(Map<String, String> paramMap) {
 		return cr16Mapper.selectSalesYearPlanD2(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectSalesDeptList(Map<String, String> paramMap) {
+		//회사가 건양ITT인가 아닌가에 따른 부서 조회
+		if(paramMap.get("coCd").equals("GUN")) {//건양ITT일때
+			return cr16Mapper.selectSalesGunDeptList(paramMap);
+		}else if(paramMap.get("coCd").equals("TRN")){//건양트루넷일때
+			return cr16Mapper.selectSalesTrnDeptList(paramMap);
+		}else{//전체일 경우
+			return null;
+		}
+	}
+
+	@Override
+	public void callPlanClose(Map<String, String> paramMap) {
+		cr16Mapper.callPlanClose(paramMap);
+		
+	}
+	
+	@Override
+	public List<Map<String, String>> selectSalesPlanHistList(Map<String, String> paramMap) {
+		return cr16Mapper.selectSalesPlanHistList(paramMap);
 	}
 }
