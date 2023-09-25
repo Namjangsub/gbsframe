@@ -203,5 +203,17 @@ public class BM14Ctr {
     	model.addAttribute("result", result);
     	return "jsonView";
     }
+	
+    // 엑셀업로드 점검용 자식 트리 전체 리스트 조회
+    @PostMapping("/selectBomAllEnterList")
+    public String selectBomAllEnterList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        int totalCnt = bm14svc.selectBomAllEnterListCount(paramMap);
+        PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+        model.addAttribute("paginationInfo", paginationInfo);
+
+    	List<Map<String, String>> result = bm14svc.selectBomAllEnterList(paramMap);
+    	model.addAttribute("result", result);
+    	return "jsonView";
+    }
     
 }
