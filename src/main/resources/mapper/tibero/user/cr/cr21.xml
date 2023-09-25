@@ -59,9 +59,9 @@
 		     )
 		   , MECH AS --매출확정 
 		     (
-		      SELECT CO_CD         AS CO_CD      --회사코드
-		            , PERIOD        AS PERIOD     --매출확정월
-		            , AMOUNT        AS SELL_AMOUNT --매출확정금액
+		      SELECT CO_CD            AS CO_CD      --회사코드
+		            , PERIOD          AS PERIOD     --매출확정월
+		            , AMOUNT/1000000  AS SELL_AMOUNT --매출확정금액
 		        FROM (
 		              SELECT CM.CO_CD                                      AS CO_CD    --회사코드
 		                    , TO_CHAR(CM.SELL_DCSN_DT, 'YYYYMM')            AS PERIOD   --매출확정월
@@ -98,6 +98,14 @@
 		              , SUM(PLAN_AMOUNT) OVER (PARTITION BY CO_CD) TOT_AMT
 		          FROM PLAN  P --사업계획
 		         WHERE 1=1
+		         UNION ALL --위 사업계획 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
+	             SELECT '1,목표' AS REC_DIV
+	                  , #{coCd}    AS CO_CD
+	                  , '${searchYear}01' AS PERIOD
+	                  , 0        AS PLAN_AMOUNT
+	                  , 0        AS TOT_AMT
+	               FROM DUAL
+	              WHERE NOT EXISTS ( SELECT * FROM PLAN )
 		       )
 		  PIVOT ( SUM(PLAN_AMOUNT) FOR PERIOD IN ('${searchYear}01', '${searchYear}02', '${searchYear}03', '${searchYear}04', '${searchYear}05', '${searchYear}06', '${searchYear}07', '${searchYear}08', '${searchYear}09', '${searchYear}10', '${searchYear}11', '${searchYear}12' ) --년월 읽어와서 넣어주기 
 		        )
@@ -111,14 +119,32 @@
 		              , SUM(SUJU_AMOUNT) OVER (PARTITION BY CO_CD) TOT_AMT
 		           FROM SJM AS S --수주실적 
 		          WHERE 1=1
-		        UNION ALL
-		        SELECT '2,실적' AS REC_DIV
+		         UNION ALL  --위 수주실적 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
+                 SELECT '2,실적' AS REC_DIV
+                      , #{coCd}    AS CO_CD
+                      , '${searchYear}01' AS PERIOD
+                      , 0        AS PLAN_AMOUNT
+                      , 0        AS TOT_AMT
+                   FROM DUAL
+                  WHERE NOT EXISTS ( SELECT * FROM SJM WHERE PERIOD LIKE SUBSTR('${searchYear}',1,4)||'%' ) --수주실적 있으면 조회 안되게
+                    AND 'SALESPLANDIV10' = #{salesplandiv}
+		         UNION ALL
+		         SELECT '2,실적' AS REC_DIV
 		              , CO_CD    --회사코드
 		              , PERIOD   --PERIOD
 		              , SELL_AMOUNT   AS AMOUNT--금액
 		              , SUM(SELL_AMOUNT) OVER (PARTITION BY CO_CD) TOT_AMT
 		           FROM MECH AS M --매출확정
 		          WHERE 1=1
+		         UNION ALL  --위 매출확정 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
+	             SELECT '2,실적' AS REC_DIV
+	                  , #{coCd}    AS CO_CD
+	                  , '${searchYear}01' AS PERIOD
+	                  , 0        AS PLAN_AMOUNT
+	                  , 0        AS TOT_AMT
+	               FROM DUAL
+	              WHERE NOT EXISTS ( SELECT * FROM MECH WHERE PERIOD LIKE SUBSTR('${searchYear}',1,4)||'%' ) --매출확정 있으면 조회 안되게
+                    AND 'SALESPLANDIV20' = #{salesplandiv}
 		       )
 		  PIVOT ( SUM(AMOUNT) FOR PERIOD IN ('${searchYear}01', '${searchYear}02', '${searchYear}03', '${searchYear}04', '${searchYear}05', '${searchYear}06', '${searchYear}07', '${searchYear}08', '${searchYear}09', '${searchYear}10', '${searchYear}11', '${searchYear}12' ) --년월 읽어와서 넣어주기 
 		        )
@@ -166,7 +192,15 @@
 		                                  WHERE 1=1
 		                                  GROUP BY CO_CD, PERIOD
 		                                ) AS M ON P.CO_CD = M.CO_CD AND P.PERIOD = M.PERIOD --매출확정  
-		          WHERE 'SALESPLANDIV20' = #{salesplandiv} 
+		          WHERE 'SALESPLANDIV20' = #{salesplandiv}
+		         UNION ALL   --위 달성율 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
+	             SELECT '3,달성율(%)' AS REC_DIV
+	                  , #{coCd}    AS CO_CD
+	                  , '${searchYear}01' AS PERIOD
+	                  , 0        AS PLAN_AMOUNT
+	                  , 0        AS TOT_AMT
+	               FROM DUAL
+	              WHERE NOT EXISTS ( SELECT * FROM PLAN )
 		       )
 		  PIVOT ( MAX(PLAN_RATE) FOR PERIOD IN ('${searchYear}01', '${searchYear}02', '${searchYear}03', '${searchYear}04', '${searchYear}05', '${searchYear}06', '${searchYear}07', '${searchYear}08', '${searchYear}09', '${searchYear}10', '${searchYear}11', '${searchYear}12' ) --년월 읽어와서 넣어주기 
 		        )
@@ -205,7 +239,15 @@
 		                                  WHERE 1=1
 		                                  GROUP BY CO_CD, PERIOD
 		                                ) AS M ON P.CO_CD = M.CO_CD AND P.PERIOD = M.PERIOD --매출확정  
-		          WHERE 'SALESPLANDIV20' = #{salesplandiv} 
+		          WHERE 'SALESPLANDIV20' = #{salesplandiv}
+	             UNION ALL  --위 차이 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
+	             SELECT '4.차이' AS REC_DIV
+	                  , #{coCd}    AS CO_CD
+	                  , '${searchYear}01' AS PERIOD
+	                  , 0        AS PLAN_AMOUNT
+	                  , 0        AS TOT_AMT
+	               FROM DUAL
+	              WHERE NOT EXISTS ( SELECT * FROM PLAN )
 		       )
 		  PIVOT ( SUM(AMOUNT) FOR PERIOD IN ('${searchYear}01', '${searchYear}02', '${searchYear}03', '${searchYear}04', '${searchYear}05', '${searchYear}06', '${searchYear}07', '${searchYear}08', '${searchYear}09', '${searchYear}10', '${searchYear}11', '${searchYear}12' ) --년월 읽어와서 넣어주기 
 		        )
