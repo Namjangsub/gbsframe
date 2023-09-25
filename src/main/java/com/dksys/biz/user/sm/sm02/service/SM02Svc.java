@@ -31,11 +31,13 @@ public interface SM02Svc {
 		
 	int updateOrderDetail(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
-	int deleteOrderMaster(Map<String, String> param);			
+	int deleteOrder(Map<String, String> param);			
 	
 	int deleteOrderDetail(Map<String, String> param);	
 	
 	List<Map<String, String>> selectCurrToday(Map<String, String> paramMap);	
 	
 	String selectCurrMatrUpr(Map<String, String> paramMap);	
+	
+	List<Map<String, String>> selectInPurchaseChk(Map<String, String> paramMap);	
 }

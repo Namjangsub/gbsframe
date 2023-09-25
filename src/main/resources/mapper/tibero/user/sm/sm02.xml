@@ -256,27 +256,16 @@
 		                     , A.CREAT_DTTM
 		                     , A.FILE_TRGT_KEY
 		                     , T.TODO_YN
-		                     ,
+		                     ,  
 		                     (
-								SELECT SUM(BOM_QTY) - ( SELECT SUM(AA.ORDRG_QTY) FROM BJM AA WHERE AA.SALES_CD = A.SALES_CD )  
-									FROM
-									(
-										SELECT T.UPPER_CD
-										, T.LOWER_CD
-										, T.MATR_CD
-										, BOM_QTY
-											FROM 
-										( SELECT X1.*, LEVEL AS LVL FROM TB_SM01M01 X1
-								           START WITH X1.UPPER_CD = 'top' AND X1.SALES_CD = A.SALES_CD
-								          CONNECT BY PRIOR X1.LOWER_CD = X1.UPPER_CD
-										) T
-									LEFT OUTER JOIN TB_SM01D01 D ON(T.CO_CD = D.CO_CD AND T.SALES_CD = D.SALES_CD AND T.UPPER_CD = D.UPPER_CD AND T.LOWER_CD = D.LOWER_CD)
-									WHERE  T.CO_CD = A.CO_CD
-										AND    T.ORDRS_NO = SUBSTRING(A.SALES_CD, 0, INSTR(A.SALES_CD, '-')-1)
-										AND    T.SALES_CD = A.SALES_CD
-										AND D.MATR_CD IS NOT NULL
-									)		                     
-		                     ) AS REAMIN_BAL_QTY	/* 발주잔량 */			                     
+										/* 데이터 정리후에는 TB_SM01D01 만 보면 된다 */
+										SELECT SUM(BOM_QTY)  
+											FROM  TB_SM01D01 D 
+									WHERE  D.CO_CD = A.CO_CD
+										AND    D.SALES_CD = A.SALES_CD
+										AND D.MATR_CD IS NOT NULL      
+		                     ) - SUM(A.ORDRG_QTY) OVER(PARTITION BY A.SALES_CD, A.CO_CD) 
+		                     AS REAMIN_BAL_QTY	/* SALES_CD 기준 BOM수량 - 발주수량 */			                     
 		                  FROM BJM A
 		                       LEFT OUTER JOIN SJD AS B ON A.CO_CD = B.CO_CD AND A.SALES_CD = B.SALES_CD
 		                       LEFT OUTER JOIN TDO AS T ON A.SALES_CD = T.SALES_CD AND A.ORDRG_NO = T.TODO_NO
@@ -936,6 +925,25 @@
 			AND CO_CD = #{coCd}
 			AND ORDRG_NO = #{ordrgNo}
 			AND ORDRG_SEQ = #{ordrgSeq}	
+	</delete>
+	
+	<!-- 발주 마스터  삭제 -->         
+	<delete id="deleteOrderMaster" parameterType="Map">
+		DELETE 
+			FROM TB_SM02M01
+		WHERE 1=1
+			AND FILE_TRGT_KEY = #{fileTrgtKey}
+			AND CO_CD = #{coCd}
+			AND ORDRG_NO = #{ordrgNo}	
+	</delete>		
+	
+	<!-- 발주 디테일  모두삭제 -->         
+	<delete id="deleteOrderDetailAll" parameterType="Map">
+		DELETE 
+			FROM TB_SM02D01
+		WHERE 1=1
+			AND CO_CD = #{coCd}
+			AND ORDRG_NO = #{ordrgNo}	
 	</delete>	
 		
 	<!-- 오늘환율 -->	
@@ -961,5 +969,23 @@
 								, #{curr, jdbcType=VARCHAR}
 								, TO_CHAR(SYSDATE, 'YYYYMMDD')) 
 			FROM DUAL		
-	</select>			
+	</select>	
+	
+	<!-- 입고,매입 작성여부  -->	
+	<select id="selectInPurchaseChk" parameterType="Map" resultType="camelMap">	
+		SELECT SUM(IN_YN) AS IN_YN
+			, SUM(PURCHASE_YN) AS PURCHASE_YN
+			FROM
+			(
+			SELECT CASE WHEN(COUNT(M03.ORDRG_NO)>0) THEN 1 ELSE 0 END AS IN_YN
+					, 0 AS PURCHASE_YN
+				FROM TB_SM03D01 M03
+			WHERE 1=1 AND M03.ORDRG_NO = #{ordrgNo}
+			UNION ALL
+			SELECT 0 AS IN_YN
+					, CASE WHEN(COUNT(M12.ORDRG_NO)>0) THEN 1 ELSE 0 END AS PURCHASE_YN
+				FROM TB_SM12D01 M12
+			WHERE 1=1 AND M12.ORDRG_NO = #{ordrgNo}	
+			)		
+	</select>				
  </mapper>

@@ -266,13 +266,7 @@ public class SM02SvcImpl implements SM02Svc {
 	    
 		return result;
 	}	
-	
-	@Override
-	public int deleteOrderMaster(Map<String, String> param) {
-		return sm02Mapper.deleteOrderMaster(param);
-	}	
-	
-	
+		
 	@Override
 	public int deleteOrderDetail(Map<String, String> param) {
 		return sm02Mapper.deleteOrderDetail(param);
@@ -289,4 +283,18 @@ public class SM02SvcImpl implements SM02Svc {
 	public String selectCurrMatrUpr(Map<String, String> paramMap) {
 		return sm02Mapper.selectCurrMatrUpr(paramMap);
 	}		
+
+	/* 발주삭제시 입고, 매입여부 체크  */
+	@Override
+	public List<Map<String, String>> selectInPurchaseChk(Map<String, String> paramMap) {
+		return sm02Mapper.selectInPurchaseChk(paramMap);
+	}			
+	
+	/* 발주 master detail 삭제 */
+	public int deleteOrder(Map<String, String> param) {
+		int result = 0;
+		result += sm02Mapper.deleteOrderDetailAll(param);
+		result += sm02Mapper.deleteOrderMaster(param);
+		return result;
+	}	
 }

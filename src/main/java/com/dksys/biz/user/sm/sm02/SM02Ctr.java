@@ -150,4 +150,21 @@ public class SM02Ctr {
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
 	}	
+	
+	//발주삭제시 입고, 매입여부 체크
+	@PostMapping(value = "/selectInPurchaseChk")
+	public String selectInPurchaseChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = sm02Svc.selectInPurchaseChk(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}		
+	
+	//발주 detail 삭제    
+	@DeleteMapping(value = "/deleteOrder")
+	public String deleteOrder(@RequestBody Map<String, String> param, ModelMap model) {
+		sm02Svc.deleteOrder(param);
+		model.addAttribute("resultCode", 200);
+    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+		return "jsonView";
+	} 	
 }

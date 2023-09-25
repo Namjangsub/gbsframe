@@ -42,9 +42,13 @@ public interface SM02Mapper {
 	
 	int deleteOrderDetail(Map<String, String> param);
 	
+	int deleteOrderDetailAll(Map<String, String> paramMap);	
+	
 	List<Map<String, String>> selectCurrToday(Map<String, String> paramMap);	
 	
 	String selectCurrMatrUpr(Map<String, String> paramMap);	
+	
+	List<Map<String, String>> selectInPurchaseChk(Map<String, String> paramMap);	
 }
 
 
