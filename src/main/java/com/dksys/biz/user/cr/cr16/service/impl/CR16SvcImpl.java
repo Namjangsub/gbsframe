@@ -51,6 +51,16 @@ public class CR16SvcImpl implements CR16Svc {
 	}
 	
 	@Override
+	public int selectSalesYearPlanListHistCount(Map<String, String> paramMap) {
+		return cr16Mapper.selectSalesYearPlanListHistCount(paramMap);
+	}
+	
+    @Override
+	public List<Map<String, String>> selectSalesYearPlanListHist(Map<String, String> paramMap) {
+		return cr16Mapper.selectSalesYearPlanListHist(paramMap);
+	}
+    
+	@Override
 	public int deleteSalesYearPlanList(Map<String, String> paramMap) {
 		int result = 0;
 		Gson gson = new Gson();
@@ -274,11 +284,6 @@ public class CR16SvcImpl implements CR16Svc {
 	        }
 		}		
 		return result;
-	}
-    
-    @Override
-	public List<Map<String, String>> selectSalesYearPlanListHist(Map<String, String> paramMap) {
-		return cr16Mapper.selectSalesYearPlanListHist(paramMap);
 	}
     
     @Override

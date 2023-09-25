@@ -11,6 +11,10 @@ public interface CR16Svc {
 
 	List<Map<String, String>> selectSalesYearPlanList(Map<String, String> paramMap);		
 	
+	int selectSalesYearPlanListHistCount(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectSalesYearPlanListHist(Map<String, String> paramMap);
+	
 	int deleteSalesYearPlanList(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectSalesYearPlanMC(Map<String, String> paramMap);
@@ -26,8 +30,6 @@ public interface CR16Svc {
 	int salesYearPlanCloseY(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
 	int salesYearPlanCloseN(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
-	
-	List<Map<String, String>> selectSalesYearPlanListHist(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectSalesYearPlanMC2(Map<String, String> paramMap);
 	

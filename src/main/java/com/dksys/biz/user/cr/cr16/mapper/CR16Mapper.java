@@ -12,6 +12,10 @@ public interface CR16Mapper {
 	
 	List<Map<String, String>> selectSalesYearPlanList(Map<String, String> paramMap);
 	
+	int selectSalesYearPlanListHistCount(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectSalesYearPlanListHist(Map<String, String> paramMap);
+	
 	int deleteSalesYearPlanM(Map<String, String> paramMap);
 	
 	int deleteSalesYearPlanD(Map<String, String> paramMap);
@@ -39,9 +43,6 @@ public interface CR16Mapper {
 	int salesYearPlanCloseChkUpdateY(Map<String, String> paramMap);
 	
 	int salesYearPlanCloseChkUpdateN(Map<String, String> paramMap);
-	
-	List<Map<String, String>> selectSalesYearPlanListHist(Map<String, String> paramMap);
-	
 	
 	List<Map<String, String>> selectSalesYearPlanMC2(Map<String, String> paramMap);
 	
