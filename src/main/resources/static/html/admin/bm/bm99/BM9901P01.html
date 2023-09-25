@@ -1,6 +1,7 @@
 <style>
 	input[comma] {text-align: right;}
 </style>
+<script src="/static/js/fileTree.js"></script>
 <div class="popup_area of_a" style="width: 100%; height: 100%;">
 	<div class="tit_contents">
         <h4 class="tit">도움말</h4>
@@ -24,27 +25,14 @@
 								<textarea class="form-control" id="pgExpl" name="pgExpl" style="height: 200px;" maxlength="9000"></textarea>
 							</td>
 						</tr>
-						<tr>
-							<td style="text-align: left;">첨부파일</td>
-							<td style="text-align: right;">
-								<a class="tbody_more_btn"></a>
-							</td>
-						</tr>
 					</thead>
-					<tbody>
-						<tr>
-							<th>
-								<button type="button" class="btn btn-primary btn-sm" style="height: 25px; line-height: 15px;" onclick="clntFile.click();" authchk>첨부파일</button>
-							</th>
-							<td>
-								<div data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 150px; width: 100%"></div>
-							</td>
-						</tr>
-					</tbody>
 				</table>
 			</form>
 		</div>
 	</div>
+	
+	<!-- 공통 파일 영역 -->
+	<div id="fileList_area"></div>
 	
     <!-- 하단 버튼 -->
 	<div class ="popup_bottom_btn">
@@ -53,49 +41,6 @@
 	</div>
 </div>
 <script type="text/javascript">
-	var $targetRow = null;
-	var fileArr = [];
-	var deleteFileArr = [];
-	var fileGridView = {
-		initView: function() {
-			this.target = new ax5.ui.grid();
-			this.target.setConfig({
-				target: $('[data-ax5grid="file-grid"]'),
-				showLineNumber: true,
-				showRowSelector: false,
-	        	multipleSelect: false,
-				header: {selector: false},
-				body: {
-		            onDBLClick: function () {
-		            	if(this.item.fileKey){
-							downloadFile(this.item.fileKey);
-						}
-		            }
-		        },
-	            columns: [
-	                {key: "fileName", label: "파일명", width: 500},
-	                {key: "fileType", label: "파일타입", width: 100},
-	                {key: "fileSize", label: "파일크기", width: 100},
-	                {
-						key:"fileDelete", label: "삭제", width:60,
-						formatter:function() {
-							return '<button type="button" class="btn btn-default btn-sm" style="height: 19px; padding: 0 0 0 0;" onclick="deleteFile('+this.dindex+');" authchk>삭제</button>'
-						}
-					}
-	            ]
-			});
-			return this;
-		},
-		setData: function() {
-			var targetObj = this.target;
-			targetObj.setData({
-				list: fileArr,
-				page : {
-					totalElements : fileArr.length
-				}
-			});
-		}
-	}
 	
 	$(document).ready(function() {
 		
@@ -105,9 +50,6 @@
 		}else{
 			$('#actionBtn').hide();
 		}
-		
-		// 파일 그리드 초기화
-		fileGridView.initView().setData();
 		
 		// 도움말 정보 불러오기 
 		selectManualInfo();
@@ -123,77 +65,28 @@
 				,"pgmId": modalStack.last().paramObj.pgmId
 				};
 		postAjax("/admin/bm/bm99/selectManualInfo", paramObj, null, function(data){
-			// 파일 정보 초기화
-			fileArr = [];
-			deleteFileArr = [];
 			setInfo(data.info);
 		});
 	}
 	
 	function setInfo(info) {
 // 		console.log(info);
-		//파일키
-		$('#fileTrgtKey').val(info.fileTrgtKey);
 		// 기본정보 set
 		$('#pgExpl').val(info.pgExpl);
 		
-		// 첨부파일 set
-		var fileList = info.fileList;
-		$.each(fileList, function(idx, obj){
-			fileArr.push({
-				'fileKey' : obj.fileKey,
-		      	'fileName' : obj.fileName,
-		      	'fileType' : obj.fileType,
-		      	'fileSize' : obj.fileSize,
-		      	'file' : obj
-			});
-		});
-		
-		// 첨부파일 그리드 set
-		fileGridView.setData();
-	}
-	
-	// 파일 추가
-	function setFile(elem) {
-		var tempFiles = elem.files;
-		// 전역변수 배열에 선택된 파일 추가 
-		$.each(tempFiles, function(idx, obj){
-			var typeArr = obj.name.split(".");
-			fileArr.push({
-				'fileKey' : 0,
-		      	'fileName' : obj.name,
-		      	'fileType' : typeArr[typeArr.length-1],
-		      	'fileSize' : obj.size,
-		      	'file' : obj
-			});
-		});
-		
-		// 첨부파일 그리드 set
-		fileGridView.setData();
-		
-		// input file 초기화
-		$(elem).val("");
-	}
-	
-	// 파일 삭제
-	function deleteFile(rowIndex) {
-		if(fileArr[rowIndex].fileKey){
-		// 기 등록되어 있는 파일 삭제시
-			deleteFileArr.push(fileArr[rowIndex].fileKey);
+      	//---------------------------------------------------------------
+		//첨부 화일 처리 시작
+		//---------------------------------------------------------------
+		fileParam = {
+			fileTrgtTyp	: "BM9901P01",
+			fileTrgtKey : info.fileTrgtKey
 		}
-		fileArr.splice(rowIndex, 1);
+
+		treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
+		//---------------------------------------------------------------
+		//첨부 화일 처리 끝
+		//---------------------------------------------------------------
 		
-		// 첨부파일 그리드 set
-		fileGridView.setData();
-	}
-	
-	// 파일 다운로드
-	function downloadFile(fileKey) {
-		postAjax("/admin/cm/cm08/fileDownInfo", {"fileKey": fileKey}, null, function(data){
-			var fileInfo = data.fileInfo;
-			var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName , "UTF-8");
-			location.href = "/admin/cm/cm08/fileDownload?filePath="+filePath;
-		});
 	}
 	
 	// 수정
@@ -222,15 +115,33 @@
 		// 파일키 추가
 		formData.append("fileTrgtKey", $('#fileTrgtKey').val());
 		
-		// 첨부파일 추가
-		$.each(fileArr, function(idx, obj){
-			// 신규파일만 추가
-			if(obj.fileKey == 0){
+
+		//---------------------------------------------------------------
+		//-------itemarr  --첨부화일 처리를 위한 부분 시작
+		//---------------------------------------------------------------
+		// 유저아이디 추가
+		formData.append("userId" , jwt.userId);
+		formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용
+
+		var fileUploadArr = [];
+		var tempArr = [];
+		
+		tempArr = treeModule.getFileArr();
+		
+		$.each(tempArr, function(idx, obj) {
+			if (obj.fileKey == 0) {
 				formData.append("files", obj.file);
+				obj.file = '';
+				fileUploadArr.push(obj);
 			}
 		});
 		
-		formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
+		formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
+		formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
+		//---------------------------------------------------------------
+		//--첨부화일 처리를 위한 부분 끝\
+		//---------------------------------------------------------------
+		
 		return formData;
 	}
 	
