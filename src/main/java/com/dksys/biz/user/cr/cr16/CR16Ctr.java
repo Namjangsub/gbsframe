@@ -36,21 +36,44 @@ public class CR16Ctr {
     CR16Svc cr16Svc;
 
     @PostMapping(value = "/selectSalesYearPlanList") 
-	public String selectSalesYearPlanList(@RequestBody Map<String, String> paramMap, ModelMap model) {	
-    	  int totalCnt = cr16Svc.selectSalesYearPlanListCount(paramMap); 
-		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		  model.addAttribute("paginationInfo", paginationInfo);		
-		  
-		  List<Map<String, String>> fileList = cr16Svc.selectSalesYearPlanList(paramMap);	  
-		  model.addAttribute("fileList", fileList);
-		  return "jsonView";
+	public String selectSalesYearPlanList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	// 계획 이력 값
+    	String salesPlanHistValue = paramMap.get("salesPlanHist");
+    	// 없거나 계획 이력이면 현제 사업계획을
+    	if (salesPlanHistValue == null || salesPlanHistValue.equals("0")) {
+    		int totalCnt = cr16Svc.selectSalesYearPlanListCount(paramMap); 
+    		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+    		model.addAttribute("paginationInfo", paginationInfo);		
+    		List<Map<String, String>> fileList = cr16Svc.selectSalesYearPlanList(paramMap);	  
+    		model.addAttribute("fileList", fileList);
+    		return "jsonView";
+    	}else {
+    	// 계획 이력 값이 있으면 이력값을 조회
+    		int totalCnt = cr16Svc.selectSalesYearPlanListHistCount(paramMap); 
+    		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+    		model.addAttribute("paginationInfo", paginationInfo);		
+    		List<Map<String, String>> fileList = cr16Svc.selectSalesYearPlanListHist(paramMap);	  
+    		model.addAttribute("fileList", fileList);
+    		return "jsonView";
+    	}
     }
     
     @PostMapping(value = "/selectSalesYearPlanListExcel") 
 	public String selectSalesYearPlanListExcel(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  List<Map<String, String>> fileList = cr16Svc.selectSalesYearPlanList(paramMap);
-		  model.addAttribute("fileList", fileList);
-		  return "jsonView";
+    	// 계획 이력 값
+    	String salesPlanHistValue = paramMap.get("salesPlanHist");
+    	// 없거나 계획 이력이면 현제 사업계획을
+    	if (salesPlanHistValue == null || salesPlanHistValue.equals("0")) {
+    	  List<Map<String, String>> fileList = cr16Svc.selectSalesYearPlanList(paramMap);
+  		  model.addAttribute("fileList", fileList);
+  		  return "jsonView";
+    	}else {
+    		// 계획 이력 값이 있으면 이력값을 조회
+    	  List<Map<String, String>> fileList = cr16Svc.selectSalesYearPlanListHist(paramMap);
+  		  model.addAttribute("fileList", fileList);
+  		  return "jsonView";
+    	}
+		  
     }    
     
     @PostMapping(value = "/selectSalesYearPlanListHist") 

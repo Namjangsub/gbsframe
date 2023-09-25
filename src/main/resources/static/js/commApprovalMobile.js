@@ -44,7 +44,7 @@ function Approval(htmlParam, param, popParam) {
 				<!--결재 테이블 -->
 		        <div clss="contents" id="applist" style="height: 100%; padding: 5px">
 			    	<!-- 결재라인 table -->
-			    	<table id="appLine" style="border: 1px solid #dbdbdb; border-collapse: collapse" >
+			    	<table id="appLine" style="border: 1px solid #dbdbdb; border-collapse: collapse" class="table_input">
 			    		<colgroup>
 			    			<col width="10%">
 			    			<col width="20%">
@@ -60,8 +60,9 @@ function Approval(htmlParam, param, popParam) {
 			    			<th class="appTh">결재일자</th>		    			
 			    		</tr>
 			    	</table>
-			    	<div class="add_btn_small pdl10" style="float:right; padding-top:10px;" id="appBtnDiv">
-					<a style="height: 30px; line-height: 28px; width: 90px;" id="appConfirmAnchor" onclick="approvalConfirm();" >결재승인</a>
+			    	<div class="popup_bottom_btn" style="text-align: center; float:right; padding-top:10px;" id="appBtnDiv">
+					<button	type="button" style="height: 40px;  width: 90px;" id="appConfirmAnchor" onclick="approvalConfirm();" >결재승인</button>
+					<button type="button" class="close_btn" style="height: 40px;  width: 90px;" id="appConfirmAnchor" onclick="window.history.back();" >닫기</button>
 					</div>
 		        </div>			        
 				<!--결재 테이블 end-->		        

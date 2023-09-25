@@ -38,5 +38,9 @@ public interface BM14Svc {
 	String insertTempBom(Map<String, String> paramMap);
 
 	Map<String, String> callDraftTempBom(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectBomAllEnterList(Map<String, String> paramMap);
+
+	int selectBomAllEnterListCount(Map<String, String> paramMap);
 	
 }

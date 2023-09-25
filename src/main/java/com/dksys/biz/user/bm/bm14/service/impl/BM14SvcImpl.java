@@ -269,5 +269,15 @@ public class BM14SvcImpl implements BM14Svc {
 		bm14Mapper.callDraftTempBom(paramMap);
 		return paramMap;
 	}
+	
+	@Override
+	public List<Map<String, String>> selectBomAllEnterList(Map<String, String> paramMap) {
+		return bm14Mapper.selectBomAllEnterList(paramMap);
+	}
+	
+	@Override
+	public int selectBomAllEnterListCount(Map<String, String> paramMap) {
+		return bm14Mapper.selectBomAllEnterListCount(paramMap);
+	}
 
 }

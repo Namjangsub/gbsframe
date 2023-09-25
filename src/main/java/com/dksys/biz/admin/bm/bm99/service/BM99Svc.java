@@ -8,6 +8,6 @@ public interface BM99Svc {
 
 	Map<String, Object> selectManualInfo(Map<String, String> paramMap);
 	
-	void updateManualInfo(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+	void updateManualInfo(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
 }
