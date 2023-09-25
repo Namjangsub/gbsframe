@@ -259,6 +259,7 @@
           },
           columns: [
               {key: "coCd",      				label: "회사",          hidden: true},
+              {key: "fileTrgtKey",      		label: "fileTrgtKey",          hidden: true},
               {key: "salesCd",  				label: "Sales Code",      align: "center",   width: 110},
               {key: "ordrgNo",      			label: "발주번호",      align: "center",   width: 100},
               {key: "reqNo",    				label: "요청번호",      align: "center",   width: 120, hidden: true},  
@@ -435,6 +436,11 @@ $(document).ready(function() {
 			};
 			Object.assign(paramObj, param);
 		} else {
+ 			var reaminBalQty = gridView.target.getList("selected")[0].reaminBalQty;			
+ 			if( parseInt(reaminBalQty) === 0 ) {
+	 			alert("발주 가능한 잔량이 없습니다.");
+	 			return;	 				
+ 			}			
 			var paramObj = {
 					"actionType" : type,
 					"coCd" 	   : $("#coCd_S").val(),
@@ -448,7 +454,53 @@ $(document).ready(function() {
  
  	/*발주 삭제 */
  	function deleteOrder() {
- 		
+    	//.selectedDataIndexs 명확치 않아 제거 20230925
+    	//let selRow = parseInt(gridView.target.selectedDataIndexs);  -- gridView.target.selectedDataIndexs.length 포함 정상동작 안함
+    	let selRow = gridView.target.getList("selected");
+ 		if( typeof(selRow[0])=="undefined" ) {
+ 			alert("선택된 행이 없습니다.");
+ 			return;
+ 		} else if( selRow.length > 1 ) {
+ 			alert("삭제록항목은 한개만 선택해 주십시오.");
+ 			return; 			
+ 		} else { 
+ 			let gridData = selRow[0]; 			
+ 			//입고, 매입 확인 
+ 			let paramObj = {
+ 							"userId" : jwt.userId
+ 							, "ordrgNo" : gridData.ordrgNo
+ 							};
+ 			postAjaxSync("/user/sm/sm02/selectInPurchaseChk", paramObj, null
+ 						, function(data) {
+ 							var list = data.resultList;
+ 							if(list.length > 0 ) {
+ 								if( list[0].inYn > 0 ) {
+ 									alert("등록된 입고 항목이 있습니다.");
+ 									return;
+ 								} else if( list[0].purchaseYn > 0 ) {
+ 									alert("등록된 매입 항목이 있습니다.");
+ 									return;
+ 								} else {
+ 									if( confirm("정말 삭제할까요?") ) {
+ 	 						 			let paramObj = {
+ 	 						 							"fileTrgtKey" : gridData.fileTrgtKey
+ 	 						 							, "coCd" : gridData.coCd
+ 	 						 							, "ordrgNo" : gridData.ordrgNo
+ 	 						 							};
+ 	 						 			deleteAjax("/user/sm/sm02/deleteOrder", paramObj, null
+ 	 					 						, function(data) {   
+ 					 	 							if (data.resultCode == 200) {
+ 					 	 								alert(data.resultMessage);
+ 					 	 								gridView.setData(0);
+ 					 	 							} else {
+ 					 	 								alert("삭제중 오류가 발생했습니다");	 	 								
+ 					 	 							} 					 								
+ 	 						 			});     //ajax end 					 		 										
+ 									}					
+ 								}
+ 							}
+ 			});     //ajax end 			
+ 		} 		
  	}
  
 	// 거래처 검색
