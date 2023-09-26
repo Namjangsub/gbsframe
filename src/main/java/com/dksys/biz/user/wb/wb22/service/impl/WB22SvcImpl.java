@@ -1,26 +1,23 @@
 package com.dksys.biz.user.wb.wb22.service.impl;
 
 import java.lang.reflect.Type;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.collections4.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.util.ExceptionThrower;
+import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb22.mapper.WB22Mapper;
 import com.dksys.biz.user.wb.wb22.service.WB22Svc;
-import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
-import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.util.ExceptionThrower;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -80,15 +77,20 @@ public class WB22SvcImpl implements WB22Svc {
 				try {
 					sharngMap.put("coCd", paramMap.get("coCd"));
 					
-					int wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
-					sharngMap.put("wbsPlanNo", Integer.toString(wbsPlanNo));
+					if(!sharngMap.containsKey("fileTrgtKey")) {
+						int wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
+						sharngMap.put("wbsPlanNo", Integer.toString(wbsPlanNo));
+						
+						int fileTrgtKey = wb22Mapper.selectWbsSeqNext(paramMap);
+						sharngMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+						
+						sharngMap.put("seq", String.valueOf(i + 1));
+						
+						result = wb22Mapper.wbsLevel1Insert(sharngMap);
+					}else {
+						result = wb22Mapper.wbsLevel1Update(sharngMap);
+					}
 					
-					int fileTrgtKey = wb22Mapper.selectWbsSeqNext(paramMap);
-					sharngMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
-					
-					sharngMap.put("seq", String.valueOf(i + 1));
-					
-					result = wb22Mapper.wbsLevel1Insert(sharngMap);
 					i++;
 				} catch (Exception e) {
 					System.out.println("error2" + e.getMessage());
@@ -102,15 +104,12 @@ public class WB22SvcImpl implements WB22Svc {
 	public int wbsLevel1Update(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		int result = 0;
 		Gson gson = new Gson();
-		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {
-		}.getType();
+		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (sharngArr != null && sharngArr.size() > 0) {
-			int i = 0;
 			for (Map<String, String> sharngMap : sharngArr) {
 				try {
 					result = wb22Mapper.wbsLevel1Update(sharngMap);
-					i++;
 				} catch (Exception e) {
 					System.out.println("error2" + e.getMessage());
 				}
@@ -172,11 +171,9 @@ public class WB22SvcImpl implements WB22Svc {
 		Type stringList1 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> deleteRowArr = gson.fromJson(paramMap.get("deleteRowArr"), stringList1);
 		if (deleteRowArr != null && deleteRowArr.size() > 0) {
-			int i = 0;
 			for (Map<String, String> sharngMap : deleteRowArr) {
 				try {
 					wb22Mapper.wbsLevel2Delete(sharngMap);
-					i++;
 				} catch (Exception e) {
 					System.out.println("error2" + e.getMessage());
 				}
@@ -222,11 +219,9 @@ public class WB22SvcImpl implements WB22Svc {
 		}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (sharngArr != null && sharngArr.size() > 0) {
-			int i = 0;
 			for (Map<String, String> sharngMap : sharngArr) {
 				try {
 					result = wb22Mapper.wbsLevel1confirm(sharngMap);
-					i++;
 				} catch (Exception e) {
 					System.out.println("error2" + e.getMessage());
 				}
@@ -243,11 +238,9 @@ public class WB22SvcImpl implements WB22Svc {
 		}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (sharngArr != null && sharngArr.size() > 0) {
-			int i = 0;
 			for (Map<String, String> sharngMap : sharngArr) {
 				try {
 					result = wb22Mapper.wbsLevel2confirm(sharngMap);
-					i++;
 				} catch (Exception e) {
 					System.out.println("error2" + e.getMessage());
 				}

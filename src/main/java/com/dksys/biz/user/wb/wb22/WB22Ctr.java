@@ -9,18 +9,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.cmn.vo.PaginationInfo;
-import com.dksys.biz.exc.LogicException;
-import com.dksys.biz.util.MessageUtils;
 import com.dksys.biz.user.wb.wb22.service.WB22Svc;
+import com.dksys.biz.util.MessageUtils;
 
 @Controller
 @Transactional(rollbackFor = Exception.class)
@@ -65,7 +62,7 @@ public class WB22Ctr {
   		try {
   			if (wb22Svc.wbsLevel1Insert(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
   		} else {
   			model.addAttribute("resultCode", 500);
   			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -82,7 +79,7 @@ public class WB22Ctr {
   		try {
   			if (wb22Svc.wbsLevel1Update(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
   		} else {
   			model.addAttribute("resultCode", 500);
   			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -105,8 +102,8 @@ public class WB22Ctr {
     public String wbsLevel2Insert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
   		try {
   			if (wb22Svc.wbsLevel2Insert(paramMap, mRequest) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  			model.addAttribute("resultCode", 200);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
   		} else {
   			model.addAttribute("resultCode", 500);
   			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -130,7 +127,7 @@ public class WB22Ctr {
   		try {
   			if (wb22Svc.wbsVerUpInsert(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
   		} else {
   			model.addAttribute("resultCode", 500);
   			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -147,7 +144,7 @@ public class WB22Ctr {
   		try {
   			if (wb22Svc.wbsLevel1confirm(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
   		} else {
   			model.addAttribute("resultCode", 500);
   			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -164,7 +161,7 @@ public class WB22Ctr {
   		try {
   			if (wb22Svc.wbsLevel2confirm(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
   		} else {
   			model.addAttribute("resultCode", 500);
   			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -195,7 +192,7 @@ public class WB22Ctr {
 		try {
 			if (wb22Svc.wbsRsltsInsert(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
-				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -212,7 +209,7 @@ public class WB22Ctr {
 		try {
 			if (wb22Svc.wbsRsltsUpdate(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
-				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -229,7 +226,7 @@ public class WB22Ctr {
   		try {
   			if (wb22Svc.wbsRsltsconfirm(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
   		} else {
   			model.addAttribute("resultCode", 500);
   			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
