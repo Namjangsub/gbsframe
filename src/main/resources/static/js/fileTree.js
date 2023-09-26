@@ -5,6 +5,7 @@
     var deleteFileArr = [];
     var paramObj;
     var currPgmAuthChk = true; // true:저장권한, false:저장권한 없음
+    var fileTempCocd = '';
     //최초 진입시점---
     //   1. 파일트리명 = 각 화면의 트리구조를 보여줄 div테그 ID ex) <div id="deptTree" ></div>
     //   2. 그리드명  = 각 화면의 ax5-grid Html Tag ID  ex) <div id="my-grid" data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 100%; width: 100%"></div>
@@ -12,9 +13,19 @@
     //   4. params 첨부자료가 저장된 타입과 일련번호를 전달한다.
     //      4-1. fileTrgtTyp   = 파일저장타입(프로그램명 또는 테이블명으로 프로젝트내에서 유니크한 값 지정) ex)TB_BM0101M01
     //      4-2. fileTrgtKey   = 파일저장일련번호 (프로그램명 또는 테이블명에서 관리되는 유니크한 일련번호 ex) 1, 2, 3, 4
-    //'deptTree', 'file-grid', 'FILETREE', paramTreeObj);
-    function initAll(selector, gridSelector, codeId, params) {
-
+    //	treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
+    //
+    //                     'deptTree', 'file-grid', 'FILETREE', paramTreeObj);
+    function initAll(selector, gridSelector, codeId, params, _coCd) {
+    	debugger;
+    	//coCd가 파라메터로넘어오면 넘어온 값을 우선 처리 아니면 하면의 coCd로 처리함
+    	if (_coCd == '' || _coCd == undefined) {
+    		fileTempCocd = $('#coCd').val();
+    	} else {
+    		fileTempCocd = _coCd;
+    	}
+    	
+    	
         if ($("#fileList_area #fileAttachTxt").length > 0) {
             // console.log("#fileAttachTxt 요소가 존재합니다.");
         } else {
@@ -279,7 +290,7 @@
 
     function selectDeptTree() {
 		var deptTree = null;
-		paramObj["coCd"] = $('#coCd').val(); 
+		paramObj["coCd"] = fileTempCocd; 
 		paramObj["userId"] = jwt.userId; 
 		paramObj["useYn"] = 'Y'; 
 
@@ -300,7 +311,7 @@
                 'fileSize': obj.size,
                 'nodeId': selectedNodeId,
                 'lpath': selectedNodeText,
-		      	'coCd': $('#coCd').val(),
+		      	'coCd': fileTempCocd,
                 'file': obj
             });
         });
