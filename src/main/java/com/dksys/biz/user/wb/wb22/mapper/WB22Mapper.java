@@ -8,7 +8,10 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 @Mapper
 public interface WB22Mapper {
-	List<Map<String, String>> selectWbsLeftSalesCodeList(Map<String, String> paramMap);
+	
+	int selectWbsSjListCount(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectWbsSjList(Map<String, String> paramMap);
 	
 	Map<String, String> selectSjInfo(Map<String, String> paramMap);
 	
@@ -57,5 +60,9 @@ public interface WB22Mapper {
 	int wbsRsltsUpdate(Map<String, String> paramMap);
 	
 	int wbsRsltsconfirm(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectTodoRsltsView(Map<String, String> paramMap);
+	
+	
 	
 }

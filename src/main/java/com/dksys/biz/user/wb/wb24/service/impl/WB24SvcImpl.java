@@ -1,4 +1,4 @@
-package com.dksys.biz.user.wb.wb22.service.impl;
+package com.dksys.biz.user.wb.wb24.service.impl;
 
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
@@ -17,8 +17,8 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.util.ExceptionThrower;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
-import com.dksys.biz.user.wb.wb22.mapper.WB22Mapper;
-import com.dksys.biz.user.wb.wb22.service.WB22Svc;
+import com.dksys.biz.user.wb.wb24.mapper.WB24Mapper;
+import com.dksys.biz.user.wb.wb24.service.WB24Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.google.gson.Gson;
@@ -27,13 +27,13 @@ import com.google.gson.reflect.TypeToken;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
-public class WB22SvcImpl implements WB22Svc {
+public class WB24SvcImpl implements WB24Svc {
 
 	@Autowired
-	WB22Mapper wb22Mapper;
+	WB24Mapper wb24Mapper;
 
 	@Autowired
-	WB22Svc wb22Svc;
+	WB24Svc wb24Svc;
 
     @Autowired
     CM08Svc cm08Svc;
@@ -48,235 +48,33 @@ public class WB22SvcImpl implements WB22Svc {
 	ExceptionThrower thrower;
 
 	@Override
-	public int selectWbsSjListCount(Map<String, String> paramMap) {;		
-		return wb22Mapper.selectWbsSjListCount(paramMap);
+	public int selectWbsIssueListCount(Map<String, String> paramMap) {;		
+		return wb24Mapper.selectWbsIssueListCount(paramMap);
 	}
 	
 	@Override
-	public List<Map<String, String>> selectWbsSjList(Map<String, String> paramMap) {
-		return wb22Mapper.selectWbsSjList(paramMap);
-	}
-
-	@Override
-	public Map<String, String> selectSjInfo(Map<String, String> paramMap) {
-		return wb22Mapper.selectSjInfo(paramMap);
-	}
-
-	@Override
-	public List<Map<String, String>> selectWBS1Level(Map<String, String> paramMap) {
-		return wb22Mapper.selectWBS1Level(paramMap);
-	}
-
-	@Override
-	public int wbsLevel1Insert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-		
-		int result = 0;
-		Gson gson = new Gson();
-		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
-		if (sharngArr != null && sharngArr.size() > 0) {
-			int i = 0;
-			for (Map<String, String> sharngMap : sharngArr) {
-				try {
-					sharngMap.put("coCd", paramMap.get("coCd"));
-					
-					int wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
-					sharngMap.put("wbsPlanNo", Integer.toString(wbsPlanNo));
-					
-					int fileTrgtKey = wb22Mapper.selectWbsSeqNext(paramMap);
-					sharngMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
-					
-					sharngMap.put("seq", String.valueOf(i + 1));
-					
-					result = wb22Mapper.wbsLevel1Insert(sharngMap);
-					i++;
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
-			}
-		}
-		return result;
-	}
-
-	@Override
-	public int wbsLevel1Update(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-		int result = 0;
-		Gson gson = new Gson();
-		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {
-		}.getType();
-		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
-		if (sharngArr != null && sharngArr.size() > 0) {
-			int i = 0;
-			for (Map<String, String> sharngMap : sharngArr) {
-				try {
-					result = wb22Mapper.wbsLevel1Update(sharngMap);
-					i++;
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
-			}
-		}
-		return result;
-	}
-
-	@Override
-	public List<Map<String, String>> selectWBS2Level(Map<String, String> paramMap) {
-		return wb22Mapper.selectWBS2Level(paramMap);
-	}
-
-	@Override
-	public int wbsLevel2Insert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-		Gson gson = new Gson();
-							
-		int result = 0;
-
-		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
-		if (sharngArr != null && sharngArr.size() > 0) {
-			int i = 0;
-			for (Map<String, String> sharngMap : sharngArr) {
-				try {
-					//System.out.println(sharngMap.get("fileTrgtKey"));
-					if (sharngMap.get("fileTrgtKey").length() > 0) {
-						sharngMap.put("seq", String.valueOf(i + 1));
-						result = wb22Mapper.wbsLevel2Update(sharngMap);
-					}
-					else {
-						sharngMap.put("coCd", paramMap.get("coCd"));					
-						int wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
-						sharngMap.put("wbsPlanNo", Integer.toString(wbsPlanNo));
-						sharngMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
-						int wbsPlanCodeId = wb22Mapper.selectMaxWbsCode(paramMap);
-																	
-					    String codeId = ""; 
-					    if (wbsPlanCodeId < 10) { 
-							  codeId = "0" + String.valueOf(wbsPlanCodeId);
-						  } 
-						  else { 
-							  codeId = String.valueOf(wbsPlanCodeId); 
-						}						 					
-						sharngMap.put("wbsPlanCodeId", paramMap.get("wbsPlanCodeKind") + codeId);
-						
-						sharngMap.put("seq", String.valueOf(i + 1));
-						int fileTrgtKey = wb22Mapper.selectWbsSeqNext(paramMap);
-						sharngMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
-						result = wb22Mapper.wbsLevel2Insert(sharngMap);
-					}									
-					i++;
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
-			}
-		}
-		
-		Type stringList1 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> deleteRowArr = gson.fromJson(paramMap.get("deleteRowArr"), stringList1);
-		if (deleteRowArr != null && deleteRowArr.size() > 0) {
-			int i = 0;
-			for (Map<String, String> sharngMap : deleteRowArr) {
-				try {
-					wb22Mapper.wbsLevel2Delete(sharngMap);
-					i++;
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
-			}
-		}
-				
-		return result;
-	}
-
-	@Override
-	public int wbsVerUpInsert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {	
-		int result = 0;
-		Gson gson = new Gson();
-		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
-		if (sharngArr != null && sharngArr.size() > 0) {
-			int i = 0;
-			for (Map<String, String> sharngMap : sharngArr) {
-				try {
-					sharngMap.put("seq", String.valueOf(i + 1));
-					wb22Mapper.wbsVerUpInsert(sharngMap);
-					result++;
-					i++;
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
-			}
-			wb22Mapper.wbsVerUpUpdate(paramMap);
-		}
-		return result;
+	public List<Map<String, String>> selectWbsIssueList(Map<String, String> paramMap) {
+		return wb24Mapper.selectWbsIssueList(paramMap);
 	}
 	
 	@Override
-    public List<Map<String, String>> selectVerNoNext(Map<String, String> paramMap) {
-  		return wb22Mapper.selectVerNoNext(paramMap);
-    }
-	
-	@Override
-	public int wbsLevel1confirm(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-		int result = 0;
-		Gson gson = new Gson();
-		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {
-		}.getType();
-		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
-		if (sharngArr != null && sharngArr.size() > 0) {
-			int i = 0;
-			for (Map<String, String> sharngMap : sharngArr) {
-				try {
-					result = wb22Mapper.wbsLevel1confirm(sharngMap);
-					i++;
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
-			}
-		}
-		return result;
+	  public List<Map<String, String>> selectMaxWbsIssueNo(Map<String, String> paramMap) {
+			return wb24Mapper.selectMaxWbsIssueNo(paramMap);
 	}
 	
 	@Override
-	public int wbsLevel2confirm(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-		int result = 0;
-		Gson gson = new Gson();
-		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {
-		}.getType();
-		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
-		if (sharngArr != null && sharngArr.size() > 0) {
-			int i = 0;
-			for (Map<String, String> sharngMap : sharngArr) {
-				try {
-					result = wb22Mapper.wbsLevel2confirm(sharngMap);
-					i++;
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
-			}
-		}
-		return result;
-	}
-    @Override
-	public List<Map<String, String>> selectRsltsSharngList(Map<String, String> paramMap) {
-		return wb22Mapper.selectRsltsSharngList(paramMap);
-	}
-
-
-    @Override
-	public List<Map<String, String>> selectRsltsApprovalList(Map<String, String> paramMap) {
-		return wb22Mapper.selectRsltsApprovalList(paramMap);
-	}
-	
-    @Override
-	public int wbsRsltsInsert(Map<String, String> paramMap , MultipartHttpServletRequest mRequest) throws Exception {
-		int fileTrgtKey = wb22Mapper.selectWbsRstlsSeqNext(paramMap);
-		paramMap.put("rsltsFileTrgtKey", Integer.toString(fileTrgtKey));
+	public int wbsIssueInsert(Map<String, String> paramMap , MultipartHttpServletRequest mRequest) throws Exception {
+		int fileTrgtKey = wb24Mapper.selectWbsIssueSeqNext(paramMap);
+		paramMap.put("issFileTrgtKey", Integer.toString(fileTrgtKey));
 				
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 	    
-		int result = wb22Mapper.wbsRsltsInsert(paramMap);	
+		int result = wb24Mapper.wbsIssueInsert(paramMap);	
 		Gson gson = new Gson();		
-
+		
+		String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("issFileTrgtKey") +"\"}";
+		
 		//String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
 		//pgParam1 += "\"fileTrgtKey\":\""+ fileTrgtKey +"\","; 
 		//pgParam1 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
@@ -287,15 +85,14 @@ public class WB22SvcImpl implements WB22Svc {
 		//pgParam1 += "\"codeKind\":\""+ paramMap.get("codeKind") +"\",";
 		//pgParam1 += "\"codeId\":\""+ paramMap.get("codeId") +"\"}";
 	    
-		String pgParam = "{\"fileTrgtKey\":\""+ fileTrgtKey +"\"}";
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
 		if (sharngArr != null && sharngArr.size() > 0 ) {
 			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
 	            try {	 
-	            	    sharngMap.put("reqNo", paramMap.get("wbsRsltsNo"));
-	            	    sharngMap.put("fileTrgtKey", paramMap.get("rsltsFileTrgtKey"));
+	            	    sharngMap.put("reqNo", paramMap.get("issNo"));
+	            	    sharngMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
 	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
 	            	    sharngMap.put("userId", paramMap.get("userId"));
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
@@ -315,8 +112,8 @@ public class WB22SvcImpl implements WB22Svc {
 			int i = 0;
 	        for (Map<String, String> approvalMap : approvalArr) {
 	            try {	 
-		            	approvalMap.put("reqNo", paramMap.get("wbsRsltsNo"));
-		            	approvalMap.put("fileTrgtKey", paramMap.get("rsltsFileTrgtKey"));
+		            	approvalMap.put("reqNo", paramMap.get("issNo"));
+		            	approvalMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
 		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 		            	approvalMap.put("userId", paramMap.get("userId"));
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
@@ -350,7 +147,7 @@ public class WB22SvcImpl implements WB22Svc {
 		//---------------------------------------------------------------  
 		if (uploadFileList.size() > 0) {
 		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("rsltsFileTrgtKey"));
+		    paramMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
 		    cm08Svc.uploadFile(paramMap, mRequest);
 		}
 		//---------------------------------------------------------------  
@@ -359,10 +156,10 @@ public class WB22SvcImpl implements WB22Svc {
 				
 		return result;
 	}
-    
-    
-    @Override
-    public int wbsRsltsUpdate(Map<String, String> paramMap , MultipartHttpServletRequest mRequest) throws Exception {
+
+	
+	@Override
+    public int wbsIssueUpdate(Map<String, String> paramMap , MultipartHttpServletRequest mRequest) throws Exception {
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 	    
@@ -393,13 +190,13 @@ public class WB22SvcImpl implements WB22Svc {
   		//첨부 화일 권한체크  끝  
   		//---------------------------------------------------------------  
 	  	    
-	    int result = wb22Mapper.wbsRsltsUpdate(paramMap);	
+	    int result = wb24Mapper.wbsIssueUpdate(paramMap);	
 		Gson gson = new Gson();					
 
-		String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("rsltsFileTrgtKey") +"\"}";
+		String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("issFileTrgtKey") +"\"}";
 		
-		paramMap.put("reqNo", paramMap.get("wbsRsltsNo"));
-		paramMap.put("salesCd", paramMap.get("salesCd2_P"));
+		paramMap.put("reqNo", paramMap.get("issNo"));
+		paramMap.put("salesCd", paramMap.get("salesCd"));
 		
 		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
 		if (sharngChk.size() > 0) {
@@ -417,8 +214,8 @@ public class WB22SvcImpl implements WB22Svc {
 			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
 	            try {	 
-	            	    sharngMap.put("reqNo", paramMap.get("wbsRsltsNo"));
-	            	    sharngMap.put("fileTrgtKey", paramMap.get("rsltsFileTrgtKey"));
+	            	    sharngMap.put("reqNo", paramMap.get("issNo"));
+	            	    sharngMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
 	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
 	            	    sharngMap.put("userId", paramMap.get("userId"));
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
@@ -438,8 +235,8 @@ public class WB22SvcImpl implements WB22Svc {
 			int i = 0;
 	        for (Map<String, String> approvalMap : approvalArr) {
 	            try {	 
-		            	approvalMap.put("reqNo", paramMap.get("wbsRsltsNo"));
-		            	approvalMap.put("fileTrgtKey", paramMap.get("rsltsFileTrgtKey"));
+		            	approvalMap.put("reqNo", paramMap.get("issNo"));
+		            	approvalMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
 		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 		            	approvalMap.put("userId", paramMap.get("userId"));
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
@@ -458,7 +255,7 @@ public class WB22SvcImpl implements WB22Svc {
 		//---------------------------------------------------------------  
 	    if (uploadFileList.size() > 0) {
 		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("rsltsFileTrgtKey"));
+		    paramMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
 		    cm08Svc.uploadFile(paramMap, mRequest);
 	    }
 	    
@@ -471,21 +268,31 @@ public class WB22SvcImpl implements WB22Svc {
 	    
 		return result;
 	}
-    
-    @Override
-	public int wbsRsltsconfirm(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	
+	@Override
+	public int wbsIssCloseYnConfirm(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		int result = 0;
-		try {
-			result = wb22Mapper.wbsRsltsconfirm(paramMap);
-		} catch (Exception e) {
-			System.out.println("error2" + e.getMessage());
+		Gson gson = new Gson();
+		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
+		if (sharngArr != null && sharngArr.size() > 0) {
+			for (Map<String, String> sharngMap : sharngArr) {
+				try {
+					if (sharngMap.containsKey("issFileTrgtKey")) {
+						result = wb24Mapper.wbsIssCloseYnConfirm(sharngMap);
+						result++;
+					}					
+				} catch (Exception e) {
+					System.out.println("error2" + e.getMessage());
+				}
+			}
 		}
 		return result;
 	}
-    
-    @Override
+	
+	@Override
 	public List<Map<String, String>> selectTodoRsltsView(Map<String, String> paramMap) {
-		return wb22Mapper.selectTodoRsltsView(paramMap);
+		return wb24Mapper.selectTodoRsltsView(paramMap);
 	}
-    
+	
 }

@@ -6,7 +6,10 @@ import java.util.Map;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface WB22Svc {
-	List<Map<String, String>> selectWbsLeftSalesCodeList(Map<String, String> paramMap);	
+	
+	int selectWbsSjListCount(Map<String, String> paramMap);
+		
+	List<Map<String, String>> selectWbsSjList(Map<String, String> paramMap);	
 
 	Map<String, String> selectSjInfo(Map<String, String> paramMap);
 	
@@ -37,5 +40,7 @@ public interface WB22Svc {
 	int wbsRsltsUpdate(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
 	int wbsRsltsconfirm(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	
+	List<Map<String, String>> selectTodoRsltsView(Map<String, String> paramMap);
 	
 }
