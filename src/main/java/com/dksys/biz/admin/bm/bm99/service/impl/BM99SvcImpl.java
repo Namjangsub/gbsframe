@@ -17,6 +17,7 @@ import com.dksys.biz.admin.bm.bm99.service.BM99Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
 @Service
@@ -44,8 +45,8 @@ public class BM99SvcImpl implements BM99Svc {
 	
 	@Override
 	public void updateManualInfo(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception {
- 		Gson gson = new Gson();
-		Type mapList = new TypeToken<ArrayList<Map<String, String>>>() { }.getType();
+		Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+        Type mapList = new TypeToken<ArrayList<Map<String, String>>>() { }.getType();
 		
 		// 거래처 update
 		bm99Mapper.updateManual(param);
@@ -85,7 +86,7 @@ public class BM99SvcImpl implements BM99Svc {
 		//첨부 화일 처리 시작
 		//---------------------------------------------------------------
 		if (uploadFileList.size() > 0) {
-			paramMap.put("fileTrgtTyp", param.get("pgmId"));
+			paramMap.put("fileTrgtTyp", param.get("fileTrgtTyp"));
 			paramMap.put("fileTrgtKey", param.get("fileTrgtKey"));
 			cm08Svc.uploadFile(paramMap, mRequest);
 		}
