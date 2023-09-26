@@ -35,9 +35,13 @@ public class WB22Ctr {
     @Autowired
     WB22Svc wb22Svc;
     
-	@PostMapping(value = "/selectWbsLeftSalesCodeList") 
-	public String selectWbsLeftSalesCodeList(@RequestBody Map<String, String> paramMap, ModelMap model) {		
-		List<Map<String, String>> fileList = wb22Svc.selectWbsLeftSalesCodeList(paramMap);
+	@PostMapping(value = "/selectWbsSjList") 
+	public String selectWbsSjList(@RequestBody Map<String, String> paramMap, ModelMap model) {	
+		int totalCnt = wb22Svc.selectWbsSjListCount(paramMap); 
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		  
+		List<Map<String, String>> fileList = wb22Svc.selectWbsSjList(paramMap);
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
     }	
@@ -235,6 +239,13 @@ public class WB22Ctr {
   		    model.addAttribute("resultMessage", e.getMessage());
   		}
   		return "jsonView";
+    }
+	
+	@PostMapping(value = "/selectTodoRsltsView") 
+    public String selectTodoRsltsView(@RequestBody Map<String, String> paramMap, ModelMap model) {	  
+	  List<Map<String, String>> resultList = wb22Svc.selectTodoRsltsView(paramMap);
+	  model.addAttribute("resultList", resultList); 
+	  return "jsonView"; 		 
     }
 	
 }
