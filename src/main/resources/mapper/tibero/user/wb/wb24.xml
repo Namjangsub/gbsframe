@@ -1,0 +1,463 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.wb.wb24.mapper.WB24Mapper">
+
+     <select id="selectWbsIssueListCount" parameterType="Map" resultType="int">
+            WITH SJD AS --수주상세 
+                 ( 
+                  SELECT M.CO_CD                                              AS CO_CD        --회사코드
+                        , (SELECT FN_CM05M01_CD_TO_NM(M.CO_CD) FROM DUAL)     AS CO_NM        --회사명 
+                        , M.ORDRS_NO                                           AS ORDRS_NO     --수주번호
+                        , X.SALES_CD                                           AS SALES_CD     --SALES Code
+                        , M.ORDRS_CLNT_CD                                      AS CLNT_CD      --고객코드
+                        , C.CLNT_NM                                            AS CLNT_NM      --고객명
+                        , M.CLNT_PJT                                           AS CLNT_PJT     --고객사프로젝트 
+                        , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)  AS CLNT_PJT_NM  --고객사프로젝트명
+                        , X.PRDT_CD
+                        , (SELECT T.PRDT_NM FROM TB_BM01M01 T WHERE T.PRDT_CD = X.PRDT_CD) AS PRDT_NM
+                     FROM TB_CR02M01  M --수주마스터
+                          INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+                          INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+                    WHERE 1=1
+                      AND M.CO_CD = #{coCd}
+                 )
+               , PLAN AS --WBS 계획정보 
+                 (
+                  SELECT CO_CD                   AS CO_CD        --회사코드
+                        , SALES_CD                AS SALES_CD     --SALSES_CD
+                        , CLOSE_YN                AS CLOSE_YN     --마감여부 
+                        , COUNT(WBS_PLAN_CODE_ID) AS PLAN_CODE_CNT--계획LVL1 수
+                     FROM TB_WB22M01--WBS계획
+                    WHERE CO_CD = #{coCd}
+                      AND WBS_PLAN_CODE_KIND = 'WBSCODE'
+                    GROUP BY CO_CD 
+                            , SALES_CD
+                            , CLOSE_YN
+                 )
+               , SUBJ AS --과제정보
+                 (
+                  SELECT X.FILE_TRGT_KEY
+                       , X.CO_CD                                                       AS CO_CD              --회사코드
+                       , X.SALES_CD                                                    AS SALES_CD           --SALES Code
+                       , X.SJ_NO                                                       AS SJ_NO              --과제번호
+                       , X.SJ_NM                                                       AS SJ_NM              --과제명
+                       , X.VER_NO                                                      AS VER_NO             --버젼
+                       , X.MKER_DIV                                                    AS MKER_DIV           --제작처구분
+                       , (SELECT FN_CM05M01_CD_TO_NM(X.MKER_DIV) FROM DUAL)           AS MKER_DIV_NM        --제작처구분명 
+                       , X.MKER_CD                                                     AS MKER_CD            --제작처코드
+                       , BM.CLNT_NM                                                    AS MKER_NM            --제작처명
+                       , X.SMRIZE_ID                                                   AS SMRIZE_ID          --총괄PM ID
+                       , (SELECT FN_CM06M01_ID_TO_NM(X.SMRIZE_ID) FROM DUAL)          AS SMRIZE_NM          --총괄PM명
+                       , TO_CHAR(X.BEGIN_DT, 'YYYY-MM-DD')                             AS BEGIN_DT           --시작일
+                       , TO_CHAR(X.DE_DT, 'YYYY-MM-DD')                                AS DE_DT              --출고일
+                       , TO_CHAR(X.ACPTNC_DT, 'YYYY-MM-DD')                            AS ACPTNC_DT          --완료검수일
+                       , TO_CHAR(X.REQRE_DAYCNT)                                       AS REQRE_DAYCNT       --소요일수
+                       , X.CLOSE_YN                                                    AS CLOSE_YN           --확정유무
+                       , X.DSGN_DIF_CODE_ID                                            AS DSGN_DIF_CODE_ID   --설계난이도
+                       , (SELECT FN_CM05M01_CD_TO_NM(X.DSGN_DIF_CODE_ID) FROM DUAL)   AS DSGN_DIF_CODE_NM   --설계난이도
+                       , X.DSGN_PLAN_HOUR                                              AS DSGN_PLAN_HOUR     --설계계획공수
+                       , X.PRDCTN_DIF_CODE_ID                                          AS PRDCTN_DIF_CODE_ID --생산난이도
+                       , (SELECT FN_CM05M01_CD_TO_NM(X.PRDCTN_DIF_CODE_ID) FROM DUAL) AS PRDCTN_DIF_CODE_NM --생산난이도
+                       , X.PRDCTN_PLAN_HOUR                                            AS PRDCTN_PLAN_HOUR   --생산계획공수
+                       , X.SJ_RMK                                                      AS SJ_RMK             --비고
+                       , PL.PLAN_CODE_CNT                                              AS PLAN_CODE_CNT      --WBS 계획LVL1 TN
+                       , PL.CLOSE_YN                                                   AS PLAN_CLOSE_YN      --WBS 계획 마감여부 
+                    FROM TB_WB21M01 X
+                         LEFT OUTER JOIN TB_BM02M01 AS BM ON X.MKER_CD = BM.CLNT_CD --거래처정보
+                         LEFT OUTER JOIN PLAN       AS PL ON X.CO_CD = PL.CO_CD AND X.SALES_CD = PL.SALES_CD
+                    WHERE X.CO_CD = #{coCd}
+                       AND X.SALES_CD LIKE '%${salesCd}%'            
+                       AND X.CLOSE_YN = 'Y'
+                 ) 
+                 SELECT COUNT(*) FROM (
+                       SELECT ROWNUM AS RN, T.*, W.* FROM (      
+                             SELECT T.* FROM (  
+                                    SELECT T.*                        
+                                      FROM (
+                                            SELECT TO_CHAR(CR.CLNT_CD)||CR.ORDRS_NO  AS UPPER_CD     
+                                                 , X.SJ_NO                            AS LOWER_CD    
+                                                 , X.CO_CD                            AS CO_CD       
+                                                 , CR.ORDRS_NO                        AS ORDRS_NO   
+                                                 , CR.ORDRS_NO||'-'||TRIM(TO_CHAR(ROW_NUMBER() OVER(PARTITION BY CR.ORDRS_NO ORDER BY CR.ORDRS_NO, X.FILE_TRGT_KEY),'0000')) AS TITLE
+                                                 , CR.CLNT_CD                         AS CLNT_CD     
+                                                 , CR.CLNT_NM                         AS CLNT_NM     
+                                                 , CR.CLNT_PJT                        AS CLNT_PJT     
+                                                 , CR.CLNT_PJT_NM                     AS CLNT_PJT_NM 
+                                                 , CR.PRDT_CD                         AS PRDT_CD     
+                                                 , CR.PRDT_NM                         AS PRDT_NM 
+                                                 , X.SJ_NO                            AS SJ_NO              
+                                                 , X.SJ_NM                            AS SJ_NM               
+                                                 , X.VER_NO                           AS VER_NO                
+                                                 , X.CLOSE_YN                         AS SJ_CLOSE_YN          
+                                                 , X.SALES_CD                         AS SALES_CD           
+                                                 , X.PLAN_CODE_CNT                    AS PLAN_CODE_CNT     
+                                                 , X.PLAN_CLOSE_YN                    AS PLAN_CLOSE_YN      
+                                                 , X.MKER_DIV                         AS MKER_DIV          
+                                                 , X.MKER_DIV_NM                      AS MKER_DIV_NM       
+                                                 , X.MKER_CD                          AS MKER_CD           
+                                                 , X.MKER_NM                          AS MKER_NM              
+                                                 , X.SMRIZE_ID                        AS SMRIZE_ID         
+                                                 , X.SMRIZE_NM                        AS SMRIZE_NM           
+                                                 , X.BEGIN_DT                         AS BEGIN_DT              
+                                                 , X.DE_DT                            AS DE_DT                 
+                                                 , X.ACPTNC_DT                        AS ACPTNC_DT          
+                                                 , X.REQRE_DAYCNT                     AS REQRE_DAYCNT      
+                                                 , X.DSGN_DIF_CODE_ID                 AS DSGN_DIF_CODE_ID  
+                                                 , X.DSGN_DIF_CODE_NM                 AS DSGN_DIF_CODE_NM  
+                                                 , X.DSGN_PLAN_HOUR                   AS DSGN_PLAN_HOUR    
+                                                 , X.PRDCTN_DIF_CODE_ID               AS PRDCTN_DIF_CODE_ID
+                                                 , X.PRDCTN_DIF_CODE_NM               AS PRDCTN_DIF_CODE_NM
+                                                 , X.PRDCTN_PLAN_HOUR                 AS PRDCTN_PLAN_HOUR 
+                                                 , X.SJ_RMK                           AS SJ_RMK            
+                                                 , X.FILE_TRGT_KEY                    AS FILE_TRGT_KEY     
+                                              FROM SUBJ X
+                                                   INNER JOIN SJD AS CR ON X.CO_CD = CR.CO_CD AND X.SALES_CD = CR.SALES_CD 
+                                             WHERE 1=1
+                                           ) T
+                                      WHERE 1=1                              
+                                      ORDER BY CLNT_NM, ORDRS_NO
+                                      ) T ) T
+                                      LEFT OUTER JOIN 
+                                             (SELECT X.FILE_TRGT_KEY AS RSLTS_FILE_TRGT_KEY,
+                                                        X.CO_CD,
+                                                        X.SALES_CD,
+                                                        X.WBS_RSLTS_NO, 
+                                                        Y.WBS_PLAN_CODE_KIND,
+                                                        Y.WBS_PLAN_CODE_ID,
+                                                        Y.WBS_PLAN_CODE_NM,
+                                                        TO_CHAR(X.WBS_RSLTSS_DT, 'YYYY-MM-DD') AS WBS_RSLTSS_DT,
+                                                        TO_CHAR(X.WBS_RSLTSE_DT, 'YYYY-MM-DD') AS WBS_RSLTSE_DT,
+                                                        Y.WBS_PLAN_MNG_ID,
+                                                        (SELECT FN_CM06M01_ID_TO_NM(Y.WBS_PLAN_MNG_ID) FROM DUAL) AS WBS_PLAN_MNG_NM,
+                                                        X.CLOSE_YN AS RSLTS_CLOSE_YN,
+                                                        Z.FILE_TRGT_KEY AS ISS_FILE_TRGT_KEY,
+                                                        Z.ISS_NO,
+                                                        Z.ISS_DIV,
+                                                        (SELECT FN_CM05M01_CD_TO_NM(Z.ISS_DIV) FROM DUAL) AS ISS_DIV_NM,
+                                                        Z.ISS_STS,
+                                                        (SELECT FN_CM05M01_CD_TO_NM(Z.ISS_STS) FROM DUAL) AS ISS_STS_NM,
+                                                        Z.ISS_CNTS,
+                                                        Z.ACT_ID,
+                                                        (SELECT FN_CM06M01_ID_TO_NM(Z.ACT_ID) FROM DUAL) AS ACT_NM,
+                                                        TO_CHAR(Z.ACTS_DT, 'YYYY-MM-DD') AS ACTS_DT,
+                                                        TO_CHAR(Z.ACTE_DT, 'YYYY-MM-DD') AS ACTE_DT,
+                                                        Z.ACT_MH,
+                                                        Z.ACT_AMT,
+                                                        Z.ACT_CNTS,
+                                                        NVL(Z.ACT_CLOSE_YN,'N') AS ACT_CLOSE_YN
+                                                        FROM TB_WB23M01 X
+                                                        LEFT OUTER JOIN TB_WB22M01 Y
+                                                        ON X.CO_CD = Y.CO_CD
+                                                        AND X.WBS_PLAN_CODE_KIND = Y.WBS_PLAN_CODE_KIND
+                                                        AND X.WBS_PLAN_CODE_ID = Y.WBS_PLAN_CODE_ID
+                                                        AND X.SALES_CD = Y.SALES_CD
+                                                        LEFT OUTER JOIN TB_WB24M01 Z
+                                                        ON X.CO_CD = Z.CO_CD
+                                                        AND X.WBS_PLAN_CODE_KIND = Z.WBS_PLAN_CODE_KIND
+                                                        AND X.WBS_PLAN_CODE_ID = Z.WBS_PLAN_CODE_ID
+                                                        AND X.SALES_CD = Z.SALES_CD
+                                                        ORDER BY  X.FILE_TRGT_KEY ASC ) W
+                                         ON T.CO_CD = W.CO_CD
+                                         AND T.SALES_CD = W.SALES_CD
+                                         WHERE T.CO_CD = #{coCd}      
+                                         AND W.RSLTS_CLOSE_YN = 'Y'                                  
+                                         <if test="salesCd != null and !salesCd.equals('')">
+                                         AND T.SALES_CD LIKE '%${salesCd}%'            
+                                         </if>
+                                         AND W.WBS_RSLTSS_DT BETWEEN #{wbsRsltssDt} AND #{wbsRsltseDt}
+                                   ) W
+          </select>
+
+
+     <select id="selectWbsIssueList" parameterType="Map" resultType="camelMap">
+            WITH SJD AS --수주상세 
+                 ( 
+                  SELECT M.CO_CD                                              AS CO_CD        --회사코드
+                        , (SELECT FN_CM05M01_CD_TO_NM(M.CO_CD) FROM DUAL)     AS CO_NM        --회사명 
+                        , M.ORDRS_NO                                           AS ORDRS_NO     --수주번호
+                        , X.SALES_CD                                           AS SALES_CD     --SALES Code
+                        , M.ORDRS_CLNT_CD                                      AS CLNT_CD      --고객코드
+                        , C.CLNT_NM                                            AS CLNT_NM      --고객명
+                        , M.CLNT_PJT                                           AS CLNT_PJT     --고객사프로젝트 
+                        , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)  AS CLNT_PJT_NM  --고객사프로젝트명
+                        , X.PRDT_CD
+                        , (SELECT T.PRDT_NM FROM TB_BM01M01 T WHERE T.PRDT_CD = X.PRDT_CD) AS PRDT_NM
+                     FROM TB_CR02M01  M --수주마스터
+                          INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+                          INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+                    WHERE 1=1
+                      AND M.CO_CD = #{coCd}
+                 )
+               , PLAN AS --WBS 계획정보 
+                 (
+                  SELECT CO_CD                   AS CO_CD        --회사코드
+                        , SALES_CD                AS SALES_CD     --SALSES_CD
+                        , CLOSE_YN                AS CLOSE_YN     --마감여부 
+                        , COUNT(WBS_PLAN_CODE_ID) AS PLAN_CODE_CNT--계획LVL1 수
+                     FROM TB_WB22M01--WBS계획
+                    WHERE CO_CD = #{coCd}
+                      AND WBS_PLAN_CODE_KIND = 'WBSCODE'
+                    GROUP BY CO_CD 
+                            , SALES_CD
+                            , CLOSE_YN
+                 )
+               , SUBJ AS --과제정보
+                 (
+                  SELECT X.FILE_TRGT_KEY
+                       , X.CO_CD                                                       AS CO_CD              --회사코드
+                       , X.SALES_CD                                                    AS SALES_CD           --SALES Code
+                       , X.SJ_NO                                                       AS SJ_NO              --과제번호
+                       , X.SJ_NM                                                       AS SJ_NM              --과제명
+                       , X.VER_NO                                                      AS VER_NO             --버젼
+                       , X.MKER_DIV                                                    AS MKER_DIV           --제작처구분
+                       , (SELECT FN_CM05M01_CD_TO_NM(X.MKER_DIV) FROM DUAL)           AS MKER_DIV_NM        --제작처구분명 
+                       , X.MKER_CD                                                     AS MKER_CD            --제작처코드
+                       , BM.CLNT_NM                                                    AS MKER_NM            --제작처명
+                       , X.SMRIZE_ID                                                   AS SMRIZE_ID          --총괄PM ID
+                       , (SELECT FN_CM06M01_ID_TO_NM(X.SMRIZE_ID) FROM DUAL)          AS SMRIZE_NM          --총괄PM명
+                       , TO_CHAR(X.BEGIN_DT, 'YYYY-MM-DD')                             AS BEGIN_DT           --시작일
+                       , TO_CHAR(X.DE_DT, 'YYYY-MM-DD')                                AS DE_DT              --출고일
+                       , TO_CHAR(X.ACPTNC_DT, 'YYYY-MM-DD')                            AS ACPTNC_DT          --완료검수일
+                       , TO_CHAR(X.REQRE_DAYCNT)                                       AS REQRE_DAYCNT       --소요일수
+                       , X.CLOSE_YN                                                    AS CLOSE_YN           --확정유무
+                       , X.DSGN_DIF_CODE_ID                                            AS DSGN_DIF_CODE_ID   --설계난이도
+                       , (SELECT FN_CM05M01_CD_TO_NM(X.DSGN_DIF_CODE_ID) FROM DUAL)   AS DSGN_DIF_CODE_NM   --설계난이도
+                       , X.DSGN_PLAN_HOUR                                              AS DSGN_PLAN_HOUR     --설계계획공수
+                       , X.PRDCTN_DIF_CODE_ID                                          AS PRDCTN_DIF_CODE_ID --생산난이도
+                       , (SELECT FN_CM05M01_CD_TO_NM(X.PRDCTN_DIF_CODE_ID) FROM DUAL) AS PRDCTN_DIF_CODE_NM --생산난이도
+                       , X.PRDCTN_PLAN_HOUR                                            AS PRDCTN_PLAN_HOUR   --생산계획공수
+                       , X.SJ_RMK                                                      AS SJ_RMK             --비고
+                       , PL.PLAN_CODE_CNT                                              AS PLAN_CODE_CNT      --WBS 계획LVL1 TN
+                       , PL.CLOSE_YN                                                   AS PLAN_CLOSE_YN      --WBS 계획 마감여부 
+                    FROM TB_WB21M01 X
+                         LEFT OUTER JOIN TB_BM02M01 AS BM ON X.MKER_CD = BM.CLNT_CD --거래처정보
+                         LEFT OUTER JOIN PLAN       AS PL ON X.CO_CD = PL.CO_CD AND X.SALES_CD = PL.SALES_CD
+                    WHERE X.CO_CD = #{coCd}
+                       AND X.SALES_CD LIKE '%${salesCd}%'            
+                       AND X.CLOSE_YN = 'Y'
+                 ) 
+                 SELECT * FROM (
+		               SELECT ROWNUM AS RN, T.*, W.* FROM (      
+		                     SELECT T.* FROM (  
+		                            SELECT T.*                        
+		                              FROM (
+		                                    SELECT TO_CHAR(CR.CLNT_CD)||CR.ORDRS_NO  AS UPPER_CD     
+		                                         , X.SJ_NO                            AS LOWER_CD    
+		                                         , X.CO_CD                            AS CO_CD       
+		                                         , CR.ORDRS_NO                        AS ORDRS_NO   
+		                                         , CR.ORDRS_NO||'-'||TRIM(TO_CHAR(ROW_NUMBER() OVER(PARTITION BY CR.ORDRS_NO ORDER BY CR.ORDRS_NO, X.FILE_TRGT_KEY),'0000')) AS TITLE
+		                                         , CR.CLNT_CD                         AS CLNT_CD     
+		                                         , CR.CLNT_NM                         AS CLNT_NM     
+		                                         , CR.CLNT_PJT                        AS CLNT_PJT     
+		                                         , CR.CLNT_PJT_NM                     AS CLNT_PJT_NM 
+		                                         , CR.PRDT_CD                         AS PRDT_CD     
+		                                         , CR.PRDT_NM                         AS PRDT_NM 
+		                                         , X.SJ_NO                            AS SJ_NO              
+		                                         , X.SJ_NM                            AS SJ_NM               
+		                                         , X.VER_NO                           AS VER_NO                
+		                                         , X.CLOSE_YN                         AS SJ_CLOSE_YN          
+		                                         , X.SALES_CD                         AS SALES_CD           
+		                                         , X.PLAN_CODE_CNT                    AS PLAN_CODE_CNT     
+		                                         , X.PLAN_CLOSE_YN                    AS PLAN_CLOSE_YN      
+		                                         , X.MKER_DIV                         AS MKER_DIV          
+		                                         , X.MKER_DIV_NM                      AS MKER_DIV_NM       
+		                                         , X.MKER_CD                          AS MKER_CD           
+		                                         , X.MKER_NM                          AS MKER_NM              
+		                                         , X.SMRIZE_ID                        AS SMRIZE_ID         
+		                                         , X.SMRIZE_NM                        AS SMRIZE_NM           
+		                                         , X.BEGIN_DT                         AS BEGIN_DT              
+		                                         , X.DE_DT                            AS DE_DT                 
+		                                         , X.ACPTNC_DT                        AS ACPTNC_DT          
+		                                         , X.REQRE_DAYCNT                     AS REQRE_DAYCNT      
+		                                         , X.DSGN_DIF_CODE_ID                 AS DSGN_DIF_CODE_ID  
+		                                         , X.DSGN_DIF_CODE_NM                 AS DSGN_DIF_CODE_NM  
+		                                         , X.DSGN_PLAN_HOUR                   AS DSGN_PLAN_HOUR    
+		                                         , X.PRDCTN_DIF_CODE_ID               AS PRDCTN_DIF_CODE_ID
+		                                         , X.PRDCTN_DIF_CODE_NM               AS PRDCTN_DIF_CODE_NM
+		                                         , X.PRDCTN_PLAN_HOUR                 AS PRDCTN_PLAN_HOUR 
+		                                         , X.SJ_RMK                           AS SJ_RMK            
+		                                         , X.FILE_TRGT_KEY                    AS FILE_TRGT_KEY     
+		                                      FROM SUBJ X
+		                                           INNER JOIN SJD AS CR ON X.CO_CD = CR.CO_CD AND X.SALES_CD = CR.SALES_CD 
+		                                     WHERE 1=1
+		                                   ) T
+		                              WHERE 1=1                              
+		                              ORDER BY CLNT_NM, ORDRS_NO
+		                              ) T ) T
+		                              LEFT OUTER JOIN 
+		                                     (SELECT X.FILE_TRGT_KEY AS RSLTS_FILE_TRGT_KEY,
+		                                                X.CO_CD,
+		                                                X.SALES_CD,
+		                                                X.WBS_RSLTS_NO, 
+		                                                Y.WBS_PLAN_CODE_KIND,
+		                                                Y.WBS_PLAN_CODE_ID,
+		                                                Y.WBS_PLAN_CODE_NM,
+		                                                TO_CHAR(X.WBS_RSLTSS_DT, 'YYYY-MM-DD') AS WBS_RSLTSS_DT,
+		                                                TO_CHAR(X.WBS_RSLTSE_DT, 'YYYY-MM-DD') AS WBS_RSLTSE_DT,
+		                                                X.WBS_RSLTS_ID,
+		                                                (SELECT FN_CM06M01_ID_TO_NM(X.WBS_RSLTS_ID) FROM DUAL) AS WBS_RSLTS_NM,
+		                                                X.CLOSE_YN AS RSLTS_CLOSE_YN,
+		                                                Z.FILE_TRGT_KEY AS ISS_FILE_TRGT_KEY,
+		                                                Z.ISS_NO,
+		                                                Z.ISS_DIV,
+		                                                (SELECT FN_CM05M01_CD_TO_NM(Z.ISS_DIV) FROM DUAL) AS ISS_DIV_NM,
+		                                                Z.ISS_STS,
+		                                                (SELECT FN_CM05M01_CD_TO_NM(Z.ISS_STS) FROM DUAL) AS ISS_STS_NM,
+		                                                Z.ISS_CNTS,
+		                                                Z.ACT_ID,
+		                                                (SELECT FN_CM06M01_ID_TO_NM(Z.ACT_ID) FROM DUAL) AS ACT_NM,
+		                                                TO_CHAR(Z.ACTS_DT, 'YYYY-MM-DD') AS ACTS_DT,
+		                                                TO_CHAR(Z.ACTE_DT, 'YYYY-MM-DD') AS ACTE_DT,
+		                                                Z.ACT_MH,
+		                                                Z.ACT_AMT,
+		                                                Z.ACT_CNTS,
+		                                                NVL(Z.ACT_CLOSE_YN,'N') AS ACT_CLOSE_YN
+		                                                FROM TB_WB23M01 X
+		                                                LEFT OUTER JOIN TB_WB22M01 Y
+		                                                ON X.CO_CD = Y.CO_CD
+		                                                AND X.WBS_PLAN_CODE_KIND = Y.WBS_PLAN_CODE_KIND
+		                                                AND X.WBS_PLAN_CODE_ID = Y.WBS_PLAN_CODE_ID
+		                                                AND X.SALES_CD = Y.SALES_CD
+		                                                LEFT OUTER JOIN TB_WB24M01 Z
+		                                                ON X.CO_CD = Z.CO_CD
+		                                                AND X.WBS_PLAN_CODE_KIND = Z.WBS_PLAN_CODE_KIND
+		                                                AND X.WBS_PLAN_CODE_ID = Z.WBS_PLAN_CODE_ID
+		                                                AND X.SALES_CD = Z.SALES_CD
+		                                                ORDER BY  X.FILE_TRGT_KEY ASC ) W
+		                                 ON T.CO_CD = W.CO_CD
+		                                 AND T.SALES_CD = W.SALES_CD
+		                                 WHERE T.CO_CD = #{coCd}      
+		                                 --AND W.RSLTS_CLOSE_YN = 'Y'                                  
+		                                 <if test="salesCd != null and !salesCd.equals('')">
+		                                 AND T.SALES_CD LIKE '%${salesCd}%'            
+		                                 </if>
+		                                 AND W.WBS_RSLTSS_DT BETWEEN #{wbsRsltssDt} AND #{wbsRsltseDt}
+		                           ) W
+		                           WHERE RN BETWEEN #{firstIndex} AND #{lastIndex}       
+                                 
+                                          
+		  </select>
+		  
+		  <select id="selectMaxWbsIssueNo" parameterType="Map"  resultType="camelMap">
+              SELECT  #{year} || trim(to_char(nvl(SUBSTR(MAX(ISS_NO), 6, 4),0) + 1, '0000')) AS ISS_NO FROM TB_WB24M01 
+              WHERE CO_CD = #{coCd}   
+          </select>
+        
+          <select id="selectWbsIssueSeqNext" parameterType="Map" resultType="int">
+             SELECT TB_WB24M01_SQ01.NEXTVAL FROM DUAL
+          </select>
+        
+          <insert id="wbsIssueInsert" parameterType="Map">
+                INSERT INTO TB_WB24M01
+                (
+                    FILE_TRGT_KEY,
+				    CO_CD,
+				    WBS_PLAN_CODE_KIND,
+				    WBS_PLAN_CODE_ID,
+				    ISS_NO,
+				    ISS_DIV,
+				    ISS_CNTS,
+				    ISS_STS,
+				    ACT_ID,
+				    ACTS_DT,
+				    ACTE_DT,
+				    ACT_MH,
+				    ACT_AMT,
+				    ACT_CNTS,
+				    ACT_CLOSE_YN,
+				    WBS_RSLTS_NO,
+				    SALES_CD,
+				    CREAT_ID,
+				    CREAT_PGM,
+				    CREAT_DTTM
+                ) 
+                VALUES
+                (
+                    #{issFileTrgtKey},
+                    #{coCd},
+                    #{wbsPlanCodeKind},
+                    #{wbsPlanCodeId},
+                    #{issNo},
+                    #{issDiv},
+                    #{issCnts},
+                    #{issSts},
+                    #{actId},
+                    #{actsDt},
+                    #{acteDt},
+                    #{actMh},
+                    #{actAmt},
+                    #{actCnts},
+                    'N',
+                    #{wbsRsltsNo},
+                    #{salesCd},
+                    #{userId},
+                    #{pgmId},
+                    SYSDATE
+                )
+            </insert>
+            
+            <update id="wbsIssueUpdate" parameterType="Map">
+                UPDATE TB_WB24M01
+	                    SET ISS_DIV = #{issDiv},
+		                    ISS_CNTS = #{issCnts},
+		                    ISS_STS = #{issSts},
+		                    ACT_ID = #{actId},
+		                    ACTS_DT = #{actsDt},
+		                    ACTE_DT = #{acteDt},
+		                    ACT_MH = #{actMh},
+		                    ACT_AMT = #{actAmt},
+		                    ACT_CNTS = #{actCnts},
+	                        UDT_ID = #{userId},
+	                        UDT_PGM = #{pgmId},
+	                        UDT_DTTM = SYSDATE     
+                    WHERE FILE_TRGT_KEY =  #{issFileTrgtKey}   
+            </update>   
+         
+            <update id="wbsIssCloseYnConfirm" parameterType="Map">
+                UPDATE TB_WB24M01
+                    SET ACT_CLOSE_YN = #{flag},
+                        UDT_ID = #{userId},
+                        UDT_PGM = #{pgmId},
+                        UDT_DTTM = SYSDATE     
+                    WHERE FILE_TRGT_KEY = #{issFileTrgtKey}   
+            </update>   
+            
+            <select id="selectTodoRsltsView" parameterType="Map" resultType="camelMap">          
+                SELECT  X.FILE_TRGT_KEY AS ISS_FILE_TRGT_KEY,
+			            X.CO_CD,
+			            X.WBS_PLAN_CODE_KIND,
+			            X.WBS_PLAN_CODE_ID,
+			            (SELECT FN_CM05M01_CD_TO_NM(X.WBS_PLAN_CODE_ID) FROM DUAL) AS WBS_PLAN_CODE_NM,
+			            X.ISS_NO,
+			            X.ISS_DIV,
+			            (SELECT FN_CM05M01_CD_TO_NM(X.ISS_DIV) FROM DUAL) AS ISS_DIV_NM,
+			            X.ISS_CNTS,
+			            X.ISS_STS,
+			            (SELECT FN_CM05M01_CD_TO_NM(X.ISS_STS) FROM DUAL) AS ISS_STS_NM,
+			            X.ACT_ID,
+			            (SELECT FN_CM06M01_ID_TO_NM(X.ACT_ID) FROM DUAL) AS ACT_NM,
+			            TO_CHAR(X.ACTS_DT, 'YYYY-MM-DD') AS ACTS_DT,
+			            TO_CHAR(X.ACTE_DT, 'YYYY-MM-DD') AS ACTE_DT,
+			            X.ACT_MH,
+			            X.ACT_AMT,
+			            X.ACT_CNTS,
+			            X.ACT_CLOSE_YN,
+			            X.SALES_CD,
+			            Y.WBS_RSLTS_NO,
+			            Y.WBS_RSLTS_ID,
+			            (SELECT FN_CM06M01_ID_TO_NM(Y.WBS_RSLTS_ID) FROM DUAL) AS WBS_RSLTS_NM,
+			            TO_CHAR(Y.WBS_RSLTSS_DT, 'YYYY-MM-DD') AS WBS_RSLTSS_DT,
+			            TO_CHAR(Y.WBS_RSLTSE_DT, 'YYYY-MM-DD') AS WBS_RSLTSE_DT
+			            FROM TB_WB24M01 X
+			            INNER JOIN TB_WB23M01 Y
+			            ON X.CO_CD = Y.CO_CD
+			            AND X.WBS_PLAN_CODE_KIND = Y.WBS_PLAN_CODE_KIND 
+			            AND X.WBS_PLAN_CODE_ID = Y.WBS_PLAN_CODE_ID
+			            AND X.SALES_CD = Y.SALES_CD
+			            WHERE X.FILE_TRGT_KEY = #{fileTrgtKey}
+          </select>
+          
+          
+         
+</mapper>
