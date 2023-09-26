@@ -46,15 +46,15 @@ function Ganttalendar(startMillis, endMillis, master, minGanttSize) {
   this.linkOnProgress = false; //set to true when creating a new link
 
   this.taskHeight=20;
-  this.resizeZoneWidth=5;
+  this.resizeZoneWidth=5
   this.taskVertOffset = (this.master.rowHeight - this.taskHeight) / 2;
 }
 
 
 Ganttalendar.prototype.zoomGantt = function (isPlus) {
   
-  var curLevel = this.zoom;
-  
+  //var curLevel = this.zoom;
+  var curLevel = this.zoom; 
   var pos = this.zoomLevels.indexOf(curLevel + "");
   var centerMillis=this.getCenterMillis();
   var newPos = pos;
@@ -72,6 +72,13 @@ Ganttalendar.prototype.zoomGantt = function (isPlus) {
     this.redraw();
     this.goToMillis(centerMillis);
   }
+/*  curLevel = this.zoomLevels[1];
+  this.gridChanged=true;
+  this.zoom = curLevel;
+
+  this.storeZoomLevel();
+  this.redraw();
+  this.goToMillis(centerMillis);*/
 };
 
 
@@ -86,29 +93,36 @@ Ganttalendar.prototype.getStoredZoomLevel = function () {
 
 Ganttalendar.prototype.storeZoomLevel = function () {
   //console.debug("storeZoomLevel: "+this.zoom);
-  if (localStorage) {
+	//debugger;
+ /* if (localStorage) {
     var savedZooms;
     if (!localStorage.getObject("TWPGanttSavedZooms"))
       savedZooms = {};
     else
-      savedZooms = localStorage.getObject("TWPGanttSavedZooms");
-
-    savedZooms[this.master.tasks[0].id]=this.zoom;
-
-    localStorage.setObject("TWPGanttSavedZooms", savedZooms);
-  }
+    savedZooms = localStorage.getObject("TWPGanttSavedZooms");
+    */
+    
+   // savedZooms[this.master.tasks[0].id]=this.zoom;
+    //debugger;
+    //savedZooms[this.master.tasks[0].id]=this.zoom;
+    //savedZooms[this.master.tasks[0].id]= "{1:'1M'}";
+    //localStorage.setObject("TWPGanttSavedZooms", savedZooms); //09.25  변경
+   // localStorage.setObject("TWPGanttSavedZooms","{1:1M}");
+ // }
 };
 
 Ganttalendar.prototype.createHeadCell=function(level,zoomDrawer,rowCtx,lbl, span, additionalClass,start, end) {
   var x = (start.getTime() - self.startMillis)* zoomDrawer.computedScaleX;
   var th = $("<th>").html(lbl).attr("colSpan", span);
   if (level>1) { //set width on second level only
-    var w = (end.getTime() - start.getTime()) * zoomDrawer.computedScaleX;
-    th.width(w);
+	var w = (end.getTime() - start.getTime()) * zoomDrawer.computedScaleX;
+	th.width(w);
   }
+
   if (additionalClass)
     th.addClass(additionalClass);
-  rowCtx.append(th);
+  rowCtx.append(th); 
+	
 };
 
 Ganttalendar.prototype.createBodyCell=function(zoomDrawer,tr,span, isEnd, additionalClass) {
@@ -164,7 +178,6 @@ Ganttalendar.prototype.createGanttGrid = function () {
   table.append(tr1).append(tr2);   // removed as on FF there are rounding issues  //.css({width:computedTableWidth});
 
     var head = table.clone().addClass("ganttFixHead");
-
     table.append(trBody).addClass("ganttTable");
 
 
@@ -397,21 +410,26 @@ Ganttalendar.prototype.drawTask = function (task) {
       })
     });
   }
-  // 07.31 추가
+  // 07.31 추가 -- >  09.25 변경
   else {
 	  taskBox
 	  .dblclick(function () {
+		  if (task.rsltsFileTrgtKey != undefined) {
+		        var paramObj = {"fileTrgtKey": task.rsltsFileTrgtKey};         
+		        openSecondModal("/static/html/user/wb/wb22/WB2201P03.html", 1200,700, "WBS 실적보기", paramObj, function (){                    
+		        }); 
+		    }  
 		  //alert(task.type +"//"+task.description+"//"+task.level);
-		  if (task.type != undefined && task.description != undefined) {
+		  /*if (task.type != undefined && task.description != undefined) {
 			  var paramObj = {
 			          "coCd" : strSplit(task.type,0),
 			          "salesCd": strSplit(task.type,1),
 			          "codeId" : strSplit(task.type,3)
 			       };
-			       openSecondModal("/static/html/user/wb/wb04/WB0401P01.html", 1600, 850, "", paramObj, function(data) {
+			       //openSecondModal("/static/html/user/wb/wb04/WB0401P01.html", 1600, 850, "", paramObj, function(data) {
 			           //gridView1.setData(0);
-			       }); 
-		  }
+			       //}); 
+		  }*/
 		  
 	   })
 	   
@@ -464,7 +482,7 @@ Ganttalendar.prototype.drawTask = function (task) {
       svg.rect(taskSvg, 0, 0, "100%", 3, {fill:"#000"});
 
     if (task.startIsMilestone) {
-      svg.image(taskSvg, -9, dimensions.height/2-9, 18, 18, self.master.resourceUrl +"milestone.png")
+      svg.image(taskSvg, -9, dimensions.height/2-9, 30, 30, self.master.resourceUrl +"milestone.png")
     }
 
     if (task.endIsMilestone) {
@@ -812,16 +830,19 @@ Ganttalendar.prototype.shrinkBoundaries = function () {
 Ganttalendar.prototype.setBestFittingZoom = function () {
   //console.debug("setBestFittingZoom");
 
-  if (this.getStoredZoomLevel()) {
-    this.zoom = this.getStoredZoomLevel();
-    return;
-  }
+  //debugger;	
+  //if (this.getStoredZoomLevel()) {
+    //this.zoom = this.getStoredZoomLevel();
+	  //this.zoom = 5;
+    //return;
+  //}
 
-
+  this.zoom = 5;
   //if zoom is not defined get the best fitting one
-  var dur = this.originalEndMillis -this.originalStartMillis;
+  /*var dur = this.originalEndMillis -this.originalStartMillis;
   var minDist = Number.MAX_VALUE;
   var i = 0;
+  
   for (; i < this.zoomLevels.length; i++) {
     var dist = Math.abs(dur - millisFromString(this.zoomLevels[i]));
     if (dist <= minDist) {
@@ -829,10 +850,10 @@ Ganttalendar.prototype.setBestFittingZoom = function () {
     } else {
       break;
     }
-    this.zoom = this.zoomLevels[i];
-  }
+    this.zoom = 3;//this.zoomLevels[i];
+  }*/
 
-  this.zoom=this.zoom||this.zoomLevels[this.zoomLevels.length-1];
+ // this.zoom=this.zoom||this.zoomLevels[this.zoomLevels.length-1];
 
 };
 

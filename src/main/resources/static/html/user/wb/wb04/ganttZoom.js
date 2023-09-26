@@ -54,10 +54,12 @@
       var start = new Date(date.getTime());
       date.setDate(date.getDate() + 6);
       date.setDate(date.getDate());
+      
       self.createHeadCell(1,this,ctxHead,start.format("MMMM d") + " - " + date.format("MMMM d yyyy")+ " ("+start.format("w")+")",7,"", start,date);
       date.setDate(date.getDate() + 1);
     },
     row2:        function (date, ctxHead, ctxBody) {
+
       var start = new Date(date.getTime());
       date.setDate(date.getDate() + 1);
       var holyClass = isHoliday(start) ? "holy" : "";

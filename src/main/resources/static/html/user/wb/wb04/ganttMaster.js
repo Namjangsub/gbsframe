@@ -45,7 +45,7 @@ function GanttMaster() {
 
   this.fillWithEmptyLines=true; //when is used by widget it could be usefull to do not fill with empty lines
 
-  this.rowHeight = 30; // todo get it from css?
+  this.rowHeight = 23; // todo get it from css?
   this.minRowsInEditor=30; // number of rows always visible in editor
   this.numOfVisibleRows=0; //number of visible rows in the editor
   this.firstScreenLine=0; //first visible row ignoring collapsed tasks
@@ -157,8 +157,7 @@ GanttMaster.prototype.init = function (workSpace) {
   }).bind("zoomPlus.gantt", function () {
     self.gantt.zoomGantt(true);
   }).bind("zoomMinus.gantt", function () {
-    self.gantt.zoomGantt(false);
-
+	  self.gantt.zoomGantt(false);
   }).bind("openFullEditor.gantt", function () {
     self.editor.openFullEditor(self.currentTask,false);
   }).bind("openAssignmentEditor.gantt", function () {
@@ -454,7 +453,7 @@ GanttMaster.prototype.loadProject = function (project) {
 
 
   
-  if (project.minEditableDate)
+ /*if (project.minEditableDate)
     this.minEditableDate = computeStart(project.minEditableDate);
   else
     this.minEditableDate = -Infinity;
@@ -462,7 +461,11 @@ GanttMaster.prototype.loadProject = function (project) {
   if (project.maxEditableDate)
     this.maxEditableDate = computeEnd(project.maxEditableDate);
   else
-    this.maxEditableDate = Infinity;
+    this.maxEditableDate = Infinity;*/
+  
+  this.minEditableDate = -Infinity;
+  this.maxEditableDate = Infinity;
+  
 
 
   //recover stored ccollapsed statuas
@@ -475,7 +478,7 @@ GanttMaster.prototype.loadProject = function (project) {
     //task.start += this.serverClientTimeOffset;
     //task.end += this.serverClientTimeOffset;
     //set initial collapsed status
-    task.collapsed=collTasks.indexOf(task.id)>=0;
+    //task.collapsed=collTasks.indexOf(task.id)>=0;
     //console.log(task.start + "//" + task.end);
   }
 
@@ -486,19 +489,20 @@ GanttMaster.prototype.loadProject = function (project) {
 
   
   //recover saved zoom level
-  if (project.zoom){
-    this.gantt.zoom = project.zoom;
-  } else {
-    this.gantt.shrinkBoundaries();
-    this.gantt.setBestFittingZoom();
-  }
+  //debugger;
+  //if (project.zoom){
+  //  this.gantt.zoom = project.zoom;
+  //} else {
+  //  this.gantt.shrinkBoundaries();
+  //  this.gantt.setBestFittingZoom();
+  //}
+ this.gantt.setBestFittingZoom();
 
-
-  this.endTransaction();
+ this.endTransaction();
   
 
-  var self = this;
-  this.gantt.element.oneTime(200, function () {self.gantt.centerOnToday()});
+  //var self = this;
+ // this.gantt.element.oneTime(200, function () {self.gantt.centerOnToday()});
  
 };
 
