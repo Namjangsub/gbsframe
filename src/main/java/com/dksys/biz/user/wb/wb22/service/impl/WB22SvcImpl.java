@@ -48,8 +48,13 @@ public class WB22SvcImpl implements WB22Svc {
 	ExceptionThrower thrower;
 
 	@Override
-	public List<Map<String, String>> selectWbsLeftSalesCodeList(Map<String, String> paramMap) {
-		return wb22Mapper.selectWbsLeftSalesCodeList(paramMap);
+	public int selectWbsSjListCount(Map<String, String> paramMap) {;		
+		return wb22Mapper.selectWbsSjListCount(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectWbsSjList(Map<String, String> paramMap) {
+		return wb22Mapper.selectWbsSjList(paramMap);
 	}
 
 	@Override
@@ -271,10 +276,7 @@ public class WB22SvcImpl implements WB22Svc {
 	    
 		int result = wb22Mapper.wbsRsltsInsert(paramMap);	
 		Gson gson = new Gson();		
-		
-		String pgParam1 = "";
-		String pgParam2 = "";
-		
+
 		//String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
 		//pgParam1 += "\"fileTrgtKey\":\""+ fileTrgtKey +"\","; 
 		//pgParam1 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
@@ -285,6 +287,7 @@ public class WB22SvcImpl implements WB22Svc {
 		//pgParam1 += "\"codeKind\":\""+ paramMap.get("codeKind") +"\",";
 		//pgParam1 += "\"codeId\":\""+ paramMap.get("codeId") +"\"}";
 	    
+		String pgParam = "{\"fileTrgtKey\":\""+ fileTrgtKey +"\"}";
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
 		if (sharngArr != null && sharngArr.size() > 0 ) {
@@ -296,7 +299,7 @@ public class WB22SvcImpl implements WB22Svc {
 	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
 	            	    sharngMap.put("userId", paramMap.get("userId"));
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
-	            	    sharngMap.put("pgParam", pgParam1);
+	            	    sharngMap.put("pgParam", pgParam);
 	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
 	            	i++;
 	            } catch (Exception e) {
@@ -317,7 +320,7 @@ public class WB22SvcImpl implements WB22Svc {
 		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 		            	approvalMap.put("userId", paramMap.get("userId"));
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
-		            	approvalMap.put("pgParam", pgParam2);
+		            	approvalMap.put("pgParam", pgParam);
 	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
 	                	i++;
 	            } catch (Exception e) {
@@ -393,8 +396,7 @@ public class WB22SvcImpl implements WB22Svc {
 	    int result = wb22Mapper.wbsRsltsUpdate(paramMap);	
 		Gson gson = new Gson();					
 
-		String pgParam1 = "";
-		String pgParam2 = "";
+		String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("rsltsFileTrgtKey") +"\"}";
 		
 		paramMap.put("reqNo", paramMap.get("wbsRsltsNo"));
 		paramMap.put("salesCd", paramMap.get("salesCd2_P"));
@@ -420,7 +422,7 @@ public class WB22SvcImpl implements WB22Svc {
 	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
 	            	    sharngMap.put("userId", paramMap.get("userId"));
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
-	            	    sharngMap.put("pgParam", pgParam1);
+	            	    sharngMap.put("pgParam", pgParam);
 	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
 	            	i++;
 	            } catch (Exception e) {
@@ -441,7 +443,7 @@ public class WB22SvcImpl implements WB22Svc {
 		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 		            	approvalMap.put("userId", paramMap.get("userId"));
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
-		            	approvalMap.put("pgParam", pgParam2);
+		            	approvalMap.put("pgParam", pgParam);
 	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
 	                	i++;
 	            } catch (Exception e) {
@@ -479,6 +481,11 @@ public class WB22SvcImpl implements WB22Svc {
 			System.out.println("error2" + e.getMessage());
 		}
 		return result;
+	}
+    
+    @Override
+	public List<Map<String, String>> selectTodoRsltsView(Map<String, String> paramMap) {
+		return wb22Mapper.selectTodoRsltsView(paramMap);
 	}
     
 }
