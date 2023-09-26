@@ -263,6 +263,9 @@ public class SM03SvcImpl implements SM03Svc {
 	
 	@Override
 	public int deleteWareHousingDetail(Map<String, String> param) {
-		return sm03Mapper.deleteWareHousingDetail(param);
+		int result = 0;	   
+		result = sm03Mapper.deleteWareHousingDetail(param);
+		result += sm03Mapper.deleteWareHousingMaster(param);
+		return result;
 	}	
 }
