@@ -1,5 +1,6 @@
 package com.dksys.biz.admin.bm.bm99;
 
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +30,10 @@ public class BM99Ctr {
     @PostMapping("/selectManualInfo")
     public String selectManualInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
     	Map<String, Object> info = bm99Svc.selectManualInfo(paramMap);
+    	paramMap.put("fileTrgtKey", (String) info.get("fileTrgtKey"));
+    	List<Map<String, String>> fileInfo = bm99Svc.selectManualFileInfo(paramMap);
     	model.addAttribute("info", info);
+    	model.addAttribute("fileInfo", fileInfo);
         return "jsonView";
     }
 
