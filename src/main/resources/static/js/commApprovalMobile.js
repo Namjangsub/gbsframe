@@ -35,7 +35,7 @@ function Approval(htmlParam, param, popParam) {
 			console.log('---html make');
 			var htmlId = htmlParam.htmlArea;
 			var htmlTable = `
-			<div class="" style="display: block; width: 400px; height: 100%; margin-bottom: 30px; border:0px solid #eee; padding-bottom:5px;">
+			<div class="" style="display: block; width: 372px; height: 100%; margin-bottom: 30px; border:0px solid #eee; padding-bottom:5px;">
 				<!--
 		        <h3 class="location">
 		          <span class="page_tit" style="text-align: left;">결재</span>
