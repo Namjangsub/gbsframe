@@ -1,9 +1,9 @@
-	var fileTreeGridView
-	var treeComonCd;
-	var treeModule = (function () {
+var fileTreeGridView
+var treeComonCd;
+var treeModule = (function () {
     var fileArr=[];
     var deleteFileArr = [];
-    var paramObj;
+    var fileTreeParamObj;
     var currPgmAuthChk = true; // true:저장권한, false:저장권한 없음
     var fileTempCocd = '';
     //최초 진입시점---
@@ -15,7 +15,7 @@
     //      4-2. fileTrgtKey   = 파일저장일련번호 (프로그램명 또는 테이블명에서 관리되는 유니크한 일련번호 ex) 1, 2, 3, 4
     //	treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
     //
-    //                     'deptTree', 'file-grid', 'FILETREE', paramTreeObj);
+    //                'deptTree', 'file-grid', 'FILETREE', paramTreeObj);
     function initAll(selector, gridSelector, codeId, params, _coCd) {
     	debugger;
     	//coCd가 파라메터로넘어오면 넘어온 값을 우선 처리 아니면 하면의 coCd로 처리함
@@ -34,11 +34,12 @@
             fileListArea_html_creation();
             
             createFileInput(gridSelector);
-            codeId = 'FILETREE';                  //최상위 트리 강제로 할당 (파라메터값 무시)
-            params["comonCd"] = codeId;           //comonCd는 xML 쿼리에서 트리ID 보관 필드명 
-            params["userId"] = jwt.userId;        //쿠키에 담아 캐시에 보관된 사용자 ID
+//            treeComonCd = codeId; //무시
+            treeComonCd = 'FILETREE';             //최상위 트리 강제로 할당 (파라메터값 무시)
+            params["comonCd"] = treeComonCd;      //comonCd는 xML 쿼리에서 트리ID 보관 필드명 
+            params["userId"] = jwt.userId;        //캐시에 보관된 사용자 ID
             
-            paramObj = params;  //
+            fileTreeParamObj = params;  //
             fileArr=[];
             deleteFileArr = [];
             
@@ -89,9 +90,9 @@
                     {key: "fileType", label: "파일타입", width: 60, align: "center"},
                     {key: "fileSize", label: "파일크기", width: 100, align: "right", formatter: "money"},
                     {key: "creatDttm", label: "저장일자", width: 130, align: "center",},
-                    {key: "creatId", label: "등록자", width: 100, align: "center"},
+                    {key: "creatNm", label: "등록자", width: 60, align: "center"},
                     {key: "clntCd", label: "거래처", width: 50, align: "center", hidden: true},
-                    {key: "clntNm", label: "거래처명", width: 110, align: "center"},
+                    {key: "clntNm", label: "거래처명", width: 110, align: "center", hidden: true},
                     {key: "prdtCd", label: "제품코드", width: 50, align: "center", hidden: true},
                     {key: "prdtNm", label: "제품명", width: 100, align: "center", hidden: true},
                     {key: "itemCd", label: "아이템", width: 50, align: "center", hidden: true},
@@ -188,7 +189,7 @@
         		let targetTree = $('#' + selector).jstree('get_selected',true)[0];
         		if (targetTree == undefined) {
         			$("#file_tag").html("파일저장Tree에는 문서를 저장할 수 없습니다.");
-        			comonCd = "FILETREE";
+        			treeComonCd = "FILETREE";
         		} else {
 	                selectedNodeId = data.node.id;
 	                selectedNodeText = data.node.text;
@@ -203,14 +204,13 @@
 	                }
         			let txt = selectedNodeText + ( (selectedNodeEtc =="N") ? "에는 저장할 수 없습니다." : "" );
         			$("#file_tag").html(txt);
-        			comonCd =  selectedNodeId;
+        			treeComonCd =  selectedNodeId;
         		}
         		
         		if (!$('#' + selector).is(":visible")) {
         			$('#' + selector).show();
         		}
-        		treeComonCd = comonCd;
-                getAllFilesForNodes(comonCd);
+                getAllFilesForNodes(treeComonCd);
 
         		// 노드 선택 시
     		}).on('hover_node.jstree',function(e, data){
@@ -271,11 +271,11 @@
 
     //트리 선택시 서버에 등록된 첨부 화일을 가져와서 그리드에 출력하기 위한 작업 
     function getAllFilesForNodes(nodeId) {
-    	if (!paramObj.fileTrgtTyp || !paramObj.fileTrgtKey) {
+    	if (!fileTreeParamObj.fileTrgtTyp || !fileTreeParamObj.fileTrgtKey) {
     		return false;
     	}
         fileArr=[];
-		tempObj = paramObj;
+		tempObj = fileTreeParamObj;
 		tempObj["pageNo"] = 1;
 		tempObj["recordCnt"] = 99999999;
 		if (nodeId) {
@@ -290,11 +290,11 @@
 
     function selectDeptTree() {
 		var deptTree = null;
-		paramObj["coCd"] = fileTempCocd; 
-		paramObj["userId"] = jwt.userId; 
-		paramObj["useYn"] = 'Y'; 
+		fileTreeParamObj["coCd"] = fileTempCocd; 
+		fileTreeParamObj["userId"] = jwt.userId; 
+		fileTreeParamObj["useYn"] = 'Y'; 
 
-		postAjaxSync("/admin/cm/cm05/selectDocTreeListAuth", paramObj, null, function(data){
+		postAjaxSync("/admin/cm/cm05/selectDocTreeListAuth", fileTreeParamObj, null, function(data){
 			deptTree = data.docTreeList;
 		});
 		return deptTree;
@@ -382,7 +382,6 @@
 			$("#treeview").css("height", minmaxValue);
 			$('[data-ax5grid="file-grid"]').css("height", minmaxValue);
 			$('[data-ax5grid="file-grid"] [data-ax5grid-container="root"] ').css("height", minmaxValue);
-//			treeModule.getAllFilesForNodes(treeComonCd);
 			fileTreeGridView.reqSetData(fileTreeGridView.target.list)
 		}
 	}
@@ -394,8 +393,8 @@
 		  fileListArea.append(`
 		    <div id="fileAttachTxt" style="display:block; cursor: pointer; text-align: right; font-weight:bold; height: 60px;"><i class="fas fa-file-import"></i> 파일첨부　　</div>
 		    <div id="fileAttachCnts" style="display:none">
-		    <div class="col-sm-2" style="padding-right: 5px;">
-		      <div class="contents" style="margin: 0; padding: 0; width: 100%; min-width: 200px">
+		    <div class="col-xs-2 pd0">
+		      <div class="contents mg0 pd0" style="width: 100%; min-width: 150px">
 		        <h3 class="location">
 		          <span class="page_tit" style="text-align: left;"> 파일트리</span>
 		        </h3>
@@ -404,10 +403,10 @@
 		        </div>
 		      </div>
 		    </div>
-		    <div class="col-sm-10" style="padding-left: 0;">
-		      <div class="contents" style="margin: 0; padding: 0; width: 100%; min-width: 200px">
+		    <div class="col-xs-10 pd0 pdl5">
+		      <div class="contents  mg0 pd0" style="width: 100%; min-width: 150px">
 		        <h3 class="location">
-		          <a class="file_tag" id="file_tag" style="font-weight: bold; color: blue; padding-left: 20px; padding-right: 10px;"></a>
+		          <a class="file_tag pdl20 pdr10" id="file_tag" style="font-weight: bold; color: blue;"></a>
 		          <span class="page_tit" id="file_tit" style="text-align: right;"> 문서현황 </span>
 		        </h3>
 		        <button type="button" id="button_file" style="height: 20px; line-height: 10px;" onclick="file.click();" authchk> 첨부파일</button>
@@ -425,7 +424,7 @@
 		  $("#fileAttachTxt").click(function() {
               $("#fileAttachTxt").hide();
               $("#fileAttachCnts").show();
-              getAllFilesForNodes(comonCd);
+              getAllFilesForNodes(treeComonCd);
           });
 	}
 	
