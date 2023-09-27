@@ -49,14 +49,15 @@ public class SM07SvcImpl implements SM07Svc {
 	
 	@Override
 	public int updateOrderDetail(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-		// Gson gson = new Gson();
+		//Gson gson = new Gson();
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+		
 		//---------------------------------------------------------------
 		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
 		//   필수값 :  jobType, userId, comonCd
 		//---------------------------------------------------------------
-		/*HashMap<String, String> param = new HashMap<>();
+		HashMap<String, String> param = new HashMap<>();
 		param.put("userId", paramMap.get("userId"));
 		param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
 		
@@ -66,41 +67,46 @@ public class SM07SvcImpl implements SM07Svc {
 			param.put("jobType", "fileUp");
 			cm15Svc.selectFileAuthCheck(param);
 		}
+		
 		String[] deleteFileArr = gsonDtl.fromJson(paramMap.get("deleteFileArr"), String[].class);
 		List<String> deleteFileList = Arrays.asList(deleteFileArr);
 		
-		for(String fileKey : deleteFileList) {  // 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
+		for(String fileKey : deleteFileList) {
+			// 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
 			Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
 			//접근 권한 없으면 Exception 발생
 			param.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
 			param.put("jobType", "fileDelete");
 			cm15Svc.selectFileAuthCheck(param);
-		}*/
+		}
 		//---------------------------------------------------------------
 		//첨부 화일 권한체크  끝
 		//---------------------------------------------------------------
 		
-		int result = 0;
+		//데이터처리 시작
+		//마스터 수정
+		int result = sm07Mapper.updateOrderDetail(paramMap);
+
+//		//상세수정
+//		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+//	    for (Map<String, String> dtl : dtlParam) {
+//	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
+//			dtl.put("userId", paramMap.get("userId"));
+//	    	dtl.put("pgmId", paramMap.get("pgmId"));
+//			
+//			String dataChk = dtl.get("dataChk").toString();	    	
+//			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
+//	    	if ("U".equals(dataChk)) {
+//				//데이터 처리
+//				qm02Mapper.update_pm02_Dtl(dtl);
+//	    	} 
+//	    }
+		//데이터 처리 끝
 		
-		//상세수정
-		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
-	    for (Map<String, String> dtl : dtlParam) {
-	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-			dtl.put("userId", paramMap.get("userId"));
-	    	dtl.put("pgmId", paramMap.get("pgmId"));
-			
-			String dataChk = dtl.get("dataChk").toString();	    	
-			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
-	    	if ("U".equals(dataChk)) {
-				//데이터 처리
-	    		result = sm07Mapper.updateOrderDetail(dtl);
-	    	} 
-	    }
-			    
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작
 		//---------------------------------------------------------------
-		/*if (uploadFileList.size() > 0) {
+		if (uploadFileList.size() > 0) {
 			paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
 			paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 			cm08Svc.uploadFile(paramMap, mRequest);
@@ -108,13 +114,12 @@ public class SM07SvcImpl implements SM07Svc {
 		
 		for(String fileKey : deleteFileList) {
 			cm08Svc.deleteFile(fileKey);
-		}*/
+		}
 		//---------------------------------------------------------------
 		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
 		return result;
 	}
-	
 	
 	/*
 	 * 마스터 페이지 조회
