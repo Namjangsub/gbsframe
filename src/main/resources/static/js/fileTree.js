@@ -163,7 +163,6 @@ var treeModule = (function () {
 //            $('#' + selector).jstree("open_all");
             // 최상위 노드 펼침
             $('#' + selector).jstree(true).open_node($('#' + selector + ' li[aria-level="1"]').eq(0).attr('id'));
-//            $('#' + selector).jstree(true).open_node($('#' + selector + ' li[aria-level="2"]').eq(0).attr('id'));
 
             var topLevelNode = $('#' + selector + ' li[aria-level="1"]').eq(0).attr('id');
 			$('#' + selector).jstree(true).deselect_all();            
@@ -358,12 +357,10 @@ var treeModule = (function () {
 				"fileKey" : fileKey,
 				"userId" : jwt.userId
 			}
-// 		postAjax("/admin/cm/cm08/fileDownInfo", {"fileKey": fileKey}, null, function(data){
 		postAjax("/admin/cm/cm08/fileDownInfoUser", tempObj, null, function(data){
 			if(data.resultCode == 200){
 				var fileInfo = data.fileInfo;
 // 				var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName , "UTF-8");
-// 				location.href = "/admin/cm/cm08/fileDownloadAuth?filePath="+filePath+"&userId="+jwt.userId;
 				location.href = "/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId;
 			} else {
 				alert("다운로드 권한이 없습니다.");	
