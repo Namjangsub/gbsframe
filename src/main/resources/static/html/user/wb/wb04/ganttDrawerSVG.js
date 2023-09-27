@@ -285,6 +285,7 @@ Ganttalendar.prototype.drawTask = function (task) {
 
       }).mouseup(function (e) {
         $(":focus").blur(); // in order to save grid field when moving task
+        
       }).mousedown(function () {
         var task = self.master.getTask($(this).attr("taskid"));
         task.rowElement.click();
@@ -418,20 +419,23 @@ Ganttalendar.prototype.drawTask = function (task) {
 		        var paramObj = {"fileTrgtKey": task.rsltsFileTrgtKey};         
 		        openSecondModal("/static/html/user/wb/wb22/WB2201P03.html", 1200,700, "WBS 실적보기", paramObj, function (){                    
 		        }); 
-		    }  
-		  //alert(task.type +"//"+task.description+"//"+task.level);
-		  /*if (task.type != undefined && task.description != undefined) {
-			  var paramObj = {
-			          "coCd" : strSplit(task.type,0),
-			          "salesCd": strSplit(task.type,1),
-			          "codeId" : strSplit(task.type,3)
-			       };
-			       //openSecondModal("/static/html/user/wb/wb04/WB0401P01.html", 1600, 850, "", paramObj, function(data) {
-			           //gridView1.setData(0);
-			       //}); 
-		  }*/
-		  
+		  }  
 	   })
+	  /*.mousemove(function () {
+		  var label = "<b>" + task.name + "</b>";
+			label += "<br>";
+			label += "<b>Start:</b> " + new Date(task.start1).format();
+			label += "<br>";
+			label += "<b>End:</b> " + new Date(task.end1).format();
+			label += "<br>";
+			label += "<b>Duration:</b> " + task.duration;
+			label += "<br>";
+			label += "<b>Progress:</b> " + task.progress + "%";
+			$("tooltip").innerText(label);
+	  }) 
+	  .mouseleave(function () {
+		  $("tooltip").innerHTML("");
+	  }) */
 	   
   }
   //ask for redraw link
@@ -474,7 +478,11 @@ Ganttalendar.prototype.drawTask = function (task) {
           textStyle["font-weight"]="bold";
         if (task.progress > 90)
           textStyle.transform = "translate(-40)";
+        
+        //debugger;
         svg.text(taskSvg, (task.progress > 90 ? 100 : task.progress) + "%", (self.master.rowHeight - 5) / 2, (task.progress > 100 ? "!!! " : "") + task.progress + "%", textStyle);
+        
+        //svg.text(taskSvg, (task.progress > 90 ? 100 : task.progress) + "%", (self.master.rowHeight - 5) / 2,  , task.progress + "%", textStyle);
       }
     }
 
@@ -482,11 +490,13 @@ Ganttalendar.prototype.drawTask = function (task) {
       svg.rect(taskSvg, 0, 0, "100%", 3, {fill:"#000"});
 
     if (task.startIsMilestone) {
-      svg.image(taskSvg, -9, dimensions.height/2-9, 30, 30, self.master.resourceUrl +"milestone.png")
+      //svg.image(taskSvg, -9, dimensions.height/2-9, 18, 18, self.master.resourceUrl +"milestone_issue.png")
+      svg.image(taskSvg, -2, dimensions.height/2-9, 20, 20, self.master.resourceUrl +"milestone_issue.png")
     }
 
     if (task.endIsMilestone) {
-      svg.image(taskSvg, "100%",dimensions.height/2-9, 18, 18, self.master.resourceUrl +"milestone.png", {transform:"translate(-9)"})
+      //svg.image(taskSvg, "100%",dimensions.height/2-9, 18, 18, self.master.resourceUrl +"milestone_delay.png", {transform:"translate(-9)"})
+    	svg.image(taskSvg, "100%", dimensions.height/2-9, 20, 20, self.master.resourceUrl +"milestone_delay.png", {transform:"translate(-21)"})
     }
 
     //task label
@@ -548,14 +558,14 @@ Ganttalendar.prototype.drawTask = function (task) {
 			 textStyle.transform = "translate(-40)";
 			 svg.text(taskSvg, (baseline.progress > 90 ? 100 : baseline.progress) + "%", (self.master.rowHeight - 5) / 2, (baseline.progress > 100 ? "!!! " : "") + baseline.progress + "%", textStyle);
 			 }*/
-    }
+        }
 
 		//if (task.isParent())
-		//  svg.rect(taskSvg, 0, 0, "100%", 3, {fill:"#000"});
+		  //svg.rect(taskSvg, 0, 0, "100%", 3, {fill:"#000"});
 
 
 		//task label
-		//svg.text(taskSvg, "100%", 18, task.name, {class:"taskLabelSVG", transform:"translate(20,-5)"});
+		svg.text(taskSvg, "100%", 18, task.name, {class:"taskLabelSVG", transform:"translate(20,-5)"});
 
 
     return taskSvg

@@ -259,8 +259,10 @@ GanttMaster.prototype.init = function (workSpace) {
 
   //resize
   $(window).resize(function () {
-    place.css({width: "100%", height: $("#gantSpace").height()});
-//    place.css({width: "100%", height: $(window).height() - 210});
+	//place.css({width: "100%", height: "100%"});  
+    //place.css({width: "100%", height: $("#gantSpace").height()});
+    //place.css({width: "100%", height: $(window).height() - 210});
+	place.css({width: "100%", height: $(window).height()-170});  
     place.trigger("resize.gantt");
   }).oneTime(2, "resize", function () {$(window).trigger("resize")});
 
