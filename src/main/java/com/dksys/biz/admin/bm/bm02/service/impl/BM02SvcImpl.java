@@ -136,6 +136,7 @@ public class BM02SvcImpl implements BM02Svc {
 
 	@Override
 	public void deleteClntPldg(Map<String, Object> paramMap) {
+		@SuppressWarnings("unchecked")
 		List<Map<String, String>> pldgList = (List<Map<String, String>>) paramMap.get("pldgArr");
 		if(pldgList != null) {
 			// 담보내역 delete
@@ -147,7 +148,7 @@ public class BM02SvcImpl implements BM02Svc {
 
 	@Override
 	public void deleteClntBizdept(Map<String,  Object> paramMap) {
-
+		@SuppressWarnings("unchecked")
 		List<Map<String, String>> bizdeptList =(List<Map<String, String>>) paramMap.get("bizdeptArr");
 		if(bizdeptList != null) {
 			// 담보내역 update

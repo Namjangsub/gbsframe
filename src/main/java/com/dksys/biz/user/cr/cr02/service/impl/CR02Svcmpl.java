@@ -437,29 +437,15 @@ public class CR02Svcmpl implements CR02Svc {
 		cr02Mapper.callUpdateProjectMaster(param);
     }
 
-
+    //ex) [{}, null, {"name": "Nam"}, {}] --> [{"name": "Nam"}]으로 만들어줌
     public static String removeEmptyObjects(String jsonArrayString) {
-        if (jsonArrayString == null || !jsonArrayString.startsWith("[") || !jsonArrayString.endsWith("]")) {
-            return jsonArrayString;
+        String nullAndEmptyObjectPattern = "(\\{\\s*\\}|null),?";  //비어있는 객체 ({}) 또는 "null" 값의 정규 표현식
+        String result = jsonArrayString.replaceAll(nullAndEmptyObjectPattern, "");  //비어있는 객체나 "null" 값을 제거
+
+        if (result.endsWith(",}")) { //마지막 요소가 ",}" 형식으로 끝나는 경우, 쉼표(",")를 제거
+            result = result.substring(0, result.length() - 2) + "}";
         }
-
-        JsonParser parser = new JsonParser();
-        JsonArray jsonArray = parser.parse(jsonArrayString).getAsJsonArray();
-        JsonArray filteredJsonArray = new JsonArray();
-
-        for (JsonElement jsonElement : jsonArray) {
-            if (jsonElement.isJsonObject()) {
-                JsonObject jsonObject = jsonElement.getAsJsonObject();
-                if (!jsonObject.entrySet().isEmpty()) {
-                    filteredJsonArray.add(jsonObject);
-                }
-            } else if (!jsonElement.isJsonNull()) {
-                filteredJsonArray.add(jsonElement);
-            }
-        }
-
-        Gson gson = new Gson();
-        return gson.toJson(filteredJsonArray);
+        return result;
     }
 
     @Override
@@ -543,12 +529,7 @@ public class CR02Svcmpl implements CR02Svc {
     }
     
     public int updateEstDeleteConfirm(Map<String, String> paramMap) {
-        Gson gson = new GsonBuilder().disableHtmlEscaping().create();
-        Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {
-        }.getType();
-        int result = cr02Mapper.updateEstDeleteConfirm(paramMap);
-
-        return result;
+        return cr02Mapper.updateEstDeleteConfirm(paramMap);
     }
 
 
