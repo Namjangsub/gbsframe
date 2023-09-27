@@ -84,7 +84,7 @@ public class BM99SvcImpl implements BM99Svc {
 			if (deleteFileList.size() > 0) {
 				//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
 				//접근 권한이 없으면 Exception 발생
-				paramMap.put("comonCd", "FITR9901");
+				paramMap.put("comonCd", "FITR9999");
 				paramMap.put("jobType", "fileDelete");
 				cm15Svc.selectFileAuthCheck(paramMap);
 			}
