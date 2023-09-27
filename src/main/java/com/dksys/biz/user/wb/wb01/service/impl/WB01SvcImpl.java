@@ -333,6 +333,12 @@ public class WB01SvcImpl implements WB01Svc {
 		return result;
 	}
 	
+	@Override
+	public int selectWbsSalesCount(Map<String, String> paramMap) {
+		int result = wb01Mapper.selectWbsSalesCount(paramMap);
+		return result;
+	}
+	
     @Override
     public int deleteWbsRsltslist(Map<String, String> paramMap) {
 	    int result = 0;

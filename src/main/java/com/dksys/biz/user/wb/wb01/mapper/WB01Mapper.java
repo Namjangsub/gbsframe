@@ -51,6 +51,8 @@ public interface WB01Mapper {
     
     int selectWbsLeftSalesCodeListCount(Map<String, String> paramMap);
     
+    int selectWbsSalesCount(Map<String, String> paramMap);
+    
     int deleteWbsRsltslist(Map<String, String> paramMap);
     
     int deleteWbsRsltsDetailSub(Map<String, String> paramMap);

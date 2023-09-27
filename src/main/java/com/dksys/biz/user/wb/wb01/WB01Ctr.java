@@ -179,6 +179,11 @@ public class WB01Ctr {
 
   @PostMapping(value = "/selectWbsSalesCodeList") 
   public String selectWbsSalesCodeList(@RequestBody Map<String, String> paramMap, ModelMap model) { 
+	  
+	  int totalCnt = wb01Svc.selectWbsSalesCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+  	model.addAttribute("paginationInfo", paginationInfo);
+  	
      List<Map<String, String>> codeInfoList = wb01Svc.selectWbsSalesCodeList(paramMap); 
      model.addAttribute("codeInfoList", codeInfoList); return "jsonView";
   }

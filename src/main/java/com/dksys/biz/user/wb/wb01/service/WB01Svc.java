@@ -39,6 +39,8 @@ public interface WB01Svc {
    
    int selectWbsLeftSalesCodeListCount(Map<String, String> paramMap);
    
+   int selectWbsSalesCount(Map<String, String> paramMap);
+   
    int deleteWbsRsltslist(Map<String, String> paramMap);
    
    List<Map<String, String>> selectWbsInfo(Map<String, String> paramMap);
