@@ -46,10 +46,10 @@ function Approval(htmlParam, param, popParam) {
 			    	<!-- 결재라인 table -->
 			    	<table id="appLine" style="border: 1px solid #dbdbdb; border-collapse: collapse" >
 			    		<colgroup>
-			    			<col width="10%">
 			    			<col width="20%">
-			    			<col width="40%">
-			    			<col width="10%">
+			    			<col width="20%">
+			    			<col width="20%">
+			    			<col width="20%">
 			    			<col width="20%">
 			    		</colgroup>
 			    		<tr id="appH" stye="text-align:center; border-bottom:1px solid #dbdbdb; height:25px;">
