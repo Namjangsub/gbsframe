@@ -1,7 +1,6 @@
 package com.dksys.biz.admin.bm.bm16.service.impl;
 
 import java.lang.reflect.Type;
-import java.text.Format.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -11,7 +10,6 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.admin.bm.bm16.mapper.BM16Mapper;
@@ -292,6 +290,16 @@ public class BM16SvcImpl implements BM16Svc {
   @Override
   public List<Map<String, String>> selectPrjctOrderBillChart(Map<String, String> paramMap) {
 	  return bm16Mapper.selectPrjctOrderBillChart(paramMap);
+  }
+  
+  @Override
+  public int selectPrjctPlanCount(Map<String, String> paramMap) {
+    return bm16Mapper.selectPrjctPlanCount(paramMap);
+  }
+
+  @Override
+  public List<Map<String, Object>> selectPrjctPlanList(Map<String, String> paramMap) {
+    return bm16Mapper.selectPrjctPlanList(paramMap);
   }
   
 }

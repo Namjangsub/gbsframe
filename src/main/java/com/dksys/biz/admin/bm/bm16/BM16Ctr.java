@@ -253,4 +253,17 @@ public class BM16Ctr {
 	  return "jsonView";
   }
 
+  //프로젝트 대일정 조회
+  @PostMapping("/selectPrjctPlanList")
+  public String selectPrjctPlanList(@RequestBody Map<String, String> param, ModelMap model) {
+	  
+      int totalCnt = bm16Svc.selectPrjctPlanCount(param);
+      PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
+      model.addAttribute("paginationInfo", paginationInfo);
+
+      List<Map<String, Object>> planList = bm16Svc.selectPrjctPlanList(param);
+      model.addAttribute("planList", planList);
+      return "jsonView";
+  }
+  
 }

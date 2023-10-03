@@ -35,4 +35,8 @@ public interface BM16Svc {
 
   List<Map<String, String>> selectPrjctOrderBillChart(Map<String, String> paramMap);
 
+  int selectPrjctPlanCount(Map<String, String> paramMap);
+
+  List<Map<String, Object>> selectPrjctPlanList(Map<String, String> paramMap);
+
 }
