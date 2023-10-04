@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,9 +17,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.cmn.vo.PaginationInfo;
-import com.dksys.biz.exc.LogicException;
-import com.dksys.biz.util.MessageUtils;
 import com.dksys.biz.user.wb.wb21.service.WB21Svc;
+import com.dksys.biz.util.MessageUtils;
 
 @Controller
 @Transactional(rollbackFor = Exception.class)
@@ -38,6 +36,13 @@ public class WB21Ctr {
     @PostMapping(value = "/selectMaxSjNo") 
     public String selectMaxSjNo(@RequestBody Map<String, String> paramMap, ModelMap model) {
 	    List<Map<String, String>> result = wb21Svc.selectMaxSjNo(paramMap);
+	    model.addAttribute("result", result); 
+	    return "jsonView"; 		 
+    }
+    
+    @PostMapping(value = "/selectSalesCodeCheck") 
+    public String selectSalesCodeCheck(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    List<Map<String, String>> result = wb21Svc.selectSalesCodeCheck(paramMap);
 	    model.addAttribute("result", result); 
 	    return "jsonView"; 		 
     }

@@ -1,25 +1,19 @@
 package com.dksys.biz.user.wb.wb21.service.impl;
 
 import java.lang.reflect.Type;
-import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.collections4.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.util.ExceptionThrower;
 import com.dksys.biz.user.wb.wb21.mapper.WB21Mapper;
 import com.dksys.biz.user.wb.wb21.service.WB21Svc;
+import com.dksys.biz.util.ExceptionThrower;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
 @Service
@@ -40,6 +34,11 @@ public class WB21SvcImpl implements WB21Svc {
     @Override
     public List<Map<String, String>> selectMaxSjNo(Map<String, String> paramMap) {
   		return wb21Mapper.selectMaxSjNo(paramMap);
+    }
+    
+    @Override
+    public List<Map<String, String>> selectSalesCodeCheck(Map<String, String> paramMap) {
+  		return wb21Mapper.selectSalesCodeCheck(paramMap);
     }
     
     @Override
@@ -78,11 +77,9 @@ public class WB21SvcImpl implements WB21Svc {
 		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (sharngArr != null && sharngArr.size() > 0 ) {
-			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
 	            try {
-	            	    wb21Mapper.insertSjDtlList(sharngMap);
-	            	i++;
+            	    wb21Mapper.insertSjDtlList(sharngMap);
 	            } catch (Exception e) {
 	                System.out.println("error2"+e.getMessage());
 	            }
@@ -99,11 +96,9 @@ public class WB21SvcImpl implements WB21Svc {
 		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (sharngArr != null && sharngArr.size() > 0 ) {
-			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
 	            try {
-	            	    wb21Mapper.insertSjDtlList(sharngMap);
-	            	i++;
+	            	wb21Mapper.insertSjDtlList(sharngMap);
 	            } catch (Exception e) {
 	                System.out.println("error2"+e.getMessage());
 	            }
@@ -148,11 +143,9 @@ public class WB21SvcImpl implements WB21Svc {
 		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (sharngArr != null && sharngArr.size() > 0 ) {
-			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
 	            try {
-	            	    wb21Mapper.insertSjDtlList(sharngMap);
-	            	i++;
+            	    wb21Mapper.insertSjDtlList(sharngMap);
 	            } catch (Exception e) {
 	                System.out.println("error2"+e.getMessage());
 	            }

@@ -10,6 +10,8 @@ public interface WB21Svc {
 
 	List<Map<String, String>> selectMaxSjNo(Map<String, String> paramMap);
 	
+	List<Map<String, String>> selectSalesCodeCheck(Map<String, String> paramMap);
+	
 	List<Map<String, String>> selectCodeList(Map<String, String> paramMap);
 
     int selectSjListCount(Map<String, String> paramMap);
@@ -36,5 +38,5 @@ public interface WB21Svc {
 	int sjVerUpInsert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
 	List<Map<String, String>> selectSjVerNoNext(Map<String, String> paramMap);
-	
+
 }
