@@ -35,6 +35,8 @@
     <script src="/static/js/jstree/jstree.min.js"></script>
     <script src="/static/js/global.js"></script>
     <script src="/static/js/fileTree.js"></script>
+    <!-- 공통결재 -->
+	<script src="/static/js/commApprovalMobile.js"></script>
     <style type="text/css">
     .input {
         border-top:none;
@@ -222,7 +224,7 @@
 		            <tr>                    
 		                <th style="text-align:left;width:20%;font-size:14px;font-weight:bold;color:black;">회사</th>
 		                <td style="text-align:left;width:30%;font-size:14px;">
-		                	<input class="input"  type="text" id="resCoCd"  name="resCoCd" disabled style="color:blue;font-weight:bold;"> 
+		                	<input class="input"  type="text" id="resCoNm"  name="resCoNm" disabled style="color:blue;font-weight:bold;"> 
 		                </td>
 		                <th style="text-align:left;width:20%;font-size:14px;font-weight:bold;color:black;">실적번호</th>
 		                <td style="text-align:left;width:30%;font-size:14px;">
@@ -233,7 +235,7 @@
 		            <tr>                    
 		                <th style="text-align:left;width:20%;font-size:14px;font-weight:bold;color:black;">실적일자</th>
 		                <td style="text-align:left;width:30%;font-size:14px;">
-		                	<input class="input"  type="text" id="rsltDt"  name="rsltDt" disabled style="color:blue;font-weight:bold;"> 
+		                	<input class="input"  type="text" id="resDt"  name="resDt" disabled style="color:blue;font-weight:bold;"> 
 		                </td>
 		                <th style="text-align:left;width:20%;font-size:14px;font-weight:bold;color:black;">등록자</th>
 		                <td style="text-align:left;width:30%;font-size:14px;">
@@ -308,6 +310,15 @@
 		            </tr>
 		            <tr><td colspan="4" style="height:5px;"></td></tr>  
 	            </table>
+	            
+	            <!-- todo 결재 -->
+				<div align="center" style="width: 100%; height: 30%;">
+					<div id="wbsPopup" class="popup_area">
+						<!-- 결제창 -->
+						<div id="approval_area"></div>
+					</div>
+				</div>
+				
 			</div>         
 	    </div>    
     </form>
@@ -324,6 +335,41 @@ var todoDiv2CodeId = "TODODIV2030";
 
 var deptCd2 = null;
 var subCd = null;
+
+/*todo 결재*/
+var btnApproval = null;
+//div area id 
+var htmlParam = {
+	htmlArea : "approval_area"
+};
+
+//세션에 정보를 활용하여 승인처리3
+//JSON.parse : JSON.stringify를 받을 때 / 문자열-> 자바스크립트로 변환
+var paramObj = JSON.parse(sessionStorage.getItem('paramObj'));
+//sessionStorage.removeItem('paramObj');제거??
+if (paramObj && paramObj != "undefined") {
+	//to-do 에서 넘어온 param;
+	var popParam = paramObj;
+	//추가로 넣어줄 param
+	var approvalParam = {
+		coCd : paramObj.coCd,
+		todoDiv1CodeId : paramObj.todoDiv1CodeId,
+		todoDiv2CodeId : paramObj.todoDiv2CodeId,
+		pgmId : paramObj.pgmId
+	};
+	//삭제할 키가 있으면 쓴다.
+	delete popParam.sanctnSn;
+	delete popParam.pgmId;
+	var commApproval = new Approval(htmlParam, approvalParam, popParam);
+	commApproval.makeHtml();
+} else {
+	window.history.back();
+}
+
+function approvalConfirm() {
+	commApproval.confirmApproval();
+	window.history.back();
+}
 
 function getParams(){
     var url = window.location.search.replace('?','');
@@ -350,7 +396,7 @@ $(document).ready(function() {
 	
 	//세션에 정보를 활용하여 승인처리
 	//JSON.parse : JSON.stringify를 받을 때 / 문자열-> 자바스크립트로 변환
-	var paramObj = JSON.parse(sessionStorage.getItem('paramObj'));
+	//var paramObj = JSON.parse(sessionStorage.getItem('paramObj'));
 
 	var formData1 = {
 			"fileTrgtKey" : paramObj.todoFileTrgtKey
@@ -373,7 +419,7 @@ $(document).ready(function() {
 			//"fileTrgtKey" : paramObj.todoFileTrgtKey,
 			"rsltNo" : paramObj.todoNo
 	    }
-	    postAjaxSync("/user/qm/qm01/selectQtyReqRespInfo", formData2, null, function(data) {	    	
+	    postAjaxSync("/user/qm/qm01/selectQtyReqRespInfo", paramObj, null, function(data) {	    	
             $.each(data.result, function(key, value) {
             	if (key == "coCd") {
             		coCd = value;
@@ -392,27 +438,30 @@ $(document).ready(function() {
                 }
             });
 	    });
+	debugger;
 	
 	var formData3 = {
             "coCd" : coCd,
             "salesCd" : salesCd,
             "todoDiv1CodeId" : todoDiv1CodeId,
             "todoDiv2CodeId" : todoDiv2CodeId,
-            "fileTrgtKey":todoFileTrgtKey
+            "fileTrgtKey": paramObj.todoFileTrgtKey
         }
-    postAjaxSync("/user/wb/wb20/selectApprovalYnList", formData3, null, function(data) {
-    	 if(data.resultList){    		 
-            createHtmlAppView(data.resultList);
-        }
+	debugger;
+    postAjaxSync("/user/wb/wb20/selectApprovalYnList", formData3,
+    		null, function(data) {
+    	 		if(data.resultList){    		 
+	            	createHtmlAppView(data.resultList);
+	        	}
     });
 	
 	var strDeptNm2 = "";
 	var strSubNm = "";
 	
-	var formData3 = {
+	var formData4 = {
             "codeId" : "COBGB"
         }
-    postAjaxSync("/user/wb/wb20/selectGetDeptList", formData3, null, function(data) {
+    postAjaxSync("/user/wb/wb20/selectGetDeptList", formData4, null, function(data) {
          if(data.resultList){
         	 if (deptCd2) {
         		 for (let i = 0; i < deptCd2.length; i++) {
@@ -464,7 +513,7 @@ function createHtmlAppView(appDataList){
     $("#appViewArea")[0].innerHTML = cHtml;
 }
 
-function updateQmMobileApproval() {
+/* function updateQmMobileApproval() {
     var formData = new FormData();
     formData.append("todoFileTrgtKey", todoFileTrgtKey); 
     formData.append("todoCfDt",  $('#todoCfDt').val()); 
@@ -485,7 +534,7 @@ function updateQmMobileApproval() {
             //modalStack.close();
         }
     });        
-}
+} */
 
 
 </script>
