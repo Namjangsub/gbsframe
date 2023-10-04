@@ -70,7 +70,12 @@ public class WB24SvcImpl implements WB24Svc {
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 	    
-		int result = wb24Mapper.wbsIssueInsert(paramMap);	
+	    	   	   
+		int result = wb24Mapper.wbsIssueInsert(paramMap);
+		
+		
+		int result1 = wb24Mapper.wbsActInsert(paramMap);
+		
 		Gson gson = new Gson();		
 		
 		String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("issFileTrgtKey") +"\"}";
@@ -191,6 +196,8 @@ public class WB24SvcImpl implements WB24Svc {
   		//---------------------------------------------------------------  
 	  	    
 	    int result = wb24Mapper.wbsIssueUpdate(paramMap);	
+	    int result1 = wb24Mapper.wbsActUpdate(paramMap);
+	    
 		Gson gson = new Gson();					
 
 		String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("issFileTrgtKey") +"\"}";
