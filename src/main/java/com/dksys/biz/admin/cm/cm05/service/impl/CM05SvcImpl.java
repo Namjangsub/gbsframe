@@ -99,4 +99,9 @@ public class CM05SvcImpl implements CM05Svc {
 	public List<Map<String, String>> selectCheckboxList(Map<String, String> param) {
 		return cm05Mapper.selectCheckboxList(param);
 	}
+	
+	@Override
+	public List<Map<String, String>> selectMonthCloseChkList(Map<String, String> param) {
+		return cm05Mapper.selectMonthCloseChkList(param);
+	}
 }

@@ -2171,5 +2171,93 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 			link.click();
 		}
 	});
+}
 
+// 월마감 체크
+function monthCloseChk(chkValue, chkType){
+	
+	if(chkValue === '') return;
+	if(!chkType){
+		chkType = "";
+	}
+	
+	var url = window.location.href;
+	var menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
+	var rtnVal = "N";
+	var rtnHolVal = "N";
+	var rtnDate = "";
+	var pchsCloseDt = "";
+	var workDay= "";
+	var actionType = "";
+	var coCd = jwt.coCd;
+	
+	chkValue = chkValue.replace(/\-/g, '');
+	
+	if(chkType === 'D'){
+		actionType = chkType;
+	}else{
+		actionType = modalStack.last().paramObj.actionType;
+	}
+		
+	var paramObj = {};
+	paramObj.coCd = coCd;
+	paramObj.menuUrl = menuUrl;
+	paramObj.actionType = actionType;
+	paramObj.chkValue = chkValue.replace(/\-/g, '');
+	
+	//console.log(paramObj);
+	postAjaxSync("/admin/cm/cm05/selectMonthCloseChk", paramObj, null, function(data) {
+
+		rtnVal = data.rtnVal;
+		rtnHolVal= data.rtnHolVal;
+		pchsCloseDt = data.pchsCloseDt;
+		workDay= data.workDay;
+	});//postAjaxSync
+	
+	if(typeof rtnVal == "undefined" || rtnVal == null) return;
+	
+	if(rtnHolVal === 'Y'){
+
+		rtnDate = calculateHoliday(pchsCloseDt, workDay);
+		
+		rtnDate = rtnDate.YMD;
+		rtnDate = rtnDate.replace(/\-/g, '');
+		rtnDate = parseFloat(rtnDate);
+		chkValue = parseFloat(chkValue);
+		
+		if(rtnDate - chkValue > 0){
+			$("#actionBtn").hide();
+			if(actionType === 'C') alert('마감되었습니다. 데이터를 등록할 수가 없습니다.');
+			if(actionType === 'D') alert('마감된 데이터입니다. 삭제할 수가 없습니다.');
+			if(actionType === 'U') setDisabledInputDate(true);
+			return false;
+		}else{
+			$("#actionBtn").show();
+			if(actionType === 'U') setDisabledInputDate(false);
+			return false;
+		}
+
+	}else{
+		if (rtnVal === 'Y') {
+			$("#actionOrdrsBtn").hide();
+			$("#actionBtn").hide();
+			if(actionType === 'C') alert('마감되었습니다. 데이터를 등록할 수가 없습니다.');
+			if(actionType === 'D') alert('마감된 데이터입니다. 삭제할 수가 없습니다.');
+			if(actionType === 'U') setDisabledInputDate(true);
+			return false;
+		}else{
+			$("#actionOrdrsBtn").show();
+			$("#actionBtn").show();
+			if(actionType === 'U') setDisabledInputDate(false);
+			return false;
+		}
+	}
+	return true;
+}
+
+//checked date disabled
+function setDisabledInputDate(_status){
+	$.each($('.popup_area input[date]'), function(idx, elem) {
+		$(elem).prop("disabled", _status);
+	});
 }
