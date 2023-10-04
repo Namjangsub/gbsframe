@@ -2234,6 +2234,7 @@ function monthCloseChk(chkValue, chkType){
 		}else{
 			$("#actionBtn").show();
 			if(actionType === 'U') setDisabledInputDate(false);
+			authChk();
 			return false;
 		}
 
@@ -2249,6 +2250,7 @@ function monthCloseChk(chkValue, chkType){
 			$("#actionOrdrsBtn").show();
 			$("#actionBtn").show();
 			if(actionType === 'U') setDisabledInputDate(false);
+			authChk();
 			return false;
 		}
 	}
