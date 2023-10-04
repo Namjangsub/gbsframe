@@ -17,14 +17,12 @@ var treeModule = (function () {
     //
     //                'deptTree', 'file-grid', 'FILETREE', paramTreeObj);
     function initAll(selector, gridSelector, codeId, params, _coCd) {
-    	debugger;
     	//coCd가 파라메터로넘어오면 넘어온 값을 우선 처리 아니면 하면의 coCd로 처리함
     	if (_coCd == '' || _coCd == undefined) {
     		fileTempCocd = $('#coCd').val();
     	} else {
     		fileTempCocd = _coCd;
     	}
-    	
     	
         if ($("#fileList_area #fileAttachTxt").length > 0) {
             // console.log("#fileAttachTxt 요소가 존재합니다.");
@@ -388,7 +386,7 @@ var treeModule = (function () {
 	function fileListArea_html_creation () {
 		var fileListArea = $('#fileList_area');
 		  fileListArea.append(`
-		    <div id="fileAttachTxt" style="display:block; cursor: pointer; text-align: right; font-weight:bold; height: 60px;"><i class="fas fa-file-import"></i> 파일첨부　　</div>
+		    <div id="fileAttachTxt" style="display:block; cursor: pointer; text-align: left; font-weight:bold; height: 30px;"><i class="fa fa-file-import"></i> 파일첨부　　</div>
 		    <div id="fileAttachCnts" style="display:none">
 		    <div class="col-xs-2 pd0">
 		      <div class="contents mg0 pd0" style="width: 100%; min-width: 150px">
