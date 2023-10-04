@@ -8,6 +8,6 @@ function manualPopup(pgmId) {
 					"pgmId" : pgmId
 					};
 	
-	openModal("/static/html/admin/bm/bm99/BM9901P01.html", 800, 500, "", paramObj);
+	openModal("/static/html/admin/bm/bm99/BM9901P01.html", 1000, 700, "", paramObj);
 	
 }
