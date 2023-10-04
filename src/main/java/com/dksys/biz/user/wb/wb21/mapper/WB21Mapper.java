@@ -4,11 +4,13 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.ibatis.annotations.Mapper;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 @Mapper
 public interface WB21Mapper {
+	
 	List<Map<String, String>> selectMaxSjNo(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectSalesCodeCheck(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectCodeList(Map<String, String> paramMap);
 	
@@ -41,4 +43,6 @@ public interface WB21Mapper {
 	int sjCloseN(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectSjVerNoNext(Map<String, String> paramMap);
+
+	
 }
