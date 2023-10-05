@@ -2183,11 +2183,11 @@ function monthCloseChk(chkValue, chkType){
 	
 	var url = window.location.href;
 	var menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
-	var rtnVal = "N";
+	var rtnVal    = "N";
 	var rtnHolVal = "N";
-	var rtnDate = "";
-	var pchsCloseDt = "";
-	var workDay= "";
+	var rtnDate   = "";
+	var sysDate   = "";
+	var workDay   = "";
 	var actionType = "";
 	var coCd = jwt.coCd;
 	
@@ -2210,16 +2210,15 @@ function monthCloseChk(chkValue, chkType){
 
 		rtnVal = data.rtnVal;
 		rtnHolVal= data.rtnHolVal;
-		pchsCloseDt = data.pchsCloseDt;
+		sysDate = data.sysDate;
 		workDay= data.workDay;
 	});//postAjaxSync
 	
 	if(typeof rtnVal == "undefined" || rtnVal == null) return;
 	
 	if(rtnHolVal === 'Y'){
+		rtnDate = calculateHoliday(sysDate, workDay);
 
-		rtnDate = calculateHoliday(pchsCloseDt, workDay);
-		
 		rtnDate = rtnDate.YMD;
 		rtnDate = rtnDate.replace(/\-/g, '');
 		rtnDate = parseFloat(rtnDate);
@@ -2262,4 +2261,35 @@ function setDisabledInputDate(_status){
 	$.each($('.popup_area input[date]'), function(idx, elem) {
 		$(elem).prop("disabled", _status);
 	});
+}
+
+//매입마감일자 체크
+function inCloseChk(chkValue){
+	
+	if(chkValue === '') return;
+	
+	var pchsCloseYn  = "";
+	var coCd = jwt.coCd;
+	
+	chkValue = chkValue.replace(/\-/g, '');
+		
+	var paramObj = {};
+	paramObj.coCd = coCd;
+	paramObj.chkValue = chkValue.replace(/\-/g, '');
+	
+	//console.log(paramObj);
+	postAjaxSync("/admin/cm/cm05/selectMonthCloseChk", paramObj, null, function(data) {
+
+		pchsCloseYn = data.pchsCloseYn;
+	});//postAjaxSync
+	
+	if(typeof pchsCloseYn == "undefined" || pchsCloseYn == null) return;
+		
+	if (pchsCloseYn === 'Y') {
+
+		return true;
+	}else{
+
+		return false;
+	}
 }
