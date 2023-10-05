@@ -159,7 +159,7 @@ public class CM05Ctr {
     	String prdctnCloseYn = "N"; //생산마감여부
     	
     	String workDay = "";
-    	String pchsCloseDt = "N";
+    	String sysDate = "";
     	
     	if(resultList != null) {
 
@@ -169,7 +169,7 @@ public class CM05Ctr {
         	prdctnCloseYn = resultList.get(0).get("prdctnCloseYn").toString();
         	
         	workDay = resultList.get(0).get("workDay").toString();
-        	pchsCloseDt = resultList.get(0).get("pchsCloseDt").toString();
+        	sysDate = resultList.get(0).get("sysDate").toString();
     	}
     	
     	if("CR0201M01".equals(menuUrl)) {  //수주관리
@@ -193,7 +193,8 @@ public class CM05Ctr {
     	}
     	
     	model.addAttribute("workDay", workDay);
-    	model.addAttribute("pchsCloseDt", pchsCloseDt);
+    	model.addAttribute("sysDate", sysDate);
+    	model.addAttribute("pchsCloseYn", pchsCloseYn);
     	model.addAttribute("rtnHolVal", rtnHolVal);
     	model.addAttribute("rtnVal", rtnVal);
     	model.addAttribute("resultList", resultList);
