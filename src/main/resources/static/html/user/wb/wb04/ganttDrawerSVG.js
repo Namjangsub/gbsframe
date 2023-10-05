@@ -72,13 +72,6 @@ Ganttalendar.prototype.zoomGantt = function (isPlus) {
     this.redraw();
     this.goToMillis(centerMillis);
   }
-/*  curLevel = this.zoomLevels[1];
-  this.gridChanged=true;
-  this.zoom = curLevel;
-
-  this.storeZoomLevel();
-  this.redraw();
-  this.goToMillis(centerMillis);*/
 };
 
 
@@ -230,7 +223,7 @@ Ganttalendar.prototype.drawTask = function (task) {
   var self = this;
   //var prof = new Profiler("ganttDrawTask");
 
-	/*if (self.master.showBaselines) {
+	if (self.master.showBaselines) {
 		var baseline = self.master.baselines[task.id];
 		if (baseline) {
 			//console.debug("baseLine",baseline)
@@ -239,15 +232,16 @@ Ganttalendar.prototype.drawTask = function (task) {
 			task.ganttBaselineElement = baseTask;
 		}
 	}
-*/
+
   var taskBox = $(_createTaskSVG(task));
 
   task.ganttElement = taskBox;
 
 
-  if (self.showCriticalPath && task.isCritical)
-    taskBox.addClass("critical");
+  //if (self.showCriticalPath && task.isCritical)
+   // taskBox.addClass("critical");
 
+ // debugger;
   if (this.master.permissions.canWrite || task.canWrite) {
 	  
     //bind all events on taskBox
@@ -446,14 +440,7 @@ Ganttalendar.prototype.drawTask = function (task) {
 
 	function _createTaskSVG(task) {
     var svg = self.svg;
-
-		/*var dimensions = {
-			x     : Math.round((task.start - self.startMillis) * self.fx),
-			y     : task.rowElement.position().top + task.rowElement.offsetParent().scrollTop() + self.taskVertOffset,
-			width : Math.max(Math.round((task.end - task.start) * self.fx), 1),
-			height: (self.master.showBaselines ? self.taskHeight / 1.3 : self.taskHeight)
-		};*/
-    //debugger;
+    
 	var dimensions = {
 			x     : Math.round((task.start - self.startMillis) * self.fx),
 			y     : task.rowElement.position().top + task.rowElement.offsetParent().scrollTop() + self.taskVertOffset,
@@ -462,13 +449,13 @@ Ganttalendar.prototype.drawTask = function (task) {
 		};	
     var taskSvg = svg.svg(self.tasksGroup, dimensions.x, dimensions.y, dimensions.width, dimensions.height, {class:"taskBox taskBoxSVG taskStatusSVG", status:task.status, taskid:task.id,fill:task.color||"#eee" });
 
-    //svg.title(taskSvg, task.name);
+    svg.title(taskSvg, task.name);
     //external box
     var layout = svg.rect(taskSvg, 0, 0, "100%", "100%", {class:"taskLayout", rx:"2", ry:"2"});
     //external dep
     if (task.hasExternalDep)
       svg.rect(taskSvg, 0, 0, "100%", "100%", {fill:"url(#extDep)"});
-
+   
     //progress
     if (task.progress > 0) {
       var progress = svg.rect(taskSvg, 0, "20%", (task.progress > 100 ? 100 : task.progress) + "%", "60%", {rx:"2", ry:"2",fill:"rgba(0,0,0,.4)"});
@@ -522,7 +509,6 @@ Ganttalendar.prototype.drawTask = function (task) {
 		};
 		var taskSvg = svg.svg(self.tasksGroup, dimensions.x, dimensions.y, dimensions.width, dimensions.height, {class: "taskBox taskBoxSVG taskStatusSVG baseline", status: baseline.status, taskid: task.id, fill: task.color || "#eee" });
 
-		//tooltip
 		var label = "<b>" + task.name + "</b>";
 		label += "<br>";
 		label += "@" + new Date(self.master.baselineMillis).format();
@@ -550,18 +536,18 @@ Ganttalendar.prototype.drawTask = function (task) {
 
 		if (baseline.progress > 0) {
 			var progress = svg.rect(taskSvg, 0, "20%", (baseline.progress > 100 ? 100 : baseline.progress) + "%", "60%", {rx: "2", ry: "2", fill: "rgba(0,0,0,.4)"});
-			/*if (dimensions.width > 50) {
+			if (dimensions.width > 50) {
 			 var textStyle = {fill:"#888", "font-size":"10px",class:"textPerc teamworkIcons",transform:"translate(5)"};
 			 if (baseline.progress > 100)
 			 textStyle["font-weight"]="bold";
 			 if (baseline.progress > 90)
 			 textStyle.transform = "translate(-40)";
 			 svg.text(taskSvg, (baseline.progress > 90 ? 100 : baseline.progress) + "%", (self.master.rowHeight - 5) / 2, (baseline.progress > 100 ? "!!! " : "") + baseline.progress + "%", textStyle);
-			 }*/
+			 }
         }
 
 		//if (task.isParent())
-		  //svg.rect(taskSvg, 0, 0, "100%", 3, {fill:"#000"});
+		  svg.rect(taskSvg, 0, 0, "100%", 3, {fill:"#000"});
 
 
 		//task label

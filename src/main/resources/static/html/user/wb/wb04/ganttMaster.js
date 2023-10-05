@@ -60,7 +60,7 @@ function GanttMaster() {
 
   this.permissions = {
     canWriteOnParent: false,
-    canWrite: false,
+    canWrite: true,
     canAdd: false,
     canDelete: false,
     canInOutdent: false,
@@ -444,7 +444,7 @@ GanttMaster.prototype.loadProject = function (project) {
   this.roles = project.roles;
 
   //permissions from loaded project
-  this.permissions.canWrite = project.canWrite;
+  this.permissions.canWrite = true;//project.canWrite;
   this.permissions.canAdd = project.canAdd;
   this.permissions.canWriteOnParent = project.canWriteOnParent;
   this.permissions.cannotCloseTaskIfIssueOpen = project.cannotCloseTaskIfIssueOpen;
