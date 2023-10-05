@@ -3,66 +3,66 @@
 
 <mapper namespace="com.dksys.biz.user.qm.qm04.mapper.QM04Mapper">
 	<!-- 그리드 조회 -->
+	<!--
 	<select id="selectMainGridList" parameterType="Map" resultType="camelMap">
-		/* 월별 장비별 개인 장애건 */
 		WITH SJD AS
 		     (
-		      SELECT X.CO_CD         AS CO_CD         --회사코드
-		            , Y.ORDRS_CLNT_CD AS ORDRS_CLNT_CD --고객코드
-		            , A.CLNT_NM       AS ORDRS_CLNT_NM --고객명
-		            , X.SALES_CD      AS SALES_CD      --SALES CODE
-		            , X.EQP_NM        AS EQP_NM        --설비명
-		        FROM TB_CR02D02 X     --수주상세
-		           , TB_CR02M01 Y     --수주마스터
-		           , TB_BM02M01 A     --거래처마스터
+		      SELECT X.CO_CD         AS CO_CD
+		            , Y.ORDRS_CLNT_CD AS ORDRS_CLNT_CD
+		            , A.CLNT_NM       AS ORDRS_CLNT_NM
+		            , X.SALES_CD      AS SALES_CD
+		            , X.EQP_NM        AS EQP_NM
+		        FROM TB_CR02D02 X
+		           , TB_CR02M01 Y
+		           , TB_BM02M01 A
 		       WHERE X.CO_CD         = #{coCd} 
 		         AND Y.ORDRS_CLNT_CD = A.CLNT_CD
 		         AND X.CO_CD         = Y.CO_CD 
 		         AND X.ORDRS_NO      = Y.ORDRS_NO	
 		     )
-		   , MEI AS --발주 시 요인별 요청번호 매칭된 매입마감자료의 금액 집계
+		   , MEI AS
 		     (
-		      SELECT E.CO_CD                        --회사코드
-		            , E.SALES_CD                     --SALES CODE
-		            , B.REQ_NO                       --요인별 요청번호
-		            , SUM(E.ORDRG_AMT) AS ORDRG_AMT --발주금액
-		            , SUM(D.PCHS_AMT)  AS  PCHS_AMT  --매입확정금액
-		        FROM TB_SM02D01 E    --발주상세
-		             INNER      JOIN TB_SM02M01 B   ON(E.CO_CD = B.CO_CD AND E.ORDRG_NO = B.ORDRG_NO AND E.SALES_CD=B.SALES_CD) --발주마스터 
-		             LEFT OUTER JOIN TB_SM12D01 D   ON(D.ORDRG_NO = E.ORDRG_NO AND D.ORDRG_SEQ = E.ORDRG_SEQ)                   --매입확정상세
-		             LEFT OUTER JOIN TB_SM12M01 M12 ON(D.CO_CD = M12.CO_CD AND D.PCHS_NO = M12.PCHS_NO)                         --매입확정마스터
+		      SELECT E.CO_CD
+		            , E.SALES_CD
+		            , B.REQ_NO
+		            , SUM(E.ORDRG_AMT) AS ORDRG_AMT
+		            , SUM(D.PCHS_AMT)  AS  PCHS_AMT
+		        FROM TB_SM02D01 E
+		             INNER      JOIN TB_SM02M01 B   ON(E.CO_CD = B.CO_CD AND E.ORDRG_NO = B.ORDRG_NO AND E.SALES_CD=B.SALES_CD)
+		             LEFT OUTER JOIN TB_SM12D01 D   ON(D.ORDRG_NO = E.ORDRG_NO AND D.ORDRG_SEQ = E.ORDRG_SEQ)
+		             LEFT OUTER JOIN TB_SM12M01 M12 ON(D.CO_CD = M12.CO_CD AND D.PCHS_NO = M12.PCHS_NO)
 		       WHERE E.CO_CD       = #{coCd}
-		         AND M12.CMPLET_YN = 'Y' --매입확정
-		       GROUP BY E.CO_CD   
+		         AND M12.CMPLET_YN = 'Y'
+		       GROUP BY E.CO_CD
 		               , E.SALES_CD
 		               , B.REQ_NO
 		     )
 		   , REQ AS
 		     (
-		      SELECT Q.CO_CD         --회사코드
-		            , Q.SALES_CD      --SALES CODE
-		            , Q.REQ_NO        --요인별 요청번호
-		            , Q.SUB_CD        --발주요인 상세코드 
-		            , S.ORDRS_CLNT_NM --고객명
-		            , S.EQP_NM        --설비명
-		            , (SELECT FN_CM06M01_ID_TO_NM(Q.ORDRG_ID) FROM DUAL) AS NAME --요청자(발행자)
-		        FROM TB_QM01M01 Q 
-		            , SJD       S --수주상세
+		      SELECT Q.CO_CD
+		            , Q.SALES_CD
+		            , Q.REQ_NO
+		            , Q.SUB_CD
+		            , S.ORDRS_CLNT_NM
+		            , S.EQP_NM
+		            , (SELECT FN_CM06M01_ID_TO_NM(Q.ORDRG_ID) FROM DUAL) AS NAME
+		        FROM TB_QM01M01 Q
+		            , SJD       S
 		       WHERE Q.CO_CD    = #{coCd}
 		         AND Q.REQ_DT  <![CDATA[>=]]> TO_DATE(#{strDate}, 'YYYYMMDD')
 		         AND Q.REQ_DT  <![CDATA[<=]]> TO_DATE(#{endDate}, 'YYYYMMDD')
 		         AND Q.CO_CD    = S.CO_CD
 		         AND Q.SALES_CD = S.SALES_CD
 		     )
-		SELECT R.ORDRS_CLNT_NM AS ORDRS_CLNT_NM--고객명
-		      , R.EQP_NM        AS EQP_NM       --설비명
-		      , R.NAME          AS NAME         --요청자(발행자)
-		      , COUNT(R.SUB_CD) AS SUB_CD_CNT   --발주요인 상세코드 건수
+		SELECT R.ORDRS_CLNT_NM AS ORDRS_CLNT_NM
+		      , R.EQP_NM        AS EQP_NM
+		      , R.NAME          AS NAME
+		      , COUNT(R.SUB_CD) AS SUB_CD_CNT
 		      , CASE WHEN SUM(M.PCHS_AMT) IS NULL THEN '미결재분'
 		             ELSE TO_CHAR(SUM(M.PCHS_AMT))
-		        END             AS PCHS_AMT     --매입확정금액
+		        END             AS PCHS_AMT
 		   FROM REQ R
-		      , MEI M--매입확정금액 
+		      , MEI M
 		 WHERE 1=1
 		   AND R.REQ_NO   = M.REQ_NO(+)
 		   AND R.SALES_CD = M.SALES_CD(+)
@@ -70,74 +70,166 @@
 		 GROUP BY R.ORDRS_CLNT_NM, R.EQP_NM, R.NAME
 		 ORDER BY 1,2,3
 	</select>
+	-->
+
+	<select id="selectMainGridList" parameterType="Map" resultType="camelMap">
+		/* 월별 장비별 개인 장애건 */
+		WITH SJD AS
+		(
+		 SELECT DISTINCT X.CO_CD AS CO_CD          --회사코드
+		      , Y.ORDRS_CLNT_CD  AS ORDRS_CLNT_CD  --고객코드
+		      , A.CLNT_NM        AS ORDRS_CLNT_NM  --고객명
+		      , X.SALES_CD       AS SALES_CD       --SALES CODE
+		      , X.EQP_NM         AS EQP_NM         --설비명
+		 FROM   TB_CR02D02 AS X     --수주상세
+		        LEFT OUTER JOIN TB_CR02M01 AS Y  ON X.CO_CD    = Y.CO_CD
+		                                        AND X.ORDRS_NO = Y.ORDRS_NO
+		        LEFT OUTER JOIN TB_BM02M01 AS A  ON Y.ORDRS_CLNT_CD = A.CLNT_CD
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    X.CO_CD = #{coCd}
+		 </if>
+		),
+		MEI AS
+		(
+		 SELECT E.CO_CD                        --회사코드
+		      , E.SALES_CD                     --SALES CODE
+		      , B.REQ_NO                       --요인별 요청번호
+		      , SUM(E.ORDRG_AMT) AS ORDRG_AMT  --발주금액
+		      , SUM(D.PCHS_AMT)  AS PCHS_AMT   --매입확정금액
+		 FROM   TB_SM02D01 AS E    --발주상세
+		        INNER      JOIN TB_SM02M01 AS B   ON (E.CO_CD = B.CO_CD AND E.ORDRG_NO = B.ORDRG_NO AND E.SALES_CD=B.SALES_CD) --발주마스터
+		        LEFT OUTER JOIN TB_SM12D01 AS D   ON (D.ORDRG_NO = E.ORDRG_NO AND D.ORDRG_SEQ = E.ORDRG_SEQ)                   --매입확정상세
+		        LEFT OUTER JOIN TB_SM12M01 AS M12 ON (D.CO_CD = M12.CO_CD AND D.PCHS_NO = M12.PCHS_NO)                         --매입확정마스터
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    E.CO_CD = #{coCd}
+		 </if>		 
+		 AND    M12.CMPLET_YN = 'Y' --매입확정
+		 GROUP BY E.CO_CD, E.SALES_CD, B.REQ_NO
+		),
+		REQ AS
+		(
+		 SELECT DISTINCT Q.CO_CD          --회사코드
+		      , Q.SALES_CD       --SALES CODE
+		      , Q.REQ_NO         --요인별 요청번호
+		      , Q.SUB_CD         --발주요인 상세코드
+		      , S.ORDRS_CLNT_NM  --고객명
+		      , S.EQP_NM         --설비명
+		      , (SELECT FN_CM06M01_ID_TO_NM(Q.ORDRG_ID) FROM DUAL) AS NAME  --요청자(발행자)
+		 FROM   TB_QM01M01 AS Q  --요인별 발주 및 출장요청
+		        LEFT OUTER JOIN SJD AS S  ON Q.CO_CD    = S.CO_CD
+		                                 AND Q.SALES_CD = S.SALES_CD
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    Q.CO_CD = #{coCd}
+		 </if>
+		 <if test="userId != null and !userId.equals('')">
+		 AND    Q.ORDRG_ID = #{userId}
+		 </if>
+         AND    Q.REQ_DT  <![CDATA[>=]]> TO_DATE(#{strDate}, 'YYYYMMDD')
+         AND    Q.REQ_DT  <![CDATA[<=]]> TO_DATE(#{endDate}, 'YYYYMMDD')
+		 AND    Q.PART_CD  = 'COBTP03'  --장애
+		)
+		SELECT R.ORDRS_CLNT_NM AS ORDRS_CLNT_NM  --고객명
+		     , R.EQP_NM        AS EQP_NM         --설비명
+		     , R.NAME          AS NAME           --요청자(발행자)
+		     , COUNT(R.SUB_CD) AS SUB_CD_CNT     --발주요인 상세코드 건수
+		     , CASE WHEN SUM(M.PCHS_AMT) IS NULL THEN '미결재분'
+		            ELSE TO_CHAR(SUM(M.PCHS_AMT))
+		       END             AS PCHS_AMT       --매입확정금액
+		FROM   REQ AS R  --요인별 발주 및 출장요청
+		       LEFT OUTER JOIN MEI AS M  ON R.REQ_NO   = M.REQ_NO
+		                                AND R.SALES_CD = M.SALES_CD
+		                                AND R.CO_CD    = M.CO_CD
+		WHERE  1 = 1
+		<if test="userName != null and !userName.equals('')">
+		AND    R.NAME LIKE '%' || #{userName} || '%'
+		</if>
+		GROUP BY R.ORDRS_CLNT_NM, R.EQP_NM, R.NAME
+		ORDER BY 1, 2, 3
+	</select>
 	
 	<!-- 그리드 조회 -->
 	<select id="selectSecondGridList" parameterType="Map" resultType="camelMap">
 		/* 월별 장비별 개인 무상A/S 건 */
 		WITH SJD AS
-		     (
-		      SELECT X.CO_CD         AS CO_CD         --회사코드
-		            , Y.ORDRS_CLNT_CD AS ORDRS_CLNT_CD --고객코드
-		            , A.CLNT_NM       AS ORDRS_CLNT_NM --고객명
-		            , X.SALES_CD      AS SALES_CD      --SALES CODE
-		            , X.EQP_NM        AS EQP_NM        --설비명
-		        FROM TB_CR02D02 X     --수주상세
-		           , TB_CR02M01 Y     --수주마스터
-		           , TB_BM02M01 A     --거래처마스터
-		       WHERE X.CO_CD         = #{coCd} 
-		         AND Y.ORDRS_CLNT_CD = A.CLNT_CD
-		         AND X.CO_CD         = Y.CO_CD 
-		         AND X.ORDRS_NO      = Y.ORDRS_NO	
-		     )
-		   , MEI AS --발주 시 요인별 요청번호 매칭된 매입마감자료의 금액 집계
-		     (
-		      SELECT E.CO_CD                        --회사코드
-		            , E.SALES_CD                     --SALES CODE
-		            , B.REQ_NO                       --요인별 요청번호
-		            , SUM(E.ORDRG_AMT) AS ORDRG_AMT --발주금액
-		            , SUM(D.PCHS_AMT)  AS  PCHS_AMT  --매입확정금액
-		        FROM TB_SM02D01 E    --발주상세
-		             INNER      JOIN TB_SM02M01 B   ON(E.CO_CD = B.CO_CD AND E.ORDRG_NO = B.ORDRG_NO AND E.SALES_CD=B.SALES_CD) --발주마스터 
-		             LEFT OUTER JOIN TB_SM12D01 D   ON(D.ORDRG_NO = E.ORDRG_NO AND D.ORDRG_SEQ = E.ORDRG_SEQ)                   --매입확정상세
-		             LEFT OUTER JOIN TB_SM12M01 M12 ON(D.CO_CD = M12.CO_CD AND D.PCHS_NO = M12.PCHS_NO)                         --매입확정마스터
-		       WHERE E.CO_CD       = #{coCd}
-		         AND M12.CMPLET_YN = 'Y' --매입확정
-		       GROUP BY E.CO_CD   
-		               , E.SALES_CD
-		               , B.REQ_NO
-		     )
-		   , REQ AS
-		     (
-		      SELECT Q.CO_CD         --회사코드
-		            , Q.SALES_CD      --SALES CODE
-		            , Q.REQ_NO        --요인별 요청번호
-		            , Q.SUB_CD        --발주요인 상세코드 
-		            , S.ORDRS_CLNT_NM --고객명
-		            , S.EQP_NM        --설비명
-		            , (SELECT FN_CM06M01_ID_TO_NM(Q.ORDRG_ID) FROM DUAL) AS NAME --요청자(발행자)
-		        FROM TB_QM01M01 Q 
-		            , SJD       S --수주상세
-		       WHERE Q.CO_CD    = #{coCd}
-		         AND Q.REQ_DT  <![CDATA[>=]]> TO_DATE(#{strDate}, 'YYYYMMDD')
-		         AND Q.REQ_DT  <![CDATA[<=]]> TO_DATE(#{endDate}, 'YYYYMMDD')
-		         AND Q.PART_CD  = 'COBTP05' --A/S무상
-		         AND Q.CO_CD    = S.CO_CD
-		         AND Q.SALES_CD = S.SALES_CD
-		     )
-		SELECT R.ORDRS_CLNT_NM AS ORDRS_CLNT_NM--고객명
-		      , R.EQP_NM        AS EQP_NM       --설비명
-		      , R.NAME          AS NAME         --요청자(발행자)
-		      , COUNT(R.SUB_CD) AS SUB_CD_CNT   --발주요인 상세코드 건수
-		      , CASE WHEN SUM(M.PCHS_AMT) IS NULL THEN '미결재분'
-		             ELSE TO_CHAR(SUM(M.PCHS_AMT))
-		        END             AS PCHS_AMT     --매입확정금액
-		   FROM REQ R
-		      , MEI M --매입확정금액 
-		 WHERE 1=1
-		   AND R.REQ_NO   = M.REQ_NO(+)
-		   AND R.SALES_CD = M.SALES_CD(+)
-		   AND R.CO_CD    = M.CO_CD(+)
-		 GROUP BY R.ORDRS_CLNT_NM, R.EQP_NM, R.NAME
-		 ORDER BY 1,2,3
+		(
+		 SELECT X.CO_CD         AS CO_CD          --회사코드
+		      , Y.ORDRS_CLNT_CD AS ORDRS_CLNT_CD  --고객코드
+			  , A.CLNT_NM       AS ORDRS_CLNT_NM  --고객명
+			  , X.SALES_CD      AS SALES_CD       --SALES CODE
+			  , X.EQP_NM        AS EQP_NM         --설비명
+		 FROM   TB_CR02D02 AS X     --수주상세
+		      , TB_CR02M01 AS Y     --수주마스터
+			  , TB_BM02M01 AS A     --거래처마스터
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    X.CO_CD = #{coCd}
+		 </if>
+		 AND    Y.ORDRS_CLNT_CD = A.CLNT_CD
+		 AND    X.CO_CD         = Y.CO_CD
+		 AND    X.ORDRS_NO      = Y.ORDRS_NO
+		),
+		MEI AS
+		(
+		 SELECT E.CO_CD                        --회사코드
+		      , E.SALES_CD                     --SALES CODE
+			  , B.REQ_NO                       --요인별 요청번호
+			  , SUM(E.ORDRG_AMT) AS ORDRG_AMT  --발주금액
+			  , SUM(D.PCHS_AMT)  AS  PCHS_AMT  --매입확정금액
+		 FROM   TB_SM02D01 AS E    --발주상세
+		        INNER      JOIN TB_SM02M01 B   ON (E.CO_CD = B.CO_CD AND E.ORDRG_NO = B.ORDRG_NO AND E.SALES_CD=B.SALES_CD)  --발주마스터
+				LEFT OUTER JOIN TB_SM12D01 D   ON (D.ORDRG_NO = E.ORDRG_NO AND D.ORDRG_SEQ = E.ORDRG_SEQ)                    --매입확정상세
+				LEFT OUTER JOIN TB_SM12M01 M12 ON (D.CO_CD = M12.CO_CD AND D.PCHS_NO = M12.PCHS_NO)                          --매입확정마스터
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    E.CO_CD = #{coCd}
+		 </if>
+		 AND    M12.CMPLET_YN = 'Y'  --매입확정
+		 GROUP BY E.CO_CD, E.SALES_CD, B.REQ_NO
+		),
+		REQ AS
+		(
+		 SELECT Q.CO_CD         --회사코드
+		      , Q.SALES_CD      --SALES CODE
+			  , Q.REQ_NO        --요인별 요청번호
+			  , Q.SUB_CD        --발주요인 상세코드
+			  , S.ORDRS_CLNT_NM --고객명
+			  , S.EQP_NM        --설비명
+			  , (SELECT FN_CM06M01_ID_TO_NM(Q.ORDRG_ID) FROM DUAL) AS NAME --요청자(발행자)
+		 FROM   TB_QM01M01 AS Q
+		      , SJD        AS S  --수주상세
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    Q.CO_CD = #{coCd}
+		 </if>
+		 <if test="userId != null and !userId.equals('')">
+		 AND    Q.ORDRG_ID = #{userId}
+		 </if>
+		 AND    Q.REQ_DT  <![CDATA[>=]]> TO_DATE(#{strDate}, 'YYYYMMDD')
+		 AND    Q.REQ_DT  <![CDATA[<=]]> TO_DATE(#{endDate}, 'YYYYMMDD')
+		 AND    Q.PART_CD  = 'COBTP05'  --A/S무상
+		 AND    Q.CO_CD    = S.CO_CD
+		 AND    Q.SALES_CD = S.SALES_CD
+		)
+		SELECT R.ORDRS_CLNT_NM AS ORDRS_CLNT_NM  --고객명
+		     , R.EQP_NM        AS EQP_NM         --설비명
+			 , R.NAME          AS NAME           --요청자(발행자)
+			 , COUNT(R.SUB_CD) AS SUB_CD_CNT     --발주요인 상세코드 건수
+			 , CASE WHEN SUM(M.PCHS_AMT) IS NULL THEN '미결재분'
+			        ELSE TO_CHAR(SUM(M.PCHS_AMT))
+			   END             AS PCHS_AMT       --매입확정금액
+		FROM   REQ AS R
+		     , MEI AS M  --매입확정금액
+		WHERE  1 = 1
+		<if test="userName != null and !userName.equals('')">
+		AND    R.NAME LIKE '%' || #{userName} || '%'
+		</if>
+		AND    R.REQ_NO   = M.REQ_NO(+)
+		AND    R.SALES_CD = M.SALES_CD(+)
+		AND    R.CO_CD    = M.CO_CD(+)
+		GROUP BY R.ORDRS_CLNT_NM, R.EQP_NM, R.NAME
+		ORDER BY 1, 2, 3
 	</select>
 </mapper>
