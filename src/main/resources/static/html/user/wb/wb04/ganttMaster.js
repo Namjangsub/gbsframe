@@ -59,18 +59,18 @@ function GanttMaster() {
 
 
   this.permissions = {
-    canWriteOnParent: false,
+    canWriteOnParent: true,
     canWrite: true,
-    canAdd: false,
-    canDelete: false,
-    canInOutdent: false,
-    canMoveUpDown: false,
-    canSeePopEdit: false,
-    canSeeFullEdit: false,
-    canSeeDep: false,
-    canSeeCriticalPath: false,
-    canAddIssue: false,
-    cannotCloseTaskIfIssueOpen: false
+    canAdd: true,
+    canDelete: true,
+    canInOutdent: true,
+    canMoveUpDown: true,
+    canSeePopEdit: true,
+    canSeeFullEdit: true,
+    canSeeDep: true,
+    canSeeCriticalPath: true,
+    canAddIssue: true,
+    cannotCloseTaskIfIssueOpen: true
   };
 
   this.firstDayOfWeek = Date.firstDayOfWeek;
