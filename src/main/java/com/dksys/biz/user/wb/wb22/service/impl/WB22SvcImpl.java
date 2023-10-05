@@ -480,5 +480,9 @@ public class WB22SvcImpl implements WB22Svc {
 	public List<Map<String, String>> selectTodoRsltsView(Map<String, String> paramMap) {
 		return wb22Mapper.selectTodoRsltsView(paramMap);
 	}
-    
+
+	@Override
+	public List<Map<String, String>> selectIncompleteJob(Map<String, String> paramMap) {
+		return wb22Mapper.selectIncompleteJob(paramMap);
+	}
 }

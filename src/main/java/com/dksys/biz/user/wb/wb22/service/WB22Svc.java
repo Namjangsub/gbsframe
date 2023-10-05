@@ -41,6 +41,8 @@ public interface WB22Svc {
 	
 	int wbsRsltsconfirm(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
-	List<Map<String, String>> selectTodoRsltsView(Map<String, String> paramMap);
+	List<Map<String, String>> selectTodoRsltsView(Map<String, String> paramMap);		
+	
+	List<Map<String, String>> selectIncompleteJob(Map<String, String> paramMap);
 	
 }

@@ -244,5 +244,13 @@ public class WB22Ctr {
 	  model.addAttribute("resultList", resultList); 
 	  return "jsonView"; 		 
     }
-	
+	  
+	  
+	//TODO 미완료 현황 대쉬보드 오른쪽 하단 WBS 계획정보
+	@PostMapping(value = "/selectIncompleteJob") 
+	public String selectIncompleteJob(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = wb22Svc.selectIncompleteJob(paramMap);
+		model.addAttribute("resultList", resultList); 
+		return "jsonView"; 
+	}
 }
