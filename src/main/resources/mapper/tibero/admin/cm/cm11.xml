@@ -199,4 +199,61 @@
 	GROUP BY TRST_DT
 	ORDER BY TRST_DT
 	</select>
+	
+	<select id="selectScheduleDelayList" resultType="CamelMap">
+		WITH SJD AS --수주상세 
+              ( 
+               SELECT M.CO_CD                                            AS CO_CD        --회사코드
+                     , M.ORDRS_NO                                         AS ORDRS_NO     --수주번호
+                     , X.SALES_CD                                         AS SALES_CD     --SALES Code
+                     , M.ORDRS_CLNT_CD                                    AS CLNT_CD      --고객코드
+                     , C.CLNT_NM                                          AS CLNT_NM      --고객명
+                   		, (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT ) FROM DUAL) AS CLNT_PJT_NM      --프로젝트
+                   		, M.CTRT_NM                                         AS CTRT_NM      --계약명
+                  FROM TB_CR02M01  M --수주마스터
+                       INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+                       INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+                 WHERE M.CO_CD = #{coCd}
+                   AND X.SALES_CD IS NOT NULL --비용제외
+                   AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만 
+                                  FROM TB_WB21M01 P 
+                                 WHERE P.CO_CD = X.CO_CD
+                                   AND P.SALES_CD  = X.SALES_CD
+                               )
+              )
+         SELECT     SJ.CLNT_NM||'('||SJ.CLNT_PJT_NM ||')'   AS CLNT_NM 
+       	 	--	 , SJ.CLNT_PJT_NM                        AS CLNT_PJT_NM
+       	 		 , SJ.CTRT_NM                        	AS CTRT_NM
+               --, P.SALES_CD                            AS SALES_CD
+               , P.CO_CD
+               , COUNT(SJ.CLNT_NM)   AS CNT
+           FROM TB_WB22M01 AS P --WBS계획
+                INNER JOIN SJD  AS SJ ON P.CO_CD = SJ.CO_CD AND P.SALES_CD = SJ.SALES_CD
+                LEFT OUTER JOIN TB_WB23M01 AS R  ON P.CO_CD              = R.CO_CD 
+                                                 AND P.SALES_CD           = R.SALES_CD 
+                                                 AND P.WBS_PLAN_CODE_KIND = R.WBS_PLAN_CODE_KIND 
+                                                 AND P.WBS_PLAN_CODE_ID   = R.WBS_PLAN_CODE_ID
+          WHERE P.WBS_PLANE_DT <![CDATA[<]]> ( SYSDATE ) --종료일 이전 내역 
+            AND P.WBS_PLAN_CODE_KIND <![CDATA[<>]]> 'WBSCODE'
+            AND P.CO_CD = #{coCd}
+          GROUP BY P.CO_CD, SJ.CLNT_NM, SJ.CLNT_PJT_NM, SJ.CTRT_NM
+	</select>
+	
+
+	<select id="selectDisabilityList" resultType="CamelMap">
+		SELECT  T.CO_CD,
+				C.CLNT_NM||'('||(SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT ) FROM DUAL) ||')'  AS CLNT_NM,
+				M.CTRT_NM,
+				T.SALES_CD,  
+				COUNT(T.CO_CD)  AS ERR_CNT,									   --장애발생건수
+				SUM(CASE WHEN RSLT_YN = 'Y' THEN 0 ELSE 1 END) AS ERR_COMP_CNT --미완료건수
+		  FROM TB_QM01M01 T
+		  			INNER JOIN TB_CR02D02 AS X ON X.CO_CD = T.CO_CD AND X.SALES_CD = T.SALES_CD--수주상세  
+		  			INNER JOIN TB_CR02M01 AS M ON M.CO_CD = M.CO_CD AND M.ORDRS_NO = X.ORDRS_NO  
+		            INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+		 WHERE T.PART_CD = 'COBTP03'										  --장애건만추출
+		   AND T.CO_CD = #{coCd}
+		   AND T.REQ_DT BETWEEN  TO_DATE(#{searchYm} || '01', 'YYYYMMDD') AND LAST_DAY(TO_DATE(#{searchYm} || '01', 'YYYYMMDD'))
+		  GROUP BY T.CO_CD, C.CLNT_NM, M.CLNT_PJT, T.SALES_CD, M.CTRT_NM
+	</select>	
 </mapper>
