@@ -107,19 +107,24 @@ public class SM14SvcImpl implements SM14Svc {
 				}
 				dtl.put("maxPchsNo", maxPchsNo);
 	    		result += sm14Mapper.insertPurchaseBillDetail(dtl);
-				//TB_SM12M01 TB_SM12M01 UPDATE
+				//TB_SM12M01 TB_SM12M01 UPDATE	- DETAIL 에서 처리 사용안함(20231005)
+				/*
 				if( dtl.get("cmpletYn").equals("Y") ) {
 		    		sm14Mapper.updatePurchaseMaster(dtl);    			
 				}
+				*/
 			}	
 			if( dtl.get("actFlag").equals("U") ) {
+				System.out.println("cmpletYn>>>" + dtl.get("cmpletYn")+"<<<");
 				dtl.put("maxPchsNo", dtl.get("pchsNo"));				
 	    		result += sm14Mapper.updatePurchaseBillDetail(dtl);			    		
 			}				
-			//TB_SM12M01 TB_SM12M01 UPDATE
+			//TB_SM12M01 TB_SM12M01 UPDATE - DETAIL 에서 처리 사용안함(20231005)
+			/*
 			if( dtl.get("cmpletYn").equals("Y") ) {
 	    		sm14Mapper.updatePurchaseMaster(dtl);    			
-			}				
+			}
+			*/				
 		}
 		return result;
 	}
@@ -149,9 +154,9 @@ public class SM14SvcImpl implements SM14Svc {
 			
     		//result += sm14Mapper.updatePurchaseBillDetail(dtl);	
     		
-    		//TB_SM12M01 TB_SM12M01 UPDATE
+    		//TB_SM12M01 TB_SM12M01 UPDATE -- 사용안함
     		if( paramMap.get("cmpletYn").equals("Y") ) {
-        		sm14Mapper.updatePurchaseMaster(dtl);    			
+        		//sm14Mapper.updatePurchaseMaster(dtl);    			
     		}
 		}			
 
