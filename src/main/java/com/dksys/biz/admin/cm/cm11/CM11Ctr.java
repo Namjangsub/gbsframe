@@ -79,41 +79,34 @@ public class CM11Ctr {
     	data.put("rows", arryRows);
     	model.addAttribute("chartData1", data);
     	
-    	List<Map<String, String>> resultList2 = cm11Svc.selectClientTaxDashList(paramMap);
+    	List<Map<String, String>> resultList2 = cm11Svc.selectScheduleDelayList(paramMap);
     	model.addAttribute("resultList2", resultList2);
     	
     	data = new JSONObject();
     	objCols1 = new JSONObject();
     	objCols2 = new JSONObject();
-    	objCols3 = new JSONObject();
     	arryCols = new JSONArray();
     	arryRows = new JSONArray();
 
     	objCols1.put("type", "string");
+    	objCols1.put("label", "거래처");
     	objCols2.put("type", "number");
-    	objCols2.put("label", "계획");
-    	objCols3.put("type", "number");
-    	objCols3.put("label", "실적");
+    	objCols2.put("label", "지연건수");
 
     	arryCols.add(objCols1);
     	arryCols.add(objCols2);
-    	arryCols.add(objCols3);
     	try {
 	    	for(int i = 0; i < resultList2.size(); i++) {
 	    		JSONObject legend = new JSONObject();
 	    		legend.put("v", resultList2.get(i).get("clntNm"));
 	    		legend.put("f", null);
 	    		JSONObject value1 = new JSONObject();
-	    		value1.put("v", resultList2.get(i).get("planAmt"));
+	    		value1.put("v", Integer.parseInt(resultList2.get(i).get("cnt")));
 	    		value1.put("f", null);
-	    		JSONObject value2 = new JSONObject();
-	    		value2.put("v", resultList2.get(i).get("salesAmt"));
-	    		value2.put("f", null);
 	    		
 	    		JSONArray cValueArry = new JSONArray();
 	    		cValueArry.add(legend);
 	    		cValueArry.add(value1);
-	    		cValueArry.add(value2);
 	    		
 	    		JSONObject cValueObj = new JSONObject();
 	    		cValueObj.put("c", cValueArry);
@@ -170,7 +163,7 @@ public class CM11Ctr {
     	data.put("rows", arryRows);
     	model.addAttribute("chartData3", data);
     	
-    	List<Map<String, String>> resultList4 = cm11Svc.selectFacList(paramMap);
+    	List<Map<String, String>> resultList4 = cm11Svc.selectDisabilityList(paramMap);
     	model.addAttribute("resultList4", resultList4);
     	data = new JSONObject();
     	objCols1 = new JSONObject();
@@ -180,11 +173,11 @@ public class CM11Ctr {
     	arryRows = new JSONArray();
 
     	objCols1.put("type", "string");
-    	objCols1.put("label", "공장");
+    	objCols1.put("label", "고객사");
     	objCols2.put("type", "number");
-    	objCols2.put("label", "계획");
+    	objCols2.put("label", "장애건수");
     	objCols3.put("type", "number");
-    	objCols3.put("label", "실적");
+    	objCols3.put("label", "미완료");
 
     	arryCols.add(objCols1);
     	arryCols.add(objCols2);
@@ -192,13 +185,13 @@ public class CM11Ctr {
     	try {
 	    	for(int i = 0; i < resultList4.size(); i++) {
 	    		JSONObject legend = new JSONObject();
-	    		legend.put("v", resultList4.get(i).get("rowTit"));
+	    		legend.put("v", resultList4.get(i).get("clntNm"));
 	    		legend.put("f", null);
 	    		JSONObject value1 = new JSONObject();
-	    		value1.put("v", resultList4.get(i).get("planAmt"));
+	    		value1.put("v", resultList4.get(i).get("errCnt"));
 	    		value1.put("f", null);
 	    		JSONObject value2 = new JSONObject();
-	    		value2.put("v", resultList4.get(i).get("salesAmt"));
+	    		value2.put("v", resultList4.get(i).get("errCompCnt"));
 	    		value2.put("f", null);
 	    		
 	    		JSONArray cValueArry = new JSONArray();

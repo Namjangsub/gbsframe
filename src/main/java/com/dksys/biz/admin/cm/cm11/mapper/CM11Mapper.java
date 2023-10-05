@@ -22,4 +22,7 @@ public interface CM11Mapper {
 
 	List<Map<String, String>> selectMonthlyStat(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectScheduleDelayList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectDisabilityList(Map<String, String> paramMap);
 }

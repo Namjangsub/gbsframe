@@ -47,4 +47,14 @@ public class CM11SvcImpl implements CM11Svc {
 	public List<Map<String, String>> selectMonthlyStat(Map<String, String> paramMap) {
 		return cm11Mapper.selectMonthlyStat(paramMap);
 	}
+
+	@Override
+	public List<Map<String, String>> selectScheduleDelayList(Map<String, String> paramMap) {
+		return cm11Mapper.selectScheduleDelayList(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectDisabilityList(Map<String, String> paramMap) {
+		return cm11Mapper.selectDisabilityList(paramMap);
+	}
 }

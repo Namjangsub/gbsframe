@@ -17,4 +17,8 @@ public interface CM11Svc {
 
 	public List<Map<String, String>> selectMonthlyStat(Map<String, String> param);
 	
+	public List<Map<String, String>> selectScheduleDelayList(Map<String, String> param);
+	
+	public List<Map<String, String>> selectDisabilityList(Map<String, String> param);
+	
 }

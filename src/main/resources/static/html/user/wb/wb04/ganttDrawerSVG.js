@@ -448,7 +448,7 @@ Ganttalendar.prototype.drawTask = function (task) {
 			height: (self.master.showBaselines ? self.taskHeight / 1.3 : self.taskHeight)
 		};	
     var taskSvg = svg.svg(self.tasksGroup, dimensions.x, dimensions.y, dimensions.width, dimensions.height, {class:"taskBox taskBoxSVG taskStatusSVG", status:task.status, taskid:task.id,fill:task.color||"#eee" });
-
+   //debugger;
     svg.title(taskSvg, task.name);
     //external box
     var layout = svg.rect(taskSvg, 0, 0, "100%", "100%", {class:"taskLayout", rx:"2", ry:"2"});
@@ -473,7 +473,7 @@ Ganttalendar.prototype.drawTask = function (task) {
       }
     }
 
-		if (task.isParent())
+	//	if (task.isParent())
       svg.rect(taskSvg, 0, 0, "100%", 3, {fill:"#000"});
 
     if (task.startIsMilestone) {
@@ -490,10 +490,10 @@ Ganttalendar.prototype.drawTask = function (task) {
     svg.text(taskSvg, "100%", 18, task.name, {class:"taskLabelSVG", transform:"translate(20,-5)"});
 
     //link tool
-    if (task.level>0){
+   //if (task.level>0){
       svg.circle(taskSvg, -self.resizeZoneWidth,  dimensions.height/2,dimensions.height/3, {class:"taskLinkStartSVG linkHandleSVG", transform:"translate("+(-dimensions.height/3+1)+")"});
       svg.circle(taskSvg, dimensions.width+self.resizeZoneWidth,dimensions.height/2,dimensions.height/3, {class:"taskLinkEndSVG linkHandleSVG", transform:"translate("+(dimensions.height/3-1)+")"});
-    }
+    //}
     return taskSvg
   }
 
@@ -551,6 +551,7 @@ Ganttalendar.prototype.drawTask = function (task) {
 
 
 		//task label
+		//  debugger;
 		svg.text(taskSvg, "100%", 18, task.name, {class:"taskLabelSVG", transform:"translate(20,-5)"});
 
 
@@ -774,11 +775,11 @@ Ganttalendar.prototype.redrawTasks = function (drawAll) {
     if (collapsedDescendant.indexOf(task)>=0){
       continue;
     }
-    if (drawAll || (row>=startRowAdd && row<endRowAdd)) {
+    //if (drawAll || (row>=startRowAdd && row<endRowAdd)) {
     this.drawTask(task);
       self.master.firstVisibleTaskIndex=self.master.firstVisibleTaskIndex==-1?i:self.master.firstVisibleTaskIndex;
       self.master.lastVisibleTaskIndex = i;
-    }
+    //}
     row++
   }
 
