@@ -85,22 +85,25 @@ public class SM07SvcImpl implements SM07Svc {
 		
 		//데이터처리 시작
 		//마스터 수정
-		int result = sm07Mapper.updateOrderDetail(paramMap);
+		
+		// int result = sm07Mapper.updateOrderDetail(paramMap);
 
-//		//상세수정
-//		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
-//	    for (Map<String, String> dtl : dtlParam) {
-//	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-//			dtl.put("userId", paramMap.get("userId"));
-//	    	dtl.put("pgmId", paramMap.get("pgmId"));
-//			
-//			String dataChk = dtl.get("dataChk").toString();	    	
-//			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
-//	    	if ("U".equals(dataChk)) {
-//				//데이터 처리
-//				qm02Mapper.update_pm02_Dtl(dtl);
-//	    	} 
-//	    }
+		int result = 0;
+
+		//상세수정
+		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+	    for (Map<String, String> dtl : dtlParam) {
+	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
+			dtl.put("userId", paramMap.get("userId"));
+	    	dtl.put("pgmId", paramMap.get("pgmId"));
+			
+			String dataChk = dtl.get("dataChk").toString();	    	
+			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
+	    	if ("U".equals(dataChk)) {
+				//데이터 처리
+				result = sm07Mapper.updateOrderDetail(dtl);
+	    	} 
+	    }
 		//데이터 처리 끝
 		
 		//---------------------------------------------------------------
