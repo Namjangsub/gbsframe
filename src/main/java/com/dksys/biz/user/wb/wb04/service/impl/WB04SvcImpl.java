@@ -82,5 +82,11 @@ public class WB04SvcImpl implements WB04Svc {
 	public List<Map<String, String>> selectGanttInfo(Map<String, String> paramMap) {
 		return wb04Mapper.selectGanttInfo(paramMap);
 	}
+    
+    @Override
+	public List<Map<String, String>> selectGanttAllList2(Map<String, String> paramMap) {
+		return wb04Mapper.selectGanttAllList2(paramMap);
+	}
+    
 	
 }

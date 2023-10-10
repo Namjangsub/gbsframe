@@ -1023,13 +1023,284 @@
 			         --AND X.SALES_CD           --SALES Code 
 			       ) T
 			  WHERE 1=1
-				
-				
-				
-				
-				
-				
 			  </select> 
+             
+             
+             
+             
+             
+             <select id="selectGanttAllList2" parameterType="Map" resultType="CamelMap">
+                WITH SJD AS --수주상세 
+                 ( 
+                  SELECT M.CO_CD                                            AS CO_CD        --회사코드
+                        , (SELECT FN_CM05M01_CD_TO_NM(M.CO_CD) FROM DUAL)   AS CO_NM        --회사명 
+                        , M.ORDRS_NO                                         AS ORDRS_NO     --수주번호
+                        , X.SALES_CD                                         AS SALES_CD     --SALES Code
+                        , M.ORDRS_CLNT_CD                                    AS CLNT_CD      --고객코드
+                        , C.CLNT_NM                                          AS CLNT_NM      --고객명
+                     FROM TB_CR02M01  M --수주마스터
+                          INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+                          INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+                    WHERE 1=1
+                      AND M.CO_CD = #{coCd}
+                      AND X.SALES_CD IS NOT NULL --비용제외
+                      AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만 
+                                     FROM TB_WB21M01 P 
+                                    WHERE P.CO_CD = X.CO_CD
+                                      AND P.SALES_CD  = X.SALES_CD
+                                  )
+                 )
+               , SUBJ AS --확정된 과제정보
+                 (
+                  SELECT X.CO_CD                            AS CO_CD        --회사코드
+                       , X.SALES_CD                          AS SALES_CD     --SALES Code
+                       , X.SJ_NO                             AS SJ_NO        --과제번호
+                       , X.SJ_NM                             AS SJ_NM        --과제명
+                       , X.VER_NO                            AS VER_NO       --버젼
+                       , TO_CHAR(X.BEGIN_DT, 'YYYY-MM-DD')   AS BEGIN_DT     --시작일
+                       , TO_CHAR(X.DE_DT, 'YYYY-MM-DD')      AS DE_DT        --출고일
+                       , TO_CHAR(X.ACPTNC_DT, 'YYYY-MM-DD')  AS ACPTNC_DT    --완료검수일
+                    FROM TB_WB21M01 X --과제정보 
+                   WHERE X.CO_CD = #{coCd}
+                     AND X.BEGIN_DT BETWEEN #{beginDt} AND #{deDt}
+                     AND X.CLOSE_YN = 'Y'    --조회조건 : 과제확정 여부 
+                    <if test="salesCd != null and !salesCd.equals('')">
+                      AND X.SALES_CD = #{salesCd}            
+                     </if>   
+                   ORDER BY X.SALES_CD
+                 )
+               , RSLT AS
+                 (
+                  SELECT CO_CD
+                        , SALES_CD
+                        , WBS_PLAN_CODE_KIND
+                        , WBS_PLAN_CODE_ID
+                        , MAX(WBS_RSLTS_RATE)      AS WBS_RSLTS_RATE
+                        , MAX(RSLTS_FILE_TRGT_KEY) AS RSLTS_FILE_TRGT_KEY
+                        , MAX(ISSUE_PLAN_TRGT_KEY) AS ISSUE_PLAN_TRGT_KEY
+                        , MAX(ISSUE_RSLT_TRGT_KEY) AS ISSUE_RSLT_TRGT_KEY
+                    FROM (
+                  SELECT WR.CO_CD               --회사코드
+                       , WR.SALES_CD            --SALES Code 
+                       , WR.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
+                       , WR.WBS_PLAN_CODE_ID    --WBS계획 LVL2
+                       , WR.WBS_RSLTS_RATE      --WBS실적 진척율
+                       , WR.FILE_TRGT_KEY                   AS RSLTS_FILE_TRGT_KEY
+                       , ''                                 AS ISSUE_PLAN_TRGT_KEY
+                       , ISU.ISSUE_FILE_TRGT_KEY            AS ISSUE_RSLT_TRGT_KEY
+                   FROM TB_WB23M01  WR--WBS실적 정보
+                        LEFT OUTER JOIN (SELECT CO_CD               --회사코드
+                                                , SALES_CD            --SALES Code 
+                                                , WBS_PLAN_CODE_KIND  --WBS계획 LVL1
+                                                , WBS_PLAN_CODE_ID    --WBS계획 LVL2
+                                                , WBS_RSLTS_NO        --WBS실적 번호
+                                                , ISS_NO              --WBS실적 이슈번호
+                                                , FILE_TRGT_KEY AS ISSUE_FILE_TRGT_KEY
+                                             FROM TB_WB24M02  --WBS이슈 정보
+                                            WHERE CO_CD = #{coCd}
+                                              AND WBS_RSLTS_NO IS NOT NULL --실적이슈 
+                                         ) AS ISU ON WR.CO_CD              = ISU.CO_CD 
+                                                 AND WR.SALES_CD           = ISU.SALES_CD 
+                                                 AND WR.WBS_PLAN_CODE_KIND = ISU.WBS_PLAN_CODE_KIND 
+                                                 AND WR.WBS_PLAN_CODE_ID   = ISU.WBS_PLAN_CODE_ID 
+                                                 AND WR.WBS_RSLTS_NO       = ISU.WBS_RSLTS_NO
+                  UNION ALL
+                  SELECT PL.CO_CD               --회사코드
+                       , PL.SALES_CD            --SALES Code 
+                       , PL.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
+                       , PL.WBS_PLAN_CODE_ID    --WBS계획 LVL2
+                       , 0  WBS_RSLTS_RATE      --WBS계획 진척율
+                       , ''                                 AS RSLTS_FILE_TRGT_KEY
+                       , ISU.ISSUE_FILE_TRGT_KEY            AS ISSUE_PLAN_TRGT_KEY
+                       , ''                                 AS ISSUE_RSLT_TRGT_KEY
+                   FROM TB_WB22M01  PL--WBS계획 정보
+                        LEFT OUTER JOIN (SELECT CO_CD               --회사코드
+                                                , SALES_CD            --SALES Code 
+                                                , WBS_PLAN_CODE_KIND  --WBS계획 LVL1
+                                                , WBS_PLAN_CODE_ID    --WBS계획 LVL2
+                                                , WBS_PLAN_NO         --WBS계획 번호
+                                                , ISS_NO              --WBS계획 이슈번호
+                                                , FILE_TRGT_KEY AS ISSUE_FILE_TRGT_KEY
+                                             FROM TB_WB24M02  --WBS이슈 정보
+                                            WHERE CO_CD = #{coCd}
+                                              AND WBS_PLAN_NO IS NOT NULL --계획이슈 
+                                         ) AS ISU ON PL.CO_CD              = ISU.CO_CD 
+                                                 AND PL.SALES_CD           = ISU.SALES_CD 
+                                                 AND PL.WBS_PLAN_CODE_KIND = ISU.WBS_PLAN_CODE_KIND 
+                                                 AND PL.WBS_PLAN_CODE_ID   = ISU.WBS_PLAN_CODE_ID 
+                                                 AND PL.WBS_PLAN_NO       = ISU.WBS_PLAN_NO
+                  WHERE PL.WBS_PLAN_CODE_KIND != 'WBSCODE'
+                  )
+                 GROUP BY CO_CD
+                        , SALES_CD
+                        , WBS_PLAN_CODE_KIND
+                        , WBS_PLAN_CODE_ID
+                 )
+               , PLAN AS --WBS 계획정보 
+                 (
+                  SELECT A.*
+                        , LEVEL AS LVL
+                        , CASE WHEN LEVEL = 3 THEN (SELECT FN_CM05M01_CD_TO_NM(A.WBS_PLAN_CODE_ID) FROM DUAL)
+                               WHEN LEVEL = 4 THEN A.WBS_PLAN_CODE_NM
+                          END AS WBS_PLAN_CODE_NAME --WBS 계획명  
+                        , CASE WHEN LEVEL = 1 THEN MAX(ISSUE_PLAN_TRGT_KEY) OVER (PARTITION BY A.CO_CD, A.CLNT_CD, A.ORDRS_NO )
+                               WHEN LEVEL = 3 THEN ( SELECT TO_CHAR(COUNT(ISSUE_PLAN_TRGT_KEY))
+                                                         FROM RSLT AS R 
+                                                        WHERE 1=1
+                                                          AND A.CO_CD    = R.CO_CD
+                                                          AND A.SALES_CD = R.SALES_CD
+                                                          AND A.WBS_PLAN_CODE_KIND = 'WBSCODE'
+                                                          AND A.WBS_PLAN_CODE_ID   = R.WBS_PLAN_CODE_KIND
+                                                     ) 
+                                ELSE ISSUE_PLAN_TRGT_KEY
+                          END ISSUE_PLAN_KEY
+                        , CASE WHEN LEVEL = 1 THEN MAX(ISSUE_RSLT_TRGT_KEY) OVER (PARTITION BY A.CO_CD, A.CLNT_CD, A.ORDRS_NO )
+                               WHEN LEVEL = 3 THEN ( SELECT TO_CHAR(COUNT(ISSUE_RSLT_TRGT_KEY))
+                                                         FROM RSLT AS R 
+                                                        WHERE 1=1
+                                                          AND A.CO_CD    = R.CO_CD
+                                                          AND A.SALES_CD = R.SALES_CD
+                                                          AND A.WBS_PLAN_CODE_KIND = 'WBSCODE'
+                                                          AND A.WBS_PLAN_CODE_ID   = R.WBS_PLAN_CODE_KIND
+                                                     ) 
+                                ELSE ISSUE_RSLT_TRGT_KEY
+                          END ISSUE_RSLT_KEY
+                        , CASE WHEN LEVEL = 1 THEN TO_CHAR((WBS_PLANE_DT - WBS_PLANS_DT)+1)
+			                   WHEN LEVEL = 2 THEN TO_CHAR((WBS_PLANE_DT - WBS_PLANS_DT)+1)
+			                   ELSE DAYCNT
+			              END DAY_COUNT  
+                        , REGEXP_REPLACE(SYS_CONNECT_BY_PATH(A.LOWER_CD, ' -> '), '^\s+\-\>\s+', '') AS PATH --출고경로 
+                    FROM (
+                        SELECT DISTINCT 
+                                'TOP'                            AS UPPER_CD
+                              , SJ.ORDRS_NO                      AS LOWER_CD
+                              , P.CO_CD                          AS CO_CD   
+                              , SJ.CLNT_CD                       AS CLNT_CD 
+                              , SJ.CLNT_NM                       AS CLNT_NM 
+                              , SJ.ORDRS_NO                      AS ORDRS_NO
+                              , ''                               AS SALES_CD
+                              , ''                               AS WBS_PLAN_CODE_KIND
+                              , ''                               AS WBS_PLAN_CODE_ID  
+                              , ''                               AS WBS_PLAN_CODE_NM  
+                              , ''                               AS WBS_PLAN_MNG_ID   
+                              , MIN(P.WBS_PLANS_DT) OVER (PARTITION BY P.CO_CD, SJ.CLNT_CD, SJ.ORDRS_NO) AS WBS_PLANS_DT      
+                              , MAX(P.WBS_PLANE_DT) OVER (PARTITION BY P.CO_CD, SJ.CLNT_CD, SJ.ORDRS_NO) AS WBS_PLANE_DT      
+                              , ''                               AS DAYCNT  
+                              , ''                               AS WBS_RSLTS_RATE    
+                              , ''                               AS RSLTS_FILE_TRGT_KEY  
+                              , ''                               AS ISSUE_PLAN_TRGT_KEY  
+                              , ''                               AS ISSUE_RSLT_TRGT_KEY
+                          FROM TB_WB22M01 P--WBS계획
+                               INNER      JOIN SUBJ AS SB ON P.CO_CD = SB.CO_CD AND P.SALES_CD = SB.SALES_CD 
+                               LEFT OUTER JOIN SJD  AS SJ ON P.CO_CD = SJ.CO_CD AND P.SALES_CD = SJ.SALES_CD
+                          WHERE P.CO_CD = #{coCd}
+                            AND P.WBS_PLAN_CODE_KIND = 'WBSCODE' 
+                        UNION ALL
+                        SELECT DISTINCT 
+                                SJ.ORDRS_NO                      AS UPPER_CD
+                              , P.WBS_PLAN_CODE_KIND||P.SALES_CD AS LOWER_CD
+                              , P.CO_CD                          AS CO_CD   
+                              , SJ.CLNT_CD                       AS CLNT_CD 
+                              , SJ.CLNT_NM                       AS CLNT_NM 
+                              , SJ.ORDRS_NO                      AS ORDRS_NO
+                              , P.SALES_CD                       AS SALES_CD
+                              , ''                               AS WBS_PLAN_CODE_KIND
+                              , ''                               AS WBS_PLAN_CODE_ID  
+                              , ''                               AS WBS_PLAN_CODE_NM  
+                              , ''                               AS WBS_PLAN_MNG_ID     
+                              , MIN(P.WBS_PLANS_DT) OVER (PARTITION BY P.CO_CD, SJ.CLNT_CD, SJ.ORDRS_NO, P.SALES_CD) AS WBS_PLANS_DT      
+                              , MAX(P.WBS_PLANE_DT) OVER (PARTITION BY P.CO_CD, SJ.CLNT_CD, SJ.ORDRS_NO, P.SALES_CD) AS WBS_PLANE_DT      
+                              , ''                               AS DAYCNT  
+                              , ''                               AS WBS_RSLTS_RATE    
+                              , ''                               AS RSLTS_FILE_TRGT_KEY  
+                              , TO_CHAR(ISU.PLAN_CNT)            AS ISSUE_PLAN_TRGT_KEY  
+                              , TO_CHAR(ISU.RSLT_CNT)            AS ISSUE_RSLT_TRGT_KEY    
+                          FROM TB_WB22M01 P--WBS계획
+                               INNER      JOIN SUBJ AS SB ON P.CO_CD = SB.CO_CD AND P.SALES_CD = SB.SALES_CD 
+                               LEFT OUTER JOIN SJD  AS SJ ON P.CO_CD = SJ.CO_CD AND P.SALES_CD = SJ.SALES_CD
+                               LEFT OUTER JOIN (SELECT CO_CD                    --회사코드
+                                                      , SALES_CD                 --SALES Code 
+                                                      , COUNT(ISSUE_PLAN_TRGT_KEY) AS PLAN_CNT --계획 이슈 COUNT
+                                                      , COUNT(ISSUE_RSLT_TRGT_KEY) AS RSLT_CNT --실적 이슈 COUNT
+                                                   FROM RSLT  --WBS이슈 정보
+                                                  WHERE CO_CD = 'GUN'
+                                                  GROUP BY CO_CD, SALES_CD
+                                               ) AS ISU ON P.CO_CD    = ISU.CO_CD 
+                                                       AND P.SALES_CD = ISU.SALES_CD 
+                          WHERE P.CO_CD = #{coCd}
+                            AND P.WBS_PLAN_CODE_KIND = 'WBSCODE' 
+                        UNION ALL
+                        SELECT P.WBS_PLAN_CODE_KIND||P.SALES_CD AS UPPER_CD
+                              , P.WBS_PLAN_CODE_ID||P.SALES_CD   AS LOWER_CD
+                              , P.CO_CD                          AS CO_CD   
+                              , SJ.CLNT_CD                       AS CLNT_CD 
+                              , SJ.CLNT_NM                       AS CLNT_NM 
+                              , SJ.ORDRS_NO                      AS ORDRS_NO
+                              , P.SALES_CD                       AS SALES_CD
+                              , P.WBS_PLAN_CODE_KIND             AS WBS_PLAN_CODE_KIND
+                              , P.WBS_PLAN_CODE_ID               AS WBS_PLAN_CODE_ID  
+                              , P.WBS_PLAN_CODE_NM               AS WBS_PLAN_CODE_NM  
+                              , P.WBS_PLAN_MNG_ID                AS WBS_PLAN_MNG_ID   
+                              , P.WBS_PLANS_DT                   AS WBS_PLANS_DT      
+                              , P.WBS_PLANE_DT                   AS WBS_PLANE_DT      
+                              , P.DAYCNT                         AS DAYCNT 
+                              , R.WBS_RSLTS_RATE                 AS WBS_RSLTS_RATE --WBS실적 진행율
+                              , R.RSLTS_FILE_TRGT_KEY            AS RSLTS_FILE_TRGT_KEY
+                              , R.ISSUE_PLAN_TRGT_KEY            AS ISSUE_PLAN_TRGT_KEY
+                              , R.ISSUE_RSLT_TRGT_KEY            AS ISSUE_RSLT_TRGT_KEY
+                           FROM TB_WB22M01 AS P --WBS계획
+                                INNER      JOIN SUBJ AS SB ON P.CO_CD = SB.CO_CD AND P.SALES_CD = SB.SALES_CD 
+                                LEFT OUTER JOIN SJD  AS SJ ON P.CO_CD = SJ.CO_CD AND P.SALES_CD = SJ.SALES_CD
+                                LEFT OUTER JOIN RSLT AS R  ON P.CO_CD              = R.CO_CD 
+                                                          AND P.SALES_CD           = R.SALES_CD 
+                                                          AND P.WBS_PLAN_CODE_KIND = R.WBS_PLAN_CODE_KIND 
+                                                          AND P.WBS_PLAN_CODE_ID   = R.WBS_PLAN_CODE_ID
+                          WHERE P.CO_CD = #{coCd}
+                          ) A
+                   WHERE 1=1
+                   START WITH UPPER_CD = 'TOP' 
+                   CONNECT BY PRIOR LOWER_CD = UPPER_CD
+                   ORDER BY PATH
+                 ) 
+            SELECT T.*
+              FROM (
+                    SELECT X.UPPER_CD            --상위코드
+                         , X.LOWER_CD             --하위코드
+                         , X.CO_CD                --회사코드
+                         , X.CLNT_CD              --고객코드
+                         , X.CLNT_NM              --고객명
+                         , X.ORDRS_NO             --수주번호
+                         , X.SALES_CD             --SALES Code 
+                         , X.WBS_PLAN_CODE_KIND   --WBS계획 LVL1
+                         , X.WBS_PLAN_CODE_ID     --WBS계획 LVL2
+                         , X.WBS_PLAN_CODE_NAME   --WBS계획 LVL2명칭
+                         , X.WBS_PLAN_MNG_ID      --WBS계획 LVL1 담당자
+                         , (SELECT FN_CM06M01_ID_TO_NM(X.WBS_PLAN_MNG_ID) FROM DUAL) AS WBS_PLAN_MNG_NM   
+                         , X.WBS_PLANS_DT         --WBS계획 시작일
+                         , X.WBS_PLANE_DT         --WBS계획 종료일
+                         , TO_CHAR(X.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT_S
+                         , TO_CHAR(X.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT_S        
+                         , NVL(X.DAY_COUNT,0) AS DAYCNT             --WBS계획 소요일
+                         , NVL(X.WBS_RSLTS_RATE,0) AS  WBS_RSLTS_RATE    --진도율     
+                         , X.LVL                  --LEVEL 
+                         , NVL(X.RSLTS_FILE_TRGT_KEY,'0') AS RSLTS_FILE_TRGT_KEY  --실적 FILE_TRGT_KEY
+                         , NVL(X.ISSUE_PLAN_KEY,'0') AS ISSUE_PLAN_KEY      --이슈계획 FILE_TRGT_KEY
+                         , NVL(X.ISSUE_RSLT_KEY,'0') AS ISSUE_RSLT_KEY      --이슈실적 FILE_TRGT_KEY
+                         , X.PATH
+                      FROM PLAN X
+                     WHERE 1=1
+                     AND X.CO_CD = #{coCd}   
+                      <if test="clntCd != null and !clntCd.equals('')">
+                      AND X.CLNT_CD = #{clntCd}          
+                     </if>
+                     <if test="salesCd != null and !salesCd.equals('')">
+                      AND X.SALES_CD = #{salesCd}            
+                     </if>
+                   ) T
+              WHERE 1=1
+              </select> 
+             
+             
              
              
  </mapper>

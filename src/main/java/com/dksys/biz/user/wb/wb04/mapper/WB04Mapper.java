@@ -21,4 +21,7 @@ public interface WB04Mapper {
     
     List<Map<String, String>> selectGanttInfo(Map<String, String> paramMap);
     
+    List<Map<String, String>> selectGanttAllList2(Map<String, String> paramMap);
+    
+    
 }
