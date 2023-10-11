@@ -100,12 +100,25 @@ public class EmailSvcImpl implements EmailSvc {
     public int sendMailHtml(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
         String authCode = createCode();
-        String targetUrl = "http://localhost/static/redirectChkCode.html?http://localhost:8090/ubi4/ubihtml.jsp" + paramMap.get("tempUrl");
+     // 1. 프로토콜 (http 또는 https)
+        String protocol = mRequest.getScheme();
+        // 2. 호스트명
+        String host = mRequest.getServerName();
+        // 3. 포트 번호 (기본값은 80)
+        int port = mRequest.getServerPort();
+        // 4. 호스트 주소까지의 문자열 생성
+        String hostAddress = protocol + "://" + host;
+        if (port != 80) {
+            hostAddress += ":" + port;
+        }
+
+        System.out.println("Host Address: " + hostAddress);
+        String targetUrl = hostAddress + "/static/redirectChkCode.html?http://" + host + ":8090/ubi4/ubihtml.jsp" + paramMap.get("tempUrl");
         paramMap.put("longUrl", targetUrl);
     	Map<String, String> returnUrl = urlService.generateShortUrl(paramMap);
     	paramMap.put("shortUrl", returnUrl.get("shortUrl"));
     	paramMap.put("chkCode", returnUrl.get("chkCode"));
-        
+       
         // html로 텍스트 설정
         String mailCnts = "";
         if ("free".equals(paramMap.get("cntsType"))) {
