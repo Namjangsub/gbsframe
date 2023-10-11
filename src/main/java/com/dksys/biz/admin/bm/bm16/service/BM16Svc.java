@@ -39,4 +39,6 @@ public interface BM16Svc {
 
   List<Map<String, Object>> selectPrjctPlanList(Map<String, String> paramMap);
 
+  Map<String, String> selectTodoIssueInfo(Map<String, String> paramMap);
+  
 }

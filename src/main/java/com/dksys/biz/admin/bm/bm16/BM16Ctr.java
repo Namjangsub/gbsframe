@@ -266,4 +266,13 @@ public class BM16Ctr {
       return "jsonView";
   }
   
+ //TODO LIST 프로젝트 이슈정보 조회
+ @PostMapping(value = "/selectTodoIssueInfo")
+ public String selectTodoIssueInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+   Map<String, String> result = bm16Svc.selectTodoIssueInfo(paramMap);
+   model.addAttribute("result", result);
+   return "jsonView";
+ }
+ 
+  
 }
