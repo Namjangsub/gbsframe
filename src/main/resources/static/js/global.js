@@ -2263,33 +2263,35 @@ function setDisabledInputDate(_status){
 	});
 }
 
-//매입마감일자 체크
+//매입마감일자 체크(마감일자 이전 여부 true return)
 function inCloseChk(chkValue){
 	
 	if(chkValue === '') return;
 	
-	var pchsCloseYn  = "";
+	var url = window.location.href;
+	var menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
+	var pchsCloseYn   = "";
 	var coCd = jwt.coCd;
 	
 	chkValue = chkValue.replace(/\-/g, '');
 		
 	var paramObj = {};
 	paramObj.coCd = coCd;
+	paramObj.menuUrl = menuUrl;
 	paramObj.chkValue = chkValue.replace(/\-/g, '');
 	
 	//console.log(paramObj);
 	postAjaxSync("/admin/cm/cm05/selectMonthCloseChk", paramObj, null, function(data) {
 
-		pchsCloseYn = data.pchsCloseYn;
+		pchsCloseYn= data.pchsCloseYn;
 	});//postAjaxSync
 	
 	if(typeof pchsCloseYn == "undefined" || pchsCloseYn == null) return;
 		
 	if (pchsCloseYn === 'Y') {
-
 		return true;
 	}else{
-
 		return false;
 	}
+	return false;
 }
