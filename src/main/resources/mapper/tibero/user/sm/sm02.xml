@@ -94,15 +94,16 @@
                 <if test="ordrgDtFrom != null and !ordrgDtFrom.equals('') and  ordrgDtTo != null and !ordrgDtTo.equals('')" >
                   AND A.ORDRG_DT BETWEEN TO_DATE( #{ordrgDtFrom},'YYYYMMDD') AND TO_DATE( #{ordrgDtTo},'YYYYMMDD') +1
                 </if>
-                <if test="SalesCd != null and !SalesCd.equals('')">
-                AND A.SALES_CD = #{SalesCd} --조회조건 : SALES_CD
+                <if test="salesCd != null and !salesCd.equals('')">
+                AND A.SALES_CD LIKE '%' || #{salesCd} || '%'   --조회조건 : SALES_CD
                </if>
+               <!-- 사용안함  -->
                <if test="ordrgDiv10 != null and !ordrgDiv10.equals('')">
-                AND A.ORDRG_DIV10 = #{ordrgDiv10} --조회조건 : 발주구분
+                AND A.ORDRG_DIV10 = #{ordrgDiv10} --조회조건 : 발주구분  
                </if>
-               <if test="pchsClntcd != null and !pchsClntcd.equals('')">
-                AND A.PCHS_CLNT_CD = #{pchsClntcd} --조회조건 : 구매처
-               </if>               
+               <if test="pchsClntNm != null and !pchsClntNm.equals('')">
+                AND C.CLNT_NM LIKE '%' || #{pchsClntNm} || '%' --조회조건 : 구매처
+               </if>    
 		     )
 		     , SJD AS --수주상세 
 		     ( 
@@ -117,7 +118,8 @@
                     , X.EQP_NM                                           AS EQP_NM        --설비명 
 		            , X.ITEM_DIV                                         AS ITEM_DIV      --아이템구분
 		            , (SELECT FN_CM05M01_CD_TO_NM(X.ITEM_DIV) FROM DUAL) AS ITEM_DIV_NM   --아이템 구분명
-		            , C.CLNT_DIV_CD                                      AS CLNT_DIV_CD
+		            , C.CLNT_DIV_CD                                      AS CLNT_DIV_CD    --거래처 분류
+		            , (SELECT FN_CM05M01_CD_TO_NM(C.CLNT_DIV_CD) FROM DUAL) AS CLNT_DIV_NM  --거래처 분류명
 					, FN_CM05M01_CD_TO_NM(M.CLNT_PJT)                    AS CLNT_PJT_NM
                 FROM TB_CR02M01  M --수주마스터
                       INNER      JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
@@ -129,7 +131,16 @@
                 </if>
                <if test="salesCd != null and !salesCd.equals('')">
                 AND X.SALES_CD = #{salesCd} --조회조건 : SALES_CD
-               </if>	
+               </if>
+               <if test="itemDiv != null and !itemDiv.equals('')">
+		        AND X.ITEM_DIV = #{itemDiv}  --조회조건 : 아이템 구분
+		       </if>  	
+               <if test="prdtNm != null and !prdtNm.equals('')">
+		        AND E.PRDT_NM LIKE '%' || #{prdtNm} || '%'  --조회조건 : 제품구분명
+		       </if>
+		       <if test="clntNm != null and !clntNm.equals('')">
+		        AND C.CLNT_NM LIKE '%' || #{clntNm} || '%'  --조회조건 : 제품구분명
+		       </if>
 		     )
 		   , TDO AS --TODO 결재공유
 		     (
@@ -182,21 +193,22 @@
 		                       LEFT OUTER JOIN SJD AS B ON A.CO_CD = B.CO_CD AND A.SALES_CD = B.SALES_CD
 		                       LEFT OUTER JOIN TDO AS T ON A.SALES_CD = T.SALES_CD AND A.ORDRG_NO = T.TODO_NO
 		                 WHERE 1=1
+		                 <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
+				          AND B.ORDRS_CLNT_CD = #{ordrsClntCd}  --조회조건 : 고객코드
+				         </if>
+				         <if test="prdtCd != null and !prdtCd.equals('')">
+				          AND B.PRDT_CD = #{prdtCd}  --조회조건 : 제품구분
+				         </if>
+				         <if test="itemDiv != null and !itemDiv.equals('')">
+				          AND B.ITEM_DIV = #{itemDiv}  --조회조건 : 아이템 구분
+				         </if>      
+				         <if test="clntDivCd != null and !clntDivCd.equals('')">
+				          AND B.CLNT_DIV_CD = #{clntDivCd}  --조회조건 : 거래처분류
+				         </if>
 		                 ORDER BY A.CO_CD, A.SALES_CD DESC, B.ORDRS_CLNT_NM, A.ORDRG_NO DESC, A.CREAT_DTTM DESC  , A.UDT_DTTM DESC
 		                ) 
 		         WHERE 1=1
-		          <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
-		          AND B.ORDRS_CLNT_CD = #{ordrsClntCd}  --조회조건 : 고객코드
-		         </if>
-		         <if test="prdtCd != null and !prdtCd.equals('')">
-		          AND B.PRDT_CD = #{prdtCd}  --조회조건 : 제품구분
-		         </if>
-		         <if test="itemDiv != null and !itemDiv.equals('')">
-		          AND B.ITEM_DIV = #{itemDiv}  --조회조건 : 아이템 구분
-		         </if>      
-		         <if test="clntDivCd != null and !clntDivCd.equals('')">
-		          AND B.CLNT_DIV_CD = #{clntDivCd}  --조회조건 : 거래처분류
-		         </if> 	
+		           	
 			) T
 			  
 	</select>
@@ -223,6 +235,7 @@
 		                     , B.ORDRS_CLNT_CD  --고객사
 		                     , B.ORDRS_CLNT_NM  --고객사명
 		                     , B.CLNT_DIV_CD    --거래처분류
+		                     , B.CLNT_DIV_NM --거래처분류명
 		                     , B.CLNT_PJT       --고객사PJT
 		                     , B.PRDT_CD        --제품구분
 		                     , B.PRDT_NM        --제품구분명
@@ -260,24 +273,31 @@
 		                       LEFT OUTER JOIN SJD AS B ON A.CO_CD = B.CO_CD AND A.SALES_CD = B.SALES_CD
 		                       LEFT OUTER JOIN TDO AS T ON A.SALES_CD = T.SALES_CD AND A.ORDRG_NO = T.TODO_NO
 		                 WHERE 1=1
+		                 <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
+				          AND B.ORDRS_CLNT_CD = #{ordrsClntCd}  --조회조건 : 고객코드
+				         </if>
+				         <if test="prdtCd != null and !prdtCd.equals('')">
+				          AND B.PRDT_CD = #{prdtCd}  --조회조건 : 제품구분
+				         </if> 
 		                 ORDER BY A.CO_CD, A.SALES_CD DESC, B.ORDRS_CLNT_NM, A.ORDRG_NO DESC, A.CREAT_DTTM DESC  , A.UDT_DTTM DESC
 		                ) 
 		         WHERE 1=1
-		          <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
-		          AND B.ORDRS_CLNT_CD = #{ordrsClntCd}  --조회조건 : 고객코드
-		         </if>
-		         <if test="prdtCd != null and !prdtCd.equals('')">
-		          AND B.PRDT_CD = #{prdtCd}  --조회조건 : 제품구분
-		         </if>
-		         <if test="itemDiv != null and !itemDiv.equals('')">
-		          AND B.ITEM_DIV = #{itemDiv}  --조회조건 : 아이템 구분
-		         </if>      
-		         <if test="clntDivCd != null and !clntDivCd.equals('')">
-		          AND B.CLNT_DIV_CD = #{clntDivCd}  --조회조건 : 거래처분류
-		         </if>  
+		          
 				) X		
 			) T
 			WHERE 1=1
+			<if test="prdtNm != null and !prdtNm.equals('')">
+			AND     T.PRDT_NM LIKE '%' || #{prdtNm} || '%'
+			</if>
+			<if test="itemDiv != null and !itemDiv.equals('')">
+	        AND     T.ITEM_DIV = #{itemDiv}  --조회조건 : 아이템 구분
+	        </if> 
+	        <if test="clntDivCd != null and !clntDivCd.equals('')">
+	        AND     T.CLNT_DIV_CD = #{clntDivCd}  --조회조건 : 아이템 구분
+	        </if>
+	        <if test="clntNm != null and !clntNm.equals('')">
+	          AND T.ORDRS_CLNT_NM LIKE '%' || #{clntNm} || '%'  --조회조건 : 고객코드
+	         </if>
 			AND RN BETWEEN ${firstIndex} AND ${lastIndex}						
 	</select>	
 	
