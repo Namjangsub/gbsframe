@@ -117,11 +117,11 @@
   //-----------------------------  1 MONTH  600px  -----------------------------
   _addZoom( "1M",{
     adjustDates: function (start, end) {
-      start.setMonth(start.getMonth()-1);
-      start.setDate(15);
+      start.setMonth(start.getMonth());
+      start.setDate(1);
       end.setDate(1);
-      end.setMonth(end.getMonth() + 1);
-      end.setDate(end.getDate() + 14);
+      end.setMonth(end.getMonth());
+      end.setDate(end.getDate() + 30);
     },
     row1:        function (date, tr1) {
       var start = new Date(date.getTime());
