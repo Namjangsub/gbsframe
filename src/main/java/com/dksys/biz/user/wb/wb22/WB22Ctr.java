@@ -253,4 +253,12 @@ public class WB22Ctr {
 		model.addAttribute("resultList", resultList); 
 		return "jsonView"; 
 	}
+	
+	//복사기능 호출
+	@PostMapping(value = "/callCopyWbsPlan") 
+    public String callCopyWbsPlan(@RequestBody Map<String, String> paramMap, ModelMap model) {	  
+	  wb22Svc.callCopyWbsPlan(paramMap);
+	  model.addAttribute("paramMap", paramMap);
+	  return "jsonView";
+    }
 }
