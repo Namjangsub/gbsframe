@@ -118,14 +118,15 @@
 		                 </tr>
 		               <thead>
 		                 <tr>
-		                    <td colspan="9" style="height:30px;text-align: left;">▣ 계획정보
-		                     <div id="addrow1" class="add_btn_small pdl10">
-                            <a id="btn1" onclick="wbsLevel1Insert();" data-grid-control="row-add1" style="width:60px;height: 30px; line-height: 28px;">저장</a>
+		                   <td colspan="9" style="height:30px;text-align: left;">▣ 계획정보
+		                   <div id="addrow1" class="add_btn_small pdl10">
+		                   <a id="btn15" onclick="copyPlanPopUp();" data-grid-control="row-add1" style="width:60px;height: 30px; line-height: 28px;">복사</a>
+                           <a id="btn1" onclick="wbsLevel1Insert();" data-grid-control="row-add1" style="width:60px;height: 30px; line-height: 28px;">저장</a>
 <!--                             <a id="btn2" onclick="wbsLevel1confirm('N');" data-grid-control="row-add2" style="width:60px;height: 30px; line-height: 28px;">미확정</a> -->
-                            <a id="btn3" onclick="wbsLevel1confirm('Y');" data-grid-control="row-add3" style="width:60px;height: 30px; line-height: 28px;">확정</a>
-                            <a id="btn4" onclick="createVerUp();" data-grid-control="row-add3" style="width:60px;height: 30px; line-height: 28px;">Ver. Up</a>                            
+                           <a id="btn3" onclick="wbsLevel1confirm('Y');" data-grid-control="row-add3" style="width:60px;height: 30px; line-height: 28px;">확정</a>
+                           <a id="btn4" onclick="createVerUp();" data-grid-control="row-add3" style="width:60px;height: 30px; line-height: 28px;">Ver. Up</a>                            
                            </div>
-		                    </td>                                                
+		                   </td>                                                
 		                 </tr>
 		               </thead>
 		                 <tr style="text-align: left;">
@@ -314,9 +315,39 @@
                              }
                              
                            	 this.self.setValue(this.dindex, "daycnt", calculateHolidayCnt(this.item.wbsPlansDt, this.item.wbsPlaneDt).workingDays);
-                           	 
                            	
                         },
+                   },
+                   contextMenu: {
+                       iconWidth: 20,
+                       acceleratorWidth: 100,
+                       itemClickAndClose: false,
+                       icons: {
+                           'arrow': '<i class="fa fa-caret-right"></i>'
+                       },
+                       items: [
+                           {type: 1, label: "붙여넣기"},
+                       ],
+                       popupFilter: function (item, param) {
+                           //console.log(item, param);
+                           if (param.element) {
+                               return true;
+                           } else {
+                               return item.type == 1;
+                           }
+                       },
+       
+                       onClick: function (item, param) {
+                           
+                           console.log("contextMenu onPaste");
+                           
+                           thisGridRow = param.dindex;
+                           thisGridCol = param.colIndex;
+       
+                           gridPaste(gridView1.target, thisGridRow, thisGridCol);
+
+                           gridView1.target.contextMenu.close();
+                       }
                    },
                    columns: [
                          {key: "rn",            label: "No.",              align: "center",   width: 40},
@@ -1565,6 +1596,66 @@ function AddDays(date, days) {
  
      }
 	 
+	 // 복사대상 팝업
+	 function copyPlanPopUp() {
+		 console.log("복사대상팝업");
+		 
+		 //Validation 체크
+	 	 var row = gridView1.target.getList()[0];
+	     if (row != undefined) {             
+	     	if (row.closeYn == "Y") {
+	             alert("확정된 상태입니다.");
+	             return;
+	         }
+	     }
+		    
+		 var paramObj = {
+				 "salesCd": $("#salesCd").val()
+				 };         
+		//복사대상 선정
+		 openThirdModal("/static/html/user/wb/wb22/WB2201P04.html", 1200, 400, "일정계획조회", paramObj, function (grid){
+			 var row = grid.target.getList("selected")[0];
+			 var formData = {
+                     "coCd" : coCd,
+                     "salesCd" : row.salesCd,
+                     "beginDt" : $('#beginDt').val(),
+                     "acptncDt" : $('#acptncDt').val()
+             }
+             
+             postAjax("/user/wb/wb22/selectWBS1Level", formData, null, function(data){
+            	 var list = data.fileList;
+                 var i = 0;
+                 if (list != undefined) {
+	               	 $.each(list, function(idx, obj){
+	               	 	list[i].daycnt = calculateHolidayCnt(obj.wbsPlansDt, obj.wbsPlaneDt).workingDays;
+	               	 	list[i].verNo = $("#popForm #wbsPlanVerNo").val();
+	               		list[i].closeYn = $("#popForm #wbsPlancloseYn").val();
+	               		i++;
+	                 });
+	               	 gridView1.target.setData({
+	                 	list : list,
+	                    page : {
+	                             // totalElements : list.length
+	                          } 
+	                 });
+	               	 console.log(list);
+             	 }
+             });
+             /*
+			 var paramObj = {
+					   coCd : $("#coCd").val()
+					 , targetSalesCd : $("#salesCd").val()
+					 , copySalesCd : row.salesCd
+					 , pgmId : $("#pgmId").val()
+					 , userId : jwt.userId
+					 };
+			 postAjaxSync("/user/wb/wb22/callCopyWbsPlan", paramObj, null, function(data){
+				 gridView1.setData(0);
+			 });
+			 */
+         }); 
+	 }
+	 
 	 // 계획이슈등록
 	 function wbsPlanIssuePopUp() {
 		 var row = gridView2.target.getList("selected")[0];
@@ -1609,5 +1700,70 @@ function AddDays(date, days) {
              alert("선택한 행에 저장된 계획정보가 없습니다.");
          }
 	 }
+	 
+	    function  gridPaste(thisGrid, thisGridRow, thisGridCol ) {
+	    	var pasteData = "";
+
+	    	navigator.clipboard.readText()
+	    		.then(pasteData => {
+	            console.log('클립보드에 저장된 값:', pasteData);
+	            if (pasteData == undefined || pasteData == "" || thisGridRow == undefined) {
+	                console.error('클립보드에 데이터가 없습니다.');
+	                return;
+	            }
+
+	    		// 붙여넣기할 데이터를 배열로 변환한다.
+	    		var pasteRows = pasteData.split("\n").map(function(row) {
+	    			return row.split("\t");
+	    		});
+	    		//복사대상의 마지막 배열의 값이 없으면 제외
+	    		if (pasteRows[pasteRows.length - 1] == "") pasteRows.splice(pasteRows.length - 1, 1);
+	    		
+	    		// 붙여넣기를 시작할 셀의 인덱스를 구한다.
+	    		var startRowIndex = thisGridRow;
+	    		var startColIndex = thisGridCol;
+	    		
+	    		// 붙여넣을 데이터의 행과 열 개수를 구한다.
+	    		var numRows = pasteRows.length;
+	    		var numCols = pasteRows[0].length;
+	    		
+	    		//그리드 컬럼정보를 가져와서 붙여넣기할때 위치정보로 사용한다.
+	    		tempColumns = thisGrid.colGroup;
+	    		for (var i = tempColumns.length - 1; i >= 0; i--) {
+	    		    if (tempColumns[i].hidden) {
+	    		        tempColumns.splice(i, 1); 
+	    		    }
+	    		}
+	    		var currGridData = thisGrid.list;
+	    		console.log(currGridData);
+	    		//마지막자료와 같은 값으로 추가하고 ordrsSeq는 0으로 설정
+	    		//참조복사를 방지하기 위함
+	    		var tempData = JSON.parse(JSON.stringify(currGridData[thisGridRow]));
+	    		tempData.ordrsSeq = "0";
+	    		
+	    		// 붙여넣기할 셀을 한 개씩 돌면서 값을 설정한다.
+	    		for (var i = 0; i < numRows; i++) {
+	    			for (var j = 0; j < numCols; j++) {
+	    			  	//carriage return 문자 삭제
+	    			    var cellData = pasteRows[i][j].replace(new RegExp('\r', 'ig'), '');
+	    			
+	    			    calRow = startRowIndex + i;
+	    				calCol = startColIndex + j;
+	    				if (calRow >= currGridData.length) {
+							//참조복사를 방지하기 위함
+	    					let tempDataCopy = JSON.parse(JSON.stringify(tempData));
+	    					currGridData.push(tempDataCopy);
+	    		        } 
+	    		        var tkey = tempColumns[calCol].key;
+	    		        currGridData[calRow][tkey] = cellData;
+	    
+	    		    }
+	    		}
+	    		thisGrid.repaint();
+	    		})
+	    	    .catch(error => {
+	    	        console.log('클립보드 읽기 오류 발생:', error);
+	    	    });	  
+	    };
  </script>
  

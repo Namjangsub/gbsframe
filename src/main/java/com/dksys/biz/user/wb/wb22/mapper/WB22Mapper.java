@@ -62,6 +62,8 @@ public interface WB22Mapper {
 	
 	List<Map<String, String>> selectTodoRsltsView(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectIncompleteJob(Map<String, String> paramMap);	
+	List<Map<String, String>> selectIncompleteJob(Map<String, String> paramMap);
+
+	void callCopyWbsPlan(Map<String, String> paramMap);	
 	
 }
