@@ -34,9 +34,9 @@ public class UrlServiceImpl implements UrlService{
     @Override
     public Map<String, String> generateShortUrl(Map<String, String> paramMap){
     	String longUrl = paramMap.get("longUrl");
-        if(!urlTypeValidation.valid(longUrl)){
-            throw new IllegalArgumentException("잘못된 URL 타입입니다.");
-        }
+//        if(!urlTypeValidation.valid(longUrl)){ //정상적인 접속이 안될경우 오류 발생으로 임시 삭제 2023.10.12 13:23분
+//            throw new IllegalArgumentException("잘못된 URL 타입입니다.");
+//        }
 
 //        longUrl = longUrl.replace("https://","").replace("http://",""); //전부제거
         longUrl = longUrl.replaceFirst("^(https?://)", ""); //한번만 제거
@@ -73,7 +73,7 @@ public class UrlServiceImpl implements UrlService{
         String shortUrl = base62Util.encoding(id);
 
     	Map<String, String> returnMap = new HashMap<>();
-    	returnMap.put("shortUrl", "http://localhost/s/"+shortUrl);
+    	returnMap.put("shortUrl", paramMap.get("hostAddress") + "/s/"+shortUrl);
     	returnMap.put("chkCode", urlMapper.getChkCodeById(id));
     	
         return returnMap;

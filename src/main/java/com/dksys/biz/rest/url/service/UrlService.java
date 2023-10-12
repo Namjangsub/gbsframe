@@ -5,11 +5,11 @@ import java.util.Map;
 
 public interface UrlService {
 
-    List<Map<String, Object>> getUrls();
+	public List<Map<String, Object>> getUrls();
 
-	String getLongUrlByshortUrl(String shortUrl);
+    public String getLongUrlByshortUrl(String shortUrl);
 
-	Map<String, String> generateShortUrl(Map<String, String> paramMap);
+	public Map<String, String> generateShortUrl(Map<String, String> paramMap);
 	
-	String shortUrlPromissChkCode(String shortUrl);
+	public String shortUrlPromissChkCode(String shortUrl);
 }

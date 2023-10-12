@@ -5,7 +5,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -99,7 +98,6 @@ public class EmailSvcImpl implements EmailSvc {
     
     public int sendMailHtml(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
-        String authCode = createCode();
      // 1. 프로토콜 (http 또는 https)
         String protocol = mRequest.getScheme();
         // 2. 호스트명
@@ -115,10 +113,20 @@ public class EmailSvcImpl implements EmailSvc {
         System.out.println("Host Address: " + hostAddress);
         String targetUrl = hostAddress + "/static/redirectChkCode.html?http://" + host + ":8090/ubi4/ubihtml.jsp" + paramMap.get("tempUrl");
         paramMap.put("longUrl", targetUrl);
-    	Map<String, String> returnUrl = urlService.generateShortUrl(paramMap);
-    	paramMap.put("shortUrl", returnUrl.get("shortUrl"));
-    	paramMap.put("chkCode", returnUrl.get("chkCode"));
-       
+        paramMap.put("hostAddress", hostAddress);
+        try {
+	    	Map<String, String> returnUrl = urlService.generateShortUrl(paramMap);
+	    	paramMap.put("shortUrl", returnUrl.get("shortUrl"));
+	    	paramMap.put("chkCode", returnUrl.get("chkCode"));
+	    	System.out.println("shortUrl: " + returnUrl);
+    	}catch(Exception e){  //ShortURL 생성 실패시 링크없이 메일 전송 처리하기 위함
+    		paramMap.put("shortUrl", "");
+	    	paramMap.put("chkCode", "");
+	    	System.out.println("shortUrl: ShortURL 생성 실패하였습니다.");
+    	}
+        
+        String authCode = createCode();
+        System.out.println("authCode: " + authCode);
         // html로 텍스트 설정
         String mailCnts = "";
         if ("free".equals(paramMap.get("cntsType"))) {
