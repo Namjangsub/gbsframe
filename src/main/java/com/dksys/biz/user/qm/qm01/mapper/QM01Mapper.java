@@ -91,4 +91,6 @@ public interface QM01Mapper {
   
   int updateReqStChk(Map<String, String> paramMap);
   
+  int updateCheckDept(Map<String, String> paramMap);
+  
 }

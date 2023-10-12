@@ -692,4 +692,15 @@ public class QM01SvcImpl implements QM01Svc {
      return result;
   }
   
+  @Override
+  public int updateCheckDept(Map<String, String> paramMap) throws Exception {
+
+	  	int result = 1;
+	  	
+	  	System.out.println("22222222222222222222222222222222222222222222222222222222");
+	  
+//	  	int result = QM01Mapper.updateCheckDept(paramMap);
+
+	    return result;
+  }
 }

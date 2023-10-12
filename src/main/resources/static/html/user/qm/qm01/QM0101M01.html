@@ -152,6 +152,7 @@
         <div class="add_btn_small pdl10">       
           <a onclick="insertQualityReqModal('C');" style="height: 30px; line-height: 28px;" authchk>+</a>
           <a onclick="deleteQualityReq();" style="height: 30px; line-height: 28px;" authchk>-</a>
+          <a onclick="updateCheckDept();" style="height: 30px; line-height: 28px;">확인</a>
           <a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a> 
           <a onclick="insertQualityRespModal();" style="height: 30px; line-height: 28px; width: 90px;"><i></i>결과등록</a>    
         </div>
@@ -177,6 +178,34 @@
 
 <script type="text/javascript">
 	var isFirst = true;
+	const comboClmnPlanDiv = [...setComboOptionCode('YN')];
+	
+    function setComboOptionCode(selectComobo){
+			var optionCode = [];
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", {"codeKind" : selectComobo} , null,  function(data){
+			var codeList = data.childCodeList;
+			$.each(codeList, function (index, item){
+				let tempCode = {
+						'CD' : item.codeId,
+						'NM' : item.codeNm}
+				optionCode.push(tempCode);
+			});
+		})
+		return optionCode;
+	}  
+    
+    //영업:영업 GUN30, 국내영업 GUN3010, 해외영업 GUN3020 | 설계:선행개발 GUN4010, 개발설계 GUN4020, 양산개발 GUN4030 | 구매협력업체:GUN90 | 생산:생산팀 GUN60, 생산 GUN6010
+	var deptId = jwt.deptId;
+	var chkDept1 = "N";  //영업
+	var chkDept2 = "N";  //설계
+	var chkDept3 = "N";  //구매
+	var chkDept4 = "N";  //생산
+	
+	getCheckDeptYn(deptId);   //팀별 권한	
+    
+//	console.log(jwt);
+//	console.log(chkDept1+'/'+chkDept2+'/'+chkDept3+'/'+chkDept4);
+	
 	ax5.ui.grid.formatter["bilgYn"] = function () {		
 		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
 		if (this.value == "E"){
@@ -196,11 +225,13 @@
   		        target: $('[data-ax5grid="gridView-first"]'),
   		        header: {
   		        	align: "center",
-  		        	selector: true
+  		        	selector: false
   		        },
   		        body: {
   		        	 onClick: function () {
-  		                this.self.select(this.dindex);
+                        this.self.clearSelect();
+                        this.self.select(this.dindex);
+
   		            },
   		             onDBLClick: function () {  
 	  	           	 	var item = this.item;
@@ -217,7 +248,7 @@
 		  	           }else{		  	 
 		  	        	    insertQualityReqModal('U');
 		  	           }   
-  		            }  		   
+  		            }		   
   		        },
 				page : {
 					navigationItemCount : 10,
@@ -264,6 +295,65 @@
 						,{key: "matrDrwNo",	    label: "대표도번",		    width: 120,		align: "center"}
 						,{key: "eqpNm",	    	label: "장비명",		    width: 160,		align: "left"}
 						,{key: "partNm",	    label: "분류",		    width: 70,		align: "center"}
+						
+						,{key: "chkdept1Yn",	    label: "영업확인",		    width: 70,		align: "center", 
+							editor: {
+								type   : "checkbox",
+                                disabled: function () {
+                                    return chkDept1 == "N";
+                                },
+								config : {
+									trueValue: "Y",
+									falseValue: "N"
+								}
+							}
+                         }
+						,{key: "chkdept2Yn",	    label: "설계확인",		    width: 70,		align: "center",
+							editor: {
+								type   : "checkbox",
+                                disabled: function () {
+                                    return chkDept2 == "N";
+                                },
+								config : {
+									trueValue: "Y",
+									falseValue: "N"
+								}
+							}
+						}
+						,{key: "chkdept3Yn",	    label: "구매확인",		    width: 70,		align: "center",
+							editor: {
+								type   : "checkbox",
+                                disabled: function () {
+                                    return chkDept3 == "N";
+                                },
+								config : {
+									trueValue: "Y",
+									falseValue: "N"
+								}
+							}
+						}
+						,{key: "chkdept4Yn",	    label: "생산확인",		    width: 70,		align: "center",
+							editor: {
+								type   : "checkbox",
+                                disabled: function () {
+                                    return chkDept4 == "N";
+                                },
+								config : {
+									trueValue: "Y",
+									falseValue: "N"
+								}
+							}
+						}
+						,{key: "chkdept5Yn",	    label: "출장완료",		    width: 70,		align: "center",
+							editor: {
+								type   : "checkbox",
+								config : {
+									trueValue: "Y",
+									falseValue: "N"
+								}
+							}
+						}
+						
 						,{key: "reqRmk",	    label: "요청비고",		    width: 140,		align: "left"}
 						,{key: "resltRst",	    label: "결과내용",	        width: 140,		align: "left"}
 						,{key: "req1yn",	    label: "발주",		    width: 50,		align: "center"}
@@ -699,4 +789,52 @@
     				  gridView.setData(0);
     			});
     } 
+	
+    //Select 선택 코드값 체크하여 명을 출력
+    function getComboName(comboArray, key) {
+	    let rtnNm = "";
+	    for (const element of comboArray) {
+	        if (key.value == element.CD)  {
+	            rtnNm = element.NM;
+	            break;
+	        }
+	    }
+	    return rtnNm;
+	}
+    
+    function getCheckDeptYn(deptId){
+		if(deptId == 'GUN30' || deptId == 'GUN3010' || deptId == 'GUN3020'){
+			chkDept1 = "Y";
+		}else if(deptId == 'GUN4010' || deptId == 'GUN4020' || deptId == 'GUN4030'){
+			chkDept2 = "Y";
+		}else if(deptId == 'GUN90' || deptId == 'GUN80'){
+			chkDept3 = "Y";
+		}else if(deptId == 'GUN60' || deptId == 'GUN6010'){
+			chkDept4 = "Y";
+		}
+	} 
+
+	/*확인 버튼 클릭 시*/
+	function updateCheckDept() {
+		var row = gridView.target.getList();
+        var planArr = [];
+        
+//         $.each(rowListPlan, function (idx, elem) {
+        	
+//         }
+		var formData = {
+				   "rowList" : JSON.stringify(row)
+		}
+
+//		formData.append("planArr", JSON.stringify(planArr));
+console.log(row);
+		alert('11111111111111111111111111111111');
+
+		postAjaxSync("/user/qm/qm01/updateCheckDept", formData, null, function(data) {
+			alert(data.resultMessage);
+			if (data.resultCode == 200) {
+				gridView.setData(0);
+			}
+		});
+	}
 </script>

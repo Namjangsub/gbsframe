@@ -264,4 +264,24 @@ public class QM01Ctr {
 				}
 	  	return "jsonView";
   }
+  
+  @PostMapping(value = "/updateCheckDept")
+  public String updateCheckDept(@RequestBody Map<String, String> paramMap, ModelMap model){
+	  
+	  
+	  System.out.println("0000000000000000000000000000000000000000000000000000000"+paramMap.get("rowList"));
+	  	try {
+			if (qm01Svc.updateCheckDept(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+  }
 }

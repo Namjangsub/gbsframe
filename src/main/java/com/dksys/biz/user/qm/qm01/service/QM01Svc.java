@@ -61,5 +61,7 @@ public interface QM01Svc {
   List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap);
   
   int updateReqStChk(Map<String, String> paramMap);
+  
+  int updateCheckDept(Map<String, String> paramMap) throws Exception;
 
 }
