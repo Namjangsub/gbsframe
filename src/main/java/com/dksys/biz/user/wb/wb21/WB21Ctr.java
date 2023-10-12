@@ -161,6 +161,8 @@ public class WB21Ctr {
     public String sjVerUpInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
     	int fileTrgtKey;//버전업한 내용을 이어서 저장할 수 있기 위해 신규 fileTrgtKey 를 받아와서 리턴값에 넣어준다.
   		try {
+  			//기존건 확정해제
+  			wb21Svc.sjConfirmN(paramMap, mRequest);
   			fileTrgtKey = wb21Svc.sjVerUpInsert(paramMap, mRequest);
   			if (fileTrgtKey != 0 ) {
   				model.addAttribute("resultCode", 200);
