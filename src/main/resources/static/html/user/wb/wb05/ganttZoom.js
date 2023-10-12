@@ -121,7 +121,7 @@
       start.setMonth(start.getMonth());
       start.setDate(1);
       end.setDate(1);
-      end.setMonth(end.getMonth());
+      end.setMonth(end.getMonth()+1);
       end.setDate(end.getDate() + 30);
     },
     row1:        function (date, tr1) {
@@ -147,7 +147,7 @@
 
 
     //-----------------------------  1 QUARTERS   -----------------------------
-    _addZoom( "1Q", {
+/*    _addZoom( "1Q", {
       adjustDates: function (start, end) {
         start.setDate(1);
         start.setMonth(Math.floor(start.getMonth() / 3) * 3 -1 );
@@ -169,11 +169,11 @@
         self.createHeadCell(2,this,tr2,start.format("MMMM"), 1, "headSmall", start,date);
         self.createBodyCell(this,trBody,1, start.getMonth() % 3 == 2);
       }
-    });
+    });*/
 
 
     //-----------------------------  2 QUARTERS   -----------------------------
-  _addZoom( "2Q", {
+/*  _addZoom( "2Q", {
     adjustDates: function (start, end) {
       start.setDate(1);
       start.setMonth(Math.floor(start.getMonth() / 3) * 3 -3);
@@ -194,11 +194,11 @@
       self.createHeadCell(2,this,tr2,lbl, 1, "headSmall", start,date);
       self.createBodyCell(this,trBody,1, start.getMonth() % 3 == 2);
     }
-  });
+  });*/
 
 
   //-----------------------------  1 YEAR  -----------------------------
-  _addZoom( "1y", {
+/*  _addZoom( "1y", {
     adjustDates: function (start, end) {
       start.setDate(1);
       start.setMonth(Math.floor(start.getMonth() / 6) * 6 -6);
@@ -218,11 +218,11 @@
       self.createHeadCell(2,this,tr2,start.format("MMM"), 1, "headSmall", start,date);
       self.createBodyCell(this,trBody,1, (start.getMonth() + 1) % 6 == 0);
     }
-  });
+  });*/
 
 
   //-----------------------------  2 YEAR -----------------------------
-  _addZoom( "2y", {
+/*  _addZoom( "2y", {
     adjustDates: function (start, end) {
       start.setDate(1);
       start.setMonth(-6);
@@ -242,7 +242,7 @@
       self.createHeadCell(2,this,tr2,GanttMaster.messages["GANTT_SEMESTER"] +" "+ sem, 1, "headSmall", start,date);
       self.createBodyCell(this,trBody,1, sem == 2);
     }
-  });
+  });*/
 
 
 
