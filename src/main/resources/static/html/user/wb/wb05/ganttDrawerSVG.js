@@ -438,7 +438,7 @@ Ganttalendar.prototype.drawTask = function (task) {
     }
 
     if (task.endIsMilestone) {
-      svg.image(taskSvg, "100%",dimensions.height/2-9, 18, 18, self.master.resourceUrl +"milestone.png", {transform:"translate(-9)"})
+      svg.image(taskSvg, "100%",dimensions.height/2-9, 18, 18, self.master.resourceUrl +"milestone_delay.png", {transform:"translate(-9)"})
     }
 
     //task label
