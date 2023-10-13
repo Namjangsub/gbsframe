@@ -532,5 +532,10 @@ public class CR02Svcmpl implements CR02Svc {
         return cr02Mapper.updateEstDeleteConfirm(paramMap);
     }
 
+	@Override
+	public void callCopyOrdrs(Map<String, String> paramMap) {
+		cr02Mapper.callCopyOrdrs(paramMap);
+	}
+
 
 }

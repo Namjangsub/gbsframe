@@ -152,5 +152,14 @@ public class CR02Ctr {
 		  List<Map<String, Object>> fileList = cr02Svc.selectItemSalesCodeTreeList(param);
 		  model.addAttribute("fileList", fileList);
 		  return "jsonView";
-	  }	 
+	  }
+
+	//복사기능 호출
+	@PostMapping(value = "/callCopyOrdrs") 
+	public String callCopyOrdrs(@RequestBody Map<String, String> paramMap, ModelMap model) {	  
+		cr02Svc.callCopyOrdrs(paramMap);
+		model.addAttribute("paramMap", paramMap);
+		return "jsonView";
+	}
+		
 }

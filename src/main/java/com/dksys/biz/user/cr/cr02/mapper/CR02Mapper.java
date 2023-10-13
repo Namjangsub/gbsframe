@@ -71,4 +71,6 @@ public interface CR02Mapper {
 	
 	void callUpdateProjectMaster(Map<String, String> param);
 
+	void callCopyOrdrs(Map<String, String> paramMap);
+
 }

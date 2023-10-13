@@ -40,4 +40,6 @@ public interface CR02Svc {
     List<Map<String, Object>> selectWbsLeftSalesCodeTreeList(Map<String, String> param);
     
     List<Map<String, Object>> selectItemSalesCodeTreeList(Map<String, String> param);
+
+	void callCopyOrdrs(Map<String, String> paramMap);
 }
