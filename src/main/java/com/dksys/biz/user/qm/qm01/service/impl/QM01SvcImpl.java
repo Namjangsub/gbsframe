@@ -694,13 +694,45 @@ public class QM01SvcImpl implements QM01Svc {
   
   @Override
   public int updateCheckDept(Map<String, String> paramMap) throws Exception {
-
-	  	int result = 1;
+      	Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+      	Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+      
+	    int result = 0;
+	    String chkDept1 = "";
+	    String chkDept2 = "";
+	    String chkDept3 = "";
+	    String chkDept4 = "";
+	    String deptId = paramMap.get("deptId").toString();
+	    
+		if("GUN30".equals(deptId) || "GUN3010".equals(deptId) || "GUN3020".equals(deptId)){   //영업팀
+			chkDept1 = "Y";
+		}else if("GUN4010".equals(deptId) || "GUN4020".equals(deptId) || "GUN4030".equals(deptId)){   //설계팀
+			chkDept2 = "Y";
+		}else if("GUN90".equals(deptId)){   //구매팀
+			chkDept3 = "Y";
+		}else if("GUN60".equals(deptId) || "GUN6010".equals(deptId)){   //생산팀
+			chkDept4 = "Y";
+		}
 	  	
-	  	System.out.println("22222222222222222222222222222222222222222222222222222222");
-	  
-//	  	int result = QM01Mapper.updateCheckDept(paramMap);
+        List<Map<String, String>> rowArr = gson.fromJson(paramMap.get("rowList"), mapList);
+        for (Map<String, String> rowMap : rowArr) {
+ 
+    	    rowMap.put("userId", paramMap.get("userId"));
+    	    
+    	    rowMap.put("chkDept1", chkDept1);
+    	    rowMap.put("chkDept2", chkDept2);
+    	    rowMap.put("chkDept3", chkDept3);
+    	    rowMap.put("chkDept4", chkDept4);
 
+    	    rowMap.put("reqNo",    rowMap.get("reqNo").toString());
+    	    rowMap.put("saleCfYn", rowMap.get("chkdept1Yn").toString());
+    	    rowMap.put("dsgnCfYn", rowMap.get("chkdept2Yn").toString());
+    	    rowMap.put("matrCfYn", rowMap.get("chkdept3Yn").toString());
+    	    rowMap.put("prodCfYn", rowMap.get("chkdept4Yn").toString());
+    	    rowMap.put("woutCfYn", rowMap.get("chkdept5Yn").toString());
+
+    	  	result = QM01Mapper.updateCheckDept(rowMap);
+        }
 	    return result;
   }
 }
