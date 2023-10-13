@@ -2295,3 +2295,23 @@ function inCloseChk(chkValue){
 	}
 	return false;
 }
+
+/**
+ * Open Progress
+ * @param progress bar 호출할 함수
+ */
+ openProgress = function(boolean){
+	 if(boolean){
+			$.blockUI.defaults.overlayCSS.opacity = 0.1;
+			$.blockUI({ 
+				message: "<img src='/static/img/progress.gif'/> <font color='blue'>실행중 기다려 주십시요.</font>",
+				css: { 
+					backgroundColor: 'rgba(0,0,0,0.0)',
+					color: '#000000', 
+					border: '0px solid #a00'
+				} 
+			});
+	 }else{
+			$.unblockUI();
+	 }
+};
