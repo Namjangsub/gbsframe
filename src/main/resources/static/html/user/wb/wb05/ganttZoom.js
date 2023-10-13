@@ -147,7 +147,7 @@
 
 
     //-----------------------------  1 QUARTERS   -----------------------------
-/*    _addZoom( "1Q", {
+    _addZoom( "1Q", {
       adjustDates: function (start, end) {
         start.setDate(1);
         start.setMonth(Math.floor(start.getMonth() / 3) * 3 -1 );
@@ -169,7 +169,7 @@
         self.createHeadCell(2,this,tr2,start.format("MMMM"), 1, "headSmall", start,date);
         self.createBodyCell(this,trBody,1, start.getMonth() % 3 == 2);
       }
-    });*/
+    });
 
 
     //-----------------------------  2 QUARTERS   -----------------------------
