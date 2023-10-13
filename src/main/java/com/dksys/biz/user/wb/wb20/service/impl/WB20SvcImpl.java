@@ -117,6 +117,11 @@ public class WB20SvcImpl implements WB20Svc {
 	  public List<Map<String, String>> selectSignResUserlst(Map<String, String> paramMap) {
 	    return wb20Mapper.selectSignResUserlst(paramMap);
 	  }
+
+	  @Override
+	  public List<Map<String, String>> selectSignResUserlstInit(Map<String, String> paramMap) {
+	    return wb20Mapper.selectSignResUserlstInit(paramMap);
+	  }	  
 	  
 	  //결재라인 부서명등 select 	  
 	  @Override

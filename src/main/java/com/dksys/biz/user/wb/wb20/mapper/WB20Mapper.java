@@ -38,6 +38,8 @@ public interface WB20Mapper {
 	int updateApprovalLine(Map<String, String> paramMap);	
 	
 	List<Map<String, String>> selectSignResUserlst(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectSignResUserlstInit(Map<String, String> paramMap);	
 	  
 	List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap);	  
 	

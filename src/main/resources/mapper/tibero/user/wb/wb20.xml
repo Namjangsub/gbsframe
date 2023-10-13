@@ -340,6 +340,7 @@
 			AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
 	</update>	 
 	
+	<!-- 결재목록 불러오기 -->
 	<select id="selectSignResUserlst" parameterType="Map" resultType="camelMap">	
 		SELECT *
 		  FROM(
@@ -382,6 +383,51 @@
 			) AS a
 		 ) A
  	</select>
+ 	
+ 	<!-- 사용자 등록된 기본 결재라인 불러오기  -->
+	<select id="selectSignResUserlstInit" parameterType="Map" resultType="camelMap">	
+		SELECT *
+		  FROM(
+		SELECT
+			ROWNUM AS RNUM, A.*
+			FROM
+			(
+				SELECT T.*
+					FROM
+						(
+							SELECT   A.CO_CD AS WBS_PLANCO_CD,
+									 A.CO_CD,
+									 FN_CM05M01_CD_TO_NM(A.CO_CD) WBS_PLANCO_CD_NM,
+							         A.ID AS USR_NM,
+							         A.EMP_NO AS EMP_NO,
+									 A.NAME AS NAME,
+									 A.TEL_NO AS TEL_NO,
+									 A.EMAIL AS EMAIL,
+									 B.DEPT_NM AS DT_NM,
+									 D.LEVEL_NM AS JIK,
+									 'TODODIV20'  AS TODO_DIV1_CODE_ID,					 
+									 '결재' AS GB
+									 , C.APP_SEQ AS SANCTN_SN					 
+									 , '' AS SANCTN_STTUS
+									 , C.APP_ID AS TODO_ID
+									 , '미승인' AS SANCTN_STTUS_NM	 
+									 , 'I' AS FLAG	
+									 , RANK() OVER(ORDER BY C.APP_NO DESC) AS RNK
+							FROM
+								TB_CM06M01 A 				
+								INNER JOIN TB_BM13M01 C ON(A.ID = C.APP_ID)  								
+								LEFT OUTER JOIN TB_CM07M01 D ON A.LEVEL_CD = D.LEVEL_CD				
+								INNER JOIN TB_CM04M01 B ON(A.DEPT_ID = B.DEPT_ID)				
+							WHERE 1=1 
+								AND C.ID = #{userId}
+								AND C.APP_DIV = #{appDiv}  	/* 발주서 */
+							ORDER BY C.APP_SEQ ASC
+						) T
+						WHERE 1=1
+						AND T.RNK = 1
+			) AS A
+		 ) 
+ 	</select> 	
 	
 	<!-- 결재 등록시 사용자 검색후 부서등 SELECT  -->
 	<select id="selectShareUserInfo" parameterType="Map" resultType="camelMap">
@@ -436,7 +482,8 @@
 				, UDT_ID = #{userId}
 				, UDT_PGM = #{pgmId}
 				/* , UDT_DTTM = SYSDATE */
-				, PG_PARAM = #{pgParam,							jdbcType=VARCHAR}          
+				, PG_PARAM = #{pgParam,							jdbcType=VARCHAR}     
+				, TODO_TITL = #{todoTitl,						jdbcType=VARCHAR}     
 		WHEN NOT MATCHED THEN						
 		INSERT 
 		(		
@@ -459,7 +506,8 @@
 			, CREAT_ID
 			, CREAT_PGM
 			, CREAT_DTTM
-			, PG_PARAM                
+			, PG_PARAM
+			, TODO_TITL             
 		) 
 		VALUES
 		(       
@@ -482,7 +530,8 @@
 			, #{userId}
 			, #{pgmId}
 			, SYSDATE
-			, #{pgParam,				jdbcType=VARCHAR}    
+			, #{pgParam,				jdbcType=VARCHAR}
+			, #{todoTitl,				jdbcType=VARCHAR}
 		)            
 	</insert>  
 	<!-- todo insert -->
