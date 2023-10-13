@@ -447,6 +447,8 @@ Ganttalendar.prototype.drawTask = function (task) {
 			width : Math.max(Math.round((task.end - task.start) * self.fx), 1),
 			height: (self.master.showBaselines ? self.taskHeight / 1.3 : self.taskHeight)
 		};	
+	
+	console.log(x);
     var taskSvg = svg.svg(self.tasksGroup, dimensions.x, dimensions.y, dimensions.width, dimensions.height, {class:"taskBox taskBoxSVG taskStatusSVG", status:task.status, taskid:task.id,fill:task.color||"#eee" });
    //debugger;
     svg.title(taskSvg, task.name);
