@@ -1,7 +1,6 @@
 package com.dksys.biz.user.pm.pm01.service.impl;
 
 import java.lang.reflect.Type;
-import java.text.Format.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -11,13 +10,12 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.user.pm.pm01.mapper.PM01Mapper;
-import com.dksys.biz.user.pm.pm01.service.PM01Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.user.pm.pm01.mapper.PM01Mapper;
+import com.dksys.biz.user.pm.pm01.service.PM01Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -211,5 +209,25 @@ public class PM01SvcImpl implements PM01Svc {
   public List<Map<String, String>> selectMonthlyWorkList(Map<String, String> paramMap) {
     return pm01Mapper.selectMonthlyWorkList(paramMap);
   }
+
+@Override
+public int selectWorkPrtCount(Map<String, String> paramMap) {
+	return pm01Mapper.selectWorkPrtCount(paramMap);
+}
+
+@Override
+public List<Map<String, String>> selectWorkPrtList(Map<String, String> paramMap) {
+	return pm01Mapper.selectWorkPrtList(paramMap);
+}
+
+@Override
+public int selectWorkOrdrsCount(Map<String, String> paramMap) {
+	return pm01Mapper.selectWorkOrdrsCount(paramMap);
+}
+
+@Override
+public List<Map<String, String>> selectWorkOrdrsList(Map<String, String> paramMap) {
+	return pm01Mapper.selectWorkOrdrsList(paramMap);
+}
   
 }
