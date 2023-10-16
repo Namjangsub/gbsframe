@@ -103,10 +103,10 @@ if(jwt){
         ubiprefix = "http://localhost:8090/ubi4";
         break;
     case "local" :
-        ubiprefix = "http://localhost:8090/ubi4";
+        ubiprefix = "http://gbs.gunyangitt.co.kr:8090/ubi4";
         break;
     default :
-        ubiprefix = "http://gbs.gunyangitt.co.kr:8090/ubi4";
+        ubiprefix = "http://localhost:8090/ubi4";
 	}
 }
 
