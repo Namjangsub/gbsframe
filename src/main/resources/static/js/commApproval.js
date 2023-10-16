@@ -46,11 +46,11 @@ function Approval(htmlParam, param, popParam) {
 			    	<!-- 결재라인 table -->
 			    	<table id="appLine" style="border: 1px solid #dbdbdb; border-collapse: collapse" >
 			    		<colgroup>
-			    			<col width="20%">
-			    			<col width="20%">
-			    			<col width="20%">
-			    			<col width="20%">
-			    			<col width="20%">
+			    			<col width="5%">
+			    			<col width="15%">
+			    			<col width="*%">
+			    			<col width="15%">
+			    			<col width="15%">			    			
 			    		</colgroup>
 			    		<tr id="appH" stye="text-align:center; border-bottom:1px solid #dbdbdb; height:25px;">
 			    			<th class="appTh">순번</th>
@@ -145,6 +145,11 @@ function Approval(htmlParam, param, popParam) {
 		if( this.applyBtn ) {
 			$("#appBtnDiv").show();
 			$("#appConfirmAnchor").attr("onclick", "approvalConfirm()");
+			//본인 결재의견
+			let todoCfOpn = $("#appLine tr").find("font").closest("tr").find("input[name=todoCfOpn]").val();
+			if( todoCfOpn != "" ) {
+				$("#appConfirmAnchor").text("의견수정");
+			}
 		} else {
 			//hide
 			$("#appBtnDiv").hide();
@@ -180,6 +185,8 @@ function Approval(htmlParam, param, popParam) {
 					"todoId" : jwt.userId
 					, "todoCfOpn" : todoCfOpn
 			}
+			let anchorText = $("#appConfirmAnchor").text();
+			let confirmText = (anchorText == "의견수정") ? "수정" : "승인"			
 			Object.assign(paramMap, this.param);
 			postAjaxSync("/user/wb/wb20/insertApprovalLine", paramMap, null, function(data){
 				if(data.resultCode == 200){
@@ -187,7 +194,7 @@ function Approval(htmlParam, param, popParam) {
 						if(data.resultCode == 200){
 							console.log("QM01M01 접수컬럼상태가 바뀌었습니다");
 						}
-						alert("승인 되었습니다.");
+						alert(confirmText + " 되었습니다.");
 						confirmYn = true;
 					});
 				} else {
