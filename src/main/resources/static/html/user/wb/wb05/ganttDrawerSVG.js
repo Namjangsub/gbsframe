@@ -418,9 +418,9 @@ Ganttalendar.prototype.drawTask = function (task) {
 
     //progress
     if (task.progress > 0) {
-      var progress = svg.rect(taskSvg, 0, "20%", (task.progress > 100 ? 100 : task.progress) + "%", "60%", {rx:"2", ry:"2",fill:"rgba(0,0,0,.6)"});
+      var progress = svg.rect(taskSvg, 0, "20%", (task.progress > 100 ? 100 : task.progress) + "%", "60%", {rx:"2", ry:"2",fill:"rgba(0,0,0,.3)"});
       if (dimensions.width > 50) {
-        var textStyle = {fill:"#ff7109", "font-size":"16px",class:"textPerc teamworkIcons",transform:"translate(5)"};
+        var textStyle = {fill:"#f31030", "font-size":"10px",class:"textPerc teamworkIcons",transform:"translate(5)"};
         textStyle["font-weight"]="bold";
         if (task.progress > 100)
           textStyle["font-weight"]="bold";
@@ -442,7 +442,8 @@ Ganttalendar.prototype.drawTask = function (task) {
     }
 
     //task label
-    svg.text(taskSvg, "100%", 18, task.name, {class:"taskLabelSVG", transform:"translate(20,-5)"});
+    //svg.text(taskSvg, "100%", 18, task.name, {class:"taskLabelSVG", transform:"translate(20,-5)"});
+    svg.text(taskSvg, "100%", 18, task.name + ' (' + task.progress + '%)', {class:"taskLabelSVG", transform:"translate(20,-5)"});
 
     //link tool
     if (task.level>0){
