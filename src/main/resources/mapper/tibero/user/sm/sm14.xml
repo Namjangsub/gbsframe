@@ -23,7 +23,7 @@
 		</if>
 
 		<if test="salesCd != null and !salesCd.equals('')">
-			AND A.SALES_CD = #{salesCd}   
+			AND A.SALES_CD LIKE '%'|| #{salesCd} || '%'   
 		</if>		
 		<!-- 확정여부 -->
 		<if test="cmpletYn != null and !cmpletYn.equals('')">
@@ -56,7 +56,6 @@
 	
 	<!-- 매입확정 리스트  -->
 	<select id="selectPurchaseList" parameterType="Map" resultType="camelMap">
-		/* No. 내림차순 */
 		SELECT *
 			FROM
 			(
@@ -141,9 +140,8 @@
 				AND RN BETWEEN ${firstIndex} AND ${lastIndex}	
 	</select>	
 	
-	<!-- 기준관리 - 일정계획 등록 메인 화면 엑셀 조회 리스트  -->
-	<select id="selectOrderExcelList" parameterType="Map" resultType="camelMap">   
-		/* No. 내림차순 */
+	<!-- 매입확정 리스트 엑셀   -->
+	<select id="selectPurchaseExcelList" parameterType="Map" resultType="camelMap">   
 		SELECT *
 			FROM
 			(
@@ -153,6 +151,7 @@
 						(
 						SELECT A.CO_CD	
 							, A.PCHS_NO			/* 매입번호 */
+							, PCHS_NO_GRID		/* 매입번호 그리드 출력용 */
 							, A.PCHS_SEQ		/* 매입순번 */
 							, MAX(A.PCHS_SEQ) OVER(PARTITION BY A.PCHS_NO, A.PCHS_SEQ)+1	AS MAX_PCHS_SEQ
 							, A.ORDRG_NO
@@ -165,6 +164,19 @@
 							, A.ORDRG_AMT	
 							, A.ORDRG_DT	
 							, A.PCHS_AMT
+							, A.PCHS_VAT		/* 부가세 */
+							, A.PCHS_QTY			/* 수량 */
+							, 
+							(
+							  CASE 
+							  	WHEN( NVL(A.PCHS_AMT, 0) > 0 AND NVL(A.PCHS_VAT, 0) > 0 )
+							  		THEN TO_NUMBER(NVL(A.PCHS_AMT, 0)) + TO_NUMBER(NVL(A.PCHS_VAT, 0))
+							  	WHEN( NVL(A.PCHS_AMT, 0) > 0 AND A.PCHS_VAT IS NOT NULL  )
+							  		THEN TO_NUMBER(NVL(A.PCHS_AMT, 0)) + TO_NUMBER(NVL(A.PCHS_VAT, 0))							  	 
+							    ELSE NULL
+							  END
+							) AS PCHS_SUM_AMT			/* 합계금액 */
+							, NVL(A.ORDRG_AMT, 0) - SUM(NVL(A.PCHS_AMT, 0)) OVER(PARTITION BY A.ORDRG_NO, A.ORDRG_SEQ) AS REMAIN_AMT	/* 잔여금액 */							
 							, TO_CHAR(A.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT
 							, A.CMPLET_YN
 							, A.USER_CHK_V
@@ -173,6 +185,7 @@
 						  (
 							SELECT E.CO_CD
 								, NVL(D.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00000') AS PCHS_NO	/*매입확정번호 */
+								, D.PCHS_NO AS PCHS_NO_GRID	/*매입확정번호 그리드용*/
 								, D.PCHS_SEQ
 								/* , DECODE(M12.CMPLET_YN, 'Y', '', 'N') AS CMPLET_YN */								
 								, E.ORDRG_NO 
@@ -190,14 +203,16 @@
 								, E.ORDRG_AMT		/*발주 금액 */
 								, B.ORDRG_DT		/* 발주일자 */
 								, D.PCHS_AMT		/* 매입금액 */
+								, D.PCHS_VAT		/* 부가세 */
+								, D.PCHS_QTY			/* 수량 */										
 								, D.PCHS_DT
-								, D.CMPLET_YN 		/* 확정여부 */
-								, NVL(DECODE(M12.CMPLET_YN, 'Y', 'Y', 'N'), 'N') AS USER_CHK_V
+								, D.CMPLET_YN AS CMPLET_YN	 		/* 확정여부 */
+								, DECODE(D.CMPLET_YN, 'Y', ' ', 'N') AS USER_CHK_V		/* DETAIL로 변경 */
 								, B.FILE_TRGT_KEY	
-								FROM TB_SM02D01 E		/* 매입 DETAIL */
-								INNER JOIN TB_SM02M01 B ON(E.CO_CD=B.CO_CD AND E.ORDRG_NO=B.ORDRG_NO AND E.SALES_CD=B.SALES_CD)
-								LEFT OUTER JOIN TB_SM12D01 D ON(D.ORDRG_NO=E.ORDRG_NO AND D.ORDRG_SEQ=E.ORDRG_SEQ)	/* 발주 DETAIL */
-								LEFT OUTER JOIN TB_SM12M01 M12 ON(D.CO_CD=M12.CO_CD AND D.PCHS_NO=M12.PCHS_NO)		/* 발주 MASTER */
+								FROM TB_SM02D01 E		/* 발주 DETAIL */
+								INNER JOIN TB_SM02M01 B ON(E.CO_CD=B.CO_CD AND E.ORDRG_NO=B.ORDRG_NO AND E.SALES_CD=B.SALES_CD)	/* 발주마스터 */
+								LEFT OUTER JOIN TB_SM12D01 D ON(D.ORDRG_NO=E.ORDRG_NO AND D.ORDRG_SEQ=E.ORDRG_SEQ)	/* 매입 DETAIL */
+								LEFT OUTER JOIN TB_SM12M01 M12 ON(D.CO_CD=M12.CO_CD AND D.PCHS_NO=M12.PCHS_NO)		/* 매입 MASTER */
 								LEFT OUTER JOIN TB_SM01D01 F ON(E.CO_CD=F.CO_CD AND E.SALES_CD=F.SALES_CD AND E.UPPER_CD=F.UPPER_CD 
 								 								AND E.LOWER_CD=F.LOWER_CD AND E.MATR_SEQ=F.MATR_SEQ AND E.MATR_CD=F.MATR_CD)	/* 구매BOM 자재 */
 							WHERE 1=1  
