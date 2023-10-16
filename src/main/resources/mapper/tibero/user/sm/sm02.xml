@@ -78,18 +78,17 @@
                 FROM TB_SM02M01 A --발주마스터
                 	  INNER 	 JOIN TB_SM02D01 B ON(A.ORDRG_NO=B.ORDRG_NO)		/* 발주디테일 */
                       INNER      JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD--거래처마스터   
-                      LEFT OUTER JOIN (SELECT CO_CD
-		                                     , ORDRG_NO
-		                                     , SALES_CD
-		                                     , SUM(ORDRG_QTY) ORDRG_QTY
-		                                     , SUM(ORDRG_AMT) ORDRG_AMT
-		                                     , MIN(DSGN_NO) AS DSGN_NO
-		                                 FROM TB_SM02D01 
-		                                WHERE CO_CD = #{coCd}
-		                                GROUP BY CO_CD
-		                                        , ORDRG_NO
-		                                        , SALES_CD
-		                                        , DSGN_NO
+                      LEFT OUTER JOIN (SELECT A.CO_CD
+		                                     , A.ORDRG_NO
+		                                     , A.SALES_CD
+		                                     , SUM(A.ORDRG_QTY) ORDRG_QTY
+		                                     , SUM(A.ORDRG_AMT) ORDRG_AMT
+											 , ( SELECT MIN(B.DSGN_NO) FROM TB_SM02D01 B WHERE A.SALES_CD=B.SALES_CD AND A.ORDRG_NO=B.ORDRG_NO) AS DSGN_NO
+		                                 FROM TB_SM02D01 A
+		                                WHERE A.CO_CD = #{coCd}
+		                                GROUP BY A.CO_CD
+		                                        , A.ORDRG_NO
+		                                        , A.SALES_CD
                                       ) AS E ON A.CO_CD = E.CO_CD AND A.SALES_CD = E.SALES_CD AND A.ORDRG_NO = E.ORDRG_NO --발주상세
 		       WHERE 1=1
                 <if test="coCd != null and !coCd.equals('')">
@@ -265,15 +264,54 @@
 		                     , T.TODO_YN
 		                     ,  
 		                     (
-										/* 데이터 정리후에는 TB_SM01D01 만 보면 된다 */
 										SELECT SUM(BOM_QTY)  
 											FROM  TB_SM01D01 D 
 									WHERE  D.CO_CD = A.CO_CD
 										AND    D.SALES_CD = A.SALES_CD
 										AND D.MATR_CD IS NOT NULL      
 		                     ) - SUM(A.ORDRG_QTY) OVER(PARTITION BY A.SALES_CD, A.CO_CD) 
-		                     AS REAMIN_BAL_QTY	/* SALES_CD 기준 BOM수량 - 발주수량 */
+		                     AS REAMIN_BAL_QTY	/* SALES_CD 기준 BOM수량 - 발주수량  (발주잔량)*/
 							 , B.CLNT_PJT_NM       --고객사PJT
+							 , 
+							 (
+							      SELECT CASE WHEN (SUM(DECODE(D.MAIL_YN, 'N', 0, 'Y', 1, 0))>0) THEN 'Y'
+							                    ELSE 'N'
+							              END 
+							        FROM TB_SM02D01 D
+							       WHERE 1=1 
+							       AND A.ORDRG_NO = D.ORDRG_NO
+							       GROUP BY ORDRG_NO, PCHS_CLNT_CD    
+							 ) AS MAIL_YN				
+							 ,
+							 DECODE(
+							 (
+							 	SELECT 
+							 		   CASE
+								 	     WHEN ( A.ORDRG_QTY - SUM(NVL(IN_QTY, 0)) = 0 )
+								 	     	THEN '1' /* 발주수량 - 입고수량 */
+								 	     ELSE '0'
+									   END 
+
+							 		FROM TB_SM03D01 D
+							       WHERE 1=1 
+							       AND A.ORDRG_NO = D.ORDRG_NO
+							       GROUP BY D.ORDRG_NO						 		
+							 ) , NULL, 'N', 0, 'N', 1, 'Y') AS IN_YN
+							 ,
+							 DECODE(
+							 (
+							 	SELECT 
+							 		   CASE
+								 	     WHEN ( A.ORDRG_AMT - SUM(NVL(D.PCHS_AMT, 0)) = 0 )
+								 	     	THEN '1' /* 발주금액 - 매입금액 */
+								 	     ELSE '0'
+									   END   
+							 		FROM TB_SM12D01 D
+							       WHERE 1=1 
+							       AND A.ORDRG_NO = D.ORDRG_NO
+							       AND D.CMPLET_YN = 'Y'
+							       GROUP BY D.ORDRG_NO						 		
+							 ) , NULL, 'N', 0, 'N', 1, 'Y') AS PCHS_YN									 				 			 
 		                  FROM BJM A
 		                       LEFT OUTER JOIN SJD AS B ON A.CO_CD = B.CO_CD AND A.SALES_CD = B.SALES_CD
 		                       LEFT OUTER JOIN TDO AS T ON A.SALES_CD = T.SALES_CD AND A.ORDRG_NO = T.TODO_NO
@@ -363,6 +401,46 @@
 		                     ) - SUM(A.ORDRG_QTY) OVER(PARTITION BY A.SALES_CD, A.CO_CD) 
 		                     AS REAMIN_BAL_QTY	/* SALES_CD 기준 BOM수량 - 발주수량 */
 							 , B.CLNT_PJT_NM       --고객사PJT
+							 , 
+							 (
+							      SELECT CASE WHEN (SUM(DECODE(D.MAIL_YN, 'N', 0, 'Y', 1, 0))>0) THEN 'Y'
+							                    ELSE 'N'
+							              END 
+							        FROM TB_SM02D01 D
+							       WHERE 1=1 
+							       AND A.ORDRG_NO = D.ORDRG_NO
+							       GROUP BY ORDRG_NO, PCHS_CLNT_CD    
+							 ) AS MAIL_YN				
+							 ,
+							 DECODE(
+							 (
+							 	SELECT 
+							 		   CASE
+								 	     WHEN ( A.ORDRG_QTY - SUM(NVL(IN_QTY, 0)) = 0 )
+								 	     	THEN '1' /* 발주수량 - 입고수량 */
+								 	     ELSE '0'
+									   END 
+
+							 		FROM TB_SM03D01 D
+							       WHERE 1=1 
+							       AND A.ORDRG_NO = D.ORDRG_NO
+							       GROUP BY D.ORDRG_NO						 		
+							 ) , NULL, 'N', 0, 'N', 1, 'Y') AS IN_YN
+							 ,
+							 DECODE(
+							 (
+							 	SELECT 
+							 		   CASE
+								 	     WHEN ( A.ORDRG_AMT - SUM(NVL(D.PCHS_AMT, 0)) = 0 )
+								 	     	THEN '1' /* 발주금액 - 매입금액 */
+								 	     ELSE '0'
+									   END   
+							 		FROM TB_SM12D01 D
+							       WHERE 1=1 
+							       AND A.ORDRG_NO = D.ORDRG_NO
+							       AND D.CMPLET_YN = 'Y'
+							       GROUP BY D.ORDRG_NO						 		
+							 ) , NULL, 'N', 0, 'N', 1, 'Y') AS PCHS_YN									 
 		                  FROM BJM A
 		                       LEFT OUTER JOIN SJD AS B ON A.CO_CD = B.CO_CD AND A.SALES_CD = B.SALES_CD
 		                       LEFT OUTER JOIN TDO AS T ON A.SALES_CD = T.SALES_CD AND A.ORDRG_NO = T.TODO_NO
