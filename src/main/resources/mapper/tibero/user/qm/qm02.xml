@@ -96,9 +96,10 @@ WITH T_REQ AS
 		 <if test="actiontype != null and !actiontype.equals('') and actiontype.equals('U'.toString())">
 		    AND R.STAT_YM = #{statym}
 		  </if>
-        AND R.ORDRG_ID = #{userId} -- 접속한 사용자 ID
+        AND R.ORDRG_ID = #{ordrgId} -- 접속한 사용자 ID
         AND R.CO_CD    = #{coCd}
         AND R.ORDRG_ID = A.ID
+        AND R.REQ_ST = 'REQST03'
      )
    , WCODE AS
      ( 
@@ -113,7 +114,7 @@ WITH T_REQ AS
            AND LEVEL = 2
          START WITH T.CODE_KIND =  (SELECT MIN(CODE_ID)
                                       FROM TB_CM05M01
-                                     WHERE CODE_RPRC = (SELECT SUBSTR(DEPT_ID,1,5) FROM TB_CM06M01 WHERE ROWNUM = 1 AND ID = #{userId}) 
+                                     WHERE CODE_RPRC = (SELECT SUBSTR(DEPT_ID,1,5) FROM TB_CM06M01 WHERE ROWNUM = 1 AND ID = #{ordrgId}) 
                                        AND CODE_KIND = 'COBGB')
          CONNECT BY PRIOR T.CODE_ID = T.CODE_KIND
        UNION ALL
@@ -311,118 +312,6 @@ ORDER BY M.SORT_NO ASC
  							)  
  		SELECT NAME, ID FROM DEPT_TEAM_
     </select>
-    
-    <select id="select_zupiter_modal1" parameterType="Map" resultType="camelMap">
-	    WITH T_PARAM AS 
-     (SELECT 'GUN'       AS P_CO_CD     
-            , #{statyy}  AS P_STAT_YY   
-            , #{userId}  AS P_ID
-        FROM DUAL
-     )
-    , T_DEPT AS
-     (SELECT A.NAME 
-            , A.ID   
-            , A.DEPT_ID
-            , B.DEPT_NM
-            , SUBSTR(A.DEPT_ID,1,5) AS UP_DEPT_ID
-        FROM TB_CM06M01 A
-            , TB_CM04M01 B
-            , TB_CM07M01 C
-            , T_PARAM    T
-       WHERE 1=1
-         AND A.DEPT_ID LIKE (SELECT  SUBSTR(DEPT_ID,1,5)||'%'
-                                FROM TB_CM06M01
-                               WHERE ID = T.P_ID 
-                             )
-         AND CO_CD      = T.P_CO_CD
-         AND A.DEPT_ID  = B.DEPT_ID  
-         AND A.LEVEL_CD = C.LEVEL_CD
-     )
-   , T_REQ AS 
-     ( 
-       SELECT D.UP_DEPT_ID
-            , D.DEPT_NM
-            , D.NAME
-            , R.REQ_CD
-            , R.REQ_DT
-            , R.DEPT_CD 
-            , R.MID_CD  
-            , R.SUB_CD  
-         FROM TB_QM01M01 R
-            , T_DEPT     D
-            , T_PARAM    T
-        WHERE 1=1
-         AND R.STAT_YY = P_STAT_YY
-         AND R.STMM_YN = 'Y'
-         AND R.CO_CD   = T.P_CO_CD
-         AND R.ORDRG_ID = D.ID
-     )
-   , T_CAT AS
-     (
-       SELECT LCD.CODE_RPRC AS DEPT_CD
-            , LCD.CODE_ID   AS LCD_ID
-            , LCD.CODE_NM   AS LCD_NM
-            , LCD.SORT_NO   AS L_SORT 
-            , MCD.MCD_ID    AS MCD_ID
-            , MCD.MCD_NM    AS MCD_NM
-            , MCD.M_SORT    AS M_SORT
-            , SCD.SCD_ID    AS SCD_ID
-            , SCD.SCD_NM    AS SCD_NM
-            , SCD.S_SORT    AS S_SORT
-        FROM TB_CM05M01 LCD
-            , ( SELECT M.CODE_KIND AS LCD_ID
-                     , M.CODE_ID  AS MCD_ID
-                     , M.CODE_NM   AS MCD_NM
-                     , M.SORT_NO   AS M_SORT
-                  FROM TB_CM05M01 M
-                 WHERE LENGTH(M.CODE_ID) <![CDATA[<]]> 9 
-                   AND M.USE_YN = 'Y'
-                   AND M.CODE_KIND NOT IN ('COBGB', 'COBGBP') 
-                   AND M.CODE_KIND LIKE 'COBGB%'
-              ) MCD --중분류 
-            , ( SELECT S.CODE_KIND AS MCD_ID
-                     , S.CODE_ID  AS SCD_ID
-                     , S.CODE_NM   AS SCD_NM
-                     , S.SORT_NO   AS S_SORT
-                  FROM TB_CM05M01 S
-                 WHERE LENGTH(S.CODE_ID) = 9 
-                   AND S.SORT_NO IS NOT NULL
-                   AND S.USE_YN = 'Y'
-                   AND S.CODE_KIND NOT IN ('COBGB', 'COBGBP') 
-                   AND S.CODE_KIND LIKE 'COBGB%'
-              ) SCD
-            , ( SELECT DISTINCT UP_DEPT_ID AS DEPT_CD
-                  FROM T_DEPT
-              ) DPT
-       WHERE LCD.CODE_RPRC = DPT.DEPT_CD
-         AND LCD.USE_YN    = 'Y'
-         AND LCD.CODE_KIND = 'COBGB' 
-         AND LCD.CODE_ID   = MCD.LCD_ID
-         AND MCD.MCD_ID    = SCD.MCD_ID
-       ORDER BY L_SORT, M_SORT, S_SORT
-     )
-SELECT *
-  FROM (
-SELECT C.M_SORT||C.S_SORT 
-      , C.MCD_NM
-      , C.SCD_NM
-      , R.NAME
-      , R.SUB_CD
-  FROM T_REQ R
-      , T_CAT C
- WHERE 1=1
-   AND C.SCD_ID  = R.SUB_CD(+)
-   AND C.MCD_ID  = R.MID_CD(+)
-   AND C.LCD_ID  = R.DEPT_CD(+)
-   AND C.DEPT_CD = R.UP_DEPT_ID(+)
- ORDER BY C.M_SORT, C.S_SORT
-       )
- PIVOT ( COUNT(SUB_CD) FOR NAME IN 
-		         (${test})
-		 )
- ORDER BY 1
-
-    </select>
 	
 	 <select id="select_zupiter_modal" parameterType="Map" resultType="camelMap">
 	    WITH T_DEPT AS 
@@ -457,6 +346,7 @@ SELECT C.M_SORT||C.S_SORT
          AND R.REQ_DT <![CDATA[<=]]> TO_DATE(#{endDate}, 'YYYYMMDD')
          AND R.CO_CD   = #{coCd}
          AND R.ORDRG_ID = D.ID
+         AND R.REQ_ST = 'REQST03'
      )
    , WCODE AS
      ( 
