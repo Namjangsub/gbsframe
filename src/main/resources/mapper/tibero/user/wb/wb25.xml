@@ -366,214 +366,219 @@
       
       <select id="selectWbsTaskEvlResultList" parameterType="Map" resultType="camelMap">      
 			WITH T_PLAN AS 
-			     ( 
-			       SELECT CO_CD
-			             , SALES_CD
-			             , VER_NO
-			             , WBS_PLAN_CODE_ID
-			             , (SELECT FN_CM05M01_CD_TO_NM(WBS_PLAN_CODE_ID) FROM DUAL) AS WBS_PLAN_CODE_NM
-			             , TO_CHAR(WBS_PLANS_DT, 'YYYY-MM-DD')                       AS WBS_PLANS_DT
-			             , TO_CHAR(WBS_PLANE_DT, 'YYYY-MM-DD')                       AS WBS_PLANE_DT
-			             , DAYCNT                                                    AS DAYCNT
-			             , (SELECT FN_CM06M01_ID_TO_NM(WBS_PLAN_MNG_ID) FROM DUAL)  AS WBS_PLAN_MNG_NM                          
-			             , CLOSE_YN                                                  AS CLOSE_YN
-			          FROM TB_WB22M01 --WBS계획 정보
-			         WHERE CO_CD    = #{coCd}
-			           AND SALES_CD = #{salesCd}
-			           AND WBS_PLAN_CODE_NM IS NULL --LVL1 : 계획
-			         ORDER BY WBS_PLAN_CODE_ID
-			     )
-			   , SJD AS --수주상세 
-			     ( 
-			      SELECT M.CO_CD                                                               AS CO_CD    --회사코드
-			            , M.ORDRS_NO                                                            AS ORDRS_NO --수주번호
-			            , X.SALES_CD                                                            AS SALES_CD --SALES Code
-			            , M.ORDRS_CLNT_CD                                                       AS CLNT_CD  --고객코드
-			            , C.CLNT_NM                                                             AS CLNT_NM  --고객명
-			            , X.EST_EPCT_MAT_PRC                                                    AS EST_PRC  --견적원가 : 예상재료비
-			            , X.TRGT_PCHS_PCOST_MACH +  X.TRGT_PCHS_PCOST_ELCTY                     AS TRGT_PRC --목표원가 : 기계전기합계 
-			            , (X.ACT_RGL_MACH + X.ACT_OBS_MACH)+(X.ACT_RGL_ELCTY + X.ACT_OBS_ELCTY) AS ACT_PRC  --실행원가 : 구매외주 합계
-			            , CASE WHEN NVL(X.EST_EPCT_MAT_PRC,0) = 0 THEN 0
-			                   ELSE ROUND( ( ( X.TRGT_PCHS_PCOST_MACH +  X.TRGT_PCHS_PCOST_ELCTY) / X.EST_EPCT_MAT_PRC) * 100, 2)
-			              END                                                                   AS TRGT_RATE--견적대비 목표율             
-			            , CASE WHEN NVL(X.TRGT_PCHS_PCOST_MACH,0) + NVL(X.TRGT_PCHS_PCOST_ELCTY,0) = 0 THEN 0
-			                   ELSE ROUND( ( (X.ACT_RGL_MACH + X.ACT_OBS_MACH + X.ACT_RGL_ELCTY + X.ACT_OBS_ELCTY) / (X.TRGT_PCHS_PCOST_MACH +  X.TRGT_PCHS_PCOST_ELCTY) 
-			                                ) * 100, 2)
-			              END                                                                   AS ACT_RATE--목표대비 실적율
-			         FROM TB_CR02M01  M --수주마스터
-			              INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
-			              INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
-			        WHERE 1=1
-			          AND M.CO_CD    = #{coCd}
-			          AND X.SALES_CD = #{salesCd}
-			          AND X.SALES_CD IS NOT NULL --비용제외
-			     )
-			   , PLAN_ISSUE AS --계획이슈
-			     (
-			      SELECT ISU.CO_CD               --회사코드
-			            , ISU.SALES_CD            --SALES Code 
-			            , ISU.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
-			            , ISU.WBS_PLAN_CODE_ID    --WBS계획 LVL2
-			            , ISU.WBS_PLAN_NO         --WBS계획 번호
-			            , COUNT(ISU.ISS_NO)      AS PLAN_ISSUE_CNT
-			            , MIN(ACT.ACTS_DT)       AS ACTS_DT--조치 시작일
-			            , MAX(ACT.ACTE_DT)       AS ACTE_DT--조치 종료일
-			            , SUM(ACT.ACT_MH)        AS ACT_MH--조치 투입공수
-			            , SUM(ACT.ACT_AMT)       AS ACT_AMT--조치 투입비용  
-			        FROM TB_WB24M02 AS ISU --WBS이슈 정보
-			             LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --계획이슈 조치내용
-			       WHERE ISU.CO_CD    = #{coCd}
-			         AND ISU.SALES_CD = #{salesCd}
-			         AND ISU.WBS_PLAN_NO IS NOT NULL --계획이슈 
-			       GROUP BY ISU.CO_CD, ISU.SALES_CD, ISU.WBS_PLAN_CODE_KIND, ISU.WBS_PLAN_CODE_ID, ISU.WBS_PLAN_NO
-			     )
-			   , RSLT_ISSUE AS --실적이슈
-			     ( 
-			      SELECT ISU.CO_CD              --회사코드
-			           , ISU.SALES_CD            --SALES Code 
-			           , ISU.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
-			           , ISU.WBS_PLAN_CODE_ID    --WBS계획 LVL2
-			           , ISU.WBS_RSLTS_NO        --WBS실적 번호
-			           , COUNT(ISU.ISS_NO)      AS RSLT_ISSUE_CNT
-			           , MIN(ACT.ACTS_DT)       AS ACTS_DT --조치 시작일
-			           , MAX(ACT.ACTE_DT)       AS ACTE_DT --조치 종료일
-			           , SUM(ACT.ACT_MH)        AS ACT_MH  --조치 투입공수
-			           , SUM(ACT.ACT_AMT)       AS ACT_AMT --조치 투입비용  
-			        FROM TB_WB24M02  AS ISU --WBS이슈 정보
-			             LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --실적이슈 조치내용
-			       WHERE ISU.CO_CD    = #{coCd}
-			         AND ISU.SALES_CD = #{salesCd}
-			         AND ISU.WBS_RSLTS_NO IS NOT NULL --실적이슈 
-			       GROUP BY ISU.CO_CD, ISU.SALES_CD, ISU.WBS_PLAN_CODE_KIND, ISU.WBS_PLAN_CODE_ID, ISU.WBS_RSLTS_NO
-			     )        
-			   , RSLT AS --WBS 계획 실적 이슈 
-			     (
-			      SELECT CO_CD
-			            , SALES_CD
-			            , WBS_PLAN_CODE_KIND
-			          --, WBS_PLAN_CODE_ID
-			            , MIN(PLANS_DT)     AS PLANS_DT      --TASK계획시작일
-			            , MAX(PLANE_DT)     AS PLANE_DT      --TASK계획종료일
-			            , SUM(PLAN_DAYCNT)  AS PLAN_DAYCNT   --TASK계획소요일
-			            , SUM(PLAN_CNT)     AS PLAN_CNT      --TASK계획이슈수
-			            , MIN(PLAN_ACTS_DT) AS PLAN_ACTS_DT  --TASK계획조치 시작일
-			            , MAX(PLAN_ACTE_DT) AS PLAN_ACTE_DT  --TASK계획조치 종료일
-			            , SUM(PLAN_ACT_MH)  AS PLAN_ACT_MH   --TASK계획조치 투입공수
-			            , SUM(PLAN_ACT_AMT) AS PLAN_ACT_AMT  --TASK계획조치 투입비용  
-			            , MIN(RSLTSS_DT)    AS RSLTSS_DT     --TASK실적시작일
-			            , MAX(RSLTSE_DT)    AS RSLTSE_DT     --TASK실적종료일 
-			            , SUM(RSLT_DAYCNT)  AS RSLT_DAYCNT   --TASK실적소요일
-			            , SUM(RSLT_CNT)     AS RSLT_CNT      --TASK실적이슈수
-			            , MIN(RSLT_ACTS_DT) AS RSLT_ACTS_DT  --TASK실적조치 시작일
-			            , MAX(RSLT_ACTE_DT) AS RSLT_ACTE_DT  --TASK실적조치 종료일
-			            , SUM(RSLT_ACT_MH)  AS RSLT_ACT_MH   --TASK실적조치 투입공수
-			            , SUM(RSLT_ACT_AMT) AS RSLT_ACT_AMT  --TASK실적조치 투입비용  
-			            , SUM(RSLTS_MH)     AS RSLTS_MH      --TASK실적공수 
-			        FROM (
-			              SELECT PL.CO_CD               --회사코드
-			                   , PL.SALES_CD            --SALES Code 
-			                   , PL.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
-			                   , MIN(PL.WBS_PLANS_DT)    AS PLANS_DT      --TASK계획시작일
-			                   , MAX(PL.WBS_PLANE_DT)    AS PLANE_DT      --TASK계획종료일
-			                   , SUM(PL.DAYCNT)          AS PLAN_DAYCNT   --TASK계획소요일
-			                   , SUM(ISU.PLAN_ISSUE_CNT) AS PLAN_CNT      --TASK계획이슈수
-			                   , MIN(ISU.ACTS_DT)        AS PLAN_ACTS_DT  --TASK계획조치 시작일
-			                   , MAX(ISU.ACTE_DT)        AS PLAN_ACTE_DT  --TASK계획조치 종료일
-			                   , SUM(ISU.ACT_MH)         AS PLAN_ACT_MH   --TASK계획조치 투입공수
-			                   , SUM(ISU.ACT_AMT)        AS PLAN_ACT_AMT  --TASK계획조치 투입비용  
-			                   , ''                      AS RSLTSS_DT     --TASK실적시작일
-			                   , ''                      AS RSLTSE_DT     --TASK실적종료일 
-			                   , 0                       AS RSLT_DAYCNT   --TASK실적소요일
-			                   , 0                       AS RSLT_CNT      --TASK실적이슈수
-			                   , ''                      AS RSLT_ACTS_DT  --TASK실적조치 시작일
-			                   , ''                      AS RSLT_ACTE_DT  --TASK실적조치 종료일
-			                   , 0                       AS RSLT_ACT_MH   --TASK실적조치 투입공수
-			                   , 0                       AS RSLT_ACT_AMT  --TASK실적조치 투입비용 
-			                   , 0                       AS RSLTS_MH      --TASK실적공수
-			                FROM TB_WB22M01  PL--WBS계획 정보
-			                     LEFT OUTER JOIN PLAN_ISSUE AS ISU ON PL.CO_CD              = ISU.CO_CD 
-			                                                      AND PL.SALES_CD           = ISU.SALES_CD 
-			                                                      AND PL.WBS_PLAN_CODE_KIND = ISU.WBS_PLAN_CODE_KIND 
-			                                                      AND PL.WBS_PLAN_CODE_ID   = ISU.WBS_PLAN_CODE_ID 
-			                                                      AND PL.WBS_PLAN_NO        = ISU.WBS_PLAN_NO
-			               WHERE PL.WBS_PLAN_CODE_KIND != 'WBSCODE' --TASK 
-			                 AND PL.CO_CD    = #{coCd}
-			                 AND PL.SALES_CD = #{salesCd}
-			               GROUP BY PL.CO_CD, PL.SALES_CD, PL.WBS_PLAN_CODE_KIND
-			              UNION ALL
-			              SELECT WR.CO_CD               --회사코드
-			                   , WR.SALES_CD            --SALES Code 
-			                   , WR.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
-			                   , ''                      AS PLANS_DT      --TASK계획시작일
-			                   , ''                      AS PLANE_DT      --TASK계획종료일
-			                   , 0                       AS PLAN_DAYCNT   --TASK계획소요일
-			                   , 0                       AS PLAN_CNT      --TASK계획이슈수
-			                   , ''                      AS PLAN_ACTS_DT  --TASK계획조치 시작일
-			                   , ''                      AS PLAN_ACTE_DT  --TASK계획조치 종료일
-			                   , 0                       AS PLAN_ACT_MH   --TASK계획조치 투입공수
-			                   , 0                       AS PLAN_ACT_AMT  --TASK계획조치 투입비용  
-			                   , MIN(WR.WBS_RSLTSS_DT)   AS RSLTSS_DT     --TASK실적시작일
-			                   , MAX(WR.WBS_RSLTSE_DT)   AS RSLTSE_DT     --TASK실적종료일 
-			                   , SUM(WR.DAYCNT)          AS RSLT_DAYCNT   --TASK실적소요일
-			                   , SUM(ISU.RSLT_ISSUE_CNT) AS RSLT_CNT      --TASK실적이슈수
-			                   , MIN(ISU.ACTS_DT)        AS RSLT_ACTS_DT  --TASK실적조치 시작일
-			                   , MAX(ISU.ACTE_DT)        AS RSLT_ACTE_DT  --TASK실적조치 종료일
-			                   , SUM(ISU.ACT_MH)         AS RSLT_ACT_MH   --TASK실적조치 투입공수
-			                   , SUM(ISU.ACT_AMT)        AS RSLT_ACT_AMT  --TASK실적조치 투입비용  
-			                   , SUM(WR.WBS_RSLTS_MH)    AS RSLTS_MH      --TASK실적공수                        
-			               FROM TB_WB23M01  WR--WBS실적 정보
-			                     LEFT OUTER JOIN RSLT_ISSUE AS ISU ON WR.CO_CD              = ISU.CO_CD 
-			                                                      AND WR.SALES_CD           = ISU.SALES_CD 
-			                                                      AND WR.WBS_PLAN_CODE_KIND = ISU.WBS_PLAN_CODE_KIND 
-			                                                      AND WR.WBS_PLAN_CODE_ID   = ISU.WBS_PLAN_CODE_ID 
-			                                                      AND WR.WBS_RSLTS_NO       = ISU.WBS_RSLTS_NO
-			              WHERE WR.CO_CD = #{coCd}
-			                AND WR.SALES_CD = #{salesCd}
-			              GROUP BY WR.CO_CD, WR.SALES_CD, WR.WBS_PLAN_CODE_KIND
-			             )
-			       GROUP BY CO_CD
-			              , SALES_CD
-			              , WBS_PLAN_CODE_KIND
-			     )
-			SELECT P.CO_CD
-			      , P.SALES_CD
-			      -----------------------------------------------------------------------------원가정보 Grouping : 화면상단에 표기
-			      , NVL(S.EST_PRC, 0) AS EST_PRC           --견적원가
-			      , NVL(S.TRGT_PRC, 0) AS TRGT_PRC          --목표원가
-			      , NVL(S.ACT_PRC, 0) AS  ACT_PRC          --실행원가
-			      , NVL(TRGT_RATE, 0) AS  TRGT_RATE           --견적대비 목표율
-			      , NVL(ACT_RATE, 0) AS   ACT_RATE           --목표대비 실적율
-			      -----------------------------------------------------------------------------계획정보 Grouping
-			      , P.WBS_PLAN_CODE_NM  --계획명
-			      , P.WBS_PLAN_MNG_NM   --계획담당자 
-			      , P.WBS_PLANS_DT      AS  WBS_PLANS_DT     --계획시작일 : LVL1
-			      , P.WBS_PLANE_DT     AS  WBS_PLANE_DT     --계획종료일 : LVL1
-			      , NVL(P.DAYCNT, 0) AS DAYCNT           --계획소요일 : LVL1
-			      -----------------------------------------------------------------------------계획/실적 Grouping
-			      , TO_CHAR(R.PLANS_DT, 'YYYY-MM-DD')      AS PLANS_DT     --TASK계획시작일
-			      , TO_CHAR(R.PLANE_DT, 'YYYY-MM-DD')      AS PLANE_DT    --TASK계획종료일
-			      , NVL(R.PLAN_DAYCNT, 0) AS PLAN_DAYCNT                   --TASK계획소요일
-			      , TO_CHAR(R.RSLTSS_DT, 'YYYY-MM-DD')     AS RSLTSS_DT   --TASK실적시작일
-			      , TO_CHAR(R.RSLTSE_DT, 'YYYY-MM-DD')     AS RSLTSE_DT   --TASK실적종료일 
-			      , NVL(R.RSLT_DAYCNT, 0) AS RSLT_DAYCNT                  --TASK실적소요일
-			      , NVL(R.RSLTS_MH, 0)                     AS RSLTS_MH    --TASK실적공수 
-			      , CASE WHEN NVL(R.PLAN_DAYCNT,0) = 0 THEN 0
-			             ELSE ROUND( (R.RSLT_DAYCNT / R.PLAN_DAYCNT) * 100, 2)
-			        END  AS DAY_RATE   --계획대비 실적율 
-			      -----------------------------------------------------------------------------이슈 Grouping
-			      , NVL(R.PLAN_CNT, 0) AS PLAN_CNT     --TASK계획이슈수
-			      , TO_CHAR(R.PLAN_ACTS_DT, 'YYYY-MM-DD')  AS PLAN_ACTS_DT --TASK계획이슈 조치 시작일
-			      , TO_CHAR(R.PLAN_ACTE_DT, 'YYYY-MM-DD')  AS PLAN_ACTE_DT --TASK계획이슈 조치 종료일
-			      , NVL(R.PLAN_ACT_MH, 0)                  AS PLAN_ACT_MH  --TASK계획이슈 조치 투입공수
-			      , NVL(R.PLAN_ACT_AMT, 0)                 AS PLAN_ACT_AMT --TASK계획이슈 조치 투입비용
-			      , NVL(R.RSLT_CNT, 0)                     AS RSLT_CNT     --TASK실적이슈수
-			      , TO_CHAR(R.RSLT_ACTS_DT, 'YYYY-MM-DD')  AS RSLT_ACTS_DT --TASK실적이슈 조치 시작일
-			      , TO_CHAR(R.RSLT_ACTE_DT, 'YYYY-MM-DD')  AS RSLT_ACTE_DT --TASK실적이슈 조치 종료일
-			      , NVL(R.RSLT_ACT_MH, 0)                  AS RSLT_ACT_MH  --TASK실적이슈 조치 투입공수
-			      , NVL(R.RSLT_ACT_AMT, 0)                 AS RSLT_ACT_AMT --TASK실적이슈 조치 투입비용
-			  FROM T_PLAN AS P
-			       INNER      JOIN SJD  AS S ON P.CO_CD = S.CO_CD AND P.SALES_CD = S.SALES_CD 
-			       LEFT OUTER JOIN RSLT AS R ON P.CO_CD = R.CO_CD AND P.SALES_CD = R.SALES_CD AND P.WBS_PLAN_CODE_ID = R.WBS_PLAN_CODE_KIND
-			 WHERE 1=1
+		     ( 
+		       SELECT CO_CD
+		             , SALES_CD
+		             , VER_NO
+		             , WBS_PLAN_CODE_ID
+		             , (SELECT FN_CM05M01_CD_TO_NM(WBS_PLAN_CODE_ID) FROM DUAL) AS WBS_PLAN_CODE_NM
+		             , TO_CHAR(WBS_PLANS_DT, 'YYYY-MM-DD')                       AS WBS_PLANS_DT
+		             , TO_CHAR(WBS_PLANE_DT, 'YYYY-MM-DD')                       AS WBS_PLANE_DT
+		             , DAYCNT                                                    AS DAYCNT
+		             , (SELECT FN_CM06M01_ID_TO_NM(WBS_PLAN_MNG_ID) FROM DUAL)  AS WBS_PLAN_MNG_NM                          
+		             , CLOSE_YN                                                  AS CLOSE_YN
+		          FROM TB_WB22M01 --WBS계획 정보
+		         WHERE CO_CD    = #{coCd}
+		           AND SALES_CD = #{salesCd}
+		           AND WBS_PLAN_CODE_NM IS NULL --LVL1 : 계획
+		         ORDER BY WBS_PLAN_CODE_ID
+		     )
+		   , SJD AS --수주상세 
+		     ( 
+		      SELECT M.CO_CD                                                               AS CO_CD    --회사코드
+		            , M.ORDRS_NO                                                            AS ORDRS_NO --수주번호
+		            , X.SALES_CD                                                            AS SALES_CD --SALES Code
+		            , M.ORDRS_CLNT_CD                                                       AS CLNT_CD  --고객코드
+		            , C.CLNT_NM                                                             AS CLNT_NM  --고객명
+		            , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)                   AS CLNT_PJT_NM  --고객사프로젝트명
+		            , X.EST_EPCT_MAT_PRC                                                    AS EST_PRC  --견적원가 : 예상재료비
+		            , X.TRGT_PCHS_PCOST_MACH +  X.TRGT_PCHS_PCOST_ELCTY                     AS TRGT_PRC --목표원가 : 기계전기합계 
+		            , (X.ACT_RGL_MACH + X.ACT_OBS_MACH)+(X.ACT_RGL_ELCTY + X.ACT_OBS_ELCTY) AS ACT_PRC  --실행원가 : 구매/외주 합계
+		            , CASE WHEN NVL(X.EST_EPCT_MAT_PRC,0) = 0 THEN 0
+		                   ELSE ROUND( ( ( X.TRGT_PCHS_PCOST_MACH +  X.TRGT_PCHS_PCOST_ELCTY) / X.EST_EPCT_MAT_PRC) * 100, 2)
+		              END                                                                   AS TRGT_RATE--견적대비 목표율             
+		            , CASE WHEN NVL(X.TRGT_PCHS_PCOST_MACH,0) + NVL(X.TRGT_PCHS_PCOST_ELCTY,0) = 0 THEN 0
+		                   ELSE ROUND( ( (X.ACT_RGL_MACH + X.ACT_OBS_MACH + X.ACT_RGL_ELCTY + X.ACT_OBS_ELCTY) / (X.TRGT_PCHS_PCOST_MACH +  X.TRGT_PCHS_PCOST_ELCTY) 
+		                                ) * 100, 2)
+		              END                                                                   AS ACT_RATE--목표대비 실적율
+		         FROM TB_CR02M01  M --수주마스터
+		              INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+		              INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+		        WHERE 1=1
+		          AND M.CO_CD    = #{coCd}
+		          AND X.SALES_CD = #{salesCd}
+		          AND X.SALES_CD IS NOT NULL --비용제외
+		     )
+		   , PLAN_ISSUE AS --계획이슈
+		     (
+		      SELECT ISU.CO_CD               --회사코드
+		            , ISU.SALES_CD            --SALES Code 
+		            , ISU.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
+		            , ISU.WBS_PLAN_CODE_ID    --WBS계획 LVL2
+		            , ISU.WBS_PLAN_NO         --WBS계획 번호
+		            , COUNT(ISU.ISS_NO)      AS PLAN_ISSUE_CNT
+		            , MIN(ACT.ACTS_DT)       AS ACTS_DT--조치 시작일
+		            , MAX(ACT.ACTE_DT)       AS ACTE_DT--조치 종료일
+		            , SUM(ACT.ACT_MH)        AS ACT_MH--조치 투입공수
+		            , SUM(ACT.ACT_AMT)       AS ACT_AMT--조치 투입비용  
+		        FROM TB_WB24M02 AS ISU --WBS이슈 정보
+		             LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --계획이슈 조치내용
+		       WHERE ISU.CO_CD    = #{coCd}
+		         AND ISU.SALES_CD = #{salesCd}
+		         AND ISU.WBS_PLAN_NO IS NOT NULL --계획이슈 
+		       GROUP BY ISU.CO_CD, ISU.SALES_CD, ISU.WBS_PLAN_CODE_KIND, ISU.WBS_PLAN_CODE_ID, ISU.WBS_PLAN_NO
+		     )
+		   , RSLT_ISSUE AS --실적이슈
+		     ( 
+		      SELECT ISU.CO_CD              --회사코드
+		           , ISU.SALES_CD            --SALES Code 
+		           , ISU.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
+		           , ISU.WBS_PLAN_CODE_ID    --WBS계획 LVL2
+		           , ISU.WBS_RSLTS_NO        --WBS실적 번호
+		           , COUNT(ISU.ISS_NO)      AS RSLT_ISSUE_CNT
+		           , MIN(ACT.ACTS_DT)       AS ACTS_DT --조치 시작일
+		           , MAX(ACT.ACTE_DT)       AS ACTE_DT --조치 종료일
+		           , SUM(ACT.ACT_MH)        AS ACT_MH  --조치 투입공수
+		           , SUM(ACT.ACT_AMT)       AS ACT_AMT --조치 투입비용  
+		        FROM TB_WB24M02  AS ISU --WBS이슈 정보
+		             LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --실적이슈 조치내용
+		       WHERE ISU.CO_CD    = #{coCd}
+		         AND ISU.SALES_CD = #{salesCd}
+		         AND ISU.WBS_RSLTS_NO IS NOT NULL --실적이슈 
+		       GROUP BY ISU.CO_CD, ISU.SALES_CD, ISU.WBS_PLAN_CODE_KIND, ISU.WBS_PLAN_CODE_ID, ISU.WBS_RSLTS_NO
+		     )        
+		   , RSLT AS --WBS 계획_실적_이슈 
+		     (
+		      SELECT CO_CD
+		            , SALES_CD
+		            , WBS_PLAN_CODE_KIND
+		          --, WBS_PLAN_CODE_ID
+		            , MIN(PLANS_DT)     AS PLANS_DT      --TASK계획시작일
+		            , MAX(PLANE_DT)     AS PLANE_DT      --TASK계획종료일
+		            , SUM(PLAN_DAYCNT)  AS PLAN_DAYCNT   --TASK계획소요일
+		            , SUM(PLAN_CNT)     AS PLAN_CNT      --TASK계획이슈수
+		            , MIN(PLAN_ACTS_DT) AS PLAN_ACTS_DT  --TASK계획조치 시작일
+		            , MAX(PLAN_ACTE_DT) AS PLAN_ACTE_DT  --TASK계획조치 종료일
+		            , SUM(PLAN_ACT_MH)  AS PLAN_ACT_MH   --TASK계획조치 투입공수
+		            , SUM(PLAN_ACT_AMT) AS PLAN_ACT_AMT  --TASK계획조치 투입비용  
+		            , MIN(RSLTSS_DT)    AS RSLTSS_DT     --TASK실적시작일
+		            , MAX(RSLTSE_DT)    AS RSLTSE_DT     --TASK실적종료일 
+		            , SUM(RSLT_DAYCNT)  AS RSLT_DAYCNT   --TASK실적소요일
+		            , SUM(RSLT_CNT)     AS RSLT_CNT      --TASK실적이슈수
+		            , MIN(RSLT_ACTS_DT) AS RSLT_ACTS_DT  --TASK실적조치 시작일
+		            , MAX(RSLT_ACTE_DT) AS RSLT_ACTE_DT  --TASK실적조치 종료일
+		            , SUM(RSLT_ACT_MH)  AS RSLT_ACT_MH   --TASK실적조치 투입공수
+		            , SUM(RSLT_ACT_AMT) AS RSLT_ACT_AMT  --TASK실적조치 투입비용  
+		            , SUM(RSLTS_MH)     AS RSLTS_MH      --TASK실적공수 
+		        FROM (
+		              SELECT PL.CO_CD               --회사코드
+		                   , PL.SALES_CD            --SALES Code 
+		                   , PL.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
+		                   , MIN(PL.WBS_PLANS_DT)    AS PLANS_DT      --TASK계획시작일
+		                   , MAX(PL.WBS_PLANE_DT)    AS PLANE_DT      --TASK계획종료일
+		                   , SUM(PL.DAYCNT)          AS PLAN_DAYCNT   --TASK계획소요일
+		                   , SUM(ISU.PLAN_ISSUE_CNT) AS PLAN_CNT      --TASK계획이슈수
+		                   , MIN(ISU.ACTS_DT)        AS PLAN_ACTS_DT  --TASK계획조치 시작일
+		                   , MAX(ISU.ACTE_DT)        AS PLAN_ACTE_DT  --TASK계획조치 종료일
+		                   , SUM(ISU.ACT_MH)         AS PLAN_ACT_MH   --TASK계획조치 투입공수
+		                   , SUM(ISU.ACT_AMT)        AS PLAN_ACT_AMT  --TASK계획조치 투입비용  
+		                   , ''                      AS RSLTSS_DT     --TASK실적시작일
+		                   , ''                      AS RSLTSE_DT     --TASK실적종료일 
+		                   , 0                       AS RSLT_DAYCNT   --TASK실적소요일
+		                   , 0                       AS RSLT_CNT      --TASK실적이슈수
+		                   , ''                      AS RSLT_ACTS_DT  --TASK실적조치 시작일
+		                   , ''                      AS RSLT_ACTE_DT  --TASK실적조치 종료일
+		                   , 0                       AS RSLT_ACT_MH   --TASK실적조치 투입공수
+		                   , 0                       AS RSLT_ACT_AMT  --TASK실적조치 투입비용 
+		                   , 0                       AS RSLTS_MH      --TASK실적공수
+		                FROM TB_WB22M01  PL--WBS계획 정보
+		                     LEFT OUTER JOIN PLAN_ISSUE AS ISU ON PL.CO_CD              = ISU.CO_CD 
+		                                                      AND PL.SALES_CD           = ISU.SALES_CD 
+		                                                      AND PL.WBS_PLAN_CODE_KIND = ISU.WBS_PLAN_CODE_KIND 
+		                                                      AND PL.WBS_PLAN_CODE_ID   = ISU.WBS_PLAN_CODE_ID 
+		                                                      AND PL.WBS_PLAN_NO        = ISU.WBS_PLAN_NO
+		               WHERE PL.WBS_PLAN_CODE_KIND != 'WBSCODE' --TASK 
+		                 AND PL.CO_CD    = #{coCd}
+		                 AND PL.SALES_CD = #{salesCd}
+		               GROUP BY PL.CO_CD, PL.SALES_CD, PL.WBS_PLAN_CODE_KIND
+		              UNION ALL
+		              SELECT WR.CO_CD               --회사코드
+		                   , WR.SALES_CD            --SALES Code 
+		                   , WR.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
+		                   , ''                      AS PLANS_DT      --TASK계획시작일
+		                   , ''                      AS PLANE_DT      --TASK계획종료일
+		                   , 0                       AS PLAN_DAYCNT   --TASK계획소요일
+		                   , 0                       AS PLAN_CNT      --TASK계획이슈수
+		                   , ''                      AS PLAN_ACTS_DT  --TASK계획조치 시작일
+		                   , ''                      AS PLAN_ACTE_DT  --TASK계획조치 종료일
+		                   , 0                       AS PLAN_ACT_MH   --TASK계획조치 투입공수
+		                   , 0                       AS PLAN_ACT_AMT  --TASK계획조치 투입비용  
+		                   , MIN(WR.WBS_RSLTSS_DT)   AS RSLTSS_DT     --TASK실적시작일
+		                   , MAX(WR.WBS_RSLTSE_DT)   AS RSLTSE_DT     --TASK실적종료일 
+		                   , SUM(WR.DAYCNT)          AS RSLT_DAYCNT   --TASK실적소요일
+		                   , SUM(ISU.RSLT_ISSUE_CNT) AS RSLT_CNT      --TASK실적이슈수
+		                   , MIN(ISU.ACTS_DT)        AS RSLT_ACTS_DT  --TASK실적조치 시작일
+		                   , MAX(ISU.ACTE_DT)        AS RSLT_ACTE_DT  --TASK실적조치 종료일
+		                   , SUM(ISU.ACT_MH)         AS RSLT_ACT_MH   --TASK실적조치 투입공수
+		                   , SUM(ISU.ACT_AMT)        AS RSLT_ACT_AMT  --TASK실적조치 투입비용  
+		                   , SUM(WR.WBS_RSLTS_MH)    AS RSLTS_MH      --TASK실적공수                    
+		               FROM TB_WB23M01  WR--WBS실적 정보
+		                     LEFT OUTER JOIN RSLT_ISSUE AS ISU ON WR.CO_CD              = ISU.CO_CD 
+		                                                      AND WR.SALES_CD           = ISU.SALES_CD 
+		                                                      AND WR.WBS_PLAN_CODE_KIND = ISU.WBS_PLAN_CODE_KIND 
+		                                                      AND WR.WBS_PLAN_CODE_ID   = ISU.WBS_PLAN_CODE_ID 
+		                                                      AND WR.WBS_RSLTS_NO       = ISU.WBS_RSLTS_NO
+		              WHERE WR.CO_CD = #{coCd}
+		                AND WR.SALES_CD = #{salesCd}
+		              GROUP BY WR.CO_CD, WR.SALES_CD, WR.WBS_PLAN_CODE_KIND
+		             )
+		       GROUP BY CO_CD
+		              , SALES_CD
+		              , WBS_PLAN_CODE_KIND
+		     )
+		SELECT P.CO_CD
+		      , P.SALES_CD
+		      -----------------------------------------------------------------------------수주정보 Grouping : 화면상단에 표기
+		      , S.CLNT_NM           --고객명
+		      , S.CLNT_PJT_NM       --고객사프로젝트명
+		      , S.ORDRS_NO          --수주번호
+		      -----------------------------------------------------------------------------계획정보 Grouping : 화면상단에 표기
+		      , NVL(S.EST_PRC, 0) AS EST_PRC           --견적원가
+              , NVL(S.TRGT_PRC, 0) AS TRGT_PRC          --목표원가
+              , NVL(S.ACT_PRC, 0) AS  ACT_PRC          --실행원가
+              , NVL(TRGT_RATE, 0) AS  TRGT_RATE           --견적대비 목표율
+              , NVL(ACT_RATE, 0) AS   ACT_RATE           --목표대비 실적율
+		      -----------------------------------------------------------------------------계획정보 Grouping
+		      , P.WBS_PLAN_CODE_NM  --계획명
+              , P.WBS_PLAN_MNG_NM   --계획담당자 
+              , P.WBS_PLANS_DT      AS  WBS_PLANS_DT     --계획시작일 : LVL1
+              , P.WBS_PLANE_DT     AS  WBS_PLANE_DT     --계획종료일 : LVL1
+              , NVL(P.DAYCNT, 0) AS DAYCNT           --계획소요일 : LVL1
+		      -----------------------------------------------------------------------------계획/실적 Grouping
+		      , TO_CHAR(R.PLANS_DT, 'YYYY-MM-DD')      AS PLANS_DT     --TASK계획시작일
+              , TO_CHAR(R.PLANE_DT, 'YYYY-MM-DD')      AS PLANE_DT    --TASK계획종료일
+              , NVL(R.PLAN_DAYCNT, 0) AS PLAN_DAYCNT                   --TASK계획소요일
+              , TO_CHAR(R.RSLTSS_DT, 'YYYY-MM-DD')     AS RSLTSS_DT   --TASK실적시작일
+              , TO_CHAR(R.RSLTSE_DT, 'YYYY-MM-DD')     AS RSLTSE_DT   --TASK실적종료일 
+              , NVL(R.RSLT_DAYCNT, 0) AS RSLT_DAYCNT                  --TASK실적소요일
+              , NVL(R.RSLTS_MH, 0)                     AS RSLTS_MH    --TASK실적공수 
+              , CASE WHEN NVL(R.PLAN_DAYCNT,0) = 0 THEN 0
+                         ELSE ROUND( (R.RSLT_DAYCNT / R.PLAN_DAYCNT) * 100, 2)
+                    END  AS DAY_RATE   --계획대비 실적율 
+		      -----------------------------------------------------------------------------이슈 Grouping
+		      , NVL(R.PLAN_CNT, 0) AS PLAN_CNT     --TASK계획이슈수
+                  , TO_CHAR(R.PLAN_ACTS_DT, 'YYYY-MM-DD')  AS PLAN_ACTS_DT --TASK계획이슈 조치 시작일
+                  , TO_CHAR(R.PLAN_ACTE_DT, 'YYYY-MM-DD')  AS PLAN_ACTE_DT --TASK계획이슈 조치 종료일
+                  , NVL(R.PLAN_ACT_MH, 0)                  AS PLAN_ACT_MH  --TASK계획이슈 조치 투입공수
+                  , NVL(R.PLAN_ACT_AMT, 0)                 AS PLAN_ACT_AMT --TASK계획이슈 조치 투입비용
+                  , NVL(R.RSLT_CNT, 0)                     AS RSLT_CNT     --TASK실적이슈수
+                  , TO_CHAR(R.RSLT_ACTS_DT, 'YYYY-MM-DD')  AS RSLT_ACTS_DT --TASK실적이슈 조치 시작일
+                  , TO_CHAR(R.RSLT_ACTE_DT, 'YYYY-MM-DD')  AS RSLT_ACTE_DT --TASK실적이슈 조치 종료일
+                  , NVL(R.RSLT_ACT_MH, 0)                  AS RSLT_ACT_MH  --TASK실적이슈 조치 투입공수
+                  , NVL(R.RSLT_ACT_AMT, 0)                 AS RSLT_ACT_AMT --TASK실적이슈 조치 투입비용
+              FROM T_PLAN AS P
+                   INNER      JOIN SJD  AS S ON P.CO_CD = S.CO_CD AND P.SALES_CD = S.SALES_CD 
+                   LEFT OUTER JOIN RSLT AS R ON P.CO_CD = R.CO_CD AND P.SALES_CD = R.SALES_CD AND P.WBS_PLAN_CODE_ID = R.WBS_PLAN_CODE_KIND
+             WHERE 1=1
      </select>                
 </mapper>

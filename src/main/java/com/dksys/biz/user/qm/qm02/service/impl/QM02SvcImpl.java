@@ -79,7 +79,7 @@ public class QM02SvcImpl implements QM02Svc {
 		map.put("userName", roleArray);
 		map.put("statym", paramMap.get("statym"));
 		map.put("actiontype", paramMap.get("actionType"));
-		map.put("userId", paramMap.get("userId"));
+		map.put("ordrgId", paramMap.get("ordrgId"));
 		map.put("coCd", paramMap.get("coCd"));
 		
 		return qm02Mapper.select_stock_modal(map);

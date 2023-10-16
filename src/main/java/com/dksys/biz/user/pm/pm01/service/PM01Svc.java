@@ -23,4 +23,12 @@ public interface PM01Svc {
   
   List<Map<String, String>> selectMonthlyWorkList(Map<String, String> paramMap);
 
+	int selectWorkPrtCount(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectWorkPrtList(Map<String, String> paramMap);
+
+	int selectWorkOrdrsCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectWorkOrdrsList(Map<String, String> paramMap);
+
 }
