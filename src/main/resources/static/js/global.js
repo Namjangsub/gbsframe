@@ -97,16 +97,16 @@ var ubiprefix = "";
 if(jwt){
 	switch (jwt.serverType){
     case "prod" :
-        ubiprefix = "http://gbs.gunyangitt.co.kr:8090/ubi4";
+        ubiprefix = "https://gbs.gunyangitt.co.kr:8443/ubi4";
         break;
     case "dev" :
-        ubiprefix = "http://localhost:8090/ubi4";
-        break;
-    case "local" :
         ubiprefix = "http://gbs.gunyangitt.co.kr:8090/ubi4";
         break;
-    default :
+    case "local" :
         ubiprefix = "http://localhost:8090/ubi4";
+        break;
+    default :
+        ubiprefix = "http://gbs.gunyangitt.co.kr:8090/ubi4";
 	}
 }
 
