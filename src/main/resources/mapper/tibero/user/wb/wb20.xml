@@ -139,7 +139,7 @@
 	                  D.DEPT_NM, 
 	                  Y.LEVEL_CD, 
 	                  L.LEVEL_NM,
-	                  X.TODO_CF_DT 
+	                  NVL(TO_CHAR(X.TODO_CF_DT, 'YYYY-MM-DD'), '') AS TODO_CF_DT		/* 승인일자 */ 
 	                  FROM (
 						        SELECT TODO_KEY, CO_CD, TODO_ID, TODO_CF_DT FROM TB_WB20M03
 						        WHERE TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
@@ -161,25 +161,30 @@
         
         
            <select id="selectApprovalMaxTodoKeyChk" parameterType="Map" resultType="camelMap">
-               SELECT MAX(TODO_KEY) AS TODO_KEY FROM (
-                      SELECT X.TODO_KEY, X.TODO_CF_DT, 
-                             (SELECT MIN(Y.TODO_KEY) FROM TB_WB20M03 Y
-                                  WHERE Y.TODO_CO_CD = #{todoCoCd}
-                                   AND Y.SALES_CD = #{salesCd}
-                                   AND Y.TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
-                                   AND Y.TODO_DIV2_CODE_ID = #{todoDiv2CodeId}) AS CHK
-                                   FROM TB_WB20M03 X 
-                           WHERE X.TODO_CO_CD = #{todoCoCd}
-                           AND X.SALES_CD = #{salesCd}
-                           AND X.TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
-                           AND X.TODO_DIV2_CODE_ID = #{todoDiv2CodeId}) S
-               WHERE TODO_KEY BETWEEN CHK AND TO_NUMBER(#{todoKey, jdbcType=VARCHAR})-1
-               AND  NVL(TO_CHAR(TODO_CF_DT,'YYYY-MM-DD'),'') = ''                       
+               SELECT MAX(TODO_KEY) AS TODO_KEY 
+                 FROM (
+                       SELECT X.TODO_KEY, X.TODO_CF_DT, 
+                             (SELECT MIN(Y.TODO_KEY) 
+                                FROM TB_WB20M03 Y
+                               WHERE Y.TODO_CO_CD = #{todoCoCd}
+                                 AND Y.SALES_CD = #{salesCd}
+                                 AND Y.TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
+                                 AND Y.TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
+                              ) AS CHK
+                         FROM TB_WB20M03 X 
+                        WHERE X.TODO_CO_CD = #{todoCoCd}
+                          AND X.SALES_CD = #{salesCd}
+                          AND X.TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
+                          AND X.TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
+                        ) S
+                WHERE TODO_KEY BETWEEN CHK AND TO_NUMBER(#{todoKey, jdbcType=VARCHAR})-1
+               --AND  NVL(TO_CHAR(TODO_CF_DT,'YYYY-MM-DD'),'') = ''                       
+                  AND  TODO_CF_DT IS NULL                       
            </select>  
            
             <update id="updateRsltsQmApproval" parameterType="Map">
                 UPDATE TB_WB20M03
-                   SET TODO_CF_DT = #{todoCfDt},
+                   SET TODO_CF_DT = SYSDATE,
                        TODO_CF_OPN = #{todoCfOpn},
                        UDT_ID = #{creatId},
                        UDT_PGM = #{creatPgm},
@@ -190,7 +195,7 @@
            
            <update id="updateQmQeqst" parameterType="Map">
                 UPDATE TB_WB20M03
-                   SET TODO_CF_DT = #{todoCfDt},
+                   SET TODO_CF_DT = SYSDATE,
                        TODO_CF_OPN = #{todoCfOpn},
                        UDT_ID = #{creatId},
                        UDT_PGM = #{creatPgm},
@@ -201,7 +206,7 @@
                       
     <update id="updateQmMobileApproval" parameterType="Map">
          UPDATE TB_WB20M03
-            SET TODO_CF_DT = #{todoCfDt},
+            SET TODO_CF_DT = SYSDATE,
                 TODO_CF_OPN = #{todoCfOpn},
                 UDT_ID = #{todoId},
                 UDT_PGM = #{creatPgm},
@@ -517,7 +522,7 @@
 			, #{todoDiv1CodeId}
 			, #{todoDiv2CodeId}
 			, #{todoId,					jdbcType=VARCHAR}
-			, #{todoCfDt,				jdbcType=VARCHAR}
+			, SYSDATE
 			, #{todoCfOpn,				jdbcType=VARCHAR}
 			, #{sanctnSttus}
 			, #{salesCd,				jdbcType=VARCHAR}
