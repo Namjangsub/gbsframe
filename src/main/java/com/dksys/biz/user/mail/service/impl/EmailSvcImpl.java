@@ -2,6 +2,7 @@ package com.dksys.biz.user.mail.service.impl;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -63,6 +64,8 @@ public class EmailSvcImpl implements EmailSvc {
     @Autowired
     private UrlService urlService;    
     
+	@Autowired
+    private Environment env;
 	/*************************************************************************
 	 * Spring Boot는 Spring Framework이 제공하는 JavaMailSender로 mimemessage 객체 생성
 	 * Spring의 JavaMailSender를 사용하면
@@ -106,13 +109,32 @@ public class EmailSvcImpl implements EmailSvc {
         int port = mRequest.getServerPort();
         // 4. 호스트 주소까지의 문자열 생성
         String hostAddress = protocol + "://" + host;
-        if (port == 80 || port == 443 ) {
+        System.out.println("Host Address: " + hostAddress);
+        String rptHostAddress = protocol + "://" + host;
+        if (port == 80) {
+//        	rptHostAddress += ":8090";
+        } else if (port == 443 ) {
+//        	rptHostAddress += ":8443";
         } else {
             hostAddress += ":" + port;
         }
 
-        System.out.println("Host Address: " + hostAddress);
-        String targetUrl = hostAddress + "/static/redirectChkCode.html?http://" + host + ":8090/ubi4/ubihtml.jsp" + paramMap.get("tempUrl");
+        String serverType = env.getActiveProfiles()[0];
+    	switch (serverType){
+        case "prod" :
+        	rptHostAddress = "http://192.168.1.8:8090/ubi4/ubihtml.jsp";
+            break;
+        case "dev" :
+        	rptHostAddress = "http://192.168.1.8:8090/ubi4/ubihtml.jsp";
+            break;
+        case "local" :
+        	rptHostAddress = "https://localhost:8443/ubi4/ubihtml.jsp";
+            break;
+        default :
+        	rptHostAddress = "http://localhost:8090/ubi4/ubihtml.jsp";
+    	}
+        // paramMap.get("tempUrl") = "?file=SM0201R03.jrf&arg=coCd%23GUN%23ordrgNo%23BAL2300055%23userId%23jangsub.nam%23"
+        String targetUrl = hostAddress + "/static/redirectChkCode.html?" + rptHostAddress + paramMap.get("tempUrl");
         paramMap.put("longUrl", targetUrl);
         paramMap.put("hostAddress", hostAddress);
         try {
