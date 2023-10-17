@@ -75,6 +75,9 @@ public class WB25SvcImpl implements WB25Svc {
 		       pgParam += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
 		       pgParam += "\"salesCd\":\""+ paramMap.get("salesCd") +"\"}";
 		
+		       
+		String todoTitle = "과제평가 : SALES CODE " + paramMap.get("salesCd");
+		       
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
 		if (sharngArr != null && sharngArr.size() > 0 ) {
@@ -87,6 +90,7 @@ public class WB25SvcImpl implements WB25Svc {
 	            	    sharngMap.put("userId", paramMap.get("userId"));
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
 	            	    sharngMap.put("pgParam", pgParam);
+	            	    sharngMap.put("todoTitle", todoTitle);
 	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
 	            	i++;
 	            } catch (Exception e) {
@@ -108,6 +112,7 @@ public class WB25SvcImpl implements WB25Svc {
 		            	approvalMap.put("userId", paramMap.get("userId"));
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
 		            	approvalMap.put("pgParam", pgParam);
+		            	approvalMap.put("todoTitle", todoTitle);
 	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
 	                	i++;
 	            } catch (Exception e) {
@@ -189,6 +194,8 @@ public class WB25SvcImpl implements WB25Svc {
 			   pgParam += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
 			   pgParam += "\"salesCd\":\""+ paramMap.get("salesCd") +"\"}";
 		
+        String todoTitle = "과제평가 : SALES CODE " + paramMap.get("salesCd");	   
+			   
 		paramMap.put("reqNo", paramMap.get("fileTrgtKey"));
 		paramMap.put("salesCd", paramMap.get("salesCd"));
 		
@@ -214,6 +221,7 @@ public class WB25SvcImpl implements WB25Svc {
 	            	    sharngMap.put("userId", paramMap.get("userId"));
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
 	            	    sharngMap.put("pgParam", pgParam);
+	            	    sharngMap.put("todoTitle", todoTitle);
 	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
 	            	i++;
 	            } catch (Exception e) {
@@ -235,6 +243,7 @@ public class WB25SvcImpl implements WB25Svc {
 		            	approvalMap.put("userId", paramMap.get("userId"));
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
 		            	approvalMap.put("pgParam", pgParam);
+		            	approvalMap.put("todoTitle", todoTitle);
 	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
 	                	i++;
 	            } catch (Exception e) {
