@@ -30,9 +30,24 @@
 						<input type="text" id="mobile" name="mobile" value="01075018741">
 						</td>
 						<td colspan="4" style="vertical-align:top;">
-						<textarea name="mssageDesc" id="mssageDesc" style="width:98%; height:400px; margin:10px; font-size:15pt; line-heihgt:40px;" required msg="메시지내용"></textarea>
+						<textarea name="mssageDesc" id="mssageDesc" style="width:98%; height:400px; margin:10px; font-size:15pt; line-heihgt:40px;" required msg="메시지내용">#{발주일자}일 발주서가 발송되었습니다.
+#{공급사명} 담당자 께서는 #{링크URL} 로 접속하여 납품 예정일자를 입력해 주시기 바랍니다.
+
+발주번호: #{발주번호}
+발주내용: #{발주내용}
+발주서확인 : #{단축URL} / 비밀코드 : #{비밀코드}
+
+발주 담당자:  #{발주담당자}, Tel : #{발주담당전화}
+회사명 : #{발주회사}
+
+(주)건양아이티티/051-312-2400</textarea>
 						</td>	
 					</tr>
+					<tr>
+						<td colspan="2"></td>
+						<td colspan="4">
+						<textarea name="jsonMsg" id="jsonMsg" style="width:98%; height:100px; margin:10px; font-size:15pt; line-heihgt:40px;"></textarea>
+						</td>
 				</table>
 				
 				<br>
@@ -58,6 +73,7 @@
 	var userNm = null;
 	var coCd = null;
 	var useYn = null;
+	var kakaoErr = [];	
 		
 $(document).ready(function() {
 	setCommonSelect($(".popup_area select[data-kind]"));
@@ -70,30 +86,21 @@ $(document).ready(function() {
 	userId = modalStack.last().paramObj.userId;
 	userNm = modalStack.last().paramObj.userNm;		
 		
-	setByCoCd(modalStack.last().paramObj.coCd);
-	$("#coCd").prop("disabled", true);
+
+	//message load
+	var paramObj = {
+					"userId" : jwt.userId
+					, "codeKind" : "KAKAOMSG"
+					//, "codeId" : $("#popForm #currCd").val()
+					};
+	postAjax("/user/sm/sm02/selectCurrToday", paramObj, null
+				, function(data) {   
+					if(data.resultList.length > 0 ) {
+						kakaoErr = data.resultList;
+					}
+	});     //user search ajax end	
 	
-	$.makeReserveDiv = function() {
-		//예약메시지 콤보 key(공통)
-		var options = $('#resveCombo option');
-		var optValues = $.map(options ,function(option) {
-		    return option.value;
-		});
-		//예약메시지 콤보 text(공통)
-		var optLabels = $.map(options ,function(option) {
-		    return option.label;
-		});
-		
-		var divTpl = `<div style="border:1px solid #000; width:90%; margin:10px; height:25px; cursor:pointer;" name="reserveDiv" data-key="@@divKey@@">@@label@@</div>`;
-		let htmlDiv = "";
-		for(var i=0; i<optLabels.length; i++) {
-			let html = divTpl;					
-			html = html.replace(/@@label@@/gi, optLabels[i]);				
-			html = html.replace(/@@divKey@@/gi, optValues[i]);
-			htmlDiv += html;
-		}
-		$("#reserveMsg").append(htmlDiv);			
-	}
+	
 	
 	//등록/수정 버튼
 	actionType = modalStack.last().paramObj.actionType;
@@ -108,11 +115,11 @@ $(document).ready(function() {
 		talkParam.paymentType = "P";
 		talkBody.service = "2310086157";				//서비스번호(1000000000 - 예시  real : 2310086157
 		talkBody.messageId = "TALK"+Math.floor(Math.random() * 1000001);			//고객사에서 관리하는 메시지No - 40byte (unique 값)
-		talkBody.messageType = "AT";			//톡드림 포탈 템플릿 사용하지 않을 경우 사용 (AT: 알림톡, AI: 이미지 알림톡 (messageType 누락시 AT가 기본값으로 사용됨)
+		//talkBody.messageType = "AT";			//톡드림 포탈 템플릿 사용하지 않을 경우 사용 (AT: 알림톡, AI: 이미지 알림톡 (messageType 누락시 AT가 기본값으로 사용됨)
 		talkBody.title = "(주)건양아이티티";				//알림톡 타이틀 - 
-		talkBody.message = "알림톡테스트입니다.";				//알림톡 메시지 (1000 byte)
+		talkBody.message = $("#mssageDesc").val();				//알림톡 메시지 (1000 byte)
 		talkBody.mobile = $("#popForm #mobile").val();				//휴대전화번호
-		talkBody.template = "10000";			//템플릿관리화면 템플릿ID
+		talkBody.template = "10001";			//템플릿관리화면 템플릿ID
 		/*
 		talkBody.price = "";				//가격/금액/결제금액
 		talkBody.currencyType = "";		//메시지내 통화단위
@@ -120,14 +127,32 @@ $(document).ready(function() {
 		talkBody.itemHighlight = "";		//하일라이트
 		talkBody.item = "";				//아이템내용
 		*/
-		let data = JSON.stringify(talkBody);
-		debugger;		
+		var listItem = [];
+		var listObj = {
+						"발주일자": "20231017"
+						, "공급사명": "공급사명"
+						, "링크URL": "링크URL"
+						, "발주번호": "발주번호"
+						, "발주내용": "발주내용"
+						, "단축URL": "URL"
+						, "비밀코드": "비밀코드"
+						, "발주담당자": "발주담당자"
+						, "발주담당전화": "발주담당전화"
+						, "발주회사": "발주회사"
+										
+		};
+		listItem.push(listObj);
+		let talkItem = {"list": listItem};
+		//talkBody.item = talkItem;
+		let talkJson = JSON.stringify(talkBody);
+		$("#jsonMsg").val(talkJson);	
+		//return;
 		//알림톡
 		$.ajax({
 		    type: "POST",
 		    url: "https://talkapi.lgcns.com/request/kakao.json",
 		    contentType: "x-www-form-urlencoded; charset=utf-8",
-		    data: data,
+		    data: talkJson,
 	        beforeSend: function (xhr) {
 	            xhr.setRequestHeader("authToken", talkParam.authToken);
 	            xhr.setRequestHeader("serverName", talkParam.serverName);	            
@@ -138,9 +163,12 @@ $(document).ready(function() {
 		    	console.log('---success---');		
 		    	console.log('status:' + data.status);
 		    	let err = data.status;
-		    	if( err.indexOf("ERR") > -1 ) {
-		    		let errorMsg = 
-		    		alert("오류코드: "+data.status+"\r\n"+);
+		    	if( err.indexOf("ERR") > -1 ) { 
+		    		let find = kakaoErr.find(e => e.codeId === err);
+					if( typeof(find.codeNm) != "undefined" ) {
+			    		var errorMsg = find.codeNm;	
+					}		    			
+		    		alert("오류코드: "+data.status+"\r\n\r\n" + errorMsg);
 		    	}
 		    },
 	        error: function (data) {
@@ -219,23 +247,6 @@ $(document).ready(function() {
 	
 	//----------------------------------------------//
 	
-	function makeFormData() {
 
-		// 날짜 하이픈 제거
-		$.each($('.popup_area input[date]'), function(idx, elem) {
-			deleteHyphen(elem);
-		});
-		// 폼데이터 생성
-		var formData = new FormData($("#popForm")[0]);
-		
-		// 기본값 set
-		formData.append("userId", jwt.userId);
-		 
-		return formData;
-	}
-	
-	function setByCoCd(value) {
-		$('#coCd option:not([value="'+value+'"])').remove();
-	}
 	
 </script>
