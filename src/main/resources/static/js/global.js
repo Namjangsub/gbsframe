@@ -97,10 +97,10 @@ var ubiprefix = "";
 if(jwt){
 	switch (jwt.serverType){
     case "prod" :
-        ubiprefix = "https://gbs.gunyangitt.co.kr:8443/ubi4";
+        ubiprefix = "http://192.168.1.8:8090/ubi4";
         break;
     case "dev" :
-        ubiprefix = "http://gbs.gunyangitt.co.kr:8090/ubi4";
+        ubiprefix = "http://192.168.1.8:8090/ubi4";
         break;
     case "local" :
         ubiprefix = "http://localhost:8090/ubi4";
@@ -574,7 +574,7 @@ function onlyNumber(elem){
 	if(elem.value.trim()){
 //		$(elem).val(addCommaStr(deleteCommaStr($(elem).val().replace(regExp, "$1$2$3"))));
 		var cleanedValue = elem.value.replace(regExp, "$1$2$3");
-        cleanedValue = cleanedValue.replace(/,/g, ''); 
+        cleanedValue = cleanedValue.replace(/,/g, '').replace(/^0+/, ''); 
         $(elem).val(addCommaStr(cleanedValue));
 	}else{
 		$(elem).val(0);
