@@ -107,5 +107,13 @@ public class WB25Ctr {
 		return "jsonView";
     }	
 	
+	@PostMapping(value = "/selectWbsTaskEvlIssList") 
+	public String selectWbsTaskEvlIssList(@RequestBody Map<String, String> paramMap, ModelMap model) {	
+		List<Map<String, String>> resultList = wb25Svc.selectWbsTaskEvlIssList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+    }
+	
+	
 	
 }

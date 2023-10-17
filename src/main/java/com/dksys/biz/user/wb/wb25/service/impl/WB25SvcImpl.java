@@ -291,4 +291,9 @@ public class WB25SvcImpl implements WB25Svc {
 		return wb25Mapper.selectWbsTaskEvlResultList(paramMap);
 	}
 	
+	@Override
+	public List<Map<String, String>> selectWbsTaskEvlIssList(Map<String, String> paramMap) {
+		return wb25Mapper.selectWbsTaskEvlIssList(paramMap);
+	}
+	
 }
