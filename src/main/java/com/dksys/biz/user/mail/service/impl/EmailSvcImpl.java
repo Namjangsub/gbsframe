@@ -106,7 +106,8 @@ public class EmailSvcImpl implements EmailSvc {
         int port = mRequest.getServerPort();
         // 4. 호스트 주소까지의 문자열 생성
         String hostAddress = protocol + "://" + host;
-        if (port != 80) {
+        if (port == 80 || port == 443 ) {
+        } else {
             hostAddress += ":" + port;
         }
 

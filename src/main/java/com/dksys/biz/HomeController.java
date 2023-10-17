@@ -61,7 +61,7 @@ public class HomeController {
 	public String redirect(HttpServletRequest request, @PathVariable String shortUrl){
 		String longUrl= urlService.getLongUrlByshortUrl(shortUrl);
 		if(longUrl != null){
-			return "redirect:"+"http://"+longUrl;
+			return "redirect:"+longUrl;
 		}
 		return  "redirect:/";
 	}

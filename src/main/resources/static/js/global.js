@@ -94,6 +94,7 @@ ModalStack.prototype.close = function(){
 var modalStack = new ModalStack();
 
 var ubiprefix = "";
+debugger;
 if(jwt){
 	switch (jwt.serverType){
     case "prod" :

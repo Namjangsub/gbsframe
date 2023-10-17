@@ -40,7 +40,7 @@ public class UrlServiceImpl implements UrlService{
 //        }
 
 //        longUrl = longUrl.replace("https://","").replace("http://",""); //전부제거
-        longUrl = longUrl.replaceFirst("^(https?://)", ""); //한번만 제거
+//        longUrl = longUrl.replaceFirst("^(https?://)", ""); //한번만 제거
         String strId = urlMapper.getUrlIdByLongUrl(longUrl);
         int id = 0;
         if (strId == null || strId.equals("")) {
@@ -89,7 +89,7 @@ public class UrlServiceImpl implements UrlService{
     
     @Override
     public String shortUrlPromissChkCode(String longUrl) {
-    	longUrl = longUrl.replaceFirst("^(https?://)", ""); // http://, https:// 한번만 제거
+//    	longUrl = longUrl.replaceFirst("^(https?://)", ""); // http://, https:// 한번만 제거
         String strId = urlMapper.getUrlIdByLongUrl(longUrl);
     	return urlMapper.getChkCodeById(Integer.parseInt(strId));
     }
