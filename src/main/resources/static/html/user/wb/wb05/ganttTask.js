@@ -61,7 +61,7 @@ function Task(id, name, code, level, start, end, duration, collapsed) {
   this.endIsMilestone = false;
 
   this.collapsed = collapsed;
-
+  
   //permissions
   // by default all true, but must be inherited from parent
   this.canWrite = true;
@@ -72,8 +72,7 @@ function Task(id, name, code, level, start, end, duration, collapsed) {
   this.rowElement; //row editor html element
   this.ganttElement; //gantt html element
   this.master;
-
-
+  
   this.assigs = [];
 }
 
@@ -714,6 +713,7 @@ Task.prototype.getParents = function () {
   }
   return ret;
 };
+
 
 
 Task.prototype.getParent = function () {

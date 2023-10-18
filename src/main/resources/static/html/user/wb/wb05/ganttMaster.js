@@ -478,6 +478,8 @@ GanttMaster.prototype.loadProject = function (project) {
 
 
   this.loadTasks(project.tasks, project.selectedRow);
+  
+  
   this.deletedTaskIds = [];
 
 
@@ -493,6 +495,11 @@ GanttMaster.prototype.loadProject = function (project) {
   this.endTransaction();
   var self = this;
   this.gantt.element.oneTime(200, function () {self.gantt.centerOnToday()});
+  
+  
+  // 2023.10.18 박성준 추가
+  self.collapseAllTasks();
+  
 };
 
 
@@ -1149,6 +1156,29 @@ GanttMaster.prototype.collapseAll = function () {
   }
 };
 
+
+
+
+
+// 2023.10.18 박성준///////////////////////////////////
+GanttMaster.prototype.collapseAllTasks = function () {
+	
+	for (var i=0; i<this.tasks.length; i++) {
+		if (this.tasks[i].level == "0") {
+			this.tasks[i].rowElement.show();
+			this.tasks[i].collapsed=true;			
+		}
+	    else {
+			this.tasks[i].rowElement.hide();
+		}
+	}
+	this.redraw();
+	//this.storeCollapsedTasks();
+};
+//////////////////////////////////////////	
+
+
+	
 GanttMaster.prototype.fullScreen = function () {
   //console.debug("fullScreen");
   this.workSpace.toggleClass("ganttFullScreen").resize();
