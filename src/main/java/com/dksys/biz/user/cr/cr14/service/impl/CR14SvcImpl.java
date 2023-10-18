@@ -42,8 +42,71 @@ public class CR14SvcImpl implements CR14Svc {
 		return cr14Mapper.select_cr14_List(paramMap);
 	}
 
-	// @Override
-	// public List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap) {
-	// 	return cr05Mapper.selectPmntmtdCd(paramMap);
-	// }
+	// POPUP 그리드 카운트
+	@Override
+	public int select_modal_List1_Count(Map<String, String> paramMap) {
+		return cr14Mapper.select_modal_List1_Count(paramMap);
+	}
+
+	@Override
+	public int select_modal_List2_Count(Map<String, String> paramMap) {
+		return cr14Mapper.select_modal_List2_Count(paramMap);
+	}
+
+	@Override
+	public int select_modal_List3_Count(Map<String, String> paramMap) {
+		return cr14Mapper.select_modal_List3_Count(paramMap);
+	}
+
+	@Override
+	public int select_modal_List4_Count(Map<String, String> paramMap) {
+		return cr14Mapper.select_modal_List4_Count(paramMap);
+	}
+
+	@Override
+	public int select_modal_List5_Count(Map<String, String> paramMap) {
+		return cr14Mapper.select_modal_List5_Count(paramMap);
+	}
+
+	@Override
+	public int select_modal_List6_Count(Map<String, String> paramMap) {
+		return cr14Mapper.select_modal_List6_Count(paramMap);
+	}
+
+	// POPUP 그리드 리스트
+	@Override
+	public List<Map<String, String>> select_modal_List1(Map<String, String> paramMap) {
+		return cr14Mapper.select_modal_List1(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> select_modal_List2(Map<String, String> paramMap) {
+		return cr14Mapper.select_modal_List2(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> select_modal_List3(Map<String, String> paramMap) {
+		return cr14Mapper.select_modal_List3(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> select_modal_List4(Map<String, String> paramMap) {
+		return cr14Mapper.select_modal_List4(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> select_modal_List5(Map<String, String> paramMap) {
+		return cr14Mapper.select_modal_List5(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> select_modal_List6(Map<String, String> paramMap) {
+		return cr14Mapper.select_modal_List6(paramMap);
+	}
+
+	// 수주버전
+	@Override
+	public List<Map<String, Object>> select_ordrsHistNo_List(Map<String, String> paramMap) {
+		return cr14Mapper.select_ordrsHistNo_List(paramMap);
+	}
 }

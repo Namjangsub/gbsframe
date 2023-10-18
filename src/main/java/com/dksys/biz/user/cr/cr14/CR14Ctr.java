@@ -40,11 +40,72 @@ public class CR14Ctr {
 		return "jsonView";
 	}
 
-	// // 수금유형 조회
-	// @PostMapping(value = "/selectPmntmtdCd") 
-	// public String selectPmntmtdCd(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	// 	List<Map<String, Object>> result = cr14svc.selectPmntmtdCd(paramMap);
-	// 	model.addAttribute("result", result);
-	// 	return "jsonView";
-	// }
+	//POPUP 리스트 조회
+	@PostMapping(value = "/select_modal_List1")
+	public String select_modal_List1(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = cr14svc.select_modal_List1_Count(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = cr14svc.select_modal_List1(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/select_modal_List2")
+	public String select_modal_List2(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = cr14svc.select_modal_List2_Count(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = cr14svc.select_modal_List2(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/select_modal_List3")
+	public String select_modal_List3(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = cr14svc.select_modal_List3_Count(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = cr14svc.select_modal_List3(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/select_modal_List4")
+	public String select_modal_List4(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = cr14svc.select_modal_List4_Count(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = cr14svc.select_modal_List4(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/select_modal_List5")
+	public String select_modal_List5(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = cr14svc.select_modal_List5_Count(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = cr14svc.select_modal_List5(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/select_modal_List6")
+	public String select_modal_List6(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = cr14svc.select_modal_List6_Count(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = cr14svc.select_modal_List6(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	// 수주버전 조회
+	@PostMapping(value = "/select_ordrsHistNo_List") 
+	public String select_ordrsHistNo_List(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, Object>> result = cr14svc.select_ordrsHistNo_List(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 }

@@ -759,14 +759,994 @@
 		ORDER BY CO_CD, RRN, COLLAPSE
 	</select>
 
-	<!-- 수금유형 -->		
-	<select id="selectPmntmtdCd" parameterType="Map" resultType="camelMap">
-		SELECT CODE_ID AS CODE_ID
-		     , CODE_NM AS CODE_NM
-		FROM   TB_CM05M01 AS A
-		WHERE  A.CODE_KIND = 'PMNTMTD'
-		<if test="codeId != null and !codeId.equals('')">
-		AND    A.CODE_ID = #{codeId}
-		</if>
+	<!-- 리스트 with -->
+	<sql id="select_ordrs_master">
+		WITH BJM AS 
+		     ( 
+		       SELECT DISTINCT 
+		               A.CO_CD                                               AS CO_CD          --회사코드
+					, (SELECT FN_CM05M01_CD_TO_NM(A.CO_CD) FROM DUAL)       AS CO_CD_NM	   --회사명
+					, A.ORDRG_NO                                             AS ORDRG_NO       --발주번호
+					, A.REQ_NO                                               AS REQ_NO         --요인별 요청번호
+					, A.SALES_CD                                             AS SALES_CD       --SALES CODE
+					, A.PCHS_CLNT_CD                                         AS PCHS_CLNT_CD   --구매처cd
+		            , C.CLNT_NM                                              AS PCHS_CLNT_NM   --구매처명
+					, TO_CHAR(A.ORDRG_DT, 'YYYY-MM-DD')                      AS ORDRG_DT       --발주일자
+					, A.CURR_CD	                                             AS CURR_CD        --통화단위
+					, A.EXRATE                                               AS EXRATE         --환율
+					, TO_CHAR(A.DUDT_DEQ_DT, 'YYYY-MM-DD')                   AS DUDT_DEQ_DT    --납기요청일
+					, A.ORDRG_RMK                                            AS ORDRG_RMK      --비고 
+					, A.IN_CMPLET_YN                                         AS IN_CMPLET_YN   --입고완료여부
+					, A.ETC_FIELD1                                           AS ETC_FIELD1
+					, A.ETC_FIELD2                                           AS ETC_FIELD2
+					, A.ETC_FIELD3                                           AS ETC_FIELD3
+					, A.CREAT_ID                                             AS CREAT_ID
+					, A.CREAT_PGM                                            AS CREAT_PGM
+					, A.CREAT_DTTM                                           AS CREAT_DTTM
+					, A.UDT_ID                                               AS UDT_ID
+					, A.UDT_DTTM                                             AS UDT_DTTM
+					, A.FILE_TRGT_KEY                                        AS FILE_TRGT_KEY    
+		            , E.ORDRG_QTY                                            AS ORDRG_QTY
+		            , E.ORDRG_AMT                                            AS ORDRG_AMT
+		            , E.DSGN_NO 											 AS DSGN_NO			/* 도번 MIN */
+                FROM TB_SM02M01 A --발주마스터
+                	  INNER 	 JOIN TB_SM02D01 B ON(A.ORDRG_NO=B.ORDRG_NO)		/* 발주디테일 */
+                      INNER      JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD--거래처마스터   
+                      LEFT OUTER JOIN (SELECT CO_CD
+		                                     , ORDRG_NO
+		                                     , SALES_CD
+		                                     , SUM(ORDRG_QTY) ORDRG_QTY
+		                                     , SUM(ORDRG_AMT) ORDRG_AMT
+		                                     , MIN(DSGN_NO) AS DSGN_NO
+		                                 FROM TB_SM02D01 
+		                                WHERE CO_CD = #{coCd}
+		                                GROUP BY CO_CD
+		                                        , ORDRG_NO
+		                                        , SALES_CD
+		                                        , DSGN_NO
+                                      ) AS E ON A.CO_CD = E.CO_CD AND A.SALES_CD = E.SALES_CD AND A.ORDRG_NO = E.ORDRG_NO --발주상세
+		       WHERE 1=1
+                <if test="coCd != null and !coCd.equals('')">
+                 AND A.CO_CD = #{coCd}
+                </if>
+                <if test="ordrgDtFrom != null and !ordrgDtFrom.equals('') and  ordrgDtTo != null and !ordrgDtTo.equals('')" >
+                  AND A.ORDRG_DT BETWEEN TO_DATE( #{ordrgDtFrom},'YYYYMMDD') AND TO_DATE( #{ordrgDtTo},'YYYYMMDD') +1
+                </if>
+                <if test="salesCd != null and !salesCd.equals('')">
+                AND A.SALES_CD LIKE '%' || #{salesCd} || '%'   --조회조건 : SALES_CD
+               </if>
+               <!-- 사용안함  -->
+               <if test="ordrgDiv10 != null and !ordrgDiv10.equals('')">
+                AND A.ORDRG_DIV10 = #{ordrgDiv10} --조회조건 : 발주구분  
+               </if>
+               <if test="pchsClntNm != null and !pchsClntNm.equals('')">
+                AND C.CLNT_NM LIKE '%' || #{pchsClntNm} || '%' --조회조건 : 구매처
+               </if>    
+		     )
+		     , SJD AS --수주상세 
+		     ( 
+              SELECT M.CO_CD                                             AS CO_CD         --회사코드
+                    , M.ORDRS_NO                                         AS ORDRS_NO      --수주번호
+                    , M.ORDRS_CLNT_CD                                    AS ORDRS_CLNT_CD --고객코드
+                    , C.CLNT_NM                                          AS ORDRS_CLNT_NM --고객명
+                    , X.SALES_CD                                         AS SALES_CD      --SALES Code
+                    , M.CLNT_PJT                                         AS CLNT_PJT      --고객사PJT 
+                    , X.PRDT_CD                                          AS PRDT_CD       --제품구분
+		            , E.PRDT_NM                                          AS PRDT_NM       --제품구분명
+                    , X.EQP_NM                                           AS EQP_NM        --설비명 
+		            , X.ITEM_DIV                                         AS ITEM_DIV      --아이템구분
+		            , (SELECT FN_CM05M01_CD_TO_NM(X.ITEM_DIV) FROM DUAL) AS ITEM_DIV_NM   --아이템 구분명
+		            , C.CLNT_DIV_CD                                      AS CLNT_DIV_CD    --거래처 분류
+		            , (SELECT FN_CM05M01_CD_TO_NM(C.CLNT_DIV_CD) FROM DUAL) AS CLNT_DIV_NM  --거래처 분류명
+					, FN_CM05M01_CD_TO_NM(M.CLNT_PJT)                    AS CLNT_PJT_NM
+                FROM TB_CR02M01  M --수주마스터
+                      INNER      JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+                      INNER      JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+                      LEFT OUTER JOIN TB_BM01M01 AS E ON X.PRDT_CD       = E.PRDT_CD --제품마스터
+               WHERE 1=1
+               <if test="coCd != null and !coCd.equals('')">
+                 AND M.CO_CD = #{coCd}	
+                </if>
+               <if test="salesCd != null and !salesCd.equals('')">
+                AND X.SALES_CD = #{salesCd} --조회조건 : SALES_CD
+               </if>
+               <if test="itemDiv != null and !itemDiv.equals('')">
+		        AND X.ITEM_DIV = #{itemDiv}  --조회조건 : 아이템 구분
+		       </if>  	
+               <if test="prdtNm != null and !prdtNm.equals('')">
+		        AND E.PRDT_NM LIKE '%' || #{prdtNm} || '%'  --조회조건 : 제품구분명
+		       </if>
+		       <if test="clntNm != null and !clntNm.equals('')">
+		        AND C.CLNT_NM LIKE '%' || #{clntNm} || '%'  --조회조건 : 제품구분명
+		       </if>
+		     )
+		   , TDO AS --TODO 결재공유
+		     (
+		      SELECT SALES_CD 
+		            , TODO_NO
+		            , CASE WHEN (COUNT(TODO_KEY)>0) THEN 'Y'
+		                    ELSE 'N'
+		               END TODO_YN
+		        FROM TB_WB20M03 W20
+		       WHERE 1=1 
+		       GROUP BY SALES_CD 
+		               , TODO_NO     
+		     )
+	</sql>
+
+	<select id="select_modal_List1_Count" parameterType="Map" resultType="int">
+		WITH SJM AS
+		(
+		 SELECT A.CO_NM
+		      , A.EST_NO
+			  , A.EST_DEG
+			  , A.ORDRS_NO
+			  , A.CLNT_NM
+			  , A.ORDRS_DT
+			  , A.ORDRS_DIV_NM
+			  , A.CLNT_PJT_NM
+			  , A.CTRT_NM
+			  , A.MNG_NM
+			  , A.ORDRS_AMT
+			  , A.CURR_NM
+			  , A.EXRATE
+			  , A.PMNT_MTD_NM
+			  , A.ORDRGER
+			  , A.FWD_EXCH_JOIN_DT
+			  , A.CHK_LIST_NM
+			  , A.CTRT_DOC_NM
+			  , A.ORGN_SALES_CD
+			  , A.INPEXP_NM
+			  , A.ORDRS_RMK
+		 FROM   (
+			     SELECT A.FILE_TRGT_KEY     AS FILE_TRGT_KEY
+					  , R1.CODE_NM          AS CO_NM
+					  , A.EST_NO            AS EST_NO
+					  , TO_CHAR(A.EST_DEG)  AS EST_DEG
+					  , A.ORDRS_NO          AS ORDRS_NO
+					  , S.CLNT_NM           AS CLNT_NM
+					  , TO_CHAR(A.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT
+					  , R2.CODE_NM          AS ORDRS_DIV_NM
+					  , R3.CODE_NM          AS CLNT_PJT_NM
+					  , A.CTRT_NM           AS CTRT_NM
+					  , U.NAME              AS MNG_NM
+					  , TO_CHAR(NVL(A.ORDRS_AMT, 0), 'FM999,999,999,999') AS ORDRS_AMT
+					  , R4.CODE_NM          AS CURR_NM
+					  , TO_CHAR(NVL(A.EXRATE, 1), 'FM999,999,999,999') AS EXRATE
+					  , R5.CODE_NM          AS PMNT_MTD_NM
+					  , A.ORDRGER           AS ORDRGER
+					  , TO_CHAR(A.FWD_EXCH_JOIN_DT, 'YYYY-MM-DD') AS FWD_EXCH_JOIN_DT
+					  , CASE WHEN NVL(A.FWD_EXCH_CHK_LIST, 'N') = 'N' THEN 'NO'
+					         ELSE 'YES'
+						END                 AS CHK_LIST_NM
+					  , R6.CODE_NM          AS CTRT_DOC_NM
+					  , A.ORGN_SALES_CD     AS ORGN_SALES_CD
+					  , R7.CODE_NM          AS INPEXP_NM
+					  , A.ORDRS_RMK         AS ORDRS_RMK
+				 FROM   TB_CR02M01 AS A
+				        --고객사
+						LEFT OUTER JOIN TB_BM02M01 AS S ON S.CLNT_CD = A.ORDRS_CLNT_CD
+						--영업담당자
+						LEFT OUTER JOIN TB_CM06M01 AS U ON U.ID = A.MNG_ID
+						--회사
+						LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.CO_CD
+						--수주구분
+						LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.ORDRS_DIV
+						--고객사PJT
+						LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.CLNT_PJT
+						--통화
+						LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = A.CURR_CD
+						--결재방법
+						LEFT OUTER JOIN TB_CM05M01 AS R5 ON R5.CODE_ID = A.PMNT_MTD
+						--계약문서
+						LEFT OUTER JOIN TB_CM05M01 AS R6 ON R6.CODE_ID = A.CTRT_DOC
+						--국내외구분
+						LEFT OUTER JOIN TB_CM05M01 AS R7 ON R7.CODE_ID = A.INPEXP_CD
+				 WHERE  1 = 1
+				 <if test="coCd != null and !coCd.equals('')">
+				 AND    A.CO_CD    = #{coCd}
+				 </if>
+				 <if test="ordrsNo != null and !ordrsNo.equals('')">
+				 AND    A.ORDRS_NO = #{ordrsNo}
+				 </if>
+				) AS A
+		 WHERE  1 = 1
+		)
+		, SJM_LIST AS
+		(
+		           SELECT '1.회사'          AS COL_01, CO_NM            AS COLNM_01, '2.수주번호'         AS COL_02, ORDRS_NO    AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '3.견적서번호'    AS COL_01, EST_NO           AS COLNM_01, '4.견적차수'         AS COL_02, EST_DEG     AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '5.고객사'        AS COL_01, CLNT_NM          AS COLNM_01, '6.고객사PJT'        AS COL_02, CLNT_PJT_NM AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '7.수주구분'      AS COL_01, ORDRS_DIV_NM     AS COLNM_01, '8.수주일자'         AS COL_02, ORDRS_DT    AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '9.계약명'        AS COL_01, CTRT_NM          AS COLNM_01, '10.비고'            AS COL_02, ORDRS_RMK   AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '11.담당자'       AS COL_01, MNG_NM           AS COLNM_01, '12.발주자'          AS COL_02, ORDRGER     AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '13.계약문서'     AS COL_01, CTRT_DOC_NM      AS COLNM_01, '14.국내외구분'      AS COL_02, INPEXP_NM   AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '15.선물환가입일' AS COL_01, FWD_EXCH_JOIN_DT AS COLNM_01, '16.선물환CheckList' AS COL_02, CHK_LIST_NM AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '17.결재방법'     AS COL_01, PMNT_MTD_NM      AS COLNM_01, '18.통화단위'        AS COL_02, CURR_NM     AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '19.환율'         AS COL_01, EXRATE           AS COLNM_01, '20.수주금액'        AS COL_02, ORDRS_AMT   AS COLNM_02 FROM SJM
+		)
+		SELECT COUNT(*)
+		FROM   SJM_LIST
+		WHERE  1 = 1
+    </select>
+
+	<select id="select_modal_List1" parameterType="Map" resultType="camelMap">
+		<!-- <include refid="select_ordrs_master"></include> -->
+		WITH SJM AS
+		(
+		 SELECT A.CO_NM
+		      , A.EST_NO
+			  , A.EST_DEG
+			  , A.ORDRS_NO
+			  , A.CLNT_NM
+			  , A.ORDRS_DT
+			  , A.ORDRS_DIV_NM
+			  , A.CLNT_PJT_NM
+			  , A.CTRT_NM
+			  , A.MNG_NM
+			  , A.ORDRS_AMT
+			  , A.CURR_NM
+			  , A.EXRATE
+			  , A.PMNT_MTD_NM
+			  , A.ORDRGER
+			  , A.FWD_EXCH_JOIN_DT
+			  , A.CHK_LIST_NM
+			  , A.CTRT_DOC_NM
+			  , A.ORGN_SALES_CD
+			  , A.INPEXP_NM
+			  , A.ORDRS_RMK
+		 FROM   (
+			     SELECT A.FILE_TRGT_KEY     AS FILE_TRGT_KEY
+					  , R1.CODE_NM          AS CO_NM
+					  , A.EST_NO            AS EST_NO
+					  , TO_CHAR(A.EST_DEG)  AS EST_DEG
+					  , A.ORDRS_NO          AS ORDRS_NO
+					  , S.CLNT_NM           AS CLNT_NM
+					  , TO_CHAR(A.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT
+					  , R2.CODE_NM          AS ORDRS_DIV_NM
+					  , R3.CODE_NM          AS CLNT_PJT_NM
+					  , A.CTRT_NM           AS CTRT_NM
+					  , U.NAME              AS MNG_NM
+					  , TO_CHAR(NVL(A.ORDRS_AMT, 0), 'FM999,999,999,999') AS ORDRS_AMT
+					  , R4.CODE_NM          AS CURR_NM
+					  , TO_CHAR(NVL(A.EXRATE, 1), 'FM999,999,999,999') AS EXRATE
+					  , R5.CODE_NM          AS PMNT_MTD_NM
+					  , A.ORDRGER           AS ORDRGER
+					  , TO_CHAR(A.FWD_EXCH_JOIN_DT, 'YYYY-MM-DD') AS FWD_EXCH_JOIN_DT
+					  , CASE WHEN NVL(A.FWD_EXCH_CHK_LIST, 'N') = 'N' THEN 'NO'
+					         ELSE 'YES'
+						END                 AS CHK_LIST_NM
+					  , R6.CODE_NM          AS CTRT_DOC_NM
+					  , A.ORGN_SALES_CD     AS ORGN_SALES_CD
+					  , R7.CODE_NM          AS INPEXP_NM
+					  , A.ORDRS_RMK         AS ORDRS_RMK
+				 FROM   TB_CR02M01 AS A
+				        --고객사
+						LEFT OUTER JOIN TB_BM02M01 AS S ON S.CLNT_CD = A.ORDRS_CLNT_CD
+						--영업담당자
+						LEFT OUTER JOIN TB_CM06M01 AS U ON U.ID = A.MNG_ID
+						--회사
+						LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.CO_CD
+						--수주구분
+						LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.ORDRS_DIV
+						--고객사PJT
+						LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.CLNT_PJT
+						--통화
+						LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = A.CURR_CD
+						--결재방법
+						LEFT OUTER JOIN TB_CM05M01 AS R5 ON R5.CODE_ID = A.PMNT_MTD
+						--계약문서
+						LEFT OUTER JOIN TB_CM05M01 AS R6 ON R6.CODE_ID = A.CTRT_DOC
+						--국내외구분
+						LEFT OUTER JOIN TB_CM05M01 AS R7 ON R7.CODE_ID = A.INPEXP_CD
+				 WHERE  1 = 1
+				 <if test="coCd != null and !coCd.equals('')">
+				 AND    A.CO_CD    = #{coCd}
+				 </if>
+				 <if test="ordrsNo != null and !ordrsNo.equals('')">
+				 AND    A.ORDRS_NO = #{ordrsNo}
+				 </if>
+				) AS A
+		 WHERE  1 = 1
+		)
+		, SJM_LIST AS
+		(
+		           SELECT '1.회사'          AS COL_01, CO_NM            AS COLNM_01, '2.수주번호'         AS COL_02, ORDRS_NO    AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '3.견적서번호'    AS COL_01, EST_NO           AS COLNM_01, '4.견적차수'         AS COL_02, EST_DEG     AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '5.고객사'        AS COL_01, CLNT_NM          AS COLNM_01, '6.고객사PJT'        AS COL_02, CLNT_PJT_NM AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '7.수주구분'      AS COL_01, ORDRS_DIV_NM     AS COLNM_01, '8.수주일자'         AS COL_02, ORDRS_DT    AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '9.계약명'        AS COL_01, CTRT_NM          AS COLNM_01, '10.비고'            AS COL_02, ORDRS_RMK   AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '11.담당자'       AS COL_01, MNG_NM           AS COLNM_01, '12.발주자'          AS COL_02, ORDRGER     AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '13.계약문서'     AS COL_01, CTRT_DOC_NM      AS COLNM_01, '14.국내외구분'      AS COL_02, INPEXP_NM   AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '15.선물환가입일' AS COL_01, FWD_EXCH_JOIN_DT AS COLNM_01, '16.선물환CheckList' AS COL_02, CHK_LIST_NM AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '17.결재방법'     AS COL_01, PMNT_MTD_NM      AS COLNM_01, '18.통화단위'        AS COL_02, CURR_NM     AS COLNM_02 FROM SJM
+		 UNION ALL SELECT '19.환율'         AS COL_01, EXRATE           AS COLNM_01, '20.수주금액'        AS COL_02, ORDRS_AMT   AS COLNM_02 FROM SJM
+		)
+		SELECT *
+		FROM   SJM_LIST
+		WHERE  1 = 1
+    </select>
+
+	<select id="select_modal_List2_Count" parameterType="Map" resultType="int">
+		WITH SJM AS
+		(
+		 SELECT A.FILE_TRGT_KEY     AS FILE_TRGT_KEY
+			  , R1.CODE_NM          AS CO_NM
+			  , NVL(A.EST_NO, '')   AS EST_NO
+			  , TO_CHAR(NVL(A.EST_DEG, ''))  AS EST_DEG
+			  , A.ORDRS_NO          AS ORDRS_NO
+			  , S.CLNT_NM           AS CLNT_NM
+			  , TO_CHAR(A.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT
+			  , R2.CODE_NM          AS ORDRS_DIV_NM
+			  , R3.CODE_NM          AS CLNT_PJT_NM
+			  , A.CTRT_NM           AS CTRT_NM
+			  , U.NAME              AS MNG_NM
+			  , TO_CHAR(NVL(A.ORDRS_AMT, 0), 'FM999,999,999,999') AS ORDRS_AMT
+			  , R4.CODE_NM          AS CURR_NM
+			  , TO_CHAR(NVL(A.EXRATE, 1), 'FM999,999,999,999') AS EXRATE
+			  , R5.CODE_NM          AS PMNT_MTD_NM
+			  , A.ORDRGER           AS ORDRGER
+			  , TO_CHAR(A.FWD_EXCH_JOIN_DT, 'YYYY-MM-DD') AS FWD_DT
+			  , CASE WHEN NVL(A.FWD_EXCH_CHK_LIST, 'N') = 'N' THEN 'NO'
+			         ELSE 'YES'
+				END                 AS CHK_LIST_NM
+			  , R6.CODE_NM          AS CTRT_DOC_NM
+			  , NVL(A.ORGN_SALES_CD, '') AS ORGN_SALES_CD
+			  , R7.CODE_NM          AS INPEXP_NM
+			  , A.ORDRS_RMK         AS ORDRS_RMK
+			  , CASE WHEN A.EST_NO = C.EST_NO                       THEN 'Y' ELSE 'N' END AS EST_NO_YN
+			  , CASE WHEN A.EST_DEG = C.EST_DEG                     THEN 'Y' ELSE 'N' END AS EST_DEG_YN
+			  , CASE WHEN A.ORDRS_CLNT_CD = C.ORDRS_CLNT_CD         THEN 'Y' ELSE 'N' END AS CLNT_CD_YN
+			  , CASE WHEN A.ORDRS_DT = C.ORDRS_DT                   THEN 'Y' ELSE 'N' END AS ORDRS_DT_YN
+			  , CASE WHEN A.ORDRS_DIV = C.ORDRS_DIV                 THEN 'Y' ELSE 'N' END AS ORDRS_DIV_YN
+			  , CASE WHEN A.CLNT_PJT = C.CLNT_PJT                   THEN 'Y' ELSE 'N' END AS CLNT_PJT_YN
+			  , CASE WHEN A.CTRT_NM = C.CTRT_NM                     THEN 'Y' ELSE 'N' END AS CTRT_NM_YN
+			  , CASE WHEN A.MNG_ID = C.MNG_ID                       THEN 'Y' ELSE 'N' END AS MNG_ID_YN
+			  , CASE WHEN A.ORDRS_AMT = C.ORDRS_AMT                 THEN 'Y' ELSE 'N' END AS ORDRS_AMT_YN
+			  , CASE WHEN A.CURR_CD = C.CURR_CD                     THEN 'Y' ELSE 'N' END AS CURR_CD_YN
+			  , CASE WHEN A.EXRATE = C.EXRATE                       THEN 'Y' ELSE 'N' END AS EXRATE_YN
+			  , CASE WHEN A.PMNT_MTD = C.PMNT_MTD                   THEN 'Y' ELSE 'N' END AS PMNT_MTD_YN
+			  , CASE WHEN A.ORDRGER = C.ORDRGER                     THEN 'Y' ELSE 'N' END AS ORDRGER_YN
+			  , CASE WHEN A.FWD_EXCH_JOIN_DT = C.FWD_EXCH_JOIN_DT   THEN 'Y' ELSE 'N' END AS FWD_DT_YN
+			  , CASE WHEN A.FWD_EXCH_CHK_LIST = C.FWD_EXCH_CHK_LIST THEN 'Y' ELSE 'N' END AS CHK_LIST_YN
+			  , CASE WHEN A.CTRT_DOC = C.CTRT_DOC                   THEN 'Y' ELSE 'N' END AS CTRT_DOC_YN
+			  , CASE WHEN A.ORGN_SALES_CD = C.ORGN_SALES_CD         THEN 'Y' ELSE 'N' END AS ORGN_SALES_CD_YN
+			  , CASE WHEN A.INPEXP_CD = C.INPEXP_CD                 THEN 'Y' ELSE 'N' END AS INPEXP_CD_YN
+			  , CASE WHEN A.ORDRS_RMK = C.ORDRS_RMK                 THEN 'Y' ELSE 'N' END AS ORDRS_RMK_YN
+		 FROM   TB_CR02M01_HIST AS A
+		        --수주
+				LEFT OUTER JOIN TB_CR02M01 AS C ON C.FILE_TRGT_KEY = A.FILE_TRGT_KEY
+		        --고객사
+				LEFT OUTER JOIN TB_BM02M01 AS S ON S.CLNT_CD = A.ORDRS_CLNT_CD
+				--영업담당자
+				LEFT OUTER JOIN TB_CM06M01 AS U ON U.ID = A.MNG_ID
+				--회사
+				LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.CO_CD
+				--수주구분
+				LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.ORDRS_DIV
+				--고객사PJT
+				LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.CLNT_PJT
+				--통화
+				LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = A.CURR_CD
+				--결재방법
+				LEFT OUTER JOIN TB_CM05M01 AS R5 ON R5.CODE_ID = A.PMNT_MTD
+				--계약문서
+				LEFT OUTER JOIN TB_CM05M01 AS R6 ON R6.CODE_ID = A.CTRT_DOC
+				--국내외구분
+				LEFT OUTER JOIN TB_CM05M01 AS R7 ON R7.CODE_ID = A.INPEXP_CD
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    A.CO_CD    = #{coCd}
+		 </if>
+		 <if test="ordrsNo != null and !ordrsNo.equals('')">
+		 AND    A.ORDRS_NO = #{ordrsNo}
+		 </if>
+		 <if test="histNo != null and !histNo.equals('')">
+		 AND    A.HIST_NO  = #{histNo}
+		 </if>
+		)
+		, SJM_LIST AS
+		(
+		           SELECT '1.회사'       AS COL_01, CO_NM        AS COLNM_01, 'Y'          AS CYN_01, '2.수주번호'         AS COL_02, ORDRS_NO    AS COLNM_02, 'Y'          AS CYN_02 FROM SJM
+		 UNION ALL SELECT '3.견적서번호'    AS COL_01, EST_NO AS COLNM_01, EST_NO_YN   AS CYN_01, '4.견적차수'          AS COL_02, EST_DEG     AS COLNM_02, EST_DEG_YN   AS CYN_02 FROM SJM
+		 UNION ALL SELECT '5.고객사'      AS COL_01, CLNT_NM      AS COLNM_01, CLNT_CD_YN   AS CYN_01, '6.고객사PJT'        AS COL_02, CLNT_PJT_NM AS COLNM_02, CLNT_PJT_YN  AS CYN_02 FROM SJM
+		 UNION ALL SELECT '7.수주구분'     AS COL_01, ORDRS_DIV_NM AS COLNM_01, ORDRS_DIV_YN AS CYN_01, '8.수주일자'         AS COL_02, ORDRS_DT    AS COLNM_02, ORDRS_DT_YN  AS CYN_02 FROM SJM
+		 UNION ALL SELECT '9.계약명'      AS COL_01, CTRT_NM      AS COLNM_01, CTRT_NM_YN   AS CYN_01, '10.비고'           AS COL_02, ORDRS_RMK   AS COLNM_02, ORDRS_RMK_YN AS CYN_02 FROM SJM
+		 UNION ALL SELECT '11.담당자'     AS COL_01, MNG_NM       AS COLNM_01, MNG_ID_YN    AS CYN_01, '12.발주자'          AS COL_02, ORDRGER     AS COLNM_02, ORDRGER_YN   AS CYN_02 FROM SJM
+		 UNION ALL SELECT '13.계약문서'    AS COL_01, CTRT_DOC_NM  AS COLNM_01, CTRT_DOC_YN  AS CYN_01, '14.국내외구분'       AS COL_02, INPEXP_NM   AS COLNM_02, INPEXP_CD_YN AS CYN_02 FROM SJM
+		 UNION ALL SELECT '15.선물환가입일' AS COL_01, FWD_DT       AS COLNM_01, FWD_DT_YN    AS CYN_01, '16.선물환CheckList' AS COL_02, CHK_LIST_NM AS COLNM_02, CHK_LIST_YN  AS CYN_02 FROM SJM
+		 UNION ALL SELECT '17.결재방법'   AS COL_01, PMNT_MTD_NM   AS COLNM_01, PMNT_MTD_YN  AS CYN_01, '18.통화단위'        AS COL_02, CURR_NM     AS COLNM_02, CURR_CD_YN   AS CYN_02 FROM SJM
+		 UNION ALL SELECT '19.환율'      AS COL_01, EXRATE       AS COLNM_01, EXRATE_YN    AS CYN_01, '20.수주금액'         AS COL_02, ORDRS_AMT   AS COLNM_02, ORDRS_AMT_YN AS CYN_02 FROM SJM
+		)
+		SELECT COUNT(*)
+		FROM   SJM_LIST
+		WHERE  1 = 1
+    </select>
+
+	<select id="select_modal_List2" parameterType="Map" resultType="camelMap">
+		<!-- <include refid="select_ordrs_master"></include> -->
+		WITH SJM AS
+		(
+		 SELECT A.FILE_TRGT_KEY     AS FILE_TRGT_KEY
+			  , R1.CODE_NM          AS CO_NM
+			  , NVL(A.EST_NO, '')   AS EST_NO
+			  , TO_CHAR(NVL(A.EST_DEG, ''))  AS EST_DEG
+			  , A.ORDRS_NO          AS ORDRS_NO
+			  , S.CLNT_NM           AS CLNT_NM
+			  , TO_CHAR(A.ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT
+			  , R2.CODE_NM          AS ORDRS_DIV_NM
+			  , R3.CODE_NM          AS CLNT_PJT_NM
+			  , A.CTRT_NM           AS CTRT_NM
+			  , U.NAME              AS MNG_NM
+			  , TO_CHAR(NVL(A.ORDRS_AMT, 0), 'FM999,999,999,999') AS ORDRS_AMT
+			  , R4.CODE_NM          AS CURR_NM
+			  , TO_CHAR(NVL(A.EXRATE, 1), 'FM999,999,999,999') AS EXRATE
+			  , R5.CODE_NM          AS PMNT_MTD_NM
+			  , A.ORDRGER           AS ORDRGER
+			  , TO_CHAR(A.FWD_EXCH_JOIN_DT, 'YYYY-MM-DD') AS FWD_DT
+			  , CASE WHEN NVL(A.FWD_EXCH_CHK_LIST, 'N') = 'N' THEN 'NO'
+			         ELSE 'YES'
+				END                 AS CHK_LIST_NM
+			  , R6.CODE_NM          AS CTRT_DOC_NM
+			  , NVL(A.ORGN_SALES_CD, '') AS ORGN_SALES_CD
+			  , R7.CODE_NM          AS INPEXP_NM
+			  , A.ORDRS_RMK         AS ORDRS_RMK
+			  , CASE WHEN NVL(A.EST_NO, '.') = NVL(C.EST_NO, '.')   THEN 'Y' ELSE 'N' END AS EST_NO_YN
+			  , CASE WHEN NVL(A.EST_DEG, 0) = NVL(C.EST_DEG, 0)     THEN 'Y' ELSE 'N' END AS EST_DEG_YN
+			  , CASE WHEN A.ORDRS_CLNT_CD = C.ORDRS_CLNT_CD         THEN 'Y' ELSE 'N' END AS CLNT_CD_YN
+			  , CASE WHEN A.ORDRS_DT = C.ORDRS_DT                   THEN 'Y' ELSE 'N' END AS ORDRS_DT_YN
+			  , CASE WHEN A.ORDRS_DIV = C.ORDRS_DIV                 THEN 'Y' ELSE 'N' END AS ORDRS_DIV_YN
+			  , CASE WHEN A.CLNT_PJT = C.CLNT_PJT                   THEN 'Y' ELSE 'N' END AS CLNT_PJT_YN
+			  , CASE WHEN A.CTRT_NM = C.CTRT_NM                     THEN 'Y' ELSE 'N' END AS CTRT_NM_YN
+			  , CASE WHEN A.MNG_ID = C.MNG_ID                       THEN 'Y' ELSE 'N' END AS MNG_ID_YN
+			  , CASE WHEN A.ORDRS_AMT = C.ORDRS_AMT                 THEN 'Y' ELSE 'N' END AS ORDRS_AMT_YN
+			  , CASE WHEN A.CURR_CD = C.CURR_CD                     THEN 'Y' ELSE 'N' END AS CURR_CD_YN
+			  , CASE WHEN A.EXRATE = C.EXRATE                       THEN 'Y' ELSE 'N' END AS EXRATE_YN
+			  , CASE WHEN A.PMNT_MTD = C.PMNT_MTD                   THEN 'Y' ELSE 'N' END AS PMNT_MTD_YN
+			  , CASE WHEN NVL(A.ORDRGER, '.') = NVL(C.ORDRGER, '.') THEN 'Y' ELSE 'N' END AS ORDRGER_YN
+			  , CASE WHEN A.FWD_EXCH_JOIN_DT = C.FWD_EXCH_JOIN_DT   THEN 'Y' ELSE 'N' END AS FWD_DT_YN
+			  , CASE WHEN A.FWD_EXCH_CHK_LIST = C.FWD_EXCH_CHK_LIST THEN 'Y' ELSE 'N' END AS CHK_LIST_YN
+			  , CASE WHEN NVL(A.CTRT_DOC, '.') = NVL(C.CTRT_DOC, '.') THEN 'Y' ELSE 'N' END AS CTRT_DOC_YN
+			  , CASE WHEN NVL(A.ORGN_SALES_CD, '.') = NVL(C.ORGN_SALES_CD, '.') THEN 'Y' ELSE 'N' END AS ORGN_SALES_CD_YN
+			  , CASE WHEN A.INPEXP_CD = C.INPEXP_CD                 THEN 'Y' ELSE 'N' END AS INPEXP_CD_YN
+			  , CASE WHEN NVL(A.ORDRS_RMK, '.') = NVL(C.ORDRS_RMK, '.') THEN 'Y' ELSE 'N' END AS ORDRS_RMK_YN
+		 FROM   TB_CR02M01_HIST AS A
+		        --수주
+				LEFT OUTER JOIN TB_CR02M01 AS C ON C.FILE_TRGT_KEY = A.FILE_TRGT_KEY
+		        --고객사
+				LEFT OUTER JOIN TB_BM02M01 AS S ON S.CLNT_CD = A.ORDRS_CLNT_CD
+				--영업담당자
+				LEFT OUTER JOIN TB_CM06M01 AS U ON U.ID = A.MNG_ID
+				--회사
+				LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.CO_CD
+				--수주구분
+				LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.ORDRS_DIV
+				--고객사PJT
+				LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.CLNT_PJT
+				--통화
+				LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = A.CURR_CD
+				--결재방법
+				LEFT OUTER JOIN TB_CM05M01 AS R5 ON R5.CODE_ID = A.PMNT_MTD
+				--계약문서
+				LEFT OUTER JOIN TB_CM05M01 AS R6 ON R6.CODE_ID = A.CTRT_DOC
+				--국내외구분
+				LEFT OUTER JOIN TB_CM05M01 AS R7 ON R7.CODE_ID = A.INPEXP_CD
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    A.CO_CD    = #{coCd}
+		 </if>
+		 <if test="ordrsNo != null and !ordrsNo.equals('')">
+		 AND    A.ORDRS_NO = #{ordrsNo}
+		 </if>
+		 <if test="histNo != null and !histNo.equals('')">
+		 AND    A.HIST_NO  = #{histNo}
+		 </if>
+		)
+		, SJM_LIST AS
+		(
+		           SELECT '1.회사'       AS COL_01, CO_NM        AS COLNM_01, 'Y'          AS CYN_01, '2.수주번호'         AS COL_02, ORDRS_NO    AS COLNM_02, 'Y'          AS CYN_02 FROM SJM
+		 UNION ALL SELECT '3.견적서번호'    AS COL_01, EST_NO AS COLNM_01, EST_NO_YN   AS CYN_01, '4.견적차수'          AS COL_02, EST_DEG     AS COLNM_02, EST_DEG_YN   AS CYN_02 FROM SJM
+		 UNION ALL SELECT '5.고객사'      AS COL_01, CLNT_NM      AS COLNM_01, CLNT_CD_YN   AS CYN_01, '6.고객사PJT'        AS COL_02, CLNT_PJT_NM AS COLNM_02, CLNT_PJT_YN  AS CYN_02 FROM SJM
+		 UNION ALL SELECT '7.수주구분'     AS COL_01, ORDRS_DIV_NM AS COLNM_01, ORDRS_DIV_YN AS CYN_01, '8.수주일자'         AS COL_02, ORDRS_DT    AS COLNM_02, ORDRS_DT_YN  AS CYN_02 FROM SJM
+		 UNION ALL SELECT '9.계약명'      AS COL_01, CTRT_NM      AS COLNM_01, CTRT_NM_YN   AS CYN_01, '10.비고'           AS COL_02, ORDRS_RMK   AS COLNM_02, ORDRS_RMK_YN AS CYN_02 FROM SJM
+		 UNION ALL SELECT '11.담당자'     AS COL_01, MNG_NM       AS COLNM_01, MNG_ID_YN    AS CYN_01, '12.발주자'          AS COL_02, ORDRGER     AS COLNM_02, ORDRGER_YN   AS CYN_02 FROM SJM
+		 UNION ALL SELECT '13.계약문서'    AS COL_01, CTRT_DOC_NM  AS COLNM_01, CTRT_DOC_YN  AS CYN_01, '14.국내외구분'       AS COL_02, INPEXP_NM   AS COLNM_02, INPEXP_CD_YN AS CYN_02 FROM SJM
+		 UNION ALL SELECT '15.선물환가입일' AS COL_01, FWD_DT       AS COLNM_01, FWD_DT_YN    AS CYN_01, '16.선물환CheckList' AS COL_02, CHK_LIST_NM AS COLNM_02, CHK_LIST_YN  AS CYN_02 FROM SJM
+		 UNION ALL SELECT '17.결재방법'   AS COL_01, PMNT_MTD_NM   AS COLNM_01, PMNT_MTD_YN  AS CYN_01, '18.통화단위'        AS COL_02, CURR_NM     AS COLNM_02, CURR_CD_YN   AS CYN_02 FROM SJM
+		 UNION ALL SELECT '19.환율'      AS COL_01, EXRATE       AS COLNM_01, EXRATE_YN    AS CYN_01, '20.수주금액'         AS COL_02, ORDRS_AMT   AS COLNM_02, ORDRS_AMT_YN AS CYN_02 FROM SJM
+		)
+		SELECT *
+		FROM   SJM_LIST
+		WHERE  1 = 1
+    </select>
+
+	<select id="select_modal_List3_Count" parameterType="Map" resultType="int">
+		WITH SJM AS
+		(
+		 SELECT A.CO_CD
+		      , A.ORDRS_NO
+		      , A.CLMN_PLAN_SEQ
+		      , A.CLMN_PLAN_DIV
+		      , R1.CODE_NM      AS CLMN_PLAN_DIV_NM
+		      , A.CLMN_DIV_SEQ
+		      , A.CLMN_RATE
+		      , A.CURR_CD
+		      , R2.CODE_NM      AS CURR_NM
+		      , A.EXRATE
+		      , A.CLMN_AMT
+		      , TO_CHAR(A.BILL_PBLS_DT, 'YYYY-MM-DD') AS BILL_PBLS_DT
+		      , TO_CHAR(A.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT
+		      , A.PMNT_DT_AFTER_BILL
+		      , A.CLMN_PLAN_RMK
+		      , A.CLMN_MGMT_STATUS
+		 FROM   TB_CR02D01 AS A
+		        --계획구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.CLMN_PLAN_DIV
+		        --통화
+		        LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.CURR_CD
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    A.CO_CD    = #{coCd}
+		 </if>
+		 <if test="ordrsNo != null and !ordrsNo.equals('')">
+		 AND    A.ORDRS_NO = #{ordrsNo}
+		 </if>
+		)
+		SELECT COUNT(*)
+		FROM   SJM
+		WHERE  1 = 1
+    </select>
+
+	<select id="select_modal_List3" parameterType="Map" resultType="camelMap">
+		<!-- <include refid="select_ordrs_master"></include> -->
+		WITH SJM AS
+		(
+		 SELECT A.CO_CD
+		      , A.ORDRS_NO
+		      , A.CLMN_PLAN_SEQ
+		      , A.CLMN_PLAN_DIV
+		      , R1.CODE_NM      AS CLMN_PLAN_DIV_NM
+		      , A.CLMN_DIV_SEQ
+		      , A.CLMN_RATE
+		      , A.CURR_CD
+		      , R2.CODE_NM      AS CURR_NM
+		      , A.EXRATE
+		      , A.CLMN_AMT
+		      , TO_CHAR(A.BILL_PBLS_DT, 'YYYY-MM-DD') AS BILL_PBLS_DT
+		      , TO_CHAR(A.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT
+		      , A.PMNT_DT_AFTER_BILL
+		      , A.CLMN_PLAN_RMK
+		      , A.CLMN_MGMT_STATUS
+		 FROM   TB_CR02D01 AS A
+		        --계획구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.CLMN_PLAN_DIV
+		        --통화
+		        LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.CURR_CD
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    A.CO_CD    = #{coCd}
+		 </if>
+		 <if test="ordrsNo != null and !ordrsNo.equals('')">
+		 AND    A.ORDRS_NO = #{ordrsNo}
+		 </if>
+		)
+		SELECT *
+		FROM   SJM
+		WHERE  1 = 1
+    </select>
+
+	<select id="select_modal_List4_Count" parameterType="Map" resultType="int">
+		WITH SJM AS
+		(
+		 SELECT A.CO_CD
+		      , A.ORDRS_NO
+		      , A.CLMN_PLAN_SEQ
+		      , A.CLMN_PLAN_DIV
+		      , R1.CODE_NM      AS CLMN_PLAN_DIV_NM
+		      , A.CLMN_DIV_SEQ
+		      , A.CLMN_RATE
+		      , A.CURR_CD
+		      , R2.CODE_NM      AS CURR_NM
+		      , A.CLMN_AMT
+		      , TO_CHAR(A.BILL_PBLS_DT, 'YYYY-MM-DD') AS BILL_PBLS_DT
+		      , TO_CHAR(A.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT
+		      , A.PMNT_DT_AFTER_BILL
+		      , A.CLMN_MGMT_STATUS		      
+		      , CASE WHEN A.CLMN_PLAN_DIV = C.CLMN_PLAN_DIV               THEN 'Y' ELSE 'N' END AS CLMN_PLAN_DIV_YN
+		      , CASE WHEN NVL(A.CLMN_DIV_SEQ, 1) = NVL(C.CLMN_DIV_SEQ, 1) THEN 'Y' ELSE 'N' END AS CLMN_DIV_SEQ_YN
+		      , CASE WHEN NVL(A.CLMN_RATE, 0) = NVL(C.CLMN_RATE, 0)       THEN 'Y' ELSE 'N' END AS CLMN_RATE_YN
+		      , CASE WHEN NVL(A.CLMN_AMT, 0) = NVL(C.CLMN_AMT, 0)         THEN 'Y' ELSE 'N' END AS CLMN_AMT_YN
+		      , CASE WHEN A.BILL_PBLS_DT = C.BILL_PBLS_DT                 THEN 'Y' ELSE 'N' END AS BILL_PBLS_DT_YN
+		      , CASE WHEN A.CLMN_DT = C.CLMN_DT                           THEN 'Y' ELSE 'N' END AS CLMN_DT_YN
+		      , CASE WHEN A.PMNT_DT_AFTER_BILL = C.PMNT_DT_AFTER_BILL     THEN 'Y' ELSE 'N' END AS PMNT_DT_AFTER_BILL_YN
+		      , CASE WHEN A.CLMN_MGMT_STATUS = C.CLMN_MGMT_STATUS         THEN 'Y' ELSE 'N' END AS CLMN_MGMT_STATUS_YN
+		 FROM   TB_CR02D01_HIST AS A
+		        INNER JOIN TB_CR02D01 AS C  ON C.CO_CD         = A.CO_CD
+		                                   AND C.ORDRS_NO      = A.ORDRS_NO
+		                                   AND C.CLMN_PLAN_SEQ = A.CLMN_PLAN_SEQ
+		        --계획구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.CLMN_PLAN_DIV
+		        --통화
+		        LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.CURR_CD
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    A.CO_CD    = #{coCd}
+		 </if>
+		 <if test="ordrsNo != null and !ordrsNo.equals('')">
+		 AND    A.ORDRS_NO = #{ordrsNo}
+		 </if>
+		 <if test="histNo != null and !histNo.equals('')">
+		 AND    A.HIST_NO  = #{histNo}
+		 </if>
+		)
+		SELECT COUNT(*)
+		FROM   SJM
+		WHERE  1 = 1
+    </select>
+
+	<select id="select_modal_List4" parameterType="Map" resultType="camelMap">
+		<!-- <include refid="select_ordrs_master"></include> -->
+		WITH SJM AS
+		(
+		 SELECT A.CO_CD
+		      , A.ORDRS_NO
+		      , A.CLMN_PLAN_SEQ
+		      , A.CLMN_PLAN_DIV
+		      , R1.CODE_NM      AS CLMN_PLAN_DIV_NM
+		      , A.CLMN_DIV_SEQ
+		      , A.CLMN_RATE
+		      , A.CURR_CD
+		      , R2.CODE_NM      AS CURR_NM
+		      , A.CLMN_AMT
+		      , TO_CHAR(A.BILL_PBLS_DT, 'YYYY-MM-DD') AS BILL_PBLS_DT
+		      , TO_CHAR(A.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT
+		      , A.PMNT_DT_AFTER_BILL
+		      , A.CLMN_MGMT_STATUS		      
+		      , CASE WHEN A.CLMN_PLAN_DIV = C.CLMN_PLAN_DIV               THEN 'Y' ELSE 'N' END AS CLMN_PLAN_DIV_YN
+		      , CASE WHEN NVL(A.CLMN_DIV_SEQ, 1) = NVL(C.CLMN_DIV_SEQ, 1) THEN 'Y' ELSE 'N' END AS CLMN_DIV_SEQ_YN
+		      , CASE WHEN NVL(A.CLMN_RATE, 0) = NVL(C.CLMN_RATE, 0)       THEN 'Y' ELSE 'N' END AS CLMN_RATE_YN
+		      , CASE WHEN NVL(A.CLMN_AMT, 0) = NVL(C.CLMN_AMT, 0)         THEN 'Y' ELSE 'N' END AS CLMN_AMT_YN
+		      , CASE WHEN A.BILL_PBLS_DT = C.BILL_PBLS_DT                 THEN 'Y' ELSE 'N' END AS BILL_PBLS_DT_YN
+		      , CASE WHEN A.CLMN_DT = C.CLMN_DT                           THEN 'Y' ELSE 'N' END AS CLMN_DT_YN
+		      , CASE WHEN A.PMNT_DT_AFTER_BILL = C.PMNT_DT_AFTER_BILL     THEN 'Y' ELSE 'N' END AS PMNT_DT_AFTER_BILL_YN
+		      , CASE WHEN NVL(A.CLMN_MGMT_STATUS, '.') = NVL(C.CLMN_MGMT_STATUS, '.') THEN 'Y' ELSE 'N' END AS CLMN_MGMT_STATUS_YN
+		 FROM   TB_CR02D01_HIST AS A
+		        INNER JOIN TB_CR02D01 AS C  ON C.CO_CD         = A.CO_CD
+		                                   AND C.ORDRS_NO      = A.ORDRS_NO
+		                                   AND C.CLMN_PLAN_SEQ = A.CLMN_PLAN_SEQ
+		        --계획구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.CLMN_PLAN_DIV
+		        --통화
+		        LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.CURR_CD
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    A.CO_CD    = #{coCd}
+		 </if>
+		 <if test="ordrsNo != null and !ordrsNo.equals('')">
+		 AND    A.ORDRS_NO = #{ordrsNo}
+		 </if>
+		 <if test="histNo != null and !histNo.equals('')">
+		 AND    A.HIST_NO  = #{histNo}
+		 </if>
+		 ORDER BY A.CO_CD, A.ORDRS_NO, A.CLMN_PLAN_SEQ
+		)
+		SELECT *
+		FROM   SJM
+		WHERE  1 = 1
+    </select>
+
+	<select id="select_modal_List5_Count" parameterType="Map" resultType="int">
+		WITH SJM AS
+		(
+		 SELECT A.ORDRS_DTL_DIV10
+		      , R1.CODE_NM        AS ORDRS_DTL_DIV10_NM
+		      , A.PRDT_CD
+		      , P.PRDT_NM         AS PRDT_NM
+		      , A.ITEM_DIV
+		      , R2.CODE_NM        AS ITEM_DIV_NM
+		      , A.ORDRS_DTL_DIV20
+		      , R3.CODE_NM        AS ORDRS_DTL_DIV20_NM
+		      , A.ORDRS_DTL_DIV30
+		      , R4.CODE_NM        AS ORDRS_DTL_DIV30_NM
+		      , A.MCTYPE
+		      , R5.CODE_NM        AS MCTYPE_NM
+		      , A.EQP_NM
+		      , TO_CHAR(A.DUDT_INTEND_DT, 'YYYY-MM-DD') AS DUDT_INTEND_DT
+		      , A.ORDRS_PRC_MACH
+		      , A.ORDRS_PRC_ELCTY
+		      , A.ORDRS_PRC
+		      , A.ORDRS_QTY
+		      , A.EST_EPCT_MAT_PRC
+		      , A.TRGT_PCHS_PCOST_MACH
+		      , A.TRGT_PCHS_PCOST_ELCTY
+		      , A.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN
+		      , A.LABOR_COST_MFG_COST
+		      , A.DTL_RMK
+		      , A.ACT_RGL_MACH
+		      , A.ACT_OBS_MACH
+		      , A.ACT_RGL_ELCTY
+		      , A.ACT_OBS_ELCTY
+		      , A.ACT_EXP_COST
+		      , A.OUT_QTY
+		      , A.DTL_RMK2
+		 FROM   TB_CR02D02 AS A
+		        --제품구분
+		        LEFT OUTER JOIN TB_BM01M01 AS P  ON A.PRDT_CD = P.PRDT_CD
+		        --입력구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.ORDRS_DTL_DIV10
+		        --아이템구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.ITEM_DIV
+		        --작업구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.ORDRS_DTL_DIV20
+		        --자체구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = A.ORDRS_DTL_DIV30
+		        --기계구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R5 ON R5.CODE_ID = A.MCTYPE
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    A.CO_CD    = #{coCd}
+		 </if>
+		 <if test="ordrsNo != null and !ordrsNo.equals('')">
+		 AND    A.ORDRS_NO = #{ordrsNo}
+		 </if>
+		)
+		SELECT COUNT(*)
+		FROM   SJM
+		WHERE  1 = 1
+    </select>
+
+	<select id="select_modal_List5" parameterType="Map" resultType="camelMap">
+		<!-- <include refid="select_ordrs_master"></include> -->
+		WITH SJM AS
+		(
+		 SELECT A.ORDRS_DTL_DIV10
+		      , R1.CODE_NM        AS ORDRS_DTL_DIV10_NM
+		      , A.PRDT_CD
+		      , P.PRDT_NM         AS PRDT_NM
+		      , A.ITEM_DIV
+		      , R2.CODE_NM        AS ITEM_DIV_NM
+		      , A.ORDRS_DTL_DIV20
+		      , R3.CODE_NM        AS ORDRS_DTL_DIV20_NM
+		      , A.ORDRS_DTL_DIV30
+		      , R4.CODE_NM        AS ORDRS_DTL_DIV30_NM
+		      , A.MCTYPE
+		      , R5.CODE_NM        AS MCTYPE_NM
+		      , A.EQP_NM
+		      , TO_CHAR(A.DUDT_INTEND_DT, 'YYYY-MM-DD') AS DUDT_INTEND_DT
+		      , A.ORDRS_PRC_MACH
+		      , A.ORDRS_PRC_ELCTY
+		      , A.ORDRS_PRC
+		      , A.ORDRS_QTY
+		      , A.EST_EPCT_MAT_PRC
+		      , A.TRGT_PCHS_PCOST_MACH
+		      , A.TRGT_PCHS_PCOST_ELCTY
+		      , A.TRGT_PCHS_PCOST_MACH + A.TRGT_PCHS_PCOST_ELCTY AS TRGT_PCHS_PCOST_TOT
+		      , A.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN
+		      , A.TRGT_PCHS_PCOST_MACH - A.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN AS TRGT_PCHS_PCOST_MACH2
+		      , A.LABOR_COST_MFG_COST
+		      , A.DTL_RMK
+		      , A.ACT_RGL_MACH
+		      , A.ACT_OBS_MACH
+		      , A.ACT_RGL_ELCTY
+		      , A.ACT_OBS_ELCTY
+		      , A.ACT_EXP_COST
+		      , A.OUT_QTY
+		      , A.DTL_RMK2
+		 FROM   TB_CR02D02 AS A
+		        --제품구분
+		        LEFT OUTER JOIN TB_BM01M01 AS P  ON A.PRDT_CD = P.PRDT_CD
+		        --입력구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.ORDRS_DTL_DIV10
+		        --아이템구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.ITEM_DIV
+		        --작업구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.ORDRS_DTL_DIV20
+		        --자체구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = A.ORDRS_DTL_DIV30
+		        --기계구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R5 ON R5.CODE_ID = A.MCTYPE
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    A.CO_CD    = #{coCd}
+		 </if>
+		 <if test="ordrsNo != null and !ordrsNo.equals('')">
+		 AND    A.ORDRS_NO = #{ordrsNo}
+		 </if>
+		)
+		SELECT *
+		FROM   SJM
+		WHERE  1 = 1
+    </select>
+
+	<select id="select_modal_List6_Count" parameterType="Map" resultType="int">
+		WITH SJM AS
+		(
+		 SELECT A.ORDRS_DTL_DIV10
+		      , R1.CODE_NM        AS ORDRS_DTL_DIV10_NM
+		      , A.PRDT_CD
+		      , P.PRDT_NM         AS PRDT_NM
+		      , A.ITEM_DIV
+		      , R2.CODE_NM        AS ITEM_DIV_NM
+		      , A.ORDRS_DTL_DIV20
+		      , R3.CODE_NM        AS ORDRS_DTL_DIV20_NM
+		      , A.ORDRS_DTL_DIV30
+		      , R4.CODE_NM        AS ORDRS_DTL_DIV30_NM
+		      , A.MCTYPE
+		      , R5.CODE_NM        AS MCTYPE_NM
+		      , A.EQP_NM
+		      , TO_CHAR(A.DUDT_INTEND_DT, 'YYYY-MM-DD') AS DUDT_INTEND_DT
+		      , A.ORDRS_PRC_MACH
+		      , A.ORDRS_PRC_ELCTY
+		      , A.ORDRS_PRC
+		      , A.ORDRS_QTY
+		      , A.EST_EPCT_MAT_PRC
+		      , A.TRGT_PCHS_PCOST_MACH
+		      , A.TRGT_PCHS_PCOST_ELCTY
+		      , A.TRGT_PCHS_PCOST_MACH + A.TRGT_PCHS_PCOST_ELCTY AS TRGT_PCHS_PCOST_TOT
+		      , A.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN
+		      , A.TRGT_PCHS_PCOST_MACH - A.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN AS TRGT_PCHS_PCOST_MACH2
+		      , A.LABOR_COST_MFG_COST
+		      , A.DTL_RMK
+		      , A.ACT_RGL_MACH
+		      , A.ACT_OBS_MACH
+		      , A.ACT_RGL_ELCTY
+		      , A.ACT_OBS_ELCTY
+		      , A.ACT_EXP_COST
+		      , A.OUT_QTY
+		      , A.DTL_RMK2
+		      , CASE WHEN A.ORDRS_DTL_DIV10 = C.ORDRS_DTL_DIV10             THEN 'Y' ELSE 'N' END AS ORDRS_DTL_DIV10_YN
+		      , CASE WHEN A.PRDT_CD = C.PRDT_CD                             THEN 'Y' ELSE 'N' END AS PRDT_CD_YN
+		      , CASE WHEN A.ITEM_DIV = C.ITEM_DIV                           THEN 'Y' ELSE 'N' END AS ITEM_DIV_YN
+		      , CASE WHEN A.ORDRS_DTL_DIV20 = C.ORDRS_DTL_DIV20             THEN 'Y' ELSE 'N' END AS ORDRS_DTL_DIV20_YN
+		      , CASE WHEN A.ORDRS_DTL_DIV30 = C.ORDRS_DTL_DIV30             THEN 'Y' ELSE 'N' END AS ORDRS_DTL_DIV30_YN
+		      , CASE WHEN A.MCTYPE = C.MCTYPE                               THEN 'Y' ELSE 'N' END AS MCTYPE_YN
+		      , CASE WHEN A.EQP_NM = C.EQP_NM                               THEN 'Y' ELSE 'N' END AS EQP_NM_YN
+		      , CASE WHEN A.DUDT_INTEND_DT = C.DUDT_INTEND_DT               THEN 'Y' ELSE 'N' END AS DUDT_INTEND_DT_YN
+		      , CASE WHEN A.ORDRS_PRC_MACH = C.ORDRS_PRC_MACH               THEN 'Y' ELSE 'N' END AS ORDRS_PRC_MACH_YN
+		      , CASE WHEN A.ORDRS_PRC_ELCTY = C.ORDRS_PRC_ELCTY             THEN 'Y' ELSE 'N' END AS ORDRS_PRC_ELCTY_YN
+		      , CASE WHEN A.ORDRS_PRC = C.ORDRS_PRC                         THEN 'Y' ELSE 'N' END AS ORDRS_PRC_YN
+		      , CASE WHEN A.ORDRS_QTY = C.ORDRS_QTY                         THEN 'Y' ELSE 'N' END AS ORDRS_QTY_YN
+		      , CASE WHEN A.EST_EPCT_MAT_PRC = C.EST_EPCT_MAT_PRC           THEN 'Y' ELSE 'N' END AS EST_EPCT_MAT_PRC_YN
+		      , CASE WHEN A.TRGT_PCHS_PCOST_MACH = C.TRGT_PCHS_PCOST_MACH   THEN 'Y' ELSE 'N' END AS TRGT_PCHS_PCOST_MACH_YN
+		      , CASE WHEN A.TRGT_PCHS_PCOST_ELCTY = C.TRGT_PCHS_PCOST_ELCTY THEN 'Y' ELSE 'N' END AS TRGT_PCHS_PCOST_ELCTY_YN
+		      , CASE WHEN (A.TRGT_PCHS_PCOST_MACH + A.TRGT_PCHS_PCOST_ELCTY) = (C.TRGT_PCHS_PCOST_MACH + C.TRGT_PCHS_PCOST_ELCTY) THEN 'Y'
+		             ELSE 'N' END AS TRGT_PCHS_PCOST_TOT_YN
+		      , CASE WHEN A.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN = C.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN THEN 'Y' ELSE 'N' END AS TRGT_PCHS_PCOST_IN_HOUSE_PRCSN_YN
+		      , CASE WHEN (A.TRGT_PCHS_PCOST_MACH - A.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN) = (C.TRGT_PCHS_PCOST_MACH - C.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN) THEN 'Y'
+		             ELSE 'N' END AS TRGT_PCHS_PCOST_MACH2_YN
+		      , CASE WHEN A.LABOR_COST_MFG_COST = C.LABOR_COST_MFG_COST     THEN 'Y' ELSE 'N' END AS LABOR_COST_MFG_COST_YN
+		      , CASE WHEN A.DTL_RMK = C.DTL_RMK                             THEN 'Y' ELSE 'N' END AS DTL_RMK_YN
+		 FROM   TB_CR02D02_HIST AS A
+		        INNER JOIN TB_CR02D02 AS C  ON C.CO_CD     = A.CO_CD
+		                                   AND C.ORDRS_NO  = A.ORDRS_NO
+		                                   AND C.ORDRS_SEQ = A.ORDRS_SEQ
+		        --제품구분
+		        LEFT OUTER JOIN TB_BM01M01 AS P  ON A.PRDT_CD = P.PRDT_CD
+		        --입력구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.ORDRS_DTL_DIV10
+		        --아이템구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.ITEM_DIV
+		        --작업구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.ORDRS_DTL_DIV20
+		        --자체구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = A.ORDRS_DTL_DIV30
+		        --기계구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R5 ON R5.CODE_ID = A.MCTYPE
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    A.CO_CD    = #{coCd}
+		 </if>
+		 <if test="ordrsNo != null and !ordrsNo.equals('')">
+		 AND    A.ORDRS_NO = #{ordrsNo}
+		 </if>
+		 <if test="histNo != null and !histNo.equals('')">
+		 AND    A.HIST_NO  = #{histNo}
+		 </if>
+		)
+		SELECT COUNT(*)
+		FROM   SJM
+		WHERE  1 = 1
+    </select>
+
+	<select id="select_modal_List6" parameterType="Map" resultType="camelMap">
+		<!-- <include refid="select_ordrs_master"></include> -->
+		WITH SJM AS
+		(
+		 SELECT A.ORDRS_DTL_DIV10
+		      , R1.CODE_NM        AS ORDRS_DTL_DIV10_NM
+		      , A.PRDT_CD
+		      , P.PRDT_NM         AS PRDT_NM
+		      , A.ITEM_DIV
+		      , R2.CODE_NM        AS ITEM_DIV_NM
+		      , A.ORDRS_DTL_DIV20
+		      , R3.CODE_NM        AS ORDRS_DTL_DIV20_NM
+		      , A.ORDRS_DTL_DIV30
+		      , R4.CODE_NM        AS ORDRS_DTL_DIV30_NM
+		      , A.MCTYPE
+		      , R5.CODE_NM        AS MCTYPE_NM
+		      , A.EQP_NM
+		      , TO_CHAR(A.DUDT_INTEND_DT, 'YYYY-MM-DD') AS DUDT_INTEND_DT
+		      , A.ORDRS_PRC_MACH
+		      , A.ORDRS_PRC_ELCTY
+		      , A.ORDRS_PRC
+		      , A.ORDRS_QTY
+		      , A.EST_EPCT_MAT_PRC
+		      , A.TRGT_PCHS_PCOST_MACH
+		      , A.TRGT_PCHS_PCOST_ELCTY
+		      , A.TRGT_PCHS_PCOST_MACH + A.TRGT_PCHS_PCOST_ELCTY AS TRGT_PCHS_PCOST_TOT
+		      , A.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN
+		      , A.TRGT_PCHS_PCOST_MACH - A.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN AS TRGT_PCHS_PCOST_MACH2
+		      , A.LABOR_COST_MFG_COST
+		      , A.DTL_RMK
+		      , A.ACT_RGL_MACH
+		      , A.ACT_OBS_MACH
+		      , A.ACT_RGL_ELCTY
+		      , A.ACT_OBS_ELCTY
+		      , A.ACT_EXP_COST
+		      , A.OUT_QTY
+		      , A.DTL_RMK2
+		      , CASE WHEN A.ORDRS_DTL_DIV10 = C.ORDRS_DTL_DIV10                     THEN 'Y' ELSE 'N' END AS ORDRS_DTL_DIV10_YN
+		      , CASE WHEN NVL(A.PRDT_CD, '.') = NVL(C.PRDT_CD, '.')                 THEN 'Y' ELSE 'N' END AS PRDT_CD_YN
+		      , CASE WHEN NVL(A.ITEM_DIV, '.') = NVL(C.ITEM_DIV, '.')               THEN 'Y' ELSE 'N' END AS ITEM_DIV_YN
+		      , CASE WHEN NVL(A.ORDRS_DTL_DIV20, '.') = NVL(C.ORDRS_DTL_DIV20, '.') THEN 'Y' ELSE 'N' END AS ORDRS_DTL_DIV20_YN
+		      , CASE WHEN NVL(A.ORDRS_DTL_DIV30, '.') = NVL(C.ORDRS_DTL_DIV30, '.') THEN 'Y' ELSE 'N' END AS ORDRS_DTL_DIV30_YN
+		      , CASE WHEN NVL(A.MCTYPE, '.') = NVL(C.MCTYPE, '.')                   THEN 'Y' ELSE 'N' END AS MCTYPE_YN
+		      , CASE WHEN NVL(A.EQP_NM, '.') = NVL(C.EQP_NM, '.')                   THEN 'Y' ELSE 'N' END AS EQP_NM_YN
+		      , CASE WHEN NVL(A.DUDT_INTEND_DT, '') = NVL(C.DUDT_INTEND_DT, '') THEN 'Y' ELSE 'N' END AS DUDT_INTEND_DT_YN
+		      , CASE WHEN A.ORDRS_PRC_MACH = C.ORDRS_PRC_MACH               THEN 'Y' ELSE 'N' END AS ORDRS_PRC_MACH_YN
+		      , CASE WHEN A.ORDRS_PRC_ELCTY = C.ORDRS_PRC_ELCTY             THEN 'Y' ELSE 'N' END AS ORDRS_PRC_ELCTY_YN
+		      , CASE WHEN A.ORDRS_PRC = C.ORDRS_PRC                         THEN 'Y' ELSE 'N' END AS ORDRS_PRC_YN
+		      , CASE WHEN A.ORDRS_QTY = C.ORDRS_QTY                         THEN 'Y' ELSE 'N' END AS ORDRS_QTY_YN
+		      , CASE WHEN A.EST_EPCT_MAT_PRC = C.EST_EPCT_MAT_PRC           THEN 'Y' ELSE 'N' END AS EST_EPCT_MAT_PRC_YN
+		      , CASE WHEN A.TRGT_PCHS_PCOST_MACH = C.TRGT_PCHS_PCOST_MACH   THEN 'Y' ELSE 'N' END AS TRGT_PCHS_PCOST_MACH_YN
+		      , CASE WHEN A.TRGT_PCHS_PCOST_ELCTY = C.TRGT_PCHS_PCOST_ELCTY THEN 'Y' ELSE 'N' END AS TRGT_PCHS_PCOST_ELCTY_YN
+		      , CASE WHEN (A.TRGT_PCHS_PCOST_MACH + A.TRGT_PCHS_PCOST_ELCTY) = (C.TRGT_PCHS_PCOST_MACH + C.TRGT_PCHS_PCOST_ELCTY) THEN 'Y'
+		             ELSE 'N' END AS TRGT_PCHS_PCOST_TOT_YN
+		      , CASE WHEN A.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN = C.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN THEN 'Y' ELSE 'N' END AS TRGT_PCHS_PCOST_IN_HOUSE_PRCSN_YN
+		      , CASE WHEN (A.TRGT_PCHS_PCOST_MACH - A.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN) = (C.TRGT_PCHS_PCOST_MACH - C.TRGT_PCHS_PCOST_IN_HOUSE_PRCSN) THEN 'Y'
+		             ELSE 'N' END AS TRGT_PCHS_PCOST_MACH2_YN
+		      , CASE WHEN A.LABOR_COST_MFG_COST = C.LABOR_COST_MFG_COST     THEN 'Y' ELSE 'N' END AS LABOR_COST_MFG_COST_YN
+		      , CASE WHEN NVL(A.DTL_RMK, '.') = NVL(C.DTL_RMK, '.')         THEN 'Y' ELSE 'N' END AS DTL_RMK_YN
+		 FROM   TB_CR02D02_HIST AS A
+		        INNER JOIN TB_CR02D02 AS C  ON C.CO_CD     = A.CO_CD
+		                                   AND C.ORDRS_NO  = A.ORDRS_NO
+		                                   AND C.ORDRS_SEQ = A.ORDRS_SEQ
+		        --제품구분
+		        LEFT OUTER JOIN TB_BM01M01 AS P  ON A.PRDT_CD = P.PRDT_CD
+		        --입력구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.ORDRS_DTL_DIV10
+		        --아이템구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.ITEM_DIV
+		        --작업구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.ORDRS_DTL_DIV20
+		        --자체구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = A.ORDRS_DTL_DIV30
+		        --기계구분
+		        LEFT OUTER JOIN TB_CM05M01 AS R5 ON R5.CODE_ID = A.MCTYPE
+		 WHERE  1 = 1
+		 <if test="coCd != null and !coCd.equals('')">
+		 AND    A.CO_CD    = #{coCd}
+		 </if>
+		 <if test="ordrsNo != null and !ordrsNo.equals('')">
+		 AND    A.ORDRS_NO = #{ordrsNo}
+		 </if>
+		 <if test="histNo != null and !histNo.equals('')">
+		 AND    A.HIST_NO  = #{histNo}
+		 </if>
+		 ORDER BY A.CO_CD, A.ORDRS_NO, A.ORDRS_SEQ
+		)
+		SELECT *
+		FROM   SJM
+		WHERE  1 = 1
+    </select>
+
+	<!-- 수주버전 -->		
+	<select id="select_ordrsHistNo_List" parameterType="Map" resultType="camelMap">
+		SELECT HIST_NO
+		     , ORDRS_NO || ' Ver.' || HIST_NO AS HIST_NM
+		FROM   TB_CR02M01_HIST
+		WHERE  1 = 1
+		AND    CO_CD    = #{coCd}
+		AND    ORDRS_NO = #{ordrsNo}
 	</select>
 </mapper>
