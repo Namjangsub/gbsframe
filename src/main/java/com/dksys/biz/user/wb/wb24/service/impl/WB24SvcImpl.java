@@ -90,7 +90,7 @@ public class WB24SvcImpl implements WB24Svc {
 		//pgParam1 += "\"codeKind\":\""+ paramMap.get("codeKind") +"\",";
 		//pgParam1 += "\"codeId\":\""+ paramMap.get("codeId") +"\"}";
 	    
-		String todoTitle = "이슈번호 : " + paramMap.get("issNo") + " 이슈";
+		String todoTitle = "이슈번호 : " + paramMap.get("issNo") + ",   이슈제목 : " + paramMap.get("issSj");
 		
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
@@ -206,7 +206,7 @@ public class WB24SvcImpl implements WB24Svc {
 
 		String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("issFileTrgtKey") +"\"}";
 		
-		String todoTitle = "이슈번호 : " + paramMap.get("issNo") + " 이슈";
+		String todoTitle = "이슈번호 : " + paramMap.get("issNo") + ",   이슈제목 : " + paramMap.get("issSj");
 		
 		paramMap.put("reqNo", paramMap.get("issNo"));
 		paramMap.put("salesCd", paramMap.get("salesCd"));

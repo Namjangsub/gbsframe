@@ -76,7 +76,7 @@ public class WB25SvcImpl implements WB25Svc {
 		       pgParam += "\"salesCd\":\""+ paramMap.get("salesCd") +"\"}";
 		
 		       
-		String todoTitle = "과제평가 : SALES CODE " + paramMap.get("salesCd");
+		String todoTitle = "과제평가 : SALES CODE " + paramMap.get("salesCd") + ",   과제명 : " + paramMap.get("sjNm");
 		       
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
@@ -194,7 +194,7 @@ public class WB25SvcImpl implements WB25Svc {
 			   pgParam += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
 			   pgParam += "\"salesCd\":\""+ paramMap.get("salesCd") +"\"}";
 		
-        String todoTitle = "과제평가 : SALES CODE " + paramMap.get("salesCd");	   
+			   String todoTitle = "과제평가 : SALES CODE " + paramMap.get("salesCd") + ",   과제명 : " + paramMap.get("sjNm");  
 			   
 		paramMap.put("reqNo", paramMap.get("fileTrgtKey"));
 		paramMap.put("salesCd", paramMap.get("salesCd"));

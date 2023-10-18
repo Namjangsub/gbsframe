@@ -282,7 +282,7 @@ public class WB22SvcImpl implements WB22Svc {
 	    
 		String pgParam = "{\"fileTrgtKey\":\""+ fileTrgtKey +"\"}";
 		
-		String todoTitle = "실적번호 : " + paramMap.get("wbsRsltsNo") + "실적";
+		String todoTitle = "TASK명 : " + paramMap.get("wbsPlanCodeNm2_P") + ",    SALES CODE : " + paramMap.get("salesCd2_P")  + "    실적일자 : " + paramMap.get("wbsRsltssDt") + "  ~  " + paramMap.get("wbsRsltseDt");
 		
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
@@ -396,7 +396,7 @@ public class WB22SvcImpl implements WB22Svc {
 
 		String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("rsltsFileTrgtKey") +"\"}";
 		
-		String todoTitle = "실적번호 : " + paramMap.get("wbsRsltsNo") + "실적";
+		String todoTitle = "TASK명 : " + paramMap.get("wbsPlanCodeNm2_P") + ",    SALES CODE : " + paramMap.get("salesCd2_P")  + "    실적일자 : " + paramMap.get("wbsRsltssDt") + "  ~  " + paramMap.get("wbsRsltseDt");
 		
 		
 		
