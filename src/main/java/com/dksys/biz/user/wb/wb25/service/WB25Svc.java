@@ -19,5 +19,5 @@ public interface WB25Svc {
 	
 	List<Map<String, String>> selectWbsTaskEvlResultList(Map<String, String> paramMap);	
 	
-	
+	List<Map<String, String>> selectWbsTaskEvlIssList(Map<String, String> paramMap);	
 }

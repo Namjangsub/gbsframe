@@ -80,6 +80,10 @@ public class WB24SvcImpl implements WB24Svc {
 		
 		String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("issFileTrgtKey") +"\"}";
 		
+		String todoTitle = "이슈번호 : " + paramMap.get("issNo") + ",   이슈제목 : " + paramMap.get("issSj");
+		
+		
+		
 		//String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
 		//pgParam1 += "\"fileTrgtKey\":\""+ fileTrgtKey +"\","; 
 		//pgParam1 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
@@ -102,6 +106,7 @@ public class WB24SvcImpl implements WB24Svc {
 	            	    sharngMap.put("userId", paramMap.get("userId"));
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
 	            	    sharngMap.put("pgParam", pgParam);
+	            	    sharngMap.put("todoTitle", todoTitle);
 	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
 	            	i++;
 	            } catch (Exception e) {
@@ -123,6 +128,7 @@ public class WB24SvcImpl implements WB24Svc {
 		            	approvalMap.put("userId", paramMap.get("userId"));
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
 		            	approvalMap.put("pgParam", pgParam);
+		            	approvalMap.put("todoTitle", todoTitle);
 	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
 	                	i++;
 	            } catch (Exception e) {
@@ -202,6 +208,9 @@ public class WB24SvcImpl implements WB24Svc {
 
 		String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("issFileTrgtKey") +"\"}";
 		
+		String todoTitle = "이슈번호 : " + paramMap.get("issNo") + ",   이슈제목 : " + paramMap.get("issSj");
+		
+		
 		paramMap.put("reqNo", paramMap.get("issNo"));
 		paramMap.put("salesCd", paramMap.get("salesCd"));
 		
@@ -227,6 +236,7 @@ public class WB24SvcImpl implements WB24Svc {
 	            	    sharngMap.put("userId", paramMap.get("userId"));
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
 	            	    sharngMap.put("pgParam", pgParam);
+	            	    sharngMap.put("todoTitle", todoTitle);
 	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
 	            	i++;
 	            } catch (Exception e) {
@@ -248,6 +258,7 @@ public class WB24SvcImpl implements WB24Svc {
 		            	approvalMap.put("userId", paramMap.get("userId"));
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
 		            	approvalMap.put("pgParam", pgParam);
+		            	approvalMap.put("todoTitle", todoTitle);
 	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
 	                	i++;
 	            } catch (Exception e) {
