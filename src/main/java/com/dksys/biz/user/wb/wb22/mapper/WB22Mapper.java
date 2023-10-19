@@ -64,6 +64,18 @@ public interface WB22Mapper {
 	
 	List<Map<String, String>> selectIncompleteJob(Map<String, String> paramMap);
 
-	void callCopyWbsPlan(Map<String, String> paramMap);	
+	void callCopyWbsPlan(Map<String, String> paramMap);
+
+	int selectWbsTaskTempletCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectWbsTaskTempletList(Map<String, String> paramMap);
+
+	String selectNewWbsTaskTempletCd(Map<String, String> paramMap);
+
+	int wbsTaskTempletInsert(Map<String, String> sharngMap);
+
+	int wbsTaskTempletUpdate(Map<String, String> sharngMap);
+
+	int wbsTaskTempletDelete(Map<String, String> sharngMap);	
 	
 }

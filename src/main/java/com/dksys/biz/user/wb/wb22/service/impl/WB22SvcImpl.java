@@ -173,7 +173,7 @@ public class WB22SvcImpl implements WB22Svc {
 		if (deleteRowArr != null && deleteRowArr.size() > 0) {
 			for (Map<String, String> sharngMap : deleteRowArr) {
 				try {
-					wb22Mapper.wbsLevel2Delete(sharngMap);
+					result = wb22Mapper.wbsLevel2Delete(sharngMap);
 				} catch (Exception e) {
 					System.out.println("error2" + e.getMessage());
 				}
@@ -489,5 +489,58 @@ public class WB22SvcImpl implements WB22Svc {
 	@Override
 	public void callCopyWbsPlan(Map<String, String> paramMap) {
 		wb22Mapper.callCopyWbsPlan(paramMap);
+	}
+
+	@Override
+	public int selectWbsTaskTempletCount(Map<String, String> paramMap) {
+		return wb22Mapper.selectWbsTaskTempletCount(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectWbsTaskTempletList(Map<String, String> paramMap) {
+		return wb22Mapper.selectWbsTaskTempletList(paramMap);
+	}
+
+	@Override
+	public int saveWbsTaskTempletList(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
+		int result = 0;
+		Gson gson = new Gson();
+		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
+		if (sharngArr != null && sharngArr.size() > 0) {
+			for (Map<String, String> sharngMap : sharngArr) {
+				try {
+					//상위 코드
+					sharngMap.put("codeKind", paramMap.get("wbsPlanCodeId"));
+					//codeId 값이 없으면 insert
+					if(sharngMap.get("codeId").isEmpty()) {
+						String wbsPlanNo = wb22Mapper.selectNewWbsTaskTempletCd(sharngMap);
+						sharngMap.put("codeId", wbsPlanNo);
+						
+						result = wb22Mapper.wbsTaskTempletInsert(sharngMap);
+					}else {
+						result = wb22Mapper.wbsTaskTempletUpdate(sharngMap);
+					}
+					
+				} catch (Exception e) {
+					System.out.println("error2" + e.getMessage());
+				}
+			}
+		}
+		
+		List<Map<String, String>> delArr = gson.fromJson(paramMap.get("taskDeleteRowArr"), stringList);
+		if (delArr != null && delArr.size() > 0) {
+			for (Map<String, String> sharngMap : delArr) {
+				try {
+
+					result = wb22Mapper.wbsTaskTempletDelete(sharngMap);
+					
+				} catch (Exception e) {
+					System.out.println("error2" + e.getMessage());
+				}
+			}
+		}
+		
+		return result;
 	}
 }

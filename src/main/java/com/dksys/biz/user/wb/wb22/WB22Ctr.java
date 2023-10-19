@@ -261,4 +261,34 @@ public class WB22Ctr {
 	  model.addAttribute("paramMap", paramMap);
 	  return "jsonView";
     }
+	
+	//TASK 템플릿 조회
+	@PostMapping(value = "/selectWbsTaskTempletList") 
+	public String selectWbsTaskTempletList(@RequestBody Map<String, String> paramMap, ModelMap model) {	
+		int totalCnt = wb22Svc.selectWbsTaskTempletCount(paramMap); 
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		  
+		List<Map<String, String>> result = wb22Svc.selectWbsTaskTempletList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+    }
+	
+	@PostMapping(value = "/saveWbsTaskTempletList")
+    public String saveWbsTaskTempletList(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (wb22Svc.saveWbsTaskTempletList(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+  		} else {
+  			model.addAttribute("resultCode", 500);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  		    model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }
+	
 }
