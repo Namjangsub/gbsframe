@@ -108,11 +108,11 @@
 								</select>
 							</div> -->
 
-							<div class="search_form" style="width:140px;float:left; margin-left: 8px; margin-top: 8px; margin-bottom: 7px;">
-								<input data-maxlength="300" style="height:25px;" type="text" id="matr_nextPrcsnNm" name="matr_nextPrcsnNm" placeholder="후행업체"
-								onkeyUp="if(window.event.keyCode == 13){matrGridDataChange('nextPrcsnNm','matr_nextPrcsnNm');}">
-								<a data-onclick="openClntSearchDataChange('nextPrcsnNm','matr_nextPrcsnNm');" onclick="openClntSearchDataChange('nextPrcsnNm','matr_nextPrcsnNm');"><i class="i_search_w"></i></a>
-							</div>
+<!-- 							<div class="search_form" style="width:140px;float:left; margin-left: 8px; margin-top: 8px; margin-bottom: 7px;"> -->
+<!-- 								<input data-maxlength="300" style="height:25px;" type="text" id="matr_nextPrcsnNm" name="matr_nextPrcsnNm" placeholder="후행업체" -->
+<!-- 								onkeyUp="if(window.event.keyCode == 13){matrGridDataChange('nextPrcsnNm','matr_nextPrcsnNm');}"> -->
+<!-- 								<a data-onclick="openClntSearchDataChange('nextPrcsnNm','matr_nextPrcsnNm');" onclick="openClntSearchDataChange('nextPrcsnNm','matr_nextPrcsnNm');"><i class="i_search_w"></i></a> -->
+<!-- 							</div> -->
 
 							<!-- <div class="search_form" style="width:140px;float:left; margin-left: 8px; margin-top: 8px; margin-bottom: 7px;">
 								<input data-maxlength="300" style="height:25px;" type="text" id="matr_dlvplcNm" name="matr_dlvplcNm" placeholder="배송처"
@@ -166,6 +166,7 @@ ax5.ui.grid.formatter["popupGrid1"] = function () {
 	aHtml += '<a style="background:url(/static/img/svg/search.svg) no-repeat 50% 50%;background-size:18px 18px;opacity:0.5;" ';
 	aHtml += 'onclick="openClntSearchGrid(\'pchsClntNm\','+this.dindex+');" data-onclick="openClntSearchGrid(\'pchsClntNm\','+this.dindex+');">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a>';
 
+	if(this.item.matrCd == undefined || this.item.matrCd === ''){ aHtml = "";}
     return aHtml;
 };
 
@@ -184,7 +185,18 @@ ax5.ui.grid.formatter["popupGrid3"] = function () {
 	aHtml += '<a style="background:url(/static/img/svg/search.svg) no-repeat 50% 50%;background-size:18px 18px;opacity:0.5;" ';
 	aHtml += 'onclick="openMatListSearchGrid(\'matrCd\','+this.dindex+');" data-onclick="openMatListSearchGrid(\'matrCd\','+this.dindex+');">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</a>';
 
+	if(this.item.matrCd == undefined || this.item.matrCd === ''){ aHtml = "";}
     return aHtml;
+};
+
+ax5.ui.grid.formatter["useYn"] = function () {
+	var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
+	if(this.item.matrCd == undefined || this.item.matrCd === ''){ return ;}
+	if (this.value == "E"){
+		return '';
+	} else {
+		return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
+	}
 };
 
 var bom_ckColumn = "lastDsgnNo,dsgnNm,dsgnBomQty,upperCd,lowerCd";
@@ -244,6 +256,7 @@ function openMatListSearchGrid(column, rowIndex) {
 	openSecondModal("/static/html/cmn/modal/matListSearch.html", 1200, 700, "자재 검색", paramObj, function (grid) {
 		var selData = matrGridView.target.getList("selected")[0];
 		var gridRow = grid.target.getList("selected")[0];
+		
 		gridRow.dtaChk = selData.dtaChk;
 		gridRow.coCd = selData.coCd;
 		gridRow.ordrsNo = selData.ordrsNo;
@@ -259,21 +272,27 @@ function openMatListSearchGrid(column, rowIndex) {
 		gridRow.dlvplcNm = selData.dlvplcNm;
 		gridRow.bomQty = selData.bomQty;
 		gridRow.posQty = selData.posQty;
-
+//		gridRow.pchsClntCd = selData.pchsClntCd;
+		gridRow.pchsClntNm = selData.pchsClntNm;
+		gridRow.matrSeq = selData.matrSeq;
+		
 		gridRow.__index = selData.__index;
 		gridRow.__origin_index__ = selData.__origin_index__;
 		gridRow.__modified__ = selData.__modified__;
 		gridRow.__selected__ = selData.__selected__;
+	
+		gridRow.text = gridRow.matrNm;
 
-		var gridList = [gridRow];
-		var selectList = initGridDataNullValue(gridList, matrGridView.target.columns);
-		var newRow = selectList[0];
 		if(selData.dtaChk == "I"||selData.dtaChk == "D"){
-			newRow.dtaChk = selData.dtaChk;
+			gridRow.dtaChk = selData.dtaChk;
+		}else{
+			gridRow.dtaChk = "U";
 		}
-		matrGridView.target.updateRow($.extend({}, matrGridView.target.list[rowIndex], newRow), rowIndex);
-		//updateRow는 onchange 발생안함. matrSeq set올 호출..
-		matrGridView.target.setValue(rowIndex, "matrSeq", selData.matrSeq);
+
+    	$.each($.extend({}, gridRow), function (key, value) {
+    		matrGridView.target.setValue(rowIndex, key, value);
+    	});
+
 	});
 }
 
@@ -290,6 +309,7 @@ var before_lowerCd = null;
 var select_bomIdx = -1;
 var select_dsgnNo = null;
 var select_lowerCd = null;
+var select_upperCd = null;
 
 var bomGridView = {
 	initView: function() {
@@ -318,15 +338,17 @@ var bomGridView = {
 					select_bomIdx = this.dindex;
 					select_dsgnNo = bomGridView.target.getList("selected")[0].dsgnNo;
 					select_lowerCd = bomGridView.target.getList("selected")[0].lowerCd;
-					//debugger;
+					select_upperCd = bomGridView.target.getList("selected")[0].upperCd;
+					// debugger;
 					
 					//원본데이타에서 화면데이터 제거 --> 화면데이타 put 원본데이타에.
 					//2023.09.19 김성욱 수정 select_dsgnNo -> select_lowerCd
-					matrGridView.selectGrid(select_dsgnNo);
 					//matrGridView.selectGrid(select_lowerCd);
-					before_bomIdx = this.dindex;
-					before_dsgnNo = bomGridView.target.getList("selected")[0].dsgnNo;
-					before_lowerCd = bomGridView.target.getList("selected")[0].lowerCd;
+
+					// 2023.10.17 김성욱 수정
+					// matrGridView.selectGrid(select_dsgnNo);
+					matrGridView.setData(select_lowerCd);
+					// 2023.10.17 김성욱 수정 끝
 				},
 				onDBLClick: function () {
 					thisGridRow = this.dindex;   // 선택된 행 정보 가져오기
@@ -366,30 +388,7 @@ var bomGridView = {
 				// {key: "dsgnNo" , label: "도번" 	 , width: 330,align: "left" ,  treeControl: true},
 				{key: "text"       , label: "도번" 	 , width: 330, align: "left"  , treeControl: true},
 				{key: "dsgnBomQty" , label: "수량"   , width: 50 , align: "right" , formatter: "money"},
-				// {key: "dsgnNm"     , label: "명칭" 	 , width: 220, align: "left",
-				// 	editor:{type:  "text",
-				// 		disabled: function () {
-				// 			if(this.item.dtaChk == "D") {
-				// 				return true;
-				// 			} else {
-				// 				return false;
-				// 			}
-				// 		},
-				// 		attributes: { 'maxlength': 100 }
-				// 	}
-				// },
-				// {key: "dsgnBomQty" , label: "수량" 	,width: 60,align: "right",
-				// 	editor:{type:  "number",
-				// 		disabled: function () {
-				// 			if(this.item.dtaChk == "D") {
-				// 				return true;
-				// 			} else {
-				// 				return false;
-				// 			}
-				// 		},
-				// 		attributes: { 'maxlength': 5 }
-				// 	}
-				// },
+
 				{key: "dsgnNm"    , label: "명칭" , align: "left"  , width: 220, hidden:true},
 				{key: "matrMat"   , label: "소재" , align: "left"  , width: 60 },
 				{key: "matrMakrNm", label: "Maker", align: "left"  , width: 60 },
@@ -466,11 +465,12 @@ var bomGridView = {
 		var formData = {
 			"coCd" : $("#coCd").val(),
 			"ordrsNo" : $("#ordrsNo").val(),
-			"salesCd" : $("#salesCd").val(),
+			"salesCd" : $("#salesCd").val()
 		}
 		postAjax("/user/sm/sm01/selectBuyBomList", formData, null, function(data) {
-			var list = initGridDataNullValue(data.resultList, target.columns, bom_ckColumn);
+//			var list = initGridDataNullValue(data.resultList, target.columns, bom_ckColumn);
 			//console.log("====list>>",list);
+			var list = data.resultList;
 			target.setData({
 				list : list,
 				page : {
@@ -489,9 +489,9 @@ var bomGridView = {
 				select_lowerCd = bomGridView.target.getList("selected")[0].lowerCd;
 				before_dsgnNo = select_dsgnNo;
 				before_lowerCd = select_lowerCd;
-				
+
 				//자재정보 조회
-				matrGridView.setData(0);
+				matrGridView.setData(select_lowerCd);
 				//matrGridView.setData("filter");
 			}
 		});
@@ -519,6 +519,9 @@ var matrGridView = {
 					this.self.select(this.dindex);
 				},
 				onDBLClick: function () {
+					
+					if(this.item.matrCd == undefined || this.item.matrCd === '') return;
+					
 					updateBomMtrlSecondModal();
 				},
 				onDataChanged: function () {
@@ -544,10 +547,21 @@ var matrGridView = {
 					if(this.key == "posQty" && this.value != "") {
 						this.item.posQty = Number(this.item.posQty.replace(/[^0-9]/g,""));
 					}
+					
+					if(this.item.matrCd == undefined || this.item.matrCd === ''){
+						setClearValue(this.dindex);
+					}
+					
 					this.self.repaint();
 				},
 			},
 			columns : [
+				{key: "lvl"        , label: "LVL"    , width: 30},
+				{key: "text"      , label: "도번" 	 , width: 300, align: "left"  , treeControl: true},
+				{key: "treeUpperCd"   , label: "상위코드"    , width: 60, align: "left", hidden:true},
+				{key: "treeLowerCd"   , label: "하위코드"    , width: 60, align: "left", hidden:true},
+				{key: "upperCd"   , label: "상위코드"    , width: 60, align: "left", hidden:true},
+				{key: "lowerCd"   , label: "하위코드"    , width: 60, align: "left", hidden:true},
 				{key: "dtaChk"    , label: " "           , width: 30 , styleClass: "grid-font-blue-bold"},
 				{key: "coCd"      , label: "CO"          , width: 50 , align: "center", hidden:true},
 				{key: "ordrsNo"   , label: "ordrsNo"     , width: 80 , align: "center", hidden:true},
@@ -556,69 +570,48 @@ var matrGridView = {
 				{key: "oldUpperCd", label: "이전상위코드", width: 160, align: "left"  , hidden:true},
 				{key: "oldLowerCd", label: "이전하위코드", width: 180, align: "left"  , hidden:true},
 				{key: "dsgnNo"    , label: "도번"        , width: 180, align: "left"  , hidden:true},
-				{key: "upperCd"   , label: "상위코드"    , width: 160, align: "left"  , hidden:true},
-				{key: "lowerCd"   , label: "하위코드"    , width: 180, align: "left"  , hidden:true},
-				{key: "pchsClntCd"   , label: "협력업체"    , width: 180, align: "left"  , hidden:true},
-				
-				// {key: "ordrgDiv20", label: "발주용도"    , width: 80 , align: "left",
-				// 	editor : {type : "select",
-				// 		config : {
-				// 			columnKeys : {optionValue: 'value',optionText: 'text'},
-				// 			options    : options_02
-				// 		},
-				// 		disabled : function () {
-				// 			return false;
-				// 		}
-				// 	},
-				// 	formatter : function () {
-				// 		var result_text = "";
-				// 		var itemValue = this.item.ordrgDiv20;
-				// 		$.each(options_02, function (idx, elem) {
-				// 			if(itemValue == elem.value)
-				// 			{
-				// 				result_text = elem.text;
-				// 			}
-				// 		});
-				// 		return result_text;
-				// 	}
-				// },
-				// {key: "ordrgDiv10", label: "발주유형", width: 80, align: "left",
-				// 	editor : {type : "select",
-				// 		config: {
-				// 			columnKeys : {optionValue: 'value',optionText: 'text'},
-				// 			options    : options_01
-				// 		},
-				// 		disabled : function () {
-				// 			return false;
-				// 		}
-				// 	},
-				// 	formatter : function () {
-				// 		var result_text = "";
-				// 		var itemValue = this.item.ordrgDiv10;
-				// 		$.each(options_01, function (idx, elem) {
-				// 			if(itemValue == elem.value)
-				// 			{
-				// 				result_text = elem.text;
-				// 			}
-				// 		});
-				// 		return result_text;
-				// 	}
-				// },
-
-				{key: "pchsClntNm", label: "협력업체", width: 118,	align: "left",
-					editor : {type: "text",
-						attributes: {'maxlength': 100,'data-maxlength': 300}
+				{key: "matrYn", label: "자재여부"    , width: 18, align: "left" , hidden:true},
+				{key: "pchsClntNm", label: "거래처명"    , width: 118, align: "left",
+					editor : {
+						type: "text",
+						attributes: {'maxlength': 100,'data-maxlength': 300},
+						disabled : function () {
+							return this.item.matrYn == "true";
+						}
 					}
 				},
-				{key: "popupGrid1", label: " "     , width: 30 , align: "center", formatter: "popupGrid1"},
+// 				{key: "pchsClntNm", label: "협력업체", width: 118,	align: "left",
+// 					editor : {type: "text",
+// 						attributes: {'maxlength': 100,'data-maxlength': 300},
+// 						disabled : function () {
+// 							return true;
+// 						}
+// 					}
+// 				},
+// 				{key: "popupGrid1", label: " "     , width: 30 , align: "center", formatter: "popupGrid1"},
 				{key: "dlvplcNm"  , label: "배송처", width: 118, align: "left",
 					editor : {type: "text",
-						attributes: {'maxlength': 100,'data-maxlength': 300}
+						attributes: {'maxlength': 100,'data-maxlength': 300},
+						disabled : function () {
+							return this.item.matrYn == "true";
+						}
 					}
 				},
 				// {key: "popupGrid2", label: " "           , width: 30,	align: "center", formatter: "popupGrid2"},
-				{key: "bomQty"    , label: "발주대상수량", width: 80 , align: "right" , editor:{type: "number"}},
-				{key: "posQty"    , label: "소요량"      , width: 80 , align: "right" , editor:{type: "number"}},
+				{key: "bomQty"    , label: "발주대상수량", width: 80 , align: "right" , 
+					editor:{type: "number",
+						disabled : function () {
+							return this.item.matrYn == "true";
+						}
+					}
+				},
+				{key: "posQty"    , label: "소요량"      , width: 80 , align: "right" , 
+					editor:{type: "number",
+						disabled : function () {
+							return this.item.matrYn == "true";
+						}
+					}
+				},
 				{key: "matrCd"    , label: "자재코드"    , width: 80 , align: "center"},
 				{key: "popupGrid3", label: " "           , width: 30 , align: "center", formatter: "popupGrid3"},
 				{key: "matrNm"    , label: "자재명"      , width: 160, align: "left"},
@@ -629,7 +622,7 @@ var matrGridView = {
 							options    : options_03
 						},
 						disabled : function () {
-							return false;
+							return this.item.matrYn == "true";
 						}
 					},
 					formatter : function () {
@@ -647,8 +640,8 @@ var matrGridView = {
 							columnKeys: {optionValue: 'value',optionText: 'text'},
 							options: options_04
 						},
-						disabled: function () {
-							return false;
+						disabled : function () {
+							return this.item.matrYn == "true";
 						}
 					},
 					formatter: function () {
@@ -666,8 +659,8 @@ var matrGridView = {
 							columnKeys: {optionValue: 'value',optionText: 'text'},
 							options: options_05
 						},
-						disabled: function () {
-							return false;
+						disabled : function () {
+							return this.item.matrYn == "true";
 						}
 					},
 					formatter: function () {
@@ -685,8 +678,8 @@ var matrGridView = {
 							columnKeys: {optionValue: 'value',optionText: 'text'},
 							options: options_06
 						},
-						disabled: function () {
-							return false;
+						disabled : function () {
+							return this.item.matrYn == "true";
 						}
 					},
 					formatter: function () {
@@ -710,8 +703,8 @@ var matrGridView = {
 							columnKeys: {optionValue: 'value',optionText: 'text'},
 							options: options_07
 						},
-						disabled: function () {
-							return false;
+						disabled : function () {
+							return this.item.matrYn == "true";
 						}
 					},
 					formatter: function () {
@@ -733,8 +726,8 @@ var matrGridView = {
 							columnKeys: {optionValue: 'value',optionText: 'text'},
 							options: options_08
 						},
-						disabled: function () {
-							return false;
+						disabled : function () {
+							return this.item.matrYn == "true";
 						}
 					},
 					formatter: function () {
@@ -753,8 +746,8 @@ var matrGridView = {
 							columnKeys: {optionValue: 'value',optionText: 'text'},
 							options: options_09
 						},
-						disabled: function () {
-							return false;
+						disabled : function () {
+							return this.item.matrYn == "true";
 						}
 					},
 					formatter: function () {
@@ -790,21 +783,27 @@ var matrGridView = {
 				{key: "matrLastTrstDt", label: "최종거래일자"  , width: 100, align: "center",
 					editor: {type: "date",
 						config: { content: { config: { mode: "day", selectMode: "day" } } },
-						disabled: function () {
-							return false;
+						disabled : function () {
+							return this.item.matrYn == "true";
 						}
 					}
 				},
 				{key: "matrAtntCd", label: "대체자재코드", width: 100, align: "center",
 					editor: {
 						type: "text",
-						attributes: {'maxlength': 20}
+						attributes: {'maxlength': 20},
+						disabled : function () {
+							return this.item.matrYn == "true";
+						}
 					}
 				},
 				{key: "matrNo", label: "자재번호", width: 100, align: "center",
 					editor: {
 						type: "text",
-						attributes: {'maxlength': 20}
+						attributes: {'maxlength': 20},
+						disabled : function () {
+							return this.item.matrYn == "true";
+						}
 					}
 				},
 				{key: "upperNm"   , label: "상위"  , width: 80 , align: "left", hidden:true},
@@ -814,87 +813,86 @@ var matrGridView = {
 				{key: "partNo"    , label: "PART"  , width: 80 , align: "left", hidden:true},
 				{key: "unitNo"    , label: "UNIT"  , width: 80 , align: "left", hidden:true},
 				{key: "revNo"     , label: "리버전", width: 80 , align: "left", hidden:true}
-			]
+			],
+			tree: {
+				use: true,
+				indentWidth: 15,
+				arrowWidth: 15,
+				iconWidth: 18,
+				icons: {
+					openedArrow: '<i class="fa fa-caret-down" aria-hidden="true"></i>',
+					collapsedArrow: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+					groupIcon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+					collapsedGroupIcon: '<i class="fa fa-folder" aria-hidden="true"></i>',
+					itemIcon: '<i class="fa fa-file" aria-hidden="true"></i>'
+				},
+				columnKeys: {
+					parentKey: "treeUpperCd",
+					selfKey: "treeLowerCd",
+				}
+			}
 		});
 		return this;
 	},
 	selectGrid : function(click_dsgnNo) {
-		if(before_bomIdx == select_bomIdx) return; //선택행 변경없을때 사용안함.
+// 		if(before_bomIdx == select_bomIdx) return; //선택행 변경없을때 사용안함.
 		
-		//2023.09.19 김성욱 수정 select_dsgnNo -> select_lowerCd
-		var delIdxArray = findIndexArray(matrArr, "dsgnNo", before_dsgnNo);
-		//var delIdxArray = findIndexArray(matrArr, "upperCd", click_dsgnNo);
+// 		//2023.09.19 김성욱 수정 select_dsgnNo -> select_lowerCd
+// 		var delIdxArray = findIndexArray(matrArr, "dsgnNo", before_dsgnNo);
+// 		//var delIdxArray = findIndexArray(matrArr, "upperCd", click_dsgnNo);
 		
-		var af_gridList = this.target.getList();
-		if(af_gridList.length > 0) {
-			$.each(af_gridList, function (idx, elem) {
-				matrArr.push(elem);
-			});
-		}
+// 		var af_gridList = this.target.getList();
+// 		if(af_gridList.length > 0) {
+// 			$.each(af_gridList, function (idx, elem) {
+// 				matrArr.push(elem);
+// 			});
+// 		}
 		
-		//행삭제는 index가 변경되므로 아래에서 삭제
-		for(var i=delIdxArray.length-1; i >= 0; i--) {
-			matrArr.splice(delIdxArray[i],1);
-		}
+// 		//행삭제는 index가 변경되므로 아래에서 삭제
+// 		for(var i=delIdxArray.length-1; i >= 0; i--) {
+// 			matrArr.splice(delIdxArray[i],1);
+// 		}
 		
-		//var target = this.target;
-		//debugger;
-		var list = getFilterData_dsgnNo(click_dsgnNo);
-		this.target.setData({
-			list : list,
-			page : {
-				totalElements : list.length
-			}
-		});
+// 		//var target = this.target;
+// 		//debugger;
+// 		var list = getFilterData_dsgnNo(click_dsgnNo);
+// 		this.target.setData({
+// 			list : list,
+// 			page : {
+// 				totalElements : list.length
+// 			}
+// 		});
 	},
-	setData: function(_mod) {
+	setData: function(select_lowerCd) {
 		var bom_selList = bomGridView.target.getList("selected");
 		var sel_dsgnNo = "";
-		if(_mod == "filter") {
-			var target = this.target;
-			bom_selList = bomGridView.target.getList("selected");
+
+		var target = this.target;
+		if(select_upperCd == null || select_upperCd == "") {
+			select_upperCd = "top";
+		}
+		var formData = {
+			"coCd"    : $("#coCd").val(),
+			"ordrsNo" : $("#ordrsNo").val(),
+			"salesCd" : $("#salesCd").val(),
+			"upperCd" : select_upperCd,
+			"lowerCd" : select_lowerCd
+		}
+
+		postAjax("/user/sm/sm01/selectBomMatrList", formData, null, function(data) {
+			//debugger;
+//			matrArr = initGridDataNullValue(data.resultList, target.columns, getViewColumnKey(matrGridView.target,["dtaChk"]));
+
+			var list = data.resultList;
+//			var list = matrArr;
 			
-			if(bom_selList.length != 0) {
-				sel_dsgnNo = bomGridView.target.getList("selected")[0].dsgnNo;
-			}
-			
-			var list = getFilterData_dsgnNo(sel_dsgnNo);
 			target.setData({
 				list : list,
 				page : {
 					totalElements : list.length
 				}
 			});
-		} else {
-			var target = this.target;
-			var formData = {
-				"coCd"    : $("#coCd").val(),
-				"ordrsNo" : $("#ordrsNo").val(),
-				"salesCd" : $("#salesCd").val(),
-			}
-			
-			postAjax("/user/sm/sm01/selectBomMatrList", formData, null, function(data) {
-				matrArr = initGridDataNullValue(data.resultList, target.columns, getViewColumnKey(matrGridView.target,["dtaChk"]));
-				
-				bom_selList = bomGridView.target.getList("selected");
-				
-				if(bom_selList.length != 0) {
-					sel_dsgnNo = bomGridView.target.getList("selected")[0].dsgnNo;
-				}
-				
-				var list = matrArr;
-				if(matrArr.length > 0 && !isEmpty(sel_dsgnNo)) {
-					list = getFilterData_dsgnNo(sel_dsgnNo);
-				}
-				
-				target.setData({
-					list : list,
-					page : {
-						totalElements : list.length
-					}
-				});
-			});
-		}
+		});
 	}
 }
 
@@ -1019,12 +1017,12 @@ var matrGridView = {
 	function updateBomMatr() {
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 			var formData = makeFormData();										// 요청이 통과하면 formData를 생성
-			setFormLock(".popup_area");
+//			setFormLock(".popup_area");
 	      	filePostAjax("/user/sm/sm01/updateBom", formData,function(data) {
 				alert(data.resultMessage);
 				if (data.resultCode == 200) {
-					gridView.setData(main_pageNo,true);
-					modalStack.close();
+					matrGridView.setData(select_lowerCd);
+//					modalStack.close();
 				}
 			});
 		}
@@ -1069,46 +1067,23 @@ var matrGridView = {
 		//--첨부화일 처리를 위한 부분 끝
 		//---------------------------------------------------------------
 
-		var bomlist = bomGridView.target.list;
-		var bomArr = getTreeBomData(bomlist);
-		formData.append("bomArr", JSON.stringify(bomArr));
-
 		//현재 자재정보 그리드정보를 matrArr에  update 한다
 		var matrGridList = matrGridView.target.list;
+		var matrArrList = [];
+		
 		if(matrGridList.length > 0){
-			var delIdxArray = [];
-			//2023.09.19 김성욱 수정 select_dsgnNo -> select_lowerCd
-			if(!isEmpty(before_dsgnNo)){
-				delIdxArray = findIndexArray(matrArr, "dsgnNo", before_dsgnNo);
-			}
 			$.each(matrGridList, function (idx, elem) {
-				matrArr.push(elem);
+				matrArrList.push(elem);
 			});
-			if(!isEmpty(before_dsgnNo)){
-				for(var i=delIdxArray.length-1; i >= 0; i--){
-					matrArr.splice(delIdxArray[i],1);
-				}
-			}
-			
-			// if(!isEmpty(before_lowerCd)){
-			// 	delIdxArray = findIndexArray(matrArr, "lowerCd", before_lowerCd);
-			// }
-			// $.each(matrGridList, function (idx, elem) {
-			// 	matrArr.push(elem);
-			// });
-			// if(!isEmpty(before_lowerCd)){
-			// 	for(var i=delIdxArray.length-1; i >= 0; i--){
-			// 		matrArr.splice(delIdxArray[i],1);
-			// 	}
-			// }
 		}
 
-		$.each(matrArr,function(idx, obj) {
-			if(isEmpty(obj.dtaChk)){
-				obj.dtaChk = "";
-			}
-		});
-		formData.append("matrArr", JSON.stringify(matrArr));
+ 		$.each(matrArrList,function(idx, obj) {
+ 			if(isEmpty(obj.dtaChk)){
+ 				obj.dtaChk = "";
+ 			}
+ 		});
+ 		
+		formData.append("matrArr", JSON.stringify(matrArrList));
 		//세부 아이템 자료 끝
 		return formData;
 	}
@@ -1473,6 +1448,7 @@ var matrGridView = {
 				newRow.partNo = bomData.partNo;
 				newRow.unitNo = bomData.unitNo;
 				newRow.dsgnNm = bomData.dsgnNm;
+				newRow.text = newRow.matrNm;
 				
 				// newRow.upperCd = bomData.upperCd;
 				// newRow.lowerCd = bomData.lowerCd;
@@ -1480,8 +1456,8 @@ var matrGridView = {
 				newRow.lowerCd = '.';
 				newRow.ordrgDiv10 = $('#matr_ordrgDiv10').val();
 				newRow.ordrgDiv20 = $('#matr_ordrgDiv20').val();
-				newRow.nextPrcsnNm = $('#matr_nextPrcsnNm').val();
-				newRow.dlvplcNm = $('#matr_dlvplcNm').val();
+//				newRow.nextPrcsnNm = $('#matr_nextPrcsnNm').val();
+//				newRow.dlvplcNm = $('#matr_dlvplcNm').val();
 				// newRow.bomQty = $('#matr_bomQty').val();
 				// newRow.posQty = $('#matr_posQty').val();
 				newRow.bomQty = vmatr_bomQty;
@@ -1494,22 +1470,11 @@ var matrGridView = {
 
 	//자재삭제
 	this.delRowMatr = function() {
-		var bomData = bomGridView.target.getList("selected")[0];
-		var isBomSelect = !isEmpty(bomData);
-
-		if(isBomSelect == false) {
-			alert("구매 BOM에 선택된 데이타가 없습니다.");
-			return;
-		}
-
-		if(isBomSelect == true && bomData.dtaChk == "D") {
-			alert("구매 BOM에서 이미 삭제 예약된 데이타 입니다.");
-			return;
-		}
 
 		if(selectGridValidationM(matrGridView.target)) return;
 		
 		var selDataList = matrGridView.target.getList("selected");
+		
 		//ax5Grid.deleteRow("selected"); 사용시 삭제이력 ax5Grid.getList("deleted");
 		for(var i=selDataList.length-1; i >= 0; i--) {
 			var selData = selDataList[i];
@@ -1517,7 +1482,14 @@ var matrGridView = {
 			if(matrDtaChk == "I") {
 				matrGridView.target.removeRow(selData.__index);
 			} else {
-				matrGridView.target.setValue(selData.__index, "dtaChk", "D");
+				if(matrDtaChk == "D") {
+					matrGridView.target.setValue(selData.__origin_index__, "dtaChk", "");
+				}else{
+					matrGridView.target.setValue(selData.__origin_index__, "dtaChk", "D");
+				}
+			}
+			if(selData.matrCd == undefined || selData.matrCd == ''){
+				matrGridView.target.setValue(selData.__origin_index__, "dtaChk", "");
 			}
 		}
 	}
@@ -1534,8 +1506,9 @@ var matrGridView = {
 	function updateBomMtrlSecondModal() {
 		if(selectGridValidation(matrGridView.target)) return;
 		var selData = matrGridView.target.getList("selected")[0];
-		if(selData.dtaChk == "D") return;
-
+		if(selData.matrCd == undefined || selData.matrCd === '') return;
+		if(selData.dtaChk == "D" || selData.dtaChk == "I") return;
+		
 		var paramObj = selData;
         var fileTrgtKey = selData.fileTrgtKey;
         paramObj.actionType = "U";
@@ -1543,7 +1516,7 @@ var matrGridView = {
         openSecondModal("/static/html/user/sm/sm01/SM0101P02.html", 1300, 550, "", paramObj, function(data) {
         	//matrGridView.target.updateRow($.extend({}, matrGridView.target.list[selData.__index], data), selData.__index);
         	$.each($.extend({}, data), function (key, value) {
-        		matrGridView.target.setValue(selData.__index, key, value);
+        		matrGridView.target.setValue(selData.__origin_index__, key, value);
         	});
         	//if(isEmpty(selData.dtaChk)) {
 	        //	matrGridView.target.setValue(selData.__index, "dtaChk", "U");
@@ -1630,5 +1603,11 @@ var matrGridView = {
 			}
 		});
 	};
-
+	
+	function setClearValue(_idx){
+		var _key = ["dtaChk", "pchsClntNm", "dlvplcNm", "bomQty", "posQty", "goodsDiv", "goodsDiv", "matrClntDiv", "matrDiv", "matrGrp","matrUnit","matrTestDiv"];
+		for(var _z=0;_z<_key.length;_z++){
+			matrGridView.target.setValue(_idx, _key[_z], "");
+		}
+	}
 </script>

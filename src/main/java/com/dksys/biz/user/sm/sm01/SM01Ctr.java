@@ -190,6 +190,7 @@ public class SM01Ctr {
 	@PostMapping(value = "/updateBom")
 	public String updateBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 	  	try {
+	  			model.addAttribute("resultCode", 200);
 			if (sm01Svc.updateBom(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("update"));

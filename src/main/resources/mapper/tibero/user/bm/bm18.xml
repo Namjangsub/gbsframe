@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.bm.bm18.mapper.BM18Mapper">
+
+	<!-- 알림톡템플릿 조회 리스트  조회조건 -->
+	<sql id="selectReceptionMessageListCondition">
+			
+		<!-- 수신번호 -->         
+		<if test="rcvNo != null and !rcvNo.equals('')">
+			AND RCV_NO LIKE '%' || #{rcvNo} || '%' 
+		</if>				
+		<!-- 템플릿 구분 -->         
+		<if test="tmplatDiv != null and !tmplatDiv.equals('')">
+			AND TMPLAT_DIV = #{tmplatDiv}
+		</if>
+		<!-- 거래처 -->       
+		<if test="clntNm != null and !clntNm.equals('')">
+			AND CLNT_NM LIKE '%' || #{clntNm} || '%'
+		</if>		
+	
+	</sql>	
+		
+	<!-- 알림톡템플릿 조회 리스트  카운트 -->
+	<select id="selectReceptionMessageListCount" parameterType="Map" resultType="int">
+		SELECT COUNT(*) 
+			FROM 
+			(
+				SELECT A.RCV_NO       --수신번호
+							, A.CLNT_CD         --거래처
+							, C.CLNT_NM         --거래처명
+							, A.TMPLAT_DIV        --발송구분
+							, (SELECT FN_CM05M01_CD_TO_NM(A.TMPLAT_DIV) FROM DUAL) AS TMPLAT_DIV_NM  --발송구분명
+							, A.SENDG_YN        --발송결과
+							, A.NAME_TO		  --받는사람
+							, A.TEL_NO		  --연락처
+							, A.APP_TITLE		  --알림톡제목
+							, A.APP_CNTS		  --내용상세
+							, A.CREAT_ID		  --생성자
+							, A.CREAT_PGM		  --생성프로그램ID
+							, TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD') CREAT_DTTM	  --생성일시
+							, A.UDT_ID		  --최종변경자
+							, A.UDT_PGM		  --최종수정프로그램ID
+							, TO_CHAR(A.UDT_DTTM, 'YYYY-MM-DD') UDT_DTTM	  --최종변경일시
+						FROM TB_BM18M01 A
+						INNER JOIN TB_BM02M01 AS C ON A.CLNT_CD = C.CLNT_CD --거래처정보
+						WHERE 1=1
+						<include refid="selectReceptionMessageListCondition"></include>
+			)
+		WHERE 1=1
+		
+	</select>
+	        
+	<!-- 알림톡템플릿 조회 리스트  -->
+	<select id="selectReceptionMessageList" parameterType="Map" resultType="camelMap">   
+		SELECT *
+			FROM
+			(
+			SELECT X.*
+					, ROWNUM AS RN
+					FROM
+						(
+						SELECT A.RCV_NO       --수신번호
+							, A.CLNT_CD         --거래처
+							, C.CLNT_NM         --거래처명
+							, A.TMPLAT_DIV        --발송구분
+							, (SELECT FN_CM05M01_CD_TO_NM(A.TMPLAT_DIV) FROM DUAL) AS TMPLAT_DIV_NM  --발송구분명
+							, A.SENDG_YN        --발송결과
+							, A.NAME_TO		  --받는사람
+							, A.TEL_NO		  --연락처
+							, A.APP_TITLE		  --알림톡제목
+							, A.APP_CNTS		  --내용상세
+							, A.CREAT_ID		  --생성자
+							, A.CREAT_PGM		  --생성프로그램ID
+							, TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD HH:MM:SS') CREAT_DTTM	  --생성일시
+							, A.UDT_ID		  --최종변경자
+							, A.UDT_PGM		  --최종수정프로그램ID
+							, TO_CHAR(A.UDT_DTTM, 'YYYY-MM-DD') UDT_DTTM	  --최종변경일시
+						FROM TB_BM18M01 A
+						INNER JOIN TB_BM02M01 AS C ON A.CLNT_CD = C.CLNT_CD --거래처정보
+						WHERE 1=1						
+						<include refid="selectReceptionMessageListCondition"></include>
+						ORDER BY CREAT_DTTM DESC
+						) X		
+			)							
+			WHERE 1=1
+				AND RN BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>
+	
+	<!-- 수신번호 채번 -->	
+	<select id="selectMaxRcvNo" parameterType="Map" resultType="String">
+		SELECT NVL(MAX_RCV_NO, 'KAKAO'||'000001') AS MAX_RCV_NO
+			FROM
+			(
+			SELECT DISTINCT DECODE( INSTR(RCV_NO, 'KAKAO'), 0, 'KAKAO'||'00001', 'KAKAO' || LPAD( SUBSTRING(RCV_NO, -6)+1, 6, '0') ) OVER()
+						  ) AS MAX_RCV_NO
+				FROM TB_BM18M01
+			UNION ALL
+			SELECT NULL AS MAX_RCV_NO
+				FROM DUAL		
+			)		
+			WHERE MAX_RCV_NO IS NOT NULL OR ROWNUM = 1	
+	</select>
+
+</mapper>
