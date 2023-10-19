@@ -35,8 +35,8 @@
 					<td>
 						<input type="hidden" id="ordrsClntCd" name="ordrsClntCd">
 						<div class="search_form">
-							<input type="text" id="ordrsClntNm" name="ordrsClntNm" required onkeyup="event.keyCode == 13 ? ClntSearch() : ''">
-							<a onclick="ClntSearch();"><i class="i_search_w"></i></a>
+							<input type="text" id="ordrsClntNm" name="ordrsClntNm" required onkeyup="event.keyCode == 8 ? ordrsClntCd.value = '' : event.keyCode == 13 ? ClntSearch($('#ordrsClntNm').val()) : ''">
+							<a onclick="ClntSearch($('#ordrsClntNm').val());"><i class="i_search_w"></i></a>
 						</div>
 					</td>
 
@@ -55,7 +55,7 @@
 						</select>
 					</td>
 
-					<th class="hit exrate">환율</th>
+					<th>환율</th>
 					<td>
 						<input type="text" id="exrate" name="exrate" class="form-control" maxlength="10" onkeyup="onlyNumber(this)" comma onchange="Chk_Exrate();">
 					</td>
@@ -145,15 +145,34 @@
 					},
 					onDataChanged: function () {
 						var miConfAmt = 0;
+						var befConfAmt = 0;
+						var sellDcsnDtlAmt = 0;
 						var confAmt = 0;
-						if (this.key == "confAmt") {
-							miConfAmt = this.item.miConfAmt;
-							confAmt = this.item.confAmt;
-							if (parseFloat(confAmt) > parseFloat(miConfAmt)) {
-								alert('매출확정금액은 미확정금액을 초과할 수 없습니다.');
-								this.item.confAmt = miConfAmt;
+						//등록시
+						if (actionType =='C'){
+							if (this.key == "confAmt") {
+								miConfAmt = this.item.miConfAmt; //미확정금액
+								befConfAmt = this.item.befConfAmt; //기 확정금액
+								confAmt = this.item.confAmt; //입력금액
+								if (parseFloat(confAmt) > parseFloat(miConfAmt) + parseFloat(befConfAmt)) {
+									alert('입력금액은 수금예정금액을 초과할 수 없습니다.');
+									this.item.confAmt = miConfAmt;
+								}
+								setSumAmt();
 							}
-							setSumAmt();
+						}
+						//수정시
+						if (actionType=='U'){
+							if (this.key == "confAmt") {
+								miConfAmt = this.item.miConfAmt; //미확정금액
+								sellDcsnDtlAmt = this.item.sellDcsnDtlAmt //확정금액
+								confAmt = this.item.confAmt; //입력금액
+								if (parseFloat(confAmt) > parseFloat(miConfAmt) + parseFloat(sellDcsnDtlAmt)) {
+									alert('입력금액은 수금예정금액을 초과할 수 없습니다.');
+									this.item.confAmt = sellDcsnDtlAmt;
+								}
+								setSumAmt();
+							}
 						}
 
 						// if (beforeGridSize != ModalgridView.list.length) {
@@ -223,7 +242,7 @@
 							}
 						}
 					},
-					{key: "confAmt",      label: "확정금액",   align: "right",  width: 80, formatter: "money",
+					{key: "confAmt",      label: "입력금액",   align: "right",  width: 80, formatter: "money",
 						editor: {
 							type: "number",
 							attributes: {
@@ -288,6 +307,10 @@
 
 		$("#popForm #userId").val(jwt.userId);
 
+		if (modalStack.last().paramObj.currCd !='' && modalStack.last().paramObj.currCd != undefined ){
+			$('#currCd').val(modalStack.last().paramObj.currCd);
+			$('#exrate').val(modalStack.last().paramObj.exrate);
+		}
 		//처리일자//
 		$('#sellDcsnDt').datepicker({
 			format : "yyyy-mm-dd",
@@ -307,6 +330,10 @@
 		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
 		ordrsClntCd = modalStack.last().paramObj.ordrsClntCd;
 		ordrsClntNm = modalStack.last().paramObj.ordrsClntNm;
+		
+		//환율 비활성화
+		//$('#popForm .exrate').removeClass('hit');
+		$('#exrate').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
 		
 		if (actionType == "C") {
 			$('#popForm .coCd').addClass('hit');
@@ -351,10 +378,6 @@
 			//통화 비활성화
 			$('#popForm .currCd').removeClass('hit');
 			$('#currCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
-			
-			//환율 비활성화
-			$('#popForm .exrate').removeClass('hit');
-			$('#exrate').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
 
 			//debugger;
 			
@@ -365,10 +388,18 @@
 			// // 기 확정금액 컬럼 삭제
 			// ModalgridView.target.removeColumn(23);
 
+			//매출계산서 등록되면 수정 못하게?
+			if (modalStack.last().paramObj.sellBillNo != undefined){ 
+				// 입력용 확정금액 컬럼 삭제
+				ModalgridView.target.removeColumn(31);
+				// chk 선택 컬럼 삭제
+				ModalgridView.target.removeColumn(30);
+				$('#actionBtn').hide();
+			}
 			// 입력용 확정금액 컬럼 삭제
-			ModalgridView.target.removeColumn(31);
+			//ModalgridView.target.removeColumn(31);
 			// chk 선택 컬럼 삭제
-			ModalgridView.target.removeColumn(30);
+			//ModalgridView.target.removeColumn(30);
 			// 기 확정금액 컬럼 삭제
 			ModalgridView.target.removeColumn(24);
 
@@ -598,6 +629,19 @@
 
 			$("#popForm #sellDcsnAmt").val(addCommaStr(SumAmt));
 		}
+		else if(actionType == "U"){
+			var SumAmt = 0;
+			var list = ModalgridView.target.list;
+			//debugger;
+			$.each(list,function(idx, obj) {
+				//신규
+				if (parseFloat(obj.confAmt) > 0) {
+					SumAmt = SumAmt + parseFloat(obj.confAmt);
+				}
+			});
+
+			$("#popForm #sellDcsnAmt").val(addCommaStr(SumAmt));
+		}
 	}
 
 	// 팝업 그리드 조회
@@ -622,6 +666,20 @@
 		//원화인 경우 1 고정
 		if (currCd == 'CURR01') {
 			$("#popForm #exrate").val("1");
+		}
+		else {
+			var formData = {
+					"currCd" : currCd,
+				}
+				postAjaxSync("/user/cr/cr07/select_recent_Exrate", formData, null, function(data) { 
+					//수주테이블(TB_CR02M01)에서 통화단위 최근 값 불러오기.없으면 빈값)
+					if (data.result != null){
+						$("#popForm #exrate").val(data.result.exrate);
+					}
+					else {
+						$("#popForm #exrate").val('');
+					}
+				});
 		}
 		Modal_DataSearch();
 	}

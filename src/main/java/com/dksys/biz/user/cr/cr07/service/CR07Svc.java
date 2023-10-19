@@ -22,6 +22,9 @@ public interface CR07Svc {
     // 수정화면 정보
 	Map<String, String> select_cr07_Info(Map<String, String> paramMap);
 	
+	// 환율값 가져오기
+		Map<String, String> select_recent_Exrate(Map<String, String> paramMap);
+	
 	// 수정화면 상세정보
 	List<Map<String, String>> select_cr07_Info_Dtl(Map<String, String> paramMap);
 	

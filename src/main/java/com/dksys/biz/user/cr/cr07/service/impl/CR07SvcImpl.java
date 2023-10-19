@@ -74,6 +74,12 @@ public class CR07SvcImpl implements CR07Svc {
 		return cr07Mapper.select_cr07_Info_Dtl(paramMap);
 	}
 	
+	// 수정화면 정보
+	@Override
+	public Map<String, String> select_recent_Exrate(Map<String, String> paramMap) {
+		return cr07Mapper.select_recent_Exrate(paramMap);
+	}
+	
 	//DATA INSERT
 	@Override
 	public int insert_cr07(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {

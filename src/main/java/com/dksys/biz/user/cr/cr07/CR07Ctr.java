@@ -64,6 +64,14 @@ public class CR07Ctr {
 		return "jsonView";
 	}
 	
+	//환율값 가져오기
+		@PostMapping(value = "/select_recent_Exrate")
+		public String select_recent_Exrate(@RequestBody Map<String, String> paramMap, ModelMap model) {
+			Map<String, String> result = cr07svc.select_recent_Exrate(paramMap);
+			model.addAttribute("result", result);
+			return "jsonView";
+		}
+	
 	//상세정보 조회
 	@PostMapping(value = "/select_cr07_Info_Dtl")
 	public String select_cr07_Info_Dtl(@RequestBody Map<String, String> paramMap, ModelMap model) {

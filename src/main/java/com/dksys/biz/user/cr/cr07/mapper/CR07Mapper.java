@@ -26,6 +26,9 @@ public interface CR07Mapper {
 	// 수정화면 상세정보
 	List<Map<String, String>> select_cr07_Info_Dtl(Map<String, String> paramMap);
 	
+	// 수정화면 상세정보
+	Map<String, String> select_recent_Exrate(Map<String, String> paramMap);
+	
 	// fileTrgtKey 생성
 	int select_cr07_SeqNext(Map<String, String> paramMap);
 
