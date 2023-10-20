@@ -39,7 +39,7 @@ public class WB24Ctr {
 	public String selectWbsIssueList(@RequestBody Map<String, String> paramMap, ModelMap model) {	
 		int totalCnt = wb24Svc.selectWbsIssueListCount(paramMap); 
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		model.addAttribute("paginationInfo", paginationInfo);
+        model.addAttribute("paginationInfo", paginationInfo);
 		  
 		List<Map<String, String>> fileList = wb24Svc.selectWbsIssueList(paramMap);
 		model.addAttribute("fileList", fileList);
@@ -110,4 +110,12 @@ public class WB24Ctr {
 	    model.addAttribute("result", result); 
 	    return "jsonView"; 		 
     }
+	
+	@PostMapping(value = "/selectRsltsMemberList") 
+	public String selectRsltsMemberList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    List<Map<String, String>> resultList = wb24Svc.selectRsltsMemberList(paramMap);
+	    model.addAttribute("resultList", resultList); 
+	    return "jsonView"; 		 
+    }
+	
 }

@@ -424,20 +424,41 @@
                       AND X.SALES_CD = #{salesCd}
                       AND X.SALES_CD IS NOT NULL --비용제외
                  )
+                 
+                 
                , T_PLAN AS -- WBS계획 LVL1
-                 ( 
-                   SELECT CO_CD
-                         , SALES_CD
-                         , VER_NO
-                         , MAX(TO_CHAR(WBS_PLANS_DT, 'YYYY-MM-DD'))  AS WBS_PLANS_DT --계획 시작일
-                         , MAX(TO_CHAR(WBS_PLANE_DT, 'YYYY-MM-DD'))  AS WBS_PLANE_DT --계획 종료일 
-                         , SUM(DAYCNT)                               AS DAYCNT       --소요일 합계
-                      FROM TB_WB22M01 --WBS계획 정보
-                     WHERE CO_CD    = #{coCd}
-                       AND SALES_CD = #{salesCd}
-                       AND WBS_PLAN_CODE_NM IS NULL   --LVL1 : 계획
-                     GROUP BY CO_CD, SALES_CD, VER_NO
-                 )
+			     ( 
+			       SELECT P.CO_CD
+			             , P.SALES_CD
+			             , MAX(TO_CHAR(P.WBS_PLANS_DT, 'YYYY-MM-DD'))  AS WBS_PLANS_DT --계획 시작일
+			             , MAX(TO_CHAR(P.WBS_PLANE_DT, 'YYYY-MM-DD'))  AS WBS_PLANE_DT --계획 종료일 
+			             , SUM(P.DAYCNT)                               AS DAYCNT       --소요일 합계
+			             , K.DSGN_EXP_MH                               AS DSGN_EXP_MH  --설계계획공수
+			             , K.PRD_EXP_MH                                AS PRD_EXP_MH   --생산계획공수
+			          FROM TB_WB22M01 AS P --WBS계획 정보
+			               LEFT OUTER JOIN ( SELECT CO_CD
+			                                       , SALES_CD
+			                                       , SUM(CASE WHEN WBS_PLAN_CODE_KIND IN ('WBSCODE04', 'WBSCODE05', 'WBSCODE06') THEN EXPECT_MH --TASK 설계, 검도, 출도 계획공수
+			                                                   ELSE 0
+			                                             END )         AS DSGN_EXP_MH --설계계획공수 
+			                                       , SUM(CASE WHEN WBS_PLAN_CODE_KIND IN ('WBSCODE09', 'WBSCODE10', 'WBSCODE11',
+			                                                                               'WBSCODE12', 'WBSCODE13', 'WBSCODE14') THEN EXPECT_MH --TASK 조립,시운전,품평회,출고,설치,On-Site 시운전 계획공수
+			                                                   ELSE 0
+			                                             END )         AS PRD_EXP_MH --생산계획공수 
+			                                   FROM TB_WB22M01 --WBS계획 정보
+			                                  WHERE WBS_PLAN_CODE_KIND != 'WBSCODE' --LEVEL2
+			                                    AND CO_CD    = #{coCd}
+			                                    AND SALES_CD = #{salesCd}
+			                                  GROUP BY CO_CD, SALES_CD
+			                               ) AS K ON P.CO_CD = K.CO_CD AND P.SALES_CD = K.SALES_CD
+			         WHERE P.CLOSE_YN = 'Y'
+			           AND P.CO_CD    = #{coCd}
+			           AND P.SALES_CD = #{salesCd}
+			           AND P.WBS_PLAN_CODE_NM IS NULL   --LVL1 : 계획
+			         GROUP BY P.CO_CD, P.SALES_CD, K.DSGN_EXP_MH, K.PRD_EXP_MH
+			     )
+			     
+			     
                , REQ AS --요인별 발주_출장요청
                  (
                   SELECT Q.CO_CD                      --회사코드
@@ -517,16 +538,29 @@
                           , S.TRGT_RATE         --견적대비 목표율
                           , S.ACT_RATE          --목표대비 실적율
                           -----------------------------------------------------------------------------3.공수정보 Grouping : 화면상단에 표기
-                          , J.DSGN_PLAN_HOUR    --설계계획공수
-                          , R.DSGN_RSLT_MH      --설계실적공수 
-                          , CASE WHEN NVL(J.DSGN_PLAN_HOUR,0) = 0 THEN 0
-                                 ELSE ROUND( (R.DSGN_RSLT_MH / J.DSGN_PLAN_HOUR) * 100, 2)
-                            END  AS DSGN_DAY_RATE   --계획대비 설계공수 실적율               
-                          , J.PRDCTN_PLAN_HOUR  --생산계획공수
+                          --, J.DSGN_PLAN_HOUR    --설계계획공수
+                          , P.DSGN_EXP_MH  AS DSGN_PLAN_HOUR     --설계계획공수
+                          , R.DSGN_RSLT_MH      --설계실적공수
+                          
+                           
+                          --, CASE WHEN NVL(J.DSGN_PLAN_HOUR,0) = 0 THEN 0
+                                 --ELSE ROUND( (R.DSGN_RSLT_MH / J.DSGN_PLAN_HOUR) * 100, 2)
+                                                                 
+                          , CASE WHEN NVL(P.DSGN_EXP_MH,0) = 0 THEN 0
+							             ELSE ROUND( (R.DSGN_RSLT_MH / P.DSGN_EXP_MH) * 100, 2)
+							        END  AS DSGN_DAY_RATE   --계획대비 설계공수 실적율      
+							             
+                          --, J.PRDCTN_PLAN_HOUR  --생산계획공수
+                          , P.PRD_EXP_MH AS PRDCTN_PLAN_HOUR       --생산계획공수
+                          
                           , R.PRDCTN_RSLT_MH    --생산실적공수 
-                          , CASE WHEN NVL(J.PRDCTN_PLAN_HOUR,0) = 0 THEN 0
-                                 ELSE ROUND( (R.PRDCTN_RSLT_MH / J.PRDCTN_PLAN_HOUR) * 100, 2)
-                            END  AS PRDCTN_DAY_RATE   --계획대비 생산공수 실적율               
+                                                    
+                         -- , CASE WHEN NVL(J.PRDCTN_PLAN_HOUR,0) = 0 THEN 0
+                         --        ELSE ROUND( (R.PRDCTN_RSLT_MH / J.PRDCTN_PLAN_HOUR) * 100, 2)
+                         
+                         , CASE WHEN NVL(P.PRD_EXP_MH,0) = 0 THEN 0
+						             ELSE ROUND( (R.PRDCTN_RSLT_MH / P.PRD_EXP_MH) * 100, 2)
+						        END  AS PRDCTN_DAY_RATE   --계획대비 생산공수 실적율              
                           -----------------------------------------------------------------------------4.품질 장애이슈 Grouping
                           , Q.REQ_CNT  --장애건수
                           , Q.PCHS_AMT --매입확정금액

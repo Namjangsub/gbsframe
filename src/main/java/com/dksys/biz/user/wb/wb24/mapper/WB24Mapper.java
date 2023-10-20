@@ -29,4 +29,7 @@ public interface WB24Mapper {
 	
 	List<Map<String, String>> selectTodoRsltsView(Map<String, String> paramMap);
 	
+	List<Map<String, String>> selectRsltsMemberList(Map<String, String> paramMap);
+
+	
 }

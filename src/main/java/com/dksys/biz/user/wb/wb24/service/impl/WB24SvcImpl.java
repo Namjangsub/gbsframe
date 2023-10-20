@@ -313,4 +313,11 @@ public class WB24SvcImpl implements WB24Svc {
 		return wb24Mapper.selectTodoRsltsView(paramMap);
 	}
 	
+	@Override
+	public List<Map<String, String>> selectRsltsMemberList(Map<String, String> paramMap) {
+		return wb24Mapper.selectRsltsMemberList(paramMap);
+	}
+	
+	
+	
 }

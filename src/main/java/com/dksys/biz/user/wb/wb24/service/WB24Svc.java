@@ -20,4 +20,9 @@ public interface WB24Svc {
 	int wbsIssCloseYnConfirm(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
 	List<Map<String, String>> selectTodoRsltsView(Map<String, String> paramMap);	
+	
+	List<Map<String, String>> selectRsltsMemberList(Map<String, String> paramMap);
+
+	
+	
 }
