@@ -24,4 +24,6 @@ public interface SM14Svc {
 	int updatePurchaseBillDetail(Map<String, String> paramMap) throws Exception;			
 	
 	int deletePurchaseDetail(Map<String, String> param);	
+	
+	int updateBillYn(Map<String, String> paramMap) throws Exception;	
 }
