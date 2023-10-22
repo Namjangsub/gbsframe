@@ -138,7 +138,7 @@
 		}
 	};
 	
-	// 미수금 그리드
+	// 미발주 그리드
 	var clmnGridView = {
 		initView : function() {
 			this.target = new ax5.ui.grid();
@@ -156,36 +156,35 @@
 						this.self.select(this.dindex);
 					},
 		            onDBLClick: function () {
-						insert_update_cr05_Modal(this.item, "U");
+						inserOrderModal("U", this.item);
 		            },
-		            mergeCells : ["ordrsClntNm", "ctrtNm", "clmnPlanDivNm"],
+		            mergeCells : ["salesCd", "dsgnNo", "ordrsClntNm"],
 				},
 				page : {
 					display : true,
 				},
 				footSum: [
 			    	[
-						{label: "[ 합계 ]", 	  align:"center",	  colspan : 3},
-						{key: "planClmnAmt"   , collector: "sum", formatter: "money", align: "right", styleClass: "grid-font-blue-bold" },
-						{key: "sellBillAmtSum", collector: "sum", formatter: "money", align: "right"},
-						{},
-						{key: "clmnAmtMi"     , collector: "sum", formatter: "money", align: "right", styleClass: "grid-font-red-bold" }
+						{label: "[ 합계 ]", 	  align:"center",	  colspan : 4},
+						{key: "ordrgQty"   , collector: "sum", formatter: "money", align: "right", styleClass: "grid-font-blue-bold" },
+						{key: "ordrgAmt", collector: "sum", formatter: "money", align: "right"},
+						{key: "reaminBalQty"     , collector: "sum", formatter: "money", align: "right", styleClass: "grid-font-red-bold" }
 			    	]
 			    ],
-				columns: [
-
-					{key: "ordrsClntNm", label: "고객사"     , align: "left"  , width: 140, formatter: function () {
-						return this.value.slice(0,8) + "(" + this.item.clntPjtNm + ")"}},
-					{key: "ctrtNm"       , label: "계약명"     , align: "left"  , width: 130},					
-					{key: "clmnPlanDivNm", label: "구분"   , align: "center", width: 70, formatter: function () {
-						return this.value + " " + this.item.clmnDivSeqNm }},
-					{key: "planClmnAmt"   , label: "수금예정금액", align: "right" , width: 100, formatter: "money", styleClass: "grid-font-blue-bold" },
-
-					{key: "sellBillAmtSum", label: "계산서발행"   , align: "right" , width: 100, formatter: "money"},
-					{key: "planClmnDt"    , label: "수금예정일"   , align: "center", width: 80},
-					{key: "clmnAmtMi"     , label: "미수금액"   , align: "right" , width: 100, formatter: "money", styleClass: "grid-font-red-bold" },
-				
-		        ]
+		          columns: [
+		              {key: "ordrsClntNm",  			label: "고객사",      align: "center",   width: 120, formatter: function () {
+							return this.value.slice(0,8) + "(" + this.item.clntPjtNm + ")"}},
+		              {key: "salesCd",  				label: "Sales Code",      align: "center",   width: 120},
+		              {key: "ordrgQty",      			label: "발주수량",      align: "right",   width: 60, formatter: "money"},              
+		              {key: "reaminBalQty",      		label: "발주잔량",      align: "right",   width: 60, formatter: "money"            	
+		            	  , styleClass: function () {return ( parseInt(this.item.reaminBalQty) > 0 ) ? "grid-font-blue-bold" : "";}},                  
+		              {key: "pchsClntNm",      			label: "구매처명",      align: "left",   width: 120},
+		              {key: "ordrgDt",      			label: "발주일자",      align: "center",   width: 80},
+		              {key: "ordrgAmt",      			label: "발주금액",      align: "right",   width: 110, formatter: "money"},              
+		              {key: "dsgnNo",  					label: "대표도번",      align: "center",   width: 180},
+		              {key: "inYn",	      				label: "입고",      align: "center",   width: 75},
+		              {key: "eqpNm",  					label: "설비명",      align: "center",   width: 120},              
+		             ]
 			});
 			return this;
 		},
@@ -193,11 +192,14 @@
 			var targetObj = this.target;
 			var paramObj = {
 					"coCd"        : $("#coCd1").val(),
-					"recordCnt" : 1,
+					"reqDtFrom"  : '19910101',
+					"reqDtTo" 	 : moment().add(3, 'days').format('YYYYMMDD'),
+					"pageNo"     : 1,
+					"recordCnt"  : 9999999
 			};
 
-			postAjax("/user/cr/cr13/select_cr13_List", paramObj, null, function(data) {
-				var list = data.result;
+			postAjax("/user/sm/sm02/selectOrderList", paramObj, null, function(data){
+	            var list = data.result;
 				if (list != undefined)
 				targetObj.setData({
 					list : list,
@@ -536,22 +538,44 @@
 		// grid init
 	});
 	
-	//수정 or 등록 버튼 클릭 시
-	function insert_update_cr05_Modal(row, type) {
-		var paramObj = {
-			"actionType"  : "C",
-			"fileTrgtKey" : 0,
-			"coCd" 	      : row.coCd,
-			"ordrsClntCd" : row.ordrsClntCd,
-			"ordrsClntNm" : row.ordrsClntNm,
-			"userId"      : jwt.userId,
-			"pgmId"       : "CR0501M01"
+	//발주수정 or 등록 버튼 클릭 시
+	function inserOrderModal(type, param) {
+		var selRow = gridView.target.getList("selected")[0];
+		//수정
+		if (type == 'U') {
+	 		if( param.coCd == "undefined" || param.coCd == "" ) {
+	 			alert("행을 선택해 주십시오.")
+	 			return;			
+	 		}
+			//그리드 col , row 만큼 배열 만든다.
+			paramObj = {
+				"actionType" : type,	
+				"userId"    : jwt.userId,
+		       	"pgmId"    : "SM0201M01"
+			};
+			Object.assign(paramObj, param);
+		} else {
+ 			//var reaminBalQty = selRow[0];
+ 			/*
+ 			if( parseInt(reaminBalQty) === 0 ) {
+	 			alert("발주 가능한 잔량이 없습니다.");
+	 			return;	 				
+ 			}
+ 			*/
+			var paramObj = {
+					"actionType" : type,
+					"coCd" 	   : $("#coCd1").val(),
+			       	"userId"   : jwt.userId,
+			       	"userNm"   : jwt.userNm,				
+			       	"pgmId"    : "SM0201M01"
+			}
+ 			if( typeof(selRow) != "undefined" ) {
+ 				Object.assign(paramObj, selRow);
+ 			} 			
 		}
-		
-		openModal("/static/html/user/cr/cr05/CR0501P01.html", 1600, 850, "", paramObj, function(data) {
-			clmnGridView.setData();
-		});
-	}
+		openModal("/static/html/user/sm/sm02/SM0201P01.html", 1600, 850, "", paramObj);
+	}	
+ 
 	
 
 	// 세금계산서 수정 화면
