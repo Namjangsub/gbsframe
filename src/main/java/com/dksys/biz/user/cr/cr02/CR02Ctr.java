@@ -84,7 +84,7 @@ public class CR02Ctr {
 		try {
 			cr02Svc.insertOrdrs(param,mRequest);
 			model.addAttribute("resultCode", 200);
-			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
 		}catch(Exception e) {
 			model.addAttribute("resultCode", 500);
 			model.addAttribute("resultMessage", e.getLocalizedMessage());
