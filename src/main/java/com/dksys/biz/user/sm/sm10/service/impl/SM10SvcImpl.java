@@ -90,6 +90,25 @@ public class SM10SvcImpl implements SM10Svc {
 
 	int result = sm10Mapper.updatePchsCost(paramMap);
 
+	List<Map<String, String>> detailArr = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+	//일단 날리고
+	sm10Mapper.deleteTurnKeyDetail(paramMap);
+	//턴키면 저장
+	if(paramMap.get("pchsCostDiv10").equals("PCHSCOSTDIV1030")) {
+		for (Map<String, String> detailMap : detailArr) {
+			try {
+				detailMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+				detailMap.put("coCd", paramMap.get("coCd"));
+				detailMap.put("userId", paramMap.get("userId"));
+				detailMap.put("pgmId", paramMap.get("pgmId"));
+				
+				sm10Mapper.insertTurnKeyDetail(detailMap);
+			} catch (Exception e) {
+				System.out.println("error3" + e.getMessage());
+			}
+		}
+	}
+    
 	//---------------------------------------------------------------  
 	//첨부 화일 처리 시작 
 	//---------------------------------------------------------------  
@@ -135,6 +154,24 @@ public class SM10SvcImpl implements SM10Svc {
 		
 		int result = sm10Mapper.insertPchsCost(paramMap);
 	
+		List<Map<String, String>> detailArr = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+		//일단 날리고
+		sm10Mapper.deleteTurnKeyDetail(paramMap);
+		//턴키면 저장
+		if(paramMap.get("pchsCostDiv10").equals("PCHSCOSTDIV1030")) {
+			for (Map<String, String> detailMap : detailArr) {
+				try {
+					detailMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+					detailMap.put("coCd", paramMap.get("coCd"));
+					detailMap.put("userId", paramMap.get("userId"));
+					detailMap.put("pgmId", paramMap.get("pgmId"));
+					
+					sm10Mapper.insertTurnKeyDetail(detailMap);
+				} catch (Exception e) {
+					System.out.println("error3" + e.getMessage());
+				}
+			}
+		}
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------  
@@ -188,5 +225,15 @@ public class SM10SvcImpl implements SM10Svc {
 		//---------------------------------------------------------------  	  
 	    return result;
   }
+
+@Override
+public int selectTurnKeySalesCodeCount(Map<String, String> paramMap) {
+	return sm10Mapper.selectTurnKeySalesCodeCount(paramMap);
+}
+
+@Override
+public List<Map<String, String>> selectTurnKeySalesCodeList(Map<String, String> paramMap) {
+	return sm10Mapper.selectTurnKeySalesCodeList(paramMap);
+}
 
 }

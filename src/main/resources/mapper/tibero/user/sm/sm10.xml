@@ -60,6 +60,7 @@
 	</select>
 
 	<select id="selectPchsCostList" parameterType="Map" resultType="CamelMap">
+	/* selectPchsCostList */
 		SELECT
 			*
 		FROM(
@@ -73,7 +74,8 @@
 							T.CO_CD,
 							FN_CM05M01_CD_TO_NM(T.CO_CD) CO_NM,
 							T.COST_NO,
-							T.SALES_CD,
+							T.ORDRS_NO,
+							(SELECT MAX(SALES_CD) || DECODE(COUNT(*), 0, '', 1, '', '외 ' || (COUNT(*)-1) || '건') FROM TB_SM10D01 WHERE COST_NO = T.COST_NO)	 AS SALES_CD,
 							T.REQ_NO,
 							T.PCHS_CLNT_CD,
 							A.CLNT_NM PCHS_CLNT_NM,
@@ -170,12 +172,14 @@
 					S.ITEM_DIV,
 					FN_CM05M01_CD_TO_NM(S.ITEM_DIV) ITEM_DIV_NM,
 					S.EQP_NM,
+					T.ORDRS_NO,
 					T.SALES_CD,
 					T.REQ_NO,
 					SM.ORDRS_CLNT_CD  	VEND_CD,
 					X.CLNT_NM 			VEND_NM,
 					SM.CLNT_PJT			CLNT_PJT_CD,
-					SM.CLNT_PJT,
+					(SELECT FN_CM05M01_CD_TO_NM(SM.CLNT_PJT) FROM DUAL) AS CLNT_PJT,
+					SM.CTRT_NM,
 					T.PCHS_CLNT_CD,
 					A.CLNT_NM PCHS_CLNT_NM,
 					TO_CHAR(T.COST_DT, 'YYYY-MM-DD') AS COST_DT,
@@ -209,8 +213,8 @@
 			                                         AND T.CO_CD   = M.CO_CD
 			             LEFT OUTER JOIN TB_CR02D02 S ON T.SALES_CD = S.SALES_CD  --수주상세(Sales Code)
 			                                         AND T.CO_CD    = S.CO_CD 
-			             LEFT OUTER JOIN TB_CR02M01 SM ON S.CO_CD    = SM.CO_CD  --수주상세(Sales Code)
-			            							  AND S.ORDRS_NO = SM.ORDRS_NO
+			             LEFT OUTER JOIN TB_CR02M01 SM ON T.CO_CD    = SM.CO_CD  --수주상세(Sales Code)
+			            							  AND T.ORDRS_NO = SM.ORDRS_NO
 			             LEFT OUTER JOIN TB_BM02M01 X ON SM.ORDRS_CLNT_CD = X.CLNT_CD --거래처마스터
 			             LEFT OUTER JOIN TB_BM01M01 P ON S.PRDT_CD = P.PRDT_CD  --제품마스터
        WHERE T.FILE_TRGT_KEY = #{fileTrgtKey}
@@ -228,7 +232,8 @@
 <update id="updatePchsCost" parameterType="Map">
     UPDATE TB_SM10M01
 		SET
-			SALES_CD               	= #{salesCd},
+			ORDRS_NO               	= #{ordrsNo, jdbcType=VARCHAR},
+			SALES_CD               	= #{salesCd, jdbcType=VARCHAR},
 			REQ_NO                  = #{reqNo,  jdbcType=VARCHAR},
 			PCHS_CLNT_CD           	= #{pchsClntCd},
 			COST_DT                	= #{costDt},
@@ -252,18 +257,19 @@
   </update>
   
   <select id="selectPchsCostSeqNext" parameterType="Map" resultType="int">
-		SELECT TO_CHAR(SYSDATE, 'YYYYMM')||LPAD(TB_SM10M01_SQ01.NEXTVAL,3,0) FROM DUAL
+	SELECT TO_CHAR(SYSDATE, 'YYYYMM')||LPAD(TB_SM10M01_SQ01.NEXTVAL,3,0) FROM DUAL
   </select>
   
-<insert id="insertPchsCost" parameterType="Map">
+  <insert id="insertPchsCost" parameterType="Map">
     <selectKey keyProperty="costNo" resultType="String" order="BEFORE">
       SELECT 'COST' || TO_CHAR(SYSDATE, 'YY')||LPAD(TB_SM10M01_SQ02.NEXTVAL,4,0) FROM DUAL
     </selectKey>
     INSERT INTO TB_SM10M01
       (
 		FILE_TRGT_KEY,  
-		CO_CD,          
+		CO_CD,
 		COST_NO,        
+		ORDRS_NO,          
 		SALES_CD,
 		REQ_NO,
 		PCHS_CLNT_CD,   
@@ -287,7 +293,8 @@
 		#{fileTrgtKey},
 		#{coCd},
 		#{costNo},
-		#{salesCd},
+		#{ordrsNo, jdbcType=VARCHAR},
+		#{salesCd, jdbcType=VARCHAR},
 		#{reqNo,  jdbcType=VARCHAR},
 		#{pchsClntCd},
 		#{costDt},
@@ -310,5 +317,105 @@
   <delete id="deletePchsCost" parameterType="Map">
     DELETE TB_SM10M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
   </delete>
+  
+  <select id="selectTurnKeySalesCodeCount" parameterType="Map" resultType="int">
+    SELECT COUNT(*) 
+      FROM (           
+          SELECT ROWNUM AS RN, 
+                 X.CO_CD, -- 회사코드
+                 FN_CM05M01_CD_TO_NM(X.CO_CD) AS CO_CD_NM,
+                 X.ORDRS_NO, -- 수주번호
+                 X.SALES_CD, -- SALES CODE
+                 DECODE(D.CHK_SAVE_CD, 'PCHSCOSTDIV1030', 'Y', 'N') AS CHK_SAVE_CD, -- 저장형태 일단은 PCHSCOSTDIV1030
+                 Y.ORGN_SALES_CD, -- 원천 SALES CODE
+                 Y.ORDRS_CLNT_CD, -- 고객사
+                 A.CLNT_NM  AS ORDRS_CLNT_NM,
+                 Y.CLNT_PJT, -- 고객사 PJT
+                 FN_CM05M01_CD_TO_NM(Y.CLNT_PJT) AS CLNT_PJT_NM, -- 고객사 PJT명
+                 X.ORDRS_DTL_DIV20, -- 신작구분
+                 FN_CM05M01_CD_TO_NM(X.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+                 X.PRDT_CD, -- 제품구분
+                 P.PRDT_NM  PRDT_CD_NM,
+                 X.ITEM_DIV, -- 아이템구분
+                 FN_CM05M01_CD_TO_NM(X.ITEM_DIV) ITEM_DIV_NM,
+                 X.EQP_NM -- 설비명
+            FROM TB_CR02D02 X
+                  INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
+                                          AND X.ORDRS_NO = Y.ORDRS_NO
+                  LEFT OUTER JOIN TB_BM01M01 P ON X.PRDT_CD = P.PRDT_CD  --제품마스터
+                  LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터
+                  LEFT OUTER JOIN TB_SM10D01 D ON X.CO_CD = D.CO_CD AND X.ORDRS_NO = D.ORDRS_NO AND X.SALES_CD = D.SALES_CD
+          WHERE X.CO_CD = #{coCd}
+            AND X.ORDRS_NO = #{ordrsNo}                
+            AND X.SALES_CD IS NOT NULL
+      ) A
+  </select>
+  
+  <select id="selectTurnKeySalesCodeList" parameterType="Map" resultType="camelMap">
+  /* selectTurnKeySalesCodeList */
+    SELECT ROWNUM AS RN, A.* 
+      FROM (           
+          SELECT 
+                 X.CO_CD, -- 회사코드
+                 FN_CM05M01_CD_TO_NM(X.CO_CD) AS CO_CD_NM,
+                 X.ORDRS_NO, -- 수주번호
+                 X.SALES_CD, -- SALES CODE
+                 DECODE(D.CHK_SAVE_CD, 'PCHSCOSTDIV1030', 'Y', 'N') AS CHK_SAVE_CD, -- 저장형태 일단은 PCHSCOSTDIV1030
+                 Y.ORGN_SALES_CD, -- 원천 SALES CODE
+                 Y.ORDRS_CLNT_CD, -- 고객사
+                 A.CLNT_NM  AS ORDRS_CLNT_NM,
+                 Y.CLNT_PJT, -- 고객사 PJT
+                 FN_CM05M01_CD_TO_NM(Y.CLNT_PJT) AS CLNT_PJT_NM, -- 고객사 PJT명
+                 X.ORDRS_DTL_DIV20, -- 신작구분
+                 FN_CM05M01_CD_TO_NM(X.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+                 X.PRDT_CD, -- 제품구분
+                 P.PRDT_NM  PRDT_CD_NM,
+                 X.ITEM_DIV, -- 아이템구분
+                 FN_CM05M01_CD_TO_NM(X.ITEM_DIV) ITEM_DIV_NM,
+                 X.EQP_NM -- 설비명
+            FROM TB_CR02D02 X
+                  INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
+                                          AND X.ORDRS_NO = Y.ORDRS_NO
+                  LEFT OUTER JOIN TB_BM01M01 P ON X.PRDT_CD = P.PRDT_CD  --제품마스터
+                  LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터
+                  LEFT OUTER JOIN TB_SM10D01 D ON X.CO_CD = D.CO_CD AND X.ORDRS_NO = D.ORDRS_NO AND X.SALES_CD = D.SALES_CD
+          WHERE X.CO_CD = #{coCd}
+            AND X.ORDRS_NO = #{ordrsNo}                
+            AND X.SALES_CD IS NOT NULL
+          ORDER BY X.SALES_CD
+      ) A
+     WHERE ROWNUM BETWEEN ${firstIndex} AND ${lastIndex}
+     
+  </select>
+    
+  <delete id="deleteTurnKeyDetail" parameterType="Map">
+    DELETE TB_SM10D01
+     WHERE COST_NO = #{costNo}
+  </delete>
+  
+  <insert id="insertTurnKeyDetail" parameterType="Map">
+    INSERT INTO TB_SM10D01
+      (
+		COST_NO,
+		CO_CD,
+		ORDRS_NO,
+		SALES_CD,
+		CHK_SAVE_CD,
+		CREAT_ID,       
+		CREAT_PGM,      
+		CREAT_DTTM
+      )
+    VALUES
+    (
+		(SELECT COST_NO FROM TB_SM10M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}),
+		#{coCd, jdbcType=VARCHAR},
+		#{ordrsNo, jdbcType=VARCHAR},
+		#{salesCd, jdbcType=VARCHAR},
+		#{chkSaveCd,  jdbcType=VARCHAR},
+		#{userId},
+		#{pgmId},
+		SYSDATE
+    )
+  </insert>
   
 </mapper>
