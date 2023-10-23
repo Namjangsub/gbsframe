@@ -103,4 +103,31 @@ public class SM14Ctr {
     	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
 		return "jsonView";
 	} 
+
+	//세금계산서발행여부 
+	@PostMapping(value = "/updateBillYn")
+    public String updateBillYnChk(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (sm14Svc.updateBillYn(paramMap) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }  
+	
+	/*
+	 * @DeleteMapping(value = "/updateBillYn") public String
+	 * updateBillYn(@RequestBody Map<String, String> param, ModelMap model) throws
+	 * Exception { sm14Svc.updateBillYn(param); model.addAttribute("resultCode",
+	 * 200); model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+	 * return "jsonView"; }
+	 */
+
 }

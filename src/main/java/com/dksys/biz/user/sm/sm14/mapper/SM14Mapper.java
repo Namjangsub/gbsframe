@@ -33,6 +33,9 @@ public interface SM14Mapper {
 	int deletePurchaseDetail(Map<String, String> param);
 	
 	int deletePurchaseMaster(Map<String, String> param);	
+	
+	int updateBillYn(Map<String, String> param);	
+
 }
 
 
