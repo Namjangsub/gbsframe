@@ -107,4 +107,15 @@ public class SM10Ctr {
 	  	return "jsonView";
   }
 
+  //프로젝트 리스트 조회
+  @PostMapping(value = "/selectTurnKeySalesCodeList")
+  public String selectTurnKeySalesCodeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    int totalCnt = sm10Svc.selectTurnKeySalesCodeCount(paramMap);
+    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+    model.addAttribute("paginationInfo", paginationInfo);
+    List<Map<String, String>> result = sm10Svc.selectTurnKeySalesCodeList(paramMap);
+    model.addAttribute("result", result);
+    return "jsonView";
+  }
+
 }

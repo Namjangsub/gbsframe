@@ -26,4 +26,5 @@ public interface BM01Mapper {
 
 	int deleteMaterial(Map<String, String> param);
 
+	int prdtCdExistValidationCheck(Map<String, String> param);
 }

@@ -45,5 +45,6 @@ public interface BM02Mapper {
 	
 	List<Map<String, String>> selectUserClntList(Map<String, String> paramMap);
 
-
+	int selectClntExistCount(Map<String, String> param);
+	
 }

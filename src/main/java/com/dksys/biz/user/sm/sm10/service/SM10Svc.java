@@ -21,4 +21,8 @@ public interface SM10Svc {
 
   int deletePchsCost(Map<String, String> paramMap) throws Exception;
 
+  int selectTurnKeySalesCodeCount(Map<String, String> paramMap);
+
+  List<Map<String, String>> selectTurnKeySalesCodeList(Map<String, String> paramMap);
+
 }

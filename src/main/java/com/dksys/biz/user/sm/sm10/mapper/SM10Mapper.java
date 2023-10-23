@@ -23,5 +23,13 @@ public interface SM10Mapper {
   int updatePchsCost(Map<String, String> paramMap);
 
   int deletePchsCost(Map<String, String> paramMap);
+
+  int selectTurnKeySalesCodeCount(Map<String, String> paramMap);
+
+  List<Map<String, String>> selectTurnKeySalesCodeList(Map<String, String> paramMap);
+
+  void deleteTurnKeyDetail(Map<String, String> paramMap);
+
+  void insertTurnKeyDetail(Map<String, String> detailMap);
   
 }
