@@ -529,10 +529,32 @@
 				, SUM(NVL(C.IN_QTY *C.IN_PRC , 0)) OVER(PARTITION BY A.CO_CD) AS SUM_IN_DTL_AMT /* 입고금액 (총 합)*/
 				, C.IN_NO		/* 입고번호 */
 				, MAX(C.CURR_CD) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO)	AS CURR_CD				/* 통화단위 */
-				, MAX(C.EXRATE) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO) AS EXRATE				/* 환율 */													  																						                    
+				, MAX(C.EXRATE) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO) AS EXRATE				/* 환율 */																	  																						                    								, ORDRS_CLNT_NM			/* 고객명 */
+				, CLNT_PJT			/* 고객사 PJT */
+				, CLNT_PJT_NM
+				, EQP_NM			/* WKDQLAUD */		 	
 			FROM TB_SM02D01 A
 			INNER JOIN TB_SM02M01 B ON(A.CO_CD=B.CO_CD AND A.ORDRG_NO=B.ORDRG_NO)
-			INNER JOIN TB_SM03D01 C ON(A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ AND A.SALES_CD=C.SALES_CD)				
+			INNER JOIN TB_SM03D01 C ON(A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ AND A.SALES_CD=C.SALES_CD)		
+			LEFT OUTER JOIN 
+			( 
+              SELECT M.CO_CD                                             AS CO_CD         --회사코드
+                    , M.ORDRS_NO                                         AS ORDRS_NO      --수주번호
+                    , M.ORDRS_CLNT_CD                                    AS ORDRS_CLNT_CD --고객코드
+                    , C.CLNT_NM                                          AS ORDRS_CLNT_NM --고객명
+                    , X.SALES_CD                                         AS SALES_CD      --SALES Code
+                    , M.CLNT_PJT                                         AS CLNT_PJT      --고객사PJT 
+                    , X.PRDT_CD                                          AS PRDT_CD       --제품구분
+                    , X.EQP_NM                                           AS EQP_NM        --설비명 
+		            , X.ITEM_DIV                                         AS ITEM_DIV      --아이템구분
+		            , (SELECT FN_CM05M01_CD_TO_NM(X.ITEM_DIV) FROM DUAL) AS ITEM_DIV_NM   --아이템 구분명
+		            , C.CLNT_DIV_CD                                      AS CLNT_DIV_CD    --거래처 분류
+		            , (SELECT FN_CM05M01_CD_TO_NM(C.CLNT_DIV_CD) FROM DUAL) AS CLNT_DIV_NM  --거래처 분류명
+					, FN_CM05M01_CD_TO_NM(M.CLNT_PJT)                    AS CLNT_PJT_NM
+                FROM TB_CR02M01  M --수주마스터
+                  			INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세  							
+                   INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보                      			
+			) S ON(A.SALES_CD=S.SALES_CD)						
 		WHERE 1=1		
 		<if test="coCd != null and !coCd.equals('')">
 			AND A.CO_CD = #{coCd}   
