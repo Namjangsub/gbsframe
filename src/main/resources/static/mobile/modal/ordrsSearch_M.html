@@ -1,0 +1,205 @@
+<body>
+<div class="popup_area_clnt">
+    <div class="popup_table">
+        <table>
+            <colgroup>
+                <col width="30%">
+                <col width="">
+            </colgroup>
+            <tr>
+            	<td>
+                    <select id="coCd_PS" data-kind="CO" data-search="coCd" onchange="orderGridView.setData(0);" required>
+<!--                         <option value="">전체</option> -->
+                    </select>
+                </td>
+                <td>
+                    <select data-search="searchType">
+                        <!--		                  	<option value="SITE_NM">고객사</option>-->
+                        <option value="ORDRS_NO">수주번호</option>
+                    </select>
+                </td>
+                <td>
+                    <div class="search_form">
+                        <input type="text" data-search="searchValue"
+                        onkeyup="if(event.keyCode == 13){orderGridView.setData(0);}">
+                        <a onClick="orderGridView.setData(0);">
+                            <i class="i_search_w"></i>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+        </table>
+        <div class="ax5_grid" data-ax5grid="order-grid" data-ax5grid-config="{}" style="height: 690px;"></div>
+    </div>
+</div>
+<div class="popup_bottom_btn">
+    <button type="button" onClick="executeCallback();">선택</button>
+    <button type="button" class="close_btn" onClick="modalStack.close();">닫기</button>
+</div>
+</body>
+<script type="text/javascript">
+ax5.ui.grid.tmpl.page_status = function(){return '<span>총 {{totalElements}}건</span>';};
+    var orderGridView = {
+        initView: function () {
+            this.target = new ax5.ui.grid();
+            this.target.setConfig({
+                showRowSelector: true,
+                multipleSelect: false,
+                target: $('[data-ax5grid="order-grid"]'),
+                header: {
+                    columnHeight: 30,
+                    align: "center",
+                    selector: false
+                },
+                body: {
+                    columnHeight: 30,
+                    onClick: function () {
+                        this.self.select(this.dindex);
+                    },
+                    onDBLClick: function () {
+                        executeCallback();
+                    }
+                },
+                page: {
+                    navigationItemCount: 9,
+                    height: 30,
+                    display: true,
+                    firstIcon: '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+                    prevIcon: '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+                    nextIcon: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+                    lastIcon: '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+                    onChange: function () {
+                        orderGridView.setData(this.page.selectPage);
+                    }
+                },
+                columns: [
+                    {key: "ordrsNo", label: "수주번호", align: "center", width: 100},
+                    {key: "ordrsDt", label: "수주일자", align: "center", width: 80},
+                    {key: "ordrsClntNm", label: "고객사명", align: "left", width: 150},
+                    {key: "clntPjt", label: "고객사PJT", align: "center", width: 100},
+                    {key: "clntPjtNm", label: "고객사PJT", align: "center", width: 100},
+                    {key: "ctrtNm", label: "계약명", align: "left", width: 200},
+                    {key: "currNm", label: "통화", align: "center", width: 50},
+                    {key: "ordrsAmt", label: "수주금액", align: "right", width: 100, formatter: "money"},
+                    {key: "ordrger ", label: "발주자", align: "center", width: 100},
+                    {key: "mngNm", label: "담당자", align: "center", width: 100},
+                    {key: "ctrtDoc", label: "계약문서", align: "center", width: 100},
+                    {key: "pmntMtdNm", label: "결제방법", align: "center", width: 100}
+                ]
+            });
+            return this;
+        },
+        setData: function (_pageNo) {
+            var targetObj = this.target;
+            var paramObj = {};
+            paramObj.pageNo = _pageNo + 1;
+            paramObj.recordCnt = 15;
+
+            for (var i = 0; i < $('.popup_area [data-search]').length; i++) {
+                var tempElem = $('.popup_area [data-search]')[i];
+                paramObj[$(tempElem).data("search")] = $(tempElem).val();
+            }
+            //debugger;
+            postAjax("/user/cr/cr02/selectOrdrsListPop", paramObj, null, function (data) {
+                var list = data.ordrsList;
+                //debugger;
+                originalData = list;
+                
+                function getClientNameByCode(ordrsClntCd, callback) {
+                    var paramObj = {
+                        "clntCd": ordrsClntCd
+                    };
+
+                    postAjax("/admin/bm/bm02/selectClntInfo", paramObj, null, function (data) {
+                        if (data && data.clntInfo) {
+                            callback(data.clntInfo.clntNm);
+                        } else {
+                            callback('');
+                        }
+                    });
+                }
+
+                var completedRequests = 0;
+
+                for (var i = 0; i < list.length; i++) {
+                    (function (index) {
+                        getClientNameByCode(list[index].ordrsClntCd, function (clientName) {
+                            list[index].ordrsClntNm = clientName;
+                            completedRequests++;
+
+                            if (completedRequests === list.length) {
+                                targetObj.setData({
+                                    list: list,
+                                    page: {
+                                        currentPage: _pageNo,
+                                        pageSize: data.paginationInfo.pageSize,
+                                        totalElements: data.paginationInfo.totalRecordCount,
+                                        totalPages: data.paginationInfo.totalPageCount
+                                    }
+                                });
+                            }
+                        });
+                    })(i);
+                }
+
+
+            });
+        }
+    }
+
+    $(document).ready(function () {
+        $('[data-search="searchValue"]').val(modalStack.last().paramObj.searchValue);
+        $('[data-search="searchValue"]').focus();
+        
+        (function () {
+            var selectArr = $('#coCd_PS[data-kind]');
+            $.each(selectArr, function (idx, elem) {
+                var param = {
+                    "codeKind": $(elem).data('kind'),
+                    "codeRprc": $(elem).data('rprc'),
+                    "codeEtc": $(elem).data('etc'),
+                    "codeDesc": $(elem).data('desc')
+                };
+                postAjaxSync("/admin/cm/cm05/selectChildCodeList", param, null, function (data) {
+                    var optionHtml = '';
+                    var codeList = data.childCodeList;
+                    $.each(codeList, function (index, item) {
+                        optionHtml += '<option value="' + item.codeId + '" data-rprc="' + item.codeRprc + '" data-etc="' + item.codeEtc + '" data-desc="' + item.codeDesc + '" data-dz-code="' + item.dzCode + '">';
+                        optionHtml += item.codeNm;
+                        optionHtml += '</option>';
+                    });
+                    $(elem).append(optionHtml);
+                })
+            })
+        })();
+        
+        var hasRun = false;  // 이 변수를 통해 함수가 이미 실행되었는지 확인합니다.
+        var desiredValue = modalStack.last().paramObj.coCd;
+        if (!hasRun) {
+            var intervalId = setInterval(function () {
+                var currentSelectedValue = $('#coCd_PS').val();
+                if (currentSelectedValue === desiredValue) {
+                    clearInterval(intervalId);
+                    //orderGridView.setData(0);
+                     orderGridView.initView().setData(0);
+//                     $('#coCd_PS').css({
+//                         'background-color': '#e6e6e6',
+//                         'pointer-events': 'none'
+//                     });
+                    hasRun = true;  // 함수가 실행되었음을 표시합니다.
+                } else {
+                    $('#coCd_PS').val(desiredValue);
+                }
+            }, 1);
+        }
+        
+      
+
+    });
+
+    function executeCallback() {
+        if (selectGridValidation(orderGridView.target)) return;
+        modalStack.last().callback(orderGridView);
+        modalStack.close();
+    }
+</script>

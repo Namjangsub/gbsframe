@@ -1,0 +1,151 @@
+<div id="commonPopup">
+	<div class="popup_area_clnt" style="width: 100%;">
+		<div class="popup_table">
+			<table>
+				<colgroup>
+		           	<col width="20%">
+		           	<col width="20%">
+		            <col width="20%">
+		            <col width="">
+				</colgroup>
+				<tr>
+					<td>
+						<select data-kind="PRDTDIV" data-search="prdtGrp" onchange="setprdtDiv(this); prdtGridView.setData(0);">
+	                		<option value="">전체</option>
+	              		</select>    
+					</td>
+					<td>
+						<select data-search="prdtDiv" onchange="prdtGridView.setData(0);">
+	                		<option value="">전체</option>
+	              		</select>    
+					</td>	
+					<td>
+						<select data-search="searchType">
+	                		<option value="PRDT_NM">제품명</option>
+	                		<option value="PRDT_SPEC">SPEC</option>
+	              		</select>    
+					</td>
+					<td>
+						<div class="search_form">
+							<input type="text" id="searchValuePop" name="searchValuePop" data-search="searchValue" onkeyup="if(event.keyCode == 13){prdtGridView.setData(0)};">
+							<a onclick="prdtGridView.setData(0);">
+								<i class="i_search_w"></i>
+							</a>
+						</div>
+					</td>
+				</tr>
+			</table>
+			<div class="ax5_grid" data-ax5grid="prdt-grid" data-ax5grid-config="{}" style="height: 720px; width: 100%" ></div>
+		</div>
+	</div>
+	<div class="popup_bottom_btn">
+		<button onclick="executeCallback();">선택</button>
+		<button class="close_btn" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+<script type="text/javascript">
+ax5.ui.grid.tmpl.page_status = function(){return '<span>총 {{totalElements}}건</span>';};
+	var prdtGridView = {
+		initView: function(){
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+		    	showRowSelector: true,
+		    	multipleSelect: false,
+		        target: $('[data-ax5grid="prdt-grid"]'),
+		        header: {
+                    columnHeight: 30,
+		        	align: "center",
+		        	selector: false
+		        },
+		        body: {
+                    columnHeight: 30,
+		        	onClick: function () {
+		                this.self.select(this.dindex); 
+		            },
+		            onDBLClick: function () {
+		            	executeCallback();
+		            }
+		        },
+		        page: {
+		            navigationItemCount: 10,
+		            height: 30,
+		            display: true,
+		            firstIcon: '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+		            prevIcon: '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+		            nextIcon: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+		            lastIcon: '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+		            onChange: function () {
+		            	prdtGridView.setData(this.page.selectPage);
+		            }
+		        },
+		        columns: [
+		          	{key: "prdtCd",      label: "제품코드",     align: "center",   width: 60},
+		          	{key: "prdtNm",       label: "제품명", 	     align: "left",   width: 200},	
+		            {key: "prdtUnit",     label: "단위코드",     hidden: true},
+		        	{key: "prdtDiv",      label: "제품구분",     hidden: true},
+		            {key: "prdtDivNm",   label: "장비분류명",         align: "center", width: 200},
+		            {key: "prdtDiv2Nm",   label: "장비분류코드",         hidden: true},
+		            {key: "prdtUnitNm",   label: "단위",         align: "center", width: 50},
+		            {key: "prdtSize",   label: "사이즈",       align: "center", width: 100},
+		            {key: "prdtSpec",     label: "스펙",         align: "center", width: 120}
+		        ]
+		    });
+			return this;
+		}, 
+		setData: function(_pageNo) {
+			var targetObj = this.target;
+			var paramObj = modalStack.last().paramObj;
+			paramObj.pageNo = _pageNo + 1;
+			paramObj.recordCnt = 16;
+			paramObj.prdtCd = '';
+			paramObj.prdtNm = '';
+			paramObj.useYn = '';
+			
+			for(var i=0;i<$('#commonPopup .popup_area_clnt [data-search]').length;i++){
+				var tempElem = $('#commonPopup .popup_area_clnt [data-search]')[i];
+				paramObj[$(tempElem).data("search")] = $(tempElem).val();
+			}
+
+			postAjax("/admin/bm/bm01/selectMaterialList", paramObj, null, function(data){
+				var list = data.materialList;
+				targetObj.setData({
+					list : list,
+					page : {
+						currentPage : _pageNo,
+						pageSize : data.paginationInfo.pageSize,
+						totalElements : data.paginationInfo.totalRecordCount,
+						totalPages : data.paginationInfo.totalPageCount
+					}
+				});
+			});
+		}
+	}
+	
+	$(document).ready(function() {
+		$('[data-search="searchValue"]').focus();
+		setCommonSelect($('#commonPopup select[data-kind]'));
+		$('#searchValuePop').val(modalStack.last().paramObj.prdtNm);
+		
+		prdtGridView.initView().setData(0);
+	});
+	
+	function setprdtDiv(elem){
+		var paramObj = {"codeKind" : $(elem).val()};
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", paramObj, null, function(data){
+			var optionHtml = '<option value="">전체</option>';
+			var childCodeList = data.childCodeList;
+			$.each(childCodeList, function(index, obj){
+				optionHtml += '<option value='+obj.codeId+'>';
+				optionHtml += obj.codeNm;
+				optionHtml += '</option>';
+			});
+			$('.popup_area_clnt [data-search="prdtDiv"]').html(optionHtml);
+		});
+	}
+	
+	function executeCallback(){
+		if(selectGridValidation(prdtGridView.target)) return;
+		modalStack.last().callback(prdtGridView);
+		modalStack.close();
+	}
+</script>
