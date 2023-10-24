@@ -4,343 +4,286 @@
 <mapper namespace="com.dksys.biz.user.wb.wb24.mapper.WB24Mapper">
 
      <select id="selectWbsIssueListCount" parameterType="Map" resultType="int">
-                WITH PLN AS --계획정보 TREE 
-                     ( 
-                      SELECT A.*
-                           , LEVEL AS LVL
-                           , REGEXP_REPLACE(SYS_CONNECT_BY_PATH(A.LOWER_CD, ' -> '), '^\s+\-\>\s+', '') AS PATH --출고경로 
-                        FROM (
-                            
-                              SELECT DISTINCT 
-                                      'TOP'    AS UPPER_CD
-                                    , SALES_CD AS LOWER_CD
-                                    , CO_CD
-                                    , SALES_CD
-                                    , VER_NO
-                                    , ''       AS WBS_PLAN_CODE_KIND
-                                    , ''       AS WBS_PLAN_CODE_ID             
-                                    , ''       AS WBS_PLAN_CODE_NM
-                                    , ''       AS WBS_PLANS_DT
-                                    , ''       AS WBS_PLANE_DT
-                                    , ''       AS WBS_MNG_NM
-                                FROM TB_WB22M01 --WBS계획 정보
-                               WHERE 1  = 1 
-                                 AND CO_CD    = #{coCd}
-                                 AND WBS_PLAN_CODE_KIND = 'WBSCODE'
-                                 <if test="salesCd != null and !salesCd.equals('')">
+WITH PLN AS --계획정보 TREE 
+                 ( 
+                  SELECT A.*
+                       , LEVEL AS LVL
+                       , REGEXP_REPLACE(SYS_CONNECT_BY_PATH(A.LOWER_CD, ' -> '), '^\s+\-\>\s+', '') AS PATH --출고경로 
+                    FROM (
+                        
+                          SELECT DISTINCT 
+                                  'TOP'    AS UPPER_CD
+                                , SALES_CD AS LOWER_CD
+                                , CO_CD
+                                , SALES_CD
+                                , VER_NO
+                                , ''       AS WBS_PLAN_CODE_KIND
+                                , ''       AS WBS_PLAN_CODE_ID             
+                                , ''       AS WBS_PLAN_CODE_NM
+                                , ''       AS WBS_PLANS_DT
+                                , ''       AS WBS_PLANE_DT
+                                , ''       AS WBS_MNG_NM
+                                , ''       AS P_PLAN_NO
+                                , ''       AS P_RSLTS_NO
+                                , ''       AS P_PLAN_TRGT_KEY
+                                , ''       AS P_RSLTS_TRGT_KEY
+                            FROM TB_WB22M01 --WBS계획 정보
+                           WHERE 1  = 1 
+                             AND CO_CD    = #{coCd}
+                             AND WBS_PLAN_CODE_KIND = 'WBSCODE'
+                             <if test="salesCd != null and !salesCd.equals('')">
                                   AND SALES_CD = #{salesCd}       
                                  </if>
-                             
-                                  AND SALES_CD IN ( SELECT DISTINCT SALES_CD --LEVEL2 없는 TOP LEVEL 제외 
-                                                       FROM TB_WB22M01 --WBS계획 정보
-                                                       WHERE CO_CD    = #{coCd}
-                                                        AND WBS_PLAN_CODE_KIND != 'WBSCODE' --LEVEL2
-                                                        AND WBS_PLANS_DT BETWEEN #{wbsRsltssDt} AND #{wbsRsltseDt}
-                                                        <if test="salesCd != null and !salesCd.equals('')">
-                                                           AND SALES_CD = #{salesCd}       
-                                                        </if>  
-                                                   ) 
-                              UNION ALL
-                              SELECT SALES_CD                    AS UPPER_CD
-                                    , SALES_CD||WBS_PLAN_CODE_ID  AS LOWER_CD
-                                    , CO_CD
-                                    , SALES_CD
-                                    , VER_NO
-                                    , WBS_PLAN_CODE_KIND
-                                    , WBS_PLAN_CODE_ID
-                                    , (SELECT FN_CM05M01_CD_TO_NM(WBS_PLAN_CODE_ID) FROM DUAL) AS WBS_PLAN_CODE_NM
-                                    , WBS_PLANS_DT   
-                                    , WBS_PLANE_DT   
-                                    , (SELECT FN_CM06M01_ID_TO_NM(WBS_PLAN_MNG_ID) FROM DUAL) AS WBS_MNG_NM
-                                 FROM TB_WB22M01 --WBS계획 정보
-                                WHERE CO_CD    = #{coCd}
-                                  AND WBS_PLAN_CODE_KIND = 'WBSCODE' --LEVEL1
-                                  AND (SALES_CD, WBS_PLAN_CODE_ID) IN ( SELECT DISTINCT SALES_CD, WBS_PLAN_CODE_KIND --LEVEL2 없는 LEVEL1 제외 
-                                                                          FROM TB_WB22M01 --WBS계획 정보
-                                                                          WHERE CO_CD    = #{coCd}
-                                                                           AND WBS_PLAN_CODE_KIND != 'WBSCODE' --LEVEL2
-                                                                           AND WBS_PLANS_DT BETWEEN #{wbsRsltssDt} AND #{wbsRsltseDt}
-                                                                            <if test="salesCd != null and !salesCd.equals('')">
-                                                                              AND SALES_CD = #{salesCd}       
-                                                                            </if>   
-                                                                       ) 
-                                  <if test="salesCd != null and !salesCd.equals('')">
-                                     AND SALES_CD = #{salesCd}       
-                                  </if> 
-                                  
-                              UNION ALL           
-                              SELECT SALES_CD||WBS_PLAN_CODE_KIND AS UPPER_CD
-                                    , WBS_PLAN_CODE_ID             AS LOWER_CD
-                                    , CO_CD
-                                    , SALES_CD
-                                    , VER_NO
-                                    , WBS_PLAN_CODE_KIND
-                                    , WBS_PLAN_CODE_ID
-                                    , WBS_PLAN_CODE_NM
-                                    , WBS_PLANS_DT   
-                                    , WBS_PLANE_DT   
-                                    , (SELECT FN_CM06M01_ID_TO_NM(WBS_PLAN_MNG_ID) FROM DUAL) AS WBS_MNG_NM
-                                 FROM TB_WB22M01 --WBS계획 정보
-                                WHERE CO_CD    = #{coCd}
-                                  AND WBS_PLAN_CODE_KIND != 'WBSCODE' --LEVEL2
-                                  AND WBS_PLANS_DT BETWEEN #{wbsRsltssDt} AND #{wbsRsltseDt}
-                                  <if test="salesCd != null and !salesCd.equals('')">
-                                     AND SALES_CD = #{salesCd}       
-                                  </if>
-                             ) A
-                       WHERE 1=1
-                       START WITH UPPER_CD = 'TOP' 
-                       CONNECT BY PRIOR LOWER_CD = UPPER_CD
-                       ORDER BY PATH
-                     ) 
-                   , SJD AS --수주상세 
-                     ( 
-                      SELECT M.CO_CD                                              AS CO_CD        --회사코드
-                            , M.ORDRS_NO                                           AS ORDRS_NO     --수주번호
-                            , X.SALES_CD                                           AS SALES_CD     --SALES Code
-                            , M.ORDRS_CLNT_CD                                      AS CLNT_CD      --고객코드
-                            , C.CLNT_NM                                            AS CLNT_NM      --고객명
-                            , M.CLNT_PJT                                           AS CLNT_PJT     --고객사프로젝트 
-                            , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)  AS CLNT_PJT_NM  --고객사프로젝트명
-                         FROM TB_CR02M01  M --수주마스터
-                              INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
-                              INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
-                        WHERE 1=1
-                          AND M.CO_CD    = #{coCd}
-                          <if test="salesCd != null and !salesCd.equals('')">
-                              AND X.SALES_CD = #{salesCd}       
-                          </if>
-                          
-                          
-                          AND EXISTS (SELECT 'X'    --조회된 TASK의 SALES_CD 만 
-                                         FROM PLN P 
-                                        WHERE P.CO_CD    = X.CO_CD
-                                          AND P.SALES_CD = X.SALES_CD
-                                      ) 
-                     )
-                   , SUBJ AS --과제정보
-                     (
-                      SELECT X.CO_CD      AS CO_CD    --회사코드
-                            , X.SALES_CD   AS SALES_CD --SALES Code
-                            , X.SJ_NO      AS SJ_NO    --과제번호
-                            , X.SJ_NM      AS SJ_NM    --과제명
-                            , X.VER_NO     AS VER_NO   --버젼
-                        FROM TB_WB21M01 X
-                       WHERE X.CO_CD    = #{coCd}
-                         <if test="salesCd != null and !salesCd.equals('')">
-                              AND X.SALES_CD = #{salesCd}       
-                          </if>
-                         AND X.CLOSE_YN = 'Y'
-                         AND EXISTS (SELECT 'X'    --조회된 TASK의 SALES_CD 만 
-                                        FROM PLN P 
-                                       WHERE P.CO_CD    = X.CO_CD
-                                         AND P.SALES_CD = X.SALES_CD
-                                     ) 
-                     ) 
-                   , ISU AS --이슈정보
-                     (
-                      SELECT *
-                        FROM (
-                              SELECT '계획'                  AS GUBUN 
-                                    , ISU.CO_CD               --회사코드
-                                    , ISU.SALES_CD            --SALES Code 
-                                    , ISU.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
-                                    , ISU.WBS_PLAN_CODE_ID    --WBS계획 LVL2
-                                    , ISU.WBS_PLAN_NO         --WBS계획 번호
-                                    , ISU.WBS_RSLTS_NO        --WBS실적 번호
-                                    , ISU.ISS_NO              --이슈번호
-                                    , ISU.ISS_SJ              --이슈제목
-                                    , ISU.ISS_DIV             --이슈유형
-                                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_DIV) FROM DUAL) AS ISS_DIV_NM
-                                    , ISU.ISS_CNTS            --이슈내용
-                                    , ISU.ISS_STS             --이슈상태
-                                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_STS) FROM DUAL) AS ISS_STS_NM
-                                    , ISU.ACT_ID              --조치담당자
-                                    , ACT.ACTS_DT             --조치 시작일
-                                    , ACT.ACTE_DT             --조치 종료일
-                                    , ACT.ACT_MH              --조치 투입공수
-                                    , ACT.ACT_AMT             --조치 투입비용  
-                                    , ACT.ACT_CNTS            --조치내용
-                                    , ISU.FILE_TRGT_KEY       --이슈 FILE_TRGT_KEY
-                                FROM TB_WB24M02 AS ISU --계획이슈 정보
-                                      LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --계획이슈 조치내용
-                               WHERE ISU.WBS_PLAN_NO IS NOT NULL --계획이슈 
-                                 AND ISU.CO_CD    = #{coCd}
-                                 <if test="salesCd != null and !salesCd.equals('')">
+                              AND SALES_CD IN ( SELECT DISTINCT SALES_CD --LEVEL2 없는 TOP LEVEL 제외 
+                                                   FROM TB_WB22M01 --WBS계획 정보
+                                                  WHERE CO_CD    = #{coCd}
+                                                    AND WBS_PLAN_CODE_KIND != 'WBSCODE' --LEVEL2
+                                                    AND WBS_PLANS_DT BETWEEN #{wbsRsltssDt} AND #{wbsRsltseDt}
+                                                 <if test="salesCd != null and !salesCd.equals('')">
+                                                       AND SALES_CD = #{salesCd}       
+                                                    </if>  
+                                               ) 
+                          UNION ALL
+                          SELECT SALES_CD                    AS UPPER_CD
+                                , SALES_CD||WBS_PLAN_CODE_ID  AS LOWER_CD
+                                , CO_CD
+                                , SALES_CD
+                                , VER_NO
+                                , WBS_PLAN_CODE_KIND
+                                , WBS_PLAN_CODE_ID
+                                , (SELECT FN_CM05M01_CD_TO_NM(WBS_PLAN_CODE_ID) FROM DUAL) AS WBS_PLAN_CODE_NM
+                                , WBS_PLANS_DT   
+                                , WBS_PLANE_DT   
+                                , (SELECT FN_CM06M01_ID_TO_NM(WBS_PLAN_MNG_ID) FROM DUAL) AS WBS_MNG_NM
+                                , ''                                  AS P_PLAN_NO
+                                , ''                                  AS P_RSLTS_NO
+                                , ''                                  AS P_PLAN_TRGT_KEY
+                                , ''                                  AS P_RSLTS_TRGT_KEY
+                             FROM TB_WB22M01 --WBS계획 정보
+                            WHERE CO_CD    = #{coCd}
+                              AND WBS_PLAN_CODE_KIND = 'WBSCODE' --LEVEL1
+                              AND (SALES_CD, WBS_PLAN_CODE_ID) IN ( SELECT DISTINCT SALES_CD, WBS_PLAN_CODE_KIND --LEVEL2 없는 LEVEL1 제외 
+                                                                      FROM TB_WB22M01 --WBS계획 정보
+                                                                     WHERE CO_CD    = #{coCd}
+                                                                       AND WBS_PLAN_CODE_KIND != 'WBSCODE' --LEVEL2
+                                                                       AND WBS_PLANS_DT BETWEEN #{wbsRsltssDt} AND #{wbsRsltseDt}
+                                                                        <if test="salesCd != null and !salesCd.equals('')">
+                                                                         AND SALES_CD = #{salesCd}       
+                                                                      </if> 
+                                                                   ) 
+                              <if test="salesCd != null and !salesCd.equals('')">
+                                 AND SALES_CD = #{salesCd}       
+                              </if> 
+                              
+                          UNION ALL           
+                          SELECT PLN.SALES_CD||PLN.WBS_PLAN_CODE_KIND AS UPPER_CD
+                                , PLN.WBS_PLAN_CODE_ID                 AS LOWER_CD
+                                , PLN.CO_CD
+                                , PLN.SALES_CD
+                                , PLN.VER_NO
+                                , PLN.WBS_PLAN_CODE_KIND
+                                , PLN.WBS_PLAN_CODE_ID
+                                , PLN.WBS_PLAN_CODE_NM
+                                , PLN.WBS_PLANS_DT   
+                                , PLN.WBS_PLANE_DT   
+                                , ''                                  AS WBS_MNG_NM
+                                , PLN.WBS_PLAN_NO                     AS P_PLAN_NO
+                                , RSL.WBS_RSLTS_NO                    AS P_RSLTS_NO
+                                , PLN.FILE_TRGT_KEY                   AS P_PLAN_TRGT_KEY
+                                , RSL.FILE_TRGT_KEY                   AS P_RSLTS_TRGT_KEY
+                             FROM TB_WB22M01 AS PLN--WBS계획 정보
+                                  LEFT OUTER JOIN TB_WB23M01 AS RSL ON PLN.CO_CD = RSL.CO_CD AND PLN.SALES_CD = RSL.SALES_CD AND PLN.WBS_PLAN_CODE_KIND = RSL.WBS_PLAN_CODE_KIND AND PLN.WBS_PLAN_CODE_ID = RSL.WBS_PLAN_CODE_ID 
+                            WHERE PLN.CO_CD    = #{coCd}
+                              AND PLN.WBS_PLAN_CODE_KIND != 'WBSCODE' --LEVEL2
+                              AND PLN.WBS_PLANS_DT BETWEEN #{wbsRsltssDt} AND #{wbsRsltseDt}
+                             <if test="salesCd != null and !salesCd.equals('')">
+                                  AND SALES_CD = #{salesCd}       
+                              </if> 
+                         ) A
+                   WHERE 1=1
+                   START WITH UPPER_CD = 'TOP' 
+                   CONNECT BY PRIOR LOWER_CD = UPPER_CD
+                   ORDER BY PATH
+                 ) 
+               , SJD AS --수주상세 
+                 ( 
+                  SELECT M.CO_CD                                              AS CO_CD        --회사코드
+                        , M.ORDRS_NO                                           AS ORDRS_NO     --수주번호
+                        , X.SALES_CD                                           AS SALES_CD     --SALES Code
+                        , M.ORDRS_CLNT_CD                                      AS CLNT_CD      --고객코드
+                        , C.CLNT_NM                                            AS CLNT_NM      --고객명
+                        , M.CLNT_PJT                                           AS CLNT_PJT     --고객사프로젝트 
+                        , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)  AS CLNT_PJT_NM  --고객사프로젝트명
+                     FROM TB_CR02M01  M --수주마스터
+                          INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+                          INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+                    WHERE 1=1
+                      AND M.CO_CD    = #{coCd}
+                      <if test="salesCd != null and !salesCd.equals('')">
+                            AND X.SALES_CD = #{salesCd}       
+                       </if> 
+                      AND EXISTS (SELECT 'X'    --조회된 TASK의 SALES_CD 만 
+                                     FROM PLN P 
+                                    WHERE P.CO_CD    = X.CO_CD
+                                      AND P.SALES_CD = X.SALES_CD
+                                  ) 
+                 )
+               , SUBJ AS --과제정보
+                 (
+                  SELECT X.CO_CD      AS CO_CD    --회사코드
+                        , X.SALES_CD   AS SALES_CD --SALES Code
+                        , X.SJ_NO      AS SJ_NO    --과제번호
+                        , X.SJ_NM      AS SJ_NM    --과제명
+                        , X.VER_NO     AS VER_NO   --버젼
+                    FROM TB_WB21M01 X
+                   WHERE X.CO_CD    = #{coCd}
+                     <if test="salesCd != null and !salesCd.equals('')">
+                            AND X.SALES_CD = #{salesCd}       
+                       </if> 
+                     AND X.CLOSE_YN = 'Y'
+                     AND EXISTS (SELECT 'X'    --조회된 TASK의 SALES_CD 만 
+                                    FROM PLN P 
+                                   WHERE P.CO_CD    = X.CO_CD
+                                     AND P.SALES_CD = X.SALES_CD
+                                 ) 
+                 ) 
+               , ISU AS --이슈정보
+                 (
+                  SELECT *
+                    FROM (
+                          SELECT '계획'  AS GUBUN 
+                                , ISU.CO_CD                                   --회사코드
+                                , ISU.SALES_CD                                --SALES Code 
+                                , ISU.WBS_PLAN_CODE_KIND                      --WBS계획 LVL1
+                                , ISU.WBS_PLAN_CODE_ID                        --WBS계획 LVL2
+                                , ISU.WBS_PLAN_NO                             --WBS계획 번호
+                                , ISU.WBS_RSLTS_NO                            --WBS실적 번호
+                                , ISU.ISS_NO                                  --이슈번호
+                                , ISU.ISS_SJ                                  --이슈제목
+                                , ISU.ISS_DIV                                 --이슈유형
+                                , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_DIV) FROM DUAL) AS ISS_DIV_NM
+                                , ISU.ISS_CNTS                                --이슈내용
+                                , ISU.ISS_STS                                 --이슈상태
+                                , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_STS) FROM DUAL) AS ISS_STS_NM
+                                , ISU.ACT_ID                                  --조치담당자
+                                , TO_CHAR(ACT.ACTS_DT,'YYYY-MM-DD') AS ACTS_DT--조치 시작일
+                                , TO_CHAR(ACT.ACTE_DT,'YYYY-MM-DD') AS ACTE_DT--조치 종료일
+                                , ACT.ACT_MH                                  --조치 투입공수
+                                , ACT.ACT_AMT                                 --조치 투입비용  
+                                , ACT.ACT_CNTS                                --조치내용
+                                , ISU.FILE_TRGT_KEY                           --이슈 FILE_TRGT_KEY
+                                , ''  WBS_RSLTSS_DT                           --실적시작일
+                                , ''  WBS_RSLTSE_DT                           --실적종료일
+                            FROM TB_WB24M02 AS ISU --계획이슈 정보
+                                  LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --계획이슈 조치내용
+                           WHERE ISU.WBS_PLAN_NO IS NOT NULL --계획이슈 
+                             AND ISU.CO_CD    = #{coCd}
+                             <if test="salesCd != null and !salesCd.equals('')">
+                               AND ISU.SALES_CD = #{salesCd}       
+                            </if>                         
+                          UNION ALL
+                          SELECT '실적'  AS GUBUN 
+                                , ISU.CO_CD                                               --회사코드
+                                , ISU.SALES_CD                                            --SALES Code 
+                                , ISU.WBS_PLAN_CODE_KIND                                  --WBS계획 LVL1
+                                , ISU.WBS_PLAN_CODE_ID                                    --WBS계획 LVL2
+                                , ISU.WBS_PLAN_NO                                         --WBS계획 번호
+                                , ISU.WBS_RSLTS_NO                                        --WBS실적 번호
+                                , ISU.ISS_NO                                              --이슈번호
+                                , ISU.ISS_SJ                                              --이슈제목
+                                , ISU.ISS_DIV                                             --이슈유형
+                                , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_DIV) FROM DUAL) AS ISS_DIV_NM
+                                , ISU.ISS_CNTS                                            --이슈내용
+                                , ISU.ISS_STS                                             --이슈상태
+                                , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_STS) FROM DUAL) AS ISS_STS_NM
+                                , ISU.ACT_ID                                              --조치담당자
+                                , TO_CHAR(ACT.ACTS_DT,'YYYY-MM-DD')  AS ACTS_DT           --조치 시작일
+                                , TO_CHAR(ACT.ACTE_DT,'YYYY-MM-DD')  AS ACTE_DT           --조치 종료일
+                                , ACT.ACT_MH                                              --조치 투입공수
+                                , ACT.ACT_AMT                                             --조치 투입비용  
+                                , ACT.ACT_CNTS                                            --조치내용
+                                , ISU.FILE_TRGT_KEY                                       --이슈 FILE_TRGT_KEY
+                                , TO_CHAR(RSL.WBS_RSLTSS_DT,'YYYY-MM-DD') AS WBS_RSLTSS_DT--실적시작일
+                                , TO_CHAR(RSL.WBS_RSLTSE_DT,'YYYY-MM-DD') AS WBS_RSLTSE_DT--실적종료일
+                            FROM TB_WB24M02  AS ISU --WBS이슈 정보
+                                  LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --실적이슈 조치내용
+                                  LEFT OUTER JOIN TB_WB23M01 AS RSL ON ISU.CO_CD = RSL.CO_CD AND ISU.SALES_CD = RSL.SALES_CD AND ISU.WBS_PLAN_CODE_KIND = RSL.WBS_PLAN_CODE_KIND AND ISU.WBS_PLAN_CODE_ID = RSL.WBS_PLAN_CODE_ID AND ISU.WBS_RSLTS_NO = RSL.WBS_RSLTS_NO
+                           WHERE ISU.WBS_RSLTS_NO IS NOT NULL  --실적이슈 
+                             AND ISU.CO_CD    = #{coCd}
+                             <if test="salesCd != null and !salesCd.equals('')">
                                   AND ISU.SALES_CD = #{salesCd}       
-                                 </if>                               
-                              UNION ALL --실적이슈 중, 계획이슈로 등록되지 않은 Task 계획 
-                              SELECT DISTINCT
-                                      '계획'                  AS GUBUN 
-                                    , ISU.CO_CD               --회사코드
-                                    , ISU.SALES_CD            --SALES Code 
-                                    , ISU.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
-                                    , ISU.WBS_PLAN_CODE_ID    --WBS계획 LVL2
-                                    , ''  WBS_PLAN_NO         --WBS계획 번호
-                                    , ''  WBS_RSLTS_NO        --WBS실적 번호
-                                    , ''  ISS_NO              --이슈번호
-                                    , ''  ISS_SJ              --이슈제목
-                                    , ''  ISS_DIV             --이슈유형
-                                    , ''  ISS_DIV_NM          --이슈유형
-                                    , ''  ISS_CNTS            --이슈내용
-                                    , ''  ISS_STS             --이슈상태
-                                    , ''  ISS_STS_NM           --이슈상태
-                                    , ''  ACT_ID              --조치담당자
-                                    , ''  ACTS_DT             --조치 시작일
-                                    , ''  ACTE_DT             --조치 종료일
-                                    , ''  ACT_MH              --조치 투입공수
-                                    , ''  ACT_AMT             --조치 투입비용  
-                                    , ''  ACT_CNTS            --조치내용
-                                    , ''  FILE_TRGT_KEY       --이슈 FILE_TRGT_KEY
-                                FROM TB_WB24M02  AS ISU --WBS이슈 정보
-                               WHERE ISU.WBS_RSLTS_NO IS NOT NULL --실적이슈 
-                                 AND ISU.CO_CD    = #{coCd}
-                                 <if test="salesCd != null and !salesCd.equals('')">
-                                  AND ISU.SALES_CD = #{salesCd}       
-                                 </if>
-                                 AND NOT EXISTS (SELECT 'X'    --계획이슈 정보 
-                                                     FROM TB_WB24M02 P 
-                                                    WHERE P.CO_CD              = ISU.CO_CD
-                                                      AND P.SALES_CD           = ISU.SALES_CD
-                                                      AND P.WBS_PLAN_CODE_KIND = ISU.WBS_PLAN_CODE_KIND
-                                                      AND P.WBS_PLAN_CODE_ID   = ISU.WBS_PLAN_CODE_ID
-                                                      AND P.WBS_PLAN_NO IS NOT NULL --계획이슈 
-                                                      AND P.CO_CD    = #{coCd}
-                                                      <if test="salesCd != null and !salesCd.equals('')">
-                                                         AND P.SALES_CD = #{salesCd}       
-                                                      </if>
-                                                 ) 
-                                 
-                              UNION ALL
-                              SELECT '실적'                  AS GUBUN 
-                                    , ISU.CO_CD               --회사코드
-                                    , ISU.SALES_CD            --SALES Code 
-                                    , ISU.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
-                                    , ISU.WBS_PLAN_CODE_ID    --WBS계획 LVL2
-                                    , ISU.WBS_PLAN_NO         --WBS계획 번호
-                                    , ISU.WBS_RSLTS_NO        --WBS실적 번호
-                                    , ISU.ISS_NO              --이슈번호
-                                    , ISU.ISS_SJ              --이슈제목
-                                    , ISU.ISS_DIV             --이슈유형
-                                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_DIV) FROM DUAL) AS ISS_DIV_NM
-                                    , ISU.ISS_CNTS            --이슈내용
-                                    , ISU.ISS_STS             --이슈상태
-                                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_STS) FROM DUAL) AS ISS_STS_NM
-                                    , ISU.ACT_ID              --조치담당자
-                                    , ACT.ACTS_DT             --조치 시작일
-                                    , ACT.ACTE_DT             --조치 종료일
-                                    , ACT.ACT_MH              --조치 투입공수
-                                    , ACT.ACT_AMT             --조치 투입비용  
-                                    , ACT.ACT_CNTS            --조치내용
-                                    , ISU.FILE_TRGT_KEY       --이슈 FILE_TRGT_KEY
-                                FROM TB_WB24M02  AS ISU --WBS이슈 정보
-                                      LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --실적이슈 조치내용
-                               WHERE ISU.WBS_RSLTS_NO IS NOT NULL  --실적이슈 
-                                 AND ISU.CO_CD    = #{coCd}
-                                 <if test="salesCd != null and !salesCd.equals('')">
-                                   AND ISU.SALES_CD = #{salesCd}       
-                                 </if>                               
-                              UNION ALL --계획이슈 중, 실적이슈로 등록되지 않은 Task 계획 
-                              SELECT DISTINCT
-                                      '실적'                  AS GUBUN 
-                                    , ISU.CO_CD               --회사코드
-                                    , ISU.SALES_CD            --SALES Code 
-                                    , ISU.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
-                                    , ISU.WBS_PLAN_CODE_ID    --WBS계획 LVL2
-                                    , ''  WBS_PLAN_NO         --WBS계획 번호
-                                    , ''  WBS_RSLTS_NO        --WBS실적 번호
-                                    , ''  ISS_NO              --이슈번호
-                                    , ''  ISS_SJ              --이슈제목
-                                    , ''  ISS_DIV             --이슈유형
-                                    , ''  ISS_DIV_NM          --이슈유형
-                                    , ''  ISS_CNTS            --이슈내용
-                                    , ''  ISS_STS             --이슈상태
-                                    , ''  ISS_STS_NM           --이슈상태
-                                    , ''  ACT_ID              --조치담당자
-                                    , ''  ACTS_DT             --조치 시작일
-                                    , ''  ACTE_DT             --조치 종료일
-                                    , ''  ACT_MH              --조치 투입공수
-                                    , ''  ACT_AMT             --조치 투입비용  
-                                    , ''  ACT_CNTS            --조치내용
-                                    , ''  FILE_TRGT_KEY       --이슈 FILE_TRGT_KEY
-                                FROM TB_WB24M02 AS ISU --계획이슈 정보
-                               WHERE ISU.WBS_PLAN_NO IS NOT NULL --계획이슈 
-                                 AND ISU.CO_CD    = #{coCd}
-                                 <if test="salesCd != null and !salesCd.equals('')">
-                                   AND ISU.SALES_CD = #{salesCd}       
-                                 </if>  
-                                 AND NOT EXISTS (SELECT 'X'    --실적이슈 정보  
-                                                     FROM TB_WB24M02 P 
-                                                    WHERE P.CO_CD              = ISU.CO_CD
-                                                      AND P.SALES_CD           = ISU.SALES_CD
-                                                      AND P.WBS_PLAN_CODE_KIND = ISU.WBS_PLAN_CODE_KIND
-                                                      AND P.WBS_PLAN_CODE_ID   = ISU.WBS_PLAN_CODE_ID
-                                                      AND P.WBS_RSLTS_NO IS NOT NULL  --계획이슈 
-                                                      AND P.CO_CD    = #{coCd}
-                                                      <if test="salesCd != null and !salesCd.equals('')">
-                                                         AND P.SALES_CD = #{salesCd}       
-                                                      </if> 
-                                                 ) 
-                             ) 
-                     )
-                     
-                  SELECT COUNT(*) FROM (      
-                            SELECT ROWNUM AS RN
-                                  , P.UPPER_CD
-                                  , P.LOWER_CD
-                                  , P.LVL
-                                  , P.PATH
-                                  , P.CO_CD       --회사코드
-                                  , S.CLNT_CD     --고객명
-                                  , S.CLNT_NM     --고객명
-                                  , S.CLNT_PJT    --고객사프로젝트
-                                  , S.CLNT_PJT_NM --고객사프로젝트명
-                                  , j.SJ_NM       --과제명
-                                --, j.VER_NO      --과제버젼
-                                  , S.ORDRS_NO     --수주번호
-                                  , P.SALES_CD    --Sales Code
-                                  , P.VER_NO      --계획버젼
-                                  , P.WBS_PLAN_CODE_KIND
-                                  , P.WBS_PLAN_CODE_ID
-                                  , CASE WHEN P.LVL = 1 THEN P.SALES_CD 
-                                         WHEN P.LVL = 2 THEN P.WBS_PLAN_CODE_NM || '  [ 계획 ]'
-                                         ELSE P.WBS_PLAN_CODE_NM  || '  [ TASK ]'  END WBS_PLAN_CODE_NM    
-                                  , TO_CHAR(P.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT
-                                  , TO_CHAR(P.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT
-                                  , P.WBS_MNG_NM
-                                  , I.GUBUN
-                                  , I.WBS_PLAN_NO         --WBS계획 번호
-                                  , I.WBS_RSLTS_NO        --WBS실적 번호
-                                  , I.ISS_SJ              --이슈제목
-                                  , I.ISS_DIV             --이슈유형
-                                  , I.ISS_DIV_NM          --이슈유형명
-                                  , I.ISS_CNTS            --이슈내용
-                                  , I.ISS_STS             --이슈상태
-                                  , I.ISS_STS_NM          --이슈상태명
-                                  , I.ACT_ID
-                                  , I.ACTS_DT
-                                  , I.ACTE_DT
-                                  , I.ACT_MH
-                                  , I.ACT_AMT
-                                  , I.ACT_CNTS
-                                  , I.FILE_TRGT_KEY
-                                  
-                              FROM PLN AS P
-                                   INNER      JOIN SJD  AS S ON P.CO_CD = S.CO_CD AND P.SALES_CD = S.SALES_CD--수주상세   
-                                   INNER      JOIN SUBJ AS J ON P.CO_CD = J.CO_CD AND P.SALES_CD = J.SALES_CD--과제정보 
-                                   LEFT OUTER JOIN ISU  AS I ON P.CO_CD = I.CO_CD AND P.SALES_CD = I.SALES_CD AND P.WBS_PLAN_CODE_KIND = I.WBS_PLAN_CODE_KIND AND P.WBS_PLAN_CODE_ID = I.WBS_PLAN_CODE_ID--이슈정보 
-                             WHERE 1=1 
-                             <if test="issSts != null and !issSts.equals('')">
-                                  AND I.ISS_STS = #{issSts}            
-                              </if>
-                              <if test="clntPjt != null and !clntPjt.equals('')">
-                                  AND S.CLNT_PJT = #{clntPjt}            
-                              </if>
-                              <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
-                                  AND S.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'            
-                              </if>
-                             ORDER BY S.CLNT_CD, S.ORDRS_NO, P.SALES_CD, P.PATH, I.GUBUN 
-                             ) W
+                             </if>                             
+                         ) 
+                 WHERE 1=1
+                 <if test="salesCd != null and !salesCd.equals('')">
+                      AND SALES_CD = #{salesCd}       
+                  </if> 
+                 
+                 )
+                 
+                 
+                 
+       SELECT COUNT(*) FROM (          
+            SELECT P.CO_CD              --회사코드
+                  , S.CLNT_CD            --고객명
+                  , S.CLNT_NM            --고객명
+                  , S.CLNT_PJT           --고객사프로젝트
+                  , S.CLNT_PJT_NM        --고객사프로젝트명
+                  , j.SJ_NM              --과제명
+                --, j.VER_NO             --과제버젼
+                  , S.ORDRS_NO           --수주번호
+                  , P.SALES_CD           --Sales Code
+                  , P.VER_NO             --계획버젼
+                  , P.WBS_PLAN_CODE_KIND --계획 LEVEL1
+                  , P.WBS_PLAN_CODE_ID   --계획 LEVLE2
+                  , CASE WHEN P.LVL = 1 THEN P.SALES_CD 
+                          ELSE P.WBS_PLAN_CODE_NM END WBS_PLAN_CODE_NM     
+                  , TO_CHAR(P.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT
+                  , TO_CHAR(P.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT
+                  , P.WBS_MNG_NM         --담당자명
+                  , I.GUBUN              --계획실적구분
+                  , I.WBS_PLAN_NO         --WBS계획 번호
+                  , I.WBS_RSLTS_NO        --WBS실적 번호
+                  , I.ISS_NO              --이슈제목
+                  , I.ISS_SJ              --이슈제목
+                  , I.ISS_DIV             --이슈유형
+                  , I.ISS_DIV_NM          --이슈유형명
+                  , I.ISS_CNTS            --이슈내용
+                  , I.ISS_STS             --이슈상태
+                  , I.ISS_STS_NM          --이슈상태명
+                  , I.ACT_ID              --조취자ID
+                  , (SELECT FN_CM05M01_CD_TO_NM(I.ACT_ID) FROM DUAL) AS ACT_NM
+                  , I.ACTS_DT             --조취시작일
+                  , I.ACTE_DT             --조취종료일
+                  , I.ACT_MH              --조취공수
+                  , I.ACT_AMT             --조취비용
+                  , I.ACT_CNTS            --조취내용
+                  , I.FILE_TRGT_KEY    AS ISS_FILE_TRGT_KEY    --이슈FILE_TRGT_KEY
+                  , I.WBS_RSLTSS_DT       --실적시작일
+                  , I.WBS_RSLTSE_DT       --실적종료일
+                  , P.UPPER_CD            --상위코드 
+                  , P.LOWER_CD            --하위코드
+                  , P.LVL                 --코드LEVLE
+                  , P.PATH                --코드PATH
+                  , P.P_PLAN_NO
+                  , P.P_RSLTS_NO
+                  , P.P_PLAN_TRGT_KEY
+                  , P.P_RSLTS_TRGT_KEY
+              FROM PLN AS P
+                   INNER      JOIN SJD  AS S ON P.CO_CD = S.CO_CD AND P.SALES_CD = S.SALES_CD--수주상세   
+                   INNER      JOIN SUBJ AS J ON P.CO_CD = J.CO_CD AND P.SALES_CD = J.SALES_CD--과제정보 
+                   LEFT OUTER JOIN ISU  AS I ON P.CO_CD = I.CO_CD AND P.SALES_CD = I.SALES_CD AND P.WBS_PLAN_CODE_KIND = I.WBS_PLAN_CODE_KIND AND P.WBS_PLAN_CODE_ID = I.WBS_PLAN_CODE_ID--이슈정보 
+             WHERE 1=1 
+             <if test="issSts != null and !issSts.equals('')">
+                    AND I.ISS_STS = #{issSts}            
+             </if>
+            <if test="clntPjt != null and !clntPjt.equals('')">
+                    AND S.CLNT_PJT = #{clntPjt}            
+            </if>
+            <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
+                    AND S.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'            
+            </if>
+             ORDER BY S.CLNT_CD, S.ORDRS_NO, P.SALES_CD, P.PATH, I.GUBUN ) W
           </select>
 
 
@@ -349,345 +292,285 @@
 
 
      <select id="selectWbsIssueList" parameterType="Map" resultType="camelMap">
-				WITH PLN AS --계획정보 TREE 
-				     ( 
-				      SELECT A.*
-				           , LEVEL AS LVL
-				           , REGEXP_REPLACE(SYS_CONNECT_BY_PATH(A.LOWER_CD, ' -> '), '^\s+\-\>\s+', '') AS PATH --출고경로 
-				        FROM (
-				            
-				              SELECT DISTINCT 
-				                      'TOP'    AS UPPER_CD
-				                    , SALES_CD AS LOWER_CD
-				                    , CO_CD
-				                    , SALES_CD
-				                    , VER_NO
-				                    , ''       AS WBS_PLAN_CODE_KIND
-				                    , ''       AS WBS_PLAN_CODE_ID             
-				                    , ''       AS WBS_PLAN_CODE_NM
-				                    , ''       AS WBS_PLANS_DT
-				                    , ''       AS WBS_PLANE_DT
-				                    , ''       AS WBS_MNG_NM
-				                FROM TB_WB22M01 --WBS계획 정보
-				               WHERE 1  = 1 
-				                 AND CO_CD    = #{coCd}
-				                 AND WBS_PLAN_CODE_KIND = 'WBSCODE'
-				                 <if test="salesCd != null and !salesCd.equals('')">
+			WITH PLN AS --계획정보 TREE 
+			     ( 
+			      SELECT A.*
+			           , LEVEL AS LVL
+			           , REGEXP_REPLACE(SYS_CONNECT_BY_PATH(A.LOWER_CD, ' -> '), '^\s+\-\>\s+', '') AS PATH --출고경로 
+			        FROM (
+			            
+			              SELECT DISTINCT 
+			                      'TOP'    AS UPPER_CD
+			                    , SALES_CD AS LOWER_CD
+			                    , CO_CD
+			                    , SALES_CD
+			                    , VER_NO
+			                    , ''       AS WBS_PLAN_CODE_KIND
+			                    , ''       AS WBS_PLAN_CODE_ID             
+			                    , ''       AS WBS_PLAN_CODE_NM
+			                    , ''       AS WBS_PLANS_DT
+			                    , ''       AS WBS_PLANE_DT
+			                    , ''       AS WBS_MNG_NM
+			                    , ''       AS P_PLAN_NO
+			                    , ''       AS P_RSLTS_NO
+			                    , ''       AS P_PLAN_TRGT_KEY
+			                    , ''       AS P_RSLTS_TRGT_KEY
+			                FROM TB_WB22M01 --WBS계획 정보
+			               WHERE 1  = 1 
+			                 AND CO_CD    = #{coCd}
+			                 AND WBS_PLAN_CODE_KIND = 'WBSCODE'
+			                 <if test="salesCd != null and !salesCd.equals('')">
                                   AND SALES_CD = #{salesCd}       
                                  </if>
-                             
-				                  AND SALES_CD IN ( SELECT DISTINCT SALES_CD --LEVEL2 없는 TOP LEVEL 제외 
-				                                       FROM TB_WB22M01 --WBS계획 정보
-				                                       WHERE CO_CD    = #{coCd}
-				                                        AND WBS_PLAN_CODE_KIND != 'WBSCODE' --LEVEL2
-				                                        AND WBS_PLANS_DT BETWEEN #{wbsRsltssDt} AND #{wbsRsltseDt}
-				                                        <if test="salesCd != null and !salesCd.equals('')">
-                                                           AND SALES_CD = #{salesCd}       
-                                                        </if>  
-				                                   ) 
-				              UNION ALL
-				              SELECT SALES_CD                    AS UPPER_CD
-				                    , SALES_CD||WBS_PLAN_CODE_ID  AS LOWER_CD
-				                    , CO_CD
-				                    , SALES_CD
-				                    , VER_NO
-				                    , WBS_PLAN_CODE_KIND
-				                    , WBS_PLAN_CODE_ID
-				                    , (SELECT FN_CM05M01_CD_TO_NM(WBS_PLAN_CODE_ID) FROM DUAL) AS WBS_PLAN_CODE_NM
-				                    , WBS_PLANS_DT   
-				                    , WBS_PLANE_DT   
-				                    , (SELECT FN_CM06M01_ID_TO_NM(WBS_PLAN_MNG_ID) FROM DUAL) AS WBS_MNG_NM
-				                 FROM TB_WB22M01 --WBS계획 정보
-				                WHERE CO_CD    = #{coCd}
-				                  AND WBS_PLAN_CODE_KIND = 'WBSCODE' --LEVEL1
-				                  AND (SALES_CD, WBS_PLAN_CODE_ID) IN ( SELECT DISTINCT SALES_CD, WBS_PLAN_CODE_KIND --LEVEL2 없는 LEVEL1 제외 
-				                                                          FROM TB_WB22M01 --WBS계획 정보
-				                                                          WHERE CO_CD    = #{coCd}
-				                                                           AND WBS_PLAN_CODE_KIND != 'WBSCODE' --LEVEL2
-				                                                           AND WBS_PLANS_DT BETWEEN #{wbsRsltssDt} AND #{wbsRsltseDt}
-				                                                            <if test="salesCd != null and !salesCd.equals('')">
-                                                                              AND SALES_CD = #{salesCd}       
-                                                                            </if>   
-				                                                       ) 
-				                  <if test="salesCd != null and !salesCd.equals('')">
-                                     AND SALES_CD = #{salesCd}       
-                                  </if> 
-				                  
-				              UNION ALL           
-				              SELECT SALES_CD||WBS_PLAN_CODE_KIND AS UPPER_CD
-				                    , WBS_PLAN_CODE_ID             AS LOWER_CD
-				                    , CO_CD
-				                    , SALES_CD
-				                    , VER_NO
-				                    , WBS_PLAN_CODE_KIND
-				                    , WBS_PLAN_CODE_ID
-				                    , WBS_PLAN_CODE_NM
-				                    , WBS_PLANS_DT   
-				                    , WBS_PLANE_DT   
-				                    , (SELECT FN_CM06M01_ID_TO_NM(WBS_PLAN_MNG_ID) FROM DUAL) AS WBS_MNG_NM
-				                 FROM TB_WB22M01 --WBS계획 정보
-				                WHERE CO_CD    = #{coCd}
-				                  AND WBS_PLAN_CODE_KIND != 'WBSCODE' --LEVEL2
-				                  AND WBS_PLANS_DT BETWEEN #{wbsRsltssDt} AND #{wbsRsltseDt}
-				                  <if test="salesCd != null and !salesCd.equals('')">
-                                     AND SALES_CD = #{salesCd}       
-                                  </if>
-				             ) A
-				       WHERE 1=1
-				       START WITH UPPER_CD = 'TOP' 
-				       CONNECT BY PRIOR LOWER_CD = UPPER_CD
-				       ORDER BY PATH
-				     ) 
-				   , SJD AS --수주상세 
-				     ( 
-				      SELECT M.CO_CD                                              AS CO_CD        --회사코드
-				            , M.ORDRS_NO                                           AS ORDRS_NO     --수주번호
-				            , X.SALES_CD                                           AS SALES_CD     --SALES Code
-				            , M.ORDRS_CLNT_CD                                      AS CLNT_CD      --고객코드
-				            , C.CLNT_NM                                            AS CLNT_NM      --고객명
-				            , M.CLNT_PJT                                           AS CLNT_PJT     --고객사프로젝트 
-				            , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)  AS CLNT_PJT_NM  --고객사프로젝트명
-				         FROM TB_CR02M01  M --수주마스터
-				              INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
-				              INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
-				        WHERE 1=1
-				          AND M.CO_CD    = #{coCd}
-				          <if test="salesCd != null and !salesCd.equals('')">
-                              AND X.SALES_CD = #{salesCd}       
-                          </if>
-				          
-				          
-				          AND EXISTS (SELECT 'X'    --조회된 TASK의 SALES_CD 만 
-				                         FROM PLN P 
-				                        WHERE P.CO_CD    = X.CO_CD
-				                          AND P.SALES_CD = X.SALES_CD
-				                      ) 
-				     )
-				   , SUBJ AS --과제정보
-				     (
-				      SELECT X.CO_CD      AS CO_CD    --회사코드
-				            , X.SALES_CD   AS SALES_CD --SALES Code
-				            , X.SJ_NO      AS SJ_NO    --과제번호
-				            , X.SJ_NM      AS SJ_NM    --과제명
-				            , X.VER_NO     AS VER_NO   --버젼
-				        FROM TB_WB21M01 X
-				       WHERE X.CO_CD    = #{coCd}
-				         <if test="salesCd != null and !salesCd.equals('')">
-                              AND X.SALES_CD = #{salesCd}       
-                          </if>
-				         AND X.CLOSE_YN = 'Y'
-				         AND EXISTS (SELECT 'X'    --조회된 TASK의 SALES_CD 만 
-				                        FROM PLN P 
-				                       WHERE P.CO_CD    = X.CO_CD
-				                         AND P.SALES_CD = X.SALES_CD
-				                     ) 
-				     ) 
-				   , ISU AS --이슈정보
-				     (
-				      SELECT *
-				        FROM (
-				              SELECT '계획'                  AS GUBUN 
-				                    , ISU.CO_CD               --회사코드
-				                    , ISU.SALES_CD            --SALES Code 
-				                    , ISU.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
-				                    , ISU.WBS_PLAN_CODE_ID    --WBS계획 LVL2
-				                    , ISU.WBS_PLAN_NO         --WBS계획 번호
-				                    , ISU.WBS_RSLTS_NO        --WBS실적 번호
-				                    , ISU.ISS_NO              --이슈번호
-				                    , ISU.ISS_SJ              --이슈제목
-				                    , ISU.ISS_DIV             --이슈유형
-				                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_DIV) FROM DUAL) AS ISS_DIV_NM
-				                    , ISU.ISS_CNTS            --이슈내용
-				                    , ISU.ISS_STS             --이슈상태
-				                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_STS) FROM DUAL) AS ISS_STS_NM
-				                    , ISU.ACT_ID              --조치담당자
-				                    , ACT.ACTS_DT             --조치 시작일
-				                    , ACT.ACTE_DT             --조치 종료일
-				                    , ACT.ACT_MH              --조치 투입공수
-				                    , ACT.ACT_AMT             --조치 투입비용  
-				                    , ACT.ACT_CNTS            --조치내용
-				                    , ISU.FILE_TRGT_KEY       --이슈 FILE_TRGT_KEY
-				                FROM TB_WB24M02 AS ISU --계획이슈 정보
-				                      LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --계획이슈 조치내용
-				               WHERE ISU.WBS_PLAN_NO IS NOT NULL --계획이슈 
-				                 AND ISU.CO_CD    = #{coCd}
-				                 <if test="salesCd != null and !salesCd.equals('')">
+			                  AND SALES_CD IN ( SELECT DISTINCT SALES_CD --LEVEL2 없는 TOP LEVEL 제외 
+			                                       FROM TB_WB22M01 --WBS계획 정보
+			                                      WHERE CO_CD    = #{coCd}
+			                                        AND WBS_PLAN_CODE_KIND != 'WBSCODE' --LEVEL2
+			                                        AND WBS_PLANS_DT BETWEEN #{wbsRsltssDt} AND #{wbsRsltseDt}
+			                                     <if test="salesCd != null and !salesCd.equals('')">
+                                                       AND SALES_CD = #{salesCd}       
+                                                    </if>  
+			                                   ) 
+			              UNION ALL
+			              SELECT SALES_CD                    AS UPPER_CD
+			                    , SALES_CD||WBS_PLAN_CODE_ID  AS LOWER_CD
+			                    , CO_CD
+			                    , SALES_CD
+			                    , VER_NO
+			                    , WBS_PLAN_CODE_KIND
+			                    , WBS_PLAN_CODE_ID
+			                    , (SELECT FN_CM05M01_CD_TO_NM(WBS_PLAN_CODE_ID) FROM DUAL) AS WBS_PLAN_CODE_NM
+			                    , WBS_PLANS_DT   
+			                    , WBS_PLANE_DT   
+			                    , (SELECT FN_CM06M01_ID_TO_NM(WBS_PLAN_MNG_ID) FROM DUAL) AS WBS_MNG_NM
+			                    , ''                                  AS P_PLAN_NO
+			                    , ''                                  AS P_RSLTS_NO
+			                    , ''                                  AS P_PLAN_TRGT_KEY
+			                    , ''                                  AS P_RSLTS_TRGT_KEY
+			                 FROM TB_WB22M01 --WBS계획 정보
+			                WHERE CO_CD    = #{coCd}
+			                  AND WBS_PLAN_CODE_KIND = 'WBSCODE' --LEVEL1
+			                  AND (SALES_CD, WBS_PLAN_CODE_ID) IN ( SELECT DISTINCT SALES_CD, WBS_PLAN_CODE_KIND --LEVEL2 없는 LEVEL1 제외 
+			                                                          FROM TB_WB22M01 --WBS계획 정보
+			                                                         WHERE CO_CD    = #{coCd}
+			                                                           AND WBS_PLAN_CODE_KIND != 'WBSCODE' --LEVEL2
+			                                                           AND WBS_PLANS_DT BETWEEN #{wbsRsltssDt} AND #{wbsRsltseDt}
+			                                                            <if test="salesCd != null and !salesCd.equals('')">
+                                                                         AND SALES_CD = #{salesCd}       
+                                                                      </if> 
+			                                                       ) 
+			                  <if test="salesCd != null and !salesCd.equals('')">
+                                 AND SALES_CD = #{salesCd}       
+                              </if> 
+			                  
+			              UNION ALL           
+			              SELECT PLN.SALES_CD||PLN.WBS_PLAN_CODE_KIND AS UPPER_CD
+			                    , PLN.WBS_PLAN_CODE_ID                 AS LOWER_CD
+			                    , PLN.CO_CD
+			                    , PLN.SALES_CD
+			                    , PLN.VER_NO
+			                    , PLN.WBS_PLAN_CODE_KIND
+			                    , PLN.WBS_PLAN_CODE_ID
+			                    , PLN.WBS_PLAN_CODE_NM
+			                    , PLN.WBS_PLANS_DT   
+			                    , PLN.WBS_PLANE_DT   
+			                    , ''                                  AS WBS_MNG_NM
+			                    , PLN.WBS_PLAN_NO                     AS P_PLAN_NO
+			                    , RSL.WBS_RSLTS_NO                    AS P_RSLTS_NO
+			                    , PLN.FILE_TRGT_KEY                   AS P_PLAN_TRGT_KEY
+			                    , RSL.FILE_TRGT_KEY                   AS P_RSLTS_TRGT_KEY
+			                 FROM TB_WB22M01 AS PLN--WBS계획 정보
+			                      LEFT OUTER JOIN TB_WB23M01 AS RSL ON PLN.CO_CD = RSL.CO_CD AND PLN.SALES_CD = RSL.SALES_CD AND PLN.WBS_PLAN_CODE_KIND = RSL.WBS_PLAN_CODE_KIND AND PLN.WBS_PLAN_CODE_ID = RSL.WBS_PLAN_CODE_ID 
+			                WHERE PLN.CO_CD    = #{coCd}
+			                  AND PLN.WBS_PLAN_CODE_KIND != 'WBSCODE' --LEVEL2
+			                  AND PLN.WBS_PLANS_DT BETWEEN #{wbsRsltssDt} AND #{wbsRsltseDt}
+			                 <if test="salesCd != null and !salesCd.equals('')">
+                                  AND SALES_CD = #{salesCd}       
+                              </if> 
+			             ) A
+			       WHERE 1=1
+			       START WITH UPPER_CD = 'TOP' 
+			       CONNECT BY PRIOR LOWER_CD = UPPER_CD
+			       ORDER BY PATH
+			     ) 
+			   , SJD AS --수주상세 
+			     ( 
+			      SELECT M.CO_CD                                              AS CO_CD        --회사코드
+			            , M.ORDRS_NO                                           AS ORDRS_NO     --수주번호
+			            , X.SALES_CD                                           AS SALES_CD     --SALES Code
+			            , M.ORDRS_CLNT_CD                                      AS CLNT_CD      --고객코드
+			            , C.CLNT_NM                                            AS CLNT_NM      --고객명
+			            , M.CLNT_PJT                                           AS CLNT_PJT     --고객사프로젝트 
+			            , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)  AS CLNT_PJT_NM  --고객사프로젝트명
+			         FROM TB_CR02M01  M --수주마스터
+			              INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+			              INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+			        WHERE 1=1
+			          AND M.CO_CD    = #{coCd}
+			          <if test="salesCd != null and !salesCd.equals('')">
+                            AND X.SALES_CD = #{salesCd}       
+                       </if> 
+			          AND EXISTS (SELECT 'X'    --조회된 TASK의 SALES_CD 만 
+			                         FROM PLN P 
+			                        WHERE P.CO_CD    = X.CO_CD
+			                          AND P.SALES_CD = X.SALES_CD
+			                      ) 
+			     )
+			   , SUBJ AS --과제정보
+			     (
+			      SELECT X.CO_CD      AS CO_CD    --회사코드
+			            , X.SALES_CD   AS SALES_CD --SALES Code
+			            , X.SJ_NO      AS SJ_NO    --과제번호
+			            , X.SJ_NM      AS SJ_NM    --과제명
+			            , X.VER_NO     AS VER_NO   --버젼
+			        FROM TB_WB21M01 X
+			       WHERE X.CO_CD    = #{coCd}
+			         <if test="salesCd != null and !salesCd.equals('')">
+                            AND X.SALES_CD = #{salesCd}       
+                       </if> 
+			         AND X.CLOSE_YN = 'Y'
+			         AND EXISTS (SELECT 'X'    --조회된 TASK의 SALES_CD 만 
+			                        FROM PLN P 
+			                       WHERE P.CO_CD    = X.CO_CD
+			                         AND P.SALES_CD = X.SALES_CD
+			                     ) 
+			     ) 
+			   , ISU AS --이슈정보
+			     (
+			      SELECT *
+			        FROM (
+			              SELECT '계획'  AS GUBUN 
+			                    , ISU.CO_CD                                   --회사코드
+			                    , ISU.SALES_CD                                --SALES Code 
+			                    , ISU.WBS_PLAN_CODE_KIND                      --WBS계획 LVL1
+			                    , ISU.WBS_PLAN_CODE_ID                        --WBS계획 LVL2
+			                    , ISU.WBS_PLAN_NO                             --WBS계획 번호
+			                    , ISU.WBS_RSLTS_NO                            --WBS실적 번호
+			                    , ISU.ISS_NO                                  --이슈번호
+			                    , ISU.ISS_SJ                                  --이슈제목
+			                    , ISU.ISS_DIV                                 --이슈유형
+			                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_DIV) FROM DUAL) AS ISS_DIV_NM
+			                    , ISU.ISS_CNTS                                --이슈내용
+			                    , ISU.ISS_STS                                 --이슈상태
+			                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_STS) FROM DUAL) AS ISS_STS_NM
+			                    , ISU.ACT_ID                                  --조치담당자
+			                    , TO_CHAR(ACT.ACTS_DT,'YYYY-MM-DD') AS ACTS_DT--조치 시작일
+			                    , TO_CHAR(ACT.ACTE_DT,'YYYY-MM-DD') AS ACTE_DT--조치 종료일
+			                    , ACT.ACT_MH                                  --조치 투입공수
+			                    , ACT.ACT_AMT                                 --조치 투입비용  
+			                    , ACT.ACT_CNTS                                --조치내용
+			                    , ISU.FILE_TRGT_KEY                           --이슈 FILE_TRGT_KEY
+			                    , ''  WBS_RSLTSS_DT                           --실적시작일
+			                    , ''  WBS_RSLTSE_DT                           --실적종료일
+			                FROM TB_WB24M02 AS ISU --계획이슈 정보
+			                      LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --계획이슈 조치내용
+			               WHERE ISU.WBS_PLAN_NO IS NOT NULL --계획이슈 
+			                 AND ISU.CO_CD    = #{coCd}
+			                 <if test="salesCd != null and !salesCd.equals('')">
+                               AND ISU.SALES_CD = #{salesCd}       
+                            </if> 			              
+			              UNION ALL
+			              SELECT '실적'  AS GUBUN 
+			                    , ISU.CO_CD                                               --회사코드
+			                    , ISU.SALES_CD                                            --SALES Code 
+			                    , ISU.WBS_PLAN_CODE_KIND                                  --WBS계획 LVL1
+			                    , ISU.WBS_PLAN_CODE_ID                                    --WBS계획 LVL2
+			                    , ISU.WBS_PLAN_NO                                         --WBS계획 번호
+			                    , ISU.WBS_RSLTS_NO                                        --WBS실적 번호
+			                    , ISU.ISS_NO                                              --이슈번호
+			                    , ISU.ISS_SJ                                              --이슈제목
+			                    , ISU.ISS_DIV                                             --이슈유형
+			                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_DIV) FROM DUAL) AS ISS_DIV_NM
+			                    , ISU.ISS_CNTS                                            --이슈내용
+			                    , ISU.ISS_STS                                             --이슈상태
+			                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_STS) FROM DUAL) AS ISS_STS_NM
+			                    , ISU.ACT_ID                                              --조치담당자
+			                    , TO_CHAR(ACT.ACTS_DT,'YYYY-MM-DD')  AS ACTS_DT           --조치 시작일
+			                    , TO_CHAR(ACT.ACTE_DT,'YYYY-MM-DD')  AS ACTE_DT           --조치 종료일
+			                    , ACT.ACT_MH                                              --조치 투입공수
+			                    , ACT.ACT_AMT                                             --조치 투입비용  
+			                    , ACT.ACT_CNTS                                            --조치내용
+			                    , ISU.FILE_TRGT_KEY                                       --이슈 FILE_TRGT_KEY
+			                    , TO_CHAR(RSL.WBS_RSLTSS_DT,'YYYY-MM-DD') AS WBS_RSLTSS_DT--실적시작일
+			                    , TO_CHAR(RSL.WBS_RSLTSE_DT,'YYYY-MM-DD') AS WBS_RSLTSE_DT--실적종료일
+			                FROM TB_WB24M02  AS ISU --WBS이슈 정보
+			                      LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --실적이슈 조치내용
+			                      LEFT OUTER JOIN TB_WB23M01 AS RSL ON ISU.CO_CD = RSL.CO_CD AND ISU.SALES_CD = RSL.SALES_CD AND ISU.WBS_PLAN_CODE_KIND = RSL.WBS_PLAN_CODE_KIND AND ISU.WBS_PLAN_CODE_ID = RSL.WBS_PLAN_CODE_ID AND ISU.WBS_RSLTS_NO = RSL.WBS_RSLTS_NO
+			               WHERE ISU.WBS_RSLTS_NO IS NOT NULL  --실적이슈 
+			                 AND ISU.CO_CD    = #{coCd}
+			                 <if test="salesCd != null and !salesCd.equals('')">
                                   AND ISU.SALES_CD = #{salesCd}       
-                                 </if>				                 
-				              UNION ALL --실적이슈 중, 계획이슈로 등록되지 않은 Task 계획 
-				              SELECT DISTINCT
-				                      '계획'                  AS GUBUN 
-				                    , ISU.CO_CD               --회사코드
-				                    , ISU.SALES_CD            --SALES Code 
-				                    , ISU.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
-				                    , ISU.WBS_PLAN_CODE_ID    --WBS계획 LVL2
-				                    , ''  WBS_PLAN_NO         --WBS계획 번호
-				                    , ''  WBS_RSLTS_NO        --WBS실적 번호
-				                    , ''  ISS_NO              --이슈번호
-				                    , ''  ISS_SJ              --이슈제목
-				                    , ''  ISS_DIV             --이슈유형
-				                    , ''  ISS_DIV_NM          --이슈유형
-				                    , ''  ISS_CNTS            --이슈내용
-				                    , ''  ISS_STS             --이슈상태
-				                    , ''  ISS_STS_NM           --이슈상태
-				                    , ''  ACT_ID              --조치담당자
-				                    , ''  ACTS_DT             --조치 시작일
-				                    , ''  ACTE_DT             --조치 종료일
-				                    , ''  ACT_MH              --조치 투입공수
-				                    , ''  ACT_AMT             --조치 투입비용  
-				                    , ''  ACT_CNTS            --조치내용
-				                    , ''  FILE_TRGT_KEY       --이슈 FILE_TRGT_KEY
-				                FROM TB_WB24M02  AS ISU --WBS이슈 정보
-				               WHERE ISU.WBS_RSLTS_NO IS NOT NULL --실적이슈 
-				                 AND ISU.CO_CD    = #{coCd}
-				                 <if test="salesCd != null and !salesCd.equals('')">
-                                  AND ISU.SALES_CD = #{salesCd}       
-                                 </if>
-				                 AND NOT EXISTS (SELECT 'X'    --계획이슈 정보 
-				                                     FROM TB_WB24M02 P 
-				                                    WHERE P.CO_CD              = ISU.CO_CD
-				                                      AND P.SALES_CD           = ISU.SALES_CD
-				                                      AND P.WBS_PLAN_CODE_KIND = ISU.WBS_PLAN_CODE_KIND
-				                                      AND P.WBS_PLAN_CODE_ID   = ISU.WBS_PLAN_CODE_ID
-				                                      AND P.WBS_PLAN_NO IS NOT NULL --계획이슈 
-				                                      AND P.CO_CD    = #{coCd}
-				                                      <if test="salesCd != null and !salesCd.equals('')">
-                                                         AND P.SALES_CD = #{salesCd}       
-                                                      </if>
-				                                 ) 
-				                 
-				              UNION ALL
-				              SELECT '실적'                  AS GUBUN 
-				                    , ISU.CO_CD               --회사코드
-				                    , ISU.SALES_CD            --SALES Code 
-				                    , ISU.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
-				                    , ISU.WBS_PLAN_CODE_ID    --WBS계획 LVL2
-				                    , ISU.WBS_PLAN_NO         --WBS계획 번호
-				                    , ISU.WBS_RSLTS_NO        --WBS실적 번호
-				                    , ISU.ISS_NO              --이슈번호
-				                    , ISU.ISS_SJ              --이슈제목
-				                    , ISU.ISS_DIV             --이슈유형
-				                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_DIV) FROM DUAL) AS ISS_DIV_NM
-				                    , ISU.ISS_CNTS            --이슈내용
-				                    , ISU.ISS_STS             --이슈상태
-				                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_STS) FROM DUAL) AS ISS_STS_NM
-				                    , ISU.ACT_ID              --조치담당자
-				                    , ACT.ACTS_DT             --조치 시작일
-				                    , ACT.ACTE_DT             --조치 종료일
-				                    , ACT.ACT_MH              --조치 투입공수
-				                    , ACT.ACT_AMT             --조치 투입비용  
-				                    , ACT.ACT_CNTS            --조치내용
-				                    , ISU.FILE_TRGT_KEY       --이슈 FILE_TRGT_KEY
-				                FROM TB_WB24M02  AS ISU --WBS이슈 정보
-				                      LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --실적이슈 조치내용
-				               WHERE ISU.WBS_RSLTS_NO IS NOT NULL  --실적이슈 
-				                 AND ISU.CO_CD    = #{coCd}
-				                 <if test="salesCd != null and !salesCd.equals('')">
-                                   AND ISU.SALES_CD = #{salesCd}       
-                                 </if>				                 
-				              UNION ALL --계획이슈 중, 실적이슈로 등록되지 않은 Task 계획 
-				              SELECT DISTINCT
-				                      '실적'                  AS GUBUN 
-				                    , ISU.CO_CD               --회사코드
-				                    , ISU.SALES_CD            --SALES Code 
-				                    , ISU.WBS_PLAN_CODE_KIND  --WBS계획 LVL1
-				                    , ISU.WBS_PLAN_CODE_ID    --WBS계획 LVL2
-				                    , ''  WBS_PLAN_NO         --WBS계획 번호
-				                    , ''  WBS_RSLTS_NO        --WBS실적 번호
-				                    , ''  ISS_NO              --이슈번호
-				                    , ''  ISS_SJ              --이슈제목
-				                    , ''  ISS_DIV             --이슈유형
-				                    , ''  ISS_DIV_NM          --이슈유형
-				                    , ''  ISS_CNTS            --이슈내용
-				                    , ''  ISS_STS             --이슈상태
-				                    , ''  ISS_STS_NM           --이슈상태
-				                    , ''  ACT_ID              --조치담당자
-				                    , ''  ACTS_DT             --조치 시작일
-				                    , ''  ACTE_DT             --조치 종료일
-				                    , ''  ACT_MH              --조치 투입공수
-				                    , ''  ACT_AMT             --조치 투입비용  
-				                    , ''  ACT_CNTS            --조치내용
-				                    , ''  FILE_TRGT_KEY       --이슈 FILE_TRGT_KEY
-				                FROM TB_WB24M02 AS ISU --계획이슈 정보
-				               WHERE ISU.WBS_PLAN_NO IS NOT NULL --계획이슈 
-				                 AND ISU.CO_CD    = #{coCd}
-				                 <if test="salesCd != null and !salesCd.equals('')">
-                                   AND ISU.SALES_CD = #{salesCd}       
-                                 </if>  
-				                 AND NOT EXISTS (SELECT 'X'    --실적이슈 정보  
-				                                     FROM TB_WB24M02 P 
-				                                    WHERE P.CO_CD              = ISU.CO_CD
-				                                      AND P.SALES_CD           = ISU.SALES_CD
-				                                      AND P.WBS_PLAN_CODE_KIND = ISU.WBS_PLAN_CODE_KIND
-				                                      AND P.WBS_PLAN_CODE_ID   = ISU.WBS_PLAN_CODE_ID
-				                                      AND P.WBS_RSLTS_NO IS NOT NULL  --계획이슈 
-				                                      AND P.CO_CD    = #{coCd}
-				                                      <if test="salesCd != null and !salesCd.equals('')">
-                                                         AND P.SALES_CD = #{salesCd}       
-                                                      </if> 
-				                                 ) 
-				             ) 
-				     )
-				     
-				  SELECT * FROM (      
-							SELECT ROWNUM AS RN
-							      , P.UPPER_CD
-                                  , P.LOWER_CD
-                                  , P.LVL
-                                  , P.PATH
-							      , P.CO_CD       --회사코드
-							      , S.CLNT_CD     --고객명
-							      , S.CLNT_NM     --고객명
-							      , S.CLNT_PJT    --고객사프로젝트
-							      , S.CLNT_PJT_NM --고객사프로젝트명
-							      , j.SJ_NM       --과제명
-							    --, j.VER_NO      --과제버젼
-							      , S.ORDRS_NO     --수주번호
-							      , P.SALES_CD    --Sales Code
-							      , P.VER_NO      --계획버젼
-							      , P.WBS_PLAN_CODE_KIND
-							      , P.WBS_PLAN_CODE_ID
-							      , CASE WHEN P.LVL = 1 THEN P.SALES_CD 
-                                         WHEN P.LVL = 2 THEN P.WBS_PLAN_CODE_NM || '  [ 계획 ]'
-                                         ELSE P.WBS_PLAN_CODE_NM  || '  [ TASK ]'  END WBS_PLAN_CODE_NM    
-							      , TO_CHAR(P.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT
-                                  , TO_CHAR(P.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT
-							      , P.WBS_MNG_NM
-							      , I.GUBUN
-							      , I.WBS_PLAN_NO         --WBS계획 번호
-							      , I.WBS_RSLTS_NO        --WBS실적 번호
-							      , I.ISS_SJ              --이슈제목
-							      , I.ISS_DIV             --이슈유형
-							      , I.ISS_DIV_NM          --이슈유형명
-							      , I.ISS_CNTS            --이슈내용
-							      , I.ISS_STS             --이슈상태
-							      , I.ISS_STS_NM          --이슈상태명
-							      , I.ACT_ID
-							      ,(SELECT FN_CM06M01_ID_TO_NM(I.ACT_ID) FROM DUAL) AS ACT_NM
-							      , I.ACTS_DT
-							      , I.ACTE_DT
-							      , I.ACT_MH
-							      , I.ACT_AMT
-							      , I.ACT_CNTS
-							      , I.FILE_TRGT_KEY
-							      
-							  FROM PLN AS P
-							       INNER      JOIN SJD  AS S ON P.CO_CD = S.CO_CD AND P.SALES_CD = S.SALES_CD--수주상세   
-							       INNER      JOIN SUBJ AS J ON P.CO_CD = J.CO_CD AND P.SALES_CD = J.SALES_CD--과제정보 
-							       LEFT OUTER JOIN ISU  AS I ON P.CO_CD = I.CO_CD AND P.SALES_CD = I.SALES_CD AND P.WBS_PLAN_CODE_KIND = I.WBS_PLAN_CODE_KIND AND P.WBS_PLAN_CODE_ID = I.WBS_PLAN_CODE_ID--이슈정보 
-							 WHERE 1=1 
-							 <if test="issSts != null and !issSts.equals('')">
-		                          AND I.ISS_STS = #{issSts}            
-		                      </if>
-		                      <if test="clntPjt != null and !clntPjt.equals('')">
-		                          AND S.CLNT_PJT = #{clntPjt}            
-		                      </if>
-		                      <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
-		                          AND S.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'            
-		                      </if>
-							 ORDER BY S.CLNT_CD, S.ORDRS_NO, P.SALES_CD, P.PATH, I.GUBUN 
-							 ) W
-                 WHERE RN BETWEEN #{firstIndex} AND #{lastIndex} 
+                             </if>    			               
+			             ) 
+			     WHERE 1=1
+			     <if test="salesCd != null and !salesCd.equals('')">
+                      AND SALES_CD = #{salesCd}       
+                  </if> 
+			     
+			     )
+			SELECT P.CO_CD              --회사코드
+			      , S.CLNT_CD            --고객명
+			      , S.CLNT_NM            --고객명
+			      , S.CLNT_PJT           --고객사프로젝트
+			      , S.CLNT_PJT_NM        --고객사프로젝트명
+			      , j.SJ_NM              --과제명
+			    --, j.VER_NO             --과제버젼
+			      , S.ORDRS_NO           --수주번호
+			      , P.SALES_CD           --Sales Code
+			      , P.VER_NO             --계획버젼
+			      , P.WBS_PLAN_CODE_KIND --계획 LEVEL1
+			      , P.WBS_PLAN_CODE_ID   --계획 LEVLE2
+			      , CASE WHEN P.LVL = 1 THEN P.SALES_CD 
+                          ELSE P.WBS_PLAN_CODE_NM END WBS_PLAN_CODE_NM     
+                  , TO_CHAR(P.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT
+                  , TO_CHAR(P.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT
+			      , P.WBS_MNG_NM         --담당자명
+			      , I.GUBUN              --계획실적구분
+			      , I.WBS_PLAN_NO         --WBS계획 번호
+			      , I.WBS_RSLTS_NO        --WBS실적 번호
+			      , I.ISS_NO              --이슈제목
+			      , I.ISS_SJ              --이슈제목
+			      , I.ISS_DIV             --이슈유형
+			      , I.ISS_DIV_NM          --이슈유형명
+			      , I.ISS_CNTS            --이슈내용
+			      , I.ISS_STS             --이슈상태
+			      , I.ISS_STS_NM          --이슈상태명
+			      , I.ACT_ID              --조취자ID
+			      , (SELECT FN_CM06M01_ID_TO_NM(I.ACT_ID) FROM DUAL) AS ACT_NM
+			      , I.ACTS_DT             --조취시작일
+			      , I.ACTE_DT             --조취종료일
+			      , I.ACT_MH              --조취공수
+			      , I.ACT_AMT             --조취비용
+			      , I.ACT_CNTS            --조취내용
+			      , I.FILE_TRGT_KEY    AS ISS_FILE_TRGT_KEY    --이슈FILE_TRGT_KEY
+			      , I.WBS_RSLTSS_DT       --실적시작일
+			      , I.WBS_RSLTSE_DT       --실적종료일
+			      , P.UPPER_CD            --상위코드 
+			      , P.LOWER_CD            --하위코드
+			      , P.LVL                 --코드LEVLE
+			      , P.PATH                --코드PATH
+			      , P.P_PLAN_NO
+			      , P.P_RSLTS_NO
+			      , CASE WHEN P.P_PLAN_NO IS NULL THEN 'N' ELSE 'Y' END AS PLAN_YN
+			      , CASE WHEN P.P_RSLTS_NO IS NULL THEN 'N' ELSE 'Y' END AS RSLTS_YN
+			      , P.P_PLAN_TRGT_KEY
+			      , P.P_RSLTS_TRGT_KEY
+			  FROM PLN AS P
+			       INNER      JOIN SJD  AS S ON P.CO_CD = S.CO_CD AND P.SALES_CD = S.SALES_CD--수주상세   
+			       INNER      JOIN SUBJ AS J ON P.CO_CD = J.CO_CD AND P.SALES_CD = J.SALES_CD--과제정보 
+			       LEFT OUTER JOIN ISU  AS I ON P.CO_CD = I.CO_CD AND P.SALES_CD = I.SALES_CD AND P.WBS_PLAN_CODE_KIND = I.WBS_PLAN_CODE_KIND AND P.WBS_PLAN_CODE_ID = I.WBS_PLAN_CODE_ID--이슈정보 
+			 WHERE 1=1 
+			 <if test="issSts != null and !issSts.equals('')">
+                    AND I.ISS_STS = #{issSts}            
+             </if>
+            <if test="clntPjt != null and !clntPjt.equals('')">
+                    AND S.CLNT_PJT = #{clntPjt}            
+            </if>
+            <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
+                    AND S.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'            
+            </if>
+			 ORDER BY S.CLNT_CD, S.ORDRS_NO, P.SALES_CD, P.PATH, I.GUBUN		        
+
      </select>
 		  
 		  
@@ -776,6 +659,14 @@
                     SYSDATE
                 )
             </insert>
+            
+            
+              <select id="actChk" parameterType="Map" resultType="camelMap">
+               SELECT *  FROM TB_WB24M03
+                   WHERE ISS_NO  = #{issNo}
+             </select>   
+  
+  
             
             <update id="wbsIssueUpdate" parameterType="Map">
                 UPDATE TB_WB24M02

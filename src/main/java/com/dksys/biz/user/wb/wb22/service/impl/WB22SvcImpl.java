@@ -282,7 +282,9 @@ public class WB22SvcImpl implements WB22Svc {
 	    
 		String pgParam = "{\"fileTrgtKey\":\""+ fileTrgtKey +"\"}";
 		
-		String todoTitle = "TASK명 : " + paramMap.get("wbsPlanCodeNm2_P") + ",    SALES CODE : " + paramMap.get("salesCd2_P")  + "    실적일자 : " + paramMap.get("wbsRsltssDt") + "  ~  " + paramMap.get("wbsRsltseDt");
+		String todoTitle1 = paramMap.get("clntNm_P") + "-" + paramMap.get("clntPjtNm_P") + "(" + paramMap.get("salesCd2_P") + ") " + paramMap.get("wbsPlanCodeNm2_P") + " 실적 공유"; 
+		
+		//String todoTitle = "TASK명 : " + paramMap.get("wbsPlanCodeNm2_P") + ",    SALES CODE : " + paramMap.get("salesCd2_P")  + "    실적일자 : " + paramMap.get("wbsRsltssDt") + "  ~  " + paramMap.get("wbsRsltseDt");
 		
 		
 		
@@ -299,7 +301,7 @@ public class WB22SvcImpl implements WB22Svc {
 	            	    sharngMap.put("userId", paramMap.get("userId"));
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
 	            	    sharngMap.put("pgParam", pgParam);
-	            	    sharngMap.put("todoTitle", todoTitle);
+	            	    sharngMap.put("todoTitle", todoTitle1);
 	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
 	            	i++;
 	            } catch (Exception e) {
@@ -308,6 +310,9 @@ public class WB22SvcImpl implements WB22Svc {
 	        }
 		}
 
+		
+		String todoTitle2 = paramMap.get("clntNm_P") + "-" + paramMap.get("clntPjtNm_P") + "(" + paramMap.get("salesCd2_P") + ") " + paramMap.get("wbsPlanCodeNm2_P") + " 실적 결재"; 
+		
 		//결재
 		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
@@ -321,7 +326,7 @@ public class WB22SvcImpl implements WB22Svc {
 		            	approvalMap.put("userId", paramMap.get("userId"));
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
 		            	approvalMap.put("pgParam", pgParam);
-		            	approvalMap.put("todoTitle", todoTitle);
+		            	approvalMap.put("todoTitle", todoTitle2);
 	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
 	                	i++;
 	            } catch (Exception e) {
@@ -399,7 +404,7 @@ public class WB22SvcImpl implements WB22Svc {
 
 		String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("rsltsFileTrgtKey") +"\"}";
 		
-		String todoTitle = "TASK명 : " + paramMap.get("wbsPlanCodeNm2_P") + ",    SALES CODE : " + paramMap.get("salesCd2_P")  + "    실적일자 : " + paramMap.get("wbsRsltssDt") + "  ~  " + paramMap.get("wbsRsltseDt");
+		String todoTitle1 = paramMap.get("clntNm_P") + "-" + paramMap.get("clntPjtNm_P") + "(" + paramMap.get("salesCd2_P") + ") " + paramMap.get("wbsPlanCodeNm2_P") + " 실적 공유"; 
 		
 		
 		
@@ -428,7 +433,7 @@ public class WB22SvcImpl implements WB22Svc {
 	            	    sharngMap.put("userId", paramMap.get("userId"));
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
 	            	    sharngMap.put("pgParam", pgParam);
-	            	    sharngMap.put("todoTitle", todoTitle);
+	            	    sharngMap.put("todoTitle", todoTitle1);
 	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
 	            	i++;
 	            } catch (Exception e) {
@@ -437,6 +442,8 @@ public class WB22SvcImpl implements WB22Svc {
 	        }
 		}
 
+		String todoTitle2 = paramMap.get("clntNm_P") + "-" + paramMap.get("clntPjtNm_P") + "(" + paramMap.get("salesCd2_P") + ") " + paramMap.get("wbsPlanCodeNm2_P") + " 실적 결재"; 
+		
 		//결재
 		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
@@ -450,7 +457,7 @@ public class WB22SvcImpl implements WB22Svc {
 		            	approvalMap.put("userId", paramMap.get("userId"));
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
 		            	approvalMap.put("pgParam", pgParam);
-		            	approvalMap.put("todoTitle", todoTitle);
+		            	approvalMap.put("todoTitle", todoTitle2);
 	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
 	                	i++;
 	            } catch (Exception e) {
