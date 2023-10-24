@@ -319,4 +319,11 @@ public class WB25SvcImpl implements WB25Svc {
 		return wb25Mapper.selectWbsTaskEvlIssList(paramMap);
 	}
 	
+	@Override
+	  public List<Map<String, String>> selectEvlCloseChk(Map<String, String> paramMap) {
+			return wb25Mapper.selectEvlCloseChk(paramMap);
+	}
+	
+	
+	
 }
