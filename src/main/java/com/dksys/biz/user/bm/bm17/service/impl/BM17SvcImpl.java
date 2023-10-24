@@ -22,6 +22,7 @@ import com.dksys.biz.util.DateUtil;
 import com.dksys.biz.util.ExceptionThrower;
 import com.dksys.biz.user.bm.bm17.mapper.BM17Mapper;
 import com.dksys.biz.user.bm.bm17.service.BM17Svc;
+import com.dksys.biz.user.bm.bm18.service.BM18Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -35,6 +36,9 @@ public class BM17SvcImpl implements BM17Svc {
 	
 	@Autowired
 	BM17Svc bm17Svc;
+	
+	@Autowired
+    BM18Svc bm18Svc;
 
 	@Autowired
 	ExceptionThrower thrower;
@@ -91,5 +95,18 @@ public class BM17SvcImpl implements BM17Svc {
 		return result;
 	  }	
 	
-	
+	//테스트 버튼 등록
+	@Override
+	public int insertKakaoMessage(Map<String, String> paramMap) throws Exception {
+
+	    //데이터 처리 시작
+		int result = 0;
+		//String maxRcvNo = bm18Svc.selectMaxRcvNo(paramMap);	    
+	    //paramMap.put("maxRcvNo", maxRcvNo);
+
+	    result = bm17Mapper.insertKakaoMessage(paramMap);	
+
+		return result;
+	}
+
 }

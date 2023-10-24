@@ -58,7 +58,7 @@ public class BM17Ctr {
 	  }    
 
 	//알림톡 등록
-	  //공통 결재승인(등록)
+	//공통 결재승인(등록)
 	@PostMapping(value = "/insertMessageTempl")
 	public String insertApprovalLine(@RequestBody Map<String, String> paramMap, ModelMap model) {
 	    	try {
@@ -107,5 +107,19 @@ public class BM17Ctr {
   			model.addAttribute("resultMessage", e.getMessage());
   		}
   	  	return "jsonView";
-    }    
+    }   
+    
+    //테스트 버튼 등록
+    @PostMapping(value = "/insertKakaoMessage")
+	public String insertKakaoMessage(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	try {
+    		bm17Svc.insertKakaoMessage(paramMap);
+	    	model.addAttribute("resultCode", 200);
+	    	model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+    	}catch(Exception e) {
+	    	 model.addAttribute("resultCode", 500);
+	 		 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+    	}
+    	return "jsonView";		  		  
+    }
 }
