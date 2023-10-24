@@ -49,8 +49,11 @@
 					<td><input id="estDeg" type="text"
 						name="estDeg" readonly></td>
 
-					<th>수주번호</th>
-					<td><input id="ordrsNo" type="text" readonly></td>
+					<th><a href="javascript:fn_orderSearch();"><b>수주번호</b></a></th>
+					<td><input id="ordrsNo" name="ordrsNo" type="text" readonly>
+					<input id="newOrdrsNo" name="newOrdrsNo" type="hidden" >
+					<input id="newOrdrsDiv" name="newOrdrsDiv" type="hidden" >
+					</td>
 				</tr>
 				<!-- 2행 -->
 				<tr>
@@ -82,8 +85,7 @@
 				<!-- 3행 -->
 				<tr>
 					<th class="hit">계약명</th>
-					<td colspan="3"><input type="text" id="ctrtNm" name="ctrtNm"
-						required></td>
+					<td colspan="3"><input type="text" id="ctrtNm" name="ctrtNm" required></td>
                     <th class="hit" title="담당자 정보를 확인합니다">담당자</th>
                     <td>
                         <div class="search_form">
@@ -314,8 +316,9 @@
 
     // 거래처 검색 함수
     function openSecondClntSearch(searchValue) {
+    	
     	//등록일 경우만 팝업처리
-// 		if (actionType == "C") {
+ 		if (actionType == "C") {
 			var paramObj = {
                 "searchValue" : searchValue,
                 "clntDivCd"   : "CLNTDIV12"
@@ -332,10 +335,11 @@
 	                "clntCd": row.clntCd
 	            }
 	            setMngInfo(paramObj);
-	        });
-// 		}
-    }
+	            $('#newOrdrsNo').val('');
 
+	        });
+ 		}
+    }
 
     function openSecondEstSearch(searchValue) {
         var aordrsDiv = $("#ordrsDiv").val();
@@ -427,7 +431,7 @@
 		formData.append("itemCd" , $('#itemDiv').val(""));			//첨부화일용
 		formData.append("prjctCd", $('#clntPjt').val());		//첨부화일용
 		formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용
-
+		
 		var fileUploadArr = [];
 		var tempArr = [];
 		
@@ -457,14 +461,10 @@
         var rowListPlan = gridOrdrsPlan.getList();
         var rowListDetail = gridOrdrsDetail.getList();
 
+        //수금내역
         if (rowListPlan.length == 0) {
         	commaChange();
             alert("수금내역을 확인해 주세요?");
-            return false;
-        }
-        if (rowListDetail.length == 0) {
-        	commaChange();
-            alert("주문 세부 내역이 없습니다.");
             return false;
         }
         var planArr = [];
@@ -543,86 +543,97 @@
 	            return false;
         	}
         }
-        
-        var totalLaborCostMfgCost = 0;
-        var totalMachineValueAfterDeduction = 0;
-        let orgnSalesCdCnt = 0;
 
-        $.each(rowListDetail, function (idx, elem) {
-            var detailObj = {
-                    "ordrsSeq": idx + 1,
-                    "ordrsDtlDiv10": elem.ordrsDtlDiv10,
-                    "ordrsDtlDiv20": elem.ordrsDtlDiv20,
-                    "ordrsDtlDiv30": elem.ordrsDtlDiv30,
-                    "orgnSalesCd": elem.orgnSalesCd,
-                    "mctype": elem.mctype,
-                    "prdtCd": elem.prdtCd,
-                    "itemDiv": elem.itemDiv,
-                    "salesCd": elem.salesCd || '', 
-                    "eqpNm": elem.eqpNm,
-                    "dudtIntendDt": elem.dudtIntendDt,
-                    "dtlRmk": elem.dtlRmk,
-                    "ordrsPrcMach": pasIntChk(elem.ordrsPrcMach),
-                    "ordrsPrcElcty": pasIntChk(elem.ordrsPrcElcty),
-                    "ordrsPrc": pasIntChk(elem.ordrsPrcMach) + pasIntChk(elem.ordrsPrcElcty),
-                    "ordrsQty": pasIntChk(elem.ordrsQty),
-                    "estEpctMatPrc": pasIntChk(elem.estEpctMatPrc),
-                    "trgtPchsPcostMach": pasIntChk(elem.trgtPchsPcostMach),
-                    "trgtPchsPcostElcty": pasIntChk(elem.trgtPchsPcostElcty),
-                    "trgtPchsPcostInHousePrcsn": pasIntChk(elem.trgtPchsPcostInHousePrcsn),
-                    "machineValueAfterDeduction": pasIntChk(elem.trgtPchsPcostMach) - pasIntChk(elem.trgtPchsPcostInHousePrcsn),
-            };
-            
-        	detailObj["orgnSalesCd"] = "";
-            let orgnSalesCode = elem.orgnSalesCd;
-			let ordrsDiv = $("#ordrsDiv").val();
-
- 			if(ordrsDiv != "ORDRSDIV1"){
-             	detailObj["orgnSalesCd"] = orgnSalesCode;
- 	            if(orgnSalesCode == '' || orgnSalesCode == undefined){
- 	            	orgnSalesCdCnt++;
- 	            }
-             }
-
-            var laborCostMfgCost = pasIntChk(elem.laborCostMfgCost);
-            var machineValueAfterDeduction = pasIntChk(detailObj["machineValueAfterDeduction"]);
-
-            detailObj["laborCostMfgCost"] = laborCostMfgCost;
-            detailObj["machineValueAfterDeduction"] = machineValueAfterDeduction;
-
-            totalLaborCostMfgCost += laborCostMfgCost;
-            totalMachineValueAfterDeduction += machineValueAfterDeduction;
-            
-            detailArr.push(detailObj);
-        });
-        
-	    if(orgnSalesCdCnt > 0){
-	        commaChange();
-	     	alert("원천SalesCode가 없습니다.");
-	         return false;
-	     }
-
-        // clmnAmt 합계 계산
-        var totalClmnAmt = 0;
-        $.each(detailArr, function (idx, elem) {
-            totalClmnAmt += parseFloat(elem.ordrsPrcMach);
-            totalClmnAmt += parseFloat(elem.ordrsPrcElcty);
-        });
-
-        // input box 값과 비교
-//        var inputAmtVal = pasIntChk($("#ordrsAmt").val());
-        var inputAmtVal = pasIntChk($("#exchangeAmt").val());
-        
-        if (totalClmnAmt != inputAmtVal) {
-        	if($("#ordrsDiv").val() != "ORDRSDIV3"){
+        if($('#coCd').val() == 'TRN' && $('#ordrsClntCd').val() == '104') {
+        }else{
+        	
+            //설비&원가 정보
+            if (rowListDetail.length == 0) {
             	commaChange();
-                alert("수주금액과 수주가합계가 일치하지 않습니다.");
+                alert("주문 세부 내역이 없습니다.");
                 return false;
-        	}
+            }
+
+            var totalLaborCostMfgCost = 0;
+            var totalMachineValueAfterDeduction = 0;
+            let orgnSalesCdCnt = 0;
+
+            $.each(rowListDetail, function (idx, elem) {
+                var detailObj = {
+                        "ordrsSeq": idx + 1,
+                        "ordrsDtlDiv10": elem.ordrsDtlDiv10,
+                        "ordrsDtlDiv20": elem.ordrsDtlDiv20,
+                        "ordrsDtlDiv30": elem.ordrsDtlDiv30,
+                        "orgnSalesCd": elem.orgnSalesCd,
+                        "mctype": elem.mctype,
+                        "prdtCd": elem.prdtCd,
+                        "itemDiv": elem.itemDiv,
+                        "salesCd": elem.salesCd || '', 
+                        "eqpNm": elem.eqpNm,
+                        "dudtIntendDt": elem.dudtIntendDt,
+                        "dtlRmk": elem.dtlRmk,
+                        "ordrsPrcMach": pasIntChk(elem.ordrsPrcMach),
+                        "ordrsPrcElcty": pasIntChk(elem.ordrsPrcElcty),
+                        "ordrsPrc": pasIntChk(elem.ordrsPrcMach) + pasIntChk(elem.ordrsPrcElcty),
+                        "ordrsQty": pasIntChk(elem.ordrsQty),
+                        "estEpctMatPrc": pasIntChk(elem.estEpctMatPrc),
+                        "trgtPchsPcostMach": pasIntChk(elem.trgtPchsPcostMach),
+                        "trgtPchsPcostElcty": pasIntChk(elem.trgtPchsPcostElcty),
+                        "trgtPchsPcostInHousePrcsn": pasIntChk(elem.trgtPchsPcostInHousePrcsn),
+                        "machineValueAfterDeduction": pasIntChk(elem.trgtPchsPcostMach) - pasIntChk(elem.trgtPchsPcostInHousePrcsn),
+                };
+                
+            	detailObj["orgnSalesCd"] = "";
+                let orgnSalesCode = elem.orgnSalesCd;
+    			let ordrsDiv = $("#ordrsDiv").val();
+
+     			if(ordrsDiv != "ORDRSDIV1"){
+                 	detailObj["orgnSalesCd"] = orgnSalesCode;
+     	            if(orgnSalesCode == '' || orgnSalesCode == undefined){
+     	            	orgnSalesCdCnt++;
+     	            }
+                 }
+
+                var laborCostMfgCost = pasIntChk(elem.laborCostMfgCost);
+                var machineValueAfterDeduction = pasIntChk(detailObj["machineValueAfterDeduction"]);
+
+                detailObj["laborCostMfgCost"] = laborCostMfgCost;
+                detailObj["machineValueAfterDeduction"] = machineValueAfterDeduction;
+
+                totalLaborCostMfgCost += laborCostMfgCost;
+                totalMachineValueAfterDeduction += machineValueAfterDeduction;
+                
+                detailArr.push(detailObj);
+            });
+            
+    	    if(orgnSalesCdCnt > 0){
+    	        commaChange();
+    	     	alert("원천SalesCode가 없습니다.");
+    	         return false;
+    	     }
+
+            // clmnAmt 합계 계산
+            var totalClmnAmt = 0;
+            $.each(detailArr, function (idx, elem) {
+                totalClmnAmt += parseFloat(elem.ordrsPrcMach);
+                totalClmnAmt += parseFloat(elem.ordrsPrcElcty);
+            });
+
+            // input box 값과 비교
+//            var inputAmtVal = pasIntChk($("#ordrsAmt").val());
+            var inputAmtVal = pasIntChk($("#exchangeAmt").val());
+            
+            if (totalClmnAmt != inputAmtVal) {
+            	if($("#ordrsDiv").val() != "ORDRSDIV3"){
+                	commaChange();
+                    alert("수주금액과 수주가합계가 일치하지 않습니다.");
+                    return false;
+            	}
+            }
+            
+            var totalSum = totalLaborCostMfgCost + totalMachineValueAfterDeduction; //laborCostMfgCost(금액)+machineVVauleAfterDeduction(차감 후 기계값)
+            var ordrsAmtVal = pasIntChk($("#ordrsAmt").val()); //수주금액에 적힌 값
         }
-        
-        var totalSum = totalLaborCostMfgCost + totalMachineValueAfterDeduction; //laborCostMfgCost(금액)+machineVVauleAfterDeduction(차감 후 기계값)
-        var ordrsAmtVal = pasIntChk($("#ordrsAmt").val()); //수주금액에 적힌 값
 
         formData.append("planArr", JSON.stringify(planArr));
         formData.append("detailArr", JSON.stringify(detailArr));
@@ -954,7 +965,7 @@
         ],
         footSum: [
                   [
-                      {label: "총합계", align: "center", colspan: 9},
+                      {label: "총합계", align: "center", colspan: 10},
                       {key: "ordrsPrcMach", collector: "sum", formatter: "money", align: "right"},
                       {key: "ordrsPrcElcty", collector: "sum", formatter: "money", align: "right"},
                       {key: "ordrsPrc", collector: function () {
@@ -1407,6 +1418,14 @@
 
 
     function insertOrdrs() {
+		if($('#coCd').val() == 'TRN' && $('#ordrsClntCd').val() == '104') {
+			if($('#newOrdrsNo').val() == ''){
+				alert('건양ITT 수주번호를 선택해 주십시요.')
+				fn_orderSearch();
+				return false;
+			}
+		}
+    
     	if (inputValidation($('.popup_area [required]').not('#frameTable [required], #nonStockTable [required]'))) {
             var formData = makeFormData();
             if (formData) {
@@ -1427,6 +1446,14 @@
     }
 
     function updateOrdrs() {
+		if($('#coCd').val() == 'TRN' && $('#ordrsClntCd').val() == '104') {
+			if($('#newOrdrsNo').val() == ''){
+				alert('건양ITT 수주번호를 선택해 주십시요.')
+				fn_orderSearch();
+				return false;
+			}
+		}
+
         if (inputValidation($('.popup_area [required]').not('#frameTable [required], #nonStockTable [required]'))) {
             var formData = makeFormData();
             if (formData) {
@@ -1791,6 +1818,22 @@
          return false;
        }
 	}
+	
+    function fn_orderSearch() {
+    	if($('#coCd').val() == 'TRN' && $('#ordrsClntCd').val() == '104') {
+        	var paramObj = {
+                    "searchValue" : '',
+                    "coCd" : 'GUN'
+                };
+        	openSecondModal("/static/html/cmn/modal/ordrsSearch.html", 1200, 420, "수주번호 검색", paramObj, function (grid) {
+                    var row = grid.target.getList("selected")[0];
+                    console.log(row);
+                    $('#newOrdrsNo').val(row.ordrsNo);
+                    $('#ctrtNm').val(row.ctrtNm);
+                    $('#clntPjt').val(row.clntPjt);
+                });
+    	}
+    }
 
 </script>
 
