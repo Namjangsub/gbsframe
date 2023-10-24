@@ -103,13 +103,18 @@ public class CR02Svcmpl implements CR02Svc {
       		//---------------------------------------------------------------
       		
         param.put("estNo", param.get("estNoOrdrs"));
+        //param.get("newOrdrsNo") => 회사 == 'TRN' && 거래처 = '104' 일때
         //수주구분이 A/S 일때 수주번호에 AS23024 번호 만들기
-        if (param.get("ordrsDiv").equals("ORDRSDIV1")) {
-        	param.put("ordrsNo", selectMaxOrdrsNo(param));
-        }
-        else {
-        	String orderNo = selectAsMaxOrdrsNo(param);
-        	param.put("ordrsNo", "AS"+orderNo);
+        if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
+            if (param.get("ordrsDiv").equals("ORDRSDIV1")) {
+            	param.put("ordrsNo", selectMaxOrdrsNo(param));
+            }
+            else {
+            	String orderNo = selectAsMaxOrdrsNo(param);
+            	param.put("ordrsNo", "AS"+orderNo);
+            }
+        }else {
+        	param.put("ordrsNo", param.get("newOrdrsNo"));
         }
         
         String fileTrgtKey;
@@ -130,7 +135,6 @@ public class CR02Svcmpl implements CR02Svc {
                 planMap.put("pgmId", param.get("pgmId"));
                 planMap.put("udtId", param.get("userId"));
                 planMap.put("udtPgm", "TB_CR02P01");
-
                 
                 cr02Mapper.insertClmnPlanHis(planMap);
                 cr02Mapper.insertClmnPlan(planMap);
@@ -179,7 +183,6 @@ public class CR02Svcmpl implements CR02Svc {
             } catch (Exception e) {
                 System.out.println("error3" + e.getMessage());
 
-
             }
         }
 
@@ -194,13 +197,6 @@ public class CR02Svcmpl implements CR02Svc {
       		//---------------------------------------------------------------
       		//첨부 화일 처리  끝
       		//---------------------------------------------------------------
-    /*    try {
-            cm08Svc.uploadTreeFile("TB_CR02M01", param, mRequest);
-        } catch (Exception e) {
-            System.out.println("error4" + e.getMessage());
-
-
-        }*/
 
       	// 수주관리의 정보를 프로젝트 관리에 반영
     	cr02Mapper.callUpdateProjectMaster(param);
@@ -209,6 +205,161 @@ public class CR02Svcmpl implements CR02Svc {
 
     @Override
     public void updateOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception {
+        Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+        Type mapList = new TypeToken<ArrayList<Map<String, String>>>() { }.getType();
+        String OrderSeq = "";
+        
+        //---------------------------------------------------------------
+		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+		//   필수값 :  jobType, userId, comonCd
+		//---------------------------------------------------------------
+		HashMap<String, String> paramMap = new HashMap<>();
+		paramMap.put("userId", param.get("userId"));
+		paramMap.put("comonCd", param.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
+		paramMap.put("uploadFileArr", param.get("uploadFileArr"));
+		
+		List<Map<String, String>> uploadFileList = gson.fromJson(paramMap.get("uploadFileArr"), mapList);
+		if (uploadFileList.size() > 0) {
+			//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
+			paramMap.put("jobType", "fileUp");
+			cm15Svc.selectFileAuthCheck(paramMap);
+		}
+		
+		String[] deleteFileArr = gson.fromJson(param.get("deleteFileArr"), String[].class);
+		List<String> deleteFileList = Arrays.asList(deleteFileArr);
+		
+		for(String fileKey : deleteFileList) {
+			// 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
+			Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
+			//접근 권한 없으면 Exception 발생
+			paramMap.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
+			paramMap.put("jobType", "fileDelete");
+			cm15Svc.selectFileAuthCheck(paramMap);
+		}
+		//---------------------------------------------------------------
+		//첨부 화일 권한체크  끝
+		//---------------------------------------------------------------
+
+		//수금정보,  설비&원가 정보, HIST 삭제, 
+		cr02Mapper.deleteOrdrsPlan(param);
+		cr02Mapper.deleteOrdrsDetailAll(param);
+		cr02Mapper.deleteOrdrsPlanHis(param);
+		
+		String newOrdrsDiv =  param.get("newOrdrsDiv");
+		
+        //param.get("newOrdrsNo") => 회사 == 'TRN' && 거래처 = '104' 일때
+        if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
+        	
+            if (!newOrdrsDiv.equals(param.get("ordrsDiv"))) {
+            	
+                if (param.get("ordrsDiv").equals("ORDRSDIV1")) {
+                	param.put("ordrsNo", selectMaxOrdrsNo(param));
+                }
+                else {
+                	String orderNo = selectAsMaxOrdrsNo(param);
+                	param.put("ordrsNo", "AS"+orderNo);
+                }
+            }
+            
+        }else {
+        	param.put("ordrsNo", param.get("newOrdrsNo"));
+        }
+		
+        param.put("udtId", param.get("userId"));
+        param.put("udtPgm", "TB_CR02M01");
+        param.put("estNo", param.get("estNoOrdrs"));
+        cr02Mapper.updateOrdrs(param);
+        
+        //수금정보 처리
+        List<Map<String, String>> planArr = gson.fromJson(param.get("planArr"), mapList);
+        for (Map<String, String> planMap : planArr) {
+            try {
+                planMap.put("coCd", param.get("coCd"));
+                planMap.put("ordrsNo", param.get("ordrsNo"));
+                planMap.put("estNo", param.get("estNo"));
+                planMap.put("currCd", param.get("currCd"));
+                planMap.put("userId", param.get("userId"));
+                planMap.put("pgmId", param.get("pgmId"));
+                planMap.put("udtId", param.get("userId"));
+                planMap.put("udtPgm", "TB_CR02P01");
+                
+                cr02Mapper.insertClmnPlanHis(planMap);
+                cr02Mapper.insertClmnPlan(planMap);
+
+            } catch (Exception e) {
+                System.out.println("error2" + e.getMessage());
+
+
+            }
+        }
+
+        // 설비&원가 정보 처리
+        List<Map<String, String>> detailArr = gson.fromJson(param.get("detailArr"), mapList);
+        
+        for (Map<String, String> detailMap : detailArr) {
+            try {
+                detailMap.put("coCd", param.get("coCd"));
+                detailMap.put("ordrsNo", param.get("ordrsNo"));
+                detailMap.put("estNo", param.get("estNo"));
+                detailMap.put("currCd", param.get("currCd"));
+                detailMap.put("userId", param.get("userId"));
+                detailMap.put("pgmId", param.get("pgmId"));
+                detailMap.put("udtId", param.get("userId"));
+                detailMap.put("udtPgm", "TB_CR02M01");
+                
+                //Sales Cd 만들떄 ITEM_DIV의 CODE_ETC 값 추출
+                String ItemDoov = (selectItemDivEtc(detailMap));
+                String Salad = detailMap.get("salesCd");
+                //입력구분이 '설비'코드 일때 sales_cd 만들기(sales_cd 값이 빈칸, null, 길이 0 일떄)
+                if (detailMap.get("ordrsDtlDiv10").equals("ORDRSDTLDIV1010")) {
+	                if ("".equals(Salad) || Salad == null || Salad.length() == 0) {
+	                	if (detailMap.get("ordrsSeq").length() == 1) {
+	                		OrderSeq = '0'+ detailMap.get("ordrsSeq");
+	                		System.out.println("OrderSeq :" + OrderSeq);
+	                	}
+	                	else {
+	                		OrderSeq = detailMap.get("ordrsSeq");
+	                		System.out.println("OrderSeq :" + OrderSeq);
+	                	}
+	                	
+	                    String newSalesCode = param.get("ordrsNo") + "-" + OrderSeq + detailMap.get("prdtCd") + ItemDoov;
+	                    detailMap.put("salesCd", newSalesCode);
+	                }
+                }
+                cr02Mapper.insertOrdrsDetail(detailMap);
+            } catch (Exception e) {
+                System.out.println("error3" + e.getMessage());
+
+            }
+        }
+        
+        //---------------------------------------------------------------
+		//첨부 화일 처리 시작
+		//---------------------------------------------------------------
+		if (uploadFileList.size() > 0) {
+			paramMap.put("fileTrgtTyp", param.get("pgmId"));
+			paramMap.put("fileTrgtKey", param.get("fileTrgtKey"));
+			cm08Svc.uploadFile(paramMap, mRequest);
+		}
+		
+		for(String fileKey : deleteFileList) {
+			cm08Svc.deleteFile(fileKey);
+		}
+		//---------------------------------------------------------------
+		//첨부 화일 처리  끝
+		//---------------------------------------------------------------
+		
+		if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
+			// 수주일자의 년도가 변경되었을 경우 수주번호를 갱신
+			cr02Mapper.callUpdateOrdrsNo(param);
+		}
+		
+		// 수주관리의 정보를 프로젝트 관리에 반영
+		cr02Mapper.callUpdateProjectMaster(param);
+    }
+
+    @Override
+    public void updateOrdrs_OLD(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception {
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
         Type mapList = new TypeToken<ArrayList<Map<String, String>>>() { }.getType();
         String OrderSeq = "";
@@ -299,10 +450,6 @@ public class CR02Svcmpl implements CR02Svc {
             if (found) {
                 // 수주 상세 업데이트
 
-//                if (ordrsDetail.get("ordrsDtlDiv10").equals("설비")) {
-//                    String newSalesCode = param.get("ordrsNo") + ordrsDetail.get("ordrsSeq") + ordrsDetail.get("prdtCd") + ordrsDetail.get("itemDiv");
-//                    ordrsDetail.put("salesCd", newSalesCode);
-//                }
                 System.out.println("23232" + ordrsDetail);
                 cr02Mapper.updateOrdrsDetail(ordrsDetail);
             } else {
@@ -390,30 +537,7 @@ public class CR02Svcmpl implements CR02Svc {
                 e.getStackTrace();
             }
         }
-/*        String[] deleteFileArr = gson.fromJson(param.get("deleteFileArr"), String[].class);
-        List<String> deleteFileList = Arrays.asList(deleteFileArr);*/
 
-
- /*       for (String fileKey : deleteFileList) {
-            cm08Svc.deleteFile(fileKey);
-        }*/
-
-
- /*       System.out.println(param.get("fileTrgtKey") + "해당위치");
-        cm08Svc.uploadTreeFile("TB_CR02M01", param, mRequest);
-*/
-
-
-/*        for (int i = 0; i < mRequest.getFiles("files").size(); i++) {
-            try {
-                cm08Svc.uploadTreeFile("TB_CR02M01", param.get("ordrsNo"), mRequest);
-            } catch (Exception e) {
-                System.out.println("error4" + e.getMessage());
-
-
-            }
-
-        }*/
         //---------------------------------------------------------------
 		//첨부 화일 처리 시작
 		//---------------------------------------------------------------
@@ -429,7 +553,7 @@ public class CR02Svcmpl implements CR02Svc {
 		//---------------------------------------------------------------
 		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
-
+		
 		// 수주일자의 년도가 변경되었을 경우 수주번호를 갱신
 		cr02Mapper.callUpdateOrdrsNo(param);
 		
@@ -475,21 +599,13 @@ public class CR02Svcmpl implements CR02Svc {
 		String onNumber = paramMap.get("ordrsSeq");
 		String estNo = paramMap.get("estNo");
 		
-		if ("1".equals(lvl)) {
-			result = cr02Mapper.deleteOrdrs(paramMap);
-	        result += cr02Mapper.deleteOrdrsPlan(paramMap);
-	        result += cr02Mapper.deleteOrdrsPlanHis(paramMap);
-	        result += cr02Mapper.deleteOrdrsDetail(paramMap);
-	        if (!"".equals(estNo) && estNo != null) {
-	        	result += cr02Mapper.updateEstDeleteConfirm(paramMap);
-	        }
-
-    	} else {
-    		 result += cr02Mapper.deleteOrdrsDetail(paramMap);
-    	}
-        //int result = cr02Mapper.deleteOrdrs(paramMap);
-        //result += cr02Mapper.deleteOrdrsPlan(paramMap);
-        //result += cr02Mapper.deleteOrdrsDetail(paramMap);
+		result = cr02Mapper.deleteOrdrs(paramMap);
+        result += cr02Mapper.deleteOrdrsPlan(paramMap);
+        result += cr02Mapper.deleteOrdrsPlanHis(paramMap);
+        result += cr02Mapper.deleteOrdrsDetailAll(paramMap);
+        if (!"".equals(estNo) && estNo != null) {
+        	result += cr02Mapper.updateEstDeleteConfirm(paramMap);
+        }
         
         //---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)

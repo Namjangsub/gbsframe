@@ -21,4 +21,6 @@ public interface BM17Svc {
 	
 	int deleteMessageTempl(Map<String, String> paramMap) throws Exception;
 	
+	//테스트 버튼 등록
+	int insertKakaoMessage(Map<String, String> paramMap) throws Exception;	
 }

@@ -24,4 +24,7 @@ public interface BM17Mapper {
 	int updateMessageTempl(Map<String, String> paramMap);
 	
 	int deleteMessageTempl(Map<String, String> paramMap);	
+	
+	//테스트 버튼 등록
+	int insertKakaoMessage(Map<String, String> paramMap);
 }

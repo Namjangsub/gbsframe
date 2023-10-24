@@ -703,17 +703,18 @@ public class QM01SvcImpl implements QM01Svc {
 	    String chkDept3 = "";
 	    String chkDept4 = "";
 	    String deptId = paramMap.get("deptId").toString();
+	    String sDeptId = deptId.substring(0,5);
 	    
-		if("GUN30".equals(deptId) || "GUN3010".equals(deptId) || "GUN3020".equals(deptId)){   //영업팀
+		if("GUN30".equals(sDeptId) || "TRN30".equals(sDeptId)){   //영업팀
 			chkDept1 = "Y";
-		}else if("GUN4010".equals(deptId) || "GUN4020".equals(deptId) || "GUN4030".equals(deptId)){   //설계팀
+		}else if("GUN40".equals(sDeptId)){   //설계팀
 			chkDept2 = "Y";
-		}else if("GUN90".equals(deptId)){   //구매팀
+		}else if("TRN50".equals(sDeptId)){   //구매팀
 			chkDept3 = "Y";
-		}else if("GUN60".equals(deptId) || "GUN6010".equals(deptId)){   //생산팀
+		}else if("GUN60".equals(sDeptId)){   //생산팀
 			chkDept4 = "Y";
 		}
-	  	
+		
         List<Map<String, String>> rowArr = gson.fromJson(paramMap.get("rowList"), mapList);
         for (Map<String, String> rowMap : rowArr) {
  
