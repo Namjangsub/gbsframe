@@ -94,7 +94,7 @@ ModalStack.prototype.close = function(){
 var modalStack = new ModalStack();
 
 var ubiprefix = "";
-debugger;
+//debugger;
 if(jwt){
 	switch (jwt.serverType){
     case "prod" :
@@ -1062,10 +1062,13 @@ function insertPgmHistory(url) {
 	});
 }
 
-function callReport(fileName, arg, width, height){
+function callReport(fileName, arg, width, height, reporttitle){
 	var url = ubiprefix + "/ubihtml.jsp";
 	url += "?file="+fileName;
 	url += "&arg="+encodeURIComponent(arg);
+	if( typeof(reporttitle) != "undefined" ) {
+		url += "&reporttitle="+encodeURIComponent(reporttitle);	
+	}
 	if (width ==""){
 		width = 900;
 	}
