@@ -288,15 +288,17 @@ public class WB24SvcImpl implements WB24Svc {
 		
 	
 		if (Integer.parseInt(paramMap.get("approvalYnCnt")) == 0) {
-			QM01Mapper.deleteWbsSharngList1(paramMap); 
-			QM01Mapper.deleteWbsApprovalList1(paramMap);
 			
 			
 			String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 이슈 공유";
 			
 			Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 			List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
+			
 			if (sharngArr != null && sharngArr.size() > 0 ) {
+				
+				QM01Mapper.deleteWbsSharngList1(paramMap); 
+				
 				int i = 0;
 		        for (Map<String, String> sharngMap : sharngArr) {
 		            try {	 
@@ -316,12 +318,17 @@ public class WB24SvcImpl implements WB24Svc {
 			}
 
 			
-			String todoTitle2 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 결재 공유";
+			String todoTitle2 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 이슈 결재";
 			
 			//결재
 			Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 			List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
+			
 			if (approvalArr != null && approvalArr.size() > 0 ) {
+				
+				QM01Mapper.deleteWbsApprovalList1(paramMap);
+				
+				
 				int i = 0;
 		        for (Map<String, String> approvalMap : approvalArr) {
 		            try {	 
@@ -346,8 +353,6 @@ public class WB24SvcImpl implements WB24Svc {
 		
 		
 		if (Integer.parseInt(paramMap.get("approvalYnCnt2")) == 0) {
-			QM01Mapper.deleteWbsSharngList1(paramMap); 
-			QM01Mapper.deleteWbsApprovalList1(paramMap);
 			
 			
 			// 조치정보 공유 결재 처리 프로세스
@@ -357,7 +362,12 @@ public class WB24SvcImpl implements WB24Svc {
 			Type stringList4 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 			List<Map<String, String>> sharngArr2 = gson.fromJson(paramMap.get("rowSharngListArr2"), stringList4);
 			if (sharngArr2 != null && sharngArr2.size() > 0 ) {
+				
+				QM01Mapper.deleteWbsSharngList2(paramMap); 
+				
 				int i = 0;
+				
+				
 		        for (Map<String, String> sharngMap2 : sharngArr2) {
 		            try {	 
 		            	    sharngMap2.put("reqNo", paramMap.get("issNo"));
@@ -382,6 +392,9 @@ public class WB24SvcImpl implements WB24Svc {
 			Type stringList5 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 			List<Map<String, String>> approvalArr2 = gson.fromJson(paramMap.get("rowApprovalListArr2"), stringList5);
 			if (approvalArr2 != null && approvalArr2.size() > 0 ) {
+				
+				QM01Mapper.deleteWbsApprovalList2(paramMap);
+								
 				int i = 0;
 		        for (Map<String, String> approvalMap2 : approvalArr2) {
 		            try {	 
