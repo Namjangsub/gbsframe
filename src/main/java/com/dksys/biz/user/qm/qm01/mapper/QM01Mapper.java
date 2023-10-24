@@ -65,7 +65,7 @@ public interface QM01Mapper {
   List<Map<String, String>> deleteWbsSharngListChk(Map<String, String> paramMap);
   
   List<Map<String, String>> deleteWbsApprovalListChk(Map<String, String> paramMap);
-  
+    
   int deleteWbsSharngList(Map<String, String> paramMap);
   
   int deleteWbsApprovalList(Map<String, String> paramMap);
@@ -92,5 +92,20 @@ public interface QM01Mapper {
   int updateReqStChk(Map<String, String> paramMap);
   
   int updateCheckDept(Map<String, String> paramMap);
+  
+  
+  
+  
+  
+  List<Map<String, String>> deleteWbsSharngListChk1(Map<String, String> paramMap);
+  
+  List<Map<String, String>> deleteWbsApprovalListChk1(Map<String, String> paramMap);
+  
+  int deleteWbsSharngList1(Map<String, String> paramMap);
+  
+  int deleteWbsApprovalList1(Map<String, String> paramMap);
+  
+  
+  
   
 }

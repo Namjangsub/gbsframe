@@ -292,6 +292,8 @@ public class BM16SvcImpl implements BM16Svc {
       String pgParam = "{\"actionType\":\""+ "U" +"\",";      
       pgParam += "\"prjctSeq\":\""+ paramMap.get("prjctSeq") +"\"}";
       
+      String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("prjctNm") + "이슈 공유";
+		      
       Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
 		if (sharngArr != null && sharngArr.size() > 0 ) {
@@ -305,6 +307,7 @@ public class BM16SvcImpl implements BM16Svc {
 	            	    sharngMap.put("userId", paramMap.get("userId"));
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
 	            	    sharngMap.put("pgParam", pgParam);
+	            	    sharngMap.put("todoTitle", todoTitle1);
 	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
 	            	i++;
 	            } catch (Exception e) {
@@ -313,6 +316,8 @@ public class BM16SvcImpl implements BM16Svc {
 	        }
 		}
 
+		String todoTitle2 = paramMap.get("clntNm") + "-" + paramMap.get("prjctNm") + "이슈 결재";
+		
 		//결재
 		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
@@ -327,6 +332,7 @@ public class BM16SvcImpl implements BM16Svc {
 		            	approvalMap.put("userId", paramMap.get("userId"));
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
 		            	approvalMap.put("pgParam", pgParam);
+		            	approvalMap.put("todoTitle", todoTitle2);
 	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
 	                	i++;
 	            } catch (Exception e) {
@@ -417,6 +423,8 @@ public class BM16SvcImpl implements BM16Svc {
 			QM01Mapper.deleteWbsApprovalList(paramMap); 
 		}
 		
+		String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("prjctNm") + "이슈 공유";
+		
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
 		if (sharngArr != null && sharngArr.size() > 0 ) {
@@ -429,6 +437,7 @@ public class BM16SvcImpl implements BM16Svc {
 	            	    sharngMap.put("userId", paramMap.get("userId"));
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
 	            	    sharngMap.put("pgParam", pgParam);
+	            	    sharngMap.put("todoTitle", todoTitle1);
 	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
 	            	i++;
 	            } catch (Exception e) {
@@ -437,6 +446,8 @@ public class BM16SvcImpl implements BM16Svc {
 	        }
 		}
 
+		
+		String todoTitle2 = paramMap.get("clntNm") + "-" + paramMap.get("prjctNm") + "이슈 결재";
 		//결재
 		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
@@ -450,6 +461,7 @@ public class BM16SvcImpl implements BM16Svc {
 		            	approvalMap.put("userId", paramMap.get("userId"));
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
 		            	approvalMap.put("pgParam", pgParam);
+		            	approvalMap.put("todoTitle", todoTitle2);
 	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
 	                	i++;
 	            } catch (Exception e) {
