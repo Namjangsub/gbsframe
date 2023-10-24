@@ -274,115 +274,136 @@ public class WB24SvcImpl implements WB24Svc {
 		paramMap.put("salesCd", paramMap.get("salesCd"));
 		
 		
-		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk1(paramMap); 
-		if (sharngChk.size() > 0) {
+
+		//List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk1(paramMap); 
+		//if (sharngChk.size() > 0) {
+		//	QM01Mapper.deleteWbsSharngList1(paramMap); 
+		//}
+		
+		//List<Map<String, String>> approvalgChk = QM01Mapper.deleteWbsApprovalListChk1(paramMap); 
+		//if (approvalgChk.size() > 0) {
+		//	QM01Mapper.deleteWbsApprovalList1(paramMap); 
+		//}
+		
+		
+	
+		if (Integer.parseInt(paramMap.get("approvalYnCnt")) == 0) {
 			QM01Mapper.deleteWbsSharngList1(paramMap); 
-		}
-		
-		List<Map<String, String>> approvalgChk = QM01Mapper.deleteWbsApprovalListChk1(paramMap); 
-		if (approvalgChk.size() > 0) {
-			QM01Mapper.deleteWbsApprovalList1(paramMap); 
-		}
-		
-		
-		String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 이슈 공유";
-		
-		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
-		if (sharngArr != null && sharngArr.size() > 0 ) {
-			int i = 0;
-	        for (Map<String, String> sharngMap : sharngArr) {
-	            try {	 
-	            	    sharngMap.put("reqNo", paramMap.get("issNo"));
-	            	    sharngMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
-	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
-	            	    sharngMap.put("userId", paramMap.get("userId"));
-	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
-	            	    sharngMap.put("pgParam", pgParam);
-	            	    sharngMap.put("todoTitle", todoTitle1);
-	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
-	            	i++;
-	            } catch (Exception e) {
-	                System.out.println("error2"+e.getMessage());
-	            }
-	        }
-		}
+			QM01Mapper.deleteWbsApprovalList1(paramMap);
+			
+			
+			String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 이슈 공유";
+			
+			Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+			List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
+			if (sharngArr != null && sharngArr.size() > 0 ) {
+				int i = 0;
+		        for (Map<String, String> sharngMap : sharngArr) {
+		            try {	 
+		            	    sharngMap.put("reqNo", paramMap.get("issNo"));
+		            	    sharngMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
+		            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
+		            	    sharngMap.put("userId", paramMap.get("userId"));
+		            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
+		            	    sharngMap.put("pgParam", pgParam);
+		            	    sharngMap.put("todoTitle", todoTitle1);
+		                	QM01Mapper.insertWbsSharngList(sharngMap);       		
+		            	i++;
+		            } catch (Exception e) {
+		                System.out.println("error2"+e.getMessage());
+		            }
+		        }
+			}
 
-		
-		String todoTitle2 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 결재 공유";
-		
-		//결재
-		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
-		if (approvalArr != null && approvalArr.size() > 0 ) {
-			int i = 0;
-	        for (Map<String, String> approvalMap : approvalArr) {
-	            try {	 
-		            	approvalMap.put("reqNo", paramMap.get("issNo"));
-		            	approvalMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
-		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
-		            	approvalMap.put("userId", paramMap.get("userId"));
-		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
-		            	approvalMap.put("pgParam", pgParam);
-		            	approvalMap.put("todoTitle", todoTitle2);
-	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
-	                	i++;
-	            } catch (Exception e) {
-	                System.out.println("error2"+e.getMessage());
-	            }
-	        }
+			
+			String todoTitle2 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 결재 공유";
+			
+			//결재
+			Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+			List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
+			if (approvalArr != null && approvalArr.size() > 0 ) {
+				int i = 0;
+		        for (Map<String, String> approvalMap : approvalArr) {
+		            try {	 
+			            	approvalMap.put("reqNo", paramMap.get("issNo"));
+			            	approvalMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
+			            	approvalMap.put("pgmId", paramMap.get("pgmId"));
+			            	approvalMap.put("userId", paramMap.get("userId"));
+			            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
+			            	approvalMap.put("pgParam", pgParam);
+			            	approvalMap.put("todoTitle", todoTitle2);
+		                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
+		                	i++;
+		            } catch (Exception e) {
+		                System.out.println("error2"+e.getMessage());
+		            }
+		        }
+			}
+			
 		}
 		
+		
+		
+		
+		if (Integer.parseInt(paramMap.get("approvalYnCnt2")) == 0) {
+			QM01Mapper.deleteWbsSharngList1(paramMap); 
+			QM01Mapper.deleteWbsApprovalList1(paramMap);
+			
+			
+			// 조치정보 공유 결재 처리 프로세스
+			
+			String todoTitle3 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 조치 공유";
+			
+			Type stringList4 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+			List<Map<String, String>> sharngArr2 = gson.fromJson(paramMap.get("rowSharngListArr2"), stringList4);
+			if (sharngArr2 != null && sharngArr2.size() > 0 ) {
+				int i = 0;
+		        for (Map<String, String> sharngMap2 : sharngArr2) {
+		            try {	 
+		            	    sharngMap2.put("reqNo", paramMap.get("issNo"));
+		            	    sharngMap2.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
+		            	    sharngMap2.put("pgmId", paramMap.get("pgmId"));
+		            	    sharngMap2.put("userId", paramMap.get("userId"));
+		            	    sharngMap2.put("sanCtnSn",Integer.toString(i+1));
+		            	    sharngMap2.put("pgParam", pgParam);
+		            	    sharngMap2.put("todoTitle", todoTitle3);
+		                	QM01Mapper.insertWbsSharngList(sharngMap2);       		
+		            	i++;
+		            } catch (Exception e) {
+		                System.out.println("error2"+e.getMessage());
+		            }
+		        }
+			}
+
+			
+			//결재
+			String todoTitle4 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 조치 결재";
+			
+			Type stringList5 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+			List<Map<String, String>> approvalArr2 = gson.fromJson(paramMap.get("rowApprovalListArr2"), stringList5);
+			if (approvalArr2 != null && approvalArr2.size() > 0 ) {
+				int i = 0;
+		        for (Map<String, String> approvalMap2 : approvalArr2) {
+		            try {	 
+			            	approvalMap2.put("reqNo", paramMap.get("issNo"));
+			            	approvalMap2.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
+			            	approvalMap2.put("pgmId", paramMap.get("pgmId"));
+			            	approvalMap2.put("userId", paramMap.get("userId"));
+			            	approvalMap2.put("sanCtnSn",Integer.toString(i+1));
+			            	approvalMap2.put("pgParam", pgParam);
+			            	approvalMap2.put("todoTitle", todoTitle4);
+		                	QM01Mapper.insertWbsApprovalList(approvalMap2);       		
+		                	i++;
+		            } catch (Exception e) {
+		                System.out.println("error2"+e.getMessage());
+		            }
+		        }
+			}
+			
+			
+		}
 	    
-		// 조치정보 공유 결재 처리 프로세스
 		
-		String todoTitle3 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 조치 공유";
-		
-		Type stringList4 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> sharngArr2 = gson.fromJson(paramMap.get("rowSharngListArr2"), stringList4);
-		if (sharngArr2 != null && sharngArr2.size() > 0 ) {
-			int i = 0;
-	        for (Map<String, String> sharngMap2 : sharngArr2) {
-	            try {	 
-	            	    sharngMap2.put("reqNo", paramMap.get("issNo"));
-	            	    sharngMap2.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
-	            	    sharngMap2.put("pgmId", paramMap.get("pgmId"));
-	            	    sharngMap2.put("userId", paramMap.get("userId"));
-	            	    sharngMap2.put("sanCtnSn",Integer.toString(i+1));
-	            	    sharngMap2.put("pgParam", pgParam);
-	            	    sharngMap2.put("todoTitle", todoTitle3);
-	                	QM01Mapper.insertWbsSharngList(sharngMap2);       		
-	            	i++;
-	            } catch (Exception e) {
-	                System.out.println("error2"+e.getMessage());
-	            }
-	        }
-		}
-
-		
-		//결재
-		String todoTitle4 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 조치 결재";
-		
-		Type stringList5 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> approvalArr2 = gson.fromJson(paramMap.get("rowApprovalListArr2"), stringList5);
-		if (approvalArr2 != null && approvalArr2.size() > 0 ) {
-			int i = 0;
-	        for (Map<String, String> approvalMap2 : approvalArr2) {
-	            try {	 
-		            	approvalMap2.put("reqNo", paramMap.get("issNo"));
-		            	approvalMap2.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
-		            	approvalMap2.put("pgmId", paramMap.get("pgmId"));
-		            	approvalMap2.put("userId", paramMap.get("userId"));
-		            	approvalMap2.put("sanCtnSn",Integer.toString(i+1));
-		            	approvalMap2.put("pgParam", pgParam);
-		            	approvalMap2.put("todoTitle", todoTitle4);
-	                	QM01Mapper.insertWbsApprovalList(approvalMap2);       		
-	                	i++;
-	            } catch (Exception e) {
-	                System.out.println("error2"+e.getMessage());
-	            }
-	        }
-		}
 		
 		
 		//---------------------------------------------------------------  
