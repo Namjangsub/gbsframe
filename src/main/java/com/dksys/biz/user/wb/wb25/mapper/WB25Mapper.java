@@ -24,4 +24,6 @@ public interface WB25Mapper {
 	List<Map<String, String>> selectWbsTaskEvlResultList(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectWbsTaskEvlIssList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectEvlCloseChk(Map<String, String> paramMap);
 }

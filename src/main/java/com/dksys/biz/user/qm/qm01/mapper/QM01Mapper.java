@@ -105,6 +105,10 @@ public interface QM01Mapper {
   
   int deleteWbsApprovalList1(Map<String, String> paramMap);
   
+  int deleteWbsSharngList2(Map<String, String> paramMap);
+  
+  int deleteWbsApprovalList2(Map<String, String> paramMap);
+  
   
   
   

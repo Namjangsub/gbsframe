@@ -114,6 +114,13 @@ public class WB25Ctr {
 		return "jsonView";
     }
 	
+	@PostMapping(value = "/selectEvlCloseChk") 
+	public String selectEvlCloseChk(@RequestBody Map<String, String> paramMap, ModelMap model) {	
+		List<Map<String, String>> result = wb25Svc.selectEvlCloseChk(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+    }
+	
 	
 	
 }
