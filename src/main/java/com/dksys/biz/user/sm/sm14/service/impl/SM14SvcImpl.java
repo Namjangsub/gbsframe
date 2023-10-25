@@ -55,8 +55,15 @@ public class SM14SvcImpl implements SM14Svc {
 	
 
 	@Override
-	public List<Map<String, String>> selectPurchaseList(Map<String, String> paramMap) {
-		return sm14Mapper.selectPurchaseList(paramMap);
+	public List<Map<String, String>> selectPurchaseList(Map<String, String> paramMap) {		
+		List<Map<String, String>> result = new ArrayList<Map<String, String>>();
+		//발주+비용
+		if( paramMap.get("union").equals("1") ) {
+			result = sm14Mapper.selectPurchaseListUnion(paramMap);
+		} else {
+			result = sm14Mapper.selectPurchaseList(paramMap);			
+		}
+		return result;		
 	}	
 		
 	@Override
