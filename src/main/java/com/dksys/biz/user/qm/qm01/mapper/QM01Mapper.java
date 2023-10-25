@@ -109,7 +109,7 @@ public interface QM01Mapper {
   
   int deleteWbsApprovalList2(Map<String, String> paramMap);
   
-  
+  int deleteApprovalList(Map<String, String> paramMap);
   
   
 }
