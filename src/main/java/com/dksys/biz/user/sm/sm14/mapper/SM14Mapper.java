@@ -15,12 +15,15 @@ public interface SM14Mapper {
 
 	int selectPurchaseListCount(Map<String, String> paramMap);
 		
-	List<Map<String, String>> selectPurchaseList(Map<String, String> paramMap);	
+	List<Map<String, String>> selectPurchaseList(Map<String, String> paramMap);
+	
+	//발주+기타비용 추가
+	List<Map<String, String>> selectPurchaseListUnion(Map<String, String> paramMap);	
 	
 	List<Map<String, String>> selectPurchaseExcelList(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectPurchaseDetailList(Map<String, String> paramMap);	
-	
+	List<Map<String, String>> selectPurchaseDetailList(Map<String, String> paramMap);
+		
 	String selectMaxPchsNo(Map<String, String> paramMap);		
 	
 	//입고 등록, 수정, 삭제	

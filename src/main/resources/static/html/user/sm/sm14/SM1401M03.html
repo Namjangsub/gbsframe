@@ -136,14 +136,16 @@
 							      <option value="N">미확정</option>
 								</select>	
 						</td>
-						<!-- 
-						<th>통화단위</th>
+ 
+						<th>매입구분</th>
 						<td>				
-								<select id="currCd" name="currCd" data-kind="CURR" data-search="currCd" required="required" msg="통화단위">
-							      <option value="">전체</option>
+								<select id="pchsGb" name="pchsGb" data-kind="pchsGb" data-search="pchsGb" onchange="gridView.setData(0);">
+								  <option value="" selected="selected">전체</option>
+							      <option value="ordrg">발주</option>
+							      <option value="cost">구매비용</option>
 								</select>	
 						</td>
-						 -->	
+	
 						<th></th>
 						<td>				
 
@@ -165,8 +167,8 @@
 		<div class="contents_tit">
 			<span  style="height: 30px; line-height: 30px;font-size: 15px;">매입 확정 리스트 </span>
 			<div class="add_btn_small pdl10">
-				<a onclick="inserPurchase('C');" style="height: 30px; line-height: 28px;" authchk>+</a>
-				<a onclick="deletePurchase();" style="height: 30px; line-height: 28px;" authchk>-</a>
+				<a onclick="inserPurchase('C');" style="height: 30px; line-height: 28px;" >+</a>
+				<a onclick="deletePurchase();" style="height: 30px; line-height: 28px;" >-</a>
 				<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 			    </div>
 				<select id="recordCnt" class="prae_select" data-search="recordCnt" onchange="gridView.setData(0);">
@@ -198,9 +200,9 @@ var yesterday = moment(new Date()).add(-1, 'days');
 
 //확정여부
 ax5.ui.grid.formatter["chkIcon"] = function () {
-	var color = (this.value == "" || !this.value)? "√" : "";
-	if (this.value == "E"){
-		return 'E';
+	var color = (this.value == "" || !this.value)? "√" : "Y";
+	if (this.value == "Y"){
+		return 'aaaa';
 	} else {
 		return color;
 	}
@@ -245,13 +247,24 @@ postAjaxSync("/user/wb/wb21/selectCodeList", optParam, null, function(data){
                 		vatSet(row, this.item.ordrgAmt);
                 	}
                 	if( typeof(this.item.pchsDt) == "undefined" || this.item.pchsDt=="" ) gridView.target.setValue(row, "pchsDt", today);
-                	if( typeof(this.item.pchsQty) == "undefined" || this.item.pchsQty=="" ) gridView.target.setValue(row, "pchsQty", "0");        
+                	if( typeof(this.item.pchsQty) == "undefined" || this.item.pchsQty=="" ) gridView.target.setValue(row, "pchsQty", "0");
+                    //비용처리일경우 
+                    if( this.item.isCost=="Y" ) {
+                    	gridView.target.setValue(row, "cmpletYn", "Y");
+                    }                	
                 }
                 if( this.column.key == "pchsDt" ) {
-                	if( typeof(this.item.pchsAmt) == "undefined" || this.item.pchsAmt=="" ) gridView.target.setValue(row, "pchsAmt", this.item.ordrgAmt);
+                	if( typeof(this.item.pchsAmt) == "undefined" || this.item.pchsAmt=="" ) {
+                		gridView.target.setValue(row, "pchsAmt", this.item.ordrgAmt);
+                		vatSet(row, this.item.ordrgAmt);
+                	}
                 	if( typeof(this.item.pchsDt) == "undefined" || this.item.pchsDt=="" ) {
                 		gridView.target.setValue(row, "pchsDt", today);               		
-                	}
+                	}                	
+                    //비용처리일경우 
+                    if( this.item.isCost=="Y" ) {
+                    	gridView.target.setValue(row, "cmpletYn", "Y");
+                    }                	
                 }                
                 
                 if(this.column.key == "cmpletYn" && this.item.userChkV != "Y") {                	
@@ -325,10 +338,14 @@ postAjaxSync("/user/wb/wb21/selectCodeList", optParam, null, function(data){
             	  , 	styleClass: function () {
                       return ( parseInt(this.item.remainAmt) > 0 ) ? "grid-font-blue-bold" : "";} 			  
               },
+              {key: "isCost", 					label: "isCost",    	align: "center",	width: 70, hidden: false},   
 			  {key: "pchsAmt", 					label: "매입금액",			align: "right", 	width: 110,		 formatter: "money"
+            	  /* 20231025 POPup 입력으로 변경 */
+            	  /*
 					, editor: {type:"number" 
 									, attributes: { 'maxlength': 13, 'data-maxlength': 15}
 					   		  } 
+	              */
 			  },			    
 			  {key: "pchsVat", 					label: "부가세",			align: "right", 	width: 110,		 formatter: "money"
 					, editor: {type:"number" 
@@ -348,18 +365,15 @@ postAjaxSync("/user/wb/wb21/selectCodeList", optParam, null, function(data){
 											content: {
 			                            				config: { mode: "day", selectMode: "day" }
 			                        				  }
-			                    			}
-								, disabled: function () {                            							
-									return this.item.userChkV == "Y";
-						  		}              
+			                    			}        
 							  }
 			  },	               
-			  {key: "cmpletYn", 				label: "완료",				align: "center", 	width: 50,		formatter: "chkIcon"
+			  {key: "cmpletYn", 				label: "완료",				align: "center", 	width: 50	,		formatter: "chkIcon" 
 					, editor:{type: "checkbox"
 								, config: {trueValue: "Y", falseValue: "N"}
-		    					, disabled: function () {  
+								, disabled: function () {  
 									return this.item.cmpletYn == "Y";
-						  		}						
+						  		}	
 							}
 			  },			  
              ]
@@ -381,7 +395,8 @@ postAjaxSync("/user/wb/wb21/selectCodeList", optParam, null, function(data){
 			});				
 			paramObj["pageNo"] = _pageNo + 1;
 			paramObj["userId"] = jwt.userId;
-			paramObj["union"] = 0;
+			//test중 - 기타구매비용과 union
+			paramObj["union"] = "1";
 
 			postAjax("/user/sm/sm14/selectPurchaseList", paramObj, null, function(data){
                  var list = data.result;
@@ -575,46 +590,40 @@ postAjaxSync("/user/wb/wb21/selectCodeList", optParam, null, function(data){
    
 	/* 수정 or 등록 버튼 클릭시 */
 	function inserPurchase(type) {
-		//수정
-		if (type == 'U') {
-			var paramObj = {
-				"actionType" : type,	
-				"userId"    : jwt.userId,
-		       	"pgmId"    : "SM1401M01"
-			};
-			var param = {};
-			param = $.setGridValParam(gridView, paramObj);
-					
-		//등록
-		} else if(type == 'C') {
+		debugger;
 			
-			var selRow = parseInt(gridView.target.selectedDataIndexs);
-			var gridList = gridView.target.getList("selected")[0];
-	 		if( isNaN(selRow) ) {
-	 			alert("행을 선택해 주십시오.")
-	 			return;
-	 		} else if( gridList.userChkV == "Y" ) {
-	 			alert("매입이 확정되었습니다.")
-	 			return;	 			
-	 		} else {
+		var selRow = parseInt(gridView.target.selectedDataIndexs);
+		var gridList = gridView.target.getList("selected")[0];
+ 		if( isNaN(selRow) ) {
+ 			alert("행을 선택해 주십시오.")
+ 			return;
+ 		} else if( gridList.userChkV == "Y" ) {
+ 			alert("매입이 확정되었습니다.")
+ 			return;
+ 		} else if( gridList.isCost == "Y" ) {
+ 			alert("발주일 경우만 분리 가능합니다.")
+ 			return;	 	 			 			
+ 		} else {
 
-				newRow = {};
-	 			//선택행 데이터 루프
-	
- 		        $.each(gridList, function (key, val) {			     	        	
- 					if( typeof(val) == "undefined") val = "";
- 					if( key != "pchsAmt" && key != "pchsDt" && key != "cmpletYn" && key != "pchsVat" && key != "pchsSumAmt"  ) {
- 	 					newRow[key] = val; 						
- 					}    			         
- 		        });
-				newRow.pchsSeq = "New"; 
-				
-				newRow.cmpletYn = "N";
-				gridView.target.addRow($.extend({}, newRow), selRow+1, false);		
-				gridView.target.clearSelect();				
-				gridView.target.select(selRow+1);
-	 		}
-		}
+			newRow = {};
+ 			//선택행 데이터 루프
+
+		        $.each(gridList, function (key, val) {			     	        	
+					if( typeof(val) == "undefined") val = "";
+					if( key != "pchsAmt" && key != "pchsDt" && key != "cmpletYn" && key != "pchsVat" && key != "pchsSumAmt"  ) {
+	 					newRow[key] = val; 						
+					}    			         
+		        });
+ 			/*
+			newRow.pchsSeq = "New"; 
+			
+			newRow.cmpletYn = "N";
+			gridView.target.addRow($.extend({}, newRow), selRow+1, false);		
+			gridView.target.clearSelect();				
+			gridView.target.select(selRow+1);
+			*/
+ 		}
+
 	}
 	//func end 
 	
@@ -794,7 +803,7 @@ $(document).ready(function() {
 	$.dayInit = function() {
 		
 		//var pre6Month = moment(new Date()).subtract(6, "M").format("YYYY-MM-DD");		
-		var pre1Month = moment(new Date()).subtract(1, "M").format("YYYY-MM-DD");
+		var pre1Month = moment(new Date()).subtract(6, "M").format("YYYY-MM-DD");
 		// 시작일 (현재날짜의 월 첫일)
 		$('#ordrgDtFrom_S').datepicker({
 				format : "yyyy-mm-dd",
