@@ -76,6 +76,8 @@ public interface WB22Mapper {
 
 	int wbsTaskTempletUpdate(Map<String, String> sharngMap);
 
-	int wbsTaskTempletDelete(Map<String, String> sharngMap);	
+	int wbsTaskTempletDelete(Map<String, String> sharngMap);
+
+	List<Map<String, String>> selectHistWBS1Level(Map<String, String> paramMap);	
 	
 }
