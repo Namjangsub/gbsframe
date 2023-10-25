@@ -49,6 +49,11 @@ public class CR02Svcmpl implements CR02Svc {
     public List<Map<String, Object>> selectOrdrsList(Map<String, String> param) {
         return cr02Mapper.selectOrdrsList(param);
     }
+
+    @Override
+    public int selectOrdrsListPopCount(Map<String, String> param) {
+        return cr02Mapper.selectOrdrsListPopCount(param);
+    }
     
     @Override
     public List<Map<String, Object>> selectOrdrsListPop(Map<String, String> param) {

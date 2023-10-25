@@ -16,6 +16,7 @@ import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.cr.cr10.mapper.CR10Mapper;
 import com.dksys.biz.user.cr.cr10.service.CR10Svc;
+import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -27,6 +28,9 @@ public class CR10SvcImpl implements CR10Svc {
   @Autowired
   CR10Mapper cr10Mapper;
 
+  @Autowired
+  QM01Mapper QM01Mapper;
+  
   @Autowired
   CM15Svc cm15Svc;
 
@@ -116,7 +120,7 @@ public class CR10SvcImpl implements CR10Svc {
 		//---------------------------------------------------------------
 		if (uploadFileList.size() > 0) {
 		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
+		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 		    cm08Svc.uploadFile(paramMap, mRequest);
 		}
 		//---------------------------------------------------------------
@@ -126,32 +130,83 @@ public class CR10SvcImpl implements CR10Svc {
 		//---------------------------------------------------------------
 		//결재 처리 시작
 		//---------------------------------------------------------------
-	    List<Map<String, String>> reqList = cr10Mapper.selectTodoAppReqList(paramMap);
-	    List<Map<String, String>> toDoAppList = gsonDtl.fromJson(reqList.toString(), dtlMap);
-	    /*
-	    DecimalFormat df = new DecimalFormat("00000");
-	    int numKey = Integer.valueOf(paramMap.get("fileTrgtKey"));
-	    */
-	    String todoDiv2CodeId = paramMap.get("lgistNo");
-	    int sanctnSn = cr10Mapper.selectTodoAppSanctnSn(paramMap);
-	    for (Map<String, String> dtl : toDoAppList) {
-	    	dtl.put("sanctnSn", String.valueOf(sanctnSn));
-	    	dtl.put("userId", paramMap.get("userId"));
-	    	dtl.put("pgmId", paramMap.get("pgmId"));
-	    	dtl.put("pgPath", paramMap.get("pgPath"));
-	    	dtl.put("pgParam", paramMap.get("pgParam"));
-	    	dtl.put("todoDiv2CodeId", todoDiv2CodeId);
-	    	cr10Mapper.insertTodoAppList(dtl);
-	    	sanctnSn++;
-	    }
-
-	    paramMap.put("todoDiv1CodeId", paramMap.get("appDiv"));
-	    paramMap.put("todoDiv2CodeId", todoDiv2CodeId);
-	    cr10Mapper.updateLgistMastTodoApp(paramMap);
+//	    List<Map<String, String>> reqList = cr10Mapper.selectTodoAppReqList(paramMap);
+//	    List<Map<String, String>> toDoAppList = gsonDtl.fromJson(reqList.toString(), dtlMap);
+//	    /*
+//	    DecimalFormat df = new DecimalFormat("00000");
+//	    int numKey = Integer.valueOf(paramMap.get("fileTrgtKey"));
+//	    */
+//	    String todoDiv2CodeId = paramMap.get("lgistNo");
+//	    int sanctnSn = cr10Mapper.selectTodoAppSanctnSn(paramMap);
+//	    for (Map<String, String> dtl : toDoAppList) {
+//	    	dtl.put("sanctnSn", String.valueOf(sanctnSn));
+//	    	dtl.put("userId", paramMap.get("userId"));
+//	    	dtl.put("pgmId", paramMap.get("pgmId"));
+//	    	dtl.put("pgPath", paramMap.get("pgPath"));
+//	    	dtl.put("pgParam", paramMap.get("pgParam"));
+//	    	dtl.put("todoDiv2CodeId", todoDiv2CodeId);
+//	    	cr10Mapper.insertTodoAppList(dtl);
+//	    	sanctnSn++;
+//	    }
+//
+//	    paramMap.put("todoDiv1CodeId", paramMap.get("appDiv"));
+//	    paramMap.put("todoDiv2CodeId", todoDiv2CodeId);
+//	    cr10Mapper.updateLgistMastTodoApp(paramMap);
 		//---------------------------------------------------------------
 		//결재 처리  끝
 		//---------------------------------------------------------------
 
+		//신 결재 처리
+		Gson gson = new Gson();		
+		String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\"}";
+		String todoTitle1 = lgistNo + " 물류진행요청 공유"; 
+		
+		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
+		if (sharngArr != null && sharngArr.size() > 0 ) {
+			int i = 0;
+	        for (Map<String, String> sharngMap : sharngArr) {
+	            try {	 
+	            	    sharngMap.put("reqNo", paramMap.get("ordrsNo"));
+	            	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
+	            	    sharngMap.put("userId", paramMap.get("userId"));
+	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
+	            	    sharngMap.put("pgParam", pgParam);
+	            	    sharngMap.put("todoTitle", todoTitle1);
+	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
+	            	i++;
+	            } catch (Exception e) {
+	                System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
+
+		
+		String todoTitle2 = lgistNo + " 물류진행요청 결재"; 
+		
+		//결재
+		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
+		if (approvalArr != null && approvalArr.size() > 0 ) {
+			int i = 0;
+	        for (Map<String, String> approvalMap : approvalArr) {
+	            try {	 
+		            	approvalMap.put("reqNo", paramMap.get("ordrsNo"));
+		            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
+		            	approvalMap.put("userId", paramMap.get("userId"));
+		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
+		            	approvalMap.put("pgParam", pgParam);
+		            	approvalMap.put("todoTitle", todoTitle2);
+	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
+	                	i++;
+	            } catch (Exception e) {
+	                System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
+		//신 결재 끝
 	    return result;
   }
   @Override
@@ -229,31 +284,87 @@ public class CR10SvcImpl implements CR10Svc {
     //---------------------------------------------------------------
     //결재 처리 시작 -수정시에도 처리 한 내역이 없다면 결재 처리한다.
     //---------------------------------------------------------------
-    int todoAppCount = cr10Mapper.selectTodoAppCount(paramMap);
-    if(todoAppCount == 0) {
-	    List<Map<String, String>> reqList = cr10Mapper.selectTodoAppReqList(paramMap);
-	    List<Map<String, String>> toDoAppList = gsonDtl.fromJson(reqList.toString(), dtlMap);
-	    String todoDiv2CodeId = paramMap.get("lgistNo");
-	    int sanctnSn = cr10Mapper.selectTodoAppSanctnSn(paramMap);
-	    for (Map<String, String> dtl : toDoAppList) {
-	    	dtl.put("sanctnSn", String.valueOf(sanctnSn));
-	    	dtl.put("userId", paramMap.get("userId"));
-	    	dtl.put("pgmId", paramMap.get("pgmId"));
-	    	dtl.put("pgPath", paramMap.get("pgPath"));
-	    	dtl.put("pgParam", paramMap.get("pgParam"));
-	    	dtl.put("todoDiv2CodeId", todoDiv2CodeId);
-	    	cr10Mapper.insertTodoAppList(dtl);
-	    	sanctnSn++;
-	    }
-
-	    paramMap.put("todoDiv1CodeId", paramMap.get("appDiv"));
-	    paramMap.put("todoDiv2CodeId", todoDiv2CodeId);
-	    cr10Mapper.updateLgistMastTodoApp(paramMap);
-    }
+//    int todoAppCount = cr10Mapper.selectTodoAppCount(paramMap);
+//    if(todoAppCount == 0) {
+//	    List<Map<String, String>> reqList = cr10Mapper.selectTodoAppReqList(paramMap);
+//	    List<Map<String, String>> toDoAppList = gsonDtl.fromJson(reqList.toString(), dtlMap);
+//	    String todoDiv2CodeId = paramMap.get("lgistNo");
+//	    int sanctnSn = cr10Mapper.selectTodoAppSanctnSn(paramMap);
+//	    for (Map<String, String> dtl : toDoAppList) {
+//	    	dtl.put("sanctnSn", String.valueOf(sanctnSn));
+//	    	dtl.put("userId", paramMap.get("userId"));
+//	    	dtl.put("pgmId", paramMap.get("pgmId"));
+//	    	dtl.put("pgPath", paramMap.get("pgPath"));
+//	    	dtl.put("pgParam", paramMap.get("pgParam"));
+//	    	dtl.put("todoDiv2CodeId", todoDiv2CodeId);
+//	    	cr10Mapper.insertTodoAppList(dtl);
+//	    	sanctnSn++;
+//	    }
+//
+//	    paramMap.put("todoDiv1CodeId", paramMap.get("appDiv"));
+//	    paramMap.put("todoDiv2CodeId", todoDiv2CodeId);
+//	    cr10Mapper.updateLgistMastTodoApp(paramMap);
+//    }
     //---------------------------------------------------------------
     //결재 처리  끝
     //---------------------------------------------------------------
 
+	//신 결재 처리
+    
+    //일단 기존 리스트 삭제
+	QM01Mapper.deleteApprovalList(paramMap); 
+	
+	Gson gson = new Gson();		
+	String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\"}";
+	String todoTitle1 = paramMap.get("lgistNo") + " 물류진행요청 공유"; 
+	
+	Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+	List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
+	if (sharngArr != null && sharngArr.size() > 0 ) {
+		int i = 0;
+        for (Map<String, String> sharngMap : sharngArr) {
+            try {	 
+            	    sharngMap.put("reqNo", paramMap.get("ordrsNo"));
+            	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
+            	    sharngMap.put("userId", paramMap.get("userId"));
+            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
+            	    sharngMap.put("pgParam", pgParam);
+            	    sharngMap.put("todoTitle", todoTitle1);
+                	QM01Mapper.insertWbsSharngList(sharngMap);       		
+            	i++;
+            } catch (Exception e) {
+                System.out.println("error2"+e.getMessage());
+            }
+        }
+	}
+
+	
+	String todoTitle2 = paramMap.get("lgistNo") + " 물류진행요청 결재"; 
+	
+	//결재
+	Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+	List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
+	if (approvalArr != null && approvalArr.size() > 0 ) {
+		int i = 0;
+        for (Map<String, String> approvalMap : approvalArr) {
+            try {	 
+	            	approvalMap.put("reqNo", paramMap.get("ordrsNo"));
+	            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+	            	approvalMap.put("pgmId", paramMap.get("pgmId"));
+	            	approvalMap.put("userId", paramMap.get("userId"));
+	            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
+	            	approvalMap.put("pgParam", pgParam);
+	            	approvalMap.put("todoTitle", todoTitle2);
+                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
+                	i++;
+            } catch (Exception e) {
+                System.out.println("error2"+e.getMessage());
+            }
+        }
+	}
+	//신 결재 끝
+	
     return result;
   }
 

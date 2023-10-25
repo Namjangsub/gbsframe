@@ -573,4 +573,9 @@ public class WB22SvcImpl implements WB22Svc {
 		
 		return result;
 	}
+
+	@Override
+	public List<Map<String, String>> selectHistWBS1Level(Map<String, String> paramMap) {
+		return wb22Mapper.selectHistWBS1Level(paramMap);
+	}
 }

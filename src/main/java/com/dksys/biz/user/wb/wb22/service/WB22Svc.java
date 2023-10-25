@@ -52,5 +52,7 @@ public interface WB22Svc {
 	List<Map<String, String>> selectWbsTaskTempletList(Map<String, String> paramMap);
 
 	int saveWbsTaskTempletList(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+
+	List<Map<String, String>> selectHistWBS1Level(Map<String, String> paramMap);
 	
 }

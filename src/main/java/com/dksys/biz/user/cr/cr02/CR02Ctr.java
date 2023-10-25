@@ -35,7 +35,7 @@ public class CR02Ctr {
 	
 	@PostMapping("/selectOrdrsListPop")
 	public String selectOrdrsListPop(@RequestBody Map<String, String> param, ModelMap model) {
-		int totalCnt = cr02Svc.selectOrdrsCount(param);
+		int totalCnt = cr02Svc.selectOrdrsListPopCount(param);
 		PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
 		List<Map<String, Object>> ordrsList = cr02Svc.selectOrdrsListPop(param);

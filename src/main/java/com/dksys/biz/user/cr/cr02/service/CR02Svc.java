@@ -10,6 +10,8 @@ public interface CR02Svc {
     int selectOrdrsCount(Map<String, String> param);
 
     List<Map<String, Object>> selectOrdrsList(Map<String, String> param);
+
+    int selectOrdrsListPopCount(Map<String, String> param);
     
     List<Map<String, Object>> selectOrdrsListPop(Map<String, String> param);
 

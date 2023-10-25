@@ -50,6 +50,14 @@ public class WB22Ctr {
    		  return "jsonView"; 
    	}
 	
+	//이력조회
+	@PostMapping(value = "/selectHistWBS1Level") 
+	public String selectHistWBS1Level(@RequestBody Map<String, String> paramMap, ModelMap model) {		
+		List<Map<String, String>> fileList = wb22Svc.selectHistWBS1Level(paramMap);
+		model.addAttribute("fileList", fileList);
+		return "jsonView";
+    }	
+	
 	@PostMapping(value = "/selectWBS1Level") 
 	public String selectWBS1Level(@RequestBody Map<String, String> paramMap, ModelMap model) {		
 		List<Map<String, String>> fileList = wb22Svc.selectWBS1Level(paramMap);
