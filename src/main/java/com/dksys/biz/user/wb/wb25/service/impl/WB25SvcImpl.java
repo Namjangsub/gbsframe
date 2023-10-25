@@ -71,7 +71,7 @@ public class WB25SvcImpl implements WB25Svc {
 		
 		String pgParam = "{\"actionType\":\""+ "U" +"\",";
                pgParam += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
-               pgParam += "\"evlCnts\":\""+ paramMap.get("evlCnts") +"\","; 
+               //pgParam += "\"evlCnts\":\""+ paramMap.get("evlCnts") +"\","; 
 		       pgParam += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
 		       pgParam += "\"salesCd\":\""+ paramMap.get("salesCd") +"\"}";
 		
@@ -193,7 +193,7 @@ public class WB25SvcImpl implements WB25Svc {
 
 		String pgParam = "{\"actionType\":\""+ "U" +"\",";
 	           pgParam += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
-	           pgParam += "\"evlCnts\":\""+ paramMap.get("evlCnts") +"\","; 
+	           //pgParam += "\"evlCnts\":\""+ paramMap.get("evlCnts") +"\","; 
 			   pgParam += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
 			   pgParam += "\"salesCd\":\""+ paramMap.get("salesCd") +"\"}";
 		

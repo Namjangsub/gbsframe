@@ -50,16 +50,43 @@
 	</div>
 
     <div id="main_area">
+
+
 		<div>
+			<div class="contents search" style="text-align:right">
+				<table class="table_input type03">
+					<tr>
+						<th style="text-align:right;">조회 일자</th>
+						<td>
+							<select id="searchYear" name="searchYear" data-search="searchYear" onchange="gridView2.reqSetData();">
+							</select>
+						</td>
+						<td>
+							<select id="searchMonth" name="searchMonth" data-search="searchMonth" onchange="gridView2.reqSetData();">
+							</select>
+						</td>
+						<th style="text-align:right;">
+							단위
+						</th>
+						<td>
+                            <select id="searchUnit" name="searchUnit" data-search="searchItem" onchange="gridView4.setData();">
+								<option value=100000000>억원</option>
+								<option value=1000000>백만원</option>
+								<option value=1000  selected>천원</option>
+								<option value=1>원</option>
+							</select>
+						</td>
+					</tr>
+				</table>
+			</div>
         </div>
         <div>
             <table class="form-group popup_table" id="scndTable">                
                 <thead>
                     <tr>
                         <td style="text-align: left;">
-                            <h3 class="location"><span class="page_tit">재고실적(법인)</span></h3> (
-                            <h7 class="location"><span class="page_tit" id="searchDttm">조회 일시 : </span></h7>)
-                            <span>(단위:Ton)</span>
+                            <h3 class="location"><span class="page_tit">장애발생현황</span></h3> (
+                            <h7 class="location"><span class="page_tit" id="searchDttm">조회 일시 : </span></h7>)                       
                         </td>
                     </tr>
                 </thead>
@@ -67,9 +94,15 @@
                     <tr>
                         <td>
                             <div class="" style="margin:0px;padding:0px;width:100%;">
-                                <div data-ax5grid="grid02" data-ax5grid-config="{}" style="height:600px; ">
+                                <div data-ax5grid="grid04" data-ax5grid-config="{}" style="height:250px; ">
                                 </div>
                             </div>
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td>
+                            <div id="chart_div4"></div>
                         </td>
                     </tr>
                 </tbody>
@@ -77,22 +110,25 @@
         </div>
     </div>
 
+
     <script type="text/javascript">
-   
-		var gridView2 = {
+        var actionType = null;
+        var odrSeq = null;
+        var odrDtlSeqArr = [];
+
+        var gridView4 = {
             initView: function () {
                 this.target = new ax5.ui.grid();
                 this.target.setConfig({
                     showRowSelector: false,
                     multipleSelect: false,
                     sortable: true,
-                    target: $('[data-ax5grid="grid02"]'),
+                    target: $('[data-ax5grid="grid04"]'),
                     header: {
                         align: "center",
                         selector: false
                     },
                     body: {
-    		            mergeCells : ["coNm", "prdtGrpNm", "prdtDivNm"],
                         onClick: function () {
                             this.self.select(this.dindex);
                         }
@@ -100,41 +136,54 @@
                     page: {
                         display: false,
                     },
-    		        columns: [
-    		          	/* {key: "prdtDt", label: "기준날짜", align: "center", width: "25%"}, */
-    		            {key: "basisPriceSeq", label: "기준번호", align: "center", width: "15%", hidden: "true"},
-    		         	{key: "coNm", label: "회사", align: "center", width: "24%"}, 
-    		         	{key: "prdtGrp",  hidden: "true"},
-    		         	{key: "prdtGrpNm", label: "그룹", align: "center", width: "17%"},
-    		         	{key: "prdtDiv",  hidden: "true"}, 
-    		         	{key: "prdtDivNm", label: "제품", align: "center", width: "18%"},
-    		        	{key: "stockQty", label: "수량", align: "right", width: "20%", formatter: "money"},
-    		        	{key: "stockWt", label: "중량", align: "right", width: "22%", 	formatter: "money"}
-    		        ],
-    		        footSum: [
-    			    	[
-    			    		{label: "합 계", 	    align:"center",	  colspan:3},
-    	                    {key: "stockQty", 		collector: "sum", formatter:"money", align: "right"},
-    	                    {key: "stockWt", 		collector: "sum", formatter:"money", align: "right"}
-    			    	]
-    			    ]
+					footSum: [
+				    	[
+				    		{label: "합계", align:"center"},
+				    		{},
+		                    {key: "errCnt", collector: "sum", formatter:"money", align: "right"},
+		                    {key: "errCompCnt", collector: "sum", formatter:"money", align: "right"}
+				    	]
+				    ],
+					columns: [
+			          	{key: "clntNm",     label: "고객사",   	align: "center",  width: "35%"},
+			          	{key: "ctrtNm",      label: "계약명",   	align: "left",  width: "40%"},
+			          	{key: "errCnt",     label: "장애건수",   	align: "right",  width: "13%", formatter:"money"},
+			          	{key: "errCompCnt", label: "미완료",   	align: "right",  width: "13%", formatter:"money"}
+			        ]
                 });
                 return this;
             },          
             reqSetData: function () {
-            	
                 var paramObj = {
-                		coCd: "",
+						option : 'co',
 						searchUnit : $("#searchUnit").val(),
-						baseDt: new Date().toISOString().substring(0, 10)
+						searchYm : $("#searchYear").val() + $("#searchMonth").val(),
+						coCd : jwt.coCd
 				};
-                postAjax(DOMAIN_URL + "/user/sm/sm07/selectStockSummaryList", paramObj, null, function (data) {
+                postAjax(DOMAIN_URL + "/user/cm/cm11/selectDashBoardList", paramObj, null, function (data) {
                     $("#searchDttm").html("조회 일시 : " + data.searchDttm);
-                    gridView2.target.setData({
-                        list: data.stockList,
+                    gridView4.target.setData({
+                        list: data.resultList4,
                         page: {
                             totalElements: 1
                         }
+
+                    });
+                    google.charts.setOnLoadCallback(function drawChart() {
+                        var chartData4 = new google.visualization.DataTable(data.chartData4); // 일정지연현황    
+                        var chart4 = new google.visualization.BarChart(document.getElementById("chart_div4")); // 일정지연현황
+                        var options = {
+                            height: 300,
+//                             width: 340,
+                            fontSize: '10',
+                            //curveType: 'function',
+                            animation: { //차트가 뿌려질때 실행될 애니메이션 효과
+                                startup: true,
+                                duration: 1000,
+                                easing: 'linear'
+                            },
+                        };
+                        chart4.draw(chartData4, options); // 매출실적(제품)                             
                     });
                 });
             }
@@ -148,9 +197,9 @@
 			SetYm();
 
             // grid init		
-            gridView2.initView().reqSetData();
+            gridView4.initView().reqSetData();
             var setDataInterval = setInterval(function () {
-                gridView2.initView().reqSetData();
+                gridView4.initView().reqSetData();
             }, 6000000);
 
         });
@@ -173,9 +222,7 @@
 			$("#searchMonth option[value=" + nmon +"]").attr("selected", true);
 		}
 
-        google.charts.load('current', {
-            'packages': ['corechart']
-        });
+        google.charts.load('current', {'packages': ['corechart']});
     </script>
 </body>
 </html>
