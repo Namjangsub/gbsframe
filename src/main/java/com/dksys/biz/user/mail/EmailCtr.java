@@ -68,7 +68,7 @@ public class EmailCtr {
 			paramMap.put("errorText", errorMessage);
 			try {
 //				int count = emailSvc.updateMailError(paramMap);
-				int count = emailSvc.insertMail(paramMap); //오류로그 남기기 Exception 발생시 rollback되어 초기등록된 자로가 없음~
+				int count = emailSvc.insertMail(paramMap); //오류로그 남기기 Exception 발생시 rollback되어 초기등록된 자료가 없음~
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("mailSendFail"));
 			}catch(Exception ex){	  
