@@ -21,7 +21,6 @@ import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.exc.LogicException;
 import com.dksys.biz.util.MessageUtils;
 import com.dksys.biz.user.wb.wb01.service.WB01Svc;
-import com.dksys.biz.user.wb.wb02.service.WB02Svc;
 
 @Controller
 @Transactional(rollbackFor = Exception.class)
