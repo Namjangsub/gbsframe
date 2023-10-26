@@ -122,4 +122,13 @@ public class BM17Ctr {
     	}
     	return "jsonView";		  		  
     }
+    
+	//조회 정보  -->
+    @PostMapping(value = "/selectMessageTemplInfo") 
+    public String selectMessageTemplInfo(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+
+  		Map<String, Object> resultInfo = bm17Svc.selectMessageTemplInfo(paramMap);
+		model.addAttribute("resultInfo", resultInfo); 
+		return "jsonView"; 
+    }
 }

@@ -109,4 +109,10 @@ public class BM17SvcImpl implements BM17Svc {
 		return result;
 	}
 
+	@Override
+	public Map<String, Object> selectMessageTemplInfo(Map<String, String> paramMap) throws Exception {
+		Map<String, Object> returnMap = new HashMap<String, Object>();
+		returnMap = bm17Mapper.selectMessageTemplInfo(paramMap);	
+		return returnMap; 
+	}
 }
