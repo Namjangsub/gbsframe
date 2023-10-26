@@ -165,6 +165,7 @@
 
 
      <select id="selectWbsTaskEvlList" parameterType="Map" resultType="camelMap">
+     /* selectWbsTaskEvlList */
          WITH SUBJ AS --확정된 과제정보
                  (
                   SELECT X.CO_CD                                                      AS CO_CD              --회사코드
@@ -236,9 +237,9 @@
                         , MAX(WR.WBS_RSLTSE_DT)  AS RSLTSE_DT     --TASK실적종료일 
                         , SUM(WR.DAYCNT)         AS RSLT_DAYCNT   --TASK실적소요일
                         , SUM(WR.WBS_RSLTS_MH)   AS RSLTS_MH      --WBS실적 공수                    
-                        , MAX(CASE WHEN WR.WBS_PLAN_CODE_KIND = 'WBSCODE15' AND WR.WBS_RSLTS_RATE = 100 THEN 'Y'
+                        , MAX(CASE WHEN WR.WBS_PLAN_CODE_KIND = 'WBSCODE14' AND WR.WBS_RSLTS_RATE = 100 THEN 'Y'
                                     ELSE 'N'
-                              END)               AS WBS_CLOSE_YN --평가대상 유무 : 완료검수 실적(WBSCODE15) = 100%
+                              END)               AS WBS_CLOSE_YN --평가대상 유무 : 설치시운전(복귀일) 실적(WBSCODE14) = 100% --완료검수 실적(WBSCODE15) = 100%
                      FROM TB_WB23M01  WR--WBS실적 정보
                     WHERE WR.CO_CD    = #{coCd}
                       AND EXISTS (SELECT 'X'    --조회된 과제의 SALES_CD 만 
@@ -380,206 +381,207 @@
       
       
       <select id="selectWbsTaskEvlResultList" parameterType="Map" resultType="camelMap">      
-
-            WITH SUBJ AS --확정된 과제정보
-                 (
-                  SELECT X.CO_CD                            AS CO_CD             --회사코드
-                       , X.SALES_CD                          AS SALES_CD          --SALES Code
-                       , X.SJ_NM                             AS SJ_NM             --과제명
-                       , X.VER_NO                            AS VER_NO            --버젼
-                       , TO_CHAR(X.BEGIN_DT, 'YYYY-MM-DD')   AS SUBJ_SDT          --시작일
-                       , TO_CHAR(X.DE_DT, 'YYYY-MM-DD')      AS DE_DT             --출고일
-                       , TO_CHAR(X.ACPTNC_DT, 'YYYY-MM-DD')  AS SUBJ_EDT          --완료검수일
-                       , TO_CHAR(X.REQRE_DAYCNT)             AS REQRE_DAYCNT      --소요일수
-                       , X.DSGN_PLAN_HOUR                    AS DSGN_PLAN_HOUR    --설계계획공수
-                       , X.PRDCTN_PLAN_HOUR                  AS PRDCTN_PLAN_HOUR  --생산계획공수
-                    FROM TB_WB21M01 X
-                   WHERE X.CO_CD    = #{coCd}
-                     AND X.SALES_CD = #{salesCd}
-                     AND X.CLOSE_YN = 'Y' --확정된 과제 
-                 )
-               , SJD AS --수주상세 
-                 ( 
-                  SELECT M.CO_CD                                                               AS CO_CD    --회사코드
-                        , M.ORDRS_NO                                                            AS ORDRS_NO --수주번호
-                        , X.SALES_CD                                                            AS SALES_CD --SALES Code
-                        , M.ORDRS_CLNT_CD                                                       AS CLNT_CD  --고객코드
-                        , C.CLNT_NM                                                             AS CLNT_NM  --고객명
-                        , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)                   AS CLNT_PJT_NM  --고객사프로젝트명
-                        , X.EST_EPCT_MAT_PRC                                                    AS EST_PRC  --견적원가 : 예상재료비
-                        , X.TRGT_PCHS_PCOST_MACH +  X.TRGT_PCHS_PCOST_ELCTY                     AS TRGT_PRC --목표원가 : 기계전기합계 
-                        , (X.ACT_RGL_MACH + X.ACT_OBS_MACH)+(X.ACT_RGL_ELCTY + X.ACT_OBS_ELCTY) AS ACT_PRC  --실행원가 : 구매/외주 합계
-                        
-                        , CASE WHEN NVL(X.EST_EPCT_MAT_PRC,0) = 0 THEN 0
-                               ELSE ROUND( ( (X.ACT_RGL_MACH + X.ACT_OBS_MACH + X.ACT_RGL_ELCTY + X.ACT_OBS_ELCTY) / X.EST_EPCT_MAT_PRC) * 100, 2)
-                          END                                                                   AS TRGT_RATE--견적대비 실적율 
-              
-                        
-                        , CASE WHEN NVL(X.TRGT_PCHS_PCOST_MACH,0) + NVL(X.TRGT_PCHS_PCOST_ELCTY,0) = 0 THEN 0
-                               ELSE ROUND( ( (X.ACT_RGL_MACH + X.ACT_OBS_MACH + X.ACT_RGL_ELCTY + X.ACT_OBS_ELCTY) / (X.TRGT_PCHS_PCOST_MACH +  X.TRGT_PCHS_PCOST_ELCTY) 
-                                            ) * 100, 2)
-                          END                                                                   AS ACT_RATE--목표대비 실적율
-                     FROM TB_CR02M01  M --수주마스터
-                          INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
-                          INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
-                    WHERE 1=1
-                      AND M.CO_CD    = #{coCd}
-                      AND X.SALES_CD = #{salesCd}
-                      AND X.SALES_CD IS NOT NULL --비용제외
-                 )
-                 
-                 
-               , T_PLAN AS -- WBS계획 LVL1
-			     ( 
-			       SELECT P.CO_CD
-			             , P.SALES_CD
-			             , MAX(TO_CHAR(P.WBS_PLANS_DT, 'YYYY-MM-DD'))  AS WBS_PLANS_DT --계획 시작일
-			             , MAX(TO_CHAR(P.WBS_PLANE_DT, 'YYYY-MM-DD'))  AS WBS_PLANE_DT --계획 종료일 
-			             , SUM(P.DAYCNT)                               AS DAYCNT       --소요일 합계
-			             , K.DSGN_EXP_MH                               AS DSGN_EXP_MH  --설계계획공수
-			             , K.PRD_EXP_MH                                AS PRD_EXP_MH   --생산계획공수
-			          FROM TB_WB22M01 AS P --WBS계획 정보
-			               LEFT OUTER JOIN ( SELECT CO_CD
-			                                       , SALES_CD
-			                                       , SUM(CASE WHEN WBS_PLAN_CODE_KIND IN ('WBSCODE04', 'WBSCODE05', 'WBSCODE06') THEN EXPECT_MH --TASK 설계, 검도, 출도 계획공수
-			                                                   ELSE 0
-			                                             END )         AS DSGN_EXP_MH --설계계획공수 
-			                                       , SUM(CASE WHEN WBS_PLAN_CODE_KIND IN ('WBSCODE09', 'WBSCODE10', 'WBSCODE11',
-			                                                                               'WBSCODE12', 'WBSCODE13', 'WBSCODE14') THEN EXPECT_MH --TASK 조립,시운전,품평회,출고,설치,On-Site 시운전 계획공수
-			                                                   ELSE 0
-			                                             END )         AS PRD_EXP_MH --생산계획공수 
-			                                   FROM TB_WB22M01 --WBS계획 정보
-			                                  WHERE WBS_PLAN_CODE_KIND != 'WBSCODE' --LEVEL2
-			                                    AND CO_CD    = #{coCd}
-			                                    AND SALES_CD = #{salesCd}
-			                                  GROUP BY CO_CD, SALES_CD
-			                               ) AS K ON P.CO_CD = K.CO_CD AND P.SALES_CD = K.SALES_CD
-			         WHERE P.CLOSE_YN = 'Y'
-			           AND P.CO_CD    = #{coCd}
-			           AND P.SALES_CD = #{salesCd}
-			           AND P.WBS_PLAN_CODE_NM IS NULL   --LVL1 : 계획
-			         GROUP BY P.CO_CD, P.SALES_CD, K.DSGN_EXP_MH, K.PRD_EXP_MH
-			     )
-			     
-			     
-               , REQ AS --요인별 발주_출장요청
-                 (
-                  SELECT Q.CO_CD                      --회사코드
-                        , Q.SALES_CD                   --SALES CODE
-                        , COUNT(Q.REQ_NO) AS REQ_CNT  --장애건수
-                        , SUM(M.PCHS_AMT) AS PCHS_AMT --매입확정금액
-                    FROM TB_QM01M01 Q --요인별 발주_출장요청
-                          LEFT OUTER JOIN ( 
-                                           SELECT E.CO_CD                       --회사코드
-                                                , E.SALES_CD                     --SALES CODE
-                                                , B.REQ_NO                       --요인별 요청번호
-                                                , SUM(E.ORDRG_AMT) AS ORDRG_AMT --발주금액
-                                                , SUM(D.PCHS_AMT)  AS  PCHS_AMT --매입확정금액
-                                             FROM TB_SM02D01 E    --발주상세
-                                                  INNER      JOIN TB_SM02M01 B   ON(E.CO_CD = B.CO_CD AND E.ORDRG_NO = B.ORDRG_NO AND E.SALES_CD=B.SALES_CD) --발주마스터 
-                                                  LEFT OUTER JOIN TB_SM12D01 D   ON(D.ORDRG_NO = E.ORDRG_NO AND D.ORDRG_SEQ = E.ORDRG_SEQ)                   --매입확정상세
-                                                  LEFT OUTER JOIN TB_SM12M01 M12 ON(D.CO_CD = M12.CO_CD AND D.PCHS_NO = M12.PCHS_NO)                         --매입확정마스터
-                                            WHERE E.CO_CD       = #{coCd}
-                                              AND M12.CMPLET_YN = 'Y' --매입확정
-                                            GROUP BY E.CO_CD, E.SALES_CD, B.REQ_NO
-                                          ) AS M  --발주 시 요인별 요청번호 매칭된 매입마감자료의 금액 집계
-                                          ON Q.REQ_NO = M.REQ_NO AND Q.SALES_CD = M.SALES_CD AND Q.CO_CD = M.CO_CD
-                   WHERE Q.CO_CD    = #{coCd}
-                     AND Q.SALES_CD = #{salesCd}
-                     AND Q.PART_CD  = 'COBTP03' --장애
-                   GROUP BY Q.CO_CD, Q.SALES_CD
-                 )
-               , RSLT AS --WBS 실적정보
-                 (              
-                  SELECT WR.CO_CD                AS CO_CD--회사코드
-                        , WR.SALES_CD             AS SALES_CD--SALES Code 
-                        , MIN(WR.WBS_RSLTSS_DT)  AS RSLTSS_DT     --TASK실적시작일
-                        , MAX(WR.WBS_RSLTSE_DT)  AS RSLTSE_DT     --TASK실적종료일 
-                        , SUM(WR.DAYCNT)         AS RSLT_DAYCNT   --TASK실적소요일
-                        , SUM(CASE WHEN WR.WBS_PLAN_CODE_KIND IN ('WBSCODE04', 'WBSCODE05', 'WBSCODE06') THEN WR.WBS_RSLTS_MH
-                                    ELSE 0
-                              END )              AS DSGN_RSLT_MH --설계실적공수 
-                        , SUM(CASE WHEN WR.WBS_PLAN_CODE_KIND IN ('WBSCODE09', 'WBSCODE10', 'WBSCODE11',
-                                                                   'WBSCODE12', 'WBSCODE13', 'WBSCODE14') THEN WR.WBS_RSLTS_MH --TASK 조립,시운전,품평회,출고,설치,On-Site 시운전 실적공수 (WBSCODE14 : 완료 검수)  
-                                    ELSE 0
-                              END )              AS PRDCTN_RSLT_MH --생산실적공수 
-                        , MAX(CASE WHEN WR.WBS_PLAN_CODE_KIND = 'WBSCODE15' AND WR.WBS_RSLTS_RATE = 100 THEN 'Y'
-                                    ELSE 'N'
-                              END)               AS WBS_CLOSE_YN --평가대상 유무 : 완료검수 실적(WBSCODE15) = 100%
-                     FROM TB_WB23M01  WR--WBS실적 정보                
-                    WHERE WR.CO_CD    = #{coCd}
-                      AND WR.SALES_CD = #{salesCd}
-                    GROUP BY WR.CO_CD, WR.SALES_CD
-                 )
-                    SELECT J.CO_CD
-                          , R.WBS_CLOSE_YN      --평가대상 유무
-                          -----------------------------------------------------------------------------수주정보 Grouping : 화면상단1에 표기
-                          , S.CLNT_NM           --고객명
-                          , S.CLNT_PJT_NM       --고객사프로젝트명
-                          , S.ORDRS_NO          --수주번호
-                          , J.SALES_CD          --Sales Code
-                          -----------------------------------------------------------------------------과제정보 Grouping : 화면상단2에 표기
-                          , J.SJ_NM             --과제명
-                          , J.VER_NO            --버젼
-                          , J.SUBJ_SDT          --과제시작일
-                          , J.SUBJ_EDT          --과제종료일
-                          , J.REQRE_DAYCNT      --소요일수
-                          -----------------------------------------------------------------------------1.계획vs실적 정보 Grouping
-                          , P.WBS_PLANS_DT      --계획시작일 : LVL1
-                          , P.WBS_PLANE_DT      --계획종료일 : LVL1
-                          , P.DAYCNT            --계획소요일 : LVL1
-                          , TO_CHAR(R.RSLTSS_DT, 'YYYY-MM-DD')  AS RSLTSS_DT   --TASK실적시작일
-                          , TO_CHAR(R.RSLTSE_DT, 'YYYY-MM-DD')  AS RSLTSE_DT   --TASK실적종료일 
-                          , R.RSLT_DAYCNT                       AS RSLT_DAYCNT --TASK실적소요일
-                          , CASE WHEN NVL(P.DAYCNT,0) = 0 THEN 0
-                                 ELSE ROUND( (R.RSLT_DAYCNT / P.DAYCNT) * 100, 2)
-                            END  AS DAY_RATE   --계획대비 실적율         
-                          -----------------------------------------------------------------------------2.원가정보 Grouping : 화면상단에 표기
-                          , S.EST_PRC           --견적원가
-                          , S.TRGT_PRC          --목표원가
-                          , S.ACT_PRC           --실행원가
-                          , S.TRGT_RATE         --견적대비 목표율
-                          , S.ACT_RATE          --목표대비 실적율
-                          -----------------------------------------------------------------------------3.공수정보 Grouping : 화면상단에 표기
-                          --, J.DSGN_PLAN_HOUR    --설계계획공수
-                          , P.DSGN_EXP_MH  AS DSGN_PLAN_HOUR     --설계계획공수
-                          , R.DSGN_RSLT_MH      --설계실적공수
-                          
-                           
-                          --, CASE WHEN NVL(J.DSGN_PLAN_HOUR,0) = 0 THEN 0
-                                 --ELSE ROUND( (R.DSGN_RSLT_MH / J.DSGN_PLAN_HOUR) * 100, 2)
-                                                                 
-                          , CASE WHEN NVL(P.DSGN_EXP_MH,0) = 0 THEN 0
-							             ELSE ROUND( (R.DSGN_RSLT_MH / P.DSGN_EXP_MH) * 100, 2)
-							        END  AS DSGN_DAY_RATE   --계획대비 설계공수 실적율      
-							             
-                          --, J.PRDCTN_PLAN_HOUR  --생산계획공수
-                          , P.PRD_EXP_MH AS PRDCTN_PLAN_HOUR       --생산계획공수
-                          
-                          , R.PRDCTN_RSLT_MH    --생산실적공수 
-                                                    
-                         -- , CASE WHEN NVL(J.PRDCTN_PLAN_HOUR,0) = 0 THEN 0
-                         --        ELSE ROUND( (R.PRDCTN_RSLT_MH / J.PRDCTN_PLAN_HOUR) * 100, 2)
-                         
-                         , CASE WHEN NVL(P.PRD_EXP_MH,0) = 0 THEN 0
-						             ELSE ROUND( (R.PRDCTN_RSLT_MH / P.PRD_EXP_MH) * 100, 2)
-						        END  AS PRDCTN_DAY_RATE   --계획대비 생산공수 실적율              
-                          -----------------------------------------------------------------------------4.품질 장애이슈 Grouping
-                          , Q.REQ_CNT  --장애건수
-                          , Q.PCHS_AMT --매입확정금액
-                          , X.EVL_ID
-                          , X.EVL_CNTS
-                          , (SELECT FN_CM06M01_ID_TO_NM(X.EVL_ID) FROM DUAL) AS EVL_NM 
-                          -- 이슈유형
-                          -- 계획 이슈
-                          -- 실적 이슈
-                      FROM SUBJ AS J
-                           INNER      JOIN T_PLAN AS P ON J.CO_CD = P.CO_CD AND J.SALES_CD = P.SALES_CD 
-                           INNER      JOIN SJD    AS S ON J.CO_CD = S.CO_CD AND J.SALES_CD = S.SALES_CD 
-                           LEFT OUTER JOIN REQ    AS Q ON J.CO_CD = Q.CO_CD AND J.SALES_CD = Q.SALES_CD 
-                           LEFT OUTER JOIN RSLT   AS R ON J.CO_CD = R.CO_CD AND J.SALES_CD = R.SALES_CD 
-                           LEFT OUTER JOIN TB_WB25M01 X ON X.CO_CD = J.CO_CD AND J.SALES_CD = X.SALES_CD
-                     WHERE 1=1
+		/* selectWbsTaskEvlResultList */
+		WITH SUBJ AS --확정된 과제정보
+		     (
+		      SELECT X.CO_CD                            AS CO_CD             --회사코드
+		           , X.SALES_CD                          AS SALES_CD          --SALES Code
+		           , X.SJ_NM                             AS SJ_NM             --과제명
+		           , X.VER_NO                            AS VER_NO            --버젼
+		           , TO_CHAR(X.BEGIN_DT, 'YYYY-MM-DD')   AS SUBJ_SDT          --시작일
+		           , TO_CHAR(X.DE_DT, 'YYYY-MM-DD')      AS DE_DT             --출고일
+		           , TO_CHAR(X.ACPTNC_DT, 'YYYY-MM-DD')  AS SUBJ_EDT          --완료검수일
+		           , TO_CHAR(X.REQRE_DAYCNT)             AS REQRE_DAYCNT      --소요일수
+		           , X.DSGN_PLAN_HOUR                    AS DSGN_PLAN_HOUR    --설계계획공수
+		           , X.PRDCTN_PLAN_HOUR                  AS PRDCTN_PLAN_HOUR  --생산계획공수
+		        FROM TB_WB21M01 X
+		       WHERE X.CO_CD    = #{coCd}
+		         AND X.SALES_CD = #{salesCd}
+		         AND X.CLOSE_YN = 'Y' --확정된 과제 
+		     )
+		   , SJD AS --수주상세 
+		     ( 
+		      SELECT M.CO_CD                                                               AS CO_CD    --회사코드
+		            , M.ORDRS_NO                                                            AS ORDRS_NO --수주번호
+		            , X.SALES_CD                                                            AS SALES_CD --SALES Code
+		            , M.ORDRS_CLNT_CD                                                       AS CLNT_CD  --고객코드
+		            , C.CLNT_NM                                                             AS CLNT_NM  --고객명
+		            , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)                   AS CLNT_PJT_NM  --고객사프로젝트명
+		            
+		            , X.EST_EPCT_MAT_PRC                                                    AS EST_PRC  --견적원가 : 예상재료비
+		            , X.TRGT_PCHS_PCOST_MACH +  X.TRGT_PCHS_PCOST_ELCTY                     AS TRGT_PRC --목표원가 : 기계전기합계 
+		            , (X.ACT_RGL_MACH + X.ACT_OBS_MACH)+(X.ACT_RGL_ELCTY + X.ACT_OBS_ELCTY) AS ACT_PRC  --실행원가 : 구매/외주 합계
+		            , CASE WHEN NVL(X.EST_EPCT_MAT_PRC,0) = 0 THEN 0
+		                   ELSE ROUND( ( (X.ACT_RGL_MACH + X.ACT_OBS_MACH + X.ACT_RGL_ELCTY + X.ACT_OBS_ELCTY) / X.EST_EPCT_MAT_PRC) * 100, 2)
+		              END                                                                   AS TRGT_RATE--견적대비 실적율                      
+		            , CASE WHEN NVL(X.TRGT_PCHS_PCOST_MACH,0) + NVL(X.TRGT_PCHS_PCOST_ELCTY,0) = 0 THEN 0
+		                   ELSE ROUND( ( (X.ACT_RGL_MACH + X.ACT_OBS_MACH + X.ACT_RGL_ELCTY + X.ACT_OBS_ELCTY) / (X.TRGT_PCHS_PCOST_MACH +  X.TRGT_PCHS_PCOST_ELCTY) 
+		                                ) * 100, 2)
+		              END                                                                   AS ACT_RATE--목표대비 실적율
+		         FROM TB_CR02M01  M --수주마스터
+		              INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+		              INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+		        WHERE 1=1
+		          AND M.CO_CD    = #{coCd}
+		          AND X.SALES_CD = #{salesCd}
+		          AND X.SALES_CD IS NOT NULL --비용제외
+		     )
+		   , T_PLAN AS -- WBS계획 LVL1
+		     ( 
+		       SELECT P.CO_CD
+		             , P.SALES_CD
+		             , MAX(TO_CHAR(P.WBS_PLANS_DT, 'YYYY-MM-DD'))  AS WBS_PLANS_DT --계획 시작일
+		             , MAX(TO_CHAR(P.WBS_PLANE_DT, 'YYYY-MM-DD'))  AS WBS_PLANE_DT --계획 종료일 
+		             , SUM(P.DAYCNT)                               AS DAYCNT       --소요일 합계
+		             , K.DSGN_EXP_MH                               AS DSGN_EXP_MH  --설계계획공수
+		             , K.PRD_EXP_MH                                AS PRD_EXP_MH   --생산계획공수
+		          FROM TB_WB22M01 AS P --WBS계획 정보
+		               LEFT OUTER JOIN ( SELECT CO_CD
+		                                       , SALES_CD
+		                                       , SUM(CASE WHEN WBS_PLAN_CODE_KIND = 'WBSCODE03' THEN EXPECT_MH --TASK 설계완료 계획공수
+											 --, SUM(CASE WHEN WBS_PLAN_CODE_KIND IN ('WBSCODE04', 'WBSCODE05', 'WBSCODE06') THEN EXPECT_MH --TASK 설계, 검도, 출도 계획공수
+		                                                   ELSE 0
+		                                             END )         AS DSGN_EXP_MH --설계계획공수 
+		                                     , SUM(CASE WHEN WBS_PLAN_CODE_KIND IN ('WBSCODE05', 'WBSCODE06', 'WBSCODE07', 'WBSCODE08', 'WBSCODE09',                --TASK 기계조립완료, 전기완료, 자체시운전완료, 조건작업완료, 고객검수,
+		                                                                            'WBSCODE10', 'WBSCODE11', 'WBSCODE12', 'WBSCODE13', 'WBSCODE14') THEN EXPECT_MH --TASK 포장, 출고, 도착, 설치시운전(출발일), 설치시운전(복귀일) 계획공수
+		                                     --, SUM(CASE WHEN WBS_PLAN_CODE_KIND IN ('WBSCODE09', 'WBSCODE10', 'WBSCODE11',
+		                                     --                                        'WBSCODE12', 'WBSCODE13', 'WBSCODE14') THEN EXPECT_MH --TASK 조립,시운전,품평회,출고,설치,On-Site 시운전 계획공수
+		                                                   ELSE 0
+		                                             END )         AS PRD_EXP_MH --생산계획공수 
+		                                   FROM TB_WB22M01 --WBS계획 정보
+		                                  WHERE WBS_PLAN_CODE_KIND != 'WBSCODE' --LEVEL2
+		                                    AND CO_CD    = #{coCd}
+		                                    AND SALES_CD = #{salesCd}
+		                                  GROUP BY CO_CD, SALES_CD
+		                               ) AS K ON P.CO_CD = K.CO_CD AND P.SALES_CD = K.SALES_CD
+		         WHERE P.CLOSE_YN = 'Y'
+		           AND P.CO_CD    = #{coCd}
+		           AND P.SALES_CD = #{salesCd}
+		           AND P.WBS_PLAN_CODE_NM IS NULL   --LVL1 : 계획
+		         GROUP BY P.CO_CD, P.SALES_CD, K.DSGN_EXP_MH, K.PRD_EXP_MH
+		     )
+		   , REQ AS --요인별 발주 and 출장요청
+		     (
+		      SELECT Q.CO_CD                      --회사코드
+		            , Q.SALES_CD                   --SALES CODE
+		            , COUNT(Q.REQ_NO) AS REQ_CNT  --장애건수
+		            , SUM(M.PCHS_AMT) AS PCHS_AMT --매입확정금액
+		        FROM TB_QM01M01 Q --요인별 발주and출장요청
+		              LEFT OUTER JOIN ( 
+		                               SELECT E.CO_CD                       --회사코드
+		                                    , E.SALES_CD                     --SALES CODE
+		                                    , B.REQ_NO                       --요인별 요청번호
+		                                    , SUM(E.ORDRG_AMT) AS ORDRG_AMT --발주금액
+		                                    , SUM(D.PCHS_AMT)  AS  PCHS_AMT --매입확정금액
+		                                 FROM TB_SM02D01 E    --발주상세
+		                                      INNER      JOIN TB_SM02M01 B   ON(E.CO_CD = B.CO_CD AND E.ORDRG_NO = B.ORDRG_NO AND E.SALES_CD=B.SALES_CD) --발주마스터 
+		                                      LEFT OUTER JOIN TB_SM12D01 D   ON(D.ORDRG_NO = E.ORDRG_NO AND D.ORDRG_SEQ = E.ORDRG_SEQ)                   --매입확정상세
+		                                      LEFT OUTER JOIN TB_SM12M01 M12 ON(D.CO_CD = M12.CO_CD AND D.PCHS_NO = M12.PCHS_NO)                         --매입확정마스터
+		                                WHERE E.CO_CD       = #{coCd}
+		                                  AND M12.CMPLET_YN = 'Y' --매입확정
+		                                GROUP BY E.CO_CD, E.SALES_CD, B.REQ_NO
+		                              ) AS M  --발주 시 요인별 요청번호 매칭된 매입마감자료의 금액 집계
+		                              ON Q.REQ_NO = M.REQ_NO AND Q.SALES_CD = M.SALES_CD AND Q.CO_CD = M.CO_CD
+		       WHERE Q.CO_CD    = #{coCd}
+		         AND Q.SALES_CD = #{salesCd}
+				 AND Q.PART_CD  = 'COBTP03' --장애
+		       GROUP BY Q.CO_CD, Q.SALES_CD
+		     )
+		   , RSLT AS --WBS 실적정보
+		     (              
+		      SELECT WR.CO_CD                AS CO_CD--회사코드
+		            , WR.SALES_CD             AS SALES_CD--SALES Code 
+		            , MIN(WR.WBS_RSLTSS_DT)  AS RSLTSS_DT     --TASK실적시작일
+		            , MAX(WR.WBS_RSLTSE_DT)  AS RSLTSE_DT     --TASK실적종료일 
+		            , SUM(WR.DAYCNT)         AS RSLT_DAYCNT   --TASK실적소요일
+		          --, SUM(CASE WHEN WR.WBS_PLAN_CODE_KIND IN ('WBSCODE04', 'WBSCODE05', 'WBSCODE06') THEN WR.WBS_RSLTS_MH
+					, SUM(CASE WHEN WR.WBS_PLAN_CODE_KIND = 'WBSCODE03' THEN WR.WBS_RSLTS_MH
+		                        ELSE 0
+		                  END )              AS DSGN_RSLT_MH --설계실적공수 
+		          --, SUM(CASE WHEN WR.WBS_PLAN_CODE_KIND IN ('WBSCODE09', 'WBSCODE10', 'WBSCODE11',
+		          --                                           'WBSCODE12', 'WBSCODE13', 'WBSCODE14') THEN WR.WBS_RSLTS_MH --TASK 조립,시운전,품평회,출고,설치,On-Site 시운전 실적공수 (WBSCODE14 : 완료 검수)  
+					, SUM(CASE WHEN WR.WBS_PLAN_CODE_KIND IN ('WBSCODE05', 'WBSCODE06', 'WBSCODE07', 'WBSCODE08', 'WBSCODE09',                      --TASK 기계조립완료, 전기완료, 자체시운전완료, 조건작업완료, 고객검수,
+		                                                      'WBSCODE10', 'WBSCODE11', 'WBSCODE12', 'WBSCODE13', 'WBSCODE14') THEN WR.WBS_RSLTS_MH --TASK 포장, 출고, 도착, 설치시운전(출발일), 설치시운전(복귀일) 실적공수
+		                        ELSE 0
+		                  END )              AS PRDCTN_RSLT_MH --생산실적공수 
+		         FROM TB_WB23M01  WR--WBS실적 정보                
+		        WHERE WR.CO_CD    = #{coCd}
+		          AND WR.SALES_CD = #{salesCd}
+		        GROUP BY WR.CO_CD, WR.SALES_CD
+		     )
+		   , EVAL AS --WBS 평가정보 
+		     (
+		      SELECT W.CO_CD                                           AS CO_CD     --회사코드
+		            , W.SALES_CD                                        AS SALES_CD  --SALSES_CD
+		            , TO_CHAR(W.EVL_DT, 'YYYY-MM-DD')                   AS EVL_DT    --평가일자 
+		            , W.CLOSE_YN                                        AS CLOSE_YN  --확정여부 
+		            , W.EVL_CNTS                                        AS EVL_CNTS  --평가내용
+		         FROM TB_WB25M01 W--WBS평가
+		        WHERE W.CO_CD = #{coCd}
+		          AND W.SALES_CD = #{salesCd}
+		     )
+		SELECT J.CO_CD
+		      -----------------------------------------------------------------------------수주정보 Grouping : 화면상단1에 표기
+		      , S.CLNT_NM           --고객명
+		      , S.CLNT_PJT_NM       --고객사프로젝트명
+		      , S.ORDRS_NO          --수주번호
+		      , J.SALES_CD          --Sales Code
+		      -----------------------------------------------------------------------------과제정보 Grouping : 화면상단2에 표기
+		      , J.SJ_NM             --과제명
+		      , J.VER_NO            --버젼
+		      , J.SUBJ_SDT          --과제시작일
+		      , J.SUBJ_EDT          --과제종료일
+		      , J.REQRE_DAYCNT      --소요일수
+		      -----------------------------------------------------------------------------1.계획vs실적 정보 Grouping
+		      , P.WBS_PLANS_DT      --계획시작일 : LVL1
+		      , P.WBS_PLANE_DT      --계획종료일 : LVL1
+		      , P.DAYCNT            --계획소요일 : LVL1
+		      , TO_CHAR(R.RSLTSS_DT, 'YYYY-MM-DD')  AS RSLTSS_DT   --TASK실적시작일
+		      , TO_CHAR(R.RSLTSE_DT, 'YYYY-MM-DD')  AS RSLTSE_DT   --TASK실적종료일 
+		      , R.RSLT_DAYCNT                       AS RSLT_DAYCNT --TASK실적소요일
+		      , CASE WHEN NVL(P.DAYCNT,0) = 0 THEN 0
+		             ELSE ROUND( (R.RSLT_DAYCNT / P.DAYCNT) * 100, 2)
+		        END  AS DAY_RATE   --계획대비 실적율         
+		      -----------------------------------------------------------------------------2.원가정보 Grouping : 화면상단에 표기
+		      , S.EST_PRC           --견적원가
+		      , S.TRGT_PRC          --목표원가
+		      , S.ACT_PRC           --실행원가
+		      , S.TRGT_RATE         --견적대비 실적율
+		      , S.ACT_RATE          --목표대비 실적율
+		      -----------------------------------------------------------------------------3.공수정보 Grouping : 화면상단에 표기
+		    --, J.DSGN_PLAN_HOUR    --설계계획공수
+		      , P.DSGN_EXP_MH       --설계계획공수
+		      , R.DSGN_RSLT_MH      --설계실적공수 
+		    --, CASE WHEN NVL(J.DSGN_PLAN_HOUR,0) = 0 THEN 0
+		    --       ELSE ROUND( (R.DSGN_RSLT_MH / J.DSGN_PLAN_HOUR) * 100, 2)
+		      , CASE WHEN NVL(P.DSGN_EXP_MH,0) = 0 THEN 0
+		             ELSE ROUND( (R.DSGN_RSLT_MH / P.DSGN_EXP_MH) * 100, 2)
+		        END  AS DAY_RATE   --계획대비 설계공수 실적율               
+		    --, J.PRDCTN_PLAN_HOUR  --생산계획공수        
+		      , P.PRD_EXP_MH        --생산계획공수
+		      , R.PRDCTN_RSLT_MH    --생산실적공수 
+		    --, CASE WHEN NVL(J.PRDCTN_PLAN_HOUR,0) = 0 THEN 0
+		    --       ELSE ROUND( (R.PRDCTN_RSLT_MH / J.PRDCTN_PLAN_HOUR) * 100, 2)
+		      , CASE WHEN NVL(P.PRD_EXP_MH,0) = 0 THEN 0
+		             ELSE ROUND( (R.PRDCTN_RSLT_MH / P.PRD_EXP_MH) * 100, 2)
+		        END  AS DAY_RATE   --계획대비 생산공수 실적율               
+		      -----------------------------------------------------------------------------4.품질 장애 and 이슈 Grouping
+		      , Q.REQ_CNT  --장애건수
+		      , Q.PCHS_AMT --매입확정금액
+		      -- 이슈유형
+		      -- 계획 이슈
+		      -- 실적 이슈
+		      -----------------------------------------------------------------------------5.평가정보
+		      , E.EVL_DT    --평가일자
+		      , E.CLOSE_YN  --확정여부 
+		      , E.EVL_CNTS  --평가내용
+		  FROM SUBJ AS J
+		       INNER      JOIN T_PLAN AS P ON J.CO_CD = P.CO_CD AND J.SALES_CD = P.SALES_CD 
+		       INNER      JOIN SJD    AS S ON J.CO_CD = S.CO_CD AND J.SALES_CD = S.SALES_CD 
+		       LEFT OUTER JOIN REQ    AS Q ON J.CO_CD = Q.CO_CD AND J.SALES_CD = Q.SALES_CD 
+		       LEFT OUTER JOIN RSLT   AS R ON J.CO_CD = R.CO_CD AND J.SALES_CD = R.SALES_CD 
+		       LEFT OUTER JOIN EVAL   AS E ON J.CO_CD = E.CO_CD AND J.SALES_CD = E.SALES_CD 
+		 WHERE 1=1
         </select>        
      
          <select id="selectWbsTaskEvlIssList" parameterType="Map" resultType="camelMap">  
@@ -606,7 +608,7 @@
           
           
           <select id="selectEvlCloseChk" parameterType="Map"  resultType="camelMap">
-             SELECT F_EVAL_CLOSE(#{coCd}, #{salesCd}) AS CLOSE_CHK FROM DUAL; 
+             SELECT F_EVAL_CLOSE(#{coCd}, #{salesCd}) AS CLOSE_CHK FROM DUAL 
           </select>
           
           
