@@ -21,4 +21,7 @@ public interface BM13Svc {
 	
 	int deleteApproval(Map<String, String> paramMap) throws Exception;
 	
+	List<Map<String, String>> selectRsltsMemberList(Map<String, String> paramMap);
+
+	
 }

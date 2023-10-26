@@ -26,4 +26,7 @@ public interface BM13Mapper {
 	int updateApproval(Map<String, String> paramMap);
 	
 	int deleteApproval(Map<String, String> paramMap);	
+	
+	List<Map<String, String>> selectRsltsMemberList(Map<String, String> paramMap);
+
 }

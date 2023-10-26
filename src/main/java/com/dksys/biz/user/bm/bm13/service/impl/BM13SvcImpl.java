@@ -144,4 +144,9 @@ public class BM13SvcImpl implements BM13Svc {
 	  }	
 	
 	
+    @Override
+	public List<Map<String, String>> selectRsltsMemberList(Map<String, String> paramMap) {
+		return bm13Mapper.selectRsltsMemberList(paramMap);
+	}
+    
 }

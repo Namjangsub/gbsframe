@@ -110,4 +110,13 @@ public class BM13Ctr {
   		}
   	  	return "jsonView";
     }    
+    
+    
+    @PostMapping(value = "/selectRsltsMemberList") 
+	public String selectRsltsMemberList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    List<Map<String, String>> resultList = bm13Svc.selectRsltsMemberList(paramMap);
+	    model.addAttribute("resultList", resultList); 
+	    return "jsonView"; 		 
+    }
+    
 }
