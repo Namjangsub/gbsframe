@@ -173,6 +173,8 @@ public class WB22SvcImpl implements WB22Svc {
 		if (deleteRowArr != null && deleteRowArr.size() > 0) {
 			for (Map<String, String> sharngMap : deleteRowArr) {
 				try {
+					//실적먼저 지워져야함
+					wb22Mapper.wbsRsltsDelete(sharngMap);
 					result = wb22Mapper.wbsLevel2Delete(sharngMap);
 				} catch (Exception e) {
 					System.out.println("error2" + e.getMessage());

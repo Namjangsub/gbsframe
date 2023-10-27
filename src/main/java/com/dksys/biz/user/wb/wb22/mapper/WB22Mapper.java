@@ -58,6 +58,8 @@ public interface WB22Mapper {
 	
 	int wbsRsltsUpdate(Map<String, String> paramMap);
 	
+	int wbsRsltsDelete(Map<String, String> paramMap);
+	
 	int wbsRsltsconfirm(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectTodoRsltsView(Map<String, String> paramMap);
