@@ -118,10 +118,8 @@
   //-----------------------------  1 MONTH  600px  -----------------------------
   _addZoom( "1M",{
     adjustDates: function (start, end) {
-      start.setMonth(start.getMonth());
       start.setDate(1);
       end.setDate(1);
-      end.setMonth(end.getMonth()+2);
       end.setDate(end.getDate() + 30);
     },
     row1:        function (date, tr1) {
@@ -150,9 +148,9 @@
     _addZoom( "1Q", {
       adjustDates: function (start, end) {
         start.setDate(1);
-        start.setMonth(Math.floor(start.getMonth() / 3) * 3 -1 );
+        start.setMonth(Math.floor(start.getMonth() / 3) * 3 -3 );
         end.setDate(1);
-        end.setMonth(Math.floor(end.getMonth() / 3) * 3 + 4);
+        end.setMonth(Math.floor(end.getMonth() / 3) * 3 + 6);
         end.setDate(end.getDate() - 1);
       },
       row1:        function (date, tr1) {
@@ -161,7 +159,7 @@
         var inc=(date.getMonth()-start.getMonth());
         inc=inc>0?inc:1;
         var q = (Math.floor(start.getMonth() / 3) + 1);
-        self.createHeadCell(1,this,tr1,GanttMaster.messages["GANTT_QUARTER"]+" "+q+" "+start.format("yyyy"), inc,"",start,date);
+        self.createHeadCell(1,this,tr1,GanttMaster.messages["GANTT_QUARTER"]+" "+q+" "+start.format("yyyy"), 3,"",start,date);
       },
       row2:        function (date, tr2, trBody) {
         var start = new Date(date.getTime());
