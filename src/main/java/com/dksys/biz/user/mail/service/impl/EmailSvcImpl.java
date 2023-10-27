@@ -112,7 +112,7 @@ public class EmailSvcImpl implements EmailSvc {
         }
 
         System.out.println("Host Address: " + hostAddress);
-        String targetUrl = hostAddress + "/static/redirectChkCode.html?http://" + host + ":8090/ubi4/ubihtml.jsp" + paramMap.get("tempUrl");
+        String targetUrl = hostAddress + "/static/redirectChkCode.html?" + hostAddress + ":8443/ubi4/ubihtml.jsp" + paramMap.get("tempUrl");
         paramMap.put("longUrl", targetUrl);
         paramMap.put("hostAddress", hostAddress);
         try {
