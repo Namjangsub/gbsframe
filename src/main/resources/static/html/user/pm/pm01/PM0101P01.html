@@ -2,7 +2,7 @@
 	<div class="tit_contents">
 		<h4 class="tit">작업일보 등록</h4>
 	</div>
-	
+	<input type="file" id="notiFile" style="display:none" multiple="multiple" onchange="setNotiFile(this);"/>
 	<form id="popForm" onSubmit="return false;">
 		<div class="form-group popup_table">
 			<input type="hidden" id="fileTrgtKey"  	name="fileTrgtKey">
@@ -124,14 +124,37 @@
 						<textarea rows="2" class="form-control" id="workRptRmk" name="workRptRmk" data-search="workRptRmk" class="form-control"  msg="비고"></textarea>
 					</td>
 				</tr>
-			
+				<tr>
+				  <th>이슈유무</th>
+				  <td>
+					  <select id="issueYn" name="issueYn" data-search="issueYn" class="form-control" >
+						  <option value="N">NO</option>
+						  <option value="Y">YES</option>
+					  </select>
+				  </td>
+				</tr>
+				<tr id="field01" style="display:none;">
+					<th>이슈제목</th>
+					<td colspan="3">
+					  <input type="text" id="issueTitle" name="issueTitle" class="form-control">
+					</td>
+				</tr>
+				<tr id="field02">
+				  <th>
+					<button type="button" id="buttonFile" class="btn btn-primary btn-sm" style="height: 25px; line-height: 15px;" onclick="notiFile.click();">첨부파일</button>
+				  </th>
+				  <td colspan="3">
+					<div data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 150px; width: 100%"></div>
+				  </td>
+				</tr>
+				
 			</table>
 		</div>
 	</form>
 </div>
 
 <!-- 공통 파일 영역 -->
-<div id="fileList_area"></div>
+<!-- <div id="fileList_area"></div> -->
 
 <!-- 하단 버튼 -->
 <div class ="popup_bottom_btn">
@@ -143,8 +166,57 @@
 <script type="text/javascript">
 	var actionType = null;
 	var fileTrgtKey = null;
+	var fileParam = null;
+	
+	//등록시 직급코드 중복체크 여부
+	var isChecked = false;
+	var notiFileArr = [];
+	var deleteFileArr = [];
+	var fileGridView = {
+		initView: function(){
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				target: $('[data-ax5grid="file-grid"]'),
+				showLineNumber: true,
+				showRowSelector: false,
+	        	multipleSelect: false,
+				header: {selector: false},
+				body: {
+		        	onClick: function () {
+		                this.self.select(this.dindex);
+		            },
+		            onDBLClick: function () {
+		            	downloadFile(this.dindex);
+		            },
+		        	},
+				columns: [
+						{key: "fileName", label: "파일명", width: 240},
+						{key: "fileType", label: "파일타입", width: 80, align: "center"},
+						{key: "fileSize", label: "파일크기", width: 80,  align: "right", formatter: "money"},
+						{key: "fileDelBtn", label: "삭제", width:50,
+							formatter:function() {return (this.item.fileDelete == "Y") ? '<button style="height: 18px; padding:0px;" type="button" onclick="deleteFile('+this.dindex+')">삭제</button>' : '불가'}
+						},
+						{key : "fileList",  label : "list",	 width : 60, align: "center", hidden: true},
+						{key : "fileUp",  label : "up",	 width : 60, align: "center", hidden: true},
+						{key : "fileDown",  label : "down",	 width : 60, align: "center", hidden: true},
+						{key : "fileUpdate",  label : "update",	 width : 60, align: "center", hidden: true},
+						{key : "fileDelete",  label : "delete",	 width : 60, align: "center", hidden: true},
+				]
+			});
+		},
+		setData: function(){
+			var targetObj = this.target;
+			targetObj.setData({
+				list: notiFileArr,
+				page : {
+					totalElements : notiFileArr.length
+				}
+			});
+		}
+	}
 
 	$(document).ready(function() {
+		fileGridView.initView();
 		$("#popForm #coCd").val(modalStack.last().paramObj.coCd);
 		$("#popForm #workRptId").val(jwt.userId);
 		$("#popForm #workRptIdNm").val(jwt.userNm);
@@ -189,18 +261,7 @@
 			});
 		}
 
-		//---------------------------------------------------------------
-		//첨부 화일 처리 시작
-		//---------------------------------------------------------------
-		fileParam = {
-				fileTrgtTyp	: $("#pgmId").val(),
-				fileTrgtKey		:fileTrgtKey
-		}
-  		treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
-		//---------------------------------------------------------------
-		//첨부 화일 처리 끝
-		//---------------------------------------------------------------
-
+		$("#field02").hide();
 		authChk();						// 권한체크
 	});
 	
@@ -281,6 +342,16 @@
 					}
 				}
 			});
+			selectNotiInfo();
+			//수정시 폼 세팅
+			if ($("#issueYn").val() =='Y'){
+				  $("#field01").show();
+				  $("#field02").show();
+			}
+			else {
+				$("#field01").hide();
+				$("#field02").hide();
+			}
 			
 			//상위코드 연동으로 바뀌기 전에 저장값 설정되므로 재설정 필요함
 			selectCodeList($("#workRptL"),0);
@@ -346,7 +417,17 @@
 // 	    }
 		// 폼데이터 생성
 		var formData = new FormData($("#popForm")[0]);
-
+		// 첨부파일 추가
+		$.each(notiFileArr, function(idx, obj){
+			// 신규파일만 추가
+			if(obj.fileKey == 0){
+				formData.append("files", obj.file);
+			}
+		});
+		
+		if(actionType == "U"){
+			formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
+		}
 		//---------------------------------------------------------------
 		//-------itemarr  --첨부화일 처리를 위한 부분 시작
 		//---------------------------------------------------------------
@@ -360,7 +441,8 @@
 		formData.append("clntPjt", $('#clntPjt').val());		
 
 		//-------itemarr  --첨부화일 처리를 위한 부분 시작
-		formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용
+		//formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용
+		formData.append("comonCd", "FITR9902");	//첨부화일용
 
 		//---------------------------------------------------------------
 
@@ -377,8 +459,9 @@
 		// 	}
 		// });
 
-		formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
-		formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
+		//formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
+		formData.append("uploadFileArr",  JSON.stringify(notiFileArr));
+		//formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
 		//---------------------------------------------------------------
 		//--첨부화일 처리를 위한 부분 끝
 		//---------------------------------------------------------------
@@ -532,5 +615,95 @@
 	    	$("#workRptHour").val("");
 	    }
 	});
+	
+	$("#popForm #issueYn").change(function() {
+		if ($("#issueYn").val() == 'Y'){
+			//fileGridView.initView();
+		    $("#field01").show();
+		    $("#field02").show();
+		}
+		else {
+			$("#field01").hide();
+		    $("#field02").hide();
+		}
+	});
+	
+	function setNotiFileInfo(fileInfo) {
+		// 첨부파일 set
+		$.each(fileInfo, function(idx, obj){
+			notiFileArr.push({
+				'fileKey' : obj.fileKey,
+		      	'fileName' : obj.fileName,
+		      	'fileType' : obj.fileType,
+		      	'fileSize' : obj.fileSize,
+		      	'fileList' : obj.fileList,
+		      	'fileUp' : obj.fileUp,
+		      	'fileDown' : obj.fileDown,
+		      	'fileDelete' : obj.fileDelete,
+		      	'fileUpdate' : obj.fileUpdate,
+		      	'file' : obj
+			});
+		});
+		// 첨부파일 그리드 set
+		fileGridView.setData();
+	}
+	
+	function setNotiFile(elem){
+		var tempFiles = elem.files;
+		$.each(tempFiles, function(idx, obj){
+			var testArr = obj.name.split(".");
+			notiFileArr.push({
+				'fileKey' : 0,
+		      	'fileName' : obj.name,
+		      	'fileType' : testArr[testArr.length-1],
+		      	'fileSize' : obj.size,
+		      	'file' : obj
+			});
+		fileGridView.setData();
+		$(elem).val("");
+		});
+	}
+	
+	function deleteFile(rowIndex) {
+        if (notiFileArr[rowIndex].fileDelete != 'Y') {
+        	alert('파일 삭제 권한이 없습니다.')
+        	return false;
+        };
+		
+		fileGridView.target.removeRow(rowIndex);
+		
+		if(notiFileArr[rowIndex].fileKey){
+		// 기 등록되어 있는 파일 삭제시
+			deleteFileArr.push(notiFileArr[rowIndex].fileKey);
+		}
+		
+		notiFileArr.splice(rowIndex, 1);
+	}
+	
+	function selectNotiInfo(){
+		var row = gridView.target.getList("selected")[0];
+		var paramObj = {
+				"fileTrgtKey": row.fileTrgtKey,
+				"fileTrgtTyp" : "PM0101M01",
+				"userId" : jwt.userId
+				};
+		
+		postAjax("/user/pm/pm01/selectUploadFileList", paramObj, null, function(data){
+			var list = data.result;
+			setNotiFileInfo(list);
+		});
+		
+		//파일 등록 권한이 없으면 버튼 비활성화
+		paramObj.comonCd = 'FITR9902';
+		postAjax("/admin/cm/cm15/selectTreeAuthUserList", paramObj, null, function(data){
+			if (data.userList[0].fileUp == 'Y') {
+	            buttonFile.disabled = false; // 활성화
+	            buttonFile.style.backgroundColor = ""; // 기본 배경색으로 변경 (옵션)
+	        } else {
+	            buttonFile.disabled = true; // 비활성화
+	            buttonFile.style.backgroundColor = "gray"; // 회색 배경색으로 변경 (옵션)
+	        }	
+		});	
+	}
 	
 </script>

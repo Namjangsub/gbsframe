@@ -59,56 +59,17 @@ public class PM01SvcImpl implements PM01Svc {
 	Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
 
-	//---------------------------------------------------------------  
-	//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
-  	//   필수값 :  jobType, userId, comonCd
-	//---------------------------------------------------------------  
-    HashMap<String, String> param = new HashMap<>();
-    param.put("userId", paramMap.get("userId"));
-    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
-    
-	List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
-	String[] deleteFileArr = gsonDtl.fromJson(paramMap.get("deleteFileArr"), String[].class);
-	List<String> deleteFileList = Arrays.asList(deleteFileArr);
-	
-	Boolean fileFlag = false; //파일영역이 추가되어 있는지 확인하는 플래그
-	if (uploadFileList == null || uploadFileList.isEmpty()) {
-		
-	} else {
-		fileFlag = true;
-		if (uploadFileList.size() > 0) {
-				//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
-				param.put("jobType", "fileUp");
-				cm15Svc.selectFileAuthCheck(param);
-		}
-		for(String fileKey : deleteFileList) {  // 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
-				Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
-				//접근 권한 없으면 Exception 발생
-				param.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
-				param.put("jobType", "fileDelete");
-				cm15Svc.selectFileAuthCheck(param);
-		}
-	}
-	//---------------------------------------------------------------  
-	//첨부 화일 권한체크  끝 
-	//---------------------------------------------------------------  
-
 	int result = pm01Mapper.updateDailyWork(paramMap);
-
+	
 	//---------------------------------------------------------------  
 	//첨부 화일 처리 시작 
-	//---------------------------------------------------------------  
-	
-	if (fileFlag) {
-		if (uploadFileList.size() > 0) {
-			paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-			paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-			cm08Svc.uploadFile(paramMap, mRequest);
-		}
-		
-		for(String fileKey : deleteFileList) {
-			cm08Svc.deleteFile(fileKey);
-		}
+	//---------------------------------------------------------------
+	cm08Svc.uploadFile("PM0101M01", paramMap.get("notiKey"), mRequest);
+	Gson gson = new Gson();
+	String[] deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), String[].class);
+	List<String> deleteFileList = Arrays.asList(deleteFileArr);
+	for(String fileKey : deleteFileList) {
+		cm08Svc.deleteFile(fileKey);
 	}
 	//---------------------------------------------------------------  
 	//첨부 화일 처리  끝 
@@ -127,18 +88,18 @@ public class PM01SvcImpl implements PM01Svc {
 		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
 	  	//   필수값 :  jobType, userId, comonCd
 		//---------------------------------------------------------------  
-		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
-		Boolean fileFlag = false;
-		if (uploadFileList == null || uploadFileList.isEmpty()) {
-			
-		} else {
-			if (uploadFileList.size() > 0) {
-				fileFlag = true;
-				//접근 권한 없으면 Exception 발생
-				paramMap.put("jobType", "fileUp");
-				cm15Svc.selectFileAuthCheck(paramMap);
-			}
-		}
+//		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
+//		Boolean fileFlag = false;
+//		if (uploadFileList == null || uploadFileList.isEmpty()) {
+//			
+//		} else {
+//			if (uploadFileList.size() > 0) {
+//				fileFlag = true;
+//				//접근 권한 없으면 Exception 발생
+//				paramMap.put("jobType", "fileUp");
+//				cm15Svc.selectFileAuthCheck(paramMap);
+//			}
+//		}
 		//---------------------------------------------------------------  
 		//첨부 화일 권한체크  끝 
 		//---------------------------------------------------------------  
@@ -148,17 +109,18 @@ public class PM01SvcImpl implements PM01Svc {
 		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
 		
 		int result = pm01Mapper.insertDailyWork(paramMap);
+		cm08Svc.uploadFile("PM0101M01", paramMap.get("fileTrgtKey"), mRequest);
 	
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------  
-		if (fileFlag) {
-			if (uploadFileList.size() > 0) {
-				paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-				paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-				cm08Svc.uploadFile(paramMap, mRequest);
-			}
-		}
+//		if (fileFlag) {
+//			if (uploadFileList.size() > 0) {
+//				paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+//				paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+//				cm08Svc.uploadFile(paramMap, mRequest);
+//			}
+//		}
 		//---------------------------------------------------------------  
 		//첨부 화일 처리  끝 
 		//---------------------------------------------------------------  
@@ -228,6 +190,20 @@ public int selectWorkOrdrsCount(Map<String, String> paramMap) {
 @Override
 public List<Map<String, String>> selectWorkOrdrsList(Map<String, String> paramMap) {
 	return pm01Mapper.selectWorkOrdrsList(paramMap);
+}
+
+@Override
+public List<Map<String, String>> selectUploadFileList(Map<String, String> paramMap) {
+  //return pm01Mapper.selectUploadFileList(paramMap);
+	return cm08Svc.selectFileList(paramMap);
+//  Map<String, Object> returnMap = new HashMap<String, Object>();
+//	Map<String, String> fileMap = new HashMap<String, String>();
+//	fileMap.put("fileTrgtTyp", "TB_PM01M01");
+//	fileMap.put("userId", paramMap.get("userId"));
+//	fileMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+//	returnMap.put("fileList", cm08Svc.selectFileList(fileMap));
+//	returnMap.put("workInfo", pm01Mapper.selectDailyWorkInfo(paramMap));
+//	return returnMap; 
 }
   
 }

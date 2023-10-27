@@ -262,4 +262,12 @@ public class PM01Ctr {
 	  //아이템 체크(itemDiv)
 	  //Commbo Box로 프론트엔드에서 체크됨
   }
+  
+  // 업로드파일 정보 조회
+  @PostMapping(value = "/selectUploadFileList")
+  public String selectUploadFileList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	List<Map<String, String>> result = pm01Svc.selectUploadFileList(paramMap);
+    model.addAttribute("result", result);
+    return "jsonView";
+  }
 }

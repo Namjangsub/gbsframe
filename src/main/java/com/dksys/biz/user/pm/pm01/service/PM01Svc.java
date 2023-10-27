@@ -30,5 +30,7 @@ public interface PM01Svc {
 	int selectWorkOrdrsCount(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectWorkOrdrsList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectUploadFileList(Map<String, String> paramMap);
 
 }
