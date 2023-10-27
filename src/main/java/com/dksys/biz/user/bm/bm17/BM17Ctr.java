@@ -91,7 +91,6 @@ public class BM17Ctr {
     @PostMapping(value = "/deleteMessageTempl")
     public String deleteMessageTempl(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
     	try {
-    		System.out.println("111111111111111111111111111111111111111111111111");
     		bm17Svc.deleteMessageTempl(paramMap);
 	    	model.addAttribute("resultCode", 200);
 	    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
