@@ -165,6 +165,8 @@ public class WB20SvcImpl implements WB20Svc {
 	  //wb20 todo 삭제
 	  @Override
 	  public int deleteTodoMaster(Map<String, String> param) {
-		  return wb20Mapper.deleteTodoMaster(param);
+		  int result = wb20Mapper.deleteTodoMaster(param);
+		  	  result = wb20Mapper.updateTodoMasterSanctnSn(param); 
+		  return  result;
 	  }
 }
