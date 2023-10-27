@@ -76,36 +76,30 @@ public class BM17Ctr {
 	//알림톡 수정    
     @PostMapping(value = "/updateMessageTempl")
     public String updateMessageTempl(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
-  	  	try {
-  			if (bm17Svc.updateMessageTempl(paramMap) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-  			} else {
-  				model.addAttribute("resultCode", 500);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  			model.addAttribute("resultMessage", e.getMessage());
-  		}
+    	try {
+    		bm17Svc.updateMessageTempl(paramMap);
+	    	model.addAttribute("resultCode", 200);
+	    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+    	}catch(Exception e) {
+	    	 model.addAttribute("resultCode", 500);
+	 		 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+    	}
   	  	return "jsonView";
     } 
     
 	//알림톡 삭제    
-    @PutMapping(value = "/deleteMessageTempl")
+    @PostMapping(value = "/deleteMessageTempl")
     public String deleteMessageTempl(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
-  	  	try {
-  			if (bm17Svc.deleteMessageTempl(paramMap) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-  			} else {
-  				model.addAttribute("resultCode", 500);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  			model.addAttribute("resultMessage", e.getMessage());
-  		}
+    	try {
+    		System.out.println("111111111111111111111111111111111111111111111111");
+    		bm17Svc.deleteMessageTempl(paramMap);
+	    	model.addAttribute("resultCode", 200);
+	    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+    	}catch(Exception e) {
+	    	 model.addAttribute("resultCode", 500);
+	 		 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+    	}
+
   	  	return "jsonView";
     }   
     
