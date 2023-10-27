@@ -113,7 +113,14 @@ public class SM14SvcImpl implements SM14Svc {
 
 				}
 				dtl.put("maxPchsNo", maxPchsNo);
-	    		result += sm14Mapper.insertPurchaseBillDetail(dtl);
+				//비용이 경우 그대로 insert 발주일경우 자재수만큼 insert
+				if( dtl.get("isCost").equals("Y") ) {
+		    		result += sm14Mapper.insertPurchaseBillDetail(dtl);	
+				} else if( dtl.get("isCost").equals("N") ) {
+					System.out.println(">>>N>>>");
+		    		result += sm14Mapper.insertPurchaseBillDetailOrdrg(dtl);
+				}
+
 				//TB_SM12M01 TB_SM12M01 UPDATE	- DETAIL 에서 처리 사용안함(20231005)
 				/*
 				if( dtl.get("cmpletYn").equals("Y") ) {
@@ -122,7 +129,6 @@ public class SM14SvcImpl implements SM14Svc {
 				*/
 			}	
 			if( dtl.get("actFlag").equals("U") ) {
-				System.out.println("cmpletYn>>>" + dtl.get("cmpletYn")+"<<<");
 				dtl.put("maxPchsNo", dtl.get("pchsNo"));				
 	    		result += sm14Mapper.updatePurchaseBillDetail(dtl);			    		
 			}				
@@ -207,5 +213,11 @@ public class SM14SvcImpl implements SM14Svc {
 		}			
 
 		return result;
-	}	
+	}
+	
+	/* 발주자재리스트 */
+	@Override
+	public List<Map<String, String>> selectOrdrgMatList(Map<String, String> paramMap) {
+		return sm14Mapper.selectOrdrgMatList(paramMap);
+	}		
 }

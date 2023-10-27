@@ -29,6 +29,9 @@ public interface SM14Mapper {
 	//입고 등록, 수정, 삭제	
 	int insertPurchaseBillDetail(Map<String, String> paramMap);	
 	
+	//발주 매입 전부 insert
+	int insertPurchaseBillDetailOrdrg(Map<String, String> paramMap);
+	
 	int updatePurchaseBillDetail(Map<String, String> paramMap);
 	
 	int updatePurchaseMaster(Map<String, String> paramMap);	
@@ -39,6 +42,7 @@ public interface SM14Mapper {
 	
 	int updateBillYn(Map<String, String> param);	
 
+	List<Map<String, String>> selectOrdrgMatList(Map<String, String> paramMap);	
 }
 
 

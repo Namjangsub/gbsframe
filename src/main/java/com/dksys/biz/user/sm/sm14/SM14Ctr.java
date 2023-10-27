@@ -122,12 +122,12 @@ public class SM14Ctr {
   		return "jsonView";
     }  
 	
-	/*
-	 * @DeleteMapping(value = "/updateBillYn") public String
-	 * updateBillYn(@RequestBody Map<String, String> param, ModelMap model) throws
-	 * Exception { sm14Svc.updateBillYn(param); model.addAttribute("resultCode",
-	 * 200); model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-	 * return "jsonView"; }
-	 */
+	// 발주자재 조회
+	@PostMapping(value = "/selectOrdrgMatList")
+	public String selectOrdrgMatList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = sm14Svc.selectOrdrgMatList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}	
 
 }
