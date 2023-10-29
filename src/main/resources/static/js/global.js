@@ -98,16 +98,16 @@ var ubiprefix = "";
 if(jwt){
 	switch (jwt.serverType){
     case "prod" :
-        ubiprefix = "http://192.168.1.8:8090/ubi4";
+        ubiprefix = "https://gbs.gunyangitt.co.kr:8443/ubi4";
         break;
     case "dev" :
-        ubiprefix = "http://192.168.1.8:8090/ubi4";
-        break;
-    case "local" :
         ubiprefix = "http://localhost:8090/ubi4";
         break;
+    case "local" :
+        ubiprefix = "https://localhost:8443/ubi4";
+        break;
     default :
-        ubiprefix = "http://gbs.gunyangitt.co.kr:8090/ubi4";
+        ubiprefix = "https://gbs.gunyangitt.co.kr:8443/ubi4";
 	}
 }
 
@@ -554,6 +554,41 @@ function downloadPDFFromBase64(base64Data, fileName) {
 
 	return file;
 }
+
+function downloadImageFromBase64(base64Data, fileName, fileType , type) {
+    var byteCharacters = atob(base64Data); // Base64 디코딩
+    var byteNumbers = new Array(byteCharacters.length);
+
+    for (var i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    var byteArray = new Uint8Array(byteNumbers);
+    var file = "";
+    if (type == "image") {
+    	file = new Blob([byteArray], { type: 'image/' + fileType , lastModified: Date.now() }); // 이미지 파일로 설정, 필요한 경우 수정 가능
+    } else {
+        file = new File([blob], fileName,  { type: 'application/octet-stream' , lastModified: new Date()});
+    }
+
+	return file;
+}
+
+
+
+function base64ToFile(base64Data, fileName, fileType , type) {
+    const byteCharacters = atob(base64Data);
+    const byteArray = new Uint8Array(byteCharacters.length);
+
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteArray[i] = byteCharacters.charCodeAt(i);
+    }
+
+    const blob = new Blob([byteArray]);
+    const file = new File([blob], fileName,  { type: 'application/octet-stream' , lastModified: new Date()});
+
+    return file;
+}
+
 
 function inputValidation(inputList) {
 	var isValid = true;

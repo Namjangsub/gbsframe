@@ -38,7 +38,7 @@
         /*   font-weight: bold; */
         /* }   */
         tr {
-          height: 40px;
+          height: 26px;
         }
         </style>    
 </head>
@@ -61,16 +61,23 @@
             <h4 class="tit">작업일보 등록</h4>
         </div>
 
-        <form id="popForm" onSubmit="return false;">
-            <input type="hidden" id="workRptNo" name="workRptNo">
+	<input type="file" id="notiFile" style="display:none" multiple="multiple" onchange="setNotiFile(this);"/>
+	<form id="popForm" onSubmit="return false;">
             <input type="hidden" id="workRptIdNm" name="workRptIdNm">
+			
+			<input type="hidden" id="fileTrgtKey"  	name="fileTrgtKey">
+			<input type="hidden" id="pgmId"     	name="pgmId"	value="PM0101M01">
+			<input type="hidden" id="deptId"     	name="deptId">
 			<input type="hidden" id="coCd" name="coCd" required msg="회사">
+			<input type="hidden" id="workRptNo" name="workRptNo" msg="작업일보번호">
+			<input class="division" type="hidden" id="workRptL" name="workRptL" data-depth="0" onchange="selectCodeList(this,0);" required msg="작업대분류" >
+			
             <div class="form-group popup_table" style="width: 100%;">
                 <table>
 
                     <colgroup>
-                    <col width="30%">
-                    <col width="70%">
+                    <col width="28%">
+                    <col width="68%">
                     </colgroup>
 
                     <tr>
@@ -80,15 +87,14 @@
                         </td>
                     </tr>
                     <tr>  
-                        <th class="hit">업무분류</th>
-                        <td>
-                                <input class="division" type="hidden" id="workRptL" name="workRptL" data-depth="0" onchange="selectCodeList(this,0);" required msg="작업대분류" >	
+                        <th class="hit">작업분류</th>
+                        <td>	
                                 <select class="division" id="workRptM" name="workRptM" onchange="selectCodeList(this,1);" data-depth="1" class="form-control" required msg="작업중분류">
                                 </select>
                         </td>
                     </tr>
                     <tr>
-                        <th class="hit">업무구분</th>
+                        <th class="hit">작업구분</th>
                         <td>
                             <select class="division" id="workRptS" name="workRptS" onchange="selectSalesCodeSet();" data-depth="2" required class="form-control" msg="작업소분류">
                             </select>
@@ -168,6 +174,32 @@
                             <input type="text" id="eqpNm" name="eqpNm" class="form-control" msg="설비명">
                         </td>
                     </tr>
+					<tr>
+					  <th>이슈유무</th>
+					  <td>
+						  <select id="issueYn" name="issueYn" data-search="issueYn" class="form-control" >
+							  <option value="N">NO</option>
+							  <option value="Y">YES</option>
+						  </select>
+					  </td>
+					</tr>
+					<tr id="field01" style="display:none;">
+						<th>이슈제목</th>
+						<td colspan="3">
+						  <input type="text" id="issueTitle" name="issueTitle" class="form-control">
+						</td>
+					</tr>
+					<tr id="field02">
+					  <th>
+						<button type="button" id="buttonFile1" class="btn btn-primary btn-sm" style="height: 40px; line-height: 15px;" onclick="fromWebToApp(1);">파일선택</button>
+						<div><br></div>
+						<button type="button" id="buttonFile2" class="btn btn-primary btn-sm" style="height: 40px; line-height: 15px;" onclick="fromWebToApp(2);">사진촬영</button>
+					  </th>
+					  <td colspan="3">
+						<div data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 150px; width: 100%"></div>
+					  </td>
+					</tr>
+				
                     
                 </table>
             </div>
@@ -184,11 +216,59 @@
 
 
 <script type="text/javascript">
-var actionType = null;
-var fileTrgtKey = null;
+	var actionType = null;
+	var fileTrgtKey = null;
+	var fileParam = null;
+	
+	var notiFileArr = [];
+	var deleteFileArr = [];
+	var fileGridView = {
+		initView: function(){
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				target: $('[data-ax5grid="file-grid"]'),
+				showLineNumber: true,
+				showRowSelector: false,
+	        	multipleSelect: false,
+				header: {selector: false},
+				body: {
+		        	onClick: function () {
+		                this.self.select(this.dindex);
+		            },
+		            onDBLClick: function () {
+		            	downloadFile(this.dindex);
+		            },
+		        	},
+				columns: [
+						{key: "fileName", label: "파일명", width: 240},
+						{key: "fileType", label: "파일타입", width: 80, align: "center"},
+						{key: "fileSize", label: "파일크기", width: 80,  align: "right", formatter: "money"},
+						{key: "fileDelBtn", label: "삭제", width:50,
+							formatter:function() {return (this.item.fileDelete == "Y") ? '<button style="height: 18px; padding:0px;" type="button" onclick="deleteFile('+this.dindex+')">삭제</button>' : '불가'}
+						},
+						{key : "fileList",  label : "list",	 width : 60, align: "center", hidden: true},
+						{key : "fileUp",  label : "up",	 width : 60, align: "center", hidden: true},
+						{key : "fileDown",  label : "down",	 width : 60, align: "center", hidden: true},
+						{key : "fileUpdate",  label : "update",	 width : 60, align: "center", hidden: true},
+						{key : "fileDelete",  label : "delete",	 width : 60, align: "center", hidden: true},
+				]
+			});
+		},
+		setData: function(){
+			var targetObj = this.target;
+			targetObj.setData({
+				list: notiFileArr,
+				page : {
+					totalElements : notiFileArr.length
+				}
+			});
+		}
+	}
+
 
 $(document).ready(function() {
 
+	fileGridView.initView();
     //작성일자//
     $('#workRptDt').datepicker({
         format : "yyyy-mm-dd",
@@ -204,7 +284,8 @@ $(document).ready(function() {
 
     	$("#popForm #coCd").val(jwt.coCd);
         actionType = paramObj.actionType;
-        fileTrgtKey = paramObj.fileTrgtKey;    
+        fileTrgtKey = paramObj.fileTrgtKey;  
+		$("#fileTrgtKey").val(fileTrgtKey);  
 
 
 		setCommonSelect($(".popup_area select[data-kind]"));
@@ -233,6 +314,7 @@ $(document).ready(function() {
             });
         }
         //authChk();   // 권한체크
+		$("#field02").hide();
         
     
     } else {
@@ -311,6 +393,17 @@ function selectDailyWorkInfo() {                        //그리드에 뿌리는
                     }
                 }
             });
+			selectNotiInfo();
+			//수정시 폼 세팅
+			if ($("#issueYn").val() =='Y'){
+				  $("#field01").show();
+				  $("#field02").show();
+			}
+			else {
+				$("#field01").hide();
+				$("#field02").hide();
+			}
+			
 			//상위코드 연동으로 바뀌기 전에 저장값 설정되므로 재설정 필요함
        	    selectCodeList($("#workRptL"),0);
 			$('#popForm #workRptM').val(data.result.workRptM);
@@ -360,6 +453,17 @@ function makeFormData() {
 //     }
     // 폼데이터 생성
     var formData = new FormData($("#popForm")[0]);
+	// 첨부파일 추가
+	$.each(notiFileArr, function(idx, obj){
+		// 신규파일만 추가
+		if(obj.fileKey == 0){
+			formData.append("files", obj.file);
+		}
+	});
+	
+	if(actionType == "U"){
+		formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
+	}
     //---------------------------------------------------------------  
     //  disabled 처리시 값 전송안됨 아래에서 폼데이터 추가
     //---------------------------------------------------------------
@@ -370,10 +474,34 @@ function makeFormData() {
     formData.append("fileTrgtKey", fileTrgtKey);
     formData.append("userId", jwt.userId);
     formData.append("pgmId", "PM0101M01_M");
-    
-    var fileUploadArr = [];
-    formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
-    formData.append("deleteFileArr", JSON.stringify(fileUploadArr));
+	// 유저아이디 추가
+	formData.append("userId", jwt.userId);
+	formData.append("clntCd", $('#clntCd').val());			//첨부화일용
+	formData.append("prdtCd", $('#prdtCd').val());			//첨부화일용
+	formData.append("itemCd", $('#itemDiv').val());			//첨부화일용
+	formData.append("itemDiv", $('#itemDiv').val());		
+	formData.append("prjctCd", $('#clntPjt').val());		//첨부화일용
+	formData.append("clntPjt", $('#clntPjt').val());
+    //-------itemarr  --첨부화일 처리를 위한 부분 시작
+	//formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용
+	formData.append("comonCd", "FITR9902");	//첨부화일용
+
+	//---------------------------------------------------------------
+
+    //---------------------------------------------------------------
+	var fileUploadArr = [];
+	var tempArr = [];
+
+	// tempArr = treeModule.getFileArr();
+	// $.each(tempArr, function(idx, obj) {
+	// 	if (obj.fileKey == 0) {
+    //         formData.append("files", obj.file);
+    //         obj.file = '';
+    //         fileUploadArr.push(obj);
+	// 	}
+	// });
+	formData.append("uploadFileArr",  JSON.stringify(notiFileArr));
+//     formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
 
     return formData;
 }
@@ -483,7 +611,211 @@ function openPrdtSearch(){
 	});
 }
 
+$("#popForm #workRptM").change(function() {
+	var workRptS = $("#workRptS").val();
+    var str = workRptS.substr(-5);
+    if (str == '09901'){
+    	$("#workRptHour").val("8");
+    }
+    else {
+    	$("#workRptHour").val("");
+    }
+});
 
+$("#popForm #workRptS").change(function() {
+	var workRptS = $("#workRptS").val();
+    var str = workRptS.substr(-5);
+    if (str == '09901'){
+    	$("#workRptHour").val("8");
+    }
+    else {
+    	$("#workRptHour").val("");
+    }
+});
+
+$("#popForm #issueYn").change(function() {
+	if ($("#issueYn").val() == 'Y'){
+// 		fileGridView.initView();
+	    $("#field01").show();
+	    $("#field02").show();
+	}
+	else {
+		$("#field01").hide();
+	    $("#field02").hide();
+	}
+});
+
+function setNotiFileInfo(fileInfo) {
+	// 첨부파일 set
+	$.each(fileInfo, function(idx, obj){
+		notiFileArr.push({
+			'fileKey' : obj.fileKey,
+	      	'fileName' : obj.fileName,
+	      	'fileType' : obj.fileType,
+	      	'fileSize' : obj.fileSize,
+	      	'fileList' : obj.fileList,
+	      	'fileUp' : obj.fileUp,
+	      	'fileDown' : obj.fileDown,
+	      	'fileDelete' : obj.fileDelete,
+	      	'fileUpdate' : obj.fileUpdate,
+	      	'file' : obj
+		});
+	});
+	// 첨부파일 그리드 set
+	fileGridView.setData();
+}
+
+function setNotiFile(elem){
+	var tempFiles = elem.files;
+	$.each(tempFiles, function(idx, obj){
+		var testArr = obj.name.split(".");
+		notiFileArr.push({
+			'fileKey' : 0,
+	      	'fileName' : obj.name,
+	      	'fileType' : testArr[testArr.length-1],
+	      	'fileSize' : obj.size,
+	      	'file' : obj,
+	      	'fileDelete':'Y'
+		});
+	fileGridView.setData();
+	$(elem).val("");
+	});
+}
+
+function deleteFile(rowIndex) {
+    if (notiFileArr[rowIndex].fileDelete != 'Y') {
+    	alert('파일 삭제 권한이 없습니다.')
+    	return false;
+    };
+	
+	fileGridView.target.removeRow(rowIndex);
+	
+	if(notiFileArr[rowIndex].fileKey){
+	// 기 등록되어 있는 파일 삭제시
+		deleteFileArr.push(notiFileArr[rowIndex].fileKey);
+	}
+	
+	notiFileArr.splice(rowIndex, 1);
+}
+
+function selectNotiInfo(){
+	var paramObj = {
+			"fileTrgtKey": fileTrgtKey,
+			"fileTrgtTyp" : "PM0101M01",
+			"userId" : jwt.userId
+			};
+	
+	postAjax("/user/pm/pm01/selectUploadFileList", paramObj, null, function(data){
+		var list = data.result;
+		setNotiFileInfo(list);
+	});
+	
+	//파일 등록 권한이 없으면 버튼 비활성화
+	paramObj.comonCd = 'FITR9902';
+	postAjax("/admin/cm/cm15/selectTreeAuthUserList", paramObj, null, function(data){
+		if (data.userList[0].fileUp == 'Y') {
+            buttonFile1.disabled = false; // 활성화
+            buttonFile1.style.backgroundColor = ""; // 기본 배경색으로 변경 (옵션)
+            buttonFile2.disabled = false; // 활성화
+            buttonFile2.style.backgroundColor = ""; // 기본 배경색으로 변경 (옵션)
+        } else {
+            buttonFile1.disabled = true; // 비활성화
+            buttonFile1.style.backgroundColor = "gray"; // 회색 배경색으로 변경 (옵션)
+            buttonFile2.disabled = true; // 비활성화
+            buttonFile2.style.backgroundColor = "gray"; // 회색 배경색으로 변경 (옵션)
+        }	
+	});	
+}
+
+//플로터 앱에서 웹페이지 자바스크립트 call
+function fromAppToWeb(msg) {
+//     document.querySelector("#flutterMessageTitle").innerText = msg;
+//     alert(msg);
+}
+
+//웹 자바스크립트에서 플로터 앱함수 call
+function fromWebToApp(select, fileTrgtKey = "112233") {
+	var paramMsg = select + ',' + fileTrgtKey;
+    toApp.postMessage(paramMsg);
+}
+
+//플로터 앱에서 웹페이지 자바스크립트에 업로드 파일 전달하는 함수 call
+function uploadFile(fileName, base64ImageData, fileObj, type) {
+// 	alert('파일:' + fileName + '\nfileTrgtKey:' + fileTrgtKey);
+	if (fileName) {
+		var typeArr = fileName.split(".");
+		var fileType = typeArr[typeArr.length-1];
+		var uploadDate = new Date();
+		var lastModifiedDate = new Date();
+		var file = "";
+		var fileData = base64ImageData;
+		
+		if (type == "image") {
+			file = downloadImageFromBase64(base64ImageData, fileName, fileType, type);
+			file = new File([file], fileName, { type: 'image/' + fileType , lastModified: uploadDate });
+		} else {
+			file = base64ToFile(base64ImageData, fileName, fileType, type);
+			file = new File([file], fileName, { type: 'application/octet-stream' , lastModified: uploadDate });
+		}
+		
+		file['name'] = fileName;
+		file['type'] = fileType;
+		file['size'] = file.size;
+		file['lastModified'] = uploadDate;
+		file['lastModifiedDate'] = lastModifiedDate;
+		
+		notiFileArr.push({
+			'fileKey' : 0,
+	      	'fileName' : fileName,
+	      	'fileType' : fileType,
+	      	'fileSize' : file.size,
+	      	'file' : file,
+	      	'fileDelete': 'Y'
+		});
+		fileGridView.setData()
+	}
+}
+
+
+// function downloadFile(idx) {
+//     if (notiFileArr[idx].fileDown != 'Y') {
+//     	alert('파일 다운로드 권한이 없습니다.')
+//     	return false;
+//     };
+	
+// 	var fileKey = notiFileArr[idx].fileKey;
+// 	var paramObj = {
+// 			"fileKey" : fileKey,
+// 			"userId" : jwt.userId
+// 		}		
+	
+// 	postAjax("/admin/cm/cm08/fileDownInfoUser", paramObj, null, function(data){
+// 		if(data.resultCode == 200){
+// 			var fileInfo = data.fileInfo;
+			
+// 		    var blob = new Blob(['File Content'], { type: 'application/octet-stream' });
+// 		    var url = URL.createObjectURL(blob);
+// 		    var a = document.createElement('a');
+// 		    a.href = "https://localhost/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId;;
+// 		    a.download = 'example.txt';
+// 		    document.body.appendChild(a);
+// 		    a.click();
+// 		    document.body.removeChild(a);
+		    
+// 		} else {
+// 			alert("다운로드 권한이 없습니다.");	
+// 		}
+// 	});
+// }
+
+
+//웹 자바스크립트에서 플로터 앱함수 fileDownloadApp call
+//플러터앱에서 다운로드 하기
+function downloadFile(idx) {
+	var fileKey = notiFileArr[idx].fileKey;
+	var paramMsg ="http://192.168.1.195/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId +"," + notiFileArr[idx].fileName;
+	fileDownloadApp.postMessage(paramMsg);
+}
 </script>
 
 </body>
