@@ -198,7 +198,8 @@
 							, CASE  
 								WHEN ( SUBSTR(A.ORDRG_NO, 0, 3) = 'BAL' )		/* 발주와 기타구매비용 분리 */
 									THEN NVL(A.ORDRG_AMT, 0) - NVL(A.PCHS_AMT, 0)
-								ELSE  NVL(A.ORDRG_AMT, 0) + NVL(A.PCHS_VAT, 0) 
+								/* ELSE NVL(A.ORDRG_AMT, 0) + NVL(A.PCHS_VAT, 0)  */
+								ELSE NVL(A.ORDRG_AMT, 0) - NVL(A.PCHS_AMT, 0) 
 							  END AS REMAIN_AMT	/* 잔여금액 구매비용일 경우 부가세 포함으로 작업함 */							
 							, TO_CHAR(A.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT
 							, A.CMPLET_YN
@@ -224,12 +225,12 @@
 									, E.PCHS_QTY				/* 매입수량 */
 									, E.PCHS_DT					/* 매입확정일자 */
 									, CASE
-										WHEN ( PCHS_CNT = CMPLET_SUM )
+										WHEN ( COUNT(B.ORDRG_SEQ) OVER(PARTITION BY B.ORDRG_NO) = CMPLET_SUM )
 											THEN 'Y'
 										ELSE 'N'
 									  END AS CMPLET_YN	 		/* 확정여부 */
 									, CASE
-										WHEN ( PCHS_CNT = CMPLET_SUM )
+										WHEN ( COUNT(B.ORDRG_SEQ) OVER(PARTITION BY B.ORDRG_NO) = CMPLET_SUM )
 											THEN 'Y'
 										ELSE 'N'
 									  END AS USER_CHK_V	 		/* 확정여부 */											            
@@ -284,7 +285,7 @@
 									, E.COST_AMT AS ORDRG_AMT		/*발주 금액 */												
 									, NVL(D.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00000') AS PCHS_NO	/*매입확정번호 */					
 									, D.PCHS_NO AS PCHS_NO_GRID	/*매입확정번호 그리드용*/			 										
-									, E.COST_AMT - TRUNC(E.COST_AMT * 10/110 ) AS PCHS_AMT		/* 매입금액  - 부가세가 없으므로 부가세가 포함된 금액으로 본다  */
+									, D.PCHS_AMT /*- TRUNC(E.COST_AMT * 10/110 ) */ AS PCHS_AMT		/* 매입금액  - 부가세 미포함으로설정  */
 									, TRUNC(E.COST_AMT * 10/110 ) AS PCHS_VAT		/* 부가세 */
 									, D.PCHS_QTY			/* 수량 */										
 									, D.PCHS_DT
@@ -599,10 +600,13 @@
 	     	FROM TB_SM02D01
 	     WHERE 1=1
 	     	AND ORDRG_NO = #{ordrgNo}
+		<if test="ordrgSeq != null and !ordrgSeq.equals('')">			
+			AND ORDRG_SEQ = #{ordrgSeq}
+		</if>	     	
 	     	ORDER BY ORDRG_SEQ
 	</insert>		
 		
-	<!-- 입고관리 상세 수정 -->
+	<!-- 매입확정관리 상세 수정 old (개별수정일경우 사용)-->
 	<update id="updatePurchaseBillDetail" parameterType="Map">
 		UPDATE TB_SM12D01
 			SET  
@@ -618,10 +622,29 @@
 			AND PCHS_NO = #{pchsNo}
 			AND PCHS_SEQ = #{pchsSeq}			
 			AND ORDRG_NO = #{ordrgNo}
+		<if test="ordrgSeq != null and !ordrgSeq.equals('')">			
 			AND ORDRG_SEQ = #{ordrgSeq}
+		</if>	     	
 	</update>
 	
-	<!-- 입고관리 마스터 CMPLET_YN 수정 -->
+	<!-- 매입확정관리 상세 수정 new (확정여부만 수정)-->
+	<update id="updatePurchaseBillDetailOrdrg" parameterType="Map">
+		UPDATE TB_SM12D01
+			SET  
+			PCHS_DT = #{pchsDt}
+			, CMPLET_YN = #{cmpletYn,			jdbcType=VARCHAR}
+			, UDT_ID = #{userId}
+			, UDT_PGM = #{pgmId}
+			, UDT_DTTM = SYSDATE
+		WHERE CO_CD = #{coCd}
+			AND ORDRG_NO = #{ordrgNo}
+			AND PCHS_NO = #{pchsNo}			
+		<if test="ordrgSeq != null and !ordrgSeq.equals('')">			
+			AND ORDRG_SEQ = #{ordrgSeq}
+		</if>	     	
+	</update>	
+	
+	<!-- 매입확정관리 마스터 CMPLET_YN 수정 -->
 	<update id="updatePurchaseMaster" parameterType="Map">
 		MERGE INTO TB_SM12M01 
 			USING DUAL
@@ -656,18 +679,17 @@
 	    )
 	</update>	
 	
-
-	
-	<!-- 매입 master  삭제 -->         
+	<!-- 매입 DETAIL  삭제 -->         
 	<delete id="deletePurchaseDetail" parameterType="Map">
 		DELETE 
 			FROM TB_SM12D01
 		WHERE 1=1
 			AND CO_CD = #{coCd}
 			AND PCHS_NO = #{pchsNo}
-			AND PCHS_SEQ = #{pchsSeq}
 			AND ORDRG_NO = #{ordrgNo}
+		<if test="ordrgSeq != null and !ordrgSeq.equals('')">			
 			AND ORDRG_SEQ = #{ordrgSeq}
+		</if>
 	</delete>	
 	
 	<!-- 매입 디테일  삭제 -->         
@@ -742,7 +764,6 @@
 		        		AND D.SALES_CD = CC.SALES_CD AND D.MATR_SEQ = CC.MATR_SEQ
 	        			AND D.UPPER_CD=CC.UPPER_CD  AND D.LOWER_CD=CC.LOWER_CD       		
 		        ) BOM_QTY /* 구매 BOM 수량 */
-		        , 'Y' AS USER_CHK_V		/* 수정시 CHK값 SET */
 		        , E.MATR_NM		/* 자재명 */
 		        , E.MATR_MAT		/* 소재 */
 		        , E.MATR_MAKR_NM
@@ -752,21 +773,25 @@
 				, ( SELECT FN_CM05M01_CD_TO_NM(D.ORDRG_DIV10) FROM DUAL ) AS ORDRG_DIV10_NM	/* 발주구분명 */			
 				, D.ORDRG_DIV20					/* 용도구분 */
 				, ( SELECT FN_CM05M01_CD_TO_NM(D.ORDRG_DIV20) FROM DUAL ) AS ORDRG_DIV20_NM	/* 용도구분명 */ 			
-				/* , (SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = E.PCHS_CLNT_CD) AS BOM_PCHS_CLNT_NM */		/* 협력사 */
 				, E.PCHS_CLNT_NM AS BOM_PCHS_CLNT_NM					/* 거래처명 */
-				, F.PCHS_CLNT_CD1
-				, (SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = F.PCHS_CLNT_CD1) AS PCHS_CLNT_NM1		/* 구매처1 */
-				, F.PCHS_CLNT_PCT1
-				, F.PCHS_CLNT_CD2
-				, (SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = F.PCHS_CLNT_CD2) AS PCHS_CLNT_NM2		/* 구매처2 */
-				, F.PCHS_CLNT_PCT2
-				, F.PCHS_CLNT_CD3
-				,(SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = F.PCHS_CLNT_CD3) AS PCHS_CLNT_NM3		/* 구매처2 */		
 				, D.NEXT_PRCSN_NM					/* 후행업체 */	                	
+		        , NVL( M12.CMPLET_YN, 'N') AS USER_CHK_V		/* 수정시 CHK값 SET */
+		        , NVL(M12.PCHS_AMT, 0) AS PCHS_AMT
+		        , NVL(M12.PCHS_VAT, 0) AS PCHS_VAT			
+		        , NVL(M12.PCHS_AMT, 0) + NVL(M12.PCHS_VAT, 0) AS PCHS_SUM_AMT
+		        , 
+		        	CASE
+	        		WHEN ( ( SELECT COUNT(*) FROM TB_SM12D01 AA WHERE D.ORDRG_NO=AA.ORDRG_NO ) > 0 )
+	        			THEN MAX(M12.PCHS_NO) OVER()
+		        		ELSE NVL(M12.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00000')
+		        	END  AS PCHS_NO	
+		        , TO_CHAR(M12.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT
+		        , M12.PCHS_QTY
 			FROM TB_SM02D01 D			/* 발주디테일 */
 			LEFT OUTER JOIN TB_SM01D01 E ON(D.CO_CD=E.CO_CD AND D.SALES_CD=E.SALES_CD AND D.UPPER_CD=E.UPPER_CD AND D.LOWER_CD=E.LOWER_CD
 											AND D.MATR_SEQ=E.MATR_SEQ AND D.MATR_CD=E.MATR_CD)		/*구매 BOM */
 			INNER JOIN TB_BM05M01 F ON ( E.MATR_CD = F.MATR_CD )	/* 자재마스터 */					
+			LEFT OUTER JOIN TB_SM12D01 M12 ON(D.ORDRG_NO=M12.ORDRG_NO AND D.ORDRG_SEQ=M12.ORDRG_SEQ)			
 			WHERE 1=1
 			<if test="coCd != null and !coCd.equals('')">
 				AND D.CO_CD = #{coCd}   

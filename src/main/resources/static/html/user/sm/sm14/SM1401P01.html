@@ -40,8 +40,7 @@
   <form id="popForm" onSubmit="return false;">
     <div class="form-group popup_table">
 		<input type="hidden" id="userId"     	name="userId">
-		<input type="hidden" id="pgmId"     	name="pgmId" value="SM1401P01">
-		<input type="hidden" id="today"     	name="pgmId" value="">			       	
+		<input type="hidden" id="pgmId"     	name="pgmId" value="SM1401P01">		       	
     </form>
     
     <div style="padding-bottom:20px;"></div>    
@@ -85,7 +84,9 @@ var secondGrid = null;
 var userId = null;
 var userNm = null;
 var fileTrgtKeyU = null;
-var currToday = [];
+//formatter
+$('[data-ax5formatter]').ax5formatter();
+var today = moment(new Date()).format("YYYY-MM-DD");
 	
 var gridViewPop = {
     	initView: function(){
@@ -101,22 +102,34 @@ var gridViewPop = {
 	              selector: false
 	            },
 	            body: {
-	            	mergeCells : ["coNm", "salesCd", "matrCd", "matrNm", "matrSpec","ordrgQty","ordrgAmt"],
+	            	mergeCells : ["coNm", "salesCd", "bomPchsClntNm"],
 					onClick: function() {
 					    this.self.select(this.dindex);
 					    var row = this.dindex;
                         var paramObj = {"row" : row};
                         //체크박스일 경우 실행 - 등록모드만
-                        if( this.column.key == "userChk" && actionType == "C" ) {
-                        	//chk, 수량, 기입고수량, row번호 
-                            $.setInitGridData(gridViewPop, row, this.item);                        		
-                        }
-                        //수정시 체크해제 불가
-                        if( this.column.key == "userChk" && actionType == "U" ) {
-                            gridViewPop.target.setValue(row, "userChk", "Y");
-                            alert("수정시는 체크 해제 할 수 없습니다.");       
-                            return;
-                        }                        
+                        if( this.column.key == "userChk" ) {
+                        	//미등록 일 경우 vat 매입, 합계금액 set
+                        	if( this.item.userChk == "Y" ) {
+                        		let vat = Math.floor(Number(this.item.ordrgAmt / 10));
+                        		let pchsAmt = Number(this.item.ordrgAmt);
+                        		let pchsQty = this.item.ordrgQty;
+                        		gridViewPop.target.setValue(row, "pchsVat", vat);
+                        		gridViewPop.target.setValue(row, "pchsAmt", pchsAmt);
+                        		gridViewPop.target.setValue(row, "pchsSumAmt", pchsAmt+vat);
+                        		gridViewPop.target.setValue(row, "pchsQty", pchsQty); 
+                        		gridViewPop.target.setValue(row, "pchsDt", today);
+                        		//확정여부 강제 set
+                        		gridViewPop.target.setValue(row, "cmpletYn", "Y");      
+                        	} else if( this.item.userChk == "N" ) {
+                        		gridViewPop.target.setValue(row, "pchsVat", 0);
+                        		gridViewPop.target.setValue(row, "pchsAmt", 0);
+                        		gridViewPop.target.setValue(row, "pchsSumAmt", 0);
+                        		gridViewPop.target.setValue(row, "pchsQty", ""); 
+                        		gridViewPop.target.setValue(row, "pchsDt", "");                        		
+                        		gridViewPop.target.setValue(row, "cmpletYn", "");                        		
+                        	}
+                        }              
 					},
 					//그리드값 변경시 실행
 		            onDataChanged: function () {
@@ -134,23 +147,26 @@ var gridViewPop = {
 
 					},
 			   },
-			   /*
 				footSum: [
-  			    	[	
-  	                 ]
-  			    ],
-  			    */	    
+			    	[
+			    		{label: "합계", colspan:5, align:"center"},
+			    		{key: "ordrgQty", 			collector: "sum", formatter:"money", align: "center"},
+			    		{key: "ordrgAmt", 			collector: "sum", formatter:"money", align: "center"},
+			    		{},			    		
+			    		{key: "pchsVat",		collector: "sum", formatter:"money", align: "center"},
+			    		{key: "pchsAmt",		collector: "sum", formatter:"money", align: "center"},
+			    		{key: "pchsSumAmt",		collector: "sum", formatter:"money", align: "center"},
+			    		{key: "pchsQty",		collector: "sum", formatter:"money", align: "center"},			    		
+	                 ]
+			    ],        
 				columns: [
-			 	 	 {key: "fileTrgtKey", 			label: "파일대상KEY", 			width: 100,		align: "center", 	hidden:true}						
+			 	 	 	{key: "coCd", 			label: "coCd", 			width: 100,		align: "center", 	hidden:true}						
 						,{key: "matrCd", 			label: "자재코드", 			width: 100,		align: "left"}		/* 품번 */						
 						,{key: "matrNm", 			label: "자재명", 				width: 150,		align: "left"}		/* 품명 */
 						,{key: "matrSpec", 			label: "규격", 				width: 100,		align: "center"}
 						,{key: "matrNm", 			label: "자재명", 				width: 120,		align: "left"}		/* 품명 */
-						,{key: "matrMat", 			label: "소재", 				width: 70,		align: "center"}						
-						,{key: "matrMakrNm", 		label: "MAKER", 			width: 70,		align: "center"}	/* 제조사 */
 						,{key: "bomPchsClntNm", 		label: "거래처", 				width: 80,		align: "center"}	/* 거래처 */						
-						,{key: "nextPrcsnNm", 			label: "후행업체", 			width: 80,		align: "left"}						
-						,{key: "ordrgQty", 			label: "발주 수량", 			width: 80,		align: "right", formatter: "money", 		hidden:true}			/*발주 수량 */
+						,{key: "ordrgQty", 			label: "발주 수량", 			width: 80,		align: "right", formatter: "money", 		hidden:false}			/*발주 수량 */
 						,{key: "ordrgPrc", 			label: "발주 단가", 			width: 80,		align: "right", 		hidden:true}			/*발주 단가 */						
 						,{key: "ordrgAmt", 			label: "발주 금액", 			width: 80,		align: "right", formatter: "money"}			/*발주 금액 */						
 						/* 체크박스없이 무조건 입력 */
@@ -165,6 +181,24 @@ var gridViewPop = {
 						,{key: "pchsVat", 			label: "부가세", 			width: 80,		align: "right", formatter: "money"}			/*매입 금액 */
 						,{key: "pchsAmt", 			label: "매입 금액", 			width: 80,		align: "right", formatter: "money"}			/*매입 금액 */												
 						,{key: "pchsSumAmt", 			label: "합계 금액", 			width: 80,		align: "right", formatter: "money"}			/*매입 금액 */
+						,{key: "pchsQty", 			label: "매입수량", 			width: 80,		align: "right", formatter: "money"}			/*매입 수량 */
+			 			,
+			 			{key: "pchsDt", 				label: "확정일자", 			width:  80,		align: "center"
+								, editor: {type: "date"
+											, config: {
+														content: {
+						                            				config: { mode: "day", selectMode: "day" }
+						                        				  }
+						                    			}        
+										  }
+						  }
+			 			,{key: "cmpletYn", 			label: "확정<br>여부", 		width: 50,		align: "center", 		hidden:true}						
+						,{key: "matrMat", 			label: "소재", 				width: 70,		align: "center"}						
+						,{key: "matrMakrNm", 		label: "MAKER", 			width: 70,		align: "center"}	/* 제조사 */						
+						,{key: "nextPrcsnNm", 		label: "후행업체", 			width: 80,		align: "left"}						
+						,{key: "ordrgNo", 			label: "ordrgNo", 			width: 80,		align: "right", 		hidden:true}
+						,{key: "ordrgSeq", 			label: "ordrgNo", 			width: 80,		align: "right", 		hidden:true}
+						,{key: "pchsNo", 			label: "pchsNo", 			width: 80,		align: "right", 		hidden:true}	
 	              ]
 	        });
 			return this;
@@ -188,8 +222,6 @@ var gridViewPop = {
         		var addParam = {ordrgSeq : ordrgSeq }
         		//Object.assign(formData, addParam);
         	}
-        	debugger;
-        	//등록과 수정 URL 다르게
         	var url = "selectOrdrgMatList";
 			postAjax("/user/sm/sm14/" + url, formData, null, function(data){
 				var list = data.resultList;
@@ -207,7 +239,7 @@ var gridViewPop = {
 	}	
 
 // 권한체크    
-authChk();		
+//authChk();		
 	
 gridViewPop.initView();
 
@@ -216,7 +248,7 @@ actionType = modalStack.last().paramObj.actionType;
 if (actionType == "C") {
 	$("#actionBtn").text("등록");
 	$('#actionBtn').on("click", function() {
-		insertWareHousing();
+		insertinsertPurchaseSel();
 	});
 	//발주서발행 btn hide
 	$("#reportRegBtn").remove();
@@ -230,7 +262,7 @@ if (actionType == "C") {
 }	
 
 // 등록 - done
-function insertWareHousing() {
+function insertinsertPurchaseSel() {
 		
 	if (inputValidation($('.popup_area [required]'))) {					// 필수 필드의 유효성 검사
 		var formData = makeFormData();									// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
@@ -242,20 +274,12 @@ function insertWareHousing() {
         }
         
 		if(makeArr.length<1) {
-			alert("입고 항목은 최소 1개 이상이어야 합니다.");
+			alert("매입 항목은 최소 1개 이상이어야 합니다.");
 			return;
 		} else {
-			//입고번호가 있을경우 set
-			if( typeof(modalStack.last().paramObj.inNo) != "undefined" ) {
-				formData.append("inNo", modalStack.last().paramObj.inNo);
-				formData.append("fileTrgtKey", param_fileTrgtKey);
-			} else {
-				formData.append("inNo", "");	
-				formData.append("fileTrgtKey", 0);
-			}
 			formData.append("makeArr", JSON.stringify(makeArr));
 		}          
-		filePostAjax("/user/sm/sm03/insertWareHousing", formData,		// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
+		filePostAjax("/user/sm/sm14/insertinsertPurchaseSel", formData,		// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
 			function(data) {
 				alert(data.resultMessage);								// 결과 메시지를 alert으로 출력
 				if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
@@ -265,81 +289,15 @@ function insertWareHousing() {
 		});
 	}
 }
-
-//수정 
-function updateWareHousing() {
-		
-	if (inputValidation($('.popup_area [required]'))) {					// 필수 필드의 유효성 검사
-		var formData = makeFormData();									// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
-		var makeArr = {};
-        //저장용 배열 push
-		makeArr = $.gridInsertArr(gridViewPop);
-        if( !makeArr ) {
-        	return;
-        }
-		if(makeArr.length<1) {
-			alert("입고 항목은 최소 1개 이상이어야 합니다.");
-			return;
-		} else {
-	        //입고번호 set
-	        formData.append("ordrgNo", $("#ordrgNo_I").val());			
-			formData.append("makeArr", JSON.stringify(makeArr));
-		}          
-		filePostAjax("/user/sm/sm03/updateWareHousingDetail", formData,		// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
-			function(data) {
-				alert(data.resultMessage);								// 결과 메시지를 alert으로 출력
-				if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
-					gridView.setData(0);
-					modalStack.close();									// 모달을 닫음
-				}
-		});
-		
-	}
-}
-
-
 
 function makeFormData() {
-	// 금액 콤마 제거
-	$.each($('.popup_area input[comma]'), function(idx, elem) {
-		deleteComma(elem);
-	});
-	// 날짜 하이픈 제거
-	$.each($('.popup_area input[date]'), function(idx, elem) {
-		deleteHyphen(elem);
-	});
+
 	// 폼데이터 생성
 	var formData = new FormData($("#popForm")[0]);
 	// 기본값 set
 	formData.append("userId", jwt.userId);
-	formData.append("currCd", $("#popForm #currCd").val());
-	formData.append("exrate", $("#popForm #exrate").val());
-	formData.append("ioDiv", $("#ioDiv").val());
-	formData.append("coCd", $("#coCd").val());
-	formData.append("salesCd", $("#salesCd").val());	
-	
-	//---------------------------------------------------------------  
-	//-------itemarr  --첨부화일 처리를 위한 부분 시작
-	//---------------------------------------------------------------  
-
-	formData.append("comonCd", treeModule.getFileNodeId());
-	var fileUploadArr = [];
-	var tempArr = [];
-	
-	tempArr = treeModule.getFileArr();
-	$.each(tempArr, function(idx, obj) {
-		if (obj.fileKey == 0) {
-            formData.append("files", obj.file);
-            obj.file = '';
-            fileUploadArr.push(obj);
-		}
-	});
-
-	formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
-	formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
-	//---------------------------------------------------------------  
-	//--첨부화일 처리를 위한 부분 끝
-	//--------------------------------------------------------------- 
+	formData.append("coCd", modalStack.last().paramObj.coCd);
+	formData.append("salesCd", modalStack.last().paramObj.salesCd);	
 	
 	return formData;	
 }
@@ -360,22 +318,10 @@ $(document).ready(function() {
 		fileTrgtKeyU = modalStack.last().paramObj.fileTrgtKey;
 		
 		$("#popForm #userId").val(userId);	
-		//작성자 readonly 등 set
-		$("#popForm #salesCd").attr("readonly", true);
-		$("#popForm #coCd").css({'background-color':'#e6e6e6', 'pointer-events':'none'});
-		$("#popForm #clntPjt").css({'background-color':'#e6e6e6', 'pointer-events':'none'});		
+		
 		
 		//등록일때만 set
 		if(actionType == "C") {
-			// 입고일자
-			$('#today').datepicker({
-					format : "yyyy-mm-dd",
-					language : "ko",
-					autoclose : true
-				})
-			.datepicker("setDate", today.toDate());
-			//수불구분 구매입고
-			$("#popForm #ioDiv").val("INOUTDIV_I01");			
 
 			//modal 넘어온값만큼 만큼 루프 
 			$.each(modalStack.last().paramObj, function (key, val) {		
@@ -390,40 +336,8 @@ $(document).ready(function() {
 			$(".add_btn.pdl10").hide();
 			
 		} else if(actionType == "U") {
-			postAjaxSync("/user/sm/sm03/selectWareHousingDetailInfo", modalStack.last().paramObj, null
-				, function(data){
-					var list = data.resultList;
-	 				if( list.length > 0 ) {
-				        $.each(list[0], function (key, val) {	
-							//html element overwrite set
-							if( val && typeof($("#"+key).attr("name")) != "undefined" ) {
-								$("#popForm #"+key).val(val);
-							}
-						});			
-					} 
-			});					
-			//그리드 load
-			gridViewPop.initView().setData(0);
-				
-			//sale code readonly
-			$("#popForm #salesCd").attr("readonly", true);
-			$("#popForm #salesCdAnchor").removeAttr("onclick");
-			//그리드 삭제버튼 hide
-			$(".add_btn.pdl10").show();			
+
 		}	
-		
-		//환율 load
-		var paramObj = {
-						"userId" : jwt.userId
-						, "codeKind" : "CURR"
-						/* , "codeId" : $("#popForm #currCd").val() */
-						};
-		postAjaxSync("/user/sm/sm02/selectCurrToday", paramObj, null
-					, function(data) {   
-						if(data.resultList.length > 0 ) {
-							currToday = data.resultList;
-						}
-		});     //user search ajax end	
 	}
 
 	$.initViewPop();
@@ -433,69 +347,10 @@ $(document).ready(function() {
 		var gridList = gridViewPop.target.getList();
 		var gridColumns = gridViewPop.target.columns;
 		if( modalStack.last().paramObj.actionType == "C" ) {
-
 		} else if( actionType == "U" ) {
-			//수정인 경우 환율 단위는 입고디테일 첫번째 항목으로 SET
-			var gridList = gridViewPop.target.getList();
-			if( gridList.length > 0 ) {
-				var exrate = gridViewPop.target.getList()[0].exrate;
-				var currCd = gridViewPop.target.getList()[0].currCd;
-				$("#popForm #currCd").val(currCd);				
-				$("#popForm #exrate").val(exrate);							
-			}			
 		}
 	}
-	
-	//등록시 통화단위에 따른 환율 SET
-	$('#popForm #currCd').on("change", function() {
-		if(actionType == "C" && $(this).val() != "" ) {
-			var selVal = $(this).val();
-			var find = currToday.find(e => e.codeId === selVal);
-			if( typeof(find.codeEtc) != "undefined" ) {
-				$('#popForm #exrate').val(find.codeEtc);	
-			}
-		} else if( actionType == "C" && $(this).val() == "" ) {
-			$('#popForm #exrate').val('');
-		}
-	});	
-	
-	//수량/단가 금액 set
-	$.setInitGridData = function(gridObj, idx, elem) {
-    	var ordrgQty = elem.ordrgQty
-    	var preInQty = elem.preInQty;
-    	var notInQty = elem.notInQty;			//미입고수량
-    	var matrTestDivNm = elem.matrTestDivNm;
-    	var ordrgPrc = elem.ordrgPrc;			//발주단가
-    	var inDtlAmt = parseInt(Number(ordrgPrc)*Number(notInQty));		//입고금액
-    	var chkVal = gridObj.target.getList()[idx].userChk;
-
-    	//입고 잔량 쳌
-    	if( Number(notInQty) == 0 ) {
-    		alert("입고 가능한 잔량이 없습니다.");
-			gridObj.target.setValue(idx, "userChk", "N");		//입고수량 view    		
-    		return;
-    	}
-    	if(chkVal == "Y" ) {
-            gridObj.target.setValue(idx, "inQty", notInQty);		        		
-            gridObj.target.setValue(idx, "badQty", 0);			        	
-            gridObj.target.setValue(idx, "inPrc", ordrgPrc);	
-            gridObj.target.setValue(idx, "inDtlAmt", inDtlAmt);
-            gridObj.target.setValue(idx, "inDt", $("#today").val());
-            gridObj.target.setValue(idx, "sInspecQty", notInQty);    //검사수량  view
-            gridObj.target.setValue(idx, "sInQty", notInQty);		//입고수량 view    		
-    	} else if(chkVal == "N") {
-            gridObj.target.setValue(idx, "inQty", "");		        		
-            gridObj.target.setValue(idx, "badQty", "");			        	
-            gridObj.target.setValue(idx, "inPrc", "");	
-            gridObj.target.setValue(idx, "inDtlAmt", "");
-            gridObj.target.setValue(idx, "inDt", "");
-            gridObj.target.setValue(idx, "sInspecQty", "");    //검사수량  view
-            gridObj.target.setValue(idx, "sInQty", "");		//입고수량 view   
-    	}    	
-    	
-
-	}
-		
+			
 	//등록시 그리드값 배열 저장
 	$.gridInsertArr = function(gridObj, mode) {
 		var gridList = gridObj.target.getList();
@@ -512,53 +367,13 @@ $(document).ready(function() {
 					var key = gridColumns[i].key;
 					var val = elem[key];
 					if( typeof(val) == "undefined") val = "";
-					//console.log('key:' + key+'=-====>val:' + val);					
-					//type number 시 콤마제거
-					if( typeof(gridColumns[i].editor) != "undefined" && gridColumns[i].editor.type == "number" && val != "" ) {
-						val = deleteCommaStr(val); 
-					}	     
 					//입고순번 은 select key로  ORDRG_SEQ  
 					detailObj[key] = val;			            			            
 	        	}
 	            //필수값 체크를 여기서 한다. 입고수량, 납기요청일 - 체크된 항목만	            
 	            //if( actionType == "C" && 
 	            if( actionType == "C" && detailObj['userChk'] == "Y" ) {
-	            	//입고수량
-		            if( detailObj['inQty'] ==="" || detailObj['inQty'] =="0" ) {
-		            	msgArr.push((idx+1)+" 행의 합격수량을 입력해 주십시오.")	;
-		            }	 
-	            	//불량수량 제거 
-	            	/*
-		            if( detailObj['badQty'] === "" ) {		            	
-		            	msgArr.push((idx+1)+" 행의 불량수량을 입력해 주십시오..")	;
-		            }
-	            	*/
-	            	//입고단가
-		            if( detailObj['inPrc'] =="" || detailObj['inPrc'] =="0" ) {
-		            	msgArr.push((idx+1)+" 행의 입고단가를 입력해 주십시오.")	;
-		            }	 	            	
-		            //납기요청일
-		            if(detailObj['dudtDeqDt'] == "" ) {
-		            	msgArr.push((idx+1)+" 행의 납기요청일을 입력해 주십시오.")	;		            	
-		            }
-		            //입고단가 체크 없음??
-		            if( detailObj['inDtlAmt'] =="" || detailObj['inDtlAmt'] =="0" ) {
-		            	msgArr.push((idx+1)+" 행의 입고금액을 확인해 주십시오.")	;
-		            }
-		            //입고수량
-		            if( Number(detailObj['ordrgQty']) < Number(detailObj['preInQty']) + Number(detailObj['inQty']) ) {
-		            	var calQty = parseInt( Number(detailObj['ordrgQty']) - Number(detailObj['preInQty']) );
-		            	msgArr.push((idx+1)+" 행의 합격수량은 " + calQty + "보다 작거나 같아야 합니다.")	;
-		            }		
-		            //합격수량+불량수량 = 미입고  == 제거(2023.0930)
-		            /*
-					var sInQty = parseInt( Number(deleteCommaStr(detailObj['inQty'])) + Number(deleteCommaStr(detailObj['badQty'])) );
-					if( sInQty > Number(detailObj['notInQty']) ) {
-						var calQty2 = parseInt( Number(detailObj['notInQty']) - Number(detailObj['inQty']) );
-		            	msgArr.push((idx+1)+" 행의 불량수량은 " + calQty2 + "보다 작거나 같아야 합니다.")	;						
-					}
-					*/
-		            //체크된 항목만 저장		            
+					//체크된 항목만 저장		            
 		            detailArr.push(detailObj);	
 				} else if( actionType == "U" ) {
 		            detailArr.push(detailObj);	            	

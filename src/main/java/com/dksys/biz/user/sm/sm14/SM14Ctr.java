@@ -74,15 +74,13 @@ public class SM14Ctr {
   		return "jsonView";
     }	  
     
-   
-
-	//발주 수정
-    @PostMapping(value = "/updatePurchaseBillDetail")
-    public String updatePurchaseDetail(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	//매입확정관리 선택등록
+    @PostMapping(value = "/insertinsertPurchaseSel")
+    public String insertinsertPurchaseSel(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
   		try {
-  			if (sm14Svc.updatePurchaseBillDetail(paramMap) != 0 ) {
+  			if (sm14Svc.insertinsertPurchaseSel(paramMap) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
   			} else {
   				model.addAttribute("resultCode", 500);
   				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -92,10 +90,9 @@ public class SM14Ctr {
   			model.addAttribute("resultMessage", e.getMessage());
   		}
   		return "jsonView";
-    }    
-
+    }	   
     
-	//발주 detail 삭제    
+	//매입 detail 삭제    
 	@DeleteMapping(value = "/deletePurchaseDetail")
 	public String deletePurchaseDetail(@RequestBody Map<String, String> param, ModelMap model) {
 		sm14Svc.deletePurchaseDetail(param);

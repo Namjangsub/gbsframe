@@ -6,8 +6,7 @@ import java.util.Map;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface SM14Svc {
-
-	// 발주 리스트 카운트	
+	
 	int selectPurchaseListCount(Map<String, String> paramMap);
 		
 	List<Map<String, String>> selectPurchaseList(Map<String, String> paramMap);
@@ -18,8 +17,10 @@ public interface SM14Svc {
 		
 	String selectMaxPchsNo(Map<String, String> paramMap);	
 
-	//발주마스터 등록, 수정, 삭제
+	//매입 디테일 마스터 등록, 수정, 삭제
 	int insertPurchaseBillDetail(Map<String, String> paramMap) throws Exception;	
+	
+	int insertinsertPurchaseSel(Map<String, String> paramMap) throws Exception;	
 		
 	int updatePurchaseBillDetail(Map<String, String> paramMap) throws Exception;			
 	

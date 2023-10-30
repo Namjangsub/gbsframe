@@ -82,6 +82,7 @@ public class SM14SvcImpl implements SM14Svc {
 		return sm14Mapper.selectPurchaseDetailList(paramMap);
 	}			
 	
+	//매입확정 detail insert
 	@Override
 	public int insertPurchaseBillDetail(Map<String, String> paramMap) throws Exception {
 
@@ -117,30 +118,57 @@ public class SM14SvcImpl implements SM14Svc {
 				if( dtl.get("isCost").equals("Y") ) {
 		    		result += sm14Mapper.insertPurchaseBillDetail(dtl);	
 				} else if( dtl.get("isCost").equals("N") ) {
-					System.out.println(">>>N>>>");
 		    		result += sm14Mapper.insertPurchaseBillDetailOrdrg(dtl);
 				}
-
-				//TB_SM12M01 TB_SM12M01 UPDATE	- DETAIL 에서 처리 사용안함(20231005)
-				/*
-				if( dtl.get("cmpletYn").equals("Y") ) {
-		    		sm14Mapper.updatePurchaseMaster(dtl);    			
-				}
-				*/
-			}	
-			if( dtl.get("actFlag").equals("U") ) {
-				dtl.put("maxPchsNo", dtl.get("pchsNo"));				
-	    		result += sm14Mapper.updatePurchaseBillDetail(dtl);			    		
-			}				
-			//TB_SM12M01 TB_SM12M01 UPDATE - DETAIL 에서 처리 사용안함(20231005)
-			/*
-			if( dtl.get("cmpletYn").equals("Y") ) {
-	    		sm14Mapper.updatePurchaseMaster(dtl);    			
 			}
-			*/				
+			//전체 확정으로 변경 - 확정일자요 확정여부 일괄 update
+			if( dtl.get("actFlag").equals("U") && !pchsNo.equals("") ) {
+				dtl.put("maxPchsNo", dtl.get("pchsNo"));				
+	    		result += sm14Mapper.updatePurchaseBillDetailOrdrg(dtl);			    		
+			}							
 		}
 		return result;
 	}
+	
+	//매입확정 detail 선택 insert
+	@Override
+	public int insertinsertPurchaseSel(Map<String, String> paramMap) throws Exception {
+
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
+		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);		
+		
+		int result = 0;	    
+	    //MAX ORDGR_NO - 최조 입력일 경우만
+		String maxPchsNo = "";
+		String pchsNo = "";	 		
+		String preOrdrgNo = "";
+		for(Map<String, String> dtl : detailMap) {
+			dtl.put("userId", paramMap.get("userId"));
+			dtl.put("pgmId", paramMap.get("pgmId"));
+			dtl.put("creatId", paramMap.get("userId"));
+			dtl.put("maxPchsNo", maxPchsNo);
+			pchsNo = dtl.get("pchsNo").toString();
+			//뒤 5자리
+			pchsNo = pchsNo.substring(pchsNo.length()-5, pchsNo.length());
+			//같은 발주번호인지 비교를 위해서 쓴다.
+			if( pchsNo.equals("00000")  ) {
+				//최초 실행이거나 이전발주번호 현재 발주번호가 다를때 신규매입번호 select
+				if( !preOrdrgNo.equals(dtl.get("ordrgNo")) || preOrdrgNo.equals("") ) {					
+					maxPchsNo = sm14Svc.selectMaxPchsNo(paramMap);					
+					preOrdrgNo = dtl.get("ordrgNo");			
+				} else if( preOrdrgNo.equals(dtl.get("ordrgNo")) ){
+
+				}
+				dtl.put("maxPchsNo", maxPchsNo);
+			} else if( !pchsNo.equals("00000")  ) {
+				dtl.put("maxPchsNo", dtl.get("pchsNo").toString());
+			}
+	    	result += sm14Mapper.insertPurchaseBillDetailOrdrg(dtl);			
+		}
+		return result;
+	}	
+	
 	
 	//매입확정 DETAIL 수정
 	@Override

@@ -26,13 +26,16 @@ public interface SM14Mapper {
 		
 	String selectMaxPchsNo(Map<String, String> paramMap);		
 	
-	//입고 등록, 수정, 삭제	
+	//매입	
 	int insertPurchaseBillDetail(Map<String, String> paramMap);	
 	
-	//발주 매입 전부 insert
+	//매입 전부 insert(리스트에서 사용)
 	int insertPurchaseBillDetailOrdrg(Map<String, String> paramMap);
 	
 	int updatePurchaseBillDetail(Map<String, String> paramMap);
+	
+	//리스트에서 등록시 사용
+	int updatePurchaseBillDetailOrdrg(Map<String, String> paramMap);	
 	
 	int updatePurchaseMaster(Map<String, String> paramMap);	
 	
