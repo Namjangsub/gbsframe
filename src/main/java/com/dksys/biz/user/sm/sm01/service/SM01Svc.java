@@ -42,5 +42,7 @@ public interface SM01Svc {
 
   List<Map<String, String>> bomTreeList(Map<String, String> paramMap);
 
+  void callCopyBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+
 
 }

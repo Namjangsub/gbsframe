@@ -307,9 +307,6 @@ public class SM01Ctr {
 		return "jsonView";
 	}
 
-
-
-
 	@PostMapping("/bomTreeList")
 	public String bomTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> resultList = sm01Svc.bomTreeList(paramMap);
@@ -317,6 +314,18 @@ public class SM01Ctr {
 		return "jsonView";
 	}
 
-
+	@PostMapping(value = "/callCopyBom")
+	public String callCopyBom(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			sm01Svc.callCopyBom(paramMap, mRequest);
+			
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", paramMap.get("errMsg"));
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 
 }

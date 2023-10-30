@@ -343,5 +343,10 @@ public class SM01SvcImpl implements SM01Svc {
     return sm01Mapper.bomTreeList(paramMap);
   }
 
+	@Override
+	public void callCopyBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
+		sm01Mapper.callCopyBom(paramMap);
+	}
+
 
 }
