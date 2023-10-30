@@ -274,5 +274,12 @@ public class BM16Ctr {
    return "jsonView";
  }
  
+ //헤더 그리드 코드 검색
+ @PostMapping(value = "/select_wbs_code")
+ public String select_wbs_code(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	List<Map<String, String>> result = bm16Svc.select_wbs_code(paramMap);
+	model.addAttribute("result", result);
+	return "jsonView";
+ }
   
 }

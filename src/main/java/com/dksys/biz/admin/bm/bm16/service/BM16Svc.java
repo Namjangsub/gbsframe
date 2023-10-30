@@ -41,4 +41,7 @@ public interface BM16Svc {
 
   Map<String, String> selectTodoIssueInfo(Map<String, String> paramMap);
   
+  //헤더 그리드 코드 검색
+  List<Map<String, String>> select_wbs_code(Map<String, String> paramMap);
+  
 }
