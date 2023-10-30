@@ -108,4 +108,15 @@ public class CR14Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+	
+    //엑셀 조회
+	@PostMapping(value = "/select_cr14_Excel")
+	public String select_cr14_Excel(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = cr14svc.select_cr14_Count(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = cr14svc.select_cr14_Excel(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 }

@@ -42,6 +42,12 @@ public class CR14SvcImpl implements CR14Svc {
 		return cr14Mapper.select_cr14_List(paramMap);
 	}
 
+	// 엑셀 리스트
+	@Override
+	public List<Map<String, String>> select_cr14_Excel(Map<String, String> paramMap) {
+		return cr14Mapper.select_cr14_List(paramMap);
+	}
+	
 	// POPUP 그리드 카운트
 	@Override
 	public int select_modal_List1_Count(Map<String, String> paramMap) {

@@ -12,6 +12,9 @@ public interface CR18Svc {
 	
 	// 그리드 리스트
 	List<Map<String, String>> select_cr18_List(Map<String, String> paramMap);
+	
+	// 그리드 리스트
+	List<Map<String, String>> select_cr18_Excel(Map<String, String> paramMap);
 
 	// // 수금유형 조회
 	// List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap);
