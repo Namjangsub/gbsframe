@@ -115,4 +115,19 @@ public class BM17SvcImpl implements BM17Svc {
 		returnMap = bm17Mapper.selectMessageTemplInfo(paramMap);	
 		return returnMap; 
 	}
+	
+	@Override
+	public Map<String, Object> selectTemplInfo(Map<String, String> paramMap) throws Exception {
+		Map<String, Object> returnMap = new HashMap<String, Object>();
+		returnMap = bm17Mapper.selectTemplInfo(paramMap);	
+		return returnMap; 
+	}
+	
+	@Override
+	public int selectMessageKey(Map<String, String> paramMap) throws Exception {
+
+		int result = 0;
+		result = bm17Mapper.selectMessageKey(paramMap);
+		return result;
+	}
 }

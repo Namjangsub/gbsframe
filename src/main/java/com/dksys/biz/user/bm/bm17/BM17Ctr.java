@@ -62,9 +62,17 @@ public class BM17Ctr {
 	@PostMapping(value = "/insertMessageTempl")
 	public String insertApprovalLine(@RequestBody Map<String, String> paramMap, ModelMap model) {
 	    	try {
-	    		bm17Svc.insertMessageTempl(paramMap);
-		    	model.addAttribute("resultCode", 200);
-		    	model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+		    	int rtnInt = bm17Svc.selectMessageKey(paramMap);
+		    	
+		    	if(rtnInt == 0) {
+			    	bm17Svc.insertMessageTempl(paramMap);
+			    	model.addAttribute("resultCode", 200);
+			    	model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+		    	}else {
+			    	model.addAttribute("resultCode", 900);
+			    	model.addAttribute("resultMessage", "기존 템플릿이 저장되어있습니다.");
+		    	}
+	    	
 	    	}catch(Exception e) {
 		    	 model.addAttribute("resultCode", 500);
 		 		 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -121,6 +129,14 @@ public class BM17Ctr {
     public String selectMessageTemplInfo(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 
   		Map<String, Object> resultInfo = bm17Svc.selectMessageTemplInfo(paramMap);
+		model.addAttribute("resultInfo", resultInfo); 
+		return "jsonView"; 
+    }
+    
+    @PostMapping(value = "/selectTemplInfo") 
+    public String selectTemplInfo(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+
+  		Map<String, Object> resultInfo = bm17Svc.selectTemplInfo(paramMap);
 		model.addAttribute("resultInfo", resultInfo); 
 		return "jsonView"; 
     }

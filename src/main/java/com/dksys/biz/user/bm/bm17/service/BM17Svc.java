@@ -25,4 +25,8 @@ public interface BM17Svc {
 	int insertKakaoMessage(Map<String, String> paramMap) throws Exception;	
 	
 	Map<String, Object> selectMessageTemplInfo(Map<String, String> paramMap) throws Exception;	
+	
+	Map<String, Object> selectTemplInfo(Map<String, String> paramMap) throws Exception;	
+	
+	int selectMessageKey(Map<String, String> paramMap) throws Exception;
 }
