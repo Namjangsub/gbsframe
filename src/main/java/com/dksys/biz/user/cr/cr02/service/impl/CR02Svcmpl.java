@@ -203,6 +203,9 @@ public class CR02Svcmpl implements CR02Svc {
       		//첨부 화일 처리  끝
       		//---------------------------------------------------------------
 
+		// 수주일자의 년도가 변경되었을 경우 수주번호를 갱신
+		cr02Mapper.callUpdateOrdrsNo(param);
+			
       	// 수주관리의 정보를 프로젝트 관리에 반영
     	cr02Mapper.callUpdateProjectMaster(param);
 
