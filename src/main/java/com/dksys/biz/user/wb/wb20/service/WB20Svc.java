@@ -42,5 +42,8 @@ public interface WB20Svc {
 	
 	int insertTodoMaster(Map<String, String> paramMap) throws Exception;	
 	
-	int deleteTodoMaster(Map<String, String> param);		
+	int deleteTodoMaster(Map<String, String> param);	
+	
+	List<Map<String, String>> selectMobileTodoSelect(Map<String, String> paramMap);
+	
 }

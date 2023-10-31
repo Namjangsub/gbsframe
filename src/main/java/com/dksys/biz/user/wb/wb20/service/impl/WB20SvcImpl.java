@@ -169,4 +169,12 @@ public class WB20SvcImpl implements WB20Svc {
 		  	  result = wb20Mapper.updateTodoMasterSanctnSn(param); 
 		  return  result;
 	  }
+	  
+	  
+	  @Override
+		public List<Map<String, String>> selectMobileTodoSelect(Map<String, String> paramMap) {
+			return wb20Mapper.selectMobileTodoSelect(paramMap);
+		}
+	  
+	  
 }

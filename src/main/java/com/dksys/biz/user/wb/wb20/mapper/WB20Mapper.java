@@ -54,4 +54,8 @@ public interface WB20Mapper {
 	//결재 todo 삭제시 순번
 	int updateTodoMasterSanctnSn(Map<String, String> paramMap);
 	
+	
+	List<Map<String, String>> selectMobileTodoSelect(Map<String, String> paramMap);	
+	
+	
 }
