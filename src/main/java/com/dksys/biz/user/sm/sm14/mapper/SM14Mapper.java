@@ -29,9 +29,10 @@ public interface SM14Mapper {
 	//매입	
 	int insertPurchaseBillDetail(Map<String, String> paramMap);	
 	
-	//매입 전부 insert(리스트에서 사용)
+	//매입 팝업 insert(리스트에서 사용)
 	int insertPurchaseBillDetailOrdrg(Map<String, String> paramMap);
 	
+	//매입 팝업수정	
 	int updatePurchaseBillDetail(Map<String, String> paramMap);
 	
 	//리스트에서 등록시 사용

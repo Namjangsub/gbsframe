@@ -161,10 +161,13 @@ public class SM14SvcImpl implements SM14Svc {
 
 				}
 				dtl.put("maxPchsNo", maxPchsNo);
+		    	result += sm14Mapper.insertPurchaseBillDetailOrdrg(dtl);	
+		    //수정일 경우
 			} else if( !pchsNo.equals("00000")  ) {
 				dtl.put("maxPchsNo", dtl.get("pchsNo").toString());
+		    	result += sm14Mapper.updatePurchaseBillDetail(dtl);				
 			}
-	    	result += sm14Mapper.insertPurchaseBillDetailOrdrg(dtl);			
+			
 		}
 		return result;
 	}	
