@@ -663,5 +663,10 @@ public class CR02Svcmpl implements CR02Svc {
 		cr02Mapper.callCopyOrdrs(paramMap);
 	}
 
-
+	@Override
+	public int selectOrdrsKey(Map<String, String> paramMap) throws Exception {
+		int result = 0;
+		result = cr02Mapper.selectOrdrsKey(paramMap);
+		return result;
+	}
 }
