@@ -174,5 +174,15 @@ public class WB20Ctr {
 		 		 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
 	    	}	    	
 			return "jsonView";
-		} 	  
+		}
+		
+		
+		@PostMapping(value = "/selectMobileTodoSelect") 
+		  public String selectMobileTodoSelect(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	  		  List<Map<String, String>> result = wb20Svc.selectMobileTodoSelect(paramMap);
+			  model.addAttribute("result", result); 
+			  return "jsonView"; 
+		  }
+		
+		
 }
