@@ -29,4 +29,8 @@ public interface BM17Mapper {
 	int insertKakaoMessage(Map<String, String> paramMap);
 	
 	Map<String, Object> selectMessageTemplInfo(Map<String, String> paramMap);
+	
+	Map<String, Object> selectTemplInfo(Map<String, String> paramMap);
+	
+	int selectMessageKey(Map<String, String> paramMap);	
 }

@@ -158,7 +158,7 @@ public class CR10SvcImpl implements CR10Svc {
 
 		//신 결재 처리
 		Gson gson = new Gson();		
-		String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\"}";
+		String pgParam = "{\"fileTrgtKey\":\""+ String.valueOf(paramMap.get("fileTrgtKey")) +"\"}";
 		String todoTitle1 = lgistNo + " 물류진행요청 공유"; 
 		
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
