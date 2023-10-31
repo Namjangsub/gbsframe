@@ -82,9 +82,17 @@ public class CR02Ctr {
 	public String insertOrdrs(@RequestParam Map<String, String> param, MultipartHttpServletRequest mRequest, ModelMap model) {
 
 		try {
-			cr02Svc.insertOrdrs(param,mRequest);
-			model.addAttribute("resultCode", 200);
-			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+//			if("".equals(param.get("newOrdrsNo"))) {
+				cr02Svc.insertOrdrs(param,mRequest);
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			/*
+			 * }else { int rtnInt = cr02Svc.selectOrdrsKey(param); if(rtnInt == 0) {
+			 * cr02Svc.insertOrdrs(param,mRequest); model.addAttribute("resultCode", 200);
+			 * model.addAttribute("resultMessage", messageUtils.getMessage("insert")); }else
+			 * { model.addAttribute("resultCode", 900); model.addAttribute("resultMessage",
+			 * "이미 등록된 건양수주번호가 있습니다."); } }
+			 */
 		}catch(Exception e) {
 			model.addAttribute("resultCode", 500);
 			model.addAttribute("resultMessage", e.getLocalizedMessage());

@@ -45,4 +45,6 @@ public interface CR02Svc {
     List<Map<String, Object>> selectItemSalesCodeTreeList(Map<String, String> param);
 
 	void callCopyOrdrs(Map<String, String> paramMap);
+	
+	int selectOrdrsKey(Map<String, String> paramMap) throws Exception;
 }
