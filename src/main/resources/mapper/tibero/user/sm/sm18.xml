@@ -47,16 +47,14 @@
 					, A.CMPLET_YN
 					, A.USER_CHK_V
 					, A.IS_COST
-					, A.EQP_NM   /*설비명 - 프로젝트명*/
 					, A.CRN		 /*사업자등록번호*/
 					, A.PCHS_CLMN_DAY  /*결제일 - 10*/	
 					, A.PCHS_CLMN_RMK  /*결제일 - 다음달 10일*/
 					, A.PCHS_PMNT_MTD_CD  --결제조건 코드
 				    , A.PCHS_PMNT_MTD_NM /*결제조건명*/
 				    , A.CLOSE_YM /*마감년월*/
-				
-					FROM
-				  	(
+				  FROM
+				  (
 					SELECT DISTINCT 
 							  A.CO_CD                                               AS CO_CD          --회사코드
 							, A.ORDRG_NO                                             AS ORDRG_NO       --발주번호
@@ -85,7 +83,6 @@
 								ELSE 'N'
 							  END AS USER_CHK_V	 		/* 확정여부 */											            
 							, 'N' IS_COST			/* 기타비용여부 */		
-							, CR02.EQP_NM /*설비명 - 프로젝트명*/
 							, BM2.CRN /*사업자등록번호*/
 							, BM2.PCHS_CLMN_DAY  /*결제일 - 10*/	
 							, BM2.PCHS_CLMN_RMK  /*결제일 - 다음달 10일*/
@@ -93,20 +90,20 @@
 						    , FN_CM05M01_CD_TO_NM(BM2.PCHS_PMNT_MTD_CD) AS PCHS_PMNT_MTD_NM /*결제조건명*/
 						    , TO_CHAR(E.PCHS_DT, 'YYYY-MM') AS CLOSE_YM /*마감년월*/
 						FROM TB_SM02M01 A --발주마스터
-				        INNER 	 JOIN TB_SM02D01 B ON(A.ORDRG_NO=B.ORDRG_NO)		/* 발주디테일 */
-				        INNER      JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD--거래처마스터   
-				        LEFT OUTER JOIN (SELECT A.CO_CD
+					    INNER 	 JOIN TB_SM02D01 B ON(A.ORDRG_NO=B.ORDRG_NO)		/* 발주디테일 */
+					    INNER      JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD--거래처마스터   
+					    LEFT OUTER JOIN (SELECT A.CO_CD
 												, A.ORDRG_NO
 												, A.SALES_CD
 												, SUM(A.ORDRG_QTY) ORDRG_QTY
 												, SUM(A.ORDRG_AMT) ORDRG_AMT
 												, ( SELECT MIN(B.DSGN_NO) FROM TB_SM02D01 B WHERE A.SALES_CD=B.SALES_CD AND A.ORDRG_NO=B.ORDRG_NO) AS DSGN_NO
 											FROM TB_SM02D01 A
-				                         WHERE 1=1
-				                         	GROUP BY A.CO_CD
-				                                     , A.ORDRG_NO
-				                                     , A.SALES_CD
-				                         ) AS D ON A.CO_CD = D.CO_CD AND A.SALES_CD = D.SALES_CD AND A.ORDRG_NO = D.ORDRG_NO --발주상세
+					                     WHERE 1=1
+					                     	GROUP BY A.CO_CD
+					                                 , A.ORDRG_NO
+					                                 , A.SALES_CD
+					                     ) AS D ON A.SALES_CD = D.SALES_CD AND A.ORDRG_NO = D.ORDRG_NO --발주상세
 						LEFT OUTER JOIN(
 										SELECT ORDRG_NO
 												, SUM(A.PCHS_AMT) AS PCHS_AMT
@@ -122,9 +119,7 @@
 											GROUP BY A.CO_CD
 													, A.ORDRG_NO
 													, A.PCHS_NO															
-										) E ON(A.ORDRG_NO=E.ORDRG_NO)	/* 매입 DETAIL */    
-										
-						LEFT OUTER JOIN TB_CR02D02 AS CR02 ON(CR02.CO_CD = A.CO_CD AND CR02.SALES_CD = A.SALES_CD) /*수주상세*/	
+										) E ON(A.ORDRG_NO=E.ORDRG_NO)	/* 매입 DETAIL */    	
 						LEFT OUTER JOIN TB_BM02M01 AS BM2  ON BM2.CLNT_CD = A.PCHS_CLNT_CD /*거래처 마스터*/
 						WHERE 1=1
 					UNION ALL		       
@@ -152,7 +147,6 @@
 							, D.CMPLET_YN AS CMPLET_YN	 		/* 확정여부 */
 							, DECODE(D.CMPLET_YN, 'Y', 'Y', 'N') AS USER_CHK_V		/* DETAIL로 변경 */
 							, 'Y' IS_COST			/* 기타비용여부 */
-							, CR02.EQP_NM /*설비명 - 프로젝트명*/
 							, BM2.CRN /*사업자등록번호*/
 							, BM2.PCHS_CLMN_DAY  /*결제일 - 10*/	
 							, BM2.PCHS_CLMN_RMK  /*결제일 - 다음달 10일*/
@@ -160,11 +154,10 @@
 						    , FN_CM05M01_CD_TO_NM(BM2.PCHS_PMNT_MTD_CD) AS PCHS_PMNT_MTD_NM /*결제조건명*/
 						    , TO_CHAR(D.PCHS_DT, 'YYYY-MM') AS CLOSE_YM /*마감년월*/
 							FROM TB_SM10M01 E		/* 구매비용 */		
-							LEFT OUTER JOIN TB_SM12D01 D ON(D.ORDRG_NO=E.COST_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */		
-							LEFT OUTER JOIN TB_CR02D02 AS CR02 ON(CR02.CO_CD = E.CO_CD AND CR02.SALES_CD = E.SALES_CD) /*수주상세*/
+							LEFT OUTER JOIN TB_SM12D01 D ON(D.ORDRG_NO=E.COST_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */
 							LEFT OUTER JOIN TB_BM02M01 AS BM2  ON BM2.CLNT_CD = E.PCHS_CLNT_CD /*거래처 마스터*/
 						WHERE 1=1													
-				  	) A		/* 발주+기타비용 내역 */
+				  ) A		/* 발주+기타비용 내역 */
 				WHERE 1=1
 				) Z
 				WHERE 1=1
@@ -230,7 +223,6 @@
 					, A.CMPLET_YN
 					, A.USER_CHK_V
 					, A.IS_COST
-					, A.EQP_NM   /*설비명 - 프로젝트명*/
 					, A.CRN		 /*사업자등록번호*/
 					, A.PCHS_CLMN_DAY  /*결제일 - 10*/	
 					, A.PCHS_CLMN_RMK  /*결제일 - 다음달 10일*/
@@ -267,7 +259,6 @@
 								ELSE 'N'
 							  END AS USER_CHK_V	 		/* 확정여부 */											            
 							, 'N' IS_COST			/* 기타비용여부 */		
-							, CR02.EQP_NM /*설비명 - 프로젝트명*/
 							, BM2.CRN /*사업자등록번호*/
 							, BM2.PCHS_CLMN_DAY  /*결제일 - 10*/	
 							, BM2.PCHS_CLMN_RMK  /*결제일 - 다음달 10일*/
@@ -288,7 +279,7 @@
 					                     	GROUP BY A.CO_CD
 					                                 , A.ORDRG_NO
 					                                 , A.SALES_CD
-					                     ) AS D ON A.CO_CD = D.CO_CD AND A.SALES_CD = D.SALES_CD AND A.ORDRG_NO = D.ORDRG_NO --발주상세
+					                     ) AS D ON A.SALES_CD = D.SALES_CD AND A.ORDRG_NO = D.ORDRG_NO --발주상세
 						LEFT OUTER JOIN(
 										SELECT ORDRG_NO
 												, SUM(A.PCHS_AMT) AS PCHS_AMT
@@ -304,9 +295,7 @@
 											GROUP BY A.CO_CD
 													, A.ORDRG_NO
 													, A.PCHS_NO															
-										) E ON(A.ORDRG_NO=E.ORDRG_NO)	/* 매입 DETAIL */    
-										
-						LEFT OUTER JOIN TB_CR02D02 AS CR02 ON(CR02.CO_CD = A.CO_CD AND CR02.SALES_CD = A.SALES_CD) /*수주상세*/	
+										) E ON(A.ORDRG_NO=E.ORDRG_NO)	/* 매입 DETAIL */    	
 						LEFT OUTER JOIN TB_BM02M01 AS BM2  ON BM2.CLNT_CD = A.PCHS_CLNT_CD /*거래처 마스터*/
 						WHERE 1=1
 					UNION ALL		       
@@ -334,7 +323,6 @@
 							, D.CMPLET_YN AS CMPLET_YN	 		/* 확정여부 */
 							, DECODE(D.CMPLET_YN, 'Y', 'Y', 'N') AS USER_CHK_V		/* DETAIL로 변경 */
 							, 'Y' IS_COST			/* 기타비용여부 */
-							, CR02.EQP_NM /*설비명 - 프로젝트명*/
 							, BM2.CRN /*사업자등록번호*/
 							, BM2.PCHS_CLMN_DAY  /*결제일 - 10*/	
 							, BM2.PCHS_CLMN_RMK  /*결제일 - 다음달 10일*/
@@ -342,8 +330,7 @@
 						    , FN_CM05M01_CD_TO_NM(BM2.PCHS_PMNT_MTD_CD) AS PCHS_PMNT_MTD_NM /*결제조건명*/
 						    , TO_CHAR(D.PCHS_DT, 'YYYY-MM') AS CLOSE_YM /*마감년월*/
 							FROM TB_SM10M01 E		/* 구매비용 */		
-							LEFT OUTER JOIN TB_SM12D01 D ON(D.ORDRG_NO=E.COST_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */		
-							LEFT OUTER JOIN TB_CR02D02 AS CR02 ON(CR02.CO_CD = E.CO_CD AND CR02.SALES_CD = E.SALES_CD) /*수주상세*/
+							LEFT OUTER JOIN TB_SM12D01 D ON(D.ORDRG_NO=E.COST_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */
 							LEFT OUTER JOIN TB_BM02M01 AS BM2  ON BM2.CLNT_CD = E.PCHS_CLNT_CD /*거래처 마스터*/
 						WHERE 1=1													
 				  ) A		/* 발주+기타비용 내역 */
