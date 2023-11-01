@@ -15,6 +15,7 @@ public interface BM18Mapper {
 	//알림톡수신 조회
 	List<Map<String, String>> selectReceptionMessageList(Map<String, String> paramMap);
 
-	//수신번호 채번
-	String selectMaxRcvNo(Map<String, String> paramMap);
+	//수신번호 채번	
+	List<Map<String, String>> selectMaxMessageId(Map<String, String> paramMap);		
 }
+
