@@ -168,7 +168,7 @@ public class CR10SvcImpl implements CR10Svc {
 	        for (Map<String, String> sharngMap : sharngArr) {
 	            try {	 
 	            	    sharngMap.put("reqNo", paramMap.get("lgistNo"));
-	            	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+	            	    sharngMap.put("fileTrgtKey", String.valueOf(paramMap.get("fileTrgtKey")));
 	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
 	            	    sharngMap.put("userId", paramMap.get("userId"));
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
@@ -193,7 +193,7 @@ public class CR10SvcImpl implements CR10Svc {
 	        for (Map<String, String> approvalMap : approvalArr) {
 	            try {	 
 		            	approvalMap.put("reqNo", paramMap.get("lgistNo"));
-		            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		            	approvalMap.put("fileTrgtKey",String.valueOf(paramMap.get("fileTrgtKey")));
 		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 		            	approvalMap.put("userId", paramMap.get("userId"));
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
@@ -315,7 +315,7 @@ public class CR10SvcImpl implements CR10Svc {
 	QM01Mapper.deleteApprovalList(paramMap); 
 	
 	Gson gson = new Gson();		
-	String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\"}";
+	String pgParam = "{\"fileTrgtKey\":\""+ String.valueOf(paramMap.get("fileTrgtKey")) +"\"}";
 	String todoTitle1 = paramMap.get("lgistNo") + " 물류진행요청 공유"; 
 	
 	Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -325,7 +325,7 @@ public class CR10SvcImpl implements CR10Svc {
         for (Map<String, String> sharngMap : sharngArr) {
             try {	 
             	    sharngMap.put("reqNo", paramMap.get("lgistNo"));
-            	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+            	    sharngMap.put("fileTrgtKey", String.valueOf(paramMap.get("fileTrgtKey")));
             	    sharngMap.put("pgmId", paramMap.get("pgmId"));
             	    sharngMap.put("userId", paramMap.get("userId"));
             	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
@@ -350,7 +350,7 @@ public class CR10SvcImpl implements CR10Svc {
         for (Map<String, String> approvalMap : approvalArr) {
             try {	 
 	            	approvalMap.put("reqNo", paramMap.get("lgistNo"));
-	            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+	            	approvalMap.put("fileTrgtKey", String.valueOf(paramMap.get("fileTrgtKey")));
 	            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 	            	approvalMap.put("userId", paramMap.get("userId"));
 	            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
