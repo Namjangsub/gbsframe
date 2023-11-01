@@ -167,7 +167,7 @@ public class CR10SvcImpl implements CR10Svc {
 			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
 	            try {	 
-	            	    sharngMap.put("reqNo", paramMap.get("ordrsNo"));
+	            	    sharngMap.put("reqNo", paramMap.get("lgistNo"));
 	            	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
 	            	    sharngMap.put("userId", paramMap.get("userId"));
@@ -192,7 +192,7 @@ public class CR10SvcImpl implements CR10Svc {
 			int i = 0;
 	        for (Map<String, String> approvalMap : approvalArr) {
 	            try {	 
-		            	approvalMap.put("reqNo", paramMap.get("ordrsNo"));
+		            	approvalMap.put("reqNo", paramMap.get("lgistNo"));
 		            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 		            	approvalMap.put("userId", paramMap.get("userId"));
@@ -324,7 +324,7 @@ public class CR10SvcImpl implements CR10Svc {
 		int i = 0;
         for (Map<String, String> sharngMap : sharngArr) {
             try {	 
-            	    sharngMap.put("reqNo", paramMap.get("ordrsNo"));
+            	    sharngMap.put("reqNo", paramMap.get("lgistNo"));
             	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
             	    sharngMap.put("pgmId", paramMap.get("pgmId"));
             	    sharngMap.put("userId", paramMap.get("userId"));
@@ -349,7 +349,7 @@ public class CR10SvcImpl implements CR10Svc {
 		int i = 0;
         for (Map<String, String> approvalMap : approvalArr) {
             try {	 
-	            	approvalMap.put("reqNo", paramMap.get("ordrsNo"));
+	            	approvalMap.put("reqNo", paramMap.get("lgistNo"));
 	            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 	            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 	            	approvalMap.put("userId", paramMap.get("userId"));
