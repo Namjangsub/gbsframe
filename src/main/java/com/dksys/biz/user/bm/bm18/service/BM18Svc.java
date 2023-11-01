@@ -13,6 +13,6 @@ public interface BM18Svc {
 	//알림톡수신 조회
 	List<Map<String, String>> selectReceptionMessageList(Map<String, String> paramMap);
 	
-	String selectMaxRcvNo(Map<String, String> paramMap);
+	List<Map<String, String>> selectMaxMessageId(Map<String, String> paramMap);	
 	
 }

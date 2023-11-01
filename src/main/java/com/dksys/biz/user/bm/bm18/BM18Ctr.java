@@ -47,4 +47,11 @@ public class BM18Ctr {
 		return "jsonView"; 
     }
  
+	//알림톡 MESSAGE ID 
+	@PostMapping(value = "/selectMaxMessageId")
+	public String selectMaxMessageId(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = bm18Svc.selectMaxMessageId(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}    
 }

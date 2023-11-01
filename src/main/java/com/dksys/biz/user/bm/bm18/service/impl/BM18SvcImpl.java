@@ -51,10 +51,9 @@ public class BM18SvcImpl implements BM18Svc {
 		return bm18Mapper.selectReceptionMessageList(paramMap);
 	}
 	
-	//수신번호 채번
-	@Override
-	public String selectMaxRcvNo(Map<String, String> paramMap) {
-		return bm18Mapper.selectMaxRcvNo(paramMap);
-	}
+	//수신번호 채번	
+	public List<Map<String, String>> selectMaxMessageId(Map<String, String> paramMap) {
+		return bm18Mapper.selectMaxMessageId(paramMap);
+	}	
 	
 }
