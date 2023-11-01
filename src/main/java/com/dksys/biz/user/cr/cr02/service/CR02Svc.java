@@ -47,4 +47,8 @@ public interface CR02Svc {
 	void callCopyOrdrs(Map<String, String> paramMap);
 	
 	int selectOrdrsKey(Map<String, String> paramMap) throws Exception;
+
+	int selectNoSalesCdOrdrsListPopCount(Map<String, String> param);
+
+	List<Map<String, Object>> selectNoSalesCdOrdrsListPop(Map<String, String> param);
 }

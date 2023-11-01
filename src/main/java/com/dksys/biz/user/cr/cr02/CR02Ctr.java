@@ -82,17 +82,15 @@ public class CR02Ctr {
 	public String insertOrdrs(@RequestParam Map<String, String> param, MultipartHttpServletRequest mRequest, ModelMap model) {
 
 		try {
-//			if("".equals(param.get("newOrdrsNo"))) {
+			int rtnInt = cr02Svc.selectOrdrsKey(param);
+			if(rtnInt == 0) {
 				cr02Svc.insertOrdrs(param,mRequest);
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-			/*
-			 * }else { int rtnInt = cr02Svc.selectOrdrsKey(param); if(rtnInt == 0) {
-			 * cr02Svc.insertOrdrs(param,mRequest); model.addAttribute("resultCode", 200);
-			 * model.addAttribute("resultMessage", messageUtils.getMessage("insert")); }else
-			 * { model.addAttribute("resultCode", 900); model.addAttribute("resultMessage",
-			 * "이미 등록된 건양수주번호가 있습니다."); } }
-			 */
+		    }else {
+		    	model.addAttribute("resultCode", 900);
+		    	model.addAttribute("resultMessage", "이미 등록된 건양수주번호가 있습니다.");
+		    }
 		}catch(Exception e) {
 			model.addAttribute("resultCode", 500);
 			model.addAttribute("resultMessage", e.getLocalizedMessage());
@@ -169,5 +167,16 @@ public class CR02Ctr {
 		model.addAttribute("paramMap", paramMap);
 		return "jsonView";
 	}
-		
+
+	
+	@PostMapping("/selectNoSalesCdOrdrsListPop")
+	public String selectNoSalesCdOrdrsListPop(@RequestBody Map<String, String> param, ModelMap model) {
+		int totalCnt = cr02Svc.selectNoSalesCdOrdrsListPopCount(param);
+		PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, Object>> ordrsList = cr02Svc.selectNoSalesCdOrdrsListPop(param);
+		model.addAttribute("ordrsList", ordrsList);
+		return "jsonView";
+	}
+	
 }

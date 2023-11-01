@@ -255,23 +255,35 @@ public class CR02Svcmpl implements CR02Svc {
 		cr02Mapper.deleteOrdrsDetailAll(param);
 		cr02Mapper.deleteOrdrsPlanHis(param);
 		
-		String newOrdrsDiv =  param.get("newOrdrsDiv");
+		String newOrdrsDiv = param.get("newOrdrsDiv");
 		
-        //param.get("newOrdrsNo") => 회사 == 'TRN' && 거래처 = '104' 일때
+		// 건양수주번호 있으면 수주번호는 건양수주번호를 따라감			
         if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
-        	
+        	// 수주구분이 달라지는 경우
             if (!newOrdrsDiv.equals(param.get("ordrsDiv"))) {
-            	
+            	//정상수주면 정상수주번호
                 if (param.get("ordrsDiv").equals("ORDRSDIV1")) {
                 	param.put("ordrsNo", selectMaxOrdrsNo(param));
-                }
-                else {
+                } else {
+                	// 그외는 AS수주번호
                 	String orderNo = selectAsMaxOrdrsNo(param);
                 	param.put("ordrsNo", "AS"+orderNo);
                 }
             }
             
+            // 건양수주번호가 있다가 사라진 경우 수주번호를 새로 체번해야한다.
+            if (!"".equals(param.get("oldOrdrsNo")) && param.get("oldOrdrsNo") != null) {
+            	//정상수주면 정상수주번호
+            	if (param.get("ordrsDiv").equals("ORDRSDIV1")) {
+            		param.put("ordrsNo", selectMaxOrdrsNo(param));
+            	} else {
+            		// 그외는 AS수주번호
+            		String orderNo = selectAsMaxOrdrsNo(param);
+            		param.put("ordrsNo", "AS"+orderNo);
+            	}
+            }
         }else {
+        	// 건양수주번호 있으면 수주번호는 건양수주번호를 따라감
         	param.put("ordrsNo", param.get("newOrdrsNo"));
         }
 		
@@ -669,4 +681,14 @@ public class CR02Svcmpl implements CR02Svc {
 		result = cr02Mapper.selectOrdrsKey(paramMap);
 		return result;
 	}
+	
+    @Override
+    public int selectNoSalesCdOrdrsListPopCount(Map<String, String> param) {
+        return cr02Mapper.selectNoSalesCdOrdrsListPopCount(param);
+    }
+    
+    @Override
+    public List<Map<String, Object>> selectNoSalesCdOrdrsListPop(Map<String, String> param) {
+        return cr02Mapper.selectNoSalesCdOrdrsListPop(param);
+    }
 }
