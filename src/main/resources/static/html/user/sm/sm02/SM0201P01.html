@@ -38,8 +38,9 @@
     <div class="form-group popup_table">
 		<input type="hidden" id="userId"     	name="userId">
 		<input type="hidden" id="pgmId"     	name="pgmId" value="SM0201M01">
-		<input type="hidden" id="fileTrgtKey"	name="fileTrgtKey" value="">		<!-- file target key -->
-	
+		<input type="hidden" id="fileTrgtKey"	name="fileTrgtKey" value="">		<!-- file target key -->		
+		<input type="hidden" id="ordrgMngNm"	name="creatNm" value="">		<!-- 알림톡발송용 생성자명(발주담당자) -->
+		<input type="hidden" id="ordrgMngTelNo"	name="ordrgMngTelNo" value="">		<!-- 알림톡발송용 생성자전화번호 -->		
       <table>
 
         <colgroup>
@@ -1929,10 +1930,20 @@ async function sendMailExec() {
                     " 5. 발주 내용 : " + ordetTxt + "\n\n" + 
                     " 6. 발주 담당자 : " + jwt.userNm + "(" + jwt.email + ")\n\n" + 
                     " 내용 확인 후 처리 해 주시기 바랍니다.\n\n" +               
-                    " 감사합니다.",
-                    
+                    " 감사합니다.",                
     };
     
+    //카카오 addParam
+    let addParam = {
+			"ordrgDt": $("#popForm #ordrgDt").val()				//발주일자				
+			, "clntNm": $("#popForm #pchsClntNm").val()				//공급사명 - 구매처
+			, "ordrgNo": $("#popForm #ordrgNo").val()				//발주번호
+			, "ordrgCoCdNm": $("#popForm #coCd option:checked").text()				//발주회사명
+			, "ordrgMngNm": $("#popForm #ordrgMngNm").val()				//발주담당자
+			, "ordrgMngTelNo": $("#popForm #ordrgMngTelNo").val()				//발주담당자전화번호
+			, "tmplatDiv": "TMPLATDIV01"							//알림톡발송템플릿 종류
+    }
+    Object.assign(paramObj, addParam);
    	//****************************************************************
    	// 파일 첨부 여부에 따라 출력물 첨부
    	//****************************************************************	   
@@ -1944,7 +1955,6 @@ async function sendMailExec() {
     
     modalStack.close();  //blind popup close   	
 	openSecondModal("/static/html/cmn/modal/mailSend.html", 640, 710, "메일 보내기", paramObj, function() {});
- 
 }	
 
 //요인별요청번호 검색
@@ -1976,5 +1986,155 @@ function openPurchaseSearch() {
 } 
 
 
+//카카오 발송
+function commKaKaoSend(param) {
+	console.log('---카카오 발주서 발행 알림톡발송시작 --' + param);
 
+	//알림톡수신번호 채번
+	var paramMax = { "userId" : jwt.userId
+					, "tmplatDiv": param.tmplatDiv
+					, "fileTrgtKey": param.fileTrgtKey 
+					/* , "clntCd" : param.clntCd */ //임시 건양
+					, "clntCd" : 1
+					};
+	var maxMessageId = null;			//message id(unique key)
+	var talkMessage = null 				//발송될 내용 template
+	var mobile = null					//수신인 휴대전화번호
+	var nameTo = null					//수신인 이름 
+	postAjaxSync("/user/bm/bm18/selectMaxMessageId", paramMax, null
+				, function(data) {   
+					if(data.resultList.length > 0 ) {
+						if( data.resultList[0].maxMessageId != "" ) {
+							maxMessageId = data.resultList[0].maxMessageId;							
+							talkMessage = data.resultList[0].messageDesc;
+							mobile =  data.resultList[0].mngMoblphonNo;
+							nameTo =  data.resultList[0].mngNm;
+						} else {
+							alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
+							return;
+						} 
+
+					}
+	});     //user search ajax end
+	if(mobile == "" || mobile == null) {
+		alert('수신전화번호가 없습니다.\r\n['+clntNm+'] 거래처관리의 사업부 첫번째 항목을 확인해 주십시오.');
+		return;
+	}
+	
+	//message 치환
+	let message = talkMessage;
+	let splitStr = Array.from(message.matchAll('\\{(.*?)\\}'), match => `${match[0]}`);	
+	//loop
+	$.each(splitStr, function (key, val) {		
+		let compKey = val.substring(1, val.length-1);
+		if( compKey != "" && compKey != "undefined" ) {
+			if( typeof(param[compKey]) != "undefined" ) {
+				let val2 = '#'+val;
+				message = message.replaceAll(val2, param[compKey]);
+			}
+		}
+	});
+	//console.log('---message--' + message);
+	//console.log('---talkMessage--' + talkMessage);
+	
+	let talkParam = {};
+	let talkBody = {};		
+
+	talkParam.authToken = "e/eDfZOFCsrBqadaECQ0+g==";
+	//talkParam.serverName = "talkdream123";
+	talkParam.serverName = "gyitt2400";		
+	talkParam.paymentType = "P";
+	talkBody.service = "2310086157";				//서비스번호(1000000000 - 예시  real : 2310086157
+	talkBody.messageId = "TALK"+Math.floor(Math.random() * 1000001);			//고객사에서 관리하는 메시지No - 40byte (unique 값)
+	//talkBody.messageId = maxMessageId;			//고객사에서 관리하는 메시지No - 40byte (unique 값);	
+	//talkBody.messageType = "AT";			//톡드림 포탈 템플릿 사용하지 않을 경우 사용 (AT: 알림톡, AI: 이미지 알림톡 (messageType 누락시 AT가 기본값으로 사용됨)
+	//talkBody.title = "(주)건양아이티티";				//알림톡 타이틀 -
+	talkBody.title = param.mailTitle;					//알림톡 타이틀 -
+	talkBody.message = message;				//알림톡 메시지 (1000 byte) -- 실행안됨
+	//talkBody.message = param.mssageDesc;				//알림톡 메시지 (1000 byte) -- 실행안됨
+	
+	talkBody.mobile = mobile;				//휴대전화번호
+	talkBody.template = "10001";			//템플릿관리화면 템플릿ID	
+	let talkJson = JSON.stringify(talkBody);
+	
+	kakaoSendReal(talkJson, talkParam, param);
+}
+
+
+var kakaoErr = [];
+//message load
+var paramObj = {
+				"userId" : jwt.userId
+				, "codeKind" : "KAKAOMSG"
+				};
+postAjax("/user/sm/sm02/selectCurrToday", paramObj, null
+			, function(data) {   
+				if(data.resultList.length > 0 ) {
+					kakaoErr = data.resultList;
+				}
+});     //user search ajax end	
+
+function kakaoSendReal(talkJson, talkParam, param) {
+	let talkDeJson = JSON.parse(talkJson);
+	//알림톡
+	$.ajax({
+	    type: "POST",
+	    url: "https://talkapi.lgcns.com/request/kakao.json",
+	    contentType: "x-www-form-urlencoded; charset=utf-8",
+	    data: talkJson,
+        beforeSend: function (xhr) {
+            xhr.setRequestHeader("authToken", talkParam.authToken);
+            xhr.setRequestHeader("serverName", talkParam.serverName);	            
+            xhr.setRequestHeader("paymentType", talkParam.paymentType);	            
+        },		    
+	    async: false,
+	    success: function(data){
+	    	console.log('---success---');		
+	    	console.log('status:' + data.status);
+	    	let err = data.status;
+	    	if( err.indexOf("ERR") > -1 || err.indexOf("KKO")> -1 ) { 
+	    		let find = kakaoErr.find(e => e.codeId === err);
+				if( typeof(find.codeNm) != "undefined" ) {
+		    		var errorMsg = find.codeNm;	
+				}		    			
+		    	insertKakaoMessage(err, talkDeJson, param);	 				
+	    		alert("오류코드: "+data.status+"\r\n\r\n" + errorMsg);   		
+	    	} else if( data.status == "OK" ) {
+	    		alert("알림톡 정상 발송되었습니다.");
+		    	insertKakaoMessage(err, talkDeJson, param);	
+	    	}
+	    },
+        error: function (data) {
+        	insertKakaoMessage(data.status, talkDeJson, param);
+        	console.log('---ajax error---');
+        }
+	});		
+}
+
+//알림톡전송로크
+function insertKakaoMessage(dStatus, talkDeJson, param){
+	var formData = {
+			 "mssageId": talkDeJson.messageId
+			, "rcvId": ""
+			, "rcvNm": ""
+			, "clntCd": param.clntCd
+			, "tmplatDiv": param.tmplatDiv
+			, "sendgStatus": dStatus
+			, "title": talkDeJson.title
+			, "mssage": talkDeJson.message
+			, "mobile": talkDeJson.mobile
+			, "nameTo": param.clntNm
+			, "creatId": jwt.userId
+			, "creatPgm": "SM02P01"
+	};
+
+	postAjax("/user/bm/bm17/insertKakaoMessage", formData, null, function(data) {
+		//alert(data.resultMessage);// 결과 메시지를 alert으로 출력
+			if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
+				console.log('--알림톡 로그 정상 저장--');
+			} else {
+				console.log('--알림톡 로그 정상 저장 오류--');				
+			}
+	});
+}
 </script>
