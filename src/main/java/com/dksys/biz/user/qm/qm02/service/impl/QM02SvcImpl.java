@@ -128,7 +128,7 @@ public class QM02SvcImpl implements QM02Svc {
 		map.put("coCd", paramMap.get("coCd"));
 		map.put("strDate", paramMap.get("strDate"));
 		map.put("endDate",paramMap.get("endDate"));
-		map.put("statyy",paramMap.get("statyy"));
+		map.put("statYm",paramMap.get("statYm"));
 
 		return qm02Mapper.select_zupiter_modal(map);
 	}
