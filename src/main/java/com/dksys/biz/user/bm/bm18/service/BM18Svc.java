@@ -15,4 +15,5 @@ public interface BM18Svc {
 	
 	List<Map<String, String>> selectMaxMessageId(Map<String, String> paramMap);	
 	
+	List<Map<String, String>> selectMaxMessageIdTodo(Map<String, String> paramMap);	
 }

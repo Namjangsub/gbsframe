@@ -55,5 +55,9 @@ public class BM18SvcImpl implements BM18Svc {
 	public List<Map<String, String>> selectMaxMessageId(Map<String, String> paramMap) {
 		return bm18Mapper.selectMaxMessageId(paramMap);
 	}	
-	
+
+	//todo 수신번호 메시지 내용 채번	
+	public List<Map<String, String>> selectMaxMessageIdTodo(Map<String, String> paramMap) {
+		return bm18Mapper.selectMaxMessageIdTodo(paramMap);
+	}		
 }

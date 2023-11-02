@@ -256,6 +256,7 @@
 	<div class ="popup_bottom_btn">
 		<button type="button" id="actionBtn" authChk>등록</button>
 		<button type="button" id="approvalReqBtn" authChk>결재요청</button>
+		<button type="button" id="approvalReqTodoBtn" authChk style="display:none;">결재요청알림톡</button>
 		<button id="reportRegBtn" type="button" onclick="setReportMain('Report');" authChk>발주서발행</button>
 		<button type="button" onclick="sendMailCall();" authChk><i class="fas fa-envelope"></i> 메일</a></button>
 		<button type="button" class="close_btn"
@@ -759,6 +760,11 @@ function updateOrder() {
 				alert(data.resultMessage);								// 결과 메시지를 alert으로 출력
 				if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
 					gridView.setData(0);
+					if(approvalArr.length > 0) {
+						//todo실행
+						kakaoTodo();
+						debugger;
+					}				
 					modalStack.close();									// 모달을 닫음
 				}
 		});
@@ -1564,7 +1570,10 @@ $(document).ready(function() {
 				$("#approvalReqBtn").hide();
 				$("#approvalReqBtn").removeAttr("onclick");
 				//결재대상자 load
-				gridViewPopApproval.initView().setData(0);			
+				gridViewPopApproval.initView().setData(0);		
+				
+				//temp
+				$("#approvalReqTodoBtn").show()
 			}
 			if( modalStack.last().paramObj.reOpen ) {
 				$("#approval_trgt").show();
@@ -2052,14 +2061,118 @@ function commKaKaoSendOrder(param) {
 	talkBody.mobile = mobile;				//휴대전화번호
 	talkBody.template = "10001";			//템플릿관리화면 템플릿ID	- 발주서 V2
 	let talkJson = JSON.stringify(talkBody);
+	kakaoSendReal(talkJson, talkParam, param);
+	//한번대 보낼경우 이곳 사용 - 남실장님 한번더 보냄 
+	talkBody.messageId = 'KAKAO'+Number(maxMessageId.substring(5, 20))+1;
+	talkBody.mobile = "01063893764"
+	talkJson = JSON.stringify(talkBody);
+	//kakaoSendReal(talkJson, talkParam, param);
+}
+
+		
+/*
+#	TODO 알림톡발송 시작
+#
+*/
+$("#approvalReqTodoBtn").on("click", function () {
+	kakaoTodo();
+});
+
+function kakaoTodo() {
+	let clntNm = (jwt.coCd=="GUN") ? "(주)건양ITT" : "트루넷";
+	
+	let param = {
+			"tmplatDiv": "TMPLATDIV02"
+			, "coCd": $("#popForm #coCd").val()				//해당업무의 coCd(트르넷발주 TRN )
+			, "todoDiv1CodeId": "TODODIV20"					//공통코드 해당업무 - 결재
+			, "todoDiv2CodeId": "TODODIV2050"					//공통코드 해당업무 - 결재 - 발주서
+			, "todoDiv1CodeNm": "결재"						//공통코드 해당업무 - 결재 - 발주서
+			, "todoNo": $("#popForm #ordrgNo").val()
+			, "clntCd": "1"					//발신회사는 로그인사용자 회사
+			, "clntNm": clntNm				//로그의 수신거래처명
+			, "ordrgMngNm": $("#popForm #ordrgMngNm").val()			//발주작성자(담당자)
+			, "ordrgMngTelNo": $("#popForm #ordrgMngTelNo").val()		//담당자전화번호						
+	}
+	commKaKaoSendTodo(param);	
+}
+
+//to-do결재요청 알림톡
+function commKaKaoSendTodo(param) {
+	console.log('---카카오 발주서 발행 알림톡발송시작 --' + param);
+
+	//알림톡수신번호 채번
+	var maxMessageId = null;			//message id(unique key)
+	var talkMessage = null 				//발송될 내용 template
+	var mobile = null					//수신인 휴대전화번호
+	var nameTo = null					//수신인 이름 
+	var title = null					//todo title
+	postAjaxSync("/user/bm/bm18/selectMaxMessageIdTodo", param, null
+				, function(data) {   
+					if(data.resultList.length > 0 ) {
+						if( data.resultList[0].maxMessageId != "" ) {
+							maxMessageId = data.resultList[0].maxMessageId;							
+							talkMessage = data.resultList[0].messageDesc;
+							mobile =  data.resultList[0].telNo;
+							//로그용
+							param.rcvId = data.resultList[0].todoId;			//todo 수신id
+							param.rcvNm = data.resultList[0].name;				//todo 수신자명
+							title =   data.resultList[0].todoTitl;
+							param.title = title;								//요청내용제목
+							param.sendDt = data.resultList[0].sendDt;
+						} else {
+							alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
+							return;
+						} 
+
+					}
+	});     //user search ajax end
+	if(mobile == "" || mobile == null) {
+		alert('수신전화번호가 없습니다.\r\n['+clntNm+'] 거래처관리의 사업부 첫번째 항목을 확인해 주십시오.');
+		return;
+	}
+	if(talkMessage == "" || talkMessage == null) {
+		alert('발송할 내용이 없습니다.\r\n알림톡템플릿관리를 확인해 주십시오.');
+		return;
+	}	
+	//message 치환
+	let message = talkMessage;
+	let splitStr = Array.from(message.matchAll('\\{(.*?)\\}'), match => `${match[0]}`);	
+	//loop
+	$.each(splitStr, function (key, val) {		
+		let compKey = val.substring(1, val.length-1);
+		if( compKey != "" && compKey != "undefined" ) {
+			if( typeof(param[compKey]) != "undefined" ) {
+				let val2 = '#'+val;
+				message = message.replaceAll(val2, param[compKey]);
+			}
+		}
+	});
+
+	let talkParam = {};
+	let talkBody = {};		
+
+	talkParam.authToken = "e/eDfZOFCsrBqadaECQ0+g==";
+	talkParam.serverName = "gyitt2400";		
+	talkParam.paymentType = "P";
+	talkBody.service = "2310086157";				//서비스번호(1000000000 - 예시  real : 2310086157
+	talkBody.messageId = maxMessageId;			//고객사에서 관리하는 메시지No - 40byte (unique 값);	
+	//talkBody.messageType = "AT";			//톡드림 포탈 템플릿 사용하지 않을 경우 사용 (AT: 알림톡, AI: 이미지 알림톡 (messageType 누락시 AT가 기본값으로 사용됨)
+	talkBody.title = title;					//알림톡 타이틀 -
+	talkBody.message = message;				//알림톡 메시지 (1000 byte) -- 실행안됨
+	talkBody.mobile = mobile;				//휴대전화번호
+	talkBody.template = "10002";			//템플릿관리화면 템플릿ID	- 발주서 V2
+	let talkJson = JSON.stringify(talkBody);
+	
+	debugger;
 	
 	kakaoSendReal(talkJson, talkParam, param);
 	//한번대 보낼경우 이곳 사용 - 남실장님 한번더 보냄 
 	talkBody.messageId = 'KAKAO'+Number(maxMessageId.substring(5, 20))+1;
 	talkBody.mobile = "01063893764"
 	talkJson = JSON.stringify(talkBody);
-	kakaoSendReal(talkJson, talkParam, param);
+	//kakaoSendReal(talkJson, talkParam, param);
 }
+
 
 
 var kakaoErr = [];
@@ -2116,8 +2229,8 @@ function kakaoSendReal(talkJson, talkParam, param) {
 function insertKakaoMessage(dStatus, talkDeJson, param){
 	var formData = {
 			 "mssageId": talkDeJson.messageId
-			, "rcvId": ""
-			, "rcvNm": ""
+			, "rcvId": param.rcvId
+			, "rcvNm": param.rcvNm
 			, "clntCd": param.clntCd
 			, "tmplatDiv": param.tmplatDiv
 			, "sendgStatus": dStatus
@@ -2128,7 +2241,7 @@ function insertKakaoMessage(dStatus, talkDeJson, param){
 			, "creatId": jwt.userId
 			, "creatPgm": "SM02P01"
 	};
-
+debugger;
 	postAjax("/user/bm/bm17/insertKakaoMessage", formData, null, function(data) {
 		//alert(data.resultMessage);// 결과 메시지를 alert으로 출력
 			if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,

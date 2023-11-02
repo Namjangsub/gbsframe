@@ -53,5 +53,13 @@ public class BM18Ctr {
 		List<Map<String, String>> resultList = bm18Svc.selectMaxMessageId(paramMap);
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
-	}    
+	}
+	
+	//알림톡 MESSAGE ID 
+	@PostMapping(value = "/selectMaxMessageIdTodo")
+	public String selectMaxMessageTodo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = bm18Svc.selectMaxMessageIdTodo(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}   	
 }

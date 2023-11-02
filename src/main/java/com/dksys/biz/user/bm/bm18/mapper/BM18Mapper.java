@@ -17,5 +17,8 @@ public interface BM18Mapper {
 
 	//수신번호 채번	
 	List<Map<String, String>> selectMaxMessageId(Map<String, String> paramMap);		
+	
+	//todo 알림톡
+	List<Map<String, String>> selectMaxMessageIdTodo(Map<String, String> paramMap);	
 }
 
