@@ -62,6 +62,9 @@ public class EmailCtr {
     		}
 			model.addAttribute("resultCode", 200);
 			model.addAttribute("resultMessage", messageUtils.getMessage("mailSendComplete"));
+			model.addAttribute("ordrgNo", paramMap.get("ordrgNo"));
+			model.addAttribute("shortUrl", paramMap.get("shortUrl"));
+			model.addAttribute("chkCode", paramMap.get("chkCode"));
 		}catch(Exception e){
 			String errorMessage = e.getMessage() != null ? e.getMessage() : "알수 없는 오류 확인 필요";
 			paramMap.put("errorYn", "Y");
