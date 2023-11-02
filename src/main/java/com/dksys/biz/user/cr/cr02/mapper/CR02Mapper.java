@@ -78,6 +78,8 @@ public interface CR02Mapper {
 
     int orderNoExistValidationCheck(Map<String, String> paramMap);
     
+    Map<String, String> selectOrdrsInfoToOrdrsNo(Map<String, String> paramMap);
+    
     int salesCdExistValidationCheck(Map<String, String> paramMap);
     
     Map<String, String> salesCdSearchOrderInfo(Map<String, String> paramMap);
