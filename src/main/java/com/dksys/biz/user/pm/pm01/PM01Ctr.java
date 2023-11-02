@@ -220,9 +220,10 @@ public class PM01Ctr {
 					model.addAttribute("resultMessage", messageUtils.getMessage("ordrsNoNotFound"));
 				 	return;
 		  } else {
-			  Map<String, String> result = cr02Mapper.ordrsCdSearchOrderInfo(paramMap);
+			  Map<String, String> result = cr02Mapper.selectOrdrsInfoToOrdrsNo(paramMap);
 			  Object ordrsNoResult = result.get("ordrsNo");
 			  if (ordrsNoResult==null ||"".equals(ordrsNoResult.toString())) {
+			  } else {
 				  paramMap.put("clntCd", result.get("ordrsClntCd"));
 				  paramMap.put("clntPjt", result.get("clntPjt"));
 				  paramMap.put("prjctCd", result.get("clntPjt"));
