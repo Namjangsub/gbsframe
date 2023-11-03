@@ -300,8 +300,7 @@ public class BM16SvcImpl implements BM16Svc {
 			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
 	            try {	 
-	            	    //sharngMap.put("reqNo", paramMap.get("issNo"));
-	            	    sharngMap.put("reqNo", "1");
+	            		sharngMap.put("reqNo", paramMap.get("prjctSeq"));
 	            	    sharngMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
 	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
 	            	    sharngMap.put("userId", paramMap.get("userId"));
@@ -325,8 +324,7 @@ public class BM16SvcImpl implements BM16Svc {
 			int i = 0;
 	        for (Map<String, String> approvalMap : approvalArr) {
 	            try {	 
-		            	//approvalMap.put("reqNo", paramMap.get("issNo"));
-	            	    approvalMap.put("reqNo", "1");
+	            		approvalMap.put("reqNo", paramMap.get("prjctSeq"));
 		            	approvalMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
 		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 		            	approvalMap.put("userId", paramMap.get("userId"));
@@ -439,7 +437,7 @@ public class BM16SvcImpl implements BM16Svc {
 				int i = 0;
 		        for (Map<String, String> sharngMap : sharngArr) {
 		            try {	 
-		            	    sharngMap.put("reqNo", paramMap.get("issNo"));
+		            		sharngMap.put("reqNo", paramMap.get("prjctSeq"));
 		            	    sharngMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
 		            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
 		            	    sharngMap.put("userId", paramMap.get("userId"));
@@ -463,7 +461,7 @@ public class BM16SvcImpl implements BM16Svc {
 				int i = 0;
 		        for (Map<String, String> approvalMap : approvalArr) {
 		            try {	 
-			            	approvalMap.put("reqNo", paramMap.get("issNo"));
+		            		approvalMap.put("reqNo", paramMap.get("prjctSeq"));
 			            	approvalMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
 			            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 			            	approvalMap.put("userId", paramMap.get("userId"));
