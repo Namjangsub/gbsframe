@@ -46,4 +46,6 @@ public interface WB20Svc {
 	
 	List<Map<String, String>> selectMobileTodoSelect(Map<String, String> paramMap);
 	
+	List<Map<String, String>> selectTodoFinalYn(Map<String, String> paramMap);	
+	
 }

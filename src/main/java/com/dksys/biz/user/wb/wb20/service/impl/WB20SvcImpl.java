@@ -176,5 +176,8 @@ public class WB20SvcImpl implements WB20Svc {
 			return wb20Mapper.selectMobileTodoSelect(paramMap);
 		}
 	  
-	  
+	  @Override
+	  public List<Map<String, String>> selectTodoFinalYn(Map<String, String> paramMap) {
+		  return wb20Mapper.selectTodoFinalYn(paramMap);
+	  }	  
 }

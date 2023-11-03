@@ -184,5 +184,11 @@ public class WB20Ctr {
 			  return "jsonView"; 
 		  }
 		
-		
+		//최종결재 완료여부
+		@PostMapping(value = "/selectTodoFinalYn")
+		public String selectTodoFinalYn(@RequestBody Map<String, String> paramMap, ModelMap model) {
+			List<Map<String, String>> result = wb20Svc.selectTodoFinalYn(paramMap);
+		    model.addAttribute("result", result);
+		    return "jsonView";
+		}	 		
 }
