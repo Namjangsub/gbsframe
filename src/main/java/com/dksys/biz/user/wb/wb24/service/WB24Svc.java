@@ -22,7 +22,7 @@ public interface WB24Svc {
 	List<Map<String, String>> selectTodoRsltsView(Map<String, String> paramMap);	
 	
 	List<Map<String, String>> selectRsltsMemberList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectMemberTelNo(Map<String, String> paramMap);
 
-	
-	
 }
