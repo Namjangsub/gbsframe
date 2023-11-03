@@ -60,7 +60,7 @@ function Approval(htmlParam, param, popParam) {
 			    			<th class="appTh">결재일자</th>		    			
 			    		</tr>
 			    	</table>
-			    	<div class="popup_bottom_btn" style="text-align: center; float:right; padding-top:10px;" id="appBtnDiv">
+			    	<div class="mobile_mid_btn" style="text-align: center; float:right; padding-top:10px;" id="appBtnDiv">
 					<button	type="button" style="height: 40px;  width: 90px;" id="appConfirmAnchor" onclick="approvalConfirm();" >결재승인</button>
 					<button type="button" class="close_btn" style="height: 40px;  width: 90px;" id="appConfirmAnchor" onclick="window.history.back();" >닫기</button>
 					</div>
