@@ -118,4 +118,13 @@ public class WB24Ctr {
 	    return "jsonView"; 		 
     }
 	
+	@PostMapping(value = "/selectMemberTelNo") 
+	public String selectMemberTelNo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    List<Map<String, String>> result = wb24Svc.selectMemberTelNo(paramMap);
+	    model.addAttribute("result", result); 
+	    return "jsonView"; 		 
+    }
+	
+	
+	
 }

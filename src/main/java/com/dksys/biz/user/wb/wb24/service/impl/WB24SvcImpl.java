@@ -469,6 +469,8 @@ public class WB24SvcImpl implements WB24Svc {
 		return wb24Mapper.selectRsltsMemberList(paramMap);
 	}
 	
-	
-	
+	@Override
+	public List<Map<String, String>> selectMemberTelNo(Map<String, String> paramMap) {
+		return wb24Mapper.selectMemberTelNo(paramMap);
+	}
 }

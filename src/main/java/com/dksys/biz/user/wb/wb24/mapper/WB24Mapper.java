@@ -32,4 +32,6 @@ public interface WB24Mapper {
 	List<Map<String, String>> selectRsltsMemberList(Map<String, String> paramMap);
 
 	List<Map<String, String>> actChk(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectMemberTelNo(Map<String, String> paramMap);
 }
