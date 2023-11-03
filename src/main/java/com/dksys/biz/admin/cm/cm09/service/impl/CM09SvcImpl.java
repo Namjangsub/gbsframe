@@ -48,16 +48,19 @@ public class CM09SvcImpl implements CM09Svc {
 	public int insertNoti(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		int result;
 		
+		result = cm09Mapper.insertNoti(paramMap);
 		List<MultipartFile> fileList = mRequest.getFiles("files");
 	    if (fileList.size() > 0) {
 			//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
 	    	//접근 권한이 없으면 Exception 발생
-			paramMap.put("comonCd", "FITR9901");
-			paramMap.put("jobType", "fileUp");
+	    	paramMap.put("fileTrgtTyp", "TB_CM09M01");
+	    	paramMap.put("fileTrgtKey", paramMap.get("notiKey"));
+	    	paramMap.put("comonCd", "FITR9901");
+	    	paramMap.put("jobType", "fileUp");
 			cm15Svc.selectFileAuthCheck(paramMap);
-			cm08Svc.uploadFile("TB_CM09M01", paramMap.get("notiKey"), mRequest);
+//			cm08Svc.uploadFile("TB_CM09M01", paramMap.get("notiKey"), mRequest);
+			cm08Svc.uploadFile(paramMap, mRequest);
 	    }
-	    result = cm09Mapper.insertNoti(paramMap);
 	    
 		return result;
 	}
