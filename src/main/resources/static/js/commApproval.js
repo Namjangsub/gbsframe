@@ -197,6 +197,16 @@ function Approval(htmlParam, param, popParam) {
 						alert(confirmText + " 되었습니다.");
 						confirmYn = true;
 					});
+
+					//최종결재 완료시 알림톡
+					postAjaxSync("/user/wb/wb20/selectTodoFinalYn", paramMap, null, function(data){
+						let todoYn = data.result[0].todoYn;
+						if( todoYn == "Y" ) {
+							console.log('---결재모두완료 알림톡시작');
+							sendTodoFinal(paramMap);																
+						}
+					});					
+
 				} else {
 					alert("승인중 오류가 발생 되었습니다.");	
 				}
@@ -211,3 +221,6 @@ function Approval(htmlParam, param, popParam) {
 		}        
 	}		
 }
+
+
+
