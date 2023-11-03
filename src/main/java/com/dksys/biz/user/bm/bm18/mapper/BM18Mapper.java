@@ -19,6 +19,9 @@ public interface BM18Mapper {
 	List<Map<String, String>> selectMaxMessageId(Map<String, String> paramMap);		
 	
 	//todo 알림톡
-	List<Map<String, String>> selectMaxMessageIdTodo(Map<String, String> paramMap);	
+	List<Map<String, String>> selectMaxMessageIdTodo(Map<String, String> paramMap);
+	
+	//알림톡 로그등록
+	int insertKakaoMessage(Map<String, String> paramMap);	
 }
 

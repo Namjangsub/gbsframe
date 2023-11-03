@@ -109,21 +109,7 @@ public class BM17Ctr {
 
   	  	return "jsonView";
     }   
-    
-    //테스트 버튼 등록
-    @PostMapping(value = "/insertKakaoMessage")
-	public String insertKakaoMessage(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    	try {
-    		bm17Svc.insertKakaoMessage(paramMap);
-	    	model.addAttribute("resultCode", 200);
-	    	model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-    	}catch(Exception e) {
-	    	 model.addAttribute("resultCode", 500);
-	 		 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-    	}
-    	return "jsonView";		  		  
-    }
-    
+        
 	//조회 정보  -->
     @PostMapping(value = "/selectMessageTemplInfo") 
     public String selectMessageTemplInfo(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {

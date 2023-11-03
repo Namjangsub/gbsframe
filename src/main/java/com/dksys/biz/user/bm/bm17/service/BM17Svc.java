@@ -20,10 +20,7 @@ public interface BM17Svc {
 	int updateMessageTempl(Map<String, String> paramMap) throws Exception;
 	
 	int deleteMessageTempl(Map<String, String> paramMap) throws Exception;
-	
-	//테스트 버튼 등록
-	int insertKakaoMessage(Map<String, String> paramMap) throws Exception;	
-	
+		
 	Map<String, Object> selectMessageTemplInfo(Map<String, String> paramMap) throws Exception;	
 	
 	Map<String, Object> selectTemplInfo(Map<String, String> paramMap) throws Exception;	

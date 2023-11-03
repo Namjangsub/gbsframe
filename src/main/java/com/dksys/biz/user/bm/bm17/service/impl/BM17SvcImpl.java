@@ -95,20 +95,6 @@ public class BM17SvcImpl implements BM17Svc {
 		return result;
 	  }	
 	
-	//테스트 버튼 등록
-	@Override
-	public int insertKakaoMessage(Map<String, String> paramMap) throws Exception {
-
-	    //데이터 처리 시작
-		int result = 0;
-		//String maxRcvNo = bm18Svc.selectMaxRcvNo(paramMap);	    
-	    //paramMap.put("maxRcvNo", maxRcvNo);
-
-	    result = bm17Mapper.insertKakaoMessage(paramMap);	
-
-		return result;
-	}
-
 	@Override
 	public Map<String, Object> selectMessageTemplInfo(Map<String, String> paramMap) throws Exception {
 		Map<String, Object> returnMap = new HashMap<String, Object>();

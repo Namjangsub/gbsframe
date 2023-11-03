@@ -60,4 +60,14 @@ public class BM18SvcImpl implements BM18Svc {
 	public List<Map<String, String>> selectMaxMessageIdTodo(Map<String, String> paramMap) {
 		return bm18Mapper.selectMaxMessageIdTodo(paramMap);
 	}		
+	
+	@Override
+	public int insertKakaoMessage(Map<String, String> paramMap) throws Exception {
+
+
+		int result = 0;
+	    result = bm18Mapper.insertKakaoMessage(paramMap);	
+
+		return result;
+	}	
 }
