@@ -2357,3 +2357,72 @@ function inCloseChk(chkValue){
 			$.unblockUI();
 	 }
 };
+
+
+
+function kakaoSendReal(talkJson, talkParam, param) {
+	let talkDeJson = JSON.parse(talkJson);
+	let sendCnt = 0;
+	//알림톡
+	$.ajax({
+	    type: "POST",
+	    url: "https://talkapi.lgcns.com/request/kakao.json",
+	    contentType: "x-www-form-urlencoded; charset=utf-8",
+	    data: talkJson,
+      beforeSend: function (xhr) {
+          xhr.setRequestHeader("authToken", talkParam.authToken);
+          xhr.setRequestHeader("serverName", talkParam.serverName);	            
+          xhr.setRequestHeader("paymentType", talkParam.paymentType);	            
+      },		    
+	    async: false,
+	    success: function(data){		
+	    	console.log('status:' + data.status);
+	    	let err = data.status;
+	    	if( err.indexOf("ERR") > -1 || err.indexOf("KKO")> -1 ) { 
+	    		let find = kakaoErr.find(e => e.codeId === err);
+				if( typeof(find.codeNm) != "undefined" ) {
+		    		var errorMsg = find.codeNm;	
+				}		    			
+		    	insertKakaoMessage(err, talkDeJson, param);	 				
+	    		alert("오류코드: "+data.status+"\r\n\r\n" + errorMsg);   		
+	    	} else if( data.status == "OK" ) {
+	    		//alert("알림톡 정상 발송되었습니다.");
+	    		sendCnt++;
+		    	insertKakaoMessage(err, talkDeJson, param);	
+	    	}
+	    },
+      error: function (data) {
+      	insertKakaoMessage(data.status, talkDeJson, param);
+      	console.log('---ajax error---');
+      }
+	});		
+	console.log('---success---' + sendCnt);	
+	return sendCnt;
+}
+
+//알림톡전송로크
+function insertKakaoMessage(dStatus, talkDeJson, param){
+	var formData = {
+			 "mssageId": talkDeJson.messageId
+			, "rcvId": param.rcvId
+			, "rcvNm": param.rcvNm
+			, "clntCd": param.clntCd
+			, "tmplatDiv": param.tmplatDiv
+			, "sendgStatus": dStatus
+			, "title": talkDeJson.title
+			, "mssage": talkDeJson.message
+			, "mobile": talkDeJson.mobile
+			, "nameTo": param.nameTo			
+			, "creatId": jwt.userId
+			, "creatPgm": param.creatPgm
+	};
+
+	postAjax("/user/bm/bm18/insertKakaoMessage", formData, null, function(data) {
+		//alert(data.resultMessage);// 결과 메시지를 alert으로 출력
+			if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
+				console.log('--알림톡 로그 정상 저장--');
+			} else {
+				console.log('--알림톡 로그 정상 저장 오류--');				
+			}
+	});
+}
