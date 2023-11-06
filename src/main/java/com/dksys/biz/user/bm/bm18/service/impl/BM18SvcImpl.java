@@ -55,15 +55,28 @@ public class BM18SvcImpl implements BM18Svc {
 	public List<Map<String, String>> selectMaxMessageId(Map<String, String> paramMap) {
 		String kakaoSeq = bm18Mapper.selectKakaoSeqNext(paramMap);
 		paramMap.put("kakaoSeq", kakaoSeq);				
-		return bm18Mapper.selectMaxMessageId(paramMap);
+		List<Map<String, String>> list = new ArrayList<Map<String,String>>();
+		list = bm18Mapper.selectMaxMessageId(paramMap);
+		//sequence add
+		for (int i = 1; i <= list.size(); i++) {
+			bm18Mapper.selectKakaoSeqNext(paramMap);
+		}
+		
+		return list;
 	}	
 	
 	//todo 수신번호 메시지 내용 채번	
 	public List<Map<String, String>> selectMaxMessageIdTodo(Map<String, String> paramMap) {
 		String kakaoSeq = bm18Mapper.selectKakaoSeqNext(paramMap);
 		paramMap.put("kakaoSeq", kakaoSeq);		
-		
-		return bm18Mapper.selectMaxMessageIdTodo(paramMap);
+
+		List<Map<String, String>> list = new ArrayList<Map<String,String>>();
+		list = bm18Mapper.selectMaxMessageIdTodo(paramMap);
+		//sequence add
+		for (int i = 1; i <= list.size(); i++) {
+			bm18Mapper.selectKakaoSeqNext(paramMap);
+		}
+		return list;
 	}		
 	
 	@Override
