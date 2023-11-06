@@ -87,142 +87,138 @@
 				AND RN BETWEEN ${firstIndex} AND ${lastIndex}
 	</select>
 	
+	<!-- 사용안함 -->
     <select id="selectKakaoSeqNext" parameterType="Map" resultType="string">
         SELECT 'KKO'||TO_CHAR(SYSDATE, 'YY') || LPAD(TB_SM18M01_SQ01.NEXTVAL, 6, 0)
         FROM DUAL
     </select>		
 	
-	<!--  수신번호 채번 messageId, TEMPLATE 내용 GET -->
+	
+	<!--  수신번호 채번 messageId, TEMPLATE 내용 GET (발주에서 사용 )-->
 	<select id="selectMaxMessageId" parameterType="Map" resultType="camelMap">
-		SELECT MAX(MAX_MESSAGE_ID) AS MAX_MESSAGE_ID			
-			, MAX(MSSAGE_DESC) AS MESSAGE_DESC
-			, MAX(A.CLNT_CD) AS CLNT_CD
-		<if test="tmplatDiv != null and !tmplatDiv.equals('')">
-			/* 발주서일 경우 거래처 D 사업부순번 1번의 전화번호를 GET */		
-			<if test='tmplatDiv == "TMPLATDIV01"'>
-			, MAX(B.MNG_NM) AS MNG_NM
-			, MAX(B.MNG_MOBLPHON_NO) AS MNG_MOBLPHON_NO
-			</if>
-		</if>				
-			FROM
-			(
-				SELECT #{kakaoSeq} AS MAX_MESSAGE_ID 
-						/* NVL(MAX_MESSAGE_ID, 'KAKAO'||TO_CHAR(SYSDATE, 'YY')||'000001') AS MAX_MESSAGE_ID */
-						, '' AS MSSAGE_DESC		
-						, #{clntCd} AS CLNT_CD						
-					FROM
-					(
-					SELECT DISTINCT DECODE( INSTR(MESSAGE_ID, 'KAKAO'||TO_CHAR(SYSDATE, 'YY')), 0, 'KAKAO'||TO_CHAR(SYSDATE, 'YY')||'000001'
-									, 'KAKAO' || MAX( TO_CHAR(SYSDATE, 'YY')|| LPAD( SUBSTRING(MESSAGE_ID, -6)+1, 6, '0') ) OVER()
-								  ) AS MAX_MESSAGE_ID
-						FROM TB_BM18M01
-					UNION ALL
-					SELECT NULL AS MAX_MESSAGE_ID
-						FROM DUAL		
-					)		
-					WHERE MAX_MESSAGE_ID IS NOT NULL OR ROWNUM = 1	
-				UNION ALL 
-				SELECT '' AS MAX_MESSAGE_ID
-						, MSSAGE_DESC AS MSSAGE_DESC
-						, '' AS CLNT_CD
-					FROM TB_BM17M01
-				WHERE 1=1
-				<if test="tmplatDiv != null and !tmplatDiv.equals('')">
-					AND TMPLAT_DIV = #{tmplatDiv}
-				</if>					
-				<if test="fileTrgtKey != null and !fileTrgtKey.equals('')">
-					AND FILE_TRGT_KEY = #{fileTrgtKey}
-				</if>									
-			) A
-		<if test="tmplatDiv != null and !tmplatDiv.equals('')">
-			/* 발주서일 경우 거래처 D 사업부순번 1번의 전화번호를 GET */		
-			<if test='tmplatDiv == "TMPLATDIV01"'>
-				LEFT OUTER JOIN
+		SELECT 'KKO'||TO_CHAR(SYSDATE, 'YY') || LPAD(TB_SM18M01_SQ01.NEXTVAL, 6, 0) MAX_MESSAGE_ID
+			, T.*
+		  FROM
+		  (	
+			SELECT MSSAGE_DESC AS MESSAGE_DESC
+				, A.CLNT_CD
+			<if test="tmplatDiv != null and !tmplatDiv.equals('')">
+				/* 발주서일 경우 거래처 D 사업부순번 1번의 전화번호를 GET */		
+				<if test='tmplatDiv == "TMPLATDIV01"'>
+				, B.MNG_NM
+				, B.MNG_MOBLPHON_NO AS MNG_MOBLPHON_NO
+				</if>
+			</if>				
+				FROM
 				(
-				SELECT MNG_NM
-						, MNG_MOBLPHON_NO
-						, CLNT_CD
-					FROM TB_BM02D01	
-				WHERE 1=1 
-				AND CLNT_CD = #{clntCd}				
-				) B ON(A.CLNT_CD=B.CLNT_CD)		
-			</if>
-		</if>								
+					SELECT 
+							MSSAGE_DESC AS MSSAGE_DESC
+							, #{clntCd} AS CLNT_CD
+						FROM TB_BM17M01
+					WHERE 1=1
+					<if test="tmplatDiv != null and !tmplatDiv.equals('')">
+						AND TMPLAT_DIV = #{tmplatDiv}
+					</if>					
+					<if test="fileTrgtKey != null and !fileTrgtKey.equals('')">
+						AND FILE_TRGT_KEY = #{fileTrgtKey}
+					</if>									
+				) A
+			<if test="tmplatDiv != null and !tmplatDiv.equals('')">
+				/* 발주서일 경우 거래처 D 사업부순번 1번의 전화번호를 GET */		
+				<if test='tmplatDiv == "TMPLATDIV01"'>
+					LEFT OUTER JOIN
+					(
+					SELECT MNG_NM
+							, MNG_MOBLPHON_NO
+							, CLNT_CD
+						FROM TB_BM02D01	
+					WHERE 1=1 
+					AND CLNT_CD = #{clntCd}				
+					) B ON(A.CLNT_CD=B.CLNT_CD)		
+				</if>
+			</if>	
+		  ) T											
 	</select>
 		
 	<!--  todo 수신번호 채번 messageId, TEMPLATE 내용 GET -->
 	<select id="selectMaxMessageIdTodo" parameterType="Map" resultType="camelMap">
-	/* selectMaxMessageIdTodo */
-		SELECT A.TODO_ID
-			, A.NAME
-			, A.TODO_TITL	
-			, A.TEL_NO
-			, A.TODO_NO
-			, A.SANCTN_SN	
-			/* , OLD 'KAKAO'||TO_NUMBER( SUBSTR(MAX_MESSAGE_ID, -8)+A.SANCTN_SN)||A.DIV_NUM AS MAX_MESSAGE_ID */
-			, 'KKO'||A.DIV_GB||TO_NUMBER( SUBSTR(MAX_MESSAGE_ID, -8)+A.SANCTN_SN) AS MAX_MESSAGE_ID
-			, B.MSSAGE_DESC	AS MESSAGE_DESC		
-			, TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI') AS SEND_DT
-			FROM
-			(
-			SELECT 	B.TODO_ID
-					, /* A.TEL_NO */ '010-7501-8741' AS TEL_NO		/*수신인전화번호 */
-					, B.TODO_NO
-					, B.SANCTN_SN 
-					, B.TODO_TITL
-					, A.NAME
-					, DECODE(B.TODO_DIV1_CODE_ID, 'TODODIV10', 'S', 'TODODIV20', 'A') AS DIV_GB
-					FROM TB_CM06M01 A
-					LEFT OUTER JOIN TB_WB20M03 B ON(A.ID=B.TODO_ID)					 					
-				WHERE 1=1
-			<if test="coCd != null and !coCd.equals('')">
-				AND B.TODO_CO_CD = #{coCd}
-			</if>
-			<if test="todoDiv1CodeId != null and !todoDiv1CodeId.equals('')">
-				AND B.TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
-			</if>
-			<if test="todoDiv2CodeId != null and !todoDiv2CodeId.equals('')">
-				AND B.TODO_DIV2_CODE_ID = #{todoDiv2CodeId}			
-			</if>			
-			<if test="todoNo != null and !todoNo.equals('')">
-				AND B.TODO_NO = #{todoNo}
-			</if>	
-			<if test="sanctnSn != null and !sanctnSn.equals('')">
-				/* 결재완료일 경우 결재 상신자(1번)에게 보냄 */			
-				AND B.SANCTN_SN = #{sanctnSn}
-			</if>											
-			) A
-			LEFT OUTER JOIN 
-			(
-				SELECT MAX(MAX_MESSAGE_ID) AS MAX_MESSAGE_ID
-					, MAX(MSSAGE_DESC) AS MSSAGE_DESC
-					, #{todoNo} AS TODO_NO			/* 이곳에 관리번호 */
-					FROM
-					(
-						SELECT #{kakaoSeq} AS MAX_MESSAGE_ID 
-								/* NVL(MAX_MESSAGE_ID, 'KAKAO'||TO_CHAR(SYSDATE, 'YY')||'000001') AS MAX_MESSAGE_ID */
-								, '' AS MSSAGE_DESC		
-							FROM
-							(
-								SELECT DISTINCT DECODE( INSTR(MESSAGE_ID, 'KAKAOA'||TO_CHAR(SYSDATE, 'YY')), 0, 'KAKAOA'||TO_CHAR(SYSDATE, 'YY')||'000001'
-									, 'KAKAOA' || MAX( TO_CHAR(SYSDATE, 'YY')|| LPAD( SUBSTRING(MESSAGE_ID, -6)+1, 6, '0') ) OVER()
-										  ) AS MAX_MESSAGE_ID
-								FROM TB_BM18M01
-							UNION ALL
-							SELECT NULL AS MAX_MESSAGE_ID
-								FROM DUAL		
-							)		
-							WHERE MAX_MESSAGE_ID IS NOT NULL OR ROWNUM = 1	
-						UNION ALL 
-						SELECT '' AS MAX_MESSAGE_ID
-								, MSSAGE_DESC AS MSSAGE_DESC
-							FROM TB_BM17M01
-						WHERE 1=1
-						<if test="tmplatDiv != null and !tmplatDiv.equals('')">
-							AND TMPLAT_DIV = #{tmplatDiv}
-						</if>
-					)					
-			) B ON(A.TODO_NO=B.TODO_NO)
+		SELECT 'KKO'||TO_CHAR(SYSDATE, 'YY') || LPAD(TB_SM18M01_SQ01.NEXTVAL, 6, 0) MAX_MESSAGE_ID
+			, T.*
+		  FROM
+		  (
+			SELECT A.TODO_ID
+				, A.NAME
+				, A.TODO_TITL	
+				, A.TEL_NO
+				, A.TODO_NO
+				, A.SANCTN_SN	
+				/* , OLD 'KAKAO'||TO_NUMBER( SUBSTR(MAX_MESSAGE_ID, -8)+A.SANCTN_SN)||A.DIV_NUM AS MAX_MESSAGE_ID */
+				/* , 'KKO'||A.DIV_GB||TO_NUMBER( SUBSTR(MAX_MESSAGE_ID, -8)+A.SANCTN_SN) AS MAX_MESSAGE_ID */
+				/* , 'KKO'||TO_NUMBER( SUBSTR(MAX_MESSAGE_ID, -8)+A.RN) AS MAX_MESSAGE_ID */
+				, B.MSSAGE_DESC	AS MESSAGE_DESC		
+				, TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI') AS SEND_DT
+				FROM
+				(
+				SELECT 	B.TODO_ID
+						, /* A.TEL_NO */ '010-7501-8741' AS TEL_NO		/*수신인전화번호 */
+						, B.TODO_NO
+						, B.SANCTN_SN 
+						, B.TODO_TITL
+						, A.NAME
+						, DECODE(B.TODO_DIV1_CODE_ID, 'TODODIV10', 'S', 'TODODIV20', 'A') AS DIV_GB
+						, ROWNUM AS RN
+						FROM TB_CM06M01 A
+						LEFT OUTER JOIN TB_WB20M03 B ON(A.ID=B.TODO_ID)					 					
+					WHERE 1=1
+				<if test="coCd != null and !coCd.equals('')">
+					AND B.TODO_CO_CD = #{coCd}
+				</if>
+				<if test="todoDiv1CodeId != null and !todoDiv1CodeId.equals('')">
+					AND B.TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
+				</if>
+				<if test="todoDiv2CodeId != null and !todoDiv2CodeId.equals('')">
+					AND B.TODO_DIV2_CODE_ID = #{todoDiv2CodeId}			
+				</if>			
+				<if test="todoNo != null and !todoNo.equals('')">
+					AND B.TODO_NO = #{todoNo}
+				</if>	
+				<if test="sanctnSn != null and !sanctnSn.equals('')">
+					/* 결재완료일 경우 결재 상신자(1번)에게 보냄 */			
+					AND B.SANCTN_SN = #{sanctnSn}
+				</if>											
+				) A
+				LEFT OUTER JOIN 
+				(
+					SELECT MAX(MAX_MESSAGE_ID) AS MAX_MESSAGE_ID
+						, MAX(MSSAGE_DESC) AS MSSAGE_DESC
+						, #{todoNo} AS TODO_NO			/* 이곳에 관리번호 */
+						FROM
+						(
+							SELECT #{kakaoSeq} AS MAX_MESSAGE_ID 
+									/* NVL(MAX_MESSAGE_ID, 'KAKAO'||TO_CHAR(SYSDATE, 'YY')||'000001') AS MAX_MESSAGE_ID */
+									, '' AS MSSAGE_DESC		
+								FROM
+								(
+									SELECT DISTINCT DECODE( INSTR(MESSAGE_ID, 'KAKAOA'||TO_CHAR(SYSDATE, 'YY')), 0, 'KAKAOA'||TO_CHAR(SYSDATE, 'YY')||'000001'
+										, 'KAKAOA' || MAX( TO_CHAR(SYSDATE, 'YY')|| LPAD( SUBSTRING(MESSAGE_ID, -6)+1, 6, '0') ) OVER()
+											  ) AS MAX_MESSAGE_ID
+									FROM TB_BM18M01
+								UNION ALL
+								SELECT NULL AS MAX_MESSAGE_ID
+									FROM DUAL		
+								)		
+								WHERE MAX_MESSAGE_ID IS NOT NULL OR ROWNUM = 1	
+							UNION ALL 
+							SELECT '' AS MAX_MESSAGE_ID
+									, MSSAGE_DESC AS MSSAGE_DESC
+								FROM TB_BM17M01
+							WHERE 1=1
+							<if test="tmplatDiv != null and !tmplatDiv.equals('')">
+								AND TMPLAT_DIV = #{tmplatDiv}
+							</if>
+						)					
+				) B ON(A.TODO_NO=B.TODO_NO)		  
+		  ) T
 	</select>	
 
 	<!-- 알림톡 로그 등록 -->
