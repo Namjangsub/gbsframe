@@ -68,10 +68,10 @@
 							, A.MESSAGE		  --알림톡메시지
 							, A.MOBILE		  --연락처
 							, A.NAME_TO		  --받는사람
-							, NVL(TO_CHAR(A.SEND_DT, 'YYYY-MM-DD HH24:MI:SS'), TO_CHAR(A.SEND_DT, 'YYYY-MM-DD HH24:MI:SS')) AS SEND_DT		  --보낸일자
+							, NVL(TO_CHAR(A.SEND_DT, 'YYYY-MM-DD HH:MM:SS'), TO_CHAR(A.SEND_DT, 'YYYY-MM-DD HH:MM:SS')) AS SEND_DT		  --보낸일자
 							, A.CREAT_ID		  --생성자
 							, A.CREAT_PGM		  --생성프로그램ID
-							, NVL(TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS'), TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS')) AS CREAT_DTTM		  --생성일시
+							, NVL(TO_CHAR(A.UDT_DTTM, 'YYYY-MM-DD HH:MM:SS'), TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD HH:MM:SS')) AS CREAT_DTTM		  --생성일시
 							, A.UDT_ID		  --최종변경자
 							, A.UDT_PGM		  --최종수정프로그램ID
 							, TO_CHAR(A.UDT_DTTM, 'YYYY-MM-DD') UDT_DTTM	  --최종변경일시
@@ -82,10 +82,9 @@
 						<include refid="selectReceptionMessageListCondition"></include>
 						ORDER BY CREAT_DTTM DESC
 						) X		
-			)						
+			)							
 			WHERE 1=1
-			AND RN BETWEEN ${firstIndex} AND ${lastIndex}
-			
+				AND RN BETWEEN ${firstIndex} AND ${lastIndex}
 	</select>
 	
 	<!--  수신번호 채번 messageId, TEMPLATE 내용 GET -->
@@ -145,6 +144,12 @@
 		</if>								
 	</select>
 	
+    <select id="selectKakaoSeqNext" parameterType="Map" resultType="string">
+        SELECT 'KKO'||TO_CHAR(SYSDATE, 'YY') || LPAD(TB_SM18M01_SQ01.NEXTVAL, 6, 0)
+        FROM DUAL
+    </select>	
+	
+	
 	
 	<!--  todo 수신번호 채번 messageId, TEMPLATE 내용 GET -->
 	<select id="selectMaxMessageIdTodo" parameterType="Map" resultType="camelMap">
@@ -156,20 +161,32 @@
 			, A.TODO_NO
 			, A.SANCTN_SN	
 			/* , OLD 'KAKAO'||TO_NUMBER( SUBSTR(MAX_MESSAGE_ID, -8)+A.SANCTN_SN)||A.DIV_NUM AS MAX_MESSAGE_ID */
-			, 'KAKAO'||A.DIV_GB||TO_NUMBER( SUBSTR(MAX_MESSAGE_ID, -8)+A.SANCTN_SN) AS MAX_MESSAGE_ID
+			, 'KKO'||A.DIV_GB||TO_NUMBER( SUBSTR(MAX_MESSAGE_ID, -8)+A.SANCTN_SN) AS MAX_MESSAGE_ID
 			, B.MSSAGE_DESC	AS MESSAGE_DESC		
 			, TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI') AS SEND_DT
 			FROM
 			(
 			SELECT 	B.TODO_ID
-					, /* A.TEL_NO */ '01075018741' AS TEL_NO		/*수신인전화번호 */
+					, /* A.TEL_NO */ '010-7501-8741' AS TEL_NO		/*수신인전화번호 */
 					, B.TODO_NO
 					, B.SANCTN_SN 
 					, B.TODO_TITL
 					, A.NAME
 					, DECODE(B.TODO_DIV1_CODE_ID, 'TODODIV10', 'S', 'TODODIV20', 'A') AS DIV_GB
 					FROM TB_CM06M01 A
+					<if test='isFinalApproval == null'>
 					LEFT OUTER JOIN TB_WB20M03 B ON(A.ID=B.TODO_ID)
+					</if>
+					<choose> 
+						<when test="isFinalApproval == null or isFinalApproval.equals('')">
+						 	/* 일반결재 전체항목일 경우 */
+							LEFT OUTER JOIN TB_WB20M03 B ON(A.ID=B.TODO_ID)
+						</when>
+						<when test='isFinalApproval == "Y"'>
+							/* 결재완료일 경우 결재 상신자(1번)에게 보냄 */
+							LEFT OUTER JOIN TB_WB20M03 B ON(A.ID=B.CREAT_ID)																			
+						</when> 
+					</choose> 					
 				WHERE 1=1
 			<if test="coCd != null and !coCd.equals('')">
 				AND TODO_CO_CD = #{coCd}
@@ -194,7 +211,8 @@
 					, #{todoNo} AS TODO_NO			/* 이곳에 관리번호 */
 					FROM
 					(
-						SELECT NVL(MAX_MESSAGE_ID, 'KAKAO'||TO_CHAR(SYSDATE, 'YY')||'000001') AS MAX_MESSAGE_ID
+						SELECT #{kakaoSeq} AS MAX_MESSAGE_ID 
+								/* NVL(MAX_MESSAGE_ID, 'KAKAO'||TO_CHAR(SYSDATE, 'YY')||'000001') AS MAX_MESSAGE_ID */
 								, '' AS MSSAGE_DESC		
 							FROM
 							(
