@@ -577,6 +577,9 @@ function insertWbsRslts() {
                     if (data.resultCode == 200) {                          
                     	gridView1.setData(0);
                     	gridView2.setData(0);
+                    	
+                    	kakaoTodo();
+                    	
                         modalStack.close();                              
                     }
                 });                                
@@ -621,6 +624,9 @@ function updateWbsRslts() {
                     if (data.resultCode == 200) {    
                     	gridView1.setData(0);
                         gridView2.setData(0);
+                        
+                        kakaoTodo();
+                        
                         modalStack.close();                              
                     }
                 });                                
@@ -788,5 +794,236 @@ function approvalYn() {
 }
 
 
+/*
+#	TODO 알림톡발송 시작
+#
+*/
+$("#approvalReqTodoBtn").on("click", function () {
+	kakaoTodo();
+});
+    
+function kakaoTodo() {
+	let clntNm = (jwt.coCd=="GUN") ? "(주)건양ITT" : "트루넷";
+	//공유
+	let param = {
+			  "tmplatDiv": "TMPLATDIV02"
+			, "coCd": $('#coCd').val()				//해당업무의 coCd(트르넷발주 TRN )
+			, "todoDiv1CodeId": "TODODIV10"					//공통코드 해당업무 - 공유
+			, "todoDiv2CodeId": "TODODIV1020"				//공통코드 해당업무 - 공유 - TASK 실적
+			, "todoDiv1CodeNm": "공유"						//공통코드 해당업무 - 공유
+			, "todoDiv2CodeNm": "TASK 실적"					//공통코드 해당업무 - 공유 - TASK 실적
+			, "sanctnDiv2": "공유"							//템플릿 결재구분2    #{sanctnDiv2} 처리 바랍니다.
+			, "todoNo": $("#popFormRslts #wbsRsltsNo").val()
+			, "clntCd": "1"					//발신회사는 로그인사용자 회사
+			, "clntNm": clntNm				//로그의 수신거래처명
+			, "ordrgMngNm": jwt.userNm			//담당자
+			, "ordrgMngTelNo": $("#popForm #telNo").val()	//담당자전화번호
+			, "creatPgm": "WB2201P03"
+	}
+	commKaKaoSendTodo(param);
+	
+	//결재
+	let param2 = {
+			  "tmplatDiv": "TMPLATDIV02"
+			, "coCd": $("#popForm #coCd").val()				//해당업무의 coCd(트르넷발주 TRN )
+			, "todoDiv1CodeId": "TODODIV20"					//공통코드 해당업무 - 결재
+			, "todoDiv2CodeId": "TODODIV2010"				//공통코드 해당업무 - 결재 - TASK 실적
+			, "todoDiv1CodeNm": "결재"						//공통코드 해당업무 - 결재
+			, "todoDiv2CodeNm": "TASK 실적"					//공통코드 해당업무 - 결재 - TASK 실적
+			, "sanctnDiv2": "결재"							//템플릿 결재구분2    #{sanctnDiv2} 처리 바랍니다.
+			, "todoNo": $("#popFormRslts #wbsRsltsNo").val()
+			, "clntCd": "1"					//발신회사는 로그인사용자 회사
+			, "clntNm": clntNm				//로그의 수신거래처명
+			, "ordrgMngNm": jwt.userNm			//담당자
+			, "ordrgMngTelNo": $("#popForm #telNo").val()	//담당자전화번호
+			, "creatPgm": "WB2201P03"
+	}
+	commKaKaoSendTodo(param2);
+    
+}
+
+//to-do결재요청 알림톡
+function commKaKaoSendTodo(param) {
+	console.log('---카카오 발주서 발행 알림톡발송시작 --' + param);
+
+	//알림톡수신번호 채번
+	var maxMessageId = null;			//message id(unique key)
+	var talkMessage = null 				//발송될 내용 template
+	var mobile = null					//수신인 휴대전화번호
+	var title = null					//todo title
+	var sendList = [];
+	let talkParam = {};
+	let talkBody = {};		
+	let sendCnt = 0;
+	postAjaxSync("/user/bm/bm18/selectMaxMessageIdTodo", param, null , function(data) {
+		if(data.resultList.length > 0 ) {
+			if( data.resultList[0].maxMessageId != "" ) {
+				sendList = data.resultList; 
+				
+				//대상 loop
+				$.each(sendList, function (key, sendObj) {
+					maxMessageId = sendObj.maxMessageId;							
+					talkMessage = sendObj.messageDesc;
+					mobile =  sendObj.telNo;
+					//로그용
+					param.rcvId = sendObj.todoId;			//todo 수신id
+					param.rcvNm = sendObj.name;				//todo 수신자명
+					param.nameTo = sendObj.name;				//todo 수신자명
+					title =   sendObj.todoTitl;
+					param.title = title;								//요청내용제목
+					param.sendDt = sendObj.sendDt;
+					
+					if(mobile == "" || mobile == null) {
+						alert('수신전화번호가 없습니다.\r\n['+clntNm+'] 거래처관리의 사업부 첫번째 항목을 확인해 주십시오.');
+						return;
+					}
+					if(talkMessage == "" || talkMessage == null) {
+						alert('발송할 내용이 없습니다.\r\n알림톡템플릿관리를 확인해 주십시오.');
+						return;
+					}	
+					//message 치환
+					let message = talkMessage;
+					let splitStr = Array.from(message.matchAll('\\{(.*?)\\}'), match => `${match[0]}`);	
+					//loop
+					$.each(splitStr, function (key, val) {		
+						let compKey = val.substring(1, val.length-1);
+						if( compKey != "" && compKey != "undefined" ) {
+							if( typeof(param[compKey]) != "undefined" ) {
+								let val2 = '#'+val;
+								message = message.replaceAll(val2, param[compKey]);
+							}
+						}
+					});
+
+					talkParam.authToken = "e/eDfZOFCsrBqadaECQ0+g==";
+					talkParam.serverName = "gyitt2400";		
+					talkParam.paymentType = "P";
+					talkBody.service = "2310086157";				//서비스번호(1000000000 - 예시  real : 2310086157
+					talkBody.messageId = maxMessageId;			//고객사에서 관리하는 메시지No - 40byte (unique 값);	
+					talkBody.title = title;					//알림톡 타이틀 -
+					talkBody.message = message;				//알림톡 메시지 (1000 byte) 
+					talkBody.mobile = mobile;				//휴대전화번호
+					talkBody.template = "10003";			//템플릿관리화면 템플릿ID	- 발주서 V2
+					let talkJson = JSON.stringify(talkBody);		
+					sendCnt = kakaoSendReal(talkJson, talkParam, param);		
+				});
+				//대상 loop end
+				if( sendCnt > 0 ) {
+					alert("알림톡 정상 발송되었습니다.");		
+				}
+				
+			} else {
+				alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
+				return;
+			} 
+
+		}
+	});     	
+	//user search ajax end
+	
+	//한번 대 보낼경우 이곳 사용 - 남실장님 한번더 보냄 
+//		talkBody.messageId = 'KAKAO'+Number(talkBody.messageId.substring(5, 20))+1;
+//		talkBody.mobile = "01063893764"
+//		talkJson = JSON.stringify(talkBody);
+	//kakaoSendReal(talkJson, talkParam, param);
+}
+
+var kakaoErr = [];
+//message load
+var paramObj = {
+				"userId" : jwt.userId
+				, "codeKind" : "KAKAOMSG"
+				};
+postAjax("/user/sm/sm02/selectCurrToday", paramObj, null
+			, function(data) {   
+				if(data.resultList.length > 0 ) {
+					kakaoErr = data.resultList;
+				}
+});     //user search ajax end	
+
+function kakaoSendReal(talkJson, talkParam, param) {
+	let talkDeJson = JSON.parse(talkJson);
+	let sendCnt = 0;
+	//알림톡
+	$.ajax({
+	    type: "POST",
+	    url: "https://talkapi.lgcns.com/request/kakao.json",
+	    contentType: "x-www-form-urlencoded; charset=utf-8",
+	    data: talkJson,
+        beforeSend: function (xhr) {
+            xhr.setRequestHeader("authToken", talkParam.authToken);
+            xhr.setRequestHeader("serverName", talkParam.serverName);	            
+            xhr.setRequestHeader("paymentType", talkParam.paymentType);	            
+        },		    
+	    async: true,
+	    success: function(data){		
+	    	console.log('status:' + data.status);
+	    	let err = data.status;
+	    	if( err.indexOf("ERR") > -1 || err.indexOf("KKO")> -1 ) { 
+	    		let find = kakaoErr.find(e => e.codeId === err);
+				if( typeof(find.codeNm) != "undefined" ) {
+		    		var errorMsg = find.codeNm;	
+				}		    			
+		    	insertKakaoMessage(err, talkDeJson, param);	 				
+	    		alert("오류코드: "+data.status+"\r\n\r\n" + errorMsg);   		
+	    	} else if( data.status == "OK" ) {
+	    		//alert("알림톡 정상 발송되었습니다.");
+	    		sendCnt++;
+		    	insertKakaoMessage(err, talkDeJson, param);	
+	    	}
+	    },
+        error: function (data) {
+        	insertKakaoMessage(data.status, talkDeJson, param);
+        	console.log('---ajax error---');
+        }
+	});		
+	console.log('---success---' + sendCnt);	
+	return sendCnt;
+}
+
+//알림톡전송로크
+function insertKakaoMessage(dStatus, talkDeJson, param){
+	var formData = {
+			 "mssageId": talkDeJson.messageId
+			, "rcvId": param.rcvId
+			, "rcvNm": param.rcvNm
+			, "clntCd": param.clntCd
+			, "tmplatDiv": param.tmplatDiv
+			, "sendgStatus": dStatus
+			, "title": talkDeJson.title
+			, "mssage": talkDeJson.message
+			, "mobile": talkDeJson.mobile
+			, "nameTo": param.nameTo			
+			, "creatId": jwt.userId
+			, "creatPgm": "WB2201P03"
+	};
+
+	postAjaxSync("/user/bm/bm18/insertKakaoMessage", formData, null, function(data) {
+		//alert(data.resultMessage);// 결과 메시지를 alert으로 출력
+			if (data.resultCode == 200) {
+				console.log('--알림톡 로그 정상 저장--');
+			} else {
+				console.log('--알림톡 로그 정상 저장 오류--');				
+			}
+	});
+}
+
+//접속자 전화번호
+function getJwtTelNo(){
+	var paramObj1 = {
+             "coCd" : jwt.coCd,
+             "userId" : jwt.userId
+         }; 
+      postAjaxSync("/user/wb/wb24/selectMemberTelNo", paramObj1, null, function(data){  
+          if (data.result[0] == undefined
+               || data.result[0].telNo == "") {
+             $("#telNo").val("051-312-2400");  
+          }
+          else {
+             $("#telNo").val(data.result[0].telNo);
+             
+          }
+      }); 	
+}
 
 </script>
