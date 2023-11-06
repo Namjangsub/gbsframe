@@ -86,7 +86,7 @@ public class WB25SvcImpl implements WB25Svc {
 			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
 	            try {	 
-	            	    sharngMap.put("reqNo", paramMap.get("fileTrgtKey"));
+	            	    sharngMap.put("reqNo", paramMap.get("sjFileTrgtKey"));
 	            	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
 	            	    sharngMap.put("userId", paramMap.get("userId"));
@@ -109,7 +109,7 @@ public class WB25SvcImpl implements WB25Svc {
 			int i = 0;
 	        for (Map<String, String> approvalMap : approvalArr) {
 	            try {	 
-		            	approvalMap.put("reqNo", paramMap.get("fileTrgtKey"));
+		            	approvalMap.put("reqNo", paramMap.get("sjFileTrgtKey"));
 		            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 		            	approvalMap.put("userId", paramMap.get("userId"));
@@ -199,20 +199,10 @@ public class WB25SvcImpl implements WB25Svc {
 		
 	    String todoTitle = "과제평가 : SALES CODE " + paramMap.get("salesCd") + ",   과제명 : " + paramMap.get("sjNm");  
 			   
-		paramMap.put("reqNo", paramMap.get("fileTrgtKey"));
+		paramMap.put("reqNo", paramMap.get("sjFileTrgtKey"));
 		paramMap.put("salesCd", paramMap.get("salesCd"));
 		
-		
-		//List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
-		//if (sharngChk.size() > 0) {
-		//	QM01Mapper.deleteWbsSharngList(paramMap); 
-		//}
-		
-		//List<Map<String, String>> approvalgChk = QM01Mapper.deleteWbsApprovalListChk(paramMap); 
-		//if (approvalgChk.size() > 0) {
-		//	QM01Mapper.deleteWbsApprovalList(paramMap); 
-		//}
-		
+		// 수정시 결재내역이 존재하지 않을 경우 결재 공유 리스트 삭제
 		if (Integer.parseInt(paramMap.get("approvalYnCnt")) == 0) {
 			QM01Mapper.deleteWbsSharngList(paramMap); 
 			
@@ -224,7 +214,7 @@ public class WB25SvcImpl implements WB25Svc {
 				int i = 0;
 		        for (Map<String, String> sharngMap : sharngArr) {
 		            try {	 
-		            	    sharngMap.put("reqNo", paramMap.get("fileTrgtKey"));
+		            	    sharngMap.put("reqNo", paramMap.get("sjFileTrgtKey"));
 		            	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 		            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
 		            	    sharngMap.put("userId", paramMap.get("userId"));
@@ -249,7 +239,7 @@ public class WB25SvcImpl implements WB25Svc {
 				int i = 0;
 		        for (Map<String, String> approvalMap : approvalArr) {
 		            try {	 
-			            	approvalMap.put("reqNo", paramMap.get("fileTrgtKey"));
+			            	approvalMap.put("reqNo", paramMap.get("sjFileTrgtKey"));
 			            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 			            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 			            	approvalMap.put("userId", paramMap.get("userId"));
