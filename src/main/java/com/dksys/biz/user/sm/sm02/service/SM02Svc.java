@@ -39,5 +39,7 @@ public interface SM02Svc {
 	
 	String selectCurrMatrUpr(Map<String, String> paramMap);	
 	
-	List<Map<String, String>> selectInPurchaseChk(Map<String, String> paramMap);	
+	List<Map<String, String>> selectInPurchaseChk(Map<String, String> paramMap);
+	
+	int updateMailConfirm(Map<String, String> param);	
 }

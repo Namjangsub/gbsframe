@@ -296,5 +296,12 @@ public class SM02SvcImpl implements SM02Svc {
 		result += sm02Mapper.deleteOrderDetailAll(param);
 		result += sm02Mapper.deleteOrderMaster(param);
 		return result;
-	}	
+	}
+	
+	/* 메일발송 yn*/
+	public int updateMailConfirm(Map<String, String> param) {
+		int result = 0;
+		result += sm02Mapper.updateMailConfirm(param);
+		return result;
+	}		
 }
