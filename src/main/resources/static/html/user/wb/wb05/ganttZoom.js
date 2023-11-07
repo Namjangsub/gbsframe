@@ -120,6 +120,7 @@
     adjustDates: function (start, end) {
       start.setDate(1);
       end.setDate(1);
+      end.setMonth(end.getMonth()+1);
       end.setDate(end.getDate() + 30);
     },
     row1:        function (date, tr1) {
