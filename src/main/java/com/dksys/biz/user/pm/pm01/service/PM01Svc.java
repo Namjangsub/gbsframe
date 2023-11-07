@@ -33,4 +33,8 @@ public interface PM01Svc {
 	
 	List<Map<String, String>> selectUploadFileList(Map<String, String> paramMap);
 
+	int selectIssueWorkCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectIssueWorkList(Map<String, String> paramMap);
+
 }
