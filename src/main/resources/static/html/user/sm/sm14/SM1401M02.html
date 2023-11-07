@@ -81,7 +81,7 @@
 					<a onclick="manualPopup();"> <button type="button" class="bg_gray" onclick="manualPopup();">도움말</button></a>
 					<a onclick="initSearch();"><button class="bg_gray">초기화</button></a>
 					<a onclick="gridView.setData(0);"><button class="bg_gray">검 색</button></a>
-					<a onclick="purchaseBillInsert()"><button class="bg_blue">등 록</button></a>					 
+					<a onclick="BillYnUpdate()"><button class="bg_blue">등 록</button></a>					 
 	            </li>
             </ul>
         </div>
@@ -275,36 +275,37 @@ postAjaxSync("/user/wb/wb21/selectCodeList", optParam, null, function(data){
           },
 			footSum: [
 			    	[
-			    		{label: "합계", colspan:8, align:"center"},
+			    		{label: "합계", colspan:6, align:"center"},
 			    		{key: "ordrgAmt", 			collector: "sum", formatter:"money", align: "center"},
+			    		{key: "remainAmt", 			collector: "sum", formatter:"money", align: "center"},
 			    		{key: "pchsAmt",		collector: "sum", formatter:"money", align: "center"},
-			    		{},
-			    		{},
+			    		{key: "pchsVat",		collector: "sum", formatter:"money", align: "center"},
+			    		{key: "pchsSumAmt",		collector: "sum", formatter:"money", align: "center"},
 			    		{},
 	                 ]
 			    ],          
           columns: [
         	  {key: "rn",      					label: "No.",          	align: "center",	width: 60},
         	  {key: "userChkV",    				label: "확정여부",      	align: "center",	width: 70,		formatter: "chkIcon",          	hidden: true},  		/* 개별확정으로 사용안함 */        	  
-        	  {key: "billChkV",    				label: "계산서확정여부",      	align: "center",	width: 70,		formatter: "chkIcon",          	hidden: true},
-        	  {key: "coCd",      				label: "회사",          	hidden: true},
+              {key: "coCd",      				label: "회사",          	hidden: true},
               {key: "coCdNm",      				label: "회사명",          hidden: true},              
               {key: "salesCd",  				label: "Sales Code",    align: "center",	width: 110},              
+              {key: "dsgnNo",  					label: "대표도번",      align: "center",   width: 180},              
               {key: "pchsClntCd",    			label: "구매처",      	align: "center",	width: 120, hidden: true},     
-              {key: "pchsClntNm",      			label: "구매처명",      	align: "left",   	width: 150},                                          
-              {key: "ordrgNo", 					label: "발주번호",      	align: "center",	width: 110},
-              {key: "ordrgSeq", 				label: "발주순번",      	align: "center",	width: 70},              
+              {key: "pchsClntNm",      			label: "구매처명",      	align: "left",   	width: 150},       
+              {key: "matrCd",  	    			label: "matrCd",      	align: "left",   	width: 150, hidden: true},              
+              {key: "ordrgNo", 					label: "발주(비용)번호",      	align: "center",	width: 110},
+              {key: "ordrgSeq", 				label: "발주순번",      	align: "center",	width: 70, hidden: true},		/* 발주순번 제거 20231026 */              
               {key: "pchsNo", 					label: "매입번호",      	align: "center",	width: 110, hidden: true},       			/* 매입번호 */                         
               {key: "pchsNoGrid",				label: "매입번호",      	align: "center",	width: 110},			/* 출력용 매입번호 */
-              {key: "pchsSeq", 					label: "매입순번",      	align: "center",	width: 70},              
-              {key: "maxPchsSeq", 				label: "next매입순번",    	align: "center",	width: 70, hidden: true},                     		
+              {key: "pchsSeq", 					label: "매입순번",      	align: "center",	width: 70,	hidden: true},                                   		
               {key: "ordrgAmt",     			label: "발주금액",      	align: "right",		width: 100, formatter: "money",          	hidden: false},              
               {key: "remainAmt",     			label: "잔여금액",      	align: "right",		width: 100, formatter: "money",          	hidden: false
             	  , 	styleClass: function () {
                       return ( parseInt(this.item.remainAmt) > 0 ) ? "grid-font-blue-bold" : "";} 			  
               },
               {key: "isCost", 					label: "isCost",    	align: "center",	width: 70, hidden: true},   
-              {key: "pchsAmt", 					label: "매입금액",			align: "right", 	width: 110,		 formatter: "money"
+			  {key: "pchsAmt", 					label: "매입금액",			align: "right", 	width: 110,		 formatter: "money"
 			  },			    
 			  {key: "pchsVat", 					label: "부가세",			align: "right", 	width: 110,		 formatter: "money"
 			  },			    
@@ -487,7 +488,7 @@ postAjaxSync("/user/wb/wb21/selectCodeList", optParam, null, function(data){
          "coCd" : $('#coCd').val(),
          "salesCd": $('#salesCd_S').val()
 		};
-		openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1000, 430, "SALES CODE 검색", paramObj, function (grid){
+		openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1068, 650, "SALES CODE 검색", paramObj, function (grid){
 			var row = grid.target.getList("selected")[0];
 			$('#salesCd_S').val(row.salesCd);
 		});
@@ -529,100 +530,11 @@ postAjaxSync("/user/wb/wb21/selectCodeList", optParam, null, function(data){
 	function BillYnUpdate() {
 		//그리드 매입금액 매입일자 확인
 		var gridList = gridView.target.getList();
-		var gridColumns = gridView.target.columns;			
-		var detailArr = [];    	
-		var msgArr = [];    	
-		var inCnt = 0;
-		
-		if( gridList.length > 0 ) {
-        	var msgArr = [];			
-	        $.each(gridList, function (idx, elem) {
-	            var detailObj = {};
-	            
-	        	//컬럼수 루프 
-	        	for(var i=0; i<gridColumns.length; i++) {
-					var key = gridColumns[i].key;
-					var val = elem[key];
-					if( typeof(val) == "undefined") val = "";					
-					//type number 시 콤마제거
-					if( typeof(gridColumns[i].editor) != "undefined" && gridColumns[i].editor.type == "number" && val != "" ) {
-						val = deleteCommaStr(val); 
-					}	     
-					
-					detailObj["idx"] = i + 1;
-					//객체 insert  
-					detailObj[key] = val;			            			            
-	        	}		      
-	        	var amtChk = (typeof(elem.pchsAmt)==="undefined" || elem.pchsAmt=="") ? false : true;
-	        	var dtChk = (typeof(elem.pchsDt)==="undefined" || elem.pchsDt=="") ? false : true;
-	                   
-	        	//매입금액 
-	        	if( amtChk ) inCnt++; 
-	        	//매입일자
-	        	if( dtChk ) inCnt++; 	            
-	            //매입번호가 있을경우 금액등 체크(수정시)
-	            if( elem.pchsNo != "PC2300000" || elem.pchsSeq == "New" ) {
-		        	//매입금액 체크
-		        	if( (!amtChk && dtChk) /* || Number(elem.pchsAmt) === 0 발주금액 chk X */ ) {
-		            	msgArr.push((idx+1)+" 행의 매입금액을 입력해 주십시오.")	;		        		
-		        	}		        	
-		        	//매입일자 체크
-		        	if( amtChk && !dtChk ) {
-		            	msgArr.push((idx+1)+" 행의 매입일자를 입력해 주십시오.")	;		        		
-		        	}
-		        	if( !amtChk && !dtChk ) {
-		            	msgArr.push((idx+1)+" 행의 매입금액/매입일자를 입력해 주십시오.")	;		        		
-		        	}
-		        	if( !amtChk && !dtChk ) {
-		            	msgArr.push((idx+1)+" 행의 매입금액/매입일자를 입력해 주십시오.")	;		        		
-		        	}		        	
-	            }
-	        	//매입금액 over 체크
-	        	if( amtChk ) {
-		        	var balAmt = Number(elem.ordrgAmt);
-		        	var pchsAmt = Number(elem.pchsAmt);	     
-		        	var vatAmt = Number(elem.pchsVat);
-		        	var calcuVat = Math.floor(Number(pchsAmt / 10));
-		        	//금액체크
-		        	if( pchsAmt > balAmt && balAmt > 0 ) {
-		            	msgArr.push((idx+1)+" 행의 매입금액은 발주금액을 초과할 수 없습니다.");
-		        	//vat 10% 초과 불가
-		        	} else if( vatAmt > calcuVat ) {
-		            	msgArr.push((idx+1)+" 행의 부가세 금액은 10%를 초과할 수 없습니다.\r\n계산된 부가세 : " + addCommaStr(calcuVat));		        		
-			        //매입금액은 0이 될수 없다
-			        } else if( pchsAmt == "0" ) {
-		            	msgArr.push((idx+1)+" 행의 매입금액은 0보다 커야 합니다.")	;
-		        	} else {
-		        		
-		        		//상태플래그
-						if( detailObj["pchsNo"] == "PC2300000") {
-							detailObj["actFlag"] = "I"
-						} else if( detailObj["pchsSeq"] == "New" ) {
-							detailObj["actFlag"] = "I"							
-						} else {
-							detailObj["actFlag"] = "U"								
-						}
-		        		//조건 만족시 배열 set
-			        	if( detailObj["pchsAmt"] && detailObj["pchsDt"] ) {
-				            detailArr.push(detailObj);		        		
-			        	}
-			        	//중량
-			        	if( typeof(elem.pchsQty)==="undefined" || elem.pchsQty=="") {
-			            	msgArr.push((idx+1)+" 행의 수량을 입력해 주십시오.")	;		        		
-			        	}
-			        	//업무구분				        		
-		        	}	        	
-		        	
-	        	}
-	        });
-	        //each end
-		}
-
-		//var formData = gridView.target.getList("selected")[0];
-		var formData = new FormData($("#mainForm")[0]);
-		
-		formData.append("makeArr", JSON.stringify(detailArr));
 		debugger;
+		
+		var formData = new FormData($("#mainForm")[0]);								
+		formData.append("makeArr", JSON.stringify(gridList));
+		
 		filePostAjax("/user/sm/sm14/updateBillYn", formData,		// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
 				function(data) {
 					if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,

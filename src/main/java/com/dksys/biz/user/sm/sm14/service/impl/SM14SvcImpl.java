@@ -239,7 +239,11 @@ public class SM14SvcImpl implements SM14Svc {
 			dtl.put("pgmId", paramMap.get("pgmId"));
 			dtl.put("creatId", paramMap.get("userId"));
 			
-    		result += sm14Mapper.updateBillYn(dtl);	
+			//billYn이 Y인것만
+			if("Y".equals(dtl.get("billYn"))) {
+				result += sm14Mapper.updateBillYn(dtl);	
+			}
+    		
     
 		}			
 
