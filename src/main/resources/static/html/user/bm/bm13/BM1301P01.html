@@ -48,7 +48,7 @@
 					<tr>
 						<th class="hit">결재선 명칭</th>
 						<td colspan="3">
-							<input type="text" id="app_line_nm" name="app_line_nm" required msg="결재선명">
+							<input type="text" id="app_line_nm" name="app_line_nm" required msg="결재선명" >
 						</td>
 				
 						<th class="hit">사용여부</th>
@@ -167,6 +167,7 @@
 				"coCd"      : $("#coCd").val(), //회사코드
 				"appId"     : $("#appId_S").val(), //결재자
 				"appNo"     : modalStack.last().paramObj.appNo	, //결재선번호
+				"appLineNm" : $("#app_line_nm").val(), //결재선명
 				"pageNo"    : _pageNo + 1,
 				"recordCnt" : $("#recordCnt").val()
 			}
@@ -217,6 +218,13 @@
 		//유저등급 지정
 		userGrade = jwt.userGrade;
 	
+		//관리자권한 체크후 없으면 readonly
+        if( userGrade != 'USERS') {
+            //작성자 비활성화
+            $("#userName_P").prop("disabled", true);
+            $("#userIdBtn_P").hide();
+        }
+		
 		setByCoCd(modalStack.last().paramObj.coCd);
 		$("#coCd").prop("disabled", true);
 	
@@ -228,12 +236,7 @@
 		if (actionType == "C") {
 			$("#actionBtn").text("등록");
 			
-			//관리자권한 체크후 없으면 readonly
-			if( userGrade != 'USERS') {
-				//작성자 비활성화
-				$("#userName_P").prop("disabled", true);
-				$("#userIdBtn").hide();
-			}
+			
 	
 			$('#actionBtn').on("click", function() {
 				insertApproval();
@@ -245,15 +248,15 @@
 			gridViewPop.initView().setData(0);
 			$('#actionBtn').text("수정");
 	
-			$("#userName_P").prop("disabled", true);
-			$("#userIdBtn").hide();
+			//$("#userName_P").prop("disabled", true);
+			//$("#userIdBtn_P").hide();
 	
 			//수정시 readonly
 			//select hidden 처리, readonly input 생성
 			$("select[name=coCd] option").hide();
 			//$("#popForm").append('<input type="text" id="coCd_P" name="coCd_P" disable="true" value="'+coCd+'">');
-			$("#userName_S").attr("readonly", true);
-			$("#userIdBtn_P").hide();
+			//$("#userName_S").attr("readonly", true);
+			//$("#userIdBtn_P").hide();
 			
 			$('#actionBtn').on("click", function() {
 				updateApproval();
@@ -444,6 +447,14 @@
 	
 		// 권한체크
 		authChk();
+		
+		
+		// 등록에서 결재선명을 입력 시 동일한 결재선 내용이 있을 경우 수정모드로 변경할 지 알림 처리 모듈
+		$('#app_line_nm').focusout(function() {
+            getApprovalList();
+        });
+		
+		
 	});
 	//ready end
 	
@@ -554,6 +565,46 @@
 	
 	function setByCoCd(value) {
 		$('#coCd option:not([value="'+value+'"])').remove();
+	}
+
+	
+	// 결재선 등록창에서 기존 결재선이 존재할 경우 처리 
+	function getApprovalList() {
+		var appLineNm = null;
+		
+		if ($("#app_line_nm").val() != "") {
+			appLineNm = $("#app_line_nm").val();
+		}
+		else {
+			// 기존 bm13.xml에서 결재선명 검색이 없어서 추가한 후 결재선명에 빈값일때 %% 문자  전달, 검색이 안되게 처리
+	        // 빈값으로 검색한 경우 전체 리스트가 나오는 경우 발생
+			appLineNm = "%%";
+		}
+		var formData = {
+                "userId"    : userId,   //userId - 작성자
+                "coCd"      : $("#coCd").val(), //회사코드
+                "appId"     : $("#appId_S").val(), //결재자
+                "appLineNm" : appLineNm, //결재선명
+                "appNo"     : modalStack.last().paramObj.appNo  , //결재선번호
+                "pageNo"    : 1,
+                "recordCnt" : 99999999
+            }
+		postAjaxSync("/user/bm/bm13/selectApprovalList", formData, null, function(data) {
+            if (data.resultList != undefined && data.resultList.length > 0) {
+            	if(confirm("기존 결재선 자료가 존재합니다. 수정하시겠습니까?")){
+            		gridViewPop.setData(0);
+            		actionType == "U";
+                    $('.tit').text('결재선 수정');
+                    $('#actionBtn').text("수정");
+                }
+            	else {
+            		$("#app_line_nm").val("");
+            		actionType == "C";            		
+                    $('.tit').text('결재선 등록');
+                    $('#actionBtn').text("등록");
+            	}
+            }                         
+        });
 	}
 	
 </script>
