@@ -11,4 +11,8 @@ public interface PM05Svc {
 	List<Map<String, String>> pm05_grid1_selectList(Map<String, String> paramMap);
 	
 	List<Map<String, Object>> selectWhCd(Map<String, String> paramMap);
+	
+	List<Map<String, String>> pm05_grid1_selectList_m(Map<String, String> paramMap);
+	
+	
 }

@@ -11,9 +11,12 @@ import java.util.Map;
 
 @Mapper
 public interface PM05Mapper {
-  int pm05_grid1_selectCount(Map<String, String> paramMap);
+    int pm05_grid1_selectCount(Map<String, String> paramMap);
 	
 	List<Map<String, String>> pm05_grid1_selectList(Map<String, String> paramMap);
   
-  List<Map<String, Object>> selectWhCd(Map<String, String> paramMap);
+    List<Map<String, Object>> selectWhCd(Map<String, String> paramMap);
+    
+    List<Map<String, String>> pm05_grid1_selectList_m(Map<String, String> paramMap);
+    
 }

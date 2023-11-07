@@ -46,4 +46,15 @@ public class PM05Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+	
+	
+	//모바일 리스트 조회
+		@PostMapping(value = "/pm05_grid1_selectList_m")
+		public String pm05_grid1_selectList_m(@RequestBody Map<String, String> paramMap, ModelMap model) {
+			List<Map<String, String>> result = pm05Svc.pm05_grid1_selectList_m(paramMap);
+			model.addAttribute("result", result);
+			return "jsonView";
+		}
+		
+		
 }

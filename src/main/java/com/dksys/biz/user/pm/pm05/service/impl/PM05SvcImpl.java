@@ -64,4 +64,9 @@ public class PM05SvcImpl implements PM05Svc {
 		return pm05Mapper.selectWhCd(paramMap);
 	}
 	
+	@Override
+	public List<Map<String, String>> pm05_grid1_selectList_m(Map<String, String> paramMap) {
+		return pm05Mapper.pm05_grid1_selectList_m(paramMap);
+	}
+	
 }
