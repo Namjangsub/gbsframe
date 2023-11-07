@@ -205,5 +205,15 @@ public List<Map<String, String>> selectUploadFileList(Map<String, String> paramM
 //	returnMap.put("workInfo", pm01Mapper.selectDailyWorkInfo(paramMap));
 //	return returnMap; 
 }
+
+@Override
+public int selectIssueWorkCount(Map<String, String> paramMap) {
+	return pm01Mapper.selectIssueWorkCount(paramMap);
+}
+
+@Override
+public List<Map<String, String>> selectIssueWorkList(Map<String, String> paramMap) {
+	return pm01Mapper.selectIssueWorkList(paramMap);
+}
   
 }

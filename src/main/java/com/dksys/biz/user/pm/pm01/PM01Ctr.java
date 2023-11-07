@@ -56,6 +56,17 @@ public class PM01Ctr {
     return "jsonView";
   }
   
+  // 작업일보 이슈 리스트 조회
+  @PostMapping(value = "/selectIssueWorkList")
+  public String selectIssueWorkList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    int totalCnt = pm01Svc.selectIssueWorkCount(paramMap);
+    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+    model.addAttribute("paginationInfo", paginationInfo);
+    List<Map<String, String>> result = pm01Svc.selectIssueWorkList(paramMap);
+    model.addAttribute("result", result);
+    return "jsonView";
+  }
+  
 
   // 개인별작업일보현황(업무별)
   @PostMapping(value = "/selectWorkPrtList")
