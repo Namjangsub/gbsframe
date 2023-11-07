@@ -314,7 +314,7 @@
 					, T.IO_SEQ
 					, T.SALES_CD
 					, T.CLNT_CD       --고객사
-					, T.CLNT_NM       --고객사명
+					, NVL(T.CLNT_NM, '.') AS CLNT_NM  --고객사명
 					, T.CLNT_PJT      --고객사PJT
 					, FN_CM05M01_CD_TO_NM(T.CLNT_PJT) CLNT_PJT_NM
 					, T.PRDT_CD       --제품구분
@@ -595,66 +595,76 @@
 	</select>
 
 	<select id="select_whin_modal" parameterType="Map" resultType="camelMap">
-	 SELECT Z.* 
-	   FROM (
-			SELECT '' AS FILE_TRGT_KEY
-			     , I.CO_NM         --회사명
-				 , I.CO_CD
-			     , I.PCHS_CLNT_CD  
-			     , I.PCHS_CLMN_NM
-			     , I.IN_NO 
-			     , I.IN_SEQ 
-			     , I.SALES_CD      --Sales Code
-			     , I.MATR_CD     -- 품번
-			     , I.CURR_CD
-				 , I.EXRATE
-			     , I.WH_CD       -- 입고창고
-			     , I.MATR_WH_NM  -- 입고창고명
-				 , I.IN_QTY      -- 입고수량
-				 , M.MATR_NM       --자재품명
-			     , M.MATR_SPEC     --자재규격
-			     , M.MATR_MAT      --자재소재
-			     , M.MATR_MAKR_NM  --자재메이커
-			     , M.MATR_MNO      --자재형번
-			     , 'N' AS CHK      --체크여부
-			     , I.RETURN_PRC  --반품단가
-			     , 0   AS RETURN_SUM  --반품긍액
-			     , (SELECT COUNT(*)
-			        FROM   TB_SM06D01 AS T
-			        WHERE  T.IN_NO  = I.IN_NO
-			        AND    T.IN_SEQ = I.IN_SEQ
-			        AND    T.SALES_CD = I.SALES_CD
-			       ) AS CNT
-			FROM   ( 
-			        SELECT DISTINCT R.CODE_DESC   AS CO_NM --회사코드
-			             , I.CO_CD
-					     , Z.PCHS_CLNT_CD      --구매업체코드
-					     , (SELECT D.CLNT_NM
-						    FROM   TB_BM02M01 D
-							WHERE  Z.PCHS_CLNT_CD = D.CLNT_CD) AS PCHS_CLMN_NM
-					     , I.IN_NO       -- 입고번호
-					     , I.IN_SEQ      -- 입고순서
-					     , I.SALES_CD    --Sales Code
-					     , I.MATR_CD     -- 품번
-					     , I.WH_CD       -- 입고창고
-					     , FN_CM05M01_CD_TO_NM(I.WH_CD ) AS MATR_WH_NM -- 입고창고명
-					     , I.CURR_CD
-				         , I.EXRATE
-					     , I.IN_QTY      -- 입고수량
-					     , I.IN_PRC AS RETURN_PRC     -- 입고단가
-					FROM   TB_SM03D01 AS I
-					       LEFT JOIN TB_CM05M01 AS R  ON R.CODE_ID  = I.CO_CD
-					       LEFT JOIN TB_SM03M01 AS T  ON T.IN_NO = I.IN_NO
-					       LEFT OUTER JOIN TB_SM02M01 Z ON Z.ORDRG_NO = I.ORDRG_NO
-					WHERE  1 = 1
-			       ) AS I
-			       LEFT JOIN TB_BM05M01 AS M  ON M.MATR_CD = I.MATR_CD
-			WHERE  1 = 1
-			AND    I.SALES_CD = #{salesCd}
-			AND    I.PCHS_CLNT_CD = #{pchsClntCd}
-			AND    I.IN_NO = #{inNumber}
-			) AS Z
-		WHERE Z.CNT = 0
+		SELECT Z.*
+		FROM   (
+				SELECT '' AS FILE_TRGT_KEY
+				     , I.CO_NM         --회사명
+				     , I.CO_CD
+				     , I.PCHS_CLNT_CD
+				     , I.PCHS_CLMN_NM
+				     , I.IN_NO
+				     , I.IN_SEQ
+				     , I.SALES_CD      --Sales Code
+				     , I.MATR_CD       --품번
+				     , I.CURR_CD
+				     , I.EXRATE
+				     , I.WH_CD         --입고창고
+				     , I.MATR_WH_NM    --입고창고명
+				     , I.IN_QTY        --입고수량
+				     , M.MATR_NM       --자재품명
+				     , M.MATR_SPEC     --자재규격
+				     , M.MATR_MAT      --자재소재
+				     , M.MATR_MAKR_NM  --자재메이커
+				     , M.MATR_MNO      --자재형번
+				     , 'N' AS CHK      --체크여부
+				     , I.RETURN_PRC    --반품단가
+				     , 0 AS RETURN_SUM  --반품긍액
+				     , (
+				         SELECT COUNT(*)
+				         FROM   TB_SM06D01 AS T
+				         WHERE  T.IN_NO  = I.IN_NO
+				         AND    T.IN_SEQ = I.IN_SEQ
+				         AND    T.SALES_CD = I.SALES_CD
+				       ) AS CNT
+				     , I.DSGN_NO
+				FROM   (
+						SELECT DISTINCT R.CODE_NM AS CO_NM --회사코드
+						     , I.CO_CD
+						     , Z.PCHS_CLNT_CD      --구매업체코드
+						     , (
+						         SELECT D.CLNT_NM
+						         FROM   TB_BM02M01 AS D
+						         WHERE  Z.PCHS_CLNT_CD = D.CLNT_CD
+						       ) AS PCHS_CLMN_NM
+						     , I.IN_NO       -- 입고번호
+						     , I.IN_SEQ      -- 입고순서
+						     , I.SALES_CD    -- Sales Code
+						     , I.MATR_CD     -- 품번
+						     , I.WH_CD       -- 입고창고
+						     , R1.CODE_NM AS MATR_WH_NM -- 입고창고명
+						     , I.CURR_CD
+						     , I.EXRATE
+						     , I.IN_QTY      -- 입고수량
+						     , I.IN_PRC AS RETURN_PRC  -- 입고단가
+						     , T.DSGN_NO
+						FROM   TB_SM03D01 AS I
+						       LEFT OUTER JOIN TB_CM05M01 AS R ON R.CODE_ID = I.CO_CD
+						       LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = I.WH_CD
+						       LEFT OUTER JOIN TB_SM02D01 AS T  ON T.CO_CD     = I.CO_CD
+						                                       AND T.ORDRG_NO  = I.ORDRG_NO
+						                                       AND T.ORDRG_SEQ = I.ORDRG_SEQ
+						       LEFT OUTER JOIN TB_SM02M01 AS Z ON Z.ORDRG_NO = I.ORDRG_NO
+						WHERE  1 = 1
+					   ) AS I
+					   LEFT JOIN TB_BM05M01 AS M  ON M.MATR_CD = I.MATR_CD
+				WHERE  1 = 1
+				AND    I.CO_CD = #{coCd}
+				AND    I.SALES_CD = #{salesCd}
+				AND    I.PCHS_CLNT_CD = #{pchsClntCd}
+				AND    I.IN_NO = #{inNumber}
+			   ) AS Z
+		WHERE  1 = 1
+		AND    Z.CNT = 0
     </select>
 	
     <!-- 수정팝업 조회 -->
@@ -665,10 +675,13 @@
 		     , O.CLNT_CD
 		     , O.CLNT_NM
 		     , A.PCHS_CLNT_CD
-		     , (SELECT D.CLNT_NM
-                       			FROM TB_BM02M01 D
-                       			WHERE A.PCHS_CLNT_CD=D.CLNT_CD) AS PCHS_CLNT_NM
-		     , O.CLNT_PJT
+		     , (
+		        SELECT D.CLNT_NM
+		        FROM   TB_BM02M01 AS D
+		        WHERE  A.PCHS_CLNT_CD = D.CLNT_CD
+		       ) AS PCHS_CLNT_NM
+		     , O.CLNT_PJT    AS CLNT_PJT_CD
+		     , O.CLNT_PJT_NM AS CLNT_PJT
 		     , O.PRDT_CD
 		     , O.PRDT_NM
 		     , O.ITEM_DIV
@@ -677,7 +690,7 @@
 		     , A.RET_NO
 		     , TO_CHAR(A.RET_DT, 'YYYY-MM-DD') AS IO_DT
 		     , A.RET_RMK AS IO_RMK
-		     , B.IN_NO AS IN_NUM   --입고번호
+		     , B.IN_NO   AS IN_NUM   --입고번호
 		     , B.RET_SEQ
 		     , B.DSGN_NO
 		     , B.MATR_CD
@@ -689,24 +702,23 @@
 		     , B.RET_QTY
 		     , B.RET_DTL_AMT AS RETURN_SUM
 		     , B.INOUT_KEY
-		     
 		     , 0  AS RETURN_QTY --재고수량
-		     , '' AS CHK       --체크여부
+		     , '' AS CHK        --체크여부
 		     , 0  AS RETURN_SUM
-
 			 , '' AS dtaChk
-	  FROM   TB_SM06M01 AS A
+		FROM   TB_SM06M01 AS A
 		       LEFT OUTER JOIN TB_SM06D01 AS B  ON B.CO_CD = A.CO_CD
 		                                       AND B.RET_NO = A.RET_NO
-		       LEFT OUTER JOIN TB_SM03D01 AS X ON X.CO_CD = B.CO_CD
-		                                 AND X.IN_NO = B.IN_NO
-		                                 AND X.IN_SEQ = B.IN_SEQ
+		       LEFT OUTER JOIN TB_SM03D01 AS X  ON X.CO_CD = B.CO_CD
+		                                       AND X.IN_NO = B.IN_NO
+		                                       AND X.IN_SEQ = B.IN_SEQ
 		       LEFT OUTER JOIN (
 		                        SELECT DISTINCT SM.CO_CD    --회사
 		                             , SM.ORDRS_NO          --수주번호
 		                             , TO_CHAR(SM.ORDRS_CLNT_CD) AS CLNT_CD --고객사
 		                             , C.CLNT_NM                 AS CLNT_NM --고객사명
 		                             , SM.CLNT_PJT          --고객사PJT
+		                             , R1.CODE_NM AS CLNT_PJT_NM
 		                             , SD.PRDT_CD           --제품구분
 		                             , P.PRDT_NM
 		                             , SD.ITEM_DIV          --아이템구분
@@ -719,6 +731,8 @@
 		                               LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD
 		                               LEFT OUTER JOIN TB_BM01M01 AS P ON P.PRDT_CD = SD.PRDT_CD
 		                               LEFT OUTER JOIN TB_CM05M01 AS R ON R.CODE_ID = SD.ITEM_DIV
+		                               LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = SM.CLNT_PJT
+		                        WHERE  1 = 1
 				               ) AS O  ON O.SALES_CD = A.SALES_CD
 		       LEFT JOIN TB_BM05M01 AS M  ON M.MATR_CD = B.MATR_CD
 		WHERE  A.FILE_TRGT_KEY = #{fileTrgtKey}
@@ -733,10 +747,13 @@
 		     , O.CLNT_CD
 		     , O.CLNT_NM
 		     , A.PCHS_CLNT_CD
-		     , (SELECT D.CLNT_NM
-                       			FROM TB_BM02M01 D
-                       			WHERE A.PCHS_CLNT_CD=D.CLNT_CD) AS PCHS_CLMN_NM
+		     , (
+		        SELECT D.CLNT_NM
+		        FROM   TB_BM02M01 AS D
+		        WHERE  A.PCHS_CLNT_CD = D.CLNT_CD
+		       ) AS PCHS_CLMN_NM
 		     , O.CLNT_PJT
+		     , O.CLNT_PJT_NM
 		     , O.PRDT_CD
 		     , O.PRDT_NM
 		     , O.ITEM_DIV
@@ -745,7 +762,7 @@
 		     , A.RET_NO
 		     , TO_CHAR(A.RET_DT, 'YYYY-MM-DD') AS IO_DT
 		     , A.RET_RMK AS IO_RMK
-		     , B.IN_NO  --입고번호
+		     , B.IN_NO         --입고번호
 		     , B.RET_SEQ
 		     , B.DSGN_NO
 		     , B.MATR_CD
@@ -757,25 +774,25 @@
 		     , B.RET_QTY AS OUT_QTY
 		     , B.RET_DTL_AMT AS RETURN_SUM
 		     , B.INOUT_KEY
-		     , X.IN_QTY  -- 입고수량
-		     , X.IN_PRC AS RETURN_PRC  -- 입고단가
-		     , X.WH_CD   -- 입고창고
-		     , FN_CM05M01_CD_TO_NM(X.WH_CD ) AS MATR_WH_NM -- 입고창고명
-		    , 'N' AS CHK       --체크여부
-
+		     , X.IN_QTY        --입고수량
+		     , X.IN_PRC AS RETURN_PRC  --입고단가
+		     , X.WH_CD         --입고창고
+		     , FN_CM05M01_CD_TO_NM(X.WH_CD) AS MATR_WH_NM  --입고창고명
+		     , 'N' AS CHK      --체크여부
 			 , 'U' AS dtaChk
 		FROM   TB_SM06M01 AS A 
 		       LEFT OUTER JOIN TB_SM06D01 AS B  ON B.CO_CD = A.CO_CD
 		                                       AND B.RET_NO = A.RET_NO
-		       LEFT OUTER JOIN TB_SM03D01 AS X ON X.CO_CD = B.CO_CD
-		                                 AND X.IN_NO = B.IN_NO
-		                                 AND X.IN_SEQ = B.IN_SEQ
+		       LEFT OUTER JOIN TB_SM03D01 AS X  ON X.CO_CD = B.CO_CD
+		                                       AND X.IN_NO = B.IN_NO
+		                                       AND X.IN_SEQ = B.IN_SEQ
 		       LEFT OUTER JOIN (
 		                        SELECT DISTINCT SM.CO_CD    --회사
 		                             , SM.ORDRS_NO          --수주번호
 		                             , TO_CHAR(SM.ORDRS_CLNT_CD) AS CLNT_CD --고객사
 		                             , C.CLNT_NM                 AS CLNT_NM --고객사명
 		                             , SM.CLNT_PJT          --고객사PJT
+		                             , R1.CODE_NM AS CLNT_PJT_NM
 		                             , SD.PRDT_CD           --제품구분
 		                             , P.PRDT_NM
 		                             , SD.ITEM_DIV          --아이템구분
@@ -788,8 +805,9 @@
 		                               LEFT OUTER JOIN TB_BM02M01 AS C ON C.CLNT_CD = SM.ORDRS_CLNT_CD
 		                               LEFT OUTER JOIN TB_BM01M01 AS P ON P.PRDT_CD = SD.PRDT_CD
 		                               LEFT OUTER JOIN TB_CM05M01 AS R ON R.CODE_ID = SD.ITEM_DIV
-				               ) AS O  ON O.CO_CD    = A.CO_CD
-				                      AND O.SALES_CD = A.SALES_CD
+		                               LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = SM.CLNT_PJT
+		                        WHERE  1 = 1
+				               ) AS O  ON O.SALES_CD = A.SALES_CD
 		       LEFT JOIN TB_BM05M01 AS M  ON M.MATR_CD = B.MATR_CD
 		WHERE  1 = 1
 		AND    A.CO_CD = #{coCd}
@@ -886,7 +904,8 @@
 			, RET_SEQ
 			, IN_NO
 			, IN_SEQ
-			, SALES_CD			
+			, SALES_CD
+			, DSGN_NO
 			, MATR_CD
 			, WH_CD
 			, CURR_CD
@@ -900,7 +919,7 @@
 			, ETC_FIELD3
 			, CREAT_ID
 			, CREAT_PGM
-			, CREAT_DTTM							
+			, CREAT_DTTM
 		)
 		VALUES
 		(
@@ -910,6 +929,7 @@
 			, #{inNo}
 			, #{inSeq}
 			, #{salesCd}
+			, #{dsgnNo}
 			, #{matrCd}
 			, #{whCd}
 			, #{currCd}

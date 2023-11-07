@@ -157,7 +157,7 @@ public class FI02Ctr {
     	objCols2.put("type", "number");
     	objCols2.put("label", "건양ITT");
     	objCols3.put("type", "number");
-    	objCols3.put("label", "투루넷");
+    	objCols3.put("label", "트루넷");
     	objCols4.put("type", "number");
     	objCols4.put("label", "합계");
 
@@ -218,7 +218,7 @@ public class FI02Ctr {
     	objCols2.put("type", "number");
     	objCols2.put("label", "건양ITT");
     	objCols3.put("type", "number");
-    	objCols3.put("label", "투루넷");
+    	objCols3.put("label", "트루넷");
     	objCols4.put("type", "number");
     	objCols4.put("label", "합계");
 
