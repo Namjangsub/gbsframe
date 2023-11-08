@@ -86,9 +86,15 @@ public class CR10Ctr {
 	@PostMapping(value = "/insertLgistMast")
 	public String insertLgistMast(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
-			if (cr10Svc.insertLgistMast(paramMap, mRequest) != 0 ) {
+			Map<String, String> rtnResult = cr10Svc.insertLgistMast(paramMap, mRequest);
+			
+			String lgistNo =  rtnResult.get("lgistNo").toString();
+			int result =  Integer.parseInt(rtnResult.get("result"));
+			
+			if (result !=0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+				model.addAttribute("lgistNo", lgistNo);
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
