@@ -23,7 +23,7 @@ public interface CR10Svc {
 
   String selectLgistAppCount(Map<String, String> paramMap);
 
-  int insertLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+  Map<String, String> insertLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
   int updateLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 

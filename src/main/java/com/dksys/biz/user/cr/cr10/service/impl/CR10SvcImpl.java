@@ -78,8 +78,10 @@ public class CR10SvcImpl implements CR10Svc {
   }
 
   @Override
-  public int insertLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+  public Map<String, String> insertLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
+	  	Map rtnMap = new HashMap();
+	  	
 	    Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 
@@ -99,6 +101,8 @@ public class CR10SvcImpl implements CR10Svc {
 		String  lgistNo = String.valueOf(cr10Mapper.selectLgistNoNext(paramMap));
 		paramMap.put("lgistNo", lgistNo);
 		int result = cr10Mapper.insertLgistMast(paramMap);
+		rtnMap.put("result", String.valueOf(result));
+		rtnMap.put("lgistNo", lgistNo);
 
 	    List<Map<String, String>> salesCdList = gsonDtl.fromJson(paramMap.get("salesCdArr"), dtlMap);
 	    for (Map<String, String> dtl : salesCdList) {
@@ -109,7 +113,7 @@ public class CR10SvcImpl implements CR10Svc {
 	    	if ("I".equals(dtaChk)) {
 	    		cr10Mapper.insertLgistDetail(dtl);
 	    	} else if ("U".equals(dtaChk)) {
-	    		cr10Mapper.updateLgistDetail(dtl);
+	   		cr10Mapper.updateLgistDetail(dtl);
 	    	} else if ("D".equals(dtaChk)) {
 	    		cr10Mapper.deleteLgistDetail(dtl);
 	    	}
@@ -207,7 +211,7 @@ public class CR10SvcImpl implements CR10Svc {
 	        }
 		}
 		//신 결재 끝
-	    return result;
+	    return rtnMap;
   }
   @Override
   public int updateLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
