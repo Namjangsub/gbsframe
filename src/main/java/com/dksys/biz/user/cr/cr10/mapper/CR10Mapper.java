@@ -51,5 +51,7 @@ public interface CR10Mapper {
   int updateLgistMastTodoApp(Map<String, String> paramMap);
 
   int updateTodoAppConfirm(Map<String, String> paramMap);
+
+  int deleteTodoDetail(Map<String, String> paramMap);
   
 }
