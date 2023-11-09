@@ -12,7 +12,7 @@
 		<!-- 거래처 -->       
 		<if test="clntNm != null and !clntNm.equals('')">
 			AND CLNT_NM LIKE '%' || #{clntNm} || '%'
-		</if>
+		</if>		
 		<!-- 수신인 -->       
 		<if test="nameTo != null and !nameTo.equals('')">
 			AND NAME_TO LIKE '%' || #{nameTo} || '%'
@@ -28,15 +28,65 @@
 		SELECT COUNT(*) 
 			FROM 
 			(
-				SELECT A.MESSAGE_ID       --수신번호
-				FROM TB_BM18M01 A
-				LEFT JOIN TB_BM02M01 AS C ON A.CLNT_CD = C.CLNT_CD --거래처정보
-				LEFT OUTER JOIN TB_BM02D01 AS B ON A.CLNT_CD = B.CLNT_CD --거래처 사업부
-				WHERE 1=1
-				<include refid="selectReceptionMessageListCondition"></include>
-			)
-		WHERE 1=1
-		
+			SELECT A.MESSAGE_ID       --수신번호
+				, A.RCV_ID             --사용자아이디
+				, A.RCV_NM             --사용자이름
+				, A.CLNT_CD         --거래처
+				, C.CLNT_NM         --거래처명
+				, B.MNG_NM           --담당자명
+				, B.MNG_TEL_NO        --담당자 전화번호
+				, A.TMPLAT_DIV        --발송구분
+				, (SELECT FN_CM05M01_CD_TO_NM(A.TMPLAT_DIV) FROM DUAL) AS TMPLAT_DIV_NM  --발송구분명
+				, A.SENDG_STATUS        --발송상태
+				--, (SELECT FN_CM05M01_CD_TO_NM(A.SENDG_STATUS) FROM DUAL) AS SENDG_STATUS_NM  --발송상태
+				,
+				CASE 
+					WHEN(A.SENDG_STATUS='OK') THEN '성공'
+					ELSE A.SENDG_STATUS
+				END AS SENDG_STATUS_CHK   -- 정상코드면 '성공' 아니면 에러코드 표시
+				,
+				CASE 
+					WHEN(A.SENDG_STATUS='OK') THEN 'Y'
+					ELSE 'N'
+				END AS SENDG_STATUS_YN   -- 정상코드면 'Y' 아니면 N
+				, A.TITLE			  --메시지제목
+				, A.MESSAGE		  --알림톡메시지
+				, A.MOBILE		  --연락처
+				, A.NAME_TO		  --받는사람
+				, NVL(TO_CHAR(A.SEND_DT, 'YYYY-MM-DD HH24:MI:SS'), TO_CHAR(A.SEND_DT, 'YYYY-MM-DD HH24:MI:SS')) AS SEND_DT		  --보낸일자
+				, A.CREAT_ID		  --생성자
+				, A.CREAT_PGM		  --생성프로그램ID
+				, NVL(TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS'), TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS')) AS CREAT_DTTM		  --생성일시
+				, A.UDT_ID		  --최종변경자
+				, A.UDT_PGM		  --최종수정프로그램ID
+				, TO_CHAR(A.UDT_DTTM, 'YYYY-MM-DD') UDT_DTTM	  --최종변경일시
+			FROM TB_BM18M01 A
+			LEFT JOIN TB_BM02M01 AS C ON A.CLNT_CD = C.CLNT_CD --거래처정보
+			LEFT OUTER JOIN TB_BM02D01 AS B ON A.CLNT_CD = B.CLNT_CD --거래처 사업부
+			WHERE 1=1						
+			
+			ORDER BY CREAT_DTTM DESC
+			) X		
+			WHERE 1=1
+			<if test="tmplatDiv != null and !tmplatDiv.equals('')">
+				AND X.TMPLAT_DIV = #{tmplatDiv}
+			</if>
+			<!-- 거래처 -->       
+			<if test="clntNm != null and !clntNm.equals('')">
+				AND X.CLNT_NM LIKE '%' || #{clntNm} || '%'
+			</if>
+			<!-- 발신성공여부 -->       
+			<if test="sendgStatusYn != null and !sendgStatusYn.equals('')">
+				AND X.SENDG_STATUS_YN = #{sendgStatusYn}
+			</if>
+			<!-- 수신인 -->       
+			<if test="nameTo != null and !nameTo.equals('')">
+				AND X.NAME_TO LIKE '%' || #{nameTo} || '%'
+			</if>
+			<!-- 수신번호 -->       
+			<if test="mobile != null and !mobile.equals('')">
+				AND X.MOBILE LIKE '%' || #{mobile} || '%'
+			</if>
 	</select>
 	        
 	<!-- 알림톡템플릿 조회 리스트  -->
@@ -58,12 +108,17 @@
 							, A.TMPLAT_DIV        --발송구분
 							, (SELECT FN_CM05M01_CD_TO_NM(A.TMPLAT_DIV) FROM DUAL) AS TMPLAT_DIV_NM  --발송구분명
 							, A.SENDG_STATUS        --발송상태
-							, (SELECT FN_CM05M01_CD_TO_NM(A.SENDG_STATUS) FROM DUAL) AS SENDG_STATUS_NM  --발송상태
+							--, (SELECT FN_CM05M01_CD_TO_NM(A.SENDG_STATUS) FROM DUAL) AS SENDG_STATUS_NM  --발송상태
 							,
 							CASE 
 								WHEN(A.SENDG_STATUS='OK') THEN '성공'
 								ELSE A.SENDG_STATUS
 							END AS SENDG_STATUS_CHK   -- 정상코드면 '성공' 아니면 에러코드 표시
+							,
+							CASE 
+								WHEN(A.SENDG_STATUS='OK') THEN 'Y'
+								ELSE 'N'
+							END AS SENDG_STATUS_YN   -- 정상코드면 'Y' 아니면 N
 							, A.TITLE			  --메시지제목
 							, A.MESSAGE		  --알림톡메시지
 							, A.MOBILE		  --연락처
@@ -79,9 +134,29 @@
 						LEFT JOIN TB_BM02M01 AS C ON A.CLNT_CD = C.CLNT_CD --거래처정보
 						LEFT OUTER JOIN TB_BM02D01 AS B ON A.CLNT_CD = B.CLNT_CD --거래처 사업부
 						WHERE 1=1						
-						<include refid="selectReceptionMessageListCondition"></include>
+						
 						ORDER BY CREAT_DTTM DESC
 						) X		
+						WHERE 1=1
+						<if test="tmplatDiv != null and !tmplatDiv.equals('')">
+							AND X.TMPLAT_DIV = #{tmplatDiv}
+						</if>
+						<!-- 거래처 -->       
+						<if test="clntNm != null and !clntNm.equals('')">
+							AND X.CLNT_NM LIKE '%' || #{clntNm} || '%'
+						</if>
+						<!-- 발신성공여부 -->       
+						<if test="sendgStatusYn != null and !sendgStatusYn.equals('')">
+							AND X.SENDG_STATUS_YN = #{sendgStatusYn}
+						</if>
+						<!-- 수신인 -->       
+						<if test="nameTo != null and !nameTo.equals('')">
+							AND X.NAME_TO LIKE '%' || #{nameTo} || '%'
+						</if>
+						<!-- 수신번호 -->       
+						<if test="mobile != null and !mobile.equals('')">
+							AND X.MOBILE LIKE '%' || #{mobile} || '%'
+						</if>
 			)							
 			WHERE 1=1
 				AND RN BETWEEN ${firstIndex} AND ${lastIndex}
