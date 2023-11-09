@@ -55,10 +55,12 @@
 						</select>
 					</td>
 
-					<th colspan="2"></th>
-<!-- 					<td> -->
-<!-- 						<input data-number type="text" id="exrate" name="exrate" class="form-control" maxlength="10" msg="환율" onchange="Chk_Exrate();"> -->
-<!-- 					</td> -->
+					<th>부가세</th>
+					<td>
+						<input type="hidden" id="sellVatVal" name="sellVatVal">
+						<select class="form-control input-sm" id="sellVatCd" name="sellVatCd" data-kind="VAT">
+						</select>
+					</td>
 
 					<th>수금금액</th>
 					<td>
@@ -85,8 +87,18 @@
 					</td>
 
 					<th>비고</th>
-					<td colspan="5">
+					<td>
 						<input type="text" id="clmnRmk" name="clmnRmk">
+					</td>
+					
+					<th>수금세액</th>
+					<td>
+						<input comma type="text" id="clmnVat" name="clmnVat" readonly="readonly">
+					</td>
+					
+					<th>수금합계</th>
+					<td>
+						<input comma type="text" id="clmnTot" name="clmnTot" readonly="readonly">
 					</td>
 				</tr>
 				
@@ -119,6 +131,8 @@
 	var fileTrgtKey = null;
 	var ordrsClntCd = null;
 	var ordrsClntNm = null;
+	var sellVatCd   = null;
+	var sellVatVal  = null;
 	var detailArr   = []; // 상세 그리드내용
 	let loadData = {};
 
@@ -139,7 +153,7 @@
 				},
 				
 				body : {
-					mergeCells : ["clntPjtNm", "ordrsNo", "ordrsDt", "ordrsDivNm", "ctrtNm", "currNm", "exrate", "ordrsAmt",
+					mergeCells : ["clntPjtNm", "ordrsNo", "ordrsDt", "ordrsDivNm", "ctrtNm", "currNm", "exrate", "ordrsAmt", "ordrsVat", "ordrsTot",
 					              "clmnPlanDivNm", "clmnDivSeqNm", "clmnRateNm", "planClmnAmt", "befClmnAmt", "miClmnAmt", "clmnDt"],
 					onClick: function () {
 						this.self.select(this.dindex);
@@ -156,13 +170,16 @@
 						//this.self.select(this.dindex);
 					},
 					onDataChanged: function () {
+						var row = this.dindex;
 						var miClmnAmt = 0;
+						var miClmnVat = 0;
 						var inputClmnDtlAmt = 0;
 						var clmnDtlAmt = 0;
 						//등록일 경우만 처리
 						if (actionType == "C") {
 							if (this.key == "inputClmnDtlAmt") {
 								miClmnAmt = this.item.miClmnAmt;
+								miClmnVat = this.item.miClmnVat;
 								inputClmnDtlAmt = this.item.inputClmnDtlAmt;
 								if (parseFloat(inputClmnDtlAmt) > parseFloat(miClmnAmt)) {
 									alert('수금금액은 미수금금액을 초과할 수 없습니다.');
@@ -173,6 +190,7 @@
 						} else {
 							if (this.key == "inputClmnDtlAmt") {
 								miClmnAmt = this.item.miClmnAmt;
+								miClmnVat = this.item.miClmnVat;
 								inputClmnDtlAmt = this.item.inputClmnDtlAmt;
 								clmnDtlAmt = this.item.clmnDtlAmt;
 								if (parseFloat(inputClmnDtlAmt) > (parseFloat(miClmnAmt) + parseFloat(clmnDtlAmt))) {
@@ -183,6 +201,36 @@
 							}
 						}
 
+						//등록일 경우만 처리
+						if (actionType == "C") {
+							if (this.key == "inputClmnDtlVat") {
+								miClmnVat = this.item.miClmnVat;
+								miClmnAmt = this.item.miClmnAmt;
+								inputClmnDtlVat = this.item.inputClmnDtlVat;
+								if (parseFloat(inputClmnDtlVat) > parseFloat(miClmnVat)) {
+									alert('수금세액은 미수금세액을 초과할 수 없습니다.');
+									this.item.inputClmnDtlVat = miClmnVat;
+								}
+								setSumAmt();
+							}
+						} else {
+							if (this.key == "inputClmnDtlVat") {
+								miClmnVat = this.item.miClmnVat;
+								miClmnAmt = this.item.miClmnAmt;
+								inputClmnDtlVat = this.item.inputClmnDtlVat;
+								clmnDtlVat = this.item.clmnDtlVat;
+								if (parseFloat(inputClmnDtlVat) > (parseFloat(miClmnVat) + parseFloat(clmnDtlVat))) {
+									alert('수금세액은 미수금세액을 초과할 수 없습니다.');
+									this.item.inputClmnDtlVat = clmnDtlVat;
+								}
+								setSumAmt();
+							}
+						}
+						
+						// 합계에 반영
+						var tot = parseFloat(this.item.inputClmnDtlAmt) + parseFloat(this.item.inputClmnDtlVat);
+						ModalgridView.target.setValue(row, "inputClmnDtlTot", tot);
+						
 						// if (this.key == "inputClmnDtlAmt") {
 						// 	miClmnAmt = this.item.miClmnAmt;
 						// 	inputClmnDtlAmt = this.item.inputClmnDtlAmt;
@@ -192,6 +240,7 @@
 						// 	}
 						// 	setSumAmt();
 						// }
+						
 					},
 				},
 				
@@ -226,8 +275,13 @@
 					{key: "currCd"     , label: "통화"       , align: "center", width: 100, hidden: true},
 					{key: "currNm"     , label: "통화"       , align: "center", width: 50},
 					{key: "exrate"     , label: "환율"       , align: "right" , width: 50, formatter: "money"},
-					{key: "ordrsAmt"   , label: "수주금액"   , align: "right" , width: 120, formatter: "money"},
-
+					{key: undefined, 		 label: "수주", 
+						columns: [
+						{key: "ordrsAmt" , label: "금액"    , align: "right" , width: 70, formatter: "money"},
+						{key: "ordrsVat" , label: "세액"    , align: "right" , width: 70, formatter: "money"},
+						{key: "ordrsTot" , label: "합계"    , align: "right" , width: 70, formatter: "money"},
+						]
+					},
 					{key: "clmnPlanSeq"  , label: "수금순번"   , align: "center", width: 100, hidden: true},
 					{key: "clmnPlanDiv"  , label: "수금구분"   , align: "center", width: 100, hidden: true},
 					{key: "clmnPlanDivNm", label: "수금구분"   , align: "center", width: 60},
@@ -235,13 +289,36 @@
 					{key: "clmnDivSeqNm" , label: "차수"       , align: "center", width: 45},
 					{key: "clmnRate"     , label: "비율"       , align: "center", width: 100, hidden: true},
 					{key: "clmnRateNm"   , label: "비율"       , align: "right" , width: 50},
-					{key: "planClmnAmt"  , label: "수금예정금액", align: "right" , width: 120, formatter: "money"},
-					{key: "befClmnAmt"   , label: "기 수금금액", align: "right" , width: 120, formatter: "money"},
-					{key: "miClmnAmt"    , label: "미 수금금액", align: "right" , width: 120, formatter: "money"},
+					{key: undefined, 		 label: "수금예정", 
+						columns: [
+						{key: "planClmnAmt" , label: "금액"    , align: "right" , width: 70, formatter: "money"},
+						{key: "planClmnVat" , label: "세액"    , align: "right" , width: 70, formatter: "money"},
+						{key: "planClmnTot" , label: "합계"    , align: "right" , width: 70, formatter: "money"},
+						]
+					},
+					{key: undefined, 		 label: "기 수금", 
+						columns: [
+						{key: "befClmnAmt" , label: "금액"    , align: "right" , width: 70, formatter: "money"},
+						{key: "befClmnVat" , label: "세액"    , align: "right" , width: 70, formatter: "money"},
+						{key: "befClmnTot" , label: "합계"    , align: "right" , width: 70, formatter: "money"},
+						]
+					},
+					{key: undefined, 		 label: "미 수금", 
+						columns: [
+						{key: "miClmnAmt" , label: "금액"    , align: "right" , width: 70, formatter: "money"},
+						{key: "miClmnVat" , label: "세액"    , align: "right" , width: 70, formatter: "money"},
+						{key: "miClmnTot" , label: "합계"    , align: "right" , width: 70, formatter: "money"},
+						]
+					},
 					{key: "billPblsDt"   , label: "계산서예정일", align: "center", width: 80, hidden: true},
 					{key: "clmnDt"       , label: "수금예정일"  , align: "center", width: 80, hidden: true},
-					{key: "clmnDtlAmt"   , label: "수금금액", align: "right" , width: 120, formatter: "money"},
-
+					{key: undefined, 		 label: "수금", 
+						columns: [
+						{key: "clmnDtlAmt" , label: "금액"    , align: "right" , width: 70, formatter: "money"},
+						{key: "clmnDtlVat" , label: "세액"    , align: "right" , width: 70, formatter: "money"},
+						{key: "clmnDtlTot" , label: "합계"    , align: "right" , width: 70, formatter: "money"},
+						]
+					},
 					{key: "fileTrgtKey", label: "파일대상KEY", align: "center", width: 50, hidden: true},
 					{key: "chk",         label: "선택",       align: "center", width: 40 , sortable: false,
 						editor: {
@@ -252,15 +329,27 @@
 							}
 						}
 					},
-					//{key: "billAmt", label: "수금금액", align: "right" , width: 90, formatter: "money"}
-					{key: "inputClmnDtlAmt", label: "수금금액",   align: "right",  width: 120, formatter: "money",
-						editor: {
-							type: "number",
-							attributes: {
-								'maxlength': 12, 'data-maxlength': 15
+					{key: undefined, 		 label: "수금", 
+						columns: [
+						{key: "inputClmnDtlAmt", label: "금액",   align: "right",  width: 80, formatter: "money",
+							editor: {
+								type: "number",
+								attributes: {
+									'maxlength': 12, 'data-maxlength': 15
+								}
 							}
-						}
-	                }
+		                },
+						{key: "inputClmnDtlVat", label: "세액",   align: "right",  width: 80, formatter: "money",
+							editor: {
+								type: "number",
+								attributes: {
+									'maxlength': 12, 'data-maxlength': 15
+								}
+							}
+		                },
+		                {key: "inputClmnDtlTot", label: "합계",   align: "right",  width: 80, formatter: "money"  }
+						]
+					},
 				]
 			});
 			return this;
@@ -293,10 +382,8 @@
 					"coCd": $('#coCd').val(),
 					"clmnNo": $('#clmnNo').val()
 				}
-				//debugger;
 				postAjax("/user/cr/cr05/select_cr05_Info_Dtl", formData, null, function(data) {
 					var list = data.result;
-					//debugger;
 					gridResize(list.length); //그리드 높이 조정
 					targetObj.setData({
 						list : list,
@@ -332,16 +419,24 @@
 
 		loadFormData("#popForm", loadData);
 
-		actionType = modalStack.last().paramObj.actionType;
+		actionType  = modalStack.last().paramObj.actionType;
 		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
 		ordrsClntCd = modalStack.last().paramObj.ordrsClntCd;
 		ordrsClntNm = modalStack.last().paramObj.ordrsClntNm;
-
+		
+		//부가세처리
+		sellVatCd   = modalStack.last().paramObj.sellVatCd;
+		sellVatVal  = modalStack.last().paramObj.sellVatVal;
+		$("#popForm #sellVatVal").val(sellVatVal);
+		$("#popForm #sellVatCd").val(sellVatCd);
+		$("#popForm #sellVatCd").css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+		
 		if (actionType == "C") {
 			$('#popForm .coCd').addClass('hit');
 			$('#popForm input#coCd').attr('required', 'required');
 
 			$("#popForm #clmnAmt").val("0");
+			
 			// $("#popForm #printAmt").val("0");
 			// $("#popForm #sellBillVat").val("0");
 			// $("#popForm #printSumAmt").val("0");
@@ -671,17 +766,27 @@
 		if (actionType == "C") {
 			var gridList = gridObj.target.getList();
 			var gridColumns = gridObj.target.columns;
-			
+
 			var Amt = parseInt(Amt);
+			//부가세
+			var Vat = parseInt(Amt) * sellVatVal / 100;
+			var Tot = Amt + Vat;
+			
 			//debugger;
 			if(chkVal == "Y") {
 				if( Amt > 0 ) {
 					gridObj.target.setValue(row, "inputClmnDtlAmt", Amt);
+					gridObj.target.setValue(row, "inputClmnDtlVat", Vat);
+					gridObj.target.setValue(row, "inputClmnDtlTot", Tot);
 				} else if( isNaN(Amt) ) {
 					gridObj.target.setValue(row, "inputClmnDtlAmt", 0);
+					gridObj.target.setValue(row, "inputClmnDtlVat", 0);
+					gridObj.target.setValue(row, "inputClmnDtlTot", 0);
 				}
 			} else if(chkVal == "N") {
 				gridObj.target.setValue(row, "inputClmnDtlAmt", 0);
+				gridObj.target.setValue(row, "inputClmnDtlVat", 0);
+				gridObj.target.setValue(row, "inputClmnDtlTot", 0);
 			}
 			setSumAmt();
 		}
@@ -690,6 +795,8 @@
 	// 금액지정
 	function setSumAmt() {
 		var SumAmt = 0;
+		var SumVat = 0;
+		var SumTot = 0;
 		var list = ModalgridView.target.list;
 		//등록일 경우만 처리
 		if (actionType == "C") {
@@ -698,19 +805,27 @@
 				//신규
 				if (parseFloat(obj.inputClmnDtlAmt) > 0 && obj.chk == 'Y') {
 					SumAmt = SumAmt + parseFloat(obj.inputClmnDtlAmt);
+					SumVat = SumVat + parseFloat(obj.inputClmnDtlVat);
+					SumTot = SumAmt + SumVat;
 				}
 			});
 
 			$("#popForm #clmnAmt").val(addCommaStr(SumAmt));
+			$("#popForm #clmnVat").val(addCommaStr(SumVat));
+			$("#popForm #clmnTot").val(addCommaStr(SumTot));
 		} else {
 			$.each(list,function(idx, obj) {
 				//신규
 				if (parseFloat(obj.inputClmnDtlAmt) > 0 ) {
 					SumAmt = SumAmt + parseFloat(obj.inputClmnDtlAmt);
+					SumVat = SumVat + parseFloat(obj.inputClmnDtlVat);
+					SumTot = SumAmt + SumVat;
 				}
 			});
 
 			$("#popForm #clmnAmt").val(addCommaStr(SumAmt));
+			$("#popForm #clmnVat").val(addCommaStr(SumVat));
+			$("#popForm #clmnTot").val(addCommaStr(SumTot));
 		}
 	}
 

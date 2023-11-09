@@ -138,7 +138,8 @@ public class CR05SvcImpl implements CR05Svc {
 				dtl.put("ordrsNo", dtl.get("ordrsNo").toString());
 				dtl.put("clmnPlanSeq", dtl.get("clmnPlanSeq").toString());
 				dtl.put("clmnDtlAmt", dtl.get("inputClmnDtlAmt").toString());
-				
+				dtl.put("clmnDtlVat", dtl.get("inputClmnDtlVat").toString());
+				dtl.put("clmnDtlTot", dtl.get("inputClmnDtlTot").toString());
 				//데이터 처리
 				cr05Mapper.insert_cr05_Dtl(dtl);
 				// cr05Mapper.update_cr05_Conf(dtl);

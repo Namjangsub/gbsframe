@@ -414,5 +414,15 @@ public class WB01SvcImpl implements WB01Svc {
 	public List<Map<String, String>> wbsCodeList(Map<String, String> paramMap) {
 		return wb01Mapper.wbsCodeList(paramMap);
 	}
+
+	@Override
+	public int selectWbsSalesCountNoCocd(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsSalesCountNoCocd(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectWbsSalesCodeListNoCocd(Map<String, String> paramMap) {
+		return wb01Mapper.selectWbsSalesCodeListNoCocd(paramMap);
+	}
     
 }

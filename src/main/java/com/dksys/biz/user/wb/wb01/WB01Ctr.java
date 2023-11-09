@@ -187,6 +187,18 @@ public class WB01Ctr {
      model.addAttribute("codeInfoList", codeInfoList); return "jsonView";
   }
   
+  @PostMapping(value = "/selectWbsSalesCodeListNoCocd") 
+  public String selectWbsSalesCodeListNoCocd(@RequestBody Map<String, String> paramMap, ModelMap model) { 
+	  
+	  int totalCnt = wb01Svc.selectWbsSalesCountNoCocd(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+  	model.addAttribute("paginationInfo", paginationInfo);
+  	
+     List<Map<String, String>> codeInfoList = wb01Svc.selectWbsSalesCodeListNoCocd(paramMap); 
+     model.addAttribute("codeInfoList", codeInfoList); return "jsonView";
+  }
+  
+  
   @PostMapping(value = "/selectWbsPlanNoList") 
   public String selectWbsPlanNoList(@RequestBody Map<String, String> paramMap, ModelMap model) {  
      List<Map<String, String>> codeInfoList =
