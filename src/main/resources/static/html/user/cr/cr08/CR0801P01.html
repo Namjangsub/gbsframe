@@ -72,7 +72,8 @@
 
 				<!-- 3행 -->
 				<tr>
-					<th colspan=8 style="height: 30px">계산서 출력 정보</th>
+					<th style="height: 30px">계산서 출력 정보</th>
+					<th colspan=7 style="height: 30px"><h1 class="tit">매출계산서 등록</h1></th>
 				</tr>
 				
 				<!-- 4행 -->
@@ -84,7 +85,7 @@
 
 					<th>세액</th>
 					<td>
-						<input comma type="text" id="sellBillVat" name="sellBillVat" class="form-control" maxlength="10" onchange="setSumVat();">
+						<input comma type="text" id="sellBillVat" name="sellBillVat" class="form-control" maxlength="10" onchange="setSumVat();" onkeyup="onlyNumber(this);chkSumVat();">
 						<!-- <input type="text" id="sellBillVat" name="sellBillVat" class="form-control" maxlength="10" onkeyup="onlyNumber(this)" comma > -->
 					</td>
 
@@ -220,9 +221,10 @@
 						var col = this.colIndex;
 						var key = this.column.key;						
 						var paramObj = {"row" : row};
+					    var vatRate = this.item.vatRate;
 						//체크박스일 경우 실행
 						if( key == "chk" ) {
-							setAmt(ModalgridView, this.item.chk , this.item.sellDcsnDtlAmt, row);                        		
+							setAmt(ModalgridView, this.item.chk , this.item.sellDcsnDtlAmt, row, vatRate);                        		
 						}
 					},
 					onDBLClick: function () {
@@ -302,7 +304,9 @@
 							}
 						}
 					},
-					{key: "billAmt", label: "발행금액", align: "right" , width: 90, formatter: "money"}
+					{key: "billAmt", label: "발행금액", align: "right" , width: 90, formatter: "money"},
+					{key: "vatRate", label: "부가세율", hidden:false},
+					{key: "sellVatAmt", label: "부가세", hidden:false}
 					// {key: "billAmt",      label: "발행금액",   align: "right",  width: 80, formatter: "money",
 					// 	editor: {
 					// 		type: "number",
@@ -362,6 +366,7 @@
 	
 	//화면 초기 설정
 	$(document).ready(function() {
+		
 		setCommonSelect($(".popup_area select[data-kind]"));
 		setByCoCd(modalStack.last().paramObj.coCd);
 
@@ -388,8 +393,8 @@
 		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
 		ordrsClntCd = modalStack.last().paramObj.ordrsClntCd;
 		ordrsClntNm = modalStack.last().paramObj.ordrsClntNm;
-
 		if (actionType == "C") {
+			
 			$('#popForm .coCd').addClass('hit');
 			$('#popForm input#coCd').attr('required', 'required');
 
@@ -651,17 +656,21 @@
 	}
 	
 	// 금액지정
-	function setAmt(gridObj, chkVal, Amt, row) {
+	function setAmt(gridObj, chkVal, Amt, row, vatRate) {
 		//등록일 경우만 처리
 		if (actionType == "C") {
 			var gridList = gridObj.target.getList();
 			var gridColumns = gridObj.target.columns;
 			
 			var Amt = parseInt(Amt);
-			//debugger;
+			// 부가세율
+			var vatRate_s = parseInt(vatRate) / 100;
+
 			if(chkVal == "Y") {
 				if( Amt > 0 ) {
 					gridObj.target.setValue(row, "billAmt", Amt);
+					// 부가세 필드 추가한 부분 계산
+					gridObj.target.setValue(row, "sellVatAmt", Amt * vatRate_s);
 				} else if( isNaN(Amt) ) {
 					gridObj.target.setValue(row, "billAmt", 0);
 				}
@@ -685,9 +694,10 @@
 				//신규
 				if (parseFloat(obj.billAmt) > 0 && obj.chk == 'Y') {
 					SumAmt = SumAmt + parseFloat(obj.billAmt);
+					sellBillVat = sellBillVat + parseFloat(obj.sellVatAmt);
 				}
 			});
-			sellBillVat = parseFloat(SumAmt) * 0.1;
+			//sellBillVat = parseFloat(SumAmt) * 0.1;
 			printSumAmt = parseFloat(SumAmt) + parseFloat(sellBillVat);
 
 			$("#popForm #sellBillAmt").val(addCommaStr(SumAmt));
@@ -716,6 +726,42 @@
 
 		$("#popForm #printSumAmt").val(addCommaStr(printSumAmt));
 	}
+	
+   // 부가세 입력 시 금액 오류 체크	
+   function chkSumVat() {
+        var sellBillVat = 0;
+        var list = ModalgridView.target.list;
+        $.each(list,function(idx, obj) {
+            if (parseFloat(obj.sellVatAmt) > 0) {
+            	sellBillVat = sellBillVat + parseFloat(obj.sellVatAmt);
+            }
+        });
+        if (parseFloat(sellBillVat) != parseFloat($('#sellBillVat').val())) {
+        	$('#sellBillVat').val(sellBillVat);
+        }
+   }
+	   
+	   
+	// 세액체크
+    function setSumVat() {
+        var SumAmt = 0;
+        var sellBillVat = 0;
+        var printSumAmt = 0;
+        var list = ModalgridView.target.list;
+        //debugger;
+        $.each(list,function(idx, obj) {
+            //신규
+            if (parseFloat(obj.billAmt) > 0) {
+                SumAmt = SumAmt + parseFloat(obj.billAmt);
+            }
+        });
+        sellBillVat = parseFloat($('#sellBillVat').val());
+        printSumAmt = parseFloat(SumAmt) + parseFloat(sellBillVat);
+
+        $("#popForm #printSumAmt").val(addCommaStr(printSumAmt));
+    }
+	
+	
 
 	// 팝업 그리드 조회
 	function Modal_DataSearch() {
