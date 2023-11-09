@@ -250,6 +250,12 @@ public class SM05SvcImpl implements SM05Svc {
 			result = sm05Mapper.delete_sm05(paramMap);
     	} else {
     		result = sm05Mapper.delete_sm05_Dtl(paramMap);
+
+    		//마스터 아래 디테일 없으면
+    		int chk = sm05Mapper.check_sm05_Master(paramMap);
+    		if(chk == 0) {
+    			result = sm05Mapper.delete_sm05(paramMap);	
+    		}
     	}
 		
 		//int result = sm05Mapper.delete_sm05(paramMap);

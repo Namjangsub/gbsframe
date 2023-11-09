@@ -51,4 +51,6 @@ public interface SM05Mapper {
     int delete_sm05_Dtl(Map<String, String> paramMap);
     
     int delete_sm05_Dtl_All(Map<String, String> paramMap);
+
+	int check_sm05_Master(Map<String, String> paramMap);
 }
