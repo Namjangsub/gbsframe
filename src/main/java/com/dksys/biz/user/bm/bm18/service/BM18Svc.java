@@ -19,4 +19,8 @@ public interface BM18Svc {
 	
 	//알림톡 로그저장
 	int insertKakaoMessage(Map<String, String> paramMap) throws Exception;	
+	
+	List<Map<String, String>> selectPmMaxMessageIdTodo(Map<String, String> paramMap);
+	
+	
 }

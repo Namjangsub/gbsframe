@@ -76,4 +76,14 @@ public class BM18Ctr {
     	}
     	return "jsonView";		  		  
     }	
+    
+    
+    //알림톡 MESSAGE ID 
+  	@PostMapping(value = "/selectPmMaxMessageIdTodo")
+  	public String selectPmMaxMessageIdTodo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+  		List<Map<String, String>> resultList = bm18Svc.selectPmMaxMessageIdTodo(paramMap);
+  		model.addAttribute("resultList", resultList);
+  		return "jsonView";
+  	}
+  	
 }
