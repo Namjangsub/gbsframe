@@ -1,0 +1,241 @@
+
+<div class="popup_area of_a" id="popup_area" >
+		<div class="form-group">
+			<form id="frm">
+				<input type="hidden" id="pgmId" name="pgmId" value="BM0102P01">
+				<input type="hidden" id="userId" name="userId">
+				<table class="popup_table">
+					<colgroup> 
+						<col width="13%">
+						<col width="35%">
+						<col width="13%">
+						<col width="35%">
+					</colgroup>
+					<tr>
+						<th class="hit">제품코드</th>
+						<td> 
+							<input type="text" id="prdtCd" name="prdtCd"  class="form-control  input-sm"  msg="제품코드" required>
+						</td>
+						</th>
+						<th class="hit">제품명</th>
+						<td colspan="1">
+							<input type="text" id="prdtNm" name="prdtNm"  class="form-control  input-sm" msg="제품명" required>
+						</td>
+	                </tr>
+	                <tr>
+	                    <td colspan=4 style="height:8px;"></td>    
+					</tr>
+					<tr>
+						<th class="hit">제품 그룹</th>
+						<td>
+							<select id="prdtGrp" name="prdtGrp" data-kind="PRDTDIV" class="form-control" onchange="setPrdtDiv(this, 'popup');" msg="제품 그룹" required>
+								<option value="">선택</option>
+							</select>
+						</td>
+						<th class="hit">제품 구분</th>
+						<td>
+							<select id="prdtDiv" name="prdtDiv" class="form-control" msg="제품 구분" required>
+								<option value="">선택</option>
+							</select>
+						</td>
+					</tr>
+	                <tr>
+	                    <td colspan=4 style="height:8px;"></td>      
+					</tr>
+					<tr>
+						<th class="hit">FRN구분</th>
+						<td>
+							<select id="prdtFrn" name="prdtFrn" data-kind="PRDTFRN" class="form-control" msg="FRN구분" required>
+								<option value="">선택</option>
+							</select>
+						</td>
+						<th>사이즈</th>
+						<td>
+							<input  type="text" id="prdtSize" name="prdtSize" class="form-control">
+						</td>
+					</tr>
+	                <tr>
+	                    <td colspan=4 style="height:8px;"></td>    
+					</tr>
+					<tr>
+						<th>제품 규격</th>
+						<td>
+							<input type="text" id="prdtSpec" name="prdtSpec" class="form-control" >
+						</td>
+						<th>단위</th>
+						<td>
+							<select id="prdtUnit" name="prdtUnit" data-kind="PRDTUNIT" class="form-control" >
+								<option value="">선택</option>
+							</select>
+						</td>
+					</tr>
+	                <tr>
+	                    <td colspan=4 style="height:8px;"></td>     
+					</tr>
+					<tr>
+						<th>기준단가</th>
+						<td>
+							<input type="text" id="prdtUpr" name="prdtUpr" class="form-control" >
+						</td>
+						<th>중량</th>
+						<td>
+							<input type="text" id="prdtWt" name="prdtWt" class="form-control" >
+						</td>
+					</tr>
+	                <tr>
+	                    <td colspan=4 style="height:8px;"></td>   
+					</tr>
+					<tr>
+						<th>단가 기준일</th>
+						<td>
+							<input type="text" id="prdtDt" name="prdtDt" class="input_calendar form-control" autocomplete="off" onkeyup="dateMask(this);" date>
+						</td>
+						<th>사용 구분</th>
+						<td>
+							<select id="useYn" name="useYn">
+								<option value="Y">사용</option>
+								<option value="N">미사용</option>
+							</select>
+						</td>
+					</tr>
+	                <tr>
+	                    <td colspan=4 style="height:8px;"></td>   
+					</tr>
+				</table>
+			</form>
+		</div>
+</div>
+<!-- 하단 버튼 -->
+<div class ="popup_bottom_btn">
+	<button type="button" class="btn btn-default btn-sm" id="checkBtn" onclick="checkOverLap()">중복체크</button>
+	<button type="button" class="btn btn-default btn-sm" id="actionBtn"></button>
+	<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫기</button>
+</div>
+<script type="text/javascript">
+	var insertOK = false;
+	$(document).ready(function() {
+		$("#userId").val(jwt.userId);
+		setCommonSelect($("#popup_area select[data-kind]"));
+		
+		$('#prdtDt').datepicker({
+			format : "yyyy-mm-dd",
+			language : "ko",
+			autoclose : true
+		});
+		
+		var actionType = modalStack.last().paramObj.actionType;
+		if(actionType == "U") {
+			$('#actionBtn').on("click", function(){updateMaterial();});
+			$("#actionBtn").html("수정");
+			$("#checkBtn").hide();
+			selectMaterialInfo();
+			insertOK = true;
+			
+		} else {
+			$('#actionBtn').on("click", function(){insertMaterial();});
+			$("#actionBtn").html("등록");
+			$('#prdtDt').datepicker("setDate", new Date());
+			 
+		}
+		
+		$('[required]').on("change", function(){
+			if(actionType != "U"){
+				insertOK = false;
+			}
+		});
+		
+	});
+	
+	function selectMaterialInfo() {
+	
+		var row = gridView.target.getList("selected")[0];
+		$("#prdtCd").val(row.prdtCd);
+		var formData = $('#frm').serializeObject();
+		postAjaxSync("/admin/bm/bm01/selectMaterialInfo", formData, null, function(data){
+			setData(data.materialInfo);
+		});
+	}
+	
+	function setData(data){
+		$.each(data, function(key, value){
+			if($('#'+key)[0]){
+				$('#'+key).val(value);
+				
+				if(key == "prdtGrp"){
+					$('#'+key).change();
+				}
+				
+			//	if($('#'+key).is('[required]') && key != "useYn"){
+			//		$('#'+key).prop("disabled", true);	
+			//	}
+				
+				if($('#'+key).is('[date]')){
+					$('#'+key).datepicker("setDate", moment(value, 'YYYY-MM-DD').toDate());
+				}
+			}
+		});
+	}
+
+	function insertMaterial() {
+		
+		if(inputValidation($('[required]'))) {
+			if(insertOK) {
+				
+				var formData = $('#frm').serializeObject();
+				formData.prdtDt = formData.prdtDt.replace(/\-/g,'');
+				
+				postAjax("/admin/bm/bm01/insertMaterial", formData, null, function(data){
+					if(data.resultCode == 200){
+						modalStack.close();
+						gridView.initView().setData(0);
+					}
+				});
+			}
+		} 
+	}
+	
+	function updateMaterial() {	
+		// for(var i=0; i<$('#frm [name]').length; i++) {
+			
+		// 	if($('#frm [name]')[i].required){ 
+		// 		$("#frm [name]")[i].disabled = false;
+		// 	}
+		// }
+
+		if(inputValidation($('[required]'))) {
+			if(insertOK) {
+				
+				var formData = $('#frm').serializeObject();
+				formData.prdtCd = formData.prdtCd + ''; 
+				formData.prdtDt = formData.prdtDt.replace(/\-/g,'');
+
+				putAjax("/admin/bm/bm01/updateMaterial", formData, null, function(data){
+					alert(data.resultMessage);
+					if(data.resultCode == 200){
+						modalStack.close();
+						gridView.initView().setData(0);
+					}
+				});
+			} 
+		}
+	}
+	
+	
+	function checkOverLap() {
+		
+		if(inputValidation($('[required]'))) {
+			var formData = $('#frm').serializeObject();
+			formData.prdtDt = formData.prdtDt.replace(/\-/g,'');
+			
+			postAjax("/admin/bm/bm01/checkOverLap", formData, null, function(data){
+				alert(data.resultMessage);
+				if(data.resultCode == 200){
+					insertOK = true;
+				} 
+			})
+			
+		}
+		
+	}
+	
+</script>
