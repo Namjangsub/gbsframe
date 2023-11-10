@@ -200,4 +200,12 @@ public class CM05Ctr {
     	model.addAttribute("resultList", resultList);
         return "jsonView";
     }
+    
+    // 공통코드 정보중 프로젝트코드 최종번호 조회 (PRJCT%)
+    @PostMapping("/selectProjectCodeLastNoInfo")
+    public String selectProjectCodeLastNoInfo(@RequestBody Map<String, String> param, ModelMap model) {
+    	Map<String, String> projectLastNo = cm05Svc.selectProjectCodeLastNoInfo(param);
+    	model.addAttribute("projectLastNo", projectLastNo);
+        return "jsonView";
+    }
 }

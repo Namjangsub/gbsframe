@@ -104,4 +104,10 @@ public class CM05SvcImpl implements CM05Svc {
 	public List<Map<String, String>> selectMonthCloseChkList(Map<String, String> param) {
 		return cm05Mapper.selectMonthCloseChkList(param);
 	}
+
+	@Override
+	public Map<String, String> selectProjectCodeLastNoInfo(Map<String, String> param) {
+		return cm05Mapper.selectProjectCodeLastNoInfo(param);
+	}
+
 }
