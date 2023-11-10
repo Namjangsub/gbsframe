@@ -25,5 +25,8 @@ public interface BM18Mapper {
 	
 	//알림톡 로그등록
 	int insertKakaoMessage(Map<String, String> paramMap);	
+	
+	List<Map<String, String>> selectPmMaxMessageIdTodo(Map<String, String> paramMap);	
+	
 }
 
