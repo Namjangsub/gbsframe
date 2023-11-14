@@ -2,6 +2,7 @@ package com.dksys.biz.user.wb.wb21.service.impl;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -164,5 +165,22 @@ public class WB21SvcImpl implements WB21Svc {
     public List<Map<String, String>> selectSjVerNoNext(Map<String, String> paramMap) {
   		return wb21Mapper.selectSjVerNoNext(paramMap);
     }
+	
+	//DATA DELETE
+	@Override
+	public int deleteSjNo(Map<String, String> paramMap) throws Exception {
+		int result = 0;
+
+		//데이터 처리
+		result = wb21Mapper.deleteSjNo(paramMap);
+		
+		return result;
+	}
+	
+	//Project 과제 체크
+	@Override
+	public Map<String, String> selectWbChk(Map<String, String> paramMap) {
+		return wb21Mapper.selectWbChk(paramMap);
+	}
 	
 }

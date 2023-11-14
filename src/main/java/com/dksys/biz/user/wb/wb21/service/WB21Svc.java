@@ -38,5 +38,11 @@ public interface WB21Svc {
 	int sjVerUpInsert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
 	List<Map<String, String>> selectSjVerNoNext(Map<String, String> paramMap);
+	
+	//DATA DELETE
+	int deleteSjNo(Map<String, String> paramMap) throws Exception;
+	
+	//Project 과제 체크
+	Map<String, String> selectWbChk(Map<String, String> paramMap);
 
 }
