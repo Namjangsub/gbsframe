@@ -16,7 +16,7 @@ public interface PM01Mapper {
   
   int selectConfirmCount(Map<String, String> paramMap);
 
-  int selectDailyWorkSeqNext(Map<String, String> paramMap);
+  String selectDailyWorkSeqNext(Map<String, String> paramMap);
   
   int insertDailyWork(Map<String, String> paramMap);
 

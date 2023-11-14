@@ -105,8 +105,8 @@ public class PM01SvcImpl implements PM01Svc {
 		//---------------------------------------------------------------  
 
 		
-		int fileTrgtKey = pm01Mapper.selectDailyWorkSeqNext(paramMap);
-		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+		String fileTrgtKey = pm01Mapper.selectDailyWorkSeqNext(paramMap);
+		paramMap.put("fileTrgtKey", fileTrgtKey);
 		
 		int result = pm01Mapper.insertDailyWork(paramMap);
 		cm08Svc.uploadFile("PM0101M01", paramMap.get("fileTrgtKey"), mRequest);
