@@ -208,4 +208,19 @@ public class CM05Ctr {
     	model.addAttribute("projectLastNo", projectLastNo);
         return "jsonView";
     }
+    
+
+    // 제품그룹 사용자 등록
+    @PostMapping("/prdtDivInsert")
+    public String prdtDivInsert(@RequestBody Map<String, String> param, ModelMap model) {
+    	try {
+    		cm05Svc.prdtDivInsert(param);
+    		model.addAttribute("resultCode", 200);
+    		model.addAttribute("resultMessage", "C".equals(param.get("actionType")) ? messageUtils.getMessage("insert") : messageUtils.getMessage("update"));
+    	} catch(Exception e) {
+    		model.addAttribute("resultCode", 500);
+    		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+    	}
+    	return "jsonView";
+    }
 }

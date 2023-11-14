@@ -36,4 +36,6 @@ public interface CM05Svc {
     public List<Map<String, String>> selectMonthCloseChkList(Map<String, String> param);
 
     public Map<String, String> selectProjectCodeLastNoInfo(Map<String, String> param);
+
+	public int prdtDivInsert(Map<String, String> param);
 }

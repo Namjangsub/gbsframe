@@ -1,0 +1,162 @@
+
+<body>
+	<div class="container-fluid">
+		<div class="popup_area">
+			<form id="prdtFrm">
+				<div class="popup_table">
+					<table>
+		                <colgroup>
+							<col width="16.5%">
+							<col width="72%">
+							<col width="16%">
+						</colgroup>
+						<tbody>
+							<tr>
+								<th class="hit">제품 그룹</th>
+								<td>
+									<select id="prdtGrp_P" name="prdtGrp_P" data-kind="PRDTDIV" class="form-control" onchange="popGridView.setData()" msg="제품 그룹" required>
+									</select>
+								</td>
+							</tr>
+							<tr>
+								<th class="hit" colspan="1">신규 제품구분명</th>
+								<td colspan="1">
+									<div class="search_form">
+										<input type="text" id="prdtGrpNm_P" name="prdtGrpNm_P" class="form-control"  required msg="신규 제품구분명">
+									</div>
+								</td>
+								<td colspan="1">
+										<button type="button" onclick="prdtDivAdd();" id="actionBtn3" authchk>등록</button>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</form>
+     		<div class="ax5_grid">
+				<div data-ax5grid="popGrid" data-ax5grid-config="{}" style="height: 500px; width: 100%;"></div>
+			</div>
+
+			<div class="popup_bottom_btn">
+				<button type="button" onclick="modalStack.close();">닫기</button>
+			</div>
+			<div>
+				<br>
+				<br>
+			</div>
+		</div>
+	</div>
+</body>
+
+</html>
+
+
+<script type="text/javascript">
+	var popGridView = {
+		initView : function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showRowSelector : false,
+				multipleSelect : false,
+				sortable : false,
+				target : $('[data-ax5grid="popGrid"]'),
+				header : {
+					align : "center",
+					selector : false
+				},
+				body : {
+					onClick : function(data) {
+						this.self.select(this.dindex);
+						$('#prdtGrpNm_P').val(this.item.codeNm);
+					},
+					onDBLClick : function() {
+						console.log(this.value);
+					},
+				},
+				columns : [ 
+					{key : "codeId", label : "그룹코드", 	width : 120, align : "center"}, 
+					{key : "codeNm", label : "제품 그룹명", 	width : '*', align : "left", hidden : false}, 
+					{key : "codeEtc", label : "제품코드",	width : 100, hidden : false} 
+					]
+			});
+			return this;
+		},
+		setData : function() {
+			var target = this.target;
+			var formData = {
+				"codeKind" : $('#prdtGrp_P').val()
+			};
+			postAjax("/admin/cm/cm05/selectChildCodeList", formData, null, function(data) {
+				var list = data.childCodeList;
+				target.setData({
+					list : list,
+					page : {
+						totalElements : list.length
+					}
+				});
+			});
+		}, //setData
+	}
+
+	$(document).ready(function() {
+		setCommonSelect($(".container-fluid select[data-kind]"));
+
+		popGridView.initView().setData();
+		authChk("BM1601M01");
+	})
+
+
+	function prdtDivAdd() {
+		var isValid = true;
+		$('#prdtFrm [required]').each(function(idx, elem) {
+			if ($.trim($(elem).val()) == "") {
+				var alertMsg = $(elem).attr("msg") || "필수값";
+				alert(alertMsg + "(을/를) 입력해주세요.");
+				$(elem).focus();
+				isValid = false;
+				return false;
+			}
+		});
+
+		var targetPrdtList = popGridView.target.list;
+		var prdtGrpNm_P = $("#prdtGrpNm_P").val().trim();
+		var dupCount = 0;
+
+		for (var i = 0; i < targetPrdtList.length; i++) {
+			if (targetPrdtList[i].codeNm == prdtGrpNm_P) {
+				dupCount++;
+			}
+		}
+		
+		if (dupCount > 0) {
+			alert("중복 제품 그룹 입니다. 확인 바랍니다.")
+			isValid = false;
+		}
+
+		if (isValid) {
+			var formData = {
+				actionType: "C",
+				codeId : "백엔드에서 자동 생성",
+				codeNm : $("#prdtGrpNm_P").val(),
+				codeKind : $('#prdtGrp_P').val(),
+				codeDesc : $("#prdtGrp_P option:selected").text(),
+				codeRprc : "",
+				codeEtc  : "",
+				sortNo   : "",
+				useYn    : "Y",
+				userId   : jwt.userId,
+				pgmId    : "BM0102D01",
+				dzCode   : "백엔드에서 자동 생성"
+			}
+// 			formData["dzCode"] = data.lastNo;
+// 			formData["codeId"] = "PRDTDIV" + data.lastNo;
+			postAjax("/admin/cm/cm05/prdtDivInsert", formData, null, function(data) {
+				alert(data.resultMessage);
+				if (data.resultCode == 200) {
+					$("#prdtGrpNm_P").val("");
+					popGridView.setData(0);
+				}
+			});
+		}
+	}
+</script>

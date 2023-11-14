@@ -110,4 +110,12 @@ public class CM05SvcImpl implements CM05Svc {
 		return cm05Mapper.selectProjectCodeLastNoInfo(param);
 	}
 
+	@Override
+	public int prdtDivInsert(Map<String, String> param) {
+		Map<String, String> resultList = cm05Mapper.selectPrdtCodeLastNoInfo(param);
+		param.put("codeId", param.get("codeKind") + resultList.get("lastNo").trim());
+		param.put("dzCode", resultList.get("lastNo"));
+		return cm05Mapper.insertCode(param);
+	}
+	
 }

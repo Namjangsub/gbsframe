@@ -39,4 +39,6 @@ public interface CM05Mapper {
 	List<Map<String, String>> selectMonthCloseChkList(Map<String, String> param);
 
 	Map<String, String> selectProjectCodeLastNoInfo(Map<String, String> param);
+	
+	Map<String, String> selectPrdtCodeLastNoInfo(Map<String, String> param);
 }
