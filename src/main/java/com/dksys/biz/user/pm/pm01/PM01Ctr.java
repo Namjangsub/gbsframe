@@ -188,7 +188,12 @@ public class PM01Ctr {
   public void inputFieldExistCheck(@RequestBody Map<String, String> paramMap, ModelMap model) {
 	  
 	  model.addAttribute("resultCode", 222);
-	  model.addAttribute("resultMessage", "");  
+	  model.addAttribute("resultMessage", ""); 
+	  //오더, salesCode용 coCd처리(ordCoCd 값이 없으면 기본 coCd값을 적용함
+	  if (paramMap.get("ordCoCd")==null ||"".equals(paramMap.get("ordCoCd"))) {
+		  paramMap.put("ordCoCd", paramMap.get("coCd"));
+	  }
+	  
 	  int cnt = 0; 
 	  //salescode 체크(salesCd)
 	  //salesCode가 있으면 salesCode에 있는 정보를 기준으로 재설정함 
