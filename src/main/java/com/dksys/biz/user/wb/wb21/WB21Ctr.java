@@ -185,4 +185,37 @@ public class WB21Ctr {
 	    model.addAttribute("result", result); 
 	    return "jsonView"; 		 
     }
+    
+  //DELETE
+  	@PutMapping(value = "/deleteSjNo")
+  	public String deleteSjNo(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+  		try {
+  			Map<String, String> projectNo = wb21Svc.selectWbChk(paramMap);
+			if(projectNo != null && projectNo.size() > 0) {
+				String verNo = projectNo.get("verNo");
+				String closeYn = projectNo.get("closeYn");
+				System.out.println(" verNo : " + verNo + "  closeYn : " + closeYn);
+				if (verNo.equals("1") && closeYn.equals("N")) {
+	        		if (wb21Svc.deleteSjNo(paramMap) != 0 ) {
+		  				model.addAttribute("resultCode", 200);
+		  				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+		  			} else {
+		  				model.addAttribute("resultCode", 500);
+		  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		  			}
+				} else {
+					model.addAttribute("resultCode", 500);
+	        		model.addAttribute("resultMessage","차수가 1차이고, 확정되지 않은 일정만 삭제 할 수 있습니다.");
+				}
+			}
+			else {	
+		  			model.addAttribute("resultCode", 500);
+		  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  	  	return "jsonView";
+  	}
 }
