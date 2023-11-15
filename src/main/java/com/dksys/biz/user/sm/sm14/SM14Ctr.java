@@ -127,4 +127,50 @@ public class SM14Ctr {
 		return "jsonView";
 	}	
 
+	// 매입관리 입고 조회 NEW
+	@PostMapping(value = "/selectPurchaseListNew")
+	public String selectPurchaseListNew(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = sm14Svc.selectPurchaseListCountNew(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = sm14Svc.selectPurchaseListNew(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
+	// 발주/입고 조회 NEW
+	@PostMapping(value = "/selectOrderDetailListNew")
+	public String selectOrderDetailListNew(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = sm14Svc.selectOrderDetailListNew(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
+	// 매입 조회 NEW
+	@PostMapping(value = "/selectPchsDetailListNew")
+	public String selectPchsDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = sm14Svc.selectPchsDetailListNew(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
+	//매입확정관리 등록
+    @PostMapping(value = "/insertPurchaseBillDetailNew")
+    public String insertPurchaseBillDetailNew(@RequestParam Map<String, String> paramMap, ModelMap model) throws Exception {
+    	
+  		try {
+  			if (sm14Svc.insertPurchaseBillDetailNew(paramMap) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }	  
+
 }

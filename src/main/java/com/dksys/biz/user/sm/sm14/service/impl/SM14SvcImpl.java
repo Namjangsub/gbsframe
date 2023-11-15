@@ -211,8 +211,13 @@ public class SM14SvcImpl implements SM14Svc {
 	@Override
 	public int deletePurchaseDetail(Map<String, String> param) {
 		int result = 0;
-		result += sm14Mapper.deletePurchaseDetail(param);
-		result += sm14Mapper.deletePurchaseMaster(param);
+		result = sm14Mapper.deletePurchaseDetail(param);
+		
+		String rtnString = sm14Mapper.selectPurchaseDetailCount(param);
+		if("0".equals(rtnString)) {
+			result = sm14Mapper.deletePurchaseMaster(param);
+		}
+		
 		return result;
 	}	
 	
@@ -255,4 +260,59 @@ public class SM14SvcImpl implements SM14Svc {
 	public List<Map<String, String>> selectOrdrgMatList(Map<String, String> paramMap) {
 		return sm14Mapper.selectOrdrgMatList(paramMap);
 	}		
+	
+	@Override
+	public List<Map<String, String>> selectPurchaseListNew(Map<String, String> paramMap) {		
+		List<Map<String, String>> result = new ArrayList<Map<String, String>>();
+		//발주+비용
+			result = sm14Mapper.selectPurchaseListNew(paramMap);
+		return result;		
+	}	
+
+	@Override
+	public int selectPurchaseListCountNew(Map<String, String> paramMap) {
+		return sm14Mapper.selectPurchaseListCountNew(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectOrderDetailListNew(Map<String, String> paramMap) {		
+		List<Map<String, String>> result = new ArrayList<Map<String, String>>();
+		//발주+비용
+			result = sm14Mapper.selectOrderDetailListNew(paramMap);
+		return result;		
+	}	
+
+	@Override
+	public List<Map<String, String>> selectPchsDetailListNew(Map<String, String> paramMap) {		
+		List<Map<String, String>> result = new ArrayList<Map<String, String>>();
+			result = sm14Mapper.selectPchsDetailListNew(paramMap);
+		return result;		
+	}
+	
+	//매입확정 detail insert
+	@Override
+	public int insertPurchaseBillDetailNew(Map<String, String> paramMap) throws Exception {
+			
+		int result = 0;	    
+
+		String maxPchsNo = "";
+
+			if("".equals(paramMap.get("pchsNo")) || paramMap.get("pchsNo") == null ) {					
+				maxPchsNo = sm14Mapper.selectMaxPchsNoNew(paramMap);		
+				paramMap.put("maxPchsNo", maxPchsNo);
+				result = sm14Mapper.insertPurchaseMaster(paramMap);
+			}else {
+				maxPchsNo = paramMap.get("pchsNo");	
+				paramMap.put("maxPchsNo", maxPchsNo);
+			}
+
+			paramMap.put("cmpletYn", "Y");
+			paramMap.put("pchsQty", "1");
+			paramMap.put("matrCd", "");
+
+			result = sm14Mapper.insertPurchaseBillDetailNew(paramMap);
+	
+		return result;
+	}
+	
 }

@@ -47,6 +47,22 @@ public interface SM14Mapper {
 	int updateBillYn(Map<String, String> param);	
 
 	List<Map<String, String>> selectOrdrgMatList(Map<String, String> paramMap);	
+	
+	int selectPurchaseListCountNew(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectPurchaseListNew(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectOrderDetailListNew(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectPchsDetailListNew(Map<String, String> paramMap);
+	
+	int insertPurchaseBillDetailNew(Map<String, String> paramMap);	
+	
+	int insertPurchaseMaster(Map<String, String> param);
+	
+	String selectPurchaseDetailCount(Map<String, String> paramMap);
+	
+	String selectMaxPchsNoNew(Map<String, String> paramMap);
 }
 
 
