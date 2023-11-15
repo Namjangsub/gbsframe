@@ -11,4 +11,11 @@ public interface SM18Svc {
 		
 	//리스트
 	List<Map<String, String>> sm18_gridView_selectList(Map<String, String> paramMap);
+
+	//카운트	
+	int sm18_gridView_selectCountNew(Map<String, String> paramMap);
+		
+	//리스트
+	List<Map<String, String>> sm18_gridView_selectListNew(Map<String, String> paramMap);
+
 }

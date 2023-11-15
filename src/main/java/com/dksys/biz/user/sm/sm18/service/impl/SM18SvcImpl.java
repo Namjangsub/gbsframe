@@ -57,4 +57,16 @@ public class SM18SvcImpl implements SM18Svc {
 	public List<Map<String, String>> sm18_gridView_selectList(Map<String, String> paramMap) {
 		return sm18Mapper.sm18_gridView_selectList(paramMap);
 	}
+	
+	//카운트
+	@Override
+	public int sm18_gridView_selectCountNew(Map<String, String> paramMap) {
+		return sm18Mapper.sm18_gridView_selectCountNew(paramMap);
+	}
+	
+	//리스트
+	@Override
+	public List<Map<String, String>> sm18_gridView_selectListNew(Map<String, String> paramMap) {
+		return sm18Mapper.sm18_gridView_selectListNew(paramMap);
+	}
 }

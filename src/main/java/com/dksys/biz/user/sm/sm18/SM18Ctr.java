@@ -37,5 +37,17 @@ public class SM18Ctr {
 		List<Map<String, String>> result = sm18Svc.sm18_gridView_selectList(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
+	}
+	
+	//리스트 조회
+	@PostMapping(value = "/sm18_gridView_selectListNew")
+	public String sm18_gridView_selectListNew(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = sm18Svc.sm18_gridView_selectCountNew(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = sm18Svc.sm18_gridView_selectListNew(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
 	}	
+
 }
