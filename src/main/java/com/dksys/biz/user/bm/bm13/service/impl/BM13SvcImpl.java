@@ -143,6 +143,17 @@ public class BM13SvcImpl implements BM13Svc {
 		return result;
 	  }	
 	
+	@Override
+	public int deleteMainGdApproval(Map<String, String> paramMap) throws Exception {
+
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		    		
+		int result = bm13Mapper.deleteMainGdApproval(paramMap);
+		
+		//---------------------------------------------------------------  		
+		return result;
+	  }	
 	
     @Override
 	public List<Map<String, String>> selectRsltsMemberList(Map<String, String> paramMap) {

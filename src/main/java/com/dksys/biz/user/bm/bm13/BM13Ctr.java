@@ -109,8 +109,25 @@ public class BM13Ctr {
   			model.addAttribute("resultMessage", e.getMessage());
   		}
   	  	return "jsonView";
-    }    
+    }
     
+  //기준관리 결재선 삭제    
+    @PutMapping(value = "/deleteMainGdApproval")
+    public String deleteMainGdApproval(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+  	  	try {
+  			if (bm13Svc.deleteMainGdApproval(paramMap) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  	  	return "jsonView";
+    } 
     
     @PostMapping(value = "/selectRsltsMemberList") 
 	public String selectRsltsMemberList(@RequestBody Map<String, String> paramMap, ModelMap model) {
