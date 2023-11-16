@@ -64,6 +64,36 @@ public class WB21Ctr {
 		  model.addAttribute("resultList", resultList); 
 		  return "jsonView"; 
 	}
+
+	// 과제일괄확정부분
+	@PostMapping(value = "/ModalsjnoconfirmList") 
+	public String ModalsjnoconfirmList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  int totalCnt = wb21Svc.ModalsjnoconfirmListCount(paramMap); 
+		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		  model.addAttribute("paginationInfo", paginationInfo);
+		  
+		  List<Map<String, String>> resultList = wb21Svc.ModalsjnoconfirmList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+	}
+
+	@PostMapping(value = "/confirm_wb21")
+	public String confirm_wb21(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (wb21Svc.confirm_wb21(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+	}
+	// 과제일괄확정부분 끝
     
     @PostMapping(value = "/sjInsert")
     public String sjInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {

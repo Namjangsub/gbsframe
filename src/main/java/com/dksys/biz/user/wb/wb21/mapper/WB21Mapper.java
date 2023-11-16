@@ -17,6 +17,14 @@ public interface WB21Mapper {
 	int selectSjListCount(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectSjList(Map<String, String> paramMap);
+
+	// 과제일괄확정부분
+	int ModalsjnoconfirmListCount(Map<String, String> paramMap);
+	
+	List<Map<String, String>> ModalsjnoconfirmList(Map<String, String> paramMap);
+
+	int confirm_wb21(Map<String, String> paramMap);
+	// 과제일괄확정부분 끝
 	
 	List<Map<String, String>> deleteSjListChk(Map<String, String> paramMap);
 	
