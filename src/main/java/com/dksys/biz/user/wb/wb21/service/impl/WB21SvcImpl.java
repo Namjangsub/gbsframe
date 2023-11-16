@@ -85,8 +85,8 @@ public class WB21SvcImpl implements WB21Svc {
 		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
 	    for (Map<String, String> dtl : dtlParam) {
 	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
-			dtl.put("userId", paramMap.get("userId"));
-	    	dtl.put("pgmId", paramMap.get("pgmId"));
+			//dtl.put("userId", paramMap.get("userId"));
+	    	//dtl.put("pgmId", paramMap.get("pgmId"));
 			
 			String dataChk = dtl.get("dataChk").toString();	    	
 			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
