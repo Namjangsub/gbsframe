@@ -1159,23 +1159,20 @@
                   FROM (
                         WITH SJD AS --수주상세 
                              ( 
-                              SELECT M.CO_CD                                            AS CO_CD        --회사코드
+                               SELECT M.CO_CD                                            AS CO_CD        --회사코드
                                     , M.ORDRS_NO                                         AS ORDRS_NO     --수주번호
                                     , X.SALES_CD                                         AS SALES_CD     --SALES Code
                                     , M.ORDRS_CLNT_CD                                    AS CLNT_CD      --고객코드
                                     , C.CLNT_NM                                          AS CLNT_NM      --고객명
                                     , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT ) FROM DUAL) AS CLNT_PJT_NM      --프로젝트
-                                    , M.CTRT_NM                                         AS CTRT_NM      --계약명
-                                 FROM TB_CR02M01  M --수주마스터
-                                      INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+                                    , M.CTRT_NM                                         AS CTRT_NM      --계약명   
+                                    , P.VER_NO                                          AS PLAN_VER_NO --계획ver                        
+                                 FROM TB_WB21M01 P 
+                                      INNER JOIN TB_CR02D02 AS X ON X.CO_CD = P.CO_CD AND X.SALES_CD = P.SALES_CD--수주상세  
+                                      INNER JOIN TB_CR02M01 AS M ON M.CO_CD = P.CO_CD AND M.ORDRS_NO = X.ORDRS_NO--수주마스터 
                                       INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
-                                WHERE M.CO_CD = #{coCd}
-                                  AND X.SALES_CD IS NOT NULL --비용제외
-                                  AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만 
-                                                 FROM TB_WB21M01 P 
-                                                WHERE P.CO_CD = X.CO_CD
-                                                  AND P.SALES_CD  = X.SALES_CD
-                                              )
+                               WHERE  1=1 --P.SALES_CD = '23078-01HAFAR'
+                                 AND CLOSE_YN = 'Y'
                              )
                         SELECT SJ.CLNT_NM                           AS CLNT_NM 
                               , SJ.CLNT_PJT_NM                        AS CLNT_PJT_NM
@@ -1194,6 +1191,7 @@
                              , P.WBS_PLAN_MNG_ID                AS WBS_MNG_ID  --담당자ID
                              , ROUND(P.WBS_PLANE_DT - SYSDATE)  AS VARIANCE_DT --종료예정 차이 일수 
                              , P.CO_CD
+                             , SJ.PLAN_VER_NO                  AS PLAN_VER_NO --계획ver 
                           FROM TB_WB22M01 AS P --WBS계획
                                INNER JOIN SJD  AS SJ ON P.CO_CD = SJ.CO_CD AND P.SALES_CD = SJ.SALES_CD
                                LEFT OUTER JOIN TB_WB23M01 AS R  ON P.CO_CD              = R.CO_CD 
@@ -1222,6 +1220,7 @@
 	                             , P.WBS_PLAN_MNG_ID                AS WBS_MNG_ID  --담당자ID
 	                             , ROUND(P.WBS_PLANE_DT - SYSDATE)  AS VARIANCE_DT --종료예정 차이 일수 
 	                             , P.CO_CD
+                             	 , SJ.PLAN_VER_NO                  AS PLAN_VER_NO --계획ver
 				         FROM TB_WB22M01 P 
 				         				LEFT OUTER JOIN TB_WB22M01 R ON R.CO_CD     = P.CO_CD
 				         				                               AND R.SALES_CD  =  P.SALES_CD
