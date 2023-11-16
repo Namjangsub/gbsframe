@@ -15,6 +15,7 @@ import com.dksys.biz.user.wb.wb21.mapper.WB21Mapper;
 import com.dksys.biz.user.wb.wb21.service.WB21Svc;
 import com.dksys.biz.util.ExceptionThrower;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
 @Service
