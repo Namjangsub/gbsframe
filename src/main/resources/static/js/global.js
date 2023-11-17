@@ -2360,7 +2360,7 @@ function inCloseChk(chkValue){
 
 
 
-function kakaoSendReal(talkJson, talkParam, param, callback) {
+function kakaoSendReal(talkJson, talkParam, param) {
 	let talkDeJson = JSON.parse(talkJson);
 	let sendCnt = 0;
 	//알림톡
@@ -2384,18 +2384,16 @@ function kakaoSendReal(talkJson, talkParam, param, callback) {
 		    		var errorMsg = find.codeNm;	
 				}		    			
 		    	insertKakaoMessage(err, talkDeJson, param);	 				
-	    		alert("오류코드: "+data.status+"\r\n\r\n" + errorMsg+"\n담당자 : "+param.nameTo+" Hp."+ param.ordrgMngTelNo);   		
+	    		alert("오류코드: "+data.status+"\r\n\r\n" + errorMsg);   		
 	    	} else if( data.status == "OK" ) {
 	    		//alert("알림톡 정상 발송되었습니다.");
 	    		sendCnt++;
 		    	insertKakaoMessage(err, talkDeJson, param);	
 	    	}
-	    	callback(data);
 	    },
       error: function (data) {
       	insertKakaoMessage(data.status, talkDeJson, param);
       	console.log('---ajax error---');
-    	callback(data);
       }
 	});		
 	console.log('---success---' + sendCnt);	
