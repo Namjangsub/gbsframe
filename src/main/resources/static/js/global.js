@@ -2383,8 +2383,8 @@ function kakaoSendReal(talkJson, talkParam, param) {
 				if( typeof(find.codeNm) != "undefined" ) {
 		    		var errorMsg = find.codeNm;	
 				}		    			
-		    	insertKakaoMessage(err, talkDeJson, param);	 				
-	    		alert("오류코드: "+data.status+"\r\n\r\n" + errorMsg);   		
+		    	insertKakaoMessage(err, talkDeJson, param);	  				
+	    		alert("오류코드: "+data.status+"\r\n\r\n" + errorMsg+"로 메세지 전송 실패하였습니다.\n담당자 : "+param.nameTo+" Hp."+ param.ordrgMngTelNo);   		
 	    	} else if( data.status == "OK" ) {
 	    		//alert("알림톡 정상 발송되었습니다.");
 	    		sendCnt++;
