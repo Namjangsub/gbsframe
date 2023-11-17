@@ -86,4 +86,16 @@ public class BM18Ctr {
   		return "jsonView";
   	}
   	
+  	
+  	
+    //알림톡 MESSAGE ID 
+  	@PostMapping(value = "/selectWbsPlanMaxMessageIdTodo")
+  	public String selectWbsPlanMaxMessageIdTodo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+  		List<Map<String, String>> resultList = bm18Svc.selectWbsPlanMaxMessageIdTodo(paramMap);
+  		model.addAttribute("resultList", resultList);
+  		return "jsonView";
+  	}
+  	
+  	
+  	
 }
