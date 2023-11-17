@@ -55,4 +55,10 @@ public interface WB22Svc {
 
 	List<Map<String, String>> selectHistWBS1Level(Map<String, String> paramMap);
 	
+	// 계획일괄복사부분
+	int ModalwbsPlanconfirmListCount(Map<String, String> paramMap);
+	
+	List<Map<String, String>> ModalwbsPlanconfirmList(Map<String, String> paramMap);
+	
+	int confirm_copy(Map<String, String> paramMap);
 }

@@ -586,4 +586,106 @@ public class WB22SvcImpl implements WB22Svc {
 	public List<Map<String, String>> selectHistWBS1Level(Map<String, String> paramMap) {
 		return wb22Mapper.selectHistWBS1Level(paramMap);
 	}
+	
+	// 계획일괄복사부분
+	@Override
+	public int ModalwbsPlanconfirmListCount(Map<String, String> paramMap) {
+		return wb22Mapper.ModalwbsPlanconfirmListCount(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> ModalwbsPlanconfirmList(Map<String, String> paramMap) {
+		return wb22Mapper.ModalwbsPlanconfirmList(paramMap);
+	}
+	
+	@Override
+	public int confirm_copy(Map<String, String> paramMap) {
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+		HashMap<String, String> param = new HashMap<>();
+		param.put("userId", paramMap.get("userId"));
+		
+		//데이터처리 시작
+		int result = 0;
+
+		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("rowList"), dtlMap);
+
+		String userId = "";
+		String sYear = "";
+		userId = paramMap.get("userId");
+		sYear = paramMap.get("year");
+
+		if(dtlParam.size()>0) {
+			
+			for (Map<String, String> dtl : dtlParam) {
+	
+				String dtaChk = dtl.get("dtaChk").toString();
+				dtl.put("creatId", userId);
+				dtl.put("year", sYear);
+	
+				if("U".equals(dtaChk))  {
+	
+					List<Map<String, String>> chkCount = wb22Mapper.selectWbcPlan(dtl);
+					
+					if(chkCount.size() == 0) {
+						//insert
+						List<Map<String, String>> chkList = wb22Mapper.selectWbcPlan(paramMap);
+						
+						for (Map<String, String> chkMap : chkList) {
+
+						  dtl.put("wbsPlanCodeId", chkMap.get("wbsPlanCodeId")); 
+						  dtl.put("verNo", "1");
+						  dtl.put("sortNo", chkMap.get("seq")); 
+						  dtl.put("wbsPlanMngId", chkMap.get("wbsPlanMngId"));
+						  dtl.put("wbsPlansDt", chkMap.get("wbsPlansDt")); 
+						  dtl.put("wbsPlaneDt", chkMap.get("wbsPlaneDt")); 
+						  dtl.put("daycnt", chkMap.get("daycnt"));
+						  dtl.put("wbsPlanStsCodeId", chkMap.get("wbsPlanStsCodeId"));
+						  dtl.put("creatPgm", chkMap.get("creatPgm"));
+							
+						  int wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(dtl);
+						  dtl.put("wbsPlanNo", Integer.toString(wbsPlanNo));
+
+						  int fileTrgtKey = wb22Mapper.selectWbsSeqNext(dtl);
+						  dtl.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+						  
+						  result = wb22Mapper.wbsLevel1Insert(dtl);
+						}
+					}else {
+						//update
+						List<Map<String, String>> chkList = wb22Mapper.selectWbcPlan(paramMap);
+						
+						if(chkList.size() == 0) {  //데이터가 없을시 대상데이터를 null 셋팅한다.
+							  dtl.put("wbsPlanCodeId", ""); 
+							  dtl.put("wbsPlanMngId", "");
+							  dtl.put("wbsPlansDt", ""); 
+							  dtl.put("wbsPlaneDt", ""); 
+							  dtl.put("daycnt", "");
+							  dtl.put("wbsPlanStsCodeId", "");
+							  dtl.put("creatPgm", "WB2201M01");
+								
+							  result = wb22Mapper.updateWbcPlan(dtl);
+						}else {
+							for (Map<String, String> chkMap : chkList) {
+
+							  dtl.put("wbsPlanCodeId", chkMap.get("wbsPlanCodeId")); 
+							  dtl.put("wbsPlanMngId", chkMap.get("wbsPlanMngId"));
+							  dtl.put("wbsPlansDt", chkMap.get("wbsPlansDt")); 
+							  dtl.put("wbsPlaneDt", chkMap.get("wbsPlaneDt")); 
+							  dtl.put("daycnt", chkMap.get("daycnt"));
+							  dtl.put("wbsPlanStsCodeId", chkMap.get("wbsPlanStsCodeId"));
+							  dtl.put("creatPgm", chkMap.get("creatPgm"));
+								
+							  result = wb22Mapper.updateWbcPlan(dtl);
+							}
+						}
+					}
+
+				}
+			}
+	    	
+	    }
+		//데이터 처리 끝
+		return result;
+	}
 }

@@ -1388,5 +1388,329 @@
 	                  ) Z
 	               ON X.CODE_ID = Z.WBS_PLAN_CODE_KIND
 	</select>
-          
+
+   <select id="ModalwbsPlanconfirmListCount" parameterType="Map" resultType="int">
+      WITH SUBJ AS --과제정보
+           (
+             SELECT X.FILE_TRGT_KEY
+                  , X.CO_CD                                                       AS CO_CD              --회사코드
+                  , X.SALES_CD                                                    AS SALES_CD           --SALES Code
+                  , X.SJ_NO                                                       AS SJ_NO              --과제번호
+                  , X.SJ_NM                                                       AS SJ_NM              --과제명
+                  , X.VER_NO                                                      AS VER_NO             --버젼
+                  , X.MKER_DIV                                                    AS MKER_DIV           --제작처구분
+                  , (SELECT FN_CM05M01_CD_TO_NM(X.MKER_DIV) FROM DUAL)           AS MKER_DIV_NM        --제작처구분명 
+                  , X.MKER_CD                                                     AS MKER_CD            --제작처코드
+                  , BM.CLNT_NM                                                    AS MKER_NM            --제작처명
+                  , X.SMRIZE_ID                                                   AS SMRIZE_ID          --총괄PM ID
+                  , (SELECT FN_CM06M01_ID_TO_NM(X.SMRIZE_ID) FROM DUAL)          AS SMRIZE_NM          --총괄PM명
+                  , TO_CHAR(X.BEGIN_DT, 'YYYY-MM-DD')                             AS BEGIN_DT           --시작일
+                  , TO_CHAR(X.DE_DT, 'YYYY-MM-DD')                                AS DE_DT              --출고일
+                  , TO_CHAR(X.ACPTNC_DT, 'YYYY-MM-DD')                            AS ACPTNC_DT          --완료검수일
+                  , TO_CHAR(X.REQRE_DAYCNT)                                       AS REQRE_DAYCNT       --소요일수
+                  , X.CLOSE_YN                                                    AS CLOSE_YN           --확정유무
+                  , X.DSGN_DIF_CODE_ID                                            AS DSGN_DIF_CODE_ID   --설계난이도
+                  , (SELECT FN_CM05M01_CD_TO_NM(X.DSGN_DIF_CODE_ID) FROM DUAL)   AS DSGN_DIF_CODE_NM   --설계난이도
+                  , X.DSGN_PLAN_HOUR                                              AS DSGN_PLAN_HOUR     --설계계획공수
+                  , X.PRDCTN_DIF_CODE_ID                                          AS PRDCTN_DIF_CODE_ID --생산난이도
+                  , (SELECT FN_CM05M01_CD_TO_NM(X.PRDCTN_DIF_CODE_ID) FROM DUAL) AS PRDCTN_DIF_CODE_NM --생산난이도
+                  , X.PRDCTN_PLAN_HOUR                                            AS PRDCTN_PLAN_HOUR   --생산계획공수
+                  , X.SJ_RMK                                                      AS SJ_RMK             --비고
+               FROM TB_WB21M01 X
+                    LEFT OUTER JOIN TB_BM02M01 AS BM ON X.MKER_CD = BM.CLNT_CD --거래처정보
+              WHERE X.CO_CD = #{coCd}
+                 AND X.CLOSE_YN = 'Y'
+           ) 
+         , SJD AS --수주상세 
+           ( 
+            SELECT M.CO_CD                                              AS CO_CD        --회사코드
+                  , (SELECT FN_CM05M01_CD_TO_NM(M.CO_CD) FROM DUAL)     AS CO_NM        --회사명 
+                  , M.ORDRS_NO                                           AS ORDRS_NO     --수주번호
+                  , X.SALES_CD                                           AS SALES_CD     --SALES Code
+                  , M.ORDRS_CLNT_CD                                      AS CLNT_CD      --고객코드
+                  , C.CLNT_NM                                            AS CLNT_NM      --고객명
+                  , M.CLNT_PJT                                           AS CLNT_PJT     --고객사프로젝트 
+                  , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)  AS CLNT_PJT_NM  --고객사프로젝트명
+                  , X.PRDT_CD
+                  , (SELECT T.PRDT_NM FROM TB_BM01M01 T WHERE T.PRDT_CD = X.PRDT_CD) AS PRDT_NM
+               FROM TB_CR02M01  M --수주마스터
+                    INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+                    INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+              WHERE 1=1
+                AND M.CO_CD = #{coCd}
+                AND X.SALES_CD IS NOT NULL --비용제외
+                AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만 
+                              FROM SUBJ P 
+                             WHERE P.CO_CD    = #{coCd}
+                               AND P.CO_CD    = X.CO_CD
+                               AND P.SALES_CD = X.SALES_CD
+                           ) 
+           )
+        , PLAN AS --WBS 계획정보 
+        (
+          SELECT W.CO_CD                   AS CO_CD        --회사코드
+               , W.SALES_CD                AS SALES_CD     --SALSES_CD
+               , W.CLOSE_YN                AS CLOSE_YN     --확정여부 
+               , W.VER_NO                    AS PLAN_VER_NO  --버전
+               , COUNT(W.WBS_PLAN_CODE_ID) AS PLAN_CODE_CNT--계획LVL1 수
+               , 'N' AS HIST_YN -- hist인지 아닌지
+           FROM TB_WB22M01 W--WBS계획
+          WHERE W.CO_CD = #{coCd}
+            AND W.WBS_PLAN_CODE_KIND = 'WBSCODE'
+             AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만 
+                            FROM SUBJ P 
+                           WHERE P.CO_CD    = #{coCd}
+                             AND P.CO_CD    = W.CO_CD
+                             AND P.SALES_CD = W.SALES_CD
+                         ) 
+          GROUP BY W.CO_CD, W.SALES_CD, W.CLOSE_YN, W.VER_NO
+         UNION ALL
+         SELECT W.CO_CD                   AS CO_CD        --회사코드
+               , W.SALES_CD                AS SALES_CD     --SALSES_CD
+               , W.CLOSE_YN                AS CLOSE_YN     --확정여부 
+               , W.VER_NO                  AS PLAN_VER_NO  --버전
+               , COUNT(W.WBS_PLAN_CODE_ID) AS PLAN_CODE_CNT--계획LVL1 수
+               , 'Y' AS HIST_YN -- hist인지 아닌지
+           FROM TB_WB22M01_HIST W--WBS계획이력 
+          WHERE W.CO_CD = #{coCd}
+            AND W.WBS_PLAN_CODE_KIND = 'WBSCODE'
+             AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만 
+                            FROM SUBJ P 
+                           WHERE P.CO_CD    = #{coCd}
+                             AND P.CO_CD    = W.CO_CD
+                             AND P.SALES_CD = W.SALES_CD
+                         ) 
+          GROUP BY W.CO_CD, W.SALES_CD, W.CLOSE_YN, W.VER_NO    
+        )
+         SELECT COUNT(*) FROM (      
+               SELECT ROWNUM AS RN, T.* FROM (  
+                      SELECT T.*                        
+                        FROM (
+                              SELECT X.CO_CD                            AS CO_CD       --회사코드
+                                   , CR.ORDRS_NO                        AS ORDRS_NO    --수주번호
+                                   , CR.CLNT_CD                         AS CLNT_CD     --고객코드
+                                   , CR.CLNT_NM                         AS CLNT_NM     --고객명
+                                   , CR.CLNT_PJT                        AS CLNT_PJT    --고객사프로젝트 
+                                   , CR.CLNT_PJT_NM                     AS CLNT_PJT_NM --고객사프로젝트명
+                                   , X.SJ_NO                            AS SJ_NO             --과제번호 
+                                   , X.SJ_NM                            AS SJ_NM             --과제명  
+                                   , X.VER_NO                           AS VER_NO            --과제버젼    
+                                   , X.CLOSE_YN                         AS SJ_CLOSE_YN       --과제확정유무   
+                                   , X.SALES_CD                         AS SALES_CD          --SALES Code 
+                                   , X.MKER_DIV                         AS MKER_DIV          --제작처구분
+                                   , X.MKER_DIV_NM                      AS MKER_DIV_NM       --제작처구분명
+                                   , X.MKER_CD                          AS MKER_CD           --제작처코드
+                                   , X.MKER_NM                          AS MKER_NM           --제작처명   
+                                   , X.SMRIZE_ID                        AS SMRIZE_ID         --총괄PM ID
+                                   , X.SMRIZE_NM                        AS SMRIZE_NM         --총괄PM명  
+                                   , X.BEGIN_DT                         AS BEGIN_DT          --시작일    
+                                   , X.DE_DT                            AS DE_DT             --출고일    
+                                   , X.ACPTNC_DT                        AS ACPTNC_DT         --완료검수일 
+                                   , X.REQRE_DAYCNT                     AS REQRE_DAYCNT      --소요일수   
+                                   , X.DSGN_DIF_CODE_ID                 AS DSGN_DIF_CODE_ID  --설계난이도
+                                   , X.DSGN_DIF_CODE_NM                 AS DSGN_DIF_CODE_NM  --설계난이도 
+                                   , X.DSGN_PLAN_HOUR                   AS DSGN_PLAN_HOUR    --설계계획공수
+                                   , X.PRDCTN_DIF_CODE_ID               AS PRDCTN_DIF_CODE_ID--생산난이도 
+                                   , X.PRDCTN_DIF_CODE_NM               AS PRDCTN_DIF_CODE_NM--생산난이도 
+                                   , X.PRDCTN_PLAN_HOUR                 AS PRDCTN_PLAN_HOUR  --생산계획공수
+                                   , X.SJ_RMK                           AS SJ_RMK            --비고
+                                   , X.FILE_TRGT_KEY                    AS FILE_TRGT_KEY     --FILE_TRGT_KEY
+                                   , PLN.CLOSE_YN                       AS PLAN_CLOSE_YN     --계획확정여부
+                                   , NVL(PLN.HIST_YN,'N')                   AS HIST_YN --이력여부
+                                FROM SUBJ X
+                                     INNER JOIN SJD AS CR ON X.CO_CD = CR.CO_CD AND X.SALES_CD = CR.SALES_CD
+                                     LEFT OUTER JOIN PLAN AS PLN ON X.CO_CD = PLN.CO_CD AND X.SALES_CD = PLN.SALES_CD
+                               WHERE 1=1
+                             ) T
+                        WHERE 1=1
+                        AND SMRIZE_ID = #{smrizeId}
+                        AND SALES_CD != #{salesCd}
+                        ) T ) T
+    </select>
+    
+   <select id="ModalwbsPlanconfirmList" parameterType="Map" resultType="camelMap">
+      WITH SUBJ AS --과제정보
+           (
+             SELECT X.FILE_TRGT_KEY
+                  , X.CO_CD                                                       AS CO_CD              --회사코드
+                  , X.SALES_CD                                                    AS SALES_CD           --SALES Code
+                  , X.SJ_NO                                                       AS SJ_NO              --과제번호
+                  , X.SJ_NM                                                       AS SJ_NM              --과제명
+                  , X.VER_NO                                                      AS VER_NO             --버젼
+                  , X.MKER_DIV                                                    AS MKER_DIV           --제작처구분
+                  , (SELECT FN_CM05M01_CD_TO_NM(X.MKER_DIV) FROM DUAL)           AS MKER_DIV_NM        --제작처구분명 
+                  , X.MKER_CD                                                     AS MKER_CD            --제작처코드
+                  , BM.CLNT_NM                                                    AS MKER_NM            --제작처명
+                  , X.SMRIZE_ID                                                   AS SMRIZE_ID          --총괄PM ID
+                  , (SELECT FN_CM06M01_ID_TO_NM(X.SMRIZE_ID) FROM DUAL)          AS SMRIZE_NM          --총괄PM명
+                  , TO_CHAR(X.BEGIN_DT, 'YYYY-MM-DD')                             AS BEGIN_DT           --시작일
+                  , TO_CHAR(X.DE_DT, 'YYYY-MM-DD')                                AS DE_DT              --출고일
+                  , TO_CHAR(X.ACPTNC_DT, 'YYYY-MM-DD')                            AS ACPTNC_DT          --완료검수일
+                  , TO_CHAR(X.REQRE_DAYCNT)                                       AS REQRE_DAYCNT       --소요일수
+                  , X.CLOSE_YN                                                    AS CLOSE_YN           --확정유무
+                  , X.DSGN_DIF_CODE_ID                                            AS DSGN_DIF_CODE_ID   --설계난이도
+                  , (SELECT FN_CM05M01_CD_TO_NM(X.DSGN_DIF_CODE_ID) FROM DUAL)   AS DSGN_DIF_CODE_NM   --설계난이도
+                  , X.DSGN_PLAN_HOUR                                              AS DSGN_PLAN_HOUR     --설계계획공수
+                  , X.PRDCTN_DIF_CODE_ID                                          AS PRDCTN_DIF_CODE_ID --생산난이도
+                  , (SELECT FN_CM05M01_CD_TO_NM(X.PRDCTN_DIF_CODE_ID) FROM DUAL) AS PRDCTN_DIF_CODE_NM --생산난이도
+                  , X.PRDCTN_PLAN_HOUR                                            AS PRDCTN_PLAN_HOUR   --생산계획공수
+                  , X.SJ_RMK                                                      AS SJ_RMK             --비고
+               FROM TB_WB21M01 X
+                    LEFT OUTER JOIN TB_BM02M01 AS BM ON X.MKER_CD = BM.CLNT_CD --거래처정보
+              WHERE X.CO_CD = #{coCd}
+                 AND X.CLOSE_YN = 'Y'
+           ) 
+         , SJD AS --수주상세 
+           ( 
+            SELECT M.CO_CD                                              AS CO_CD        --회사코드
+                  , (SELECT FN_CM05M01_CD_TO_NM(M.CO_CD) FROM DUAL)     AS CO_NM        --회사명 
+                  , M.ORDRS_NO                                           AS ORDRS_NO     --수주번호
+                  , X.SALES_CD                                           AS SALES_CD     --SALES Code
+                  , M.ORDRS_CLNT_CD                                      AS CLNT_CD      --고객코드
+                  , C.CLNT_NM                                            AS CLNT_NM      --고객명
+                  , M.CLNT_PJT                                           AS CLNT_PJT     --고객사프로젝트 
+                  , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)  AS CLNT_PJT_NM  --고객사프로젝트명
+                  , X.PRDT_CD
+                  , (SELECT T.PRDT_NM FROM TB_BM01M01 T WHERE T.PRDT_CD = X.PRDT_CD) AS PRDT_NM
+               FROM TB_CR02M01  M --수주마스터
+                    INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+                    INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+              WHERE 1=1
+                AND M.CO_CD = #{coCd}
+                AND X.SALES_CD IS NOT NULL --비용제외
+                AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만 
+                              FROM SUBJ P 
+                             WHERE P.CO_CD    = #{coCd}
+                               AND P.CO_CD    = X.CO_CD
+                               AND P.SALES_CD = X.SALES_CD
+                           ) 
+           )
+        , PLAN AS --WBS 계획정보 
+        (
+          SELECT W.CO_CD                   AS CO_CD        --회사코드
+               , W.SALES_CD                AS SALES_CD     --SALSES_CD
+               , W.CLOSE_YN                AS CLOSE_YN     --확정여부 
+               , W.VER_NO                    AS PLAN_VER_NO  --버전
+               , COUNT(W.WBS_PLAN_CODE_ID) AS PLAN_CODE_CNT--계획LVL1 수
+               , 'N' AS HIST_YN -- hist인지 아닌지
+           FROM TB_WB22M01 W--WBS계획
+          WHERE W.CO_CD = #{coCd}
+            AND W.WBS_PLAN_CODE_KIND = 'WBSCODE'
+             AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만 
+                            FROM SUBJ P 
+                           WHERE P.CO_CD    = #{coCd}
+                             AND P.CO_CD    = W.CO_CD
+                             AND P.SALES_CD = W.SALES_CD
+                         ) 
+          GROUP BY W.CO_CD, W.SALES_CD, W.CLOSE_YN, W.VER_NO
+         UNION ALL
+         SELECT W.CO_CD                   AS CO_CD        --회사코드
+               , W.SALES_CD                AS SALES_CD     --SALSES_CD
+               , W.CLOSE_YN                AS CLOSE_YN     --확정여부 
+               , W.VER_NO                  AS PLAN_VER_NO  --버전
+               , COUNT(W.WBS_PLAN_CODE_ID) AS PLAN_CODE_CNT--계획LVL1 수
+               , 'Y' AS HIST_YN -- hist인지 아닌지
+           FROM TB_WB22M01_HIST W--WBS계획이력 
+          WHERE W.CO_CD = #{coCd}
+            AND W.WBS_PLAN_CODE_KIND = 'WBSCODE'
+             AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만 
+                            FROM SUBJ P 
+                           WHERE P.CO_CD    = #{coCd}
+                             AND P.CO_CD    = W.CO_CD
+                             AND P.SALES_CD = W.SALES_CD
+                         ) 
+          GROUP BY W.CO_CD, W.SALES_CD, W.CLOSE_YN, W.VER_NO    
+        )
+         SELECT * FROM (      
+               SELECT ROWNUM AS RN, T.* FROM (  
+                      SELECT T.*                        
+                        FROM (
+                              SELECT X.CO_CD                            AS CO_CD       --회사코드
+                                   , CR.ORDRS_NO                        AS ORDRS_NO    --수주번호
+                                   , CR.CLNT_CD                         AS CLNT_CD     --고객코드
+                                   , CR.CLNT_NM                         AS CLNT_NM     --고객명
+                                   , CR.CLNT_PJT                        AS CLNT_PJT    --고객사프로젝트 
+                                   , CR.CLNT_PJT_NM                     AS CLNT_PJT_NM --고객사프로젝트명
+                                   , X.SJ_NO                            AS SJ_NO             --과제번호 
+                                   , X.SJ_NM                            AS SJ_NM             --과제명  
+                                   , X.VER_NO                           AS VER_NO            --과제버젼    
+                                   , X.CLOSE_YN                         AS SJ_CLOSE_YN       --과제확정유무   
+                                   , X.SALES_CD                         AS SALES_CD          --SALES Code 
+                                   , X.MKER_DIV                         AS MKER_DIV          --제작처구분
+                                   , X.MKER_DIV_NM                      AS MKER_DIV_NM       --제작처구분명
+                                   , X.MKER_CD                          AS MKER_CD           --제작처코드
+                                   , X.MKER_NM                          AS MKER_NM           --제작처명   
+                                   , X.SMRIZE_ID                        AS SMRIZE_ID         --총괄PM ID
+                                   , X.SMRIZE_NM                        AS SMRIZE_NM         --총괄PM명  
+                                   , X.BEGIN_DT                         AS BEGIN_DT          --시작일    
+                                   , X.DE_DT                            AS DE_DT             --출고일    
+                                   , X.ACPTNC_DT                        AS ACPTNC_DT         --완료검수일 
+                                   , X.REQRE_DAYCNT                     AS REQRE_DAYCNT      --소요일수   
+                                   , X.DSGN_DIF_CODE_ID                 AS DSGN_DIF_CODE_ID  --설계난이도
+                                   , X.DSGN_DIF_CODE_NM                 AS DSGN_DIF_CODE_NM  --설계난이도 
+                                   , X.DSGN_PLAN_HOUR                   AS DSGN_PLAN_HOUR    --설계계획공수
+                                   , X.PRDCTN_DIF_CODE_ID               AS PRDCTN_DIF_CODE_ID--생산난이도 
+                                   , X.PRDCTN_DIF_CODE_NM               AS PRDCTN_DIF_CODE_NM--생산난이도 
+                                   , X.PRDCTN_PLAN_HOUR                 AS PRDCTN_PLAN_HOUR  --생산계획공수
+                                   , X.SJ_RMK                           AS SJ_RMK            --비고
+                                   , X.FILE_TRGT_KEY                    AS FILE_TRGT_KEY     --FILE_TRGT_KEY
+                                   , PLN.CLOSE_YN                       AS PLAN_CLOSE_YN     --계획확정여부
+                                   , PLN.PLAN_VER_NO                    AS PLAN_VER_NO       --계획버전
+                                   , NVL(PLN.HIST_YN,'N')                   AS HIST_YN --이력여부
+                                FROM SUBJ X
+                                     INNER JOIN SJD AS CR ON X.CO_CD = CR.CO_CD AND X.SALES_CD = CR.SALES_CD
+                                     LEFT OUTER JOIN PLAN AS PLN ON X.CO_CD = PLN.CO_CD AND X.SALES_CD = PLN.SALES_CD
+                               WHERE 1=1
+                             ) T
+                        WHERE 1=1
+                        AND SMRIZE_ID = #{smrizeId}
+                        AND SALES_CD != #{salesCd}
+                        ORDER BY CLNT_NM, ORDRS_NO, SALES_CD, PLAN_VER_NO DESC
+                        ) T ) T
+
+            WHERE RN BETWEEN #{firstIndex} AND #{lastIndex}
+    </select>
+
+    <select id="selectWbcPlan" parameterType="Map" resultType="camelMap">
+		 SELECT FILE_TRGT_KEY,
+               CO_CD,
+               WBS_PLAN_NO,
+               WBS_PLAN_CODE_KIND,
+               WBS_PLAN_CODE_ID,
+               SALES_CD,
+               VER_NO,
+               SEQ,
+               WBS_PLAN_MNG_ID,
+               TO_CHAR(WBS_PLANS_DT, 'YYYYMMDD') AS WBS_PLANS_DT,
+               TO_CHAR(WBS_PLANE_DT, 'YYYYMMDD') AS WBS_PLANE_DT,
+               DAYCNT,
+               WBS_PLAN_STS_CODE_ID,
+               CREAT_ID,
+               CREAT_PGM,
+               CREAT_DTTM
+		   FROM TB_WB22M01 
+		  WHERE CO_CD = #{coCd}
+            AND SALES_CD = #{salesCd}
+            AND WBS_PLAN_CODE_KIND = 'WBSCODE'
+          ORDER BY WBS_PLAN_NO
+   </select>
+    
+     <update id="updateWbcPlan" parameterType="Map">
+           UPDATE TB_WB22M01
+           SET WBS_PLAN_MNG_ID = #{wbsPlanMngId,  jdbcType=VARCHAR},
+               WBS_PLANS_DT = #{wbsPlansDt,  jdbcType=VARCHAR},
+               WBS_PLANE_DT = #{wbsPlaneDt,  jdbcType=VARCHAR},
+               DAYCNT = #{daycnt,  jdbcType=VARCHAR},
+               WBS_PLAN_STS_CODE_ID = #{wbsPlanStsCodeId,  jdbcType=VARCHAR},
+               UDT_ID = #{creatId},
+               UDT_PGM = #{creatPgm},
+               UDT_DTTM = SYSDATE
+		  WHERE CO_CD = #{coCd}
+            AND SALES_CD = #{salesCd}
+       <if test="wbsPlanCodeId != null and !wbsPlanCodeId.equals('')">
+            AND WBS_PLAN_CODE_ID = #{wbsPlanCodeId}
+       </if>
+            AND WBS_PLAN_CODE_KIND = 'WBSCODE'    
+    </update>	
+              
 </mapper>

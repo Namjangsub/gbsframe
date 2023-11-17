@@ -299,4 +299,32 @@ public class WB22Ctr {
   		return "jsonView";
     }
 	
+	// 일괄복사부분
+	@PostMapping(value = "/ModalwbsPlanconfirmList") 
+	public String ModalsjnoconfirmList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  int totalCnt = wb22Svc.ModalwbsPlanconfirmListCount(paramMap); 
+		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		  model.addAttribute("paginationInfo", paginationInfo);
+		  
+		  List<Map<String, String>> resultList = wb22Svc.ModalwbsPlanconfirmList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+	}
+	
+	@PostMapping(value = "/confirm_copy")
+	public String confirm_copy(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			if (wb22Svc.confirm_copy(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+	}
 }
