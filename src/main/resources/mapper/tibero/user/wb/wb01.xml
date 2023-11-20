@@ -791,85 +791,100 @@
                          AND TODO_DIV2_CODE_ID  = #{S_todoDiv2CodeId}
         </delete>
         
-         <select id="selectWbsSalesCount" parameterType="Map" resultType="int">
-           SELECT COUNT(*) 
-             FROM (           
-	                SELECT ROWNUM AS RN, 
-	                       X.CO_CD, -- 회사코드
-	                       FN_CM05M01_CD_TO_NM(X.CO_CD) AS CO_CD_NM,
-	                       X.ORDRS_NO, -- 수주번호
-	                       X.SALES_CD, -- SALES CODE
-	                       Y.ORGN_SALES_CD, -- 원천 SALES CODE
-	                       Y.ORDRS_CLNT_CD, -- 고객사
-	                       A.CLNT_NM  AS ORDRS_CLNT_NM,
-	                       Y.CLNT_PJT, -- 고객사 PJT
-	                       FN_CM05M01_CD_TO_NM(Y.CLNT_PJT) AS CLNT_PJT_NM, -- 고객사 PJT명
-	                       X.ORDRS_DTL_DIV20, -- 신작구분
-	                       FN_CM05M01_CD_TO_NM(X.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
-	                       X.PRDT_CD, -- 제품구분
-	                       P.PRDT_NM  PRDT_CD_NM,
-	                       X.ITEM_DIV, -- 아이템구분
-	                       FN_CM05M01_CD_TO_NM(X.ITEM_DIV) ITEM_DIV_NM,
-	                       X.EQP_NM -- 설비명
-	                  FROM TB_CR02D02 X
-			                        INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
-			                                                AND X.ORDRS_NO = Y.ORDRS_NO
-			                        LEFT OUTER JOIN TB_BM01M01 P ON X.PRDT_CD = P.PRDT_CD  --제품마스터
-			                        LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터
-			                WHERE X.CO_CD = #{coCd}
-			                  AND X.SALES_CD IS NOT NULL
-			               <if test="searchValue != null and !searchValue.equals('') and !searchType.equals('CLNT_PJT_NM')">
-								AND UPPER(${searchType}) LIKE '%'||UPPER(#{searchValue})||'%'				
-							</if>
-			            ) A
-   				<if test="searchType != null and searchType.equals('CLNT_PJT_NM')">
-                  WHERE UPPER(CLNT_PJT_NM) LIKE '%' || UPPER(#{searchValue}) || '%'
-            	</if>             
-           </select>
+    <select id="selectWbsSalesCount" parameterType="Map" resultType="int">
+        SELECT COUNT(*)
+        FROM   (
+                SELECT A.*
+                     , ROWNUM AS RN
+                FROM   (
+                        SELECT DISTINCT X.CO_CD
+                             , R1.CODE_NM AS CO_CD_NM
+                             , X.ORDRS_NO
+                             , X.SALES_CD
+                             , Y.ORGN_SALES_CD
+                             , Y.ORDRS_CLNT_CD
+                             , A.CLNT_NM AS ORDRS_CLNT_NM
+                             , Y.CLNT_PJT
+                             , R2.CODE_NM AS CLNT_PJT_NM
+                             , X.ORDRS_DTL_DIV20
+                             , R3.CODE_NM AS ORDRS_DTL_DIV20_NM
+                             , X.PRDT_CD
+                             , P.PRDT_NM AS PRDT_CD_NM
+                             , X.ITEM_DIV
+                             , R4.CODE_NM AS ITEM_DIV_NM
+                             , X.EQP_NM
+                             , Y.CTRT_NM
+                        FROM   TB_CR02D02 AS X
+                               INNER JOIN TB_CR02M01 AS Y  ON X.CO_CD    = Y.CO_CD
+                                                          AND X.ORDRS_NO = Y.ORDRS_NO
+                               LEFT OUTER JOIN TB_BM01M01 AS P ON X.PRDT_CD = P.PRDT_CD  --제품마스터
+                               LEFT OUTER JOIN TB_BM02M01 AS A ON Y.ORDRS_CLNT_CD = A.CLNT_CD  --거래처마스터
+                               LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = X.CO_CD  --회사
+                               LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = Y.CLNT_PJT  --고객사PJT
+                               LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = X.ORDRS_DTL_DIV20  --신작구분
+                               LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = X.ITEM_DIV  --아이템구분
+                        WHERE  1 = 1
+                        AND    X.CO_CD = #{coCd}
+                        AND    X.SALES_CD IS NOT NULL
+                        <if test="searchValue != null and !searchValue.equals('') and !searchType.equals('CLNT_PJT_NM')">
+                        AND    UPPER(${searchType}) LIKE '%'||UPPER(#{searchValue})||'%'
+                        </if>
+                       ) AS A
+                WHERE  1 = 1
+                <if test="searchType != null and searchType.equals('CLNT_PJT_NM')">
+                AND    UPPER(CLNT_PJT_NM) LIKE '%' || UPPER(#{searchValue}) || '%'
+                </if>
+               ) AS B
+        WHERE  1 = 1
+    </select>
         
-           <select id="selectWbsSalesCodeList" parameterType="Map" resultType="camelMap">
-           --salesCode 검색
-           SELECT B.* 
-             FROM (
-		           SELECT A.* 
-		                 , ROWNUM AS RN
-		             FROM (           
-			                SELECT  
-			                       X.CO_CD, -- 회사코드
-			                       FN_CM05M01_CD_TO_NM(X.CO_CD) AS CO_CD_NM,
-			                       X.ORDRS_NO, -- 수주번호
-			                       X.SALES_CD, -- SALES CODE
-			                       Y.ORGN_SALES_CD, -- 원천 SALES CODE
-			                       Y.ORDRS_CLNT_CD, -- 고객사
-			                       A.CLNT_NM  AS ORDRS_CLNT_NM,
-			                       Y.CLNT_PJT, -- 고객사 PJT
-			                       FN_CM05M01_CD_TO_NM(Y.CLNT_PJT) AS CLNT_PJT_NM, -- 고객사 PJT명
-			                       X.ORDRS_DTL_DIV20, -- 신작구분
-			                       FN_CM05M01_CD_TO_NM(X.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
-			                       X.PRDT_CD, -- 제품구분
-			                       P.PRDT_NM  PRDT_CD_NM,
-			                       X.ITEM_DIV, -- 아이템구분
-			                       FN_CM05M01_CD_TO_NM(X.ITEM_DIV) ITEM_DIV_NM,
-			                       X.EQP_NM, -- 설비명
-			                       Y.CTRT_NM /*계약명*/
-			                  FROM TB_CR02D02 X
-			                        INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
-			                                                AND X.ORDRS_NO = Y.ORDRS_NO
-			                        LEFT OUTER JOIN TB_BM01M01 P ON X.PRDT_CD = P.PRDT_CD  --제품마스터
-			                        LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터
-			                WHERE X.CO_CD = #{coCd}
-			                  AND X.SALES_CD IS NOT NULL
-			               <if test="searchValue != null and !searchValue.equals('') and !searchType.equals('CLNT_PJT_NM')">
-								AND UPPER(${searchType}) LIKE '%'||UPPER(#{searchValue})||'%'				
-							</if>
-			            ) A
-   				<if test="searchType != null and searchType.equals('CLNT_PJT_NM')">
-                  WHERE UPPER(CLNT_PJT_NM) LIKE '%' || UPPER(#{searchValue}) || '%'
-            	</if>   
-   				) B
-   				WHERE B.RN BETWEEN ${firstIndex} AND ${lastIndex}
-   				                               
-           </select>
+    <select id="selectWbsSalesCodeList" parameterType="Map" resultType="camelMap">
+        SELECT B.*
+        FROM   (
+                SELECT A.*
+                     , ROWNUM AS RN
+                FROM   (
+                        SELECT DISTINCT X.CO_CD
+                             , R1.CODE_NM AS CO_CD_NM
+                             , X.ORDRS_NO
+                             , X.SALES_CD
+                             , Y.ORGN_SALES_CD
+                             , Y.ORDRS_CLNT_CD
+                             , A.CLNT_NM AS ORDRS_CLNT_NM
+                             , Y.CLNT_PJT
+                             , R2.CODE_NM AS CLNT_PJT_NM
+                             , X.ORDRS_DTL_DIV20
+                             , R3.CODE_NM AS ORDRS_DTL_DIV20_NM
+                             , X.PRDT_CD
+                             , P.PRDT_NM AS PRDT_CD_NM
+                             , X.ITEM_DIV
+                             , R4.CODE_NM AS ITEM_DIV_NM
+                             , X.EQP_NM
+                             , Y.CTRT_NM
+                        FROM   TB_CR02D02 AS X
+                               INNER JOIN TB_CR02M01 AS Y  ON X.CO_CD    = Y.CO_CD
+                                                          AND X.ORDRS_NO = Y.ORDRS_NO
+                               LEFT OUTER JOIN TB_BM01M01 AS P ON X.PRDT_CD = P.PRDT_CD  --제품마스터
+                               LEFT OUTER JOIN TB_BM02M01 AS A ON Y.ORDRS_CLNT_CD = A.CLNT_CD  --거래처마스터
+                               LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = X.CO_CD  --회사
+                               LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = Y.CLNT_PJT  --고객사PJT
+                               LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = X.ORDRS_DTL_DIV20  --신작구분
+                               LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = X.ITEM_DIV  --아이템구분
+                        WHERE  1 = 1
+                        AND    X.CO_CD = #{coCd}
+                        AND    X.SALES_CD IS NOT NULL
+                        <if test="searchValue != null and !searchValue.equals('') and !searchType.equals('CLNT_PJT_NM')">
+                        AND    UPPER(${searchType}) LIKE '%'||UPPER(#{searchValue})||'%'
+                        </if>
+                       ) AS A
+                WHERE  1 = 1
+                <if test="searchType != null and searchType.equals('CLNT_PJT_NM')">
+                AND    UPPER(CLNT_PJT_NM) LIKE '%' || UPPER(#{searchValue}) || '%'
+                </if>
+               ) AS B
+        WHERE  1 = 1
+        AND    B.RN BETWEEN ${firstIndex} AND ${lastIndex}
+    </select>
            
            <select id="selectWbsSalesCountNoCocd" parameterType="Map" resultType="int">
            SELECT COUNT(*) 

@@ -99,6 +99,46 @@ public class WB21SvcImpl implements WB21Svc {
 		return result;
 	}
 	// 과제일괄확정부분 끝
+
+	// 과제복사
+	@Override
+	public int ModalsjnocopyListCount(Map<String, String> paramMap) {
+		return wb21Mapper.ModalsjnocopyListCount(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> ModalsjnocopyList(Map<String, String> paramMap) {
+		return wb21Mapper.ModalsjnocopyList(paramMap);
+	}
+
+	@Override
+	public int copy_wb21(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+		HashMap<String, String> param = new HashMap<>();
+		param.put("userId", paramMap.get("userId"));
+		
+		//데이터처리 시작
+		int result = 0;
+
+		//상세수정
+		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+	    for (Map<String, String> dtl : dtlParam) {
+	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
+			//dtl.put("userId", paramMap.get("userId"));
+	    	//dtl.put("pgmId", paramMap.get("pgmId"));
+			
+			String dataChk = dtl.get("dataChk").toString();	    	
+			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
+	    	if ("I".equals(dataChk)) {
+				//데이터 처리
+				result = wb21Mapper.copy_wb21(dtl);
+	    	} 
+	    }
+		//데이터 처리 끝
+		return result;
+	}
+	// 과제복사 끝
 	
 	@Override
 	public List<Map<String, String>> deleteSjListChk(Map<String, String> paramMap) {
