@@ -351,7 +351,35 @@ public class WB22Ctr {
   		}
   		return "jsonView";
     }
-	
-	
+
+	// 일괄확정부분
+	@PostMapping(value = "/Modalwb22noconfirmList") 
+	public String Modalwb22noconfirmList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  int totalCnt = wb22Svc.Modalwb22noconfirmListCount(paramMap); 
+		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		  model.addAttribute("paginationInfo", paginationInfo);
+		  
+		  List<Map<String, String>> resultList = wb22Svc.Modalwb22noconfirmList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+	}
+
+	@PostMapping(value = "/confirm_wb22")
+	public String confirm_wb22(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (wb22Svc.confirm_wb22(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+	}
+	// 일괄확정부분 끝
 	
 }

@@ -94,4 +94,12 @@ public interface WB22Mapper {
 	List<Map<String, String>> selectWbcPlanTodoList(Map<String, String> paramMap);
 	
 	int wbcPlanTodoInsert(Map<String, String> paramMap);
+
+	// 일괄확정부분
+	int Modalwb22noconfirmListCount(Map<String, String> paramMap);
+	
+	List<Map<String, String>> Modalwb22noconfirmList(Map<String, String> paramMap);
+
+	int confirm_wb22(Map<String, String> paramMap);
+	// 일괄확정부분 끝
 }
