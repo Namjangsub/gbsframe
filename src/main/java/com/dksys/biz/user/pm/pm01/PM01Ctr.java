@@ -287,4 +287,17 @@ public class PM01Ctr {
     model.addAttribute("result", result);
     return "jsonView";
   }
+  
+  
+  // 작업일보 이슈 리스트 조회
+  @PostMapping(value = "/selectAllIssueWorkList")
+  public String selectAllIssueWorkList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    int totalCnt = pm01Svc.selectAllIssueWorkListCount(paramMap);
+    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+    model.addAttribute("paginationInfo", paginationInfo);
+    List<Map<String, String>> result = pm01Svc.selectAllIssueWorkList(paramMap);
+    model.addAttribute("result", result);
+    return "jsonView";
+  }
+  
 }

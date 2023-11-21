@@ -167,53 +167,64 @@ public class PM01SvcImpl implements PM01Svc {
 	    return result;
   }
 
-  @Override
-  public List<Map<String, String>> selectMonthlyWorkList(Map<String, String> paramMap) {
-    return pm01Mapper.selectMonthlyWorkList(paramMap);
-  }
+	@Override
+	public List<Map<String, String>> selectMonthlyWorkList(Map<String, String> paramMap) {
+	    return pm01Mapper.selectMonthlyWorkList(paramMap);
+	}
+	
+	@Override
+	public int selectWorkPrtCount(Map<String, String> paramMap) {
+		return pm01Mapper.selectWorkPrtCount(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectWorkPrtList(Map<String, String> paramMap) {
+		return pm01Mapper.selectWorkPrtList(paramMap);
+	}
+	
+	@Override
+	public int selectWorkOrdrsCount(Map<String, String> paramMap) {
+		return pm01Mapper.selectWorkOrdrsCount(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectWorkOrdrsList(Map<String, String> paramMap) {
+		return pm01Mapper.selectWorkOrdrsList(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectUploadFileList(Map<String, String> paramMap) {
+	  //return pm01Mapper.selectUploadFileList(paramMap);
+		return cm08Svc.selectFileList(paramMap);
+	//  Map<String, Object> returnMap = new HashMap<String, Object>();
+	//	Map<String, String> fileMap = new HashMap<String, String>();
+	//	fileMap.put("fileTrgtTyp", "TB_PM01M01");
+	//	fileMap.put("userId", paramMap.get("userId"));
+	//	fileMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+	//	returnMap.put("fileList", cm08Svc.selectFileList(fileMap));
+	//	returnMap.put("workInfo", pm01Mapper.selectDailyWorkInfo(paramMap));
+	//	return returnMap; 
+	}
+	
+	@Override
+	public int selectIssueWorkCount(Map<String, String> paramMap) {
+		return pm01Mapper.selectIssueWorkCount(paramMap);
+	}
 
-@Override
-public int selectWorkPrtCount(Map<String, String> paramMap) {
-	return pm01Mapper.selectWorkPrtCount(paramMap);
-}
+	@Override
+	public List<Map<String, String>> selectIssueWorkList(Map<String, String> paramMap) {
+		return pm01Mapper.selectIssueWorkList(paramMap);
+	}
+	
+	@Override
+	public int selectAllIssueWorkListCount(Map<String, String> paramMap) {
+		return pm01Mapper.selectAllIssueWorkListCount(paramMap);
+	}
 
-@Override
-public List<Map<String, String>> selectWorkPrtList(Map<String, String> paramMap) {
-	return pm01Mapper.selectWorkPrtList(paramMap);
-}
-
-@Override
-public int selectWorkOrdrsCount(Map<String, String> paramMap) {
-	return pm01Mapper.selectWorkOrdrsCount(paramMap);
-}
-
-@Override
-public List<Map<String, String>> selectWorkOrdrsList(Map<String, String> paramMap) {
-	return pm01Mapper.selectWorkOrdrsList(paramMap);
-}
-
-@Override
-public List<Map<String, String>> selectUploadFileList(Map<String, String> paramMap) {
-  //return pm01Mapper.selectUploadFileList(paramMap);
-	return cm08Svc.selectFileList(paramMap);
-//  Map<String, Object> returnMap = new HashMap<String, Object>();
-//	Map<String, String> fileMap = new HashMap<String, String>();
-//	fileMap.put("fileTrgtTyp", "TB_PM01M01");
-//	fileMap.put("userId", paramMap.get("userId"));
-//	fileMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-//	returnMap.put("fileList", cm08Svc.selectFileList(fileMap));
-//	returnMap.put("workInfo", pm01Mapper.selectDailyWorkInfo(paramMap));
-//	return returnMap; 
-}
-
-@Override
-public int selectIssueWorkCount(Map<String, String> paramMap) {
-	return pm01Mapper.selectIssueWorkCount(paramMap);
-}
-
-@Override
-public List<Map<String, String>> selectIssueWorkList(Map<String, String> paramMap) {
-	return pm01Mapper.selectIssueWorkList(paramMap);
-}
+	@Override
+	public List<Map<String, String>> selectAllIssueWorkList(Map<String, String> paramMap) {
+		return pm01Mapper.selectAllIssueWorkList(paramMap);
+	}
+  
   
 }

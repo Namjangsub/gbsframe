@@ -37,5 +37,9 @@ public interface PM01Mapper {
 	int selectIssueWorkCount(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectIssueWorkList(Map<String, String> paramMap);
+
+	int selectAllIssueWorkListCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectAllIssueWorkList(Map<String, String> paramMap);
   
 }
