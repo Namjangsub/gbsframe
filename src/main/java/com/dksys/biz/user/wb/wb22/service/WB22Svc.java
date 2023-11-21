@@ -61,4 +61,9 @@ public interface WB22Svc {
 	List<Map<String, String>> ModalwbsPlanconfirmList(Map<String, String> paramMap);
 	
 	int confirm_copy(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectWbcPlanTodoList(Map<String, String> paramMap);
+	
+	int wbcPlanTodoInsert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	
 }

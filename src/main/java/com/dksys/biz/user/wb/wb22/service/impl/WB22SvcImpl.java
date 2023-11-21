@@ -688,4 +688,45 @@ public class WB22SvcImpl implements WB22Svc {
 		//데이터 처리 끝
 		return result;
 	}
+	
+	@Override
+	public List<Map<String, String>> selectWbcPlanTodoList(Map<String, String> paramMap) {
+		return wb22Mapper.selectWbcPlanTodoList(paramMap);
+	}
+	
+	
+	@Override
+	public int wbcPlanTodoInsert(Map<String, String> paramMap , MultipartHttpServletRequest mRequest) throws Exception {
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+	   	   
+		int result = 0;
+		
+		Gson gson = new Gson();		
+		
+		
+		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList);
+		if (sharngArr != null && sharngArr.size() > 0 ) {
+			int i = 0;
+	        for (Map<String, String> sharngMap : sharngArr) {
+	            try {	
+	            	   String pgParam = "{\"coCd\":\""+ sharngMap.get("coCd") +"\",";
+	 			              pgParam += "\"salesCd\":\""+ sharngMap.get("salesCd") +"\",";
+	 			              pgParam += "\"planVerNo\":\""+ sharngMap.get("verNo") +"\",";
+	 			              pgParam += "\"histYn\":\""+ sharngMap.get("histYn") +"\"}";
+	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
+	            	    sharngMap.put("pgParam", pgParam);
+	            	    result = QM01Mapper.insertWbsSharngList(sharngMap);       		
+	            	i++;
+	            } catch (Exception e) {
+	                System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
+        return result;
+	}
+	
+	
+	
 }

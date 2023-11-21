@@ -327,4 +327,31 @@ public class WB22Ctr {
 		}
 	  	return "jsonView";
 	}
+	
+	@PostMapping(value = "/selectWbcPlanTodoList") 
+    public String selectWbcPlanTodoList(@RequestBody Map<String, String> paramMap, ModelMap model) {	  
+	  List<Map<String, String>> resultList = wb22Svc.selectWbcPlanTodoList(paramMap);
+	  model.addAttribute("resultList", resultList); 
+	  return "jsonView"; 		 
+    }
+	
+	@PostMapping(value = "/wbcPlanTodoInsert")
+    public String wbsIssInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (wb22Svc.wbcPlanTodoInsert(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  		} else {
+  			model.addAttribute("resultCode", 500);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  		    model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }
+	
+	
+	
 }

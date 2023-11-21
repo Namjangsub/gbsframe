@@ -90,4 +90,8 @@ public interface WB22Mapper {
 	List<Map<String, String>> selectWbcPlan(Map<String, String> paramMap);
 	
 	int updateWbcPlan(Map<String, String> sharngMap);
+	
+	List<Map<String, String>> selectWbcPlanTodoList(Map<String, String> paramMap);
+	
+	int wbcPlanTodoInsert(Map<String, String> paramMap);
 }
