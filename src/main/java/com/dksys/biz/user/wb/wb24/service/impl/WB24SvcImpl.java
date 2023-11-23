@@ -473,4 +473,9 @@ public class WB24SvcImpl implements WB24Svc {
 	public List<Map<String, String>> selectMemberTelNo(Map<String, String> paramMap) {
 		return wb24Mapper.selectMemberTelNo(paramMap);
 	}
+
+	@Override
+	public Map<String, String> select_wb2401p01_Info(Map<String, String> paramMap) {
+		return wb24Mapper.select_wb2401p01_Info(paramMap);
+	}
 }

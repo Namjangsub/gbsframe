@@ -25,4 +25,6 @@ public interface WB24Svc {
 	
 	List<Map<String, String>> selectMemberTelNo(Map<String, String> paramMap);
 
+	Map<String, String> select_wb2401p01_Info(Map<String, String> paramMap);
+
 }
