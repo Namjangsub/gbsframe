@@ -124,6 +124,13 @@ public class WB24Ctr {
 	    model.addAttribute("result", result); 
 	    return "jsonView"; 		 
     }
+
+	@PostMapping(value = "/select_wb2401p01_Info")
+	public String select_wb2401p01_Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = wb24Svc.select_wb2401p01_Info(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 	
 	
 	
