@@ -769,4 +769,10 @@ public class WB22SvcImpl implements WB22Svc {
 	}
 	// 일괄확정부분 끝
 	
+	
+	@Override
+	public List<Map<String, String>> selectWbcPlanUpdteTodoList(Map<String, String> paramMap) {
+		return wb22Mapper.selectWbcPlanUpdteTodoList(paramMap);
+	}
+	
 }

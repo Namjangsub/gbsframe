@@ -335,6 +335,16 @@ public class WB22Ctr {
 	  return "jsonView"; 		 
     }
 	
+	
+	@PostMapping(value = "/selectWbcPlanUpdteTodoList") 
+    public String selectWbcPlanUpdteTodoList(@RequestBody Map<String, String> paramMap, ModelMap model) {	  
+	  List<Map<String, String>> resultList = wb22Svc.selectWbcPlanUpdteTodoList(paramMap);
+	  model.addAttribute("resultList", resultList); 
+	  return "jsonView"; 		 
+    }
+	
+	
+	
 	@PostMapping(value = "/wbcPlanTodoInsert")
     public String wbsIssInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
   		try {
@@ -351,6 +361,9 @@ public class WB22Ctr {
   		}
   		return "jsonView";
     }
+	
+	
+	
 
 	// 일괄확정부분
 	@PostMapping(value = "/Modalwb22noconfirmList") 

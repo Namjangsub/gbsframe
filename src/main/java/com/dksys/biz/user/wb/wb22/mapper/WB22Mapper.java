@@ -102,4 +102,9 @@ public interface WB22Mapper {
 
 	int confirm_wb22(Map<String, String> paramMap);
 	// 일괄확정부분 끝
+	
+	
+	List<Map<String, String>> selectWbcPlanUpdteTodoList(Map<String, String> paramMap);
+	
+	
 }

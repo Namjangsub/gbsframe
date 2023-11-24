@@ -23,4 +23,8 @@ public interface BM18Svc {
 	List<Map<String, String>> selectPmMaxMessageIdTodo(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectWbsPlanMaxMessageIdTodo(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectWbsPlanUpdateMaxMessageIdTodo(Map<String, String> paramMap);
+	
+	
 }
