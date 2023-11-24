@@ -277,6 +277,8 @@
 		              , SUBSTR(TO_CHAR(A.ORDRS_DT, 'YYYY/MM/DD'), 6, 5) AS ORDRS_MMDD
 		              , A.ORDRS_CLNT_CD          AS CLNT_CD
 		              , C.CLNT_NM                AS CLNT_NM
+		              , C.SELL_VAT_CD 			 AS SELL_VAT_CD
+		              , NVL(R8.CODE_RPRC, 0) 	 AS CODE_RPRC
 		              , R4.CODE_NM               AS CURR_NM
 		              , R6.CODE_NM               AS CTRT_DOC_NM
 		              , R5.CODE_NM               AS PMNT_MTD_NM
@@ -306,6 +308,8 @@
 		                LEFT OUTER JOIN TB_CM05M01 AS R6 ON R6.CODE_ID = A.CTRT_DOC
 		                --국내외구분
 		                LEFT OUTER JOIN TB_CM05M01 AS R7 ON R7.CODE_ID = A.INPEXP_CD
+		                -- 부가세
+		                LEFT OUTER JOIN TB_CM05M01 AS R8 ON R8.CODE_ID = C.SELL_VAT_CD
 				 WHERE  1 = 1
 				 <if test="coCd != null and !coCd.equals('')">
 				 AND    A.CO_CD = #{coCd}
@@ -428,7 +432,7 @@
 		(
 		 --수금 정보
 		 SELECT A.CO_CD, A.ORDRS_NO, A.CLMN_PLAN_SEQ
-		      , SUM(A.CLMN_AMT_01) AS CLMN_AMT_01
+		      , SUM(A.CLMN_AMT_01 + A.CLMN_DTL_VAT) AS CLMN_AMT_01
 		      , SUM(A.CLMN_AMT_02) AS CLMN_AMT_02
 		      , SUM(A.CLMN_DTL_AMT) AS CLMN_AMT
 		 FROM   (
@@ -437,6 +441,7 @@
 		              , A.ORDRS_NO
 		              , A.CLMN_PLAN_SEQ
 		              , A.CLMN_DTL_AMT
+		              , A.CLMN_DTL_VAT
 		              , CASE WHEN A.YYYYMM = (SELECT FROM_YYYYMM FROM YYYYMM) THEN A.CLMN_DTL_AMT ELSE 0 END AS CLMN_AMT_01
 		              , CASE WHEN A.YYYYMM = (SELECT TO_YYYYMM FROM YYYYMM) THEN A.CLMN_DTL_AMT ELSE 0 END AS CLMN_AMT_02
 		         FROM   (
@@ -448,6 +453,7 @@
 						      , B.ORDRS_NO
 						      , B.CLMN_PLAN_SEQ
 						      , NVL(B.CLMN_DTL_AMT, 0) AS CLMN_DTL_AMT
+						      , NVL(B.CLMN_DTL_VAT, 0) AS CLMN_DTL_VAT
 						 FROM   TB_CR05M01 AS A
 						        LEFT OUTER JOIN TB_CR05D01 AS B  ON B.CO_CD   = A.CO_CD
 						                                        AND B.CLMN_NO = A.CLMN_NO
@@ -512,9 +518,13 @@
 		     , A.CLNT_CD, A.CURR_CD, A.CTRT_DOC, A.PMNT_MTD, A.FWD_EXCH_CHK_LIST, A.MNG_ID
 			 , SUBSTR((SELECT FROM_YYYYMM FROM YYYYMM), 5, 2) AS FROM_MM
 			 , SUBSTR((SELECT TO_YYYYMM FROM YYYYMM), 5, 2)   AS TO_MM
-			 , CASE WHEN A.CURR_CD = 'WON' THEN A.ORDRS_AMT * 1.1
-			        ELSE A.ORDRS_AMT * NVL(A.EXRATE, 1)
-			   END              AS EXP_AMT
+			 , CASE WHEN A.CODE_RPRC = '10' THEN 
+			        (CASE WHEN A.CURR_CD = 'WON' THEN A.ORDRS_AMT 
+			              ELSE A.ORDRS_AMT * NVL(A.EXRATE, 1) END) * 1.1
+               ELSE (CASE WHEN A.CURR_CD = 'WON' THEN A.ORDRS_AMT 
+                          ELSE A.ORDRS_AMT * NVL(A.EXRATE, 1) END)
+                END AS EXP_AMT
+			 , A.CODE_RPRC
 			 , NVL(A.EXRATE, 1) AS EXRATE
 			 , (SELECT FROM_YYYYMM FROM YYYYMM) AS FROM_YYYYMM
 			 , (SELECT TO_YYYYMM FROM YYYYMM)   AS TO_YYYYMM
