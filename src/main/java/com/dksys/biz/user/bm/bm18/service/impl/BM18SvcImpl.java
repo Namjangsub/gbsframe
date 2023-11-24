@@ -85,4 +85,9 @@ public class BM18SvcImpl implements BM18Svc {
 	public List<Map<String, String>> selectWbsPlanMaxMessageIdTodo(Map<String, String> paramMap) {
 		return bm18Mapper.selectWbsPlanMaxMessageIdTodo(paramMap);
 	}
+	
+	@Override
+	public List<Map<String, String>> selectWbsPlanUpdateMaxMessageIdTodo(Map<String, String> paramMap) {
+		return bm18Mapper.selectWbsPlanUpdateMaxMessageIdTodo(paramMap);
+	}
 }
