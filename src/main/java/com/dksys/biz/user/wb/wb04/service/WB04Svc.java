@@ -21,4 +21,6 @@ public interface WB04Svc {
     
     List<Map<String, String>> selectGanttAllList2(Map<String, String> paramMap);
     
+    List<Map<String, String>> selectGanttAllList3(Map<String, String> paramMap);
+    
 }
