@@ -335,16 +335,17 @@ public class CR02Svcmpl implements CR02Svc {
                 //입력구분이 '설비'코드 일때 sales_cd 만들기(sales_cd 값이 빈칸, null, 길이 0 일떄)
                 if (detailMap.get("ordrsDtlDiv10").equals("ORDRSDTLDIV1010")) {
 	                if ("".equals(Salad) || Salad == null || Salad.length() == 0) {
-	                	if (detailMap.get("ordrsSeq").length() == 1) {
-	                		OrderSeq = '0'+ detailMap.get("ordrsSeq");
-	                		System.out.println("OrderSeq :" + OrderSeq);
-	                	}
-	                	else {
-	                		OrderSeq = detailMap.get("ordrsSeq");
-	                		System.out.println("OrderSeq :" + OrderSeq);
-	                	}
+	                	OrderSeq = cr02Mapper.selectSalesCdLastNumberPlusOne(param);
+//	                	if (detailMap.get("ordrsSeq").length() == 1) {
+//	                		OrderSeq = '0'+ detailMap.get("ordrsSeq");
+//	                		System.out.println("OrderSeq :" + OrderSeq);
+//	                	}
+//	                	else {
+//	                		OrderSeq = detailMap.get("ordrsSeq");
+//	                		System.out.println("OrderSeq :" + OrderSeq);
+//	                	}
 	                	
-	                    String newSalesCode = param.get("ordrsNo") + "-" + OrderSeq + detailMap.get("prdtCd") + ItemDoov;
+	                    String newSalesCode = param.get("ordrsNo") + "-" + OrderSeq.trim() + detailMap.get("prdtCd") + ItemDoov;
 	                    detailMap.put("salesCd", newSalesCode);
 	                }
                 }
