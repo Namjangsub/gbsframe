@@ -290,6 +290,9 @@ public class CR02Svcmpl implements CR02Svc {
         param.put("udtId", param.get("userId"));
         param.put("udtPgm", "TB_CR02M01");
         param.put("estNo", param.get("estNoOrdrs"));
+        if(!"".equals(param.get("estNoOrdrs")) || param.get("estNoOrdrs") != null) {
+        	cr01Svc.updateEstConfirm(param);
+        }
         cr02Mapper.updateOrdrs(param);
         
         //수금정보 처리
