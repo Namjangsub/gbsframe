@@ -2216,8 +2216,8 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 }
 
 // 월마감 체크
-function monthCloseChk(chkValue, chkType){
-	
+function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
+
 	if(chkValue === '') return;
 	if(!chkType){
 		chkType = "";
@@ -2231,7 +2231,7 @@ function monthCloseChk(chkValue, chkType){
 	var sysDate   = "";
 	var workDay   = "";
 	var actionType = "";
-	var coCd = jwt.coCd;
+//	var coCd = jwt.coCd;
 	
 	chkValue = chkValue.replace(/\-/g, '');
 	
@@ -2245,7 +2245,7 @@ function monthCloseChk(chkValue, chkType){
 	paramObj.coCd = coCd;
 	paramObj.menuUrl = menuUrl;
 	paramObj.actionType = actionType;
-	paramObj.chkValue = chkValue.replace(/\-/g, '');
+	paramObj.chkValue = chkValue;
 	
 	//console.log(paramObj);
 	postAjaxSync("/admin/cm/cm05/selectMonthCloseChk", paramObj, null, function(data) {
@@ -2257,7 +2257,7 @@ function monthCloseChk(chkValue, chkType){
 	});//postAjaxSync
 	
 	if(typeof rtnVal == "undefined" || rtnVal == null) return;
-	
+
 	if(rtnHolVal === 'Y'){
 		rtnDate = calculateHoliday(sysDate, workDay);
 
