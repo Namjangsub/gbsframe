@@ -151,7 +151,7 @@ public class PM03SvcImpl implements PM03Svc {
 			//pm03Mapper.deleteLgistSalesCdAll(paramMap);
 
 
-		List<Map<String, String>> salesCdList = gsonDtl.fromJson(paramMap.get("salesCdArr"), dtlMap);
+		List<Map<String, String>> salesCdList = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
 		for (Map<String, String> dtl : salesCdList) {
 			dtl.put("userId", paramMap.get("userId"));
 			dtl.put("pgmId", paramMap.get("pgmId"));
