@@ -40,6 +40,17 @@ public class CR19Ctr {
 		return "jsonView";
 	}
 
+	//리스트 조회
+	@PostMapping(value = "/select_cr19m02_List")
+	public String select_cr19m02_List(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = cr19svc.select_cr19m02_Count(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = cr19svc.select_cr19m02_List(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
 	// 수주버전 조회
 	@PostMapping(value = "/select_ordrsHistNo_List") 
 	public String select_ordrsHistNo_List(@RequestBody Map<String, String> paramMap, ModelMap model) {

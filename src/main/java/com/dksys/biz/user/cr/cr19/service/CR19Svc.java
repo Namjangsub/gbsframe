@@ -13,6 +13,10 @@ public interface CR19Svc {
 	// 그리드 리스트
 	List<Map<String, String>> select_cr19_List(Map<String, String> paramMap);
 
+	int select_cr19m02_Count(Map<String, String> paramMap);
+	
+	List<Map<String, String>> select_cr19m02_List(Map<String, String> paramMap);
+
 	// 수주버전 조회
 	List<Map<String, Object>> select_ordrsHistNo_List(Map<String, String> paramMap);
 

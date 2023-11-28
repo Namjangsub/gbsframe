@@ -553,7 +553,579 @@
 		WHERE  1 = 1
 		AND    A.RRN BETWEEN #{firstIndex} AND #{lastIndex}
 	</select>
+	
+	<!-- 그리드 조회 카운트-->
+    <select id="select_cr19m02_Count" parameterType="Map" resultType="int">
+		WITH SJM AS
+		(
+		 --수주마스터 정보
+		 SELECT A.*
+		 FROM   (
+		         SELECT R1.CODE_NM               AS CO_NM
+		              , SUBSTR(A.ORDRS_DT, 1, 4) AS YYYY
+		              , SUBSTR(TO_CHAR(A.ORDRS_DT, 'YYYY/MM/DD'), 6, 5) AS ORDRS_MMDD
+		              , A.ORDRS_CLNT_CD          AS CLNT_CD
+		              , C.CLNT_NM                AS CLNT_NM
+		              , R4.CODE_NM               AS CURR_NM
+		              , R6.CODE_NM               AS CTRT_DOC_NM
+		              , R5.CODE_NM               AS PMNT_MTD_NM
+		              , SUBSTR(TO_CHAR(A.FWD_EXCH_JOIN_DT, 'YYYY/MM/DD'), 6, 5) AS FWD_MMDD
+		              , CASE WHEN NVL(A.FWD_EXCH_CHK_LIST, 'N') = 'N' THEN 'NO' ELSE 'YES' END AS CHK_LIST_NM
+		              , U.NAME                   AS MNG_NM
+		              , R2.CODE_NM               AS ORDRS_DIV_NM
+		              , R3.CODE_NM               AS CLNT_PJT_NM
+		              , R7.CODE_NM               AS INPEXP_NM
+		              , A.*
+		         FROM   TB_CR02M01 AS A
+				        --고객사
+		                LEFT OUTER JOIN TB_BM02M01 AS C ON A.ORDRS_CLNT_CD = C.CLNT_CD
+		                --영업담당자
+		                LEFT OUTER JOIN TB_CM06M01 AS U ON U.ID = A.MNG_ID
+		                --회사
+		                LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.CO_CD
+		                --수주구분
+		                LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.ORDRS_DIV
+		                --고객사PJT
+		                LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.CLNT_PJT
+		                --통화
+		                LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = A.CURR_CD
+		                --결재방법
+		                LEFT OUTER JOIN TB_CM05M01 AS R5 ON R5.CODE_ID = A.PMNT_MTD
+		                --계약문서
+		                LEFT OUTER JOIN TB_CM05M01 AS R6 ON R6.CODE_ID = A.CTRT_DOC
+		                --국내외구분
+		                LEFT OUTER JOIN TB_CM05M01 AS R7 ON R7.CODE_ID = A.INPEXP_CD
+				 WHERE  1 = 1
+				 <if test="coCd != null and !coCd.equals('')">
+				 AND    A.CO_CD = #{coCd}
+				 </if>
+				 <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
+				 AND    A.ORDRS_CLNT_CD = #{ordrsClntCd}
+				 </if>
+				 <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
+				 AND    C.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'
+				 </if>
+				 <if test="ordrsNo != null and !ordrsNo.equals('')">
+				 AND    A.ORDRS_NO LIKE '%' || #{ordrsNo} || '%'
+				 </if>
+				 <if test="clntPjt != null and !clntPjt.equals('')">
+				 AND    A.CLNT_PJT = #{clntPjt}
+				 </if>
+				 <if test="ctrtNm != null and !ctrtNm.equals('')">
+				 AND    A.CTRT_NM LIKE '%' || #{ctrtNm} || '%'
+				 </if>
+				 <if test="ordrsDiv != null and !ordrsDiv.equals('')">
+				 AND    A.ORDRS_DIV = #{ordrsDiv}
+				 </if>
+                ) AS A
+         WHERE  1 = 1
+		 <if test="yyyy != null and !yyyy.equals('')">
+		 AND    A.YYYY = #{yyyy}
+		 </if>
+		)
+		, SJD1 AS
+		(
+		 --수주 수금예정 정보
+		 SELECT B.CLMN_PLAN_SEQ
+		      , B.CLMN_PLAN_DIV
+		      , R1.CODE_NM AS CLMN_PLAN_DIV_NM
+		      , B.CLMN_DIV_SEQ
+		      , TO_CHAR(B.CLMN_DIV_SEQ)||'차' AS CHASU_NM
+		      , SUBSTR(TO_CHAR(B.BILL_PBLS_DT, 'YYYYMMDD'), 3, 2) AS BILL_PBLS_YY
+		      , SUBSTR(TO_CHAR(B.BILL_PBLS_DT, 'YYYYMMDD'), 5, 2) AS BILL_PBLS_MM
+		      , NVL(B.CLMN_RATE, 0) AS CLMN_RATE
+		      , TO_CHAR(NVL(B.CLMN_RATE, 0))||'%' AS CLMN_RATE_NM
+		      , NVL(B.CLMN_AMT, 0) AS SUJU_CLMN_AMT
+		      , B.PMNT_DT_AFTER_BILL
+		      , A.*
+		 FROM   SJM AS A
+		        INNER JOIN TB_CR02D01 AS B  ON B.CO_CD    = A.CO_CD
+		                                   AND B.ORDRS_NO = A.ORDRS_NO
+		        LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = B.CLMN_PLAN_DIV
+		 WHERE  1 = 1
+		)
+		, YYYYMM AS
+		(
+		 --검색조건 년월
+		 SELECT #{yyyymm} AS FROM_YYYYMM
+		      , SUBSTR(TO_CHAR(ADD_MONTHS(TO_DATE(#{yyyymm}||'01', 'YYYY-MM-DD'), 1), 'YYYYMMDD'), 1, 6) AS TO_YYYYMM
+		 FROM   DUAL
+		)
+		, PLAN AS
+		(
+		 --월별 수금계획 정보
+		 SELECT A.CO_CD                 AS CO_CD
+		      , A.ORDRS_NO              AS ORDRS_NO
+		      , A.CLMN_PLAN_SEQ         AS CLMN_PLAN_SEQ
+		      , MAX(A.CLMN_MGMT_STATUS) AS PLAN_BILL_RMK
+		      , SUM(A.PLAN_BILL_AMT_01) AS PLAN_BILL_AMT_01
+		      , SUM(A.PLAN_CLMN_AMT_01) AS PLAN_CLMN_AMT_01
+		      , SUM(A.PLAN_BILL_AMT_02) AS PLAN_BILL_AMT_02
+		      , SUM(A.PLAN_CLMN_AMT_02) AS PLAN_CLMN_AMT_02
+		      , ''                      AS PLAN_CLMN_RMK
+		      , ''                      AS PLAN_RMK
+		 FROM   (
+		         SELECT CASE WHEN A.BILL_YYMM = (SELECT FROM_YYYYMM FROM YYYYMM) THEN A.CLMN_AMT ELSE 0  END AS PLAN_BILL_AMT_01
+				      , CASE WHEN A.CLMN_YYMM = (SELECT FROM_YYYYMM FROM YYYYMM) THEN A.CLMN_AMT ELSE 0  END AS PLAN_CLMN_AMT_01
+				      , CASE WHEN A.BILL_YYMM = (SELECT TO_YYYYMM   FROM YYYYMM) THEN A.CLMN_AMT ELSE 0  END AS PLAN_BILL_AMT_02
+				      , CASE WHEN A.CLMN_YYMM = (SELECT TO_YYYYMM   FROM YYYYMM) THEN A.CLMN_AMT ELSE 0  END AS PLAN_CLMN_AMT_02
+				      , A.*
+				 FROM   (
+				         SELECT B.CO_CD            AS CO_CD
+				              , B.ORDRS_NO         AS ORDRS_NO
+				              , B.CLMN_PLAN_SEQ    AS CLMN_PLAN_SEQ
+				              , SUBSTR(TO_CHAR(B.BILL_PBLS_DT, 'YYYYMMDD'), 1, 6)  AS BILL_YYMM
+				              , SUBSTR(TO_CHAR(B.CLMN_DT     , 'YYYYMMDD'), 1, 6)  AS CLMN_YYMM
+				              , NVL(B.CLMN_AMT, 0) AS CLMN_AMT
+				              , B.CLMN_MGMT_STATUS AS CLMN_MGMT_STATUS
+				         FROM   SJM AS A
+				                INNER JOIN TB_CR02D01 AS B  ON B.CO_CD    = A.CO_CD
+		                                                   AND B.ORDRS_NO = A.ORDRS_NO
+				         WHERE  1 = 1
+				        ) AS A
+				 WHERE  1 = 1
+		        ) AS A
+		 WHERE  1 = 1
+		 GROUP BY A.CO_CD, A.ORDRS_NO, A.CLMN_PLAN_SEQ
+		)
+		, BILL AS
+		(
+		 --계산서 정보
+		 SELECT A.CO_CD, A.ORDRS_NO, A.CLMN_PLAN_SEQ
+		      , SUM(A.BILL_AMT_01) AS BILL_AMT_01
+		      , SUM(A.BILL_AMT_02) AS BILL_AMT_02
+		      , SUM(A.SELL_BILL_DTL_AMT) AS BILL_AMT
+		 FROM   (
+		         SELECT A.CO_CD
+		              , A.YYYYMM
+		              , A.ORDRS_NO
+		              , A.CLMN_PLAN_SEQ
+		              , A.SELL_BILL_DTL_AMT
+		              , CASE WHEN A.YYYYMM = (SELECT FROM_YYYYMM FROM YYYYMM) THEN A.SELL_BILL_DTL_AMT ELSE 0 END AS BILL_AMT_01
+		              , CASE WHEN A.YYYYMM = (SELECT TO_YYYYMM FROM YYYYMM) THEN A.SELL_BILL_DTL_AMT ELSE 0 END AS BILL_AMT_02
+		         FROM   (
+		                 SELECT A.FILE_TRGT_KEY
+						      , A.CO_CD
+						      , A.SELL_BILL_NO
+						      , A.SELL_BILL_DT
+						      , SUBSTR(REPLACE(TO_CHAR(A.SELL_BILL_DT, 'YYYY-MM-DD'), '-', ''), 1, 6) AS YYYYMM
+						      , B.ORDRS_NO
+						      , B.CLMN_PLAN_SEQ
+						      , NVL(B.SELL_BILL_DTL_AMT, 0) AS SELL_BILL_DTL_AMT
+						 FROM   TB_CR04M01 AS A
+						        LEFT OUTER JOIN TB_CR04D01 AS B  ON B.CO_CD        = A.CO_CD
+						                                        AND B.SELL_BILL_NO = A.SELL_BILL_NO
+						 WHERE  1 = 1
+		                ) AS A
+		         WHERE  1 = 1
+		         --AND    A.YYYYMM BETWEEN (SELECT FROM_YYYYMM FROM YYYYMM) AND (SELECT TO_YYYYMM FROM YYYYMM)
+		        ) AS A
+		 WHERE  1 = 1
+		 GROUP BY A.CO_CD, A.ORDRS_NO, A.CLMN_PLAN_SEQ
+		)
+		, CLMN AS
+		(
+		 --수금 정보
+		 SELECT A.CO_CD, A.ORDRS_NO, A.CLMN_PLAN_SEQ
+		      , SUM(A.CLMN_AMT_01) AS CLMN_AMT_01
+		      , SUM(A.CLMN_AMT_02) AS CLMN_AMT_02
+		      , SUM(A.CLMN_DTL_AMT) AS CLMN_AMT
+		 FROM   (
+		         SELECT A.CO_CD
+		              , A.YYYYMM
+		              , A.ORDRS_NO
+		              , A.CLMN_PLAN_SEQ
+		              , A.CLMN_DTL_AMT
+		              , CASE WHEN A.YYYYMM = (SELECT FROM_YYYYMM FROM YYYYMM) THEN A.CLMN_DTL_AMT ELSE 0 END AS CLMN_AMT_01
+		              , CASE WHEN A.YYYYMM = (SELECT TO_YYYYMM FROM YYYYMM) THEN A.CLMN_DTL_AMT ELSE 0 END AS CLMN_AMT_02
+		         FROM   (
+		                 SELECT A.FILE_TRGT_KEY
+						      , A.CO_CD
+						      , A.CLMN_NO
+						      , A.CLMN_DT
+						      , SUBSTR(REPLACE(TO_CHAR(A.CLMN_DT, 'YYYY-MM-DD'), '-', ''), 1, 6) AS YYYYMM
+						      , B.ORDRS_NO
+						      , B.CLMN_PLAN_SEQ
+						      , NVL(B.CLMN_DTL_AMT, 0) AS CLMN_DTL_AMT
+						 FROM   TB_CR05M01 AS A
+						        LEFT OUTER JOIN TB_CR05D01 AS B  ON B.CO_CD   = A.CO_CD
+						                                        AND B.CLMN_NO = A.CLMN_NO
+						 WHERE  1 = 1 
+		                ) AS A
+		         WHERE  1 = 1
+		         --AND    A.YYYYMM BETWEEN (SELECT FROM_YYYYMM FROM YYYYMM) AND (SELECT TO_YYYYMM FROM YYYYMM)
+		        ) AS A
+		 WHERE  1 = 1
+		 GROUP BY A.CO_CD, A.ORDRS_NO, A.CLMN_PLAN_SEQ
+		)
+		, LIST AS
+		(
+		SELECT ROWNUM AS RRN
+		     , A.CO_CD
+		     , A.CO_NM
+		     , A.YYYY
+		     , A.ORDRS_NO
+		     , A.ORDRS_MMDD
+		     , A.CLNT_NM
+		     , A.CTRT_NM
+		     , A.CURR_NM
+		     , A.ORDRS_AMT
+		     , A.ORDRGER
+		     , A.CTRT_DOC_NM
+		     , A.PMNT_MTD_NM
+		     , A.CLMN_PLAN_SEQ
+		     , A.CLMN_PLAN_DIV_NM||' '||A.CHASU_NM AS CLMN_PLAN_DIV_NM
+		     , A.BILL_PBLS_YY||'년'||A.BILL_PBLS_MM||'월 '||A.CLMN_RATE_NM AS CLMN_NM
+		     , A.SUJU_CLMN_AMT
+		     , A.PMNT_DT_AFTER_BILL
+		     , A.FWD_MMDD
+		     , A.CHK_LIST_NM
+		     , A.MNG_NM
+		     , NVL(P.PLAN_BILL_RMK, '')   AS PLAN_BILL_RMK
+		     , NVL(P.PLAN_BILL_AMT_01, 0) AS PLAN_BILL_AMT_01
+		     , NVL(B.BILL_AMT_01, 0)      AS BILL_AMT_01
+		     , CASE WHEN NVL(P.PLAN_BILL_AMT_01, 0) = 0 THEN 0
+		            ELSE ROUND((NVL(B.BILL_AMT_01, 0) / NVL(P.PLAN_BILL_AMT_01, 0)) * 100, 0)
+		       END                        AS BILL_PER_01
+		     , NVL(P.PLAN_CLMN_AMT_01, 0) AS PLAN_CLMN_AMT_01
+		     , NVL(C.CLMN_AMT_01, 0)      AS CLMN_AMT_01
+		     , CASE WHEN NVL(P.PLAN_CLMN_AMT_01, 0) = 0 THEN 0
+		            ELSE ROUND((NVL(C.CLMN_AMT_01, 0) / NVL(P.PLAN_CLMN_AMT_01, 0)) * 100, 0)
+		       END                        AS CLMN_PER_01
+		     , NVL(P.PLAN_BILL_AMT_02, 0) AS PLAN_BILL_AMT_02
+		     , NVL(B.BILL_AMT_02, 0)      AS BILL_AMT_02
+		     , CASE WHEN NVL(P.PLAN_BILL_AMT_02, 0) = 0 THEN 0
+		            ELSE ROUND((NVL(B.BILL_AMT_02, 0) / NVL(P.PLAN_BILL_AMT_02, 0)) * 100, 0)
+		       END                        AS BILL_PER_02
+		     , NVL(P.PLAN_CLMN_AMT_02, 0) AS PLAN_CLMN_AMT_02
+		     , NVL(C.CLMN_AMT_02, 0)      AS CLMN_AMT_02
+		     , CASE WHEN NVL(P.PLAN_CLMN_AMT_02, 0) = 0 THEN 0
+		            ELSE ROUND((NVL(C.CLMN_AMT_02, 0) / NVL(P.PLAN_CLMN_AMT_02, 0)) * 100, 0)
+		       END                        AS BILL_PER_02
+		     , NVL(P.PLAN_CLMN_RMK, '')   AS PLAN_CLMN_RMK
+		     , 0                          AS EXP_AMT
+		     , NVL(B.BILL_AMT, 0)         AS BILL_AMT
+		     , NVL(C.CLMN_AMT, 0)         AS CLMN_AMT		      
+		     , NVL(A.SUJU_CLMN_AMT, 0) - NVL(B.BILL_AMT, 0) AS MI_BILL_AMT
+		     , NVL(A.SUJU_CLMN_AMT, 0) - NVL(C.CLMN_AMT, 0) AS MI_CLMN_AMT		      
+		     , NVL(P.PLAN_RMK, '')        AS PLAN_RMK
+		     , A.CLNT_CD, A.CURR_CD, A.CTRT_DOC, A.PMNT_MTD, A.FWD_EXCH_CHK_LIST, A.MNG_ID
+		FROM   SJD1 AS A
+		       LEFT OUTER JOIN PLAN AS P  ON A.CO_CD         = P.CO_CD
+		                                 AND A.ORDRS_NO      = P.ORDRS_NO
+		                                 AND A.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
+		       LEFT OUTER JOIN BILL AS B  ON A.CO_CD         = B.CO_CD
+		                                 AND A.ORDRS_NO      = B.ORDRS_NO
+		                                 AND A.CLMN_PLAN_SEQ = B.CLMN_PLAN_SEQ
+		       LEFT OUTER JOIN CLMN AS C  ON A.CO_CD         = C.CO_CD
+		                                 AND A.ORDRS_NO      = C.ORDRS_NO
+		                                 AND A.CLMN_PLAN_SEQ = C.CLMN_PLAN_SEQ
+		WHERE  1 = 1
+		)
+		SELECT COUNT(*)
+		FROM   LIST
+		WHERE  1 = 1
+    </select>
 
+	<!-- 그리드 조회 -->
+	<select id="select_cr19m02_List" parameterType="Map" resultType="camelMap">
+		WITH SJM AS
+		(
+		 --수주마스터 정보
+		 SELECT A.*
+		 FROM   (
+		         SELECT R1.CODE_NM               AS CO_NM
+		              , SUBSTR(A.ORDRS_DT, 1, 4) AS YYYY
+		              , SUBSTR(TO_CHAR(A.ORDRS_DT, 'YYYY/MM/DD'), 6, 5) AS ORDRS_MMDD
+		              , A.ORDRS_CLNT_CD          AS CLNT_CD
+		              , C.CLNT_NM                AS CLNT_NM
+		              , C.SELL_VAT_CD 			 AS SELL_VAT_CD
+		              , NVL(R8.CODE_RPRC, 0) 	 AS CODE_RPRC
+		              , R4.CODE_NM               AS CURR_NM
+		              , R6.CODE_NM               AS CTRT_DOC_NM
+		              , R5.CODE_NM               AS PMNT_MTD_NM
+		              , SUBSTR(TO_CHAR(A.FWD_EXCH_JOIN_DT, 'YYYY/MM/DD'), 6, 5) AS FWD_MMDD
+		              , CASE WHEN NVL(A.FWD_EXCH_CHK_LIST, 'N') = 'N' THEN 'NO' ELSE 'YES' END AS CHK_LIST_NM
+		              , U.NAME                   AS MNG_NM
+		              , R2.CODE_NM               AS ORDRS_DIV_NM
+		              , R3.CODE_NM               AS CLNT_PJT_NM
+		              , R7.CODE_NM               AS INPEXP_NM
+		              , A.*
+		         FROM   TB_CR02M01 AS A
+				        --고객사
+		                LEFT OUTER JOIN TB_BM02M01 AS C ON A.ORDRS_CLNT_CD = C.CLNT_CD
+		                --영업담당자
+		                LEFT OUTER JOIN TB_CM06M01 AS U ON U.ID = A.MNG_ID
+		                --회사
+		                LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.CO_CD
+		                --수주구분
+		                LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.ORDRS_DIV
+		                --고객사PJT
+		                LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.CLNT_PJT
+		                --통화
+		                LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = A.CURR_CD
+		                --결재방법
+		                LEFT OUTER JOIN TB_CM05M01 AS R5 ON R5.CODE_ID = A.PMNT_MTD
+		                --계약문서
+		                LEFT OUTER JOIN TB_CM05M01 AS R6 ON R6.CODE_ID = A.CTRT_DOC
+		                --국내외구분
+		                LEFT OUTER JOIN TB_CM05M01 AS R7 ON R7.CODE_ID = A.INPEXP_CD
+		                -- 부가세
+		                LEFT OUTER JOIN TB_CM05M01 AS R8 ON R8.CODE_ID = C.SELL_VAT_CD
+				 WHERE  1 = 1
+				 <if test="coCd != null and !coCd.equals('')">
+				 AND    A.CO_CD = #{coCd}
+				 </if>
+				 <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
+				 AND    A.ORDRS_CLNT_CD = #{ordrsClntCd}
+				 </if>
+				 <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
+				 AND    C.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'
+				 </if>
+				 <if test="ordrsNo != null and !ordrsNo.equals('')">
+				 AND    A.ORDRS_NO LIKE '%' || #{ordrsNo} || '%'
+				 </if>
+				 <if test="clntPjt != null and !clntPjt.equals('')">
+				 AND    A.CLNT_PJT = #{clntPjt}
+				 </if>
+				 <if test="ctrtNm != null and !ctrtNm.equals('')">
+				 AND    A.CTRT_NM LIKE '%' || #{ctrtNm} || '%'
+				 </if>
+				 <if test="ordrsDiv != null and !ordrsDiv.equals('')">
+				 AND    A.ORDRS_DIV = #{ordrsDiv}
+				 </if>
+                ) AS A
+         WHERE  1 = 1
+		 <if test="yyyy != null and !yyyy.equals('')">
+		 AND    A.YYYY = #{yyyy}
+		 </if>
+		)
+		, SJD1 AS
+		(
+		 --수주 수금예정 정보
+		 SELECT B.CLMN_PLAN_SEQ
+		      , B.CLMN_PLAN_DIV
+		      , R1.CODE_NM AS CLMN_PLAN_DIV_NM
+		      , B.CLMN_DIV_SEQ
+		      , TO_CHAR(B.CLMN_DIV_SEQ)||'차' AS CHASU_NM
+		      , SUBSTR(TO_CHAR(B.BILL_PBLS_DT, 'YYYYMMDD'), 3, 2) AS BILL_PBLS_YY
+		      , SUBSTR(TO_CHAR(B.BILL_PBLS_DT, 'YYYYMMDD'), 5, 2) AS BILL_PBLS_MM
+		      , NVL(B.CLMN_RATE, 0) AS CLMN_RATE
+		      , TO_CHAR(NVL(B.CLMN_RATE, 0))||'%' AS CLMN_RATE_NM
+		      , NVL(B.CLMN_AMT, 0) AS SUJU_CLMN_AMT
+		      , B.PMNT_DT_AFTER_BILL
+		      , A.*
+		 FROM   SJM AS A
+		        INNER JOIN TB_CR02D01 AS B  ON B.CO_CD    = A.CO_CD
+		                                   AND B.ORDRS_NO = A.ORDRS_NO
+		        LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = B.CLMN_PLAN_DIV
+		 WHERE  1 = 1
+		)
+		, YYYYMM AS
+		(
+		 --검색조건 년월
+		 SELECT #{yyyymm} AS FROM_YYYYMM
+		      , SUBSTR(TO_CHAR(ADD_MONTHS(TO_DATE(#{yyyymm}||'01', 'YYYY-MM-DD'), 1), 'YYYYMMDD'), 1, 6) AS TO_YYYYMM
+		 FROM   DUAL
+		)
+		, PLAN AS
+		(
+		 --월별 수금계획 정보
+		 SELECT A.CO_CD                 AS CO_CD
+		      , A.ORDRS_NO              AS ORDRS_NO
+		      , A.CLMN_PLAN_SEQ         AS CLMN_PLAN_SEQ
+		      , ''                      AS PLAN_BILL_RMK
+		      , SUM(A.PLAN_BILL_AMT_01) AS PLAN_BILL_AMT_01
+		      , SUM(A.PLAN_CLMN_AMT_01) AS PLAN_CLMN_AMT_01
+		      , SUM(A.PLAN_BILL_AMT_02) AS PLAN_BILL_AMT_02
+		      , SUM(A.PLAN_CLMN_AMT_02) AS PLAN_CLMN_AMT_02
+		      , MAX(A.CLMN_MGMT_STATUS) AS PLAN_CLMN_RMK
+		      , ''                      AS PLAN_RMK
+		 FROM   (
+		         SELECT CASE WHEN A.BILL_YYMM = (SELECT FROM_YYYYMM FROM YYYYMM) THEN A.CLMN_AMT ELSE 0  END AS PLAN_BILL_AMT_01
+				      , CASE WHEN A.CLMN_YYMM = (SELECT FROM_YYYYMM FROM YYYYMM) THEN A.CLMN_AMT ELSE 0  END AS PLAN_CLMN_AMT_01
+				      , CASE WHEN A.BILL_YYMM = (SELECT TO_YYYYMM   FROM YYYYMM) THEN A.CLMN_AMT ELSE 0  END AS PLAN_BILL_AMT_02
+				      , CASE WHEN A.CLMN_YYMM = (SELECT TO_YYYYMM   FROM YYYYMM) THEN A.CLMN_AMT ELSE 0  END AS PLAN_CLMN_AMT_02
+				      , A.*
+				 FROM   (
+				         SELECT B.CO_CD            AS CO_CD
+				              , B.ORDRS_NO         AS ORDRS_NO
+				              , B.CLMN_PLAN_SEQ    AS CLMN_PLAN_SEQ
+				              , SUBSTR(TO_CHAR(B.BILL_PBLS_DT, 'YYYYMMDD'), 1, 6)  AS BILL_YYMM
+				              , SUBSTR(TO_CHAR(B.CLMN_DT     , 'YYYYMMDD'), 1, 6)  AS CLMN_YYMM
+				              , NVL(B.CLMN_AMT, 0) AS CLMN_AMT
+				              , B.CLMN_MGMT_STATUS AS CLMN_MGMT_STATUS
+				         FROM   SJM AS A
+				                INNER JOIN TB_CR02D01 AS B  ON B.CO_CD    = A.CO_CD
+		                                                   AND B.ORDRS_NO = A.ORDRS_NO
+				         WHERE  1 = 1
+				        ) AS A
+				 WHERE  1 = 1
+		        ) AS A
+		 WHERE  1 = 1
+		 GROUP BY A.CO_CD, A.ORDRS_NO, A.CLMN_PLAN_SEQ
+		)
+		, BILL AS
+		(
+		 --계산서 정보
+		 SELECT A.CO_CD, A.ORDRS_NO, A.CLMN_PLAN_SEQ
+		      , SUM(A.BILL_AMT_01) AS BILL_AMT_01
+		      , SUM(A.BILL_AMT_02) AS BILL_AMT_02
+		      , SUM(A.SELL_BILL_DTL_AMT) AS BILL_AMT
+		 FROM   (
+		         SELECT A.CO_CD
+		              , A.YYYYMM
+		              , A.ORDRS_NO
+		              , A.CLMN_PLAN_SEQ
+		              , A.SELL_BILL_DTL_AMT
+		              , CASE WHEN A.YYYYMM = (SELECT FROM_YYYYMM FROM YYYYMM) THEN A.SELL_BILL_DTL_AMT ELSE 0 END AS BILL_AMT_01
+		              , CASE WHEN A.YYYYMM = (SELECT TO_YYYYMM FROM YYYYMM) THEN A.SELL_BILL_DTL_AMT ELSE 0 END AS BILL_AMT_02
+		         FROM   (
+		                 SELECT A.FILE_TRGT_KEY
+						      , A.CO_CD
+						      , A.SELL_BILL_NO
+						      , A.SELL_BILL_DT
+						      , SUBSTR(REPLACE(TO_CHAR(A.SELL_BILL_DT, 'YYYY-MM-DD'), '-', ''), 1, 6) AS YYYYMM
+						      , B.ORDRS_NO
+						      , B.CLMN_PLAN_SEQ
+						      , NVL(B.SELL_BILL_DTL_AMT, 0) AS SELL_BILL_DTL_AMT
+						 FROM   TB_CR04M01 AS A
+						        LEFT OUTER JOIN TB_CR04D01 AS B  ON B.CO_CD        = A.CO_CD
+						                                        AND B.SELL_BILL_NO = A.SELL_BILL_NO
+						 WHERE  1 = 1
+		                ) AS A
+		         WHERE  1 = 1
+		         --AND    A.YYYYMM BETWEEN (SELECT FROM_YYYYMM FROM YYYYMM) AND (SELECT TO_YYYYMM FROM YYYYMM)
+		        ) AS A
+		 WHERE  1 = 1
+		 GROUP BY A.CO_CD, A.ORDRS_NO, A.CLMN_PLAN_SEQ
+		)
+		, CLMN AS
+		(
+		 --수금 정보
+		 SELECT A.CO_CD, A.ORDRS_NO, A.CLMN_PLAN_SEQ
+		      , SUM(A.CLMN_AMT_01 + A.CLMN_DTL_VAT) AS CLMN_AMT_01
+		      , SUM(A.CLMN_AMT_02) AS CLMN_AMT_02
+		      , SUM(A.CLMN_DTL_AMT) AS CLMN_AMT
+		 FROM   (
+		         SELECT A.CO_CD
+		              , A.YYYYMM
+		              , A.ORDRS_NO
+		              , A.CLMN_PLAN_SEQ
+		              , A.CLMN_DTL_AMT
+		              , A.CLMN_DTL_VAT
+		              , CASE WHEN A.YYYYMM = (SELECT FROM_YYYYMM FROM YYYYMM) THEN A.CLMN_DTL_AMT ELSE 0 END AS CLMN_AMT_01
+		              , CASE WHEN A.YYYYMM = (SELECT TO_YYYYMM FROM YYYYMM) THEN A.CLMN_DTL_AMT ELSE 0 END AS CLMN_AMT_02
+		         FROM   (
+		                 SELECT A.FILE_TRGT_KEY
+						      , A.CO_CD
+						      , A.CLMN_NO
+						      , A.CLMN_DT
+						      , SUBSTR(REPLACE(TO_CHAR(A.CLMN_DT, 'YYYY-MM-DD'), '-', ''), 1, 6) AS YYYYMM
+						      , B.ORDRS_NO
+						      , B.CLMN_PLAN_SEQ
+						      , NVL(B.CLMN_DTL_AMT, 0) AS CLMN_DTL_AMT
+						      , NVL(B.CLMN_DTL_VAT, 0) AS CLMN_DTL_VAT
+						 FROM   TB_CR05M01 AS A
+						        LEFT OUTER JOIN TB_CR05D01 AS B  ON B.CO_CD   = A.CO_CD
+						                                        AND B.CLMN_NO = A.CLMN_NO
+						 WHERE  1 = 1 
+		                ) AS A
+		         WHERE  1 = 1
+		         --AND    A.YYYYMM BETWEEN (SELECT FROM_YYYYMM FROM YYYYMM) AND (SELECT TO_YYYYMM FROM YYYYMM)
+		        ) AS A
+		 WHERE  1 = 1
+		 GROUP BY A.CO_CD, A.ORDRS_NO, A.CLMN_PLAN_SEQ
+		)
+		, LIST AS
+		(
+		SELECT ROWNUM AS RRN
+		     , A.CO_CD
+		     , A.CO_NM
+		     , A.YYYY
+		     , A.ORDRS_NO
+		     , A.ORDRS_MMDD
+		     , A.CLNT_NM
+		     , A.CTRT_NM
+		     , A.CURR_NM
+		     , A.ORDRS_AMT
+		     , A.ORDRGER
+		     , A.CTRT_DOC_NM
+		     , A.PMNT_MTD_NM
+		     , A.CLMN_PLAN_SEQ
+		     , A.CLMN_PLAN_DIV_NM||' '||A.CHASU_NM AS CLMN_PLAN_DIV_NM
+		     , A.BILL_PBLS_YY||'년'||A.BILL_PBLS_MM||'월 '||A.CLMN_RATE_NM AS CLMN_NM
+		     , A.SUJU_CLMN_AMT
+		     , A.PMNT_DT_AFTER_BILL
+		     , A.FWD_MMDD
+		     , A.CHK_LIST_NM
+		     , A.MNG_NM
+		     , NVL(P.PLAN_BILL_RMK, '')   AS PLAN_BILL_RMK
+		     , NVL(P.PLAN_BILL_AMT_01, 0) AS PLAN_BILL_AMT_01
+		     , NVL(B.BILL_AMT_01, 0)      AS BILL_AMT_01
+		     , CASE WHEN NVL(P.PLAN_BILL_AMT_01, 0) = 0 THEN 0||' %'
+		            ELSE ROUND((NVL(B.BILL_AMT_01, 0) / NVL(P.PLAN_BILL_AMT_01, 0)) * 100, 0)||' %'
+		       END                        AS BILL_PER_01
+		     , NVL(P.PLAN_CLMN_AMT_01, 0) AS PLAN_CLMN_AMT_01
+		     , NVL(C.CLMN_AMT_01, 0)      AS CLMN_AMT_01
+		     , CASE WHEN NVL(P.PLAN_CLMN_AMT_01, 0) = 0 THEN 0||' %'
+		            ELSE ROUND((NVL(C.CLMN_AMT_01, 0) / NVL(P.PLAN_CLMN_AMT_01, 0)) * 100, 0)||' %'
+		       END                        AS CLMN_PER_01
+		     , NVL(P.PLAN_BILL_AMT_02, 0) AS PLAN_BILL_AMT_02
+		     , NVL(B.BILL_AMT_02, 0)      AS BILL_AMT_02
+		     , CASE WHEN NVL(P.PLAN_BILL_AMT_02, 0) = 0 THEN 0||' %'
+		            ELSE ROUND((NVL(B.BILL_AMT_02, 0) / NVL(P.PLAN_BILL_AMT_02, 0)) * 100, 0)||' %'
+		       END                        AS BILL_PER_02
+		     , NVL(P.PLAN_CLMN_AMT_02, 0) AS PLAN_CLMN_AMT_02
+		     , NVL(C.CLMN_AMT_02, 0)      AS CLMN_AMT_02
+		     , CASE WHEN NVL(P.PLAN_CLMN_AMT_02, 0) = 0 THEN 0||' %'
+		            ELSE ROUND((NVL(C.CLMN_AMT_02, 0) / NVL(P.PLAN_CLMN_AMT_02, 0)) * 100, 0)||' %'
+		       END                        AS CLMN_PER_02
+		     , NVL(P.PLAN_CLMN_RMK, '')   AS PLAN_CLMN_RMK
+		     , NVL(B.BILL_AMT, 0)         AS BILL_AMT
+		     , NVL(C.CLMN_AMT, 0)         AS CLMN_AMT
+		     , NVL(A.SUJU_CLMN_AMT, 0) - NVL(B.BILL_AMT, 0) AS MI_BILL_AMT
+		     , NVL(A.SUJU_CLMN_AMT, 0) - NVL(C.CLMN_AMT, 0) AS MI_CLMN_AMT
+		     , NVL(P.PLAN_RMK, '')        AS PLAN_RMK
+		     , A.CLNT_CD, A.CURR_CD, A.CTRT_DOC, A.PMNT_MTD, A.FWD_EXCH_CHK_LIST, A.MNG_ID
+			 , SUBSTR((SELECT FROM_YYYYMM FROM YYYYMM), 5, 2) AS FROM_MM
+			 , SUBSTR((SELECT TO_YYYYMM FROM YYYYMM), 5, 2)   AS TO_MM
+			 , CASE WHEN A.CODE_RPRC = '10' THEN 
+			        (CASE WHEN A.CURR_CD = 'WON' THEN A.ORDRS_AMT 
+			              ELSE A.ORDRS_AMT * NVL(A.EXRATE, 1) END) * 1.1
+               ELSE (CASE WHEN A.CURR_CD = 'WON' THEN A.ORDRS_AMT 
+                          ELSE A.ORDRS_AMT * NVL(A.EXRATE, 1) END)
+                END AS EXP_AMT
+			 , A.CODE_RPRC
+			 , NVL(A.EXRATE, 1) AS EXRATE
+			 , (SELECT FROM_YYYYMM FROM YYYYMM) AS FROM_YYYYMM
+			 , (SELECT TO_YYYYMM FROM YYYYMM)   AS TO_YYYYMM
+		FROM   SJD1 AS A
+		       LEFT OUTER JOIN PLAN AS P  ON A.CO_CD         = P.CO_CD
+		                                 AND A.ORDRS_NO      = P.ORDRS_NO
+		                                 AND A.CLMN_PLAN_SEQ = P.CLMN_PLAN_SEQ
+		       LEFT OUTER JOIN BILL AS B  ON A.CO_CD         = B.CO_CD
+		                                 AND A.ORDRS_NO      = B.ORDRS_NO
+		                                 AND A.CLMN_PLAN_SEQ = B.CLMN_PLAN_SEQ
+		       LEFT OUTER JOIN CLMN AS C  ON A.CO_CD         = C.CO_CD
+		                                 AND A.ORDRS_NO      = C.ORDRS_NO
+		                                 AND A.CLMN_PLAN_SEQ = C.CLMN_PLAN_SEQ
+		WHERE  1 = 1
+		ORDER BY A.CO_CD, A.YYYY, A.ORDRS_MMDD, A.ORDRS_NO, A.CLMN_PLAN_SEQ, A.CLNT_NM, A.CTRT_NM
+		)
+		SELECT A.*
+		     , A.PLAN_BILL_RMK    AS PLAN_BILL_RMK_OLD
+			 , A.PLAN_BILL_AMT_01 AS PLAN_BILL_AMT_01_OLD
+		     , A.PLAN_CLMN_AMT_01 AS PLAN_CLMN_AMT_01_OLD
+		     , A.PLAN_BILL_AMT_02 AS PLAN_BILL_AMT_02_OLD
+		     , A.PLAN_CLMN_AMT_02 AS PLAN_CLMN_AMT_02_OLD
+			 , A.PLAN_CLMN_RMK    AS PLAN_CLMN_RMK_OLD
+			 , A.PLAN_RMK         AS PLAN_RMK_OLD
+		FROM   LIST AS A
+		WHERE  1 = 1
+		AND    A.RRN BETWEEN #{firstIndex} AND #{lastIndex}
+	</select>
+	
 	<!-- 리스트 with -->
 	<sql id="select_ordrs_master">
 		WITH BJM AS 

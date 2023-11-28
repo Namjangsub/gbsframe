@@ -42,6 +42,18 @@ public class CR19SvcImpl implements CR19Svc {
 		return cr19Mapper.select_cr19_List(paramMap);
 	}
 
+	// 그리드 카운트
+	@Override
+	public int select_cr19m02_Count(Map<String, String> paramMap) {
+		return cr19Mapper.select_cr19m02_Count(paramMap);
+	}
+
+	// 그리드 리스트
+	@Override
+	public List<Map<String, String>> select_cr19m02_List(Map<String, String> paramMap) {
+		return cr19Mapper.select_cr19m02_List(paramMap);
+	}
+
 	// 수주버전
 	@Override
 	public List<Map<String, Object>> select_ordrsHistNo_List(Map<String, String> paramMap) {
