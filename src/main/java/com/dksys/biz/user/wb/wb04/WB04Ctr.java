@@ -107,14 +107,12 @@ public class WB04Ctr {
 	  List<Map<String, String>> fileList = wb04Svc.selectGanttAllList3(paramMap); 
 	  model.addAttribute("fileList", fileList); 
 	  return "jsonView";
-	  
-    }   
-	  
-	  
-	  
-	  
-	  
-	  
-	  
-	  
+    }
+
+	@PostMapping(value = "/selectGanttAllList4") 
+	public String selectGanttAllList4(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	  List<Map<String, String>> fileList = wb04Svc.selectGanttAllList4(paramMap); 
+	  model.addAttribute("fileList", fileList); 
+	  return "jsonView";
+    }
 }
