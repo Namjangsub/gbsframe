@@ -247,7 +247,7 @@ var openBlindModal = function(url, width, height, title, paramObj, callback) {
 
 function parseJwt(token) {
 
-	console.log('parseJwt !!!');
+//	console.log('parseJwt !!!');
 	if(token == null) {
 		if(location.href.search("/static/index.html") != -1  || location.href.search("/static/mobile/index.html") != -1 )  {
 			return;
@@ -306,7 +306,7 @@ function checkGridRow(grid, type){
 var tokenErrorMsg = ["unauthorized", "invalid_token"];
 
 function postAjax(url, data, contentType, callback) {
-	console.log(`postAjax url = ${url} `);
+//	console.log(`postAjax url = ${url} `);
 	if(contentType == null) {
 		contentType = "application/json; charset=utf-8";
 		data = JSON.stringify(data);
@@ -342,7 +342,7 @@ function postAjax(url, data, contentType, callback) {
 
 function postAjaxSync(url, data, contentType, callback) {
 
-	console.log(`postAjaxSync url = ${url} `);
+//	console.log(`postAjaxSync url = ${url} `);
 	if(contentType == null) {
 		contentType = "application/json; charset=utf-8";
 		data = JSON.stringify(data);
@@ -1569,7 +1569,7 @@ function isEmpty(str){
 			else return true;
 		}
 	} catch (e) {
-		console.log("====isEmpty error>>",e);
+//		console.log("====isEmpty error>>",e);
 		return true;
 	}
 }
@@ -2376,7 +2376,7 @@ function kakaoSendReal(talkJson, talkParam, param) {
       },		    
 	    async: false,
 	    success: function(data){		
-	    	console.log('status:' + data.status);
+//	    	console.log('status:' + data.status);
 	    	let err = data.status;
 	    	if( err.indexOf("ERR") > -1 || err.indexOf("KKO")> -1 ) { 
 	    		let find = kakaoErr.find(e => e.codeId === err);
@@ -2393,10 +2393,10 @@ function kakaoSendReal(talkJson, talkParam, param) {
 	    },
       error: function (data) {
       	insertKakaoMessage(data.status, talkDeJson, param);
-      	console.log('---ajax error---');
+//      	console.log('---ajax error---');
       }
 	});		
-	console.log('---success---' + sendCnt);	
+//	console.log('---success---' + sendCnt);	
 	return sendCnt;
 }
 
@@ -2420,9 +2420,9 @@ function insertKakaoMessage(dStatus, talkDeJson, param){
 	postAjax("/user/bm/bm18/insertKakaoMessage", formData, null, function(data) {
 		//alert(data.resultMessage);// 결과 메시지를 alert으로 출력
 			if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
-				console.log('--알림톡 로그 정상 저장--');
+//				console.log('--알림톡 로그 정상 저장--');
 			} else {
-				console.log('--알림톡 로그 정상 저장 오류--');				
+//				console.log('--알림톡 로그 정상 저장 오류--');				
 			}
 	});
 }

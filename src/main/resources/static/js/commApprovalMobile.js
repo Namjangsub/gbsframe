@@ -32,7 +32,7 @@ function Approval(htmlParam, param, popParam) {
 		}
 		
 		if( htmlParam.htmlArea ) {
-			console.log('---html make');
+//			console.log('---html make');
 			var htmlId = htmlParam.htmlArea;
 			var htmlTable = `
 			<div class="" style="display: block; width: 372px; height: 100%; margin-bottom: 30px; border:0px solid #eee; padding-bottom:5px;">
@@ -173,7 +173,7 @@ function Approval(htmlParam, param, popParam) {
 		if( this.applyBtn ) {
 			//본인 결재의견
 			var todoCfOpn = $("#appLine tr").find("font").closest("tr").find("textarea[name=todoCfOpn]").val();
-			console.log("todoCfOpn=",todoCfOpn);
+//			console.log("todoCfOpn=",todoCfOpn);
 			//입력값 set			
 			var paramMap = {		
 					"todoId" : jwt.userId
@@ -184,7 +184,7 @@ function Approval(htmlParam, param, popParam) {
 				if(data.resultCode == 200){
 					postAjaxSync("/user/qm/qm01/updateReqStChk", paramMap, null, function(data){
 						if(data.resultCode == 200){
-							console.log("QM01M01 접수컬럼상태가 바뀌었습니다");
+//							console.log("QM01M01 접수컬럼상태가 바뀌었습니다");
 						}
 						alert("승인 되었습니다.");
 						confirmYn = true;

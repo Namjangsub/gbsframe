@@ -32,7 +32,7 @@ function Approval(htmlParam, param, popParam) {
 		}
 		
 		if( htmlParam.htmlArea ) {
-			console.log('---html make');
+//			console.log('---html make');
 			var htmlId = htmlParam.htmlArea;
 			var htmlTable = `
 			<div class="" style="display: block; width: 700px; height: 100%; margin-bottom: 30px; border:0px solid #eee; padding-bottom:5px;">
@@ -192,7 +192,7 @@ function Approval(htmlParam, param, popParam) {
 				if(data.resultCode == 200){
 					postAjaxSync("/user/qm/qm01/updateReqStChk", paramMap, null, function(data){
 						if(data.resultCode == 200){
-							console.log("QM01M01 접수컬럼상태가 바뀌었습니다");
+//							console.log("QM01M01 접수컬럼상태가 바뀌었습니다");
 						}
 						alert(confirmText + " 되었습니다.");
 						confirmYn = true;
@@ -202,7 +202,7 @@ function Approval(htmlParam, param, popParam) {
 					postAjaxSync("/user/wb/wb20/selectTodoFinalYn", paramMap, null, function(data){
 						let todoYn = data.result[0].todoYn;
 						if( todoYn == "Y" ) {
-							console.log('---결재모두완료 알림톡시작');
+//							console.log('---결재모두완료 알림톡시작');
 							sendTodoFinal(paramMap);																
 						}
 					});					

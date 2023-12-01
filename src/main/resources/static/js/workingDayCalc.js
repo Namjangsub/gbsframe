@@ -82,7 +82,7 @@ function calculateHoliday(startDate, duration=1) {
 		     
 		} while (workingDays < countDay);
 
-		console.log('근무일:' + workingDays + '   휴일 :' + holiDaysCnt);
+//		console.log('근무일:' + workingDays + '   휴일 :' + holiDaysCnt);
 		
 		start.setDate(start.getDate() + (addSubVal * -1));  //하루 차이 방지하기위함
 		
@@ -228,7 +228,7 @@ function calculateHolidayCnt(startDate, endDate) {
 		     
 		} 
 
-		console.log('근무일:' + workingDays + '   휴일 :' + holiDaysCnt);
+//		console.log('근무일:' + workingDays + '   휴일 :' + holiDaysCnt);
 		
 		return new myWorkDay(workingDays, holiDaysCnt);
 		
