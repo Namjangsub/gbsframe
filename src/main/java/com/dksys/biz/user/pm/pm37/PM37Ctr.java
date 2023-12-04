@@ -46,4 +46,12 @@ public class PM37Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+
+	  // 작업일보 리스트 조회
+	  @PostMapping(value = "/selectYearWorkMainList")
+	  public String selectYearWorkMainList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  List<Map<String, String>>  result = pm37Svc.selectYearWorkMainList(paramMap);
+	      model.addAttribute("result", result);
+	      return "jsonView";
+	  }
 }

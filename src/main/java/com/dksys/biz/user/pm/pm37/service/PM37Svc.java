@@ -12,4 +12,5 @@ public interface PM37Svc {
 	 
 	 List<Map<String, String>> select_all_name(Map<String, String> paramMap);
 
+	 List<Map<String, String>> selectYearWorkMainList(Map<String, String> paramMap);
 }

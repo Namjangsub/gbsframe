@@ -62,4 +62,10 @@ public class PM37SvcImpl implements PM37Svc{
 	public List<Map<String, String>> select_all_name(Map<String, String> paramMap) {
 		return pm37Mapper.select_all_name(paramMap);
 	}
+	  
+	@Override
+	  public List<Map<String, String>> selectYearWorkMainList(Map<String, String> paramMap) {
+	    return pm37Mapper.selectYearWorkMainList(paramMap);
+	  }
+	
 }
