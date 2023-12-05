@@ -196,87 +196,20 @@
 
 	 <select id="selectYearWorkMainList" parameterType="Map" resultType="CamelMap">
 	        /* 작업일보 년갑 집계 내역 분석 */
-			WITH DPT AS
-			     (
-			      SELECT A.CO_CD
-			            , A.NAME                AS NAME    
-			            , A.ID                  AS ID      
-			            , A.DEPT_ID             AS DEPT_ID 
-			            , B.DEPT_NM             AS DEPT_NM
-			            , SUBSTR(A.DEPT_ID,1,5) AS UP_DEPT 
-			        FROM TB_CM06M01 A  
-			             INNER JOIN TB_CM04M01 AS B ON (A.DEPT_ID = B.DEPT_ID ) 
-			       WHERE A.CO_CD = #{coCd}
-			         AND A.DEPT_ID LIKE (SELECT SUBSTR(DEPT_ID,1,5)||'%'
-			                               FROM TB_CM06M01
-			                              WHERE ID = #{userId}
-			                             )
-			     )
-			   , PCODE AS 
-			     ( 
-			       SELECT LEVEL - 1 AS LVL
-			            , T.CODE_KIND
-			            , T.CODE_DESC
-			            , T.CODE_ID
-			            , T.CODE_NM
-			            , T.SORT_NO
-			          FROM TB_CM05M01 T    
-			         WHERE USE_YN = 'Y'
-			           AND LEVEL = 2 
-			         START WITH T.CODE_KIND =  (SELECT MIN(CODE_ID)
-			                                      FROM TB_CM05M01
-			                                     WHERE CODE_RPRC = (SELECT MAX(UP_DEPT) FROM DPT) 
-			                                       AND CODE_KIND = 'WORKRPT') 
-			         CONNECT BY PRIOR T.CODE_ID = T.CODE_KIND
-			     )
-			   , SJD AS --수주상세정보 
-			     (
-			      SELECT X.CO_CD                                             AS CO_CD         
-			            , Y.ORDRS_CLNT_CD                                     AS CLNT_CD      
-			            , A.CLNT_NM                                           AS CLNT_NM       
-			            , X.SALES_CD                                          AS SALES_CD      
-			            , (SELECT FN_CM05M01_CD_TO_NM(Y.CLNT_PJT) FROM DUAL) AS PJT_NM       
-			            , X.PRDT_CD                                           AS PRDT_CD       
-			            , (SELECT FN_BM01M01_ID_TO_NM(X.PRDT_CD) FROM DUAL)  AS PRDT_CD_NM   
-			            , X.ITEM_DIV                                          AS ITEM_DIV      
-			            , (SELECT FN_CM05M01_CD_TO_NM(X.ITEM_DIV) FROM DUAL) AS ITEM_DIV_NM
-			            , X.ORDRS_DTL_DIV20									AS ORDRS_DTL_DIV20
-			            , X.ORDRS_DTL_DIV30 								AS ORDRS_DTL_DIV30
-			            , X.MCTYPE 											AS MCTYPE
-			            , X.EQP_NM                                            AS EQP_NM        
-			        FROM TB_CR02D02 X     --수주상세
-			             INNER JOIN TB_CR02M01 AS Y ON (X.CO_CD = Y.CO_CD AND X.ORDRS_NO = Y.ORDRS_NO) 
-			             INNER JOIN TB_BM02M01 AS A ON (Y.ORDRS_CLNT_CD = A.CLNT_CD)
-			     )
-			   , PDS AS --생산일보 
+			WITH PDS AS --생산일보 
 			     ( 
 			      SELECT T.CO_CD                                               AS CO_CD          
-			            , T.SALES_CD                                            AS SALES_CD      
 			            , T.WORK_RPT_L                                          AS WORK_RPT_L    
 			            , T.WORK_RPT_M                                          AS WORK_RPT_M     
 			            , T.WORK_RPT_S                                          AS WORK_RPT_S    
 			            , T.WORK_RPT_HOUR                                       AS WORK_RPT_HOUR  
-			            , T.WORK_RPT_ID                                         AS WORK_RPT_ID    
-			            , (SELECT FN_CM06M01_ID_TO_NM(T.CREAT_ID) FROM DUAL)   AS WORK_RPT_NM    
+			            , T.WORK_RPT_ID                                         AS WORK_RPT_ID  
 			            , TO_CHAR(T.WORK_RPT_DT,'YYYY-MM-DD')                   AS WORK_RPT_DT   
-			            , CR.CLNT_NM                                            AS CLNT_NM         
-			            , CR.PJT_NM                                             AS CLNT_PJT      
-			            , CR.PRDT_CD_NM                                         AS PRDT_CD_NM    
-			            , CR.ITEM_DIV_NM                                        AS ITEM_DIV_NM   
-			            , CR.EQP_NM                                             AS EQP_NM
-			            , CR.ORDRS_DTL_DIV20									AS ORDRS_DTL_DIV20
-			            , (SELECT FN_CM05M01_CD_TO_NM(CR.ORDRS_DTL_DIV20) FROM DUAL) AS ORDRS_DTL_DIV20_NM 
-			            , CR.ORDRS_DTL_DIV30 								AS ORDRS_DTL_DIV30
-			            , (SELECT FN_CM05M01_CD_TO_NM(CR.ORDRS_DTL_DIV30) FROM DUAL) AS ORDRS_DTL_DIV30_NM 
-			            , CR.MCTYPE 											AS MCTYPE
-			            , (SELECT FN_CM05M01_CD_TO_NM(CR.MCTYPE) FROM DUAL) AS MCTYPE_NM  
 			            , to_CHAR(T.WORK_RPT_DT, 'MM')     AS MM
 			            , T.WORK_RPT_L||T.WORK_RPT_M ||T.WORK_RPT_S			AS GUBUN
 			            , TOT.TOT_HOURS
 			            , TOT.ALL_TOT         
 			        FROM TB_PM01M01 T 
-			              LEFT OUTER JOIN SJD AS CR ON ( T.SALES_CD = CR.SALES_CD )
-			              INNER      JOIN DPT AS DP ON ( T.CO_CD = DP.CO_CD AND T.WORK_RPT_ID = DP.ID AND T.WORK_RPT_L = DP.UP_DEPT)   
 			              LEFT OUTER JOIN (
 			              					SELECT WORK_RPT_ID, WORK_RPT_L, WORK_RPT_M, WORK_RPT_S,
 			              					       SUM(WORK_RPT_HOUR) AS TOT_HOURS, 
@@ -289,45 +222,36 @@
 				              					   ) AS ALL_TOT
 			              					  FROM TB_PM01M01 
 			              					 WHERE CO_CD = #{coCd}
-			              					   AND WORK_RPT_ID = #{userId} 
+			              					   AND WORK_RPT_ID = #{userId}    
 			              					   AND WORK_RPT_DT BETWEEN TO_DATE(#{reqYyyy}||'0101','YYYYMMDD') AND TO_DATE(#{reqYyyy}||'1231','YYYYMMDD')
 			              					 GROUP BY WORK_RPT_ID, WORK_RPT_L, WORK_RPT_M, WORK_RPT_S 
 			              				) AS TOT ON (T.WORK_RPT_ID = TOT.WORK_RPT_ID AND T.WORK_RPT_L = TOT.WORK_RPT_L AND T.WORK_RPT_M = TOT.WORK_RPT_M AND T.WORK_RPT_S = TOT.WORK_RPT_S)
 			       WHERE 1=1
 			         AND T.WORK_RPT_DT BETWEEN TO_DATE(#{reqYyyy}||'0101','YYYYMMDD') AND TO_DATE(#{reqYyyy}||'1231','YYYYMMDD')
 			         AND T.CO_CD = #{coCd}
-			         AND DP.ID = #{userId}  
+			         AND T.WORK_RPT_ID = #{userId}   
 			     )
 			SELECT *
 			  FROM (
-			SELECT C.CODE_KIND    --중분류코드
-			     , C.CODE_DESC     --중분류명
-			     , C.CODE_ID       --소분류코드
-			     , C.CODE_NM       --소분류명
-<!-- 			     , P.SALES_CD -->
-<!-- 			     , P.CLNT_NM -->
-<!-- 			     , P.CLNT_PJT -->
-<!-- 			     , P.PRDT_CD_NM -->
-<!-- 			     , P.ITEM_DIV_NM -->
-<!-- 			     , P.ORDRS_DTL_DIV20_NM -->
-<!-- 			     , P.ORDRS_DTL_DIV30_NM -->
-<!-- 			     , P.MCTYPE_NM -->
-<!-- 			     , P.EQP_NM -->
-			     , P.WORK_RPT_NM   --작성자명
+			SELECT P.WORK_RPT_L
+			     , (SELECT FN_CM05M01_CD_TO_NM(P.WORK_RPT_L) FROM DUAL) AS  CODE_DIV  --대분류명
+			     , P.WORK_RPT_M    --중분류코드
+			     , (SELECT FN_CM05M01_CD_TO_NM(P.WORK_RPT_M) FROM DUAL) AS  CODE_DESC  --중분류명
+			     , P.WORK_RPT_S       --소분류코드
+			     , (SELECT FN_CM05M01_CD_TO_NM(P.WORK_RPT_S) FROM DUAL) AS  CODE_NM --소분류명
+
+			     , (SELECT FN_CM06M01_ID_TO_NM(P.WORK_RPT_ID) FROM DUAL)   AS WORK_RPT_NM --작성자명
 			     , P.WORK_RPT_S    --작업일보소분류
 			     , P.WORK_RPT_HOUR --작업시간 
-			     , C.CODE_KIND||C.CODE_ID||C.SORT_NO AS ORD_SEQ
-<!-- 			     , (select count(CODE_KIND) from PCODE a where C.CODE_KIND = a.CODE_KIND) as ROW_CNT -->
+			     , P.WORK_RPT_S AS ORD_SEQ
+
 			     , P.GUBUN
 			     , MM
 			     , P.TOT_HOURS
 			     , P.ALL_TOT
 			     , TO_CHAR(P.TOT_HOURS/P.ALL_TOT*100, '999.99') AS TOT_PCT
 			  FROM PDS   P
-			      , PCODE C
 			 WHERE 1=1
-			   AND C.CODE_ID    = P.WORK_RPT_S(+)
-			   AND C.CODE_KIND  = P.WORK_RPT_M(+)
 			   AND P.WORK_RPT_HOUR > 0
 			       )
 			   PIVOT (SUM(WORK_RPT_HOUR) FOR MM IN ( '01' AS MM01, '02' AS MM02, '03' AS MM03, '04' AS MM04, '05' AS MM05, '06' AS MM06,
@@ -335,18 +259,14 @@
 			         )
 			<where>
 				<if test="workRptm != null and !workRptm.equals('')">
-				  AND CODE_KIND = #{workRptm}
+				  AND WORK_RPT_M = #{workRptm}
 				</if>
 				<if test="workRpts != null and !workRpts.equals('')">
-				  AND CODE_ID = #{workRpts}
+				  AND WORK_RPT_S = #{workRpts}
 				</if>
-				<if test="salesCd != null and !salesCd.equals('')">
-            	  AND SALES_CD = #{salesCd}
-        		</if>
 			</where>       
-			         
 			 ORDER BY ORD_SEQ
-	
+			 
 	    </select>
      
     </mapper>
