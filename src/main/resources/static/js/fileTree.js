@@ -389,17 +389,17 @@ var treeModule = (function () {
 		    <div id="fileAttachTxt" style="display:block; cursor: pointer; text-align: left; font-weight:bold; height: 30px;"><i class="fa fa-file-import"></i> 파일첨부　　</div>
 		    <div id="fileAttachCnts" style="display:none">
 		    <div class="col-xs-2 pd0">
-		      <div class="contents mg0 pd0" style="width: 100%; min-width: 150px">
+		      <div class="contents mg0 pd0" style="width: 100%; min-width: 200px">
 		        <h3 class="location">
 		          <span class="page_tit" style="text-align: left;"> 파일트리</span>
 		        </h3>
-		        <div id="treeview" style="height: 100px; padding: 5px">
+		        <div id="treeview" style="height: 300px; padding: 5px">
 		          <div id="deptTreeOrdars"></div>
 		        </div>
 		      </div>
 		    </div>
 		    <div class="col-xs-10 pd0 pdl5">
-		      <div class="contents  mg0 pd0" style="width: 100%; min-width: 150px">
+		      <div class="contents  mg0 pd0" style="width: 100%; min-width: 200px">
 		        <h3 class="location">
 		          <a class="file_tag pdl20 pdr10" id="file_tag" style="font-weight: bold; color: blue;"></a>
 		          <span class="page_tit" id="file_tit" style="text-align: right;"> 문서현황 </span>
@@ -409,7 +409,7 @@ var treeModule = (function () {
 					<a onclick="treeModule.button_zoomUp('+');" style="height: 25px;"><i class="glyphicon glyphicon-zoom-in"></i>+</a>
 					<a onclick="treeModule.button_zoomUp('-');" style="height: 25px;"><i class="glyphicon glyphicon-zoom-out"></i>-</a>
 				</div>
-		        <div class="ax5_grid" data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 100px; width: 100%"></div>
+		        <div class="ax5_grid" data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 300px; width: 100%"></div>
 		      </div>
 		    </div>
 			<div class="col-xs-2" style="height: 70px;"></div>
