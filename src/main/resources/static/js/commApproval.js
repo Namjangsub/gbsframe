@@ -46,10 +46,10 @@ function Approval(htmlParam, param, popParam) {
 			    	<!-- 결재라인 table -->
 			    	<table id="appLine" style="border: 1px solid #dbdbdb; border-collapse: collapse" >
 			    		<colgroup>
-			    			<col width="5%">
-			    			<col width="15%">
+			    			<col width="8%">
+			    			<col width="10%">
 			    			<col width="*%">
-			    			<col width="15%">
+			    			<col width="10%">
 			    			<col width="15%">			    			
 			    		</colgroup>
 			    		<tr id="appH" stye="text-align:center; border-bottom:1px solid #dbdbdb; height:25px;">
@@ -60,8 +60,8 @@ function Approval(htmlParam, param, popParam) {
 			    			<th class="appTh">결재일자</th>		    			
 			    		</tr>
 			    	</table>
-			    	<div class="add_btn_small pdl10" style="float:right; padding-top:10px;" id="appBtnDiv">
-					<a style="height: 30px; line-height: 28px; width: 90px;" id="appConfirmAnchor" onclick="approvalConfirm();" >결재승인</a>
+			    	<div class="popup_bottom_btn" id="appBtnDiv">
+						<button id="appConfirmAnchor"  onclick="approvalConfirm();">결재승인</button>
 					</div>
 		        </div>			        
 				<!--결재 테이블 end-->		        
@@ -164,7 +164,7 @@ function Approval(htmlParam, param, popParam) {
     		<tr style="border-bottom:1px solid #dbdbdb;">
     			<td class="appTd">@@item1@@</td>
     			<td class="appTd">@@bold@@@@item2@@</font></td>
-    			<td class="appTd" style='text-align:left; padding-left:5px; height:25px;'><input type='text' name='todoCfOpn' value="@@item3@@" readonly="readonly"></td>
+    			<td class="appTd" style='text-align:left; padding-left:5px; height:25px;'><input type='text' name='todoCfOpn' value="@@item3@@" class="form-control" readonly="readonly"></td>
     			<td class="appTd">@@item4@@</td>
     			<td class="appTd">@@item5@@</td>    			
     		</tr>		
