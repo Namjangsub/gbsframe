@@ -111,7 +111,7 @@ public class CR02Svcmpl implements CR02Svc {
         //param.get("newOrdrsNo") => 회사 == 'TRN' && 거래처 = '104' 일때
         //수주구분이 A/S 일때 수주번호에 AS23024 번호 만들기
         if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
-            if (param.get("ordrsDiv").equals("ORDRSDIV1")) {
+            if (param.get("ordrsDiv").equals("ORDRSDIV1") || param.get("ordrsDiv").equals("ORDRSDIV9")) {
             	param.put("ordrsNo", selectMaxOrdrsNo(param));
             }
             else {
