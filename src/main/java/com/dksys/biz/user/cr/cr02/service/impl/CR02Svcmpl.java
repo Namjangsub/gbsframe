@@ -262,7 +262,7 @@ public class CR02Svcmpl implements CR02Svc {
         	// 수주구분이 달라지는 경우
             if (!newOrdrsDiv.equals(param.get("ordrsDiv"))) {
             	//정상수주면 정상수주번호
-                if (param.get("ordrsDiv").equals("ORDRSDIV1")) {
+                if (param.get("ordrsDiv").equals("ORDRSDIV1") || param.get("ordrsDiv").equals("ORDRSDIV9")) {
                 	param.put("ordrsNo", selectMaxOrdrsNo(param));
                 } else {
                 	// 그외는 AS수주번호
@@ -274,7 +274,7 @@ public class CR02Svcmpl implements CR02Svc {
             // 건양수주번호가 있다가 사라진 경우 수주번호를 새로 체번해야한다.
             if (!"".equals(param.get("oldOrdrsNo")) && param.get("oldOrdrsNo") != null) {
             	//정상수주면 정상수주번호
-            	if (param.get("ordrsDiv").equals("ORDRSDIV1")) {
+            	if (param.get("ordrsDiv").equals("ORDRSDIV1") || param.get("ordrsDiv").equals("ORDRSDIV9")) {
             		param.put("ordrsNo", selectMaxOrdrsNo(param));
             	} else {
             		// 그외는 AS수주번호
