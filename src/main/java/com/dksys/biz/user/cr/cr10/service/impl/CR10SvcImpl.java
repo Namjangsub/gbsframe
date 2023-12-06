@@ -395,8 +395,8 @@ public class CR10SvcImpl implements CR10Svc {
 		//---------------------------------------------------------------
 
 	  int result = cr10Mapper.deleteLgistDetailAll(paramMap);
-	  result = cr10Mapper.deleteLgistMast(paramMap);
-	  result = cr10Mapper.deleteTodoDetail(paramMap);
+	  result += cr10Mapper.deleteLgistMast(paramMap);
+	  result += cr10Mapper.deleteTodoDetail(paramMap);
 
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
