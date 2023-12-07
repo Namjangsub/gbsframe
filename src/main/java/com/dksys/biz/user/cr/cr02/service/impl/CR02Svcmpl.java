@@ -163,6 +163,8 @@ public class CR02Svcmpl implements CR02Svc {
                 detailMap.put("userId", param.get("userId"));
                 detailMap.put("pgmId", param.get("pgmId"));
                 detailMap.put("udtId", param.get("userId"));
+                detailMap.put("ordrsClntNm", param.get("ordrsClntNm"));
+                detailMap.put("clntPjt", param.get("clntPjt"));
                 detailMap.put("udtPgm", "TB_CR02M01");
                 
                 //Sales Cd 만들떄 ITEM_DIV의 CODE_ETC 값 추출
@@ -330,6 +332,8 @@ public class CR02Svcmpl implements CR02Svc {
                 detailMap.put("userId", param.get("userId"));
                 detailMap.put("pgmId", param.get("pgmId"));
                 detailMap.put("udtId", param.get("userId"));
+                detailMap.put("ordrsClntNm", param.get("ordrsClntNm"));
+                detailMap.put("clntPjt", param.get("clntPjt"));
                 detailMap.put("udtPgm", "TB_CR02M01");
                 
                 //Sales Cd 만들떄 ITEM_DIV의 CODE_ETC 값 추출
