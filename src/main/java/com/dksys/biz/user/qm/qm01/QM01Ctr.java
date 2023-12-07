@@ -137,6 +137,7 @@ public class QM01Ctr {
 			if (qm01Svc.insertQualityReq(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+				model.addAttribute("resultData", paramMap);
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
