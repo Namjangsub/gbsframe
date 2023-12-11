@@ -78,7 +78,7 @@ public class CM05SvcImpl implements CM05Svc {
 	@Override
 	public int insertCode(Map<String, String> param) throws Exception {
 		//프로젝트 코드일경우 자동 채번으로 번호 등록함, 최종 변호는 dzCode에 저장함
-		if (param.get("codeKind").equals("PRJCTCD")) {
+		if (("PRJCTCD".equals(param.get("codeKind"))) && ("C".equals(param.get("actionType")))) {
 			Map<String, String> resultList = cm05Mapper.selectProjectCodeLastNoInfo(param);
 			param.put("codeId", "PRJCT" + resultList.get("lastNo").trim());
 			param.put("dzCode", resultList.get("lastNo"));
