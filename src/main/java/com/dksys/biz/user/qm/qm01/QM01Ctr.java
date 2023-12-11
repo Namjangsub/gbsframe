@@ -134,10 +134,20 @@ public class QM01Ctr {
   @PostMapping(value = "/insertQualityReq")
   public String insertQualityReq(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
-			if (qm01Svc.insertQualityReq(paramMap, mRequest) != 0 ) {
+			//insertQualityReq 메서드를 호출. 결과를 담은 Map<String, String>을 반환
+			Map<String, String> rtnResult = qm01Svc.insertQualityReq(paramMap, mRequest);
+			
+			//결과처리
+			//"reqNo" 키에 해당하는 값을 가져와 문자열로 변환
+			String reqNo = rtnResult.get("reqNo").toString();
+			//문자열을 정수로 변환
+			int result =  Integer.parseInt(rtnResult.get("result"));
+			
+			if (result !=0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-				model.addAttribute("resultData", paramMap);
+				//model.addAttribute("resultData", paramMap);
+				model.addAttribute("reqNo", reqNo);
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));

@@ -40,7 +40,8 @@ public interface QM01Svc {
 
   int selectConfirmCount(Map<String, String> paramMap);
 
-  int insertQualityReq(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+  //int insertQualityReq(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+  Map<String, String> insertQualityReq(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
   
   int insertQualityResp(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
