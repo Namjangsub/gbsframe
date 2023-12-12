@@ -146,4 +146,13 @@ public class BM02Ctr {
     	model.addAttribute("clntList", clntList);
         return "jsonView";
     }
+	
+	// 거래처 담당자 e-mail 리스트 조회
+    @PostMapping("/selectClntPurchaseMngEmail")
+    public String selectClntPurchaseMngEmail(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, String>> clntEmail = bm02Svc.selectClntPurchaseMngEmail(paramMap);
+    	model.addAttribute("clntEmail", clntEmail);
+        return "jsonView";
+    }
+
 }

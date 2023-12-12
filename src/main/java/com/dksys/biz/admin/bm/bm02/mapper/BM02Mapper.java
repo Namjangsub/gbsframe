@@ -47,4 +47,6 @@ public interface BM02Mapper {
 
 	int selectClntExistCount(Map<String, String> param);
 	
+	List<Map<String, String>> selectClntPurchaseMngEmail(Map<String, String> paramMap);
+	
 }

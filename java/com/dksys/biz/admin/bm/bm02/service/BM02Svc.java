@@ -27,4 +27,6 @@ public interface BM02Svc {
 
 	void deleteClntBizdept(Map<String, Object> paramMap);
 
+	List<Map<String, String>> selectClntPurchaseMngEmail(Map<String, String> paramMap);
+
 }
