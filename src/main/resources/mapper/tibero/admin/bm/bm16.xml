@@ -811,7 +811,7 @@ WITH SJD AS --수주상세
                     , (SELECT FN_CM05M01_CD_TO_NM(T.NEW_PRDT_CD) FROM DUAL)  AS ORDRS_DTL_DIV20_NM --작업구분명
                     , FN_CM05M01_CD_TO_NM(T.ODR_CD)                          AS CTRT_DOC           --계약문서 
                     , TO_CHAR(T.DUDT_PLAN_DT, 'YYYY-MM-DD')                  AS DUDT_INTEND_DT     --예상납기일자
-                    , TO_CHAR(T.ORDRS_PLAN_DT, 'YYYY-MM-DD')                 AS ORDRS_DT           --수주예정일자
+                    , TO_CHAR(NVL(T.ORDRS_PLAN_DT,LAST_DAY(TO_DATE(T.YYYYMM, 'YYYYMM'))), 'YYYY-MM-DD')                 AS ORDRS_DT           --수주예정일자
                   --, TO_CHAR(T.ORDRS_DT, 'YYYY-MM-DD')                      AS ORDRS_DT           --수주일자
                     , TO_CHAR(T.DSGN_DT, 'YYYY-MM-DD')                       AS DSGN_DT            --설계일자
                     , TO_CHAR(T.PURCHS_DT, 'YYYY-MM-DD')                     AS PURCHS_DT          --구매일자
@@ -821,8 +821,7 @@ WITH SJD AS --수주상세
                  FROM TB_BM06M01 T --프로젝트마스터
                       LEFT OUTER JOIN TB_BM02M01 A  ON T.CLNT_CD = A.CLNT_CD --거래처마스터
                 WHERE T.CO_CD = #{coCd}
-                  AND T.ORDRS_PLAN_DT <![CDATA[>=]]> TO_DATE(#{strtDt}, 'YYYYMMDD')
-                  AND T.ORDRS_PLAN_DT <![CDATA[<=]]> TO_DATE(#{endDt}, 'YYYYMMDD')
+                  AND T.YYYYMM  BETWEEN  SUBSTRING(#{strtDt},1,6) AND SUBSTRING(#{endDt},1,6)
                 <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
                  AND T.CLNT_CD = #{ordrsClntCd}
                 </if>
@@ -878,7 +877,7 @@ WITH SJD AS --수주상세
 	       ) 
    PIVOT ( MAX(PLANE_DT) FOR PLAN_CD_NM IN ('수주확정' AS WBS01, '목표원가/PFU배포' AS WBS02, '설계완료' AS WBS03, '구매완료' AS WBS04, '기계조립완료' AS WBS05, '전기완료' AS WBS06, '자체시운전완료' AS WBS07, '조건작업완료' AS WBS08, '고객검수' AS WBS09, '포장' AS WBS10, '출고' AS WBS11, '도착' AS WBS12, '설치시운전(출발일)' AS WBS13, '설치시운전(복귀일)' AS WBS14 ) --해당부서 코드명 넣어주기 
          )
- 		 ORDER BY CLNT_CD, CLNT_PJT, ORDRS_DT
+ 		 ORDER BY CLNT_CD, CLNT_PJT, ORDRS_DT, SALES_CD
 	</select>
 
 	<select id="selectPrjctPlanList" resultType="CamelMap">
@@ -986,7 +985,7 @@ WITH SJD AS --수주상세
 					                    , (SELECT FN_CM05M01_CD_TO_NM(T.NEW_PRDT_CD) FROM DUAL)  AS ORDRS_DTL_DIV20_NM --작업구분명
 					                    , FN_CM05M01_CD_TO_NM(T.ODR_CD)                          AS CTRT_DOC           --계약문서 
 					                    , TO_CHAR(T.DUDT_PLAN_DT, 'YYYY-MM-DD')                  AS DUDT_INTEND_DT     --예상납기일자
-					                    , TO_CHAR(T.ORDRS_PLAN_DT, 'YYYY-MM-DD')                 AS ORDRS_DT           --수주예정일자
+					                    , TO_CHAR(NVL(T.ORDRS_PLAN_DT,LAST_DAY(TO_DATE(T.YYYYMM, 'YYYYMM'))), 'YYYY-MM-DD')                 AS ORDRS_DT           --수주예정일자
 					                  --, TO_CHAR(T.ORDRS_DT, 'YYYY-MM-DD')                      AS ORDRS_DT           --수주일자
 					                    , TO_CHAR(T.DSGN_DT, 'YYYY-MM-DD')                       AS DSGN_DT            --설계일자
 					                    , TO_CHAR(T.PURCHS_DT, 'YYYY-MM-DD')                     AS PURCHS_DT          --구매일자
@@ -996,8 +995,7 @@ WITH SJD AS --수주상세
 					                 FROM TB_BM06M01 T --프로젝트마스터
 					                      LEFT OUTER JOIN TB_BM02M01 A  ON T.CLNT_CD = A.CLNT_CD --거래처마스터
 					                WHERE T.CO_CD = #{coCd}
-					                  AND T.ORDRS_PLAN_DT <![CDATA[>=]]> TO_DATE(#{strtDt}, 'YYYYMMDD')
-					                  AND T.ORDRS_PLAN_DT <![CDATA[<=]]> TO_DATE(#{endDt}, 'YYYYMMDD')
+					                  AND T.YYYYMM  BETWEEN  SUBSTRING(#{strtDt},1,6) AND SUBSTRING(#{endDt},1,6)
 					                <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
 					                 AND T.CLNT_CD = #{ordrsClntCd}
 					                </if>
@@ -1056,7 +1054,7 @@ WITH SJD AS --수주상세
 						       ) 
 					   PIVOT ( MAX(PLANE_DT) FOR PLAN_CD_NM IN (${wbscode}) --해당부서 코드명 넣어주기 
 					         )
-					 		 ORDER BY CLNT_CD, CLNT_PJT, ORDRS_DT
+					 		 ORDER BY CLNT_CD, CLNT_PJT, ORDRS_DT, SALES_CD
 			 ) N
 	   )T
  	WHERE 1=1
@@ -1141,7 +1139,7 @@ WITH SJD AS --수주상세
 						      (
 						       SELECT CO_CD
 						            , CO_NM
-						       	    , SALES_CD
+						       	    , NVL(SALES_CD,' ')  AS SALES_CD
 						       	    , CLNT_CD
 						       	    , CLNT_NM
 						       	    , CLNT_PJT
@@ -1245,7 +1243,7 @@ WITH SJD AS --수주상세
 						    , '출도' AS WBS06, '발주' AS WBS07, '입고' AS WBS08, '조립' AS WBS09, '시운전, 검수' AS WBS10
 							, '품평회' AS WBS11, '출고' AS WBS12, '설치' AS WBS13, 'On-Site 시운전' AS WBS14, '완료 검수' AS WBS15) --계획코드 읽어와서 넣어주기 
 						         )
-						 ORDER BY CLNT_CD, CLNT_PJT, SALES_CD, ORDRS_DT
+						 ORDER BY CLNT_CD, CLNT_PJT, ORDRS_DT, SALES_CD 
  
 						) AS A
 				WHERE  1 = 1
