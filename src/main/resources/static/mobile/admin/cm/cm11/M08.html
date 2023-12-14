@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
+	<link rel="stylesheet" href="/static/fontawesome/css/all.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5grid.css" />
+	<link rel="stylesheet" href="/static/css/ax5/ax5modal.css" />
+	<link rel="stylesheet" href="/static/css/gnb.css" />
+	<link rel="stylesheet" href="/static/css/main.css" />
+	<link rel="stylesheet" href="/static/css/sub.css" />
+	<link rel="stylesheet" href="/static/css/m_common.css" />
+	<link rel="stylesheet" href="/static/css/mobile.css" />
+	<!-- <link rel="stylesheet" href="/static/css/common.css" /> -->
+
+	<script src="/static/js/jquery-latest.min.js"></script>
+	<script src="/static/js/jquery.serializeObject.js"></script>
+	<script src="/static/bootstrap/js/bootstrap.min.js"></script>
+	<script src="/static/js/ax5/ax5core.min.js"></script>
+	<script src="/static/js/ax5/ax5grid.min.js"></script>
+	<script src="/static/js/ax5/ax5modal.min.js"></script>
+	<script src="/static/js/global.js"></script>
+	<!-- 공통결재 -->
+    <script src="/static/js/commApprovalMobile.js"></script>
+<style>
+	#appLine tr {
+    	height: 50px !important;
+	}
+	#appLine th {
+    	padding: 1px !important;
+	}
+	table {
+        cursor: pointer;
+    }
+</style>
+</head>
+
+
+<body>
+	<div id="head_area" class="off" >
+		<div class="left_btn" onclick="history.back(-1)">
+      		<a class="back_btn"></a>
+    	</div>
+		<h1 class="logo">
+      		<img src="/static/img/Logo_gunyangitt.gif" alt="건양ITT" />
+    	</h1>
+	</div>
+
+	<div id="main_area">
+		<div>
+			<table class="form-group">
+				<thead>
+					<tr>
+						<td style="text-align: left;">
+							<h3 class="location"><span class="page_tit">To-Do List</span></h3>
+						</td>
+					</tr>
+				</thead>
+				<tbody>
+				 <tr>
+                        <td style="width: 100%;">
+							<!-- 카드를 표시할 div 추가 -->
+							<div id="cardContainer" class="card-container"></div>
+							<!-- 카드를 표시할 div 끝 -->
+                        </td>
+                    </tr>
+					<tr>
+						<td>
+							<div class="" style="margin:0px;padding:0px;">
+<!-- 								<div data-ax5grid="todo-grid" data-ax5grid-config="{}" style="display:none;"> -->
+								<div data-ax5grid="todo-grid" data-ax5grid-config="{}" >
+								</div>
+							</div>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+
+
+
+	<script type="text/javascript">
+	// Todo 그리드
+
+	var cardContainer = $("#cardContainer");    //변수지정
+
+	var gridView = {
+		initView : function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showRowSelector : false,
+				multipleSelect : false,
+				sortable : false,
+				target : $('[data-ax5grid="todo-grid"]'),
+				header : {
+					align : "center",
+					selector : false,
+                    columnHeight: 40,
+				},
+				body : {
+					columnHeight: 40,
+					onClick : function() {
+						this.self.select(this.dindex);
+						//"내용 클릭시 모달창 오픈 ('TODODIV2020','TODODIV2030')
+						if ( this.column.key == "todoTitl") {
+							openSecondModal();
+						}
+						else{
+							toDoConfirmApproval(this.dindex);
+						}
+					},
+		            onDBLClick: function () {
+		            	//toDoConfirmApproval(this.dindex);
+		            },
+		            mergeCells :  ["todoDiv2CodeNm", "salesCd", "creatNm"],
+				},
+				page : {
+					display : true,
+				},
+				columns: [
+			        {key: "todoTitl",      		label: "내용",      	align: "left",   width: 160},
+			        {key: "todoDiv2CodeNm",     label: "*작업내용",      	align: "center",   width: 70},
+			        {key: "salesCd",      		label: "SALES CODE",    align: "center",   width: 110},
+	                {key: "todoDiv1CodeNm",     label: "*구분",  			align: "center",   width: 50, formatter:function() {
+	                	return ('<button class="add_btn" style="height: 40px; padding:0px;" type="button" onclick="toDoConfirmApproval('+this.dindex+')" authchk>'+this.value+'</button>')}
+                    },
+			        {key: "creatNm",      		label: "요청자",      	align: "center",   width: 80},
+			        {key: "creatDttm",      	label: "요청일자",      	align: "center",   width: 80},
+			        {key: "todoNo",      		label: "관리번호",      	align: "center",   width: 80},
+			        {key: "todoDiv1Code",     label: "TODO구분1",          hidden:true},
+                    {key: "todoDiv2Code",     label: "TODO구분2",          hidden:true},
+                    {key: "todoKey",          label: "TODOKEY",          hidden:true},
+                    {key: "coCd",          label: "CO_CD",          hidden:true},
+		        ]
+			});
+			return this;
+		},
+		setData : function() {
+			var targetObj = this.target;
+     	    var formData = {
+    				"coCd"		: $("#coCd3").val(),
+                    "salesMngId" : jwt.userId, // 공유대상자
+                    "boardParam" : "BOARD",
+					"sanctnSttus" : "N",  //공유건은 미확인만
+                    "pageNo" :  1,
+    				"recordCnt" : 999999999,
+     	           };
+			postAjax("/user/wb/wb20/selectToDoList", formData, null, function(data){
+				var list = data.resultList;
+				if (list != undefined)
+				targetObj.setData({
+					list : list,
+					page : {
+						totalElements : list.length
+					}
+				});
+
+                // 데이터를 이용하여 카드 생성 및 표시
+                list.forEach(function (item, index) {
+                    var cardClass = "card-" + index;  // 각 카드에 인덱스를 이용한 클래스 생성
+
+                    var cardHtml =
+                    	  `<div class="square-box">
+                        <div class="card ${cardClass}" style="border: 1px solid #ccc; margin-bottom: 10px;">
+                            <div class="card-header" style="font-weight: bold;border-bottom: 1px solid #ccc;">${item.todoTitl}</div>
+                            <div class="card-body">
+                                <p><strong></strong> ${item.todoDiv2CodeNm} |
+                                <strong>SALES CODE :</strong> ${item.salesCd}</p>
+                                <p class="card-text">
+                                <strong>구분 :</strong> ${item.todoDiv1CodeNm}
+                                <strong>요청자 :</strong> ${item.creatNm}
+                                <strong>요청일자 :</strong> ${item.creatDttm}
+                                <strong>관리번호 :</strong> ${item.todoNo}
+                         		</p>
+                                </div>
+                            </div>
+                        </div>`;
+
+                        cardContainer.append(cardHtml);
+
+                        // 각 카드에 고유한 클래스를 부여
+                        $(".card." + cardClass).addClass(cardClass);
+                    });
+                    // 코드 끝
+
+			});
+
+		} //setData
+	} //gridView
+
+
+	$(document).ready(function () {
+
+		var newScreenWidth = $(window).width();
+    	var newScreenHeight = $(window).height();
+
+		// grid init
+		gridView.initView().setData();
+
+
+
+		 $(document).on("click", ".card", function (event) {
+		        // 클릭한 카드의 인덱스 가져오기
+		        var cardIndex = parseInt($(this).attr("class").split('-')[1]);
+
+		        // 리스트에서 해당 데이터에 액세스
+		        var rowData = gridView.target.list[cardIndex];
+
+		        // 카드가 결재용인지 확인
+		        if (rowData.todoDiv1CodeNm == "결재") {
+		            var paramObj = {
+		                "coCd": rowData.coCd,
+		                "salesCd": rowData.salesCd,
+		                "todoDiv1CodeId": rowData.todoDiv1CodeId,
+		                "todoDiv2CodeId": rowData.todoDiv2CodeId,
+		                "todoFileTrgtKey": rowData.todoFileTrgtKey,
+		                "pgmId": "WB2001M01",
+		                "userId": jwt.userId
+		            };
+		            // 세션 스토리지에 매개변수 설정
+		            sessionStorage.setItem('paramObj', JSON.stringify(paramObj));
+
+		            // 결재 페이지로 이동
+		            var nextUrl = '/static/mobile/modal/WB2001P01.html';
+		            insertPgmHistory(nextUrl);
+		            location.href = nextUrl;
+// 		        } else {
+// 		            // 다른 카드 유형에 대한 네비게이션 처리 (필요한 경우)
+		        }
+		    });
+	});
+
+
+	// 공유확인/결재 처리
+	function toDoConfirmApproval(selRow){
+// 		var selRow = parseInt(gridObj.target.selectedDataIndexs);
+			if( isNaN(selRow) ) {
+				alert("선택된 행이 없습니다.");
+				return;
+			} else {
+				if( selRow > -1 ) {
+					var row = gridView.target.list[selRow];
+					if( row.todoDiv1CodeNm == "공유" ) {
+						if( row.sanctnSttus == "N" ) {
+							if( confirm("확인 처리 하시겠습니까?") ) {
+								toDoConfirm(row);
+							}
+						} else {
+							alert("이미 확인처리 하였습니다.");
+						}
+					} else if( row.todoDiv1CodeNm == "결재" ) {
+						var paramObj = {
+								 "coCd":row.coCd
+								 , "salesCd":row.salesCd
+								 , "todoDiv1CodeId":row.todoDiv1CodeId
+								 , "todoDiv2CodeId":row.todoDiv2CodeId
+								 , "todoFileTrgtKey":row.todoFileTrgtKey
+								 , "pgmId": "WB2001M01"
+								 , "userId": jwt.userId
+						};
+						// openSecondModal("/static/html/user/wb/wb20/WB2001P01.html", $(window).width(), $(window).height(), "", paramObj);
+						//세션에 파라미터 저장후 전달하고 URL redirect 처리
+						sessionStorage.setItem('paramObj', JSON.stringify(paramObj));
+						var nextUrl = '/static/mobile/modal/WB2001P01.html';
+						insertPgmHistory(nextUrl);
+						location.href = nextUrl;
+					}
+				}
+
+				// gridView.setData();
+			}
+		return;
+	}
+
+	function toDoConfirm(row){
+		if (row.todoKey != undefined) {
+			var today = new Date();
+			var strDate = today.getFullYear()+"-"+('0'+(today.getMonth()+1)).slice(-2)+"-"+('0'+today.getDate()).slice(-2);
+
+			var formData = new FormData();
+			formData.append("todoKey", row.todoKey);
+			formData.append("creatId", jwt.userId);
+			formData.append("creatPgm", "WB2001M01");
+			//formData.append("todoCfDt", strDate);
+			filePutAjax("/user/wb/wb20/toDoCfDtUpdate", formData, function(data){
+				if(data.resultCode == 200){
+					alert("공유 확인되었습니다.");
+					gridView.initView().setData(0);
+				}
+			});
+		}
+	}
+
+	//모달 오픈
+	function openSecondModal() {
+		//선택한 데이터
+		const gridList = gridView.target.getList("selected")[0];
+		//todo 결재 구분 : 발주 및 출장 요청
+		if(gridList.todoDiv2CodeId == 'TODODIV2020'){
+		    var paramObj = {
+		    		"fileTrgtKey" : gridList.todoFileTrgtKey,
+		            "coCd"     : jwt.coCd,
+		            "userId"   : jwt.userId,
+		            //"salesCd"  : row.salesCd,
+		            "pgmId"    : "QM0101M01_M"
+		    };
+		    //todoFileTrgtKey 존재하면 해당 gridList 데이터 paramObj에 추가
+		    if( gridList.todoFileTrgtKey > 0 ) {
+		        $.each(gridList, function (key, val) {
+					if( typeof(val) == "undefined") val = "";
+					paramObj[key] = val;
+		        });
+			}
+	    	var nextUrl = '/static/mobile/html/user/qm/qm01/QM0101P01_M.html';
+        }
+      	//todo 결재 구분 : 발주 및 출장 요청서 (결과)
+      	else if(gridList.todoDiv2CodeId == 'TODODIV2030'){
+      		var paramObj = {
+		    		"fileTrgtKey" : gridList.todoFileTrgtKey,
+		            "coCd"     : jwt.coCd,
+		            "userId"   : jwt.userId,
+		            "rsltNo" : gridList.todoNo,
+		            //"salesCd"  : row.salesCd,
+		            "pgmId"    : "QM0101M01_M"
+		    };
+		    //todoFileTrgtKey 존재하면 해당 gridList 데이터 paramObj에 추가
+		    if( gridList.todoFileTrgtKey > 0 ) {
+		        $.each(gridList, function (key, val) {
+					if( typeof(val) == "undefined") val = "";
+					paramObj[key] = val;
+		        });
+			}
+      		var nextUrl = '/static/mobile/html/user/qm/qm01/QM0101P02_M.html';
+        }
+		// 그외 TODO 구분에 따른 페이지 뷰어 처리 // 2023.10.31 박성준 코딩
+      	else{
+
+      		var paramObj = {};
+      		if( gridList.todoFileTrgtKey > 0 ) {
+                $.each(gridList, function (key, val) {
+                    if( typeof(val) == "undefined") val = "";
+                    paramObj[key] = val;
+                });
+
+            }
+
+      		var nextUrl = '/static/mobile/html/user/qm/qm01/M_TODO_VIEW.html';
+
+      	}
+      	//세션에 파라미터 저장후 전달하고 URL redirect 처리
+	 	//sessionStorage : 변경된 사항은 현재 페이지가 닫힐 때 까지 저장되어 사용가능, 새로고침은 유지
+	 	//JSON.stringify : 인수로 전달받은 자바스크립트 객체를 문자열로 변환하여 반환
+
+        sessionStorage.setItem('paramObj', JSON.stringify(paramObj));
+	    insertPgmHistory(nextUrl);
+	    location.href = nextUrl;
+	}
+
+
+	</script>
+
+</body>
+
+</html>
