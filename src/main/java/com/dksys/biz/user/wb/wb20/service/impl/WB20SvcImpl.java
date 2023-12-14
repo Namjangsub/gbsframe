@@ -180,4 +180,10 @@ public class WB20SvcImpl implements WB20Svc {
 	  public List<Map<String, String>> selectTodoFinalYn(Map<String, String> paramMap) {
 		  return wb20Mapper.selectTodoFinalYn(paramMap);
 	  }	  
+		
+	  @Override
+	  public int updateApprovalCancle(Map<String, String> paramMap) {
+		return wb20Mapper.updateApprovalCancle(paramMap);
+	  } 
+	
 }

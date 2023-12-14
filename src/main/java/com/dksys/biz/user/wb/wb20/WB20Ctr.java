@@ -191,4 +191,19 @@ public class WB20Ctr {
 		    model.addAttribute("result", result);
 		    return "jsonView";
 		}	 		
+		  
+
+		@PostMapping(value = "/updateApprovalCancle")
+	  public String updateApprovalCancle(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    	try {
+				wb20Svc.updateApprovalCancle(paramMap);
+		    	model.addAttribute("resultCode", 200);
+		    	model.addAttribute("resultMessage", messageUtils.getMessage("cancel"));
+	    	}catch(Exception e) {
+		    	 model.addAttribute("resultCode", 500);
+		 		 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+	    	}
+
+	    	return "jsonView";		  		  
+    }		  
 }
