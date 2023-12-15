@@ -185,7 +185,6 @@
 </div>
 
 <script type="text/javascript">
-	var isFirst = true;
 	var lastGridView1Rownum = null;
 	var coCd = null;
 	var salesCd = null;
@@ -208,13 +207,19 @@
 			return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
 		}
 	};
-	
+	//---------------------------------------------------
+	/*  WBSPLANSTS10	미진행
+		WBSPLANSTS20	진행중
+		WBSPLANSTS30	지연
+		WBSPLANSTS40	지연완료
+		WBSPLANSTS50	정상완료 */
 	var wbsPlanStsCodeId = [];
 	var paramObj = {codeKind : "WBSPLANSTS"};
 	
 	postAjaxSync("/user/wb/wb21/selectCodeList", paramObj, null, function(data) {
 		wbsPlanStsCodeId = data.resultList;
 	});
+	//---------------------------------------------------
 	
 	var gridView1 = {
 		initView: function() {
@@ -254,22 +259,24 @@
 							var row = gridView1.target.getList("selected")[0];
 							level__index = row.__index;
 							// 1. 총괄 PM인 경우 조회만 됨
-							if(jwt.userId == smrizeId || jwt.userId == 'canmtb'){
-								gridView2.setData(0);
-							}else if(row != undefined && row.wbsPlanMngId == jwt.userId){
-								// 2. 자신이 담당자인 TASK 조회
-								gridView2.setData(0);
-							}else{
-								gridView2.setData(0);
-							}
-							
+							//  총괄PM 또는 일정관리 담당자 한동주 가능-->
+							// 등록내용은 전체 조회가 되고,  수정권한만 제거 함. 남장섭 231215 확인
 							// Validation 체크 - 2레벨 담당자 체크 버튼 보임 처리
-							var row = gridView1.target.getList("selected")[0];
 							if (row != undefined && row.wbsPlanMngId != jwt.userId) {
 								$("#popForm #addrow2").hide();
 							}else {
 								$("#popForm #addrow2").show();
 							}
+// 							if(jwt.userId == smrizeId || jwt.userId == 'canmtb'){ 
+// 								gridView2.setData(0);
+// 							}else if(row != undefined && row.wbsPlanMngId == jwt.userId){
+// 								// 2. 자신이 담당자인 TASK 조회
+// 								gridView2.setData(0);
+// 							}else{
+// 								gridView2.setData(0);
+// 							}
+
+							gridView2.setData(0);
 						}
 						
 					},
@@ -299,7 +306,8 @@
 					},
 					onDataChanged: function () {
 
-						//하나라도 수정되면 저장버튼 활성화
+						//하나라도 수정되면 저장버튼 활성화, 
+						//   setValue는 onDataChanged 이벤트 없음.--> 함당함수에서 처리해야함
 						$("#popForm #btn1").show();  //저장버튼
 						// console.log(this.key);
 						// Validation 체크
@@ -309,8 +317,6 @@
 						}
 						const fDate = new Date(this.item.wbsPlansDt);
 						const tDate = new Date(this.item.wbsPlaneDt);
-						// console.log(this.item.wbsPlansDt);
-						// console.log(this.item.wbsPlaneDt);
 						
 						//시작일
 						const beginDt = new Date($('#beginDt').val());
@@ -320,24 +326,14 @@
 						//1. 시작일자가 시작일 이전이면 안됨
 						if(this.item.wbsPlansDt != undefined && fDate < beginDt){
 							alert("시작일자는 시작일 이전 일 수 없습니다.");
-							// this.self.setValue(this.dindex, "wbsPlansDt", $('#beginDt').val());
-							if(this.key == "wbsPlansDt"){
-								this.self.setValue(this.dindex, "wbsPlansDt", null);
-							}else{
-								this.self.setValue(this.dindex, "wbsPlaneDt", null);
-							}
+							this.self.setValue(this.dindex, "wbsPlaneDt", null);
 							return false;
 						}
 						
 						//2. 종료일자가 완료검수일 이후면 안됨
 						if(this.item.wbsPlaneDt != undefined && tDate > acptncDt){
 							alert("종료일자는 완료검수일 이후 일 수 없습니다.");
-							// this.self.setValue(this.dindex, "wbsPlaneDt", $('#acptncDt').val());
-							if(this.key == "wbsPlansDt"){
-								this.self.setValue(this.dindex, "wbsPlansDt", null);
-							}else{
-								this.self.setValue(this.dindex, "wbsPlaneDt", null);
-							}
+							this.self.setValue(this.dindex, "wbsPlaneDt", null);
 							return false;
 						}
 						
@@ -347,20 +343,10 @@
 							let dtSelect = confirm("시작일자는 종료일자 이후 일 수 없습니다.");
 							if (dtSelect) {
 								//확인이면 종료일자를 시작일자로 설정
-								if(this.key == "wbsPlansDt"){
-									this.self.setValue(this.dindex, "wbsPlaneDt", this.item.wbsPlansDt);
-								}else{
-									this.self.setValue(this.dindex, "wbsPlansDt", this.item.wbsPlaneDt);
-								}
+								this.self.setValue(this.dindex, "wbsPlaneDt", this.item.wbsPlansDt);
 							} else {
-								if(this.key == "wbsPlansDt"){
-									this.self.setValue(this.dindex, "wbsPlansDt", null);
-								}else{
-									this.self.setValue(this.dindex, "wbsPlaneDt", null);
-								}
+								this.self.setValue(this.dindex, "wbsPlansDt", null);
 							}
-							// this.self.setValue(this.dindex, "wbsPlansDt", $('#beginDt').val());
-							// this.self.setValue(this.dindex, "wbsPlaneDt", $('#acptncDt').val());
 							return false;
 						}
 						
@@ -530,7 +516,7 @@
 				"userId" : $('#smrizeId').val(),
 				"histYn" : histYn
 			}
-
+debugger;
 			var ajaxUrl;
 			if(histYn == "N"){
 				ajaxUrl = "/user/wb/wb22/selectWBS1Level";
@@ -694,7 +680,6 @@
                             if(fDate > tDate) {
 								alert("시작일자는 종료일자 이후 일 수 없습니다.");
                             	this.self.setValue(this.dindex, "wbsPlansDt", row.wbsPlansDt);
-                            	this.self.setValue(this.dindex, "wbsPlaneDt", row.wbsPlaneDt);
                             	return false;
                             }
 						}
@@ -943,7 +928,6 @@
 	$(document).ready(function() {
 		let UserId = jwt.userId;
 		setCommonSelect($(".popup_area select[data-kind]"));
-		isFirst = false;    
 		coCd = modalStack.last().paramObj.coCd;
 		salesCd = modalStack.last().paramObj.salesCd;
 		planVerNo = modalStack.last().paramObj.planVerNo;
@@ -986,28 +970,6 @@
 			}
 		});
 		
-		// var row = salesGridView.target.getList("selected")[0];
-		// if (row != undefined) {
-		//  	$.each(row, function (key, val) {
-		//     	$("#popForm #" + key).val(val);
-		//     	if (key == "sjCloseYn") {   
-		//         	var color = val == "Y" ? "color-circle_02.png" : "color-circle_01.png";
-		//             var html = '<img src="/static/img/'+color+'" align="center" style="width: 10px;height: 10px;"></img>';
-		//             $("#popForm #close").html(html)
-		//         }
-				
-		//   	});
-			
-		//     // Validation 체크
-		//     if ($('#closeYn').val() == "N") {
-		//         alert("과제정보가 미확정입니다. 확정 후 입력 가능합니다.");
-		//     } else {
-		//         gridView1.setData(0);                                  
-		//     }
-			
-		//  }
-		
-		
 		// 과제 평가 완료 시 등록, 수정, 삭제 버튼 비활성화 처리
 		var paramObj = {
 			"coCd" : $("#popForm #coCd").val(),
@@ -1030,9 +992,6 @@
 		setCopyButton();
 	});
 
-	function calcDate(fDate, tDate) {
-		return calculateHolidayCnt(fDate, tDate).workingDays;
-	}
 
 	function wbsLevel1Insert() {	
 		
