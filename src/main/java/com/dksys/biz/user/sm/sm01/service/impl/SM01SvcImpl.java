@@ -348,5 +348,9 @@ public class SM01SvcImpl implements SM01Svc {
 		sm01Mapper.callCopyBom(paramMap);
 	}
 
+  @Override
+  public List<Map<String, String>> nextPrcsnNmList(Map<String, String> paramMap) {
+    return sm01Mapper.nextPrcsnNmList(paramMap);
+  }
 
 }

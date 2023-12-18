@@ -44,5 +44,6 @@ public interface SM01Svc {
 
   void callCopyBom(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
+  List<Map<String, String>> nextPrcsnNmList(Map<String, String> paramMap);
 
 }

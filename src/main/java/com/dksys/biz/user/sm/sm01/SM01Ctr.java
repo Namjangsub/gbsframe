@@ -328,4 +328,11 @@ public class SM01Ctr {
 		return "jsonView";
 	}
 
+
+	@PostMapping("/nextPrcsnNmList")
+	public String nextPrcsnNmList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = sm01Svc.nextPrcsnNmList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
 }
