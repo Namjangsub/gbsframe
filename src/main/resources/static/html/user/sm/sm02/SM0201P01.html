@@ -208,10 +208,14 @@
 	        <ul class="ul_list" style="height:100%; width: 100%">
 	            <li style="width: 100%;">
 	                <div class="table_list_tit" style="width: 100%;">
-	                	<h5 class="tit" style="float:left; margin-left: 8px; margin-top: 8px; margin-bottom: 8px;">구매 BOM</h5>
+	                	<h5 class="tit" style="float:left; margin-left: 8px; margin-top: 8px; margin-bottom: 8px;">구매 BOM 등록 현황</h5>
 		                <div class="add_btn pdl10" style="margin-right:8px; margin-top: 8px;">
-		                    <!--  <a onclick="addRowBom()" style="" authchk>+</a> -->
-		                    <a id="deleteDetailButton" style="" authchk>-</a>&nbsp;
+		                    <!--  <a onclick="addRowBom()" style="" authchk>+</a> -->	
+<!-- 		                    <a id="deleteDetailButton" style="" authchk>-</a>&nbsp; -->
+		                    
+							<input type="text" id="searchClntNm" name="searchClntNm" style="width:100px;height:30px;" placeholder="구매업체명">
+		                    <a onclick="searchClntNmCheck('Y');" style="height: 30px; line-height: 28px; width: 60px;" authChk><i class="far fa-check-square"></i> 선택 </a>
+		                    <a onclick="searchClntNmCheck('N');" style="height: 30px; line-height: 28px; width: 70px;" authChk><i class="fas fa-backspace"></i> 선택취소 </a>
 		                    <a onclick="excelDownP();" style="height: 30px; line-height: 28px; width: 90px;" authChk><i class="fas fa-file-excel"></i>엑셀다운로드</a>
 		                </div>
 	                </div>
@@ -308,20 +312,64 @@ var gridViewPop = {
 	            	mergeCells : ["coNm", "salesCd", "partNo", "unitNo", "revNo","dsgnNo"],
 					onClick: function() {
 					    this.self.select(this.dindex);
-		                prdtIdx = this.dindex;
 		                thisGridRow = this.dindex;   // 선택된 행 정보 가져오기
 		                thisGridCol = this.colIndex; // 선택된 열 정보 가져오기
-		                
+// 		                debugger;
 		                var clickedRowIndex = this.dindex;					    
-					    
 					    var row = this.dindex;
                         var paramObj = {"row" : row};
                         //체크박스일 경우 실행 - 등록모드만
                         if( this.column.key == "userChk" && actionType == "C" ) {
                         	//chk, 수량, 기발주수량, row번호 
-                            $.setOrdrgQty(gridViewPop, this.item.userChk , this.item.bomQty, this.item.preBomQty, row);   
+//                             $.setOrdrgQty(gridViewPop, this.item.userChk , this.item.bomQty, this.item.preBomQty, row);   
+//                             $.setOrdrgQty(gridViewPop, this.item, row);   
+                            
+            	        		if (this.item.bomQty == 0) {
+            	        			this.item.userChk = "";
+            	        			return false;
+            	        		}
+	                            
+	            				var bomQty = parseInt(this.item.bomQty);
+	            				var preBomQty = parseInt(this.item.preBomQty);
+	            				var ordrgQty = parseInt(bomQty - preBomQty);			
+	            			    //발주금액 없을경우 0 셋
+	            			    if( this.item.ordrgPrc == "" || typeof(this.item.ordrgPrc) == "undefined" ) {
+	            			    	this.item.ordrgPrc = 0;  
+	            			    }			
+	            	        	//수량
+	            	        	if(this.item.userChk == "Y") {
+	            	        		if( ordrgQty > 0 ) {
+	            	        			this.item.ordrgQty = ordrgQty; 
+	            	        			this.item.dudtDeqDt = $('#dudtDeqDt').val();
+	            	        		} else if( isNaN(ordrgQty) || ordrgQty == 0 ) {
+	            	        			this.item.ordrgQty = 0;        			
+	            	        		}
+	            	        		//구매단가 set
+	                				var paramObj = {
+	        								"coCd" : $("#popForm #coCd").val()
+	        								, "matrCd" : this.item.matrCd
+	        								, "pchsClntCd" : $("#popForm #pchsClntCd").val()
+	        								, "curr" : $("#popForm #currCd").val()
+	        								};
+	    		    				postAjax("/user/sm/sm02/selectCurrMatrUpr", paramObj, null, function(data) {   
+	    		    						if (data.resultList != null) {
+// console.log('row:['+row+'] , 단가:'+data.resultList);
+	    		    							gridViewPop.target.list[row].ordrgPrc = data.resultList;
+	    		    							gridViewPop.target.repaint();
+	    		    						} 
+	    		    				});  
+	            	        	} else if(this.item.userChk == "N") {
+	            	    			this.item.ordrgQty = "";
+	            	    			this.item.ordrgPrc = ""; 
+	            	    			this.item.dudtDeqDt = ""
+	            	    			this.item.ordrgAmt = "";     
+	            	        	}
+                            
+	            	        	gridViewPop.target.repaint()
+                            
                         	//구매단가 set
-                            $.setMatrUpr(this.item, row);
+//                             $.setMatrUpr(this.item, row);
+
                         }
 					},
 					//그리드값 변경시 실행
@@ -341,6 +389,7 @@ var gridViewPop = {
 			            		} else {
 								    gridViewPop.target.setValue(row, "ordrgAmt", "");		            			
 			            		}
+			            		console.log("단가,수량"+ordrgAmt);
 			            	}           	
 							//발주수량 OVER CHK
 			            	if ( this.key == "ordrgQty") {			            		
@@ -360,6 +409,8 @@ var gridViewPop = {
 									    alert("발주수량은 "+ calcuOrdrgQty+" (와)과 같거나 작아야 합니다");
 									    return;
 				            		}
+
+				            		console.log("수량"+calcuOrdrgQty);
 			            		}
 			            	}
 			            	//수정내용 적용하기
@@ -1767,27 +1818,27 @@ fileParam = {
 		});
 		
 		//bom 발주수량 set
-		$.setOrdrgQty = function(gridObj, chkVal, bomQty, preBomQty, row ) {
+		$.setOrdrgQty = function(gridObj, item, row ) {
 			//수량 - 기발주수량 = 발주수량 //수량 - 기발주수량 = 발주수량 
-			var gridList = gridObj.target.getList();
-			var gridColumns = gridObj.target.columns;	
+// 			var gridList = gridObj.target.getList();
+// 			var gridColumns = gridObj.target.columns;	
 			
-				var bomQty = parseInt(bomQty);
-				var preBomQty = parseInt(preBomQty);
+				var bomQty = parseInt(item.bomQty);
+				var preBomQty = parseInt(item.preBomQty);
 				var ordrgQty = parseInt(bomQty - preBomQty);			
 			    //발주금액 없을경우 0 셋
-			    if( gridList[row].ordrgPrc == "" || typeof(gridList[row].ordrgPrc) == "undefined" ) {
+			    if( item.ordrgPrc == "" || typeof(item.ordrgPrc) == "undefined" ) {
 			    	gridObj.target.setValue(row, "ordrgPrc", 0);  
 			    }			
 	        	//수량
-	        	if(chkVal == "Y") {
+	        	if(item.userChk == "Y") {
 	        		if( ordrgQty > 0 ) {
 	        			gridObj.target.setValue(row, "ordrgQty", ordrgQty); 
 	        			gridObj.target.setValue(row, "dudtDeqDt", $('#dudtDeqDt').val());
 	        		} else if( isNaN(ordrgQty) || ordrgQty == 0 ) {
 	        			gridObj.target.setValue(row, "ordrgQty", 0);        			
 	        		}
-	        	} else if(chkVal == "N") {
+	        	} else if(item.userChk == "N") {
 	    			gridObj.target.setValue(row, "ordrgQty", "");
 	    			gridObj.target.setValue(row, "ordrgPrc", ""); 
 	    			gridObj.target.setValue(row, "dudtDeqDt", "")
@@ -2255,4 +2306,82 @@ fileParam = {
 	    }
 	}
 
+	//구매업체를 입력하고 선택버튼을 클릭하면 그리드 내에 거래쳐명이 포함된 자료는 모두 선택되게 함.
+	function searchClntNmCheck(jobType) {
+		var gridList = gridViewPop.target.getList();
+		var searchTempVal = $('#searchClntNm').val();
+		
+		//검색할 구매업체명이 없으면 종료
+		if (searchTempVal == "") return false;
+		if (gridList.length > 0 ) {
+	        $.each(gridList, function (idx, elem) {
+	            //동일한 거래처명일경우 선택 체크하고 전량발주 및 발주단가 검색 처리	    
+	            if (elem.bomPchsClntNm == searchTempVal) {
+	            	if (jobType == "Y") {
+	        			gridRowPurchSelectCheck(idx);
+	            	} else if (jobType == "N") {
+	            		gridRowPurchSelectCancle(idx);
+	            	}
+	            } 
+	        });	
+
+	     	gridViewPop.target.repaint()
+		}
+	}
+		
+	//이프로그램의 그리드에 종속적으로 개발됨
+	//그리드명   ==> gridViewPop
+	function gridRowPurchSelectCheck(row) {		
+    	//chk, 수량, 기발주수량, row번호 
+    	var tempRow = gridViewPop.target.list[row];
+    	
+ 		if (tempRow.bomQty == 0) {
+ 			gridViewPop.target.list[row].userChk = "";
+ 			return false;
+ 		}
+         
+		var bomQty = parseInt(tempRow.bomQty);
+		var preBomQty = parseInt(tempRow.preBomQty);
+		var ordrgQty = parseInt(bomQty - preBomQty);			
+	    //발주금액 없을경우 0 셋
+	    if (tempRow.ordrgPrc == "" || typeof(tempRow.ordrgPrc) == "undefined" ) {
+	    	gridViewPop.target.list[row].ordrgPrc = 0;  
+	    }			
+     	//수량
+   		if( ordrgQty > 0 ) {
+   			gridViewPop.target.list[row].ordrgQty = ordrgQty; 
+   			gridViewPop.target.list[row].dudtDeqDt = $('#dudtDeqDt').val();
+   			gridViewPop.target.list[row].userChk = "Y";
+     		//구매단가 set
+			var paramObj = {
+					"coCd" : $("#popForm #coCd").val()
+					, "matrCd" : tempRow.matrCd
+					, "pchsClntCd" : $("#popForm #pchsClntCd").val()
+					, "curr" : $("#popForm #currCd").val()
+					};
+			postAjax("/user/sm/sm02/selectCurrMatrUpr", paramObj, null, function(data) {   
+					if (data.resultList != null) {
+//console.log('row:['+row+'] , 단가:'+data.resultList);
+						gridViewPop.target.list[row].ordrgPrc = data.resultList;
+						gridViewPop.target.repaint();
+					} 
+			});  
+
+   		} else if( isNaN(ordrgQty) || ordrgQty == 0 ) {
+   			gridViewPop.target.list[row].ordrgQty = 0;  
+   			gridViewPop.target.list[row].userChk = "N";      			
+   		}
+	}
+	
+	
+	//이프로그램의 그리드에 종속적으로 개발됨
+	//그리드명   ==> gridViewPop
+	//같은 구매처명이 있으면 선택해제함.
+	function gridRowPurchSelectCancle(row) {		
+		gridViewPop.target.list[row].userChk = "N";  
+		gridViewPop.target.list[row].ordrgQty = "";
+		gridViewPop.target.list[row].ordrgPrc = ""; 
+		gridViewPop.target.list[row].dudtDeqDt = "";
+		gridViewPop.target.list[row].ordrgAmt = "";     
+	}	
 </script>
