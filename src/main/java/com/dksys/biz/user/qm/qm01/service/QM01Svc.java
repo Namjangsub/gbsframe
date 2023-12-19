@@ -65,4 +65,6 @@ public interface QM01Svc {
   
   int updateCheckDept(Map<String, String> paramMap) throws Exception;
 
+  List<Map<String, String>> nonOrderStatusList(Map<String, String> paramMap);
+  
 }

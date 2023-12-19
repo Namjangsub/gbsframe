@@ -296,4 +296,12 @@ public class QM01Ctr {
 		}
 	  	return "jsonView";
   }
+
+//미발주현황 조회
+ @PostMapping(value = "/nonOrderStatusList")
+ public String nonOrderStatusList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+   List<Map<String, String>> result = qm01Svc.nonOrderStatusList(paramMap);
+   model.addAttribute("result", result);
+   return "jsonView";
+ }
 }

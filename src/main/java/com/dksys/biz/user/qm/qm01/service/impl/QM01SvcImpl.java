@@ -738,4 +738,10 @@ public class QM01SvcImpl implements QM01Svc {
         }
 	    return result;
   }
+ 
+  @Override
+  public List<Map<String, String>> nonOrderStatusList(Map<String, String> paramMap) {
+    return QM01Mapper.nonOrderStatusList(paramMap);
+  }
+  
 }

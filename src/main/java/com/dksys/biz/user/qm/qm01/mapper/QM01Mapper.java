@@ -111,5 +111,7 @@ public interface QM01Mapper {
   
   int deleteApprovalList(Map<String, String> paramMap);
   
-  
+
+
+  List<Map<String, String>> nonOrderStatusList(Map<String, String> paramMap);
 }
