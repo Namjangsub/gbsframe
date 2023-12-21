@@ -184,14 +184,13 @@
   
 //전역초기화  
 var actionType = null;
-var paramPrjctSeq = null;
-var firstGrid = null;
-var secondGrid = null;
-var userId = null;
-var userNm = null;
 var fileTrgtKeyU = null;
 var currToday = [];
-	
+
+var thisGridRow=0; // 선택된 행 정보 저장할 변수
+var thisGridCol=0; // 선택된 열 정보 저장할 변수
+var beforeGridSize = 0; //수주상세그리드의 갯수용 그리드컨텐츠 높이조절용
+
 var gridViewPop = {
     	initView: function(){
 			this.target = new ax5.ui.grid();
@@ -206,7 +205,7 @@ var gridViewPop = {
 	              selector: false
 	            },
 	            body: {
-	            	mergeCells : ["coNm", "salesCd", "matrCd", "matrNm", "matrSpec","ordrgQty","ordrgAmt"],
+	            	mergeCells : ["salesCd", ],
 					onClick: function() {
 					    this.self.select(this.dindex);
 					    var row = this.dindex;
@@ -301,15 +300,17 @@ var gridViewPop = {
 						,{key: "matrSeq", 			label: "matrSeq", 			width: 100,		align: "left", 		hidden:true}
 						,{key: "upperCd", 			label: "upperCd", 			width: 100,		align: "left", 		hidden:true}						
 						,{key: "lowerCd", 			label: "lowerCd", 			width: 100,		align: "left", 		hidden:true}						
-						,{key: "dsgnNo", 			label: "dsgnNo", 			width: 100,		align: "left", 		hidden:true}						
-						,{key: "matrCd", 			label: "자재코드", 			width: 100,		align: "left"}		/* 품번 */						
+						,{key: "dsgnNo", 			label: "dsgnNo", 			width: 180,		align: "left", 		hidden:false}			
 						,{key: "matrNm", 			label: "자재명", 				width: 150,		align: "left"}		/* 품명 */
-						,{key: "matrSpec", 			label: "규격", 				width: 100,		align: "center"}
-						,{key: "ordrgQty", 			label: "발주 수량", 			width: 80,		align: "right", formatter: "money"}			/*발주 수량 */
-						,{key: "ordrgAmt", 			label: "발주 금액", 			width: 80,		align: "right", formatter: "money"}			/*발주 금액 */
-						,{key: "ordrgPrc", 			label: "발주단가", 			width: 80,		align: "right", 		hidden:true}			/*발주 단가 */						
-						,{key: "preInQty", 			label: "기입고<br>수량", 		width: 80,		align: "center"}									
-						,{key: "notInQty", 			label: "미입고<br>수량", 		width: 80,		align: "center"}														
+						,{key: "matrMat", 			label: "소재/Maker",			width: 150,		align: "left"}		/* 소재 */
+						,{key: "matrSpec", 			label: "형번", 				width: 100,		align: "center"}
+						,{key: "matrSize", 			label: "크기", 				width: 100,		align: "center"}
+						,{key: "ordrgQty", 			label: "발주수량", 			width: 60,		align: "right", formatter: "money"}			/*발주 수량 */
+						,{key: "ordrgAmt", 			label: "발주금액", 			width: 60,		align: "right", formatter: "money"}			/*발주 금액 */
+						,{key: "ordrgPrc", 			label: "발주단가", 			width: 60,		align: "right", 		hidden:true}			/*발주 단가 */						
+						,{key: "preInQty", 			label: "기입고<br>수량", 		width: 60,		align: "center"}									
+						,{key: "notInQty", 			label: "미입고<br>수량", 		width: 60,		align: "center"}	             
+			            ,{key: "dudtDeqDt",      	label: "납기요청일",      align: "center",   width: 90}													
 						/* 체크박스없이 무조건 입력 */
 						,{key: "userChk", 			label: "선택", 				width: 50,		align: "center"
 								, editor:{type: "checkbox"
@@ -329,41 +330,42 @@ var gridViewPop = {
 					                    			}
 									  }
 						}					
-						,{key: "inQty", 			label: "합격수량", 			width: 80,		align: "right", formatter: "money"
+						,{key: "inQty", 			label: "합격수량", 			width: 60,		align: "right", formatter: "money"
 							, editor: {type:"number" 
 										, attributes: { 'maxlength': 13, 'data-maxlength': 15}
 									   } 
-						}						
+						}		
+						,{key: "badQty", 			label: "불량수량", 			width: 60,		align: "right", formatter: "money"
+							, editor: {type:"number" 
+										, attributes: { 'maxlength': 13, 'data-maxlength': 15}
+									   } 
+							, hidden:false
+						}											
 					
-						,{key: "inPrc", 			label: "입고단가", 			width: 110,		align: "right", formatter: "money"
+						,{key: "inPrc", 			label: "입고단가", 			width: 100,		align: "right", formatter: "money"
 							, editor: {type:"number" 
 											, attributes: { 'maxlength': 13, 'data-maxlength': 15}
 							   		  } 
 						}
-						,{key: "inDtlAmt", 			label: "입고금액", 			width: 110,		align: "right", formatter: "money"
+						,{key: "inDtlAmt", 			label: "입고금액", 			width: 100,		align: "right", formatter: "money"
 							/*
 							, editor: {type:"number" 
 											, attributes: { 'maxlength': 13, 'data-maxlength': 15}
 							          }
 							*/
 						}			
-						,{key: "sInspecQty", 			label: "검사수량", 		width: 80,		align: "right", formatter: "money"}							
-						,{key: "sInQty", 				label: "입고수량", 		width: 80,		align: "right", formatter: "money"}
-						,{key: "badQty", 			label: "불량수량", 			width: 80,		align: "right", formatter: "money"
-							, editor: {type:"number" 
-										, attributes: { 'maxlength': 13, 'data-maxlength': 15}
-									   } 
-							, hidden:false
-						}							
+						,{key: "sInspecQty", 			label: "검사수량", 		width: 60,		align: "right", formatter: "money"}							
+						,{key: "sInQty", 				label: "입고수량", 		width: 60,		align: "right", formatter: "money"}
 						,{key: "matrWhCd", 			label: "입고창고Cd", 			width: 100,		align: "center", 	hidden:true}	/* 자재창고 Cd*/						
 						,{key: "matrWhNm", 			label: "입고창고", 			width: 100,		align: "center"}	/* 자재창고 */						
 						,{key: "matrTestDiv", 		label: "검사구분", 			width: 100,		align: "center", 	hidden:true}	/* 검사구분 */
-						,{key: "matrTestDivNm",		label: "검사구분", 			width: 100,		align: "center"}						
+						,{key: "matrTestDivNm",		label: "검사구분", 			width: 70,		align: "center"}						
 						,{key: "inDtlRmk", 			label: "입고비고", 			width: 200,		align: "left", formatter: ""
 							, editor: {type:"text" 
 										, attributes: { 'maxlength': 3000, 'data-maxlength': 3000}
 									   } 
-					}						
+						}													
+						,{key: "matrCd", 			label: "자재코드", 			width: 80,		align: "left"}		/* 품번 */		
 	
 	              ]
 	        });
@@ -399,7 +401,8 @@ var gridViewPop = {
 				    }
 				});
 				$.popViewInit();
-				
+				//그리드 크기 동적 할당
+				gridResize(list.length); //그리드 높이 조정
             });
       	   
 		} 
@@ -569,10 +572,9 @@ $(document).ready(function() {
 	$.initViewPop = function() {
 		//combo set
 		setCommonSelect($(".popup_area select[data-kind]"));
-		userId = modalStack.last().paramObj.userId;
 		fileTrgtKeyU = modalStack.last().paramObj.fileTrgtKey;
 		
-		$("#popForm #userId").val(userId);	
+		$("#popForm #userId").val(modalStack.last().paramObj.userId);	
 		//작성자 readonly 등 set
 		$("#popForm #salesCd").attr("readonly", true);
 		$("#popForm #coCd").css({'background-color':'#e6e6e6', 'pointer-events':'none'});
@@ -750,9 +752,10 @@ $(document).ready(function() {
 	            //필수값 체크를 여기서 한다. 입고수량, 납기요청일 - 체크된 항목만	            
 	            //if( actionType == "C" && 
 	            if( actionType == "C" && detailObj['userChk'] == "Y" ) {
+	            	var tempMatrName = "["+ detailObj['matrNm'] +"]";
 	            	//입고수량
 		            if( detailObj['inQty'] ==="" || detailObj['inQty'] =="0" ) {
-		            	msgArr.push((idx+1)+" 행의 합격수량을 입력해 주십시오.")	;
+		            	msgArr.push((idx+1)+" 행의 "+tempMatrName+" 합격수량을 입력해 주십시오.")	;
 		            }	 
 	            	//불량수량 제거 
 	            	/*
@@ -762,20 +765,20 @@ $(document).ready(function() {
 	            	*/
 	            	//입고단가
 		            if( detailObj['inPrc'] =="" || detailObj['inPrc'] =="0" ) {
-		            	msgArr.push((idx+1)+" 행의 입고단가를 입력해 주십시오.")	;
+		            	msgArr.push((idx+1)+"행 "+tempMatrName+" 입고단가를 입력해 주십시오.")	;
 		            }	 	            	
 		            //납기요청일
 		            if(detailObj['dudtDeqDt'] == "" ) {
-		            	msgArr.push((idx+1)+" 행의 납기요청일을 입력해 주십시오.")	;		            	
+		            	msgArr.push((idx+1)+"행 "+tempMatrName+" 납기요청일을 입력해 주십시오.")	;		            	
 		            }
 		            //입고단가 체크 없음??
-		            if( detailObj['inDtlAmt'] =="" || detailObj['inDtlAmt'] =="0" ) {
-		            	msgArr.push((idx+1)+" 행의 입고금액을 확인해 주십시오.")	;
-		            }
+// 		            if( detailObj['inDtlAmt'] =="" || detailObj['inDtlAmt'] =="0" ) {
+// 		            	msgArr.push((idx+1)+" 행의 입고금액을 확인해 주십시오.")	;
+// 		            }
 		            //입고수량
 		            if( Number(detailObj['ordrgQty']) < Number(detailObj['preInQty']) + Number(detailObj['inQty']) ) {
 		            	var calQty = parseInt( Number(detailObj['ordrgQty']) - Number(detailObj['preInQty']) );
-		            	msgArr.push((idx+1)+" 행의 합격수량은 " + calQty + "보다 작거나 같아야 합니다.")	;
+		            	msgArr.push((idx+1)+"행의 합격수량은 " + calQty + "보다 작거나 같아야 합니다.")	;
 		            }		
 		            //합격수량+불량수량 = 미입고  == 제거(2023.0930)
 		            /*
@@ -839,5 +842,19 @@ $(document).ready(function() {
  		}		
 	});	
 });
+
+
+//그리드 높이 동적 크기 조정
+function gridResize(size) {
+	if (size < 7) return;
+    if (beforeGridSize != size) {
+        var tagHeight = (size) * 27 + 123 ;
+        tagHeight = tagHeight > 750 ? 750 : tagHeight;
+        tagHeight = tagHeight < 450 ? 450 : tagHeight;
+     
+        gridViewPop.target.setHeight(tagHeight);
+        beforeGridSize = size;
+    }
+}
 
 </script>
