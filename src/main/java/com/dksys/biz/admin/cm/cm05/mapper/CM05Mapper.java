@@ -41,4 +41,6 @@ public interface CM05Mapper {
 	Map<String, String> selectProjectCodeLastNoInfo(Map<String, String> param);
 	
 	Map<String, String> selectPrdtCodeLastNoInfo(Map<String, String> param);
+
+	int selectPrjectCodeDupCheck(Map<String, String> param);
 }

@@ -79,6 +79,11 @@ public class CM05SvcImpl implements CM05Svc {
 	public int insertCode(Map<String, String> param) throws Exception {
 		//프로젝트 코드일경우 자동 채번으로 번호 등록함, 최종 변호는 dzCode에 저장함
 		if (("PRJCTCD".equals(param.get("codeKind"))) && ("C".equals(param.get("actionType")))) {
+			// 중복프로잭트명이 있는지 체크하여 한건이라도 있으면 오류 발생 시킴
+			int dupCount = cm05Mapper.selectPrjectCodeDupCheck(param);
+			if (dupCount > 0 ) {
+				
+			}
 			Map<String, String> resultList = cm05Mapper.selectProjectCodeLastNoInfo(param);
 			param.put("codeId", "PRJCT" + resultList.get("lastNo").trim());
 			param.put("dzCode", resultList.get("lastNo"));
@@ -123,5 +128,11 @@ public class CM05SvcImpl implements CM05Svc {
 		param.put("dzCode", resultList.get("lastNo"));
 		return cm05Mapper.insertCode(param);
 	}
+
+    @Override
+	public int selectPrjectCodeDupCheck(Map<String, String> param) {
+		return cm05Mapper.selectPrjectCodeDupCheck(param);
+	}
+
 	
 }

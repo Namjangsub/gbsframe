@@ -38,4 +38,6 @@ public interface CM05Svc {
     public Map<String, String> selectProjectCodeLastNoInfo(Map<String, String> param);
 
 	public int prdtDivInsert(Map<String, String> param);
+
+	public int selectPrjectCodeDupCheck(Map<String, String> param);
 }

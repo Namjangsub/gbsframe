@@ -96,9 +96,17 @@ public class CM05Ctr {
     @PostMapping("/insertCode")
     public String insertCode(@RequestBody Map<String, String> param, ModelMap model) {
     	try {
-    		cm05Svc.insertCode(param);
-    		model.addAttribute("resultCode", 200);
-    		model.addAttribute("resultMessage", "C".equals(param.get("actionType")) ? messageUtils.getMessage("insert") : messageUtils.getMessage("update"));
+
+			// 중복프로잭트명이 있는지 체크하여 한건이라도 있으면 오류 발생 시킴
+			int dupCount = cm05Svc.selectPrjectCodeDupCheck(param);
+			if ("C".equals(param.get("actionType")) && dupCount > 0 ) {
+	    		model.addAttribute("resultCode", 900);
+	    		model.addAttribute("resultMessage", "프로젝트명이 등록되어 있습니다.");
+			} else {
+	    		cm05Svc.insertCode(param);
+	    		model.addAttribute("resultCode", 200);
+	    		model.addAttribute("resultMessage", "C".equals(param.get("actionType")) ? messageUtils.getMessage("insert") : messageUtils.getMessage("update"));
+			}
     	} catch(Exception e) {
     		model.addAttribute("resultCode", 500);
     		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
