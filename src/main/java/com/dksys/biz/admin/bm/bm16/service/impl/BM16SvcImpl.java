@@ -516,14 +516,16 @@ public class BM16SvcImpl implements BM16Svc {
   public List<Map<String, Object>> selectPrjctPlanList(Map<String, String> paramMap) {
 	  HashMap<String, Object> map = new HashMap<String, Object>();
 		
-		String[] roleArray = paramMap.get("wbsCode").split(",");
+		String[] wbsArray = paramMap.get("wbsCode").split(",");  //수주확정:WBSCODE01,목표원가/PFU배포:WBSCODE02,설계완료:WBSCODE03....
 		String wbscode = "";
-		for (int i = 0; i < roleArray.length; i++) {
-			if ((roleArray.length -1) == i ) {
-				wbscode += "'" + roleArray[i] +"' AS WBS0"+ (i+1);
+		for (int i = 0; i < wbsArray.length; i++) {
+
+			String[] roleArray = wbsArray[i].split(":");   //"수주확정:WBSCODE01
+			if ((wbsArray.length -1) == i ) {
+				wbscode += "'" + roleArray[0] +"' AS " + roleArray[1];
 			}
 			else {
-				wbscode += "'" + roleArray[i] +"' AS WBS0"+ (i+1) +  ",";
+				wbscode += "'" + roleArray[0] +"' AS " + roleArray[1] +  ",";
 			}
 		}
 		paramMap.put("wbscode", wbscode);
