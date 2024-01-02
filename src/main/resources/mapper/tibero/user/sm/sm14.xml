@@ -1178,8 +1178,9 @@
 							, A.PCHS_CLNT_NM		/* 구매처명 */
 							, A.MATR_CD
 							, A.ORDRG_QTY
-							, A.ORDRG_AMT
+							, A.ORDRG_AMT	
 							, A.IN_DTL_AMT	
+							, A.IN_DTL_AMT_GRID	
 							, A.ORDRG_DT
 							, A.DSGN_NO			/* 대표도번 */	
 							, A.PCHS_AMT
@@ -1188,24 +1189,24 @@
 							, 
 							(
 							  CASE 
-							  	WHEN( NVL(A.PCHS_AMT, 0) > 0 AND NVL(A.PCHS_VAT, 0) > 0 )
-							  		THEN TO_NUMBER(NVL(A.PCHS_AMT, 0)) + TO_NUMBER(NVL(A.PCHS_VAT, 0))
-							  	WHEN( NVL(A.PCHS_AMT, 0) > 0 AND A.PCHS_VAT IS NOT NULL  )
-							  		THEN TO_NUMBER(NVL(A.PCHS_AMT, 0)) + TO_NUMBER(NVL(A.PCHS_VAT, 0))							  	 
-							    ELSE NULL
-							  END
+							  	WHEN NVL(A.PCHS_AMT,'0') = '0' 
+							  	THEN NULL
+							  		ELSE TO_NUMBER(NVL(A.PCHS_AMT, 0)) + TO_NUMBER(NVL(A.PCHS_VAT, 0))						  	 
+							  END	
 							) AS PCHS_SUM_AMT			/* 합계금액 */
 							, CASE  
-								WHEN ( SUBSTR(A.ORDRG_NO, 0, 3) = 'BAL' )		/* 발주와 기타구매비용 분리 */
-									THEN NVL(A.IN_DTL_AMT, 0) - NVL(A.PCHS_AMT, 0)
+								WHEN ( SUBSTR(A.ORDRG_NO, 0, 3) = 'RET' )		/* 발주와 기타구매비용 분리 */
+									THEN NVL(A.IN_DTL_AMT, 0) + NVL(A.PCHS_AMT, 0)
 								/* ELSE NVL(A.IN_DTL_AMT, 0) + NVL(A.PCHS_VAT, 0)  */
 								ELSE NVL(A.IN_DTL_AMT, 0) - NVL(A.PCHS_AMT, 0) 
 							  END AS REMAIN_AMT	/* 잔여금액 구매비용일 경우 부가세 포함으로 작업함 */							
 							, TO_CHAR(A.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT
-							, NVL(A.CMPLET_YN,'N') AS CMPLET_YN
+							, NVL(A.CMPLET_YN,'') AS CMPLET_YN
 							, A.USER_CHK_V
 							, A.IS_COST
-							, A.BILL_YN		  /*계산서 여부*/
+							, A.IS_CNT
+							, A.IS_DIV
+							, A.BILL_YN   /*계산서 여부*/
 							, A.FILE_TRGT_KEY
 						  FROM
 						  (
@@ -1220,17 +1221,19 @@
 									, D.DSGN_NO 											 AS DSGN_NO			/* 도번 MIN */
 									, D.ORDRG_QTY				/* 발주수량 */
 									, D.ORDRG_AMT				/*발주 금액 */
-									, F.IN_DTL_AMT
+									, F.IN_DTL_AMT              /*입고 금액 */
+									, F.IN_DTL_AMT AS IN_DTL_AMT_GRID         /*입고 금액 */
 									, NVL(E.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00000') AS PCHS_NO	/*매입확정번호 */
 									, E.PCHS_NO AS PCHS_NO_GRID	/*매입확정번호 그리드용*/					
 									, E.PCHS_AMT				/* 매입금액 */
 									, E.PCHS_VAT				/* 매입금액 */
 									, E.PCHS_QTY				/* 매입수량 */
+									, E.PCHS_QTY AS IS_CNT
 									, E.PCHS_DT					/* 매입확정일자 */
 									, CASE
-										WHEN ( COUNT(B.ORDRG_SEQ) OVER(PARTITION BY B.ORDRG_NO) = CMPLET_SUM )
+										WHEN ( TO_NUMBER(E.PCHS_AMT) = TO_NUMBER(F.IN_DTL_AMT) )
 											THEN 'Y'
-										ELSE 'N'
+										ELSE ''
 									  END AS CMPLET_YN	 		/* 확정여부 */
 									, CASE
 										WHEN ( COUNT(B.ORDRG_SEQ) OVER(PARTITION BY B.ORDRG_NO) = CMPLET_SUM )
@@ -1238,8 +1241,9 @@
 										ELSE 'N'
 									  END AS USER_CHK_V	 		/* 확정여부 */											            
 									, 'N' IS_COST			/* 기타비용여부 */	
+									, '발주' IS_DIV			/* 구분 */
 									, '' AS BILL_YN		  /*계산서 여부*/
-									, FILE_TRGT_KEY		
+									, A.FILE_TRGT_KEY
 								FROM TB_SM02M01 A --발주마스터
 				                INNER 	 JOIN TB_SM02D01 B ON(A.ORDRG_NO=B.ORDRG_NO)		/* 발주디테일 */
 				                INNER      JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD--거래처마스터   
@@ -1270,7 +1274,7 @@
 													GROUP BY A.CO_CD
 															, A.ORDRG_NO
 															, A.PCHS_NO															
-												) E ON(A.ORDRG_NO=E.ORDRG_NO)	/* 매입 DETAIL */                                 
+												) E ON(A.ORDRG_NO=E.ORDRG_NO)	/* 매입 DETAIL */    
 								LEFT OUTER JOIN (SELECT A.CO_CD
 														, A.ORDRG_NO
 														, A.SALES_CD
@@ -1280,9 +1284,9 @@
 						                         	GROUP BY A.CO_CD
 						                                     , A.ORDRG_NO
 						                                     , A.SALES_CD
-				                                 ) AS F ON A.CO_CD = F.CO_CD AND A.SALES_CD = F.SALES_CD AND A.ORDRG_NO = F.ORDRG_NO --입고상세
-												     
+				                                 ) AS F ON A.CO_CD = F.CO_CD AND A.SALES_CD = F.SALES_CD AND A.ORDRG_NO = F.ORDRG_NO --입고상세                                  
 									WHERE 1=1
+									AND IN_DTL_AMT IS NOT NULL
 							UNION ALL		       
 								SELECT E.CO_CD
 									, E.COST_NO AS ORDRG_NO
@@ -1298,22 +1302,25 @@
 									, E.COST_DT AS ORDRG_DT			
 									, '' AS DSGN_NO							
 									, 1 AS ORDRG_QTY				/*발주수량 */
-									, E.COST_AMT AS ORDRG_AMT		/*발주 금액 */	
-									, E.COST_AMT AS IN_DTL_AMT											
+									, E.COST_AMT AS ORDRG_AMT		/*발주 금액 */		
+									, E.COST_AMT AS IN_DTL_AMT										
+									, E.COST_AMT AS IN_DTL_AMT_GRID										
 									, NVL(D.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00000') AS PCHS_NO	/*매입확정번호 */					
 									, D.PCHS_NO AS PCHS_NO_GRID	/*매입확정번호 그리드용*/			 										
 									, D.PCHS_AMT /*- TRUNC(E.COST_AMT * 10/110 ) */ AS PCHS_AMT		/* 매입금액  - 부가세 미포함으로설정  */
 									, /* TRUNC(E.COST_AMT * 10/110 ) */ D.PCHS_VAT AS PCHS_VAT		/* 부가세 */
-									, D.PCHS_QTY			/* 수량 */										
+									, D.PCHS_QTY			/* 수량 */	
+									, D.PCHS_QTY AS IS_CNT									
 									, D.PCHS_DT
 									, D.CMPLET_YN AS CMPLET_YN	 		/* 확정여부 */
 									, DECODE(D.CMPLET_YN, 'Y', 'Y', 'N') AS USER_CHK_V		/* DETAIL로 변경 */
 									, 'Y' IS_COST			/* 기타비용여부 */
+									, '비용' IS_DIV			/* 구분 */
 									, D.BILL_YN AS BILL_YN  /*계산서 여부*/
-									, FILE_TRGT_KEY
+									, E.FILE_TRGT_KEY
 									FROM TB_SM10M01 E		/* 구매비용 */		
-									LEFT OUTER JOIN TB_SM12D01 D ON(D.ORDRG_NO=E.COST_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */					
-								WHERE 1=1					
+									LEFT OUTER JOIN TB_SM12D01 D ON(D.CO_CD=E.CO_CD AND D.ORDRG_NO=E.COST_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */					
+								WHERE 1=1				
 							UNION ALL
 								SELECT E.CO_CD
 									, E.RET_NO AS ORDRG_NO
@@ -1327,31 +1334,34 @@
 									) AS PCHS_CLNT_NM		/* 구매처명 */
 									, E.IO_DIV AS MATR_CD
 									, E.RET_DT AS ORDRG_DT			
-									, '' AS DSGN_NO							
+									, R.DSGN_NO AS DSGN_NO							
 									, 1 AS ORDRG_QTY				/*발주수량 */
 									, R.RET_DTL_AMT AS ORDRG_AMT		/*발주 금액 */	
 									, R.RET_DTL_AMT AS IN_DTL_AMT											
+									, -(R.RET_DTL_AMT) AS IN_DTL_AMT_GRID											
 									, NVL(D.PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00000') AS PCHS_NO	/*매입확정번호 */					
 									, D.PCHS_NO AS PCHS_NO_GRID	/*매입확정번호 그리드용*/			 										
-									, D.PCHS_AMT AS PCHS_AMT		/* 매입금액  */
-									, D.PCHS_VAT AS PCHS_VAT		/* 부가세 */
-									, D.PCHS_QTY			/* 수량 */										
+									, -(D.PCHS_AMT) AS PCHS_AMT		/* 매입금액  */
+									, -(D.PCHS_VAT) AS PCHS_VAT		/* 부가세 */
+									, D.PCHS_QTY			/* 수량 */	
+									, D.PCHS_QTY AS CNT									
 									, D.PCHS_DT
 									, D.CMPLET_YN AS CMPLET_YN	 		/* 확정여부 */
 									, DECODE(D.CMPLET_YN, 'Y', 'Y', 'N') AS USER_CHK_V		/* DETAIL로 변경 */
 									, 'R' IS_COST			/* 반품여부 */
+									, '반품' IS_DIV			/* 구분 */
 									, D.BILL_YN AS BILL_YN  /*계산서 여부*/
 									, FILE_TRGT_KEY
 									FROM TB_SM06M01 E		/* 반품 */	
-									INNER JOIN (SELECT SUM(RET_DTL_AMT) AS RET_DTL_AMT, RET_NO, CO_CD FROM TB_SM06D01 GROUP BY RET_NO, CO_CD ) R 
+									INNER JOIN (SELECT SUM(RET_DTL_AMT) AS RET_DTL_AMT, MIN(DSGN_NO) AS DSGN_NO, RET_NO, CO_CD FROM TB_SM06D01 GROUP BY RET_NO, CO_CD ) R 
 									ON R.CO_CD = E.CO_CD AND R.RET_NO = E.RET_NO	
-									LEFT OUTER JOIN TB_SM12D01 D ON(D.ORDRG_NO=E.RET_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */	
-								WHERE 1=1											
-						  ) A		/* 발주+기타비용 내역 */
-						  WHERE 1=1 
+									LEFT OUTER JOIN TB_SM12D01 D ON(D.CO_CD=E.CO_CD AND D.ORDRG_NO=E.RET_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */	
+								WHERE 1=1										
+						  ) A		/* 발주+기타비용+반품 내역 */
+						  WHERE 1=1		
 						<include refid="selectPurchaseListCondition"></include>
-						  ORDER BY A.CO_CD, A.ORDRG_DT ASC, A.ORDRG_NO DESC, A.SALES_CD DESC, A.PCHS_NO DESC
-						) X		
+						  ORDER BY A.CO_CD, A.PCHS_CLNT_NM, A.ORDRG_NO,  A.PCHS_NO 
+						) X
 	</select>
 	
 		<!-- 매입확정 리스트  구매비용 포함-->
@@ -1554,7 +1564,7 @@
 						  ) A		/* 발주+기타비용+반품 내역 */
 						  WHERE 1=1		
 						<include refid="selectPurchaseListCondition"></include>
-						  ORDER BY A.CO_CD, A.PCHS_CLNT_CD, A.ORDRG_NO,  A.PCHS_NO 
+						  ORDER BY A.CO_CD, A.PCHS_CLNT_NM, A.ORDRG_NO,  A.PCHS_NO 
 						) X		
 			)							
 			WHERE 1=1
