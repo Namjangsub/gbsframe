@@ -40,6 +40,9 @@
 			<if test='pchsGb == "retn"'>
 			AND A.IS_COST = 'R'
 			</if>			
+		</if>	
+		<if test="prjctCdNm != null and !prjctCdNm.equals('')">
+			AND UPPER(CLNT_PJT_NM) LIKE '%'|| UPPER(#{prjctCdNm}) || '%'   
 		</if>																		
 	</sql>	
 		
@@ -1208,6 +1211,8 @@
 							, A.IS_DIV
 							, A.BILL_YN   /*계산서 여부*/
 							, A.FILE_TRGT_KEY
+							, CLNT_PJT
+							, CLNT_PJT_NM
 						  FROM
 						  (
 							SELECT DISTINCT 
@@ -1244,9 +1249,14 @@
 									, '발주' IS_DIV			/* 구분 */
 									, '' AS BILL_YN		  /*계산서 여부*/
 									, A.FILE_TRGT_KEY
+									, SJM.CLNT_PJT
+									, CMM.CODE_NM  AS CLNT_PJT_NM
 								FROM TB_SM02M01 A --발주마스터
 				                INNER 	 JOIN TB_SM02D01 B ON(A.ORDRG_NO=B.ORDRG_NO)		/* 발주디테일 */
-				                INNER      JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD--거래처마스터   
+				                LEFT OUTER JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD--거래처마스터     
+								LEFT OUTER JOIN TB_CR02D02  SJD  ON SJD.SALES_CD  = A.SALES_CD
+								LEFT OUTER JOIN TB_CR02M01  SJM  ON SJM.ORDRS_NO  = SJD.ORDRS_NO
+								LEFT OUTER JOIN TB_CM05M01  CMM  ON CMM.CODE_ID  = SJM.CLNT_PJT
 				                LEFT OUTER JOIN (SELECT A.CO_CD
 														, A.ORDRG_NO
 														, A.SALES_CD
@@ -1318,8 +1328,13 @@
 									, '비용' IS_DIV			/* 구분 */
 									, D.BILL_YN AS BILL_YN  /*계산서 여부*/
 									, E.FILE_TRGT_KEY
+									, SJM.CLNT_PJT
+									, CMM.CODE_NM  AS CLNT_PJT_NM
 									FROM TB_SM10M01 E		/* 구매비용 */		
-									LEFT OUTER JOIN TB_SM12D01 D ON(D.CO_CD=E.CO_CD AND D.ORDRG_NO=E.COST_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */					
+									LEFT OUTER JOIN TB_SM12D01 D ON(D.CO_CD=E.CO_CD AND D.ORDRG_NO=E.COST_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */	
+									LEFT OUTER JOIN TB_CR02D02  SJD  ON SJD.SALES_CD  = E.SALES_CD
+									LEFT OUTER JOIN TB_CR02M01  SJM  ON SJM.ORDRS_NO  = SJD.ORDRS_NO
+									LEFT OUTER JOIN TB_CM05M01  CMM  ON CMM.CODE_ID  = SJM.CLNT_PJT								
 								WHERE 1=1				
 							UNION ALL
 								SELECT E.CO_CD
@@ -1351,11 +1366,16 @@
 									, 'R' IS_COST			/* 반품여부 */
 									, '반품' IS_DIV			/* 구분 */
 									, D.BILL_YN AS BILL_YN  /*계산서 여부*/
-									, FILE_TRGT_KEY
+									, E.FILE_TRGT_KEY
+									, SJM.CLNT_PJT
+									, CMM.CODE_NM  AS CLNT_PJT_NM
 									FROM TB_SM06M01 E		/* 반품 */	
 									INNER JOIN (SELECT SUM(RET_DTL_AMT) AS RET_DTL_AMT, MIN(DSGN_NO) AS DSGN_NO, RET_NO, CO_CD FROM TB_SM06D01 GROUP BY RET_NO, CO_CD ) R 
 									ON R.CO_CD = E.CO_CD AND R.RET_NO = E.RET_NO	
-									LEFT OUTER JOIN TB_SM12D01 D ON(D.CO_CD=E.CO_CD AND D.ORDRG_NO=E.RET_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */	
+									LEFT OUTER JOIN TB_SM12D01 D ON(D.CO_CD=E.CO_CD AND D.ORDRG_NO=E.RET_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */		
+									LEFT OUTER JOIN TB_CR02D02  SJD  ON SJD.SALES_CD  = E.SALES_CD
+									LEFT OUTER JOIN TB_CR02M01  SJM  ON SJM.ORDRS_NO  = SJD.ORDRS_NO
+									LEFT OUTER JOIN TB_CM05M01  CMM  ON CMM.CODE_ID  = SJM.CLNT_PJT			
 								WHERE 1=1										
 						  ) A		/* 발주+기타비용+반품 내역 */
 						  WHERE 1=1		
@@ -1412,6 +1432,8 @@
 							, A.IS_DIV
 							, A.BILL_YN   /*계산서 여부*/
 							, A.FILE_TRGT_KEY
+							, CLNT_PJT
+							, CLNT_PJT_NM
 						  FROM
 						  (
 							SELECT DISTINCT 
@@ -1448,9 +1470,14 @@
 									, '발주' IS_DIV			/* 구분 */
 									, '' AS BILL_YN		  /*계산서 여부*/
 									, A.FILE_TRGT_KEY
+									, SJM.CLNT_PJT
+									, CMM.CODE_NM  AS CLNT_PJT_NM
 								FROM TB_SM02M01 A --발주마스터
 				                INNER 	 JOIN TB_SM02D01 B ON(A.ORDRG_NO=B.ORDRG_NO)		/* 발주디테일 */
-				                INNER      JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD--거래처마스터   
+				                INNER      JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD--거래처마스터    
+								LEFT OUTER JOIN TB_CR02D02  SJD  ON SJD.SALES_CD  = A.SALES_CD
+								LEFT OUTER JOIN TB_CR02M01  SJM  ON SJM.ORDRS_NO  = SJD.ORDRS_NO
+								LEFT OUTER JOIN TB_CM05M01  CMM  ON CMM.CODE_ID  = SJM.CLNT_PJT
 				                LEFT OUTER JOIN (SELECT A.CO_CD
 														, A.ORDRG_NO
 														, A.SALES_CD
@@ -1522,8 +1549,13 @@
 									, '비용' IS_DIV			/* 구분 */
 									, D.BILL_YN AS BILL_YN  /*계산서 여부*/
 									, E.FILE_TRGT_KEY
+									, SJM.CLNT_PJT
+									, CMM.CODE_NM  AS CLNT_PJT_NM
 									FROM TB_SM10M01 E		/* 구매비용 */		
-									LEFT OUTER JOIN TB_SM12D01 D ON(D.CO_CD=E.CO_CD AND D.ORDRG_NO=E.COST_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */					
+									LEFT OUTER JOIN TB_SM12D01 D ON(D.CO_CD=E.CO_CD AND D.ORDRG_NO=E.COST_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */			
+									LEFT OUTER JOIN TB_CR02D02  SJD  ON SJD.SALES_CD  = E.SALES_CD
+									LEFT OUTER JOIN TB_CR02M01  SJM  ON SJM.ORDRS_NO  = SJD.ORDRS_NO
+									LEFT OUTER JOIN TB_CM05M01  CMM  ON CMM.CODE_ID  = SJM.CLNT_PJT						
 								WHERE 1=1				
 							UNION ALL
 								SELECT E.CO_CD
@@ -1555,11 +1587,16 @@
 									, 'R' IS_COST			/* 반품여부 */
 									, '반품' IS_DIV			/* 구분 */
 									, D.BILL_YN AS BILL_YN  /*계산서 여부*/
-									, FILE_TRGT_KEY
+									, E.FILE_TRGT_KEY
+									, SJM.CLNT_PJT
+									, CMM.CODE_NM  AS CLNT_PJT_NM
 									FROM TB_SM06M01 E		/* 반품 */	
 									INNER JOIN (SELECT SUM(RET_DTL_AMT) AS RET_DTL_AMT, MIN(DSGN_NO) AS DSGN_NO, RET_NO, CO_CD FROM TB_SM06D01 GROUP BY RET_NO, CO_CD ) R 
 									ON R.CO_CD = E.CO_CD AND R.RET_NO = E.RET_NO	
-									LEFT OUTER JOIN TB_SM12D01 D ON(D.CO_CD=E.CO_CD AND D.ORDRG_NO=E.RET_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */	
+									LEFT OUTER JOIN TB_SM12D01 D ON(D.CO_CD=E.CO_CD AND D.ORDRG_NO=E.RET_NO AND D.ORDRG_SEQ=1)	/* 매입 DETAIL */		
+									LEFT OUTER JOIN TB_CR02D02  SJD  ON SJD.SALES_CD  = E.SALES_CD
+									LEFT OUTER JOIN TB_CR02M01  SJM  ON SJM.ORDRS_NO  = SJD.ORDRS_NO
+									LEFT OUTER JOIN TB_CM05M01  CMM  ON CMM.CODE_ID  = SJM.CLNT_PJT			
 								WHERE 1=1										
 						  ) A		/* 발주+기타비용+반품 내역 */
 						  WHERE 1=1		
