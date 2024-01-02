@@ -268,4 +268,12 @@ public class SM03SvcImpl implements SM03Svc {
 		result += sm03Mapper.deleteWareHousingMaster(param);
 		return result;
 	}	
+	
+	@Override
+	public int deleteWareHousingInno(Map<String, String> param) {
+		int result = 0;	   
+		result = sm03Mapper.deleteWareHousingDirectMaster(param);
+		result += sm03Mapper.deleteWareHousingDirectDetail(param);
+		return result;
+	}	
 }

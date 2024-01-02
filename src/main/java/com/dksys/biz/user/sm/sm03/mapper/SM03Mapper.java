@@ -43,6 +43,10 @@ public interface SM03Mapper {
 	int deleteWareHousingMaster(Map<String, String> paramMap);
 	
 	int deleteWareHousingDetail(Map<String, String> param);	
+	
+	int deleteWareHousingDirectMaster(Map<String, String> paramMap);
+	
+	int deleteWareHousingDirectDetail(Map<String, String> param);	
 }
 
 

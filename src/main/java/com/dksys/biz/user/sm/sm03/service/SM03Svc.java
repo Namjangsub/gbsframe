@@ -31,5 +31,7 @@ public interface SM03Svc {
 	
 	int deleteWareHousingMaster(Map<String, String> param);			
 	
-	int deleteWareHousingDetail(Map<String, String> param);	
+	int deleteWareHousingDetail(Map<String, String> param);			
+	
+	int deleteWareHousingInno(Map<String, String> param);	
 }

@@ -127,4 +127,13 @@ public class SM03Ctr {
     	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
 		return "jsonView";
 	} 
+	
+	//입고내역중 입고번호에 해당하는 내역 Direct 삭제  (마스터 삭제후 모든 상세내역 삭제처리 함.)    
+	@DeleteMapping(value = "/deleteWareHousingInno")
+	public String deleteWareHousingInno(@RequestBody Map<String, String> param, ModelMap model) {
+		sm03Svc.deleteWareHousingInno(param);
+		model.addAttribute("resultCode", 200);
+    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+		return "jsonView";
+	} 
 }
