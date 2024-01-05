@@ -194,7 +194,7 @@ function Approval(htmlParam, param, popParam) {
 						if(data.resultCode == 200){
 //							console.log("QM01M01 접수컬럼상태가 바뀌었습니다");
 						}
-						alert(confirmText + " 되었습니다.");
+//						alert(confirmText + " 되었습니다.");
 						confirmYn = true;
 					});
 
