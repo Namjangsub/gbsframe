@@ -184,5 +184,25 @@ public class SM02Ctr {
   			model.addAttribute("resultMessage", e.getMessage());
   		}
   		return "jsonView";
-    }   	
+    }   	  
+    
+	//발주 일괄 결재 요청
+    @PostMapping(value = "/updateOrderApprovalRequest")
+    public String updateOrderApprovalRequest(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (sm02Svc.updateOrderApprovalRequest(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  				model.addAttribute("makeArr", paramMap.get("makeArr"));  //콜백에서 처리하기 위해 파라메터 전달함.
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }         
+
 }

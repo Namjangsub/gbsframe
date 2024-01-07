@@ -22,6 +22,7 @@ import com.dksys.biz.util.DateUtil;
 import com.dksys.biz.util.ExceptionThrower;
 import com.dksys.biz.user.sm.sm02.mapper.SM02Mapper;
 import com.dksys.biz.user.sm.sm02.service.SM02Svc;
+import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -46,7 +47,10 @@ public class SM02SvcImpl implements SM02Svc {
 	CM08Svc cm08Svc;	
 	
     @Autowired
-    WB20Svc wb20Svc;	
+    WB20Svc wb20Svc;
+    
+    @Autowired
+    WB20Mapper wb20Mapper;
 
 	@Autowired
 	ExceptionThrower thrower;
@@ -304,4 +308,70 @@ public class SM02SvcImpl implements SM02Svc {
 		result += sm02Mapper.updateMailConfirm(param);
 		return result;
 	}		
+	
+	//발주 일괄 결재 요청
+	@Override
+	public int updateOrderApprovalRequest(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
+		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);	
+		
+		int result = 0;	    	    
+	    //upate
+		for(Map<String, String> dtl : detailMap) {
+			dtl.put("coCd", paramMap.get("coCd"));
+			dtl.put("userId", paramMap.get("userId"));
+			dtl.put("pgmId", paramMap.get("pgmId"));
+			dtl.put("creatId", paramMap.get("userId"));
+			
+			result = sm02Mapper.updateOrderMaster(dtl);	
+			
+			//---------------------------------------------------------------  
+			// 결재라인 처리 시작 
+			//---------------------------------------------------------------		
+			if( paramMap.containsKey("approvalArr") ) {	
+
+				List<Map<String, String>> approvalMap = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
+					paramMap.put("todoNo", dtl.get("ordrgNo"));
+					paramMap.put("todoDiv2CodeId", "TODODIV2050");
+					paramMap.put("todoFileTrgtKey", dtl.get("fileTrgtKey"));
+					paramMap.put("todoCoCd", dtl.get("coCd"));
+					paramMap.put("salesCd", dtl.get("salesCd"));
+					paramMap.put("sanctnSttus", "N");
+					
+					//수정시 삭제된 부분만 처리가 불가하여 전체 삭제후 저장
+					wb20Mapper.deleteAllTodoMaster(paramMap);
+					
+					//결제라인 insert			
+					String maxTodoKey = "";		
+					for(Map<String, String> dtlApp : approvalMap) {
+						//입력, 수정 
+						
+						dtlApp.put("todoNo", dtl.get("ordrgNo"));
+						dtlApp.put("todoDiv2CodeId", "TODODIV2050");
+						dtlApp.put("todoFileTrgtKey", dtl.get("fileTrgtKey"));
+						dtlApp.put("todoCoCd", dtl.get("coCd"));
+						dtlApp.put("salesCd", dtl.get("salesCd"));
+						dtlApp.put("sanctnSttus", "N");
+						dtlApp.put("pgParam", dtl.get("pgParam"));
+						dtlApp.put("pgPath", paramMap.get("pgPath"));
+						dtlApp.put("userId", paramMap.get("userId"));
+						dtlApp.put("pgmId", paramMap.get("pgmId"));
+						
+			            //TITLE 추가
+						dtlApp.put("todoTitl", dtl.get("pchsClntNm") + " " + dtl.get("eqpNm"));
+						
+						maxTodoKey =  wb20Mapper.selectmaxTodoKey(dtlApp);
+						dtlApp.put("todoKey", maxTodoKey);
+						result += wb20Mapper.insertTodoMaster(dtlApp);				
+					}		
+				}				
+			}		
+			//---------------------------------------------------------------  
+			// 결재라인 처리 end
+			//---------------------------------------------------------------	
+		
+		return result;
+	}	
 }

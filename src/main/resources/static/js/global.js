@@ -2379,12 +2379,12 @@ function kakaoSendReal(talkJson, talkParam, param) {
 //	    	console.log('status:' + data.status);
 	    	let err = data.status;
 	    	if( err.indexOf("ERR") > -1 || err.indexOf("KKO")> -1 ) { 
-	    		let find = kakaoErr.find(e => e.codeId === err);
-				if( typeof(find.codeNm) != "undefined" ) {
-		    		var errorMsg = find.codeNm;	
-				}		    			
+//	    		let find = kakaoErr.find(e => e.codeId === err);
+//				if( typeof(find.codeNm) != "undefined" ) {
+//		    		var errorMsg = find.codeNm;	
+//				}		    			
 		    	insertKakaoMessage(err, talkDeJson, param);	  				
-	    		alert("오류코드: "+data.status+"\r\n\r\n" + errorMsg+"로 메세지 전송 실패하였습니다.\n담당자 : "+param.nameTo+" Hp."+ param.ordrgMngTelNo);   		
+//	    		alert("오류코드: "+data.status+"\r\n\r\n" + errorMsg+"로 메세지 전송 실패하였습니다.\n담당자 : "+param.nameTo+" Hp."+ param.ordrgMngTelNo);   		
 	    	} else if( data.status == "OK" ) {
 	    		//alert("알림톡 정상 발송되었습니다.");
 	    		sendCnt++;
