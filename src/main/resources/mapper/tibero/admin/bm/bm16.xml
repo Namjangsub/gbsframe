@@ -874,10 +874,47 @@ WITH SJD AS --수주상세
 	              , P.PLANE_DT           --계획종료일
 	          FROM PJT P
 	         WHERE 1=1
+	        UNION ALL --일정 수행결과 등록현황
+	         SELECT 
+				    S.CO_CD              --회사코드
+	              , S.CO_NM              --회사명
+				  , '수주후실적'               AS GUBUN
+	              , S.SALES_CD           --SALES Code
+	              , S.CLNT_CD            --고객코드
+	              , S.CLNT_NM            --고객명
+	              , S.CLNT_PJT           --고객사프로젝트 
+	              , S.CLNT_PJT_NM        --고객사프로젝트명
+	              , S.EQP_NM             --설비명 
+	              , S.ORDRS_QTY          --수주수량 
+	              , S.ORDRS_DTL_DIV20    --작업구분
+	              , S.ORDRS_DTL_DIV20_NM --작업구분명
+	              , S.CTRT_DOC           --계약문서 
+	              , S.DUDT_INTEND_DT     --납기예정일 
+	              , S.ORDRS_DT           --수주확정일
+	              , C.CODE_NM							 AS PLAN_CD_NM   --계획 LVL1 명
+	              , TO_CHAR(Z.RSLTSE_DT, 'YYYY-MM-DD') AS PLANE_DT
+			    FROM SJD S
+		            LEFT OUTER JOIN TB_WB22M01 A ON S.CO_CD = A.CO_CD
+		            							AND S.SALES_CD = A.SALES_CD
+		        	LEFT OUTER JOIN (                  
+				                        SELECT 
+				                        	   WR.CO_CD
+				                        	 , WR.SALES_CD
+				                        	 , WR.WBS_PLAN_CODE_KIND
+				                             , MIN(WR.WBS_RSLTSS_DT)   AS RSLTSS_DT     --TASK실적시작일
+				                             , MAX(WR.WBS_RSLTSE_DT)   AS RSLTSE_DT     --TASK실적종료일 
+				                             , SUM(WR.DAYCNT)          AS RSLT_DAYCNT   --TASK실적소요일
+				                          FROM TB_WB23M01  WR--WBS실적 정보
+				                         GROUP BY WR.CO_CD, WR.SALES_CD, WR.WBS_PLAN_CODE_KIND
+				                      ) Z ON A.CO_CD  = Z.CO_CD
+        								 AND A.SALES_CD  = Z.SALES_CD 
+        								 AND A.WBS_PLAN_CODE_ID  = Z.WBS_PLAN_CODE_KIND
+                          LEFT OUTER JOIN TB_CM05M01 C ON   A.WBS_PLAN_CODE_ID = C.CODE_ID
+		       WHERE 1=1
 	       ) 
    PIVOT ( MAX(PLANE_DT) FOR PLAN_CD_NM IN ('수주확정' AS WBS01, '목표원가/PFU배포' AS WBS02, '설계완료' AS WBS03, '구매완료' AS WBS04, '기계조립완료' AS WBS05, '전기완료' AS WBS06, '자체시운전완료' AS WBS07, '조건작업완료' AS WBS08, '고객검수' AS WBS09, '포장' AS WBS10, '출고' AS WBS11, '도착' AS WBS12, '설치시운전(출발일)' AS WBS13, '설치시운전(복귀일)' AS WBS14 ) --해당부서 코드명 넣어주기 
          )
- 		 ORDER BY CLNT_CD, CLNT_PJT, ORDRS_DT, SALES_CD
+ 		 ORDER BY CLNT_CD, CLNT_PJT, ORDRS_DT, SALES_CD, GUBUN
 	</select>
 
 	<select id="selectPrjctPlanList" resultType="CamelMap">
@@ -1009,11 +1046,12 @@ WITH SJD AS --수주상세
 					              UNPIVOT INCLUDE NULLS  ( DT_VAL FOR COL_DT IN (DSGN_DT, PURCHS_DT, PRDCTN_DT, ACPTNC_DT, DLIVY_DT )
 					                                     )
 					      )
+					      --일정 계획 자료 현황
 						SELECT *
 						  FROM (
 						        SELECT  S.CO_CD              --회사코드
 						              , S.CO_NM              --회사명
-									  , '수주후'               AS GUBUN
+									  , '1.일정계획'               AS GUBUN
 						              , S.SALES_CD           --SALES Code
 						              , S.CLNT_CD            --고객코드
 						              , S.CLNT_NM            --고객명
@@ -1031,10 +1069,10 @@ WITH SJD AS --수주상세
 						          FROM SJD S
 						               LEFT OUTER JOIN WBS AS W ON S.CO_CD = W.CO_CD AND S.SALES_CD = W.SALES_CD
 						         WHERE 1=1
-						        UNION ALL
+						        UNION ALL --프로젝트 계획자료
 						        SELECT  P.CO_CD              --회사코드
 						              , P.CO_NM              --회사명
-									  , '수주전'               AS GUBUN
+									  , '0.예상수주'               AS GUBUN
 						              , P.SALES_CD           --SALES Code
 						              , P.CLNT_CD            --고객코드
 						              , P.CLNT_NM            --고객명
@@ -1051,10 +1089,51 @@ WITH SJD AS --수주상세
 						              , P.PLANE_DT           --계획종료일
 						          FROM PJT P
 						         WHERE 1=1
+						        UNION ALL --일정 수행결과 등록현황
+						         SELECT 
+									    S.CO_CD              --회사코드
+						              , S.CO_NM              --회사명
+									  , '2.수행결과'               AS GUBUN
+						              , S.SALES_CD           --SALES Code
+						              , S.CLNT_CD            --고객코드
+						              , S.CLNT_NM            --고객명
+						              , S.CLNT_PJT           --고객사프로젝트 
+						              , S.CLNT_PJT_NM        --고객사프로젝트명
+						              , S.EQP_NM             --설비명 
+						              , S.ORDRS_QTY          --수주수량 
+						              , S.ORDRS_DTL_DIV20    --작업구분
+						              , S.ORDRS_DTL_DIV20_NM --작업구분명
+						              , S.CTRT_DOC           --계약문서 
+						              , S.DUDT_INTEND_DT     --납기예정일 
+						              , S.ORDRS_DT           --수주확정일
+						              , C.CODE_NM							 AS PLAN_CD_NM   --계획 LVL1 명
+						              , (TO_CHAR(Z.RSLTSE_DT, 'YYYY-MM-DD') || 
+						              	CASE WHEN F_PLAN2RESULT_CHECK(A.CO_CD, A.SALES_CD, A.WBS_PLAN_CODE_ID) IS NULL THEN ''
+		    								 ELSE '(' || F_PLAN2RESULT_CHECK(A.CO_CD, A.SALES_CD, A.WBS_PLAN_CODE_ID) || ')'
+		    								 END
+		    							) AS PLANE_DT
+								    FROM SJD S
+							            LEFT OUTER JOIN TB_WB22M01 A ON S.CO_CD = A.CO_CD
+							            							AND S.SALES_CD = A.SALES_CD
+							        	LEFT OUTER JOIN (                  
+									                        SELECT 
+									                        	   WR.CO_CD
+									                        	 , WR.SALES_CD
+									                        	 , WR.WBS_PLAN_CODE_KIND
+									                             , MIN(WR.WBS_RSLTSS_DT)   AS RSLTSS_DT     --TASK실적시작일
+									                             , MAX(WR.WBS_RSLTSE_DT)   AS RSLTSE_DT     --TASK실적종료일 
+									                             , SUM(WR.DAYCNT)          AS RSLT_DAYCNT   --TASK실적소요일
+									                          FROM TB_WB23M01  WR--WBS실적 정보
+									                         GROUP BY WR.CO_CD, WR.SALES_CD, WR.WBS_PLAN_CODE_KIND
+									                      ) Z ON A.CO_CD  = Z.CO_CD
+					        								 AND A.SALES_CD  = Z.SALES_CD 
+					        								 AND A.WBS_PLAN_CODE_ID  = Z.WBS_PLAN_CODE_KIND
+			                            LEFT OUTER JOIN TB_CM05M01 C ON   A.WBS_PLAN_CODE_ID = C.CODE_ID
+							       WHERE 1=1
 						       ) 
 					   PIVOT ( MAX(PLANE_DT) FOR PLAN_CD_NM IN (${wbscode}) --해당부서 코드명 넣어주기 
 					         )
-					 		 ORDER BY CLNT_CD, CLNT_PJT, ORDRS_DT, SALES_CD
+					 		 ORDER BY CLNT_CD, CLNT_PJT, ORDRS_DT, SALES_CD, GUBUN
 			 ) N
 	   )T
  	WHERE 1=1
