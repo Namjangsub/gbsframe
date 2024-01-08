@@ -42,17 +42,17 @@ function Approval(htmlParam, param, popParam) {
 		        </h3>
 		        -->
 				<!--결재 테이블 -->
-		        <div clss="contents" id="applist" style="height: 100%; padding: 5px">
+		        <div clss="contents" id="applist" style="whdth:100%; height: 100%; padding: 5px">
 			    	<!-- 결재라인 table -->
-			    	<table id="appLine" style="border: 1px solid #dbdbdb; border-collapse: collapse" class="table_input">
+			    	<table id="appLine" class="table_input">
 			    		<colgroup>
-			    			<col width="18%">
+			    			<col width="12%">
 			    			<col width="20%">
 			    			<col width="24%">
 			    			<col width="16%">
 			    			<col width="22%">
 			    		</colgroup>
-			    		<tr id="appH" stye="text-align:center; border-bottom:1px solid #dbdbdb; height:25px;">
+			    		<tr id="appH">
 			    			<th class="appTh">순번</th>
 			    			<th class="appTh">결재자</th>
 			    			<th class="appTh">결재의견</th>			    			
@@ -60,7 +60,7 @@ function Approval(htmlParam, param, popParam) {
 			    			<th class="appTh">결재일자</th>		    			
 			    		</tr>
 			    	</table>
-			    	<div class="mobile_mid_btn" style="text-align: center; float:right; padding-top:10px;" id="appBtnDiv">
+			    	<div class="mobile_mid_btn" style="text-align: center; float:center; padding-top:10px;" id="appBtnDiv">
 					<button	type="button" style="height: 40px;  width: 90px;" id="appConfirmAnchor" onclick="approvalConfirm();" >결재승인</button>
 					<button type="button" class="close_btn" style="height: 40px;  width: 90px;" id="appConfirmAnchor" onclick="window.history.back();" >닫기</button>
 					</div>
@@ -186,7 +186,7 @@ function Approval(htmlParam, param, popParam) {
 						if(data.resultCode == 200){
 //							console.log("QM01M01 접수컬럼상태가 바뀌었습니다");
 						}
-						alert("승인 되었습니다.");
+//						alert("승인 되었습니다.");
 						confirmYn = true;
 					});
 				} else {
