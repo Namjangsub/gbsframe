@@ -257,6 +257,20 @@ public class BM16Ctr {
   @PostMapping("/selectPrjctPlanList")
   public String selectPrjctPlanList(@RequestBody Map<String, String> param, ModelMap model) {
 	  
+		String[] wbsArray = param.get("wbsCode").split(",");  //수주확정:WBSCODE01,목표원가/PFU배포:WBSCODE02,설계완료:WBSCODE03....
+		String wbscode = "";
+		for (int i = 0; i < wbsArray.length; i++) {
+
+			String[] roleArray = wbsArray[i].split(":");   //"수주확정:WBSCODE01
+			if ((wbsArray.length -1) == i ) {
+				wbscode += "'" + roleArray[0] +"' AS " + roleArray[1];
+			}
+			else {
+				wbscode += "'" + roleArray[0] +"' AS " + roleArray[1] +  ",";
+			}
+		}
+		param.put("wbscode", wbscode);
+	  
       int totalCnt = bm16Svc.selectPrjctPlanCount(param);
       PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
       model.addAttribute("paginationInfo", paginationInfo);
