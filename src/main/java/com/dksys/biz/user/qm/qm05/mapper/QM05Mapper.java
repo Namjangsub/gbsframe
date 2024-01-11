@@ -9,6 +9,8 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 @Mapper
 public interface QM05Mapper {
+
+	int selectMainGridListCount(Map<String, String> paramMap);
 	
 	//그리드 리스트
 	List<Map<String, String>> selectMainGridList(Map<String, String> paramMap);

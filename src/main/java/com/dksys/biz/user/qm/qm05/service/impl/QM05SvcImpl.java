@@ -30,9 +30,11 @@ public class QM05SvcImpl implements QM05Svc {
 	
 	@Autowired
 	QM05Svc qm05Svc;
-
-	@Autowired
-	CM08Svc cm08Svc;
+	  
+	@Override
+	public int selectMainGridListCount(Map<String, String> paramMap) {
+		return qm05Mapper.selectMainGridListCount(paramMap);
+	}
 	
 	// 그리드 리스트
 	@Override

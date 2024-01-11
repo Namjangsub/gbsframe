@@ -31,10 +31,10 @@ public class QM05Ctr {
 
 		//리스트 조회
 		@PostMapping(value = "/selectMainGridList")
-		public String grid1_selectList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-//			int totalCnt = qm04svc.select_grid_Count(paramMap);
-//			PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-//			model.addAttribute("paginationInfo", paginationInfo);
+		public String selectMainGridList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+			int totalCnt = qm05svc.selectMainGridListCount(paramMap);
+			PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+			model.addAttribute("paginationInfo", paginationInfo);
 			List<Map<String, String>> result = qm05svc.selectMainGridList(paramMap);
 			model.addAttribute("result", result);
 			return "jsonView";

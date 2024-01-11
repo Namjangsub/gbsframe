@@ -7,6 +7,8 @@ import java.util.Map;
 
 public interface QM05Svc {
 
+	  int selectMainGridListCount(Map<String, String> paramMap);
+
 	// 그리드 리스트
 	List<Map<String, String>> selectMainGridList(Map<String, String> paramMap);
 }
