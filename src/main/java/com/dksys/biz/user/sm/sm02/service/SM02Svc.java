@@ -12,8 +12,6 @@ public interface SM02Svc {
 	
 	List<Map<String, String>> selectOrderList(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectOrderExcelList(Map<String, String> paramMap);
-	
 	List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectOrderDetailList(Map<String, String> paramMap);

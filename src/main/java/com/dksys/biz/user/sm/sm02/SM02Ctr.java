@@ -38,14 +38,6 @@ public class SM02Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
-	
-	// 매입관리 발주 조회 엑셀
-	@PostMapping(value = "/selectOrderExcelList")
-	public String selectOrderExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> result = sm02Svc.selectOrderExcelList(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-	}	
 
 	// BOM내역상세 조회
 	@PostMapping(value = "/selectBomDetailList")

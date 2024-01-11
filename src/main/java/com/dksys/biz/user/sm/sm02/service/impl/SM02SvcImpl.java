@@ -65,11 +65,6 @@ public class SM02SvcImpl implements SM02Svc {
 	public List<Map<String, String>> selectOrderList(Map<String, String> paramMap) {
 		return sm02Mapper.selectOrderList(paramMap);
 	}	
-	
-	@Override
-	public List<Map<String, String>> selectOrderExcelList(Map<String, String> paramMap) {
-		return sm02Mapper.selectOrderExcelList(paramMap);
-	}		
 
 	@Override
 	public int selectMaxTrgtKey(Map<String, String> paramMap) {
