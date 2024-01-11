@@ -4,6 +4,163 @@
 
 <mapper namespace="com.dksys.biz.user.qm.qm06.mapper.QM06Mapper">
 
+	<select id="selectQualityReqListCount" parameterType="Map" resultType="int">
+	/* selectQualityReqListCount */
+		WITH SJD AS --수주상세 
+		     ( 
+		      SELECT M.CO_CD                                              AS CO_CD       --회사코드
+		            , M.ORDRS_NO                                           AS ORDRS_NO    --수주번호
+		            , X.SALES_CD                                           AS SALES_CD    --SALES Code
+		            , M.ORDRS_CLNT_CD                                      AS CLNT_CD     --고객코드
+		            , C.CLNT_NM                                            AS CLNT_NM     --고객명
+		            , M.CLNT_PJT                                           AS CLNT_PJT_CD --고객사프로젝트 
+		            , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)  AS CLNT_PJT    --고객사프로젝트명
+		            , X.ITEM_DIV                                           AS ITEM_DIV
+		            , (SELECT FN_CM05M01_CD_TO_NM(X.ITEM_DIV) FROM DUAL)  AS ITEM_DIV_NM
+		            , X.PRDT_CD                                            AS PRDT_CD1
+		            , P.PRDT_GRP                                           AS PRDT_CD  
+		            , NVL(X.EQP_NM,' ')                                    AS EQP_NM                              
+		         FROM TB_CR02M01  M --수주마스터
+		              LEFT OUTER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+		              LEFT OUTER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+		              LEFT OUTER JOIN TB_BM01M01 AS P ON X.PRDT_CD  = P.PRDT_CD      --제품마스터 
+		        WHERE 1=1
+		          AND M.CO_CD = #{coCd}
+		     )
+		   , REQ AS --발주및출장요청상세 
+		     (
+		      SELECT T.CO_CD         AS CO_CD 
+		           , T.REQ_NO        AS REQ_NO
+		           , P.RSLT_NO       AS RSLT_NO            
+		           , CASE WHEN INSTR(T.BUST_CD, ',', 1, 1) = 0 THEN T.BUST_CD
+		                   ELSE SUBSTR(T.BUST_CD, 1, INSTR(T.BUST_CD, ',', 1, 1)-1)
+		             END BUST_CD01
+		           , CASE WHEN INSTR(T.BUST_CD, ',', 1, 2) = 0 THEN ''
+		                   ELSE SUBSTR(T.BUST_CD, INSTR(T.BUST_CD, ',', 1, 1)+1, (INSTR(T.BUST_CD, ',', 1, 2)-1) - INSTR(T.BUST_CD, ',', 1, 1))
+		             END BUST_CD02
+		           , CASE WHEN INSTR(T.INWK_CD, ',', 1, 1) = 0 THEN T.INWK_CD
+		                   ELSE SUBSTR(T.INWK_CD, 1, INSTR(T.INWK_CD, ',', 1, 1)-1)
+		             END INWK_CD01
+		           , CASE WHEN INSTR(T.INWK_CD, ',', 1, 2) = 0 THEN ''
+		                   ELSE SUBSTR(T.INWK_CD, INSTR(T.INWK_CD, ',', 1, 1)+1, (INSTR(T.INWK_CD, ',', 1, 2)-1) - INSTR(T.INWK_CD, ',', 1, 1))
+		             END INWK_CD02
+		           , NVL(T.SALES_CD,' ')                                  AS SALES_CD
+		           , T.REQ_ST                                             AS REQ_ST
+		           , T.REQ_CD                                             AS REQ_CD
+		           , T.REG_ID                                             AS REQ_ID
+		           , T.ORDRG_ID                                           AS ORDRG_ID
+		           , SUBSTR(U.DEPT_ID,1,5)                                AS UP_DEPT_ID           --상위부서
+		           , (SELECT FN_CM05M01_CD_TO_NM(SUBSTR(U.DEPT_ID,1,5)) FROM DUAL) AS UP_DEPT_NM --상위부서명
+		           , T.DEPT_CD                                            AS DEPT_CD
+		           , T.MID_CD                                             AS MID_CD
+		           , T.SUB_CD                                             AS SUB_CD
+		           , T.STAT_YM                                            AS STAT_YM
+		           , P.CREAT_ID                                           AS CREAT_ID
+		           , T.PART_CD                                            AS COBTB_CD
+		           , TO_CHAR(T.ORDRG_DT, 'YYYY-MM-DD')                    AS ORDRG_DT
+		           , T.RSLT_YN                                            AS RSLT_YN
+		           , (SELECT FN_CM05M01_CD_TO_NM(T.REQ_CD)   FROM DUAL)  AS REQ_NM
+		           , (SELECT FN_CM06M01_ID_TO_NM(T.REG_ID)   FROM DUAL)  AS REG_NM
+		           , (SELECT FN_CM06M01_ID_TO_NM(T.ORDRG_ID) FROM DUAL)  AS ORDRG_NM
+		           , (SELECT FN_CM05M01_CD_TO_NM(T.DEPT_CD) FROM DUAL)   AS DEPT_NM
+		           , (SELECT FN_CM05M01_CD_TO_NM(T.MID_CD)  FROM DUAL)   AS MID_NM
+		           , (SELECT FN_CM05M01_CD_TO_NM(T.SUB_CD) FROM DUAL)    AS SUB_NM
+		           , (SELECT FN_CM05M01_CD_TO_NM(T.PART_CD) FROM DUAL)   AS PART_NM
+		           , (SELECT FN_CM05M01_CD_TO_NM(T.REQ_ST) FROM DUAL)    AS CODE_NM 
+		           , T.REQ_RMK                                            AS REQ_RMK
+		           , TO_CHAR(P.CREAT_DTTM, 'YYYY-MM-DD')                  AS CREAT_DTTM
+		           , (SELECT FN_CM06M01_ID_TO_NM(T.REG_ID) FROM DUAL)    AS CREAT_NM
+		           , NVL(P.RESLT_RST,' ')                                 AS RESLT_RST
+		           , NVL(P.SUB_CD, '')                                    AS RESLT_SUB_CD
+		           , T.FILE_TRGT_KEY                                      AS FILE_TRGT_KEY
+		        FROM TB_QM01M01 T --발주및출장요청 
+		              LEFT OUTER JOIN TB_QM01P01 P ON P.REQ_NO = T.REQ_NO --품질요청결과서
+		              LEFT OUTER JOIN TB_CM06M01 U ON T.ORDRG_ID = U.ID
+		       WHERE 1=1
+		         AND T.CO_CD = #{coCd}
+		         AND T.ORDRG_DT <![CDATA[ >= ]]> TO_DATE( #{reqDtFrom},'YYYY-MM-DD')
+		         AND T.ORDRG_DT <![CDATA[ <= ]]> TO_DATE( #{reqDtTo},'YYYY-MM-DD')
+				<if test="userId !=null and !userId.equals('')">
+		          AND T.ORDRG_ID = #{userId}
+		         </if>
+				<if test="userName !=null and !userName.equals('')">
+		          AND U.NAME like  '%'||#{userName}||'%'
+		         </if>
+		         <if test="deptId !=null and !deptId.equals('')">
+		           AND SUBSTR(U.DEPT_ID,1,5) = SUBSTR(#{deptId},1,5)
+		         </if>
+		         <if test="salesCd !=null and !salesCd.equals('')">
+		          AND T.SALES_CD  LIKE '%'||#{salesCd}||'%'
+		         </if>
+		        <if test="cobtbCd !=null and !cobtbCd.equals('')">
+		          AND T.PART_CD = #{cobtbCd}
+		        </if>
+		     )  
+			SELECT count(*)
+			  FROM (
+			        SELECT R.CO_CD 
+			              , UP_DEPT_ID
+			              , UP_DEPT_NM
+			              , S.CLNT_CD
+			              , S.CLNT_NM
+			              , S.CLNT_PJT_CD
+			              , S.CLNT_PJT
+			              , S.EQP_NM     
+			              , R.ORDRG_ID
+			              , R.ORDRG_NM
+			              , R.ORDRG_DT
+			              , S.PRDT_CD  
+			              , R.COBTB_CD
+			              , R.PART_NM
+			              , R.MID_CD
+			              , R.SUB_CD
+			              , R.MID_NM
+			              , R.SUB_NM                                                                             
+			              , R.REQ_NO
+			              , R.RSLT_NO            
+			              , R.BUST_CD01
+			              , R.BUST_CD02
+			              , R.INWK_CD01
+			              , R.INWK_CD02
+			              , DECODE((SELECT FN_CM05M01_CD_TO_NM(R.BUST_CD01) FROM DUAL) || ',' || (SELECT FN_CM05M01_CD_TO_NM(R.BUST_CD02) FROM DUAL) , ',','',(SELECT FN_CM05M01_CD_TO_NM(R.BUST_CD01) FROM DUAL) || ',' || (SELECT FN_CM05M01_CD_TO_NM(R.BUST_CD02) FROM DUAL)) AS BUST_NM
+              			  , DECODE((SELECT FN_CM05M01_CD_TO_NM(R.INWK_CD01) FROM DUAL) || ',' || (SELECT FN_CM05M01_CD_TO_NM(R.INWK_CD02) FROM DUAL) , ',','',(SELECT FN_CM05M01_CD_TO_NM(R.INWK_CD01) FROM DUAL) || ',' || (SELECT FN_CM05M01_CD_TO_NM(R.INWK_CD02) FROM DUAL)) AS INWK_NM
+			              , R.SALES_CD
+			              , R.REQ_ST
+			              , R.REQ_CD
+			              , R.REQ_NM
+			              , R.REQ_ID
+			              , R.STAT_YM
+			
+			              , R.CREAT_ID
+			              , R.COBTB_CD
+			              , S.ITEM_DIV
+			              , S.ITEM_DIV_NM
+			              , S.PRDT_CD1
+			              , R.RSLT_YN
+			              , R.REG_NM
+			              , R.CODE_NM      /* REQST_NM 접수상태 */
+			              , R.REQ_RMK
+			              , R.CREAT_DTTM
+			              , R.CREAT_NM
+			              , R.RESLT_RST
+			              , R.RESLT_SUB_CD
+			              , R.FILE_TRGT_KEY
+			           FROM REQ AS R
+			           LEFT OUTER JOIN SJD AS S ON R.CO_CD = S.CO_CD AND R.SALES_CD = S.SALES_CD --수주상세 
+			          WHERE 1=1 
+			          <if test="eqpNm !=null and !eqpNm.equals('')">
+				       AND S.EQP_NM  LIKE '%'||#{eqpNm}||'%' 
+			          </if>
+			          <if test="clntCd !=null and !clntCd.equals('')">
+			            AND S.CLNT_CD = #{clntCd}
+			          </if>
+			          <if test="clntPjt !=null and !clntPjt.equals('')">
+			            AND S.CLNT_PJT_CD = #{clntPjt}
+			          </if>
+			           ORDER BY 2,4,6,8,10, 12
+			       ) A
+	</select>
+
 	<select id="selectQualityReqList" parameterType="Map" resultType="CamelMap">	
 	   /*발주요청서 현황조회  selectQualityReqList */
 		WITH SJD AS --수주상세 
@@ -95,7 +252,8 @@
 		        <if test="cobtbCd !=null and !cobtbCd.equals('')">
 		          AND T.PART_CD = #{cobtbCd}
 		        </if>
-		     )  
+		     )
+         SELECT * FROM (   
 			SELECT ROWNUM AS RNUM
 			     , A.*
 			  FROM (
@@ -160,6 +318,8 @@
 			          </if>
 			           ORDER BY 2,4,6,8,10, 12
 			       ) A
+	       ) T
+                WHERE RNUM BETWEEN #{firstIndex} AND #{lastIndex}
 	</select>
 	
 </mapper>

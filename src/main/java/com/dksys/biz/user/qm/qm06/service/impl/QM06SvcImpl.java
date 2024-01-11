@@ -33,6 +33,11 @@ public class QM06SvcImpl implements QM06Svc {
   CM15Svc cm15Svc;
   
   @Override
+  public int selectQualityReqListCount(Map<String, String> paramMap) {
+    return QM06Mapper.selectQualityReqListCount(paramMap);
+  }
+  
+  @Override
   public List<Map<String, String>> selectQualityReqList(Map<String, String> paramMap) {
     return QM06Mapper.selectQualityReqList(paramMap);
   }

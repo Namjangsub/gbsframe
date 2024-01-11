@@ -32,9 +32,9 @@ public class QM06Ctr {
 // 발주 및 출장 요청서 리스트 조회
   @PostMapping(value = "/selectQualityReqList")
   public String selectQualityReqList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-//    int totalCnt = qm06Svc.selectQualityReqCount(paramMap);
-//    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-//    model.addAttribute("paginationInfo", paginationInfo);
+    int totalCnt = qm06Svc.selectQualityReqListCount(paramMap);
+    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+    model.addAttribute("paginationInfo", paginationInfo);
     List<Map<String, String>> result = qm06Svc.selectQualityReqList(paramMap);
     model.addAttribute("result", result);
     return "jsonView";
