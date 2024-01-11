@@ -13,7 +13,5 @@ public interface QM04Mapper {
 		//그리드 리스트
 		List<Map<String, String>> selectMainGridList(Map<String, String> paramMap);
 		
-		//그리드 리스트
-		List<Map<String, String>> selectSecondGridList(Map<String, String> paramMap);
 
 }

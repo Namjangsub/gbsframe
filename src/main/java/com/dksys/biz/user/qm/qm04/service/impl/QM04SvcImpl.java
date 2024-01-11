@@ -46,9 +46,4 @@ public class QM04SvcImpl implements QM04Svc {
 			return qm04Mapper.selectMainGridList(paramMap);
 		}
 
-		// 그리드 리스트
-		@Override
-		public List<Map<String, String>> selectSecondGridList(Map<String, String> paramMap) {
-			return qm04Mapper.selectSecondGridList(paramMap);
-		}
 }

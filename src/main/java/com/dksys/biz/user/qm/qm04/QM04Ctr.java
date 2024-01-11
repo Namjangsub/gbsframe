@@ -40,14 +40,4 @@ public class QM04Ctr {
 			return "jsonView";
 		}
 		
-		//리스트 조회
-		@PostMapping(value = "/selectSecondGridList")
-		public String grid2_selectList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-//			int totalCnt = qm04svc.select_grid_Count(paramMap);
-//			PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-//			model.addAttribute("paginationInfo", paginationInfo);
-			List<Map<String, String>> result = qm04svc.selectSecondGridList(paramMap);
-			model.addAttribute("result", result);
-			return "jsonView";
-		}
 }
