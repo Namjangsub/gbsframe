@@ -93,4 +93,6 @@ public interface CR02Mapper {
 	List<Map<String, Object>> selectNoSalesCdOrdrsListPop(Map<String, String> param);	
 
 	String selectSalesCdLastNumberPlusOne(Map<String, String> param);
+	
+	void updateMainHistNo(Map<String, String> param);
 }

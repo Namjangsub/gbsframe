@@ -26,7 +26,7 @@ public interface CR02Svc {
     
     String selectItemDivEtc(Map<String, String> param);
 
-    void insertOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception;
+    Map<String, String> insertOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception;
 
     void updateOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception;
 

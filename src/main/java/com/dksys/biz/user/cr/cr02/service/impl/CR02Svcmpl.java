@@ -5,6 +5,7 @@ import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.cr.cr01.service.CR01Svc;
 import com.dksys.biz.user.cr.cr02.mapper.CR02Mapper;
+import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.cr.cr02.service.CR02Svc;
 import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
@@ -30,6 +31,8 @@ public class CR02Svcmpl implements CR02Svc {
     @Autowired
     CR02Mapper cr02Mapper;
 
+    @Autowired
+    QM01Mapper QM01Mapper;
 
     @Autowired
     CM08Mapper cm08Mapper;
@@ -88,11 +91,11 @@ public class CR02Svcmpl implements CR02Svc {
     }
     
     @Override
-    public void insertOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception {
+    public Map<String, String> insertOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception {
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
         Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
         Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-        
+        Map rtnMap = new HashMap();
         	//---------------------------------------------------------------
       		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
       		//   필수값 :  jobType, userId, comonCd
@@ -121,6 +124,8 @@ public class CR02Svcmpl implements CR02Svc {
         }else {
         	param.put("ordrsNo", param.get("newOrdrsNo"));
         }
+        
+        rtnMap.put("ordrsNo", param.get("ordrsNo"));// rtnMap에 "ordrsNo"키로 저장
         
         String fileTrgtKey;
         String OrderSeq = "";
@@ -204,7 +209,74 @@ public class CR02Svcmpl implements CR02Svc {
       		//---------------------------------------------------------------
       		//첨부 화일 처리  끝
       		//---------------------------------------------------------------
-
+      		
+      		//---------------------------------------------------------------
+      		//결재처리[1. 수주에서는  SalesCd를 가질수 없음]
+      		//---------------------------------------------------------------
+      		param.put("reqNo", param.get("ordrsNo"));
+      		
+    		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(param); 
+    		if (sharngChk.size() > 0) {
+    			QM01Mapper.deleteWbsSharngList(param); 
+    		}
+    		
+    		String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
+    		pgParam1 += "\"fileTrgtKey\":\""+ param.get("fileTrgtKey") +"\","; 
+    		pgParam1 += "\"coCd\":\""+ param.get("coCd") +"\","; 
+    		//pgParam1 += "\"salesCd\":\""+ param.get("salesCd") +"\",";
+    		pgParam1 += "\"ordrsNo\":\""+ param.get("ordrsNo") +"\"}";
+    		//공유
+    		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+    		List<Map<String, String>> sharngArr = gson.fromJson(param.get("rowSharngListArr"), stringList2);
+    		if (sharngArr != null && sharngArr.size() > 0 ) {
+    			int i = 0;
+    	        for (Map<String, String> sharngMap : sharngArr) {
+    	            try {	 
+    	            	    sharngMap.put("reqNo", param.get("ordrsNo"));
+    	            	    sharngMap.put("fileTrgtKey", param.get("fileTrgtKey"));
+    	            	    sharngMap.put("pgmId", param.get("pgmId"));
+    	            	    sharngMap.put("userId", param.get("userId"));
+    	            	    sharngMap.put("histNo", "1");
+    	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
+    	            	    sharngMap.put("pgParam", pgParam1);
+    	            	    sharngMap.put("todoTitle", param.get("ordrsNo") +" , " + sharngMap.get("todoTitle"));
+    	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
+    	            	i++;
+    	            } catch (Exception e) {
+    	                System.out.println("error2"+e.getMessage());
+    	            }
+    	        }
+    		}
+    		
+    		String pgParam2 = "{\"actionType\":\""+ "S" +"\",";
+    		pgParam2 += "\"fileTrgtKey\":\""+ param.get("fileTrgtKey") +"\","; 
+    		pgParam2 += "\"coCd\":\""+ param.get("coCd") +"\","; 
+    		//pgParam2 += "\"salesCd\":\""+ param.get("salesCd") +"\",";
+    		pgParam2 += "\"ordrsNo\":\""+ param.get("ordrsNo") +"\"}";
+    		//결재
+    		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+    		List<Map<String, String>> approvalArr = gson.fromJson(param.get("rowApprovalListArr"), stringList3);
+    		if (approvalArr != null && approvalArr.size() > 0 ) {
+    			int i = 0;
+    	        for (Map<String, String> approvalMap : approvalArr) {
+    	            try {	 
+    		            	approvalMap.put("reqNo", param.get("ordrsNo"));
+    		            	approvalMap.put("fileTrgtKey", param.get("fileTrgtKey"));
+    		            	approvalMap.put("pgmId", param.get("pgmId"));
+    		            	approvalMap.put("userId", param.get("userId"));
+    		            	approvalMap.put("histNo", "1");
+    		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
+    		            	approvalMap.put("pgParam", pgParam2);
+    		            	approvalMap.put("todoTitle", param.get("ordrsNo") +" , " + approvalMap.get("todoTitle"));
+    	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
+    	                	i++;
+    	            } catch (Exception e) {
+    	                System.out.println("error2"+e.getMessage());
+    	            }
+    	        }
+    		}
+    		cr02Mapper.callCopyOrdrs(param); //이력생성
+    		
 		if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
 			// 수주일자의 년도가 변경되었을 경우 수주번호를 갱신
 			cr02Mapper.callUpdateOrdrsNo(param);
@@ -213,6 +285,7 @@ public class CR02Svcmpl implements CR02Svc {
       	// 수주관리의 정보를 프로젝트 관리에 반영
     	cr02Mapper.callUpdateProjectMaster(param);
 
+    	return rtnMap;
     }
 
     @Override
@@ -378,6 +451,74 @@ public class CR02Svcmpl implements CR02Svc {
 		//---------------------------------------------------------------
 		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
+		
+		//---------------------------------------------------------------
+  		//결재처리[1. 수주에서는  SalesCd를 가질수 없음]
+  		//---------------------------------------------------------------
+  		param.put("reqNo", param.get("ordrsNo"));
+  		
+		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(param); 
+		if (sharngChk.size() > 0) {
+			QM01Mapper.deleteWbsSharngList(param); 
+		}
+		
+		String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
+		pgParam1 += "\"fileTrgtKey\":\""+ param.get("fileTrgtKey") +"\","; 
+		pgParam1 += "\"coCd\":\""+ param.get("coCd") +"\","; 
+		pgParam1 += "\"histNo\":\""+ param.get("histNo") +"\","; 
+		//pgParam1 += "\"salesCd\":\""+ param.get("salesCd") +"\",";
+		pgParam1 += "\"ordrsNo\":\""+ param.get("ordrsNo") +"\"}";
+		//공유
+		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> sharngArr = gson.fromJson(param.get("rowSharngListArr"), stringList2);
+		if (sharngArr != null && sharngArr.size() > 0 ) {
+			int i = 0;
+	        for (Map<String, String> sharngMap : sharngArr) {
+	            try {	 
+	            	    sharngMap.put("reqNo", param.get("ordrsNo"));
+	            	    sharngMap.put("fileTrgtKey", param.get("fileTrgtKey"));
+	            	    sharngMap.put("pgmId", param.get("pgmId"));
+	            	    sharngMap.put("userId", param.get("userId"));
+	            	    sharngMap.put("histNo", param.get("histNo"));
+	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
+	            	    sharngMap.put("pgParam", pgParam1);
+	            	    sharngMap.put("todoTitle", param.get("ordrsNo") +" , " + sharngMap.get("todoTitle"));
+	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
+	            	i++;
+	            } catch (Exception e) {
+	                System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
+		
+		String pgParam2 = "{\"actionType\":\""+ "S" +"\",";
+		pgParam2 += "\"fileTrgtKey\":\""+ param.get("fileTrgtKey") +"\","; 
+		pgParam2 += "\"coCd\":\""+ param.get("coCd") +"\",";
+		pgParam2 += "\"histNo\":\""+ param.get("histNo") +"\",";
+		//pgParam2 += "\"salesCd\":\""+ param.get("salesCd") +"\",";
+		pgParam2 += "\"ordrsNo\":\""+ param.get("ordrsNo") +"\"}";
+		//결재
+		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> approvalArr = gson.fromJson(param.get("rowApprovalListArr"), stringList3);
+		if (approvalArr != null && approvalArr.size() > 0 ) {
+			int i = 0;
+	        for (Map<String, String> approvalMap : approvalArr) {
+	            try {	 
+		            	approvalMap.put("reqNo", param.get("ordrsNo"));
+		            	approvalMap.put("fileTrgtKey", param.get("fileTrgtKey"));
+		            	approvalMap.put("pgmId", param.get("pgmId"));
+		            	approvalMap.put("userId", param.get("userId"));
+		            	approvalMap.put("histNo", param.get("histNo"));
+		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
+		            	approvalMap.put("pgParam", pgParam2);
+		            	approvalMap.put("todoTitle", param.get("ordrsNo") +" , " + approvalMap.get("todoTitle"));
+	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
+	                	i++;
+	            } catch (Exception e) {
+	                System.out.println("error2"+e.getMessage());
+	            }
+	        }
+		}
 		
 		if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
 			// 수주일자의 년도가 변경되었을 경우 수주번호를 갱신
@@ -681,6 +822,7 @@ public class CR02Svcmpl implements CR02Svc {
 	@Override
 	public void callCopyOrdrs(Map<String, String> paramMap) {
 		cr02Mapper.callCopyOrdrs(paramMap);
+		cr02Mapper.updateMainHistNo(paramMap);
 	}
 
 	@Override

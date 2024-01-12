@@ -84,7 +84,8 @@ public class CR02Ctr {
 		try {
 			int rtnInt = cr02Svc.selectOrdrsKey(param);
 			if(rtnInt == 0) {
-				cr02Svc.insertOrdrs(param,mRequest);
+				Map<String, String> rtnResult = cr02Svc.insertOrdrs(param,mRequest);
+				model.addAttribute("ordrsNo", rtnResult.get("ordrsNo").toString());
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
 		    }else {
