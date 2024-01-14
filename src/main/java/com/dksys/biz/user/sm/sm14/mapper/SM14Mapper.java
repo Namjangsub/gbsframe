@@ -63,6 +63,10 @@ public interface SM14Mapper {
 	String selectPurchaseDetailCount(Map<String, String> paramMap);
 	
 	String selectMaxPchsNoNew(Map<String, String> paramMap);
+
+	List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
+
+	List<Map<String, String>> select_mngId_code(Map<String, String> paramMap);
 }
 
 

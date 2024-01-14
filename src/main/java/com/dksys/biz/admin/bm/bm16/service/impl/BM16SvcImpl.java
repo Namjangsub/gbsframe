@@ -529,4 +529,10 @@ public class BM16SvcImpl implements BM16Svc {
 	 return bm16Mapper.select_wbs_code(paramMap);
   }
   
+  //그리드 검색
+  @Override
+  public List<Map<String, String>> select_prjct_code(Map<String, String> paramMap) {
+	 return bm16Mapper.select_prjct_code(paramMap);
+  }
+  
 }

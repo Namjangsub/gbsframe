@@ -130,12 +130,39 @@ public class SM14Ctr {
 	// 매입관리 입고 조회 NEW
 	@PostMapping(value = "/selectPurchaseListNew")
 	public String selectPurchaseListNew(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		paramMap.put("clntPjt", sqlInCodeGen(paramMap.get("clntPjt")));
+		paramMap.put("mngIdCd", sqlInCodeGen(paramMap.get("mngIdCd")));
 		int totalCnt = sm14Svc.selectPurchaseListCountNew(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
 		List<Map<String, String>> result = sm14Svc.selectPurchaseListNew(paramMap);
 		model.addAttribute("result", result);
+
+	   	List<Map<String, String>> resultPrjct = sm14Svc.select_prjct_code(paramMap);
+	   	model.addAttribute("resultPrjct", resultPrjct);
+
+	   	List<Map<String, String>> resultMngId = sm14Svc.select_mngId_code(paramMap);
+	   	model.addAttribute("resultMngId", resultMngId);
+	   	
 		return "jsonView";
+	}
+
+	public String sqlInCodeGen(String inValue) {
+
+		//프로젝트 코드 배열을 쿼리 in함수용 파라메터로 변환작업  
+		String[] tempArray = inValue.split(",");  //'PRJCT98,PRJCT160,PRJCT159'
+		String tempValue = "";
+		if (!("").equals(inValue)) {
+			tempValue = "'";
+	        for (int i = 0; i < tempArray.length; i++) {
+	        	tempValue += tempArray[i].trim(); // trim()을 사용하여 앞뒤 공백 제거
+	            if (i < tempArray.length - 1) {
+	            	tempValue += "','";
+	            }
+	        }
+	        tempValue += "'";
+		}
+		return tempValue;
 	}
 	
 	// 발주/입고 조회 NEW

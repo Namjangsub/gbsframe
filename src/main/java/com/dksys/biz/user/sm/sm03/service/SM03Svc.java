@@ -34,4 +34,8 @@ public interface SM03Svc {
 	int deleteWareHousingDetail(Map<String, String> param);			
 	
 	int deleteWareHousingInno(Map<String, String> param);	
+
+	List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
+
+	List<Map<String, String>> select_mngId_code(Map<String, String> paramMap);
 }

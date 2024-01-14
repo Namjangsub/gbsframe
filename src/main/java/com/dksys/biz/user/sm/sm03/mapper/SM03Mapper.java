@@ -47,6 +47,10 @@ public interface SM03Mapper {
 	int deleteWareHousingDirectMaster(Map<String, String> paramMap);
 	
 	int deleteWareHousingDirectDetail(Map<String, String> param);	
+
+	List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
+
+	List<Map<String, String>> select_mngId_code(Map<String, String> paramMap);
 }
 
 

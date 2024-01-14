@@ -125,8 +125,13 @@
 		            , (SELECT FN_CM05M01_CD_TO_NM(C.CLNT_DIV_CD) FROM DUAL) AS CLNT_DIV_NM  --거래처 분류명
 					, FN_CM05M01_CD_TO_NM(M.CLNT_PJT)                    AS CLNT_PJT_NM
                 FROM TB_CR02M01  M --수주마스터
-                      INNER      JOIN TB_CR02D02 AS X ON X.ORDRS_NO = M.ORDRS_NO--수주상세   
-                      INNER      JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+                      INNER      JOIN ( 
+                      					SELECT #{coCd} CO_CD, SALES_CD, max(EQP_NM) EQP_NM, max(PRDT_CD) PRDT_CD, max(ITEM_DIV) ITEM_DIV, min(CO_CD||ORDRS_NO) ORDRS_NO
+                      					  FROM TB_CR02D02
+                      				     WHERE CO_CD = CASE WHEN 'GUN' = #{coCd} THEN 'GUN' ELSE CO_CD END
+                      					 GROUP BY SALES_CD 
+                      				) AS X ON X.ORDRS_NO = M.CO_CD || M.ORDRS_NO--수주상세  
+                      LEFT OUTER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
                       LEFT OUTER JOIN TB_BM01M01 AS E ON X.PRDT_CD       = E.PRDT_CD --제품마스터
                WHERE 1=1
                <if test="salesCd != null and !salesCd.equals('')">
@@ -140,6 +145,9 @@
 		       </if>
 		       <if test="clntNm != null and !clntNm.equals('')">
 		        AND C.CLNT_NM LIKE '%' || #{clntNm} || '%'  --조회조건 : 제품구분명
+		       </if>
+		       <if test="clntPjt != null and !clntPjt.equals('')">
+		        AND M.CLNT_PJT IN ( ${clntPjt} )
 		       </if>
 		     )
 		   , TDO AS --TODO 결재공유
@@ -200,19 +208,24 @@
 		                       LEFT OUTER JOIN TDO AS T ON A.SALES_CD = T.SALES_CD AND A.ORDRG_NO = T.TODO_NO
 							   LEFT OUTER JOIN INY AS D ON(A.ORDRG_NO=D.ORDRG_NO)		                       
 		                 WHERE 1=1
-		                 <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
-				          AND B.ORDRS_CLNT_CD = #{ordrsClntCd}  --조회조건 : 고객코드
-				         </if>
-				         <if test="prdtCd != null and !prdtCd.equals('')">
-				          AND B.PRDT_CD = #{prdtCd}  --조회조건 : 제품구분
-				         </if>
-				         <if test="itemDiv != null and !itemDiv.equals('')">
-				          AND B.ITEM_DIV = #{itemDiv}  --조회조건 : 아이템 구분
-				         </if>      
-				         <if test="clntDivCd != null and !clntDivCd.equals('')">
-				          AND B.CLNT_DIV_CD = #{clntDivCd}  --조회조건 : 거래처분류
-				         </if>
-		                 ORDER BY A.CO_CD, A.SALES_CD DESC, B.ORDRS_CLNT_NM, A.ORDRG_NO DESC, A.CREAT_DTTM DESC  , A.UDT_DTTM DESC
+						<if test="prdtNm != null and !prdtNm.equals('')">
+						AND     T.PRDT_NM LIKE '%' || #{prdtNm} || '%'
+						</if>
+						<if test="itemDiv != null and !itemDiv.equals('')">
+				        AND     T.ITEM_DIV = #{itemDiv}  --조회조건 : 아이템 구분
+				        </if> 
+				        <if test="clntDivCd != null and !clntDivCd.equals('')">
+				        AND     T.CLNT_DIV_CD = #{clntDivCd}  --조회조건 : 아이템 구분
+				        </if>
+				        <if test="clntPjt != null and !clntPjt.equals('')">
+				        AND     B.CLNT_PJT IN ( ${clntPjt} )
+				        </if>
+				        <if test="mngIdCd != null and !mngIdCd.equals('')">
+				        AND     A.CREAT_ID IN ( ${mngIdCd} )
+				        </if>
+				        <if test="clntNm != null and !clntNm.equals('')">
+				        AND T.ORDRS_CLNT_NM LIKE '%' || #{clntNm} || '%'  --조회조건 : 고객코드
+				        </if>
 		                ) 
 		         WHERE 1=1
 		           	
@@ -336,11 +349,14 @@
 	        AND     T.CLNT_DIV_CD = #{clntDivCd}  --조회조건 : 아이템 구분
 	        </if>
 	        <if test="clntPjt != null and !clntPjt.equals('')">
-	        AND     T.CLNT_PJT = #{clntPjt}
+	        AND     T.CLNT_PJT IN ( ${clntPjt} )
+	        </if>
+	        <if test="mngIdCd != null and !mngIdCd.equals('')">
+	        AND     T.CREAT_ID IN ( ${mngIdCd} )
 	        </if>
 	        <if test="clntNm != null and !clntNm.equals('')">
-	          AND T.ORDRS_CLNT_NM LIKE '%' || #{clntNm} || '%'  --조회조건 : 고객코드
-	         </if>
+	        AND T.ORDRS_CLNT_NM LIKE '%' || #{clntNm} || '%'  --조회조건 : 고객코드
+	        </if>
 			AND RN BETWEEN ${firstIndex} AND ${lastIndex}						
 	</select>	
 	
@@ -921,4 +937,63 @@
 		WHERE CO_CD = #{coCd} 
 		 AND ORDRG_NO = #{ordrgNo} 
 	</update>	
+	
+	<select id="select_prjct_code" parameterType="Map" resultType="camelMap">
+			SELECT DISTINCT 
+	        		  X.CLNT_PJT           AS CODE      --고객사PJT 
+					, C.CODE_NM            AS NAME
+	         FROM TB_SM02M01 A --발주마스터
+	         			LEFT OUTER JOIN  ( 
+                      					SELECT #{coCd} CO_CD, max(SALES_CD) SALES_CD,  min(CO_CD||ORDRS_NO) ORDRS_NO
+                      					FROM TB_CR02D02
+                      					WHERE SALES_CD IS NOT NULL
+                      					  AND CO_CD = CASE WHEN 'GUN' = #{coCd} THEN 'GUN' ELSE CO_CD END
+                      					GROUP BY SALES_CD 
+                      				)   M  ON A.CO_CD = M.CO_CD
+                      				      AND A.SALES_CD = M.SALES_CD
+	                    LEFT OUTER JOIN TB_CR02M01 AS X ON X.CO_CD||X.ORDRS_NO = M.ORDRS_NO--수주상세 
+	                    LEFT OUTER JOIN TB_CM05M01 AS C ON X.CLNT_PJT = C.CODE_ID   
+                      	LEFT OUTER JOIN TB_BM02M01 AS B ON X.ORDRS_CLNT_CD = B.CLNT_CD --거래처정보
+	       WHERE 1=1
+                <if test="coCd != null and !coCd.equals('')">
+                 AND A.CO_CD = #{coCd}
+                </if>
+                <if test="ordrgDtFrom != null and !ordrgDtFrom.equals('') and  ordrgDtTo != null and !ordrgDtTo.equals('')" >
+                  AND A.ORDRG_DT BETWEEN TO_DATE( #{ordrgDtFrom},'YYYYMMDD') AND TO_DATE( #{ordrgDtTo},'YYYYMMDD') +1
+                </if>
+                <if test="salesCd != null and !salesCd.equals('')">
+                AND A.SALES_CD LIKE '%' || #{salesCd} || '%'   --조회조건 : SALES_CD
+               </if>
+               <!-- 사용안함  -->
+               <if test="ordrgDiv10 != null and !ordrgDiv10.equals('')">
+                AND A.ORDRG_DIV10 = #{ordrgDiv10} --조회조건 : 발주구분  
+               </if>
+		       <if test="clntNm != null and !clntNm.equals('')">
+		        AND B.CLNT_NM LIKE '%' || #{clntNm} || '%'  
+		       </if>
+		   ORDER BY C.CODE_NM   
+    </select>
+	
+	<select id="select_mngId_code" parameterType="Map" resultType="camelMap">
+			SELECT DISTINCT
+	               A.CREAT_ID   AS CODE
+				 , C.NAME 		AS NAME
+	         FROM TB_SM02M01 A --발주마스터
+	        		   LEFT OUTER JOIN TB_CM06M01 C  ON A.CREAT_ID  = C.ID
+	        WHERE 1=1
+                <if test="coCd != null and !coCd.equals('')">
+                 AND A.CO_CD = #{coCd}
+                </if>
+                <if test="ordrgDtFrom != null and !ordrgDtFrom.equals('') and  ordrgDtTo != null and !ordrgDtTo.equals('')" >
+                AND A.ORDRG_DT BETWEEN TO_DATE( #{ordrgDtFrom},'YYYYMMDD') AND TO_DATE( #{ordrgDtTo},'YYYYMMDD') +1
+                </if>
+                <if test="salesCd != null and !salesCd.equals('')">
+                AND A.SALES_CD LIKE '%' || #{salesCd} || '%'   --조회조건 : SALES_CD
+               </if>
+               <!-- 사용안함  -->
+               <if test="ordrgDiv10 != null and !ordrgDiv10.equals('')">
+               AND A.ORDRG_DIV10 = #{ordrgDiv10} --조회조건 : 발주구분  
+               </if>
+		     ORDER BY C.NAME  
+    </select>
  </mapper>

@@ -2426,3 +2426,22 @@ function insertKakaoMessage(dStatus, talkDeJson, param){
 			}
 	});
 }
+
+
+//프로젝트코드 멀티셀렉트용
+//multi select 항목 자동 생성
+function multiPrjctSelectHtml (_arrList, elem) {
+	let optionHtml = '';
+	$.each(_arrList, function (index, item){
+		if (item?.code == undefined) {
+			optionHtml += '<option value="">없음(전체)</option>'
+		} else {
+			optionHtml += '<option value="'+item.code+'">';
+			optionHtml += item.name;
+			optionHtml += '</option>\n';
+		};
+	});
+	$(elem).empty()
+	$(elem).append(optionHtml);
+	$(elem).multiselect('rebuild');
+}

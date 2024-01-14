@@ -31,14 +31,58 @@ public class SM02Ctr {
 	// 매입관리 발주 조회
 	@PostMapping(value = "/selectOrderList")
 	public String selectPchsList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+
+//		//프로젝트 코드 배열을 쿼리 in함수용 파라메터로 변환작업  
+//		String[] clntPjtArray = paramMap.get("clntPjt").split(",");  //'PRJCT98,PRJCT160,PRJCT159'
+//		String clntPjt = "";
+//		if (!("").equals(paramMap.get("clntPjt"))) {
+//			clntPjt = "'";
+//	        for (int i = 0; i < clntPjtArray.length; i++) {
+//	        	clntPjt += clntPjtArray[i].trim(); // trim()을 사용하여 앞뒤 공백 제거
+//	            if (i < clntPjtArray.length - 1) {
+//	            	clntPjt += "','";
+//	            }
+//	        }
+//	        clntPjt += "'";
+//		}
+//		paramMap.put("clntPjt", clntPjt);
+
+		paramMap.put("clntPjt", sqlInCodeGen(paramMap.get("clntPjt")));
+		paramMap.put("mngIdCd", sqlInCodeGen(paramMap.get("mngIdCd")));
 		int totalCnt = sm02Svc.selectOrderListCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
 		List<Map<String, String>> result = sm02Svc.selectOrderList(paramMap);
 		model.addAttribute("result", result);
+		
+
+	   	List<Map<String, String>> resultPrjct = sm02Svc.select_prjct_code(paramMap);
+	   	model.addAttribute("resultPrjct", resultPrjct);
+
+	   	List<Map<String, String>> resultMngId = sm02Svc.select_mngId_code(paramMap);
+	   	model.addAttribute("resultMngId", resultMngId);
+	   	
 		return "jsonView";
 	}
 
+	public String sqlInCodeGen(String inValue) {
+
+		//프로젝트 코드 배열을 쿼리 in함수용 파라메터로 변환작업  
+		String[] tempArray = inValue.split(",");  //'PRJCT98,PRJCT160,PRJCT159'
+		String tempValue = "";
+		if (!("").equals(inValue)) {
+			tempValue = "'";
+	        for (int i = 0; i < tempArray.length; i++) {
+	        	tempValue += tempArray[i].trim(); // trim()을 사용하여 앞뒤 공백 제거
+	            if (i < tempArray.length - 1) {
+	            	tempValue += "','";
+	            }
+	        }
+	        tempValue += "'";
+		}
+		return tempValue;
+	}
+	
 	// BOM내역상세 조회
 	@PostMapping(value = "/selectBomDetailList")
 	public String selectBomDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -195,6 +239,22 @@ public class SM02Ctr {
   			model.addAttribute("resultMessage", e.getMessage());
   		}
   		return "jsonView";
-    }         
+    } 
+
+    //헤더 multi select 코드 검색
+    @PostMapping(value = "/select_prjct_code")
+    public String select_prjct_code(@RequestBody Map<String, String> paramMap, ModelMap model) {
+   	List<Map<String, String>> result = sm02Svc.select_prjct_code(paramMap);
+   	model.addAttribute("result", result);
+   	return "jsonView";
+    }
+
+    //헤더 multi select 코드 검색
+    @PostMapping(value = "/select_mngId_code")
+    public String select_mngId_code(@RequestBody Map<String, String> paramMap, ModelMap model) {
+   	List<Map<String, String>> result = sm02Svc.select_mngId_code(paramMap);
+   	model.addAttribute("result", result);
+   	return "jsonView";
+    }
 
 }

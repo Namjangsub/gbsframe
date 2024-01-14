@@ -270,7 +270,22 @@ public class BM16Ctr {
 			}
 		}
 		param.put("wbscode", wbscode);
-	  
+		
+		//프로젝트 코드 배열을 쿼리 in함수용 파라메터로 변환작업  
+		String[] clntPjtArray = param.get("clntPjt").split(",");  //'PRJCT98,PRJCT160,PRJCT159'
+		String clntPjt = "";
+		if (!("").equals(param.get("clntPjt"))) {
+			clntPjt = "'";
+	        for (int i = 0; i < clntPjtArray.length; i++) {
+	        	clntPjt += clntPjtArray[i].trim(); // trim()을 사용하여 앞뒤 공백 제거
+	            if (i < clntPjtArray.length - 1) {
+	            	clntPjt += "','";
+	            }
+	        }
+	        clntPjt += "'";
+		}
+		param.put("clntPjt", clntPjt);
+		
       int totalCnt = bm16Svc.selectPrjctPlanCount(param);
       PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
       model.addAttribute("paginationInfo", paginationInfo);
@@ -295,5 +310,13 @@ public class BM16Ctr {
 	model.addAttribute("result", result);
 	return "jsonView";
  }
-  
+
+ //헤더 그리드 코드 검색
+ @PostMapping(value = "/select_prjct_code")
+ public String select_prjct_code(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	List<Map<String, String>> result = bm16Svc.select_prjct_code(paramMap);
+	model.addAttribute("result", result);
+	return "jsonView";
+ }
+    
 }

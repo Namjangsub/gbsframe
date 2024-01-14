@@ -275,5 +275,17 @@ public class SM03SvcImpl implements SM03Svc {
 		result = sm03Mapper.deleteWareHousingDirectMaster(param);
 		result += sm03Mapper.deleteWareHousingDirectDetail(param);
 		return result;
-	}	
+	}		
+	  
+	  //multi select 검색
+	  @Override
+	  public List<Map<String, String>> select_prjct_code(Map<String, String> paramMap) {
+		 return sm03Mapper.select_prjct_code(paramMap);
+	  }
+	  
+	  //multi select 검색
+	  @Override
+	  public List<Map<String, String>> select_mngId_code(Map<String, String> paramMap) {
+		 return sm03Mapper.select_mngId_code(paramMap);
+	  }
 }

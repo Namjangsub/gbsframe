@@ -31,14 +31,43 @@ public class SM03Ctr {
 	// 매입관리 입고 조회
 	@PostMapping(value = "/selectWareHousingList")
 	public String selectWareHousingList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+
+		paramMap.put("clntPjt", sqlInCodeGen(paramMap.get("clntPjt")));
+		paramMap.put("mngIdCd", sqlInCodeGen(paramMap.get("mngIdCd")));
 		int totalCnt = sm03Svc.selectWareHousingListCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
 		List<Map<String, String>> result = sm03Svc.selectWareHousingList(paramMap);
 		model.addAttribute("result", result);
+		
+
+	   	List<Map<String, String>> resultPrjct = sm03Svc.select_prjct_code(paramMap);
+	   	model.addAttribute("resultPrjct", resultPrjct);
+
+	   	List<Map<String, String>> resultMngId = sm03Svc.select_mngId_code(paramMap);
+	   	model.addAttribute("resultMngId", resultMngId);
+	   	
 		return "jsonView";
 	}
-			
+
+	public String sqlInCodeGen(String inValue) {
+
+		//프로젝트 코드 배열을 쿼리 in함수용 파라메터로 변환작업  
+		String[] tempArray = inValue.split(",");  //'PRJCT98,PRJCT160,PRJCT159'
+		String tempValue = "";
+		if (!("").equals(inValue)) {
+			tempValue = "'";
+	        for (int i = 0; i < tempArray.length; i++) {
+	        	tempValue += tempArray[i].trim(); // trim()을 사용하여 앞뒤 공백 제거
+	            if (i < tempArray.length - 1) {
+	            	tempValue += "','";
+	            }
+	        }
+	        tempValue += "'";
+		}
+		return tempValue;
+	}
+	
 	// 매입관리 발주 조회 엑셀
 	@PostMapping(value = "/selectWareHousingExcelList")
 	public String selectWareHousingExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -136,4 +165,20 @@ public class SM03Ctr {
     	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
 		return "jsonView";
 	} 
+
+    //헤더 multi select 코드 검색
+    @PostMapping(value = "/select_prjct_code")
+    public String select_prjct_code(@RequestBody Map<String, String> paramMap, ModelMap model) {
+   	List<Map<String, String>> result = sm03Svc.select_prjct_code(paramMap);
+   	model.addAttribute("result", result);
+   	return "jsonView";
+    }
+
+    //헤더 multi select 코드 검색
+    @PostMapping(value = "/select_mngId_code")
+    public String select_mngId_code(@RequestBody Map<String, String> paramMap, ModelMap model) {
+   	List<Map<String, String>> result = sm03Svc.select_mngId_code(paramMap);
+   	model.addAttribute("result", result);
+   	return "jsonView";
+    }
 }

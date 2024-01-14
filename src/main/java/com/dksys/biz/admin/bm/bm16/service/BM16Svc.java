@@ -43,5 +43,7 @@ public interface BM16Svc {
   
   //헤더 그리드 코드 검색
   List<Map<String, String>> select_wbs_code(Map<String, String> paramMap);
+
+  List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
   
 }

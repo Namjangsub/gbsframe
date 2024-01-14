@@ -369,4 +369,16 @@ public class SM02SvcImpl implements SM02Svc {
 		
 		return result;
 	}	
+	  
+	  //multi select 검색
+	  @Override
+	  public List<Map<String, String>> select_prjct_code(Map<String, String> paramMap) {
+		 return sm02Mapper.select_prjct_code(paramMap);
+	  }
+	  
+	  //multi select 검색
+	  @Override
+	  public List<Map<String, String>> select_mngId_code(Map<String, String> paramMap) {
+		 return sm02Mapper.select_mngId_code(paramMap);
+	  }
 }

@@ -42,4 +42,8 @@ public interface SM02Svc {
 	int updateMailConfirm(Map<String, String> param);	
 	
 	int updateOrderApprovalRequest(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
+	List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
+
+	List<Map<String, String>> select_mngId_code(Map<String, String> paramMap);
 }

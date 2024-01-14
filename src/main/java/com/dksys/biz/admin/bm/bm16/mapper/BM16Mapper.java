@@ -64,5 +64,7 @@ public interface BM16Mapper {
   
   //헤더 컬럼 그리드 검색
   List<Map<String, String>> select_wbs_code(Map<String, String> paramMap);
+
+  List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
   
 }

@@ -313,6 +313,18 @@ public class SM14SvcImpl implements SM14Svc {
 			result = sm14Mapper.insertPurchaseBillDetailNew(paramMap);
 	
 		return result;
-	}
+	}	
+	  
+	  //multi select 검색
+	  @Override
+	  public List<Map<String, String>> select_prjct_code(Map<String, String> paramMap) {
+		 return sm14Mapper.select_prjct_code(paramMap);
+	  }
+	  
+	  //multi select 검색
+	  @Override
+	  public List<Map<String, String>> select_mngId_code(Map<String, String> paramMap) {
+		 return sm14Mapper.select_mngId_code(paramMap);
+	  }
 	
 }

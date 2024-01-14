@@ -38,5 +38,9 @@ public interface SM14Svc {
 	
 	List<Map<String, String>> selectPchsDetailListNew(Map<String, String> paramMap);
 	
-	int insertPurchaseBillDetailNew(Map<String, String> paramMap) throws Exception;	
+	int insertPurchaseBillDetailNew(Map<String, String> paramMap) throws Exception;		
+
+	List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
+
+	List<Map<String, String>> select_mngId_code(Map<String, String> paramMap);
 }
