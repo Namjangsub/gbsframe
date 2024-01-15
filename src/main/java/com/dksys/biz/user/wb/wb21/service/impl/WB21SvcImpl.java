@@ -265,5 +265,12 @@ public class WB21SvcImpl implements WB21Svc {
 	public Map<String, String> selectWbChk(Map<String, String> paramMap) {
 		return wb21Mapper.selectWbChk(paramMap);
 	}
+
+	//외주 제작업체 수정
+	@Override
+	public int planMkerCdChange(Map<String, String> paramMap) {
+		int result = wb21Mapper.planMkerCdChange(paramMap);
+		return result;
+	}
 	
 }

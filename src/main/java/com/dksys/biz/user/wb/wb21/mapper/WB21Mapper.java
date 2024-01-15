@@ -65,4 +65,7 @@ public interface WB21Mapper {
 
 	//Project 과제 체크
 	Map<String, String> selectWbChk(Map<String, String> paramMap);
+	
+	//외주 제작업체 수정
+    int planMkerCdChange(Map<String, String> paramMap);
 }

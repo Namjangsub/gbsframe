@@ -278,4 +278,21 @@ public class WB21Ctr {
   		}
   	  	return "jsonView";
   	}
+
+    @PostMapping(value = "/planMkerCdChange")
+    public String planMkerCdChange(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (wb21Svc.planMkerCdChange(paramMap) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  		} else {
+  			model.addAttribute("resultCode", 500);
+  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  		    model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }
 }
