@@ -332,35 +332,35 @@ public class CR02Svcmpl implements CR02Svc {
 		
 		String newOrdrsDiv = param.get("newOrdrsDiv");
 		
-		// 건양수주번호 있으면 수주번호는 건양수주번호를 따라감			
-        if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
-        	// 수주구분이 달라지는 경우
-            if (!newOrdrsDiv.equals(param.get("ordrsDiv"))) {
-            	//정상수주면 정상수주번호
-                if (param.get("ordrsDiv").equals("ORDRSDIV1") || param.get("ordrsDiv").equals("ORDRSDIV9")) {
-                	param.put("ordrsNo", selectMaxOrdrsNo(param));
-                } else {
-                	// 그외는 AS수주번호
-                	String orderNo = selectAsMaxOrdrsNo(param);
-                	param.put("ordrsNo", "AS"+orderNo);
-                }
-            }
-            
-            // 건양수주번호가 있다가 사라진 경우 수주번호를 새로 체번해야한다.
-            if (!"".equals(param.get("oldOrdrsNo")) && param.get("oldOrdrsNo") != null) {
-            	//정상수주면 정상수주번호
-            	if (param.get("ordrsDiv").equals("ORDRSDIV1") || param.get("ordrsDiv").equals("ORDRSDIV9")) {
-            		param.put("ordrsNo", selectMaxOrdrsNo(param));
-            	} else {
-            		// 그외는 AS수주번호
-            		String orderNo = selectAsMaxOrdrsNo(param);
-            		param.put("ordrsNo", "AS"+orderNo);
-            	}
-            }
-        }else {
-        	// 건양수주번호 있으면 수주번호는 건양수주번호를 따라감
-        	param.put("ordrsNo", param.get("newOrdrsNo"));
-        }
+//		// 건양수주번호 있으면 수주번호는 건양수주번호를 따라감			
+//        if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
+//        	// 수주구분이 달라지는 경우
+//            if (!newOrdrsDiv.equals(param.get("ordrsDiv"))) {
+//            	//정상수주면 정상수주번호
+//                if (param.get("ordrsDiv").equals("ORDRSDIV1") || param.get("ordrsDiv").equals("ORDRSDIV9")) {
+//                	param.put("ordrsNo", selectMaxOrdrsNo(param));
+//                } else {
+//                	// 그외는 AS수주번호
+//                	String orderNo = selectAsMaxOrdrsNo(param);
+//                	param.put("ordrsNo", "AS"+orderNo);
+//                }
+//            }
+//            
+//            // 건양수주번호가 있다가 사라진 경우 수주번호를 새로 체번해야한다.
+//            if (!"".equals(param.get("oldOrdrsNo")) && param.get("oldOrdrsNo") != null) {
+//            	//정상수주면 정상수주번호
+//            	if (param.get("ordrsDiv").equals("ORDRSDIV1") || param.get("ordrsDiv").equals("ORDRSDIV9")) {
+//            		param.put("ordrsNo", selectMaxOrdrsNo(param));
+//            	} else {
+//            		// 그외는 AS수주번호
+//            		String orderNo = selectAsMaxOrdrsNo(param);
+//            		param.put("ordrsNo", "AS"+orderNo);
+//            	}
+//            }
+//        }else {
+//        	// 건양수주번호 있으면 수주번호는 건양수주번호를 따라감
+//        	param.put("ordrsNo", param.get("newOrdrsNo"));
+//        }
 		
         param.put("udtId", param.get("userId"));
         param.put("udtPgm", "TB_CR02M01");
@@ -520,10 +520,10 @@ public class CR02Svcmpl implements CR02Svc {
 	        }
 		}
 		
-		if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
-			// 수주일자의 년도가 변경되었을 경우 수주번호를 갱신
-			cr02Mapper.callUpdateOrdrsNo(param);
-		}
+//		if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
+//			// 수주일자의 년도가 변경되었을 경우 수주번호를 갱신
+//			cr02Mapper.callUpdateOrdrsNo(param);
+//		}
 		
 		// 수주관리의 정보를 프로젝트 관리에 반영
 		cr02Mapper.callUpdateProjectMaster(param);
