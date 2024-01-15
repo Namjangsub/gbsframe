@@ -48,6 +48,7 @@ public class PM37SvcImpl implements PM37Svc{
 
 		map.put("test", test);
 		map.put("userId", paramMap.get("userId"));
+		map.put("userNm", paramMap.get("userNm"));
 		map.put("coCd", paramMap.get("coCd"));
 		map.put("reqDtFrom", paramMap.get("reqDtFrom"));
 		map.put("reqDtTo",paramMap.get("reqDtTo"));

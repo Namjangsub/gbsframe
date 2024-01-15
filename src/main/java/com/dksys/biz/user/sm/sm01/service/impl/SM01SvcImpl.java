@@ -352,5 +352,11 @@ public class SM01SvcImpl implements SM01Svc {
   public List<Map<String, String>> nextPrcsnNmList(Map<String, String> paramMap) {
     return sm01Mapper.nextPrcsnNmList(paramMap);
   }
+  
+  //multi select 검색
+  @Override
+  public List<Map<String, String>> select_prjct_code(Map<String, String> paramMap) {
+	 return sm01Mapper.select_prjct_code(paramMap);
+  }
 
 }

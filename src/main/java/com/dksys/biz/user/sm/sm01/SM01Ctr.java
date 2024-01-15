@@ -30,6 +30,7 @@ import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.sm.sm01.service.SM01Svc;
 import com.dksys.biz.util.DateUtil;
 import com.dksys.biz.util.MessageUtils;
+import com.dksys.biz.util.ObjectUtil;
 
 @Controller
 @RequestMapping("/user/sm/sm01")
@@ -122,14 +123,18 @@ public class SM01Ctr {
 	//구매BOM관리 Master 조회
 	@PostMapping(value = "/selectBomSalesList")
 	public String selectBomSalesList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		paramMap.put("clntPjt", ObjectUtil.sqlInCodeGen(paramMap.get("clntPjt")));
 		int totalCnt = sm01Svc.selectBomSalesCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
 		List<Map<String, String>> result = sm01Svc.selectBomSalesList(paramMap);
 		model.addAttribute("resultList", result);
+
+	   	List<Map<String, String>> resultPrjct = sm01Svc.select_prjct_code(paramMap);
+	   	model.addAttribute("resultPrjct", resultPrjct);
 		return "jsonView";
 	}
-
+	
 	// BOM내역상세 조회
 	@PostMapping(value = "/selectBomDetailList")
 	public String selectBomDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {

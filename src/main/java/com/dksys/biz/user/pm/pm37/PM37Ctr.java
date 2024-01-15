@@ -16,8 +16,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.user.pm.pm37.service.PM37Svc;
+import com.dksys.biz.admin.cm.cm04.service.CM04Svc;
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.util.MessageUtils;
+import com.dksys.biz.util.ObjectUtil;
 
 @Controller
 @RequestMapping("/user/pm/pm37")
@@ -28,6 +30,9 @@ public class PM37Ctr {
 
   @Autowired
   PM37Svc pm37Svc;
+  
+  @Autowired
+  CM04Svc cm04Svc;
 
   // 작업일보 리스트 조회
   @PostMapping(value = "/selectDailyWorkMainList")

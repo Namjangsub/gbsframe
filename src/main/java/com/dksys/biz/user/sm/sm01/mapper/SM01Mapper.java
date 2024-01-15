@@ -49,4 +49,6 @@ public interface SM01Mapper {
   void callCopyBom(Map<String, String> paramMap);
   
   List<Map<String, String>> nextPrcsnNmList(Map<String, String> paramMap);
+  
+  List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
 }

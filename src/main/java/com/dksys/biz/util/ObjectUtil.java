@@ -305,4 +305,21 @@ public class ObjectUtil {
         }
         return new BigDecimal(object.toString());
     }
+	
+	public static String sqlInCodeGen(String inValue) {
+		//프로젝트 코드 배열을 쿼리 in함수용 파라메터로 변환작업  
+		String[] tempArray = inValue.split(",");  //'PRJCT98,PRJCT160,PRJCT159'
+		String tempValue = "";
+		if (!("").equals(inValue)) {
+			tempValue = "'";
+	        for (int i = 0; i < tempArray.length; i++) {
+	        	tempValue += tempArray[i].trim(); // trim()을 사용하여 앞뒤 공백 제거
+	            if (i < tempArray.length - 1) {
+	            	tempValue += "','";
+	            }
+	        }
+	        tempValue += "'";
+		}
+		return tempValue;
+	}	
 }

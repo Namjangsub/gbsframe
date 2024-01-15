@@ -15,4 +15,6 @@ public interface CM04Svc {
 
 	void moveDept(List<Map<String, String>> paramList) throws Exception;
 	
+	List<Map<String, String>> select_deptId_code(Map<String, String> paramMap);
+	
 }

@@ -42,4 +42,9 @@ public class CM04SvcImpl implements CM04Svc {
 		}
 	}
 
+	@Override
+	public List<Map<String, String>> select_deptId_code(Map<String, String> paramMap) {
+		return cm04Mapper.select_deptId_code(paramMap);
+	}
+
 }

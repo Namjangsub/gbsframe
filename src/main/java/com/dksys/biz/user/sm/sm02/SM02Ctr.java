@@ -17,6 +17,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.sm.sm02.service.SM02Svc;
 import com.dksys.biz.util.MessageUtils;
+import com.dksys.biz.util.ObjectUtil;
 
 @Controller
 @RequestMapping("/user/sm/sm02")
@@ -47,8 +48,8 @@ public class SM02Ctr {
 //		}
 //		paramMap.put("clntPjt", clntPjt);
 
-		paramMap.put("clntPjt", sqlInCodeGen(paramMap.get("clntPjt")));
-		paramMap.put("mngIdCd", sqlInCodeGen(paramMap.get("mngIdCd")));
+		paramMap.put("clntPjt", ObjectUtil.sqlInCodeGen(paramMap.get("clntPjt")));
+		paramMap.put("mngIdCd", ObjectUtil.sqlInCodeGen(paramMap.get("mngIdCd")));
 		int totalCnt = sm02Svc.selectOrderListCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
@@ -63,24 +64,6 @@ public class SM02Ctr {
 	   	model.addAttribute("resultMngId", resultMngId);
 	   	
 		return "jsonView";
-	}
-
-	public String sqlInCodeGen(String inValue) {
-
-		//프로젝트 코드 배열을 쿼리 in함수용 파라메터로 변환작업  
-		String[] tempArray = inValue.split(",");  //'PRJCT98,PRJCT160,PRJCT159'
-		String tempValue = "";
-		if (!("").equals(inValue)) {
-			tempValue = "'";
-	        for (int i = 0; i < tempArray.length; i++) {
-	        	tempValue += tempArray[i].trim(); // trim()을 사용하여 앞뒤 공백 제거
-	            if (i < tempArray.length - 1) {
-	            	tempValue += "','";
-	            }
-	        }
-	        tempValue += "'";
-		}
-		return tempValue;
 	}
 	
 	// BOM내역상세 조회

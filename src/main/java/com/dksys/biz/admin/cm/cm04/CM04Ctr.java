@@ -77,4 +77,12 @@ public class CM04Ctr {
     	}
         return "jsonView";
     }
+
+    //부서 선택 select 코드 검색
+    @PostMapping(value = "/select_deptId_code")
+    public String select_deptId_code(@RequestBody Map<String, String> paramMap, ModelMap model) {
+   	List<Map<String, String>> result = cm04Svc.select_deptId_code(paramMap);
+   	model.addAttribute("result", result);
+   	return "jsonView";
+    }
 }

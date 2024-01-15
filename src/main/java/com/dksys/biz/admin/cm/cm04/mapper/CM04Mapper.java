@@ -22,4 +22,6 @@ public interface CM04Mapper {
 
 	int moveDept(Map<String, String> paramMap);
 	
+	List<Map<String, String>> select_deptId_code(Map<String, String> paramMap);
+	
 }

@@ -46,4 +46,6 @@ public interface SM01Svc {
 
   List<Map<String, String>> nextPrcsnNmList(Map<String, String> paramMap);
 
+  List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
+
 }
