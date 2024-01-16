@@ -681,7 +681,11 @@ public class QM01SvcImpl implements QM01Svc {
   
   @Override
   public int updateReqStChk(Map<String, String> paramMap) {
-//	  String rsltNo = paramMap.get("todoNo");
+	  String rsltNo = paramMap.get("todoNo");
+	  int result = 0;
+	  
+	  //REQxxxx : 발주요청서, RESxxxx : 발주요청서 결과서 
+	  if (rsltNo.substring(0, 2).equals("RE")) {
 //	  if(rsltNo.substring(0, 3).equals("RES")) {
 //		  paramMap.put("reqSt", "REQST03");
 //	  }
@@ -689,7 +693,8 @@ public class QM01SvcImpl implements QM01Svc {
 //		  paramMap.put("reqSt", "REQST02");
 //	  }
 //	  // updateReqStChk실행 쿼리안에 F_QM01RESULT_CHECK(#{coCd}, #{salesCd}, #{todoNo}) 함수에서 상태코드 변경함
-	  int result = QM01Mapper.updateReqStChk(paramMap);
+		  result = QM01Mapper.updateReqStChk(paramMap);
+	  }
 	  
      return result;
   }
