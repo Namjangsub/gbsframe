@@ -1527,40 +1527,19 @@ FROM (
 	<update id="updateReqStChk" parameterType="Map">
 	/* updateReqStChk 발주요청서 상태값 바꾸기 */
 	    UPDATE TB_QM01M01
-		SET REQ_ST = #{reqSt},
+		SET REQ_ST = F_QM01RESULT_CHECK(#{coCd}, #{salesCd}, #{todoNo}),
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
-		WHERE REQ_NO = 
-		  (
-			  SELECT DECODE(REQ_NO, NULL, TODO_NO, REQ_NO) AS TODO_NO
-			  	FROM
-			  	(
-					SELECT CASE 
-						WHEN( SANCTN_STTUS =  MAX(CNT_SN) )
-							THEN 'Y'
-						ELSE 'N'
-					   END AS APPROVAL_YN
-					   , MAX(TODO_NO) AS TODO_NO
-					   , MAX(REQ_NO) AS REQ_NO
-					FROM
-							(
-								SELECT COUNT(CASE WHEN A.SANCTN_STTUS = 'Y' THEN 1 END) OVER() AS SANCTN_STTUS 
-									 , COUNT(A.SANCTN_SN) OVER() CNT_SN
-									 , MAX(A.TODO_NO) OVER() AS TODO_NO
-									 , B.REQ_NO AS REQ_NO
-								FROM TB_WB20M03 A
-										LEFT OUTER JOIN TB_QM01P01 B ON A.TODO_NO = B.RSLT_NO 
-								WHERE 1=1 
-								  AND A.TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
-								  AND A.TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
-								  AND A.SALES_CD = #{salesCd}
-								  AND A.TODO_NO = #{todoNo}
-							)
-					GROUP BY TODO_NO, SANCTN_STTUS
-				)
-			   WHERE APPROVAL_YN='Y'
-		  )
+		WHERE REQ_NO = ( 
+						 SELECT REQ_NO 
+						   FROM (
+									SELECT REQ_NO FROM TB_QM01M01 WHERE REQ_NO = #{todoNo}
+									UNION ALL 
+									SELECT REQ_NO FROM TB_QM01P01 WHERE RSLT_NO = #{todoNo}
+								)
+							GROUP BY REQ_NO
+		)
 	</update>    
 	
 	<update id="updateCheckDept" parameterType="Map">
