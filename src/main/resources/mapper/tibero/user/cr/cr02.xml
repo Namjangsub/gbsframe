@@ -237,6 +237,14 @@
 							   , SDS.ACT_TOT_ELCTY                  --실행원가-전기
 							   , SDS.ACT_EXP_COST                   --실행원가-경비관리비
 							   , U.NAME AS MNG_NM					--담당자명
+							   , (SELECT CASE WHEN ( COUNT(A.TODO_KEY) = SUM(DECODE(NVL(A.SANCTN_STTUS, 'N'), 'N', 0, 'Y', 1) ) ) 
+											  THEN 'Y'
+										 	  ELSE TO_CHAR( SUM(DECODE(NVL(A.SANCTN_STTUS, 'N'), 'N', 0, 'Y', 1) ) )
+							            	   END TODO_YN
+								    FROM TB_WB20M03 A
+							       WHERE A.TODO_NO = M.ORDRS_NO
+							         AND A.ETC_FIELD2 = M.HIST_NO
+							         AND A.TODO_DIV1_CODE_ID = 'TODODIV20') AS APP_STATUS  --결재상태
 		                  FROM   TB_CR02M01 AS M  -- 수주마스터
 		                         LEFT OUTER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD
 								 LEFT OUTER JOIN SJS AS SDS  ON M.CO_CD    = SDS.CO_CD
@@ -340,6 +348,7 @@
 		       , RRN
 		       , SM.MNG_NM
 		       , SM.HIST_NO
+		       , SM.APP_STATUS
 		  FROM   SJM AS SM --수주마스터
 		         LEFT OUTER JOIN TB_CR02D02 AS SD  ON SM.CO_CD    = SD.CO_CD
 		                                          AND SM.ORDRS_NO = SD.ORDRS_NO
@@ -506,6 +515,7 @@
 			 , TO_CHAR(RRN)                     AS RRN_NM
 		     , MNG_NM
 		     , HIST_NO
+		     , APP_STATUS
 		     , 1 AS LVL
 		FROM   SJM
 		UNION ALL
@@ -602,6 +612,7 @@
 			 , TO_CHAR(RRN)  AS RRN_NM
 		     , MNG_NM
 		     , HIST_NO
+		     , APP_STATUS
 		     , 2		 AS LVL
 		FROM   SJD
 		UNION ALL
@@ -698,6 +709,7 @@
 			 , ''                             AS RRN_NM
 		     , '' AS MNG_NM
 		     , '' AS HIST_NO
+		     , '' AS APP_STATUS
 		     , '' AS LVL
 		FROM   SJG1
 		UNION ALL
@@ -794,6 +806,7 @@
 			 , ''                             AS RRN_NM
 		     , '' AS MNG_NM
 		     , '' AS HIST_NO
+		     , '' AS APP_STATUS
 		     , '' AS LVL
 		FROM   SJG2
 		)
@@ -2475,5 +2488,17 @@
 			UDT_DTTM 		  = SYSDATE
             WHERE ORDRS_NO = #{ordrsNo}
     </update>
+    
+    <select id="selectJunmooApproval" resultType="int">
+		SELECT COUNT(TODO_KEY) AS CNT
+		  FROM TB_WB20M03
+		 WHERE 1 = 1
+		   AND TODO_NO = #{ordrsNo} --수주번호
+		   AND ETC_FIELD2 = #{histNo}  --수주버전
+		   AND SANCTN_STTUS = 'Y'
+		   AND TODO_ID = (SELECT NVL(MAX(CODE_ETC), '.') 
+			                FROM TB_CM05M01 
+			               WHERE CODE_ID = 'XTREE')
+    </select>
 	
 </mapper>
