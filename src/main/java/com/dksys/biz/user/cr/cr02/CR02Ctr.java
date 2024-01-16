@@ -180,4 +180,11 @@ public class CR02Ctr {
 		return "jsonView";
 	}
 	
+	  @PostMapping(value = "/selectJunmooApproval") 
+	  public String selectJunmooApproval(@RequestBody Map<String, String> param, ModelMap model) {		  
+		  int JunmooApproval = cr02Svc.selectJunmooApproval(param);
+		  model.addAttribute("JunmooApproval", JunmooApproval);
+		  return "jsonView";
+	  }
+	
 }

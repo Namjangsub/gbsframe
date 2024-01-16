@@ -95,4 +95,6 @@ public interface CR02Mapper {
 	String selectSalesCdLastNumberPlusOne(Map<String, String> param);
 	
 	void updateMainHistNo(Map<String, String> param);
+	
+	int selectJunmooApproval(Map<String, String> param);
 }

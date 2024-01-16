@@ -841,4 +841,9 @@ public class CR02Svcmpl implements CR02Svc {
     public List<Map<String, Object>> selectNoSalesCdOrdrsListPop(Map<String, String> param) {
         return cr02Mapper.selectNoSalesCdOrdrsListPop(param);
     }
+    
+    @Override
+    public int selectJunmooApproval(Map<String, String> param) {
+        return cr02Mapper.selectJunmooApproval(param);
+    }
 }
