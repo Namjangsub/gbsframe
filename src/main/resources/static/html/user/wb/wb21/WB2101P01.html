@@ -202,6 +202,7 @@
 				</tr>
 			</table>
 			<input type="hidden" id="userId" name="userId">
+			<input type="hidden" id="userId" name="maxVerNo">
 			<input type="hidden" id="pgmId" name="pgmId" value="WB2101M02">
 		</form>         
     </div>
@@ -217,10 +218,10 @@
 	</div>
 </div>
 
-<link rel="stylesheet" href="/static/css/jstree/style.min.css" />
-<script src="/static/js/jstree/jstree.min.js"></script>
-
 <script type="text/javascript">
+	// 카톡 정상알림 카운터 변수
+	var kakaoCnt = 0;
+	var fileTrgtKey = '';
 	$(document).ready(function() {
 // 		console.log("팝업레뒤");
 		setCommonSelect($(".popup_area select[data-kind]"));
@@ -233,6 +234,7 @@
 		} else {
 			$("#popForm #coCd").val(modalStack.last().paramObj.coCd);
 		}
+		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
 		
 		$('#beginDt').datepicker({
 			format : "yyyy-mm-dd",
@@ -341,6 +343,8 @@
 			}
 		});
 		// ----------------------------------
+		
+		authChk();
 	});
 	
 	function modalClose() {
@@ -377,9 +381,10 @@
 		if (inputValidation($('.popup_area [required]'))) {
 			var codeId = null;
 			var formData = makeFormData();
+			
 			if (actionType == "C") {
 				filePostAjax("/user/wb/wb21/sjInsert", formData, function(data) {
-					alert(data.resultMessage);
+					// alert(data.resultMessage);
 					if (data.resultCode == 200) {
 						var salesCd = $("#popForm #salesCd").val();
 						var verNo = $("#popForm #verNo").val();
@@ -389,8 +394,9 @@
 				});
 			} else {
 				filePostAjax("/user/wb/wb21/sjUpdate", formData, function(data) {
-					alert(data.resultMessage);
+					// alert(data.resultMessage);
 					if (data.resultCode == 200) {
+                        kakaoTodo();
 						gridView.setData(0);
 						modalClose();
 					}
@@ -400,24 +406,47 @@
 	}
 	
 	function confirmY() {
-		var row = gridView.target.getList("selected")[0];
-		if (row != undefined && row.fileTrgtKey != undefined) {
-			if (row.verNo < row.maxVerNo) {
+		if (fileTrgtKey != undefined) {
+			if (parseInt($("#popForm #verNo").val())< parseInt($("#popForm #maxVerNo").val())) {
 				alert("상위버전이 존재합니다.");
 				return;
 			}
 			
-			if (row.closeYn == "Y") {
+			if ($("#popForm #closeYn").val() == "Y") {
 				alert("확정된 상태입니다.");
 				return;
 			}
 			
 			if(confirm("확정하시겠습니까?")) {
 				var formData = new makeFormData();
-				formData.append("fileTrgtKey", row.fileTrgtKey);
+				formData.append("fileTrgtKey", fileTrgtKey);
+				var rowSharngListArr = []; //공유정보
+				var rowSharngListObj = {};
+				// if (elem.gb == '공유'){
+					rowSharngListObj["gb"] = '공유';
+					rowSharngListObj["sanCtnSn"] = '1';
+					rowSharngListObj["coCd"] = $("#popForm #coCd").val() ;
+					rowSharngListObj["todoDiv1CodeId"] = "TODODIV10";
+					rowSharngListObj["todoDiv2CodeId"] = "TODODIV1110";
+					rowSharngListObj["salesCd"] = $("#popForm #salesCd").val();  
+					rowSharngListObj["pgPath"] = "/user/wb/wb21/WB2101P01.html";
+					rowSharngListObj["fileTrgtKey"] = fileTrgtKey;
+					rowSharngListObj["reqNo"] = $("#popForm #sjNo").val();
+					rowSharngListObj["usrNm"] = 'canmtb';	//공유 또는 결재대상 canmtb: 한동주과장
+					rowSharngListObj["userId"] = jwt.userId;
+					rowSharngListObj["pgmId"] = "WB2101P01";
+					rowSharngListObj["todoCoCd"] = $("#popForm #coCd").val() ;
+					// rowSharngListObj["pgParam"] = modalStack.last().paramObj; 
+				//TITLE 추가
+					rowSharngListObj['todoTitle'] = $("#popForm #salesCd").val() + "과제관리 등록 확인용"
+					rowSharngListArr.push(rowSharngListObj);
+				// }	
+				formData.append("rowSharngListArr", JSON.stringify(rowSharngListArr)); 
+
 				filePutAjax("/user/wb/wb21/sjConfirmY", formData, function(data) {
 					if(data.resultCode == 200) {
-						alert("확정 되었습니다.");
+						// alert("확정 되었습니다.");
+                        kakaoTodo();
 						gridView.setData(0);
 						modalClose();
 					}
@@ -429,21 +458,20 @@
 	}
 	
 	function confirmN() {
-		var row = gridView.target.getList("selected")[0];
-		if (row != undefined && row.fileTrgtKey != undefined) {
-			if (row.verNo < row.maxVerNo) {
+		if (fileTrgtKey != undefined) {
+			if (parseInt($("#popForm #verNo").val())< parseInt($("#popForm #maxVerNo").val())) {
 				alert("상위버전이 존재합니다.");
 				return;
 			}
 			
-			if (row.closeYn == "N") {
+			if ($('#closeYn').val() == "N") {
 				alert("확정 취소 상태입니다.");
 				return;
 			}
 			
 			if(confirm("확정 취소 하시겠습니까?")) {
 				var formData = new FormData();
-				formData.append("fileTrgtKey", row.fileTrgtKey);
+				formData.append("fileTrgtKey", fileTrgtKey);
 				formData.append("userId", $('#userId').val());
 				formData.append("pgmId", $('#pgmId').val());
 				filePutAjax("/user/wb/wb21/sjConfirmN", formData, function(data) {
@@ -460,8 +488,7 @@
 	}
 	
 	function createVerUp() {
-		var row = gridView.target.getList("selected")[0];
-		if (actionType == "U" && row == undefined) {
+		if (actionType == "U" && fileTrgtKey == undefined) {
 			alert("대상을 선택하세요");
 			return;
 		}
@@ -473,8 +500,8 @@
 		
 		var strYear = new Date().toISOString().substring(2, 4);
 		var planData = {
-			"coCd" : row.coCd,
-			"sjNo" : row.sjNo,
+			"coCd" : coCd,
+			"sjNo" : $("#popForm #sjNo").val(),
 			"salesCd" : $("#popForm #salesCd").val(),
 		};
 		var newVerNo;
@@ -557,4 +584,182 @@
 		});
 	}
 
+    /*
+    #   TODO 알림톡발송 시작
+    #
+    */
+//     $("#approvalReqTodoBtn").on("click", function () {
+//        kakaoTodo();
+//     });
+function kakaoTodo() {
+	rowListArr
+
+
+       debugger;
+         //---------------------------------------
+       let param = {
+             "tmplatDiv"	: "TMPLATDIV02"
+             , "title"		: "과제관리"
+             , "coCd"		: $("#popForm #coCd").val()            	//해당업무의 coCd(트르넷발주 TRN )
+             , "todoNo"		: $("#popForm #salesCd").val()			//Sales Code
+             , "histNo"		: ''   									//수주등록시 사용
+             , "clntCd"		: "1"               					//발신회사는 로그인사용자 회사
+             , "clntNm"		: (jwt.coCd=="GUN") ? "(주)건양ITT" : "트루넷"       //로그의 수신거래처명
+             , "creatPgm"  	: "WB2101P01"  
+			 , "userId" 	: jwt.userId    
+
+             , "todoDiv1CodeId"	: "TODODIV10"               //공통코드 해당업무 - 결재
+             , "todoDiv2CodeId"	: "TODODIV1110"             //공통코드 해당업무 - 결재 - 발주서
+             , "todoDiv1CodeNm"	: "공유"                  	//공통코드 해당업무 - 결재 - 발주서 
+             , "sanctnDiv2"		: "공유"                     	//템플릿 결재구분2    #{sanctnDiv2} 처리 바랍니다.  
+			 
+       }
+       commKaKaoSendTodo(param);  //결재자 전송처리
+         
+       if (kakaoCnt > 0) {
+           kakaoCnt = 0;
+//            alert("알림톡이 정상 발송되었습니다.");
+        }
+    }
+
+    //to-do결재요청 알림톡
+    function commKaKaoSendTodo(param) {
+//        console.log('---카카오 발주및출장요청서 알림톡발송시작 --' + param);
+
+       //알림톡수신번호 채번
+       var talkMessage = null             //발송될 내용 template
+       var mobile = null               //수신인 휴대전화번호
+       var sendList = [];
+       let talkParam = {};
+       let talkBody = {};      
+       let sendCnt = 0;
+       postAjaxSync("/user/bm/bm18/selectMaxMessageIdTodoNew", param, null
+                , function(data) {   
+                   if(data.resultList.length > 0 ) {
+                      if( data.resultList[0].maxMessageId != "" ) {
+                         sendList = data.resultList; 
+                      } else {
+                         alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
+                         return;
+                      } 
+
+                   }
+       });        
+       //user search ajax end
+       
+       //대상 loop
+       $.each(sendList, function (key, sendObj) {
+          talkMessage = sendObj.messageDesc;
+          mobile =  sendObj.telNo;
+          if(mobile == "" || mobile == null) {
+             alert('수신전화번호가 없습니다.\r\n['+clntNm+'] 거래처관리의 사업부 첫번째 항목을 확인해 주십시오.');
+             return false;
+          }
+          if(talkMessage == "" || talkMessage == null) {
+             alert('발송할 내용이 없습니다.\r\n알림톡템플릿관리를 확인해 주십시오.');
+             return false;
+          }   
+          //로그용
+          param.rcvId = sendObj.todoId;         	//todo 수신id
+          param.rcvNm = sendObj.name;            	//todo 수신자명
+          param.nameTo = sendObj.name;            	//todo 수신자명
+          param.todoDiv2CodeNm = sendObj.todoTitl;
+          param.sendDt = sendObj.sendDt;
+          param.ordrgMngNm = sendObj.ordrgMngNm;	 //작성자(담당자)
+          param.ordrgMngTelNo = sendObj.ordrgMngTelNo;//담당자전화번호
+		  
+          //message 치환
+          let message = talkMessage;
+          let splitStr = Array.from(message.matchAll('\\{(.*?)\\}'), match => `${match[0]}`);   
+          //loop
+          $.each(splitStr, function (key, val) {      
+             let compKey = val.substring(1, val.length-1);
+             if( compKey != "" && compKey != "undefined" ) {
+                if( typeof(param[compKey]) != "undefined" ) {
+                   let val2 = '#'+val;
+                   message = message.replaceAll(val2, param[compKey]);
+                }
+             }
+          });
+
+          talkParam.authToken = "e/eDfZOFCsrBqadaECQ0+g==";
+          talkParam.serverName = "gyitt2400";      
+          talkParam.paymentType = "P";
+
+          talkBody.service = "2310086157";            	//서비스번호(1000000000 - 예시  real : 2310086157
+          talkBody.messageId = sendObj.maxMessageId;    //고객사에서 관리하는 메시지No - 40byte (unique 값으로 건별 번호);   
+          talkBody.title = param.title;               	//알림톡 타이틀 -
+          talkBody.message = message;            		//알림톡 메시지 (1000 byte) 
+          talkBody.mobile = mobile;            			//휴대전화번호
+          talkBody.template = "10003";         			//템플릿관리화면 템플릿ID   - 발주서 V2
+          let talkJson = JSON.stringify(talkBody);
+		  
+          sendCnt = kakaoSendReal(talkJson, talkParam, param);      
+       });
+       //대상 loop end
+       if( sendCnt > 0 ) {
+          //alert("알림톡 정상 발송되었습니다.");
+          kakaoCnt++;
+       }
+    }
+
+
+
+    var kakaoErr = [];
+    //message load
+    var paramObj = {
+                "userId" : jwt.userId
+                , "codeKind" : "KAKAOMSG"
+                };
+    postAjax("/user/sm/sm02/selectCurrToday", paramObj, null
+             , function(data) {   
+                if(data.resultList.length > 0 ) {
+                   kakaoErr = data.resultList;
+                }
+    });     //user search ajax end
+
+
+    function dateChk() {
+        if($('#beginDt').val() != "" && $('#deDt').val() != "" && $('#beginDt').val() > $('#deDt').val()) {
+            alert("시작일과 출고일이 맞지 않습니다.");
+            $('#beginDt').datepicker("setDate", $('#deDt').val());
+            return;
+        }
+        
+        if($('#beginDt').val() != "" && $('#acptncDt').val() != "" && $('#beginDt').val() > $('#acptncDt').val()) {
+            alert("시작일과 완료 검수일이 맞지 않습니다.");
+            $('#beginDt').datepicker("setDate", $('#acptncDt').val());
+            return;
+        }
+        
+        if($('#deDt').val() != "" && $('#acptncDt').val() != "" && $('#deDt').val() < $('#acptncDt').val()) {
+            alert("출고일과 완료 검수일이 맞지 않습니다.");
+            $('#acptncDt').datepicker("setDate", $('#deDt').val());
+            return;
+        }
+        
+        $('#reqreDaycnt').val(calcDate());
+    }
+
+    function calcDate() {
+    	var date1 = new Date($('#beginDt').val().substr(0,4), $('#beginDt').val().substr(5,2), $('#beginDt').val().substr(8,2));
+        var date2 = new Date($('#deDt').val().substr(0,4), $('#deDt').val().substr(5,2), $('#deDt').val().substr(8,2));
+        var count = 0;
+    	while(true) {  	
+    	    var temp_date = date1;
+    	    if(temp_date.getTime() > date2.getTime()) {
+//     	        console.log("count : " + count);
+    	        break;
+    	    } else {
+    	        var tmp = temp_date.getDay();
+    	        if(tmp == 0 || tmp == 6) {
+    	        } else {
+    	            count++;         
+    	        }
+    	        temp_date.setDate(date1.getDate() + 1); 
+    	    }
+    	}
+    	return count;
+    }
+    
 </script>

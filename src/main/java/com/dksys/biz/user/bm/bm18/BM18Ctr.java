@@ -63,6 +63,14 @@ public class BM18Ctr {
 		return "jsonView";
 	}
 	
+	//알림톡 MESSAGE ID 
+	@PostMapping(value = "/selectMaxMessageIdTodoNew")
+	public String selectMaxMessageIdTodoNew(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = bm18Svc.selectMaxMessageIdTodoNew(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+	
     //알림톡 로그 등록
     @PostMapping(value = "/insertKakaoMessage")
 	public String insertKakaoMessage(@RequestBody Map<String, String> paramMap, ModelMap model) {

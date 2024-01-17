@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb21.mapper.WB21Mapper;
 import com.dksys.biz.user.wb.wb21.service.WB21Svc;
 import com.dksys.biz.util.ExceptionThrower;
@@ -26,6 +27,9 @@ public class WB21SvcImpl implements WB21Svc {
     WB21Mapper wb21Mapper;
 
     
+    @Autowired
+    QM01Mapper QM01Mapper;
+
     @Autowired
     WB21Svc wb21Svc;
     
@@ -205,6 +209,40 @@ public class WB21SvcImpl implements WB21Svc {
 	
 	@Override
 	public int sjConfirmY(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	
+	
+        Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+		//---------------------------------------------------------------
+		//공유처리[]
+		//---------------------------------------------------------------
+		//공유
+			
+		String pgParam1 = "{\"pgmId\":\""+ paramMap.get("pgmId") +"\",";
+		pgParam1 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
+		pgParam1 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
+		pgParam1 += "\"sjNo\":\""+ paramMap.get("sjNo") +"\","; 
+		pgParam1 += "\"verNo\":\""+ paramMap.get("verNo") +"\",";
+		pgParam1 += "\"ordrsNo\":\""+ paramMap.get("userId") +"\"}";
+		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList);
+		if (sharngArr != null && sharngArr.size() > 0 ) {
+			int i = 0;
+			for (Map<String, String> sharngMap : sharngArr) {
+				try {	 
+					sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+					sharngMap.put("pgmId", paramMap.get("pgmId"));
+					sharngMap.put("userId", paramMap.get("userId"));
+					sharngMap.put("sanCtnSn",Integer.toString(i+1));
+					sharngMap.put("pgParam", pgParam1);
+					QM01Mapper.insertWbsSharngList(sharngMap);       		
+					i++;
+				} catch (Exception e) {
+					System.out.println("error2"+e.getMessage());
+				}
+			}
+		}
+			  
+	
 		int result = wb21Mapper.sjConfirmY(paramMap);
 		result = wb21Mapper.sjCloseY(paramMap);
 	    return result;

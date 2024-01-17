@@ -1,30 +1,16 @@
 package com.dksys.biz.user.bm.bm18.service.impl;
 
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Type;
-import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.collections4.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.util.DateUtil;
 import com.dksys.biz.util.ExceptionThrower;
 import com.dksys.biz.user.bm.bm18.mapper.BM18Mapper;
 import com.dksys.biz.user.bm.bm18.service.BM18Svc;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -64,6 +50,14 @@ public class BM18SvcImpl implements BM18Svc {
 
 		List<Map<String, String>> list = new ArrayList<Map<String,String>>();
 		list = bm18Mapper.selectMaxMessageIdTodo(paramMap);
+		return list;
+	}			
+	
+	//todo 수신번호 메시지 내용 채번 NEW	
+	public List<Map<String, String>> selectMaxMessageIdTodoNew(Map<String, String> paramMap) {
+
+		List<Map<String, String>> list = new ArrayList<Map<String,String>>();
+		list = bm18Mapper.selectMaxMessageIdTodoNew(paramMap);
 		return list;
 	}		
 	
