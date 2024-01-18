@@ -1124,6 +1124,12 @@
 				LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = M.CO_CD
 		 WHERE  1 = 1
 		 AND    M.CO_CD = #{coCd}
+		<if test="clntCd != null and !clntCd.equals('')">
+		 AND    M.CLNT_CD = #{clntCd}
+		</if>
+		<if test="clntNm != null and !clntNm.equals('')">
+		 AND    C.CLNT_NM LIKE '%' || #{clntNm} || '%'
+		</if>
 		 AND    X.SALES_CD IS NOT NULL  --비용제외
 		 AND    EXISTS (
 			            SELECT 'X'  --과제등록된 SALES_CD 만
@@ -1572,6 +1578,14 @@
 												 AND WR.WBS_PLAN_CODE_KIND = ISU.WBS_PLAN_CODE_KIND
 												 AND WR.WBS_PLAN_CODE_ID   = ISU.WBS_PLAN_CODE_ID
 												 AND WR.WBS_RSLTS_NO       = ISU.WBS_RSLTS_NO
+				 WHERE  1 = 1
+				 AND    EXISTS (
+					            SELECT 'X'  --과제등록된 SALES_CD 만
+								FROM   SUBJ AS P
+								WHERE  1=1
+								AND    P.CO_CD    = WR.CO_CD
+								AND    P.SALES_CD = WR.SALES_CD
+							   )
 				 UNION ALL
 				 SELECT PL.CO_CD               --회사코드
 				      , PL.SALES_CD            --SALES Code
@@ -1601,9 +1615,42 @@
 												 AND PL.WBS_PLAN_CODE_ID   = ISU.WBS_PLAN_CODE_ID
 												 AND PL.WBS_PLAN_NO       = ISU.WBS_PLAN_NO
 				 WHERE  PL.WBS_PLAN_CODE_KIND != 'WBSCODE'
+				 AND    EXISTS (
+					            SELECT 'X'  --과제등록된 SALES_CD 만
+								FROM   SUBJ AS P
+								WHERE  1=1
+								AND    PL.CO_CD    = P.CO_CD
+								AND    PL.SALES_CD = P.SALES_CD
+							   )
 				)
 		 WHERE  1 = 1
 		 GROUP BY CO_CD, SALES_CD, WBS_PLAN_CODE_KIND, WBS_PLAN_CODE_ID
+		)
+		, PLAN_BEFORE AS 
+		(
+		     SELECT  P.WBS_PLAN_CODE_KIND
+				      , P.WBS_PLAN_CODE_ID
+				      , P.SALES_CD
+					  , SJ.GANT_KEY                      AS GANT_KEY
+					  , P.CO_CD                          AS CO_CD
+					  , SJ.CLNT_CD                       AS CLNT_CD
+					  , SJ.CLNT_NM                       AS CLNT_NM
+					  , SJ.CLNT_PJT                      AS CLNT_PJT
+					  , SJ.ORDRS_NO                      AS ORDRS_NO
+					  , P.WBS_PLAN_CODE_NM               AS WBS_PLAN_CODE_NM
+					  , P.WBS_PLAN_MNG_ID                AS WBS_PLAN_MNG_ID
+					  , P.WBS_PLANS_DT                   AS WBS_PLANS_DT
+					  , P.WBS_PLANE_DT                   AS WBS_PLANE_DT
+					  , P.DAYCNT                         AS DAYCNT
+					  , SB.SJ_NM
+			 FROM   TB_WB22M01 AS P  --WBS계획
+			        INNER JOIN SUBJ AS SB  ON P.CO_CD    = SB.CO_CD
+					                      AND P.SALES_CD = SB.SALES_CD
+					LEFT OUTER JOIN SJD AS SJ  ON P.CO_CD    = SJ.CO_CD
+					                          AND P.SALES_CD = SJ.SALES_CD
+			 WHERE  P.CO_CD = #{coCd}
+			 AND    (p.WBS_PLAN_CODE_KIND = 'WBSCODE' AND P.CLOSE_YN = 'Y' AND P.WBS_PLAN_MNG_ID IS NOT NULL)
+			 OR    (p.WBS_PLAN_CODE_KIND != 'WBSCODE')
 		)
 		, PLAN AS  --WBS 계획정보
 		(
@@ -1688,21 +1735,21 @@
 			  , REGEXP_REPLACE(SYS_CONNECT_BY_PATH(A.LOWER_CD, ' -> '), '^\s+\-\>\s+', '') AS PATH  --출고경로
 		 FROM   (
 			     SELECT DISTINCT 'TOP' AS UPPER_CD
-				      , SJ.CLNT_PJT    AS LOWER_CD
-					  , SJ.GANT_KEY    AS GANT_KEY
-					  , (SELECT FN_CM05M01_CD_TO_NM(SJ.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM
+				      , P.CLNT_PJT    AS LOWER_CD
+					  , P.CLNT_PJT    AS GANT_KEY
+					  , (SELECT FN_CM05M01_CD_TO_NM(P.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM
 					  , P.CO_CD        AS CO_CD
 					  , 0              AS CLNT_CD
-					  , SJ.CLNT_NM     AS CLNT_NM
-					  , SJ.CLNT_PJT    AS CLNT_PJT
+					  , ''     AS CLNT_NM
+					  , P.CLNT_PJT    AS CLNT_PJT
 					  , ''             AS ORDRS_NO
 					  , ''             AS SALES_CD
 					  , ''             AS WBS_PLAN_CODE_KIND
 					  , ''             AS WBS_PLAN_CODE_ID
 					  , ''             AS WBS_PLAN_CODE_NM
 					  , ''             AS WBS_PLAN_MNG_ID
-					  , MIN(P.WBS_PLANS_DT) OVER (PARTITION BY P.CO_CD, SJ.CLNT_CD) AS WBS_PLANS_DT
-					  , MAX(P.WBS_PLANE_DT) OVER (PARTITION BY P.CO_CD, SJ.CLNT_CD) AS WBS_PLANE_DT
+					  , MIN(P.WBS_PLANS_DT)  AS WBS_PLANS_DT
+					  , MAX(P.WBS_PLANE_DT)  AS WBS_PLANE_DT
 					  , ''             AS DAYCNT
 					  , 0              AS WBS_RSLTS_RATE
 					  , ''             AS WBS_RSLTSS_DT
@@ -1710,31 +1757,26 @@
 					  , ''             AS RSLTS_FILE_TRGT_KEY
 					  , ''             AS ISSUE_PLAN_TRGT_KEY
 					  , ''             AS ISSUE_RSLT_TRGT_KEY
-				 FROM   TB_WB22M01 AS P  --WBS계획
-				        INNER JOIN SUBJ AS SB  ON P.CO_CD    = SB.CO_CD
-						                      AND P.SALES_CD = SB.SALES_CD
-						LEFT OUTER JOIN SJD AS SJ  ON P.CO_CD    = SJ.CO_CD
-						                          AND P.SALES_CD = SJ.SALES_CD
-				 WHERE  P.CO_CD = #{coCd}
-				 --AND    P.WBS_PLAN_CODE_KIND = 'WBSCODE'
-				 AND    P.CLOSE_YN = 'Y'
+				 FROM   PLAN_BEFORE AS P  --WBS계획
+				 WHERE  1=1
+				 GROUP BY CLNT_PJT, CO_CD
 				 UNION ALL
-				 SELECT DISTINCT SJ.CLNT_PJT AS UPPER_CD
-				      , SJ.GANT_KEY          AS LOWER_CD
-					  , SJ.GANT_KEY          AS GANT_KEY
-					  , (SELECT FN_CM05M01_CD_TO_NM(SJ.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM
+				 SELECT DISTINCT P.CLNT_PJT AS UPPER_CD
+				      , P.CLNT_PJT||CLNT_CD          AS LOWER_CD
+					  , P.CLNT_PJT||CLNT_CD          AS GANT_KEY
+					  , (SELECT FN_CM05M01_CD_TO_NM(P.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM
 					  , P.CO_CD              AS CO_CD
-					  , SJ.CLNT_CD           AS CLNT_CD
-					  , SJ.CLNT_NM           AS CLNT_NM
-					  , SJ.CLNT_PJT          AS CLNT_PJT
+					  , P.CLNT_CD           AS CLNT_CD
+					  , P.CLNT_NM           AS CLNT_NM
+					  , P.CLNT_PJT          AS CLNT_PJT
 					  , ''                   AS ORDRS_NO
 					  , ''                   AS SALES_CD
 					  , ''                   AS WBS_PLAN_CODE_KIND
 					  , ''                   AS WBS_PLAN_CODE_ID
 					  , ''                   AS WBS_PLAN_CODE_NM
 					  , ''                   AS WBS_PLAN_MNG_ID
-					  , MIN(P.WBS_PLANS_DT) OVER (PARTITION BY P.CO_CD, SJ.CLNT_CD) AS WBS_PLANS_DT
-					  , MAX(P.WBS_PLANE_DT) OVER (PARTITION BY P.CO_CD, SJ.CLNT_CD) AS WBS_PLANE_DT
+					  , MIN(P.WBS_PLANS_DT) OVER (PARTITION BY P.CO_CD, P.CLNT_CD) AS WBS_PLANS_DT
+					  , MAX(P.WBS_PLANE_DT) OVER (PARTITION BY P.CO_CD, P.CLNT_CD) AS WBS_PLANE_DT
 					  , ''                   AS DAYCNT
 					  , 0                    AS WBS_RSLTS_RATE
 					  , ''                   AS WBS_RSLTSS_DT
@@ -1742,31 +1784,24 @@
 					  , ''                   AS RSLTS_FILE_TRGT_KEY
 					  , ''                   AS ISSUE_PLAN_TRGT_KEY
 					  , ''                   AS ISSUE_RSLT_TRGT_KEY
-				 FROM   TB_WB22M01 AS P  --WBS계획
-				        INNER JOIN SUBJ AS SB  ON P.CO_CD    = SB.CO_CD
-						                      AND P.SALES_CD = SB.SALES_CD
-						LEFT OUTER JOIN SJD AS SJ  ON P.CO_CD    = SJ.CO_CD
-						                          AND P.SALES_CD = SJ.SALES_CD
-				 WHERE  P.CO_CD = #{coCd}
-				 --AND    P.WBS_PLAN_CODE_KIND = 'WBSCODE'
-				 AND    P.CLOSE_YN = 'Y'
+				 FROM   PLAN_BEFORE AS P  --WBS계획
 				 UNION ALL
-				 SELECT DISTINCT SJ.GANT_KEY AS UPPER_CD
-				      , SJ.ORDRS_NO          AS LOWER_CD
-					  , SJ.GANT_KEY          AS GANT_KEY
-					  , (SELECT FN_CM05M01_CD_TO_NM(SJ.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM
+				 SELECT DISTINCT P.CLNT_PJT||CLNT_CD AS UPPER_CD
+				      , P.CLNT_PJT||CLNT_CD||P.ORDRS_NO          AS LOWER_CD
+					  , P.CLNT_PJT||CLNT_CD          AS GANT_KEY
+					  , (SELECT FN_CM05M01_CD_TO_NM(P.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM
 					  , P.CO_CD              AS CO_CD
-					  , SJ.CLNT_CD           AS CLNT_CD
-					  , SJ.CLNT_NM           AS CLNT_NM
-					  , SJ.CLNT_PJT          AS CLNT_PJT
-					  , SJ.ORDRS_NO          AS ORDRS_NO
+					  , P.CLNT_CD           AS CLNT_CD
+					  , P.CLNT_NM           AS CLNT_NM
+					  , P.CLNT_PJT          AS CLNT_PJT
+					  , P.ORDRS_NO          AS ORDRS_NO
 					  , ''                   AS SALES_CD
 					  , ''                   AS WBS_PLAN_CODE_KIND
 					  , ''                   AS WBS_PLAN_CODE_ID
 					  , ''                   AS WBS_PLAN_CODE_NM
 					  , ''                   AS WBS_PLAN_MNG_ID
-					  , MIN(P.WBS_PLANS_DT) OVER (PARTITION BY P.CO_CD, SJ.CLNT_CD, SJ.ORDRS_NO) AS WBS_PLANS_DT  --2023/09/15
-					  , MAX(P.WBS_PLANE_DT) OVER (PARTITION BY P.CO_CD, SJ.CLNT_CD, SJ.ORDRS_NO) AS WBS_PLANE_DT  --2024/01/15
+					  , MIN(P.WBS_PLANS_DT) OVER (PARTITION BY P.CO_CD, P.CLNT_CD, P.ORDRS_NO) AS WBS_PLANS_DT  --2023/09/15
+					  , MAX(P.WBS_PLANE_DT) OVER (PARTITION BY P.CO_CD, P.CLNT_CD, P.ORDRS_NO) AS WBS_PLANE_DT  --2024/01/15
 					  , ''                   AS DAYCNT
 					  , 0                    AS WBS_RSLTS_RATE
 					  , ''                   AS WBS_RSLTSS_DT
@@ -1774,31 +1809,24 @@
 					  , ''                   AS RSLTS_FILE_TRGT_KEY
 					  , ''                   AS ISSUE_PLAN_TRGT_KEY
 					  , ''                   AS ISSUE_RSLT_TRGT_KEY
-				 FROM   TB_WB22M01 AS P  --WBS계획
-				        INNER JOIN SUBJ AS SB  ON P.CO_CD    = SB.CO_CD
-						                      AND P.SALES_CD = SB.SALES_CD
-						LEFT OUTER JOIN SJD AS SJ  ON P.CO_CD    = SJ.CO_CD
-						                          AND P.SALES_CD = SJ.SALES_CD
-				 WHERE  P.CO_CD = #{coCd}
-				 --AND    P.WBS_PLAN_CODE_KIND = 'WBSCODE'
-				 AND    P.CLOSE_YN = 'Y'
+				 FROM   PLAN_BEFORE AS P  --WBS계획
 				 UNION ALL
-				 SELECT DISTINCT SJ.ORDRS_NO              AS UPPER_CD
-				      , P.WBS_PLAN_CODE_KIND||P.SALES_CD  AS LOWER_CD
-					  , SJ.GANT_KEY                       AS GANT_KEY
-					  , (SELECT FN_CM05M01_CD_TO_NM(SJ.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM
+				 SELECT DISTINCT P.CLNT_PJT||CLNT_CD||P.ORDRS_NO              AS UPPER_CD
+				      , P.CLNT_PJT||CLNT_CD||P.ORDRS_NO||P.SALES_CD				  AS LOWER_CD
+					  , P.CLNT_PJT||CLNT_CD          AS GANT_KEY
+					  , (SELECT FN_CM05M01_CD_TO_NM(P.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM
 					  , P.CO_CD                           AS CO_CD
-					  , SJ.CLNT_CD                        AS CLNT_CD
-					  , SJ.CLNT_NM                        AS CLNT_NM
-					  , SJ.CLNT_PJT                       AS CLNT_PJT
-					  , SJ.ORDRS_NO                       AS ORDRS_NO
+					  , P.CLNT_CD                        AS CLNT_CD
+					  , P.CLNT_NM                        AS CLNT_NM
+					  , P.CLNT_PJT                       AS CLNT_PJT
+					  , P.ORDRS_NO                       AS ORDRS_NO
 					  , P.SALES_CD                        AS SALES_CD
 					  , ''                                AS WBS_PLAN_CODE_KIND
 					  , ''                                AS WBS_PLAN_CODE_ID
-					  , SB.SJ_NM                          AS WBS_PLAN_CODE_NM --2033.12.05 남장섭 SalesCode의 설비명
+					  , P.SJ_NM             			  AS WBS_PLAN_CODE_NM --2033.12.05 남장섭 SalesCode의 설비명
 					  , ''                                AS WBS_PLAN_MNG_ID
-					  , MIN(P.WBS_PLANS_DT) OVER (PARTITION BY P.CO_CD, SJ.CLNT_CD, SJ.ORDRS_NO, P.SALES_CD) AS WBS_PLANS_DT
-					  , MAX(P.WBS_PLANE_DT) OVER (PARTITION BY P.CO_CD, SJ.CLNT_CD, SJ.ORDRS_NO, P.SALES_CD) AS WBS_PLANE_DT
+					  , MIN(P.WBS_PLANS_DT) OVER (PARTITION BY P.CO_CD, P.CLNT_CD, P.ORDRS_NO, P.SALES_CD) AS WBS_PLANS_DT
+					  , MAX(P.WBS_PLANE_DT) OVER (PARTITION BY P.CO_CD, P.CLNT_CD, P.ORDRS_NO, P.SALES_CD) AS WBS_PLANE_DT
 					  , ''                                AS DAYCNT
 					  , 0                                 AS WBS_RSLTS_RATE
 					  , ''                                AS WBS_RSLTSS_DT
@@ -1806,34 +1834,27 @@
 					  , ''                                AS RSLTS_FILE_TRGT_KEY
 					  , TO_CHAR(ISU.PLAN_CNT)             AS ISSUE_PLAN_TRGT_KEY
 					  , TO_CHAR(ISU.RSLT_CNT)             AS ISSUE_RSLT_TRGT_KEY
-				 FROM   TB_WB22M01 AS P  --WBS계획
-				        INNER JOIN SUBJ AS SB  ON P.CO_CD    = SB.CO_CD
-						                      AND P.SALES_CD = SB.SALES_CD
-						LEFT OUTER JOIN SJD AS SJ  ON P.CO_CD    = SJ.CO_CD
-						                          AND P.SALES_CD = SJ.SALES_CD
+				 FROM   PLAN_BEFORE AS P  --WBS계획
 						LEFT OUTER JOIN (
 							             SELECT CO_CD                    --회사코드
 										      , SALES_CD                 --SALES Code
 											  , COUNT(ISSUE_PLAN_TRGT_KEY) AS PLAN_CNT --계획 이슈 COUNT
 											  , COUNT(ISSUE_RSLT_TRGT_KEY) AS RSLT_CNT --실적 이슈 COUNT
 										 FROM   RSLT  --WBS이슈 정보
-										 WHERE  CO_CD = #{coCd}
+										 WHERE  CO_CD = 'GUN'
 										 GROUP BY CO_CD, SALES_CD
 										) AS ISU  ON P.CO_CD    = ISU.CO_CD
-										         AND P.SALES_CD = ISU.SALES_CD
-				 WHERE  P.CO_CD = #{coCd}
-				 AND    P.WBS_PLAN_CODE_KIND = 'WBSCODE'
-				 AND    P.CLOSE_YN = 'Y'
+										         AND P.SALES_CD = ISU.SALES_CD	
 				 UNION ALL
-				 SELECT P.WBS_PLAN_CODE_KIND||P.SALES_CD AS UPPER_CD
-				      , P.WBS_PLAN_CODE_ID||P.SALES_CD   AS LOWER_CD
-					  , SJ.GANT_KEY                      AS GANT_KEY
-					  , (SELECT FN_CM05M01_CD_TO_NM(SJ.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM
+				 SELECT P.CLNT_PJT||CLNT_CD||P.ORDRS_NO||P.SALES_CD	 AS UPPER_CD
+				      , P.CLNT_PJT||CLNT_CD||P.ORDRS_NO||P.SALES_CD||P.WBS_PLAN_CODE_ID   AS LOWER_CD
+					  , P.CLNT_PJT||CLNT_CD          AS GANT_KEY
+					  , (SELECT FN_CM05M01_CD_TO_NM(P.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM
 					  , P.CO_CD                          AS CO_CD
-					  , SJ.CLNT_CD                       AS CLNT_CD
-					  , SJ.CLNT_NM                       AS CLNT_NM
-					  , SJ.CLNT_PJT                       AS CLNT_PJT
-					  , SJ.ORDRS_NO                      AS ORDRS_NO
+					  , P.CLNT_CD                       AS CLNT_CD
+					  , P.CLNT_NM                       AS CLNT_NM
+					  , P.CLNT_PJT                       AS CLNT_PJT
+					  , P.ORDRS_NO                      AS ORDRS_NO
 					  , P.SALES_CD                       AS SALES_CD
 					  , P.WBS_PLAN_CODE_KIND             AS WBS_PLAN_CODE_KIND
 					  , P.WBS_PLAN_CODE_ID               AS WBS_PLAN_CODE_ID
@@ -1848,18 +1869,42 @@
 					  , R.RSLTS_FILE_TRGT_KEY            AS RSLTS_FILE_TRGT_KEY
 					  , R.ISSUE_PLAN_TRGT_KEY            AS ISSUE_PLAN_TRGT_KEY
 					  , R.ISSUE_RSLT_TRGT_KEY            AS ISSUE_RSLT_TRGT_KEY
-				 FROM   TB_WB22M01 AS P  --WBS계획
-				        INNER JOIN SUBJ AS SB  ON P.CO_CD    = SB.CO_CD
-						                      AND P.SALES_CD = SB.SALES_CD
-						LEFT OUTER JOIN SJD AS SJ  ON P.CO_CD    = SJ.CO_CD
-						                          AND P.SALES_CD = SJ.SALES_CD
+				 FROM   PLAN_BEFORE AS P  --WBS계획
 						LEFT OUTER JOIN RSLT AS R  ON P.CO_CD              = R.CO_CD
 						                          AND P.SALES_CD           = R.SALES_CD
 												  AND P.WBS_PLAN_CODE_KIND = R.WBS_PLAN_CODE_KIND
 												  AND P.WBS_PLAN_CODE_ID   = R.WBS_PLAN_CODE_ID
-				 WHERE  P.CO_CD = #{coCd}
-				 --AND    P.CLOSE_YN = 'Y'
-				 AND    P.WBS_PLAN_MNG_ID IS NOT NULL
+				WHERE P.WBS_PLAN_CODE_KIND = 'WBSCODE'
+				 UNION ALL
+				 SELECT P.CLNT_PJT||CLNT_CD||P.ORDRS_NO||P.SALES_CD||P.WBS_PLAN_CODE_KIND
+				      , P.CLNT_PJT||CLNT_CD||P.ORDRS_NO||P.SALES_CD||P.WBS_PLAN_CODE_KIND||P.WBS_PLAN_CODE_ID    AS LOWER_CD
+					  , P.CLNT_PJT||CLNT_CD          AS GANT_KEY
+					  , (SELECT FN_CM05M01_CD_TO_NM(P.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM
+					  , P.CO_CD                          AS CO_CD
+					  , P.CLNT_CD                       AS CLNT_CD
+					  , P.CLNT_NM                       AS CLNT_NM
+					  , P.CLNT_PJT                       AS CLNT_PJT
+					  , P.ORDRS_NO                      AS ORDRS_NO
+					  , P.SALES_CD                       AS SALES_CD
+					  , P.WBS_PLAN_CODE_KIND             AS WBS_PLAN_CODE_KIND
+					  , P.WBS_PLAN_CODE_ID               AS WBS_PLAN_CODE_ID
+					  , P.WBS_PLAN_CODE_NM               AS WBS_PLAN_CODE_NM
+					  , P.WBS_PLAN_MNG_ID                AS WBS_PLAN_MNG_ID
+					  , P.WBS_PLANS_DT                   AS WBS_PLANS_DT
+					  , P.WBS_PLANE_DT                   AS WBS_PLANE_DT
+					  , P.DAYCNT                         AS DAYCNT
+					  , NVL(R.WBS_RSLTS_RATE,0)          AS WBS_RSLTS_RATE --WBS실적 진행율
+					  , R.WBS_RSLTSS_DT                  AS WBS_RSLTSS_DT
+					  , R.WBS_RSLTSE_DT                  AS WBS_RSLTSE_DT
+					  , R.RSLTS_FILE_TRGT_KEY            AS RSLTS_FILE_TRGT_KEY
+					  , R.ISSUE_PLAN_TRGT_KEY            AS ISSUE_PLAN_TRGT_KEY
+					  , R.ISSUE_RSLT_TRGT_KEY            AS ISSUE_RSLT_TRGT_KEY
+				 FROM   PLAN_BEFORE AS P  --WBS계획
+						LEFT OUTER JOIN RSLT AS R  ON P.CO_CD              = R.CO_CD
+						                          AND P.SALES_CD           = R.SALES_CD
+												  AND P.WBS_PLAN_CODE_KIND = R.WBS_PLAN_CODE_KIND
+												  AND P.WBS_PLAN_CODE_ID   = R.WBS_PLAN_CODE_ID
+				WHERE P.WBS_PLAN_CODE_KIND != 'WBSCODE'
 				) AS A
 		 WHERE  1 = 1
 		 START WITH UPPER_CD = 'TOP'
@@ -2009,12 +2054,6 @@
 				WHERE  1 = 1
 			   ) AS T
 		WHERE  1 = 1
-		<if test="clntCd != null and !clntCd.equals('')">
-		AND    T.CLNT_CD = #{clntCd}
-		</if>
-		<if test="clntNm != null and !clntNm.equals('')">
-		AND T.CLNT_NM LIKE '%' || #{clntNm} || '%'
-		</if>
 	</select>
 
 </mapper>
