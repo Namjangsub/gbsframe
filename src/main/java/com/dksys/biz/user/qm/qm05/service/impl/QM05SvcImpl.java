@@ -41,5 +41,11 @@ public class QM05SvcImpl implements QM05Svc {
 	public List<Map<String, String>> selectMainGridList(Map<String, String> paramMap) {
 		return qm05Mapper.selectMainGridList(paramMap);
 	}
+	
+	//multi select 검색
+	@Override
+	public List<Map<String, String>> select_dept_code(Map<String, String> paramMap) {
+		return qm05Mapper.select_dept_code(paramMap);
+	}
 
 }

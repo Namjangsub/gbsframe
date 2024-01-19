@@ -11,4 +11,6 @@ public interface QM05Svc {
 
 	// 그리드 리스트
 	List<Map<String, String>> selectMainGridList(Map<String, String> paramMap);
+
+	List<Map<String, String>> select_dept_code(Map<String, String> paramMap);
 }
