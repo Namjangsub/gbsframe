@@ -2384,7 +2384,7 @@ function kakaoSendReal(talkJson, talkParam, param) {
 //		    		var errorMsg = find.codeNm;	
 //				}		    			
 		    	insertKakaoMessage(err, talkDeJson, param);	  				
-//	    		alert("오류코드: "+data.status+"\r\n\r\n" + errorMsg+"로 메세지 전송 실패하였습니다.\n담당자 : "+param.nameTo+" Hp."+ param.ordrgMngTelNo);   		
+	    		alert("오류코드: ["+param.nameTo+" Hp."+ param.ordrgMngTelNo + "] "+data.status+"\r\n\r\n" + errorMsg+"로 메세지 전송 실패하였습니다.");   		
 	    	} else if( data.status == "OK" ) {
 	    		//alert("알림톡 정상 발송되었습니다.");
 	    		sendCnt++;
