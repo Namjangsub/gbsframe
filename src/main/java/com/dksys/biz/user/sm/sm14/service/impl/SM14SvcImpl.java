@@ -1,30 +1,23 @@
 package com.dksys.biz.user.sm.sm14.service.impl;
 
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Type;
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.commons.collections4.MapUtils;
+import com.google.gson.*;
+import com.google.gson.reflect.TypeToken;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.util.DateUtil;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import com.dksys.biz.util.ExceptionThrower;
 import com.dksys.biz.user.sm.sm14.mapper.SM14Mapper;
 import com.dksys.biz.user.sm.sm14.service.SM14Svc;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 
@@ -244,11 +237,12 @@ public class SM14SvcImpl implements SM14Svc {
 			dtl.put("pgmId", paramMap.get("pgmId"));
 			dtl.put("creatId", paramMap.get("userId"));
 			
-			//billYn이 Y인것만
-			if("Y".equals(dtl.get("billYn"))) {
-				result += sm14Mapper.updateBillYn(dtl);	
-			}
-    		
+//			//billYn이 Y : 매입계산서 발행확인,  N : 계산서 발행 취소 처리
+//			if("Y".equals(dtl.get("billYn"))) {
+//				result += sm14Mapper.updateBillYn(dtl);	
+//			}
+//    		
+			result += sm14Mapper.updateBillYn(dtl);	
     
 		}			
 

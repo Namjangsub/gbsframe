@@ -38,10 +38,10 @@
 	<link rel="stylesheet" href="/static/css/sub.css">
 	<link rel="stylesheet" href="/static/css/common.css">
 	
-    <link rel="stylesheet" type="text/css"
-          href="https://cdn.rawgit.com/ax5ui/ax5ui-calendar/master/dist/ax5calendar.css">
-    <link rel="stylesheet" type="text/css" href="https://cdn.rawgit.com/ax5ui/ax5ui-picker/master/dist/ax5picker.css">
-    <link rel="stylesheet" type="text/css" href="https://cdn.rawgit.com/ax5ui/ax5ui-select/master/dist/ax5select.css">	
+<!--     <link rel="stylesheet" type="text/css" -->
+<!--           href="https://cdn.rawgit.com/ax5ui/ax5ui-calendar/master/dist/ax5calendar.css"> -->
+<!--     <link rel="stylesheet" type="text/css" href="https://cdn.rawgit.com/ax5ui/ax5ui-picker/master/dist/ax5picker.css"> -->
+<!--     <link rel="stylesheet" type="text/css" href="https://cdn.rawgit.com/ax5ui/ax5ui-select/master/dist/ax5select.css">	 -->
           
 	<script src="/static/js/jquery-latest.min.js"></script>
 	<script src="/static/js/jquery.serializeObject.js"></script>
@@ -162,7 +162,8 @@
 			<div class="add_btn_small pdl10">
 				<!-- <a onclick="inserPurchase('C');" style="height: 30px; line-height: 28px;" authchk>+</a>
 				<a onclick="deletePurchase();" style="height: 30px; line-height: 28px;" authchk>-</a> -->
-				<a onclick="BillYnUpdate()" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-check-square"></i> 등 록 </button></a>		
+				<a onclick="BillYnUpdate('Y')" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-check-square"></i> 발행확인 </button></a>		
+				<a onclick="BillYnUpdate('N')" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-check-square"></i> 발행취소 </button></a>		
 				<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 			    </div>
 				<select id="recordCnt" class="prae_select" data-search="recordCnt" onchange="gridView.setData(0);">
@@ -532,20 +533,34 @@ postAjaxSync("/user/wb/wb21/selectCodeList", optParam, null, function(data){
 	}  
 	
 	//매입계산서 등록
-	function BillYnUpdate() {
+	function BillYnUpdate(jobYn) {
 		//그리드 매입금액 매입일자 확인
 		var gridList = gridView.target.getList("selected")[0];
 		if (gridList == undefined || gridList?.length < 1) {
  			alert("처리할 자료를 선택해 주세요.");
  			return false;	 			
  		}
-		if (gridList?.billYn != 'Y') {   //백엔드 SM14SvcImpl.java -> billYn이 Y인것만 처리하므오 오류발생됨
-			alert("입고처리가 완료 되지 않았습니다.");
-			return false;
-		}
 		
-		var formData = new FormData($("#mainForm")[0]);								
-		formData.append("makeArr", JSON.stringify(gridList));
+		if (jobYn == 'Y') {
+			if (gridList?.cmpletYn != 'Y') {   //매입확정 완료 되지 않은것은 처리 안함
+				alert("입고처리가 완료 되지 않았습니다.");
+				return false;
+			}
+
+			if (gridList?.billYn != 'Y') {   //백엔드 SM14SvcImpl.java -> billYn이 Y인것만 발행완료 처리
+				return false;
+			}
+		} else {  //계산서 발행 취소
+			if (gridList?.billYn != 'Y') {   // billYn이 Y인것만 취소 처리가능 오류발생됨
+				return false;
+			}
+		}
+		debugger;
+		var formData = new FormData($("#mainForm")[0]);	
+		let billUploadArr = [];
+		gridList.billYn = jobYn;  		//jobYn = Y:발행확인처리, N: 발행 취소 처리
+		billUploadArr.push(gridList);
+		formData.append("makeArr", JSON.stringify(billUploadArr));
 		
 		filePostAjax("/user/sm/sm14/updateBillYn", formData,		// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
 				function(data) {
