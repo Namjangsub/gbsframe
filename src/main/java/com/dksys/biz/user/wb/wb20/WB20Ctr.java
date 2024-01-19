@@ -117,7 +117,7 @@ public class WB20Ctr {
 	  @PostMapping(value = "/selectGetApprovalList") 
 	  public String selectApprovalGetList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		  
-  		  List<Map<String, String>> resultList = wb20Svc.selectApprovalList(paramMap);
+  		  List<Map<String, String>> resultList = wb20Svc.selectGetApprovalList(paramMap);
 		  model.addAttribute("resultList", resultList); 
 		  return "jsonView"; 
 		  

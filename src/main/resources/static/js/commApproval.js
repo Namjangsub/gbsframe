@@ -6,7 +6,6 @@ function approvalConfirm() {
 
 //결재 메인
 function Approval(htmlParam, param, popParam) {
-	debugger;
 	this.htmlParam = htmlParam;		//결재창 출력영역
 	this.param = param;				//ADD 한 param
 	this.popParam = popParam;		//부모창에서 공통팝업으로 전달한 param

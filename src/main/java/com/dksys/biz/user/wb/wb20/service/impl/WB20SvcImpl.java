@@ -98,8 +98,8 @@ public class WB20SvcImpl implements WB20Svc {
 	
 	/* 공통결재 라인 read */
 	@Override
-	public List<Map<String, String>> selectApprovalList(Map<String, String> paramMap) {
-		return wb20Mapper.selectApprovalList(paramMap);
+	public List<Map<String, String>> selectGetApprovalList(Map<String, String> paramMap) {
+		return wb20Mapper.selectGetApprovalList(paramMap);
 	}	
 
 	/* 공통결재 라인 insert */

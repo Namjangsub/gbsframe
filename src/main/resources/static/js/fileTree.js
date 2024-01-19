@@ -1,5 +1,6 @@
 var fileTreeGridView
 var treeComonCd;
+var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 var treeModule = (function () {
     var fileArr=[];
     var deleteFileArr = [];
@@ -47,6 +48,23 @@ var treeModule = (function () {
             
             fileTreeGridView.init(gridSelector);
 
+            
+            //--------------------------------------------------------------------
+            //To-Do List에서 팝업창을 뛰우면 정보확인하고 결재버튼 클릭시 결재 처리를 위한 버튼 추가  시작
+            //--------------------------------------------------------------------
+//        	console.log(modalStack.last().paramObj.gridObj);
+        	approvalWorkingGrid = modalStack.last().paramObj.gridObj; //결재 승인을 위한 파라메터 전역변수에 저장함
+        	modalStack.last().paramObj.gridObj = "";	//AJAX 직렬화 하지 않은 배열은 실행오류 발생됨으로 배열변수 Clear 처리함
+        	//결재전이면 결재승인버튼 추가
+        	if (approvalWorkingGrid.sanctnSttus == "N") {
+	            let callCmd = `<button id="callApprovalWorking" onclick="treeModule.callApprovalWorking()">결재승인</button>`;
+	            $('#popForm a:has(i.i_search_w)').removeAttr('onclick');  //popForm ID안에 있는 <a>태그중 자식으로 i태그 i_search_w 클래스가 있으면 onclick 제거--> 결재창과 중복 방지를 위함
+	            $('#popForm a:has(i.i_search_w)').remove();  //I 태그도 삭제
+				$('.popup_bottom_btn').append(callCmd);
+        	}
+            //--------------------------------------------------------------------
+            //To-Do List에서 팝업창을 뛰우면 정보확인하고 결재버튼 클릭시 결재 처리를 위한 버튼 추가  끝
+            //--------------------------------------------------------------------
         }
     }
     
@@ -423,6 +441,66 @@ var treeModule = (function () {
           });
 	}
 	
+
+	function callApprovalWorking(){
+		let row = approvalWorkingGrid;
+		if (row.todoCfDt != undefined) {
+			if(!confirm("결재/확인 처리 완료건입니다.  의견 수정하시겟습니까?")) {
+				return false;
+			}
+		}
+		if (row.todoId != jwt.userId) {
+			alert("결재/확인은 담당자만 처리가능합니다. ");
+			return false;
+		}
+		if( row.todoDiv1CodeNm == "공유" ) {
+			if( row.sanctnSttus == "N" ) {
+				if( confirm("확인 처리 하시겠습니까?") ) {
+				    if (row.todoKey != undefined) {
+					 	 var today = new Date();
+					     var strDate = today.getFullYear()+"-"+('0'+(today.getMonth()+1)).slice(-2)+"-"+('0'+today.getDate()).slice(-2);
+					     
+					     var formData = new FormData();
+					     formData.append("todoKey", row.todoKey);
+					     formData.append("creatId", jwt.userId);
+					     formData.append("creatPgm", "WB2001M01");
+					     //formData.append("todoCfDt", strDate);
+					     filePutAjax("/user/wb/wb20/toDoCfDtUpdate", formData, function(data){
+					         if(data.resultCode == 200){
+					        	 $('#callApprovalWorking)').remove(); 
+					             alert("공유 확인되었습니다.");      
+					             gridView.initView().setData(0);
+					         }
+					     }); 
+				    }    
+				}
+			} else {
+				alert("이미 확인처리 하였습니다.");
+				return;
+			}
+		} else if( row.todoDiv1CodeNm == "결재" ) {
+			var paramObj = {
+					 "coCd":row.coCd
+					 , "salesCd":row.salesCd
+					 , "todoDiv1CodeId":row.todoDiv1CodeId
+					 , "todoDiv1CodeNm":row.todoDiv1CodeNm
+					 , "todoDiv2CodeId":row.todoDiv2CodeId
+					 , "todoDiv2CodeNm":row.todoDiv2CodeNm
+					 , "todoFileTrgtKey":row.todoFileTrgtKey
+					 , "todoTitl":row.todoTitl
+					 , "sanctnSn":row.sanctnSn
+					 , "pgmId": "WB2001M01"
+					 , "userId": jwt.userId
+					 , "histNo" : row.etcField2
+			};
+			openThirdModal("/static/html/user/wb/wb20/WB2001P01.html", 730, 300, "", paramObj, function(data){
+	       		if (data == "승인완료") {
+	       			$('#callApprovalWorking').remove();
+	       		}
+			});					
+		}
+	}
+	
     return {
         initDeptTree: initDeptTree,
         getAllFilesForNodes: getAllFilesForNodes,
@@ -435,6 +513,7 @@ var treeModule = (function () {
         deleteFile:deleteFile,
         downloadFile:downloadFile,
         button_zoomUp:button_zoomUp,
+        callApprovalWorking:callApprovalWorking,
     };
 
 

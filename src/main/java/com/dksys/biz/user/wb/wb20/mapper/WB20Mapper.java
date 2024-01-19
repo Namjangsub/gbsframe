@@ -33,7 +33,7 @@ public interface WB20Mapper {
 	
 	List<Map<String, String>> selectGetDeptList(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectApprovalList(Map<String, String> paramMap);	
+	List<Map<String, String>> selectGetApprovalList(Map<String, String> paramMap);	
 	
 	int updateApprovalLine(Map<String, String> paramMap);	
 	

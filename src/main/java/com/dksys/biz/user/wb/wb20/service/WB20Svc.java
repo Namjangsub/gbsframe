@@ -28,7 +28,7 @@ public interface WB20Svc {
 	
 	List<Map<String, String>> selectGetDeptList(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectApprovalList(Map<String, String> paramMap);	
+	List<Map<String, String>> selectGetApprovalList(Map<String, String> paramMap);	
 	
 	int insertApprovalLine(Map<String, String> paramMap);	
 	
