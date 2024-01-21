@@ -54,13 +54,15 @@ var treeModule = (function () {
             //--------------------------------------------------------------------
 //        	console.log(modalStack.last().paramObj.gridObj);
         	approvalWorkingGrid = modalStack.last().paramObj.gridObj; //결재 승인을 위한 파라메터 전역변수에 저장함
-        	modalStack.last().paramObj.gridObj = "";	//AJAX 직렬화 하지 않은 배열은 실행오류 발생됨으로 배열변수 Clear 처리함
-        	//결재전이면 결재승인버튼 추가
-        	if (approvalWorkingGrid.sanctnSttus == "N") {
-	            let callCmd = `<button id="callApprovalWorking" onclick="treeModule.callApprovalWorking()">결재승인</button>`;
-	            $('#popForm a:has(i.i_search_w)').removeAttr('onclick');  //popForm ID안에 있는 <a>태그중 자식으로 i태그 i_search_w 클래스가 있으면 onclick 제거--> 결재창과 중복 방지를 위함
-	            $('#popForm a:has(i.i_search_w)').remove();  //I 태그도 삭제
-				$('.popup_bottom_btn').append(callCmd);
+        	if (approvalWorkingGrid != undefined) {
+		    	modalStack.last().paramObj.gridObj = "";	//AJAX 직렬화 하지 않은 배열은 실행오류 발생됨으로 배열변수 Clear 처리함
+		    	//결재전이면 결재승인버튼 추가
+		    	if (approvalWorkingGrid.sanctnSttus == "N") {
+		            let callCmd = `<button id="callApprovalWorking" onclick="treeModule.callApprovalWorking()">결재승인</button>`;
+		            $('#popForm a:has(i.i_search_w)').removeAttr('onclick');  //popForm ID안에 있는 <a>태그중 자식으로 i태그 i_search_w 클래스가 있으면 onclick 제거--> 결재창과 중복 방지를 위함
+		            $('#popForm a:has(i.i_search_w)').remove();  //I 태그도 삭제
+					$('.popup_bottom_btn').append(callCmd);
+		    	}
         	}
             //--------------------------------------------------------------------
             //To-Do List에서 팝업창을 뛰우면 정보확인하고 결재버튼 클릭시 결재 처리를 위한 버튼 추가  끝
