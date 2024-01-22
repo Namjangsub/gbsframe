@@ -35,6 +35,8 @@
 	<script src="/static/js/ax5/ax5toast.min.js"></script>
 	<script src="/static/js/jstree/jstree.min.js"></script>
 	<script src="/static/js/global.js"></script>
+	<script type="text/javascript" src="/static/js/workingDayCalc.js"></script>
+	<script type="text/javascript" src="/static/js/korean-lunar-calendar.min.js"></script>
 	
 	<!-- 도움말 팝업 -->
     <script src="/static/js/manualPopup.js"></script>
@@ -164,13 +166,27 @@
 	var actionType = null;
 	var isFirst = true;
 	var wbscode = [];
-	function gridColor(gubunCode) {
+	let nowDate = moment(new Date()).toDate().format('yyyy-MM-dd');
+	
+	function gridColor(dataValue) {
 		let rtnColor = "";
-		if (gubunCode=="0.예상수주") {
+		let row = dataValue.item;
+
+		if (row.gubun=="0.예상수주") {
 			rtnColor = "grid-cell-orange";
-		} else if (gubunCode=="2.수행결과") {
+		} else if (row.gubun=="2.수행결과") {
 			rtnColor = "grid-row-blue";
+			if (dataValue.key.substr(0,7) == "wbscode") {
+				let wbsPlanDt = gridView.target.list[dataValue.index-1][dataValue.key+'Dt'];
+				let wbsPct = Number.isNaN(parseInt(row[dataValue.key+'Pct'])) ? 0 : parseInt(row[dataValue.key+'Pct']);
+				if (wbsPlanDt  != undefined) {
+					if (wbsPlanDt < nowDate && wbsPct < 100 ) {
+						return 'grid-cell-pupple';
+					}
+				}
+			}
 		}
+		
 		return rtnColor;
 	}
 	var gridView = {
@@ -199,6 +215,23 @@
                         });
 	                    this.self.select(this.dindex);
 					},
+                    onDBLClick: function () {
+                    	debugger;
+                    	gridView.target.clearSelect();
+                    	this.self.select(this.doindex);
+                        var row = gridView.target.getList("selected")[0];
+                        if (row != undefined && (row.gubun == "1.일정계획" || row.gubun == "2.수행결과")) {
+                            var paramObj = {
+                                "coCd": row.coCd,
+                                "salesCd": row.salesCd,
+                                "planVerNo": row.planVerNo,
+                                "histYn": 'N',
+                            };
+                            openSecondModal("/static/html/user/wb/wb22/WB2201P01.html", 1200, 900, "WBS 계획등록", paramObj, function () {
+                            	gridView.setData(0);
+                            });
+                        }
+                 },
 					onDataChanged: function () {
 					// changeCheck(this);
 					}
@@ -207,31 +240,31 @@
 				columns : [
 	    			       {key: "clntNm",		    label: "고객사",	         width: 100,	align: "left"}
 		    			 , {key: "clntPjtNm",		label: "고객사PJT", 	     width: 70,		align: "center"}
-	    			     , {key: "salesCd",		    label: "번호(Sales Code)",width: 120,		align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-		    			 , {key: "eqpNm",		    label: "장비명",	         width: 150,	align: "left", styleClass: function () {return gridColor(this.item.gubun);}}
-		    			 , {key: "ordrsQty",		label: "수량<br>(Set)",   width: 50,		align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-		    			 , {key: "ordrsDtlDiv20Nm",	label: "구분",	         width: 50,		align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-		    			 , {key: "ctrtDoc",			label: "계약문서",	         width: 60,		align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-		    			 , {key: "dudtIntendDt",	label: "납기일",	         width: 80,		align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-		    			 , {key: "ordrsDt",			label: "수주확정일",	     width: 80,		align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-		    			 , {key: "gubun",		    label: "자료구분",	         width: 70,	sortable: false,	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
+	    			     , {key: "salesCd",		    label: "번호(Sales Code)",width: 120,		align: "center", styleClass: function () {return gridColor(this);}}
+		    			 , {key: "eqpNm",		    label: "장비명",	         width: 150,	align: "left", styleClass: function () {return gridColor(this);}}
+		    			 , {key: "ordrsQty",		label: "수량<br>(Set)",   width: 50,		align: "center", styleClass: function () {return gridColor(this);}}
+		    			 , {key: "ordrsDtlDiv20Nm",	label: "구분",	         width: 50,		align: "center", styleClass: function () {return gridColor(this);}}
+		    			 , {key: "ctrtDoc",			label: "계약문서",	         width: 60,		align: "center", styleClass: function () {return gridColor(this);}}
+		    			 , {key: "dudtIntendDt",	label: "납기일",	         width: 80,		align: "center", styleClass: function () {return gridColor(this);}}
+		    			 , {key: "ordrsDt",			label: "수주확정일",	     width: 80,		align: "center", styleClass: function () {return gridColor(this);}}
+		    			 , {key: "gubun",		    label: "자료구분",	         width: 70,	sortable: false,	align: "center", styleClass: function () {return gridColor(this);}}
 		    		     , {key : undefined, label : "공정구분", columns: [
-			    		       {key: "wbscode01",	   label: "수주확정",		    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode02",	   label: "목표원가및PFU",     width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode03",	   label: "설계완료",			width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode17",	   label: "모델링완료",		width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode04",	   label: "구매완료",		    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode05",	   label: "기계조립완료",	    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode06",	   label: "전기완료",	        width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode07",	   label: "자체시운전완료",		width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode08",	   label: "조건작업완료",	    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode16",	   label: "외부제작검수",	    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode09",	   label: "고객검수",		    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode10",	   label: "포장",				width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode11",	   label: "출고",		    	width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode12",	   label: "도착",	            width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode13",	   label: "설치시운전(출발일)",  width: 110,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode14",	   label: "설치시운전(복귀일)",	width: 110,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
+			    		       {key: "wbscode01",	   label: "수주확정",		    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode02",	   label: "목표원가및PFU",     width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode03",	   label: "설계완료",			width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode17",	   label: "모델링완료",		width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode04",	   label: "구매완료",		    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode05",	   label: "기계조립완료",	    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode06",	   label: "전기완료",	        width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode07",	   label: "자체시운전완료",		width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode08",	   label: "조건작업완료",	    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode16",	   label: "외부제작검수",	    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode09",	   label: "고객검수",		    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode10",	   label: "포장",				width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode11",	   label: "출고",		    	width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode12",	   label: "도착",	            width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode13",	   label: "설치시운전(출발일)",  width: 110,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode14",	   label: "설치시운전(복귀일)",	width: 110,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
 		    		         ]
 		    		       }
 		         ],
@@ -335,31 +368,31 @@
 				columns: [
  			       	   {key: "clntNm",		    label: "고객사",	         width: 100,	align: "left"}
 	    			 , {key: "clntPjtNm",		label: "고객사PJT", 	     width: 70,		align: "center"}
-  			     	 , {key: "salesCd",		    label: "번호(Sales Code)",width: 120,		align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-	    			 , {key: "eqpNm",		    label: "장비명",	         width: 150,	align: "left", styleClass: function () {return gridColor(this.item.gubun);}}
-	    			 , {key: "ordrsQty",		label: "수량<br>(Set)",   width: 50,		align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-	    			 , {key: "ordrsDtlDiv20Nm",	label: "구분",	         width: 50,		align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-	    			 , {key: "ctrtDoc",			label: "계약문서",	         width: 60,		align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-	    			 , {key: "dudtIntendDt",	label: "납기일",	         width: 80,		align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-	    			 , {key: "ordrsDt",			label: "수주확정일",	     width: 80,		align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-	    			 , {key: "gubun",		    label: "자료구분",	         width: 70,		align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
+  			     	 , {key: "salesCd",		    label: "번호(Sales Code)",width: 120,		align: "center", styleClass: function () {return gridColor(this);}}
+	    			 , {key: "eqpNm",		    label: "장비명",	         width: 150,	align: "left", styleClass: function () {return gridColor(this);}}
+	    			 , {key: "ordrsQty",		label: "수량<br>(Set)",   width: 50,		align: "center", styleClass: function () {return gridColor(this);}}
+	    			 , {key: "ordrsDtlDiv20Nm",	label: "구분",	         width: 50,		align: "center", styleClass: function () {return gridColor(this);}}
+	    			 , {key: "ctrtDoc",			label: "계약문서",	         width: 60,		align: "center", styleClass: function () {return gridColor(this);}}
+	    			 , {key: "dudtIntendDt",	label: "납기일",	         width: 80,		align: "center", styleClass: function () {return gridColor(this);}}
+	    			 , {key: "ordrsDt",			label: "수주확정일",	     width: 80,		align: "center", styleClass: function () {return gridColor(this);}}
+	    			 , {key: "gubun",		    label: "자료구분",	         width: 70,		align: "center", styleClass: function () {return gridColor(this);}}
 	    		     , {key : undefined, label : "공정구분", columns: [
-		    		       {key: "wbscode01",	   label: "수주확정",		    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode02",	   label: "목표원가및PFU",     width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode03",	   label: "설계완료",			width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode17",	   label: "모델링완료",		width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode04",	   label: "구매완료",		    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode05",	   label: "기계조립완료",	    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode06",	   label: "전기완료",	        width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode07",	   label: "자체시운전완료",		width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode08",	   label: "조건작업완료",	    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode16",	   label: "외부제작검수",	    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode09",	   label: "고객검수",		    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode10",	   label: "포장",				width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode11",	   label: "출고",		    	width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode12",	   label: "도착",	            width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode13",	   label: "설치시운전(출발일)",  width: 110,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
-			    		     , {key: "wbscode14",	   label: "설치시운전(복귀일)",	width: 110,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item.gubun);}}
+		    		       {key: "wbscode01",	   label: "수주확정",		    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode02",	   label: "목표원가및PFU",     width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode03",	   label: "설계완료",			width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode17",	   label: "모델링완료",		width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode04",	   label: "구매완료",		    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode05",	   label: "기계조립완료",	    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode06",	   label: "전기완료",	        width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode07",	   label: "자체시운전완료",		width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode08",	   label: "조건작업완료",	    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode16",	   label: "외부제작검수",	    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode09",	   label: "고객검수",		    width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode10",	   label: "포장",				width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode11",	   label: "출고",		    	width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode12",	   label: "도착",	            width: 105,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode13",	   label: "설치시운전(출발일)",  width: 110,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
+			    		     , {key: "wbscode14",	   label: "설치시운전(복귀일)",	width: 110,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this);}}
 	    		         ]
 	    		       },
 				],

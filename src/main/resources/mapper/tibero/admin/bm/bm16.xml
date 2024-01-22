@@ -966,6 +966,7 @@
 				            	  , W.WBS_PLAN_CODE_ID   --계획 LVL1 Code
 					              , (SELECT FN_CM05M01_CD_TO_NM(W.WBS_PLAN_CODE_ID) FROM DUAL) AS PLAN_CD_NM        --계획 LVL1 명
 					              , TO_CHAR(W.WBS_PLANE_DT, 'YYYY-MM-DD') 					   AS PLANE_DT           --계획종료일
+					              , W.VER_NO												  AS PLAN_VER_NO		--계획버전번호
 					         FROM TB_CR02M01  M --수주마스터
 					              INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
 					              LEFT OUTER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
@@ -1081,6 +1082,9 @@
 						              , S.ORDRS_DT           --수주확정일
 						              , S.PLAN_CD_NM         --계획 LVL1 명
 						              , S.PLANE_DT           --계획종료일
+						              , S.PLANE_DT  AS PLANE_DT1      --계획종료일
+						              , '' AS PLANE_PCT
+						              , S.PLAN_VER_NO		--계획버전
 						          FROM SJD S
 						         WHERE 1=1
 					        <if test='planPrjct == "Y"'>
@@ -1102,6 +1106,9 @@
 						              , P.ORDRS_DT           --수주확정일
 						              , P.PLAN_CD_NM         --계획 LVL1 명
 						              , P.PLANE_DT           --계획종료일
+						              , P.PLANE_DT  AS PLANE_DT1      --계획종료일
+						              , '' AS PLANE_PCT
+						              , ''
 						          FROM PJT P
 						         WHERE 1=1
 					        </if>
@@ -1125,6 +1132,9 @@
 						              , S.PLAN_CD_NM							 AS PLAN_CD_NM   --계획 LVL1 명
 						              , (TO_CHAR(Z.RSLTSE_DT, 'YYYY-MM-DD') || 
 						              	DECODE(S.PLANE_DT, NULL,'', '(' || ROUND(RC.RESULT_PCT / PC.PLAN_CNT,0)  || ')')) AS PLANE_DT
+						              , TO_CHAR(Z.RSLTSE_DT, 'YYYY-MM-DD')  	AS PLANE_DT1
+						              , ROUND(RC.RESULT_PCT / PC.PLAN_CNT,0) AS PLANE_PCT
+						              , S.PLAN_VER_NO		--계획버전
 								    FROM SJD S
 							        	LEFT OUTER JOIN (                  
 									                        SELECT 
@@ -1160,8 +1170,8 @@
 													          AND S.WBS_PLAN_CODE_ID = RC.WBS_PLAN_CODE_KIND
 							       WHERE 1=1
 						       ) 
-					   PIVOT ( MAX(PLANE_DT) FOR PLAN_CD_NM IN (${wbscode}) )--코드명 넣어주기 Ctrl에서 배열 생성함 $-->#으로 바꾸면 오류남 바꾸지 말것 
-					         
+					   PIVOT ( MAX(PLANE_DT), MAX(PLANE_DT1) AS DT, MAX(PLANE_PCT) AS PCT FOR PLAN_CD_NM IN ('수주확정' AS WBSCODE01,'목표원가/PFU배포' AS WBSCODE02,'설계완료' AS WBSCODE03,'모델링완료' AS WBSCODE17,'구매완료' AS WBSCODE04,'기계조립완료' AS WBSCODE05,'전기완료' AS WBSCODE06,'자체시운전완료' AS WBSCODE07,'조건작업완료' AS WBSCODE08,'외부제작검수' AS WBSCODE16,'고객검수' AS WBSCODE09,'포장' AS WBSCODE10,'출고' AS WBSCODE11,'도착' AS WBSCODE12,'설치시운전(출발일)' AS WBSCODE13,'설치시운전(복귀일)' AS WBSCODE14) )--코드명 넣어주기 Ctrl에서 배열 생성함 $-->#으로 바꾸면 오류남 바꾸지 말것 
+
 					 		 ORDER BY CLNT_CD, CLNT_PJT, ORDRS_DT, SALES_CD, GUBUN
 			 ) N
 	   )T
