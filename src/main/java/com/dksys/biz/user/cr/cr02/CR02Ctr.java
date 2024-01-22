@@ -186,5 +186,27 @@ public class CR02Ctr {
 		  model.addAttribute("JunmooApproval", JunmooApproval);
 		  return "jsonView";
 	  }
+	  
+		//설비원가정보 삭제    
+		@DeleteMapping(value = "/deleteOrdrsDetail")
+		public String deleteOrdrsDetail(@RequestBody Map<String, String> param, ModelMap model) {
+	    	try {			
+	    		cr02Svc.deleteOrdrsDetail(param);
+				model.addAttribute("resultCode", 200);
+	    		model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+	    	}catch(Exception e) {
+		    	 model.addAttribute("resultCode", 500);
+		 		 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+	    	}	    	
+			return "jsonView";
+		}
+		
+	  //SalesCode Search modal폼 사용 조회
+	  @PostMapping(value = "/selectOrdrsDetails") 
+	  public String selectOrdrsDetails(@RequestBody Map<String, String> param, ModelMap model) {		  
+		  List<Map<String, Object>> fileList = cr02Svc.selectOrdrsDetails(param);
+		  model.addAttribute("fileList", fileList);
+		  return "jsonView";
+	  }
 	
 }

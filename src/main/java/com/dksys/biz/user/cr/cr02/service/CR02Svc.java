@@ -53,4 +53,8 @@ public interface CR02Svc {
 	List<Map<String, Object>> selectNoSalesCdOrdrsListPop(Map<String, String> param);
 	
 	int selectJunmooApproval(Map<String, String> param);
+	
+	int deleteOrdrsDetail(Map<String, String> param);
+	
+	List<Map<String, Object>> selectOrdrsDetails(Map<String, String> param);
 }

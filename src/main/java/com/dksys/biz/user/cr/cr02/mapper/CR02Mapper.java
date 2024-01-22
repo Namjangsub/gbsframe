@@ -56,6 +56,8 @@ public interface CR02Mapper {
 
     int deleteOrdrsPlan(Map<String, String> param);
     
+    int deleteOrdrsPlanEx(Map<String, String> param);
+    
     int deleteOrdrsPlanHis(Map<String, String> param);
 
     int deleteOrdrsDetail(Map<String, String> param);
@@ -97,4 +99,6 @@ public interface CR02Mapper {
 	void updateMainHistNo(Map<String, String> param);
 	
 	int selectJunmooApproval(Map<String, String> param);
+	
+	int updateOrdrsDetailSoonban(Map<String, String> param);
 }
