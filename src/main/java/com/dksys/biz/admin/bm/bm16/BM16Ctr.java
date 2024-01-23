@@ -131,8 +131,12 @@ public class BM16Ctr {
   // 프로젝트 이슈정보 조회
   @PostMapping(value = "/selectPrjctIssueInfo")
   public String selectPrjctIssueInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    Map<String, String> result = bm16Svc.selectPrjctIssueInfo(paramMap);
-    model.addAttribute("result", result);
+	  Map<String, String> result = bm16Svc.selectPrjctIssueInfo(paramMap);
+	  model.addAttribute("result", result);
+	  
+	  Map<String, String> PrjctInfo = bm16Svc.selectPrjctInfo(paramMap);
+	  model.addAttribute("PrjctInfo", PrjctInfo);
+	  
     return "jsonView";
   }
     
