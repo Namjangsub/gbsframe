@@ -348,7 +348,14 @@
   	const comboClmnPlanDiv = [...setComboOptionCode('CLMNPLANDIV')];
 
   	let refCode = setRefCode();
-  	
+
+    var actionType = modalStack.last().paramObj.actionType;
+    var paramObj = modalStack.last().paramObj;
+
+    var deleteFileArr = [];
+    var selectedNodeId = "";
+    var fileTrgtTyp = "";
+    
     function setComboOptionCode(selectComobo) {
         var optionCode = [];
         postAjaxSync("/admin/cm/cm05/selectChildCodeList", {"codeKind" : selectComobo} , null, function(data) {
@@ -466,6 +473,31 @@
         	}
 
         })
+
+        $("#ordrsAmt").change(function () {
+            calclateTotalClmnAmt();
+        });
+        
+        //견적서번호 지울경우 견적차수도 지워지게 처리
+        $("#estNoOrdrs").change(function () {
+        	var ordNo = $("#estNoOrdrs").val()
+        	if (isNaN(ordNo) || ordNo == "") {
+        		$("#estDeg").val("");
+        	}
+        });
+        
+        // //선물환기입check리스트 NG일떄 계약문서칸 사용못하게 해야함
+        // $("#fwdExchChkList").change(function () {
+    	//     var fwdExchChkList = $("#fwdExchChkList").val();
+    	//     if(fwdExchChkList == "N"){
+    	// 		//내용 삭제 후 비활성화	    	
+    	//     	$("#ctrtDoc").val("");
+    	//     	$('#ctrtDoc').prop('disabled', true);
+    	//     }else{
+    	//     	$('#ctrtDoc').prop('disabled', false);
+    	//     }
+        // });
+        
         //gridViewPop7.initView();
 
       	//---------------------------------------------------------------
@@ -748,31 +780,35 @@
             var totalMachineValueAfterDeduction = 0;
             let orgnSalesCdCnt = 0;
 
+            // clmnAmt 합계 계산
+            var totalClmnAmt = 0;
+            let eqpNmChk = false;
+            
             $.each(rowListDetail, function (idx, elem) {
                 var detailObj = {
-                    "ordrsSeq": idx + 1,
-                    "devDiv": elem.devDiv,
-                    "ordrsDtlDiv10": elem.ordrsDtlDiv10,
-                    "ordrsDtlDiv20": elem.ordrsDtlDiv20,
-                    "ordrsDtlDiv30": elem.ordrsDtlDiv30,
-                    "orgnSalesCd": elem.orgnSalesCd,
-                    "mctype": elem.mctype,
-                    "prdtCd": elem.prdtCd,
-                    "itemDiv": elem.itemDiv,
-                    "salesCd": elem.salesCd || '',
-                    "eqpNm": elem.eqpNm,
-                    "dudtIntendDt": elem.dudtIntendDt,
-                    "dtlRmk": elem.dtlRmk,
-                    "ordrsPrcMach": pasIntChk(elem.ordrsPrcMach),
-                    "ordrsPrcElcty": pasIntChk(elem.ordrsPrcElcty),
-                    "ordrsPrc": pasIntChk(elem.ordrsPrcMach) + pasIntChk(elem.ordrsPrcElcty),
-                    "ordrsQty": pasIntChk(elem.ordrsQty),
-                    "estEpctMatPrc": pasIntChk(elem.estEpctMatPrc),
-                    "trgtPchsPcostMach": pasIntChk(elem.trgtPchsPcostMach),
-                    "trgtPchsPcostElcty": pasIntChk(elem.trgtPchsPcostElcty),
+                    "ordrsSeq"				: idx + 1,
+                    "devDiv"				: elem.devDiv,
+                    "ordrsDtlDiv10"			: elem.ordrsDtlDiv10,
+                    "ordrsDtlDiv20"			: elem.ordrsDtlDiv20,
+                    "ordrsDtlDiv30"			: elem.ordrsDtlDiv30,
+                    "orgnSalesCd"			: elem.orgnSalesCd,
+                    "mctype"				: elem.mctype,
+                    "prdtCd"				: elem.prdtCd,
+                    "itemDiv"				: elem.itemDiv,
+                    "salesCd"				: elem.salesCd || '',
+                    "eqpNm"					: elem.eqpNm,
+                    "dudtIntendDt"			: elem.dudtIntendDt,
+                    "dtlRmk"				: elem.dtlRmk,
+                    "ordrsPrcMach"			: pasIntChk(elem.ordrsPrcMach),
+                    "ordrsPrcElcty"			: pasIntChk(elem.ordrsPrcElcty),
+                    "ordrsPrc"				: pasIntChk(elem.ordrsPrcMach) + pasIntChk(elem.ordrsPrcElcty),
+                    "ordrsQty"				: pasIntChk(elem.ordrsQty),
+                    "estEpctMatPrc"			: pasIntChk(elem.estEpctMatPrc),
+                    "trgtPchsPcostMach"		: pasIntChk(elem.trgtPchsPcostMach),
+                    "trgtPchsPcostElcty"	: pasIntChk(elem.trgtPchsPcostElcty),
                     "trgtPchsPcostInHousePrcsn": pasIntChk(elem.trgtPchsPcostInHousePrcsn),
                     "machineValueAfterDeduction": pasIntChk(elem.trgtPchsPcostMach) - pasIntChk(elem.trgtPchsPcostInHousePrcsn),
-                    "outtkClntNm": elem.outtkClntNm
+                    "outtkClntNm"			: elem.outtkClntNm
                 };
                 
                 let orgnSalesCode = elem.orgnSalesCd;
@@ -783,45 +819,54 @@
                 let itemDiv = elem.itemDiv;
                 let eqpNm = elem.eqpNm;
                 
-                if(orgnSalesCode == '' || orgnSalesCode == undefined) {
+                if(orgnSalesCode == '' || orgnSalesCode == undefined) { //원천SalesCd
                     detailObj["orgnSalesCd"] = "";
                 }
 
-     			if(ordrsDtlDiv20 == '' || ordrsDtlDiv20 == undefined) {
+     			if(ordrsDtlDiv20 == '' || ordrsDtlDiv20 == undefined) { //수주설비 작업구분
                     detailObj["ordrsDtlDiv20"] = "";
                 }
 
-     			if(ordrsDtlDiv30 == '' || ordrsDtlDiv30 == undefined) {
+     			if(ordrsDtlDiv30 == '' || ordrsDtlDiv30 == undefined) { //수주설비 자체구분
                     detailObj["ordrsDtlDiv30"] = "";
                 }
 
-     			if(mctype == '' || mctype == undefined) {
+     			if(mctype == '' || mctype == undefined) { //수주설비 기계구분
                     detailObj["mctype"] = "";
                 }
 
-     			if(prdtCd == '' || prdtCd == undefined) {
+     			if(prdtCd == '' || prdtCd == undefined) { //제품구분
                     detailObj["prdtCd"] = "";
                 }
                 
-                if(itemDiv == '' || itemDiv == undefined) {
+                if(itemDiv == '' || itemDiv == undefined) { //아이템구분
                     detailObj["itemDiv"] = "";
                 }
                 
-                if(eqpNm == '' || eqpNm == undefined) {
+                if(eqpNm == '' || eqpNm == undefined) {  //설비명
                     detailObj["eqpNm"] = "";
+                    eqpNmChk = true;
                 }
                 
-                var laborCostMfgCost = pasIntChk(elem.laborCostMfgCost);
-                var machineValueAfterDeduction = pasIntChk(detailObj["machineValueAfterDeduction"]);
+                var laborCostMfgCost = pasIntChk(elem.laborCostMfgCost); //노무비 제조걍비
+                var machineValueAfterDeduction = pasIntChk(detailObj["machineValueAfterDeduction"]); //
 
-                detailObj["laborCostMfgCost"] = laborCostMfgCost;
+                detailObj["laborCostMfgCost"] = laborCostMfgCost; //노무비 제조걍비
                 detailObj["machineValueAfterDeduction"] = machineValueAfterDeduction;
 
-                totalLaborCostMfgCost += laborCostMfgCost;
+                totalLaborCostMfgCost += laborCostMfgCost; //노무비 제조걍비
                 totalMachineValueAfterDeduction += machineValueAfterDeduction;
                 
-                detailArr.push(detailObj);
+                totalClmnAmt += parseFloat(elem.ordrsPrcMach);
+                totalClmnAmt += parseFloat(elem.ordrsPrcElcty);
+                
+                detailArr.push(detailObj);  //설비정보
             });
+            
+            if(eqpNmChk) {
+                alert("설비명은 필수 입력입니다.");
+                return false;
+            }
             
             // if(orgnSalesCdCnt > 0) {
             //     commaChange();
@@ -829,12 +874,6 @@
             //     return false;
             // }
             
-            // clmnAmt 합계 계산
-            var totalClmnAmt = 0;
-            $.each(detailArr, function (idx, elem) {
-                totalClmnAmt += parseFloat(elem.ordrsPrcMach);
-                totalClmnAmt += parseFloat(elem.ordrsPrcElcty);
-            });
 
             // input box 값과 비교
             // var inputAmtVal = pasIntChk($("#ordrsAmt").val());
@@ -1134,30 +1173,6 @@
 
         gridOrdrsPlan.setData(data);
     } 
-
-    $("#ordrsAmt").change(function () {
-        calclateTotalClmnAmt();
-    });
-    
-    //견적서번호 지울경우 견적차수도 지워지게 처리
-    $("#estNoOrdrs").change(function () {
-    	var ordNo = $("#estNoOrdrs").val()
-    	if (isNaN(ordNo) || ordNo == "") {
-    		$("#estDeg").val("");
-    	}
-    });
-    
-    // //선물환기입check리스트 NG일떄 계약문서칸 사용못하게 해야함
-    // $("#fwdExchChkList").change(function () {
-	//     var fwdExchChkList = $("#fwdExchChkList").val();
-	//     if(fwdExchChkList == "N"){
-	// 		//내용 삭제 후 비활성화	    	
-	//     	$("#ctrtDoc").val("");
-	//     	$('#ctrtDoc').prop('disabled', true);
-	//     }else{
-	//     	$('#ctrtDoc').prop('disabled', false);
-	//     }
-    // });
     
     //Select 선택 코드값 체크하여 명을 출력
     function getComboName(comboArray, key) {
@@ -1593,12 +1608,6 @@
                   }
   	}
 
-    var actionType = modalStack.last().paramObj.actionType;
-    var paramObj = modalStack.last().paramObj;
-
-    var deleteFileArr = [];
-    var selectedNodeId = "";
-    var fileTrgtTyp = "";
     if (actionType == "C") {
         //회사 기본값지정
 		if(modalStack.last().paramObj.coCd == '' || modalStack.last().paramObj.coCd == undefined){
