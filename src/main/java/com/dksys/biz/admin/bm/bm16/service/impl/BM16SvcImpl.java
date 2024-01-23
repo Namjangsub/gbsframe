@@ -289,7 +289,7 @@ public class BM16SvcImpl implements BM16Svc {
       
       Gson gson = new Gson();	
       
-      String pgParam = "{\"actionType\":\""+ "U" +"\",";      
+      String pgParam = "{\"actionType\":\""+ "I" +"\",";      
       pgParam += "\"prjctSeq\":\""+ paramMap.get("prjctSeq") +"\"}";
       
       String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("prjctNm") + "이슈 공유";
