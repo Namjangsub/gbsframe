@@ -470,9 +470,10 @@ var treeModule = (function () {
 					     //formData.append("todoCfDt", strDate);
 					     filePutAjax("/user/wb/wb20/toDoCfDtUpdate", formData, function(data){
 					         if(data.resultCode == 200){
-					        	 $('#callApprovalWorking)').remove(); 
+					        	 $('#callApprovalWorking').remove(); 
 					             alert("공유 확인되었습니다.");      
 					             gridView.initView().setData(0);
+					       		 modalStack.close();
 					         }
 					     }); 
 				    }    
@@ -498,7 +499,9 @@ var treeModule = (function () {
 			};
 			openThirdModal("/static/html/user/wb/wb20/WB2001P01.html", 730, 300, "", paramObj, function(data){
 	       		if (data == "승인완료") {
-	       			$('#callApprovalWorking').remove();
+	       			$('#callApprovalWorking').remove();   
+		            gridView.initView().setData(0);
+	       			modalStack.close();
 	       		}
 			});					
 		}
