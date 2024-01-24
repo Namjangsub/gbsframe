@@ -122,8 +122,9 @@ public class BM16SvcImpl implements BM16Svc {
     	 * "I"인 경우 bm16Mapper.insertPrjctDtl(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
     	 * "U"인 경우 bm16Mapper.updatePrjctDtl(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
     	 * "D"인 경우 * bm16Mapper.deletePrjctDtl(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
+
+		dtl.put("prjctSeq", paramMap.get("prjctSeq"));
     	if ("I".equals(dtaChk)) {
-    		dtl.put("prjctSeq", paramMap.get("prjctSeq"));
     		bm16Mapper.insertPrjctPrdt(dtl);
     	} else if ("U".equals(dtaChk)) {
     		bm16Mapper.updatePrjctPrdt(dtl);
