@@ -381,4 +381,24 @@ public class SM02SvcImpl implements SM02Svc {
 	  public List<Map<String, String>> select_mngId_code(Map<String, String> paramMap) {
 		 return sm02Mapper.select_mngId_code(paramMap);
 	  }
+	
+	//발주서 발행 이력 남기기
+	@Override
+	public int OrderMasterReport(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
+		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("reportArr"), dtlMap);	
+		
+		int result = 0;	    	    
+	    //upate
+		for(Map<String, String> dtl : detailMap) {
+			dtl.put("coCd", paramMap.get("coCd"));
+			dtl.put("pgmId", paramMap.get("pgmId"));
+			dtl.put("creatId", paramMap.get("userId"));
+			
+			result = sm02Mapper.OrderMasterReport(dtl);
+		}
+		
+		return result;
+	}
 }

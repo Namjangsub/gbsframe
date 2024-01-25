@@ -1,5 +1,6 @@
 package com.dksys.biz.user.sm.sm02;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
@@ -239,5 +240,23 @@ public class SM02Ctr {
    	model.addAttribute("result", result);
    	return "jsonView";
     }
+    
+    @PostMapping(value = "/OrderMasterReport")
+    public String OrderMasterReport(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (sm02Svc.OrderMasterReport(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }	  
+
 
 }

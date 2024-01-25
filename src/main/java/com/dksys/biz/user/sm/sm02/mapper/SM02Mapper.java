@@ -53,6 +53,8 @@ public interface SM02Mapper {
 	List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
 
 	List<Map<String, String>> select_mngId_code(Map<String, String> paramMap);
+
+	int OrderMasterReport(Map<String, String> paramMap);
 }
 
 
