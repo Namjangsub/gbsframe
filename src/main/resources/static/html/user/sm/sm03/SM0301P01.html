@@ -159,7 +159,8 @@
 	                	<h5 class="tit" style="float:left; margin-left: 8px; margin-top: 1px; margin-bottom: 1px;">입고상세 리스트</h5>
 	                </div>
 		                <div class="add_btn pdl10" style="margin-right:8px; margin-top: 8px;">
-		                    <a id="deleteDetailButton" style="" authchk>-</a>
+		                    <a id="inProcessCheck" style="height: 30px; line-height: 28px; width: 80px;" authchk><i class="fas fa-check-double"></i> 전체선택 </a>
+		                    <a id="deleteDetailButton" style="height: 30px; line-height: 28px; width: 120px;" authchk><i class="fas fa-backspace"></i> 입고 아이템 삭제 </a>
 		                </div>	                
 	                <div>
 	                	<div data-ax5grid="wareHousingDetail-grid-modal" data-ax5grid-config="{}" style="height:250px; width: 100%" ></div>
@@ -202,7 +203,7 @@ var gridViewPop = {
 				target: $('[data-ax5grid="wareHousingDetail-grid-modal"]'),
 				header: {
 	              align: "center",
-	              selector: true
+	              selector: false
 	            },
 	            body: {
 	            	mergeCells : ["salesCd", ],
@@ -231,23 +232,33 @@ var gridViewPop = {
 					    //체크박스 변경 제외
 					    if( this.key != "userChk" ) {
 
-							if (this.item.inPrc == 0) {
-            	        		//최종단가 set
-                				var paramObj = {
-        								"coCd" : $("#popForm #coCd").val()
-        								, "matrCd" : this.item.matrCd
-        								, "pchsClntCd" : $("#popForm #pchsClntCd").val()
-        								, "curr" : $("#popForm #currCd").val()
-        								};
-            	        		let inQty = this.item.inQty;
-    		    				postAjax("/user/sm/sm02/selectCurrMatrUpr", paramObj, null, function(data) {   
-    		    						if (data.resultList != null) {
-    		    							let inPrc = data.resultList;
-    		    							gridViewPop.target.setValue(row, "inPrc", inPrc);	
-    				            			var inDtlAmt = parseFloat( deleteCommaStr(inQty) * deleteCommaStr(inPrc) );
-    				            			gridViewPop.target.setValue(row, "inDtlAmt", inDtlAmt);		
-    		    						} 
-    		    				});  
+							if (this.item.inPrc == 0) {  //입고단가가 0
+							
+								//발주단가가 있으면 발주단가를 입고단가로 설정, 발주단가가 없으면 최정 거래 단가를 불러옴.
+								if (this.item.ordrgPrc > 0) {	//발주단가가 없으면 최종 거래내역단가를 불러옴
+		            	        		let inQty = this.item.inQty;
+										let inPrc = this.item.ordrgPrc
+ 		    							gridViewPop.target.setValue(row, "inPrc", inPrc);	
+ 				            			var inDtlAmt = parseFloat( deleteCommaStr(inQty) * deleteCommaStr(inPrc) );
+ 				            			gridViewPop.target.setValue(row, "inDtlAmt", inDtlAmt);		
+								} else {
+	            	        		//최종단가 set
+	                				var paramObj = {
+	        								"coCd" : $("#popForm #coCd").val()
+	        								, "matrCd" : this.item.matrCd
+	        								, "pchsClntCd" : $("#popForm #pchsClntCd").val()
+	        								, "curr" : $("#popForm #currCd").val()
+	        								};
+	            	        		let inQty = this.item.inQty;
+	    		    				postAjax("/user/sm/sm02/selectCurrMatrUpr", paramObj, null, function(data) {   
+	    		    						if (data.resultList != null) {
+	    		    							let inPrc = data.resultList;
+	    		    							gridViewPop.target.setValue(row, "inPrc", inPrc);	
+	    				            			var inDtlAmt = parseFloat( deleteCommaStr(inQty) * deleteCommaStr(inPrc) );
+	    				            			gridViewPop.target.setValue(row, "inDtlAmt", inDtlAmt);		
+	    		    						} 
+	    		    				});  
+								}
 							}
 							
 	            			var inPrc = (this.item.inPrc=="" || typeof(this.item.inPrc)=="undefined")? 0 : this.item.inPrc;
@@ -302,12 +313,24 @@ var gridViewPop = {
 
 					},
 			   },
-			   /*
 				footSum: [
-  			    	[	
+  			    	[
+  			    		{label: "합계", colspan:5, align:"center"},
+  			    		{key: "ordrgQty",			collector: "sum", formatter:"money", align: "right"},  		
+  			    		{key: "ordrgAmt",			collector: "sum", formatter:"money", align: "right"},
+  			    		{key: "preInQty",			collector: "sum", formatter:"money", align: "center"},  		
+  			    		{key: "notInQty",			collector: "sum", formatter:"money", align: "center"},  
+  			    		{},
+  			    		{},
+  			    		{},		
+  			    		{key: "inQty",			collector: "sum", formatter:"money", align: "right"},  		
+  			    		{key: "badQty",			collector: "sum", formatter:"money", align: "right"},
+  			    		{},	 		
+  			    		{key: "inDtlAmt",			collector: "sum", formatter:"money", align: "right"},  		
+  			    		{key: "sInspecQty",			collector: "sum", formatter:"money", align: "right"},  		
+  			    		{key: "sInQty",			collector: "sum", formatter:"money", align: "right"},  		
   	                 ]
-  			    ],
-  			    */	    
+  			    ],  
 				columns: [
 			 	 	 {key: "fileTrgtKey", 			label: "파일대상KEY", 			width: 100,		align: "center", 	hidden:true}
 						,{key: "coCd", 				label: "회사코드", 			width: 100,		align: "center", 	hidden:true}
@@ -327,7 +350,7 @@ var gridViewPop = {
 						,{key: "matrSpec", 			label: "형번", 				width: 120,		align: "left"}
 						,{key: "matrSize", 			label: "크기", 				width: 100,		align: "center"}
 						,{key: "ordrgQty", 			label: "발주수량", 			width: 60,		align: "right", formatter: "money"}			/*발주 수량 */
-						,{key: "ordrgAmt", 			label: "발주금액", 			width: 60,		align: "right", formatter: "money"}			/*발주 금액 */
+						,{key: "ordrgAmt", 			label: "발주금액", 			width: 100,		align: "right", formatter: "money"}			/*발주 금액 */
 						,{key: "ordrgPrc", 			label: "발주단가", 			width: 60,		align: "right", 		hidden:true}			/*발주 단가 */						
 						,{key: "preInQty", 			label: "기입고<br>수량", 		width: 60,		align: "center"}									
 						,{key: "notInQty", 			label: "미입고<br>수량", 		width: 60,		align: "center"}	             
@@ -625,7 +648,8 @@ $(document).ready(function() {
 			
 			gridViewPop.initView().setData(0);			
 			//그리드 삭제버튼 hide
-			$(".add_btn.pdl10").hide();
+			$("#deleteDetailButton").hide();
+			$("#inProcessCheck").show();
 			
 		} else if(actionType == "U") {
 			postAjaxSync("/user/sm/sm03/selectWareHousingDetailInfo", modalStack.last().paramObj, null, function(data){
@@ -649,7 +673,8 @@ $(document).ready(function() {
 			$("#popForm #salesCd").attr("readonly", true);
 			$("#popForm #salesCdAnchor").removeAttr("onclick");
 			//그리드 삭제버튼 hide
-			$(".add_btn.pdl10").show();			
+			$("#deleteDetailButton").show();	
+			$("#inProcessCheck").hide();		
 		}	
 		
 		//환율 load
@@ -866,6 +891,74 @@ $(document).ready(function() {
  			} 			
  		}		
 	});	
+	
+	//전체 선택 버튼 기능
+    $("#inProcessCheck").on("click", function () {
+        // 첫 번째 경우: 선택된 행이 있는 경우
+        let rowList = gridViewPop.target.list;
+        // 두 번째 경우: 그리드가 비어 있는 경우
+        if (rowList.length == 0) {
+            return false;
+        }
+
+		//단가가 zero인 자료가 있는지체크하기위한 변수
+		let zeroPrcRowIndex = 0;
+		let zeroPrcCheck = false;
+        $.each(rowList, function (idx, elem) {
+			if (parseFloat(elem.notInQty) != 0 & (elem.userChk == undefined || elem.userChk == 'N')){
+				elem.userChk = 'Y';
+				elem.inQty = elem.notInQty;
+				elem.badQty = 0;
+				elem.inDt = $("#today").val();
+
+				if (elem.inPrc == undefined || elem.inPrc == 0) {  //입고단가가 0
+					//발주단가가 있으면 발주단가를 입고단가로 설정, 발주단가가 없으면 최정 거래 단가를 불러옴.
+					if (parseFloat(elem.ordrgPrc) > 0) {	//발주단가가 없으면 최종 거래내역단가를 불러옴
+							elem.inPrc = elem.ordrgPrc;	
+					} else {
+    	        		//최종단가 set
+        				var paramObj = {
+								"coCd" : $("#popForm #coCd").val()
+								, "matrCd" : elem.matrCd
+								, "pchsClntCd" : $("#popForm #pchsClntCd").val()
+								, "curr" : $("#popForm #currCd").val()
+								};
+	    				postAjaxSync("/user/sm/sm02/selectCurrMatrUpr", paramObj, null, function(data) {   
+	    						if (data.resultList == null) {
+	    							elem.inPrc = 0;
+	    						} else {
+	    							elem.inPrc = data.resultList;	
+	    						} 
+	    				});  
+					}
+				}
+				
+    			var inPrc = (elem.inPrc=="" || typeof(elem.inPrc)=="undefined")? 0 : elem.inPrc;
+           		if( elem.inQty != "" && elem.inQty > 0  ) {
+           			elem.inDtlAmt = parseFloat( deleteCommaStr(elem.inQty) * deleteCommaStr(inPrc) );
+           			elem.sInQty = parseFloat( elem.inQty );	
+           			elem.sInspecQty = parseFloat( elem.inQty );	;				            		
+           		} else {
+           			elem.inDtlAmt = "";		            			
+           		}
+           		//수정된 자료 그리드자료로 Update하기
+           		rowList[idx] = elem;
+           		
+	         	if (parseFloat(elem.inPrc) == 0 && zeroPrcCheck == false) {
+	         		zeroPrcRowIndex = idx;
+	         		zeroPrcCheck = true;
+	           	}
+			}            
+        }); //$.each(rowList
+        		
+   		//수정된 자료 그리드자료 화면에 표시하기
+        gridViewPop.target.setData(rowList);
+        //단가가 0인자료가 존재하면 오류 알림
+		if (zeroPrcCheck) {
+			gridViewPop.target.focus(zeroPrcRowIndex);
+			alert("단가가 없는 자료가 있습니다. 확인하세요!")
+		}
+    });  //$("#inProcessCheck").on("click", function ()
 });
 
 
