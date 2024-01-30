@@ -109,7 +109,7 @@ public class BM16SvcImpl implements BM16Svc {
 	int result = bm16Mapper.updatePrjct(paramMap);
     	//  bm16Mapper.updatePrjct(paramMap)을 호출하여 paramMap을 사용하여 프로젝트를 업데이트하고 그 결과를 result 변수에 저장.
 
-
+	String workPrjctSeq = paramMap.get("prjctSeq");
     List<Map<String, String>> dtlPrdt = gsonDtl.fromJson(paramMap.get("prdtArr"), dtlMap);
     for (Map<String, String> dtl : dtlPrdt) {
     	//  dtlParam 리스트의 각 맵 요소에 대해 반복문을 실행
@@ -123,7 +123,7 @@ public class BM16SvcImpl implements BM16Svc {
     	 * "U"인 경우 bm16Mapper.updatePrjctDtl(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
     	 * "D"인 경우 * bm16Mapper.deletePrjctDtl(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
 
-		dtl.put("prjctSeq", paramMap.get("prjctSeq"));
+		dtl.put("prjctSeq", workPrjctSeq);
     	if ("I".equals(dtaChk)) {
     		bm16Mapper.insertPrjctPrdt(dtl);
     	} else if ("U".equals(dtaChk)) {
