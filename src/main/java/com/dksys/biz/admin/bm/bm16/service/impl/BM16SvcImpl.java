@@ -105,11 +105,12 @@ public class BM16SvcImpl implements BM16Svc {
 	//---------------------------------------------------------------  
 	//첨부 화일 권한체크  끝 
 	//---------------------------------------------------------------  
-
+    //프로젝트 마스터 정보 Update
+	String workPrjctSeq = paramMap.get("prjctSeq");
 	int result = bm16Mapper.updatePrjct(paramMap);
     	//  bm16Mapper.updatePrjct(paramMap)을 호출하여 paramMap을 사용하여 프로젝트를 업데이트하고 그 결과를 result 변수에 저장.
 
-	String workPrjctSeq = paramMap.get("prjctSeq");
+	//프로젝트 세부 설비내역 정보 Update
     List<Map<String, String>> dtlPrdt = gsonDtl.fromJson(paramMap.get("prdtArr"), dtlMap);
     for (Map<String, String> dtl : dtlPrdt) {
     	//  dtlParam 리스트의 각 맵 요소에 대해 반복문을 실행
@@ -134,6 +135,7 @@ public class BM16SvcImpl implements BM16Svc {
     	}
     }
     
+    //설비별 아이템 처리
     List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("prdtItemArr"), dtlMap);
     for (Map<String, String> dtl : dtlParam) {
     	//  dtlParam 리스트의 각 맵 요소에 대해 반복문을 실행
@@ -146,6 +148,7 @@ public class BM16SvcImpl implements BM16Svc {
 		 * "I"인 경우 bm16Mapper.insertPrjctDtl(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
 		 * "U"인 경우 bm16Mapper.updatePrjctDtl(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
 		 * "D"인 경우 * bm16Mapper.deletePrjctDtl(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
+	  dtl.put("prjctSeq", workPrjctSeq);
       if ("I".equals(dtaChk)) {
 	        bm16Mapper.insertPrjctDtl(dtl);
 	      } else if ("U".equals(dtaChk)) {
