@@ -262,7 +262,10 @@ public class WB21SvcImpl implements WB21Svc {
 	
 		int fileTrgtKey = wb21Mapper.selectSjSeqNext(paramMap);
 		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
-		
+
+		//기존건 확정해제
+		sjConfirmN(paramMap, mRequest);
+			
 		Gson gson = new Gson(); 
 		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
