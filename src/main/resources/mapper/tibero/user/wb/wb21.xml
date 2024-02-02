@@ -534,6 +534,9 @@
                              , R4.CODE_NM AS ITEM_DIV_NM
                              , X.EQP_NM
                              , Y.CTRT_NM
+                             , Y.ORDRS_DIV
+                             , CR.SALES_CD  AS COMP_SALES_CD
+                             , CR.CLOSE_YN
                         FROM   TB_CR02D02 AS X
                                INNER JOIN TB_CR02M01 AS Y  ON X.CO_CD    = Y.CO_CD
                                                           AND X.ORDRS_NO = Y.ORDRS_NO
@@ -543,15 +546,19 @@
                                LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = Y.CLNT_PJT  --고객사PJT
                                LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = X.ORDRS_DTL_DIV20  --신작구분
                                LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = X.ITEM_DIV  --아이템구분
+                               LEFT OUTER JOIN TB_WB21M01 AS CR ON CR.CO_CD = X.CO_CD 
+                                                               AND CR.SALES_CD = X.SALES_CD 
+                                                               AND CR.VER_NO = (SELECT max(TO_NUMBER(VER_NO)) FROM  TB_WB21M01 CC WHERE CC.CO_CD = X.CO_CD 
+                                                               															 AND CC.SALES_CD = X.SALES_CD)
                         WHERE  1 = 1
                         AND    X.CO_CD = #{coCd}
                         AND    X.SALES_CD IS NOT NULL
+                        AND    CR.CLOSE_YN  != 'Y'
                         <if test="searchValue != null and !searchValue.equals('') and !searchType.equals('CLNT_PJT_NM')">
                         AND    UPPER(${searchType}) LIKE '%'||UPPER(#{searchValue})||'%'
                         </if>
                        ) AS A
                 WHERE  1 = 1
-                AND    A.SALES_CD NOT IN ( SELECT DISTINCT SALES_CD FROM TB_WB21M01 )
                 <if test="searchType != null and searchType.equals('CLNT_PJT_NM')">
                 AND    A.CLNT_PJT_NM_UPPER LIKE '%' || UPPER(#{searchValue}) || '%'
                 </if>
@@ -584,6 +591,8 @@
                              , X.EQP_NM
                              , Y.CTRT_NM
                              , Y.ORDRS_DIV
+                             , CR.SALES_CD  AS COMP_SALES_CD
+                             , CR.CLOSE_YN
                         FROM   TB_CR02D02 AS X
                                INNER JOIN TB_CR02M01 AS Y  ON X.CO_CD    = Y.CO_CD
                                                           AND X.ORDRS_NO = Y.ORDRS_NO
@@ -593,24 +602,38 @@
                                LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = Y.CLNT_PJT  --고객사PJT
                                LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = X.ORDRS_DTL_DIV20  --신작구분
                                LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = X.ITEM_DIV  --아이템구분
+                               LEFT OUTER JOIN TB_WB21M01 AS CR ON CR.CO_CD = X.CO_CD 
+                                                               AND CR.SALES_CD = X.SALES_CD 
+                                                               AND CR.VER_NO = (SELECT max(TO_NUMBER(VER_NO)) FROM  TB_WB21M01 CC WHERE CC.CO_CD = X.CO_CD 
+                                                               															 AND CC.SALES_CD = X.SALES_CD)
                         WHERE  1 = 1
                         AND    X.CO_CD = #{coCd}
                         AND    X.SALES_CD IS NOT NULL
+                        AND    CR.CLOSE_YN  != 'Y'
                         <if test="searchValue != null and !searchValue.equals('') and !searchType.equals('CLNT_PJT_NM')">
                         AND    UPPER(${searchType}) LIKE '%'||UPPER(#{searchValue})||'%'
                         </if>
                         ORDER BY Y.ORDRS_DIV, X.ORDRS_NO DESC
                        ) AS A
                 WHERE  1 = 1
-                AND    A.SALES_CD NOT IN ( SELECT DISTINCT SALES_CD FROM TB_WB21M01 )
                 <if test="searchType != null and searchType.equals('CLNT_PJT_NM')">
                 AND    A.CLNT_PJT_NM_UPPER LIKE '%' || UPPER(#{searchValue}) || '%'
                 </if>
+                ORDER BY A.ORDRS_NO DESC, A.SALES_CD
                ) AS B
         WHERE  1 = 1
         AND    B.RN BETWEEN ${firstIndex} AND ${lastIndex}
     </select>
-
+ 
+      
+    <!-- 과제삭제 -->    
+    <delete id="delete_wb21" parameterType="Map">
+           DELETE FROM TB_WB21M01
+            WHERE CO_CD  = #{coCd}
+              AND SALES_CD  = #{salesCd}
+                     
+    </delete> 
+                    
     <!-- 과제복사 -->
     <update id="copy_wb21" parameterType="map">
         INSERT INTO TB_WB21M01

@@ -135,7 +135,9 @@ public class WB21SvcImpl implements WB21Svc {
 			String dataChk = dtl.get("dataChk").toString();	    	
 			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
 	    	if ("I".equals(dataChk)) {
+	    		dtl.put("coCd", paramMap.get("coCd_PS"));
 				//데이터 처리
+	    		result = wb21Mapper.delete_wb21(dtl);
 				result = wb21Mapper.copy_wb21(dtl);
 	    	} 
 	    }

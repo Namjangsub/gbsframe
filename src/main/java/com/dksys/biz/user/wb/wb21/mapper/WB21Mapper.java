@@ -68,4 +68,6 @@ public interface WB21Mapper {
 	
 	//외주 제작업체 수정
     int planMkerCdChange(Map<String, String> paramMap);
+
+	int delete_wb21(Map<String, String> paramMap);
 }
