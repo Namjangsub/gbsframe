@@ -118,13 +118,14 @@ public class CR02Svcmpl implements CR02Svc {
         //param.get("newOrdrsNo") => 회사 == 'TRN' && 거래처 = '104' 일때
         //수주구분이 A/S 일때 수주번호에 AS23024 번호 만들기
         if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
-            if (param.get("ordrsDiv").equals("ORDRSDIV1") || param.get("ordrsDiv").equals("ORDRSDIV9")) {
+        	//단일번호체계로 가면수 수주구분으로 분류하면 문제가 있나?
+//            if (param.get("ordrsDiv").equals("ORDRSDIV1") || param.get("ordrsDiv").equals("ORDRSDIV9")) {
             	param.put("ordrsNo", selectMaxOrdrsNo(param));
-            }
-            else {
-            	String orderNo = selectAsMaxOrdrsNo(param);
-            	param.put("ordrsNo", "AS"+orderNo);
-            }
+//            }
+//            else {
+//            	String orderNo = selectAsMaxOrdrsNo(param);
+//            	param.put("ordrsNo", "AS"+orderNo);
+//            }
         }else {
         	param.put("ordrsNo", param.get("newOrdrsNo"));
         }
