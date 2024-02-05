@@ -75,8 +75,16 @@
 		            , E.ORDRG_QTY                                            AS ORDRG_QTY
 		            , E.ORDRG_AMT                                            AS ORDRG_AMT
 		            , E.DSGN_NO 											 AS DSGN_NO			/* 도번 MIN */
+		            , B.MATR_CD
+		            , (SELECT FN_BM05M01_NM(B.MATR_CD) FROM dual)            AS MATR_NM
+		            , 
+						CASE 
+							WHEN BB.CNT > 1  THEN  ' 외 ' || (BB.CNT - 1) ||'건'
+							ELSE ''
+						END AS CNT_NM
                 FROM TB_SM02M01 A --발주마스터
-                	  LEFT OUTER JOIN TB_SM02D01 B ON(A.ORDRG_NO=B.ORDRG_NO)		/* 발주디테일 */
+                	  LEFT OUTER JOIN TB_SM02D01 B ON(A.ORDRG_NO=B.ORDRG_NO AND B.ORDRG_SEQ = 1)		/* 발주디테일 */
+                	  LEFT OUTER JOIN (SELECT count(*) AS CNT, ORDRG_NO FROM TB_SM02D01 GROUP BY ORDRG_NO) BB ON (A.ORDRG_NO=BB.ORDRG_NO)
                       LEFT OUTER JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD--거래처마스터   
                       LEFT OUTER JOIN (SELECT A.CO_CD
 		                                     , A.ORDRG_NO
@@ -134,6 +142,7 @@
                       LEFT OUTER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
                       LEFT OUTER JOIN TB_BM01M01 AS E ON X.PRDT_CD       = E.PRDT_CD --제품마스터
                WHERE 1=1
+                 AND EXISTS (SELECT SALES_CD FROM BJM B WHERE B.SALES_CD = X.SALES_CD )
                <if test="salesCd != null and !salesCd.equals('')">
                 AND X.SALES_CD LIKE '%'||#{salesCd}||'%' --조회조건 : SALES_CD
                </if>
@@ -172,6 +181,7 @@
 				            END TODO_YN
 				        FROM TB_WB20M03 A
 				       WHERE 1=1 
+                		 AND EXISTS (SELECT SALES_CD FROM BJM B WHERE B.SALES_CD = A.SALES_CD )
 		               <if test="salesCd != null and !salesCd.equals('')">
 		                AND A.SALES_CD LIKE '%'||#{salesCd}||'%' --조회조건 : SALES_CD
 		               </if>			       
@@ -187,6 +197,7 @@
 			        , TO_CHAR(MAX(D.IN_DT), 'YYYY-MM-DD') AS IN_DT			        
 				FROM TB_SM03D01 D
 				WHERE 1=1 
+                 AND EXISTS (SELECT SALES_CD FROM BJM B WHERE B.ORDRG_NO = D.ORDRG_NO )
                <if test="salesCd != null and !salesCd.equals('')">
                 AND D.SALES_CD LIKE '%'||#{salesCd}||'%' --조회조건 : SALES_CD
                </if>				
@@ -325,7 +336,8 @@
 							 	  FROM TB_SM02D02
 								 WHERE CO_CD = A.CO_CD 
 								   AND ORDRG_NO = A.ORDRG_NO 
-							 ) AS REPORT_DT								 				 			 
+							 ) AS REPORT_DT	
+							 , MATR_NM || CNT_NM  AS MATR_NM							 				 			 
 		                  FROM BJM A
 		                       LEFT OUTER JOIN SJD AS B ON A.SALES_CD = B.SALES_CD
 		                       LEFT OUTER JOIN TDO AS T ON A.SALES_CD = T.SALES_CD AND A.ORDRG_NO = T.TODO_NO
