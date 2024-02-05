@@ -477,21 +477,21 @@ public class CR02Svcmpl implements CR02Svc {
 	                //입력구분이 '설비'코드 일때 sales_cd 만들기(sales_cd 값이 빈칸, null, 길이 0 일떄)
 	                //프론트엔드에서 cudCheck 값은 추가면 C코드가 수정이면 U 코드가 넘어온다. 
 	    			if (jobType.equals("U")) {
-	    				String Salad = detailMap.get("salesCd");
 	                    //입력구분이 '설비'코드 일때 sales_cd 만들기(sales_cd 값이 빈칸, null, 길이 0 일떄)
 	    				//수정모드일때는 설비이면 sales_cd 없으면 새로 만들고
 	    				//설비가 아니면 sales_cd는 공백으로 처리 함
 	                    if (detailMap.get("ordrsDtlDiv10").equals("ORDRSDTLDIV1010")) {       
 	                    	String newSalesCode = "";
+	                    	String Salad = detailMap.get("salesCd");
 			                if ("".equals(Salad) || Salad == null || Salad.length() == 0) {
 			                	OrderSeq = cr02Mapper.selectSalesCdLastNumberPlusOne(param);
 			                	
 			                    newSalesCode = param.get("ordrsNo") + "-" + OrderSeq.trim() + detailMap.get("prdtCd") + ItemDoov;
 			                    detailMap.put("salesCd", newSalesCode);
 			                } 
-		                	// 수주 상세 업데이트
-		                    cr02Mapper.updateOrdrsDetail(detailMap);
 	                    }
+	                    // 수주 상세 업데이트
+	                    cr02Mapper.updateOrdrsDetail(detailMap);
 	                    
 	    			} else if (jobType.equals("C")) {
 	    	                //신규 입력이면서 '설비'코드 일때 신규 sales_cd 만들기(sales_cd 값이 빈칸, null, 길이 0 일떄)
