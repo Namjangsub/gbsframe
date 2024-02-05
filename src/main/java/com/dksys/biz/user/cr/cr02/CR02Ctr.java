@@ -63,13 +63,6 @@ public class CR02Ctr {
 		return "jsonView";
 	}
 	// ...
-
-	@PostMapping(value = "/maxOrdrsNo")
-	public String getMaxOrdrsNo(@RequestBody Map<String, String> param, ModelMap model) {
-		String maxOrdrsNo = cr02Svc.selectMaxOrdrsNo(param);
-		model.addAttribute("maxOrdrsNo", maxOrdrsNo);
-		return "jsonView";
-	}
 	
 	@PostMapping(value = "/ItemDivEtc")
 	public String getItemDivEtc(@RequestBody Map<String, String> param, ModelMap model) {
