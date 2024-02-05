@@ -116,6 +116,21 @@ var openModal = function(url, width, height, title, paramObj, callback) {
 		header: {
 			title: title,
 	        btns: {
+//	            minimize: {
+//	                label: '<i class="fa fa-minus-circle" aria-hidden="true"></i>', onClick: function () {
+//	                    modal.minimize();
+//	                }
+//	            },
+//	            maximize: {
+//	                label: '<i class="fa fa-plus-circle" aria-hidden="true"></i>', onClick: function () {
+//	                	modal.css({width:$(window).width(), height: $(window).height()});
+//	                	let ax5gridObj = $('[data-ax5grid]');
+//	                	$('[data-ax5grid]').each(function() {
+//	                		  var ax5gridAttributeValue = $(this).attr('data-ax5grid');
+//	                		  console.log('Grid Name:', ax5gridAttributeValue);
+//	                	});
+//	                }
+//	            },
 	        	close: {
 	                label: '<i class="fa fa-times-circle" aria-hidden="true"></i>',
 	                onClick: function () {
@@ -2379,12 +2394,13 @@ function kakaoSendReal(talkJson, talkParam, param) {
 //	    	console.log('status:' + data.status);
 	    	let err = data.status;
 	    	if( err.indexOf("ERR") > -1 || err.indexOf("KKO")> -1 ) { 
-//	    		let find = kakaoErr.find(e => e.codeId === err);
-//				if( typeof(find.codeNm) != "undefined" ) {
-//		    		var errorMsg = find.codeNm;	
-//				}		    			
-		    	insertKakaoMessage(err, talkDeJson, param);	  				
-	    		alert("오류코드: ["+param.nameTo+" Hp."+ param.ordrgMngTelNo + "] "+data.status+"\r\n\r\n" + errorMsg+"로 메세지 전송 실패하였습니다.");   		
+	    		let find = kakaoErr.find(e => e.codeId === err);
+				if( typeof(find.codeNm) != "undefined" ) {
+		    		var errorMsg = find.codeNm;	
+				}		    			
+		    	insertKakaoMessage(err, talkDeJson, param);	
+		    	debugger;
+	    		alert("오류코드: ["+param.nameTo+" Hp."+ talkDeJson.mobile + "] "+data.status+"\r\n\r\n" + errorMsg+"로 메세지 전송 실패하였습니다.");   		
 	    	} else if( data.status == "OK" ) {
 	    		//alert("알림톡 정상 발송되었습니다.");
 	    		sendCnt++;
