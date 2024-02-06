@@ -96,6 +96,7 @@
 		            , FN_CM06M01_ID_TO_NM(SD.UDT_ID)         					   AS UDT_ID_NM     --수정자명
 		            , TO_CHAR(SD.UDT_DTTM, 'YYYY-MM-DD')                           AS UDT_DTTM      --수정일시 
 		            , SM.FILE_TRGT_KEY                                             AS FILE_TRGT_KEY 
+		            , SD.EST_TRGT_COST                                             AS EST_TRGT_COST --수주목표원가
 				    , RRN
 		         FROM SJM AS SM --수주마스터
 		                 LEFT OUTER JOIN TB_CR02D02 AS SD  ON SM.CO_CD    = SD.CO_CD
@@ -145,6 +146,7 @@
 					     , '' TRGT_PCHS_PCOST_ELCTY--목표구매원가-전기
 					     , '' TRGT_PCHS_PCOST_IN_HOUSE_PRCSN --목표구매원가-기자체가공
 					     , '' LABOR_COST_MFG_COST  --노무비및제조경비
+		           		 , '' EST_TRGT_COST        --수주목표원가
 					     , CREAT_ID                --작성자ID
 					     , FN_CM06M01_ID_TO_NM(CREAT_ID) CREAT_ID_NM             --작성자명
 					     , TO_CHAR(CREAT_DTTM,'YYYY-MM-DD') CREAT_DTTM              --작성일시
@@ -180,6 +182,7 @@
 		       , ROUND(SUM(A.ACT_OBS_ELCTY) / 1000, 1)                  AS ACT_OBS_ELCTY                  --실행원가-장애-전기
 		       , ROUND(SUM(A.ACT_TOT_ELCTY) / 1000, 1)                  AS ACT_TOT_ELCTY                  --실행원가-전기
 		       , ROUND(SUM(A.ACT_EXP_COST) / 1000, 1)                   AS ACT_EXP_COST                   --실행원가-경비관리비
+		       , ROUND(SUM(A.EST_TRGT_COST) / 1000, 1)                  AS EST_TRGT_COST                  --수주목표원가
 		  FROM   (
 		          SELECT CO_CD
 				       , ORDRS_NO
@@ -204,6 +207,7 @@
 				       , NVL(ACT_OBS_ELCTY, 0)                                                 AS ACT_OBS_ELCTY                  --실행원가-장애-전기
 				       , NVL(ACT_RGL_ELCTY, 0) + NVL(ACT_OBS_ELCTY, 0)                         AS ACT_TOT_ELCTY                  --실행원가-전기
 				       , NVL(ACT_EXP_COST, 0)                                                  AS ACT_EXP_COST                   --실행원가-경비관리비
+				       , NVL(EST_TRGT_COST, 0)                                                 AS EST_TRGT_COST                  --수주목표원가
 		          FROM   TB_CR02D02
 				  WHERE  1 = 1
 		         ) AS A
@@ -236,6 +240,7 @@
 							   , SDS.ACT_OBS_ELCTY                  --실행원가-장애-전기
 							   , SDS.ACT_TOT_ELCTY                  --실행원가-전기
 							   , SDS.ACT_EXP_COST                   --실행원가-경비관리비
+							   , SDS.EST_TRGT_COST                  --수주목표원가
 							   , U.NAME AS MNG_NM					--담당자명
 							   , (SELECT CASE WHEN ( COUNT(A.TODO_KEY) = SUM(DECODE(NVL(A.SANCTN_STTUS, 'N'), 'N', 0, 'Y', 1) ) ) 
 											  THEN 'Y'
@@ -338,6 +343,7 @@
 		       , ROUND(NVL(SD.ACT_OBS_ELCTY, 0) / 1000, 1)                            AS ACT_OBS_ELCTY                  --실행원가-장애-전기
 		       , ROUND((NVL(SD.ACT_RGL_ELCTY, 0) + NVL(SD.ACT_OBS_ELCTY, 0)) / 1000, 1) AS ACT_TOT_ELCTY                  --실행원가-전기
 		       , ROUND(NVL(SD.ACT_EXP_COST, 0) / 1000, 1)                             AS ACT_EXP_COST                   --실행원가-경비관리비
+		       , ROUND(NVL(SD.EST_TRGT_COST, 0) / 1000, 1)                            AS EST_TRGT_COST                  --수주목표원가
 		       , SD.CREAT_ID                                   AS CREAT_ID      --작성자ID
 		       , FN_CM06M01_ID_TO_NM(SD.CREAT_ID)              AS CREAT_ID_NM   --작성자명
 		       , TO_CHAR(SD.CREAT_DTTM,'YYYY-MM-DD')           AS CREAT_DTTM    --작성일시
@@ -381,6 +387,7 @@
 			   , SUM(ACT_TOT_MACH) + SUM(ACT_TOT_ELCTY)  AS ACT_TOT
 			   , SUM(LABOR_COST_MFG_COST)                AS LABOR_COST_MFG_COST --노무비및제조경비
 			   , SUM(ACT_EXP_COST)                       AS ACT_EXP_COST        --실행원가-경비관리비
+			   , SUM(EST_TRGT_COST)                      AS EST_TRGT_COST       --수주목표원가
 			   , SUM(ACT_TOT_MACH) + SUM(ACT_TOT_ELCTY) + SUM(LABOR_COST_MFG_COST) AS WONGA_TOT
 		       , SUM(ORDRS_PRC) - (SUM(ACT_TOT_MACH) + SUM(ACT_TOT_ELCTY) + SUM(LABOR_COST_MFG_COST)) - SUM(ACT_EXP_COST) AS FIT
 		       , MAX(FILE_TRGT_KEY)                      AS FILE_TRGT_KEY
@@ -412,6 +419,7 @@
 			   , SUM(ACT_TOT_MACH) + SUM(ACT_TOT_ELCTY)  AS ACT_TOT
 			   , SUM(LABOR_COST_MFG_COST)                AS LABOR_COST_MFG_COST --노무비및제조경비
 			   , SUM(ACT_EXP_COST)                       AS ACT_EXP_COST        --실행원가-경비관리비
+			   , SUM(EST_TRGT_COST)                      AS EST_TRGT_COST       --수주목표원가
 			   , SUM(ACT_TOT_MACH) + SUM(ACT_TOT_ELCTY) + SUM(LABOR_COST_MFG_COST) AS WONGA_TOT
 		       , SUM(ORDRS_PRC) - (SUM(ACT_TOT_MACH) + SUM(ACT_TOT_ELCTY) + SUM(LABOR_COST_MFG_COST)) - SUM(ACT_EXP_COST) AS FIT
 		       , MAX(FILE_TRGT_KEY)                      AS FILE_TRGT_KEY
@@ -492,6 +500,7 @@
 			                            ELSE ROUND((LABOR_COST_MFG_COST / ORDRS_PRC) * 100, 1)
 			   END                             AS LABOR_COST_PER
 			 , ACT_EXP_COST                    AS ACT_EXP_COST        --실행원가-경비관리비
+			 , EST_TRGT_COST                   AS EST_TRGT_COST       --수주목표원가
 			 , CASE WHEN ORDRS_PRC = 0 THEN 0
 			                           ELSE ROUND((ACT_EXP_COST / ORDRS_PRC) * 100, 1)
 			   END                             AS ACT_EXP_PER
@@ -588,7 +597,8 @@
 			 , CASE WHEN ORDRS_PRC = 0 THEN 0
 			                            ELSE ROUND((LABOR_COST_MFG_COST / ORDRS_PRC) * 100, 1)
 			   END                            AS LABOR_COST_PER
-			 , ACT_EXP_COST                    AS ACT_EXP_COST        --실행원가-경비관리비
+			 , ACT_EXP_COST                   AS ACT_EXP_COST        --실행원가-경비비관리비
+			 , EST_TRGT_COST                   AS EST_TRGT_COST        --수주목표원가
 			 , CASE WHEN ORDRS_PRC = 0 THEN 0
 			                           ELSE ROUND((ACT_EXP_COST / ORDRS_PRC) * 100, 1)
 			   END                             AS ACT_EXP_PER
@@ -686,6 +696,7 @@
 			                           ELSE ROUND((LABOR_COST_MFG_COST / ORDRS_PRC) * 100, 1)
 			   END                            AS LABOR_COST_PER
 			 , ACT_EXP_COST                   AS ACT_EXP_COST        --실행원가-경비관리비
+			 , EST_TRGT_COST                  AS EST_TRGT_COST       --수주목표원가
 			 , CASE WHEN ORDRS_PRC = 0 THEN 0
 			                           ELSE ROUND((ACT_EXP_COST / ORDRS_PRC) * 100, 1)
 			   END                            AS ACT_EXP_PER
@@ -783,6 +794,7 @@
 			                           ELSE ROUND((LABOR_COST_MFG_COST / ORDRS_PRC) * 100, 1)
 			   END                            AS LABOR_COST_PER
 			 , ACT_EXP_COST                   AS ACT_EXP_COST        --실행원가-경비관리비
+			 , EST_TRGT_COST                  AS EST_TRGT_COST       --수주목표원가
 			 , CASE WHEN ORDRS_PRC = 0 THEN 0
 			                           ELSE ROUND((ACT_EXP_COST / ORDRS_PRC) * 100, 1)
 			   END                            AS ACT_EXP_PER
@@ -919,6 +931,7 @@
 		            , FN_CM06M01_ID_TO_NM(SD.UDT_ID)         					   AS UDT_ID_NM     --수정자명
 		            , TO_CHAR(SD.UDT_DTTM, 'YYYY-MM-DD')                           AS UDT_DTTM      --수정일시 
 		            , SM.FILE_TRGT_KEY                                             AS FILE_TRGT_KEY 
+		            , SD.EST_TRGT_COST                                             AS EST_TRGT_COST --수주목표원가
 		            , RRN
 		         FROM SJM AS SM --수주마스터
 		                 LEFT OUTER JOIN TB_CR02D02 AS SD  ON SM.CO_CD    = SD.CO_CD
@@ -967,6 +980,7 @@
 				     , '' TRGT_PCHS_PCOST_ELCTY--목표구매원가-전기
 				     , '' TRGT_PCHS_PCOST_IN_HOUSE_PRCSN --목표구매원가-기자체가공
 				     , '' LABOR_COST_MFG_COST  --노무비및제조경비
+				     , '' EST_TRGT_COST  	   --수주목표원가
 				     , CREAT_ID                --작성자ID
 				     , FN_CM06M01_ID_TO_NM(CREAT_ID) CREAT_ID_NM             --작성자명
 				     , TO_CHAR(CREAT_DTTM,'YYYY-MM-DD') CREAT_DTTM              --작성일시
@@ -1019,6 +1033,7 @@
 				     , TRGT_PCHS_PCOST_ELCTY--목표구매원가-전기
 				     , TRGT_PCHS_PCOST_IN_HOUSE_PRCSN --목표구매원가-기자체가공
 				     , LABOR_COST_MFG_COST  --노무비및제조경비
+				     , EST_TRGT_COST  	    --수주목표원가
 				     , CREAT_ID             --작성자ID
 				     , CREAT_ID_NM          --작성자명
 				     , CREAT_DTTM           --작성일시
@@ -1231,6 +1246,7 @@
              , DEV_DIV
              , OUTTK_CLNT_CD
              , OUTTK_CLNT_NM
+             , EST_TRGT_COST
         FROM TB_CR02D02
         WHERE CO_CD = #{coCd}
           AND ORDRS_NO = #{ordrsNo}
@@ -1577,7 +1593,8 @@
                 DEV_DIV,
                 OUTTK_CLNT_CD,
                 OUTTK_CLNT_NM,
-                DATA_SEARCH
+                DATA_SEARCH,
+                EST_TRGT_COST
             )
         VALUES (
                    -- 1. 회사 코드
@@ -1639,7 +1656,8 @@
 						 FROM   TB_CM05M01 --고객사PJT
 					     WHERE  CODE_ID = #{clntPjt} 
 					       AND  'ORDRSDTLDIV1010' = #{ordrsDtlDiv10}  --설비인경우만 검색필드 생성
-				   		),'')  --NVL
+				   		),'') , --NVL
+					#{estTrgtCost}
                )
     </insert>
     <update id="updateOrdrsDetail" parameterType="map">
@@ -1676,7 +1694,9 @@
 													 FROM   TB_CM05M01 --고객사PJT
 												     WHERE  CODE_ID = #{clntPjt} 
 												       AND  'ORDRSDTLDIV1010' = #{ordrsDtlDiv10}  --설비인경우만 검색필드 생성
-											   		),'')  --NVL
+											   		),''),  --NVL
+            
+            EST_TRGT_COST			   	   = #{estTrgtCost}		-- 수주목표원가
         WHERE CO_CD = #{coCd}
           AND ORDRS_NO =  #{ordrsNo}
           AND ORDRS_SEQ = #{ordrsSeq}
