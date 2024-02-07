@@ -327,8 +327,8 @@ var bomGridView = {
 		this.target.setConfig({
 			//frozenRowIndex:1,
 			frozenColumnIndex : 3,
-			showRowSelector   : false,
-			multipleSelect    : true,
+			showRowSelector   : true,
+// 			multipleSelect    : false,
 			sortable          : false, 
 			target : $('[data-ax5grid="bom-grid"]'),
 			header : {
@@ -338,13 +338,18 @@ var bomGridView = {
 			body: {
 				//mergeCells : ["salesCd"],//editor 는 merge 안됨
 				onClick: function () {
-					thisGridRow = this.dindex;   // 선택된 행 정보 가져오기
-					thisGridRow = this.colIndex; // 선택된 열 정보 가져오기
-					$.each($.extend({}, this.list), function(idx, obj) {
-						bomGridView.target.select(obj.__index, {selected: false});//this.self.select 사용시 멀티선택됨
-					});
-					
-					this.self.select(this.doindex);
+
+					thisGridRow = this.doindex;   // 선택된 행 정보 가져오기
+					thisGridCol = this.colIndex; // 선택된 열 정보 가져오기
+
+                    var list = bomGridView.target.getList();
+                     $.each(list, function(idx, obj){
+                    	 bomGridView.target.select(obj.__index, {selected: false});//this.self.select 사용시 멀티선택됨
+                     });
+                        
+					this.self.select(this.dindex);
+// 					this.self.select(this.doindex);
+// 					this.self.select(this.doindex, {selected: true});
 					select_bomIdx = this.dindex;
 					select_dsgnNo = this.item.dsgnNo;
 					select_lowerCd = this.item.lowerCd;
@@ -363,8 +368,8 @@ var bomGridView = {
 					// 2023.10.17 김성욱 수정 끝
 				},
 				onDBLClick: function () {
-					thisGridRow = this.dindex;   // 선택된 행 정보 가져오기
-					thisGridRow = this.colIndex; // 선택된 열 정보 가져오기
+					thisGridRow = this.doindex;   // 선택된 행 정보 가져오기
+					thisGridCol = this.colIndex; // 선택된 열 정보 가져오기
 					clearSelectMulti(bomGridView);
 					this.self.select(this.dindex);
 					//addRowBomPopup();
@@ -971,21 +976,6 @@ var matrGridView = {
 		actionType = modalStack.last().paramObj.actionType;
 
 		
-
-		// Ctrl + V 단축키 이벤트 처리 --> 모든 필드에서 단일 이벤트로 처리되서 문제
-			document.addEventListener('keydown', function(event) {
-			  // Ctrl + V 키 이벤트인 경우
-			  if (event.ctrlKey && event.keyCode === 86) {
-				 debugger;
-			    // 붙여넣기된 값을 셀에 적용
-			    gridPaste(thisGridRow,thisGridCol)
-			    // 이벤트 기본 동작 차단
-			    event.preventDefault();
-			  }
-			});        
-		
-		
-		
 		/**
 		 * grid 초기화
 		*/
@@ -1032,14 +1022,97 @@ var matrGridView = {
 		//첨부 화일 처리 끝
 		//---------------------------------------------------------------
 
-	    // Ctrl + V 단축키 이벤트 처리
-		bomGridView.target.$target.on("paste", function (e, a) {
-			gridPaste();
-		});
+// 	    // Ctrl + V 단축키 이벤트 처리
+// 		bomGridView.target.$target.on("paste", function (e, a) {
+// 			gridPaste();
+// 		});
 
 		authChk();// 권한체크
 
+	      // 화사표 위, 아래, 엔터, 텐키 PLUS키 이벤트 처리 --> 모든 필드에서 단일 이벤트로 처리되서 문제
+	   	document.addEventListener('keydown', function(event) {
+// 	   		debugger;
+	   	  
+				if (!event.ctrlKey && !event.altKey) {
+				   	switch (event.keyCode) {
+					    case 38:	//아래로 이동 화살표키
+					    	bomGridRowMoveCtr('before')
+					        break;
+					    case 40:	//위로 이동 화살표키
+					    	bomGridRowMoveCtr('after')
+					        break;
+					    case 13:	//그냥 엔터키 누룸
+							openMatListSearchMulti("MATR");
+					   	    event.preventDefault();		// 이벤트 기본 동작 차단
+					        break; 
+					    case 107:	//텐키쪽에 있는  PLUS(+) Key
+							openMatListSearchMulti("MATR");
+					   	    event.preventDefault();		// 이벤트 기본 동작 차단
+					        break; 
+// 					    default:
+// 					    	alert("key 값은 : " + event.keyCode + "입니다.");
+					}
+				}
+				
+// 				if (event.ctrlKey && (event.keyCode === 13 || event.keyCode === 25)) {  //CTRL + Enter Key
+// 					openMatListSearchMulti();
+// 			   	    event.preventDefault();		// 이벤트 기본 동작 차단
+// 				}
+	   	}); // document.addEventListener('keydown', function(event) {
 	});
+	   	
+	//왼쪽 BOM 그리드 위,아래 한줄 이동하고 선택 된 내용을 가지고 오른쪽 그리드 활성화 하기
+	function bomGridRowMoveCtr(moveType) {
+		let selRow = bomGridView.target.getList("selected")[0];
+		if( typeof(selRow)=="undefined" ) {
+ 			alert("선택된 행이 없습니다.");
+ 			return;
+ 		}
+		//현재 선택된 Row의 Index 값과 BOM 건수 정보 확인
+// 		let curRowIndex = parseInt(selRow.__index);
+		let curRowIndex = parseInt(selRow.__origin_index__==undefined ? selRow.__index : selRow.__origin_index__);
+// 		console.log('인덱스:' + curRowIndex, thisGridRow);
+		if (curRowIndex == 'NaN') curRowIndex = thisGridRow;
+		let rowLength = bomGridView.target.list.length - 1;
+		let targetRowIndex = curRowIndex;
+
+		//선택된 Row를 선택해제하함.  Multi Select로 여러 Row를 선택가능한 상태임
+		bomGridView.target.select(curRowIndex, {selected: false});
+		//선택된 Row를 선택해제하함.  Multi Select로 여러 Row를 선택가능한 상태임
+		if (moveType == "after") {
+			targetRowIndex += 1;
+		} else { //'before'
+			targetRowIndex -= 1;
+		}
+		if (targetRowIndex > rowLength) { //타겟 위치를 BOM 최대 ROW 보다 크면 최대 ROW로 설정
+			targetRowIndex = rowLength;
+		}		
+		if (targetRowIndex < 0) { //타겟 위치를 BOM 최소값 0 보다 작으면 0으로 설정
+			targetRowIndex = 0;
+		}
+//			bomGridView.target.focus(targetRowIndex);
+		bomGridView.target.focused = true;
+		bomGridView.target.select(targetRowIndex, {selected: true});
+		//커서 이동후 선택된 로우값으로 자재 내역 검색처리
+		selRow = bomGridView.target.list[targetRowIndex];
+		let selGridRow = parseInt(selRow.__origin_index__==undefined ? selRow.__index : selRow.__origin_index__);;   // 선택된 행 정보 가져오기
+		if (selGridRow == undefined || selGridRow == 'NaN') {
+			bomGridView.target.focused = true;
+			bomGridView.target.select(thisGridRow, {selected: true});
+			selRow = bomGridView.target.list[thisGridRow];
+		}
+		
+		select_bomIdx = parseInt(selRow.__origin_index__==undefined ? selRow.__index : selRow.__origin_index__);
+		select_dsgnNo = selRow.dsgnNo;
+		select_lowerCd = selRow.lowerCd;
+		select_upperCd = selRow.upperCd;
+		
+		if (selRow.matGubun=="자재") select_lowerCd = select_upperCd;
+		bomGridView.target.repaint();
+		matrGridView.setData(select_lowerCd);							
+		
+   	    event.preventDefault();		// 이벤트 기본 동작 차단
+	}
 
 	// //초기화
 	// function initBomGrid(){
@@ -1112,7 +1185,7 @@ var matrGridView = {
 		formData.append("comonCd", treeModule.getFileNodeId());
 		var fileUploadArr = [];
 		var tempArr = [];
-debugger;
+
 		tempArr = treeModule.getFileArr();
 		$.each(tempArr, function(idx, obj) {
 			if (obj.fileKey == 0) {
@@ -1471,17 +1544,29 @@ debugger;
 		matrGridView.target.addRow($.extend({}, newRow), "last");
 	}
 
-	//자재품번 검색
-	function openMatListSearchMulti() {
-		var bomData = bomGridView.target.getList("selected")[0];
-// 		var bomData = matrGridView.target.list[0];
-		var matrLength = matrGridView.target.list.length;
-		var tempSearchValue ="";
-		if (bomData) {
-			if (bomData.matrMno) { tempSearchValue = bomData.matrMno == "-" ? "" : bomData.matrMno; }  //형번 "BYGS10100-45H" 
-			else if (bomData.matrMat) {tempSearchValue = (tempSearchValue != "") ? tempSearchValue : (bomData.matrMat == "-") ? "" : bomData.matrMat;}  //소재 "SMC/부경금속"
-			else if (bomData.matrSpec) {tempSearchValue = (tempSearchValue != "") ? tempSearchValue : (bomData.matrSpec == "-") ? "" : bomData.matrSpec;}  //규격
-			else if (bomData.matrNm) {tempSearchValue = (tempSearchValue != "") ? tempSearchValue : (bomData.matrNm == "-") ? "" : bomData.matrNm;}  //자재명 "손잡이"
+	//자재품번 검색 (왼쪽 BOM그리드의 선택된 ROW를 기준으로 자재 검색 실행하기)
+	//Default작업 type은 "BOM"으로 왼쪽 BOM 그리드의 선택 ROW를 기준으로 검색처리함.
+	//    작업 Type이 "MATR"은 오른쪽 자재 그리드의 최상단을 기준으로 검색함. -->(진입시점은 화면에서 엔터키를 누를때 진입함)
+	function openMatListSearchMulti(_type = 'BOM') {
+		let tempSearchValue ="";
+		if (_type == "BOM") {
+			let bomData = bomGridView.target.getList("selected")[0];
+			if (bomData) {
+				if (bomData.matrMno) { tempSearchValue = bomData.matrMno == "-" ? "" : bomData.matrMno; }  //형번 "BYGS10100-45H" 
+				else if (bomData.matrMat) {tempSearchValue = (tempSearchValue != "") ? tempSearchValue : (bomData.matrMat == "-") ? "" : bomData.matrMat;}  //소재 "SMC/부경금속"
+				else if (bomData.matrSpec) {tempSearchValue = (tempSearchValue != "") ? tempSearchValue : (bomData.matrSpec == "-") ? "" : bomData.matrSpec;}  //규격
+				else if (bomData.matrNm) {tempSearchValue = (tempSearchValue != "") ? tempSearchValue : (bomData.matrNm == "-") ? "" : bomData.matrNm;}  //자재명 "손잡이"
+			}
+		} else if (_type == "MATR"){
+			let matrData = matrGridView.target.list[0];
+			if (matrData) {
+				if (matrData.matrSpec) { tempSearchValue = matrData.matrSpec == "-" ? "" : matrData.matrSpec; }  //형번/규격 "BYGS10100-45H" 
+				else if (matrData.matrMat) {tempSearchValue = (tempSearchValue != "") ? tempSearchValue : (matrData.matrMat == "-") ? "" : matrData.matrMat;}  //소재/Maker "SMC/부경금속"
+				else if (matrData.matrSize) {tempSearchValue = (tempSearchValue != "") ? tempSearchValue : (matrData.matrSize == "-") ? "" : matrData.matrSize;}  //크기
+				else if (matrData.matrNm) {tempSearchValue = (tempSearchValue != "") ? tempSearchValue : (matrData.matrNm == "-") ? "" : matrData.matrNm;}  //자재명 "손잡이"
+			}
+		} else {
+			//BOM, MATR 외 처리내역 -필요시
 		}
 		var paramObj = {
 			"coCd" : $('#coCd').val(),
@@ -1489,6 +1574,7 @@ debugger;
 		}
 
 		openSecondModal("/static/html/cmn/modal/matListSearchMulti.html", 1200, 700, "자재 검색", paramObj, function (dataList) {
+			let matrLength = matrGridView.target.list.length;
 	        $.each($.extend({}, dataList), function (idx, elem) {
 	        	var row_index = Number(idx);
 				var newRow = elem;
