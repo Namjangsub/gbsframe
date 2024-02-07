@@ -7,59 +7,20 @@
 	<sql id="selectWareHousingListCondition">
 
 		<!-- 회사코드 -->         
-		<if test="coCd != null and !coCd.equals('')">
-			AND A.CO_CD = #{coCd}   
-		</if>
+		AND A.CO_CD = #{coCd}   
 		<!-- 입고일자 -->         
-		<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')">
-			<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
-            			AND B.ORDRG_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
-			</if>   
-		</if>	
-		
-		<if test="clntDivCd != null and !clntDivCd.equals('')">
-			AND B.PCHS_CLNT_CD IN
-			(
-			SELECT CLNT_CD
-				FROM TB_BM02M01 CC
-			WHERE CC.CLNT_DIV_CD = #{clntDivCd} 
-			)
-		</if>			
-		
+        AND B.ORDRG_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
 		<if test="salesCd != null and !salesCd.equals('')">
 			AND A.SALES_CD LIKE  '%' || #{salesCd} || '%'   			
 		</if>			
 		<!-- 구매처 -->         
 		<if test="pchsClntCd != null and !pchsClntCd.equals('')">
 			AND B.PCHS_CLNT_CD = #{pchsClntCd}   
-		</if>     
+		</if>    		
 		<if test="pchsClntNm != null and !pchsClntNm.equals('')">
 			AND D.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'   
 		</if>
-		<!-- 입고구분 -->
-		<if test="ordrgdiv10 != null and !ordrgdiv10.equals('')">
-			AND A.ORDRG_DIV10 = #{ordrgdiv10}   
-		</if>				
-		<!-- 용도구분 -->
-		<if test="ordrgdiv20 != null and !ordrgdiv20.equals('')">
-			AND A.ORDRG_DIV20 = #{ordrgdiv20}   
-		</if>
-		<!-- 특성구분 -->
-		<if test="ordrgdiv30 != null and !ordrgdiv30.equals('')">
-			AND A.ORDRG_DIV30 = #{ordrgdiv30}   
-		</if>			
-		<!--고객사프로젝트명 -->
-		<if test="prjctCdNm != null and !prjctCdNm.equals('')">
-			AND UPPER(S.CLNT_PJT_NM) LIKE '%'||UPPER(#{prjctCdNm})||'%'  
-		</if>				
-		<!-- 고객사명코드 -->         
-		<if test="pchsClntCd != null and !pchsClntCd.equals('')">
-			AND B.PCHS_CLNT_CD = #{pchsClntCd}   
-		</if>     		
-		<!--고객사명 -->
-		<if test="clntCd != null and !clntCd.equals('')">
-			AND ORDRS_CLNT_CD = #{clntCd} 
-		</if>			
+		
 	</sql>	
 		
 	<!-- 입고관리 리스트  카운트 -->
@@ -216,6 +177,16 @@
 	<!-- 입고관리 리스트  -->
 	<select id="selectWareHousingList" parameterType="Map" resultType="camelMap">
 	   /* selectWareHousingList  */
+	   WITH CNT AS (
+					SELECT count(*) AS CNT
+					      , ORDRG_NO 
+					      ,CASE WHEN count(*) = 1  THEN  ''
+								ELSE ' 외 ' || (count(*) - 1) ||'건'
+							END AS CNT_NM	
+					  FROM TB_SM02D01 CC
+				--	 WHERE EXISTS (SELECT 1 FROM SEL WHERE CC.ORDRG_NO = SEL.ORDRG_NO) 
+					 GROUP BY ORDRG_NO
+					)
 		SELECT T.*
 			FROM
 			(
@@ -223,6 +194,8 @@
 					, CC.IN_NO
 					, CC.IN_QTY
 					, T.*
+					, CNT.CNT_NM
+					, MATR_NM || CNT.CNT_NM  AS MATR_CNT_NM
 				FROM
 				(
 				SELECT CO_CD
@@ -258,7 +231,8 @@
 					, min(EQP_NM)  			AS EQP_NM			/* WKDQLAUD */
 					, min(DSGN_NO) 			AS DSGN_NO				
 					, min(ORDRG_MNG_ID) 	AS ORDRG_MNG_ID				
-					, min(ORDRG_MNG_NM) 	AS ORDRG_MNG_NM				
+					, min(ORDRG_MNG_NM) 	AS ORDRG_MNG_NM	
+					, MAX(MATR_NM)          AS MATR_NM					
 					FROM
 						(
 						SELECT A.CO_CD
@@ -311,7 +285,8 @@
 								, EQP_NM			/* WKDQLAUD */		
 								, A.DSGN_NO
 								, B.CREAT_ID    AS ORDRG_MNG_ID
-								, M.NAME 		AS ORDRG_MNG_NM   /*생성자명 */					
+								, M.NAME 		AS ORDRG_MNG_NM   /*생성자명 */		
+								, DECODE(A.ORDRG_SEQ, 1,(SELECT FN_BM05M01_NM(A.MATR_CD) FROM dual),'')  AS MATR_NM		
 					  FROM TB_SM02D01 A
 							LEFT OUTER JOIN TB_SM02M01 B ON(A.CO_CD=B.CO_CD AND A.ORDRG_NO=B.ORDRG_NO)
 							LEFT OUTER JOIN TB_CM06M01 M ON M.ID = B.CREAT_ID
@@ -323,7 +298,7 @@
 													FROM TB_SM03D01 C 
 												GROUP BY C.ORDRG_NO, C.ORDRG_SEQ
 											) CTOT ON A.ORDRG_NO  = CTOT.ORDRG_NO 
-											      AND A.ORDRG_SEQ = CTOT.ORDRG_SEQ
+											      AND A.ORDRG_SEQ = CTOT.ORDRG_SEQ 
 							LEFT OUTER JOIN 
 										( 
 							              SELECT M.CO_CD                                             AS CO_CD         --회사코드
@@ -372,6 +347,7 @@
 							                    GROUP BY I.CO_CD, I.ORDRG_NO, IN_NO
 										      ) CC ON CC.CO_CD    = T.CO_CD
 										          AND CC.ORDRG_NO = T.ORDRG_NO
+							LEFT OUTER JOIN CNT ON CNT.ORDRG_NO = T.ORDRG_NO
 					<if test="cmpletYn != null and !cmpletYn.equals('')">
 					WHERE 1=1 				
 						<if test='cmpletYn == "N"'>
