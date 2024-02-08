@@ -236,6 +236,7 @@ public class WB21SvcImpl implements WB21Svc {
 					sharngMap.put("userId", paramMap.get("userId"));
 					sharngMap.put("sanCtnSn",Integer.toString(i+1));
 					sharngMap.put("pgParam", pgParam1);
+					QM01Mapper.deleteSJApprovalList1(sharngMap); 
 					QM01Mapper.insertWbsSharngList(sharngMap);       		
 					i++;
 				} catch (Exception e) {
