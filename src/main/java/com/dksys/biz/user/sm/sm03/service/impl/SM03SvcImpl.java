@@ -57,11 +57,6 @@ public class SM03SvcImpl implements SM03Svc {
 	public List<Map<String, String>> selectWareHousingList(Map<String, String> paramMap) {
 		return sm03Mapper.selectWareHousingList(paramMap);
 	}	
-		
-	@Override
-	public List<Map<String, String>> selectWareHousingExcelList(Map<String, String> paramMap) {
-		return sm03Mapper.selectWareHousingExcelList(paramMap);
-	}		
 
 	@Override
 	public int selectMaxTrgtKey(Map<String, String> paramMap) {

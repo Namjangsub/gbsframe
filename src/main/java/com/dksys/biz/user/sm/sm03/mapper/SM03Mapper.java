@@ -19,8 +19,6 @@ public interface SM03Mapper {
 	
 	List<Map<String, String>> selectWareHousingList(Map<String, String> paramMap);	
 	
-	List<Map<String, String>> selectWareHousingExcelList(Map<String, String> paramMap);
-	
 	List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectWareHousingDetailList(Map<String, String> paramMap);	

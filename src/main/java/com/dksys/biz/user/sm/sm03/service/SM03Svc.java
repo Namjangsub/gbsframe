@@ -12,8 +12,6 @@ public interface SM03Svc {
 		
 	List<Map<String, String>> selectWareHousingList(Map<String, String> paramMap);
 		
-	List<Map<String, String>> selectWareHousingExcelList(Map<String, String> paramMap);
-	
 	List<Map<String, String>> selectWareHousingDetailList(Map<String, String> paramMap);		
 	
 	List<Map<String, String>> selectWareHousingDetailInfo(Map<String, String> paramMap);

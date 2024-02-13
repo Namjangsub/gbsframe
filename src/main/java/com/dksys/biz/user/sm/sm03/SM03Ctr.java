@@ -51,14 +51,6 @@ public class SM03Ctr {
 		return "jsonView";
 	}
 	
-	// 매입관리 발주 조회 엑셀
-	@PostMapping(value = "/selectWareHousingExcelList")
-	public String selectWareHousingExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> result = sm03Svc.selectWareHousingExcelList(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-	}	
-
 	
 	// 발주상세 조회
 	@PostMapping(value = "/selectWareHousingDetailList")
