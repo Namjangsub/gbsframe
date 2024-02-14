@@ -330,9 +330,6 @@ var gridViewPop = {
                         var paramObj = {"row" : row};
                         //체크박스일 경우 실행 - 등록모드만
                         if( this.column.key == "userChk" && actionType == "C" ) {
-                        	//chk, 수량, 기발주수량, row번호 
-//                             $.setOrdrgQty(gridViewPop, this.item.userChk , this.item.bomQty, this.item.preBomQty, row);   
-//                             $.setOrdrgQty(gridViewPop, this.item, row);   
                             
             	        		if (this.item.bomQty == 0) {
             	        			this.item.userChk = "";
@@ -354,21 +351,26 @@ var gridViewPop = {
 	            	        		} else if( isNaN(ordrgQty) || ordrgQty == 0 ) {
 	            	        			this.item.ordrgQty = 0;        			
 	            	        		}
-	            	        		//구매단가 set
-	                				var paramObj = {
-	        								"coCd" : $("#popForm #coCd").val()
-	        								, "matrCd" : this.item.matrCd
-	        								, "pchsClntCd" : $("#popForm #pchsClntCd").val()
-	        								, "curr" : $("#popForm #currCd").val()
-	        								};
-	    		    				postAjax("/user/sm/sm02/selectCurrMatrUpr", paramObj, null, function(data) {   
-	    		    						if (data.resultList != null) {
-// console.log('row:['+row+'] , 단가:'+data.resultList);
-	    		    							gridViewPop.target.list[row].ordrgPrc = data.resultList;
-	    		    							gridViewPop.target.list[row].ordrgAmt = ordrgQty * deleteCommaStr(data.resultList);
-	    		    							gridViewPop.target.repaint();
-	    		    						} 
-	    		    				});  
+
+	            	        		this.item.ordrgPrc = 0;
+	            	        		this.item.ordrgAmt = 0;
+	            	        		//구매품(GOODSDIV01), 전기자재(GOODSDIV03)인경우만 단가 적용함
+	            	        		if (this.item.goodsDiv == 'GOODSDIV01' || this.item.goodsDiv == 'GOODSDIV03') {
+		            	        		//구매단가 set
+		                				var paramObj = {
+		        								"coCd" : $("#popForm #coCd").val()
+		        								, "matrCd" : this.item.matrCd
+		        								, "pchsClntCd" : $("#popForm #pchsClntCd").val()
+		        								, "curr" : $("#popForm #currCd").val()
+		        								};
+		    		    				postAjax("/user/sm/sm02/selectCurrMatrUpr", paramObj, null, function(data) {   
+		    		    					if (data.resultList != null) {
+		    		    						gridViewPop.target.list[row].ordrgPrc = data.resultList;
+		    		    						gridViewPop.target.list[row].ordrgAmt = pasFloatChk(data.resultList) * ordrgQty;
+		    		    					} 
+		    		    					gridViewPop.target.repaint();
+		    		    				}); 
+	            	        		}
 	            	        	} else if(this.item.userChk == "N") {
 	            	    			this.item.ordrgQty = "";
 	            	    			this.item.ordrgPrc = ""; 
@@ -378,9 +380,6 @@ var gridViewPop = {
                             
 	            	        	gridViewPop.target.repaint()
                             
-                        	//구매단가 set
-//                             $.setMatrUpr(this.item, row);
-
                         }
 					},
 					//그리드값 변경시 실행
@@ -1668,30 +1667,6 @@ fileParam = {
 		exrateCal(); //최초 로딩시 환율 적용
 		$('#popForm #currCd').on('change', exrateCal);
 		
-		//bom row 클릭시 구매단가 set
-		$.setMatrUpr = function(item, row) {
-			//등록시 구매단가 발주단가로 set 
-			if( item.userChk == "Y" ) {
-				var paramObj = {
-								"coCd" : $("#popForm #coCd").val()
-								, "matrCd" : item.matrCd
-								, "pchsClntCd" : $("#popForm #pchsClntCd").val()
-								, "curr" : $("#popForm #currCd").val()
-								};
-				postAjax("/user/sm/sm02/selectCurrMatrUpr", paramObj, null, function(data) {   
-						if(data.resultList != null) {
-							var ordrgPrc = data.resultList;
-							gridViewPop.target.setValue(row, "ordrgPrc", ordrgPrc);
-						} else {
-														
-						}
-				});     //user search ajax end					
-			} else {
-				return;
-			}
-	
-		}
-		
 		//sale Code keyup 이벤트
 		$("#salesCd").on("keyup", function () {
 			if(event.keyCode == 8) {
@@ -2336,29 +2311,32 @@ fileParam = {
    			gridViewPop.target.list[row].ordrgQty = ordrgQty; 
    			gridViewPop.target.list[row].dudtDeqDt = $('#dudtDeqDt').val();
    			gridViewPop.target.list[row].userChk = "Y";
-     		//구매단가 set
-			var paramObj = {
-					"coCd" : $("#popForm #coCd").val()
-					, "matrCd" : tempRow.matrCd
-					, "pchsClntCd" : $("#popForm #pchsClntCd").val()
-					, "curr" : $("#popForm #currCd").val()
-					};
-			postAjaxSync("/user/sm/sm02/selectCurrMatrUpr", paramObj, null, function(data) {   
+			gridViewPop.target.list[row].ordrgPrc = 0;
+			gridViewPop.target.list[row].ordrgAmt = 0;
+
+    		//구매품(GOODSDIV01), 전기자재(GOODSDIV03)인경우만 단가 적용함
+    		if (tempRow.goodsDiv == 'GOODSDIV01' || tempRow.goodsDiv == 'GOODSDIV03') {
+        		//구매단가 set
+				var paramObj = {
+						"coCd" : $("#popForm #coCd").val()
+						, "matrCd" : this.item.matrCd
+						, "pchsClntCd" : $("#popForm #pchsClntCd").val()
+						, "curr" : $("#popForm #currCd").val()
+						};
+				postAjax("/user/sm/sm02/selectCurrMatrUpr", paramObj, null, function(data) {   
 					if (data.resultList != null) {
-//console.log('row:['+row+'] , 단가:'+data.resultList);
 						gridViewPop.target.list[row].ordrgPrc = data.resultList;
 						gridViewPop.target.list[row].ordrgAmt = pasFloatChk(data.resultList) * ordrgQty;
-					} else {
-						gridViewPop.target.list[row].ordrgPrc = 0;
-						gridViewPop.target.list[row].ordrgAmt = 0;
-					}
+					} 
 					gridViewPop.target.repaint();
-			});  
-
+				}); 
+    		} 
    		} else if( isNaN(ordrgQty) || ordrgQty == 0 ) {
    			gridViewPop.target.list[row].ordrgQty = 0;  
    			gridViewPop.target.list[row].userChk = "N";      			
    		}
+
+		gridViewPop.target.repaint();
 	}
 	
 	
