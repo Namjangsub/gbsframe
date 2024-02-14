@@ -153,16 +153,21 @@
 			)
 		     , BAL AS --- SALES_CD 별 발주총수량
 		     (
-		     	SELECT M.CO_CD, M.SALES_CD, D.ORDRG_NO
-		     	     , SUM(NVL(D.ORDRG_QTY,0))  AS ORDRG_QTY 
-		     	     , SUM(NVL(D.ORDRG_AMT,0))  AS ORDRG_AMT
-		     	     , MIN(D.DSGN_NO) 			AS DSGN_NO 
-				  FROM  TB_SM02D01 D 
-				  			INNER JOIN TB_SM02M01 M  ON M.ORDRG_NO = D.ORDRG_NO
-				 WHERE 1=1   
-				   AND D.CO_CD = 'TRN'
-                   AND EXISTS (SELECT SALES_CD FROM SJD B WHERE B.SALES_CD = D.SALES_CD )
-                 GROUP BY M.CO_CD, M.SALES_CD, D.ORDRG_NO
+		     SELECT  B.*
+		     	, SUM(ORDRG_QTY) OVER(PARTITION BY CO_CD, SALES_CD) AS SALES_QTY
+		     	, SUM(ORDRG_AMT) OVER(PARTITION BY CO_CD, SALES_CD) AS SALES_AMT
+				FROM (		
+				     	SELECT M.CO_CD,M.SALES_CD, D.ORDRG_NO
+				     	     , SUM(NVL(D.ORDRG_QTY,0))  AS ORDRG_QTY 
+				     	     , SUM(NVL(D.ORDRG_AMT,0))  AS ORDRG_AMT
+				     	     , MIN(D.DSGN_NO) 			AS DSGN_NO 
+						  FROM  TB_SM02D01 D 
+						  			INNER JOIN TB_SM02M01 M  ON M.ORDRG_NO = D.ORDRG_NO
+						 WHERE 1=1   
+						   AND D.CO_CD = 'TRN'
+		                   AND EXISTS (SELECT SALES_CD FROM SJD B WHERE B.SALES_CD = D.SALES_CD )
+		                 GROUP BY M.CO_CD, M.SALES_CD, D.ORDRG_NO
+		             ) B
 			)
 	</sql>
 	
@@ -250,7 +255,7 @@
 		                     , T.TODO_YN
 		                     , T.TODO_NO
 		                     , (SELECT FN_CM06M01_ID_TO_NM(NVL(A.UDT_ID,A.CREAT_ID)) FROM DUAL) AS PROCESS_NM	
-		                     , M.BOM_QTY - BAL.ORDRG_QTY   AS REAMIN_BAL_QTY	/* SALES_CD 기준 BOM수량 - 발주수량  (발주잔량)*/
+		                     , M.BOM_QTY - BAL.SALES_QTY   AS REAMIN_BAL_QTY	/* SALES_CD 기준 BOM수량 - 발주수량  (발주잔량)*/
 							 , B.CLNT_PJT_NM       --고객사PJT
 							 , 
 							 (
