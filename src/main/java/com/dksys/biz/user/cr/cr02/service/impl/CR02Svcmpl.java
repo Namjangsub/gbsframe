@@ -370,78 +370,86 @@ public class CR02Svcmpl implements CR02Svc {
         cr02Mapper.updateOrdrs(param);
         
         //////////////수금정보  update 수정////////
-        
-        //데이터 처리 시작   
-        int clmnPlanDegKey = cr02Mapper.selectDegKey(param);
-        param.put("clmnPlanDegKey", Integer.toString(clmnPlanDegKey));
-        
-        //DB 저장된 수금정보 가져오기
-        List<Map<String, Object>> dbPlanListRaw = cr02Mapper.selectPmntPlan(param);
-		
-        //Convert Object to String
-        List<Map<String, String>> dbPlanList = dbPlanListRaw.stream()
-        .map(rawMap -> rawMap.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, e -> String.valueOf(e.getValue()))))
-        .collect(Collectors.toList());
+        updateOrdrsPmntPlanProcess(param, mRequest );
 
-        ///////////////
+        ////////////////////////////////////////////////////////////////////////////////////
+        //이하 문장은 위의 함수로 대체함.  남장섭 -->Strat
+        ////////////////////////////////////////////////////////////////////////////////////
+        // //데이터 처리 시작   
+        // int clmnPlanDegKey = cr02Mapper.selectDegKey(param);
+        // param.put("clmnPlanDegKey", Integer.toString(clmnPlanDegKey));
+        
+        // //DB 저장된 수금정보 가져오기
+        // List<Map<String, Object>> dbPlanListRaw = cr02Mapper.selectPmntPlan(param);
+		
+        // //Convert Object to String
+        // List<Map<String, String>> dbPlanList = dbPlanListRaw.stream()
+        // .map(rawMap -> rawMap.entrySet().stream()
+        //         .collect(Collectors.toMap(Map.Entry::getKey, e -> String.valueOf(e.getValue()))))
+        // .collect(Collectors.toList());
+
+        // ///////////////
         
         
-        //수금정보 처리
-        List<Map<String, String>> planArr = gson.fromJson(param.get("planArr"), mapList);
-        //1. 수정부분
-        for (Map<String, String> dbPlan : dbPlanList) {
-        	boolean found = false;
-            for (Map<String, String> plan : planArr) {
-                if (dbPlan.get("clmnPlanSeq").equals(plan.get("clmnPlanSeq"))) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                cr02Mapper.deleteOrdrsPlanEx(dbPlan);
-            }
-        }//1.
+        // //수금정보 처리
+        // List<Map<String, String>> planArr = gson.fromJson(param.get("planArr"), mapList);
+        // //1. 수정부분
+        // for (Map<String, String> dbPlan : dbPlanList) {
+        // 	boolean found = false;
+        //     for (Map<String, String> plan : planArr) {
+        //         if (dbPlan.get("clmnPlanSeq").equals(plan.get("clmnPlanSeq"))) {
+        //             found = true;
+        //             break;
+        //         }
+        //     }
+        //     if (!found) {
+        //         cr02Mapper.deleteOrdrsPlanEx(dbPlan);
+        //     }
+        // }//1.
         
-        for (Map<String, String> planMap : planArr) {
-            try {
-            	boolean found = false; //1.
-                for (Map<String, String> dbPlan : dbPlanList) {
-                    if (dbPlan.get("clmnPlanSeq").equals(planMap.get("clmnPlanSeq"))) {
-                        found = true;
-                        break;
-                    }
-                }//1.
-                planMap.put("coCd", param.get("coCd"));
-                planMap.put("ordrsNo", param.get("ordrsNo"));
-                planMap.put("estNo", param.get("estNo"));
-                planMap.put("currCd", param.get("currCd"));
-                planMap.put("userId", param.get("userId"));
-                planMap.put("pgmId", param.get("pgmId"));
-                planMap.put("udtId", param.get("userId"));
-                planMap.put("udtPgm", "TB_CR02P01");
+        // for (Map<String, String> planMap : planArr) {
+        //     try {
+        //     	boolean found = false; //1.
+        //         for (Map<String, String> dbPlan : dbPlanList) {
+        //             if (dbPlan.get("clmnPlanSeq").equals(planMap.get("clmnPlanSeq"))) {
+        //                 found = true;
+        //                 break;
+        //             }
+        //         }//1.
+        //         planMap.put("coCd", param.get("coCd"));
+        //         planMap.put("ordrsNo", param.get("ordrsNo"));
+        //         planMap.put("estNo", param.get("estNo"));
+        //         planMap.put("currCd", param.get("currCd"));
+        //         planMap.put("userId", param.get("userId"));
+        //         planMap.put("pgmId", param.get("pgmId"));
+        //         planMap.put("udtId", param.get("userId"));
+        //         planMap.put("udtPgm", "TB_CR02P01");
                 
-                planMap.put("clmnPlanDegKey", param.get("clmnPlanDegKey"));
+        //         planMap.put("clmnPlanDegKey", param.get("clmnPlanDegKey"));
                 
-				if (found) {
-					// Update plan
-					cr02Mapper.updateClmnPlan(planMap);
-					cr02Mapper.insertUpdatePlanHis(planMap);
-				} else {
-					// Insert new plan
-					//cr02Mapper.updateClmnPlan(planMap);
+		// 		if (found) {
+		// 			// Update plan
+		// 			cr02Mapper.updateClmnPlan(planMap);
+		// 			cr02Mapper.insertUpdatePlanHis(planMap);
+		// 		} else {
+		// 			// Insert new plan
+		// 			//cr02Mapper.updateClmnPlan(planMap);
 					
 					
-					cr02Mapper.insertClmnPlan(planMap);
-					cr02Mapper.insertUpdatePlanHis(planMap);
-				}
+		// 			cr02Mapper.insertClmnPlan(planMap);
+		// 			cr02Mapper.insertUpdatePlanHis(planMap);
+		// 		}
                 
-            } catch (Exception e) {
-                System.out.println("error2" + e.getMessage());
-    			thrower.throwCommonException("수금정보 수정오류!");
-            }
-        }
+        //     } catch (Exception e) {
+        //         System.out.println("error2" + e.getMessage());
+    	// 		thrower.throwCommonException("수금정보 수정오류!");
+        //     }
+        // }
         
+        ////////////////////////////////////////////////////////////////////////////////////
+        //이하 문장은 위의 함수로 대체함.  남장섭 -->End
+        ////////////////////////////////////////////////////////////////////////////////////
+
         ///////////////////설비&원가 정보 update /////////////////////
         // 설비&원가 정보 처리
         //1. 설비삭제내역 처리
@@ -607,6 +615,87 @@ public class CR02Svcmpl implements CR02Svc {
 		cr02Mapper.callUpdateProjectMaster(param);
     }
 
+
+    @Override
+    public void updateOrdrsPmntPlanProcess(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception {
+        Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+        Type mapList = new TypeToken<ArrayList<Map<String, String>>>() { }.getType();
+
+        //////////////수금정보  update 수정////////
+        
+        //데이터 처리 시작   
+        int clmnPlanDegKey = cr02Mapper.selectDegKey(param);
+        param.put("clmnPlanDegKey", Integer.toString(clmnPlanDegKey));
+        
+        //DB 저장된 수금정보 가져오기
+        List<Map<String, Object>> dbPlanListRaw = cr02Mapper.selectPmntPlan(param);
+		
+        //Convert Object to String
+        List<Map<String, String>> dbPlanList = dbPlanListRaw.stream()
+        .map(rawMap -> rawMap.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> String.valueOf(e.getValue()))))
+        .collect(Collectors.toList());
+
+        ///////////////
+        
+        
+        //수금정보 처리
+        List<Map<String, String>> planArr = gson.fromJson(param.get("planArr"), mapList);
+        //1. 수정부분
+        for (Map<String, String> dbPlan : dbPlanList) {
+			boolean found = false;
+            for (Map<String, String> plan : planArr) {
+                if (dbPlan.get("clmnPlanSeq").equals(plan.get("clmnPlanSeq"))) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                cr02Mapper.deleteOrdrsPlanEx(dbPlan);
+            }
+        }//1.
+        
+        for (Map<String, String> planMap : planArr) {
+            try {
+            	boolean found = false; //1.
+                for (Map<String, String> dbPlan : dbPlanList) {
+                    if (dbPlan.get("clmnPlanSeq").equals(planMap.get("clmnPlanSeq"))) {
+                        found = true;
+                        break;
+                    }
+                }//1.
+                planMap.put("coCd", param.get("coCd"));
+                planMap.put("ordrsNo", param.get("ordrsNo"));
+                planMap.put("estNo", param.get("estNo"));
+                planMap.put("currCd", param.get("currCd"));
+                planMap.put("userId", param.get("userId"));
+                planMap.put("pgmId", param.get("pgmId"));
+                planMap.put("udtId", param.get("userId"));
+                planMap.put("udtPgm", "TB_CR02P01");
+                
+                planMap.put("clmnPlanDegKey", param.get("clmnPlanDegKey"));
+                
+				if (found) {
+					// Update plan
+					cr02Mapper.updateClmnPlan(planMap);
+					cr02Mapper.insertUpdatePlanHis(planMap);
+				} else {
+					// Insert new plan
+					//cr02Mapper.updateClmnPlan(planMap);
+					
+					
+					cr02Mapper.insertClmnPlan(planMap);
+					cr02Mapper.insertUpdatePlanHis(planMap);
+				}
+                
+            } catch (Exception e) {
+                System.out.println("error2" + e.getMessage());
+				thrower.throwCommonException("수금정보 수정오류!");
+            }
+        }
+        
+	}
+	
     @Override
     public void updateOrdrs_OLD(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception {
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();

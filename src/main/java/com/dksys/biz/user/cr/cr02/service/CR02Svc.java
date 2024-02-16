@@ -57,4 +57,7 @@ public interface CR02Svc {
 	int deleteOrdrsDetail(Map<String, String> param);
 	
 	List<Map<String, Object>> selectOrdrsDetails(Map<String, String> param);
+
+    void updateOrdrsPmntPlanProcess(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception;
+
 }

@@ -113,6 +113,24 @@ public class CR02Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/updateOrdrsPmntPlanProcess")
+	public String updateOrdrsPmntPlanProcess(@RequestParam Map<String, String> param,MultipartHttpServletRequest mRequest, ModelMap model) {
+
+		try {
+			cr02Svc.updateOrdrsPmntPlanProcess(param,mRequest);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+		}catch(Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", e.getLocalizedMessage());
+		}
+
+
+
+
+		return "jsonView";
+	}
+
 	@DeleteMapping(value = "/deleteOrdrs")
 	public String deleteOrdrs(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 
