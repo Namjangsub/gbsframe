@@ -2464,3 +2464,12 @@ function multiPrjctSelectHtml (_arrList, elem, _type=0) {
 	$(elem).append(optionHtml);
 	if (_type==0)	$(elem).multiselect('rebuild');
 }
+
+
+
+//그리드 높이 화면사이즈에 맞게 조정
+function gridHeightResize(_grid, _minusHeight) {
+ 	let virtualHeight = $('body').height();
+    let tagHeight = virtualHeight - _minusHeight;
+    _grid.target.setHeight(tagHeight);
+}
