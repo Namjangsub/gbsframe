@@ -85,12 +85,11 @@
 		)
 		,CTOT AS ( -- 발주번호+SEQ 별 총입고수량 산정 
 			SELECT    C.ORDRG_NO 
-					, C.ORDRG_SEQ
 					, NVL(SUM(C.IN_QTY), 0) AS TOT_IN_QTY
 			  FROM TB_SM03D01 C
 			WHERE  1=1
 			 AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = C.ORDRG_NO)	
-			GROUP BY C.ORDRG_NO, C.ORDRG_SEQ
+			GROUP BY C.ORDRG_NO
 		) 
 		,INO AS ( --발주번호별 입고내역
 			  SELECT DISTINCT I.ORDRG_NO,  
@@ -112,8 +111,8 @@
 			SELECT COUNT(*)
 			  FROM
 				(			
-					SELECT   NVL(IN_QTY,0) AS TOT_IN_QTY
-							, ORDRG_QTY - NVL(IN_QTY,0)  AS REAMIN_IN_QTY
+					SELECT   NVL(CT.TOT_IN_QTY,0) AS TOT_IN_QTY
+							, ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)  AS REAMIN_IN_QTY
 							, substr(BJM.MATR_CD,4,10)   AS MATR_CD  --temp파일 생성시 발주일련번호+자재코드로 만듬 첫번째 자재확인을 위함(ex. 001990-01101 = 001 + 990-01101)
 							, (SELECT FN_BM05M01_NM(substr(BJM.MATR_CD,4,10)) FROM dual) || BJM.CNT_NM AS MATR_CNT_NM
 				--			, BJM.DSGN_NO
@@ -135,10 +134,11 @@
 									LEFT OUTER JOIN TB_BM02M01 D ON BJM.PCHS_CLNT_CD = D.CLNT_CD
 									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD				
 				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보  
+				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
 					 WHERE 1=1
 						<!-- 입고잔량이 있는것만(데쉬보드용) -->
 						<if test="remainQty != null and !remainQty.equals('')">
-						AND (ORDRG_QTY - NVL(IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)	
+						AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)	
 						AND DUDT_DEQ_DT 	<![CDATA[<]]> #{ordrgDtTo}
 						</if>	
 						<!-- 프로젝트 -->
@@ -150,10 +150,10 @@
 				        AND BJM.CREAT_ID IN ( ${mngIdCd} )
 						</if>
 						<if test='cmpletYn == "Y"'>
-					    AND (ORDRG_QTY - NVL(IN_QTY,0))  = 0			--입고완료
+					    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0))  = 0			--입고완료
 						</if>
 						<if test='cmpletYn == "N"'>						
-				  	    AND (ORDRG_QTY - NVL(IN_QTY,0)) != 0			--미입고현황
+				  	    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) != 0			--미입고현황
 						</if>	
 					) T			
 	</select>
@@ -168,8 +168,8 @@
 					, T.*
 				FROM
 				(			
-					SELECT   NVL(IN_QTY,0) AS TOT_IN_QTY
-							, ORDRG_QTY - NVL(IN_QTY,0)  AS REAMIN_IN_QTY
+					SELECT   NVL(CT.TOT_IN_QTY,0) AS TOT_IN_QTY
+							, ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)  AS REAMIN_IN_QTY
 							, substr(BJM.MATR_CD,4,10)   AS MATR_CD  --temp파일 생성시 발주일련번호+자재코드로 만듬 첫번째 자재확인을 위함(ex. 001990-01101 = 001 + 990-01101)
 							, (SELECT FN_BM05M01_NM(substr(BJM.MATR_CD,4,10)) FROM dual) || BJM.CNT_NM AS MATR_CNT_NM
 				--			, BJM.DSGN_NO
@@ -191,10 +191,11 @@
 									LEFT OUTER JOIN TB_BM02M01 D ON BJM.PCHS_CLNT_CD = D.CLNT_CD
 									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD				
 				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보  
+				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
 					 WHERE 1=1
 						<!-- 입고잔량이 있는것만(데쉬보드용) -->
 						<if test="remainQty != null and !remainQty.equals('')">
-						AND (ORDRG_QTY - NVL(IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)	
+						AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)	
 						AND DUDT_DEQ_DT 	<![CDATA[<]]> #{ordrgDtTo}
 						</if>	
 						<!-- 프로젝트 -->
@@ -206,10 +207,10 @@
 				        AND BJM.CREAT_ID IN ( ${mngIdCd} )
 						</if>
 						<if test='cmpletYn == "Y"'>
-					    AND (ORDRG_QTY - NVL(IN_QTY,0))  = 0			--입고완료
+					    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0))  = 0			--입고완료
 						</if>
 						<if test='cmpletYn == "N"'>						
-				  	    AND (ORDRG_QTY - NVL(IN_QTY,0)) != 0			--미입고현황
+				  	    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) != 0			--미입고현황
 						</if>
 					ORDER BY BJM.SALES_CD, BJM.REQ_NO, BJM.DSGN_NO,  BJM.ORDRG_NO, PCHS_CLNT_NM  
 					) T						
@@ -628,33 +629,19 @@
 					, CLNT_PJT_NM        AS NAME
 				FROM
 				(																
-					SELECT   NVL(IN_QTY,0) AS TOT_IN_QTY
-							, ORDRG_QTY - NVL(IN_QTY,0)  AS REAMIN_IN_QTY
-							, substr(BJM.MATR_CD,4,10)   AS MATR_CD  --temp파일 생성시 발주일련번호+자재코드로 만듬 첫번째 자재확인을 위함(ex. 001990-01101 = 001 + 990-01101)
-							, (SELECT FN_BM05M01_NM(substr(BJM.MATR_CD,4,10)) FROM dual) || BJM.CNT_NM AS MATR_CNT_NM
-				--			, BJM.DSGN_NO
-							, BJM.CREAT_ID    			AS ORDRG_MNG_ID
-							, M.NAME 		  			AS ORDRG_MNG_NM   
-				--            , BJM.PCHS_CLNT_NM		/* 구매처명 */ 
-				            , SUJU.CLNT_PJT             AS CLNT_PJT      --고객사PJT 
+					SELECT    SUJU.CLNT_PJT             AS CLNT_PJT      --고객사PJT 
 							, FN_CM05M01_CD_TO_NM(SUJU.CLNT_PJT)    AS CLNT_PJT_NM
-							, SUJU.EQP_NM
-							, SUJU.ORDRS_CLNT_CD
-				            , C.CLNT_NM                 AS ORDRS_CLNT_NM --고객명
-					        , C.CLNT_DIV_CD             AS CLNT_DIV_CD    --거래처 분류
-					        , (SELECT FN_CM05M01_CD_TO_NM(C.CLNT_DIV_CD) FROM DUAL) AS CLNT_DIV_NM  --거래처 분류명
-							, BJM.*
-							, INO.*
 					  FROM BJM														        --발주내역
 					   				LEFT OUTER JOIN INO          ON  BJM.ORDRG_NO = INO.ORDRG_NO		--입고내역
 									LEFT OUTER JOIN TB_CM06M01 M ON M.ID = BJM.CREAT_ID
 									LEFT OUTER JOIN TB_BM02M01 D ON BJM.PCHS_CLNT_CD = D.CLNT_CD
 									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD				
 				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보  
+				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
 					 WHERE 1=1
 						<!-- 입고잔량이 있는것만(데쉬보드용) -->
 						<if test="remainQty != null and !remainQty.equals('')">
-						AND (ORDRG_QTY - NVL(IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)	
+						AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)	
 						AND DUDT_DEQ_DT 	<![CDATA[<]]> #{ordrgDtTo}
 						</if>	
 						<!-- 프로젝트 -->
@@ -666,10 +653,10 @@
 				        AND BJM.CREAT_ID IN ( ${mngIdCd} )
 						</if>
 						<if test='cmpletYn == "Y"'>
-					    AND (ORDRG_QTY - NVL(IN_QTY,0))  = 0			--입고완료
+					    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0))  = 0			--입고완료
 						</if>
 						<if test='cmpletYn == "N"'>						
-				  	    AND (ORDRG_QTY - NVL(IN_QTY,0)) != 0			--미입고현황
+				  	    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) != 0			--미입고현황
 						</if>
 					) T								
 	</select>		
@@ -682,33 +669,16 @@
 					, ORDRG_MNG_NM        	AS NAME
 				FROM
 				(			
-					SELECT   NVL(IN_QTY,0) AS TOT_IN_QTY
-							, ORDRG_QTY - NVL(IN_QTY,0)  AS REAMIN_IN_QTY
-							, substr(BJM.MATR_CD,4,10)   AS MATR_CD  --temp파일 생성시 발주일련번호+자재코드로 만듬 첫번째 자재확인을 위함(ex. 001990-01101 = 001 + 990-01101)
-							, (SELECT FN_BM05M01_NM(substr(BJM.MATR_CD,4,10)) FROM dual) || BJM.CNT_NM AS MATR_CNT_NM
-				--			, BJM.DSGN_NO
-							, BJM.CREAT_ID    			AS ORDRG_MNG_ID
-							, M.NAME 		  			AS ORDRG_MNG_NM   
-				--            , BJM.PCHS_CLNT_NM		/* 구매처명 */ 
-				            , SUJU.CLNT_PJT             AS CLNT_PJT      --고객사PJT 
-							, FN_CM05M01_CD_TO_NM(SUJU.CLNT_PJT)    AS CLNT_PJT_NM
-							, SUJU.EQP_NM
-							, SUJU.ORDRS_CLNT_CD
-				            , C.CLNT_NM                 AS ORDRS_CLNT_NM --고객명
-					        , C.CLNT_DIV_CD             AS CLNT_DIV_CD    --거래처 분류
-					        , (SELECT FN_CM05M01_CD_TO_NM(C.CLNT_DIV_CD) FROM DUAL) AS CLNT_DIV_NM  --거래처 분류명
-							, BJM.*
-							, INO.*
+					SELECT   BJM.CREAT_ID    			AS ORDRG_MNG_ID
+							, M.NAME 		  			AS ORDRG_MNG_NM 
 					  FROM BJM														        --발주내역
 					   				LEFT OUTER JOIN INO          ON  BJM.ORDRG_NO = INO.ORDRG_NO		--입고내역
-									LEFT OUTER JOIN TB_CM06M01 M ON M.ID = BJM.CREAT_ID
-									LEFT OUTER JOIN TB_BM02M01 D ON BJM.PCHS_CLNT_CD = D.CLNT_CD
-									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD				
-				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보  
+									LEFT OUTER JOIN TB_CM06M01 M ON M.ID = BJM.CREAT_ID  
+				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
 					 WHERE 1=1
 						<!-- 입고잔량이 있는것만(데쉬보드용) -->
 						<if test="remainQty != null and !remainQty.equals('')">
-						AND (ORDRG_QTY - NVL(IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)	
+						AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)	
 						AND DUDT_DEQ_DT 	<![CDATA[<]]> #{ordrgDtTo}
 						</if>	
 						<!-- 프로젝트 -->
@@ -720,10 +690,10 @@
 				        AND BJM.CREAT_ID IN ( ${mngIdCd} )
 						</if>
 						<if test='cmpletYn == "Y"'>
-					    AND (ORDRG_QTY - NVL(IN_QTY,0))  = 0			--입고완료
+					    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0))  = 0			--입고완료
 						</if>
 						<if test='cmpletYn == "N"'>						
-				  	    AND (ORDRG_QTY - NVL(IN_QTY,0)) != 0			--미입고현황
+				  	    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) != 0			--미입고현황
 						</if>
 					) T		
 
