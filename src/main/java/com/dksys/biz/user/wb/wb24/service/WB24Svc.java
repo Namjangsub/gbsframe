@@ -27,4 +27,6 @@ public interface WB24Svc {
 
 	Map<String, String> select_wb2401p01_Info(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectWbsIssueListDashboard(Map<String, String> paramMap);
+
 }

@@ -45,6 +45,13 @@ public class WB24Ctr {
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
     }	
+    
+	@PostMapping(value = "/selectWbsIssueListDashboard") 
+	public String selectWbsIssueListDashboard(@RequestBody Map<String, String> paramMap, ModelMap model) {	
+		List<Map<String, String>> result = wb24Svc.selectWbsIssueListDashboard(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+    }	
 	
     @PostMapping(value = "/selectMaxWbsIssueNo") 
     public String selectMaxWbsPlanNo(@RequestBody Map<String, String> paramMap, ModelMap model) {

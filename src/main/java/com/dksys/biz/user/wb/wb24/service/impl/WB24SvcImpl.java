@@ -58,6 +58,11 @@ public class WB24SvcImpl implements WB24Svc {
 	}
 	
 	@Override
+	public List<Map<String, String>> selectWbsIssueListDashboard(Map<String, String> paramMap) {
+		return wb24Mapper.selectWbsIssueListDashboard(paramMap);
+	}
+	
+	@Override
 	  public List<Map<String, String>> selectMaxWbsIssueNo(Map<String, String> paramMap) {
 			return wb24Mapper.selectMaxWbsIssueNo(paramMap);
 	}
