@@ -593,7 +593,8 @@ WITH PLN AS --계획정보 TREE
 			     (
 			      SELECT *
 			        FROM (
-			              SELECT '계획'  AS GUBUN 
+			              SELECT  2  AS SORT_SEQ 
+			                    , '계획'  AS GUBUN 
 			                    , ISU.CO_CD                                   --회사코드
 			                    , ISU.SALES_CD                                --SALES Code 
 			                    , ISU.WBS_PLAN_CODE_KIND                      --WBS계획 LVL1
@@ -625,7 +626,8 @@ WITH PLN AS --계획정보 TREE
 			                 AND ISU.CO_CD    = #{coCd}
 
 			              UNION ALL
-			              SELECT '실적'  AS GUBUN 
+			              SELECT 2  AS SORT_SEQ 
+			                    , '실적'  AS GUBUN 
 			                    , ISU.CO_CD                                               --회사코드
 			                    , ISU.SALES_CD                                            --SALES Code 
 			                    , ISU.WBS_PLAN_CODE_KIND                                  --WBS계획 LVL1
@@ -656,7 +658,39 @@ WITH PLN AS --계획정보 TREE
 			                      LEFT OUTER JOIN TB_WB23M01 AS RSL ON ISU.CO_CD = RSL.CO_CD AND ISU.SALES_CD = RSL.SALES_CD AND ISU.WBS_PLAN_CODE_KIND = RSL.WBS_PLAN_CODE_KIND AND ISU.WBS_PLAN_CODE_ID = RSL.WBS_PLAN_CODE_ID AND ISU.WBS_RSLTS_NO = RSL.WBS_RSLTS_NO
 			               WHERE ISU.WBS_RSLTS_NO IS NOT NULL  --실적이슈 
 			                 AND ISU.CO_CD    = #{coCd}
-
+			                 
+						--작업일보에서 등록된 이슈 내용 확인 (최근 1개월이내 자료)
+			              UNION ALL
+							SELECT  1  AS SORT_SEQ 
+				                 , '일보'  AS GUBUN 
+					             , T.CO_CD
+					             , T.SALES_CD                                            	--SALES Code 
+					             , T.WORK_RPT_M
+					             , T.WORK_RPT_S	
+					             , T.WORK_RPT_NO                                            --WBS계획 번호
+					             , T.WORK_RPT_NO                                            --WBS실적 번호
+				                 , T.WORK_RPT_NO                                   			--이슈번호
+				                 , T.ISSUE_TITLE                                   			--이슈제목
+				                 , '' AS ISS_DIV                                     		--이슈유형
+				                 , '작업일보' AS ISS_DIV_NM
+					             , T.WORK_RPT_RMK                                           --이슈내용
+				                 , 'ISSSTS01'                                             	--이슈상태
+				                 , '발생' AS ISS_STS_NM
+					             , T.WORK_RPT_ID     ACT_ID                                 --조치담당자
+				                 , TO_CHAR(T.WORK_RPT_DT,'YYYY-MM-DD')   AS ACTS_DT         --조치 시작일
+				                 , TO_CHAR(T.WORK_RPT_DT,'YYYY-MM-DD')   AS ACTE_DT         --조치 종료일
+				                 , T.WORK_RPT_HOUR                                          --조치 투입공수
+				                 , ''                                             --조치 투입비용  
+				                 , ''                                           			--조치내용
+				                 , T.FILE_TRGT_KEY                                       	--이슈 FILE_TRGT_KEY
+				                 , TO_CHAR(T.WORK_RPT_DT,'YYYY-MM-DD') AS WBS_RSLTSS_DT		--실적시작일
+				                 , TO_CHAR(T.WORK_RPT_DT,'YYYY-MM-DD') AS WBS_RSLTSE_DT		--실적종료일
+				                 , ''  AS REQ_NO                          					--발주요청번호
+				                 , NVL2(T.UDT_DTTM, T.UDT_DTTM, T.CREAT_DTTM) AS CREAT_DTTM --등록/수정일자 
+				                 , NVL2(T.UDT_ID, T.UDT_ID, T.CREAT_ID) AS CREAT_ID       	--등록/수정담당자	
+					        FROM   TB_PM01M01 AS T
+					        WHERE  T.ISSUE_YN = 'Y'
+					        AND    T.WORK_RPT_DT <![CDATA[>=]]> ADD_MONTHS(SYSDATE, -1) --TRUNC(SYSDATE, 'MM')
 			             ) 
 			     WHERE 1=1
 			     )
@@ -667,7 +701,7 @@ WITH PLN AS --계획정보 TREE
 			  FROM ISU
 			  WHERE 1 = 1
 			    AND ISS_STS != 'ISSSTS03'  --상태코드 완료가 아닌것
-			  ORDER BY CO_CD, SALES_CD, WBS_PLAN_CODE_ID, ISS_NO
+			  ORDER BY CO_CD, SORT_SEQ, CREAT_DTTM, SALES_CD, WBS_PLAN_CODE_ID, ISS_NO
      </select>
 		  
 		  
