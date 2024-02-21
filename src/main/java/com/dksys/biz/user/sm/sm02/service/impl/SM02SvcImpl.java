@@ -192,8 +192,7 @@ public class SM02SvcImpl implements SM02Svc {
 	public int updateOrderDetail(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
-		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
-		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);	
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    	
 
 
 		//---------------------------------------------------------------  
@@ -223,7 +222,9 @@ public class SM02SvcImpl implements SM02Svc {
 		//첨부 화일 권한체크  끝 
 		//---------------------------------------------------------------  		
 		
-		int result = 0;	    	    
+		int result = 0;	  
+		//발주 세부 내역 변경 DB Update
+		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);   
 	    //upate
 		for(Map<String, String> dtl : detailMap) {
 			dtl.put("coCd", paramMap.get("coCd"));
@@ -234,6 +235,20 @@ public class SM02SvcImpl implements SM02Svc {
 			
     		result += sm02Mapper.updateOrderDetail(dtl);		
 		}			
+
+		result = 0;	 
+		//발주 세부 내역 삭제 DB delete   	 		
+		List<Map<String, String>> detailDeleteArrMap = gsonDtl.fromJson(paramMap.get("makeDeleteArr"), dtlMap);   
+		// detailDeleteArrMap에 삭제할 자료가 있는지 확인후 처리
+		if (detailDeleteArrMap != null && !detailDeleteArrMap.isEmpty()) {
+			//delete
+			for(Map<String, String> dtl : detailDeleteArrMap) {
+				dtl.put("coCd", paramMap.get("coCd"));
+				dtl.put("ordrgNo", paramMap.get("ordrgNo"));
+				
+	    		result += sm02Mapper.deleteOrderDetail(dtl);		
+			}	
+		}
 		  		
 		//---------------------------------------------------------------  
 		// 결재라인 처리 시작 
