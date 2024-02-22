@@ -2,7 +2,6 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.dksys.biz.user.sm.sm01.mapper.SM01Mapper">
-
 	<sql id="selectBomSalesSql">
         SELECT BOM.FILE_TRGT_KEY
 		     , A.CO_CD
@@ -79,6 +78,7 @@
 		</if>
 		ORDER BY A.CO_CD, A.ORDRS_CLNT_CD, A.CLNT_PJT, A.ORDRS_NO, B.SALES_CD
 	</sql>
+
 	<select id="selectBomSalesCount" parameterType="Map" resultType="int">
         SELECT
         COUNT(*)
@@ -101,8 +101,7 @@
         ) A
         WHERE RNUM BETWEEN #{firstIndex} AND #{lastIndex}
 	</select>
-        
-        
+	
 	<select id="selectBomDetailList" parameterType="Map" resultType="camelMap">
         SELECT T.FILE_TRGT_KEY
         , T.LVL
@@ -354,6 +353,112 @@
 	    ORDER BY PATH
 	</select>
 
+	<select id="selectBomSalesTreeList" parameterType="Map" resultType="CamelMap">
+		SELECT '' AS DTA_CHK
+		     , (LEVEL-1) AS LVL
+		     , T.FILE_TRGT_KEY
+		     , T.CO_CD
+	         , T.ORDRS_NO
+	         , T.SALES_CD
+	         , T.DSGN_NO
+	         , T.UPPER_NM
+	         , T.LOWER_NM
+			 , T.LOWER_NM || '(' || T.MATR_NM || ')' AS TEXT
+	         , REGEXP_REPLACE(SYS_CONNECT_BY_PATH(T.LOWER_NM, ' > '), '^\s+\>\s+', '') AS PATH
+	         , SUBSTR(REPLACE(T.DSGN_NO,T.SALES_CD,''), INSTR(REPLACE(T.DSGN_NO,T.SALES_CD,''), '-', -1) + 1) AS LAST_DSGN_NO
+	         , T.UPPER_CD
+	         , T.LOWER_CD
+	         , T.UPPER_CD AS OLD_UPPER_CD
+	         , T.LOWER_CD AS OLD_LOWER_CD
+	         , T.DSGN_NM
+	         , T.DSGN_BOM_QTY
+			 , T.BOM_SEQ
+	         , T.PART_NO
+	         , T.UNIT_NO
+	         , T.REV_NO
+	         , T.MATR_SEQ
+	         , T.MATR_CD
+	         , T.MATR_NM
+	         , T.MATR_MAT
+	         , T.MATR_MAKR_NM
+	         , T.MATR_MNO
+	         , T.MATR_SPEC
+	         , T.MATR_RMK
+	         , T.MAT_GUBUN
+			 , CASE WHEN T.UPPER_CD = 'top' THEN '#' ELSE T.UPPER_CD END AS PARENT
+	         , T.LOWER_CD AS ID
+	         , CASE WHEN CONNECT_BY_ISLEAF = 1 THEN 'leaf' ELSE 'unit' END AS TYPE
+		FROM   (
+				SELECT T.FILE_TRGT_KEY
+				     , T.CO_CD
+					 , T.ORDRS_NO
+					 , T.SALES_CD
+					 , T.LOWER_CD
+					 , T.UPPER_NM
+					 , T.LOWER_NM
+					 , T.UPPER_CD
+					 , T.UPPER_CD AS OLD_UPPER_CD
+					 , T.LOWER_CD AS OLD_LOWER_CD
+					 , T.DSGN_NM
+					 , T.DSGN_BOM_QTY
+					 , T.BOM_SEQ
+					 , T.PART_NO
+					 , T.UNIT_NO
+					 , T.REV_NO
+					 , T.MATR_SEQ
+					 , T.MATR_CD
+					 , T.MATR_NM
+					 , T.MATR_MAT
+					 , T.MATR_MAKR_NM
+					 , T.MATR_MNO
+					 , T.MATR_SPEC
+					 , T.MATR_RMK
+					 , T.DSGN_NO
+					 , '' AS MAT_GUBUN
+					 , 0  AS COLLAPSE
+				FROM   TB_SM01M01 AS T
+				WHERE  T.CO_CD = #{coCd}
+				AND    T.ORDRS_NO = #{ordrsNo}
+				AND    T.SALES_CD = #{salesCd}
+				UNION ALL
+				SELECT '' AS FILE_TRGT_KEY
+				     , CO_CD
+					 , ORDRS_NO
+					 , SALES_CD
+					 , LOWER_CD
+					 , UPPER_NM
+					 , LOWER_NM
+					 , UPPER_CD
+					 , UPPER_CD AS OLD_UPPER_CD
+					 , LOWER_CD AS OLD_LOWER_CD
+					 , DSGN_NM AS DSGN_NM
+					 , BOM_QTY AS DSGN_BOM_QTY
+					 , TO_CHAR(BOM_QTY) AS BOM_QTY
+					 , PART_NO
+					 , UNIT_NO
+					 , REV_NO
+					 , TO_CHAR(MATR_SEQ) AS MATR_SEQ
+					 , MATR_CD
+					 , MATR_NM
+					 , MATR_MAT
+					 , MATR_MAKR_NM
+					 , MATR_MNO
+					 , MATR_SPEC
+					 , MATR_RMK
+					 , ''
+					 , '자재'
+					 , 0  AS COLLAPSE
+				FROM   TB_SM01D01 AS D
+				WHERE  D.CO_CD = #{coCd}
+				AND    D.ORDRS_NO = #{ordrsNo}
+				AND    D.SALES_CD = #{salesCd}
+			   ) AS T
+		START WITH T.UPPER_CD = 'top'
+		CONNECT BY PRIOR T.LOWER_CD = T.UPPER_CD
+		ORDER BY T.LOWER_CD
+		--ORDER BY T.CO_CD, LEVEL, T.UPPER_NM, T.LOWER_NM
+	</select>
+
 	<!-- 구매 BOM 조회 -->
 	<select id="selectBuyBomList" resultType="CamelMap">
 		SELECT '' AS DTA_CHK
@@ -387,72 +492,72 @@
 	         , T.MATR_SPEC
 	         , T.MATR_RMK
 	         , T.MAT_GUBUN
---		     , 1  AS COLLAPSE
-		FROM  (
+		     --, 1  AS COLLAPSE
+		FROM   (
 				SELECT  T.FILE_TRGT_KEY
-		     , T.CO_CD
-	         , T.ORDRS_NO
-	         , T.SALES_CD
-	         , T.LOWER_CD
-	         , T.UPPER_NM
-	         , T.LOWER_NM
-	         , T.UPPER_CD
-	         , T.UPPER_CD AS OLD_UPPER_CD
-	         , T.LOWER_CD AS OLD_LOWER_CD
-	         , T.DSGN_NM
-	         , T.DSGN_BOM_QTY
-			 , T.BOM_SEQ
-	         , T.PART_NO
-	         , T.UNIT_NO
-	         , T.REV_NO
-	         , T.MATR_SEQ
-	         , T.MATR_CD
-	         , T.MATR_NM
-	         , T.MATR_MAT
-	         , T.MATR_MAKR_NM
-	         , T.MATR_MNO
-	         , T.MATR_SPEC
-	         , T.MATR_RMK
-	         , T.DSGN_NO
-	         , '' AS MAT_GUBUN
-		     , 0  AS COLLAPSE
-		FROM   TB_SM01M01 AS T
-		WHERE  T.CO_CD = #{coCd}
-		AND    T.ORDRS_NO = #{ordrsNo}
-		AND    T.SALES_CD = #{salesCd}		
-	UNION ALL 
-		SELECT ''  AS FILE_TRGT_KEY
-				,CO_CD
-				,ORDRS_NO
-				,SALES_CD
-				,''
-				,UPPER_NM
-				,LOWER_NM
-				,UPPER_CD
-				,UPPER_CD AS OLD_UPPER_CD
-				,LOWER_CD AS OLD_LOWER_CD
-				,DSGN_NM AS DSGN_NM
-				,BOM_QTY AS DSGN_BOM_QTY
-				,TO_CHAR(BOM_QTY) AS BOM_QTY
-				,PART_NO
-				,UNIT_NO
-				,REV_NO
-				,TO_CHAR(MATR_SEQ) AS MATR_SEQ
-				,MATR_CD
-				,MATR_NM
-				,MATR_MAT
-				,MATR_MAKR_NM
-				,MATR_MNO
-				,MATR_SPEC
-				,MATR_RMK
-				, ''
-				, '자재'
-		     	, 0  AS COLLAPSE
-				FROM TB_SM01D01 D	
-						WHERE  D.CO_CD = #{coCd}
-						AND    D.ORDRS_NO = #{ordrsNo}
-						AND    D.SALES_CD = #{salesCd}
-		) T
+					, T.CO_CD
+					, T.ORDRS_NO
+					, T.SALES_CD
+					, T.LOWER_CD
+					, T.UPPER_NM
+					, T.LOWER_NM
+					, T.UPPER_CD
+					, T.UPPER_CD AS OLD_UPPER_CD
+					, T.LOWER_CD AS OLD_LOWER_CD
+					, T.DSGN_NM
+					, T.DSGN_BOM_QTY
+					, T.BOM_SEQ
+					, T.PART_NO
+					, T.UNIT_NO
+					, T.REV_NO
+					, T.MATR_SEQ
+					, T.MATR_CD
+					, T.MATR_NM
+					, T.MATR_MAT
+					, T.MATR_MAKR_NM
+					, T.MATR_MNO
+					, T.MATR_SPEC
+					, T.MATR_RMK
+					, T.DSGN_NO
+					, '' AS MAT_GUBUN
+					, 0  AS COLLAPSE
+				FROM   TB_SM01M01 AS T
+				WHERE  T.CO_CD = #{coCd}
+				AND    T.ORDRS_NO = #{ordrsNo}
+				AND    T.SALES_CD = #{salesCd}
+				UNION ALL 
+				SELECT ''  AS FILE_TRGT_KEY
+						,CO_CD
+						,ORDRS_NO
+						,SALES_CD
+						,''
+						,UPPER_NM
+						,LOWER_NM
+						,UPPER_CD
+						,UPPER_CD AS OLD_UPPER_CD
+						,LOWER_CD AS OLD_LOWER_CD
+						,DSGN_NM AS DSGN_NM
+						,BOM_QTY AS DSGN_BOM_QTY
+						,TO_CHAR(BOM_QTY) AS BOM_QTY
+						,PART_NO
+						,UNIT_NO
+						,REV_NO
+						,TO_CHAR(MATR_SEQ) AS MATR_SEQ
+						,MATR_CD
+						,MATR_NM
+						,MATR_MAT
+						,MATR_MAKR_NM
+						,MATR_MNO
+						,MATR_SPEC
+						,MATR_RMK
+						, ''
+						, '자재'
+						, 0  AS COLLAPSE
+				FROM TB_SM01D01 AS D
+				WHERE  D.CO_CD = #{coCd}
+				AND    D.ORDRS_NO = #{ordrsNo}
+				AND    D.SALES_CD = #{salesCd}
+		       ) AS T
 		START WITH T.UPPER_CD = 'top' 
 		CONNECT BY PRIOR T.LOWER_CD = T.UPPER_CD
 		ORDER BY T.CO_CD, LEVEL, T.UPPER_NM, T.LOWER_NM
@@ -644,13 +749,13 @@
     </update>
 
 	<delete id="deleteBom" parameterType="Map">
-	  DELETE TB_SM01M01
-	   WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		DELETE TB_SM01M01
+		WHERE FILE_TRGT_KEY = #{fileTrgtKey}
 	</delete>
 
 	<delete id="deleteBomMatrAll" parameterType="Map">
-	  DELETE TB_SM01D01
-	  WHERE CO_CD = #{coCd}
+		DELETE TB_SM01D01
+		WHERE CO_CD = #{coCd}
 	    AND ORDRS_NO = #{ordrsNo}
 	    AND SALES_CD = #{salesCd}
 	    AND UPPER_CD = #{upperCd}
@@ -885,27 +990,25 @@
     </update>
 
 	<delete id="deleteBomMatr" parameterType="Map">
-	  DELETE TB_SM01D01
-	  WHERE CO_CD = #{coCd}
+		DELETE TB_SM01D01
+		WHERE CO_CD = #{coCd}
 	    AND ORDRS_NO = #{ordrsNo}
 	    AND SALES_CD = #{salesCd}
 	    AND MATR_SEQ = #{matrSeq}
 	    AND UPPER_CD = #{upperCd}
 	    AND LOWER_CD = #{lowerCd}
 	</delete>
-
-
-
+	
 	<delete id="deleteBomAllMatrAll" parameterType="Map">
-	  DELETE TB_SM01D01
-	  WHERE CO_CD = #{coCd}
+		DELETE TB_SM01D01
+		WHERE CO_CD = #{coCd}
 	    AND ORDRS_NO = #{ordrsNo}
 	    AND SALES_CD = #{salesCd}
 	</delete>
 
 	<delete id="deleteBomAll" parameterType="Map">
-	  DELETE TB_SM01M01
-	  WHERE CO_CD = #{coCd}
+		DELETE TB_SM01M01
+		WHERE CO_CD = #{coCd}
 	    AND ORDRS_NO = #{ordrsNo}
 	    AND SALES_CD = #{salesCd}
 	</delete>
@@ -976,15 +1079,14 @@
 	        , UNIT_NO
 	        , REV_NO
 		FROM TB_SM01D01 T
-	  WHERE CO_CD = #{coCd}
+		WHERE CO_CD = #{coCd}
 	    AND ORDRS_NO = #{ordrsNo}
 	    AND SALES_CD = #{salesCd}
 	    AND MATR_SEQ = #{matrSeq}
 	    AND UPPER_CD = #{upperCd}
 	    AND LOWER_CD = #{lowerCd}
-  </select>
-
-
+	</select>
+	
 	<select id="bomTreeList" resultType="camelMap">
 		SELECT
 	         CASE WHEN T.UPPER_CD = '.' THEN '' ELSE T.UPPER_CD END UPPER_CD,
