@@ -120,6 +120,14 @@ public class SM01Ctr {
 		return "jsonView";
 	}
 
+	// BOM 전체 정전개 트리 조회
+    @PostMapping("/selectBomSalesTreeList")
+    public String selectBomSalesTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, String>> result = sm01Svc.selectBomSalesTreeList(paramMap);
+    	model.addAttribute("result", result);
+        return "jsonView";
+    }
+
 	//구매BOM관리 Master 조회
 	@PostMapping(value = "/selectBomSalesList")
 	public String selectBomSalesList(@RequestBody Map<String, String> paramMap, ModelMap model) {

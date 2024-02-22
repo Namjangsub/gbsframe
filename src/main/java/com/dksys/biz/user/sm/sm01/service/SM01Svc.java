@@ -9,6 +9,8 @@ public interface SM01Svc {
 
   int selectBomSalesCount(Map<String, String> paramMap);
 
+  List<Map<String, String>> selectBomSalesTreeList(Map<String, String> paramMap);
+
   List<Map<String, String>> selectBomSalesList(Map<String, String> paramMap);
 
   List<Map<String, String>> selectBomDetailList(Map<String, String> paramMap);
