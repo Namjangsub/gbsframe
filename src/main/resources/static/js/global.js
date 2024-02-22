@@ -2291,7 +2291,7 @@ function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 			if(actionType === 'U') setDisabledInputDate(true);
 			return false;
 		}else{
-			$("#actionBtn").show();
+//			$("#actionBtn").show();
 			if(actionType === 'U') setDisabledInputDate(false);
 			authChk();
 			return true;
@@ -2306,8 +2306,8 @@ function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 			if(actionType === 'U') setDisabledInputDate(true);
 			return false;
 		}else{
-			$("#actionOrdrsBtn").show();
-			$("#actionBtn").show();
+//			$("#actionOrdrsBtn").show();
+//			$("#actionBtn").show();
 			if(actionType === 'U') setDisabledInputDate(false);
 			authChk();
 			return true;
