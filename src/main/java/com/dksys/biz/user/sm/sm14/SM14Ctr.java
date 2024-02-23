@@ -134,6 +134,24 @@ public class SM14Ctr {
   			model.addAttribute("resultMessage", e.getMessage());
   		}
   		return "jsonView";
+    } 
+
+	//세금계산서발행여부 
+	@PostMapping(value = "/updateBillSeqYn")
+    public String updateBillSeqYn(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (sm14Svc.updateBillSeqYn(paramMap) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
     }  
 	
 	// 발주자재 조회

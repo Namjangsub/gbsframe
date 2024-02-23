@@ -31,6 +31,8 @@ public interface SM14Svc {
 	int deletePurchaseDetail(Map<String, String> param);	
 	
 	int updateBillYn(Map<String, String> paramMap) throws Exception;
+
+	int updateBillSeqYn(Map<String, String> paramMap) throws Exception;
 	
 	List<Map<String, String>> selectOrdrgMatList(Map<String, String> paramMap);	
 	

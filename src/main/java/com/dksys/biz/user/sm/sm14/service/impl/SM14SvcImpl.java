@@ -260,6 +260,37 @@ public class SM14SvcImpl implements SM14Svc {
 		return result;
 	}
 	
+	//세금계산서발행여부 
+	@Override
+	public int updateBillSeqYn(Map<String, String> paramMap) throws Exception {
+
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
+		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);		
+
+		//---------------------------------------------------------------  
+		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+	  	//   필수값 :  jobType, userId, comonCd
+		//---------------------------------------------------------------  
+	    HashMap<String, String> param = new HashMap<>();
+	    param.put("userId", paramMap.get("userId"));
+	    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
+	    	
+		int result = 0;	    	    
+	    //upate
+		for(Map<String, String> dtl : detailMap) {
+			dtl.put("userId", paramMap.get("userId"));
+			dtl.put("pgmId", paramMap.get("pgmId"));
+			dtl.put("creatId", paramMap.get("userId"));
+			
+			result += sm14Mapper.updateBillSeqYn(dtl);	
+    
+		}			
+
+		return result;
+	}
+	
+	
 	/* 발주자재리스트 */
 	@Override
 	public List<Map<String, String>> selectOrdrgMatList(Map<String, String> paramMap) {

@@ -45,7 +45,9 @@ public interface SM14Mapper {
 	int deletePurchaseMaster(Map<String, String> param);	
 	
 	int updateBillYn(Map<String, String> param);	
-
+	
+	int updateBillSeqYn(Map<String, String> param);	
+	
 	List<Map<String, String>> selectOrdrgMatList(Map<String, String> paramMap);	
 	
 	int selectPurchaseListCountNew(Map<String, String> paramMap);
