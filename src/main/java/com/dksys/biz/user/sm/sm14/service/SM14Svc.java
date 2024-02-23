@@ -10,6 +10,10 @@ public interface SM14Svc {
 	int selectPurchaseListCount(Map<String, String> paramMap);
 		
 	List<Map<String, String>> selectPurchaseList(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectClntPurchaseList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectClntPurchaseDetailList(Map<String, String> paramMap);
 		
 	List<Map<String, String>> selectPurchaseExcelList(Map<String, String> paramMap);
 	

@@ -40,7 +40,23 @@ public class SM14Ctr {
 		return "jsonView";
 	}
 		
-	// 매입관리 발주 조회 엑셀
+
+	// 거래처별 매입 확정 집계 조회
+	@PostMapping(value = "/selectClntPurchaseList")
+	public String selectClntPurchaseList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = sm14Svc.selectClntPurchaseList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}	
+
+	// 거래처별 매입 확정 상세 조회
+	@PostMapping(value = "/selectClntPurchaseDetailList")
+	public String selectClntPurchaseDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = sm14Svc.selectClntPurchaseDetailList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+		// 매입관리 발주 조회 엑셀
 	@PostMapping(value = "/selectPurchaseExcelList")
 	public String selectPurchaseExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> result = sm14Svc.selectPurchaseExcelList(paramMap);

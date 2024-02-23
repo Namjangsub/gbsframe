@@ -62,7 +62,18 @@ public class SM14SvcImpl implements SM14Svc {
 	@Override
 	public List<Map<String, String>> selectPurchaseExcelList(Map<String, String> paramMap) {
 		return sm14Mapper.selectPurchaseExcelList(paramMap);
-	}		
+	}	
+
+	@Override
+	public List<Map<String, String>> selectClntPurchaseList(Map<String, String> paramMap) {		
+		return sm14Mapper.selectClntPurchaseList(paramMap);
+	}	
+
+	@Override
+	public List<Map<String, String>> selectClntPurchaseDetailList(Map<String, String> paramMap) {		
+		return sm14Mapper.selectClntPurchaseDetailList(paramMap);
+	}	
+			
 
 	@Override
 	public String selectMaxPchsNo(Map<String, String> paramMap) {

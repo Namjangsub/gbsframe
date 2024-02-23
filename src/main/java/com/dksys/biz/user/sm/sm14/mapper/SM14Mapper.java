@@ -51,6 +51,10 @@ public interface SM14Mapper {
 	int selectPurchaseListCountNew(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectPurchaseListNew(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectClntPurchaseList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectClntPurchaseDetailList(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectOrderDetailListNew(Map<String, String> paramMap);
 	
