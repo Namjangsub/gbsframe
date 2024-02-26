@@ -489,12 +489,16 @@
 								<if test="coCd != null and !coCd.equals('')">
 									AND D.CO_CD = #{coCd}   
 								</if>												
-								<!-- 확정일자 -->         
-<!-- 								<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')"> -->
-<!-- 									<if test="ordrgDtTo != null and !ordrgDtTo.equals('')"> -->
-<!-- 						            	AND D.PCHS_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo} -->
-<!-- 									</if>    -->
-<!-- 								</if>	 -->
+<!-- 								확정일자          -->
+								<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')">
+									<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
+						            AND D.PCHS_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+									</if>   
+								</if>	
+								<!-- 매입구분 -->
+								<if test="pchsGb != null and !pchsGb.equals('')">
+									AND substr(D.ORDRG_NO,0,3) = #{pchsGb} /* 'BAL', 'RET', 'COS'*/
+								</if>
             				) A
             					LEFT OUTER JOIN TB_BM02M01 AS C ON PCHS_CLNT_CD = C.CLNT_CD   --거래처마스터
 						  WHERE 1=1 
@@ -572,7 +576,11 @@
 									</if>       
 									<if test="pchsClntNm != null and !pchsClntNm.equals('')">
 										AND C.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'   
-									</if>									
+									</if>			
+									<!-- 매입구분 -->
+									<if test="pchsGb != null and !pchsGb.equals('')">
+										AND substr(D.ORDRG_NO,0,3) = #{pchsGb} /* 'BAL', 'RET', 'COS'*/
+									</if>						
 									
 								)
 								,  IPGOTOT AS --매입확정집계
@@ -637,10 +645,6 @@
 					<!-- 확정여부 -->
 					<if test="cmpletYn != null and !cmpletYn.equals('')">
 						AND NVL(A.CMPLET_YN, 'N') = #{cmpletYn}	/* 체크항목 CHKBOX 표시를 안하기 위해서 '' 처리후 USER_CHK_V 로 검색 */
-					</if>		
-					<!-- 매입구분 -->
-					<if test="pchsGb != null and !pchsGb.equals('')">
-						AND A.IS_COST = DECODE(#{pchsGb},'ordrg','N','cost','Y','retn','R')
 					</if>	
 					<if test="prjctCdNm != null and !prjctCdNm.equals('')">
 						AND UPPER(CLNT_PJT_NM) LIKE '%'|| UPPER(#{prjctCdNm}) || '%'   
@@ -1631,6 +1635,89 @@
 	
 		<!-- 매입확정 리스트  구매비용 포함-->
 	<select id="selectPurchaseListNew" parameterType="Map" resultType="camelMap">
+		WITH IPGO_BALJU AS (
+						SELECT DISTINCT 
+								IPGO.CO_CD, IPGO.ORDRG_NO, IPGO.REQ_NO, IPGO.SALES_CD
+						FROM TB_SM03D01 IPGO
+								LEFT OUTER JOIN TB_SM02M01 M ON(IPGO.ORDRG_NO = M.ORDRG_NO)		/* 발주마스터 */
+								LEFT OUTER JOIN TB_BM02M01 AS C ON M.PCHS_CLNT_CD = C.CLNT_CD   --거래처마스터
+						WHERE 1 = 1
+					<!-- 회사코드 -->         
+					<if test="coCd != null and !coCd.equals('')">
+						AND IPGO.CO_CD = #{coCd}   
+					</if>
+					<!-- 확정일자 -->         
+					<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')">
+						<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
+			            AND IPGO.IN_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+						</if>   
+					</if>	
+					<!-- 구매처 -->         
+					<if test="pchsClntCd != null and !pchsClntCd.equals('')">
+						AND M.PCHS_CLNT_CD = #{pchsClntCd}   
+					</if>       
+					<if test="pchsClntNm != null and !pchsClntNm.equals('')">
+						AND C.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'   
+					</if>
+			
+					<if test="salesCd != null and !salesCd.equals('')">
+						AND IPGO.SALES_CD LIKE '%'|| #{salesCd} || '%'   
+					</if>
+				UNION ALL    
+					  SELECT DISTINCT 
+					         E.CO_CD, E.COST_NO, E.REQ_NO, E.SALES_CD 
+					    FROM TB_SM10M01 E		/* 구매비용 */	
+								LEFT OUTER JOIN TB_BM02M01 AS C ON E.PCHS_CLNT_CD = C.CLNT_CD   --거래처마스터
+					   WHERE 1 = 1
+					<!-- 회사코드 -->         
+					<if test="coCd != null and !coCd.equals('')">
+						AND E.CO_CD = #{coCd}   
+					</if>
+					<!-- 확정일자 -->         
+					<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')">
+						<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
+			            AND E.COST_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+						</if>   
+					</if>	
+					<!-- 구매처 -->         
+					<if test="pchsClntCd != null and !pchsClntCd.equals('')">
+						AND E.PCHS_CLNT_CD = #{pchsClntCd}   
+					</if>       
+					<if test="pchsClntNm != null and !pchsClntNm.equals('')">
+						AND C.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'   
+					</if>
+			
+					<if test="salesCd != null and !salesCd.equals('')">
+						AND E.SALES_CD LIKE '%'|| #{salesCd} || '%'   
+					</if>
+				UNION ALL    
+					  SELECT DISTINCT 
+					         E.CO_CD, E.RET_NO, '', E.SALES_CD  
+						FROM TB_SM06M01 E		/* 반품 */	
+								LEFT OUTER JOIN TB_BM02M01 AS C ON E.PCHS_CLNT_CD = C.CLNT_CD   --거래처마스터
+					   WHERE 1 = 1
+					<!-- 회사코드 -->         
+					<if test="coCd != null and !coCd.equals('')">
+						AND E.CO_CD = #{coCd}   
+					</if>
+					<!-- 확정일자 -->         
+					<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')">
+						<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
+			            AND E.RET_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+						</if>   
+					</if>	
+					<!-- 구매처 -->         
+					<if test="pchsClntCd != null and !pchsClntCd.equals('')">
+						AND E.PCHS_CLNT_CD = #{pchsClntCd}   
+					</if>       
+					<if test="pchsClntNm != null and !pchsClntNm.equals('')">
+						AND C.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'   
+					</if>
+			
+					<if test="salesCd != null and !salesCd.equals('')">
+						AND E.SALES_CD LIKE '%'|| #{salesCd} || '%'   
+					</if>
+		)
 		SELECT *
 			FROM
 			(
@@ -1747,13 +1834,14 @@
 														, PCHS_NO
 														, COUNT(A.PCHS_NO) PCHS_CNT 
 														, SUM(DECODE(A.CMPLET_YN, 'Y', 1, 0)) AS CMPLET_SUM
-														, MAX(A.PCHS_DT) AS PCHS_DT
+														, A.PCHS_DT AS PCHS_DT
 													FROM TB_SM12D01 A 
 												WHERE 1=1
 													AND ORDRG_NO LIKE 'BAL%'
 													GROUP BY A.CO_CD
 															, A.ORDRG_NO
-															, A.PCHS_NO															
+															, A.PCHS_NO	
+															, A.PCHS_DT														
 												) E ON(A.ORDRG_NO=E.ORDRG_NO)	/* 매입 DETAIL */    
 								LEFT OUTER JOIN (SELECT A.CO_CD
 														, A.ORDRG_NO
@@ -1765,8 +1853,8 @@
 						                                     , A.ORDRG_NO
 						                                     , A.SALES_CD
 				                                 ) AS F ON A.CO_CD = F.CO_CD AND A.SALES_CD = F.SALES_CD AND A.ORDRG_NO = F.ORDRG_NO --입고상세                                  
-									WHERE 1=1
-									AND IN_DTL_AMT IS NOT NULL
+									WHERE 1=1  
+									AND EXISTS (SELECT 1 FROM IPGO_BALJU WHERE A.ORDRG_NO = IPGO_BALJU.ORDRG_NO)
 							UNION ALL		       
 								SELECT E.CO_CD
 									, E.COST_NO AS ORDRG_NO
@@ -1852,8 +1940,33 @@
 									LEFT OUTER JOIN TB_CM05M01  CMM  ON CMM.CODE_ID  = SJM.CLNT_PJT			
 								WHERE 1=1										
 						  ) A		/* 발주+기타비용+반품 내역 */
-						  WHERE 1=1		
-						<include refid="selectPurchaseListCondition"></include>
+						  WHERE 1=1	
+							AND EXISTS (SELECT 1 FROM IPGO_BALJU WHERE A.ORDRG_NO = IPGO_BALJU.ORDRG_NO)
+		<!-- 확정여부 -->
+		<if test="cmpletYn != null and !cmpletYn.equals('')">
+			AND NVL(A.CMPLET_YN, 'N') = #{cmpletYn}	/* 체크항목 CHKBOX 표시를 안하기 위해서 '' 처리후 USER_CHK_V 로 검색 */
+		</if>		
+		<!-- 매입구분 -->
+		<if test="pchsGb != null and !pchsGb.equals('')">
+			<if test='pchsGb == "ordrg"'>
+			AND A.IS_COST = 'N'
+			</if>
+			<if test='pchsGb == "cost"'>
+			AND A.IS_COST = 'Y'
+			</if>			
+			<if test='pchsGb == "retn"'>
+			AND A.IS_COST = 'R'
+			</if>			
+		</if>	
+		<if test="prjctCdNm != null and !prjctCdNm.equals('')">
+			AND UPPER(CLNT_PJT_NM) LIKE '%'|| UPPER(#{prjctCdNm}) || '%'   
+		</if>	
+        <if test="clntPjt != null and !clntPjt.equals('')">
+        	AND CLNT_PJT IN ( ${clntPjt} )
+        </if>	
+        <if test="mngIdCd != null and !mngIdCd.equals('')">
+        	AND ORDRG_MNG_ID IN ( ${mngIdCd} )
+        </if>	
 						  ORDER BY A.CO_CD, A.PCHS_CLNT_NM, A.ORDRG_NO,  A.PCHS_NO 
 						) X		
 			)							
@@ -2194,7 +2307,7 @@
 							<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
 				            	AND A.ORDRG_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
 							</if>   
-						</if>
+						</if>  
 						ORDER BY ORDRG_MNG_NM
 
     </select>	
@@ -2347,18 +2460,43 @@
 			--매입확정내역
 			, COMP AS 
 			(
-				SELECT    A.CO_CD
-				        , M.PCHS_CLNT_CD
-						, SUM(A.PCHS_AMT) 		AS PCHS_AMT
-						, SUM(A.PCHS_VAT) 		AS PCHS_VAT
-						, SUM(A.PCHS_QTY) 		AS PCHS_QTY
-						, COUNT(A.PCHS_NO) 		AS PCHS_CNT --확정횟수
-						, MAX(A.PCHS_DT) 		AS PCHS_DT --최종매입확정일자
-					FROM TB_SM12D01 A 
-						LEFT OUTER JOIN TB_SM02M01 M ON(A.ORDRG_NO = M.ORDRG_NO)		/* 발주마스터 */
+				SELECT    D.CO_CD
+				        , D.PCHS_CLNT_CD
+						, SUM(D.PCHS_AMT) 		AS PCHS_AMT
+						, SUM(D.PCHS_VAT) 		AS PCHS_VAT
+						, SUM(D.PCHS_QTY) 		AS PCHS_QTY
+						, COUNT(D.PCHS_NO) 		AS PCHS_CNT --확정횟수
+						, MAX(D.PCHS_DT) 		AS PCHS_DT --최종매입확정일자
+				 FROM (		
+						SELECT 
+								  D.CO_CD
+								, D.PCHS_AMT
+								, D.PCHS_VAT
+								, D.PCHS_QTY
+								, D.PCHS_NO
+								, D.PCHS_DT
+								, CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.PCHS_CLNT_CD 
+									   WHEN substr(D.ORDRG_NO,0,3) = 'RET' THEN RM.PCHS_CLNT_CD ELSE C.PCHS_CLNT_CD END PCHS_CLNT_CD
+								, CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD 
+									   WHEN substr(D.ORDRG_NO,0,3) = 'RET' THEN R.SALES_CD  ELSE C.SALES_CD END AS SALES_CD
+								, CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD 
+									   WHEN substr(D.ORDRG_NO,0,3) = 'RET' THEN R.DSGN_NO  ELSE C.SALES_CD END AS DSGN_NO					
+						FROM TB_SM12D01 D /* 매입 DETAIL */		
+								LEFT OUTER JOIN TB_SM02M01 M ON(D.ORDRG_NO = M.ORDRG_NO)		/* 발주마스터 */
+								LEFT OUTER JOIN TB_SM10M01 C ON(D.ORDRG_NO = C.COST_NO)		/* 비용마스터 */
+								LEFT OUTER JOIN TB_SM06D01 R ON(D.ORDRG_NO = R.RET_NO)		/* 반품 상세 */
+								LEFT OUTER JOIN TB_SM06M01 RM ON(RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)		/* 반품 상세 */
+						WHERE 1=1
+					<!-- 확정일자 -->         
+					<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')">
+						<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
+			              AND D.PCHS_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+						</if>   
+					</if>
+					 ) D
 				WHERE 1=1
-				  AND EXISTS (SELECT 1 FROM IPGO WHERE IPGO.PCHS_CLNT_CD = M.PCHS_CLNT_CD)
-				GROUP BY A.CO_CD, M.PCHS_CLNT_CD
+				AND EXISTS (SELECT 1 FROM IPGO WHERE IPGO.PCHS_CLNT_CD = D.PCHS_CLNT_CD)
+				GROUP BY D.CO_CD, D.PCHS_CLNT_CD
 			 )
 			 SELECT 
 				 	  IPGO.CO_CD
@@ -2378,6 +2516,8 @@
 				 	, SUM(COMP.PCHS_QTY) 		AS PCHS_QTY
 				 	, MAX(COMP.PCHS_CNT)		AS PCHS_CNT
 				 	, TO_CHAR(MAX(COMP.PCHS_DT), 'YYYY-MM-DD') 		AS PCHS_DT
+				 	, NVL(SUM(IPGO.IN_DTL_AMT),0) - NVL(SUM(COMP.PCHS_AMT),0) 	AS PCHS_AMT_REM	--미확정금액
+				 	, NVL(SUM(IPGO.IN_QTY),0) - NVL(SUM(COMP.PCHS_QTY),0) 		AS PCHS_QTY_REM	--미확정수량 (계산안됨 확정시 수량없음)
 				 	, MAX(IPGO.STS)				AS STS
 				-- 	IPGO.*
 			 FROM IPGO 
