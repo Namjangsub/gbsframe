@@ -303,6 +303,14 @@ public class SM14SvcImpl implements SM14Svc {
 		//발주+비용
 			result = sm14Mapper.selectPurchaseListNew(paramMap);
 		return result;		
+	}		
+	
+	@Override
+	public List<Map<String, String>> selectClntPurchaseInboundList(Map<String, String> paramMap) {		
+		List<Map<String, String>> result = new ArrayList<Map<String, String>>();
+		//발주+비용
+			result = sm14Mapper.selectClntPurchaseInboundList(paramMap);
+		return result;		
 	}	
 
 	@Override

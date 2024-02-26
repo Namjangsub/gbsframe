@@ -182,6 +182,15 @@ public class SM14Ctr {
 		return "jsonView";
 	}
 	
+
+	// 매입관리 입고 조회 NAM 240226
+	@PostMapping(value = "/selectClntPurchaseInboundList")
+	public String selectClntPurchaseInboundList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = sm14Svc.selectClntPurchaseInboundList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
 	// 발주/입고 조회 NEW
 	@PostMapping(value = "/selectOrderDetailListNew")
 	public String selectOrderDetailListNew(@RequestBody Map<String, String> paramMap, ModelMap model) {

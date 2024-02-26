@@ -49,4 +49,6 @@ public interface SM14Svc {
 	List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
 
 	List<Map<String, String>> select_mngId_code(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectClntPurchaseInboundList(Map<String, String> paramMap);
 }
