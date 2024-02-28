@@ -272,6 +272,8 @@ var ordrgNoU =  null;			//list에서 받은값
 var coCdU = null;	
 var currToday = [];
 var remaindAmt = 0; 	//매입미확정금액 계산용
+var totAcceptAmt = 0; 	//총입고금액 계산용
+let maxIndt = '';	//최종 입고일자를 확인하기 위함
 
 ax5.ui.grid.formatter["clntChk"] = function () {
 	var color = this.value == "Y" ? '<img src="/static/img/color-circle_02.png" style="width: 10px;height: 10px;"></img>' : '';
@@ -340,17 +342,18 @@ var gridViewPop = {
 						,{key: "matrNm", 			label: "자재명", 				width: 150,		align: "left"}		/* 품명 */
 						,{key: "matrMat", 			label: "소재", 				width: 70,		align: "center"}						
 						,{key: "matrMakrNm", 		label: "MAKER", 			width: 70,		align: "center"}	/* 제조사 */
-						,{key: "bomPchsClntNm", 		label: "거래처", 				width: 80,		align: "center"}	/* 제조사 */	
-						,{key: "mngNm", 		label: "담당자명", 				width: 80,		align: "center"}	/* 담당자명 */						
+						,{key: "bomPchsClntNm", 	label: "거래처", 				width: 80,		align: "center"}	/* 제조사 */	
+						,{key: "mngNm", 			label: "담당자명", 			width: 80,		align: "center"}	/* 담당자명 */						
 						,{key: "bomQty", 			label: "수량", 				width: 50,		align: "center"}			/*수량 */						
 						,{key: "preBomQty", 		label: "기발주수량", 			width: 80,		align: "center"}			/*기발주 수량 */			
 						,{key: "userChkV", 			label: "userChkV", 			width: 60,		align: "center", 	hidden:true}	/* 수정시 userChk */
 						,{key: "ordrgPrc", 			label: "발주단가", 			width: 90,		align: "right", formatter: "money"}
 						,{key: "ordrgAmt", 			label: "발주금액", 			width: 110,		align: "right", formatter: "money"}							
-						,{key: "ordrgQty", 		label: "발주수량", 			width: 80,		align: "center", formatter: "money"}
+						,{key: "ordrgQty", 			label: "발주수량", 			width: 80,		align: "center", formatter: "money"}
 						,{key: "inDtlAmt", 			label: "입고금액", 			width: 110,		align: "right", formatter: "money"}
-						,{key: "inQty", 		label: "입고수량", 			width: 80,		align: "center", formatter: "money"}
-						,{key: "dudtDeqDt", 		label: "납기요청일", 			width:  80,		align: "center"}												
+						,{key: "inQty", 			label: "입고수량", 			width: 70,		align: "center", formatter: "money"}
+						,{key: "dudtDeqDt", 		label: "납기요청일", 			width:  75,		align: "center"}												
+						,{key: "inDt", 				label: "최종입고일", 			width:  75,		align: "center"}												
 					
 	              ]
 	        });
@@ -377,12 +380,17 @@ var gridViewPop = {
 				    		totalElements : list.length,
 				    	} 
 				});	
-
-				gridResize(list.length); //그리드 높이 조정
+				gridHeightResize(list.length); //그리드 높이 조정
+				remaindAmt = 0;
 				$.each($.extend({}, list), function (idx, elem) {
-					remaindAmt += parseInt(elem.inDtlAmt);
+					remaindAmt += pasIntChk(elem.inDtlAmt);
+					let lastInDt = deleteHyphenStr(elem.inDt);
+					if (maxIndt < lastInDt) maxIndt = lastInDt;	//최종 입고 일자 체크용
 				});
+
 				if (remaindAmt < 0) remaindAmt= 0;
+				totAcceptAmt = remaindAmt;	//총입고금액 산정 공용변수 저장함
+				
 				$('#pchsAmt').val(addCommaStr(remaindAmt));  //매입금액입력정보 Clear
 				setVat();  						//VAT 계산
             });    	   
@@ -453,7 +461,7 @@ var gridViewPopIn = {
 			postAjax("/user/sm/sm14/selectPchsDetailListNew", formData, null, function(data){
 				var list = data.result;
 				if(list.length == 0) $("#pchsNo").val('');
-				
+
 				$.each($.extend({}, list), function (idx, elem) {
 					$("#pchsNo").val(elem.pchsNo);
 					remaindAmt -= parseInt(elem.pchsAmt);
@@ -528,21 +536,25 @@ authChk();
 			alert('매입금액을 입력하십시요.');
 			return false;
 		}
- 		 var rowListView = gridViewPopIn.target.getList();
-		
-          var rowpchsAmt = 0;
-          $.each(rowListView, function (idx, elem) {
-        	  rowpchsAmt += parseFloat(elem.pchsAmt);
-          });
+
+		let rowListView = gridViewPopIn.target.getList(); //발주/입고 상세내역
+		let rowpchsAmt = 0;
+		$.each(rowListView, function (idx, elem) {
+			rowpchsAmt += parseFloat(elem.pchsAmt);
+		});
         
         // input box 값과 비교
         var inputAmtVal = pasIntChk($("#pchsAmt").val())+rowpchsAmt;
-
-         if (inputAmtVal > $("#totalpchsAmt").val()) {
+		if (inputAmtVal > totAcceptAmt) {
  	        alert("입고금액을 초과했습니다.");
  	        return false;
-         }
-        
+		}
+
+		if (maxIndt > deleteHyphenStr($('#pchsDt').val())) {
+ 	        alert("최종입고일 이전 매입확정처리 불가합니다.");
+ 	        return false;
+		}
+
 		return formData;	
 	}
 
@@ -658,7 +670,7 @@ function setByCoCd(value) {
 	$('#coCd option:not([value="'+value+'"])').remove();
 }
 
-function gridResize(size) {
+function gridHeightResize(size) {
     var tagHeight = (size) * 27 + 90 ;
     tagHeight = tagHeight > 750 ? 750 : tagHeight;
     tagHeight = tagHeight < 200 ? 200 : tagHeight;
