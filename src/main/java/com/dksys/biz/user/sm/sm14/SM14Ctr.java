@@ -183,6 +183,27 @@ public class SM14Ctr {
 	}
 	
 
+	// 매입관리 입고 조회 NEW--Nam 거래처별 집계처리 하단그리드 세부내용
+	@PostMapping(value = "/sm14selectPurchaseListNew")
+	public String sm14selectPurchaseListNew(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		paramMap.put("clntPjt", ObjectUtil.sqlInCodeGen(paramMap.get("clntPjt")));
+		paramMap.put("mngIdCd", ObjectUtil.sqlInCodeGen(paramMap.get("mngIdCd")));
+		int totalCnt = sm14Svc.sm14selectPurchaseListNewCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = sm14Svc.sm14selectPurchaseListNew(paramMap);
+		model.addAttribute("result", result);
+
+	   	List<Map<String, String>> resultPrjct = sm14Svc.select_prjct_code(paramMap);
+	   	model.addAttribute("resultPrjct", resultPrjct);
+
+	   	List<Map<String, String>> resultMngId = sm14Svc.select_mngId_code(paramMap);
+	   	model.addAttribute("resultMngId", resultMngId);
+	   	
+		return "jsonView";
+	}
+	
+
 	// 매입관리 입고 조회 NAM 240226
 	@PostMapping(value = "/selectClntPurchaseInboundList")
 	public String selectClntPurchaseInboundList(@RequestBody Map<String, String> paramMap, ModelMap model) {

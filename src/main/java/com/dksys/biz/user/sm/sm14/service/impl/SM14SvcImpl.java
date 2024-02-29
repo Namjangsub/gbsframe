@@ -297,6 +297,21 @@ public class SM14SvcImpl implements SM14Svc {
 		return sm14Mapper.selectOrdrgMatList(paramMap);
 	}		
 	
+	
+
+	@Override
+	public int sm14selectPurchaseListNewCount(Map<String, String> paramMap) {
+		return sm14Mapper.sm14selectPurchaseListNewCount(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> sm14selectPurchaseListNew(Map<String, String> paramMap) {		
+		List<Map<String, String>> result = new ArrayList<Map<String, String>>();
+		//발주+비용
+			result = sm14Mapper.sm14selectPurchaseListNew(paramMap);
+		return result;		
+	}		
+
 	@Override
 	public List<Map<String, String>> selectPurchaseListNew(Map<String, String> paramMap) {		
 		List<Map<String, String>> result = new ArrayList<Map<String, String>>();
