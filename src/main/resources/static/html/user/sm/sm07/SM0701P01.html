@@ -69,16 +69,13 @@
 					<th class="">발주일자</th>
 					<td>
 						<div class="date_input">
-							<input id="ordrgDt" name="ordrgDt"  class="input_calendar2" autocomplete="off"
-							required="required" msg="발주 시작일자" data-search="ordrgDt">
+							<input id="ordrgDt" name="ordrgDt"  class="input_calendar2" autocomplete="off" required msg="발주일자" data-search="ordrgDt">
 						</div>
 					</td>
 					
-					<th class="">납기요청일자</th>
+					<th class="hit">납기요청일자</th>
 					<td>
-						<div class="date_input">
-							<input id="dudtDeqDt" name="dudtDeqDt"  class="input_calendar2" autocomplete="off" data-search="ordrgDt">
-						</div>
+						<input id="dudtDeqDt" name="dudtDeqDt"  class="input_calendar" autocomplete="off" data-search="dudtDeqDt" date class="form-control" required>
 					</td>
 				</tr>
 				
@@ -175,6 +172,7 @@
 	var userId = null;
 	var userNm = null;
 	var fileTrgtKeyU = null;
+	var allDetailChange = false;
 	
 	var gridViewPop = {
 		initView: function() {
@@ -311,9 +309,10 @@
 		
 		//TR 아래 모든 자식 input 태그 입력 금지 처리
 		$('.vendInquery').find('input').prop('disabled', true);
+		$('#dudtDeqDt').prop('disabled', false);
 		//TR 아래 모든 자식 combox 태그 입력 금지 처리
 		$('.vendInquery').find('select').prop('disabled', true);
-		
+
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작
 		//---------------------------------------------------------------
@@ -335,7 +334,6 @@
 			// debugger;
 			postAjaxSync("/user/sm/sm02/selectOrderDetailView", modalStack.last().paramObj, null, function(data) {
 				var list = data.resultList;
-				
 				if( list.length > 0 ) {
 					$.each(list[0], function (key, val) {
 						//html element overwrite set
@@ -348,6 +346,13 @@
 							}
 						}
 					});
+			      	//납기요청일자//
+					$('#dudtDeqDt').datepicker({
+						format : "yyyy-mm-dd",
+						language : "ko",
+						autoclose : true
+					}).datepicker("setDate", list[0].dudtDeqDt)
+					.on("changeDate", function() { monthCloseChk(this.value);});
 				}
 			});
 			gridViewPop.setData();
@@ -423,7 +428,17 @@
 		//상세자료 준비
         detailArr = [];
 
-		var list = gridViewPop.target.getList("modified");
+		let list = [];
+		if (allDetailChange) {	//납기요청일 일괄수정이면
+			list = gridViewPop.target.getList();
+			formData.append("master" , "Y");		//마스터 수정여부
+		} else { //부분수정일경우 처리
+			list = gridViewPop.target.getList("modified");
+			formData.append("master" , "N");		//마스터 수정여부
+		}
+		formData.append("coCd" , $('#coCd').val());
+		formData.append("ordrgNo" , $('#ordrgNo').val());
+		
 		let errChk = false;  //납기요청일자 입력 누락이 있는지 체크용
 		$.each(list,function(idx, obj) {
 			if (obj.dudtDeqDt == '') {
@@ -453,4 +468,15 @@
 		$('[data-ax5grid="first-grid-modal"] [data-ax5grid-container="root"]').height(tagHeight);
 	}
 	
+	
+	function monthCloseChk (value) {
+		let row = gridViewPop.target.list;
+		$.each(row,function(idx, obj) {
+			row[idx].dudtDeqDt = value;
+		});
+		//전역변수 상세레코드 전체 수정 flag (setData처리하면 그리드 수정데이터 추출하는 modefied 안먹힘)
+		allDetailChange  =  true; 
+		gridViewPop.target.setData(row);
+		
+	}
 	</script>

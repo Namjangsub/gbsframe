@@ -25,4 +25,7 @@ public interface SM07Mapper {
 	 * //모달창 안에 그리드 grid-modal List<Map<String, String>>
 	 * grid_Modal_selectList(Map<String, String> paramMap);
 	 */
+	
+	int updateOrderMasterDudtDeqDt(Map<String, String> paramMap);
+	
 }

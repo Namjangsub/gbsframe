@@ -90,6 +90,10 @@ public class SM07SvcImpl implements SM07Svc {
 
 		int result = 0;
 
+		if ("Y".equals(paramMap.get("master"))) {
+			result += sm07Mapper.updateOrderMasterDudtDeqDt(paramMap);
+	    }
+			
 		//상세수정
 		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
 	    for (Map<String, String> dtl : dtlParam) {
