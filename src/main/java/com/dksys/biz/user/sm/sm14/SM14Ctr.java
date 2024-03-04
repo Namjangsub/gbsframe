@@ -52,8 +52,13 @@ public class SM14Ctr {
 	// 거래처별 매입 확정 상세 조회
 	@PostMapping(value = "/selectClntPurchaseDetailList")
 	public String selectClntPurchaseDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		paramMap.put("mngIdCd", ObjectUtil.sqlInCodeGen(paramMap.get("mngIdCd")));
 		List<Map<String, String>> result = sm14Svc.selectClntPurchaseDetailList(paramMap);
 		model.addAttribute("result", result);
+		
+	   	List<Map<String, String>> resultMngId = sm14Svc.select_mngId_code(paramMap);
+	   	model.addAttribute("resultMngId", resultMngId);
+	   	
 		return "jsonView";
 	}
 		// 매입관리 발주 조회 엑셀
@@ -216,6 +221,14 @@ public class SM14Ctr {
 	@PostMapping(value = "/selectOrderDetailListNew")
 	public String selectOrderDetailListNew(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> result = sm14Svc.selectOrderDetailListNew(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
+	// 발주/입고 조회 NEW
+	@PostMapping(value = "/selectOrderDetailListNewNam")
+	public String selectOrderDetailListNewNam(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = sm14Svc.selectOrderDetailListNewNam(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
