@@ -55,4 +55,6 @@ public interface SM14Svc {
 	int sm14selectPurchaseListNewCount(Map<String, String> paramMap);
 
 	List<Map<String, String>> sm14selectPurchaseListNew(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectOrderDetailListNewNam(Map<String, String> paramMap);
 }

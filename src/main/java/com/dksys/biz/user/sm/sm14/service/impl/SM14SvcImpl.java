@@ -340,6 +340,14 @@ public class SM14SvcImpl implements SM14Svc {
 			result = sm14Mapper.selectOrderDetailListNew(paramMap);
 		return result;		
 	}	
+	
+	@Override
+	public List<Map<String, String>> selectOrderDetailListNewNam(Map<String, String> paramMap) {		
+		List<Map<String, String>> result = new ArrayList<Map<String, String>>();
+		//발주+비용
+			result = sm14Mapper.selectOrderDetailListNewNam(paramMap);
+		return result;		
+	}	
 
 	@Override
 	public List<Map<String, String>> selectPchsDetailListNew(Map<String, String> paramMap) {		
