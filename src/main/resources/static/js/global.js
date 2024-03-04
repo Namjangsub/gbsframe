@@ -739,6 +739,7 @@ function deleteHyphen(elem){
 
 // 하이픈 제거 스트링변수용
 function deleteHyphenStr(value){
+	if (value == undefined ) return "";
 	return value.replace(/-/g, "");
 }
 

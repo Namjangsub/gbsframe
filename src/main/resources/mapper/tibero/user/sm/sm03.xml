@@ -63,25 +63,25 @@
 		        AND A.ORDRG_DIV10 = ( #{ordrgdiv10} )
 				</if>
 	         GROUP BY A.CO_CD, A.SALES_CD, B.REQ_NO,  A.ORDRG_NO
-	        ),
-	    SALE AS (   --요청번호, SALES_CD
-	        SELECT DISTINCT CO_CD, REQ_NO, SALES_CD
+	        )
+	    , SALE AS (   --요청번호, SALES_CD
+	        SELECT DISTINCT CO_CD, SALES_CD
 	          FROM BJM
 	    )
 	    ,SUJU AS (    --수주내역
 	        SELECT 
-	                 M.CO_CD                                             AS CO_CD         --회사코드
+	                 SALE.CO_CD                                             AS CO_CD         --회사코드
 	                , M.ORDRS_NO                                         AS ORDRS_NO      --수주번호
 	                , M.ORDRS_CLNT_CD                                    AS ORDRS_CLNT_CD --고객코드
-	                , A.SALES_CD                                      AS SALES_CD      --SALES Code
+	                , SALE.SALES_CD                                      AS SALES_CD      --SALES Code
 	                , M.CLNT_PJT                                         AS CLNT_PJT      --고객사PJT 
 	                , A.PRDT_CD                                          AS PRDT_CD       --제품구분
 	                , A.EQP_NM                                           AS EQP_NM        --설비명 
 		            , A.ITEM_DIV                                         AS ITEM_DIV      --아이템구분
 		            , (SELECT FN_CM05M01_CD_TO_NM(A.ITEM_DIV) FROM DUAL) AS ITEM_DIV_NM   --아이템 구분명
-	          FROM TB_CR02D02 A --ON SALE.SALES_CD = A.SALES_CD
-			          	LEFT OUTER JOIN TB_CR02M01 M ON(A.CO_CD = M.CO_CD AND A.ORDRS_NO = M.ORDRS_NO)			
-	         WHERE EXISTS (SELECT 1 FROM SALE WHERE SALE.SALES_CD = A.SALES_CD)	
+	          FROM SALE 
+	          			LEFT OUTER JOIN TB_CR02D02 A ON SALE.SALES_CD = A.SALES_CD
+			          	LEFT OUTER JOIN TB_CR02M01 M ON(A.CO_CD = M.CO_CD AND A.ORDRS_NO = M.ORDRS_NO)
 		)
 		,CTOT AS ( -- 발주번호+SEQ 별 총입고수량 산정 
 			SELECT    C.ORDRG_NO 
@@ -92,13 +92,16 @@
 			GROUP BY C.ORDRG_NO
 		) 
 		,INO AS ( --발주번호별 입고내역
-			  SELECT DISTINCT I.ORDRG_NO,  
-			  				  I.IN_NO, 
-			  				  SUM(nvl(I.IN_QTY,0)) AS  IN_QTY,
-			  				  MAX(M.FILE_TRGT_KEY) AS FILE_TRGT_KEY,
-			  				  TO_CHAR(MAX(I.IN_DT), 'YYYY-MM-DD') IN_DT		/* 입고일자 */	
+			  SELECT  DISTINCT I.ORDRG_NO 
+			  				  , I.IN_NO 
+			  				  , SUM(nvl(I.IN_QTY,0)) 			AS  IN_QTY
+			  				  , MAX(M.FILE_TRGT_KEY) 			AS FILE_TRGT_KEY
+			  				  , TO_CHAR(MAX(I.IN_DT), 'YYYY-MM-DD') IN_DT		/* 입고일자 */	
+			  				  , SUM(nvl(I.BAD_QTY,0)) 			AS BAD_QTY 
+			  				  , SUM(nvl(I.IN_DTL_AMT,0))		AS IN_DTL_AMT
+			  				  , MAX(I.INOUT_KEY) 				AS INOUT_KEY
 	            FROM TB_SM03D01 I 
-			          	LEFT OUTER JOIN TB_SM03M01 M ON(M.IN_NO =I.IN_NO )		
+			          	LEFT OUTER JOIN TB_SM03M01 M ON (M.CO_CD =I.CO_CD AND M.IN_NO =I.IN_NO )		
 	           WHERE 1=1
 			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = I.ORDRG_NO)	
 	           GROUP BY I.ORDRG_NO, I.IN_NO
