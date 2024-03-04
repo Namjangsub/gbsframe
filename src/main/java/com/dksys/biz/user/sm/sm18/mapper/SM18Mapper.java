@@ -23,6 +23,9 @@ public interface SM18Mapper {
 	
 	//리스트
 	List<Map<String, String>> sm18_gridView_selectListNew(Map<String, String> paramMap);	
+	
+	//리스트 - 2024.03.04 쿼리 수정
+	List<Map<String, String>> sm18_gridView_selectListNewNam(Map<String, String> paramMap);	
 
 }
 

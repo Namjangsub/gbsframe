@@ -50,4 +50,13 @@ public class SM18Ctr {
 		return "jsonView";
 	}	
 
+	
+	//리스트 조회
+	@PostMapping(value = "/sm18_gridView_selectListNewNam")
+	public String sm18_gridView_selectListNewNam(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = sm18Svc.sm18_gridView_selectListNewNam(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}	
+
 }
