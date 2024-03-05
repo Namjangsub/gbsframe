@@ -937,49 +937,52 @@
 						LEFT OUTER JOIN TB_QM01M01 Q ON M.REQ_NO = Q.REQ_NO
 	            WHERE 1=1
 	              AND EXISTS (SELECT 1 FROM IPGO WHERE  IPGO.ORDRG_NO = M.ORDRG_NO)
-	              
 		)
-		SELECT A.CO_CD	
-			, A.PCHS_NO			/* 매입번호 */
-			, A.PCHS_SEQ
-			, A.ORDRG_NO
-			, A.DSGN_NO
-			, A.SALES_CD
-			, A.PCHS_CLNT_CD
-			, A.PCHS_CLNT_NM		/* 구매처명 */
-			, A.MATR_CD
-			, A.ORDRG_QTY
-			, A.ORDRG_AMT	
-			, A.ORDRG_DT
-			, A.DSGN_NO			/* 대표도번 */	
-			, A.PCHS_AMT
-			, A.PCHS_VAT		/* 부가세 */
-			, A.PCHS_QTY			/* 수량 */
-			, NVL(A.PCHS_AMT, 0) + NVL(A.PCHS_VAT, 0) AS PCHS_SUM_AMT			/* 합계금액 */
-			, A.PCHS_AMT_TOT
-			, A.PCHS_VAT_TOT
-			, A.IN_DTL_AMT - A.PCHS_AMT_TOT AS REMAIN_AMT												
-			, TO_CHAR(A.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT
-			, A.CMPLET_YN
-			, A.IS_COST
-			, A.BILL_YN   /*계산서 여부*/
-			, A.FILE_TRGT_KEY
-			, A.CREAT_ID_NM
-			, A.PCHS_SEQ
-			, A.CRN /*사업자등록번호*/
-			, A.PCHS_CLMN_DAY  /*결제일 - 10*/	
-			, A.PCHS_CLMN_RMK  /*결제일 - 다음달 10일*/
-			, A.PCHS_PMNT_MTD_CD  --결제조건 코드
-			, A.PCHS_PMNT_MTD_NM  --결제조건 코드
-			, A.IS_DIV
-			, DECODE(substr(A.ORDRG_NO,0,3),'BAL', A.IN_DTL_AMT, A.PCHS_AMT_TOT) IN_DTL_AMT --입고금액계
-			, A.REQ_NO		--발주요청서 번호
-			, A.REQ_ORDRG_DT	--발주요청서 발행일자
-			, A.PART_CD						--발주요청서 분류코드
-			, A.PART_CD_NM
-			, A.REQ_ORDRG_ID		---발주요청서 발행자ID
-		  FROM
-		  (
+		SELECT T.*
+		       , ROWNUM AS RN
+		FROM  (
+			SELECT A.CO_CD	
+				, A.PCHS_NO			/* 매입번호 */
+				, A.PCHS_SEQ
+				, A.ORDRG_NO
+				, A.DSGN_NO
+				, A.SALES_CD
+				, A.PCHS_CLNT_CD
+				, A.PCHS_CLNT_NM		/* 구매처명 */
+				, A.MATR_CD
+				, A.ORDRG_QTY
+				, A.ORDRG_AMT	
+				, A.ORDRG_DT
+				, A.DSGN_NO			/* 대표도번 */	
+				, A.PCHS_AMT
+				, A.PCHS_VAT		/* 부가세 */
+				, A.PCHS_QTY			/* 수량 */
+				, NVL(A.PCHS_AMT, 0) + NVL(A.PCHS_VAT, 0) AS PCHS_SUM_AMT			/* 합계금액 */
+				, A.PCHS_AMT_TOT
+				, A.PCHS_VAT_TOT
+				, A.IN_DTL_AMT - A.PCHS_AMT_TOT AS REMAIN_AMT												
+				, TO_CHAR(A.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT
+				, A.CMPLET_YN
+				, A.IS_COST
+				, A.BILL_YN   /*계산서 여부*/
+				, A.FILE_TRGT_KEY
+				, A.CREAT_ID_NM
+				, A.PCHS_SEQ
+				, A.CRN /*사업자등록번호*/
+				, A.PCHS_CLMN_DAY  /*결제일 - 10*/	
+				, A.PCHS_CLMN_RMK  /*결제일 - 다음달 10일*/
+				, A.PCHS_PMNT_MTD_CD  --결제조건 코드
+				, A.PCHS_PMNT_MTD_NM  --결제조건 코드
+				, A.IS_DIV
+				, DECODE(substr(A.ORDRG_NO,0,3),'BAL', A.IN_DTL_AMT, A.PCHS_AMT_TOT) IN_DTL_AMT --입고금액계
+				, A.REQ_NO		--발주요청서 번호
+				, A.REQ_ORDRG_DT	--발주요청서 발행일자
+				, A.PART_CD						--발주요청서 분류코드
+				, A.PART_CD_NM
+				, A.REQ_ORDRG_ID		---발주요청서 발행자ID
+				, A.ORDRG_ID_NM
+			  FROM
+			  (
 					SELECT 
 						  A.CO_CD
 							, A.ORDRG_NO
@@ -1025,16 +1028,15 @@
 			                LEFT OUTER JOIN IPGOAMT AS F ON A.CO_CD = F.CO_CD AND A.ORDRG_NO = F.ORDRG_NO --입고 집계
 			                LEFT OUTER JOIN QM AS Q ON A.CO_CD = Q.CO_CD AND A.ORDRG_NO = Q.ORDRG_NO --발주요청
 				  WHERE 1=1 										
-	  ) A		/* 발주+기타비용 내역 */
-	  WHERE 1=1 
-	<if test="salesCd != null and !salesCd.equals('')">
-		AND A.SALES_CD LIKE '%'|| #{salesCd} || '%'   
-	</if>		
-	<if test="prjctCdNm != null and !prjctCdNm.equals('')">
-		AND UPPER(CLNT_PJT_NM) LIKE '%'|| UPPER(#{prjctCdNm}) || '%'   
-	</if>	
-	  ORDER BY A.CO_CD, A.PCHS_CLNT_NM, A.PCHS_DT, A.ORDRG_NO, A.PCHS_NO
+			  ) A		/* 발주+기타비용 내역 */
+			  WHERE 1=1 
+			<if test="salesCd != null and !salesCd.equals('')">
+				AND A.SALES_CD LIKE '%'|| #{salesCd} || '%'   
+			</if>		
+			<if test="prjctCdNm != null and !prjctCdNm.equals('')">
+				AND UPPER(CLNT_PJT_NM) LIKE '%'|| UPPER(#{prjctCdNm}) || '%'   
+			</if>	
+			  ORDER BY A.CO_CD, A.PCHS_CLNT_NM, A.PCHS_DT, A.ORDRG_NO, A.PCHS_NO
+		) T
 	</select>
-	
-	
 </mapper>
