@@ -294,13 +294,18 @@
 								 WHERE CO_CD = A.CO_CD 
 								   AND ORDRG_NO = A.ORDRG_NO 
 							 ) AS REPORT_DT	
-							 , MATR_NM || CNT_NM  AS MATR_NM							 				 			 
+							 , MATR_NM || CNT_NM  AS MATR_NM		
+           					 , TO_CHAR(IP.MIN_IPGO_DT, 'YYYY-MM-DD')     				AS MIN_IPGO_DT		--입고시작일자								 				 			 
 		                  FROM BJM A
 		                       LEFT OUTER JOIN SJD AS B ON A.SALES_CD = B.SALES_CD
 		                       LEFT OUTER JOIN TDO AS T ON A.SALES_CD = T.SALES_CD AND A.ORDRG_NO = T.TODO_NO
 							   LEFT OUTER JOIN INY AS D ON A.ORDRG_NO = D.ORDRG_NO
 							   LEFT OUTER JOIN BOM AS M ON A.SALES_CD = M.SALES_CD
-							   LEFT OUTER JOIN BAL      ON A.SALES_CD = BAL.SALES_CD AND A.CO_CD = BAL.CO_CD AND  A.ORDRG_NO =  BAL.ORDRG_NO		                       
+							   LEFT OUTER JOIN BAL      ON A.SALES_CD = BAL.SALES_CD AND A.CO_CD = BAL.CO_CD AND  A.ORDRG_NO =  BAL.ORDRG_NO	
+								LEFT OUTER JOIN ( SELECT ORDRG_NO, MIN(IN_DT) AS MIN_IPGO_DT 
+													FROM TB_SM03D01 IP 
+												   GROUP BY IP.ORDRG_NO 
+												 ) IP ON IP.ORDRG_NO = A.ORDRG_NO 	                       		                       
 		                 WHERE 1=1
 		                 <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
 				          AND B.ORDRS_CLNT_CD = #{ordrsClntCd}  --조회조건 : 고객코드
@@ -608,26 +613,46 @@
             , M.NAME 		AS ORDRG_MNG_NM   /*생성자명 */
             , M.OFF_TEL_NO  AS ORDRG_MNG_TEL_NO   /*생성자전화번호 */
             , A.ORDRG_RMK  
-            , A.CREAT_ID       AS ORDRG_CREAT_ID           
+            , A.CREAT_ID       AS ORDRG_CREAT_ID             
+            , TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS')     		AS CREAT_DTTM   	--작성일자 
+            , TO_CHAR(IP.MIN_IPGO_DT, 'YYYY-MM-DD')     				AS MIN_IPGO_DT		--입고시작일자
+            , TO_CHAR(MA.SEND_DTTM, 'YYYY-MM-DD HH24:MI:SS')     		AS MAIL_SEND_DTTM  	--최초메일발송일자
+            , TO_CHAR(RP.REPORT_DTTM, 'YYYY-MM-DD HH24:MI:SS')     		AS REPORT_DTTM  	--최초발행일자
+            
 		FROM TB_SM02M01 A
-		INNER JOIN TB_SM02D01 B ON(A.CO_CD=B.CO_CD AND A.SALES_CD=B.SALES_CD AND A.ORDRG_NO=B.ORDRG_NO)
-		LEFT OUTER JOIN TB_CM06M01 AS M ON M.ID = A.CREAT_ID
-		LEFT OUTER JOIN
-		(
-		 SELECT  X.CO_CD 					/* 회사코드 */
-		 		, Y.ORDRS_CLNT_CD 			/* 고객사 */
-                      , A.CLNT_NM  AS ORDRS_CLNT_NM		/* 고객사명 */
-                      , X.SALES_CD
-                      , Y.CLNT_PJT		/* 고객사PJT */
-                      , X.PRDT_CD			/* 제품구분 */
-                      , E.PRDT_NM			/* 제품구분명 */
-                      , X.ITEM_DIV		/* 아이템 구분 */
-                      , X.EQP_NM			/* 설비명 */
-                FROM TB_CR02D02 X		/* 수주상세 */
-                      INNER JOIN TB_CR02M01 Y ON(X.CO_CD = Y.CO_CD AND X.ORDRS_NO = Y.ORDRS_NO)	/* 수주마스터 */
-                      LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD /* 거래처마스터 */
-                      LEFT OUTER JOIN TB_BM01M01 E ON(X.PRDT_CD=E.PRDT_CD)							
-		) C ON(A.SALES_CD=C.SALES_CD)					
+							INNER JOIN TB_SM02D01 B ON(A.CO_CD=B.CO_CD AND A.SALES_CD=B.SALES_CD AND A.ORDRG_NO=B.ORDRG_NO)
+							LEFT OUTER JOIN TB_CM06M01 AS M ON M.ID = A.CREAT_ID
+							LEFT OUTER JOIN
+											(
+											 SELECT  X.CO_CD 					/* 회사코드 */
+											 		, Y.ORDRS_CLNT_CD 			/* 고객사 */
+									                      , A.CLNT_NM  AS ORDRS_CLNT_NM		/* 고객사명 */
+									                      , X.SALES_CD
+									                      , Y.CLNT_PJT		/* 고객사PJT */
+									                      , X.PRDT_CD			/* 제품구분 */
+									                      , E.PRDT_NM			/* 제품구분명 */
+									                      , X.ITEM_DIV		/* 아이템 구분 */
+									                      , X.EQP_NM			/* 설비명 */
+									                FROM TB_CR02D02 X		/* 수주상세 */
+									                      INNER JOIN TB_CR02M01 Y ON(X.CO_CD = Y.CO_CD AND X.ORDRS_NO = Y.ORDRS_NO)	/* 수주마스터 */
+									                      LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD /* 거래처마스터 */
+									                      LEFT OUTER JOIN TB_BM01M01 E ON(X.PRDT_CD=E.PRDT_CD)							
+											) C ON(A.SALES_CD=C.SALES_CD)	
+							LEFT OUTER JOIN ( SELECT ORDRG_NO, MIN(IN_DT) AS MIN_IPGO_DT 
+												FROM TB_SM03D01 IP 
+											   GROUP BY IP.ORDRG_NO 
+											 ) IP ON IP.ORDRG_NO = A.ORDRG_NO 
+							LEFT OUTER JOIN (
+												SELECT SEND_KEY, MIN(SEND_DTTM) AS SEND_DTTM
+												 FROM TB_CM10M01
+												WHERE SEND_TYPE = 'SM0201P01'
+												GROUP BY SEND_KEY
+											) MA ON MA.SEND_KEY = A.FILE_TRGT_KEY 
+							LEFT OUTER JOIN (
+												SELECT ORDRG_NO, MIN(CREAT_DTTM) AS REPORT_DTTM
+												 FROM TB_SM02D02
+												GROUP BY ORDRG_NO
+											) RP ON RP.ORDRG_NO = A.ORDRG_NO 
 		WHERE 1=1
 		<if test="coCd != null and !coCd.equals('')">
 			AND A.CO_CD = #{coCd}   
