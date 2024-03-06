@@ -968,7 +968,24 @@
 			SELECT N.*,
 			      ROWNUM AS RN
 			  FROM (
-					WITH SJD AS --수주상세 
+					WITH SCD AS		--현재 일정 수립계획중이고 시작일과 완료검수일 사이에있는 자료만
+						 (
+						  SELECT   P.SALES_CD
+						         , P.CO_CD
+						         , P.SJ_NM
+						         , NVL(MC.CLOSE_YN,'N') CLOSE_YN
+						         , P.BEGIN_DT
+						         , P.ACPTNC_DT
+							FROM TB_WB21M01 P
+										LEFT OUTER JOIN TB_WB25M01 MC ON MC.SALES_CD = P.SALES_CD
+						   WHERE 1 = 1
+						     AND BEGIN_DT  <![CDATA[<=]]> sysdate 	--시작일
+							 AND ACPTNC_DT <![CDATA[>=]]> sysdate	--완료검수일
+							 AND NVL(MC.CLOSE_YN,'N') != 'Y'
+ 							 AND VER_NO IN (SELECT MAX(TO_NUMBER(PT.VER_NO)) FROM TB_WB21M01 PT WHERE PT.SJ_NO = P.SJ_NO) --최종 버젼 자료만 적용
+ 							 AND EXISTS (SELECT 1 FROM TB_WB22M01 PL WHERE P.SALES_CD = PL.SALES_CD )	--계획 수립된 자료만 검색하기 위함
+						 )
+					, SJD AS --수주상세 
 					     ( 
 					      SELECT M.CO_CD                                                    AS CO_CD              --회사코드
 					            , (SELECT FN_CM05M01_CD_TO_NM(M.CO_CD) FROM DUAL)           AS CO_NM              --회사명 
@@ -1015,17 +1032,22 @@
 					         AND M.CLNT_PJT IN ( ${clntPjt} )
 					        </if>
 					        <if test='planCheck == "Y"'>
-							  AND  EXISTS (SELECT * FROM TB_WB22M01 PL
+							  AND  EXISTS (SELECT * FROM TB_WB22M01 PL		--계획수립자료
 										   WHERE X.SALES_CD = PL.SALES_CD 
 										)
 					        </if>
 					        <if test='planCheck == "N"'>
-							  AND  NOT EXISTS (SELECT * FROM TB_WB22M01 PL
+							  AND  NOT EXISTS (SELECT * FROM TB_WB22M01 PL --계획없는 자료
 										   WHERE X.SALES_CD = PL.SALES_CD 
 										)
 					        </if>
-					        <if test='planPrjct == "B"'>
-							  AND  1=2
+					        <if test='planPrjct == "B"'>  
+							  AND  1=2   --프로젝트 계획 자료만일경우에는 제외처용
+					        </if>
+					        <if test="targetDate != null and !targetDate.equals('')">
+					          AND  EXISTS (SELECT 1 FROM SCD
+										   WHERE X.SALES_CD = SCD.SALES_CD 
+										)
 					        </if>
 					     )
 					    , PJT AS 
@@ -1123,7 +1145,7 @@
 						              , S.DTL_RMK  AS PRJCT_RMK	--수주 설비 비고
 						          FROM SJD S
 						         WHERE 1=1
-					        <if test='planPrjct != "N"'>
+					        <if test='planPrjct != "N" and targetDate != "Y"'>
 						        UNION ALL --프로젝트 계획자료
 						        SELECT  P.CO_CD              --회사코드
 						              , P.CO_NM              --회사명
