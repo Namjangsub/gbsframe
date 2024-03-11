@@ -38,6 +38,9 @@ public interface BM05Mapper {
 	//DATA DELETE
 	int delete_bm05(Map<String, String> paramMap);
 
+	//DATA DELETE 사용자로그
+	int update_bm05_userLog(Map<String, String> paramMap);
+
 	// 증복체크
 	Map<String, String> selectMatrCdChk(Map<String, String> paramMap);
 

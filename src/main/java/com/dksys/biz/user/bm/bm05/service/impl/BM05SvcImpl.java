@@ -198,6 +198,7 @@ public class BM05SvcImpl implements BM05Svc {
 		//첨부 화일 권한체크 끝
 		//---------------------------------------------------------------
 		
+		int resultLog = bm05Mapper.update_bm05_userLog(paramMap);
 		int result = bm05Mapper.delete_bm05(paramMap);
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
