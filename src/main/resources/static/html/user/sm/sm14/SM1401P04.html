@@ -293,12 +293,12 @@ var gridViewPop = {
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
 				showLineNumber: true,	
-				showRowSelector: false,
-				multipleSelect: false,
+				showRowSelector: true,
+				multipleSelect: true,
 				target: $('[data-ax5grid="bom-grid-modal"]'),
 				header: {
 	              align: "center",
-	              selector: false
+	              selector: true
 	            },
 	            body: {
 					onClick: function() {
@@ -354,6 +354,7 @@ var gridViewPop = {
 						,{key: "inQty", 			label: "입고수량", 			width: 70,		align: "center", formatter: "money"}
 						,{key: "dudtDeqDt", 		label: "납기요청일", 			width:  75,		align: "center"}												
 						,{key: "inDt", 				label: "최종입고일", 			width:  75,		align: "center"}												
+						,{key: "inNo", 				label: "입고번호", 			width:  75,		align: "center"}												
 					
 	              ]
 	        });
@@ -432,9 +433,7 @@ var gridViewPopIn = {
   	                 ]
   			    ],
 	           columns: [
-						 {key: "coCd", 				label: "회사코드", 			width: 100,		align: "center", 	hidden:true}
-						,{key: "pchsSeq",	    	label: "pchsSeq",			width: 70,		align: "center", 	hidden:true}						
-						,{key: "ordrgSeq",	    	label: "ordrgSeq",			width: 70,		align: "center", 	hidden:true}						
+						 {key: "coCd", 				label: "회사코드", 			width: 100,		align: "center", 	hidden:true}					
 						,{key: "salesCd", 			label: "Sales Code", 	    width: 120,		align: "center"}
 						,{key: "ordrgNo", 			label: "발주번호", 		    width: 120,		align: "center"}
 						,{key: "pchsNo", 			label: "매입번호", 		    width: 120,		align: "center"}
@@ -443,6 +442,8 @@ var gridViewPopIn = {
 						,{key: "pchsDt", 		    label: "확정일자", 			width:  150,	align: "center", editor: {type: "date", config: {}}}
 						,{key: "creatNm", 		    label: "생성자", 			    width:  150,	align: "center", editor: {type: "date", config: {}}}
 						,{key: "creatDttm", 	    label: "생성일자", 			width:  150,	align: "center", editor: {type: "date", config: {}}}
+						,{key: "pchsSeq",	    	label: "매입순번",			width: 70,		align: "center", 	hidden:false}						
+						,{key: "ordrgSeq",	    	label: "발주순번",			width: 70,		align: "center", 	hidden:false}	
 	              ]
 	        });
 			return this;
@@ -498,7 +499,9 @@ authChk();
 
 	// 등록 - done
 	function insertOrder() {
-			
+		if (!crossCheck()) {	//입고 상세내역 금액과 매입확정금액 Cross Checking
+			return false;
+		}	
 		if (inputValidation($('.popup_area [required]'))) {					// 필수 필드의 유효성 검사
 			var formData = makeFormData();									// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성    
 
@@ -512,7 +515,22 @@ authChk();
 			}
 		}
 	}
-	
+
+	function crossCheck(){
+		let rowCheck = gridViewPop.target.getList("selected"); //발주/입고 상세내역 선택
+		let rowInDtlAmt = 0;
+		$.each(rowCheck, function (idx, elem) {
+			rowInDtlAmt += parseFloat(elem.inDtlAmt);
+		});
+        
+		if (rowInDtlAmt != parseFloat($('#pchsAmt').val())) {
+			alert ("입고 금액과 확정금액이 일치하지 않습니다.!")
+			return false;
+		} else {
+			return true;
+		}
+	}
+
 	function fnSetting(){
 		$('#pchsAmt').val("");
 		$('#pchsVat').val("");
@@ -524,20 +542,12 @@ authChk();
             deleteComma(elem);
         });
 
-        
-        // 날짜 하이픈 제거
-        $.each($('.popup_area input[date]'), function (idx, elem) {
-            deleteHyphen(elem);
-        });
-        
-        var formData = new FormData($("#popForm")[0]);
-        
 		if($("#pchsAmt").val() == 0){
 			alert('매입금액을 입력하십시요.');
 			return false;
 		}
 
-		let rowListView = gridViewPopIn.target.getList(); //발주/입고 상세내역
+		let rowListView = gridViewPopIn.target.getList(); //매입확정 상세내역
 		let rowpchsAmt = 0;
 		$.each(rowListView, function (idx, elem) {
 			rowpchsAmt += parseFloat(elem.pchsAmt);
@@ -554,7 +564,24 @@ authChk();
  	        alert("최종입고일 이전 매입확정처리 불가합니다.");
  	        return false;
 		}
-
+        
+        // 날짜 하이픈 제거
+        $.each($('.popup_area input[date]'), function (idx, elem) {
+            deleteHyphen(elem);
+        });
+        
+        var formData = new FormData($("#popForm")[0]);
+        
+        //----------------------
+        //발주/입고 상세내역 선택  입고내역 선택자료에대한 매입확정번호 설정을 위한 자료담기
+        //매입번호 IN24xxxxx에 해당하는 매입확정번호 PC24xxxxx를 연결시키기 위함
+        let ipgoArr = [];
+		let rowData = gridViewPop.target.getList("selected"); 
+		$.each(rowData, function (idx, elem) {
+			ipgoArr.push(rowData[idx]);
+		});
+		formData.append("ipgoArr", JSON.stringify(ipgoArr));
+        
 		return formData;	
 	}
 
@@ -633,6 +660,7 @@ $(document).ready(function() {
 		        var formData = {
 		                "coCd": row.coCd,
 		                "pchsNo": row.pchsNo,
+		                "pchsSeq": row.pchsSeq,
 		                "ordrgSeq": row.ordrgSeq,
 		                "ordrgNo": row.ordrgNo,
 		                "userId" : jwt.userId,

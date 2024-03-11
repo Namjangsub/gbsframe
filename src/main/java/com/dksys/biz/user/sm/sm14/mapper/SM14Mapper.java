@@ -64,6 +64,8 @@ public interface SM14Mapper {
 	
 	int insertPurchaseBillDetailNew(Map<String, String> paramMap);	
 	
+	int updateIpgoDataPurchaseBillNo(Map<String, String> param);	
+	
 	int insertPurchaseMaster(Map<String, String> param);
 	
 	String selectPurchaseDetailCount(Map<String, String> paramMap);
@@ -81,6 +83,9 @@ public interface SM14Mapper {
 	List<Map<String, String>> sm14selectPurchaseListNew(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectOrderDetailListNewNam(Map<String, String> paramMap);
+
+	int updateIpgoDataPurchaseBillNoClear(Map<String, String> param);
+
 }
 
 

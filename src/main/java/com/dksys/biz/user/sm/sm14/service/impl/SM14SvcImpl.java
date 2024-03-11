@@ -216,6 +216,9 @@ public class SM14SvcImpl implements SM14Svc {
 	public int deletePurchaseDetail(Map<String, String> param) {
 		int result = 0;
 		result = sm14Mapper.deletePurchaseDetail(param);
+
+		result += sm14Mapper.updateIpgoDataPurchaseBillNoClear(param);
+		
 		
 		String rtnString = sm14Mapper.selectPurchaseDetailCount(param);
 		if("0".equals(rtnString)) {
@@ -364,20 +367,36 @@ public class SM14SvcImpl implements SM14Svc {
 
 		String maxPchsNo = "";
 
-			if("".equals(paramMap.get("pchsNo")) || paramMap.get("pchsNo") == null ) {					
-				maxPchsNo = sm14Mapper.selectMaxPchsNoNew(paramMap);		
-				paramMap.put("maxPchsNo", maxPchsNo);
-				result = sm14Mapper.insertPurchaseMaster(paramMap);
-			}else {
-				maxPchsNo = paramMap.get("pchsNo");	
-				paramMap.put("maxPchsNo", maxPchsNo);
-			}
+		if("".equals(paramMap.get("pchsNo")) || paramMap.get("pchsNo") == null ) {					
+			maxPchsNo = sm14Mapper.selectMaxPchsNoNew(paramMap);		
+			paramMap.put("maxPchsNo", maxPchsNo);
+			result = sm14Mapper.insertPurchaseMaster(paramMap);
+		}else {
+			maxPchsNo = paramMap.get("pchsNo");	
+			paramMap.put("maxPchsNo", maxPchsNo);
+		}
 
-			paramMap.put("cmpletYn", "Y");
-			paramMap.put("pchsQty", "1");
-			paramMap.put("matrCd", "");
+		paramMap.put("cmpletYn", "Y");
+		paramMap.put("pchsQty", "1");
+		paramMap.put("matrCd", "");
+		//매입확정번호 및 자료 생성
+		result = sm14Mapper.insertPurchaseBillDetailNew(paramMap);
+			
 
-			result = sm14Mapper.insertPurchaseBillDetailNew(paramMap);
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
+		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("ipgoArr"), dtlMap);		
+		
+		//매입확정 선택된 입고자료에 대해 매입확정번호 설정함
+		for(Map<String, String> dtl : detailMap) {
+			dtl.put("userId", paramMap.get("userId"));
+			dtl.put("pgmId", paramMap.get("pgmId"));
+			dtl.put("creatId", paramMap.get("userId"));
+			dtl.put("maxPchsNo", maxPchsNo);
+			dtl.put("pchsSeq", paramMap.get("pchsSeq"));
+    		result += sm14Mapper.updateIpgoDataPurchaseBillNo(dtl);		//입고자료에 매입확정번호 설정	    		
+		}			
+			
 	
 		return result;
 	}	
