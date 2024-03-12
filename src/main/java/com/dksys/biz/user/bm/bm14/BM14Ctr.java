@@ -65,23 +65,52 @@ public class BM14Ctr {
     	model.addAttribute("deptCount", deptCount);
         return "jsonView";
     }
-    
-    @PostMapping(value = "/insertBomTree")
-    public String insertBomTree(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  	  try {
-  		  if (bm14svc.insertBomTree(paramMap, mRequest) != 0 ) {
-  			  model.addAttribute("resultCode", 200);
-  			  model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-  		  } else {
-  			  model.addAttribute("resultCode", 500);
-  			  model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  		  };
-  	  }catch(Exception e){
-  		  model.addAttribute("resultCode", 900);
-  		  model.addAttribute("resultMessage", e.getMessage());
-  	  }
-  	  return "jsonView";
-    }
+	
+	@PostMapping(value = "/insertBomTree")
+	public String insertBomTree(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			// Map<String, String> delmatrbom = bm14svc.deleteMatrbomChk(paramMap);
+			// String delyn = delmatrbom.get("delyn");
+			// if("N".equals(delyn)) {
+        	// 	model.addAttribute("resultCode", 500);
+			// 	model.addAttribute("resultMessage", " 구매BOM정보가 변경되어 삭제할 수 없습니다.");
+        	// 	// model.addAttribute("resultMessage", delmatrbom.get("matrCd") + " : 발주정보가 존재하여 삭제할 수 없습니다.");
+        	// } else {
+        	//  	if (bm14svc.deleteBom(paramMap) != 0 ) {
+			// 		model.addAttribute("resultCode", 200);
+			// 		model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			// 	} else {
+			// 		model.addAttribute("resultCode", 500);
+			// 		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));    			
+			// 	}
+        	// }
+
+			if (bm14svc.insertBomTree(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+
+		// try {
+		// 	if (bm14svc.insertBomTree(paramMap, mRequest) != 0 ) {
+		// 		model.addAttribute("resultCode", 200);
+		// 		model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+		// 	} else {
+		// 		model.addAttribute("resultCode", 500);
+		// 		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		// 	};
+		// }catch(Exception e){
+		// 	model.addAttribute("resultCode", 900);
+		// 	model.addAttribute("resultMessage", e.getMessage());
+		// }
+		return "jsonView";
+	}
     
     // BOM이동
     @PostMapping("/moveBom")
@@ -100,23 +129,47 @@ public class BM14Ctr {
     	}
         return "jsonView";
     }
+
     // BOM 삭제
     @PostMapping("/deleteBom")
     public String deleteBom(@RequestBody Map<String, String> paramMap, ModelMap model) {
     	try {
-    		if (bm14svc.deleteBom(paramMap) != 0 ) {
-    			model.addAttribute("resultCode", 200);
-    			model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-    		} else {
-    			model.addAttribute("resultCode", 500);
-    			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));    			
-    		}
-    	}catch(Exception e) {
+			Map<String, String> delmatrbom = bm14svc.deleteMatrbomChk(paramMap);
+			String delyn = delmatrbom.get("delyn");
+			if("N".equals(delyn)) {
+        		model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", " 구매BOM정보가 변경되어 삭제할 수 없습니다.");
+        		// model.addAttribute("resultMessage", delmatrbom.get("matrCd") + " : 발주정보가 존재하여 삭제할 수 없습니다.");
+        	} else {
+        	 	if (bm14svc.deleteBom(paramMap) != 0 ) {
+					model.addAttribute("resultCode", 200);
+					model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+				} else {
+					model.addAttribute("resultCode", 500);
+					model.addAttribute("resultMessage", messageUtils.getMessage("fail"));    			
+				}
+        	}
+    	}catch(Exception e){
     		model.addAttribute("resultCode", 900);
-    		model.addAttribute("resultMessage", e.getMessage());
+			model.addAttribute("resultMessage", e.getMessage());
     	}
     	return "jsonView";
+		
+		// try {
+    	// 	if (bm14svc.deleteBom(paramMap) != 0 ) {
+    	// 		model.addAttribute("resultCode", 200);
+    	// 		model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+    	// 	} else {
+    	// 		model.addAttribute("resultCode", 500);
+    	// 		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));    			
+    	// 	}
+    	// }catch(Exception e) {
+    	// 	model.addAttribute("resultCode", 900);
+    	// 	model.addAttribute("resultMessage", e.getMessage());
+    	// }
+    	// return "jsonView";
     }
+
     // BOM Node 복사
     @PostMapping("/copyBomTree")
     public String copyBomTree(@RequestBody List<Map<String, String>> paramList, ModelMap model) {

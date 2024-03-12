@@ -348,4 +348,38 @@ public class SM01Ctr {
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
 	}
+
+	// // BOM 동기화
+    // @PostMapping("/syncBom")
+    // public String syncBom(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    // 	try {
+	// 		Map<String, String> delmatrbom = sm01Svc.deleteMatrbomChk(paramMap);
+	// 		String delyn = delmatrbom.get("delyn");
+	// 		if("N".equals(delyn)) {
+    //     		model.addAttribute("resultCode", 500);
+	// 			model.addAttribute("resultMessage", " 구매BOM정보가 변경되어 삭제할 수 없습니다.");
+    //     		// model.addAttribute("resultMessage", delmatrbom.get("matrCd") + " : 발주정보가 존재하여 삭제할 수 없습니다.");
+    //     	} else {
+    //     	 	if (sm01Svc.deleteBom(paramMap) != 0 ) {
+	// 				model.addAttribute("resultCode", 200);
+	// 				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+	// 			} else {
+	// 				model.addAttribute("resultCode", 500);
+	// 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));    			
+	// 			}
+    //     	}
+    // 	}catch(Exception e){
+    // 		model.addAttribute("resultCode", 900);
+	// 		model.addAttribute("resultMessage", e.getMessage());
+    // 	}
+    // 	return "jsonView";
+    // }
+
+	// 업로드 내용 적용 프로시져 호출
+    @PostMapping("/syncBom")
+    public String syncBom(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	Map<String, String> result = sm01Svc.syncBom(paramMap);
+    	model.addAttribute("result", result);
+    	return "jsonView";
+    }
 }

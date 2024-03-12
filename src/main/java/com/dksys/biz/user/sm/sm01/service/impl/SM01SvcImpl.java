@@ -357,5 +357,16 @@ public class SM01SvcImpl implements SM01Svc {
 	public List<Map<String, String>> select_prjct_code(Map<String, String> paramMap) {
 		return sm01Mapper.select_prjct_code(paramMap);
 	}
+
+	// @Override
+	// public int syncBom(Map<String, String> paramMap) {
+	// 	return sm01Mapper.syncBom(paramMap);
+	// }
+
+	@Override
+	public Map<String, String> syncBom(Map<String, String> paramMap) {
+		sm01Mapper.syncBom(paramMap);
+		return paramMap;
+	}
 	
 }

@@ -53,4 +53,8 @@ public interface SM01Mapper {
   List<Map<String, String>> nextPrcsnNmList(Map<String, String> paramMap);
   
   List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
+
+  // int syncBom(Map<String, String> paramMap);
+
+  void syncBom(Map<String, String> param);
 }

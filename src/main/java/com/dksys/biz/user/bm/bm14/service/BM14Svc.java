@@ -42,5 +42,8 @@ public interface BM14Svc {
 	List<Map<String, String>> selectBomAllEnterList(Map<String, String> paramMap);
 
 	int selectBomAllEnterListCount(Map<String, String> paramMap);
+
+	// 삭제 체크 조회
+	Map<String, String> deleteMatrbomChk(Map<String, String> paramMap);
 	
 }

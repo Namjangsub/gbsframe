@@ -54,6 +54,12 @@ public class BM14SvcImpl implements BM14Svc {
 		return bm14Mapper.checkBomId(paramMap);
 	}
 
+	// 삭제체크
+	@Override
+	public Map<String, String> deleteMatrbomChk(Map<String, String> paramMap) {
+		return bm14Mapper.deleteMatrbomChk(paramMap);
+	}
+
 	@Override
 	public int insertBomTree(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();

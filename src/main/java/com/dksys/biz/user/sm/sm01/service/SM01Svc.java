@@ -50,4 +50,8 @@ public interface SM01Svc {
 
   List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
 
+  // int syncBom(Map<String, String> paramMap);
+
+  Map<String, String> syncBom(Map<String, String> paramMap);
+
 }
