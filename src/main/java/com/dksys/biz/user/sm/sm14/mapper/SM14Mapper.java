@@ -86,6 +86,10 @@ public interface SM14Mapper {
 
 	int updateIpgoDataPurchaseBillNoClear(Map<String, String> param);
 
+	int updateETCIpgoDataPurchaseBillNo(Map<String, String> paramMap);
+
+	int updateETCIpgoDataPurchaseBillNoClear(Map<String, String> param);
+
 }
 
 

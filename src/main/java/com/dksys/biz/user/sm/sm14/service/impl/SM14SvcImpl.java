@@ -217,7 +217,13 @@ public class SM14SvcImpl implements SM14Svc {
 		int result = 0;
 		result = sm14Mapper.deletePurchaseDetail(param);
 
-		result += sm14Mapper.updateIpgoDataPurchaseBillNoClear(param);
+		String ordrgNo = param.get("ordrgNo");
+		String orderPrefix = ordrgNo.substring(0, 4);
+		if (orderPrefix.equals("COST")) { 		//기타매입인경우
+			result += sm14Mapper.updateETCIpgoDataPurchaseBillNoClear(param);
+		} else {
+			result += sm14Mapper.updateIpgoDataPurchaseBillNoClear(param);
+		}
 		
 		
 		String rtnString = sm14Mapper.selectPurchaseDetailCount(param);
@@ -381,23 +387,29 @@ public class SM14SvcImpl implements SM14Svc {
 		paramMap.put("matrCd", "");
 		//매입확정번호 및 자료 생성
 		result = sm14Mapper.insertPurchaseBillDetailNew(paramMap);
-			
 
-		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
-		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
-		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("ipgoArr"), dtlMap);		
-		
-		//매입확정 선택된 입고자료에 대해 매입확정번호 설정함
-		for(Map<String, String> dtl : detailMap) {
-			dtl.put("userId", paramMap.get("userId"));
-			dtl.put("pgmId", paramMap.get("pgmId"));
-			dtl.put("creatId", paramMap.get("userId"));
-			dtl.put("maxPchsNo", maxPchsNo);
-			dtl.put("pchsSeq", paramMap.get("pchsSeq"));
-    		result += sm14Mapper.updateIpgoDataPurchaseBillNo(dtl);		//입고자료에 매입확정번호 설정	    		
-		}			
+		String ordrgNo = paramMap.get("ordrgNo");
+		String orderPrefix = ordrgNo.substring(0, 4);
+		if (orderPrefix.equals("COST")) {
+			result += sm14Mapper.updateETCIpgoDataPurchaseBillNo(paramMap);
+		} else {
+			//매입자료에 대한 처리부분임 (매입확정은 일반입고, 기타비용, 반풐이있음)
+			Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+			Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
+			List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("ipgoArr"), dtlMap);		
+			if (detailMap != null && !detailMap.isEmpty()) {
+				//매입확정 선택된 입고자료에 대해 매입확정번호 설정함
+				for(Map<String, String> dtl : detailMap) {
+					dtl.put("userId", paramMap.get("userId"));
+					dtl.put("pgmId", paramMap.get("pgmId"));
+					dtl.put("creatId", paramMap.get("userId"));
+					dtl.put("maxPchsNo", maxPchsNo);
+					dtl.put("pchsSeq", paramMap.get("pchsSeq"));
+		    		result += sm14Mapper.updateIpgoDataPurchaseBillNo(dtl);		//입고자료에 매입확정번호 설정	    		
+				}			
+			}
+		}
 			
-	
 		return result;
 	}	
 	  
