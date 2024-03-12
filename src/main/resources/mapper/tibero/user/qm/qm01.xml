@@ -4,23 +4,29 @@
 <mapper namespace="com.dksys.biz.user.qm.qm01.mapper.QM01Mapper">
 
 	<select id="selectQualityReqCount" parameterType="Map" resultType="int">
-		SELECT COUNT(*)   
+		SELECT COUNT(*) 
 		FROM TB_QM01M01 T
-		 LEFT OUTER JOIN TB_QM01P01 P ON P.REQ_NO = T.REQ_NO
+		 LEFT OUTER JOIN TB_QM01P01 P ON P.CO_CD = T.CO_CD AND P.REQ_NO = T.REQ_NO
 		 LEFT OUTER JOIN TB_CR02D02 S ON T.SALES_CD = S.SALES_CD  
 		 LEFT OUTER JOIN TB_CR02M01 SM ON S.CO_CD =  SM.CO_CD  AND S.ORDRS_NO = SM.ORDRS_NO
 		 LEFT OUTER JOIN TB_BM01M01 B ON S.PRDT_CD = B.PRDT_CD  
-		 LEFT OUTER JOIN TB_CM05M01 C ON C.CODE_ID  = T.REQ_ST AND C.USE_YN='Y' AND C.CODE_KIND = 'REQST'       
-		 LEFT OUTER JOIN TB_CM05M01 C1 ON C1.CODE_ID = T.BUST_CD AND C1.USE_YN='Y' AND C1.CODE_KIND = 'BUSTCD' 
-		 LEFT OUTER JOIN TB_CM05M01 C2 ON C2.CODE_ID = T.INWK_CD AND C2.USE_YN='Y' AND C2.CODE_KIND = 'INWKCD'		
+		 LEFT OUTER JOIN TB_CM05M01 C ON C.CODE_ID  = T.REQ_ST AND C.USE_YN='Y' AND C.CODE_KIND = 'REQST'       	
 		 LEFT OUTER JOIN TB_CM05M01 C3 ON C3.CODE_ID = T.DEPT_CD AND C3.USE_YN='Y' AND C3.CODE_KIND = 'COBGB'
 		 LEFT OUTER JOIN TB_CM05M01 C4 ON C4.CODE_ID = T.MID_CD AND C4.USE_YN='Y' 
 		 LEFT OUTER JOIN TB_CM05M01 C5 ON C5.CODE_ID = T.SUB_CD AND C5.USE_YN='Y' 	
 		 LEFT OUTER JOIN TB_CM05M01 C6 ON C6.CODE_ID = T.PART_CD AND C6.USE_YN='Y' AND C6.CODE_KIND = 'COBTP'	 
-		 LEFT OUTER JOIN TB_CM06M01 N1 ON N1.ID = T.REG_ID  --AND N1.CO_CD =  T.CO_CD
-		 LEFT OUTER JOIN TB_CM06M01 N2 ON N2.ID = T.ORDRG_ID  --AND N2.CO_CD =  T.CO_CD
-		 LEFT OUTER JOIN TB_CM06M01 N3 ON N3.ID = T.CREAT_ID  --AND N3.CO_CD =  T.CO_CD
-		 WHERE 1=1 
+		 LEFT OUTER JOIN TB_CM06M01 N1 ON N1.ID = T.REG_ID -- AND N1.CO_CD =  T.CO_CD
+		 LEFT OUTER JOIN TB_CM06M01 N2 ON N2.ID = T.ORDRG_ID -- AND N2.CO_CD =  T.CO_CD
+		 LEFT OUTER JOIN TB_CM06M01 N3 ON N3.ID = T.CREAT_ID  --AND N3.CO_CD =  T.CO_CD		 
+		 LEFT OUTER JOIN TB_BM02M01 CT ON CT.CLNT_CD = SM.ORDRS_CLNT_CD AND CT.USE_YN = 'Y' 
+		 LEFT OUTER JOIN TB_CM04M01 CM4 ON CM4.DEPT_ID = substr(N2.DEPT_ID,1,5) 
+		 LEFT OUTER JOIN TB_WB20M03 CC ON CC.TODO_FILE_TRGT_KEY = T.FILE_TRGT_KEY
+										 AND CC.TODO_CO_CD = T.CO_CD
+									     AND CC.TODO_NO    = T.REQ_NO
+										 AND CC.TODO_DIV1_CODE_ID = 'TODODIV20'  --결재건
+										 AND CC.SANCTN_SN = 1  --첫번째가 결재되어야 함(팀장)
+										 AND CC.SANCTN_STTUS = 'Y'  --결재상태	
+		 WHERE 1=1  
 		<if test="coCd !=null and !coCd.equals('')">
 		  AND T.CO_CD = #{coCd}
 		 </if>
@@ -30,12 +36,12 @@
          <if test="ordrgId !=null and !ordrgId.equals('')">
           AND (T.ORDRG_ID = #{ordrgId} OR T.REG_ID = #{ordrgId})
          </if>
+         <if test="ordrgNm !=null and !ordrgNm.equals('')">
+          AND N2.NAME = #{ordrgNm}
+         </if>
          <if test="salesCd !=null and !salesCd.equals('')">
           AND T.SALES_CD  LIKE '%${salesCd}%'
          </if>
-         <!-- <if test="prdtCd !=null and !prdtCd.equals('')">
-     	  AND S.PRDT_CD = #{prdtCd}
-         </if>-->
          <if test="prdtCd !=null and !prdtCd.equals('')">
           AND B.PRDT_GRP = #{prdtCd}
          </if>         	
@@ -51,12 +57,21 @@
         <if test="eqpNm !=null and !eqpNm.equals('')">
           AND S.EQP_NM  LIKE '%${eqpNm}%'  
         </if>
+        <if test="reqSt !=null and !reqSt.equals('')">
+          AND T.REQ_ST = #{reqSt}
+         </if>
         <if test="clntCd !=null and !clntCd.equals('')">
           AND SM.ORDRS_CLNT_CD = #{clntCd}
         </if> 
         <if test="partCd !=null and !partCd.equals('')">
           AND T.PART_CD = #{partCd}
         </if>  
+        <if test="rsltYn !=null and !rsltYn.equals('')">
+          AND T.RSLT_YN = #{rsltYn}
+        </if>  
+	  	<if test="clntNm !=null and !clntNm.equals('')">
+	      AND CT.CLNT_NM LIKE '%' || #{clntNm} || '%'
+	    </if> 
 	</select>
 	
 	<select id="selectQualityReqList" parameterType="Map" resultType="CamelMap">	
@@ -196,14 +211,14 @@
         <if test="rsltYn !=null and !rsltYn.equals('')">
           AND T.RSLT_YN = #{rsltYn}
         </if>  
+	  	<if test="clntNm !=null and !clntNm.equals('')">
+	      AND CT.CLNT_NM LIKE '%' || #{clntNm} || '%'
+	    </if> 
           <!--ORDER BY T.CO_CD, T.REQ_NO-->
             ORDER BY T.REQ_NO DESC
 		 ) AS a
 		) A
 	  WHERE  RNUM BETWEEN #{firstIndex} AND #{lastIndex}
-	  	<if test="clntNm !=null and !clntNm.equals('')">
-	      AND CLNT_NM LIKE '%' || #{clntNm} || '%'
-	    </if> 
 	   
 	</select>
 	
