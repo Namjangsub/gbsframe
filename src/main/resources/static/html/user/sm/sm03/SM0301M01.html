@@ -183,16 +183,18 @@
 			<div class="add_btn_small pdl10">
 				<a onclick="inserWareHousingModal('C');" style="height: 30px; line-height: 28px;" authchk>+</a>
 				<!-- <a onclick="deleteAproval();" style="height: 30px; line-height: 28px;" authchk>-</a> -->
+				<a onclick="arriveWareHousing('Y');" style="height: 30px; line-height: 28px; width: 90px;" title="입고 확인만 처리합니다. 매입처리 필요함." authchk><i class="fas fa-check-square"></i> 입고확인(O) </a>
+				<a onclick="arriveWareHousing('N');" style="height: 30px; line-height: 28px; width: 100px;" title="입고 확인만 처리합니다. 매입처리 필요함." authchk><i class="fas fa-eraser"></i> 입고확인취소(X) </a>
 					<a onclick="setReportOrderDetail();" style="height: 30px; line-height: 28px; width: 90px;" title="발주내역중 매입확정건만 출력됩니다."><i class="fas fa-print"></i> 발주명세서</a>
-				<a onclick="deleteWareHousingInno();" style="height: 30px; line-height: 28px; width: 90px;" authchk><i class="fas fa-backspace"></i> 입고취소 </a>
-				<a onclick="insert_update_sm06_Modal('C');" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i>반품등록 </a>				
+				<a onclick="deleteWareHousingInno();" style="height: 30px; line-height: 28px; width: 90px;" authchk><i class="fas fa-backspace"></i> 매입처리취소 </a>
+				<a onclick="insert_update_sm06_Modal('C');" style="height: 30px; line-height: 28px; width: 90px;" authchk><i class="fas fa-file-excel"></i>반품등록 </a>				
 				<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 			    </div>
 				<select id="recordCnt" class="prae_select" data-search="recordCnt" onchange="gridView.setData(0);">
-					<option value="10">10</option>
-					<option value="25">25</option>
-					<option value="50" selected>50</option>
+					<option value="50">50</option>
 					<option value="100">100</option>
+					<option value="500" selected>500</option>
+					<option value="1000">1000</option>
 					<option value="9999999"  >전체</option>
 		        </select>
 			</div>
@@ -210,6 +212,14 @@
 </html>
 
 <script type="text/javascript">
+	ax5.ui.grid.formatter["bilgYn"] = function () {
+		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
+		if (this.value == "E"){
+			return 'E';
+		} else {
+			return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
+		}
+	};
   var gridView = {
   	initView: function(){
 	this.target = new ax5.ui.grid();
@@ -221,7 +231,7 @@
 		target: $('[data-ax5grid="first-grid"]'),
 		header: {
              align: "center",
-             selector: false
+             selector: true
            },
            body: {
 		    mergeCells : ["coCdNm", "dsgnNo", "ordrgNo", "salesCd", "pchsClntNm","ordrgMngNm","ordrgDt","dudtDeqDt","dudtIntendDt","ordrgQty","reaminInQty"],        	   
@@ -276,6 +286,8 @@
               {key: "ordrgDt",      			label: "발주일자",      align: "center",   width: 90,
                   formatter: function () { return ( moment(this.item.creatDttm).format('YYYY-MM-DD'));},},                    
               {key: "dudtDeqDt",      			label: "납기요청일",      align: "center",   width: 90},     
+			  {key: "arrYn",					label: "입고확인",		  align: "center",	width: 70,		formatter: "bilgYn"},
+			  {key: "arrDttm",					label: "확인일자",		  align: "center",	width: 90},
               {key: "matrCntNm",	      		label: "품목명(형번/규격/크기)",      align: "left",   width: 250,},    
               {key: "dudtIntendDt",      		label: "납기예정일",      align: "center",   width: 90},
               {key: "ordrgDiv10",      			label: "발주구분cd",      align: "center",   width: 130, hidden: true},
@@ -502,6 +514,50 @@
  		}
 	}
 	
+
+	//물건 입고 확인 처리입니다.
+	//단가확정후 입고처리 필요함.
+	function arriveWareHousing(_type = 'Y') {
+
+    	let selRow = gridView.target.getList("selected");
+		let gridData = selRow[0];     	
+ 		if( typeof(selRow[0])=="undefined" ) {
+ 			alert("선택된 행이 없습니다.");
+ 			return false;
+ 		}  	
+ 		
+		
+		if (confirm("입고 " + ((_type == "Y") ? "확인 ":"취소 ") +"처리 하시겠습니까?")) {
+			// 기본값 set
+			var formData = new FormData();
+			formData.append('jobType', _type);	//확인처리 'Y',  확인취소 'N'
+			formData.append('userId', jwt.userId);
+			formData.append('pgmId', "SM0301M01");
+			
+			//입고확인 안된 자료만 처리함
+	 		let processArr = [];
+			$.each(selRow, function (idx, elem) {
+				//'Y'일경우 'N'인 자료 'N'일경우 'Y'인자료만 처리함
+				//입고확인된 자료 재처리할 경우 pass,  입고확인되지 않았는데 취소 처리하면 pass처리하기 위함
+				if (selRow[idx].arrYn !=  _type) {		
+					processArr.push(selRow[idx]);
+				}
+	        });
+			if (processArr.length == 0) {
+				alert("입고확인 및 취소 처리할 자료가 없습니다.")
+				return false;
+			}
+			formData.append("detailArr", JSON.stringify(processArr));
+			
+			filePostAjax("/user/sm/sm02/arriveWareHousing", formData,	function(data) {
+				if (data.resultCode == 200) {
+					gridView.setData(0);
+				}
+			});
+		}
+	}
+	
+	
 	
 
 	//엑셀다운로드
@@ -615,7 +671,7 @@ $(document).ready(function() {
 		
 	// 시작일 (현재날짜의 이전월 첫일)
 	const now = moment().startOf("month");
-	var beDay = now.add(-1, "M").format("YYYY-MM-DD");	
+	var beDay = now.add(-6, "M").format("YYYY-MM-DD");	
 	
 	$.dayInit = function() {
 						

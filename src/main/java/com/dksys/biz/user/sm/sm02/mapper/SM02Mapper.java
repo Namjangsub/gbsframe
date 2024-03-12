@@ -55,6 +55,10 @@ public interface SM02Mapper {
 	List<Map<String, String>> select_mngId_code(Map<String, String> paramMap);
 
 	int OrderMasterReport(Map<String, String> paramMap);
+
+	int arriveWareHousingConfirm(Map<String, String> paramMap);
+	
+	int arriveWareHousingUnconfirm(Map<String, String> paramMap);
 }
 
 

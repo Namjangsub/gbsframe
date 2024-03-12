@@ -48,4 +48,6 @@ public interface SM02Svc {
 	List<Map<String, String>> select_mngId_code(Map<String, String> paramMap);
 
 	int OrderMasterReport(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+
+	int arriveWareHousing(Map<String, String> paramMap) throws Exception;
 }

@@ -416,4 +416,27 @@ public class SM02SvcImpl implements SM02Svc {
 		
 		return result;
 	}
+
+	//발주 물품 당사 도착 확인 처리
+	@Override
+	public int arriveWareHousing(Map<String, String> paramMap)  throws Exception {
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
+		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);	
+		
+		int result = 0;	    	    
+		String jobType = paramMap.get("jobType");	    	    
+	    //upate
+		for(Map<String, String> dtl : detailMap) {
+			dtl.put("pgmId", paramMap.get("pgmId"));
+			dtl.put("userId", paramMap.get("userId"));
+			
+			if ("Y".equals(jobType)) {
+				result += sm02Mapper.arriveWareHousingConfirm(dtl);
+			} else {
+				result += sm02Mapper.arriveWareHousingUnconfirm(dtl);
+			}
+		}
+		return result;
+	}
 }
