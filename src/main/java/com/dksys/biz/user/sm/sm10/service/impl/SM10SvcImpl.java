@@ -96,16 +96,16 @@ public class SM10SvcImpl implements SM10Svc {
 	//턴키면 저장
 	if(paramMap.get("pchsCostDiv10").equals("PCHSCOSTDIV1030")) {
 		for (Map<String, String> detailMap : detailArr) {
-			try {
+//			try {
 				detailMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-				detailMap.put("coCd", paramMap.get("coCd"));
+				detailMap.put("coCd", paramMap.get("ordrsCoCd"));
 				detailMap.put("userId", paramMap.get("userId"));
 				detailMap.put("pgmId", paramMap.get("pgmId"));
 				
 				sm10Mapper.insertTurnKeyDetail(detailMap);
-			} catch (Exception e) {
-				System.out.println("error3" + e.getMessage());
-			}
+//			} catch (Exception e) {
+//				System.out.println("error3" + e.getMessage());
+//			}
 		}
 	}
     
@@ -160,16 +160,16 @@ public class SM10SvcImpl implements SM10Svc {
 		//턴키면 저장
 		if(paramMap.get("pchsCostDiv10").equals("PCHSCOSTDIV1030")) {
 			for (Map<String, String> detailMap : detailArr) {
-				try {
+//				try {
 					detailMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-					detailMap.put("coCd", paramMap.get("coCd"));
+					detailMap.put("coCd", paramMap.get("ordrsCoCd"));
 					detailMap.put("userId", paramMap.get("userId"));
 					detailMap.put("pgmId", paramMap.get("pgmId"));
 					
 					sm10Mapper.insertTurnKeyDetail(detailMap);
-				} catch (Exception e) {
-					System.out.println("error3" + e.getMessage());
-				}
+//				} catch (Exception e) {
+//					System.out.println("error3" + e.getMessage());
+//				}
 			}
 		}
 		//---------------------------------------------------------------  
