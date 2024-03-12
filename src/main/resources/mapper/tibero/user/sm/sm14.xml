@@ -2625,8 +2625,6 @@
 				, ORDRG_PRC			/* 발주단가 */
 				, ORDRG_QTY			/* 발주수량 */
 				, ORDRG_AMT			/* 발주금액  */
-				, G.IN_DTL_AMT      /* 입고금액  */
-				, G.IN_QTY          /* 입고수량  */
 				, TO_CHAR(D.DUDT_DEQ_DT, 'YYYY-MM-DD') DUDT_DEQ_DT
 				, TO_CHAR(D.DUDT_INTEND_DT, 'YYYY-MM-DD') DUDT_INTEND_DT
 				, ORDRG_DTL_RMK
@@ -2658,7 +2656,7 @@
 	        			AND D.UPPER_CD=CC.UPPER_CD  AND D.LOWER_CD=CC.LOWER_CD       		
 		        ) BOM_QTY /* 구매 BOM 수량 */
 		        , 'Y' AS USER_CHK_V		/* 수정시 CHK값 SET */
-		        , E.MATR_NM		/* 자재명 */
+		        , F.MATR_NM		/* 자재명 */
 		        , D.MATR_MAT		/* 소재 */
 		        , D.MATR_MAKR_NM
 		        , D.MATR_MNO
@@ -2679,26 +2677,25 @@
 				, F.PCHS_CLNT_PCT2
 				, F.PCHS_CLNT_CD3
 				,(SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = F.PCHS_CLNT_CD3) AS PCHS_CLNT_NM3		/* 구매처2 */		
-				, D.NEXT_PRCSN_NM					/* 후행업체 */	         
-				, TO_CHAR(G.IN_DT, 'YYYY-MM-DD') IN_DT
-				, G.IN_NO 				/* 입고번호 */
+				, D.NEXT_PRCSN_NM					/* 후행업체 */	
+				, G.IN_NO 				/* 입고번호 */	         
+				, TO_CHAR(G.IN_DT, 'YYYY-MM-DD') IN_DT /* 입고일자 */
+				, G.IN_PRC          /* 입고단가  */
+				, G.IN_QTY          /* 입고수량  */
+				, G.IN_DTL_AMT      /* 입고금액  */
 			FROM TB_SM02D01 D			/* 발주디테일 */
+			--입고처리 내역 합계
+			LEFT OUTER JOIN TB_SM03D01 G ON G.CO_CD = D.CO_CD 
+									    AND G.ORDRG_NO = D.ORDRG_NO 
+									    AND G.ORDRG_SEQ = D.ORDRG_SEQ 
+									    AND G.SALES_CD = D.SALES_CD 
+									    AND G.MATR_CD = D.MATR_CD
 			LEFT OUTER JOIN TB_SM01D01 E ON(/* D.CO_CD=E.CO_CD AND */ D.SALES_CD=E.SALES_CD 
 											AND D.UPPER_CD=E.UPPER_CD 
 											AND D.LOWER_CD=E.LOWER_CD
 											AND D.MATR_SEQ=E.MATR_SEQ 
 											AND D.MATR_CD=E.MATR_CD)		/*구매 BOM */
-			LEFT OUTER JOIN TB_BM05M01 F ON ( E.MATR_CD = F.MATR_CD )	/* 자재마스터 */
-			--입고처리 내역 합계
-			LEFT OUTER JOIN (
-							 SELECT CO_CD, ORDRG_NO, ORDRG_SEQ, SALES_CD, MATR_CD, SUM(IN_DTL_AMT) IN_DTL_AMT, SUM(IN_QTY) IN_QTY, MAX(IN_DT) IN_DT, IN_NO
-			                   FROM TB_SM03D01 
-			                  GROUP BY CO_CD, ORDRG_NO, ORDRG_SEQ, SALES_CD, MATR_CD, IN_NO
-							) G ON  G.CO_CD = D.CO_CD 
-							   AND G.ORDRG_NO = D.ORDRG_NO 
-							   AND G.ORDRG_SEQ = D.ORDRG_SEQ 
-							   AND G.SALES_CD = D.SALES_CD 
-							   AND G.MATR_CD = D.MATR_CD
+			LEFT OUTER JOIN TB_BM05M01 F ON ( G.MATR_CD = F.MATR_CD )	/* 자재마스터 */
 			WHERE 1=1
 			<if test="coCd != null and !coCd.equals('')">
 				AND D.CO_CD = #{coCd}   
@@ -2837,9 +2834,10 @@
 		    , D.ORDRG_SEQ
 		    , D.PCHS_AMT
 		    , D.PCHS_VAT
+		    , D.PCHS_AMT + D.PCHS_VAT  AS PCHS_TOT
 		    , TO_CHAR(D.PCHS_DT, 'YYYY-MM-DD') PCHS_DT
 		    , D.CREAT_ID
-		    , TO_CHAR(D.CREAT_DTTM, 'YYYY-MM-DD') CREAT_DTTM
+		    , TO_CHAR(D.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') CREAT_DTTM
 		    , A.SALES_CD 
 		    , C.NAME AS CREAT_NM            	
 		FROM TB_SM12D01 D			/* 매입디테일 */
