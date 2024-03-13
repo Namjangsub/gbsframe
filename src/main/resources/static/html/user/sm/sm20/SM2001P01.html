@@ -1,0 +1,684 @@
+<div class="popup_area of_a" style="width: 100%; height: 100%;">
+	<div class="tit_contents">
+		<h4 class="tit">매입계산서 등록</h4>
+	</div>
+	
+	<form id="popForm" onSubmit="return false;">
+		<div class="form-group popup_table">
+			<input type="hidden" id="fileTrgtKey" name="fileTrgtKey">
+			<input type="hidden" id="userId"      name="userId">
+			<input type="hidden" id="pgmId"       name="pgmId" value="SM2001P01">
+			<table>
+				<colgroup>
+					<col width="11%">
+					<col width="14%">
+					<col width="11%">
+					<col width="14%">
+					<col width="11%">
+					<col width="14%">
+					<col width="11%">
+					<col width="14%">
+				</colgroup>
+				<!-- 1행 -->
+				<tr>
+					<th class="hit coCd">회사</th>
+					<td>
+						<select id="coCd" name="coCd" data-kind="CO" class="form-control input-sm" required msg="회사"></select>
+					</td>
+
+					<th>계산서번호</th>
+					<td>
+						<input type="text"  id="billNo" name="billNo" msg="계산서번호" readonly="readonly">
+					</td>
+
+					<th class="hit clntNm">거래처</th>
+					<td>
+						<input type="hidden" id="clntCd" name="clntCd">
+						<div class="search_form">
+							<input type="text" id="clntNm" name="clntNm" required
+							onkeyup="event.keyCode == 8 ? clntCd.value = '' : event.keyCode == 13 ? ClntSearch($('#clntNm').val()) : ''">
+							<a onclick="ClntSearch($('#clntNm').val());"><i class="i_search_w"></i></a>
+						</div>
+					</td>
+
+					<th class="hit billDt">발행일자</th>
+					<td>
+						<input id="billDt" name="billDt" class="input_calendar form-control" autocomplete="off"
+						 onkeyup="dateMask(this);" msg="발행일자" required date onchange="monthCloseChk(this.value);">
+					</td>
+				</tr>
+				
+				<!-- 2행 -->
+				<tr>
+					<th>통화단위</th>
+					<td>
+						<select id="currCd" name="currCd" data-kind="CURR" class="form-control input-sm" onchange="Chk_currCd();">
+						</select>
+					</td>
+
+					<th colspan="2"></th>
+					<!-- <td>
+						<input data-number type="text" id="exrate" name="exrate" class="form-control" maxlength="10" onchange="Chk_Exrate();" readonly="readonly">
+					</td> -->
+
+					<th>계산서금액</th>
+					<td>
+						<input comma type="text" id="billAmt" name="billAmt" readonly="readonly">
+					</td>
+
+					<!-- 빈값추가 -->
+					<th></th>
+					<th></th>
+				</tr>
+
+				<!-- 3행 -->
+				<tr>
+					<th>공급가액</th>
+					<td>
+						<input comma type="text" id="printAmt" name="printAmt" readonly="readonly">
+					</td>
+
+					<th>부가세</th>
+					<td>
+						<input comma type="text" id="billVat" name="billVat" class="form-control" maxlength="10" onchange="setSumVat();" onkeyup="onlyNumber(this);chkSumVat();">
+					</td>
+
+					<th>합계금액</th>
+					<td>
+						<input type="text" id="printSumAmt" name="printSumAmt" comma readonly="readonly">
+					</td>
+
+					<th>차이금액</th>
+					<td>
+						<input type="text" id="diffVat" name="diffVat" comma readonly="readonly">
+					</td>
+					
+					<th></th>
+					<th></th>
+				</tr>
+				
+			</table>
+		</div>
+	</form>
+	
+	<!-- 콘텐츠 -->
+	<div class="contents">
+		<!-- 리스트 -->
+		<div class="ax5_grid">
+			<div>
+				<div data-ax5grid="first-grid-modal" data-ax5grid-config="{}" style="height:500px; width: 100%" ></div>
+			</div>
+		</div>
+	</div>
+	
+	<!-- 공통 파일 영역 -->
+	<div id="fileList_area"></div>
+</div>
+
+<!-- 하단 버튼 -->
+<div class ="popup_bottom_btn">
+	<button type="button" id="actionBtn" authChk>등록</button>
+	<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+</div>
+
+<script type="text/javascript">
+	var actionType  = null;
+	var fileTrgtKey = null;
+	var clntCd = null;
+	var clntNm = null;
+	var detailArr   = []; // 상세 그리드내용
+	let loadData = {};
+
+	var ModalgridView = {
+		initView: function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				//frozenColumnIndex : 3,
+				showLineNumber : true,
+				// 체크박스
+				//showRowSelector: true,
+				multipleSelect : false,
+				sortable       : true,
+				target : $('[data-ax5grid="first-grid-modal"]'),
+				header : {
+					align   : "center",
+					selector: false
+				},
+				
+				body : {
+					mergeCells : ["ordrgNo", "ordrgSeq", "pchsNo", "pchsSeq", "salesCd", "dsgnNo"],
+					onClick: function () {
+						this.self.select(this.dindex);
+						var row = this.dindex;
+						var col = this.colIndex;
+						var key = this.column.key;						
+						var paramObj = {"row" : row};
+					    var vatRate = 10;
+						//체크박스일 경우 실행
+						if( key == "chk" ) {
+							setAmt(ModalgridView, this.item.chk , this.item.pchsAmt, row, vatRate);                        		
+						}
+					},
+					onDBLClick: function () {
+						//this.self.select(this.dindex);
+					},
+					onDataChanged: function () {
+					},
+				},
+				
+				page : {
+					navigationItemCount: 9,
+					height: 30,
+					display: true,
+					firstIcon: '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+					prevIcon: '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+					nextIcon: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+					lastIcon: '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+					onChange: function () {
+						ModalgridView.setData(this.page.selectPage);
+					}
+				},
+				footSum : [
+					[
+						{label: "합계", colspan:4, align:"center"},
+						{key: "pchsAmt"   , collector: "sum", formatter:"money", align: "right"},
+						{key: "pchsVat"   , collector: "sum", formatter:"money", align: "right"},
+						{key: "pchsSumAmt", collector: "sum", formatter:"money", align: "right"},
+						{},
+						{},
+						{key: "billDtlAmt", collector: "sum", formatter:"money", align: "right"},
+						{key: "billDtlVat", collector: "sum", formatter:"money", align: "right"},
+						{key: "billDtlTot", collector: "sum", formatter:"money", align: "right"},
+					]
+				],
+				columns: [
+					{key: "ordrgNo"   , label: "발주(비용)번호", align: "center", width: 120},
+					{key: "ordrgSeq"  , label: "순번"          , align: "center", width: 120, hidden: true},
+					{key: "pchsNo"    , label: "매입번호"      , align: "center", width: 120},
+					{key: "pchsSeq"   , label: "순번"          , align: "center", width: 120, hidden: true},
+					{key: "salesCd"   , label: "Sales Code"    , align: "center", width: 150},
+					{key: "dsgnNo"    , label: "대표도번"      , align: "left"  , width: 250},
+					{key: "pchsAmt"   , label: "매입금액"      , align: "right" , width: 100, formatter: "money"},
+					{key: "pchsVat"   , label: "부가세"        , align: "right" , width: 100, formatter: "money"},
+					{key: "pchsSumAmt", label: "합계금액"      , align: "right" , width: 100, formatter: "money"},
+					{key: "pchsDt"    , label: "확정일자"      , align: "center", width: 90},
+					{key: "creatIdNm" , label: "담당자"        , align: "center", width: 100},
+					{key: "billDtlAmt"   , label: "발행금액"    , align: "right" , width: 100, formatter: "money"},
+					{key: "billDtlVat"   , label: "발행부가세"  , align: "right" , width: 100, formatter: "money"},
+					{key: "billDtlTot"   , label: "발행금액합계", align: "right" , width: 100, formatter: "money"},
+					{key: "chk"       , label: "선택"          , align: "center", width: 40 , sortable: false,
+						editor: {
+							type   : "checkbox",
+							config : {
+								trueValue: "Y",
+								falseValue: "N"
+							}
+						}
+					},
+				]
+			});
+			return this;
+		},
+		
+		setData: function(_pageNo) {
+			var targetObj = this.target;
+			var coCd = $('#coCd').val();
+			var billNo = $('#billNo').val();
+			
+			var formData = new FormData();
+			if (billNo == "") {
+				formData = {
+					"coCd": $('#coCd').val(),
+					"clntCd": $('#clntCd').val(),
+					"currCd": $('#currCd').val()
+				}
+				// debugger;
+				postAjax("/user/sm/sm20/select_sm20_insert_target_modal", formData, null, function(data) {
+					var list = data.result;
+					gridResize(list.length); //그리드 높이 조정
+					targetObj.setData({
+						list : list,
+						page : {
+							totalElements: list.length
+						}
+					});
+				});
+			} else {
+				formData = {
+					"coCd": $('#coCd').val(),
+					"billNo": $('#billNo').val()
+				}
+				// debugger;
+				postAjax("/user/sm/sm20/select_sm20_Info_Dtl", formData, null, function(data) {
+					var list = data.result;
+					gridResize(list.length); //그리드 높이 조정
+					targetObj.setData({
+						list : list,
+						page : {
+							totalElements: list.length
+						}
+					});
+					monthCloseChk($('#billDt').val());
+				});
+			}
+		}
+	}
+	
+	//화면 초기 설정
+	$(document).ready(function() {
+		// debugger;
+		
+		setCommonSelect($(".popup_area select[data-kind]"));
+		setByCoCd(modalStack.last().paramObj.coCd);
+
+		$("#popForm #userId").val(jwt.userId);
+		
+		if (modalStack.last().paramObj.currCd !='' && modalStack.last().paramObj.currCd != undefined ) {
+			$("#popForm #currCd").val(modalStack.last().paramObj.currCd);
+		}
+
+		//통화단위 비활성화
+		$('#popForm .currCd').removeClass('hit');
+		$('#currCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+		
+		//처리일자//
+		$('#billDt').datepicker({
+			format : "yyyy-mm-dd",
+			language : "ko",
+			autoclose : true
+		}).datepicker("setDate", new Date());
+		
+		ModalgridView.initView();
+
+		loadFormData("#popForm", loadData);
+
+		authChk(); //권한체크
+		
+		actionType = modalStack.last().paramObj.actionType;
+		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
+		clntCd = modalStack.last().paramObj.clntCd;
+		clntNm = modalStack.last().paramObj.clntNm;
+		if (actionType == "C") {			
+			$('#popForm .coCd').addClass('hit');
+			$('#popForm input#coCd').attr('required', 'required');
+			
+			$("#popForm #billAmt").val("0");
+			$("#popForm #printAmt").val("0");
+			$("#popForm #billVat").val("0");
+			$("#popForm #printSumAmt").val("0");
+			$("#popForm #billQty").val("1");
+			$("#popForm #billPrc").val("0");
+			
+			//버튼명 변경
+			$("#actionBtn").text("등록");
+
+			if (clntCd != undefined) {
+				$("#popForm #clntCd").val(clntCd);
+				$("#popForm #clntNm").val(clntNm);
+				Modal_DataSearch();
+			}
+
+			//버튼 클릭 시
+			$('#actionBtn').on("click", function() {
+				insert_sm20();
+			});
+		} else if (actionType == "U") {
+			//타이틀명 변경
+			$('.tit').text('매입계산서 수정');
+			
+			//회사 비활성화
+			$('#popForm .coCd').removeClass('hit');
+			$('#coCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+			
+			//거래처 비활성화
+			$('#popForm .clntNm').removeClass('hit');
+			$('#clntNm').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+			
+			//통화 비활성화
+			$('#popForm .currCd').removeClass('hit');
+			$('#currCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+
+			//부가세 비활성화
+			$('#popForm .billVat').removeClass('hit');
+			$('#billVat').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+			
+			// 입력용 체크박스 컬럼 삭제
+			// debugger;
+			ModalgridView.target.removeColumn(14);
+
+			//수정 모드 데이터 가져오기
+			select_sm20_Info();
+			
+			//버튼명 변경
+			$('#actionBtn').text("수정");
+
+			//버튼 클릭 시
+			$('#actionBtn').on("click", function() {
+				update_sm20();
+			});
+		}
+		//---------------------------------------------------------------
+		//첨부 화일 처리 시작
+		//---------------------------------------------------------------
+		fileParam = {
+			fileTrgtTyp	: $("#popForm #pgmId").val(),
+			fileTrgtKey : fileTrgtKey
+		}
+		
+		treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
+		//---------------------------------------------------------------
+		//첨부 화일 처리 끝
+		//---------------------------------------------------------------
+	});
+	
+	//입력정보
+	function select_sm20_Info() {
+		var formData = {
+			"fileTrgtKey" : fileTrgtKey,
+		}
+		// debugger;
+		postAjaxSync("/user/sm/sm20/select_sm20_Info", formData, null, function(data) {
+			$.each(data.result, function(key, value) {
+				if ($('#popForm #' + key)[0]) {
+					$('#popForm #' + key).val(value);
+					
+					if ($('#popForm #' + key).is('[comma]')) {
+						onlyNumber($('#popForm #' + key)[0]);
+					}
+				}
+			});
+		});
+		ModalgridView.setData(0);
+	}
+	
+	// 등록
+	function insert_sm20() {
+		if (inputValidation($('.popup_area [required]'))) {		// 필수 필드의 유효성 검사
+			//상세대상이 없는 경우 저장 안되게 처리 시작
+			var Insert_Cnt = 0;
+			var list = ModalgridView.target.list;
+			$.each(list,function(idx, obj) {
+				//신규
+				if (parseFloat(obj.billAmt) > 0 && obj.chk == 'Y') {
+					Insert_Cnt++;
+				}
+			});
+
+			if (Insert_Cnt == 0) {
+				return;
+			}
+			//상세대상이 없는 경우 저장 안되게 처리 끝
+			
+			// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
+			var formData = makeFormData();
+			// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행
+			filePostAjax("/user/sm/sm20/insert_sm20", formData, function(data) {
+				// 결과 메시지를 alert으로 출력
+				alert(data.resultMessage);
+				if (data.resultCode == 200) {
+					//  요청이 성공(200)한 경우, gridView.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
+					gridView1.setData(0);
+					gridView2.setData(0);
+					// 모달을 닫음
+					modalStack.close();
+				}
+			});
+		}
+	}
+	
+	// 수정
+	function update_sm20() {
+		// 필수 필드의 유효성 검사
+		if (inputValidation($('.popup_area [required]'))) {
+			// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
+			var formData = makeFormData();
+			filePostAjax("/user/sm/sm20/update_sm20", formData,function(data) {
+				alert(data.resultMessage);
+				
+				if (data.resultCode == 200) {
+					gridView.setData(0);
+					modalStack.close();
+				}
+			});
+		}
+	}
+	
+	function makeFormData() {
+		// 금액 콤마 제거
+		$.each($('.popup_area input[comma]'), function(idx, elem) {
+			deleteComma(elem);
+		});
+		
+		// 날짜 하이픈 제거
+		$.each($('.popup_area input[date]'), function(idx, elem) {
+			deleteHyphen(elem);
+		});
+		
+		// 폼데이터 생성
+		var formData = new FormData($("#popForm")[0]);
+		// console.log(formData);
+		//---------------------------------------------------------------
+		//-------itemarr  --첨부화일 처리를 위한 부분 시작
+		//---------------------------------------------------------------
+		// 유저아이디 추가
+		formData.append("userId" , jwt.userId);
+		formData.append("clntCd" , $('#clntCd').val());    //첨부화일용
+		//formData.append("prdtCd" , $('#prdtCd').val());         //첨부화일용
+		//formData.append("itemCd" , $('#itemDiv').val());        //첨부화일용
+		formData.append("prjctCd", $('#clntPjt').val());        //첨부화일용
+		formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용
+		
+		var fileUploadArr = [];
+		var tempArr = [];
+		
+		tempArr = treeModule.getFileArr();
+		
+		$.each(tempArr, function(idx, obj) {
+			if (obj.fileKey == 0) {
+				formData.append("files", obj.file);
+				obj.file = '';
+				fileUploadArr.push(obj);
+			}
+		});
+		
+		formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
+		formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
+		//---------------------------------------------------------------
+		//--첨부화일 처리를 위한 부분 끝\
+		//---------------------------------------------------------------
+
+		//상세자료 준비
+        detailArr = [];
+
+		var list = ModalgridView.target.list;
+		
+		$.each(list,function(idx, obj) {
+			//신규
+			if (parseFloat(obj.billAmt) > 0 && obj.chk == 'Y') {
+				obj.dtaChk = 'I';
+				detailArr.push(obj);
+			}
+			
+			//수정
+			if (obj.dtaChk == 'U') {
+				detailArr.push(obj);
+			}
+		});
+		formData.append("detailArr", JSON.stringify(detailArr));//선택된 ROW 만 formData에 저장
+		//상세자료 끝
+
+		return formData;
+	}
+
+	function gridResize(size) {
+		var tagHeight = (size) * 30 + 65 ;
+        tagHeight = tagHeight > 750 ? 750 : tagHeight;
+        tagHeight = tagHeight < 300 ? 300 : tagHeight;
+		
+		ModalgridView.target.setHeight(tagHeight);
+	}
+
+	// 거래처 검색 함수
+	function ClntSearch(inputValue) {
+		var paramObj = {
+	            "searchValue" : inputValue,
+				"clntDivCd"   : "",
+				"pchsClntCd"  : "CLNTDIV12"  /*구매처 팝업일 경우 구분자 고객사 제외하고 세팅 */
+	            // "clntDivCd"   : "CLNTDIV12"
+	        };
+		//등록일 경우만 팝업처리
+		if (actionType == "C") {
+			openSecondModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "거래처 검색", paramObj, function(grid) {
+				var row = grid.target.getList("selected")[0];
+				$('#clntCd').val(row.clntCd);
+				$('#clntNm').val(row.clntNm);
+				
+				Modal_DataSearch();
+			});
+		}
+	}
+	
+	// 금액지정
+	function setAmt(gridObj, chkVal, Amt, row, vatRate) {
+		//등록일 경우만 처리
+		if (actionType == "C") {
+			var gridList = gridObj.target.getList();
+			var gridColumns = gridObj.target.columns;
+			
+			var Amt = parseFloat(Amt);
+			// 부가세율
+			var vatRate_s = parseInt(vatRate) / 100;
+
+			if(chkVal == "Y") {
+				if( Amt > 0 ) {
+					gridObj.target.setValue(row, "billAmt", Amt);
+					gridObj.target.setValue(row, "billDtlAmt", Amt);
+					// 부가세 필드 추가한 부분 계산
+					gridObj.target.setValue(row, "vatAmt", Amt * vatRate_s);
+					gridObj.target.setValue(row, "billDtlVat", Amt * vatRate_s);
+					gridObj.target.setValue(row, "billDtlTot", Amt + (Amt * vatRate_s));
+				} else if( isNaN(Amt) ) {
+					gridObj.target.setValue(row, "billAmt", 0);
+					gridObj.target.setValue(row, "vatAmt", 0);
+					gridObj.target.setValue(row, "billDtlAmt", 0);
+					gridObj.target.setValue(row, "billDtlVat", 0);
+					gridObj.target.setValue(row, "billDtlTot", 0);
+				}
+			} else if(chkVal == "N") {
+				gridObj.target.setValue(row, "billAmt", 0);
+				gridObj.target.setValue(row, "vatAmt", 0);
+				gridObj.target.setValue(row, "billDtlAmt", 0);
+				gridObj.target.setValue(row, "billDtlVat", 0);
+				gridObj.target.setValue(row, "billDtlTot", 0);
+			}
+			setSumAmt();
+		}
+	}
+
+	// 금액지정
+	function setSumAmt() {
+		//등록일 경우만 처리
+		if (actionType == "C") {
+			var SumAmt = 0;
+			var billVat = 0;
+			var printSumAmt = 0;
+			var list = ModalgridView.target.list;
+
+			$.each(list,function(idx, obj) {
+				//신규
+				if (parseFloat(obj.billAmt) > 0 && obj.chk == 'Y') {
+					SumAmt = SumAmt + parseFloat(obj.billAmt);
+					billVat = billVat + parseFloat(obj.vatAmt);
+				}
+			});
+			//billVat = parseFloat(SumAmt) * 0.1;
+			printSumAmt = parseFloat(SumAmt) + parseFloat(billVat);
+
+			$("#popForm #billAmt").val(addCommaStr(SumAmt));
+			$("#popForm #printAmt").val(addCommaStr(SumAmt));
+			$("#popForm #billVat").val(addCommaStr(billVat));
+			$("#popForm #printSumAmt").val(addCommaStr(printSumAmt));
+			$("#popForm #billPrc").val(addCommaStr(SumAmt));
+		}
+	}
+
+	// 부가세 입력 시 금액 오류 체크
+	function chkSumVat() {
+		var apply_yn = "N";
+		var apply_Vat = 0;
+		var billVat = 0;
+        var list = ModalgridView.target.list;
+		
+		$.each(list,function(idx, obj) {
+			if (obj.chk == "Y") {
+				if (parseFloat(obj.pchsVat) > 0) {
+					billVat = billVat + parseFloat(obj.pchsVat);
+				}
+			}
+        });
+
+		var bill_amt = parseInt( deleteCommaStr($('#printAmt').val()) );
+		var bill_vat = parseInt( deleteCommaStr($('#billVat').val()) );
+		var diff_vat = billVat - bill_vat;
+
+		var bill_tot_amt = bill_amt + bill_vat;
+		
+		$('#printSumAmt').val(bill_tot_amt);
+		$('#diffVat').val(diff_vat);
+
+		$("#popForm #diffVat").val(addCommaStr(diff_vat));
+		$("#popForm #printSumAmt").val(addCommaStr(bill_tot_amt));
+
+		$.each(list,function(idx, obj) {
+			if (obj.chk == "Y" && apply_yn == "N") {
+				apply_Vat = parseFloat(obj.vatAmt) - diff_vat;
+				if (apply_Vat > 0) {
+					ModalgridView.target.setValue(idx, "billDtlVat", apply_Vat);
+					ModalgridView.target.setValue(idx, "billDtlTot", parseFloat(obj.billAmt) + apply_Vat);
+					apply_yn = "Y"
+				}
+			}
+        });
+	}
+	
+	// 세액체크
+    function setSumVat() {
+        var SumAmt = 0;
+        var billVat = 0;
+        var printSumAmt = 0;
+        var list = ModalgridView.target.list;
+		
+        $.each(list,function(idx, obj) {
+            //신규
+            if (parseFloat(obj.billAmt) > 0) {
+                SumAmt = SumAmt + parseFloat(obj.billAmt);
+            }
+        });
+		billVat = parseInt( deleteCommaStr($('#billVat').val()) );
+        printSumAmt = parseFloat(SumAmt) + parseFloat(billVat);
+		// debugger;
+
+        $("#popForm #printSumAmt").val(addCommaStr(printSumAmt));
+    }
+	
+	// 팝업 그리드 조회
+	function Modal_DataSearch() {
+		ModalgridView.setData(0);
+	}
+	
+	// 통화단위 체크
+	function Chk_currCd() {
+		var currCd = $('#currCd').val();
+
+		//원화인 경우 1 고정
+		// if (currCd == 'CURR01') {
+		// 	$("#popForm #exrate").val("1");
+		// }
+		Modal_DataSearch();
+	}
+	
+	function setByCoCd(value) {
+		$('#coCd option:not([value="'+value+'"])').remove();
+	}
+
+</script>
