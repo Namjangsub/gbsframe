@@ -65,11 +65,9 @@
 				<th class="hit">고찰일자</th>
 					<td> 
 					  <div class="date_input">
-	 				    <input id="reqDtFrom" name="reqDtFrom"  class="input_calendar" autocomplete="off" onkeyup="dateMask(this);"
-					      msg="시작일자" data-search="reqDtFrom" onchange="gridView.setData(0);"> 
+	 				    <input id="reqDtFrom" name="reqDtFrom"  class="input_calendar" autocomplete="off" onkeyup="dateMask(this);" msg="시작일자" data-search="reqDtFrom"> 
 					    <span>~</span>
-	 				    <input id="reqDtTo" name="reqDtTo"  class="input_calendar" autocomplete="off" onkeyup="dateMask(this);"
-					      msg="종료일자" data-search="reqDtTo" onchange="gridView.setData(0);"> 
+	 				    <input id="reqDtTo" name="reqDtTo"  class="input_calendar" autocomplete="off" onkeyup="dateMask(this);" msg="종료일자" data-search="reqDtTo"> 
 					  </div> 
 					</td> 
 					<th class= "hit">발행자</th>					
@@ -122,7 +120,6 @@
 	var userDeptId = jwt.deptId; //소속부서
 	var userDept = userDeptId.substr(0, 5); //상위 소속부서
 	
-	var isFirst = true;
 	ax5.ui.grid.formatter["bilgYn"] = function () {		
 		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
 		if (this.value == "E"){
@@ -190,7 +187,6 @@
         		},
 
 		setData : function(_pageNo) {
-			if (isFirst) return;
 			var targetObj = this.target;
 			
 			if (inputValidation($('input[required]'))) {
@@ -228,16 +224,17 @@
 			this.target.setConfig({
 			target: $('[data-ax5grid="excel-grid"]'),
 			columns : [
-   		     	 {key: "rn",	        label: "No",	        width: 50,		align: "center"}
+   		     {key: "rn",	        label: "No",	        width: 50,		align: "center"}
+				,{key: "ordrgNm",	    label: "발행자",			width: 70,		align: "center"}
+				,{key: "resDiv",	   	label: "고찰구분",			width: 80,		align: "center"}
+				,{key: "statYm",	    label: "고찰입력 년월",		width: 120,		align: "center"}
+				,{key: "resRmk",	   	label: "고찰",			width: 650,		align: "left", formatter: function () {
+					return (this.value) ? '<span style="display: block; white-space: pre;">'+this.value+'</span>' : ''}}
+				,{key: "resDt",	    	label: "고찰일자",			width: 80,		align: "center"}
 				,{key: "fileTrgtKey",	label: "파일대상KEY",		width: 50,		align: "center", hidden:true}
 				,{key: "coCd",	    	label: "회사코드",			width: 70,		align: "center", hidden:true}
 				,{key: "resNo",	    	label: "관리번호",			width: 100,		align: "center"}
 				,{key: "ordrgId",	    label: "발행자ID",		width: 70,		align: "center", hidden:true}
-				,{key: "ordrgNm",	    label: "발행자",			width: 70,		align: "center"}
-				,{key: "resDiv",	   	label: "고찰구분",			width: 80,		align: "center"}
-				,{key: "resDt",	    	label: "고찰일자",			width: 80,		align: "center"}
-				,{key: "statYm",	    label: "고찰입력 년월",		width: 120,		align: "center"}
-				,{key: "resRmk",	   	label: "고찰",			width: 650,		align: "left"}
 				
            ]
 			});
@@ -258,7 +255,11 @@
         if (jwt.authInfo.indexOf("AUTH001") > -1) {//팀장이면 팀고찰버튼 보이게
 			$("#teamButton").show();
 		}
-        
+
+    	// 시작일 (현재날짜의 이전월 첫일)
+    	const now = moment().startOf("month");
+    	var beDay = now.add(-2, "M").format("YYYY-MM-DD");	
+    	
         // 시작일 (현재날짜의 월 첫일)
 		$('#reqDtFrom').datepicker({
   			format : "yyyy-mm",
@@ -266,7 +267,7 @@
   			language : "ko",
   			autoclose : true
   		})
-  		.datepicker("setDate", new Date())
+  		.datepicker("setDate", beDay)
   		.on("changeDate", function(){
   			if($('#reqDtFrom').val() > $('#reqDtTo').val()){
   				$('#reqDtTo').datepicker("setDate", new Date($('#reqDtFrom').val()));
@@ -287,28 +288,14 @@
   			}
   		});
   		
-  		
-  		$("#ordrgNm_S").on("keyup", function () {
-  			if(event.keyCode == 8) {
-  				$("#ordrgNm_S").val('');
-  				$("#ordrgId_S").val('');
-  				gridView.setData(0); 
-  			} else if(event.keyCode == 13) { 
-  				gridView.setData(0); 
-  			}		
-  		});
-  		
-        isFirst = false;    
-        
   		gridView.initView().setData(0);
-
+  		excelView.initView();
+  		
           // 검색조건 이벤트 bind
   		$('[data-search]').on("change", function(){
   			gridView.setData(0);
   		});
           
-  		excelView.initView();
-  		
   		//권한체크
   		authChk();
 
@@ -421,10 +408,6 @@
 		$("#userId_S").val(jwt.userId);
 	    $("#userNm_S").val(jwt.userNm);
 			
-        // 검색조건 이벤트 bind
-  		$('[data-search]').on("change", function(){
-  			gridView.setData(0);
-  		});		
 		gridView.initView().setData(0);
 	}
 
@@ -509,23 +492,18 @@
     		
  // 엑셀다운로드
 	function excelDown() {	
-		var formData = {	  
-			   "coCd" : $("#coCd_S").val(),
-	           "reqDtFrom" :  $("#reqDtFrom").val().replace(/\-/g, ''),
-	           "reqDtTo" : $("#reqDtTo").val().replace(/\-/g, ''),
-			   "ordrgId" : $("#userId_S").val(),
-			   "sharId" : $("#appId_S").val(), 
-			   "salesCd" : $("#salesCd_S").val(), 
-			   "itemCd" : $("#itemCd_S").val(), 
-			   "prdtCd" : $("#prdtCd_S").val(), 
-			   "prdtNm" :$("#prdtNm").val(), 
-			   "clntPjt" : $("#clntPjt_S").val(),
-			   "eqpNm" : $("#eqpNm_S").val(), 
-			   "clntCd" : $("#clntCd_S").val(), 
-			   "partCd" : $("#cobtbCd_S").val() 
-	    }	
-		 postAjax("/user/qm/qm02/selectMainGridList", formData, null, function(data){
-		
+		var formData = {};
+		$.each($('[data-search]'), function(idx, elem){
+			formData[$(elem).data("search")] = $(elem).val();
+		});	
+		formData["coCd"] = $("#coCd_S").val();				
+		formData["strtDt"]  = $("#reqDtFrom").val().replace(/\-/g, '');
+		formData["endDt"]   = $("#reqDtTo").val().replace(/\-/g, '');
+		formData["ordrgId"] = $("#userId_S").val();
+		formData["userId"] = jwt.userId;
+		formData["pageNo"] = 1;
+		formData["recordCnt"] = 99999999;
+		postAjax("/user/qm/qm02/selectMainGridList", formData, null, function(data){
 	    var list = data.result;
 		excelView.target.setData({
 			list : list,
@@ -543,12 +521,14 @@
 		let row = gridView.target.getList("selected")[0];
 		if (!row) return false;
 		jobCode = (row.resDiv == "팀") ? "T" : "P";	//개인, 팀 구분자 적용
+		
  		let fileName = (jobCode == "P") ? "QM0201R01.jrf" :  "QM0201R02.jrf";  //여러 발주서 번호 처리 (in 처리)
  		let arg =  
  			  "coCd#"		+  row.coCd
  		    + "#userId#"	+  row.ordrgId
  		    + "#statYm#"	+  row.statYm
  		    + "#fileTrgtKey#"	+ row.fileTrgtKey 
+ 		    + "#member#"	+ DeptNameRtv(row.deptId.slice(0,5))
  	    	+ "#";    
  		
  		if (_type == '' || _type == undefined ) {
@@ -567,4 +547,23 @@
  		}
  	}
 
+	//부서원을 PIVOT조건으로 생성함
+    function DeptNameRtv(_deptCd){
+    	let formData = {
+    			"deps" : _deptCd
+    		}
+		let userName = "";
+    	postAjaxSync("/user/qm/qm02/select_all_modal", formData, null, function(data) {
+    		var list = data.result;
+			 if (list.length > 0) {
+                 $.each(list, function(idx, elem){
+                 	userName += list[idx].name;
+	             	if(idx != list.length){ 
+	             		userName += ","; 
+	             	}
+                 });
+			 }
+		});	
+		return userName;
+    }
 </script>
