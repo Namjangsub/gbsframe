@@ -8,7 +8,9 @@
 		  FROM (
 				SELECT T.CO_CD, T.ORDRG_ID
 				FROM TB_QM01M01 T
-				 LEFT OUTER JOIN TB_CM06M01 N2 ON N2.ID = T.ORDRG_ID
+				 	LEFT OUTER JOIN TB_CM06M01 N2 ON N2.ID = T.ORDRG_ID
+					LEFT OUTER JOIN TB_CR02D02 D1 ON T.SALES_CD = D1.SALES_CD
+					LEFT OUTER JOIN TB_CR02M01 M1 ON D1.CO_CD = D1.CO_CD AND D1.ORDRS_NO = M1.ORDRS_NO
 				 WHERE 1=1  
 					<if test="coCd !=null and !coCd.equals('')">
 					  AND T.CO_CD = #{coCd}
@@ -23,7 +25,16 @@
 			          AND N2.NAME = #{ordrgNm}
 			         </if>
 			         <if test="salesCd !=null and !salesCd.equals('')">
-			          AND T.SALES_CD  LIKE '%${salesCd}%'
+			          AND T.SALES_CD  LIKE '%' || #{salesCd} || '%'
+			         </if>
+			         <if test="deptCd !=null and !deptCd.equals('')">
+		        	  AND substr(N2.DEPT_ID,1,5) = #{deptCd}
+			         </if>
+			         <if test="prjctCd !=null and !prjctCd.equals('')">
+		        	  AND M1.CLNT_PJT = #{prjctCd}
+			         </if>
+			         <if test="clntCd !=null and !clntCd.equals('')">
+		        	  AND M1.ORDRS_CLNT_CD = #{clntCd}
 			         </if>
 		           AND T.PART_CD = 'COBTP01'
 				GROUP BY T.CO_CD, T.ORDRG_ID
@@ -41,6 +52,47 @@
 		   	   			, SUM(COUNT(*)) OVER (ORDER BY T.CO_CD ) AS REQ_TOT
 		   	   			, SUM(SUM(DECODE(NVL(T.SCD_STS,'SCDSTS01'), 'SCDSTS01',1,0))) OVER (ORDER BY T.CO_CD ) AS NORMAL_TOT
 		   	   			, SUM(SUM(DECODE(NVL(T.SCD_STS,'SCDSTS01'), 'SCDSTS01',0,1))) OVER (ORDER BY T.CO_CD ) AS AFT_ERR_TOT
+				FROM TB_QM01M01 T
+				 	LEFT OUTER JOIN TB_CM06M01 N2 ON N2.ID = T.ORDRG_ID
+					LEFT OUTER JOIN TB_CR02D02 D1 ON T.SALES_CD = D1.SALES_CD
+					LEFT OUTER JOIN TB_CR02M01 M1 ON D1.CO_CD = D1.CO_CD AND D1.ORDRS_NO = M1.ORDRS_NO
+				 WHERE 1=1  
+					<if test="coCd !=null and !coCd.equals('')">
+					  AND T.CO_CD = #{coCd}
+					 </if>
+					 <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
+			          AND T.ORDRG_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYY-MM-DD') AND TO_DATE( #{reqDtTo},'YYYY-MM-DD')
+			         </if>
+			         <if test="ordrgId !=null and !ordrgId.equals('')">
+			          AND (T.ORDRG_ID = #{ordrgId} OR T.REG_ID = #{ordrgId})
+			         </if>
+			         <if test="ordrgNm !=null and !ordrgNm.equals('')">
+			          AND N2.NAME = #{ordrgNm}
+			         </if>
+			         <if test="salesCd !=null and !salesCd.equals('')">
+			          AND T.SALES_CD  LIKE '%' || #{salesCd} || '%'
+			         </if>
+			         <if test="deptCd !=null and !deptCd.equals('')">
+		        	  AND substr(N2.DEPT_ID,1,5) = #{deptCd}
+			         </if>
+			         <if test="prjctCd !=null and !prjctCd.equals('')">
+		        	  AND M1.CLNT_PJT = #{prjctCd}
+			         </if>
+			         <if test="clntCd !=null and !clntCd.equals('')">
+		        	  AND M1.ORDRS_CLNT_CD = #{clntCd}
+			         </if>
+				GROUP BY T.CO_CD, T.ORDRG_ID
+				ORDER BY count(T.REQ_NO) DESC, MAX(N2.NAME) 
+		) A
+<!-- 	  WHERE  ROWNUM BETWEEN #{firstIndex} AND #{lastIndex} -->
+	   
+	</select>
+    
+	<select id="selectQualityReqSCDSTSDept" parameterType="Map" resultType="CamelMap">	
+	 SELECT A.*, D1.DEPT_NM 
+	   FROM(
+				SELECT
+						 T.CO_CD, substr(N2.DEPT_ID,1,5) AS DEPT_ID
 				FROM TB_QM01M01 T
 				 LEFT OUTER JOIN TB_CM06M01 N2 ON N2.ID = T.ORDRG_ID
 				 WHERE 1=1  
@@ -62,11 +114,76 @@
 			         <if test="partCd !=null and !partCd.equals('')">
 		        	  AND T.PART_CD = #{partCd}
 			         </if>
-				GROUP BY T.CO_CD, T.ORDRG_ID
-				ORDER BY count(T.REQ_NO) DESC, MAX(N2.NAME) 
+				GROUP BY T.CO_CD, substr(N2.DEPT_ID,1,5)
 		) A
-<!-- 	  WHERE  ROWNUM BETWEEN #{firstIndex} AND #{lastIndex} -->
-	   
+			LEFT OUTER JOIN TB_CM04M01 D1 ON A.DEPT_ID = D1.DEPT_ID
+			ORDER BY DEPT_NM
+	</select>
+    
+	<select id="selectQualityReqSCDSTSClnt" parameterType="Map" resultType="CamelMap">
+	 SELECT A.*
+	   FROM(
+				SELECT
+						 T.CO_CD, M1.ORDRS_CLNT_CD, C1.CLNT_NM
+				FROM TB_QM01M01 T
+					LEFT OUTER JOIN TB_CR02D02 D1 ON T.SALES_CD = D1.SALES_CD
+					LEFT OUTER JOIN TB_CR02M01 M1 ON D1.CO_CD = D1.CO_CD AND D1.ORDRS_NO = M1.ORDRS_NO
+					LEFT OUTER JOIN TB_BM02M01 C1 ON M1.ORDRS_CLNT_CD = C1.CLNT_CD
+				 WHERE 1=1  
+					<if test="coCd !=null and !coCd.equals('')">
+					  AND T.CO_CD = #{coCd}
+					 </if>
+					 <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
+			          AND T.ORDRG_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYY-MM-DD') AND TO_DATE( #{reqDtTo},'YYYY-MM-DD')
+			         </if>
+			         <if test="ordrgId !=null and !ordrgId.equals('')">
+			          AND (T.ORDRG_ID = #{ordrgId} OR T.REG_ID = #{ordrgId})
+			         </if>
+			         <if test="ordrgNm !=null and !ordrgNm.equals('')">
+			          AND N2.NAME = #{ordrgNm}
+			         </if>
+			         <if test="salesCd !=null and !salesCd.equals('')">
+			          AND T.SALES_CD  LIKE '%' || #{salesCd} || '%'
+			         </if>
+			         <if test="partCd !=null and !partCd.equals('')">
+		        	  AND T.PART_CD = #{partCd}
+			         </if>
+				GROUP BY T.CO_CD, M1.ORDRS_CLNT_CD, C1.CLNT_NM
+		) A
+			ORDER BY CLNT_NM
+	</select>
+    
+	<select id="selectQualityReqSCDSTSPrjct" parameterType="Map" resultType="CamelMap">
+	 SELECT A.*
+	   FROM(
+				SELECT
+						 T.CO_CD, M1.CLNT_PJT
+						 , ( SELECT FN_CM05M01_CD_TO_NM(M1.CLNT_PJT) FROM DUAL ) AS CLNT_PJT_NM
+				FROM TB_QM01M01 T
+					LEFT OUTER JOIN TB_CR02D02 D1 ON T.SALES_CD = D1.SALES_CD
+					LEFT OUTER JOIN TB_CR02M01 M1 ON D1.CO_CD = D1.CO_CD AND D1.ORDRS_NO = M1.ORDRS_NO
+				 WHERE 1=1  
+					<if test="coCd !=null and !coCd.equals('')">
+					  AND T.CO_CD = #{coCd}
+					 </if>
+					 <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
+			          AND T.ORDRG_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYY-MM-DD') AND TO_DATE( #{reqDtTo},'YYYY-MM-DD')
+			         </if>
+			         <if test="ordrgId !=null and !ordrgId.equals('')">
+			          AND (T.ORDRG_ID = #{ordrgId} OR T.REG_ID = #{ordrgId})
+			         </if>
+			         <if test="ordrgNm !=null and !ordrgNm.equals('')">
+			          AND N2.NAME = #{ordrgNm}
+			         </if>
+			         <if test="salesCd !=null and !salesCd.equals('')">
+			          AND T.SALES_CD  LIKE '%' || #{salesCd} || '%'
+			         </if>
+			         <if test="partCd !=null and !partCd.equals('')">
+		        	  AND T.PART_CD = #{partCd}
+			         </if>
+				GROUP BY T.CO_CD, M1.CLNT_PJT
+		) A		
+			ORDER BY CLNT_PJT_NM
 	</select>
     
 </mapper>

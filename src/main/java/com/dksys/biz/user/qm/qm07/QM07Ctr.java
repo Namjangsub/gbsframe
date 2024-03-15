@@ -90,5 +90,17 @@ public class QM07Ctr {
 	    	
 		return "jsonView";
   }
+
+//발주 및 출장 요청서 검색조건용 자료 조회
+ @PostMapping(value = "/selectQualityReqSCDSTSOption")
+ public String selectQualityReqSCDSTSOption(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    List<Map<String, String>> resultDept = qm07Svc.selectQualityReqSCDSTSDept(paramMap);
+		model.addAttribute("resultDept", resultDept);
+	    List<Map<String, String>> resultClnt = qm07Svc.selectQualityReqSCDSTSClnt(paramMap);
+		model.addAttribute("resultClnt", resultClnt);
+	    List<Map<String, String>> resultPrjct = qm07Svc.selectQualityReqSCDSTSPrjct(paramMap);
+		model.addAttribute("resultPrjct", resultPrjct);
+		return "jsonView";
+ }
   
 }

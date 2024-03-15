@@ -26,4 +26,19 @@ public class QM07SvcImpl implements QM07Svc {
   public List<Map<String, String>> selectQualityReqSCDSTSList(Map<String, String> paramMap) {
     return QM07Mapper.selectQualityReqSCDSTSList(paramMap);
   }
+  
+  @Override
+  public List<Map<String, String>> selectQualityReqSCDSTSDept(Map<String, String> paramMap) {
+    return QM07Mapper.selectQualityReqSCDSTSDept(paramMap);
+  }
+  
+  @Override
+  public List<Map<String, String>> selectQualityReqSCDSTSClnt(Map<String, String> paramMap) {
+    return QM07Mapper.selectQualityReqSCDSTSClnt(paramMap);
+  }
+  
+  @Override
+  public List<Map<String, String>> selectQualityReqSCDSTSPrjct(Map<String, String> paramMap) {
+    return QM07Mapper.selectQualityReqSCDSTSPrjct(paramMap);
+  }
 }
