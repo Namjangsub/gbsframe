@@ -53,19 +53,26 @@
 						SELECT
 						      E.CO_CD
 						    , 'REQ9999999'
-						    , NVL(SALES_CD,'99999-9900000')
-							, COST_NO
+						    , NVL(ED.SALES_CD,'99999-9900000')
+							, E.COST_NO
 					 	    , 0 AS IN_QTY
 					 	    , 0 AS BAD_QTY
-					 	    , SUM(E.COST_AMT) 		AS COST_AMT
+					 	    , SUM(NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,1),E.COST_AMT)) 		AS COST_AMT
 					 	    , MIN(E.COST_DT) 		AS MIN_COST_DT
 					 	    , max(E.COST_DT) 		AS COST_DT
 			 	    		, '비용' 					AS STS
-			 	    		, SUM(decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1050', 0, 'PCHSCOSTDIV1030', 0, E.COST_AMT))   AS GER_AMT
-			 	    		, SUM(decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1050', E.COST_AMT,0))  AS ELEC_AMT	--전기비용
-			 	    		, SUM(decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1030', E.COST_AMT,0))  AS TRUN_AMT	--턴키비용
+			 	    		, SUM(decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1050', 0, 'PCHSCOSTDIV1030', 0, NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,1),E.COST_AMT)))   AS GER_AMT
+			 	    		, SUM(decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1050', NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,1),E.COST_AMT),0))  AS ELEC_AMT	--전기비용
+			 	    		, SUM(decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1030', NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,1),E.COST_AMT),0))  AS TRUN_AMT	--턴키비용
+--			 	    		, MAX(EC.SL_CNT) 		AS SL_CNT
 						FROM TB_SM10M01 E		/* 구매비용 */	
+								LEFT OUTER JOIN TB_SM10D01 ED ON E.COST_NO = ED.COST_NO
 								LEFT OUTER JOIN TB_BM02M01 D ON E.PCHS_CLNT_CD = D.CLNT_CD
+								LEFT OUTER JOIN (	SELECT    CO_CD
+															, COST_NO
+															, COUNT(SALES_CD) SL_CNT
+													  FROM TB_SM10D01 ED
+													  GROUP BY  CO_CD, COST_NO)	EC ON E.COST_NO = EC.COST_NO
 						WHERE 1 = 1
 					<!-- 회사코드 -->         
 					<if test="coCd != null and !coCd.equals('')">
@@ -74,7 +81,7 @@
 					<if test="salesCd != null and !salesCd.equals('')">
 						AND E.SALES_CD LIKE '%'|| #{salesCd} || '%'   
 					</if>
-						GROUP BY E.CO_CD, SALES_CD, COST_NO	
+						GROUP BY E.CO_CD, E.COST_NO, ED.SALES_CD
 					UNION ALL	
 						SELECT 
 							  E.CO_CD

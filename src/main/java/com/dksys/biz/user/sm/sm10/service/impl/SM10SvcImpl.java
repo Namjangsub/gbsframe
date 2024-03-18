@@ -94,20 +94,18 @@ public class SM10SvcImpl implements SM10Svc {
 	//일단 날리고
 	sm10Mapper.deleteTurnKeyDetail(paramMap);
 	//턴키면 저장
-	if(paramMap.get("pchsCostDiv10").equals("PCHSCOSTDIV1030")) {
+//	if(paramMap.get("pchsCostDiv10").equals("PCHSCOSTDIV1030")) {
+	if (detailArr != null && !detailArr.isEmpty()) {
 		for (Map<String, String> detailMap : detailArr) {
-//			try {
 				detailMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 				detailMap.put("coCd", paramMap.get("ordrsCoCd"));
 				detailMap.put("userId", paramMap.get("userId"));
 				detailMap.put("pgmId", paramMap.get("pgmId"));
 				
 				sm10Mapper.insertTurnKeyDetail(detailMap);
-//			} catch (Exception e) {
-//				System.out.println("error3" + e.getMessage());
-//			}
 		}
 	}
+//	}
     
 	//---------------------------------------------------------------  
 	//첨부 화일 처리 시작 
@@ -157,21 +155,19 @@ public class SM10SvcImpl implements SM10Svc {
 		List<Map<String, String>> detailArr = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
 		//일단 날리고
 		sm10Mapper.deleteTurnKeyDetail(paramMap);
-		//턴키면 저장
-		if(paramMap.get("pchsCostDiv10").equals("PCHSCOSTDIV1030")) {
+			//턴키면 저장
+//		if(paramMap.get("pchsCostDiv10").equals("PCHSCOSTDIV1030")) {
+		if (detailArr != null && !detailArr.isEmpty()) {
 			for (Map<String, String> detailMap : detailArr) {
-//				try {
 					detailMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 					detailMap.put("coCd", paramMap.get("ordrsCoCd"));
 					detailMap.put("userId", paramMap.get("userId"));
 					detailMap.put("pgmId", paramMap.get("pgmId"));
 					
 					sm10Mapper.insertTurnKeyDetail(detailMap);
-//				} catch (Exception e) {
-//					System.out.println("error3" + e.getMessage());
-//				}
 			}
 		}
+//		}
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------  
@@ -208,9 +204,11 @@ public class SM10SvcImpl implements SM10Svc {
 		//---------------------------------------------------------------  
 		//첨부 화일 권한체크 끝 
 		//---------------------------------------------------------------  
-	  
-	  int result = sm10Mapper.deletePchsCost(paramMap);
-	  
+	    int result = sm10Mapper.deletePchsCost(paramMap);
+
+	    //상세내역 삭제
+	    sm10Mapper.deleteTurnKeyDetail(paramMap);
+	    
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------  
