@@ -32,7 +32,7 @@ public class QM02Ctr {
     //리스트 조회
 	@PostMapping(value = "/selectMainGridList")
 	public String grid1_selectList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = qm02svc.select_grid_Count(paramMap);
+		int totalCnt = qm02svc.selectMainGridListCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
 		List<Map<String, String>> result = qm02svc.selectMainGridList(paramMap);

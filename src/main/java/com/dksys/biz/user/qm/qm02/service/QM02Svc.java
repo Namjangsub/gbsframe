@@ -8,7 +8,7 @@ import java.util.Map;
 public interface QM02Svc {
 
     // 그리드 카운트
-	int select_grid_Count(Map<String, String> paramMap);
+	int selectMainGridListCount(Map<String, String> paramMap);
 	
 	// 그리드 카운트
 	int select_gochal_count(Map<String, String> paramMap);

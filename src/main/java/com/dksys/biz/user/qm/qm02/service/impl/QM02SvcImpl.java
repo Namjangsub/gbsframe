@@ -40,8 +40,8 @@ public class QM02SvcImpl implements QM02Svc {
 
 	// 그리드 카운트
 	@Override
-	public int select_grid_Count(Map<String, String> paramMap) {
-		return qm02Mapper.select_grid_Count(paramMap);
+	public int selectMainGridListCount(Map<String, String> paramMap) {
+		return qm02Mapper.selectMainGridListCount(paramMap);
 	}
 	
 	// 그리드 카운트
