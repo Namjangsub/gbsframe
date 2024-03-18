@@ -24,8 +24,6 @@ public interface QM01Mapper {
   
   List<Map<String, String>> selectPurchaseListPop(Map<String, String> paramMap);
   
-  List<Map<String, String>> selectQualityReqExList(Map<String, String> paramMap);
-  
   List<Map<String, String>> selectShareUserlst(Map<String, String> paramMap);
   
   List<Map<String, String>> selectShareResUserlst(Map<String, String> paramMap);

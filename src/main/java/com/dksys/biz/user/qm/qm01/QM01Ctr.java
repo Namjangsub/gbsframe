@@ -51,16 +51,6 @@ public class QM01Ctr {
    return "jsonView";
  }
    
-   
-//발주 및 출장 요청서 리스트엑셀 리스트  -->
-  @PostMapping(value = "/selectQualityReqExList") 
-	public String selectMsExcelList(@RequestBody Map<String, String> paramMap, ModelMap model) {		  
-		  List<Map<String, String>> resultList = qm01Svc.selectQualityReqExList(paramMap);
-		  	  model.addAttribute("resultList", resultList); 
-		   //  System.out.println("resultList==?"+resultList);
-		  return "jsonView"; 
-		  
-	}  
 
   //요청 정보 
   @PostMapping(value = "/selectQtyReqInfo")

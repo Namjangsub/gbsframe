@@ -654,12 +654,6 @@ public class QM01SvcImpl implements QM01Svc {
   
   
   @Override
-  public List<Map<String, String>> selectQualityReqExList(Map<String, String> paramMap) {
-		return QM01Mapper.selectQualityReqExList(paramMap);
-  }
-
-  
-  @Override
   public List<Map<String, String>> selectApprovalList(Map<String, String> paramMap) {
 		return QM01Mapper.selectApprovalList(paramMap);
   }
