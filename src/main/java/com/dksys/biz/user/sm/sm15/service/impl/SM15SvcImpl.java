@@ -42,4 +42,19 @@ public class SM15SvcImpl implements SM15Svc {
 		return result;		
 	}		
 	
+	@Override
+	public List<Map<String, String>> sm15_2selectPurchaseListNew(Map<String, String> paramMap) {		
+		List<Map<String, String>> result = new ArrayList<Map<String, String>>();
+		//발주+비용
+		result = sm15Mapper.sm15_2selectPurchaseListNew(paramMap);
+		return result;		
+	}		
+
+
+	//카운트
+	@Override
+	public int sm15_2selectPurchaseListNewCount(Map<String, String> paramMap) {
+		return sm15Mapper.sm15_2selectPurchaseListNewCount(paramMap);
+	}
+	
 }
