@@ -117,7 +117,7 @@
 		<!-- 콘텐츠 -->
 		<div class="contents">
 			<!-- 리스트 -->
-			<table class="form-group popup_table" id="scndTable">
+			<table class="form-group popup_table" id="scndTable" style="margin-bottom: 0px;">
 				<thead>
 					<tr>
 						<td>
@@ -132,7 +132,7 @@
 							<div style="text-align:right">
 <!-- 								<input type=radio id="chartLine" name="chartOption" value="line" onchange="gridView.initView().setData();" checked><label for="chartLine"> 선으로 보기 </label> -->
 <!-- 								<input type=radio id="chartColumn" name="chartOption" value="column" onchange="gridView.initView().setData();"><label for="chartColumn"> 막대로 보기 </label> -->
-								&nbsp &nbsp (단위: 건수)
+								&nbsp &nbsp (단위: 원,건수)
 <!-- 								<select id="searchUnit" name="searchUnit" data-search="searchItem" onchange="gridView.initView().setData();"> -->
 <!-- 									<option value="100000000">억원</option> -->
 <!-- 									<option value="1000000" selected>백만원</option> -->
@@ -151,7 +151,7 @@
 					<tr>
 						<td colspan=2>
 							<div class="" style="margin:0px;padding:0px;width:100%;">
-								<div data-ax5grid="grid01" data-ax5grid-config="{}" style="height:110px; width: 100%"></div>
+								<div data-ax5grid="grid01" data-ax5grid-config="{}" style="height:158px; width: 100%"></div>
 							</div>
 						</td>
 					</tr>
@@ -184,7 +184,7 @@
 					},
 					columns: [
 						{key: "tit"       , label: "장애담당자"     , align: "center"  , width: "*"},
-						{key: "reqTot"    , label: "합계"     	 , align: "center"  , width: 80},
+						{key: "reqTot"    , label: "합계"     	 , align: "center"  , width: 80, formatter:"money"},
 			        ]
 				});
 				return this;
@@ -202,65 +202,94 @@
 					return false;
 				}
 				let viewRow1 = {"tit":"장애 담당자", "reqTot":list[0].errCnt};
-				let viewRow2 = {"tit":"장애건수"	, "reqTot":list[0].normalTot};
+				let viewRow2 = {"tit":"장애건수"	, "reqTot":list[0].reqTot};
 				let viewRow3 = {"tit":"일정지연건수", "reqTot":list[0].aftErrTot};
-				let viewRow4 = {"tit":"%", "reqTot":100};
+				let viewRow4 = {"tit":"매입확정금액", "reqTot":list[0].pchsAmtTotAll};
+				let viewRow5 = {"tit":"입고금액", "reqTot":list[0].inDtlAmtTotAll};
+				let viewRow6 = {"tit":"금액점유율(%)", "reqTot":100};
 				let cellWidth = 1500 / list.length ;
 
+				var names = list.map(item => item.ordrgIdNm);
+				var counts = list.map(item => parseInt(item.normalCnt));
+				var amounts = list.map(item => item.pchsAmtTot ? parseInt(item.pchsAmtTot) : null);
+
+				// Create the desired format
+// 				var formattedData = [
+// 				    ['이름'].concat(list.map(item => item.ordrgIdNm)),
+// 				    ['Month'].concat(list.map(item => parseInt(item.normalCnt))),
+// 				    ['확정'].concat(list.map(item => item.pchsAmtTot ? parseInt(item.pchsAmtTot) : null)),
+// 				    ['입고'].concat(list.map(item => item.pchsAmtTot ? parseInt(item.inDtlAmtTot) : null)),
+// 				    ['지연'].concat(list.map(item => parseInt(item.errCnt))),
+// 				    ['지연2'].concat(list.map(item => parseInt(item.errCnt)))
+// 				];
+				var formattedData = [['이름','매입확정금액','입고금액']];
+				let tempData = [];
+				
                 $.each(list, function(idx, elem){
-                	gridView.target.addColumn({key: "dt"+[idx], label:list[idx].ordrgIdNm, align:"center", width: cellWidth});
+                	gridView.target.addColumn({key: "dt"+[idx], label:list[idx].ordrgIdNm, align:"center", width: cellWidth, formatter:"money"});
                 	viewRow1["dt"+idx] = list[idx].ordrgIdNm;
                 	viewRow2["dt"+idx] = list[idx].errCnt;
                 	viewRow3["dt"+idx] = list[idx].aftErrCnt;
-                	viewRow4["dt"+idx] = (list[idx].errCnt * 100 / list[idx].normalTot).toFixed(1);
+                	viewRow4["dt"+idx] = list[idx].pchsAmtTot;
+                	viewRow5["dt"+idx] = list[idx].inDtlAmtTot;
+//                 	viewRow6["dt"+idx] = (list[idx].errCnt * 100 / list[idx].normalTot).toFixed(1);
+                	viewRow6["dt"+idx] = list[idx].pchsAmtPct;
+                	
+                	//그래프 생성용 데이터 편집
+                	tempData = [
+                		  list[idx].ordrgIdNm
+                		, parseInt(list[idx].pchsAmtTot)
+                		, parseInt(list[idx].inDtlAmtTot)
+                	];
+                	formattedData.push(tempData);
                 });
+				chartData = formattedData;
                 let viewData = [];
 //                 viewData.push(viewRow1);
                 viewData.push(viewRow2);
                 viewData.push(viewRow3);
                 viewData.push(viewRow4);
+                viewData.push(viewRow5);
+                viewData.push(viewRow6);
                 
 				gridView.target.setData({
 					list : viewData,
 					page : {
 					}
 				});
-				google.charts.setOnLoadCallback(function drawChart(){
-					chartData = new google.visualization.DataTable(data.chartData);      
-					setChart();
-				});	
+
+			    google.charts.setOnLoadCallback(drawVisualization);
+			    
 			});		
 		}
 	}
 	
-	function setChart(){
-		var options = {
-					height : 585,
-					fontSize: '14',
-					title: '요인별 발주요청서 장애발생 현황',
-// 					hAxis: {title: '년월'},
-// 					vAxis: {title: '금액'},
-					pointSize: 5,
-					series: {
-						0: { pointShape: 'circle' },
-						1: { pointShape: 'triangle' },
-						2: { pointShape: 'square' },
-						3: { pointShape: 'diamond' },
-						4: { pointShape: 'star', sides: 5, dent: 0.5 },
-						5: { pointShape: 'polygon' }
-					},
-					chartArea : { left: 80, right: 120, top: 50, bottom: 60},
-					isStacked: false,
-					legend: { position: 'right' },
-// 					curveType: 'function',
-					alwaysOutside: true,
-					textStyle: {fontSize: 12, color: '#871b47', auraColor: '#d799ae', opacity: 0.8},
-		}
-		
-		var chart = new google.visualization.ColumnChart(document.getElementById("chart_div1"));      
-		chart.draw(chartData, options);
-	}
-	
+	function drawVisualization() {
+        var data = google.visualization.arrayToDataTable(chartData);
+        var options = {
+				height : 580,
+				fontSize: '14',
+                title : '요인별 발주요청서 장애발생 현황',
+//                 vAxis: {title: '금액'},
+//                 hAxis: {title: '담당'},
+                seriesType: 'bars',
+                series: {2: {type: 'line'}},
+				pointSize: 5,
+				series: {
+					1: { type: 'line', lineWidth: 4 },
+				},
+				chartArea : { left: 200, right: 20, top: 80, bottom: 60},
+				isStacked: false,
+				legend: { position: 'top' },
+// 				curveType: 'function',
+				alwaysOutside: true,
+				textStyle: {fontSize: 12, color: '#871b47', auraColor: '#d799ae', opacity: 0.8},
+				 crosshair: { focused: { color: '#3bc', opacity: 0.8 },trigger: 'both' },
+              };
+        var chart = new google.visualization.ComboChart(document.getElementById('chart_div1'));
+        chart.draw(data, options);
+      }
+
 
 	$(document).ready(function() {
 		// 페이지 타이틀 set
