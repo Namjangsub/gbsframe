@@ -74,6 +74,7 @@ public class BM14SvcImpl implements BM14Svc {
 					dtl.put("salesCd", paramMap.get("salesCd"));
 					dtl.put("upperKey", paramMap.get("upperKey"));
 					dtl.put("upperCd", paramMap.get("upperCd"));
+					dtl.put("ordrsNo", paramMap.get("ordrsNo"));
 					//      반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
 					String updChk = dtl.get("updChk").toString();
 					/* "dtaChk" 값을 확인하여
