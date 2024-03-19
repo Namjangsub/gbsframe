@@ -41,52 +41,6 @@ public class QM07Ctr {
 	    model.addAttribute("paginationInfo", paginationInfo);
 	    List<Map<String, String>> result = qm07Svc.selectQualityReqSCDSTSList(paramMap);
 		model.addAttribute("list", result);
-
-    	JSONObject data = new JSONObject();
-    	JSONObject objCols1 = new JSONObject();
-    	JSONObject objCols2 = new JSONObject();
-    	JSONObject objCols3 = new JSONObject();
-    	JSONArray arryCols = new JSONArray();
-    	JSONArray arryRows = new JSONArray();
-
-    	objCols1.put("type", "string");
-    	objCols2.put("type", "number");
-    	objCols2.put("label", "장애");
-    	objCols3.put("type", "number");
-    	objCols3.put("label", "일정지연");
-//ERR_CNT, ORDRG_ID_NM, NORMAL_CNT,  AFT_ERR_CNT
-    	arryCols.add(objCols1);
-    	arryCols.add(objCols2);
-    	arryCols.add(objCols3);
-    	try {
-	    	for(int i = 0; i < result.size(); i++) {
-	    		JSONObject legend = new JSONObject();
-	    		legend.put("v", result.get(i).get("ordrgIdNm"));
-	    		legend.put("f", null);
-	    		JSONObject value1 = new JSONObject();
-	    		value1.put("v", result.get(i).get("errCnt"));
-	    		value1.put("f", null);
-	    		JSONObject value2 = new JSONObject();
-	    		value2.put("v", result.get(i).get("aftErrCnt"));
-	    		value2.put("f", null);
-	    		
-	    		JSONArray cValueArry = new JSONArray();
-	    		cValueArry.add(legend);
-	    		cValueArry.add(value1);
-	    		cValueArry.add(value2);
-	    		
-	    		JSONObject cValueObj = new JSONObject();
-	    		cValueObj.put("c", cValueArry);
-	    		
-	    		arryRows.add(cValueObj);
-	    	}
-    	}catch(Exception e){
-    	    System.out.println("결과 자료변환 중 오류 발생");
-        }
-        
-    	data.put("cols", arryCols);
-    	data.put("rows", arryRows);
-    	model.addAttribute("chartData", data);
 	    	
 		return "jsonView";
   }
