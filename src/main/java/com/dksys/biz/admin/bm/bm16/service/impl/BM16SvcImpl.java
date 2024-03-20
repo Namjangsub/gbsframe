@@ -293,10 +293,11 @@ public class BM16SvcImpl implements BM16Svc {
       
       Gson gson = new Gson();	
       
-      String pgParam = "{\"actionType\":\""+ "I" +"\",";      
-      pgParam += "\"prjctSeq\":\""+ paramMap.get("prjctSeq") +"\"}";
+      String pgParam = "{\"actionType\":\""+ "I" +"\","; 
+	  pgParam += "\"prjctSeq\":\""+ paramMap.get("prjctSeq") +"\",";
+	  pgParam += "\"issNo\":\""+ paramMap.get("issNo") +"\"}";
       
-      String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("prjctNm") + "이슈 공유";
+      String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("prjctNm");
 		      
       Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
@@ -304,8 +305,8 @@ public class BM16SvcImpl implements BM16Svc {
 			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
 	            try {	 
-	            		sharngMap.put("reqNo", paramMap.get("prjctSeq"));
-	            	    sharngMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
+	            		sharngMap.put("reqNo", paramMap.get("fileTrgtKey"));
+	            	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
 	            	    sharngMap.put("userId", paramMap.get("userId"));
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
@@ -319,7 +320,7 @@ public class BM16SvcImpl implements BM16Svc {
 	        }
 		}
 
-		String todoTitle2 = paramMap.get("clntNm") + "-" + paramMap.get("prjctNm") + "이슈 결재";
+		String todoTitle2 = paramMap.get("clntNm") + "-" + paramMap.get("prjctNm");
 		
 		//결재
 		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -328,8 +329,8 @@ public class BM16SvcImpl implements BM16Svc {
 			int i = 0;
 	        for (Map<String, String> approvalMap : approvalArr) {
 	            try {	 
-	            		approvalMap.put("reqNo", paramMap.get("prjctSeq"));
-		            	approvalMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
+	            		approvalMap.put("reqNo", paramMap.get("fileTrgtKey"));
+		            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 		            	approvalMap.put("userId", paramMap.get("userId"));
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
@@ -361,7 +362,7 @@ public class BM16SvcImpl implements BM16Svc {
 		//---------------------------------------------------------------  
 		if (uploadFileList.size() > 0) {
 		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
+		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 		    cm08Svc.uploadFile(paramMap, mRequest);
 		}
 		//---------------------------------------------------------------  
@@ -409,10 +410,11 @@ public class BM16SvcImpl implements BM16Svc {
 
 		Gson gson = new Gson();					
 
-		String pgParam = "{\"actionType\":\""+ "U" +"\",";      
-	    pgParam += "\"prjctSeq\":\""+ paramMap.get("prjctSeq") +"\"}";
+		String pgParam = "{\"actionType\":\""+ "I" +"\",";      
+	    pgParam += "\"prjctSeq\":\""+ paramMap.get("prjctSeq") +"\",";
+	    pgParam += "\"issNo\":\""+ paramMap.get("issNo") +"\"}";
 	    
-		paramMap.put("reqNo", paramMap.get("issNo"));
+		paramMap.put("reqNo", paramMap.get("fileTrgtKey"));
 		paramMap.put("salesCd", paramMap.get("prjctSeq"));
 		
 		
@@ -433,7 +435,7 @@ public class BM16SvcImpl implements BM16Svc {
 		if (Integer.parseInt(paramMap.get("approvalYnCnt")) == 0) {
 			QM01Mapper.deleteWbsSharngList(paramMap); 
 		
-			String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("prjctNm") + "이슈 공유";
+			String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("prjctNm");
 			
 			Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 			List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
@@ -441,8 +443,8 @@ public class BM16SvcImpl implements BM16Svc {
 				int i = 0;
 		        for (Map<String, String> sharngMap : sharngArr) {
 		            try {	 
-		            		sharngMap.put("reqNo", paramMap.get("prjctSeq"));
-		            	    sharngMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
+		            		sharngMap.put("reqNo", paramMap.get("fileTrgtKey"));
+		            	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 		            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
 		            	    sharngMap.put("userId", paramMap.get("userId"));
 		            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
@@ -457,7 +459,7 @@ public class BM16SvcImpl implements BM16Svc {
 			}
 
 			
-			String todoTitle2 = paramMap.get("clntNm") + "-" + paramMap.get("prjctNm") + "이슈 결재";
+			String todoTitle2 = paramMap.get("clntNm") + "-" + paramMap.get("prjctNm");
 			//결재
 			Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 			List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
@@ -465,8 +467,8 @@ public class BM16SvcImpl implements BM16Svc {
 				int i = 0;
 		        for (Map<String, String> approvalMap : approvalArr) {
 		            try {	 
-		            		approvalMap.put("reqNo", paramMap.get("prjctSeq"));
-			            	approvalMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
+		            		approvalMap.put("reqNo", paramMap.get("fileTrgtKey"));
+			            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 			            	approvalMap.put("pgmId", paramMap.get("pgmId"));
 			            	approvalMap.put("userId", paramMap.get("userId"));
 			            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
@@ -492,7 +494,7 @@ public class BM16SvcImpl implements BM16Svc {
 		//---------------------------------------------------------------  
 	    if (uploadFileList.size() > 0) {
 		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("prjctSeq"));
+		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 		    cm08Svc.uploadFile(paramMap, mRequest);
 	    }
 	    
@@ -505,6 +507,60 @@ public class BM16SvcImpl implements BM16Svc {
 	    
 	  return result;
   }
+  
+  @Override
+  public int updatePrjctIssueComplete(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	    int result = bm16Mapper.updatePrjctIssueComplete(paramMap);
+	  
+	    Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+	    
+	    //---------------------------------------------------------------  
+		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+	  	//   필수값 :  jobType, userId, comonCd
+		//---------------------------------------------------------------  
+	    HashMap<String, String> param = new HashMap<>();
+   	    param.put("userId", paramMap.get("userId"));
+	    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
+	    
+		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
+		if (uploadFileList.size() > 0) {
+				//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
+				param.put("jobType", "fileUp");
+				cm15Svc.selectFileAuthCheck(param);
+		}
+		String[] deleteFileArr = gsonDtl.fromJson(paramMap.get("deleteFileArr"), String[].class);
+		List<String> deleteFileList = Arrays.asList(deleteFileArr);
+	    for(String fileKey : deleteFileList) {  // 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
+			    Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
+				//접근 권한 없으면 Exception 발생
+			    param.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
+			    param.put("jobType", "fileDelete");
+				cm15Svc.selectFileAuthCheck(param);
+		}
+		//---------------------------------------------------------------  
+		//첨부 화일 권한체크  끝  
+		//---------------------------------------------------------------  
+	    
+		//---------------------------------------------------------------  
+		//첨부 화일 처리 시작 
+		//---------------------------------------------------------------  
+	    if (uploadFileList.size() > 0) {
+		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		    cm08Svc.uploadFile(paramMap, mRequest);
+	    }
+	    
+	    for(String fileKey : deleteFileList) {
+	    	cm08Svc.deleteFile(fileKey);
+	    }
+		//---------------------------------------------------------------  
+		//첨부 화일 처리  끝 
+		//---------------------------------------------------------------  
+	    
+	  return result;
+  }
+
 
   @Override
   public List<Map<String, String>> selectPrjctOrderBillChart(Map<String, String> paramMap) {
@@ -538,5 +594,15 @@ public class BM16SvcImpl implements BM16Svc {
   public List<Map<String, String>> select_prjct_code(Map<String, String> paramMap) {
 	 return bm16Mapper.select_prjct_code(paramMap);
   }
+
   
+  @Override
+  public int selectPrjctIssueListCount(Map<String, String> paramMap) {
+    return bm16Mapper.selectPrjctIssueListCount(paramMap);
+  }
+
+  @Override
+  public List<Map<String, String>> selectPrjctIssueList(Map<String, String> paramMap) {
+    return bm16Mapper.selectPrjctIssueList(paramMap);
+  }
 }

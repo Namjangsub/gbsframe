@@ -174,6 +174,24 @@ public class BM16Ctr {
 	  return "jsonView";
   }
   
+  
+  @PostMapping(value = "/updatePrjctIssueComplete")
+  public String updatePrjctIssueComplete(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	  try {
+		  if (bm16Svc.updatePrjctIssueComplete(paramMap, mRequest) != 0 ) {
+			  model.addAttribute("resultCode", 200);
+			  model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+		  } else {
+			  model.addAttribute("resultCode", 500);
+			  model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		  };
+	  }catch(Exception e){
+		  model.addAttribute("resultCode", 900);
+		  model.addAttribute("resultMessage", e.getMessage());
+	  }
+	  return "jsonView";
+  }
+  
   // 수주목표 물량 그래프용
   @PostMapping("/selectPrjctOrderBillChart")
   public String selectPrjctOrderBillChart(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -321,6 +339,17 @@ public class BM16Ctr {
 	List<Map<String, String>> result = bm16Svc.select_prjct_code(paramMap);
 	model.addAttribute("result", result);
 	return "jsonView";
+ }
+ 
+//프로젝트 이슈 리스트 조회
+ @PostMapping(value = "/selectPrjctIssueList")
+ public String selectPrjctIssueList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	 int totalCnt = bm16Svc.selectPrjctIssueListCount(paramMap);
+	 PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+	 model.addAttribute("paginationInfo", paginationInfo);
+	 List<Map<String, String>> result = bm16Svc.selectPrjctIssueList(paramMap);
+	 model.addAttribute("result", result);
+	 return "jsonView";
  }
     
 }

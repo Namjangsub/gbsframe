@@ -130,7 +130,8 @@
     <div class="contents no_bg">
       <div class="contents_tit">
         <div class="add_btn_small pdl10">
-          <a onclick="issueUpdate();" style="height: 30px; line-height: 28px; width: 60px;" title="프로젝트별 이슈를 처리합니다." authchk><i class="far fa-comment-dots"></i> 이슈</a>
+          <a onclick="issueUpdate('C');" style="height: 30px; line-height: 28px; width: 60px;" title="프로젝트별 이슈를 처리합니다." authchk><i class="fas fa-plus"></i></i> 이슈</a>
+          <a onclick="issueUpdate('U');" style="height: 30px; line-height: 28px; width: 60px;" title="프로젝트별 이슈를 처리합니다." authchk><i class="far fa-comment-dots"></i> 이슈</a>
 		  <a onclick="jsonToExcel(gridView);" style="height: 30px; line-height: 28px; width: 60px;"><i class="fas fa-file-excel"></i> 엑셀</a>
 <!--           <a onclick="setReportMain('Report');" style="height: 30px; line-height: 28px; width: 60px;" title="내역서를 출력합니다."><i class="fas fa-print"></i> 출력</a> -->
 <!--           <a onclick="setReportMain('Export');" style="height: 30px; line-height: 28px; width: 60px;" title="내역서를 PDF로 저장합니다."><i class="fa fa-file-pdf"></i> PDF</a> -->
@@ -187,7 +188,7 @@
   		                this.self.select(this.dindex);
   		            },
   		            onDBLClick: function () {
-  		            	issueUpdate();
+  		            	issueUpdate('U');
   		            },
   		        },
 
@@ -220,7 +221,7 @@
 						,{key: "issYn", 		label: "이슈", 			width: 50,		align: "center",	formatter: "winYn"}						
 						,{key: "issCnts", 		label: "이슈내용", 		width: 540,		align: "left",      styleClass: function () {
 			            			return (this.item.issYn === "N") ? "grid-font-red" : "";}, 				formatter: function () {
-									return (this.value) ? '<span style="display: block; white-space: pre;">'+this.value+'</span>' : ''}}
+									return (this.value) ? '<span style="display: block; white-space: pre;; max-height: 60px;">'+this.value+'</span>' : ''}}
 						,{key: "issSts", 		label: "상태", 			width: 50,		align: "center",	hidden:true}
 						,{key: "issStsNm", 		label: "상태", 			width: 50,		align: "center"}
 						,{key: "issCreatDt", 	label: "등록일", 			width: 80,		align: "center"}
@@ -256,7 +257,7 @@
 // 				paramObj["userId"] = jwt.userId;
 				
 				
-				postAjax("/admin/bm/bm16/selectPrjctList", paramObj, null, function(data){
+				postAjax("/admin/bm/bm16/selectPrjctIssueList", paramObj, null, function(data){
 					var list = data.result;
   					firstGrid.setData({
   						list : list,
@@ -273,8 +274,7 @@
   		}
   	}
 
-	$(function(){
-//   	$(document).ready(function() {
+  	$(document).ready(function() {
 
   		mainDefaultLoad("사업계획", "고객사프로젝트 이슈 현황");			// 페이지 타이틀 설정
   		setCommonSelect($("#main_area select[data-kind]"));		// 공통코드 set
@@ -386,120 +386,26 @@
 
 
 	// 이슈처리 //
-	function issueUpdate() {
+	function issueUpdate(_type ='U') {
 		var row = gridView.target.getList("selected")[0];
 		var paramObj = {
-			"actionType" : "U",
+			"actionType" : _type,
 			"prjctSeq" : row.prjctSeq,
+			"issNo"    : row.issNo,
 			"coCd" 	   : row.coCd,
 	       	"userId"   : jwt.userId,
 	       	"pgmId"    : "BM1602M01",
 	       	"row"	   : row
 		};
 
-		openModal("/static/html/admin/bm/bm16/BM1601P02.html", 900, 880, "", paramObj);
+		openModal("/static/html/admin/bm/bm16/BM1601P02.html", 1200, 880, "", paramObj);
 	}
 
  	
  	function jsonToExcel (grid) {
  		const list = grid.target.getList();
  		const header = grid.target.colGroup;
- 		exportJSONToExcel(list, header,  '프로젝트이슈'); 	 		
+ 		exportJSONToExcel(list, header,  '고객사프로젝트이슈현황'); 	 		
  	}	
  	
- 	
- 	
-	function setReportMain(_type) {
-		var fileName = "BM1602M01.jrf";
-		var arg = "";
-// 		debugger;
-		$.each($('#main_area [data-search]'), function(idx, elem){
-			if ($(elem).data("search") == "reqDtFrom" || $(elem).data("search") == "reqDtTo") {
-				arg += "#" + $(elem).data("search") + "#" + $(elem).val().replace(/\-/g, '');
-			} else {
-				arg += "#" + $(elem).data("search") + "#" + $(elem).val();
-			}
-		});	
-		arg = arg.replace(/^#/, '');//첫번째 # 삭제
-		arg = arg.replace(/#recordCnt.*/, '');  //#recordCnt라는 문자포함해서 이후 삭제
-		arg += "#";
-		
-		if (_type == 'Report') {
-			callReport(fileName, arg, 1150, 720);
-		} else { //Export 작업
-	        mask.open();
-			ubiExportAjax(fileName, arg, function(response) {
-				if (response.resultCode === 200) {
-					var base64FileData = response.base64FileData;
-					var fileName = response.exportFileName;
-					const file = downloadPDFFromBase64(base64FileData, fileName);
-					
-					var url = URL.createObjectURL(file);
-					var anchor = $('<a>');
-					anchor.attr('href', url);
-					anchor.attr('download', fileName);
-					
-					$('body').append(anchor);
-					anchor[0].click();
-					anchor.remove();
-					
-					URL.revokeObjectURL(url);
-				
-				} else {
-					alert('PDF 내보내기 실패: ' + response.resultText);
-				}
-// 				if (response.resultCode == 200) { //PDF 생성완로
-// 		            alert("생성완료");
-// 					console.log(response.resultText);
-// 					console.log(response.exportFileName);
-// 					console.log(response.exportFilePath);
-// 				} else { //PDF 생성 실패
-// 		            alert("생성실패");
-// 					console.log(response.resultCode);
-// 					console.log(response.resultText);
-// 				}
-
-            	mask.close();
-			});
-		}
-	}	
-
-	
- 	
-//     function sendMailCall() {
-//         mask.open();
-// 		var fileName = "BM1602M01.jrf";
-// 		var arg =  
-// 			  "coCd#"		+  $('#coCd_S').val()
-//         	+ "#reqDtFrom#"	+  $("#reqDtFrom_S").val().replace(/\-/g, '')
-//         	+ "#reqDtTo#"	+  $("#reqDtTo_S").val().replace(/\-/g, '')
-//         	+ "#";         
-//     	ubiExportAjax(fileName, arg, function(response) {
-// 			if (response.resultCode === 200) {
-// 				var base64FileData = response.base64FileData;
-// 				var fileName = response.exportFileName;
-// 				const attachFile = downloadPDFFromBase64(base64FileData, fileName);
-        		
-// 		        var paramObj = {
-// 		           "coCd" : $('#coCd_S').val(),
-// 		           "file" : attachFile,
-// 		           "fileName" : fileName,
-// 		           "mailTitle" : moment().format('YYYY-MM-DD HH:mm') + " 프로젝트 이슈현황의 건",
-// 		           "mailCnts" : "프로젝트 이슈 현황을 아래와 같이 보내드리오니 업무 참고바랍니다.\n\n" +
-// 		           				"     - 아 래 -\n\n" +
-// 		                        " 1. 기간 : " + $("#reqDtFrom_S").val() + "-" + $("#reqDtTo_S").val() + "\n\n" +            
-// 		                        " 2. 기타 : 이슈 확인 후 조치바랍니다.\n\n" +               
-// 		                        " 감사합니다.",
-		                        
-// 		        };
-		        
-// 		        openModal("/static/html/cmn/modal/mailSend.html", 600, 500, "메일 보내기", paramObj);
-// 			} else {
-// 				alert('PDF 내보내기 실패: ' + response.resultText);
-// 			}
-//         	mask.close();
-
-// 		});
-        
-//     }	 	
 </script>

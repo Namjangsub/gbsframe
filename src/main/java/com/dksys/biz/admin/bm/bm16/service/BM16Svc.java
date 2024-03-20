@@ -45,5 +45,11 @@ public interface BM16Svc {
   List<Map<String, String>> select_wbs_code(Map<String, String> paramMap);
 
   List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
+
+  int selectPrjctIssueListCount(Map<String, String> paramMap);
+
+  List<Map<String, String>> selectPrjctIssueList(Map<String, String> paramMap);
+
+  int updatePrjctIssueComplete(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
   
 }

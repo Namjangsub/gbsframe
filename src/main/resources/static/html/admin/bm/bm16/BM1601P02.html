@@ -91,8 +91,9 @@
         </tr>
 
         <tr>
-          <th></th>
+          <th>이슈번호</th>
           <td>
+            <input type="text" id="fileTrgtKey" name="fileTrgtKey" class="form-control" style="text-align: left;" >
           </td>
           <th>완료일자</th>
           <td>
@@ -147,19 +148,20 @@
 </div>
     <div class="contents"> 
     <!-- 공통 파일 영역 -->
-         <div id="fileList_area" style="width:850px;"></div>       
+         <div id="fileList_area" style="width:100%;"></div>       
     </div>
     <!-- 하단 버튼 -->
 	<div class ="popup_bottom_btn">
 		<button type="button" id="prjctActionBtn" authChk>등록</button>
-		<button type="button" class="close_btn"
-			onclick="modalStack.close();">닫기</button>
+		<button type="button" id="prjctCompleteBtn" style="display: none;" authChk>진행/완료</button>
+		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
 	</div>
 
 <script type="text/javascript">
 
-var actionType = null;
+var actionType = null;  //C:생성, U:수정,  I:조회
 var paramPrjctSeq = null;
+var paramIssNo = null;
 
 var gridViewPop = {
         initView : function() {
@@ -214,8 +216,8 @@ var gridViewPop = {
                 setData : function(_pageNo) {
                     var targetObj = this.target;
                     var formData = {
-                            "fileTrgtKey" : $("#popForm #prjctSeq").val(),
-                            "reqNo" :  $("#popForm #prjctSeq").val(), 
+                            "fileTrgtKey" : $("#popForm #fileTrgtKey").val(),
+                            "reqNo" :  $("#popForm #fileTrgtKey").val(), 
                             "flag" : "N",
                             "pageNo" : _pageNo + 1
                     }
@@ -229,6 +231,12 @@ var gridViewPop = {
 		                            } 
 		                        });
 
+		    					$.each(list, function(idx, elm) {
+		    						if (list[idx].todoCfDt) {
+										$("#prjctActionBtn").hide();
+										$("#prjctCompleteBtn").show();
+		    						}
+		    					});
 		          		      gridResize(); //그리드 높이 조정
                     	}
                     	else {
@@ -290,9 +298,16 @@ var gridViewPop = {
   			}
   		});
 
-		
+		debugger;
 		actionType = modalStack.last().paramObj.actionType;
 		paramPrjctSeq = modalStack.last().paramObj.prjctSeq;
+		if (actionType =='U' || actionType =='I' ) {	//수정, 조회
+			paramIssNo = modalStack.last().paramObj.issNo;
+			issNo      = modalStack.last().paramObj.issNo;
+		} else if (actionType =='C') { //신규등록
+			paramIssNo = 0;
+			issNo      = 0;
+		}
 
 		selectPrjctIssueInfo();	
 
@@ -303,7 +318,8 @@ var gridViewPop = {
 	      //---------------------------------------------------------------
 	      fileParam = {
 	              fileTrgtTyp : $("#popForm #pgmId").val(),
-	              fileTrgtKey     :$("#popForm #prjctSeq").val()
+// 	              fileTrgtKey     :$("#popForm #prjctSeq").val()
+	              fileTrgtKey     :$("#popForm #fileTrgtKey").val()
 	      }
 	      treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
 	      //---------------------------------------------------------------  
@@ -323,26 +339,19 @@ var gridViewPop = {
 	      if (actionType =='I') {
 	    	  $('#prjctActionBtn').hide();
 	      }
+	      
+		$('#prjctCompleteBtn').on("click", function() {
+			updatePrjctIssueComplete();
+		});
 	});
 
 	function selectPrjctIssueInfo() {						//화면에 뿌리는 데이터
-		
-// 		$.each(modalStack.last().paramObj.row, function(key, value) {
-// 			//debugger;
-// 			if ($('#popForm #' + key)[0]) {
-// 				$('#popForm #' + key).val(value);
-// 				if ($('#popForm #' + key).is('[comma]')) {
-// 					onlyNumber($('#popForm #' + key)[0]);
-// 				}
-// 			}
-// 		});
-	
-		//$('#popForm #actDt').val(''); //기본 오늘날자이므로 clear
-
 		var formData = {
 			"prjctSeq" : paramPrjctSeq,
+			"issNo"    : paramIssNo,
 		}
 		postAjaxSync("/admin/bm/bm16/selectPrjctIssueInfo", formData, null, function(data) {
+				//프로젝트 정보
 				if (data.PrjctInfo) {
 					$.each(data.PrjctInfo, function(key, value) {
 						//debugger;
@@ -354,7 +363,7 @@ var gridViewPop = {
 						}
 					});
 				}
-				
+				//이슈 정보
 				if (data.result) {
 					$.each(data.result, function(key, value) {
 						if ($('#popForm #' + key)[0]) {
@@ -394,7 +403,6 @@ var gridViewPop = {
 							gridView.setData(0);								// 결과갑시 200인 경우 리드 뷰를 업데이트
 							//종료 후 카톡
 							kakaoTodo();
-							
 							modalStack.close();									// 모달을 닫음
 						}
 					});
@@ -414,13 +422,34 @@ var gridViewPop = {
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 			var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
 	      	filePostAjax("/admin/bm/bm16/updatePrjctIssue", formData,function(data) {
-						alert(data.resultMessage);
+// 						alert(data.resultMessage);
 						if (data.resultCode == 200) {
-// 							gridView.setData(0);
+							gridView.setData(0);
 							//종료 후 카톡
 							kakaoTodo();
-							
-// 							modalStack.close();
+							modalStack.close();
+						}
+					});
+		}
+	}
+
+	// 수정
+	function updatePrjctIssueComplete() {
+		var dataRprc = $('#issSts option:selected').data('rprc');
+		if (dataRprc == 'Y') {
+			if ($('#actDt').val() == '' ) {
+				alert("완료일자를 선택하세요!");
+				return false;
+			}
+		}
+		
+		if (inputValidation($('.popup_area [required]'))) {	
+			var formData = makeFormData();
+	      	filePostAjax("/admin/bm/bm16/updatePrjctIssueComplete", formData,function(data) {
+// 						alert(data.resultMessage);
+						if (data.resultCode == 200) {
+							gridView.setData(0);
+							modalStack.close();
 						}
 					});
 		}
@@ -642,7 +671,7 @@ var gridViewPop = {
 				, "todoDiv1CodeNm": "공유"						//공통코드 해당업무 - 공유
 				, "todoDiv2CodeNm": "프로젝트 이슈"					//공통코드 해당업무 - 공유 - 프로젝트 이슈
 				, "sanctnDiv2": "공유"							//템플릿 결재구분2    #{sanctnDiv2} 처리 바랍니다.
-				, "todoNo": $("#popForm #prjctSeq").val()
+				, "todoNo": $("#popForm #fileTrgtKey").val()
 				, "clntCd": "1"					//발신회사는 로그인사용자 회사
 				, "clntNm": clntNm				//로그의 수신거래처명
 				, "ordrgMngNm": jwt.userNm			//담당자
@@ -661,7 +690,7 @@ var gridViewPop = {
 				, "todoDiv1CodeNm": "결재"						//공통코드 해당업무 - 결재
 				, "todoDiv2CodeNm": "프로젝트 이슈"					//공통코드 해당업무 - 결재 - 프로젝트 이슈
 				, "sanctnDiv2": "결재"							//템플릿 결재구분2    #{sanctnDiv2} 처리 바랍니다.
-				, "todoNo": $("#popForm #prjctSeq").val()
+				, "todoNo": $("#popForm #fileTrgtKey").val()
 				, "clntCd": "1"					//발신회사는 로그인사용자 회사
 				, "clntNm": clntNm				//로그의 수신거래처명
 				, "ordrgMngNm": jwt.userNm			//담당자
