@@ -300,4 +300,12 @@ public class PM01Ctr {
     return "jsonView";
   }
   
+  // 작업일보 리스트 조회
+  @PostMapping(value = "/selectDailyWorkPrductList")
+  public String selectDailyWorkPrductList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    List<Map<String, String>> result = pm01Svc.selectDailyWorkPrductList(paramMap);
+    model.addAttribute("result", result);
+    return "jsonView";
+  }
+  
 }

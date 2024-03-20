@@ -41,4 +41,6 @@ public interface PM01Svc {
 
 	List<Map<String, String>> selectAllIssueWorkList(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectDailyWorkPrductList(Map<String, String> paramMap);
+
 }

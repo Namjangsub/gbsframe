@@ -225,6 +225,10 @@ public class PM01SvcImpl implements PM01Svc {
 	public List<Map<String, String>> selectAllIssueWorkList(Map<String, String> paramMap) {
 		return pm01Mapper.selectAllIssueWorkList(paramMap);
 	}
-  
+
+	@Override
+	public List<Map<String, String>> selectDailyWorkPrductList(Map<String, String> paramMap) {
+		return pm01Mapper.selectDailyWorkPrductList(paramMap);
+	}
   
 }
