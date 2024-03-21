@@ -91,10 +91,6 @@ public interface QM01Mapper {
   
   int updateCheckDept(Map<String, String> paramMap);
   
-  
-  
-  
-  
   List<Map<String, String>> deleteWbsSharngListChk1(Map<String, String> paramMap);
   
   List<Map<String, String>> deleteWbsApprovalListChk1(Map<String, String> paramMap);
@@ -111,7 +107,19 @@ public interface QM01Mapper {
   //과제확정 공유자 삭제
   int deleteSJApprovalList1(Map<String, String> paramMap);
   
-
-
   List<Map<String, String>> nonOrderStatusList(Map<String, String> paramMap);
+
+  void insertWb24SharngList(Map<String, String> param);
+
+  int updateWb24SharngList1(Map<String, String> paramMap);
+  int deleteWb24SharngList1(Map<String, String> paramMap);
+
+  int updateWb24ApprovalList1(Map<String, String> paramMap);
+  int deleteWb24ApprovalList1(Map<String, String> paramMap);
+
+  int updateWb24SharngList2(Map<String, String> paramMap);
+  int deleteWb24SharngList2(Map<String, String> paramMap);
+
+  int updateWb24ApprovalList2(Map<String, String> paramMap);
+  int deleteWb24ApprovalList2(Map<String, String> paramMap);
 }

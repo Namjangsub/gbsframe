@@ -215,7 +215,7 @@
 		
 	<!--  todo 수신번호 채번 messageId, TEMPLATE 내용 GET -->
 	<select id="selectMaxMessageIdTodo" parameterType="Map" resultType="camelMap">
-	--selectMaxMessageIdTodo
+		--selectMaxMessageIdTodo
 		SELECT 'KKO'||TO_CHAR(SYSDATE, 'YY') || LPAD(TB_SM18M01_SQ01.NEXTVAL, 6, 0) MAX_MESSAGE_ID
 			, T.*
 		  FROM
@@ -288,8 +288,7 @@
 						)					
 				) B ON(A.TODO_NO=B.TODO_NO)		  
 		  ) T
-	</select>	
-
+	</select>
 	
 	<!--  todo 수신번호 채번 messageId, TEMPLATE 내용 GET -->
 	<select id="selectMaxMessageIdTodoNew" parameterType="Map" resultType="camelMap">
@@ -356,7 +355,82 @@
 						WHERE ID = #{userId}
 					) BB
 		  ) T
-	</select>	
+	</select>
+
+	<!--  todo 수신번호 채번 messageId, TEMPLATE 내용 GET -->
+	<select id="selectMaxMessageIdTodo_kakao" parameterType="Map" resultType="camelMap">
+		SELECT 'KKO'||TO_CHAR(SYSDATE, 'YY') || LPAD(TB_SM18M01_SQ01.NEXTVAL, 6, 0) MAX_MESSAGE_ID
+		     , T.*
+		FROM   (
+				SELECT A.TODO_ID
+				     , A.NAME
+				     , A.TODO_TITL
+				     , A.TEL_NO
+				     , A.TODO_NO
+				     , A.SANCTN_SN
+				     , B.MSSAGE_DESC AS MESSAGE_DESC
+				     , TO_CHAR(A.SEND_DT, 'YYYY-MM-DD HH24:MI') AS SEND_DT
+				     , A.TODO_CF_OPN    --2023.12.05 남장섭 수정
+					 , A.ETC_FIELD3
+				FROM   (
+						SELECT B.TODO_ID
+						     , A.TEL_NO AS TEL_NO
+						     , B.TODO_NO
+						     , B.SANCTN_SN
+						     , B.TODO_TITL
+						     , A.NAME
+						     , DECODE(B.TODO_DIV1_CODE_ID, 'TODODIV10', 'S', 'TODODIV20', 'A') AS DIV_GB
+						     , B.CREAT_DTTM AS SEND_DT
+						     , ROWNUM AS RN
+						     , B.TODO_CF_OPN    --2023.12.05 남장섭 수정
+							 , TRIM(B.ETC_FIELD3) AS ETC_FIELD3
+						FROM   TB_CM06M01 AS A
+						       LEFT OUTER JOIN TB_WB20M03 AS B ON (A.ID = B.TODO_ID)
+						WHERE  1 = 1
+						<if test="coCd != null and !coCd.equals('')">
+						AND    B.TODO_CO_CD = #{coCd}
+						</if>
+						<if test="todoDiv1CodeId != null and !todoDiv1CodeId.equals('')">
+						AND    B.TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
+						</if>
+						<if test="todoDiv2CodeId != null and !todoDiv2CodeId.equals('')">
+						AND    B.TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
+						</if>
+						<if test="todoNo != null and !todoNo.equals('')">
+						AND    B.TODO_NO = #{todoNo}
+						</if>
+						<if test="histNo != null and !histNo.equals('')">
+						AND    B.ETC_FIELD2 = #{histNo}
+						</if>
+						<if test="sanctnSn != null and !sanctnSn.equals('')">
+						/* 결재완료일 경우 결재 상신자(1번)에게 보냄 */
+						AND    B.SANCTN_SN = #{sanctnSn}
+						</if>
+						<if test="reConfirm != null and !reConfirm.equals('')">
+							<if test='reConfirm == "Y"'>
+							/* 발주서 알림톡재발송 버튼클릭시 */
+							AND    B.SANCTN_STTUS = 'N'
+							</if>
+						</if>
+					   ) AS A
+					   LEFT OUTER JOIN (
+					                    SELECT MAX(MSSAGE_DESC) AS MSSAGE_DESC
+										     , #{todoNo} AS TODO_NO    /* 이곳에 관리번호 */
+					                    FROM   (
+												SELECT MSSAGE_DESC AS MSSAGE_DESC
+												FROM   TB_BM17M01
+												WHERE  1 = 1
+												<if test="tmplatDiv != null and !tmplatDiv.equals('')">
+												AND    TMPLAT_DIV = #{tmplatDiv}
+												</if>
+											   )
+					                    WHERE  1 = 1
+					                   ) AS B ON (A.TODO_NO = B.TODO_NO)
+				WHERE  1 = 1
+				AND    A.ETC_FIELD3 = 'N'
+			   ) AS T
+		WHERE  1 = 1
+	</select>
 
 	<!-- 알림톡 로그 등록 -->
 	<insert id="insertKakaoMessage" parameterType="Map">	    

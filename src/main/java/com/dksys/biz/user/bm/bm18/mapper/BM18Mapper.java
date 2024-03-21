@@ -22,6 +22,9 @@ public interface BM18Mapper {
 	
 	//todo 알림톡New 남장섭 일부 최적화
 	List<Map<String, String>> selectMaxMessageIdTodoNew(Map<String, String> paramMap);
+
+	//todo 알림톡
+	List<Map<String, String>> selectMaxMessageIdTodo_kakao(Map<String, String> paramMap);
 	
 	String selectKakaoSeqNext(Map<String, String> paramMap);	
 	
