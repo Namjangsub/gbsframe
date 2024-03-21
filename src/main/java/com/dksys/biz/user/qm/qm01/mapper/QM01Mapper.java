@@ -109,7 +109,8 @@ public interface QM01Mapper {
   
   List<Map<String, String>> nonOrderStatusList(Map<String, String> paramMap);
 
-  void insertWb24SharngList(Map<String, String> param);
+  // void insertWb24SharngList(Map<String, String> param);
+  int insertWb24SharngList(Map<String, String> paramMap);
 
   int updateWb24SharngList1(Map<String, String> paramMap);
   int deleteWb24SharngList1(Map<String, String> paramMap);
