@@ -51,9 +51,23 @@
 	<!-- ToDo List  메인 화면 조회 카운터  -->
 	<select id="selectToDoCount" parameterType="Map" resultType="int">
 		SELECT COUNT(*) 
-			FROM TB_WB20M03 T
-					LEFT OUTER JOIN TB_CM05M01 X ON  X.CODE_ID = T.TODO_DIV2_CODE_ID
+		 FROM (SELECT 	T.*
+						, NVL(( 
+							  SELECT 1
+							  FROM TB_WB20M03 S
+							  WHERE S.TODO_DIV1_CODE_ID = T.TODO_DIV1_CODE_ID
+							    AND S.TODO_DIV2_CODE_ID = T.TODO_DIV2_CODE_ID
+							    AND S.SALES_CD = T.SALES_CD
+							    AND S.TODO_NO = T.TODO_NO
+							    AND S.SANCTN_STTUS = 'N'
+							    AND S.TODO_ID != T.TODO_ID
+							    AND S.SANCTN_SN <![CDATA[ < ]]> T.SANCTN_SN 
+		 				), 0) AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
+				FROM TB_WB20M03 T
+						LEFT OUTER JOIN TB_CM05M01 X ON  X.CODE_ID = T.TODO_DIV2_CODE_ID
+				) T
 		WHERE 1=1
+		  AND T.BEFORE_NOT_CONFIRM != 1
 		<include refid="selectToDoListCondition"></include>			
 	</select>
           
@@ -111,16 +125,26 @@
 						, T.TODO_TITL AS TODO_TITL
 						, T.CREAT_PGM
 						, T.ETC_FIELD2
+						, NVL(( 
+							  SELECT 1
+							  FROM TB_WB20M03 S
+							  WHERE S.TODO_DIV1_CODE_ID = T.TODO_DIV1_CODE_ID
+							    AND S.TODO_DIV2_CODE_ID = T.TODO_DIV2_CODE_ID
+							    AND S.SALES_CD = T.SALES_CD
+							    AND S.TODO_NO = T.TODO_NO
+							    AND S.SANCTN_STTUS = 'N'
+							    AND S.TODO_ID != T.TODO_ID
+							    AND S.SANCTN_SN <![CDATA[ < ]]> T.SANCTN_SN 
+		 				), 0) AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
 					FROM TB_WB20M03 T
 							LEFT OUTER JOIN TB_CM05M01 X ON  X.CODE_ID = T.TODO_DIV2_CODE_ID
 					WHERE 1 = 1
 						<include refid="selectToDoListCondition"></include>
 						/* ORDER BY T.SALES_CD DESC, T.TODO_NO DESC, T.SANCTN_SN DESC */
-<!-- 				<if test="boardParam != null and !boardParam.equals('')"> -->	<!-- 현우 확인 요망 20231005 -->
-				ORDER BY TODO_DIV1_CODE_NM,  TODO_DIV2_CODE_NM, SALES_CD DESC, TODO_NM             
-<!-- 				</if>				 -->							
+					ORDER BY TODO_DIV1_CODE_NM,  TODO_DIV2_CODE_NM, SALES_CD DESC, TODO_NM             
 				) AS X
 				WHERE 1=1
+				  AND BEFORE_NOT_CONFIRM != 1 --이전 미결자료 존재 여부
 			) AS Z
 		WHERE  1 = 1
 		  AND  Z.RN BETWEEN ${firstIndex} AND ${lastIndex}	
