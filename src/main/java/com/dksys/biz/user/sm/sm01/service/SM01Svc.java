@@ -54,4 +54,9 @@ public interface SM01Svc {
 
   Map<String, String> syncBom(Map<String, String> paramMap);
 
+  // tree copy
+  int copyMatrBomTree(List<Map<String, String>> paramList);
+  // tree move
+  int moveMatrBom(List<Map<String, String>> paramList);
+
 }

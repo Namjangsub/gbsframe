@@ -353,6 +353,7 @@
 	    ORDER BY PATH
 	</select>
 
+<!-- 	구매BOM 트리용 -->
 	<select id="selectBomSalesTreeList" parameterType="Map" resultType="CamelMap">
 		SELECT '' AS DTA_CHK
 		     , (LEVEL-1) AS LVL
@@ -388,6 +389,7 @@
 			 , CASE WHEN T.UPPER_CD = 'top' THEN '#' ELSE T.UPPER_CD END AS PARENT
 	         , T.LOWER_CD AS ID
 	         , CASE WHEN CONNECT_BY_ISLEAF = 1 THEN 'leaf' ELSE 'unit' END AS TYPE
+	         , DECODE(T.MAT_GUBUN,'자재','','glyphicon glyphicon-folder-close') AS ICON
 		FROM   (
 				SELECT T.FILE_TRGT_KEY
 				     , T.CO_CD
@@ -427,7 +429,7 @@
 					 , SALES_CD
 					 , LOWER_CD
 					 , UPPER_NM
-					 , LOWER_NM
+					 , MATR_CD || ':' || LOWER_NM AS LOWER_NM
 					 , UPPER_CD
 					 , UPPER_CD AS OLD_UPPER_CD
 					 , LOWER_CD AS OLD_LOWER_CD
@@ -455,8 +457,7 @@
 			   ) AS T
 		START WITH T.UPPER_CD = 'top'
 		CONNECT BY PRIOR T.LOWER_CD = T.UPPER_CD
-		ORDER BY T.LOWER_NM
-		--ORDER BY T.CO_CD, LEVEL, T.UPPER_NM, T.LOWER_NM
+		ORDER BY T.CO_CD, LEVEL, T.UPPER_NM, T.LOWER_NM
 	</select>
 
 	<!-- 구매 BOM 조회 -->
@@ -560,7 +561,7 @@
 		       ) AS T
 		START WITH T.UPPER_CD = 'top' 
 		CONNECT BY PRIOR T.LOWER_CD = T.UPPER_CD
-		ORDER BY T.CO_CD, LEVEL, T.UPPER_NM, T.LOWER_NM
+		ORDER BY T.CO_CD, LEVEL, T.UPPER_NM, LOWER_CD
 	</select>
 
 	<!-- BOM 자재정보 조회 -->
@@ -654,7 +655,7 @@
 			         , A.MATR_SEQ
 			         , A.UPPER_NM
 			         , A.LOWER_NM
-					 , A.LOWER_NM || '(' || A.MATR_NM || ')' AS TEXT
+					 ,  DECODE(A.GUBUN,'D', A.LOWER_NM, A.MATR_CD) || '(' || A.MATR_NM || ')' AS TEXT
 					 , A.MATR_CD
 					 , NVL(A.MATR_MAT,A.MATR_MAKR_NM) AS  MATR_MAT         --2023.12.05 남장섭
 					 , A.MATR_MNO           				   --2023.12.05 남장섭
@@ -687,7 +688,7 @@
 		                                       AND A.LOWER_CD = T.LOWER_CD
 		                                       AND A.MATR_SEQ = T.MATR_SEQ
 		WHERE  1 = 1
-		ORDER BY A.CO_CD, A.LVL, A.UPPER_NM, A.LOWER_NM
+		ORDER BY A.CO_CD,  A.LVL, A.UPPER_CD, A.TEXT
 	</select>
 	
     <insert id="insertBom" parameterType="Map">
@@ -768,7 +769,7 @@
 		SELECT TB_BM14M01_SQ01.NEXTVAL
 		FROM   DUAL
 	</select>
-
+		
     <insert id="insertBomMatr" parameterType="Map">
         <selectKey keyProperty="matrSeq" resultType="String" order="BEFORE">
 			SELECT NVL(MAX(MATR_SEQ), 0) + 1
@@ -1154,4 +1155,131 @@
 	    )}
     </select>
 
+	<update id="moveMatrBom">
+		UPDATE
+			TB_SM01D01
+		SET
+			MATR_SEQ	=  
+					( SELECT TO_NUMBER(NVL(MAX(MATR_SEQ),0))+1 
+						FROM tb_sm01d01 d 
+					   WHERE D.CO_CD = #{coCd}
+						 AND D.ORDRS_NO = #{ordrsNo}	
+						 AND D.SALES_CD = #{salesCd}
+						 AND D.UPPER_CD = #{upperCdTo}
+						 AND D.LOWER_CD = #{lowerCd}	 ), 
+			UPPER_CD	= #{upperCdTo},
+			UPPER_NM	= #{upperNmTo},
+			BOM_QTY		= #{bomQtyTo},
+			POS_QTY		= #{bomQtyTo},
+			PART_NO		= #{partNoTo, jdbcType=VARCHAR},
+			UNIT_NO		= #{unitNoTo, jdbcType=VARCHAR},
+			REV_NO		= #{revNoTo, jdbcType=VARCHAR},
+			UDT_ID		= #{userId},
+			UDT_PGM		= #{pgmId},
+			UDT_DTTM	= SYSDATE
+		WHERE
+			  CO_CD    = #{coCd}
+		  AND ORDRS_NO = #{ordrsNo}
+		  AND SALES_CD = #{salesCd}
+		  AND MATR_SEQ = #{matrSeq}
+		  AND UPPER_CD = #{upperCd}
+		  AND LOWER_CD = #{lowerCd}
+			  
+	</update>
+		
+    <insert id="copyMatrBomTree" parameterType="Map">
+		INSERT INTO TB_SM01D01 
+			(CO_CD, 
+			ORDRS_NO, 
+			SALES_CD, 
+			MATR_SEQ, 
+			UPPER_CD, 
+			LOWER_CD, 
+			ORDRG_DIV_10, 	ORDRG_DIV_20, 	NEXT_PRCSN_NM, 	DLVPLC_NM, 
+			BOM_QTY, 		POS_QTY, 		MATR_CD, 		MATR_NM, 
+			GOODS_DIV, 		MATR_CLNT_DIV, 	MATR_DIV, 		MATR_GRP, 
+			MATR_MAT, 		MATR_SIZE, 		MATR_SPEC, 		MATR_MAKR_NM, 
+			MATR_MNO, 		MATR_WT, 		MATR_UNIT, 		ORIGIN_NM, 
+			MATR_DRW_NO, 	MATR_TEST_DIV, 	DLVR_RQM_DAY, 	MATR_PURC_DIV, 
+			MIN_ORDRG_QTY, 	MATR_SAFT_QTY, 	MATR_STOCK_CD, 	DSGN_2D_MD, 
+			AVRG_2D_MD, 	DSGN_3D_MD, 	AVRG_3D_MD, 	PRDCTN_RQM_MD, 
+			PRDCTN_AVRG_MD, USE_YN, 		MATR_PART_NO, 	PCHS_CLNT_CD1, 
+			PCHS_CLNT_PCT1, PCHS_CLNT_CD2, 	PCHS_CLNT_PCT2, PCHS_CLNT_CD3, 
+			PCHS_CLNT_PCT3, MATR_UPR, 		MATR_AVRG_UPR, 	MATR_RMK, 
+			MATR_LAST_TRST_DT, MATR_ATNT_CD, MATR_NO, 
+			ETC_FIELD1, 	ETC_FIELD2, 	ETC_FIELD3, 
+			CREAT_ID,		CREAT_PGM, 		CREAT_DTTM, 
+			UDT_ID, 		UDT_PGM, 		UDT_DTTM, 
+			DSGN_NO, 		DSGN_NM, 		UPPER_NM, 		LOWER_NM, 
+			AVLB_STRT_DT, 	AVLB_END_DT, 	PART_NO, 		UNIT_NO, 		REV_NO, 
+			PCHS_CLNT_CD, 	PCHS_CLNT_NM, 	MNG_NM
+			)
+			SELECT  
+			        CO_CD, 
+					#{ordrsNoTo}, 
+					#{salesCdTo}, 
+					( SELECT TO_NUMBER(NVL(MAX(MATR_SEQ),0))+1 
+						FROM tb_sm01d01 d 
+					   WHERE D.CO_CD = #{coCd}
+						 AND D.ORDRS_NO = #{ordrsNoTo}	
+						 AND D.SALES_CD = #{salesCdTo}
+						 AND D.UPPER_CD = #{upperCdTo}
+						 AND D.LOWER_CD = #{lowerCdTo}	 ), 
+					#{upperCdTo}, 
+					#{lowerCdTo}, 
+					ORDRG_DIV_10, 	ORDRG_DIV_20, 	NEXT_PRCSN_NM, 	DLVPLC_NM, 
+					#{bomQtyTo}, 	#{bomQtyTo}, 	MATR_CD, 		MATR_NM, 
+					GOODS_DIV, 		MATR_CLNT_DIV, 	MATR_DIV, 		MATR_GRP, 
+					MATR_MAT, 		MATR_SIZE, 		MATR_SPEC, 		MATR_MAKR_NM, 
+					MATR_MNO, 		MATR_WT, 		MATR_UNIT, 		ORIGIN_NM, 
+					MATR_DRW_NO, 	MATR_TEST_DIV, 	DLVR_RQM_DAY, 	MATR_PURC_DIV, 
+					MIN_ORDRG_QTY, 	MATR_SAFT_QTY, 	MATR_STOCK_CD, 	DSGN_2D_MD, 
+					AVRG_2D_MD, 	DSGN_3D_MD, 	AVRG_3D_MD, 	PRDCTN_RQM_MD, 
+					PRDCTN_AVRG_MD, USE_YN, 		MATR_PART_NO, 	PCHS_CLNT_CD1, 
+					PCHS_CLNT_PCT1, PCHS_CLNT_CD2, 	PCHS_CLNT_PCT2, PCHS_CLNT_CD3, 
+					PCHS_CLNT_PCT3, MATR_UPR, 		MATR_AVRG_UPR, 	MATR_RMK, 
+					MATR_LAST_TRST_DT, MATR_ATNT_CD, MATR_NO, 
+					ETC_FIELD1, 	ETC_FIELD2, 	ETC_FIELD3, 
+					CREAT_ID,		CREAT_PGM, 		CREAT_DTTM, 
+					'', 			'', 			'', 
+					DSGN_NO, 		DSGN_NM, 		#{upperNm}, 	LOWER_NM, 
+					AVLB_STRT_DT, 	AVLB_END_DT, 	#{partNoTo, jdbcType=VARCHAR},
+												 	#{unitNoTo, jdbcType=VARCHAR},
+												 	#{revNoTo, jdbcType=VARCHAR}, 
+					PCHS_CLNT_CD, 	PCHS_CLNT_NM, 	MNG_NM
+			FROM TB_SM01D01
+			WHERE
+				  CO_CD    = #{coCd}
+			  AND ORDRS_NO = #{ordrsNo}
+			  AND SALES_CD = #{salesCd}
+			  AND MATR_SEQ = #{matrSeq}
+			  AND UPPER_CD = #{upperCd}
+			  AND LOWER_CD = #{lowerCd}
+			  
+	</insert>
+	
+	<select id="selectMatrBomlevelList" parameterType="Map" resultType="CamelMap">
+		SELECT TO_CHAR(T.AVLB_STRT_DT, 'YYYY-MM-DD') AS AVLB_STRT_DT
+		     , TO_CHAR(T.AVLB_END_DT, 'YYYY-MM-DD') AS AVLB_END_DT
+			 , TO_CHAR(T.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM
+			 , T.*
+			 , FN_CM05M01_CD_TO_NM(T.MATR_UNIT_CD) MATR_UNIT_CD_NM
+			 , NVL(C.CHANGE_YN, 'N') AS CHANGE_YN
+		FROM   TB_BM14M01 AS T
+		       LEFT OUTER JOIN TB_BM14M01_COMPARE AS C  ON T.CO_CD = C.CO_CD
+			                                           AND T.SALES_CD = C.SALES_CD
+													   AND T.UPPER_KEY = C.UPPER_KEY
+													   AND T.LOWER_KEY = C.LOWER_KEY
+		WHERE  T.SALES_CD = #{salesCd}
+		AND    T.CO_CD    = #{coCd}
+		AND    T.UPPER_KEY  = #{upperKey}
+		ORDER BY T.LOWER_CD
+	</select>
+	
+	
+	
+	<select id="selectMatrBomSeqNext" parameterType="Map" resultType="int">
+			SELECT TB_SM01D01_SQ01.NEXTVAL  FROM DUAL 
+	</select>
+	
 </mapper>

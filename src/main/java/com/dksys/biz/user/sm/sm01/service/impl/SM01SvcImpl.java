@@ -31,7 +31,7 @@ public class SM01SvcImpl implements SM01Svc {
 	
 	@Autowired
 	CM08Svc cm08Svc;
-	
+
 	@Override
 	public int selectBomSalesCount(Map<String, String> paramMap) {
 		return sm01Mapper.selectBomSalesCount(paramMap);
@@ -368,5 +368,49 @@ public class SM01SvcImpl implements SM01Svc {
 		sm01Mapper.syncBom(paramMap);
 		return paramMap;
 	}
-	
+
+	// BOM tree Node Move
+	@Override
+	public int moveMatrBom(List<Map<String, String>> paramList) {
+		int result = 0;
+		for(Map<String, String> paramMap : paramList) {
+			result += sm01Mapper.moveMatrBom(paramMap);
+		}
+		return result;
+	}
+
+	// BOM tree Node Copy
+	@Override
+	public int copyMatrBomTree(List<Map<String, String>> paramList) {
+		int result = 0;
+		String lowerCd = "";
+		
+		for(Map<String, String> paramMap : paramList) {
+			//신규등록 키값 할당
+			lowerCd = Integer.toString(sm01Mapper.select_bm14_Key(paramMap));
+			paramMap.put("lowerCdTo", lowerCd);
+			paramMap.put("salesCdTo", paramMap.get("salesCd"));
+			//트리 복사
+			result += sm01Mapper.copyMatrBomTree(paramMap);
+			
+			/*{coCd=GUN, salesCd=23010-99TVFTE, salesCdTo=23010-99TVFTE, 
+			 * 복사하고자하는 대상 부모코드 : parentId=114, upperCd=2000, upperKey=114, 
+			 * 붙여넣기할 대상코드 하위코드 : childId=244, lowerCd=0050, lowerKey=244, 
+			 * 새로 생성할 키값 : fileTrgtKey=1630} --> 신규생성된 lowerKey값도 동일하게 처리함
+			 * 
+			 * {coCd=GUN, salesCd=23010-99TVFTE, salesCdTo=23010-99TVFTE,
+			 *  parentId=114, upperCd=2000, upperKey=114,
+			 *  childId=244, lowerCd=0050, lowerKey=244, 
+			 *  fileTrgtKey=1633}
+			 * 
+			 * {coCd=GUN, salesCd=23010-99TVFTE, salesCdTo=23010-99TVFTE,
+			 *  parentId=114, upperCd=2000, upperKey=114, 
+			 *  childId=244, lowerCd=0050, lowerKey=244, 
+			 *  userId=jangsub.nam, pgmId=ZZ0101M01, 
+			 *  fileTrgtKey=1634}
+			 */
+		}
+		return result;	
+	}
+
 }

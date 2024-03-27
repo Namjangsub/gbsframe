@@ -33,6 +33,8 @@ var menuIdx = getCookie("menuIdx");
 if (typeof ax5 !== 'undefined' && typeof ax5.ui !== 'undefined') {
 	if (typeof ax5.ui.mask === 'function') {
 		var mask = new ax5.ui.mask();
+		var secondMask = new ax5.ui.mask();
+		var thirdMask = new ax5.ui.mask();
 	}
 	if (typeof ax5.ui.modal === 'function') {
 		var modal = new ax5.ui.modal();
@@ -184,13 +186,16 @@ var openSecondModal = function(url, width, height, title, paramObj, callback) {
         closeToEsc: false,
         onStateChanged: function () {
         	if (this.state === "open") {
+                secondMask.open();
         		var modalObj = {
                 	"target": this.self,
                 	"paramObj": paramObj,
                 	"callback": callback
                 }
                 modalStack.push(modalObj);
-        	}
+        	} else if (this.state === "close") {
+        		secondMask.close();
+            }
         }
     }, function () {
     	var targetEl = this.$["body-frame"];
@@ -219,13 +224,16 @@ var openThirdModal = function(url, width, height, title, paramObj, callback) {
         closeToEsc: false,
         onStateChanged: function () {
         	if (this.state === "open") {
+                thirdMask.open();
         		var modalObj = {
                 	"target": this.self,
                 	"paramObj": paramObj,
                 	"callback": callback
                 }
                 modalStack.push(modalObj);
-        	}
+        	} else if (this.state === "close") {
+        		thirdMask.close();
+            }
         }
     }, function () {
     	var targetEl = this.$["body-frame"];

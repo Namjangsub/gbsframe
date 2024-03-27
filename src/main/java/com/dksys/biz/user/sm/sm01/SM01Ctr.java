@@ -382,4 +382,45 @@ public class SM01Ctr {
     	model.addAttribute("result", result);
     	return "jsonView";
     }
+    
+    
+
+
+    // BOM Tree Node 복사
+    @PostMapping("/copyMatrBomTree")
+    public String copyMatrBomTree(@RequestBody List<Map<String, String>> paramList, ModelMap model) {
+    	try {
+    		if (sm01Svc.copyMatrBomTree(paramList) != 0 ) {
+    			model.addAttribute("resultCode", 200);
+    			model.addAttribute("resultMessage", messageUtils.getMessage("copy"));
+    		} else {
+    			model.addAttribute("resultCode", 500);
+    			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));    			
+    		}
+    	}catch(Exception e) {
+    		model.addAttribute("resultCode", 900);
+    		model.addAttribute("resultMessage", e.getMessage());
+    	}
+    	return "jsonView";
+    }
+
+
+    // BOM Tree Node 이동
+    @PostMapping("/moveMatrBom")
+    public String moveMatrBom(@RequestBody List<Map<String, String>> paramList, ModelMap model) {
+    	try {
+    		if (sm01Svc.moveMatrBom(paramList) != 0 ) {
+    			model.addAttribute("resultCode", 200);
+    			model.addAttribute("resultMessage", messageUtils.getMessage("copy"));
+    		} else {
+    			model.addAttribute("resultCode", 500);
+    			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));    			
+    		}
+    	}catch(Exception e) {
+    		model.addAttribute("resultCode", 900);
+    		model.addAttribute("resultMessage", e.getMessage());
+    	}
+    	return "jsonView";
+    }
+    
 }

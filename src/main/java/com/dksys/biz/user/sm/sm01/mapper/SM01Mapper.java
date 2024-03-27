@@ -57,4 +57,15 @@ public interface SM01Mapper {
   // int syncBom(Map<String, String> paramMap);
 
   void syncBom(Map<String, String> param);
+  
+  // Tree Node Copy
+  int copyMatrBomTree(Map<String, String> paramMap);
+
+  // Tree Node Move
+  int moveMatrBom(Map<String, String> paramMap);
+
+  List<Map<String, String>> selectMatrBomlevelList(Map<String, String> paramMap);
+  
+  int selectMatrBomSeqNext(Map<String, String> paramMap);
+  
 }

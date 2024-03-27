@@ -1,4 +1,6 @@
 
+<link rel="stylesheet" href="/static/css/jstree/style.min.css">
+<script src="/static/js/jstree/jstree.min.js"></script>
 <style>
 	.add_btn_small {
 		display: inline-block;
@@ -60,7 +62,7 @@
     .resizable-div {
       border: 1px dashed #bbb9b9;
     }
-    
+
 	</style>
 <div class="popup_area of_a" style="width: 100%; height: 100%;">
 	<div class="tit_contents">
@@ -215,6 +217,7 @@
 	var select_dsgnNo = null;
 	var select_lowerCd = null;
 	var select_upperCd = null;
+	var treeChkRefresh = '';	//왼쪽 jstree refresh 변경여부
 
 	let bomData = "";
 
@@ -291,8 +294,8 @@
 					{key: "text", label: "도번/품명", width: 250, align: "left", treeControl: true, styleClass: function () { return gridStyle(this.item); }},
 					{key: "treeUpperCd", label: "상위코드"    , width: 60, align: "left", hidden:true},
 					{key: "treeLowerCd", label: "하위코드"    , width: 60, align: "left", hidden:true},
-					{key: "upperCd"    , label: "상위코드"    , width: 60, align: "left", hidden:true},
-					{key: "lowerCd"    , label: "하위코드"    , width: 60, align: "left", hidden:true},
+					{key: "upperCd"    , label: "상위코드"    , width: 60, align: "left", hidden:false},
+					{key: "lowerCd"    , label: "하위코드"    , width: 60, align: "left", hidden:false},
 					{key: "dtaChk"     , label: " "           , width: 30 , hidden:true},
 					{key: "coCd"       , label: "CO"          , width: 50 , align: "center", hidden:true},
 					{key: "ordrsNo"    , label: "ordrsNo"     , width: 80 , align: "center", hidden:true},
@@ -506,6 +509,7 @@
 
 			postAjax("/user/sm/sm01/selectBomMatrList", formData, null, function(data) {
 				var list = data.resultList;
+
 				target.setData({
 					list : list,
 					page : {
@@ -705,14 +709,14 @@
 		    $('[data-ax5grid="matr-grid"]').height(tagHeight);
 		    $('[data-ax5grid-container="root"]').height(tagHeight);
 		    $('#treeFrame').height(tagHeight + 45);
-		    $('#deptTree').height(tagHeight);
+		    $('#MatrBomTree').height(tagHeight);
 		    $('#treeFrame .contents').height(tagHeight+50);
 
 			var chgWidth = workWidth - tagWidth -2;
 		    chgWidth = (tagWidth + chgWidth) > workWidth ?  (workWidth - tagWidth) : chgWidth;
 			$("#gridFrame").width(tagWidth);
 		    $("#treeFrame").width(chgWidth);
-		    $('#deptTree').width(chgWidth);
+		    $('#MatrBomTree').width(chgWidth);
 		    $('#treeFrame .contents').width(chgWidth);
 		});			
 		// 사이즈 조정 시 태그 자동 크기 조절
@@ -724,14 +728,14 @@
 		    tagWidth = tagWidth < 100 ? 100 : tagWidth;
 		    tagWidth = tagWidth > workWidth ? workWidth : tagWidth;
 		    
-		    $('#deptTree').height(tagHeight -45);
+		    $('#MatrBomTree').height(tagHeight -45);
 		    $('#treeFrame .contents').height(tagHeight);
 		    $('#gridFrame').height(tagHeight);
 		    $('[data-ax5grid="matr-grid"]').height(tagHeight - 45);
 		    $('[data-ax5grid-container="root"]').height(tagHeight- 45);
 		    
 		    $("#treeFrame").width(tagWidth);
-		    $('#deptTree').width(tagWidth);
+		    $('#MatrBomTree').width(tagWidth);
 		    $('#treeFrame .contents').width(tagWidth);
 		    var chgWidth = workWidth - tagWidth -2;
 		    chgWidth = (tagWidth + chgWidth) > workWidth ?  (workWidth - tagWidth) : chgWidth;
@@ -763,15 +767,44 @@
 	
 	function initMatrBomTree() {
 		$("#MatrBomTree").jstree("destroy");
-		// debugger;
 		$("#MatrBomTree").jstree(
 		{
-			plugins : ['types', 'dnd', 'search' ],
+			plugins : ['types', 'dnd',  'search' ],
   			core : {
 				"check_callback": checkOperation,
 				dblclick_toggle: false,
 				data : selectMatrBomTree()
 			},
+  			
+//			1. plugins에 Contextmenu를 추가한다.
+//			2. item에서 넘어오는 $node는 메뉴 클릭할 때 선택한 node를 가르킨다. 
+//			3. return 항목에 메뉴들을 정의한다.
+//			4. 메뉴에 action에 메뉴를 클릭하면 실행할 코드를 넣는다 
+			contextmenu : {
+  				"items" : function($node) {
+  					console.log("Context menu items function called.");
+  					console.log("$node:", $node);
+//   					var tree = $("#MatrBomTree").jstree(true);
+  					return {
+	  					"create" : { 
+	  		        		"separator_before" : false,
+	  						"separator_after" : true,
+	  						"icon": "glyphicon glyphicon-edit",
+	  						"label" : "BOM 수정",
+	  						"_disabled":  true,
+// 	  						"action" : function(obj){createBom('U',$node)}
+	  					},
+	  					"remove" : {
+	  						"separator_before" : false,
+	  						"separator_after" : true,
+	  						"icon": "glyphicon glyphicon-erase",
+	  						"label" : "BOM 삭제",
+	  						"_disabled":  false,
+// 	  						"action" : function(obj){deleteBom($node)}
+	  					}
+  					}
+  				}
+  			} ,
 			types : {
   				'unit'      : { 'icon' : 'glyphicon glyphicon-folder-close' },
 				'unit-open' : { 'icon' : 'glyphicon glyphicon-folder-open' },
@@ -780,45 +813,47 @@
   		}).on('loaded.jstree', function() {
 			// 루트 노드 로드 완료 시
 			// 최상위 노드 펼침
-			// debugger;
 			$('#MatrBomTree').jstree(true).open_node($('#MatrBomTree li[aria-level=1]').eq(0).attr('id'));
 			
 			//첫번째 노드 검색해서 선택하기
-			// debugger;
 			var firstNode = $('#MatrBomTree').jstree(true).get_node('#').children[0];
 			$('#MatrBomTree').jstree(true).activate_node(firstNode);
-			// debugger;
 		}).on("refresh.jstree", function() {
 			// 리프레시 완료 시
-			debugger;
-			var selectedId = $('#MatrBomTree').jstree(true).get_selected()[0];
-			$('#MatrBomTree').jstree(true).deselect_all();
-			$('#MatrBomTree').jstree(true).select_node(selectedId);
+			if (treeChkRefresh) {
+				$('#MatrBomTree').jstree(true).deselect_all();
+		 		$('#MatrBomTree').jstree(true).select_node(treeChkRefresh);
+		 		treeChkRefresh = '';
+				return false;
+			} else {
+				var selectedId = $('#MatrBomTree').jstree(true).get_selected()[0];
+				$('#MatrBomTree').jstree(true).deselect_all();
+				$('#MatrBomTree').jstree(true).select_node(selectedId);
+			}
+// 		}).on('mousedown', function(event) {
+// 		    debugger;
+// 		    if (event.which === 3) { // Right mouse button
+// 		        var node = $(event.target).closest('.jstree-node');
+// 		        if (node.length > 0) {
+// 		            $('#MatrBomTree').jstree('show_contextmenu', node);
+// 		        }
+// 		    }
 		}).on("select_node.jstree", function(e, data) {
 			// 노드 선택 시 발생 이벤트
+			
 			// BOM정보 set
-			// setBomInfo(data.node);
-			// debugger;
 			bomData = data.node.original;
-			matrGridView.setData(data.node.original.lowerCd, data.node.original.upperCd);
-			// debugger;
-			// 신규 노드 삭제
-			if($('#MatrBomTree').jstree(true).get_node('new')){
-				if(data.node.id != "new"){
-					$('#MatrBomTree').jstree(true).refresh();
-				}
-			}
-		}).on('open_node.jstree', function(e, data) {
+			if (bomData.matGubun != "자재") {
+				matrGridView.setData(data.node.original.lowerCd, data.node.original.upperCd);
+			};
+        }).on('open_node.jstree', function(e, data) {
 			// 노드 열릴 때
-			// debugger;
 			data.instance.set_type(data.node, 'unit-open');
   		}).on('close_node.jstree', function(e, data) {
 			// 노드 닫힐 때
-			// debugger;
   			data.instance.set_type(data.node, 'unit');
   		}).on('create_node.jstree', function(e, data){
 			// 노드 생성 시
-			// debugger;
   			$('#MatrBomTree').jstree(true).deselect_all();
   			$('#MatrBomTree').jstree(true).select_node(data.node.id);
   			// setBomInfo(data.node);
@@ -827,12 +862,288 @@
   			var node = $(this).jstree(true).get_node(this);
 //   			createBom('U');
   		}).on('copy_node.jstree', function(e, data) {
-			
+  		    let targetNodeId = data.parent;		 //To 부모노드 ID
+  		    let targetNode = $("#MatrBomTree").jstree(true).get_node(targetNodeId);
+  			if (data.old_parent == data.parent || targetNode.parent == '#' || targetNode.id == '#'){ //동일한자리이거나 이동위치가 Top인경우
+//   				alert("같은자리에는 복사할 수 없습니다.");
+  				dataRefreshMatrBomTree(); //왼쪽 트리 그리기
+  				return false;
+  			}
+  		    if (targetNode.original.matGubun != undefined ) {
+	  			if (targetNode.original.matGubun == '자재') {
+	  				alert('자재코드는 하위 자재를 넣을수 없습니다.');
+	  				dataRefreshMatrBomTree(); //왼쪽 트리 그리기
+	  				return false;
+	  			}
+  		    }
+  		    //선택된 노드정보를 가져와서 자재로 등록된 내용만 복사 대상으로 추출
+	  		let seletedNodes = data.instance.get_selected(true)
+	  		let chkNodes = $.grep(seletedNodes, function (o) {
+	  			return data.instance.is_leaf(o) && o.original.matGubun == '자재';})
+	  		if (seletedNodes.length > 1) {
+	  			if (chkNodes.length == 0) {
+	  				dataRefreshMatrBomTree(); //왼쪽 트리 그리기
+	  				return false;
+	  			}
+	  			if (!confirm(chkNodes.length + '건을 [' + targetNode.text + ']로 복사 하시겠습니까?')) {
+	  				dataRefreshMatrBomTree(); //왼쪽 트리 그리기
+	  				return false;
+	  			}
+	  		} else {
+	  			if (!confirm(data.node.text + '를  [' + targetNode.text + ']으로 복사 하시겠습니까?')) {
+	  				dataRefreshMatrBomTree(); //왼쪽 트리 그리기
+	  				return false;
+	  			}
+	  			chkNodes = [ data.node ];
+	  		}
+
+  		    
+  		    
+	  		let nodeInfoArr = [];
+	  		$.each(chkNodes, function (i, o) {	//복하사고자하는 노드정보 배열임
+// 	  		    console.log("seleted("+i+") : " + o.text, o);
+  				//console.log("노드 복사 완료: " + copiedNodeId);
+	  			let nodeInfo = {};
+	  			nodeInfo.coCd		= $('#coCd').val();
+	  			nodeInfo.ordrsNoTo	= $('#ordrsNo').val();
+	  			nodeInfo.ordrsNo 	= $('#ordrsNo').val();
+	  			nodeInfo.salesCd	= $('#salesCd').val();
+	  			nodeInfo.salesCdTo	= $('#salesCd').val();  //Target sales Code 230720 추가
+	  			nodeInfo.parentIdTo	= targetNodeId;
+	  			nodeInfo.upperCdTo	= targetNode.original.lowerCd;
+	  			nodeInfo.upperKeyTo	= targetNodeId;
+	  			nodeInfo.bomQtyTo	= targetNode.original.dsgnBomQty;
+	  			nodeInfo.upperNm	= targetNode.original.dsgnNm;
+	  			nodeInfo.partNoTo	= targetNode.original.partNo;
+	  			nodeInfo.unitNoTo	= targetNode.original.unitNo;
+	  			nodeInfo.revNoTo	= targetNode.original.revNo;
+	  			nodeInfo.parent		= o.parent;
+	  			nodeInfo.upperCd	= o.original.upperCd;
+	  			nodeInfo.upperKey	= o.parent;
+	  			nodeInfo.childId	= o.id;
+	  			nodeInfo.lowerCd	= o.original.lowerCd;
+	  			nodeInfo.matrSeq	= o.original.matrSeq;
+	  			nodeInfo.lowerKey	= o.id;
+	  			nodeInfo.matrCd		= o.original.matrCd;
+	  			nodeInfo.changeYn	= "Y";    // 도면번호에 SalesCd 변경 여부임 변경없을경우 'N'
+	  			nodeInfo.userId		= jwt.userId;
+	  			nodeInfo.pgmId		= $('#pgmId').val();
+	  			//백엔드 서비스단에서 재귀호출을 통합 하위 복사로 대체함
+				nodeInfoArr.push(nodeInfo);
+
+	  		})
+	  		
+	  			postAjaxSync("/user/sm/sm01/copyMatrBomTree", nodeInfoArr, null, function(data){
+	 				if(data.resultCode == 200){
+					} else {
+						//오류처리 트리를 원복해야함
+	  					alert(data.resultMessage);
+					}
+					treeChkRefresh = targetNodeId;
+	  				dataRefreshMatrBomTree(); //왼쪽 트리 그리기
+	  			});  
+  			$('#MatrBomTree').jstree(true).select_node(targetNodeId);
+			$('#MatrBomTree').jstree(true).open_all(targetNodeId);
 		}).on('move_node.jstree', function(e, data){
+	  		// 노드 이동완료 시
+  		    //선택된 노드정보를 가져와서 자재로 등록된 내용만 복사 대상으로 추출
+  			let curParent = $('#MatrBomTree').jstree(true).get_node(data.parent);	//타겟 위치 노드 ID
+  			let oldParent = $('#MatrBomTree').jstree(true).get_node(data.old_parent); //예전 노드 ID
+	  		if(curParent == oldParent || curParent.parent == '#' || curParent.id == '#') { //동일한자리이거나 이동위치가 Top인경우 
+  				dataRefreshMatrBomTree(); //왼쪽 트리 그리기
+	  			return false;
+	  		}
+	  			if (curParent.original && curParent.original.matGubun == '자재') {
+	  				alert('자재코드는 하위 자재를 넣을수 없습니다.');
+	  				dataRefreshMatrBomTree(); //왼쪽 트리 그리기
+	  				return false;
+	  			}
+//   			debugger;
+	  		let seletedNodes = data.instance.get_selected(true)
+	  		let chkNodes = $.grep(seletedNodes, function (o) {
+	  			return data.instance.is_leaf(o) && o.original.matGubun == '자재';})
+	  		if (seletedNodes.length > 1) {
+	  			if (chkNodes.length == 0) {
+	  				dataRefreshMatrBomTree(); //왼쪽 트리 그리기
+	  				return false;
+	  			}
+	  			if (!confirm(chkNodes.length + '건을 [' + curParent.text + ']로 이동 하시겠습니까?')) {
+	  				dataRefreshMatrBomTree(); //왼쪽 트리 그리기
+	  				return false;
+	  			}
+	  		} else {
+	  			if (!confirm(data.node.text + '를  [' + curParent.text + ']으로 이동 하시겠습니까?')) {
+	  				dataRefreshMatrBomTree(); //왼쪽 트리 그리기
+	  				return false;
+	  			}
+	  			chkNodes = [ data.node];
+	  		}
+
+  			
+	  		let nodeInfoArr = [];		//자식 노드 전체를 담기위한 영역
+	  		$.each(chkNodes, function (i, o) {	//이동 하려는 노드정보 배열임
+// 	  		    console.log("seleted("+i+") : " + o.text, o);
+				let nodeInfo = {};		//노드정보 재구성용
+  		  
+				nodeInfo.coCd 		= o.original.coCd;
+				nodeInfo.ordrsNo 	= o.original.ordrsNo;
+				nodeInfo.salesCd	= o.original.salesCd;
+				nodeInfo.matrSeq 	= o.original.matrSeq;
+				nodeInfo.upperCd	= o.original.upperCd;
+				nodeInfo.lowerCd	= o.original.lowerCd
+				
+				nodeInfo.upperCdTo	= curParent.original.lowerCd;
+				nodeInfo.upperNmTo	= curParent.original.lowerNm;
+				nodeInfo.bomQtyTo	= curParent.original.dsgnBomQty;
+				nodeInfo.partNoTo	= curParent.original.partNo;
+				nodeInfo.unitNoTo	= curParent.original.unitNo;
+				nodeInfo.revNoTo	= curParent.original.revNo;
+				
+				nodeInfo.bomQty		= oldParent.original.dsgnBomQty;
+				nodeInfo.partNo		= oldParent.original.partNo;
+				nodeInfo.unitNo		= oldParent.original.unitNo;
+				nodeInfo.revNo		= oldParent.original.revNo;
+				nodeInfo.userId		= jwt.userId;
+				nodeInfo.pgmId		= $('#pgmId').val();
 			
+				nodeInfoArr.push(nodeInfo);
+
+  			});
+  			postAjaxSync("/user/sm/sm01/moveMatrBom", nodeInfoArr, null, function(data){
+ 				if(data.resultCode == 200){
+ 				} else {
+   					alert(data.resultMessage);
+ 				}
+  			});
+  			$('#MatrBomTree').jstree(true).select_node(curParent);
+			$('#MatrBomTree').jstree(true).open_all(curParent);
+			treeChkRefresh = curParent;
+ 			dataRefreshMatrBomTree(); //왼쪽 트리 그리기
+ 				
+		}).on('keydown', function(event) {
+		    if (event.ctrlKey || event.metaKey) {
+		        // Check for Ctrl+C (copy) shortcut
+		        if (event.keyCode === 67) {
+		        	copyNodes();
+		            event.preventDefault(); 
+		        }
+		        // Check for Ctrl+V (paste) shortcut
+		        else if (event.keyCode === 86) {
+		            pasteNodes();
+		            event.preventDefault();
+		        }
+		    };
 		});
   	}
 
+	function copyNodes() {
+	    var selectedNodes =  $('#MatrBomTree').jstree(true).get_selected();
+	    window.copiedNodes = selectedNodes;
+	}
+
+	function pasteNodes() {
+	    if (window.copiedNodes) {
+	        var targetNode = $('#MatrBomTree').jstree(true).get_selected()[0];
+	        window.copiedNodes.forEach(function(node) {
+	            $('#MatrBomTree').jstree(true).create_node(targetNode, node);
+	        });
+	    }
+	}
+	// Tree dnd check
+	//callback 사용 안함.--> 백엔드에서 처리하고 결과를 트리에 그리므로 사용안함
+	function checkOperation(operation, node, parent, position, more) {
+// 		console.log(operation, node, parent, position, "more:", more, "more.core:", more.core);
+// 		if (position == 1) return false;
+// 		if (more && more.core) { // 노드가 드랍되었을 때
+// 			if(operation == "move_node"){
+// 				console.log('position : '+ position, 'node.id :'+node.id );
+// 				if (!$("#actionBtn").length) return false; //수정버튼이 없는 사용자는 작업권한이 없어 수정 못함
+// // 				if (position == 1) return false;
+// 				if(node.id == "new"){
+// 					debugger;
+// 					alert("신규로 추가한 BOM을 저장해 주세요.");
+// 					return false;
+// 				}else{
+// 					// 자식노드중에 같은게 있는지 확인
+// 					debugger;
+// 					const result = isNodeNameExists(parent, node.text);
+// 		    		if (result) {
+// 		    			$("#MatrBomTree").jstree().search(node.text,true,false,parent.id);
+// 		    			alert("동일한 아이템이 존재합니다.");
+// 		    			$('#MatrBomTree').jstree(true).refresh();
+// 		  				return false;
+// 			   		} 	
+		    		
+// 					var confirmMessage = "BOM을 이동하시겠습니까?";
+// 					if(!confirm(confirmMessage)){
+// 						return false;
+// 					}
+// 					return true;
+// 				}
+// 			} else if(operation == "create_node"){
+//     			$('#MatrBomTree').jstree(true).refresh();	//기능 없음
+//     			return false;
+// 			} else if(operation == "copy_node"){
+// 				debugger;
+// 				if (!$("#actionBtn").length) return false; //수정버튼이 없는 사용자는 작업권한이 없어 수정 못함
+				// 노드가 드랍되었을 때
+				// 자식노드중에 같은게 있는지 확인
+// 				const result = isNodeNameExists(parent, node.text);
+// 	    		if (result) {
+// 	    			$("#MatrBomTree").jstree().search(node.text,true,false,parent.id);
+// 	    			alert("동일한 아이템이 존재합니다.");
+// 	    			$('#MatrBomTree').jstree(true).refresh();
+// 	  				return false;
+// 		   		} 			
+// 				return true;
+// 			}
+// 		} //if (more && more.core)
+	}  	// function	}
+
+	// 특정 노드 아래에 있는 자식 노드들 중에서 특정 노드명이 있는지 체크
+    function isNodeNameExists(node, nodeName) {
+		if (!node || !node.children.length) { // 해당 노드가 없거나 자식 노드가 없는 경우
+			return false;
+		}
+		
+		let result = false;
+		node.children.forEach(childNodeId => {
+		    const childNode = $("#MatrBomTree").jstree(true).get_node(childNodeId);
+		    if (childNode.text === nodeName) {
+		      result = true;
+		      return false; // break the loop
+		    } 
+		});
+		
+		return result;
+	}    
+    
+	function  deleteBom() {
+		if (!$("#actionBtn").length) return false; //삭제버튼이 없는 사용자는 작업권한이 없어 삭제 못함
+		var node = $('#MatrBomTree').jstree(true).get_selected()[0];
+		var currNode = $("#MatrBomTree").jstree(true).get_node(node);
+		if (confirm(currNode.text + "삭제하시겠습니까?")) {
+			var paramObj = {
+				"coCd"        : $('#coCd').val(),
+				"ordrsNo"     : $('#ordrsNo').val(),
+				"salesCd"     : $('#salesCd').val(),
+				"matrSeq"    : currNode.original.matrSeq,
+				"upperKey"    : currNode.original.parent,
+				"lowerKey"    : currNode.original.id
+			}
+			postAjax("/user/sm/sm14/deleteBom", paramObj, null, function(data) {
+				if (data.resultCode == 200) {
+					// alert(data.resultMessage);
+// 					$('#MatrBomTree').jstree(true).settings.core.data = selectMatrBomTree();
+				} else {
+  					alert(data.resultMessage);
+  				}
+// 				$('#MatrBomTree').jstree(true).refresh();
+  				dataRefreshMatrBomTree(); //왼쪽 트리 그리기
+  			});
+		}
+  	}
+	
 	// BOM 트리 데이터 select
 	function selectMatrBomTree() {
 		var MatrBomTree = null;
@@ -844,13 +1155,7 @@
 		postAjaxSync("/user/sm/sm01/selectBomSalesTreeList", paramObj, null, function(data){
 			MatrBomTree = data.result;
 		});
-		// debugger;
 		return MatrBomTree;
-	}
-
-	// Tree dnd check
-	function checkOperation(operation, node, parent, position, more) {
-		return false;
 	}
 
 	// 등록
@@ -873,7 +1178,6 @@
 
 	// 수정
 	function updateBomMatr() {
-		// debugger;
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 			var formData = makeFormData();										// 요청이 통과하면 formData를 생성
 			// setFormLock(".popup_area");
@@ -958,6 +1262,8 @@
 	//Default작업 type은 "BOM"으로 왼쪽 BOM 그리드의 선택 ROW를 기준으로 검색처리함.
 	//    작업 Type이 "MATR"은 오른쪽 자재 그리드의 최상단을 기준으로 검색함. -->(진입시점은 화면에서 엔터키를 누를때 진입함)
 	function openMatListSearchMulti(_type = 'BOM') {
+		var bomData = matrGridView.target.list[0];
+		var matrLength = matrGridView.target.list.length;
 		let tempSearchValue ="";
 		if (bomData) {
 			if (bomData.matrMno) { tempSearchValue = bomData.matrMno == "-" ? "" : bomData.matrMno; }  //형번 "BYGS10100-45H"
@@ -988,7 +1294,6 @@
 				} else {
 					vmatr_posQty = $('#matr_posQty').val();
 				}
-				// debugger;
 
 				newRow.dtaChk = "I";
 				newRow.matrYn = "자재";
@@ -1086,7 +1391,6 @@
 	}
 
 	function treeExpandClose(selector) {
-		// debugger;
 		selector = selector ? selector : "MatrBomTree" ;
 		var node = $('#' + selector).jstree(true).get_selected()[0];
 		node = node ? node : "#" ;
@@ -1120,12 +1424,10 @@
 	}
 
 	function syncBom() {
-		// debugger;
 		//버튼이 없는 사용자는 작업권한이 없어 처리 못함
 		// if (!$("#bomsyncBtn").length) return false;
 		var node = $('#MatrBomTree').jstree(true).get_selected()[0];
 		var currNode = $("#MatrBomTree").jstree(true).get_node(node);
-		// debugger;
 		if (confirm(currNode.text + "설계BOM기준 적용처리 하시겠습니까?")) {
 			var target = this.target;
 			var formData = {
@@ -1146,4 +1448,5 @@
 		const cvtValue = parseFloat(value.replace(/[^0-9.-]/g, '')); //숫자(0-9), 빼기 기호(-)가 아닌 모든 문자를 바꿉니다. 
 		return isNaN(cvtValue) ? 0 : cvtValue; //NaN이면 0로 대체 --> minus기호만 있는경우
 	}
+	
 </script>
