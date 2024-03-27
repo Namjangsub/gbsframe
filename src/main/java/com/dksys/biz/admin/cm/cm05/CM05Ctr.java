@@ -159,7 +159,8 @@ public class CM05Ctr {
     	
     	String rtnVal = "N";
     	String rtnHolVal = "N";     //영업일마감여부
-    	String menuUrl = (String)param.get("menuUrl").toString();
+    	//메뉴 앞2문자로 업무 구분용으로 사용
+    	String menuUrl = (String)param.get("menuUrl").toString().substring(0, 2);
     	
     	String closeYn = "N";       //마감년월여부
     	String pchsCloseYn = "N";   //메입마감여부
@@ -180,23 +181,43 @@ public class CM05Ctr {
         	sysDate = resultList.get(0).get("sysDate").toString();
     	}
     	
-    	if("CR0201M01".equals(menuUrl)) {  //수주관리
+//    	if("CR0201M01".equals(menuUrl)) {  //수주관리
+//    		
+//	    	rtnVal = closeYn;	//마감년월여부
+//    	}else if("PM0101M01".equals(menuUrl)) {  //작업일보
+//
+//	    	rtnVal = prdctnCloseYn;				//생산마감여부
+//    	}else if("CR0701M01".equals(menuUrl) || "CR0801M01".equals(menuUrl) || "CR0501M01".equals(menuUrl) || "CR1001M01".equals(menuUrl)) {
+//    		//매출확정, 매출계산서, 수금, 물류진행요청
+//
+//	        rtnVal = sellCloseYn;	//매출마감여부
+//    	}else if("SM0301M01".equals(menuUrl) || "SM1401M01".equals(menuUrl) || "SM1001M01".equals(menuUrl) || "SM0601M01".equals(menuUrl)) {
+//    		//입고, 매입확정 및 계산서, 구매비용, 반품
+//
+//	        rtnVal = pchsCloseYn;	//입마감여부
+//    	}else if("SM0201M01".equals(menuUrl) || "QM0101M01".equals(menuUrl) || "WB2401M01".equals(menuUrl)) {
+//    		//발주, 요인별 발주 및 출장요청, WBS이슈관리
+//
+//    		rtnHolVal = "Y";
+//    	}
+    	
+    	if("CR".equals(menuUrl)) {  //수주관리
     		
-	    	rtnVal = closeYn;
-    	}else if("PM0101M01".equals(menuUrl)) {  //작업일보
-
-	    	rtnVal = prdctnCloseYn;
-    	}else if("CR0701M01".equals(menuUrl) || "CR0801M01".equals(menuUrl) || "CR0501M01".equals(menuUrl) || "CR1001M01".equals(menuUrl)) {
+    		rtnVal = closeYn;	//마감년월여부
+    	}else if("PM".equals(menuUrl)) {  //작업일보
+    		
+    		rtnVal = prdctnCloseYn;				//생산마감여부
+    	}else if("CR".equals(menuUrl) ) {
     		//매출확정, 매출계산서, 수금, 물류진행요청
-
-	        rtnVal = sellCloseYn;
-    	}else if("SM0301M01".equals(menuUrl) || "SM1401M01".equals(menuUrl) || "SM1001M01".equals(menuUrl) || "SM0601M01".equals(menuUrl)) {
+    		
+    		rtnVal = sellCloseYn;	//매출마감여부
+    	}else if("SM".equals(menuUrl) ) {
     		//입고, 매입확정 및 계산서, 구매비용, 반품
-
-	        rtnVal = pchsCloseYn;
-    	}else if("SM0201M01".equals(menuUrl) || "QM0101M01".equals(menuUrl) || "WB2401M01".equals(menuUrl)) {
+    		
+    		rtnVal = pchsCloseYn;	//입마감여부
+    	}else if("QM".equals(menuUrl) || "WB".equals(menuUrl)) {
     		//발주, 요인별 발주 및 출장요청, WBS이슈관리
-
+    		
     		rtnHolVal = "Y";
     	}
     	

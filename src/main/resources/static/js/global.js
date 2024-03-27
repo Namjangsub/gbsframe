@@ -2242,7 +2242,13 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 	});
 }
 
+//********************************************************
 // 월마감 체크
+//    파라메터 : 
+//       chkValue : 체크일자 (년월일)
+//       chkType  : 'D'- 삭제
+//       coCd     : 회사코드
+//********************************************************
 function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 
 	if(chkValue === '') return;
@@ -2284,8 +2290,7 @@ function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 	});//postAjaxSync
 	
 	if(typeof rtnVal == "undefined" || rtnVal == null) return;
-
-	if(rtnHolVal === 'Y'){
+	if(rtnHolVal === 'Y'){	//발주, 요인별 발주 및 출장요청, WBS이슈관리
 		rtnDate = calculateHoliday(sysDate, workDay);
 
 		rtnDate = rtnDate.YMD;
@@ -2294,30 +2299,32 @@ function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 		chkValue = parseFloat(chkValue);
 		
 		if(rtnDate - chkValue > 0){
-			$("#actionBtn").hide();
-			if(actionType === 'C') alert('마감되었습니다. 데이터를 등록할 수가 없습니다.');
-			if(actionType === 'D') alert('마감된 데이터입니다. 삭제할 수가 없습니다.');
-			if(actionType === 'U') setDisabledInputDate(true);
+//			$("#actionBtn").hide();
+			if(actionType === 'C') alert('마감된 일자입니다. 데이터를 등록할 수가 없습니다.');
+			if(actionType === 'D') alert('마감된 일자입니다. 삭제할 수가 없습니다.');
+//			if(actionType === 'U') setDisabledInputDate(true);
+			if(actionType === 'U') alert('마감된 일자입니다. 수정할 수가 없습니다.');
 			return false;
 		}else{
 //			$("#actionBtn").show();
-			if(actionType === 'U') setDisabledInputDate(false);
+//			if(actionType === 'U') setDisabledInputDate(false);
 			authChk();
 			return true;
 		}
 
 	}else{
-		if (rtnVal === 'Y') {
-			$("#actionOrdrsBtn").hide();
-			$("#actionBtn").hide();
-			if(actionType === 'C') alert('마감되었습니다. 데이터를 등록할 수가 없습니다.');
-			if(actionType === 'D') alert('마감된 데이터입니다. 삭제할 수가 없습니다.');
-			if(actionType === 'U') setDisabledInputDate(true);
+		if (rtnVal === 'Y') {  //마감완료
+//			$("#actionOrdrsBtn").hide();
+//			$("#actionBtn").hide();
+			if(actionType === 'C') alert('마감된 일자입니다. 데이터를 등록할 수가 없습니다.');
+			if(actionType === 'D') alert('마감된 일자입니다. 삭제할 수가 없습니다.');
+//			if(actionType === 'U') setDisabledInputDate(true);
+			if(actionType === 'U') alert('마감된 일자입니다. 수정할 수가 없습니다.');
 			return false;
 		}else{
 //			$("#actionOrdrsBtn").show();
 //			$("#actionBtn").show();
-			if(actionType === 'U') setDisabledInputDate(false);
+//			if(actionType === 'U') setDisabledInputDate(false);
 			authChk();
 			return true;
 		}
