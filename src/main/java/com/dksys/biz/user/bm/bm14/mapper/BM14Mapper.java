@@ -53,4 +53,5 @@ public interface BM14Mapper {
 	// 삭제체크
 	Map<String, String> deleteMatrbomChk(Map<String, String> paramMap);
 	
+	int selectPchsBomCheck(Map<String, String> paramMap);
 }

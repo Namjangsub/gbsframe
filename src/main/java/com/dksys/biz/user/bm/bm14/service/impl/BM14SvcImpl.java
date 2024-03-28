@@ -87,9 +87,19 @@ public class BM14SvcImpl implements BM14Svc {
 						dtl.put("fileTrgtKey", fileTrgtKey);
 						result += bm14Mapper.insertBomTree(dtl);
 					} else if ("U".equals(updChk)) {
-						result += bm14Mapper.updateBom(dtl);
+						if (bm14Mapper.selectPchsBomCheck(dtl) == 0) {
+							result += bm14Mapper.updateBom(dtl);
+						} else {
+							//error 구매BOM 작업완료 수정 불가
+							throw new IllegalArgumentException("구매BOM 작업완료 수정 불가");
+						}
 					} else if ("D".equals(updChk)) {
-						result += bm14Mapper.deleteBom(dtl);
+						if (bm14Mapper.selectPchsBomCheck(dtl) == 0) {
+							result += bm14Mapper.deleteBom(dtl);
+						} else {
+							//error 구매BOM 작업완료 삭제 불가
+							throw new IllegalArgumentException("구매BOM 작업완료 삭제 불가");
+						}
 					}
 				}
 		}

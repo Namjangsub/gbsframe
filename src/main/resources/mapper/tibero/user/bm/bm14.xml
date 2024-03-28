@@ -4,12 +4,23 @@
 <mapper namespace="com.dksys.biz.user.bm.bm14.mapper.BM14Mapper">
 	
 	<select id="selectBomTreeList" parameterType="Map" resultType="CamelMap">
+		WITH PCHS_BOM AS (
+		     SELECT D.CO_CD, D.SALES_CD, D.UPPER_CD, COUNT(*) AS PCHS_BOM_CNT
+		       FROM TB_SM01D01 D
+		     WHERE 1 = 1
+			   AND D.CO_CD    = #{coCd}
+			   AND D.SALES_CD = #{salesCd}
+		     GROUP BY D.CO_CD, D.SALES_CD, D.UPPER_CD
+		)
 		SELECT
 	         T.UPPER_KEY as PARENT,
 	         T.LOWER_KEY ID, 
 	         T.UPPER_CD,
 	         T.LOWER_CD,
-	         T.LOWER_CD || '(' || MATR_NM || ') x ' || T.LOWER_QTY AS TEXT, 
+	         <![CDATA[
+	         CASE WHEN NVL(D.PCHS_BOM_CNT, 0) > 0 THEN '<span style=''color: red;''>' || T.LOWER_CD || '(' || MATR_NM || ') x ' || T.LOWER_QTY || '</span>'
+	         								  ELSE T.LOWER_CD || '(' || MATR_NM || ') x ' || T.LOWER_QTY END AS TEXT, 
+	         ]]>								  
 	         (LEVEL-1)  LVL,
 	         T.DSGN_NO,
 	         CASE WHEN CONNECT_BY_ISLEAF = 1 THEN 'leaf' ELSE 'unit' END AS TYPE,
@@ -33,8 +44,12 @@
 	         T.UPPER_KEY,
 	         T.LOWER_KEY,
 	         T.FILE_TRGT_KEY,
-	         T.ORDRS_NO 
+	         T.ORDRS_NO,
+			 NVL(D.PCHS_BOM_CNT, 0) AS PCHS_BOM_CNT
 	     FROM TB_BM14M01 T
+			  				LEFT OUTER JOIN  PCHS_BOM   AS D   ON T.CO_CD  = D.CO_CD
+			  				                                  AND T.SALES_CD  = D.SALES_CD
+			  				                                  AND T.LOWER_KEY  = D.UPPER_CD
 	     WHERE T.SALES_CD = #{salesCd}
 	       AND T.CO_CD = #{coCd}	     
 		     START WITH T.LOWER_KEY =  (SELECT LOWER_KEY 
@@ -241,17 +256,29 @@
 	</insert>
 	
 	<select id="selectBomlevelList" parameterType="Map" resultType="CamelMap">
+		WITH PCHS_BOM AS (
+		     SELECT D.CO_CD, D.SALES_CD, D.UPPER_CD, COUNT(*) AS PCHS_BOM_CNT
+		       FROM TB_SM01D01 D
+		     WHERE 1 = 1
+			   AND D.CO_CD    = #{coCd}
+			   AND D.SALES_CD = #{salesCd}
+		     GROUP BY D.CO_CD, D.SALES_CD, D.UPPER_CD
+		)
 		SELECT TO_CHAR(T.AVLB_STRT_DT, 'YYYY-MM-DD') AS AVLB_STRT_DT
 		     , TO_CHAR(T.AVLB_END_DT, 'YYYY-MM-DD') AS AVLB_END_DT
 			 , TO_CHAR(T.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM
 			 , T.*
 			 , FN_CM05M01_CD_TO_NM(T.MATR_UNIT_CD) MATR_UNIT_CD_NM
 			 , NVL(C.CHANGE_YN, 'N') AS CHANGE_YN
+			 , NVL(D.PCHS_BOM_CNT, 0) AS PCHS_BOM_CNT
 		FROM   TB_BM14M01 AS T
 		       LEFT OUTER JOIN TB_BM14M01_COMPARE AS C  ON T.CO_CD = C.CO_CD
 			                                           AND T.SALES_CD = C.SALES_CD
 													   AND T.UPPER_KEY = C.UPPER_KEY
 													   AND T.LOWER_KEY = C.LOWER_KEY
+				LEFT OUTER JOIN  PCHS_BOM   AS D   ON T.CO_CD  = D.CO_CD
+				                                  AND T.SALES_CD  = D.SALES_CD
+				                                  AND T.LOWER_KEY  = D.UPPER_CD
 		WHERE  T.SALES_CD = #{salesCd}
 		AND    T.CO_CD    = #{coCd}
 		AND    T.UPPER_KEY  = #{upperKey}
@@ -283,6 +310,14 @@
 	
 	<select id="selectBomAllLevelList" parameterType="Map" resultType="CamelMap">
 	/* selectBomAllLevelList */
+			WITH PCHS_BOM AS (
+			     SELECT D.CO_CD, D.SALES_CD, D.UPPER_CD, COUNT(*) AS PCHS_BOM_CNT
+			       FROM TB_SM01D01 D
+			     WHERE 1 = 1
+				   AND D.CO_CD    = #{coCd}
+				   AND D.SALES_CD = #{salesCd}
+			     GROUP BY D.CO_CD, D.SALES_CD, D.UPPER_CD
+			)
 				SELECT 	CASE WHEN T.LOWER_KEY = #{fileTrgtKey} THEN '' ELSE T.UPPER_KEY END PID,  
 					T.LOWER_KEY ID ,
 					(LEVEL-1)  LVL,
@@ -294,8 +329,14 @@
 			       , M.MATR_AVRG_UPR  --평균구매단가
 			       , TO_CHAR(M.MATR_LAST_TRST_DT,'YYYY-MM-DD') MATR_LAST_TRST_DT  --최종거래일자
 			       , M.MATR_UPR * T.LOWER_QTY AS PART_AMT
+			       , T.UPPER_CD 
+			       , T.LOWER_CD 
+			       , NVL(D.PCHS_BOM_CNT, 0) AS PCHS_BOM_CNT
 			  FROM TB_BM14M01 T
 			  				LEFT OUTER JOIN  TB_BM05M01 AS M   ON T.MATR_CD  = M.MATR_CD 
+			  				LEFT OUTER JOIN  PCHS_BOM   AS D   ON T.CO_CD  = D.CO_CD
+			  				                                  AND T.SALES_CD  = D.SALES_CD
+			  				                                  AND T.LOWER_KEY  = D.UPPER_CD
 			 WHERE T.SALES_CD = #{salesCd}
 			   AND T.CO_CD    = #{coCd}	 
 			 START WITH T.LOWER_KEY =  #{fileTrgtKey}	
@@ -612,6 +653,15 @@
 	        #{pgmId     , mode=IN, jdbcType=VARCHAR},
 	        #{errMsg     , mode=OUT, jdbcType=VARCHAR}
 	    )}
+    </select>
+    
+	<select id="selectPchsBomCheck" parameterType="Map" resultType="int">
+		     SELECT COUNT(*) AS PCHS_BOM_CNT
+		       FROM TB_SM01D01 D
+		     WHERE 1 = 1
+			   AND D.CO_CD    = #{coCd}
+			   AND D.SALES_CD = #{salesCd}
+			   AND D.UPPER_CD = #{lowerKey}
     </select>
     
 </mapper>
