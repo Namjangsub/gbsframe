@@ -185,5 +185,15 @@ public class WB20SvcImpl implements WB20Svc {
 	  public int updateApprovalCancle(Map<String, String> paramMap) {
 		return wb20Mapper.updateApprovalCancle(paramMap);
 	  } 
-	
+
+		@Override
+		public int M08selectToDoCount(Map<String, String> paramMap) {	
+			return wb20Mapper.M08selectToDoCount(paramMap);
+		}
+
+		@Override
+		public List<Map<String, String>> M08selectToDoList(Map<String, String> paramMap) {
+			return wb20Mapper.M08selectToDoList(paramMap);
+		}
+		
 }

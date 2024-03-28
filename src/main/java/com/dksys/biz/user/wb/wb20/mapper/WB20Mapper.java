@@ -60,4 +60,8 @@ public interface WB20Mapper {
 	List<Map<String, String>> selectTodoFinalYn(Map<String, String> paramMap);	
 	
 	int updateApprovalCancle(Map<String, String> paramMap);
+
+	int M08selectToDoCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> M08selectToDoList(Map<String, String> paramMap);
 }

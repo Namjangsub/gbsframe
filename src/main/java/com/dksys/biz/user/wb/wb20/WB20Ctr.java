@@ -50,6 +50,20 @@ public class WB20Ctr {
 		  
 	  }
 	 
+	  @PostMapping(value = "/M08selectToDoList") 
+	  public String M08selectToDoList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  
+		  int totalCnt = wb20Svc.M08selectToDoCount(paramMap); 
+		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		  model.addAttribute("paginationInfo", paginationInfo);
+		  
+		  List<Map<String, String>> resultList = wb20Svc.M08selectToDoList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+		  
+		  
+	  }
+	  
 	  @PutMapping(value = "/toDoCfDtUpdate")
       public String toDoCfDtUpdate(@RequestParam Map<String, String> paramMap, ModelMap model) {
 		wb20Svc.toDoCfDtUpdate(paramMap);
