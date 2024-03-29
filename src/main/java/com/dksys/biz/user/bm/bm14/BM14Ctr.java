@@ -268,5 +268,23 @@ public class BM14Ctr {
     	model.addAttribute("result", result);
     	return "jsonView";
     }
+
+    // BOM 작업완료, 작업완료취소 설정하기
+    @PostMapping("/confirmBom")
+    public String confirmBom(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		 try {
+    	 	if (bm14svc.confirmBom(paramMap) != 0 ) {
+    	 		model.addAttribute("resultCode", 200);
+    	 		model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+    	 	} else {
+    	 		model.addAttribute("resultCode", 500);
+    	 		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));    			
+    	 	}
+    	 }catch(Exception e) {
+    	 	model.addAttribute("resultCode", 900);
+    	 	model.addAttribute("resultMessage", e.getMessage());
+    	 }
+    	 return "jsonView";
+    }
     
 }

@@ -45,5 +45,7 @@ public interface BM14Svc {
 
 	// 삭제 체크 조회
 	Map<String, String> deleteMatrbomChk(Map<String, String> paramMap);
+
+	int confirmBom(Map<String, String> paramMap);
 	
 }
