@@ -2251,7 +2251,7 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 //********************************************************
 function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 
-	if(chkValue === '') return;
+	if(chkValue === '' || chkValue== undefined) return false;
 	if(!chkType){
 		chkType = "";
 	}
@@ -2264,6 +2264,7 @@ function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 	var sysDate   = "";
 	var workDay   = "";
 	var actionType = "";
+	var resultList = [];
 //	var coCd = jwt.coCd;
 	
 	chkValue = chkValue.replace(/\-/g, '');
@@ -2285,11 +2286,13 @@ function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 
 		rtnVal = data.rtnVal;
 		rtnHolVal= data.rtnHolVal;
+		rtnDate= data.rtnDate;
 		sysDate = data.sysDate;
 		workDay= data.workDay;
+		resultList = data.resultList;
 	});//postAjaxSync
 	
-	if(typeof rtnVal == "undefined" || rtnVal == null) return;
+	if(typeof rtnVal == "undefined" || rtnVal == null) return false;
 	if(rtnHolVal === 'Y'){	//발주, 요인별 발주 및 출장요청, WBS이슈관리
 		rtnDate = calculateHoliday(sysDate, workDay);
 
@@ -2300,10 +2303,10 @@ function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 		
 		if(rtnDate - chkValue > 0){
 //			$("#actionBtn").hide();
-			if(actionType === 'C') alert('마감된 일자입니다. 데이터를 등록할 수가 없습니다.');
-			if(actionType === 'D') alert('마감된 일자입니다. 삭제할 수가 없습니다.');
+			if(actionType === 'C') alert('마감된 일자입니다. ' + rtnDate + '일 이전은 데이터를 등록할 수가 없습니다.');
+			if(actionType === 'D') alert('마감된 일자입니다. ' + rtnDate + '일 이전은 삭제할 수가 없습니다.');
 //			if(actionType === 'U') setDisabledInputDate(true);
-			if(actionType === 'U') alert('마감된 일자입니다. 수정할 수가 없습니다.');
+			if(actionType === 'U') alert('마감된 일자입니다. ' + rtnDate + '일 이전은 수정할 수가 없습니다.');
 			return false;
 		}else{
 //			$("#actionBtn").show();
@@ -2316,10 +2319,10 @@ function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 		if (rtnVal === 'Y') {  //마감완료
 //			$("#actionOrdrsBtn").hide();
 //			$("#actionBtn").hide();
-			if(actionType === 'C') alert('마감된 일자입니다. 데이터를 등록할 수가 없습니다.');
-			if(actionType === 'D') alert('마감된 일자입니다. 삭제할 수가 없습니다.');
+			if(actionType === 'C') alert('마감된 일자입니다. ' + rtnDate + '일 이전은 데이터를 등록할 수가 없습니다.');
+			if(actionType === 'D') alert('마감된 일자입니다. ' + rtnDate + '일 이전은 삭제할 수가 없습니다.');
 //			if(actionType === 'U') setDisabledInputDate(true);
-			if(actionType === 'U') alert('마감된 일자입니다. 수정할 수가 없습니다.');
+			if(actionType === 'U') alert('마감된 일자입니다. ' + rtnDate + '일 이전은 수정할 수가 없습니다.');
 			return false;
 		}else{
 //			$("#actionOrdrsBtn").show();
