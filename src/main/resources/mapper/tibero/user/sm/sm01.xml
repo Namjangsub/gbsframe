@@ -364,7 +364,13 @@
 	         , T.DSGN_NO
 	         , T.UPPER_NM
 	         , T.LOWER_NM
-			 , T.LOWER_NM || '(' || T.MATR_NM || ') x ' || T.DSGN_BOM_QTY  AS TEXT
+	         , B.CNF_CHECK
+	         <![CDATA[
+	         , CASE WHEN NVL(T.BAL_CNT, 0) > 0 THEN '<span style=''color: red;''>' || T.LOWER_NM || '(' || T.MATR_NM || ') x ' || T.DSGN_BOM_QTY || '</span>'
+	         								  ELSE T.LOWER_NM || '(' || T.MATR_NM || ') x ' || T.DSGN_BOM_QTY END || 
+	         				CASE WHEN  (B.CNF_CHECK = 'Y') THEN  '<span style=''color: blue;''>' || ' (완료)' || '</span>' END 
+	         								   AS TEXT
+	         ]]>
 	         , REGEXP_REPLACE(SYS_CONNECT_BY_PATH(T.LOWER_NM, ' > '), '^\s+\>\s+', '') AS PATH
 	         , SUBSTR(REPLACE(T.DSGN_NO,T.SALES_CD,''), INSTR(REPLACE(T.DSGN_NO,T.SALES_CD,''), '-', -1) + 1) AS LAST_DSGN_NO
 	         , T.UPPER_CD
@@ -418,6 +424,7 @@
 					 , T.DSGN_NO
 					 , '' AS MAT_GUBUN
 					 , 0  AS COLLAPSE
+					 , 0  AS BAL_CNT
 				FROM   TB_SM01M01 AS T
 				WHERE  T.CO_CD = #{coCd}
 				AND    T.ORDRS_NO = #{ordrsNo}
@@ -450,11 +457,24 @@
 					 , ''
 					 , '자재'
 					 , 0  AS COLLAPSE
+			         , (
+				         SELECT count(*) AS BAL_CNT
+						   			FROM TB_SM02D01 DD
+									WHERE  DD.SALES_CD =  D.SALES_CD
+									  AND  DD.MATR_SEQ =  D.MATR_SEQ
+									  AND  DD.UPPER_CD =  D.UPPER_CD
+									  AND  DD.LOWER_CD =  D.LOWER_CD
+									  AND  DD.MATR_CD  =  D.MATR_CD
+			         )  AS BAL_CNT
 				FROM   TB_SM01D01 AS D
 				WHERE  D.CO_CD = #{coCd}
 				AND    D.ORDRS_NO = #{ordrsNo}
 				AND    D.SALES_CD = #{salesCd}
 			   ) AS T
+			   			LEFT OUTER JOIN TB_BM14M01 B ON B.SALES_CD = T.SALES_CD
+											        AND B.CO_CD	   = T.CO_CD	     
+												    AND B.UPPER_KEY = T.UPPER_CD
+												    AND B.LOWER_KEY = T.LOWER_CD
 		START WITH T.UPPER_CD = 'top'
 		CONNECT BY PRIOR T.LOWER_CD = T.UPPER_CD
 		ORDER BY T.CO_CD, LEVEL, T.UPPER_NM, T.LOWER_NM
@@ -643,6 +663,15 @@
 			 , A.UNIT_NO
 			 , A.REV_NO
 			 , A.DSGN_NO
+	         , (
+		         SELECT count(*) AS BAL_CNT
+				   			FROM TB_SM02D01 DD
+							WHERE  DD.SALES_CD =  T.SALES_CD
+							  AND  DD.MATR_SEQ =  T.MATR_SEQ
+							  AND  DD.UPPER_CD =  T.UPPER_CD
+							  AND  DD.LOWER_CD =  T.LOWER_CD
+							  AND  DD.MATR_CD  =  T.MATR_CD
+	         )  AS BAL_CNT
 		FROM   (
 		        SELECT LEVEL - 1 AS LVL
 		             , A.GUBUN            --2023.12.05 남장섭
@@ -1225,12 +1254,12 @@
 			PCHS_CLNT_CD, 	PCHS_CLNT_NM, 	MNG_NM
 			)
 			SELECT  
-			        CO_CD, 
+			        #{coCdTo}, 
 					#{ordrsNoTo}, 
 					#{salesCdTo}, 
 					( SELECT TO_NUMBER(NVL(MAX(MATR_SEQ),0))+1 
 						FROM tb_sm01d01 d 
-					   WHERE D.CO_CD = #{coCd}
+					   WHERE D.CO_CD = #{coCdTo}
 						 AND D.ORDRS_NO = #{ordrsNoTo}	
 						 AND D.SALES_CD = #{salesCdTo}
 						 AND D.UPPER_CD = #{upperCdTo}
@@ -1250,9 +1279,9 @@
 					PCHS_CLNT_PCT3, MATR_UPR, 		MATR_AVRG_UPR, 	MATR_RMK, 
 					MATR_LAST_TRST_DT, MATR_ATNT_CD, MATR_NO, 
 					ETC_FIELD1, 	ETC_FIELD2, 	ETC_FIELD3, 
-					CREAT_ID,		CREAT_PGM, 		CREAT_DTTM, 
+					#{userId},		#{pgmId}, 		SYSDATE, 
 					'', 			'', 			'', 
-					#{dsgnNoTo}, 	#{dsgnNmTo}, 	#{upperNm}, 	LOWER_NM, 
+					#{dsgnNoTo}, 	#{dsgnNmTo}, 	#{upperNmTo}, 	LOWER_NM, 
 					AVLB_STRT_DT, 	AVLB_END_DT, 	#{partNoTo, jdbcType=VARCHAR},
 												 	#{unitNoTo, jdbcType=VARCHAR},
 												 	#{revNoTo, jdbcType=VARCHAR}, 

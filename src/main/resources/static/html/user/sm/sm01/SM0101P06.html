@@ -72,7 +72,7 @@
 	<div class="form-group popup_table">
 		<form id="popForm" onSubmit="return false;">
 			<input type="hidden" id="fileTrgtKey" name="fileTrgtKey">
-			<input type="hidden" id="pgmId" name="pgmId" value="SM0101P01">
+			<input type="hidden" id="pgmId" name="pgmId" value="SM0101P06">
 			
 			<table>
 				<colgroup>
@@ -227,6 +227,7 @@
 		if (row.matrYn == "자재") {
 			if (pasFloatChk(row.bomQty) == 0)  return "grid-no-msg-font-blue-bold";
 		}
+		if (pasFloatChk(row.balCnt) > 0)  return "grid-font-red";
 		return "";
 	}
 	
@@ -1031,14 +1032,16 @@
 		    if (event.ctrlKey || event.metaKey) {
 		        // Check for Ctrl+C (copy) shortcut
 		        if (event.keyCode === 67) {
-		        	copyNodes();
 		        	window.pasteJobCode = "copy";
+		        	window.pasteRandomCode = Math.random().toFixed(10);
+		        	copyNodes();
 		            event.preventDefault(); 
 		        }
 		        // Check for Ctrl+C (copy) shortcut
 		        if (event.keyCode === 88) {
-		        	copyNodes();
 		        	window.pasteJobCode = "move";
+		        	window.pasteRandomCode = Math.random().toFixed(10);
+		        	copyNodes();
 		            event.preventDefault(); 
 		        }
 		        // Check for Ctrl+V (paste) shortcut
@@ -1063,15 +1066,24 @@
 	    	}
 	    	 window.copiedNodes.push(selNode)
 	    });
+		let copiedData = {
+				copiedNodes: window.copiedNodes,		//복사할 노드모음
+				pasteRandomCode: window.pasteRandomCode, //동일창에서 작업인지 구분하기 위함.
+		        pasteJobCode: window.pasteJobCode		
+		    };
+		localStorage.setItem('copiedNodeDataPchsBOM', JSON.stringify(copiedData));
 	}
 
 	function pasteNodes() {
         let targetNodeId = $('#MatrBomTree').jstree(true).get_selected()[0];
+//     	let copiedNodes = window.copiedNodes;
+    	let copiedData = JSON.parse(localStorage.getItem('copiedNodeDataPchsBOM'));
+    	let copiedNodes = copiedData.copiedNodes;
 		$('#MatrBomTree').jstree(true).open_all(targetNodeId);
-	    if (window.copiedNodes || targetNodeId) {
+	    if (copiedNodes || targetNodeId) {
   		    let targetNode = $('#MatrBomTree').jstree(true).get_node(targetNodeId);;		 //To 부모노드 ID
 	  		let nodeInfoArr = [];
-        	let copiedNodes = window.copiedNodes;
+
         	for (var i = 0; i < copiedNodes.length; i++) {
 	        	let node = copiedNodes[i];
 
@@ -1090,10 +1102,20 @@
 	  				return false;
 	  		  	}
 	  			let nodeInfo = {};
-	  			nodeInfo.coCd		= $('#coCd').val();
+	  			nodeInfo.childId	= node.id;
+	  			nodeInfo.parent		= node.parent;
+	  			nodeInfo.coCd		= node.original.coCd;
+	  			nodeInfo.ordrsNo 	= node.original.ordrsNo;
+	  			nodeInfo.salesCd	= node.original.salesCd;
+	  			nodeInfo.upperCd	= node.original.upperCd;
+	  			nodeInfo.lowerCd	= node.original.lowerCd;
+	  			nodeInfo.matrSeq	= node.original.matrSeq;
+	  			nodeInfo.matrCd		= node.original.matrCd;
+	  			nodeInfo.lowerKey	= node.id;
+	  			nodeInfo.upperKey	= node.parent;
+	  			
+	  			nodeInfo.coCdTo		= $('#coCd').val();
 	  			nodeInfo.ordrsNoTo	= $('#ordrsNo').val();
-	  			nodeInfo.ordrsNo 	= $('#ordrsNo').val();
-	  			nodeInfo.salesCd	= $('#salesCd').val();
 	  			nodeInfo.salesCdTo	= $('#salesCd').val();  //Target sales Code 230720 추가
 	  			
 	  			nodeInfo.parentIdTo	= targetNodeId;
@@ -1108,28 +1130,19 @@
 	  			nodeInfo.unitNoTo	= targetNode.original.unitNo;
 	  			nodeInfo.revNoTo	= targetNode.original.revNo;
 	  			
-	  			nodeInfo.parent		= node.parent;
-	  			nodeInfo.upperCd	= node.original.upperCd;
-	  			nodeInfo.upperKey	= node.parent;
-	  			nodeInfo.childId	= node.id;
-	  			nodeInfo.lowerCd	= node.original.lowerCd;
-	  			nodeInfo.matrSeq	= node.original.matrSeq;
-	  			nodeInfo.lowerKey	= node.id;
-	  			nodeInfo.matrCd		= node.original.matrCd;
 	  			nodeInfo.changeYn	= "Y";    // 도면번호에 SalesCd 변경 여부임 변경없을경우 'N'
 	  			nodeInfo.userId		= jwt.userId;
-	  			nodeInfo.pgmId		= $('#pgmId').val();
+	  			nodeInfo.pgmId		= $('#popForm #pgmId').val();
 	  			//백엔드 서비스단에서 재귀호출을 통합 하위 복사로 대체함
 				nodeInfoArr.push(nodeInfo);
 	
 		  	};
 		  	let callPgmId = "";
-        	if (window.pasteJobCode == "copy") {
-        		callPgmId = "/user/sm/sm01/copyMatrBomTree";
-        	} else if (window.pasteJobCode == "move") {
+		  	//동일 창일때만 이동이 가능함.
+        	if (window.pasteRandomCode == copiedData.pasteRandomCode && window.pasteJobCode == "move") {
         		callPgmId = "/user/sm/sm01/moveMatrBom"
-        	} else {
-        		return false;
+        	} else  {
+        		callPgmId = "/user/sm/sm01/copyMatrBomTree";
         	}
   			postAjaxSync(callPgmId, nodeInfoArr, null, function(data){
  				if(data.resultCode == 200){
@@ -1562,4 +1575,30 @@
 		return isNaN(cvtValue) ? 0 : cvtValue; //NaN이면 0로 대체 --> minus기호만 있는경우
 	}
 	
+    
+//     function copyNodeData() {
+//         var selectedNodeData = $('#MatrBomTree').jstree(true).get_selected(true)[0].original;
+
+//         localStorage.setItem('copiedNodeData', JSON.stringify(selectedNodeData));
+//     }
+//     function pasteNodeData() {
+//         var copiedNodeData = JSON.parse(localStorage.getItem('copiedNodeData'));
+
+//         var selectedNode = $('#MatrBomTree').jstree(true).get_selected(true)[0];
+
+//         if (selectedNode) {
+//             $('#MatrBomTree').jstree(true).create_node(selectedNode, copiedNodeData, 'last');
+//         } else {
+//             $('#MatrBomTree').jstree(true).create_node(null, copiedNodeData, 'last');
+//         }
+//     }
+
+//     $(document).keydown(function(event) {
+//         if (event.ctrlKey && event.key === 'c') {
+//             copyNodeData();
+//         }
+//         if (event.ctrlKey && event.key === 'v') {
+//             pasteNodeData();
+//         }
+//     });
 </script>

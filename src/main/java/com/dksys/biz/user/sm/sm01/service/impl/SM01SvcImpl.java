@@ -389,7 +389,6 @@ public class SM01SvcImpl implements SM01Svc {
 			//신규등록 키값 할당
 			lowerCd = Integer.toString(sm01Mapper.select_bm14_Key(paramMap));
 			paramMap.put("lowerCdTo", lowerCd);
-			paramMap.put("salesCdTo", paramMap.get("salesCd"));
 			//트리 복사
 			result += sm01Mapper.copyMatrBomTree(paramMap);
 			
