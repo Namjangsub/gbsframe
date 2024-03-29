@@ -146,6 +146,7 @@ public class BM16Ctr {
 		  if (bm16Svc.insertPrjctIssue(paramMap, mRequest) != 0 ) {
 			  model.addAttribute("resultCode", 200);
 			  model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			  model.addAttribute("paramMap", paramMap);
 		  } else {
 			  model.addAttribute("resultCode", 500);
 			  model.addAttribute("resultMessage", messageUtils.getMessage("fail"));

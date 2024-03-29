@@ -298,6 +298,8 @@ public class BM16SvcImpl implements BM16Svc {
 	  pgParam += "\"issNo\":\""+ paramMap.get("issNo") +"\"}";
       
       String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("prjctNm");
+      String fileTrgtKey = paramMap.get("prjctSeq") + "-" + paramMap.get("issNo");
+      paramMap.put("fileTrgtKey", fileTrgtKey); //Insert 처리된 등록번호
 		      
       Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
