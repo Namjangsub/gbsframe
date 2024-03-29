@@ -159,6 +159,7 @@ public class CM05Ctr {
     	
     	String rtnVal = "N";
     	String rtnHolVal = "N";     //영업일마감여부
+    	String rtnDate = "";     //마감일자
     	//메뉴 앞2문자로 업무 구분용으로 사용
     	String menuUrl = (String)param.get("menuUrl").toString().substring(0, 2);
     	
@@ -179,7 +180,6 @@ public class CM05Ctr {
         	
         	workDay = resultList.get(0).get("workDay").toString();
         	sysDate = resultList.get(0).get("sysDate").toString();
-    	}
     	
 //    	if("CR0201M01".equals(menuUrl)) {  //수주관리
 //    		
@@ -201,31 +201,38 @@ public class CM05Ctr {
 //    		rtnHolVal = "Y";
 //    	}
     	
-    	if("CR".equals(menuUrl)) {  //수주관리
-    		
-    		rtnVal = closeYn;	//마감년월여부
-    	}else if("PM".equals(menuUrl)) {  //작업일보
-    		
-    		rtnVal = prdctnCloseYn;				//생산마감여부
-    	}else if("CR".equals(menuUrl) ) {
-    		//매출확정, 매출계산서, 수금, 물류진행요청
-    		
-    		rtnVal = sellCloseYn;	//매출마감여부
-    	}else if("SM".equals(menuUrl) ) {
-    		//입고, 매입확정 및 계산서, 구매비용, 반품
-    		
-    		rtnVal = pchsCloseYn;	//입마감여부
-    	}else if("QM".equals(menuUrl) || "WB".equals(menuUrl)) {
-    		//발주, 요인별 발주 및 출장요청, WBS이슈관리
-    		
-    		rtnHolVal = "Y";
+	    	if("CR".equals(menuUrl)) {  //수주관리
+	    		
+	    		rtnVal = closeYn;	//마감년월여부
+	    		rtnDate = resultList.get(0).get("closeYm").toString();
+	    	}else if("PM".equals(menuUrl)) {  //작업일보
+	    		
+	    		rtnVal = prdctnCloseYn;				//생산마감여부
+	    		rtnDate = resultList.get(0).get("prdctnCloseDt").toString();
+	    	}else if("CR".equals(menuUrl) ) {
+	    		//매출확정, 매출계산서, 수금, 물류진행요청
+	    		
+	    		rtnVal = sellCloseYn;	//매출마감여부
+	    		rtnDate = resultList.get(0).get("sellCloseDt").toString();
+	    	}else if("SM".equals(menuUrl) ) {
+	    		//입고, 매입확정 및 계산서, 구매비용, 반품
+	    		
+	    		rtnVal = pchsCloseYn;	//입마감여부
+	    		rtnDate = resultList.get(0).get("pchsCloseDt").toString();
+	    	}else if("QM".equals(menuUrl) || "WB".equals(menuUrl)) {
+	    		//발주, 요인별 발주 및 출장요청, WBS이슈관리
+	    		
+	    		rtnHolVal = "Y";
+	    		rtnDate = resultList.get(0).get("pchsCloseDt").toString();
+	    	}
+
     	}
-    	
     	model.addAttribute("workDay", workDay);
     	model.addAttribute("sysDate", sysDate);
     	model.addAttribute("pchsCloseYn", pchsCloseYn);
     	model.addAttribute("rtnHolVal", rtnHolVal);
     	model.addAttribute("rtnVal", rtnVal);
+    	model.addAttribute("rtnDate", rtnDate);
     	model.addAttribute("resultList", resultList);
         return "jsonView";
     }
