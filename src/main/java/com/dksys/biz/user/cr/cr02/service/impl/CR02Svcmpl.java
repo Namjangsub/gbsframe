@@ -282,7 +282,8 @@ public class CR02Svcmpl implements CR02Svc {
 //		}
 			
       	// 수주관리의 정보를 프로젝트 관리에 반영
-    	cr02Mapper.callUpdateProjectMaster(param);
+    	// 남장섭 240401 프로젝트 등록후 선택하게 수정 
+//    	cr02Mapper.callUpdateProjectMaster(param);
 
     	return rtnMap;
     }
@@ -612,7 +613,8 @@ public class CR02Svcmpl implements CR02Svc {
 //		}
 		
 		// 수주관리의 정보를 프로젝트 관리에 반영
-		cr02Mapper.callUpdateProjectMaster(param);
+    	// 남장섭 240401 프로젝트 등록후 선택하게 수정 
+//		cr02Mapper.callUpdateProjectMaster(param);
     }
 
 
@@ -896,7 +898,8 @@ public class CR02Svcmpl implements CR02Svc {
 		cr02Mapper.callUpdateOrdrsNo(param);
 		
 		// 수주관리의 정보를 프로젝트 관리에 반영
-		cr02Mapper.callUpdateProjectMaster(param);
+    	// 남장섭 240401 프로젝트 등록후 선택하게 수정 
+//		cr02Mapper.callUpdateProjectMaster(param);
     }
 
     //ex) [{}, null, {"name": "Nam"}, {}] --> [{"name": "Nam"}]으로 만들어줌
