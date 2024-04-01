@@ -283,7 +283,11 @@ public class CR02Svcmpl implements CR02Svc {
 			
       	// 수주관리의 정보를 프로젝트 관리에 반영
     	// 남장섭 240401 프로젝트 등록후 선택하게 수정 
-//    	cr02Mapper.callUpdateProjectMaster(param);
+    	// param.get("prjctSeq") 값이 있으면 해당 프로젝트에 연결하고, 없으면 프로젝트 신규 생성함.
+    	// 해당 수주에 프로젝트번호 update 처리
+    	if (param.get("prjctSeq").equals("")) {
+    		cr02Mapper.callUpdateProjectMaster(param);
+    	}
 
     	return rtnMap;
     }
@@ -614,7 +618,12 @@ public class CR02Svcmpl implements CR02Svc {
 		
 		// 수주관리의 정보를 프로젝트 관리에 반영
     	// 남장섭 240401 프로젝트 등록후 선택하게 수정 
-//		cr02Mapper.callUpdateProjectMaster(param);
+    	// param.get("prjctSeq") 값이 있으면 해당 프로젝트에 연결하고, 없으면 프로젝트 신규 생성함.
+    	// 해당 수주에 프로젝트번호 update 처리
+    	if (param.get("prjctSeq").equals("")) {
+    		cr02Mapper.callUpdateProjectMaster(param);
+    	}
+
     }
 
 
