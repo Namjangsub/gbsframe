@@ -64,7 +64,7 @@ public class PM01SvcImpl implements PM01Svc {
 
 	  
 	  //출장경비 상세 내역 삭제 처리
-	  result = pm01Mapper.deleteTripRpt(paramMap);
+	  result += pm01Mapper.deleteTripRpt(paramMap);
 	  //첨부파일 상세내역 연계자료 삭제 처리 필요함
 
 	//경비 Insert 처리
@@ -85,9 +85,11 @@ public class PM01SvcImpl implements PM01Svc {
 	Gson gson = new Gson();
 	String[] deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), String[].class);
 	List<String> deleteFileList = Arrays.asList(deleteFileArr);
-	for(String fileKey : deleteFileList) {
-		cm08Svc.deleteFile(fileKey);
-	}
+    if (deleteFileList != null && !deleteFileList.isEmpty()) {
+		for(String fileKey : deleteFileList) {
+			cm08Svc.deleteFile(fileKey);
+		}
+    }
 	//---------------------------------------------------------------  
 	//첨부 화일 처리  끝 
 	//---------------------------------------------------------------  
@@ -141,10 +143,13 @@ public class PM01SvcImpl implements PM01Svc {
 	        }
         }
 		//경비 Insert용 첨부파일 처리
-//        List<Map<String, String>> rptTripFileArr = gsonDtl.fromJson(paramMap.get("rptTripFileArr"), dtlMap);
+        List<Map<String, String>> rptTripFileArr = gsonDtl.fromJson(paramMap.get("rptTripFileArr"), dtlMap);
         //경비관련 첨부파일은 아래 함수를 활용함
         // fileTrgtKey : PM0101M01_M 으로 저장함.  fileTrgtKey=PM0101M01은 일반 첨부 파일임
-//        uploadFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest) 
+        String fileTrgtTyp = "PM0101M01_M";
+        //세부내역별 키값에 대한부분은 작업일보 번호 + 경비인련번호로 구성함
+        String trip_fileTrgtKey = paramMap.get("workRptNo") +  "-" ;
+        cm08Svc.uploadFile(fileTrgtTyp, trip_fileTrgtKey, mRequest) ;
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------  
