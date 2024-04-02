@@ -9,6 +9,7 @@ import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +46,29 @@ public class CM08SvcImpl implements CM08Svc {
 
     @Override
     public int uploadFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest) {
-        List<MultipartFile> fileList = mRequest.getFiles("files");
+        List<MultipartFile> fileList =  new ArrayList<>();
+        //PM0101M01_M ==> 작업일보에서 출장경비용 첨부파일인경우, 그외 해당 화면의 프로그램명으로 들어옴
+        if ("PM0101M01_M".equals(fileTrgtTyp)) {
+        	// 작업일보번호 : DM20240402-3615-1  마지막 일련번호 추출
+        	String str = fileTrgtKey;
+        	String lastPart = "rptTripFiles";
+            int lastIndex = str.lastIndexOf('-'); // 마지막 '-'의 위치
+            if (lastIndex != -1 && lastIndex < str.length() - 1) { // 마지막 '-' 문자뒤에 있나?
+                lastPart += str.substring(lastIndex + 1); 
+            }
+        	
+        	//rptTripFiles1, rptTripFiles2, rptTripFiles3으로 담겨져 넘어옴
+//        	fileList = mRequest.getFiles("rptTripFiles1");
+        	fileList = mRequest.getFiles(lastPart);
+        } else {
+            fileList = mRequest.getFiles("files");
+        }
+        
+        if (fileList != null && !fileList.isEmpty()) {
+        	//저장할 파일이 있다면 여기
+        } else { //첨부 파이이 없으므로 작업 종료함.
+        	return 0;
+        }
         String year = DateUtil.getCurrentYyyy();
         String month = DateUtil.getCurrentMm();
         String path = uploadDir + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;

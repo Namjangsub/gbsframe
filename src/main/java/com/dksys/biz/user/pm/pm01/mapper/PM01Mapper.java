@@ -51,5 +51,7 @@ public interface PM01Mapper {
 	String selectTripRptSeqNext(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectDailyWorkTripRows(Map<String, String> paramMap);
+
+	int updateTripRpt(Map<String, String> tripMap);
 	  
 }

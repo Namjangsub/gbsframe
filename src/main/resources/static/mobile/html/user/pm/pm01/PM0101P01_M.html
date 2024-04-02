@@ -4,8 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">    
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- 	<meta name="viewport" content="width=device-width, initial-scale=1, mimum-scale=1"> -->
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="/static/bootstrap/css/bootstrap-theme.min.css">
@@ -232,8 +231,8 @@
  
 	var notiFileArr = [];
 	var deleteFileArr = [];
-	var rptTripFileArr = [];
-	var rptTripdeleteFileArr = [];
+	var rptTripFileArr = []; //경비항목별 첨부파일 정보 임시저장
+	var tripRptRowDeleteArr = []; //경비 등록내용 삭제 임시저장
 	var fileGridView = {
 		initView: function(){
 			this.target = new ax5.ui.grid();
@@ -305,7 +304,7 @@ $(document).ready(function() {
         language : "ko",
         autoclose : true
     }).datepicker("setDate", new Date());
-debugger;
+
     //세션에 정보를 활용하여 승인처리
     paramObj = JSON.parse(sessionStorage.getItem('paramObj'));
     sessionStorage.removeItem('paramObj');
@@ -362,7 +361,8 @@ debugger;
                 updateDailyWork();
             });
         }
-        
+
+		debugger;
         
         // Kakao 알림톡 보내는사람(userID) 연락처 조회 값 세팅 
         var paramObj1 = {
@@ -379,20 +379,38 @@ debugger;
              }
          }); 
         //---------------------------------------
-        
+        //경비추가 버튼
     	$('#addDayileRptTrpButton').click(function() {
     		dailyRptTripAdd();
     	});
-        
+
+        //경비제거 버튼
     	$('#removeDayileRptTrpButton').click(function() {
+    		
+//     		let tripCnt = $('.tripTable').not(':hidden').length;  //$('.tripTable:not(:visible)' --> tripTable1 display: none이 아닌 요소 선택
+//     		if ($('#tripTable' + tripCnt + ' #updCheck').val() == 'U') {
+//  				$('#tripTable' + tripCnt + ' #updCheck').val('D');		//DB에서 불러오면 수정임 'U', 처음 등록시 C, 제거시 'D'
+//     		} else {
+//     			$('#tripTable' + tripCnt + ' #updCheck').val('');		//처음 생성한다음 삭제인경우 처리 제외 blank
+//     		}
+//     		$('#tripTable' + tripCnt).hide();  //마지막 테이블 숨기기
+
     		let tripCnt = $('.tripTable').length;
     		if (tripCnt == 0)  return false;
     		if (tripCnt == 1) $('#removeDayileRptTrpButton').hide();
-    		$('#tripTable' + tripCnt).remove();
+    		
+    		if ($('#tripTable' + tripCnt + ' #updCheck').val() == 'U') {
+				$('#tripTable' + tripCnt + ' #updCheck').val('D');		//DB에서 불러오면 수정임 'U', 처음 등록시 C, 제거시 'D'
+	    		tripRptRowDeleteArr.push(tripRptRow(tripCnt));	//삭제대상으로 저장함
+			} 
+    		
+			$('#tripTable' + tripCnt).remove();  //마지막 테이블 지우기
+    		
+    		
     	});
         
         //authChk();   // 권한체크
-		$("#field02").hide();
+		$("#field02").hide();	//파일첨부영역
         
     
     } else {
@@ -478,80 +496,93 @@ function tripData() {
 		console.log("No trpTyp option selected.");
 	}
 }
-
+//경비추가 버튼 기능  수행
 function dailyRptTripAdd() {
 		let tripCnt = $('.tripTable').length;
 		$('#removeDayileRptTrpButton').show();
-		tripCnt += 1;
-
-        var newRow = $('<table id="tripTable'+ (tripCnt) +'" class="tripTable" style="margin-top: 20px;"> ' +
-        	'<tr class="tripArea">' +
-            '<th class="hit">비용항목</th>' +
-            '<td>' +
-            '<select id="tripRptTyp" name="tripRptTyp" data-kind="TRPTYP" data-search="tripRptTyp" class="form-control" msg="비용항목" required>' +
-            '<option value=""></option>' +
-            '</select>' +
-            '</td>' +
-            '<th>내용</th>' +
-            '<td>' +
-            '<input type="hidden" id="fileTrgtKey" name="fileTrgtKey" value="">' +
-            '<input type="hidden" id="updCheck" name="updCheck" value="C">' +
-            '<input type="hidden" id="workRptNoSeq" name="workRptNoSeq" value=' + tripCnt +'>' +
-            '<input type="text" id="tripRptRmk" name="tripRptRmk" data-search="tripRptRmk" class="form-control" msg="내용">' +
-            '</td>' +
-            '</tr>' +
-            '<tr class="tripArea">' +
-            '<th class="hit" >결재방법</th>' +
-            '<td>' +
-            '<select id="tripRptCurTyp" name="tripRptCurTyp" data-kind="CURTYP" data-search="tripRptCurTyp" class="form-control" msg="결제방법" required>' +
-            '<option value=""></option>' +
-            '</select>' +
-            '</td>' +
-            '<th id="cardTh">카드번호</th>' +
-            '<td>' +
-            '<input type="text" id="tripRptCardNo" name="tripRptCardNo"  data-search="tripRptCardNo" class="form-control" msg="카드번호">' +
-            '</td>' +
-            '</tr>' +
-            '<tr class="tripArea">' +
-            '<th class="hit" >통화종류</th>' +
-            '<td>' +
-            '<select id="tripRptCurr" name="tripRptCurr" data-kind="CURR" data-search="tripRptCurr" class="form-control" msg="통화종류" required>' +
-            '<option value=""></option>' +
-            '</select>' +
-            '</td>' +
-            '<th class="hit" >금액</th>' +
-            '<td>' +
-            '<input type="text" id="tripRptAmt" name="tripRptAmt" value=0  data-search="tripRptAmt" class="form-control" onkeyup="onlyNumber(this); checkChange();" comma="" msg="금액" required>' +
-            '</td>' +
-            '</tr>' +
-            '<tr class="tripArea">' +
-            '<th colspan="2">' +
-            '<button type="button" id="buttonFile3" class="btn btn-primary btn-sm" style="height: 30px; line-height: 10px;" onclick="fromWebToApp(1, 0, ' + tripCnt + ' );">파일선택</button>' +
-            '<button type="button" id="buttonFile4" class="btn btn-primary btn-sm" style="height: 30px; line-height: 10px;" onclick="fromWebToApp(2, 0, ' + tripCnt + ' );">사진촬영</button>' +
-            '</th>' +
-            '<td colspan="2">' +
-            '<input type="text" id="tripRptFileNm" name="tripRptFileNm" class="form-control" msg="첨부파일명">' +
-            '</td>' +
-            '</tr>' +
-            '</table>');
-        $('#dayilyRpt').append(newRow);
-
-		setCommonSelect($('#tripTable' + tripCnt + ' #tripRptTyp'));
-		setCommonSelect($('#tripTable' + tripCnt + ' #tripRptCurTyp'));
-		setCommonSelect($('#tripTable' + tripCnt + ' #tripRptCurr'));
-		
-
-    	$('#tripTable' + tripCnt + ' #tripRptCurTyp').on('change', function () {
-    		//결재방법인 카드인경우는 카드번호 필수임
-    		if ($('#tripTable' + tripCnt + ' #tripRptCurTyp').val() == 'CURTYP01') {
-    			$('#tripTable' + tripCnt + ' #cardTh').addClass('hit');
-    			$('#tripTable' + tripCnt + ' #tripRptCardNo').attr('required', '');
+		if ($('#tripTable' + tripCnt).css('display') === 'none') {
+	        console.log('마지막 tripTable 숨김상태');
+	        //마지막영역이 숨김이면 활성화 시킴
+    		if ($('#tripTable' + tripCnt + ' #updCheck').val() == 'D') {
+ 				$('#tripTable' + tripCnt + ' #updCheck').val('U');		//DB에서 불러오면 수정임 'U' --> D --> U
     		} else {
-    			$('#tripTable' + tripCnt + ' #cardTh').removeClass('hit');
-    			$('#tripTable' + tripCnt + ' #tripRptCardNo').removeAttr('required', '');
+    			$('#tripTable' + tripCnt + ' #updCheck').val('C');		//처음 생성한다음 삭제인경우 C --> null --> C
     		}
-    			
-    	});
+    		$('#tripTable' + tripCnt).show();  //마지막 테이블 숨기기
+	    } else {
+	        console.log('마지막 tripTable 활성상태');
+			tripCnt += 1;
+	
+	        var newRow = $('<table id="tripTable'+ (tripCnt) +'" class="tripTable" style="margin-top: 20px; display:break"> ' +
+	        	'<tr class="tripArea">' +
+	            '<th class="hit">비용항목</th>' +
+	            '<td>' +
+	            '<select id="tripRptTyp" name="tripRptTyp" data-kind="TRPTYP" data-search="tripRptTyp" class="form-control" msg="비용항목" required>' +
+	            '<option value=""></option>' +
+	            '</select>' +
+	            '</td>' +
+	            '<th>내용</th>' +
+	            '<td>' +
+	            '<input type="hidden" id="fileTrgtKey" name="fileTrgtKey" value="">' +
+	            '<input type="hidden" id="updCheck" name="updCheck" value="C">' +
+	            '<input type="hidden" id="workRptNoSeq" name="workRptNoSeq" value=' + tripCnt +'>' +
+	            '<input type="text" id="tripRptRmk" name="tripRptRmk" data-search="tripRptRmk" class="form-control" msg="내용">' +
+	            '</td>' +
+	            '</tr>' +
+	            '<tr class="tripArea">' +
+	            '<th class="hit" >결재방법</th>' +
+	            '<td>' +
+	            '<select id="tripRptCurTyp" name="tripRptCurTyp" data-kind="CURTYP" data-search="tripRptCurTyp" class="form-control" msg="결제방법" required>' +
+	            '<option value=""></option>' +
+	            '</select>' +
+	            '</td>' +
+	            '<th id="cardTh">카드번호</th>' +
+	            '<td>' +
+	            '<input type="text" id="tripRptCardNo" name="tripRptCardNo"  data-search="tripRptCardNo" class="form-control" msg="카드번호">' +
+	            '</td>' +
+	            '</tr>' +
+	            '<tr class="tripArea">' +
+	            '<th class="hit" >통화종류</th>' +
+	            '<td>' +
+	            '<select id="tripRptCurr" name="tripRptCurr" data-kind="CURR" data-search="tripRptCurr" class="form-control" msg="통화종류" required>' +
+	            '<option value=""></option>' +
+	            '</select>' +
+	            '</td>' +
+	            '<th class="hit" >금액</th>' +
+	            '<td>' +
+	            '<input type="text" id="tripRptAmt" name="tripRptAmt" value=0  data-search="tripRptAmt" class="form-control" onkeyup="onlyNumber(this); checkChange();" comma="" msg="금액" required>' +
+	            '</td>' +
+	            '</tr>' +
+	            '<tr class="tripArea">' +
+	            '<th colspan="2">' +
+	            '<button type="button" id="buttonFile3" class="btn btn-primary btn-sm" style="height: 30px; line-height: 10px;" onclick="fromWebToApp(1, 0, ' + tripCnt + ' );">파일선택</button>' +
+	            '<button type="button" id="buttonFile4" class="btn btn-primary btn-sm" style="height: 30px; line-height: 10px;" onclick="fromWebToApp(2, 0, ' + tripCnt + ' );">사진촬영</button>' +
+	            '</th>' +
+	            '<td colspan="2">' +
+	            '<input type="text" id="tripRptFileNm" name="tripRptFileNm" class="form-control" readonly msg="첨부파일명">' +
+	            '<input type="hidden" id="fileKey" name="fileKey" class="form-control" msg="첨부파일명">' +
+	            '</td>' +
+	            '</tr>' +
+	            '</table>');
+	        $('#dayilyRpt').append(newRow);
+	
+			setCommonSelect($('#tripTable' + tripCnt + ' #tripRptTyp'));
+			setCommonSelect($('#tripTable' + tripCnt + ' #tripRptCurTyp'));
+			setCommonSelect($('#tripTable' + tripCnt + ' #tripRptCurr'));
+			
+	
+	    	$('#tripTable' + tripCnt + ' #tripRptCurTyp').on('change', function () {
+	    		//결재방법인 카드인경우는 카드번호 필수임
+	    		if ($('#tripTable' + tripCnt + ' #tripRptCurTyp').val() == 'CURTYP01') {
+	    			$('#tripTable' + tripCnt + ' #cardTh').addClass('hit');
+	    			$('#tripTable' + tripCnt + ' #tripRptCardNo').attr('required', '');
+	    		} else {
+	    			$('#tripTable' + tripCnt + ' #cardTh').removeClass('hit');
+	    			$('#tripTable' + tripCnt + ' #tripRptCardNo').removeAttr('required', '');
+	    		}
+	    			
+	    	});
+	    }
 }
 
 
@@ -580,12 +611,12 @@ function selectDailyWorkInfo() {                        //그리드에 뿌리는
 			selectNotiInfo();
 			//수정시 폼 세팅
 			if ($("#issueYn").val() =='Y'){
-				  $("#field01").show();
-				  $("#field02").show();
+				  $("#field01").show(); //이슈제목
+				  $("#field02").show(); //파일첨부영역
 			}
 			else {
-				$("#field01").hide();
-				$("#field02").hide();
+				$("#field01").hide(); //이슈제목
+				$("#field02").hide(); //파일첨부영역
 			}
 			
 			//상위코드 연동으로 바뀌기 전에 저장값 설정되므로 재설정 필요함
@@ -599,6 +630,7 @@ function selectDailyWorkInfo() {                        //그리드에 뿌리는
     	 	if (tripRows && tripRows.length > 0) {
     	 		for (var i = 0; i < tripRows.length; i++) {
     	 			dailyRptTripAdd(); //입력필드 생성
+    	 			$('#tripTable' + (i+1) + ' #updCheck').val('U');		//DB에서 불러오면 수정임 'U', 처음 등록시 C, 제거시 'D'
     	            $.each(tripRows[i], function(key, value) {
     	                if ($('#tripTable' + (i+1) + ' #' + key)) {
     	                    if ($('#tripTable' + (i+1) + ' #' + key).is('[comma]')) {
@@ -725,53 +757,103 @@ function makeFormData() {
 	// 	}
 	// });
 	formData.append("uploadFileArr",  JSON.stringify(notiFileArr));
-//     formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
 
-
+	//경비 테이블의 값을 arry로 변환하여 저장하기
 	let tripCnt = $('.tripTable').length;
-
-	let tripRptS = [];
-	
+	let tripRptS = [];	//경비현황 저장,  파일정보는 별도 보관됨 rptTripFileArr에 보관되어 있음
 	for (var i = 1; i < tripCnt+1; i++) {
-    	let updCheck = $('#tripTable' + i + ' #updCheck').val();
-    	let fileTrgtKey = $('#tripTable' + i + ' #fileTrgtKey').val();
-    	let workRptNoSeq = $('#tripTable' + i + ' #workRptNoSeq').val();
-    	let tripRptTyp = $('#tripTable' + i + ' #tripRptTyp').val();
-    	let tripRptRmk = $('#tripTable' + i + ' #tripRptRmk').val();
-    	let tripRptCurTyp = $('#tripTable' + i + ' #tripRptCurTyp').val();
-    	let tripRptCardNo = $('#tripTable' + i + ' #tripRptCardNo').val();
-    	let tripRptCurr = $('#tripTable' + i + ' #tripRptCurr').val();
-    	let tripRptAmt = deleteCommaStr($('#tripTable' + i + ' #tripRptAmt').val());
-    	let tripRptFileNm = $('#tripTable' + i + ' #tripRptFileNm').val();
-    	let tripRps = {
-    			updCheck 		: updCheck,		//파일저장정보 인덱스
-    			fileTrgtKey 	: fileTrgtKey,		//파일저장정보 인덱스
-    			workRptNoSeq 	: workRptNoSeq,		//파일저장정보 인덱스
-    			tripRptTyp		: tripRptTyp,
-    			tripRptRmk		: tripRptRmk,
-    			tripRptCurTyp	: tripRptCurTyp,
-    			tripRptCardNo	: tripRptCardNo,
-    			tripRptCurr		: tripRptCurr,
-    			tripRptAmt		: tripRptAmt,
-    			tripRptFileNm	: tripRptFileNm,
+//     	let updCheck = $('#tripTable' + i + ' #updCheck').val();
+//     	let fileTrgtKey = $('#tripTable' + i + ' #fileTrgtKey').val();
+//     	let workRptNoSeq = $('#tripTable' + i + ' #workRptNoSeq').val();
+//     	let tripRptTyp = $('#tripTable' + i + ' #tripRptTyp').val();
+//     	let tripRptRmk = $('#tripTable' + i + ' #tripRptRmk').val();
+//     	let tripRptCurTyp = $('#tripTable' + i + ' #tripRptCurTyp').val();
+//     	let tripRptCardNo = $('#tripTable' + i + ' #tripRptCardNo').val();
+//     	let tripRptCurr = $('#tripTable' + i + ' #tripRptCurr').val();
+//     	let tripRptAmt = deleteCommaStr($('#tripTable' + i + ' #tripRptAmt').val());
+//     	let tripRptFileNm = $('#tripTable' + i + ' #tripRptFileNm').val();
+//     	let fileKey = $('#tripTable' + i + ' #fileKey').val();
+//     	let tripRps = {
+//     			updCheck 		: updCheck,		//파일저장정보 인덱스
+//     			fileTrgtKey 	: fileTrgtKey,		//파일저장정보 인덱스
+//     			workRptNoSeq 	: workRptNoSeq,		//파일저장정보 인덱스
+//     			tripRptTyp		: tripRptTyp,
+//     			tripRptRmk		: tripRptRmk,
+//     			tripRptCurTyp	: tripRptCurTyp,
+//     			tripRptCardNo	: tripRptCardNo,
+//     			tripRptCurr		: tripRptCurr,
+//     			tripRptAmt		: tripRptAmt,
+//     			tripRptFileNm	: tripRptFileNm,
+//     			fileKey			: fileKey,
     			
 
-    		    coCd			: jwt.coCd,
-    		    workRptId		: jwt.userId,
-    		    workRptNo		: $('#workRptNo').val(),
-    		    workRptDt		: $('#workRptDt').val(),
-    		    fileTrgtKey		: fileTrgtKey,
-    		    userId			: jwt.userId,
-    		    pgmId			: "PM0101D01_M"
-    	}
-    	tripRptS.push(tripRps);
+//     		    coCd			: jwt.coCd,
+//     		    workRptId		: jwt.userId,
+//     		    workRptNo		: $('#workRptNo').val(), //수정모드일경우만 값이 존재함.
+//     		    workRptDt		: $('#workRptDt').val(),
+//     		    fileTrgtKey		: fileTrgtKey,
+//     		    userId			: jwt.userId,
+//     		    pgmId			: "PM0101D01_M"
+//     	}
+//     	tripRptS.push(tripRps);
+    	tripRptS.push(tripRptRow(i));
 	}
-
-	formData.append("tripRptS",  JSON.stringify(tripRptS));
-	formData.append("rptTripFileArr",  JSON.stringify(rptTripFileArr));
 	
+	//paramMap.get("tripRptS")				-->최종입력된  경비내역 정보
+	//paramMap.get("tripRptRowDeleteArr")	-->수정중 삭제된 경비내역 정보
+	//paramMap.get("rptTripFiles"+xx)		-->최종입력됨 경비내역 첨부파일 file object임
+	// 서버에서 작업시는 paramMap.get("tripRptRowDeleteArr")를 확인후 먼저 삭제 로직 수행후 paramMap.get("tripRptS") 처리해야함.
+	formData.append("tripRptS",  JSON.stringify(tripRptS)); //수정된 경비내역 서버로 전송
+	formData.append("tripRptRowDeleteArr",  JSON.stringify(tripRptRowDeleteArr));  //삭제된 경비내역 서버로 전송
+	//file object만 별도 추출 
+	$.each(rptTripFileArr, function(idx, obj){
+		// 신규파일만 추가
+		formData.append("rptTripFiles" + obj.rptTripNo, obj.file);
+	});
     return formData;
 }
+
+
+
+//경비 처리 변경 내역 저장 단 U인경우 삭제된것만 저장하면됨 
+//경비테이블의 값을 추출하기
+function tripRptRow(i) {
+  	let updCheck = $('#tripTable' + i + ' #updCheck').val();
+  	let fileTrgtKey = $('#tripTable' + i + ' #fileTrgtKey').val();
+  	let workRptNoSeq = $('#tripTable' + i + ' #workRptNoSeq').val();
+  	let tripRptTyp = $('#tripTable' + i + ' #tripRptTyp').val();
+  	let tripRptRmk = $('#tripTable' + i + ' #tripRptRmk').val();
+  	let tripRptCurTyp = $('#tripTable' + i + ' #tripRptCurTyp').val();
+  	let tripRptCardNo = $('#tripTable' + i + ' #tripRptCardNo').val();
+  	let tripRptCurr = $('#tripTable' + i + ' #tripRptCurr').val();
+  	let tripRptAmt = deleteCommaStr($('#tripTable' + i + ' #tripRptAmt').val());
+  	let tripRptFileNm = $('#tripTable' + i + ' #tripRptFileNm').val();
+  	let fileKey = $('#tripTable' + i + ' #fileKey').val();
+  	let tripRps = {
+  			updCheck 		: updCheck,		//파일저장정보 인덱스
+  			fileTrgtKey 	: fileTrgtKey,		//파일저장정보 인덱스
+  			workRptNoSeq 	: workRptNoSeq,		//파일저장정보 인덱스
+  			tripRptTyp		: tripRptTyp,
+  			tripRptRmk		: tripRptRmk,
+  			tripRptCurTyp	: tripRptCurTyp,
+  			tripRptCardNo	: tripRptCardNo,
+  			tripRptCurr		: tripRptCurr,
+  			tripRptAmt		: tripRptAmt,
+  			tripRptFileNm	: tripRptFileNm,
+  			fileKey			: fileKey,
+  			
+
+  		    coCd			: jwt.coCd,
+  		    workRptId		: jwt.userId,
+  		    workRptNo		: $('#workRptNo').val(), //수정모드일경우만 값이 존재함.
+  		    workRptDt		: $('#workRptDt').val(),
+  		    fileTrgtKey		: fileTrgtKey,
+  		    userId			: jwt.userId,
+  		    pgmId			: "PM0101D01_M"
+  	}
+  	return tripRps;
+}
+      
 
 //Sales Code 검색
 function wbsSalesCodeSearch() {
@@ -904,12 +986,12 @@ $("#popForm #workRptS").change(function() {
 $("#popForm #issueYn").change(function() {
 	if ($("#issueYn").val() == 'Y'){
 // 		fileGridView.initView();
-	    $("#field01").show();
-	    $("#field02").show();
+	    $("#field01").show(); //이슈제목
+	    $("#field02").show(); //파일첨부영역
 	}
 	else {
-		$("#field01").hide();
-	    $("#field02").hide();
+		$("#field01").hide(); //이슈제목
+	    $("#field02").hide(); //파일첨부영역
 	}
 });
 
@@ -1036,7 +1118,7 @@ function uploadFile(fileName, base64ImageData, fileObj, type) {
 			file['lastModified'] = uploadDate;
 			file['lastModifiedDate'] = lastModifiedDate;
 			
-		if (lastPosition == 0) { //0이슈 첨부파일임
+		if (lastPosition == 0) { //0 작업일보 이슈 첨부파일임
 			notiFileArr.push({
 				'fileKey' : 0,
 		      	'fileName' : fileName,
@@ -1046,8 +1128,8 @@ function uploadFile(fileName, base64ImageData, fileObj, type) {
 		      	'fileDelete': 'Y'
 			});
 			fileGridView.setData()
-		} else {		//0이 아닌겨우 하당 경비항목으로 추가됨
-
+		} else {		//0이 아닌경우 해당 경비항목으로 추가된 첨부화일임 (경비 1건에 첨부 1개만 가능함)
+debugger;
 			rptTripFileArr.push({
 				'rptTripNo' : lastPosition,
 				'fileKey' : 0,
@@ -1058,7 +1140,6 @@ function uploadFile(fileName, base64ImageData, fileObj, type) {
 		      	'fileDelete': 'Y'
 			});
 			$('#tripTable' + lastPosition + ' #tripRptFileNm').val(fileName);
-// 			rptTripdeleteFileArr = [];
 		}
 	}
 }
