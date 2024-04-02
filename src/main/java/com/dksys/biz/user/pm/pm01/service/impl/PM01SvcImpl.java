@@ -60,7 +60,23 @@ public class PM01SvcImpl implements PM01Svc {
 	Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
 
 	int result = pm01Mapper.updateDailyWork(paramMap);
-	
+
+
+	  
+	  //출장경비 상세 내역 삭제 처리
+	  result = pm01Mapper.deleteTripRpt(paramMap);
+	  //첨부파일 상세내역 연계자료 삭제 처리 필요함
+	  
+	//경비 Insert 처리
+    List<Map<String, String>> tripArr = gsonDtl.fromJson(paramMap.get("tripRptS"), dtlMap);
+    for (Map<String, String> tripMap : tripArr) {
+        pm01Mapper.insertTripRpt(tripMap);
+    }
+
+	//경비 Insert용 첨부파일 처리
+//    List<Map<String, String>> rptTripFileArr = gsonDtl.fromJson(paramMap.get("rptTripFileArr"), dtlMap);
+    
+    
 	//---------------------------------------------------------------  
 	//첨부 화일 처리 시작 
 	//---------------------------------------------------------------
@@ -83,7 +99,6 @@ public class PM01SvcImpl implements PM01Svc {
 
 	    Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-	    
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
 	  	//   필수값 :  jobType, userId, comonCd
@@ -110,7 +125,22 @@ public class PM01SvcImpl implements PM01Svc {
 		
 		int result = pm01Mapper.insertDailyWork(paramMap);
 		cm08Svc.uploadFile("PM0101M01", paramMap.get("fileTrgtKey"), mRequest);
-	
+		
+		
+		//경비 Insert 처리
+        List<Map<String, String>> tripArr = gsonDtl.fromJson(paramMap.get("tripRptS"), dtlMap);
+        for (Map<String, String> tripMap : tripArr) {
+        	//출장비용 상세 내역별 일련번호 생성후 사용
+        	tripMap.put("fileTrgtKey", pm01Mapper.selectTripRptSeqNext(paramMap));	//상세내역 fileTrgtKey 번호 생성 필요함.
+        	tripMap.put("workRptNo", paramMap.get("workRptNo"));					//백엔드에서 신규 등록시 생성된 번호로 대체함
+            pm01Mapper.insertTripRpt(tripMap);
+        }
+
+		//경비 Insert용 첨부파일 처리
+        List<Map<String, String>> rptTripFileArr = gsonDtl.fromJson(paramMap.get("rptTripFileArr"), dtlMap);
+        //경비관련 첨부파일은 아래 함수를 활용함
+        // fileTrgtKey : PM0101M01_M 으로 저장함.  fileTrgtKey=PM0101M01은 일반 첨부 파일임
+//        uploadFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest) 
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------  
@@ -151,6 +181,11 @@ public class PM01SvcImpl implements PM01Svc {
 		//---------------------------------------------------------------  
 	  
 	  int result = pm01Mapper.deleteDailyWork(paramMap);
+	  
+	  //출장경비 상세 내역 삭제 처리
+	  result = pm01Mapper.deleteTripRpt(paramMap);
+	  //첨부파일 상세내역 연계자료 삭제 처리 필요함
+	  
 	  
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
@@ -229,6 +264,11 @@ public class PM01SvcImpl implements PM01Svc {
 	@Override
 	public List<Map<String, String>> selectDailyWorkPrductList(Map<String, String> paramMap) {
 		return pm01Mapper.selectDailyWorkPrductList(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectDailyWorkTripRows(Map<String, String> paramMap) {
+		return pm01Mapper.selectDailyWorkTripRows(paramMap);
 	}
   
 }

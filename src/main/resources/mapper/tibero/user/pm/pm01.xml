@@ -279,7 +279,7 @@
 
     <insert id="insertDailyWork" parameterType="Map">
         <selectKey keyProperty="workRptNo" resultType="String" order="BEFORE">
-            SELECT 'DM' || TO_CHAR(SYSDATE, 'YYYYMMDD')||'-'||LPAD(TB_PM01M01_SQ02.NEXTVAL,4,0) FROM DUAL
+            SELECT 'DM' || TO_CHAR(SYSDATE, 'YYYYMMDD')||'-'||LPAD(MOD(TB_PM01M01_SQ02.NEXTVAL, 10000), 4, '0') FROM DUAL
         </selectKey>
         INSERT INTO TB_PM01M01
         (
@@ -339,6 +339,7 @@
 		#{issueTitle, jdbcType=VARCHAR},
 		#{ordCoCd, jdbcType=VARCHAR}
         )
+        
     </insert>
 
     <delete id="deleteDailyWork" parameterType="Map">
@@ -1431,4 +1432,111 @@
 				        ORDER BY T.CO_CD, T.WORK_RPT_DT DESC, T.WORK_RPT_L, T.WORK_RPT_M, T.WORK_RPT_S, T.WORK_RPT_NO DESC, T.FILE_TRGT_KEY DESC
 				        </if>
     </select>
+    
+    
+    <select id="selectTripRptSeqNext" parameterType="Map" resultType="String">
+        SELECT NVL(MAX(FILE_TRGT_KEY),0) + 1
+		  FROM  TB_PM01D01
+    </select>
+
+    <insert id="insertTripRpt" parameterType="Map">
+        <selectKey keyProperty="fileTrgtKey" resultType="String" order="BEFORE">
+        SELECT NVL(MAX(FILE_TRGT_KEY),0) + 1
+		  FROM  TB_PM01D01
+        </selectKey>
+		MERGE INTO TB_PM01D01 AS T
+		USING DUAL AS D
+		ON (
+				T.CO_CD              = #{coCd}
+			AND T.WORK_RPT_NO  		 = #{workRptNo}
+			AND T.WORK_RPT_NO_SEQ    = #{workRptNoSeq}
+			)
+		WHEN MATCHED THEN
+			UPDATE SET
+				  TRIP_RPT_TYP		= #{tripRptTyp}
+				, TRIP_RPT_RMK      = #{tripRptRmk}
+				, TRIP_RPT_CUR_TYP  = #{tripRptCurTyp}
+				, TRIP_RPT_CARD_NO  = #{tripRptCardNo}
+				, TRIP_RPT_CURR     = #{tripRptCurr}
+				, TRIP_RPT_AMT      = #{tripRptAmt}
+				, TRIP_RPT_FILE_NM  = #{tripRptFileNm}
+				, UDT_ID 			= #{userId}
+				, UDT_PGM 			= #{pgmId}
+				, UDT_DTTM 			= SYSDATE
+		WHEN NOT MATCHED THEN
+	        INSERT
+	        (
+				  FILE_TRGT_KEY
+				, CO_CD
+				, WORK_RPT_NO
+				, WORK_RPT_NO_SEQ
+				, WORK_RPT_ID
+				, TRIP_RPT_TYP
+				, TRIP_RPT_RMK
+				, TRIP_RPT_CUR_TYP
+				, TRIP_RPT_CARD_NO
+				, TRIP_RPT_CURR
+				, TRIP_RPT_AMT
+				, TRIP_RPT_FILE_NM
+				, ETC_FIELD1
+				, ETC_FIELD2
+				, ETC_FIELD3
+				, CREAT_ID
+				, CREAT_PGM
+				, CREAT_DTTM
+				, UDT_ID
+				, UDT_PGM
+				, UDT_DTTM
+	        )
+	        VALUES
+	        (
+				  #{fileTrgtKey}
+				, #{coCd}
+				, #{workRptNo}
+				, #{workRptNoSeq}
+				, #{workRptId}
+				, #{tripRptTyp}
+				, #{tripRptRmk}
+				, #{tripRptCurTyp}
+				, #{tripRptCardNo}
+				, #{tripRptCurr}
+				, #{tripRptAmt}
+				, #{tripRptFileNm}
+				, #{etcField1, jdbcType=VARCHAR}
+				, #{etcField2, jdbcType=VARCHAR}
+				, #{etcField3, jdbcType=VARCHAR}
+		        , #{userId}
+		        , #{pgmId}
+		        , SYSDATE
+				, ''
+				, ''
+				, ''
+	        )
+    </insert>
+    
+
+    <delete id="deleteTripRpt" parameterType="Map">
+        DELETE
+        		TB_PM01D01 
+        WHERE CO_CD 	  = #{coCd}
+          AND WORK_RPT_NO = #{workRptNo}
+    </delete>
+    
+    
+
+    <select id="selectDailyWorkTripRows" parameterType="Map" resultType="CamelMap">
+        SELECT T.*
+        FROM   TB_PM01D01 AS T
+        WHERE  1 = 1
+        <if test="coCd !=null and !coCd.equals('')">
+        AND    T.CO_CD = #{coCd}
+        </if>
+        <if test="workRptNo !=null and !workRptNo.equals('')">
+        AND    T.WORK_RPT_NO = #{workRptNo}
+        </if>
+        <if test="workRptId !=null and !workRptId.equals('')">
+        AND    T.WORK_RPT_ID = #{workRptId}
+        </if>
+    </select>
+    
 </mapper>

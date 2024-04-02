@@ -56,20 +56,17 @@
         <div class="tit_contents">
             <h4 class="tit">작업일보 등록</h4>
         </div>
-
-	<input type="file" id="notiFile" style="display:none" multiple="multiple" onchange="setNotiFile(this);"/>
+			<input type="file" id="notiFile" style="display:none" multiple="multiple" onchange="setNotiFile(this);"/>
 	<form id="popForm" onSubmit="return false;">
             <input type="hidden" id="workRptIdNm" name="workRptIdNm">
-			
 			<input type="hidden" id="fileTrgtKey"  	name="fileTrgtKey">
 			<input type="hidden" id="pgmId"     	name="pgmId"	value="PM0101M01">
 			<input type="hidden" id="deptId"     	name="deptId">
 			<input type="hidden" id="ordCoCd"     	name="ordCoCd" msg="오더도는 salesCode용 회사코드">
 			<input type="hidden" id="coCd" name="coCd" required msg="회사">
 			<input type="hidden" id="workRptNo" name="workRptNo" msg="작업일보번호">
-			<input class="division" type="hidden" id="workRptL" name="workRptL" data-depth="0" onchange="selectCodeList(this,0);" required msg="작업대분류" >
+			<input type="hidden" id="workRptL" name="workRptL" data-depth="0" onchange="selectCodeList(this,0);" class="division" required msg="작업대분류" >
 			<input type="hidden" id="telNo"   name="telNo">
-			
             <div class="form-group popup_table" style="width: 100%;">
                 <table>
 
@@ -149,9 +146,9 @@
                     </tr>
                     <tr> 
 						<th>제품유형</th>
-								<input type="text" id="prdtCd" name="prdtCd" data-search="prdtCd" class="form-control" style="text-align: center;" readonly>
 						<td colspan= "1">
 					   		<div class="search_form">
+								<input type="hidden" id="prdtCd" name="prdtCd" data-search="prdtCd" class="form-control" style="text-align: center;" readonly>
 					    	  	<input type="text" id="prdtCdNm" name="prdtCdNm" data-search="prdtNm" class="form-control" onkeyup="event.keyCode == 8 ? prdtCd.value = '' : event.keyCode == 13 ? gridView.setData(0) : ''" >
 						    	<a onclick="openPrdtSearch();"><i class="i_search_w"></i></a>
 							</div>
@@ -196,10 +193,14 @@
 						<div data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 150px; width: 100%"></div>
 					  </td>
 					</tr>
-				
-                    
+					<tr class="tripAreaButton">
+						<th colspan=1>일일 출장비 내역 등록</th>
+						<th><button type="button" id="addDayileRptTrpButton" class="btn btn-primary btn-sm" style="height: 35px; line-height: 15px;">경비추가</button> 
+						<button type="button" id="removeDayileRptTrpButton" class="btn btn-primary btn-sm" style="height: 35px; line-height: 15px; display: none;">경비제거</button></th>
+					</tr>
                 </table>
             </div>
+            <div  id="dayilyRpt"></div>
         </form>
 		<br>
 		<br>
@@ -220,6 +221,7 @@
 <script type="text/javascript">
 	var actionType = null;
 	var fileTrgtKey = null;
+	var paramObj = null;
 	var fileParam = null;
     var windowWidth = $(window).width();
     var windowHeight = $(window).height();
@@ -230,6 +232,8 @@
  
 	var notiFileArr = [];
 	var deleteFileArr = [];
+	var rptTripFileArr = [];
+	var rptTripdeleteFileArr = [];
 	var fileGridView = {
 		initView: function(){
 			this.target = new ax5.ui.grid();
@@ -301,9 +305,9 @@ $(document).ready(function() {
         language : "ko",
         autoclose : true
     }).datepicker("setDate", new Date());
-
+debugger;
     //세션에 정보를 활용하여 승인처리
-    var paramObj = JSON.parse(sessionStorage.getItem('paramObj'));
+    paramObj = JSON.parse(sessionStorage.getItem('paramObj'));
     sessionStorage.removeItem('paramObj');
     if (paramObj && paramObj != "undefined") {
 
@@ -323,6 +327,7 @@ $(document).ready(function() {
 //         $("#itemDivNm").prop("readonly", true);
 //         $("#eqpNm").prop("readonly", true);
         
+        if (jwt.userId != 'js.nam') $('#tripAreaButton').hide();
         if (actionType == "C") {
             $("#actionBtn").text("등록");
             
@@ -375,6 +380,16 @@ $(document).ready(function() {
          }); 
         //---------------------------------------
         
+    	$('#addDayileRptTrpButton').click(function() {
+    		dailyRptTripAdd();
+    	});
+        
+    	$('#removeDayileRptTrpButton').click(function() {
+    		let tripCnt = $('.tripTable').length;
+    		if (tripCnt == 0)  return false;
+    		if (tripCnt == 1) $('#removeDayileRptTrpButton').hide();
+    		$('#tripTable' + tripCnt).remove();
+    	});
         
         //authChk();   // 권한체크
 		$("#field02").hide();
@@ -440,11 +455,117 @@ function selectSalesCodeSet() {
 //         $("#salesTarget").removeAttr("onclick").addClass("disabled");
 
     }
+
+    //GUN6020xx : 생산팀 출장,  xxxxx9902 : 개인 출장
+//     let tempJobCode = $('#workRptS').val();
+//     if (tempJobCode) {
+// 	    if (tempJobCode.slice(0,7) === 'GUN6020' || tempJobCode.slice(5,9) === '9902') { //출장
+// 	    	$('.tripArea').show();
+// 	    } else {
+// 	    	$('.tripArea').hide();
+// 	    }
+//     }
 }       
+
+function tripData() {
+	var selectedOptions = $('#trpTyp').val();
+	if (selectedOptions && selectedOptions.length > 0) {
+		
+		selectedOptions.forEach(function(optionValue) {
+			console.log("Selected trpTyp value:", optionValue);
+		});
+	} else {
+		console.log("No trpTyp option selected.");
+	}
+}
+
+function dailyRptTripAdd() {
+		let tripCnt = $('.tripTable').length;
+		$('#removeDayileRptTrpButton').show();
+		tripCnt += 1;
+
+        var newRow = $('<table id="tripTable'+ (tripCnt) +'" class="tripTable" style="margin-top: 20px;"> ' +
+        	'<tr class="tripArea">' +
+            '<th class="hit">비용항목</th>' +
+            '<td>' +
+            '<select id="tripRptTyp" name="tripRptTyp" data-kind="TRPTYP" data-search="tripRptTyp" class="form-control" msg="비용항목" required>' +
+            '<option value=""></option>' +
+            '</select>' +
+            '</td>' +
+            '<th>내용</th>' +
+            '<td>' +
+            '<input type="hidden" id="fileTrgtKey" name="fileTrgtKey" value="">' +
+            '<input type="hidden" id="updCheck" name="updCheck" value="C">' +
+            '<input type="hidden" id="workRptNoSeq" name="workRptNoSeq" value=' + tripCnt +'>' +
+            '<input type="text" id="tripRptRmk" name="tripRptRmk" data-search="tripRptRmk" class="form-control" msg="내용">' +
+            '</td>' +
+            '</tr>' +
+            '<tr class="tripArea">' +
+            '<th class="hit" >결재방법</th>' +
+            '<td>' +
+            '<select id="tripRptCurTyp" name="tripRptCurTyp" data-kind="CURTYP" data-search="tripRptCurTyp" class="form-control" msg="결제방법" required>' +
+            '<option value=""></option>' +
+            '</select>' +
+            '</td>' +
+            '<th id="cardTh">카드번호</th>' +
+            '<td>' +
+            '<input type="text" id="tripRptCardNo" name="tripRptCardNo"  data-search="tripRptCardNo" class="form-control" msg="카드번호">' +
+            '</td>' +
+            '</tr>' +
+            '<tr class="tripArea">' +
+            '<th class="hit" >통화종류</th>' +
+            '<td>' +
+            '<select id="tripRptCurr" name="tripRptCurr" data-kind="CURR" data-search="tripRptCurr" class="form-control" msg="통화종류" required>' +
+            '<option value=""></option>' +
+            '</select>' +
+            '</td>' +
+            '<th class="hit" >금액</th>' +
+            '<td>' +
+            '<input type="text" id="tripRptAmt" name="tripRptAmt" value=0  data-search="tripRptAmt" class="form-control" onkeyup="onlyNumber(this); checkChange();" comma="" msg="금액" required>' +
+            '</td>' +
+            '</tr>' +
+            '<tr class="tripArea">' +
+            '<th colspan="2">' +
+            '<button type="button" id="buttonFile3" class="btn btn-primary btn-sm" style="height: 30px; line-height: 10px;" onclick="fromWebToApp(1, 0, ' + tripCnt + ' );">파일선택</button>' +
+            '<button type="button" id="buttonFile4" class="btn btn-primary btn-sm" style="height: 30px; line-height: 10px;" onclick="fromWebToApp(2, 0, ' + tripCnt + ' );">사진촬영</button>' +
+            '</th>' +
+            '<td colspan="2">' +
+            '<input type="text" id="tripRptFileNm" name="tripRptFileNm" class="form-control" msg="첨부파일명">' +
+            '</td>' +
+            '</tr>' +
+            '</table>');
+        $('#dayilyRpt').append(newRow);
+
+		setCommonSelect($('#tripTable' + tripCnt + ' #tripRptTyp'));
+		setCommonSelect($('#tripTable' + tripCnt + ' #tripRptCurTyp'));
+		setCommonSelect($('#tripTable' + tripCnt + ' #tripRptCurr'));
+		
+
+    	$('#tripTable' + tripCnt + ' #tripRptCurTyp').on('change', function () {
+    		//결재방법인 카드인경우는 카드번호 필수임
+    		if ($('#tripTable' + tripCnt + ' #tripRptCurTyp').val() == 'CURTYP01') {
+    			$('#tripTable' + tripCnt + ' #cardTh').addClass('hit');
+    			$('#tripTable' + tripCnt + ' #tripRptCardNo').attr('required', '');
+    		} else {
+    			$('#tripTable' + tripCnt + ' #cardTh').removeClass('hit');
+    			$('#tripTable' + tripCnt + ' #tripRptCardNo').removeAttr('required', '');
+    		}
+    			
+    	});
+}
+
+
+function checkChange() {
+	inputAmtVal = addCommaStr($("#tripRptAmt").val());
+	$("#tripRptAmt").val(inputAmtVal);
+}
+
 
 function selectDailyWorkInfo() {                        //그리드에 뿌리는 데이터
     var formData = {
-        "fileTrgtKey" : fileTrgtKey,
+        "fileTrgtKey" : paramObj.fileTrgtKey,
+        "workRptNo" : paramObj.workRptNo,
+        "workRptId" : paramObj.workRptId,
     }
     postAjax("/user/pm/pm01/selectDailyWorkInfo", formData, null, function(data) {
 			var resultData = data.result;
@@ -472,6 +593,23 @@ function selectDailyWorkInfo() {                        //그리드에 뿌리는
 			$('#popForm #workRptM').val(data.result.workRptM);
     	    selectCodeList($("#workRptM"),1);
     	 	$('#popForm #workRptS').val(data.result.workRptS);
+    	 	
+    	 	//경비내용 처리를 위한 루틴
+    	 	let tripRows = data.tripRows;
+    	 	if (tripRows && tripRows.length > 0) {
+    	 		for (var i = 0; i < tripRows.length; i++) {
+    	 			dailyRptTripAdd(); //입력필드 생성
+    	            $.each(tripRows[i], function(key, value) {
+    	                if ($('#tripTable' + (i+1) + ' #' + key)) {
+    	                    if ($('#tripTable' + (i+1) + ' #' + key).is('[comma]')) {
+	    	                    $('#tripTable' + (i+1) + ' #' + key).val(addCommaStr(value));
+    	                    } else {
+	    	                    $('#tripTable' + (i+1) + ' #' + key).val(value);
+    	                    }
+    	                }
+    	            });
+    	 		}
+    	 	}
     });
 }
 
@@ -589,6 +727,49 @@ function makeFormData() {
 	formData.append("uploadFileArr",  JSON.stringify(notiFileArr));
 //     formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
 
+
+	let tripCnt = $('.tripTable').length;
+
+	let tripRptS = [];
+	
+	for (var i = 1; i < tripCnt+1; i++) {
+    	let updCheck = $('#tripTable' + i + ' #updCheck').val();
+    	let fileTrgtKey = $('#tripTable' + i + ' #fileTrgtKey').val();
+    	let workRptNoSeq = $('#tripTable' + i + ' #workRptNoSeq').val();
+    	let tripRptTyp = $('#tripTable' + i + ' #tripRptTyp').val();
+    	let tripRptRmk = $('#tripTable' + i + ' #tripRptRmk').val();
+    	let tripRptCurTyp = $('#tripTable' + i + ' #tripRptCurTyp').val();
+    	let tripRptCardNo = $('#tripTable' + i + ' #tripRptCardNo').val();
+    	let tripRptCurr = $('#tripTable' + i + ' #tripRptCurr').val();
+    	let tripRptAmt = deleteCommaStr($('#tripTable' + i + ' #tripRptAmt').val());
+    	let tripRptFileNm = $('#tripTable' + i + ' #tripRptFileNm').val();
+    	let tripRps = {
+    			updCheck 		: updCheck,		//파일저장정보 인덱스
+    			fileTrgtKey 	: fileTrgtKey,		//파일저장정보 인덱스
+    			workRptNoSeq 	: workRptNoSeq,		//파일저장정보 인덱스
+    			tripRptTyp		: tripRptTyp,
+    			tripRptRmk		: tripRptRmk,
+    			tripRptCurTyp	: tripRptCurTyp,
+    			tripRptCardNo	: tripRptCardNo,
+    			tripRptCurr		: tripRptCurr,
+    			tripRptAmt		: tripRptAmt,
+    			tripRptFileNm	: tripRptFileNm,
+    			
+
+    		    coCd			: jwt.coCd,
+    		    workRptId		: jwt.userId,
+    		    workRptNo		: $('#workRptNo').val(),
+    		    workRptDt		: $('#workRptDt').val(),
+    		    fileTrgtKey		: fileTrgtKey,
+    		    userId			: jwt.userId,
+    		    pgmId			: "PM0101D01_M"
+    	}
+    	tripRptS.push(tripRps);
+	}
+
+	formData.append("tripRptS",  JSON.stringify(tripRptS));
+	formData.append("rptTripFileArr",  JSON.stringify(rptTripFileArr));
+	
     return formData;
 }
 
@@ -820,8 +1001,12 @@ function fromAppToWeb(msg) {
 //     alert(msg);
 }
 
+
+var lastPosition = 0;
 //웹 자바스크립트에서 플로터 앱함수 call
-function fromWebToApp(select, fileTrgtKey = "112233") {
+//rptPosition ==> 경비추가 영역의 인덱스 번호임
+function fromWebToApp(select, fileTrgtKey = "112233", rptPosition = 0) {
+    lastPosition = rptPosition;
 	var paramMsg = select + ',' + fileTrgtKey;
     toApp.postMessage(paramMsg);
 }
@@ -845,21 +1030,35 @@ function uploadFile(fileName, base64ImageData, fileObj, type) {
 			file = new File([file], fileName, { type: 'application/octet-stream' , lastModified: uploadDate });
 		}
 		
-		file['name'] = fileName;
-		file['type'] = fileType;
-		file['size'] = file.size;
-		file['lastModified'] = uploadDate;
-		file['lastModifiedDate'] = lastModifiedDate;
-		
-		notiFileArr.push({
-			'fileKey' : 0,
-	      	'fileName' : fileName,
-	      	'fileType' : fileType,
-	      	'fileSize' : file.size,
-	      	'file' : file,
-	      	'fileDelete': 'Y'
-		});
-		fileGridView.setData()
+			file['name'] = fileName;
+			file['type'] = fileType;
+			file['size'] = file.size;
+			file['lastModified'] = uploadDate;
+			file['lastModifiedDate'] = lastModifiedDate;
+			
+		if (lastPosition == 0) { //0이슈 첨부파일임
+			notiFileArr.push({
+				'fileKey' : 0,
+		      	'fileName' : fileName,
+		      	'fileType' : fileType,
+		      	'fileSize' : file.size,
+		      	'file' : file,
+		      	'fileDelete': 'Y'
+			});
+			fileGridView.setData()
+		} else {		//0이 아닌겨우 하당 경비항목으로 추가됨
+
+			rptTripFileArr.push({
+				'rptTripNo' : lastPosition,
+				'fileKey' : 0,
+		      	'fileName' : fileName,
+		      	'fileType' : fileType,
+		      	'fileSize' : file.size,
+		      	'file' : file,
+		      	'fileDelete': 'Y'
+			});
+// 			rptTripdeleteFileArr = [];
+		}
 	}
 }
 
@@ -1070,6 +1269,12 @@ postAjax("/user/sm/sm02/selectCurrToday", paramObj, null
 
 
 
+
+function pasFloatChk (ivalue) {
+	let value = ivalue +' ';    	
+	const cvtValue = parseFloat(value.replace(/[^0-9.-]/g, '')); //숫자(0-9), 빼기 기호(-)가 아닌 모든 문자를 바꿉니다. 
+	return isNaN(cvtValue) ? 0 : cvtValue; //NaN이면 0로 대체 --> minus기호만 있는경우
+}
 
 
 </script>
