@@ -66,13 +66,14 @@ public class PM01SvcImpl implements PM01Svc {
 	  //출장경비 상세 내역 삭제 처리
 	  result = pm01Mapper.deleteTripRpt(paramMap);
 	  //첨부파일 상세내역 연계자료 삭제 처리 필요함
-	  
+
 	//경비 Insert 처리
     List<Map<String, String>> tripArr = gsonDtl.fromJson(paramMap.get("tripRptS"), dtlMap);
-    for (Map<String, String> tripMap : tripArr) {
-        pm01Mapper.insertTripRpt(tripMap);
+    if (tripArr != null && !tripArr.isEmpty()) {	//경비내역이 있으면 처리함.
+	    for (Map<String, String> tripMap : tripArr) {
+	        pm01Mapper.insertTripRpt(tripMap);
+	    }
     }
-
 	//경비 Insert용 첨부파일 처리
 //    List<Map<String, String>> rptTripFileArr = gsonDtl.fromJson(paramMap.get("rptTripFileArr"), dtlMap);
     
@@ -123,21 +124,24 @@ public class PM01SvcImpl implements PM01Svc {
 		String fileTrgtKey = pm01Mapper.selectDailyWorkSeqNext(paramMap);
 		paramMap.put("fileTrgtKey", fileTrgtKey);
 		
+		//작업일보 등록
 		int result = pm01Mapper.insertDailyWork(paramMap);
+		//첨부파일 처리
 		cm08Svc.uploadFile("PM0101M01", paramMap.get("fileTrgtKey"), mRequest);
 		
 		
 		//경비 Insert 처리
         List<Map<String, String>> tripArr = gsonDtl.fromJson(paramMap.get("tripRptS"), dtlMap);
-        for (Map<String, String> tripMap : tripArr) {
-        	//출장비용 상세 내역별 일련번호 생성후 사용
-        	tripMap.put("fileTrgtKey", pm01Mapper.selectTripRptSeqNext(paramMap));	//상세내역 fileTrgtKey 번호 생성 필요함.
-        	tripMap.put("workRptNo", paramMap.get("workRptNo"));					//백엔드에서 신규 등록시 생성된 번호로 대체함
-            pm01Mapper.insertTripRpt(tripMap);
+        if (tripArr != null && !tripArr.isEmpty()) {	//경비내역이 있으면 처리함.
+	        for (Map<String, String> tripMap : tripArr) {
+	        	//출장비용 상세 내역별 일련번호 생성후 사용
+	        	tripMap.put("fileTrgtKey", pm01Mapper.selectTripRptSeqNext(paramMap));	//상세내역 fileTrgtKey 번호 생성 필요함.
+	        	tripMap.put("workRptNo", paramMap.get("workRptNo"));					//백엔드에서 신규 등록시 생성된 번호로 대체함
+	            pm01Mapper.insertTripRpt(tripMap);
+	        }
         }
-
 		//경비 Insert용 첨부파일 처리
-        List<Map<String, String>> rptTripFileArr = gsonDtl.fromJson(paramMap.get("rptTripFileArr"), dtlMap);
+//        List<Map<String, String>> rptTripFileArr = gsonDtl.fromJson(paramMap.get("rptTripFileArr"), dtlMap);
         //경비관련 첨부파일은 아래 함수를 활용함
         // fileTrgtKey : PM0101M01_M 으로 저장함.  fileTrgtKey=PM0101M01은 일반 첨부 파일임
 //        uploadFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest) 
