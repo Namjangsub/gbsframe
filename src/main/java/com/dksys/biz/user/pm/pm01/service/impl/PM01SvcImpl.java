@@ -80,7 +80,7 @@ public class PM01SvcImpl implements PM01Svc {
 	//---------------------------------------------------------------  
 
 
-	//경비중 삭제된 내역  처리
+	//1. 경비중 삭제된 내역  처리 (경비내역 + 첨부파일 삭제처리)
 	List<Map<String, String>> tripRptRowDeleteArr = gsonDtl.fromJson(paramMap.get("tripRptRowDeleteArr"), dtlMap);
 	if (tripRptRowDeleteArr != null && !tripRptRowDeleteArr.isEmpty()) {	//경비내역이 있으면 처리함.
 	    for (Map<String, String> tripMap : tripRptRowDeleteArr) {
@@ -99,8 +99,19 @@ public class PM01SvcImpl implements PM01Svc {
         	}
 	    }
 	}  
+
+	//2. 경비중 첨부파일만 삭제된 내역  처리 (첨부파일만 변경시 기존 첨부 파일 삭제처리임)
+	List<Map<String, String>> tripRptRowFileDeleteArr = gsonDtl.fromJson(paramMap.get("tripRptRowFileDeleteArr"), dtlMap);
+	if (tripRptRowFileDeleteArr != null && !tripRptRowFileDeleteArr.isEmpty()) {	//경비내역이 있으면 처리함.
+	    for (Map<String, String> tripMap : tripRptRowFileDeleteArr) { //tripMap={fileKey, fileName} 만 있음.
+    		//첨부파일만 삭제됨
+	    	String fileKey = tripMap.get("fileKey").toString();
+		    cm08Svc.deleteFile( fileKey );
+	    }
+	}  
+
 	
-	//경비 Insert 처리
+	//3. 경비 Update 처리
 	List<Map<String, String>> tripArr = gsonDtl.fromJson(paramMap.get("tripRptS"), dtlMap);
 	if (tripArr != null && !tripArr.isEmpty()) {	//경비내역이 있으면 처리함.
 	    for (Map<String, String> tripMap : tripArr) {
@@ -118,8 +129,11 @@ public class PM01SvcImpl implements PM01Svc {
 			    cm08Svc.uploadFile(tripfileTrgtTyp, tripfileTrgtKey, mRequest) ;
         	} else if ("U".equals(updCheck)) { //구분코드 C, U, D  : 처음 등록시에는 C, 수정은 U, 삭제는 D.
 		        pm01Mapper.updateTripRpt(tripMap);
+		        //파일만 Update 처리는?
+		        //경비용 첨부파일 처리
+			    cm08Svc.uploadFile(tripfileTrgtTyp, tripfileTrgtKey, mRequest) ;
         		
-        	} else if ("D".equals(updCheck)) { //구분코드 C, U, D  : 처음 등록시에는 C, 수정은 U, 삭제는 D.
+        	} else if ("D".equals(updCheck)) { //구분코드 C, U, D  : 처음 등록시에는 C, 수정은 U, 삭제는 D. //최종버젼에서는 update에는 삭제데이터 처리내역 없음. 위에 1., 2.에서 처리됨
 
         	    //출장경비 상세 내역 삭제 처리
         		result += pm01Mapper.deleteTripRpt(tripMap);
