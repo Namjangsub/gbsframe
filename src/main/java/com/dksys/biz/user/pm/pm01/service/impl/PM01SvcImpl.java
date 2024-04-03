@@ -72,7 +72,9 @@ public class PM01SvcImpl implements PM01Svc {
 	List<String> deleteFileList = Arrays.asList(deleteFileArr);
     if (deleteFileList != null && !deleteFileList.isEmpty()) {
 		for(String fileKey : deleteFileList) {
-			cm08Svc.deleteFile(fileKey);
+	        if (fileKey != null && !fileKey.isEmpty()) {	//경비내역이 있으면 처리함.
+	        	cm08Svc.deleteFile(fileKey);
+	        }
 		}
     }
 	//---------------------------------------------------------------  
@@ -94,8 +96,10 @@ public class PM01SvcImpl implements PM01Svc {
         	    //출장경비 상세 내역 삭제 처리
         		result += pm01Mapper.deleteTripRpt(tripMap);
         		//첨부파일 상세내역 연계자료 삭제 처리 필요함
-		    	String fileKey = tripMap.get("fileKey").toString();
-			    cm08Svc.deleteFile( fileKey );
+		    	String fileKey = tripMap.get("fileKey");
+		        if (fileKey != null && !fileKey.isEmpty()) {	//경비내역이 있으면 처리함.
+		        	cm08Svc.deleteFile( fileKey );
+		        }
         	}
 	    }
 	}  
@@ -105,8 +109,10 @@ public class PM01SvcImpl implements PM01Svc {
 	if (tripRptRowFileDeleteArr != null && !tripRptRowFileDeleteArr.isEmpty()) {	//경비내역이 있으면 처리함.
 	    for (Map<String, String> tripMap : tripRptRowFileDeleteArr) { //tripMap={fileKey, fileName} 만 있음.
     		//첨부파일만 삭제됨
-	    	String fileKey = tripMap.get("fileKey").toString();
-		    cm08Svc.deleteFile( fileKey );
+	    	String fileKey = tripMap.get("fileKey");
+	        if (fileKey != null && !fileKey.isEmpty()) {	//경비내역이 있으면 처리함.
+	        	cm08Svc.deleteFile( fileKey );
+	        }
 	    }
 	}  
 
@@ -138,8 +144,10 @@ public class PM01SvcImpl implements PM01Svc {
         	    //출장경비 상세 내역 삭제 처리
         		result += pm01Mapper.deleteTripRpt(tripMap);
         		//첨부파일 상세내역 연계자료 삭제 처리 필요함
-		    	String fileKey = tripMap.get("fileKey").toString();
-			    cm08Svc.deleteFile( fileKey );
+		    	String fileKey = tripMap.get("fileKey");
+		        if (fileKey != null && !fileKey.isEmpty()) {	//경비내역이 있으면 처리함.
+		        	cm08Svc.deleteFile( fileKey );
+		        }
         	}
 	    }
 	}
@@ -251,8 +259,10 @@ public class PM01SvcImpl implements PM01Svc {
 		//---------------------------------------------------------------  
 		if (deleteFileList.size() > 0) {		  
 		    for (Map<String, String> deleteDtl : deleteFileList) {
-		    	String fileKey = deleteDtl.get("fileKey").toString();
-			    cm08Svc.deleteFile( fileKey );
+		    	String fileKey = deleteDtl.get("fileKey");
+		        if (fileKey != null && !fileKey.isEmpty()) {	//경비내역이 있으면 처리함.
+		        	cm08Svc.deleteFile( fileKey );
+		        }
 		    }
 		}
 		//---------------------------------------------------------------  
@@ -263,10 +273,11 @@ public class PM01SvcImpl implements PM01Svc {
 		List<Map<String, String>> deleteTripRptFileList = pm01Mapper.selectDailyWorkTripRows(paramMap); 
 		if (deleteTripRptFileList.size() > 0) {		  
 		    for (Map<String, String> deleteDtl : deleteTripRptFileList) {
-		    	String fileKey = deleteDtl.get("fileKey").toString();
-				//첨부파일 상세내역 연계자료 삭제 처리
-			    cm08Svc.deleteFile( fileKey );
-
+		    	String fileKey = deleteDtl.get("fileKey");
+		        if (fileKey != null && !fileKey.isEmpty()) {	//경비내역이 있으면 처리함.
+					//첨부파일 상세내역 연계자료 삭제 처리
+				    cm08Svc.deleteFile( fileKey );
+		        }
 				//출장경비 상세 내역 삭제 처리
 				result += pm01Mapper.deleteTripRpt(deleteDtl);
 		    }
