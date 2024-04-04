@@ -1,0 +1,622 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.sm.sm16.mapper.SM16Mapper">
+	
+	
+	<!-- 발주-입고 내역 DETAIL SELECT -->
+	<select id="selectSM16MainList" parameterType="Map" resultType="camelMap">
+			WITH BAL AS (
+				SELECT *
+				  FROM TB_SM10M01 T
+				 WHERE 1 = 1
+					--  AND T.ORDRS_NO = '23151' 
+					--  AND T.SALES_CD = '23135-03URNUP'
+				<!-- 회사코드 -->         
+				<if test="coCd != null and !coCd.equals('')">
+					AND T.CO_CD = #{coCd}   
+				</if>
+				<if test="ordrsNo != null and !ordrsNo.equals('')">
+				    AND T.ORDRS_NO = #{ordrsNo}   
+				</if>
+				<if test="salesCd != null and !salesCd.equals('')">
+					AND T.SALES_CD LIKE '%'|| #{salesCd} || '%'   
+				</if>
+				<if test="pchsCostDiv10 != null and !pchsCostDiv10.equals('')">
+				   AND T.PCHS_COST_DIV10 = #{pchsCostDiv10}  
+				</if>
+			)
+			, COMP AS (
+				SELECT *
+				  FROM TB_SM12D01 I
+				 WHERE ORDRG_NO BETWEEN 'COST' AND 'COSTZZZ'
+				   AND EXISTS (SELECT 1 FROM BAL WHERE BAL.COST_NO = I.ORDRG_NO)
+			)
+			SELECT T.*
+			 		, TYP0_TOT_AMT-TYP1_TOT_AMT 	AS REM_AMT	--미지급금
+			 		, (TYP0_TOT_AMT*0.1)-VAT1_TOT 	AS REM_VAT	--미지급VAT
+			 		, (TYP0_TOT_AMT+(TYP0_TOT_AMT*0.1)) -(TYP1_TOT_AMT+VAT1_TOT)  AS REM_VAT	--미지급금합계
+			 		, B.CLNT_NM 	AS PCHS_CLNT_CD_NM		--공급사명
+			 		, B.PCHS_VAT_CD			--VAT코드
+			 		, B.PCHS_CLMN_DAY		--매입결재일자
+			 		, B.PCHS_CLMN_RMK		--매입결재비고
+ 					, ( SELECT FN_CM05M01_CD_TO_NM(B.PCHS_PMNT_MTD_CD) FROM DUAL ) AS PCHS_PMNT_MTD_CD_NM --매입결재조건
+			 		, C.ORDRS_CLNT_CD		--수주고객사
+			 		, BC.CLNT_NM 	AS ORDRS_CLNT_CD_NM		--수주고객사명
+			 		, C.ORDRS_DT			--수주일자
+			 		, C.CLNT_PJT			--고객사PJT
+			 		, ( SELECT FN_CM05M01_CD_TO_NM(C.CLNT_PJT) FROM DUAL ) AS CLNT_PJT_NM
+			 		, C.CTRT_NM				--주문계약명
+			  FROM (
+					SELECT  T.CO_CD, T.PCHS_CLNT_CD, T.PCHS_COST_DIV10, T.ORDRS_CO_CD, T.ORDRS_NO
+							, TO_CHAR(MIN(COST_DT), 'YYYY-MM-DD') AS COST_DT
+					--		, ( SELECT FN_CM05M01_CD_TO_NM(T.CURR_CD) FROM DUAL ) AS CURR_CD_NM
+					--		, ( SELECT FN_CM05M01_CD_TO_NM(T.PAY_DIV) FROM DUAL ) AS PAY_DIV_NM
+							, SUM(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2040', T.COST_AMT, 0)) TYP_04	--일반금액
+							, SUM(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2010', T.COST_AMT, 0)) TYP_01	--계약금금액
+							, SUM(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2020', T.COST_AMT, 0)) TYP_02	--중도금금액
+							, SUM(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2030', T.COST_AMT, 0)) TYP_03	--잔금금액
+							, SUM(T.COST_AMT) AS TYP0_TOT_AMT
+							, SUM(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2040', C.PCHS_AMT, 0)) TYP_14	--일반확정금액
+							, SUM(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2010', C.PCHS_AMT, 0)) TYP_11	--계약금확정금액
+							, SUM(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2020', C.PCHS_AMT, 0)) TYP_12	--중도금확정금액
+							, SUM(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2030', C.PCHS_AMT, 0)) TYP_13	--잔금확정금액
+							, SUM(C.PCHS_AMT) AS TYP1_TOT_AMT
+							, SUM(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2040', C.PCHS_VAT, 0)) VAT_14	--일반확정금액 VAT
+							, SUM(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2010', C.PCHS_VAT, 0)) VAT_11	--계약금확정금액 VAT
+							, SUM(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2020', C.PCHS_VAT, 0)) VAT_12	--중도금확정금액 VAT
+							, SUM(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2030', C.PCHS_VAT, 0)) VAT_13	--잔금확정금액 VAT
+							, SUM(C.PCHS_VAT) AS VAT1_TOT 
+							, MAX(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2040', C.PCHS_DT)) PCHS_DT_14	--일반최종지급일
+							, MAX(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2010', C.PCHS_DT)) PCHS_DT_11	--계약금최종지급일
+							, MAX(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2020', C.PCHS_DT)) PCHS_DT_12	--중도금최종지급일
+							, MAX(DECODE(T.PCHS_COST_DIV20, 'PCHSCOSTDIV2030', C.PCHS_DT)) PCHS_DT_13	--잔금최종지급일
+							, MAX(C.PCHS_DT) AS PCHS_DT_LAST 
+					FROM BAL T
+							LEFT OUTER JOIN COMP C ON T.COST_NO  = C.ORDRG_NO
+					WHERE 1 = 1
+				GROUP BY T.CO_CD, T.PCHS_CLNT_CD, T.PCHS_COST_DIV10, T.ORDRS_CO_CD, T.ORDRS_NO
+				) T
+					LEFT OUTER JOIN TB_CR02M01 C  ON T.ORDRS_CO_CD = C.CO_CD AND T.ORDRS_NO = C.ORDRS_NO
+					LEFT OUTER JOIN TB_BM02M01 B  ON T.PCHS_CLNT_CD = B.CLNT_CD 
+					LEFT OUTER JOIN TB_BM02M01 BC  ON C.ORDRS_CLNT_CD = BC.CLNT_CD 
+		 
+	</select>
+	
+	<!-- 매입확정 리스트  구매비용 포함-->
+	<select id="sm16selectPurchaseListNew" parameterType="Map" resultType="camelMap">
+			  SELECT  
+					  IPGO.CO_CD
+					, IPGO.IN_NO
+					, IPGO.IN_SEQ
+					, IPGO.ORDRG_NO
+					, IPGO.ORDRG_SEQ
+					, IPGO.REQ_NO
+					, IPGO.SALES_CD
+					, IPGO.MATR_CD
+					, IPGO.MATR_TEST_DIV
+					, IPGO.IN_PRC
+					, IPGO.IN_QTY
+					, IPGO.BAD_QTY
+					, IPGO.IN_DTL_AMT
+					, IPGO.CURR_CD
+					, IPGO.EXRATE
+					, IPGO.IN_DTL_RMK
+					, TO_CHAR(IPGO.INOUT_KEY)	AS INOUT_KEY
+					, IPGO.CREAT_ID
+					, IPGO.CREAT_PGM
+ 			        , TO_CHAR(IPGO.CREAT_DTTM, 'YYYY-MM-DD')	AS CREAT_DTTM
+					, IPGO.IO_DIV
+ 			        , TO_CHAR(IPGO.IN_DT, 'YYYY-MM-DD')	AS IN_DT
+ 			        , C.CLNT_NM
+ 			        , D.DSGN_NO
+					, J.MATR_NM
+ 			        , J.MATR_MAT
+ 			        , J.MATR_SIZE
+ 			        , J.MATR_SPEC	
+ 			        , Q.PART_CD
+ 			        , (SELECT FN_CM05M01_CD_TO_NM(Q.PART_CD) FROM DUAL ) AS PART_CD_NM		/* 발주분류명 */	
+ 			        , J.GOODS_DIV
+ 			        , (SELECT FN_CM05M01_CD_TO_NM(J.GOODS_DIV) FROM DUAL ) AS GOODS_DIV_NM	/* 자재품목구분명 */
+ 			        , IM.FILE_TRGT_KEY 
+ 			        , 'N'  AS IS_COST
+			FROM TB_SM03D01 IPGO
+					LEFT OUTER JOIN TB_SM02M01 M    ON(IPGO.ORDRG_NO = M.ORDRG_NO)		/* 발주마스터 */
+					LEFT OUTER JOIN TB_SM02D01 D    ON(IPGO.ORDRG_NO = D.ORDRG_NO AND IPGO.ORDRG_SEQ = D.ORDRG_SEQ)		/* 발주상세 */
+					LEFT OUTER JOIN TB_BM02M01 AS C ON M.PCHS_CLNT_CD = C.CLNT_CD   --거래처마스터
+					LEFT OUTER JOIN TB_BM05M01 AS J ON IPGO.MATR_CD = J.MATR_CD   --자재마스터
+					LEFT OUTER JOIN TB_QM01M01 Q    ON IPGO.REQ_NO = Q.REQ_NO
+					LEFT OUTER JOIN TB_SM03M01 IM   ON IPGO.IN_NO = IM.IN_NO
+			WHERE 1 = 1
+			<!-- 회사코드 -->         
+			<if test="coCd != null and !coCd.equals('')">
+				AND IPGO.CO_CD = #{coCd}   
+			</if>    
+			<!-- 매입구분 N: 발주,  Y:qldyd,  R:반품 -->         
+			<if test="pchsGb != null and !pchsGb.equals('')">
+			    AND 'N' = #{pchsGb}
+			</if>  
+			<!-- 확정여부 -->      
+			<if test="cmpletYn != null and cmpletYn != ''">         
+				AND NVL2(IPGO.PCHS_NO,'Y','N') = #{cmpletYn}
+			</if>     
+			<choose>
+				<when test = "salesCd.equals('99999-9900000')">
+				AND IPGO.SALES_CD IS NULL   
+				</when>
+				<otherwise>
+				AND IPGO.SALES_CD LIKE '%'|| #{salesCd} || '%'   
+				</otherwise>
+			</choose>
+			<choose>
+				<when test = "reqNo.equals('REQ9999999')">
+				AND IPGO.REQ_NO IS NULL   
+				</when>
+				<otherwise>
+				AND IPGO.REQ_NO LIKE '%'|| #{reqNo} || '%' 
+				</otherwise>
+			</choose>
+		UNION ALL --구매비용집계현황
+			SELECT
+					  E.CO_CD
+					, E.COST_NO
+					, 0
+					, E.ORDRS_NO
+					, 0
+					, E.REQ_NO
+					, E.SALES_CD
+					, ''
+					, ''
+					, E.COST_AMT	AS IN_PRC
+					, 1				AS IN_QTY
+					, 0
+					, E.COST_AMT	AS IN_DTL_AMT
+					, E.CURR_CD
+					, E.EXRATE
+					, E.COST_RMK
+					, E.FILE_TRGT_KEY
+					, E.CREAT_ID
+					, E.CREAT_PGM
+					, TO_CHAR(E.CREAT_DTTM, 'YYYY-MM-DD')	AS CREAT_DTTM
+					, '' 			AS IO_DIV
+					, TO_CHAR(E.COST_DT, 'YYYY-MM-DD')	AS IN_DT
+ 			        , C.CLNT_NM
+ 			        , '' 			AS DSGN_NO
+					, '비용처리건' 		AS MATR_NM
+ 			        , ''			AS MATR_MAT
+ 			        , ''			AS MATR_SIZE
+ 			        , ''			AS MATR_SPEC	
+ 			        , Q.PART_CD
+ 			        , (SELECT FN_CM05M01_CD_TO_NM(Q.PART_CD) FROM DUAL ) AS PART_CD_NM		/* 발주분류명 */	
+ 			        , E.PCHS_COST_DIV10
+ 			        , (SELECT FN_CM05M01_CD_TO_NM(E.PCHS_COST_DIV10) FROM DUAL ) AS GOODS_DIV_NM	/* 자재품목구분명 */
+ 			        , E.FILE_TRGT_KEY 
+ 			        , 'Y'  AS IS_COST
+			FROM TB_SM10M01 E		/* 구매비용 */	
+					LEFT OUTER JOIN TB_BM02M01 C    ON E.PCHS_CLNT_CD = C.CLNT_CD
+					LEFT OUTER JOIN TB_QM01M01 Q    ON E.REQ_NO = Q.REQ_NO
+					LEFT OUTER JOIN TB_SM10D01 ED   ON E.COST_NO = ED.COST_NO
+			WHERE 1 = 1	
+			<!-- 회사코드 -->         
+			<if test="coCd != null and !coCd.equals('')">
+				AND E.CO_CD = #{coCd}   
+			</if>   
+			<!-- 매입구분 N: 발주,  Y:비용,  R:반품 -->         
+			<if test="pchsGb != null and !pchsGb.equals('')">
+			    AND 'Y' = #{pchsGb}
+			</if>    
+			<!-- 확정여부 -->       
+			<if test="cmpletYn != null and cmpletYn != ''">        
+				AND NVL2(E.PCHS_NO,'Y','N') = #{cmpletYn}
+			</if>     
+			<choose>
+				<when test = "salesCd.equals('99999-9900000')">
+				AND E.SALES_CD IS NULL   
+				</when>
+				<otherwise>
+				AND ED.SALES_CD LIKE '%'|| #{salesCd} || '%'   
+				</otherwise>
+			</choose>
+			<choose>
+				<when test = "reqNo.equals('REQ9999999')">
+				AND E.REQ_NO IS NULL   
+				</when>
+				<otherwise>
+				AND E.REQ_NO LIKE '%'|| #{reqNo} || '%' 
+				</otherwise>
+			</choose>
+		UNION ALL --반품현황
+			SELECT 
+					  E.CO_CD
+					, E.RET_NO
+					, R.RET_SEQ
+					, I.ORDRG_NO
+					, I.ORDRG_SEQ
+					, I.REQ_NO
+					, E.SALES_CD
+					, R.MATR_CD
+					, ''
+					, R.RET_PRC
+					, R.RET_QTY
+					, 0
+					, R.RET_DTL_AMT
+					, R.CURR_CD
+					, R.EXRATE
+					, R.RET_DTL_RMK
+					, to_CHAR(R.INOUT_KEY)	AS INOUT_KEY
+					, R.CREAT_ID
+					, R.CREAT_PGM
+ 			        , TO_CHAR(R.CREAT_DTTM, 'YYYY-MM-DD')	AS CREAT_DTTM
+					, ''
+ 			        , TO_CHAR(E.RET_DT, 'YYYY-MM-DD')	AS RET_DT
+ 			        , C.CLNT_NM
+ 			        , R.DSGN_NO
+					, J.MATR_NM
+ 			        , J.MATR_MAT
+ 			        , J.MATR_SIZE
+ 			        , J.MATR_SPEC	
+ 			        , Q.PART_CD
+ 			        , (SELECT FN_CM05M01_CD_TO_NM(Q.PART_CD) FROM DUAL ) AS PART_CD_NM		/* 발주분류명 */	
+ 			        , J.GOODS_DIV
+ 			        , (SELECT FN_CM05M01_CD_TO_NM(J.GOODS_DIV) FROM DUAL ) AS GOODS_DIV_NM	/* 자재품목구분명 */
+ 			        , E.FILE_TRGT_KEY 
+ 			        , 'R'  AS IS_COST
+			FROM TB_SM06M01 E		/* 반품 */	
+					LEFT OUTER JOIN TB_SM06D01 R ON R.CO_CD = E.CO_CD AND R.RET_NO = E.RET_NO	
+					LEFT OUTER JOIN TB_SM03D01 I ON I.IN_NO = R.IN_NO AND I.IN_SEQ = R.IN_SEQ	
+					LEFT OUTER JOIN TB_QM01M01 Q ON I.REQ_NO = Q.REQ_NO
+					LEFT OUTER JOIN TB_BM02M01 C ON E.PCHS_CLNT_CD = C.CLNT_CD
+					LEFT OUTER JOIN TB_BM05M01 J ON R.MATR_CD = J.MATR_CD		/* 자재마스터 */
+			WHERE 1 = 1
+			<!-- 회사코드 -->         
+			<if test="coCd != null and !coCd.equals('')">
+				AND E.CO_CD = #{coCd}   
+			</if>
+			<!-- 매입구분 N: 발주,  Y:비용,  R:반품 -->         
+			<if test="pchsGb != null and !pchsGb.equals('')">
+			    AND 'R' = #{pchsGb}
+			</if>    
+			<!-- 확정여부 -->         
+			<if test="cmpletYn != null and cmpletYn != ''">          
+				AND NVL2(R.PCHS_NO,'Y','N') = #{cmpletYn}
+			</if>    
+			<choose>
+				<when test = "salesCd.equals('99999-9900000')">
+				AND E.SALES_CD IS NULL   
+				</when>
+				<otherwise>
+				AND E.SALES_CD LIKE '%'|| #{salesCd} || '%'   
+				</otherwise>
+			</choose>
+			<choose>
+				<when test = "reqNo.equals('REQ9999999')">
+				AND Q.REQ_NO IS NULL   
+				</when>
+				<otherwise>
+				AND Q.REQ_NO LIKE '%'|| #{reqNo} || '%' 
+				</otherwise>
+			</choose>
+
+	</select>	
+ 
+	
+	<!-- 구매자재세부현황 리스트  구매비용 포함-->
+	<select id="sm16_2selectPurchaseListNewCount" parameterType="Map" resultType="int">
+		WITH IPGO AS (
+			SELECT    A.*
+					, D1.CLNT_NM  AS PCHS_CLNT_NM
+					, D1.CRN /*사업자등록번호*/
+					, D1.PCHS_CLMN_DAY  /*결제일 - 10*/	
+					, D1.PCHS_CLMN_RMK  /*결제일 - 다음달 10일*/
+					, D1.PCHS_PMNT_MTD_CD  --결제조건 코드
+				    , FN_CM05M01_CD_TO_NM(D1.PCHS_PMNT_MTD_CD) AS PCHS_PMNT_MTD_NM /*결제조건명*/
+			  FROM (
+					SELECT A.* 
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN 'N' 
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN 'R' ELSE 'Y' END IS_COST
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN '' 
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN '' ELSE C.ORDRS_NO END ORDRS_NO --수주번호
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD 
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN RM.SALES_CD ELSE C.SALES_CD END SALES_CD
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.PCHS_CLNT_CD 
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN RM.PCHS_CLNT_CD ELSE C.PCHS_CLNT_CD END PCHS_CLNT_CD
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.FILE_TRGT_KEY 
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN RM.FILE_TRGT_KEY ELSE C.FILE_TRGT_KEY END FILE_TRGT_KEY
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN '발주' 
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN '반품' ELSE '비용' END IS_DIV
+								, (SELECT FN_CM06M01_ID_TO_NM(A.CREAT_ID) FROM DUAL) AS CREAT_ID_NM
+					FROM  TB_SM12D01 A /* 매입 확정 DETAIL */		
+							LEFT OUTER JOIN TB_SM02M01 M ON(A.ORDRG_NO = M.ORDRG_NO)		/* 발주마스터 */
+							LEFT OUTER JOIN TB_SM10M01 C ON(A.ORDRG_NO = C.COST_NO)			/* 비용마스터 */
+							LEFT OUTER JOIN TB_SM06D01 R ON(A.ORDRG_NO = R.RET_NO)		/* 반품 상세 */
+							LEFT OUTER JOIN TB_SM06M01 RM ON(RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)		/* 반품 상세 */
+				  WHERE 1=1 
+				    AND NVL(C.PAY_DIV,'PAYDIV02') = 'PAYDIV02'  --기타비용의 경우 청구(PAYDIV02)인 경우만 구매현황에 출력함.
+				<!-- 회사코드 -->         
+				<if test="coCd != null and !coCd.equals('')">
+					AND A.CO_CD = #{coCd}   
+				</if>     
+				<!-- 확정일자 -->         
+				<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')">
+				<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
+	              	AND A.PCHS_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+				</if>   
+				</if>
+				) A
+     			LEFT OUTER JOIN TB_BM02M01 D1 ON A.PCHS_CLNT_CD = D1.CLNT_CD   --거래처마스터
+			 WHERE 1 = 1
+				<if test="pchsClmnDay != null and !pchsClmnDay.equals('')">
+				AND D1.PCHS_CLMN_DAY = #{pchsClmnDay}
+				</if>
+		)
+		,  IPGODTL AS --입고상세
+		(
+ 			 SELECT   *  
+				FROM  TB_SM03D01 A /* 입고 DETAIL */		
+			  WHERE 1=1 
+                   AND EXISTS (SELECT 1 FROM IPGO WHERE  IPGO.ORDRG_NO = A.ORDRG_NO)	
+		)
+		,  IPGOAMT AS --입고집계
+		(
+ 			 SELECT   CO_CD, ORDRG_NO
+ 			 	   , SUM(IN_QTY) AS IN_QTY
+ 			       , SUM(BAD_QTY) AS BAD_QTY
+ 			       , SUM(IN_DTL_AMT) AS IN_DTL_AMT 
+				FROM  IPGODTL A /* 입고 DETAIL */		
+			  GROUP BY CO_CD, ORDRG_NO
+		)
+		,  IPGOTOT AS --매입확정집계
+		(
+ 			 SELECT   CO_CD, ORDRG_NO
+ 			 	   , SUM(PCHS_AMT) AS PCHS_AMT_TOT
+ 			       , SUM(PCHS_VAT) AS PCHS_VAT_TOT
+ 			       , SUM(PCHS_QTY) AS PCHS_QTY_TO --수량은 입고 건별 1로 불일치 발생
+				FROM  TB_SM12D01 A /* 매입확정 DETAIL */		
+			  WHERE 1=1 
+                   AND EXISTS (SELECT 1 FROM IPGO WHERE  IPGO.ORDRG_NO = A.ORDRG_NO)
+			  GROUP BY CO_CD, ORDRG_NO
+		)
+		,  BAL AS  --발주집계
+		(
+			SELECT A.CO_CD
+					, A.ORDRG_NO
+					, A.SALES_CD
+					, SUM(A.ORDRG_QTY) ORDRG_QTY
+					, SUM(A.ORDRG_AMT) ORDRG_AMT
+					, MIN(A.DSGN_NO)   AS DSGN_NO
+				FROM TB_SM02D01 A
+                      WHERE 1=1
+                        AND EXISTS (SELECT 1 FROM IPGO WHERE  IPGO.ORDRG_NO = A.ORDRG_NO)
+                      GROUP BY A.CO_CD, A.ORDRG_NO, A.SALES_CD
+		)
+		,  QM AS 
+		(
+				SELECT 	DISTINCT  
+						  M.CO_CD
+						, M.ORDRG_NO
+						, M.REQ_NO  --발행번호 REQ2300099
+						, M.SALES_CD
+						, Q.ORDRG_DT --발행일자
+						, Q.PART_CD	--분류( 출도	 추가	 장애	 A/S유상	 A/S무상	 SPARE유상	 SPARE무상	 고객E/O	 설치시운전	 기타)
+						, Q.ORDRG_ID	--발행자
+				FROM TB_SM02M01 M
+						LEFT OUTER JOIN TB_QM01M01 Q ON M.REQ_NO = Q.REQ_NO
+	            WHERE 1=1
+	              AND EXISTS (SELECT 1 FROM IPGO WHERE  IPGO.ORDRG_NO = M.ORDRG_NO)
+		)
+					SELECT count(*)
+					FROM  IPGO A /* 매입 확정 DETAIL */		
+			                LEFT OUTER JOIN BAL AS D ON A.CO_CD = D.CO_CD AND A.ORDRG_NO = D.ORDRG_NO --발주상세
+			                LEFT OUTER JOIN IPGOTOT AS E ON A.CO_CD = E.CO_CD AND A.ORDRG_NO = E.ORDRG_NO --매입확정집계
+			                LEFT OUTER JOIN IPGOAMT AS F ON A.CO_CD = F.CO_CD AND A.ORDRG_NO = F.ORDRG_NO --입고 집계
+			                LEFT OUTER JOIN QM AS Q ON A.CO_CD = Q.CO_CD AND A.ORDRG_NO = Q.ORDRG_NO --발주요청
+			                LEFT OUTER JOIN IPGODTL AS I ON A.CO_CD = I.CO_CD AND A.ORDRG_NO = I.ORDRG_NO --발주요청
+							LEFT OUTER JOIN TB_BM05M01 J ON I.MATR_CD = J.MATR_CD		/* 자재마스터 */
+				  WHERE 1=1 					
+			  ORDER BY A.CO_CD, A.PCHS_CLNT_NM, A.PCHS_DT, A.ORDRG_NO, A.PCHS_NO
+	</select>	
+ 
+	
+	<!-- 구매자재세부현황 리스트  구매비용 포함-->
+	<select id="sm16_2selectPurchaseListNew" parameterType="Map" resultType="camelMap">
+		WITH IPGO AS (
+			SELECT    A.*
+					, D1.CLNT_NM  AS PCHS_CLNT_NM
+					, D1.CRN /*사업자등록번호*/
+					, D1.PCHS_CLMN_DAY  /*결제일 - 10*/	
+					, D1.PCHS_CLMN_RMK  /*결제일 - 다음달 10일*/
+					, D1.PCHS_PMNT_MTD_CD  --결제조건 코드
+				    , FN_CM05M01_CD_TO_NM(D1.PCHS_PMNT_MTD_CD) AS PCHS_PMNT_MTD_NM /*결제조건명*/
+			  FROM (
+					SELECT A.* 
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN 'N' 
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN 'R' ELSE 'Y' END IS_COST
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN '' 
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN '' ELSE C.ORDRS_NO END COST_ORDRS_NO --수주번호
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD 
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN RM.SALES_CD ELSE C.SALES_CD END SALES_CD
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.PCHS_CLNT_CD 
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN RM.PCHS_CLNT_CD ELSE C.PCHS_CLNT_CD END PCHS_CLNT_CD
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN TO_CHAR(I.INOUT_KEY)
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN RM.FILE_TRGT_KEY ELSE C.FILE_TRGT_KEY END FILE_TRGT_KEY
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN '발주' 
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN '반품' ELSE '비용' END IS_DIV
+								, (SELECT FN_CM06M01_ID_TO_NM(A.CREAT_ID) FROM DUAL) AS CREAT_ID_NM
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN I.IN_DT
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN RM.RET_DT ELSE C.COST_DT END IN_DT
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN I.IN_NO
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN R.RET_NO ELSE C.COST_NO END IPGO_IN_NO
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN I.IN_SEQ
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN R.RET_SEQ ELSE '' END IN_SEQ
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN I.MATR_CD
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN R.MATR_CD ELSE C.MATR_CD END MATR_CD
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN I.IN_PRC
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN R.RET_PRC ELSE C.COST_AMT END IN_PRC
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN I.IN_QTY
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN R.RET_QTY ELSE 1 END IN_QTY
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN I.BAD_QTY
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN '' ELSE '' END BAD_QTY
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN I.IN_DTL_AMT
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN R.RET_DTL_AMT ELSE C.COST_AMT END IN_DTL_AMT
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN I.ORDRG_SEQ
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN '' ELSE '' END IPGO_ORDRG_SEQ
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN ''
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN R.RET_DTL_RMK ELSE C.COST_RMK END COST_RMK
+					FROM  TB_SM12D01 A /* 매입 확정 DETAIL */		
+							LEFT OUTER JOIN TB_SM02M01 M ON(A.ORDRG_NO = M.ORDRG_NO)		/* 발주마스터 */
+							LEFT OUTER JOIN TB_SM03D01 I ON(A.PCHS_NO = I.PCHS_NO AND A.PCHS_SEQ = I.PCHS_SEQ)		/* 입고 상세 */
+							LEFT OUTER JOIN TB_SM10M01 C ON(A.PCHS_NO = C.PCHS_NO AND A.PCHS_SEQ = C.PCHS_SEQ)			/* 비용마스터 */
+							LEFT OUTER JOIN TB_SM06D01 R ON(A.PCHS_NO = R.PCHS_NO AND A.PCHS_SEQ = R.PCHS_SEQ)		/* 반품 상세 */
+							LEFT OUTER JOIN TB_SM06M01 RM ON(RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)		/* 반품 상세 */
+				  WHERE 1=1
+				    AND NVL(C.PAY_DIV,'PAYDIV02') = 'PAYDIV02'  --기타비용의 경우 청구(PAYDIV02)인 경우만 구매현황에 출력함.
+				<!-- 회사코드 -->         
+				<if test="coCd != null and !coCd.equals('')">
+					AND A.CO_CD = #{coCd}   
+				</if>     
+				<!-- 확정일자 -->         
+				<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')">
+				<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
+	              	AND A.PCHS_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+				</if>   
+				</if>
+				) A
+     			LEFT OUTER JOIN TB_BM02M01 D1 ON A.PCHS_CLNT_CD = D1.CLNT_CD   --거래처마스터
+			 WHERE 1 = 1
+				<if test="pchsClmnDay != null and !pchsClmnDay.equals('')">
+				AND D1.PCHS_CLMN_DAY = #{pchsClmnDay}
+				</if>
+				<if test="salesCd != null and !salesCd.equals('')">
+				AND A.SALES_CD LIKE '%' || #{salesCd} || '%'
+				</if>
+				<if test="pchsClntNm != null and !pchsClntNm.equals('')">
+				AND D1.CLNT_NM LIKE '%' || #{pchsClntNm} || '%'
+				</if>
+				<if test="pchsGb != null and !pchsGb.equals('')">
+				AND A.IS_DIV =  #{pchsGb}
+				</if>
+		)
+		,  IPGOAMT AS --입고집계
+		(
+ 			 SELECT   CO_CD, ORDRG_NO
+ 			 	   , SUM(IN_QTY) AS IN_QTY
+ 			       , SUM(BAD_QTY) AS BAD_QTY
+ 			       , SUM(IN_DTL_AMT) AS IN_DTL_AMT_TOT 
+				FROM  TB_SM03D01 A /* 입고 DETAIL */		
+			  WHERE 1=1 
+                   AND EXISTS (SELECT 1 FROM IPGO WHERE  IPGO.ORDRG_NO = A.ORDRG_NO)	
+			  GROUP BY CO_CD, ORDRG_NO
+		)
+		,  IPGOTOT AS --매입확정집계
+		(
+ 			 SELECT   CO_CD, ORDRG_NO
+ 			 	   , SUM(PCHS_AMT) AS PCHS_AMT_TOT
+ 			       , SUM(PCHS_VAT) AS PCHS_VAT_TOT
+ 			       , SUM(PCHS_QTY) AS PCHS_QTY_TO --수량은 입고 건별 1로 불일치 발생
+				FROM  TB_SM12D01 A /* 매입확정 DETAIL */		
+			  WHERE 1=1 
+                   AND EXISTS (SELECT 1 FROM IPGO WHERE  IPGO.ORDRG_NO = A.ORDRG_NO)
+			  GROUP BY CO_CD, ORDRG_NO
+		)
+		,  BAL AS  --발주집계
+		(
+			SELECT A.CO_CD
+					, A.ORDRG_NO
+					, A.SALES_CD
+					, SUM(A.ORDRG_QTY) ORDRG_QTY
+					, SUM(A.ORDRG_AMT) ORDRG_AMT
+					, MIN(A.DSGN_NO)   AS DSGN_NO
+				FROM TB_SM02D01 A
+                      WHERE 1=1
+                        AND EXISTS (SELECT 1 FROM IPGO WHERE  IPGO.ORDRG_NO = A.ORDRG_NO)
+                      GROUP BY A.CO_CD, A.ORDRG_NO, A.SALES_CD
+		)
+		,  QM AS 
+		(
+				SELECT 	DISTINCT  
+						  M.CO_CD
+						, M.ORDRG_NO
+						, M.REQ_NO  --발행번호 REQ2300099
+						, M.SALES_CD
+						, Q.ORDRG_DT --발행일자
+						, Q.PART_CD	--분류( 출도	 추가	 장애	 A/S유상	 A/S무상	 SPARE유상	 SPARE무상	 고객E/O	 설치시운전	 기타)
+						, Q.ORDRG_ID	--발행자
+				FROM TB_SM02M01 M
+						LEFT OUTER JOIN TB_QM01M01 Q ON M.REQ_NO = Q.REQ_NO
+	            WHERE 1=1
+	              AND EXISTS (SELECT 1 FROM IPGO WHERE  IPGO.ORDRG_NO = M.ORDRG_NO)
+		)
+			SELECT  ROWNUM AS RN
+					, T.*
+			  FROM (
+					SELECT 
+						  A.CO_CD
+							, A.ORDRG_NO
+							, A.SALES_CD
+							, A.PCHS_CLNT_CD
+							, A.PCHS_CLNT_NM
+							, A.PCHS_DT AS ORDRG_DT									
+							, D.DSGN_NO  AS DSGN_NO			/* 도번 MIN */	
+							, E.PCHS_AMT_TOT
+							, E.PCHS_VAT_TOT		
+							, D.ORDRG_QTY AS ORDRG_QTY				/*발주수량 */
+							, D.ORDRG_AMT AS ORDRG_AMT		/*발주 금액 */		
+							, F.IN_DTL_AMT_TOT - E.PCHS_AMT_TOT AS REMAIN_AMT	
+							, A.PCHS_NO   AS PCHS_NO		/*매입확정번호 */					
+							, A.PCHS_AMT  AS PCHS_AMT		/* 매입금액 */
+							, A.PCHS_VAT AS PCHS_VAT		/* 부가세 */
+							, NVL(A.PCHS_AMT, 0) + NVL(A.PCHS_VAT, 0) AS PCHS_SUM_AMT			/* 합계금액 */
+							, A.PCHS_QTY AS PCHS_QTY		/* 수량  --> 매입확정시 무조건 1로 입력됨 의미없음*/										
+							, TO_CHAR(A.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT
+							, A.CMPLET_YN AS CMPLET_YN	 		/* 확정여부 */
+							, DECODE(A.CMPLET_YN, 'Y', 'Y', 'N') AS USER_CHK_V		/* DETAIL로 변경 */
+							, A.IS_COST AS  IS_COST			/* 기타비용여부 */
+							, A.BILL_YN AS BILL_YN  /*계산서 여부*/
+							, A.FILE_TRGT_KEY
+							, A.PCHS_SEQ
+							, A.CREAT_ID_NM
+							, A.CRN /*사업자등록번호*/
+							, A.PCHS_CLMN_DAY  /*결제일 - 10*/	
+							, A.PCHS_CLMN_RMK  /*결제일 - 다음달 10일*/
+							, A.PCHS_PMNT_MTD_CD  --결제조건 코드
+							, A.PCHS_PMNT_MTD_NM  --결제조건 코드
+							, A.IS_DIV
+							, DECODE(substr(A.ORDRG_NO,0,3),'BAL', F.IN_DTL_AMT_TOT, E.PCHS_AMT_TOT) IN_DTL_AMT_TOT --입고금액계
+							, Q.REQ_NO		--발주요청서 번호
+							, Q.ORDRG_DT  	AS REQ_ORDRG_DT	--발주요청서 발행일자
+							, Q.PART_CD						--발주요청서 분류코드
+							, FN_CM05M01_CD_TO_NM(Q.PART_CD) AS PART_CD_NM
+							, Q.ORDRG_ID 	AS REQ_ORDRG_ID		---발주요청서 발행자ID
+							, FN_CM06M01_ID_TO_NM(Q.ORDRG_ID) AS ORDRG_ID_NM
+							, A.CREAT_ID_NM						--매입확정담당자면
+--							, A.IN_DTL_AMT  AS IPGO_DTL_AMT_TOT
+							, TO_CHAR(A.IN_DT, 'YYYY-MM-DD') AS IN_DT
+							, A.MATR_CD
+							, A.IN_PRC
+							, A.IN_QTY
+							, A.BAD_QTY
+							, A.IN_DTL_AMT AS IPGO_AMT
+							, A.IPGO_IN_NO 
+							, A.IN_SEQ
+							, A.IPGO_ORDRG_SEQ
+							, A.COST_RMK
+							, J.MATR_NM
+		 			        , J.MATR_MAT
+		 			        , J.MATR_SIZE
+		 			        , J.MATR_SPEC	
+		 			        , J.GOODS_DIV
+		 			        , (SELECT FN_CM05M01_CD_TO_NM(J.GOODS_DIV) FROM DUAL ) AS GOODS_DIV_NM	/* 자재품목구분명 */
+					FROM  IPGO A /* 매입 확정 DETAIL */		
+			                LEFT OUTER JOIN BAL AS D ON A.CO_CD = D.CO_CD AND A.ORDRG_NO = D.ORDRG_NO --발주상세
+			                LEFT OUTER JOIN IPGOTOT AS E ON A.CO_CD = E.CO_CD AND A.ORDRG_NO = E.ORDRG_NO --매입확정집계
+			                LEFT OUTER JOIN IPGOAMT AS F ON A.CO_CD = F.CO_CD AND A.ORDRG_NO = F.ORDRG_NO --입고 집계
+			                LEFT OUTER JOIN QM AS Q ON A.CO_CD = Q.CO_CD AND A.ORDRG_NO = Q.ORDRG_NO --발주요청
+							LEFT OUTER JOIN TB_BM05M01 J ON A.MATR_CD = J.MATR_CD		/* 자재마스터 */
+				  WHERE 1=1 				
+			  	  ORDER BY A.CO_CD, A.PCHS_CLNT_NM, A.PCHS_DT, A.ORDRG_NO, A.PCHS_NO
+			) T
+		WHERE 1=1
+		AND ROWNUM BETWEEN ${firstIndex} AND ${lastIndex}	
+	</select>	
+ 
+ </mapper>
