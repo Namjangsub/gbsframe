@@ -156,4 +156,23 @@ public class SM03Ctr {
    	model.addAttribute("result", result);
    	return "jsonView";
     }
+    
+	//메일발송상태 update
+    @PostMapping(value = "/updateMailStoreConfirm")
+    public String updateMailStoreConfirm(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
+  		try {
+  			if (sm03Svc.updateMailStoreConfirm(param) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }   	  
+  
 }

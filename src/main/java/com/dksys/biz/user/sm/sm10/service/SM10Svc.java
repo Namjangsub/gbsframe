@@ -25,4 +25,8 @@ public interface SM10Svc {
 
   List<Map<String, String>> selectTurnKeySalesCodeList(Map<String, String> paramMap);
 
+  int etcPchsOrderMasterReport(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+
+  int updateMailEtcPchsOrderConfirm(Map<String, String> param);
+
 }

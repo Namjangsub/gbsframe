@@ -223,15 +223,43 @@ public class SM10SvcImpl implements SM10Svc {
 		//---------------------------------------------------------------  	  
 	    return result;
   }
+	
+	@Override
+	public int selectTurnKeySalesCodeCount(Map<String, String> paramMap) {
+		return sm10Mapper.selectTurnKeySalesCodeCount(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectTurnKeySalesCodeList(Map<String, String> paramMap) {
+		return sm10Mapper.selectTurnKeySalesCodeList(paramMap);
+	}
 
-@Override
-public int selectTurnKeySalesCodeCount(Map<String, String> paramMap) {
-	return sm10Mapper.selectTurnKeySalesCodeCount(paramMap);
-}
-
-@Override
-public List<Map<String, String>> selectTurnKeySalesCodeList(Map<String, String> paramMap) {
-	return sm10Mapper.selectTurnKeySalesCodeList(paramMap);
-}
+	
+	/* 메일발송 yn*/
+	public int updateMailEtcPchsOrderConfirm(Map<String, String> param) {
+		int result = 0;
+		result += sm10Mapper.updateMailEtcPchsOrderConfirm(param);
+		return result;
+	}		
+	
+	//발주서 발행 이력 남기기
+	@Override
+	public int etcPchsOrderMasterReport(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
+		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("reportArr"), dtlMap);	
+		
+		int result = 0;	    	    
+	    //upate
+		for(Map<String, String> dtl : detailMap) {
+			dtl.put("coCd", paramMap.get("coCd"));
+			dtl.put("pgmId", paramMap.get("pgmId"));
+			dtl.put("creatId", paramMap.get("userId"));
+			
+			result = sm10Mapper.etcPchsOrderMasterReport(dtl);
+		}
+		
+		return result;
+	}
 
 }

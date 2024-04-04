@@ -8,6 +8,8 @@
 		<input type="hidden" id="fileTrgtKey"  	name="fileTrgtKey">
 		<input type="hidden" id="userId"     	name="userId">
 		<input type="hidden" id="pgmId"     	name="pgmId"	value="SM1001P01">
+		<input type="hidden" id="ordrgMngNm"	name="creatNm" value="">		<!-- 알림톡발송용 생성자명(발주담당자) -->
+		<input type="hidden" id="ordrgMngTelNo"	name="ordrgMngTelNo" value="">		<!-- 알림톡발송용 생성자전화번호 -->		
  		<table>
 
         <colgroup>
@@ -192,8 +194,8 @@
     <!-- 하단 버튼 -->
 	<div class ="popup_bottom_btn">
 		<button type="button" id="actionBtn" authChk>등록</button>
-		<button type="button" class="close_btn"
-			onclick="modalStack.close();">닫기</button>
+		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+		<button type="button" id="mailSendBtn" onclick="sendMailCall();" authChk><i class="fas fa-envelope"></i> 메일</a></button>
 	</div>
 
 <script type="text/javascript">
@@ -722,4 +724,203 @@
             
             turnKeyGridView.target.setHeight(tagHeight);
     }
+    
+    
+
+	function sendMailCall() {
+		try {
+			if (approvalConfirmCheck){
+		        sendMailExec();
+			}
+	    } catch (error) {
+	    } finally {
+	    }
+	  
+	}
+	
+	function approvalConfirmCheck (){
+		//확인일자 체크
+// 		if (editVal.todoYn != "Y") {
+// 			alert("결재 승인전 발송 할 수 없습니다.");
+// 			return false;
+// 		}
+	
+// 		var todoCfDtChk = gridViewPopApproval.target.list;
+// 		todoCfDtChk.forEach(function (item) {
+// 	        if (item.gb == "결재" && item.todoCfDt !== undefined) {
+// 	        	alert(item.name + "님께서 결재 승인하지 않았습니다.");
+// 	    		return false;
+// 	        }
+// 	    });
+		return true;
+	}
+	
+	async function sendMailExec() {
+		//파일 첨부 여부(application.yml파일의 spring.fileAttached=YES or NO)
+		//****************************************************************
+		let fileAttached = false;
+		let paramData = {"coCd#":$('#coCd').val()};
+		postAjaxSync ("/mail/sendFilefileAttach", paramData, null, function(data) {
+			fileAttached = (data.resultCode == "200") ? data.fileAttached : true;
+		});
+		//****************************************************************
+		var fileName = "SM1001R01.jrf";
+		var arg =  
+			  "coCd#"		+  $('#coCd').val()
+	    	+ "#ordrgNo#"	+  $('#costNo').val()
+	    	+ "#userId#"	+  jwt.userId
+	    	+ "#";         
+	
+		var tempUrl = "?file="+fileName;
+			tempUrl += "&arg="+encodeURIComponent(arg);
+			
+		//****************************************************************
+		// Report 출력물을 PDF 파일로 변환
+		//****************************************************************	
+		var attachFile="";
+		if (fileAttached == "true") { //파일 첨부일 경우 PDF 변환
+			let response = "";
+			await ubiExportAjaxSync(fileName, arg, function(result) {
+				response=result;
+			});
+			if (response.resultCode === 200) {
+				const base64FileData = response.base64FileData;
+				fileName = response.exportFileName;
+				attachFile = downloadPDFFromBase64(base64FileData, fileName);
+			} else {
+	// 			console.log('PDF 내보내기 실패: ' + response.resultText);
+			}
+		}
+		//****************************************************************	
+	
+		const orderCnt = 1;
+		var ordetTxt = $('#costRmk').val();
+	
+		ordetTxt = ordetTxt + ((orderCnt > 1) ? (" 외 " + (orderCnt - 1) + "건") : "");
+		var tempDudtDeqDt = $('#costDt').val();
+	    var paramObj = {
+	       "coCd" : $('#coCd').val(),
+	       "clntCd" : $('#pchsClntCd').val(),
+	       "clntMngNm" : "",
+	       "pgmId" :  "SM1001P01",
+	       "sendType" :  "SM1001P01",
+	       "sendKey" : $('#fileTrgtKey').val(),
+	       "tempUrl" : tempUrl,
+	       "mailTitle" : moment().format('YYYY-MM-DD HH:mm') + " 기준  발주번호 (" + $('#costNo').val() + ")의 발주서 발송의 건",
+	       "mailCnts" : ordetTxt + "의 발주서를 첨부와 같이 보내 드리오니 업무 참고 바랍니다.\n" +
+	       				"        - 아 래 -\n" +
+	                    " 1. 발주 번호 : " + $('#costNo').val() + "\n" +            
+	                    " 2. 발주 일자 : " + $('#costDt').val() + "\n" + 
+	                    " 3. 납기요청일자 : " + tempDudtDeqDt + "\n" + 
+	                    " 3. 발주 업체 : " + $('#pchsClntNm').val() + "\n" + 
+	                    " 4. 발주 금액 : " + addCommaStr($('#costAmt').val()) + "\n" + 
+	                    " 5. 발주 내용 : " + ordetTxt + "\n" + 
+	                    " 6. 발주 담당자 : " + jwt.userNm + "(" + jwt.email + ")\n" + 
+	                    " 내용 확인 후 처리 해 주시기 바랍니다.\n" +               
+	                    " 감사합니다.",                
+	    };
+	    
+	    //카카오 addParam
+	    let addParam = {
+				"ordrgDt": $("#popForm #costDt").val()				//발주일자				
+				, "clntNm": $("#popForm #pchsClntNm").val()				//공급사명 - 구매처
+				, "ordrgNo": $("#popForm #costNo").val()				//발주번호
+				, "ordrgCoCdNm": $("#popForm #coCd option:checked").text()				//발주회사명
+				, "ordrgMngNm": $("#popForm #ordrgMngNm").val()				//발주담당자
+				, "ordrgMngTelNo": $("#popForm #ordrgMngTelNo").val()				//발주담당자전화번호
+				, "tmplatDiv": "TMPLATDIV01"							//알림톡발송템플릿 종류
+	    }
+	    Object.assign(paramObj, addParam);
+	   	//****************************************************************
+	   	// 파일 첨부 여부에 따라 출력물 첨부
+	   	//****************************************************************	   
+		if (fileAttached == "true") { //파일 첨부 여부
+			paramObj["file"]     = attachFile;
+			paramObj["fileName"] = fileName;
+		}
+	   	//****************************************************************
+	    
+// 	    modalStack.close();  //blind popup close   	
+		openSecondModal("/static/html/cmn/modal/mailSend.html", 640, 850, "메일 보내기", paramObj, function() {});
+	}	
+	
+
+	//카카오 발송 - 발주서
+	function commKaKaoSendOrder(param) {
+	// 	console.log('---카카오 발주서 발행 알림톡발송시작 --' + param);
+	
+		//알림톡수신번호 채번
+		var paramMax = { "userId" : jwt.userId
+						, "tmplatDiv": param.tmplatDiv
+						, "fileTrgtKey": param.fileTrgtKey 
+						/* , "clntCd" : param.clntCd */ //임시 건양
+						, "clntCd" : 1
+						};
+		var maxMessageId = null;			//message id(unique key)
+		var talkMessage = null 				//발송될 내용 template
+		var mobile = null					//수신인 휴대전화번호
+		let talkParam = {};
+		let talkBody = {};			
+		let sendCnt = 0;	
+		postAjaxSync("/user/bm/bm18/selectMaxMessageId", paramMax, null
+					, function(data) {   
+						if(data.resultList.length > 0 ) {
+							if( data.resultList[0].maxMessageId != "" ) {
+								maxMessageId = data.resultList[0].maxMessageId;							
+								talkMessage = data.resultList[0].messageDesc;
+								mobile =  data.resultList[0].mngMoblphonNo;
+								param.nameTo =  data.resultList[0].mngNm; //수신인 이름
+							} else {
+								alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
+								return;
+							} 
+	
+						}
+		});     //user search ajax end
+		if(mobile == "" || mobile == null) {
+// 			alert('수신전화번호가 없습니다.\r\n['+clntNm+'] 거래처관리의 사업부 첫번째 항목을 확인해 주십시오.');
+			return;
+		}
+		
+		//message 치환
+		let message = talkMessage;
+		let splitStr = Array.from(message.matchAll('\\{(.*?)\\}'), match => `${match[0]}`);	
+		//loop
+		$.each(splitStr, function (key, val) {		
+			let compKey = val.substring(1, val.length-1);
+			if( compKey != "" && compKey != "undefined" ) {
+				if( typeof(param[compKey]) != "undefined" ) {
+					let val2 = '#'+val;
+					message = message.replaceAll(val2, param[compKey]);
+				}
+			}
+		});
+	
+		talkParam.authToken = "e/eDfZOFCsrBqadaECQ0+g==";
+		talkParam.serverName = "gyitt2400";		
+		talkParam.paymentType = "P";
+		talkBody.service = "2310086157";				//서비스번호(1000000000 - 예시  real : 2310086157
+		talkBody.messageId = maxMessageId;			//고객사에서 관리하는 메시지No - 40byte (unique 값);	
+		//talkBody.messageType = "AT";			//톡드림 포탈 템플릿 사용하지 않을 경우 사용 (AT: 알림톡, AI: 이미지 알림톡 (messageType 누락시 AT가 기본값으로 사용됨)
+		//talkBody.title = "(주)건양아이티티";				//알림톡 타이틀 - 
+		if (param.mailTitle.length > 50) {
+			param.mailTitle = param.mailTitle.substring(0, 49); // 50자까지만 자르기
+		}
+		talkBody.title = param.mailTitle;					//알림톡 타이틀 -
+		talkBody.message = message;				//알림톡 메시지 (1000 byte) 
+		talkBody.mobile = mobile;				//휴대전화번호
+		talkBody.template = "10001";			//템플릿관리화면 템플릿ID	- 발주서 V2
+		let talkJson = JSON.stringify(talkBody);
+		sendCnt = kakaoSendReal(talkJson, talkParam, param);
+		//한번대 보낼경우 이곳 사용 - 남실장님 한번더 보냄 
+	// 	talkBody.messageId = 'KAKAO'+Number(maxMessageId.substring(5, 20))+1;
+	// 	talkBody.mobile = "01063893764"
+	// 	talkJson = JSON.stringify(talkBody);
+		//kakaoSendReal(talkJson, talkParam, param);
+		
+		if( sendCnt > 0 ) {
+	// 		alert("알림톡 정상 발송되었습니다.");		
+		}	
+	}
+
 </script>

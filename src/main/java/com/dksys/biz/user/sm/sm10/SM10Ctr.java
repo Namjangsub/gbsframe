@@ -118,4 +118,40 @@ public class SM10Ctr {
     return "jsonView";
   }
 
+	
+	//메일발송상태 update
+  @PostMapping(value = "/updateMailEtcPchsOrderConfirm")
+  public String updateMailEtcPchsOrderConfirm(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
+		try {
+			if (sm10Svc.updateMailEtcPchsOrderConfirm(param) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+  }   	  
+  
+  @PostMapping(value = "/etcPchsOrderMasterReport")
+  public String etcPchsOrderMasterReport(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (sm10Svc.etcPchsOrderMasterReport(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+  }	  
+	  
 }

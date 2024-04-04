@@ -283,4 +283,14 @@ public class SM03SvcImpl implements SM03Svc {
 	  public List<Map<String, String>> select_mngId_code(Map<String, String> paramMap) {
 		 return sm03Mapper.select_mngId_code(paramMap);
 	  }
+
+	public int updateMailStoreConfirm(Map<String, String> param) {
+		int result = 0;
+		result += sm03Mapper.updateMailStoreConfirm(param);
+		return result;
+	}		
+
+		
+		/* 메일발송 yn*/
+		
 }

@@ -139,7 +139,11 @@
 							T.PCHS_NO, 
 							T.PCHS_SEQ,
 							T.ORDRS_CO_CD,
-							FN_CM05M01_CD_TO_NM(T.ORDRS_CO_CD) AS ORDRS_CO_CD_NM
+							FN_CM05M01_CD_TO_NM(T.ORDRS_CO_CD) AS ORDRS_CO_CD_NM,
+							T.MAIL_YN,
+							T.MAIL_DTTM, 
+							T.MAIL_SEND_ID,
+							TO_CHAR((SELECT MAX(CREAT_DTTM) FROM TB_SM10D02 WHERE COST_NO = T.COST_NO), 'YYYY-MM-DD')	 AS REPORT_DT--발주서발행일자
 				FROM TB_SM10M01 T
 					             LEFT OUTER JOIN TB_BM02M01 A ON T.PCHS_CLNT_CD = A.CLNT_CD
 					             LEFT OUTER JOIN TB_CM06M01 B ON T.CREAT_ID = B.ID
@@ -525,5 +529,39 @@
 		SYSDATE
     )
   </insert>
-  
+  			
+	
+	<!-- 메일발송 수정 -->
+	<update id="updateMailEtcPchsOrderConfirm" parameterType="Map">
+		UPDATE TB_SM10M01
+			SET 
+				  MAIL_YN 	 	= #{mailYn}	
+				, MAIL_DTTM		= SYSDATE	
+				, MAIL_SEND_ID	= #{userId} 
+		WHERE CO_CD = #{coCd} 
+		 AND COST_NO = #{ordrgNo} 
+	</update>	
+	
+
+	<!-- 발주서 발행 여부 체크 -->
+	<insert id="etcPchsOrderMasterReport" parameterType="Map">
+	    INSERT INTO TB_SM10D02
+	    (
+			CO_CD
+			, COST_NO
+			, COST_SEQ
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+	      )
+	    VALUES
+	    (
+			#{coCd}
+			, #{costNo}
+			, (SELECT  NVL(max(TO_NUMBER(COST_SEQ)),0)+1 FROM TB_SM10D02 WHERE CO_CD = #{coCd} AND COST_NO = #{costNo})
+			, #{creatId}
+			, #{pgmId}
+			, SYSDATE	   
+	    )
+	</insert>
 </mapper>

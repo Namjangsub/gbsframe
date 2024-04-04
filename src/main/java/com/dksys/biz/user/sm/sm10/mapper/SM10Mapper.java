@@ -31,5 +31,9 @@ public interface SM10Mapper {
   void deleteTurnKeyDetail(Map<String, String> paramMap);
 
   void insertTurnKeyDetail(Map<String, String> detailMap);
+
+  int etcPchsOrderMasterReport(Map<String, String> dtl);
+
+  int updateMailEtcPchsOrderConfirm(Map<String, String> param);
   
 }
