@@ -58,6 +58,8 @@ public interface SM02Mapper {
 
 	int arriveWareHousingConfirm(Map<String, String> paramMap);
 	
+	int arriveWareHousingStoreConfirm(Map<String, String> paramMap);
+	
 	int arriveWareHousingUnconfirm(Map<String, String> paramMap);
 }
 

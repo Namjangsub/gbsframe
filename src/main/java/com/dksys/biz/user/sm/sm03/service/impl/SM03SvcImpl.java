@@ -20,6 +20,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.util.DateUtil;
 import com.dksys.biz.util.ExceptionThrower;
+import com.dksys.biz.user.sm.sm02.mapper.SM02Mapper;
 import com.dksys.biz.user.sm.sm03.mapper.SM03Mapper;
 import com.dksys.biz.user.sm.sm03.service.SM03Svc;
 import com.google.gson.Gson;
@@ -34,6 +35,9 @@ public class SM03SvcImpl implements SM03Svc {
 
 	@Autowired
 	SM03Mapper sm03Mapper;
+	
+	@Autowired
+	SM02Mapper sm02Mapper;
 	
 	@Autowired
 	SM03Svc sm03Svc;
@@ -132,7 +136,7 @@ public class SM03SvcImpl implements SM03Svc {
 	    paramMap.put("maxInNo", maxInNo);
 	    if( paramMap.get("inNo").equals("") ) {
 			//master 용		
-			result += sm03Mapper.insertWareHousingMaster(paramMap);	    	
+			result += sm03Mapper.insertWareHousingMaster(paramMap);	        	
 	    }	 
 		for(Map<String, String> dtl : detailMap) {
 			dtl.put("userId", paramMap.get("userId"));
@@ -145,6 +149,9 @@ public class SM03SvcImpl implements SM03Svc {
     		result += sm03Mapper.insertWareHousingDetail(dtl);			
 		}			
 		  		
+		
+		//발주서 입고확인 및 입고확인 날자 설정 (발주수량과 입고수량이 같을때만 입고처리 됨)
+		result += sm02Mapper.arriveWareHousingStoreConfirm(paramMap);	
 		
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작 
