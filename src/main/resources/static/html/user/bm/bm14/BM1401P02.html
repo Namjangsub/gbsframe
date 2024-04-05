@@ -167,17 +167,17 @@
 			<div class="contents">
 			    <!-- 리스트 -->
 			    <div class="ax5_grid">
-			              <div class="table_list_tit">
-			                  <h5 class="tit">BOM 하위 내용</h5>
-			                  <div class="add_btn_small">
-			                      <a onclick= "insertChildList()" style="width: 50px;" authchk><i class="fas fa-folder-plus"></i> 추가</a>
-			                      <a onclick= "openMatListSearch();" style="width: 50px;" authchk><i class="fas fa-money-check"></i> 자재 </a>
-			                      <a onclick= "deleteChildList()" style="width: 50px;" authchk><i class="fas fa-trash"></i> 삭제 </a>
-			                  </div>
-			              </div>
-			              <div>
-			              <div data-ax5grid="parents-grid" data-ax5grid-config="{}" style="height:550px; width: 100%" ></div>
-			              </div>
+	              <div class="table_list_tit">
+	                  <h5 class="tit">BOM 하위 내용</h5>
+	                  <div class="add_btn_small">
+	                      <a onclick= "insertChildList()" style="width: 90px;" authchk><i class="fas fa-folder-plus"></i> BOM추가</a>
+	                      <a onclick= "openMatListSearch();" style="width: 90px;" authchk><i class="fas fa-money-check"></i> 자재검색 </a>
+	                      <a onclick= "deleteChildList()" style="width: 90px;" authchk><i class="fas fa-trash"></i> BOM삭제 </a>
+	                  </div>
+	              </div>
+	              <div>
+	              	<div data-ax5grid="parents-grid" data-ax5grid-config="{}" style="height:550px; width: 100%" ></div>
+	              </div>
 			  </div>
 			</div>
 
@@ -215,6 +215,7 @@
 	var paramActionType = modalStack.last().paramObj.actionType;
 	var thisGridRow=0; // 선택된 행 정보 저장할 변수
 	var thisGridCol=0; // 선택된 열 정보 저장할 변수
+	var matModalOpen = false;  //형변 변경시 자재코드 자동 실행되게 처리함
 	
 	var childGridView = {
 		initView: function() {
@@ -230,6 +231,7 @@
 				},
 				body: {
 					onClick: function (columnIndex, rowData) {
+						this.self.clearSelect();
 						this.self.select(this.dindex);
 						prdtIdx = this.dindex;
 						thisGridRow = this.dindex;   // 선택된 행 정보 가져오기
@@ -243,7 +245,7 @@
 					},
 					onDBLClick: function () {
 						if (this.item.matrYn == 'Y')  {
-							openMatListSearch(this.dindex);
+							openMatListSearch();
 						}
 					},
 					onDataChanged: function () {
@@ -259,6 +261,9 @@
 								this.list[this.dindex].dsgnNo = creatDsgnNo(this.list[this.dindex]);
 							}							
 							childGridView.target.repaint();   //수정내용 적용하기
+						} else if (this.key == "matrMno") {
+							//같은창을 계속 open 하는데 처리방법은?
+							if (!matModalOpen) openMatListSearch();
 						}
 
 						if (this.item.__selected__ == true) {
@@ -550,6 +555,7 @@
 		return 	formData;
 		
 	}
+	
 	function insertChildList() {
 		insertDetailGridRow();
 		if ($('[name="matrYn"]:checked').val() == "Y") {
@@ -562,7 +568,7 @@
 		if (!newRow) {
 			newRow = childGridView.target.getList()[childGridView.target.list.length - 1];
 		}
-		debugger;
+		
 		if (!newRow) {
 			newRow = {
 			    "coCd"		: $("#coCd").val(),
@@ -639,9 +645,8 @@
 	
 	//자재품번 검색
 	function openMatListSearch(row) {
-		// debugger;
 		if (!row) {
-			// 해당 인데스가 없으면 선택된 행의 인덱스 적용
+			// 해당 인덱스가 없으면 선택된 행의 인덱스 적용
 			var gridRow = childGridView.target.getList("selected")[0];
 			if (!gridRow) {
 				return false;
@@ -657,11 +662,19 @@
 		
 		// if(gridDataValidation(bomGridView.target)) return;
 		
+		let tempSearchValue ="";
+		if (gridRow) {
+			if (gridRow.matrMno) { tempSearchValue = gridRow.matrMno == "-" ? "" : gridRow.matrMno; }  //형번 "BYGS10100-45H"
+			else if (gridRow.matrMat) {tempSearchValue = (tempSearchValue != "") ? tempSearchValue : (gridRow.matrMat == "-") ? "" : gridRow.matrMat;}  //소재 "SMC/부경금속"
+// 			else if (gridRow.matrMno) {tempSearchValue = (tempSearchValue != "") ? tempSearchValue : (gridRow.matrMno == "-") ? "" : gridRow.matrMno;}  //규격
+			else if (gridRow.matrNm) {tempSearchValue = (tempSearchValue != "") ? tempSearchValue : (gridRow.matrNm == "-") ? "" : gridRow.matrNm;}  //자재명 "손잡이"
+		}
+		//자재 검색시 필드내용 전체 선택으로 변경 처리함
 		var paramObj = {
 			"coCd" : $('#coCd_S').val(),
-			"searchValue" : $("#matrMno").val()
+			"searchValue" : tempSearchValue.replace(/ /g, '')
 		}
-		
+		matModalOpen = true;	//자재형변변경시 한번만 실행되게 강제하기위함
 		openThirdModal("/static/html/cmn/modal/multimatListSearch.html", 1200, 700, "자재 검색", paramObj, function (grid) {
 			const allItm = grid.target.getList("selected");
 			let index = 0;
@@ -681,12 +694,13 @@
 				childGridView.target.setValue(row, "matrMakrNm", newRow.matrMakrNm);
 				childGridView.target.setValue(row, "matrMno", newRow.matrSpec);
 				// childGridView.target.setValue(row, "matrSpec", newRow.matrSpec);
-				childGridView.target.setValue(row, "matrYn", "Y");
+				childGridView.target.setValue(row, "matrYn", "N");
 				if ($('[name="matrYn"]:checked').val() == "Y") {
 					childGridView.target.setValue(row, "lowerCd", newRow.matrCd);
 				}
 				index=1;
 			};	
+			matModalOpen = false;	//자재형변변경시 한번만 실행되게 강제하기위함
 		});
 	}	
 	
