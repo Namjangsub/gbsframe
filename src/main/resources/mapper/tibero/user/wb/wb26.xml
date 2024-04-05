@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.wb.wb26.mapper.WB26Mapper">
+
+	<select id="select_wb26_Count" parameterType="Map" resultType="int">
+		SELECT COUNT(*)
+		FROM   (
+                SELECT X.*
+                     , ROWNUM AS RN
+                FROM   (
+                        WITH SJD AS --수주상세
+                        (
+                         SELECT M.CO_CD                                            AS CO_CD        --회사코드
+                              , M.ORDRS_NO                                         AS ORDRS_NO     --수주번호
+                              , X.SALES_CD                                         AS SALES_CD     --SALES Code
+                              , M.ORDRS_CLNT_CD                                    AS CLNT_CD      --고객코드
+                              , C.CLNT_NM                                          AS CLNT_NM      --고객명
+                              , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM  --프로젝트
+                              , M.CTRT_NM                                          AS CTRT_NM      --계약명
+                              , P.VER_NO                                           AS PLAN_VER_NO  --계획ver
+                         FROM   TB_WB21M01 AS P
+                                INNER JOIN TB_CR02D02 AS X ON X.CO_CD = P.CO_CD AND X.SALES_CD = P.SALES_CD    --수주상세
+                                INNER JOIN TB_CR02M01 AS M ON M.CO_CD = P.CO_CD AND M.ORDRS_NO = X.ORDRS_NO    --수주마스터
+                                INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD    --거래처정보
+                         WHERE  1 = 1
+                         AND    P.VER_NO = (
+                                            SELECT MAX(TO_NUMBER(VER_NO))
+                                            FROM   TB_WB21M01 AS P1
+                                            WHERE  P1.SJ_NO = P.SJ_NO
+                                           )
+                         AND    P.CLOSE_YN = 'Y'
+                        )
+                        --과제 등록된 내용중 일정계획 수립확정 되니 않은 건 확정건에 대한 계획수립 안한 내역
+                        SELECT SJ.CLNT_NM                            AS CLNT_NM
+                             , SJ.CLNT_PJT_NM                        AS CLNT_PJT_NM
+                             , P.SALES_CD                            AS SALES_CD
+                             , SJ.CTRT_NM                            AS CTRT_NM                             
+                             , (SELECT FN_CM05M01_CD_TO_NM(P.WBS_PLAN_CODE_KIND) FROM DUAL) AS WBS_PLAN_NM --WBS 계획명
+                             , TO_CHAR(R.WBS_PLANS_DT, 'YYYY-MM-DD')  AS PLAN_STRT_DT --WBS Task 시작일
+                             , TO_CHAR(R.WBS_PLANE_DT, 'YYYY-MM-DD')  AS PLAN_END_DT  --WBS Task 종료일
+                             , R.DAYCNT                               AS PLAN_DAYCNT
+                             , P.WBS_PLAN_CODE_NM                     AS WBS_TASK_NM --WBS Task NM                              
+                             , TO_CHAR(P.WBS_PLANS_DT, 'YYYY-MM-DD')  AS TASK_STRT_DT --WBS Task 시작일
+                             , TO_CHAR(P.WBS_PLANE_DT, 'YYYY-MM-DD')  AS TASK_END_DT  --WBS Task 종료일
+                             , P.DAYCNT                               AS TASK_DAYCNT
+                             , P.EXPECT_MH                            AS TASK_EXPECT_MH                             
+                             , TO_CHAR(S.WBS_RSLTSS_DT, 'YYYY-MM-DD') AS RSLT_STRT_DT --WBS Task 시작일
+                             , TO_CHAR(S.WBS_RSLTSE_DT, 'YYYY-MM-DD') AS RSLT_END_DT  --WBS Task 종료일
+                             , S.DAYCNT                               AS RSLT_DAYCNT
+                             , S.WBS_RSLTS_MH                         AS RSLT_INTOCNT
+                             , NVL(S.WBS_RSLTS_RATE,0)                AS RSLT_RATE    --WBS 실적 진행율
+                             , (SELECT FN_CM06M01_ID_TO_NM(P.WBS_PLAN_MNG_ID) FROM DUAL)  AS WBS_MNG_NM --담당자명
+                             -- 관련코드 참고정보 -----------------------------------------------
+                             , SJ.CLNT_CD                      AS CLNT_CD 
+                             , P.WBS_PLAN_CODE_KIND            AS WBS_PLAN_CD --WBS 계획CD
+                             , P.WBS_PLAN_CODE_ID              AS WBS_TASK_ID --WBS Task ID 
+                             , P.WBS_PLAN_MNG_ID               AS WBS_MNG_ID  --담당자ID
+                             , ROUND(P.WBS_PLANE_DT - SYSDATE) AS VARIANCE_DT --종료예정 차이 일수 
+                             , P.CO_CD
+                             , SJ.PLAN_VER_NO                  AS PLAN_VER_NO --계획ver
+                             , NVL(S.CLOSE_YN, 'N')            AS RSLT_CLOSE_YN
+                        FROM   TB_WB22M01 AS P    --WBS계획
+                               INNER JOIN SJD  AS SJ  ON P.CO_CD    = SJ.CO_CD
+                                                     AND P.SALES_CD = SJ.SALES_CD
+                               LEFT OUTER JOIN TB_WB22M01 AS R  ON R.CO_CD    = P.CO_CD
+                                                               AND R.SALES_CD = P.SALES_CD
+                                                               AND R.WBS_PLAN_CODE_ID = P.WBS_PLAN_CODE_KIND
+                               LEFT OUTER JOIN TB_WB23M01 AS S  ON P.CO_CD              = S.CO_CD
+                                                               AND P.SALES_CD           = S.SALES_CD
+                                                               AND P.WBS_PLAN_CODE_KIND = S.WBS_PLAN_CODE_KIND
+                                                               AND P.WBS_PLAN_CODE_ID   = S.WBS_PLAN_CODE_ID
+                        WHERE  1 = 1
+                        AND    P.WBS_PLANE_DT  <![CDATA[<]]> ( SYSDATE + 3) --종료일 3일 이전 내역
+                        AND    P.WBS_PLAN_MNG_ID = #{usrId}
+                        AND    P.WBS_PLAN_CODE_KIND <![CDATA[<>]]> 'WBSCODE'
+                        <if test="coCd != null and !coCd.equals('')">
+                        AND    P.CO_CD = #{coCd}
+                        </if>
+                        --AND    NVL(R.WBS_RSLTS_RATE,0) <![CDATA[<>]]> 100
+                       ) AS X
+                WHERE  1 = 1
+				<if test="coCd != null and !coCd.equals('')">
+				AND    X.SALES_CD LIKE '%'||#{salesCd}||'%'
+				</if>
+				ORDER BY SALES_CD, WBS_PLAN_CD, WBS_TASK_ID
+               ) AS Z
+        WHERE  1 = 1
+	</select>
+
+	<select id="select_wb26_List" parameterType="Map" resultType="camelMap">
+		SELECT Z.*
+        FROM   (
+                SELECT X.*
+                     , ROWNUM AS RN
+                FROM   (
+                        WITH SJD AS --수주상세
+                        (
+                         SELECT M.CO_CD                                            AS CO_CD        --회사코드
+                              , M.ORDRS_NO                                         AS ORDRS_NO     --수주번호
+                              , X.SALES_CD                                         AS SALES_CD     --SALES Code
+                              , M.ORDRS_CLNT_CD                                    AS CLNT_CD      --고객코드
+                              , C.CLNT_NM                                          AS CLNT_NM      --고객명
+                              , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM  --프로젝트
+                              , M.CTRT_NM                                          AS CTRT_NM      --계약명
+                              , P.VER_NO                                           AS PLAN_VER_NO  --계획ver
+                         FROM   TB_WB21M01 AS P
+                                INNER JOIN TB_CR02D02 AS X ON X.CO_CD = P.CO_CD AND X.SALES_CD = P.SALES_CD    --수주상세
+                                INNER JOIN TB_CR02M01 AS M ON M.CO_CD = P.CO_CD AND M.ORDRS_NO = X.ORDRS_NO    --수주마스터
+                                INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD    --거래처정보
+                         WHERE  1 = 1
+                         AND    P.VER_NO = (
+                                            SELECT MAX(TO_NUMBER(VER_NO))
+                                            FROM   TB_WB21M01 AS P1
+                                            WHERE  P1.SJ_NO = P.SJ_NO
+                                           )
+                         AND    P.CLOSE_YN = 'Y'
+                        )
+                        --과제 등록된 내용중 일정계획 수립확정 되니 않은 건 확정건에 대한 계획수립 안한 내역
+                        SELECT SJ.CLNT_NM                            AS CLNT_NM
+                             , SJ.CLNT_PJT_NM                        AS CLNT_PJT_NM
+                             , P.SALES_CD                            AS SALES_CD
+                             , SJ.CTRT_NM                            AS CTRT_NM
+                             , (SELECT FN_CM05M01_CD_TO_NM(P.WBS_PLAN_CODE_KIND) FROM DUAL) AS WBS_PLAN_NM --WBS 계획명
+                             , TO_CHAR(R.WBS_PLANS_DT, 'YYYY-MM-DD')  AS PLAN_STRT_DT --WBS Task 시작일
+                             , TO_CHAR(R.WBS_PLANE_DT, 'YYYY-MM-DD')  AS PLAN_END_DT  --WBS Task 종료일
+                             , R.DAYCNT                               AS PLAN_DAYCNT
+                             , P.WBS_PLAN_CODE_NM                     AS WBS_TASK_NM --WBS Task NM
+                             , TO_CHAR(P.WBS_PLANS_DT, 'YYYY-MM-DD')  AS TASK_STRT_DT --WBS Task 시작일
+                             , TO_CHAR(P.WBS_PLANE_DT, 'YYYY-MM-DD')  AS TASK_END_DT  --WBS Task 종료일
+                             , P.DAYCNT                               AS TASK_DAYCNT
+                             , P.EXPECT_MH                            AS TASK_EXPECT_MH
+                             , TO_CHAR(S.WBS_RSLTSS_DT, 'YYYY-MM-DD') AS RSLT_STRT_DT --WBS Task 시작일
+                             , TO_CHAR(S.WBS_RSLTSE_DT, 'YYYY-MM-DD') AS RSLT_END_DT  --WBS Task 종료일
+                             , S.DAYCNT                               AS RSLT_DAYCNT
+                             , S.WBS_RSLTS_MH                         AS RSLT_INTOCNT
+                             , NVL(S.WBS_RSLTS_RATE,0)                AS RSLT_RATE    --WBS 실적 진행율
+                             , (SELECT FN_CM06M01_ID_TO_NM(P.WBS_PLAN_MNG_ID) FROM DUAL)  AS WBS_MNG_NM --담당자명
+                             -- 관련코드 참고정보 -----------------------------------------------
+                             , SJ.CLNT_CD                      AS CLNT_CD 
+                             , P.WBS_PLAN_CODE_KIND            AS WBS_PLAN_CD --WBS 계획CD
+                             , P.WBS_PLAN_CODE_ID              AS WBS_TASK_ID --WBS Task ID 
+                             , P.WBS_PLAN_MNG_ID               AS WBS_MNG_ID  --담당자ID
+                             , ROUND(P.WBS_PLANE_DT - SYSDATE) AS VARIANCE_DT --종료예정 차이 일수 
+                             , P.CO_CD
+                             , SJ.PLAN_VER_NO                  AS PLAN_VER_NO --계획ver
+                             , NVL(S.CLOSE_YN, 'N')            AS RSLT_CLOSE_YN
+							 , CONCAT(CONCAT(SJ.CLNT_NM, ' - '), SJ.CLNT_PJT_NM) AS CLNT_NM_PJT_NM
+							 , NVL(S.FILE_TRGT_KEY, '.')       AS RSLT_FILE_TRGT_KEY
+                             , CASE WHEN NVL(S.FILE_TRGT_KEY, '.') = '.' THEN 'I' ELSE 'U' END AS DATA_STS
+                             , '' AS DATA_CHK
+							 , P.WBS_PLAN_NO
+                        FROM   TB_WB22M01 AS P    --WBS계획
+                               INNER JOIN SJD  AS SJ  ON P.CO_CD    = SJ.CO_CD
+                                                     AND P.SALES_CD = SJ.SALES_CD
+                               LEFT OUTER JOIN TB_WB22M01 AS R  ON R.CO_CD    = P.CO_CD
+                                                               AND R.SALES_CD = P.SALES_CD
+                                                               AND R.WBS_PLAN_CODE_ID = P.WBS_PLAN_CODE_KIND
+                               LEFT OUTER JOIN TB_WB23M01 AS S  ON P.CO_CD              = S.CO_CD
+                                                               AND P.SALES_CD           = S.SALES_CD
+                                                               AND P.WBS_PLAN_CODE_KIND = S.WBS_PLAN_CODE_KIND
+                                                               AND P.WBS_PLAN_CODE_ID   = S.WBS_PLAN_CODE_ID
+                        WHERE  1 = 1
+                        AND    P.WBS_PLANE_DT  <![CDATA[<]]> ( SYSDATE + 3) --종료일 3일 이전 내역
+                        AND    P.WBS_PLAN_MNG_ID = #{usrId}
+                        AND    P.WBS_PLAN_CODE_KIND <![CDATA[<>]]> 'WBSCODE'
+                        <if test="coCd != null and !coCd.equals('')">
+                        AND    P.CO_CD = #{coCd}
+                        </if>
+                        --AND    NVL(R.WBS_RSLTS_RATE,0) <![CDATA[<>]]> 100
+                       ) AS X
+                WHERE  1 = 1
+				<if test="coCd != null and !coCd.equals('')">
+				AND    X.SALES_CD LIKE '%'||#{salesCd}||'%'
+				</if>
+				ORDER BY SALES_CD, WBS_PLAN_CD, WBS_TASK_ID
+               ) AS Z
+        WHERE  1 = 1
+		AND    RN BETWEEN #{firstIndex} AND #{lastIndex}
+	</select>
+
+	<update id="update_wb26_confirmYn" parameterType="Map">
+		UPDATE TB_WB23M01
+		SET    CLOSE_YN = #{rsltCloseYn, jdbcType=VARCHAR}
+			 , UDT_ID   = #{userId}
+			 , UDT_PGM  = #{pgmId}
+			 , UDT_DTTM = SYSDATE
+		WHERE  FILE_TRGT_KEY = #{rsltFileTrgtKey}
+	</update>
+	
+	<update id="update_wb26" parameterType="Map">
+		UPDATE TB_WB23M01
+		SET    WBS_RSLTS_RATE = #{rsltRate}
+		     , WBS_RSLTS_MH   = #{rsltIntocnt}
+			 , WBS_RSLTSS_DT  = #{rsltStrtDt}
+			 , WBS_RSLTSE_DT  = #{rsltEndDt}
+			 , DAYCNT         = #{rsltDaycnt}
+			 , UDT_ID         = #{userId}
+			 , UDT_PGM        = #{pgmId}
+			 , UDT_DTTM       = SYSDATE
+		WHERE FILE_TRGT_KEY =  #{rsltFileTrgtKey}
+    </update>
+
+	<insert id="insert_wb26" parameterType="Map">
+		<selectKey keyProperty="rsltsFileTrgtKey" resultType="String" order="BEFORE">
+			SELECT TB_WB23M01_SQ01.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO TB_WB23M01
+		( FILE_TRGT_KEY
+		, CO_CD
+		, WBS_RSLTS_NO
+		, WBS_PLAN_CODE_KIND
+		, WBS_PLAN_CODE_ID
+		, SALES_CD
+		, WBS_RSLTS_ID
+		, WBS_RSLTS_RATE
+		, WBS_RSLTS_MH
+		, WBS_RSLTS_CNTS
+		, WBS_RSLTSS_DT
+		, WBS_RSLTSE_DT
+		, DAYCNT
+		, LOCK_YN
+		, CLOSE_YN
+		, CREAT_ID
+		, CREAT_PGM
+		, CREAT_DTTM
+		)
+		VALUES
+		( #{rsltsFileTrgtKey}
+		, #{coCd}
+		, #{wbsPlanNo}
+		, #{wbsPlanCd}
+		, #{wbsTaskId}
+		, #{salesCd}
+		, #{wbsMngId}
+		, #{rsltRate}
+		, #{rsltIntocnt}
+		, ''
+		, #{rsltStrtDt}
+		, #{rsltEndDt, jdbcType=VARCHAR}
+		, #{rsltDaycnt}
+		, 'N'
+		, 'N'
+		, #{userId}
+		, #{pgmId}
+		, SYSDATE
+		)
+    </insert>
+	
+</mapper>

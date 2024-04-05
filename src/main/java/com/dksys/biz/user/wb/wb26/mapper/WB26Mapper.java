@@ -1,0 +1,27 @@
+package com.dksys.biz.user.wb.wb26.mapper;
+
+import java.util.List;
+import java.util.Map;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
+
+@Mapper
+public interface WB26Mapper {
+    // 그리드 카운트
+	int select_wb26_Count(Map<String, String> paramMap);
+
+	// 그리드 리스트
+	List<Map<String, String>> select_wb26_List(Map<String, String> paramMap);
+
+	int wb26save(Map<String, String> paramMap);
+
+	int insert_wb26(Map<String, String> paramMap);
+
+	int update_wb26(Map<String, String> paramMap);
+
+	int update_wb26_confirmYn(Map<String, String> param);
+
+    // // 수금유형 검색
+	// List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap);
+}
