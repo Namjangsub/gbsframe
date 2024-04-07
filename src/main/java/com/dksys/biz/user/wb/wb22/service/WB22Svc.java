@@ -76,6 +76,8 @@ public interface WB22Svc {
 	
 	
 	List<Map<String, String>> selectWbcPlanUpdteTodoList(Map<String, String> paramMap);
+
+	Map<String, String> wbsResultLastVerNoSearch(Map<String, String> paramMap);
 	
 	
 }

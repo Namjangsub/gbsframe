@@ -394,5 +394,12 @@ public class WB22Ctr {
 	  	return "jsonView";
 	}
 	// 일괄확정부분 끝
+
+	@PostMapping(value = "/wbsResultLastVerNoSearch") 
+   	public String wbsResultLastVerNoSearch(@RequestBody Map<String, String> paramMap, ModelMap model) {
+   		  Map<String, String> resultList = wb22Svc.wbsResultLastVerNoSearch(paramMap);
+   		  model.addAttribute("resultList", resultList); 
+   		  return "jsonView"; 
+   	}
 	
 }

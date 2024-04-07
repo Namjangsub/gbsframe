@@ -774,5 +774,9 @@ public class WB22SvcImpl implements WB22Svc {
 	public List<Map<String, String>> selectWbcPlanUpdteTodoList(Map<String, String> paramMap) {
 		return wb22Mapper.selectWbcPlanUpdteTodoList(paramMap);
 	}
-	
+
+	@Override
+	public Map<String, String> wbsResultLastVerNoSearch(Map<String, String> paramMap) {
+		return wb22Mapper.wbsResultLastVerNoSearch(paramMap);
+	}
 }
