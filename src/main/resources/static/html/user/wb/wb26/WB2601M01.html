@@ -24,6 +24,7 @@
 <link rel="stylesheet" href="/static/css/main.css">
 <link rel="stylesheet" href="/static/css/sub.css">
 <link rel="stylesheet" href="/static/css/common.css">
+<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
 
 <script type="text/javascript" src="/static/js/jquery-latest.min.js"></script>
 <script type="text/javascript" src="/static/js/jquery.serializeObject.js"></script>
@@ -37,17 +38,20 @@
 <script type="text/javascript" src="/static/js/ax5/ax5mask.min.js"></script>
 <script type="text/javascript" src="/static/js/ax5/ax5modal.min.js"></script>
 <script type="text/javascript" src="/static/js/ax5/ax5toast.min.js"></script>
+<script type="text/javascript" src="/static/js/global.js"></script>
+<script type="text/javascript" src="/static/js/fileTree.js"></script>
+<script type="text/javascript" src="/static/js/workingDayCalc.js"></script>
+<script type="text/javascript" src="/static/js/korean-lunar-calendar.min.js"></script>
+
 <script src="/static/js/ax5/ax5calendar.min.js"></script>
 <script src="/static/js/ax5/ax5picker.min.js"></script>
 <script src="/static/js/ax5/ax5menu.min.js"></script>
 <script src="/static/js/ax5/ax5formatter.min.js"></script>
 <script src="/static/js/ax5/ax5combobox.min.js"></script>
 <script src="/static/js/ax5/ax5select.min.js"></script>
+<script src="/static/js/ax5/ax5grid-inline-editor.js"></script>
 
-<script type="text/javascript" src="/static/js/global.js"></script>
-<script type="text/javascript" src="/static/js/fileTree.js"></script>
-<script type="text/javascript" src="/static/js/workingDayCalc.js"></script>
-<script type="text/javascript" src="/static/js/korean-lunar-calendar.min.js"></script>
+<script src="https://unpkg.com/exceljs/dist/exceljs.min.js"></script>
 
 <!-- 도움말 팝업 -->
 <script src="/static/js/manualPopup.js"></script>
@@ -150,6 +154,9 @@
 		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
 		return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
 	};
+
+	var thisGridRow=0; // 선택된 행 정보 저장할 변수
+	var thisGridCol=0; // 선택된 열 정보 저장할 변수
 	
 	var gridView = {
 		initView : function() {
@@ -171,16 +178,33 @@
 					mergeCells : ["clntNmPjtNm", "salesCd", "ctrtNm", "wbsMngNm", "wbsPlanNm"
 					            , "planStrtDt", "planEndDt", "planDaycnt"],
 					onClick: function () {
-						var list = gridView.target.getList("selected");
-                        $.each(list, function(idx, obj){
-                            gridView.target.select(obj.__index, {selected: false});
-                        });
-	                    this.self.select(this.dindex);
+						// var list = gridView.target.getList("selected");
+                        // $.each(list, function(idx, obj){
+                        //     gridView.target.select(obj.__index, {selected: false});
+                        // });
+	                    // this.self.select(this.dindex);
+
+						this.self.clearSelect();
+						this.self.select(this.dindex);
+						prdtIdx = this.dindex;
+						thisGridRow = this.dindex;   // 선택된 행 정보 가져오기
+						thisGridCol = this.colIndex; // 선택된 열 정보 가져오기
+						
+						var clickedRowIndex = this.dindex;
+						var clickedRowElement = this.self.bodyRowTable;
+						
+						// 선택된 행의 글자색을 변경
+						$(clickedRowElement).addClass("highlight");
 					},
-					onDBLClick: function () {
-						//this.self.select(this.dindex);
-						// insert_update_cr05_Modal("U");
-					},
+					onDBLClick: function () {	
+						this.self.clearSelect();
+						this.self.select(this.dindex);
+						if(this.item.nonePlanYn == "Y") {
+							// 계획 없는 자료 입력 팝업 오픈
+							workModal(this.item, "C");
+						}
+						
+		            },
 					onDataChanged: function () {
 						if (this.item.rsltCloseYn == "Y") {
 							//alert("확정된 상태입니다.");
@@ -200,7 +224,25 @@
 
 						// const fDate = new Date(this.item.rsltStrtDt);
 						// const tDate = new Date(this.item.rsltEndDt);
-						
+
+						// 시작일자 지정 시 진척율, 투입공수 기본지정
+						// debugger;
+						if(this.item.rsltStrtDt != undefined) {
+							if(this.item.rsltRate == undefined || this.item.rsltRate == "0") {
+								this.self.setValue(this.dindex, "rsltRate", "10");
+							}
+
+							if(this.item.rsltIntocnt == undefined || this.item.rsltIntocnt == "0") {
+								this.self.setValue(this.dindex, "rsltIntocnt", "1");
+							}
+						}
+
+						// 종료일자 지정 시 진척율
+						// debugger;
+						if(this.item.rsltEndDt != undefined && this.item.rsltEndDt != "") {
+							this.self.setValue(this.dindex, "rsltRate", "100");
+						}
+
 						// 일자 입력 시 소요일 지정
 						if(this.item.rsltStrtDt != undefined && this.item.rsltEndDt != undefined) {
 							this.self.setValue(this.dindex, "rsltDaycnt", calculateHolidayCnt(this.item.rsltStrtDt, this.item.rsltEndDt).workingDays);
@@ -218,16 +260,20 @@
 							// const taskStrtDt = new Date(this.item.taskStrtDt);
 							// const taskEndDt = new Date(this.item.taskEndDt);
 
-							if(this.item.rsltStrtDt == undefined) {								
+							if(this.item.rsltStrtDt == undefined || this.item.rsltStrtDt == "") {
 								this.self.setValue(this.dindex, "rsltStrtDt", this.item.taskStrtDt);
 							}
 
-							if(rsltRate == "100") {
-								this.self.setValue(this.dindex, "rsltStrtDt", this.item.taskStrtDt);
-								this.self.setValue(this.dindex, "rsltEndDt", this.item.taskEndDt);
-							} else {
-								// 진척율 100 아닌 경우
-								this.self.setValue(this.dindex, "rsltEndDt", "");
+							if(this.item.rsltEndDt == undefined || this.item.rsltEndDt == "") {
+								if(rsltRate == "100") {
+									if(this.item.rsltStrtDt == undefined || this.item.rsltStrtDt == "") {
+										this.self.setValue(this.dindex, "rsltStrtDt", this.item.taskStrtDt);
+									}
+									this.self.setValue(this.dindex, "rsltEndDt", this.item.taskEndDt);
+								} else {
+									// 진척율 100 아닌 경우
+									this.self.setValue(this.dindex, "rsltEndDt", "");
+								}
 							}
 						} else {
 							// 진척율 0 인경우
@@ -244,8 +290,8 @@
 					{key: "clntNmPjtNm", label: "고객사"    , align: "left"  , width: 140},
 					{key: "salesCd"    , label: "SALES CODE", align: "left", width: 120},
 					{key: "ctrtNm"     , label: "과제명"    , align: "left", width: 200},
-// 					{key: "wbsMngId"   , label: "담당자ID"  , align: "center", width: 100, hidden: true},
-// 					{key: "wbsMngNm"   , label: "담당자"    , align: "center", width: 100},
+					// {key: "wbsMngId"   , label: "담당자ID"  , align: "center", width: 100, hidden: true},
+					// {key: "wbsMngNm"   , label: "담당자"    , align: "center", width: 100},
 					
 					{key: undefined  , label: "계획",
 						columns: [
@@ -276,7 +322,7 @@
 										}
 									},
 									disabled: function () {
-										if (this.item.rsltCloseYn == "Y") {
+										if (this.item.rsltCloseYn == "Y" || this.item.nonePlanYn == "Y") {
 											//alert("확정된 상태입니다.");
 											return true;
 										} else {
@@ -293,7 +339,7 @@
 										}
 									},
 									disabled: function () {
-										if (this.item.rsltCloseYn == "Y") {
+										if (this.item.rsltCloseYn == "Y" || this.item.nonePlanYn == "Y") {
 											//alert("확정된 상태입니다.");
 											return true;
 										} else {
@@ -306,7 +352,7 @@
 							{key: "rsltRate"   , label: "진척율"  , align: "right" , width: 60, formatter: "money",
 								editor: {
 									type: "money", disabled: function () {
-										if (this.item.rsltCloseYn == "Y") {
+										if (this.item.rsltCloseYn == "Y" || this.item.nonePlanYn == "Y") {
 											//alert("확정된 상태입니다.");
 											return true;
 										} else {
@@ -318,7 +364,7 @@
 							{key: "rsltIntocnt", label: "투입공수", align: "right" , width: 60, formatter: "money",
 								editor: {
 									type: "money", disabled: function () {
-										if (this.item.rsltCloseYn == "Y") {
+										if (this.item.rsltCloseYn == "Y" || this.item.nonePlanYn == "Y") {
 											//alert("확정된 상태입니다.");
 											return true;
 										} else {
@@ -333,6 +379,7 @@
 							{key: "wbsPlanNo", label: "wbsPlanNo", align: "left", width: 100, hidden: true},
 							{key: "wbsPlanCd", label: "wbsPlanCd", align: "left", width: 100, hidden: true},
 							{key: "wbsTaskId", label: "wbsTaskId", align: "left", width: 100, hidden: true},
+							{key: "nonePlanYn", label: "nonePlanYn", align: "left", width: 100, hidden: true},
 							
 							// {key: "varianceDt" , label: "지연일수", align: "right" , width: 60, formatter: "money"},
 						]
@@ -349,7 +396,36 @@
 	                onChange: function () {
 	                    gridView.setData(this.page.selectPage);
 	                }
-	            }
+	            },
+				contextMenu: {
+					iconWidth: 20,
+					acceleratorWidth: 100,
+					itemClickAndClose: false,
+					icons: {
+						'arrow': '<i class="fa fa-caret-right"></i>'
+					},
+					items: [
+						{type: 1, label: "붙여넣기"}
+					],
+					popupFilter: function (item, param) {
+						//console.log(item, param);
+						if(param.element) {
+							return true;
+						} else {
+							return item.type == 1;
+						}
+					},
+					onClick: function (item, param) {
+						// console.log(item, param);
+						thisGridRow = param.dindex;
+						thisGridCol = param.colIndex;
+						
+						if (item.label == "붙여넣기") {
+							gridPaste(thisGridRow, thisGridCol);
+						}
+						gridView.target.contextMenu.close();
+					}
+				}
 			});
 			return this;
 		},
@@ -411,14 +487,19 @@
   		$('[data-search]').on("change", function(){
   			gridView.setData(0);
   		});
-  		
-  		//권한체크
+
+		// Ctrl + V 단축키 이벤트 처리
+		gridView.target.$target.on("paste", function (e, a) {
+			gridPaste(thisGridRow, thisGridCol);
+		});
+		
+		//권한체크
   		authChk();
 	});
 
 	// 초기화 버튼
 	function initSearch() {
-		$('[data-search]').off("change");	//바인딩기능 오프
+		// $('[data-search]').off("change");	//바인딩기능 오프
 		$('.contents.search select, .contents.search input').val("");
 		// 회사 선택 상자 값 설정
 		$("#coCd_S").val(jwt.coCd);
@@ -550,6 +631,74 @@
 			}
 		});
 	}
+
+	function workModal(row) {
+		var paramObj = {
+			"coCd"		: row.coCd,
+			"salesCd"	: row.salesCd,
+			"planVerNo" : row.planVerNo,
+			"histYn"	: 'N',
+		};
+		openSecondModal("/static/html/user/wb/wb22/WB2201P01.html", 1200, 900, "WBS 계획등록", paramObj, function () {
+			
+		});
+	}
+	
+	function gridPaste(thisGridRow, thisGridCol) {
+		$('[data-search]').off("change");	//바인딩기능 오프
+		var pasteData = "";
+		// debugger;
+
+		navigator.clipboard.readText().then(pasteData => {
+			// console.log('클립보드에 저장된 값:', pasteData);
+			if (pasteData==undefined ||pasteData=="" || thisGridRow===undefined) {
+				return;
+			}
+			
+			// 붙여넣기할 데이터를 배열로 변환한다.
+			pasteData = (pasteData.charAt(pasteData.length - 1) === "\n") ? pasteData : pasteData + "\n";
+			var pasteRows = pasteData.split("\n").map(function(row) {
+				return row.split("\t");
+			});
+			
+			// 붙여넣기를 시작할 셀의 인덱스를 구한다.
+			var startRowIndex = thisGridRow;
+			// var startColIndex = thisGridCol;
+			var startColIndex = 0;
+
+			
+			// 붙여넣을 데이터의 행과 열 개수를 구한다.
+			var numRows = pasteRows.length;
+			var numCols = pasteRows[0].length;
+			
+			var gridLength = gridView.target.getList().length;
+			var gridColumns = gridView.target.config.columns;
+			var list = gridView.target.list;
+			var rsltCloseYn = "Y";
+			var nonePlanYn = "Y";
+			
+			// 붙여넣기할 셀을 한 개씩 돌면서 값을 설정한다.
+			for (var i = 0; i < numRows-1; i++) {
+				
+				for (var j = 0; j < numCols; j++) {
+					var calRow = startRowIndex + i;
+					var calCol = startColIndex + j;
+					
+					//carriage return 문자 삭제
+					var cellData = pasteRows[i][j].replace(new RegExp('\r', 'ig'), '');
+					// debugger;
+					rsltCloseYn = list[calRow].rsltCloseYn;
+					nonePlanYn = list[calRow].nonePlanYn;
+
+					// 실적확정이 아니고 계획이 있을 때만 자료입력
+					if (rsltCloseYn != "Y" && nonePlanYn != "Y") {
+						gridView.target.setValue(calRow, gridColumns[9].columns[calCol].key, cellData);
+					}
+				}
+			}
+			gridView.target.repaint();
+		});
+	};
 	
 	// 판매법인 set
 	function setByCoCd(value) {
