@@ -490,10 +490,14 @@
 			SELECT    A.*
 					, D1.CLNT_NM  AS PCHS_CLNT_NM
 					, D1.CRN /*사업자등록번호*/
-					, D1.PCHS_CLMN_DAY  /*결제일 - 10*/	
-					, D1.PCHS_CLMN_RMK  /*결제일 - 다음달 10일*/
-					, D1.PCHS_PMNT_MTD_CD  --결제조건 코드
-				    , FN_CM05M01_CD_TO_NM(D1.PCHS_PMNT_MTD_CD) AS PCHS_PMNT_MTD_NM /*결제조건명*/
+--					, D1.PCHS_CLMN_DAY  /*결제일 - 10*/	
+--					, D1.PCHS_CLMN_RMK  /*결제일 - 다음달 10일*/
+--					, D1.PCHS_PMNT_MTD_CD  --결제조건 코드
+--				    , FN_CM05M01_CD_TO_NM(D1.PCHS_PMNT_MTD_CD) AS PCHS_PMNT_MTD_NM /*결제조건명*/
+					, NVL(A.SM10_CLMN_DAY, D1.PCHS_CLMN_DAY) AS PCHS_CLMN_DAY  /*결제일 - 10*/	
+					, NVL2(A.SM10_CLMN_RMK, '', D1.PCHS_CLMN_RMK) AS PCHS_CLMN_RMK   /*결제일 - 다음달 10일*/
+					, NVL(A.SM10_PMNT_MTD_CD, D1.PCHS_PMNT_MTD_CD) AS PCHS_PMNT_MTD_CD  --결제조건 코드
+				    , FN_CM05M01_CD_TO_NM(NVL(A.SM10_PMNT_MTD_CD, D1.PCHS_PMNT_MTD_CD)) AS PCHS_PMNT_MTD_NM /*결제조건명*/
 			  FROM (
 					SELECT A.* 
 								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN 'N' 
@@ -529,6 +533,10 @@
 								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN '' ELSE '' END IPGO_ORDRG_SEQ
 								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN ''
 								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN R.RET_DTL_RMK ELSE C.COST_RMK END COST_RMK
+								, DECODE (substr(A.ORDRG_NO,0,3), 'COS', C.PCHS_CLMN_DAY, '') 		AS SM10_CLMN_DAY
+								, DECODE (substr(A.ORDRG_NO,0,3), 'COS', C.PCHS_CLMN_DIV_CD, '') 	AS SM10_CLMN_DIV_CD
+								, DECODE (substr(A.ORDRG_NO,0,3), 'COS', C.PCHS_PMNT_MTD_CD, '') 	AS SM10_PMNT_MTD_CD
+								, DECODE (substr(A.ORDRG_NO,0,3), 'COS', 'COST', '') 				AS SM10_CLMN_RMK
 					FROM  TB_SM12D01 A /* 매입 확정 DETAIL */		
 							LEFT OUTER JOIN TB_SM02M01 M ON(A.ORDRG_NO = M.ORDRG_NO)		/* 발주마스터 */
 							LEFT OUTER JOIN TB_SM03D01 I ON(A.PCHS_NO = I.PCHS_NO AND A.PCHS_SEQ = I.PCHS_SEQ)		/* 입고 상세 */
@@ -551,7 +559,7 @@
      			LEFT OUTER JOIN TB_BM02M01 D1 ON A.PCHS_CLNT_CD = D1.CLNT_CD   --거래처마스터
 			 WHERE 1 = 1
 				<if test="pchsClmnDay != null and !pchsClmnDay.equals('')">
-				AND D1.PCHS_CLMN_DAY = #{pchsClmnDay}
+				AND NVL(A.SM10_CLMN_DAY, D1.PCHS_CLMN_DAY) = #{pchsClmnDay}
 				</if>
 				<if test="salesCd != null and !salesCd.equals('')">
 				AND A.SALES_CD LIKE '%' || #{salesCd} || '%'
