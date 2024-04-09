@@ -169,6 +169,7 @@
 			<div class="contents_tit">
 				<span style="height: 30px; line-height: 30px; font-size: 15px;">매입 확정 리스트 </span>
 				<div class="add_btn_small pdl10">
+					<a onclick="setReportOrderDetail();" style="height: 30px; line-height: 28px; width: 90px;" title="발주내역중 매입확정건만 출력됩니다."><i class="fas fa-print"></i> 발주명세서</a>
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 				</div>
 <!-- 				<select id="recordCnt" class="prae_select" data-search="recordCnt" -->
@@ -345,18 +346,20 @@
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
 				//		showLineNumber    : true,
-				showRowSelector : false,
+				showRowSelector : true,
 				multipleSelect : true,
 				sortable : true,
 				target : $('[data-ax5grid="first-grid"]'),
 				header : {
 					align : "center",
-					selector : false
+					selector : true
 				},
 				body : {
 					mergeCells : [ "pchsClntNm", "salesCd", "dsgnNo", "isDiv", "ordrgAmt","inTotAmt", "inDt" ],
 					onClick : function() {
 						var row = this.dindex;
+					    this.self.clearSelect();
+					    this.self.select(this.dindex); 
 					},
 					onDBLClick : function() {
 						this.self.clearSelect();
@@ -427,7 +430,7 @@
 					],
 				columns : 
 					[
-						{key : "rn", 				label : "No.", 				align : "center", width : 40},
+						{key : "rn", 				label : "No", 				align : "center", width : 40},
 						{key : "pchsClntNm", 		label : "구매처명", 			align : "left", width : 140},
 						{key : "salesCd", 			label : "Sales Code", 		align : "left", width : 110},
 						{key : "dsgnNo", 			label : "대표도번", 			align : "left", width : 180},
@@ -881,4 +884,54 @@
 		
 	    gridView.target.setHeight(tagHeight);
 	}	
+	
+
+ 	//발주명세서 출력 - report 출력
+ 	function setReportOrderDetail(_type = "") {
+ 		debugger;
+ 		if(selectGridValidationM(gridView.target)) return false;
+ 		var selDataList = gridView.target.getList("selected");
+ 		
+ 		//동일거래처인지 체크
+ 	    var clntValue = selDataList[0].pchsClntCd;
+ 		var reaminInQty = selDataList[0].reaminInQty;
+ 		//매입 yn	
+//  		if( typeof(reaminInQty)=="undefiend" || parseFloat(reaminInQty) != 0  ) {
+//  			alert('매입처리가  완료되지 않았습니다.');
+//  			return false;		
+//  		}
+ 	    for (var i = 1; i < selDataList.length; i++) {
+ 			if (selDataList[i].pchsClntCd !== clntValue) {
+ 				// clnt 값이 다른 경우 오류 처리
+ 				alert('동일 거래처만 처리 가능합니다.');
+ 				return false;
+ 			}
+ 			
+ 	    }
+ 	    
+ 		var fileName = "SM0301R02.jrf";  //여러 발주서 번호 처리 (in 처리)
+ 		var arg =  
+ 			  "coCd#"		+  selDataList[0].coCd
+ 		    //+ "#ordrgNo#"	+  "'"+selDataList.map(item => item.ordrgNo).join("','")+"'"//여러건 출력 => 배열의 값을 하나의 문자로 생성  
+ 		    + "#ordrgNo#"	+  selDataList.map(item => item.ordrgNo).join(",") 
+ 		    + "#inNo#"	+  selDataList.map(item => item.inNo).join(",") 
+ 		    + "#rptDt#"	+  $('#ordrgDtTo_S').val() 
+ 	    	+ "#";    
+ 		if (_type == '' || _type == undefined ) {
+ 			callReport(fileName, arg, 1150, 720, '발주명세서');
+ 		} else { //Export 작업
+ 			ubiExportAjax(fileName, arg, function(response) {
+ 				if (response.resultCode === 200) {
+ 					var base64FileData = response.base64FileData;
+ 					var fileName = response.exportFileName;
+ 					downloadPDFFromBase64(base64FileData, fileName);
+ 				} else {
+ 					alert('PDF 내보내기 실패: ' + response.resultText);
+ 				}
+
+ 			});
+ 		}
+ 	}
+
+	
 </script>
