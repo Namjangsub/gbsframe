@@ -2492,3 +2492,14 @@ function gridHeightResize(_grid, _minusHeight) {
     let tagHeight = virtualHeight - _minusHeight;
     _grid.target.setHeight(tagHeight);
 }
+
+
+function gPasIntChk (value) {
+	const cvtValue = parseInt(deleteCommaStr(value));
+	return isNaN(cvtValue) ? 0 : cvtValue;
+}
+
+function gPasFloatChk (value) {
+	const cvtValue = parseFloat(deleteCommaStr(value));
+	return isNaN(cvtValue) ? 0 : cvtValue;
+}
