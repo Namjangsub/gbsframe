@@ -211,6 +211,8 @@
 
 	/***********전역변수****************/
 	let selectedRowKey;
+	let actionType = null;
+	let fileTrgtKey = null;
 	
 	const comboClmnPlanDiv = [...setComboOptionCode('CLMNPLANDIV')];
     function setComboOptionCode(selectComobo) {
@@ -496,10 +498,8 @@
 		}
     };
 
-	var actionType = null;
-	var fileTrgtKey = null;
-
 	$(document).ready(function() {
+
 		setCommonSelect($(".popup_area select[data-kind]"));
 		setByCoCd(modalStack.last().paramObj.coCd);
 		$("#popForm #userId").val(jwt.userId);
@@ -520,7 +520,7 @@
 		exrateCal(); //최초 로딩시 환율 적용
 	    $('#currCd').on('change', exrateCal);
 	    turnKeyGridView.initView();
-	    
+	    debugger;
 	    
 		let refFileTrgtKey = modalStack.last().paramObj.refFileTrgtKey;
 		let refCtrtNo = modalStack.last().paramObj.ctrtNo;
@@ -532,9 +532,9 @@
 				turnKeyGridView.setData(0);
 			}
 			
-			$('#actionBtn').on("click", function() {
-				insertContract();
-			});
+// 			$('#actionBtn').on("click", function() {
+// 				insertContract();
+// 			});
 
 		} else if (actionType == "U") {
 			$('.tit').text('외주관리 수정')
@@ -547,7 +547,84 @@
 				updateContract();
 			});
 		}
-		
+
+	    $("#addPaymentButton").on("click", function () {
+	        var row;
+			var newRowData = {
+					clmnPlanDiv: "CLMNPLANDIV1",
+					clmnDivSeq : 1,
+					clmnRate : 0,
+					clmnAmt : 0,
+					clmnDt : "",
+					pmntDtAfterBill : "",
+					billPblsDt : "",
+					clmnMgmtStatus : "",
+			};
+
+	        var ctrtAmtVal = gPasIntChk($("#ctrtAmt").val()); //계약금액에 적힌 값
+	        if (ctrtAmtVal == 0 || ctrtAmtVal == ""){
+	        	alert("계약금액을 입력바랍니다.");
+	        	$("#ctrtAmt").focus();
+	        	return false;
+	        } else {
+			        // 첫 번째 경우: 선택된 행이 있는 경우
+			        if (selectedRowKey !== undefined) {
+			            let row = gridClmnPlan.getList("selected")[0];
+			            let newRowData = $.extend({}, row, {__index: undefined, clmnRate: 0, clmnAmt: 0});
+			            gridClmnPlan.addRow(newRowData, row.__index + 1);
+			        }
+			        // 두 번째 경우: 그리드가 비어 있는 경우
+			        else if (gridClmnPlan.getList().length === 0) {
+			            gridClmnPlan.addRow(newRowData, 0);
+			        }
+			        // 세 번째 경우: 그리드에 행은 있지만 선택된 행이 없는 경우
+			        else {
+			            gridClmnPlan.addRow(newRowData, gridClmnPlan.list.length);
+			            return;
+			        }
+			
+				        const data = gridClmnPlan.getList();
+				        gridClmnPlan.setData({
+				            list: data,
+				            page: {
+				                totalElements: data.length
+				            }
+				        });
+	        }
+	        prevData = JSON.parse(JSON.stringify(gridClmnPlan.getList()));
+	        // 여기에서 그리드 데이터가 준비된 후 실행하려는 코드를 추가할 수 있습니다.
+
+	    });
+
+	    $("#deletePaymentButton").on("click", function () {
+	        if (selectedRowKey !== undefined) {
+	            gridClmnPlan.removeRow(selectedRowKey);
+	            const data = gridClmnPlan.getList();
+	            gridClmnPlan.setData({
+	                list: data,
+	                page: {
+	                    totalElements: data.length
+	                }
+	            });
+
+	            // 선택된 행을 업데이트합니다.
+	            if (data.length > 0) { // 아직 데이터가 있는지 확인합니다.
+	                if (selectedRowKey < data.length) { // 선택된 행이 마지막 행이 아니라면 다음 행을 선택합니다.
+	                    gridClmnPlan.select(selectedRowKey);
+	                } else { // 선택된 행이 마지막 행이었다면 이전 행을 선택합니다.
+	                    selectedRowKey = selectedRowKey - 1;
+	                    gridClmnPlan.select(selectedRowKey);
+	                }
+	            } else { // 데이터가 없다면 선택된 행을 초기화합니다.
+	                selectedRowKey = undefined;
+	                // 이 경우 삭제 버튼을 비활성화할 수 있습니다.
+	                // 예: $("#deleteProductButton").prop("disabled", true);
+	            }
+	        } else {
+	            alert("삭제를 위해 선택된 행이 없습니다.");
+	        }
+	    });
+
 
         $("#ctrtAmt").change(function () {
             calclateTotalClmnAmt();
@@ -1100,14 +1177,6 @@
 	}
 
 	
-	function getCheckedValues() {
-// 		$('#CTRITEM03, #CTRITEM05').prop('checked', true);
-        var checkedValues = [];
-        $('input[name="ctrItems"]:checked').each(function() {
-            checkedValues.push($(this).val());
-        });
-        return checkedValues.join(', ');
-    }
     function calclateTotalClmnAmt () {
         var ctrtAmt = gPasIntChk($("#ctrtAmt").val());
         var data = gridClmnPlan.getList();
@@ -1204,83 +1273,5 @@
         });
     };
     
-
-    $("#addPaymentButton").on("click", function () {
-        var row;
-		var newRowData = {
-				clmnPlanDiv: "CLMNPLANDIV1",
-				clmnDivSeq : 1,
-				clmnRate : 0,
-				clmnAmt : 0,
-				clmnDt : "",
-				pmntDtAfterBill : "",
-				billPblsDt : "",
-				clmnMgmtStatus : "",
-		};
-
-        var ctrtAmtVal = gPasIntChk($("#ctrtAmt").val()); //계약금액에 적힌 값
-        if (ctrtAmtVal == 0 || ctrtAmtVal == ""){
-        	alert("계약금액을 입력바랍니다.");
-        	$("#ctrtAmt").focus();
-        	return false;
-        } else {
-		        // 첫 번째 경우: 선택된 행이 있는 경우
-		        if (selectedRowKey !== undefined) {
-		            let row = gridClmnPlan.getList("selected")[0];
-		            let newRowData = $.extend({}, row, {__index: undefined, clmnRate: 0, clmnAmt: 0});
-		            gridClmnPlan.addRow(newRowData, row.__index + 1);
-		        }
-		        // 두 번째 경우: 그리드가 비어 있는 경우
-		        else if (gridClmnPlan.getList().length === 0) {
-		            gridClmnPlan.addRow(newRowData, 0);
-		        }
-		        // 세 번째 경우: 그리드에 행은 있지만 선택된 행이 없는 경우
-		        else {
-		            gridClmnPlan.addRow(newRowData, gridClmnPlan.list.length);
-		            return;
-		        }
-		
-			        const data = gridClmnPlan.getList();
-			        gridClmnPlan.setData({
-			            list: data,
-			            page: {
-			                totalElements: data.length
-			            }
-			        });
-        }
-        prevData = JSON.parse(JSON.stringify(gridClmnPlan.getList()));
-        // 여기에서 그리드 데이터가 준비된 후 실행하려는 코드를 추가할 수 있습니다.
-
-    });
-
-    $("#deletePaymentButton").on("click", function () {
-        if (selectedRowKey !== undefined) {
-            gridClmnPlan.removeRow(selectedRowKey);
-            const data = gridClmnPlan.getList();
-            gridClmnPlan.setData({
-                list: data,
-                page: {
-                    totalElements: data.length
-                }
-            });
-
-            // 선택된 행을 업데이트합니다.
-            if (data.length > 0) { // 아직 데이터가 있는지 확인합니다.
-                if (selectedRowKey < data.length) { // 선택된 행이 마지막 행이 아니라면 다음 행을 선택합니다.
-                    gridClmnPlan.select(selectedRowKey);
-                } else { // 선택된 행이 마지막 행이었다면 이전 행을 선택합니다.
-                    selectedRowKey = selectedRowKey - 1;
-                    gridClmnPlan.select(selectedRowKey);
-                }
-            } else { // 데이터가 없다면 선택된 행을 초기화합니다.
-                selectedRowKey = undefined;
-                // 이 경우 삭제 버튼을 비활성화할 수 있습니다.
-                // 예: $("#deleteProductButton").prop("disabled", true);
-            }
-        } else {
-            alert("삭제를 위해 선택된 행이 없습니다.");
-        }
-    });
-
 
 </script>
