@@ -33,6 +33,74 @@
 
 	<select id="selectContractList" parameterType="Map" resultType="CamelMap">
 	/* selectContractList */
+	 WITH CT AS (
+		 		SELECT *
+		 		  FROM TB_SM11M01 M
+		         WHERE 1=1
+              <if test="coCd !=null and !coCd.equals('')">
+     	           AND M.CO_CD = #{coCd}
+              </if>
+			   <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
+				   AND M.CTRT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD') +1
+			  </if>
+              <if test="clntCd !=null and !clntCd.equals('')">
+     	           AND M.CLNT_CD = #{clntCd}
+              </if>
+              <if test="clntNm !=null and !clntNm.equals('')">
+     	           AND B.CLNT_NM LIKE '%'||#{clntNm}||'%'
+              </if>
+              <if test="ordrsNo !=null and !ordrsNo.equals('')">
+     	           AND M.ORDRS_NO LIKE '%'||#{ordrsNo}||'%'
+              </if>
+              <if test="salesCd !=null and !salesCd.equals('')">
+     	           AND M.SALES_CD LIKE '%'||#{salesCd}||'%'
+              </if>
+	 			)
+	 	, PLAN AS (
+					SELECT   
+					         CTRT_NO
+						   , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2010',CLMN_RATE)) AS PLAN_YUL1
+					       , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2010',CLMN_AMT))  AS PLAN_AMT1
+					       , MIN(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2010',CLMN_DT))   AS PLAN_DT1
+					       , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2020',CLMN_RATE)) AS PLAN_YUL2
+					       , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2020',CLMN_AMT))  AS PLAN_AMT2
+					       , MIN(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2020',CLMN_DT))   AS PLAN_DT2
+					       , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2030',CLMN_RATE)) AS PLAN_YUL3
+					       , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2030',CLMN_AMT))  AS PLAN_AMT3
+					       , MIN(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2030',CLMN_DT))   AS PLAN_DT3
+					       , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2040',CLMN_RATE)) AS PLAN_YUL4
+					       , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2040',CLMN_AMT))  AS PLAN_AMT4
+					       , MIN(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2040',CLMN_DT))   AS PLAN_DT4
+					       , SUM(CLMN_AMT) 											AS PLAN_AMT9
+					FROM TB_SM11D01 P
+					WHERE 1 = 1
+					  AND EXISTS (SELECT 1 FROM CT WHERE  P.CTRT_NO = CT.CTRT_NO)
+					GROUP BY P.CTRT_NO
+	 			)
+	 	, PAY AS (
+			 	SELECT R.CTRT_NO
+						, SUM(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2010',COST_AMT))  		AS PAY_AMT11	--매입금액
+						, TO_CHAR(MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2010',COST_DT)), 'MM-DD')   		AS PAY_DT11		--매입일자
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2010',PAY_DIV_DT))   	AS PAY_TX_DT11 	--세금계산서발행
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2010',PCHS_NO))   		AS PAY_CF_NO11 	--매입확정번호
+						, SUM(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2020',COST_AMT))  		AS PAY_AMT12
+						, TO_CHAR(MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2020',COST_DT)), 'MM-DD')   		AS PAY_DT12
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2020',PAY_DIV_DT))   	AS PAY_TX_DT12
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2020',PCHS_NO))   		AS PAY_CF_NO11 	--매입확정번호
+						, SUM(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2030',COST_AMT))  		AS PAY_AMT13
+						, TO_CHAR(MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2030',COST_DT)), 'MM-DD')   		AS PAY_DT13
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2030',PAY_DIV_DT))   	AS PAY_TX_DT13
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2030',PCHS_NO))   		AS PAY_CF_NO11 	--매입확정번호
+						, SUM(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2040',COST_AMT))  		AS PAY_AMT14
+						, TO_CHAR(MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2040',COST_DT)), 'MM-DD')   		AS PAY_DT14
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2040',PAY_DIV_DT))   	AS PAY_TX_DT14
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2040',PCHS_NO))   		AS PAY_CF_NO11 	--매입확정번호
+						, SUM(R.COST_AMT)												AS PAY_AMT19
+				FROM TB_SM10M01 R
+				WHERE 1 = 1
+				  AND EXISTS (SELECT 1 FROM CT WHERE  R.CTRT_NO = CT.CTRT_NO)
+				GROUP BY R.CTRT_NO
+	 		)
 		SELECT
 			*
 		FROM(
@@ -83,31 +151,18 @@
 						, (SELECT FN_CM06M01_ID_TO_NM(M.UDT_ID) FROM DUAL) UDT_ID_NM
 						, M.UDT_PGM
 						, TO_CHAR(M.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM
-				FROM TB_SM11M01 M
+						, M.CTRT_AMT - NVL(PAY_AMT19, 0) 			AS REM_AMT	--미지급금액
+						, PLAN.*
+						, PAY.*
+				FROM CT M
 						LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
 						LEFT OUTER JOIN TB_CR02M01 C ON C.CO_CD = M.ORDRS_CO_CD
 						                            AND C.ORDRS_NO = M.ORDRS_NO
 						LEFT OUTER JOIN TB_BM02M01 D ON D.CLNT_CD = C.ORDRS_CLNT_CD
+						LEFT OUTER JOIN PLAN ON PLAN.CTRT_NO = M.CTRT_NO			--지급계획
+						LEFT OUTER JOIN PAY  ON PAY.CTRT_NO = M.CTRT_NO				--지급실적
 		         WHERE 1=1
-              <if test="coCd !=null and !coCd.equals('')">
-     	           AND M.CO_CD = #{coCd}
-              </if>
-			   <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
-				   AND M.CTRT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD') +1
-			  </if>
-              <if test="clntCd !=null and !clntCd.equals('')">
-     	           AND M.CLNT_CD = #{clntCd}
-              </if>
-              <if test="clntNm !=null and !clntNm.equals('')">
-     	           AND B.CLNT_NM LIKE '%'||#{clntNm}||'%'
-              </if>
-              <if test="ordrsNo !=null and !ordrsNo.equals('')">
-     	           AND M.ORDRS_NO LIKE '%'||#{ordrsNo}||'%'
-              </if>
-              <if test="salesCd !=null and !salesCd.equals('')">
-     	           AND M.SALES_CD LIKE '%'||#{salesCd}||'%'
-              </if>
-		         ORDER BY M.CO_CD, M.CTRT_NO DESC, B.CLNT_NM
+		         ORDER BY M.CO_CD, B.CLNT_NM, M.CTRT_NO DESC
 				) AS a
 			) A
 		WHERE  RNUM BETWEEN #{firstIndex} AND #{lastIndex}
@@ -322,7 +377,7 @@
 			, UDT_ID                 = #{userId}
 			, UDT_PGM                = #{pgmId}
 			, UDT_DTTM               = SYSDATE
-    WHERE FILE_TRGT_KEY         = #{ctrtNo}
+    WHERE CTRT_NO         = #{ctrtNo}
   </update>
   
   <delete id="deleteContract" parameterType="Map">
@@ -433,5 +488,137 @@
           AND CTRT_NO = #{ctrtNo}
           AND CTRT_NO_SEQ = #{ctrtNoSeq}
     </delete>
+        
+
+	<select id="selectContractLPayCount" parameterType="Map" resultType="int">
+		SELECT
+            count(*)
+		FROM TB_SM11M01 M
+				LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
+         WHERE 1=1
+            <if test="coCd !=null and !coCd.equals('')">
+   	           AND M.CO_CD = #{coCd}
+            </if>
+		    <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
+			   AND M.CTRT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD') +1
+		    </if>
+            <if test="clntCd !=null and !clntCd.equals('')">
+   	           AND M.CLNT_CD = #{clntCd}
+            </if>
+            <if test="clntNm !=null and !clntNm.equals('')">
+   	           AND B.CLNT_NM LIKE '%'||#{clntNm}||'%'
+            </if>
+            <if test="ordrsNo !=null and !ordrsNo.equals('')">
+   	           AND M.ORDRS_NO LIKE '%'||#{ordrsNo}||'%'
+            </if>
+            <if test="salesCd !=null and !salesCd.equals('')">
+   	           AND M.SALES_CD LIKE '%'||#{salesCd}||'%'
+            </if>
+         ORDER BY M.CO_CD, M.CTRT_NO DESC, B.CLNT_NM			  			  
+
+	</select>
+	
+	<select id="selectContractLPayList" parameterType="Map" resultType="CamelMap">
+		SELECT
+			*
+		FROM(
+			SELECT
+				ROWNUM AS RNUM, A.*
+
+			FROM
+			(
+					SELECT 	  M.FILE_TRGT_KEY
+							, M.CO_CD
+							, FN_CM05M01_CD_TO_NM(M.CO_CD) AS CO_CD_NM
+							, M.CTRT_NO
+							, M.CLNT_CD  				AS VEND_CD	--공급사
+							, B.CLNT_NM  				AS VEND_NM	--공급사명
+							, C.ORDRS_CLNT_CD 			AS CLNT_CD	--수주고객사
+							, D.CLNT_NM								--수주고객사명
+							, M.ORDRS_CO_CD							--수주회사코드
+							, M.ORDRS_NO							--수주번호
+							, C.CLNT_PJT							--고객사프로젝트
+							, FN_CM05M01_CD_TO_NM(C.CLNT_PJT) AS CLNT_PJT_NM
+							, M.CTRT_NM								--외주계약명
+							, TO_CHAR(M.CTRT_DT, 'YYYY-MM-DD') AS CTRT_DT
+							, M.CTRT_AMT
+							, M.CTRT_ITEMS		--외주계약 품목
+							, M.CTRT_PMNT_MTD_CD
+							, FN_CM05M01_CD_TO_NM(M.CTRT_PMNT_MTD_CD) AS CTRT_PMNT_MTD_CD_NM
+							, M.CTRT_CLMN_DIV_CD
+							, FN_CM05M01_CD_TO_NM(M.CTRT_CLMN_DIV_CD) AS CTRT_CLMN_DIV_CD_NM
+							, M.CTRT_CLMN_DAY
+							, M.CTRT_CLMN_VAT
+							, FN_CM05M01_CD_TO_NM(M.CTRT_CLMN_VAT) AS CTRT_CLMN_VAT_NM
+							, TO_CHAR(M.CTRT_ORDRS_DT, 'YYYY-MM-DD') AS CTRT_ORDRS_DT
+							, TO_CHAR(M.CTRT_PFMC_DT, 'YYYY-MM-DD') AS CTRT_PFMC_DT
+							, TO_CHAR(M.CTRT_BF_PFMC_DT, 'YYYY-MM-DD') AS CTRT_BF_PFMC_DT
+							, TO_CHAR(M.CTRT_AF_PFMC_DT, 'YYYY-MM-DD') AS CTRT_AF_PFMC_DT
+							, M.CURR_CD
+							, FN_CM05M01_CD_TO_NM(M.CURR_CD) AS CURR_CD_NM
+							, M.EXRATE
+							, (SELECT FN_CM06M01_ID_TO_NM(M.MNG_ID) FROM DUAL) MNG_ID_NM
+							, M.CTRT_RMK
+							, M.ETC_FIELD1
+							, M.ETC_FIELD2
+							, M.ETC_FIELD3
+							, M.CREAT_ID
+							, (SELECT FN_CM06M01_ID_TO_NM(M.CREAT_ID) FROM DUAL) CREAT_ID_NM
+							, M.CREAT_PGM
+							, TO_CHAR(M.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM
+							, M.UDT_ID
+							, (SELECT FN_CM06M01_ID_TO_NM(M.UDT_ID) FROM DUAL) UDT_ID_NM
+							, M.UDT_PGM
+							, TO_CHAR(M.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM
+							, P.CLMN_PLAN_DIV
+							, FN_CM05M01_CD_TO_NM(P.CLMN_PLAN_DIV) AS CLMN_PLAN_DIV_NM
+							, P.CLMN_DIV_SEQ
+							, P.CLMN_RATE
+							, P.CLMN_AMT
+							, TO_CHAR(P.CLMN_DT, 'YYYY-MM-DD') AS CLMN_DT
+							, P.CLMN_PLAN_RMK
+							, P.CLMN_MGMT_STATUS
+							, R.COST_NO
+							, TO_CHAR(R.COST_DT, 'YYYY-MM-DD') AS COST_DT
+							, FN_CM05M01_CD_TO_NM(R.PCHS_COST_DIV20) AS PCHS_COST_DIV20_NM
+							, R.COST_AMT
+							, TO_CHAR(R.PAY_DIV_DT, 'YYYY-MM-DD') AS PAY_DIV_DT
+							, R.PCHS_NO
+							, decode(R.PCHS_NO,'',0, R.COST_AMT )
+							, P.CLMN_AMT-R.COST_AMT 				AS REM_AMT
+					FROM TB_SM11D01 P
+							LEFT OUTER JOIN TB_SM11M01 M ON P.CTRT_NO  = M.CTRT_NO  
+							LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
+							LEFT OUTER JOIN TB_CR02M01 C ON C.CO_CD = M.ORDRS_CO_CD
+							                            AND C.ORDRS_NO = M.ORDRS_NO
+							LEFT OUTER JOIN TB_BM02M01 D ON D.CLNT_CD = C.ORDRS_CLNT_CD
+							LEFT OUTER JOIN TB_SM10M01 R ON R.CTRT_NO = P.CTRT_NO
+							                            AND R.CTRT_NO_SEQ = P.CTRT_NO_SEQ
+		         WHERE 1=1
+              <if test="coCd !=null and !coCd.equals('')">
+     	           AND M.CO_CD = #{coCd}
+              </if>
+			   <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
+				   AND P.CLMN_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD') +1
+			  </if>
+              <if test="clntCd !=null and !clntCd.equals('')">
+     	           AND M.CLNT_CD = #{clntCd}
+              </if>
+              <if test="clntNm !=null and !clntNm.equals('')">
+     	           AND B.CLNT_NM LIKE '%'||#{clntNm}||'%'
+              </if>
+              <if test="ordrsNo !=null and !ordrsNo.equals('')">
+     	           AND M.ORDRS_NO LIKE '%'||#{ordrsNo}||'%'
+              </if>
+              <if test="salesCd !=null and !salesCd.equals('')">
+     	           AND M.SALES_CD LIKE '%'||#{salesCd}||'%'
+              </if>
+		         ORDER BY B.CLNT_NM, M.CTRT_NO
+				) AS a
+			) A
+		WHERE  RNUM BETWEEN #{firstIndex} AND #{lastIndex}
+
+	</select>
+
         
 </mapper>

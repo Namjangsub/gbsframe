@@ -24,5 +24,9 @@ public interface SM11Svc {
   int etcPchsOrderMasterReport(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
   int updateMailEtcPchsOrderConfirm(Map<String, String> param);
+  
+  int selectContractLPayCount(Map<String, String> paramMap);
+  
+  List<Map<String, String>> selectContractLPayList(Map<String, String> paramMap);
 
 }

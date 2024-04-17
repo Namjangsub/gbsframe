@@ -289,4 +289,14 @@ public class SM11SvcImpl implements SM11Svc {
 		return result;
 	}
 
+	  
+	  @Override
+	  public int selectContractLPayCount(Map<String, String> paramMap) {
+	    return sm11Mapper.selectContractLPayCount(paramMap);
+	  }
+
+	  @Override
+	  public List<Map<String, String>> selectContractLPayList(Map<String, String> paramMap) {
+	    return sm11Mapper.selectContractLPayList(paramMap);
+	  }
 }

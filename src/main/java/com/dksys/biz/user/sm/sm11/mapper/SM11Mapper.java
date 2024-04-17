@@ -40,4 +40,8 @@ public interface SM11Mapper {
   int deleteTurnKeyClmnPlanEx(Map<String, String> paramMap);
   
   
+
+  int selectContractLPayCount(Map<String, String> paramMap);
+  
+  List<Map<String, String>> selectContractLPayList(Map<String, String> paramMap);
 }

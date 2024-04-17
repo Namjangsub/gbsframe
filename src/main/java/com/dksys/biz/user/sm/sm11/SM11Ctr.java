@@ -141,5 +141,16 @@ public class SM11Ctr {
 		}
 		return "jsonView";
   }	  
+  
+//   외주관리 지급대상 리스트 조회
+  @PostMapping(value = "/selectContractLPayList")
+  public String selectContractLPayList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	  int totalCnt = sm11Svc.selectContractLPayCount(paramMap);
+	  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+	  model.addAttribute("paginationInfo", paginationInfo);
+	  List<Map<String, String>> result = sm11Svc.selectContractLPayList(paramMap);
+	  model.addAttribute("result", result);
+	  return "jsonView";
+  }
 	  
 }
