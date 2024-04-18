@@ -130,7 +130,7 @@ public class SM11Ctr {
 		try {
 			if (sm11Svc.etcPchsOrderMasterReport(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
-				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -150,6 +150,40 @@ public class SM11Ctr {
 	  model.addAttribute("paginationInfo", paginationInfo);
 	  List<Map<String, String>> result = sm11Svc.selectContractLPayList(paramMap);
 	  model.addAttribute("result", result);
+	  return "jsonView";
+  }
+
+  @PutMapping(value = "/createContractBill")
+  public String createContractBill(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+	  	try {
+			if (sm11Svc.createContractBill(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+  }
+  
+  @PutMapping(value = "/deleteContractBill")
+  public String deleteContractBill(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+	  try {
+		  if (sm11Svc.deleteContractBill(paramMap) != 0 ) {
+			  model.addAttribute("resultCode", 200);
+			  model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+		  } else {
+			  model.addAttribute("resultCode", 500);
+			  model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		  };
+	  }catch(Exception e){
+		  model.addAttribute("resultCode", 900);
+		  model.addAttribute("resultMessage", e.getMessage());
+	  }
 	  return "jsonView";
   }
 	  

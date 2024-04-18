@@ -29,4 +29,8 @@ public interface SM11Svc {
   
   List<Map<String, String>> selectContractLPayList(Map<String, String> paramMap);
 
+  int createContractBill(Map<String, String> paramMap) throws Exception;
+  
+  int deleteContractBill(Map<String, String> paramMap) throws Exception;
+  
 }

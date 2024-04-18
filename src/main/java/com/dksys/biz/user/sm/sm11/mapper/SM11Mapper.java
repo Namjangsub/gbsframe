@@ -31,6 +31,8 @@ public interface SM11Mapper {
 
 
 
+  String selectContractBilCostNoCreation(Map<String, String> paramMap);
+
   int insertTurnKeyClmnPlan(Map<String, String> detailMap);
 
   int updateTurnKeyClmnPlan(Map<String, String> paramMap);
@@ -44,4 +46,11 @@ public interface SM11Mapper {
   int selectContractLPayCount(Map<String, String> paramMap);
   
   List<Map<String, String>> selectContractLPayList(Map<String, String> paramMap);
+  
+  //외주관리에서 기타매출 생성 및 삭제처리
+  int createContractBillMaster(Map<String, String> paramMap);
+  int createContractBillDetail(Map<String, String> paramMap);
+  int deleteContractBillMaster(Map<String, String> paramMap);
+  int deleteContractBillDetail(Map<String, String> paramMap);
+  int deleteContractBillReport(Map<String, String> paramMap);
 }

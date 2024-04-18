@@ -299,4 +299,34 @@ public class SM11SvcImpl implements SM11Svc {
 	  public List<Map<String, String>> selectContractLPayList(Map<String, String> paramMap) {
 	    return sm11Mapper.selectContractLPayList(paramMap);
 	  }
+	  
+
+
+	  @Override
+	  public int createContractBill(Map<String, String> paramMap) throws Exception {
+		  
+		  //기타비용 번호 자동 생성
+		  String costNo = sm11Mapper.selectContractBilCostNoCreation(paramMap);
+		  paramMap.put("costNo", costNo);
+		  
+		  //기타매입 마스터 생성
+		  int result = sm11Mapper.createContractBillMaster(paramMap);
+
+		  //기타매입 상세내역 생성
+		  result += sm11Mapper.createContractBillDetail(paramMap);
+		    
+		  return result;
+	  }
+
+	  @Override
+	  public int deleteContractBill(Map<String, String> paramMap) throws Exception {
+		  //기타매입 마스터 삭제
+		  int result = sm11Mapper.deleteContractBillMaster(paramMap);
+		  //기타매입 상세내역 삭제
+		  result += sm11Mapper.deleteContractBillDetail(paramMap);
+		  //기타매입 발주서발행내역 삭제
+		  result += sm11Mapper.deleteContractBillReport(paramMap);
+		    
+		  return result;
+	  }
 }
