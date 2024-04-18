@@ -34,4 +34,7 @@ public interface BM05Svc {
 
 	// 자재마스터 품번 삭제 체크 조회
 	Map<String, String> deleteMatrCdChk(Map<String, String> paramMap);
+
+	// 자재마스터 설계 BOM에서 형번/규격 검색용
+	List<Map<String, String>> BOM_selectMatrMnoList(Map<String, String> paramMap);
 }

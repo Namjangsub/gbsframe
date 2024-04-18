@@ -124,4 +124,14 @@ public class BM05Ctr {
     	}
     	return "jsonView";
 	}
+	
+
+
+	//자재마스터 설계 BOM에서 형번/규격 검색용
+	@PostMapping(value = "/BOM_selectMatrMnoList")
+	public String BOM_selectMatrMnoList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = bm05Svc.BOM_selectMatrMnoList(paramMap);
+		model.addAttribute("resultList", result);
+		return "jsonView";
+	}
 }

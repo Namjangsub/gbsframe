@@ -214,4 +214,10 @@ public class BM05SvcImpl implements BM05Svc {
 		//---------------------------------------------------------------
 		return result;
 	}
+
+	// 자재마스터 설계 BOM에서 형번/규격 검색용
+	@Override
+	public List<Map<String, String>> BOM_selectMatrMnoList(Map<String, String> paramMap) {
+		return bm05Mapper.BOM_selectMatrMnoList(paramMap);
+	}
 }
