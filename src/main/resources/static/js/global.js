@@ -2269,7 +2269,7 @@ function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 	
 	chkValue = chkValue.replace(/\-/g, '');
 	
-	if(chkType === 'D'){
+	if(chkType === 'D' || chkType === 'C' || chkType === 'U' ){
 		actionType = chkType;
 	}else{
 		actionType = modalStack.last().paramObj.actionType;

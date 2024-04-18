@@ -203,17 +203,16 @@ public class CM05Ctr {
     	
 	    	if("CR".equals(menuUrl)) {  //수주관리
 	    		
-	    		rtnVal = closeYn;	//마감년월여부
-	    		rtnDate = resultList.get(0).get("closeYm").toString();
-	    	}else if("PM".equals(menuUrl)) {  //작업일보
-	    		
-	    		rtnVal = prdctnCloseYn;				//생산마감여부
-	    		rtnDate = resultList.get(0).get("prdctnCloseDt").toString();
-	    	}else if("CR".equals(menuUrl) ) {
+//	    		rtnVal = closeYn;	//마감년월여부
+//	    		rtnDate = resultList.get(0).get("closeYm").toString();
 	    		//매출확정, 매출계산서, 수금, 물류진행요청
 	    		
 	    		rtnVal = sellCloseYn;	//매출마감여부
 	    		rtnDate = resultList.get(0).get("sellCloseDt").toString();
+	    	}else if("PM".equals(menuUrl)) {  //작업일보
+	    		
+	    		rtnVal = prdctnCloseYn;				//생산마감여부
+	    		rtnDate = resultList.get(0).get("prdctnCloseDt").toString();
 	    	}else if("SM".equals(menuUrl) ) {
 	    		//입고, 매입확정 및 계산서, 구매비용, 반품
 	    		
