@@ -265,6 +265,10 @@
 						} else if (this.key == "matrMno") {
 							//같은창을 계속 open 하는데 처리방법은?
 // 							if (!matModalOpen) openMatListSearch();
+							this.list[this.dindex].matrCd = "";
+							this.list[this.dindex].matrUnitCdNm = "";
+							this.list[this.dindex].matrError = "";
+							this.list[this.dindex].matrErrorText = "";
 						}
 
 						if (this.item.__selected__ == true) {
@@ -295,6 +299,8 @@
 			        //    ,{key : "updChk", 		label : "수정구분",   		width : 100,	hidden: true, 	styleClass: function () { return gridStyle(this.item); }}
 			        //    ,{key : "fileTrgtKey",  	label : "키값",   		width : 30,		hidden: true}
 			        //    ,{key : "lowerKey",  	label : "하위코드",   		width : 30,		hidden: true}
+		            {key : "matrErrorText", label : "오류내용", 			width : 120},
+		            {key : "matrError", 	label : "구매수정", 			width : 80,  hidden: true},
 				],
 				contextMenu: {
 					iconWidth: 20,
@@ -337,6 +343,8 @@
 							tempRow.matrCd 		= "";
 							tempRow.matrUnitCd	= "";
 							tempRow.matrUnitCdNm	= "";
+							tempRow.matrError	= "";
+							tempRow.matrErrorText	= "";
 // 							childGridView.target.addRow($.extend({}, childGridView.target.list[param.dindex], {__index: undefined}),param.dindex+1,);
 							childGridView.target.addRow(tempRow,param.dindex+1,);
 // 							childGridView.target.setValue(param.dindex+1, 'updChk', "I");
@@ -473,7 +481,7 @@
 			//**************************************************************
 			//  구매품, 유공압품은 자재검색 필수 처리 Start
 			//**************************************************************
-			let chkDigit = /^[5-6]\d{2}$/;  //5 또는 6으로 시작하는 3자리 문자열인지 검사하는 정규식
+			let chkDigit = /^[5-6][0-9]{2}.*/  //*  /^[5-6]\d{2}$/; */ //5 또는 6으로 시작하는 3자리 문자열인지 검사하는 정규식
 			$.each(tempBomArr,function(rowIdx, list) {
 				if (pasFloatChk(list.pchsBomCnt) > 0) {
 					alert(list.lowerCd + "번은 구매BOM 작성 완료되어 수정할 수 없습니다.")
@@ -482,10 +490,10 @@
 				if (chkDigit.test(list.lowerCd)) {
 // 					console.log("3자리 구매품");
 					if (list.matrMno == undefined  || list.matrMno == ""){
-						alert(list.lowerCd + "번은 구매품으로 형번/규격이 필요합니다.");
+// 						alert(list.lowerCd + "번은 구매품으로 형번/규격이 필요합니다.");
 						childGridView.target.setValue(list.__index, 'matrError', 'E');
+						childGridView.target.setValue(list.__index, 'matrErrorText', '형번/규격 없음');
 						noErr = false;
-						return false;
 					}
 
 					if (list.matrError !="Y") { //자재검색 완료된것이 아니면 체크필요함
@@ -493,18 +501,20 @@
 						var paramObj = { "matrMno" : list.matrMno };
 						postAjaxSync("/user/bm/bm05/BOM_selectMatrMnoList", paramObj, null, function(data) {   
 							if(data.resultList.length == 0 ) {	//형번규격이 검색되지 않음
-								alert(list.lowerCd + "번은 구매품으로 형번/규격이 존재하지 않습니다. 확인 해 주세요.");
+// 								alert(list.lowerCd + "번은 구매품으로 형번/규격이 존재하지 않습니다. 확인 해 주세요.");
 								childGridView.target.setValue(list.__index, 'matrError', 'E');
+								childGridView.target.setValue(list.__index, 'matrErrorText', '형번/규격 없음');
 								noErr = false;
-								return false;
 							} else if(data.resultList.length == 1 ) {	//1건 정상 검색처리스
 								childGridView.target.setValue(list.__index, 'matrCd', data.resultList[0].matrCd);
+								childGridView.target.setValue(list.__index, 'matrMno', data.resultList[0].matrSpec);
 								childGridView.target.setValue(list.__index, 'matrError', 'Y');
+								childGridView.target.setValue(list.__index, 'matrErrorText', '');
 							} else {	//1건이상 검색시 선택이 필요함
-								alert(list.lowerCd + "번은 자재가 2개이상 중복됩니다. 자재코드를 선택해 주세요.");
+// 								alert(list.lowerCd + "번은 자재가 2개이상 중복됩니다. 자재코드를 선택해 주세요.");
 								childGridView.target.setValue(list.__index, 'matrError', 'E');
+								childGridView.target.setValue(list.__index, 'matrErrorText', '자재 2개이상 중복');
 								noErr = false;
-								return false;
 							}
 					
 						});   //자재 형번/규격 검색처리 end
@@ -651,6 +661,8 @@
 		newRow.matrCd 	= "";
 		newRow.matrUnitCd	= "";
 		newRow.matrUnitCdNm	= "";
+		newRow.matrError	= "";
+		newRow.matrErrorText	= "";
 		
 		if($('input[name="autoNo"]:checked').val() == 'Y'){ // 자동체번 체크했을 때,
 			if (newRow.lowerCd.length == 3) {
@@ -758,6 +770,7 @@
 				index=1;
 
 				childGridView.target.setValue(row, 'matrError', 'Y');
+				childGridView.target.setValue(row, 'matrErrorText', '');
 			};	
 			matModalOpen = false;	//자재형변변경시 한번만 실행되게 강제하기위함
 		});
@@ -855,6 +868,8 @@
 			  for (var i = 0; i < numRows-1; i++) {
 			        if (startRowIndex + i >= gridLength) {
 			        	childGridView.target.addRow($.extend({"updChk":"I"}, childGridView.target.list[thisGridRow], {__index: undefined}));
+						childGridView.target.setValue(startRowIndex + i, 'matrError', '');
+						childGridView.target.setValue(startRowIndex + i, 'matrErrorText', '');
 			        	gridLength = childGridView.target.getList().length;
 			        }
 	
