@@ -547,14 +547,17 @@
 							, A.BILL_YN   /*계산서 여부*/
 							, A.FILE_TRGT_KEY
 							, A.CREAT_ID_NM
+							, A.PAY_DIV
+							, TO_CHAR(A.PAY_DIV_DT, 'YYYY-MM-DD') 	AS PAY_DIV_DT
+							, ( SELECT FN_CM05M01_CD_TO_NM(A.PAY_DIV) FROM DUAL ) AS PAY_DIV_NM	
 						  FROM
 						  (
 								WITH IPGO AS (
 									SELECT    A.*
 											, D1.CLNT_NM  AS PCHS_CLNT_NM
 									  FROM (
-											SELECT A.* 
-														, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN 'N' 
+											SELECT
+														  CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN 'N' 
 														   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN 'R' ELSE 'Y' END IS_COST
 														, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN '' 
 														   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN '' ELSE C.ORDRS_NO END ORDRS_NO --수주번호
@@ -565,6 +568,7 @@
 														, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.FILE_TRGT_KEY 
 														   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN RM.FILE_TRGT_KEY ELSE C.FILE_TRGT_KEY END FILE_TRGT_KEY
 														, (SELECT FN_CM06M01_ID_TO_NM(A.CREAT_ID) FROM DUAL) AS CREAT_ID_NM
+														, A.* 
 											FROM  TB_SM12D01 A /* 매입 확정 DETAIL */		
 													LEFT OUTER JOIN TB_SM02M01 M ON(A.ORDRG_NO = M.ORDRG_NO)		/* 발주마스터 */
 													LEFT OUTER JOIN TB_SM10M01 C ON(A.ORDRG_NO = C.COST_NO)			/* 비용마스터 */
@@ -656,6 +660,8 @@
 											, A.FILE_TRGT_KEY
 											, A.PCHS_SEQ
 											, A.CREAT_ID_NM
+											, A.PAY_DIV
+											, A.PAY_DIV_DT
 									FROM  IPGO A /* 매입 확정 DETAIL */		
 							                LEFT OUTER JOIN BAL AS D ON A.CO_CD = D.CO_CD AND A.ORDRG_NO = D.ORDRG_NO --발주상세
 							                LEFT OUTER JOIN IPGOTOT AS E ON A.CO_CD = E.CO_CD AND A.ORDRG_NO = E.ORDRG_NO --매입확정집계
@@ -955,23 +961,14 @@
 		SELECT NVL(MAX_PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00001') AS MAX_IN_NO
 			FROM
 			(
-			SELECT DISTINCT DECODE( INSTR(PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')), 0, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00001'
-							, 'PC' || MAX( TO_CHAR(SYSDATE, 'YY')|| LPAD( SUBSTRING(PCHS_NO, -5)+1, 5, '0') ) OVER()
-						  ) AS MAX_PCHS_NO
-				FROM TB_SM12D01
-			WHERE 1=1
-				AND PCHS_NO LIKE 'PC'||TO_CHAR(SYSDATE, 'YY')||'%'
-			<if test="coCd != null and !coCd.equals('')">
-				AND CO_CD = #{coCd}   
-			</if>	
-			<if test="ordrgNo != null and !ordrgNo.equals('')">
-				AND ORDRG_NO = #{ordrgNo}   
-			</if>					
-			UNION ALL
-			SELECT NULL AS MAX_PCHS_NO
-				FROM DUAL		
+				SELECT DISTINCT DECODE( INSTR(PCHS_NO, 'PC'||TO_CHAR(SYSDATE, 'YY')), 0, 'PC'||TO_CHAR(SYSDATE, 'YY')||'00001'
+								, 'PC' || MAX( TO_CHAR(SYSDATE, 'YY')|| LPAD( SUBSTRING(PCHS_NO, -5)+1, 5, '0') ) OVER()
+							  ) AS MAX_PCHS_NO
+					FROM TB_SM12D01
+				WHERE 1=1
+					AND PCHS_NO LIKE 'PC'||TO_CHAR(SYSDATE, 'YY')||'%'
 			)		
-			WHERE MAX_PCHS_NO IS NOT NULL OR ROWNUM = 1	
+			WHERE MAX_PCHS_NO IS NOT NULL OR ROWNUM = 1		
 	</select>		
 	
 	<!-- 발주 DETAIL SELECT -->
@@ -2355,8 +2352,10 @@
 						, COMP.PCHS_AMT
 						, COMP.PCHS_VAT
 						, COMP.PCHS_AMT_TOT
+						, COMP.PAY_DIV
+						, ( SELECT FN_CM05M01_CD_TO_NM(COMP.PAY_DIV) FROM DUAL ) PAY_DIV_NM    
 --						, DECODE(SUBSTR(MR.ORDRG_NO,1,3),'BAL', MR.IN_TOT_AMT - NVL(COMP.PCHS_AMT_TOT,0),0)  AS REMAIN_AMT --발주일경우만 잔액이 발생 함
-						, MR.IN_TOT_AMT - NVL(COMP.PCHS_AMT_TOT,0)  AS REMAIN_AMT
+						, MR.IN_TOT_AMT - NVL(COMP.PCHS_NO_AMT_TOT,0)  AS REMAIN_AMT
 				  FROM (
 						  SELECT  
 									IPGO.CO_CD, IPGO.ORDRG_NO, IPGO.REQ_NO, IPGO.SALES_CD
@@ -2462,10 +2461,12 @@
 												SELECT    CO_CD
 														, ORDRG_NO
 														, PCHS_NO
+														, PAY_DIV
 														, MAX(PCHS_DT)	  AS PCHS_DT	--매입확정일자
 														, SUM(PCHS_AMT)   AS PCHS_AMT
 														, SUM(PCHS_VAT)   AS PCHS_VAT
-														, SUM(SUM(PCHS_AMT)) OVER(PARTITION BY CO_CD, ORDRG_NO, PCHS_NO) AS PCHS_AMT_TOT
+														, SUM(SUM(PCHS_AMT)) OVER(PARTITION BY CO_CD, ORDRG_NO, PCHS_NO, PAY_DIV) AS PCHS_AMT_TOT	 --지급유형별 계
+														, SUM(SUM(PCHS_AMT)) OVER(PARTITION BY CO_CD, ORDRG_NO, PCHS_NO ) 		  AS PCHS_NO_AMT_TOT  --입고번호계
 												  FROM TB_SM12D01 M
 												 WHERE 1 = 1      
 												<if test="coCd != null and !coCd.equals('')">
@@ -2477,7 +2478,7 @@
 										            AND M.PCHS_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
 													</if>   
 												</if>	
-												 GROUP BY CO_CD, ORDRG_NO, PCHS_NO   --, PCHS_DT
+												 GROUP BY CO_CD, ORDRG_NO, PCHS_NO, PAY_DIV   --, PCHS_DT
 							) COMP ON MR.CO_CD = COMP.CO_CD AND MR.ORDRG_NO = COMP.ORDRG_NO
 		)
 		SELECT *
@@ -2500,6 +2501,8 @@
 							, IPGO_BALJU.PCHS_AMT + IPGO_BALJU.PCHS_VAT   AS PCHS_AMT_VAT
 							, IPGO_BALJU.PCHS_AMT_TOT
 							, IPGO_BALJU.REMAIN_AMT
+							, IPGO_BALJU.PAY_DIV
+							, IPGO_BALJU.PAY_DIV_NM
 						  FROM
 						  (
 							SELECT DISTINCT 
@@ -2870,7 +2873,10 @@
 		    , TO_CHAR(D.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') CREAT_DTTM
 		    , A.SALES_CD 
 		    , C.NAME AS CREAT_NM            	
-		    , PCHS_RMK            	
+		    , PCHS_RMK
+		    , PAY_DIV   	
+			, FN_CM05M01_CD_TO_NM(D.PAY_DIV)    	AS PAY_DIV_NM
+		    , TO_CHAR(D.PAY_DIV_DT, 'YYYY-MM-DD') 	AS PAY_DIV_DT	
 		FROM TB_SM12D01 D			/* 매입디테일 */
 		LEFT OUTER JOIN TB_SM02M01 A ON A.ORDRG_NO = D.ORDRG_NO
 		LEFT OUTER JOIN TB_CM06M01 C ON C.EMP_NO = D.CREAT_ID
@@ -2904,6 +2910,8 @@
 			, CREAT_PGM
 			, CREAT_DTTM
 			, PCHS_RMK
+			, PAY_DIV
+			, PAY_DIV_DT
 		  )
 		VALUES
 		  (
@@ -2921,6 +2929,8 @@
 			, #{pgmId}
 			, SYSDATE
 			, #{pchsRmk}
+			, #{payDiv}
+			, #{payDivDt}
 	      )
 	</insert>	
 	
@@ -2935,10 +2945,6 @@
 				FROM TB_SM12D01
 			WHERE 1=1
 			  AND PCHS_NO LIKE 'PC'||TO_CHAR(SYSDATE, 'YY')||'%'
-			  AND CO_CD = #{coCd}   
-			UNION ALL
-			SELECT NULL AS MAX_PCHS_NO
-				FROM DUAL		
 			)		
 			WHERE MAX_PCHS_NO IS NOT NULL OR ROWNUM = 1	
 	</select>
