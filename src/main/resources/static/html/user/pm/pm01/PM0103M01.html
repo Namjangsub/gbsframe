@@ -99,8 +99,9 @@
 
     <div class="contents">
       <div class="ax5_grid">
-        <div data-ax5grid="first-grid" data-ax5grid-config="{}" style="height: 750px; width: 100%"></div>
+        <div data-ax5grid="first-grid" data-ax5grid-config="{}" style="height: 450px; width: 100%"></div>
         <div data-ax5grid="excel-grid" data-ax5grid-config="{}" style="display: none;"></div>
+		<div data-ax5grid="second-grid" data-ax5grid-config="{}" style="height: 300px; width: 100%"></div>
       </div>
     </div>
 </body>
@@ -108,31 +109,38 @@
 
 
 <script type="text/javascript">
-var isFirst = true;
-var today = new Date();  //카렌더 생성용
+	var today = new Date();  //카렌더 생성용
 
-ax5.ui.grid.formatter["holyChk"] = function () {
-	var idx = parseInt(this.key);
-    const jobKey = `job${idx}`;
-    var jobValue = this.item[jobKey]; //휴가, 출장 텍스트 
-    
-	//휴가 시간 산출
-//     const holyTimeKey = `holyTime${idx}`;
-//     var holyTimeValue = this.item[holyTimeKey];  //휴가 시간
-//     holyTimeValue = holyTimeValue == undefined ? "" : holyTimeValue;
-    
-    if (this.value > 0) {
-	    if (jobValue == undefined) {
-	    	jobValue = this.value;
-	    } else {
-	    	jobValue += "+" + this.value;
-	    }
-	}
+	ax5.ui.grid.formatter["issYn"] = function () {
+		var color = this.value == "N" ? "color-circle_02.png" : "color-circle_01.png";
+		if (this.value == "E") {
+			return 'E';
+		} else {
+			return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
+		}
+	};
+	ax5.ui.grid.formatter["holyChk"] = function () {
+		var idx = parseInt(this.key);
+	    const jobKey = `job${idx}`;
+	    var jobValue = this.item[jobKey]; //휴가, 출장 텍스트 
+	    
+		//휴가 시간 산출
+	//     const holyTimeKey = `holyTime${idx}`;
+	//     var holyTimeValue = this.item[holyTimeKey];  //휴가 시간
+	//     holyTimeValue = holyTimeValue == undefined ? "" : holyTimeValue;
+	    
+	    if (this.value > 0) {
+		    if (jobValue == undefined) {
+		    	jobValue = this.value;
+		    } else {
+		    	jobValue += "+" + this.value;
+		    }
+		}
+		
+		return jobValue;
+	};
 	
-	return jobValue;
-};
-
-var gridView = {
+	var gridView = {
 		initView : function() {
   			this.target = new ax5.ui.grid();
   			this.target.setConfig({
@@ -146,10 +154,15 @@ var gridView = {
   		        },
   		        body: {
   		        	columnHeight: 40,
-  		        	 onClick: function () {
+  		        	onClick: function () {
+   		                this.self.clearSelect();
   		                this.self.select(this.dindex);
+  		            	dailyGridView.setData(0, this.column.key);
   		            },
   		            onDBLClick: function () {
+   		                this.self.clearSelect();
+  		                this.self.select(this.dindex);
+  		                insertNewDayDailyWorkModal(this.column.key);
   		            },
   		        },
 
@@ -209,7 +222,7 @@ var gridView = {
         },
 
 		setData : function(_pageNo) {
-	    firstGrid = this.target;
+	    	firstGrid = this.target;
 			if (inputValidation($('input[required]'))) {
 				var paramObj = {};
 				$.each($('#main_area [data-search]'), function(idx, elem){
@@ -234,7 +247,7 @@ var gridView = {
   							totalElements : list==undefined ? 0 : list.length
   						}
 					});
-					gridHeightResize(gridView, 169); // 169 = 919 - 750 : 화면 Body 높이 - 그리드 기본크기 750
+// 					gridHeightResize(gridView, 169); // 169 = 919 - 750 : 화면 Body 높이 - 그리드 기본크기 750
 				});
 			}
 		}
@@ -260,6 +273,117 @@ var gridView = {
 	}
 
 
+	
+	var dailyGridView = {
+		initView : function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+		    	showRowSelector: true,
+		    	multipleSelect: false,
+		    	sortable: true,
+		        target: $('[data-ax5grid="second-grid"]'),
+		        header: {
+		        	align: "center",
+		        	selector: true
+		        },
+		        body: {
+					mergeCells : ["coNm", "workRptDt","workRptLNm","workRptMNm","workRptSNm","workRptNo","salesCd","prdtCdNm","itemDivNm","workRptIdNm"],
+					onClick: function () {
+						this.self.select(this.dindex);
+					},
+					onDBLClick: function () {
+						insertDailyWorkModal("U");
+					},
+					grouping: {
+						by: ["workRptDt"] ,
+						columns: [
+							{
+								label: function () {
+									return this.groupBy.labels.join(", ") + " 소계";
+								}, colspan: 2, align: "center"
+							},
+							{key: "workRptHour", collector: "sum", formatter: "money", align: "right"},
+						]
+					}
+				},
+				page : {
+					navigationItemCount : 10,
+					height : 30,
+					display : true,
+					firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+					prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+					nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+					lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+					onChange : function() {
+						gridView.setData(this.page.selectPage);
+					}
+				},
+				footSum: [
+					[
+						{label: "총계", colspan:2, align:"center"},
+						{key: "workRptHour", 		collector: "sum", formatter:"money", align: "right"}
+					]
+				],
+				columns : [
+					{key: "fileTrgtKey",	label: "파일대상KEY",		width: 50,		align: "center", 	hidden:true}
+					,{key: "coCd",	    	label: "회사코드",			width: 100,		align: "center", 	hidden:true}
+					,{key: "workRptId",	    label: "작성자ID",			width: 100,		align: "center", 	hidden:true}
+					,{key: "coNm",	    	label: "회사",			width: 70,		align: "center", 	hidden:true}
+					,{key: "workRptLNm", 	label: "대분류", 			width: 140,		align: "left", 	hidden:true}
+					,{key: "workRptIdNm",	label: "작성자",			width: 90,		align: "center"}
+					,{key: "workRptDt", 	label: "작성일자", 		width: 90,		align: "center"}
+					,{key: "workRptHour",	label: "작업시간",			width: 70,		align: "right" }
+					,{key: "workRptMNm",  	label: "중분류", 			width: 140,		align: "left"}
+					,{key: "workRptSNm",  	label: "소분류", 			width: 140,		align: "left"}
+					,{key: "workRptNo",		label: "작업일보번호", 	    width: 130,		align: "center", 	hidden:true}
+					,{key: "issueYn", 		label: "이슈", 			width: 50,		align: "center",	formatter: "issYn"}	
+					,{key: "clntNm", 		label: "고객사", 			width: 140,		align: "left"}
+					,{key: "clntPjtNm", 	label: "고객사PJT", 		width: 80,		align: "center"}
+					,{key: "salesCd", 		label: "Sales Code", 	width: 120,		align: "center"}
+					,{key: "prdtCdNm", 		label: "제품구분", 		width: 150,		align: "left"}
+					,{key: "itemDivNm", 	label: "아이템구분", 		width: 150,		align: "left"}
+					,{key: "workRptRmk", 	label: "비고", 			width: 250,		align: "left"}
+					,{key: "eqpNm",			label: "설비명", 	    	width: 90,		align: "center", 	hidden:true}
+					,{key: "creatNm", 		label: "생성자", 			width: 90,		align: "center"}
+					,{key: "creatDttm", 	label: "생성일시", 		width: 130,		align: "center"}
+					,{key: "udtNm", 		label: "변경자", 			width: 80,		align: "center"}
+					,{key: "udtDttm", 		label: "변경일시", 		width: 130,		align: "center"}
+					,{key: "issueTitle", 	label: "이슈제목", 		width: 130,		align: "center"}
+				],
+			}).setColumnSort({
+			      "workRptIdNm": {orderBy: "asc", seq: 0},
+			      "workRptDt": {orderBy: "desc", seq: 1},
+			});
+			return this;
+		},
+		setData : function(_pageNo, day='01') {
+			var targetObj = this.target;
+			let row = gridView.target.getList("selected")[0];
+			let paramObj = {
+				  pageNo		: 1,
+				  sortType		: "DATE",
+				  coCd			: $("#coCd_S").val(),
+				  reqDtFrom		: $("#workYm").val().replace(/\-/g, '') + day.toString().padStart(2, "0"),
+				  reqDtTo		: $("#workYm").val().replace(/\-/g, '') + day.toString().padStart(2, "0"),
+				  workRptId		: row.id,
+				  prdtCd		: "",
+				  prdtNm		: "",
+				  recordCnt		: 999999
+				};
+			postAjax("/user/pm/pm01/selectDailyWorkList", paramObj, null, function(data) {
+				var list = data.result;
+				targetObj.setData({
+					list : list,
+					page : {
+						totalElements : data.paginationInfo.totalRecordCount,
+					}
+				});
+// 				gridHeightResize(gridView, 219); // 219 = 919 - 700 : 화면 Body 높이 919 - 그리드 기본크기 700
+				
+			});
+		}
+	}
+
   	$(document).ready(function() {
 
   		mainDefaultLoad("공통업무", "월작업일보집계현황");			// 페이지 타이틀 설정
@@ -278,6 +402,8 @@ var gridView = {
 	  	
 		gridView.initView();
   		excelView.initView();
+  		dailyGridView.initView();
+  		
 		buildCalendar(); //달력에 맞게 그리드 생성
 		gridView.setData();
   		
@@ -513,5 +639,49 @@ var gridView = {
 
 		gridView.target.addColumn({key: "rmk", label: "비고", width: 120, align: "center"}); 	
 	  }	
-	  
+
+	function insertNewDayDailyWorkModal(day) {
+		var paramObj = {
+			"actionType" : "C",
+			"fileTrgtKey" : 0,
+			"coCd" 	   : jwt.coCd,
+			"userId"   : jwt.userId,
+			"workRptDt": $('#workYm').val() + '-' + day.toString().padStart(2, "0"),
+			"pgmId"    : "PM0101M01"
+		}
+		openModal("/static/html/user/pm/pm01/PM0101P01.html", 750, 560, "", paramObj, function(data) {
+			gridView.setData(0);
+			dailyGridView.setData(0);
+		});
+	}
+
+	/*수정 or 등록 버튼 클릭 시*/
+	function insertDailyWorkModal(type) {
+		var row = dailyGridView.target.getList("selected")[0];
+		if (type == 'U') {
+			var paramObj = {
+				"actionType" : type,
+				"fileTrgtKey" : row.fileTrgtKey,
+				"coCd" 	   : row.coCd,
+				"userId"   : jwt.userId,
+				"pgmId"    : "PM0101M01"
+			};
+		} else {
+			var paramObj = {
+				"actionType" : type,
+				"fileTrgtKey" : 0,
+				"coCd" 	   : jwt.coCd,
+				"userId"   : jwt.userId,
+				"pgmId"    : "PM0101M01"
+			}
+			var param = {};
+			Object.assign(paramObj, row)	
+		}
+		// debugger;
+		openModal("/static/html/user/pm/pm01/PM0101P01.html", 750, 560, "", paramObj, function(data) {
+			gridView.setData(0);
+			dailyGridView.setData(0);
+		});
+	}
+
 </script>
