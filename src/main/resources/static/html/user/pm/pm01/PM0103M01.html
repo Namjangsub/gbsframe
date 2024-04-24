@@ -37,6 +37,8 @@
 <script src="/static/js/fileTree.js"></script>
 <!-- <script src="/static/js/calLuna.js"></script> -->
 <script src="/static/js/LunarCalendar.js"></script>
+<script type="text/javascript" src="/static/js/workingDayCalc.js"></script>
+<script type="text/javascript" src="/static/js/korean-lunar-calendar.min.js"></script>
 </head>
 
 <body>
@@ -101,9 +103,24 @@
       <div class="ax5_grid">
         <div data-ax5grid="first-grid" data-ax5grid-config="{}" style="height: 450px; width: 100%"></div>
         <div data-ax5grid="excel-grid" data-ax5grid-config="{}" style="display: none;"></div>
-		<div data-ax5grid="second-grid" data-ax5grid-config="{}" style="height: 300px; width: 100%"></div>
       </div>
     </div>
+    
+	<div class="contents_tit">
+		<span style="height: 30px; line-height: 30px;font-size: 15px;margin-left: 15px">작업일보 리스트</span>
+		<div class="add_btn_small pdl10">
+			<a onclick="insertDailyWorkModal('C');" style="height: 30px; line-height: 28px;" authchk>+</a>
+			<a onclick="deleteDailyWork();" style="height: 30px; line-height: 28px;" authchk>-</a>
+			<a onclick="wbsPlanInsertModal();" style="height: 30px; line-height: 28px; width: 90px;"><i class="far fa-calendar-alt"></i> 일정관리</a>
+		</div>
+	</div>
+
+    <div class="contents">
+      <div class="ax5_grid">
+		<div data-ax5grid="second-grid" data-ax5grid-config="{}" style="height: 260px; width: 100%"></div>
+      </div>
+    </div>
+    
 </body>
 </html>
 
@@ -384,7 +401,7 @@
 						totalElements : data.paginationInfo.totalRecordCount,
 					}
 				});
-// 				gridHeightResize(gridView, 219); // 219 = 919 - 700 : 화면 Body 높이 919 - 그리드 기본크기 700
+				gridHeightResize(dailyGridView, 659); // 659 = 919 - 260 : 화면 Body 높이 919 - 그리드 기본크기 260
 				
 			});
 		}
@@ -685,7 +702,6 @@
 			var param = {};
 			Object.assign(paramObj, row)	
 		}
-		debugger;
 		openModal("/static/html/user/pm/pm01/PM0101P01.html", 750, 560, "", paramObj, function (data){
 			gridView.setData(0);
 			gridView.target.select(lastMainIndex);
@@ -693,4 +709,62 @@
 		});
 	}
 
+
+	/*삭제 버튼 클릭 시*/
+	function deleteDailyWork() {
+		var row = dailyGridView.target.getList("selected")[0];
+		var formData = {
+            "fileTrgtKey"   : row.fileTrgtKey,
+            "workRptNo"     : row.workRptNo,
+            "workRptId"     : row.workRptId,
+            "coCd"          : row.coCd,
+			"userId"   		: jwt.userId,
+			"fileTrgtTyp"  : $('#pgmId').val(),
+		}
+		
+		if(!monthCloseChk(row.workRptDt, 'D', row.coCd)) return;  //마감일통제
+		
+		if (confirm("삭제하시겠습니까?")) {
+			putAjax("/user/pm/pm01/deleteDailyWork", formData, null, function(data) {
+				alert(data.resultMessage);
+				if (data.resultCode == 200) {
+					gridView.setData(0);
+					gridView.target.select(lastMainIndex);
+					dailyGridView.setData(0);
+				}
+			});
+		}
+	}
+
+	
+	//일정관리 PopUP call
+    function wbsPlanInsertModal() {
+        var row = dailyGridView.target.getList("selected")[0];
+        //작업일보에는 계획버전이나 이력번호가 없음 자동 검색해야함
+// 		if (planVerNo == "" || histYn == "") {
+// 			//계획버젼 및 이력번호 가져오기
+// 		}
+        let tempVerNo = 0;
+		postAjaxSync("/user/wb/wb22/wbsResultLastVerNoSearch", paramObj, null, function(data){
+			var row = data.resultList;
+			if (row != undefined) {
+				tempVerNo = row.verNo;
+			}
+		});
+        
+        if (row != undefined && row.salesCd != undefined) {
+            var paramObj = {
+                "coCd"     : row.coCd,
+                "salesCd"  : row.salesCd,
+                "planVerNo": tempVerNo,
+                "histYn"   : "N",
+            };
+            openSecondModal("/static/html/user/wb/wb22/WB2201P01.html", 1200, 900, "WBS 계획등록", paramObj, function () {
+//                 salesGridView.setData(0);
+            });
+
+        } else {
+            alert("SALES CODE을 선택하세요");
+        }
+    }
 </script>
