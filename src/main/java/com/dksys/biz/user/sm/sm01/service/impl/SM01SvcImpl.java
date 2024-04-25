@@ -186,6 +186,8 @@ public class SM01SvcImpl implements SM01Svc {
 				dtl.put("lowerCd", Integer.toString(lowerCd));
 				sm01Mapper.insertBomMatr(dtl);
 			} else if ("U".equals(dtaChk)) {
+				dtl.put("oldLowerCd", dtl.get("lowerCd"));
+				dtl.put("oldUpperCd", dtl.get("upperCd"));
 				sm01Mapper.updateBomMatr(dtl);
 			} else if ("D".equals(dtaChk)) {
 				sm01Mapper.deleteBomMatr(dtl);
