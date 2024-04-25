@@ -219,5 +219,13 @@ public class CR02Ctr {
 		  model.addAttribute("fileList", fileList);
 		  return "jsonView";
 	  }
-	
+
+	  // salesCd 정보 조회
+	  @PostMapping(value = "/salesCdSearchOrderInfo")
+	  public String salesCdSearchOrderInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = cr02Svc.salesCdSearchOrderInfo(paramMap);
+	    model.addAttribute("result", result);
+	    return "jsonView";
+	  }
+	  
 }

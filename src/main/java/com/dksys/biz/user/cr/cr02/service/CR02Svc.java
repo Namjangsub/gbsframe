@@ -60,4 +60,6 @@ public interface CR02Svc {
 
     void updateOrdrsPmntPlanProcess(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception;
 
+	Map<String, String> salesCdSearchOrderInfo(Map<String, String> paramMap);
+
 }
