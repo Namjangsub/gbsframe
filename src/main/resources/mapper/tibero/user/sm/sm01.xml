@@ -355,6 +355,13 @@
 
 <!-- 	구매BOM 트리용 -->
 	<select id="selectBomSalesTreeList" parameterType="Map" resultType="CamelMap">
+	WITH BAL_CNT AS (
+			      SELECT DD.SALES_CD, DD.MATR_SEQ, DD.UPPER_CD, DD.LOWER_CD, DD.MATR_CD,
+			         	 count(*) AS BAL_CNT
+		   			FROM TB_SM02D01 DD
+				   WHERE DD.SALES_CD =  #{salesCd}
+				   GROUP BY DD.SALES_CD, DD.MATR_SEQ, DD.UPPER_CD, DD.LOWER_CD, DD.MATR_CD
+		)
 		SELECT '' AS DTA_CHK
 		     , (LEVEL-1) AS LVL
 		     , T.FILE_TRGT_KEY
@@ -431,42 +438,39 @@
 				AND    T.SALES_CD = #{salesCd}
 				UNION ALL
 				SELECT '' AS FILE_TRGT_KEY
-				     , CO_CD
-					 , ORDRS_NO
-					 , SALES_CD
-					 , LOWER_CD
-					 , UPPER_NM
-					 , MATR_CD || ':' || LOWER_NM AS LOWER_NM
-					 , UPPER_CD
-					 , UPPER_CD AS OLD_UPPER_CD
-					 , LOWER_CD AS OLD_LOWER_CD
-					 , DSGN_NM AS DSGN_NM
-					 , BOM_QTY AS DSGN_BOM_QTY
-					 , TO_CHAR(BOM_QTY) AS BOM_QTY
-					 , PART_NO
-					 , UNIT_NO
-					 , REV_NO
-					 , TO_CHAR(MATR_SEQ) AS MATR_SEQ
-					 , MATR_CD
-					 , MATR_NM
-					 , MATR_MAT
-					 , MATR_MAKR_NM
-					 , MATR_MNO
-					 , MATR_SPEC
-					 , MATR_RMK
+				     , D.CO_CD
+					 , D.ORDRS_NO
+					 , D.SALES_CD
+					 , D.LOWER_CD
+					 , D.UPPER_NM
+					 , D.MATR_CD || ':' || D.LOWER_NM AS LOWER_NM
+					 , D.UPPER_CD
+					 , D.UPPER_CD AS OLD_UPPER_CD
+					 , D.LOWER_CD AS OLD_LOWER_CD
+					 , D.DSGN_NM AS DSGN_NM
+					 , D.BOM_QTY AS DSGN_BOM_QTY
+					 , TO_CHAR(D.BOM_QTY) AS BOM_QTY
+					 , D.PART_NO
+					 , D.UNIT_NO
+					 , D.REV_NO
+					 , TO_CHAR(D.MATR_SEQ) AS MATR_SEQ
+					 , D.MATR_CD
+					 , D.MATR_NM
+					 , D.MATR_MAT
+					 , D.MATR_MAKR_NM
+					 , D.MATR_MNO
+					 , D.MATR_SPEC
+					 , D.MATR_RMK
 					 , ''
 					 , '자재'
 					 , 0  AS COLLAPSE
-			         , (
-				         SELECT count(*) AS BAL_CNT
-						   			FROM TB_SM02D01 DD
-									WHERE  DD.SALES_CD =  D.SALES_CD
-									  AND  DD.MATR_SEQ =  D.MATR_SEQ
-									  AND  DD.UPPER_CD =  D.UPPER_CD
-									  AND  DD.LOWER_CD =  D.LOWER_CD
-									  AND  DD.MATR_CD  =  D.MATR_CD
-			         )  AS BAL_CNT
+			         , DD.BAL_CNT
 				FROM   TB_SM01D01 AS D
+						       LEFT OUTER JOIN BAL_CNT DD  ON  DD.SALES_CD =  D.SALES_CD
+														  AND  DD.MATR_SEQ =  D.MATR_SEQ
+														  AND  DD.UPPER_CD =  D.UPPER_CD
+														  AND  DD.LOWER_CD =  D.LOWER_CD
+														  AND  DD.MATR_CD  =  D.MATR_CD
 				WHERE  D.CO_CD = #{coCd}
 				AND    D.ORDRS_NO = #{ordrsNo}
 				AND    D.SALES_CD = #{salesCd}
@@ -585,7 +589,7 @@
 	</select>
 
 	<!-- BOM 자재정보 조회 -->
-	<select id="selectBomMatrList" resultType="CamelMap">
+	<select id="selectBomMatrListOLD_20240425 남장섭 수정작업" resultType="CamelMap">
 	--selectBomMatrList--
 		SELECT '' AS DTA_CHK
 		     , A.CO_CD
@@ -729,6 +733,170 @@
 		ORDER BY A.CO_CD,  A.LVL, A.UPPER_CD, A.TEXT
 	</select>
 	
+	<!-- BOM 자재정보 조회 selectBomMatrListOLD_20240425 변경 -->
+	<select id="selectBomMatrList" resultType="CamelMap">
+	--selectBomMatrList--
+WITH BAL_CNT AS (
+		      SELECT DD.SALES_CD, DD.MATR_SEQ, DD.UPPER_CD, DD.LOWER_CD, DD.MATR_CD,
+		         	 count(*) AS BAL_CNT
+	   			FROM TB_SM02D01 DD
+			   WHERE DD.SALES_CD =  #{salesCd}
+			   GROUP BY DD.SALES_CD, DD.MATR_SEQ, DD.UPPER_CD, DD.LOWER_CD, DD.MATR_CD
+	)
+		SELECT '' AS DTA_CHK
+	         , CASE WHEN A.LVL = 0 THEN 'top' ELSE A.UPPER_CD END AS TREE_UPPER_CD
+	         , A.LOWER_CD AS TREE_LOWER_CD
+			 , A.*
+		FROM   (
+		        SELECT LEVEL - 1 AS LVL
+		             , A.*
+				FROM   (
+				        SELECT     'D'		AS GUBUN
+						         , ''		AS MATR_YN
+						         , FILE_TRGT_KEY	, CO_CD			, ORDRS_NO		, SALES_CD
+						         , UPPER_CD			, UPPER_NM		, LOWER_CD		, LOWER_NM
+						         , 0 AS MATR_SEQ	, MATR_CD		, MATR_NM		, NVL(MATR_MAT,MATR_MAKR_NM) AS MATR_MAT
+						         , MATR_MNO			, MATR_MAKR_NM	, DSGN_NO		, MATR_RMK
+						         , DSGN_NM			, PART_NO		, UNIT_NO		, REV_NO
+						         , DSGN_BOM_QTY AS BOM_QTY			, DSGN_BOM_QTY AS POS_QTY	, LOWER_NM || '(' || MATR_NM || ')' AS TEXT
+				        		--************************
+						         , ''  AS ORDRG_DIV_10
+						         , ''  AS ORDRG_DIV_20
+						         , ''  AS NEXT_PRCSN_NM
+						         , ''  AS DLVPLC_NM
+						         , ''  AS GOODS_DIV
+						         , ''  AS MATR_CLNT_DIV
+						         , ''  AS MATR_DIV
+						         , ''  AS MATR_GRP
+						         , ''  AS MATR_SIZE
+						         , ''  AS MATR_MAKR_NM
+						         , ''  AS MATR_MAT
+						         , ''  AS MATR_SPEC
+						         , ''  AS MATR_MNO
+						         , ''  AS MATR_RMK
+						         , ''  AS MATR_WT
+						         , ''  AS MATR_UNIT
+						         , ''  AS ORIGIN_NM
+						         , ''  AS MATR_DRW_NO
+						         , ''  AS MATR_TEST_DIV
+						         , ''  AS DLVR_RQM_DAY
+						         , ''  AS MATR_PURC_DIV
+						         , ''  AS MIN_ORDRG_QTY
+						         , ''  AS MATR_SAFT_QTY
+						         , ''  AS MATR_STOCK_CD
+						         , ''  AS DSGN_2D_MD
+						         , ''  AS AVRG_2D_MD
+						         , ''  AS DSGN_3D_MD
+						         , ''  AS AVRG_3D_MD
+						         , ''  AS PRDCTN_RQM_MD
+						         , ''  AS PRDCTN_AVRG_MD
+						         , ''  AS USE_YN
+						         , ''  AS MATR_PART_NO
+						         , ''  AS PCHS_CLNT_NM
+						         , ''  AS MNG_NM
+						         , ''  AS PCHS_CLNT_CD1
+						         , ''  AS PCHS_CLNT_PCT1
+						         , ''  AS PCHS_CLNT_CD2
+						         , ''  AS PCHS_CLNT_PCT2
+						         , ''  AS PCHS_CLNT_CD3
+						         , ''  AS PCHS_CLNT_PCT3
+						         , ''  AS MATR_UPR
+						         , ''  AS MATR_AVRG_UPR
+						         , ''  AS MATR_LAST_TRST_DT
+						         , ''  AS MATR_ATNT_CD
+						         , ''  AS MATR_NO
+								 , ''  AS AVLB_STRT_DT
+								 , ''  AS AVLB_END_DT
+								 , ''  AS PCHS_CLNT_NM1
+								 , ''  AS PCHS_CLNT_NM2
+								 , ''  AS PCHS_CLNT_NM3
+								 , 0   AS BAL_CNT
+				        FROM   TB_SM01M01
+				        WHERE  CO_CD    = #{coCd}
+				        AND    ORDRS_NO = #{ordrsNo}
+				        AND    SALES_CD = #{salesCd}
+				        UNION ALL
+				        SELECT     'M'		AS GUBUN
+						         , '자재'		AS MATR_YN --2023.12.05 남장섭
+						         , '' AS FILE_TRGT_KEY 	, T.CO_CD 		, T.ORDRS_NO 	, T.SALES_CD
+						         , T.UPPER_CD 			, '' AS UPPER_NM, T.LOWER_CD	, '' AS LOWER_NM
+						         , T.MATR_SEQ			, T.MATR_CD		, T.MATR_NM		, NVL(MATR_MAT,MATR_MAKR_NM) AS MATR_MAT
+						         , MATR_MNO				, MATR_MAKR_NM	, DSGN_NO		, MATR_RMK
+						         , DSGN_NM				, PART_NO		, UNIT_NO		, REV_NO
+						         , BOM_QTY				, POS_QTY		, T.MATR_CD || '(' || T.MATR_NM || ')' AS TEXT
+				        		--************************
+						         , T.ORDRG_DIV_10
+						         , T.ORDRG_DIV_20
+						         , T.NEXT_PRCSN_NM
+						         , T.DLVPLC_NM
+						         , T.GOODS_DIV
+						         , T.MATR_CLNT_DIV
+						         , T.MATR_DIV
+						         , T.MATR_GRP
+						         , T.MATR_SIZE
+						         , T.MATR_MAKR_NM
+						         , T.MATR_MAT
+						         , T.MATR_SPEC
+						         , T.MATR_MNO
+						         , T.MATR_RMK
+						         , T.MATR_WT
+						         , T.MATR_UNIT
+						         , T.ORIGIN_NM
+						         , T.MATR_DRW_NO
+						         , T.MATR_TEST_DIV
+						         , T.DLVR_RQM_DAY
+						         , T.MATR_PURC_DIV
+						         , T.MIN_ORDRG_QTY
+						         , T.MATR_SAFT_QTY
+						         , T.MATR_STOCK_CD
+						         , T.DSGN_2D_MD
+						         , T.AVRG_2D_MD
+						         , T.DSGN_3D_MD
+						         , T.AVRG_3D_MD
+						         , T.PRDCTN_RQM_MD
+						         , T.PRDCTN_AVRG_MD
+						         , T.USE_YN
+						         , T.MATR_PART_NO
+						         , T.PCHS_CLNT_NM
+						         , T.MNG_NM
+						         , T.PCHS_CLNT_CD1
+						         , T.PCHS_CLNT_PCT1
+						         , T.PCHS_CLNT_CD2
+						         , T.PCHS_CLNT_PCT2
+						         , T.PCHS_CLNT_CD3
+						         , T.PCHS_CLNT_PCT3
+						         , T.MATR_UPR
+						         , T.MATR_AVRG_UPR
+						         , TO_CHAR(T.MATR_LAST_TRST_DT, 'YYYY-MM-DD') AS MATR_LAST_TRST_DT
+						         , T.MATR_ATNT_CD
+						         , T.MATR_NO
+								 , T.AVLB_STRT_DT
+								 , T.AVLB_END_DT
+								 , B1.CLNT_NM  AS PCHS_CLNT_NM1
+								 , B2.CLNT_NM  AS PCHS_CLNT_NM2
+								 , B3.CLNT_NM  AS PCHS_CLNT_NM3
+								 , DD.BAL_CNT
+				        FROM   TB_SM01D01 T
+						       LEFT OUTER JOIN TB_BM02M01 B1 ON B1.CLNT_CD = T.PCHS_CLNT_CD1
+						       LEFT OUTER JOIN TB_BM02M01 B2 ON B2.CLNT_CD = T.PCHS_CLNT_CD2
+						       LEFT OUTER JOIN TB_BM02M01 B3 ON B3.CLNT_CD = T.PCHS_CLNT_CD3
+						       LEFT OUTER JOIN BAL_CNT DD  ON  DD.SALES_CD =  T.SALES_CD
+														  AND  DD.MATR_SEQ =  T.MATR_SEQ
+														  AND  DD.UPPER_CD =  T.UPPER_CD
+														  AND  DD.LOWER_CD =  T.LOWER_CD
+														  AND  DD.MATR_CD  =  T.MATR_CD
+				        WHERE  T.CO_CD    = #{coCd}
+				        AND    T.ORDRS_NO = #{ordrsNo}
+				        AND    T.SALES_CD = #{salesCd}
+				       ) AS A
+				WHERE  1 = 1
+				START WITH A.LOWER_CD = #{lowerCd}
+				CONNECT BY PRIOR A.LOWER_CD = A.UPPER_CD
+				ORDER BY A.CO_CD, A.UPPER_CD, A.LOWER_CD
+		       ) AS A
+		WHERE  1 = 1
+		ORDER BY A.CO_CD,  A.LVL, A.UPPER_CD, A.TEXT
+	</select>
     <insert id="insertBom" parameterType="Map">
         <selectKey keyProperty="fileTrgtKey" resultType="String" order="BEFORE">
             SELECT NVL(MAX(TO_NUMBER(NVL(FILE_TRGT_KEY,'0'))),0) + 1 FROM TB_SM01M01
