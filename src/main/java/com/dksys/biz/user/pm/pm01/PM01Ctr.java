@@ -95,6 +95,9 @@ public class PM01Ctr {
   public String selectDailyWorkInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
 	Map<String, String> result = pm01Svc.selectDailyWorkInfo(paramMap);
     model.addAttribute("result", result);
+    paramMap.put("workRptNo", result.get("workRptNo"));
+    paramMap.put("workRptId", result.get("workRptId"));
+    
     List<Map<String, String>> tripRows = pm01Svc.selectDailyWorkTripRows(paramMap);
     model.addAttribute("tripRows", tripRows);
     return "jsonView";
