@@ -1,0 +1,353 @@
+<style>
+	.table tr th {
+		text-align: center;
+	}
+	
+	.modal_bottom {
+		position: fixed;
+		bottom: 5px;
+		width: 100%;
+	}
+</style>
+<div class="popup_area of_a">
+	<input type="file" id="boardFile" style="display:none" multiple="multiple" onchange="setBoardFile(this);"/>
+	<form id="popForm">
+		<table class="form-group popup_table">
+			<colgroup>
+				<col style="width: 15%;">
+				<col style="width: 35%;">
+				<col style="width: 15%;">
+				<col style="width: 30%;">
+			</colgroup>
+			<tbody>
+				<tr>
+					<th class="hit">자료유형</th>
+					<td>
+						<select id="boardType" name="boardType" class="form-control input-sm"  data-kind="BOARDTYPE" onchange="selectCodeList(this);" data-search="boardType" required msg="자료유형">
+							<option value="">전체</option>
+						</select>
+					</td>
+					<th class="hit">상세 구분</th>
+					<td>
+						<select id="boardType2" name="boardType2" class="form-control input-sm" data-kind="BOARDTYPE2" data-search="boardType2" required msg="상세 구분">
+							<option value="">전체</option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th>만료 여부</th>
+					<td>
+						<input type="radio" name="exprtnYn" value="N" checked="checked">사용 안함
+						<input type="radio" name="exprtnYn" value="Y">사용
+					</td>
+					<th>만료일</th>
+					<td>
+						<div class="input-group date" id="exprtnDatePicker">
+		                    <input type="text" class="form-control input-sm" id="exprtnDt" name="exprtnDt" onkeyup="dateMask(this);" style="text-align: center;"/>
+		                    <span class="input-group-addon" style="padding: 0px 5px;">
+		                        <span class="glyphicon glyphicon-calendar" style="cursor: pointer;"></span>
+		                    </span>
+		                </div>
+					</td>
+				</tr>
+				<tr>
+					<th class="hit">제목</th>
+					<td colspan=3>
+						<input type="text" class="form-control input-sm" id="boardTitle" name="boardTitle" required>
+					</td>
+				</tr>
+				<tr>
+					<th class="hit">내용</th>
+					<td colspan=3>
+						<textarea rows="28" cols="100" id="boardCnts" name="boardCnts"></textarea>
+					</td>
+				</tr>
+				<tr>
+					<th>
+						<button type="button" id="buttonFile" class="btn btn-primary btn-sm" style="height: 25px; line-height: 15px;" onclick="boardFile.click();">첨부파일</button>
+					</th>
+					<td colspan=3>
+						<div data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 150px; width: 100%"></div>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+		<input type="hidden" id="fileTrgtKey" name="fileTrgtKey">
+		<input type="hidden" id="userId" name="userId">
+		<input type="hidden" id="pgmId" name="pgmId" value="CM1401P01">
+		<input type="hidden" id="coCd" name="coCd">
+		<input type="hidden" id="readCnt" name="readCnt">
+		<input type="hidden" id="useYn" name="useYn">
+		<input type="hidden" id="mngId" name="mngId">
+	</form>
+</div>
+<div class="popup_bottom_btn">
+	<button type="button" class="btn btn-default btn-sm" id="actionBtn"></button>
+	<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫기</button>
+</div>
+<script type="text/javascript">
+	var actionType = "";
+	var fileTrgtKey = "";
+	
+	var boardFileArr = [];
+	var deleteFileArr = [];
+	var fileGridView = {
+		initView: function(){
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				target: $('[data-ax5grid="file-grid"]'),
+				showLineNumber: true,
+				showRowSelector: false,
+	        	multipleSelect: false,
+				header: {selector: false},
+				body: {
+		        	onClick: function () {
+		                this.self.select(this.dindex);
+		            },
+		            onDBLClick: function () {
+		            	downloadFile(this.dindex);
+		            },
+		        	},
+				columns: [
+						{key: "fileName"		, label: "파일명"				, width: 400, align: "left"},
+						{key: "fileType"		, label: "파일타입"			, width: 80, align: "center"},
+						{key: "fileSize"		, label: "파일크기"			, width: 90,  align: "right", formatter: "money"},
+						{key: "fileDelBtn"		, label: "삭제"				, width:50,
+							formatter:function() {return (this.item.fileDelete == "Y") ? '<button style="height: 18px; padding:0px;" type="button" onclick="deleteFile('+this.dindex+')">삭제</button>' : '불가'}
+						},
+						{key : "fileList"		,  label : "list"			, width : 60, align: "center", hidden: true},
+						{key : "fileUp"			,  label : "up"				, width : 60, align: "center", hidden: true},
+						{key : "fileDown"		,  label : "down"			, width : 60, align: "center", hidden: true},
+						{key : "fileUpdate"		,  label : "update"			, width : 60, align: "center", hidden: true},
+						{key : "fileDelete"		,  label : "delete"			, width : 60, align: "center", hidden: true},
+				]
+			});
+		},
+		setData: function(){
+			var targetObj = this.target;
+			targetObj.setData({
+				list: boardFileArr,
+				page : {
+					totalElements : boardFileArr.length
+				}
+			});
+		}
+	}
+	
+	$(document).ready(function() {
+		setCommonSelect($("#popForm select[data-kind]"));
+		
+		fileGridView.initView();
+// 	  	txtareaHeightResize($('#workRptRmk'));  //비고 크기 조절하기
+		
+		actionType = modalStack.last().paramObj.actionType;
+		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
+		if(actionType == "C"){
+			$('#actionBtn').on("click", function(){insertBoard();});
+			$('#actionBtn').text("등록");
+		} else if(actionType == "U") {
+			selectBoardInfo();
+			$('#actionBtn').on("click", function(){updateBoard();});
+			$('#actionBtn').text("수정");
+		}
+	});
+	
+	// 만료일 데이트피커 set
+	$('#exprtnDatePicker').datepicker({
+		format: "yyyy-mm-dd",
+		language : "ko",
+		autoclose : true
+	});
+
+	function insertBoard() {
+		if(inputValidation($('input[required]'))) {
+			$("#useYn").val("Y");
+			$("#readCnt").val("0");
+			var formData = makeFormData();
+			filePostAjax("/admin/cm/cm14/insertBoard", formData, function(data){
+				alert(data.resultMessage);           
+				if(data.resultCode == 200){
+					gridView.setData(0);
+					modalStack.close();
+				}
+			});
+		}
+	}
+
+	function updateBoard() {
+// 		debugger;
+		if(inputValidation($('input[required]'))){
+			var formData = makeFormData();
+			filePutAjax("/admin/cm/cm14/updateBoard", formData, function(data){
+				alert(data.resultMessage);
+				if(data.resultCode == 200){
+					gridView.setData(0);
+					modalStack.close();
+				}
+			});
+		}
+	}
+	
+	function selectBoardInfo(){
+		var paramObj = {
+				"fileTrgtKey": fileTrgtKey,
+				"userId" 	 : jwt.userId
+				};
+		postAjax("/admin/cm/cm14/selectBoardInfo", paramObj, null, function(data){
+			setBoardInfo(data.result.boardInfo);
+			setBoardFileInfo(data.result.fileList);
+		});
+
+		//파일 등록 권한이 없으면 버튼 비활성화
+		paramObj.comonCd = 'FITR9901';
+		postAjax("/admin/cm/cm15/selectTreeAuthUserList", paramObj, null, function(data){
+			if (data.userList[0].fileUp == 'Y') {
+	            buttonFile.disabled = false; // 활성화
+	            buttonFile.style.backgroundColor = ""; // 기본 배경색으로 변경 (옵션)
+	        } else {
+	            buttonFile.disabled = true; // 비활성화
+	            buttonFile.style.backgroundColor = "gray"; // 회색 배경색으로 변경 (옵션)
+	        }	
+		});
+		
+	}
+	
+	
+	function makeFormData() {
+		// 폼데이터 생성
+		var formData = new FormData($("#popForm")[0]);
+		$("#popForm #userId").val(jwt.userId);             ;
+		$("#popForm").find("#coCd").val($('#mainForm').find("#coCd_S option:selected").val());
+		$("#exprtnDt").val($("#exprtnDt").val().replace(/-/g, ""));
+		
+		var formData = new FormData($("#popForm")[0]);
+		// 첨부파일 추가
+		$.each(boardFileArr, function(idx, obj){
+			// 신규파일만 추가
+			if(obj.fileKey == 0){
+				formData.append("files", obj.file);
+			}
+		});
+		
+		var actionType = modalStack.last().paramObj.actionType;
+		if(actionType == "U"){
+			formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
+		}
+		
+		return formData;
+	}
+	
+	function setBoardInfo(boardInfo){
+		$.each(boardInfo, function(key, value){
+			$('#'+key).val(value);
+		});
+		$('input:radio[name=exprtnYn]:input[value=' + boardInfo.exprtnYn + ']').prop("checked", true);
+
+// 		$('#popForm #boardType').val(boardInfo.boardType);
+		
+		selectCodeList($("#boardType"));
+		$('#popForm #boardType2').val(boardInfo.boardType2);
+		//관리자가 아닌경우 수정 버튼 숨기기
+		if (boardInfo.mngId  != jwt.userId) {
+			$('#actionBtn').hide();
+		}
+	}
+	
+	function downloadFile(idx) {
+        if (boardFileArr[idx].fileDown != 'Y') {
+        	alert('파일 다운로드 권한이 없습니다.')
+        	return false;
+        };
+		
+		var fileKey = boardFileArr[idx].fileKey;
+		var paramObj = {
+				"fileKey" : fileKey,
+				"userId" : jwt.userId
+			}		
+		
+		postAjax("/admin/cm/cm08/fileDownInfoUser", paramObj, null, function(data){
+			if(data.resultCode == 200){
+				var fileInfo = data.fileInfo;
+				location.href = "/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId;
+			} else {
+				alert("다운로드 권한이 없습니다.");	
+			}
+		});
+	}
+	
+	function setBoardFileInfo(fileInfo) {
+		// 첨부파일 set
+		$.each(fileInfo, function(idx, obj){
+			boardFileArr.push({
+				'fileKey' : obj.fileKey,
+		      	'fileName' : obj.fileName,
+		      	'fileType' : obj.fileType,
+		      	'fileSize' : obj.fileSize,
+		      	'fileList' : obj.fileList,
+		      	'fileUp' : obj.fileUp,
+		      	'fileDown' : obj.fileDown,
+		      	'fileDelete' : obj.fileDelete,
+		      	'fileUpdate' : obj.fileUpdate,
+		      	'file' : obj
+			});
+		});
+		
+		// 첨부파일 그리드 set
+		fileGridView.setData();
+	}
+	
+	function setBoardFile(elem){
+		var tempFiles = elem.files;
+		$.each(tempFiles, function(idx, obj){
+			var testArr = obj.name.split(".");
+			boardFileArr.push({
+				'fileKey' : 0,
+		      	'fileName' : obj.name,
+		      	'fileType' : testArr[testArr.length-1],
+		      	'fileSize' : obj.size,
+		      	'file' : obj,
+		      	'fileDelete' : 'Y',
+			});
+		});
+		fileGridView.setData();
+		$(elem).val("");
+	}
+	
+	function deleteFile(rowIndex) {
+        if (boardFileArr[rowIndex].fileDelete != 'Y') {
+        	alert('파일 삭제 권한이 없습니다.')
+        	return false;
+        };
+		
+		fileGridView.target.removeRow(rowIndex);
+		
+		if(boardFileArr[rowIndex].fileKey){
+		// 기 등록되어 있는 파일 삭제시
+			deleteFileArr.push(boardFileArr[rowIndex].fileKey);
+		}
+		
+		boardFileArr.splice(rowIndex, 1);
+	}
+	
+	//작업 대분류/중분류/소분류
+	function selectCodeList(obj) {
+		var codeKind = $(obj).val();
+		target = $("#boardType2");
+		$('#boardType2 option[value!=""]').remove();
+		var paramObj = {"codeKind": codeKind};
+
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", paramObj, null, function(data){
+			var optionHtml = '';
+			var childCodeList = data.childCodeList;
+			$.each(childCodeList, function(index, item) {
+				// optionHtml += '<option value='+item.codeId+' >';
+				//data-etc = 'Y' 이면 saledCode 필수 'N' 이면 옵션으로 설정
+				optionHtml += '<option value="'+item.codeId+'" data-rprc="'+item.codeRprc+'" data-etc="'+item.codeEtc+'"">';
+				optionHtml += item.codeNm;
+				optionHtml += '</option>';
+			});
+			$(target).append(optionHtml);
+		});
+	}
+
+</script>
