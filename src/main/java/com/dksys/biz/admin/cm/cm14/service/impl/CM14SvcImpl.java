@@ -179,7 +179,7 @@ public class CM14SvcImpl implements CM14Svc {
 	        
 	        //---------------------------------------------------------------
 			//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
-			//---------------------------------------------------------------
+			//---------------------------------------------------------------ma
 			if (deleteFileList.size() > 0) {
 				for (Map<String, String> deleteDtl : deleteFileList) {
 					String fileKey = deleteDtl.get("fileKey").toString();
