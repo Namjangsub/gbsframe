@@ -4,38 +4,74 @@
 <mapper namespace="com.dksys.biz.user.sm.sm11.mapper.SM11Mapper">
 
 	<select id="selectContractCount" parameterType="Map" resultType="int">
+	 	WITH CT AS (
+		 		SELECT M.*
+		 				, B.CLNT_NM
+		 		  FROM TB_SM11M01 M
+						LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
+		         WHERE 1=1
+              <if test="coCd !=null and !coCd.equals('')">
+     	           AND M.CO_CD = #{coCd}
+              </if>
+			   <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
+				   AND M.CTRT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD')
+			  </if>
+              <if test="clntCd !=null and !clntCd.equals('')">
+     	           AND M.CLNT_CD = #{clntCd}
+              </if>
+              <if test="clntNm !=null and !clntNm.equals('')">
+     	           AND B.CLNT_NM LIKE '%'||#{clntNm}||'%'
+              </if>
+              <if test="ordrsNo !=null and !ordrsNo.equals('')">
+     	           AND M.ORDRS_NO LIKE '%'||#{ordrsNo}||'%'
+              </if>
+              <if test="salesCd !=null and !salesCd.equals('')">
+     	           AND M.SALES_CD LIKE '%'||#{salesCd}||'%'
+              </if>
+	 			)
+	 	, PAY AS (
+			 	SELECT R.CTRT_NO
+						, SUM(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2010',COST_AMT))  		AS PAY_AMT11	--매입금액
+						, TO_CHAR(MAX(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2010',COST_DT)), 'MM-DD')   		AS PAY_DT11		--매입일자
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2010',PAY_DIV_DT))   	AS PAY_TX_DT11 	--세금계산서발행
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2010',PCHS_NO))   		AS PAY_CF_NO11 	--매입확정번호
+						, SUM(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2020',COST_AMT))  		AS PAY_AMT12
+						, TO_CHAR(MAX(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2020',COST_DT)), 'MM-DD')   		AS PAY_DT12
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2020',PAY_DIV_DT))   	AS PAY_TX_DT12
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2020',PCHS_NO))   		AS PAY_CF_NO11 	--매입확정번호
+						, SUM(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2030',COST_AMT))  		AS PAY_AMT13
+						, TO_CHAR(MAX(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2030',COST_DT)), 'MM-DD')   		AS PAY_DT13
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2030',PAY_DIV_DT))   	AS PAY_TX_DT13
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2030',PCHS_NO))   		AS PAY_CF_NO11 	--매입확정번호
+						, SUM(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2040',COST_AMT))  		AS PAY_AMT14
+						, TO_CHAR(MAX(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2040',COST_DT)), 'MM-DD')   		AS PAY_DT14
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2040',PAY_DIV_DT))   	AS PAY_TX_DT14
+						, MIN(decode(PCHS_COST_DIV20,'PCHSCOSTDIV2040',PCHS_NO))   		AS PAY_CF_NO11 	--매입확정번호
+						, SUM(R.COST_AMT)												AS PAY_AMT19
+				FROM TB_SM10M01 R
+				WHERE 1 = 1
+				  AND EXISTS (SELECT 1 FROM CT WHERE  R.CTRT_NO = CT.CTRT_NO)
+				GROUP BY R.CTRT_NO
+	 		)
 		SELECT
             count(*)
-		FROM TB_SM11M01 M
-				LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
+		FROM  CT M
+				LEFT OUTER JOIN PAY  ON PAY.CTRT_NO = M.CTRT_NO				--지급실적
          WHERE 1=1
-            <if test="coCd !=null and !coCd.equals('')">
-   	           AND M.CO_CD = #{coCd}
-            </if>
-		    <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
-			   AND M.CTRT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD')
-		    </if>
-            <if test="clntCd !=null and !clntCd.equals('')">
-   	           AND M.CLNT_CD = #{clntCd}
-            </if>
-            <if test="clntNm !=null and !clntNm.equals('')">
-   	           AND B.CLNT_NM LIKE '%'||#{clntNm}||'%'
-            </if>
-            <if test="ordrsNo !=null and !ordrsNo.equals('')">
-   	           AND M.ORDRS_NO LIKE '%'||#{ordrsNo}||'%'
-            </if>
-            <if test="salesCd !=null and !salesCd.equals('')">
-   	           AND M.SALES_CD LIKE '%'||#{salesCd}||'%'
-            </if>
-         ORDER BY M.CO_CD, B.CLNT_NM, M.CTRT_DT DESC, M.CTRT_NO DESC			  			  
+         <if test="cmpletYn !=null and !cmpletYn.equals('')">
+   	       AND (M.CTRT_AMT - NVL(PAY_AMT19, 0) = 0 AND #{cmpletYn} = 'Y')
+   	        OR (M.CTRT_AMT - NVL(PAY_AMT19, 0) != 0 AND #{cmpletYn} = 'N')
+	     </if>
 
 	</select>
 
 	<select id="selectContractList" parameterType="Map" resultType="CamelMap">
 	/* selectContractList */
 	 WITH CT AS (
-		 		SELECT *
+		 		SELECT M.*
+		 				, B.CLNT_NM
 		 		  FROM TB_SM11M01 M
+						LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
 		         WHERE 1=1
               <if test="coCd !=null and !coCd.equals('')">
      	           AND M.CO_CD = #{coCd}
@@ -113,7 +149,7 @@
 						, FN_CM05M01_CD_TO_NM(M.CO_CD) AS CO_CD_NM
 						, M.CTRT_NO
 						, M.CLNT_CD  				AS VEND_CD	--공급사
-						, B.CLNT_NM  				AS VEND_NM	--공급사명
+						, M.CLNT_NM  				AS VEND_NM	--공급사명
 						, C.ORDRS_CLNT_CD 			AS CLNT_CD	--수주고객사
 						, D.CLNT_NM								--수주고객사명
 						, M.ORDRS_CO_CD							--수주회사코드
@@ -155,14 +191,18 @@
 						, PLAN.*
 						, PAY.*
 				FROM CT M
-						LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
+---------						LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
 						LEFT OUTER JOIN TB_CR02M01 C ON C.CO_CD = M.ORDRS_CO_CD
 						                            AND C.ORDRS_NO = M.ORDRS_NO
 						LEFT OUTER JOIN TB_BM02M01 D ON D.CLNT_CD = C.ORDRS_CLNT_CD
 						LEFT OUTER JOIN PLAN ON PLAN.CTRT_NO = M.CTRT_NO			--지급계획
 						LEFT OUTER JOIN PAY  ON PAY.CTRT_NO = M.CTRT_NO				--지급실적
 		         WHERE 1=1
-		         ORDER BY M.CO_CD, B.CLNT_NM, M.CTRT_DT DESC, M.CTRT_NO DESC
+              	 <if test="cmpletYn !=null and !cmpletYn.equals('')">
+     	          AND (M.CTRT_AMT - NVL(PAY_AMT19, 0) = 0 AND #{cmpletYn} = 'Y')
+     	           OR (M.CTRT_AMT - NVL(PAY_AMT19, 0) != 0 AND #{cmpletYn} = 'N')
+		         </if>
+		         ORDER BY M.CO_CD, M.CLNT_NM, M.CTRT_DT DESC, M.CTRT_NO DESC
 				) AS a
 			) A
 		WHERE  RNUM BETWEEN #{firstIndex} AND #{lastIndex}
