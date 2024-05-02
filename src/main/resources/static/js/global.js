@@ -2421,7 +2421,6 @@ function kakaoSendReal(talkJson, talkParam, param) {
 		    		var errorMsg = find.codeNm;	
 				}		    			
 		    	insertKakaoMessage(err, talkDeJson, param);	
-		    	debugger;
 	    		alert("오류코드: ["+param.nameTo+" Hp."+ talkDeJson.mobile + "] "+data.status+"\r\n\r\n" + errorMsg+"로 메세지 전송 실패하였습니다.");   		
 	    	} else if( data.status == "OK" ) {
 	    		//alert("알림톡 정상 발송되었습니다.");
