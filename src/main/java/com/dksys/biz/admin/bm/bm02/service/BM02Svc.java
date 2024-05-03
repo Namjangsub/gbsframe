@@ -33,4 +33,6 @@ public interface BM02Svc {
 
 	List<Map<String, String>> selectClntPurchaseMngEmail(Map<String, String> paramMap);
 
+	Map<String, String> selectClntBusinessMngInfo(Map<String, String> paramMap);
+
 }

@@ -154,5 +154,13 @@ public class BM02Ctr {
     	model.addAttribute("clntEmail", clntEmail);
         return "jsonView";
     }
+    
+    // 거래처 담당자 상세정보 리스트 조회
+	@PostMapping("/selectClntBusinessMngInfo")
+    public String selectClntBusinessMngInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	Map<String, String> mngInfo = bm02Svc.selectClntBusinessMngInfo(paramMap);
+    	model.addAttribute("mngInfo", mngInfo);
+        return "jsonView";
+    }
 
 }

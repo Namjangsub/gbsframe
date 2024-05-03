@@ -189,4 +189,9 @@ public class BM02SvcImpl implements BM02Svc {
 	public List<Map<String, String>> selectClntPurchaseMngEmail(Map<String, String> paramMap) {
 		return bm02Mapper.selectClntPurchaseMngEmail(paramMap);
 	}
+
+	@Override
+	public Map<String, String> selectClntBusinessMngInfo(Map<String, String> paramMap) {
+		return bm02Mapper.selectClntBusinessMngInfo(paramMap);
+	}
 }
