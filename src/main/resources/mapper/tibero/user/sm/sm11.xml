@@ -9,6 +9,17 @@
 		 				, B.CLNT_NM
 		 		  FROM TB_SM11M01 M
 						LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
+						LEFT OUTER JOIN (
+										SELECT MM.CTRT_NO, MM.ORDRS_CO_CD, MM.SALES_CD
+										  FROM TB_SM11D02 MM
+										 WHERE MM.CTRT_NO_SEQ = (SELECT min(CTRT_NO_SEQ) FROM TB_SM11D02 D WHERE D.CTRT_NO = MM.CTRT_NO)
+										 GROUP BY MM.CTRT_NO, MM.ORDRS_CO_CD, MM.SALES_CD
+										) AS MD ON MD.CTRT_NO = M.CTRT_NO
+						LEFT OUTER JOIN TB_CR02D02 CR ON CR.SALES_CD = MD.SALES_CD
+						LEFT OUTER JOIN TB_CR02M01 CM ON CM.CO_CD    = CR.CO_CD
+						                             AND CM.ORDRS_NO = CR.ORDRS_NO
+						LEFT OUTER JOIN TB_BM02M01 D ON D.CLNT_CD = CM.ORDRS_CLNT_CD
+						LEFT OUTER JOIN TB_CM06M01 U ON U.ID = M.MNG_ID
 		         WHERE 1=1
               <if test="coCd !=null and !coCd.equals('')">
      	           AND M.CO_CD = #{coCd}
@@ -25,8 +36,17 @@
               <if test="ordrsNo !=null and !ordrsNo.equals('')">
      	           AND M.ORDRS_NO LIKE '%'||#{ordrsNo}||'%'
               </if>
-              <if test="salesCd !=null and !salesCd.equals('')">
-     	           AND M.SALES_CD LIKE '%'||#{salesCd}||'%'
+              <if test="vendNm !=null and !vendNm.equals('')">
+     	           AND D.CLNT_NM LIKE '%'||#{vendNm}||'%'
+              </if>
+              <if test="vendCd !=null and !vendCd.equals('')">
+     	           AND  CM.ORDRS_CLNT_CD = #{vendCd}
+              </if>
+              <if test="mngId !=null and !mngId.equals('')">
+     	           AND  M.MNG_ID = #{mngId}
+              </if>
+              <if test="mngIdNm !=null and !mngIdNm.equals('')">
+     	           AND U.NAME LIKE '%'||#{mngIdNm}||'%'
               </if>
 	 			)
 	 	, PAY AS (
@@ -68,7 +88,11 @@
 	<select id="selectContractList" parameterType="Map" resultType="CamelMap">
 	/* selectContractList */
 	 WITH CT AS (
-		 		SELECT M.*
+		 		SELECT 
+						  M.CLNT_CD  				AS VEND_CD	--공급사
+						, B.CLNT_NM  				AS VEND_NM	--공급사명
+						, CM.ORDRS_CLNT_CD 			AS CUST_CD	--수주고객사
+						, D.CLNT_NM					AS CUST_NM  --수주고객사명
 		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM01%' THEN 'Y' ELSE 'N' END AS FLAG1
 		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM02%' THEN 'Y' ELSE 'N' END AS FLAG2
 		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM03%' THEN 'Y' ELSE 'N' END AS FLAG3
@@ -79,6 +103,8 @@
 		 				, B.CLNT_NM
 		 				, CR.EQP_NM			--수주상세 설비명
 		 				, CR.ORDRS_QTY		--수주상세 대수
+						, CM.CLNT_PJT							--고객사프로젝트
+						, M.*
 		 		  FROM TB_SM11M01 M
 						LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
 						LEFT OUTER JOIN (
@@ -88,6 +114,10 @@
 										 GROUP BY MM.CTRT_NO, MM.ORDRS_CO_CD, MM.SALES_CD
 										) AS MD ON MD.CTRT_NO = M.CTRT_NO
 						LEFT OUTER JOIN TB_CR02D02 CR ON CR.SALES_CD = MD.SALES_CD
+						LEFT OUTER JOIN TB_CR02M01 CM ON CM.CO_CD    = CR.CO_CD
+						                             AND CM.ORDRS_NO = CR.ORDRS_NO
+						LEFT OUTER JOIN TB_BM02M01 D ON D.CLNT_CD = CM.ORDRS_CLNT_CD
+						LEFT OUTER JOIN TB_CM06M01 U ON U.ID = M.MNG_ID
 		         WHERE 1=1
               <if test="coCd !=null and !coCd.equals('')">
      	           AND M.CO_CD = #{coCd}
@@ -104,8 +134,17 @@
               <if test="ordrsNo !=null and !ordrsNo.equals('')">
      	           AND M.ORDRS_NO LIKE '%'||#{ordrsNo}||'%'
               </if>
-              <if test="salesCd !=null and !salesCd.equals('')">
-     	           AND M.SALES_CD LIKE '%'||#{salesCd}||'%'
+              <if test="vendNm !=null and !vendNm.equals('')">
+     	           AND D.CLNT_NM LIKE '%'||#{vendNm}||'%'
+              </if>
+              <if test="vendCd !=null and !vendCd.equals('')">
+     	           AND  CM.ORDRS_CLNT_CD = #{vendCd}
+              </if>
+              <if test="mngId !=null and !mngId.equals('')">
+     	           AND  M.MNG_ID = #{mngId}
+              </if>
+              <if test="mngIdNm !=null and !mngIdNm.equals('')">
+     	           AND U.NAME LIKE '%'||#{mngIdNm}||'%'
               </if>
 	 			)
 	 	, PLAN AS (
@@ -164,14 +203,14 @@
 						, M.CO_CD
 						, FN_CM05M01_CD_TO_NM(M.CO_CD) AS CO_CD_NM
 						, M.CTRT_NO
-						, M.CLNT_CD  				AS VEND_CD	--공급사
-						, M.CLNT_NM  				AS VEND_NM	--공급사명
-						, C.ORDRS_CLNT_CD 			AS CLNT_CD	--수주고객사
-						, D.CLNT_NM								--수주고객사명
+						, M.VEND_CD	--공급사
+						, M.VEND_NM	--공급사명
+						, M.CUST_CD AS CLNT_CD	--수주고객사
+						, M.CUST_NM AS CLNT_NM					--수주고객사명
 						, M.ORDRS_CO_CD							--수주회사코드
 						, M.ORDRS_NO							--수주번호
-						, C.CLNT_PJT							--고객사프로젝트
-						, FN_CM05M01_CD_TO_NM(C.CLNT_PJT) AS CLNT_PJT_NM
+						, M.CLNT_PJT							--고객사프로젝트
+						, FN_CM05M01_CD_TO_NM(M.CLNT_PJT) AS CLNT_PJT_NM
 						, M.CTRT_NM								--외주계약명
 						, TO_CHAR(M.CTRT_DT, 'YYYY-MM-DD') AS CTRT_DT
 						, M.CTRT_AMT
@@ -222,10 +261,6 @@
 						, PLAN.*
 						, PAY.*
 				FROM CT M
----------						LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
-						LEFT OUTER JOIN TB_CR02M01 C ON C.CO_CD = M.ORDRS_CO_CD
-						                            AND C.ORDRS_NO = M.ORDRS_NO
-						LEFT OUTER JOIN TB_BM02M01 D ON D.CLNT_CD = C.ORDRS_CLNT_CD
 						LEFT OUTER JOIN PLAN ON PLAN.CTRT_NO = M.CTRT_NO			--지급계획
 						LEFT OUTER JOIN PAY  ON PAY.CTRT_NO = M.CTRT_NO				--지급실적
 		         WHERE 1=1
