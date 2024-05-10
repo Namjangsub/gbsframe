@@ -850,7 +850,32 @@
 		              , R2.CODE_NM               AS ORDRS_DIV_NM
 		              , R3.CODE_NM               AS CLNT_PJT_NM
 		              , R7.CODE_NM               AS INPEXP_NM
-		              , A.*
+					, A.FILE_TRGT_KEY
+					, A.CO_CD
+					, A.ORDRS_NO
+					, A.EST_NO
+					, A.EST_DEG
+					, A.ORDRS_CLNT_CD
+					, A.ORDRS_DT
+					, A.ORDRS_DIV
+					, A.CLNT_PJT
+					, A.CTRT_NM
+					, A.CURR_CD
+					, A.EXRATE
+					, A.ORDRS_AMT
+					, round(A.EXRATE * A.ORDRS_AMT, 1) AS ORDRS_AMT_CURR
+					, A.FWD_EXCH_JOIN_DT
+					, A.FWD_EXCH_CHK_LIST
+					, A.ORDRGER
+					, A.MNG_ID
+					, A.CTRT_DOC
+					, A.PMNT_MTD
+					, A.ORDRS_RMK
+					, A.ORGN_SALES_CD
+					, A.INPEXP_CD
+					, A.NEW_ORDRS_NO
+					, A.HIST_NO
+					, A.PRJCT_SEQ
 		         FROM   TB_CR02M01 AS A
 				        --고객사
 		                LEFT OUTER JOIN TB_BM02M01 AS C ON A.ORDRS_CLNT_CD = C.CLNT_CD
@@ -913,7 +938,7 @@
 		      , SUBSTR(TO_CHAR(B.BILL_PBLS_DT, 'YYYYMMDD'), 5, 2) AS BILL_PBLS_MM
 		      , NVL(B.CLMN_RATE, 0) AS CLMN_RATE
 		      , TO_CHAR(NVL(B.CLMN_RATE, 0))||'%' 	AS CLMN_RATE_NM
-		      , NVL(B.CLMN_AMT, 0) 					AS SUJU_CLMN_AMT
+		      , round(A.EXRATE * NVL(B.CLMN_AMT, 0), 1) 		AS SUJU_CLMN_AMT
 		      , B.PMNT_DT_AFTER_BILL
 		      , A.FILE_TRGT_KEY 					AS SJM_FILE_TRGT_KEY
 		      , A.*
@@ -962,8 +987,8 @@
 				              , SUBSTR(TO_CHAR(B.BILL_PBLS_DT, 'YYYYMMDD'), 1, 6)  AS BILL_YYMM
 				              , SUBSTR(TO_CHAR(B.CLMN_DT     , 'YYYYMMDD'), 1, 6)  AS CLMN_YYMM
 				              , B.CLMN_MGMT_STATUS AS CLMN_MGMT_STATUS
-							  , CASE WHEN A.CODE_RPRC = '10' THEN NVL(B.CLMN_AMT, 0) * 1.1
-							                                 ELSE NVL(B.CLMN_AMT, 0)
+							  , CASE WHEN A.CODE_RPRC = '10' THEN round(A.EXRATE * NVL(B.CLMN_AMT, 0) * 1.1, 1)
+							                                 ELSE round(A.EXRATE * NVL(B.CLMN_AMT, 0), 1)
 							    END AS CLMN_AMT
 				         FROM   SJM AS A
 				                INNER JOIN TB_CR02D01 AS B  ON B.CO_CD    = A.CO_CD
@@ -998,10 +1023,12 @@
 						      , SUBSTR(REPLACE(TO_CHAR(A.SELL_BILL_DT, 'YYYY-MM-DD'), '-', ''), 1, 6) AS YYYYMM
 						      , B.ORDRS_NO
 						      , B.CLMN_PLAN_SEQ
-						      , NVL(B.SELL_BILL_DTL_AMT, 0) AS SELL_BILL_DTL_AMT
+						      , round(M.EXRATE * NVL(B.SELL_BILL_DTL_AMT, 0), 1) AS SELL_BILL_DTL_AMT
 						 FROM   TB_CR04M01 AS A
 						        LEFT OUTER JOIN TB_CR04D01 AS B  ON B.CO_CD        = A.CO_CD
 						                                        AND B.SELL_BILL_NO = A.SELL_BILL_NO
+						        LEFT OUTER JOIN TB_CR02M01 AS M  ON B.CO_CD        = M.CO_CD
+						                                        AND B.ORDRS_NO     = M.ORDRS_NO
 						 WHERE  1 = 1
 		                ) AS A
 		         WHERE  1 = 1
@@ -1036,11 +1063,13 @@
 						      , SUBSTR(REPLACE(TO_CHAR(A.CLMN_DT, 'YYYY-MM-DD'), '-', ''), 1, 6) AS YYYYMM
 						      , B.ORDRS_NO
 						      , B.CLMN_PLAN_SEQ
-						      , NVL(B.CLMN_DTL_AMT, 0) AS CLMN_DTL_AMT
-						      , NVL(B.CLMN_DTL_VAT, 0) AS CLMN_DTL_VAT
+						      , round(M.EXRATE * NVL(B.CLMN_DTL_AMT, 0), 1) AS CLMN_DTL_AMT
+						      , round(M.EXRATE * NVL(B.CLMN_DTL_VAT, 0), 1) AS CLMN_DTL_VAT
 						 FROM   TB_CR05M01 AS A
 						        LEFT OUTER JOIN TB_CR05D01 AS B  ON B.CO_CD   = A.CO_CD
 						                                        AND B.CLMN_NO = A.CLMN_NO
+						        LEFT OUTER JOIN TB_CR02M01 AS M  ON B.CO_CD        = M.CO_CD
+						                                        AND B.ORDRS_NO     = M.ORDRS_NO
 						 WHERE  1 = 1 
 		                ) AS A
 		         WHERE  1 = 1
@@ -1056,11 +1085,13 @@
 		     , A.CO_NM
 		     , A.YYYY
 		     , A.ORDRS_NO
+		     , A.ORDRS_DIV
 		     , A.ORDRS_MMDD
 		     , A.CLNT_NM
 		     , A.CTRT_NM
 		     , A.CURR_NM
 		     , A.ORDRS_AMT
+		     , A.ORDRS_AMT_CURR
 		     , A.ORDRGER
 		     , A.CTRT_DOC_NM
 		     , A.PMNT_MTD_NM
@@ -1069,64 +1100,45 @@
 		     , A.BILL_PBLS_YY||'년'||A.BILL_PBLS_MM||'월 '||A.CLMN_RATE_NM AS CLMN_NM
 		     --, A.SUJU_CLMN_AMT
 		     , CASE WHEN A.CODE_RPRC = '10' THEN
-		       			 (CASE WHEN A.CURR_CD = 'WON' THEN A.SUJU_CLMN_AMT
-                    	       ELSE A.SUJU_CLMN_AMT * NVL(A.EXRATE, 1) END) * 1.1
-                    ELSE (CASE WHEN A.CURR_CD = 'WON' THEN A.SUJU_CLMN_AMT
-                    	       ELSE A.SUJU_CLMN_AMT * NVL(A.EXRATE, 1) END) 
+		       			  A.SUJU_CLMN_AMT * 1.1
+                    ELSE  A.SUJU_CLMN_AMT 
                     END AS SUJU_CLMN_AMT --계약금액(VAT포함)(원화)
-                    
+
 		     , A.PMNT_DT_AFTER_BILL
 		     , A.FWD_MMDD
 		     , A.CHK_LIST_NM
 		     , A.MNG_NM
 		     , NVL(P.PLAN_BILL_RMK, '')   AS PLAN_BILL_RMK
-		     --, NVL(P.PLAN_BILL_AMT_01, 0) AS PLAN_BILL_AMT_01 --해당월 계산서 계획(달러)
-		     , CASE WHEN A.CURR_CD = 'WON' THEN P.PLAN_BILL_AMT_01 
-                    ELSE P.PLAN_BILL_AMT_01 * NVL(A.EXRATE, 1) END AS PLAN_BILL_AMT_01  --해당월 계산서 계획(원화)
-		     
+		     , NVL(P.PLAN_BILL_AMT_01, 0) AS PLAN_BILL_AMT_01 --해당월 계산서 계획(달러)
+
 		     --, NVL(B.BILL_AMT_01, 0)      AS BILL_AMT_01
 		     , NVL(CASE WHEN A.CODE_RPRC = '10' THEN
-				             (CASE WHEN A.CURR_CD = 'WON' THEN B.BILL_AMT_01 
-		                           ELSE B.BILL_AMT_01 * NVL(A.EXRATE, 1) END) * 1.1
-                        ELSE (CASE WHEN A.CURR_CD = 'WON' THEN B.BILL_AMT_01 
-		                           ELSE B.BILL_AMT_01 * NVL(A.EXRATE, 1) END)
+				             ROUND(NVL(B.BILL_AMT_01, 0) * 1.1, 1)
+                        ELSE NVL(B.BILL_AMT_01, 0)
 		                END, 0) AS BILL_AMT_01  --해당월 계산서 발행(VAT포함)(원화)
 
 		     , CASE WHEN NVL(P.PLAN_BILL_AMT_01, 0) = 0 THEN 0||' %'
 		            ELSE ROUND((NVL(B.BILL_AMT_01, 0) / NVL(P.PLAN_BILL_AMT_01, 0)) * 100, 0)||' %'
 		       END                        AS BILL_PER_01
-		     --, NVL(P.PLAN_CLMN_AMT_01, 0) AS PLAN_CLMN_AMT_01 --해당월 수금 계획(달러)
-		     , CASE WHEN A.CURR_CD = 'WON' THEN P.PLAN_CLMN_AMT_01
-                    ELSE P.PLAN_CLMN_AMT_01 * NVL(A.EXRATE, 1) END AS PLAN_CLMN_AMT_01 --해당월 수금 계획(원화)
-		     --, NVL(C.CLMN_AMT_01, 0)      AS CLMN_AMT_01 --해당월 수금 실적(달러)
-		     , NVL(CASE WHEN A.CURR_CD = 'WON' THEN C.CLMN_AMT_01
-                    ELSE C.CLMN_AMT_01 * NVL(A.EXRATE, 1) END, 0) AS CLMN_AMT_01 --해당월 수금 실적(원화)
+		     , NVL(P.PLAN_CLMN_AMT_01, 0) AS PLAN_CLMN_AMT_01 --해당월 수금 계획(달러)
+		     , NVL(C.CLMN_AMT_01, 0)      AS CLMN_AMT_01 --해당월 수금 실적(달러)
 
 		     , CASE WHEN NVL(P.PLAN_CLMN_AMT_01, 0) = 0 THEN 0||' %'
 		            ELSE ROUND((NVL(C.CLMN_AMT_01, 0) / NVL(P.PLAN_CLMN_AMT_01, 0)) * 100, 0)||' %'
 		       END                        AS CLMN_PER_01
-		     --, NVL(P.PLAN_BILL_AMT_02, 0) AS PLAN_BILL_AMT_02 --다음월 계산서 계획(달러)
-		     , CASE WHEN A.CURR_CD = 'WON' THEN P.PLAN_BILL_AMT_02
-                    ELSE P.PLAN_BILL_AMT_02 * NVL(A.EXRATE, 1) END AS PLAN_BILL_AMT_02 --다음월 계산서 계획(원화)
+		     , NVL(P.PLAN_BILL_AMT_02, 0) AS PLAN_BILL_AMT_02 --다음월 계산서 계획(달러)
 
 		     --, NVL(B.BILL_AMT_02, 0)      AS BILL_AMT_02 --다음월 계산서 발행(달러)
-		     , NVL(CASE WHEN A.CODE_RPRC = '10' THEN
-					         (CASE WHEN A.CURR_CD = 'WON' THEN B.BILL_AMT_02
-			                       ELSE B.BILL_AMT_02 * NVL(A.EXRATE, 1) END) * 1.1
-			            ELSE (CASE WHEN A.CURR_CD = 'WON' THEN B.BILL_AMT_02
-			                       ELSE B.BILL_AMT_02 * NVL(A.EXRATE, 1) END)
-			            END, 0) AS BILL_AMT_02 --다음월 계산서 발행(VAT포함)(원화)
+		     , CASE WHEN A.CODE_RPRC = '10' THEN
+					         round(NVL(B.BILL_AMT_02, 0) * 1.1, 1)
+			            ELSE NVL(B.BILL_AMT_02, 0) END  AS BILL_AMT_02 --다음월 계산서 발행(VAT포함)(원화)
 
 		     , CASE WHEN NVL(P.PLAN_BILL_AMT_02, 0) = 0 THEN 0||' %'
 		            ELSE ROUND((NVL(B.BILL_AMT_02, 0) / NVL(P.PLAN_BILL_AMT_02, 0)) * 100, 0)||' %'
 		       END                        AS BILL_PER_02
-		     --, NVL(P.PLAN_CLMN_AMT_02, 0) AS PLAN_CLMN_AMT_02
-		     , CASE WHEN A.CURR_CD = 'WON' THEN P.PLAN_CLMN_AMT_02
-                    ELSE P.PLAN_CLMN_AMT_02 * NVL(A.EXRATE, 1) END AS PLAN_CLMN_AMT_02 --다음월 수금 계획(원화)
+		     , NVL(P.PLAN_CLMN_AMT_02, 0) AS PLAN_CLMN_AMT_02 --다음월 수금 계획(원화)
 
-		     --, NVL(C.CLMN_AMT_02, 0)      AS CLMN_AMT_02
-		     , NVL(CASE WHEN A.CURR_CD = 'WON' THEN C.CLMN_AMT_02
-                    ELSE C.CLMN_AMT_02 * NVL(A.EXRATE, 1) END, 0) AS CLMN_AMT_02 --다음월 수금 실적(원화)
+		     , NVL(C.CLMN_AMT_02, 0)      AS CLMN_AMT_02 --다음월 수금 실적(원화)
 
 		     , CASE WHEN NVL(P.PLAN_CLMN_AMT_02, 0) = 0 THEN 0||' %'
 		            ELSE ROUND((NVL(C.CLMN_AMT_02, 0) / NVL(P.PLAN_CLMN_AMT_02, 0)) * 100, 0)||' %'
@@ -1135,35 +1147,27 @@
 
 		     --, NVL(B.BILL_AMT, 0)         AS BILL_AMT --총계산서발행금액(달러)
 		     , CASE WHEN A.CODE_RPRC = '10' THEN
-				         (CASE WHEN A.CURR_CD = 'WON' THEN B.BILL_AMT 
-		                       ELSE B.BILL_AMT * NVL(A.EXRATE, 1) END) * 1.1 
-                    ELSE (CASE WHEN A.CURR_CD = 'WON' THEN B.BILL_AMT 
-			                   ELSE B.BILL_AMT * NVL(A.EXRATE, 1) END)
+				         round(NVL(B.BILL_AMT, 0) * 1.1, 1) 
+                    ELSE NVL(B.BILL_AMT, 0) 
 			        END AS BILL_AMT --총계산서발행금액(VAT포함)(원화)
 
 		     --, NVL(C.CLMN_AMT, 0)         AS CLMN_AMT --총수금액(달러)
 		     , CASE WHEN A.CODE_RPRC = '10' THEN		     
-					     (CASE WHEN A.CURR_CD = 'WON' THEN C.CLMN_AMT 
-			                   ELSE C.CLMN_AMT * NVL(A.EXRATE, 1) END)
-                    ELSE (CASE WHEN A.CURR_CD = 'WON' THEN C.CLMN_AMT 
-		                       ELSE C.CLMN_AMT * NVL(A.EXRATE, 1) END)
+					     NVL(C.CLMN_AMT, 0)
+                    ELSE NVL(C.CLMN_AMT, 0)
 		            END AS CLMN_AMT --총수금액(VAT포함)(원화)
 
 		     --, NVL(A.SUJU_CLMN_AMT, 0) - NVL(B.BILL_AMT, 0) AS MI_BILL_AMT --총계산서미발행금액(달러)
 		     , CASE WHEN A.CODE_RPRC = '10' THEN
-				         (CASE WHEN A.CURR_CD = 'WON' THEN NVL(A.SUJU_CLMN_AMT, 0) - NVL(B.BILL_AMT, 0) 
-		                       ELSE (NVL(A.SUJU_CLMN_AMT, 0) - NVL(B.BILL_AMT, 0)) * NVL(A.EXRATE, 1) END) * 1.1 
-                    ELSE (CASE WHEN A.CURR_CD = 'WON' THEN NVL(A.SUJU_CLMN_AMT, 0) - NVL(B.BILL_AMT, 0) 
-		                       ELSE (NVL(A.SUJU_CLMN_AMT, 0) - NVL(B.BILL_AMT, 0)) * NVL(A.EXRATE, 1) END)
+				         round((NVL(A.SUJU_CLMN_AMT, 0) - NVL(B.BILL_AMT, 0)) * 1.1, 1) 
+                    ELSE (NVL(A.SUJU_CLMN_AMT, 0) - NVL(B.BILL_AMT, 0))
 		            END AS MI_BILL_AMT --총계산서미발행금액(VAT포함)(원화)
 --             , CASE WHEN (NVL(A.SUJU_CLMN_AMT, 0) - NVL(B.BILL_AMT, 0)) > 0 THEN 'N' ELSE 'Y' END AS BILL_YN  --수금완료
 
 		     --, NVL(A.SUJU_CLMN_AMT, 0) - NVL(C.CLMN_AMT, 0) AS MI_CLMN_AMT --총미수금액(달러)
 		     , CASE WHEN A.CODE_RPRC = '10' THEN
-		                 (CASE WHEN A.CURR_CD = 'WON' THEN NVL(A.SUJU_CLMN_AMT, 0) - NVL(C.CLMN_AMT, 0) 
-                               ELSE ((NVL(A.SUJU_CLMN_AMT, 0)* 1.1) - NVL(C.CLMN_AMT, 0)) * NVL(A.EXRATE, 1) END) 
-                    ELSE (CASE WHEN A.CURR_CD = 'WON' THEN NVL(A.SUJU_CLMN_AMT, 0) - NVL(C.CLMN_AMT, 0) 
-                               ELSE (NVL(A.SUJU_CLMN_AMT, 0) - NVL(C.CLMN_AMT, 0)) * NVL(A.EXRATE, 1) END)
+		                 round(NVL(A.SUJU_CLMN_AMT, 0)* 1.1, 1) - NVL(C.CLMN_AMT, 0)
+                    ELSE NVL(A.SUJU_CLMN_AMT, 0) - NVL(C.CLMN_AMT, 0) 
                      END AS MI_CLMN_AMT --총미수금액(VAT포함)(원화)
 
 		     , NVL(P.PLAN_RMK, '')        AS PLAN_RMK
@@ -1171,10 +1175,8 @@
 			 , SUBSTR((SELECT FROM_YYYYMM FROM YYYYMM), 5, 2) AS FROM_MM
 			 , SUBSTR((SELECT TO_YYYYMM FROM YYYYMM), 5, 2)   AS TO_MM
 			 , CASE WHEN A.CODE_RPRC = '10' THEN 
-			        (CASE WHEN A.CURR_CD = 'WON' THEN A.SUJU_CLMN_AMT
-			              ELSE A.SUJU_CLMN_AMT * NVL(A.EXRATE, 1) END) * 1.1
-               ELSE (CASE WHEN A.CURR_CD = 'WON' THEN A.SUJU_CLMN_AMT
-                          ELSE A.SUJU_CLMN_AMT * NVL(A.EXRATE, 1) END)
+			        round(A.SUJU_CLMN_AMT * 1.1, 1)
+               ELSE A.SUJU_CLMN_AMT
                 END AS EXP_AMT --총수금예상금액(VAT포함)[원화]
 			 , A.CODE_RPRC
 			 , NVL(A.EXRATE, 1) AS EXRATE
