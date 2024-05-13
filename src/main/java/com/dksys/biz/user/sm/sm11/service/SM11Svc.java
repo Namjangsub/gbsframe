@@ -32,5 +32,8 @@ public interface SM11Svc {
   int createContractBill(Map<String, String> paramMap) throws Exception;
   
   int deleteContractBill(Map<String, String> paramMap) throws Exception;
+
+  int selectClntCrtrListCount(Map<String, String> paramMap);
   
+  List<Map<String, String>> selectClntCrtrList(Map<String, String> paramMap);
 }

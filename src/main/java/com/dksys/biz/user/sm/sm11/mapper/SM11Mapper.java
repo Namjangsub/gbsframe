@@ -53,4 +53,10 @@ public interface SM11Mapper {
   int deleteContractBillMaster(Map<String, String> paramMap);
   int deleteContractBillDetail(Map<String, String> paramMap);
   int deleteContractBillReport(Map<String, String> paramMap);
+  
+
+  int selectClntCrtrListCount(Map<String, String> paramMap);
+  
+  List<Map<String, String>> selectClntCrtrList(Map<String, String> paramMap);
+  
 }

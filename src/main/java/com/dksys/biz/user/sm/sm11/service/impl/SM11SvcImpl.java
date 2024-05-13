@@ -329,4 +329,15 @@ public class SM11SvcImpl implements SM11Svc {
 		    
 		  return result;
 	  }
+	  
+	  @Override
+	  public int selectClntCrtrListCount(Map<String, String> paramMap) {
+	    return sm11Mapper.selectClntCrtrListCount(paramMap);
+	  }
+
+	  @Override
+	  public List<Map<String, String>> selectClntCrtrList(Map<String, String> paramMap) {
+	    return sm11Mapper.selectClntCrtrList(paramMap);
+	  }
+	  
 }

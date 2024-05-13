@@ -186,5 +186,16 @@ public class SM11Ctr {
 	  }
 	  return "jsonView";
   }
-	  
+  
+	//PJT별 대금 입금.지급 관리 상황
+	@PostMapping(value = "/selectClntCrtrList")
+	public String selectClntCrtrList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  int totalCnt = sm11Svc.selectClntCrtrListCount(paramMap);
+		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		  model.addAttribute("paginationInfo", paginationInfo);
+		  List<Map<String, String>> result = sm11Svc.selectClntCrtrList(paramMap);
+		  model.addAttribute("result", result);
+		  return "jsonView";
+	}
+
 }
