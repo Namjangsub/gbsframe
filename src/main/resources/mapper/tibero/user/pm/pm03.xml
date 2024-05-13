@@ -40,6 +40,25 @@
 		 </if>
 		 --AND M.ORDRS_DIV = 'ORDRSDIV1'
 		)
+		, OUT_TOT AS
+		(
+		 SELECT
+		        X.CO_CD                                               AS CO_CD          --회사코드
+		      , X.ORDRS_NO                                            AS ORDRS_NO       --수주번호
+		      , SUM(D.OUT_QTY)   									  AS OUT_TOT_QTY    --출고수량(수주번호별 출고번호의 SUM)
+		 FROM   TB_PM03M01 AS X  --제품출고
+		        LEFT OUTER JOIN (
+		                         SELECT CO_CD
+		                              , OUT_NO
+		                              , SUM(OUT_QTY) OUT_QTY
+		                         FROM   TB_PM03D01  --출고상세
+		                         WHERE  CO_CD = 'GUN'
+		                         GROUP BY CO_CD, OUT_NO
+		                        ) AS D ON D.CO_CD = X.CO_CD AND D.OUT_NO = X.OUT_NO
+		 WHERE  1 = 1 
+		   AND EXISTS ( SELECT 1 FROM SJM WHERE SJM.CO_CD = X.CO_CD AND SJM.ORDRS_NO = X.ORDRS_NO)
+		 GROUP BY X.CO_CD, X.ORDRS_NO
+		)
 		, PCH AS
 		(
 		 SELECT TO_CHAR(A.ORDRS_CLNT_CD)||X.ORDRS_NO                  AS UPPER_CD       --상위코드
@@ -131,7 +150,7 @@
 		             , ''                                   AS OUT_ID_NM      --출고자명
 		             , ''                                   AS OUT_RMK        --출고 비고 
 		             , NVL(ORDRS_QTY,0)                     AS ORDRS_QTY      --수주수량
-		             , (SELECT MAX(OUT_QTY) FROM PCH WHERE CO_CD = B.CO_CD AND ORDRS_NO = B.ORDRS_NO ) AS OUT_QTY --출고수량 (수주번호별 출고수량 중 1개)
+		             , (SELECT OUT_TOT_QTY FROM OUT_TOT WHERE CO_CD = B.CO_CD AND ORDRS_NO = B.ORDRS_NO ) AS OUT_QTY --출고수량 (수주번호별 출고수량 중 1개)
 		        FROM   SJM AS B
 		        WHERE  1 = 1
 		        <if test="userId != null and !userId.equals('')">
