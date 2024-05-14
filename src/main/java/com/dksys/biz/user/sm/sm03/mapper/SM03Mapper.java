@@ -52,6 +52,10 @@ public interface SM03Mapper {
 
 	int updateMailStoreConfirm(Map<String, String> param);
 	
+
+	int selectWareHousingDetaiNewlListCount(Map<String, String> paramMap);
+	
+	List<Map<String, String>> selectWareHousingDetaiNewlList(Map<String, String> paramMap);	
 }
 
 

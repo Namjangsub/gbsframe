@@ -297,7 +297,14 @@ public class SM03SvcImpl implements SM03Svc {
 		return result;
 	}		
 
-		
-		/* 메일발송 yn*/
-		
+	@Override
+	public int selectWareHousingDetaiNewlListCount(Map<String, String> paramMap) {
+		return sm03Mapper.selectWareHousingDetaiNewlListCount(paramMap);
+	}
+	
+	@Override
+	public List<Map<String, String>> selectWareHousingDetaiNewlList(Map<String, String> paramMap) {
+		return sm03Mapper.selectWareHousingDetaiNewlList(paramMap);
+	}	
+
 }

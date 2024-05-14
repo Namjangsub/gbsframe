@@ -174,5 +174,27 @@ public class SM03Ctr {
   		}
   		return "jsonView";
     }   	  
-  
+
+	// 매입관리 상세 입고 조회
+	@PostMapping(value = "/selectWareHousingDetaiNewlList")
+	public String selectWareHousingDetaiNewlList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+
+		paramMap.put("clntPjt", ObjectUtil.sqlInCodeGen(paramMap.get("clntPjt")));
+		paramMap.put("mngIdCd", ObjectUtil.sqlInCodeGen(paramMap.get("mngIdCd")));
+		int totalCnt = sm03Svc.selectWareHousingDetaiNewlListCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = sm03Svc.selectWareHousingDetaiNewlList(paramMap);
+		model.addAttribute("result", result);
+		
+
+	   	List<Map<String, String>> resultPrjct = sm03Svc.select_prjct_code(paramMap);
+	   	model.addAttribute("resultPrjct", resultPrjct);
+
+	   	List<Map<String, String>> resultMngId = sm03Svc.select_mngId_code(paramMap);
+	   	model.addAttribute("resultMngId", resultMngId);
+	   	
+		return "jsonView";
+	}
+	
 }

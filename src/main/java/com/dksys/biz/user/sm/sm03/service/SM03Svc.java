@@ -38,4 +38,10 @@ public interface SM03Svc {
 	List<Map<String, String>> select_mngId_code(Map<String, String> paramMap);
 
 	int updateMailStoreConfirm(Map<String, String> param);
+
+
+	// 입고 상세 리스트 카운트	
+	int selectWareHousingDetaiNewlListCount(Map<String, String> paramMap);
+		
+	List<Map<String, String>> selectWareHousingDetaiNewlList(Map<String, String> paramMap);
 }
