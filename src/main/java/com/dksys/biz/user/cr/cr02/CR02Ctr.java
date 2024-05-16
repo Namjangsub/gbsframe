@@ -106,10 +106,6 @@ public class CR02Ctr {
 			model.addAttribute("resultCode", 500);
 			model.addAttribute("resultMessage", e.getLocalizedMessage());
 		}
-
-
-
-
 		return "jsonView";
 	}
 
@@ -124,10 +120,6 @@ public class CR02Ctr {
 			model.addAttribute("resultCode", 500);
 			model.addAttribute("resultMessage", e.getLocalizedMessage());
 		}
-
-
-
-
 		return "jsonView";
 	}
 
@@ -157,21 +149,22 @@ public class CR02Ctr {
 		return "jsonView";
 	}
 	
-	  //SalesCode Search modal폼 사용 조회
-	  @PostMapping(value = "/selectWbsLeftSalesCodeTreeList") 
-	  public String selectWbsLeftSalesCodeTreeList(@RequestBody Map<String, String> param, ModelMap model) {		  
-		  List<Map<String, Object>> fileList = cr02Svc.selectWbsLeftSalesCodeTreeList(param);
-		  model.addAttribute("fileList", fileList);
-		  return "jsonView";
-	  }	 	
+	//SalesCode Search modal폼 사용 조회
+	@PostMapping(value = "/selectWbsLeftSalesCodeTreeList")
+	public String selectWbsLeftSalesCodeTreeList(@RequestBody Map<String, String> param, ModelMap model) {
+		List<Map<String, Object>> fileList = cr02Svc.selectWbsLeftSalesCodeTreeList(param);
+		model.addAttribute("fileList", fileList);
+		return "jsonView";
+	}
+	
 	//SalesCode Search사용 조회
-	  @PostMapping(value = "/selectItemSalesCodeTreeList") 
-	  public String selectItemSalesCodeTreeList(@RequestBody Map<String, String> param, ModelMap model) {		  
-		  List<Map<String, Object>> fileList = cr02Svc.selectItemSalesCodeTreeList(param);
-		  model.addAttribute("fileList", fileList);
-		  return "jsonView";
-	  }
-
+	@PostMapping(value = "/selectItemSalesCodeTreeList")
+	public String selectItemSalesCodeTreeList(@RequestBody Map<String, String> param, ModelMap model) {
+		List<Map<String, Object>> fileList = cr02Svc.selectItemSalesCodeTreeList(param);
+		model.addAttribute("fileList", fileList);
+		return "jsonView";
+	}
+	
 	//복사기능 호출
 	@PostMapping(value = "/callCopyOrdrs") 
 	public String callCopyOrdrs(@RequestBody Map<String, String> paramMap, ModelMap model) {	  
@@ -179,7 +172,6 @@ public class CR02Ctr {
 		model.addAttribute("paramMap", paramMap);
 		return "jsonView";
 	}
-
 	
 	@PostMapping("/selectNoSalesCdOrdrsListPop")
 	public String selectNoSalesCdOrdrsListPop(@RequestBody Map<String, String> param, ModelMap model) {
@@ -191,41 +183,50 @@ public class CR02Ctr {
 		return "jsonView";
 	}
 	
-	  @PostMapping(value = "/selectJunmooApproval") 
-	  public String selectJunmooApproval(@RequestBody Map<String, String> param, ModelMap model) {		  
-		  int JunmooApproval = cr02Svc.selectJunmooApproval(param);
-		  model.addAttribute("JunmooApproval", JunmooApproval);
-		  return "jsonView";
-	  }
-	  
-		//설비원가정보 삭제    
-		@DeleteMapping(value = "/deleteOrdrsDetail")
-		public String deleteOrdrsDetail(@RequestBody Map<String, String> param, ModelMap model) {
-	    	try {			
-	    		cr02Svc.deleteOrdrsDetail(param);
-				model.addAttribute("resultCode", 200);
-	    		model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-	    	}catch(Exception e) {
-		    	 model.addAttribute("resultCode", 500);
-		 		 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-	    	}	    	
-			return "jsonView";
+	@PostMapping(value = "/selectJunmooApproval")
+	public String selectJunmooApproval(@RequestBody Map<String, String> param, ModelMap model) {
+		int JunmooApproval = cr02Svc.selectJunmooApproval(param);
+		model.addAttribute("JunmooApproval", JunmooApproval);
+		return "jsonView";
+	}
+	
+	//설비원가정보 삭제
+	@DeleteMapping(value = "/deleteOrdrsDetail")
+	public String deleteOrdrsDetail(@RequestBody Map<String, String> param, ModelMap model) {
+		try {
+			cr02Svc.deleteOrdrsDetail(param);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
 		}
-		
-	  //SalesCode Search modal폼 사용 조회
-	  @PostMapping(value = "/selectOrdrsDetails") 
-	  public String selectOrdrsDetails(@RequestBody Map<String, String> param, ModelMap model) {		  
-		  List<Map<String, Object>> fileList = cr02Svc.selectOrdrsDetails(param);
-		  model.addAttribute("fileList", fileList);
-		  return "jsonView";
-	  }
-
-	  // salesCd 정보 조회
-	  @PostMapping(value = "/salesCdSearchOrderInfo")
-	  public String salesCdSearchOrderInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		catch(Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		}
+		return "jsonView";
+	}
+	
+	//SalesCode Search modal폼 사용 조회
+	@PostMapping(value = "/selectOrdrsDetails")
+	public String selectOrdrsDetails(@RequestBody Map<String, String> param, ModelMap model) {
+		List<Map<String, Object>> fileList = cr02Svc.selectOrdrsDetails(param);
+		model.addAttribute("fileList", fileList);
+		return "jsonView";
+	}
+	
+	// salesCd 정보 조회
+	@PostMapping(value = "/salesCdSearchOrderInfo")
+	public String salesCdSearchOrderInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		Map<String, String> result = cr02Svc.salesCdSearchOrderInfo(paramMap);
-	    model.addAttribute("result", result);
-	    return "jsonView";
-	  }
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	// 수주변경 타이틀
+	@PostMapping(value = "/selectOrderChangeTitle")
+	public String selectOrderChangeTitle(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = cr02Svc.selectOrderChangeTitle(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 	  
 }

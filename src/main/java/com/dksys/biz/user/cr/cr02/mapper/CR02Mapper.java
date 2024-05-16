@@ -99,4 +99,6 @@ public interface CR02Mapper {
 	int selectJunmooApproval(Map<String, String> param);
 	
 	int updateOrdrsDetailSoonban(Map<String, String> param);
+
+    List<Map<String, String>> selectOrderChangeTitle(Map<String, String> paramMap);
 }

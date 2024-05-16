@@ -62,4 +62,6 @@ public interface CR02Svc {
 
 	Map<String, String> salesCdSearchOrderInfo(Map<String, String> paramMap);
 
+    List<Map<String, String>> selectOrderChangeTitle(Map<String, String> paramMap);
+
 }

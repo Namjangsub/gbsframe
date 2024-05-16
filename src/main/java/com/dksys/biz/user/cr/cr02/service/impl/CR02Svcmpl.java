@@ -1043,4 +1043,9 @@ public class CR02Svcmpl implements CR02Svc {
 	    public Map<String, String> salesCdSearchOrderInfo(Map<String, String> paramMap) {
 	        return cr02Mapper.salesCdSearchOrderInfo(paramMap);
 	    }
+    
+    @Override
+	public List<Map<String, String>> selectOrderChangeTitle(Map<String, String> paramMap) {
+		return cr02Mapper.selectOrderChangeTitle(paramMap);
+	}
 }
