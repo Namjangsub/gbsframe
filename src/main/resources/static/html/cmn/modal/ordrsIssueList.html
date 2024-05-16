@@ -1,0 +1,173 @@
+<div id="commonPopup">
+	<div class="popup_area">
+		<div class="popup_table">
+		    <table>
+                <colgroup>
+                    <col width="20%">
+                    <col width="">
+                </colgroup>
+                <tr>
+                    <td>
+                    SALES CODE
+                    </td>
+                    <td>
+                        <div class="search_form">
+                            <input type="text" id="searchValue" data-search="searchValue" onkeyup="if(window.event.keyCode == 8){searchValue.value = ''}  else if (window.event.keyCode == 13){gridIssueView.setData(0);}">
+                            <a onclick="gridIssueView.setData(0);">
+                                <i class="i_search_w"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+			<div class="ax5_grid" data-ax5grid="gridIssue-grid" data-ax5grid-config="{}" style="height: 820px; width: 100%"></div>
+		</div>
+	</div>
+	<div class="popup_bottom_btn">
+<!-- 		<button type="button" onclick="executeCallback();">선택</button> -->
+		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+<script type="text/javascript">
+    var coCd = modalStack.last().paramObj.coCd;
+    var salesCd = modalStack.last().paramObj.searchValue;
+    $('#commonPopup #searchValue').val(modalStack.last().paramObj.searchValue);
+	ax5.ui.grid.formatter["bilgYn"] = function () {
+		var color = this.value == "ISSSTS03" ? "color-circle_02.png" : "color-circle_01.png";
+		if (this.value == "E") {
+			return 'E';
+		} else {
+			return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
+		}
+	};
+	var gridIssueView = {
+			initView : function() {
+				this.target = new ax5.ui.grid();
+				this.target.setConfig({
+			    	showRowSelector: false,
+			    	multipleSelect: false,
+			    	sortable: true,
+			        target: $('[data-ax5grid="gridIssue-grid"]'),
+			        header: {
+			        	align: "center",
+			        	selector: true
+			        },
+			        body: {
+						mergeCells : ["clntNm", "clntPjtNm","salesCd","eqpNm","workRptDt","workRptIdNm", "workRptDeptNm"],
+						onClick: function () {
+							this.self.select(this.dindex);
+						},
+						onDBLClick: function () {
+	                        wbsIssModal(this.item);
+						},
+						columnHeight: 50
+					},
+					columns : [
+						 {key: "fileTrgtKey",	label: "파일대상KEY",		width: 50,		align: "center", 	hidden:true}
+						,{key: "coCd",	    	label: "회사코드",			width: 100,		align: "center", 	hidden:true}
+						,{key: "workRptId",	    label: "작성자ID",			width: 100,		align: "center", 	hidden:true}
+						,{key: "coNm",	    	label: "회사",			width: 70,		align: "center", 	hidden:true}
+						,{key: "workRptLNm", 	label: "대분류", 			width: 140,		align: "left", 	hidden:true}
+						,{key: "salesCd", 		label: "Sales Code", 	width: 120,		align: "left"}
+						,{key: "eqpNm", 		label: "설비명", 			width: 200,		align: "left"}
+						,{key: "workRptDt", 	label: "발생일자", 		width: 80,		align: "center"}
+						,{key: "workRptIdNm",	label: "작성자",			width: 55,		align: "center"}
+						,{key: "workRptDeptNm",	label: "작성부서",			width: 80,		align: "left"}
+						,{key: "actIdNm",		label: "조치담당",			width: 70,		align: "center"}
+						,{key: "actDeptNm",		label: "조치부서",			width: 80,		align: "left"}
+						,{key: "issueTitle",  	label: "이슈제목",			width: 250,		align: "left",      styleClass: function () {
+	            			return (this.item.issSts != "ISSSTS03") ? "grid-font-red" : "";},}
+						,{key: "workRptRmk", 	label: "내용", 			width: 500,		align: "left", formatter: function () { return (this.value) ? '<span style="display: block;white-space: pre;">'+this.value+'</span>' : '' }}
+						,{key: "issSts", 	    label: "상태", 			width: 50,		align: "center", formatter: "bilgYn"}
+						,{key: "issStsNm", 	    label: "상태", 			width: 50,		align: "center", 	hidden:true}
+						,{key: "wbsRsltseDt", 	label: "완료일자", 		width: 80,		align: "center"}
+						,{key: "jobDiv", 		label: "발생업무", 		width: 70,		align: "center"}
+					]
+				});
+				return this;
+			},
+			setData : function() {
+				var targetObj = this.target;
+				var formData = {
+						"coCd"		: coCd,
+			            "salesCd"	: $('#commonPopup #searchValue').val(),
+			            "reqDtFrom"	: "20200101",
+			            "reqDtTo"	: "20991231",
+			            "workRptId"	: "",
+			            "prdtCd"	: "",
+			            "itemDiv"	: "",
+			            "prdtNm"	: "",
+			            "actId"		: "",
+						"pageNo"	: 1,
+						"recordCnt" : 99999999
+				};
+				
+				postAjax("/user/pm/pm01/selectAllIssueWorkList", formData, null, function(data) {
+					var list = data.result;
+					debugger;
+					if (list.length == 0) modalStack.close();
+					targetObj.setData({
+						list : list,
+						page : {
+	                    	totalElements : list.length
+						}
+					});
+// 					gridHeightResize(gridIssueView, 194); // 194 = 919 - 725 : 화면 Body 높이 - 그리드 기본크기 725
+				});
+			}
+		}
+
+    // WBS 계획 이슈 수정 방법은 이슈 관리 화면(구분자:U3) 에서 등록 (1가지 방법), 기존 WBS 일정계획 (구분자:U1)은 사용하지 않고 이슈관리 화면으로 이동    
+    // WBS 실적 이슈 수정 방법은 이슈 관리 화면(구분자:U4) 에서 등록 (1가지 방법), 기존 WBS 일정계획 (구분자:U2)은 사용하지 않고 이슈관리 화면으로 이동
+    function wbsIssModal(row) {
+    	if (row == undefined) {
+            return;
+    	} else if (row.jobDiv == "작업일보") {
+			var paramObj = {
+				"actionType" : "I",
+				"fileTrgtKey" : row.fileTrgtKey,
+				"coCd" 	   : row.coCd,
+				"userId"   : jwt.userId,
+				"pgmId"    : "PM0101M01"
+			};
+			openModal("/static/html/user/pm/pm01/PM0101P01.html", 750, 560, "", paramObj, function(data) {});
+        } else {
+            // 이슈관리에서 계획 이슈 수정 구분자는 "U3"
+            if (row.gubun == "계획") {
+                var paramObj = {
+                    "actionType"     : "I",
+                    "coCd"           : row.coCd,
+                    "issFileTrgtKey" : row.fileTrgtKey
+                };
+                // debugger;
+                openSecondModal("/static/html/user/wb/wb24/WB2401P01.html", 1200, 870, "WBS 계획이슈수정", paramObj, function (){
+                    
+                });
+            }
+    		else if (row.gubun == "실적") {
+                // 이슈관리에서 등록 이슈 수정 구분자는 "U4"
+                var paramObj = {
+                    "actionType"     : "I",
+                    "coCd"           : row.coCd,
+                    "issFileTrgtKey" : row.fileTrgtKey
+                };
+                // debugger;
+                openSecondModal("/static/html/user/wb/wb24/WB2401P11.html", 1200, 870, "WBS 실적이슈수정", paramObj, function (){
+                    
+                });
+            }
+        }
+    }
+	
+
+	function executeCallback(){
+		if(selectGridValidation(gridIssueView.target)) return;
+		modalStack.last().callback(gridIssueView);
+		modalStack.close();
+	}
+
+    $(document).ready(function() {
+    	gridIssueView.initView().setData();
+    })
+
+</script>
