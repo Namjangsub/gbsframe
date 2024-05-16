@@ -78,24 +78,24 @@
 					<tr>
 						<th class= "hit">회사</th>
 						<td>
-							<select id="coCd_S" name="coCd_S" data-kind="CO" data-search required="required" msg="회사" onchange="gridView.setData(0);">
+							<select id="coCd_S" name="coCd_S" data-kind="CO" data-search="coCd" required="required" msg="회사">
 							</select>
 						</td>
 
 						<th class= "hit">출고일자</th>
 						<td>
 							<div class="date_input">
-								<input type="text" class="input_calendar" onkeyup="dateMask(this);" id="ordrsDtFr_S" name="ordrsDtFr_S" data-search required="required" msg="발행 시작일" autocomplete="off" date>
+								<input type="text" class="input_calendar" onkeyup="dateMask(this);" id="ordrsDtFr_S" name="ordrsDtFr_S" data-search="ordrsDtFr" required="required" msg="발행 시작일" autocomplete="off" date>
 								<span>~</span>
-								<input type="text" class="input_calendar" onkeyup="dateMask(this);" id="ordrsDtTo_S" name="ordrsDtTo_S" data-search required="required" msg="발행 종료일" autocomplete="off" date>
+								<input type="text" class="input_calendar" onkeyup="dateMask(this);" id="ordrsDtTo_S" name="ordrsDtTo_S" data-search="ordrsDtTo" required="required" msg="발행 종료일" autocomplete="off" date>
 							</div>
 						</td>
-						<th>출고담당자</th>
+						<th>담당자</th>
 						<td>
 							<div class="search_form">
-								<input type="hidden" id="userId"    name="userId">
-								<input type="text" data-search id="outIdNm_S" name="outIdNm_S" data-search>
-								<a onclick="openUserTree('outIdNm_S');"><i class="i_search_w"></i></a>
+								<input type="hidden" id="userId_S"    name="userId_S"  data-search="userId">
+								<input type="text" id="userIdNm_S" name="userdNm_S" data-search="userIdNm" onkeyup="event.keyCode == 8 ? userId_S.value = '' : event.keyCode == 13 ? gridView.setData(0) : ''">
+								<a onclick="openUserTree('userIdNm_S');"><i class="i_search_w"></i></a>
 							</div>
 						</td>
                         <th></th><td></td>
@@ -104,25 +104,25 @@
 					<tr>
 						<th>수주번호</th>
 						<td>
-							<input type="text" id="ordrsNo_S" name="ordrsNo_S" data-search>
+							<input type="text" id="ordrsNo_S" name="ordrsNo_S" data-search="ordrsNo">
 						</td>
 						<th>고객사 PJT</th>
 						<td>
-							<select id="clntPjt_S" name="clntPjt_S" data-kind="PRJCTCD" data-search="clntPjt" onchange="gridView.setData(0);">
+							<select id="clntPjt_S" name="clntPjt_S" data-kind="PRJCTCD" data-search="clntPjt">
 								<option value="">전체</option>
 							</select>
 						    <!-- <input type="text" id="clntPjt_S" name="clntPjt_S" data-search> -->
-						</td>
+						</td>c
 						<th>고객사</th>
 						<td>
 							<div class="search_form" style="width: 100%;">
-								<input type="text" id="clntNm_S" name="clntNm_S" data-search>
+								<input type="text" id="clntNm_S" name="clntNm_S" data-search="clntNm">
 								<a onclick="openClntSearch($('#clntNm_S').val());"><i class="i_search_w"></i></a>
 							</div>
 						</td>
 						<th>계약명</th>
 						<td>
-							<input type="text" id="ctrtNm_S" name="ctrtNm_S" data-search>
+							<input type="text" id="ctrtNm_S" name="ctrtNm_S" data-search="ctrtNm">
 						</td>
 					</tr>
 	            </table>
@@ -174,11 +174,6 @@
 
 	var approvalAuthorityIgnore = false; //결재기능무시(true) 결재하기. 기본: false
 	var approvalAppInfoView = true; //결재상태보기
-	$('#outIdNm_S').change(function() {
-		if($('#outIdNm_S').val() == '') {
-			$('#userId').val('');
-		}
-	});
 
 	ax5.ui.grid.formatter["chkYn"] = function () {
 	    var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
@@ -290,9 +285,18 @@
 		},
 		setData : function(_pageNo) {
 			var targetObj = this.target;
+            var formData = {};
         	if (inputValidation($('.table_input [required]'))) {
-        		var paramObj = getSearchParam(".table_input", 1, 99999999);
-                postAjax("/user/pm/pm03/selectDeliveryList", paramObj, null, function(data) {
+                $.each($('[data-search]'), function(idx, elem){
+    				formData[$(elem).data("search")] = $(elem).val();
+    			});
+
+				formData["ordrsDtFr"] = $("#ordrsDtFr_S").val().replace(/\-/g, '');
+				formData["ordrsDtTo"] = $("#ordrsDtTo_S").val().replace(/\-/g, '');
+				formData["pageNo"] = _pageNo + 1;
+				formData["recordCnt"] = 9999999;
+				debugger;
+                postAjax("/user/pm/pm03/selectDeliveryList", formData, null, function(data) {
 					gridHeightResize(gridView, 194); // 194 = 919 - 725 : 화면 Body 높이 - 그리드 기본크기 725
 					var list = data.resultList;
 					targetObj.setData({
@@ -388,7 +392,6 @@
 
 		authChk();
 
-		$('#ordrsDiv_S option:not([value="ORDRSDIV1"], [value="ORDRSDIV9"])').remove();		//정상수주외 제거
 	});
 
 	function insertSelectModal(index) {
@@ -518,11 +521,8 @@
 		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function (tree){
 	        var checkedId = tree.get_checked()[0];
 	        var checkedNode = tree.get_node(checkedId);
-// 	        console.log("====checkedNode>>",checkedNode);
-	        $('#userId').val(checkedNode.id);
-	        $('#'+userNm).val(checkedNode.text);
-	        //$("#deptNm").val(checkedNode.original.deptNm);
-	        //$("#deptId").val(checkedNode.parent);
+	        $('#userId_S').val(checkedNode.id);
+	        $('#userIdNm_S').val(checkedNode.text);
 
 	        gridView.setData(0);
 		});
