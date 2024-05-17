@@ -2509,7 +2509,7 @@ function imageViewPopup(_fileKey, _filename) {
 
 	var paramObj = {
 			"fileKey" 	: _fileKey,
-			"filename" 	: _filename,
+			"fileName" 	: _filename,
 		};
 	openModal("/static/html/cmn/modal/attachImageView.html", 1024, 768, _filename, paramObj, function(data) {
 	});

@@ -91,7 +91,6 @@ var treeModule = (function () {
                     },
                     onDBLClick: function () {
                         var fileKey = this.item.fileKey;
-                        debugger;
                         if (fileKey) {
                             if (this.item.fileDown == 'Y') {
           		                if (this.column.key == "fileName") {
