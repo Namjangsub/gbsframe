@@ -91,8 +91,23 @@ var treeModule = (function () {
                     },
                     onDBLClick: function () {
                         var fileKey = this.item.fileKey;
+                        debugger;
                         if (fileKey) {
-                            (this.item.fileDown == 'Y')  ? downloadFile(fileKey) : alert('파일 다운로드 권한이 없습니다.');
+                            if (this.item.fileDown == 'Y') {
+          		                if (this.column.key == "fileName") {
+          		                	//첨부파일 이미지뷰
+          		                	let tempType = this.item.fileType.toLowerCase();
+          		                	if (tempType == 'jpg' || tempType == 'jpeg' || tempType == 'png' || tempType == 'gif') {
+          		                		imageViewPopup(fileKey, this.item.fileName);
+          		                	} else {
+          		                		downloadFile(fileKey);
+          		                	}
+          		                } else {
+      		                		downloadFile(fileKey);
+          		                }
+                            } else {
+                            	alert('파일 다운로드 권한이 없습니다.');
+                            }
                         }
                     },
                 },

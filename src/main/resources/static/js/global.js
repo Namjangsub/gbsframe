@@ -2502,3 +2502,15 @@ function gPasFloatChk (value) {
 	const cvtValue = parseFloat(deleteCommaStr(value));
 	return isNaN(cvtValue) ? 0 : cvtValue;
 }
+
+
+//이미지뷰 팝업
+function imageViewPopup(_fileKey, _filename) {
+
+	var paramObj = {
+			"fileKey" 	: _fileKey,
+			"filename" 	: _filename,
+		};
+	openModal("/static/html/cmn/modal/attachImageView.html", 1024, 768, _filename, paramObj, function(data) {
+	});
+}
