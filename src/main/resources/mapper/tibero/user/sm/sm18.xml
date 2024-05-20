@@ -854,6 +854,8 @@
 								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN RM.FILE_TRGT_KEY ELSE C.FILE_TRGT_KEY END FILE_TRGT_KEY
 								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN '발주' 
 								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN '반품' ELSE '비용' END IS_DIV
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.REQ_NO 
+								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN '' ELSE C.REQ_NO END REQ_NO
 								, (SELECT FN_CM06M01_ID_TO_NM(A.CREAT_ID) FROM DUAL) AS CREAT_ID_NM
 								, DECODE (substr(A.ORDRG_NO,0,3), 'COS', C.PCHS_CLMN_DAY, '') 		AS SM10_CLMN_DAY
 								, DECODE (substr(A.ORDRG_NO,0,3), 'COS', C.PCHS_CLMN_DIV_CD, '') 	AS SM10_CLMN_DIV_CD
@@ -929,21 +931,6 @@
                       WHERE 1=1
                         AND EXISTS (SELECT 1 FROM IPGO WHERE  IPGO.ORDRG_NO = A.ORDRG_NO)
                       GROUP BY A.CO_CD, A.ORDRG_NO, A.SALES_CD
-		)
-		,  QM AS 
-		(
-				SELECT 	DISTINCT  
-						  M.CO_CD
-						, M.ORDRG_NO
-						, M.REQ_NO  --발행번호 REQ2300099
-						, M.SALES_CD
-						, Q.ORDRG_DT --발행일자
-						, Q.PART_CD	--분류( 출도	 추가	 장애	 A/S유상	 A/S무상	 SPARE유상	 SPARE무상	 고객E/O	 설치시운전	 기타)
-						, Q.ORDRG_ID	--발행자
-				FROM TB_SM02M01 M
-						LEFT OUTER JOIN TB_QM01M01 Q ON M.REQ_NO = Q.REQ_NO
-	            WHERE 1=1
-	              AND EXISTS (SELECT 1 FROM IPGO WHERE  IPGO.ORDRG_NO = M.ORDRG_NO)
 		)
 		SELECT T.*
 		       , ROWNUM AS RN
@@ -1025,7 +1012,7 @@
 							, F.IN_DTL_AMT  --입고금액계
 							, Q.REQ_NO		--발주요청서 번호
 							, Q.ORDRG_DT  	AS REQ_ORDRG_DT	--발주요청서 발행일자
-							, Q.PART_CD						--발주요청서 분류코드
+							, Q.PART_CD						--발주요청서 분류코드( 출도	 추가	 장애	 A/S유상	 A/S무상	 SPARE유상	 SPARE무상	 고객E/O	 설치시운전	 기타)
 							, FN_CM05M01_CD_TO_NM(Q.PART_CD) AS PART_CD_NM
 							, Q.ORDRG_ID 	AS REQ_ORDRG_ID		---발주요청서 발행자ID
 							, FN_CM06M01_ID_TO_NM(Q.ORDRG_ID) AS ORDRG_ID_NM
@@ -1033,7 +1020,7 @@
 			                LEFT OUTER JOIN BAL AS D ON A.CO_CD = D.CO_CD AND A.ORDRG_NO = D.ORDRG_NO --발주상세
 			                LEFT OUTER JOIN IPGOTOT AS E ON A.CO_CD = E.CO_CD AND A.ORDRG_NO = E.ORDRG_NO --매입확정집계
 			                LEFT OUTER JOIN IPGOAMT AS F ON A.CO_CD = F.CO_CD AND A.ORDRG_NO = F.ORDRG_NO --입고 집계
-			                LEFT OUTER JOIN QM AS Q ON A.CO_CD = Q.CO_CD AND A.ORDRG_NO = Q.ORDRG_NO --발주요청
+			                LEFT OUTER JOIN TB_QM01M01 AS Q ON A.REQ_NO = Q.REQ_NO --발주요청
 				  WHERE 1=1 										
 			  ) A		/* 발주+기타비용 내역 */
 			  WHERE 1=1 

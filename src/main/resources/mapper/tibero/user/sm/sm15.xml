@@ -5,12 +5,15 @@
 	
 	
 	<!-- 발주-입고 내역 DETAIL SELECT -->
-	<select id="selectSM15MainList" parameterType="Map" resultType="camelMap">--입고내역-발주분
+	<select id="selectSM15MainList" parameterType="Map" resultType="camelMap">
+	--입고내역-발주분
 		WITH IPGO AS 
 			(
 			SELECT  
 					  CO_CD
 					, SALES_CD
+					, NVL(SALES_CD,'00999-9900000') 	AS VIEW_SALES_CD
+					, decode(SUBSTRING(SALES_CD,0,2),'AS',9,1) AS SEQ_DIV --AS로 시작하는 salesCd 맨뒤로 보내기 위함
 					, REQ_NO
 			 	    , SUM(IN_QTY) 		AS IN_QTY
 			 	    , SUM(BAD_QTY) 		AS BAD_QTY
@@ -59,8 +62,8 @@
 					UNION ALL --구매비용집계현황
 						SELECT
 						      E.CO_CD
-						    , 'REQ9999999'
-						    , NVL(ED.SALES_CD,'99999-9900000')
+						    , NVL(E.REQ_NO,'REQ9999999')  		AS REQ_NO
+						    , ED.SALES_CD
 							, E.COST_NO
 					 	    , 0 AS IN_QTY
 					 	    , 0 AS BAD_QTY
@@ -96,7 +99,7 @@
 					<if test="cmpletYn != null and cmpletYn != ''">         
 						AND NVL2(E.PCHS_NO,'Y','N') = #{cmpletYn}
 					</if>  
-						GROUP BY E.CO_CD, E.COST_NO, ED.SALES_CD
+						GROUP BY E.CO_CD, ED.SALES_CD, E.REQ_NO, E.COST_NO
 					UNION ALL	
 						SELECT 
 							  E.CO_CD
@@ -146,7 +149,7 @@
 				, decode(Q.PART_CD,'COBTP04',IPGO.IN_DTL_AMT,'COBTP05',IPGO.IN_DTL_AMT,0)  	AS AS_AMT --AS유무상금액
 		FROM IPGO
 				LEFT OUTER JOIN TB_QM01M01 Q ON IPGO.REQ_NO = Q.REQ_NO
-		ORDER BY IPGO.SALES_CD, IPGO.REQ_NO
+		ORDER BY IPGO.SEQ_DIV, IPGO.VIEW_SALES_CD DESC, IPGO.REQ_NO
 		 
 	</select>
 	
