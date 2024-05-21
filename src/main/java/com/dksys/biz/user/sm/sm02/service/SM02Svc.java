@@ -50,4 +50,6 @@ public interface SM02Svc {
 	int OrderMasterReport(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
 	int arriveWareHousing(Map<String, String> paramMap) throws Exception;
+
+	int detailArriveWareHousing(Map<String, String> paramMap) throws Exception;
 }

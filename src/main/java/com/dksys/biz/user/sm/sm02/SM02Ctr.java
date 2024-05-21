@@ -275,7 +275,26 @@ public class SM02Ctr {
 			model.addAttribute("resultMessage", e.getMessage());
 		}
 		return "jsonView";
-  } 
+  }   
+	  
+  
+//발주 물품 당사 도착 확인 처리
+@PostMapping(value = "/detailArriveWareHousing")
+public String detailArriveWareHousing(@RequestParam Map<String, String> paramMap, ModelMap model) throws Exception {
+	try {
+		if (sm02Svc.detailArriveWareHousing(paramMap) != 0 ) {
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+		} else {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		};
+	}catch(Exception e){
+		model.addAttribute("resultCode", 900);
+		model.addAttribute("resultMessage", e.getMessage());
+	}
+	return "jsonView";
+} 
 
 
 }

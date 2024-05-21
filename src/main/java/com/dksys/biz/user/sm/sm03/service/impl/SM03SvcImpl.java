@@ -146,12 +146,18 @@ public class SM03SvcImpl implements SM03Svc {
 			dtl.put("ioDiv", paramMap.get("ioDiv"));
 			dtl.put("currCd", paramMap.get("currCd"));
 			dtl.put("exrate", paramMap.get("exrate"));
-    		result += sm03Mapper.insertWareHousingDetail(dtl);			
+    		result += sm03Mapper.insertWareHousingDetail(dtl);	
+    		
+    		//발주 상세 아이템별 수량과 입고수량이 같으면 상세내역은 자동으로 입고확인처리함.
+    		result += sm02Mapper.detailArriveWareHousingStoreConfirm(dtl);
+
+    		//발주 상세 아이템의 모든내역 입고확인면 마스터에 입고확인 처리함.
+    		result += sm02Mapper.allArriveWareHousingStoreCheck(dtl);			
 		}			
 		  		
 		
 		//발주서 입고확인 및 입고확인 날자 설정 (발주수량과 입고수량이 같을때만 입고처리 됨)
-		result += sm02Mapper.arriveWareHousingStoreConfirm(paramMap);	
+//		result += sm02Mapper.arriveWareHousingStoreConfirm(paramMap);	
 		
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작 

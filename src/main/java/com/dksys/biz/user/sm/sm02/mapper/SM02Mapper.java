@@ -61,6 +61,14 @@ public interface SM02Mapper {
 	int arriveWareHousingStoreConfirm(Map<String, String> paramMap);
 	
 	int arriveWareHousingUnconfirm(Map<String, String> paramMap);
+
+	int detailArriveWareHousingConfirm(Map<String, String> dtl);
+
+	int detailArriveWareHousingUnconfirm(Map<String, String> dtl);
+	
+	int detailArriveWareHousingStoreConfirm(Map<String, String> dtl);
+
+	int allArriveWareHousingStoreCheck(Map<String, String> dtl);
 }
 
 
