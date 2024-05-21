@@ -430,11 +430,14 @@ public class SM02SvcImpl implements SM02Svc {
 		for(Map<String, String> dtl : detailMap) {
 			dtl.put("pgmId", paramMap.get("pgmId"));
 			dtl.put("userId", paramMap.get("userId"));
+			dtl.put("ordrgSeq", "");
 			
 			if ("Y".equals(jobType)) {
 				result += sm02Mapper.arriveWareHousingConfirm(dtl);
+				result += sm02Mapper.detailArriveWareHousingConfirm(dtl);
 			} else {
 				result += sm02Mapper.arriveWareHousingUnconfirm(dtl);
+				result += sm02Mapper.detailArriveWareHousingUnconfirm(dtl);
 			}
 		}
 		return result;
@@ -459,6 +462,7 @@ public class SM02SvcImpl implements SM02Svc {
 				result += sm02Mapper.allArriveWareHousingStoreCheck(dtl);
 			} else {
 				result += sm02Mapper.detailArriveWareHousingUnconfirm(dtl);
+				result += sm02Mapper.allArriveWareHousingStoreCheck(dtl);
 			}
 		}
 		return result;

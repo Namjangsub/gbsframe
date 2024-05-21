@@ -856,17 +856,20 @@
 								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN '반품' ELSE '비용' END IS_DIV
 								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.REQ_NO 
 								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN '' ELSE C.REQ_NO END REQ_NO
-								, (SELECT FN_CM06M01_ID_TO_NM(A.CREAT_ID) FROM DUAL) AS CREAT_ID_NM
+								--, (SELECT FN_CM06M01_ID_TO_NM(A.CREAT_ID) FROM DUAL) AS CREAT_ID_NM
+								, U.NAME											 AS CREAT_ID_NM
 								, DECODE (substr(A.ORDRG_NO,0,3), 'COS', C.PCHS_CLMN_DAY, '') 		AS SM10_CLMN_DAY
 								, DECODE (substr(A.ORDRG_NO,0,3), 'COS', C.PCHS_CLMN_DIV_CD, '') 	AS SM10_CLMN_DIV_CD
 								, DECODE (substr(A.ORDRG_NO,0,3), 'COS', C.PCHS_PMNT_MTD_CD, '') 	AS SM10_PMNT_MTD_CD
 								, DECODE (substr(A.ORDRG_NO,0,3), 'COS', 'COST', '') 				AS SM10_CLMN_RMK
-								
+				    			, CD.DEPT_NM
 					FROM  TB_SM12D01 A /* 매입 확정 DETAIL */		
 							LEFT OUTER JOIN TB_SM02M01 M ON(A.ORDRG_NO = M.ORDRG_NO)		/* 발주마스터 */
 							LEFT OUTER JOIN TB_SM10M01 C ON(A.ORDRG_NO = C.COST_NO)			/* 비용마스터 */
 							LEFT OUTER JOIN TB_SM06D01 R ON(A.ORDRG_NO = R.RET_NO)		/* 반품 상세 */
 							LEFT OUTER JOIN TB_SM06M01 RM ON(RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)		/* 반품 상세 */
+							LEFT OUTER JOIN TB_CM06M01 U ON U.ID = A.CREAT_ID
+							LEFT OUTER JOIN TB_CM04M01 CD ON CD.DEPT_ID = SUBSTRING(U.DEPT_ID,0,5)
 				  WHERE 1=1 
 				    AND NVL(C.PAY_DIV,'PAYDIV02') = 'PAYDIV02'  --기타비용의 경우 청구(PAYDIV02)인 경우만 구매현황에 출력함.
 				    AND NVL(A.PAY_DIV,'PAYDIV02') = 'PAYDIV02'  --매입확정의 경우에도 청구(PAYDIV02)인 경우만 구매현황에 출력함.
@@ -886,7 +889,10 @@
 				<!-- 매입구분 -->
 				<if test="pchsGb != null and !pchsGb.equals('')">
 					AND substr(D.ORDRG_NO,0,3) = #{pchsGb} /* 'BAL', 'RET', 'COS'*/
-				</if>			
+				</if>		
+				<if test="deptNm !=null and !deptNm.equals('')">
+					AND CD.DEPT_NM LIKE '%'||#{deptNm}||'%'
+				</if>	
 				) A
      				LEFT OUTER JOIN TB_BM02M01 D1 ON A.PCHS_CLNT_CD = D1.CLNT_CD   --거래처마스터
 			 WHERE 1 = 1
@@ -961,6 +967,7 @@
 				, A.BILL_YN   /*계산서 여부*/
 				, A.FILE_TRGT_KEY
 				, A.CREAT_ID_NM
+				, A.DEPT_NM
 				, A.PCHS_SEQ
 				, A.CRN /*사업자등록번호*/
 				, A.PCHS_CLMN_DAY  /*결제일 - 10*/	
@@ -1003,6 +1010,7 @@
 							, A.FILE_TRGT_KEY
 							, A.PCHS_SEQ
 							, A.CREAT_ID_NM
+							, A.DEPT_NM
 							, A.CRN /*사업자등록번호*/
 							, A.PCHS_CLMN_DAY  /*결제일 - 10*/	
 							, A.PCHS_CLMN_RMK  /*결제일 - 다음달 10일*/
