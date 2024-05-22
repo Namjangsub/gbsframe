@@ -971,15 +971,73 @@
                           LEFT OUTER JOIN TB_BM02M01 AS BM ON X.MKER_CD = BM.CLNT_CD --거래처정보
                     WHERE X.CO_CD = #{coCd} 
                        AND X.VER_NO  = (SELECT MAX(to_NUMBER(VER_NO,000)) FROM TB_WB21M01 XS WHERE XS.CO_CD = X.CO_CD AND XS.SALES_CD = X.SALES_CD )
+                       <if test="salesCd == null and salesCd.equals('')">
                        AND X.BEGIN_DT BETWEEN #{beginDt} AND #{deDt}
+                       </if>
                        <if test="salesCd != null and !salesCd.equals('')">
-                       AND X.SALES_CD LIKE '%${salesCd}%'            
+                       AND X.SALES_CD LIKE '%'|| #{salesCd} ||'%'            
                        </if>
                        <if test="sjNm != null and !sjNm.equals('')">
-                       AND X.SJ_NM LIKE '%${sjNm}%' 
+                       AND X.SJ_NM LIKE '%'|| #{sjNm} ||'%' 
                        </if>
                        AND X.CLOSE_YN = 'Y'
                  ) 
+               , SCD AS --일정계획
+                 (
+                 	SELECT *
+					  FROM (
+					        SELECT  S.CO_CD              --회사코드
+								  , '1.일정계획'               AS GUBUN
+					              , S.SALES_CD           --SALES Code
+					              , S.PLAN_CD_NM         --계획 LVL1 명
+					              , S.PLANS_DT           --계획종료일
+					              , S.PLANE_DT  --계획종료일
+					              , S.PLANS_DT || '/' || S.PLANE_DT  AS PLANE_DT_SE
+					              , S.PLAN_VER_NO		--계획버전
+					          FROM 
+								     ( 
+									      SELECT 	W.CO_CD
+									              , W.SALES_CD                                                 AS SALES_CD           --SALES Code
+								            	  , W.WBS_PLAN_CODE_ID   --계획 LVL1 Code
+									              , (SELECT FN_CM05M01_CD_TO_NM(W.WBS_PLAN_CODE_ID) FROM DUAL) AS PLAN_CD_NM        --계획 LVL1 명
+									              , TO_CHAR(W.WBS_PLANS_DT, 'YYYY-MM-DD') 					   AS PLANS_DT           --계획시작일
+									              , TO_CHAR(W.WBS_PLANE_DT, 'YYYY-MM-DD') 					   AS PLANE_DT           --계획종료일
+									              , W.VER_NO												  AS PLAN_VER_NO		--계획버전번호
+									         FROM TB_WB22M01 AS W 
+									        WHERE 1=1
+									          AND W.CO_CD = #{coCd}
+									          AND W.WBS_PLAN_CODE_KIND = 'WBSCODE'
+									          AND EXISTS (SELECT 1
+						                                    FROM SUBJ P 
+						                                   WHERE P.CO_CD    = #{coCd}
+						                                     AND P.CO_CD    = W.CO_CD
+						                                     AND P.SALES_CD = W.SALES_CD
+						                                 ) 
+									     UNION ALL
+									      SELECT   	W.CO_CD
+									      		  , W.SALES_CD                                                 AS SALES_CD           --SALES Code
+								            	  , W.WBS_PLAN_CODE_ID   --계획 LVL1 Code
+									              , (SELECT FN_CM05M01_CD_TO_NM(W.WBS_PLAN_CODE_ID) FROM DUAL) AS PLAN_CD_NM        --계획 LVL1 명
+									              , TO_CHAR(W.WBS_PLANS_DT, 'YYYY-MM-DD') 					   AS PLANS_DT           --계획시작일
+									              , TO_CHAR(W.WBS_PLANE_DT, 'YYYY-MM-DD') 					   AS PLANE_DT           --계획종료일
+									              , W.VER_NO												  AS PLAN_VER_NO		--계획버전번호
+									         FROM TB_WB22M01_HIST W
+									        WHERE 1=1
+									          AND W.CO_CD = #{coCd}
+									          AND W.WBS_PLAN_CODE_KIND = 'WBSCODE'
+									          AND EXISTS (SELECT 1
+						                                    FROM SUBJ P 
+						                                   WHERE P.CO_CD    = #{coCd}
+						                                     AND P.CO_CD    = W.CO_CD
+						                                     AND P.SALES_CD = W.SALES_CD
+						                                 ) 
+								     ) S
+					         WHERE 1=1
+					       ) 
+				   PIVOT ( MAX(PLANS_DT) AS S, MAX(PLANE_DT) AS E, MAX(PLANE_DT_SE) 
+				     FOR PLAN_CD_NM 
+				      IN ('수주확정' AS WBSCODE01,'목표원가/PFU배포' AS WBSCODE02,'설계완료' AS WBSCODE03,'모델링완료' AS WBSCODE17,'구매완료' AS WBSCODE04,'기계조립완료' AS WBSCODE05,'전기완료' AS WBSCODE06,'자체시운전완료' AS WBSCODE07,'조건작업완료' AS WBSCODE08,'외부제작검수' AS WBSCODE16,'고객검수' AS WBSCODE09,'포장' AS WBSCODE10,'출고' AS WBSCODE11,'도착' AS WBSCODE12,'설치시운전(출발일)' AS WBSCODE13,'설치시운전(복귀일)' AS WBSCODE14) )
+                 )
                , SJD AS --수주상세 
                  ( 
                   SELECT M.CO_CD                                              AS CO_CD        --회사코드
@@ -1079,9 +1137,57 @@
                                          , PLN.PLAN_VER_NO                    AS PLAN_VER_NO       --계획버전
                                          , NVL(PLN.HIST_YN,'N')                   AS HIST_YN --이력여부
                                          , CR.ORDRS_QTY					--수주수량
+										 , SCD.WBSCODE01_E
+										 , SCD.WBSCODE01
+										 , SCD.WBSCODE02_S
+										 , SCD.WBSCODE02_E
+										 , SCD.WBSCODE02
+										 , SCD.WBSCODE03_S
+										 , SCD.WBSCODE03_E
+										 , SCD.WBSCODE03
+										 , SCD.WBSCODE17_S
+										 , SCD.WBSCODE17_E
+										 , SCD.WBSCODE17
+										 , SCD.WBSCODE04_S
+										 , SCD.WBSCODE04_E
+										 , SCD.WBSCODE04
+										 , SCD.WBSCODE05_S
+										 , SCD.WBSCODE05_E
+										 , SCD.WBSCODE05
+										 , SCD.WBSCODE06_S
+										 , SCD.WBSCODE06_E
+										 , SCD.WBSCODE06
+										 , SCD.WBSCODE07_S
+										 , SCD.WBSCODE07_E
+										 , SCD.WBSCODE07
+										 , SCD.WBSCODE08_S
+										 , SCD.WBSCODE08_E
+										 , SCD.WBSCODE08
+										 , SCD.WBSCODE16_S
+										 , SCD.WBSCODE16_E
+										 , SCD.WBSCODE16
+										 , SCD.WBSCODE09_S
+										 , SCD.WBSCODE09_E
+										 , SCD.WBSCODE09
+										 , SCD.WBSCODE10_S
+										 , SCD.WBSCODE10_E
+										 , SCD.WBSCODE10
+										 , SCD.WBSCODE11_S
+										 , SCD.WBSCODE11_E
+										 , SCD.WBSCODE11
+										 , SCD.WBSCODE12_S
+										 , SCD.WBSCODE12_E
+										 , SCD.WBSCODE12
+										 , SCD.WBSCODE13_S
+										 , SCD.WBSCODE13_E
+										 , SCD.WBSCODE13
+										 , SCD.WBSCODE14_S
+										 , SCD.WBSCODE14_E
+										 , SCD.WBSCODE14
                                       FROM SUBJ X
                                            INNER JOIN SJD AS CR ON X.CO_CD = CR.CO_CD AND X.SALES_CD = CR.SALES_CD
                                            LEFT OUTER JOIN PLAN AS PLN ON X.CO_CD = PLN.CO_CD AND X.SALES_CD = PLN.SALES_CD
+                                           LEFT OUTER JOIN SCD  ON X.CO_CD = SCD.CO_CD AND X.SALES_CD = SCD.SALES_CD AND PLN.PLAN_VER_NO = SCD.PLAN_VER_NO
                                      WHERE 1=1
                                      <if test="histYn != null and !histYn.equals('')">
 		                             AND NVL(PLN.HIST_YN,'N') = #{histYn}            
@@ -1089,7 +1195,7 @@
                                    ) T
                               WHERE 1=1
                               <if test="sjNm != null and !sjNm.equals('')">
-                              AND T.SJ_NM LIKE '%${sjNm}%'              
+                              AND T.SJ_NM LIKE '%'|| #{sjNm} ||'%'              
                               </if>
                               <if test="closeYn != null and !closeYn.equals('')">
                               AND NVL(T.PLAN_CLOSE_YN, 'N') = #{closeYn}           
@@ -1405,6 +1511,7 @@
 	                    GROUP BY WR.WBS_PLAN_CODE_KIND
 	                  ) Z
 	               ON X.CODE_ID = Z.WBS_PLAN_CODE_KIND
+	    ORDER BY SORT_NO
     </select>
     
     <select id="ModalwbsPlanconfirmListCount" parameterType="Map" resultType="int">
