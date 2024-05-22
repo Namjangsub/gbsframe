@@ -1,206 +1,373 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.dksys.biz.user.cr.cr21.mapper.CR21Mapper"> 
+<mapper namespace="com.dksys.biz.user.cr.cr21.mapper.CR21Mapper">
 
-<select id="selectPrjctVSResultChart" parameterType="Map" resultType="camelMap">
+	<select id="selectPrjctVSResultChart" parameterType="Map" resultType="camelMap">
 		/* 수주 계획 VS 실적 조회 */
 		WITH PLAN AS --사업계획 수주/매출
-		     (
-	         SELECT M.CO_CD                 AS CO_CD      --회사코드
-                  , M.SALES_PLAN_YM         AS PERIOD     --계획월
-                  , SUM(M.SALES_PLAN_AMT)  AS PLAN_AMOUNT --계획금액
-              FROM TB_CR10M01_HIST M  --년간사업계획 확정 
-                   INNER JOIN TB_BM02M01 AS C ON M.SALES_PLAN_CLNT_CD = C.CLNT_CD --거래처정보
-                   INNER JOIN TB_CM06M01 AS U ON M.CO_CD = U.CO_CD AND M.SALES_PLAN_ID  = U.ID  --사용자정보
-             WHERE 1=1
-               AND M.CO_CD = #{coCd}
-               AND M.SALES_PLAN_YM LIKE #{searchYear}||'%'   --조회조건 : 계획년도
-               AND M.SALES_PLAN_DIV = #{salesplandiv} --(SALESPLANDIV10:수주 / SALESPLANDIV20:매출)
-               AND M.SALES_PLAN_CLOSE_SEQ = ( SELECT TO_CHAR(MAX(TO_NUMBER(SALES_PLAN_CLOSE_SEQ)))
-                                                 FROM TB_CR10M01_HIST
-                                                WHERE CO_CD = #{coCd}
-                                                  AND SALES_PLAN_YM LIKE #{searchYear}||'%' --조회조건 : 계획년도
-                                            )
-               <if test="deptId != null and !deptId.equals('')">
-                 AND U.DEPT_ID = #{deptId}               
-               </if>
-               <if test="salesPlanId != null and !salesPlanId.equals('')">
-                 AND M.SALES_PLAN_ID = #{salesPlanId}               
-               </if>
-               <if test="salesPlanClntCd != null and !salesPlanClntCd.equals('')">
-                 AND M.SALES_PLAN_CLNT_CD = #{salesPlanClntCd}               
-               </if>
-		       GROUP BY M.CO_CD, M.SALES_PLAN_YM
-		     )
-		   , SJM AS --수주실적 
-		     (
-		      SELECT CO_CD                                                        AS CO_CD    --회사코드
-		            , PERIOD                                                      AS PERIOD   --수주월
-		            , AMOUNT                                                      AS SUJU_AMOUNT   --수주금액
-		        FROM (
-		              SELECT M.CO_CD                         AS CO_CD    --회사코드
-		                    , TO_CHAR(M.ORDRS_DT, 'YYYYMM')   AS PERIOD   --수주월
-		                    , SUM(M.ORDRS_AMT)               AS AMOUNT   --수주금액
-		                 FROM TB_CR02M01  M --수주마스터
-		                      INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD            --거래처정보
-		                      INNER JOIN TB_CM06M01 AS U ON M.CO_CD = U.CO_CD AND M.MNG_ID = U.ID  --사용자정보
-		                WHERE 1=1
-		                  AND M.CO_CD = #{coCd}
-		                  AND M.ORDRS_DT >= TO_DATE(#{searchYear}||'0101', 'YYYYMMDD')
-		                  AND M.ORDRS_DT <![CDATA[<=]]> TO_DATE(#{searchYear}||'1231', 'YYYYMMDD')
-		                  AND 'SALESPLANDIV10' = #{salesplandiv} --조회조건 : 계획구분이 수주일때만 
-		                <if test="deptId != null and !deptId.equals('')">
-	                      AND U.DEPT_ID = #{deptId}               
-	                    </if>
-                        <if test="salesPlanId != null and !salesPlanId.equals('')">
-	                      AND M.MNG_ID = #{salesPlanId}               
-	                    </if>
-	                    <if test="salesPlanClntCd != null and !salesPlanClntCd.equals('')">
-	                      AND M.ORDRS_CLNT_CD = #{salesPlanClntCd}               
-	                    </if>
-		                GROUP BY M.CO_CD, TO_CHAR(M.ORDRS_DT, 'YYYYMM')
-		             )
-		     )
-		   , MECH AS --매출확정 
-		     (
-		      SELECT CO_CD            AS CO_CD      --회사코드
-		            , PERIOD          AS PERIOD     --매출확정월
-		            , ROUND(AMOUNT/${searchUnit},2)  AS SELL_AMOUNT --매출확정금액
-		        FROM (
-		              SELECT CM.CO_CD                                      AS CO_CD    --회사코드
-		                    , TO_CHAR(CM.SELL_DCSN_DT, 'YYYYMM')           AS PERIOD   --매출확정월
-		                    , SUM(NVL(CD.EXRATE,1) * CD.SELL_DCSN_DTL_AMT) AS AMOUNT   --매출확정금액
-		                 FROM TB_CR03M01 AS CM --매출확정
-		                      INNER JOIN TB_BM02M01 AS C  ON CM.ORDRS_CLNT_CD = C.CLNT_CD                              --거래처정보
-		                      INNER JOIN TB_CR03D01 AS CD ON CD.CO_CD = CM.CO_CD AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO --매출확정상세
-		                      INNER JOIN TB_CR02M01 AS M  ON CD.CO_CD = M.CO_CD  AND CD.ORDRS_NO = M.ORDRS_NO          --거래처마스터
-		                      INNER JOIN TB_CM06M01 AS U  ON M.CO_CD = U.CO_CD   AND M.MNG_ID = U.ID                   --사용자정보
-		                WHERE 1=1
-		                  AND CM.CO_CD = #{coCd}
-		                  AND CM.SELL_DCSN_DT >= TO_DATE(#{searchYear}||'0101', 'YYYYMMDD')
-		                  AND CM.SELL_DCSN_DT <![CDATA[<=]]> TO_DATE(#{searchYear}||'1231', 'YYYYMMDD')
-		                  AND 'SALESPLANDIV20' = #{salesplandiv} --조회조건 : 계획구분이 매출일때만 
-						<if test="deptId != null and !deptId.equals('')">
-	                      AND U.DEPT_ID = #{deptId}               
-	                    </if>
-                        <if test="salesPlanId != null and !salesPlanId.equals('')">
-	                      AND M.MNG_ID = #{salesPlanId}               
-	                    </if>
-	                    <if test="salesPlanClntCd != null and !salesPlanClntCd.equals('')">
-	                      AND M.ORDRS_CLNT_CD = #{salesPlanClntCd}               
-	                    </if>
-		                GROUP BY CM.CO_CD , TO_CHAR(CM.SELL_DCSN_DT, 'YYYYMM')
-		             )
-		     )
-		
+		(
+			SELECT M.CO_CD                 AS CO_CD      --회사코드
+			     , M.SALES_PLAN_YM         AS PERIOD     --계획월
+				 , SUM(M.SALES_PLAN_AMT)  AS PLAN_AMOUNT --계획금액
+			FROM   TB_CR10M01_HIST M  --년간사업계획 확정
+			       INNER JOIN TB_BM02M01 AS C ON M.SALES_PLAN_CLNT_CD = C.CLNT_CD --거래처정보
+				   INNER JOIN TB_CM06M01 AS U ON M.CO_CD = U.CO_CD AND M.SALES_PLAN_ID  = U.ID  --사용자정보
+			WHERE  1 = 1
+			AND    M.CO_CD = #{coCd}
+			AND    M.SALES_PLAN_YM LIKE #{searchYear}||'%'   --조회조건 : 계획년도
+			AND    M.SALES_PLAN_DIV = #{salesplandiv} --(SALESPLANDIV10:수주 / SALESPLANDIV20:매출)
+			AND    M.SALES_PLAN_CLOSE_SEQ = (
+				                             SELECT TO_CHAR(MAX(TO_NUMBER(SALES_PLAN_CLOSE_SEQ)))
+											 FROM   TB_CR10M01_HIST
+											 WHERE  CO_CD = #{coCd}
+											 AND    SALES_PLAN_YM LIKE #{searchYear}||'%' --조회조건 : 계획년도
+											)
+			<if test="deptId != null and !deptId.equals('')">
+			AND    U.DEPT_ID = #{deptId}
+			</if>
+			<if test="salesPlanId != null and !salesPlanId.equals('')">
+			AND    M.SALES_PLAN_ID = #{salesPlanId}
+			</if>
+			<if test="salesPlanClntCd != null and !salesPlanClntCd.equals('')">
+			AND    M.SALES_PLAN_CLNT_CD = #{salesPlanClntCd}
+			</if>
+			GROUP BY M.CO_CD, M.SALES_PLAN_YM
+		)
+		, SJM AS --수주실적
+		(
+			SELECT CO_CD  AS CO_CD        --회사코드
+			     , PERIOD AS PERIOD       --수주월
+				 , AMOUNT AS SUJU_AMOUNT  --수주금액
+			FROM   (
+				    SELECT M.CO_CD                       AS CO_CD    --회사코드
+					     , TO_CHAR(M.ORDRS_DT, 'YYYYMM') AS PERIOD   --수주월
+						 , SUM(M.ORDRS_AMT)              AS AMOUNT   --수주금액
+					FROM   TB_CR02M01 AS M --수주마스터
+					       INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD            --거래처정보
+						   INNER JOIN TB_CM06M01 AS U ON M.CO_CD = U.CO_CD AND M.MNG_ID = U.ID  --사용자정보
+					WHERE  1 = 1
+					AND    M.CO_CD = #{coCd}
+					AND    M.ORDRS_DT >= TO_DATE(#{searchYear}||'0101', 'YYYYMMDD')
+					AND    M.ORDRS_DT <![CDATA[<=]]> TO_DATE(#{searchYear}||'1231', 'YYYYMMDD')
+					AND    'SALESPLANDIV10' = #{salesplandiv} --조회조건 : 계획구분이 수주일때만
+					<if test="deptId != null and !deptId.equals('')">
+					AND    U.DEPT_ID = #{deptId}
+					</if>
+					<if test="salesPlanId != null and !salesPlanId.equals('')">
+					AND    M.MNG_ID = #{salesPlanId}
+					</if>
+					<if test="salesPlanClntCd != null and !salesPlanClntCd.equals('')">
+					AND    M.ORDRS_CLNT_CD = #{salesPlanClntCd}
+					</if>
+					GROUP BY M.CO_CD, TO_CHAR(M.ORDRS_DT, 'YYYYMM')
+				   )
+			WHERE  1 = 1
+		)
+		, MECH AS --매출확정
+		(
+			SELECT CO_CD  AS CO_CD      --회사코드
+			     , PERIOD AS PERIOD     --매출확정월
+				 , ROUND(AMOUNT/${searchUnit},2)  AS SELL_AMOUNT --매출확정금액
+			FROM   (
+				    SELECT CM.CO_CD                                     AS CO_CD    --회사코드
+					     , TO_CHAR(CM.SELL_DCSN_DT, 'YYYYMM')           AS PERIOD   --매출확정월
+						 , SUM(NVL(CD.EXRATE,1) * CD.SELL_DCSN_DTL_AMT) AS AMOUNT   --매출확정금액
+					FROM   TB_CR03M01 AS CM --매출확정
+					       INNER JOIN TB_BM02M01 AS C  ON CM.ORDRS_CLNT_CD = C.CLNT_CD                              --거래처정보
+						   INNER JOIN TB_CR03D01 AS CD ON CD.CO_CD = CM.CO_CD AND CD.SELL_DCSN_NO = CM.SELL_DCSN_NO --매출확정상세
+						   INNER JOIN TB_CR02M01 AS M  ON CD.CO_CD = M.CO_CD  AND CD.ORDRS_NO = M.ORDRS_NO          --거래처마스터
+						   INNER JOIN TB_CM06M01 AS U  ON M.CO_CD = U.CO_CD   AND M.MNG_ID = U.ID                   --사용자정보
+					WHERE  1 = 1
+					AND    CM.CO_CD = #{coCd}
+					AND    CM.SELL_DCSN_DT >= TO_DATE(#{searchYear}||'0101', 'YYYYMMDD')
+					AND    CM.SELL_DCSN_DT <![CDATA[<=]]> TO_DATE(#{searchYear}||'1231', 'YYYYMMDD')
+					AND    'SALESPLANDIV20' = #{salesplandiv} --조회조건 : 계획구분이 매출일때만
+					<if test="deptId != null and !deptId.equals('')">
+					AND    U.DEPT_ID = #{deptId}
+					</if>
+					<if test="salesPlanId != null and !salesPlanId.equals('')">
+					AND    M.MNG_ID = #{salesPlanId}
+					</if>
+					<if test="salesPlanClntCd != null and !salesPlanClntCd.equals('')">
+					AND    M.ORDRS_CLNT_CD = #{salesPlanClntCd}
+					</if>
+					GROUP BY CM.CO_CD , TO_CHAR(CM.SELL_DCSN_DT, 'YYYYMM')
+				   )
+			WHERE  1 = 1
+		)
+		, BILL AS --계산서
+		(
+			SELECT CO_CD                          AS CO_CD
+			     , PERIOD                         AS PERIOD
+				 , ROUND(AMOUNT/${searchUnit}, 2) AS BILL_AMOUNT
+			FROM   (
+				    SELECT A.CO_CD                 AS CO_CD
+						 , A.PERIOD                AS PERIOD
+						 , SUM(NVL(A.BILL_TOT, 0)) AS AMOUNT
+					FROM   (
+							SELECT A.CO_CD                           AS CO_CD 
+									, TO_CHAR(A.SELL_BILL_DT, 'YYYYMM') AS PERIOD
+									, (NVL(A.EXRATE, 1) * NVL(B.SELL_BILL_DTL_AMT, 0))                                                AS BILL_AMT
+									, (NVL(A.EXRATE, 1) * NVL(B.SELL_BILL_DTL_AMT, 0)) *      (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)  AS BILL_VAT
+									, (NVL(A.EXRATE, 1) * NVL(B.SELL_BILL_DTL_AMT, 0)) * (1 + (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)) AS BILL_TOT
+							FROM   TB_CR04M01 AS A  --계산서
+									INNER JOIN TB_CR04D01 AS B  ON B.CO_CD        = A.CO_CD
+																AND B.SELL_BILL_NO = A.SELL_BILL_NO
+									--거래처
+									LEFT OUTER JOIN TB_BM02M01 AS C  ON C.CLNT_CD = A.ORDRS_CLNT_CD
+									--공통코드
+									LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID = C.SELL_VAT_CD
+									--수주
+									INNER JOIN TB_CR02M01 AS M  ON M.CO_CD    = B.CO_CD
+																AND M.ORDRS_NO = B.ORDRS_NO
+									--사용자정보
+									INNER JOIN TB_CM06M01 AS U  ON U.CO_CD = M.CO_CD
+																AND U.ID    = M.MNG_ID
+							WHERE  1 = 1
+							AND    A.CO_CD = #{coCd}
+							AND    A.SELL_BILL_DT >= TO_DATE(#{searchYear}||'0101', 'YYYYMMDD')
+							AND    A.SELL_BILL_DT <![CDATA[<=]]> TO_DATE(#{searchYear}||'1231', 'YYYYMMDD')
+							AND    'SALESPLANDIV30' = #{salesplandiv} --조회조건 : 계획구분이 계산서일 때만
+							<if test="deptId != null and !deptId.equals('')">
+							AND    U.DEPT_ID = #{deptId}
+							</if>
+							<if test="salesPlanId != null and !salesPlanId.equals('')">
+							AND    M.MNG_ID = #{salesPlanId}
+							</if>
+							<if test="salesPlanClntCd != null and !salesPlanClntCd.equals('')">
+							AND    A.ORDRS_CLNT_CD = #{salesPlanClntCd}
+							</if>
+							) AS A  --계산서
+					WHERE  1 = 1
+					GROUP BY A.CO_CD , A.PERIOD
+				   )
+			WHERE  1 = 1
+		)
+		, SUGM AS --수금
+		(
+			SELECT CO_CD                          AS CO_CD
+			     , PERIOD                         AS PERIOD
+				 , ROUND(AMOUNT/${searchUnit}, 2) AS SUGM_AMOUNT
+			FROM   (
+				    SELECT A.CO_CD                 AS CO_CD
+						 , A.PERIOD                AS PERIOD
+						 , SUM(NVL(A.SUGM_TOT, 0)) AS AMOUNT
+					FROM   (
+							SELECT A.CO_CD                      AS CO_CD 
+							     , TO_CHAR(A.CLMN_DT, 'YYYYMM') AS PERIOD
+							     , (NVL(A.EXRATE, 1) * NVL(B.CLMN_DTL_AMT, 0))                                                AS SUGM_AMT
+							     , (NVL(A.EXRATE, 1) * NVL(B.CLMN_DTL_AMT, 0)) *      (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)  AS SUGM_VAT
+								 , (NVL(A.EXRATE, 1) * NVL(B.CLMN_DTL_AMT, 0)) * (1 + (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)) AS SUGM_TOT
+							FROM   TB_CR05M01 AS A  --수금
+							       INNER JOIN TB_CR05D01 AS B  ON B.CO_CD   = A.CO_CD
+							                                  AND B.CLMN_NO = A.CLMN_NO
+							       --거래처
+							       LEFT OUTER JOIN TB_BM02M01 AS C  ON C.CLNT_CD = A.ORDRS_CLNT_CD
+							       --공통코드
+							       LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID = C.SELL_VAT_CD
+							       --수주
+							       INNER JOIN TB_CR02M01 AS M  ON M.CO_CD    = B.CO_CD
+							                                  AND M.ORDRS_NO = B.ORDRS_NO
+							       --사용자정보
+								   INNER JOIN TB_CM06M01 AS U  ON U.CO_CD = M.CO_CD
+								                              AND U.ID    = M.MNG_ID
+							WHERE  1 = 1
+							AND    A.CO_CD = #{coCd}
+							AND    A.CLMN_DT >= TO_DATE(#{searchYear}||'0101', 'YYYYMMDD')
+							AND    A.CLMN_DT <![CDATA[<=]]> TO_DATE(#{searchYear}||'1231', 'YYYYMMDD')
+							AND    'SALESPLANDIV40' = #{salesplandiv} --조회조건 : 계획구분이 계산서일 때만
+							<if test="deptId != null and !deptId.equals('')">
+							AND    U.DEPT_ID = #{deptId}
+							</if>
+							<if test="salesPlanId != null and !salesPlanId.equals('')">
+							AND    M.MNG_ID = #{salesPlanId}
+							</if>
+							<if test="salesPlanClntCd != null and !salesPlanClntCd.equals('')">
+							AND    A.ORDRS_CLNT_CD = #{salesPlanClntCd}
+							</if>
+							) AS A  --수금
+					WHERE  1 = 1
+					GROUP BY A.CO_CD , A.PERIOD
+				   )
+			WHERE  1 = 1
+		)
 		SELECT *
-		  FROM (
-		        SELECT '1.목표' AS REC_DIV
-		              , CO_CD      --회사코드
-		              , PERIOD     --PERIOD
-		              , ROUND(PLAN_AMOUNT /${searchUnit},2) AS PLAN_AMOUNT --금액
-		              , ROUND(SUM(PLAN_AMOUNT) OVER (PARTITION BY CO_CD) /${searchUnit},2) AS TOT_AMT
-		          FROM PLAN  P --사업계획
-		         WHERE 1=1
-		         UNION ALL --위 사업계획 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
-	             SELECT '1,목표' AS REC_DIV
-	                  , #{coCd}    AS CO_CD
+		FROM   (
+			    SELECT '1.목표' AS REC_DIV
+				     , CO_CD      --회사코드
+					 , PERIOD     --PERIOD
+					 , ROUND(PLAN_AMOUNT /${searchUnit},2) AS PLAN_AMOUNT --금액
+					 , ROUND(SUM(PLAN_AMOUNT) OVER (PARTITION BY CO_CD) /${searchUnit},2) AS TOT_AMT
+				FROM   PLAN AS P  --사업계획
+				WHERE  1 = 1
+				UNION ALL --위 사업계획 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함
+				SELECT '1,목표'          AS REC_DIV
+				     , #{coCd}           AS CO_CD
+					 , '${searchYear}01' AS PERIOD
+					 , 0                 AS PLAN_AMOUNT
+					 , 0                 AS TOT_AMT
+				FROM   DUAL
+				WHERE  NOT EXISTS ( SELECT * FROM PLAN )
+			   )
+		PIVOT ( SUM(PLAN_AMOUNT) FOR PERIOD IN ('${searchYear}01', '${searchYear}02', '${searchYear}03', '${searchYear}04', '${searchYear}05', '${searchYear}06', '${searchYear}07', '${searchYear}08', '${searchYear}09', '${searchYear}10', '${searchYear}11', '${searchYear}12' ) --년월 읽어와서 넣어주기 
+		      )
+		UNION ALL
+		SELECT *
+		FROM   (
+			    SELECT '2.실적' AS REC_DIV
+		             , CO_CD    --회사코드
+		             , PERIOD   --PERIOD
+		             , ROUND(SUJU_AMOUNT /${searchUnit},2) AS AMOUNT--금액
+		             , ROUND(SUM(SUJU_AMOUNT) OVER (PARTITION BY CO_CD) /${searchUnit},2) TOT_AMT
+		        FROM   SJM AS S --수주실적 
+		        WHERE  1 = 1
+		        UNION ALL  --위 수주실적 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
+                SELECT '2.실적'           AS REC_DIV
+                     , #{coCd}           AS CO_CD
+                     , '${searchYear}01' AS PERIOD
+                     , 0                 AS PLAN_AMOUNT
+                     , 0                 AS TOT_AMT
+                FROM   DUAL
+                WHERE  NOT EXISTS ( SELECT * FROM SJM WHERE PERIOD LIKE SUBSTR('${searchYear}',1,4)||'%' ) --수주실적 있으면 조회 안되게
+                AND 'SALESPLANDIV10' = #{salesplandiv}
+		        UNION ALL
+		        SELECT '2,실적' AS REC_DIV
+		             , CO_CD    --회사코드
+		             , PERIOD   --PERIOD
+		             --, ROUND(SELL_AMOUNT/${searchUnit},2)   AS AMOUNT--금액
+					 , SELL_AMOUNT AS AMOUNT--금액
+		             , ROUND(SUM(SELL_AMOUNT) OVER (PARTITION BY CO_CD)/${searchUnit},2) TOT_AMT
+		        FROM   MECH AS M --매출확정
+		        WHERE  1 = 1
+		        UNION ALL  --위 매출확정 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
+	            SELECT '2.실적'           AS REC_DIV
+	                  , #{coCd}           AS CO_CD
 	                  , '${searchYear}01' AS PERIOD
-	                  , 0        AS PLAN_AMOUNT
-	                  , 0        AS TOT_AMT
-	               FROM DUAL
-	              WHERE NOT EXISTS ( SELECT * FROM PLAN )
+	                  , 0                 AS PLAN_AMOUNT
+	                  , 0                 AS TOT_AMT
+	            FROM DUAL
+	            WHERE NOT EXISTS ( SELECT * FROM MECH WHERE PERIOD LIKE SUBSTR('${searchYear}',1,4)||'%' ) --매출확정 있으면 조회 안되게
+                AND 'SALESPLANDIV20' = #{salesplandiv}
+				UNION ALL
+		        SELECT '2,실적' AS REC_DIV
+		             , CO_CD    --회사코드
+		             , PERIOD   --PERIOD
+		             --, ROUND(BILL_AMOUNT/${searchUnit},2)   AS AMOUNT--금액
+					 , BILL_AMOUNT AS AMOUNT--금액
+		             , ROUND(SUM(BILL_AMOUNT) OVER (PARTITION BY CO_CD)/${searchUnit},2) TOT_AMT
+		        FROM   BILL  --계산서
+		        WHERE  1 = 1
+		        UNION ALL  --위 계산서 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
+	            SELECT '2.실적'           AS REC_DIV
+	                  , #{coCd}           AS CO_CD
+	                  , '${searchYear}01' AS PERIOD
+	                  , 0                 AS PLAN_AMOUNT
+	                  , 0                 AS TOT_AMT
+	            FROM DUAL
+	            WHERE NOT EXISTS ( SELECT * FROM BILL WHERE PERIOD LIKE SUBSTR('${searchYear}',1,4)||'%' ) --계산서 있으면 조회 안되게
+                AND 'SALESPLANDIV30' = #{salesplandiv}
+				UNION ALL
+		        SELECT '2,실적' AS REC_DIV
+		             , CO_CD    --회사코드
+		             , PERIOD   --PERIOD
+		             --, ROUND(SUGM_AMOUNT/${searchUnit},2)   AS AMOUNT--금액
+					 , SUGM_AMOUNT AS AMOUNT--금액
+		             , ROUND(SUM(SUGM_AMOUNT) OVER (PARTITION BY CO_CD)/${searchUnit},2) TOT_AMT
+		        FROM   SUGM  --수금
+		        WHERE  1 = 1
+		        UNION ALL  --위 수금 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
+	            SELECT '2.실적'           AS REC_DIV
+	                  , #{coCd}           AS CO_CD
+	                  , '${searchYear}01' AS PERIOD
+	                  , 0                 AS PLAN_AMOUNT
+	                  , 0                 AS TOT_AMT
+	            FROM DUAL
+	            WHERE NOT EXISTS ( SELECT * FROM SUGM WHERE PERIOD LIKE SUBSTR('${searchYear}',1,4)||'%' ) --수금 있으면 조회 안되게
+                AND 'SALESPLANDIV40' = #{salesplandiv}
 		       )
-		  PIVOT ( SUM(PLAN_AMOUNT) FOR PERIOD IN ('${searchYear}01', '${searchYear}02', '${searchYear}03', '${searchYear}04', '${searchYear}05', '${searchYear}06', '${searchYear}07', '${searchYear}08', '${searchYear}09', '${searchYear}10', '${searchYear}11', '${searchYear}12' ) --년월 읽어와서 넣어주기 
-		        )
+		PIVOT ( SUM(AMOUNT) FOR PERIOD IN ('${searchYear}01', '${searchYear}02', '${searchYear}03', '${searchYear}04', '${searchYear}05', '${searchYear}06', '${searchYear}07', '${searchYear}08', '${searchYear}09', '${searchYear}10', '${searchYear}11', '${searchYear}12' ) --년월 읽어와서 넣어주기 
+		      )
 		UNION ALL 
 		SELECT *
-		  FROM (
-		        SELECT '2.실적' AS REC_DIV
-		              , CO_CD    --회사코드
-		              , PERIOD   --PERIOD
-		              , ROUND(SUJU_AMOUNT /${searchUnit},2)   AS AMOUNT--금액
-		              , ROUND(SUM(SUJU_AMOUNT) OVER (PARTITION BY CO_CD) /${searchUnit},2) TOT_AMT
-		           FROM SJM AS S --수주실적 
-		          WHERE 1=1
-		         UNION ALL  --위 수주실적 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
-                 SELECT '2.실적' AS REC_DIV
-                      , #{coCd}    AS CO_CD
-                      , '${searchYear}01' AS PERIOD
-                      , 0        AS PLAN_AMOUNT
-                      , 0        AS TOT_AMT
-                   FROM DUAL
-                  WHERE NOT EXISTS ( SELECT * FROM SJM WHERE PERIOD LIKE SUBSTR('${searchYear}',1,4)||'%' ) --수주실적 있으면 조회 안되게
-                    AND 'SALESPLANDIV10' = #{salesplandiv}
-		         UNION ALL
-		         SELECT '2,실적' AS REC_DIV
-		              , CO_CD    --회사코드
-		              , PERIOD   --PERIOD
-		              , ROUND(SELL_AMOUNT/${searchUnit},2)   AS AMOUNT--금액
-		              , ROUND(SUM(SELL_AMOUNT) OVER (PARTITION BY CO_CD)/${searchUnit},2) TOT_AMT
-		           FROM MECH AS M --매출확정
-		          WHERE 1=1
-		         UNION ALL  --위 매출확정 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
-	             SELECT '2.실적' AS REC_DIV
-	                  , #{coCd}    AS CO_CD
-	                  , '${searchYear}01' AS PERIOD
-	                  , 0        AS PLAN_AMOUNT
-	                  , 0        AS TOT_AMT
-	               FROM DUAL
-	              WHERE NOT EXISTS ( SELECT * FROM MECH WHERE PERIOD LIKE SUBSTR('${searchYear}',1,4)||'%' ) --매출확정 있으면 조회 안되게
-                    AND 'SALESPLANDIV20' = #{salesplandiv}
-		       )
-		  PIVOT ( SUM(AMOUNT) FOR PERIOD IN ('${searchYear}01', '${searchYear}02', '${searchYear}03', '${searchYear}04', '${searchYear}05', '${searchYear}06', '${searchYear}07', '${searchYear}08', '${searchYear}09', '${searchYear}10', '${searchYear}11', '${searchYear}12' ) --년월 읽어와서 넣어주기 
-		        )
-		UNION ALL 
-		SELECT *
-		  FROM (
+		FROM   (
 		        SELECT '3.달성율(%)' AS REC_DIV
-		              , P.CO_CD  --회사코드
-		              , P.PERIOD --PERIOD
-		              , CASE WHEN  NVL(P.PLAN_AMOUNT,0) = 0 THEN 0 ELSE ROUND( NVL(S.SUJU_AMOUNT, 0) / P.PLAN_AMOUNT, 4) END * 100 AS PLAN_RATE
-		              , CASE WHEN SUM(P.PLAN_AMOUNT) OVER (PARTITION BY P.CO_CD) = 0 THEN 0 ELSE ROUND( SUM(NVL(S.SUJU_AMOUNT, 0)) OVER (PARTITION BY P.CO_CD)  / SUM(P.PLAN_AMOUNT)              OVER (PARTITION BY P.CO_CD) , 4) END * 100 AS TOT_RATE
-		           FROM PLAN AS P --사업계획
-		                LEFT OUTER JOIN (
-		                                 SELECT CO_CD                         --회사코드
-		                                      , PERIOD                         --PERIOD
-		                                      , SUM(SUJU_AMOUNT) AS SUJU_AMOUNT--금액
-		                                   FROM SJM --수주실적
-		                                  WHERE 1=1
-		                                  GROUP BY CO_CD, PERIOD
-		                                )  AS S ON P.CO_CD = S.CO_CD AND P.PERIOD = S.PERIOD --수주실적 
-		          WHERE 'SALESPLANDIV10' = #{salesplandiv}
+		             , P.CO_CD  --회사코드
+		             , P.PERIOD --PERIOD
+		             , CASE WHEN  NVL(P.PLAN_AMOUNT,0) = 0 THEN 0 ELSE ROUND( NVL(S.SUJU_AMOUNT, 0) / P.PLAN_AMOUNT, 4) END * 100 AS PLAN_RATE
+		             , CASE WHEN SUM(P.PLAN_AMOUNT) OVER (PARTITION BY P.CO_CD) = 0 THEN 0 ELSE ROUND( SUM(NVL(S.SUJU_AMOUNT, 0)) OVER (PARTITION BY P.CO_CD)  / SUM(P.PLAN_AMOUNT)              OVER (PARTITION BY P.CO_CD) , 4) END * 100 AS TOT_RATE
+		        FROM   PLAN AS P --사업계획
+		               LEFT OUTER JOIN (
+		                                SELECT CO_CD                         --회사코드
+		                                     , PERIOD                         --PERIOD
+		                                     , SUM(SUJU_AMOUNT) AS SUJU_AMOUNT--금액
+		                                FROM   SJM --수주실적
+		                                WHERE  1 = 1
+		                                GROUP BY CO_CD, PERIOD
+		                               )  AS S ON P.CO_CD = S.CO_CD AND P.PERIOD = S.PERIOD --수주실적 
+		        WHERE  'SALESPLANDIV10' = #{salesplandiv}
 		        UNION ALL
 		        SELECT '3.달성율(%)' AS REC_DIV
-		              , P.CO_CD  --회사코드
-		              , P.PERIOD --PERIOD
-		              , CASE WHEN  NVL(P.PLAN_AMOUNT,0) = 0 THEN 0 ELSE ROUND( NVL(M.SELL_AMOUNT, 0) / P.PLAN_AMOUNT, 4) END * 100 AS PLAN_RATE
-		              , CASE WHEN SUM(P.PLAN_AMOUNT) OVER (PARTITION BY P.CO_CD) = 0 THEN 0 ELSE ROUND( SUM(NVL(M.SELL_AMOUNT, 0)) OVER (PARTITION BY P.CO_CD)  / SUM(P.PLAN_AMOUNT)              OVER (PARTITION BY P.CO_CD) , 4) END * 100 AS TOT_RATE
-		           FROM PLAN AS P --사업계획
-		                LEFT OUTER JOIN (
-		                                 SELECT CO_CD                         --회사코드
-		                                      , PERIOD                         --PERIOD
-		                                      , SUM(SELL_AMOUNT) AS SELL_AMOUNT--금액
-		                                   FROM MECH --매출확정
-		                                  WHERE 1=1
-		                                  GROUP BY CO_CD, PERIOD
-		                                ) AS M ON P.CO_CD = M.CO_CD AND P.PERIOD = M.PERIOD --매출확정  
-		          WHERE 'SALESPLANDIV20' = #{salesplandiv}
-		         UNION ALL   --위 달성율 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
-	             SELECT '3.달성율(%)' AS REC_DIV
-	                  , #{coCd}    AS CO_CD
-	                  , '${searchYear}01' AS PERIOD
-	                  , 0        AS PLAN_AMOUNT
-	                  , 0        AS TOT_AMT
-	               FROM DUAL
-	              WHERE NOT EXISTS ( SELECT * FROM PLAN )
+		             , P.CO_CD  --회사코드
+		             , P.PERIOD --PERIOD
+		             , CASE WHEN  NVL(P.PLAN_AMOUNT,0) = 0 THEN 0 ELSE ROUND( NVL(M.SELL_AMOUNT, 0) / P.PLAN_AMOUNT, 4) END * 100 AS PLAN_RATE
+		             , CASE WHEN SUM(P.PLAN_AMOUNT) OVER (PARTITION BY P.CO_CD) = 0 THEN 0 ELSE ROUND( SUM(NVL(M.SELL_AMOUNT, 0)) OVER (PARTITION BY P.CO_CD)  / SUM(P.PLAN_AMOUNT)              OVER (PARTITION BY P.CO_CD) , 4) END * 100 AS TOT_RATE
+		        FROM   PLAN AS P --사업계획
+		               LEFT OUTER JOIN (
+		                                SELECT CO_CD                         --회사코드
+		                                     , PERIOD                         --PERIOD
+		                                     , SUM(SELL_AMOUNT) AS SELL_AMOUNT--금액
+		                                FROM   MECH --매출확정
+		                                WHERE  1 = 1
+		                                GROUP BY CO_CD, PERIOD
+		                               ) AS M ON P.CO_CD = M.CO_CD AND P.PERIOD = M.PERIOD --매출확정  
+		        WHERE  'SALESPLANDIV20' = #{salesplandiv}
+				UNION ALL
+		        SELECT '3.달성율(%)' AS REC_DIV
+		             , P.CO_CD  --회사코드
+		             , P.PERIOD --PERIOD
+		             , CASE WHEN  NVL(P.PLAN_AMOUNT,0) = 0 THEN 0 ELSE ROUND( NVL(M.BILL_AMOUNT, 0) / P.PLAN_AMOUNT, 4) END * 100 AS PLAN_RATE
+		             , CASE WHEN SUM(P.PLAN_AMOUNT) OVER (PARTITION BY P.CO_CD) = 0 THEN 0 ELSE ROUND( SUM(NVL(M.BILL_AMOUNT, 0)) OVER (PARTITION BY P.CO_CD)  / SUM(P.PLAN_AMOUNT)              OVER (PARTITION BY P.CO_CD) , 4) END * 100 AS TOT_RATE
+		        FROM   PLAN AS P --사업계획
+		               LEFT OUTER JOIN (
+		                                SELECT CO_CD                         --회사코드
+		                                     , PERIOD                         --PERIOD
+		                                     , SUM(BILL_AMOUNT) AS BILL_AMOUNT--금액
+		                                FROM   BILL --계산서
+		                                WHERE  1 = 1
+		                                GROUP BY CO_CD, PERIOD
+		                               ) AS M ON P.CO_CD = M.CO_CD AND P.PERIOD = M.PERIOD --매출확정  
+		        WHERE  'SALESPLANDIV30' = #{salesplandiv}
+				UNION ALL
+		        SELECT '3.달성율(%)' AS REC_DIV
+		             , P.CO_CD  --회사코드
+		             , P.PERIOD --PERIOD
+		             , CASE WHEN  NVL(P.PLAN_AMOUNT,0) = 0 THEN 0 ELSE ROUND( NVL(M.SUGM_AMOUNT, 0) / P.PLAN_AMOUNT, 4) END * 100 AS PLAN_RATE
+		             , CASE WHEN SUM(P.PLAN_AMOUNT) OVER (PARTITION BY P.CO_CD) = 0 THEN 0 ELSE ROUND( SUM(NVL(M.SUGM_AMOUNT, 0)) OVER (PARTITION BY P.CO_CD)  / SUM(P.PLAN_AMOUNT)              OVER (PARTITION BY P.CO_CD) , 4) END * 100 AS TOT_RATE
+		        FROM   PLAN AS P --사업계획
+		               LEFT OUTER JOIN (
+		                                SELECT CO_CD                         --회사코드
+		                                     , PERIOD                         --PERIOD
+		                                     , SUM(SUGM_AMOUNT) AS SUGM_AMOUNT--금액
+		                                FROM   SUGM --수금
+		                                WHERE  1 = 1
+		                                GROUP BY CO_CD, PERIOD
+		                               ) AS M ON P.CO_CD = M.CO_CD AND P.PERIOD = M.PERIOD --매출확정  
+		        WHERE  'SALESPLANDIV40' = #{salesplandiv}
+		        UNION ALL   --위 달성율 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
+	            SELECT '3.달성율(%)'      AS REC_DIV
+	                 , #{coCd}           AS CO_CD
+	                 , '${searchYear}01' AS PERIOD
+	                 , 0                 AS PLAN_AMOUNT
+	                 , 0                 AS TOT_AMT
+	            FROM   DUAL
+	            WHERE  NOT EXISTS ( SELECT * FROM PLAN )
 		       )
-		  PIVOT ( MAX(PLAN_RATE) FOR PERIOD IN ('${searchYear}01', '${searchYear}02', '${searchYear}03', '${searchYear}04', '${searchYear}05', '${searchYear}06', '${searchYear}07', '${searchYear}08', '${searchYear}09', '${searchYear}10', '${searchYear}11', '${searchYear}12' ) --년월 읽어와서 넣어주기 
-		        )
+		PIVOT ( MAX(PLAN_RATE) FOR PERIOD IN ('${searchYear}01', '${searchYear}02', '${searchYear}03', '${searchYear}04', '${searchYear}05', '${searchYear}06', '${searchYear}07', '${searchYear}08', '${searchYear}09', '${searchYear}10', '${searchYear}11', '${searchYear}12' ) --년월 읽어와서 넣어주기 
+		      )
 		UNION ALL 
 		SELECT *
-		  FROM (
+		FROM   (
 		        SELECT '4.차이' AS REC_DIV
 		              , P.CO_CD  --회사코드
 		              , P.PERIOD --PERIOD
@@ -216,7 +383,7 @@
 		                                  WHERE 1=1
 		                                  GROUP BY CO_CD, PERIOD
 		                                )  AS S ON P.CO_CD = S.CO_CD AND P.PERIOD = S.PERIOD --수주실적 
-		          WHERE 'SALESPLANDIV10' = #{salesplandiv}
+		        WHERE 'SALESPLANDIV10' = #{salesplandiv}
 		        UNION ALL
 		        SELECT '4.차이' AS REC_DIV
 		              , P.CO_CD  --회사코드
@@ -233,15 +400,49 @@
 		                                  WHERE 1=1
 		                                  GROUP BY CO_CD, PERIOD
 		                                ) AS M ON P.CO_CD = M.CO_CD AND P.PERIOD = M.PERIOD --매출확정  
-		          WHERE 'SALESPLANDIV20' = #{salesplandiv}
-	             UNION ALL  --위 차이 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
-	             SELECT '4.차이' AS REC_DIV
+		        WHERE 'SALESPLANDIV20' = #{salesplandiv}
+				UNION ALL
+		        SELECT '4.차이' AS REC_DIV
+		              , P.CO_CD  --회사코드
+		              , P.PERIOD --PERIOD
+		              , ROUND(NVL(P.PLAN_AMOUNT,0)/${searchUnit},2) - ROUND(NVL(M.BILL_AMOUNT, 0)/${searchUnit},2)      AS AMOUNT
+		              , ROUND(SUM(P.PLAN_AMOUNT) OVER (PARTITION BY P.CO_CD)/${searchUnit},2) -
+		                ROUND(SUM(M.BILL_AMOUNT) OVER (PARTITION BY P.CO_CD)/${searchUnit},2)   AS TOT_AMT 
+		           FROM PLAN AS P --사업계획
+		                LEFT OUTER JOIN (
+		                                 SELECT CO_CD                         --회사코드
+		                                      , PERIOD                         --PERIOD
+		                                      , SUM(BILL_AMOUNT) AS BILL_AMOUNT--금액
+		                                   FROM BILL --매출확정
+		                                  WHERE 1=1
+		                                  GROUP BY CO_CD, PERIOD
+		                                ) AS M ON P.CO_CD = M.CO_CD AND P.PERIOD = M.PERIOD --매출확정  
+		        WHERE 'SALESPLANDIV30' = #{salesplandiv}
+				UNION ALL
+		        SELECT '4.차이' AS REC_DIV
+		              , P.CO_CD  --회사코드
+		              , P.PERIOD --PERIOD
+		              , ROUND(NVL(P.PLAN_AMOUNT,0)/${searchUnit},2) - ROUND(NVL(M.SUGM_AMOUNT, 0)/${searchUnit},2)      AS AMOUNT
+		              , ROUND(SUM(P.PLAN_AMOUNT) OVER (PARTITION BY P.CO_CD)/${searchUnit},2) -
+		                ROUND(SUM(M.SUGM_AMOUNT) OVER (PARTITION BY P.CO_CD)/${searchUnit},2)   AS TOT_AMT 
+		           FROM PLAN AS P --사업계획
+		                LEFT OUTER JOIN (
+		                                 SELECT CO_CD                         --회사코드
+		                                      , PERIOD                         --PERIOD
+		                                      , SUM(SUGM_AMOUNT) AS SUGM_AMOUNT--금액
+		                                   FROM SUGM --수금
+		                                  WHERE 1=1
+		                                  GROUP BY CO_CD, PERIOD
+		                                ) AS M ON P.CO_CD = M.CO_CD AND P.PERIOD = M.PERIOD --매출확정  
+		        WHERE 'SALESPLANDIV40' = #{salesplandiv}
+	            UNION ALL  --위 차이 데이타 없을 시, 그래프 셋팅 값 사용 목적으로 쿼리함 
+	            SELECT '4.차이' AS REC_DIV
 	                  , #{coCd}    AS CO_CD
 	                  , '${searchYear}01' AS PERIOD
 	                  , 0        AS PLAN_AMOUNT
 	                  , 0        AS TOT_AMT
-	               FROM DUAL
-	              WHERE NOT EXISTS ( SELECT * FROM PLAN )
+	            FROM DUAL
+	            WHERE NOT EXISTS ( SELECT * FROM PLAN )
 		       )
 		  PIVOT ( SUM(AMOUNT) FOR PERIOD IN ('${searchYear}01', '${searchYear}02', '${searchYear}03', '${searchYear}04', '${searchYear}05', '${searchYear}06', '${searchYear}07', '${searchYear}08', '${searchYear}09', '${searchYear}10', '${searchYear}11', '${searchYear}12' ) --년월 읽어와서 넣어주기 
 		        )

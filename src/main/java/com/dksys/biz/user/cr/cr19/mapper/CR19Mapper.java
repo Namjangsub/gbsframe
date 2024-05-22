@@ -27,4 +27,8 @@ public interface CR19Mapper {
 	void save_cr19(Map<String, String> param);
 
 	void call_save_cr19(Map<String, String> param);
+
+	void save_cr19_create_cr10(Map<String, String> param);
+	
+	void call_save_cr19_create_cr10(Map<String, String> paramMap);
 }

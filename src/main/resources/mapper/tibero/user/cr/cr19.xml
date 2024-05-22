@@ -850,32 +850,32 @@
 		              , R2.CODE_NM               AS ORDRS_DIV_NM
 		              , R3.CODE_NM               AS CLNT_PJT_NM
 		              , R7.CODE_NM               AS INPEXP_NM
-					, A.FILE_TRGT_KEY
-					, A.CO_CD
-					, A.ORDRS_NO
-					, A.EST_NO
-					, A.EST_DEG
-					, A.ORDRS_CLNT_CD
-					, A.ORDRS_DT
-					, A.ORDRS_DIV
-					, A.CLNT_PJT
-					, A.CTRT_NM
-					, A.CURR_CD
-					, A.EXRATE
-					, A.ORDRS_AMT
-					, round(A.EXRATE * A.ORDRS_AMT, 1) AS ORDRS_AMT_CURR
-					, A.FWD_EXCH_JOIN_DT
-					, A.FWD_EXCH_CHK_LIST
-					, A.ORDRGER
-					, A.MNG_ID
-					, A.CTRT_DOC
-					, A.PMNT_MTD
-					, A.ORDRS_RMK
-					, A.ORGN_SALES_CD
-					, A.INPEXP_CD
-					, A.NEW_ORDRS_NO
-					, A.HIST_NO
-					, A.PRJCT_SEQ
+					  , A.FILE_TRGT_KEY
+					  , A.CO_CD
+					  , A.ORDRS_NO
+					  , A.EST_NO
+					  , A.EST_DEG
+					  , A.ORDRS_CLNT_CD
+					  , A.ORDRS_DT
+					  , A.ORDRS_DIV
+					  , A.CLNT_PJT
+					  , A.CTRT_NM
+					  , A.CURR_CD
+					  , A.EXRATE
+					  , A.ORDRS_AMT
+					  , round(A.EXRATE * A.ORDRS_AMT, 1) AS ORDRS_AMT_CURR
+					  , A.FWD_EXCH_JOIN_DT
+					  , A.FWD_EXCH_CHK_LIST
+					  , A.ORDRGER
+					  , A.MNG_ID
+					  , A.CTRT_DOC
+					  , A.PMNT_MTD
+					  , A.ORDRS_RMK
+					  , A.ORGN_SALES_CD
+					  , A.INPEXP_CD
+					  , A.NEW_ORDRS_NO
+					  , A.HIST_NO
+					  , A.PRJCT_SEQ
 		         FROM   TB_CR02M01 AS A
 				        --고객사
 		                LEFT OUTER JOIN TB_BM02M01 AS C ON A.ORDRS_CLNT_CD = C.CLNT_CD
@@ -1078,6 +1078,144 @@
 		 WHERE  1 = 1
 		 GROUP BY A.CO_CD, A.ORDRS_NO, A.CLMN_PLAN_SEQ
 		)
+		, VW_CR02 AS
+		(
+		 --수주금액 흐름
+		 SELECT PLAN.CO_CD                     AS CO_CD
+		      , PLAN.ORDRS_NO                  AS ORDRS_NO
+			  , M.ORDRS_CLNT_CD                AS CLNT_CD
+			  , C.CLNT_NM                      AS CLNT_NM
+			  , C.SELL_VAT_CD                  AS SELL_VAT_CD
+			  , R.CODE_NM                      AS SELL_VAT_NM
+			  , NVL(TO_NUMBER(R.CODE_RPRC), 0) AS SELL_VAT_RATE
+			  , PLAN.CLMN_PLAN_SEQ             AS CLMN_PLAN_SEQ
+			  , PLAN.CLMN_PLAN_DIV             AS CLMN_PLAN_DIV
+			  , NVL(PLAN.CLMN_DIV_SEQ, 1)      AS CLMN_DIV_SEQ
+			  , NVL(PLAN.CLMN_RATE, 0)         AS CLMN_RATE
+			  , PLAN.BILL_PBLS_DT              AS PLAN_BILL_DT
+			  , PLAN.CLMN_DT                   AS PLAN_SUGM_DT
+			  , SUBSTR(TO_CHAR(PLAN.BILL_PBLS_DT, 'YYYYMMDD'), 0, 6) AS PLAN_BILL_YYYYMM
+			  , SUBSTR(TO_CHAR(PLAN.CLMN_DT     , 'YYYYMMDD'), 0, 6) AS PLAN_SUGM_YYYYMM
+			  , NVL(PLAN.CURR_CD, 'CURR01')    AS CURR_CD
+			  , NVL(PLAN.EXRATE, 1)            AS EXRATE
+			  , NVL(PLAN.CLMN_AMT, 0)          AS PLAN_AMT
+			  , NVL(CONF.CONF_AMT, 0)          AS CONF_AMT
+			  , NVL(BILL.BILL_AMT, 0)                                                AS BILL_AMT
+			  , NVL(BILL.BILL_AMT, 0) *      (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)  AS BILL_VAT
+			  , NVL(BILL.BILL_AMT, 0) * (1 + (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)) AS BILL_TOT
+			  , (NVL(PLAN.CLMN_AMT, 0) - NVL(BILL.BILL_AMT, 0))                                                AS MI_BILL_AMT
+			  , (NVL(PLAN.CLMN_AMT, 0) - NVL(BILL.BILL_AMT, 0)) *      (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)  AS MI_BILL_VAT
+			  , (NVL(PLAN.CLMN_AMT, 0) - NVL(BILL.BILL_AMT, 0)) * (1 + (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)) AS MI_BILL_TOT
+			  , NVL(SUGM.SUGM_AMT, 0)          AS SUGM_AMT
+			  , NVL(SUGM.SUGM_VAT, 0)          AS SUGM_VAT
+			  , NVL(SUGM.SUGM_TOT, 0)          AS SUGM_TOT
+			  , (NVL(PLAN.CLMN_AMT, 0) - NVL(SUGM.SUGM_AMT, 0))                                                AS MI_SUGM_AMT
+			  , (NVL(PLAN.CLMN_AMT, 0) - NVL(SUGM.SUGM_AMT, 0)) *      (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)  AS MI_SUGM_VAT
+			  , (NVL(PLAN.CLMN_AMT, 0) - NVL(SUGM.SUGM_AMT, 0)) * (1 + (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)) AS MI_SUGM_TOT
+			  , (NVL(PLAN.EXRATE, 1) * NVL(PLAN.CLMN_AMT, 0)) AS WON_PLAN_AMT
+			  , NVL(CONF.WON_CONF_AMT, 0)                     AS WON_CONF_AMT
+			  , NVL(BILL.WON_BILL_AMT, 0)                                                AS WON_BILL_AMT
+			  , NVL(BILL.WON_BILL_AMT, 0) *      (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)  AS WON_BILL_VAT
+			  , NVL(BILL.WON_BILL_AMT, 0) * (1 + (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)) AS WON_BILL_TOT
+			  , ((NVL(PLAN.EXRATE, 1) * NVL(PLAN.CLMN_AMT, 0)) - NVL(BILL.WON_BILL_AMT, 0))                                                AS MI_WON_BILL_AMT
+			  , ((NVL(PLAN.EXRATE, 1) * NVL(PLAN.CLMN_AMT, 0)) - NVL(BILL.WON_BILL_AMT, 0)) *      (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)  AS MI_WON_BILL_VAT
+			  , ((NVL(PLAN.EXRATE, 1) * NVL(PLAN.CLMN_AMT, 0)) - NVL(BILL.WON_BILL_AMT, 0)) * (1 + (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)) AS MI_WON_BILL_TOT
+			  , NVL(SUGM.WON_SUGM_AMT, 0)                     AS WON_SUGM_AMT
+			  , NVL(SUGM.WON_SUGM_VAT, 0)                     AS WON_SUGM_VAT
+			  , NVL(SUGM.WON_SUGM_TOT, 0)                     AS WON_SUGM_TOT
+			  , ((NVL(PLAN.EXRATE, 1) * NVL(PLAN.CLMN_AMT, 0)) - NVL(SUGM.WON_SUGM_AMT, 0))                                                AS MI_WON_SUGM_AMT
+			  , ((NVL(PLAN.EXRATE, 1) * NVL(PLAN.CLMN_AMT, 0)) - NVL(SUGM.WON_SUGM_AMT, 0)) *      (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)  AS MI_WON_SUGM_VAT
+			  , ((NVL(PLAN.EXRATE, 1) * NVL(PLAN.CLMN_AMT, 0)) - NVL(SUGM.WON_SUGM_AMT, 0)) * (1 + (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)) AS MI_WON_SUGM_TOT
+		 FROM   TB_CR02D01 AS PLAN
+		        LEFT OUTER JOIN (
+					             --매출확정
+								 SELECT C1.CO_CD
+								      , C1.ORDRS_NO
+									  , C1.CLMN_PLAN_SEQ
+									  , SUM(C1.CONF_AMT)     AS CONF_AMT
+									  , SUM(C1.WON_CONF_AMT) AS WON_CONF_AMT
+								 FROM   (
+									     SELECT CO_CD
+										      , ORDRS_NO
+											  , CLMN_PLAN_SEQ
+											  , NVL(EXRATE, 1)                               AS EXRATE
+											  , NVL(SELL_DCSN_DTL_AMT, 0)                    AS CONF_AMT
+											  , (NVL(EXRATE, 1) * NVL(SELL_DCSN_DTL_AMT, 0)) AS WON_CONF_AMT
+										 FROM   TB_CR03D01
+										 WHERE  1 = 1
+										) AS C1
+								 WHERE  1 = 1
+								 GROUP BY C1.CO_CD
+								        , C1.ORDRS_NO
+										, C1.CLMN_PLAN_SEQ
+								) AS CONF  ON CONF.CO_CD         = PLAN.CO_CD
+								          AND CONF.ORDRS_NO      = PLAN.ORDRS_NO
+										  AND CONF.CLMN_PLAN_SEQ = PLAN.CLMN_PLAN_SEQ
+		        LEFT OUTER JOIN (
+					             --매출계산서
+								 SELECT B1.CO_CD
+								      , B1.ORDRS_NO
+									  , B1.CLMN_PLAN_SEQ
+									  , SUM(B1.BILL_AMT)     AS BILL_AMT
+									  , SUM(B1.WON_BILL_AMT) AS WON_BILL_AMT
+								 FROM   (
+									     SELECT CO_CD
+										      , ORDRS_NO
+											  , CLMN_PLAN_SEQ
+											  , NVL(EXRATE, 1)                               AS EXRATE
+											  , NVL(SELL_BILL_DTL_AMT, 0)                    AS BILL_AMT
+											  , (NVL(EXRATE, 1) * NVL(SELL_BILL_DTL_AMT, 0)) AS WON_BILL_AMT
+										 FROM   TB_CR04D01
+										 WHERE  1 = 1
+										) AS B1
+								 WHERE  1 = 1
+								 GROUP BY B1.CO_CD
+								        , B1.ORDRS_NO
+										, B1.CLMN_PLAN_SEQ
+								) AS BILL  ON BILL.CO_CD         = PLAN.CO_CD
+								          AND BILL.ORDRS_NO      = PLAN.ORDRS_NO
+										  AND BILL.CLMN_PLAN_SEQ = PLAN.CLMN_PLAN_SEQ
+		        LEFT OUTER JOIN (
+					             --수금
+								 SELECT S.CO_CD
+								      , S.ORDRS_NO
+									  , S.CLMN_PLAN_SEQ
+									  , SUM(S.SUGM_AMT)     AS SUGM_AMT
+									  , SUM(S.SUGM_VAT)     AS SUGM_VAT
+									  , SUM(S.SUGM_TOT)     AS SUGM_TOT
+									  , SUM(S.WON_SUGM_AMT) AS WON_SUGM_AMT
+									  , SUM(S.WON_SUGM_VAT) AS WON_SUGM_VAT
+									  , SUM(S.WON_SUGM_TOT) AS WON_SUGM_TOT
+								 FROM   (
+									     SELECT CO_CD
+										      , ORDRS_NO
+											  , CLMN_PLAN_SEQ
+											  , NVL(EXRATE, 1)                          AS EXRATE
+											  , NVL(CLMN_DTL_AMT, 0)                    AS SUGM_AMT
+											  , NVL(CLMN_DTL_VAT, 0)                    AS SUGM_VAT
+											  , NVL(CLMN_DTL_TOT, 0)                    AS SUGM_TOT
+											  , (NVL(EXRATE, 1) * NVL(CLMN_DTL_AMT, 0)) AS WON_SUGM_AMT
+											  , (NVL(EXRATE, 1) * NVL(CLMN_DTL_VAT, 0)) AS WON_SUGM_VAT
+											  , (NVL(EXRATE, 1) * NVL(CLMN_DTL_TOT, 0)) AS WON_SUGM_TOT
+										 FROM   TB_CR05D01
+										 WHERE  1 = 1
+										) AS S
+								 WHERE  1 = 1
+								 GROUP BY S.CO_CD
+								        , S.ORDRS_NO
+										, S.CLMN_PLAN_SEQ
+								) AS SUGM  ON SUGM.CO_CD         = PLAN.CO_CD
+								          AND SUGM.ORDRS_NO      = PLAN.ORDRS_NO
+										  AND SUGM.CLMN_PLAN_SEQ = PLAN.CLMN_PLAN_SEQ
+		        --수주
+				LEFT OUTER JOIN TB_CR02M01 AS M  ON M.CO_CD    = PLAN.CO_CD
+				                                AND M.ORDRS_NO = PLAN.ORDRS_NO
+		        --거래처
+				LEFT OUTER JOIN TB_BM02M01 AS C  ON C.CLNT_CD = M.ORDRS_CLNT_CD
+				--공통코드
+				LEFT OUTER JOIN TB_CM05M01 AS R  ON R.CODE_ID = C.SELL_VAT_CD
+		 WHERE  1 = 1
+		)
 		, LIST AS
 		(
 		SELECT ROWNUM AS RRN
@@ -1109,8 +1247,8 @@
 		     , A.CHK_LIST_NM
 		     , A.MNG_NM
 		     , NVL(P.PLAN_BILL_RMK, '')   AS PLAN_BILL_RMK
-		     , NVL(P.PLAN_BILL_AMT_01, 0) AS PLAN_BILL_AMT_01 --해당월 계산서 계획(달러)
-
+		     --, NVL(P.PLAN_BILL_AMT_01, 0) AS PLAN_BILL_AMT_01 --해당월 계산서 계획(달러) --2024.05.17 김성욱 아래 컬럼으로 변경
+			 , NVL(V1.MI_WON_BILL_TOT, 0)  AS PLAN_BILL_AMT_01
 		     --, NVL(B.BILL_AMT_01, 0)      AS BILL_AMT_01
 		     , NVL(CASE WHEN A.CODE_RPRC = '10' THEN
 				             ROUND(NVL(B.BILL_AMT_01, 0) * 1.1, 1)
@@ -1120,7 +1258,8 @@
 		     , CASE WHEN NVL(P.PLAN_BILL_AMT_01, 0) = 0 THEN 0||' %'
 		            ELSE ROUND((NVL(B.BILL_AMT_01, 0) / NVL(P.PLAN_BILL_AMT_01, 0)) * 100, 0)||' %'
 		       END                        AS BILL_PER_01
-		     , NVL(P.PLAN_CLMN_AMT_01, 0) AS PLAN_CLMN_AMT_01 --해당월 수금 계획(달러)
+		     --, NVL(P.PLAN_CLMN_AMT_01, 0) AS PLAN_CLMN_AMT_01 --해당월 수금 계획(달러) --2024.05.17 김성욱 아래 컬럼으로 변경
+			 , NVL(V2.MI_WON_SUGM_TOT, 0)  AS PLAN_CLMN_AMT_01
 		     , NVL(C.CLMN_AMT_01, 0)      AS CLMN_AMT_01 --해당월 수금 실적(달러)
 
 		     , CASE WHEN NVL(P.PLAN_CLMN_AMT_01, 0) = 0 THEN 0||' %'
@@ -1162,7 +1301,7 @@
 				         round((NVL(A.SUJU_CLMN_AMT, 0) - NVL(B.BILL_AMT, 0)) * 1.1, 1) 
                     ELSE (NVL(A.SUJU_CLMN_AMT, 0) - NVL(B.BILL_AMT, 0))
 		            END AS MI_BILL_AMT --총계산서미발행금액(VAT포함)(원화)
---             , CASE WHEN (NVL(A.SUJU_CLMN_AMT, 0) - NVL(B.BILL_AMT, 0)) > 0 THEN 'N' ELSE 'Y' END AS BILL_YN  --수금완료
+             --  , CASE WHEN (NVL(A.SUJU_CLMN_AMT, 0) - NVL(B.BILL_AMT, 0)) > 0 THEN 'N' ELSE 'Y' END AS BILL_YN  --수금완료
 
 		     --, NVL(A.SUJU_CLMN_AMT, 0) - NVL(C.CLMN_AMT, 0) AS MI_CLMN_AMT --총미수금액(달러)
 		     , CASE WHEN A.CODE_RPRC = '10' THEN
@@ -1194,6 +1333,28 @@
 		       LEFT OUTER JOIN CLMN AS C  ON A.CO_CD         = C.CO_CD
 		                                 AND A.ORDRS_NO      = C.ORDRS_NO
 		                                 AND A.CLMN_PLAN_SEQ = C.CLMN_PLAN_SEQ
+		       LEFT OUTER JOIN (
+				                SELECT CO_CD
+								     , ORDRS_NO
+									 , CLMN_PLAN_SEQ
+									 , MI_WON_BILL_TOT
+									 , MI_WON_SUGM_TOT
+								FROM   VW_CR02
+								WHERE  PLAN_BILL_YYYYMM <![CDATA[<=]]> #{yyyymm}
+			                   ) AS V1  ON A.CO_CD         = V1.CO_CD
+		                               AND A.ORDRS_NO      = V1.ORDRS_NO
+		                               AND A.CLMN_PLAN_SEQ = V1.CLMN_PLAN_SEQ
+		       LEFT OUTER JOIN (
+				                SELECT CO_CD
+								     , ORDRS_NO
+									 , CLMN_PLAN_SEQ
+									 , MI_WON_BILL_TOT
+									 , MI_WON_SUGM_TOT
+								FROM   VW_CR02
+								WHERE  PLAN_SUGM_YYYYMM <![CDATA[<=]]> #{yyyymm}
+			                   ) AS V2  ON A.CO_CD         = V2.CO_CD
+		                               AND A.ORDRS_NO      = V2.ORDRS_NO
+		                               AND A.CLMN_PLAN_SEQ = V2.CLMN_PLAN_SEQ
 		WHERE  1 = 1
 		ORDER BY A.CO_CD, A.YYYY, A.ORDRS_MMDD, A.ORDRS_NO, A.CLMN_PLAN_SEQ, A.CLNT_NM, A.CTRT_NM
 		)
@@ -1365,4 +1526,26 @@
 	        #{errMsg       , mode=OUT, jdbcType=VARCHAR}
 	    )}
     </select>
+
+	<select id="callCopyWbsPlan" statementType="CALLABLE" parameterType="map">
+        {call SP_WB22M01_I(
+            #{coCd      , mode=IN, jdbcType=VARCHAR},
+            #{targetSalesCd   , mode=IN, jdbcType=VARCHAR},
+            #{copySalesCd   , mode=IN, jdbcType=VARCHAR},
+            #{userId    , mode=IN, jdbcType=VARCHAR},
+            #{pgmId     , mode=IN, jdbcType=VARCHAR},
+            #{errMsg     , mode=OUT, jdbcType=VARCHAR}
+        )}
+    </select>
+
+	<select id="save_cr19_create_cr10" statementType="CALLABLE" parameterType="map">
+		{call SP_CR10_I(
+			#{coCd   , mode=IN, jdbcType=VARCHAR},
+			#{yyyymm , mode=IN, jdbcType=VARCHAR},
+	        #{userId , mode=IN, jdbcType=VARCHAR},
+	        #{pgmId  , mode=IN, jdbcType=VARCHAR},
+	        #{errMsg , mode=OUT, jdbcType=VARCHAR}
+	    )}
+    </select>
+
 </mapper>

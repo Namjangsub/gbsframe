@@ -71,4 +71,41 @@ public class CR19Ctr {
 		}
 		return "jsonView";
 	}
+	
+	@PostMapping("/save_cr19_create_cr10")
+    public String save_cr19_create_cr10(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	Map<String, String> result = cr19svc.save_cr19_create_cr10(paramMap);
+    	model.addAttribute("result", result);
+    	return "jsonView";
+    }
+	
+	//@PostMapping(value = "/save_cr19_create_cr10")
+	//public String save_cr19_create_cr10(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	//	try {
+	//		cr19svc.save_cr19_create_cr10(paramMap, mRequest);
+	//		model.addAttribute("resultCode", 200);
+	//		model.addAttribute("resultMessage", paramMap.get("errMsg"));
+	//	}catch(Exception e){
+	//		model.addAttribute("resultCode", 900);
+	//		model.addAttribute("resultMessage", e.getMessage());
+	//	}
+	//	return "jsonView";
+	//}
+
+	//@PostMapping(value = "/save_cr19_create_cr10")
+	//public String save_cr19_create_cr10(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	//	try {
+	//		if (cr19svc.save_cr19_create_cr10(paramMap, mRequest) != 0 ) {
+	//			model.addAttribute("resultCode", 200);
+	//			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+	//		} else {
+	//			model.addAttribute("resultCode", 500);
+	//			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+	//		};
+	//	}catch(Exception e){
+	//		model.addAttribute("resultCode", 900);
+	//		model.addAttribute("resultMessage", e.getMessage());
+	//	}
+	//	return "jsonView";
+	//}
 }

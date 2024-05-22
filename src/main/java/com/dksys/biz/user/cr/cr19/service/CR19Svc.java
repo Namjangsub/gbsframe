@@ -21,4 +21,8 @@ public interface CR19Svc {
 	List<Map<String, Object>> select_ordrsHistNo_List(Map<String, String> paramMap);
 
 	void save_cr19(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
+	//void save_cr19_create_cr10(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+	
+	Map<String, String> save_cr19_create_cr10(Map<String, String> paramMap);
 }

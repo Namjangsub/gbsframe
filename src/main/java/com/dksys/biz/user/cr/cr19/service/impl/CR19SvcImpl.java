@@ -76,4 +76,39 @@ public class CR19SvcImpl implements CR19Svc {
 			cr19Mapper.call_save_cr19(dtl);
 	    }
     }
+
+	//@Override
+    //public void save_cr19_create_cr10(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	//	Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+	//	Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+	//	String OrderSeq = "";
+    //    // 데이터 처리 시작
+	//	List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+	//    for (Map<String, String> dtl : dtlParam) {
+	//		dtl.put("userId", paramMap.get("userId").toString());
+	//		dtl.put("pgmId", paramMap.get("pgmId").toString());
+	//		//데이터 처리
+	//		cr19Mapper.call_save_cr19_create_cr10(dtl);
+	//    }
+    //}
+	
+	//@Override
+	//public int save_cr19_create_cr10(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	//	Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+	//	Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+	//	//생성
+	//	int result = cr19Mapper.call_save_cr19_create_cr10(paramMap);
+	//	return result;
+	//}
+	
+	//@Override
+	//public void save_cr19_create_cr10(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
+	//	cr19Mapper.call_save_cr19_create_cr10(paramMap);
+	//}
+	
+	@Override
+	public Map<String, String> save_cr19_create_cr10(Map<String, String> paramMap) {
+		cr19Mapper.save_cr19_create_cr10(paramMap);
+		return paramMap;
+	}
 }
