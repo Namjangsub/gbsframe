@@ -117,6 +117,16 @@ public class CR16SvcImpl implements CR16Svc {
 	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt20").toString());
 	            	arrMap.put("salesPlanDiv", "SALESPLANDIV20");
 	            	cr16Mapper.salesPlanYearInsert(arrMap);
+
+	            	//계산서
+	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt30").toString());
+	            	arrMap.put("salesPlanDiv", "SALESPLANDIV30");
+	            	cr16Mapper.salesPlanYearInsert(arrMap);
+
+	            	//수금
+	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt40").toString());
+	            	arrMap.put("salesPlanDiv", "SALESPLANDIV40");
+	            	cr16Mapper.salesPlanYearInsert(arrMap);
 	            	
 	            	result++;	            	 
 	            } catch (Exception e) {
@@ -177,6 +187,16 @@ public class CR16SvcImpl implements CR16Svc {
 	            	//매출
 	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt20").toString());
 	            	arrMap.put("salesPlanDiv", "SALESPLANDIV20");
+	            	cr16Mapper.salesPlanYearUpdate(arrMap);
+
+	            	//계산서
+	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt30").toString());
+	            	arrMap.put("salesPlanDiv", "SALESPLANDIV30");
+	            	cr16Mapper.salesPlanYearUpdate(arrMap);
+
+	            	//수금
+	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt40").toString());
+	            	arrMap.put("salesPlanDiv", "SALESPLANDIV40");
 	            	cr16Mapper.salesPlanYearUpdate(arrMap);
 	            	
 	            	result++;	            	 
