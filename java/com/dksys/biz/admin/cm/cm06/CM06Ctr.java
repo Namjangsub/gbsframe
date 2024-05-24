@@ -212,4 +212,20 @@ public class CM06Ctr {
 		}
     	return "jsonView";
     }
+    
+    // 개인사진정보 상태정보
+    @PostMapping("/selectUserStatusList")
+    public String selectUserStatusList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, String>> ruleList = cm06Svc.selectUserStatusList(paramMap);
+    	model.addAttribute("ruleList", ruleList);
+    	return "jsonView";
+    }
+    
+    // 사용자 사진 정보 조회
+    @PostMapping("/checkUserIdImage")
+    public String checkUserIdImage(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	Map<String, String> userInfo = cm06Svc.checkUserIdImage(paramMap);
+    	model.addAttribute("userInfo", userInfo);
+    	return "jsonView";
+    }
 }

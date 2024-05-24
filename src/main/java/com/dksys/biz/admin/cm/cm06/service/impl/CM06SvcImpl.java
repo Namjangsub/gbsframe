@@ -108,5 +108,9 @@ public class CM06SvcImpl implements CM06Svc {
 		return cm06Mapper.selectEmployeeStatusList(paramMap); 
 	}
 
-	
+
+	@Override
+	public Map<String, String> checkUserIdImage(Map<String, String> paramMap) {
+		return cm06Mapper.checkUserIdImage(paramMap);
+	}
 }
