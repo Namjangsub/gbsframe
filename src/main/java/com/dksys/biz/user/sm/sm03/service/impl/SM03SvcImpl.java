@@ -313,4 +313,9 @@ public class SM03SvcImpl implements SM03Svc {
 		return sm03Mapper.selectWareHousingDetaiNewlList(paramMap);
 	}	
 
+	
+	@Override
+	public Map<String, String> selectPurchaseconfirmed(Map<String, String> paramMap) {
+		return sm03Mapper.selectPurchaseconfirmed(paramMap);
+	}
 }

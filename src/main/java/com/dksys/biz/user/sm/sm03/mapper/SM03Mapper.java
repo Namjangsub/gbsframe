@@ -56,6 +56,8 @@ public interface SM03Mapper {
 	int selectWareHousingDetaiNewlListCount(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectWareHousingDetaiNewlList(Map<String, String> paramMap);	
+	
+	Map<String, String> selectPurchaseconfirmed(Map<String, String> paramMap);
 }
 
 

@@ -126,9 +126,20 @@ public class SM03Ctr {
 	//발주 detail 삭제    
 	@DeleteMapping(value = "/deleteWareHousingDetail")
 	public String deleteWareHousingDetail(@RequestBody Map<String, String> param, ModelMap model) {
-		sm03Svc.deleteWareHousingDetail(param);
-		model.addAttribute("resultCode", 200);
-    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+
+		//삭제할 입고번호와 일련번호의 내용이 매입확정 되었는지 확인.
+    	Map<String, String> result = sm03Svc.selectPurchaseconfirmed(param);
+//	    String tempPchsNo = result.get("pchsNo");
+		if( result.get("pchsNo") == null || result.get("pchsNo").trim().isEmpty() ) {	//매입확정이 없으면 삭제 가능
+			sm03Svc.deleteWareHousingDetail(param);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+		} else {
+
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));			
+//			model.addAttribute("resultData", result);			
+		}
 		return "jsonView";
 	} 
 	
