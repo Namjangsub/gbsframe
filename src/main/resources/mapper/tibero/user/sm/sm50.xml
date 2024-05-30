@@ -1,0 +1,487 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.sm.sm50.mapper.SM50Mapper">
+	
+	<select id="selectBomCostTreeList" parameterType="Map" resultType="CamelMap">
+		WITH PCHS_BOM AS (
+		     SELECT D.CO_CD, D.SALES_CD, D.UPPER_CD, COUNT(*) AS PCHS_BOM_CNT
+		       FROM TB_SM01D01 D
+		     WHERE 1 = 1
+			   AND D.CO_CD    = #{coCd}
+			   AND D.SALES_CD = #{salesCd}
+		     GROUP BY D.CO_CD, D.SALES_CD, D.UPPER_CD
+		)
+		SELECT
+	         T.UPPER_KEY as PARENT,
+	         T.LOWER_KEY ID, 
+	         T.UPPER_CD,
+	         T.LOWER_CD,
+	         <![CDATA[
+	         CASE WHEN NVL(D.PCHS_BOM_CNT, 0) > 0 THEN '<span style=''color: red;''>' || T.LOWER_CD || '(' || MATR_NM || ') x ' || T.LOWER_QTY || '</span>'
+	         								  ELSE T.LOWER_CD || '(' || MATR_NM || ') x ' || T.LOWER_QTY END || 
+	         				CASE WHEN  (T.CNF_CHECK = 'Y') THEN  '<span style=''color: blue;''>' || ' (완료)' || '</span>' END
+	         								   AS TEXT, 
+	         ]]>								  
+	         (LEVEL-1)  LVL,
+	         T.DSGN_NO,
+	         CASE WHEN CONNECT_BY_ISLEAF = 1 THEN 'leaf' ELSE 'unit' END AS TYPE,
+	         REGEXP_REPLACE(SYS_CONNECT_BY_PATH(T.LOWER_CD, ' -> '), '^\s+\-\>\s+', '') as PATH,
+	         T.CO_CD,
+	         T.SALES_CD,
+	         T.MATR_NM,
+	         T.LOWER_QTY,
+	         T.LOWER_UNIT,
+	         T.MATR_UNIT_CD,
+	         FN_CM05M01_CD_TO_NM(T.MATR_UNIT_CD) MATR_UNIT_CD_NM,
+	         T.MATR_YN,
+			 T.MATR_MAT,
+			 T.MATR_MAKR_NM,
+			 T.MATR_MNO,
+			 T.MATR_SPEC,
+			 T.MATR_RMK,
+			 T.LOWER_QTY,
+			 T.LOWER_UNIT,
+			 T.MATR_UNIT_CD,         
+	         T.UPPER_KEY,
+	         T.LOWER_KEY,
+	         T.FILE_TRGT_KEY,
+	         T.ORDRS_NO,
+			 NVL(D.PCHS_BOM_CNT, 0) AS PCHS_BOM_CNT,
+			 T.CNF_CHECK
+	     FROM TB_BM14M01 T
+			  				LEFT OUTER JOIN  PCHS_BOM   AS D   ON T.CO_CD  = D.CO_CD
+			  				                                  AND T.SALES_CD  = D.SALES_CD
+			  				                                  AND T.LOWER_KEY  = D.UPPER_CD
+	     WHERE T.SALES_CD = #{salesCd}
+	       AND T.CO_CD = #{coCd}	     
+		     START WITH T.LOWER_KEY =  (SELECT LOWER_KEY 
+							              FROM TB_BM14M01 T		     
+									     WHERE T.UPPER_CD = '#'
+									       AND T.CO_CD    = #{coCd}
+										   AND T.LOWER_CD = #{salesCd}	)	
+		     CONNECT BY PRIOR T.LOWER_KEY = T.UPPER_KEY
+		     ORDER BY LOWER_CD  
+	</select>
+	
+	<select id="selectBomSeqNext" parameterType="Map" resultType="int">
+			SELECT TB_BM14M01_SQ01.NEXTVAL  FROM DUAL 
+	</select>
+
+	<!-- 삭제 체크 -->
+	<select id="deleteMatrbomChk" parameterType="Map" resultType="camelMap">
+		SELECT FN_BM14M01_DEL_CHK(#{coCd}, #{salesCd}, #{upperKey}, #{lowerKey}) AS DELYN
+		FROM   DUAL
+	</select>
+	
+    <insert id="insertBomTree" parameterType="Map">
+        INSERT INTO TB_BM14M01
+			(
+			   CO_CD
+			 , SALES_CD
+			 , UPPER_KEY
+			 , LOWER_KEY
+			 , UPPER_CD
+			 , LOWER_CD
+			 , DSGN_NO
+			 , BOM_SEQ
+			 , PART_NO
+			 , UNIT_NO
+			 , REV_NO
+			 , MATR_SEQ
+			 , MATR_CD
+			 , MATR_NM
+			 , MATR_MAT
+			 , MATR_MAKR_NM
+			 , MATR_MNO
+			 , MATR_SPEC
+			 , MATR_RMK
+			 , AVLB_STRT_DT
+			 , AVLB_END_DT
+			 , USE_YN
+			 , MATR_YN
+			 , ETC_FIELD1
+			 , ETC_FIELD2
+			 , ETC_FIELD3
+			 , CREAT_ID
+			 , CREAT_PGM
+			 , CREAT_DTTM
+			 , FILE_TRGT_KEY
+			 , LOWER_QTY
+			 , LOWER_UNIT
+			 , MATR_UNIT_CD
+			 , ORDRS_NO
+			)
+        VALUES
+			(
+			   #{coCd}
+			 , #{salesCd}
+			 , #{upperKey}
+			 , #{fileTrgtKey}
+			 , #{upperCd}
+			 , #{lowerCd}
+			 , #{dsgnNo}
+			 , #{bomSeq, jdbcType=VARCHAR}
+			 , #{partNo, jdbcType=VARCHAR}
+			 , #{unitNo, jdbcType=VARCHAR}
+			 , #{revNo, jdbcType=VARCHAR}
+			 , #{matrSeq, jdbcType=VARCHAR}
+			 , #{matrCd, jdbcType=VARCHAR}
+			 , #{matrNm, jdbcType=VARCHAR}
+			 , #{matrMat, jdbcType=VARCHAR}
+			 , #{matrMakrNm, jdbcType=VARCHAR}
+			 , #{matrMno, jdbcType=VARCHAR}
+			 , #{matrSpec, jdbcType=VARCHAR}
+			 , #{matrRmk, jdbcType=VARCHAR}
+			 , #{avlbStrtDt, jdbcType=VARCHAR}
+			 , #{avlbEndDt, jdbcType=VARCHAR}
+			 , #{useYn, jdbcType=VARCHAR}
+			 , #{matrYn, jdbcType=VARCHAR}
+			 , #{etcField1, jdbcType=VARCHAR}
+			 , #{etcField2, jdbcType=VARCHAR}
+			 , #{etcField3, jdbcType=VARCHAR}
+			 , #{userId}
+			 , #{pgmId}
+			 , SYSDATE
+			 , #{fileTrgtKey}
+			 , #{lowerQty, jdbcType=VARCHAR}
+			 , #{lowerUnit, jdbcType=VARCHAR}
+			 , #{matrUnitCd, jdbcType=VARCHAR}
+			 , #{ordrsNo, jdbcType=VARCHAR}
+			)
+	</insert>
+
+    <update id="updateBom" parameterType="Map">
+        UPDATE TB_BM14M01
+        SET   
+				  DSGN_NO			= #{dsgnNo}
+				, LOWER_CD			= #{lowerCd, jdbcType=VARCHAR}
+				, BOM_SEQ			= #{bomSeq, jdbcType=VARCHAR}
+				, PART_NO			= #{partNo, jdbcType=VARCHAR}
+				, UNIT_NO			= #{unitNo, jdbcType=VARCHAR}
+				, REV_NO			= #{revNo, jdbcType=VARCHAR}
+				, MATR_SEQ			= #{matrSeq, jdbcType=VARCHAR}
+				, MATR_CD			= #{matrCd, jdbcType=VARCHAR}
+				, MATR_NM			= #{matrNm, jdbcType=VARCHAR}
+				, MATR_MAT			= #{matrMat, jdbcType=VARCHAR}
+				, MATR_MAKR_NM		= #{matrMakrNm, jdbcType=VARCHAR}
+				, MATR_MNO			= #{matrMno, jdbcType=VARCHAR}
+				, MATR_SPEC			= #{matrSpec, jdbcType=VARCHAR}
+				, MATR_RMK			= #{matrRmk, jdbcType=VARCHAR}
+				, AVLB_STRT_DT		= #{avlbStrtDt, jdbcType=VARCHAR}
+				, AVLB_END_DT		= #{avlbEndDt, jdbcType=VARCHAR}
+				, USE_YN			= #{useYn, jdbcType=VARCHAR}
+				, MATR_YN			= #{matrYn, jdbcType=VARCHAR}
+				, ETC_FIELD1		= #{etcField1, jdbcType=VARCHAR}
+				, ETC_FIELD2		= #{etcField2, jdbcType=VARCHAR}
+				, ETC_FIELD3		= #{etcField3, jdbcType=VARCHAR}
+				, UDT_ID			= #{userId}
+				, UDT_PGM			= #{pgmId}
+				, UDT_DTTM			= SYSDATE
+				, LOWER_QTY			= #{lowerQty}
+				, LOWER_UNIT			= #{lowerUnit}
+				, MATR_UNIT_CD		= #{matrUnitCd, jdbcType=VARCHAR}
+				, ORDRS_NO		= #{ordrsNo, jdbcType=VARCHAR}
+        WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+    </update>
+
+	<delete id="deleteBom" parameterType="Map">
+	  DELETE TB_BM14M01
+	   WHERE FILE_TRGT_KEY IN (
+				SELECT FILE_TRGT_KEY 
+				  FROM TB_BM14M01 T
+				 WHERE T.SALES_CD = #{salesCd}
+				   AND T.CO_CD    = #{coCd}	 
+				 START WITH T.LOWER_KEY =  #{fileTrgtKey}	
+			     CONNECT BY PRIOR T.LOWER_KEY = T.UPPER_KEY
+		     )
+	    AND UPPER_KEY <![CDATA[<>]]> '#'
+	</delete>
+
+	
+	<update id="moveBom">
+		UPDATE
+			TB_BM14M01
+		SET
+			UPPER_KEY	= #{upDeptId},
+			UPPER_CD	= #{upperCd},
+			UDT_ID		= #{userId},
+			UDT_PGM		= #{pgmId},
+			UDT_DTTM	= SYSDATE
+		WHERE
+			FILE_TRGT_KEY = #{deptId}
+	</update>
+		
+<!--     <insert id="copyBomTree" parameterType="Map"> -->
+<!-- 		INSERT INTO TB_BM14M01  -->
+<!-- 			(CO_CD, SALES_CD, UPPER_KEY, LOWER_KEY, UPPER_CD, LOWER_CD, DSGN_NO,  -->
+<!-- 			BOM_SEQ, PART_NO, UNIT_NO, REV_NO, MATR_SEQ, MATR_CD, MATR_NM, MATR_MAT,  -->
+<!-- 			MATR_MAKR_NM, MATR_MNO, MATR_SPEC, MATR_RMK, AVLB_STRT_DT, AVLB_END_DT,  -->
+<!-- 			USE_YN, MATR_YN, ETC_FIELD1, ETC_FIELD2, ETC_FIELD3, CREAT_ID, CREAT_PGM,  -->
+<!-- 			CREAT_DTTM, UDT_ID, UDT_PGM, UDT_DTTM, LOWER_QTY, LOWER_UNIT, MATR_UNIT_CD, FILE_TRGT_KEY) -->
+<!-- 			SELECT   -->
+<!-- 			        CO_CD, SALES_CD, #{upperKey}, #{fileTrgtKey} LOWER_KEY, UPPER_CD, LOWER_CD, DSGN_NO,  -->
+<!-- 			        BOM_SEQ, PART_NO, UNIT_NO, REV_NO, MATR_SEQ, MATR_CD, MATR_NM, MATR_MAT, -->
+<!-- 			        MATR_MAKR_NM, MATR_MNO, MATR_SPEC, MATR_RMK, AVLB_STRT_DT, AVLB_END_DT,  -->
+<!-- 			        USE_YN, MATR_YN, ETC_FIELD1, ETC_FIELD2, ETC_FIELD3, CREAT_ID, CREAT_PGM,  -->
+<!-- 			        CREAT_DTTM, UDT_ID, UDT_PGM, UDT_DTTM, LOWER_QTY, LOWER_UNIT, MATR_UNIT_CD, #{fileTrgtKey} -->
+<!-- 			FROM TB_BM14M01 -->
+<!-- 			WHERE -->
+<!-- 				FILE_TRGT_KEY = #{lowerKey} -->
+<!-- 	</insert>	 -->
+		
+    <insert id="copyBomTree" parameterType="Map">
+		INSERT INTO TB_BM14M01 
+			(CO_CD, 
+			SALES_CD, 
+			UPPER_KEY, 
+			LOWER_KEY, 
+			UPPER_CD, LOWER_CD, 
+			DSGN_NO, 
+			BOM_SEQ, PART_NO, UNIT_NO, REV_NO, MATR_SEQ, MATR_CD, MATR_NM, MATR_MAT, 
+			MATR_MAKR_NM, MATR_MNO, MATR_SPEC, MATR_RMK, AVLB_STRT_DT, AVLB_END_DT, 
+			USE_YN, MATR_YN, ETC_FIELD1, ETC_FIELD2, ETC_FIELD3, CREAT_ID, CREAT_PGM, 
+			CREAT_DTTM, UDT_ID, UDT_PGM, UDT_DTTM, LOWER_QTY, LOWER_UNIT, MATR_UNIT_CD, FILE_TRGT_KEY, ORDRS_NO)
+			SELECT  
+			        CO_CD, 
+			        REPLACE(SALES_CD, #{salesCd}, #{salesCdTo}) SALES_CD, 
+			        #{upperKey}, 
+			        #{fileTrgtKey} LOWER_KEY, 
+			        REPLACE(UPPER_CD, #{salesCd}, #{salesCdTo}) UPPER_CD, LOWER_CD, 
+			        CASE WHEN #{changeYn} = 'Y' THEN REPLACE(DSGN_NO, #{salesCd}, #{salesCdTo}) ELSE DSGN_NO END DSGN_NO, 
+			        BOM_SEQ, PART_NO, UNIT_NO, REV_NO, MATR_SEQ, MATR_CD, MATR_NM, MATR_MAT,
+			        MATR_MAKR_NM, MATR_MNO, MATR_SPEC, MATR_RMK, AVLB_STRT_DT, AVLB_END_DT, 
+			        USE_YN, MATR_YN, ETC_FIELD1, ETC_FIELD2, ETC_FIELD3, #{userId} CREAT_ID, #{pgmId} CREAT_PGM, 
+			        SYSDATE CREAT_DTTM, '' UDT_ID, '' UDT_PGM, '' UDT_DTTM, LOWER_QTY, LOWER_UNIT, MATR_UNIT_CD, #{fileTrgtKey}, ORDRS_NO
+			FROM TB_BM14M01
+			WHERE
+				FILE_TRGT_KEY = #{lowerKey}		
+	</insert>
+	
+	<select id="selectBomlevelList" parameterType="Map" resultType="CamelMap">
+		WITH PCHS_BOM AS (
+		     SELECT D.CO_CD, D.SALES_CD, D.UPPER_CD, COUNT(*) AS PCHS_BOM_CNT
+		       FROM TB_SM01D01 D
+		     WHERE 1 = 1
+			   AND D.CO_CD    = #{coCd}
+			   AND D.SALES_CD = #{salesCd}
+		     GROUP BY D.CO_CD, D.SALES_CD, D.UPPER_CD
+		)
+		SELECT TO_CHAR(T.AVLB_STRT_DT, 'YYYY-MM-DD') AS AVLB_STRT_DT
+		     , TO_CHAR(T.AVLB_END_DT, 'YYYY-MM-DD') AS AVLB_END_DT
+			 , TO_CHAR(T.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM
+			 , T.*
+			 , FN_CM05M01_CD_TO_NM(T.MATR_UNIT_CD) MATR_UNIT_CD_NM
+			 , NVL(C.CHANGE_YN, 'N') AS CHANGE_YN
+			 , NVL(D.PCHS_BOM_CNT, 0) AS PCHS_BOM_CNT
+			 , 'Y'  					AS MATR_ERROR --자재마스터 검증완료여부
+		FROM   TB_BM14M01 AS T
+		       LEFT OUTER JOIN TB_BM14M01_COMPARE AS C  ON T.CO_CD = C.CO_CD
+			                                           AND T.SALES_CD = C.SALES_CD
+													   AND T.UPPER_KEY = C.UPPER_KEY
+													   AND T.LOWER_KEY = C.LOWER_KEY
+				LEFT OUTER JOIN  PCHS_BOM   AS D   ON T.CO_CD  = D.CO_CD
+				                                  AND T.SALES_CD  = D.SALES_CD
+				                                  AND T.LOWER_KEY  = D.UPPER_CD
+		WHERE  T.SALES_CD = #{salesCd}
+		AND    T.CO_CD    = #{coCd}
+		AND    T.UPPER_KEY  = #{upperKey}
+		ORDER BY T.LOWER_CD
+	</select>
+	
+	<select id="checkBomInfo" parameterType="Map" resultType="int">
+			SELECT count(FILE_TRGT_KEY) 
+			  FROM TB_BM14M01 T
+			 WHERE  T.CO_CD     = #{coCd}
+			   AND 	T.SALES_CD	= #{salesCdTo}
+<!-- 			   AND 	UPPER_KEY   <![CDATA[<>]]> '#' -->
+	</select>	
+	
+	
+	<select id="selectBomRootSalesCdTree" parameterType="Map" resultType="CamelMap">
+			SELECT * 
+			  FROM TB_BM14M01 T
+			 WHERE  T.CO_CD     = #{coCd}
+			   AND 	T.SALES_CD	= #{salesCd}
+			   AND 	T.UPPER_KEY	= '#' --SalesCd Root 구분자가 #임
+	</select>	
+	
+	<select id="selectBomInfo" parameterType="Map" resultType="CamelMap">
+			SELECT * 
+			  FROM TB_BM14M01 T
+			 WHERE  T.FILE_TRGT_KEY	= #{fileTrgtKey}	 
+	</select>	
+	
+	<select id="selectBomAllCostList" parameterType="Map" resultType="CamelMap">
+	/* selectBomAllCostList */
+			SELECT 	CASE WHEN T.LOWER_CD = #{fileTrgtKey} THEN '' ELSE T.UPPER_CD END PID  
+				   , T.LOWER_CD ID 
+				   , decode(T.BOM_TYPE,'M',T.MATR_CD, T.LOWER_NM) VIEW_ID 	   
+				   --, (LEVEL-1)  LVL
+				   , REGEXP_REPLACE(SYS_CONNECT_BY_PATH('', '.'), '^\s+\-\>\s+', '.')|| (LEVEL-1) as LVL
+				   , REGEXP_REPLACE(SYS_CONNECT_BY_PATH(T.LOWER_NM, ' -> '), '^\s+\-\>\s+', '') as PATH
+				   , FN_CM05M01_CD_TO_NM(M.MATR_UNIT) MATR_UNIT_CD_NM
+			       , M.MATR_WT
+			       , M.MATR_UPR   --최종구매단가
+			       , M.MATR_AVRG_UPR  --평균구매단가
+			       , TO_CHAR(M.MATR_LAST_TRST_DT,'YYYY-MM-DD') MATR_LAST_TRST_DT  --최종거래일자
+			       , M.MATR_UPR * T.BOM_QTY AS PART_AMT
+			       , T.*
+			  FROM BOM_TEMP T
+			  				LEFT OUTER JOIN TB_BM05M01 AS M   ON T.MATR_CD  = M.MATR_CD 
+			  				LEFT OUTER JOIN BOM_TEMP   AS B   ON T.UPPER_CD = B.LOWER_CD
+			 WHERE T.SALES_CD = #{salesCd}
+			   AND T.CO_CD    = #{coCd}		 
+			 START WITH T.LOWER_CD =  #{fileTrgtKey}	
+		     CONNECT BY PRIOR T.LOWER_CD = T.UPPER_CD
+		     ORDER BY PATH
+	</select>	
+	
+	<select id="selectBomAllEnterListCount" parameterType="Map" resultType="int">
+	/* selectBomAllEnterListCount */
+				SELECT 	count(*)
+			       FROM
+						(SELECT CO_CD, SALES_CD, LOWER_KEY, LOWER_CD, DSGN_NO, min(MATR_NM) MATR_NM, min(MATR_RMK) MATR_RMK
+					              FROM TB_BM14M01 T		     
+							     WHERE T.UPPER_CD = '#'
+								<if test="coCd != null and !coCd.equals('')">
+								   AND T.CO_CD   = #{coCd}
+								</if>
+								<if test="salesCd != null and !salesCd.equals('')">
+								   AND T.SALES_CD  LIKE  '%'||#{salesCd}||'%'
+								</if>
+							     GROUP BY CO_CD, SALES_CD, LOWER_KEY, LOWER_CD, DSGN_NO
+						) AS MST 
+							     INNER JOIN (
+							     				SELECT CO_CD, SALES_CD, count(LOWER_KEY) - 1 AS BOM_CNT
+									              FROM TB_BM14M01 T
+									             WHERE 1=1	
+												<if test="coCd != null and !coCd.equals('')">
+												   AND T.CO_CD   = #{coCd}
+												</if>
+												<if test="salesCd != null and !salesCd.equals('')">
+												   AND T.SALES_CD  LIKE  '%'||#{salesCd}||'%'
+												</if>
+											     GROUP BY CO_CD, SALES_CD
+							     			) AS DTL  ON MST.CO_CD      =  DTL.CO_CD
+							     			         AND MST.SALES_CD   =  DTL.SALES_CD
+						     LEFT OUTER JOIN TB_CR02D02 CD  ON MST.CO_CD      =  CD.CO_CD
+						     			        	       AND MST.SALES_CD   =  CD.SALES_CD
+						     LEFT OUTER JOIN TB_CR02M01 CM  ON MST.CO_CD      =  CM.CO_CD
+						     			        	       AND CD.ORDRS_NO    =  CM.ORDRS_NO
+						 	 LEFT OUTER JOIN TB_BM02M01  B  ON CM.ORDRS_CLNT_CD     =  B.CLNT_CD
+				WHERE 1=1
+					<if test="clntCd != null and !clntCd.equals('')">
+					   AND CM.ORDRS_CLNT_CD   = #{clntCd}
+					</if>
+					<if test="clntNm != null and !clntNm.equals('')">
+					   AND B.CLNT_NM   LIKE  '%'||#{clntNm}||'%'
+					</if>
+	</select>
+	
+	<select id="selectBomAllEnterList" parameterType="Map" resultType="CamelMap">
+	/* selectBomAllEnterList */
+		SELECT *
+		  FROM
+			(SELECT T.*
+				     , ROWNUM AS RN 
+			  FROM
+				(SELECT 	MST.*, 
+				     		FN_CM05M01_CD_TO_NM(MST.CO_CD)  CO_CD_NM,
+				     		CD.ORDRS_NO,
+				     		CD.EQP_NM,
+				     		CD.ORDRS_DTL_DIV10, 
+				     		FN_CM05M01_CD_TO_NM(CD.ORDRS_DTL_DIV10)  ORDRS_DTL_DIV10_NM,
+				     		CD.PRDT_CD,
+				     		FN_BM01M01_ID_TO_NM(CD.PRDT_CD) PRDT_CD_NM,
+				     		CD.ITEM_DIV, 
+				     		FN_CM05M01_CD_TO_NM(CD.ITEM_DIV)  ITEM_DIV_NM,
+				     		CD.ORDRS_DTL_DIV20, 
+				     		FN_CM05M01_CD_TO_NM(CD.ORDRS_DTL_DIV20)  ORDRS_DTL_DIV20_NM,
+				     		CD.ORDRS_DTL_DIV30,
+				     		FN_CM05M01_CD_TO_NM(CD.ORDRS_DTL_DIV30)  ORDRS_DTL_DIV30_NM,
+				     		CM.ORDRS_CLNT_CD,
+				     		B.CLNT_NM,
+				     		FN_CM05M01_CD_TO_NM(CM.ORDRS_CLNT_CD)  ORDRS_CLNT_CD_NM,
+				     		CM.CLNT_PJT,
+				     		FN_CM05M01_CD_TO_NM(CM.CLNT_PJT)  CLNT_PJT_NM,
+				     		CM.CTRT_NM,
+				     		DTL.BOM_CNT
+			       FROM
+						(SELECT CO_CD, SALES_CD, LOWER_KEY, LOWER_CD, DSGN_NO, min(MATR_NM) MATR_NM, min(MATR_RMK) MATR_RMK
+					              FROM TB_BM14M01 T		     
+							     WHERE T.UPPER_CD = '#'
+								<if test="coCd != null and !coCd.equals('')">
+								   AND T.CO_CD   = #{coCd}
+								</if>
+								<if test="salesCd != null and !salesCd.equals('')">
+												   AND T.SALES_CD  LIKE  '%'||#{salesCd}||'%'
+								</if>
+							     GROUP BY CO_CD, SALES_CD, LOWER_KEY, LOWER_CD, DSGN_NO
+						) AS MST 
+							     INNER JOIN (
+							     				SELECT CO_CD, SALES_CD, count(LOWER_KEY) - 1 AS BOM_CNT
+									              FROM TB_BM14M01 T
+									             WHERE 1=1	
+												<if test="coCd != null and !coCd.equals('')">
+												   AND T.CO_CD   = #{coCd}
+												</if>
+												<if test="salesCd != null and !salesCd.equals('')">
+												   AND T.SALES_CD  LIKE  '%'||#{salesCd}||'%'
+												</if>
+											     GROUP BY CO_CD, SALES_CD
+							     			) AS DTL  ON MST.CO_CD      =  DTL.CO_CD
+							     			         AND MST.SALES_CD   =  DTL.SALES_CD
+						     LEFT OUTER JOIN TB_CR02D02 CD  ON MST.CO_CD      =  CD.CO_CD
+						     			        	       AND MST.SALES_CD   =  CD.SALES_CD
+						     LEFT OUTER JOIN TB_CR02M01 CM  ON MST.CO_CD      =  CM.CO_CD
+						     			        	       AND CD.ORDRS_NO    =  CM.ORDRS_NO
+						 	 LEFT OUTER JOIN TB_BM02M01  B  ON CM.ORDRS_CLNT_CD     =  B.CLNT_CD
+				WHERE 1=1
+					<if test="clntCd != null and !clntCd.equals('')">
+					   AND CM.ORDRS_CLNT_CD   = #{clntCd}
+					</if>
+					<if test="clntNm != null and !clntNm.equals('')">
+					   AND B.CLNT_NM   LIKE  '%'||#{clntNm}||'%'
+					</if>
+				) T
+				ORDER BY CO_CD, CLNT_NM, CLNT_PJT_NM, SALES_CD, DSGN_NO
+			) T
+		WHERE  RN BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>	
+	
+	<select id="selectBomAllLevelTempList" parameterType="Map" resultType="CamelMap">
+	/* selectBomAllLevelTempList */
+				SELECT 	CASE WHEN T.LOWER_KEY = (SELECT LOWER_KEY FROM TB_BM14M01_TMP WHERE SALES_CD = T.SALES_CD AND CO_CD = T.CO_CD AND UPPER_CD = '#') THEN '' ELSE T.UPPER_KEY END PID,  
+					T.LOWER_KEY ID ,
+					(LEVEL-1)  LVL,
+					REGEXP_REPLACE(SYS_CONNECT_BY_PATH(T.LOWER_CD, ' -> '), '^\s+\-\>\s+', '') as PATH,
+					FN_CM05M01_CD_TO_NM(T.MATR_UNIT_CD) MATR_UNIT_CD_NM,
+					T.* 
+			       , M.MATR_WT
+			       , M.MATR_UPR   --최종구매단가
+			       , M.MATR_AVRG_UPR  --평균구매단가
+			       , M.MATR_LAST_TRST_DT  --최종거래일자
+			       , M.MATR_UPR * T.LOWER_QTY AS PART_AMT
+			  FROM TB_BM14M01_TMP T
+			  				LEFT OUTER JOIN  TB_BM05M01 AS M   ON T.MATR_CD  = M.MATR_CD 
+			 WHERE T.SALES_CD = #{salesCd, jdbcType=VARCHAR}
+			   AND T.CO_CD    = #{coCd, jdbcType=VARCHAR}	 
+			 START WITH T.LOWER_KEY =  (SELECT LOWER_KEY FROM TB_BM14M01_TMP WHERE SALES_CD = T.SALES_CD AND CO_CD = T.CO_CD AND UPPER_CD = '#')
+		     CONNECT BY PRIOR T.LOWER_KEY = T.UPPER_KEY
+		     ORDER BY PATH
+	</select>
+	
+	
+	<select id="callBomTempUpd" statementType="CALLABLE" parameterType="map">
+	/* callBomTempUpd */
+        {call SP_BOM_TEMP_UPD(
+	        #{coCd      , mode=IN, jdbcType=VARCHAR},
+	        #{ordrsNo   , mode=IN, jdbcType=VARCHAR},
+	        #{salesCd   , mode=IN, jdbcType=VARCHAR},
+	        #{errMsg     , mode=OUT, jdbcType=VARCHAR}
+	    )}
+    </select>
+    
+		
+</mapper>
