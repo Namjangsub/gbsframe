@@ -385,11 +385,15 @@ public class SM14SvcImpl implements SM14Svc {
 		paramMap.put("cmpletYn", "Y");
 		paramMap.put("pchsQty", "1");
 		paramMap.put("matrCd", "");
-		//매입확정번호 및 자료 생성
-		result = sm14Mapper.insertPurchaseBillDetailNew(paramMap);
 
 		String ordrgNo = paramMap.get("ordrgNo");
 		String orderPrefix = ordrgNo.substring(0, 4);
+		if (orderPrefix.equals("COST")) {
+			paramMap.put("inNo", ordrgNo);
+		}
+		//매입확정번호 및 자료 생성
+		result = sm14Mapper.insertPurchaseBillDetailNew(paramMap);
+
 		if (orderPrefix.equals("COST")) {
 			result += sm14Mapper.updateETCIpgoDataPurchaseBillNo(paramMap);
 		} else {
