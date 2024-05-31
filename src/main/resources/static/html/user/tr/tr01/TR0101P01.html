@@ -155,7 +155,7 @@
 			</td>
 			<th class="hit">운송금액</th>
 			<td>
-				<input type="text" id="transAmt" name="transAmt" class="form-control" onkeyup="chechChange(this);" comma  class="hit" msg="운송금액">
+				<input type="text" id="transAmt" name="transAmt" class="form-control" onkeyup="chechChange(this);" comma  required msg="운송금액">
 			</td>
 			<th>화물중량<br>(kg)</th>
 			<td>
@@ -175,11 +175,21 @@
 			<td colspan="7">
 				<textarea class="form-control" id="transRmk" name="transRmk" msg="비고" style="height: 60px;" maxlength="1000"></textarea>
 			</td>			
-        </tr>
+        </tr> 
+        
+      	
       </table>
     </form>
 	</div>
 
+	<!-- 콘텐츠1 -->
+	<div class="contents_tit">
+		<!-- 리스트 -->
+		<div class="ax5_grid">
+			<div id="turnKeyGrid" class="ax5_grid" data-ax5grid="transTarget-grid" data-ax5grid-config="{}" style="height: 300px;"></div>
+		</div>
+	</div>
+	
 	<!-- 공통 파일 영역 -->
 	<div id="fileList_area" style="margin-bottom: 30px;"></div>
 	
@@ -195,7 +205,90 @@
 	/***********전역변수****************/
 	let actionType = null;
 	let fileTrgtKey = null;
-	
+
+
+	var transTargetGridView = {
+        initView: function () {
+            this.target = new ax5.ui.grid();
+            this.target.setConfig({
+                showRowSelector: true,
+                multipleSelect: true,
+                target: $('[data-ax5grid="transTarget-grid"]'),
+                header: {
+                    align: "center",
+                    selector: true
+                },
+                body: {
+                    onClick: function () {
+                        this.self.select(this.dindex);
+                    },
+                    onDBLClick: function () {
+                    },
+                    onDataChanged: function () {
+                    },
+                },
+                page: {
+                    navigationItemCount: 9,
+                    height: 30,
+                    display: true,
+                    firstIcon: '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+                    prevIcon: '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+                    nextIcon: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+                    lastIcon: '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+                    onChange: function () {
+                        transTargetGridView.setData(this.page.selectPage);
+                    }
+                },
+				columns : [
+					{key : "coCd", 			  label : "회사",          hidden : true},
+					{key : "coCdNm", 		  label : "회사명",        align : "center", 	width : 80, hidden : true},
+					{key : "ordrsNo", 		  label : "수주번호",      align : "center", 	width : 60},
+					{key : "salesCd", 		  label : "Sales Code",   align : "left", 	width : 170},
+// 					{key : "eqpNm", 		  label : "설비명",        align : "center", width : 240},
+					{key : "eqpNm", 		  label : "설비명",        align : "left", 	width : "*"},
+					{key : "chkSaveCd" ,	  label : "턴키여부",		align: "center",	width: 60, align: "center", formatter: function () { return this.value =="Y" ? "대상":""; }},
+					{key : "ordrsClntCd", 	  label : "고객사",        hidden : true},
+					{key : "ordrsClntNm", 	  label : "고객사명",      align : "left", width : "*"},
+					{key : "clntPjt", 		  label : "고객사 PJT",    align : "center", width : 100, hidden : true},
+					{key : "clntPjtNm", 	  label : "프로젝트",    	align : "center", width : 80, hidden : false},
+					{key : "ordrsDtlDiv20",   label : "신작구분",      hidden : true},
+					{key : "ordrsDtlDiv20Nm", label : "신작구분",      align : "center", width : 60},
+					{key : "prdtCd", 		  label : "제품구분",      hidden : true},
+					{key : "prdtCdNm", 		  label : "제품",        align : "left", width : 180},
+					{key : "itemDiv", 		  label : "아이템구분",    align : "center", width: 100, hidden : true},
+					{key : "itemDivNm", 	  label : "아이템",    align : "left", width: 120},
+					{key : "orgnSalesCd", 	  label : "원 Sales Code", align : "left", width : 140},
+				]
+            });
+            return this;
+        },
+		setData : function(_pageNo) {
+			var targetObj = this.target;
+			var paramObj = {};
+			paramObj.pageNo = _pageNo + 1;
+			paramObj.recordCnt = 999999;
+
+			paramObj.coCd = $("#transOrdrsCoCd").val();		
+			paramObj.ordrsNo = $("#transOrdrsNo").val();
+			paramObj.fileTrgtKey = $("#fileTrgtKey").val();
+			var searchValue = paramObj.searchValue;
+			var searchType  = paramObj.searchType;
+			postAjax("/user/tr/tr01/selectTransTargetSalesCodeList", paramObj, null, function(data) {
+				var list = data.result;
+				$.each(list, function (idx, elem) {
+					list[idx].__selected__ = elem.chkSaveCd=="Y" ? true : false;	//저장된 salesCd 이면 선택되게 변경 처리함
+				});
+				targetObj.setData({
+					list : list,
+					page : {
+						totalElements : list.length,
+					}
+				});
+		        localgridResize(list.length+1); //그리드 높이 조정
+			});
+		}
+    };
+
 	$(document).ready(function() {
 
 		setCommonSelect($(".popup_area select[data-kind]"));
@@ -210,11 +303,13 @@
 		actionType = modalStack.last().paramObj.actionType;
 		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
 
+	    transTargetGridView.initView();
 		if (actionType == "C") {
 			$("#actionBtn").text("등록");
 			//참조키값이 있으면 자료를 불러옴.
 			if (fileTrgtKey){
 				selectTransInfo(fileTrgtKey);
+				transTargetGridView.setData(0);
 			}
 			
 			$('#actionBtn').on("click", function() {
@@ -224,6 +319,7 @@
 		} else if (actionType == "U") {
 			$('.tit').text('배차관리 수정')
 			selectTransInfo(fileTrgtKey);
+			transTargetGridView.setData(0);
 			
 			$('#actionBtn').text("수정");
 			$('#actionBtn').on("click", function() {
@@ -251,8 +347,7 @@
 		var formData = {
 			"fileTrgtKey" 	: _fileTrgtKey,
 		}
-	debugger;
-		postAjax("/user/tr/tr01/selectTransInfo", formData, null, function(data) {
+		postAjaxSync("/user/tr/tr01/selectTransInfo", formData, null, function(data) {
 			if (actionType == "C") {
 				data.result.fileTrgtKey = 0;
 				data.result.transAmt = 0;
@@ -274,7 +369,14 @@
 					}
 				}
 			});
-	        
+
+//             var contractDetails = data.result.details;
+//             transTargetGridView.setData({
+//                 list: contractDetails,
+//                 page: {
+//                     totalElements: contractDetails.length
+//                 }
+//             });
 			//마감체크
 			monthCloseChk($('#transDt').val(), '', $('#coCd').val());
 				
@@ -325,6 +427,12 @@
 	//----------------------------------------------//
 	
 	function makeFormData() {
+		if (gPasFloatChk($('#transAmt').val()) == 0 ) {
+			alert("운송금액을 입력하세요!");
+			$('#transAmt').focus();
+			return false;
+		}
+		
 		// 금액 콤마 제거
 		$.each($('.popup_area input[comma]'), function(idx, elem) {
 			deleteComma(elem);
@@ -346,6 +454,15 @@
 		
 		//---------------------------------------------------------------  
         
+		//턴키 등록용 그리드 Sales Code 정보 
+		let turnKeyList = transTargetGridView.target.getList("selected");
+		if (turnKeyList.length > 0 ) {
+			$.each(turnKeyList, function (idx, elem) {
+				// 선택된 정보만 저장
+				if (idx==0) firstSalesCd = turnKeyList[idx].salesCd; //SalesCd는 상세내역에 있음. 대표 세일즈코드 (선택된것중에 첫번째)
+	        });
+			formData.append("detailArr", JSON.stringify(turnKeyList));
+		}
         //---------------------------------------------------------------  
 		var fileUploadArr = [];
 		var tempArr = [];
@@ -443,11 +560,21 @@
             $('#clntPjt').val(row.clntPjtCd);
             $('#clntPjtNm').val(row.clntPjtNm);
             $('#ctrtNm').val(row.ctrtNm);
+
+    		transTargetGridView.initView().setData(0);
         });
     }
 
     function chechChange(elm) {
     	elm.value = addCommaStr(gPasIntChk(elm.value));
+    }
+
+    function localgridResize(size) {
+            let tagHeight = (size) * 27 + 25 ;
+            tagHeight = tagHeight > 750 ? 750 : tagHeight;
+            tagHeight = tagHeight < 300 ? 300 : tagHeight;
+            
+            transTargetGridView.target.setHeight(tagHeight);
     }
     
 </script>

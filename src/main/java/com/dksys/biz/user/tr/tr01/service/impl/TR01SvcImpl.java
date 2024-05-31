@@ -83,6 +83,21 @@ public class TR01SvcImpl implements TR01Svc {
 	//---------------------------------------------------------------  
 
 	int result = tr01Mapper.updateTrans(paramMap);
+	
+	List<Map<String, String>> detailArr = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+	//일단 날리고
+	tr01Mapper.deleteTransTargetDetail(paramMap);
+	//턴키 저장
+	if (detailArr != null && !detailArr.isEmpty()) {
+		for (Map<String, String> detailMap : detailArr) {
+				detailMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+				detailMap.put("transRmk", paramMap.get("transRmk"));
+				detailMap.put("userId", paramMap.get("userId"));
+				detailMap.put("pgmId", paramMap.get("pgmId"));
+				
+				result += tr01Mapper.insertTransTargetDetail(detailMap);
+		}
+	}
 
 	//---------------------------------------------------------------  
 	//첨부 화일 처리 시작 
@@ -129,6 +144,21 @@ public class TR01SvcImpl implements TR01Svc {
 		
 		int result = tr01Mapper.insertTrans(paramMap);
 	
+		List<Map<String, String>> detailArr = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+		//일단 날리고
+		tr01Mapper.deleteTransTargetDetail(paramMap);
+		//턴키 저장
+		if (detailArr != null && !detailArr.isEmpty()) {
+			for (Map<String, String> detailMap : detailArr) {
+					detailMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+					detailMap.put("transRmk", paramMap.get("transRmk"));
+					detailMap.put("userId", paramMap.get("userId"));
+					detailMap.put("pgmId", paramMap.get("pgmId"));
+					
+					result += tr01Mapper.insertTransTargetDetail(detailMap);
+			}
+		}
+	
 		
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
@@ -168,6 +198,9 @@ public class TR01SvcImpl implements TR01Svc {
 		//---------------------------------------------------------------  
 	    int result = tr01Mapper.deleteTrans(paramMap);
 
+	    //상세내역 삭제
+	    result += tr01Mapper.deleteTransTargetDetail(paramMap);
+
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------  
@@ -183,5 +216,11 @@ public class TR01SvcImpl implements TR01Svc {
 	    return result;
   }
 	
-	  
+
+	
+	@Override
+	public List<Map<String, String>> selectTransTargetSalesCodeList(Map<String, String> paramMap) {
+		return tr01Mapper.selectTransTargetSalesCodeList(paramMap);
+	}
+  
 }

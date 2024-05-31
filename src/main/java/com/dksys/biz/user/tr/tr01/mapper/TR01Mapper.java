@@ -23,5 +23,11 @@ public interface TR01Mapper {
 
   int deleteTrans(Map<String, String> paramMap);
 
+  List<Map<String, String>> selectTransTargetSalesCodeList(Map<String, String> paramMap);
+
+  int deleteTransTargetDetail(Map<String, String> paramMap);
+
+  int insertTransTargetDetail(Map<String, String> detailMap);
+
   
 }

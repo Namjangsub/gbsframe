@@ -120,7 +120,10 @@
 	</select>
 
 
-  <select id="selectTransInfo" parameterType="map" resultType="CamelMap">
+  <resultMap id="resultInfoMap" type="CamelMap">
+      <collection select="selectTransTargetSalesCodeList" property="details" column="{coCd=TRANS_ORDRS_CO_CD, ordrsNo=TRANS_ORDRS_NO, fileTrgtKey=FILE_TRGT_KEY}" ofType="CamelMap"/>
+  </resultMap>
+  <select id="selectTransInfo" parameterType="map" resultMap="resultInfoMap">
           SELECT  M.FILE_TRGT_KEY
 				, M.CO_CD
 				, TO_CHAR(M.TRANS_DT, 'YYYY-MM-DD') AS TRANS_DT
@@ -163,10 +166,47 @@
   </select>
   
 
+
+  <select id="selectTransTargetSalesCodeList" parameterType="Map" resultType="camelMap">
+  /* selectTurnKeySalesCodeList */
+            SELECT 
+                 X.CO_CD, -- 회사코드
+                 FN_CM05M01_CD_TO_NM(X.CO_CD) 			AS CO_CD_NM,
+                 X.ORDRS_NO, -- 수주번호
+                 X.SALES_CD, -- SALES CODE
+                 NVL2(D.SALES_CD, 'Y', 'N') 			AS CHK_SAVE_CD, 
+                 Y.ORGN_SALES_CD, -- 원천 SALES CODE
+                 Y.ORDRS_CLNT_CD, -- 고객사
+                 A.CLNT_NM  							AS ORDRS_CLNT_NM,
+                 Y.CLNT_PJT, -- 고객사 PJT
+                 FN_CM05M01_CD_TO_NM(Y.CLNT_PJT) 		AS CLNT_PJT_NM, -- 고객사 PJT명
+                 X.ORDRS_DTL_DIV20, -- 신작구분
+                 FN_CM05M01_CD_TO_NM(X.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+                 X.PRDT_CD, -- 제품구분
+                 P.PRDT_NM  PRDT_CD_NM,
+                 X.ITEM_DIV, -- 아이템구분
+                 FN_CM05M01_CD_TO_NM(X.ITEM_DIV) ITEM_DIV_NM,
+                 X.EQP_NM -- 설비명
+            FROM TB_CR02D02 X
+                  INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
+                                          AND X.ORDRS_NO = Y.ORDRS_NO
+                  LEFT OUTER JOIN TB_BM01M01 P ON X.PRDT_CD = P.PRDT_CD  --제품마스터
+                  LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터
+                  LEFT OUTER JOIN TB_TR01D02 D ON X.CO_CD = D.ORDRS_CO_CD 
+                  								AND X.ORDRS_NO = D.ORDRS_NO
+                  								AND X.SALES_CD = D.SALES_CD
+                  								AND D.FILE_TRGT_KEY  = #{fileTrgtKey}
+          WHERE X.CO_CD = #{coCd}
+            AND X.ORDRS_NO = #{ordrsNo}                
+            AND X.SALES_CD IS NOT NULL
+          ORDER BY X.ORDRS_NO, X.SALES_CD
+  </select>
+	
 	
   <select id="selectTransSeqNext" parameterType="Map" resultType="String">
 	 SELECT 'TR' || TO_CHAR(SYSDATE, 'YY')||LPAD( NVL(max(TO_NUMBER(SUBSTR(FILE_TRGT_KEY,3,10))),0) + 1,4,0) 
 	   FROM TB_TR01M01
+	   WHERE SUBSTR(FILE_TRGT_KEY,1,2) = TO_CHAR(SYSDATE, 'YY')
   </select>
   
   
@@ -251,4 +291,37 @@
     DELETE TB_TR01M01 M WHERE M.FILE_TRGT_KEY  = #{fileTrgtKey}
   </delete>
   
+  <insert id="insertTransTargetDetail" parameterType="Map">
+    INSERT INTO TB_TR01D02
+      (
+		FILE_TRGT_KEY,
+		TRANS_SEQ,
+		ORDRS_CO_CD,
+		ORDRS_NO,
+		SALES_CD,
+		TRANS_RMK,
+		CREAT_ID,       
+		CREAT_PGM,      
+		CREAT_DTTM
+      )
+    VALUES
+    (
+		#{fileTrgtKey},
+		(SELECT NVL(max(TRANS_SEQ),0)+1 FROM TB_TR01D02 WHERE FILE_TRGT_KEY = #{fileTrgtKey}),
+		#{coCd},
+		#{ordrsNo},
+		#{salesCd},
+		#{transRmk,  jdbcType=VARCHAR},
+		#{userId},
+		#{pgmId},
+		SYSDATE
+    )
+  </insert>
+  			
+  <delete id="deleteTransTargetDetail" parameterType="Map">
+    DELETE TB_TR01D02
+     WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+  </delete>
+  
+   
 </mapper>

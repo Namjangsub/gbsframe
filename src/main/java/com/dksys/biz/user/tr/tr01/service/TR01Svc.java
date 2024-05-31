@@ -19,4 +19,6 @@ public interface TR01Svc {
 
   int deleteTrans(Map<String, String> paramMap) throws Exception;
 
+  List<Map<String, String>> selectTransTargetSalesCodeList(Map<String, String> paramMap);
+
 }

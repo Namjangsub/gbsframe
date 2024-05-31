@@ -98,4 +98,13 @@ public class TR01Ctr {
 	  	return "jsonView";
   }
 
+
+  //salesCode 리스트 조회
+  @PostMapping(value = "/selectTransTargetSalesCodeList")
+  public String selectTransTargetSalesCodeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    List<Map<String, String>> result = tr01Svc.selectTransTargetSalesCodeList(paramMap);
+    model.addAttribute("result", result);
+    return "jsonView";
+  }
+  
 }
