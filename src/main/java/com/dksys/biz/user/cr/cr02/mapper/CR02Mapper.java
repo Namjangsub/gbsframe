@@ -101,4 +101,6 @@ public interface CR02Mapper {
 	int updateOrdrsDetailSoonban(Map<String, String> param);
 
     List<Map<String, String>> selectOrderChangeTitle(Map<String, String> paramMap);
+
+	int clmnPlanRmkUpdate(Map<String, String> dtl);
 }

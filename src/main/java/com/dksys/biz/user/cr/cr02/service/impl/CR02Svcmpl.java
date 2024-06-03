@@ -1048,4 +1048,22 @@ public class CR02Svcmpl implements CR02Svc {
 	public List<Map<String, String>> selectOrderChangeTitle(Map<String, String> paramMap) {
 		return cr02Mapper.selectOrderChangeTitle(paramMap);
 	}
+    
+	//수금관리사항 수정 처리
+	@Override
+	public int clmnPlanRmkUpdate(Map<String, String> paramMap)  throws Exception {
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
+		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);	
+		
+		int result = 0;	    	    
+		String jobType = paramMap.get("jobType");	    	    
+	    //upate
+		for(Map<String, String> dtl : detailMap) {
+			dtl.put("pgmId", paramMap.get("pgmId"));
+			dtl.put("userId", paramMap.get("userId"));
+			result += cr02Mapper.clmnPlanRmkUpdate(dtl);
+		}
+		return result;
+	}
 }
