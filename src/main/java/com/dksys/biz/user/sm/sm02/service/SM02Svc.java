@@ -35,7 +35,10 @@ public interface SM02Svc {
 	
 	List<Map<String, String>> selectCurrToday(Map<String, String> paramMap);	
 	
-	String selectCurrMatrUpr(Map<String, String> paramMap);	
+	String selectCurrMatrUpr(Map<String, String> paramMap);
+
+	// 제한기준일자 조회
+	String selectordrglimit(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectInPurchaseChk(Map<String, String> paramMap);
 	

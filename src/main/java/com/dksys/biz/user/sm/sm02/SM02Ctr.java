@@ -169,7 +169,15 @@ public class SM02Ctr {
 		String resultList = sm02Svc.selectCurrMatrUpr(paramMap);
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
-	}	
+	}
+
+	// 제한기준일자 조회
+	@PostMapping(value = "/selectordrglimit")
+	public String selectordrglimit(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		String resultList = sm02Svc.selectordrglimit(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
 	
 	//발주삭제시 입고, 매입여부 체크
 	@PostMapping(value = "/selectInPurchaseChk")

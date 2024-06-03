@@ -296,8 +296,14 @@ public class SM02SvcImpl implements SM02Svc {
 	@Override
 	public String selectCurrMatrUpr(Map<String, String> paramMap) {
 		return sm02Mapper.selectCurrMatrUpr(paramMap);
-	}		
+	}
 
+	// 제한기준일자 조회
+	@Override
+	public String selectordrglimit(Map<String, String> paramMap) {
+		return sm02Mapper.selectordrglimit(paramMap);
+	}
+	
 	/* 발주삭제시 입고, 매입여부 체크  */
 	@Override
 	public List<Map<String, String>> selectInPurchaseChk(Map<String, String> paramMap) {
