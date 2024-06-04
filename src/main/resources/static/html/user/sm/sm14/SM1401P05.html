@@ -195,8 +195,8 @@
 			</td>
 			<th class="hit">확정일자</th>
 			<td>
-			     <input id="pchsDt" name="pchsDt"  class="input_calendar2" autocomplete="off" onkeyup="dateMask(this);"
-			              required="required" msg="확정일자" data-search="pchsDt" >		
+				<input id="pchsDt" name="pchsDt"  class="input_calendar2" autocomplete="off" onkeyup="dateMask(this);"
+					required="required" msg="확정일자" data-search="pchsDt" onchange="limit_date_chk(this.value);">
 			</td>
 			<th>비 고</th>
 			<td colspan = 1>
@@ -238,11 +238,14 @@
 	</div>
 
 <script type="text/javascript">
-var fileTrgtKeyU = null;		//list에서 받은값
-var salesCdU = null;			//list에서 받은값
-var ordrgNoU =  null;			//list에서 받은값
-var coCdU = null;
-
+	var fileTrgtKeyU = null;		//list에서 받은값
+	var salesCdU = null;			//list에서 받은값
+	var ordrgNoU =  null;			//list에서 받은값
+	var coCdU = null;
+	var limitDate = null;
+	var inDt = null;
+	var limit_yn = "N";
+	
 	var gridViewPopIn = {
 	    	initView: function(){
 				this.target = new ax5.ui.grid();
@@ -280,7 +283,7 @@ var coCdU = null;
 							 {key: "coCd", 				label: "회사코드", 			width: 80,		align: "center", 	hidden:true}
 							,{key: "pchsSeq",	    	label: "pchsSeq",			width: 70,		align: "center", 	hidden:true}						
 							,{key: "ordrgSeq",	    	label: "ordrgSeq",			width: 70,		align: "center", 	hidden:true}						
-//							,{key: "salesCd", 			label: "Sales Code", 	    width: 120,		align: "center"}
+							// ,{key: "salesCd", 			label: "Sales Code", 	    width: 120,		align: "center"}
 							,{key: "ordrgNo", 			label: "비용번호", 		    width: 90,		align: "center"}
 							,{key: "pchsNo", 			label: "매입번호", 		    width: 90,		align: "center"}
 							,{key: "pchsSeq", 			label: "매입순번", 		    width: 60,		align: "center"}
@@ -358,8 +361,7 @@ var coCdU = null;
 	var totalpchsAmt = null;
 
 	$(document).ready(function() {
-		
-	  	//확정일자//
+		//확정일자//
 		$('#pchsDt').datepicker({
 			format : "yyyy-mm-dd",
 			language : "ko",
@@ -367,7 +369,6 @@ var coCdU = null;
 		}).datepicker("setDate", new Date());
 	  	
 		$.initViewPop = function() {
-			
 			setCommonSelect($(".popup_area select[data-kind]"));
 			//setByCoCd(modalStack.last().paramObj.coCd);
 			$("#popForm #userId").val(jwt.userId);
@@ -382,10 +383,17 @@ var coCdU = null;
 			//전역 set
 			salesCdU = modalStack.last().paramObj.salesCd;
 			ordrgNoU = modalStack.last().paramObj.ordrgNo;	
-			coCdU = modalStack.last().paramObj.coCd;	
+			coCdU = modalStack.last().paramObj.coCd;
 			
-		//	$('.cost').find('input').prop('disabled', true);
-		//	$('.cost').find('select').prop('disabled', true);
+			// debugger;
+			// 제한일자 지정
+			limitDate = modalStack.last().paramObj.limitDate;
+
+			//입고일자 지정
+			inDt = modalStack.last().paramObj.inDt;
+			
+			//	$('.cost').find('input').prop('disabled', true);
+			//	$('.cost').find('select').prop('disabled', true);
 	
 			selectPchsCostInfo();
 	
@@ -399,61 +407,60 @@ var coCdU = null;
 			});
 			
 			$("#deleteDetailButton").on("click", function () {
-
-		    	if (selectGridValidation(gridViewPopIn.target)) return;
-		    	var row = gridViewPopIn.target.getList("selected")[0];
-
+				if (selectGridValidation(gridViewPopIn.target)) return;
+				var row = gridViewPopIn.target.getList("selected")[0];
+				
 				//마감일자 체크
 				if (!monthCloseChk(row.pchsDt,"", $('#coCd_S').val())) {
 					return false;
 				}
-		        var formData = {
-		                "coCd": row.coCd,
-		                "pchsNo": row.pchsNo,
-		                "ordrgSeq": row.ordrgSeq,
-		                "ordrgNo": row.ordrgNo,
-		                "userId" : jwt.userId,
-		            }
-// 		           	if (confirm("삭제하시겠습니까?")) {
-		                   deleteAjax("/user/sm/sm14/deletePurchaseDetail", formData, null, function (data) {
-// 	                           alert(data.resultMessage);
-		                       gridView.setData(0);
-		                       gridViewPopIn.setData(0);
-		                   });
-// 		             } 
 				
+				var formData = {
+					"coCd": row.coCd,
+					"pchsNo": row.pchsNo,
+					"ordrgSeq": row.ordrgSeq,
+					"ordrgNo": row.ordrgNo,
+					"userId" : jwt.userId,
+				}
+				// if (confirm("삭제하시겠습니까?")) {
+					deleteAjax("/user/sm/sm14/deletePurchaseDetail", formData, null, function (data) {
+						//alert(data.resultMessage);
+						gridView.setData(0);
+						gridViewPopIn.setData(0);
+					});
+				// }
 			});
-
 		}
 		
 		$.initViewPop();
 		$('#pchsDt').on('change', function() {
 			if (!monthCloseChk($('#pchsDt').val(),"", $('#coCd_S').val())) {
-// 				$('#pchsDt').val(moment().format("YYYY-MM-DD"));
+				// $('#pchsDt').val(moment().format("YYYY-MM-DD"));
 			}
 		});
-	});	
+	});
 	
-	function selectPchsCostInfo() {						//그리드에 뿌리는 데이터
+	function selectPchsCostInfo() {
+		//그리드에 뿌리는 데이터
 		var formData = {
 			"fileTrgtKey" : fileTrgtKey,
 		}
-
 		postAjax("/user/sm/sm10/selectPchsCostInfo", formData, null, function(data) {
-				$.each(data.result, function(key, value) {
-					if ($('#popForm #' + key)[0]) {
-						$('#popForm #' + key).val(value);
-						if ($('#popForm #' + key).is('[comma]')) {
-							onlyNumber($('#popForm #' + key)[0]);
-						}
+			$.each(data.result, function(key, value) {
+				if ($('#popForm #' + key)[0]) {
+					$('#popForm #' + key).val(value);
+					if ($('#popForm #' + key).is('[comma]')) {
+						onlyNumber($('#popForm #' + key)[0]);
 					}
-				});
+				}
+			});
+			// 제한일자 체크
+			limit_date_chk($('#pchsDt').val());
 		});
 	}
-
+	
 	// 등록 - done
 	function insertOrder() {
-			
 		if (inputValidation($('.popup_area [required]'))) {					// 필수 필드의 유효성 검사
 			var formData = makeFormData();									// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성    
 
@@ -462,7 +469,7 @@ var coCdU = null;
 					gridView.setData(0);
 					gridViewPopIn.setData(0);
 					setVat();
-// 					alert(data.resultMessage);								// 결과 메시지를 alert으로 출력
+					// alert(data.resultMessage);								// 결과 메시지를 alert으로 출력
 				});		
 			}
 		}
@@ -538,6 +545,38 @@ var coCdU = null;
 		let value = ivalue +' ';    	
 		const cvtValue = parseFloat(value.replace(/[^0-9.-]/g, '')); //숫자(0-9), 빼기 기호(-)가 아닌 모든 문자를 바꿉니다. 
 		return isNaN(cvtValue) ? 0 : cvtValue; //NaN이면 0로 대체 --> minus기호만 있는경우
+	}
+
+	//제한일자 체크
+	function limit_date_chk(chkValue) {
+		// monthCloseChk(chkValue);
+
+		//debugger;
+
+		limit_yn = "N";
+		
+		if (limitDate != null) {
+			if (limitDate > chkValue ) {
+				limit_yn = "Y";
+				alert('제한된 일자입니다. ' + limitDate + '일 이전은 데이터를 등록 및 수정할 수가 없습니다.');
+				//$('#actionBtn').remove();
+				$("#actionBtn").hide();
+			} else {
+				limit_yn = "N";
+				$("#actionBtn").show();
+			}
+		}
+
+		// 제한일자 위반이 아닌 경우 입고일자 체크
+		if (limit_yn == "N") {
+			if (inDt > chkValue ) {
+				alert('입고일 ' + inDt + ' 이전은 데이터를 등록 및 수정할 수가 없습니다.');
+				//$('#actionBtn').remove();
+				$("#actionBtn").hide();
+			} else {
+				$("#actionBtn").show();
+			}
+		}
 	}
 
 </script>
