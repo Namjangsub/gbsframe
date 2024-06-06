@@ -165,8 +165,8 @@
 			</td>
 			<th class="hit">확정일자</th>
 			<td>
-			     <input id="pchsDt" name="pchsDt"  class="input_calendar2" autocomplete="off" onkeyup="dateMask(this);"
-			              required="required" msg="확정일자" data-search="pchsDt" >		
+				<input id="pchsDt" name="pchsDt"  class="input_calendar2" autocomplete="off" onkeyup="dateMask(this);"
+					required="required" msg="확정일자" data-search="pchsDt"onchange="limit_date_chk(this.value);">
 			</td>
 			<th></th>
 			<td>
@@ -211,7 +211,10 @@
 	var salesCdU = null;			//list에서 받은값
 	var ordrgNoU =  null;			//list에서 받은값
 	var coCdU = null;
-
+	var limitDate = null;
+	var inDt = null;
+	var limit_yn = "N";
+	
 	var gridViewPopIn = {
 	    	initView: function(){
 				this.target = new ax5.ui.grid();
@@ -346,7 +349,13 @@
 			//전역 set
 			salesCdU = modalStack.last().paramObj.salesCd;
 			ordrgNoU = modalStack.last().paramObj.ordrgNo;	
-			coCdU = modalStack.last().paramObj.coCd;	
+			coCdU = modalStack.last().paramObj.coCd;
+			
+			// 제한일자 지정
+			limitDate = modalStack.last().paramObj.limitDate;
+
+			//입고일자 지정
+			inDt = modalStack.last().paramObj.inDt;
 			
 			//반품일자To//
 			$('#ioDt').datepicker({
@@ -363,7 +372,10 @@
 	
 			authChk();						// 권한체크
 			
-			gridViewPopIn.initView().setData(0);	
+			gridViewPopIn.initView().setData(0);
+			
+			// 제한일자 체크
+			limit_date_chk($('#pchsDt').val());
 			
 			$('#actionBtn').text("등록");
 			$('#actionBtn').on("click", function() {
@@ -371,27 +383,23 @@
 			});
 			
 			$("#deleteDetailButton").on("click", function () {
-				
-		    	if (selectGridValidation(gridViewPopIn.target)) return;
-		    	var row = gridViewPopIn.target.getList("selected")[0];
-		 		
-		        var formData = {
-		                "coCd": row.coCd,
-		                "pchsNo": row.pchsNo,
-		                "ordrgSeq": row.ordrgSeq,
-		                "ordrgNo": row.ordrgNo,
-		                "userId" : jwt.userId,
-		            }
-		           	if (confirm("삭제하시겠습니까?")) {
-		                   deleteAjax("/user/sm/sm14/deletePurchaseDetail", formData, null, function (data) {
-	                           alert(data.resultMessage);
-		                       gridView.setData(0);
-		                       gridViewPopIn.setData(0);
-		                   });
-		             } 
-				
+				if (selectGridValidation(gridViewPopIn.target)) return;
+				var row = gridViewPopIn.target.getList("selected")[0];
+				var formData = {
+					"coCd": row.coCd,
+					"pchsNo": row.pchsNo,
+					"ordrgSeq": row.ordrgSeq,
+					"ordrgNo": row.ordrgNo,
+					"userId" : jwt.userId,
+				}
+				if (confirm("삭제하시겠습니까?")) {
+					deleteAjax("/user/sm/sm14/deletePurchaseDetail", formData, null, function (data) {
+						alert(data.resultMessage);
+						gridView.setData(0);
+						gridViewPopIn.setData(0);
+					});
+				}
 			});
-
 		}
 		$.initViewPop();
 	});	
@@ -484,5 +492,37 @@
 	function pasIntChk (value) {
 		const cvtValue = parseInt(deleteCommaStr(value));
 		return isNaN(cvtValue) ? 0 : cvtValue;
+	}
+
+	//제한일자 체크
+	function limit_date_chk(chkValue) {
+		// monthCloseChk(chkValue);
+
+		//debugger;
+
+		limit_yn = "N";
+		
+		if (limitDate != null) {
+			if (limitDate > chkValue ) {
+				limit_yn = "Y";
+				alert('제한된 일자입니다. ' + limitDate + '일 이전은 데이터를 등록 및 수정할 수가 없습니다.');
+				//$('#actionBtn').remove();
+				$("#actionBtn").hide();
+			} else {
+				limit_yn = "N";
+				$("#actionBtn").show();
+			}
+		}
+
+		// 제한일자 위반이 아닌 경우 입고일자 체크
+		if (limit_yn == "N") {
+			if (inDt > chkValue ) {
+				alert('입고일 ' + inDt + ' 이전은 데이터를 등록 및 수정할 수가 없습니다.');
+				//$('#actionBtn').remove();
+				$("#actionBtn").hide();
+			} else {
+				$("#actionBtn").show();
+			}
+		}
 	}
 </script>
