@@ -24,7 +24,12 @@ var treeModule = (function () {
     	} else {
     		fileTempCocd = _coCd;
     	}
-    	
+    	//일정관리에서 이슈등록은 fileList_area영역이 일정관리와 이슈화면영역과 겹침 발생
+    	// $('#wbsPopupIss').length --> 이슈화면이 활성화 되어 있는지 확인하여
+    	// 이슈가 활성화 되어있으면 이전 팝업의 파일첨부영역 삭제처리하여 오류 발생 제거함
+    	if ($('#wbsPopupIss').length) {
+    		$("#wbsPopup #fileList_area").remove();
+    	}
         if ($("#fileList_area #fileAttachTxt").length > 0) {
             // console.log("#fileAttachTxt 요소가 존재합니다.");
         } else {
