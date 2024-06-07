@@ -22,4 +22,6 @@ public interface SM50Mapper {
 
 	List<Map<String, String>> selectBomAllEnterList(Map<String, String> paramMap);
 
+	Map<String, String> selectBomTrgtPchsPcostInfo(Map<String, String> paramMap);
+
 }

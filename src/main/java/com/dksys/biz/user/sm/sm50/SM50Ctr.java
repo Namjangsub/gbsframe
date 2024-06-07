@@ -49,6 +49,8 @@ public class SM50Ctr {
     	Map<String, String> resultTemp = sm50Svc.callBomTempUpd(paramMap);
     	List<Map<String, String>> result = sm50Svc.selectBomAllCostList(paramMap);
     	model.addAttribute("result", result);
+    	Map<String, String> pcostInfo = sm50Svc.selectBomTrgtPchsPcostInfo(paramMap);
+    	model.addAttribute("pcostInfo", pcostInfo);
     	return "jsonView";
     }
     

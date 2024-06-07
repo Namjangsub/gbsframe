@@ -63,4 +63,10 @@ public class SM50SvcImpl implements SM50Svc {
 	}
 	
 
+	
+	@Override
+	public Map<String, String> selectBomTrgtPchsPcostInfo(Map<String, String> paramMap) {
+		return bm50Mapper.selectBomTrgtPchsPcostInfo(paramMap);
+	}
+
 }
