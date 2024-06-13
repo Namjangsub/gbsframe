@@ -30,6 +30,11 @@ public class SM50SvcImpl implements SM50Svc {
 	
 	@Override
 	public List<Map<String, String>> selectBomCostTreeList(Map<String, String> paramMap) {
+
+    	Map<String, String> pcostInfo = sm50Svc.selectBomTrgtPchsPcostInfo(paramMap);
+	    // BOM비용 산정 프로시져 호출
+    	Map<String, String> resultTemp = sm50Svc.callBomTempUpd(paramMap);
+    	
 		return bm50Mapper.selectBomCostTreeList(paramMap);
 	}
 
@@ -40,6 +45,9 @@ public class SM50SvcImpl implements SM50Svc {
 	
 	@Override
 	public List<Map<String, String>> selectBomAllCostList(Map<String, String> paramMap) {
+	    // BOM비용 산정 프로시져 호출
+//    	Map<String, String> resultTemp = sm50Svc.callBomTempUpd(paramMap);
+    	
 		return bm50Mapper.selectBomAllCostList(paramMap);
 	}
 

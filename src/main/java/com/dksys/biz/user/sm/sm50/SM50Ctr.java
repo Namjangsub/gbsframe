@@ -29,6 +29,7 @@ public class SM50Ctr {
  // BOM 전체 정전개 트리 조회
     @PostMapping("/selectBomCostTreeList")
     public String selectBomCostTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	
     	List<Map<String, String>> result = sm50Svc.selectBomCostTreeList(paramMap);
     	model.addAttribute("result", result);
         return "jsonView";
@@ -46,7 +47,6 @@ public class SM50Ctr {
     @PostMapping("/selectBomAllCostList")
     public String selectBomAllCostList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 
-    	Map<String, String> resultTemp = sm50Svc.callBomTempUpd(paramMap);
     	List<Map<String, String>> result = sm50Svc.selectBomAllCostList(paramMap);
     	model.addAttribute("result", result);
     	Map<String, String> pcostInfo = sm50Svc.selectBomTrgtPchsPcostInfo(paramMap);
@@ -65,7 +65,7 @@ public class SM50Ctr {
     }
 	
     
-    // 업로드 내용 적용 프로시져 호출
+    // BOM비용 산정 프로시져 호출
     @PostMapping("/callBomTempUpd")
     public String callBomTempUpd(@RequestBody Map<String, String> paramMap, ModelMap model) {
     	Map<String, String> result = sm50Svc.callBomTempUpd(paramMap);
