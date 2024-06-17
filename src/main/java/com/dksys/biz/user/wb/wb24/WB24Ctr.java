@@ -140,5 +140,22 @@ public class WB24Ctr {
 	}
 	
 	
+
 	
+	@PutMapping(value = "/wbsIssueDelete")
+    public String wbsIssueDelete(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+  		try {
+  			if (wb24Svc.wbsIssueDelete(paramMap) != 0 ) {
+  				model.addAttribute("resultCode", 200); 
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+	  		} else {
+	  			model.addAttribute("resultCode", 500);
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+	  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  		    model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }
 }

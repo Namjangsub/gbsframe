@@ -29,4 +29,6 @@ public interface WB24Svc {
 
 	List<Map<String, String>> selectWbsIssueListDashboard(Map<String, String> paramMap);
 
+	int wbsIssueDelete(Map<String, String> paramMap) throws Exception;
+
 }

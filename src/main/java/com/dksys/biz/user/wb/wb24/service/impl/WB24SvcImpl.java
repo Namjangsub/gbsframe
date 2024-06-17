@@ -439,4 +439,70 @@ public class WB24SvcImpl implements WB24Svc {
 	public Map<String, String> select_wb2401p01_Info(Map<String, String> paramMap) {
 		return wb24Mapper.select_wb2401p01_Info(paramMap);
 	}
+
+	
+	@Override
+    public int wbsIssueDelete(Map<String, String> paramMap) throws Exception {
+	    
+	    //---------------------------------------------------------------  
+  		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+  	  	//   필수값 :  jobType, userId, comonCd
+  		//---------------------------------------------------------------  
+  	    HashMap<String, String> param = new HashMap<>();
+     	param.put("userId", paramMap.get("userId"));
+  	    
+	    List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
+        for (Map<String, String> deleteFile : deleteFileList) {
+			// 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
+			//접근 권한 없으면 Exception 발생
+			param.put("comonCd", deleteFile.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
+			param.put("jobType", "fileDelete");
+			cm15Svc.selectFileAuthCheck(param);
+		}
+  		//---------------------------------------------------------------  
+  		//첨부 화일 권한체크  끝  
+  		//---------------------------------------------------------------  
+
+		List<Map<String, String>> actChkList = wb24Mapper.actChk(paramMap);
+		//issNo에 해당하는 조치결과가 있으면 삭제 불가함.
+		int result = 0;
+		if (actChkList.size() > 0) {
+		    result = wb24Mapper.wbsIssueResultDelete(paramMap);
+//			thrower.throwCommonException("fail");
+		}
+
+		//issNo에 해당하는 이슈정보  삭제.
+	    result += wb24Mapper.wbsIssueDelete(paramMap);
+		//String todoTitle = "이슈번호 : " + paramMap.get("issNo") + ",   이슈제목 : " + paramMap.get("issSj");
+		
+		
+
+		//issNo에 해당하는 결재, 공유정보 삭제.
+    	//Key : CO_CD, SALES_CD, TODO_NO
+		paramMap.put("reqNo", paramMap.get("issNo"));
+		
+		QM01Mapper.deleteWbsSharngList1(paramMap);		//TODO_DIV2_CODE_ID = 'TODODIV1030'  WBS이슈-공유
+		QM01Mapper.deleteWbsApprovalList1(paramMap);	//TODO_DIV2_CODE_ID = 'TODODIV2060'  WBS이슈-결재
+		QM01Mapper.deleteWbsSharngList2(paramMap);		//TODO_DIV2_CODE_ID = 'TODODIV1090'  WBS조치-공유
+		QM01Mapper.deleteWbsApprovalList2(paramMap);	//TODO_DIV2_CODE_ID = 'TODODIV2090'  WBS조치-결재
+
+		//---------------------------------------------------------------  
+		//첨부 화일 처리 시작 
+//		//---------------------------------------------------------------  
+//	    if (uploadFileList.size() > 0) {
+//		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+//		    paramMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
+//		    cm08Svc.uploadFile(paramMap, mRequest);
+//	    }
+
+        for (Map<String, String> deleteFile : deleteFileList) {
+			// 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
+	    	cm08Svc.deleteFile(deleteFile.get("fileKey"));
+	    }
+		//---------------------------------------------------------------  
+		//첨부 화일 처리  끝 
+		//---------------------------------------------------------------  
+	    
+		return result;
+	}
 }

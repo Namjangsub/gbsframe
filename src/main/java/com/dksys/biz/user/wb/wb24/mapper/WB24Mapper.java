@@ -40,4 +40,8 @@ public interface WB24Mapper {
 	List<Map<String, String>> selectWbsIssueListDashboard(Map<String, String> paramMap);
 
 	List<Map<String, String>> select_wb24_shareUserchk(Map<String, String> paramMap);
+	
+	int wbsIssueDelete(Map<String, String> paramMap);
+	
+	int wbsIssueResultDelete(Map<String, String> paramMap);
 }
