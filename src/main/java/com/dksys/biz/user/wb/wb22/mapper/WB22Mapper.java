@@ -35,7 +35,9 @@ public interface WB22Mapper {
 	List<Map<String, String>> wbsPlanListChk(Map<String, String> paramMap);
 	
 	int deleteWbsPlanlist(Map<String, String> paramMap);
-	
+
+    int wbsLevel2MngIdUpdate(Map<String, String> paramMap);
+    
 	int wbsLevel2Delete(Map<String, String> paramMap);
 	
 	int wbsVerUpInsert(Map<String, String> paramMap);

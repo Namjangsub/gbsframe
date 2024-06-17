@@ -74,7 +74,7 @@ public class WB22SvcImpl implements WB22Svc {
 		if (sharngArr != null && sharngArr.size() > 0) {
 			int i = 0;
 			for (Map<String, String> sharngMap : sharngArr) {
-				try {
+//				try {
 					sharngMap.put("coCd", paramMap.get("coCd"));
 					
 					if(!sharngMap.containsKey("fileTrgtKey")) {
@@ -89,12 +89,23 @@ public class WB22SvcImpl implements WB22Svc {
 						result = wb22Mapper.wbsLevel1Insert(sharngMap);
 					}else {
 						result = wb22Mapper.wbsLevel1Update(sharngMap);
+						
+						//level2 Task정보 변경 처리
+						sharngMap.put("wbsPlanCodeKind", sharngMap.get("wbsPlanCodeId"));
+						String chkValue = sharngMap.get("wbsPlanMngId");
+						if (chkValue == null || chkValue.equals("")) {
+							//level1 담당자와 일정이 없으면 TASK등록된 일정 일괄 삭제처리
+							result = wb22Mapper.deleteWbsPlanlist(sharngMap);
+						} else {
+							//level1 담당자로 TASK 담당자 일괄 수정
+							result = wb22Mapper.wbsLevel2MngIdUpdate(sharngMap);
+						}
 					}
 					
 					i++;
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
+//				} catch (Exception e) {
+//					System.out.println("error2" + e.getMessage());
+//				}
 			}
 		}
 		return result;
@@ -108,11 +119,11 @@ public class WB22SvcImpl implements WB22Svc {
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (sharngArr != null && sharngArr.size() > 0) {
 			for (Map<String, String> sharngMap : sharngArr) {
-				try {
+//				try {
 					result = wb22Mapper.wbsLevel1Update(sharngMap);
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
+//				} catch (Exception e) {
+//					System.out.println("error2" + e.getMessage());
+//				}
 			}
 		}
 		return result;
@@ -134,7 +145,7 @@ public class WB22SvcImpl implements WB22Svc {
 		if (sharngArr != null && sharngArr.size() > 0) {
 			int i = 0;
 			for (Map<String, String> sharngMap : sharngArr) {
-				try {
+//				try {
 					//System.out.println(sharngMap.get("fileTrgtKey"));
 					if (sharngMap.get("fileTrgtKey").length() > 0) {
 						sharngMap.put("seq", String.valueOf(i + 1));
@@ -162,9 +173,9 @@ public class WB22SvcImpl implements WB22Svc {
 						result = wb22Mapper.wbsLevel2Insert(sharngMap);
 					}									
 					i++;
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
+//				} catch (Exception e) {
+//					System.out.println("error2" + e.getMessage());
+//				}
 			}
 		}
 		
@@ -172,13 +183,13 @@ public class WB22SvcImpl implements WB22Svc {
 		List<Map<String, String>> deleteRowArr = gson.fromJson(paramMap.get("deleteRowArr"), stringList1);
 		if (deleteRowArr != null && deleteRowArr.size() > 0) {
 			for (Map<String, String> sharngMap : deleteRowArr) {
-				try {
+//				try {
 					//실적먼저 지워져야함
 					wb22Mapper.wbsRsltsDelete(sharngMap);
 					result = wb22Mapper.wbsLevel2Delete(sharngMap);
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
+//				} catch (Exception e) {
+//					System.out.println("error2" + e.getMessage());
+//				}
 			}
 		}
 				
@@ -194,14 +205,14 @@ public class WB22SvcImpl implements WB22Svc {
 		if (sharngArr != null && sharngArr.size() > 0) {
 			int i = 0;
 			for (Map<String, String> sharngMap : sharngArr) {
-				try {
+//				try {
 					sharngMap.put("seq", String.valueOf(i + 1));
 					wb22Mapper.wbsVerUpInsert(sharngMap);
 					result++;
 					i++;
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
+//				} catch (Exception e) {
+//					System.out.println("error2" + e.getMessage());
+//				}
 			}
 			wb22Mapper.wbsVerUpUpdate(paramMap);
 		}
@@ -222,11 +233,20 @@ public class WB22SvcImpl implements WB22Svc {
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (sharngArr != null && sharngArr.size() > 0) {
 			for (Map<String, String> sharngMap : sharngArr) {
-				try {
+//				try {
 					result = wb22Mapper.wbsLevel1confirm(sharngMap);
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
+					sharngMap.put("wbsPlanCodeKind", sharngMap.get("wbsPlanCodeId"));
+					String chkValue = sharngMap.get("wbsPlanMngId");
+					if (chkValue == null || chkValue.equals("")) {
+						//level1 담당자와 일정이 없으면 TASK등록된 일정 일괄 삭제처리
+						result = wb22Mapper.deleteWbsPlanlist(sharngMap);
+					} else {
+						//level1 담당자로 TASK 담당자 일괄 수정
+						result = wb22Mapper.wbsLevel2MngIdUpdate(sharngMap);
+					}
+//				} catch (Exception e) {
+//					System.out.println("error2" + e.getMessage());
+//				}
 			}
 		}
 		return result;
@@ -241,11 +261,11 @@ public class WB22SvcImpl implements WB22Svc {
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (sharngArr != null && sharngArr.size() > 0) {
 			for (Map<String, String> sharngMap : sharngArr) {
-				try {
+//				try {
 					result = wb22Mapper.wbsLevel2confirm(sharngMap);
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
+//				} catch (Exception e) {
+//					System.out.println("error2" + e.getMessage());
+//				}
 			}
 		}
 		return result;
@@ -298,7 +318,7 @@ public class WB22SvcImpl implements WB22Svc {
 		if (sharngArr != null && sharngArr.size() > 0 ) {
 			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
-	            try {	 
+//	            try {	 
 	            	    sharngMap.put("reqNo", paramMap.get("wbsRsltsNo"));
 	            	    sharngMap.put("fileTrgtKey", paramMap.get("rsltsFileTrgtKey"));
 	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
@@ -308,9 +328,9 @@ public class WB22SvcImpl implements WB22Svc {
 	            	    sharngMap.put("todoTitle", todoTitle1);
 	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
 	            	i++;
-	            } catch (Exception e) {
-	                System.out.println("error2"+e.getMessage());
-	            }
+//	            } catch (Exception e) {
+//	                System.out.println("error2"+e.getMessage());
+//	            }
 	        }
 		}
 
@@ -325,7 +345,7 @@ public class WB22SvcImpl implements WB22Svc {
 		if (approvalArr != null && approvalArr.size() > 0 ) {
 			int i = 0;
 	        for (Map<String, String> approvalMap : approvalArr) {
-	            try {	 
+//	            try {	 
 		            	approvalMap.put("reqNo", paramMap.get("wbsRsltsNo"));
 		            	approvalMap.put("fileTrgtKey", paramMap.get("rsltsFileTrgtKey"));
 		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
@@ -335,9 +355,9 @@ public class WB22SvcImpl implements WB22Svc {
 		            	approvalMap.put("todoTitle", todoTitle2);
 	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
 	                	i++;
-	            } catch (Exception e) {
-	                System.out.println("error2"+e.getMessage());
-	            }
+//	            } catch (Exception e) {
+//	                System.out.println("error2"+e.getMessage());
+//	            }
 	        }
 		}
 		
@@ -506,11 +526,11 @@ public class WB22SvcImpl implements WB22Svc {
     @Override
 	public int wbsRsltsconfirm(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		int result = 0;
-		try {
+//		try {
 			result = wb22Mapper.wbsRsltsconfirm(paramMap);
-		} catch (Exception e) {
-			System.out.println("error2" + e.getMessage());
-		}
+//		} catch (Exception e) {
+//			System.out.println("error2" + e.getMessage());
+//		}
 		return result;
 	}
     
@@ -547,7 +567,7 @@ public class WB22SvcImpl implements WB22Svc {
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (sharngArr != null && sharngArr.size() > 0) {
 			for (Map<String, String> sharngMap : sharngArr) {
-				try {
+//				try {
 					//상위 코드
 					sharngMap.put("codeKind", paramMap.get("wbsPlanCodeId"));
 					//codeId 값이 없으면 insert
@@ -560,22 +580,22 @@ public class WB22SvcImpl implements WB22Svc {
 						result = wb22Mapper.wbsTaskTempletUpdate(sharngMap);
 					}
 					
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
+//				} catch (Exception e) {
+//					System.out.println("error2" + e.getMessage());
+//				}
 			}
 		}
 		
 		List<Map<String, String>> delArr = gson.fromJson(paramMap.get("taskDeleteRowArr"), stringList);
 		if (delArr != null && delArr.size() > 0) {
 			for (Map<String, String> sharngMap : delArr) {
-				try {
+//				try {
 
 					result = wb22Mapper.wbsTaskTempletDelete(sharngMap);
 					
-				} catch (Exception e) {
-					System.out.println("error2" + e.getMessage());
-				}
+//				} catch (Exception e) {
+//					System.out.println("error2" + e.getMessage());
+//				}
 			}
 		}
 		
@@ -710,7 +730,7 @@ public class WB22SvcImpl implements WB22Svc {
 		if (sharngArr != null && sharngArr.size() > 0 ) {
 			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
-	            try {	
+//	            try {	
 	            	   String pgParam = "{\"coCd\":\""+ sharngMap.get("coCd") +"\",";
 	 			              pgParam += "\"salesCd\":\""+ sharngMap.get("salesCd") +"\",";
 	 			              pgParam += "\"planVerNo\":\""+ sharngMap.get("verNo") +"\",";
@@ -719,9 +739,9 @@ public class WB22SvcImpl implements WB22Svc {
 	            	    sharngMap.put("pgParam", pgParam);
 	            	    result = QM01Mapper.insertWbsSharngList(sharngMap);       		
 	            	i++;
-	            } catch (Exception e) {
-	                System.out.println("error2"+e.getMessage());
-	            }
+//	            } catch (Exception e) {
+//	                System.out.println("error2"+e.getMessage());
+//	            }
 	        }
 		}
         return result;
