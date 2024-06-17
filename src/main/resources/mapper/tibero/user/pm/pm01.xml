@@ -563,14 +563,8 @@
     </select>
 
     <select id="selectWorkPrtList" parameterType="Map" resultType="CamelMap">
-        SELECT A.*
-		FROM   (
-				SELECT ROWNUM AS RNUM
-				     , A.*
-				FROM   (
-				        SELECT  T.WORK_RPT_ID
-						     , B.NAME					 AS WORK_RPT_ID_NM
-						     , TO_CHAR(T.WORK_RPT_DT,'YYYY-MM-DD') AS WORK_RPT_DT
+        	SELECT *
+				FROM   (SELECT  B.NAME					 AS WORK_RPT_ID_NM
 						     , T.WORK_RPT_L
 						     , T.WORK_RPT_M
 						     , T.WORK_RPT_S
@@ -578,14 +572,9 @@
 						     , FN_CM05M01_CD_TO_NM(T.WORK_RPT_M) AS WORK_RPT_M_NM
 						     , FN_CM05M01_CD_TO_NM(T.WORK_RPT_S) AS WORK_RPT_S_NM
 						     , SUM(T.WORK_RPT_HOUR) AS WORK_RPT_HOUR
+						     , SUM(SUM(T.WORK_RPT_HOUR)) OVER (PARTITION BY T.WORK_RPT_S) AS TOTAL_SUM
 				        FROM   TB_PM01M01 AS T
-				               LEFT OUTER JOIN TB_CR02D02 AS CR  ON T.ORD_CO_CD= CR.CO_CD
-				                                                AND T.SALES_CD = CR.SALES_CD
-				               LEFT OUTER JOIN TB_CR02M01 AS Y  ON CR.CO_CD    = Y.CO_CD
-                                                               AND CR.ORDRS_NO = Y.ORDRS_NO
-				               LEFT OUTER JOIN TB_BM02M01 AS A  ON Y.ORDRS_CLNT_CD = A.CLNT_CD 
-				               LEFT OUTER JOIN TB_CM06M01 AS B  ON T.WORK_RPT_ID = B.ID    
-				               LEFT OUTER JOIN TB_BM01M01 AS C  ON CR.PRDT_CD = C.PRDT_CD
+				               LEFT OUTER JOIN TB_CM06M01 AS B  ON T.WORK_RPT_ID = B.ID   
 				        WHERE  1 = 1
 				        <if test="coCd !=null and !coCd.equals('')">
 				        AND    T.CO_CD = #{coCd}
@@ -595,15 +584,6 @@
 				        </if>
 				        <if test="workRptId !=null and !workRptId.equals('')">
 				        AND    T.WORK_RPT_ID = #{workRptId}
-				        </if>
-				        <if test="salesCd != null and !salesCd.equals('')">
-				        AND    T.SALES_CD LIKE  '%'||#{salesCd}||'%'
-				        </if>
-				        <if test="prdtCd != null and !prdtCd.equals('')">
-				        AND    CR.PRDT_CD = #{prdtCd}
-				        </if>
-				        <if test="itemDiv != null and !itemDiv.equals('')">
-				        AND    CR.ITEM_DIV = #{itemDiv}
 				        </if>
 				        <if test="workRptL != null and !workRptL.equals('')">
 				        AND    T.WORK_RPT_L = #{workRptL}
@@ -617,15 +597,10 @@
 				        <if test="workRptId.equals('') and workRptIdNm !=null and !workRptIdNm.equals('')">
 				        AND    B.NAME LIKE  '%'||#{workRptIdNm}||'%'
 				        </if>
-				        <if test="prdtCd.equals('') and prdtNm !=null and !prdtNm.equals('')">
-				        AND    C.PRDT_NM LIKE  '%'||#{prdtNm}||'%'
-				        </if>
-				        GROUP BY T.WORK_RPT_ID, B.NAME, T.WORK_RPT_L, T.WORK_RPT_M, T.WORK_RPT_S,T.WORK_RPT_DT
-						ORDER BY T.WORK_RPT_L, T.WORK_RPT_M, T.WORK_RPT_S, T.WORK_RPT_DT
-				       ) AS A
-				WHERE  1 = 1
-			   ) AS A
-		WHERE  A.RNUM BETWEEN #{firstIndex} AND #{lastIndex}
+				        GROUP BY T.WORK_RPT_ID, B.NAME, T.WORK_RPT_L, T.WORK_RPT_M, T.WORK_RPT_S
+				       )
+			   PIVOT (SUM(WORK_RPT_HOUR) FOR WORK_RPT_ID_NM IN ( ${test} )  )--해당부서 인원 읽어와서 넣어주기 
+			 ORDER BY WORK_RPT_L, WORK_RPT_M, WORK_RPT_S
     </select>
     
     <select id="selectWorkOrdrsCount" parameterType="Map" resultType="int">

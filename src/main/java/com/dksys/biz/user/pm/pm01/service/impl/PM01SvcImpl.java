@@ -298,6 +298,20 @@ public class PM01SvcImpl implements PM01Svc {
 	
 	@Override
 	public List<Map<String, String>> selectWorkPrtList(Map<String, String> paramMap) {
+
+		String[] roleArray = paramMap.get("userName").split(",");
+		String test = "";
+		for (int i = 0; i < roleArray.length; i++) {
+			if ((roleArray.length -1) == i ) {
+				test += "'" + roleArray[i] +"' AS user"+ (i+1);
+			}
+			else {
+				test += "'" + roleArray[i] +"' AS user"+ (i+1) +  ",";
+			}
+		}
+
+		paramMap.put("test", test);
+		
 		return pm01Mapper.selectWorkPrtList(paramMap);
 	}
 	

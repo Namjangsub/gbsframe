@@ -71,9 +71,6 @@ public class PM01Ctr {
   // 개인별작업일보현황(업무별)
   @PostMapping(value = "/selectWorkPrtList")
   public String selectWorkPrtList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    int totalCnt = pm01Svc.selectWorkPrtCount(paramMap);
-    PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-    model.addAttribute("paginationInfo", paginationInfo);
     List<Map<String, String>> result = pm01Svc.selectWorkPrtList(paramMap);
     model.addAttribute("result", result);
     return "jsonView";

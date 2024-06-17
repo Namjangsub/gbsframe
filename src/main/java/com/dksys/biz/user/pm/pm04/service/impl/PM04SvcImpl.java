@@ -33,7 +33,7 @@ public class PM04SvcImpl implements PM04Svc{
 	  
 	@Override
 	  public List<Map<String, String>> selectDailyWorkMainList(Map<String, String> paramMap) {
-HashMap<String, Object> map = new HashMap<String, Object>();
+		HashMap<String, Object> map = new HashMap<String, Object>();
 		
 		String[] roleArray = paramMap.get("userName").split(",");
 		String test = "";
