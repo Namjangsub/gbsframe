@@ -6,8 +6,6 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface PM04Svc {
 	
-	 int selectDailyWorkCount(Map<String, String> paramMap);
-
 	 List<Map<String, String>> selectDailyWorkMainList(Map<String, String> paramMap);
 	 
 	 List<Map<String, String>> select_all_name(Map<String, String> paramMap);

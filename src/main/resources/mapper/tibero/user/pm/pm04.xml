@@ -3,46 +3,6 @@
 
 <mapper namespace="com.dksys.biz.user.pm.pm04.mapper.PM04Mapper">
 
- <select id="selectDailyWorkCount" parameterType="Map" resultType="int">
-        SELECT
-        		COUNT(*)
-	        FROM TB_PM01M01 T
-			        		LEFT OUTER JOIN TB_CR02D02 CR ON T.CO_CD    = CR.CO_CD
-			        								     AND T.SALES_CD = CR.SALES_CD
-			        		LEFT OUTER JOIN TB_CR02M01 Y  ON CR.CO_CD    = Y.CO_CD
-                                                         AND CR.ORDRS_NO = Y.ORDRS_NO
-                            LEFT OUTER JOIN TB_BM02M01 A  ON Y.ORDRS_CLNT_CD = A.CLNT_CD    
-        WHERE 1=1
-        <if test="coCd !=null and !coCd.equals('')">
-            AND T.CO_CD = #{coCd}
-        </if>
-        <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')">
-            AND T.WORK_RPT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD')
-        </if>
-        <if test="workRptId !=null and !workRptId.equals('')">
-            AND T.WORK_RPT_ID = #{workRptId}
-        </if>
-        <if test="salesCd != null and !salesCd.equals('')">
-            AND T.SALES_CD = #{salesCd}
-        </if>
-        <if test="prdtCd != null and !prdtCd.equals('')">
-            AND A.PRDT_CD = #{prdtCd}
-        </if>
-        <if test="itemDiv != null and !itemDiv.equals('')">
-            AND A.ITEM_DIV = #{itemDiv}
-        </if>
-        <if test="workRptL != null and !workRptL.equals('')">
-            AND T.WORK_RPT_L = #{workRptL}
-        </if>
-        <if test="workRptM != null and !workRptM.equals('')">
-            AND T.WORK_RPT_M = #{workRptM}
-        </if>
-        <if test="workRptS !=null and !workRptS.equals('')">
-            AND T.WORK_RPT_S = #{workRptS}
-        </if>
-
-    </select>
-
 	 <select id="selectDailyWorkMainList" parameterType="Map" resultType="CamelMap">
 	        /* 작업일보 내역 분석 */
 			WITH DPT AS
@@ -75,6 +35,25 @@
 			         START WITH T.CODE_KIND =  (SELECT MIN(CODE_ID)
 			                                      FROM TB_CM05M01
 			                                     WHERE CODE_RPRC = (SELECT MAX(UP_DEPT) FROM DPT) 
+			                                       AND CODE_KIND = 'WORKRPT') 
+			         CONNECT BY PRIOR T.CODE_ID = T.CODE_KIND
+			     UNION ALL
+			             SELECT LEVEL - 1 AS LVL
+			            , T.CODE_KIND
+			            , T.CODE_DESC
+			            , T.CODE_ID
+			            , T.CODE_NM
+			            , T.SORT_NO
+			          FROM TB_CM05M01 T    
+			         WHERE USE_YN = 'Y'
+			           AND LEVEL = 2 
+			         START WITH T.CODE_KIND =  (SELECT MIN(CODE_ID)
+			                                      FROM TB_CM05M01
+			                                     WHERE CODE_RPRC = (SELECT MAX(WORK_RPT_L)
+															         FROM TB_PM01M01 T
+															         WHERE T.WORK_RPT_ID = #{userId}
+															           AND T.WORK_RPT_DT  BETWEEN TO_DATE(  #{reqDtFrom},'YYYYMMDD') AND  TO_DATE( #{reqDtTo},'YYYYMMDD')
+															        ) 
 			                                       AND CODE_KIND = 'WORKRPT') 
 			         CONNECT BY PRIOR T.CODE_ID = T.CODE_KIND
 			     )
@@ -123,8 +102,7 @@
 			              LEFT OUTER JOIN SJD AS CR ON ( T.SALES_CD = CR.SALES_CD )
 			              INNER      JOIN DPT AS DP ON ( T.CO_CD = DP.CO_CD AND T.WORK_RPT_ID = DP.ID AND T.WORK_RPT_L = DP.UP_DEPT)   
 			       WHERE 1=1
-			         AND T.WORK_RPT_DT <![CDATA[>=]]> TO_DATE( #{reqDtFrom},'YYYYMMDD') 
-			         AND T.WORK_RPT_DT <![CDATA[<=]]> TO_DATE( #{reqDtTo},'YYYYMMDD')
+			         AND T.WORK_RPT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD')
 			         AND T.CO_CD = #{coCd}  
 			     )
 			SELECT *
@@ -177,7 +155,7 @@
 						   SELECT  ROWNUM AS RNUM, B.NAME,B.ID
 						   FROM( 
 						   SELECT A.NAME, A.DEPT_ID, A.LEVEL_CD, A.ID,
-						             (SELECT COUNT(*) FROM TB_CM06M01  WHERE DEPT_ID LIKE 'GUN30%') AS CNT
+						             (SELECT COUNT(*) FROM TB_CM06M01  WHERE DEPT_ID LIKE #{deps} || '%') AS CNT
 						   FROM TB_CM06M01 A 
 						   WHERE A.DEPT_ID LIKE #{deps} || '%'
 						   ORDER BY A.DEPT_ID ASC, A.LEVEL_CD DESC

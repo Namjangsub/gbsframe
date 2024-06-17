@@ -26,11 +26,6 @@ public class PM04SvcImpl implements PM04Svc{
 	  @Autowired
 	  PM04Mapper pm04Mapper;
 	  
-	  @Override
-	  public int selectDailyWorkCount(Map<String, String> paramMap) {
-	    return pm04Mapper.selectDailyWorkCount(paramMap);
-	  }
-	  
 	@Override
 	  public List<Map<String, String>> selectDailyWorkMainList(Map<String, String> paramMap) {
 		HashMap<String, Object> map = new HashMap<String, Object>();
