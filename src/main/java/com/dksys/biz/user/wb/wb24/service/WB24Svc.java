@@ -31,4 +31,6 @@ public interface WB24Svc {
 
 	int wbsIssueDelete(Map<String, String> paramMap) throws Exception;
 
+	Map<String, String> selectTeamManagerInfo(Map<String, String> paramMap);
+
 }

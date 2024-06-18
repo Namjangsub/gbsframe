@@ -399,28 +399,6 @@
                     }
                 });
                 
-                // //if (data.result.length > 0) {
-                //     var list = data.result;
-                //     targetObj.setData({
-                //         list : list,
-                //         page : {
-                //             totalElements :  data.paginationInfo.totalRecordCount,
-                //         }
-                //     });
-                // //}
-                // // else {
-                // //     var paramObj = {
-                // //         "userId": jwt.userId
-                // //         ,"appDiv": 'APPDIV05'
-                // //     };
-                // //     postAjax("/user/wb/wb20/selectSignResUserlstInit", paramObj, null, function(data) {
-                // //         var list = data.result;
-                // //         targetObj.setData({
-                // //             list : list,
-                // //             page : { totalElements : list.length }
-                // //         });
-                // //     });
-                // // }
             });
         },
         setData2 : function(_list) {
@@ -502,28 +480,6 @@
                     }
                 });
                 
-                // //if (data.result.length > 0) {
-                //     var list = data.result;
-                //     targetObj.setData({
-                //         list : list,
-                //         page : {
-                //             totalElements :  data.paginationInfo.totalRecordCount,
-                //         }
-                //     });
-                // //}
-                // // else {
-                // //     var paramObj = {
-                // //         "userId": jwt.userId
-                // //         ,"appDiv": 'APPDIV05'
-                // //     };
-                // //     postAjax("/user/wb/wb20/selectSignResUserlstInit", paramObj, null, function(data) {
-                // //         var list = data.result;
-                // //         targetObj.setData({
-                // //             list : list,
-                // //             page : { totalElements : list.length }
-                // //         });
-                // //     });
-                // // }
             });
         },
         setData2 : function(_list) {
@@ -619,7 +575,7 @@
                 //2. 조치 시작일자는 조치 종료일자 이후 일 수 없다. 하지만 종료일자가 없으면 체크 안해야지
                 if($('#actsDt').val() != undefined && $('#acteDt').val() != undefined && $('#actsDt').val() > $('#acteDt').val()) {
                     alert("조치 시작일은 조치 종료일 이전일 수 없습니다.");
-                    $('#actsDt').datepicker("setDate", new Date($('#wbsPlansDt').val()));
+                    $('#acteDt').datepicker("setDate", $('#actsDt').val());
                     return;
                 }
             });
@@ -632,8 +588,8 @@
             .datepicker("setDate",  moment(new Date()).endOf("month").toDate())
             .on("changeDate", function(){
                 if( $('#actsDt').val() != undefined && $('#acteDt').val() != undefined && $('#actsDt').val() > $('#acteDt').val()) {
-                    alert("조치 시작일은 조치 종료일 이전일 수 없습니다.");
-                    $('#acteDt').datepicker("setDate", new Date($('#wbsPlaneDt').val()));
+                    alert("조치 종료일은 조치 시작일 이전일 수 없습니다.");
+                    $('#actsDt').datepicker("setDate", $('#acteDt').val());
                 }
             });
         }
@@ -641,6 +597,8 @@
 		
         $("#popForm_S #userId").val(jwt.userId);
 
+        $("#popForm_S #actsDt").val("");
+        $("#popForm_S #acteDt").val("");
         // 구분자 "C1": WBS 일정계획화면 -> 계획이슈 등록 시 사용, "C3":WBS 이슈 관리 화면 -> 계획이슈 등록 시 사용
         if (actionType == "C1" || actionType == "C3") {
             //$('.tit1').text('WBS 이슈 등록')
@@ -827,6 +785,9 @@
     }
     
     function updateWbsIssue() {
+    	if ($("#issSts").val() == 'ISSSTS03') {
+    		selectTeamManagerInfo($('#actId').val());   //이슈진행상태가 완료이면 조치자의 담당팀장 결재라인에 자동 등록 처리하기
+    	}
         if (inputValidation($('.popup_area [required]'))) {
             var formData = makeFormData();
             filePostAjax("/user/wb/wb24/wbsIssueUpdate", formData, function(data) {
@@ -1585,4 +1546,76 @@
 		else
 			obj.css('height', (rowCount * 17) + "px");
 	}
+    
+    
+    //조치담당자 팀장 정보 가져오기
+	function selectTeamManagerInfo(paramUserId) {
+		//결자자 정보 가져오기//결자자 정보 가져오기 gridViewPop2
+        var appshaList = gridViewPop2.target.list.map(function(item) {
+			            return {
+			                gb: item.gb,
+			                usrNm: item.usrNm,
+			                name: item.name,
+			                jik: item.jik,
+			                dtNm: item.dtNm,
+			                telNo: item.telNo,
+			                offTelNo: item.offTelNo,
+			                email: item.email,
+			            };
+			        });
+		
+		
+        var appArray = $.grep(appshaList, function(item) { return item.gb === "결재"; }).map(function(item) {
+			            return {
+			                gb: item.gb,
+			                usrNm: item.usrNm,
+			                name: item.name,
+			                jik: item.jik,
+			                dtNm: item.dtNm,
+			                telNo: item.telNo,
+			                offTelNo: item.offTelNo,
+			                email: item.email
+			            };
+			        });
+        var shaArray =  $.grep(appshaList, function(item) { return item.gb === "공유"; }).map(function(item) {
+			            return {
+			                gb: tem.gb,
+			                usrNm: item.usrNm,
+			                name: item.name,
+			                jik: item.jik,
+			                dtNm: item.dtNm,
+			                telNo: item.telNo,
+			                offTelNo: item.offTelNo,
+			                email: item.email
+			            };
+			        });
+      
+        var formData = {
+            "userId" : paramUserId,
+        }
+        postAjaxSync("/user/wb/wb24/selectTeamManagerInfo", formData, null, function(data) {
+        	if (data.result != '') { 
+        		//결자자 정보 가져오기
+        		let list = data.result;
+        		if (appArray.some(item => item.usrNm === list.id)) {
+        			//Array에 usrNm 의 값중에 list.id와 같은 값이 있으면 true
+        		} else {
+        			appArray.push({
+		                        gb: "결재",
+		                        usrNm: list.id,
+		                        name: list.name,
+		                        jik: list.levelNm,
+		                        dtNm: list.deptNm,
+		                        telNo: list.telNo,
+		                        offTelNo: list.offTelNo,
+		                        email: list.email,
+				               
+		                    });
+        		}
+	            
+                gridViewPop2.setData2(appArray.concat(shaArray));
+        	}
+		});
+	}
+    
 </script>

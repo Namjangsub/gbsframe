@@ -158,4 +158,15 @@ public class WB24Ctr {
   		}
   		return "jsonView";
     }
+	
+	//조치담당자의 팀장 정보 가져오기
+	@PostMapping(value = "/selectTeamManagerInfo")
+	public String selectTeamManagerInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = wb24Svc.selectTeamManagerInfo(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
+	
+
 }

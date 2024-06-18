@@ -505,4 +505,10 @@ public class WB24SvcImpl implements WB24Svc {
 	    
 		return result;
 	}
+
+	//조치담당자의 팀장 정보가져오기
+	@Override
+	public Map<String, String> selectTeamManagerInfo(Map<String, String> paramMap) {
+		return wb24Mapper.selectTeamManagerInfo(paramMap);
+	}
 }
