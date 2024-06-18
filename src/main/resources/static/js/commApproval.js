@@ -70,6 +70,22 @@ function Approval(htmlParam, param, popParam) {
 			$("#"+htmlId).html('');
 			$("#"+htmlId).append(htmlTable);
 			
+			//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
+			var actDngEval = `
+						<tr style="text-align: right;">
+			                <th class="hit" colspan=2>위험도 평가</th>
+			                <td colspan=1>
+			                    <select id="actDngEval" name="actDngEval"msg="위험도 평가" required>
+			                        <option value="">선택</option>
+									<option value="ACTDNG01">상</option>
+									<option value="ACTDNG02">중</option>
+									<option value="ACTDNG03">하</option>
+								</select>
+			                </td>
+							<td colspan=2></td>
+			            </tr>			
+						`;
+							
 			//결재라인 read
 			postAjaxSync("/user/wb/wb20/selectGetApprovalList", this.param, null
 				, function(data){
@@ -78,6 +94,7 @@ function Approval(htmlParam, param, popParam) {
 	 				if( data.resultList.length > 0 ) {
 	 					
 	 					var htmlTr = "";
+	 					var confrmActDngEval = "";
 		 				$("#appLine tr").eq(0).next().remove();
 				        $.each(list, function (idx, data) {
 		 					var html = trTempl;				        	
@@ -111,6 +128,10 @@ function Approval(htmlParam, param, popParam) {
 									approvalParam.todoDiv2CodeId = data.todoDiv2CodeId;
 									approvalParam.todoNo = data.todoNo;
 									html = html.replace(/readonly/gi, "");		//결재의견 input
+									//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
+					 				if( data.todoDiv2CodeId=='TODODIV2090' && data.teamManager == 'TEAM01' ) {
+					 					confrmActDngEval = actDngEval;
+					 				}
 								} 
 							}
 							if(applyBtn == false) {
@@ -125,6 +146,10 @@ function Approval(htmlParam, param, popParam) {
 						});			
 					} 
 					$("#appLine").append(htmlTr);
+					
+					//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
+					$("#appLine").append(confrmActDngEval);
+					
 			});		//end ajax
 			
 			this.todoId = todoId;
@@ -173,7 +198,10 @@ function Approval(htmlParam, param, popParam) {
 	
 	//승인 ajax
 	this.confirmApproval = function(param) {
-		
+
+		if (!inputValidation($('.popup_area [required]'))) {
+			return false;
+		}
 		var confirmYn = false;	
 		//승인 save
 		if( this.applyBtn ) {
@@ -181,8 +209,8 @@ function Approval(htmlParam, param, popParam) {
 			var todoCfOpn = $("#appLine tr").find("font").closest("tr").find("input[name=todoCfOpn]").val();
 			//입력값 set			
 			var paramMap = {		
-					"todoId" : jwt.userId
-					, "todoCfOpn" : todoCfOpn
+					  "todoId" 		: jwt.userId
+					, "todoCfOpn" 	: todoCfOpn
 			}
 			let anchorText = $("#appConfirmAnchor").text();
 			let confirmText = (anchorText == "의견수정") ? "수정" : "승인"			
@@ -191,34 +219,46 @@ function Approval(htmlParam, param, popParam) {
 				if(data.resultCode == 200){
 					postAjaxSync("/user/qm/qm01/updateReqStChk", paramMap, null, function(data){
 						if(data.resultCode == 200){
-//							console.log("QM01M01 접수컬럼상태가 바뀌었습니다");
 						}
-//						alert(confirmText + " 되었습니다.");
 						confirmYn = true;
 					});
-
+					
+					//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
+					if ($('#actDngEval').length) {
+						let paramObj = {
+								  issNo 		: $('#issNo').val()
+								, actDngEval	: $('#actDngEval').val()
+						}
+						postAjaxSync("/user/wb/wb24/updateWbsIssueResultEvaluate", paramObj, null, function(data){
+							if(data.resultCode != 200){
+								alert("위험도 평가 반영에 실해하였습니다.");	
+							}
+						});
+			        } 
+					
 					//최종결재 완료시 알림톡
 					postAjaxSync("/user/wb/wb20/selectTodoFinalYn", paramMap, null, function(data){
 						let todoYn = data.result[0].todoYn;
 						if( todoYn == "Y" ) {
-//							console.log('---결재모두완료 알림톡시작');
 							sendTodoFinal(paramMap);																
 						}
 					});					
-
 				} else {
 					alert("승인중 오류가 발생 되었습니다.");	
 				}
 			});	
+			
+			
 			if( confirmYn ) {
 				this.makeHtml();
 				this.applyBtn = false;
 				this.applyBtnCtrl();
 			}
+			return true;
 		} else {
-			return;
-		}        
-	}		
+			return false;
+		}    
+	}
 }
 
 

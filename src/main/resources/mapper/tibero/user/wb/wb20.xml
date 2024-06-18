@@ -240,22 +240,18 @@
                   
 	<!-- 결재목록 및 결재상태 결재버튼 등 불러오기 -->
 	<select id="selectGetApprovalList" parameterType="Map" resultType="camelMap">
-		SELECT TODO_KEY
-			, SANCTN_SN
-			, CO_CD
-			, TODO_DIV1_CODE_ID
-			, TODO_DIV2_CODE_ID
-			, TODO_ID			/* 대상자 ID */
-			,
-			(
-				SELECT NAME
-					FROM TB_CM06M01 B
-				WHERE A.TODO_ID = B.ID
-			) AS TODO_NM		/* 작성자 이름 */
-			, NVL(TO_CHAR(TODO_CF_DT, 'YYYY-MM-DD'), ' ') AS TODO_CF_DT		/* 승인일자 */
-			, TODO_CF_OPN
-			, SANCTN_STTUS
-			, DECODE(SANCTN_STTUS, 'Y', '승인', 'N', '미승인', ' ') AS SANCTN_STTUS_NM
+		SELECT A.TODO_KEY
+			, A.SANCTN_SN
+			, A.CO_CD
+			, A.TODO_DIV1_CODE_ID
+			, A.TODO_DIV2_CODE_ID
+			, A.TODO_ID			/* 대상자 ID */
+			, B.NAME AS TODO_NM		/* 작성자 이름 */
+			, B.TEAM_MANAGER		/* 팀장구분 */
+			, NVL(TO_CHAR(A.TODO_CF_DT, 'YYYY-MM-DD'), ' ') AS TODO_CF_DT		/* 승인일자 */
+			, A.TODO_CF_OPN
+			, A.SANCTN_STTUS
+			, DECODE(A.SANCTN_STTUS, 'Y', '승인', 'N', '미승인', ' ') AS SANCTN_STTUS_NM
 			, 
 			(
 				SELECT SANCTN_STTUS
@@ -294,54 +290,55 @@
 					)
 					WHERE RN=1
 			) AS NEXT_STTUS 			/* 상위 완료여부 */					
-			, SALES_CD
-			, PG_PATH
-			, SUBSTR(PG_PATH, INSTR(PG_PATH, '/', -1)+1) AS DOC_NM		/* 문서명 pgmId */
-			, TODO_FILE_TRGT_KEY
-			, TODO_CO_CD
-			, TODO_NO
-			, TODO_CODE_KIND
-			, TODO_CODE_ID
-			, NVL(NVL(TO_CHAR(SYSDATE, 'YYYY-MM-DD'), TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD')), ' ') AS CREAT_DTTM
-			, PG_PARAM
+			, A.SALES_CD
+			, A.PG_PATH
+			, SUBSTR(A.PG_PATH, INSTR(A.PG_PATH, '/', -1)+1) AS DOC_NM		/* 문서명 pgmId */
+			, A.TODO_FILE_TRGT_KEY
+			, A.TODO_CO_CD
+			, A.TODO_NO
+			, A.TODO_CODE_KIND
+			, A.TODO_CODE_ID
+			, NVL(NVL(TO_CHAR(SYSDATE, 'YYYY-MM-DD'), TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD')), ' ') AS CREAT_DTTM
+			, A.PG_PARAM
 			FROM TB_WB20M03 A
+					LEFT OUTER JOIN TB_CM06M01 B  ON A.TODO_ID = B.ID
 		WHERE 1=1		
 			<if test="todoKey != null and !todoKey.equals('')">			
-				AND TODO_KEY = #{todoKey}                                  
+				AND A.TODO_KEY = #{todoKey}                                  
 			</if>
 			<if test="sanctnSn != null and !sanctnSn.equals('')">			
-				AND SANCTN_SN = #{sanctnSn}                                  
+				AND A.SANCTN_SN = #{sanctnSn}                                  
 			</if>   
 			<if test="coCd != null and !coCd.equals('')">
-				AND CO_CD = #{coCd}                                  
+				AND A.CO_CD = #{coCd}                                  
 			</if>   								
 			<if test="todoDiv1CodeId != null and !todoDiv1CodeId.equals('')">
-				AND TODO_DIV1_CODE_ID = #{todoDiv1CodeId}                                  
+				AND A.TODO_DIV1_CODE_ID = #{todoDiv1CodeId}                                  
 			</if>
 			<if test="todoDiv2CodeId != null and !todoDiv2CodeId.equals('')">
-				AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}                                  
+				AND A.TODO_DIV2_CODE_ID = #{todoDiv2CodeId}                                  
 			</if>
 			<!-- TO_DO ~ 시작컬럼은 대상업무에서 넘어온 데이터 -->
 			<if test="salesCd != null and !salesCd.equals('')">
-				AND SALES_CD = #{salesCd}                                  
+				AND A.SALES_CD = #{salesCd}                                  
 			</if> 			
 			<if test="pgPath != null and !pgPath.equals('')">
 				<!-- / 로 SLIT 하여 마지막부분이 문서명 -->
-				AND PG_PATH = #{pgPath}                                  
+				AND A.PG_PATH = #{pgPath}                                  
 			</if>   					
 			<if test="todoFileTrgtKey != null and !todoFileTrgtKey.equals('')">
-				AND TODO_FILE_TRGT_KEY = #{todoFileTrgtKey}                                  
+				AND A.TODO_FILE_TRGT_KEY = #{todoFileTrgtKey}                                  
 			</if>
 			<if test="todoCoCd != null and !todoCoCd.equals('')">
-				AND TODO_CO_CD = #{todoCoCd}                                  
+				AND A.TODO_CO_CD = #{todoCoCd}                                  
 			</if>   			   
 			<if test="todoNo != null and !todoNo.equals('')">
-				AND TODO_NO = #{todoNo}                                  
+				AND A.TODO_NO = #{todoNo}                                  
 			</if>
 			<if test="histNo != null and !histNo.equals('')">
-				AND ETC_FIELD2 = #{histNo}                                  
+				AND A.ETC_FIELD2 = #{histNo}                                  
 			</if>       
-				AND CREAT_DTTM IN (	SELECT MAX(CREAT_DTTM)
+				AND A.CREAT_DTTM IN (	SELECT MAX(CREAT_DTTM)
 									  FROM TB_WB20M03	
 									 WHERE 1 = 1	
 									<if test="todoKey != null and !todoKey.equals('')">			
@@ -370,7 +367,7 @@
 										AND ETC_FIELD2 = #{histNo}                                  
 									</if>                     
 								  ) 
-		ORDER BY SANCTN_SN DESC																	        			                      
+		ORDER BY A.SANCTN_SN DESC																	        			                      
 	</select>             
            
 	<!-- 결재 승인 -->

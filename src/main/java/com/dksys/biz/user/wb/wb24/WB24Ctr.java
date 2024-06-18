@@ -76,7 +76,7 @@ public class WB24Ctr {
   		}
   		return "jsonView";
     }
-	
+
 	@PostMapping(value = "/wbsIssueUpdate")
     public String wbsIssueUpdate(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
   		try {
@@ -167,6 +167,18 @@ public class WB24Ctr {
 		return "jsonView";
 	}
 	
-	
+	//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
+	@PostMapping(value = "/updateWbsIssueResultEvaluate")
+	public String updateWbsIssueResultEvaluate(@RequestBody Map<String, String> paramMap, ModelMap model){
+		int result = wb24Svc.updateWbsIssueResultEvaluate(paramMap);
+		if ( result != 0 ) {
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", result);				
+		} else {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		}
+		return "jsonView";
+	}
 
 }
