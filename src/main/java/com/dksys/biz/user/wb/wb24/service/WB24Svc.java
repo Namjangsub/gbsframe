@@ -33,4 +33,6 @@ public interface WB24Svc {
 
 	Map<String, String> selectTeamManagerInfo(Map<String, String> paramMap);
 
+	int updateWbsIssueResultEvaluate(Map<String, String> paramMap);
+
 }
