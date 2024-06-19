@@ -85,7 +85,7 @@ function Approval(htmlParam, param, popParam) {
 							<td colspan=2></td>
 			            </tr>			
 						`;
-							
+			var confrmActDngEval = '';
 			//결재라인 read
 			postAjaxSync("/user/wb/wb20/selectGetApprovalList", this.param, null
 				, function(data){
@@ -94,7 +94,6 @@ function Approval(htmlParam, param, popParam) {
 	 				if( data.resultList.length > 0 ) {
 	 					
 	 					var htmlTr = "";
-	 					var confrmActDngEval = "";
 		 				$("#appLine tr").eq(0).next().remove();
 				        $.each(list, function (idx, data) {
 		 					var html = trTempl;				        	

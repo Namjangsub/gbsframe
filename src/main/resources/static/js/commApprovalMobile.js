@@ -113,6 +113,9 @@ function Approval(htmlParam, param, popParam) {
 									if( data.sanctnSn == "1" || data.preSttus=="Y") {
 										applyBtn = true;										
 									} 
+								//결재가 1건일 경우 
+								} else if( data.sanctnSn == "1" && typeof(data.preSttus)=="undefined" ) {
+									applyBtn = true;									
 								}
 								//다음순번이 미결재일 경우 결재의견 가능하게 변경
 								if( data.nextSttus=="N") applyBtn = true;
@@ -199,11 +202,11 @@ function Approval(htmlParam, param, popParam) {
 		if( this.applyBtn ) {
 			//본인 결재의견
 			var todoCfOpn = $("#appLine tr").find("font").closest("tr").find("textarea[name=todoCfOpn]").val();
-//			console.log("todoCfOpn=",todoCfOpn);
 			//입력값 set			
 			var paramMap = {		
 					"todoId" : jwt.userId
 					, "todoCfOpn" : todoCfOpn
+					, "issNo" 		: $('#issNo').val()
 					, "actDngEval" : $('#actDngEvalTodo').val()
 			}
 
