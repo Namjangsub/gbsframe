@@ -76,7 +76,7 @@ function Approval(htmlParam, param, popParam) {
 						<tr style="text-align: right;">
 			                <th class="hit" colspan=2>위험도 평가</th>
 			                <td colspan=1>
-			                    <select id="actDngEval" name="actDngEval"msg="위험도 평가" required>
+			                    <select id="actDngEvalTodo" name="actDngEvalTodo"msg="위험도 평가" required>
 			                        <option value="">선택</option>
 									<option value="ACTDNG01">상</option>
 									<option value="ACTDNG02">중</option>
@@ -204,7 +204,7 @@ function Approval(htmlParam, param, popParam) {
 			var paramMap = {		
 					"todoId" : jwt.userId
 					, "todoCfOpn" : todoCfOpn
-					, "actDngEval" : $('#actDngEval').val()
+					, "actDngEval" : $('#actDngEvalTodo').val()
 			}
 
 			Object.assign(paramMap, this.param);

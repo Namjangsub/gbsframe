@@ -75,7 +75,7 @@ function Approval(htmlParam, param, popParam) {
 						<tr style="text-align: right;">
 			                <th class="hit" colspan=2>위험도 평가</th>
 			                <td colspan=1>
-			                    <select id="actDngEval" name="actDngEval"msg="위험도 평가" required>
+			                    <select id="actDngEvalTodo" name="actDngEvalTodo"msg="위험도 평가" required>
 			                        <option value="">선택</option>
 									<option value="ACTDNG01">상</option>
 									<option value="ACTDNG02">중</option>
@@ -212,7 +212,7 @@ function Approval(htmlParam, param, popParam) {
 					  "todoId" 		: jwt.userId
 					, "todoCfOpn" 	: todoCfOpn
 					, "issNo" 		: $('#issNo').val()
-					, "actDngEval"	: $('#actDngEval').val()
+					, "actDngEval"	: $('#actDngEvalTodo').val()
 			}
 			let anchorText = $("#appConfirmAnchor").text();
 			let confirmText = (anchorText == "의견수정") ? "수정" : "승인"			
@@ -223,7 +223,7 @@ function Approval(htmlParam, param, popParam) {
 					confirmYn = true;
 					let todoYn = data.result.todoYn;
 					if( todoYn == "Y" ) {
-						sendTodoFinal(paramMap);																
+//						sendTodoFinal(paramMap);																
 					}
 					
 //					postAjaxSync("/user/qm/qm01/updateReqStChk", paramMap, null, function(data){
