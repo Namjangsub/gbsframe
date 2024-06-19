@@ -86,7 +86,7 @@ function Approval(htmlParam, param, popParam) {
 							<td colspan=2></td>
 			            </tr>			
 						`;
-			
+			var confrmActDngEval = '';
 			//결재라인 read
 			postAjaxSync("/user/wb/wb20/selectGetApprovalList", this.param, null
 				, function(data){
