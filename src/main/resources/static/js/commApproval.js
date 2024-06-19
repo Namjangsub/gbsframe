@@ -223,7 +223,7 @@ function Approval(htmlParam, param, popParam) {
 					confirmYn = true;
 					let todoYn = data.result.todoYn;
 					if( todoYn == "Y" ) {
-//						sendTodoFinal(paramMap);																
+						sendTodoFinal(paramMap);																
 					}
 					
 //					postAjaxSync("/user/qm/qm01/updateReqStChk", paramMap, null, function(data){
