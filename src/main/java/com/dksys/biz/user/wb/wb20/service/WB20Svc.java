@@ -30,7 +30,7 @@ public interface WB20Svc {
 	
 	List<Map<String, String>> selectGetApprovalList(Map<String, String> paramMap);	
 	
-	int insertApprovalLine(Map<String, String> paramMap);	
+	Map<String, String> insertApprovalLine(Map<String, String> paramMap);	
 	
 	List<Map<String, String>> selectSignResUserlst(Map<String, String> paramMap);
 	
@@ -46,7 +46,7 @@ public interface WB20Svc {
 	
 	List<Map<String, String>> selectMobileTodoSelect(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectTodoFinalYn(Map<String, String> paramMap);	
+	Map<String, String> selectTodoFinalYn(Map<String, String> paramMap);	
 
 	int updateApprovalCancle(Map<String, String> paramMap);
 

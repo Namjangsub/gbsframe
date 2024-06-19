@@ -141,7 +141,9 @@ public class WB20Ctr {
 	  @PostMapping(value = "/insertApprovalLine")
 	  public String insertApprovalLine(@RequestBody Map<String, String> paramMap, ModelMap model) {
 	    	try {
-				wb20Svc.insertApprovalLine(paramMap);
+	    		Map<String, String> result = wb20Svc.insertApprovalLine(paramMap);
+	    	    model.addAttribute("result", result);
+	    	    
 		    	model.addAttribute("resultCode", 200);
 		    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 	    	}catch(Exception e) {
@@ -201,7 +203,7 @@ public class WB20Ctr {
 		//최종결재 완료여부
 		@PostMapping(value = "/selectTodoFinalYn")
 		public String selectTodoFinalYn(@RequestBody Map<String, String> paramMap, ModelMap model) {
-			List<Map<String, String>> result = wb20Svc.selectTodoFinalYn(paramMap);
+			Map<String, String> result = wb20Svc.selectTodoFinalYn(paramMap);
 		    model.addAttribute("result", result);
 		    return "jsonView";
 		}	 		

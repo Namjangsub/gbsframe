@@ -505,6 +505,7 @@ var treeModule = (function () {
 			var paramObj = {
 					 "coCd":row.coCd
 					 , "salesCd":row.salesCd
+					 , "issNo":row.todoNo
 					 , "todoDiv1CodeId":row.todoDiv1CodeId
 					 , "todoDiv1CodeNm":row.todoDiv1CodeNm
 					 , "todoDiv2CodeId":row.todoDiv2CodeId

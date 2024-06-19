@@ -211,38 +211,45 @@ function Approval(htmlParam, param, popParam) {
 			var paramMap = {		
 					  "todoId" 		: jwt.userId
 					, "todoCfOpn" 	: todoCfOpn
+					, "issNo" 		: $('#issNo').val()
+					, "actDngEval"	: $('#actDngEval').val()
 			}
 			let anchorText = $("#appConfirmAnchor").text();
 			let confirmText = (anchorText == "의견수정") ? "수정" : "승인"			
 			Object.assign(paramMap, this.param);
+
 			postAjaxSync("/user/wb/wb20/insertApprovalLine", paramMap, null, function(data){
 				if(data.resultCode == 200){
-					postAjaxSync("/user/qm/qm01/updateReqStChk", paramMap, null, function(data){
-						if(data.resultCode == 200){
-						}
-						confirmYn = true;
-					});
+					confirmYn = true;
+					let todoYn = data.result.todoYn;
+					if( todoYn == "Y" ) {
+						sendTodoFinal(paramMap);																
+					}
+					
+//					postAjaxSync("/user/qm/qm01/updateReqStChk", paramMap, null, function(data){
+//						if(data.resultCode == 200){
+//						}
+//						confirmYn = true;
+//					});
 					
 					//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
-					if ($('#actDngEval').length) {
-						let paramObj = {
-								  issNo 		: $('#issNo').val()
-								, actDngEval	: $('#actDngEval').val()
-						}
-						postAjaxSync("/user/wb/wb24/updateWbsIssueResultEvaluate", paramObj, null, function(data){
-							if(data.resultCode != 200){
-								alert("위험도 평가 반영에 실해하였습니다.");	
-							}
-						});
-			        } 
+//					if ($('#actDngEval').length) {
+//						paramMap.issNo 		= $('#issNo').val();
+//						paramMap.actDngEval	= $('#actDngEval').val();
+//						postAjaxSync("/user/wb/wb24/updateWbsIssueResultEvaluate", paramMap, null, function(data){
+//							if(data.resultCode != 200){
+//								alert("위험도 평가 반영에 실해하였습니다.");	
+//							}
+//						});
+//			        } 
 					
 					//최종결재 완료시 알림톡
-					postAjaxSync("/user/wb/wb20/selectTodoFinalYn", paramMap, null, function(data){
-						let todoYn = data.result[0].todoYn;
-						if( todoYn == "Y" ) {
-							sendTodoFinal(paramMap);																
-						}
-					});					
+//					postAjaxSync("/user/wb/wb20/selectTodoFinalYn", paramMap, null, function(data){
+//						let todoYn = data.result[0].todoYn;
+//						if( todoYn == "Y" ) {
+//							sendTodoFinal(paramMap);																
+//						}
+//					});					
 				} else {
 					alert("승인중 오류가 발생 되었습니다.");	
 				}

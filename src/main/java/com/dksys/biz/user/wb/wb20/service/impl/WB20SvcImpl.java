@@ -16,8 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.util.ExceptionThrower;
+import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
+import com.dksys.biz.user.wb.wb24.mapper.WB24Mapper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -29,10 +31,11 @@ public class WB20SvcImpl implements WB20Svc {
     @Autowired
     WB20Mapper wb20Mapper;
 
+    @Autowired
+    WB24Mapper wb24Mapper;
     
     @Autowired
-    WB20Svc wb20Svc;
-    
+    QM01Mapper qm01Mapper;
 
     @Autowired
     ExceptionThrower thrower;
@@ -104,12 +107,31 @@ public class WB20SvcImpl implements WB20Svc {
 
 	/* 공통결재 라인 insert */
 	@Override
-	public int insertApprovalLine(Map<String, String> paramMap) {
+	public Map<String, String> insertApprovalLine(Map<String, String> paramMap) {
 
 		int result = 0;	    
-		result += wb20Mapper.updateApprovalLine(paramMap);		
-	    	    		  		
-		return result;
+		result += wb20Mapper.updateApprovalLine(paramMap);	
+		
+		//TODODIV202:발주 및 출장 요청 상태코드 바꾸기
+		if ("TODODIV2020".equals(paramMap.get("todoDiv2CodeId"))) {
+			//발주요청서 진행상태 변경 처리
+			result += qm01Mapper.updateReqStChk(paramMap);
+
+		//TODODIV2060:WBS이슈 발생에 대한 결재이면 이슈상태 변경처리
+		} else if ("TODODIV2060".equals(paramMap.get("todoDiv2CodeId"))) {
+			//ISS_STS: ISSSTS01 --> ISSSTS02 로 상태 변경처리
+			result += wb24Mapper.updateWbsIssueStChk(paramMap);
+
+		//TODODIV2090:WBS조치 이슈조치결과 담당팀장 위험도 평가내역 수정 처리
+		} else if ("TODODIV2090".equals(paramMap.get("todoDiv2CodeId"))) {
+			result += wb24Mapper.updateWbsIssueResultEvaluate(paramMap);
+		}
+	    	
+		//최종결재 완료시 알림톡 발송 대상인지 확인 
+		Map<String, String> resultMap = wb20Mapper.selectTodoFinalYn(paramMap);
+		resultMap.put("resultCount", Integer.toString(result));
+		
+		return resultMap;
 	}		
 	
 	  // 결재라인 싱글 셀렉트 read	
@@ -153,7 +175,7 @@ public class WB20SvcImpl implements WB20Svc {
 			for(Map<String, String> dtl : detailMap) {
 				//입력, 수정 
 				if( dtl.get("todoKey").equals("") ) {
-					maxTodoKey = wb20Svc.selectmaxTodoKey(dtl);
+					maxTodoKey = wb20Mapper.selectmaxTodoKey(dtl);
 					dtl.put("todoKey", maxTodoKey);
 				}
 				result += wb20Mapper.insertTodoMaster(dtl);				
@@ -177,7 +199,7 @@ public class WB20SvcImpl implements WB20Svc {
 		}
 	  
 	  @Override
-	  public List<Map<String, String>> selectTodoFinalYn(Map<String, String> paramMap) {
+	  public Map<String, String> selectTodoFinalYn(Map<String, String> paramMap) {
 		  return wb20Mapper.selectTodoFinalYn(paramMap);
 	  }	  
 		

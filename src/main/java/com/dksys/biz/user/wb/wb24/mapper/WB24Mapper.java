@@ -48,4 +48,6 @@ public interface WB24Mapper {
 	Map<String, String> selectTeamManagerInfo(Map<String, String> paramMap);
 
 	int updateWbsIssueResultEvaluate(Map<String, String> paramMap);
+
+	int updateWbsIssueStChk(Map<String, String> paramMap);
 }
