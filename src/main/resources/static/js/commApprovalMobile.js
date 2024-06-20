@@ -219,14 +219,13 @@ function Approval(htmlParam, param, popParam) {
 						     //formData.append("todoCfDt", strDate);
 						     filePutAjax("/user/wb/wb20/toDoCfDtUpdate", formData, function(data){
 						         if(data.resultCode == 200){
-										this.makeHtml();
-										this.applyBtn = false;
-										this.applyBtnCtrl();
+									this.applyBtn = false;
 						         }
 						     }); 
 					    }    
 					}
 				} 
+				return true;
 			} else if( this.param.todoDiv1CodeNm == "결재" ) {
 			
 				if (!inputValidation($('.popup_area [required]'))) {
