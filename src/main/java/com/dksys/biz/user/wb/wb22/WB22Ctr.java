@@ -70,10 +70,10 @@ public class WB22Ctr {
   		try {
   			if (wb22Svc.wbsLevel1Insert(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-  		} else {
-  			model.addAttribute("resultCode", 500);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+	  		} else {
+	  			model.addAttribute("resultCode", 500);
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
   			};
   		}catch(Exception e){
   			model.addAttribute("resultCode", 900);
@@ -87,10 +87,10 @@ public class WB22Ctr {
   		try {
   			if (wb22Svc.wbsLevel1Update(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-  		} else {
-  			model.addAttribute("resultCode", 500);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+  			} else {
+	  			model.addAttribute("resultCode", 500);
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
   			};
   		}catch(Exception e){
   			model.addAttribute("resultCode", 900);
@@ -110,11 +110,11 @@ public class WB22Ctr {
     public String wbsLevel2Insert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
   		try {
   			if (wb22Svc.wbsLevel2Insert(paramMap, mRequest) != 0 ) {
-  			model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-  		} else {
-  			model.addAttribute("resultCode", 500);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+	  			model.addAttribute("resultCode", 200);
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+	  		} else {
+	  			model.addAttribute("resultCode", 500);
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
   			};
   		}catch(Exception e){
   			model.addAttribute("resultCode", 900);
@@ -135,10 +135,10 @@ public class WB22Ctr {
   		try {
   			if (wb22Svc.wbsVerUpInsert(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-  		} else {
-  			model.addAttribute("resultCode", 500);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+	  		} else {
+	  			model.addAttribute("resultCode", 500);
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
   			};
   		}catch(Exception e){
   			model.addAttribute("resultCode", 900);
@@ -152,10 +152,10 @@ public class WB22Ctr {
   		try {
   			if (wb22Svc.wbsLevel1confirm(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-  		} else {
-  			model.addAttribute("resultCode", 500);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+	  		} else {
+	  			model.addAttribute("resultCode", 500);
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
   			};
   		}catch(Exception e){
   			model.addAttribute("resultCode", 900);
@@ -169,10 +169,10 @@ public class WB22Ctr {
   		try {
   			if (wb22Svc.wbsLevel2confirm(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-  		} else {
-  			model.addAttribute("resultCode", 500);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+	  		} else {
+	  			model.addAttribute("resultCode", 500);
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
   			};
   		}catch(Exception e){
   			model.addAttribute("resultCode", 900);
@@ -234,10 +234,10 @@ public class WB22Ctr {
   		try {
   			if (wb22Svc.wbsRsltsconfirm(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-  		} else {
-  			model.addAttribute("resultCode", 500);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+	  		} else {
+	  			model.addAttribute("resultCode", 500);
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
   			};
   		}catch(Exception e){
   			model.addAttribute("resultCode", 900);
@@ -287,10 +287,10 @@ public class WB22Ctr {
   		try {
   			if (wb22Svc.saveWbsTaskTempletList(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-  		} else {
-  			model.addAttribute("resultCode", 500);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+	  		} else {
+	  			model.addAttribute("resultCode", 500);
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
   			};
   		}catch(Exception e){
   			model.addAttribute("resultCode", 900);
@@ -350,10 +350,10 @@ public class WB22Ctr {
   		try {
   			if (wb22Svc.wbcPlanTodoInsert(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-  		} else {
-  			model.addAttribute("resultCode", 500);
-  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+	  		} else {
+	  			model.addAttribute("resultCode", 500);
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
   			};
   		}catch(Exception e){
   			model.addAttribute("resultCode", 900);

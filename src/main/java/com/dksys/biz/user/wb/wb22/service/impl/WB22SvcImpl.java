@@ -86,19 +86,19 @@ public class WB22SvcImpl implements WB22Svc {
 						
 						sharngMap.put("seq", String.valueOf(i + 1));
 						
-						result = wb22Mapper.wbsLevel1Insert(sharngMap);
+						result += wb22Mapper.wbsLevel1Insert(sharngMap);
 					}else {
-						result = wb22Mapper.wbsLevel1Update(sharngMap);
+						result += wb22Mapper.wbsLevel1Update(sharngMap);
 						
 						//level2 Task정보 변경 처리
 						sharngMap.put("wbsPlanCodeKind", sharngMap.get("wbsPlanCodeId"));
 						String chkValue = sharngMap.get("wbsPlanMngId");
 						if (chkValue == null || chkValue.equals("")) {
 							//level1 담당자와 일정이 없으면 TASK등록된 일정 일괄 삭제처리
-							result = wb22Mapper.deleteWbsPlanlist(sharngMap);
+							result += wb22Mapper.deleteWbsPlanlist(sharngMap);
 						} else {
 							//level1 담당자로 TASK 담당자 일괄 수정
-							result = wb22Mapper.wbsLevel2MngIdUpdate(sharngMap);
+							result += wb22Mapper.wbsLevel2MngIdUpdate(sharngMap);
 						}
 					}
 					
@@ -239,10 +239,10 @@ public class WB22SvcImpl implements WB22Svc {
 					String chkValue = sharngMap.get("wbsPlanMngId");
 					if (chkValue == null || chkValue.equals("")) {
 						//level1 담당자와 일정이 없으면 TASK등록된 일정 일괄 삭제처리
-						result = wb22Mapper.deleteWbsPlanlist(sharngMap);
+						result += wb22Mapper.deleteWbsPlanlist(sharngMap);
 					} else {
 						//level1 담당자로 TASK 담당자 일괄 수정
-						result = wb22Mapper.wbsLevel2MngIdUpdate(sharngMap);
+						result += wb22Mapper.wbsLevel2MngIdUpdate(sharngMap);
 					}
 //				} catch (Exception e) {
 //					System.out.println("error2" + e.getMessage());
@@ -262,7 +262,7 @@ public class WB22SvcImpl implements WB22Svc {
 		if (sharngArr != null && sharngArr.size() > 0) {
 			for (Map<String, String> sharngMap : sharngArr) {
 //				try {
-					result = wb22Mapper.wbsLevel2confirm(sharngMap);
+					result += wb22Mapper.wbsLevel2confirm(sharngMap);
 //				} catch (Exception e) {
 //					System.out.println("error2" + e.getMessage());
 //				}
