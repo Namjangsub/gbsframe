@@ -280,6 +280,10 @@
 			<if test="goodsDiv != null and !goodsDiv.equals('')">
 			    AND J.GOODS_DIV IN ( ${goodsDiv} )
 			</if>  
+			<!-- 발주요청 분류 검색 -->         
+			<if test="partCd != null and !partCd.equals('')">
+			    AND Q.PART_CD IN ( ${partCd} )
+			</if>  
 			<!-- 확정여부 -->      
 			<if test="cmpletYn != null and cmpletYn != ''">         
 				AND NVL2(IPGO.PCHS_NO,'Y','N') = #{cmpletYn}
@@ -326,7 +330,18 @@
 					, TO_CHAR(E.COST_DT, 'YYYY-MM-DD')	AS IN_DT
  			        , C.CLNT_NM
  			        , '' 			AS DSGN_NO
-					, '비용처리건' 		AS MATR_NM
+					, DECODE( E.CTRT_NO, NULL, E.COST_RMK, 
+	 			        TRIM( BOTH ',' FROM
+					        CASE WHEN INSTR(Y.CTRT_ITEMS, 'CTRITEM01') > 0 THEN '설계,' ELSE '' END ||
+					        CASE WHEN INSTR(Y.CTRT_ITEMS, 'CTRITEM02') > 0 THEN '제작,' ELSE '' END ||
+					        CASE WHEN INSTR(Y.CTRT_ITEMS, 'CTRITEM03') > 0 THEN '공사건,' ELSE '' END ||
+					        CASE WHEN INSTR(Y.CTRT_ITEMS, 'CTRITEM04') > 0 THEN '슈퍼바이저,' ELSE '' END ||
+					        CASE WHEN INSTR(Y.CTRT_ITEMS, 'CTRITEM05') > 0 THEN 'A/S,' ELSE '' END ||
+					        CASE WHEN INSTR(Y.CTRT_ITEMS, 'CTRITEM09') > 0 THEN '단품티칭,' ELSE '' END ||
+					        CASE WHEN INSTR(Y.CTRT_ITEMS, 'CTRITEM99') > 0 THEN '기타,' ELSE '' END
+					    )) || '-' ||
+					    (SELECT FN_CM05M01_CD_TO_NM(E.PCHS_COST_DIV20) FROM DUAL ) 	/* 비용상세구분 */
+					    AS MATR_NM
  			        , ''			AS MATR_MAT
  			        , ''			AS MATR_SIZE
  			        , ''			AS MATR_SPEC	
@@ -340,13 +355,12 @@
 					LEFT OUTER JOIN TB_BM02M01 C    ON E.PCHS_CLNT_CD = C.CLNT_CD
 					LEFT OUTER JOIN TB_QM01M01 Q    ON E.REQ_NO = Q.REQ_NO
 					LEFT OUTER JOIN TB_SM10D01 ED   ON E.COST_NO = ED.COST_NO
+		            LEFT OUTER JOIN TB_SM11M01 Y    ON E.CTRT_NO  = Y.CTRT_NO   --외주계약마스터
 					LEFT OUTER JOIN (	SELECT    CO_CD
 												, COST_NO
 												, COUNT(SALES_CD) SL_CNT
 										  FROM TB_SM10D01 ED
 										  GROUP BY  CO_CD, COST_NO)	EC ON E.COST_NO = EC.COST_NO
-					,(	SELECT  'GOODSDIV11'  AS GOODS_DIV
-										  FROM DUAL )	J 
 			WHERE 1 = 1	
 				AND E.PCHS_CLNT_CD != 2	--건양트루넷이 구매처가 아닌것만 취합함
 			<!-- 회사코드 -->         
@@ -357,10 +371,14 @@
 			<if test="pchsGb != null and !pchsGb.equals('')">
 			    AND 'Y' = #{pchsGb}
 			</if>   
-			<!-- 자재불류코드 검색 -->         
-			<if test="goodsDiv != null and !goodsDiv.equals('')">
-			    AND J.GOODS_DIV IN ( ${goodsDiv} )
-			</if>    
+			<!-- 발주요청 분류 검색 -->         
+			<if test="costCd != null and !costCd.equals('')">
+			    AND E.PCHS_COST_DIV10 IN ( ${costCd} )
+			</if>  
+			<!-- 발주요청 분류 검색 -->         
+			<if test="partCd != null and !partCd.equals('')">
+			    AND nvl(Q.PART_CD,'COBTP99') IN ( ${partCd} )
+			</if>  
 			<!-- 확정여부 -->       
 			<if test="cmpletYn != null and cmpletYn != ''">        
 				AND NVL2(E.PCHS_NO,'Y','N') = #{cmpletYn}
@@ -435,7 +453,11 @@
 			<!-- 자재불류코드 검색 -->         
 			<if test="goodsDiv != null and !goodsDiv.equals('')">
 			    AND J.GOODS_DIV IN ( ${goodsDiv} )
-			</if>    
+			</if>   
+			<!-- 발주요청 분류 검색 -->         
+			<if test="partCd != null and !partCd.equals('')">
+			    AND Q.PART_CD IN ( ${partCd} )
+			</if>   
 			<!-- 확정여부 -->         
 			<if test="cmpletYn != null and cmpletYn != ''">          
 				AND NVL2(R.PCHS_NO,'Y','N') = #{cmpletYn}
