@@ -124,7 +124,12 @@ public class WB20SvcImpl implements WB20Svc {
 
 		//TODODIV2090:WBS조치 이슈조치결과 담당팀장 위험도 평가내역 수정 처리
 		} else if ("TODODIV2090".equals(paramMap.get("todoDiv2CodeId"))) {
-			result += wb24Mapper.updateWbsIssueResultEvaluate(paramMap);
+			if (paramMap.containsKey("actDngEval")) {
+				String value = paramMap.get("actDngEval");
+				if (value != null && !value.isEmpty()) {
+					result += wb24Mapper.updateWbsIssueResultEvaluate(paramMap);
+				} 
+			} 
 		}
 	    	
 		//최종결재 완료시 알림톡 발송 대상인지 확인 
