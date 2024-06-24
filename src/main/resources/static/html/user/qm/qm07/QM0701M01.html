@@ -132,7 +132,7 @@
 							<div style="text-align:right">
 <!-- 								<input type=radio id="chartLine" name="chartOption" value="line" onchange="gridView.initView().setData();" checked><label for="chartLine"> 선으로 보기 </label> -->
 <!-- 								<input type=radio id="chartColumn" name="chartOption" value="column" onchange="gridView.initView().setData();"><label for="chartColumn"> 막대로 보기 </label> -->
-								&nbsp &nbsp (단위: 원,건수)
+								&nbsp &nbsp (단위: 천원,건수)
 <!-- 								<select id="searchUnit" name="searchUnit" data-search="searchItem" onchange="gridView.initView().setData();"> -->
 <!-- 									<option value="100000000">억원</option> -->
 <!-- 									<option value="1000000" selected>백만원</option> -->
@@ -151,7 +151,7 @@
 					<tr>
 						<td colspan=2>
 							<div class="" style="margin:0px;padding:0px;width:100%;">
-								<div data-ax5grid="grid01" data-ax5grid-config="{}" style="height:158px; width: 100%"></div>
+								<div data-ax5grid="grid01" data-ax5grid-config="{}" style="height:184px; width: 100%"></div>
 							</div>
 						</td>
 					</tr>
@@ -163,6 +163,9 @@
 </html>
 
 <script type="text/javascript">
+	//10분간격으로 화면 다시그리기
+	var chartSeq = 0;
+	var tempTit = '전체';
 	var chartData;
 	var gridView = {
 			initView : function() {
@@ -194,6 +197,32 @@
 			$.each($('[data-search]'), function(idx, elem){
 				paramObj[$(elem).data("search")] = $(elem).val();
 			});	
+			if (chartSeq == 0) {
+				paramObj.partCd = '';
+				tempTit = '장애전체';
+			} else if (chartSeq == 1) {
+				paramObj.partCd = 'COBTP02';
+				tempTit = '추가';
+			} else if (chartSeq == 2) {
+				paramObj.partCd = 'COBTP03';
+				tempTit = '장애';
+			} else if (chartSeq == 3) {
+				paramObj.partCd = 'COBTP05';
+				tempTit = 'A/S무상';
+			} else if (chartSeq == 4) {
+				paramObj.partCd = 'COBTP09';
+				tempTit = '설치시운전';
+			} else if (chartSeq == 5) {
+				paramObj.partCd = 'COBTP99';
+				tempTit = '기타';
+			} else if (chartSeq == 6) {
+				paramObj.partCd = '';
+				tempTit = '금액점유율';
+			} else if (chartSeq == 7) {
+				paramObj.partCd = '';
+				tempTit = '수주대비 장애비용 점유율';
+			} 
+			chartSeq = ++chartSeq % 8;
 			postAjax("/user/qm/qm07/selectQualityReqSCDSTSList", paramObj, null, function(data) {
 				let list = data.list;
 				gridView.initView();
@@ -203,11 +232,13 @@
 				}
 				let gbn = $("#partCd_S option:selected").text();
 				let viewRow1 = {"tit": gbn + " 담당자", "reqTot":list[0].errCnt};
-				let viewRow2 = {"tit": gbn + "건수"	, "reqTot":list[0].reqTot};
+				let viewRow2 = {"tit": gbn + "건수"	, "reqTot":list[0].totCnt};
 				let viewRow3 = {"tit":"일정지연건수", "reqTot":list[0].aftErrTot};
-				let viewRow4 = {"tit":"매입확정금액", "reqTot":list[0].pchsAmtTotAll};
+// 				let viewRow4 = {"tit":"매입확정금액", "reqTot":list[0].pchsAmtTotAll};
+				let viewRow4 = {"tit":"수주금액", "reqTot":list[0].ordrsPrcTotAll};
 				let viewRow5 = {"tit":"입고금액", "reqTot":list[0].inDtlAmtTotAll};
 				let viewRow6 = {"tit":"금액점유율(%)", "reqTot":100};
+				let viewRow7 = {"tit":"수주대비(%)", "reqTot":(list[0].inDtlAmtTotAll/list[0].ordrsPrcTotAll*100).toFixed(3)};
 				let cellWidth = 1500 / list.length ;
 
 				var names = list.map(item => item.ordrgIdNm);
@@ -223,30 +254,84 @@
 // 				    ['지연'].concat(list.map(item => parseInt(item.errCnt))),
 // 				    ['지연2'].concat(list.map(item => parseInt(item.errCnt)))
 // 				];
-				var formattedData = [['이름','추가','장애','A/S무상','설치시운전','장애']];
+				var formattedData = [];
+                if (chartSeq == 1) {
+					formattedData = [['이름','추가','장애','A/S무상','설치시운전','기타','장애']];
+                } else  if (chartSeq == 0) {
+					formattedData = [['이름','점유율']];
+                } else {
+                	formattedData = [['이름',tempTit,tempTit]];
+                }
 				let tempData = [];
 				
                 $.each(list, function(idx, elem){
+                	//하단 그리드 데이터 생성
                 	gridView.target.addColumn({key: "dt"+[idx], label:list[idx].ordrgIdNm, align:"center", width: cellWidth, formatter:"money"});
                 	viewRow1["dt"+idx] = list[idx].ordrgIdNm;
                 	viewRow2["dt"+idx] = list[idx].errCnt;
                 	viewRow3["dt"+idx] = list[idx].aftErrCnt;
-                	viewRow4["dt"+idx] = list[idx].pchsAmtTot;
+//                 	viewRow4["dt"+idx] = list[idx].pchsAmtTot;
+                	viewRow4["dt"+idx] = list[idx].ordrsPrc;
                 	viewRow5["dt"+idx] = list[idx].inDtlAmtTot;
 //                 	viewRow6["dt"+idx] = (list[idx].errCnt * 100 / list[idx].normalTot).toFixed(1);
                 	viewRow6["dt"+idx] = list[idx].pchsAmtPct;
+                	viewRow7["dt"+idx] = list[idx].ordrsPrcPct;
                 	
                 	//그래프 생성용 데이터 편집
-                	tempData = [
-                		  list[idx].ordrgIdNm
-                		, parseInt(list[idx].sumAmt02)
-                		, parseInt(list[idx].sumAmt03)
-                		, parseInt(list[idx].sumAmt05)
-                		, parseInt(list[idx].sumAmt09)
-//                 		, parseInt(list[idx].sumAmt99)
-//                 		, parseInt(list[idx].pchsAmtTot)
-                		, parseInt(list[idx].sumAmt03)
-                	];
+                	if (chartSeq == 1) {
+	                	tempData = [
+	                		  list[idx].ordrgIdNm
+	                		, parseInt(list[idx].sumAmt02)
+	                		, parseInt(list[idx].sumAmt03)
+	                		, parseInt(list[idx].sumAmt05)
+	                		, parseInt(list[idx].sumAmt09)
+	                		, parseInt(list[idx].sumAmt99)
+	//                 		, parseInt(list[idx].pchsAmtTot)
+	                		, parseInt((chartSeq % 6 == 1) ? list[idx].sumAmt03 : list[idx].pchsAmtTot)
+	                	];
+                	} else if (chartSeq == 2) {
+	                	tempData = [
+	                		  list[idx].ordrgIdNm
+	                		, parseInt(list[idx].sumAmt02)
+	                		, parseInt((chartSeq % 6 == 2) ? list[idx].sumAmt02 : list[idx].pchsAmtTot)
+	                	];
+	            	} else if (chartSeq == 3) {
+	                	tempData = [
+	                		  list[idx].ordrgIdNm
+		                	, parseInt(list[idx].sumAmt03)
+	                		, parseInt(list[idx].sumAmt03)
+	                	];
+	            	} else if (chartSeq == 4) {
+	                	tempData = [
+	                		  list[idx].ordrgIdNm
+		                	, parseInt(list[idx].sumAmt05)
+		                	, parseInt(list[idx].sumAmt05)
+	                	];
+	            	} else if (chartSeq == 5) {
+	                	tempData = [
+	                		  list[idx].ordrgIdNm
+		                	, parseInt(list[idx].sumAmt09)
+		                	, parseInt(list[idx].sumAmt09)
+	                	];
+	            	} else if (chartSeq == 6) {
+	                	tempData = [
+	                		  list[idx].ordrgIdNm
+		                	, parseInt(list[idx].sumAmt09)
+		                	, parseInt(list[idx].sumAmt09)
+	                	];
+	            	} else if (chartSeq == 7) {
+	                	tempData = [
+	                		  list[idx].ordrgIdNm
+		                	, parseInt(list[idx].ordrsPrcPct*100)
+		                	, parseInt(list[idx].ordrsPrcPct*100)
+	                	];
+	            	} else if (chartSeq == 0) {
+	                	tempData = [
+	                		  list[idx].ordrgIdNm
+		                	, parseInt(list[idx].pchsAmtPct)
+// 		                	, parseInt(list[idx].ordrsPrcPct)
+	                	];
+	            	}
                 	formattedData.push(tempData);
                 });
 				chartData = formattedData;
@@ -257,6 +342,7 @@
                 viewData.push(viewRow4);
                 viewData.push(viewRow5);
                 viewData.push(viewRow6);
+                viewData.push(viewRow7);
                 
 				gridView.target.setData({
 					list : viewData,
@@ -271,16 +357,21 @@
 	}
 	
 	function drawVisualization() {
-        var data = google.visualization.arrayToDataTable(chartData);
+        let data = google.visualization.arrayToDataTable(chartData);
         var options = {
-				height : 580,
+				height : 550,
 				fontSize: '14',
-                title : '요인별 발주요청서 장애발생 현황',
+                title : '(' + tempTit + ') 발생건수 현황',
+                titleTextStyle: {
+                    fontSize: 24, // 제목 글꼴 크기를 24px로 설정
+                    bold: true,
+                    color: '#333'
+                  },
 //                 vAxis: {title: '금액'},
 //                 hAxis: {title: '담당'},
                 seriesType: 'bars',
 				pointSize: 5,
-				series: { 4: { type: 'line', lineWidth: 4 }, },
+				series: { 5: { type: 'line', lineWidth: 4 }, },
 				chartArea : { left: 200, right: 20, top: 80, bottom: 60},
 				isStacked: false,
 				legend: { position: 'top' },
@@ -289,8 +380,68 @@
 				textStyle: {fontSize: 12, color: '#871b47', auraColor: '#d799ae', opacity: 0.8},
 				 crosshair: { focused: { color: '#3bc', opacity: 0.8 },trigger: 'both' },
               };
-        var chart = new google.visualization.ComboChart(document.getElementById('chart_div1'));
-        chart.draw(data, options);
+        var options2 = {
+				height : 550,
+				fontSize: '16',
+                title : '(' + tempTit + ') 발생건수 현황',
+                titleTextStyle: {
+                    fontSize: 24, // 제목 글꼴 크기를 24px로 설정
+                    bold: true,
+                    color: '#333'
+                  },
+                seriesType: 'bars',
+				pointSize: 5,
+				series: { 1: { type: 'line', lineWidth: 4 }, },
+				chartArea : { fontSize: 12,left: 200, right: 20, top: 80, bottom: 60},
+				isStacked: false,
+				legend: { position: 'top' },
+				alwaysOutside: true,
+				textStyle: {fontSize: 12, color: '#871b47', auraColor: '#d799ae', opacity: 0.8},
+				 crosshair: { focused: { color: '#3bc', opacity: 0.8 },trigger: 'both' },
+              };
+
+        var options3 = {
+        	title: '개인별 장애 금액 현황',
+            titleTextStyle: {
+                fontSize: 24, // 제목 글꼴 크기를 24px로 설정
+                bold: true,
+                color: '#333'
+              },
+        	pieHole: 0.2,
+			height : 550,
+			fontSize: '14',
+			chartArea : { left: 200, right: 20, top: 80, bottom: 60},
+// 	        legend: 'none',
+	        pieSliceText: 'label',
+	        is3D: true
+        };
+        var options4 = {
+            	title: '개인별 수주대비 장애금액 점유율 현황',
+                titleTextStyle: {
+                    fontSize: 24, // 제목 글꼴 크기를 24px로 설정
+                    bold: true,
+                    color: '#333'
+                  },
+            	pieHole: 0.2,
+    			height : 550,
+    			fontSize: '14',
+    			chartArea : { left: 200, right: 20, top: 80, bottom: 60},
+//     	        legend: 'none',
+    	        pieSliceText: 'label',
+            };
+    	if (chartSeq == 1) {
+            var chart = new google.visualization.ComboChart(document.getElementById('chart_div1'));
+        	chart.draw(data, options);
+    	} else if (chartSeq == 7) {
+    		var chart = new google.visualization.PieChart(document.getElementById('chart_div1'));
+        	chart.draw(data, options4);
+    	} else if (chartSeq == 0) {
+    		var chart = new google.visualization.PieChart(document.getElementById('chart_div1'));
+        	chart.draw(data, options3);
+    	} else {
+            var chart = new google.visualization.ComboChart(document.getElementById('chart_div1'));
+    		chart.draw(data, options2);
+    	}
       }
 
 
@@ -337,18 +488,24 @@
 //   		$('#partCd_S').val('COBTP03');
   		
 		google.charts.load('current', {'packages':['corechart']});
+
+		//부서, 프로젝트, 고객사 선택조건 생성
+  		setQM07ComboCreateSelect();
 		
 		// grid init
 		gridView.initView().setData();
 
-		//부서, 프로젝트, 고객사 선택조건 생성
-  		setQM07ComboCreateSelect();
-  		
         // 검색조건 이벤트 bind
 		$('[data-search]').on("change", function(){
 			gridView.initView().setData();
 		});
         
+
+		//10분간격으로 화면 다시그리기
+		var setDataInterval = setInterval(function() {
+			gridView.initView().setData();
+		}, 600000);
+		
 		authChk();
 	});
 	
