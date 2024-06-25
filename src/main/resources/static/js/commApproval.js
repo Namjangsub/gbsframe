@@ -116,6 +116,10 @@ function Approval(htmlParam, param, popParam) {
 								} else if( data.sanctnSn == "1" && typeof(data.preSttus)=="undefined" ) {
 									applyBtn = true;									
 								}
+								//결재문서가 수주목표가 결재가 아니면 순서 상관없이 결재처리 가능함. 20240625 남장섭
+								if (data.todoDiv2CodeId != "TODODIV2100") {
+									applyBtn = true;								
+								}
 								//다음순번이 미결재일 경우 결재의견 가능하게 변경
 								if( data.nextSttus=="N") applyBtn = true;
 								//만족시 버튼 show
