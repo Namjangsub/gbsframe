@@ -29,6 +29,17 @@ public interface CR19Mapper {
 	void call_save_cr19(Map<String, String> param);
 
 	void save_cr19_create_cr10(Map<String, String> param);
+	//아래쪽 수금계획 확정 저장 (계산서, 수금)처리로 대체함 
+//	void call_save_cr19_create_cr10(Map<String, String> paramMap);
+
+	//수금계획 이전 자료 삭제처리 (계산서, 수금) 상세, 및 집계자료
+	int delete_cr19_create_cr10_planBillClmnDtl(Map<String, String> paramMap);
+	int delete_cr19_create_cr10_planBillClmnMst(Map<String, String> paramMap);
+	//수금계획 확정 저장 (계산서, 수금)
+	int save_cr19_create_cr10_planBill(Map<String, String> dtl);
+	int save_cr19_create_cr10_planClmn(Map<String, String> dtl);
+	//수금계획  (계산서, 수금) 집계자료 생성
+	int save_cr19_create_cr10_planClmn_Maste(Map<String, String> paramMap);
+
 	
-	void call_save_cr19_create_cr10(Map<String, String> paramMap);
 }

@@ -107,8 +107,34 @@ public class CR19SvcImpl implements CR19Svc {
 	//}
 	
 	@Override
-	public Map<String, String> save_cr19_create_cr10(Map<String, String> paramMap) {
-		cr19Mapper.save_cr19_create_cr10(paramMap);
-		return paramMap;
+	public int save_cr19_create_cr10(Map<String, String> paramMap) {
+//		cr19Mapper.save_cr19_create_cr10(paramMap);
+		
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		String OrderSeq = "";
+		int result = 0;
+
+		//기존 자료 삭제 처리
+		result += cr19Mapper.delete_cr19_create_cr10_planBillClmnDtl(paramMap);
+		result += cr19Mapper.delete_cr19_create_cr10_planBillClmnMst(paramMap);
+		
+        // 데이터 처리 시작
+		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("planData"), dtlMap);
+	    for (Map<String, String> dtl : dtlParam) {
+			dtl.put("userId", paramMap.get("userId").toString());
+			dtl.put("pgmId", paramMap.get("pgmId").toString());
+			dtl.put("yyyymm", paramMap.get("yyyymm").toString());
+			
+			//계산서, 수금 계획 데이터 처리
+			// planBillAmt01 : 계산서발행계획금액
+			// planClmnAmt01 : 수금계획 금액
+			result += cr19Mapper.save_cr19_create_cr10_planBill(dtl);
+			result += cr19Mapper.save_cr19_create_cr10_planClmn(dtl);
+	    }
+        // 계획 집계자료 생성
+		result += cr19Mapper.save_cr19_create_cr10_planClmn_Maste(paramMap);
+		
+		return result;
 	}
 }

@@ -24,5 +24,5 @@ public interface CR19Svc {
 
 	//void save_cr19_create_cr10(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 	
-	Map<String, String> save_cr19_create_cr10(Map<String, String> paramMap);
+	int save_cr19_create_cr10(Map<String, String> paramMap);
 }

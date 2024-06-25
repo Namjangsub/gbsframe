@@ -74,9 +74,15 @@ public class CR19Ctr {
 	
 	@PostMapping("/save_cr19_create_cr10")
     public String save_cr19_create_cr10(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    	Map<String, String> result = cr19svc.save_cr19_create_cr10(paramMap);
-    	model.addAttribute("result", result);
-    	return "jsonView";
+		try {
+			cr19svc.save_cr19_create_cr10(paramMap);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+		} catch(Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", e.getLocalizedMessage());
+		}
+		return "jsonView";
     }
 	
 	//@PostMapping(value = "/save_cr19_create_cr10")
