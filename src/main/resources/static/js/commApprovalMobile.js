@@ -1,9 +1,17 @@
 
 //결재승인 버튼
-function approvalConfirm() { 
-	commApprovalMobile.confirmApproval();	
+///commApprovalMobile.js 모듈에서 일괄 처리하게 변경
+//function approvalConfirm() { 
+//	commApprovalMobile.confirmApproval();
+//}
+function approvalConfirm() {
+	$('#appConfirmAnchor').hide();
+	if (commApproval.confirmApproval()) {
+		window.history.back();
+		return true;
+	}
+	$('#appConfirmAnchor').show();
 }
-
 //결재 메인
 function Approval(htmlParam, param, popParam) {
 	this.htmlParam = htmlParam;		//결재창 출력영역
