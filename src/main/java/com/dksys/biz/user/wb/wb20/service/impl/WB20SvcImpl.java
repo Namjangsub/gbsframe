@@ -112,10 +112,20 @@ public class WB20SvcImpl implements WB20Svc {
 		int result = 0;	    
 		result += wb20Mapper.updateApprovalLine(paramMap);	
 		
-		//TODODIV202:발주 및 출장 요청 상태코드 바꾸기
+		String tempReqNo = paramMap.get("todoNo");
+		//TODODIV2020:발주 및 출장 요청 상태코드 바꾸기
 		if ("TODODIV2020".equals(paramMap.get("todoDiv2CodeId"))) {
 			//발주요청서 진행상태 변경 처리
-			result += qm01Mapper.updateReqStChk(paramMap);
+			//REQ_ST: REQST01 --> REQST02 로 상태 변경처
+			//result += qm01Mapper.updateReqStChk(paramMap);
+			paramMap.put("reqNo",    tempReqNo);
+			result += qm01Mapper.updateReqSt(paramMap);
+
+		//TODODIV2030:발주 및 출장 요청 결과자료 상태코드 바꾸기
+		} else if ("TODODIV2030".equals(paramMap.get("todoDiv2CodeId"))) {
+			//REQ_ST: REQST02 --> REQST03 로 상태 변경처리
+			paramMap.put("reqNo",    "REQ" + tempReqNo.substring(3, 10));
+			result += qm01Mapper.updateReqStRslt(paramMap);
 
 		//TODODIV2060:WBS이슈 발생에 대한 결재이면 이슈상태 변경처리
 		} else if ("TODODIV2060".equals(paramMap.get("todoDiv2CodeId"))) {
