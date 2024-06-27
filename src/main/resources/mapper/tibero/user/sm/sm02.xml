@@ -439,15 +439,6 @@
 	
 	<!-- bom detail list -->
 	<select id="selectBomDetailList" parameterType="Map" resultType="camelMap">
-		SELECT X.*
-				, 
-				CASE 
-					WHEN((X.BOM_QTY-X.PRE_BOM_QTY) = 0)
-					  THEN 'Y'
-					ELSE 'N'
-				END AS USER_CHK_V		/* 수정시 CHK값 SET */		
-			FROM
-			(
 		        SELECT D.CO_CD
 			        , ( SELECT FN_CM05M01_CD_TO_NM(D.CO_CD) FROM DUAL ) CO_CD_NM
 					, D.SALES_CD
@@ -511,26 +502,24 @@
 			        , F_CO_DEFAULT_WH(#{coCd}, 'GDSGRPWHDIV01', 'CD') AS MATR_WH_CD		/* 입고창고 하드코딩값 */
 			        , F_CO_DEFAULT_WH(#{coCd}, 'GDSGRPWHDIV01', 'NM') AS MATR_WH_NM		/* 입고창고 하드코딩값 */
 			        , D.BOM_QTY /* 구매 BOM 수량 */
-			        , 
-			        (
-			        	SELECT NVL(SUM(ORDRG_QTY), 0) 
-			        		FROM TB_SM02D01 CC
-			        	WHERE 1=1 /* D.CO_CD = CC.CO_CD */ 
-				        		AND D.SALES_CD = CC.SALES_CD 
-				        		AND D.LOWER_CD = CC.LOWER_CD
-				        		AND D.MATR_CD = CC.MATR_CD        		
-			        ) AS PRE_BOM_QTY			/* 구매 BOM 기발주 수량 임시 */        
+			        , CC.ORDRG_QTY AS PRE_BOM_QTY			/* 구매 BOM 기발주 수량 임시 */ 
+			        , DECODE(D.BOM_QTY-CC.ORDRG_QTY, 0, 'Y', 'N')  AS USER_CHK_V		/* 수정시 CHK값 SET */	      
 				FROM TB_SM01D01 D		/* 구매 BOM */
-					INNER JOIN TB_BM05M01 E ON ( D.MATR_CD = E.MATR_CD )	/* 자재마스터 */
+					LEFT OUTER JOIN TB_BM05M01 E ON ( D.MATR_CD = E.MATR_CD )	/* 자재마스터 */
 					LEFT OUTER JOIN  TB_SM01M01 M ON   M.SALES_CD = D.SALES_CD  AND  M.LOWER_CD = D.UPPER_CD
-				WHERE 1=1	
-					AND D.MATR_CD IS NOT NULL
-					AND D.BOM_QTY IS NOT NULL   
+					LEFT OUTER JOIN (
+							        	SELECT CC.SALES_CD, CC.LOWER_CD, CC.MATR_CD, NVL(SUM(ORDRG_QTY), 0)  AS ORDRG_QTY
+							        	  FROM TB_SM02D01 CC
+							        	 WHERE 1=1 /* D.CO_CD = CC.CO_CD */ 
+								           AND CC.SALES_CD = '23170-01FBFDT' 
+								         GROUP BY CC.SALES_CD, CC.LOWER_CD, CC.MATR_CD    	
+								        ) CC ON   CC.SALES_CD = D.SALES_CD  AND  CC.LOWER_CD = D.LOWER_CD AND  CC.MATR_CD = D.MATR_CD
+				WHERE 1=1	  
 					AND D.SALES_CD = #{salesCd}
-			/* ORDER BY D.LOWER_CD, D.UPPER_CD, D.MATR_SEQ */			
-			) X 
-			WHERE (BOM_QTY-PRE_BOM_QTY) != 0 
-			ORDER BY  BOM_PCHS_CLNT_NM ASC, DSGN_NO, MATR_CD
+					AND (D.BOM_QTY - CC.ORDRG_QTY) != 0
+					AND D.MATR_CD IS NOT NULL
+					AND D.BOM_QTY IS NOT NULL 
+			   ORDER BY D.PCHS_CLNT_NM  ASC, M.DSGN_NO, D.MATR_CD 			
 	</select>	
 	
 	<!-- 발주상세 팝업 -->
