@@ -25,6 +25,7 @@ public class User implements UserDetails {
 	private String empNo;
 	private String name;
 	private String coCd;
+	private String mngCoCd;
 	private String deptId;
 	private String levelCd;
     private String email;
@@ -36,6 +37,8 @@ public class User implements UserDetails {
     private String passYn;
     private String passChg;
     private String passChkCnt;
+    private String userGrade;
+    private String clntCd;
     
     @Builder.Default
     private List<String> roles = new ArrayList<>();

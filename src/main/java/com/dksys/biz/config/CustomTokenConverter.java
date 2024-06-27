@@ -27,6 +27,7 @@ public class CustomTokenConverter extends JwtAccessTokenConverter {
 			additionalInfo.put("userNm", user.getName());
 			additionalInfo.put("empNo", user.getEmpNo());
 			additionalInfo.put("coCd", user.getCoCd());
+			additionalInfo.put("mngCoCd", user.getMngCoCd());
 			additionalInfo.put("deptId", user.getDeptId());
 			additionalInfo.put("levelCd", user.getLevelCd());
 			additionalInfo.put("email", user.getEmail());
