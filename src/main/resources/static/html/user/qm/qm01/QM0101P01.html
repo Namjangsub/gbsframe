@@ -823,37 +823,10 @@
          alert("결재가 이미 진행중입니다.");
          return;
       }
+
        if (inputValidation($('.popup_area [required]'))) {               // 필수 필드의 유효성 검사
           var formData = makeFormData();                              // 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
-          /*
-              *   결재그리드 insert make start
-              */   
-              //각업무에 맞는 param insert - 하드코딩값
-            var addParam = {
-                     coCd: $("#popForm #coCd").val()
-                     , pgmId: "QM0101P01"
-                     , pgPath: "/user/qm/qm01/QM0101P01.html"
-                     , sanctnSttus: "N"
-                     , salesCd: $("#popForm #salesCd").val()
-                     , todoCoCd: $("#popForm #coCd").val()
-                     , todoNo: $("#popForm #reqNo").val()
-                     , todoFileTrgtKey: modalStack.last().paramObj.fileTrgtKey
-                     , userId: jwt.userId
-                     };
-            //부모창에서 넘어온값 - pgp
-            var modalParam = {}; 
-            $.each(modalStack.last().paramObj, function (key, val) {      
-               modalParam[key] = val;
-            });      
-            if( Object.keys(modalParam).length > 0 ) {
-               var pgParam = {pgParam: JSON.stringify(modalParam)}
-               Object.assign(addParam, pgParam);
-            }
-              approvalArr = $.approvalInsertArr(gridViewPop, addParam);
-            //결재그리드
-            if(approvalArr.length > 0) {
-               formData.append("approvalArr", JSON.stringify(approvalArr));
-            }
+         
               /* 결재그리드 insert make end */
             filePostAjax("/user/qm/qm01/updateQualityReq", formData,function(data) {
                   alert(data.resultMessage);
@@ -935,86 +908,96 @@
       //--첨부화일 처리를 위한 부분 끝
       //--------------------------------------------------------------- 
 
-       // 공유대상자 리스트  TODO LIST에 등록하기 위한 모듈 추가 (박성준 : 2023.08.03) 
+       // 공유대상자 리스트  TODO LIST에 등록하기 위한 모듈 추가 
       // 공유 : TODODIV10, TODODIV1040  결재 :TODODIV20, TODODIV2020
+
+		/*	결재그리드 insert make start */	
+	    //발행자의 담당팀장 결재라인에 자동 등록 처리하기
+		selectTeamManagerInfo($('#ordrgId').val());   
+   	
+		//결재그리드
        var rowSharngList = gridViewPop.target.list;
-       var ParamObj = modalStack.last().paramObj.ParamObj;
+       var ParamObj = modalStack.last().paramObj;
 
-       var rowSharngListArr = []; //공유정보
-       var rowApprovalListArr = []; //결재정보
+       var approvalArr = []; //결재정보
+		//TITLE 추가
+       var tempTitl = $("#clntNm").val() + ',' + clntPjt + ',' + $("input[name='COBTP']:checked")[0].dataset.label + ', ' + $("input[name='CODECOBGB']:checked")[0].dataset.label ;
+      
+      //각업무에 맞는 param insert - 하드코딩값
+		var addParam = {
+					  coCd: $('#coCd').val()
+					, salesCd: $('#salesCd').val()
+					, pgmId: $("#pgmId").val()
+					, pgPath: "/user/qm/qm01/QM0101P01.html"
+					, sanctnSttus: "N"
+					, todoCoCd: $('#coCd').val()
+					, todoNo: $("#reqNo").val()
+					, todoFileTrgtKey: $("#fileTrgtKey").val()
+					, userId: jwt.userId
+					, todoTitl:  wordRemove(tempTitl)
+					, todoKey: ""
+					, todoCodeKind: ""
+					, todoCodeId: ""
+			};
+
+        let 결재순번 = 0;
+        let 공유순번 = 0;
        if(rowSharngList.length > 0) {
-           $.each(rowSharngList, function(idx, elem){
-               var rowSharngListObj = elem;
-               var rowApprovalListObj = elem;
+           $.each(rowSharngList, function(idx, elem) {
+               var approvalListObj = elem;
 
-               if (elem.gb == '공유'){
-                  rowSharngListObj["gb"] = elem.gb;
-                  rowSharngListObj["coCd"] = $('#coCd').val();
-                   rowSharngListObj["salesCd"] = $('#salesCd').val();
-                   rowSharngListObj["todoDiv1CodeId"] = "TODODIV10";
-                   rowSharngListObj["todoDiv2CodeId"] = "TODODIV1040";
-                   rowSharngListObj["todoId"] = elem.usrNm;
-                   rowSharngListObj["todoCoCd"] = elem.coCd;
-                   rowSharngListObj["empNo"] = elem.empNo;
-                   rowSharngListObj["name"] = elem.name;
-                   rowSharngListObj["telNo"] = elem.telNo;
-                   rowSharngListObj["email"] = elem.eMail;    
-                   rowSharngListObj["pgPath"] = "/user/qm/qm01/QM0101P01.html";
-                 //TITLE 추가
-                   var tempTitl = $("#clntNm").val() + ',' + clntPjt + ',' + $("input[name='COBTP']:checked")[0].dataset.label + ', ' + $("input[name='CODECOBGB']:checked")[0].dataset.label ;
-                   wordRemove(tempTitl);
-                   rowSharngListObj['todoTitle'] = tempTitl;
-                   rowSharngListArr.push(rowSharngListObj);
-
+               addParam["todoId"] = elem.usrNm;
+               addParam["empNo"] = elem.empNo;
+               addParam["name"] = elem.name;
+               addParam["telNo"] = elem.telNo;
+               addParam["email"] = elem.eMail;
+               addParam["gb"] = elem.gb;
+               
+               ParamObj["actionType"] = (elem.gb == '공유')? "T" : "S";
+               addParam["pgParam"] = JSON.stringify(ParamObj);
+               
+               if (elem.gb == '공유') {
+	               	공유순번 += 1;
+	               	approvalListObj["sanctnSn"] = 공유순번;
+	               	approvalListObj["todoDiv1CodeId"] = "TODODIV10";
+	               	approvalListObj["todoDiv2CodeId"] = "TODODIV1040";
+               } else if (elem.gb == '결재') {
+	               	결재순번 += 1;
+	               	approvalListObj["sanctnSn"] = 결재순번;
+	               	approvalListObj["todoDiv1CodeId"] = "TODODIV20";
+	               	approvalListObj["todoDiv2CodeId"] = "TODODIV2020";
                }
-               else if (elem.gb == '결재'){
-                    rowApprovalListObj["gb"] = elem.gb;
-                    rowApprovalListObj["coCd"] = $('#coCd').val();
-	                rowApprovalListObj["salesCd"] = $('#salesCd').val();
-	                rowApprovalListObj["todoDiv1CodeId"] = "TODODIV20";
-	                rowApprovalListObj["todoDiv2CodeId"] = "TODODIV2020";
-	                rowApprovalListObj["todoId"] = elem.usrNm;
-	                rowApprovalListObj["todoCoCd"] = elem.coCd;
-	                rowApprovalListObj["empNo"] = elem.empNo;
-	                rowApprovalListObj["name"] = elem.name;
-	                rowApprovalListObj["telNo"] = elem.telNo;
-	                rowApprovalListObj["email"] = elem.eMail;    
-	                rowApprovalListObj["pgPath"] = "/user/qm/qm01/QM0101P01.html";
-	               //TITLE 추가
-                   let tempTitl = $("#clntNm").val() + ',' + clntPjt + ',' + $("input[name='COBTP']:checked")[0].dataset.label + ', ' + $("input[name='CODECOBGB']:checked")[0].dataset.label ;
-                   wordRemove(tempTitl);
-                   tempTitl =  wordRemove(tempTitl);
-                   rowApprovalListObj['todoTitle'] = tempTitl;
-                   rowApprovalListArr.push(rowApprovalListObj);
-               }
+               const mergedParam = {...addParam, ...approvalListObj}//속성합치기
+               approvalArr.push(mergedParam); 
            });
        }
        
 		//작성자와 발행자가 다를경우 발행자에게 공유카톡 자동 발송 추가
 		if ($("#regId").val() != $("#ordrgId").val()) {
-			let rowSharngListObj ={};
-     		rowSharngListObj["gb"] = '공유';
-     		rowSharngListObj["coCd"] = $('#coCd').val();
-          rowSharngListObj["salesCd"] = $('#salesCd').val();
-          rowSharngListObj["todoDiv1CodeId"] = "TODODIV10";
-          rowSharngListObj["todoDiv2CodeId"] = "TODODIV1040";
-          rowSharngListObj["todoId"] = $("#ordrgId").val();
-          rowSharngListObj["usrNm"] = $("#ordrgId").val();
-          rowSharngListObj["todoCoCd"] = $('#coCd').val();
-          rowSharngListObj["empNo"] = $("#ordrgId").val();
-          rowSharngListObj["name"] = $('#ordrgNm').val();
-          rowSharngListObj["telNo"] = '';
-          rowSharngListObj["email"] = '';    
-          rowSharngListObj["pgPath"] = "/user/qm/qm01/QM0101P01.html";
-        //TITLE 추가
-          var tempTitl = $("#clntNm").val() + ',' + clntPjt + ',' + $("input[name='COBTP']:checked")[0].dataset.label + ', ' + $("input[name='CODECOBGB']:checked")[0].dataset.label ;
-          wordRemove(tempTitl);
-          rowSharngListObj['todoTitle'] = tempTitl;
-          rowSharngListArr.push(rowSharngListObj);
-		}           
-       formData.append("rowSharngListArr", JSON.stringify(rowSharngListArr));
-       formData.append("rowApprovalListArr", JSON.stringify(rowApprovalListArr));
 
+            addParam["todoId"] = $("#ordrgId").val();
+            addParam["usrNm"] = $("#ordrgId").val();
+            addParam["empNo"] = $("#ordrgId").val();
+            addParam["name"] = $('#ordrgNm').val();
+            addParam["telNo"] = '';
+            addParam["email"] = '';
+            addParam["gb"] = '공유';
+            ParamObj["actionType"] = "T";
+            addParam["pgParam"] = JSON.stringify(ParamObj);
+            
+            var approvalListObj = {};
+
+           	공유순번 += 1;
+           	approvalListObj["sanctnSn"] = 공유순번;
+           	approvalListObj["todoDiv1CodeId"] = "TODODIV10";
+           	approvalListObj["todoDiv2CodeId"] = "TODODIV1040";
+           	
+            const mergedParam = {...addParam, ...approvalListObj}//속성합치기
+            approvalArr.push(mergedParam); 
+		}           
+		formData.append("approvalArr", JSON.stringify(approvalArr));
+	    /*	결재그리드 insert make end */
+		
        formData.append("S_todoDiv1CodeId", "TODODIV10");
        formData.append("S_todoDiv2CodeId", "TODODIV1040");
 
@@ -1399,5 +1382,77 @@
                   kakaoErr = data.resultList;
                }
    });     //user search ajax end   
+
+   
+   //조치담당자 팀장 정보 가져오기
+	function selectTeamManagerInfo(paramUserId) {
+		//결자자 정보 가져오기//결자자 정보 가져오기 gridViewPop2
+       var appshaList = gridViewPop.target.list.map(function(item) {
+			            return {
+			                gb: item.gb,
+			                usrNm: item.usrNm,
+			                name: item.name,
+			                jik: item.jik,
+			                dtNm: item.dtNm,
+			                telNo: item.telNo,
+			                offTelNo: item.offTelNo,
+			                email: item.email,
+			            };
+			        });
+		
+		
+       var appArray = $.grep(appshaList, function(item) { return item.gb === "결재"; }).map(function(item) {
+			            return {
+			                gb: item.gb,
+			                usrNm: item.usrNm,
+			                name: item.name,
+			                jik: item.jik,
+			                dtNm: item.dtNm,
+			                telNo: item.telNo,
+			                offTelNo: item.offTelNo,
+			                email: item.email
+			            };
+			        });
+       var shaArray =  $.grep(appshaList, function(item) { return item.gb === "공유"; }).map(function(item) {
+			            return {
+			                gb: item.gb,
+			                usrNm: item.usrNm,
+			                name: item.name,
+			                jik: item.jik,
+			                dtNm: item.dtNm,
+			                telNo: item.telNo,
+			                offTelNo: item.offTelNo,
+			                email: item.email
+			            };
+			        });
+     
+       var formData = {
+           "userId" : paramUserId,
+       }
+       postAjaxSync("/user/wb/wb24/selectTeamManagerInfo", formData, null, function(data) {
+       	if (data.result != '' && data.result!=null) { 
+       		//결자자 정보 가져오기
+       		let list = data.result;
+       		if (appArray.some(item => item.usrNm === list.id)) {
+       			//Array에 usrNm 의 값중에 list.id와 같은 값이 있으면 true
+       		} else {
+       			appArray.push({
+		                        gb: "결재",
+		                        usrNm: list.id,
+		                        name: list.name,
+		                        jik: list.levelNm,
+		                        dtNm: list.deptNm,
+		                        telNo: list.telNo,
+		                        offTelNo: list.offTelNo,
+		                        email: list.email,
+		                        todoNo: $('#rsltNo').val(),
+		                        sanctnSn: 0,
+		                    });
+       		}
+	            
+       		gridViewPop.setData2(appArray.concat(shaArray));
+       	}
+		});
+	}
    
 </script>

@@ -184,7 +184,9 @@ public class WB20SvcImpl implements WB20Svc {
 		String maxTodoKey = "";		
 		if( paramMap.containsKey("approvalArr") ) {		
 			//수정시 삭제된 부분만 처리가 불가하여 전체 삭제후 저장
-			wb20Mapper.deleteAllTodoMaster(detailMap.get(0));
+			for(Map<String, String> dtl : detailMap) {
+				wb20Mapper.deleteAllTodoMaster(dtl);
+			}		
 			
 			//결제라인 insert			
 			for(Map<String, String> dtl : detailMap) {

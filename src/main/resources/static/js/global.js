@@ -809,6 +809,15 @@ function setCommonSelect(selectArr){
 			var optionHtml = '';
 			var codeList = data.childCodeList;
 			$.each(codeList, function (index, item){
+//				if ($(elem).data('kind') == 'CO') {	//회사코드인 경우 관리회사만 가능 함.
+//				if ($(elem).attr('ID') == 'coCd_S') {	//회사코드인 경우 관리회사만 가능 함.
+//					if (jwt.mngCoCd.includes(item.codeId)) {
+////						console.log('관리회사입니다.');
+//					} else {
+////						console.log('조회불가 회사입니다.');
+//						return ;
+//					}
+//				}
 				optionHtml += '<option value="'+item.codeId+'" data-rprc="'+item.codeRprc+'" data-etc="'+item.codeEtc+'" data-desc="'+item.codeDesc+'" data-dz-code="'+item.dzCode+'">';
 				optionHtml += item.codeNm;
 				optionHtml += '</option>';
@@ -817,95 +826,6 @@ function setCommonSelect(selectArr){
 		})
 	})
 }
-
-function setCommonDiv(inputCd){
-	$.each(inputCd, function(idx, elem){
-		var param = {
-			"codeKind" : $(elem).data('kind')
-		};
-		postAjaxSync("/admin/cm/cm05/selectChildCodeList", param , null,  function(data){
-			var inputHtml = '';
-			var codeList = data.childCodeList;
-			var i = "CP";
-			var j = 0;
-			   $.each(codeList, function (index, item){
-					j = j+1;
-					inputHtml += '<td style="border:0px;font-size:13px;">';
-					inputHtml += '<input type="radio" id="'+item.codeKind+j+'" name="'+item.codeKind+i+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
-					inputHtml += ' ' +item.codeNm;
-					inputHtml += '</td>';
-				});
-				$(elem).append(inputHtml);
-
-		})
-	})
-}
-
-function setCommonTd(inputCd,inputCd2,inputCd3){
-	$.each(inputCd, function(idx, elem){
-		var param = {
-			"codeId" : inputCd2,
-			"codeKind" : inputCd3
-		};
-		postAjaxSync("/admin/cm/cm05/selectChildCodeList", param , null,  function(data){
-			var inputHtml = '';
-			var codeList = data.childCodeList;
-			var i = "CP";
-			var j = 0;
-			   $.each(codeList, function (index, item){
-					j = j+1;
-					inputHtml += '<input type="checkbox" id="'+item.codeKind+j+'M" name="'+item.codeKind+i+'" value="'+item.codeId+'" style="padding:0px;margin:0;width:auto;">';
-					inputHtml += ' ' +item.codeNm+' ';
-
-				});
-				$(elem).append(inputHtml);
-
-		})
-	})
-}
-
-
-function setCommonItem(inputCd){
-	$.each(inputCd, function(idx, elem){
-		var param = {
-			"codeKind" : $(elem).data('kind')
-		};
-		postAjaxSync("/admin/cm/cm05/selectPtchildCodeList", param , null,  function(data){
-			var inputHtml = '';
-			var codeList = data.PtchildCodeList;
-			var i = "CP";
-			var j = 0;
-			$.each(codeList, function (index, item){
-				j = j+1;
-				inputHtml += '<tr>';
-				if(item.midNm2 == ' '){
-				    inputHtml += ' ';
-				}else{
-				    inputHtml += '<th rowspan="'+item.subCnt+'">';
-				}
-				inputHtml += item.midNm2;
-				inputHtml += '</th>';
-				inputHtml += '<td style="text-align:left;height:20px;">';
-				inputHtml += ' ';
-				inputHtml += '<input type="checkbox" id="'+item.midCd+j+'" name="'+item.midCd+i+'" value="'+item.subCd+'">';
-				inputHtml += ' ';
-				inputHtml += item.subNm;
-				inputHtml += '</td>';
-				inputHtml += '</tr>';
-			});
-			if(i < 16){
-			  for (i; i < 15; i++) {
-				inputHtml += '<tr style="height:20px;">';
-				inputHtml += '<th> </th>';
-				inputHtml += '<td> </th>';
-				inputHtml += '</tr>';
-			  }
-			}
-			$(elem).append(inputHtml);
-		})
-	})
-}
-
 
 function mainDefaultLoad(menuNm, subMenuNm) {
 	// left
@@ -1177,20 +1097,6 @@ function authChk(menuUrl){
 	}
 		var arr = JSON.parse(getCookie("authArr"));
         var saveYn = "N";
-//        for(var i = 0; i < arr.length; i++){
-//            if(arr[i].m == menuUrl){
-//                saveYn = arr[i].s;
-//                break;
-//            }
-//        }
-//        $.each($("[authchk]"), function(idx, elem){
-//            if(saveYn == "Y"){
-//                $(elem).show();
-//            } else {
-////                $(elem).hide();
-//                $(elem).remove();
-//            }
-//        });
 
         //array함수로 기능 대체하고 버튼을 삭제함(버튼을 사용하는 프로그램은 오류 발생 가능)
         // 버튼 숨김으로 하면 소스 편집하여 강제처리가능으로 위험

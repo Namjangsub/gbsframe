@@ -177,33 +177,18 @@ public class QM01SvcImpl implements QM01Svc {
 	//첨부 화일 처리  끝 
 	//---------------------------------------------------------------  
 
-	
+
 	//---------------------------------------------------------------  
 	// 결재라인 처리 시작 
 	//---------------------------------------------------------------	
-//	List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
-//	if (sharngChk.size() > 0) {
-//		QM01Mapper.deleteWbsSharngList(paramMap); 
-//	}
-//	
-//	List<Map<String, String>> approvalgChk = QM01Mapper.deleteWbsApprovalListChk(paramMap); 
-//	if (approvalgChk.size() > 0) {
-//		QM01Mapper.deleteWbsApprovalList(paramMap); 
-//	}
-
-	Gson gson = new Gson();
 	if( paramMap.containsKey("approvalArr") ) {	
-		List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("approvalArr"), dtlMap);
-		if (approvalArr != null && approvalArr.size() > 0 ) {
-	        for (Map<String, String> approvalMap : approvalArr) {
         		//결제라인 insert
-        		result += wb20Svc.insertTodoMaster(approvalMap);	
-	        }
-		}						
+        		result += wb20Svc.insertTodoMaster(paramMap);	
 	}		
 	//---------------------------------------------------------------  
 	// 결재라인 처리 end
 	//---------------------------------------------------------------
+
 
      return result;
   }
@@ -320,57 +305,17 @@ public class QM01SvcImpl implements QM01Svc {
 		//---------------------------------------------------------------  
 		//첨부 화일 처리  끝 
 		//---------------------------------------------------------------  
-	    
-		Gson gson = new Gson();	
-		
-		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
-		if (sharngChk.size() > 0) {
-			QM01Mapper.deleteWbsSharngList(paramMap); 
-		}
-		
-		String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
-		pgParam1 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
-		pgParam1 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
-		pgParam1 += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
-		pgParam1 += "\"reqNo\":\""+ paramMap.get("reqNo") +"\"}";
-		//공유
-		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
-		if (sharngArr != null && sharngArr.size() > 0 ) {
-			int i = 0;
-	        for (Map<String, String> sharngMap : sharngArr) {
-	            	    sharngMap.put("reqNo", paramMap.get("reqNo"));
-	            	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-	            	    sharngMap.put("pgmId", paramMap.get("pgmId"));
-	            	    sharngMap.put("userId", paramMap.get("userId"));
-	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
-	            	    sharngMap.put("pgParam", pgParam1);
-	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
-	            	i++;
-	        }
-		}
-		
-		String pgParam2 = "{\"actionType\":\""+ "S" +"\",";
-		pgParam2 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
-		pgParam2 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
-		pgParam2 += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
-		pgParam2 += "\"reqNo\":\""+ paramMap.get("reqNo") +"\"}";
-		//결재
-		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
-		if (approvalArr != null && approvalArr.size() > 0 ) {
-			int i = 0;
-	        for (Map<String, String> approvalMap : approvalArr) {
-		            	approvalMap.put("reqNo", paramMap.get("reqNo"));
-		            	approvalMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-		            	approvalMap.put("pgmId", paramMap.get("pgmId"));
-		            	approvalMap.put("userId", paramMap.get("userId"));
-		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
-		            	approvalMap.put("pgParam", pgParam2);
-	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
-	                	i++;
-	        }
-		}	
+
+		//---------------------------------------------------------------  
+		// 결재라인 처리 시작 
+		//---------------------------------------------------------------	
+		if( paramMap.containsKey("approvalArr") ) {	
+	        		//결제라인 insert
+	        		result += wb20Svc.insertTodoMaster(paramMap);	
+		}		
+		//---------------------------------------------------------------  
+		// 결재라인 처리 end
+		//---------------------------------------------------------------
 		
 	    return rtnMap;
   }
