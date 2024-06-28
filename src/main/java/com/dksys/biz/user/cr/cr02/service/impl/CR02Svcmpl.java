@@ -232,6 +232,7 @@ public class CR02Svcmpl implements CR02Svc {
     	        for (Map<String, String> sharngMap : sharngArr) {
     	            try {	 
     	            	    sharngMap.put("reqNo", param.get("ordrsNo"));
+    	            	    sharngMap.put("salesCd", param.get("ordrsNo"));
     	            	    sharngMap.put("fileTrgtKey", param.get("fileTrgtKey"));
     	            	    sharngMap.put("pgmId", param.get("pgmId"));
     	            	    sharngMap.put("userId", param.get("userId"));
@@ -260,6 +261,7 @@ public class CR02Svcmpl implements CR02Svc {
     	        for (Map<String, String> approvalMap : approvalArr) {
     	            try {	 
     		            	approvalMap.put("reqNo", param.get("ordrsNo"));
+    		            	approvalMap.put("salesCd", param.get("ordrsNo"));
     		            	approvalMap.put("fileTrgtKey", param.get("fileTrgtKey"));
     		            	approvalMap.put("pgmId", param.get("pgmId"));
     		            	approvalMap.put("userId", param.get("userId"));
