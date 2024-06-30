@@ -1,0 +1,229 @@
+ <!DOCTYPE html>
+<html lang="ko">
+
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+<link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+<link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
+<link rel="stylesheet" href="/static/css/ax5/ax5mask.css">
+<link rel="stylesheet" href="/static/css/ax5/ax5modal.css">
+	<link rel="stylesheet" href="/static/css/main.css" />
+	<link rel="stylesheet" href="/static/css/sub.css" />
+	<link rel="stylesheet" href="/static/css/m_common.css" />
+	<link rel="stylesheet" href="/static/css/mobile.css" />
+
+<script src="/static/js/jquery-latest.min.js"></script>
+<script src="/static/js/ax5/ax5core.min.js"></script>
+<script src="/static/js/ax5/ax5mask.min.js"></script>
+<script src="/static/js/ax5/ax5modal.min.js"></script>
+<script src="/static/bootstrap/js/bootstrap-datepicker.min.js"></script>
+<script src="/static/bootstrap/js/bootstrap-datepicker.ko.min.js"></script>
+<script src="/static/js/moment/moment-with-locales.js"></script>
+<script src="/static/js/global.js"></script>
+	<!-- 공통결재 -->
+    <script src="/static/js/commApprovalMobile.js"></script>
+<style>
+         .card {
+             display: table;
+             border: 1px solid #EEEEEE;
+             margin-bottom: 10px;
+             width: 100%;
+         }
+        .tg { border-collapse: collapse; border-spacing: 0; width: 100%;}
+        .tg td { border-color: black; border-width: 0.5px; font-size: 10px; overflow: hidden; padding: 10px 5px; word-break: normal;}
+	    .tg .tg-title { background-color:#EEEEEE; text-align: left; vertical-align: middle;}
+        .tg .tg-menu { background-color:#EEEEEE;text-align: right; vertical-align: middle; font-size: 11px;  padding-right: 5px;}
+        .tg .tg-rspn { width: 10px; text-align: left; vertical-align: middle; font-size: 11px;  padding-left: 5px;}
+
+        /* 터치 친화버튼 */
+         button {
+             margin: 1px;
+        }
+		/* 모바일 여백조정 */
+         .card-container {
+             display: table;
+		     width: 100%;
+		     margin-bottom: 1px;
+		     height: 10px;
+         }
+</style>
+</head>
+
+<body>
+	<div id="head_area" class="off" >
+		<div class="left_btn" onclick="history.back(-1)">
+      		<a class="back_btn"></a>
+    	</div>
+		<h1 class="logo">
+      		<img src="/static/img/Logo_gunyangitt.gif" alt="건양ITT" />
+    	</h1>
+	</div>
+	<div id="main_area">
+	    <div id="wbsPopup" class="popup_area" >
+	        <div class="tit_contents">
+	            <h4 class="tit">To-Do List</h4>
+	        </div>
+
+			<div class="contents search" style="margin-bottom: 0px; padding-bottom: 0px;">
+				<table class="table_input">
+                    <tr>
+                        <th style="width:25px;">일자</th>
+                        <td style="width:90px;">
+                            <div class="date_input">
+                                <input id="reqDtFrom" name="reqDtFrom" class="input_calendar" autocomplete="off" onkeyup="dateMask(this);" msg="시작일자" data-search="reqDtFrom">
+                            </div>
+                        </td>
+                        <td style="width:10px;">
+                       ~
+                        </td>
+                        <td style="width:90px;">
+                            <div class="date_input">
+                                <input id="reqDtTo" name="reqDtTo" class="input_calendar" autocomplete="off" onkeyup="dateMask(this);" msg="종료일자" data-search="reqDtTo">
+                            </div>
+                        </td>
+                    </tr>
+               </table>
+			</div>
+			
+			<!-- 카드를 표시할 div 추가 -->
+			<div id="cardContainer" class="card-container"></div>
+			<!-- 카드를 표시할 div 끝 -->
+		</div>
+	</div>
+
+<script type="text/javascript">
+	var list = [];   //전체 list 저장용
+
+	$(document).ready(function () {
+
+		var newScreenWidth = $(window).width();
+    	var newScreenHeight = $(window).height();
+
+    	// 시작일 (현재날짜의 이전월 첫일)
+    	const now = moment().startOf("month");
+    	var beDay = now.add(-15, "d").format("YYYY-MM-DD");
+    	
+        $('#reqDtFrom').datepicker({
+            format : "yyyy-mm-dd",
+            language : "ko",
+            autoclose : true
+        })
+		.datepicker("setDate", beDay)
+        .on("changeDate", function(){
+            if($('#reqDtFrom').val() > $('#reqDtTo').val()){
+                alert("날짜를 확인해주세요");
+                $('#reqDtFrom').datepicker("setDate", new Date($('#reqDtTo').val()));
+            }
+        });
+        
+        $('#reqDtTo').datepicker({
+            format : "yyyy-mm-dd",
+            language : "ko",
+            autoclose : true
+        })
+        .datepicker("setDate", moment(new Date()).endOf("month").toDate())
+        .on("changeDate", function(){
+            if($('#reqDtFrom').val() > $('#reqDtTo').val()){
+                alert("날짜를 확인해주세요");
+                $('#reqDtTo').datepicker("setDate", new Date($('#reqDtFrom').val()));
+            }
+        });
+        $('.date_input').on("changeDate", function(){
+        	toDoList();
+        });
+        
+    	toDoList();
+	});
+
+	function toDoList () {
+ 	    var formData = {
+				"coCd"		: jwt.coCd,
+                "workRptId" : jwt.userId,
+//                 "reqDtFrom" : jwt.userId,
+//                 "reqDtTo" : jwt.userId,
+                "pageNo" :  1,
+				"recordCnt" : 999999999,
+ 	           };
+		postAjax("/user/pm/pm06/selectTripRptList", formData, null, function(data){
+			list = data.result;
+			let cardContainer = $("#cardContainer"); 
+			cardContainer.empty();
+            // 데이터를 이용하여 카드 생성 및 표시
+            if (list.length > 0) {
+	            $.each(list, function (index, item){
+	            	if (item.tripRptCardNo == undefined) item.tripRptRmk='';
+	            	if (item.tripRptCardNo == undefined) item.tripRptCardNo='';
+			    	var cardClass = "card-" + index;
+		            var cardHtml =
+		                `<div class="square-box">
+		                    <div class="card ${cardClass}" style="border: 1px solid #EEEEEE; margin-bottom: 10px;">
+			                    <table class="tg">
+		                            <tr>
+		                            <td class="tg-title" colspan="4">${item.workRptDt} ${item.tripRptTypNm}</td>
+			                        </tr>
+			                        <tr>
+			                            <td class="tg-menu">내용</td>
+			                            <td class="tg-rspn" colspan="3">${item.tripRptRmk}</td>
+			                        </tr>
+			                        <tr>
+			                            <td class="tg-menu">결재방법</td>
+			                            <td class="tg-rspn">${item.tripRptCurTypNm}</td>
+			                            <td class="tg-menu">카드번호</td>
+			                            <td class="tg-rspn">${item.tripRptCardNo}</td>
+			                        </tr>
+			                        <tr>
+			                            <td class="tg-menu">통화종류</td>
+			                            <td class="tg-rspn">${item.tripRptCurrNm}</td>
+			                            <td class="tg-menu">금액</td>
+			                            <td class="tg-rspn" style="color: blue;">${item.tripRptAmt}</td>
+			                        </tr>
+		                            <tr>
+			                            <td class="tg-menu">첨부자료</td>
+			                            <td class="tg-rspn" colspan="3" onclick="imageViewPopupM(${index})">${item.tripRptFileNm}</td>
+			                        </tr>
+	
+		                        </table>
+		                    </div>
+		                </div>`;
+	
+	        		cardContainer.append(cardHtml);
+	
+	                // 각 카드에 고유한 클래스를 부여
+	                $(".card." + cardClass).addClass(cardClass);
+	        	});	
+	            // 코드 끝
+            } else {
+            	
+            	cardContainer.append('<h6 style="font-size:20px;">결재 확인 자료가 없습니다.</h6>');
+            }
+    	});			
+	}	
+	
+	// 공유확인/결재 처리
+	function toDoConfirmApproval(selRow){
+		if( isNaN(selRow) ) {
+			alert("선택된 행이 없습니다.");
+			return;
+		} else {
+		}
+		return;
+	}
+
+
+	//이미지뷰 팝업
+	function imageViewPopupM(index) {
+		const gridList = list[index];
+		let tempFileName = gridList.workRptIdNm + '-' + gridList.attchFileTrgtKey + '-' + gridList.tripRptTypNm + '-' + gridList.tripRptFileNm;
+		var paramObj = {
+				"fileKey" 	: gridList.fileKey,
+				"fileName" 	: tempFileName,
+			};
+		openThirdModal("/static/mobile/modal/attachImageView_M.html", 1300, 875, tempFileName, paramObj, function(data) {
+		});
+	}
+		</script>
+	</body>
+</html>
