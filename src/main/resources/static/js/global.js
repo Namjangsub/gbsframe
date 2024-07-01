@@ -1584,29 +1584,7 @@ function getSearchParam(_form, _pageNo, _recordCnt){
 	}
 	return resultParam;
 }
-//input,select,textarea 읽기
-function readFormData(_form){
-	let resultParam = {};
-	$.each($(_form+" input"), function (idx, elem) {
-		var _name = $(elem).attr('name');
-		if(!isEmpty(_name)){
-			resultParam[_name] = $(elem).val();
-		}
-	});
-	$.each($(_form+" select"), function (idx, elem) {
-		var _name = $(elem).attr('name');
-		if(!isEmpty(_name)){
-			resultParam[_name] = $(elem).val();
-		}
-	});
-	$.each($(_form+" textarea"), function (idx, elem) {
-		var _name = $(elem).attr('name');
-		if(!isEmpty(_name)){
-			resultParam[_name] = $(elem).val();
-		}
-	});
-	return resultParam;
-}
+
 //FormData 데이타에서 comma 제거
 function getFormData(_form){
 	var formData = new FormData($(_form)[0]);
