@@ -1057,7 +1057,7 @@
 				        </if>
 				    <choose>
 				        <when test="salesCd != null and !salesCd.equals('')"> 
-				        AND    ISU.SALES_CD LIKE  '%'||#{salesCd}||'%'
+				        AND    T.SALES_CD LIKE  '%'||#{salesCd}||'%'
 				        </when>
 				        <otherwise>
 						AND    T.WORK_RPT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD')
@@ -1199,7 +1199,8 @@
 							 , ''        AS ISS_DIV_NM
 							 , ''        AS ACT_ID
 							 , ''        AS ACT_ID_NM
-				            , '' 		 AS ACT_DEPT_NM		  --조치부서
+				             , '' 		 AS ACT_DEPT_NM		  --조치부서
+				             , '' 		 AS ACT_DEPT_ID		  --조치부서
 							 , ''        AS ACTS_DT
 							 , ''        AS ACTE_DT
 							 , ''        AS ACT_MH
@@ -1207,7 +1208,6 @@
 							 , ''        AS ACT_CNTS
 							 , ''        AS WBS_RSLTSS_DT
 							 , ''        AS WBS_RSLTSE_DT
-							 , ''        AS REQ_NO
 		                     , '' 		 AS ACT_AMT_STS
 		                     , ''		 AS ACT_AMT_STS_NM
 		                     , ''		 AS ACT_DNG
@@ -1216,6 +1216,11 @@
 		                     , '' 		 AS ACT_DNG_EVAL_NM
 					        , C.PRDT_GRP 	AS PRDT_DIV_CD	
 					        , C7.CODE_NM    AS PRDT_DIV_NM	
+					        , ''  AS MID_CD
+		                    , ''  AS MID_CD_NM
+					        , ''  AS SUB_CD
+		                    , ''  AS SUB_CD_NM
+					        , ''  AS REQ_NO
 				        FROM   TB_PM01M01 AS T
 				               LEFT OUTER JOIN TB_CR02D02 AS CR  ON T.ORD_CO_CD= CR.CO_CD
 				                                                AND T.SALES_CD = CR.SALES_CD
@@ -1232,7 +1237,7 @@
 				        </if>
 				    <choose>
 				        <when test="salesCd != null and !salesCd.equals('')"> 
-				        AND    ISU.SALES_CD LIKE  '%'||#{salesCd}||'%'
+				        AND    T.SALES_CD LIKE  '%'||#{salesCd}||'%'
 				        </when>
 				        <otherwise>
 						AND    T.WORK_RPT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD')
@@ -1293,6 +1298,7 @@
 		                    , ISU.ACT_ID                                              --조치담당자
 							, B2.NAME 							 AS ACT_ID_NM
 				            , B3.DEPT_NM				 		 AS ACT_DEPT_NM		  --조치부서
+				            , SUBSTRING(B2.DEPT_ID,0,5) 		 AS ACT_DEPT_ID		  --조치부서
 		                    , TO_CHAR(ACT.ACTS_DT,'YYYY-MM-DD')  AS ACTS_DT           --조치 시작일
 		                    , TO_CHAR(ACT.ACTE_DT,'YYYY-MM-DD')  AS ACTE_DT           --조치 종료일
 		                    , ACT.ACT_MH                                              --조치 투입공수
@@ -1300,7 +1306,6 @@
 		                    , ACT.ACT_CNTS                                            --조치내용
 		                    , TO_CHAR(RSL.WBS_RSLTSS_DT,'YYYY-MM-DD') AS WBS_RSLTSS_DT--실적시작일
 		                    , TO_CHAR(RSL.WBS_RSLTSE_DT,'YYYY-MM-DD') AS WBS_RSLTSE_DT--실적종료일
-		                    , ACT.REQ_NO 
 		                    , ACT.ACT_AMT_STS
 		                    , (SELECT FN_CM05M01_CD_TO_NM(ACT.ACT_AMT_STS) FROM DUAL) AS ACT_AMT_STS_NM
 		                    , ACT.ACT_DNG
@@ -1309,6 +1314,11 @@
 		                    , (SELECT FN_CM05M01_CD_TO_NM(ACT.ACT_DNG_EVAL) FROM DUAL) AS ACT_DNG_EVAL_NM
 					        , C.PRDT_GRP 	AS PRDT_DIV_CD	
 					        , C7.CODE_NM    AS PRDT_DIV_NM	
+					        , ISU.MID_CD
+		                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.MID_CD) FROM DUAL) AS MID_CD_NM
+					        , ISU.SUB_CD
+		                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.SUB_CD) FROM DUAL) AS SUB_CD_NM
+					        , ISU.REQ_NO
 		                FROM TB_WB24M02  AS ISU --WBS이슈 정보
 			            		LEFT OUTER JOIN TB_CR02D02 AS CR  ON ISU.CO_CD= CR.CO_CD
 			                                                	AND ISU.SALES_CD = CR.SALES_CD
@@ -1360,16 +1370,9 @@
 				        AND    C.PRDT_GRP = #{prdtDiv}
 				        </if> 
 				       ) AS A
-				       		LEFT OUTER JOIN ( SELECT REQ.REQ_NO, sum(ME.PCHS_AMT) AS REQ_AMT
-												FROM (
-														SELECT DISTINCT ISU.SALES_CD, ACT.REQ_NO
-														  FROM TB_WB24M02  AS ISU --WBS이슈 정보
-																LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --실적이슈 조치내용
-														 WHERE 1=1
-														   AND     ISU.CREAT_DTTM BETWEEN TO_DATE( '20240501','YYYYMMDD') AND TO_DATE( '20240630','YYYYMMDD')
-														   AND     ACT.REQ_NO is not null
-														) AS REQ LEFT OUTER JOIN TB_SM12D01  AS ME ON REQ.REQ_NO = ME.REQ_NO
-												GROUP BY REQ.REQ_NO
+				       		LEFT OUTER JOIN ( SELECT ME.REQ_NO, sum(ME.PCHS_AMT) AS REQ_AMT
+												FROM TB_SM12D01 ME
+												GROUP BY ME.REQ_NO
 												) AS REQ ON REQ.REQ_NO = A.REQ_NO
 				WHERE  1 = 1
 				ORDER BY ORDRS_NO DESC, SALES_CD, WORK_RPT_DT DESC, GUBUN
