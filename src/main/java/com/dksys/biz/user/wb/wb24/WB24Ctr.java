@@ -55,7 +55,7 @@ public class WB24Ctr {
 	
     @PostMapping(value = "/selectMaxWbsIssueNo") 
     public String selectMaxWbsPlanNo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	    List<Map<String, String>> result = wb24Svc.selectMaxWbsIssueNo(paramMap);
+	    Map<String, String> result = wb24Svc.selectMaxWbsIssueNo(paramMap);
 	    model.addAttribute("result", result); 
 	    return "jsonView"; 		 
     }
@@ -181,4 +181,26 @@ public class WB24Ctr {
 		return "jsonView";
 	}
 
+	
+	@PostMapping(value = "/select_wb2401p01_planInfo")
+	public String select_wb2401p01_planInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = wb24Svc.select_wb2401p01_planInfo(paramMap);
+		result.put("ISS_NO", "신규등록");
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	
+	@PostMapping(value = "/select_wb2401p01_rsltInfo")
+	public String select_wb2401p01_rsltInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = wb24Svc.select_wb2401p01_rsltInfo(paramMap);
+		//이슈번호 발번---중보오류 발생됨.  여기서 만들면 안됨  Insert작업시 자동 발번 처리로 변경함
+//		Map<String, String> resultIssNo = wb24Svc.selectMaxWbsIssueNo(paramMap);
+//		result.put("ISS_NO", resultIssNo.get("issNo"));
+		result.put("ISS_NO", "신규등록");
+		
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
 }

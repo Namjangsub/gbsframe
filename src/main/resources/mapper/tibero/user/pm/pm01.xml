@@ -1164,7 +1164,7 @@
     </select>
 
     <select id="selectAllIssueWorkList" parameterType="Map" resultType="CamelMap">
-        SELECT A.*
+SELECT A.*
 		FROM   (
 				SELECT ROWNUM AS RNUM
 				     , A.*
@@ -1178,8 +1178,6 @@
 				             , T.WORK_RPT_ID
 				             , B.NAME					 AS WORK_RPT_ID_NM
 				             , B1.DEPT_NM				 AS WORK_RPT_DEPT_NM
-				             , 'ISSSTS03'  AS ISS_STS
-				             , '발생으로완료'  AS ISS_STS_NM
 				             , TO_CHAR(T.WORK_RPT_DT,'YYYY-MM-DD') AS WORK_RPT_DT
 				             , T.ORDRS_NO
 				             , T.SALES_CD
@@ -1197,6 +1195,8 @@
 				             , '작업일보' as JOB_DIV
 				             , ''        AS ISS_DIV
 							 , ''        AS ISS_DIV_NM
+				             , 'ISSSTS03'  AS ISS_STS
+				             , '발생으로완료'  AS ISS_STS_NM
 							 , ''        AS ACT_ID
 							 , ''        AS ACT_ID_NM
 				             , '' 		 AS ACT_DEPT_NM		  --조치부서
@@ -1272,12 +1272,10 @@
 		                    , ISU.FILE_TRGT_KEY                                       --이슈 FILE_TRGT_KEY
 		                    , ISU.CO_CD                                               --회사코드
 			             	, FN_CM05M01_CD_TO_NM(ISU.CO_CD) CO_NM
-		                    , ISU.ISS_NO                                              --이슈번호
+		                    , ISU.ISS_NO        		 AS WORK_RPT_NO               --이슈번호
 		                    , ISU.CREAT_ID  --생성자
 			             	, B.NAME					 AS WORK_RPT_ID_NM
 				            , B1.DEPT_NM				 AS WORK_RPT_DEPT_NM
-		                    , ISU.ISS_STS                                             --이슈상태
-		                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_STS) FROM DUAL) AS ISS_STS_NM
 		                    , TO_CHAR(ISU.CREAT_DTTM,'YYYY-MM-DD') AS CREAT_DTTM   --생성일자
 		                    , Y.ORDRS_NO
 		                    , ISU.SALES_CD                                			--SALES Code
@@ -1295,17 +1293,20 @@
 				            , '일정관리' as JOB_DIV
 		                    , ISU.ISS_DIV                                             --이슈유형
 		                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_DIV) FROM DUAL) AS ISS_DIV_NM
-		                    , ISU.ACT_ID                                              --조치담당자
-							, B2.NAME 							 AS ACT_ID_NM
-				            , B3.DEPT_NM				 		 AS ACT_DEPT_NM		  --조치부서
-				            , SUBSTRING(B2.DEPT_ID,0,5) 		 AS ACT_DEPT_ID		  --조치부서
-		                    , TO_CHAR(ACT.ACTS_DT,'YYYY-MM-DD')  AS ACTS_DT           --조치 시작일
-		                    , TO_CHAR(ACT.ACTE_DT,'YYYY-MM-DD')  AS ACTE_DT           --조치 종료일
-		                    , ACT.ACT_MH                                              --조치 투입공수
+		                    , decode(ISU.REQ_NO, '', ISU.ISS_STS, QM.REQ_ST)      AS ISS_STS	--이슈상태
+		                    , (SELECT FN_CM05M01_CD_TO_NM( decode(ISU.REQ_NO, '', ISU.ISS_STS, QM.REQ_ST)) FROM DUAL) AS ISS_STS_NM
+		                    , decode(ISU.REQ_NO, '', ISU.ACT_ID, QM.ORDRG_ID)       					AS ACT_ID    --조치담당자
+							, decode(ISU.REQ_NO, '', B2.NAME, B4.NAME) 			 						AS ACT_ID_NM
+				            , decode(ISU.REQ_NO, '', B3.DEPT_NM,B5.DEPT_NM) 							AS ACT_DEPT_NM		  --조치부서
+				            , SUBSTRING(decode(ISU.REQ_NO, '', B2.DEPT_ID,B4.DEPT_ID),0,5) 		 		AS ACT_DEPT_ID		  --조치부서
+		                    , TO_CHAR(decode(ISU.REQ_NO, '', ACT.ACTS_DT, QM.ORDRG_DT),'YYYY-MM-DD')  	AS ACTS_DT           --조치 시작일
+		                    , TO_CHAR(decode(ISU.REQ_NO, '', ACT.ACTE_DT, QP.RSLT_DT),'YYYY-MM-DD')  	AS ACTE_DT           --조치 종료일
+--		                    , decode(ISU.REQ_NO, '', ACT.ACT_MH, QP.ACT_MH)          					AS ACT_MH   --조치 투입공수
+		                    , ACT.ACT_MH          					AS ACT_MH   --조치 투입공수
 		                    , ACT.ACT_AMT                                             --조치 투입비용  
-		                    , ACT.ACT_CNTS                                            --조치내용
-		                    , TO_CHAR(RSL.WBS_RSLTSS_DT,'YYYY-MM-DD') AS WBS_RSLTSS_DT--실적시작일
-		                    , TO_CHAR(RSL.WBS_RSLTSE_DT,'YYYY-MM-DD') AS WBS_RSLTSE_DT--실적종료일
+		                    , decode(ISU.REQ_NO, '', ACT.ACT_CNTS, QP.MEAS_RST)      					AS ACT_CNTS    --조치내용
+		                    , TO_CHAR(RSL.WBS_RSLTSS_DT,'YYYY-MM-DD') 									AS WBS_RSLTSS_DT--실적시작일
+		                    , TO_CHAR(RSL.WBS_RSLTSE_DT,'YYYY-MM-DD') 									AS WBS_RSLTSE_DT--실적종료일
 		                    , ACT.ACT_AMT_STS
 		                    , (SELECT FN_CM05M01_CD_TO_NM(ACT.ACT_AMT_STS) FROM DUAL) AS ACT_AMT_STS_NM
 		                    , ACT.ACT_DNG
@@ -1333,6 +1334,10 @@
 				                LEFT OUTER JOIN TB_CM05M01 AS C7 ON C7.CODE_ID = C.PRDT_GRP 
 		            			LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --실적이슈 조치내용
 		              			LEFT OUTER JOIN TB_WB23M01 AS RSL ON ISU.CO_CD = RSL.CO_CD AND ISU.SALES_CD = RSL.SALES_CD AND ISU.WBS_PLAN_CODE_KIND = RSL.WBS_PLAN_CODE_KIND AND ISU.WBS_PLAN_CODE_ID = RSL.WBS_PLAN_CODE_ID AND ISU.WBS_RSLTS_NO = RSL.WBS_RSLTS_NO
+		              			LEFT OUTER JOIN TB_QM01M01 AS QM ON QM.REQ_NO = ISU.REQ_NO
+								LEFT OUTER JOIN TB_QM01P01 AS QP ON QP.REQ_NO = ISU.REQ_NO
+			           			LEFT OUTER JOIN TB_CM06M01 AS B4 ON QM.ORDRG_ID = B4.ID 
+				                LEFT OUTER JOIN TB_CM04M01 AS B5 ON B5.DEPT_ID = SUBSTRING(B4.DEPT_ID,0,5)  
 		               WHERE 1=1
 				        <if test="coCd !=null and !coCd.equals('')">
 				        AND    ISU.CO_CD = #{coCd}
@@ -1375,7 +1380,7 @@
 												GROUP BY ME.REQ_NO
 												) AS REQ ON REQ.REQ_NO = A.REQ_NO
 				WHERE  1 = 1
-				ORDER BY ORDRS_NO DESC, SALES_CD, WORK_RPT_DT DESC, GUBUN
+				ORDER BY WORK_RPT_DT DESC, WORK_RPT_ID_NM,  ACT_ID_NM, SUB_CD_NM
 			   ) AS A
 		WHERE  A.RNUM BETWEEN #{firstIndex} AND #{lastIndex}
     </select>

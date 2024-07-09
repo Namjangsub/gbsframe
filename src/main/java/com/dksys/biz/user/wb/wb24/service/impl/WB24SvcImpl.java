@@ -63,7 +63,7 @@ public class WB24SvcImpl implements WB24Svc {
 	}
 	
 	@Override
-	  public List<Map<String, String>> selectMaxWbsIssueNo(Map<String, String> paramMap) {
+	  public Map<String, String> selectMaxWbsIssueNo(Map<String, String> paramMap) {
 			return wb24Mapper.selectMaxWbsIssueNo(paramMap);
 	}
 	
@@ -71,31 +71,31 @@ public class WB24SvcImpl implements WB24Svc {
 	public int wbsIssueInsert(Map<String, String> paramMap , MultipartHttpServletRequest mRequest) throws Exception {
 		int fileTrgtKey = wb24Mapper.selectWbsIssueSeqNext(paramMap);
 		paramMap.put("issFileTrgtKey", Integer.toString(fileTrgtKey));
+
+		//이슈번호 발번
+		Map<String, String> createIssNo = wb24Mapper.selectMaxWbsIssueNo(paramMap);
+		paramMap.put("issNo", createIssNo.get("issNo"));
 				
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		
+
+		String midCode = paramMap.get("CODECOBGB");
+		String midCd = midCode.substring(0, 7);
+		paramMap.put("midCd", midCd);
 		int result = wb24Mapper.wbsIssueInsert(paramMap);
 		
 		//int result1 = wb24Mapper.wbsActInsert(paramMap);
 		
 		Gson gson = new Gson();		
 		
-		String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("issFileTrgtKey") +"\"}";
-		
-		//String todoTitle = "이슈번호 : " + paramMap.get("issNo") + ",   이슈제목 : " + paramMap.get("issSj");
-		
 		String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 이슈 공유"; 
 		
-		//String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
-		//pgParam1 += "\"fileTrgtKey\":\""+ fileTrgtKey +"\","; 
-		//pgParam1 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
-		//pgParam1 += "\"lvl\":\""+ paramMap.get("lvl") +"\",";
-		//pgParam1 += "\"idx\":\""+ paramMap.get("idx") +"\",";
-		//pgParam1 += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
-		//pgParam1 += "\"ordrsNo\":\""+ paramMap.get("ordrsNo") +"\",";
-		//pgParam1 += "\"codeKind\":\""+ paramMap.get("codeKind") +"\",";
-		//pgParam1 += "\"codeId\":\""+ paramMap.get("codeId") +"\"}";
+		String pgParam = "{\"actionType\":\""+ "I" +"\",";
+		pgParam += "\"fileTrgtKey\":\""+ fileTrgtKey +"\","; 
+		pgParam += "\"issFileTrgtKey\":\""+ fileTrgtKey +"\","; 
+		pgParam += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
+		pgParam += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+		pgParam += "\"ordrsNo\":\""+ paramMap.get("ordrsNo") +"\"}";
 	    
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
@@ -133,47 +133,47 @@ public class WB24SvcImpl implements WB24Svc {
 				i++;
 			}
 		}
-		
-		// 조치정보 공유 결재 처리 프로세스
-		String todoTitle3 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 조치 공유"; 
-		
-		Type stringList4 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> sharngArr2 = gson.fromJson(paramMap.get("rowSharngListArr2"), stringList4);
-		if (sharngArr2 != null && sharngArr2.size() > 0 ) {
-			int i = 0;
-	        for (Map<String, String> sharngMap2 : sharngArr2) {
-				sharngMap2.put("reqNo", paramMap.get("issNo"));
-				sharngMap2.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
-				sharngMap2.put("pgmId", paramMap.get("pgmId"));
-				sharngMap2.put("userId", paramMap.get("userId"));
-				sharngMap2.put("sanCtnSn",Integer.toString(i+1));
-				sharngMap2.put("pgParam", pgParam);
-				sharngMap2.put("todoTitle", todoTitle3);
-				QM01Mapper.insertWbsSharngList(sharngMap2);
-				i++;
-			}
-		}
-		
-		//결재
-		String todoTitle4 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 조치 결재";
-		
-		Type stringList5 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> approvalArr2 = gson.fromJson(paramMap.get("rowApprovalListArr2"), stringList5);
-		if (approvalArr2 != null && approvalArr2.size() > 0 ) {
-			int i = 0;
-	        for (Map<String, String> approvalMap2 : approvalArr2) {
-				approvalMap2.put("reqNo", paramMap.get("issNo"));
-				approvalMap2.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
-				approvalMap2.put("pgmId", paramMap.get("pgmId"));
-				approvalMap2.put("userId", paramMap.get("userId"));
-				approvalMap2.put("sanCtnSn",Integer.toString(i+1));
-				approvalMap2.put("pgParam", pgParam);
-				approvalMap2.put("todoTitle", todoTitle4);
-				QM01Mapper.insertWbsApprovalList(approvalMap2);
-				i++;
-			}
-		}
-		
+//		
+//		// 조치정보 공유 결재 처리 프로세스
+//		String todoTitle3 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 조치 공유"; 
+//		
+//		Type stringList4 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+//		List<Map<String, String>> sharngArr2 = gson.fromJson(paramMap.get("rowSharngListArr2"), stringList4);
+//		if (sharngArr2 != null && sharngArr2.size() > 0 ) {
+//			int i = 0;
+//	        for (Map<String, String> sharngMap2 : sharngArr2) {
+//				sharngMap2.put("reqNo", paramMap.get("issNo"));
+//				sharngMap2.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
+//				sharngMap2.put("pgmId", paramMap.get("pgmId"));
+//				sharngMap2.put("userId", paramMap.get("userId"));
+//				sharngMap2.put("sanCtnSn",Integer.toString(i+1));
+//				sharngMap2.put("pgParam", pgParam);
+//				sharngMap2.put("todoTitle", todoTitle3);
+//				QM01Mapper.insertWbsSharngList(sharngMap2);
+//				i++;
+//			}
+//		}
+//		
+//		//결재
+//		String todoTitle4 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 조치 결재";
+//		
+//		Type stringList5 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+//		List<Map<String, String>> approvalArr2 = gson.fromJson(paramMap.get("rowApprovalListArr2"), stringList5);
+//		if (approvalArr2 != null && approvalArr2.size() > 0 ) {
+//			int i = 0;
+//	        for (Map<String, String> approvalMap2 : approvalArr2) {
+//				approvalMap2.put("reqNo", paramMap.get("issNo"));
+//				approvalMap2.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
+//				approvalMap2.put("pgmId", paramMap.get("pgmId"));
+//				approvalMap2.put("userId", paramMap.get("userId"));
+//				approvalMap2.put("sanCtnSn",Integer.toString(i+1));
+//				approvalMap2.put("pgParam", pgParam);
+//				approvalMap2.put("todoTitle", todoTitle4);
+//				QM01Mapper.insertWbsApprovalList(approvalMap2);
+//				i++;
+//			}
+//		}
+//		
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
 	  	//   필수값 :  jobType, userId, comonCd
@@ -236,35 +236,41 @@ public class WB24SvcImpl implements WB24Svc {
   		//---------------------------------------------------------------  
   		//첨부 화일 권한체크  끝  
   		//---------------------------------------------------------------  
-	  	    
+
+		String midCode = paramMap.get("CODECOBGB");
+		String midCd = midCode.substring(0, 7);
+		paramMap.put("midCd", midCd);
 	    int result = wb24Mapper.wbsIssueUpdate(paramMap);
 		
-		List<Map<String, String>> actchk = wb24Mapper.actChk(paramMap);
-		
-		if (actchk.size() > 0) {
-			int result1 = wb24Mapper.wbsActUpdate(paramMap);
-		} else {
-			int result1 = wb24Mapper.wbsActInsert(paramMap);
-		}
+	    
 		
 		Gson gson = new Gson();					
 
-		String pgParam = "{\"fileTrgtKey\":\""+ paramMap.get("issFileTrgtKey") +"\"}";
-		
+		String pgParam = "{\"actionType\":\""+ "I" +"\",";
+		pgParam += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
+		pgParam += "\"issFileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
+		pgParam += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
+		pgParam += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+		pgParam += "\"ordrsNo\":\""+ paramMap.get("ordrsNo") +"\"}";
+	    
 		//String todoTitle = "이슈번호 : " + paramMap.get("issNo") + ",   이슈제목 : " + paramMap.get("issSj");
 		
+		paramMap.put("actReqNo", paramMap.get("reqNo"));
 		paramMap.put("reqNo", paramMap.get("issNo"));
 		paramMap.put("salesCd", paramMap.get("salesCd"));
 		
-		//List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk1(paramMap); 
-		//if (sharngChk.size() > 0) {
-		//	QM01Mapper.deleteWbsSharngList1(paramMap); 
-		//}
-		
-		//List<Map<String, String>> approvalgChk = QM01Mapper.deleteWbsApprovalListChk1(paramMap); 
-		//if (approvalgChk.size() > 0) {
-		//	QM01Mapper.deleteWbsApprovalList1(paramMap); 
-		//}
+//		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk1(paramMap); 
+//		if (sharngChk.size() > 0) {
+//			QM01Mapper.deleteWbsSharngList1(paramMap); 
+//		}
+//		
+//		List<Map<String, String>> approvalgChk = QM01Mapper.deleteWbsApprovalListChk1(paramMap); 
+//		if (approvalgChk.size() > 0) {
+//			QM01Mapper.deleteWbsApprovalList1(paramMap); 
+//		}
+
+		QM01Mapper.updateWb24SharngList1(paramMap);
+		QM01Mapper.updateWb24ApprovalList1(paramMap);
 		
 		if (Integer.parseInt(paramMap.get("approvalYnCnt")) == 0) {
 			String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 이슈 공유";
@@ -275,7 +281,6 @@ public class WB24SvcImpl implements WB24Svc {
 			if (sharngArr != null && sharngArr.size() > 0 ) {
 				// 2024.03.20 김성욱 수정
 				// QM01Mapper.deleteWbsSharngList1(paramMap);
-				QM01Mapper.updateWb24SharngList1(paramMap);
 				
 				int i = 0;
 		        for (Map<String, String> sharngMap : sharngArr) {
@@ -291,8 +296,6 @@ public class WB24SvcImpl implements WB24Svc {
 					QM01Mapper.insertWb24SharngList(sharngMap);
 					i++;
 				}
-		        // 2024.03.20 김성욱 추가
-		        QM01Mapper.deleteWb24SharngList1(paramMap);
 			}
 			
 			String todoTitle2 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 이슈 결재";
@@ -304,7 +307,6 @@ public class WB24SvcImpl implements WB24Svc {
 			if (approvalArr != null && approvalArr.size() > 0 ) {
 				// 2024.03.20 김성욱 수정
 				// QM01Mapper.deleteWbsApprovalList1(paramMap);
-				QM01Mapper.updateWb24ApprovalList1(paramMap);
 				
 				int i = 0;
 		        for (Map<String, String> approvalMap : approvalArr) {
@@ -320,11 +322,32 @@ public class WB24SvcImpl implements WB24Svc {
 					QM01Mapper.insertWb24SharngList(approvalMap);
 					i++;
 		        }
-		        // 2024.03.20 김성욱 추가
-		        QM01Mapper.deleteWb24ApprovalList1(paramMap);
 			}
 		}
-		
+
+        // 2024.03.20 김성욱 추가
+        QM01Mapper.deleteWb24SharngList1(paramMap);
+        // 2024.03.20 김성욱 추가
+        QM01Mapper.deleteWb24ApprovalList1(paramMap);
+        
+        
+        
+
+	    //진행상태가 완료("ISSSTS03") 일경우 결과 등록 또는 Update 진행
+	    if ("ISSSTS03".equals(paramMap.get("issSts"))) {
+			paramMap.put("reqNo", paramMap.get("actReqNo"));
+	    	//TB_WB24M03 테이블에 issNo 가 등록되어있는지 확인
+			List<Map<String, String>> actchk = wb24Mapper.actChk(paramMap);
+			
+			if (actchk.size() > 0) {
+				result += wb24Mapper.wbsActUpdate(paramMap);
+			} else {
+				result += wb24Mapper.wbsActInsert(paramMap);
+			}
+	    }
+
+		QM01Mapper.updateWb24SharngList2(paramMap);
+		QM01Mapper.updateWb24ApprovalList2(paramMap);
 		if (Integer.parseInt(paramMap.get("approvalYnCnt2")) == 0) {
 			// 조치정보 공유 결재 처리 프로세스
 			String todoTitle3 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 조치 공유";
@@ -333,8 +356,7 @@ public class WB24SvcImpl implements WB24Svc {
 			List<Map<String, String>> sharngArr2 = gson.fromJson(paramMap.get("rowSharngListArr2"), stringList4);
 			if (sharngArr2 != null && sharngArr2.size() > 0 ) {
 				// 2024.03.20 김성욱 수정
-				// QM01Mapper.deleteWbsSharngList2(paramMap);
-				QM01Mapper.updateWb24SharngList2(paramMap);
+//				QM01Mapper.deleteWbsSharngList2(paramMap);
 				
 				int i = 0;
 				
@@ -351,8 +373,6 @@ public class WB24SvcImpl implements WB24Svc {
 					QM01Mapper.insertWb24SharngList(sharngMap2);
 					i++;
 		        }
-				// 2024.03.20 김성욱 추가
-		        QM01Mapper.deleteWb24SharngList2(paramMap);
 			}
 			
 			//결재
@@ -361,9 +381,7 @@ public class WB24SvcImpl implements WB24Svc {
 			Type stringList5 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 			List<Map<String, String>> approvalArr2 = gson.fromJson(paramMap.get("rowApprovalListArr2"), stringList5);
 			if (approvalArr2 != null && approvalArr2.size() > 0 ) {
-				// 2024.03.20 김성욱 수정
-				// QM01Mapper.deleteWbsApprovalList2(paramMap);
-				QM01Mapper.updateWb24ApprovalList2(paramMap);
+//				QM01Mapper.deleteWbsApprovalList2(paramMap);
 				
 				int i = 0;
 		        for (Map<String, String> approvalMap2 : approvalArr2) {
@@ -379,11 +397,14 @@ public class WB24SvcImpl implements WB24Svc {
 					QM01Mapper.insertWb24SharngList(approvalMap2);
 					i++;
 		        }
-		        // 2024.03.20 김성욱 추가
-		        QM01Mapper.deleteWb24ApprovalList2(paramMap);
 			}
 		}
 
+		// 2024.03.20 김성욱 추가
+        QM01Mapper.deleteWb24SharngList2(paramMap);
+        // 2024.03.20 김성욱 추가
+        QM01Mapper.deleteWb24ApprovalList2(paramMap);
+        
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작 
 		//---------------------------------------------------------------  
@@ -462,14 +483,24 @@ public class WB24SvcImpl implements WB24Svc {
   		//---------------------------------------------------------------  
   		//첨부 화일 권한체크  끝  
   		//---------------------------------------------------------------  
-
+        
+        //발주요청서 등록여부 체크 발주요청서 등록되었으면 삭제물가 start
+        Map<String, String> selectQtyReqInfo = QM01Mapper.selectQtyReqInfo(paramMap);
+		if ("".equals(selectQtyReqInfo.get("reqNo"))) {
+//		    result = wb24Mapper.wbsIssueResultDelete(paramMap);
+			thrower.throwCommonException("fail");
+		}        
+        //발주요청서 등록여부 체크 발주요청서 등록되었으면 삭제물가 end
+        
+        //결재 진행여부 체크 한명이라도 결재처리 되었으면 삭제 물가 처리 start
 		List<Map<String, String>> actChkList = wb24Mapper.actChk(paramMap);
 		//issNo에 해당하는 조치결과가 있으면 삭제 불가함.
 		int result = 0;
 		if (actChkList.size() > 0) {
-		    result = wb24Mapper.wbsIssueResultDelete(paramMap);
-//			thrower.throwCommonException("fail");
-		}
+//		    result = wb24Mapper.wbsIssueResultDelete(paramMap);
+			thrower.throwCommonException("fail");
+		}        
+        //결재 진행여부 체크 한명이라도 결재처리 되었으면 삭제 물가 처리 start
 
 		//issNo에 해당하는 이슈정보  삭제.
 	    result += wb24Mapper.wbsIssueDelete(paramMap);
@@ -517,4 +548,15 @@ public class WB24SvcImpl implements WB24Svc {
 	public int updateWbsIssueResultEvaluate(Map<String, String> paramMap) {
 		return wb24Mapper.updateWbsIssueResultEvaluate(paramMap);
 	}
+
+	@Override
+	public Map<String, String> select_wb2401p01_planInfo(Map<String, String> paramMap) {
+		return wb24Mapper.select_wb2401p01_planInfo(paramMap);
+	}
+
+	@Override
+	public Map<String, String> select_wb2401p01_rsltInfo(Map<String, String> paramMap) {
+		return wb24Mapper.select_wb2401p01_rsltInfo(paramMap);
+	}
+
 }

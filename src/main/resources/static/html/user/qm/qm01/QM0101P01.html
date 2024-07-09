@@ -27,7 +27,7 @@
          <td>
               <div class="search_form">                  
                 <input type="hidden" id="regId" name="regId" data-search="regId" msg="작성자">
-                   <input type="text"   id="regNm" data-search="regNm" class="form-control" msg="작성자이름" readonly="readonly">
+                   <input type="text"   id="regNm" data-search="regNm" class="form-control" msg="작성자이름" onclick="openSecondUserSearch();" readonly>
                    <a onclick="openSecondUserSearch();"><i class="i_search_w" id="userIdBtn"></i></a>
                  </div>
          </td>
@@ -65,7 +65,7 @@
          <td>
                  <div class="search_form">                  
                 <input type="hidden" id="ordrgId" name="ordrgId"  data-search="ordrgId" msg="발행자아이디" >
-                   <input type="text"   id="ordrgNm" data-search="ordrgNm" class="form-control" msg="발행자" readonly="readonly">
+                   <input type="text"   id="ordrgNm" data-search="ordrgNm" class="form-control" msg="발행자" onclick="openFirstUserSearch();" readonly>
                    <a onclick="openFirstUserSearch();"><i class="i_search_w" id="userIdBtn"></i></a>
                  </div>
          </td>
@@ -110,11 +110,11 @@
             <div id="COBTP-radioButtonContainer"></div>         
          </td>
           <th>고객사PJT</th>
-               <td>
-                   <div class="search_form">
-                       <select id="clntPjt" name="clntPjt" data-kind="PRJCTCD" ></select>
-                   </div>
-               </td>
+              <td>
+                  <select id="clntPjt" name="clntPjt" data-kind="PRJCTCD" >
+                  		<option value=""></option>
+                  </select>
+              </td>
          <th>신작구분</th>
          <td>
             <input type="hidden" id="ordrsdtldiv20" name="ordrsdtldiv20">
@@ -122,16 +122,18 @@
          </td>
         </tr>
         <tr>
-         <th class="hit">일정지연상황</th>
-         <td colspan= "1">   		
-			<select id="scdSts" name="scdSts" data-kind="SCDSTS" data-search="scdSts" msg="일정지연상황" required>
-				<option value="">지연상황 선택(필수)</option>
-			</select>		
-         </td>
-               <td colspan= "2">
-               </td>
-         <td colspan= "4">
-         </td>
+			<th class="hit">일정지연상황</th>
+			<td colspan= "3">   		
+				<select id="scdSts" name="scdSts" data-kind="SCDSTS" data-search="scdSts" msg="일정지연상황" required>
+					<option value="">지연상황 선택(필수)</option>
+				</select>		
+			</td>
+			<td colspan= "2">
+			</td>
+			<th>문제등록번호</th>
+			<td>
+				<input type="text" id="workRptNo" name="workRptNo" readonly>
+			</td>
         </tr>
         
         <tr>
@@ -173,8 +175,6 @@
       </table>
     </form>
     
-    
-   </div>
 
    <!-- 공통 파일 영역-->
     <div id="fileList_area"></div>
@@ -190,19 +190,30 @@
          onclick="modalStack.close();">닫기</button>
    </div>
 
+        <div class="overlay"></div>
+    
+   </div>
 <script type="text/javascript">
 	var actionType = null;
 	var fileTrgtKey = null;
     var approvalList = null;
     var reqNo = null;
-    var tReqNo = null; //inser시 reqNo값 가지고오기 위함
+    var tReqNo = null; //insert시 reqNo값 가지고오기 위함
     var clntPjt = "";
     var teleNo = ""; //카카오 접수자 전화번호변수
+	//분류,등록사유 자동생성시 20240708이전에는 전체 옵션 표시, 이후에는 정상, 문제 분리 표시용 start
+	const standardDate = "2024-07-03"; //발주요청서 처리 절차변경일자기준 20240708일자로 코드 변경처리함
+	var currentDate = ""; //발주요청서 처리 절차변경일자기준 20240708일자로 코드 변경처리함
+	//분류,등록사유 자동생성시 20240708이전에는 전체 옵션 표시, 이후에는 정상, 문제 분리 표시용 end  
+	
     // 카톡 정상알림 카운터 변수
     var kakaoCnt = 0;
     
     var userDeptId = "";
     var userDept = "";
+	var fromJobType = "REQ"; //default 발주요청서 작업구분--> REQ,  이슈에서 처리할경우 ISS//작업 구분 발주요청서가 시작이면 default 값인 REQ로 작업 진행하고 아니면 ISS가 파라메터로 넘오옴
+	if (modalStack.last().paramObj.issNo != "") fromJobType = "ISS"; //기존 등록자료 수정모드로 진입시 처리하기 위함
+	if (modalStack.last().paramObj.fromJobType != undefined) fromJobType = modalStack.last().paramObj.fromJobType;
    
    var gridViewPop = {
       initView : function() {
@@ -249,7 +260,7 @@
                        {key: "creatDttm",         label: "요청일자",    align: "center",   width: 90},
                        {key: "todoCfDt",            label: "확인일자",      align: "center",   width: 130},
                        {key: "todoCfOpn",         label: "확인의견",    align: "left",     width: 200},
-                       {key: "telNo",            label: "H.P",      align: "center",   width: 130},
+//                        {key: "telNo",            label: "H.P",      align: "center",   width: 130},
                        {key: "todoKey",            label: "todoKey",      align: "center",   width: 130, hidden: true},
                        {key: "sanctnSttus",         label: "sanctnSttus",      align: "center",   width: 130, hidden: true},                   
                        {key: "todoId",            label: "todoId",      align: "center",   width: 130, hidden: true},
@@ -267,17 +278,13 @@
                          "pageNo" : _pageNo + 1
                   }
 
-                  //postAjax("/user/qm/qm01/selectShareUserlst", formData, null, function(data){
                   postAjax("/user/wb/wb20/selectSignResUserlst", formData, null, function(data){
                      var list = data.result;
                      //targetObj.setData({
                      gridViewPop.target.setData({
                           list : list,
                           page : {
-// //                                 currentPage : _pageNo,
-// //                                 pageSize : data.paginationInfo.pageSize,
                                    totalElements : list.length
-// //                                 totalPages : data.paginationInfo.totalPageCount
                       } 
                        });
                      
@@ -322,12 +329,24 @@
    //************************************************************************************
    
    function createRadioOptions(groupName, _type) {
+    	//분류(COBTP) 이면 codeEtc가 REQ인 자료만 생성 함.
+		let codeEtc = '';
+		//발주요청서 처리 절차변경일자기준 20240708일자로 코드 변경처리함
+		if (groupName=='COBTP') {
+    		if (currentDate > standardDate) {
+    			codeEtc = fromJobType;
+    		} else {
+    			codeEtc = '';
+    		}
+    	}
       var param = {
-            "codeKind" : groupName
+            "codeKind" : groupName,
+            "codeEtc"  : codeEtc
       };
       postAjaxSync("/admin/cm/cm05/selectChildCodeList", param , null,  function(data){
          const codeList = data.childCodeList;
          var container = $('#' + groupName + '-radioButtonContainer');
+         container.empty();
          var typeStr = _type =="radio" ? "radio" : "checkbox";
          codeList.forEach(item => {
             const iHtml = '<td><input type="' + typeStr  + '" id="' + item.codeId + 
@@ -339,45 +358,63 @@
          });
       })   
    }
-   
-   function createCheckBox(deptCode) {
-      $('#COBGB-checkboxContainer').empty();
-      var param = {
-         "userDept" : deptCode
-       };
 
-      postAjaxSync("/admin/cm/cm05/selectCheckboxList", param , null,  function(data){
-         var codeList = data.childCodeList;
-         var container = $('#COBGB-checkboxContainer');
-         var lastKind = '';
-         const table = $('<table>').appendTo('#COBGB-checkboxContainer')
-         var tableRow = '';   
-         $.each(codeList, function (index, item){
-            if (lastKind != item.codeKind) {
-               tableRow = $('<tr>').appendTo(table);
-               var trElement = $('<tr>');
-               $('<th>').attr('rowspan', item.rowCnt).css('width', '90').text(item.codeDesc).appendTo(tableRow);
-               lastKind = item.codeKind;
-            } else {
-               tableRow = $('<tr>').appendTo(table);
-               var trElement = $('<tr>');
-            }
-            const comboName= "CODECOBGB";
-            const iHtml = 
-              '<input type="radio" id="' + item.codeId + 
-                            '" name="' + comboName + 
-                           '" value="' + item.codeId + 
-                        '" data-label="' + item.codeNm + 
-                 '" onchange="fnc(this)" style="margin-left:20px"> ' + item.codeNm + '\n';
+	function createCheckBox(deptCode) {
+		if (deptCode == 'TRN30') deptCode = 'TRN50';	//트루넷직접매출
+		if (deptCode == 'GUN70') deptCode = 'GUN60';	//생산관리
+		if (deptCode == 'GUN90') deptCode = 'TRN50';	//구매협력업체
+		if (deptCode == 'GUN50') deptCode = 'TRN50';	//구매외주팀 (건양ITT)
+		if (deptCode == 'GUN95') deptCode = 'TRN50';	//실적관리용 (건양ITT)
+		if (deptCode == 'GUN80') deptCode = 'GUN40';	//전산실
+       
+		$('#COBGB-checkboxContainer').empty();
+		
+		//발주요청서 처리 절차변경일자기준 20240708일자로 코드 변경처리함 start
+		var codeEtc = fromJobType;
+   		if (currentDate > standardDate) {
+   			codeEtc = fromJobType;
+   		} else {
+   			codeEtc = '';
+   		}
+		//발주요청서 처리 절차변경일자기준 20240708일자로 코드 변경처리함 start
+	   
+		var param = {
+			"userDept" : deptCode,
+			"codeEtc"  : codeEtc
+		};
 
-            const tdElement  = $('<td>').attr('style', 'text-align:left;height:20px;').text('').appendTo(tableRow);
-            tdElement.append(iHtml);
-
-         });
-      })   
-      gridViewPop.initView();
-      const grdiHeight = $('#COBGB-checkboxContainer').height()-35;
-      gridViewPop.target.setHeight(grdiHeight< 162 ? 162 : grdiHeight);
+		postAjaxSync("/admin/cm/cm05/selectCheckboxList", param , null,  function(data){
+			var codeList = data.childCodeList;
+			var container = $('#COBGB-checkboxContainer');
+			var lastKind = '';
+			const table = $('<table>').appendTo('#COBGB-checkboxContainer')
+			var tableRow = '';   
+			$.each(codeList, function (index, item){
+			   if (lastKind != item.codeKind) {
+			      tableRow = $('<tr>').appendTo(table);
+			      var trElement = $('<tr>');
+			      $('<th>').attr('rowspan', item.rowCnt).css('width', '90').text(item.codeDesc).appendTo(tableRow);
+			      lastKind = item.codeKind;
+			   } else {
+			      tableRow = $('<tr>').appendTo(table);
+			      var trElement = $('<tr>');
+			   }
+			   const comboName= "CODECOBGB";
+			   const iHtml = 
+			     '<input type="radio" id="' + item.codeId + 
+			                   '" name="' + comboName + 
+			                  '" value="' + item.codeId + 
+			               '" data-label="' + item.codeNm + 
+			        '" onchange="fnc(this)" style="margin-left:20px"> ' + item.codeNm + '\n';
+			
+			   const tdElement  = $('<td>').attr('style', 'text-align:left;height:20px;').text('').appendTo(tableRow);
+			   tdElement.append(iHtml);
+			
+			});
+		})   
+		gridViewPop.initView();
+		const grdiHeight = $('#COBGB-checkboxContainer').height()-35;
+		gridViewPop.target.setHeight(grdiHeight< 162 ? 162 : grdiHeight);
    }
 
    function fnc(thisButton) {
@@ -397,120 +434,143 @@
  */
 //*************************************************************************************   
  
-   $(document).ready(function() {
-
-      actionType = modalStack.last().paramObj.actionType;
-      fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
-      reqNo = modalStack.last().paramObj.reqNo;
-      $("#fileTrgtKey").val(fileTrgtKey);
-      setCommonSelect($(".popup_area select[data-kind]"));
-      setByCoCd(modalStack.last().paramObj.coCd);
-
-      selectAuth(jwt.deptId);
+	$(document).ready(function() {
+		createRadioOptions('COBTP', "radio");  //분류 자동 생성
+		createRadioOptions('BUSTCD', "checkbox");  //출장자 구분
+		createRadioOptions('INWKCD', "checkbox");  //사내작업 구분
+		createRadioOptions('REQCD', "radio");  //요청구분 구분
+		
+		actionType = modalStack.last().paramObj.actionType;
+		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
+		reqNo = modalStack.last().paramObj.reqNo;
+        if (reqNo == undefined) fileTrgtKey = 0; //이슈에서 넘어온 fileTrgtKey는 이슈등록에 대한 번호임.
+		$("#fileTrgtKey").val(fileTrgtKey);
+		
+		
+		setCommonSelect($(".popup_area select[data-kind]"));
+		setByCoCd(modalStack.last().paramObj.coCd);
       
-      createRadioOptions('COBTP', "radio");  //분류 자동 생성
-      createRadioOptions('BUSTCD', "checkbox");  //출장자 구분
-      createRadioOptions('INWKCD', "checkbox");  //사내작업 구분
-      createRadioOptions('REQCD', "radio");  //요청구분 구분
-      createCheckBox(userDept);   //부서별 장애원인 자동 생성
       
-      $("#coCd").prop("disabled", true);
-      $('#clntPjt').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
-      
+		$("#coCd").prop("disabled", true);
+		$('#clntPjt').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
       
           //발행일자//
-      $('#ordrgDt').datepicker({
-         format : "yyyy-mm-dd",
-         language : "ko",
-         autoclose : true
-      }).datepicker("setDate", new Date());
+		$('#ordrgDt').datepicker({
+			format : "yyyy-mm-dd",
+			language : "ko",
+			autoclose : true
+		}).datepicker("setDate", new Date());
       
-      //요구일정//
-      $('#reqDt').datepicker({
-         format : "yyyy-mm-dd",
-         language : "ko",
-         autoclose : true
-      }).datepicker("setDate", new Date());
+		//요구일정//
+		$('#reqDt').datepicker({
+			format : "yyyy-mm-dd",
+			language : "ko",
+			autoclose : true
+		}).datepicker("setDate", new Date());
 
-      authChk();                  // 권한체크
+		authChk();                  // 권한체크
 
-      $('#reportRegBtn').hide();  //발주요청서 출력버튼 기본은 숨김 처리--> 1번결재자가 결재완료 되면 보임. 2023.11.27 정상훈차장 요청
-        
-      
-      if (actionType == "C") {
-         $("#ordrgId").val(modalStack.last().paramObj.userId);
-         $("#ordrgNm").val(modalStack.last().paramObj.userName);
-         $("#regId").val(modalStack.last().paramObj.userId);
-         $("#regNm").val(modalStack.last().paramObj.userName);
-         $("#creatId").val(modalStack.last().paramObj.userId);
-         //발주요청서 발행 btn hide
-         $("#reportRegBtn").remove();
-          
-         $("#actionBtn").text("등록");
-         $('#actionBtn').on("click", function() {
-            insertQualityReq();
-         });
-         gridViewPop.setData3();
-      } else if (actionType == "U" || actionType == "S" || actionType == "T" ) {
-         $('.tit').text('요인별 발주 및 출장요청 수정');
+		//분류,등록사유 자동생성시 20240708이전에는 전체 옵션 표시, 이후에는 정상, 문제 분리 표시용 start
+		currentDate =  $('#ordrgDt').val(); //발주요청서 처리 절차변경일자기준 20240708일자로 코드 변경처리함	
+		//분류,등록사유 자동생성시 20240708이전에는 전체 옵션 표시, 이후에는 정상, 문제 분리 표시용 end  
+		$('#reportRegBtn').hide();  //발주요청서 출력버튼 기본은 숨김 처리--> 1번결재자가 결재완료 되면 보임. 2023.11.27 정상훈차장 요청
+		if (actionType == "C") {
+			  $('#ordrgDt').parent('td').addClass('no-click'); //발행일자
+			  $('#regNm').parent('div').addClass('no-click');  //작성자
+	    	  if (fromJobType == "REQ") {
+	        	 selectAuth(jwt.deptId);
+		         $("#ordrgId").val(modalStack.last().paramObj.userId);
+		         $("#ordrgNm").val(modalStack.last().paramObj.userName);
+		         $("#regId").val(modalStack.last().paramObj.userId);
+		         $("#regNm").val(modalStack.last().paramObj.userName);
+	    	  } else { //"ISS" 인경우 문제관리에서 파라메터 넘어옴
+	          	 selectAuth(modalStack.last().paramObj.actDeptId); //ISS 일경우 조치담당자의 부서 코드
+		         $("#ordrgId").val(modalStack.last().paramObj.actId);
+		         $("#ordrgNm").val(modalStack.last().paramObj.actIdNm);
+		         $("#regId").val(jwt.userId);
+		         $("#regNm").val(jwt.userNm);
+		         $("#salesCd").val(modalStack.last().paramObj.salesCd);
+		         $("#clntPjt").val(modalStack.last().paramObj.clntPjt);
+		         $("#ordrsNo").val(modalStack.last().paramObj.ordrsNo);
+		         $("#matrDrwNo").val(modalStack.last().paramObj.salesCd);
+		         $("#eqpNm").val(modalStack.last().paramObj.eqpNm);
+		         $("#newCd").val(modalStack.last().paramObj.clntPjt);
+		         $("#clntNm").val(modalStack.last().paramObj.clntNm);
+		         $("#workRptNo").val(modalStack.last().paramObj.workRptNo);		//문제등록번호
+		         let tempRmk = "제목:" + modalStack.last().paramObj.issueTitle +"\n\n" + "내용:" + modalStack.last().paramObj.workRptRmk;
+		         $("#reqRmk").val(tempRmk);
+		         $('#salesCd').parent('div').addClass('no-click')
+	    	  }
+	    	  //REQ, ISS 에 따라 부서가 달라지므로 여기에 위치시킴
+	          createCheckBox(userDept);   //부서별 장애원인 자동 생성
+		      gridViewPop.setData3();	  //결재라인에 등록된 결재선 가져오기
+				
+		      //등록사유체크하기(ISS=이슈에서 시작하면 이슈의 등록정보를 재활용)
+		      if (fromJobType == "ISS") $('#'+ modalStack.last().paramObj.subCd).prop("checked", true);
+		      
+	         //발주요청서 발행 btn 없애기~입력시에는 사용 안함
+	         $("#reportRegBtn").remove();
+	          
+	         $("#actionBtn").text("등록");
+	         $('#actionBtn').on("click", function() { insertQualityReq();  });
+	         
+		} else if (actionType == "U" || actionType == "S" || actionType == "T" ) {
+	         $('.tit').text('요인별 발주 및 출장요청 수정');
+	         
+	         if (fileTrgtKey == '0' || fileTrgtKey == '' ) {
+	        	 alert('정보 불일치가 발생되었습니다.  전산실 연락 바랍니다.');
+	        	 return false;
+	         }
+	
+	         selectQtyReqInfo();
+	         
+	         $('#popForm input#coCd').attr('required', 'required');
+	         $('#coCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+	         $('#salesCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+	
+	         $("#ordrgDt").prop("disabled", true);
+	         $("#reqDt").prop("disabled", true);
+	         $("#regNm").prop("disabled", true);
+	         $("#ordrgNm").prop("disabled", true);
+	         gridViewPop.initView().setData(0);
+	           
+	         $('#actionBtn').text("수정");
+	         $('#actionBtn').on("click", function() { updateQualityReq(); });
+		} 
+		// TODO 리스트에서 호출 시 공유 : actionType:T  결재: actionType:S 처리 부분 
+		var _todoViewMode =modalStack.last().paramObj.todoView;
+		if (_todoViewMode != undefined && _todoViewMode == "INQ") {
+			$('.tit').text('요인별 발주 및 출장요청 조회');
+
+			$('#actionBtn').remove();
+			$("#plus-minus").remove();
          
-         if (fileTrgtKey == '0' || fileTrgtKey == '' ) {
-        	 alert('정보 불일치가 발생되었습니다.  전산실 연락 바랍니다.');
-        	 return false;
-         }
-
-         selectQtyReqInfo();
-         
-         $('#popForm input#coCd').attr('required', 'required');
-         $('#coCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
-         $('#salesCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
-
-         $("#ordrgDt").prop("disabled", true);
-         $("#reqDt").prop("disabled", true);
-         $("#regNm").prop("disabled", true);
-         $("#ordrgNm").prop("disabled", true);
-         $("#creatId").val(modalStack.last().paramObj.userId);         
-         gridViewPop.initView().setData(0);
-           
-         $('#actionBtn').text("수정");
-         $('#actionBtn').on("click", function() {
-            updateQualityReq();
-         });
-      } 
-      // TODO 리스트에서 호출 시 공유 : actionType:T  결재: actionType:S 처리 부분 
-       var _todoViewMode =modalStack.last().paramObj.todoView;
-       if (_todoViewMode != undefined && _todoViewMode == "INQ") {
-         $('.tit').text('요인별 발주 및 출장요청 조회');
-
-         $('#actionBtn').remove();
-           $("#plus-minus").remove();
-         
-         //input readonly, radio.checkbox disabled
-         $.each($('#popForm select, input, textarea'), function(idx, elem){
-            var id = $(elem).attr("ID");
-            if( id ) {
-               var eleId = "#popForm #"+id;
-               if( $(elem).prop('tagName') == "INPUT" ) $(eleId).attr("readonly", true);
-               if( $(elem).prop('tagName') == "TEXTAREA" ) $(eleId).attr("readonly", true);
-               if( $(elem).prop('tagName') == "SELECT" ) $(eleId).css({'background-color':'#e6e6e6', 'pointer-events':'none'});
-               if( $(elem).prop('type') == "checkbox" || $(elem).prop('type') == "radio") $(eleId).on('click', function(e) {e.preventDefault();});
-            } 
+			//input readonly, radio.checkbox disabled
+			$.each($('#popForm select, input, textarea'), function(idx, elem){
+	            var id = $(elem).attr("ID");
+	            if( id ) {
+	               var eleId = "#popForm #"+id;
+	               if( $(elem).prop('tagName') == "INPUT" ) $(eleId).attr("readonly", true);
+	               if( $(elem).prop('tagName') == "TEXTAREA" ) $(eleId).attr("readonly", true);
+	               if( $(elem).prop('tagName') == "SELECT" ) $(eleId).css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+	               if( $(elem).prop('type') == "checkbox" || $(elem).prop('type') == "radio") $(eleId).on('click', function(e) {e.preventDefault();});
+	            } 
             
-         });   
+			});   
        
           
-       }
-      //---------------------------------------------------------------  
-      //첨부 화일 처리 시작 
-      //---------------------------------------------------------------  
-      fileParam = {
+		}
+		//---------------------------------------------------------------  
+		//첨부 화일 처리 시작 
+		//---------------------------------------------------------------  
+		fileParam = {
             fileTrgtTyp   : $("#popForm #pgmId").val(),
             fileTrgtKey      :fileTrgtKey
-      }
-        treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
-      //---------------------------------------------------------------  
-      //첨부 화일 처리 끝
-      //---------------------------------------------------------------  
+		}
+		treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
+		//---------------------------------------------------------------  
+		//첨부 화일 처리 끝
+		//---------------------------------------------------------------  
         
 //       if (approvalList.length == 0) {
 //          alert("결재선 지정 정보가 존재하지 않습니다. 기준관리에서 결재선을 추가 하세요");
@@ -534,7 +594,6 @@
    
    // 공유대상자 추가//  
     function insertShareUserModal() {
-      
        if( approvalYn() ) {
          alert("결재가 이미 진행중입니다.");
          return;
@@ -663,7 +722,7 @@
        
        var selRow = parseInt(gridViewPop.target.selectedDataIndexs);    
        if( isNaN(selRow) ) {
-          alert("선택된 행이 없습니다.");
+//           alert("선택된 행이 없습니다.");
           return;
        } else {         
              if( selRow > -1 ) {
@@ -714,7 +773,6 @@
                       $('#ordrgNm').val(checkedNode.text);
                       createCheckBox(checkedNode.parent.slice(0,5))
                       selectAuth(checkedNode.parent);
-                        //gridView.setData(0);
                    });
        }
     }   
@@ -733,7 +791,6 @@
                    var checkedNode = tree.get_node(checkedId);                
                    $('#regId').val(checkedNode.id);
                    $('#regNm').val(checkedNode.text);
-                    gridView.setData(0);
                 });
        }
     }     
@@ -741,12 +798,19 @@
     
    function selectQtyReqInfo() {                  //그리드에 뿌리는 데이터
       var formData = {
-         "fileTrgtKey" : fileTrgtKey,
+         "fileTrgtKey" 	: fileTrgtKey,
+         "reqNo" 		: reqNo,
       }
       postAjaxSync("/user/qm/qm01/selectQtyReqInfo", formData, null, function(data) {
+    	 //분류,등록사유 자동생성시 20240708이전에는 전체 옵션 표시, 이후에는 정상, 문제 분리 표시용 start
+		 currentDate = data.result.ordrgDt //발주요청서 처리 절차변경일자기준 20240708일자로 코드 변경처리함	
+    	 //분류,등록사유 자동생성시 20240708이전에는 전체 옵션 표시, 이후에는 정상, 문제 분리 표시용 end  
+    	 
+		 createRadioOptions('COBTP', "radio");  //분류 자동 생성
          createCheckBox(data.result.deptCd);
          selectAuth(data.result.deptCd);
-
+         fileTrgtKey = data.result.fileTrgtKey; //발주요청서의 등록번호로 설정하기
+         
            selectApprovalCheck(reqNo);
             $.each(data.result, function(key, value) {
                if ($('#popForm #' + key)[0]) {
@@ -811,11 +875,13 @@
                      alert(data.resultMessage);                        // 결과 메시지를 alert으로 출력
                      if (data.resultCode == 200) {                     //  요청이 성공(200)한 경우, gridView.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
                         
-                    	tReqNo = data.reqNo;  						   //inser시 reqNo값 가지고오기 위함
+                    	tReqNo = data.reqNo;  						   //insert시 reqNo값 가지고오기 위함
                     	$('#reqNo').val(tReqNo);					  //java단에서 reqNo가지고와서 관리번호 값 넣기
-                    	kakaoTodo();								  //kakaoTodo() 호출
+//                     	kakaoTodo();								  //kakaoTodo() 호출
                     	
-                        gridView.setData(0);
+                        
+                        if (typeof gridView !== 'undefined') gridView.setData(0);
+                        if (typeof salesGridView !== 'undefined') salesGridView.setData(0);
                         modalStack.close();                           // 모달을 닫음
                      }
                   });
@@ -837,7 +903,7 @@
             filePostAjax("/user/qm/qm01/updateQualityReq", formData,function(data) {
                   alert(data.resultMessage);
                   if (data.resultCode == 200) {
-                     kakaoTodo();
+//                      kakaoTodo();
                      gridView.setData(0);
                      modalStack.close();
                   }
@@ -856,6 +922,14 @@
       $.each($('.popup_area input[date]'), function(idx, elem) {
          deleteHyphen(elem);
       });
+      
+
+		//1. 조치담당자 결재 자동등록 처리하기
+		//2. 조치담당자 팀장 결재 자동등록 처리하기
+		//3. 이슈 등록자 담당팀장 결재 자동 등록 처리하기
+		selectTeamManagerApprovalAdd();  //($("#issSts").val() == 'ISSSTS03')에달 등록인지 결과인지 판단함
+      
+      
       // 폼데이터 생성
       var formData = new FormData($("#popForm")[0]);
       formData.append("coCd", $('#coCd').val());
@@ -863,6 +937,7 @@
       formData.append("reqDt", $('#reqDt').val());   //요구일자
       formData.append("deptCd", userDept);   //부서코드 5자리
       formData.append("deptCd2", userDeptId);   //부서코드 Full
+      formData.append("issNo",  $('#workRptNo').val());   //문제등록번호
       
       var inwkCd = [];
       var bustCd = [];
@@ -1005,11 +1080,11 @@
 		formData.append("approvalArr", JSON.stringify(approvalArr));
 	    /*	결재그리드 insert make end */
 		
-       formData.append("S_todoDiv1CodeId", "TODODIV10");
-       formData.append("S_todoDiv2CodeId", "TODODIV1040");
-
-      return formData;
-   }
+		formData.append("S_todoDiv1CodeId", "TODODIV10");
+		formData.append("S_todoDiv2CodeId", "TODODIV1040");
+       
+		return formData;
+	}
    
    function wordRemove(originalWord) {
 		let tempWord = originalWord.replace(/주식회사/g, '');
@@ -1054,35 +1129,12 @@
                 $('#prdtCd').val(row.prdtCd);
                 $('#itemDiv').val(row.itemDiv);
                 $('#eqpNm').val(row.eqpNm);
+
            });
        }
     }
           
    
-   // 고객사 검색
-   function clntSearch() {
-      openSecondModal("/static/html/cmn/modal/clntSearch.html", 650, 650,
-            "고객사 검색", {}, function(grid) {
-               var row = grid.target.getList("selected")[0];
-               $('#clntCd').val(row.clntCd);
-               $('#clntNm').val(row.clntNm);
-            });
-   }
-   
-   // 자재 품번 팝업 호출하는 함수
-    function openMatListSearch(openType) {
-          //;
-          var paramObj = {
-               "searchValue" : $("#matrNm").val()
-          }
-          openSecondModal("/static/html/cmn/modal/matListSearch.html", 600, 420, "자재 품번 검색", paramObj, function(grid) {
-                        var row = grid.target.getList("selected")[0];
-                        if (openType == "P") {
-                     $('#matrCd').val(row.matrCd);      //    품번 값 가져오기
-                     $('#matrNm').val(row.matrNm);   //   품번 값 가져오기
-                        } 
-                 });
-    }
       
    function setByCoCd(value) {
       $('#coCd option:not([value="'+value+'"])').remove();
@@ -1461,5 +1513,99 @@
        	}
 		});
 	}
-   
+
+    
+    //조치담당자 팀장 정보 가져오기
+	function selectTeamManagerApprovalAdd() {
+    	//------------------------------------------------
+    	//이슈등록, 조치결과 등록시 결재자 정보를 메모리에 가져오기  start
+    	//결재자 정보와 공유자 정보를 분리하고 조치담당자, 조치담당자 팀장이 공유에 있으면 제외 처리함.
+    	//------------------------------------------------
+    	let appshaList = gridViewPop.target.getList();
+		 
+		var appArray = [];	//결재권자 정보
+		var shaArray = [];	//공유자 정보
+		var tempActId = $("#ordrgId").val();	//발행자ID
+        $.each(appshaList, function(idx, item){
+            if (item.gb === "결재") {
+            	appArray.push(item);
+            } else {
+            	//공유일경우 조치담당자가 공유에 있으면 제외처리함.
+            	if (item.usrNm != tempActId) {
+            		shaArray.push(item);
+            	}
+            }
+        });
+		//------------------------------------------------
+		//이슈등록, 조치결과 등록시 결재자 정보를 메모리에 가져오기  end
+		//------------------------------------------------
+     
+		//발행자의 팀장 정보 가져오기
+// 		appArray = approvalUserInfoData(tempActId, appArray);
+		appArray = approvalTeamManagerInfoData(tempActId, appArray);
+// 		appArray = approvalTeamManagerInfoData(jwt.userId, appArray);
+		
+
+		gridViewPop.setData2(appArray.concat(shaArray));
+	}
+    
+    //조치담당자정보 자동 추가하기
+	function approvalUserInfoData (appUserId, appArray) {
+	    var formData = {
+	        "userId" : appUserId,
+	    }
+	    postAjaxSync("/user/wb/wb24/selectRsltsMemberList", formData, null, function(data) {
+	    	if (data.resultList != '' && data.resultList!=null) { 
+	    		//조치결과 결자자 정보 가져오기
+	    		let list = data.resultList[0];
+	    		if (appArray.some(item => item.usrNm === list.usrNm)) {
+	    			//Array에 usrNm 의 값중에 list.id와 같은 값이 있으면 true
+	    		} else {
+	    			appArray.push({
+		                        gb: "공유",
+		                        usrNm: list.usrNm,
+		                        name: list.name,
+		                        jik: list.jik,
+		                        dtNm: list.deptNm,
+		                        telNo: list.telNo,
+		                        offTelNo: list.offTelNo,
+		                        email: list.email,
+		                    });
+	    		}
+	    	}
+		});
+		return appArray;
+	}
+	
+	
+
+    //담당자 팀장 정보 가져오기
+	function approvalTeamManagerInfoData(appUserId, appArray) {
+	    var formData = {
+		        "userId" : appUserId,
+		}
+        postAjaxSync("/user/wb/wb24/selectTeamManagerInfo", formData, null, function(data) {
+        	if (data.result != '' && data.result!=null) { 
+        		//결자자 정보 가져오기
+        		let list = data.result;
+        		if (appArray.some(item => item.usrNm === list.id)) {
+        			//Array에 usrNm 의 값중에 list.id와 같은 값이 있으면 true
+        		} else {
+        			appArray.push({
+		                        gb: "결재",
+		                        usrNm: list.id,
+		                        name: list.name,
+		                        jik: list.levelNm,
+		                        dtNm: list.deptNm,
+		                        telNo: list.telNo,
+		                        offTelNo: list.offTelNo,
+		                        email: list.email,
+				               
+		                    });
+        		}
+        	}
+		});
+		return appArray;
+	}
+
 </script>

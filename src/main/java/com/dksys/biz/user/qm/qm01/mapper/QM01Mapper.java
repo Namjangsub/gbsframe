@@ -123,4 +123,8 @@ public interface QM01Mapper {
 
   int updateWb24ApprovalList2(Map<String, String> paramMap);
   int deleteWb24ApprovalList2(Map<String, String> paramMap);
+  
+  int updateWbsIssueReqNo(Map<String, String> paramMap);
+  int clearWbsIssueReqNo(Map<String, String> paramMap);
+
 }

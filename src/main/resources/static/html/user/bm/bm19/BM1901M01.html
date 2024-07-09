@@ -43,6 +43,39 @@
     <script type="text/javascript" src="/static/js/fileTree.js"></script>
 <!-- 도움말 팝업 -->
 <script src="/static/js/manualPopup.js"></script>
+
+    <style>
+        /* 툴팁을 포함할 부모 요소 스타일 */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+        }
+
+        /* 툴팁 텍스트 스타일 */
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 150px;
+            background-color: black;
+            color: #fff;
+            text-align: center;
+            border-radius: 5px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%; /* 텍스트를 부모 요소 위에 배치 */
+            left: 50%;
+            margin-left: 0px; /* 텍스트를 가운데 정렬 */
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        /* 마우스를 올리면 툴팁 텍스트 보이기 */
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
 </head>
 
 <body>
@@ -145,10 +178,11 @@
 		
 		<div class="contents no_bg">
 			<div class="contents_tit">
-				<span style="height: 30px; line-height: 30px;font-size: 15px;margin-left: 15px">이슈 현황(작업일보+일정관리) 리스트</span>
+				<span style="height: 30px; line-height: 30px;font-size: 15px;margin-left: 15px">문제 현황(작업일보+일정관리) 리스트</span>
 				<div class="add_btn_small pdl10">
 <!-- 					<a onclick="insertDailyWorkModal('C');" style="height: 30px; line-height: 28px;" authchk>+</a> -->
 <!-- 					<a onclick="deleteDailyWork();" style="height: 30px; line-height: 28px;" authchk>-</a> -->
+					<a onclick="insertQualityReqModal();" style="height: 30px; line-height: 28px; width: 110px;"><i class="fas fa-folder"></i>요인별발주요청서</a>
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 				</div>
 				<select id="recordCnt" class="prae_select" data-search="recordCnt" onchange="gridView.setData(0);">
@@ -174,7 +208,7 @@
 	var isFirst = true;
 	
 	ax5.ui.grid.formatter["bilgYn"] = function () {
-		var color = this.value == "ISSSTS03" ? "color-circle_02.png" : "color-circle_01.png";
+		var color = (this.value == "ISSSTS03" || this.value == "REQST03" ) ? "color-circle_02.png" : "color-circle_01.png";
 		if (this.value == "E") {
 			return 'E';
 		} else {
@@ -195,12 +229,17 @@
 		        	selector: true
 		        },
 		        body: {
-					mergeCells : ["clntNm", "clntPjtNm","salesCd","eqpNm","workRptDt","workRptIdNm", "workRptDeptNm"],
+					mergeCells : ["workRptDt", "workRptDeptNm", "workRptIdNm", "actDeptNm", "actIdNm","subCdNm", "reqNo",],
 					onClick: function () {
 						this.self.select(this.dindex);
 					},
 					onDBLClick: function () {
-                        wbsIssModal(this.item);
+						
+ 		  	           if(this.column.key == "reqNo" ){    //reqNo = 발주요청번호 필드 선택시
+ 		  	        		insertQualityReqModal(); 	//발주요청서 수정으로 진입
+ 			  	       } else{	
+ 		                        wbsIssModal(this.item);			//이슈수정모드
+ 			  	       }   
 					},
 					columnHeight: 50
 				},
@@ -222,34 +261,37 @@
 					,{key: "workRptId",	    label: "작성자ID",		width: 100,		align: "center", 	hidden:true}
 					,{key: "coNm",	    	label: "회사",			width: 70,		align: "center", 	hidden:true}
 					,{key: "workRptLNm", 	label: "대분류", 			width: 140,		align: "left", 	hidden:true}
-					,{key: "clntNm", 		label: "고객사", 			width: 120,		align: "left"}
-					,{key: "clntPjtNm",		label: "고객사PJT", 		width: 80,		align: "left"}
-					,{key: "salesCd", 		label: "Sales Code", 	width: 110,		align: "left"}
-					,{key: "eqpNm", 		label: "설비명", 			width: 160,		align: "left"}
 					,{key: "workRptDt", 	label: "발생일자", 		width: 80,		align: "center"}
 					,{key: "workRptDeptNm",	label: "작성부서",			width: 80,		align: "left"}
 					,{key: "workRptIdNm",	label: "작성자",			width: 55,		align: "center"}
 					,{key: "actDeptNm",		label: "조치부서",			width: 80,		align: "left"}
 					,{key: "actIdNm",		label: "조치자",			width: 55,		align: "center"}
+					,{key: "issDivNm",		label: "유형",			width: 60,		align: "center"}
+					,{key: "subCdNm", 		label: "등록사유", 		width: 100,		align: "left"}
+					,{key: "reqNo", 		label: "발주요청", 		width: 90,		align: "center"}
 					,{key: "issSts", 	    label: "상태", 			width: 50,		align: "center", formatter: "bilgYn"}
 					,{key: "issStsNm", 	    label: "상태", 			width: 50,		align: "center", 	hidden:true}
 					,{key: "acteDt", 		label: "완료일자", 		width: 80,		align: "center"}
-					,{key: "issueTitle",  	label: "이슈제목",			width: 250,		align: "left",      styleClass: function () {
+					,{key: "prdtDivNm", 	label: "제품군", 			width: 130,		align: "left"}
+					,{key: "clntNm", 		label: "고객사", 			width: 120,		align: "left"}
+					,{key: "clntPjtNm",		label: "고객사PJT", 		width: 80,		align: "left"}
+					,{key: "salesCd", 		label: "Sales Code", 	width: 110,		align: "left"}
+					,{key: "issueTitle",  	label: "문제제목",			width: 250,		align: "left",      styleClass: function () {
             			return (this.item.issSts != "ISSSTS03") ? "grid-font-red" : "";},}
 					,{key: "workRptRmk", 	label: "내용", 			width: 350,		align: "left", 
 						formatter: function () { return (this.value) ? '<span style="display: block;white-space: pre;">'+this.value+'</span>' : '' }}
-					,{key: "prdtDivNm", 	label: "제품군", 			width: 150,		align: "left"}
+					,{key: "eqpNm", 		label: "설비명", 			width: 160,		align: "left"}
 					,{key: "actMh", 		label: "투입공수", 		width: 70,		align: "center", formatter: "money"}
 					,{key: "reqAmt", 		label: "투입비용", 		width: 70,		align: "right", formatter: "money"}
-					,{key: "actDngNm", 		label: "담당평가위험", 		width: 80,		align: "center"}
-					,{key: "actDngEvalNm", 	label: "팀장평가위험", 		width: 80,		align: "center"}
-					,{key: "actAmtStsNm", 	label: "비용유형", 		width: 80,		align: "center"}
-					,{key: "reqNo", 		label: "발주요청", 		width: 90,		align: "center"}
+// 					,{key: "actDngNm", 		label: "담당평가위험", 		width: 80,		align: "center"}
+// 					,{key: "actDngEvalNm", 	label: "팀장평가위험", 		width: 80,		align: "center"}
+// 					,{key: "actAmtStsNm", 	label: "비용유형", 		width: 80,		align: "center"}
 					,{key: "jobDiv", 		label: "발생업무", 		width: 70,		align: "center"}
 					,{key: "ordrsNo", 		label: "수주번호", 		width: 70,		align: "center"}
 // 					,{key: "prdtCd", 		label: "제품", 			width: 60,		align: "center"}
 					,{key: "prdtCdNm", 		label: "제품구분", 		width: 150,		align: "left"}
 					,{key: "itemDivNm", 	label: "아이템구분", 		width: 150,		align: "left"}
+					,{key: "workRptNo", 	label: "문제등록번호", 		width: 90,		align: "center"}
 				]
 			});
 			return this;
@@ -268,7 +310,6 @@
 			formData["reqDtFrom"] = $("#reqDtFrom_S").val().replace(/\-/g, '');
 			formData["reqDtTo"]   = $("#reqDtTo_S").val().replace(/\-/g, '');
 			
-			// debugger;
 			postAjax("/user/pm/pm01/selectAllIssueWorkList", formData, null, function(data) {
 				var list = data.result;
 				for (let i = 0; i < list.length; i++) {
@@ -306,14 +347,14 @@
 						,{key: "actIdNm",		label: "조치자",			width: 55,		align: "center"}
 						,{key: "issSts", 	    label: "상태", 			width: 50,		align: "center"}
 						,{key: "acteDt", 		label: "완료일자", 		width: 80,		align: "center"}
-						,{key: "issueTitle",  	label: "이슈제목",			width: 250,		align: "left"}
+						,{key: "issueTitle",  	label: "문제제목",			width: 250,		align: "left"}
 						,{key: "workRptRmk", 	label: "내용", 			width: 350,		align: "left"}
 						,{key: "prdtDivNm", 	label: "제품군", 			width: 150,		align: "left"}
 						,{key: "actMh", 		label: "투입공수", 		width: 70,		align: "center", formatter: "money"}
 						,{key: "reqAmt", 		label: "투입비용", 		width: 70,		align: "right", formatter: "money"}
-						,{key: "actDngNm", 		label: "담당평가위험", 		width: 80,		align: "center"}
-						,{key: "actDngEvalNm", 	label: "팀장평가위험", 		width: 80,		align: "center"}
-						,{key: "actAmtStsNm", 	label: "비용유형", 		width: 80,		align: "center"}
+// 						,{key: "actDngNm", 		label: "담당평가위험", 		width: 80,		align: "center"}
+// 						,{key: "actDngEvalNm", 	label: "팀장평가위험", 		width: 80,		align: "center"}
+// 						,{key: "actAmtStsNm", 	label: "비용유형", 		width: 80,		align: "center"}
 						,{key: "reqNo", 		label: "발주요청", 		width: 90,		align: "center"}
 						,{key: "jobDiv", 		label: "발생업무", 		width: 70,		align: "center"}
 						,{key: "ordrsNo", 		label: "수주번호", 		width: 70,		align: "center"}
@@ -327,7 +368,7 @@
 	}
 	
 	$(document).ready(function() {
-		mainDefaultLoad("대시보드", "이슈 현황(작업일보+일정관리)");		// 페이지 타이틀 설정
+		mainDefaultLoad("대시보드", "문제 현황(작업일보+일정관리)");		// 페이지 타이틀 설정
   		setCommonSelect($("#main_area select[data-kind]"));		// 공통코드 set
 
 // 		$("#coCd_S").val(jwt.coCd);
@@ -449,7 +490,6 @@
 	    };
 	    openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1068, 650, "SALES CODE 검색", paramObj, function (grid){
 	    	var row = grid.target.getList("selected")[0];
-			// debugger;
 	        $('#salesCd_S').val(row.salesCd);
 	        //$('#wbsClntPjt').val(row.clntPjt); // 고객사 PJT
 	        //$('#prdtCd_S').val(row.prdtCd); // 제품구분
@@ -501,12 +541,12 @@
 				}
 			});
 			var todayDate = new Date().format('yyyyMMddHHmmss');
-			excelView.target.exportExcel("기간별 이슈 현황_"+todayDate+".xls");
+			excelView.target.exportExcel("기간별 문제 현황_"+todayDate+".xls");
 		});
 	}
 	
-    // WBS 계획 이슈 수정 방법은 이슈 관리 화면(구분자:U3) 에서 등록 (1가지 방법), 기존 WBS 일정계획 (구분자:U1)은 사용하지 않고 이슈관리 화면으로 이동    
-    // WBS 실적 이슈 수정 방법은 이슈 관리 화면(구분자:U4) 에서 등록 (1가지 방법), 기존 WBS 일정계획 (구분자:U2)은 사용하지 않고 이슈관리 화면으로 이동
+    // WBS 계획 문제 수정 방법은 문제 관리 화면(구분자:U3) 에서 등록 (1가지 방법), 기존 WBS 일정계획 (구분자:U1)은 사용하지 않고 문제관리 화면으로 이동    
+    // WBS 실적 문제 수정 방법은 문제 관리 화면(구분자:U4) 에서 등록 (1가지 방법), 기존 WBS 일정계획 (구분자:U2)은 사용하지 않고 문제관리 화면으로 이동
     function wbsIssModal(row) {
     	if (row == undefined) {
             return;
@@ -520,33 +560,68 @@
 			};
 			openModal("/static/html/user/pm/pm01/PM0101P01.html", 750, 560, "", paramObj, function(data) {});
         } else {
-            // 이슈관리에서 계획 이슈 수정 구분자는 "U3"
+            // 문제관리에서 계획 문제 수정 구분자는 "U3"
             if (row.gubun == "계획") {
                 var paramObj = {
 //                     "actionType"     : "I",
                     "actionType"     : "U3",
                     "coCd"           : row.coCd,
+                    "salesCd"        : row.salesCd,
                     "issFileTrgtKey" : row.fileTrgtKey
                 };
-                // debugger;
-                openSecondModal("/static/html/user/wb/wb24/WB2401P01.html", 1200, 870, "WBS 계획이슈수정", paramObj, function (){
+                openModal("/static/html/user/wb/wb24/WB2401P01.html", 1200, 870, "WBS 계획문제수정", paramObj, function (){
                     
                 });
             }
     		else if (row.gubun == "실적") {
-                // 이슈관리에서 등록 이슈 수정 구분자는 "U4"
+                // 문제관리에서 등록 문제 수정 구분자는 "U4"
                 var paramObj = {
 //                     "actionType"     : "I",
                     "actionType"     : "U4",
                     "coCd"           : row.coCd,
+                    "salesCd"        : row.salesCd,
                     "issFileTrgtKey" : row.fileTrgtKey
                 };
-                // debugger;
-                openSecondModal("/static/html/user/wb/wb24/WB2401P11.html", 1200, 870, "WBS 실적이슈수정", paramObj, function (){
+                openModal("/static/html/user/wb/wb24/WB2401P11.html", 1200, 870, "WBS 실적문제수정", paramObj, function (){
                     
                 });
             }
         }
     }
 	
+
+	/*수정 or 등록 버튼 클릭 시*/
+	function insertQualityReqModal() { 
+			var row = gridView.target.getList("selected")[0];
+	    	if (row.reqNo) {
+	    		//발주요청번호가 존재하면 발주요청서 수정 업무 시작
+// 	    		insertQualityReqModal('U');
+
+				var paramObj = {
+					"actionType" : "U",
+//	 				"fileTrgtKey" : 0,		//정보 없음
+					"reqNo"    : row.reqNo,
+					"coCd" 	   : row.coCd,
+			       	"userId"   : jwt.userId,
+			       	"deptId"   : jwt.deptId,
+			       	"issNo"    : row.issNo,
+			       	"pgmId"    : "QM0101M01"
+				};
+				openModal("/static/html/user/qm/qm01/QM0101P01.html", 1600, 850, "", paramObj, function(data) {
+				});
+			} else {
+	    		//발주요청서 신규 생성업무 시작
+		    	var paramObj = JSON.parse(JSON.stringify(row));
+		        paramObj.fromJobType = "ISS";	//발주요청서 자체 실행은 "REQ", 문제에서 전달하는것은 "ISS"
+		        paramObj.actionType  = "C";	//발주요청서 신규 생성
+		        paramObj.eqpNm  = row.eqpNm;	
+		        paramObj.workRptNo  = row.workRptNo;	//이슈등록번호
+		        paramObj.issueTitle  = row.issueTitle;	
+		        paramObj.workRptRmk  = row.workRptRmk;	
+		        openModal("/static/html/user/qm/qm01/QM0101P01.html", 1200, 870, "요인별 발주 및 출장요청서 작성", paramObj, function (){
+		        	gridView.setData(0);
+		        });
+	    	}
+	}
+
 </script>

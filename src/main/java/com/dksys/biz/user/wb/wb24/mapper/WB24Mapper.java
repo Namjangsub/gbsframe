@@ -13,7 +13,7 @@ public interface WB24Mapper {
 	
 	List<Map<String, String>> selectWbsIssueList(Map<String, String> paramMap);
 	
-	List<Map<String, String>> selectMaxWbsIssueNo(Map<String, String> paramMap);
+	Map<String, String> selectMaxWbsIssueNo(Map<String, String> paramMap);
 	
 	int selectWbsIssueSeqNext(Map<String, String> paramMap);
 	
@@ -50,4 +50,9 @@ public interface WB24Mapper {
 	int updateWbsIssueResultEvaluate(Map<String, String> paramMap);
 
 	int updateWbsIssueStChk(Map<String, String> paramMap);
+
+	Map<String, String> select_wb2401p01_planInfo(Map<String, String> paramMap);
+
+	Map<String, String> select_wb2401p01_rsltInfo(Map<String, String> paramMap);
+
 }

@@ -173,7 +173,9 @@
 	                    , ISU.CREAT_PGM 						AS  FILE_TRGT_TYP   --생성프로그램
 	                    , ''  WBS_RSLTSS_DT                           --실적시작일
 	                    , ''  WBS_RSLTSE_DT                           --실적종료일
-	                    , ACT.REQ_NO                                  --발주요청번호
+	                    , ISU.REQ_NO                                  --발주요청번호
+	                    , ISU.SUB_CD                                  --등록사유
+	                    , ISU.CREAT_ID                                --등록ID
 	                FROM TB_WB24M02 AS ISU --계획이슈 정보
 	                      LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --계획이슈 조치내용
 	               WHERE ISU.WBS_PLAN_NO IS NOT NULL --계획이슈 
@@ -204,7 +206,9 @@
 	                    , ISU.CREAT_PGM 						AS  FILE_TRGT_TYP   --생성프로그램
 	                    , TO_CHAR(RSL.WBS_RSLTSS_DT,'YYYY-MM-DD') AS WBS_RSLTSS_DT--실적시작일
 	                    , TO_CHAR(RSL.WBS_RSLTSE_DT,'YYYY-MM-DD') AS WBS_RSLTSE_DT--실적종료일
-	                    , ACT.REQ_NO                                  --발주요청번호
+	                    , ISU.REQ_NO                                  --발주요청번호
+	                    , ISU.SUB_CD                                  --등록사유
+	                    , ISU.CREAT_ID                                --등록ID
 	                FROM TB_WB24M02  AS ISU --WBS이슈 정보
 	                      LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --실적이슈 조치내용
 	                      LEFT OUTER JOIN TB_WB23M01 AS RSL ON ISU.CO_CD = RSL.CO_CD AND ISU.SALES_CD = RSL.SALES_CD AND ISU.WBS_PLAN_CODE_KIND = RSL.WBS_PLAN_CODE_KIND AND ISU.WBS_PLAN_CODE_ID = RSL.WBS_PLAN_CODE_ID AND ISU.WBS_RSLTS_NO = RSL.WBS_RSLTS_NO
@@ -243,7 +247,8 @@
                   , I.ISS_DIV_NM          --이슈유형명
                   , I.ISS_CNTS            --이슈내용
 
-                  , (SELECT FN_CM06M01_ID_TO_NM(I.ACT_ID) FROM DUAL) AS ACT_NM
+                  , U.NAME 		 		AS ACT_ID_NM	--조치담당자명
+                  , U.DEPT_ID 		 	AS ACT_DEPT_ID	--조치담당부서
                   , I.ACTS_DT             --조취시작일
                   , I.ACTE_DT             --조취종료일
                   , I.REQ_NO              --발주요청번호
@@ -267,9 +272,12 @@
                   , I.FILE_TRGT_KEY    AS ISS_FILE_TRGT_KEY    --이슈FILE_TRGT_KEY
                   , I.FILE_TRGT_TYP    AS ISS_FILE_TRGT_TYP    --이슈FILE_TRGT_TYP
                   , P.PATH                --코드PATH
+	              , I.SUB_CD              --등록사유
+	              , I.CREAT_ID            --등록ID
 			  FROM PLN AS P
 			       INNER      JOIN SUBJ AS J ON P.CO_CD = J.CO_CD AND P.SALES_CD = J.SALES_CD--과제정보 
-			       LEFT OUTER JOIN ISU  AS I ON P.CO_CD = I.CO_CD AND P.SALES_CD = I.SALES_CD AND P.WBS_PLAN_CODE_KIND = I.WBS_PLAN_CODE_KIND AND P.WBS_PLAN_CODE_ID = I.WBS_PLAN_CODE_ID--이슈정보 
+			       LEFT OUTER JOIN ISU  AS I ON P.CO_CD = I.CO_CD AND P.SALES_CD = I.SALES_CD AND P.WBS_PLAN_CODE_KIND = I.WBS_PLAN_CODE_KIND AND P.WBS_PLAN_CODE_ID = I.WBS_PLAN_CODE_ID--이슈정보
+			       LEFT OUTER JOIN TB_CM06M01 U ON U.ID = I.ACT_ID
 			 WHERE 1=1 
 			 <if test="issSts != null and !issSts.equals('')">
                     AND I.ISS_STS = #{issSts}            
@@ -317,7 +325,7 @@
 			                    , ISU.FILE_TRGT_KEY                           --이슈 FILE_TRGT_KEY
 			                    , ''  WBS_RSLTSS_DT                           --실적시작일
 			                    , ''  WBS_RSLTSE_DT                           --실적종료일
-			                    , ACT.REQ_NO                                  --발주요청번호
+			                    , ISU.REQ_NO                                  --발주요청번호
 			                    , NVL2(ISU.UDT_DTTM, ISU.UDT_DTTM, ISU.CREAT_DTTM) AS CREAT_DTTM       --등록/수정일자 
 			                    , NVL2(ISU.UDT_ID, ISU.UDT_ID, ISU.CREAT_ID) AS CREAT_ID       --등록/수정담당자
 			                FROM TB_WB24M02 AS ISU --계획이슈 정보
@@ -350,7 +358,7 @@
 			                    , ISU.FILE_TRGT_KEY                                       --이슈 FILE_TRGT_KEY
 			                    , TO_CHAR(RSL.WBS_RSLTSS_DT,'YYYY-MM-DD') AS WBS_RSLTSS_DT--실적시작일
 			                    , TO_CHAR(RSL.WBS_RSLTSE_DT,'YYYY-MM-DD') AS WBS_RSLTSE_DT--실적종료일
-			                    , ACT.REQ_NO                                  --발주요청번호
+			                    , ISU.REQ_NO                                  --발주요청번호
 			                    , NVL2(ISU.UDT_DTTM, ISU.UDT_DTTM, ISU.CREAT_DTTM) AS CREAT_DTTM       --등록/수정일자 
 			                    , NVL2(ISU.UDT_ID, ISU.UDT_ID, ISU.CREAT_ID) AS CREAT_ID       --등록/수정담당자
 			                FROM TB_WB24M02  AS ISU --WBS이슈 정보
@@ -441,8 +449,9 @@
 		  
 		  
 		  <select id="selectMaxWbsIssueNo" parameterType="Map"  resultType="camelMap">
-              SELECT  #{year} || trim(to_char(nvl(SUBSTR(MAX(ISS_NO), 6, 4),0) + 1, '0000')) AS ISS_NO FROM TB_WB24M02 
-              WHERE CO_CD = #{coCd}   
+              SELECT  'ISS' || (SELECT to_char(sysdate,'yy') FROM dual) || 
+                      trim(to_char(nvl(SUBSTR(MAX(ISS_NO), 6, 4),0) + 1, '0000')) AS ISS_NO 
+                FROM TB_WB24M02 
           </select>
         
           <select id="selectWbsIssueSeqNext" parameterType="Map" resultType="int">
@@ -467,7 +476,9 @@
 				    SALES_CD,
 				    CREAT_ID,
 				    CREAT_PGM,
-				    CREAT_DTTM
+				    CREAT_DTTM,
+				    MID_CD,
+				    SUB_CD
                 ) 
                 VALUES
                 (
@@ -486,7 +497,9 @@
                     #{salesCd},
                     #{userId},
                     #{pgmId},
-                    SYSDATE
+                    SYSDATE,
+					#{midCd},
+					#{CODECOBGB}
                 )
             </insert>
             
@@ -520,8 +533,8 @@
                     #{actAmt, jdbcType=VARCHAR},
                     #{actCnts},
                     #{reqNo, jdbcType=VARCHAR},
-                    #{actAmtSts},
-                    #{actDng},
+                    #{actAmtSts, jdbcType=VARCHAR},
+                    #{actDng, jdbcType=VARCHAR},
                     #{userId},
                     #{pgmId},
                     SYSDATE
@@ -530,8 +543,11 @@
             
             
             <select id="actChk" parameterType="Map" resultType="camelMap">
-               SELECT *  FROM TB_WB24M03
-                   WHERE ISS_NO  = #{issNo}
+	            SELECT *
+				  FROM TB_WB20M03 
+				 WHERE 1=1 
+				   AND SALES_CD = #{salesCd}
+				   AND TODO_NO = #{issNo}
             </select>   
   
   
@@ -545,7 +561,10 @@
 		                    ACT_ID 		= #{actId},
 		                    UDT_ID 		= #{userId},
 	                        UDT_PGM 	= #{pgmId},
-	                        UDT_DTTM 	= SYSDATE     
+	                        UDT_DTTM 	= SYSDATE,
+						    MID_CD		= #{midCd},
+						    SUB_CD		= #{CODECOBGB}     
+						    MEAS_RST	= #{measRst}     
                     WHERE FILE_TRGT_KEY =  #{issFileTrgtKey}   
             </update>   
          
@@ -558,8 +577,8 @@
                             ACT_AMT 	= #{actAmt, jdbcType=VARCHAR},
                             ACT_CNTS 	= #{actCnts},
                             REQ_NO 		= #{reqNo, jdbcType=VARCHAR},
-                            ACT_AMT_STS = #{actAmtSts},
-                            ACT_DNG 	= #{actDng},
+                            ACT_AMT_STS = #{actAmtSts, jdbcType=VARCHAR},
+                            ACT_DNG 	= #{actDng, jdbcType=VARCHAR},
                             UDT_ID 		= #{userId},
                             UDT_PGM 	= #{pgmId},
                             UDT_DTTM 	= SYSDATE     
@@ -588,7 +607,7 @@
 			            A.ACT_MH,
 			            A.ACT_AMT,
 			            A.ACT_CNTS,
-			            A.REQ_NO,
+		                X.REQ_NO,
 			            X.SALES_CD,
 			            Y.WBS_RSLTS_NO,
 			            Y.WBS_RSLTS_ID,
@@ -654,13 +673,16 @@
                       X.EMP_NO,
                       X.NAME,
                       X.TEL_NO,
-                      D.LEVEL_NM AS JIK ,
+                      X.OFF_TEL_NO,
+                      D.LEVEL_NM AS JIK,
+                      C.DEPT_NM,
+                      X.EMAIL,
                       TO_CHAR(SYSDATE, 'YYYY-MM-DD') AS REQ_DATE                     
                       FROM TB_CM06M01 X  
-                      INNER JOIN TB_CM04M01 C ON(X.DEPT_ID=C.DEPT_ID) 
-                      INNER JOIN TB_CM07M01 D ON(X.LEVEL_CD=D.LEVEL_CD) 
+	                      LEFT OUTER JOIN TB_CM04M01 C ON(X.DEPT_ID=C.DEPT_ID) 
+	                      LEFT OUTER JOIN TB_CM07M01 D ON(X.LEVEL_CD=D.LEVEL_CD) 
                       WHERE 1 = 1
-                      AND X.ID = '${userId}' 
+                      AND X.ID = #{userId} 
           </select>
           
           <select id="selectMemberTelNo" parameterType="Map" resultType="camelMap">
@@ -672,6 +694,7 @@
     <select id="select_wb2401p01_Info" parameterType="Map" resultType="camelMap">
         SELECT A.WBS_PLAN_NO
              , A.WBS_RSLTS_NO
+             , A.WBS_PLAN_CODE_KIND
              , A.WBS_PLAN_CODE_ID
              , TO_CHAR(NVL(P.WBS_PLANS_DT,R.WBS_RSLTSS_DT),'YYYY-MM-DD') AS WBS_PLANS_DT
              , TO_CHAR(NVL(P.WBS_PLANE_DT,R.WBS_RSLTSE_DT),'YYYY-MM-DD') AS WBS_PLANE_DT
@@ -683,14 +706,14 @@
              , R4.CODE_NM AS ISS_STS_NM
              , A.ISS_SJ
              , A.ISS_CNTS
-             , NVL2(A.ACT_ID,A.ACT_ID,A.CREAT_ID) AS ACT_ID
-             , (SELECT FN_CM06M01_ID_TO_NM(NVL2(A.ACT_ID,A.ACT_ID,A.CREAT_ID)) FROM DUAL) AS ACT_NM
-             --, U.NAME AS ACT_NM
+             , A.ACT_ID			AS ACT_ID
+             , U.NAME 			AS ACT_NM
+             , U.DEPT_ID		AS ACT_DEPT_ID
              , TO_CHAR(S.ACTS_DT,'YYYY-MM-DD') AS ACTS_DT
              , TO_CHAR(S.ACTE_DT,'YYYY-MM-DD') AS ACTE_DT
              , NVL(S.ACT_MH, 0)  AS ACT_MH
              , NVL(S.ACT_AMT, 0) AS ACT_AMT
-             , S.REQ_NO
+			 , A.REQ_NO
              , S.ACT_CNTS
              , R1.CODE_NM AS WBS_PLAN_CODE_KIND_NM
              , NVL(R2.CODE_NM, R1.CODE_NM) AS WBS_PLAN_CODE_NM
@@ -699,12 +722,9 @@
              , A.FILE_TRGT_KEY  AS ISS_FILE_TRGT_KEY
              , A.SALES_CD
              , A.CO_CD
-             , A.WBS_PLAN_CODE_KIND
-             , A.WBS_PLAN_CODE_ID
-             , A.SALES_CD
-             , A.CO_CD
              , A.CREAT_ID
              , U2.NAME  			AS CREAT_ID_NM
+             , U2.DEPT_ID			AS CREAT_DEPT_ID
              , A.CREAT_PGM
              , A.CREAT_DTTM
              , TO_CHAR(A.CREAT_DTTM,'YYYY-MM-DD') AS CREAT_DT
@@ -715,7 +735,7 @@
                 SELECT COUNT(*)
                 FROM   TB_WB20M03
                 WHERE  1 = 1
-                AND    TODO_FILE_TRGT_KEY = #{fileTrgtKey}
+                AND    TODO_FILE_TRGT_KEY = '281'
                 AND    TODO_DIV2_CODE_ID = 'TODODIV2060'
                 AND    TODO_CF_DT IS NOT NULL
                ) AS APP_CNT
@@ -723,13 +743,18 @@
                 SELECT COUNT(*)
                 FROM   TB_WB20M03
                 WHERE  1 = 1
-                AND    TODO_FILE_TRGT_KEY = #{fileTrgtKey}
+                AND    TODO_FILE_TRGT_KEY = '281'
                 AND    TODO_DIV2_CODE_ID = 'TODODIV2090'
                 AND    TODO_CF_DT IS NOT NULL
                ) AS ACT_APP_CNT
              , S.ACT_AMT_STS
              , S.ACT_DNG			--담당자위험도평가
 		     , S.ACT_DNG_EVAL		--팀장위험도평가
+		     , S.MEAS_RST			--원인
+			 , A.MID_CD AS MID_CD
+			 , (SELECT FN_CM05M01_CD_TO_NM(A.MID_CD) FROM DUAL) AS MID_NM
+			 , A.SUB_CD AS SUB_CD
+			 , (SELECT FN_CM05M01_CD_TO_NM(A.SUB_CD) FROM DUAL) AS SUB_CD_NM
         FROM   TB_WB24M02 AS A
                LEFT OUTER JOIN TB_WB22M01 AS P  ON P.CO_CD       = A.CO_CD
                                                AND P.WBS_PLAN_NO = A.WBS_PLAN_NO
@@ -776,7 +801,7 @@
 	
 	<update id="updateWbsIssueResultEvaluate" parameterType="Map">
 		UPDATE TB_WB24M03
-           SET ACT_DNG_EVAL 	= #{actDngEval}
+           SET ACT_DNG_EVAL 	= #{actDngEval, jdbcType=VARCHAR}
 		 WHERE  ISS_NO =  #{issNo}   
 	</update>
 	
@@ -786,4 +811,68 @@
 		 WHERE ISS_NO = #{issNo}
 		   AND ISS_STS = 'ISSSTS01'
 	</update>
+	
+	
+    
+    <select id="select_wb2401p01_planInfo" parameterType="Map" resultType="camelMap">
+		SELECT   
+			  	  WBS_PLAN_CODE_KIND
+				, FN_CM05M01_CD_TO_NM(T.WBS_PLAN_CODE_KIND) AS WBS_PLAN_CODE_KIND_NM
+				, WBS_PLAN_CODE_ID
+				, WBS_PLAN_CODE_NM
+				, VER_NO
+				, SALES_CD
+				, SEQ
+				, WBS_PLAN_MNG_ID
+				, FN_CM06M01_ID_TO_NM(T.WBS_PLAN_MNG_ID) 	AS WBS_PLAN_MNG_ID_NM
+             	, TO_CHAR(T.WBS_PLANS_DT,'YYYY-MM-DD') 		AS WBS_PLANS_DT
+             	, TO_CHAR(T.WBS_PLANE_DT,'YYYY-MM-DD') 		AS WBS_PLANE_DT
+				, DAYCNT
+				, WBS_PLAN_STS_CODE_ID
+				, FN_CM05M01_CD_TO_NM(T.WBS_PLAN_STS_CODE_ID) AS WBS_PLAN_STS_CODE_ID_NM
+				, LOCK_YN
+				, CLOSE_YN
+				, CREAT_ID
+				, FN_CM06M01_ID_TO_NM(T.CREAT_ID) AS CREAT_ID_NM
+            	, T.EXPECT_MH
+				, U.TEL_NO
+		FROM TB_WB22M01	T,  (SELECT TEL_NO                    
+		                      FROM TB_CM06M01  
+		                      WHERE ID = #{userId}) U
+		WHERE T.WBS_PLAN_NO = #{wbsPlanNo}
+    </select>
+	
+	
+    <select id="select_wb2401p01_rsltInfo" parameterType="Map" resultType="camelMap">
+		SELECT   
+				  T.WBS_PLAN_CODE_KIND
+				, FN_CM05M01_CD_TO_NM(T.WBS_PLAN_CODE_KIND) AS WBS_PLAN_CODE_KIND_NM
+				, T.WBS_PLAN_CODE_ID
+				, T.SALES_CD
+				, T.WBS_RSLTS_ID
+				, FN_CM06M01_ID_TO_NM(T.WBS_RSLTS_ID) AS WBS_RSLTS_ID_NM
+				, T.WBS_RSLTS_RATE
+				, T.WBS_PLAN_MH
+				, T.WBS_RSLTS_MH
+				, T.WBS_RSLTS_CNTS
+             	, TO_CHAR(T.WBS_RSLTSS_DT,'YYYY-MM-DD') 		AS WBS_RSLTSS_DT
+             	, TO_CHAR(T.WBS_RSLTSE_DT,'YYYY-MM-DD') 		AS WBS_RSLTSE_DT
+				, T.DAYCNT
+				, T.LOCK_YN
+				, T.CLOSE_YN
+				, T.CREAT_ID
+				, FN_CM06M01_ID_TO_NM(T.CREAT_ID) AS CREAT_ID_NM
+				, P.WBS_PLAN_CODE_NM
+             	, TO_CHAR(P.WBS_PLANS_DT,'YYYY-MM-DD') 		AS WBS_PLANS_DT
+             	, TO_CHAR(P.WBS_PLANE_DT,'YYYY-MM-DD') 		AS WBS_PLANE_DT
+             	, P.EXPECT_MH
+				, U.TEL_NO
+		FROM TB_WB23M01	T
+						LEFT OUTER JOIN TB_WB22M01 P ON WBS_PLAN_NO = #{wbsRsltsNo}
+				,  (SELECT TEL_NO                    
+		                      FROM TB_CM06M01  
+		                      WHERE ID = 'js.nam') U
+		WHERE T.WBS_RSLTS_NO = #{wbsRsltsNo}
+    </select>
+	
 </mapper>

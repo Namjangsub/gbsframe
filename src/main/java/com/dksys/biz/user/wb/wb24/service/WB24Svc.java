@@ -11,7 +11,7 @@ public interface WB24Svc {
 		
 	List<Map<String, String>> selectWbsIssueList(Map<String, String> paramMap);	
 	
-	List<Map<String, String>> selectMaxWbsIssueNo(Map<String, String> paramMap);
+	Map<String, String> selectMaxWbsIssueNo(Map<String, String> paramMap);
 	
 	int wbsIssueInsert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
@@ -34,5 +34,9 @@ public interface WB24Svc {
 	Map<String, String> selectTeamManagerInfo(Map<String, String> paramMap);
 
 	int updateWbsIssueResultEvaluate(Map<String, String> paramMap);
+
+	Map<String, String> select_wb2401p01_planInfo(Map<String, String> paramMap);
+
+	Map<String, String> select_wb2401p01_rsltInfo(Map<String, String> paramMap);
 
 }
