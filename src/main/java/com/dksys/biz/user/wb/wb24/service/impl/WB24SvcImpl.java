@@ -335,11 +335,11 @@ public class WB24SvcImpl implements WB24Svc {
 
 	    //진행상태가 완료("ISSSTS03") 일경우 결과 등록 또는 Update 진행
 	    if ("ISSSTS03".equals(paramMap.get("issSts"))) {
-			paramMap.put("reqNo", paramMap.get("actReqNo"));
+//			paramMap.put("reqNo", paramMap.get("actReqNo"));
 	    	//TB_WB24M03 테이블에 issNo 가 등록되어있는지 확인
-			List<Map<String, String>> actchk = wb24Mapper.actChk(paramMap);
+			List<Map<String, String>> issueResultChk = wb24Mapper.issueResultChk(paramMap);
 			
-			if (actchk.size() > 0) {
+			if (issueResultChk.size() > 0) {
 				result += wb24Mapper.wbsActUpdate(paramMap);
 			} else {
 				result += wb24Mapper.wbsActInsert(paramMap);

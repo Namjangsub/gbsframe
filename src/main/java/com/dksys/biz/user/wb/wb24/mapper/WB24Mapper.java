@@ -33,6 +33,8 @@ public interface WB24Mapper {
 
 	List<Map<String, String>> actChk(Map<String, String> paramMap);
 
+	List<Map<String, String>> issueResultChk(Map<String, String> paramMap);
+
 	List<Map<String, String>> selectMemberTelNo(Map<String, String> paramMap);
 
 	Map<String, String> select_wb2401p01_Info(Map<String, String> paramMap);
