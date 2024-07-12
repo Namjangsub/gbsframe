@@ -42,13 +42,4 @@ public class CR18SvcImpl implements CR18Svc {
 		return cr18Mapper.select_cr18_List(paramMap);
 	}
 
-	// 엑셀 그리드 리스트
-	@Override
-	public List<Map<String, String>> select_cr18_Excel(Map<String, String> paramMap) {
-		return cr18Mapper.select_cr18_Excel(paramMap);
-	}
-	// @Override
-	// public List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap) {
-	// 	return cr05Mapper.selectPmntmtdCd(paramMap);
-	// }
 }

@@ -14,9 +14,6 @@ public interface CR14Mapper {
 	// 그리드 리스트
 	List<Map<String, String>> select_cr14_List(Map<String, String> paramMap);
 
-	// 엑셀 리스트
-	List<Map<String, String>> select_cr14_Excel(Map<String, String> paramMap);
-	
 	// POPUP 그리드 카운트
 	int select_modal_List1_Count(Map<String, String> paramMap);
 	int select_modal_List2_Count(Map<String, String> paramMap);

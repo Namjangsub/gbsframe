@@ -40,22 +40,4 @@ public class CR18Ctr {
 		return "jsonView";
 	}
 	
-    //엑셀리스트 조회
-	@PostMapping(value = "/select_cr18_Excel")
-	public String select_cr18_Excel(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = cr18svc.select_cr18_Count(paramMap);
-		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		model.addAttribute("paginationInfo", paginationInfo);
-		List<Map<String, String>> result = cr18svc.select_cr18_Excel(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-	}
-
-	// // 수금유형 조회
-	// @PostMapping(value = "/selectPmntmtdCd") 
-	// public String selectPmntmtdCd(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	// 	List<Map<String, Object>> result = cr14svc.selectPmntmtdCd(paramMap);
-	// 	model.addAttribute("result", result);
-	// 	return "jsonView";
-	// }
 }

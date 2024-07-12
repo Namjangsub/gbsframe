@@ -14,9 +14,4 @@ public interface CR18Mapper {
 	// 그리드 리스트
 	List<Map<String, String>> select_cr18_List(Map<String, String> paramMap);
 
-	// 그리드 리스트
-	List<Map<String, String>> select_cr18_Excel(Map<String, String> paramMap);
-	
-    // // 수금유형 검색
-	// List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap);
 }
