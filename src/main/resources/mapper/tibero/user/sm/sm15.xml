@@ -2,10 +2,229 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.dksys.biz.user.sm.sm15.mapper.SM15Mapper">
+
+     <select id="selectSM15MainListCount" parameterType="Map" resultType="int">
+	--입고내역-발주분
+		WITH IPGO AS 
+			(
+			SELECT  
+					  CO_CD
+					, SALES_CD
+					, NVL(SALES_CD,'00999-9900000') 	AS VIEW_SALES_CD
+					, decode(SUBSTRING(SALES_CD,0,2),'AS',9,1) AS SEQ_DIV --AS로 시작하는 salesCd 맨뒤로 보내기 위함
+					, REQ_NO
+			 	    , SUM(IN_QTY) 		AS IN_QTY
+			 	    , SUM(BAD_QTY) 		AS BAD_QTY
+			 	    , SUM(IN_DTL_AMT) 	AS IN_DTL_AMT
+					, TO_CHAR(MIN(IN_DT), 'YYYY-MM-DD') MIN_IN_DT
+					, TO_CHAR(max(IN_DT), 'YYYY-MM-DD') IN_DT
+			 	    , MAX(STS) 				AS STS
+			 	    , SUM(GER_AMT) 			AS GER_AMT
+			 	    , SUM(ELEC_AMT) 		AS ELEC_AMT
+			 	    , SUM(TRUN_AMT) 		AS TRUN_AMT
+			 	    , SUM(STD_AMT) 			AS STD_AMT
+			 	    , SUM(BAD_AMT) 			AS BAD_AMT
+			 	    , SUM(AS_AMT) 			AS AS_AMT
+			 	    , SUM(AS_PAY_AMT) 		AS AS_PAY_AMT
+			 	    , SUM(AS_NON_PAY_AMT) 	AS AS_NON_PAY_AMT
+			 	    
+			 	    , SUM(PCHS_GOODS_AMT) 	AS PCHS_GOODS_AMT
+			 	    , SUM(RAW_MAT_AMT) 		AS RAW_MAT_AMT
+			 	    , SUM(CAM_AMT) 			AS CAM_AMT
+			 	    , SUM(PROC_GOODS_AMT) 	AS PROC_GOODS_AMT
+			 	    , SUM(POST_PROC_AMT) 	AS POST_PROC_AMT
+			 	    , SUM(TRANS_AMT) 		AS TRANS_AMT
+			 	    , SUM(ETC_AMT) 			AS ETC_AMT
+			 	    
+		    		, max(PART_CD) 			AS PART_CD /* 발주분류명 */	
+		    		, max(REQ_CD) 			AS REQ_CD   /* 발주요청구분명 */	
+		    		, max(ORDRG_ID) 			AS ORDRG_ID /* 발주발행자명 */
+			  FROM (
+						SELECT 
+							  IPGO.CO_CD
+							, M.REQ_NO
+							, IPGO.SALES_CD
+							, IPGO.ORDRG_NO
+					 	    , SUM(IPGO.IN_QTY) 		AS IN_QTY
+					 	    , SUM(IPGO.BAD_QTY) 	AS BAD_QTY
+					 	    , SUM(IPGO.IN_DTL_AMT) 	AS IN_DTL_AMT
+					 	    , MIN(IPGO.IN_DT) 		AS MIN_IN_DT
+					 	    , max(IPGO.IN_DT) 		AS IN_DT
+			 	    		, '입고' 					AS STS
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV03', 0, 'GOODSDIV07', 0, 'GOODSDIV08', 0, decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT) ))  	AS GER_AMT	--운송비('GOODSDIV08')는 제외
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV03', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT) ,0))  									AS ELEC_AMT
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV07', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT),0))  									AS TRUN_AMT
+
+							, SUM(decode(J.GOODS_DIV,'GOODSDIV08', 0, decode(Q.PART_CD,'COBTP03',0,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT)))  	AS STD_AMT	--정상금액 --운송비('GOODSDIV08')는 제외
+							, SUM(decode(J.GOODS_DIV,'GOODSDIV08', 0, decode(Q.PART_CD,'COBTP03',IPGO.IN_DTL_AMT,0)))  							AS BAD_AMT --장애금액 --운송비('GOODSDIV08')는 제외
+							, SUM(decode(J.GOODS_DIV,'GOODSDIV08', 0, decode(Q.PART_CD,'COBTP04',IPGO.IN_DTL_AMT,'COBTP05',IPGO.IN_DTL_AMT,0)))  	AS AS_AMT --AS유무상금액 --운송비('GOODSDIV08')는 제외
+							, SUM(decode(J.GOODS_DIV,'GOODSDIV08', 0, decode(Q.PART_CD,'COBTP04',IPGO.IN_DTL_AMT,0)))  	AS AS_PAY_AMT --AS유상금액 --운송비('GOODSDIV08')는 제외
+							, SUM(decode(J.GOODS_DIV,'GOODSDIV08', 0, decode(Q.PART_CD,'COBTP05',IPGO.IN_DTL_AMT,0)))  	AS AS_NON_PAY_AMT --AS무상금액 --운송비('GOODSDIV08')는 제외
+						
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV01', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT), 0))  								AS PCHS_GOODS_AMT
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV02', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT), 
+				    								 'GOODSDIV03', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT), 0))  AS RAW_MAT_AMT
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV04', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT), 0))  								AS CAM_AMT
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV05', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT), 0))  								AS PROC_GOODS_AMT
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV06', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT), 0))  								AS POST_PROC_AMT
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV08', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT), 0))  								AS TRANS_AMT
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV07', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT), 
+				    								 'GOODSDIV09', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT), 
+				    								 'GOODSDIV10', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT), 
+				    								 'GOODSDIV11', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT), 0))  AS ETC_AMT
+				    		, max(Q.PART_CD) AS PART_CD /* 발주분류명 */	
+				    		, max(Q.REQ_CD) AS REQ_CD   /* 발주요청구분명 */	
+				    		, max(Q.ORDRG_ID) AS ORDRG_ID /* 발주발행자명 */
+						FROM TB_SM03D01 IPGO
+								LEFT OUTER JOIN TB_SM02M01 M ON(IPGO.ORDRG_NO = M.ORDRG_NO)		/* 발주마스터 */
+								LEFT OUTER JOIN TB_BM02M01 D ON M.PCHS_CLNT_CD = D.CLNT_CD
+								LEFT OUTER JOIN TB_BM05M01 J ON IPGO.MATR_CD = J.MATR_CD		/* 자재마스터 */
+								LEFT OUTER JOIN TB_QM01M01 Q ON IPGO.REQ_NO = Q.REQ_NO
+						WHERE 1 = 1
+					<!-- 회사코드 -->         
+					<if test="coCd != null and !coCd.equals('')">
+						AND IPGO.CO_CD = #{coCd}   
+					</if>
+					<if test="salesCd != null and !salesCd.equals('')">
+						AND IPGO.SALES_CD LIKE '%'|| #{salesCd} || '%'   
+					</if>
+					<!-- 매입구분 N: 발주,  Y:비용,  R:반품 -->         
+					<if test="pchsGb != null and !pchsGb.equals('')">
+					    AND 'N' = #{pchsGb}
+					</if>      
+					<if test="cmpletYn != null and cmpletYn != ''">           
+						AND NVL2(IPGO.PCHS_NO,'Y','N') = #{cmpletYn}
+					</if>  
+						GROUP BY IPGO.CO_CD, IPGO.SALES_CD, M.REQ_NO, IPGO.ORDRG_NO
+					UNION ALL --구매비용집계현황
+						SELECT
+						      E.CO_CD
+						    , NVL(E.REQ_NO,'REQ9999999')  		AS REQ_NO
+						    , ED.SALES_CD
+							, E.COST_NO
+					 	    , 0 AS IN_QTY
+					 	    , 0 AS BAD_QTY
+					 	    , SUM(NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT)) 		AS COST_AMT
+					 	    , MIN(E.COST_DT) 		AS MIN_COST_DT
+					 	    , max(E.COST_DT) 		AS COST_DT
+			 	    		, '비용' 					AS STS
+			 	    		, SUM(decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1050', 0, 'PCHSCOSTDIV1030', 0, decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT))))   AS GER_AMT
+			 	    		, SUM(decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1050', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT)),0))  AS ELEC_AMT	--전기비용
+			 	    		, SUM(decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1030', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT)),0))  AS TRUN_AMT	--턴키비용
+	 	    		
+--			 	    		, MAX(EC.SL_CNT) 		AS SL_CNT
+							, SUM(decode(Q.PART_CD,'',NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT),'COBTP03',0,'COBTP04',0,'COBTP05',0,NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT)))  	AS STD_AMT	--정상금액
+							, SUM(decode(Q.PART_CD,'COBTP03',NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT),0))  							AS BAD_AMT --장애금액
+							, SUM(decode(Q.PART_CD,'COBTP04',NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT),
+												   'COBTP05',NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT),0))  	AS AS_AMT --AS유무상금액
+							, SUM(decode(Q.PART_CD,'COBTP04',NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT),0))  	AS AS_PAY_AMT --AS유상금액
+							, SUM(decode(Q.PART_CD,'COBTP05',NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT),0))  	AS AS_NON_PAY_AMT --AS무상금액
+			 	    		, 0
+			 	    		, 0
+			 	    		, 0
+			 	    		, 0
+			 	    		, 0
+			 	    		, 0
+			 	    		, SUM(decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT)))
+				    		, max(Q.PART_CD) AS PART_CD /* 발주분류명 */	
+				    		, max(Q.REQ_CD) AS REQ_CD   /* 발주요청구분명 */	
+				    		, max(Q.ORDRG_ID) AS ORDRG_ID /* 발주발행자명 */
+						FROM TB_SM10M01 E		/* 구매비용 */	
+								LEFT OUTER JOIN TB_SM10D01 ED ON E.COST_NO = ED.COST_NO
+								LEFT OUTER JOIN TB_BM02M01 D ON E.PCHS_CLNT_CD = D.CLNT_CD
+								LEFT OUTER JOIN (	SELECT    CO_CD
+															, COST_NO
+															, COUNT(SALES_CD) SL_CNT
+													  FROM TB_SM10D01 ED
+													  GROUP BY  CO_CD, COST_NO)	EC ON E.COST_NO = EC.COST_NO
+								LEFT OUTER JOIN TB_QM01M01 Q ON E.REQ_NO = Q.REQ_NO
+						WHERE 1 = 1
+						AND E.PCHS_CLNT_CD != 2	--건양트루넷이 구매처가 아닌것만 취합함
+					<!-- 회사코드 -->         
+					<if test="coCd != null and !coCd.equals('')">
+						AND E.CO_CD = #{coCd}   
+					</if>
+					<if test="salesCd != null and !salesCd.equals('')">
+						AND ED.SALES_CD LIKE '%'|| #{salesCd} || '%'   
+					</if>
+					<!-- 매입구분 N: 발주,  Y:비용,  R:반품 -->         
+					<if test="pchsGb != null and !pchsGb.equals('')">
+					    AND 'Y' = #{pchsGb}
+					</if>  
+					<!-- 확정여부 -->       
+					<if test="cmpletYn != null and cmpletYn != ''">         
+						AND NVL2(E.PCHS_NO,'Y','N') = #{cmpletYn}
+					</if>  
+						GROUP BY E.CO_CD, ED.SALES_CD, E.REQ_NO, E.COST_NO
+					UNION ALL	
+						SELECT 
+							  E.CO_CD
+							, E.RET_NO
+							, E.SALES_CD
+							, E.RET_NO
+					 	    , SUM(R.RET_QTY) 		AS RET_QTY
+					 	    , 0 					AS BAD_QTY
+					 	    , SUM(R.RET_DTL_AMT) 	AS RET_DTL_AMT
+					 	    , MIN(E.RET_DT) 		AS MIN_RET_DT
+					 	    , MAX(E.RET_DT) 		AS RET_DT
+			 	    		, '반품' 					AS STS
+				    		
+			 	    		, SUM(decode(J.GOODS_DIV,'GOODSDIV03', 0, 'GOODSDIV07', 0, 'GOODSDIV08', 0, R.RET_DTL_AMT))  AS GER_AMT  --운송비('GOODSDIV08')는 제외ㅍ
+			 	    		, SUM(decode(J.GOODS_DIV,'GOODSDIV03', R.RET_DTL_AMT,0))  AS ELEC_AMT
+			 	    		, SUM(decode(J.GOODS_DIV,'GOODSDIV07', R.RET_DTL_AMT,0))  AS TRUN_AMT
+							, SUM(decode(J.GOODS_DIV,'GOODSDIV08', 0, R.RET_DTL_AMT))  		AS STD_AMT	--정상금액  --운송비('GOODSDIV08')는 제외
+							, 0  															AS BAD_AMT --장애금액
+							, 0  															AS AS_AMT --AS유무상금액
+							, 0  															AS AS_PAY_AMT --AS유상금액 --운송비('GOODSDIV08')는 제외
+							, 0  															AS AS_NON_PAY_AMT --AS무상금액 --운송비('GOODSDIV08')는 제외
+			 	    		
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV01', R.RET_DTL_AMT, 0))  								AS PCHS_GOODS_AMT
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV02', R.RET_DTL_AMT, 'GOODSDIV03',R.RET_DTL_AMT, 0))   AS RAW_MAT_AMT
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV04', R.RET_DTL_AMT, 0))  								AS CAM_AMT
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV05', R.RET_DTL_AMT, 0))  								AS PROC_GOODS_AMT
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV06', R.RET_DTL_AMT, 0))  								AS POST_PROC_AMT
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV08', R.RET_DTL_AMT, 0))  								AS TRANS_AMT
+				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV07', R.RET_DTL_AMT, 'GOODSDIV09', R.RET_DTL_AMT, 'GOODSDIV10', R.RET_DTL_AMT, 'GOODSDIV11', R.RET_DTL_AMT, 0))  AS ETC_AMT
+				    		, '' AS PART_CD /* 발주분류명 */	
+				    		, '' AS REQ_CD   /* 발주요청구분명 */	
+				    		, '' AS ORDRG_ID /* 발주발행자명 */
+						FROM TB_SM06M01 E		/* 반품 */	
+								LEFT OUTER JOIN TB_SM06D01 R ON R.CO_CD = E.CO_CD AND R.RET_NO = E.RET_NO	
+								LEFT OUTER JOIN TB_BM02M01 D ON E.PCHS_CLNT_CD = D.CLNT_CD
+								LEFT OUTER JOIN TB_BM05M01 J ON R.MATR_CD = J.MATR_CD		/* 자재마스터 */
+						WHERE 1 = 1
+					<if test="coCd != null and !coCd.equals('')">
+						AND E.CO_CD = #{coCd}   
+					</if>
+					<if test="salesCd != null and !salesCd.equals('')">
+						AND E.SALES_CD LIKE '%'|| #{salesCd} || '%'   
+					</if>
+					<!-- 매입구분 N: 발주,  Y:비용,  R:반품 -->         
+					<if test="pchsGb != null and !pchsGb.equals('')">
+					    AND 'R' = #{pchsGb}
+					</if>  
+					<!-- 확정여부 -->      
+					<if test="cmpletYn != null and cmpletYn != ''">        
+						AND NVL2(R.PCHS_NO,'Y','N') = #{cmpletYn}
+					</if>  
+						GROUP BY E.CO_CD, E.SALES_CD, E.RET_NO
+					) AS T	
+			GROUP BY CO_CD, SALES_CD, REQ_NO
+		)
+		SELECT 
+				  count(*)
+		FROM IPGO
+     </select>
+
 	
 	
 	<!-- 발주-입고 내역 DETAIL SELECT -->
 	<select id="selectSM15MainList" parameterType="Map" resultType="camelMap">
+        SELECT A.*
+		FROM   (
+			SELECT A.*
+				, ROWNUM AS RN
+			FROM	(
 	--입고내역-발주분
 		WITH IPGO AS 
 			(
@@ -219,8 +438,13 @@
 				, (SELECT FN_CM05M01_CD_TO_NM(IPGO.REQ_CD) FROM DUAL ) AS REQ_CD_NM	/* 발주요청구분명 */	
 				, (SELECT FN_CM06M01_ID_TO_NM(IPGO.ORDRG_ID) FROM DUAL ) AS ORDRG_ID_NM	/* 발주발행자명 */	
 		FROM IPGO
-		ORDER BY IPGO.SEQ_DIV, IPGO.VIEW_SALES_CD DESC, IPGO.REQ_NO
-		 
+--		ORDER BY IPGO.SEQ_DIV, IPGO.VIEW_SALES_CD DESC, IPGO.REQ_NO		        
+		ORDER BY IPGO.VIEW_SALES_CD, IPGO.REQ_NO		        
+					) AS A
+			WHERE  1 = 1
+	       ) AS A
+		WHERE  1 = 1
+		AND    A.RN BETWEEN ${firstIndex} AND ${lastIndex}
 	</select>
 	
 	<!-- 매입확정 리스트  구매비용 포함-->

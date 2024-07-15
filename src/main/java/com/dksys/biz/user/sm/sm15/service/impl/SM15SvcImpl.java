@@ -25,6 +25,11 @@ public class SM15SvcImpl implements SM15Svc {
 	@Autowired
 	ExceptionThrower thrower;
 
+	@Override
+	public int selectSM15MainListCount(Map<String, String> paramMap) {
+		return sm15Mapper.selectSM15MainListCount(paramMap);
+	}
+
 	
 	@Override
 	public List<Map<String, String>> selectSM15MainList(Map<String, String> paramMap) {		

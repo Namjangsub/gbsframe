@@ -31,6 +31,10 @@ public class SM15Ctr {
 	// 발주/입고 조회 NEW
 	@PostMapping(value = "/selectSM15MainList")
 	public String selectSM15MainList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = sm15Svc.selectSM15MainListCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		
 		List<Map<String, String>> result = sm15Svc.selectSM15MainList(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";

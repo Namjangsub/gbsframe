@@ -15,8 +15,6 @@ public interface SM15Mapper {
 	List<Map<String, String>> sm15_2selectPurchaseListNew(Map<String, String> paramMap);
 
 	int sm15_2selectPurchaseListNewCount(Map<String, String> paramMap);
+
+	int selectSM15MainListCount(Map<String, String> paramMap);
 }
-
-
-
-
