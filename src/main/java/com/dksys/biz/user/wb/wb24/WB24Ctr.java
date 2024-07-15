@@ -37,9 +37,9 @@ public class WB24Ctr {
     
 	@PostMapping(value = "/selectWbsIssueList") 
 	public String selectWbsIssueList(@RequestBody Map<String, String> paramMap, ModelMap model) {	
-		//int totalCnt = wb24Svc.selectWbsIssueListCount(paramMap); 
-		//PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-        //model.addAttribute("paginationInfo", paginationInfo);
+		int totalCnt = wb24Svc.selectWbsIssueListCount(paramMap); 
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+        model.addAttribute("paginationInfo", paginationInfo);
 		  
 		List<Map<String, String>> fileList = wb24Svc.selectWbsIssueList(paramMap);
 		model.addAttribute("fileList", fileList);
