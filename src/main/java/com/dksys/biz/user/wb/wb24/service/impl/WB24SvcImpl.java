@@ -485,11 +485,15 @@ public class WB24SvcImpl implements WB24Svc {
   		//---------------------------------------------------------------  
         
         //발주요청서 등록여부 체크 발주요청서 등록되었으면 삭제물가 start
-        Map<String, String> selectQtyReqInfo = QM01Mapper.selectQtyReqInfo(paramMap);
-		if ("".equals(selectQtyReqInfo.get("reqNo"))) {
-//		    result = wb24Mapper.wbsIssueResultDelete(paramMap);
-			thrower.throwCommonException("fail");
-		}        
+        Map<String, String> select_wb2401p01_Info = wb24Mapper.select_wb2401p01_Info(paramMap);
+        if (select_wb2401p01_Info.get("reqNo") != null) {
+			if ("".equals(select_wb2401p01_Info.get("reqNo"))) {
+				//요인별 발주요청서가 등록되지 않았으므로 삭제가능 체크.
+			} else {
+				//요인별 발주요청서가 있으므로 삭제불가능합니다.
+				thrower.throwCommonException("fail");
+			}        
+        }
         //발주요청서 등록여부 체크 발주요청서 등록되었으면 삭제물가 end
         
         //결재 진행여부 체크 한명이라도 결재처리 되었으면 삭제 물가 처리 start
