@@ -260,6 +260,74 @@
 	</select>	
 	
 
+	
+	<!-- 입고관리 리스트 데시보드 -->
+	<select id="selectDashBoardWareHousingList" parameterType="Map" resultType="camelMap">																
+		SELECT  T.*
+				, (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_CD_NM
+				, M2.REQ_NO
+				, M2.PCHS_CLNT_CD
+				, M2.ORDRG_DT  						AS ORDRG_DT
+				, M2.CURR_CD   						AS CURR_CD
+				, M2.EXRATE    						AS EXRATE
+				, D.CLNT_NM    						AS PCHS_CLNT_NM		/* 구매처명 */ 
+		        , M2.ARR_ID     					AS ARR_ID
+		        , TO_CHAR(M2.ARR_DTTM, 'YYYY-MM-DD')	AS ARR_DTTM
+		        , M2.ARR_YN     					AS ARR_YN
+		        , Q.PART_CD							AS PART_CD
+				, M2.CREAT_ID    					AS ORDRG_MNG_ID
+				, U.NAME 		  					AS ORDRG_MNG_NM   
+				, ORDRG_QTY - IN_QTY				AS REAMIN_IN_QTY
+		FROM (
+				SELECT 	  T.CO_CD
+						, T.SALES_CD
+						, T.ORDRG_NO
+						, SUM(NVL(T.ORDRG_QTY,0))			AS ORDRG_QTY
+						, SUM(NVL(T.ORDRG_AMT,0))			AS ORDRG_AMT
+						, SUM(NVL(T.IN_QTY,0)) 				AS IN_QTY 
+						, SUM(NVL(T.IN_DTL_AMT,0))			AS IN_DTL_AMT
+						, min(T.DUDT_DEQ_DT)				AS DUDT_DEQ_DT		/* 납기요청일 */
+						, min(T.DUDT_INTEND_DT)				AS DUDT_INTEND_DT	/* 납기예정일 */
+						, MAX(T.CREAT_ID)					AS CREAT_ID
+					    , MAX(T.CREAT_PGM)					AS CREAT_PGM
+					    , min(T.CREAT_DTTM)					AS CREAT_DTTM
+						, min(T.DSGN_NO)     				AS DSGN_NO
+						, min(T.MATR_SEQ_CD)     			AS MATR_SEQ_CD
+						, CASE WHEN count(*) = 1  THEN  ''
+							   ELSE ' 외 ' || (count(*) - 1) ||'건' END 		AS CNT_NM
+				  FROM (
+						SELECT    D2.CO_CD, D2.SALES_CD, D2.ORDRG_NO, D2.ORDRG_SEQ, D2.MATR_CD
+								, MAX(NVL(D2.ORDRG_QTY,0))		AS ORDRG_QTY
+					    		, MAX(NVL(D2.ORDRG_AMT,0))  	AS ORDRG_AMT
+								, SUM(NVL(D3.IN_QTY,0))			AS IN_QTY
+								, SUM(NVL(D3.IN_DTL_AMT,0))			AS IN_DTL_AMT
+							    , TO_CHAR(min(D2.DUDT_DEQ_DT), 'YYYY-MM-DD') 		AS DUDT_DEQ_DT		/* 납기요청일 */
+							    , TO_CHAR(min(D2.DUDT_INTEND_DT), 'YYYY-MM-DD')		AS DUDT_INTEND_DT		/* 납기예정일 */
+								, MAX(D2.CREAT_ID)					AS CREAT_ID
+							    , MAX(D2.CREAT_PGM)					AS CREAT_PGM
+							    , min(D2.CREAT_DTTM)				AS CREAT_DTTM
+								, min(D2.DSGN_NO)     					AS DSGN_NO
+								, min(TO_CHAR(D2.ORDRG_SEQ, 'FM000') || D2.MATR_CD)  AS MATR_SEQ_CD  --첫번째 자재코드를 추출용
+						FROM TB_SM02D01 AS D2
+								LEFT OUTER JOIN TB_SM03D01 AS D3 ON D2.ORDRG_NO = D3.ORDRG_NO  AND D2.ORDRG_SEQ = D3.ORDRG_SEQ 
+						WHERE 1 = 1
+						  <!-- 회사코드 -->  
+						  <if test="coCd != null and !coCd.equals('')">
+						  AND D2.CO_CD  =  #{coCd}
+						  </if>	  
+						GROUP BY D2.CO_CD, D2.SALES_CD, D2.ORDRG_NO, D2.ORDRG_SEQ, D2.MATR_CD
+						) AS T 
+				WHERE 1 = 1
+				  AND ORDRG_QTY != IN_QTY
+				GROUP BY T.CO_CD, T.SALES_CD, T.ORDRG_NO
+			 )  AS T
+						LEFT OUTER JOIN TB_SM02M01 M2 ON T.CO_CD = M2.CO_CD AND T.ORDRG_NO = M2.ORDRG_NO
+						LEFT OUTER JOIN TB_BM02M01 D  ON M2.PCHS_CLNT_CD = D.CLNT_CD
+						LEFT OUTER JOIN TB_QM01M01 Q  ON M2.REQ_NO = Q.REQ_NO
+						LEFT OUTER JOIN TB_CM06M01 U  ON U.ID = M2.CREAT_ID
+		WHERE 1 = 1
+	</select>	
+	
 	<!--  file target key -->
 	<select id="selectMaxTrgtKey" parameterType="Map" resultType="int">
     	SELECT NVL(MAX(TO_NUMBER(FILE_TRGT_KEY)),0) + 1 FROM TB_SM03M01

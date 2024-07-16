@@ -58,6 +58,8 @@ public interface SM03Mapper {
 	List<Map<String, String>> selectWareHousingDetaiNewlList(Map<String, String> paramMap);	
 	
 	Map<String, String> selectPurchaseconfirmed(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectDashBoardWareHousingList(Map<String, String> paramMap);
 }
 
 

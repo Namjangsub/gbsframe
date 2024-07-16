@@ -61,6 +61,11 @@ public class SM03SvcImpl implements SM03Svc {
 	public List<Map<String, String>> selectWareHousingList(Map<String, String> paramMap) {
 		return sm03Mapper.selectWareHousingList(paramMap);
 	}	
+	
+	@Override
+	public List<Map<String, String>> selectDashBoardWareHousingList(Map<String, String> paramMap) {
+		return sm03Mapper.selectDashBoardWareHousingList(paramMap);
+	}	
 
 	@Override
 	public int selectMaxTrgtKey(Map<String, String> paramMap) {

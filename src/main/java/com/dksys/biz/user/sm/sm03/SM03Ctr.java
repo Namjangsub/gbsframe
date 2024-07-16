@@ -51,6 +51,16 @@ public class SM03Ctr {
 		return "jsonView";
 	}
 	
+
+	// 입고관리 리스트 데시보드
+	@PostMapping(value = "/selectDashBoardWareHousingList")
+	public String selectDashBoardWareHousingList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = sm03Svc.selectDashBoardWareHousingList(paramMap);
+		model.addAttribute("result", result);
+	   	
+		return "jsonView";
+	}
+	
 	
 	// 발주상세 조회
 	@PostMapping(value = "/selectWareHousingDetailList")
