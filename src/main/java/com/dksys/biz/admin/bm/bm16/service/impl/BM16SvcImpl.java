@@ -607,4 +607,49 @@ public class BM16SvcImpl implements BM16Svc {
   public List<Map<String, String>> selectPrjctIssueList(Map<String, String> paramMap) {
     return bm16Mapper.selectPrjctIssueList(paramMap);
   }
+  
+
+
+  @Override
+  public int deleteProjectIssue(Map<String, String> paramMap) throws Exception {
+	    //---------------------------------------------------------------  
+		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
+	  	//   필수값 :  jobType, userId, comonCd
+		//---------------------------------------------------------------  
+	    List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
+	    HashMap<String, String> param = new HashMap<>();
+	    param.put("jobType", "fileDelete");
+	    param.put("userId", paramMap.get("userId"));
+	    if (deleteFileList.size() > 0) {
+		    for (Map<String, String> dtl : deleteFileList) {
+					//접근 권한 없으면 Exception 발생
+		            param.put("comonCd",  dtl.get("comonCd"));
+			    	
+					cm15Svc.selectFileAuthCheck(param);
+			}
+	    }
+		//---------------------------------------------------------------  
+		//첨부 화일 권한체크 끝 
+		//---------------------------------------------------------------  
+	  
+	    int result = bm16Mapper.deleteProjectIssue(paramMap);
+	  
+		//---------------------------------------------------------------  
+		//첨부 화일 삭제 처리 시작 
+		//---------------------------------------------------------------  
+		if (deleteFileList.size() > 0) {		  
+		    for (Map<String, String> deleteDtl : deleteFileList) {
+		    	String fileKey = deleteDtl.get("fileKey");
+		        if (fileKey != null && !fileKey.isEmpty()) {
+		        	cm08Svc.deleteFile( fileKey );
+		        }
+		    }
+		}
+		//---------------------------------------------------------------  
+		//첨부 화일 삭제 처리  끝 
+		//---------------------------------------------------------------  	 
+		
+	    return result;
+  }
+  
 }

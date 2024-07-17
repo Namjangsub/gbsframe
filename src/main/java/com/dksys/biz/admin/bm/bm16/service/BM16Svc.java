@@ -51,5 +51,7 @@ public interface BM16Svc {
   List<Map<String, String>> selectPrjctIssueList(Map<String, String> paramMap);
 
   int updatePrjctIssueComplete(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
+  int deleteProjectIssue(Map<String, String> paramMap) throws Exception;
   
 }

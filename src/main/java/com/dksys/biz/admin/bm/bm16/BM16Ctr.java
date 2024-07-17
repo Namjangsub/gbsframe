@@ -352,5 +352,24 @@ public class BM16Ctr {
 	 model.addAttribute("result", result);
 	 return "jsonView";
  }
-    
+
+//프로젝트 이슈 리스트 삭제
+ @PutMapping(value = "/deleteProjectIssue")
+ public String deleteProjectIssue(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+	  	try {
+			if (bm16Svc.deleteProjectIssue(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+ }
+
+ 
 }
