@@ -322,6 +322,9 @@ public class QM01SvcImpl implements QM01Svc {
 		pgParam1 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
 		pgParam1 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
 		pgParam1 += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+		if (!"".equals(paramMap.get("workRptNo"))) {	//issNo가 존재하면 문제건, 없으면 정상건
+			pgParam1 += "\"issNo\":\""+ paramMap.get("workRptNo") +"\",";
+		}
 		pgParam1 += "\"reqNo\":\""+ paramMap.get("reqNo") +"\"}";
 		
 		//결재
@@ -329,6 +332,9 @@ public class QM01SvcImpl implements QM01Svc {
 		pgParam2 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
 		pgParam2 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
 		pgParam2 += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+		if (!"".equals(paramMap.get("workRptNo"))) {	//issNo가 존재하면 문제건, 없으면 정상건
+			pgParam2 += "\"issNo\":\""+ paramMap.get("workRptNo") +"\",";
+		}
 		pgParam2 += "\"reqNo\":\""+ paramMap.get("reqNo") +"\"}";
 		//공유-결재
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
