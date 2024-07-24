@@ -286,7 +286,7 @@ public class QM01SvcImpl implements QM01Svc {
 		
 		int fileTrgtKey = QM01Mapper.selectQualityReqSeqNext(paramMap);
 		String reqNo = String.valueOf(QM01Mapper.selectQualityReqCalNext(paramMap));
-		System.out.println("요청관리 번호==?"+reqNo);
+//		System.out.println("요청관리 번호==?"+reqNo);
 		
 		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
 		paramMap.put("reqNo", reqNo);
