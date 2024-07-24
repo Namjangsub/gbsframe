@@ -459,7 +459,11 @@ public class QM01SvcImpl implements QM01Svc {
 
 	  	int result = QM01Mapper.deleteQualityReq(paramMap);
 		//문제발생내역의 발주요청번호 update 처리하기 (ISSNO에 해당하는 문제에 발주요청번호 clear 처리함.
-		result += QM01Mapper.clearWbsIssueReqNo(paramMap);
+		if( paramMap.containsKey("issNo") ) {	
+			if (paramMap.get("issNo") != null && !paramMap.get("issNo").isEmpty()) {	
+				result += QM01Mapper.clearWbsIssueReqNo(paramMap);
+			}
+		}
 	  	
 		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
 			if (sharngChk.size() > 0) {
