@@ -247,8 +247,8 @@ public class WB24SvcImpl implements WB24Svc {
 		Gson gson = new Gson();					
 
 		String pgParam = "{\"actionType\":\""+ "I" +"\",";
-		pgParam += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
-		pgParam += "\"issFileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
+		pgParam += "\"fileTrgtKey\":\""+ paramMap.get("issFileTrgtKey") +"\","; 
+		pgParam += "\"issFileTrgtKey\":\""+ paramMap.get("issFileTrgtKey") +"\","; 
 		pgParam += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
 		pgParam += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
 		pgParam += "\"ordrsNo\":\""+ paramMap.get("ordrsNo") +"\"}";
