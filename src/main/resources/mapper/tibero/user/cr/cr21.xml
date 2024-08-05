@@ -126,9 +126,19 @@
 					FROM   (
 							SELECT A.CO_CD                           AS CO_CD 
 									, TO_CHAR(A.SELL_BILL_DT, 'YYYYMM') AS PERIOD
-									, (NVL(A.EXRATE, 1) * NVL(B.SELL_BILL_DTL_AMT, 0))                                                AS BILL_AMT
-									, (NVL(A.EXRATE, 1) * NVL(B.SELL_BILL_DTL_AMT, 0)) *      (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)  AS BILL_VAT
-									, (NVL(A.EXRATE, 1) * NVL(B.SELL_BILL_DTL_AMT, 0)) * (1 + (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)) AS BILL_TOT
+--									, (NVL(A.EXRATE, 1) * NVL(B.SELL_BILL_DTL_AMT, 0))                                                AS BILL_AMT
+--									, (NVL(A.EXRATE, 1) * NVL(B.SELL_BILL_DTL_AMT, 0)) *      (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)  AS BILL_VAT
+--									, (NVL(A.EXRATE, 1) * NVL(B.SELL_BILL_DTL_AMT, 0)) * (1 + (NVL(TO_NUMBER(R.CODE_RPRC), 0) / 100)) AS BILL_TOT
+							      , round(M.EXRATE * NVL(B.SELL_BILL_DTL_AMT, 0), 0) 	AS BILL_AMT
+							      , R8.CODE_RPRC
+							      , NVL(CASE WHEN R8.CODE_RPRC = '10' THEN
+									              ROUND(M.EXRATE * NVL(B.SELL_BILL_DTL_AMT, 0) * 0.1, 0)
+					                         ELSE ROUND(M.EXRATE * NVL(B.SELL_BILL_DTL_AMT, 0) * 0.1, 0)
+						                 	END, 0) 									AS BILL_VAT  --해당월 계산서 발행(VAT포함)(원화)
+							      , NVL(CASE WHEN R8.CODE_RPRC = '10' THEN
+									              ROUND(M.EXRATE * NVL(B.SELL_BILL_DTL_AMT, 0) * 1.1, 0)
+					                         ELSE M.EXRATE * NVL(B.SELL_BILL_DTL_AMT, 0)
+						                 	END, 0) 									AS BILL_TOT  --해당월 계산서 발행(VAT포함)(원화)
 							FROM   TB_CR04M01 AS A  --계산서
 									INNER JOIN TB_CR04D01 AS B  ON B.CO_CD        = A.CO_CD
 																AND B.SELL_BILL_NO = A.SELL_BILL_NO
@@ -139,6 +149,10 @@
 									--수주
 									INNER JOIN TB_CR02M01 AS M  ON M.CO_CD    = B.CO_CD
 																AND M.ORDRS_NO = B.ORDRS_NO
+							        --고객사
+					                LEFT OUTER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD
+					                -- 부가세
+					                LEFT OUTER JOIN TB_CM05M01 AS R8 ON R8.CODE_ID = C.SELL_VAT_CD
 									--사용자정보
 									INNER JOIN TB_CM06M01 AS U  ON U.CO_CD = M.CO_CD
 																AND U.ID    = M.MNG_ID
