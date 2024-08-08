@@ -44,10 +44,10 @@ public class CR50SvcImpl implements CR50Svc {
 	}
 	
 	
-	@Override
-	public Map<String, String> selectPfuClobInfo(Map<String, String> paramMap) {
-	    return cr50Mapper.selectPfuClobInfo(paramMap);
-	}
+//	@Override
+//	public Map<String, String> selectPfuClobInfo(Map<String, String> paramMap) {
+//	    return cr50Mapper.selectPfuClobInfo(paramMap);
+//	}
 	
 	@Override
 	public int insertPfu(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {

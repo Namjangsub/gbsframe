@@ -12,7 +12,7 @@ public interface CR50Mapper {
 
 	Map<String, String> selectPfuInfo(Map<String, String> paramMap);
 
-	Map<String, String> selectPfuClobInfo(Map<String, String> paramMap);
+//	Map<String, String> selectPfuClobInfo(Map<String, String> paramMap);
 
 	int insertPfu(Map<String, String> paramMap);
 	

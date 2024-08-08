@@ -53,12 +53,12 @@ public class CR50Ctr {
 
 
     // PFU 정보 조회
-    @PostMapping(value = "/selectPfuClobInfo")
-    public String selectPfuClobInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-      Map<String, String> resultClob = cr50Svc.selectPfuClobInfo(paramMap);
-      model.addAttribute("resultClob", resultClob);
-      return "jsonView";
-    }
+//    @PostMapping(value = "/selectPfuClobInfo")
+//    public String selectPfuClobInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+//      Map<String, String> resultClob = cr50Svc.selectPfuClobInfo(paramMap);
+//      model.addAttribute("resultClob", resultClob);
+//      return "jsonView";
+//    }
 
 
 
