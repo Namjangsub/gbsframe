@@ -3,6 +3,7 @@
 
 <mapper namespace="com.dksys.biz.user.cr.cr50.mapper.CR50Mapper">
 
+	<!-- 표준PFU에 등록된 내역을 화면 그리드에 출력하기위함 -->
 	<select id="selectPFUAreaItemList" parameterType="Map" resultType="camelMap">
 		SELECT 	  PRDT_DIV
 				, AREA_DIV
@@ -18,6 +19,9 @@
 				, SORT_NO
 				, USE_YN
 				, CLNT_CD
+				, 'Y'  AS STD_CHK	--표준PFU항목 = Y
+				, 'N'  AS IND_CHK	--Nomal, I=추가, U=수정, D=삭제
+				, PART_ID AS ORG_PART_ID
 		  FROM TB_CM50M01 C
 		 WHERE 1 = 1
 			<if test="prdtDiv != null and !prdtDiv.equals('')">
@@ -31,7 +35,10 @@
 	
   <resultMap id="resultInfoMap" type="CamelMap">
     <collection select="selectPfuClobInfo" property="resultClob" column="{fileTrgtKey=FILE_TRGT_KEY }" ofType="CamelMap"/>
-<!--     <collection select="selectAreaList" property="AREA01_LIST" column="{fileTrgtKey=FILE_TRGT_KEY, areaDiv='PFUAREA01' }" ofType="CamelMap"/> -->
+<!--     <collection select="selectAreaList" property="area01List" column="{fileTrgtKey=FILE_TRGT_KEY, areaDiv='PFUAREA01' }" ofType="CamelMap"/> -->
+<!--     <collection select="selectAreaList" property="area02List" column="{fileTrgtKey=FILE_TRGT_KEY, areaDiv='PFUAREA02' }" ofType="CamelMap"/> -->
+<!--     <collection select="selectAreaList" property="area03List" column="{fileTrgtKey=FILE_TRGT_KEY, areaDiv='PFUAREA03' }" ofType="CamelMap"/> -->
+<!--     <collection select="selectAreaList" property="area04List" column="{fileTrgtKey=FILE_TRGT_KEY, areaDiv='PFUAREA04' }" ofType="CamelMap"/> -->
 <!--     <collection select="selectFileList" property="FILE_LIST" column="{fileTrgtKey=PRJCT_SEQ}" ofType="CamelMap"/> -->
   </resultMap>
 
@@ -69,11 +76,14 @@
 --			, T.PFU_ETC	--CLOB Data
 			, T.USE_YN
 			, T.CREAT_ID
+			, (SELECT FN_CM06M01_ID_TO_NM(T.CREAT_ID) FROM DUAL) AS CREAT_ID_NM
 			, TO_CHAR(T.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
 			, T.CREAT_PGM
 			, T.UDT_ID
+			, (SELECT FN_CM06M01_ID_TO_NM(T.UDT_ID) FROM DUAL) AS UDT_ID_NM
 			, TO_CHAR(T.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM
 			, T.UDT_PGM
+			, T.VER_NO
         FROM TB_CR50M01 T 
              LEFT OUTER JOIN TB_BM02M01 A ON T.CLNT_CD = A.CLNT_CD
              LEFT OUTER JOIN TB_CM06M01 B ON T.MNG_ID = B.ID
@@ -103,8 +113,10 @@
         FROM TB_CR50M01 T 
        WHERE FILE_TRGT_KEY = #{fileTrgtKey}
   </select>
-
-  <select id="selectAreaList" parameterType="Map" resultType="CamelMap">  
+  
+  
+  <!-- 각설비별 등록된 내역을 화면 그리드에 출력하기위함 -->
+  <select id="selectPFUAreaRetriveList" parameterType="Map" resultType="CamelMap">  
  		SELECT 	  C.FILE_TRGT_KEY
 				, C.PFU_SEQ
 				, C.PRDT_DIV
@@ -122,12 +134,17 @@
 				, C.PART_ETC
 				, C.SORT_NO
 				, C.CREAT_ID
-				, C.CREAT_DTTM
+				, (SELECT FN_CM06M01_ID_TO_NM(C.CREAT_ID) FROM DUAL) AS CREAT_ID_NM
 				, TO_CHAR(C.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
 				, C.CREAT_PGM
 				, C.UDT_ID
+				, (SELECT FN_CM06M01_ID_TO_NM(C.UDT_ID) FROM DUAL) AS UDT_ID_NM
 				, TO_CHAR(C.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM
 				, C.UDT_PGM
+				, 'U' 											AS UDT_CHK
+				, C.STD_CHK	--표준PFU항목 = Y
+				, C.IND_CHK	--Nomal, I=추가, U=수정, D=삭제
+				, C.ORG_PART_ID
 		  FROM TB_CR50D01 C
 		 WHERE 1 = 1
 		 	AND	    C.FILE_TRGT_KEY = #{fileTrgtKey}
@@ -136,7 +153,13 @@
 			<if test="areaDiv != null and !areaDiv.equals('')">
 			AND    C.AREA_DIV = #{areaDiv} </if>
   </select>
-         
+  
+  
+  
+  <select id="selectSystemCreateDttm" parameterType="Map" resultType="String">
+		SELECT TO_CHAR(sysdate, 'YYYY-MM-DD HH24:MI:SS') FROM DUAL 
+  </select>
+  
   
   <insert id="insertPfu" parameterType="Map">
 	<selectKey keyProperty="fileTrgtKey" resultType="String" order="BEFORE">
@@ -210,6 +233,132 @@
 		, #{pgmId}
     )
   </insert>
+  
+  
+
+  <update id="updatePfu" parameterType="Map">
+    UPDATE TB_CR50M01
+		SET
+		  SALES_CDS                 =   #{salesCds    } 
+		, CTRT_NM                   =   #{ctrtNm      }   
+		, PRDT_DIV                  =   #{prdtDiv     }   
+		, PRDT_TYP                  =   #{prdtTyp     }   
+		, CTRT_DT                   =   #{ctrtDt      }   
+		, PRDCTN_DT                 =   #{prdctnDt    , jdbcType=VARCHAR}   
+		, ACPTNC_DT                 =   #{acptncDt    , jdbcType=VARCHAR}   
+		, MNG_ID                    =   #{mngId       }   
+		, CLNT_MNG_NM               =   #{clntMngNm   , jdbcType=VARCHAR}   
+		, CLNT_MNG_HP               =   #{clntMngHp   , jdbcType=VARCHAR}   
+		, CLNT_MNG_EMAIL            =   #{clntMngEmail, jdbcType=VARCHAR}   
+		, TRANS_OPT                 =   #{transOpt    , jdbcType=VARCHAR}   
+		, TRANS_INFO                =   #{transInfo   , jdbcType=VARCHAR}   
+		, TRANS_VEHICLE             =   #{transVehicle, jdbcType=VARCHAR}   
+		, INSTALL_ADDR              =   #{installAddr , jdbcType=VARCHAR}   
+		, GATE_WIDTH                =   #{gateWidth   }   
+		, GATE_HEIGHT               =   #{gateHeight  }   
+		, CTRT_RMK                  =   #{ctrtRmk, jdbcType=CLOB}   
+		, CUST_REQ                  =   #{custReq, jdbcType=CLOB}   
+		, SPARE_LIST                =   #{spareList, jdbcType=CLOB}   
+		, PFU_ETC                   =	#{pfuEtc, jdbcType=CLOB}  
+		, USE_YN                    =	#{useYn, jdbcType=VARCHAR}  
+		, UDT_ID                	=	#{userId}  
+		, UDT_DTTM                	=	SYSDATE  
+		, UDT_PGM                	=	#{pgmId} 
+    WHERE FILE_TRGT_KEY         = #{fileTrgtKey}
+  </update>
+  
+  <delete id="deletePfu" parameterType="Map">
+    DELETE TB_CR50M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+  </delete>
+  
+  
+  <insert id="insertPfuArea" parameterType="Map">
+    INSERT INTO TB_CR50D01
+      (   
+			  FILE_TRGT_KEY
+			, PFU_SEQ
+			, PRDT_DIV
+			, PART_ID
+			, AREA_DIV
+			, PART_DIV
+			, PART_NM
+			, PART_STD
+			, PART_CUST
+			, PART_CONF
+			, PART_ETC
+			, SORT_NO
+			, CREAT_ID
+			, CREAT_DTTM
+			, CREAT_PGM
+			, STD_CHK
+			, IND_CHK
+			, ORG_PART_ID
+			, UDT_ID
+			, UDT_DTTM
+			, UDT_PGM
+      )
+    VALUES
+    (
+			  #{fileTrgtKey}
+			, #{pfuSeq     }
+			, #{prdtDiv    , jdbcType=VARCHAR}
+			, #{partId     , jdbcType=VARCHAR}
+			, #{areaDiv    , jdbcType=VARCHAR}
+			, #{partDiv    , jdbcType=VARCHAR}
+			, #{partNm     }
+			, #{partStd    , jdbcType=VARCHAR}
+			, #{partCust   , jdbcType=VARCHAR}
+			, #{partConf   , jdbcType=VARCHAR}
+			, #{partEtc    , jdbcType=VARCHAR}
+			, #{sortNo     }
+			, #{creatId}
+			, #{creatDttm}
+			, #{creatPgm}
+			, #{stdChk     }
+			, #{indChk     }
+			, #{orgPartId  , jdbcType=VARCHAR}
+			, #{udtId	   , jdbcType=VARCHAR}  
+			, #{udtDttm	   , jdbcType=VARCHAR} 
+			, #{udtPgm	   , jdbcType=VARCHAR} 
+    )
+  </insert>
+  
+  
+
+  <update id="updatePfuArea" parameterType="Map">
+    UPDATE TB_CR50D01
+		SET
+			  PRDT_DIV            = #{prdtDiv    , jdbcType=VARCHAR}
+			, PART_ID             = #{partId     , jdbcType=VARCHAR}
+			, AREA_DIV            = #{areaDiv    , jdbcType=VARCHAR}
+			, PART_DIV            = #{partDiv    , jdbcType=VARCHAR}
+			, PART_NM             = #{partNm     }
+			, PART_STD            = #{partStd    , jdbcType=VARCHAR}
+			, PART_CUST           = #{partCust   , jdbcType=VARCHAR}
+			, PART_CONF           = #{partConf   , jdbcType=VARCHAR}
+			, PART_ETC            = #{partEtc    , jdbcType=VARCHAR}
+			, SORT_NO             = #{sortNo     }
+			, UDT_ID              =	#{userId}  
+			, UDT_DTTM            =	SYSDATE  
+			, UDT_PGM             =	#{pgmId} 
+			, STD_CHK             = #{stdChk     }
+			, IND_CHK             = #{indChk     }
+			, ORG_PART_ID         = #{orgPartId  , jdbcType=VARCHAR}
+    WHERE FILE_TRGT_KEY         = #{fileTrgtKey}
+      AND PFU_SEQ				= #{pfuSeq}
+  </update>
+  
+  <delete id="deletePfuArea" parameterType="Map">
+    DELETE TB_CR50D01 
+     WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+       AND PFU_SEQ		 = #{pfuSeq}
+  </delete>
+  
+  <delete id="deletePfuAreaAll" parameterType="Map">
+    DELETE TB_CR50D01 
+     WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+  </delete>
+ 
 </mapper>
 
 

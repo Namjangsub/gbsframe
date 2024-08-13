@@ -11,6 +11,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -40,6 +41,14 @@ public class CR50Ctr {
 		model.addAttribute("result", result);
 	    	
 		return "jsonView";
+    }
+    
+    @PostMapping(value = "/selectPFUAreaRetriveList") 
+    public String selectPFUAreaRetriveList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, String>> result = cr50Svc.selectPFUAreaRetriveList(paramMap);
+    	model.addAttribute("result", result);
+    	
+    	return "jsonView";
     }
 
 
@@ -79,5 +88,40 @@ public class CR50Ctr {
   		}
   		return "jsonView";
     }
+
+    @PostMapping(value = "/updatePfu")
+    public String updatePfu(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  	  	try {
+  			if (cr50Svc.updatePfu(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  	  	return "jsonView";
+    }
+
+    @PutMapping(value = "/deletePfu")
+    public String deletePfu(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+  	  	try {
+  			if (cr50Svc.deletePfu(paramMap) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  	  	return "jsonView";
+    }
+
 
 }	  
