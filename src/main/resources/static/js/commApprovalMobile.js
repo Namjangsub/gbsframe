@@ -281,17 +281,18 @@ function Approval(htmlParam, param, popParam) {
 
 	//최종결재시 결재완료 최초작성자(1번)에게 전송
 	function sendTodoFinal(param) {
-		//message load
-		var paramObj = {
-						"userId" : jwt.userId
-						, "codeKind" : "KAKAOMSG"
-						};
-		postAjaxSync("/user/sm/sm02/selectCurrToday", paramObj, null
-					, function(data) {   
-						if(data.resultList.length > 0 ) {
-							kakaoErr = data.resultList;
-						}
-		});     //user search ajax end	
+        //message load
+        if (kakaoErr.length == 0) {
+	        var paramObj = {
+	            "userId" : jwt.userId
+	            , "codeKind" : "KAKAOMSG"
+	        };
+	        postAjaxSync("/user/sm/sm02/selectCurrToday", paramObj, null, function(data) {
+	            if(data.resultList.length > 0 ) {
+	                kakaoErr = data.resultList;
+	            }
+	        });   
+        }
 		
 		//TODO 결재완료 알림톡
 		let paramSend = {
