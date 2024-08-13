@@ -187,7 +187,7 @@ public class WB20SvcImpl implements WB20Svc {
 			for(Map<String, String> dtl : detailMap) {
 				wb20Mapper.deleteAllTodoMaster(dtl);
 			}		
-			
+			String sysCreateDttm =  wb20Mapper.selectSystemCreateDttm(paramMap);
 			//결제라인 insert			
 			for(Map<String, String> dtl : detailMap) {
 				//입력, 수정 
@@ -195,6 +195,7 @@ public class WB20SvcImpl implements WB20Svc {
 					maxTodoKey = wb20Mapper.selectmaxTodoKey(dtl);
 					dtl.put("todoKey", maxTodoKey);
 				}
+				dtl.put("createDttm", sysCreateDttm);
 				result += wb20Mapper.insertTodoMaster(dtl);				
 			}		
 		}				

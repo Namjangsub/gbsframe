@@ -44,6 +44,8 @@ public interface WB20Mapper {
 	List<Map<String, String>> selectShareUserInfo(Map<String, String> paramMap);	  
 	
 	String selectmaxTodoKey(Map<String, String> paramMap);
+
+	String selectSystemCreateDttm(Map<String, String> paramMap);
 	
 	int insertTodoMaster(Map<String, String> paramMap);  
 	
