@@ -347,7 +347,8 @@ public class SM02SvcImpl implements SM02Svc {
 			// 결재라인 처리 시작 
 			//---------------------------------------------------------------		
 			if( paramMap.containsKey("approvalArr") ) {	
-
+				
+				String sysCreateDttm =  wb20Mapper.selectSystemCreateDttm(paramMap);	//생성일자 동일하게 처리하기 위함
 				List<Map<String, String>> approvalMap = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
 					paramMap.put("todoNo", dtl.get("ordrgNo"));
 					paramMap.put("todoDiv2CodeId", "TODODIV2050");
@@ -360,7 +361,7 @@ public class SM02SvcImpl implements SM02Svc {
 					wb20Mapper.deleteAllTodoMaster(paramMap);
 					
 					//결제라인 insert			
-					String maxTodoKey = "";		
+					String maxTodoKey = "";	
 					for(Map<String, String> dtlApp : approvalMap) {
 						//입력, 수정 
 						
@@ -380,6 +381,7 @@ public class SM02SvcImpl implements SM02Svc {
 						
 						maxTodoKey =  wb20Mapper.selectmaxTodoKey(dtlApp);
 						dtlApp.put("todoKey", maxTodoKey);
+						dtlApp.put("createDttm", sysCreateDttm);		//생성일자 동일하게 처리하기 위함
 						result += wb20Mapper.insertTodoMaster(dtlApp);				
 					}		
 				}				
