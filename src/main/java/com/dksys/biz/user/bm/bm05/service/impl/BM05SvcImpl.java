@@ -220,4 +220,10 @@ public class BM05SvcImpl implements BM05Svc {
 	public List<Map<String, String>> BOM_selectMatrMnoList(Map<String, String> paramMap) {
 		return bm05Mapper.BOM_selectMatrMnoList(paramMap);
 	}
+	
+	// 자재마스터 등록시 제조사+형번/규격 검색용
+	@Override
+	public List<Map<String, String>> selectMatrMatSpecToDuplicateList(Map<String, String> paramMap) {
+		return bm05Mapper.selectMatrMatSpecToDuplicateList(paramMap);
+	}
 }

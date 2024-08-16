@@ -134,4 +134,14 @@ public class BM05Ctr {
 		model.addAttribute("resultList", result);
 		return "jsonView";
 	}
+	
+	
+	
+	//자재마스터 설계 BOM에서 형번/규격 검색용
+	@PostMapping(value = "/selectMatrMatSpecToDuplicateList")
+	public String selectMatrMatSpecToDuplicateList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = bm05Svc.selectMatrMatSpecToDuplicateList(paramMap);
+		model.addAttribute("resultList", result);
+		return "jsonView";
+	}
 }

@@ -37,4 +37,6 @@ public interface BM05Svc {
 
 	// 자재마스터 설계 BOM에서 형번/규격 검색용
 	List<Map<String, String>> BOM_selectMatrMnoList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectMatrMatSpecToDuplicateList(Map<String, String> paramMap);
 }
