@@ -12,9 +12,12 @@ public interface CR50Mapper {
 	
 	List<Map<String, String>> selectPFUAreaRetriveList(Map<String, String> paramMap);
 
+	Map<String, String> selectSalesCdInfo(Map<String, String> paramMap);
+
 	Map<String, String> selectPfuInfo(Map<String, String> paramMap);
 
 //	Map<String, String> selectPfuClobInfo(Map<String, String> paramMap);
+	List<Map<String, String>> selectStdPfuClobInfo(Map<String, String> paramMap);
 
 	String selectSystemCreateDttm(Map<String, String> paramMap);
 
@@ -31,6 +34,10 @@ public interface CR50Mapper {
 
 	int deletePfuArea(Map<String, String> paramMap);
 	int deletePfuAreaAll(Map<String, String> paramMap);
+
+	int selectPfuListCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectPfuList(Map<String, String> paramMap);
 	
 }
 

@@ -19,6 +19,7 @@ import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.cr.cr50.mapper.CR50Mapper;
 import com.dksys.biz.user.cr.cr50.service.CR50Svc;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.GsonBuilder;
@@ -38,16 +39,35 @@ public class CR50SvcImpl implements CR50Svc {
 	  
 	@Autowired
 	CM08Svc cm08Svc;
+
+    
+    @Override
+	public int selectPfuListCount(Map<String, String> paramMap) {
+		return cr50Mapper.selectPfuListCount(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectPfuList(Map<String, String> paramMap) {
+		return cr50Mapper.selectPfuList(paramMap);
+	}
+	
 	
 	@Override
 	public List<Map<String, String>> selectPFUAreaItemList(Map<String, String> paramMap) {
-		return cr50Mapper.selectPFUAreaItemList(paramMap);
+		List<Map<String, String>> result = cr50Mapper.selectPFUAreaItemList(paramMap);
+		return result;
 	}
 
 	
 	@Override
 	public List<Map<String, String>> selectPFUAreaRetriveList(Map<String, String> paramMap) {
 		return cr50Mapper.selectPFUAreaRetriveList(paramMap);
+	}
+	
+	@Override
+	public Map<String, String> selectSalesCdInfo(Map<String, String> paramMap) {
+		Map<String, String> result = cr50Mapper.selectSalesCdInfo(paramMap);
+	    return result;
 	}
 	
 	@Override
@@ -60,6 +80,12 @@ public class CR50SvcImpl implements CR50Svc {
 //	public Map<String, String> selectPfuClobInfo(Map<String, String> paramMap) {
 //	    return cr50Mapper.selectPfuClobInfo(paramMap);
 //	}
+	
+	
+	@Override
+	public List<Map<String, String>> selectStdPfuClobInfo(Map<String, String> paramMap) {
+	    return cr50Mapper.selectStdPfuClobInfo(paramMap);
+	}
 	
 	@Override
 	public int insertPfu(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
@@ -131,7 +157,7 @@ public class CR50SvcImpl implements CR50Svc {
   		//결재처리. 
   		//---------------------------------------------------------------
 		String ordrsNo = paramMap.get("ordrsNo");
-		String salesCd = paramMap.get("salesCds");
+		String salesCd = paramMap.get("salesCd");
 		String fileTrgtKey = paramMap.get("fileTrgtKey");
 		String coCd = paramMap.get("coCd");
 		String pgmId = paramMap.get("pgmId");
@@ -320,7 +346,7 @@ public class CR50SvcImpl implements CR50Svc {
   		//결재처리. 
   		//---------------------------------------------------------------
 		String ordrsNo = paramMap.get("ordrsNo");
-		String salesCd = paramMap.get("salesCds");
+		String salesCd = paramMap.get("salesCd");
 		String fileTrgtKey = paramMap.get("fileTrgtKey");
 		String coCd = paramMap.get("coCd");
 		String pgmId = paramMap.get("pgmId");

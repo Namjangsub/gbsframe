@@ -3,8 +3,341 @@
 
 <mapper namespace="com.dksys.biz.user.cr.cr50.mapper.CR50Mapper">
 
+    
+    <select id="selectPfuListCount" parameterType="Map"  resultType="int">
+        /* selectPfuListCount */
+                        WITH SJD AS --수주상세 
+		                     ( 
+		                      SELECT M.CO_CD                                              AS CO_CD        --회사코드
+		                            , M.ORDRS_NO                                           AS ORDRS_NO     --수주번호
+		                            , X.SALES_CD                                           AS SALES_CD     --SALES Code
+		                            , M.ORDRS_CLNT_CD                                      AS CLNT_CD      --고객코드
+		                            , C.CLNT_NM                                            AS CLNT_NM      --고객명
+		                            , M.CLNT_PJT                                           AS CLNT_PJT     --고객사프로젝트 
+		                            , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)  AS CLNT_PJT_NM  --고객사프로젝트명
+		                            , X.PRDT_CD                                            AS PRDT_CD      --제품코드
+		                            , (SELECT FN_CM05M01_CD_TO_NM(X.PRDT_CD) FROM DUAL)   AS PRDT_NM      --제품명
+		                            , X.ITEM_DIV                                           AS ITEM_DIV     --아이템구분
+		                            , (SELECT FN_CM05M01_CD_TO_NM(X.ITEM_DIV) FROM DUAL)  AS ITEM_DIV_NM  --아이템구분명
+		                            , X.EQP_NM                                             AS EQP_NM       --설비명
+		                            , M.ORDRS_DT
+		                         FROM TB_CR02M01  M --수주마스터
+		                              INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+		                              INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+		                        WHERE 1=1
+		                          AND M.CO_CD = #{coCd}
+								 <if test="salesCd == null or salesCd.equals('')">
+		                          AND M.ORDRS_DT BETWEEN #{beginDt} AND #{deDt}     
+	                             </if>
+								 <if test="salesCd != null and !salesCd.equals('')">
+	                             AND X.SALES_CD LIKE '%'||#{salesCd}||'%'  --salesCd로 검색시 날자와 상관없이 표시되게
+	                             </if>
+		                          AND X.SALES_CD IS NOT NULL --비용제외
+		                          AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만 
+		                                        FROM TB_WB21M01 P 
+		                                       WHERE P.CO_CD    = #{coCd}
+		                                         AND P.CO_CD    = X.CO_CD
+		                                         AND P.SALES_CD = X.SALES_CD
+		                                     )
+			                       <if test="clntPjt != null and !clntPjt.equals('')">
+		                           AND M.CLNT_PJT = #{clntPjt}            
+		                           </if>
+		                           <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
+		                           AND C.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'            
+		                           </if>
+		                     )
+		                   , SUBJ AS --과제정보
+		                     (
+		                      SELECT X.FILE_TRGT_KEY
+		                           , X.CO_CD                                                       AS CO_CD              --회사코드
+		                           , (SELECT FN_CM05M01_CD_TO_NM(X.CO_CD) FROM DUAL)              AS CO_NM              --회사명 
+		                           , X.SJ_NO                                                       AS SJ_NO              --과제번호
+		                           , X.SJ_NM                                                       AS SJ_NM              --과제명
+		                           , TO_NUMBER(X.VER_NO)                                           AS VER_NO             --버젼
+		                           , MAX(TO_NUMBER(X.VER_NO)) OVER(PARTITION BY X.CO_CD, X.SJ_NO)  AS MAX_VER_NO        --최근버젼
+		                           , X.SALES_CD                                                    AS SALES_CD           --SALES Code
+		                           , X.MKER_DIV                                                    AS MKER_DIV           --제작처구분
+		                           , (SELECT FN_CM05M01_CD_TO_NM(X.MKER_DIV) FROM DUAL)           AS MKER_DIV_NM        --제작처구분명 
+		                           , X.MKER_CD                                                     AS MKER_CD            --제작처코드
+		                           , BM.CLNT_NM                                                    AS MKER_NM            --고객명
+		                           , X.SMRIZE_ID                                                   AS SMRIZE_ID          --총괄PM ID
+		                           , (SELECT FN_CM06M01_ID_TO_NM(X.SMRIZE_ID) FROM DUAL)          AS SMRIZE_NM          --총괄PM명
+		                           , TO_CHAR(X.BEGIN_DT, 'YYYY-MM-DD')                             AS BEGIN_DT           --시작일
+		                           , TO_CHAR(X.DE_DT, 'YYYY-MM-DD')                                AS DE_DT              --출고일
+		                           , TO_CHAR(X.ACPTNC_DT, 'YYYY-MM-DD')                            AS ACPTNC_DT          --완료검수일
+		                           , X.REQRE_DAYCNT                                                AS REQRE_DAYCNT       --소요일수
+		                           , X.DSGN_DIF_CODE_ID                                            AS DSGN_DIF_CODE_ID   --설계난이도
+		                           , (SELECT FN_CM05M01_CD_TO_NM(X.DSGN_DIF_CODE_ID) FROM DUAL)   AS DSGN_DIF_CODE_NM   --설계난이도
+		                           , X.DSGN_PLAN_HOUR                                              AS DSGN_PLAN_HOUR     --설계계획공수
+		                           , X.PRDCTN_DIF_CODE_ID                                          AS PRDCTN_DIF_CODE_ID --생산난이도
+		                           , (SELECT FN_CM05M01_CD_TO_NM(X.PRDCTN_DIF_CODE_ID) FROM DUAL) AS PRDCTN_DIF_CODE_NM --생산난이도
+		                           , X.PRDCTN_PLAN_HOUR                                            AS PRDCTN_PLAN_HOUR   --생산계획공수
+		                           , X.SJ_RMK                                                      AS SJ_RMK             --비고
+		                           , X.CLOSE_YN                                                    AS CLOSE_YN           --확정유무
+		                           , X.CREAT_ID                                                    AS CREAT_ID           --작성자ID
+		                           , X.CREAT_PGM                                                   AS CREAT_PGM          --
+		                           , TO_CHAR(X.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS')                AS CREAT_DTTM         --
+		                           , X.UDT_ID                                                      AS UDT_ID             --
+		                           , X.UDT_PGM                                                     AS UDT_PGM            --
+		                           , TO_CHAR(X.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS')                  AS UDT_DTT            --
+		                        FROM TB_WB21M01 X
+		                             LEFT OUTER JOIN TB_BM02M01 AS BM ON X.MKER_CD = BM.CLNT_CD --거래처정보
+		                       WHERE X.CO_CD = #{coCd}
+                                <if test="sjNm != null and !sjNm.equals('')">
+                                 AND X.SJ_NM LIKE '%${sjNm}%'                
+                                </if>  
+                                <if test="closeYn != null and !closeYn.equals('')">
+                                 AND CLOSE_YN LIKE '%${closeYn}%'                
+                                </if>
+		                          AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만 
+		                                        FROM SJD P 
+		                                       WHERE P.CO_CD    = X.CO_CD
+		                                         AND P.SALES_CD = X.SALES_CD
+		                                     )
+		                     )
+        				SELECT COUNT(*)
+		                  FROM SUBJ X
+		                 WHERE 1=1
+                           <if test="lastYn != null and !lastYn.equals('')">
+		                   AND X.VER_NO = X.MAX_VER_NO       
+                           </if>
+    </select>
+    
+    <select id="selectPfuList" parameterType="Map"  resultType="camelMap">
+       /* selectPfuList */
+		SELECT * 
+		  FROM (
+		        SELECT ROWNUM AS RN, X.* 
+		          FROM (
+		                WITH SJD AS --수주상세 
+		                     ( 
+		                      SELECT M.CO_CD                                              AS CO_CD        --회사코드
+		                            , M.ORDRS_NO                                           AS ORDRS_NO     --수주번호
+		                            , X.SALES_CD                                           AS SALES_CD     --SALES Code
+		                            , M.ORDRS_CLNT_CD                                      AS CLNT_CD      --고객코드
+		                            , C.CLNT_NM                                            AS CLNT_NM      --고객명
+		                            , M.CLNT_PJT                                           AS CLNT_PJT     --고객사프로젝트 
+		                            , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)  AS CLNT_PJT_NM  --고객사프로젝트명
+		                            , X.PRDT_CD                                            AS PRDT_CD      --제품코드
+		                            , (SELECT FN_CM05M01_CD_TO_NM(X.PRDT_CD) FROM DUAL)   AS PRDT_NM      --제품명
+		                            , X.ITEM_DIV                                           AS ITEM_DIV     --아이템구분
+		                            , (SELECT FN_CM05M01_CD_TO_NM(X.ITEM_DIV) FROM DUAL)  AS ITEM_DIV_NM  --아이템구분명
+		                            , X.EQP_NM                                             AS EQP_NM       --설비명
+		                            , M.ORDRS_DT
+		                         FROM TB_CR02M01  M --수주마스터
+		                              INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+		                              INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+		                        WHERE 1=1
+		                          AND M.CO_CD = #{coCd}
+								 <if test="salesCd == null or salesCd.equals('')">
+		                          AND M.ORDRS_DT BETWEEN #{beginDt} AND #{deDt}     
+	                             </if>
+								 <if test="salesCd != null and !salesCd.equals('')">
+	                             AND X.SALES_CD LIKE '%'||#{salesCd}||'%'  --salesCd로 검색시 날자와 상관없이 표시되게
+	                             </if>
+		                          AND X.SALES_CD IS NOT NULL --비용제외
+		                          AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만 
+		                                        FROM TB_WB21M01 P 
+		                                       WHERE P.CO_CD    = #{coCd}
+		                                         AND P.CO_CD    = X.CO_CD
+		                                         AND P.SALES_CD = X.SALES_CD
+		                                     )
+			                       <if test="clntPjt != null and !clntPjt.equals('')">
+		                           AND M.CLNT_PJT = #{clntPjt}            
+		                           </if>
+		                           <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
+		                           AND C.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'            
+		                           </if>
+		                     )
+		                   , SUBJ AS --과제정보
+		                     (
+		                      SELECT X.FILE_TRGT_KEY
+		                           , X.CO_CD                                                       AS CO_CD              --회사코드
+		                           , (SELECT FN_CM05M01_CD_TO_NM(X.CO_CD) FROM DUAL)              AS CO_NM              --회사명 
+		                           , X.SJ_NO                                                       AS SJ_NO              --과제번호
+		                           , X.SJ_NM                                                       AS SJ_NM              --과제명
+		                           , TO_NUMBER(X.VER_NO)                                           AS VER_NO             --버젼
+		                           , MAX(TO_NUMBER(X.VER_NO)) OVER(PARTITION BY X.CO_CD, X.SJ_NO)  AS MAX_VER_NO        --최근버젼
+		                           , X.SALES_CD                                                    AS SALES_CD           --SALES Code
+		                           , X.MKER_DIV                                                    AS MKER_DIV           --제작처구분
+		                           , (SELECT FN_CM05M01_CD_TO_NM(X.MKER_DIV) FROM DUAL)           AS MKER_DIV_NM        --제작처구분명 
+		                           , X.MKER_CD                                                     AS MKER_CD            --제작처코드
+		                           , BM.CLNT_NM                                                    AS MKER_NM            --고객명
+		                           , X.SMRIZE_ID                                                   AS SMRIZE_ID          --총괄PM ID
+		                           , (SELECT FN_CM06M01_ID_TO_NM(X.SMRIZE_ID) FROM DUAL)          AS SMRIZE_NM          --총괄PM명
+		                           , TO_CHAR(X.BEGIN_DT, 'YYYY-MM-DD')                             AS BEGIN_DT           --시작일
+		                           , TO_CHAR(X.DE_DT, 'YYYY-MM-DD')                                AS DE_DT              --출고일
+		                           , TO_CHAR(X.ACPTNC_DT, 'YYYY-MM-DD')                            AS ACPTNC_DT          --완료검수일
+		                           , X.REQRE_DAYCNT                                                AS REQRE_DAYCNT       --소요일수
+		                           , X.DSGN_DIF_CODE_ID                                            AS DSGN_DIF_CODE_ID   --설계난이도
+		                           , (SELECT FN_CM05M01_CD_TO_NM(X.DSGN_DIF_CODE_ID) FROM DUAL)   AS DSGN_DIF_CODE_NM   --설계난이도
+		                           , X.DSGN_PLAN_HOUR                                              AS DSGN_PLAN_HOUR     --설계계획공수
+		                           , X.PRDCTN_DIF_CODE_ID                                          AS PRDCTN_DIF_CODE_ID --생산난이도
+		                           , (SELECT FN_CM05M01_CD_TO_NM(X.PRDCTN_DIF_CODE_ID) FROM DUAL) AS PRDCTN_DIF_CODE_NM --생산난이도
+		                           , X.PRDCTN_PLAN_HOUR                                            AS PRDCTN_PLAN_HOUR   --생산계획공수
+		                           , X.SJ_RMK                                                      AS SJ_RMK             --비고
+		                           , X.CLOSE_YN                                                    AS CLOSE_YN           --확정유무
+		                           , X.CREAT_ID                                                    AS CREAT_ID           --작성자ID
+		                           , X.CREAT_PGM                                                   AS CREAT_PGM          --
+		                           , TO_CHAR(X.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS')                AS CREAT_DTTM         --
+		                           , X.UDT_ID                                                      AS UDT_ID             --
+		                           , X.UDT_PGM                                                     AS UDT_PGM            --
+		                           , TO_CHAR(X.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS')                  AS UDT_DTT            --
+		                           , X.PLAN_EXCEPT
+		                           , DECODE(X.PLAN_EXCEPT, 'PLANEXCEPT01', '', (SELECT FN_CM05M01_CD_TO_NM(X.PLAN_EXCEPT) FROM DUAL)) 			AS PLAN_EXCEPT_NM --일정예외상황
+		                           , CR.FILE_TRGT_KEY  											AS PFU_NO
+		                           , CR.PRDT_DIV
+		                           , CR.PRDT_TYP
+		                           , CR.VER_NO AS PFU_VER_NO
+		                        FROM 
+		                        	(
+		                        		SELECT *
+		                        		  FROM (
+				                        	 	  SELECT X.*, ROW_NUMBER() OVER (PARTITION BY SALES_CD ORDER BY VER_NO DESC) AS rn 
+		    									    FROM TB_WB21M01 X
+							                       WHERE X.CO_CD = #{coCd}
+					                                <if test="sjNm != null and !sjNm.equals('')">
+					                                 AND X.SJ_NM LIKE '%${sjNm}%'                
+					                                </if>  
+					                                <if test="closeYn != null and !closeYn.equals('')">
+					                                 AND CLOSE_YN LIKE '%${closeYn}%'                
+					                                </if>
+		                         
+							                         AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만 
+							                                       FROM SJD P 
+							                                      WHERE P.CO_CD    = X.CO_CD
+							                                        AND P.SALES_CD = X.SALES_CD
+							                                     )
+					                           )AS MAXVERSION
+					                      WHERE  rn = 1 --마지막버젼 자료만 가져오기
+		                        	) AS X
+		                             LEFT OUTER JOIN TB_BM02M01 AS BM ON X.MKER_CD = BM.CLNT_CD --거래처정보
+		                             LEFT OUTER JOIN TB_CR50M01 AS CR ON X.SALES_CD = CR.SALES_CD --PFU 등록정보
+		                     )
+		                SELECT X.FILE_TRGT_KEY
+		                     , X.CO_CD              --회사코드
+		                     , X.CO_NM              --회사명 
+		                     , X.SJ_NO              --과제번호     : 1
+		                     , X.SJ_NM              --과제명       : 2
+		                     , X.VER_NO             --버젼         : 3
+		                     , X.MAX_VER_NO         --최근버젼
+		                     , X.SALES_CD           --SALES Code   : 5
+		                     , X.MKER_DIV           --제작처구분
+		                     , X.MKER_DIV_NM        --제작처구분명 : 9
+		                     , X.MKER_CD            --제작처코드
+		                     , X.MKER_NM            --제작처명     : 10
+		                     , X.SMRIZE_ID          --총괄PM ID
+		                     , X.SMRIZE_NM          --총괄PM명     : 8
+		                     , X.BEGIN_DT           --시작일       : 11
+		                     , X.DE_DT              --출고일       : 12
+		                     , X.ACPTNC_DT          --완료검수일   : 13
+		                     , X.REQRE_DAYCNT       --소요일수     : 14
+		                     , X.DSGN_DIF_CODE_ID   --설계난이도
+		                     , X.DSGN_DIF_CODE_NM   --설계난이도   : 15
+		                     , X.DSGN_PLAN_HOUR     --설계계획공수 : 16
+		                     , X.PRDCTN_DIF_CODE_ID --생산난이도  
+		                     , X.PRDCTN_DIF_CODE_NM --생산난이도   : 17
+		                     , X.PRDCTN_PLAN_HOUR   --생산계획공수 : 18
+		                     , X.SJ_RMK             --비고
+		                     , X.CLOSE_YN           --확정유무     : 4
+		                     , CR.CLNT_CD           --고객코드
+		                     , CR.CLNT_NM           --고객명       : 7
+		                     , CR.PRDT_CD           --제품코드
+		                     , CR.PRDT_NM           --제품명
+		                     , CR.CLNT_PJT          --고객사프로젝트 
+		                     , CR.CLNT_PJT_NM       --고객사프로젝트명
+		                     , CR.ORDRS_NO          --수주번호     : 6
+		                     , X.CREAT_ID           --작성자ID
+		                     , X.CREAT_PGM          --작성프로그램
+		                     , X.CREAT_DTTM         --작성일시
+		                     , X.UDT_ID             --수정자 ID
+		                     , X.UDT_PGM            --수정 프로그램
+		                     , X.UDT_DTT            --수정일시
+		                     , X.PLAN_EXCEPT		--일정예외상황
+		                     , X.PLAN_EXCEPT_NM		--일정예외상황
+		                     , X.PFU_NO
+		                     , X.PRDT_DIV
+		                     , X.PRDT_TYP
+		                     , X.PFU_VER_NO
+		                  FROM SUBJ X
+		                       LEFT OUTER JOIN SJD AS CR ON X.CO_CD = CR.CO_CD AND X.SALES_CD = CR.SALES_CD 
+		                 WHERE 1=1
+                           <if test="lastYn != null and !lastYn.equals('')">
+		                   AND X.VER_NO = X.MAX_VER_NO       
+                           </if>
+		                 ORDER BY CR.CLNT_NM, X.SALES_CD, X.VER_NO DESC
+		               ) X 
+		       ) X      
+		 WHERE RN BETWEEN ${firstIndex} AND ${lastIndex}
+      </select>
+    
+    
+    
+    
+    <select id="selectSalesCdInfo" parameterType="map" resultType="CamelMap">
+	    SELECT --Sales 코드 추출
+	           X.CO_CD  							AS ORDRS_CO_CD -- 회사코드
+	         , FN_CM05M01_CD_TO_NM(X.CO_CD) 		AS CO_CD_NM
+	         , X.ORDRS_NO  -- 수주번호
+	         , X.SALES_CD  							AS SALES_CD -- SALES CODE
+	         , X.ORDRS_DTL_DIV10  -- 입력구분
+	         , X.ORDRS_DTL_DIV20  -- 신작구분
+	         , FN_CM05M01_CD_TO_NM(X.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM
+	         , X.ORDRS_DTL_DIV30  -- 자체구분
+	         , X.MCTYPE  -- 기계구분
+	         , X.EQP_NM  							AS CTRT_NM -- 설비명
+	         , X.ITEM_DIV
+	         , FN_CM05M01_CD_TO_NM(X.ITEM_DIV) 		AS ITEM_DIV_NM
+	         , X.PRDT_CD
+	         , FN_BM01M01_ID_TO_NM(X.PRDT_CD) 		AS PRDT_CD_NM
+	         , Y.ORGN_SALES_CD  -- 원천 SALES CODE
+	         , Y.ORDRS_CLNT_CD 						AS CLNT_CD -- 고객사
+	         , A.CLNT_NM  							AS CLNT_NM
+	         , Y.CLNT_PJT  -- 고객사 PJT
+	         , FN_CM05M01_CD_TO_NM(Y.CLNT_PJT) 		AS CLNT_PJT_NM
+	         , Y.CTRT_NM							AS ORDRS_CTRT_NM --계약명
+	         , Y.CTRT_NM   /* 계약명 */
+	         , TO_CHAR(Y.ORDRS_DT, 'YYYY-MM-DD') 	AS CTRT_DT
+             , Y.ORDRS_DIV
+             , FN_CM05M01_CD_TO_NM(Y.ORDRS_DIV) 	AS ORDRS_DIV_NM
+             , Y.MNG_ID
+             , U1.NAME 								AS MNG_ID_NM
+	         , B.PRDT_GRP							AS PRDT_DIV
+	         , B.PRDT_NM							AS PRDT_CD_NM
+	         , C.CODE_RPRC							AS PFU_CODE
+	         , TO_CHAR(P.DE_DT, 'YYYY-MM-DD')                                AS PRDCTN_DT              --출고일
+	         , TO_CHAR(P.ACPTNC_DT, 'YYYY-MM-DD')                            AS ACPTNC_DT          --완료검수일
+		     , DECODE(P.PLAN_EXCEPT, 'PLANEXCEPT01', '', (SELECT FN_CM05M01_CD_TO_NM(P.PLAN_EXCEPT) FROM DUAL)) 			AS PLAN_EXCEPT_NM --일정예외상황
+			 , P.MKER_DIV                                                    AS MKER_DIV           --제작처구분
+			 , (SELECT FN_CM05M01_CD_TO_NM(P.MKER_DIV) FROM DUAL)            AS MKER_DIV_NM        --제작처구분명 
+			 , P.MKER_CD                                                     AS MKER_CD            --제작처코드
+	    FROM   
+	    	(
+        		SELECT *
+        		  FROM (
+                	 	  SELECT P.*, ROW_NUMBER() OVER (PARTITION BY SALES_CD ORDER BY VER_NO DESC) AS rn 
+						    FROM TB_WB21M01 P
+	                       WHERE P.CO_CD = #{coCd}
+                             AND P.SALES_CD = #{salesCd}       
+                       )AS MAXVERSION
+                  WHERE  rn = 1 --마지막버젼 자료만 가져오기
+        	) AS P
+			   LEFT OUTER JOIN TB_CR02D02 X ON P.SALES_CD = X.SALES_CD
+	           LEFT OUTER JOIN TB_CR02M01 Y  ON X.CO_CD    = Y.CO_CD
+	                                   AND X.ORDRS_NO = Y.ORDRS_NO
+	           LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터
+			   LEFT OUTER JOIN TB_CM06M01 AS U1 ON U1.ID = Y.MNG_ID
+			   LEFT OUTER JOIN TB_BM01M01 B ON B.PRDT_CD = X.PRDT_CD
+			   LEFT OUTER JOIN TB_CM05M01 C ON B.PRDT_GRP = C.CODE_ID
+    </select>
+    
+    
+<!--   <resultMap id="resultStdInfoMap" type="CamelMap"> -->
+<!--     <collection select="selectStdPfuClobInfo" property="resultStdClob" column="{prdtDiv=PRDT_DIV, prdtTyp=PRDT_TYP, clntCd=CLNT_CD, partId=PART_ID}" ofType="CamelMap"/> -->
+<!--   </resultMap> -->
+
 	<!-- 표준PFU에 등록된 내역을 화면 그리드에 출력하기위함 -->
-	<select id="selectPFUAreaItemList" parameterType="Map" resultType="camelMap">
+	<select id="selectPFUAreaItemList" parameterType="Map" resultType="CamelMap">
 		SELECT 	  PRDT_DIV
 				, AREA_DIV
 				, (SELECT FN_CM05M01_CD_TO_NM(C.AREA_DIV) FROM DUAL)            AS AREA_DIV_NM
@@ -31,7 +364,29 @@
 			AND    C.AREA_DIV = #{areaDiv}
 			</if>
 	</select>
-         
+	
+	
+	<!-- CLOB Field는 일반 필드처럼 사용할수 없음.  오류 발생됨 -->
+	<!-- jdbcType="CLOB" javaType="java.lang.String" 으로 설정해야 정상적으로 처리 가능함-->
+	<resultMap id="pfuImgMap" type="hashMap">
+		<result property="partId" column="PART_ID" />
+		<result property="partNm" column="PART_NM" />
+		<result property="partImg" column="PART_IMG" jdbcType="CLOB" javaType="java.lang.String"/>
+	</resultMap>
+	
+	<select id="selectStdPfuClobInfo" resultMap="pfuImgMap">
+      SELECT  T.PART_ID
+			, T.PART_NM
+			, T.PART_IMG
+        FROM TB_CM50D01 T 
+       WHERE PRDT_DIV = #{prdtDiv}
+         AND PRDT_TYP = #{prdtTyp}
+         AND CLNT_CD = #{clntCd}
+		<if test="partId != null and !partId.equals('')">
+         AND PART_ID = #{partId}</if>
+  </select>        
+  
+  
 	
   <resultMap id="resultInfoMap" type="CamelMap">
     <collection select="selectPfuClobInfo" property="resultClob" column="{fileTrgtKey=FILE_TRGT_KEY }" ofType="CamelMap"/>
@@ -50,7 +405,7 @@
 			, A.CLNT_NM
 			, T.ORDRS_CO_CD
 			, T.ORDRS_NO
-			, T.SALES_CDS
+			, T.SALES_CD
 			, T.CLNT_PJT
 			, FN_CM05M01_CD_TO_NM(T.CLNT_PJT) AS CLNT_PJT_NM
 			, T.CTRT_NM
@@ -84,6 +439,7 @@
 			, TO_CHAR(T.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM
 			, T.UDT_PGM
 			, T.VER_NO
+			, T.PRDT_CAV
         FROM TB_CR50M01 T 
              LEFT OUTER JOIN TB_BM02M01 A ON T.CLNT_CD = A.CLNT_CD
              LEFT OUTER JOIN TB_CM06M01 B ON T.MNG_ID = B.ID
@@ -171,7 +527,7 @@
 		, CLNT_CD
 		, ORDRS_CO_CD
 		, ORDRS_NO
-		, SALES_CDS
+		, SALES_CD
 		, CLNT_PJT
 		, CTRT_NM
 		, PRDT_DIV
@@ -197,6 +553,7 @@
 		, CREAT_ID
 		, CREAT_DTTM
 		, CREAT_PGM
+		, PRDT_CAV
       )
     VALUES
     (
@@ -205,7 +562,7 @@
 		, #{clntCd      }
 		, #{ordrsCoCd   }
 		, #{ordrsNo     }
-		, #{salesCds    }
+		, #{salesCd     }
 		, #{clntPjt     }
 		, #{ctrtNm      }
 		, #{prdtDiv     }
@@ -231,6 +588,7 @@
 		, #{userId}
 		, SYSDATE
 		, #{pgmId}
+		, #{prdtCav}
     )
   </insert>
   
@@ -239,7 +597,7 @@
   <update id="updatePfu" parameterType="Map">
     UPDATE TB_CR50M01
 		SET
-		  SALES_CDS                 =   #{salesCds    } 
+		  SALES_CD                  =   #{salesCd    } 
 		, CTRT_NM                   =   #{ctrtNm      }   
 		, PRDT_DIV                  =   #{prdtDiv     }   
 		, PRDT_TYP                  =   #{prdtTyp     }   
@@ -264,6 +622,7 @@
 		, UDT_ID                	=	#{userId}  
 		, UDT_DTTM                	=	SYSDATE  
 		, UDT_PGM                	=	#{pgmId} 
+		, PRDT_CAV                	=	#{prdtCav} 
     WHERE FILE_TRGT_KEY         = #{fileTrgtKey}
   </update>
   

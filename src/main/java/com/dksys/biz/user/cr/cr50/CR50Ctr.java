@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.cr.cr50.service.CR50Svc;
 import com.dksys.biz.util.MessageUtils;
 
@@ -35,6 +36,20 @@ public class CR50Ctr {
     
     @Autowired
     CR50Svc cr50Svc;
+    
+
+    
+    @PostMapping(value = "/selectPfuList") 
+	public String selectPfuList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  int totalCnt = cr50Svc.selectPfuListCount(paramMap); 
+		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		  model.addAttribute("paginationInfo", paginationInfo);
+		  
+		  List<Map<String, String>> resultList = cr50Svc.selectPfuList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+	}
+    
     @PostMapping(value = "/selectPFUAreaItemList") 
 	public String selectPFUAreaItemList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> result = cr50Svc.selectPFUAreaItemList(paramMap);
@@ -49,6 +64,19 @@ public class CR50Ctr {
     	model.addAttribute("result", result);
     	
     	return "jsonView";
+    }
+
+    // salesCd 정보 조회
+    @PostMapping(value = "/selectSalesCdInfo")
+    public String selectSalesCdInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	Map<String, String> result = cr50Svc.selectSalesCdInfo(paramMap);
+    	model.addAttribute("result", result);
+
+		String pfuCode = result.get("pfuCode");
+		paramMap.put("prdtDiv", pfuCode);
+		List<Map<String, String>> resultImg = cr50Svc.selectStdPfuClobInfo(paramMap);
+		model.addAttribute("resultImg", resultImg);
+      return "jsonView";
     }
 
 
