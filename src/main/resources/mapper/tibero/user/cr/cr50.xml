@@ -123,6 +123,10 @@
 		                            , X.ITEM_DIV                                           AS ITEM_DIV     --아이템구분
 		                            , (SELECT FN_CM05M01_CD_TO_NM(X.ITEM_DIV) FROM DUAL)  AS ITEM_DIV_NM  --아이템구분명
 		                            , X.EQP_NM                                             AS EQP_NM       --설비명
+		                            , X.MCTYPE                                             AS MCTYPE       --설비유형
+		                            , (SELECT FN_CM05M01_CD_TO_NM(X.MCTYPE) FROM DUAL)     AS MCTYPE_NM  --설비유형명
+		                            , X.ORDRS_DTL_DIV20
+		                            , (SELECT FN_CM05M01_CD_TO_NM(X.ORDRS_DTL_DIV20) FROM DUAL)     AS ORDRS_DTL_DIV20_NM
 		                            , M.ORDRS_DT
 		                         FROM TB_CR02M01  M --수주마스터
 		                              INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
@@ -186,8 +190,10 @@
 		                           , X.PLAN_EXCEPT
 		                           , DECODE(X.PLAN_EXCEPT, 'PLANEXCEPT01', '', (SELECT FN_CM05M01_CD_TO_NM(X.PLAN_EXCEPT) FROM DUAL)) 			AS PLAN_EXCEPT_NM --일정예외상황
 		                           , CR.FILE_TRGT_KEY  											AS PFU_NO
-		                           , CR.PRDT_DIV
+		                           , CR.PFU_PRDT_DIV
 		                           , CR.PRDT_TYP
+		                           , CR.PRDT_CAV
+		                           , CR.PRDT_STEP
 		                           , CR.VER_NO AS PFU_VER_NO
 		                        FROM 
 		                        	(
@@ -247,6 +253,12 @@
 		                     , CR.CLNT_PJT          --고객사프로젝트 
 		                     , CR.CLNT_PJT_NM       --고객사프로젝트명
 		                     , CR.ORDRS_NO          --수주번호     : 6
+		                     , CR.MCTYPE
+		                     , CR.MCTYPE_NM  --설비유형명
+		                     , CR.ITEM_DIV
+		                     , CR.ITEM_DIV_NM
+		                     , CR.ORDRS_DTL_DIV20
+		                     , CR.ORDRS_DTL_DIV20_NM
 		                     , X.CREAT_ID           --작성자ID
 		                     , X.CREAT_PGM          --작성프로그램
 		                     , X.CREAT_DTTM         --작성일시
@@ -256,8 +268,13 @@
 		                     , X.PLAN_EXCEPT		--일정예외상황
 		                     , X.PLAN_EXCEPT_NM		--일정예외상황
 		                     , X.PFU_NO
-		                     , X.PRDT_DIV
+		                     , X.PFU_PRDT_DIV
+		                     , (SELECT FN_CM05M01_CD_TO_NM(X.PFU_PRDT_DIV) FROM DUAL) AS PFU_PRDT_DIV_NM --PFU유형
 		                     , X.PRDT_TYP
+		                     , X.PRDT_CAV
+		                     , (SELECT FN_CM05M01_CD_TO_NM(X.PRDT_CAV) FROM DUAL) AS PRDT_CAV_NM --작동방식
+		                     , X.PRDT_STEP
+		                     , (SELECT FN_CM05M01_CD_TO_NM(X.PRDT_STEP) FROM DUAL) AS PRDT_STEP_NM
 		                     , X.PFU_VER_NO
 		                  FROM SUBJ X
 		                       LEFT OUTER JOIN SJD AS CR ON X.CO_CD = CR.CO_CD AND X.SALES_CD = CR.SALES_CD 
@@ -304,7 +321,7 @@
              , U1.NAME 								AS MNG_ID_NM
 	         , B.PRDT_GRP							AS PRDT_DIV
 	         , B.PRDT_NM							AS PRDT_CD_NM
-	         , C.CODE_RPRC							AS PFU_CODE
+	         , C.CODE_RPRC							AS PFU_PRDT_DIV	--표준 PFU 등록코드임
 	         , TO_CHAR(P.DE_DT, 'YYYY-MM-DD')                                AS PRDCTN_DT              --출고일
 	         , TO_CHAR(P.ACPTNC_DT, 'YYYY-MM-DD')                            AS ACPTNC_DT          --완료검수일
 		     , DECODE(P.PLAN_EXCEPT, 'PLANEXCEPT01', '', (SELECT FN_CM05M01_CD_TO_NM(P.PLAN_EXCEPT) FROM DUAL)) 			AS PLAN_EXCEPT_NM --일정예외상황
@@ -338,7 +355,7 @@
 
 	<!-- 표준PFU에 등록된 내역을 화면 그리드에 출력하기위함 -->
 	<select id="selectPFUAreaItemList" parameterType="Map" resultType="CamelMap">
-		SELECT 	  PRDT_DIV
+		SELECT 	  PFU_PRDT_DIV
 				, AREA_DIV
 				, (SELECT FN_CM05M01_CD_TO_NM(C.AREA_DIV) FROM DUAL)            AS AREA_DIV_NM
 				, PART_DIV
@@ -352,17 +369,19 @@
 				, SORT_NO
 				, USE_YN
 				, CLNT_CD
+				, 'Y'  AS CHANGE_YN	--표준PFU항목은 수정안됨 = Y
+				, 'N'  AS FINAL_YN	--고객요청, 확정 수정여부 = N
 				, 'Y'  AS STD_CHK	--표준PFU항목 = Y
 				, 'N'  AS IND_CHK	--Nomal, I=추가, U=수정, D=삭제
 				, PART_ID AS ORG_PART_ID
 		  FROM TB_CM50M01 C
 		 WHERE 1 = 1
-			<if test="prdtDiv != null and !prdtDiv.equals('')">
-			AND    C.PRDT_DIV = #{prdtDiv}
-			</if>
+			AND    C.PFU_PRDT_DIV = #{pfuPrdtDiv}
+			AND    C.PRDT_TYP = #{prdtTyp}
+			<if test="clntCd != null and !clntCd.equals('')">
+			AND    C.CLNT_CD = #{clntCd} </if>
 			<if test="areaDiv != null and !areaDiv.equals('')">
-			AND    C.AREA_DIV = #{areaDiv}
-			</if>
+			AND    C.AREA_DIV = #{areaDiv} </if>
 	</select>
 	
 	
@@ -379,9 +398,10 @@
 			, T.PART_NM
 			, T.PART_IMG
         FROM TB_CM50D01 T 
-       WHERE PRDT_DIV = #{prdtDiv}
+       WHERE PFU_PRDT_DIV = #{pfuPrdtDiv}
          AND PRDT_TYP = #{prdtTyp}
-         AND CLNT_CD = #{clntCd}
+		<if test="clntCd != null and !clntCd.equals('')">
+         AND CLNT_CD = #{clntCd}</if>
 		<if test="partId != null and !partId.equals('')">
          AND PART_ID = #{partId}</if>
   </select>        
@@ -410,7 +430,11 @@
 			, FN_CM05M01_CD_TO_NM(T.CLNT_PJT) AS CLNT_PJT_NM
 			, T.CTRT_NM
 			, T.PRDT_DIV
+			, T.PFU_PRDT_DIV
 			, T.PRDT_TYP
+			, T.PRDT_CAV
+			, T.PRDT_STEP
+			, T.VER_NO
 			, TO_CHAR(T.CTRT_DT, 'YYYY-MM-DD') AS CTRT_DT
 			, TO_CHAR(T.PRDCTN_DT, 'YYYY-MM-DD') AS PRDCTN_DT
 			, TO_CHAR(T.ACPTNC_DT, 'YYYY-MM-DD') AS ACPTNC_DT
@@ -438,11 +462,16 @@
 			, (SELECT FN_CM06M01_ID_TO_NM(T.UDT_ID) FROM DUAL) AS UDT_ID_NM
 			, TO_CHAR(T.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM
 			, T.UDT_PGM
-			, T.VER_NO
-			, T.PRDT_CAV
+			, W.APPROVAL_CHKECK
         FROM TB_CR50M01 T 
              LEFT OUTER JOIN TB_BM02M01 A ON T.CLNT_CD = A.CLNT_CD
              LEFT OUTER JOIN TB_CM06M01 B ON T.MNG_ID = B.ID
+             ,
+	  			(  	SELECT CASE WHEN max(SANCTN_STTUS) = 'Y' THEN 'Y' ELSE 'N' END AS APPROVAL_CHKECK
+					FROM TB_WB20M03
+					WHERE TODO_NO = #{fileTrgtKey}
+					  AND TODO_DIV2_CODE_ID = 'TODODIV2120'
+				) AS W
        WHERE FILE_TRGT_KEY = #{fileTrgtKey}
   </select>
 
@@ -475,8 +504,8 @@
   <select id="selectPFUAreaRetriveList" parameterType="Map" resultType="CamelMap">  
  		SELECT 	  C.FILE_TRGT_KEY
 				, C.PFU_SEQ
-				, C.PRDT_DIV
-				, (SELECT FN_CM05M01_CD_TO_NM(C.PRDT_DIV) FROM DUAL)            AS AREA_DIV_NM
+				, C.PFU_PRDT_DIV
+				, (SELECT FN_CM05M01_CD_TO_NM(C.PFU_PRDT_DIV) FROM DUAL)            AS PFU_PRDT_DIV_NM
 				, C.PART_ID
 				, (SELECT FN_CM05M01_CD_TO_NM(C.PART_ID) FROM DUAL)            AS PART_ID_NM
 				, C.AREA_DIV
@@ -498,16 +527,64 @@
 				, TO_CHAR(C.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM
 				, C.UDT_PGM
 				, 'U' 											AS UDT_CHK
+				, CASE WHEN (C.STD_CHK = 'Y') THEN 'Y' ELSE 'N' END AS CHANGE_YN	--표준PFU항목은 수정안됨 = Y
+				, CASE WHEN (W.APPROVAL_CHKECK = 'Y') THEN 'Y' ELSE 'N' END AS FINAL_YN	--고객요청, 확정 결재자 있으면 수정안됨 = Y
+				, C.STD_CHK	--표준PFU항목 = Y
+				, C.IND_CHK	--Nomal, I=추가, U=수정, D=삭제
+				, C.ORG_PART_ID
+		  FROM TB_CR50D01 C ,
+	  			(  	SELECT CASE WHEN max(SANCTN_STTUS) = 'Y' THEN 'Y' ELSE 'N' END AS APPROVAL_CHKECK
+					FROM TB_WB20M03
+					WHERE TODO_NO = #{fileTrgtKey}
+					  AND TODO_DIV2_CODE_ID = 'TODODIV2120'
+				) AS W
+		 WHERE 1 = 1
+		 	AND	    C.FILE_TRGT_KEY = #{fileTrgtKey}
+			<if test="prdtDiv != null and !prdtDiv.equals('')">
+			AND    C.PFU_PRDT_DIV = #{pfuPrdtDiv} </if>
+			<if test="areaDiv != null and !areaDiv.equals('')">
+			AND    C.AREA_DIV = #{areaDiv} </if>
+  </select>
+  
+  
+  
+  <!-- 각설비별 변경된 내역을 화면 그리드에 출력하기위함 -->
+  <select id="selectPFUChangedList" parameterType="Map" resultType="CamelMap">  
+ 		SELECT 	  C.FILE_TRGT_KEY
+				, C.PFU_SEQ
+				, C.PFU_PRDT_DIV
+				, (SELECT FN_CM05M01_CD_TO_NM(C.PFU_PRDT_DIV) FROM DUAL)            AS PFU_PRDT_DIV_NM
+				, C.PART_ID
+				, (SELECT FN_CM05M01_CD_TO_NM(C.PART_ID) FROM DUAL)            AS PART_ID_NM
+				, C.AREA_DIV
+				, (SELECT FN_CM05M01_CD_TO_NM(C.AREA_DIV) FROM DUAL)            AS AREA_DIV_NM
+				, C.PART_DIV
+				, (SELECT FN_CM05M01_CD_TO_NM(C.PART_DIV) FROM DUAL)            AS PART_DIV_NM
+				, C.PART_NM
+				, C.PART_STD
+				, C.PART_CUST
+				, C.PART_CONF
+				, C.PART_ETC
+				, C.SORT_NO
+				, C.CREAT_ID
+				, (SELECT FN_CM06M01_ID_TO_NM(C.CREAT_ID) FROM DUAL) AS CREAT_ID_NM
+				, TO_CHAR(C.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
+				, C.CREAT_PGM
+				, C.UDT_ID
+				, (SELECT FN_CM06M01_ID_TO_NM(C.UDT_ID) FROM DUAL) AS UDT_ID_NM
+				, TO_CHAR(C.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM
+				, C.UDT_PGM
+				, 'U' 											AS UDT_CHK
+				, 'Y'  AS CHANGE_YN	--표준PFU항목은 수정안됨 = Y
+				, 'Y'  AS FINAL_YN	--고객요청, 확정 결재자 있으면 수정안됨 = Y
 				, C.STD_CHK	--표준PFU항목 = Y
 				, C.IND_CHK	--Nomal, I=추가, U=수정, D=삭제
 				, C.ORG_PART_ID
 		  FROM TB_CR50D01 C
 		 WHERE 1 = 1
-		 	AND	    C.FILE_TRGT_KEY = #{fileTrgtKey}
-			<if test="prdtDiv != null and !prdtDiv.equals('')">
-			AND    C.PRDT_DIV = #{prdtDiv} </if>
-			<if test="areaDiv != null and !areaDiv.equals('')">
-			AND    C.AREA_DIV = #{areaDiv} </if>
+		 	AND	   C.FILE_TRGT_KEY = #{fileTrgtKey}
+			AND   (STD_CHK != 'Y'
+			    OR IND_CHK != 'N')
   </select>
   
   
@@ -554,6 +631,8 @@
 		, CREAT_DTTM
 		, CREAT_PGM
 		, PRDT_CAV
+		, PFU_PRDT_DIV
+		, PRDT_STEP
       )
     VALUES
     (
@@ -589,6 +668,8 @@
 		, SYSDATE
 		, #{pgmId}
 		, #{prdtCav}
+		, #{pfuPrdtDiv  }
+		, #{prdtStep    }
     )
   </insert>
   
@@ -599,7 +680,7 @@
 		SET
 		  SALES_CD                  =   #{salesCd    } 
 		, CTRT_NM                   =   #{ctrtNm      }   
-		, PRDT_DIV                  =   #{prdtDiv     }   
+		, PRDT_DIV              	=   #{prdtDiv     }   
 		, PRDT_TYP                  =   #{prdtTyp     }   
 		, CTRT_DT                   =   #{ctrtDt      }   
 		, PRDCTN_DT                 =   #{prdctnDt    , jdbcType=VARCHAR}   
@@ -623,10 +704,12 @@
 		, UDT_DTTM                	=	SYSDATE  
 		, UDT_PGM                	=	#{pgmId} 
 		, PRDT_CAV                	=	#{prdtCav} 
+		, PFU_PRDT_DIV              =	#{pfuPrdtDiv  } 
+		, PRDT_STEP              	=	#{prdtStep    } 
     WHERE FILE_TRGT_KEY         = #{fileTrgtKey}
   </update>
   
-  <delete id="deletePfu" parameterType="Map">
+  <delete id="deletePfuNo" parameterType="Map">
     DELETE TB_CR50M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
   </delete>
   
@@ -636,7 +719,7 @@
       (   
 			  FILE_TRGT_KEY
 			, PFU_SEQ
-			, PRDT_DIV
+			, PFU_PRDT_DIV
 			, PART_ID
 			, AREA_DIV
 			, PART_DIV
@@ -660,7 +743,7 @@
     (
 			  #{fileTrgtKey}
 			, #{pfuSeq     }
-			, #{prdtDiv    , jdbcType=VARCHAR}
+			, #{pfuPrdtDiv , jdbcType=VARCHAR}
 			, #{partId     , jdbcType=VARCHAR}
 			, #{areaDiv    , jdbcType=VARCHAR}
 			, #{partDiv    , jdbcType=VARCHAR}
@@ -687,7 +770,7 @@
   <update id="updatePfuArea" parameterType="Map">
     UPDATE TB_CR50D01
 		SET
-			  PRDT_DIV            = #{prdtDiv    , jdbcType=VARCHAR}
+			  PFU_PRDT_DIV        = #{pfuPrdtDiv , jdbcType=VARCHAR}
 			, PART_ID             = #{partId     , jdbcType=VARCHAR}
 			, AREA_DIV            = #{areaDiv    , jdbcType=VARCHAR}
 			, PART_DIV            = #{partDiv    , jdbcType=VARCHAR}
@@ -717,7 +800,13 @@
     DELETE TB_CR50D01 
      WHERE FILE_TRGT_KEY = #{fileTrgtKey}
   </delete>
- 
+  
+  <select id="selectPfuDeleteCheck" parameterType="Map" resultType="String">
+  	SELECT CASE WHEN max(SANCTN_STTUS) = 'Y' THEN 'Y' ELSE 'N' END AS APPROVAL_CHKECK
+		FROM TB_WB20M03
+		WHERE TODO_NO = #{fileTrgtKey}
+		  AND TODO_DIV2_CODE_ID = 'TODODIV2120'
+  </select>
 </mapper>
 
 

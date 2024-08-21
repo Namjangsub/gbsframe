@@ -65,17 +65,34 @@ public class CR50Ctr {
     	
     	return "jsonView";
     }
+    
+    @PostMapping(value = "/selectPFUChangedList") 
+    public String selectPFUChangedList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, String>> result = cr50Svc.selectPFUChangedList(paramMap);
+    	model.addAttribute("result", result);
+    	
+    	return "jsonView";
+    }
 
+    
+    @PostMapping(value = "/selectStdPfuClobInfo") 
+    public String selectStdPfuClobInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultImg = cr50Svc.selectStdPfuClobInfo(paramMap);
+		model.addAttribute("resultImg", resultImg);
+    	
+    	return "jsonView";
+    }
+    
     // salesCd 정보 조회
     @PostMapping(value = "/selectSalesCdInfo")
     public String selectSalesCdInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
     	Map<String, String> result = cr50Svc.selectSalesCdInfo(paramMap);
     	model.addAttribute("result", result);
 
-		String pfuCode = result.get("pfuCode");
-		paramMap.put("prdtDiv", pfuCode);
-		List<Map<String, String>> resultImg = cr50Svc.selectStdPfuClobInfo(paramMap);
-		model.addAttribute("resultImg", resultImg);
+//		String pfuCode = result.get("pfuCode");
+//		paramMap.put("prdtDiv", pfuCode);
+//		List<Map<String, String>> resultImg = cr50Svc.selectStdPfuClobInfo(paramMap);
+//		model.addAttribute("resultImg", resultImg);
       return "jsonView";
     }
 
@@ -134,10 +151,10 @@ public class CR50Ctr {
   	  	return "jsonView";
     }
 
-    @PutMapping(value = "/deletePfu")
-    public String deletePfu(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+    @PutMapping(value = "/deletePfuNo")
+    public String deletePfuNo(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
   	  	try {
-  			if (cr50Svc.deletePfu(paramMap) != 0 ) {
+  			if (cr50Svc.deletePfuNo(paramMap) != 0 ) {
   				model.addAttribute("resultCode", 200);
   				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
   			} else {

@@ -19,6 +19,7 @@ import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.cr.cr50.mapper.CR50Mapper;
 import com.dksys.biz.user.cr.cr50.service.CR50Svc;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
+import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
@@ -33,6 +34,9 @@ public class CR50SvcImpl implements CR50Svc {
 
     @Autowired
     QM01Mapper QM01Mapper;
+    
+	@Autowired
+	WB20Mapper wb20Mapper;
     
 	@Autowired
 	CM15Svc cm15Svc;
@@ -62,6 +66,12 @@ public class CR50SvcImpl implements CR50Svc {
 	@Override
 	public List<Map<String, String>> selectPFUAreaRetriveList(Map<String, String> paramMap) {
 		return cr50Mapper.selectPFUAreaRetriveList(paramMap);
+	}
+	
+	
+	@Override
+	public List<Map<String, String>> selectPFUChangedList(Map<String, String> paramMap) {
+		return cr50Mapper.selectPFUChangedList(paramMap);
 	}
 	
 	@Override
@@ -111,7 +121,7 @@ public class CR50SvcImpl implements CR50Svc {
 		
 		String sysCreateDttm =  cr50Mapper.selectSystemCreateDttm(paramMap);
         int newSeq = 0;
-		for (int i = 1; i <= 4; i++) {
+		for (int i = 1; i <= 6; i++) {
 		    // a01ListRow, a02ListRow, a03ListRow, a04ListRow를 동적으로 가져옵니다.
 		    String key = "a0" + i + "ListRow"; // "a01ListRow", "a02ListRow", ...
 		    List<Map<String, String>> aListArr = gsonDtl.fromJson(paramMap.get(key), dtlMap);
@@ -278,7 +288,7 @@ public class CR50SvcImpl implements CR50Svc {
 
 		String sysCreateDttm =  cr50Mapper.selectSystemCreateDttm(paramMap);
         int newSeq = 0;
-		for (int i = 1; i <= 4; i++) {
+		for (int i = 1; i <= 6; i++) {
 		    // a01ListRow, a02ListRow, a03ListRow, a04ListRow를 동적으로 가져옵니다.
 		    String key = "a0" + i + "ListRow"; // "a01ListRow", "a02ListRow", ...
 		    List<Map<String, String>> aListArr = gsonDtl.fromJson(paramMap.get(key), dtlMap);
@@ -370,7 +380,7 @@ public class CR50SvcImpl implements CR50Svc {
 	  }
 
 	  @Override
-	  public int deletePfu(Map<String, String> paramMap) throws Exception {
+	  public int deletePfuNo(Map<String, String> paramMap) throws Exception {
 		    //---------------------------------------------------------------  
 			//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
 		  	//   필수값 :  jobType, userId, comonCd
@@ -390,13 +400,20 @@ public class CR50SvcImpl implements CR50Svc {
 			//---------------------------------------------------------------  
 			//첨부 화일 권한체크 끝 
 			//---------------------------------------------------------------  
-		    int result = cr50Mapper.deletePfu(paramMap);
 
+		    //1명이라도 결재완료이면 'Y' 아니면 'N'
+			String deleteCheck =  cr50Mapper.selectPfuDeleteCheck(paramMap);
+		    if ("Y".equals(deleteCheck)) {
+		    	//한명이라도 결재가 완료되면 삭제는 불가능합니다.
+		    	throw new Exception("결재완료건이 있습니다. 확인바랍니다."); 
+		    }
+			
+		    int result = cr50Mapper.deletePfuNo(paramMap);
 //		    //상세내역 삭제
-//		    result += cr50Mapper.deleteTurnKeyDetail(paramMap);
-//		    
-//		    //지급계획 삭제
-//		    result += cr50Mapper.deleteTurnKeyClmnPlan(paramMap);
+		    result += cr50Mapper.deletePfuAreaAll(paramMap);
+
+		    //결재요청정보 삭제처리
+		    result += wb20Mapper.deleteAllTodoMaster(paramMap);
 		    
 			//---------------------------------------------------------------  
 			//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
