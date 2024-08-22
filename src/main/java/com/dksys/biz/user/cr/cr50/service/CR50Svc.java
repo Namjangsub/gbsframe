@@ -31,4 +31,15 @@ public interface CR50Svc {
 
 	List<Map<String, String>> selectStdPfuClobInfo(Map<String, String> paramMap);
 
+	// PFU복사부분 시작
+	int copy_cr50(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	
+	int selectPfuCopyTargetListCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectPfuCopyTargetList(Map<String, String> paramMap);
+	// PFU복사부분 끝
+
+	String selectPfuIsThereList(Map<String, String> paramMap);
+
+
 }

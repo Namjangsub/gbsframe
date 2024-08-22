@@ -23,7 +23,6 @@ import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
-import com.google.gson.GsonBuilder;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -430,5 +429,51 @@ public class CR50SvcImpl implements CR50Svc {
 		    return result;
 	  }
 		
-	
+
+
+		// PFU복사부분 시작
+		@Override
+		public int copy_cr50(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+			Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+			Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+			HashMap<String, String> param = new HashMap<>();
+			param.put("userId", paramMap.get("userId"));
+			
+			//데이터처리 시작
+			int result = 0;
+			int resultDel = 0;
+
+			//상세수정
+			List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+		    for (Map<String, String> dtl : dtlParam) {
+				String dataChk = dtl.get("dataChk").toString();	    	
+				//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
+		    	if ("I".equals(dataChk)) {
+					//데이터 처리
+//		    		resultDel = cr50Mapper.delete_cr50_master(dtl);
+//		    		resultDel = cr50Mapper.delete_cr50_detail(dtl);
+					result += cr50Mapper.copy_cr50_master(dtl);	//TB_CR50M01 마스터 정보 복사
+					result += cr50Mapper.copy_cr50_detail(dtl); //TB_CR50D01 상세내역 복사
+		    	} 
+		    }
+			//데이터 처리 끝
+			return result;
+		}
+
+	    
+	    @Override
+		public int selectPfuCopyTargetListCount(Map<String, String> paramMap) {
+			return cr50Mapper.selectPfuCopyTargetListCount(paramMap);
+		}
+
+		@Override
+		public List<Map<String, String>> selectPfuCopyTargetList(Map<String, String> paramMap) {
+			return cr50Mapper.selectPfuCopyTargetList(paramMap);
+		}
+		
+
+	    @Override
+		public String selectPfuIsThereList(Map<String, String> paramMap) {
+			return cr50Mapper.selectPfuIsThereList(paramMap);
+		}
 }

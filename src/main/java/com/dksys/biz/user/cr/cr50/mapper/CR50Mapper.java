@@ -41,7 +41,20 @@ public interface CR50Mapper {
 	int selectPfuListCount(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectPfuList(Map<String, String> paramMap);
+
+	// PFU복사부분 시작
+	int copy_cr50_master(Map<String, String> dtl);
+	int copy_cr50_detail(Map<String, String> dtl);
+	int delete_cr50(Map<String, String> dtl);
 	
+	int selectPfuCopyTargetListCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectPfuCopyTargetList(Map<String, String> paramMap);
+	// PFU복사 끝
+
+	String selectPfuIsThereList(Map<String, String> paramMap);
+
+
 }
 
 

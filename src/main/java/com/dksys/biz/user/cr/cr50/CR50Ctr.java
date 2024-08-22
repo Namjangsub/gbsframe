@@ -74,6 +74,14 @@ public class CR50Ctr {
     	return "jsonView";
     }
 
+
+    @PostMapping(value = "/selectPfuIsThereList") 
+	public String selectPfuIsThereList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  String totalCnt = cr50Svc.selectPfuIsThereList(paramMap); 
+		  model.addAttribute("resultList", totalCnt);
+		  return "jsonView"; 
+	}
+    
     
     @PostMapping(value = "/selectStdPfuClobInfo") 
     public String selectStdPfuClobInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -169,4 +177,35 @@ public class CR50Ctr {
     }
 
 
+
+	@PostMapping(value = "/copy_cr50")
+	public String copy_cr50(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (cr50Svc.copy_cr50(paramMap, mRequest) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+	}
+	
+
+    
+    @PostMapping(value = "/selectPfuCopyTargetList") 
+	public String selectPfuCopyTargetList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  int totalCnt = cr50Svc.selectPfuCopyTargetListCount(paramMap); 
+		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		  model.addAttribute("paginationInfo", paginationInfo);
+		  
+		  List<Map<String, String>> resultList = cr50Svc.selectPfuCopyTargetList(paramMap);
+		  model.addAttribute("resultList", resultList); 
+		  return "jsonView"; 
+	}
+    
 }	  
