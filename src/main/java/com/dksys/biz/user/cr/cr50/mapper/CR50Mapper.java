@@ -52,7 +52,7 @@ public interface CR50Mapper {
 	List<Map<String, String>> selectPfuCopyTargetList(Map<String, String> paramMap);
 	// PFU복사 끝
 
-	String selectPfuIsThereList(Map<String, String> paramMap);
+	int selectPfuIsThereListCount(Map<String, String> paramMap);
 
 
 }

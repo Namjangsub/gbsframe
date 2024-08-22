@@ -473,7 +473,7 @@ public class CR50SvcImpl implements CR50Svc {
 		
 
 	    @Override
-		public String selectPfuIsThereList(Map<String, String> paramMap) {
-			return cr50Mapper.selectPfuIsThereList(paramMap);
+		public int selectPfuIsThereListCount(Map<String, String> paramMap) {
+			return cr50Mapper.selectPfuIsThereListCount(paramMap);
 		}
 }

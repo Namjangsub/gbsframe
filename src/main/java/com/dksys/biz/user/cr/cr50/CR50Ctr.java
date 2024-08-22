@@ -75,9 +75,9 @@ public class CR50Ctr {
     }
 
 
-    @PostMapping(value = "/selectPfuIsThereList") 
-	public String selectPfuIsThereList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  String totalCnt = cr50Svc.selectPfuIsThereList(paramMap); 
+    @PostMapping(value = "/selectPfuIsThereListCount") 
+	public String selectPfuIsThereListCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  int totalCnt = cr50Svc.selectPfuIsThereListCount(paramMap); 
 		  model.addAttribute("resultList", totalCnt);
 		  return "jsonView"; 
 	}
