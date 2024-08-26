@@ -111,7 +111,26 @@ public class WB20SvcImpl implements WB20Svc {
 
 		int result = 0;	    
 		result += wb20Mapper.updateApprovalLine(paramMap);	
-		
+		/*paramMap 내용
+		 * {
+			  todoId=js.nam,
+			  todoCfOpn=,
+			  issNo=RES2400144,
+			  coCd=GUN,
+			  todoDiv1CodeId=TODODIV20,
+			  todoDiv2CodeId=TODODIV2030,
+			  pgmId=WB2001M01,
+			  salesCd=24000-00DUMMY,
+			  todoDiv1CodeNm=결재,
+			  todoDiv2CodeNm=발주/출장요청(결과),
+			  todoFileTrgtKey=1287,
+			  todoTitl=(주)건양아이티티-기타정상발주및출장요청서결과,
+			  userId=js.nam,
+			  todoKey=8504,
+			  sanctnSn=1,
+			  todoNo=RES2400144
+			}
+		 * */
 		String tempReqNo = paramMap.get("todoNo");
 		//TODODIV2020:발주 및 출장 요청 상태코드 바꾸기
 		if ("TODODIV2020".equals(paramMap.get("todoDiv2CodeId"))) {

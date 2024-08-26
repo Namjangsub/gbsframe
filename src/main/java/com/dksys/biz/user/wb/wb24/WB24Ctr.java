@@ -167,6 +167,15 @@ public class WB24Ctr {
 		return "jsonView";
 	}
 	
+	
+	//조치담당자의 팀장 정보 가져오기
+	@PostMapping(value = "/selectTeamManagerSpecialInfo")
+	public String selectTeamManagerSpecialInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = wb24Svc.selectTeamManagerSpecialInfo(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
 	//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
 	@PostMapping(value = "/updateWbsIssueResultEvaluate")
 	public String updateWbsIssueResultEvaluate(@RequestBody Map<String, String> paramMap, ModelMap model){

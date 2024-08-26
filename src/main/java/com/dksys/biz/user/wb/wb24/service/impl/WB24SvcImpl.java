@@ -546,6 +546,12 @@ public class WB24SvcImpl implements WB24Svc {
 	public Map<String, String> selectTeamManagerInfo(Map<String, String> paramMap) {
 		return wb24Mapper.selectTeamManagerInfo(paramMap);
 	}
+	
+	//조치담당자의 팀장 정보가져오기
+	@Override
+	public Map<String, String> selectTeamManagerSpecialInfo(Map<String, String> paramMap) {
+		return wb24Mapper.selectTeamManagerSpecialInfo(paramMap);
+	}
 
 	//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
 	@Override
