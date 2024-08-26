@@ -38,8 +38,8 @@ public interface CR50Mapper {
 	String selectPfuDeleteCheck(Map<String, String> paramMap);
 
 
-	int selectPfuListCount(Map<String, String> paramMap);
-
+	int selectPfuListCount(Map<String, String> paramMap); 
+ 
 	List<Map<String, String>> selectPfuList(Map<String, String> paramMap);
 
 	// PFU복사부분 시작
