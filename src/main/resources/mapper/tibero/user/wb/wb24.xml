@@ -391,8 +391,8 @@
 	                    , ISU.ISS_STS                                 --이슈상태
 	                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_STS) FROM DUAL) AS ISS_STS_NM
 	                    , ISU.ACT_ID                                  --조치담당자
-	                    , TO_CHAR(ACT.ACTS_DT,'YYYY-MM-DD') AS ACTS_DT--조치 시작일
-	                    , TO_CHAR(ACT.ACTE_DT,'YYYY-MM-DD') AS ACTE_DT--조치 종료일
+	                    , ACT.ACTS_DT           					  --조치 시작일
+	                    , ACT.ACTE_DT           					  --조치 종료일
 	                    , ACT.ACT_MH                                  --조치 투입공수
 	                    , ACT.ACT_AMT                                 --조치 투입비용  
 	                    , ACT.ACT_CNTS                                --조치내용
@@ -424,8 +424,8 @@
 	                    , ISU.ISS_STS                                             --이슈상태
 	                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_STS) FROM DUAL) AS ISS_STS_NM
 	                    , ISU.ACT_ID                                              --조치담당자
-	                    , TO_CHAR(ACT.ACTS_DT,'YYYY-MM-DD')  AS ACTS_DT           --조치 시작일
-	                    , TO_CHAR(ACT.ACTE_DT,'YYYY-MM-DD')  AS ACTE_DT           --조치 종료일
+	                    , ACT.ACTS_DT           								  --조치 시작일
+	                    , ACT.ACTE_DT           								  --조치 종료일
 	                    , ACT.ACT_MH                                              --조치 투입공수
 	                    , ACT.ACT_AMT                                             --조치 투입비용  
 	                    , ACT.ACT_CNTS                                            --조치내용
@@ -443,6 +443,15 @@
 	                 AND ISU.CO_CD    = #{coCd}
 	         		 AND EXISTS (SELECT 1 FROM TRG WHERE TRG.SALES_CD = ISU.SALES_CD) 
 			     )
+			   , REQ AS --발주요청정보
+			     (
+			       SELECT 	  ME.REQ_NO
+			       			, sum(ME.PCHS_AMT) AS REQ_AMT
+					FROM TB_SM12D01 ME
+					WHERE 1 = 1
+	         		 AND EXISTS (SELECT 1 FROM ISU WHERE ISU.REQ_NO = ME.REQ_NO) 
+					GROUP BY ME.REQ_NO
+				 ) 
 			SELECT P.CO_CD              --회사코드
                   , P.CLNT_CD            --고객명
                   , P.CLNT_NM            --고객명
@@ -474,14 +483,22 @@
                   , I.ISS_DIV_NM          --이슈유형명
                   , I.ISS_CNTS            --이슈내용
 
-                  , U.NAME 		 		AS ACT_ID_NM	--조치담당자명
-                  , U.DEPT_ID 		 	AS ACT_DEPT_ID	--조치담당부서
-                  , I.ACTS_DT             --조취시작일
-                  , I.ACTE_DT             --조취종료일
+                  , decode(I.REQ_NO, '', I.ACT_ID, QM.ORDRG_ID)       					AS ACT_ID    --조치담당자
+				  , decode(I.REQ_NO, '', B2.NAME, B4.NAME) 			 					AS ACT_ID_NM
+	              , decode(I.REQ_NO, '', B3.DEPT_NM,B5.DEPT_NM) 						AS ACT_DEPT_NM		  --조치부서
+	              , SUBSTRING(decode(I.REQ_NO, '', B2.DEPT_ID,B4.DEPT_ID),0,5) 		AS ACT_DEPT_ID		  --조치부서
+--                  , I.ACTS_DT             --조취시작일
+--                  , I.ACTE_DT             --조취종료일
+		          , TO_CHAR(decode(I.REQ_NO, '', I.ACTS_DT, QM.ORDRG_DT),'YYYY-MM-DD')  AS ACTS_DT           --조치 시작일
+		          , TO_CHAR(decode(I.REQ_NO, '', I.ACTE_DT, QP.RSLT_DT),'YYYY-MM-DD')  	AS ACTE_DT           --조치 종료일
                   , I.REQ_NO              --발주요청번호
-                  , I.ACT_MH              --조취공수
-                  , I.ACT_AMT             --조취비용
-                  , I.ACT_CNTS            --조취내용
+--                  , I.ACT_MH              --조취공수
+		          , decode(I.REQ_NO, '', I.ACT_MH, QP.ACT_MH)          					AS ACT_MH   --조치 투입공수
+		          , decode(I.REQ_NO, '', I.ACT_AMT, REQ.REQ_AMT)      					AS ACT_AMT    --조취비용
+--                  , I.ACT_CNTS            --조취내용
+		          , decode(I.REQ_NO, '', I.ACT_CNTS, QP.MEAS_RST)      					AS ACT_CNTS    --조치내용
+
+
 
                   , I.WBS_RSLTSS_DT       --실적시작일
                   , I.WBS_RSLTSE_DT       --실적종료일
@@ -504,7 +521,13 @@
 			  FROM PLN AS P
 			       INNER      JOIN SUBJ AS J ON P.CO_CD = J.CO_CD AND P.SALES_CD = J.SALES_CD--과제정보 
 			       LEFT OUTER JOIN ISU  AS I ON P.CO_CD = I.CO_CD AND P.SALES_CD = I.SALES_CD AND P.WBS_PLAN_CODE_KIND = I.WBS_PLAN_CODE_KIND AND P.WBS_PLAN_CODE_ID = I.WBS_PLAN_CODE_ID--이슈정보
-			       LEFT OUTER JOIN TB_CM06M01 U ON U.ID = I.ACT_ID
+          		   LEFT OUTER JOIN TB_QM01M01 AS QM ON QM.REQ_NO = I.REQ_NO	--발주요청
+				   LEFT OUTER JOIN TB_QM01P01 AS QP ON QP.REQ_NO = I.REQ_NO	--발주요청결과
+           		   LEFT OUTER JOIN TB_CM06M01 AS B2 ON I.ACT_ID = B2.ID 
+	               LEFT OUTER JOIN TB_CM04M01 AS B3 ON B3.DEPT_ID = SUBSTRING(B2.DEPT_ID,0,5) 
+           		   LEFT OUTER JOIN TB_CM06M01 AS B4 ON QM.ORDRG_ID = B4.ID 
+				   LEFT OUTER JOIN TB_CM04M01 AS B5 ON B5.DEPT_ID = SUBSTRING(B4.DEPT_ID,0,5) 
+				   LEFT OUTER JOIN REQ ON REQ.REQ_NO = I.REQ_NO  
 			 WHERE 1=1 
 			 <if test="issSts != null and !issSts.equals('')">
                     AND I.ISS_STS = #{issSts}            
