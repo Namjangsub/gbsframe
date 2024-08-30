@@ -210,7 +210,8 @@ public class WB20SvcImpl implements WB20Svc {
 			//결제라인 insert			
 			for(Map<String, String> dtl : detailMap) {
 				//입력, 수정 
-				if( dtl.get("todoKey").equals("") ) {
+				String tempKey = dtl.get("todoKey");
+				if( tempKey == null || tempKey.equals("") ) {
 					maxTodoKey = wb20Mapper.selectmaxTodoKey(dtl);
 					dtl.put("todoKey", maxTodoKey);
 				}
