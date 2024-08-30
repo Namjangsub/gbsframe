@@ -1,6 +1,5 @@
 package com.dksys.biz.user.cr.cr51.service.impl;
 
-import java.util.function.Function;
 import java.util.function.Consumer;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -20,7 +19,6 @@ import com.dksys.biz.user.cr.cr51.mapper.CR51Mapper;
 import com.dksys.biz.user.cr.cr51.service.CR51Svc;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 
@@ -73,6 +71,7 @@ public class CR51SvcImpl implements CR51Svc {
 		return cr51Mapper.selectPFUChangedList(paramMap);
 	}
 	
+	
 	@Override
 	public Map<String, String> selectSalesCdInfo(Map<String, String> paramMap) {
 		Map<String, String> result = cr51Mapper.selectSalesCdInfo(paramMap);
@@ -84,6 +83,11 @@ public class CR51SvcImpl implements CR51Svc {
 	    return cr51Mapper.selectPfuInfo(paramMap);
 	}
 	
+
+	@Override
+	public List<Map<String, String>> selectPfuInfoSalesCdList(Map<String, String> paramMap) {
+		return cr51Mapper.selectPfuInfoSalesCdList(paramMap);
+	}
 	
 //	@Override
 //	public Map<String, String> selectPfuClobInfo(Map<String, String> paramMap) {
@@ -142,8 +146,8 @@ public class CR51SvcImpl implements CR51Svc {
 		            detailMap.put("creatDttm", sysCreateDttm);
 		            detailMap.put("creatPgm", paramMap.get("pgmId"));
 		            detailMap.put("udtId", "");
-		            detailMap.put("udtPgm", "");
 		            detailMap.put("udtDttm", "");
+		            detailMap.put("udtPgm", "");
 
 		            result += cr51Mapper.insertPfuArea(detailMap);
 		        }
@@ -361,7 +365,7 @@ public class CR51SvcImpl implements CR51Svc {
 	        for (Map<String, String> detailMap : salesCdListArr) {
 	            detailMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 	            String createId = detailMap.get("creatId");
-	            if (salesCdListArr != null ||"".equals(detailMap.get("creatId"))) {  //추가항목 추가항목은 신규 Insert 임.
+	            if (createId == null || "".equals(createId)) {  //추가항목 추가항목은 신규 Insert 임.
 		            detailMap.put("creatId", paramMap.get("userId"));
 		            detailMap.put("creatDttm", sysCreateDttm);
 		            detailMap.put("creatPgm", paramMap.get("pgmId"));
@@ -370,8 +374,8 @@ public class CR51SvcImpl implements CR51Svc {
 		            detailMap.put("udtDttm", "");
 	            } else {
 		            detailMap.put("udtId", paramMap.get("userId"));
-		            detailMap.put("udtPgm", sysCreateDttm);
-		            detailMap.put("udtDttm", paramMap.get("pgmId"));
+		            detailMap.put("udtDttm", sysCreateDttm);
+		            detailMap.put("udtPgm", paramMap.get("pgmId"));
 	            }
 
 	            result += cr51Mapper.insertPfuSalesCd(detailMap);
@@ -524,5 +528,18 @@ public class CR51SvcImpl implements CR51Svc {
 		@Override
 		public List<Map<String, String>> selectTagetSalesCodeList(Map<String, String> paramMap) {
 			return cr51Mapper.selectTagetSalesCodeList(paramMap);
+		}
+		
+		
+		@Override
+		public List<Map<String, String>> selectPfuReferenceTargetList(Map<String, String> paramMap) {
+			return cr51Mapper.selectPfuReferenceTargetList(paramMap);
+		}
+		
+		
+		@Override
+		public List<Map<String, String>> selectIssueReferenceList(Map<String, String> paramMap) {
+			return cr51Mapper.selectIssueReferenceList(paramMap);
+
 		}
 }

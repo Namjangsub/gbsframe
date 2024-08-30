@@ -17,6 +17,8 @@ public interface CR51Svc {
 
 	Map<String, String> selectPfuInfo(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectPfuInfoSalesCdList(Map<String, String> paramMap);
+
 //	Map<String, String> selectPfuClobInfo(Map<String, String> paramMap);
 
 	int insertPfu(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
@@ -42,6 +44,10 @@ public interface CR51Svc {
 	int selectPfuIsThereListCount(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectTagetSalesCodeList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectPfuReferenceTargetList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectIssueReferenceList(Map<String, String> paramMap);
 
 
 }

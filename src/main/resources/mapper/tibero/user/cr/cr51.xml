@@ -218,7 +218,8 @@
 					                      WHERE  rn = 1 --마지막버젼 자료만 가져오기
 		                        	) AS X
 		                             LEFT OUTER JOIN TB_BM02M01 AS BM ON X.MKER_CD = BM.CLNT_CD --거래처정보
-		                             LEFT OUTER JOIN TB_CR51M01 AS CR ON X.SALES_CD = CR.SALES_CD --PFU 등록정보
+		                             LEFT OUTER JOIN TB_CR51D02 AS CD ON X.SALES_CD = CD.SALES_CD --PFU 등록정보
+		                             LEFT OUTER JOIN TB_CR51M01 AS CR ON CR.FILE_TRGT_KEY = CD.FILE_TRGT_KEY --PFU 등록정보
 		                     )
 		                SELECT X.FILE_TRGT_KEY
 		                     , X.CO_CD              --회사코드
@@ -409,12 +410,11 @@
   
 	
   <resultMap id="resultInfoMap" type="CamelMap">
-    <collection select="selectPfuClobInfo" property="resultClob" column="{fileTrgtKey=FILE_TRGT_KEY }" ofType="CamelMap"/>
+    <collection select="selectPfuClobInfo" property="RESULT_CLOB" column="{fileTrgtKey=FILE_TRGT_KEY }" ofType="CamelMap"/>
 <!--     <collection select="selectAreaList" property="area01List" column="{fileTrgtKey=FILE_TRGT_KEY, areaDiv='PFUAREA01' }" ofType="CamelMap"/> -->
 <!--     <collection select="selectAreaList" property="area02List" column="{fileTrgtKey=FILE_TRGT_KEY, areaDiv='PFUAREA02' }" ofType="CamelMap"/> -->
 <!--     <collection select="selectAreaList" property="area03List" column="{fileTrgtKey=FILE_TRGT_KEY, areaDiv='PFUAREA03' }" ofType="CamelMap"/> -->
 <!--     <collection select="selectAreaList" property="area04List" column="{fileTrgtKey=FILE_TRGT_KEY, areaDiv='PFUAREA04' }" ofType="CamelMap"/> -->
-    <collection select="selectPfuInfoSalesCdList" property="PfuInfoSalesCdList" column="{fileTrgtKey=FILE_TRGT_KEY}" ofType="CamelMap"/>
   </resultMap>
 
   <select id="selectPfuInfo" parameterType="Map" resultMap="resultInfoMap">
@@ -462,6 +462,17 @@
 			, TO_CHAR(T.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS UDT_DTTM
 			, T.UDT_PGM
 			, W.APPROVAL_CHKECK
+			, T.FROM_CO_CD
+			, T.FROM_CLNT 
+			, T.FROM_ORDRS_NO
+			, T.FROM_SALES_CD
+			, T.FROM_PFU_NO
+			, T.FROM_PFU_VER_NO
+			, T.FROM_PFU_PRDT_DIV
+			, T.FROM_PRDT_TYP
+			, T.FROM_PRDT_CAV
+			, T.FROM_PRDT_CD
+			, T.FROM_PRDT_STEP
         FROM TB_CR51M01 T 
              LEFT OUTER JOIN TB_BM02M01 A ON T.CLNT_CD = A.CLNT_CD
              LEFT OUTER JOIN TB_CM06M01 B ON T.MNG_ID = B.ID
@@ -499,10 +510,48 @@
   </select>
   
 	<select id="selectPfuInfoSalesCdList" parameterType="Map" resultType="CamelMap">
-      SELECT  *
-        FROM TB_CR51D02 T 
-       WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+      SELECT 
+      			 D.ORDRS_CO_CD  , -- 회사코드
+                 FN_CM05M01_CD_TO_NM(D.ORDRS_CO_CD) 			AS ORDRS_CO_CD_NM,
+                 D.ORDRS_NO, -- 수주번호
+                 D.SALES_CD, -- SALES CODE
+                 NVL2(D.SALES_CD, 'Y', 'N') 			AS CHK_SAVE_CD, 
+                 X.ORGN_SALES_CD, -- 원천 SALES CODE
+                 Y.ORDRS_CLNT_CD, -- 고객사
+                 A.CLNT_NM  							AS ORDRS_CLNT_NM,
+                 Y.CLNT_PJT, -- 고객사 PJT
+                 FN_CM05M01_CD_TO_NM(Y.CLNT_PJT) 		AS CLNT_PJT_NM, -- 고객사 PJT명
+                 D.ORDRS_DTL_DIV10,
+                 D.ORDRS_DTL_DIV20, -- 신작구분
+                 FN_CM05M01_CD_TO_NM(D.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+                 D.ORDRS_DTL_DIV30,
+                 D.PRDT_CD, -- 제품구분
+                 P.PRDT_GRP ,
+                 FN_CM05M01_CD_TO_NM(P.PRDT_GRP) PRDT_GRP_NM,
+                 P.PRDT_NM  PRDT_CD_NM,
+                 D.ITEM_DIV, -- 아이템구분
+                 FN_CM05M01_CD_TO_NM(D.ITEM_DIV) ITEM_DIV_NM,
+                 D.ORDRS_QTY ,
+                 D.MCTYPE ,
+                 FN_CM05M01_CD_TO_NM(D.MCTYPE) MCTYPE_NM,
+                 D.EQP_NM , -- 설비명
+                 D.DTL_RMK,
+                 D.CREAT_ID,
+				 D.CREAT_PGM,
+				 TO_CHAR(D.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS')                AS CREAT_DTTM,
+				 D.UDT_ID,
+				 D.UDT_PGM,
+				 TO_CHAR(D.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS')                AS UDT_DTTM
+        FROM TB_CR51D02 D 
+       			  LEFT OUTER JOIN TB_CR02D02 X ON D.ORDRS_CO_CD = X.CO_CD 
+       			  							  AND D.SALES_CD    = X.SALES_CD 
+                  INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
+                                          AND X.ORDRS_NO = Y.ORDRS_NO
+                  LEFT OUTER JOIN TB_BM01M01 P ON D.PRDT_CD = P.PRDT_CD  --제품마스터
+                  LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터
+       WHERE D.FILE_TRGT_KEY =  #{fileTrgtKey}
   </select>
+  
   
   <!-- 각설비별 등록된 내역을 화면 그리드에 출력하기위함 -->
   <select id="selectPFUAreaRetriveList" parameterType="Map" resultType="CamelMap">  
@@ -636,14 +685,17 @@
 		, CREAT_ID
 		, CREAT_DTTM
 		, CREAT_PGM
+		, FROM_CO_CD
 		, FROM_CLNT 
 		, FROM_ORDRS_NO
 		, FROM_SALES_CD
 		, FROM_PFU_NO
-		, FROM_PFU_VER
+		, FROM_PFU_VER_NO
 		, FROM_PFU_PRDT_DIV
 		, FROM_PRDT_TYP
 		, FROM_PRDT_CAV
+		, FROM_PRDT_CD
+		, FROM_PRDT_STEP
       )
     VALUES
     (
@@ -680,14 +732,17 @@
 		, #{userId}
 		, SYSDATE
 		, #{pgmId}		
+		, #{fromCoCd, jdbcType=VARCHAR}
 		, #{fromClnt, jdbcType=VARCHAR}
 		, #{fromOrdrsNo, jdbcType=VARCHAR}
 		, #{fromSalesCd, jdbcType=VARCHAR}
 		, #{fromPfuNo, jdbcType=VARCHAR}
-		, #{fromPfuVer, jdbcType=VARCHAR}
+		, #{fromPfuVerNo, jdbcType=VARCHAR}
 		, #{fromPfuPrdtDiv, jdbcType=VARCHAR}
 		, #{fromPrdtTyp, jdbcType=VARCHAR}
 		, #{fromPrdtCav, jdbcType=VARCHAR}
+		, #{fromPrdtCd, jdbcType=VARCHAR}
+		, #{fromPrdtStep, jdbcType=VARCHAR}
     )
   </insert>
   
@@ -724,14 +779,17 @@
 		, UDT_ID                	=	#{userId}  
 		, UDT_DTTM                	=	SYSDATE  
 		, UDT_PGM                	=	#{pgmId} 	
+		, FROM_CO_CD                =	#{fromCoCd, jdbcType=VARCHAR}   
 		, FROM_CLNT                 =	#{fromClnt , jdbcType=VARCHAR}    
 		, FROM_ORDRS_NO             =   #{fromOrdrsNo, jdbcType=VARCHAR}   
 		, FROM_SALES_CD             =   #{fromSalesCd, jdbcType=VARCHAR}   
 		, FROM_PFU_NO               =   #{fromPfuNo, jdbcType=VARCHAR}   
-		, FROM_PFU_VER              =   #{fromPfuVer, jdbcType=VARCHAR}   
+		, FROM_PFU_VER_NO           =   #{fromPfuVerNo, jdbcType=VARCHAR}   
 		, FROM_PFU_PRDT_DIV         =   #{fromPfuPrdtDiv, jdbcType=VARCHAR}   
 		, FROM_PRDT_TYP             =   #{fromPrdtTyp, jdbcType=VARCHAR}   
 		, FROM_PRDT_CAV             =   #{fromPrdtCav, jdbcType=VARCHAR}   
+		, FROM_PRDT_CD              =   #{fromPrdtCd, jdbcType=VARCHAR}   
+		, FROM_PRDT_STEP            =   #{fromPrdtStep, jdbcType=VARCHAR}   
     WHERE FILE_TRGT_KEY         = #{fileTrgtKey}
   </update>
   
@@ -866,7 +924,7 @@
     (
 			  #{fileTrgtKey  }
 			, #{salesCd      }
-			, #{coCd         }
+			, #{ordrsCoCd    }
 			, #{ordrsNo      }
 			, #{ordrsDtlDiv10}
 			, #{ordrsDtlDiv20}
@@ -882,7 +940,7 @@
 			, #{etcField3    , jdbcType=VARCHAR}
 			, #{creatId	     }  
 			, #{creatPgm	 } 
-			, #{creatDttm    }
+			, #{creatDttm	 }
 			, #{udtId        , jdbcType=VARCHAR}
 			, #{udtPgm       , jdbcType=VARCHAR}
 			, #{udtDttm      , jdbcType=VARCHAR}
@@ -913,7 +971,7 @@
 			, UDT_PGM                   =   #{udtPgm       , jdbcType=VARCHAR}
 			, UDT_DTTM                  =   SYSDATE
     WHERE FILE_TRGT_KEY         = #{fileTrgtKey}
-      AND ORDRS_CO_CD			= #{coCd}
+      AND ORDRS_CO_CD			= #{ordrsCoCd}
       AND ORDRS_NO				= #{ordrsNo}
       AND SALES_CD				= #{salesCd}
   </update>
@@ -921,7 +979,7 @@
   <delete id="deletePfuSalesCd" parameterType="Map">
     DELETE TB_CR51D02 
      WHERE FILE_TRGT_KEY = #{fileTrgtKey}
-       AND ORDRS_CO_CD	 = #{coCd}
+       AND ORDRS_CO_CD	 = #{ordrsCoCd}
        AND ORDRS_NO		 = #{ordrsNo}
        AND SALES_CD		 = #{salesCd}
   </delete>
@@ -1230,11 +1288,18 @@
   <select id="selectTagetSalesCodeList" parameterType="Map" resultType="camelMap">
   /* selectTagetSalesCodeList */
           SELECT 
-                 X.CO_CD, -- 회사코드
-                 FN_CM05M01_CD_TO_NM(X.CO_CD) 			AS CO_CD_NM,
+                 X.CO_CD 								AS ORDRS_CO_CD, -- 회사코드
+                 FN_CM05M01_CD_TO_NM(X.CO_CD) 			AS ORDRS_CO_CD_NM,
                  X.ORDRS_NO, -- 수주번호
                  X.SALES_CD, -- SALES CODE
-                 NVL2(D.SALES_CD, 'Y', 'N') 			AS CHK_SAVE_CD, 
+				<choose>
+				    <when test="salesCd == null">
+						NVL2(D.SALES_CD, 'Y', 'N') 			AS CHK_SAVE_CD,
+				    </when>
+				    <otherwise>
+						decode(X.SALES_CD, #{salesCd}, 'Y', 'N') 			AS CHK_SAVE_CD,
+				    </otherwise>
+				</choose>
                  Y.ORGN_SALES_CD, -- 원천 SALES CODE
                  Y.ORDRS_CLNT_CD, -- 고객사
                  A.CLNT_NM  							AS ORDRS_CLNT_NM,
@@ -1270,8 +1335,172 @@
                   								AND X.SALES_CD = D.SALES_CD
                   								AND D.FILE_TRGT_KEY  = #{pfuNo}
           WHERE X.CO_CD = #{coCd}
-            AND X.ORDRS_NO = #{ordrsNo}              
+            AND X.ORDRS_NO = #{ordrsNo}  
+			<if test="salesCd != null and !salesCd.equals('')">
+			AND X.SALES_CD = #{salesCd}  --salesCd로 검색시 날자와 상관없이 표시되게
+			</if>
             AND X.SALES_CD IS NOT NULL
           ORDER BY X.ORDRS_NO, X.SALES_CD
   </select>
+      
+  <select id="selectPfuReferenceTargetList" parameterType="Map" resultType="camelMap">
+  /* selectPfuReferenceTargetList */
+          SELECT 
+                 X.CO_CD, -- 회사코드
+                 FN_CM05M01_CD_TO_NM(X.CO_CD) 			AS CO_CD_NM,
+                 X.ORDRS_NO, -- 수주번호
+                 X.SALES_CD, -- SALES CODE
+                 NVL2(D.SALES_CD, 'Y', 'N') 			AS CHK_SAVE_CD, 
+                 Y.ORGN_SALES_CD, -- 원천 SALES CODE
+                 Y.ORDRS_CLNT_CD, -- 고객사
+                 A.CLNT_NM  							AS ORDRS_CLNT_NM,
+--                 Y.CLNT_PJT, -- 고객사 PJT
+--                 FN_CM05M01_CD_TO_NM(Y.CLNT_PJT) 		AS CLNT_PJT_NM, -- 고객사 PJT명
+                 X.ORDRS_DTL_DIV10,
+                 X.ORDRS_DTL_DIV20, -- 신작구분
+                 FN_CM05M01_CD_TO_NM(X.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM,
+                 X.ORDRS_DTL_DIV30,
+                 X.PRDT_CD, -- 제품구분
+                 P.PRDT_GRP ,
+                 FN_CM05M01_CD_TO_NM(P.PRDT_GRP) PRDT_GRP_NM,
+                 P.PRDT_NM  PRDT_CD_NM,
+                 X.ITEM_DIV, -- 아이템구분
+                 FN_CM05M01_CD_TO_NM(X.ITEM_DIV) ITEM_DIV_NM,
+                 X.ORDRS_QTY ,
+                 X.MCTYPE ,
+                 FN_CM05M01_CD_TO_NM(X.MCTYPE) MCTYPE_NM,
+                 X.EQP_NM , -- 설비명
+                 X.DTL_RMK,D.CREAT_ID,
+				 D.CREAT_PGM,
+				 D.CREAT_DTTM,
+				 D.UDT_ID,
+				 D.UDT_PGM,
+				 D.UDT_DTTM,
+				 M.MNG_ID,
+				 (SELECT FN_CM06M01_ID_TO_NM(M.MNG_ID) FROM DUAL) AS MNG_ID_NM,
+				 M.CLNT_PJT, 
+                 FN_CM05M01_CD_TO_NM(M.CLNT_PJT) CLNT_PJT_NM,
+				 M.PRDT_DIV, 
+                 FN_CM05M01_CD_TO_NM(M.PRDT_DIV) PRDT_DIV_NM,
+				 M.PFU_PRDT_DIV, 
+                 FN_CM05M01_CD_TO_NM(M.PFU_PRDT_DIV) PFU_PRDT_DIV_NM, 
+				 M.PRDT_TYP,
+                 FN_CM05M01_CD_TO_NM(M.PRDT_TYP) PRDT_TYP_NM, 
+				 M.PRDT_CAV, 
+                 FN_CM05M01_CD_TO_NM(M.PRDT_CAV) PRDT_CAV_NM,
+				 M.PRDT_STEP,
+                 FN_CM05M01_CD_TO_NM(M.PRDT_STEP) PRDT_STEP_NM,
+				 M.FILE_TRGT_KEY 	AS PFU_NO,
+				 M.VER_NO			AS PFU_VER_NO
+            FROM TB_CR02D02 X
+                  INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
+                                          AND X.ORDRS_NO = Y.ORDRS_NO
+                  LEFT OUTER JOIN TB_BM01M01 P ON X.PRDT_CD = P.PRDT_CD  --제품마스터
+                  LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터
+                  LEFT OUTER JOIN TB_CR51D02 D ON X.CO_CD = D.ORDRS_CO_CD
+                  								AND X.ORDRS_NO = D.ORDRS_NO 
+                  								AND X.SALES_CD = D.SALES_CD
+                  LEFT OUTER JOIN TB_CR51M01 M ON M.FILE_TRGT_KEY = D.FILE_TRGT_KEY	--PFU번호가 Key임
+          WHERE X.CO_CD = #{coCd}
+            AND X.SALES_CD LIKE '%' || #{ordrsNo} || '%'              
+            AND X.SALES_CD IS NOT NULL			--설비(salesCd가 있는 것만)
+--             AND M.FILE_TRGT_KEY IS NOT NULL		--PFU가 등록된 내용만 조회
+          ORDER BY X.ORDRS_NO, X.SALES_CD
+  </select>
+  
+  
+      
+  <select id="selectIssueReferenceList" parameterType="ArrayList" resultType="camelMap">
+  /* selectIssueReferenceList */
+  				SELECT
+				       A.*
+				     , REQ.REQ_AMT
+				FROM   (
+		              SELECT '실적'  AS GUBUN 
+		                    , ISU.FILE_TRGT_KEY                                       --이슈 FILE_TRGT_KEY
+		                    , ISU.CO_CD                                               --회사코드
+			             	, FN_CM05M01_CD_TO_NM(ISU.CO_CD) CO_NM
+		                    , ISU.ISS_NO        		 AS WORK_RPT_NO               --이슈번호
+		                    , ISU.CREAT_ID  			 AS WORK_RPT_ID --생성자
+			             	, B.NAME					 AS WORK_RPT_ID_NM
+				            , B1.DEPT_NM				 AS WORK_RPT_DEPT_NM
+		                    , TO_CHAR(ISU.CREAT_DTTM,'YYYY-MM-DD') AS WORK_RPT_DT   --생성일자
+		                    , Y.ORDRS_NO
+		                    , ISU.SALES_CD                                			--SALES Code
+				            , CR.PRDT_CD
+				            , C.PRDT_NM                        AS PRDT_CD_NM
+				            , CR.ITEM_DIV
+				            , FN_CM05M01_CD_TO_NM(CR.ITEM_DIV) AS ITEM_DIV_NM
+		                    , ISU.ISS_CNTS                     AS WORK_RPT_RMK      --이슈내용
+		                    , ISU.ISS_SJ                       AS ISSUE_TITLE       --이슈제목
+				            , TO_CHAR(Y.ORDRS_CLNT_CD)  AS  CLNT_CD
+				            , A.CLNT_NM
+				            , Y.CLNT_PJT
+				            , FN_CM05M01_CD_TO_NM(Y.CLNT_PJT)  AS CLNT_PJT_NM
+				            , CR.EQP_NM
+				            , '일정관리' as JOB_DIV
+		                    , ISU.ISS_DIV                                             --이슈유형
+		                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_DIV) FROM DUAL) AS ISS_DIV_NM
+		                    , decode(ISU.REQ_NO, '', ISU.ISS_STS, QM.REQ_ST)      AS ISS_STS	--이슈상태
+		                    , (SELECT FN_CM05M01_CD_TO_NM( decode(ISU.REQ_NO, '', ISU.ISS_STS, QM.REQ_ST)) FROM DUAL) AS ISS_STS_NM
+		                    , decode(ISU.REQ_NO, '', ISU.ACT_ID, QM.ORDRG_ID)       					AS ACT_ID    --조치담당자
+							, decode(ISU.REQ_NO, '', B2.NAME, B4.NAME) 			 						AS ACT_ID_NM
+				            , decode(ISU.REQ_NO, '', B3.DEPT_NM,B5.DEPT_NM) 							AS ACT_DEPT_NM		  --조치부서
+				            , SUBSTRING(decode(ISU.REQ_NO, '', B2.DEPT_ID,B4.DEPT_ID),0,5) 		 		AS ACT_DEPT_ID		  --조치부서
+		                    , TO_CHAR(decode(ISU.REQ_NO, '', ACT.ACTS_DT, QM.ORDRG_DT),'YYYY-MM-DD')  	AS ACTS_DT           --조치 시작일
+		                    , TO_CHAR(decode(ISU.REQ_NO, '', ACT.ACTE_DT, QP.RSLT_DT),'YYYY-MM-DD')  	AS ACTE_DT           --조치 종료일
+--		                    , decode(ISU.REQ_NO, '', ACT.ACT_MH, QP.ACT_MH)          					AS ACT_MH   --조치 투입공수
+		                    , ACT.ACT_MH          					AS ACT_MH   --조치 투입공수
+		                    , ACT.ACT_AMT                                             --조치 투입비용  
+		                    , decode(ISU.REQ_NO, '', ACT.ACT_CNTS, QP.MEAS_RST)      					AS ACT_CNTS    --조치내용
+		                    , TO_CHAR(RSL.WBS_RSLTSS_DT,'YYYY-MM-DD') 									AS WBS_RSLTSS_DT--실적시작일
+		                    , TO_CHAR(RSL.WBS_RSLTSE_DT,'YYYY-MM-DD') 									AS WBS_RSLTSE_DT--실적종료일
+		                    , ACT.ACT_AMT_STS
+		                    , (SELECT FN_CM05M01_CD_TO_NM(ACT.ACT_AMT_STS) FROM DUAL) AS ACT_AMT_STS_NM
+		                    , ACT.ACT_DNG
+		                    , (SELECT FN_CM05M01_CD_TO_NM(ACT.ACT_DNG) FROM DUAL) AS ACT_DNG_NM
+		                    , ACT.ACT_DNG_EVAL
+		                    , (SELECT FN_CM05M01_CD_TO_NM(ACT.ACT_DNG_EVAL) FROM DUAL) AS ACT_DNG_EVAL_NM
+					        , C.PRDT_GRP 	AS PRDT_DIV_CD	
+					        , C7.CODE_NM    AS PRDT_DIV_NM	
+					        , ISU.MID_CD
+		                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.MID_CD) FROM DUAL) AS MID_CD_NM
+					        , ISU.SUB_CD
+		                    , (SELECT FN_CM05M01_CD_TO_NM(ISU.SUB_CD) FROM DUAL) AS SUB_CD_NM
+					        , ISU.REQ_NO
+					        , QM.FILE_TRGT_KEY 								 AS RES_FILE_TRGT_KEY
+					        , QP.RSLT_NO
+					        , B2.ID 			 AS USER_ID
+		                    , B2.NAME			 AS USER_NAME
+					        , B2.DEPT_ID		 AS DEPT_ID
+		                FROM TB_WB24M02  AS ISU --WBS이슈 정보
+			            		LEFT OUTER JOIN TB_CR02D02 AS CR  ON ISU.CO_CD= CR.CO_CD
+			                                                	AND ISU.SALES_CD = CR.SALES_CD
+			            		LEFT OUTER JOIN TB_CR02M01 AS Y  ON ISU.CO_CD= Y.CO_CD
+                                                              	AND CR.ORDRS_NO = Y.ORDRS_NO
+			            		LEFT OUTER JOIN TB_BM02M01 AS A  ON Y.ORDRS_CLNT_CD = A.CLNT_CD 
+			           			LEFT OUTER JOIN TB_CM06M01 AS B  ON ISU.CREAT_ID = B.ID 
+				                LEFT OUTER JOIN TB_CM04M01 AS B1 ON B1.DEPT_ID = SUBSTRING(B.DEPT_ID,0,5)   
+			           			LEFT OUTER JOIN TB_CM06M01 AS B2 ON ISU.ACT_ID = B2.ID 
+				                LEFT OUTER JOIN TB_CM04M01 AS B3 ON B3.DEPT_ID = SUBSTRING(B2.DEPT_ID,0,5)   
+			          			LEFT OUTER JOIN TB_BM01M01 AS C  ON CR.PRDT_CD = C.PRDT_CD   
+				                LEFT OUTER JOIN TB_CM05M01 AS C7 ON C7.CODE_ID = C.PRDT_GRP 
+		            			LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --실적이슈 조치내용
+		              			LEFT OUTER JOIN TB_WB23M01 AS RSL ON ISU.CO_CD = RSL.CO_CD AND ISU.SALES_CD = RSL.SALES_CD AND ISU.WBS_PLAN_CODE_KIND = RSL.WBS_PLAN_CODE_KIND AND ISU.WBS_PLAN_CODE_ID = RSL.WBS_PLAN_CODE_ID AND ISU.WBS_RSLTS_NO = RSL.WBS_RSLTS_NO
+		              			LEFT OUTER JOIN TB_QM01M01 AS QM ON QM.REQ_NO = ISU.REQ_NO
+								LEFT OUTER JOIN TB_QM01P01 AS QP ON QP.REQ_NO = ISU.REQ_NO
+			           			LEFT OUTER JOIN TB_CM06M01 AS B4 ON QM.ORDRG_ID = B4.ID 
+				                LEFT OUTER JOIN TB_CM04M01 AS B5 ON B5.DEPT_ID = SUBSTRING(B4.DEPT_ID,0,5)  
+		               WHERE 1=1
+						AND     ISU.CO_CD = #{coCd} 
+						AND     ISU.SALES_CD = #{salesCd} 
+				       ) AS A
+				       		LEFT OUTER JOIN ( SELECT ME.REQ_NO, sum(ME.PCHS_AMT) AS REQ_AMT
+												FROM TB_SM12D01 ME
+												GROUP BY ME.REQ_NO
+												) AS REQ ON REQ.REQ_NO = A.REQ_NO						
+				WHERE  1 = 1
+				ORDER BY WORK_RPT_DT DESC, WORK_RPT_ID_NM,  ACT_ID_NM, SUB_CD_NM
+  </select>
+  
 </mapper>

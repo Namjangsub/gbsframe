@@ -18,6 +18,8 @@ public interface CR51Mapper {
 
 	Map<String, String> selectPfuInfo(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectPfuInfoSalesCdList(Map<String, String> paramMap);
+
 //	Map<String, String> selectPfuClobInfo(Map<String, String> paramMap);
 	List<Map<String, String>> selectStdPfuClobInfo(Map<String, String> paramMap);
 
@@ -61,6 +63,10 @@ public interface CR51Mapper {
 
 	int deletePfuSalesCd(Map<String, String> paramMap);
 	int deletePfuSalesCdAll(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectPfuReferenceTargetList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectIssueReferenceList(Map<String, String> paramMap);
 
 
 }

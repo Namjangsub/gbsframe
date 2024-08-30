@@ -113,6 +113,14 @@ public class CR51Ctr {
       return "jsonView";
     }
 
+    
+    @PostMapping(value = "/selectPfuInfoSalesCdList") 
+    public String selectPfuInfoSalesCdList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, String>> result = cr51Svc.selectPfuInfoSalesCdList(paramMap);
+    	model.addAttribute("result", result);
+    	
+    	return "jsonView";
+    }
 
     // PFU 정보 조회
 //    @PostMapping(value = "/selectPfuClobInfo")
@@ -212,9 +220,24 @@ public class CR51Ctr {
     
     @PostMapping(value = "/selectTagetSalesCodeList") 
 	public String selectTagetSalesCodeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  List<Map<String, String>> resultList = cr51Svc.selectTagetSalesCodeList(paramMap);
-		  model.addAttribute("resultList", resultList); 
+		  List<Map<String, String>> result = cr51Svc.selectTagetSalesCodeList(paramMap);
+		  model.addAttribute("result", result); 
 		  return "jsonView"; 
 	}
+    
+    
+    @PostMapping(value = "/selectPfuReferenceTargetList") 
+    public String selectPfuReferenceTargetList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, String>> resultList = cr51Svc.selectPfuReferenceTargetList(paramMap);
+    	model.addAttribute("resultList", resultList); 
+    	return "jsonView"; 
+    }
+    
+    @PostMapping(value = "/selectIssueReferenceList") 
+    public String selectIssueReferenceList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	List<Map<String, String>> result = cr51Svc.selectIssueReferenceList(paramMap);
+    	model.addAttribute("result", result); 
+    	return "jsonView"; 
+    }
     
 }	  
