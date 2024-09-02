@@ -35,5 +35,8 @@ public interface SM10Mapper {
   int etcPchsOrderMasterReport(Map<String, String> dtl);
 
   int updateMailEtcPchsOrderConfirm(Map<String, String> param);
+
+  //매입확정자료가 존재하는제 체크하기
+  int deletePchsCostCheck(Map<String, String> paramMap);
   
 }

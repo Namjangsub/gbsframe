@@ -29,4 +29,7 @@ public interface SM10Svc {
 
   int updateMailEtcPchsOrderConfirm(Map<String, String> param);
 
+  //매입확정자료가 존재하는제 체크하기
+  int deletePchsCostCheck(Map<String, String> paramMap);
+
 }

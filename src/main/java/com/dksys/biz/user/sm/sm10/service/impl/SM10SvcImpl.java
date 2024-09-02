@@ -261,5 +261,12 @@ public class SM10SvcImpl implements SM10Svc {
 		
 		return result;
 	}
+	
+
+	//매입확정자료가 존재하는제 체크하기
+	@Override
+	public int deletePchsCostCheck(Map<String, String> paramMap) {
+		return sm10Mapper.deletePchsCostCheck(paramMap);
+	}
 
 }

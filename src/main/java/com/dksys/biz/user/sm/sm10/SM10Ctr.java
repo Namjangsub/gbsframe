@@ -93,7 +93,13 @@ public class SM10Ctr {
   @PutMapping(value = "/deletePchsCost")
   public String deletePchsCost(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 	  	try {
-			if (sm10Svc.deletePchsCost(paramMap) != 0 ) {
+	  		//매입확정자료가 존재하는제 체크하기
+	  		int checkCount = sm10Svc.deletePchsCostCheck(paramMap);
+	  		if (checkCount > 0) {
+				model.addAttribute("resultCode", 400);
+				model.addAttribute("resultMessage", "삭제가 불가능합니다. 매입확정 자료가 있습니다.!");
+	  		} else 
+	  		if (sm10Svc.deletePchsCost(paramMap) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
 			} else {
