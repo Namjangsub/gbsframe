@@ -17,7 +17,12 @@
 	<script src="/static/js/ax5/ax5core.min.js"></script>
 	<script src="/static/js/ax5/ax5grid.min.js"></script>
 	<script src="/static/js/global.js"></script>
+	<script type="text/javascript" src="/static/js/tinymce/tinymce.min.js"></script>
 <style>
+        .mce-content-body {
+            max-height: 700px;
+            overflow-y: auto;
+        }
 </style>	
 </head>
 <body>
@@ -39,7 +44,11 @@
           </tr>
           <tr>
             <th>내용</th>
-            <td id="notiCnts" class="popup_txt">         
+            	<td>
+            	<div id="notiCnts" class="popup_txt" style="display:none"></div> 
+				<div id="notiClob"  style="display:none">
+					<textarea rows="28" id="notiCntsClob" name="notiCntsClob"></textarea>
+				</div>      
 				
             </td>
           </tr>
@@ -112,7 +121,103 @@
 		var url = unescape(location.href);
 		var pm  = url.split('=');
 		cookieValue = pm[1];
-		selectNotiInfo();
+// 		selectNotiInfo();
+		
+		
+        // tinymce html 편집기 start ----------------------------------------------------------
+	    var plugins = [
+	        "advlist", "autolink", "lists", "link", "image", "charmap", "print", "preview", "anchor",
+	        "searchreplace", "visualblocks", "code", "fullscreen", "insertdatetime", "media", "table",
+	        "code", "help", "wordcount", "save", 'autoresize'
+	    ];
+	    var edit_toolbar = 'formatselect fontselect fontsizeselect |'
+	               + ' forecolor backcolor |'
+	               + ' bold italic underline strikethrough |'
+	               + ' alignjustify alignleft aligncenter alignright |'
+	               + ' bullist numlist |'
+	               + ' table tabledelete |'
+	               + ' link image';
+
+	    tinymce.init({
+	     	language: 'ko_KR' ,//한글판으로 변경
+	    	license_key: 'gpl',
+        	selector: '#notiCntsClob',
+            autoresize_bottom_margin: 0,
+            setup: function (editor) {
+                editor.on('init', function () {
+                    editor.getDoc().body.style.overflowY = 'auto';
+                    editor.getBody().style.fontSize = '10pt';
+                    selectNotiInfo();
+                }),
+                editor.on('change', function () {
+                    // 내용이 변경될 때 실행할 코드
+//	                    console.log('내용이 변경되었습니다.');
+                }),
+                editor.on('keyup', function (aa) {
+                }),
+                editor.on(' SetContent', function (aa) {
+                });
+            },
+	        height: 300,
+//             max_height: 450,
+	        toolbar: false,  // 툴바 숨기기
+	        menubar: false,   // 메뉴바도 숨기기
+		    statusbar: false,  // 상태 바 숨기기
+	        plugins: plugins,
+// 	        toolbar: edit_toolbar,
+	        
+	        /*** image upload ***/
+	        image_title: false,
+	        /* enable automatic uploads of images represented by blob or data URIs*/
+	        automatic_uploads: false,
+	        /*
+	            URL of our upload handler (for more details check: https://www.tiny.cloud/docs/configure/file-image-upload/#images_upload_url)
+	            images_upload_url: 'postAcceptor.php',
+	            here we add custom filepicker only to Image dialog
+	        */
+	        file_picker_types: 'image',
+	        /* and here's our custom image picker*/
+	        file_picker_callback: function (cb, value, meta) {
+	            var input = document.createElement('input');
+	            input.setAttribute('type', 'file');
+	            input.setAttribute('accept', 'image/*');
+
+	            /*
+	            Note: In modern browsers input[type="file"] is functional without
+	            even adding it to the DOM, but that might not be the case in some older
+	            or quirky browsers like IE, so you might want to add it to the DOM
+	            just in case, and visually hide it. And do not forget do remove it
+	            once you do not need it anymore.
+	            */
+	            input.onchange = function () {
+	                var file = this.files[0];
+
+	                var reader = new FileReader();
+	                reader.onload = function () {
+	                    /*
+	                    Note: Now we need to register the blob in TinyMCEs image blob
+	                    registry. In the next release this part hopefully won't be
+	                    necessary, as we are looking to handle it internally.
+	                    */
+	                    var id = 'blobid' + (new Date()).getTime();
+	                    var blobCache =  tinymce.activeEditor.editorUpload.blobCache;
+	                    var base64 = reader.result.split(',')[1];
+	                    var blobInfo = blobCache.create(id, file, base64);
+	                    blobCache.add(blobInfo);
+
+	                    /* call the callback and populate the Title field with the file name */
+	                    cb(blobInfo.blobUri(), { title: file.name });
+	                };
+	                reader.readAsDataURL(file);
+	            };
+	            input.click();
+	        },
+	        /*** image upload ***/
+	        
+	        content_style: 'body { font-family:Helvetica,Arial,sans-serif; } p {margin: 0;  font-size:10pt}'
+	    });
+	    // tinymce html 편집기 end ----------------------------------------------------------
+	    
 	});
 	
 	function selectNotiInfo(){
@@ -129,8 +234,19 @@
 		$.each(notiInfo, function(key, value){
 			$('#'+key).val(value);
 		});
-		$("#notiCnts").html(notiInfo.notiCnts.replace(/\n/gi, "<br>"));
 		$(document).prop('title', notiInfo.notiTitle);
+		
+
+		if (notiInfo.notiCnts != undefined) {
+			$('#notiCnts').show();
+			$('#notiClob').css('display', 'none');
+			$("#notiCnts").html(notiInfo.notiCnts.replace(/\n/gi, "<br>"));
+			
+		} else {
+			$('#notiClob').show();
+			setContentInEditor('notiCntsClob', notiInfo.resultClob[0].notiCntsClob);
+		}
+		
 	}
 	
 	function downloadFile(idx) {
@@ -176,5 +292,14 @@
 		fileGridView.setData();
 		$(elem).val("");
 	}
-	
+
+	function setContentInEditor(editorId, content) {
+        var editor = tinymce.get(editorId);
+        if (editor) {
+            editor.setContent(content);
+            editor.save(); // 에디터 내용을 저장하여 화면에 즉시 반영
+        } else {
+            console.error('Editor not found: ' + editorId);
+        }
+    }
 </script>
