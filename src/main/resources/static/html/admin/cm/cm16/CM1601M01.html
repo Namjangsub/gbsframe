@@ -115,14 +115,268 @@
 
 <script type="text/javascript">	
 
+	var gridView = {
+		initView: function(){
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showRowSelector: true,
+			multipleSelect: false,
+			sortable: true,
+			target: $('[data-ax5grid="first-grid"]'),
+			header: {
+				align: "center",
+				selector: false
+			},
+			body: {
+				mergeCells : ["REQ_DT", "REQ_TM", "REQ_REQ_DEPT", "REQ_ID", "REQ_TYPE"],
+				onClick: function () {
+				this.self.clearSelect();
+			    this.self.select(this.dindex); 
+				},
+			},
+			page: {
+				navigationItemCount: 9,
+				height: 30,
+				display: true,
+				firstIcon: '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+				prevIcon: '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+				nextIcon: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+				lastIcon: '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+				onChange: function () {
+				gridView.setData(this.page.selectPage); 
+				}
+			},
+			// align이 안되는거 같습니다.
+			columns: [
+				{key: "FILE_TRGT_KEY",			label: "No.",		align: "center",   width: 80},
+				{key: "REQ_DT",					label: "요청일자",	align: "center",   width: 110},
+				{key: "REQ_TH",					label: "시간",	align: "center",   width: 80},
+				{key: "REQ_DEPT",				label: "요청부서",	align: "center",   width: 120},
+				{key: "REQ_ID",					label: "요청자",	align: "center",   width: 80},
+				{key: "REQ_TYPE",				label: "구분",	align: "center",   width: 80},
+				{key: "ISSUE",					label: "문제",	align: "center",   width: 220},
+				{key: "ACT_CD",					label: "조치상태",	align: "center",   width: 100},
+				{key: "ACT_DTTM",				label: "처리일자",	align: "center",   width: 110},
+				{key: "ACT_DTTM",				label: "처리시간",	align: "center",   width: 80},
+				{key: "ACT_ID",					label: "처리자",	align: "center",   width: 100},
+				{key: "ACT_PROC_TM",			label: "담당투입시간",	align: "center",   width: 110},
+				{key: "ACT_DESC",				label: "처리내용",	align: "center",   width: 220},
+				{key: "RMK",					label: "비고",	align: "center",   width: 150},
+			]
+			});
+			return this;
 
-$(document).ready() {
-	isFirst = false;
+		},
+		setData: function(_pageNo) {
+			var targetObj = this.target;
+			var paramObj = {};
+			$.each($('main_area [data-search]'), function(idx, elem){
+				paramObj[$(elem).data("search")] = $(elem).val();
+			});
+			paramObj["pageNo"] = _pageNo + 1;
+			paramObj["userId"] = jwt.userId;
+
+			//ajax내용을 써야함
+		}
+	}
 	
-	mainDefaultLoad("공통업무", "문제현황 및 조치"); 
-	setCommonSelect($("#main_area select[data-kind]")); 
-	//ㅁㅁㅁㅁㅁㅁㅁㅁㅁㅁㅁㅁㅁㅁㅁ
-}
+	var excelView = {
+		initView: function(){
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+			target: $('[data-ax5grid="excel-grid"]'),
+			columns: [
+				{key: "FILE_TRGT_KEY",			label: "No.",		align: "center",   width: 80},
+				{key: "REQ_DT",					label: "요청일자",	align: "center",   width: 110},
+				{key: "REQ_TH",					label: "시간",	align: "center",   width: 80},
+				{key: "REQ_DEPT",				label: "요청부서",	align: "center",   width: 120},
+				{key: "REQ_ID",					label: "요청자",	align: "center",   width: 80},
+				{key: "REQ_TYPE",				label: "구분",	align: "center",   width: 80},
+				{key: "ISSUE",					label: "문제",	align: "center",   width: 220},
+				{key: "ACT_CD",					label: "조치상태",	align: "center",   width: 100},
+				{key: "ACT_DTTM",				label: "처리일자",	align: "center",   width: 110},
+				{key: "ACT_DTTM",				label: "처리시간",	align: "center",   width: 80},
+				{key: "ACT_ID",					label: "처리자",	align: "center",   width: 100},
+				{key: "ACT_PROC_TM",			label: "담당투입시간",	align: "center",   width: 110},
+				{key: "ACT_DESC",				label: "처리내용",	align: "center",   width: 220},
+				{key: "RMK",					label: "비고",	align: "center",   width: 150},
+			]
+			});
+
+		return this;
+		}
+	}
+
+
+	$(document).ready(function() {
+		mainDefaultLoad("공통업무", "문제현황 및 조치")
+		setCommonSelect($("#main_area select[data-kind]"));
+
+		$("#coCd_S").val(jwt.coCd);
+		$("#userId").val(jwt.userId);
+
+		// 시작일 (현재날짜의 월 첫일)
+		$('#reqDtFrom_S').datepicker({
+			format : "yyyy-mm-dd",
+			language : "ko",
+			autoclose : true
+		})
+		.datepicker("setDate", moment(new Date()).startOf("month").toDate())
+		.on("changeDate", function(){
+		if($('#reqDtFrom_S').val() > $('#reqDtTo_S').val()){
+		alert("날짜를 확인해주세요");
+		$('#reqDtFrom_S').datepicker("setDate", new Date($('#reqDtTo_S').val()));
+		}
+		});
+
+		gridView.initView().setData(0);
+		excelView.initView();
+
+		$('[data-search]').on("change", function(){
+			gridView.setData(0);
+		});
+
+		// 종료일 (현재날짜의 월 말일)
+		$('#reqDtTo_S').datepicker({
+			format : "yyyy-mm-dd",
+			language : "ko",
+			autoclose : true
+		})
+		.datepicker("setDate", moment(new Date()).endOf("month").toDate())
+		.on("changeDate", function(){
+			if($('#reqDtFrom_S').val() > $('#reqDtTo_S').val()){
+			alert("날짜를 확인해주세요");
+			$('#reqDtTo_S').datepicker("setDate", new Date($('#reqDtFrom_S').val()));
+			}
+		});
+
+		$('[data-search]').on("change", function(){
+			gridView.setData(0);
+		});
+
+// 		gridView.initView().setData(0);
+		excelView.initView();
+
+		authChk();
+	});
+	
+	// 수정 or 등록 버튼 클릭 시
+	function insertIssueModal(type) {
+		var row = gridView.target.getList("selected")[0];
+		if (type == 'U') {
+			var paramObj = {
+				"actionType" : type,
+				"fileTrgtKey" : row.fileTrgtKey,
+				"REQ_DT" 	   : row.reqDt,
+				"userId"   : jwt.userId,
+				"pgmId"    : "CM1601M01"
+			};
+		} else {
+			var paramObj = {
+				"actionType" : type,
+				"fileTrgtKey" : 0,
+				"coCd" 	   : jwt.coCd,
+				"userId"   : jwt.userId,
+				"pgmId"    : "PM0101M01"
+			}
+			var param = {};
+			param = $.setGridValParam(gridView);
+			Object.assign(paramObj, param)	
+		}
+		// 파업창열기
+		openModal("/static/html/admin/cm/cm16/CM1601P01.html", 750, 560, "", paramObj, function(data) {
+			gridView.setData(0);
+		});
+	}
+	
+	// 삭제 버튼 클릭 시
+	function deleteIssue() {
+		var row = gridView.target.getList("selected")[0];
+		
+		// 폼 데이터 생성 : 삭제 요청에 필요한 데이터를 formData 객체로 만듬
+		// 어떤걸 forData로 말아서 보낼지 생각해보기
+		var formData = {
+            "fileTrgtKey"   : row.fileTrgtKey,
+            "workRptNo"     : row.workRptNo,
+            "workRptId"     : row.workRptId,
+            "coCd"          : row.coCd,
+			"userId"   		: jwt.userId,
+			"fileTrgtTyp"  : $('#pgmId').val(),
+		}
+		
+		// ajax 요청 만들어야함
+		if (confirm("삭제하시겠습니까?")) {
+			// 임의로 만들어봄 나중에 ajax 요청 코드를 만들어야 사용가능
+			postAjax("/admin/cm/cm16/deleteIssue", formData, null, function(data) {
+				alert(data.resultMessage);
+				if (data.resultCode == 200) {
+					gridView.setData(0);
+				}
+			});
+		}
+	}
+	
+	function openUserSearch() {
+		var paramObj = {
+			"coCd" : $('#coCd').val(),
+			"userId" : $('#workRptId_S').val(),
+			"userNm" : $('#workRptIdNm_S').val(),
+		};
+
+		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
+					var checkedId = tree.get_checked()[0];
+					var checkedNode = tree.get_node(checkedId);
+					$('#workRptId_S').val(checkedNode.id);
+					$('#workRptIdNm_S').val(checkedNode.text);
+					gridView.setData(0);
+				});
+	}
+	
+	// 조치상태 리스트
+	function actStatusList() {
+    var target = $("#actStatus_S");
+
+    $('#actStatus_S option[value!=""]').remove();
+
+    postAjax("/admin/cm/cm16/selectActStatusList", null, null, function(data) {
+		var optionHtml = '';
+		var statusList = data.statusList;
+
+		$.each(statusList, function(index, item) {
+		optionHtml += '<option value=' + item.codeId + '>';
+		optionHtml += item.codeNm;
+		optionHtml += '</option>';
+		});
+
+		$("#actStatus_S").append(optionHtml);
+	});
+	}
+	
+	// 엑셀 다운로드
+	function excelDown() {
+		var paramObj = {"pageNo": 1};
+
+		$.each($('[data-search]'), function(idx, elem){
+			paramObj[$(elem).data("search")] = $(elem).val();
+		});
+		paramObj["recordCnt"] =  9999999;
+
+		paramObj["reqDtFrom"] =  $("#reqDtFrom_S").val().replace(/\-/g, '');
+		paramObj["reqDtTo"] =  $("#reqDtTo_S").val().replace(/\-/g, '');
+
+		// 이것도 만들어야함
+		postAjax("/admin/cm/cm16/selectIssueList", paramObj, null, function(data){
+			var list = data.result;
+			excelView.target.setData({
+				list : list,
+				page : {
+					totalElements : data.paginationInfo.totalRecordCount
+				}
+			});
+			var todayDate = new Date().format('yyyyMMddHHmmss');
+			excelView.target.exportExcel("문제리스트_"+todayDate+".xls");
+		});
+	}
 	
 	
 </script>
