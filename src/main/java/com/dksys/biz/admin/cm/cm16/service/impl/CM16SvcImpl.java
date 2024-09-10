@@ -34,8 +34,8 @@ public class CM16SvcImpl implements CM16Svc {
     CM08Svc cm08Svc;
     
     @Override
-    public int selectItoaIssueCount(Map<String, String> paramMap) {
-        return cm16Mapper.selectItoaIssueCount(paramMap);
+    public int selectItoaIssueListCount(Map<String, String> paramMap) {
+        return cm16Mapper.selectItoaIssueListCount(paramMap);
     }
 
     @Override

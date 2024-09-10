@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.admin.cm.cm16.mapper.CM16Mapper;
 import com.dksys.biz.admin.cm.cm16.service.CM16Svc;
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.util.MessageUtils;
@@ -29,13 +28,10 @@ public class CM16Ctr {
     @Autowired
     CM16Svc cm16Svc;
 
-    @Autowired
-    CM16Mapper cm16Mapper;
-
     // 문제현황 리스트 조회
     @PostMapping(value = "/selectItoaIssueList")
     public String selectItoaIssueList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-        int totalCnt = cm16Svc.selectItoaIssueCount(paramMap); 
+        int totalCnt = cm16Svc.selectItoaIssueListCount(paramMap); 
         PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
         model.addAttribute("paginationInfo", paginationInfo);
         List<Map<String, String>> result = cm16Svc.selectItoaIssueList(paramMap);

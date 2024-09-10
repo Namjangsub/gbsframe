@@ -7,7 +7,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface CM16Svc {
 
-    int selectItoaIssueCount(Map<String, String> paramMap);
+	int selectItoaIssueListCount(Map<String, String> paramMap);
 
     List<Map<String, String>> selectItoaIssueList(Map<String, String> paramMap);
 
@@ -18,4 +18,5 @@ public interface CM16Svc {
     int updateItoaIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
     int deleteItoaIssue(Map<String, String> paramMap) throws Exception;
+
 }
