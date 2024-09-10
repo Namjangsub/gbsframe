@@ -323,4 +323,25 @@ public class SM03SvcImpl implements SM03Svc {
 	public Map<String, String> selectPurchaseconfirmed(Map<String, String> paramMap) {
 		return sm03Mapper.selectPurchaseconfirmed(paramMap);
 	}
+
+	public int updateDudtIntendDt(Map<String, String> param) {
+		//Gson gson = new Gson();
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+		
+		//데이터처리 시작
+		int result = 0;
+			
+		//상세 납기일자 수정
+		List<Map<String, String>> dtlParam = gsonDtl.fromJson(param.get("detailArr"), dtlMap);
+	    for (Map<String, String> dtl : dtlParam) {
+	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
+			dtl.put("userId", param.get("userId"));
+	    	dtl.put("pgmId", param.get("pgmId"));
+			
+			result = sm03Mapper.updateDudtIntendDt(dtl);
+	    }
+		//데이터 처리 끝
+		return result;
+	}	
 }

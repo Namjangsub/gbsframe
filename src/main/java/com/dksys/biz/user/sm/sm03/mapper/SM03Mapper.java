@@ -60,6 +60,8 @@ public interface SM03Mapper {
 	Map<String, String> selectPurchaseconfirmed(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectDashBoardWareHousingList(Map<String, String> paramMap);
+
+	int updateDudtIntendDt(Map<String, String> param);
 }
 
 

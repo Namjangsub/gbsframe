@@ -217,5 +217,24 @@ public class SM03Ctr {
 	   	
 		return "jsonView";
 	}
-	
+
+	//납기예정일자 Update
+    @PostMapping(value = "/updateDudtIntendDt")
+    public String updateDudtIntendDt(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
+  		try {
+  			if (sm03Svc.updateDudtIntendDt(param) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }   	  
+  
+
 }
