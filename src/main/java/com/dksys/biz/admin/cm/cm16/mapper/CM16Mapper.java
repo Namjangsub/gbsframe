@@ -7,7 +7,6 @@ import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface CM16Mapper {
-    
 
     List<Map<String, String>> selectItoaIssueList(Map<String, String> paramMap);
 
