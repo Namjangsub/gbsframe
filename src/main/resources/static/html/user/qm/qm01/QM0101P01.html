@@ -87,6 +87,9 @@
          <th class="hit">SalesCode</th>
             <td>
                <div class="search_form">
+                   <input type="hidden" id="ordrsDiv" name="ordrsDiv" >
+                   <input type="hidden" id="ordrsDivNm" name="ordrsDivNm" >
+                   <input type="hidden" id="orgnSalesCd" name="orgnSalesCd" >
                    <input type="text" id="salesCd" name="salesCd" class="form-control" msg="salesCode" readonly="readonly" >
                      <a onclick="wbsSalesCodeSearch();"><i class="i_search_w"></i></a>
                 </div>
@@ -229,7 +232,7 @@
 	var fromJobType = "REQ"; //default 발주요청서 작업구분--> REQ,  이슈에서 처리할경우 ISS//작업 구분 발주요청서가 시작이면 default 값인 REQ로 작업 진행하고 아니면 ISS가 파라메터로 넘오옴
 	if (modalStack.last().paramObj.issNo != undefined && modalStack.last().paramObj.issNo != "") fromJobType = "ISS"; //기존 등록자료 수정모드로 진입시 처리하기 위함
 	if (modalStack.last().paramObj.fromJobType != undefined) fromJobType = modalStack.last().paramObj.fromJobType;
-   
+
    var gridViewPop = {
       initView : function() {
            this.target = new ax5.ui.grid();
@@ -375,11 +378,11 @@
          if (actionType == "C") {	//신규등록인경우 선택 분류코드 제거하기
 	         //업무(정상)=COBTP00 은 생산팀 전용 설정 
 	         if (userDept != 'GUN60') $('#COBTP00').closest('td').remove();
-			 //A/S(유상) = COBTP04 , A/S(무상)=COBTP05 은 영업팀 전용 설정 
-	         if (userDept != 'GUN30') {
-	        	 $('#COBTP04').closest('td').remove();
-	        	 $('#COBTP05').closest('td').remove();
-	         }
+// 			 A/S(유상) = COBTP04 , A/S(무상)=COBTP05 은 영업팀 전용 설정 
+// 	         if (userDept != 'GUN30') {
+// 	        	 $('#COBTP04').closest('td').remove();
+// 	        	 $('#COBTP05').closest('td').remove();
+// 	         }
          }
       })   
    }
@@ -500,6 +503,8 @@
 		currentDate =  $('#ordrgDt').val(); //발주요청서 처리 절차변경일자기준 20240708일자로 코드 변경처리함	
 		//분류,등록사유 자동생성시 20240708이전에는 전체 옵션 표시, 이후에는 정상, 문제 분리 표시용 end  
 
+	    selectAuth(jwt.deptId); //발행자 부서코드 
+		
 		createRadioOptions('COBTP', "radio");  //분류 자동 생성
 		createRadioOptions('BUSTCD', "checkbox");  //출장자 구분
 		createRadioOptions('INWKCD', "checkbox");  //사내작업 구분
@@ -511,11 +516,10 @@
 			  $('#ordrgDt').parent('td').addClass('no-click'); //발행일자
 			  $('#regNm').parent('div').addClass('no-click');  //작성자
 	    	  if (fromJobType == "REQ") {
-	        	 selectAuth(jwt.deptId);
-		         $("#ordrgId").val(modalStack.last().paramObj.userId);
-		         $("#ordrgNm").val(modalStack.last().paramObj.userName);
-		         $("#regId").val(modalStack.last().paramObj.userId);
-		         $("#regNm").val(modalStack.last().paramObj.userName);
+		         $("#ordrgId").val(jwt.userId);
+		         $("#ordrgNm").val(jwt.userNm);
+		         $("#regId").val(jwt.userId);
+		         $("#regNm").val(jwt.userNm);
 	    	  } else { //"ISS" 인경우 문제관리에서 파라메터 넘어옴
 	          	 selectAuth(modalStack.last().paramObj.actDeptId); //ISS 일경우 조치담당자의 부서 코드
 		         $("#ordrgId").val(modalStack.last().paramObj.actId);
@@ -603,7 +607,6 @@
 		//이슈번호 클릭시 이슈내용 조회화면 호출하기
         $('#popForm #workRptNo').on("click", function() {
         	if (this.value) {
-            	debugger; 
             	// 문제관리에서 계획 문제 수정 구분자는 "U3"
                 var paramObj = {
                         "actionType"     : "I",
@@ -922,7 +925,11 @@
               alert("분류값을 선택해주세요"); 
          }else if($("input[name='CODECOBGB']:checked").val() == undefined || $("input[name='CODECOBGB']:checked").val() == ""){
               alert("등록사유를 선택해주세요");  
-         }else{   
+         }else if ($("#ordrsDiv").val() == 'ORDRSDIV2' && $("input[name='COBTP']:checked").val() != 'COBTP04') { //A/S유상
+            	 alert("A/S유상 수주번호입니다. 분류코드 확인바랍니다.");
+         }else if ($("#ordrsDiv").val() == 'ORDRSDIV3' && $("input[name='COBTP']:checked").val() != 'COBTP05') { //A/S무상
+            	 alert("A/S무상 수주번호입니다. 분류코드 확인바랍니다.");
+         }else {
             var formData = makeFormData();                              // 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
             filePostAjax("/user/qm/qm01/insertQualityReq", formData,            // 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행
                   function(data) {
@@ -1210,6 +1217,7 @@
            };
 
            openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1068, 650, "SALES CODE 검색", paramObj, function (grid){
+        	   debugger;
                var row = grid.target.getList("selected")[0];
                 $('#salesCd').val(row.salesCd);
                 $('#matrDrwNo').val(row.salesCd);
@@ -1223,7 +1231,14 @@
                 $('#prdtCd').val(row.prdtCd);
                 $('#itemDiv').val(row.itemDiv);
                 $('#eqpNm').val(row.eqpNm);
-
+                $('#ordrsDiv').val(row.ordrsDiv);		//수주구분 "ORDRSDIV2"
+                $('#ordrsDivNm').val(row.ordrsDivNm);	//수주구분명 "유상A/S
+                $('#orgnSalesCd').val(row.orgnSalesCd);	//수주구분명 "유상A/S
+                if (row.ordrsDiv == 'ORDRSDIV2') {
+                	$('#COBTP04').prop("checked", true);
+                } else if (row.ordrsDiv == 'ORDRSDIV3') {
+                	$('#COBTP05').prop("checked", true);
+                }
            });
        }
     }
