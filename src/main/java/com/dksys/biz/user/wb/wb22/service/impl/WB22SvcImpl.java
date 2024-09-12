@@ -214,6 +214,7 @@ public class WB22SvcImpl implements WB22Svc {
 		if (sharngArr != null && sharngArr.size() > 0) {
 			for (Map<String, String> sharngMap : sharngArr) {
 					result = wb22Mapper.wbsLevel1confirm(sharngMap);
+					result += wb22Mapper.wbsLevel1confirmAll(sharngMap); //전체 Y 설정
 					sharngMap.put("wbsPlanCodeKind", sharngMap.get("wbsPlanCodeId"));
 					String chkValue = sharngMap.get("wbsPlanMngId");
 					if (chkValue == null || chkValue.equals("")) {

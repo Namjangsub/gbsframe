@@ -47,6 +47,8 @@ public interface WB22Mapper {
 	List<Map<String, String>> selectVerNoNext(Map<String, String> paramMap);
 	
 	int wbsLevel1confirm(Map<String, String> paramMap);
+//확정시  동일한 salesCd에 해당하는 1레벨은 일괄 적용 건별 수정에서는 추가된 코드나 삭제된 코드는 적용되지 않음(코드 추가 삭제로 인한 처리 추가)
+	int wbsLevel1confirmAll(Map<String, String> sharngMap);
 	
 	int wbsLevel2confirm(Map<String, String> paramMap);
 	
