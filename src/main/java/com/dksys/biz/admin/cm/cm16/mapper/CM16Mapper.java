@@ -10,13 +10,15 @@ public interface CM16Mapper {
 
     List<Map<String, String>> selectItoaIssueList(Map<String, String> paramMap);
 
+    Map<String, String> selectItoaIssueInfo(Map<String, String> paramMap);
+
     int selectConfirmCount(Map<String, String> paramMap);
 
     String selectItoaIssueSeqNext(Map<String, String> paramMap);
 
-    int insertItoaIssue(Map<String, String> paramMap);
+    int itoaInsertIssue(Map<String, String> paramMap);
 
-    int updateItoaIssue(Map<String, String> paramMap);
+    int itoaUpdateIssue(Map<String, String> paramMap);
 
     int deleteItoaIssue(Map<String, String> paramMap);
 

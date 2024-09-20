@@ -39,6 +39,16 @@ public class CM16Ctr {
         return "jsonView";  
     }
 
+     // 문제현황 정보 조회
+    @PostMapping(value = "/selectItoaIssueInfo")
+     public String selectItoaIssueInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	    Map<String, String> result = cm16Svc.selectItoaIssueInfo(paramMap);
+        model.addAttribute("result", result);
+        paramMap.put("itoaIssueNo", result.get("itoaIssueNo"));
+        paramMap.put("reqId", result.get("reqId"));
+        return "jsonView";
+    }
+
     @PostMapping(value = "/selectConfirmCount")
     public String selectConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
         int result = cm16Svc.selectConfirmCount(paramMap);
@@ -48,9 +58,9 @@ public class CM16Ctr {
 
     // 문제현황 등록
     @PostMapping(value = "/itoaInsertIssue")
-    public String insertItoaIssue(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+    public String itoaInsertIssue(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
         try {
-            if(cm16Svc.insertItoaIssue(paramMap, mRequest) !=0 ) {
+            if(cm16Svc.itoaInsertIssue(paramMap, mRequest) !=0 ) {
                 model.addAttribute("resultCode", 200);
                 model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
             } else {
@@ -66,9 +76,9 @@ public class CM16Ctr {
 
     // 문제현황 수정
     @PostMapping(value = "/itoaUpdateIssue")
-    public String updateItoaIssue(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+    public String itoaUpdateIssue(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
         try {
-            if(cm16Svc.updateItoaIssue(paramMap, mRequest) !=0 ) {
+            if(cm16Svc.itoaUpdateIssue(paramMap, mRequest) !=0 ) {
                 model.addAttribute("resultCode", 200);
                 model.addAttribute("resultMessage", messageUtils.getMessage("update"));
             } else {
@@ -84,9 +94,9 @@ public class CM16Ctr {
 
     // 문제현황 삭제
     @PostMapping(value = "itoaDeleteIssue")
-    public String deleteItoaIssue(@RequestParam Map<String, String> paramMap, ModelMap model) throws Exception {
+    public String itoaDeleteIssue(@RequestParam Map<String, String> paramMap, ModelMap model) throws Exception {
         try {
-            if (cm16Svc.deleteItoaIssue(paramMap) != 0) {
+            if (cm16Svc.itoaDeleteIssue(paramMap) != 0) {
                 model.addAttribute("resultCode", 200);
                 model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
             } else {

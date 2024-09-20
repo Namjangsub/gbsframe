@@ -44,12 +44,17 @@ public class CM16SvcImpl implements CM16Svc {
     }
 
     @Override
+    public Map<String, String> selectItoaIssueInfo(Map<String, String> paramMap) {
+    return cm16Mapper.selectItoaIssueInfo(paramMap);
+    }
+
+    @Override
     public int selectConfirmCount(Map<String, String> paramMap) {
         return cm16Mapper.selectConfirmCount(paramMap);
     }
 
     @Override
-    public int insertItoaIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+    public int itoaInsertIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
         // Gson: JSON 데이터를 파싱하거나 생성하기 위한 라이브러리
         // disableHtmlEscaping(): HTML 문자를 이스케이프하지 않도록 설정
@@ -61,38 +66,47 @@ public class CM16SvcImpl implements CM16Svc {
         paramMap.put("fileTrgtKey", fileTrgtKey);
 
         //문제현황 등록
-        int result = cm16Mapper.insertItoaIssue(paramMap);
+        int result = cm16Mapper.itoaInsertIssue(paramMap);
 
         // 첨부파일 처리
-        cm08Svc.uploadFile("PM1601M01", paramMap.get("fileTrgtKey"), mRequest);
+        if (mRequest != null && mRequest.getFileNames().hasNext()) {
+            // 첨부파일 처리
+            cm08Svc.uploadFile("PM1601M01", paramMap.get("fileTrgtKey"), mRequest);
+        }
 
         return result;
     }
 
     @Override
-    public int updateItoaIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+    public int itoaUpdateIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
         Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
-	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+        Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
 
-        int result = cm16Mapper.deleteItoaIssue(paramMap);
+        int result = cm16Mapper.itoaUpdateIssue(paramMap);
 
-        // 첨부파일 처리
-        cm08Svc.uploadFile("PM1601M01", paramMap.get("fileTrgtKey"), mRequest);
-	    Gson gson = new Gson();
-	    String[] deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), String[].class);
-	    List<String> deleteFileList = Arrays.asList(deleteFileArr);
-        if (deleteFileList != null && !deleteFileList.isEmpty()) {
-		    for(String fileKey : deleteFileList) {
-	            if (fileKey != null && !fileKey.isEmpty()) {
-	        	    cm08Svc.deleteFile(fileKey);
-	            }
-		    }
+        // 파일이 존재할 때만 파일 업로드 로직 실행
+        if (mRequest != null && mRequest.getFileNames().hasNext()) {
+            // 첨부파일 처리
+            cm08Svc.uploadFile("PM1601M01", paramMap.get("fileTrgtKey"), mRequest);
         }
+
+    // 삭제할 파일이 있을 때 삭제 처리
+        Gson gson = new Gson();
+        String[] deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), String[].class);
+        List<String> deleteFileList = Arrays.asList(deleteFileArr);
+        if (deleteFileList != null && !deleteFileList.isEmpty()) {
+            for (String fileKey : deleteFileList) {
+                if (fileKey != null && !fileKey.isEmpty()) {
+                    cm08Svc.deleteFile(fileKey);
+                }
+            }
+        }
+
         return result;
     }
     
     @Override
-    public int deleteItoaIssue(Map<String, String> paramMap) throws Exception {
+    public int itoaDeleteIssue(Map<String, String> paramMap) throws Exception {
         
         List<Map<String, String>> deleteFileList = cm08Svc.selectFileList(paramMap);
         HashMap<String, String> param = new HashMap<>();

@@ -11,12 +11,14 @@ public interface CM16Svc {
 
     List<Map<String, String>> selectItoaIssueList(Map<String, String> paramMap);
 
+    Map<String, String> selectItoaIssueInfo(Map<String, String> paramMap);
+
     int selectConfirmCount(Map<String, String> paramMap);
     
-    int insertItoaIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+    int itoaInsertIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
-    int updateItoaIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+    int itoaUpdateIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
-    int deleteItoaIssue(Map<String, String> paramMap) throws Exception;
+    int itoaDeleteIssue(Map<String, String> paramMap) throws Exception;
 
 }
