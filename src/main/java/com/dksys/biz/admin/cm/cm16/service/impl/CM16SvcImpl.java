@@ -56,11 +56,6 @@ public class CM16SvcImpl implements CM16Svc {
     @Override
     public int itoaInsertIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
-        // Gson: JSON 데이터를 파싱하거나 생성하기 위한 라이브러리
-        // disableHtmlEscaping(): HTML 문자를 이스케이프하지 않도록 설정
-        // -TypeToken : 제너릭 타입의 정보를 유지하기 위해 사용
-        Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
-	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 
         String fileTrgtKey = cm16Mapper.selectItoaIssueSeqNext(paramMap);
         paramMap.put("fileTrgtKey", fileTrgtKey);
@@ -68,11 +63,6 @@ public class CM16SvcImpl implements CM16Svc {
         //문제현황 등록
         int result = cm16Mapper.itoaInsertIssue(paramMap);
 
-        // 첨부파일 처리
-        if (mRequest != null && mRequest.getFileNames().hasNext()) {
-            // 첨부파일 처리
-            cm08Svc.uploadFile("PM1601M01", paramMap.get("fileTrgtKey"), mRequest);
-        }
 
         return result;
     }
