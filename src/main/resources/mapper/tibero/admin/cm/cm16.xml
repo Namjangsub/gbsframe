@@ -3,9 +3,9 @@
 
 <mapper namespace="com.dksys.biz.admin.cm.cm16.mapper.CM16Mapper">
 
-<resultMap id="ItoaIssueMap" type="CamelMap">
+<!-- <resultMap id="ItoaIssueMap" type="CamelMap">
     <result property="actCd" column="ACT_CD" jdbcType="VARCHAR"/>
-</resultMap>
+</resultMap> -->
 
     <select id="selectItoaIssueListCount" parameterType="Map"  resultType="int">
                SELECT COUNT(*)
@@ -24,21 +24,25 @@
 		    	  FROM (
 					SELECT 
                               X.FILE_TRGT_KEY
-                            , X.ITOA_ISSUE_NO
                             , X.CO_CD
                             , FN_CM05M01_CD_TO_NM(X.CO_CD) CO_NM
-							, TO_CHAR(X.REQ_DTTM, 'YYYY-MM-DD HH24:MI') AS REQ_DTTM
-							, X.REQ_DEPT
-							, C.DEPT_NM 												AS REQ_DEPT_NM
-							, X.REQ_ID    
-							, (SELECT FN_CM06M01_ID_TO_NM(X.REQ_ID) FROM DUAL)          AS REQ_ID_NM  
-							, X.REQ_TYPE
+                            , TO_CHAR(X.REQ_DTTM, 'YYYY-MM-DD HH24:MI')                 AS REQ_DTTM
+                            , (
+                                SELECT C.DEPT_NM 
+                                FROM TB_CM04M01 C
+                                JOIN TB_CM06M01 D ON C.DEPT_ID = D.DEPT_ID
+                                WHERE D.ID = X.REQ_ID
+                              )                                                         AS REQ_DEPT
+                            , X.REQ_ID    
+							, (SELECT FN_CM06M01_ID_TO_NM(X.REQ_ID) FROM DUAL)          AS REQ_ID_NM
+                            , X.REQ_TYPE
                             , A.CODE_NM                                                 AS REQ_TYPE_NM
-							, X.ISSUE
-							, X.ACT_CD
+                            , X.ISSUE
+                            , X.ACT_CD						
                             , B.CODE_NM                                                 AS ACT_CD_NM
-							, TO_CHAR(X.ACT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS ACT_DTTM
+							, TO_CHAR(X.ACT_DTTM, 'YYYY-MM-DD HH24:MI:SS')              AS ACT_DTTM
 							, X.ACT_ID
+                            , (SELECT FN_CM06M01_ID_TO_NM(X.ACT_ID) FROM DUAL)          AS ACT_ID_NM
 							, X.ACT_PROC_TM
 							, X.ACT_DESC
 							, X.RMK
@@ -46,15 +50,15 @@
 							, (SELECT FN_CM06M01_ID_TO_NM(X.CREAT_ID) FROM DUAL)          	AS CREAT_ID_NM  
 							, X.CREAT_PGM
 							, TO_CHAR(X.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') 				AS CREAT_DTTM
-                            , X.UDT_ID                                                      AS UDT_ID             --
+                            , X.UDT_ID                                                      AS UDT_ID             
 							, (SELECT FN_CM06M01_ID_TO_NM(X.UDT_ID) FROM DUAL)          	AS UDT_ID_NM
-                            , X.UDT_PGM                                                     AS UDT_PGM            --
-                            , TO_CHAR(X.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS')                  AS UDT_DTT            --
+                            , X.UDT_PGM                                                     AS UDT_PGM            
+                            , TO_CHAR(X.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS')                  AS UDT_DTT            
 					 FROM TB_CM16M01 X
-					 			LEFT OUTER JOIN TB_CM04M01 C ON X.REQ_DEPT = C.DEPT_ID
                                 LEFT OUTER JOIN TB_CM05M01 A ON X.REQ_TYPE = A.CODE_ID
                                 LEFT OUTER JOIN TB_CM05M01 B ON X.ACT_CD = B.CODE_ID
                                 LEFT OUTER JOIN TB_CM06M01 D ON X.REQ_ID = D.ID
+                                LEFT OUTER JOIN TB_CM06M01 E ON X.ACT_ID = E.ID
 					WHERE 1 = 1 
                     <if test="coCd !=null and !coCd.equals('')">
 				        AND    X.CO_CD = #{coCd}
@@ -68,13 +72,22 @@
                     <if test="reqIdNm != null and !reqIdNm.equals('')">
                      AND FN_CM06M01_ID_TO_NM(X.REQ_ID) = #{reqIdNm}
                     </if>
+                    <if test="actId !=null and !actId.equals('')">
+				     AND X.ACT_ID = #{actId}
+				    </if>
+                    <if test="actIdNd != null and !actIdNd.equals('')">
+                     AND FN_CM06M01_ID_TO_NM(X.ACT_ID) = #{actIdNd}
+                    </if>
                     <if test="actCdNm != null and !actCdNm.equals('')"> 
                      AND X.ACT_CD = #{actCdNm}
+                    </if>
+                    <if test="reqIdNm != null and !reqIdNm.equals('')">
+                     AND FN_CM06M01_ID_TO_NM(X.ACT_CD) = #{actNm}
                     </if>
                     <if test="reqTypeNm != null and !reqTypeNm.equals('')">
                      AND X.REQ_TYPE = #{reqTypeNm}
                     </if>
-                    ORDER BY X.ITOA_ISSUE_NO DESC
+                    ORDER BY X.FILE_TRGT_KEY DESC
 			    ) X 
 			) 
 		 WHERE RN BETWEEN ${firstIndex} AND ${lastIndex}
@@ -82,113 +95,122 @@
 
     <select id="selectItoaIssueInfo" resultType="CamelMap">
         SELECT 
-              X.FILE_TRGT_KEY
-            , X.ITOA_ISSUE_NO
-            , X.CO_CD
-            , FN_CM05M01_CD_TO_NM(X.CO_CD) CO_NM
-            , TO_CHAR(X.REQ_DTTM, 'YYYY-MM-DD HH24:MI') AS REQ_DTTM
-            , X.REQ_ID    
-            , (SELECT FN_CM06M01_ID_TO_NM(X.REQ_ID) FROM DUAL)          AS REQ_ID_NM  
-            , X.REQ_TYPE
-            , A.CODE_NM                                                 AS REQ_TYPE_NM
-            , X.ISSUE
-            , X.ACT_CD
-            , B.CODE_NM                                                 AS ACT_CD_NM
-            , TO_CHAR(X.ACT_DTTM, 'YYYY-MM-DD HH24:MI') AS ACT_DTTM
-            , X.ACT_ID
-            , X.ACT_PROC_TM
-            , X.ACT_DESC
-            , X.RMK
-            , X.CREAT_ID
-            , (SELECT FN_CM06M01_ID_TO_NM(X.CREAT_ID) FROM DUAL)          	AS CREAT_ID_NM  
-            , X.CREAT_PGM
-            , TO_CHAR(X.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') 				AS CREAT_DTTM
-            , X.UDT_ID                                                      AS UDT_ID             --
-            , (SELECT FN_CM06M01_ID_TO_NM(X.UDT_ID) FROM DUAL)          	AS UDT_ID_NM
-            , X.UDT_PGM                                                     AS UDT_PGM            --
-            , TO_CHAR(X.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS')                  AS UDT_DTT            --
-        FROM TB_CM16M01 X
-                LEFT OUTER JOIN TB_CM04M01 C ON X.REQ_DEPT = C.DEPT_ID
+                  X.FILE_TRGT_KEY
+                , X.CO_CD
+                , FN_CM05M01_CD_TO_NM(X.CO_CD) CO_NM
+                , TO_CHAR(X.REQ_DTTM, 'YYYY-MM-DD HH24:MI')                 AS REQ_DTTM
+                , X.REQ_ID    
+                , (SELECT FN_CM06M01_ID_TO_NM(X.REQ_ID) FROM DUAL)          AS REQ_ID_NM
+                , X.REQ_TYPE
+                , A.CODE_NM                                                 AS REQ_TYPE_NM
+                , X.ISSUE
+                , X.ACT_CD						
+                , B.CODE_NM                                                 AS ACT_CD_NM
+                , TO_CHAR(X.ACT_DTTM, 'YYYY-MM-DD HH24:MI:SS')              AS ACT_DTTM
+                , X.ACT_ID
+                , (SELECT FN_CM06M01_ID_TO_NM(X.ACT_ID) FROM DUAL)          AS ACT_ID_NM
+                , X.ACT_PROC_TM
+                , X.ACT_DESC
+                , X.RMK
+                , X.CREAT_ID
+                , (SELECT FN_CM06M01_ID_TO_NM(X.CREAT_ID) FROM DUAL)          	AS CREAT_ID_NM  
+                , X.CREAT_PGM
+                , TO_CHAR(X.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') 				AS CREAT_DTTM
+                , X.UDT_ID                                                      AS UDT_ID             
+                , (SELECT FN_CM06M01_ID_TO_NM(X.UDT_ID) FROM DUAL)          	AS UDT_ID_NM
+                , X.UDT_PGM                                                     AS UDT_PGM            
+                , TO_CHAR(X.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS')                  AS UDT_DTT            
+					 FROM TB_CM16M01 X
                 LEFT OUTER JOIN TB_CM05M01 A ON X.REQ_TYPE = A.CODE_ID
                 LEFT OUTER JOIN TB_CM05M01 B ON X.ACT_CD = B.CODE_ID
                 LEFT OUTER JOIN TB_CM06M01 D ON X.REQ_ID = D.ID
-        WHERE X.ITOA_ISSUE_NO = #{itoaIssueNo}
+                LEFT OUTER JOIN TB_CM06M01 E ON X.ACT_ID = E.ID
+        WHERE X.FILE_TRGT_KEY = #{fileTrgtKey}
     </select>
 
     <select id="selectConfirmCount" resultType="CamelMap">
         SELECT COUNT(FILE_TRGT_KEY) CNT
         FROM TB_CM16M01
-        WHERE ITOA_ISSUE_NO = #{itoaIssueNo}
-    </select>
-
-    <update id="itoaUpdateIssue" parameterType="Map">
-        UPDATE TB_CM16M01
-        SET CO_CD           = #{coCd},
-            ITOA_ISSUE_NO   = #{itoaIssueNo}
-            FILE_TRGT_KEY   = #{fileTrgtKey},
-            REQ_DTTM        = #{reqDttm},
-            REQ_DEPT        = #{reqDept, jdbcType=VARCHAR},
-            REQ_ID          = #{reqId},
-            REQ_TYPE        = #{reqType},
-            ISSUE           = #{issue},
-            ACT_CD          = #{actCd},
-            ACT_DTTM        = #{actDttm},
-            ACT_ID          = #{actId},
-            ACT_PROC_TM     = #{actProcTm},
-            ACT_DESC        = #{actDesc},
-            RMK             = #{rmk}
-        WHERE ITOA_ISSUE_NO = #{itoaIssueNo}
-
-    </update>
-
-    
-    <select id="selectItoaIssueSeqNext" parameterType="Map" resultType="String">
-        SELECT ITOA_ISSUE_SEQ.NEXTVAL FROM DUAL
+        WHERE FILE_TRGT_KEY = #{fileTrgtKey}
     </select>
 
     <insert id="itoaInsertIssue" parameterType="Map">
 
-        <selectKey keyProperty="itoaIssueNo" resultType="String" order="BEFORE">
-            SELECT ITOA_ISSUE_SEQ.NEXTVAL FROM DUAL
+        <selectKey keyProperty="fileTrgtKey" resultType="String" order="BEFORE">
+        SELECT MAX(NVL(TO_NUMBER(FILE_TRGT_KEY),0)) + 1
+		  FROM  TB_CM16M01
         </selectKey>
         INSERT INTO TB_CM16M01
-	        (
-		        CO_CD,
-		        ITOA_ISSUE_NO,
-		        FILE_TRGT_KEY,
-		        REQ_DTTM,
-		        REQ_DEPT,
-		        REQ_ID ,
-		        REQ_TYPE,
-		        ISSUE,
-		        ACT_CD,
-		        ACT_DTTM,
-		        ACT_ID,
-		        ACT_PROC_TM,
-		        ACT_DESC,
-		        RMK
+            ( 
+                  FILE_TRGT_KEY
+                , CO_CD
+                , REQ_DTTM
+                , REQ_ID 
+                , REQ_TYPE
+                , ISSUE
+                , ACT_CD
+                , ACT_DTTM
+                , ACT_ID
+                , ACT_PROC_TM
+                , ACT_DESC
+                , RMK
+                , CREAT_ID
+				, CREAT_PGM
+				, CREAT_DTTM
+				, UDT_ID
+				, UDT_PGM
+				, UDT_DTTM
 	        )
         VALUES
-	        (
-		        #{coCd},
-		        #{itoaIssueNo},
-		        #{fileTrgtKey},
-		        #{reqDttm},
-		        #{reqDept, jdbcType=VARCHAR},
-		        #{reqId},
-		        #{reqType},
-		        #{issue},
-		        #{actCd},
-		        #{actDttm},
-		        #{actId},
-		        #{actProcTm},
-		        #{actDesc},
-		        #{rmk}
-	        )
+            (
+                  #{fileTrgtKey}
+                , #{coCd}
+                , TO_DATE(REPLACE(#{reqDttm}, 'T', ' '), 'YYYY-MM-DD HH24:MI')
+                , #{reqId}
+                , #{reqType, jdbcType=VARCHAR}
+                , #{issue}
+                , #{actCd, jdbcType=VARCHAR}
+                , TO_DATE(REPLACE(#{actDttm}, 'T', ' '), 'YYYY-MM-DD HH24:MI')
+                , #{actId}
+                , #{actProcTm}
+                , #{actDesc}
+                , #{rmk}
+                , #{userId}
+		        , #{pgmId}
+		        , SYSDATE
+				, ''
+				, ''
+				, ''
+            )
     </insert>
 
+    <update id="itoaUpdateIssue" parameterType="Map">
+        UPDATE TB_CM16M01
+        SET   FILE_TRGT_KEY     = #{fileTrgtKey}
+            , CO_CD             = #{coCd}
+            , REQ_DTTM          = TO_DATE(REPLACE(#{reqDttm}, 'T', ' '), 'YYYY-MM-DD HH24:MI')
+            , REQ_ID            = #{reqId}
+            , REQ_TYPE          = #{reqType, jdbcType=VARCHAR}
+            , ISSUE             = #{issue}
+            , ACT_CD            = #{actCd, jdbcType=VARCHAR}
+            , ACT_DTTM          = TO_DATE(REPLACE(#{actDttm}, 'T', ' '), 'YYYY-MM-DD HH24:MI')
+            , ACT_ID            = #{actId}
+            , ACT_PROC_TM       = #{actProcTm}
+            , ACT_DESC          = #{actDesc}
+            , RMK               = #{rmk}
+            , UDT_ID            = #{userId}
+            , UDT_PGM           = #{pgmId}
+            , UDT_DTTM          = SYSDATE
+        WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+    </update>
+
+    
+    <select id="selectItoaIssueSeqNext" parameterType="Map" resultType="String">
+        SELECT FILE_TRGT_KEY_SEQ.NEXTVAL FROM DUAL
+    </select>
+
     <delete id="itoaDeleteIssue" parameterType="Map">
-        DELETE FROM TB_CM1601M01 WHERE ITOA_ISSUE_NO = #{itoaIssueNo}
+        DELETE TB_CM16M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
     </delete>
   
 </mapper>    

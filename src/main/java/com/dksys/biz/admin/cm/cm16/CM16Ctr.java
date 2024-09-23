@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -44,7 +45,7 @@ public class CM16Ctr {
      public String selectItoaIssueInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
 	    Map<String, String> result = cm16Svc.selectItoaIssueInfo(paramMap);
         model.addAttribute("result", result);
-        paramMap.put("itoaIssueNo", result.get("itoaIssueNo"));
+        paramMap.put("fileTrgtKey", result.get("fileTrgtKey"));
         paramMap.put("reqId", result.get("reqId"));
         return "jsonView";
     }
@@ -52,6 +53,14 @@ public class CM16Ctr {
     @PostMapping(value = "/selectConfirmCount")
     public String selectConfirmCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
         int result = cm16Svc.selectConfirmCount(paramMap);
+        model.addAttribute("result", result);
+        return "jsonView";
+    }
+
+    // 업로드파일 정보 조회
+    @PostMapping(value = "/selectUploadFileList")
+    public String selectUploadFileList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        List<Map<String, String>> result = cm16Svc.selectUploadFileList(paramMap);
         model.addAttribute("result", result);
         return "jsonView";
     }
@@ -94,21 +103,21 @@ public class CM16Ctr {
 
     // 문제현황 삭제
     @PostMapping(value = "itoaDeleteIssue")
-    public String itoaDeleteIssue(@RequestParam Map<String, String> paramMap, ModelMap model) throws Exception {
+    public String itoaDeleteIssue(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
         try {
-            if (cm16Svc.itoaDeleteIssue(paramMap) != 0) {
-                model.addAttribute("resultCode", 200);
-                model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-            } else {
-                model.addAttribute("resultCode", 500);
-                model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-            }
-        } catch (Exception e) {
-            model.addAttribute("resultCode", 900);
-            model.addAttribute("resultMessage", e.getMessage());
-        }
+          if (cm16Svc.itoaDeleteIssue(paramMap) != 0 ) {
+              model.addAttribute("resultCode", 200);
+              model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+          } else {
+              model.addAttribute("resultCode", 500);
+              model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+          };
+      }catch(Exception e){
+          model.addAttribute("resultCode", 900);
+          model.addAttribute("resultMessage", e.getMessage());
+      }
         return "jsonView";
-    }
+}
 
     public void inputFieldExistCheck(@RequestBody Map<String, String> paramMap, ModelMap model) {
         model.addAttribute("resultCode", 200);

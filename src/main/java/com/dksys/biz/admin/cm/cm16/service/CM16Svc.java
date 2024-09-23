@@ -14,6 +14,8 @@ public interface CM16Svc {
     Map<String, String> selectItoaIssueInfo(Map<String, String> paramMap);
 
     int selectConfirmCount(Map<String, String> paramMap);
+
+    List<Map<String, String>> selectUploadFileList(Map<String, String> paramMap);
     
     int itoaInsertIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 

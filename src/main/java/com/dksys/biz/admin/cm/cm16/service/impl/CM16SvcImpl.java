@@ -56,6 +56,34 @@ public class CM16SvcImpl implements CM16Svc {
     @Override
     public int itoaInsertIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
+        Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+
+        //---------------------------------------------------------------  
+		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+	  	//   필수값 :  jobType, userId, comonCd
+		//---------------------------------------------------------------  
+		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
+		if (uploadFileList.size() > 0) {
+				//접근 권한 없으면 Exception 발생
+				paramMap.put("jobType", "fileUp");
+				cm15Svc.selectFileAuthCheck(paramMap);
+		}
+		//---------------------------------------------------------------  
+		//첨부 화일 권한체크  끝 
+		//---------------------------------------------------------------  
+
+        //---------------------------------------------------------------  
+		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
+		//---------------------------------------------------------------  
+        if (uploadFileList.size() > 0) {
+		    // paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		    cm08Svc.uploadFile(paramMap, mRequest);
+		}
+		//---------------------------------------------------------------  
+		//첨부 화일 처리  끝 
+		//---------------------------------------------------------------  
 
         String fileTrgtKey = cm16Mapper.selectItoaIssueSeqNext(paramMap);
         paramMap.put("fileTrgtKey", fileTrgtKey);
@@ -80,7 +108,7 @@ public class CM16SvcImpl implements CM16Svc {
             cm08Svc.uploadFile("PM1601M01", paramMap.get("fileTrgtKey"), mRequest);
         }
 
-    // 삭제할 파일이 있을 때 삭제 처리
+        // 삭제할 파일이 있을 때 삭제 처리
         Gson gson = new Gson();
         String[] deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), String[].class);
         List<String> deleteFileList = Arrays.asList(deleteFileArr);
@@ -97,7 +125,10 @@ public class CM16SvcImpl implements CM16Svc {
     
     @Override
     public int itoaDeleteIssue(Map<String, String> paramMap) throws Exception {
-        
+        //---------------------------------------------------------------  
+		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
+	  	//   필수값 :  jobType, userId, comonCd
+		//---------------------------------------------------------------  
         List<Map<String, String>> deleteFileList = cm08Svc.selectFileList(paramMap);
         HashMap<String, String> param = new HashMap<>();
 	    param.put("jobType", "fileDelete");
@@ -110,9 +141,15 @@ public class CM16SvcImpl implements CM16Svc {
 					cm15Svc.selectFileAuthCheck(param);
 			}
 	    }
+        //---------------------------------------------------------------  
+		//첨부 화일 권한체크 끝 
+		//---------------------------------------------------------------  
 
-        int result = cm16Mapper.deleteItoaIssue(paramMap);
+        int result = cm16Mapper.itoaDeleteIssue(paramMap);
 
+        //---------------------------------------------------------------  
+		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
+		//---------------------------------------------------------------
         if (deleteFileList.size() > 0) {		  
 		    for (Map<String, String> deleteDtl : deleteFileList) {
 		    	String fileKey = deleteDtl.get("fileKey");
@@ -121,6 +158,16 @@ public class CM16SvcImpl implements CM16Svc {
 		        }
 		    }
 		}
+        //---------------------------------------------------------------  
+		//첨부 화일 처리  끝 
+		//---------------------------------------------------------------  
+
         return result;
+    }
+
+    @Override
+    public List<Map<String, String>> selectUploadFileList(Map<String, String> paramMap) {
+        
+        return cm08Svc.selectFileList(paramMap);
     }
 }

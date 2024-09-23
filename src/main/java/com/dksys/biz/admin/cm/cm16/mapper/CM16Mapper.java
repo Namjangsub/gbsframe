@@ -20,7 +20,7 @@ public interface CM16Mapper {
 
     int itoaUpdateIssue(Map<String, String> paramMap);
 
-    int deleteItoaIssue(Map<String, String> paramMap);
+    int itoaDeleteIssue(Map<String, String> paramMap);
 
 	int selectItoaIssueListCount(Map<String, String> paramMap);
 }
