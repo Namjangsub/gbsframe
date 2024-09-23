@@ -73,17 +73,6 @@ public class CM16SvcImpl implements CM16Svc {
 		//첨부 화일 권한체크  끝 
 		//---------------------------------------------------------------  
 
-        //---------------------------------------------------------------  
-		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
-		//---------------------------------------------------------------  
-        if (uploadFileList.size() > 0) {
-		    // paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-		    cm08Svc.uploadFile(paramMap, mRequest);
-		}
-		//---------------------------------------------------------------  
-		//첨부 화일 처리  끝 
-		//---------------------------------------------------------------  
 
         String fileTrgtKey = cm16Mapper.selectItoaIssueSeqNext(paramMap);
         paramMap.put("fileTrgtKey", fileTrgtKey);
@@ -91,6 +80,17 @@ public class CM16SvcImpl implements CM16Svc {
         //문제현황 등록
         int result = cm16Mapper.itoaInsertIssue(paramMap);
 
+        //---------------------------------------------------------------  
+		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
+		//---------------------------------------------------------------  
+        if (uploadFileList.size() > 0) {
+		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		    cm08Svc.uploadFile(paramMap, mRequest);
+		}
+		//---------------------------------------------------------------  
+		//첨부 화일 처리  끝 
+		//---------------------------------------------------------------  
 
         return result;
     }
@@ -105,7 +105,7 @@ public class CM16SvcImpl implements CM16Svc {
         // 파일이 존재할 때만 파일 업로드 로직 실행
         if (mRequest != null && mRequest.getFileNames().hasNext()) {
             // 첨부파일 처리
-            cm08Svc.uploadFile("PM1601M01", paramMap.get("fileTrgtKey"), mRequest);
+            cm08Svc.uploadFile("CM1601M01", paramMap.get("fileTrgtKey"), mRequest);
         }
 
         // 삭제할 파일이 있을 때 삭제 처리
