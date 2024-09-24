@@ -9,7 +9,7 @@ public interface CM16Svc {
 
 	int selectItoaIssueListCount(Map<String, String> paramMap);
 
-    List<Map<String, String>> selectItoaIssueList(Map<String, String> paramMap);
+    List<Map<String, Object>> selectItoaIssueList(Map<String, String> paramMap);
 
     Map<String, String> selectItoaIssueInfo(Map<String, String> paramMap);
 

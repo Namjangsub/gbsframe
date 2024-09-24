@@ -8,7 +8,9 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface CM16Mapper {
 
-    List<Map<String, String>> selectItoaIssueList(Map<String, String> paramMap);
+    int selectItoaIssueListCount(Map<String, String> paramMap);
+
+    List<Map<String, Object>> selectItoaIssueList(Map<String, String> paramMap);
 
     Map<String, String> selectItoaIssueInfo(Map<String, String> paramMap);
 
@@ -22,5 +24,5 @@ public interface CM16Mapper {
 
     int itoaDeleteIssue(Map<String, String> paramMap);
 
-	int selectItoaIssueListCount(Map<String, String> paramMap);
+	
 }

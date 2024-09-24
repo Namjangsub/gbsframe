@@ -35,15 +35,15 @@ public class CM16Ctr {
         int totalCnt = cm16Svc.selectItoaIssueListCount(paramMap); 
         PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
         model.addAttribute("paginationInfo", paginationInfo);
-        List<Map<String, String>> result = cm16Svc.selectItoaIssueList(paramMap);
+        List<Map<String, Object>> result = cm16Svc.selectItoaIssueList(paramMap);
         model.addAttribute("result", result);
         return "jsonView";  
     }
 
      // 문제현황 정보 조회
     @PostMapping(value = "/selectItoaIssueInfo")
-     public String selectItoaIssueInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	    Map<String, String> result = cm16Svc.selectItoaIssueInfo(paramMap);
+    public String selectItoaIssueInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        Map<String, String> result = cm16Svc.selectItoaIssueInfo(paramMap);
         model.addAttribute("result", result);
         paramMap.put("fileTrgtKey", result.get("fileTrgtKey"));
         paramMap.put("reqId", result.get("reqId"));
@@ -98,6 +98,7 @@ public class CM16Ctr {
             model.addAttribute("resultCode", 900);
 			model.addAttribute("resultMessage", e.getMessage());
         }
+
         return "jsonView";
     }
 
@@ -105,19 +106,20 @@ public class CM16Ctr {
     @PostMapping(value = "itoaDeleteIssue")
     public String itoaDeleteIssue(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
         try {
-          if (cm16Svc.itoaDeleteIssue(paramMap) != 0 ) {
-              model.addAttribute("resultCode", 200);
-              model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-          } else {
-              model.addAttribute("resultCode", 500);
-              model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-          };
-      }catch(Exception e){
-          model.addAttribute("resultCode", 900);
-          model.addAttribute("resultMessage", e.getMessage());
-      }
+            if (cm16Svc.itoaDeleteIssue(paramMap) != 0 ) {
+                model.addAttribute("resultCode", 200);
+                model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+            } else {
+                model.addAttribute("resultCode", 500);
+                model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+            }
+        } catch(Exception e){
+            model.addAttribute("resultCode", 900);
+            model.addAttribute("resultMessage", e.getMessage());
+        }
+
         return "jsonView";
-}
+    }
 
     public void inputFieldExistCheck(@RequestBody Map<String, String> paramMap, ModelMap model) {
         model.addAttribute("resultCode", 200);

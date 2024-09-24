@@ -39,7 +39,7 @@ public class CM16SvcImpl implements CM16Svc {
     }
 
     @Override
-    public List<Map<String, String>> selectItoaIssueList(Map<String, String> paramMap) {
+    public List<Map<String, Object>> selectItoaIssueList(Map<String, String> paramMap) {
         return cm16Mapper.selectItoaIssueList(paramMap);
     }
 
@@ -51,6 +51,12 @@ public class CM16SvcImpl implements CM16Svc {
     @Override
     public int selectConfirmCount(Map<String, String> paramMap) {
         return cm16Mapper.selectConfirmCount(paramMap);
+    }
+
+    @Override
+    public List<Map<String, String>> selectUploadFileList(Map<String, String> paramMap) {
+        
+        return cm08Svc.selectFileList(paramMap);
     }
 
     @Override
@@ -165,9 +171,4 @@ public class CM16SvcImpl implements CM16Svc {
         return result;
     }
 
-    @Override
-    public List<Map<String, String>> selectUploadFileList(Map<String, String> paramMap) {
-        
-        return cm08Svc.selectFileList(paramMap);
-    }
 }
