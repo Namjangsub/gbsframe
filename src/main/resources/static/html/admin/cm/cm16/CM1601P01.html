@@ -22,7 +22,7 @@
 				<tr>
 					<th class="hit">회사</th>
 					<td>
-						<select id="coCd" name="coCd" data-kind="CO" required>
+						<select id="coCd" name="coCd" data-kind="CO" required msg="회사">
 					</td>
 					<th>No</th>
 					<td>
@@ -117,14 +117,14 @@
 
 	$(document).ready(function() {
 		// select 요소에 데이터를 채우는 함수 호출
-		setCommonSelect($(".popup_area select[data-kind]"));	
-
+		setCommonSelect($(".popup_area select[data-kind]"));
+		
 		// 변수 설정
 		actionType = modalStack.last().paramObj.actionType;
 		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
 		$("#fileTrgtKey").val(fileTrgtKey);
 		$("#coCd").val(modalStack.last().paramObj.coCd);
-	
+
 		// 등록 모드일 때
 		if (actionType == "C") {    
 			// 조치자, 회사코드 들어오기
@@ -176,6 +176,80 @@
 				});
 			}
 		}
+
+	//조치상태가 완료일때 처리일시, 담당투입시간, 처리내용은 필수
+	$('#actCd').change(function () {
+		var actCd = $("#actCd").val();
+
+    	// 접수(ISSSTS01) 또는 진행중(ISSSTS02) 상태일 때 처리일시, 담당투입시간, 처리내용 입력 불가
+		if (actCd === 'ISSSTS01' || actCd === 'ISSSTS02') {
+			// 필드 비활성화 및 hit 클래스 제거
+			$("#actDttm").attr('readonly', true).val('');
+			$('#actProcTm').attr('readonly', true).val('');
+			$('#actDesc').attr('readonly', true).val('');
+			
+			// 필수 항목 해제
+			$('#actDttm').removeAttr('required');
+			$('#actProcTm').removeAttr('required');
+			$('#actDesc').removeAttr('required');
+
+			// 필드 라벨에서 hit 클래스 제거
+			$("#actDttm").closest('td').prev('th').removeClass('hit');
+			$('#actProcTm').closest('td').prev('th').removeClass('hit');
+			$('#actDesc').parent('td').prev('th').removeClass('hit');
+		} else if (actCd === 'ISSSTS03') {
+			// 완료(ISSSTS03) 상태일 때 필드 활성화 및 필수 설정
+			$("#actDttm").attr('readonly', false);
+			$('#actProcTm').attr('readonly', false);
+			$('#actDesc').attr('readonly', false);
+			
+			// 필수 항목 설정
+			$('#actDttm').attr('required', 'true');
+			$('#actProcTm').attr('required', 'true');
+			$('#actDesc').attr('required', 'true');
+
+			// 필드 라벨에 hit 클래스 추가
+			$("#actDttm").closest('td').prev('th').addClass('hit');
+			$('#actProcTm').closest('td').prev('th').addClass('hit');
+			$('#actDesc').parent('td').prev('th').addClass('hit');
+		}
+	});
+
+	// 조치 상태가 변경될 때마다 담당투입시간, 처리일시, 처리내용 필수로 변경
+	$('#actCd').change(function () {
+		var actCd = $("#actCd").val();
+		var isCompleted = (actCd === 'ISSSTS03');
+
+		// 처리할 필드들
+		var fields = ['#actDttm', '#actProcTm', '#actDesc'];
+		
+		fields.forEach(function(field) {
+			$(field).attr('readonly', !isCompleted);
+			$(field).attr('required', isCompleted ? 'true' : null);
+			$(field).closest('td').prev('th').toggleClass('hit', isCompleted);
+			if (!isCompleted) {
+				$(field).val('');
+			}
+		});
+	});
+
+	// 수정 모드일 때 조치 상태가 완료 면 담당투입시간, 처리일시, 처리내용 필수로 지정
+	if (actionType === 'U') {
+		var actCd = $("#actCd").val();
+		var isCompleted = (actCd === 'ISSSTS03');
+
+		// 처리할 필드들
+		var fields = ['#actDttm', '#actProcTm', '#actDesc'];
+		
+		fields.forEach(function(field) {
+			$(field).attr('readonly', !isCompleted);
+			$(field).attr('required', isCompleted ? 'true' : null);
+			$(field).closest('td').prev('th').toggleClass('hit', isCompleted);
+			if (!isCompleted) {
+				$(field).val('');
+			}
+		});
+	}
 	
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작 
@@ -201,6 +275,7 @@
 		// });
 		
 		authChk();
+
 	});
 
 	function selectItoaIssueInfo() {
@@ -228,66 +303,7 @@
 			txtareaHeightResize($('#actDesc'));
 			txtareaHeightResize($('#rmk'));
 
-		}
-	}
-	// 필수 입력값 검사
-	function validateForm() {
-		// 먼저 모든 필수 필드를 검사
-		if (!inputValidation($('.popup_area [required]'))) {
-			return false;
-		}
-
-		var actCd = $('#actCd').val();      // 조치상태
-		var reqDttm = $('#reqDttm').val();  // 요청일시
-		var actDttm = $('#actDttm').val();  // 처리일시
-		var actProcTm = $('#actProcTm').val();  // 담당투입시간
-		var actDesc = $('#actDesc').val();  // 처리내용
-
-		// 조치 상태가 접수중(ISSSTS01)일 때는 처리일시를 입력하지 못하게 하고 비활성화
-		// if (actCd === 'ISSSTS01') { // 접수중 상태
-		// 	$('#actDttm').val(''); // 처리일시 초기화
-		// 	$('#actDttm').prop('disabled', true); // 처리일시 비활성화
-		// } else {
-		// 	$('#actDttm').prop('disabled', false); // 처리일시 활성화
-		// }
-
-		// 조치 상태가 진행중(ISSSTS02) 또는 완료(ISSSTS03)일 때 추가 검증
-		if (actCd === 'ISSSTS01' || actCd === 'ISSSTS02') {
-			if (actDttm) {
-				alert('조치 상태가 완료일 때만 처리 일시를 입력하실 수 있습니다.');
-				return false;
-			}
-		}
-		if (actCd === 'ISSSTS02' || actCd === 'ISSSTS03') {
-			// 처리일시가 요청일시보다 빠를 수 없음
-			if (reqDttm && actDttm) {
-				var reqDate = new Date(reqDttm);
-				var actDate = new Date(actDttm);
-				if (actDate < reqDate) {
-					alert('처리일시는 요청일시보다 빠를 수 없습니다.');
-					return false;
-				}
-			}
-
-			// 담당투입시간과 처리내용 검증
-			if (!actProcTm) {
-				alert('담당투입시간을 입력해주세요.');
-				return false;
-			}
-			if (!actDesc) {
-				alert('처리내용을 입력해주세요.');
-				return false;
-			}
-
-			// 조치 상태가 완료(ISSSTS03)일 때는 처리일시가 필수
-			if (actCd === 'ISSSTS03' && !actDttm) {
-				alert('처리일시를 입력해주세요.');
-				return false;
-			}
-		}
-
-		// 모든 검증 통과 시 true 반환
-		return true;
+		});
 	}
 	
 	// 등록
@@ -325,8 +341,22 @@
 	//----------------------------------------------//
 
 	function makeFormData() {
-		if (!validateForm()) {
+		if (!inputValidation($('.popup_area [required]'))) {
 			return false;  //
+		}
+		var actCd = $('#actCd').val(); 
+		var reqDttm = $('#reqDttm').val();  
+		var actDttm = $('#actDttm').val(); 
+		if (actCd === 'ISSSTS02' || actCd === 'ISSSTS03') {
+			// 처리일시가 요청일시보다 빠를 수 없음
+			if (reqDttm && actDttm) {
+				var reqDate = new Date(reqDttm);
+				var actDate = new Date(actDttm);
+				if (actDate < reqDate) {
+					alert('처리일시는 요청일시보다 빠를 수 없습니다.');
+					return false;
+				}
+			}
 		}
 		// 날짜 하이픈 제거
 		$.each($('.popup_area input[date]'), function(idx, elem) {
@@ -376,6 +406,8 @@
 		return formData;
 	}
 
+	
+
 
 	// 요청자 검색 //
 	function openUserSearch() {
@@ -384,7 +416,7 @@
 			"userId" : $('#reqId').val(),
 			"userNm" : $('#reqIdNm').val(),
 		};
-		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
+		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "요청자 검색", paramObj, function(tree) {
 					var checkedId = tree.get_checked()[0];
 					var checkedNode = tree.get_node(checkedId);
 
