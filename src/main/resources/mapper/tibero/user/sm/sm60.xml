@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.sm.sm60.mapper.SM60Mapper">
+
+	<!-- 매입확정 리스트  개별매입 사용안함 -->
+	<select id="selectVendEstimateList" parameterType="Map" resultType="camelMap">
+		SELECT    T.*
+				, B3.CLNT_CD
+				, B3.ESTMT_YEAR
+				, TO_CHAR(B3.ESTMT_DT , 'YYYY-MM-DD')		AS ESTMT_DT
+				, B3.ESTMT_MNG
+				, (SELECT FN_CM06M01_ID_TO_NM(B3.ESTMT_MNG) FROM DUAL) AS ESTMT_MNG_NM
+				, B3.ESTMT_AMT
+				, B3.BADN_AMT
+				, B3.TRST_CNT
+				, B3.BADN_CNT
+				, B3.BADN_SCORE
+				, B3.CNTMSR_SCORE
+				, B3.SCHDUL_SCORE
+				, B3.EMGC_SCORE
+				, B3.EST_SCORE
+				, B3.PRC_SCORE
+				, B3.TOTAL_SCORE
+				, B3.ESTMT_RMK
+				, B3.CREAT_ID
+				, TO_CHAR(B3.CREAT_DTTM , 'YYYY-MM-DD')		AS CREAT_DTTM
+				, B3.CREAT_PGM
+				, B3.UDT_ID
+				, TO_CHAR(B3.UDT_DTTM , 'YYYY-MM-DD')		AS UDT_DTTM
+				, B3.UDT_PGM
+				, E1.TOTAL_SCORE							AS TOTAL_SCORE_BEFORE
+				, BD.REQ_NO_CNT								AS BADN_CNT
+				, BD.PCHS_AMT								AS BADN_AMT
+				, ROWNUM 									AS RN
+		 FROM (
+				SELECT        PCHS_CLNT_CD, C.CLNT_NM
+							, SUM(PCHS_QTY)						AS PCHS_QTY		/* 수량 */		
+							, SUM(PCHS_AMT)						AS PCHS_AMT		/* 매입금액 */
+							, SUM(PCHS_VAT)						AS PCHS_VAT		/* 부가세 */
+							, SUM(PCHS_AMT)+SUM(PCHS_VAT)		AS PCHS_TOT		/* 합계 */
+							, COUNT(A.ORDRG_NO)					AS CNT
+							, MIN(B2.SALES_EMP_ID_NM)			AS SALES_EMP_ID_NM
+							, MIN(B2.SALES_EMP_ID)				AS SALES_EMP_ID
+				FROM (			
+							SELECT 
+									  D.CO_CD
+										, CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.PCHS_CLNT_CD 
+											   WHEN substr(D.ORDRG_NO,0,3) = 'RET' THEN RM.PCHS_CLNT_CD ELSE C.PCHS_CLNT_CD END PCHS_CLNT_CD
+										, D.ORDRG_NO
+										, CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD 
+											   WHEN substr(D.ORDRG_NO,0,3) = 'RET' THEN R.SALES_CD  ELSE C.SALES_CD END AS SALES_CD
+										, D.PCHS_DT AS ORDRG_DT			
+										, CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD 
+											   WHEN substr(D.ORDRG_NO,0,3) = 'RET' THEN R.DSGN_NO  ELSE C.SALES_CD END AS DSGN_NO					
+										, 1 AS ORDRG_QTY				/*발주수량 */
+										, M.ORDRG_AMT AS ORDRG_AMT		/*발주 금액 */												
+										, D.PCHS_NO   AS PCHS_NO		/*매입확정번호 */					
+										, D.PCHS_AMT  AS PCHS_AMT		/* 매입금액 */
+										, D.PCHS_VAT AS PCHS_VAT		/* 부가세 */
+										, D.PCHS_QTY AS PCHS_QTY		/* 수량 */										
+										, D.PCHS_DT
+										, D.CMPLET_YN AS CMPLET_YN	 		/* 확정여부 */
+										, CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN '' 
+											   WHEN substr(D.ORDRG_NO,0,3) = 'RET' THEN ''  ELSE C.PCHS_CLMN_DAY END AS PCHS_CLMN_DAY		
+							FROM  TB_SM12D01 D /* 매입 DETAIL */		
+									LEFT OUTER JOIN TB_SM02M01 M ON(D.ORDRG_NO = M.ORDRG_NO)		/* 발주마스터 */
+									LEFT OUTER JOIN TB_SM10M01 C ON(D.ORDRG_NO = C.COST_NO)		/* 비용마스터 */
+									LEFT OUTER JOIN TB_SM06D01 R ON(D.ORDRG_NO = R.RET_NO)		/* 반품 상세 */
+									LEFT OUTER JOIN TB_SM06M01 RM ON(RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)		/* 반품 상세 */
+							WHERE 1=1	
+				            AND D.PCHS_DT BETWEEN TO_DATE( #{ordrgDtFrom},'YYYYMMDD') AND TO_DATE( #{ordrgDtTo},'YYYYMMDD')
+					) A
+						LEFT OUTER JOIN TB_BM02M01 AS C ON PCHS_CLNT_CD = C.CLNT_CD   --거래처마스터
+						LEFT OUTER JOIN (
+		            						SELECT  B.*
+												  , (SELECT FN_CM06M01_ID_TO_NM(B.SALES_EMP_ID) FROM DUAL) AS SALES_EMP_ID_NM
+											FROM (
+											    SELECT 
+											          B.CLNT_CD
+											        , B.BIZDEPT_SN
+											        , B.SALES_EMP_ID
+											        , B.SALES_CO_CD
+											        , ROW_NUMBER() OVER (PARTITION BY B.CLNT_CD ORDER BY B.BIZDEPT_SN ASC) AS rn
+											    FROM TB_BM02D01 B
+--											    WHERE B.SALES_CO_CD = 'TRN'  --구매업무는 트루넷에서 처리함
+												) B
+											WHERE rn = 1
+	    								) B2 ON B2.CLNT_CD = PCHS_CLNT_CD
+				  WHERE 1=1 
+				GROUP BY C.CLNT_NM, PCHS_CLNT_CD
+				ORDER BY C.CLNT_NM
+				) T
+	    				LEFT OUTER JOIN TB_BM02M30 B3 ON B3.CLNT_CD = T.PCHS_CLNT_CD AND B3.ESTMT_YEAR = #{trgYear}  --공급업체 평가결과
+						LEFT OUTER JOIN TB_BM02M30 E1 ON E1.CLNT_CD = T.PCHS_CLNT_CD AND E1.ESTMT_YEAR = (#{trgYear}-1)
+						LEFT OUTER JOIN (
+											SELECT 	  W.VEND_CD
+													--, W.REQ_NO , W.ISS_NO, W.ACT_ID, W.CREAT_DTTM 
+													, COUNT(W.REQ_NO) REQ_NO_CNT	--장애발생횟수
+													, MAX(D.ORDRG_NO) ORDRG_NO
+													, SUM(D.PCHS_AMT) PCHS_AMT		--장애발생금액
+													, SUM(D.PCHS_VAT) PCHS_VAT
+													, MAX(D.PCHS_DT)  PCHS_DT
+											  FROM TB_WB24M02 W
+											  			LEFT OUTER JOIN TB_SM12D01 D ON D.REQ_NO = W.REQ_NO
+											 WHERE W.VEND_CD IS NOT NULL
+											   AND W.CREAT_DTTM BETWEEN TO_DATE( #{ordrgDtFrom},'YYYYMMDD') AND TO_DATE( #{ordrgDtTo},'YYYYMMDD')
+											 GROUP BY W.VEND_CD
+										) AS BD ON BD.VEND_CD = T.PCHS_CLNT_CD
+	    	WHERE 1 = 1
+--	    	  AND T.PCHS_CLNT_CD IN (524, 2)
+			  <if test="pchsClntNm != null and !pchsClntNm.equals('')">
+	    	  AND T.CLNT_NM LIKE '%'|| #{pchsClntNm} || '%'
+	    	  </if>		
+	    	  <if test="mngIdCd != null and !mngIdCd.equals('')">
+	    	  AND T.SALES_EMP_ID IN ( ${mngIdCd} )
+	    	  </if>
+	</select>	
+	
+		
+	<select id="select_mngId_code" parameterType="Map" resultType="camelMap">
+			SELECT DISTINCT
+						  B2.SALES_EMP_ID_NM			AS NAME
+						, B2.SALES_EMP_ID				AS CODE
+			FROM (			
+						SELECT 
+								  D.CO_CD
+									, CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.PCHS_CLNT_CD 
+										   WHEN substr(D.ORDRG_NO,0,3) = 'RET' THEN RM.PCHS_CLNT_CD ELSE C.PCHS_CLNT_CD END PCHS_CLNT_CD
+									, D.ORDRG_NO
+									, CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD 
+										   WHEN substr(D.ORDRG_NO,0,3) = 'RET' THEN R.SALES_CD  ELSE C.SALES_CD END AS SALES_CD
+									, D.PCHS_DT AS ORDRG_DT			
+									, CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD 
+										   WHEN substr(D.ORDRG_NO,0,3) = 'RET' THEN R.DSGN_NO  ELSE C.SALES_CD END AS DSGN_NO					
+									, 1 AS ORDRG_QTY				/*발주수량 */
+									, M.ORDRG_AMT AS ORDRG_AMT		/*발주 금액 */												
+									, D.PCHS_NO   AS PCHS_NO		/*매입확정번호 */					
+									, D.PCHS_AMT  AS PCHS_AMT		/* 매입금액 */
+									, D.PCHS_VAT AS PCHS_VAT		/* 부가세 */
+									, D.PCHS_QTY AS PCHS_QTY		/* 수량 */										
+									, D.PCHS_DT
+									, D.CMPLET_YN AS CMPLET_YN	 		/* 확정여부 */
+									, CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN '' 
+										   WHEN substr(D.ORDRG_NO,0,3) = 'RET' THEN ''  ELSE C.PCHS_CLMN_DAY END AS PCHS_CLMN_DAY		
+						FROM  TB_SM12D01 D /* 매입 DETAIL */		
+								LEFT OUTER JOIN TB_SM02M01 M ON(D.ORDRG_NO = M.ORDRG_NO)		/* 발주마스터 */
+								LEFT OUTER JOIN TB_SM10M01 C ON(D.ORDRG_NO = C.COST_NO)		/* 비용마스터 */
+								LEFT OUTER JOIN TB_SM06D01 R ON(D.ORDRG_NO = R.RET_NO)		/* 반품 상세 */
+								LEFT OUTER JOIN TB_SM06M01 RM ON(RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)		/* 반품 상세 */
+						WHERE 1=1	
+			            AND D.PCHS_DT BETWEEN TO_DATE( #{ordrgDtFrom},'YYYYMMDD') AND TO_DATE( #{ordrgDtTo},'YYYYMMDD')
+				) A
+					LEFT OUTER JOIN TB_BM02M01 AS C ON PCHS_CLNT_CD = C.CLNT_CD   --거래처마스터
+					LEFT OUTER JOIN (
+	            						SELECT  B.*
+											  , (SELECT FN_CM06M01_ID_TO_NM(B.SALES_EMP_ID) FROM DUAL) AS SALES_EMP_ID_NM
+										FROM (
+										    SELECT 
+										          B.CLNT_CD
+										        , B.BIZDEPT_SN
+										        , B.SALES_EMP_ID
+										        , B.SALES_CO_CD
+										        , ROW_NUMBER() OVER (PARTITION BY B.CLNT_CD ORDER BY B.BIZDEPT_SN ASC) AS rn
+										    FROM TB_BM02D01 B
+--										    WHERE B.SALES_CO_CD = 'TRN'  --구매업무는 트루넷에서 처리함
+											) B
+										WHERE rn = 1
+    								) B2 ON B2.CLNT_CD = PCHS_CLNT_CD
+			  WHERE 1=1 
+			  ORDER BY B2.SALES_EMP_ID_NM	
+    </select>	
+     
+			
+	<!-- 평가점수 Update -->
+	<update id="updateVendEstimate" parameterType="Map">
+		MERGE INTO TB_BM02M30 A
+			USING DUAL
+			ON (A.CLNT_CD = #{pchsClntCd} 
+			AND A.ESTMT_YEAR = #{trgYear} )  --공급업체 평가결과
+		WHEN MATCHED THEN
+			UPDATE SET
+				  ESTMT_DT     = SYSDATE
+				, ESTMT_MNG    = #{userId    }
+				, ESTMT_AMT    = #{pchsAmt    }
+				, BADN_AMT     = #{badnAmt     }
+				, TRST_CNT     = #{pchsQty     }
+				, BADN_CNT     = #{badnCnt     }
+				, BADN_SCORE   = #{badnScore   }
+				, CNTMSR_SCORE = #{cntmsrScore }
+				, SCHDUL_SCORE = #{schdulScore }
+				, EMGC_SCORE   = #{emgcScore   }
+				, EST_SCORE    = #{estScore    }
+				, PRC_SCORE    = #{prcScore    }
+				, TOTAL_SCORE  = #{totalScore  }
+				, ESTMT_RMK    = #{estmtRmk, jdbcType=VARCHAR}
+				, UDT_ID       = #{userId      }
+				, UDT_DTTM     = SYSDATE
+				, UDT_PGM      = #{pgmId      }
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				  CLNT_CD, ESTMT_YEAR, ESTMT_DT, ESTMT_MNG, ESTMT_AMT, BADN_AMT, TRST_CNT, BADN_CNT
+				, BADN_SCORE, CNTMSR_SCORE, SCHDUL_SCORE, EMGC_SCORE, EST_SCORE, PRC_SCORE, TOTAL_SCORE
+				, ESTMT_RMK, CREAT_ID, CREAT_DTTM, CREAT_PGM
+			)
+			VALUES
+			(
+			 	  #{pchsClntCd}, #{trgYear}, SYSDATE, #{userId}, #{pchsAmt}, #{badnAmt}, #{pchsQty}, #{badnCnt}
+				, #{badnScore}, #{cntmsrScore}, #{schdulScore}, #{emgcScore}, #{estScore}, #{prcScore}, #{totalScore}
+				, #{estmtRmk, jdbcType=VARCHAR}, #{userId}, SYSDATE, #{pgmId}
+			)
+	</update>
+	
+	<!-- 평가점수 Delete -->
+	<delete id="deleteVendEstimate" parameterType="Map">
+		DELETE TB_BM02M30 WHERE CLNT_CD = #{pchsClntCd} AND ESTMT_YEAR = #{trgYear}
+	</delete>
+	
+ </mapper>
