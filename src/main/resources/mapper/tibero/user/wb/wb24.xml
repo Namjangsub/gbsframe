@@ -213,13 +213,7 @@
 			     )
 			SELECT  count(*)
 			  FROM PLN AS P
-			       INNER      JOIN SUBJ AS J ON P.CO_CD = J.CO_CD AND P.SALES_CD = J.SALES_CD--과제정보 
-			       LEFT OUTER JOIN ISU  AS I ON P.CO_CD = I.CO_CD AND P.SALES_CD = I.SALES_CD AND P.WBS_PLAN_CODE_KIND = I.WBS_PLAN_CODE_KIND AND P.WBS_PLAN_CODE_ID = I.WBS_PLAN_CODE_ID--이슈정보
-			       LEFT OUTER JOIN TB_CM06M01 U ON U.ID = I.ACT_ID
 			 WHERE 1=1 
-			 <if test="issSts != null and !issSts.equals('')">
-                    AND I.ISS_STS = #{issSts}            
-             </if>
             <if test="clntPjt != null and !clntPjt.equals('')">
                     AND P.CLNT_PJT = #{clntPjt}            
             </if>
@@ -233,9 +227,6 @@
      
         SELECT A.*
 		FROM   (
-			SELECT A.*
-				, ROWNUM AS RN
-			FROM	(
 			WITH TRG AS 
 				(
 						SELECT DISTINCT W.SALES_CD 
@@ -261,6 +252,10 @@
 				)
 				, PLN AS --계획정보 TREE 
 			     ( 
+			SELECT * FROM (
+				SELECT B.*
+			           , ROWNUM AS RN 
+				FROM (
 			      SELECT A.*
 			           , LEVEL AS LVL
 			           , REGEXP_REPLACE(SYS_CONNECT_BY_PATH(A.LOWER_CD, ' -> '), '^\s+\-\>\s+', '') AS PATH --출고경로 
@@ -356,7 +351,10 @@
 			       START WITH UPPER_CD = 'top' 
 			       CONNECT BY PRIOR LOWER_CD = UPPER_CD
 			       ORDER BY PATH
-			     ) 
+			       ) B
+			    ) T
+				WHERE    RN BETWEEN ${firstIndex} AND ${lastIndex}
+			    )
 			   , SUBJ AS --과제정보
 			     (
 			      SELECT X.CO_CD      AS CO_CD    --회사코드
@@ -539,11 +537,8 @@
                     AND P.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'            
             </if>
 			 ORDER BY P.CLNT_CD, P.ORDRS_NO, P.SALES_CD, P.PATH, I.GUBUN		        
-					) AS A
-			WHERE  1 = 1
 	       ) AS A
 		WHERE  1 = 1
-		AND    A.RN BETWEEN ${firstIndex} AND ${lastIndex}
      </select>
 		  
 		  
