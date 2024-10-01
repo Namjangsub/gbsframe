@@ -103,6 +103,7 @@
 		,INO AS ( --발주번호별 입고내역
 			  SELECT  DISTINCT I.ORDRG_NO
 			  				  , I.IN_NO
+			  				  , MAX(I.PCHS_NO)					AS PCHS_NO
 			  				  , SUM(nvl(I.IN_QTY,0)) 			AS  IN_QTY
 			  				  , MAX(M.FILE_TRGT_KEY) 			AS FILE_TRGT_KEY
 			  				  , TO_CHAR(MAX(I.IN_DT), 'YYYY-MM-DD') IN_DT		/* 입고일자 */
@@ -117,17 +118,6 @@
 			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = I.ORDRG_NO)
 	           GROUP BY I.ORDRG_NO, I.IN_NO
 		)
-		,CNF AS ( --매입확정
-			  SELECT  M12.ORDRG_NO
-			  				  , SUM(nvl( M12.PCHS_QTY,0)) 		AS  PCHS_QTY
-			  				  , SUM(nvl( M12.PCHS_AMT,0)) 		AS  PCHS_AMT
-			  				  , SUM(nvl( M12.PCHS_VAT,0)) 		AS  PCHS_VAT
-			  				  , TO_CHAR(MAX(M12.PCHS_DT), 'YYYY-MM-DD') PCHS_DT		/* 확정일자 */
-	            FROM  TB_SM12D01 M12
-	           WHERE 1=1
-			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = M12.ORDRG_NO)
-	           GROUP BY M12.ORDRG_NO
-	    )
 	</sql>
 
 	<!-- 입고관리 리스트  카운트 -->
@@ -231,8 +221,7 @@
 			  				, NVL(INO.MAIL_YN,'N')		AS MAIL_YN
 			  				, INO.MAIL_DTTM
 	              			, (SELECT FN_CM05M01_CD_TO_NM(BJM.PART_CD) FROM DUAL) AS PART_CD_NM
-	              			, CNF.PCHS_AMT	--매입확정금액
-	              			, CNF.PCHS_QTY	--매이확정수량
+	              			, INO.PCHS_NO	--매입확정번호
 					  FROM BJM														        --발주내역
 					   				LEFT OUTER JOIN INO          ON  BJM.ORDRG_NO = INO.ORDRG_NO		--입고내역
 									LEFT OUTER JOIN TB_CM06M01 M ON M.ID = BJM.CREAT_ID
@@ -240,7 +229,6 @@
 									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD
 				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
 				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
-				              		LEFT OUTER JOIN CNF          ON CNF.ORDRG_NO = BJM.ORDRG_NO
 					 WHERE 1=1
 						<!-- 입고잔량이 있는것만(데쉬보드용) -->
 						<if test="remainQty != null and !remainQty.equals('')">
