@@ -4,21 +4,21 @@
   	today = new Date(year, month-1, 1);
   }
 
-  //today 에 Date객체를 넣어줌 //ex)5일 
+  //today 에 Date객체를 넣어줌 //ex)5일
 	function prevCalendar() {
 		gridView.initView();
 		today = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate()); // month 를 조정해 해당 월을 변경함
 		buildCalendar(); // 달력을 새로 그려준다.
 		gridView.setData();
 	}
-  
+
 	function nextCalendar() {
 		gridView.initView();
 		today = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
 		buildCalendar();
 		gridView.setData();
 	}
-  
+
   function buildCalendar() {// 현재 달fur
   	var week = [ '일', '월', '화', '수', '목', '금', '토', '일'];
   	var nMonth = new Date(today.getFullYear(), today.getMonth(), 1); // 이번 달의 첫째 날
@@ -26,42 +26,43 @@
   	var tblCalendar = $("#calendar"); // 테이블 달력을 만들 테이블
   	var tblCalendarYM = $("#calendarYM"); // yyyy년 m월 출력할 곳
   	tblCalendarYM.html(today.getFullYear() + "년 " + (today.getMonth() + 1) + "월");// yyyy년 m월 출력
-  	
+
   	var dayWeek = week[nMonth.getDay()]; //이번달 첫째날의 요일
   	var year = today.getFullYear();
   	var lastYear = 0;
-  	
+
   	// year와 lastyear가 동일할경우 setLunaToSolar를 계산하지 않음;
   	var isSame = false;
   	if (year == lastYear)
   		isSame = true;
-  	
+
   	var solarHolidays = [ "0101", "0301", "0505", "0606", "0815", "1003", "1009", "1225" ]; //양력휴일
   	var lunaHolidays = [ "0101", "0102", "0408", "0814", "0815", "0816" ]; //음력휴일, 설전날도 넣어야함.
-  	
+
   	//대체공휴일 입력구간. 임시휴일이나 대체공휴일이 있을 경우 배열에 넣으면됨. yyyymmdd 입력
-  	var alternativeHolidays = [   "20140910", "20150929", "20160210", "20170130", "20171006", 
-		"20180507", "20180926", "20190506", "20200127", "20210816", 
-		"20211004", "20211011", "20220912", "20221010", "20230124", 
-		"20230529", "20231002", "20240212", "20240410", "20240501", 
-		"20240506", "20240729", "20240730", "20240731", "20241001",
-		"20250303", "20250506", "20251008", "20260302", "20260525", 
-		"20260817", "20261005", "20270209", "20270816", "20271004", 
-		"20271011", "20271227", "20281005", "20290507", "20290521", 
-		"20290924", "20300205", "20300506", "20310303", "20320517", 
-		"20320816", "20320921", "20321004", "20321011", "20321227", 
-		"20330202", "20331010", "20331226", "20340221", "20350507", 
-		"20350918", "20360130", "20360303", "20360506", "20361006", 
-		"20361007", "20370217", "20370302", "20370817", "20371005", 
-		"20380816", "20380915", "20381004", "20381011", "20381227", 
-		"20390126", "20390502", "20391004", "20391005", "20391010", 
-		"20391226", "20400214", "20400507", "20410506", "20420303", 
-		"20420930", "20430302", "20430518", "20430817", "20431005", 
-		"20440201", "20440506", "20441010", "20441226", "20450927", 
-		"20460507", "20460514", "20460917", "20470128", "20470506", 
-		"20471007", "20480302", "20480817", "20481005", "20490510", 
+	//20241001 임시 공휴일-->당사는 20241004일로 변경 근무 진행함
+  	var alternativeHolidays = [   "20140910", "20150929", "20160210", "20170130", "20171006",
+		"20180507", "20180926", "20190506", "20200127", "20210816",
+		"20211004", "20211011", "20220912", "20221010", "20230124",
+		"20230529", "20231002", "20240212", "20240410", "20240501",
+		"20240506", "20240729", "20240730", "20240731", "20241004",
+		"20250303", "20250506", "20251008", "20260302", "20260525",
+		"20260817", "20261005", "20270209", "20270816", "20271004",
+		"20271011", "20271227", "20281005", "20290507", "20290521",
+		"20290924", "20300205", "20300506", "20310303", "20320517",
+		"20320816", "20320921", "20321004", "20321011", "20321227",
+		"20330202", "20331010", "20331226", "20340221", "20350507",
+		"20350918", "20360130", "20360303", "20360506", "20361006",
+		"20361007", "20370217", "20370302", "20370817", "20371005",
+		"20380816", "20380915", "20381004", "20381011", "20381227",
+		"20390126", "20390502", "20391004", "20391005", "20391010",
+		"20391226", "20400214", "20400507", "20410506", "20420303",
+		"20420930", "20430302", "20430518", "20430817", "20431005",
+		"20440201", "20440506", "20441010", "20441226", "20450927",
+		"20460507", "20460514", "20460917", "20470128", "20470506",
+		"20471007", "20480302", "20480817", "20481005", "20490510",
 		"20490816", "20490913", "20491004", "20491011", "20491227"];
-  	
+
   	var setLunaToSolar = []; //당년도의 음력을 양력으로
 
   	//테이블에 기존값이 존재할 경우 해당 값을 다 날림.
@@ -73,7 +74,7 @@
 //    if (tblCalendar.find("thead").length === 0) {
 //        tblCalendar.append("<thead></thead>");
 //    }
-    
+
 //    var header = tblCalendar.find("thead")[0];
 //  	var hrow = null;
 //  	hrow = header.insertRow();
@@ -92,7 +93,7 @@
 
   	//setLunaToSolar
   	///////////////////////////////////////////////////
-  	if (!isSame) { //당년도의 음력휴일 양력으로 변환 
+  	if (!isSame) { //당년도의 음력휴일 양력으로 변환
   		for (i = 0; i < lunaHolidays.length; i++) {
   			var solar = Resut(year + "" + lunaHolidays[i]);
   			if (i == 0) {
@@ -105,7 +106,7 @@
 
   				/* cDate.setMonth(parseInt(cMonth-1)); // 월 설정
   				cDate.setDate(parseInt(cDay)); //일 설정
-  				//cDate.setDate(-1); //하루전날 
+  				//cDate.setDate(-1); //하루전날
 
   				//var sdate = cDate.setDate(cDate.getDate()-1); */
   				var sm = (cDate.getMonth() + 1);
@@ -174,17 +175,17 @@
 		tempWeek = week[(nMonth.getDay() + i) % 7];
 //  		headerCell.innerHTML = tempWeek;
 //  		hrow.appendChild(headerCell);
-  		
-  		gridView.target.addColumn({label: tempWeek,  
+
+  		gridView.target.addColumn({label: tempWeek,
   			columns:[{key: "d"+(i+1), label: i+1, width: 40, align: "center"}]});
-  		
+
   		cnt++;
   	}
 
-	gridView.target.addColumn({key: "tot", label: "합계", width: 80, align: "center"}); 	
-	gridView.target.addColumn({key: "rmk", label: "비고", width: 120, align: "center"}); 	
-  	
-  	
+	gridView.target.addColumn({key: "tot", label: "합계", width: 80, align: "center"});
+	gridView.target.addColumn({key: "rmk", label: "비고", width: 120, align: "center"});
+
+
 //  	headerCell = document.createElement("th");
 //  	headerCell.innerHTML = "비고";
 //  	headerCell.className = "cBlue";
@@ -208,7 +209,7 @@
 //  		if (list.length > 0) { //휴일이 있을경우
 //  			for (j = 0; j < list.length; j++) {
 //  				if (list[j] == i) {
-//  					headerCell.className = "red"; 
+//  					headerCell.className = "red";
 //  					pass = true;
 //  					isHoliday = true;
 //  					break;
