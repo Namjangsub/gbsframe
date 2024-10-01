@@ -31,44 +31,44 @@
 						END 							AS CNT_NM
 				  , min(TO_CHAR(ORDRG_SEQ, 'FM000') || MATR_CD)  AS MATR_CD  --첫번째 자재코드를 추출용
 				  , min(A.DSGN_NO)     					AS DSGN_NO
-	              , min(D.CLNT_NM)     					AS PCHS_CLNT_NM		/* 구매처명 */ 
+	              , min(D.CLNT_NM)     					AS PCHS_CLNT_NM		/* 구매처명 */
 	              , max(B.ARR_ID)     					AS ARR_ID
 	              , TO_CHAR(max(B.ARR_DTTM), 'YYYY-MM-DD')	AS ARR_DTTM
 	              , max(B.ARR_YN)     					AS ARR_YN
 	              , MAX(Q.PART_CD)						AS PART_CD
 			  FROM TB_SM02D01 A
-						LEFT OUTER JOIN TB_SM02M01 B ON (A.CO_CD = B.CO_CD 
+						LEFT OUTER JOIN TB_SM02M01 B ON (A.CO_CD = B.CO_CD
 						                            AND  A.ORDRG_NO = B.ORDRG_NO)
 						LEFT OUTER JOIN TB_BM02M01 D ON B.PCHS_CLNT_CD = D.CLNT_CD
 						LEFT OUTER JOIN TB_QM01M01 Q ON Q.REQ_NO = B.REQ_NO
-			 WHERE 1=1		
-				<!-- 회사코드 -->  
+			 WHERE 1=1
+				<!-- 회사코드 -->
 				<if test="coCd != null and !coCd.equals('')">
-				AND A.CO_CD = #{coCd}   
-				</if>	       
-				<!-- 입고일자 -->         
-		        AND B.ORDRG_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo} 
-				<!-- SalesCode -->         
+				AND A.CO_CD = #{coCd}
+				</if>
+				<!-- 입고일자 -->
+		        AND B.ORDRG_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+				<!-- SalesCode -->
 				<if test="salesCd != null and !salesCd.equals('')">
-				AND A.SALES_CD LIKE  '%' || #{salesCd} || '%'   			
-				</if>			
-				<!-- 구매처 -->         
+				AND A.SALES_CD LIKE  '%' || #{salesCd} || '%'
+				</if>
+				<!-- 구매처 -->
 				<if test="pchsClntCd != null and !pchsClntCd.equals('')">
-				AND B.PCHS_CLNT_CD = #{pchsClntCd}   
-				</if>    		
+				AND B.PCHS_CLNT_CD = #{pchsClntCd}
+				</if>
 				<if test="pchsClntNm != null and !pchsClntNm.equals('')">
-				AND D.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'   
-				</if>    	
-				<!-- 발주번호 -->  		
+				AND D.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'
+				</if>
+				<!-- 발주번호 -->
 				<if test="ordrgNo != null and !ordrgNo.equals('')">
-				AND A.ORDRG_NO LIKE '%'||#{ordrgNo}||'%'   
+				AND A.ORDRG_NO LIKE '%'||#{ordrgNo}||'%'
 				</if>
 				<!-- 발주구분 -->
-		        <if test="ordrgdiv10 != null and !ordrgdiv10.equals('')">	
+		        <if test="ordrgdiv10 != null and !ordrgdiv10.equals('')">
 		        AND A.ORDRG_DIV10 = ( #{ordrgdiv10} )
 				</if>
 				<!-- 발주요청서 분류 -->
-		        <if test="partCd != null and !partCd.equals('')">	
+		        <if test="partCd != null and !partCd.equals('')">
 		        AND Q.PART_CD = #{partCd}
 				</if>
 	         GROUP BY A.CO_CD, A.SALES_CD, B.REQ_NO,  A.ORDRG_NO
@@ -78,63 +78,73 @@
 	          FROM BJM
 	    )
 	    ,SUJU AS (    --수주내역
-	        SELECT 
+	        SELECT
 	                 SALE.CO_CD                                             AS CO_CD         --회사코드
 	                , M.ORDRS_NO                                         AS ORDRS_NO      --수주번호
 	                , M.ORDRS_CLNT_CD                                    AS ORDRS_CLNT_CD --고객코드
 	                , SALE.SALES_CD                                      AS SALES_CD      --SALES Code
-	                , M.CLNT_PJT                                         AS CLNT_PJT      --고객사PJT 
+	                , M.CLNT_PJT                                         AS CLNT_PJT      --고객사PJT
 	                , A.PRDT_CD                                          AS PRDT_CD       --제품구분
-	                , A.EQP_NM                                           AS EQP_NM        --설비명 
+	                , A.EQP_NM                                           AS EQP_NM        --설비명
 		            , A.ITEM_DIV                                         AS ITEM_DIV      --아이템구분
 		            , (SELECT FN_CM05M01_CD_TO_NM(A.ITEM_DIV) FROM DUAL) AS ITEM_DIV_NM   --아이템 구분명
-	          FROM SALE 
+	          FROM SALE
 	          			LEFT OUTER JOIN TB_CR02D02 A ON SALE.SALES_CD = A.SALES_CD
 			          	LEFT OUTER JOIN TB_CR02M01 M ON(A.CO_CD = M.CO_CD AND A.ORDRS_NO = M.ORDRS_NO)
 		)
-		,CTOT AS ( -- 발주번호+SEQ 별 총입고수량 산정 
-			SELECT    C.ORDRG_NO 
+		,CTOT AS ( -- 발주번호+SEQ 별 총입고수량 산정
+			SELECT    C.ORDRG_NO
 					, NVL(SUM(C.IN_QTY), 0) AS TOT_IN_QTY
 			  FROM TB_SM03D01 C
 			WHERE  1=1
-			 AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = C.ORDRG_NO)	
+			 AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = C.ORDRG_NO)
 			GROUP BY C.ORDRG_NO
-		) 
+		)
 		,INO AS ( --발주번호별 입고내역
-			  SELECT  DISTINCT I.ORDRG_NO 
-			  				  , I.IN_NO 
+			  SELECT  DISTINCT I.ORDRG_NO
+			  				  , I.IN_NO
 			  				  , SUM(nvl(I.IN_QTY,0)) 			AS  IN_QTY
 			  				  , MAX(M.FILE_TRGT_KEY) 			AS FILE_TRGT_KEY
-			  				  , TO_CHAR(MAX(I.IN_DT), 'YYYY-MM-DD') IN_DT		/* 입고일자 */	
-			  				  , SUM(nvl(I.BAD_QTY,0)) 			AS BAD_QTY 
+			  				  , TO_CHAR(MAX(I.IN_DT), 'YYYY-MM-DD') IN_DT		/* 입고일자 */
+			  				  , SUM(nvl(I.BAD_QTY,0)) 			AS BAD_QTY
 			  				  , SUM(nvl(I.IN_DTL_AMT,0))		AS IN_DTL_AMT
 			  				  , MAX(I.INOUT_KEY) 				AS INOUT_KEY
 			  				  , MAX(M.MAIL_YN)					AS MAIL_YN
 			  				  , TO_CHAR(MAX(M.MAIL_DTTM), 'YYYY-MM-DD') AS MAIL_DTTM
-	            FROM TB_SM03D01 I 
-			          	LEFT OUTER JOIN TB_SM03M01 M ON (M.CO_CD =I.CO_CD AND M.IN_NO =I.IN_NO )		
+	            FROM TB_SM03D01 I
+			          	LEFT OUTER JOIN TB_SM03M01 M ON (M.CO_CD =I.CO_CD AND M.IN_NO =I.IN_NO )
 	           WHERE 1=1
-			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = I.ORDRG_NO)	
+			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = I.ORDRG_NO)
 	           GROUP BY I.ORDRG_NO, I.IN_NO
-		)	
-		
-	</sql>	
-		
+		)
+		,CNF AS ( --매입확정
+			  SELECT  M12.ORDRG_NO
+			  				  , SUM(nvl( M12.PCHS_QTY,0)) 		AS  PCHS_QTY
+			  				  , SUM(nvl( M12.PCHS_AMT,0)) 		AS  PCHS_AMT
+			  				  , SUM(nvl( M12.PCHS_VAT,0)) 		AS  PCHS_VAT
+			  				  , TO_CHAR(MAX(M12.PCHS_DT), 'YYYY-MM-DD') PCHS_DT		/* 확정일자 */
+	            FROM  TB_SM12D01 M12
+	           WHERE 1=1
+			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = M12.ORDRG_NO)
+	           GROUP BY M12.ORDRG_NO
+	    )
+	</sql>
+
 	<!-- 입고관리 리스트  카운트 -->
-	<select id="selectWareHousingListCount" parameterType="Map" resultType="int">																
-		<include refid="selectWareHousingListCondition"></include>			
+	<select id="selectWareHousingListCount" parameterType="Map" resultType="int">
+		<include refid="selectWareHousingListCondition"></include>
 			SELECT COUNT(*)
 			  FROM
-				(			
+				(
 					SELECT   NVL(CT.TOT_IN_QTY,0) AS TOT_IN_QTY
 							, ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)  AS REAMIN_IN_QTY
 							, substr(BJM.MATR_CD,4,10)   AS MATR_CD  --temp파일 생성시 발주일련번호+자재코드로 만듬 첫번째 자재확인을 위함(ex. 001990-01101 = 001 + 990-01101)
 							, (SELECT FN_BM05M01_NM(substr(BJM.MATR_CD,4,10)) FROM dual) || BJM.CNT_NM AS MATR_CNT_NM
 				--			, BJM.DSGN_NO
 							, BJM.CREAT_ID    			AS ORDRG_MNG_ID
-							, M.NAME 		  			AS ORDRG_MNG_NM   
-				--            , BJM.PCHS_CLNT_NM		/* 구매처명 */ 
-				            , SUJU.CLNT_PJT             AS CLNT_PJT      --고객사PJT 
+							, M.NAME 		  			AS ORDRG_MNG_NM
+				--            , BJM.PCHS_CLNT_NM		/* 구매처명 */
+				            , SUJU.CLNT_PJT             AS CLNT_PJT      --고객사PJT
 							, FN_CM05M01_CD_TO_NM(SUJU.CLNT_PJT)    AS CLNT_PJT_NM
 							, SUJU.EQP_NM
 							, SUJU.ORDRS_CLNT_CD
@@ -142,11 +152,11 @@
 					        , C.CLNT_DIV_CD             AS CLNT_DIV_CD    --거래처 분류
 					        , (SELECT FN_CM05M01_CD_TO_NM(C.CLNT_DIV_CD) FROM DUAL) AS CLNT_DIV_NM  --거래처 분류명
 							, BJM.*
-							, INO.IN_NO 
+							, INO.IN_NO
 			  				, INO.IN_QTY
 			  				, INO.FILE_TRGT_KEY
-			  				, INO.IN_DT		/* 입고일자 */	
-			  				, INO.BAD_QTY 
+			  				, INO.IN_DT		/* 입고일자 */
+			  				, INO.BAD_QTY
 			  				, INO.IN_DTL_AMT
 			  				, INO.INOUT_KEY
 			  				, NVL(INO.MAIL_YN,'N')		AS MAIL_YN
@@ -155,19 +165,19 @@
 					   				LEFT OUTER JOIN INO          ON  BJM.ORDRG_NO = INO.ORDRG_NO		--입고내역
 									LEFT OUTER JOIN TB_CM06M01 M ON M.ID = BJM.CREAT_ID
 									LEFT OUTER JOIN TB_BM02M01 D ON BJM.PCHS_CLNT_CD = D.CLNT_CD
-									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD				
-				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보  
+									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD
+				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
 				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
 					 WHERE 1=1
 						<!-- 입고잔량이 있는것만(데쉬보드용) -->
 						<if test="remainQty != null and !remainQty.equals('')">
-						AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)	
+						AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)
 						AND DUDT_DEQ_DT 	<![CDATA[<]]> #{ordrgDtTo}
-						</if>	
+						</if>
 						<!-- 프로젝트 -->
 				        <if test="clntPjt != null and !clntPjt.equals('')">
 				        AND SUJU.CLNT_PJT IN ( ${clntPjt} )
-				        </if>	
+				        </if>
 						<!-- 담당자 -->
 				        <if test="mngIdCd != null and !mngIdCd.equals('')">
 				        AND BJM.CREAT_ID IN ( ${mngIdCd} )
@@ -175,35 +185,35 @@
 						<if test='cmpletYn == "Y"'>
 					    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0))  = 0			--입고완료
 						</if>
-						<if test='cmpletYn == "N"'>						
+						<if test='cmpletYn == "N"'>
 				  	    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) != 0			--미입고현황
-						</if>	
+						</if>
 						<!-- 입고확인 -->
 				        <if test="arrYn != null and !arrYn.equals('')">
 				        AND BJM.ARR_YN  = #{arrYn}
-				        </if>	
-					) T			
+				        </if>
+					) T
 	</select>
-	
+
 	<!-- 입고관리 리스트  -->
-	<select id="selectWareHousingList" parameterType="Map" resultType="camelMap">																
-		<include refid="selectWareHousingListCondition"></include>			
+	<select id="selectWareHousingList" parameterType="Map" resultType="camelMap">
+		<include refid="selectWareHousingListCondition"></include>
 		SELECT T.*
 			FROM
 			(
 			SELECT ROWNUM AS RN
 					, T.*
 				FROM
-				(			
+				(
 					SELECT   NVL(CT.TOT_IN_QTY,0) AS TOT_IN_QTY
 							, ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)  AS REAMIN_IN_QTY
 							, substr(BJM.MATR_CD,4,10)   AS MATR_CD  --temp파일 생성시 발주일련번호+자재코드로 만듬 첫번째 자재확인을 위함(ex. 001990-01101 = 001 + 990-01101)
 							, (SELECT FN_BM05M01_NM(substr(BJM.MATR_CD,4,10)) FROM dual) || BJM.CNT_NM AS MATR_CNT_NM
 				--			, BJM.DSGN_NO
 							, BJM.CREAT_ID    			AS ORDRG_MNG_ID
-							, M.NAME 		  			AS ORDRG_MNG_NM   
-				--            , BJM.PCHS_CLNT_NM		/* 구매처명 */ 
-				            , SUJU.CLNT_PJT             AS CLNT_PJT      --고객사PJT 
+							, M.NAME 		  			AS ORDRG_MNG_NM
+				--            , BJM.PCHS_CLNT_NM		/* 구매처명 */
+				            , SUJU.CLNT_PJT             AS CLNT_PJT      --고객사PJT
 							, FN_CM05M01_CD_TO_NM(SUJU.CLNT_PJT)    AS CLNT_PJT_NM
 							, SUJU.EQP_NM
 							, SUJU.ORDRS_CLNT_CD
@@ -211,33 +221,36 @@
 					        , C.CLNT_DIV_CD             AS CLNT_DIV_CD    --거래처 분류
 					        , (SELECT FN_CM05M01_CD_TO_NM(C.CLNT_DIV_CD) FROM DUAL) AS CLNT_DIV_NM  --거래처 분류명
 							, BJM.*
-							, INO.IN_NO 
+							, INO.IN_NO
 			  				, INO.IN_QTY
 			  				, INO.FILE_TRGT_KEY
-			  				, INO.IN_DT		/* 입고일자 */	
-			  				, INO.BAD_QTY 
+			  				, INO.IN_DT		/* 입고일자 */
+			  				, INO.BAD_QTY
 			  				, INO.IN_DTL_AMT
 			  				, INO.INOUT_KEY
 			  				, NVL(INO.MAIL_YN,'N')		AS MAIL_YN
 			  				, INO.MAIL_DTTM
 	              			, (SELECT FN_CM05M01_CD_TO_NM(BJM.PART_CD) FROM DUAL) AS PART_CD_NM
+	              			, CNF.PCHS_AMT	--매입확정금액
+	              			, CNF.PCHS_QTY	--매이확정수량
 					  FROM BJM														        --발주내역
 					   				LEFT OUTER JOIN INO          ON  BJM.ORDRG_NO = INO.ORDRG_NO		--입고내역
 									LEFT OUTER JOIN TB_CM06M01 M ON M.ID = BJM.CREAT_ID
 									LEFT OUTER JOIN TB_BM02M01 D ON BJM.PCHS_CLNT_CD = D.CLNT_CD
-									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD				
-				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보  
+									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD
+				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
 				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
+				              		LEFT OUTER JOIN CNF          ON CNF.ORDRG_NO = BJM.ORDRG_NO
 					 WHERE 1=1
 						<!-- 입고잔량이 있는것만(데쉬보드용) -->
 						<if test="remainQty != null and !remainQty.equals('')">
-						AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)	
+						AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)
 						AND DUDT_DEQ_DT 	<![CDATA[<]]> #{ordrgDtTo}
-						</if>	
+						</if>
 						<!-- 프로젝트 -->
 				        <if test="clntPjt != null and !clntPjt.equals('')">
 				        AND SUJU.CLNT_PJT IN ( ${clntPjt} )
-				        </if>	
+				        </if>
 						<!-- 담당자 -->
 				        <if test="mngIdCd != null and !mngIdCd.equals('')">
 				        AND BJM.CREAT_ID IN ( ${mngIdCd} )
@@ -245,24 +258,24 @@
 						<if test='cmpletYn == "Y"'>
 					    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0))  = 0			--입고완료
 						</if>
-						<if test='cmpletYn == "N"'>						
+						<if test='cmpletYn == "N"'>
 				  	    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) != 0			--미입고현황
 						</if>
 						<!-- 입고확인 -->
 				        <if test="arrYn != null and !arrYn.equals('')">
 				        AND BJM.ARR_YN  = #{arrYn}
-				        </if>	
-					ORDER BY BJM.SALES_CD, BJM.REQ_NO, BJM.DSGN_NO,  BJM.ORDRG_NO, PCHS_CLNT_NM  
-					) T						
+				        </if>
+					ORDER BY BJM.SALES_CD, BJM.REQ_NO, BJM.DSGN_NO,  BJM.ORDRG_NO, PCHS_CLNT_NM
+					) T
 		) T
 		WHERE 1=1
-		AND RN BETWEEN ${firstIndex} AND ${lastIndex}	
-	</select>	
-	
+		AND RN BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>
 
-	
+
+
 	<!-- 입고관리 리스트 데시보드 -->
-	<select id="selectDashBoardWareHousingList" parameterType="Map" resultType="camelMap">																
+	<select id="selectDashBoardWareHousingList" parameterType="Map" resultType="camelMap">
 		SELECT  T.*
 				, (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_CD_NM
 				, M2.REQ_NO
@@ -270,13 +283,13 @@
 				, M2.ORDRG_DT  						AS ORDRG_DT
 				, M2.CURR_CD   						AS CURR_CD
 				, M2.EXRATE    						AS EXRATE
-				, D.CLNT_NM    						AS PCHS_CLNT_NM		/* 구매처명 */ 
+				, D.CLNT_NM    						AS PCHS_CLNT_NM		/* 구매처명 */
 		        , M2.ARR_ID     					AS ARR_ID
 		        , TO_CHAR(M2.ARR_DTTM, 'YYYY-MM-DD')	AS ARR_DTTM
 		        , M2.ARR_YN     					AS ARR_YN
 		        , Q.PART_CD							AS PART_CD
 				, M2.CREAT_ID    					AS ORDRG_MNG_ID
-				, U.NAME 		  					AS ORDRG_MNG_NM   
+				, U.NAME 		  					AS ORDRG_MNG_NM
 				, ORDRG_QTY - IN_QTY				AS REAMIN_IN_QTY
 		FROM (
 				SELECT 	  T.CO_CD
@@ -284,7 +297,7 @@
 						, T.ORDRG_NO
 						, SUM(NVL(T.ORDRG_QTY,0))			AS ORDRG_QTY
 						, SUM(NVL(T.ORDRG_AMT,0))			AS ORDRG_AMT
-						, SUM(NVL(T.IN_QTY,0)) 				AS IN_QTY 
+						, SUM(NVL(T.IN_QTY,0)) 				AS IN_QTY
 						, SUM(NVL(T.IN_DTL_AMT,0))			AS IN_DTL_AMT
 						, min(T.DUDT_DEQ_DT)				AS DUDT_DEQ_DT		/* 납기요청일 */
 						, min(T.DUDT_INTEND_DT)				AS DUDT_INTEND_DT	/* 납기예정일 */
@@ -309,14 +322,14 @@
 								, min(D2.DSGN_NO)     					AS DSGN_NO
 								, min(TO_CHAR(D2.ORDRG_SEQ, 'FM000') || D2.MATR_CD)  AS MATR_SEQ_CD  --첫번째 자재코드를 추출용
 						FROM TB_SM02D01 AS D2
-								LEFT OUTER JOIN TB_SM03D01 AS D3 ON D2.ORDRG_NO = D3.ORDRG_NO  AND D2.ORDRG_SEQ = D3.ORDRG_SEQ 
+								LEFT OUTER JOIN TB_SM03D01 AS D3 ON D2.ORDRG_NO = D3.ORDRG_NO  AND D2.ORDRG_SEQ = D3.ORDRG_SEQ
 						WHERE 1 = 1
-						  <!-- 회사코드 -->  
+						  <!-- 회사코드 -->
 						  <if test="coCd != null and !coCd.equals('')">
 						  AND D2.CO_CD  =  #{coCd}
-						  </if>	  
+						  </if>
 						GROUP BY D2.CO_CD, D2.SALES_CD, D2.ORDRG_NO, D2.ORDRG_SEQ, D2.MATR_CD
-						) AS T 
+						) AS T
 				WHERE 1 = 1
 				  AND ORDRG_QTY != IN_QTY
 				GROUP BY T.CO_CD, T.SALES_CD, T.ORDRG_NO
@@ -326,18 +339,18 @@
 						LEFT OUTER JOIN TB_QM01M01 Q  ON M2.REQ_NO = Q.REQ_NO
 						LEFT OUTER JOIN TB_CM06M01 U  ON U.ID = M2.CREAT_ID
 		WHERE 1 = 1
-	</select>	
-	
+	</select>
+
 	<!--  file target key -->
 	<select id="selectMaxTrgtKey" parameterType="Map" resultType="int">
     	SELECT NVL(MAX(TO_NUMBER(FILE_TRGT_KEY)),0) + 1 FROM TB_SM03M01
     		WHERE 1=1
 			<if test="inNo != null and !inNo.equals('')">
-				AND IN_NO = #{inNo}   
-			</if>	    		
-	</select>	
-	
-	<!-- 입고번호 max -->	
+				AND IN_NO = #{inNo}
+			</if>
+	</select>
+
+	<!-- 입고번호 max -->
 	<select id="selectMaxInNo" parameterType="Map" resultType="String">
 		SELECT NVL(MAX_IN_NO, 'IN'||TO_CHAR(SYSDATE, 'YY')||'00001') AS MAX_IN_NO
 			FROM
@@ -349,94 +362,94 @@
 			WHERE 1=1
   			  AND IN_NO LIKE 'IN'||TO_CHAR(SYSDATE, 'YY')||'%'
 			<if test="coCd != null and !coCd.equals('')">
-				AND CO_CD = #{coCd}   
-			</if>			
+				AND CO_CD = #{coCd}
+			</if>
 			UNION ALL
 			SELECT NULL AS MAX_IN_NO
-				FROM DUAL		
-			)		
-			WHERE MAX_IN_NO IS NOT NULL OR ROWNUM = 1	
-	</select>		
-	
+				FROM DUAL
+			)
+			WHERE MAX_IN_NO IS NOT NULL OR ROWNUM = 1
+	</select>
+
 	<!-- 입고 DETAIL SELECT -->
-	<select id="selectWareHousingDetailList" parameterType="Map" resultType="camelMap">	
+	<select id="selectWareHousingDetailList" parameterType="Map" resultType="camelMap">
 		SELECT B.FILE_TRGT_KEY
 				, A.CO_CD
-				, ( SELECT FN_CM05M01_CD_TO_NM(A.CO_CD) FROM DUAL ) AS CO_CD_NM	/* 회사명 */		
+				, ( SELECT FN_CM05M01_CD_TO_NM(A.CO_CD) FROM DUAL ) AS CO_CD_NM	/* 회사명 */
 				, A.MATR_CD						/* 자재코드 */
-				, ( SELECT FN_CM05M01_CD_TO_NM(A.MATR_CD) FROM DUAL ) AS MATR_CD_NM	/* 자재명 */				
+				, ( SELECT FN_CM05M01_CD_TO_NM(A.MATR_CD) FROM DUAL ) AS MATR_CD_NM	/* 자재명 */
 				, A.ORDRG_NO			/* 입고번호 */
 				, A.ORDRG_SEQ			/* 입고순번 */
 				, B.REQ_NO				/* 요인별 요청번호 */
 				, A.SALES_CD
 				, A.MATR_CD 			/* 자재코드 */
 				, D.MATR_NM		    /* 자재명 */
-				, A.MATR_MAT		/* 소재/Maker */								
-				, A.MATR_SPEC		/* 규격 */								
-				, A.MATR_SIZE		/* 크기 */	
-				, D.DSGN_NO         /* 도면번호  */									
+				, A.MATR_MAT		/* 소재/Maker */
+				, A.MATR_SPEC		/* 규격 */
+				, A.MATR_SIZE		/* 크기 */
+				, D.DSGN_NO         /* 도면번호  */
 				, B.PCHS_CLNT_CD				/* 구매처cd */
                    			,
                    			(
                    				SELECT D.CLNT_NM
                    					FROM TB_BM02M01 D
                    				WHERE B.PCHS_CLNT_CD=D.CLNT_CD
-                   			) AS PCHS_CLNT_NM		/* 구매처명 */            		
+                   			) AS PCHS_CLNT_NM		/* 구매처명 */
 				, TO_CHAR(B.ORDRG_DT, 'YYYY-MM-DD') ORDRG_DT		/* 입고일자 */
 				, A.ORDRG_DIV10					/* 입고구분 */
 				, ( SELECT FN_CM05M01_CD_TO_NM(A.ORDRG_DIV10) FROM DUAL ) AS ORDRG_DIV10_NM	/* 입고구분명 */
 				, A.ORDRG_DIV20					/* 용도구분 */
-				, ( SELECT FN_CM05M01_CD_TO_NM(A.ORDRG_DIV20) FROM DUAL ) AS ORDRG_DIV20_NM	/* 용도구분명 */								
-				, 
+				, ( SELECT FN_CM05M01_CD_TO_NM(A.ORDRG_DIV20) FROM DUAL ) AS ORDRG_DIV20_NM	/* 용도구분명 */
+				,
 				(
 					SELECT SUM(D.ORDRG_AMT)
 						FROM TB_SM02D01 D
 					WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.ORDRG_SEQ=D.ORDRG_SEQ AND A.SALES_CD=D.SALES_CD
-				) AS ORDRG_AMT										
-				, SUM(A.ORDRG_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_QTY	/* 입고수량 */									
-				, SUM(A.ORDRG_AMT) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_AMT	/* 입고금액 */	
-				, SUM(A.ORDRG_PRC) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_PRC	/* 입고단가 */	
+				) AS ORDRG_AMT
+				, SUM(A.ORDRG_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_QTY	/* 입고수량 */
+				, SUM(A.ORDRG_AMT) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_AMT	/* 입고금액 */
+				, SUM(A.ORDRG_PRC) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) ORDRG_PRC	/* 입고단가 */
 				, NVL(CTOT.IN_QTY, 0)  AS  PRE_IN_QTY 	/* 기입고수량 */
 				<if test='actionType == "U" '>
 				, C.IN_NO								/* 입고번호 */
-				, C.IN_SEQ								/* 입고순번 */				
-				, 'Y' AS USER_CHK 						/* chk 값 */   	
-				, NVL(C.IN_QTY, 0) AS IN_QTY 			/* 입고(합격)수량 */	
-				, NVL(C.BAD_QTY, 0) AS BAD_QTY			/* 불량수량 */   				
+				, C.IN_SEQ								/* 입고순번 */
+				, 'Y' AS USER_CHK 						/* chk 값 */
+				, NVL(C.IN_QTY, 0) AS IN_QTY 			/* 입고(합격)수량 */
+				, NVL(C.BAD_QTY, 0) AS BAD_QTY			/* 불량수량 */
 				, NVL(C.IN_PRC, 0) AS IN_PRC			/* 입고단가 */
 				, NVL(C.IN_DTL_AMT, 0) AS IN_DTL_AMT	/* 입고금액 */
 				, NVL(C.IN_QTY+C.BAD_QTY, 0) AS S_INSPEC_QTY		/* 검사수량 */
-				, NVL(C.IN_QTY, 0) AS S_IN_QTY			/* 입고수량 */					
-				, TO_CHAR(C.IN_DT, 'YYYY-MM-DD') IN_DT		/* 입고일자 */	
-				, C.IN_DTL_RMK						/* 상세비고 */				
+				, NVL(C.IN_QTY, 0) AS S_IN_QTY			/* 입고수량 */
+				, TO_CHAR(C.IN_DT, 'YYYY-MM-DD') IN_DT		/* 입고일자 */
+				, C.IN_DTL_RMK						/* 상세비고 */
 				, MAX(C.CURR_CD) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO)	AS CURR_CD				/* 통화단위 */
-				, MAX(C.EXRATE) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO) AS EXRATE				/* 환율 */						
-				</if>				
+				, MAX(C.EXRATE) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO) AS EXRATE				/* 환율 */
+				</if>
 				<if test='actionType == "C" '>
 				, B.CURR_CD						/* 통화단위 */
-				, B.EXRATE						/* 환율 */   				   
-				</if>								
-				, 
-				  SUM(A.ORDRG_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ) 
-				  - NVL(CTOT.IN_QTY, 0) AS NOT_IN_QTY			/* 미입고수량 */	
+				, B.EXRATE						/* 환율 */
+				</if>
+				,
+				  SUM(A.ORDRG_QTY) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO, A.ORDRG_SEQ)
+				  - NVL(CTOT.IN_QTY, 0) AS NOT_IN_QTY			/* 미입고수량 */
 		        , A.WH_CD AS MATR_WH_CD															/* 입고창고  */
-		        , ( SELECT FN_CM05M01_CD_TO_NM(A.WH_CD) FROM DUAL ) AS MATR_WH_NM				/* 입고창고  */								  
-				, A.MATR_TEST_DIV																/*검사구분 */				  
-				, ( SELECT FN_CM05M01_CD_TO_NM(A.MATR_TEST_DIV) FROM DUAL ) MATR_TEST_DIV_NM	/*검사구분 */	
+		        , ( SELECT FN_CM05M01_CD_TO_NM(A.WH_CD) FROM DUAL ) AS MATR_WH_NM				/* 입고창고  */
+				, A.MATR_TEST_DIV																/*검사구분 */
+				, ( SELECT FN_CM05M01_CD_TO_NM(A.MATR_TEST_DIV) FROM DUAL ) MATR_TEST_DIV_NM	/*검사구분 */
 				, TO_CHAR(A.DUDT_DEQ_DT	, 'YYYY-MM-DD') 	AS DUDT_DEQ_DT 						/* 납기요청일 */
-				, TO_CHAR(A.DUDT_INTEND_DT	, 'YYYY-MM-DD') AS DUDT_INTEND_DT					/* 납기예정일 */	
-				, TO_CHAR(A.ARR_DTTM	, 'YYYY-MM-DD') AS ARR_DTTM								/* 입고확인일자 */																						                    
+				, TO_CHAR(A.DUDT_INTEND_DT	, 'YYYY-MM-DD') AS DUDT_INTEND_DT					/* 납기예정일 */
+				, TO_CHAR(A.ARR_DTTM	, 'YYYY-MM-DD') AS ARR_DTTM								/* 입고확인일자 */
 			FROM TB_SM02D01 A
 			INNER JOIN TB_SM02M01 B ON(A.CO_CD=B.CO_CD AND A.ORDRG_NO=B.ORDRG_NO)
-			LEFT OUTER JOIN TB_SM01D01 D ON(/* A.CO_CD = D.CO_CD AND */ A.SALES_CD = D.SALES_CD AND A.UPPER_CD = D.UPPER_CD AND A.LOWER_CD = D.LOWER_CD 
+			LEFT OUTER JOIN TB_SM01D01 D ON(/* A.CO_CD = D.CO_CD AND */ A.SALES_CD = D.SALES_CD AND A.UPPER_CD = D.UPPER_CD AND A.LOWER_CD = D.LOWER_CD
 											AND A.MATR_SEQ=D.MATR_SEQ AND A.MATR_CD=D.MATR_CD)
 			<if test='actionType == "U" '>
-			INNER JOIN TB_SM03D01 C ON A.ORDRG_NO=C.ORDRG_NO 
-			                       AND A.ORDRG_SEQ=C.ORDRG_SEQ 
-			                       AND A.SALES_CD=C.SALES_CD 
+			INNER JOIN TB_SM03D01 C ON A.ORDRG_NO=C.ORDRG_NO
+			                       AND A.ORDRG_SEQ=C.ORDRG_SEQ
+			                       AND A.SALES_CD=C.SALES_CD
 			                       AND C.IN_NO = #{inNo}
-			</if>							
-			<if test='actionType == "C" '>											
+			</if>
+			<if test='actionType == "C" '>
 						LEFT OUTER JOIN
 						(
 							SELECT    C.ORDRG_NO
@@ -446,114 +459,114 @@
 							WHERE C.ORDRG_NO = #{ordrgNo}
 							GROUP BY C.ORDRG_NO, C.ORDRG_SEQ
 						) C ON( A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ)
-			</if>				
+			</if>
 			LEFT OUTER JOIN (
 								SELECT I.ORDRG_NO, I.ORDRG_SEQ, SUM(IN_QTY) IN_QTY,  SUM(BAD_QTY) BAD_QTY, SUM(IN_DTL_AMT) IN_DTL_AMT, AVG(IN_PRC) IN_PRC
 								  FROM TB_SM03D01 I
-								 WHERE I.ORDRG_NO = #{ordrgNo}  
+								 WHERE I.ORDRG_NO = #{ordrgNo}
 								 GROUP BY  I.ORDRG_NO, I.ORDRG_SEQ
 						) CTOT	ON CTOT.ORDRG_NO  	= A.ORDRG_NO
-						       AND CTOT.ORDRG_SEQ	= A.ORDRG_SEQ	
-		WHERE 1=1	
-			AND A.CO_CD = #{coCd}   
-			AND A.ORDRG_NO = #{ordrgNo}   
-			AND A.SALES_CD = #{salesCd}  
+						       AND CTOT.ORDRG_SEQ	= A.ORDRG_SEQ
+		WHERE 1=1
+			AND A.CO_CD = #{coCd}
+			AND A.ORDRG_NO = #{ordrgNo}
+			AND A.SALES_CD = #{salesCd}
 		ORDER BY D.DSGN_NO, B.ORDRG_DT, A.DUDT_INTEND_DT
 	</select>
-	
+
 	<!--입고정보 - 수정 팝업-->
 	<select id="selectWareHousingDetailInfo" parameterType="Map" resultType="camelMap">
 		SELECT B.FILE_TRGT_KEY
 				, A.CO_CD
-				, ( SELECT FN_CM05M01_CD_TO_NM(A.CO_CD) FROM DUAL ) AS CO_CD_NM	/* 회사명 */					
+				, ( SELECT FN_CM05M01_CD_TO_NM(A.CO_CD) FROM DUAL ) AS CO_CD_NM	/* 회사명 */
 				, A.ORDRG_NO			/* 입고번호 */
 				, A.ORDRG_SEQ			/* 입고순번 */
 				, B.REQ_NO				/* 요인별 요청번호 */
-				, A.SALES_CD						
+				, A.SALES_CD
 				, B.PCHS_CLNT_CD				/* 구매처cd */
        			,
        			(
        				SELECT D.CLNT_NM
        					FROM TB_BM02M01 D
        				WHERE B.PCHS_CLNT_CD=D.CLNT_CD
-       			) AS PCHS_CLNT_NM		/* 구매처명 */            							
-				, 
+       			) AS PCHS_CLNT_NM		/* 구매처명 */
+				,
 				(
 					SELECT SUM(D.ORDRG_AMT)
 						FROM TB_SM02D01 D
 					WHERE A.CO_CD=D.CO_CD AND A.ORDRG_NO=D.ORDRG_NO AND A.ORDRG_SEQ=D.ORDRG_SEQ AND A.SALES_CD=D.SALES_CD
-				) AS ORDRG_AMT										
+				) AS ORDRG_AMT
 				, SUM(NVL(C.IN_QTY *C.IN_PRC , 0)) OVER(PARTITION BY A.CO_CD) AS SUM_IN_DTL_AMT /* 입고금액 (총 합)*/
 				, C.IN_NO		/* 입고번호 */
 				, MAX(C.CURR_CD) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO)	AS CURR_CD				/* 통화단위 */
 				, MAX(C.EXRATE) OVER(PARTITION BY A.CO_CD, A.ORDRG_NO) AS EXRATE				/* 환율 */																	  																						                    								, ORDRS_CLNT_NM			/* 고객명 */
 				, CLNT_PJT			/* 고객사 PJT */
 				, CLNT_PJT_NM
-				, EQP_NM			/* WKDQLAUD */		
-				, C.IO_DIV 	
+				, EQP_NM			/* WKDQLAUD */
+				, C.IO_DIV
 				, TO_CHAR(B.ORDRG_DT, 'YYYY-MM-DD') 	AS ORDRG_DT	--발주일자
 				, B.CREAT_ID    --발주서작성자
 				, CC.NAME  	AS CREAT_NM	--발주서작성자명
 				, CC.TEL_NO AS  ORDRG_MNG_TEL_NO --발주서작성자전호번호
 			FROM TB_SM02D01 A
 			INNER JOIN TB_SM02M01 B ON(A.CO_CD=B.CO_CD AND A.ORDRG_NO=B.ORDRG_NO)
-			INNER JOIN TB_SM03D01 C ON(A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ AND A.SALES_CD=C.SALES_CD)		
-			LEFT OUTER JOIN TB_CM06M01 CC ON(A.CREAT_ID=CC.ID)		--작성자정보	
-			LEFT OUTER JOIN 
-			( 
+			INNER JOIN TB_SM03D01 C ON(A.ORDRG_NO=C.ORDRG_NO AND A.ORDRG_SEQ=C.ORDRG_SEQ AND A.SALES_CD=C.SALES_CD)
+			LEFT OUTER JOIN TB_CM06M01 CC ON(A.CREAT_ID=CC.ID)		--작성자정보
+			LEFT OUTER JOIN
+			(
               SELECT M.CO_CD                                             AS CO_CD         --회사코드
                     , M.ORDRS_NO                                         AS ORDRS_NO      --수주번호
                     , M.ORDRS_CLNT_CD                                    AS ORDRS_CLNT_CD --고객코드
                     , C.CLNT_NM                                          AS ORDRS_CLNT_NM --고객명
                     , X.SALES_CD                                         AS SALES_CD      --SALES Code
-                    , M.CLNT_PJT                                         AS CLNT_PJT      --고객사PJT 
+                    , M.CLNT_PJT                                         AS CLNT_PJT      --고객사PJT
                     , X.PRDT_CD                                          AS PRDT_CD       --제품구분
-                    , X.EQP_NM                                           AS EQP_NM        --설비명 
+                    , X.EQP_NM                                           AS EQP_NM        --설비명
 		            , X.ITEM_DIV                                         AS ITEM_DIV      --아이템구분
 		            , (SELECT FN_CM05M01_CD_TO_NM(X.ITEM_DIV) FROM DUAL) AS ITEM_DIV_NM   --아이템 구분명
 		            , C.CLNT_DIV_CD                                      AS CLNT_DIV_CD    --거래처 분류
 		            , (SELECT FN_CM05M01_CD_TO_NM(C.CLNT_DIV_CD) FROM DUAL) AS CLNT_DIV_NM  --거래처 분류명
 					, FN_CM05M01_CD_TO_NM(M.CLNT_PJT)                    AS CLNT_PJT_NM
                 FROM TB_CR02M01  M --수주마스터
-                  			INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세  							
-                   INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보                      			
-			) S ON(A.SALES_CD=S.SALES_CD)						
-		WHERE 1=1	
-			AND C.IN_NO = #{inNo}	
+                  			INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세
+                   INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+			) S ON(A.SALES_CD=S.SALES_CD)
+		WHERE 1=1
+			AND C.IN_NO = #{inNo}
 		<if test="coCd != null and !coCd.equals('')">
-			AND A.CO_CD = #{coCd}   
-		</if>	
+			AND A.CO_CD = #{coCd}
+		</if>
 		<if test="ordrgNo != null and !ordrgNo.equals('')">
-			AND A.ORDRG_NO = #{ordrgNo}   
-		</if>			
+			AND A.ORDRG_NO = #{ordrgNo}
+		</if>
 		<if test="salesCd != null and !salesCd.equals('')">
-			AND A.SALES_CD = #{salesCd}   
-		</if>								
+			AND A.SALES_CD = #{salesCd}
+		</if>
 	</select>
 	<!-- 입고정보 - 수정 팝업-->
 
-	
+
 	<!-- 입고관리 - 입고마스터 등록 사용안함 -->
-	<insert id="insertWareHousingMaster" parameterType="Map">	
+	<insert id="insertWareHousingMaster" parameterType="Map">
 		MERGE INTO TB_SM03M01 A
 			USING DUAL
 			ON (
 			A.FILE_TRGT_KEY = #{fileTrgtKey}
 			AND A.CO_CD = #{coCd}
 			AND A.IN_NO = #{maxInNo}
-				)	
+				)
 		WHEN MATCHED THEN
-			UPDATE SET	
+			UPDATE SET
 				REQ_NO						= #{reqNo,  jdbcType=VARCHAR}
 				, SALES_CD					= #{salesCd}
 				, ETC_FIELD1				= #{etcField1,  jdbcType=VARCHAR}
 				, ETC_FIELD2				= #{etcField2,  jdbcType=VARCHAR}
 				, ETC_FIELD3				= #{etcField3,  jdbcType=VARCHAR}
 				, UDT_ID					= #{userId}
-				, UDT_PGM					= #{pgmId}	
+				, UDT_PGM					= #{pgmId}
 				, UDT_DTTM					= SYSDATE
-		WHEN NOT MATCHED THEN											
-		INSERT 
+		WHEN NOT MATCHED THEN
+		INSERT
 	      (
 			FILE_TRGT_KEY
 			 , CO_CD
@@ -575,15 +588,15 @@
 			, #{pgmId}
 			, SYSDATE
 	    )
-	</insert>	
-	
+	</insert>
+
 	<!-- 입고 detail 등록   -->
 	<insert id="insertWareHousingDetail" parameterType="Map">
 	    <selectKey keyProperty="inSeq" resultType="String" order="BEFORE">
-			SELECT NVL(MAX(IN_SEQ)+1, 1) FROM TB_SM03D01 
+			SELECT NVL(MAX(IN_SEQ)+1, 1) FROM TB_SM03D01
 				WHERE CO_CD = #{coCd}
 						AND IN_NO = #{maxInNo}
-	    </selectKey>		        
+	    </selectKey>
 		INSERT INTO TB_SM03D01
 		  (
 			CO_CD
@@ -638,13 +651,13 @@
 			, #{inDt}
 			, #{matrWhCd}
 	      )
-	</insert>	
-	
+	</insert>
+
 	<!-- 입고관리 마스터 수정 사용안함  -->
 	<update id="updateWareHousingMaster" parameterType="Map">
 		UPDATE TB_SM02M01
 			SET
-		REQ_NO = #{reqNo} 
+		REQ_NO = #{reqNo}
 		, SALES_CD = #{salesCd}
 		, PCHS_CLNT_CD = #{pchsClntCd}
 		, ORDRG_DT = #{ordrgDt}
@@ -654,7 +667,7 @@
 		, EXRATE = #{exrate}
 		, ORDRG_AMT = #{ordrgAmt}
 		, DUDT_DEQ_DT = #{dudtDeqDt}
-		, ORDRG_RMK = #{ordrgRmk,			jdbcType=VARCHAR}	 	
+		, ORDRG_RMK = #{ordrgRmk,			jdbcType=VARCHAR}
 		, IN_CMPLET_YN = #{inCmpletYn,			jdbcType=VARCHAR}
 		, UDT_ID = #{userId}
 		, UDT_PGM = #{pgmId}
@@ -663,11 +676,11 @@
 			AND CO_CD = #{coCd}
 			AND ORDRG_NO = #{ordrgNo}
 	</update>
-		
+
 	<!-- 입고관리 상세 수정 -->
 	<update id="updateWareHousingDetail" parameterType="Map">
 		UPDATE TB_SM03D01
-			SET 
+			SET
 			MATR_CD = #{matrCd}
 			, MATR_TEST_DIV = #{matrTestDiv}
 			, IN_PRC = #{inPrc}
@@ -677,7 +690,7 @@
 			, IN_DTL_AMT = #{inDtlAmt}
 			, CURR_CD = #{currCd}
 			, EXRATE = #{exrate}
-			, IN_DTL_RMK = #{inDtlRmk,			jdbcType=VARCHAR}	 	
+			, IN_DTL_RMK = #{inDtlRmk,			jdbcType=VARCHAR}
 			, UDT_ID = #{userId}
 			, UDT_PGM = #{pgmId}
 			, UDT_DTTM = SYSDATE
@@ -688,22 +701,22 @@
 			AND IN_NO = #{inNo}
 			AND IN_SEQ = #{inSeq}
 	</update>
-	
-	<!-- 입고 디테일  삭제 -->         
+
+	<!-- 입고 디테일  삭제 -->
 	<delete id="deleteWareHousingDetail" parameterType="Map">
-		DELETE 
+		DELETE
 			FROM TB_SM03D01
 		WHERE 1=1
 			AND CO_CD = #{coCd}
 			AND IN_NO = #{inNo}
-			AND IN_SEQ = #{inSeq}	
-	</delete>	
-	
+			AND IN_SEQ = #{inSeq}
+	</delete>
+
 	<!-- 입고 디테일 모두 삭제될 경우  MASTER 삭제-->
 	<delete id="deleteWareHousingMaster" parameterType="Map">
-		DELETE 
+		DELETE
 			FROM TB_SM03M01 A
-			WHERE A.IN_NO IN 
+			WHERE A.IN_NO IN
 			(
 			SELECT #{inNo} IN_NO
 				FROM
@@ -712,56 +725,56 @@
 					FROM TB_SM03D01 A
 					WHERE 1=1
 					AND A.ORDRG_NO = #{ordrgNo}
-					GROUP BY IN_NO							
+					GROUP BY IN_NO
 				)
-				WHERE CNT = 0											
+				WHERE CNT = 0
 			)
 	</delete>
-	
+
 	<!-- 입고  MASTER 삭제-->
 	<delete id="deleteWareHousingDirectMaster" parameterType="Map">
-		DELETE 
+		DELETE
 			 FROM TB_SM03M01 A
-			WHERE A.CO_CD  =  #{coCd} 
-			  AND A.IN_NO  =  #{inNo} 
+			WHERE A.CO_CD  =  #{coCd}
+			  AND A.IN_NO  =  #{inNo}
 	</delete>
-	
+
 	<!-- 입고  Detail 삭제-->
 	<delete id="deleteWareHousingDirectDetail" parameterType="Map">
-		DELETE 
+		DELETE
 			 FROM TB_SM03D01 A
-			WHERE A.CO_CD  =  #{coCd} 
-			  AND A.IN_NO  =  #{inNo} 
-	</delete>	
-	
+			WHERE A.CO_CD  =  #{coCd}
+			  AND A.IN_NO  =  #{inNo}
+	</delete>
+
 
 	<select id="select_prjct_code" parameterType="Map" resultType="camelMap">
-		<include refid="selectWareHousingListCondition"></include>	
+		<include refid="selectWareHousingListCondition"></include>
 	   /* select_prjct_code  */
-			SELECT DISTINCT 
-	        		  CLNT_PJT           AS CODE      --고객사PJT 
+			SELECT DISTINCT
+	        		  CLNT_PJT           AS CODE      --고객사PJT
 					, CLNT_PJT_NM        AS NAME
 				FROM
-				(																
-					SELECT    SUJU.CLNT_PJT             AS CLNT_PJT      --고객사PJT 
+				(
+					SELECT    SUJU.CLNT_PJT             AS CLNT_PJT      --고객사PJT
 							, FN_CM05M01_CD_TO_NM(SUJU.CLNT_PJT)    AS CLNT_PJT_NM
 					  FROM BJM														        --발주내역
 					   				LEFT OUTER JOIN INO          ON  BJM.ORDRG_NO = INO.ORDRG_NO		--입고내역
 									LEFT OUTER JOIN TB_CM06M01 M ON M.ID = BJM.CREAT_ID
 									LEFT OUTER JOIN TB_BM02M01 D ON BJM.PCHS_CLNT_CD = D.CLNT_CD
-									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD				
-				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보  
+									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD
+				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
 				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
 					 WHERE 1=1
 						<!-- 입고잔량이 있는것만(데쉬보드용) -->
 						<if test="remainQty != null and !remainQty.equals('')">
-						AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)	
+						AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)
 						AND DUDT_DEQ_DT 	<![CDATA[<]]> #{ordrgDtTo}
-						</if>	
+						</if>
 						<!-- 프로젝트 -->
 				        <if test="clntPjt != null and !clntPjt.equals('')">
 				        AND SUJU.CLNT_PJT IN ( ${clntPjt} )
-				        </if>	
+				        </if>
 						<!-- 담당자 -->
 				        <if test="mngIdCd != null and !mngIdCd.equals('')">
 				        AND BJM.CREAT_ID IN ( ${mngIdCd} )
@@ -769,36 +782,36 @@
 						<if test='cmpletYn == "Y"'>
 					    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0))  = 0			--입고완료
 						</if>
-						<if test='cmpletYn == "N"'>						
+						<if test='cmpletYn == "N"'>
 				  	    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) != 0			--미입고현황
 						</if>
-					) T								
-	</select>		
+					) T
+	</select>
 
-	
-	<select id="select_mngId_code" parameterType="Map" resultType="camelMap">															
-		<include refid="selectWareHousingListCondition"></include>			
-			SELECT DISTINCT 
-	        		  ORDRG_MNG_ID          AS CODE      --고객사PJT 
+
+	<select id="select_mngId_code" parameterType="Map" resultType="camelMap">
+		<include refid="selectWareHousingListCondition"></include>
+			SELECT DISTINCT
+	        		  ORDRG_MNG_ID          AS CODE      --고객사PJT
 					, ORDRG_MNG_NM        	AS NAME
 				FROM
-				(			
+				(
 					SELECT   BJM.CREAT_ID    			AS ORDRG_MNG_ID
-							, M.NAME 		  			AS ORDRG_MNG_NM 
+							, M.NAME 		  			AS ORDRG_MNG_NM
 					  FROM BJM														        --발주내역
 					   				LEFT OUTER JOIN INO          ON  BJM.ORDRG_NO = INO.ORDRG_NO		--입고내역
-									LEFT OUTER JOIN TB_CM06M01 M ON M.ID = BJM.CREAT_ID  
+									LEFT OUTER JOIN TB_CM06M01 M ON M.ID = BJM.CREAT_ID
 				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
 					 WHERE 1=1
 						<!-- 입고잔량이 있는것만(데쉬보드용) -->
 						<if test="remainQty != null and !remainQty.equals('')">
-						AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)	
+						AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) !=  0	 --입고잔량이 있는것만(데쉬보드용)
 						AND DUDT_DEQ_DT 	<![CDATA[<]]> #{ordrgDtTo}
-						</if>	
+						</if>
 						<!-- 프로젝트 -->
 				        <if test="clntPjt != null and !clntPjt.equals('')">
 				        AND SUJU.CLNT_PJT IN ( ${clntPjt} )
-				        </if>	
+				        </if>
 						<!-- 담당자 -->
 				        <if test="mngIdCd != null and !mngIdCd.equals('')">
 				        AND BJM.CREAT_ID IN ( ${mngIdCd} )
@@ -806,27 +819,27 @@
 						<if test='cmpletYn == "Y"'>
 					    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0))  = 0			--입고완료
 						</if>
-						<if test='cmpletYn == "N"'>						
+						<if test='cmpletYn == "N"'>
 				  	    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) != 0			--미입고현황
 						</if>
-					) T		
+					) T
 
-    </select>		
-	
+    </select>
+
 	<!-- 메일발송 수정 -->
 	<update id="updateMailStoreConfirm" parameterType="Map">
 		UPDATE TB_SM03M01
-			SET 
-				  MAIL_YN 	 	= #{mailYn}	
-				, MAIL_DTTM		= SYSDATE	
-				, MAIL_SEND_ID	= #{userId} 
-		WHERE CO_CD = #{coCd} 
-		 AND IN_NO = #{inNo} 
-	</update>	
-	
+			SET
+				  MAIL_YN 	 	= #{mailYn}
+				, MAIL_DTTM		= SYSDATE
+				, MAIL_SEND_ID	= #{userId}
+		WHERE CO_CD = #{coCd}
+		 AND IN_NO = #{inNo}
+	</update>
+
 
 	<!-- 입고관리 리스트 Count  -->
-	<select id="selectWareHousingDetaiNewlListCount" parameterType="Map" resultType="int">	
+	<select id="selectWareHousingDetaiNewlListCount" parameterType="Map" resultType="int">
 
 		WITH BJM AS (	--조건별 발주내역
 			SELECT  A.CO_CD
@@ -851,44 +864,44 @@
 			      ,1 ||'건'							AS CNT_NM
 				  , A.MATR_CD  						AS MATR_CD  --첫번째 자재코드를 추출용
 				  , A.DSGN_NO     					AS DSGN_NO
-	              , D.CLNT_NM     					AS PCHS_CLNT_NM		/* 구매처명 */ 
+	              , D.CLNT_NM     					AS PCHS_CLNT_NM		/* 구매처명 */
 	              , B.ARR_ID     					AS ARR_ID
 	              , TO_CHAR(B.ARR_DTTM, 'YYYY-MM-DD')	AS ARR_DTTM
 	              , B.ARR_YN     					AS ARR_YN
 	              , Q.PART_CD						AS PART_CD
 			  FROM TB_SM02D01 A
-						LEFT OUTER JOIN TB_SM02M01 B ON (A.CO_CD = B.CO_CD 
+						LEFT OUTER JOIN TB_SM02M01 B ON (A.CO_CD = B.CO_CD
 						                            AND  A.ORDRG_NO = B.ORDRG_NO)
 						LEFT OUTER JOIN TB_BM02M01 D ON B.PCHS_CLNT_CD = D.CLNT_CD
 						LEFT OUTER JOIN TB_QM01M01 Q ON Q.REQ_NO = B.REQ_NO
-			 WHERE 1=1			
-				<!-- 회사코드 -->  
+			 WHERE 1=1
+				<!-- 회사코드 -->
 				<if test="coCd != null and !coCd.equals('')">
-				AND A.CO_CD = #{coCd}   
-				</if>	       
-				<!-- 입고일자 -->         
-		        AND B.ORDRG_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo} 
-				<!-- SalesCode -->         
+				AND A.CO_CD = #{coCd}
+				</if>
+				<!-- 입고일자 -->
+		        AND B.ORDRG_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+				<!-- SalesCode -->
 				<if test="salesCd != null and !salesCd.equals('')">
-				AND A.SALES_CD LIKE  '%' || #{salesCd} || '%'   			
-				</if>			
-				<!-- 구매처 -->         
+				AND A.SALES_CD LIKE  '%' || #{salesCd} || '%'
+				</if>
+				<!-- 구매처 -->
 				<if test="pchsClntCd != null and !pchsClntCd.equals('')">
-				AND B.PCHS_CLNT_CD = #{pchsClntCd}   
-				</if>    		
+				AND B.PCHS_CLNT_CD = #{pchsClntCd}
+				</if>
 				<if test="pchsClntNm != null and !pchsClntNm.equals('')">
-				AND D.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'   
-				</if>    	
-				<!-- 발주번호 -->  		
+				AND D.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'
+				</if>
+				<!-- 발주번호 -->
 				<if test="ordrgNo != null and !ordrgNo.equals('')">
-				AND A.ORDRG_NO LIKE '%'||#{ordrgNo}||'%'   
+				AND A.ORDRG_NO LIKE '%'||#{ordrgNo}||'%'
 				</if>
 				<!-- 발주구분 -->
-		        <if test="ordrgdiv10 != null and !ordrgdiv10.equals('')">	
+		        <if test="ordrgdiv10 != null and !ordrgdiv10.equals('')">
 		        AND A.ORDRG_DIV10 = ( #{ordrgdiv10} )
 				</if>
 				<!-- 발주요청서 분류 -->
-		        <if test="partCd != null and !partCd.equals('')">	
+		        <if test="partCd != null and !partCd.equals('')">
 		        AND Q.PART_CD = #{partCd}
 				</if>
 	        )
@@ -897,46 +910,46 @@
 	          FROM BJM
 	    )
 	    ,SUJU AS (    --수주내역
-	        SELECT 
+	        SELECT
 	                 SALE.CO_CD                                             AS CO_CD         --회사코드
 	                , M.ORDRS_NO                                         AS ORDRS_NO      --수주번호
 	                , M.ORDRS_CLNT_CD                                    AS ORDRS_CLNT_CD --고객코드
 	                , SALE.SALES_CD                                      AS SALES_CD      --SALES Code
-	                , M.CLNT_PJT                                         AS CLNT_PJT      --고객사PJT 
+	                , M.CLNT_PJT                                         AS CLNT_PJT      --고객사PJT
 	                , A.PRDT_CD                                          AS PRDT_CD       --제품구분
-	                , A.EQP_NM                                           AS EQP_NM        --설비명 
+	                , A.EQP_NM                                           AS EQP_NM        --설비명
 		            , A.ITEM_DIV                                         AS ITEM_DIV      --아이템구분
 		            , (SELECT FN_CM05M01_CD_TO_NM(A.ITEM_DIV) FROM DUAL) AS ITEM_DIV_NM   --아이템 구분명
-	          FROM SALE 
+	          FROM SALE
 	          			LEFT OUTER JOIN TB_CR02D02 A ON SALE.SALES_CD = A.SALES_CD
 			          	LEFT OUTER JOIN TB_CR02M01 M ON(A.CO_CD = M.CO_CD AND A.ORDRS_NO = M.ORDRS_NO)
 		)
-		,CTOT AS ( -- 발주번호+SEQ 별 총입고수량 산정 
-			SELECT    C.ORDRG_NO 
+		,CTOT AS ( -- 발주번호+SEQ 별 총입고수량 산정
+			SELECT    C.ORDRG_NO
 					, C.ORDRG_SEQ
 					, NVL(SUM(C.IN_QTY), 0) AS TOT_IN_QTY
 			  FROM TB_SM03D01 C
 			 WHERE  1 = 1
-			   AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = C.ORDRG_NO)	
+			   AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = C.ORDRG_NO)
 		 	 GROUP BY C.ORDRG_NO, C.ORDRG_SEQ
-		) 
+		)
 		,INO AS ( --발주번호별 입고내역
-			  SELECT   I.ORDRG_NO, ORDRG_SEQ 
-			  				  , I.IN_NO 
+			  SELECT   I.ORDRG_NO, ORDRG_SEQ
+			  				  , I.IN_NO
 			  				  , SUM(nvl(I.IN_QTY,0)) 			AS  IN_QTY
 			  				  , MAX(M.FILE_TRGT_KEY) 			AS FILE_TRGT_KEY
-			  				  , TO_CHAR(MAX(I.IN_DT), 'YYYY-MM-DD') IN_DT		/* 입고일자 */	
-			  				  , SUM(nvl(I.BAD_QTY,0)) 			AS BAD_QTY 
+			  				  , TO_CHAR(MAX(I.IN_DT), 'YYYY-MM-DD') IN_DT		/* 입고일자 */
+			  				  , SUM(nvl(I.BAD_QTY,0)) 			AS BAD_QTY
 			  				  , SUM(nvl(I.IN_DTL_AMT,0))		AS IN_DTL_AMT
 			  				  , MAX(I.INOUT_KEY) 				AS INOUT_KEY
 			  				  , MAX(M.MAIL_YN)					AS MAIL_YN
 			  				  , TO_CHAR(MAX(M.MAIL_DTTM), 'YYYY-MM-DD') AS MAIL_DTTM
-	            FROM TB_SM03D01 I 
-			          	LEFT OUTER JOIN TB_SM03M01 M ON (M.CO_CD =I.CO_CD AND M.IN_NO =I.IN_NO )		
+	            FROM TB_SM03D01 I
+			          	LEFT OUTER JOIN TB_SM03M01 M ON (M.CO_CD =I.CO_CD AND M.IN_NO =I.IN_NO )
 	           WHERE 1=1
-			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = I.ORDRG_NO)	
+			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = I.ORDRG_NO)
 	           GROUP BY I.ORDRG_NO, ORDRG_SEQ, I.IN_NO
-		)	
+		)
 
 					SELECT   count(*)
 					  FROM BJM														        --발주내역
@@ -944,15 +957,15 @@
 					   											AND BJM.ORDRG_SEQ = INO.ORDRG_SEQ
 									LEFT OUTER JOIN TB_CM06M01 M ON M.ID = BJM.CREAT_ID
 									LEFT OUTER JOIN TB_BM02M01 D ON BJM.PCHS_CLNT_CD = D.CLNT_CD
-									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD				
-				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보  
+									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD
+				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
 				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
 					   											AND  CT.ORDRG_SEQ = BJM.ORDRG_SEQ
 					 WHERE 1=1
 						<!-- 프로젝트 -->
 				        <if test="clntPjt != null and !clntPjt.equals('')">
 				        AND SUJU.CLNT_PJT IN ( ${clntPjt} )
-				        </if>	
+				        </if>
 						<!-- 담당자 -->
 				        <if test="mngIdCd != null and !mngIdCd.equals('')">
 				        AND BJM.CREAT_ID IN ( ${mngIdCd} )
@@ -960,19 +973,19 @@
 						<if test='cmpletYn == "Y"'>
 					    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0))  = 0			--입고완료
 						</if>
-						<if test='cmpletYn == "N"'>						
+						<if test='cmpletYn == "N"'>
 				  	    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) != 0			--미입고현황
 						</if>
 						<!-- 입고확인 -->
 				        <if test="arrYn != null and !arrYn.equals('')">
 				        AND BJM.ARR_YN  = #{arrYn}
-				        </if>	
-					
-	</select>	
-		
-	
+				        </if>
+
+	</select>
+
+
 	<!-- 입고관리 리스트  -->
-	<select id="selectWareHousingDetaiNewlList" parameterType="Map" resultType="camelMap">	
+	<select id="selectWareHousingDetaiNewlList" parameterType="Map" resultType="camelMap">
 
 		WITH BJM AS (	--조건별 발주내역
 			SELECT  A.CO_CD
@@ -994,50 +1007,50 @@
 			      , B.ORDRG_DT  					AS ORDRG_DT
 			      , B.CURR_CD   					AS CURR_CD
 			      , B.EXRATE    					AS EXRATE
-			      , A.MATR_SPEC || 
-				    CASE WHEN A.MATR_MNO IS NOT NULL THEN ',' || A.MATR_MNO ELSE '' END || 
-				    CASE WHEN A.MATR_SIZE IS NOT NULL THEN ',' || A.MATR_SIZE ELSE '' END || 
+			      , A.MATR_SPEC ||
+				    CASE WHEN A.MATR_MNO IS NOT NULL THEN ',' || A.MATR_MNO ELSE '' END ||
+				    CASE WHEN A.MATR_SIZE IS NOT NULL THEN ',' || A.MATR_SIZE ELSE '' END ||
 				    CASE WHEN A.MATR_MAT IS NOT NULL THEN ',' || A.MATR_MAT ELSE '' END AS CNT_NM
 				  , A.MATR_CD  						AS MATR_CD  --첫번째 자재코드를 추출용
 				  , A.DSGN_NO     					AS DSGN_NO
-	              , D.CLNT_NM     					AS PCHS_CLNT_NM		/* 구매처명 */ 
+	              , D.CLNT_NM     					AS PCHS_CLNT_NM		/* 구매처명 */
 	              , A.ARR_ID     					AS ARR_ID
 	              , TO_CHAR(A.ARR_DTTM, 'YYYY-MM-DD')	AS ARR_DTTM
 	              , A.ARR_YN     					AS ARR_YN
 	              , Q.PART_CD						AS PART_CD
 			  FROM TB_SM02D01 A
-						LEFT OUTER JOIN TB_SM02M01 B ON (A.CO_CD = B.CO_CD 
+						LEFT OUTER JOIN TB_SM02M01 B ON (A.CO_CD = B.CO_CD
 						                            AND  A.ORDRG_NO = B.ORDRG_NO)
 						LEFT OUTER JOIN TB_BM02M01 D ON B.PCHS_CLNT_CD = D.CLNT_CD
 						LEFT OUTER JOIN TB_QM01M01 Q ON Q.REQ_NO = B.REQ_NO
-			 WHERE 1=1			
-				<!-- 회사코드 -->  
+			 WHERE 1=1
+				<!-- 회사코드 -->
 				<if test="coCd != null and !coCd.equals('')">
-				AND A.CO_CD = #{coCd}   
-				</if>	       
-				<!-- 입고일자 -->         
-		        AND B.ORDRG_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo} 
-				<!-- SalesCode -->         
+				AND A.CO_CD = #{coCd}
+				</if>
+				<!-- 입고일자 -->
+		        AND B.ORDRG_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+				<!-- SalesCode -->
 				<if test="salesCd != null and !salesCd.equals('')">
-				AND A.SALES_CD LIKE  '%' || #{salesCd} || '%'   			
-				</if>			
-				<!-- 구매처 -->         
+				AND A.SALES_CD LIKE  '%' || #{salesCd} || '%'
+				</if>
+				<!-- 구매처 -->
 				<if test="pchsClntCd != null and !pchsClntCd.equals('')">
-				AND B.PCHS_CLNT_CD = #{pchsClntCd}   
-				</if>    		
+				AND B.PCHS_CLNT_CD = #{pchsClntCd}
+				</if>
 				<if test="pchsClntNm != null and !pchsClntNm.equals('')">
-				AND D.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'   
-				</if>    	
-				<!-- 발주번호 -->  		
+				AND D.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'
+				</if>
+				<!-- 발주번호 -->
 				<if test="ordrgNo != null and !ordrgNo.equals('')">
-				AND A.ORDRG_NO LIKE '%'||#{ordrgNo}||'%'   
+				AND A.ORDRG_NO LIKE '%'||#{ordrgNo}||'%'
 				</if>
 				<!-- 발주구분 -->
-		        <if test="ordrgdiv10 != null and !ordrgdiv10.equals('')">	
+		        <if test="ordrgdiv10 != null and !ordrgdiv10.equals('')">
 		        AND A.ORDRG_DIV10 = ( #{ordrgdiv10} )
 				</if>
 				<!-- 발주요청서 분류 -->
-		        <if test="partCd != null and !partCd.equals('')">	
+		        <if test="partCd != null and !partCd.equals('')">
 		        AND Q.PART_CD = #{partCd}
 				</if>
 	        )
@@ -1046,64 +1059,64 @@
 	          FROM BJM
 	    )
 	    ,SUJU AS (    --수주내역
-	        SELECT 
+	        SELECT
 	                 SALE.CO_CD                                             AS CO_CD         --회사코드
 	                , M.ORDRS_NO                                         AS ORDRS_NO      --수주번호
 	                , M.ORDRS_CLNT_CD                                    AS ORDRS_CLNT_CD --고객코드
 	                , SALE.SALES_CD                                      AS SALES_CD      --SALES Code
-	                , M.CLNT_PJT                                         AS CLNT_PJT      --고객사PJT 
+	                , M.CLNT_PJT                                         AS CLNT_PJT      --고객사PJT
 	                , A.PRDT_CD                                          AS PRDT_CD       --제품구분
-	                , A.EQP_NM                                           AS EQP_NM        --설비명 
+	                , A.EQP_NM                                           AS EQP_NM        --설비명
 		            , A.ITEM_DIV                                         AS ITEM_DIV      --아이템구분
 		            , (SELECT FN_CM05M01_CD_TO_NM(A.ITEM_DIV) FROM DUAL) AS ITEM_DIV_NM   --아이템 구분명
-	          FROM SALE 
+	          FROM SALE
 	          			LEFT OUTER JOIN TB_CR02D02 A ON SALE.SALES_CD = A.SALES_CD
 			          	LEFT OUTER JOIN TB_CR02M01 M ON(A.CO_CD = M.CO_CD AND A.ORDRS_NO = M.ORDRS_NO)
 		)
-		,CTOT AS ( -- 발주번호+SEQ 별 총입고수량 산정 
-			SELECT    C.ORDRG_NO 
+		,CTOT AS ( -- 발주번호+SEQ 별 총입고수량 산정
+			SELECT    C.ORDRG_NO
 					, C.ORDRG_SEQ
 					, NVL(SUM(C.IN_QTY), 0) AS TOT_IN_QTY
 			  FROM TB_SM03D01 C
 			 WHERE  1 = 1
-			   AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = C.ORDRG_NO)	
+			   AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = C.ORDRG_NO)
 		 	 GROUP BY C.ORDRG_NO, C.ORDRG_SEQ
-		) 
+		)
 		,INO AS ( --발주번호별 입고내역
-			  SELECT   I.ORDRG_NO, ORDRG_SEQ 
-			  				  , I.IN_NO 
+			  SELECT   I.ORDRG_NO, ORDRG_SEQ
+			  				  , I.IN_NO
 			  				  , SUM(nvl(I.IN_QTY,0)) 			AS  IN_QTY
 			  				  , MAX(M.FILE_TRGT_KEY) 			AS FILE_TRGT_KEY
-			  				  , TO_CHAR(MAX(I.IN_DT), 'YYYY-MM-DD') IN_DT		/* 입고일자 */	
-			  				  , SUM(nvl(I.BAD_QTY,0)) 			AS BAD_QTY 
+			  				  , TO_CHAR(MAX(I.IN_DT), 'YYYY-MM-DD') IN_DT		/* 입고일자 */
+			  				  , SUM(nvl(I.BAD_QTY,0)) 			AS BAD_QTY
 			  				  , SUM(nvl(I.IN_DTL_AMT,0))		AS IN_DTL_AMT
 			  				  , MAX(I.INOUT_KEY) 				AS INOUT_KEY
 			  				  , MAX(M.MAIL_YN)					AS MAIL_YN
 			  				  , TO_CHAR(MAX(M.MAIL_DTTM), 'YYYY-MM-DD') AS MAIL_DTTM
-	            FROM TB_SM03D01 I 
-			          	LEFT OUTER JOIN TB_SM03M01 M ON (M.CO_CD =I.CO_CD AND M.IN_NO =I.IN_NO )		
+	            FROM TB_SM03D01 I
+			          	LEFT OUTER JOIN TB_SM03M01 M ON (M.CO_CD =I.CO_CD AND M.IN_NO =I.IN_NO )
 	           WHERE 1=1
-			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = I.ORDRG_NO)	
+			     AND EXISTS (SELECT 1 FROM BJM WHERE BJM.ORDRG_NO = I.ORDRG_NO)
 	           GROUP BY I.ORDRG_NO, ORDRG_SEQ, I.IN_NO
-		)	
-		
+		)
+
 		SELECT T.*
 			FROM
 			(
 			SELECT ROWNUM AS RN
 					, T.*
 				FROM
-				(	
+				(
 					SELECT   NVL(CT.TOT_IN_QTY,0) AS TOT_IN_QTY
 							, ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)  AS REAMIN_IN_QTY
-							, BJM.MATR_CD   			AS MATR_CD 
+							, BJM.MATR_CD   			AS MATR_CD
 							, J.MATR_NM ||
 							  CASE WHEN BJM.CNT_NM IS NOT NULL THEN ' [' || BJM.CNT_NM ||']' ELSE '' END
 							AS MATR_CNT_NM
 							, J.MATR_STOCK_CD 			AS MATR_STOCK_CD
 							, BJM.CREAT_ID    			AS ORDRG_MNG_ID
-							, M.NAME 		  			AS ORDRG_MNG_NM   
-				            , SUJU.CLNT_PJT             AS CLNT_PJT      --고객사PJT 
+							, M.NAME 		  			AS ORDRG_MNG_NM
+				            , SUJU.CLNT_PJT             AS CLNT_PJT      --고객사PJT
 							, FN_CM05M01_CD_TO_NM(SUJU.CLNT_PJT)    AS CLNT_PJT_NM
 							, SUJU.EQP_NM
 							, SUJU.ORDRS_CLNT_CD
@@ -1118,16 +1131,16 @@
 					   											AND BJM.ORDRG_SEQ = INO.ORDRG_SEQ
 									LEFT OUTER JOIN TB_CM06M01 M ON M.ID = BJM.CREAT_ID
 									LEFT OUTER JOIN TB_BM02M01 D ON BJM.PCHS_CLNT_CD = D.CLNT_CD
-									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD				
-				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보  
+									LEFT OUTER JOIN SUJU		 ON SUJU.SALES_CD = BJM.SALES_CD
+				              		LEFT OUTER JOIN TB_BM02M01 C ON SUJU.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
 				              		LEFT OUTER JOIN CTOT       CT ON CT.ORDRG_NO =  BJM.ORDRG_NO
-					   											AND  CT.ORDRG_SEQ = BJM.ORDRG_SEQ		
-				              		LEFT OUTER JOIN TB_BM05M01 J ON BJM.MATR_CD = J.MATR_CD --자재정보  
+					   											AND  CT.ORDRG_SEQ = BJM.ORDRG_SEQ
+				              		LEFT OUTER JOIN TB_BM05M01 J ON BJM.MATR_CD = J.MATR_CD --자재정보
 					 WHERE 1=1
 						<!-- 프로젝트 -->
 				        <if test="clntPjt != null and !clntPjt.equals('')">
 				        AND SUJU.CLNT_PJT IN ( ${clntPjt} )
-				        </if>	
+				        </if>
 						<!-- 담당자 -->
 				        <if test="mngIdCd != null and !mngIdCd.equals('')">
 				        AND BJM.CREAT_ID IN ( ${mngIdCd} )
@@ -1135,30 +1148,30 @@
 						<if test='cmpletYn == "Y"'>
 					    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0))  = 0			--입고완료
 						</if>
-						<if test='cmpletYn == "N"'>						
+						<if test='cmpletYn == "N"'>
 				  	    AND (ORDRG_QTY - NVL(CT.TOT_IN_QTY,0)) != 0			--미입고현황
 						</if>
 						<!-- 입고확인 -->
 				        <if test="arrYn != null and !arrYn.equals('')">
 				        AND NVL(BJM.ARR_YN, 'N')  = #{arrYn}
-				        </if>	
-					ORDER BY BJM.SALES_CD, BJM.DSGN_NO,  BJM.MATR_CD, BJM.REQ_NO, BJM.ORDRG_NO, PCHS_CLNT_NM  
-					) T						
+				        </if>
+					ORDER BY BJM.SALES_CD, BJM.DSGN_NO,  BJM.MATR_CD, BJM.REQ_NO, BJM.ORDRG_NO, PCHS_CLNT_NM
+					) T
 		) T
 		WHERE 1=1
-		AND RN BETWEEN ${firstIndex} AND ${lastIndex}	
-	</select>	
+		AND RN BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>
 
 
-	<select id="selectPurchaseconfirmed" parameterType="Map" resultType="camelMap">		
-	 -- 매입확정 여부 체크용													
-		SELECT 
+	<select id="selectPurchaseconfirmed" parameterType="Map" resultType="camelMap">
+	 -- 매입확정 여부 체크용
+		SELECT
 				CO_CD, IN_NO, IN_SEQ, ORDRG_NO, ORDRG_SEQ, REQ_NO, SALES_CD, MATR_CD, PCHS_NO, PCHS_SEQ
 		  FROM TB_SM03D01
 		 WHERE IN_NO = #{inNo}
-		   AND IN_SEQ = #{inSeq} 	
-    </select>		
-			
+		   AND IN_SEQ = #{inSeq}
+    </select>
+
 	<!-- 발주관리 상세 납기예정일자 수정 -->
 	<update id="updateDudtIntendDt" parameterType="Map">
 		UPDATE TB_SM02D01
@@ -1170,7 +1183,7 @@
 		AND    ORDRG_NO = #{ordrgNo}
 		<if test="ordrgSeq != null and !ordrgSeq.equals('')">
 		AND    ORDRG_SEQ = #{ordrgSeq}
-		</if>	
+		</if>
 	</update>
-			
+
  </mapper>
