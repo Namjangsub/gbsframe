@@ -36,24 +36,24 @@ var treeModule = (function () {
             // console.log("#fileAttachTxt 요소가 존재하지 않습니다.");
             // #fileList_area 요소의 자식으로 새로운 코드를 삽입합니다.
             fileListArea_html_creation();
-            
+
             createFileInput(gridSelector);
 //            treeComonCd = codeId; //무시
             treeComonCd = 'FILETREE';             //최상위 트리 강제로 할당 (파라메터값 무시)
-            params["comonCd"] = treeComonCd;      //comonCd는 xML 쿼리에서 트리ID 보관 필드명 
+            params["comonCd"] = treeComonCd;      //comonCd는 xML 쿼리에서 트리ID 보관 필드명
             params["userId"] = jwt.userId;        //캐시에 보관된 사용자 ID
-            
+
             fileTreeParamObj = params;  //
             fileArr=[];
             deleteFileArr = [];
-            
+
             initDeptTree(selector);
-            
+
             currPgmAuthChk = authChk(); // true:저장권한, false:저장권한 없음
-            
+
             fileTreeGridView.init(gridSelector);
 
-            
+
             //--------------------------------------------------------------------
             //To-Do List에서 팝업창을 뛰우면 정보확인하고 결재버튼 클릭시 결재 처리를 위한 버튼 추가  시작
             //--------------------------------------------------------------------
@@ -77,7 +77,7 @@ var treeModule = (function () {
             //--------------------------------------------------------------------
         }
     }
-    
+
 
     fileTreeGridView = {
         target: new ax5.ui.grid(),
@@ -141,7 +141,7 @@ var treeModule = (function () {
                     // {key: "prjctNm", label: "프로젝트명", width: 110, align: "center"},
 					{key : "lpath",  label : "저장위치",	 width : 180, align: "center", hidden: false},
                     {key: "fileDelete", label: "삭제", width: 60, align: "center",
-                    	formatter:function() {return (this.item.fileDelete == "Y" || this.item.fileKey == 0 ) && currPgmAuthChk ? '<button style="height: 18px; padding:0px;" type="button" onclick="treeModule.deleteFile('+this.dindex+')" authchk>삭제</button>' : '불가'}                    	
+                    	formatter:function() {return (this.item.fileDelete == "Y" || this.item.fileKey == 0 ) && currPgmAuthChk ? '<button style="height: 18px; padding:0px;" type="button" onclick="treeModule.deleteFile('+this.dindex+')" authchk>삭제</button>' : '불가'}
                     }],
                 page: {
                     display: false
@@ -161,7 +161,7 @@ var treeModule = (function () {
                 $("#fileAttachTxt").hide();
                 $("#fileAttachCnts").show();
             };
-            
+
             targetObj.setData({
                 list: list,
                 page: {
@@ -179,7 +179,7 @@ var treeModule = (function () {
     			core : {
     				check_callback: true,
     				data : selectDeptTree(),
-    				
+
     				check_callback: function (operation, node, node_parent, node_position, more) {
     					if (operation === 'delete_node') {
     						if (node.original.isLeaf == 0) {
@@ -190,7 +190,7 @@ var treeModule = (function () {
     					}
     					// 삭제가능
     					return true;
-    				},                
+    				},
     				types : {
     	  				'leaf' : {"icon" : 'glyphicon glyphicon-file'},
     	  				'unit' : {'icon' : 'glyphicon glyphicon-folder-close'},
@@ -205,16 +205,16 @@ var treeModule = (function () {
             $('#' + selector).jstree(true).open_node($('#' + selector + ' li[aria-level="1"]').eq(0).attr('id'));
 
             var topLevelNode = $('#' + selector + ' li[aria-level="1"]').eq(0).attr('id');
-			$('#' + selector).jstree(true).deselect_all();            
+			$('#' + selector).jstree(true).deselect_all();
             $('#' + selector).jstree(true).select_node(topLevelNode);
-            
+
 			var tree = $('#' + selector).jstree(true);
 			const topNode = 'FILETREE';
 			const rootNode = tree.get_node(topNode);
-			  
+
 			//자식노드중에 isLeaf가 1인 자식인 하나도 없으면 트리목록 삭제 처리
 			searchAndDelete(tree, topNode, topNode);
-			
+
         })
             .on("refresh.jstree", function () {
                 // 리프레시 완료 시
@@ -237,7 +237,7 @@ var treeModule = (function () {
 	                if (buttonFile.length) {
 		    			if (selectedNodeEtc == 'N') {
 		    				buttonFile.hide();
-		    			} else {			
+		    			} else {
 		    				buttonFile.show();
 		    			}
 	                }
@@ -245,7 +245,7 @@ var treeModule = (function () {
         			$("#file_tag").html(txt);
         			treeComonCd =  selectedNodeId;
         		}
-        		
+
         		if (!$('#' + selector).is(":visible")) {
         			$('#' + selector).show();
         		}
@@ -264,7 +264,7 @@ var treeModule = (function () {
 			var selectedNode = $('#' + selector).jstree('get_selected');
 			if (selectedNode.length > 0) {
 				var selectedNodeData = $('#' + selector).jstree('get_node', selectedNode[0]).original;
-				  
+
 				// 선택된 노드의 속성 값을 가져오기
 				if (selectedNodeData.codeEtc == 'N') {
 					alert('"' + selectedNodeData.text + '" 폴더는 자료를 저장할 수 없는 폴더입니다.');
@@ -272,7 +272,7 @@ var treeModule = (function () {
 					file.click();
 				}
 			}
-    			
+
     		}).on('open_node.jstree', function (e, data) {
                 // 노드 열릴 때
                 data.instance.set_type(data.node, 'unit-open');
@@ -282,7 +282,7 @@ var treeModule = (function () {
         })
     }
 
-    
+
     function createFileInput(gridSelector) {
         // 새로운 input 요소 생성
         var fileInput = document.createElement('input');
@@ -308,7 +308,7 @@ var treeModule = (function () {
         }
     }
 
-    //트리 선택시 서버에 등록된 첨부 화일을 가져와서 그리드에 출력하기 위한 작업 
+    //트리 선택시 서버에 등록된 첨부 화일을 가져와서 그리드에 출력하기 위한 작업
     function getAllFilesForNodes(nodeId) {
     	if (!fileTreeParamObj.fileTrgtTyp || !fileTreeParamObj.fileTrgtKey) {
     		return false;
@@ -329,9 +329,9 @@ var treeModule = (function () {
 
     function selectDeptTree() {
 		var deptTree = null;
-		fileTreeParamObj["coCd"] = fileTempCocd; 
-		fileTreeParamObj["userId"] = jwt.userId; 
-		fileTreeParamObj["useYn"] = 'Y'; 
+		fileTreeParamObj["coCd"] = fileTempCocd;
+		fileTreeParamObj["userId"] = jwt.userId;
+		fileTreeParamObj["useYn"] = 'Y';
 
 		postAjaxSync("/admin/cm/cm05/selectDocTreeListAuth", fileTreeParamObj, null, function(data){
 			deptTree = data.docTreeList;
@@ -379,7 +379,7 @@ var treeModule = (function () {
         	alert('파일 삭제 권한이 없습니다.')
         	return false;
         };
-		
+
     	if(fileArr[rowIndex].fileKey){
     		// 기 등록되어 있는 파일 삭제시
             deleteFileArr.push(fileArr[rowIndex].fileKey);
@@ -403,7 +403,7 @@ var treeModule = (function () {
 // 				var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName , "UTF-8");
 				location.href = "/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId;
 			} else {
-				alert("다운로드 권한이 없습니다.");	
+				alert("다운로드 권한이 없습니다.");
 			}
 		});
     }
@@ -422,8 +422,8 @@ var treeModule = (function () {
 			fileTreeGridView.reqSetData(fileTreeGridView.target.list)
 		}
 	}
-	
-	
+
+
 	// #fileList_area 요소의 자식으로 새로운 코드를 삽입합니다.
 	function fileListArea_html_creation () {
 		var fileListArea = $('#fileList_area');
@@ -455,16 +455,16 @@ var treeModule = (function () {
 		      </div>
 		    </div>
 			<div class="col-xs-2" style="height: 70px;"></div>
-			</div>	    
+			</div>
 		  `);
-		  
+
 		  $("#fileAttachTxt").click(function() {
               $("#fileAttachTxt").hide();
               $("#fileAttachCnts").show();
               getAllFilesForNodes(treeComonCd);
           });
 	}
-	
+
 
 	function callApprovalWorking(){
 		let row = approvalWorkingGrid;
@@ -483,7 +483,7 @@ var treeModule = (function () {
 				    if (row.todoKey != undefined) {
 					 	 var today = new Date();
 					     var strDate = today.getFullYear()+"-"+('0'+(today.getMonth()+1)).slice(-2)+"-"+('0'+today.getDate()).slice(-2);
-					     
+
 					     var formData = new FormData();
 					     formData.append("todoKey", row.todoKey);
 					     formData.append("creatId", jwt.userId);
@@ -491,13 +491,13 @@ var treeModule = (function () {
 					     //formData.append("todoCfDt", strDate);
 					     filePutAjax("/user/wb/wb20/toDoCfDtUpdate", formData, function(data){
 					         if(data.resultCode == 200){
-					        	 $('#callApprovalWorking').remove(); 
-					             alert("공유 확인되었습니다.");      
+					        	 $('#callApprovalWorking').remove();
+					             alert("공유 확인되었습니다.");
 					             gridView.initView().setData(0);
 					       		 modalStack.close();
 					         }
-					     }); 
-				    }    
+					     });
+				    }
 				}
 			} else {
 				alert("이미 확인처리 하였습니다.");
@@ -521,14 +521,14 @@ var treeModule = (function () {
 			};
 			openThirdModal("/static/html/user/wb/wb20/WB2001P01.html", 730, 300, "", paramObj, function(data){
 	       		if (data == "승인완료") {
-	       			$('#callApprovalWorking').remove();   
+	       			$('#callApprovalWorking').remove();
 		            gridView.initView().setData(0);
 	       			modalStack.close();
 	       		}
-			});					
+			});
 		}
 	}
-	
+
     return {
         initDeptTree: initDeptTree,
         getAllFilesForNodes: getAllFilesForNodes,
