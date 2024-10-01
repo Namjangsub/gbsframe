@@ -24,5 +24,5 @@ public interface CM16Mapper {
 
     int itoaDeleteIssue(Map<String, String> paramMap);
 
-	
+	List<Map<String, String>> select_reqId_code(Map<String, String> paramMap);
 }
