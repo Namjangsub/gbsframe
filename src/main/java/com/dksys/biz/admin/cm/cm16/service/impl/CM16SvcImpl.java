@@ -171,4 +171,10 @@ public class CM16SvcImpl implements CM16Svc {
         return result;
     }
 
+    //요청자 multi select 검색
+    @Override
+    public List<Map<String, String>> select_reqId_code(Map<String, String> paramMap) {
+        return cm16Mapper.select_reqId_code(paramMap);
+    }
+
 }

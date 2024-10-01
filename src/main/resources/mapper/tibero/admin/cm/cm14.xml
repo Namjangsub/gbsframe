@@ -14,7 +14,10 @@
 				, T.BOARD_TYPE2
 				, (SELECT CODE_NM FROM TB_CM05M01 WHERE CODE_ID = T.BOARD_TYPE2) AS BOARD_TYPE2_NM
 				, T.BOARD_TITLE
-				, T.BOARD_CNTS
+				, CASE
+					WHEN T.BOARD_CNTS_CLOB IS NOT NULL THEN TO_CHAR(T.BOARD_CNTS_CLOB)
+					ELSE T.BOARD_CNTS
+				  END AS BOARD_CNTS_CLOB
 				, T.EXPRTN_YN
 		    	, TO_CHAR(T.EXPRTN_DT, 'YYYY-MM-DD') AS EXPRTN_DT
 				, T.USE_YN
@@ -81,6 +84,10 @@
 			 OR UPPER(REPLACE(REPLACE(BOARD_CNTS, '-', ''), ' ', '')) LIKE '%'|| UPPER(REPLACE(REPLACE(#{boardTitle}, '-', ''), ' ', '')) ||'%')
 		</if>	
 	</select>
+
+  <resultMap id="resultInfoMap" type="CamelMap">
+    <collection select="selectBoardInfoClob" property="RESULT_CLOB" column="{ fileTrgtKey=FILE_TRGT_KEY }" ofType="CamelMap"/>
+  </resultMap>
 	
 	<select id="selectBoardInfo" parameterType="Map" resultType="CamelMap">
 	 	SELECT 
@@ -89,7 +96,10 @@
 			, BOARD_TYPE
 			, BOARD_TYPE2
 			, BOARD_TITLE
-			, BOARD_CNTS
+			, CASE
+				WHEN BOARD_CNTS_CLOB IS NOT NULL THEN TO_CHAR(BOARD_CNTS_CLOB)
+				ELSE BOARD_CNTS
+			  END AS BOARD_CNTS_CLOB
 			, EXPRTN_YN
 	        , TO_CHAR(EXPRTN_DT, 'YYYY-MM-DD') AS EXPRTN_DT
 			, USE_YN
@@ -104,9 +114,22 @@
 	 	FROM TB_CM14M01
 	 	WHERE FILE_TRGT_KEY = #{fileTrgtKey}
 	</select>
+
+	<!-- CLOB Field는 일반 필드처럼 사용할수 없음.  오류 발생됨 -->
+	<!-- jdbcType="CLOB" javaType="java.lang.String" 으로 설정해야 정상적으로 처리 가능함-->
+	<resultMap id="clobMap" type="hashMap">
+		<result property="boardCntsClob" column="BOARD_CNTS_CLOB" jdbcType="CLOB" javaType="java.lang.String"/>
+		
+	</resultMap>
+	<select id="selectBoardInfoClob" resultMap="clobMap">
+	SELECT  BOARD_CNTS_CLOB
+		FROM TB_CM14M01
+		WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+	</select>
+	
 	
 	<insert id="insertBoard" parameterType="Map">
-		<selectKey keyProperty="fileTrgtKey" resultType="int" order="BEFORE">
+		<selectKey keyProperty="fileTrgtKey" resultType="String" order="BEFORE">
 			SELECT TB_CM14M01_SQ01.NEXTVAL FROM DUAL
 	  	</selectKey>
 		INSERT INTO TB_CM14M01
@@ -116,7 +139,7 @@
 			, BOARD_TYPE
 			, BOARD_TYPE2
 			, BOARD_TITLE
-			, BOARD_CNTS
+			, BOARD_CNTS_CLOB
 			, EXPRTN_YN
 			, EXPRTN_DT
 			, USE_YN
@@ -136,7 +159,7 @@
 			, #{boardType}
 			, #{boardType2}
 			, #{boardTitle}
-			, #{boardCnts}
+			, #{boardCntsClob, jdbcType=CLOB}
 			, #{exprtnYn}
 			, #{exprtnDt}
 			, #{useYn}
@@ -157,7 +180,7 @@
 			,BOARD_TYPE = #{boardType}
 			,BOARD_TYPE2 = #{boardType2}
 			,BOARD_TITLE = #{boardTitle}
-			,BOARD_CNTS = #{boardCnts} 
+			,BOARD_CNTS_CLOB = #{boardCntsClob, jdbcType=CLOB} 
 			,EXPRTN_YN = #{exprtnYn} 
 			,EXPRTN_DT = #{exprtnDt} 
 			,USE_YN = #{useYn} 

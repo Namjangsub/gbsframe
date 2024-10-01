@@ -1,3 +1,4 @@
+	<script type="text/javascript" src="/static/js/tinymce/tinymce.min.js"></script>
 <style>
 	.table tr th {
 		text-align: center;
@@ -71,6 +72,7 @@
 /*         overflow: auto; */
       }
 </style>
+
 <div class="popup_area of_a">
 	<input type="file" id="boardFile" style="display:none" multiple="multiple" onchange="setDragAndDropFile(this);"/>
 	<form id="popForm">
@@ -115,13 +117,16 @@
 				<tr>
 					<th class="hit">제목</th>
 					<td colspan=3>
-						<input type="text" class="form-control input-sm" id="boardTitle" name="boardTitle" required>
+						<input type="text" class="form-control input-sm" id="boardTitle" name="boardTitle" required msg="제목">
 					</td>
 				</tr>
 				<tr>
 					<th class="hit">내용</th>
 					<td colspan=3>
-						<textarea rows="28" cols="100" id="boardCnts" name="boardCnts"></textarea>
+						<textarea rows="28" cols="100" id="boardCnts" name="boardCnts" style="display:none"></textarea>
+						<div id="boardClob"  style="display:none">
+						<textarea rows="28" id="boardCntsClob" name="boardCntsClob"></textarea>
+						</div>
 					</td>
 				</tr>
 				
@@ -219,13 +224,116 @@
 	}
 	
 	$(document).ready(function() {
+		var paramObj = modalStack.last().paramObj;
+    	$("#popForm").find("#coCd").val(paramObj.coCd);
 		setCommonSelect($("#popForm select[data-kind]"));
 		
 		fileGridView.initView();
 // 	  	txtareaHeightResize($('#workRptRmk'));  //비고 크기 조절하기
+
+		// tinymce html 편집기 start ----------------------------------------------------------
+		var plugins = [
+	        "advlist", "autolink", "lists", "link", "image", "charmap", "print", "preview", "anchor",
+	        "searchreplace", "visualblocks", "code", "fullscreen", "insertdatetime", "media", "table",
+	        "code", "help", "wordcount", "save", 'autoresize'
+	    ];
+	    var edit_toolbar = 'formatselect fontselect fontsizeselect |'
+	               + ' forecolor backcolor |'
+	               + ' bold italic underline strikethrough |'
+	               + ' alignjustify alignleft aligncenter alignright |'
+	               + ' bullist numlist |'
+	               + ' table tabledelete |'
+	               + ' link image';
+
+	    tinymce.init({
+	     	language: 'ko_KR' ,//한글판으로 변경
+	    	license_key: 'gpl',
+        	selector: '#boardCntsClob',
+//         	height: 450,
+            max_height: 400,
+            autoresize_bottom_margin: 0,
+            setup: function (editor) {
+                editor.on('init', function () {
+//                     editor.getDoc().body.style.maxHeight = '400px';
+                    editor.getDoc().body.style.height = '400px';
+                    editor.getDoc().body.style.overflowY = 'auto';
+                    editor.getBody().style.fontSize = '10pt';
+                    if (actionType != "U") {
+						$('#boardClob').show();
+						setContentInEditor('boardCntsClob', '자료내용 입력하세요!');
+					}
+                }),
+                editor.on('change', function () {
+                    // 내용이 변경될 때 실행할 코드
+//	                    console.log('내용이 변경되었습니다.');
+                }),
+                editor.on('keyup', function (aa) {
+                }),
+                editor.on(' SetContent', function (aa) {
+                });
+            },
+	        
+	        menubar: false,
+//		        statusbar: false,  // 상태 바 숨기기
+	        plugins: plugins,
+	        toolbar: edit_toolbar,
+	        
+	        /*** image upload ***/
+	        image_title: true,
+	        /* enable automatic uploads of images represented by blob or data URIs*/
+	        automatic_uploads: true,
+	        /*
+	            URL of our upload handler (for more details check: https://www.tiny.cloud/docs/configure/file-image-upload/#images_upload_url)
+	            images_upload_url: 'postAcceptor.php',
+	            here we add custom filepicker only to Image dialog
+	        */
+	        file_picker_types: 'image',
+	        /* and here's our custom image picker*/
+	        file_picker_callback: function (cb, value, meta) {
+	            var input = document.createElement('input');
+	            input.setAttribute('type', 'file');
+	            input.setAttribute('accept', 'image/*');
+
+	            /*
+	            Note: In modern browsers input[type="file"] is functional without
+	            even adding it to the DOM, but that might not be the case in some older
+	            or quirky browsers like IE, so you might want to add it to the DOM
+	            just in case, and visually hide it. And do not forget do remove it
+	            once you do not need it anymore.
+	            */
+	            input.onchange = function () {
+	                var file = this.files[0];
+
+	                var reader = new FileReader();
+	                reader.onload = function () {
+	                    /*
+	                    Note: Now we need to register the blob in TinyMCEs image blob
+	                    registry. In the next release this part hopefully won't be
+	                    necessary, as we are looking to handle it internally.
+	                    */
+	                    var id = 'blobid' + (new Date()).getTime();
+	                    var blobCache =  tinymce.activeEditor.editorUpload.blobCache;
+	                    var base64 = reader.result.split(',')[1];
+	                    var blobInfo = blobCache.create(id, file, base64);
+	                    blobCache.add(blobInfo);
+
+	                    /* call the callback and populate the Title field with the file name */
+	                    cb(blobInfo.blobUri(), { title: file.name });
+	                };
+	                reader.readAsDataURL(file);
+	            };
+	            input.click();
+	        },
+	        /*** image upload ***/
+	        
+	        content_style: 'body { font-family:Helvetica,Arial,sans-serif; } p {margin: 0;  font-size:10pt}'
+	    });
+	    // tinymce html 편집기 end ----------------------------------------------------------
+
 		
 		actionType = modalStack.last().paramObj.actionType;
 		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
+
 		if(actionType == "C"){
 			$('#actionBtn').on("click", function(){insertBoard();});
 			$('#actionBtn').text("등록");
@@ -248,7 +356,7 @@
 	});
 
 	function insertBoard() {
-		if(inputValidation($('input[required]'))) {
+		if(inputValidation($('.popup_area [required]'))) {
 			$("#useYn").val("Y");
 			$("#readCnt").val("0");
 			var formData = makeFormData();
@@ -264,7 +372,7 @@
 
 	function updateBoard() {
 // 		debugger;
-		if(inputValidation($('input[required]'))){
+		if(inputValidation($('.popup_area [required]'))){
 			var formData = makeFormData();
 			filePutAjax("/admin/cm/cm14/updateBoard", formData, function(data){
 				alert(data.resultMessage);
@@ -277,8 +385,9 @@
 	}
 	
 	function selectBoardInfo(){
+		var row = gridView.target.getList("selected")[0];
 		var paramObj = {
-				"fileTrgtKey": fileTrgtKey,
+				"fileTrgtKey": row.fileTrgtKey,
 				"userId" 	 : jwt.userId
 				};
 		postAjax("/admin/cm/cm14/selectBoardInfo", paramObj, null, function(data){
@@ -300,15 +409,21 @@
 		
 	}
 	
-	
 	function makeFormData() {
+		if (!inputValidation($('.popup_area [required]'))) {
+			return false;  //
+		}
 		// 폼데이터 생성
 		var formData = new FormData($("#popForm")[0]);
-		$("#popForm #userId").val(jwt.userId);             ;
-		$("#popForm").find("#coCd").val($('#mainForm').find("#coCd_S option:selected").val());
+		var paramObj = modalStack.last().paramObj;
+		$("#popForm #userId").val(jwt.userId);
+		$("#popForm #coCd").val(paramObj.coCd);
 		$("#exprtnDt").val($("#exprtnDt").val().replace(/-/g, ""));
 		
 		var formData = new FormData($("#popForm")[0]);
+
+		formData.set("boardCntsClob" 		, tinymce.get('boardCntsClob').getContent());
+
 		// 첨부파일 추가
 		$.each(boardFileArr, function(idx, obj){
 			// 신규파일만 추가
@@ -321,7 +436,7 @@
 		if(actionType == "U"){
 			formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
 		}
-		
+
 		return formData;
 	}
 	
@@ -330,6 +445,22 @@
 			$('#'+key).val(value);
 		});
 		$('input:radio[name=exprtnYn]:input[value=' + boardInfo.exprtnYn + ']').prop("checked", true);
+
+
+		$('#boardClob').show();
+		if (boardInfo.boardCnts) {
+			setContentInEditor('boardCntsClob', boardInfo.boardCnts);
+		} else if (boardInfo.resultClob && boardInfo.resultClob[0]) {
+			setContentInEditor('boardCntClob', boardInfo.resultClob[0].boardCntsClob);
+		}
+		// if (boardInfo.boardCnts != undefined) {
+		// 	$('#boardCnts').show();
+		// 	$('#boardClob').css('display', 'none');
+			
+		// } else {
+		// 	$('#boardClob').show();
+		// 	if (boardInfo.resultClob[0]) setContentInEditor('boardCntClob', boardInfo.resultClob[0].boardCntsClob);
+		// }
 
 // 		$('#popForm #boardType').val(boardInfo.boardType);
 		
@@ -427,6 +558,8 @@
 		selectFile(elem.files);	//첨부파일 메모리에 저장하기
 		$(elem).val("");
 	}
+
+	
 	
 	// 파일 드롭 다운
 	function fileDropDown() {
@@ -663,5 +796,15 @@
 	      $("#fileListTable").hide();
 	    }
 	  }
+
+	  function setContentInEditor(editorId, content) {
+        var editor = tinymce.get(editorId);
+        if (editor) {
+            editor.setContent(content);
+            editor.save(); // 에디터 내용을 저장하여 화면에 즉시 반영
+        } else {
+            console.error('Editor not found: ' + editorId);
+        }
+    }
 
 </script>

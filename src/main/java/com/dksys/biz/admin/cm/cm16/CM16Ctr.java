@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import com.dksys.biz.admin.cm.cm16.service.CM16Svc;
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.util.MessageUtils;
+import com.dksys.biz.util.ObjectUtil;
 
 
 
@@ -32,11 +33,17 @@ public class CM16Ctr {
     // 문제현황 리스트 조회
     @PostMapping(value = "/selectItoaIssueList")
     public String selectItoaIssueList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+
+        paramMap.put("reqId", ObjectUtil.sqlInCodeGen(paramMap.get("reqId")));
         int totalCnt = cm16Svc.selectItoaIssueListCount(paramMap); 
         PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
         model.addAttribute("paginationInfo", paginationInfo);
         List<Map<String, Object>> result = cm16Svc.selectItoaIssueList(paramMap);
         model.addAttribute("result", result);
+
+        List<Map<String, String>> resultReqId = cm16Svc.select_reqId_code(paramMap);
+        model.addAttribute("resultReqId", resultReqId);
+        
         return "jsonView";  
     }
 

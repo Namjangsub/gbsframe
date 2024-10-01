@@ -23,4 +23,6 @@ public interface CM16Svc {
 
     int itoaDeleteIssue(Map<String, String> paramMap) throws Exception;
 
+    List<Map<String, String>> select_reqId_code(Map<String, String> paramMap);
+
 }

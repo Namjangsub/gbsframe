@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="/static/bootstrap/css/bootstrap-theme.min.css">
 <link rel="stylesheet" href="/static/bootstrap/css/dashboard.css">
 <link rel="stylesheet" href="/static/bootstrap/css/bootstrap-datepicker.css">
+<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-multiselect.css">
 <link rel="stylesheet" href="/static/fontawesome/css/all.css">
 <link rel="stylesheet" href="/static/css/ax5/ax5grid.css" />
 <link rel="stylesheet" href="/static/css/ax5/ax5mask.css" />
@@ -24,6 +25,7 @@
 <script src="/static/bootstrap/js/bootstrap.min.js"></script>
 <script src="/static/bootstrap/js/bootstrap-datepicker.min.js"></script>
 <script src="/static/bootstrap/js/bootstrap-datepicker.ko.min.js"></script>
+<script src="/static/bootstrap/js/bootstrap-multiselect.min.js"></script>
 <script src="/static/js/moment/moment-with-locales.js"></script>
 <script src="/static/js/ax5/ax5core.min.js"></script>
 <script src="/static/js/ax5/ax5grid.min.js"></script>
@@ -54,8 +56,9 @@
 		</div>
 		<!-- 콘텐츠 -->
 		<div class="contents search">
-				<!-- 테이블 인풋 4분할 -->
-				<table class="table_input type05"> 
+				<!-- 테이블 인풋 5분할 -->
+				<table class="table_input type05">
+					<!-- 검색조건 1행 -->
 					<tr>
 						<th class="hit">회사</th>
 						<td>
@@ -71,12 +74,11 @@
 								<input id="reqDtTo_S" name="reqDtTo_S" class="input_calendar" onkeyup="dateMask(this);" autocomplete="off"  msg="종료일자" data-search="reqDtTo">
 							</div>
 						</td>
-						<th>요청자</th>
+						<th data-field="name">요청자</th>
 						<td>
-							<div class="search_form">
-								<input type="hidden" id="reqId_S"   name="reqId_S"   data-search="reqId">
-								<input type="text"	id="reqIdNm_S" name="reqIdNm_S" data-search="reqIdNm" onkeyup="event.keyCode == 8 ? reqId_S.value='' : event.keyCode == 13 ? gridView.setData(0) : '' ">
-								<a onclick="openUserSearch();"><i class="i_search_w"></i></a>
+							<div class="">
+								<select id="multiple-checkboxes-reqId" multiple="multiple">
+								</select>
 							</div>
 						</td>
 						<th>조치상태</th>
@@ -132,11 +134,11 @@
 	ax5.ui.grid.formatter["actCd"] = function () {
 		if (this.value == "E") {
 			return 'E';
-		} else if (this.value == "완료") {
+		} else if (this.value == "ISSSTS03") {
 			return '<span style="font-size:11px;color:blue">●</span>';
-		} else if (this.value == "접수" ) {
+		} else if (this.value == "ISSSTS01" ) {
 			return '<span style="font-size:11px;color:red">●</span>'; 
-		} else if (this.value == "진행중") {
+		} else if (this.value == "ISSSTS02") {
 			return '<span style="font-size:11px;color:silver">●</span>';
 		}
 	}
@@ -184,8 +186,8 @@
 							{key: "reqIdNm",		label: "요청자",		align: "center",   width: 80},
 							{key: "reqTypeNm",		label: "구분",			align: "center",   width: 80},
 							{key: "issue",			label: "문제",			align: "center",   width: 220},
-							{key: "actCd",			label: "조치상태",		align: "center",   width: 80, hidden:true},
-							{key: "actCdNm",		label: "조치상태",		align: "center",   width: 80, formatter: "actCd"},
+							{key: "actCd",			label: "조치상태",		align: "center",   width: 80, formatter: "actCd"},
+							{key: "actCdNm",		label: "조치상태",		align: "center",   width: 80, hidden:true},
 							{key: "actDttm",		label: "처리일시",		align: "center",   width: 120},
 							{key: "actId",			label: "처리자",		align: "center",   width: 100, hidden:true},
 							{key: "actIdNm",		label: "처리자",		align: "center",   width: 100},
@@ -212,6 +214,14 @@
 			paramObj["pageNo"] = _pageNo + 1;
 			paramObj["userId"] = jwt.userId;
 
+			// 요청자 multi selec
+			let selectReqId = $('#multiple-checkboxes-reqId').val();
+			if (!selectReqId) { // null이면
+				paramObj["reqId"]	= "";
+			} else {
+				paramObj["reqId"]	= selectReqId.join(","); //['ssj', 'js.nam'] --> "ssj,js.nam" 변환해서 쿼리 in 조건에 맞게 변환
+			}
+
 			postAjax("/admin/cm/cm16/selectItoaIssueList", paramObj, null, function(data){
 				gridHeightResize(gridView, 194);
 				var list = data.result;
@@ -224,6 +234,10 @@
 						totalPages : data.paginationInfo.totalPageCount
 					}
 				});
+
+				var list = data.resultReqId;
+				multiPrjctSelectHtml(list, $('#multiple-checkboxes-reqId'));  // 요청자를 multi select로 자동 생성
+				$('#multiple-checkboxes-reqId').multiselect('select', selectReqId);  // 이전 선택된 내용을 복원
 			});
 		}
 	}
@@ -298,13 +312,16 @@
 			}
 		});
 
-
 		gridView.initView().setData(0);
 		excelView.initView();
 
 		$('[data-search]').on("change", function(){
 			gridView.setData(0);
 		});
+
+		$('#multiple-checkboxes-reqId').multiselect({includeSelectAllOption: true, });
+		$('#multiple-checkboxes-reqId').on("change", function(){gridView.setData(0);});
+		
 
 		authChk();
 	});
@@ -351,31 +368,11 @@
 
 	// 초기화 버튼용
 	function initSearch() {
-		$("#coCd_S").val("");
 		$("#reqDtFrom_S").datepicker("setDate", moment(new Date()).startOf("month").toDate());
 		$("#reqDtTo_S").datepicker("setDate", moment(new Date()).endOf("month").toDate());
-		$("#reqId_S").val("");
-		$("#reqIdNm_S").val("");
-		$("#reqTypeNm_S").val("");
-		$("#actCdNm_S").val("");
+		$(".contents.search select").val("");
+		$(".contents.search input").val(""); 	
 		gridView.setData(0);
-	}
-	
-	// 요청자 검색 //
-	function openUserSearch() {
-		var paramObj = {
-			  "coCd" : $('#coCd_S').val(),
-			"userId" : $('#reqId_S').val(),
-			"userNm" : $('#reqIdNm_S').val(),
-			"useYn": "Y"
-		};
-		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "요청자 검색", paramObj, function(tree) {
-					var checkedId = tree.get_checked()[0];
-					var checkedNode = tree.get_node(checkedId);
-					$('#reqId_S').val(checkedNode.id);
-					$('#reqIdNm_S').val(checkedNode.text);
-					gridView.setData(0);
-				});
 	}
 	
 	// 엑셀 다운로드
@@ -385,8 +382,16 @@
 		$.each($('[data-search]'), function(idx, elem){
 			paramObj[$(elem).data("search")] = $(elem).val();
 		});
-		paramObj["recordCnt"] =  9999999;
 
+		// 요청자 multi select
+		// 엑셀다운로드는 selectItoaIssueList 이쪽으로 ajax 요청을 보내니깐 똑같은 폼으로 해야함
+		let selectReqId = $('#multiple-checkboxes-reqId').val();
+		if (!selectReqId) { //nul이면
+			paramObj["reqId"]    = "";
+		} else {
+			paramObj["reqId"]    =  selectReqId.join(",");
+		}
+		paramObj["recordCnt"] =  9999999;
 		paramObj["reqDtFrom"] =  $("#reqDtFrom_S").val().replace(/\-/g, '');
 		paramObj["reqDtTo"] =  $("#reqDtTo_S").val().replace(/\-/g, '');
 
@@ -395,12 +400,13 @@
 			excelView.target.setData({
 				list : list,
 				page : {
-					totalElements : data.paginationInfo.totalRecordCount
+					totalElements : list.length,
 				}
 			});
 			var todayDate = new Date().format('yyyyMMddHHmmss');
 			excelView.target.exportExcel("문제리스트_"+todayDate+".xls");
 		});
+
 	}
 
 </script>
