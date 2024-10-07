@@ -84,6 +84,23 @@ public interface WB22Mapper {
 
 	int wbsTaskTempletDelete(Map<String, String> sharngMap);
 
+	// 유저 템플릿 mapper
+	// ------------------------------------------------------------------------------------
+
+	int selectWbsUserTaskTempletCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectWbsUserTaskTempletList(Map<String, String> paramMap);
+
+	String selectNewWbsUserTaskTempletCd(Map<String, String> paramMap);
+
+	int wbsUserTaskTempletInsert(Map<String, String> sharngMap);
+
+	int wbsUserTaskTempletUpdate(Map<String, String> sharngMap);
+	
+	int wbsUserTaskTempletDelete(Map<String, String> sharngMap);
+
+	// ------------------------------------------------------------------------------------
+
 	List<Map<String, String>> selectHistWBS1Level(Map<String, String> paramMap);	
 	
 	// 일괄복사부분

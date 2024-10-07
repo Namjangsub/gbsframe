@@ -53,6 +53,17 @@ public interface WB22Svc {
 
 	int saveWbsTaskTempletList(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
+	// 유저 템플릿 service
+	//---------------------------------------------------------------------------------------------------
+
+	int selectWbsUserTaskTempletCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectWbsUserTaskTempletList(Map<String, String> paramMap);
+
+	int saveWbsUserTaskTempletList(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
+
+	//---------------------------------------------------------------------------------------------------
+
 	List<Map<String, String>> selectHistWBS1Level(Map<String, String> paramMap);
 	
 	// 계획일괄복사부분

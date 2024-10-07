@@ -562,6 +562,51 @@ public class WB22SvcImpl implements WB22Svc {
 		return result;
 	}
 
+	// 유저별 템플릿 serviceImplement
+	//------------------------------------------------------------------------------------------------------
+	@Override
+	public int selectWbsUserTaskTempletCount(Map<String, String> paramMap) {
+		return wb22Mapper.selectWbsUserTaskTempletCount(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectWbsUserTaskTempletList(Map<String, String> paramMap) {
+		return wb22Mapper.selectWbsUserTaskTempletList(paramMap);
+	}
+
+	@Override
+	public int saveWbsUserTaskTempletList(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
+		int result = 0;
+		Gson gson = new Gson();
+		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		
+		List<Map<String, String>> delArr = gson.fromJson(paramMap.get("taskDeleteRowArr"), stringList);
+		if (delArr != null && delArr.size() > 0) {
+			for (Map<String, String> sharngMap : delArr) {
+					result = wb22Mapper.wbsUserTaskTempletDelete(sharngMap);
+			}
+		}
+		
+		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
+		if (sharngArr != null && sharngArr.size() > 0) {
+			for (Map<String, String> sharngMap : sharngArr) {
+					//상위 코드
+					sharngMap.put("codeKind", paramMap.get("wbsPlanCodeId"));
+					//codeId 값이 없으면 insert
+					if(sharngMap.get("codeId").isEmpty()) {						
+						result = wb22Mapper.wbsUserTaskTempletInsert(sharngMap);
+					}else {
+						result = wb22Mapper.wbsUserTaskTempletUpdate(sharngMap);
+					}
+					
+			}
+		}
+		
+		return result;
+	}
+
+	//------------------------------------------------------------------------------------------------------
+
 	@Override
 	public List<Map<String, String>> selectHistWBS1Level(Map<String, String> paramMap) {
 		return wb22Mapper.selectHistWBS1Level(paramMap);

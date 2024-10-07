@@ -298,7 +298,38 @@ public class WB22Ctr {
   		}
   		return "jsonView";
     }
+
+	// 유저별 템플릿 controller
+	//---------------------------------------------------------------------------------------------------------------------------------------------
+	//유저별 TASK 템플릿 조회
+	@PostMapping(value = "/selectWbsUserTaskTempletList") 
+	public String selectWbsUserTaskTempletList(@RequestBody Map<String, String> paramMap, ModelMap model) {	
+		int totalCnt = wb22Svc.selectWbsUserTaskTempletCount(paramMap); 
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		  
+		List<Map<String, String>> result = wb22Svc.selectWbsUserTaskTempletList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+    }
 	
+	@PostMapping(value = "/saveWbsUserTaskTempletList")
+    public String saveWbsUserTaskTempletList(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+  		try {
+  			if (wb22Svc.saveWbsUserTaskTempletList(paramMap, mRequest) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+	  		} else {
+	  			model.addAttribute("resultCode", 500);
+	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  		    model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }
+//---------------------------------------------------------------------------------------------------------------------------------------------
 	// 일괄복사부분
 	@PostMapping(value = "/ModalwbsPlanconfirmList") 
 	public String ModalsjnoconfirmList(@RequestBody Map<String, String> paramMap, ModelMap model) {
