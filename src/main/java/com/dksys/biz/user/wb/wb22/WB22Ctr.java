@@ -23,414 +23,426 @@ import com.dksys.biz.util.MessageUtils;
 @Transactional(rollbackFor = Exception.class)
 @RequestMapping("/user/wb/wb22")
 public class WB22Ctr {
-	
+
 	private Logger logger = LoggerFactory.getLogger(WB22Ctr.class);
-	
+
 	@Autowired
 	MessageUtils messageUtils;
-    
-    @Autowired
-    WB22Svc wb22Svc;
-    
-	@PostMapping(value = "/selectWbsSjList") 
-	public String selectWbsSjList(@RequestBody Map<String, String> paramMap, ModelMap model) {	
-		int totalCnt = wb22Svc.selectWbsSjListCount(paramMap); 
+
+	@Autowired
+	WB22Svc wb22Svc;
+
+	@PostMapping(value = "/selectWbsSjList")
+	public String selectWbsSjList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = wb22Svc.selectWbsSjListCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
-		  
+
 		List<Map<String, String>> fileList = wb22Svc.selectWbsSjList(paramMap);
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
-    }	
-	
-	@PostMapping(value = "/selectSjInfo") 
-   	public String selectSjInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-   		  Map<String, String> resultList = wb22Svc.selectSjInfo(paramMap);
-   		  model.addAttribute("resultList", resultList); 
-   		  return "jsonView"; 
-   	}
-	
-	//이력조회
-	@PostMapping(value = "/selectHistWBS1Level") 
-	public String selectHistWBS1Level(@RequestBody Map<String, String> paramMap, ModelMap model) {		
+	}
+
+	@PostMapping(value = "/selectSjInfo")
+	public String selectSjInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> resultList = wb22Svc.selectSjInfo(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+
+	// 이력조회
+	@PostMapping(value = "/selectHistWBS1Level")
+	public String selectHistWBS1Level(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> fileList = wb22Svc.selectHistWBS1Level(paramMap);
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
-    }	
-	
-	@PostMapping(value = "/selectWBS1Level") 
-	public String selectWBS1Level(@RequestBody Map<String, String> paramMap, ModelMap model) {		
+	}
+
+	@PostMapping(value = "/selectWBS1Level")
+	public String selectWBS1Level(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> fileList = wb22Svc.selectWBS1Level(paramMap);
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
-    }	
-	
+	}
+
 	@PostMapping(value = "/wbsLevel1Insert")
-    public String wbsLevel1Insert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  		try {
-  			if (wb22Svc.wbsLevel1Insert(paramMap, mRequest) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-	  		} else {
-	  			model.addAttribute("resultCode", 500);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  		    model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }
-	
+	public String wbsLevel1Insert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (wb22Svc.wbsLevel1Insert(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
 	@PostMapping(value = "/wbsLevel1Update")
-    public String wbsLevel1Update(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  		try {
-  			if (wb22Svc.wbsLevel1Update(paramMap, mRequest) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-  			} else {
-	  			model.addAttribute("resultCode", 500);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  		    model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }
-	
-	@PostMapping(value = "/selectWBS2Level") 
-	public String selectWBS2Level(@RequestBody Map<String, String> paramMap, ModelMap model) {		
+	public String wbsLevel1Update(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (wb22Svc.wbsLevel1Update(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/selectWBS2Level")
+	public String selectWBS2Level(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> fileList = wb22Svc.selectWBS2Level(paramMap);
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
-    }	
-	
+	}
+
 	@PostMapping(value = "/wbsLevel2Insert")
-    public String wbsLevel2Insert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  		try {
-  			if (wb22Svc.wbsLevel2Insert(paramMap, mRequest) != 0 ) {
-	  			model.addAttribute("resultCode", 200);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-	  		} else {
-	  			model.addAttribute("resultCode", 500);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  		    model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }
-	
-	@PostMapping(value = "/selectVerNoNext") 
-    public String selectSjVerNoNext(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	    List<Map<String, String>> result = wb22Svc.selectVerNoNext(paramMap);
-	    model.addAttribute("result", result); 
-	    return "jsonView"; 		 
-    }
-	
-	@PostMapping(value = "/wbsVerUpInsert")
-    public String sjVerUpInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  		try {
-  			if (wb22Svc.wbsVerUpInsert(paramMap, mRequest) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-	  		} else {
-	  			model.addAttribute("resultCode", 500);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  		    model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }
-	
-	@PostMapping(value = "/wbsLevel1confirm")
-    public String wbsLevel1confirm(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  		try {
-  			if (wb22Svc.wbsLevel1confirm(paramMap, mRequest) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-	  		} else {
-	  			model.addAttribute("resultCode", 500);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  		    model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }
-	
-	@PostMapping(value = "/wbsLevel2confirm")
-    public String wbsLevel2confirm(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  		try {
-  			if (wb22Svc.wbsLevel2confirm(paramMap, mRequest) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-	  		} else {
-	  			model.addAttribute("resultCode", 500);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  		    model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }
-	
-	@PostMapping(value = "/selectRsltsSharngList") 
-    public String selectRsltsSharngList(@RequestBody Map<String, String> paramMap, ModelMap model) {	  
-	  List<Map<String, String>> resultList = wb22Svc.selectRsltsSharngList(paramMap);
-	  model.addAttribute("resultList", resultList); 
-	  return "jsonView"; 		 
-    }
-	
-	@PostMapping(value = "/selectRsltsApprovalList") 
-    public String selectRsltsApprovalList(@RequestBody Map<String, String> paramMap, ModelMap model) {	  
-	  List<Map<String, String>> resultList = wb22Svc.selectRsltsApprovalList(paramMap);
-	  model.addAttribute("resultList", resultList); 
-	  return "jsonView"; 		 
-    }
-	
-	@PostMapping(value = "/wbsRsltsInsert")
-    public String wbsRsltsInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {		
+	public String wbsLevel2Insert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
-			if (wb22Svc.wbsRsltsInsert(paramMap, mRequest) != 0 ) {
+			if (wb22Svc.wbsLevel2Insert(paramMap, mRequest) != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-			};
-		}catch(Exception e){
+			}
+			;
+		} catch (Exception e) {
 			model.addAttribute("resultCode", 900);
 			model.addAttribute("resultMessage", e.getMessage());
 		}
-  	return "jsonView";
-   }
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/selectVerNoNext")
+	public String selectSjVerNoNext(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = wb22Svc.selectVerNoNext(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/wbsVerUpInsert")
+	public String sjVerUpInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (wb22Svc.wbsVerUpInsert(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/wbsLevel1confirm")
+	public String wbsLevel1confirm(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model)
+			throws Exception {
+		try {
+			if (wb22Svc.wbsLevel1confirm(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/wbsLevel2confirm")
+	public String wbsLevel2confirm(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model)
+			throws Exception {
+		try {
+			if (wb22Svc.wbsLevel2confirm(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/selectRsltsSharngList")
+	public String selectRsltsSharngList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = wb22Svc.selectRsltsSharngList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/selectRsltsApprovalList")
+	public String selectRsltsApprovalList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = wb22Svc.selectRsltsApprovalList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/wbsRsltsInsert")
+	public String wbsRsltsInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+		try {
+			if (wb22Svc.wbsRsltsInsert(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 
 	@PostMapping(value = "/wbsRsltsUpdate")
-    public String wbsRsltsUpdate(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {		
+	public String wbsRsltsUpdate(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
 		try {
-			if (wb22Svc.wbsRsltsUpdate(paramMap, mRequest) != 0 ) {
+			if (wb22Svc.wbsRsltsUpdate(paramMap, mRequest) != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-			};
-		}catch(Exception e){
+			}
+			;
+		} catch (Exception e) {
 			model.addAttribute("resultCode", 900);
 			model.addAttribute("resultMessage", e.getMessage());
 		}
-  	return "jsonView";
-   }	
-	
+		return "jsonView";
+	}
+
 	@PostMapping(value = "/wbsRsltsconfirm")
-    public String wbsRsltsconfirm(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  		try {
-  			if (wb22Svc.wbsRsltsconfirm(paramMap, mRequest) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-	  		} else {
-	  			model.addAttribute("resultCode", 500);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  		    model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }
-	
-	@PostMapping(value = "/selectTodoRsltsView") 
-    public String selectTodoRsltsView(@RequestBody Map<String, String> paramMap, ModelMap model) {	  
-	  List<Map<String, String>> resultList = wb22Svc.selectTodoRsltsView(paramMap);
-	  model.addAttribute("resultList", resultList); 
-	  return "jsonView"; 		 
-    }
-	  
-	  
-	//TODO 미완료 현황 대쉬보드 오른쪽 하단 WBS 계획정보
-	@PostMapping(value = "/selectIncompleteJob") 
+	public String wbsRsltsconfirm(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (wb22Svc.wbsRsltsconfirm(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/selectTodoRsltsView")
+	public String selectTodoRsltsView(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = wb22Svc.selectTodoRsltsView(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+
+	// TODO 미완료 현황 대쉬보드 오른쪽 하단 WBS 계획정보
+	@PostMapping(value = "/selectIncompleteJob")
 	public String selectIncompleteJob(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> resultList = wb22Svc.selectIncompleteJob(paramMap);
-		model.addAttribute("resultList", resultList); 
-		return "jsonView"; 
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
 	}
-	
-	//복사기능 호출
-	@PostMapping(value = "/callCopyWbsPlan") 
-    public String callCopyWbsPlan(@RequestBody Map<String, String> paramMap, ModelMap model) {	  
-	  wb22Svc.callCopyWbsPlan(paramMap);
-	  model.addAttribute("paramMap", paramMap);
-	  return "jsonView";
-    }
-	
-	//TASK 템플릿 조회
-	@PostMapping(value = "/selectWbsTaskTempletList") 
-	public String selectWbsTaskTempletList(@RequestBody Map<String, String> paramMap, ModelMap model) {	
-		int totalCnt = wb22Svc.selectWbsTaskTempletCount(paramMap); 
+
+	// 복사기능 호출
+	@PostMapping(value = "/callCopyWbsPlan")
+	public String callCopyWbsPlan(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		wb22Svc.callCopyWbsPlan(paramMap);
+		model.addAttribute("paramMap", paramMap);
+		return "jsonView";
+	}
+
+	// TASK 템플릿 조회
+	@PostMapping(value = "/selectWbsTaskTempletList")
+	public String selectWbsTaskTempletList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = wb22Svc.selectWbsTaskTempletCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
-		  
+
 		List<Map<String, String>> result = wb22Svc.selectWbsTaskTempletList(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
-    }
-	
-	@PostMapping(value = "/saveWbsTaskTempletList")
-    public String saveWbsTaskTempletList(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  		try {
-  			if (wb22Svc.saveWbsTaskTempletList(paramMap, mRequest) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-	  		} else {
-	  			model.addAttribute("resultCode", 500);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  		    model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }
-
-	// 유저별 템플릿 controller
-	//---------------------------------------------------------------------------------------------------------------------------------------------
-	//유저별 TASK 템플릿 조회
-	@PostMapping(value = "/selectWbsUserTaskTempletList") 
-	public String selectWbsUserTaskTempletList(@RequestBody Map<String, String> paramMap, ModelMap model) {	
-		int totalCnt = wb22Svc.selectWbsUserTaskTempletCount(paramMap); 
-		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		model.addAttribute("paginationInfo", paginationInfo);
-		  
-		List<Map<String, String>> result = wb22Svc.selectWbsUserTaskTempletList(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-    }
-	
-	@PostMapping(value = "/saveWbsUserTaskTempletList")
-    public String saveWbsUserTaskTempletList(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  		try {
-  			if (wb22Svc.saveWbsUserTaskTempletList(paramMap, mRequest) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("save"));
-	  		} else {
-	  			model.addAttribute("resultCode", 500);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  		    model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }
-//---------------------------------------------------------------------------------------------------------------------------------------------
-	// 일괄복사부분
-	@PostMapping(value = "/ModalwbsPlanconfirmList") 
-	public String ModalsjnoconfirmList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  int totalCnt = wb22Svc.ModalwbsPlanconfirmListCount(paramMap); 
-		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		  model.addAttribute("paginationInfo", paginationInfo);
-		  
-		  List<Map<String, String>> resultList = wb22Svc.ModalwbsPlanconfirmList(paramMap);
-		  model.addAttribute("resultList", resultList); 
-		  return "jsonView"; 
 	}
-	
-	@PostMapping(value = "/confirm_copy")
-	public String confirm_copy(@RequestBody Map<String, String> paramMap, ModelMap model) {
+
+	@PostMapping(value = "/saveWbsTaskTempletList")
+	public String saveWbsTaskTempletList(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model)
+			throws Exception {
 		try {
-			if (wb22Svc.confirm_copy(paramMap) != 0 ) {
+			if (wb22Svc.saveWbsTaskTempletList(paramMap, mRequest) != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-			};
-		}catch(Exception e){
+			}
+			;
+		} catch (Exception e) {
 			model.addAttribute("resultCode", 900);
 			model.addAttribute("resultMessage", e.getMessage());
 		}
-	  	return "jsonView";
+		return "jsonView";
 	}
-	
-	@PostMapping(value = "/selectWbcPlanTodoList") 
-    public String selectWbcPlanTodoList(@RequestBody Map<String, String> paramMap, ModelMap model) {	  
-	  List<Map<String, String>> resultList = wb22Svc.selectWbcPlanTodoList(paramMap);
-	  model.addAttribute("resultList", resultList); 
-	  return "jsonView"; 		 
-    }
-	
-	
-	@PostMapping(value = "/selectWbcPlanUpdteTodoList") 
-    public String selectWbcPlanUpdteTodoList(@RequestBody Map<String, String> paramMap, ModelMap model) {	  
-	  List<Map<String, String>> resultList = wb22Svc.selectWbcPlanUpdteTodoList(paramMap);
-	  model.addAttribute("resultList", resultList); 
-	  return "jsonView"; 		 
-    }
-	
-	
-	
+
+	// 유저별 템플릿 controller
+	// ---------------------------------------------------------------------------------------------------------------------------------------------
+	// 유저별 TASK 템플릿 조회
+	@PostMapping(value = "/selectWbsUserTaskTempletList")
+	public String selectWbsUserTaskTempletList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+//		int totalCnt = wb22Svc.selectWbsUserTaskTempletCount(paramMap);
+//		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+//		model.addAttribute("paginationInfo", paginationInfo);
+
+		List<Map<String, String>> result = wb22Svc.selectWbsUserTaskTempletList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/saveWbsUserTaskTempletList")
+	public String saveWbsUserTaskTempletList(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model)
+			throws Exception {
+		try {
+			if (wb22Svc.saveWbsUserTaskTempletList(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+//---------------------------------------------------------------------------------------------------------------------------------------------
+	// 일괄복사부분
+	@PostMapping(value = "/ModalwbsPlanconfirmList")
+	public String ModalsjnoconfirmList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = wb22Svc.ModalwbsPlanconfirmListCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+
+		List<Map<String, String>> resultList = wb22Svc.ModalwbsPlanconfirmList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/confirm_copy")
+	public String confirm_copy(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			if (wb22Svc.confirm_copy(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/selectWbcPlanTodoList")
+	public String selectWbcPlanTodoList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = wb22Svc.selectWbcPlanTodoList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/selectWbcPlanUpdteTodoList")
+	public String selectWbcPlanUpdteTodoList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = wb22Svc.selectWbcPlanUpdteTodoList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+
 	@PostMapping(value = "/wbcPlanTodoInsert")
-    public String wbsIssInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  		try {
-  			if (wb22Svc.wbcPlanTodoInsert(paramMap, mRequest) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-	  		} else {
-	  			model.addAttribute("resultCode", 500);
-	  			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  		    model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }
-	
-	
-	
+	public String wbsIssInsert(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (wb22Svc.wbcPlanTodoInsert(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 
 	// 일괄확정부분
-	@PostMapping(value = "/Modalwb22noconfirmList") 
+	@PostMapping(value = "/Modalwb22noconfirmList")
 	public String Modalwb22noconfirmList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  int totalCnt = wb22Svc.Modalwb22noconfirmListCount(paramMap); 
-		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		  model.addAttribute("paginationInfo", paginationInfo);
-		  
-		  List<Map<String, String>> resultList = wb22Svc.Modalwb22noconfirmList(paramMap);
-		  model.addAttribute("resultList", resultList); 
-		  return "jsonView"; 
+		int totalCnt = wb22Svc.Modalwb22noconfirmListCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+
+		List<Map<String, String>> resultList = wb22Svc.Modalwb22noconfirmList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
 	}
 
 	@PostMapping(value = "/confirm_wb22")
 	public String confirm_wb22(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
-			if (wb22Svc.confirm_wb22(paramMap, mRequest) != 0 ) {
+			if (wb22Svc.confirm_wb22(paramMap, mRequest) != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-			};
-		}catch(Exception e){
+			}
+			;
+		} catch (Exception e) {
 			model.addAttribute("resultCode", 900);
 			model.addAttribute("resultMessage", e.getMessage());
 		}
-	  	return "jsonView";
+		return "jsonView";
 	}
 	// 일괄확정부분 끝
 
-	@PostMapping(value = "/wbsResultLastVerNoSearch") 
-   	public String wbsResultLastVerNoSearch(@RequestBody Map<String, String> paramMap, ModelMap model) {
-   		  Map<String, String> resultList = wb22Svc.wbsResultLastVerNoSearch(paramMap);
-   		  model.addAttribute("resultList", resultList); 
-   		  return "jsonView"; 
-   	}
-	
+	@PostMapping(value = "/wbsResultLastVerNoSearch")
+	public String wbsResultLastVerNoSearch(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> resultList = wb22Svc.wbsResultLastVerNoSearch(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+
 }
