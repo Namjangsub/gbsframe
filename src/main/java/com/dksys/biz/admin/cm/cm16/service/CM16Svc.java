@@ -17,11 +17,11 @@ public interface CM16Svc {
 
     List<Map<String, String>> selectUploadFileList(Map<String, String> paramMap);
     
-    int itoaInsertIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+    int insertItoaIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
-    int itoaUpdateIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+    int updateItoaIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
-    int itoaDeleteIssue(Map<String, String> paramMap) throws Exception;
+    int deleteItoaIssue(Map<String, String> paramMap) throws Exception;
 
     List<Map<String, String>> select_reqId_code(Map<String, String> paramMap);
 
