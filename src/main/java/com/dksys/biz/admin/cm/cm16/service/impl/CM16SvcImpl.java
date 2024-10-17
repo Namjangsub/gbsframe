@@ -16,6 +16,8 @@ import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.admin.cm.cm16.mapper.CM16Mapper;
 import com.dksys.biz.admin.cm.cm16.service.CM16Svc;
+import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
+import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -25,6 +27,9 @@ import com.google.gson.reflect.TypeToken;
 public class CM16SvcImpl implements CM16Svc {
 
     @Autowired
+    QM01Mapper QM01Mapper;
+
+    @Autowired
     CM16Mapper cm16Mapper;
 
     @Autowired
@@ -32,6 +37,9 @@ public class CM16SvcImpl implements CM16Svc {
 
     @Autowired
     CM08Svc cm08Svc;
+    
+    @Autowired
+    WB20Svc wb20Svc;
     
     @Override
     public int selectItoaIssueListCount(Map<String, String> paramMap) {
@@ -60,7 +68,7 @@ public class CM16SvcImpl implements CM16Svc {
     }
 
     @Override
-    public int itoaInsertIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+    public int insertItoaIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
         Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -82,9 +90,12 @@ public class CM16SvcImpl implements CM16Svc {
 
         String fileTrgtKey = cm16Mapper.selectItoaIssueSeqNext(paramMap);
         paramMap.put("fileTrgtKey", fileTrgtKey);
+        paramMap.put("todoNo", fileTrgtKey);
+        paramMap.put("todoFileTrgtKey", fileTrgtKey);
+        paramMap.put("reqNo", fileTrgtKey);
 
         //문제현황 등록
-        int result = cm16Mapper.itoaInsertIssue(paramMap);
+        int result = cm16Mapper.insertItoaIssue(paramMap);
 
         //---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
@@ -98,15 +109,69 @@ public class CM16SvcImpl implements CM16Svc {
 		//첨부 화일 처리  끝 
 		//---------------------------------------------------------------  
 
+        Gson gson = new Gson();	
+		
+		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
+		if (sharngChk.size() > 0) {
+			QM01Mapper.deleteWbsSharngList(paramMap); 
+		}
+		
+		//공유
+		String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
+		pgParam1 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
+		pgParam1 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
+		pgParam1 += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+		if (!"".equals(paramMap.get("workRptNo"))) {	//issNo가 존재하면 문제건, 없으면 정상건
+			pgParam1 += "\"issNo\":\""+ paramMap.get("workRptNo") +"\",";
+		}
+		pgParam1 += "\"reqNo\":\""+ paramMap.get("reqNo") +"\"}";
+		
+		//결재
+		String pgParam2 = "{\"actionType\":\""+ "S" +"\",";
+		pgParam2 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
+		pgParam2 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
+		pgParam2 += "\"salesCd\":\""+ paramMap.get("salesCd") +"\",";
+		if (!"".equals(paramMap.get("workRptNo"))) {	//issNo가 존재하면 문제건, 없으면 정상건
+			pgParam2 += "\"issNo\":\""+ paramMap.get("workRptNo") +"\",";
+		}
+		pgParam2 += "\"reqNo\":\""+ paramMap.get("reqNo") +"\"}";
+		//공유-결재
+		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("approvalArr"), stringList2);
+		if (sharngArr != null && sharngArr.size() > 0 ) {
+			int iSharng = 1;
+			int iApproval = 1;
+	        for (Map<String, String> sharngMap : sharngArr) {
+
+        	    sharngMap.put("reqNo", fileTrgtKey);
+        	    sharngMap.put("fileTrgtKey", fileTrgtKey);
+        	    sharngMap.put("salesCd", fileTrgtKey);
+        	    sharngMap.put("pgmId", paramMap.get("pgmId"));
+        	    sharngMap.put("userId", paramMap.get("userId"));
+        	    
+	        	if ("공유".equals(sharngMap.get("gb"))) {
+	            	    sharngMap.put("sanCtnSn",Integer.toString(iSharng));
+	            	    sharngMap.put("pgParam", pgParam1);
+	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
+	                	iSharng++;
+	        	} else {
+	        		sharngMap.put("sanCtnSn",Integer.toString(iApproval));
+	        		sharngMap.put("pgParam", pgParam2);
+	                	QM01Mapper.insertWbsApprovalList(sharngMap);       		
+	                	iApproval++;
+	        	}
+	        }
+		}
+
         return result;
     }
 
     @Override
-    public int itoaUpdateIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+    public int updateItoaIssue(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
         Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
         Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
 
-        int result = cm16Mapper.itoaUpdateIssue(paramMap);
+        int result = cm16Mapper.updateItoaIssue(paramMap);
 
         // 파일이 존재할 때만 파일 업로드 로직 실행
         if (mRequest != null && mRequest.getFileNames().hasNext()) {
@@ -126,11 +191,22 @@ public class CM16SvcImpl implements CM16Svc {
             }
         }
 
+        //---------------------------------------------------------------  
+        // 결재라인 처리 시작 
+        //---------------------------------------------------------------	
+        if( paramMap.containsKey("approvalArr") ) {	
+            //결제라인 insert
+            result += wb20Svc.insertTodoMaster(paramMap);	
+        }		
+        //---------------------------------------------------------------  
+        // 결재라인 처리 end
+        //---------------------------------------------------------------
+
         return result;
     }
     
     @Override
-    public int itoaDeleteIssue(Map<String, String> paramMap) throws Exception {
+    public int deleteItoaIssue(Map<String, String> paramMap) throws Exception {
         //---------------------------------------------------------------  
 		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
 	  	//   필수값 :  jobType, userId, comonCd
@@ -151,7 +227,12 @@ public class CM16SvcImpl implements CM16Svc {
 		//첨부 화일 권한체크 끝 
 		//---------------------------------------------------------------  
 
-        int result = cm16Mapper.itoaDeleteIssue(paramMap);
+        int result = cm16Mapper.deleteItoaIssue(paramMap);
+
+        List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
+			if (sharngChk.size() > 0) {
+				QM01Mapper.deleteWbsSharngList(paramMap); 
+            }
 
         //---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)

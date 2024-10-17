@@ -18,11 +18,12 @@ public interface CM16Mapper {
 
     String selectItoaIssueSeqNext(Map<String, String> paramMap);
 
-    int itoaInsertIssue(Map<String, String> paramMap);
+    int insertItoaIssue(Map<String, String> paramMap);
 
-    int itoaUpdateIssue(Map<String, String> paramMap);
+    int updateItoaIssue(Map<String, String> paramMap);
 
-    int itoaDeleteIssue(Map<String, String> paramMap);
+    int deleteItoaIssue(Map<String, String> paramMap);
 
 	List<Map<String, String>> select_reqId_code(Map<String, String> paramMap);
+
 }

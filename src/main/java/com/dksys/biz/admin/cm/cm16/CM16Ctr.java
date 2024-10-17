@@ -73,12 +73,13 @@ public class CM16Ctr {
     }
 
     // 문제현황 등록
-    @PostMapping(value = "/itoaInsertIssue")
-    public String itoaInsertIssue(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+    @PostMapping(value = "/insertItoaIssue")
+    public String insertItoaIssue(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
         try {
-            if(cm16Svc.itoaInsertIssue(paramMap, mRequest) !=0 ) {
+            if(cm16Svc.insertItoaIssue(paramMap, mRequest) !=0 ) {
                 model.addAttribute("resultCode", 200);
                 model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+                model.addAttribute("fileTrgtKey", paramMap.get("fileTrgtKey"));
             } else {
                 model.addAttribute("resultCode", 500);
                 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -91,10 +92,10 @@ public class CM16Ctr {
     }
 
     // 문제현황 수정
-    @PostMapping(value = "/itoaUpdateIssue")
-    public String itoaUpdateIssue(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+    @PostMapping(value = "/updateItoaIssue")
+    public String updateItoaIssue(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
         try {
-            if(cm16Svc.itoaUpdateIssue(paramMap, mRequest) !=0 ) {
+            if(cm16Svc.updateItoaIssue(paramMap, mRequest) !=0 ) {
                 model.addAttribute("resultCode", 200);
                 model.addAttribute("resultMessage", messageUtils.getMessage("update"));
             } else {
@@ -110,10 +111,10 @@ public class CM16Ctr {
     }
 
     // 문제현황 삭제
-    @PostMapping(value = "itoaDeleteIssue")
-    public String itoaDeleteIssue(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+    @PostMapping(value = "deleteItoaIssue")
+    public String deleteItoaIssue(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
         try {
-            if (cm16Svc.itoaDeleteIssue(paramMap) != 0 ) {
+            if (cm16Svc.deleteItoaIssue(paramMap) != 0 ) {
                 model.addAttribute("resultCode", 200);
                 model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
             } else {
@@ -128,6 +129,7 @@ public class CM16Ctr {
         return "jsonView";
     }
 
+    // 첨부파일
     public void inputFieldExistCheck(@RequestBody Map<String, String> paramMap, ModelMap model) {
         model.addAttribute("resultCode", 200);
         model.addAttribute("resultMessage", "");
@@ -136,4 +138,5 @@ public class CM16Ctr {
             paramMap.put("ordCoCd", paramMap.get("coCd"));
         }
     }
+
 }
