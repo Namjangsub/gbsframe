@@ -79,11 +79,11 @@ public class WB22SvcImpl implements WB22Svc {
 				sharngMap.put("coCd", paramMap.get("coCd"));
 
 				if (!sharngMap.containsKey("fileTrgtKey")) {
-					int wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
-					sharngMap.put("wbsPlanNo", Integer.toString(wbsPlanNo));
+					String wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
+					sharngMap.put("wbsPlanNo", wbsPlanNo);
 
-					int fileTrgtKey = wb22Mapper.selectWbsSeqNext(paramMap);
-					sharngMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+					String fileTrgtKey = wb22Mapper.selectWbsSeqNext(paramMap);
+					sharngMap.put("fileTrgtKey", fileTrgtKey);
 
 					sharngMap.put("seq", String.valueOf(i + 1));
 
@@ -147,8 +147,8 @@ public class WB22SvcImpl implements WB22Svc {
 					result = wb22Mapper.wbsLevel2Update(sharngMap);
 				} else {
 					sharngMap.put("coCd", paramMap.get("coCd"));
-					int wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
-					sharngMap.put("wbsPlanNo", Integer.toString(wbsPlanNo));
+					String wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
+					sharngMap.put("wbsPlanNo", wbsPlanNo);
 					sharngMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
 					int wbsPlanCodeId = wb22Mapper.selectMaxWbsCode(paramMap);
 
@@ -161,8 +161,8 @@ public class WB22SvcImpl implements WB22Svc {
 					sharngMap.put("wbsPlanCodeId", paramMap.get("wbsPlanCodeKind") + codeId);
 
 					sharngMap.put("seq", String.valueOf(i + 1));
-					int fileTrgtKey = wb22Mapper.selectWbsSeqNext(paramMap);
-					sharngMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+					String fileTrgtKey = wb22Mapper.selectWbsSeqNext(paramMap);
+					sharngMap.put("fileTrgtKey", fileTrgtKey);
 					result = wb22Mapper.wbsLevel2Insert(sharngMap);
 				}
 				i++;
@@ -666,11 +666,11 @@ public class WB22SvcImpl implements WB22Svc {
 							dtl.put("wbsPlanStsCodeId", chkMap.get("wbsPlanStsCodeId"));
 							dtl.put("creatPgm", chkMap.get("creatPgm"));
 
-							int wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(dtl);
-							dtl.put("wbsPlanNo", Integer.toString(wbsPlanNo));
+							String wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(dtl);
+							dtl.put("wbsPlanNo", wbsPlanNo);
 
-							int fileTrgtKey = wb22Mapper.selectWbsSeqNext(dtl);
-							dtl.put("fileTrgtKey", Integer.toString(fileTrgtKey));
+							String fileTrgtKey = wb22Mapper.selectWbsSeqNext(dtl);
+							dtl.put("fileTrgtKey", fileTrgtKey);
 
 							result = wb22Mapper.wbsLevel1Insert(dtl);
 						}
