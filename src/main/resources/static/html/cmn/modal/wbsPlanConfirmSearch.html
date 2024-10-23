@@ -14,7 +14,7 @@
 							<select id="coCd_PS" name="coCd_PS" data-kind="CO" data-search="coCd" required msg="회사" onchange="ModalsjnoconfirmGridView.setData(0);">
 							</select>
 						</td>
-						
+
 						<td>
 							<select data-search="searchType">
 <!-- 								<option value="SMRIZE_NM">총괄PM명</option> -->
@@ -24,7 +24,7 @@
 								<option value="EQP_NM">설비명</option> -->
 							</select>
 						</td>
-						
+
 						<td>
 							<div class="search_form">
 								<input type="text" id="searchValue" name="searchValue" data-search="searchValue" onkeypress="if(event.keyCode == 13){ModalsjnoconfirmGridView.setData(0);}">
@@ -54,7 +54,7 @@
 			return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
 		}
 	};
-	
+
 	var ModalsjnoconfirmGridView = {
 		initView : function() {
 			this.target = new ax5.ui.grid();
@@ -100,12 +100,12 @@
 					}
 				},
 				columns : [
-	        	   {key: "clntNm",           label: "고객명",           width: 150,  align: "left"},                       
+	        	   {key: "clntNm",           label: "고객명",           width: 150,  align: "left"},
 		       	   {key: "clntPjtNm",        label: "고객사PJT",     width: 80,  align: "center"},
-                   {key: "ordrsNo",          label: "수주번호",          width: 70,  align: "center", hidden: false, treeControl: false},                       
-		       	   {key: "salesCd",          label: "SALES CODE",     width: 120,   align: "center"},
-		       	   {key: "planVerNo",        label: "계획Ver.",          width: 60,   align: "center"},
-		       	   {key: "sjNm",             label: "과제명",           width: 280,   align: "left"},
+                   {key: "ordrsNo",          label: "수주번호",          width: 70,  align: "center", hidden: false, treeControl: false},
+		       	   {key: "salesCd",          label: "SALES CODE",     width: 120,   align: "center", styleClass: function () {return (this.item.planVerNo !== undefined) ? "grid-font-blue-bold" : "";}},
+		       	   {key: "planVerNo",        label: "계획Ver.",          width: 60,   align: "center", styleClass: function () {return (this.item.planVerNo !== undefined) ? "grid-font-blue-bold" : "";}},
+		       	   {key: "sjNm",             label: "과제명",           width: 280,   align: "left", styleClass: function () {return (this.item.planVerNo !== undefined) ? "grid-font-blue-bold" : "";}},
 		       	   {key: "verNo",            label: "과제Ver.",          width: 60,   align: "center"},
 		       	   {key: "planCloseYn",      label: "계획확정",   width: 60,   align: "center", formatter: "chkYn"},
 		           {key: "mkerDivNm",        label: "제작처 구분",       width: 80,   align: "center"},
@@ -135,10 +135,10 @@
 			for(var i=0;i<$('.popup_area_sjnoconfirm [data-search]').length;i++){
 				var tempElem = $('.popup_area_sjnoconfirm [data-search]')[i];
 				paramObj[$(tempElem).data("search")] = $(tempElem).val();
-			}				
+			}
 			paramObj["salesCd"] = $('#salesCd').val();
 			paramObj["smrizeId"] = $('#smrizeId').val();
-			
+
 			if(_pageNo !== 999) {
 				var searchValue = paramObj.searchValue;
 				var searchType  = paramObj.searchType;
@@ -164,7 +164,7 @@
 		$('#searchValue').focus();
 		setCommonSelect($('#commonPopup select[data-kind]'));
 		$('#searchValue').val(modalStack.last().paramObj.searchValue);
-		
+
 		//회사 기본값지정
 		if(modalStack.last().paramObj.coCd == '' || modalStack.last().paramObj.coCd == undefined) {
 			$("#coCd_PS").val(jwt.coCd);
@@ -178,29 +178,28 @@
 
 	// 일괄복사
 	function confirm_copy() {
-		var rowList = ModalsjnoconfirmGridView.target.getList();
-	    var rowListArr = [];
-	    var icnt = 0;
-	    $.each(rowList, function(idx, elem){
-	        var dtaChk = null;
-	        if (elem.dtaChk == undefined) {
-	        	dtaChk = "";
-	        }else{
-	        	dtaChk = elem.dtaChk;
-		        icnt++;
-	        }      
-	        const obj = {
-	                coCd: elem.coCd, 
-	                clntCd: elem.clntCd, 
-	                salesCd: elem.salesCd,
-	                dtaChk: dtaChk
-	                };
-	         rowListArr.push(obj);
-	    }); 
-	    if(icnt < 1){
+		var rowList = ModalsjnoconfirmGridView.target.getList("selected");
+	    if (rowList.length < 1) {
 	    	alert('한개 이상을 선택하십시요.');
-	    	return;
+	    	return false;
 	    }
+
+	    const savedSalesCode = rowList
+		    .filter(item => item.planVerNo) 	// planVerNo 값이 있는 객체만 필터링
+		    .map(item => item.salesCd)			// salesCd 값만 추출
+		    .join(',');     ;					//계획Ver 값이 있는경우 체크
+		if (savedSalesCode) {
+		    if (!confirm("WBS계획 등록된 자료가  존재합니다.\n기존 계획자료는 무시됩니다.\nSalesCd:[" + savedSalesCode + "]\n변경하시겠습니까?")) {
+				return false;
+			}
+	    }
+		const rowListArr = rowList.map(elem => ({
+		    coCd: elem.coCd,
+		    clntCd: elem.clntCd,
+		    salesCd: elem.salesCd,
+		    dtaChk: elem.dtaChk || ""  // dtaChk가 undefined일 경우 빈 문자열을 할당
+		}));
+
 		var formData = {
 				"userId" : jwt.userId,
 				"coCd" : $("#coCd").val(),
@@ -212,16 +211,10 @@
 		postAjaxSync("/user/wb/wb22/confirm_copy", formData, null, function(data) {
 			 	alert(data.resultMessage);
 			 	if (data.resultCode == 200) {
-			 		salesGridView.setData(0);
 			 		modalStack.close();
 			 	}
 			 });
 	}
-	
-	function executeCallback() {
-		if(selectGridValidation(ModalsjnoconfirmGridView.target)) return;
-		modalStack.last().callback(ModalsjnoconfirmGridView);
-		modalStack.close();
-	}
+
 
 </script>
