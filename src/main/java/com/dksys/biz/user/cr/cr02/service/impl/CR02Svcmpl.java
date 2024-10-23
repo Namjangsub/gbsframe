@@ -1,20 +1,5 @@
 package com.dksys.biz.user.cr.cr02.service.impl;
 
-import com.dksys.biz.admin.cm.cm08.mapper.CM08Mapper;
-import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
-import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
-import com.dksys.biz.user.cr.cr01.service.CR01Svc;
-import com.dksys.biz.user.cr.cr02.mapper.CR02Mapper;
-import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
-import com.dksys.biz.util.ExceptionThrower;
-import com.dksys.biz.user.cr.cr02.service.CR02Svc;
-import com.google.gson.*;
-import com.google.gson.reflect.TypeToken;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
-
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,6 +7,23 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
+
+import com.dksys.biz.admin.cm.cm08.mapper.CM08Mapper;
+import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.user.cr.cr01.service.CR01Svc;
+import com.dksys.biz.user.cr.cr02.mapper.CR02Mapper;
+import com.dksys.biz.user.cr.cr02.service.CR02Svc;
+import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
+import com.dksys.biz.util.ExceptionThrower;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -43,10 +45,10 @@ public class CR02Svcmpl implements CR02Svc {
 
 	@Autowired
 	CM15Svc cm15Svc;
-	
+
     @Autowired
     ExceptionThrower thrower;
-	
+
     @Override
     public int selectOrdrsCount(Map<String, String> param) {
         return cr02Mapper.selectOrdrsCount(param);
@@ -61,7 +63,7 @@ public class CR02Svcmpl implements CR02Svc {
     public int selectOrdrsListPopCount(Map<String, String> param) {
         return cr02Mapper.selectOrdrsListPopCount(param);
     }
-    
+
     @Override
     public List<Map<String, Object>> selectOrdrsListPop(Map<String, String> param) {
         return cr02Mapper.selectOrdrsListPop(param);
@@ -83,7 +85,7 @@ public class CR02Svcmpl implements CR02Svc {
     public String selectMaxOrdrsNo(Map<String, String> param) {
         return cr02Mapper.selectMaxOrdrsNo(param);
     }
-    
+
     @Override
     public String selectAsMaxOrdrsNo(Map<String, String> param) {
         return cr02Mapper.selectAsMaxOrdrsNo(param);
@@ -93,7 +95,7 @@ public class CR02Svcmpl implements CR02Svc {
     public String selectItemDivEtc(Map<String, String> param) {
         return cr02Mapper.selectItemDivEtc(param);
     }
-    
+
     @Override
     public Map<String, String> insertOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception {
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
@@ -113,7 +115,7 @@ public class CR02Svcmpl implements CR02Svc {
       		//---------------------------------------------------------------
       		//첨부 화일 권한체크  끝
       		//---------------------------------------------------------------
-      		
+
         param.put("estNo", param.get("estNoOrdrs"));
         //param.get("newOrdrsNo") => 회사 == 'TRN' && 거래처 = '104' 일때
         //수주구분이 A/S 일때 수주번호에 AS23024 번호 만들기
@@ -129,15 +131,15 @@ public class CR02Svcmpl implements CR02Svc {
         }else {
         	param.put("ordrsNo", param.get("newOrdrsNo"));
         }
-        
+
         rtnMap.put("ordrsNo", param.get("ordrsNo"));// rtnMap에 "ordrsNo"키로 저장
-        
+
         String fileTrgtKey;
         String OrderSeq = "";
-        
+
         cr01Svc.updateEstConfirm(param);
         cr02Mapper.insertOrdrs(param);
-        
+
         //List<Map<String, String>> planArr = gson.fromJson(removeEmptyObjects(param.get("planArr")), mapList);
         List<Map<String, String>> planArr = gson.fromJson(param.get("planArr"), mapList);
         for (Map<String, String> planMap : planArr) {
@@ -150,7 +152,7 @@ public class CR02Svcmpl implements CR02Svc {
                 planMap.put("pgmId", param.get("pgmId"));
                 planMap.put("udtId", param.get("userId"));
                 planMap.put("udtPgm", "TB_CR02P01");
-                
+
                 cr02Mapper.insertClmnPlanHis(planMap);
                 cr02Mapper.insertClmnPlan(planMap);
 
@@ -163,7 +165,7 @@ public class CR02Svcmpl implements CR02Svc {
 
 //        List<Map<String, String>> detailArr = gson.fromJson(removeEmptyObjects(param.get("detailArr")), mapList);
         List<Map<String, String>> detailArr = gson.fromJson(param.get("detailArr"), mapList);
-        
+
         for (Map<String, String> detailMap : detailArr) {
             try {
                 detailMap.put("coCd", param.get("coCd"));
@@ -176,7 +178,7 @@ public class CR02Svcmpl implements CR02Svc {
                 detailMap.put("ordrsClntNm", param.get("ordrsClntNm"));
                 detailMap.put("clntPjt", param.get("clntPjt"));
                 detailMap.put("udtPgm", "TB_CR02M01");
-                
+
                 //Sales Cd 만들떄 ITEM_DIV의 CODE_ETC 값 추출
                 String ItemDoov = (selectItemDivEtc(detailMap));
                 String Salad = detailMap.get("salesCd");
@@ -208,20 +210,20 @@ public class CR02Svcmpl implements CR02Svc {
       		//---------------------------------------------------------------
       		//첨부 화일 처리  끝
       		//---------------------------------------------------------------
-      		
+
       		//---------------------------------------------------------------
       		//결재처리[1. 수주에서는  SalesCd를 가질수 없음]
       		//---------------------------------------------------------------
       		param.put("reqNo", param.get("ordrsNo"));
-      		
-    		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(param); 
+
+    		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(param);
     		if (sharngChk.size() > 0) {
-    			QM01Mapper.deleteWbsSharngList(param); 
+    			QM01Mapper.deleteWbsSharngList(param);
     		}
-    		
+
     		String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
-    		pgParam1 += "\"fileTrgtKey\":\""+ param.get("fileTrgtKey") +"\","; 
-    		pgParam1 += "\"coCd\":\""+ param.get("coCd") +"\","; 
+    		pgParam1 += "\"fileTrgtKey\":\""+ param.get("fileTrgtKey") +"\",";
+    		pgParam1 += "\"coCd\":\""+ param.get("coCd") +"\",";
     		//pgParam1 += "\"salesCd\":\""+ param.get("salesCd") +"\",";
     		pgParam1 += "\"ordrsNo\":\""+ param.get("ordrsNo") +"\"}";
     		//공유
@@ -230,7 +232,7 @@ public class CR02Svcmpl implements CR02Svc {
     		if (sharngArr != null && sharngArr.size() > 0 ) {
     			int i = 0;
     	        for (Map<String, String> sharngMap : sharngArr) {
-    	            try {	 
+    	            try {
     	            	    sharngMap.put("reqNo", param.get("ordrsNo"));
     	            	    sharngMap.put("salesCd", param.get("ordrsNo"));
     	            	    sharngMap.put("fileTrgtKey", param.get("fileTrgtKey"));
@@ -240,17 +242,17 @@ public class CR02Svcmpl implements CR02Svc {
     	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
     	            	    sharngMap.put("pgParam", pgParam1);
     	            	    sharngMap.put("todoTitle", param.get("ordrsNo") +" , " + sharngMap.get("todoTitle"));
-    	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
+    	                	QM01Mapper.insertWbsSharngList(sharngMap);
     	            	i++;
     	            } catch (Exception e) {
     	                System.out.println("error2"+e.getMessage());
     	            }
     	        }
     		}
-    		
+
     		String pgParam2 = "{\"actionType\":\""+ "S" +"\",";
-    		pgParam2 += "\"fileTrgtKey\":\""+ param.get("fileTrgtKey") +"\","; 
-    		pgParam2 += "\"coCd\":\""+ param.get("coCd") +"\","; 
+    		pgParam2 += "\"fileTrgtKey\":\""+ param.get("fileTrgtKey") +"\",";
+    		pgParam2 += "\"coCd\":\""+ param.get("coCd") +"\",";
     		//pgParam2 += "\"salesCd\":\""+ param.get("salesCd") +"\",";
     		pgParam2 += "\"ordrsNo\":\""+ param.get("ordrsNo") +"\"}";
     		//결재
@@ -259,7 +261,7 @@ public class CR02Svcmpl implements CR02Svc {
     		if (approvalArr != null && approvalArr.size() > 0 ) {
     			int i = 0;
     	        for (Map<String, String> approvalMap : approvalArr) {
-    	            try {	 
+    	            try {
     		            	approvalMap.put("reqNo", param.get("ordrsNo"));
     		            	approvalMap.put("salesCd", param.get("ordrsNo"));
     		            	approvalMap.put("fileTrgtKey", param.get("fileTrgtKey"));
@@ -269,7 +271,7 @@ public class CR02Svcmpl implements CR02Svc {
     		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
     		            	approvalMap.put("pgParam", pgParam2);
     		            	approvalMap.put("todoTitle", param.get("ordrsNo") +" , " + approvalMap.get("todoTitle"));
-    	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
+    	                	QM01Mapper.insertWbsApprovalList(approvalMap);
     	                	i++;
     	            } catch (Exception e) {
     	                System.out.println("error2"+e.getMessage());
@@ -277,14 +279,14 @@ public class CR02Svcmpl implements CR02Svc {
     	        }
     		}
     		cr02Mapper.callCopyOrdrs(param); //이력생성
-    		
+
 //		if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
 //			// 수주일자의 년도가 변경되었을 경우 수주번호를 갱신
 //			cr02Mapper.callUpdateOrdrsNo(param);
 //		}
-			
+
       	// 수주관리의 정보를 프로젝트 관리에 반영
-    	// 남장섭 240401 프로젝트 등록후 선택하게 수정 
+    	// 남장섭 240401 프로젝트 등록후 선택하게 수정
     	// param.get("prjctSeq") 값이 있으면 해당 프로젝트에 연결하고, 없으면 프로젝트 신규 생성함.
     	// 해당 수주에 프로젝트번호 update 처리
     	if (param.get("prjctSeq").equals("")) {
@@ -299,7 +301,7 @@ public class CR02Svcmpl implements CR02Svc {
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
         Type mapList = new TypeToken<ArrayList<Map<String, String>>>() { }.getType();
         String OrderSeq = "";
-        
+
         //---------------------------------------------------------------
 		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
 		//   필수값 :  jobType, userId, comonCd
@@ -308,17 +310,17 @@ public class CR02Svcmpl implements CR02Svc {
 		paramMap.put("userId", param.get("userId"));
 		paramMap.put("comonCd", param.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
 		paramMap.put("uploadFileArr", param.get("uploadFileArr"));
-		
+
 		List<Map<String, String>> uploadFileList = gson.fromJson(paramMap.get("uploadFileArr"), mapList);
 		if (uploadFileList.size() > 0) {
 			//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
 			paramMap.put("jobType", "fileUp");
 			cm15Svc.selectFileAuthCheck(paramMap);
 		}
-		
+
 		String[] deleteFileArr = gson.fromJson(param.get("deleteFileArr"), String[].class);
 		List<String> deleteFileList = Arrays.asList(deleteFileArr);
-		
+
 		for(String fileKey : deleteFileList) {
 			// 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
 			Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
@@ -331,14 +333,14 @@ public class CR02Svcmpl implements CR02Svc {
 		//첨부 화일 권한체크  끝
 		//---------------------------------------------------------------
 
-		//수금정보,  설비&원가 정보, HIST 삭제, 
+		//수금정보,  설비&원가 정보, HIST 삭제,
 //		cr02Mapper.deleteOrdrsPlan(param);
 //		cr02Mapper.deleteOrdrsDetailAll(param);
 //		cr02Mapper.deleteOrdrsPlanHis(param);
-		
+
 		String newOrdrsDiv = param.get("newOrdrsDiv");
-		
-//		// 건양수주번호 있으면 수주번호는 건양수주번호를 따라감			
+
+//		// 건양수주번호 있으면 수주번호는 건양수주번호를 따라감
 //        if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
 //        	// 수주구분이 달라지는 경우
 //            if (!newOrdrsDiv.equals(param.get("ordrsDiv"))) {
@@ -351,7 +353,7 @@ public class CR02Svcmpl implements CR02Svc {
 //                	param.put("ordrsNo", "AS"+orderNo);
 //                }
 //            }
-//            
+//
 //            // 건양수주번호가 있다가 사라진 경우 수주번호를 새로 체번해야한다.
 //            if (!"".equals(param.get("oldOrdrsNo")) && param.get("oldOrdrsNo") != null) {
 //            	//정상수주면 정상수주번호
@@ -367,7 +369,7 @@ public class CR02Svcmpl implements CR02Svc {
 //        	// 건양수주번호 있으면 수주번호는 건양수주번호를 따라감
 //        	param.put("ordrsNo", param.get("newOrdrsNo"));
 //        }
-		
+
         param.put("udtId", param.get("userId"));
         param.put("udtPgm", "TB_CR02M01");
         param.put("estNo", param.get("estNoOrdrs"));
@@ -375,20 +377,20 @@ public class CR02Svcmpl implements CR02Svc {
         	cr01Svc.updateEstConfirm(param);
         }
         cr02Mapper.updateOrdrs(param);
-        
+
         //////////////수금정보  update 수정////////
         updateOrdrsPmntPlanProcess(param, mRequest );
 
         ////////////////////////////////////////////////////////////////////////////////////
         //이하 문장은 위의 함수로 대체함.  남장섭 -->Strat
         ////////////////////////////////////////////////////////////////////////////////////
-        // //데이터 처리 시작   
+        // //데이터 처리 시작
         // int clmnPlanDegKey = cr02Mapper.selectDegKey(param);
         // param.put("clmnPlanDegKey", Integer.toString(clmnPlanDegKey));
-        
+
         // //DB 저장된 수금정보 가져오기
         // List<Map<String, Object>> dbPlanListRaw = cr02Mapper.selectPmntPlan(param);
-		
+
         // //Convert Object to String
         // List<Map<String, String>> dbPlanList = dbPlanListRaw.stream()
         // .map(rawMap -> rawMap.entrySet().stream()
@@ -396,8 +398,8 @@ public class CR02Svcmpl implements CR02Svc {
         // .collect(Collectors.toList());
 
         // ///////////////
-        
-        
+
+
         // //수금정보 처리
         // List<Map<String, String>> planArr = gson.fromJson(param.get("planArr"), mapList);
         // //1. 수정부분
@@ -413,7 +415,7 @@ public class CR02Svcmpl implements CR02Svc {
         //         cr02Mapper.deleteOrdrsPlanEx(dbPlan);
         //     }
         // }//1.
-        
+
         // for (Map<String, String> planMap : planArr) {
         //     try {
         //     	boolean found = false; //1.
@@ -431,9 +433,9 @@ public class CR02Svcmpl implements CR02Svc {
         //         planMap.put("pgmId", param.get("pgmId"));
         //         planMap.put("udtId", param.get("userId"));
         //         planMap.put("udtPgm", "TB_CR02P01");
-                
+
         //         planMap.put("clmnPlanDegKey", param.get("clmnPlanDegKey"));
-                
+
 		// 		if (found) {
 		// 			// Update plan
 		// 			cr02Mapper.updateClmnPlan(planMap);
@@ -441,18 +443,18 @@ public class CR02Svcmpl implements CR02Svc {
 		// 		} else {
 		// 			// Insert new plan
 		// 			//cr02Mapper.updateClmnPlan(planMap);
-					
-					
+
+
 		// 			cr02Mapper.insertClmnPlan(planMap);
 		// 			cr02Mapper.insertUpdatePlanHis(planMap);
 		// 		}
-                
+
         //     } catch (Exception e) {
         //         System.out.println("error2" + e.getMessage());
     	// 		thrower.throwCommonException("수금정보 수정오류!");
         //     }
         // }
-        
+
         ////////////////////////////////////////////////////////////////////////////////////
         //이하 문장은 위의 함수로 대체함.  남장섭 -->End
         ////////////////////////////////////////////////////////////////////////////////////
@@ -465,9 +467,9 @@ public class CR02Svcmpl implements CR02Svc {
         	//프론트단에서 복사 붙여넣기로 추가한것을 삭제할때 반드시 ORDRS_SEQ값을 clear 0으로 초기화 시킬것
         	//아니면 기존 설비레코드 삭제처리됨.
         	cr02Mapper.deleteOrdrsDetail(dbDelete);
-        }      
-        
-        
+        }
+
+
       //2. 설비정보 추가, 수정 건 처리
         List<Map<String, String>> detailArr = gson.fromJson(param.get("detailArr"), mapList);
         String jobType = "";  //추가="C",  수정 = "U" 코드 저장용
@@ -486,33 +488,33 @@ public class CR02Svcmpl implements CR02Svc {
 	                detailMap.put("ordrsClntNm", param.get("ordrsClntNm"));
 	                detailMap.put("clntPjt", param.get("clntPjt"));
 	                detailMap.put("udtPgm", "TB_CR02M01");
-	                
+
 	                //Sales Cd 만들떄 ITEM_DIV의 CODE_ETC 값 추출
 	                String ItemDoov = (selectItemDivEtc(detailMap));
 	                //입력구분이 '설비'코드 일때 sales_cd 만들기(sales_cd 값이 빈칸, null, 길이 0 일떄)
-	                //프론트엔드에서 cudCheck 값은 추가면 C코드가 수정이면 U 코드가 넘어온다. 
+	                //프론트엔드에서 cudCheck 값은 추가면 C코드가 수정이면 U 코드가 넘어온다.
 	    			if (jobType.equals("U")) {
 	                    //입력구분이 '설비'코드 일때 sales_cd 만들기(sales_cd 값이 빈칸, null, 길이 0 일떄)
 	    				//수정모드일때는 설비이면 sales_cd 없으면 새로 만들고
 	    				//설비가 아니면 sales_cd는 공백으로 처리 함
-	                    if (detailMap.get("ordrsDtlDiv10").equals("ORDRSDTLDIV1010")) {       
+	                    if (detailMap.get("ordrsDtlDiv10").equals("ORDRSDTLDIV1010")) {
 	                    	String newSalesCode = "";
 	                    	String Salad = detailMap.get("salesCd");
 			                if ("".equals(Salad) || Salad == null || Salad.length() == 0) {
 			                	OrderSeq = cr02Mapper.selectSalesCdLastNumberPlusOne(param);
-			                	
+
 			                    newSalesCode = param.get("ordrsNo") + "-" + OrderSeq.trim() + detailMap.get("prdtCd") + ItemDoov;
 			                    detailMap.put("salesCd", newSalesCode);
-			                } 
+			                }
 	                    }
 	                    // 수주 상세 업데이트
 	                    cr02Mapper.updateOrdrsDetail(detailMap);
-	                    
+
 	    			} else if (jobType.equals("C")) {
 	    	                //신규 입력이면서 '설비'코드 일때 신규 sales_cd 만들기(sales_cd 값이 빈칸, null, 길이 0 일떄)
 	    	                if (detailMap.get("ordrsDtlDiv10").equals("ORDRSDTLDIV1010")) {
 			                	OrderSeq = cr02Mapper.selectSalesCdLastNumberPlusOne(param);
-			                	
+
 			                    String newSalesCode = param.get("ordrsNo") + "-" + OrderSeq.trim() + detailMap.get("prdtCd") + ItemDoov;
 			                    detailMap.put("salesCd", newSalesCode);
 	    	                }
@@ -525,7 +527,7 @@ public class CR02Svcmpl implements CR02Svc {
     			thrower.throwCommonException("설비&원가 수정오류!");
             }
         }
-        
+
         //---------------------------------------------------------------
 		//첨부 화일 처리 시작
 		//---------------------------------------------------------------
@@ -534,28 +536,28 @@ public class CR02Svcmpl implements CR02Svc {
 			paramMap.put("fileTrgtKey", param.get("fileTrgtKey"));
 			cm08Svc.uploadFile(paramMap, mRequest);
 		}
-		
+
 		for(String fileKey : deleteFileList) {
 			cm08Svc.deleteFile(fileKey);
 		}
 		//---------------------------------------------------------------
 		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
-		
+
 		//---------------------------------------------------------------
   		//결재처리[1. 수주에서는  SalesCd를 가질수 없음]
   		//---------------------------------------------------------------
   		param.put("reqNo", param.get("ordrsNo"));
-  		
-		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(param); 
+
+		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(param);
 		if (sharngChk.size() > 0) {
-			QM01Mapper.deleteWbsSharngList(param); 
+			QM01Mapper.deleteWbsSharngList(param);
 		}
-		
+
 		String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
-		pgParam1 += "\"fileTrgtKey\":\""+ param.get("fileTrgtKey") +"\","; 
-		pgParam1 += "\"coCd\":\""+ param.get("coCd") +"\","; 
-		pgParam1 += "\"histNo\":\""+ param.get("histNo") +"\","; 
+		pgParam1 += "\"fileTrgtKey\":\""+ param.get("fileTrgtKey") +"\",";
+		pgParam1 += "\"coCd\":\""+ param.get("coCd") +"\",";
+		pgParam1 += "\"histNo\":\""+ param.get("histNo") +"\",";
 		//pgParam1 += "\"salesCd\":\""+ param.get("salesCd") +"\",";
 		pgParam1 += "\"ordrsNo\":\""+ param.get("ordrsNo") +"\"}";
 		//공유
@@ -564,7 +566,7 @@ public class CR02Svcmpl implements CR02Svc {
 		if (sharngArr != null && sharngArr.size() > 0 ) {
 			int i = 0;
 	        for (Map<String, String> sharngMap : sharngArr) {
-	            try {	 
+	            try {
 	            	    sharngMap.put("reqNo", param.get("ordrsNo"));
 	            	    sharngMap.put("salesCd", param.get("ordrsNo"));
 	            	    sharngMap.put("fileTrgtKey", param.get("fileTrgtKey"));
@@ -574,16 +576,16 @@ public class CR02Svcmpl implements CR02Svc {
 	            	    sharngMap.put("sanCtnSn",Integer.toString(i+1));
 	            	    sharngMap.put("pgParam", pgParam1);
 	            	    sharngMap.put("todoTitle", param.get("ordrsNo") +" , " + sharngMap.get("todoTitle"));
-	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
+	                	QM01Mapper.insertWbsSharngList(sharngMap);
 	            	i++;
 	            } catch (Exception e) {
 	                System.out.println("error2"+e.getMessage());
 	            }
 	        }
 		}
-		
+
 		String pgParam2 = "{\"actionType\":\""+ "S" +"\",";
-		pgParam2 += "\"fileTrgtKey\":\""+ param.get("fileTrgtKey") +"\","; 
+		pgParam2 += "\"fileTrgtKey\":\""+ param.get("fileTrgtKey") +"\",";
 		pgParam2 += "\"coCd\":\""+ param.get("coCd") +"\",";
 		pgParam2 += "\"histNo\":\""+ param.get("histNo") +"\",";
 		//pgParam2 += "\"salesCd\":\""+ param.get("salesCd") +"\",";
@@ -594,7 +596,7 @@ public class CR02Svcmpl implements CR02Svc {
 		if (approvalArr != null && approvalArr.size() > 0 ) {
 			int i = 0;
 	        for (Map<String, String> approvalMap : approvalArr) {
-	            try {	 
+	            try {
 		            	approvalMap.put("reqNo", param.get("ordrsNo"));
 		            	approvalMap.put("salesCd", param.get("ordrsNo"));
 		            	approvalMap.put("fileTrgtKey", param.get("fileTrgtKey"));
@@ -604,7 +606,7 @@ public class CR02Svcmpl implements CR02Svc {
 		            	approvalMap.put("sanCtnSn",Integer.toString(i+1));
 		            	approvalMap.put("pgParam", pgParam2);
 		            	approvalMap.put("todoTitle", param.get("ordrsNo") +" , " + approvalMap.get("todoTitle"));
-	                	QM01Mapper.insertWbsApprovalList(approvalMap);       		
+	                	QM01Mapper.insertWbsApprovalList(approvalMap);
 	                	i++;
 	            } catch (Exception e) {
 	                System.out.println("error2"+e.getMessage());
@@ -612,14 +614,14 @@ public class CR02Svcmpl implements CR02Svc {
 	            }
 	        }
 		}
-		
+
 //		if("".equals(param.get("newOrdrsNo")) || param.get("newOrdrsNo") == null) {
 //			// 수주일자의 년도가 변경되었을 경우 수주번호를 갱신
 //			cr02Mapper.callUpdateOrdrsNo(param);
 //		}
-		
+
 		// 수주관리의 정보를 프로젝트 관리에 반영
-    	// 남장섭 240401 프로젝트 등록후 선택하게 수정 
+    	// 남장섭 240401 프로젝트 등록후 선택하게 수정
     	// param.get("prjctSeq") 값이 있으면 해당 프로젝트에 연결하고, 없으면 프로젝트 신규 생성함.
     	// 해당 수주에 프로젝트번호 update 처리
     	if (param.get("prjctSeq").equals("")) {
@@ -635,14 +637,14 @@ public class CR02Svcmpl implements CR02Svc {
         Type mapList = new TypeToken<ArrayList<Map<String, String>>>() { }.getType();
 
         //////////////수금정보  update 수정////////
-        
-        //데이터 처리 시작   
+
+        //데이터 처리 시작
         int clmnPlanDegKey = cr02Mapper.selectDegKey(param);
         param.put("clmnPlanDegKey", Integer.toString(clmnPlanDegKey));
-        
+
         //DB 저장된 수금정보 가져오기
         List<Map<String, Object>> dbPlanListRaw = cr02Mapper.selectPmntPlan(param);
-		
+
         //Convert Object to String
         List<Map<String, String>> dbPlanList = dbPlanListRaw.stream()
         .map(rawMap -> rawMap.entrySet().stream()
@@ -650,8 +652,8 @@ public class CR02Svcmpl implements CR02Svc {
         .collect(Collectors.toList());
 
         ///////////////
-        
-        
+
+
         //수금정보 처리
         List<Map<String, String>> planArr = gson.fromJson(param.get("planArr"), mapList);
         //1. 수정부분
@@ -667,7 +669,7 @@ public class CR02Svcmpl implements CR02Svc {
                 cr02Mapper.deleteOrdrsPlanEx(dbPlan);
             }
         }//1.
-        
+
         for (Map<String, String> planMap : planArr) {
             try {
             	boolean found = false; //1.
@@ -685,9 +687,9 @@ public class CR02Svcmpl implements CR02Svc {
                 planMap.put("pgmId", param.get("pgmId"));
                 planMap.put("udtId", param.get("userId"));
                 planMap.put("udtPgm", "TB_CR02P01");
-                
+
                 planMap.put("clmnPlanDegKey", param.get("clmnPlanDegKey"));
-                
+
 				if (found) {
 					// Update plan
 					cr02Mapper.updateClmnPlan(planMap);
@@ -695,26 +697,26 @@ public class CR02Svcmpl implements CR02Svc {
 				} else {
 					// Insert new plan
 					//cr02Mapper.updateClmnPlan(planMap);
-					
-					
+
+
 					cr02Mapper.insertClmnPlan(planMap);
 					cr02Mapper.insertUpdatePlanHis(planMap);
 				}
-                
+
             } catch (Exception e) {
                 System.out.println("error2" + e.getMessage());
 				thrower.throwCommonException("수금정보 수정오류!");
             }
         }
-        
+
 	}
-	
+
     @Override
     public void updateOrdrs_OLD(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception {
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
         Type mapList = new TypeToken<ArrayList<Map<String, String>>>() { }.getType();
         String OrderSeq = "";
-        
+
         //---------------------------------------------------------------
 		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
 		//   필수값 :  jobType, userId, comonCd
@@ -723,17 +725,17 @@ public class CR02Svcmpl implements CR02Svc {
 		paramMap.put("userId", param.get("userId"));
 		paramMap.put("comonCd", param.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
 		paramMap.put("uploadFileArr", param.get("uploadFileArr"));
-		
+
 		List<Map<String, String>> uploadFileList = gson.fromJson(paramMap.get("uploadFileArr"), mapList);
 		if (uploadFileList.size() > 0) {
 			//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
 			paramMap.put("jobType", "fileUp");
 			cm15Svc.selectFileAuthCheck(paramMap);
 		}
-		
+
 		String[] deleteFileArr = gson.fromJson(param.get("deleteFileArr"), String[].class);
 		List<String> deleteFileList = Arrays.asList(deleteFileArr);
-		
+
 		for(String fileKey : deleteFileList) {
 			// 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
 			Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
@@ -751,10 +753,10 @@ public class CR02Svcmpl implements CR02Svc {
         param.put("estNo", param.get("estNoOrdrs"));
         cr02Mapper.updateOrdrs(param);
 
-        //데이터 처리 시작   
+        //데이터 처리 시작
         int clmnPlanDegKey = cr02Mapper.selectDegKey(param);
         param.put("clmnPlanDegKey", Integer.toString(clmnPlanDegKey));
-        
+
         // 데이터베이스에서 현재 수주 상세 목록 가져오기
         List<Map<String, Object>> dbDetailListRaw = cr02Mapper.selectOrdrsDetails(param);
         // 데이터베이스 목록의 Object를 String으로 변환
@@ -797,7 +799,7 @@ public class CR02Svcmpl implements CR02Svc {
             ordrsDetail.put("pgmId", param.get("pgmId"));
             ordrsDetail.put("udtId", param.get("userId"));
             ordrsDetail.put("udtPgm", "TB_CR02M01");
-            
+
             if (found) {
                 // 수주 상세 업데이트
 
@@ -819,7 +821,7 @@ public class CR02Svcmpl implements CR02Svc {
 	                		OrderSeq = ordrsDetail.get("ordrsSeq");
 	                		System.out.println("OrderSeq :" + OrderSeq);
 	                	}
-	                	
+
 	                    String newSalesCode = param.get("ordrsNo") + "-" + OrderSeq + ordrsDetail.get("prdtCd") + ItemDoov;
 	                    ordrsDetail.put("salesCd", newSalesCode);
 	                }
@@ -862,7 +864,7 @@ public class CR02Svcmpl implements CR02Svc {
                         break;
                     }
                 }
-                
+
                 plan.put("coCd", param.get("coCd"));
                 plan.put("ordrsNo", param.get("ordrsNo"));
                 plan.put("estNo", param.get("estNo"));
@@ -871,7 +873,7 @@ public class CR02Svcmpl implements CR02Svc {
                 plan.put("currCd", param.get("currCd"));
 
                 plan.put("clmnPlanDegKey", param.get("clmnPlanDegKey"));
-                
+
                 if (found) {
                     // Update plan
                     cr02Mapper.updateClmnPlan(plan);
@@ -882,8 +884,8 @@ public class CR02Svcmpl implements CR02Svc {
                     cr02Mapper.insertClmnPlan(plan);
                     cr02Mapper.insertUpdatePlanHis(plan);
                 }
-                
-           
+
+
             }catch(Exception e){
                 e.getStackTrace();
             }
@@ -897,19 +899,19 @@ public class CR02Svcmpl implements CR02Svc {
 			paramMap.put("fileTrgtKey", param.get("fileTrgtKey"));
 			cm08Svc.uploadFile(paramMap, mRequest);
 		}
-		
+
 		for(String fileKey : deleteFileList) {
 			cm08Svc.deleteFile(fileKey);
 		}
 		//---------------------------------------------------------------
 		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
-		
+
 		// 수주일자의 년도가 변경되었을 경우 수주번호를 갱신
 		cr02Mapper.callUpdateOrdrsNo(param);
-		
+
 		// 수주관리의 정보를 프로젝트 관리에 반영
-    	// 남장섭 240401 프로젝트 등록후 선택하게 수정 
+    	// 남장섭 240401 프로젝트 등록후 선택하게 수정
 //		cr02Mapper.callUpdateProjectMaster(param);
     }
 
@@ -944,13 +946,13 @@ public class CR02Svcmpl implements CR02Svc {
 		//---------------------------------------------------------------
 		//첨부 화일 권한체크 끝
 		//---------------------------------------------------------------
-		
+
 		//데이터 처리
 		int result = 0;
 		String lvl = paramMap.get("lvl").toString();
 		String onNumber = paramMap.get("ordrsSeq");
 		String estNo = paramMap.get("estNo");
-		
+
 		result = cr02Mapper.deleteOrdrs(paramMap);
         result += cr02Mapper.deleteOrdrsPlan(paramMap);
         result += cr02Mapper.deleteOrdrsPlanHis(paramMap);
@@ -958,7 +960,7 @@ public class CR02Svcmpl implements CR02Svc {
         if (!"".equals(estNo) && estNo != null) {
         	result += cr02Mapper.updateEstDeleteConfirm(paramMap);
         }
-        
+
         //---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------
@@ -971,7 +973,7 @@ public class CR02Svcmpl implements CR02Svc {
 		//---------------------------------------------------------------
 		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
-      		
+
         return result;
     }
 
@@ -985,18 +987,24 @@ public class CR02Svcmpl implements CR02Svc {
     public List<Map<String, Object>> selectOrdrsPlanHis(Map<String, String> param) {
         return cr02Mapper.selectOrdrsPlanHis(param);
     }
-    
+
     @Override
     public List<Map<String, Object>> selectWbsLeftSalesCodeTreeList(Map<String, String> param) {
     	return cr02Mapper.selectWbsLeftSalesCodeTreeList(param);
     }
-    
+
     @Override
     public List<Map<String, Object>> selectItemSalesCodeTreeList(Map<String, String> param) {
     	return cr02Mapper.selectItemSalesCodeTreeList(param);
     }
-    
-    public int updateEstDeleteConfirm(Map<String, String> paramMap) {
+
+    @Override
+    public List<Map<String, Object>> selectItemSalesCodeTreeList2(Map<String, String> param) {
+    	return cr02Mapper.selectItemSalesCodeTreeList2(param);
+    }
+
+    @Override
+	public int updateEstDeleteConfirm(Map<String, String> paramMap) {
         return cr02Mapper.updateEstDeleteConfirm(paramMap);
     }
 
@@ -1012,30 +1020,30 @@ public class CR02Svcmpl implements CR02Svc {
 		result = cr02Mapper.selectOrdrsKey(paramMap);
 		return result;
 	}
-	
+
     @Override
     public int selectNoSalesCdOrdrsListPopCount(Map<String, String> param) {
         return cr02Mapper.selectNoSalesCdOrdrsListPopCount(param);
     }
-    
+
     @Override
     public List<Map<String, Object>> selectNoSalesCdOrdrsListPop(Map<String, String> param) {
         return cr02Mapper.selectNoSalesCdOrdrsListPop(param);
     }
-    
+
     @Override
     public int selectJunmooApproval(Map<String, String> param) {
         return cr02Mapper.selectJunmooApproval(param);
     }
-    
+
 	  //wb20 todo 삭제
 	  @Override
 	  public int deleteOrdrsDetail(Map<String, String> param) {
 		  int result = cr02Mapper.deleteOrdrsDetail(param);
-		  	  result = cr02Mapper.updateOrdrsDetailSoonban(param); 
+		  	  result = cr02Mapper.updateOrdrsDetailSoonban(param);
 		  return  result;
 	  }
-	  
+
 	    @Override
 	    public List<Map<String, Object>> selectOrdrsDetails(Map<String, String> param) {
 	        return cr02Mapper.selectOrdrsDetails(param);
@@ -1045,21 +1053,21 @@ public class CR02Svcmpl implements CR02Svc {
 	    public Map<String, String> salesCdSearchOrderInfo(Map<String, String> paramMap) {
 	        return cr02Mapper.salesCdSearchOrderInfo(paramMap);
 	    }
-    
+
     @Override
 	public List<Map<String, String>> selectOrderChangeTitle(Map<String, String> paramMap) {
 		return cr02Mapper.selectOrderChangeTitle(paramMap);
 	}
-    
+
 	//수금관리사항 수정 처리
 	@Override
 	public int clmnPlanRmkUpdate(Map<String, String> paramMap)  throws Exception {
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
-		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();	    		
-		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);	
-		
-		int result = 0;	    	    
-		String jobType = paramMap.get("jobType");	    	    
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+
+		int result = 0;
+		String jobType = paramMap.get("jobType");
 	    //upate
 		for(Map<String, String> dtl : detailMap) {
 			dtl.put("pgmId", paramMap.get("pgmId"));

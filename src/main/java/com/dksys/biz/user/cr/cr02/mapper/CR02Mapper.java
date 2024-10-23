@@ -16,7 +16,7 @@ public interface CR02Mapper {
     List<Map<String, Object>> selectOrdrsList(Map<String, String> param);
 
     int selectOrdrsListPopCount(Map<String, String> param);
-    
+
     List<Map<String, Object>> selectOrdrsListPop(Map<String, String> param);
 
     Map<String, Object> selectOrdrsInfo(Map<String, String> paramMap);
@@ -29,9 +29,9 @@ public interface CR02Mapper {
     List<Map<String, Object>> selectPmntPlan(Map<String, String> paramMap);
 
     String selectMaxOrdrsNo(Map<String, String> param);
-    
+
     String selectAsMaxOrdrsNo(Map<String, String> param);
-    
+
     String selectItemDivEtc(Map<String, String> param);
 
     int insertOrdrs(Map<String, String> param);
@@ -47,57 +47,59 @@ public interface CR02Mapper {
     void updateClmnPlan(Map<String, String> param);
 
     int insertClmnPlanHis(Map<String, String> param);
-    
+
     int selectDegKey(Map<String, String> param);
-    
+
     int insertUpdatePlanHis(Map<String, String> param);
 
     int deleteOrdrs(Map<String, String> param);
 
     int deleteOrdrsPlan(Map<String, String> param);
-    
+
     int deleteOrdrsPlanEx(Map<String, String> param);
-    
+
     int deleteOrdrsPlanHis(Map<String, String> param);
 
     int deleteOrdrsDetail(Map<String, String> param);
-    
+
     int deleteOrdrsDetailAll(Map<String, String> param);
 
     int updateEstDeleteConfirm(Map<String, String> param);
 
     List<Map<String, Object>> selectOrdrsPlanHis(Map<String, String> param);
-    
+
     List<Map<String, Object>> selectWbsLeftSalesCodeTreeList(Map<String, String> param);
-    
+
     List<Map<String, Object>> selectItemSalesCodeTreeList(Map<String, String> param);
 
+    List<Map<String, Object>> selectItemSalesCodeTreeList2(Map<String, String> param);
+
 	void callUpdateOrdrsNo(Map<String, String> param);
-	
+
 	void callUpdateProjectMaster(Map<String, String> param);
 
 	void callCopyOrdrs(Map<String, String> paramMap);
 
     int orderNoExistValidationCheck(Map<String, String> paramMap);
-    
+
     Map<String, String> selectOrdrsInfoToOrdrsNo(Map<String, String> paramMap);
-    
+
     int salesCdExistValidationCheck(Map<String, String> paramMap);
-    
+
     Map<String, String> salesCdSearchOrderInfo(Map<String, String> paramMap);
 
     int selectOrdrsKey(Map<String, String> paramMap);
 
 	int selectNoSalesCdOrdrsListPopCount(Map<String, String> param);
 
-	List<Map<String, Object>> selectNoSalesCdOrdrsListPop(Map<String, String> param);	
+	List<Map<String, Object>> selectNoSalesCdOrdrsListPop(Map<String, String> param);
 
 	String selectSalesCdLastNumberPlusOne(Map<String, String> param);
-	
+
 	void updateMainHistNo(Map<String, String> param);
-	
+
 	int selectJunmooApproval(Map<String, String> param);
-	
+
 	int updateOrdrsDetailSoonban(Map<String, String> param);
 
     List<Map<String, String>> selectOrderChangeTitle(Map<String, String> paramMap);

@@ -1,17 +1,22 @@
 package com.dksys.biz.user.cr.cr02;
 
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
+
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.cr.cr01.service.CR01Svc;
 import com.dksys.biz.user.cr.cr02.service.CR02Svc;
 import com.dksys.biz.util.MessageUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
-
-import java.util.List;
-import java.util.Map;
 @Controller
 @RequestMapping("/user/cr/cr02")
 public class CR02Ctr {
@@ -32,7 +37,7 @@ public class CR02Ctr {
 		model.addAttribute("ordrsList", ordrsList);
 		return "jsonView";
 	}
-	
+
 	@PostMapping("/selectOrdrsListPop")
 	public String selectOrdrsListPop(@RequestBody Map<String, String> param, ModelMap model) {
 		int totalCnt = cr02Svc.selectOrdrsListPopCount(param);
@@ -63,7 +68,7 @@ public class CR02Ctr {
 		return "jsonView";
 	}
 	// ...
-	
+
 	@PostMapping(value = "/ItemDivEtc")
 	public String getItemDivEtc(@RequestBody Map<String, String> param, ModelMap model) {
 		String itemDivEtc = cr02Svc.selectItemDivEtc(param);
@@ -148,7 +153,7 @@ public class CR02Ctr {
 		model.addAttribute("ordrsPlanHisList", ordrsPlanHisList);
 		return "jsonView";
 	}
-	
+
 	//SalesCode Search modal폼 사용 조회
 	@PostMapping(value = "/selectWbsLeftSalesCodeTreeList")
 	public String selectWbsLeftSalesCodeTreeList(@RequestBody Map<String, String> param, ModelMap model) {
@@ -156,23 +161,23 @@ public class CR02Ctr {
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
 	}
-	
+
 	//SalesCode Search사용 조회
-	@PostMapping(value = "/selectItemSalesCodeTreeList")
-	public String selectItemSalesCodeTreeList(@RequestBody Map<String, String> param, ModelMap model) {
-		List<Map<String, Object>> fileList = cr02Svc.selectItemSalesCodeTreeList(param);
+	@PostMapping(value = "/selectItemSalesCodeTreeList2")
+	public String selectItemSalesCodeTreeList2(@RequestBody Map<String, String> param, ModelMap model) {
+		List<Map<String, Object>> fileList = cr02Svc.selectItemSalesCodeTreeList2(param);
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
 	}
-	
+
 	//복사기능 호출
-	@PostMapping(value = "/callCopyOrdrs") 
-	public String callCopyOrdrs(@RequestBody Map<String, String> paramMap, ModelMap model) {	  
+	@PostMapping(value = "/callCopyOrdrs")
+	public String callCopyOrdrs(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		cr02Svc.callCopyOrdrs(paramMap);
 		model.addAttribute("paramMap", paramMap);
 		return "jsonView";
 	}
-	
+
 	@PostMapping("/selectNoSalesCdOrdrsListPop")
 	public String selectNoSalesCdOrdrsListPop(@RequestBody Map<String, String> param, ModelMap model) {
 		int totalCnt = cr02Svc.selectNoSalesCdOrdrsListPopCount(param);
@@ -182,14 +187,14 @@ public class CR02Ctr {
 		model.addAttribute("ordrsList", ordrsList);
 		return "jsonView";
 	}
-	
+
 	@PostMapping(value = "/selectJunmooApproval")
 	public String selectJunmooApproval(@RequestBody Map<String, String> param, ModelMap model) {
 		int JunmooApproval = cr02Svc.selectJunmooApproval(param);
 		model.addAttribute("JunmooApproval", JunmooApproval);
 		return "jsonView";
 	}
-	
+
 	//설비원가정보 삭제
 	@DeleteMapping(value = "/deleteOrdrsDetail")
 	public String deleteOrdrsDetail(@RequestBody Map<String, String> param, ModelMap model) {
@@ -204,7 +209,7 @@ public class CR02Ctr {
 		}
 		return "jsonView";
 	}
-	
+
 	//SalesCode Search modal폼 사용 조회
 	@PostMapping(value = "/selectOrdrsDetails")
 	public String selectOrdrsDetails(@RequestBody Map<String, String> param, ModelMap model) {
@@ -212,7 +217,7 @@ public class CR02Ctr {
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
 	}
-	
+
 	// salesCd 정보 조회
 	@PostMapping(value = "/salesCdSearchOrderInfo")
 	public String salesCdSearchOrderInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -245,6 +250,6 @@ public class CR02Ctr {
 			model.addAttribute("resultMessage", e.getMessage());
 		}
 		return "jsonView";
-	} 
+	}
 
 }
