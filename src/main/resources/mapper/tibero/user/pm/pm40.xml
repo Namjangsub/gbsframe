@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.pm.pm40.mapper.PM40Mapper">
+
+
+<select id="selectMainGridListCount" parameterType="Map" resultType="int">
+    SELECT count(*)
+    FROM  TB_PM04M01 A
+           LEFT OUTER JOIN TB_CM06M01 C ON C.ID = A.CREAT_ID  AND C.CO_CD = A.CO_CD
+    WHERE  1 = 1
+      AND SUBSTR(C.DEPT_ID,0,5) IN (SELECT SUBSTR(C.DEPT_ID,0,5) FROM TB_CM06M01 C WHERE C.ID = #{userId})
+    <if test="coCd != null and !coCd.equals('')">
+      AND A.CO_CD = #{coCd}
+    </if>
+    <if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')" >
+      AND A.WORK_YM BETWEEN #{strtDt} AND #{endDt}
+    </if>
+    <if test="creatId != null and !creatId.equals('')">
+      AND A.CREAT_ID = #{creatId}
+    </if>
+    <if test="creatNm != null and !creatNm.equals('')">
+      AND C.NAME LIKE '%' || #{creatNm} || '%'
+    </if>
+    ORDER BY A.WORK_YM DESC, C.NAME, A.WORK_DIV
+</select>
+
+	<!-- 그리드 조회 -->
+	<select id="selectMainGridList" parameterType="Map" resultType="camelMap">
+    SELECT B.*
+        ,  ROWNUM AS RN
+      FROM (
+          SELECT
+                  A.WORK_NO
+                 ,A.CREAT_ID
+                , A.CO_CD
+                , A.CREAT_ID
+                , C.NAME AS CREAT_NM
+                , TO_CHAR(A.CREAT_DTM, 'YYYY-MM-DD') AS CREAT_DTM
+                , A.WORK_GOOD_TXT
+       			, A.WORK_BAD_TXT
+        		, A.WORK_NEED_TXT
+        		, A.WORK_PROPOSAL_TXT
+        		, A.WORK_RMK
+                , A.WORK_DIV
+                , A.WORK_YM
+                , A.CREAT_PGM
+                , A.CREAT_DTM
+                , SUBSTR(C.DEPT_ID,0,5) AS DEPT_ID
+            FROM  TB_PM04M01 A
+                   LEFT OUTER JOIN TB_CM06M01 C ON C.ID = A.CREAT_ID AND C.CO_CD = A.CO_CD
+            WHERE  1 = 1
+              AND SUBSTR(C.DEPT_ID,0,5) IN (SELECT SUBSTR(C.DEPT_ID,0,5) FROM TB_CM06M01 C WHERE C.ID = #{userId})
+            <if test="coCd != null and !coCd.equals('')">
+              AND A.CO_CD = #{coCd}
+            </if>
+            <if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')" >
+              AND A.WORK_YM BETWEEN #{strtDt} AND #{endDt}
+            </if>
+            <if test="creatId != null and !creatId.equals('')">
+              AND A.CREAT_ID = #{creatId}
+            </if>
+            <if test="creatNm != null and !creatNm.equals('')">
+              AND C.NAME LIKE '%' || #{creatNm} || '%'
+            </if>
+            ORDER BY A.WORK_YM DESC, C.NAME, A.WORK_DIV
+        ) B
+    WHERE 1 = 1 
+    AND ROWNUM BETWEEN ${firstIndex} AND ${lastIndex}
+</select>
+
+
+	 <select id="selectYearWorkMainList" parameterType="Map" resultType="CamelMap">
+	        /* 작업일보 년갑 집계 내역 분석 */
+			WITH PDS AS --생산일보 
+			     ( 
+			      SELECT T.CO_CD                                               AS CO_CD          
+			            , T.WORK_RPT_L                                          AS WORK_RPT_L    
+			            , T.WORK_RPT_M                                          AS WORK_RPT_M     
+			            , T.WORK_RPT_S                                          AS WORK_RPT_S    
+			            , T.WORK_RPT_HOUR                                       AS WORK_RPT_HOUR  
+			            , T.WORK_RPT_ID                                         AS WORK_RPT_ID  
+			            , TO_CHAR(T.WORK_RPT_DT,'YYYY-MM-DD')                   AS WORK_RPT_DT   
+			            , to_CHAR(T.WORK_RPT_DT, 'MM')     AS MM
+			            , T.WORK_RPT_L||T.WORK_RPT_M ||T.WORK_RPT_S			AS GUBUN
+			            , TOT.TOT_HOURS
+			            , TOT.ALL_TOT         
+			        FROM TB_PM01M01 T 
+			              LEFT OUTER JOIN (
+			              					SELECT WORK_RPT_ID, WORK_RPT_L, WORK_RPT_M, WORK_RPT_S,
+			              					       SUM(WORK_RPT_HOUR) AS TOT_HOURS, 
+			              					       (
+				              					    SELECT SUM(WORK_RPT_HOUR) 
+				              					    FROM TB_PM01M01
+				              					    WHERE CO_CD = #{coCd}
+				              					       AND WORK_RPT_ID = #{userId} 
+				              					       AND WORK_RPT_DT BETWEEN TO_DATE(#{workYm},'YYYY-MM') AND LAST_DAY(TO_DATE(#{workYm}, 'YYYY-MM'))
+				              					   ) AS ALL_TOT
+			              					  FROM TB_PM01M01 
+			              					 WHERE CO_CD = #{coCd}
+			              					   AND WORK_RPT_ID = #{userId}    
+			              					   AND WORK_RPT_DT BETWEEN TO_DATE(#{workYm},'YYYY-MM') AND LAST_DAY(TO_DATE(#{workYm}, 'YYYY-MM'))
+			              					 GROUP BY WORK_RPT_ID, WORK_RPT_L, WORK_RPT_M, WORK_RPT_S 
+			              				) AS TOT ON (T.WORK_RPT_ID = TOT.WORK_RPT_ID AND T.WORK_RPT_L = TOT.WORK_RPT_L AND T.WORK_RPT_M = TOT.WORK_RPT_M AND T.WORK_RPT_S = TOT.WORK_RPT_S)
+			       WHERE 1=1
+			         AND T.WORK_RPT_DT BETWEEN TO_DATE(#{workYm},'YYYY-MM') AND LAST_DAY(TO_DATE(#{workYm}, 'YYYY-MM'))
+			         AND T.CO_CD = #{coCd}
+			         AND T.WORK_RPT_ID = #{userId}   
+			     )
+			SELECT *
+			  FROM (
+			SELECT P.WORK_RPT_L
+			     , (SELECT FN_CM05M01_CD_TO_NM(P.WORK_RPT_L) FROM DUAL) AS  CODE_DIV  --대분류명
+			     , P.WORK_RPT_M    --중분류코드
+			     , (SELECT FN_CM05M01_CD_TO_NM(P.WORK_RPT_M) FROM DUAL) AS  CODE_DESC  --중분류명
+			     , P.WORK_RPT_S       --소분류코드
+			     , (SELECT FN_CM05M01_CD_TO_NM(P.WORK_RPT_S) FROM DUAL) AS  CODE_NM --소분류명
+
+			     , (SELECT FN_CM06M01_ID_TO_NM(P.WORK_RPT_ID) FROM DUAL)   AS WORK_RPT_NM --작성자명
+			     , P.WORK_RPT_S    --작업일보소분류
+			     , P.WORK_RPT_HOUR --작업시간 
+			     , P.WORK_RPT_S AS ORD_SEQ
+
+			     , P.GUBUN
+			     , MM
+			     , P.TOT_HOURS
+			     , P.ALL_TOT
+			     , TO_CHAR(P.TOT_HOURS/P.ALL_TOT*100, '999.99') AS TOT_PCT
+			  FROM PDS   P
+			 WHERE 1=1
+			   AND P.WORK_RPT_HOUR > 0
+			       )
+			   PIVOT (SUM(WORK_RPT_HOUR) FOR MM IN ( '01' AS MM01, '02' AS MM02, '03' AS MM03, '04' AS MM04, '05' AS MM05, '06' AS MM06,
+			   											 '07' AS MM07, '08' AS MM08, '09' AS MM09, '10' AS MM10, '11' AS MM11, '12' AS MM12) 
+			         )
+			<where>
+				<if test="workRptm != null and !workRptm.equals('')">
+				  AND WORK_RPT_M = #{workRptm}
+				</if>
+				<if test="workRpts != null and !workRpts.equals('')">
+				  AND WORK_RPT_S = #{workRpts}
+				</if>
+			</where>       
+			 ORDER BY ORD_SEQ
+			 
+	    </select>
+
+
+<insert id="insert_pm40" parameterType="Map">
+    INSERT INTO TB_PM04M01
+    (
+          WORK_NO
+        , CO_CD
+        , USER_ID
+        , DEPT_CD
+        , WORK_YM
+        , WORK_DIV
+        , WORK_GOOD_TXT
+        , WORK_BAD_TXT
+        , WORK_NEED_TXT
+        , WORK_PROPOSAL_TXT
+        , WORK_RMK
+        , CREAT_ID
+        , CREAT_PGM
+        , CREAT_DTM
+    )
+    VALUES
+    (
+          #{workNo}
+        , #{coCd}
+        , #{userId}
+        , #{deptCd}
+        , #{workYm}
+        , #{workDiv}
+        , #{workGoodTxt}
+        , #{workBadTxt}
+        , #{workNeedTxt}
+        , #{workProposalTxt}
+        , #{workRmk}
+        , #{userId}
+        , #{pgmId}
+        , SYSDATE
+    )
+</insert>
+
+<!-- update -->
+<update id="update_pm40" parameterType="Map">
+    UPDATE TB_PM04M01
+    SET    WORK_GOOD_TXT =#{workGoodTxt}
+         , WORK_BAD_TXT =#{workBadTxt}
+         , WORK_NEED_TXT =#{workNeedTxt}
+         , WORK_PROPOSAL_TXT =#{workProposalTxt}
+         , WORK_RMK =#{workRmk}
+         , UDT_ID    = #{userId}
+         , UDT_PGM   = #{pgmId}
+         , UDT_DTM   = SYSDATE
+    WHERE  WORK_NO   = #{workNo}
+</update>
+
+<!-- delete -->    
+<delete id="delete_pm40" parameterType="Map">
+    DELETE FROM TB_PM04M01
+    WHERE WORK_NO = #{workNo}
+</delete>
+
+	<!-- 관리번호 채번 -->
+	<select id="select_pm40_Next_MNGM_NO" parameterType="java.util.Map" resultType="java.lang.String">
+		SELECT CASE WHEN MAX(WORK_NO) IS NULL THEN 'WORK'||SUBSTR(#{workYm}, 3, 2)||'00001'
+		                                    ELSE 'WORK'||SUBSTR(#{workYm}, 3, 2)||LPAD(TO_NUMBER(SUBSTR(MAX(WORK_NO), -5)) + 1, 5, 0)
+			   END AS MNGM_NO
+		FROM   TB_PM04M01
+		WHERE  CO_CD = #{coCd}
+		AND    WORK_YM LIKE SUBSTR(#{workYm}, 0, 4)||'%'
+    </select>
+	
+	<select id="select_gochal_count" parameterType="Map" resultType="int">
+		SELECT count(*)
+		  FROM TB_PM04M01 
+		  WHERE WORK_YM = #{workYm}
+		    AND USER_ID = #{userId}
+		    AND WORK_DIV = '개인'
+	</select>
+
+ <!-- 수정팝업 조회 -->
+    <select id="select_pm40_Info" parameterType="Map" resultType="camelMap">
+		SELECT ROWNUM AS RN
+				, A.WORK_NO
+				, A.CO_CD
+				, A.USER_ID
+				, C.NAME AS USER_NM
+				, TO_CHAR(A.CREAT_DTM, 'YYYY-MM-DD') AS CREAT_DTM  
+				, A.WORK_GOOD_TXT
+       			, A.WORK_BAD_TXT
+        		, A.WORK_NEED_TXT
+        		, A.WORK_PROPOSAL_TXT
+				, A.WORK_RMK
+				, A.WORK_DIV
+				--, A.WRITE_DT
+				, A.WORK_YM
+				, A.CREAT_ID
+				, A.CREAT_PGM
+				, A.CREAT_DTM
+				FROM  TB_PM04M01 A
+				LEFT OUTER JOIN TB_CM06M01 C ON C.ID = A.CREAT_ID  AND C.CO_CD =  A.CO_CD
+		WHERE  A.WORK_NO = #{workNo}
+		AND    ROWNUM = 1
+    </select>
+
+
+</mapper>
