@@ -1,0 +1,567 @@
+<div class="popup_area of_a" style="width: 100%; height: 100%;">
+	<div class="tit_contents">
+		<h4 class="tit">작업일보 결과표</h4>
+	</div>
+	
+	<form id="popForm" onSubmit="return false;">
+		<div class="form-group popup_table">
+			<input type="hidden" id="fileTrgtKey" name="fileTrgtKey">
+			<input type="hidden" id="workNo" name="workNo">
+			<input type="hidden" id="userId"      name="userId">
+			<input type="hidden" id="pgmId"       name="pgmId" value="PM4001P01">
+			<table>
+				<colgroup>
+					<col width="11%">
+					<col width="14%">
+					<col width="11%">
+					<col width="14%">
+					<col width="11%">
+					<col width="14%">
+					<col width="11%">
+					<col width="14%">
+				</colgroup>
+				<!-- 1행 -->
+				<tr>
+					<th>발행자</th>
+					<td>
+		               <div class="search_form">
+		               	  <input type="hidden"	id="coCd" name = "coCd" readonly="readonly">						
+					      <input type="hidden" id="ordrgId" name="ordrgId"  data-search="ordrgId"  >
+		             	  <input type="text"	id="ordrgNm"  name="ordrgNm" readonly="readonly">
+		               </div>
+					</td>
+					<th>년월</th>
+					<td>
+						 <div class="date_input">
+						   <select id="writeYear" name="writeYear" data-search="writeYear" style="width:100px;">
+						   </select>
+						   <select id="writeMonth" name="writeMonth" data-search="writeMonth"  style="width:100px;" onchange="ModalgridView.setData();">
+						   </select>							
+						 </div>					
+					</td>
+					<th>고찰번호</th>
+					<td>
+						 <div class="search_form">
+						   
+						   <input type="text"	id="workNo" name="workNo" readonly="readonly">						
+						 </div>					
+					</td>
+					<th>고찰일자</th>
+					<td>
+						 <div class="search_form">	
+						   <input type="text" id="resDt" name = "resDt"  readonly="readonly">						
+						 </div>											
+					</td>
+				</tr>
+			</table>
+		</div>
+			<!-- 콘텐츠 -->
+			<div class="contents">
+				<!-- 리스트 -->
+				<div class="ax5_grid">
+					<div>
+						<div data-ax5grid="first-grid-modal" data-ax5grid-config="{}" style="height:400px; width: 100%" ></div>
+					</div>
+				</div>
+			</div>
+			
+			<table>
+				<tr>
+					<th class="">1. 잘한점</th>
+					<td colspan="7">
+						<textarea class="form-control" id="workGoodTxt" name="workGoodTxt" style="height: 50px;"></textarea>
+					</td>
+				</tr>
+				<tr>
+					<th class="">2. 아쉬운점</th>
+					<td colspan="7">
+						<textarea class="form-control" id="workBadTxt" name="workBadTxt" style="height: 50px;"></textarea>
+					</td>
+				</tr>
+				<tr>
+					<th class="">3. 개선할점</th>
+					<td colspan="7">
+						<textarea class="form-control" id="workNeedTxt" name="workNeedTxt" style="height: 50px;"></textarea>
+					</td>
+				</tr>
+				<tr>
+					<th class="">4. 건의사항</th>
+					<td colspan="7">
+						<textarea class="form-control" id="workProposalTxt" name="workProposalTxt" style="height: 50px;"></textarea>
+					</td>
+				</tr>
+				<tr>
+					<th class="">비고</th>
+					<td colspan="7">
+						<textarea class="form-control" id="workRmk" name="workRmk" style="height: 50px;"></textarea>
+					</td>
+				</tr>
+			</table>
+	</form>
+	
+	
+	<!-- 공통 파일 영역 -->
+	<div id="fileList_area"></div>
+	<div><br><br></div>
+</div>
+
+<!-- 하단 버튼 -->
+<div class ="popup_bottom_btn">
+	<button type="button" id="actionBtn" authChk>등록</button>
+	<button type="button" onclick="setReportOrderDetail();">개인고찰출력</button>
+	<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+</div>
+
+<script type="text/javascript">
+	
+	var actionType  = null;
+	var fileTrgtKey = null;
+    var beforeGridSize = 0; //수주상세그리드의 갯수용 그리드컨텐츠 높이조절용
+	var detailArr   = []; // 상세 그리드내용
+	var cobtp  = [];
+	var workNo = null;
+	var ModalgridView = {
+		initView: function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showLineNumber : false,
+				// 체크박스
+				//showRowSelector: true,
+				multipleSelect : false,
+				sortable       : false,
+				target : $('[data-ax5grid="first-grid-modal"]'),
+				header : {
+					align   : "center",
+					selector: false
+				},
+				
+				body: {
+		        	mergeCells : ["codeDiv", "codeKind", "codeDesc", "codeNm"],
+		        	 onClick: function () {
+		                this.self.select(this.dindex);
+		            },
+		            onDBLClick: function () {
+		            },
+		            
+		            grouping: {
+	                    by: ["codeDesc" ],
+	                    columns: [
+	                        {
+	                            label: function () {
+	                                return this.groupBy.labels.join(", ") + " 소계";
+	                            }, colspan: 3, align: "center"
+	                        },
+							
+							{key : "mm01" , collector : "sum", formatter : "money", align : "right"},
+							{key : "mm02" , collector : "sum", formatter : "money", align : "right"},
+							{key : "mm03" , collector : "sum", formatter : "money", align : "right"},
+							{key : "mm04" , collector : "sum", formatter : "money", align : "right"},
+							{key : "mm05" , collector : "sum", formatter : "money", align : "right"},
+							{key : "mm06" , collector : "sum", formatter : "money", align : "right"},
+							{key : "mm07" , collector : "sum", formatter : "money", align : "right"},
+							{key : "mm08" , collector : "sum", formatter : "money", align : "right"},
+							{key : "mm09" , collector : "sum", formatter : "money", align : "right"},
+							{key : "mm10" , collector : "sum", formatter : "money", align : "right"},
+							{key : "mm11" , collector : "sum", formatter : "money", align : "right"},
+							{key : "mm12" , collector : "sum", formatter : "money", align : "right"},
+							{key : "totPct" , collector : "sum", formatter : "money", align : "right"}
+	                    ]
+	                }
+		            
+		            
+		            
+		            
+		            
+		        },
+			page : {
+				navigationItemCount : 10,
+				height : 30,
+				display : false,
+				firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+				prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+				nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+				lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+				onChange : function() {
+					gridView.setData(this.page.selectPage);
+				}
+			},
+			footSum: [
+		    	[
+					{label : "합계", colspan: 3, align: "center"},
+					{key : "mm01" , collector : "sum", formatter : "money", align : "right"},
+					{key : "mm02" , collector : "sum", formatter : "money", align : "right"},
+					{key : "mm03" , collector : "sum", formatter : "money", align : "right"},
+					{key : "mm04" , collector : "sum", formatter : "money", align : "right"},
+					{key : "mm05" , collector : "sum", formatter : "money", align : "right"},
+					{key : "mm06" , collector : "sum", formatter : "money", align : "right"},
+					{key : "mm07" , collector : "sum", formatter : "money", align : "right"},
+					{key : "mm08" , collector : "sum", formatter : "money", align : "right"},
+					{key : "mm09" , collector : "sum", formatter : "money", align : "right"},
+					{key : "mm10" , collector : "sum", formatter : "money", align : "right"},
+					{key : "mm11" , collector : "sum", formatter : "money", align : "right"},
+					{key : "mm12" , collector : "sum", formatter : "money", align : "right"},
+					//{key : "totHours" , collector : "sum", formatter : "money", align : "right"},
+					{key : "totPct" , collector : "sum", formatter : "money", align : "right"},
+                 ]
+		    ],          
+	    	columns : [
+					 {key: "codeDiv",	    label: "부서구분",			width: 70,		align: "center"}
+					,{key: "codeDesc",	    label: "업무분류",			width: 70,		align: "center"}
+					,{key: "codeNm",		label: "업무일지", 	    width: 250,		align: "left"}
+					,{key: "mm01",			label: "1월", 	    	width: 90,		align: "right"}
+					,{key: "mm02",			label: "2월", 	    	width: 90,		align: "right"}
+					,{key: "mm03",			label: "3월", 	    	width: 90,		align: "right"}
+					,{key: "mm04",			label: "4월", 	    	width: 90,		align: "right"}
+					,{key: "mm05",			label: "5월", 	    	width: 90,		align: "right"}
+					,{key: "mm06",			label: "6월", 	    	width: 90,		align: "right"}
+					,{key: "mm07",			label: "7월", 	    	width: 90,		align: "right"}
+					,{key: "mm08",			label: "8월", 	    	width: 90,		align: "right"}
+					,{key: "mm09",			label: "9월", 	    	width: 90,		align: "right"}
+					,{key: "mm10",			label: "10월", 	    	width: 90,		align: "right"}
+					,{key: "mm11",			label: "11월", 	    	width: 90,		align: "right"}
+					,{key: "mm12",			label: "12월", 	    	width: 90,		align: "right"}
+					//,{key: "totHours",		label: "누계", 	    	width: 90,		align: "right"}
+					,{key: "totPct",		label: "백분율", 	    	width: 90,		align: "right"}
+	            ]
+
+						});
+    			return this;
+    		},
+		
+		setData: function(_pageNo) {
+			var targetObj = this.target;
+			if (inputValidation($('input[required]'))) {
+				var paramObj = {};
+				$.each($('#main_area [data-search]'), function(idx, elem){
+					paramObj[$(elem).data("search")] = $(elem).val();					
+				});
+		
+				
+				var writeYear = $('#writeYear').val();
+				var writeMonth = $('#writeMonth').val();
+				if (writeYear && writeMonth) {
+				    var workYm = writeYear + (writeMonth.length === 1 ? '0' + writeMonth : writeMonth);  // 월이 한 자리일 경우 앞에 0 추가
+				    paramObj['workYm'] = workYm;  // 새로운 파라미터 추가
+				}
+				
+				
+				postAjax("/user/pm/pm40/selectYearWorkMainList", paramObj, null, function(data){
+					var list = data.result;
+					targetObj.setData({
+							list : list,
+							page : {
+								totalElements : list.length,
+							}
+					});
+					gridHeightResize(gridView, 194); // 194 = 919 - 725 : 화면 Body 높이 - 그리드 기본크기 725
+				});
+		}
+	}
+	}
+	//화면 초기 설정
+	$(document).ready(function() {
+		
+		setCommonSelect($(".popup_area select[data-kind]"));
+		$("#coCd").val(modalStack.last().paramObj.coCd);
+		$("#popForm #userId").val(jwt.userId);
+		
+// 		$('#writeYear').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+		
+		//고찰일자//
+		$("#resDt").val(new Date().format('yyyy-MM-dd'));
+		
+		ModalgridView.initView();
+		
+		SetYm(); //월 셀렉트박스 세팅
+		
+		
+		authChk(); //권한체크
+
+		actionType = modalStack.last().paramObj.actionType;
+		//fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
+		workNo = modalStack.last().paramObj.workNo;
+		//발행자 세팅
+		$("#popForm #ordrgId").val(modalStack.last().paramObj.userId);
+		$("#popForm #ordrgNm").val(modalStack.last().paramObj.userNm);
+		
+		if (actionType == "C") {
+			
+			//타이틀명 변경
+			$('.tit').text('작업일보 월별 고찰 등록')
+			
+			$('#popForm .coCd').addClass('hit');
+			$('#popForm input#coCd').attr('required', 'required');
+			
+			
+			//버튼명 변경
+			$("#actionBtn").text("등록");
+			
+			ModalgridView.setData(0);
+			//버튼 클릭 시
+			$('#actionBtn').on("click", function() {
+				insert_pm40();
+			});
+		} else if (actionType == "U") {
+			//타이틀명 변경
+			$('.tit').text('작업일보 월별 고찰 수정')
+			
+			//회사 비활성화
+			$('#coCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+			
+			$('#writeMonth').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+			$('#writeYear').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+			$('#writeYear').val(modalStack.last().paramObj.workYm.substr(0,4));
+			$('#writeMonth').val(modalStack.last().paramObj.workYm.substr(4,2))
+			//수정 모드 데이터 가져오기
+			select_pm40_Info();
+			
+			//버튼명 변경
+			$('#actionBtn').text("수정");
+
+			//버튼 클릭 시
+			$('#actionBtn').on("click", function() {
+				update_pm40();
+			});
+		}
+		
+		//---------------------------------------------------------------
+		//첨부 화일 처리 시작
+		//---------------------------------------------------------------
+		fileParam = {
+			fileTrgtTyp	: $("#popForm #pgmId").val(),
+			fileTrgtKey : fileTrgtKey
+		}
+		
+		treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
+		//---------------------------------------------------------------
+		//첨부 화일 처리 끝
+		//---------------------------------------------------------------
+	});
+	
+	//입력정보
+	function select_pm40_Info() {
+		var formData = {
+			"workNo" : workNo,
+		}
+		
+		postAjaxSync("/user/pm/pm40/select_pm40_Info", formData, null, function(data) {
+			$.each(data.result, function(key, value) {
+				if ($('#popForm #' + key)[0]) {
+					$('#popForm #' + key).val(value);
+					if ($('#popForm #' + key).is('[comma]')) {
+						onlyNumber($('#popForm #' + key)[0]);
+					}
+				}
+			});
+		});
+		ModalgridView.setData(0);
+	}
+	
+	// 등록
+	function insert_pm40() {
+		if (inputValidation($('.popup_area [required]'))) {		// 필수 필드의 유효성 검사
+			var formData = makeFormData();						// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
+
+			filePostAjax("/user/pm/pm40/insert_pm40", formData,	// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행
+			            function(data) {
+					    
+							if (data.resultCode == 200) {		//  요청이 성공(200)한 경우, gridView.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
+								alert(data.resultMessage);			// 결과 메시지를 alert으로 출력
+								gridView.setData(0);
+								
+								modalStack.close();				// 모달을 닫음
+							}
+						}
+			);
+		}
+	}
+	
+	// 수정
+	function update_pm40() {
+		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
+			var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
+			
+			filePostAjax("/user/pm/pm40/update_pm40", formData,function(data) {
+				alert(data.resultMessage);
+				
+				if (data.resultCode == 200) {
+					gridView.setData(0);
+					modalStack.close();
+				}
+			});
+		}
+	}
+	
+	function makeFormData() {
+		// 금액 콤마 제거
+		$.each($('.popup_area input[comma]'), function(idx, elem) {
+			deleteComma(elem);
+		});
+		
+		// 날짜 하이픈 제거
+		$.each($('.popup_area input[date]'), function(idx, elem) {
+			deleteHyphen(elem);
+		});
+		
+		//////오늘 날짜의 월의 고찰을 등록하려할떄 체크
+		var toDay = parseInt(new Date().format("yyyyMM")); //오늘 날짜의 년월 체크
+		var resDay = parseInt($("#writeYear").val() + $("#writeMonth").val()); //사용자가 등록하려는 년월
+		
+		if (toDay < resDay){
+			alert("해당 월에 고찰 등록은 할 수 없습니다.");
+			return
+		}
+		
+		// 폼데이터 생성
+		var formData = new FormData($("#popForm")[0]);
+		
+		var writeDt = $("#resDt").val().replace(/\-/g, '');
+		
+		formData.append("statym", resDay);
+		formData.append("writeMonth", $("#writeMonth").val());
+		formData.append("writeDt", writeDt);
+		formData.append("workDiv", "개인");
+		formData.append("deptCd", jwt.deptId);
+		formData.append("workYm", resDay)
+		
+// 		console.log(formData);
+		//---------------------------------------------------------------
+		//-------itemarr  --첨부화일 처리를 위한 부분 시작
+		//---------------------------------------------------------------
+		// 유저아이디 추가
+		//formData.append("userId" , jwt.userId);
+		//formData.append("clntCd" , $('#clntCd').val());			//첨부화일용
+		//formData.append("prdtCd" , $('#prdtCd').val());			//첨부화일용
+		//formData.append("itemCd" , $('#itemDiv').val());			//첨부화일용
+		//formData.append("prjctCd", $('#clntPjt').val());		//첨부화일용
+		//formData.append("comonCd", treeModule.getFileNodeId());	//첨부화일용
+		
+		/* var fileUploadArr = [];
+		var tempArr = [];
+		
+		tempArr = treeModule.getFileArr();
+		
+		$.each(tempArr, function(idx, obj) {
+			if (obj.fileKey == 0) {
+				formData.append("files", obj.file);
+				obj.file = '';
+				fileUploadArr.push(obj);
+			}
+		});
+		
+		formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
+		formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
+		//---------------------------------------------------------------
+		//--첨부화일 처리를 위한 부분 끝\
+		//---------------------------------------------------------------
+
+		//상세자료 준비
+        detailArr = [];
+
+		var list = ModalgridView.target.list;
+		$.each(list,function(idx, obj) {
+			//신규
+			if (parseFloat(obj.outQty) > 0 && obj.chk == 'Y') {
+				obj.dataChk = 'I';
+				detailArr.push(obj);
+			}
+			
+			//수정			
+			if (obj.dataChk == 'U') {
+				detailArr.push(obj);
+			}
+		});
+		formData.append("detailArr", JSON.stringify(detailArr));//선택된 ROW 만 formData에 저장
+		//상세자료 끝 */
+
+		return formData;
+	}
+
+	// 팝업 그리드 조회
+	function Modal_DataSearch() {
+		ModalgridView.setData(0);
+	}
+	
+	function SetYm(){
+		var now = new Date();
+		var nyear = now.getFullYear();
+		var nmon =  (now.getMonth()+1) > 9 ? ''+(now.getMonth()+1) : '0'+(now.getMonth()+1);
+		
+		for(var sy = 2020; sy <= nyear; sy++){
+			$("#writeYear").append("<option value='" + sy + "'>" + sy + "년</option>");
+		}
+		for(var i=1; i <= 12; i++){
+			var sm = i > 9 ? i : "0" + i;
+			$("#writeMonth").append("<option value='" + sm + "'>" + i + "월</option>");
+		}
+
+		$("#writeYear option[value=" + nyear +"]").attr("selected", true);
+		$("#writeMonth option[value=" + nmon +"]").attr("selected", true);
+	}
+	
+    function gridResize(size) {
+	    if (beforeGridSize != size) {
+		    var tagHeight = (size) * 27 + 100 ;
+		    tagHeight = tagHeight > 300 ? tagHeight : 300;
+	
+		    $('[data-ax5grid="first-grid-modal"]').height(tagHeight);
+		    $('[data-ax5grid="first-grid-modal"] [data-ax5grid-container="root"]').height(tagHeight);
+		    beforeGridSize = size;
+	    }
+    }
+
+    function GridHeaderWrite(){
+		formData = {
+					 "deps": userDept
+		           }
+		postAjaxSync("/user/qm/qm02/select_cobtp_modal", formData, null, function(data) {
+			var list = data.result;
+			
+			 if (list.length > 0) {
+                    var i = 0;
+                    $.each(list, function(idx, elem){
+                    	ModalgridView.target.addColumn({key: "cobtp"+[idx+1], label:list[idx].codeNm, align:"center"
+                    		,
+                    		 formatter: function(){
+                    			 if(this.value == 0){return '';}
+                    			 return this.value;
+                    		 },
+                    		 styleClass: function () {
+     			                  return (this.value != 0) ? "grid-font-blue-bold" : "";
+     			             }
+                    	});
+                    	cobtp += list[idx].codeNm + ',';
+                    });
+			 }
+		});
+	}
+    
+
+ 	//고찰 보고서 출력 - report 출력
+ 	function setReportOrderDetail(_type = "") {
+ 		let fileName = "QM0201R01.jrf";  //여러 발주서 번호 처리 (in 처리)
+ 		let arg =  
+ 			  "coCd#"		+  $("#popForm #coCd").val()
+ 		    + "#userId#"	+  $("#popForm #ordrgId").val()
+ 		    + "#statYm#"	+  $("#writeYear").val() + $("#writeMonth").val()
+ 		    + "#fileTrgtKey#"	+  fileTrgtKey 
+ 	    	+ "#";    
+ 		
+ 		if (_type == '' || _type == undefined ) {
+ 			callReport(fileName, arg, 1150, 720, '발주요청서고찰');
+ 		} else { //Export 작업
+ 			ubiExportAjax(fileName, arg, function(response) {
+ 				if (response.resultCode === 200) {
+ 					var base64FileData = response.base64FileData;
+ 					var fileName = response.exportFileName;
+ 					downloadPDFFromBase64(base64FileData, fileName);
+ 				} else {
+ 					alert('PDF 내보내기 실패: ' + response.resultText);
+ 				}
+
+ 			});
+ 		}
+ 	}
+
+     
+</script>
