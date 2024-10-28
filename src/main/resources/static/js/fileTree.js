@@ -547,7 +547,9 @@ var treeModule = (function () {
 					         if(data.resultCode == 200){
 					        	 $('#callApprovalWorking').remove();
 					             alert("공유 확인되었습니다.");
-					             gridView.initView().setData(0);
+					             if (typeof gridView !== 'undefined') {
+					            	 gridView.initView().setData(0);
+					             }
 					       		 modalStack.close();
 					         }
 					     });
@@ -576,7 +578,9 @@ var treeModule = (function () {
 			openThirdModal("/static/html/user/wb/wb20/WB2001P01.html", 730, 300, "", paramObj, function(data){
 	       		if (data == "승인완료") {
 	       			$('#callApprovalWorking').remove();
-		            gridView.initView().setData(0);
+		            if (typeof gridView !== 'undefined') {
+		            	gridView.initView().setData(0);
+		            }
 	       			modalStack.close();
 	       		}
 			});
