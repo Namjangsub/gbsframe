@@ -77,7 +77,8 @@ var treeModule = (function () {
 			    	modalStack.last().paramObj.gridObj = "";	//AJAX 직렬화 하지 않은 배열은 실행오류 발생됨으로 배열변수 Clear 처리함
 
 			    	//결재전이면 결재승인버튼 추가
-			    	if (approvalWorkingGrid.sanctnSttus == "N") {
+					//결재안된 상태이고 User와 결재자가 동일하면 결재버튼 활성화
+			    	if (approvalWorkingGrid.sanctnSttus == "N" && approvalWorkingGrid.todoId == jwt.userId) {
 			    		let actionType = (approvalWorkingGrid.todoDiv1CodeNm == '결재') ? '결재승인' : '공유확인';
 			            let callCmd = `<button id="callApprovalWorking" onclick="treeModule.callApprovalWorking()">` + actionType +`</button>`;
 			            $('#popForm a:has(i.i_search_w)').removeAttr('onclick');  //popForm ID안에 있는 <a>태그중 자식으로 i태그 i_search_w 클래스가 있으면 onclick 제거--> 결재창과 중복 방지를 위함
