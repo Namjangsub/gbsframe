@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.dksys.biz.admin.cm.cm16.mapper.CM16Mapper;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
@@ -30,6 +31,9 @@ public class WB20SvcImpl implements WB20Svc {
 
 	@Autowired
 	QM01Mapper qm01Mapper;
+
+	@Autowired
+	CM16Mapper cm16Mapper;
 
 	@Autowired
 	ExceptionThrower thrower;
@@ -135,7 +139,12 @@ public class WB20SvcImpl implements WB20Svc {
 					result += wb24Mapper.updateWbsIssueResultEvaluate(paramMap);
 				}
 			}
+		} else if ("TODODIV2130".equals(todoDiv2CodeId)) {
+			// ISS_STS: ISSSTS01 --> ISSSTS02 로 상태 변경처리
+			result += cm16Mapper.updateItoaIssueStChk(paramMap);
 		}
+
+
 
 		// 최종결재 완료시 알림톡 발송 대상인지 확인
 		Map<String, String> resultMap = wb20Mapper.selectTodoFinalYn(paramMap);
