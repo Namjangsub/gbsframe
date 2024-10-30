@@ -432,28 +432,44 @@ var treeModule = (function () {
 
     }
 
-    function downLoadFileAll() {
-    	let downLoadList = fileTreeGridView.target.list;
-    	downLoadList.forEach((elem) => {
-    		if (downLoadFile(elem.fileKey) == 'ERROR') return false;
-    	});
+//    function downLoadFileAll() {
+//    	let downLoadList = fileTreeGridView.target.list;
+//    	downLoadList.forEach((elem) => {
+//    		if (downLoadFile(elem.fileKey) == 'ERROR') return false;
+//    	});
+//    }
+    //async 함수로 정의하고
+    //for...of 루프를 사용하여 downLoadFile을 순차적으로 호출
+    //
+    async function downLoadFileAll() {
+        let downLoadList = fileTreeGridView.target.list;
+        for (const elem of downLoadList) {
+//        	console.log(elem.fileName);
+            const result = await downLoadFile(elem.fileKey);
+            if (result === 'ERROR') {
+            	alert(`파일 다운로드 중 오류가 발생했습니다. 파일 키: ${elem.fileName} 관리자에게 문의하세요.`);
+            }
+        }
     }
 
     function downLoadFile(fileKey) {
-    	var tempObj = {
-				"fileKey" : fileKey,
-				"userId" : jwt.userId
-			}
-		postAjaxSync("/admin/cm/cm08/fileDownInfoUser", tempObj, null, function(data){
-			if(data.resultCode == 200){
-				var fileInfo = data.fileInfo;
-// 				var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName , "UTF-8");
-				location.href = "/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId;
-			} else {
-				alert("다운로드 권한이 없습니다.");
-				return 'ERROR';
-			}
-		});
+    	return new Promise((resolve) => {
+	    	var tempObj = {
+					"fileKey" : fileKey,
+					"userId" : jwt.userId
+				}
+			postAjaxSync("/admin/cm/cm08/fileDownInfoUser", tempObj, null, function(data){
+				if(data.resultCode == 200){
+					var fileInfo = data.fileInfo;
+	// 				var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName , "UTF-8");
+					location.href = "/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId;
+					resolve('SUCCESS');
+				} else {
+					alert("다운로드 권한이 없습니다.");
+					resolve('ERROR');
+				}
+			});
+        });
     }
 
 	//+,- 버튼에 따라 파일 트리와 그리드 크기를 200px 증가 또는 감소 처리하고
