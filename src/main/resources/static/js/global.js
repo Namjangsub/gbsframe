@@ -2395,6 +2395,6 @@ function imageViewPopup(_fileKey, _filename) {
 			"fileKey" 	: _fileKey,
 			"fileName" 	: _filename,
 		};
-	openThirdModal("/static/html/cmn/modal/attachImageView.html", 1300, 875, _filename, paramObj, function(data) {
+	openThirdModal("/static/html/cmn/modal/attachImageView.html", $('body').width()-40, $('body').height()-50, _filename, paramObj, function(data) {
 	});
 }
