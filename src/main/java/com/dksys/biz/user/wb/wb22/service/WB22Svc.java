@@ -90,5 +90,6 @@ public interface WB22Svc {
 
 	Map<String, String> wbsResultLastVerNoSearch(Map<String, String> paramMap);
 	
-	
+	// wbs계획 관리 변경사항 저장
+	int updateWbsChanges(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 }

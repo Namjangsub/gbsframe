@@ -798,4 +798,30 @@ public class WB22SvcImpl implements WB22Svc {
 	public Map<String, String> wbsResultLastVerNoSearch(Map<String, String> paramMap) {
 		return wb22Mapper.wbsResultLastVerNoSearch(paramMap);
 	}
+
+	// wbs계획 관리 변경사항 저장
+	@Override
+	public int updateWbsChanges(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+		int result = 0;
+		
+		// Gson을 사용하여 JSON 데이터를 파싱
+		Gson gson = new Gson();
+		Type listType = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+
+		// JSON 형식의 "changedData" 추출
+		List<Map<String, String>> changedDataList = gson.fromJson(paramMap.get("changedData"), listType);
+
+		// 데이터가 존재할 경우 처리
+		if (changedDataList != null && !changedDataList.isEmpty()) {
+			for (Map<String, String> changedData : changedDataList) {
+				// 필요시 추가 처리 (예: coCd, salesCd와 같은 추가 필드 처리)
+				changedData.put("coCd", paramMap.get("coCd"));
+				changedData.put("salesCd", paramMap.get("salesCd"));
+
+				result += wb22Mapper.updateWbsChanges(changedData);
+			}
+		}
+		
+		return result;
+	}
 }

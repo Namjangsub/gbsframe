@@ -123,6 +123,7 @@
 								<div id="addrow1" class="add_btn_small pdl10">
 									<a id="btn15" onclick="copyAllPlanPopUp();" data-grid-control="row-add1" style="width:60px;height: 30px; line-height: 28px;">복사</a>
 									<a id="btn1" onclick="wbsLevel1Insert();" data-grid-control="row-add1" style="width:60px;height: 30px; line-height: 28px;">저장</a>
+									<a id="btn2" onClick="updateWbsChanges()"; data-grid-control="row-add1" style="width:100px;height: 30px; line-height: 28px;">변경요청 저장</a>
 									<!-- <a id="btn2" onclick="wbsLevel1confirm('N');" data-grid-control="row-add2" style="width:60px;height: 30px; line-height: 28px;">미확정</a> -->
 									<a id="btn3" onclick="wbsLevel1confirm('Y');" data-grid-control="row-add3" style="width:60px;height: 30px; line-height: 28px;">확정</a>
 									<a id="btn4" onclick="createVerUp();" data-grid-control="row-add3" style="width:60px;height: 30px; line-height: 28px;">Ver. Up</a>
@@ -325,14 +326,17 @@
 					onDataChanged: function () {
 
 						//하나라도 수정되면 저장버튼 활성화,
-						//   setValue는 onDataChanged 이벤트 없음.--> 함당함수에서 처리해야함
-						$("#popForm #btn1").show();  //저장버튼
-						// console.log(this.key);
+						//   setValue는 onDataChanged 이벤트 없음.--> 해당함수에서 처리해야함
+
 						// Validation 체크
 						if (this.item.closeYn == "Y") {
-							//alert("확정된 상태입니다.");
-							return;
+							$("#popForm #btn1").hide();  //  '저장' 버튼 숨기기
+							$("#popForm #btn2").show();  //  '변경요청 저장' 버튼 활성화
+						} else {
+							$("#popForm #btn1").show();
+							$("#popForm #btn2").hide();
 						}
+
 						const fDate = new Date(this.item.wbsPlansDt);
 						const tDate = new Date(this.item.wbsPlaneDt);
 
@@ -373,6 +377,7 @@
 						}else{
 							this.self.setValue(this.dindex, "daycnt", 0);
 						}
+
 					},
 				},
 				contextMenu: {
@@ -426,11 +431,11 @@
 					{key: "salesCd",       label: "SALES CODE",    hidden:true},
 					{key: "wbsPlanNo",     label: "계획번호",   hidden:true},
 					{key: "wbsPlanCodeId", label: "계획코드",    hidden:true},
-					{key: "wbsPlanCodeNm", label: "계획명",    align: "left",   width: 260},
+					{key: "wbsPlanCodeNm", label: "계획명",    align: "left",   width: 170},
 					{key: "wbsCodeDesc",   label: "코드설명",    hidden:true},
 					{key: "verNo",         label: "Ver.",    align: "center",   width: 100,      hidden: true},
-					{key: "wbsPlanMngId",  label: "담당자 ID",    align: "center",   width: 100},
-					{key: "wbsPlanMngNm",  label: "<span style='color: red;'>*</span>담당자명",    align: "center",   width: 100},
+					{key: "wbsPlanMngId",  label: "담당자 ID",    align: "center",   width: 80},
+					{key: "wbsPlanMngNm",  label: "<span style='color: red;'>*</span>담당자명",    align: "center",   width: 80},
 					{key: "wbsPlansDt",    label: "<span style='color: red;'>*</span>시작일자",      align: "center",   width: 120,
 						editor: {
 							type: "date", config: {
@@ -488,6 +493,7 @@
 							return '<div style="color: #0000FF">' + val + '</div>';
 						}
 					},
+					{key: "chgReason",      	label: "변경사유",   	   width: 150, align: "center", editor: {type: "text"}},
 					{key: "wbsPlanStsCodeIdNm",      hidden: true},
 					{key: "closeYn",      label: "확정",   width: 80, align: "center" , formatter: "chkYn",      hidden: true},
 					{key: "creatId",      label: "생성자",      hidden: true},
@@ -883,6 +889,7 @@
 		//권한처리하면 기본적으로  버튼은 숨겨야함
 		$("#popForm #addrow1").hide();
 		$("#popForm #addrow2").hide();
+		$("#popForm #btn2").hide(); // 위 코드가 작동을 안해서 넣어둠
 		//저장, 확정, Ver.Up 버튼 숨김 처리
 // 		$("#popForm #btn1").hide();
 // 		$("#popForm #btn3").hide();
@@ -1076,6 +1083,8 @@
 				rowListObj["wbsPlanStsCodeId"] = wbsPlanStsCodeId;
 				rowListObj["creatId"] = jwt.userId;
 				rowListObj["creatPgm"] = "WB2201M01";
+				rowListObj["chgReason"] = elem.chgReason;		// 변경사유
+
 				rowListArr.push(rowListObj);
 			});
 			formData.append("rowListArr", JSON.stringify(rowListArr));
@@ -2269,6 +2278,10 @@
 		}
 		var rowSharngListArr = [];
 
+		var changedData = gridView1.target.getList().filter(function(row) {
+			return row.__modified__;
+		});
+
 		// verNo가 1인 경우와 1보다 큰 경우 분기
 		if ($('#wbsPlanVerNo').val() == "1") {
 			postAjaxSync("/user/wb/wb22/selectWbcPlanTodoList", paramObj, null, function(data){
@@ -2410,5 +2423,44 @@
 			$('#mkerNm').val('');
 			$('#PlanMkerNm').css('display', 'inline');
 		}
+	}
+
+	function updateWbsChanges() {
+		// 그리드에서 변경된 데이터만 필터링 (수정된 행을 찾아낸다)
+		var changedData = gridView1.target.getList().filter(function(row) {
+			return row.__modified__;  // 수정된 행만 반환
+		});
+
+		if (changedData.length === 0) {
+			alert('변경된 내용이 없습니다.');
+			return;  // 변경된 데이터가 없으면 함수 종료
+		}
+
+		// FormData 객체 생성
+		var formData = new FormData();
+
+		// 기본 필드 추가 (회사 코드, SALES 코드 등)
+		formData.append("coCd", $('#coCd').val());
+		formData.append("salesCd", $('#salesCd').val());
+
+		// 필요한 데이터만 추출 (필터링 후 배열로)
+		var filteredData = changedData.map(function(row) {
+			return {
+				coCd: row.coCd,
+				salesCd: $('#salesCd').val(),
+				fileTrgtKey: row.fileTrgtKey,
+				chgReason: row.chgReason
+			};
+		});
+
+		// 변경된 데이터를 JSON으로 변환하여 추가
+		formData.append("changedData", JSON.stringify(filteredData));
+
+		filePostAjax("/user/wb/wb22/updateWbsChanges", formData, function(data) {
+			alert(data.resultMessage);
+			if (data.resultCode == 200) {
+				gridView1.setData(0);
+			}
+		});
 	}
 </script>

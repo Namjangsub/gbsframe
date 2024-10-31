@@ -445,4 +445,22 @@ public class WB22Ctr {
 		return "jsonView";
 	}
 
+	// wbs계획 관리 변경사항 저장
+	@PostMapping(value = "updateWbsChanges")
+	public String saveWbsChanges(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+		try {
+			if (wb22Svc.updateWbsChanges(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 }
