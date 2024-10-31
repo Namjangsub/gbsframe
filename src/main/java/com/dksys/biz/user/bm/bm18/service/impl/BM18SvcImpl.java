@@ -8,9 +8,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.dksys.biz.util.ExceptionThrower;
 import com.dksys.biz.user.bm.bm18.mapper.BM18Mapper;
 import com.dksys.biz.user.bm.bm18.service.BM18Svc;
+import com.dksys.biz.util.ExceptionThrower;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -38,7 +38,8 @@ public class BM18SvcImpl implements BM18Svc {
 	}
 	
 	//수신번호 채번	
-	public List<Map<String, String>> selectMaxMessageId(Map<String, String> paramMap) {
+	@Override
+    public List<Map<String, String>> selectMaxMessageId(Map<String, String> paramMap) {
 			
 		List<Map<String, String>> list = new ArrayList<Map<String,String>>();
 		list = bm18Mapper.selectMaxMessageId(paramMap);
@@ -46,7 +47,17 @@ public class BM18SvcImpl implements BM18Svc {
 	}	
 	
 	//todo 수신번호 메시지 내용 채번	
-	public List<Map<String, String>> selectMaxMessageIdTodo(Map<String, String> paramMap) {
+    @Override
+    public List<Map<String, String>> selectMaxMessageIdTodoCompleted(Map<String, String> paramMap) {
+
+        List<Map<String, String>> list = new ArrayList<Map<String, String>>();
+        list = bm18Mapper.selectMaxMessageIdTodoCompleted(paramMap);
+        return list;
+    }
+
+    // todo 수신번호 메시지 내용 채번
+	@Override
+    public List<Map<String, String>> selectMaxMessageIdTodo(Map<String, String> paramMap) {
 
 		List<Map<String, String>> list = new ArrayList<Map<String,String>>();
 		list = bm18Mapper.selectMaxMessageIdTodo(paramMap);
@@ -54,7 +65,8 @@ public class BM18SvcImpl implements BM18Svc {
 	}
 	
 	//todo 수신번호 메시지 내용 채번 NEW	
-	public List<Map<String, String>> selectMaxMessageIdTodoNew(Map<String, String> paramMap) {
+	@Override
+    public List<Map<String, String>> selectMaxMessageIdTodoNew(Map<String, String> paramMap) {
 
 		List<Map<String, String>> list = new ArrayList<Map<String,String>>();
 		list = bm18Mapper.selectMaxMessageIdTodoNew(paramMap);
@@ -62,7 +74,8 @@ public class BM18SvcImpl implements BM18Svc {
 	}
 	
 	//todo 수신번호 메시지 내용 채번	
-	public List<Map<String, String>> selectMaxMessageIdTodo_kakao(Map<String, String> paramMap) {
+	@Override
+    public List<Map<String, String>> selectMaxMessageIdTodo_kakao(Map<String, String> paramMap) {
 		List<Map<String, String>> list = new ArrayList<Map<String,String>>();
 		list = bm18Mapper.selectMaxMessageIdTodo_kakao(paramMap);
 		return list;
@@ -72,7 +85,7 @@ public class BM18SvcImpl implements BM18Svc {
 	public int insertKakaoMessage(Map<String, String> paramMap) throws Exception {
 
 		int result = 0;		
-	    result = bm18Mapper.insertKakaoMessage(paramMap);	
+        result = bm18Mapper.insertKakaoMessage(paramMap);
 
 		return result;
 	}	
