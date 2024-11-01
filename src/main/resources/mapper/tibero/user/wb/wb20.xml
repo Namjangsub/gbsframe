@@ -864,4 +864,67 @@
 			ORDER BY T.TODO_DIV1_CODE_ID DESC, T.CREAT_DTTM ASC
 	</select>
 
+	
+	<!-- 특정화면에서 사용자 승인/결재 자료 있는지 확인하여 list로 전달하기  -->
+	<!-- 각 화면에서 결재자정보에 User 가 있으면 결재, 승인버튼 활성화 하기 위함 -->
+	<select id="selectCurrentUserApprovalDataListFromTodoKey" parameterType="Map" resultType="camelMap">
+			SELECT T.CO_CD
+				, T.TODO_KEY  --TO DO KEY
+				, T.TODO_DIV1_CODE_ID --TO DO 구분(공유-결재)
+				, T.TODO_DIV2_CODE_ID
+				, FN_CM05M01_CD_TO_NM(T.TODO_DIV1_CODE_ID) AS TODO_DIV1_CODE_NM --TO DO 구분(공유-결재) 명
+				, X.CODE_NM  			AS TODO_DIV2_CODE_NM 	 --발생프로그램 명
+				, T.SALES_CD --Sales Code
+				, T.TODO_NO  --관리번호
+				, T.SANCTN_SN  --결제순번
+				, T.TODO_ID
+				, B.NAME       AS TODO_NM --대상자명
+				/* 결재요청자와 결재자가 같은 팀이면 팀장구분을 리턴하고 그외는 공백으로 처리함(이슈 결재처리시 위험도평가에서 사용함
+				 * 계획이슈 조치결과,  실적이슈 조치결과는 팀장이 위험도 평가를 해야함 */
+--				, DECODE(substr(C.DEPT_ID,0,5), substr(B.DEPT_ID,0,5),B.TEAM_MANAGER,'') AS TEAM_MANAGER		/* 팀장구분 */
+				, DECODE(T.TODO_DIV2_CODE_ID, 'TODODIV2090',DECODE(substr(C.DEPT_ID,0,5), substr(B.DEPT_ID,0,5),'평가',''),'') AS TEAM_MANAGER		/* 팀장구분 */
+				, T.SANCTN_STTUS
+				, T.PG_PATH
+				, T.TODO_FILE_TRGT_KEY
+				, T.TODO_NO
+				, CASE WHEN (T.TODO_DIV2_CODE_ID = 'TODODIV2100' OR T.TODO_DIV2_CODE_ID = 'TODODIV1100') THEN (T.TODO_NO ||' ' || T.ETC_FIELD2 || '차')
+					ELSE T.TODO_NO
+					END AS SHW_TODO_NO
+				, T.PG_PARAM
+				, TO_CHAR(T.TODO_CF_DT, 'YYYY-MM-DD') AS TODO_CF_DT  --확인일자
+				, T.TODO_CF_OPN  --확인의견
+				, T.CREAT_ID  --생성자
+				, C.NAME      AS CREAT_NM	/*생성자명 */
+				, TO_CHAR(T.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM  --생성일시
+				, T.UDT_ID  --최종변경자
+				,
+				(
+					SELECT A.NAME
+						FROM TB_CM06M01 AS A
+					WHERE A.ID = T.UDT_ID
+				) AS UDT_NM	/*변경자명 */
+				, TO_CHAR(T.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM  --최종변경일자
+				, T.TODO_TITL AS TODO_TITL
+				, T.CREAT_PGM
+				, T.ETC_FIELD2
+				, NVL((
+					SELECT COUNT(*) CNT
+					FROM TB_WB20M03 S
+					WHERE S.TODO_DIV1_CODE_ID = T.TODO_DIV1_CODE_ID
+						AND S.TODO_DIV2_CODE_ID = T.TODO_DIV2_CODE_ID
+						AND S.SALES_CD = T.SALES_CD
+						AND S.TODO_NO = T.TODO_NO
+						AND S.SANCTN_STTUS = 'N'
+						AND S.TODO_ID != T.TODO_ID
+						AND S.SANCTN_SN <![CDATA[ < ]]> T.SANCTN_SN
+				), 0) AS BEFORE_NOT_CONFIRM  --이전미결자료 존재여부
+			FROM TB_WB20M03 T
+					LEFT OUTER JOIN TB_CM05M01 X ON  X.CODE_ID = T.TODO_DIV2_CODE_ID
+					LEFT OUTER JOIN TB_CM06M01 B  ON T.TODO_ID = B.ID
+					LEFT OUTER JOIN TB_CM06M01 C  ON T.CREAT_ID = C.ID
+			WHERE 1 = 1
+			AND T.SANCTN_STTUS 		= 'N'
+			AND T.TODO_KEY 			= #{todoKey}
+			AND T.TODO_ID 			= #{userId}
+	</select>
  </mapper>

@@ -66,4 +66,6 @@ public interface WB20Mapper {
 	//화면에 결재자정보주 해당유저가 있으면 결재/공유 버튼 활성화 자료 검색
 	List<Map<String, String>> selectCurrentUserApprovalDataList(Map<String, String> paramMap);
 
+    List<Map<String, String>> selectCurrentUserApprovalDataListFromTodoKey(Map<String, String> paramMap);
+
 }

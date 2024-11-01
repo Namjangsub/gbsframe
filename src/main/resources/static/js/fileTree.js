@@ -1,7 +1,6 @@
-var fileTreeGridView
+var treeModule = (function () {var fileTreeGridView
 var treeComonCd;
 var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
-var treeModule = (function () {
 	var fileArr=[];
 	var deleteFileArr = [];
 	var fileTreeParamObj;
@@ -25,7 +24,7 @@ var treeModule = (function () {
 			fileTempCocd = _coCd;
 		}
 
-		gridSelector = gridSelector.replace('-','');
+		gridSelector = gridSelector.replace('-',''); 
 
 		//첨부파일영역 설정값이 없으면 기본은 : fileList_area 로 명영함.
 		if (_fileList_area == '' || _fileList_area == undefined) {
@@ -70,7 +69,7 @@ var treeModule = (function () {
 			// 결재, 승인 버튼활성화를 위해서는 modalStack.last().paramObj.gridObj 에 결재 승인을 위한 파라메터 값이 있어야 함.
 			//--------------------------------------------------------------------
 //        	console.log(modalStack.last().paramObj.gridObj);
-
+debugger;
 			if (modalStack.last() != undefined) {
 				approvalWorkingGrid = modalStack.last().paramObj.gridObj; //결재 승인을 위한 파라메터 전역변수에 저장함
 				if (approvalWorkingGrid != undefined) { //To-Do List에서 넘어온 작업임
@@ -79,11 +78,12 @@ var treeModule = (function () {
 					//결재전이면 결재승인버튼 추가
 					//결재안된 상태이고 User와 결재자가 동일하면 결재버튼 활성화
 					if (approvalWorkingGrid.sanctnSttus == "N" && approvalWorkingGrid.todoId == jwt.userId) {
-						let actionType = (approvalWorkingGrid.todoDiv1CodeNm == '결재') ? '결재승인' : '공유확인';
-						let callCmd = `<button id="callApprovalWorking" onclick="treeModule.callApprovalWorking()">` + actionType +`</button>`;
+						const actionType = (approvalWorkingGrid.todoDiv1CodeNm == '결재') ? '결재승인' : '공유확인';
+						const todoKey = approvalWorkingGrid.todoKey;	//TO-Do 고유번호
+						const callCmd = `<button class="callApprovalWorking" onclick="treeModule.callApprovalWorking('${todoKey}')">${actionType}</button>`;
 						$('#popForm a:has(i.i_search_w)').removeAttr('onclick');  //popForm ID안에 있는 <a>태그중 자식으로 i태그 i_search_w 클래스가 있으면 onclick 제거--> 결재창과 중복 방지를 위함
 						$('#popForm a:has(i.i_search_w)').remove();  //I 태그도 삭제
-						$('.popup_bottom_btn').append(callCmd);
+						$('.popup_bottom_btn').last().append(callCmd);
 					}
 				} else {	//To-Do List가 아닌경우 각 화면에서 결재대상이면 처리하기 위함
 					if (params.todoNo != undefined && params.fileTrgtKey != '0' && params.fileTrgtKey != undefined) {
@@ -97,16 +97,18 @@ var treeModule = (function () {
 								"userId" 			: jwt.userId,
 								"useYn" 			: 'Y',
 						}
-						postAjaxSync("/user/wb/wb20/selectCurrentUserApprovalDataList", paramObj, null, function(data){
+						postAjax("/user/wb/wb20/selectCurrentUserApprovalDataList", paramObj, null, function(data){
 							if (data.resultList.length > 0) {
 								approvalWorkingGrid = data.resultList[0]; //결재 승인을 위한 파라메터 전역변수에 저장함
 
 								//결재전이면 결재승인버튼 추가
-								let actionType = (approvalWorkingGrid.todoDiv1CodeNm == '결재') ? '결재승인' : '공유확인';
-								let callCmd = `<button id="callApprovalWorking" onclick="treeModule.callApprovalWorking()">` + actionType +`</button>`;
+								const actionType = (approvalWorkingGrid.todoDiv1CodeNm == '결재') ? '결재승인' : '공유확인';
+								const todoKey = approvalWorkingGrid.todoKey;	//TO-Do 고유번호
+								const callCmd = `<button class="callApprovalWorking" onclick="treeModule.callApprovalWorking('${todoKey}')">${actionType}</button>`;
+
 								$('#popForm a:has(i.i_search_w)').removeAttr('onclick');  //popForm ID안에 있는 <a>태그중 자식으로 i태그 i_search_w 클래스가 있으면 onclick 제거--> 결재창과 중복 방지를 위함
 								$('#popForm a:has(i.i_search_w)').remove();  //I 태그도 삭제
-								$('.popup_bottom_btn').append(callCmd);
+								$('.popup_bottom_btn').last().append(callCmd);	//마지막 popup_bottom_btn class에서 버튼 추가
 							}
 						});
 					}
@@ -577,16 +579,24 @@ var treeModule = (function () {
 	}
 
 
-	function callApprovalWorking(){
-		let row = approvalWorkingGrid;
+	function callApprovalWorking(todoKey){
+
+		paramObj = {
+				"todoKey" : todoKey,
+				"userId"  : jwt.userId,
+		}
+		let row = {};
+		postAjaxSync("/user/wb/wb20/selectCurrentUserApprovalDataListFromTodoKey", paramObj, null, function(data){
+			row = data.resultList[0];
+		});
+		if (row.todoId != jwt.userId) {
+			alert("결재/확인은 담당자만 처리가능합니다. ");
+			return false;
+		}
 		if (row.todoCfDt != undefined) {
 			if(!confirm("결재/확인 처리 완료건입니다.  의견 수정하시겟습니까?")) {
 				return false;
 			}
-		}
-		if (row.todoId != jwt.userId) {
-			alert("결재/확인은 담당자만 처리가능합니다. ");
-			return false;
 		}
 		if( row.todoDiv1CodeNm == "공유" ) {
 			if( row.sanctnSttus == "N" ) {
@@ -602,8 +612,8 @@ var treeModule = (function () {
 						//formData.append("todoCfDt", strDate);
 						filePutAjax("/user/wb/wb20/toDoCfDtUpdate", formData, function(data){
 							if(data.resultCode == 200){
-								$('#callApprovalWorking').remove();
-								alert("공유 확인되었습니다.");
+								$('.callApprovalWorking').last().remove();	//마지막 callApprovalWorking class에서 버튼 제거
+//								alert("공유 확인되었습니다.");
 								if (typeof gridView !== 'undefined') {
 									gridView.initView().setData(0);
 								}
@@ -634,7 +644,7 @@ var treeModule = (function () {
 			};
 			openThirdModal("/static/html/user/wb/wb20/WB2001P01.html", 730, 300, "", paramObj, function(data){
 				if (data == "승인완료") {
-					$('#callApprovalWorking').remove();
+					$('.callApprovalWorking').last().remove();		//마지막 callApprovalWorking class에서 버튼 제거
 					if (typeof gridView !== 'undefined') {
 						gridView.initView().setData(0);
 					}

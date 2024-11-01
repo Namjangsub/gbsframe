@@ -245,4 +245,9 @@ public class WB20SvcImpl implements WB20Svc {
 	public List<Map<String, String>> selectCurrentUserApprovalDataList(Map<String, String> paramMap) {
 		return wb20Mapper.selectCurrentUserApprovalDataList(paramMap);
 	}
+
+    @Override
+    public List<Map<String, String>> selectCurrentUserApprovalDataListFromTodoKey(Map<String, String> paramMap) {
+        return wb20Mapper.selectCurrentUserApprovalDataListFromTodoKey(paramMap);
+    }
 }

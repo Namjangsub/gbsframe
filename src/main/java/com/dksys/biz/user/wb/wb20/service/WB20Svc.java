@@ -52,4 +52,6 @@ public interface WB20Svc {
 
 	List<Map<String, String>> selectCurrentUserApprovalDataList(Map<String, String> paramMap);
 
+    List<Map<String, String>> selectCurrentUserApprovalDataListFromTodoKey(Map<String, String> paramMap);
+
 }

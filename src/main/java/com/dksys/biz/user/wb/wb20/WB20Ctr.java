@@ -213,11 +213,19 @@ public class WB20Ctr {
 		return "jsonView";
     }
 
-	//화면에 결재자정보주 해당유저가 있으면 결재/공유 버튼 활성화 자료 검색
+    // 화면에 결재자정보 해당유저가 있으면 결재/공유 버튼 활성화 자료 검색
 	@PostMapping(value = "/selectCurrentUserApprovalDataList")
 		public String selectCurrentUserApprovalDataList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 			List<Map<String, String>> resultList = wb20Svc.selectCurrentUserApprovalDataList(paramMap);
 			model.addAttribute("resultList", resultList);
 		return "jsonView";
 	}
+
+    // 화면에 결재자정보 해당유저가 있으면 결재/공유 버튼 활성화에서 결재버튼 클릭시 실행시 해당 자료 검색
+    @PostMapping(value = "/selectCurrentUserApprovalDataListFromTodoKey")
+    public String selectCurrentUserApprovalDataListFromTodoKey(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        List<Map<String, String>> resultList = wb20Svc.selectCurrentUserApprovalDataListFromTodoKey(paramMap);
+        model.addAttribute("resultList", resultList);
+        return "jsonView";
+    }
 }
