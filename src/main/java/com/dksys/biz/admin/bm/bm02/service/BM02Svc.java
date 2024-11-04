@@ -27,6 +27,8 @@ public interface BM02Svc {
 
 	void deleteClntBizdept(Map<String, Object> paramMap);
 
+	void deleteBiz(Map<String, Object> paramMap);
+
 	int selectUserClntCount(Map<String, String> paramMap);
 	
 	List<Map<String, String>> selectUserClntList(Map<String, String> paramMap);
