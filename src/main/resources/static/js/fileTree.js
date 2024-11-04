@@ -69,7 +69,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 			// 결재, 승인 버튼활성화를 위해서는 modalStack.last().paramObj.gridObj 에 결재 승인을 위한 파라메터 값이 있어야 함.
 			//--------------------------------------------------------------------
 //        	console.log(modalStack.last().paramObj.gridObj);
-debugger;
+
 			if (modalStack.last() != undefined) {
 				approvalWorkingGrid = modalStack.last().paramObj.gridObj; //결재 승인을 위한 파라메터 전역변수에 저장함
 				if (approvalWorkingGrid != undefined) { //To-Do List에서 넘어온 작업임
