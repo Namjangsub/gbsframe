@@ -37,7 +37,7 @@
   		isSame = true;
 
   	var solarHolidays = [ "0101", "0301", "0505", "0606", "0815", "1003", "1009", "1225" ]; //양력휴일
-  	var lunaHolidays = [ "0101", "0102", "0408", "0814", "0815", "0816" ]; //음력휴일, 설전날도 넣어야함.
+  	var lunarHoliTempdays = [ "0101", "0102", "0408", "0814", "0815", "0816" ]; //음력휴일, 설전날도 넣어야함.
 
   	//대체공휴일 입력구간. 임시휴일이나 대체공휴일이 있을 경우 배열에 넣으면됨. yyyymmdd 입력
 	//20241001 임시 공휴일-->당사는 20241004일로 변경 근무 진행함
@@ -65,6 +65,22 @@
 
   	var setLunaToSolar = []; //당년도의 음력을 양력으로
 
+  //휴일관리 테이블에서 불러오기 --> 휴일관리는 TB_CM12M01에서 등록 관리로 변경함.
+	var paramObj = {
+		"calDivCd": "A",	//calDivCd : A(All), S(solarHolidays), L(lunaHoliTempdays), E(eventHolidays)
+	};
+	postAjaxSync("/admin/cm/cm12/selectSolarLunarEventHolidaysList", paramObj, null, function(data){
+		let temp = data.resultSolar;	//양력휴일
+		solarHolidays = temp.map(item => item.calYmd.trim());
+		
+		temp = data.resultLumar;	//음력휴일, 설전날은 계산헤서 넣음.
+		lunarHoliTempdays = temp.map(item => item.calYmd.trim());
+		
+		temp = data.resultEnent;	//대체공휴일 입력구간. 임시휴일
+		alternativeHolidays = temp.map(item => item.calYmd.trim());
+	});
+  	
+  	
   	//테이블에 기존값이 존재할 경우 해당 값을 다 날림.
 //	if ($('#calendar').length > 0) {
 //	    $('#calendar thead').empty(); // Delete all content inside <thead>
@@ -94,8 +110,8 @@
   	//setLunaToSolar
   	///////////////////////////////////////////////////
   	if (!isSame) { //당년도의 음력휴일 양력으로 변환
-  		for (i = 0; i < lunaHolidays.length; i++) {
-  			var solar = Resut(year + "" + lunaHolidays[i]);
+  		for (i = 0; i < lunarHoliTempdays.length; i++) {
+  			var solar = Resut(year + "" + lunarHoliTempdays[i]);
   			if (i == 0) {
   				//var cDate = new Date();
   				var cMonth = solar.substring(0, 2);
