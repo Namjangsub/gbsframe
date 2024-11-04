@@ -110,8 +110,20 @@ public class BM02Ctr {
     	}
     	return "jsonView";
     }
-		
 	
+	// 업무이력 내역 삭제
+	@DeleteMapping("/deleteBiz")
+    public String deleteBiz(@RequestBody Map<String, Object> paramMap, ModelMap model) {
+		try {
+    		bm02Svc.deleteBiz(paramMap);
+    		model.addAttribute("resultCode", 200);
+    		model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+    	}catch(Exception e){
+    		model.addAttribute("resultCode", 500);
+    		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+    	}
+    	return "jsonView";
+    }
 	
 	// 거래처 사용안함 처리
 	@PutMapping("/unuseClnt")

@@ -71,6 +71,17 @@ public class BM02SvcImpl implements BM02Svc {
 				bm02Mapper.insertPldg(pldgMap);
 			}
 		}
+
+		List<Map<String, String>> bizList = gson.fromJson(paramMap.get("bizArr"), mapList);
+		if(bizList != null) {
+			// 업무이력관리 insert
+			for(Map<String, String> bizMap : bizList) {
+				bizMap.put("clntCd_P", paramMap.get("clntCd_P"));
+				bizMap.put("userId", paramMap.get("userId"));
+				bizMap.put("pgmId", paramMap.get("pgmId"));
+				bm02Mapper.insertBiz(bizMap);
+			}
+		}
 		
 		// 파일 업로드
 		cm08Svc.uploadFile("TB_BM02M01", paramMap.get("clntCd_P"), mRequest);
@@ -124,6 +135,24 @@ public class BM02SvcImpl implements BM02Svc {
 				
 			}
 		}
+
+		List<Map<String, String>> bizList = gson.fromJson(paramMap.get("bizArr"), mapList);
+		if(bizList != null) {
+			// 업무이력 insert
+			for(Map<String, String> bizMap : bizList) {
+				bizMap.put("clntCd_P", paramMap.get("clntCd_P"));
+				bizMap.put("userId", paramMap.get("userId"));
+				bizMap.put("pgmId", paramMap.get("pgmId"));
+				bizMap.put("udtId",  paramMap.get("userId"));
+				bizMap.put("udtPgm", paramMap.get("pgmId"));
+				
+				if(bizMap.get("bizSn")==null || "".equals(bizMap.get("bizSn"))) {
+					bm02Mapper.insertBiz(bizMap);
+				}else {
+					bm02Mapper.updateBiz(bizMap);
+				}
+			}
+		}
 		
 		// 파일 업로드
 		cm08Svc.uploadFile("TB_BM02M01", paramMap.get("clntCd_P"), mRequest);
@@ -156,7 +185,19 @@ public class BM02SvcImpl implements BM02Svc {
 				bm02Mapper.deleteBizdept(bizdeptMap);				
 			}
 		}
-	}	
+	}
+	
+	@Override
+	public void deleteBiz(Map<String,  Object> paramMap) {
+
+		List<Map<String, String>> bizdeptList =(List<Map<String, String>>) paramMap.get("bizdeptArr");
+		if(bizdeptList != null) {
+			// 담보내역 update
+			for(Map<String, String> bizdeptMap : bizdeptList) {
+				bm02Mapper.deleteBiz(bizdeptMap);				
+			}
+		}
+	}
 	
 	@Override
 	public void unuseClnt(Map<String, String> paramMap) {

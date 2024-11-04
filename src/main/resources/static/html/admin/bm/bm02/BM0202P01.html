@@ -479,6 +479,78 @@
 					<td></td>
 				</tr>
 			</tbody></table>-->
+			<!-- 업무이력관리 테이블 -->
+			<table class="popup_table" id="bizTable">
+				<colgroup>
+					<col width="3%">
+					<col width="15%">
+					<col width="25%">
+					<col width="25%">
+					<col width="6%">
+					<col width="8%">
+					<col width="8%">
+					<col width="10%">
+				</colgroup>
+				<thead>
+					<tr>
+						<td colspan="11" style="text-align: left;">업무이력관리</td>
+						<td style="text-align: right;">
+							<a class="tbody_more_btn"></a>
+						</td>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td colspan="12">
+							<div class="add_btn">
+								<a onclick="addBizRow();" authchk>+</a> 
+								<a onclick="removeBizRow();" authchk>-</a>
+							</div>
+						</td>
+					</tr>
+					<tr name="bizHead">
+						<th></th>
+						<th class="tc">제목</th>
+						<th class="tc">내용</th>
+						<th class="tc">비고</th>
+						<th class="tc">수량</th>
+						<th class="tc">금액</th>
+						<th class="tc">생성자</th>
+						<th class="tc">생성일시</th>
+					</tr>
+				</tbody>
+			</table>
+			<table id="bizFrameTable" style="display: none;">
+				<tr name="bizRow">
+					<td>
+						<input type="hidden"   id="bizSn" name="bizSn">
+						<input type="checkbox" name="bizChkBox">
+					</td>
+					<td>
+						<input type="text" class="form-control" name="bizTitl" maxlength="25" msg="제목">
+					</td>
+					<td>
+						<input type="text" class="form-control" name="bizCnts" maxlength="2000" msg="내용">
+					</td>
+					<td>
+						<input type="text" class="form-control" name="bizRmk" maxlength="2000" msg="비고">
+					</td>
+					<td>
+						<input type="text" class="form-control" name="bizQty" maxlength="15" onkeyup="onlyNumber(this);" msg="수량">
+					</td>
+					<td>
+						<input type="text" class="form-control" name="bizAmt" maxlength="15" onkeyup="onlyNumber(this);" msg="금액">
+					</td>
+					<td>
+						<input type="hidden" class="form-control" name="creatId" maxlength="15">
+						<input type="text" class="form-control" name="creatIdNm" readonly maxlength="15">
+					</td>
+					<td>
+						<input type="hidden" class="form-control" name="creatDttm" maxlength="15">
+						<input type="text" class="form-control" name="creatDttm" readonly maxlength="15">
+					</td>
+				</tr>
+			</table>
 			<br>
 			<!-- 첨부파일 테이블 -->
 			<table class="popup_table">
@@ -668,6 +740,26 @@
 		}
 		
 		countTot();
+
+		// 업무이력 set
+		var bizList = clntInfo.bizList;
+		if(bizList.length > 0){
+			$.each(bizList, function(idx, obj){
+				var $bizRow = addBizRow();
+				for(var i=0;i<$bizRow.find('[name]').length;i++){
+					var bizItem = $bizRow.find('[name]')[i];
+					var itemValue = obj[bizItem.name];
+					if(itemValue){
+						$(bizItem).val(itemValue);
+					}
+				}
+				if (obj.salesCoCd == undefined ) {
+					$('[name="salesCoCd"]').val('');
+				} else {
+					$('[name="salesCoCd"]').val(obj.salesCoCd);
+				}
+			});
+		}
 		
 		// 첨부파일 set
 		var clntFileList = clntInfo.clntFileList;
@@ -772,6 +864,45 @@
 		$('#pldgTable tbody').append($pldgRow[0]);
 		return $pldgRow;
 	}
+
+	// 업무이력 추가
+	function addBizRow(){
+		var $bizRow = $('#bizFrameTable tr[name="bizRow"]').clone();
+		$('#bizTable tbody').append($bizRow[0]);
+		// 접속자 회사 set
+		$bizRow.find('select[name="salesCoCd"]').val(jwt.coCd)
+		return $bizRow;
+	}
+	
+	// 업무이력 삭제
+	function removeBizRow(){
+		var $checkedBizs = $('#bizTable input[name="bizChkBox"]:checked');
+		// 업무이력 내역 추가
+		var bizArr = [];
+
+		if($checkedBizs.length > 0){
+			$.each($checkedBizs, function(idx, elem){
+
+				var bizObj = {};
+				// 키 추가
+				var bizSn = $(elem).closest('tr').find('[name="bizSn"]').val();
+				if(bizSn){
+					bizObj["bizSn"] = bizSn;
+					bizArr.push(bizObj);
+				}
+				
+				$(elem).closest('tr[name="bizRow"]').remove();
+			});
+			
+			deleteAjax("/admin/bm/bm02/deleteBiz", {"bizArr": bizArr}, null, function(data) {
+				if (data.resultCode == 200) {
+					alert(data.resultMessage);
+				}
+			});
+		}else{
+			alert("삭제할 업무이력을 선택해주세요.");
+		}
+	}
 	
 	// 파일 추가
 	function setClntFile(elem) {
@@ -866,6 +997,27 @@
 			bizdeptArr.push(bizdeptObj);
 		});
 		formData.append("bizdeptArr", JSON.stringify(bizdeptArr));
+
+		// 업무이력관리 추가
+		var bizArr = [];
+		$.each($('#bizTable tr[name="bizRow"]'), function(idx, elem){
+			var bizObj = {};
+			$.each($(elem).find('[name]'), function(idx, elem){
+				var elemName = elem.name;
+				var elemValue = elem.value;
+
+				// 금액 필드(bizAmt)에서 쉼표 제거
+				if (elemName === "bizAmt" || elemName === "bizQty") {
+					elemValue = elemValue.replace(/,/g, ''); // 쉼표 제거
+				}
+
+				bizObj[elemName] = elemValue;
+			});
+			delete bizObj["creatId"];
+			delete bizObj["creatDttm"];
+			bizArr.push(bizObj);
+		});
+		formData.append("bizArr", JSON.stringify(bizArr));
 		
 		// 첨부파일 추가
 		$.each(clntFileArr, function(idx, obj){
@@ -880,6 +1032,7 @@
 		if(actionType == "U"){
 			formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
 		}
+		debugger;
 		
 		return formData;
 	}
