@@ -189,12 +189,12 @@ public class BM02SvcImpl implements BM02Svc {
 	
 	@Override
 	public void deleteBiz(Map<String,  Object> paramMap) {
-
-		List<Map<String, String>> bizdeptList =(List<Map<String, String>>) paramMap.get("bizdeptArr");
-		if(bizdeptList != null) {
-			// 담보내역 update
-			for(Map<String, String> bizdeptMap : bizdeptList) {
-				bm02Mapper.deleteBiz(bizdeptMap);				
+		
+		List<Map<String, String>> bizList =(List<Map<String, String>>) paramMap.get("bizArr");
+		if(bizList != null) {
+			// 이력관리 update
+			for(Map<String, String> bizMap : bizList) {
+				bm02Mapper.deleteBiz(bizMap);				
 			}
 		}
 	}
