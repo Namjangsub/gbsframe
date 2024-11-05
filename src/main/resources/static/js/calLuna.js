@@ -66,19 +66,19 @@
   	var setLunaToSolar = []; //당년도의 음력을 양력으로
 
   //휴일관리 테이블에서 불러오기 --> 휴일관리는 TB_CM12M01에서 등록 관리로 변경함.
-	var paramObj = {
-		"calDivCd": "A",	//calDivCd : A(All), S(solarHolidays), L(lunaHoliTempdays), E(eventHolidays)
-	};
-	postAjaxSync("/admin/cm/cm12/selectSolarLunarEventHolidaysList", paramObj, null, function(data){
-		let temp = data.resultSolar;	//양력휴일
-		solarHolidays = temp.map(item => item.calYmd.trim());
-		
-		temp = data.resultLumar;	//음력휴일, 설전날은 계산헤서 넣음.
-		lunarHoliTempdays = temp.map(item => item.calYmd.trim());
-		
-		temp = data.resultEnent;	//대체공휴일 입력구간. 임시휴일
-		alternativeHolidays = temp.map(item => item.calYmd.trim());
-	});
+//	var paramObj = {
+//		"calDivCd": "A",	//calDivCd : A(All), S(solarHolidays), L(lunaHoliTempdays), E(eventHolidays)
+//	};
+//	postAjaxSync("/admin/cm/cm12/selectSolarLunarEventHolidaysList", paramObj, null, function(data){
+//		let temp = data.resultSolar;	//양력휴일
+//		solarHolidays = temp.map(item => item.calYmd.trim());
+//		
+//		temp = data.resultLumar;	//음력휴일, 설전날은 계산헤서 넣음.
+//		lunarHoliTempdays = temp.map(item => item.calYmd.trim());
+//		
+//		temp = data.resultEnent;	//대체공휴일 입력구간. 임시휴일
+//		alternativeHolidays = temp.map(item => item.calYmd.trim());
+//	});
   	
   	
   	//테이블에 기존값이 존재할 경우 해당 값을 다 날림.
