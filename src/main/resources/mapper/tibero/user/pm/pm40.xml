@@ -35,6 +35,7 @@
                  ,A.CREAT_ID
                 , A.CO_CD
                 , A.CREAT_ID
+                , A.DEPT_CD
                 , C.NAME AS CREAT_NM
                 , TO_CHAR(A.CREAT_DTM, 'YYYY-MM-DD') AS CREAT_DTM
                 , A.WORK_GOOD_TXT
@@ -221,12 +222,21 @@
 		    AND WORK_DIV = '개인'
 	</select>
 
+	<select id="select_result_count" parameterType="Map" resultType="int">
+		SELECT count(*)
+		  FROM TB_PM04M01 
+		  WHERE WORK_YM = #{workYm}
+		    AND USER_ID = #{userId}
+		    AND WORK_DIV = '팀'
+	</select>
+
  <!-- 수정팝업 조회 -->
     <select id="select_pm40_Info" parameterType="Map" resultType="camelMap">
 		SELECT ROWNUM AS RN
 				, A.WORK_NO
 				, A.CO_CD
 				, A.USER_ID
+				, A.DEPT_CD
 				, C.NAME AS USER_NM
 				, TO_CHAR(A.CREAT_DTM, 'YYYY-MM-DD') AS CREAT_DTM  
 				, A.WORK_GOOD_TXT
@@ -246,5 +256,128 @@
 		AND    ROWNUM = 1
     </select>
 
+<!-- 결재목록 불러오기 -->
+	<select id="selectSignResUserlst" parameterType="Map" resultType="camelMap">	
+		SELECT *
+		  FROM(
+		SELECT
+			ROWNUM AS RNUM, A.*
+		FROM
+		(
+			SELECT   A.CO_CD AS WBS_PLANCO_CD,
+					 A.CO_CD,
+					 FN_CM05M01_CD_TO_NM(A.CO_CD) WBS_PLANCO_CD_NM,
+			         A.ID AS USR_NM,
+			         A.EMP_NO AS EMP_NO,
+					 A.NAME AS NAME,
+					 A.TEL_NO AS TEL_NO,
+					 A.EMAIL AS EMAIL,
+					 B.DEPT_NM AS DT_NM,
+					 D.LEVEL_NM AS JIK,
+					 C.TODO_DIV1_CODE_ID  AS TODO_DIV1_CODE_ID,
+					 DECODE(C.TODO_DIV1_CODE_ID, 'TODODIV10', '공유', 'TODODIV20', '결재', '') AS GB
+					 , C.SANCTN_STTUS
+					 , DECODE(C.SANCTN_STTUS, 'Y', '승인', 'N', '미승인', ' ') AS SANCTN_STTUS_NM
+					 , NVL(TO_CHAR(C.CREAT_DTTM, 'YYYY-MM-DD'), '') AS CREAT_DTTM		/* 요청일자 */
+					 , NVL(TO_CHAR(C.TODO_CF_DT, 'YYYY-MM-DD'), '') AS TODO_CF_DT		/* 승인일자 */
+					 , C.TODO_CF_OPN		/* 확인의견 */
+					 , C.TODO_KEY
+					 , C.SANCTN_SN
+					 , C.TODO_ID
+					 , C.TODO_DIV1_CODE_ID
+					 , C.TODO_DIV2_CODE_ID
+					 , C.SALES_CD	 
+					 , 'U' AS FLAG							 
+			FROM
+				TB_CM06M01 A
+				LEFT OUTER JOIN TB_CM07M01 D ON A.LEVEL_CD = D.LEVEL_CD 
+				INNER JOIN TB_CM04M01 B on A.DEPT_ID = B.DEPT_ID
+				INNER JOIN TB_WB20M03 C ON A.ID = C.TODO_ID
+				  AND C.TODO_NO = #{reqNo}
+				<if test="etcField2 != null and !etcField2.equals('')">
+				  AND C.ETC_FIELD2 = #{etcField2}   
+				</if>
+			ORDER BY C.TODO_DIV1_CODE_ID DESC, SANCTN_SN ASC, CREAT_DTTM ASC
+			) AS a
+		 ) A
+ 	</select>
 
+
+	<select id="selectWorkPrtList" parameterType="Map" resultType="CamelMap">
+        	SELECT *
+				FROM   (SELECT  B.NAME					 AS WORK_RPT_ID_NM
+						     , T.WORK_RPT_L
+						     , T.WORK_RPT_M
+						     , T.WORK_RPT_S
+						     , FN_CM05M01_CD_TO_NM(T.WORK_RPT_L) AS WORK_RPT_L_NM
+						     , FN_CM05M01_CD_TO_NM(T.WORK_RPT_M) AS WORK_RPT_M_NM
+						     , FN_CM05M01_CD_TO_NM(T.WORK_RPT_S) AS WORK_RPT_S_NM
+						     , SUM(T.WORK_RPT_HOUR) AS WORK_RPT_HOUR
+						     , SUM(SUM(T.WORK_RPT_HOUR)) OVER (PARTITION BY T.WORK_RPT_S) AS TOTAL_SUM
+				        FROM   TB_PM01M01 AS T
+				               LEFT OUTER JOIN TB_CM06M01 AS B  ON T.WORK_RPT_ID = B.ID
+				        WHERE  1 = 1
+				        <if test="coCd !=null and !coCd.equals('')">
+				        AND    T.CO_CD = #{coCd}
+				        </if>
+				        <if test="workYm != null and !workYm.equals('') and  workYm != null and !workYm.equals('')">
+				        AND    T.WORK_RPT_DT BETWEEN TO_DATE(#{workYm},'YYYY-MM') AND LAST_DAY(TO_DATE(#{workYm}, 'YYYY-MM'))
+				        </if>
+				        <if test="workRptId !=null and !workRptId.equals('')">
+				        AND    T.WORK_RPT_ID = #{workRptId}
+				        </if>
+				        <if test="workRptL != null and !workRptL.equals('')">
+				        AND    T.WORK_RPT_L = #{workRptL}
+				        </if>
+				        <if test="workRptM != null and !workRptM.equals('')">
+				        AND    T.WORK_RPT_M = #{workRptM}
+				        </if>
+				        <if test="workRptS !=null and !workRptS.equals('')">
+				        AND    T.WORK_RPT_S = #{workRptS}
+				        </if>
+				        <if test="workRptId.equals('') and workRptIdNm !=null and !workRptIdNm.equals('')">
+				        AND    B.NAME LIKE  '%'||#{workRptIdNm}||'%'
+				        </if>
+				        GROUP BY T.WORK_RPT_ID, B.NAME, T.WORK_RPT_L, T.WORK_RPT_M, T.WORK_RPT_S
+				       )
+			   PIVOT (SUM(WORK_RPT_HOUR) FOR WORK_RPT_ID_NM IN ( ${test} )  )--해당부서 인원 읽어와서 넣어주기
+			 ORDER BY WORK_RPT_L, WORK_RPT_M, WORK_RPT_S
+    </select>
+
+<insert id="insert_pm40_p02" parameterType="Map">
+    INSERT INTO TB_PM04M01
+    (
+          WORK_NO
+        , CO_CD
+        , USER_ID
+        , DEPT_CD
+        , WORK_YM
+        , WORK_DIV
+        , WORK_GOOD_TXT
+        , WORK_BAD_TXT
+        , WORK_NEED_TXT
+        , WORK_PROPOSAL_TXT
+        , WORK_RMK
+        , CREAT_ID
+        , CREAT_PGM
+        , CREAT_DTM
+    )
+    VALUES
+    (
+          #{workNo}
+        , #{coCd}
+        , #{userId}
+        , #{deptCd}
+        , #{workYm}
+        , #{workDiv}
+        , #{workGoodTxt}
+        , #{workBadTxt}
+        , #{workNeedTxt}
+        , #{workProposalTxt}
+        , #{workRmk}
+        , #{userId}
+        , #{pgmId}
+        , SYSDATE
+    )
+</insert>
 </mapper>

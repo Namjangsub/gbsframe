@@ -27,4 +27,10 @@ public interface PM40Mapper {
 		int select_gochal_count(Map<String, String> paramMap);
 		
 		Map<String, String> select_pm40_Info(Map<String, String> paramMap);
+		
+		List<Map<String, String>> selectSignResUserlst(Map<String, String> paramMap);
+		
+		List<Map<String, String>> selectWorkPrtList(Map<String, String> paramMap);
+		int select_result_count(Map<String, String> paramMap);
+		int insert_pm40_p02(Map<String, String> paramMap);
 }
