@@ -53,23 +53,13 @@ public class PM40Ctr {
 		@PostMapping(value = "/insert_pm40")
 		public String insert_pm40(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 			try {
-				Map<String, String> rtnResult = pm40svc.insert_pm40(paramMap, mRequest);
-				//결과처리
-				//"reqNo" 키에 해당하는 값을 가져와 문자열로 변환
-				
-				//문자열을 정수로 변환
-				int result =  Integer.parseInt(rtnResult.get("result"));
-				
-				
-				
+				int result = pm40svc.insert_pm40(paramMap, mRequest);
 				if (result != 0 && result != 7 ) {
 					model.addAttribute("resultCode", 200);
 					model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-					String workNo = rtnResult.get("workNo").toString();
-					model.addAttribute("workNo", workNo);
 				}
 				else if (result != 0 && result == 7) {
-					model.addAttribute("resultCode", 500);
+					model.addAttribute("resultCode", 200);
 					model.addAttribute("resultMessage", "해당 월의 고찰은 등록 되어 있습니다.");
 				}
 				else {
@@ -133,54 +123,4 @@ public class PM40Ctr {
 			return "jsonView";
 		}
 		
-
-		  @PostMapping(value = "/selectSignResUserlst")
-		  public String selectSignResUserlst(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		    List<Map<String, String>> result = pm40svc.selectSignResUserlst(paramMap);
-		    model.addAttribute("result", result);
-		    return "jsonView";
-		  }	 
-		  // 개인별작업일보현황(업무별)
-		  @PostMapping(value = "/selectWorkPrtList")
-		  public String selectWorkPrtList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		    List<Map<String, String>> result = pm40svc.selectWorkPrtList(paramMap);
-		    model.addAttribute("result", result);
-		    return "jsonView";
-		  }
-		  
-		  @PostMapping(value = "/insert_pm40_p02")
-			public String insert_pm40_p02(@RequestParam Map<String, String> paramMap, ModelMap model) throws Exception {
-			  
-
-			  
-				try {
-					Map<String, String> rtnResult = pm40svc.insert_pm40_p02(paramMap);
-					//결과처리
-					//"reqNo" 키에 해당하는 값을 가져와 문자열로 변환
-					
-					//문자열을 정수로 변환
-					int result =  Integer.parseInt(rtnResult.get("result"));
-					
-					//System.out.println("@@@@@@@@"+result);
-					
-					if (result != 0 && result != 7 ) {
-						model.addAttribute("resultCode", 200);
-						model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-						String workNo = rtnResult.get("workNo").toString();
-						model.addAttribute("workNo", workNo);
-					}
-					else if (result != 0 && result == 7) {
-						model.addAttribute("resultCode", 500);
-						model.addAttribute("resultMessage", "해당 월의 고찰은 등록 되어 있습니다.");
-					}
-					else {
-						model.addAttribute("resultCode", 500);
-						model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-					};
-				}catch(Exception e){
-					model.addAttribute("resultCode", 900);
-					model.addAttribute("resultMessage", e.getMessage());
-				}
-				return "jsonView";
-			}
 }
