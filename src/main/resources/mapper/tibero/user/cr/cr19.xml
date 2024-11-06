@@ -957,8 +957,9 @@
 		, YYYYMM AS
 		(
 		 --검색조건 년월
-		 SELECT #{yyyymm} AS FROM_YYYYMM
-		      , SUBSTR(TO_CHAR(ADD_MONTHS(TO_DATE(#{yyyymm}||'01', 'YYYY-MM-DD'), 1), 'YYYYMMDD'), 1, 6) AS TO_YYYYMM
+		 SELECT #{yyyymm} AS FROM_YYYYMM	--기준년월
+		      , SUBSTR(TO_CHAR(ADD_MONTHS(TO_DATE(#{yyyymm}||'01', 'YYYY-MM-DD'), 1), 'YYYYMMDD'), 1, 6) AS TO_YYYYMM 		--다음년월
+		      , SUBSTR(TO_CHAR(ADD_MONTHS(TO_DATE(#{yyyymm}||'01', 'YYYY-MM-DD'), -1), 'YYYYMMDD'), 1, 6) AS BEFORE_YYYYMM 	--이전년월
 		 FROM   DUAL
 		)
 		, PLAN AS
@@ -1021,6 +1022,7 @@
 		      , max(EXRATE) 				AS EXRATE
 		      , SUM(A.BILL_AMT_BEFORE) 		AS BILL_AMT_BEFORE
 		      , SUM(A.BILL_AMT_AFTER) 		AS BILL_AMT_AFTER
+		      , SUM(A.BILL_AMT_BEFORE_MONTH) 		AS BILL_AMT_BEFORE_MONTH
 		 FROM   (
 		         SELECT A.CO_CD
 		              , A.YYYYMM
@@ -1034,6 +1036,7 @@
 		              , CASE WHEN A.YYYYMM = (SELECT FROM_YYYYMM FROM YYYYMM) THEN A.SELL_BILL_DTL_TOT ELSE 0 END AS BILL_AMT_01
 		              , CASE WHEN A.YYYYMM = (SELECT TO_YYYYMM FROM YYYYMM)   THEN A.SELL_BILL_DTL_TOT ELSE 0 END AS BILL_AMT_02
 		              , CASE WHEN A.YYYYMM <![CDATA[ > ]]> (SELECT TO_YYYYMM FROM YYYYMM)   THEN A.SELL_BILL_DTL_TOT ELSE 0 END AS BILL_AMT_AFTER
+		              , CASE WHEN A.YYYYMM   =   (SELECT BEFORE_YYYYMM FROM YYYYMM) THEN A.SELL_BILL_DTL_TOT ELSE 0 END AS BILL_AMT_BEFORE_MONTH
 		         FROM   (
 		                 SELECT A.FILE_TRGT_KEY
 						      , A.CO_CD
@@ -1171,6 +1174,7 @@
 						   + NVL(P.PLAN_CLMN_AMT_01, 0) - NVL(C.CLMN_AMT_01, 0) 
 						   + NVL(P.PLAN_CLMN_AMT_02, 0)
 					END 																				AS PLAN_CLMN_AMT_02	--다음달계획
+		     , NVL(B.BILL_AMT_BEFORE_MONTH, 0)      AS BILL_AMT_01_BEFORE_MONTH --이전달 계산서 발행(원화)
 		     , NVL(B.BILL_AMT_01, 0)      AS BILL_AMT_01 --해당월 계산서 실적(원화)
 		     , NVL(B.BILL_AMT_02, 0)      AS BILL_AMT_02 --다음월 계산서 실적(원화)
 		     , NVL(C.CLMN_AMT_01, 0)      AS CLMN_AMT_01 --해당월 수금 실적(원화)
@@ -1203,7 +1207,6 @@
 		                                 AND A.ORDRS_NO      = C.ORDRS_NO
 		                                 AND A.CLMN_PLAN_SEQ = C.CLMN_PLAN_SEQ
 		WHERE  1 = 1
-		ORDER BY A.CO_CD, A.YYYY, A.ORDRS_MMDD, A.ORDRS_NO, A.CLMN_PLAN_SEQ, A.CLNT_NM, A.CTRT_NM
 		)
 		SELECT A.*
 		     , A.PLAN_BILL_RMK    AS PLAN_BILL_RMK_OLD
@@ -1223,9 +1226,10 @@
 		  AND 	A.MNG_NM LIKE '%' || #{searchidnm} || '%'
 		</if>
 		<if test="useyn != null and !useyn.equals('')">
-		  AND   DECODE((A.MI_CLMN_AMT+A.CLMN_AMT_01+A.CLMN_AMT_02),0,'Y','N') = #{useyn}
+		  AND   (DECODE((A.MI_CLMN_AMT+A.CLMN_AMT_01+A.CLMN_AMT_02),0,'Y','N') = #{useyn} OR NVL(A.BILL_AMT_01_BEFORE_MONTH, 0) != 0)
 		</if>
 		AND    A.RRN BETWEEN #{firstIndex} AND #{lastIndex}
+		ORDER BY A.MNG_NM, A.CLNT_NM, A.CTRT_NM
 	</select>
 	
 	<!-- 리스트 with -->

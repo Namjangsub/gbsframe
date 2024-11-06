@@ -239,21 +239,22 @@
 			, FN_CM05M01_CD_TO_NM(A.INWK_CD01) AS INWK_CD01
 			, FN_CM05M01_CD_TO_NM(A.INWK_CD02) AS INWK_CD02
 		FROM (
-				SELECT  T.CO_CD AS CO_CD
+				SELECT  T.CO_CD 							AS CO_CD
 						,(SELECT X.CODE_NM FROM TB_CM05M01 X WHERE X.CODE_ID = T.CO_CD) AS CO_NM
-						,T.REQ_NO AS REQ_NO
-						,TO_CHAR(T.ORDRG_DT, 'YYYY-MM-DD') AS ORDRG_DT
-						,T.ORDRG_ID AS ORDRG_ID
-						,N2.NAME AS ORDRG_NM
-						,SUBSTR(N2.DEPT_ID,0,5) AS DEPT_CD
-						,N3.DEPT_NM AS DEPT_NM
-						,T.REG_ID AS REG_ID
-						,N1.NAME AS REG_NM
-						,T.SALES_CD AS SALES_CD
-						,T.SALES_CD AS MATR_DRW_NO
-						,SM.ORDRS_CLNT_CD  AS CLNT_CD
-						,CT.CLNT_NM AS CLNT_NM
-						,SM.CLNT_PJT AS CLNT_PJT
+						,T.REQ_NO 							AS REQ_NO
+						,TO_CHAR(T.ORDRG_DT, 'YYYY-MM-DD') 	AS ORDRG_DT
+						,T.ORDRG_ID 						AS ORDRG_ID		--발행자ID
+						,N2.NAME 							AS ORDRG_NM		--발행자성면
+						,SUBSTR(N2.DEPT_ID,0,5) 			AS DEPT_CD	--발행자부서코드
+						,N3.DEPT_NM 						AS DEPT_NM
+						,T.REG_ID 							AS REG_ID		--작성자ID
+						,N1.NAME 							AS REG_NM		--작성자이름
+						,SUBSTR(N1.DEPT_ID,0,5)				AS REG_DEPT_ID	--작성자부서코드
+						,T.SALES_CD 						AS SALES_CD
+						,T.SALES_CD 						AS MATR_DRW_NO
+						,SM.ORDRS_CLNT_CD  					AS CLNT_CD
+						,CT.CLNT_NM 						AS CLNT_NM
+						,SM.CLNT_PJT 						AS CLNT_PJT
 						, (SELECT FN_CM05M01_CD_TO_NM(SM.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM
 						,T.REQ_CD AS REQ_CD
 						, (SELECT FN_CM05M01_CD_TO_NM(T.REQ_CD) FROM DUAL) AS REQ_CD_NM
@@ -568,8 +569,8 @@
 		LEFT OUTER JOIN TB_CM06M01 B ON A.APP_ID = B.ID AND A.USE_YN = 'Y'
 		WHERE 1=1
 		AND A.APP_DIV = 'APPDIV02' <!-- 결제선구분 : APPDIV02 발부및 출장요청 결제선 -->
-		AND A.CO_CD = '${coCd}'
-		AND A.APP_ID =  '${userId}'
+		AND A.CO_CD = #{coCd}
+		AND A.APP_ID =  #{userId}
 	</select>
 
 	<select id="selectConfirmCount" parameterType="Map" resultType="int">
@@ -837,7 +838,8 @@
 			PG_PARAM,
 			TODO_TITL,
 			ETC_FIELD2,
-			ETC_FIELD3
+			ETC_FIELD3,
+			TODO_CODE_ID
 		)
 		VALUES
 		(
@@ -854,11 +856,20 @@
 			#{reqNo},
 			#{userId},
 			#{pgmId},
-			SYSDATE,
+			 ( SELECT nvl(max(CREAT_DTTM), SYSDATE)  AS LAST_DTTM
+				 FROM TB_WB20M03 T
+			    WHERE T.TODO_FILE_TRGT_KEY = #{fileTrgtKey}
+				  AND T.TODO_NO            = #{reqNo}
+				  AND T.CREAT_PGM          = #{pgmId, jdbcType=VARCHAR}
+             	  <if test="histNo != null and !histNo.equals('')" >
+				  AND T.ETC_FIELD2         = #{histNo, jdbcType=VARCHAR}
+             	  </if>
+			 ),
 			#{pgParam},
 			(SELECT #{todoTitle, jdbcType=VARCHAR}||' ' ||FN_CR02_KAKAO_TITLE_NM(#{reqNo}, #{histNo, jdbcType=VARCHAR}) FROM DUAL),
 			#{histNo, jdbcType=VARCHAR},
-			'N'
+			'N',
+			'insertWbsSharngList'
 		)
 	</insert>
 
@@ -904,7 +915,8 @@
 			, T.ETC_FIELD3
 			, T.CREAT_ID
 			, T.CREAT_PGM
-			, T.CREAT_DTTM )
+			, T.CREAT_DTTM
+			, T.TODO_CODE_ID )
 			VALUES
 			( ( SELECT NVL(MAX(TODO_KEY), 0) + 1 FROM TB_WB20M03 )
 			, #{sanCtnSn, jdbcType=VARCHAR}
@@ -922,7 +934,16 @@
 			, 'N'
 			, #{userId, jdbcType=VARCHAR}
 			, #{pgmId, jdbcType=VARCHAR}
-			, SYSDATE )
+			, ( SELECT nvl(max(CREAT_DTTM), SYSDATE)  AS LAST_DTTM
+				  FROM TB_WB20M03 T
+				 WHERE T.TODO_FILE_TRGT_KEY = #{fileTrgtKey}
+				   AND T.TODO_NO            = #{reqNo}
+				   AND T.CREAT_PGM          = #{pgmId, jdbcType=VARCHAR}
+             	  <if test="histNo != null and !histNo.equals('')" >
+				  AND T.ETC_FIELD2         = #{histNo, jdbcType=VARCHAR}
+             	  </if>
+              )
+			, 'insertWb24SharngList')
     </update>
 
 	<select id="insertWb24SharngList1" statementType="CALLABLE" parameterType="map">
@@ -1039,7 +1060,8 @@
             PG_PARAM,
             TODO_TITL,
             ETC_FIELD2,
-			ETC_FIELD3
+			ETC_FIELD3,
+			TODO_CODE_ID
         )
         VALUES
         (
@@ -1056,11 +1078,20 @@
             #{reqNo},
             #{userId},
             #{pgmId},
-            SYSDATE,
+			  ( SELECT nvl(max(CREAT_DTTM), SYSDATE)  AS LAST_DTTM
+				  FROM TB_WB20M03 T
+				 WHERE T.TODO_FILE_TRGT_KEY = #{fileTrgtKey}
+				   AND T.TODO_NO            = #{reqNo}
+				   AND T.CREAT_PGM          = #{pgmId, jdbcType=VARCHAR}
+             	  <if test="histNo != null and !histNo.equals('')" >
+				  AND T.ETC_FIELD2         = #{histNo, jdbcType=VARCHAR}
+             	  </if>
+              ),
             #{pgParam},
             #{todoTitle, jdbcType=VARCHAR},
             #{histNo, jdbcType=VARCHAR},
-			'N'
+			'N',
+			'insertWbsApprovalLi-'
         )
 	</insert>
 
@@ -1142,8 +1173,8 @@
 				INNER JOIN TB_CM04M01 B on A.DEPT_ID = B.DEPT_ID
 				INNER JOIN TB_CM05M01 C ON A.CO_CD = C.CODE_ID
 				AND	A.USE_YN = 'Y'
-			    AND A.CO_CD = '${coCd}'
-			    AND A.ID =  '${userId}'
+			    AND A.CO_CD = #{coCd}
+			    AND A.ID =  #{userId}
 	</select>
 
 	<select id="selectPurchaseListPopCount" parameterType="Map" resultType="int">
@@ -1386,8 +1417,7 @@
 			FROM TB_QM01M01 A
 			LEFT OUTER JOIN TB_QM01P01 B ON B.REQ_NO = A.REQ_NO
 			LEFT OUTER JOIN TB_WB20M03 C ON C.TODO_NO = A.REQ_NO
-		WHERE A.CO_CD = #{coCd}
-			AND C.TODO_DIV1_CODE_ID = 'TODODIV20'
+		WHERE C.TODO_DIV1_CODE_ID = 'TODODIV20'
 		<if test="reqNo != null and !reqNo.equals('')">
 			AND A.REQ_NO = #{reqNo}
 		</if>
@@ -1401,8 +1431,7 @@
 	<select id="selectReqStCurrentStatus" parameterType="Map" resultType="String">
 		SELECT REQ_ST
 		  FROM TB_QM01M01 T
-		 WHERE CO_CD = #{coCd}
-		   AND REQ_NO = #{reqNo}
+		 WHERE REQ_NO = #{reqNo}
 	</select>
 
 	<update id="updateReqSt" parameterType="Map">
@@ -1411,8 +1440,7 @@
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
-		WHERE CO_CD = #{coCd}
-		  AND REQ_NO = #{reqNo}
+		WHERE REQ_NO = #{reqNo}
 	</update>
 
 	<update id="updateReqStRslt" parameterType="Map">
@@ -1421,8 +1449,7 @@
 			UDT_ID = #{userId},
 			UDT_PGM = #{pgmId},
 			UDT_DTTM = SYSDATE
-		WHERE CO_CD = #{coCd}
-		  AND REQ_NO = #{reqNo}
+		WHERE REQ_NO = #{reqNo}
 	</update>
 
 	<update id="updateReqStChk" parameterType="Map">

@@ -110,12 +110,12 @@ function yearHolidayTable (_currYear) {
   	//2006년까지는 0717(체헌절) 공휴일, 0405(식목일)
   	//1949~1990년까지 1009(한글날) 1990년폐지됐다가 2014년부터 공휴일 시행 상기내용은 일자계산시 반영 되지 않음
 	var solarHolidays = [ "0101", "0301", "0505", "0606", "0815", "1003", "1009", "1225" ]; //양력휴일
-	var lunaHoliTempdays = [ "0101", "0102", "0408", "0814", "0815", "0816" ]; //음력휴일, 설전날은 계산헤서 넣음.
+	var lunarHolidays = [ "0101", "0102", "0408", "0814", "0815", "0816" ]; //음력휴일, 설전날은 계산해서 넣음.
 	var yearHolidays = [];  //전체 휴일 내역
 
 	//대체공휴일 입력구간. 임시휴일이나 대체공휴일이 있을 경우 배열에 넣으면됨. yyyymmdd 입력 2014~2049년까지
 	//20241001 임시 공휴일-->당사는 20241004일로 변경 근무 진행함
-	var eventHolidays = [   "20140910", "20150929", "20160210", "20170130", "20171006",
+	var alternativeHolidays = [   "20140910", "20150929", "20160210", "20170130", "20171006",
 							"20180507", "20180926", "20190506", "20200127", "20210816",
 							"20211004", "20211011", "20220912", "20221010", "20230124",
 							"20230529", "20231002", "20240212", "20240410", "20240501",
@@ -136,6 +136,25 @@ function yearHolidayTable (_currYear) {
 							"20460507", "20460514", "20460917", "20470128", "20470506",
 							"20471007", "20480302", "20480817", "20481005", "20490510",
 							"20490816", "20490913", "20491004", "20491011", "20491227"];
+	
+
+		//휴일관리 테이블에서 불러오기 --> 휴일관리는 TB_CM12M01에서 등록 관리로 변경함.
+//		var paramObj = {
+//			"calDivCd": "A",	//calDivCd : A(All), S(solarHolidays), L(lunarHolidays), E(alternativeHolidays)
+//		};
+//		postAjaxSync("/admin/cm/cm12/selectSolarLunarEventHolidaysList", paramObj, null, function(data){
+//			let temp = data.resultSolar;	//양력휴일
+//			solarHolidays = temp.map(item => item.calYmd.trim());
+//			
+//			temp = data.resultLumar;	//음력휴일, 설전날은 계산헤서 넣음.
+//			lunarHolidays = temp.map(item => item.calYmd.trim());
+//			
+//			temp = data.resultEnent;	//대체공휴일 입력구간. 임시휴일
+//			alternativeHolidays = temp.map(item => item.calYmd.trim());
+//		});
+//		
+	
+	
 
 	/**************************
 	 * 휴일테이블만들기 Start
@@ -148,18 +167,18 @@ function yearHolidayTable (_currYear) {
 	//설전날자를 휴일에 추가
 	let set설날 = new Date(calendar.solarCalendar.year + '-' + calendar.solarCalendar.month + '-' + calendar.solarCalendar.day);
 	set설날.setDate(set설날.getDate() - 1); //음력 설전날 양력일자로 휴일
-	eventHolidays.push(set설날.getFullYear() + (set설날.getMonth() + 1).toString().padStart(2, '0') + set설날.getDate().toString().padStart(2, '0'));
+	alternativeHolidays.push(set설날.getFullYear() + (set설날.getMonth() + 1).toString().padStart(2, '0') + set설날.getDate().toString().padStart(2, '0'));
 
 	//음력 휴일을 양력으로 변경
-	for (const lunaday of lunaHoliTempdays) { //음력날자에 해당하는 양력휴일 추구
+	for (const lunaday of lunarHolidays) { //음력날자에 해당하는 양력휴일 추구
 		calendar.setLunarDate(_currYear, parseInt(lunaday.slice(0, 2)), parseInt(lunaday.slice(2, 4)), false);
 		//solarCalendar: {year: 2023, month: 1, day: 22}
 
-		eventHolidays.push(calendar.solarCalendar.year + calendar.solarCalendar.month.toString().padStart(2, '0') + calendar.solarCalendar.day.toString().padStart(2, '0'));
+		alternativeHolidays.push(calendar.solarCalendar.year + calendar.solarCalendar.month.toString().padStart(2, '0') + calendar.solarCalendar.day.toString().padStart(2, '0'));
  	}
 
-	//휴테이블에 eventHolidays[] + solarHolidays[]의 앞에 해당년도 추가하고 머지해서 오름차순으로 정렬
-	var combinedHolidays = eventHolidays.concat(solarHolidays.map(date => _currYear + date)).sort();
+	//휴테이블에 alternativeHolidays[] + solarHolidays[]의 앞에 해당년도 추가하고 머지해서 오름차순으로 정렬
+	var combinedHolidays = alternativeHolidays.concat(solarHolidays.map(date => _currYear + date)).sort();
 
 	yearHolidays = combinedHolidays.filter(function(date) {
 		return date.startsWith(_currYear);

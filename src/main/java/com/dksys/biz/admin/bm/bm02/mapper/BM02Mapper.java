@@ -36,6 +36,12 @@ public interface BM02Mapper {
 	
 	int updatePldg(Map<String, String> paramMap);
 
+	int deleteBiz(Map<String, String> paramMap);
+	
+	int insertBiz(Map<String, String> paramMap);
+
+	int updateBiz(Map<String, String> paramMap);
+
 	Map<String, String> selectMngInfo(Map<String, String> paramMap);
 	
 	// 동일 사업자 번호 체크

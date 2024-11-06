@@ -1,7 +1,7 @@
 
 //결재승인 버튼
-function approvalConfirm() { 
-	commApproval.confirmApproval();	
+function approvalConfirm() {
+	commApproval.confirmApproval();
 }
 
 //결재 메인
@@ -12,14 +12,14 @@ function Approval(htmlParam, param, popParam) {
 	Object.assign(this.param, this.popParam);
 	//this.boldFont = "font-weight:bold; color:blue;";
 	this.boldFont = "<font style='font-weight:bold; color:blue;'>";
-	
+
 	this.todoId = null;
 	this.applyBtn = false;
 	var approvalParam = {}
-	
+
 	//html make
 	this.makeHtml = function() {
-		
+
 		var trTempl = this.htmlTr();
 		var boldFont = this.boldFont;
 		var todoId = this.todoId;
@@ -29,7 +29,7 @@ function Approval(htmlParam, param, popParam) {
 			delete this.param.sanctnSn;
 			delete this.param.todoKey;
 		}
-		
+
 		if( htmlParam.htmlArea ) {
 //			console.log('---html make');
 			var htmlId = htmlParam.htmlArea;
@@ -49,27 +49,27 @@ function Approval(htmlParam, param, popParam) {
 			    			<col width="10%">
 			    			<col width="*%">
 			    			<col width="10%">
-			    			<col width="15%">			    			
+			    			<col width="15%">
 			    		</colgroup>
 			    		<tr id="appH" stye="text-align:center; border-bottom:1px solid #dbdbdb; height:25px;">
 			    			<th class="appTh">순번</th>
 			    			<th class="appTh">결재자</th>
-			    			<th class="appTh">결재의견</th>			    			
+			    			<th class="appTh">결재의견</th>
 			    			<th class="appTh">상태</th>
-			    			<th class="appTh">결재일자</th>		    			
+			    			<th class="appTh">결재일자</th>
 			    		</tr>
 			    	</table>
 			    	<div class="popup_bottom_btn" id="appBtnDiv">
 						<button id="appConfirmAnchor"  onclick="approvalConfirm();">결재승인</button>
 					</div>
-		        </div>			        
-				<!--결재 테이블 end-->		        
-		    </div>		 			
+		        </div>
+				<!--결재 테이블 end-->
+		    </div>
 			`;
-			
+
 			$("#"+htmlId).html('');
 			$("#"+htmlId).append(htmlTable);
-			
+
 			//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
 			var actDngEval = `
 						<tr style="text-align: right;">
@@ -83,7 +83,7 @@ function Approval(htmlParam, param, popParam) {
 								</select>
 			                </td>
 							<td colspan=2></td>
-			            </tr>			
+			            </tr>
 						`;
 			var confrmActDngEval = '';
 			//결재라인 read
@@ -92,11 +92,11 @@ function Approval(htmlParam, param, popParam) {
 					var list = data.resultList;
 					var todoCfOpnHid = "";
 	 				if( data.resultList.length > 0 ) {
-	 					
+
 	 					var htmlTr = "";
 		 				$("#appLine tr").eq(0).next().remove();
 				        $.each(list, function (idx, data) {
-		 					var html = trTempl;				        	
+		 					var html = trTempl;
 							//html = html.replace(/@@item1@@/gi, (idx+1));		//순번
 							html = html.replace(/@@item1@@/gi, data.sanctnSn);		//순번
 							html = html.replace(/@@item2@@/gi, data.todoNm);		//결재자명
@@ -107,18 +107,18 @@ function Approval(htmlParam, param, popParam) {
 							if( data.todoId != "undefined" && (data.todoId == jwt.userId ) ) {
 								html = html.replace(/@@bold@@/gi, boldFont);
 								todoId = data.todoId;
-								//applyBtn SHOW - 순번이 1이거나 이전 결재 상태가 Y일 경우							
+								//applyBtn SHOW - 순번이 1이거나 이전 결재 상태가 Y일 경우
 								if( data.sanctnSttus != "undefined" && data.sanctnSttus == "N"  ) {
 									if( data.sanctnSn == "1" || data.preSttus=="Y") {
-										applyBtn = true;										
-									} 
-								//결재가 1건일 경우 
+										applyBtn = true;
+									}
+								//결재가 1건일 경우
 								} else if( data.sanctnSn == "1" && typeof(data.preSttus)=="undefined" ) {
-									applyBtn = true;									
+									applyBtn = true;
 								}
 								//결재문서가 수주목표가 결재가 아니면 순서 상관없이 결재처리 가능함. 20240625 남장섭
 								if (data.todoDiv2CodeId != "TODODIV2100") {
-									applyBtn = true;								
+									applyBtn = true;
 								}
 								//다음순번이 미결재일 경우 결재의견 가능하게 변경
 								if( data.nextSttus=="N") applyBtn = true;
@@ -132,41 +132,41 @@ function Approval(htmlParam, param, popParam) {
 									approvalParam.todoNo = data.todoNo;
 									html = html.replace(/readonly/gi, "");		//결재의견 input
 									//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
-					 				if( data.todoDiv2CodeId=='TODODIV2090' && data.teamManager == 'TEAM01' ) {
-					 					confrmActDngEval = actDngEval;
-					 				}
-								} 
+//					 				if( data.todoDiv2CodeId=='TODODIV2090' && data.teamManager == 'TEAM01' ) {
+//					 					confrmActDngEval = actDngEval;
+//					 				}
+								}
 							}
 							if(applyBtn == false) {
 								html = html.replace(/@@bold@@/gi, "");
 							} else {
-								html = html.replace(/@@bold@@/gi, "");								
+								html = html.replace(/@@bold@@/gi, "");
 							}
 							//console.log('--applyBtn--' + applyBtn);
 							html = html.replace(/@@item4@@/gi, data.sanctnSttusNm);		//상태명
 							html = html.replace(/@@item5@@/gi, data.todoCfDt);		//확인(결재)일자
 							htmlTr += html;
-						});			
-					} 
+						});
+					}
 					$("#appLine").append(htmlTr);
-					
+
 					//팀장 이슈 조치결과 결재일경우 위험성 평가 기능 추가 하기위함   남장섭 240618
 					$("#appLine").append(confrmActDngEval);
-					
+
 			});		//end ajax
-			
+
 			this.todoId = todoId;
 			this.applyBtn = applyBtn;
 			//btn control
-			this.applyBtnCtrl();		
+			this.applyBtnCtrl();
 			if( this.applyBtn ) {
-				Object.assign(this.param, approvalParam);				
-			}			
+				Object.assign(this.param, approvalParam);
+			}
 		} else {
 			alert( '결재란 영역을 찾을수 없습니다. \r\nex) <div id="approval_area"></div>');
 		}
 	}
-	
+
 	//btn show & auth
 	this.applyBtnCtrl = function() {
 		if( this.applyBtn ) {
@@ -180,45 +180,45 @@ function Approval(htmlParam, param, popParam) {
 		} else {
 			//hide
 			$("#appBtnDiv").hide();
-			$("#appConfirmAnchor").removeAttr("onclick");		
-		}		
+			$("#appConfirmAnchor").removeAttr("onclick");
+		}
 		return;
 	}
-	
+
 	//loop contents html
 	this.htmlTr = function() {
-		var html = ` 
+		var html = `
     		<tr style="border-bottom:1px solid #dbdbdb;">
     			<td class="appTd">@@item1@@</td>
     			<td class="appTd">@@bold@@@@item2@@</font></td>
     			<td class="appTd" style='text-align:left; padding-left:5px; height:25px;'><input type='text' name='todoCfOpn' value="@@item3@@" class="form-control" readonly="readonly"></td>
     			<td class="appTd">@@item4@@</td>
-    			<td class="appTd">@@item5@@</td>    			
-    		</tr>		
+    			<td class="appTd">@@item5@@</td>
+    		</tr>
 			`;
 		return html;
 	}
-	
+
 	//승인 ajax
 	this.confirmApproval = function(param) {
 
 		if (!inputValidation($('.popup_area [required]'))) {
 			return false;
 		}
-		var confirmYn = false;	
+		var confirmYn = false;
 		//승인 save
 		if( this.applyBtn ) {
 			//본인 결재의견
 			var todoCfOpn = $("#appLine tr").find("font").closest("tr").find("input[name=todoCfOpn]").val();
-			//입력값 set			
-			var paramMap = {		
+			//입력값 set
+			var paramMap = {
 					  "todoId" 		: jwt.userId
 					, "todoCfOpn" 	: todoCfOpn
 					, "issNo" 		: $('#issNo').val()
 					, "actDngEval"	: $('#actDngEvalTodo').val()
 			}
 			let anchorText = $("#appConfirmAnchor").text();
-			let confirmText = (anchorText == "의견수정") ? "수정" : "승인"			
+			let confirmText = (anchorText == "의견수정") ? "수정" : "승인"
 			Object.assign(paramMap, this.param);
 
 			postAjaxSync("/user/wb/wb20/insertApprovalLine", paramMap, null, function(data){
@@ -226,15 +226,15 @@ function Approval(htmlParam, param, popParam) {
 					confirmYn = true;
 					let todoYn = data.result.todoYn;
 					if( todoYn == "Y" ) {
-						sendTodoFinal(paramMap);																
+						sendTodoFinal(paramMap);
 					}
-									
+
 				} else {
-					alert("승인중 오류가 발생 되었습니다.");	
+					alert("승인중 오류가 발생 되었습니다.");
 				}
-			});	
-			
-			
+			});
+
+
 			if( confirmYn ) {
 				this.makeHtml();
 				this.applyBtn = false;
@@ -243,7 +243,7 @@ function Approval(htmlParam, param, popParam) {
 			return true;
 		} else {
 			return false;
-		}    
+		}
 	}
 }
 

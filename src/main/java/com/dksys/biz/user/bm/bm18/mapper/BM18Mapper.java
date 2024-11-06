@@ -19,6 +19,8 @@ public interface BM18Mapper {
 	
 	//todo 알림톡
 	List<Map<String, String>> selectMaxMessageIdTodo(Map<String, String> paramMap);
+
+    List<Map<String, String>> selectMaxMessageIdTodoCompleted(Map<String, String> paramMap);
 	
 	//todo 알림톡New 남장섭 일부 최적화
 	List<Map<String, String>> selectMaxMessageIdTodoNew(Map<String, String> paramMap);
@@ -35,6 +37,6 @@ public interface BM18Mapper {
 	
 	List<Map<String, String>> selectWbsPlanMaxMessageIdTodo(Map<String, String> paramMap);	
 	
-	List<Map<String, String>> selectWbsPlanUpdateMaxMessageIdTodo(Map<String, String> paramMap);	
+    List<Map<String, String>> selectWbsPlanUpdateMaxMessageIdTodo(Map<String, String> paramMap);
 }
 

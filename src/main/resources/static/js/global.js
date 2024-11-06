@@ -636,7 +636,7 @@ function onlyNumber(elem){
 	if(elem.value.trim()){
 //		$(elem).val(addCommaStr(deleteCommaStr($(elem).val().replace(regExp, "$1$2$3"))));
 		var cleanedValue = elem.value.replace(regExp, "$1$2$3");
-        cleanedValue = cleanedValue.replace(/,/g, '').replace(/^0+/, ''); 
+        cleanedValue = cleanedValue.replace(/,/g, '').replace(/^0+/, '');
         $(elem).val(addCommaStr(cleanedValue));
 	}else{
 		$(elem).val(0);
@@ -733,7 +733,7 @@ function addCommaStr(value) {
 
 // 콤마 제거 스트링변수용
 function deleteCommaStr(value) {
-	if (typeof value !== 'string') return value; 
+	if (typeof value !== 'string') return value;
 
 //    return value.toString().replace(/,/g, "");
 	let num = value.replace(/[^-0-9,.]/g, '');
@@ -757,7 +757,7 @@ function setMenuAuth() {
 	var formData = {
 		"authInfo" : jwt.authInfo
 	}
-	postAjaxSync("/selectMenuAuth", formData, null, function(data) {
+	postAjax("/selectMenuAuth", formData, null, function(data) {
 		authArr = data.accessList;
 		checkMenuAuth(data.accessList);
 	});
@@ -1049,7 +1049,7 @@ function callReport(fileName, arg, width, height, reporttitle){
 	url += "?file="+fileName;
 	url += "&arg="+encodeURIComponent(arg);
 	if( typeof(reporttitle) != "undefined" ) {
-		url += "&reporttitle="+encodeURIComponent(reporttitle);	
+		url += "&reporttitle="+encodeURIComponent(reporttitle);
 	}
 	if (width ==""){
 		width = 900;
@@ -1109,7 +1109,7 @@ function authChk(menuUrl){
 	            return false;
 	        }
         } else {
-//        	console.error('arr의 갑이 비었습니다.');
+        	console.error('arr의 값이 비었습니다.');
         }
 //	// select 회사코드 disable (감사용 임시코드)
 //	$('select[data-kind="CO"]').prop("disabled", true);
@@ -2128,7 +2128,7 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 
 //********************************************************
 // 월마감 체크
-//    파라메터 : 
+//    파라메터 :
 //       chkValue : 체크일자 (년월일)
 //       chkType  : 'D'- 삭제
 //       coCd     : 회사코드
@@ -2139,7 +2139,7 @@ function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 	if(!chkType){
 		chkType = "";
 	}
-	
+
 	var url = window.location.href;
 	var menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
 	var rtnVal    = "N";
@@ -2150,21 +2150,21 @@ function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 	var actionType = "";
 	var resultList = [];
 //	var coCd = jwt.coCd;
-	
+
 	chkValue = chkValue.replace(/\-/g, '');
-	
+
 	if(chkType === 'D' || chkType === 'C' || chkType === 'U' ){
 		actionType = chkType;
 	}else{
 		actionType = modalStack.last().paramObj.actionType;
 	}
-		
+
 	var paramObj = {};
 	paramObj.coCd = coCd;
 	paramObj.menuUrl = menuUrl;
 	paramObj.actionType = actionType;
 	paramObj.chkValue = chkValue;
-	
+
 	//console.log(paramObj);
 	postAjaxSync("/admin/cm/cm05/selectMonthCloseChk", paramObj, null, function(data) {
 
@@ -2175,7 +2175,7 @@ function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 		workDay= data.workDay;
 		resultList = data.resultList;
 	});//postAjaxSync
-	
+
 	if(typeof rtnVal == "undefined" || rtnVal == null) return false;
 	if(rtnHolVal === 'Y'){	//발주, 요인별 발주 및 출장요청, WBS이슈관리
 		rtnDate = calculateHoliday(sysDate, workDay);
@@ -2184,7 +2184,7 @@ function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 		rtnDate = rtnDate.replace(/\-/g, '');
 		rtnDate = parseFloat(rtnDate);
 		chkValue = parseFloat(chkValue);
-		
+
 		if(rtnDate - chkValue > 0){
 //			$("#actionBtn").hide();
 			if(actionType === 'C') alert('마감된 일자입니다. ' + rtnDate + '일 이전은 데이터를 등록할 수가 없습니다.');
@@ -2228,29 +2228,29 @@ function setDisabledInputDate(_status){
 
 //매입마감일자 체크(마감일자 이전 여부 true return)
 function inCloseChk(chkValue){
-	
+
 	if(chkValue === '') return;
-	
+
 	var url = window.location.href;
 	var menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
 	var pchsCloseYn   = "";
 	var coCd = jwt.coCd;
-	
+
 	chkValue = chkValue.replace(/\-/g, '');
-		
+
 	var paramObj = {};
 	paramObj.coCd = coCd;
 	paramObj.menuUrl = menuUrl;
 	paramObj.chkValue = chkValue.replace(/\-/g, '');
-	
+
 	//console.log(paramObj);
 	postAjaxSync("/admin/cm/cm05/selectMonthCloseChk", paramObj, null, function(data) {
 
 		pchsCloseYn= data.pchsCloseYn;
 	});//postAjaxSync
-	
+
 	if(typeof pchsCloseYn == "undefined" || pchsCloseYn == null) return;
-		
+
 	if (pchsCloseYn === 'Y') {
 		return true;
 	}else{
@@ -2266,13 +2266,13 @@ function inCloseChk(chkValue){
  openProgress = function(boolean){
 	 if(boolean){
 			$.blockUI.defaults.overlayCSS.opacity = 0.1;
-			$.blockUI({ 
+			$.blockUI({
 				message: "<img src='/static/img/progress.gif'/> <font color='blue'>실행중 기다려 주십시요.</font>",
-				css: { 
+				css: {
 					backgroundColor: 'rgba(0,0,0,0.0)',
-					color: '#000000', 
+					color: '#000000',
 					border: '0px solid #a00'
-				} 
+				}
 			});
 	 }else{
 			$.unblockUI();
@@ -2292,32 +2292,32 @@ function kakaoSendReal(talkJson, talkParam, param) {
 	    data: talkJson,
       beforeSend: function (xhr) {
           xhr.setRequestHeader("authToken", talkParam.authToken);
-          xhr.setRequestHeader("serverName", talkParam.serverName);	            
-          xhr.setRequestHeader("paymentType", talkParam.paymentType);	            
-      },		    
+          xhr.setRequestHeader("serverName", talkParam.serverName);
+          xhr.setRequestHeader("paymentType", talkParam.paymentType);
+      },
 	    async: false,
-	    success: function(data){		
+	    success: function(data){
 //	    	console.log('status:' + data.status);
 	    	let err = data.status;
-	    	if( err.indexOf("ERR") > -1 || err.indexOf("KKO")> -1 ) { 
+	    	if( err.indexOf("ERR") > -1 || err.indexOf("KKO")> -1 ) {
 	    		let find = kakaoErr.find(e => e.codeId === err);
 				if( typeof(find.codeNm) != "undefined" ) {
-		    		var errorMsg = find.codeNm;	
-				}		    			
-		    	insertKakaoMessage(err, talkDeJson, param);	
-	    		alert("오류코드: ["+param.nameTo+" Hp."+ talkDeJson.mobile + "] "+data.status+"\r\n\r\n" + errorMsg+"로 메세지 전송 실패하였습니다.");   		
+		    		var errorMsg = find.codeNm;
+				}
+		    	insertKakaoMessage(err, talkDeJson, param);
+	    		alert("오류코드: ["+param.nameTo+" Hp."+ talkDeJson.mobile + "] "+data.status+"\r\n\r\n" + errorMsg+"로 메세지 전송 실패하였습니다.");
 	    	} else if( data.status == "OK" ) {
 	    		//alert("알림톡 정상 발송되었습니다.");
 	    		sendCnt++;
-		    	insertKakaoMessage(err, talkDeJson, param);	
+		    	insertKakaoMessage(err, talkDeJson, param);
 	    	}
 	    },
       error: function (data) {
       	insertKakaoMessage(data.status, talkDeJson, param);
 //      	console.log('---ajax error---');
       }
-	});		
-//	console.log('---success---' + sendCnt);	
+	});
+//	console.log('---success---' + sendCnt);
 	return sendCnt;
 }
 
@@ -2333,7 +2333,7 @@ function insertKakaoMessage(dStatus, talkDeJson, param){
 			, "title": talkDeJson.title
 			, "mssage": talkDeJson.message
 			, "mobile": talkDeJson.mobile
-			, "nameTo": param.nameTo			
+			, "nameTo": param.nameTo
 			, "creatId": jwt.userId
 			, "creatPgm": param.creatPgm
 	};
@@ -2343,7 +2343,7 @@ function insertKakaoMessage(dStatus, talkDeJson, param){
 			if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
 //				console.log('--알림톡 로그 정상 저장--');
 			} else {
-//				console.log('--알림톡 로그 정상 저장 오류--');				
+//				console.log('--알림톡 로그 정상 저장 오류--');
 			}
 	});
 }
@@ -2395,6 +2395,6 @@ function imageViewPopup(_fileKey, _filename) {
 			"fileKey" 	: _fileKey,
 			"fileName" 	: _filename,
 		};
-	openThirdModal("/static/html/cmn/modal/attachImageView.html", 1300, 875, _filename, paramObj, function(data) {
+	openThirdModal("/static/html/cmn/modal/attachImageView.html", $('body').width()-40, $('body').height()-50, _filename, paramObj, function(data) {
 	});
 }
