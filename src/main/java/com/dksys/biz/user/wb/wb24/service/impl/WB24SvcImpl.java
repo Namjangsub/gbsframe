@@ -81,8 +81,6 @@ public class WB24SvcImpl implements WB24Svc {
 		paramMap.put("midCd", midCd);
 		int result = wb24Mapper.wbsIssueInsert(paramMap);
 
-		//int result1 = wb24Mapper.wbsActInsert(paramMap);
-
 		Gson gson = new Gson();
 
 		String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 이슈 공유";
@@ -130,47 +128,7 @@ public class WB24SvcImpl implements WB24Svc {
 				i++;
 			}
 		}
-//
-//		// 조치정보 공유 결재 처리 프로세스
-//		String todoTitle3 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 조치 공유";
-//
-//		Type stringList4 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-//		List<Map<String, String>> sharngArr2 = gson.fromJson(paramMap.get("rowSharngListArr2"), stringList4);
-//		if (sharngArr2 != null && sharngArr2.size() > 0 ) {
-//			int i = 0;
-//	        for (Map<String, String> sharngMap2 : sharngArr2) {
-//				sharngMap2.put("reqNo", paramMap.get("issNo"));
-//				sharngMap2.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
-//				sharngMap2.put("pgmId", paramMap.get("pgmId"));
-//				sharngMap2.put("userId", paramMap.get("userId"));
-//				sharngMap2.put("sanCtnSn",Integer.toString(i+1));
-//				sharngMap2.put("pgParam", pgParam);
-//				sharngMap2.put("todoTitle", todoTitle3);
-//				QM01Mapper.insertWbsSharngList(sharngMap2);
-//				i++;
-//			}
-//		}
-//
-//		//결재
-//		String todoTitle4 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 조치 결재";
-//
-//		Type stringList5 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-//		List<Map<String, String>> approvalArr2 = gson.fromJson(paramMap.get("rowApprovalListArr2"), stringList5);
-//		if (approvalArr2 != null && approvalArr2.size() > 0 ) {
-//			int i = 0;
-//	        for (Map<String, String> approvalMap2 : approvalArr2) {
-//				approvalMap2.put("reqNo", paramMap.get("issNo"));
-//				approvalMap2.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
-//				approvalMap2.put("pgmId", paramMap.get("pgmId"));
-//				approvalMap2.put("userId", paramMap.get("userId"));
-//				approvalMap2.put("sanCtnSn",Integer.toString(i+1));
-//				approvalMap2.put("pgParam", pgParam);
-//				approvalMap2.put("todoTitle", todoTitle4);
-//				QM01Mapper.insertWbsApprovalList(approvalMap2);
-//				i++;
-//			}
-//		}
-//
+
 		//---------------------------------------------------------------
 		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
 	  	//   필수값 :  jobType, userId, comonCd
@@ -242,8 +200,6 @@ public class WB24SvcImpl implements WB24Svc {
 		paramMap.put("midCd", midCd);
 	    int result = wb24Mapper.wbsIssueUpdate(paramMap);
 
-
-
 		Gson gson = new Gson();
 
 		String pgParam = "{\"actionType\":\""+ "I" +"\",";
@@ -267,56 +223,60 @@ public class WB24SvcImpl implements WB24Svc {
   	     *************************************************************************/
 
 	    if (!"ISSSTS03".equals(paramMap.get("issSts"))) {	//접수, 또는 진행중이면
-			QM01Mapper.updateWb24SharngList1(paramMap);	// TB_WB20M03 --> SET    ETC_FIELD3 = 'DEL' 로 변경처리
-			QM01Mapper.updateWb24ApprovalList1(paramMap); // TB_WB20M03 --> SET    ETC_FIELD3 = 'DEL' 로 변경처리
+            QM01Mapper.updateWb24SharngList1(paramMap); // TB_WB20M03 --> SET ETC_FIELD3 = 'DEL' 로 변경처리
+            QM01Mapper.updateWb24ApprovalList1(paramMap); // TB_WB20M03 --> SET ETC_FIELD3 = 'DEL' 로 변경처리
 
-			if (Integer.parseInt(paramMap.get("approvalYnCnt")) == 0) {
-				String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 이슈 공유";
+            String todoTitle1 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") "
+                    + paramMap.get("wbsPlanCodeNm") + " 이슈 공유";
 
-				Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-				List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
+            Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {
+            }.getType();
+            List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
 
-				if (sharngArr != null && sharngArr.size() > 0 ) {
-					int i = 0;
-			        for (Map<String, String> sharngMap : sharngArr) {
-						sharngMap.put("reqNo", paramMap.get("issNo"));
-						sharngMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
-						sharngMap.put("pgmId", paramMap.get("pgmId"));
-						sharngMap.put("userId", paramMap.get("userId"));
-						sharngMap.put("sanCtnSn",Integer.toString(i+1));
-						sharngMap.put("pgParam", pgParam);
-						sharngMap.put("todoTitle", todoTitle1);
-						QM01Mapper.insertWb24SharngList(sharngMap);	//TB_WB20M03 --> SET T.ETC_FIELD3 = 'KAKAO' 로 변경처리
-						i++;
-					}
+            if (sharngArr != null && sharngArr.size() > 0) {
+                int i = 0;
+                for (Map<String, String> sharngMap : sharngArr) {
+                    sharngMap.put("reqNo", paramMap.get("issNo"));
+                    sharngMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
+                    sharngMap.put("pgmId", paramMap.get("pgmId"));
+                    sharngMap.put("userId", paramMap.get("userId"));
+                    sharngMap.put("sanCtnSn", Integer.toString(i + 1));
+                    sharngMap.put("pgParam", pgParam);
+                    sharngMap.put("todoTitle", todoTitle1);
+                    QM01Mapper.insertWb24SharngList(sharngMap); // TB_WB20M03 --> SET T.ETC_FIELD3 = 'KAKAO' 로 변경처리, Merge 문에서 insert만 N으로 설정하여 카톡
+                                                                // 전송처리함.
+                    i++;
 				}
+            }
 
-				String todoTitle2 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 이슈 결재";
+            String todoTitle2 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") "
+                    + paramMap.get("wbsPlanCodeNm") + " 이슈 결재";
 
-				//결재
-				Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-				List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
+            // 결재
+            Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {
+            }.getType();
+            List<Map<String, String>> approvalArr = gson.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
 
-				if (approvalArr != null && approvalArr.size() > 0 ) {
-					int i = 0;
-			        for (Map<String, String> approvalMap : approvalArr) {
-						approvalMap.put("reqNo", paramMap.get("issNo"));
-						approvalMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
-						approvalMap.put("pgmId", paramMap.get("pgmId"));
-						approvalMap.put("userId", paramMap.get("userId"));
-						approvalMap.put("sanCtnSn",Integer.toString(i+1));
-						approvalMap.put("pgParam", pgParam);
-						approvalMap.put("todoTitle", todoTitle2);
-						QM01Mapper.insertWb24SharngList(approvalMap);	//TB_WB20M03 --> SET T.ETC_FIELD3 = 'KAKAO' 로 변경처리
-						i++;
-			        }
-				}
+            if (approvalArr != null && approvalArr.size() > 0) {
+                int i = 0;
+                for (Map<String, String> approvalMap : approvalArr) {
+                    approvalMap.put("reqNo", paramMap.get("issNo"));
+                    approvalMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
+                    approvalMap.put("pgmId", paramMap.get("pgmId"));
+                    approvalMap.put("userId", paramMap.get("userId"));
+                    approvalMap.put("sanCtnSn", Integer.toString(i + 1));
+                    approvalMap.put("pgParam", pgParam);
+                    approvalMap.put("todoTitle", todoTitle2);
+                    QM01Mapper.insertWb24SharngList(approvalMap); // TB_WB20M03 --> SET T.ETC_FIELD3 = 'KAKAO' 로 변경처리, Merge 문에서 insert만 N으로 설정하여
+                                                                  // 카톡 전송처리함.
+                    i++;
+                }
 			}
 
 	        // 2024.03.20 김성욱 추가
-	        QM01Mapper.deleteWb24SharngList1(paramMap);
+            QM01Mapper.deleteWb24SharngList1(paramMap); // TB_WB20M03 --> ETC_FIELD3 = 'DEL'삭제처리
 	        // 2024.03.20 김성욱 추가
-	        QM01Mapper.deleteWb24ApprovalList1(paramMap);
+            QM01Mapper.deleteWb24ApprovalList1(paramMap); // TB_WB20M03 --> ETC_FIELD3 = 'DEL'삭제처리
 
 	    } else {
   	    /************************************************************************
@@ -342,49 +302,51 @@ public class WB24SvcImpl implements WB24Svc {
   	     *************************************************************************/
 			QM01Mapper.updateWb24SharngList2(paramMap);// TB_WB20M03 --> SET    ETC_FIELD3 = 'DEL' 로 변경처리
 			QM01Mapper.updateWb24ApprovalList2(paramMap);// TB_WB20M03 --> SET    ETC_FIELD3 = 'DEL' 로 변경처리
-			if (Integer.parseInt(paramMap.get("approvalYnCnt2")) == 0) {
-				// 조치정보 공유 결재 처리 프로세스
-				String todoTitle3 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 조치 공유";
+            // 조치정보 공유 결재 처리 프로세스
+            String todoTitle3 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") "
+                    + paramMap.get("wbsPlanCodeNm") + " 조치 공유";
 
-				Type stringList4 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-				List<Map<String, String>> sharngArr2 = gson.fromJson(paramMap.get("rowSharngListArr2"), stringList4);
-				if (sharngArr2 != null && sharngArr2.size() > 0 ) {
+            Type stringList4 = new TypeToken<ArrayList<Map<String, String>>>() {
+            }.getType();
+            List<Map<String, String>> sharngArr2 = gson.fromJson(paramMap.get("rowSharngListArr2"), stringList4);
+            if (sharngArr2 != null && sharngArr2.size() > 0) {
 
-					int i = 0;
+                int i = 0;
 
-					for (Map<String, String> sharngMap2 : sharngArr2) {
-						sharngMap2.put("reqNo", paramMap.get("issNo"));
-						sharngMap2.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
-						sharngMap2.put("pgmId", paramMap.get("pgmId"));
-						sharngMap2.put("userId", paramMap.get("userId"));
-						sharngMap2.put("sanCtnSn",Integer.toString(i+1));
-						sharngMap2.put("pgParam", pgParam);
-						sharngMap2.put("todoTitle", todoTitle3);
-						QM01Mapper.insertWb24SharngList(sharngMap2);// TB_WB20M03 --> SET      T.ETC_FIELD3 = 'KAKAO'
-						i++;
-			        }
-				}
+                for (Map<String, String> sharngMap2 : sharngArr2) {
+                    sharngMap2.put("reqNo", paramMap.get("issNo"));
+                    sharngMap2.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
+                    sharngMap2.put("pgmId", paramMap.get("pgmId"));
+                    sharngMap2.put("userId", paramMap.get("userId"));
+                    sharngMap2.put("sanCtnSn", Integer.toString(i + 1));
+                    sharngMap2.put("pgParam", pgParam);
+                    sharngMap2.put("todoTitle", todoTitle3);
+                    QM01Mapper.insertWb24SharngList(sharngMap2);// TB_WB20M03 --> SET T.ETC_FIELD3 = 'KAKAO'
+                    i++;
+                }
+            }
 
-				//결재
-				String todoTitle4 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") " + paramMap.get("wbsPlanCodeNm") + " 조치 결재";
+            // 결재
+            String todoTitle4 = paramMap.get("clntNm") + "-" + paramMap.get("clntPjtNm") + "(" + paramMap.get("salesCd") + ") "
+                    + paramMap.get("wbsPlanCodeNm") + " 조치 결재";
 
-				Type stringList5 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-				List<Map<String, String>> approvalArr2 = gson.fromJson(paramMap.get("rowApprovalListArr2"), stringList5);
-				if (approvalArr2 != null && approvalArr2.size() > 0 ) {
+            Type stringList5 = new TypeToken<ArrayList<Map<String, String>>>() {
+            }.getType();
+            List<Map<String, String>> approvalArr2 = gson.fromJson(paramMap.get("rowApprovalListArr2"), stringList5);
+            if (approvalArr2 != null && approvalArr2.size() > 0) {
 
-					int i = 0;
-			        for (Map<String, String> approvalMap2 : approvalArr2) {
-						approvalMap2.put("reqNo", paramMap.get("issNo"));
-						approvalMap2.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
-						approvalMap2.put("pgmId", paramMap.get("pgmId"));
-						approvalMap2.put("userId", paramMap.get("userId"));
-						approvalMap2.put("sanCtnSn",Integer.toString(i+1));
-						approvalMap2.put("pgParam", pgParam);
-						approvalMap2.put("todoTitle", todoTitle4);
-						QM01Mapper.insertWb24SharngList(approvalMap2);// TB_WB20M03 --> SET      T.ETC_FIELD3 = 'KAKAO'
-						i++;
-			        }
-				}
+                int i = 0;
+                for (Map<String, String> approvalMap2 : approvalArr2) {
+                    approvalMap2.put("reqNo", paramMap.get("issNo"));
+                    approvalMap2.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
+                    approvalMap2.put("pgmId", paramMap.get("pgmId"));
+                    approvalMap2.put("userId", paramMap.get("userId"));
+                    approvalMap2.put("sanCtnSn", Integer.toString(i + 1));
+                    approvalMap2.put("pgParam", pgParam);
+                    approvalMap2.put("todoTitle", todoTitle4);
+                    QM01Mapper.insertWb24SharngList(approvalMap2);// TB_WB20M03 --> SET T.ETC_FIELD3 = 'KAKAO'
+                    i++;
+                }
 			}
 
 			// 2024.03.20 김성욱 추가
@@ -499,9 +461,6 @@ public class WB24SvcImpl implements WB24Svc {
 
 		//issNo에 해당하는 이슈정보  삭제.
 	    result += wb24Mapper.wbsIssueDelete(paramMap);
-		//String todoTitle = "이슈번호 : " + paramMap.get("issNo") + ",   이슈제목 : " + paramMap.get("issSj");
-
-
 
 		//issNo에 해당하는 결재, 공유정보 삭제.
     	//Key : CO_CD, SALES_CD, TODO_NO
@@ -515,12 +474,6 @@ public class WB24SvcImpl implements WB24Svc {
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작
 //		//---------------------------------------------------------------
-//	    if (uploadFileList.size() > 0) {
-//		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-//		    paramMap.put("fileTrgtKey", paramMap.get("issFileTrgtKey"));
-//		    cm08Svc.uploadFile(paramMap, mRequest);
-//	    }
-
         for (Map<String, String> deleteFile : deleteFileList) {
 			// 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
 	    	cm08Svc.deleteFile(deleteFile.get("fileKey"));

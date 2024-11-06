@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,9 +17,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.cmn.vo.PaginationInfo;
-import com.dksys.biz.exc.LogicException;
-import com.dksys.biz.util.MessageUtils;
 import com.dksys.biz.user.wb.wb24.service.WB24Svc;
+import com.dksys.biz.util.MessageUtils;
 
 @Controller
 @Transactional(rollbackFor = Exception.class)
@@ -65,6 +63,7 @@ public class WB24Ctr {
   		try {
   			if (wb24Svc.wbsIssueInsert(paramMap, mRequest) != 0 ) {
   				model.addAttribute("resultCode", 200);
+                model.addAttribute("resultIssNo", paramMap.get("issNo"));
   			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
   		} else {
   			model.addAttribute("resultCode", 500);
