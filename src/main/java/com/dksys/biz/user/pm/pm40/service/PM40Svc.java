@@ -15,7 +15,7 @@ public interface PM40Svc {
 		List<Map<String, String>> selectMainGridList(Map<String, String> paramMap);
 		
 		//DATA INSERT
-		int insert_pm40(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+		Map<String, String> insert_pm40(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 		
 		//DATA UPDATE
 		int update_pm40(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
@@ -31,4 +31,9 @@ public interface PM40Svc {
 		
 		Map<String, String> select_pm40_Info(Map<String, String> paramMap);
 		
+		List<Map<String, String>> selectSignResUserlst(Map<String, String> paramMap);
+		
+		List<Map<String, String>> selectWorkPrtList(Map<String, String> paramMap);
+		int select_result_count(Map<String, String> paramMap);
+		Map<String, String> insert_pm40_p02(Map<String, String> paramMap);
 }
