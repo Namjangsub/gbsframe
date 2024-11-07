@@ -28,8 +28,8 @@ public class PM40SvcImpl implements PM40Svc{
 	 @Autowired
 	  PM40Mapper pm40Mapper;
 	
-	 @Autowired
-	  QM01Mapper QM01Mapper;
+	// @Autowired
+	 // QM01Mapper QM01Mapper;
 	 
 	 
 	 	
@@ -71,9 +71,9 @@ public class PM40SvcImpl implements PM40Svc{
 				rtnMap.put("workNo", newMNGM_NO);// rtnMap에 "workNo"키로 저장
 				Gson gson = new Gson();	
 				
-				List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
+				List<Map<String, String>> sharngChk = pm40Mapper.deleteWbsSharngListChk(paramMap); 
 				if (sharngChk.size() > 0) {
-					QM01Mapper.deleteWbsSharngList(paramMap); 
+					pm40Mapper.deleteWbsSharngList(paramMap); 
 				}
 				
 				//공유
@@ -115,12 +115,12 @@ public class PM40SvcImpl implements PM40Svc{
 			        	if ("공유".equals(sharngMap.get("gb"))) {
 			            	    sharngMap.put("sanCtnSn",Integer.toString(iSharng));
 			            	    sharngMap.put("pgParam", pgParam1);
-			                	QM01Mapper.insertWbsSharngList(sharngMap);       		
+			            	    pm40Mapper.insertWbsSharngList(sharngMap);       		
 			                	iSharng++;
 			        	} else {
 			        		sharngMap.put("sanCtnSn",Integer.toString(iApproval));
 			        		sharngMap.put("pgParam", pgParam2);
-			                	QM01Mapper.insertWbsApprovalList(sharngMap);       		
+			        		pm40Mapper.insertWbsApprovalList(sharngMap);       		
 			                	iApproval++;
 			        	}
 			        }
@@ -149,9 +149,9 @@ public class PM40SvcImpl implements PM40Svc{
 			paramMap.put("reqNo",paramMap.get("workNo"));
 			Gson gson = new Gson();	
 			
-			List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
+			List<Map<String, String>> sharngChk = pm40Mapper.deleteWbsSharngListChk(paramMap); 
 			if (sharngChk.size() > 0) {
-				QM01Mapper.deleteWbsSharngList(paramMap); 
+				pm40Mapper.deleteWbsSharngList(paramMap); 
 			}
 			
 			//공유
@@ -194,12 +194,12 @@ public class PM40SvcImpl implements PM40Svc{
 		        	if ("공유".equals(sharngMap.get("gb"))) {
 		            	    sharngMap.put("sanCtnSn",Integer.toString(iSharng));
 		            	    sharngMap.put("pgParam", pgParam1);
-		                	QM01Mapper.insertWbsSharngList(sharngMap);       		
+		            	    pm40Mapper.insertWbsSharngList(sharngMap);       		
 		                	iSharng++;
 		        	} else {
 		        		sharngMap.put("sanCtnSn",Integer.toString(iApproval));
 		        		sharngMap.put("pgParam", pgParam2);
-		                	QM01Mapper.insertWbsApprovalList(sharngMap);       		
+		        		pm40Mapper.insertWbsApprovalList(sharngMap);       		
 		                	iApproval++;
 		        	}
 		        }
@@ -214,9 +214,9 @@ public class PM40SvcImpl implements PM40Svc{
 		int result = 0;
 		result = pm40Mapper.delete_pm40(paramMap);
 		
-		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
+		List<Map<String, String>> sharngChk = pm40Mapper.deleteWbsSharngListChk(paramMap); 
 		if (sharngChk.size() > 0) {
-			QM01Mapper.deleteWbsSharngList(paramMap); 
+			pm40Mapper.deleteWbsSharngList(paramMap); 
 		 }
 		
 		return result;
@@ -322,9 +322,9 @@ public class PM40SvcImpl implements PM40Svc{
 				
 				Gson gson = new Gson();	
 				
-				List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
+				List<Map<String, String>> sharngChk = pm40Mapper.deleteWbsSharngListChk(paramMap); 
 				if (sharngChk.size() > 0) {
-					QM01Mapper.deleteWbsSharngList(paramMap); 
+					pm40Mapper.deleteWbsSharngList(paramMap); 
 				}
 				
 				//공유
@@ -367,12 +367,12 @@ public class PM40SvcImpl implements PM40Svc{
 			        	if ("공유".equals(sharngMap.get("gb"))) {
 			            	    sharngMap.put("sanCtnSn",Integer.toString(iSharng));
 			            	    sharngMap.put("pgParam", pgParam1);
-			                	QM01Mapper.insertWbsSharngList(sharngMap);       		
+			            	    pm40Mapper.insertWbsSharngList(sharngMap);       		
 			                	iSharng++;
 			        	} else {
 			        		sharngMap.put("sanCtnSn",Integer.toString(iApproval));
 			        		sharngMap.put("pgParam", pgParam2);
-			                	QM01Mapper.insertWbsApprovalList(sharngMap);       		
+			        			pm40Mapper.insertWbsApprovalList(sharngMap);       		
 			                	iApproval++;
 			        	}
 			        }
