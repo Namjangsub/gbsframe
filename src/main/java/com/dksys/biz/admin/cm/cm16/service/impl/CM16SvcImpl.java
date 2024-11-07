@@ -93,6 +93,7 @@ public class CM16SvcImpl implements CM16Svc {
         paramMap.put("todoNo", fileTrgtKey);
         paramMap.put("todoFileTrgtKey", fileTrgtKey);
         paramMap.put("reqNo", fileTrgtKey);
+        paramMap.put("salesCd", fileTrgtKey);
 
         //문제현황 등록
         int result = cm16Mapper.insertItoaIssue(paramMap);
