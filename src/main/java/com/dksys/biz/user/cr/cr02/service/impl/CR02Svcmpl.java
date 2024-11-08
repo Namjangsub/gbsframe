@@ -548,6 +548,7 @@ public class CR02Svcmpl implements CR02Svc {
   		//결재처리[1. 수주에서는  SalesCd를 가질수 없음]
   		//---------------------------------------------------------------
   		param.put("reqNo", param.get("ordrsNo"));
+        param.put("salesCd", param.get("ordrsNo"));
 
 		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(param);
 		if (sharngChk.size() > 0) {
