@@ -1,6 +1,5 @@
 package com.dksys.biz.admin.cm.cm14.service.impl;
 
-import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -15,7 +14,6 @@ import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm14.mapper.CM14Mapper;
 import com.dksys.biz.admin.cm.cm14.service.CM14Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
-import com.dksys.biz.util.DateUtil;
 import com.dksys.biz.util.ExceptionThrower;
 import com.google.gson.Gson;
 
@@ -51,11 +49,11 @@ public class CM14SvcImpl implements CM14Svc {
 		result = cm14Mapper.insertBoard(paramMap);
 		List<MultipartFile> fileList = mRequest.getFiles("files");
 	    if (fileList.size() > 0) {
-			//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
+            // "FITR9903"은 공통코드에서 자료실 첨부 디렉토리임
 	    	//접근 권한이 없으면 Exception 발생
 	    	paramMap.put("fileTrgtTyp", "TB_CM14M01");
 	    	paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-	    	paramMap.put("comonCd", "FITR9901");
+            paramMap.put("comonCd", "FITR9903");
 	    	paramMap.put("jobType", "fileUp");
 			cm15Svc.selectFileAuthCheck(paramMap);
 //			cm08Svc.uploadFile("TB_CM14M01", paramMap.get("fileTrgtKey"), mRequest);
@@ -70,8 +68,8 @@ public class CM14SvcImpl implements CM14Svc {
 		Map<String, Object> returnMap = new HashMap<String, Object>();
 		Map<String, String> fileMap = new HashMap<String, String>();
 		fileMap.putAll(paramMap);
-		//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
-		fileMap.put("comonCd", "FITR9901");
+        // "FITR9903"은 공통코드에서 자료실 첨부 디렉토리임
+        fileMap.put("comonCd", "FITR9903");
 		fileMap.put("fileTrgtTyp", "TB_CM14M01");
 		fileMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 		fileMap.put("jobType", "fileList");
@@ -86,9 +84,9 @@ public class CM14SvcImpl implements CM14Svc {
 		
 		List<MultipartFile> fileList = mRequest.getFiles("files");
 		if (fileList.size() > 0) {
-			//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
+            // "FITR9901"은 공통코드에서 자료실 첨부 디렉토리임
 	    	//접근 권한이 없으면 Exception 발생
-			paramMap.put("comonCd", "FITR9901");
+            paramMap.put("comonCd", "FITR9903");
 			paramMap.put("jobType", "fileUp");
 			cm15Svc.selectFileAuthCheck(paramMap);
 		}
@@ -98,9 +96,9 @@ public class CM14SvcImpl implements CM14Svc {
 		List<String> deleteFileList = Arrays.asList(deleteFileArr);
 		
 		if (deleteFileList.size() > 0) {
-			//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
+            // "FITR9901"은 공통코드에서 자료실 첨부 디렉토리임
 	    	//접근 권한이 없으면 Exception 발생
-			paramMap.put("comonCd", "FITR9901");
+            paramMap.put("comonCd", "FITR9903");
 			paramMap.put("jobType", "fileDelete");
 			cm15Svc.selectFileAuthCheck(paramMap);
 		}
@@ -121,9 +119,9 @@ public class CM14SvcImpl implements CM14Svc {
 	public int uploadFile(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		List<MultipartFile> fileList = mRequest.getFiles("files");
 	    if (fileList.size() > 0) {
-			//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
+            // "FITR9901"은 공통코드에서 자료실 첨부 디렉토리임
 	    	//접근 권한이 없으면 Exception 발생
-			paramMap.put("comonCd", "FITR9901");
+            paramMap.put("comonCd", "FITR9903");
 			paramMap.put("jobType", "fileUp");
 			cm15Svc.selectFileAuthCheck(paramMap);
 			
