@@ -2398,3 +2398,11 @@ function imageViewPopup(_fileKey, _filename) {
 	openThirdModal("/static/html/cmn/modal/attachImageView.html", $('body').width()-40, $('body').height()-50, _filename, paramObj, function(data) {
 	});
 }
+
+function toastMsg(message, theme = 'primary' ) { //theme : default, primary, success, info, warning, danger
+	try {
+		toast.push({theme: theme, msg: message});
+	} catch (error) {
+//		console.error('toastGlobal push 중 오류 발생:', error);
+	}
+}
