@@ -215,6 +215,7 @@ public class CR02Svcmpl implements CR02Svc {
       		//결재처리[1. 수주에서는  SalesCd를 가질수 없음]
       		//---------------------------------------------------------------
       		param.put("reqNo", param.get("ordrsNo"));
+      		param.put("salesCd", param.get("ordrsNo"));
 
     		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(param);
     		if (sharngChk.size() > 0) {
@@ -961,7 +962,12 @@ public class CR02Svcmpl implements CR02Svc {
         if (!"".equals(estNo) && estNo != null) {
         	result += cr02Mapper.updateEstDeleteConfirm(paramMap);
         }
-
+        paramMap.put("reqNo", paramMap.get("ordrsNo"));
+        paramMap.put("salesCd", paramMap.get("ordrsNo"));
+        List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap);
+        if (sharngChk.size() > 0) {
+            QM01Mapper.deleteWbsSharngList(paramMap);
+        }
         //---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------
