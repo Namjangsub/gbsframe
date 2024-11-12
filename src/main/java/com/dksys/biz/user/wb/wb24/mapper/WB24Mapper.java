@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.ibatis.annotations.Mapper;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 @Mapper
 public interface WB24Mapper {
@@ -58,5 +57,7 @@ public interface WB24Mapper {
 	Map<String, String> select_wb2401p01_planInfo(Map<String, String> paramMap);
 
 	Map<String, String> select_wb2401p01_rsltInfo(Map<String, String> paramMap);
+
+    List<Map<String, String>> selectVendProblemList(Map<String, String> paramMap);
 
 }

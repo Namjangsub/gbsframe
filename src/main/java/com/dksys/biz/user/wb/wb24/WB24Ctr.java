@@ -210,5 +210,11 @@ public class WB24Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
-	
+
+    @PostMapping(value = "/selectVendProblemList")
+    public String selectVendProblemList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        List<Map<String, String>> vendProblem = wb24Svc.selectVendProblemList(paramMap);
+        model.addAttribute("vendProblem", vendProblem);
+        return "jsonView";
+    }
 }

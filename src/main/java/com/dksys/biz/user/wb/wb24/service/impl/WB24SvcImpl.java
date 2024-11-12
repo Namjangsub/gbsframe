@@ -513,4 +513,9 @@ public class WB24SvcImpl implements WB24Svc {
 		return wb24Mapper.select_wb2401p01_rsltInfo(paramMap);
 	}
 
+    @Override
+    public List<Map<String, String>> selectVendProblemList(Map<String, String> paramMap) {
+        return wb24Mapper.selectVendProblemList(paramMap);
+    }
+
 }

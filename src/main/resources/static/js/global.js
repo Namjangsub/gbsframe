@@ -42,6 +42,18 @@ if (typeof ax5 !== 'undefined' && typeof ax5.ui !== 'undefined') {
 		var thirdModal = new ax5.ui.modal();
 		var blindModal = new ax5.ui.modal();
 	}
+	if (typeof ax5.ui.toast === 'function') {
+		var toast = new ax5.ui.toast();
+		toast.setConfig({
+		    width: 500,
+		    displayTime: 5000,
+		    icon: '<i class="fa fa-bell"></i>',
+		    containerPosition: "top-left",
+		    closeIcon: '<i class="fa fa-times"></i>'
+		});
+
+		toast.init();
+	}
 	if (typeof ax5.ui.grid === 'function') {
 		// 그리드 총건수 표기 커스텀
 //		ax5.ui.grid.tmpl.page_status = function(){return '<span>총 {{totalElements}}건</span>';};
@@ -2399,10 +2411,72 @@ function imageViewPopup(_fileKey, _filename) {
 	});
 }
 
-function toastMsg(message, theme = 'primary' ) { //theme : default, primary, success, info, warning, danger
-	try {
-		toast.push({theme: theme, msg: message});
-	} catch (error) {
-//		console.error('toastGlobal push 중 오류 발생:', error);
+
+
+
+//백엔드에서 해당 구매내역에 대한 거래처의 문제현황을 검색해오기
+//메세지 뿌리기
+// 파라메터 구성 
+//     1. 업무구분 코드(type) : 'M':구매  ,  'S':영업,   'D': 설계,   'P':생산 
+//     2. 거래처코드 (vendCd) : 구매처, 협력사 또는 고객사 
+//     3. 구매인경우 자재목록(list) : 구매 아이템 내역을 포함하는  list 구매는 가공업체인 경우만 문제 관리 메세지 표시
+//
+// 영업인 경우 업체정보만 있음 
+// 설계인경우에도 업체 정보만 있음
+function toastMsg(type, vendCd, list={}) { //theme : default, primary, success, info, warning, danger
+	let oemChecking = false;
+	let param = { vendCd 		: vendCd,
+				selectType 	: 'OEM'
+				};
+	if (type == 'M') oemChecking = list.some(item => item.oemDivTxt === '가공품'); //구매팀 제외조건 적용.  가공품인경우만 문제내역 표시
+	if (type == 'O') {	//외주관리에서 Call 하는것
+		oemChecking = true;
+		param.selectType = 'OEM';
 	}
+//	if (type == 'S') oemChecking = 영업팀 고객사 제외 조건 작성;
+//	if (type == 'D') oemChecking = 연구소 협력사 제외 조건 작성;
+//	if (type == 'P') oemChecking = 생산팀 협력사 제외 조건 작성;
+	if (!oemChecking) return false;
+
+	postAjax("/user/wb/wb24/selectVendProblemList", param, null, function(data) {
+		let problemList = data.vendProblem;
+		if (problemList.length > 0) {	//최근문제 5개에 대한 내용만 추출하기
+			const problemMsg = problemList.slice(0, 5).map(item => '[' + item.creatDttm + ':' + item.subCdNm + '] '+  item.issSj).join('\n');
+			const message = problemList[0].vendNm + ' 최근 문제 5건 내역\n' + problemMsg;
+			try {
+				toast.push({msg: message, theme: 'danger'}
+				, function () {
+//		            console.log(this);
+		        });
+			} catch (error) {
+//				console.error('toast push 중 오류 발생:', error);
+			}
+		}
+	});
+}
+
+
+function toastConfirm(type, vendCd, list={}) { //theme : default, primary, success, info, warning, danger
+	let oemChecking = list.some(item => item.oemDivTxt === '가공품');
+	if (!oemChecking) return false;
+
+	const param = {
+					vendCd 		: vendCd,
+					selectType 	: 'OEM'
+				};
+	postAjax("/user/wb/wb24/selectVendProblemList", param, null, function(data) {
+		let problemList = data.vendProblem;
+		if (problemList.length > 0) {	//최근문제 5개에 대한 내용만 추출하기
+			const problemMsg = problemList.slice(0, 5).map(item => '[' + item.creatDttm + ':' + item.subCdNm + '] '+  item.issSj).join('\n');
+			const message = problemList[0].vendNm + ' 최근 문제 5건 내역\n' + problemMsg;
+			try {
+				toast.confirm({msg: message, theme: 'danger'}
+				, function () {
+//		            console.log(this);
+		        });
+			} catch (error) {
+//				console.error('toast push 중 오류 발생:', error);
+			}
+		}
+	});
 }

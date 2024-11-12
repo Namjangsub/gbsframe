@@ -41,4 +41,6 @@ public interface WB24Svc {
 
 	Map<String, String> select_wb2401p01_rsltInfo(Map<String, String> paramMap);
 
+    List<Map<String, String>> selectVendProblemList(Map<String, String> paramMap);
+
 }
