@@ -176,6 +176,10 @@ public class WB20SvcImpl implements WB20Svc {
 	}
 
 	// wb20 결재 insert
+    /***********************************************************************************************
+     * 1. 결재정보 저장할때 동일건은 등록일시가 동일하게 처리해야함. 각 이벤트별 결재자를 하나로 묶어주는것을 날자시간으로 처리함. 2. 결재정보 처리절차 2-1 이전에 등록된 결재자 정보 삭제처리 TODO_DIV2_CODE_ID =
+     * #{todoDiv2CodeId} AND SALES_CD = #{salesCd} AND TODO_NO = #{todoNo} 2-2 새로운 결재 내역 등록 (1번의 날자시간은 동일하게 처리함)
+     ***********************************************************************************************/
 	@Override
 	public int insertTodoMaster(Map<String, String> paramMap) throws Exception {
 
@@ -202,6 +206,13 @@ public class WB20SvcImpl implements WB20Svc {
 				}
 				dtl.put("createDttm", sysCreateDttm);
 				result += wb20Mapper.insertTodoMaster(dtl);
+
+                // 조치자가 팀장일경우 insertWbsApprovalList 에서 결재완료처리로 등록되므로 상태코드를 진행으로 변경하기 위해 아래 쿼리 실행함
+                // insertWbsApprovalList --> usrNm 을 todoId 에 저장하고 있음
+                if (dtl.get("userId").equals(dtl.get("todoId"))) {
+                    dtl.put("todoCfOpn", "자체승인");
+                    insertApprovalLine(dtl);
+                }
 			}
 		}
 		return result;

@@ -1,25 +1,22 @@
 package com.dksys.biz.user.qm.qm01.service.impl;
 
 import java.lang.reflect.Type;
-import java.text.Format.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.bouncycastle.asn1.ocsp.Request;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.qm.qm01.service.QM01Svc;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
-import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
-import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -239,7 +236,6 @@ public class QM01SvcImpl implements QM01Svc {
 	// 결재라인 처리 end
 	//---------------------------------------------------------------
 
-	
 	//---------------------------------------------------------------  
 	//첨부 화일 처리 시작 
 	//---------------------------------------------------------------  
@@ -350,15 +346,31 @@ public class QM01SvcImpl implements QM01Svc {
         	    sharngMap.put("userId", paramMap.get("userId"));
         	    
 	        	if ("공유".equals(sharngMap.get("gb"))) {
-	            	    sharngMap.put("sanCtnSn",Integer.toString(iSharng));
-	            	    sharngMap.put("pgParam", pgParam1);
-	                	QM01Mapper.insertWbsSharngList(sharngMap);       		
-	                	iSharng++;
+                    sharngMap.put("sanCtnSn", Integer.toString(iSharng));
+                    sharngMap.put("pgParam", pgParam1);
+                    QM01Mapper.insertWbsSharngList(sharngMap);
+                    iSharng++;
 	        	} else {
-	        		sharngMap.put("sanCtnSn",Integer.toString(iApproval));
-	        		sharngMap.put("pgParam", pgParam2);
-	                	QM01Mapper.insertWbsApprovalList(sharngMap);       		
-	                	iApproval++;
+                    sharngMap.put("sanCtnSn", Integer.toString(iApproval));
+                    sharngMap.put("pgParam", pgParam2);
+                    QM01Mapper.insertWbsApprovalList(sharngMap);
+                    iApproval++;
+                    // 조치자가 팀장일경우 insertWbsApprovalList 에서 결재완료처리로 등록되므로 상태코드를 진행으로 변경하기 위해 아래 쿼리 실행함
+                    // insertWbsApprovalList --> usrNm 을 todoId 에 저장하고 있음
+                    if (sharngMap.get("userId").equals(sharngMap.get("usrNm"))) {
+//                        QM01Mapper.updateReqSt(sharngMap);
+                        sharngMap.put("todoCfOpn", "자체승인");
+                        sharngMap.put("todoNo", sharngMap.get("reqNo"));
+
+                        Object value = sharngMap.get("toDoKey");
+
+                        if (value != null) {
+                            // String으로 변환 후 Map에 저장 (Integer 또는 String 모두 처리 가능)
+                            sharngMap.put("todoKey", value.toString());
+                        }
+
+                        wb20Svc.insertApprovalLine(sharngMap);
+                    }
 	        	}
 	        }
 		}
@@ -428,8 +440,6 @@ public class QM01SvcImpl implements QM01Svc {
 		//---------------------------------------------------------------  
 		// 결재라인 처리 end
 		//---------------------------------------------------------------
-
-		
 		
 	    return result;
   }
