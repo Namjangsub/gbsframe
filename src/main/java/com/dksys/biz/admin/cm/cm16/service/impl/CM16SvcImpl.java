@@ -93,6 +93,7 @@ public class CM16SvcImpl implements CM16Svc {
         paramMap.put("todoNo", fileTrgtKey);
         paramMap.put("todoFileTrgtKey", fileTrgtKey);
         paramMap.put("reqNo", fileTrgtKey);
+        paramMap.put("issNo", fileTrgtKey);
         paramMap.put("salesCd", fileTrgtKey);
 
         //문제현황 등록
@@ -146,6 +147,7 @@ public class CM16SvcImpl implements CM16Svc {
 
         	    sharngMap.put("reqNo", fileTrgtKey);
         	    sharngMap.put("fileTrgtKey", fileTrgtKey);
+        	    sharngMap.put("issNo", fileTrgtKey);
         	    sharngMap.put("salesCd", fileTrgtKey);
         	    sharngMap.put("pgmId", paramMap.get("pgmId"));
         	    sharngMap.put("userId", paramMap.get("userId"));
@@ -158,9 +160,25 @@ public class CM16SvcImpl implements CM16Svc {
 	        	} else {
 	        		sharngMap.put("sanCtnSn",Integer.toString(iApproval));
 	        		sharngMap.put("pgParam", pgParam2);
-	                	QM01Mapper.insertWbsApprovalList(sharngMap);       		
-	                	iApproval++;
-	        	}
+                    QM01Mapper.insertWbsApprovalList(sharngMap);       		
+                    iApproval++;
+                    // 조치자가 팀장일경우 insertWbsApprovalList 에서 결재완료처리로 등록되므로 상태코드를 진행으로 변경하기 위해 아래 쿼리 실행함
+                    // insertWbsApprovalList --> usrNm 을 todoId 에 저장하고 있음
+                    if (sharngMap.get("userId").equals(sharngMap.get("usrNm"))) {
+//                        QM01Mapper.updateReqSt(sharngMap);
+                        sharngMap.put("todoCfOpn", "자체승인");
+                        sharngMap.put("todoNo", sharngMap.get("reqNo"));
+
+                        Object value = sharngMap.get("toDoKey");
+
+                        if (value != null) {
+                            // String으로 변환 후 Map에 저장 (Integer 또는 String 모두 처리 가능)
+                            sharngMap.put("todoKey", value.toString());
+                        }
+                        
+                        wb20Svc.insertApprovalLine(sharngMap);
+                    }
+                }
 	        }
 		}
 
@@ -173,6 +191,7 @@ public class CM16SvcImpl implements CM16Svc {
         Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
 
         int result = cm16Mapper.updateItoaIssue(paramMap);
+        result += cm16Mapper.updateItoaIssueStChk(paramMap);
 
         // 파일이 존재할 때만 파일 업로드 로직 실행
         if (mRequest != null && mRequest.getFileNames().hasNext()) {
