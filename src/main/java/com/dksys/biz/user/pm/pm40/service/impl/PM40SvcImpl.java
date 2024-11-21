@@ -13,6 +13,8 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.user.pm.pm40.mapper.PM40Mapper;
 import com.dksys.biz.user.pm.pm40.service.PM40Svc;
+import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
+import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -27,8 +29,11 @@ public class PM40SvcImpl implements PM40Svc{
 	 @Autowired
 	  PM40Mapper pm40Mapper;
 	
-	// @Autowired
-    // QM01Mapper QM01Mapper;
+    @Autowired
+    QM01Mapper QM01Mapper;
+
+    @Autowired
+    WB20Svc wb20Svc;
 
     @Override
     public int selectMainGridListCount(Map<String, String> paramMap) {
@@ -49,6 +54,9 @@ public class PM40SvcImpl implements PM40Svc{
         // 해당월의 고찰데이터가 있는지 없는지 확인
 		
         Map rtnMap = new HashMap();
+        paramMap.put("reqNo", paramMap.get("workNo"));
+        paramMap.put("fileTrgtKey", paramMap.get("workNo"));
+        paramMap.put("salesCd", paramMap.get("workNo"));
 		
         int gochalIn = pm40Mapper.select_gochal_count(paramMap);
 
@@ -65,32 +73,26 @@ public class PM40SvcImpl implements PM40Svc{
             rtnMap.put("workNo", newMNGM_NO);// rtnMap에 "workNo"키로 저장
 			Gson gson = new Gson();	
 			
-			List<Map<String, String>> sharngChk = pm40Mapper.deleteWbsSharngListChk(paramMap); 
+            List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap);
 			if (sharngChk.size() > 0) {
-				pm40Mapper.deleteWbsSharngList(paramMap); 
+                QM01Mapper.deleteWbsSharngList(paramMap);
 			}
 			
 			//공유
 			String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
-			//pgParam1 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\","; 
+            pgParam1 += "\"gubun\":\"" + "개인" + "\",";
 			pgParam1 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
 			pgParam1 += "\"workYm\":\""+ paramMap.get("workYm") +"\",";
-			//if (!"".equals(paramMap.get("workRptNo"))) {	//issNo가 존재하면 문제건, 없으면 정상건
 			pgParam1 += "\"userId\":\""+ paramMap.get("userId") +"\",";
-			//}
-            pgParam1 += "\"gubun\":\"" + "개인" + "\",";
 			pgParam1 += "\"workNo\":\""+ paramMap.get("workNo") +"\"}";
 			
 			
 			//결재
 			String pgParam2 = "{\"actionType\":\""+ "S" +"\",";
-            // pgParam2 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\",";
+            pgParam2 += "\"gubun\":\"" + "개인" + "\",";
 			pgParam2 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
 			pgParam2 += "\"workYm\":\""+ paramMap.get("workYm") +"\",";
-			//if (!"".equals(paramMap.get("workRptNo"))) {	//issNo가 존재하면 문제건, 없으면 정상건
 			pgParam2 += "\"userId\":\""+ paramMap.get("userId") +"\",";
-			//}
-            pgParam2 += "\"gubun\":\"" + "개인" + "\",";
 			pgParam2 += "\"workNo\":\""+ paramMap.get("workNo") +"\"}";
 			
 			//공유-결재
@@ -102,20 +104,39 @@ public class PM40SvcImpl implements PM40Svc{
 		        for (Map<String, String> sharngMap : sharngArr) {
 
 	        	    sharngMap.put("reqNo", paramMap.get("reqNo"));
-	        	    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+                    sharngMap.put("fileTrgtKey", paramMap.get("workNo"));
+                    sharngMap.put("salesCd", paramMap.get("workNo"));
 	        	    sharngMap.put("pgmId", paramMap.get("pgmId"));
 	        	    sharngMap.put("userId", paramMap.get("userId"));
 	        	    
 		        	if ("공유".equals(sharngMap.get("gb"))) {
-		            	    sharngMap.put("sanCtnSn",Integer.toString(iSharng));
-		            	    sharngMap.put("pgParam", pgParam1);
-		            	    pm40Mapper.insertWbsSharngList(sharngMap);       		
+                        sharngMap.put("sanCtnSn", Integer.toString(iSharng));
+                        sharngMap.put("pgParam", pgParam1);
+//                        pm40Mapper.insertWbsSharngList(sharngMap);
+                        QM01Mapper.insertWbsSharngList(sharngMap);
 		                	iSharng++;
 		        	} else {
 		        		sharngMap.put("sanCtnSn",Integer.toString(iApproval));
 		        		sharngMap.put("pgParam", pgParam2);
-		        		pm40Mapper.insertWbsApprovalList(sharngMap);       		
+//		        		pm40Mapper.insertWbsApprovalList(sharngMap); 
+                        QM01Mapper.insertWbsApprovalList(sharngMap);
 		                	iApproval++;
+                        // 조치자가 팀장일경우 insertWbsApprovalList 에서 결재완료처리로 등록되므로 상태코드를 진행으로 변경하기 위해 아래 쿼리 실행함
+                        // insertWbsApprovalList --> usrNm 을 todoId 에 저장하고 있음
+                        if (sharngMap.get("userId").equals(sharngMap.get("usrNm"))) {
+//		                        QM01Mapper.updateReqSt(sharngMap);
+                            sharngMap.put("todoCfOpn", "자체승인");
+                            sharngMap.put("todoNo", sharngMap.get("reqNo"));
+
+                            Object value = sharngMap.get("toDoKey");
+
+                            if (value != null) {
+                                // String으로 변환 후 Map에 저장 (Integer 또는 String 모두 처리 가능)
+                                sharngMap.put("todoKey", value.toString());
+                            }
+
+                            wb20Svc.insertApprovalLine(sharngMap);
+                        }
 		        	}
 		        }
 			}
@@ -137,36 +158,32 @@ public class PM40SvcImpl implements PM40Svc{
         Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {
         }.getType();
 
-        int result = pm40Mapper.update_pm40(paramMap);
         paramMap.put("reqNo", paramMap.get("workNo"));
+        paramMap.put("fileTrgtKey", paramMap.get("workNo"));
+        paramMap.put("salesCd", paramMap.get("workNo"));
+
+        int result = pm40Mapper.update_pm40(paramMap);
         Gson gson = new Gson();
 
-        List<Map<String, String>> sharngChk = pm40Mapper.deleteWbsSharngListChk(paramMap);
+        List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap);
         if (sharngChk.size() > 0) {
-            pm40Mapper.deleteWbsSharngList(paramMap);
-		}
+            QM01Mapper.deleteWbsSharngList(paramMap);
+        }
 		
         // 공유
         String pgParam1 = "{\"actionType\":\"" + "T" + "\",";
-        // pgParam1 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\",";
+        pgParam1 += "\"gubun\":\"" + "팀" + "\",";
         pgParam1 += "\"coCd\":\"" + paramMap.get("coCd") + "\",";
         pgParam1 += "\"workYm\":\"" + paramMap.get("workYm") + "\",";
-        // if (!"".equals(paramMap.get("workRptNo"))) { //issNo가 존재하면 문제건, 없으면 정상건
         pgParam1 += "\"userId\":\"" + paramMap.get("userId") + "\",";
-        // }
-        pgParam1 += "\"gubun\":\"" + "팀" + "\",";
         pgParam1 += "\"workNo\":\"" + paramMap.get("workNo") + "\"}";
 
         // 결재
         String pgParam2 = "{\"actionType\":\"" + "S" + "\",";
-        // pgParam2 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\",";
         pgParam2 += "\"gubun\":\"" + "팀" + "\",";
         pgParam2 += "\"coCd\":\"" + paramMap.get("coCd") + "\",";
         pgParam2 += "\"workYm\":\"" + paramMap.get("workYm") + "\",";
-        // if (!"".equals(paramMap.get("workRptNo"))) { //issNo가 존재하면 문제건, 없으면 정상건
         pgParam2 += "\"userId\":\"" + paramMap.get("userId") + "\",";
-        // }
-        pgParam2 += "\"gubun\":\"" + "팀" + "\",";
         pgParam2 += "\"workNo\":\"" + paramMap.get("workNo") + "\"}";
 
         // 공유-결재
@@ -179,19 +196,20 @@ public class PM40SvcImpl implements PM40Svc{
             for (Map<String, String> sharngMap : sharngArr) {
 
                 sharngMap.put("reqNo", paramMap.get("reqNo"));
-                sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+                sharngMap.put("fileTrgtKey", paramMap.get("workNo"));
+                sharngMap.put("salesCd", paramMap.get("workNo"));
                 sharngMap.put("pgmId", paramMap.get("pgmId"));
                 sharngMap.put("userId", paramMap.get("userId"));
 
                 if ("공유".equals(sharngMap.get("gb"))) {
                     sharngMap.put("sanCtnSn", Integer.toString(iSharng));
                     sharngMap.put("pgParam", pgParam1);
-                    pm40Mapper.insertWbsSharngList(sharngMap);
+                    QM01Mapper.insertWbsSharngList(sharngMap);
                     iSharng++;
                 } else {
                     sharngMap.put("sanCtnSn", Integer.toString(iApproval));
                     sharngMap.put("pgParam", pgParam2);
-                    pm40Mapper.insertWbsApprovalList(sharngMap);
+                    QM01Mapper.insertWbsApprovalList(sharngMap);
                     iApproval++;
                 }
             }
@@ -205,9 +223,9 @@ public class PM40SvcImpl implements PM40Svc{
         int result = 0;
         result = pm40Mapper.delete_pm40(paramMap);
 
-        List<Map<String, String>> sharngChk = pm40Mapper.deleteWbsSharngListChk(paramMap);
+        List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap);
         if (sharngChk.size() > 0) {
-            pm40Mapper.deleteWbsSharngList(paramMap);
+            QM01Mapper.deleteWbsSharngList(paramMap);
         }
 
         return result;
@@ -215,20 +233,16 @@ public class PM40SvcImpl implements PM40Svc{
 
     @Override
     public List<Map<String, String>> selectYearWorkMainList(Map<String, String> paramMap) {
-        // TODO Auto-generated method stub
         return pm40Mapper.selectYearWorkMainList(paramMap);
     }
 
     @Override
     public String select_pm40_Next_MNGM_NO(Map<String, String> paramMap) {
-
-        // TODO Auto-generated method stub
         return pm40Mapper.select_pm40_Next_MNGM_NO(paramMap);
     }
 
     @Override
     public int select_gochal_count(Map<String, String> paramMap) {
-        // TODO Auto-generated method stub
         return pm40Mapper.select_gochal_count(paramMap);
     }
 
@@ -249,7 +263,6 @@ public class PM40SvcImpl implements PM40Svc{
 
     @Override
     public List<Map<String, String>> selectWorkPrtList(Map<String, String> paramMap) {
-        // TODO Auto-generated method stub
 
         String[] roleArray = paramMap.get("userName").split(",");
         String test = "";
@@ -292,7 +305,10 @@ public class PM40SvcImpl implements PM40Svc{
         Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {
         }.getType();
         Map rtnMap = new HashMap();
-		
+
+        paramMap.put("reqNo", paramMap.get("workNo"));
+        paramMap.put("fileTrgtKey", paramMap.get("workNo"));
+        paramMap.put("salesCd", paramMap.get("workNo"));
 		
         // 데이터 처리 시작
         int result = 0;
@@ -311,33 +327,26 @@ public class PM40SvcImpl implements PM40Svc{
 
             Gson gson = new Gson();
 
-            List<Map<String, String>> sharngChk = pm40Mapper.deleteWbsSharngListChk(paramMap);
+            List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap);
             if (sharngChk.size() > 0) {
-                pm40Mapper.deleteWbsSharngList(paramMap);
+                QM01Mapper.deleteWbsSharngList(paramMap);
             }
 
             // 공유
             String pgParam1 = "{\"actionType\":\"" + "T" + "\",";
-            // pgParam1 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\",";
+            pgParam1 += "\"gubun\":\"" + "팀" + "\",";
             pgParam1 += "\"coCd\":\"" + paramMap.get("coCd") + "\",";
             pgParam1 += "\"workYm\":\"" + paramMap.get("workYm") + "\",";
-            // if (!"".equals(paramMap.get("workRptNo"))) { //issNo가 존재하면 문제건, 없으면 정상건
             pgParam1 += "\"userId\":\"" + paramMap.get("userId") + "\",";
-            // }
-            pgParam1 += "\"gubun\":\"" + "팀" + "\",";
             pgParam1 += "\"workNo\":\"" + paramMap.get("workNo") + "\"}";
 			
 			
             // 결재
             String pgParam2 = "{\"actionType\":\"" + "S" + "\",";
-            // pgParam2 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\",";
             pgParam2 += "\"gubun\":\"" + "팀" + "\",";
             pgParam2 += "\"coCd\":\"" + paramMap.get("coCd") + "\",";
             pgParam2 += "\"workYm\":\"" + paramMap.get("workYm") + "\",";
-            // if (!"".equals(paramMap.get("workRptNo"))) { //issNo가 존재하면 문제건, 없으면 정상건
             pgParam2 += "\"userId\":\"" + paramMap.get("userId") + "\",";
-            // }
-            pgParam2 += "\"gubun\":\"" + "팀" + "\",";
             pgParam2 += "\"workNo\":\"" + paramMap.get("workNo") + "\"}";
 
             // 공유-결재
@@ -350,19 +359,20 @@ public class PM40SvcImpl implements PM40Svc{
                 for (Map<String, String> sharngMap : sharngArr) {
 
                     sharngMap.put("reqNo", paramMap.get("reqNo"));
-                    sharngMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+                    sharngMap.put("fileTrgtKey", paramMap.get("workNo"));
+                    sharngMap.put("salesCd", paramMap.get("workNo"));
                     sharngMap.put("pgmId", paramMap.get("pgmId"));
                     sharngMap.put("userId", paramMap.get("userId"));
 
                     if ("공유".equals(sharngMap.get("gb"))) {
                         sharngMap.put("sanCtnSn", Integer.toString(iSharng));
                         sharngMap.put("pgParam", pgParam1);
-                        pm40Mapper.insertWbsSharngList(sharngMap);
+                        QM01Mapper.insertWbsSharngList(sharngMap);
                         iSharng++;
                     } else {
                         sharngMap.put("sanCtnSn", Integer.toString(iApproval));
                         sharngMap.put("pgParam", pgParam2);
-                        pm40Mapper.insertWbsApprovalList(sharngMap);
+                        QM01Mapper.insertWbsApprovalList(sharngMap);
                         iApproval++;
                     }
                 }

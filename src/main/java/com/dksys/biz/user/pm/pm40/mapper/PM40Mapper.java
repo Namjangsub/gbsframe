@@ -38,12 +38,4 @@ public interface PM40Mapper {
     int select_result_count(Map<String, String> paramMap);
 
     int insert_pm40_p02(Map<String, String> paramMap);
-
-    int insertWbsApprovalList(Map<String, String> sharngMap);
-
-    int insertWbsSharngList(Map<String, String> sharngMap);
-
-    int deleteWbsSharngList(Map<String, String> paramMap);
-
-    List<Map<String, String>> deleteWbsSharngListChk(Map<String, String> paramMap);
 }
