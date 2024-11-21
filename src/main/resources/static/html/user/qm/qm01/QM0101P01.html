@@ -227,6 +227,12 @@
 	//분류,등록사유 자동생성시 20240708이전에는 전체 옵션 표시, 이후에는 정상, 문제 분리 표시용 end
     const currFormId = "#popFormQ01";	//현재화면의 Form ID,  poup 화면을 중복으로 Call 할시 필드명 중복으로 구분 안됨
     const currDivId = "#qmpopFormQ01";		//현재화면의 Form ID,  poup 화면을 중복으로 Call 할시 필드명 중복으로 구분 안됨
+    
+	//담당자가 바뀌었을때 문제등록 사유 유지하기 위함 변수 설정
+    var tempCOBTP =  ''; //$("input[name='COBTP']:checked").val();
+    var tempCOBTPTxt = ''; //$("input[name='COBTP']:checked").attr('data-label');
+    var tempCODECOBGB = ''; //$("input[name='CODECOBGB']:checked").val();
+    var tempCODECOBGBTxt =''; // $("input[name='CODECOBGB']:checked").attr('data-label');
 
     // 카톡 정상알림 카운터 변수
     var kakaoCnt = 0;
@@ -237,7 +243,7 @@
 	var fromJobType = "REQ"; //default 발주요청서 작업구분--> REQ,  이슈에서 처리할경우 ISS//작업 구분 발주요청서가 시작이면 default 값인 REQ로 작업 진행하고 아니면 ISS가 파라메터로 넘오옴
 	if (modalStack.last().paramObj.issNo != undefined && modalStack.last().paramObj.issNo != "") fromJobType = "ISS"; //기존 등록자료 수정모드로 진입시 처리하기 위함
 	if (modalStack.last().paramObj.fromJobType != undefined) fromJobType = modalStack.last().paramObj.fromJobType;
-	debugger;
+
    var gridViewPop = {
       initView : function() {
            this.target = new ax5.ui.grid();
@@ -557,6 +563,7 @@
 		      if (fromJobType == "ISS") {
 		    	  $(currFormId + ' #'+ modalStack.last().paramObj.subCd).prop("checked", true);	//등록사유 문제에서 등록된 내용으로 설정하기
 		    	  $(currFormId + ' #COBTP03').prop("checked", true);	//분류 --> 장애
+		    	  
 		      }
 
 		} else if (actionType == "U" || actionType == "S" || actionType == "T" ) {
@@ -833,6 +840,10 @@
     // 발행자 검색 //
     function openFirstUserSearch() {
        if (actionType == "C"){
+    	    tempCOBTP = $("input[name='COBTP']:checked").val() == undefined ? tempCOBTP : $("input[name='COBTP']:checked").val();
+    	    tempCOBTPTxt = $("input[name='COBTP']:checked").val() == undefined ? tempCOBTPTxt : $("input[name='COBTP']:checked").attr('data-label');
+    	    tempCODECOBGB = $("input[name='CODECOBGB']:checked").val() == undefined ? tempCODECOBGB : $("input[name='CODECOBGB']:checked").val();
+    	    tempCODECOBGBTxt = $("input[name='CODECOBGB']:checked").val() == undefined ? tempCODECOBGBTxt : $("input[name='CODECOBGB']:checked").attr('data-label');
              var paramObj = {
                   "coCd" : $(currFormId + ' #coCd').val(),
                 "userId" : $(currFormId + ' #ordrgId').val(),
@@ -840,26 +851,40 @@
                "useYn": "Y"
              };
              openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
-                      var checkedId = tree.get_checked()[0];
-                      var checkedNode = tree.get_node(checkedId);
-
-                      $(currFormId + ' #ordrgId').val(checkedNode.id);
-                      $(currFormId + ' #ordrgNm').val(checkedNode.text);
-
-                      //발행자에 따라 등록사유 선택항목 재생성 작업
-                      //if (tempActId.slice(0,7) == 'gyrsult') return false
-                      //    -->퇴사자인경우 작성자를 기준으로 생성해야함므로 작성자의 부서가 필요함
-                      // 작성자의 부서는 작성자 정보 출력시 저장해야함.
-                      if (checkedNode.id.slice(0,7) == 'gyrsult') {
-                    	  createCheckBox(jwt.deptId.slice(0,5));
-                          selectAuth(jwt.deptId);
-                      } else {
-                      	  createCheckBox(checkedNode.parent.slice(0,5));
-                          selectAuth(checkedNode.parent);
-                      }
-
-                      createRadioOptions('COBTP', "radio");  //분류 자동 생성
-                   });
+	             var checkedId = tree.get_checked()[0];
+	             var checkedNode = tree.get_node(checkedId);
+	             
+	             $(currFormId + ' #ordrgId').val(checkedNode.id);
+	             $(currFormId + ' #ordrgNm').val(checkedNode.text);
+	
+	             //발행자에 따라 등록사유 선택항목 재생성 작업
+	             //if (tempActId.slice(0,7) == 'gyrsult') return false
+	             //    -->퇴사자인경우 작성자를 기준으로 생성해야함므로 작성자의 부서가 필요함
+	             // 작성자의 부서는 작성자 정보 출력시 저장해야함.
+	             if (checkedNode.id.slice(0,7) == 'gyrsult') {
+	           	  createCheckBox(jwt.deptId.slice(0,5));
+	                 selectAuth(jwt.deptId);
+	             } else {
+	             	  createCheckBox(checkedNode.parent.slice(0,5));
+	                 selectAuth(checkedNode.parent);
+	             }
+	
+	             createRadioOptions('COBTP', "radio");  //분류 자동 생성
+// 	             if (fromJobType = "ISS") {
+		             if ($(currFormId + ' #' + tempCOBTP).length) {
+				     	 $(currFormId + ' #'+ tempCOBTP).prop("checked", true);	//등록사유 문제에서 등록된 내용으로 설정하기
+		             } else {
+						 alert(checkedNode.text + ' [' +tempCOBTPTxt +'] 등록사유가 존재하지 않습니다. 확인 바랍니다.')
+					 }
+		             
+					 if ($(currFormId + ' #' + tempCODECOBGB).length) {
+						 $(currFormId + ' #' + tempCODECOBGB).prop("checked", true);	//분류 --> 장애
+					 } else {
+						 alert(checkedNode.text + ' [' + tempCODECOBGBTxt + '] 분류가 존재하지 않습니다. 확인 바랍니다.')
+					 }
+// 	             }
+	               
+	        });
        }
     }
 
@@ -1371,7 +1396,7 @@
                }
 
             });
-debugger;
+
             $(currDivId + ' #actionBtn').remove();
               $(currDivId + ' #plus-minus').remove();
           }
@@ -1442,7 +1467,7 @@ debugger;
 	            }
 	        });
        }
-debugger;
+
       let clntNm = (jwt.coCd=="GUN") ? "(주)건양ITT" : "트루넷";
 
       // Kakao 알림톡 보내는사람(userID) 연락처 조회 값 세팅
