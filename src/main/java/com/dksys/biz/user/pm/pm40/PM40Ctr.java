@@ -57,14 +57,14 @@ public class PM40Ctr {
             // 문자열을 정수로 변환
             int result = Integer.parseInt(rtnResult.get("result"));
 
-            if (result != 0 && result != 7) {
+            if (result == 7) {
+                model.addAttribute("resultCode", 500);
+                model.addAttribute("resultMessage", "해당 월의 고찰은 등록 되어 있습니다.");
+            } else if (result != 0) {
                 model.addAttribute("resultCode", 200);
                 model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
                 String workNo = rtnResult.get("workNo").toString();
                 model.addAttribute("workNo", workNo);
-            } else if (result != 0 && result == 7) {
-                model.addAttribute("resultCode", 500);
-                model.addAttribute("resultMessage", "해당 월의 고찰은 등록 되어 있습니다.");
             } else {
                 model.addAttribute("resultCode", 500);
                 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
