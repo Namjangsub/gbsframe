@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.wb.wb21.service.WB21Svc;
 import com.dksys.biz.util.MessageUtils;
@@ -32,6 +33,9 @@ public class WB21Ctr {
     
     @Autowired
     WB21Svc wb21Svc;
+
+    @Autowired
+    CM08Svc cm08Svc;
 
     @PostMapping(value = "/selectMaxSjNo") 
     public String selectMaxSjNo(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -293,4 +297,50 @@ public class WB21Ctr {
   		}
   		return "jsonView";
     }
+
+    @PostMapping(value = "/updateSalesCdManual")
+    public String updateSalesCdManual(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model)
+            throws Exception {
+        try {
+            if (wb21Svc.updateSalesCdManual(paramMap, mRequest) != 0) {
+                model.addAttribute("resultCode", 200);
+                model.addAttribute("manualCall", paramMap.get("manualCall"));
+                model.addAttribute("fileKey", paramMap.get("fileKey"));
+                model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+            } else {
+                // 정상처리 되지 않으면 파일 삭제처리
+                cm08Svc.deleteFile(paramMap.get("fileKey"));
+                model.addAttribute("resultCode", 500);
+                model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+            }
+            ;
+        } catch (Exception e) {
+            // 정상처리 되지 않으면 파일 삭제처리
+            cm08Svc.deleteFile(paramMap.get("fileKey"));
+            model.addAttribute("resultCode", 900);
+            model.addAttribute("resultMessage", e.getMessage());
+        }
+//            }
+        return "jsonView";
+    }
+
+    @PostMapping(value = "/deleteSalesCdManual")
+    public String deleteSalesCdManual(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model)
+            throws Exception {
+        try {
+            if (wb21Svc.deleteSalesCdManual(paramMap) != 0) {
+                model.addAttribute("resultCode", 200);
+                model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+            } else {
+                model.addAttribute("resultCode", 500);
+                model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+            }
+            ;
+        } catch (Exception e) {
+            model.addAttribute("resultCode", 900);
+            model.addAttribute("resultMessage", e.getMessage());
+        }
+        return "jsonView";
+    }
+
 }

@@ -47,7 +47,7 @@
                              , P.EXPECT_MH                            AS TASK_EXPECT_MH
                              , TO_CHAR(S.WBS_RSLTSS_DT, 'YYYY-MM-DD') AS RSLT_STRT_DT --WBS Task 시작일
                              , TO_CHAR(S.WBS_RSLTSE_DT, 'YYYY-MM-DD') AS RSLT_END_DT  --WBS Task 종료일
-                             , S.DAYCNT                               AS RSLT_DAYCNT
+                             , NVL(S.DAYCNT,0)                        AS RSLT_DAYCNT
                              , S.WBS_RSLTS_MH                         AS RSLT_INTOCNT
                              , NVL(S.WBS_RSLTS_RATE,0)                AS RSLT_RATE    --WBS 실적 진행율
                              , (SELECT FN_CM06M01_ID_TO_NM(P.WBS_PLAN_MNG_ID) FROM DUAL)  AS WBS_MNG_NM --담당자명
@@ -63,8 +63,9 @@
                              , CONCAT(CONCAT(SJ.CLNT_NM, ' - '), SJ.CLNT_PJT_NM) AS CLNT_NM_PJT_NM
                              , NVL(S.FILE_TRGT_KEY, '.')       AS RSLT_FILE_TRGT_KEY
                              , CASE WHEN NVL(S.FILE_TRGT_KEY, '.') = '.' THEN 'I' ELSE 'U' END AS DATA_STS
-                             , '' AS DATA_CHK
-                             , P.WBS_PLAN_NO
+                             , ''                              AS DATA_CHK
+                             , P.WBS_PLAN_NO                   AS WBS_PLAN_NO
+                             , 'N'                             AS NONE_PLAN_YN
                         FROM   TB_WB22M01 AS P    --WBS계획
                                INNER JOIN SJD  AS SJ  ON P.CO_CD    = SJ.CO_CD
                                                      AND P.SALES_CD = SJ.SALES_CD
@@ -83,7 +84,7 @@
                         AND    P.CO_CD = #{coCd}
                         </if>
                         --AND    NVL(R.WBS_RSLTS_RATE,0) <![CDATA[<>]]> 100
-                        UNION All    --일정계획 확정건에 대한 계획수립 안한 내역
+                  UNION All    --일정계획 확정건에 대한 계획수립 안한 내역
                         SELECT SJ.CLNT_NM                             AS CLNT_NM
                              , SJ.CLNT_PJT_NM                         AS CLNT_PJT_NM
                              , P.SALES_CD                             AS SALES_CD
@@ -99,7 +100,7 @@
                              , P.EXPECT_MH                            AS TASK_EXPECT_MH
                              , ''                                     AS RSLT_STRT_DT --WBS Task 시작일
                              , ''                                     AS RSLT_END_DT  --WBS Task 종료일
-                             , ''                                     AS RSLT_DAYCNT
+                             , '0'                                    AS RSLT_DAYCNT
                              , 0                                      AS RSLT_INTOCNT
                              , 0                                      AS RSLT_RATE    --WBS 실적 진행율
                              , (SELECT FN_CM06M01_ID_TO_NM(P.WBS_PLAN_MNG_ID) FROM DUAL)  AS WBS_MNG_NM --담당자명
@@ -116,7 +117,8 @@
                              , '.'                             AS RSLT_FILE_TRGT_KEY
                              , ''                              AS DATA_STS
                              , ''                              AS DATA_CHK
-                             , P.WBS_PLAN_NO
+                             , P.WBS_PLAN_NO                   AS WBS_PLAN_NO
+                             , 'Y'                             AS NONE_PLAN_YN
                         FROM   TB_WB22M01 AS P
                                LEFT OUTER JOIN TB_WB22M01 AS R  ON R.CO_CD    = P.CO_CD
                                                                AND R.SALES_CD = P.SALES_CD
@@ -129,6 +131,114 @@
                         AND    P.WBS_PLAN_MNG_ID IS NOT NULL
                         AND    R.FILE_TRGT_KEY IS NULL
                         AND    P.CLOSE_YN = 'Y'
+                        AND    SJ.SALES_CD IS NOT NULL
+				 UNION All   --과제별  매뉴얼 작성 대상인경우 기계매뉴얼 체크  						     	 
+                        SELECT SJ.CLNT_NM                             AS CLNT_NM
+                             , SJ.CLNT_PJT_NM                         AS CLNT_PJT_NM
+                             , P.SALES_CD                             AS SALES_CD
+                             , SJ.CTRT_NM                             AS CTRT_NM
+                             , '기계매뉴얼등록' 						  AS WBS_PLAN_NM --WBS 계획명
+						     , TO_CHAR(R.WBS_PLANS_DT, 'YYYY-MM-DD')  AS PLAN_STRT_DT --WBS Task 시작일
+						     , TO_CHAR(R.WBS_PLANE_DT, 'YYYY-MM-DD')  AS PLAN_END_DT  --WBS Task 종료일
+                             , '0'                                    AS PLAN_DAYCNT
+                             , '기계매뉴얼등록'                     	  AS WBS_TASK_NM --WBS Task NM
+                             , ''  									  AS TASK_STRT_DT --WBS Task 시작일
+                             , CASE WHEN WD.MANUAL_MC IS NOT NULL 
+                                    THEN TO_CHAR(WD.CREAT_DTTM, 'YYYY-MM-DD')
+                                    ELSE ''
+                                    END 							  AS TASK_END_DT  --WBS Task 종료일
+                             , ''                               	  AS TASK_DAYCNT
+                             , 0                          		  	  AS TASK_EXPECT_MH
+                             , '' 									  AS RSLT_STRT_DT --WBS Task 시작일
+                             , CASE WHEN WD.MANUAL_MC IS NOT NULL 
+                                    THEN TO_CHAR(WD.CREAT_DTTM, 'YYYY-MM-DD')
+                                    ELSE ''
+                                    END 							  AS RSLT_END_DT  --WBS Task 종료일
+                             , ''                        			  AS RSLT_DAYCNT
+                             , 0			                          AS RSLT_INTOCNT
+                             , 0					                  AS RSLT_RATE    --WBS 실적 진행율
+                             , (SELECT FN_CM06M01_ID_TO_NM(R.WBS_PLAN_MNG_ID) FROM DUAL)  AS WBS_MNG_NM --담당자명
+                             -- 관련코드 참고정보 -----------------------------------------------
+                             , SJ.CLNT_CD                      		AS CLNT_CD 
+						     , 'MANUAL'                       		AS WBS_PLAN_CD --WBS 계획CD
+						     , 'MANUALMC'   				   		AS WBS_TASK_ID --WBS Task ID 
+                             , R.WBS_PLAN_MNG_ID               		AS WBS_MNG_ID  --담당자ID
+                             , ROUND(R.WBS_PLANE_DT - SYSDATE) 		AS VARIANCE_DT --종료예정 차이 일수 
+                             , P.CO_CD
+                             , SJ.PLAN_VER_NO                  		AS PLAN_VER_NO --계획ver
+                             , 'N'            				   		AS RSLT_CLOSE_YN
+                             , CONCAT(CONCAT(SJ.CLNT_NM, ' - '), SJ.CLNT_PJT_NM) AS CLNT_NM_PJT_NM
+                             , P.FILE_TRGT_KEY       	   	   		AS RSLT_FILE_TRGT_KEY
+                             , CASE WHEN NVL(WD.SALES_CD, '.') = '.' THEN 'I' ELSE 'U' END AS DATA_STS
+                             , ''                              		AS DATA_CHK
+                             , 'MANUALMC'                   		AS WBS_PLAN_NO
+                             , 'Y'                             		AS NONE_PLAN_YN
+						FROM TB_WB21M01 P
+								LEFT OUTER JOIN TB_WB21D02 AS WD ON WD.SALES_CD = P.SALES_CD
+								LEFT OUTER JOIN SJD        AS SJ ON SJ.SALES_CD = P.SALES_CD
+								INNER JOIN TB_WB22M01 AS R  ON R.CO_CD     = P.CO_CD
+								                                AND R.SALES_CD  =  P.SALES_CD
+								                                AND R.WBS_PLAN_CODE_ID = 'WBSCODE03'
+								                                AND R.WBS_PLAN_MNG_ID = #{usrId}
+						WHERE P.MANUAL_YN = 'Y'
+						  AND P.CLOSE_YN = 'Y'
+						  AND R.WBS_PLANE_DT   <![CDATA[ <]]>  ( SYSDATE + 3) --종료일 3일 이전 내역
+						  AND P.VER_NO  = (SELECT MAX(TO_NUMBER(VER_NO)) FROM TB_WB21M01 P1 WHERE P1.SJ_NO = P.SJ_NO)
+						  AND WD.MANUAL_MC IS NULL   --WD.MANUAL_ELEC
+						  
+				 UNION All   --과제별  매뉴얼 작성 대상인경우 전기매뉴얼 체크   					     	 
+                        SELECT SJ.CLNT_NM                            AS CLNT_NM
+                             , SJ.CLNT_PJT_NM                        AS CLNT_PJT_NM
+                             , P.SALES_CD                            AS SALES_CD
+                             , SJ.CTRT_NM                            AS CTRT_NM
+                             , '전기매뉴얼등록' 						 AS WBS_PLAN_NM --WBS 계획명
+						     , TO_CHAR(R.WBS_PLANS_DT, 'YYYY-MM-DD') AS PLAN_STRT_DT --WBS Task 시작일
+						     , TO_CHAR(R.WBS_PLANE_DT, 'YYYY-MM-DD') AS PLAN_END_DT  --WBS Task 종료일
+                             , '0'                                   AS PLAN_DAYCNT
+                             , '전기매뉴얼등록'                     	  AS WBS_TASK_NM --WBS Task NM
+                             , ''  									  AS TASK_STRT_DT --WBS Task 시작일
+                             , CASE WHEN WD.MANUAL_MC IS NOT NULL 
+                                    THEN TO_CHAR(WD.CREAT_DTTM, 'YYYY-MM-DD')
+                                    ELSE ''
+                                    END 							  AS TASK_END_DT  --WBS Task 종료일
+                             , ''                               	  AS TASK_DAYCNT
+                             , 0                          		  	  AS TASK_EXPECT_MH
+                             , '' 									  AS RSLT_STRT_DT --WBS Task 시작일
+                             , CASE WHEN WD.MANUAL_MC IS NOT NULL 
+                                    THEN TO_CHAR(WD.CREAT_DTTM, 'YYYY-MM-DD')
+                                    ELSE ''
+                                    END 							  AS RSLT_END_DT  --WBS Task 종료일
+                             , ''                        			  AS RSLT_DAYCNT
+                             , 0			                          AS RSLT_INTOCNT
+                             , 0					                  AS RSLT_RATE    --WBS 실적 진행율
+                             , (SELECT FN_CM06M01_ID_TO_NM(R.WBS_PLAN_MNG_ID) FROM DUAL)  AS WBS_MNG_NM --담당자명
+                             -- 관련코드 참고정보 -----------------------------------------------
+                             , SJ.CLNT_CD                      		AS CLNT_CD 
+						     , 'MANUAL'                       		AS WBS_PLAN_CD --WBS 계획CD
+						     , 'MANUALELEC'   				   		AS WBS_TASK_ID --WBS Task ID 
+                             , R.WBS_PLAN_MNG_ID               		AS WBS_MNG_ID  --담당자ID
+                             , ROUND(R.WBS_PLANE_DT - SYSDATE) 		AS VARIANCE_DT --종료예정 차이 일수 
+                             , P.CO_CD
+                             , SJ.PLAN_VER_NO                  		AS PLAN_VER_NO --계획ver
+                             , 'N'            				   		AS RSLT_CLOSE_YN
+                             , CONCAT(CONCAT(SJ.CLNT_NM, ' - '), SJ.CLNT_PJT_NM) AS CLNT_NM_PJT_NM
+                             , P.FILE_TRGT_KEY       	   	   		AS RSLT_FILE_TRGT_KEY
+                             , CASE WHEN NVL(WD.SALES_CD, '.') = '.' THEN 'I' ELSE 'U' END AS DATA_STS
+                             , ''                              		AS DATA_CHK
+                             , 'MANUALELEC'                    		AS WBS_PLAN_NO
+                             , 'Y'                             		AS NONE_PLAN_YN
+						FROM TB_WB21M01 P
+								LEFT OUTER JOIN TB_WB21D02 AS WD ON WD.SALES_CD = P.SALES_CD
+								LEFT OUTER JOIN SJD        AS SJ ON SJ.SALES_CD = P.SALES_CD
+								INNER JOIN TB_WB22M01 AS R  ON R.CO_CD     = P.CO_CD
+								                                AND R.SALES_CD  =  P.SALES_CD
+								                                AND R.WBS_PLAN_CODE_ID = 'WBSCODE06'
+								                                AND R.WBS_PLAN_MNG_ID = #{usrId}
+						WHERE P.MANUAL_YN = 'Y'
+						  AND P.CLOSE_YN = 'Y' 
+						  AND R.WBS_PLANE_DT   <![CDATA[ <]]>  ( SYSDATE + 3) --종료일 3일 이전 내역
+						  AND P.VER_NO  = (SELECT MAX(TO_NUMBER(VER_NO)) FROM TB_WB21M01 P1 WHERE P1.SJ_NO = P.SJ_NO)
+						  AND WD.MANUAL_ELEC IS NULL
                        ) AS X
                 WHERE  1 = 1
                 <if test="salesCd != null and !salesCd.equals('')">
@@ -138,8 +248,8 @@
                 AND    X.RSLT_CLOSE_YN LIKE #{rsltCloseYn}
                 </if>
                 ORDER BY SALES_CD, WBS_PLAN_CD, WBS_TASK_ID
+                
                ) AS Z
-        WHERE  1 = 1
     </select>
     
     <select id="select_wb26_List" parameterType="Map" resultType="camelMap">
@@ -223,7 +333,7 @@
                         AND    P.CO_CD = #{coCd}
                         </if>
                         --AND    NVL(R.WBS_RSLTS_RATE,0) <![CDATA[<>]]> 100
-                        UNION All    --일정계획 확정건에 대한 계획수립 안한 내역
+                  UNION All    --일정계획 확정건에 대한 계획수립 안한 내역
                         SELECT SJ.CLNT_NM                             AS CLNT_NM
                              , SJ.CLNT_PJT_NM                         AS CLNT_PJT_NM
                              , P.SALES_CD                             AS SALES_CD
@@ -271,6 +381,113 @@
                         AND    R.FILE_TRGT_KEY IS NULL
                         AND    P.CLOSE_YN = 'Y'
                         AND    SJ.SALES_CD IS NOT NULL
+				 UNION All   --과제별  매뉴얼 작성 대상인경우 기계매뉴얼 체크  						     	 
+                        SELECT SJ.CLNT_NM                             AS CLNT_NM
+                             , SJ.CLNT_PJT_NM                         AS CLNT_PJT_NM
+                             , P.SALES_CD                             AS SALES_CD
+                             , SJ.CTRT_NM                             AS CTRT_NM
+                             , '매뉴얼등록' 							  AS WBS_PLAN_NM --WBS 계획명
+						     , TO_CHAR(R.WBS_PLANS_DT, 'YYYY-MM-DD')  AS PLAN_STRT_DT --WBS Task 시작일
+						     , TO_CHAR(R.WBS_PLANE_DT, 'YYYY-MM-DD')  AS PLAN_END_DT  --WBS Task 종료일
+                             , '0'                                    AS PLAN_DAYCNT
+                             , '기계매뉴얼등록'                     	  AS WBS_TASK_NM --WBS Task NM
+                             , ''  									  AS TASK_STRT_DT --WBS Task 시작일
+                             , CASE WHEN WD.MANUAL_MC IS NOT NULL 
+                                    THEN TO_CHAR(WD.CREAT_DTTM, 'YYYY-MM-DD')
+                                    ELSE ''
+                                    END 							  AS TASK_END_DT  --WBS Task 종료일
+                             , ''                               	  AS TASK_DAYCNT
+                             , 0                          		  	  AS TASK_EXPECT_MH
+                             , '' 									  AS RSLT_STRT_DT --WBS Task 시작일
+                             , CASE WHEN WD.MANUAL_MC IS NOT NULL 
+                                    THEN TO_CHAR(WD.CREAT_DTTM, 'YYYY-MM-DD')
+                                    ELSE ''
+                                    END 							  AS RSLT_END_DT  --WBS Task 종료일
+                             , ''                        			  AS RSLT_DAYCNT
+                             , 0			                          AS RSLT_INTOCNT
+                             , 0					                  AS RSLT_RATE    --WBS 실적 진행율
+                             , (SELECT FN_CM06M01_ID_TO_NM(R.WBS_PLAN_MNG_ID) FROM DUAL)  AS WBS_MNG_NM --담당자명
+                             -- 관련코드 참고정보 -----------------------------------------------
+                             , SJ.CLNT_CD                      		AS CLNT_CD 
+						     , 'MANUAL'                       		AS WBS_PLAN_CD --WBS 계획CD
+						     , 'MANUALMC'   				   		AS WBS_TASK_ID --WBS Task ID 
+                             , R.WBS_PLAN_MNG_ID               		AS WBS_MNG_ID  --담당자ID
+                             , ROUND(R.WBS_PLANE_DT - SYSDATE) 		AS VARIANCE_DT --종료예정 차이 일수 
+                             , P.CO_CD
+                             , SJ.PLAN_VER_NO                  		AS PLAN_VER_NO --계획ver
+                             , 'N'            				   		AS RSLT_CLOSE_YN
+                             , CONCAT(CONCAT(SJ.CLNT_NM, ' - '), SJ.CLNT_PJT_NM) AS CLNT_NM_PJT_NM
+                             , P.FILE_TRGT_KEY       	   	   		AS RSLT_FILE_TRGT_KEY
+                             , CASE WHEN NVL(WD.SALES_CD, '.') = '.' THEN 'I' ELSE 'U' END AS DATA_STS
+                             , ''                              		AS DATA_CHK
+                             , 'MANUALMC'                   		AS WBS_PLAN_NO
+                             , 'Y'                             		AS NONE_PLAN_YN
+						FROM TB_WB21M01 P
+								LEFT OUTER JOIN TB_WB21D02 AS WD ON WD.SALES_CD = P.SALES_CD
+								LEFT OUTER JOIN SJD        AS SJ ON SJ.SALES_CD = P.SALES_CD
+								INNER JOIN TB_WB22M01 AS R  ON R.CO_CD     = P.CO_CD
+								                                AND R.SALES_CD  =  P.SALES_CD
+								                                AND R.WBS_PLAN_CODE_ID = 'WBSCODE03'
+								                                AND R.WBS_PLAN_MNG_ID = #{usrId}
+						WHERE P.MANUAL_YN = 'Y'
+						  AND P.CLOSE_YN = 'Y'
+						  AND R.WBS_PLANE_DT   <![CDATA[ <]]>  ( SYSDATE + 3) --종료일 3일 이전 내역
+						  AND P.VER_NO  = (SELECT MAX(TO_NUMBER(VER_NO)) FROM TB_WB21M01 P1 WHERE P1.SJ_NO = P.SJ_NO)
+						  AND WD.MANUAL_MC IS NULL   --WD.MANUAL_ELEC
+						  
+				 UNION All   --과제별  매뉴얼 작성 대상인경우 전기매뉴얼 체크   					     	 
+                        SELECT SJ.CLNT_NM                            AS CLNT_NM
+                             , SJ.CLNT_PJT_NM                        AS CLNT_PJT_NM
+                             , P.SALES_CD                            AS SALES_CD
+                             , SJ.CTRT_NM                            AS CTRT_NM
+                             , '매뉴얼등록' 							 AS WBS_PLAN_NM --WBS 계획명
+						     , TO_CHAR(R.WBS_PLANS_DT, 'YYYY-MM-DD') AS PLAN_STRT_DT --WBS Task 시작일
+						     , TO_CHAR(R.WBS_PLANE_DT, 'YYYY-MM-DD') AS PLAN_END_DT  --WBS Task 종료일
+                             , '0'                                   AS PLAN_DAYCNT
+                             , '전기매뉴얼등록'                     	  AS WBS_TASK_NM --WBS Task NM
+                             , ''  									  AS TASK_STRT_DT --WBS Task 시작일
+                             , CASE WHEN WD.MANUAL_MC IS NOT NULL 
+                                    THEN TO_CHAR(WD.CREAT_DTTM, 'YYYY-MM-DD')
+                                    ELSE ''
+                                    END 							  AS TASK_END_DT  --WBS Task 종료일
+                             , ''                               	  AS TASK_DAYCNT
+                             , 0                          		  	  AS TASK_EXPECT_MH
+                             , '' 									  AS RSLT_STRT_DT --WBS Task 시작일
+                             , CASE WHEN WD.MANUAL_MC IS NOT NULL 
+                                    THEN TO_CHAR(WD.CREAT_DTTM, 'YYYY-MM-DD')
+                                    ELSE ''
+                                    END 							  AS RSLT_END_DT  --WBS Task 종료일
+                             , ''                        			  AS RSLT_DAYCNT
+                             , 0			                          AS RSLT_INTOCNT
+                             , 0					                  AS RSLT_RATE    --WBS 실적 진행율
+                             , (SELECT FN_CM06M01_ID_TO_NM(R.WBS_PLAN_MNG_ID) FROM DUAL)  AS WBS_MNG_NM --담당자명
+                             -- 관련코드 참고정보 -----------------------------------------------
+                             , SJ.CLNT_CD                      		AS CLNT_CD 
+						     , 'MANUAL'                       		AS WBS_PLAN_CD --WBS 계획CD
+						     , 'MANUALELEC'   				   		AS WBS_TASK_ID --WBS Task ID 
+                             , R.WBS_PLAN_MNG_ID               		AS WBS_MNG_ID  --담당자ID
+                             , ROUND(R.WBS_PLANE_DT - SYSDATE) 		AS VARIANCE_DT --종료예정 차이 일수 
+                             , P.CO_CD
+                             , SJ.PLAN_VER_NO                  		AS PLAN_VER_NO --계획ver
+                             , 'N'            				   		AS RSLT_CLOSE_YN
+                             , CONCAT(CONCAT(SJ.CLNT_NM, ' - '), SJ.CLNT_PJT_NM) AS CLNT_NM_PJT_NM
+                             , P.FILE_TRGT_KEY       	   	   		AS RSLT_FILE_TRGT_KEY
+                             , CASE WHEN NVL(WD.SALES_CD, '.') = '.' THEN 'I' ELSE 'U' END AS DATA_STS
+                             , ''                              		AS DATA_CHK
+                             , 'MANUALELEC'                    		AS WBS_PLAN_NO
+                             , 'Y'                             		AS NONE_PLAN_YN
+						FROM TB_WB21M01 P
+								LEFT OUTER JOIN TB_WB21D02 AS WD ON WD.SALES_CD = P.SALES_CD
+								LEFT OUTER JOIN SJD        AS SJ ON SJ.SALES_CD = P.SALES_CD
+								INNER JOIN TB_WB22M01 AS R  ON R.CO_CD     = P.CO_CD
+								                                AND R.SALES_CD  =  P.SALES_CD
+								                                AND R.WBS_PLAN_CODE_ID = 'WBSCODE06'
+								                                AND R.WBS_PLAN_MNG_ID = #{usrId}
+						WHERE P.MANUAL_YN = 'Y'
+						  AND P.CLOSE_YN = 'Y' 
+						  AND R.WBS_PLANE_DT   <![CDATA[ <]]>  ( SYSDATE + 3) --종료일 3일 이전 내역
+						  AND P.VER_NO  = (SELECT MAX(TO_NUMBER(VER_NO)) FROM TB_WB21M01 P1 WHERE P1.SJ_NO = P.SJ_NO)
+						  AND WD.MANUAL_ELEC IS NULL
                        ) AS X
                 WHERE  1 = 1
                 <if test="salesCd != null and !salesCd.equals('')">

@@ -70,4 +70,8 @@ public interface WB21Mapper {
     int planMkerCdChange(Map<String, String> paramMap);
 
 	int delete_wb21(Map<String, String> paramMap);
+
+    int updateSalesCdManual(Map<String, String> paramMap);
+
+    int deleteSalesCdManual(Map<String, String> paramMap);
 }

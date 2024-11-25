@@ -64,4 +64,8 @@ public interface WB21Svc {
 	//외주 제작업체 수정
 	int planMkerCdChange(Map<String, String> paramMap);
 
+    int updateSalesCdManual(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
+    int deleteSalesCdManual(Map<String, String> paramMap) throws Exception;
+
 }

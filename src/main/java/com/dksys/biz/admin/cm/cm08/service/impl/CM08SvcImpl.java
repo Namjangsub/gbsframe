@@ -1,6 +1,4 @@
 package com.dksys.biz.admin.cm.cm08.service.impl;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -8,12 +6,10 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -24,6 +20,8 @@ import org.apache.poi.xssf.usermodel.XSSFCellStyle;
 import org.apache.poi.xssf.usermodel.XSSFDataFormat;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -174,7 +172,7 @@ public class CM08SvcImpl implements CM08Svc {
     			// if(fileTrgtTyp.equals("TB_OD01M01") || fileTrgtTyp.equals("TB_BM02M01") || fileTrgtTyp.equals("TB_OD02M01") || fileTrgtTyp.equals("TB_AR14M01")) {
     			mf.transferTo(new File(path + saveFile));
     			// }
-    			
+                paramMap.put("fileKey", param.get("fileKey"));
     		} catch (IllegalStateException e) {
     			e.printStackTrace();
     		} catch (IOException e) {

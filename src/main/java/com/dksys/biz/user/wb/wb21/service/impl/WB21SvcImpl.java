@@ -372,5 +372,110 @@ public class WB21SvcImpl implements WB21Svc {
 		int result = wb21Mapper.planMkerCdChange(paramMap);
 		return result;
 	}
-	
+
+    // 과제등록,수정시에 매뉴얼 파일 등록하기 (삭제는 아래 deleteSalesCdManual 함수이용)
+    // 파일 첨부하는 시점에 즉시 실행되며, 하나의 파일만 Upload 처리되게 구현됨
+    // case1 최초 등록시 실행됨
+    // case2 파일변경시 대체파일과 삭제대상 Key값이 manualFileDeleteArr에 전달됨(추후 감안 array로 처리함)
+    @Override
+    public int updateSalesCdManual(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+        Gson gson = new Gson();
+        Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+        Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {
+        }.getType();
+        int result = 0;
+        // ---------------------------------------------------------------
+        // 매뉴얼 파일 등록삭제는 권한 체크 없이 처리함
+        // ---------------------------------------------------------------
+        HashMap<String, String> param = new HashMap<>();
+        param.put("userId", paramMap.get("userId"));
+        param.put("comonCd", paramMap.get("comonCd")); // 프로트엔드에 넘어온 화일 저장 위치 정보
+
+        String tripfileTrgtTyp = "WB2101P01";
+        String manualType = paramMap.get("manualCall");
+        // 세부내역별 키값에 대한부분은 작업일보 번호 + 경비인련번호로 구성함
+        String tripfileTrgtKey = paramMap.get("fileTrgtKey") + "-" + manualType;
+        String tempFileName = "";
+        if (manualType.equals("manualMc")) {
+            tempFileName = paramMap.get("manualMc");
+        } else {
+            tempFileName = paramMap.get("manualElec");
+        }
+        // 매뉴얼 첨부파일 처리
+        try {
+            paramMap.put("fileTrgtTyp", "WB2101P01");
+            paramMap.put("fileTrgtKey", tripfileTrgtKey);
+            cm08Svc.uploadFile(paramMap, mRequest);
+        } catch (Exception e) {
+            System.out.println(tempFileName + " 파일 삭제중 오류발생!!" + e.getMessage());
+        }
+
+        // Upload된 파일의 등록번호를 과제테이블에 반영하기
+        // 매뉴얼은 최종본만 관리하는 것으로 설정함. salesCd별로 기계, 전기 매뉴얼 한개씩 관리하며,
+        // 메뉴얼 이력을 관리하려면 테이블 구조를 바꿔야 함.
+        if (manualType.equals("manualMc")) {
+            paramMap.put("manualMc", paramMap.get("fileKey"));
+        } else {
+            paramMap.put("manualElec", paramMap.get("fileKey"));
+        }
+        result = wb21Mapper.updateSalesCdManual(paramMap);
+
+
+        // ---------------------------------------------------------------
+        // 이전 등록된 화일이 잇으면 삭제하기
+        // ---------------------------------------------------------------
+        List<Map<String, String>> deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), stringList);
+        if (deleteFileArr != null && deleteFileArr.size() > 0) {
+            for (Map<String, String> dtlMap : deleteFileArr) {
+                try {
+                    cm08Svc.deleteFile(dtlMap.get("fileKey"));
+                } catch (Exception e) {
+                    System.out.println(dtlMap.get("fileName") + " 파일 등록중 오류발생!!" + e.getMessage());
+                }
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // 이전 등록된 화일이 잇으면 삭제하기 끝
+        // ---------------------------------------------------------------
+
+        return result;
+    }
+
+    // 과제등록,수정시에 매뉴얼 파일 삭제하기 (등록처리는 updateSalesCdManual 함수이용)
+    @Override
+    public int deleteSalesCdManual(Map<String, String> paramMap) throws Exception {
+
+        String manualType = paramMap.get("manualCall");
+        if (manualType.equals("manualMc")) {
+            paramMap.put("manualMc", "");
+        } else {
+            paramMap.put("manualElec", "");
+        }
+        int result = wb21Mapper.updateSalesCdManual(paramMap);
+
+        // 매뉴얼 파일 등록삭제는 권한 체크 없이 처리함
+        Gson gson = new Gson();
+        Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {
+        }.getType();
+        List<Map<String, String>> deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), stringList);
+        if (deleteFileArr != null && deleteFileArr.size() > 0) {
+
+            // ---------------------------------------------------------------
+            // 첨부 화일 처리 시작
+            // ---------------------------------------------------------------
+            for (Map<String, String> dtlMap : deleteFileArr) {
+                try {
+                    cm08Svc.deleteFile(dtlMap.get("fileKey"));
+                } catch (Exception e) {
+                    System.out.println(dtlMap.get("fileName") + " 파일 삭제중 오류발생!!" + e.getMessage());
+                }
+            }
+            // ---------------------------------------------------------------
+            // 첨부 화일 처리 끝
+            // ---------------------------------------------------------------
+        }
+        return result;
+    }
+
 }
