@@ -73,58 +73,67 @@ public class PM40SvcImpl implements PM40Svc{
             rtnMap.put("workNo", newMNGM_NO);// rtnMap에 "workNo"키로 저장
 			Gson gson = new Gson();	
 			
-            List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap);
-			if (sharngChk.size() > 0) {
-                QM01Mapper.deleteWbsSharngList(paramMap);
-			}
-			
-			//공유
-			String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
-            pgParam1 += "\"gubun\":\"" + "개인" + "\",";
-			pgParam1 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
-			pgParam1 += "\"workYm\":\""+ paramMap.get("workYm") +"\",";
-			pgParam1 += "\"userId\":\""+ paramMap.get("userId") +"\",";
-			pgParam1 += "\"workNo\":\""+ paramMap.get("workNo") +"\"}";
-			
-			
-			//결재
-			String pgParam2 = "{\"actionType\":\""+ "S" +"\",";
-            pgParam2 += "\"gubun\":\"" + "개인" + "\",";
-			pgParam2 += "\"coCd\":\""+ paramMap.get("coCd") +"\","; 
-			pgParam2 += "\"workYm\":\""+ paramMap.get("workYm") +"\",";
-			pgParam2 += "\"userId\":\""+ paramMap.get("userId") +"\",";
-			pgParam2 += "\"workNo\":\""+ paramMap.get("workNo") +"\"}";
-			
-			//공유-결재
-			Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-			List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("approvalArr"), stringList2);
-			if (sharngArr != null && sharngArr.size() > 0 ) {
-				int iSharng = 1;
-				int iApproval = 1;
-		        for (Map<String, String> sharngMap : sharngArr) {
+            Boolean isMobile = false;
+            if (paramMap.containsKey("jobSource")) {
+                String value = paramMap.get("jobSource");
+                if ("MOBILE".equals(value)) {
+                    // 모바일에서 입력된것이면 결재관련 프로세스 없으므로 기존 결재정보 유지하기위하 결재정보 삭제, 추가 실행하지 않음.
+                    isMobile = true;
+                    return rtnMap;
+                } else {
+                    isMobile = false;
+                }
+            }
 
-	        	    sharngMap.put("reqNo", paramMap.get("reqNo"));
+            List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap);
+            if (sharngChk.size() > 0) {
+                QM01Mapper.deleteWbsSharngList(paramMap);
+            }
+
+            // 공유
+            String pgParam1 = "{\"actionType\":\"" + "T" + "\",";
+            pgParam1 += "\"gubun\":\"" + "개인" + "\",";
+            pgParam1 += "\"coCd\":\"" + paramMap.get("coCd") + "\",";
+            pgParam1 += "\"workYm\":\"" + paramMap.get("workYm") + "\",";
+            pgParam1 += "\"userId\":\"" + paramMap.get("userId") + "\",";
+            pgParam1 += "\"workNo\":\"" + paramMap.get("workNo") + "\"}";
+
+            // 결재
+            String pgParam2 = "{\"actionType\":\"" + "S" + "\",";
+            pgParam2 += "\"gubun\":\"" + "개인" + "\",";
+            pgParam2 += "\"coCd\":\"" + paramMap.get("coCd") + "\",";
+            pgParam2 += "\"workYm\":\"" + paramMap.get("workYm") + "\",";
+            pgParam2 += "\"userId\":\"" + paramMap.get("userId") + "\",";
+            pgParam2 += "\"workNo\":\"" + paramMap.get("workNo") + "\"}";
+
+            // 공유-결재
+            Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {
+            }.getType();
+            List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("approvalArr"), stringList2);
+            if (sharngArr != null && sharngArr.size() > 0) {
+                int iSharng = 1;
+                int iApproval = 1;
+                for (Map<String, String> sharngMap : sharngArr) {
+
+                    sharngMap.put("reqNo", paramMap.get("reqNo"));
                     sharngMap.put("fileTrgtKey", paramMap.get("workNo"));
                     sharngMap.put("salesCd", paramMap.get("workNo"));
-	        	    sharngMap.put("pgmId", paramMap.get("pgmId"));
-	        	    sharngMap.put("userId", paramMap.get("userId"));
-	        	    
-		        	if ("공유".equals(sharngMap.get("gb"))) {
+                    sharngMap.put("pgmId", paramMap.get("pgmId"));
+                    sharngMap.put("userId", paramMap.get("userId"));
+
+                    if ("공유".equals(sharngMap.get("gb"))) {
                         sharngMap.put("sanCtnSn", Integer.toString(iSharng));
                         sharngMap.put("pgParam", pgParam1);
-//                        pm40Mapper.insertWbsSharngList(sharngMap);
                         QM01Mapper.insertWbsSharngList(sharngMap);
-		                	iSharng++;
-		        	} else {
-		        		sharngMap.put("sanCtnSn",Integer.toString(iApproval));
-		        		sharngMap.put("pgParam", pgParam2);
-//		        		pm40Mapper.insertWbsApprovalList(sharngMap); 
+                        iSharng++;
+                    } else {
+                        sharngMap.put("sanCtnSn", Integer.toString(iApproval));
+                        sharngMap.put("pgParam", pgParam2);
                         QM01Mapper.insertWbsApprovalList(sharngMap);
-		                	iApproval++;
+                        iApproval++;
                         // 조치자가 팀장일경우 insertWbsApprovalList 에서 결재완료처리로 등록되므로 상태코드를 진행으로 변경하기 위해 아래 쿼리 실행함
                         // insertWbsApprovalList --> usrNm 을 todoId 에 저장하고 있음
                         if (sharngMap.get("userId").equals(sharngMap.get("usrNm"))) {
-//		                        QM01Mapper.updateReqSt(sharngMap);
                             sharngMap.put("todoCfOpn", "자체승인");
                             sharngMap.put("todoNo", sharngMap.get("reqNo"));
 
@@ -137,9 +146,9 @@ public class PM40SvcImpl implements PM40Svc{
 
                             wb20Svc.insertApprovalLine(sharngMap);
                         }
-		        	}
-		        }
-			}
+                    }
+                }
+            }
 			
 			
             // 마스터입력
@@ -164,6 +173,18 @@ public class PM40SvcImpl implements PM40Svc{
 
         int result = pm40Mapper.update_pm40(paramMap);
         Gson gson = new Gson();
+
+        Boolean isMobile = false;
+        if (paramMap.containsKey("jobSource")) {
+            String value = paramMap.get("jobSource");
+            if ("MOBILE".equals(value)) {
+                // 모바일에서 입력된것이면 결재관련 프로세스 없으므로 기존 결재정보 유지하기위하 결재정보 삭제, 추가 실행하지 않음.
+                isMobile = true;
+                return result;
+            } else {
+                isMobile = false;
+            }
+        }
 
         List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap);
         if (sharngChk.size() > 0) {
