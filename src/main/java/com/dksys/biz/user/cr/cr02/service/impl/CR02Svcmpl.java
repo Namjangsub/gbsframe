@@ -152,7 +152,7 @@ public class CR02Svcmpl implements CR02Svc {
 		// 신규 AS 수주 처리
 		if ("ORDRSDIV2".equals(param.get("ordrsDiv")) || "ORDRSDIV3".equals(param.get("ordrsDiv"))) {
 			// 고객사의 AS 프로젝트 조회
-			Map<String, String> asPrjct = bm16Mapper.selectAsPrjct(param.get("ordrsClntCd"));
+			Map<String, String> asPrjct = bm16Mapper.selectAsPrjct(param);
 
 			if (asPrjct == null) {		// AS 프로젝트가 없으면 새로 생성
 				String newPrjctSeq = String.valueOf(bm16Mapper.selectPrjctSeqNext(param)); 
@@ -426,7 +426,7 @@ public class CR02Svcmpl implements CR02Svc {
 
 		if ("ORDRSDIV2".equals(param.get("ordrsDiv")) || "ORDRSDIV3".equals(param.get("ordrsDiv"))) {
 			// 고객사의 AS 프로젝트 조회
-			Map<String, String> asPrjct = bm16Mapper.selectAsPrjct(param.get("ordrsClntCd"));
+			Map<String, String> asPrjct = bm16Mapper.selectAsPrjct(param);
 
 			if (asPrjct == null) {
 				// AS 프로젝트가 없으면 새로 생성
