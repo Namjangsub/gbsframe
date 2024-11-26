@@ -74,11 +74,11 @@ public interface CR02Mapper {
 
     List<Map<String, Object>> selectItemSalesCodeTreeList2(Map<String, String> param);
 
-	void callUpdateOrdrsNo(Map<String, String> param);
+    void callUpdateOrdrsNo(Map<String, String> param);
 
-	void callUpdateProjectMaster(Map<String, String> param);
+    void callUpdateProjectMaster(Map<String, String> param);
 
-	void callCopyOrdrs(Map<String, String> paramMap);
+    void callCopyOrdrs(Map<String, String> paramMap);
 
     int orderNoExistValidationCheck(Map<String, String> paramMap);
 
@@ -90,21 +90,19 @@ public interface CR02Mapper {
 
     int selectOrdrsKey(Map<String, String> paramMap);
 
-	int selectNoSalesCdOrdrsListPopCount(Map<String, String> param);
+    int selectNoSalesCdOrdrsListPopCount(Map<String, String> param);
 
-	List<Map<String, Object>> selectNoSalesCdOrdrsListPop(Map<String, String> param);
+    List<Map<String, Object>> selectNoSalesCdOrdrsListPop(Map<String, String> param);
 
-	String selectSalesCdLastNumberPlusOne(Map<String, String> param);
+    String selectSalesCdLastNumberPlusOne(Map<String, String> param);
 
-	void updateMainHistNo(Map<String, String> param);
+    void updateMainHistNo(Map<String, String> param);
 
-	int selectJunmooApproval(Map<String, String> param);
+    int selectJunmooApproval(Map<String, String> param);
 
-	int updateOrdrsDetailSoonban(Map<String, String> param);
+    int updateOrdrsDetailSoonban(Map<String, String> param);
 
     List<Map<String, String>> selectOrderChangeTitle(Map<String, String> paramMap);
 
-	int clmnPlanRmkUpdate(Map<String, String> dtl);
-
-    Map<String, String> selectOrdrsAmt(String fileTrgtKey);
+    int clmnPlanRmkUpdate(Map<String, String> dtl);
 }
