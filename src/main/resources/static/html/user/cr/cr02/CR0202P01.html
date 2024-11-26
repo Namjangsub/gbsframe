@@ -34,6 +34,7 @@
 
 			<input type="hidden" id="pgmId" name="pgmId" value="CR0202P01">
 			<input type="hidden" id="fileTrgtKey" name="fileTrgtKey" value="">
+			<input type="hidden" id="repstNm" name="repstNm" value="">
 			<table>
 				<colgroup>
 					<col width="10%">
@@ -212,7 +213,7 @@
 							<input type="hidden" id="prjctSeq" name="prjctSeq"><a onclick="openSecondProjectSearch(document.getElementById('prjctSeqNm').value);"><i class="i_search_w"></i></a>
 						</div>
 					</td>
-					<th>고객사PJT</th>
+					<th class="hit">고객사PJT</th>
 					<td>
 						<select id="clntPjt" name="clntPjt" data-kind="PRJCTCD" class="form-control" required  msg="고객사PJT">
 							<option value=""></option>
@@ -432,6 +433,7 @@
 		// 페이지 로드 시 초기 상태 설정
 		// toggleOrgnSalesCd();
 
+		// 수주구분 변경에 따른 적용
 		$('#ordrsDiv').on('change', function () {
 			if(actionType == "C" || actionType == "U"){
 
@@ -468,6 +470,7 @@
 			}
 		})
 
+		// 선물환 CheckList 변경에 따른 적용
 		$('#fwdExchChkList').on('change', function () {
 
 			if($("#fwdExchChkList").val() == "N"){
@@ -482,6 +485,7 @@
 
 		})
 
+		// 수주금액 변경에 따른 적용
 		$("#ordrsAmt").change(function () {
 			calclateTotalClmnAmt();
 		});
@@ -493,7 +497,7 @@
 				$("#estDeg").val("");
 			}
 		});
-		$(clntPjt).prop('disabled', true); //프로젝트 변경 불가능하세 수정
+		// $(clntPjt).prop('disabled', true); //프로젝트 변경 불가능하세 수정
 		//2024.03.04 전무님 지시로 수금정보 수정 기능 삭제 남장섭
 		// $('#ordrsPlanUpdate').on("click", function() {
 		//     ordrsPlanUpdate();
@@ -555,7 +559,7 @@
 
 	});  /* document.ready */
 
-	// 거래처 검색 함수
+	// 고객사 검색 함수
 	function openSecondClntSearch(searchValue) {
 		//등록일 경우만 팝업처리
 		// if (actionType == "C") {
@@ -563,11 +567,12 @@
 				"searchValue" : searchValue,
 				"clntDivCd"   : "CLNTDIV12"
 			};
-			openSecondModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "거래처 검색", paramObj, function (grid) {
+			openSecondModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "고객사 검색", paramObj, function (grid) {
 				var row = grid.target.getList("selected")[0];
 
 				$('#ordrsClntCd').val(row.clntCd);
 				$('#ordrsClntNm').val(row.clntNm);
+				$('#repstNm').val(row.repstNm); // 대표자도 가져오기
 
 				//$('#clntPjt').val(row.clntPjt);
 				if ($('#mngId').val() == "") {
@@ -585,6 +590,7 @@
 		// }
 	}
 
+	// 견적서번호 검색
 	function openSecondEstSearch(searchValue) {
 		var aordrsDiv = $("#ordrsDiv").val();
 
@@ -640,7 +646,7 @@
 		});
 	}
 
-	// 사용자 검색 함수
+	// 담당자 검색 함수
 	function openSecondUserSearch() {
 		//등록일 경우만 팝업처리
 		if (actionType == "C") {
@@ -651,13 +657,29 @@
 				"useYn"  : "Y"
 			};
 
-			openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function (tree) {
+			openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "담당자 검색", paramObj, function (tree) {
 				var checkedId = tree.get_checked()[0];
 				var checkedNode = tree.get_node(checkedId);
 				$("#salesEmpId").val(checkedNode.id);
 				$("#salesEmpNm").val(checkedNode.text);
 			});
 		}
+	}
+
+	// 현재날짜형식 YYYY-MM-DD
+	function currentDate() {
+		let date = new Date();
+		let year = date.getFullYear();
+		let month = String(date.getMonth() + 1).padStart(2, '0');
+		let day = String(date.getDate()).padStart(2, '0');
+		return `${year}-${month}-${day}`;
+	}
+
+	// 날짜형식 YYYY12 -> 필드에 등록된 수주일자를 기준으로 생성
+	function currentYear12() {
+		let year = $('#ordrsDt').val().replace(/-/g, "").substring(0, 4);
+		let month = 12
+		return `${year}${month}`;
 	}
 
 	// 폼 데이터 생성 함수
@@ -710,6 +732,40 @@
 		formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
 		//---------------------------------------------------------------
 		//--첨부화일 처리를 위한 부분 끝\
+		//---------------------------------------------------------------
+
+		//---------------------------------------------------------------
+		// 해당 고객사의 유무상AS 프로젝트 생성을 위한 formData
+		if ($('#ordrsDiv').val() === 'ORDRSDIV2' || $('#ordrsDiv').val() === 'ORDRSDIV3') {
+			var gridData = gridOrdrsDetail.getList();
+			var totalOrdrsQty = gridData.reduce((sum, row) => {return sum + (row.ordrsQty ? parseInt(row.ordrsQty, 10) : 0);}, 0) || 0;
+			var eqpNm = gridData.length > 0 ? gridData[0].eqpNm : '';
+			var dudtPlanDtValue = (gridData.length > 0 && gridData[0].dudtIntendDt) ? gridData[0].dudtIntendDt : currentDate();
+
+			formData.append("yyyymm", currentYear12()); 					// 계약 연월
+			formData.append("prjctNm", $('#ctrtNm').val()); 				// 프로젝트 명
+			formData.append("eqpNm", eqpNm); 								// 설비명
+			formData.append("eqpQty", totalOrdrsQty); 						// 설비 대수
+			formData.append("clntMngNm", $('#repstNm').val()); 				// 대표자명
+			formData.append("epctAmt", $('#ordrsAmt').val()); 				// 예상 물량 금액 
+			formData.append("ordrsPlanAmt", $('#ordrsAmt').val()); 			// 수주 목표 금액 
+			formData.append("ordrsAmt", $('#ordrsAmt').val()); 				// 수주 금액
+			formData.append("winbdCd", 'Y'); 								// 수주 확정
+			formData.append("winbdRmk", $('#ctrtNm').val()); 				// 영업 상황
+			formData.append("ordrsPlanDt", currentDate()); 					// 수주 예정일
+			formData.append("dsgnDt", currentDate());						// 설계 일자
+			formData.append("purchsDt", currentDate()); 					// 구매 일자
+			formData.append("prdctnDt", currentDate()); 					// 생산 일자
+			formData.append("acptncDt", currentDate()); 					// 검수 일자
+			formData.append("dlivyDt", currentDate()); 						// 출고 일자
+			formData.append("dudtPlanDt", dudtPlanDtValue); 				// 설치 시운전 완료일자
+			formData.append("prjctRmk", $("#ordrsRmk").val()); 				// 비고
+			formData.append("usrYn", 'Y'); 									// 사용 여부
+			formData.append("odrCd", 'PCHORD03');							// 구매 방법 : 기타
+			formData.append("ordrsPct", 100); 								// 100% 설정
+			formData.append("newPrdtCd", 'ORDRSDTLDIV2040'); 				// 신규 여부(작업구분) => AS
+		}
+		
 		//---------------------------------------------------------------
 
 		$.each($('#detailTable tr[name="detailRow"]'), function (idx, elem) {
@@ -1052,6 +1108,7 @@
 
 	/* 그리드 관련 함수 */
 	// 그리드 생성
+	// 수금 정보 그리드
 	const gridOrdrsPlan = new ax5.ui.grid();
 
 	gridOrdrsPlan.setConfig({
