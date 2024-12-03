@@ -156,6 +156,7 @@ public class CR02Svcmpl implements CR02Svc {
 			if (asPrjct == null) {		// AS 프로젝트가 없으면 새로 생성
 				String newPrjctSeq = String.valueOf(bm16Mapper.selectPrjctSeqNext(param)); 
 				param.put("prjctSeq", newPrjctSeq);
+				param.put("prjctNm", param.get("ctrtNm"));
 				param.put("ordrsPlanDt", param.get("ordrsDt"));
 				param.put("dsgnDt", param.get("ordrsDt"));
 				param.put("purchsDt", param.get("ordrsDt"));
@@ -421,8 +422,6 @@ public class CR02Svcmpl implements CR02Svc {
 //          param.put("ordrsNo", param.get("newOrdrsNo"));
 //        }
 
-        
-
         //---------------------------------------------------------------
 		// 프로젝트 수정 로직 Start
 		if ("ORDRSDIV2".equals(param.get("ordrsDiv")) || "ORDRSDIV3".equals(param.get("ordrsDiv"))) {
@@ -448,6 +447,7 @@ public class CR02Svcmpl implements CR02Svc {
 			if (updatePrjct == null) {
 				String newPrjctSeq = String.valueOf(bm16Mapper.selectPrjctSeqNext(param));
 				param.put("prjctSeq", newPrjctSeq);
+				param.put("prjctNm", param.get("ctrtNm"));
 				param.put("ordrsPlanDt", param.get("ordrsDt"));
 				param.put("dsgnDt", param.get("ordrsDt"));
 				param.put("purchsDt", param.get("ordrsDt"));
@@ -460,14 +460,18 @@ public class CR02Svcmpl implements CR02Svc {
 				if (originPrjct != null && isDataChanged) {
 					updatedAmt = Integer.parseInt(originPrjct.get("ordrsAmt")) - oldOrdrsAmt;
 					param2.put("prjctSeq", originPrjct.get("prjctSeq"));
+					param2.put("inpexpCd", originPrjct.get("inpexpCd"));
 					param2.put("ordrsAmt", String.valueOf(updatedAmt));
 					param2.put("epctAmt", String.valueOf(updatedAmt));
 					param2.put("ordrsPlanAmt", String.valueOf(updatedAmt));
-					if (updatedAmt != 0) {
-						bm16Mapper.updateOrdrsPrjct(param2); 
-					} else {
-						bm16Mapper.deletePrjct(param2); 
-					}
+
+                    bm16Mapper.updateOrdrsPrjct(param2);
+
+                    List<Map<String, String>> selectOrdrsPrjctCount = cr02Mapper.selectOrdrsPrjctCount(param2);
+                    int prjctCout = selectOrdrsPrjctCount.size() - 1;   // 현재 수주정보를 하나 빼기
+                    if (prjctCout == 0) {
+                        bm16Mapper.deletePrjct(param2);
+                    } 
 				}
 			} else {
                 // 수정한 데이터 기반으로 프로젝트가 있을때 주요키에 따른 금액 업데이트
@@ -490,14 +494,17 @@ public class CR02Svcmpl implements CR02Svc {
                 if (!updatePrjct.get("prjctSeq").equals(originPrjct.get("prjctSeq"))) {
                     updatedAmt = Integer.parseInt(originPrjct.get("ordrsAmt")) - oldOrdrsAmt;
                     param2.put("prjctSeq", originPrjct.get("prjctSeq"));
+					param2.put("inpexpCd", originPrjct.get("inpexpCd"));
                     param2.put("ordrsAmt", String.valueOf(updatedAmt));
                     param2.put("epctAmt", String.valueOf(updatedAmt));
                     param2.put("ordrsPlanAmt", String.valueOf(updatedAmt));
-                    if (updatedAmt != 0) {
-                        bm16Mapper.updateOrdrsPrjct(param2); 
-                    } else {
-                        bm16Mapper.deletePrjct(param2); 
-                    }
+                    bm16Mapper.updateOrdrsPrjct(param2);
+
+                    List<Map<String, String>> selectOrdrsPrjctCount = cr02Mapper.selectOrdrsPrjctCount(param2);
+                    int prjctCout = selectOrdrsPrjctCount.size() - 1;   // 현재 수주정보를 하나 빼기
+                    if (prjctCout == 0) {
+                        bm16Mapper.deletePrjct(param2);
+                    } 
                 }
                 
 			}
@@ -513,7 +520,6 @@ public class CR02Svcmpl implements CR02Svc {
             cr01Svc.updateEstConfirm(param);
         }
         cr02Mapper.updateOrdrs(param);
-
         //////////////수금정보  update 수정////////
         updateOrdrsPmntPlanProcess(param, mRequest );
 
