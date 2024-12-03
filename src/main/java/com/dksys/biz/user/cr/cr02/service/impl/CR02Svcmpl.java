@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import com.dksys.biz.admin.bm.bm16.mapper.BM16Mapper;
 import com.dksys.biz.admin.cm.cm08.mapper.CM08Mapper;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
@@ -45,6 +46,9 @@ public class CR02Svcmpl implements CR02Svc {
 
     @Autowired
     CM15Svc cm15Svc;
+
+    @Autowired
+    BM16Mapper bm16Mapper;
 
     @Autowired
     ExceptionThrower thrower;
@@ -136,6 +140,52 @@ public class CR02Svcmpl implements CR02Svc {
 
         String fileTrgtKey;
         String OrderSeq = "";
+
+		//---------------------------------------------------------------
+		// 프로젝트 자동생성 Start
+
+		// 신규 AS 수주 처리
+		if ("ORDRSDIV2".equals(param.get("ordrsDiv")) || "ORDRSDIV3".equals(param.get("ordrsDiv"))) {
+			// 고객사의 AS 프로젝트 조회
+			HashMap<String, String> param2 = new HashMap<>();
+			param2.put("ordrsAmt", param.get("ordrsAmt"));
+			int newOrdrsAmt = Integer.parseInt(param2.get("ordrsAmt"));
+
+			Map<String, String> asPrjct = bm16Mapper.selectAsPrjct(param);
+
+			if (asPrjct == null) {		// AS 프로젝트가 없으면 새로 생성
+				String newPrjctSeq = String.valueOf(bm16Mapper.selectPrjctSeqNext(param)); 
+				param.put("prjctSeq", newPrjctSeq);
+				param.put("ordrsPlanDt", param.get("ordrsDt"));
+				param.put("dsgnDt", param.get("ordrsDt"));
+				param.put("purchsDt", param.get("ordrsDt"));
+				param.put("acptncDt", param.get("ordrsDt"));
+				param.put("dlivyDt", param.get("ordrsDt"));
+				param.put("prdctnDt", param.get("ordrsDt"));
+				bm16Mapper.insertPrjct(param);
+			} else {
+				int currentOrdrAmt = Integer.parseInt(asPrjct.get("ordrsAmt"));
+				int updateOrdrAmt = currentOrdrAmt + newOrdrsAmt;
+				param.put("prjctSeq", asPrjct.get("prjctSeq"));
+				param2.put("prjctSeq", asPrjct.get("prjctSeq"));
+				param2.put("inpexpCd", asPrjct.get("inpexpCd")); 
+				param2.put("prjctCd", asPrjct.get("prjctCd")); 
+				param2.put("eqpNm", asPrjct.get("eqpNm")); 
+				param2.put("eqpQty", asPrjct.get("eqpQty")); 
+
+				param2.put("mngId", param.get("mngId"));
+				param2.put("userId", param.get("userId"));
+				param2.put("pgmId", param.get("pgmId"));
+
+				param2.put("epctAmt", String.valueOf(updateOrdrAmt));
+				param2.put("ordrsPlanAmt", String.valueOf(updateOrdrAmt));
+				param2.put("ordrsAmt", String.valueOf(updateOrdrAmt));
+				bm16Mapper.updateOrdrsPrjct(param2);
+			}
+		}
+
+		// 프로젝트 자동생성 End
+		//---------------------------------------------------------------
 
         cr01Svc.updateEstConfirm(param);
         cr02Mapper.insertOrdrs(param);
@@ -370,6 +420,91 @@ public class CR02Svcmpl implements CR02Svc {
 //          // 건양수주번호 있으면 수주번호는 건양수주번호를 따라감
 //          param.put("ordrsNo", param.get("newOrdrsNo"));
 //        }
+
+        
+
+        //---------------------------------------------------------------
+		// 프로젝트 수정 로직 Start
+		if ("ORDRSDIV2".equals(param.get("ordrsDiv")) || "ORDRSDIV3".equals(param.get("ordrsDiv"))) {
+			Map<String, String> originalOrdrsInfo = gson.fromJson(param.get("originalOrdrsInfo"), Map.class); // 기존 데이터
+
+			int newOrdrsAmt = Integer.parseInt(param.get("ordrsAmt")); // param에서 넘어온 수정한 금액
+			int oldOrdrsAmt = Integer.parseInt(originalOrdrsInfo.get("ordrsAmt"));  // 기존 금액
+            int gapOrdrsAmt = newOrdrsAmt - oldOrdrsAmt;
+            int updatedAmt; // 최종업데이트할 금액
+		
+            // 변경사항 체크(회사, 고객사PJT, 국내해외, 고객사<업체명>) -> 변경사항에 따라 새로운 프로젝트를 생성 및 업데이트
+            boolean isDataChanged = !param.get("coCd").equals(originalOrdrsInfo.get("coCd")) ||
+                                    !param.get("clntPjt").equals(originalOrdrsInfo.get("clntPjt")) ||
+                                    !param.get("inpexpCd").equals(originalOrdrsInfo.get("inpexpCd")) ||
+                                    !param.get("ordrsClntCd").equals(originalOrdrsInfo.get("ordrsClntCd"));
+
+			Map<String, String> updatePrjct = bm16Mapper.selectAsPrjct(param);              // 수정된 데이터 기반 프로젝트 조회
+			Map<String, String> originPrjct = bm16Mapper.selectAsPrjct(originalOrdrsInfo);  // 기존 프로젝트
+			
+			HashMap<String, String> param2 = new HashMap<>();
+            param2.putAll(param);
+		
+			if (updatePrjct == null) {
+				String newPrjctSeq = String.valueOf(bm16Mapper.selectPrjctSeqNext(param));
+				param.put("prjctSeq", newPrjctSeq);
+				param.put("ordrsPlanDt", param.get("ordrsDt"));
+				param.put("dsgnDt", param.get("ordrsDt"));
+				param.put("purchsDt", param.get("ordrsDt"));
+				param.put("acptncDt", param.get("ordrsDt"));
+				param.put("dlivyDt", param.get("ordrsDt"));
+				param.put("prdctnDt", param.get("ordrsDt"));
+				bm16Mapper.insertPrjct(param); 
+		
+				// 기존 프로젝트 금액 차감
+				if (originPrjct != null && isDataChanged) {
+					updatedAmt = Integer.parseInt(originPrjct.get("ordrsAmt")) - oldOrdrsAmt;
+					param2.put("prjctSeq", originPrjct.get("prjctSeq"));
+					param2.put("ordrsAmt", String.valueOf(updatedAmt));
+					param2.put("epctAmt", String.valueOf(updatedAmt));
+					param2.put("ordrsPlanAmt", String.valueOf(updatedAmt));
+					if (updatedAmt != 0) {
+						bm16Mapper.updateOrdrsPrjct(param2); 
+					} else {
+						bm16Mapper.deletePrjct(param2); 
+					}
+				}
+			} else {
+                // 수정한 데이터 기반으로 프로젝트가 있을때 주요키에 따른 금액 업데이트
+                if (updatePrjct != null) {
+                    if (isDataChanged) {
+                        updatedAmt = Integer.parseInt(updatePrjct.get("ordrsAmt")) + newOrdrsAmt;
+                    } else { 
+                        updatedAmt = Integer.parseInt(updatePrjct.get("ordrsAmt")) + gapOrdrsAmt;
+                    }
+                    param2.put("prjctSeq", updatePrjct.get("prjctSeq"));
+                    param2.put("ordrsAmt", String.valueOf(updatedAmt));
+                    param2.put("epctAmt", String.valueOf(updatedAmt));
+                    param2.put("ordrsPlanAmt", String.valueOf(updatedAmt));
+
+                    bm16Mapper.updateOrdrsPrjct(param2);
+
+                    param.put("prjctSeq", updatePrjct.get("prjctSeq")); // param에 수정한 프로젝트의 프로젝트 코드를 넣어야함
+                } 
+                // 기존프로젝트 수정
+                if (!updatePrjct.get("prjctSeq").equals(originPrjct.get("prjctSeq"))) {
+                    updatedAmt = Integer.parseInt(originPrjct.get("ordrsAmt")) - oldOrdrsAmt;
+                    param2.put("prjctSeq", originPrjct.get("prjctSeq"));
+                    param2.put("ordrsAmt", String.valueOf(updatedAmt));
+                    param2.put("epctAmt", String.valueOf(updatedAmt));
+                    param2.put("ordrsPlanAmt", String.valueOf(updatedAmt));
+                    if (updatedAmt != 0) {
+                        bm16Mapper.updateOrdrsPrjct(param2); 
+                    } else {
+                        bm16Mapper.deletePrjct(param2); 
+                    }
+                }
+                
+			}
+		}
+        
+		// 프로젝트 수정 로직 End
+		//---------------------------------------------------------------
 
         param.put("udtId", param.get("userId"));
         param.put("udtPgm", "TB_CR02M01");
@@ -930,6 +1065,42 @@ public class CR02Svcmpl implements CR02Svc {
 
     @Override
     public int deleteOrdrs(Map<String, String> paramMap) throws Exception {
+
+        // 프로젝트 삭제 로직 Start
+		//---------------------------------------------------------------
+		Map<String, String> selectOrdrsAll = cr02Mapper.selectOrdrsAll(paramMap); // 선택한 수주 정보 조회
+		if ("ORDRSDIV2".equals(selectOrdrsAll.get("ordrsDiv")) || "ORDRSDIV3".equals(selectOrdrsAll.get("ordrsDiv"))) {
+			HashMap<String, String> param2 = new HashMap<>();
+			param2.putAll(selectOrdrsAll);
+			param2.put("prjctCd", selectOrdrsAll.get("clntPjt"));
+			param2.put("userId", paramMap.get("userId"));
+			param2.put("pgmId", "CR0201P02");
+
+            Map<String, String> asPrjct = bm16Mapper.selectAsPrjct(param2);			// 고객사의 AS 프로젝트 조회
+			int totalOrdrsAmt = Integer.parseInt(asPrjct.get("ordrsAmt")); 
+			int oldOrdrsAmt = Integer.parseInt(selectOrdrsAll.get("ordrsAmt")); 
+			int updatedOrdrsAmt = totalOrdrsAmt - oldOrdrsAmt;
+
+            if (selectOrdrsAll != null) {
+                if(updatedOrdrsAmt != 0) {
+                    param2.put("prjctSeq", asPrjct.get("prjctSeq"));
+                    param2.put("eqpNm", asPrjct.get("eqpNm"));
+                    param2.put("eqpQty", asPrjct.get("eqpQty"));
+                    param2.put("epctAmt", String.valueOf(updatedOrdrsAmt));
+                    param2.put("ordrsPlanAmt", String.valueOf(updatedOrdrsAmt));
+                    param2.put("ordrsAmt", String.valueOf(updatedOrdrsAmt));
+                    bm16Mapper.updateOrdrsPrjct(param2);
+                } else {
+                    bm16Mapper.deletePrjctPrdtSeqAll(param2);
+                    bm16Mapper.deletePrjctDtlSeqAll(param2);
+                    bm16Mapper.deletePrjct(param2);
+                }
+            }
+		}
+
+		// 프로젝트 삭제 로직 End
+		//---------------------------------------------------------------
+
         //---------------------------------------------------------------
         //첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
         //   필수값 :  jobType, userId, comonCd

@@ -34,6 +34,7 @@
 
 			<input type="hidden" id="pgmId" name="pgmId" value="CR0202P01">
 			<input type="hidden" id="fileTrgtKey" name="fileTrgtKey" value="">
+			<input type="hidden" id="repstNm" name="repstNm" value="">
 			<table>
 				<colgroup>
 					<col width="10%">
@@ -358,6 +359,8 @@
 	var fileTrgtTyp = "";
 	var gridOrdrsDetaildeleteArr = [];  //수주설비&원가 삭제저장용
 
+	let originalOrdrsInfo = null; // 처음 불러온 데이터를 원본 정보
+
 	function setComboOptionCode(selectComobo) {
 		var optionCode = [];
 		postAjaxSync("/admin/cm/cm05/selectChildCodeList", {"codeKind" : selectComobo} , null, function(data) {
@@ -432,6 +435,7 @@
 		// 페이지 로드 시 초기 상태 설정
 		// toggleOrgnSalesCd();
 
+		// 수주구분 변경에 따른 적용
 		$('#ordrsDiv').on('change', function () {
 			if(actionType == "C" || actionType == "U"){
 
@@ -468,6 +472,7 @@
 			}
 		})
 
+		// 선물환 CheckList 변경에 따른 적용
 		$('#fwdExchChkList').on('change', function () {
 
 			if($("#fwdExchChkList").val() == "N"){
@@ -482,6 +487,7 @@
 
 		})
 
+		// 수주금액 변경에 따른 적용
 		$("#ordrsAmt").change(function () {
 			calclateTotalClmnAmt();
 		});
@@ -555,7 +561,7 @@
 
 	});  /* document.ready */
 
-	// 거래처 검색 함수
+	// 고객사 검색 함수
 	function openSecondClntSearch(searchValue) {
 		//등록일 경우만 팝업처리
 		// if (actionType == "C") {
@@ -563,11 +569,12 @@
 				"searchValue" : searchValue,
 				"clntDivCd"   : "CLNTDIV12"
 			};
-			openSecondModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "거래처 검색", paramObj, function (grid) {
+			openSecondModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "고객사 검색", paramObj, function (grid) {
 				var row = grid.target.getList("selected")[0];
 
 				$('#ordrsClntCd').val(row.clntCd);
 				$('#ordrsClntNm').val(row.clntNm);
+				$('#repstNm').val(row.repstNm); // 대표자도 가져오기
 
 				//$('#clntPjt').val(row.clntPjt);
 				if ($('#mngId').val() == "") {
@@ -585,6 +592,7 @@
 		// }
 	}
 
+	// 견적서번호 검색
 	function openSecondEstSearch(searchValue) {
 		var aordrsDiv = $("#ordrsDiv").val();
 
@@ -640,7 +648,7 @@
 		});
 	}
 
-	// 사용자 검색 함수
+	// 담당자 검색 함수
 	function openSecondUserSearch() {
 		//등록일 경우만 팝업처리
 		if (actionType == "C") {
@@ -651,13 +659,29 @@
 				"useYn"  : "Y"
 			};
 
-			openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function (tree) {
+			openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "담당자 검색", paramObj, function (tree) {
 				var checkedId = tree.get_checked()[0];
 				var checkedNode = tree.get_node(checkedId);
 				$("#salesEmpId").val(checkedNode.id);
 				$("#salesEmpNm").val(checkedNode.text);
 			});
 		}
+	}
+
+	// 현재날짜형식 YYYY-MM-DD
+	function currentDate() {
+		let date = new Date();
+		let year = date.getFullYear();
+		let month = String(date.getMonth() + 1).padStart(2, '0');
+		let day = String(date.getDate()).padStart(2, '0');
+		return `${year}-${month}-${day}`;
+	}
+
+	// 날짜형식 YYYY12 -> 필드에 등록된 수주일자를 기준으로 생성
+	function currentYear12() {
+		let year = $('#ordrsDt').val().replace(/-/g, "").substring(0, 4);
+		let month = 12
+		return `${year}${month}`;
 	}
 
 	// 폼 데이터 생성 함수
@@ -710,6 +734,38 @@
 		formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
 		//---------------------------------------------------------------
 		//--첨부화일 처리를 위한 부분 끝\
+		//---------------------------------------------------------------
+
+		//---------------------------------------------------------------
+		// 해당 고객사의 유무상AS 프로젝트 생성을 위한 formData
+		if ($('#ordrsDiv').val() === 'ORDRSDIV2' || $('#ordrsDiv').val() === 'ORDRSDIV3') {
+			var gridData = gridOrdrsDetail.getList();
+			var totalOrdrsQty = gridData.reduce((sum, row) => {return sum + (row.ordrsQty ? parseInt(row.ordrsQty, 10) : 0);}, 0) || 0;
+			var eqpNm = gridData.length > 0 ? gridData[0].eqpNm : '';
+			var dudtPlanDtValue = (gridData.length > 0 && gridData[0].dudtIntendDt) ? gridData[0].dudtIntendDt : currentDate();
+
+			formData.append("yyyymm", currentYear12()); 					// 계약 연월
+			formData.append("prjctNm", $('#ctrtNm').val()); 				// 프로젝트 명
+			formData.append("ctrtNm", $('#ctrtNm').val()); 					// 프로젝트 명
+			formData.append("eqpNm", eqpNm); 								// 설비명
+			formData.append("eqpQty", totalOrdrsQty); 						// 설비 대수
+			formData.append("clntMngNm", $('#repstNm').val()); 				// 대표자명
+			formData.append("epctAmt", $('#ordrsAmt').val()); 				// 예상 물량 금액 
+			formData.append("ordrsPlanAmt", $('#ordrsAmt').val()); 			// 수주 목표 금액 
+			formData.append("ordrsAmt", $('#ordrsAmt').val()); 				// 수주 금액
+			formData.append("winbdCd", 'Y'); 								// 수주 확정
+			formData.append("winbdRmk", $('#ctrtNm').val()); 				// 영업 상황
+			formData.append("dudtPlanDt", dudtPlanDtValue); 				// 설치 시운전 완료일자
+			formData.append("prjctRmk", $("#ordrsRmk").val()); 				// 비고
+			formData.append("usrYn", 'Y'); 									// 사용 여부
+			formData.append("odrCd", 'PCHORD03');							// 구매 방법 : 기타
+			formData.append("ordrsPct", 100); 								// 100% 설정
+			formData.append("newPrdtCd", 'ORDRSDTLDIV2040'); 				// 신규 여부(작업구분) => AS
+		}
+		// 원본 데이터를 추가
+		if (originalOrdrsInfo) {
+			formData.append("originalOrdrsInfo", JSON.stringify(originalOrdrsInfo));
+		}
 		//---------------------------------------------------------------
 
 		$.each($('#detailTable tr[name="detailRow"]'), function (idx, elem) {
@@ -1052,6 +1108,7 @@
 
 	/* 그리드 관련 함수 */
 	// 그리드 생성
+	// 수금 정보 그리드
 	const gridOrdrsPlan = new ax5.ui.grid();
 
 	gridOrdrsPlan.setConfig({
@@ -1793,81 +1850,7 @@
 		$("#ordrsPlanHis").show();
 		$('#pmntMtd').val('PMNTMTD01');
 
-		postAjax("/user/cr/cr02/selectOrdrsInfo", paramObj, null, function (data) {
-			var parsedData = data;
-			Object.keys(parsedData.ordrsInfo).forEach(function (key) {
-				var inputField = document.getElementById(key == 'estNo' ? 'estNoOrdrs' : key);
-				if (!inputField) return;
-
-				var value = parsedData.ordrsInfo[key];
-
-				switch (key) {
-				//    case 'ordrsDiv':
-				//        if (value == 'ORDRSDIV1') {
-				//            $('#orgnSalesCdTd,#orgnSalesCdTh').hide();
-				//        }
-				//        else {
-				//        	inputField.value = value || '';
-				//        	$('#orgnSalesCdTd,#orgnSalesCdTh').show();
-				//        }
-				//        break;
-					case 'ordrsDt':	//바닥의 다른 화면 필드와 겹치는 경우를 위하여 class에서 정의함.
-						$(".ordrsDt").val(value);
-					case 'dudtPlanDt':  //바닥의 다른 화면 필드와 겹치는 경우를 위하여 class에서 정의함.
-						// $(".dudtPlanDt").val(value);
-					case 'ordrsAmt':
-					case 'exrate':
-						inputField.value = addCommaStr(value);
-						break;
-					case 'exchangeAmt':
-						inputField.value = addCommaStr(value);
-						break;
-					default:
-						inputField.value = value || '';
-						break;
-				}
-			});
-
-			//수정시  로드 될떄 gridOrdrsPlan 그리드 데이터 불러오는 부분 (xml 파일에서 : resultInfoMap 해당 쿼리)
-			var pmntPlans = data.ordrsInfo.plans;
-			gridOrdrsPlan.setData({
-				list: pmntPlans,
-				page: {
-					totalElements: pmntPlans.length
-				}
-			});
-			//수정시  로드 될떄 orderDetails 그리드 데이터 불러오는 부분 (xml 파일에서 : resultInfoMap 해당 쿼리)
-			var ordrsDetails = data.ordrsInfo.details;
-			if ($("#coCd").val() != jwt.coCd) {
-				$("#ordrsAmt").val("0");
-				$("#exchangeAmt").val("0");
-				for (var i = 0; i < ordrsDetails.length; i++) {
-					ordrsDetails[i].ordrsAmt = 0;
-					ordrsDetails[i].exchangeAmt = 0;
-					ordrsDetails[i].ordrsPrcMach = 0;
-					ordrsDetails[i].ordrsPrcElcty = 0;
-					ordrsDetails[i].ordrsPrc = 0;
-					ordrsDetails[i].estEpctMatPrc = 0;
-				}
-
-				$("#viewHistory").hide();
-			}
-			gridOrdrsDetail.setData({
-				list: ordrsDetails,
-				page: {
-					totalElements: ordrsDetails.length
-				}
-			});
-			gridResize(ordrsDetails.length+1); //그리드 높이 조정
-			//monthCloseChk($('#ordrsDt').val());  //마감일통제 원래 위치
-			gridViewPop7.initView().setData(0);
-			gridViewPop7.target.setHeight((gridViewPop7.target.list.length+1) * 27 + 123 );//그리드 높이 조정
-
-			setDetailButton();// 설비 & 원가 정보 버튼 통제
-
-			//최초값셋팅
-			setInitSetting();
-		});
+		selectOrdrsInfo();
 
 	}
 
@@ -2031,6 +2014,87 @@
 		}
 	});
 
+	function selectOrdrsInfo() {
+		postAjax("/user/cr/cr02/selectOrdrsInfo", paramObj, null, function (data) {
+			var parsedData = data;
+
+			// 원본 데이터를 깊은 복사로 저장
+			originalOrdrsInfo = JSON.parse(JSON.stringify(parsedData.ordrsInfo));
+
+			Object.keys(parsedData.ordrsInfo).forEach(function (key) {
+				var inputField = document.getElementById(key == 'estNo' ? 'estNoOrdrs' : key);
+				if (!inputField) return;
+
+				var value = parsedData.ordrsInfo[key];
+
+				switch (key) {
+				//    case 'ordrsDiv':
+				//        if (value == 'ORDRSDIV1') {
+				//            $('#orgnSalesCdTd,#orgnSalesCdTh').hide();
+				//        }
+				//        else {
+				//        	inputField.value = value || '';
+				//        	$('#orgnSalesCdTd,#orgnSalesCdTh').show();
+				//        }
+				//        break;
+					case 'ordrsDt':	//바닥의 다른 화면 필드와 겹치는 경우를 위하여 class에서 정의함.
+						$(".ordrsDt").val(value);
+					case 'dudtPlanDt':  //바닥의 다른 화면 필드와 겹치는 경우를 위하여 class에서 정의함.
+						// $(".dudtPlanDt").val(value);
+					case 'ordrsAmt':
+					case 'exrate':
+						inputField.value = addCommaStr(value);
+						break;
+					case 'exchangeAmt':
+						inputField.value = addCommaStr(value);
+						break;
+					default:
+						inputField.value = value || '';
+						break;
+				}
+			});
+
+			//수정시  로드 될떄 gridOrdrsPlan 그리드 데이터 불러오는 부분 (xml 파일에서 : resultInfoMap 해당 쿼리)
+			var pmntPlans = data.ordrsInfo.plans;
+			gridOrdrsPlan.setData({
+				list: pmntPlans,
+				page: {
+					totalElements: pmntPlans.length
+				}
+			});
+			//수정시  로드 될떄 orderDetails 그리드 데이터 불러오는 부분 (xml 파일에서 : resultInfoMap 해당 쿼리)
+			var ordrsDetails = data.ordrsInfo.details;
+			if ($("#coCd").val() != jwt.coCd) {
+				$("#ordrsAmt").val("0");
+				$("#exchangeAmt").val("0");
+				for (var i = 0; i < ordrsDetails.length; i++) {
+					ordrsDetails[i].ordrsAmt = 0;
+					ordrsDetails[i].exchangeAmt = 0;
+					ordrsDetails[i].ordrsPrcMach = 0;
+					ordrsDetails[i].ordrsPrcElcty = 0;
+					ordrsDetails[i].ordrsPrc = 0;
+					ordrsDetails[i].estEpctMatPrc = 0;
+				}
+
+				$("#viewHistory").hide();
+			}
+			gridOrdrsDetail.setData({
+				list: ordrsDetails,
+				page: {
+					totalElements: ordrsDetails.length
+				}
+			});
+			gridResize(ordrsDetails.length+1); //그리드 높이 조정
+			//monthCloseChk($('#ordrsDt').val());  //마감일통제 원래 위치
+			gridViewPop7.initView().setData(0);
+			gridViewPop7.target.setHeight((gridViewPop7.target.list.length+1) * 27 + 123 );//그리드 높이 조정
+
+			setDetailButton();// 설비 & 원가 정보 버튼 통제
+
+			//최초값셋팅
+			setInitSetting();
+		});
+	}
 
 	function insertOrdrs() {
 		if($('#coCd').val() == 'TRN' && $('#ordrsClntCd').val() == refCode) {
