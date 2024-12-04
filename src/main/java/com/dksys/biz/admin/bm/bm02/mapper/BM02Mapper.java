@@ -56,5 +56,7 @@ public interface BM02Mapper {
 	List<Map<String, String>> selectClntPurchaseMngEmail(Map<String, String> paramMap);
 
 	Map<String, String> selectClntBusinessMngInfo(Map<String, String> paramMap);
+
+	Map<String, String> selectClntRepstNm(Map<String, String> paramMap);
 	
 }
