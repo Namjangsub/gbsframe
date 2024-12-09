@@ -202,6 +202,13 @@ function Approval(htmlParam, param, popParam) {
 	//승인 ajax
 	this.confirmApproval = function(param) {
 
+        $("#mcPartCd").closest('td').prev('th').removeClass('hit');
+        $("#mcPartCd").removeAttr('required', 'true');
+        $("#impactCd").closest('td').prev('th').removeClass('hit');
+        $("#impactCd").removeAttr('required', 'true');
+        $("#importantCd").closest('td').prev('th').removeClass('hit');
+        $("#importantCd").removeAttr('required', 'true');
+		
 		if (!inputValidation($('.popup_area [required]'))) {
 			return false;
 		}
