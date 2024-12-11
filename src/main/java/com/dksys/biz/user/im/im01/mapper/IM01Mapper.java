@@ -31,5 +31,9 @@ public interface IM01Mapper {
     int updateImprvmStsCd(Map<String, String> paramMap);
 
     int updateExecStsCd(Map<String, String> paramMap);
+
+    void updateDelApprovalList1(Map<String, String> paramMap);
+
+    void deleteDelApprovalgList1(Map<String, String> paramMap);
 	  
 }

@@ -3,6 +3,7 @@ package com.dksys.biz.user.im.im01.service.impl;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -151,6 +152,11 @@ public class IM01SvcImpl implements IM01Svc {
         // 결재라인 처리 시작
         // wb20Svc.insertTodoMaster(paramMap); 에서는 결재자 정보를 approvalArr 키값으로 처리하고 있음
         // ---------------------------------------------------------------
+
+        HashMap<String, String> wbDelChkParam = new HashMap<>();
+        wbDelChkParam.put("reqNo", paramMap.get("imprvmNo")); // 개선제안서 번호를 키로 검색함
+        im01Mapper.updateDelApprovalList1(wbDelChkParam);// TB_WB20M03 --> SET ETC_FIELD3 = 'DEL' 로 변경처리
+
         if (paramMap.containsKey("imprApprovalArr")) {
             paramMap.put("approvalArr", paramMap.get("imprApprovalArr"));
             // 결제라인 insert
@@ -161,6 +167,7 @@ public class IM01SvcImpl implements IM01Svc {
             // 결제라인 insert
             result += wb20Svc.insertTodoMaster(paramMap);
         }
+        im01Mapper.deleteDelApprovalgList1(wbDelChkParam);// TB_WB20M03 --> TRIM(ETC_FIELD3) = 'DEL' 정보 삭제처리
         // ---------------------------------------------------------------
         // 결재라인 처리 end
         // ---------------------------------------------------------------
