@@ -173,7 +173,7 @@ function Approval(htmlParam, param, popParam) {
 			$("#appBtnDiv").show();
 			$("#appConfirmAnchor").attr("onclick", "approvalConfirm()");
 			//본인 결재의견
-			let todoCfOpn = $("#appLine tr").find("font").closest("tr").find("input[name=todoCfOpn]").val();
+			let todoCfOpn = $("#appLine tr").find("font").closest("tr").find("textarea[name=todoCfOpn]").val();
 			if( todoCfOpn != "" ) {
 				$("#appConfirmAnchor").text("의견수정");
 			}
@@ -191,7 +191,7 @@ function Approval(htmlParam, param, popParam) {
     		<tr style="border-bottom:1px solid #dbdbdb;">
     			<td class="appTd">@@item1@@</td>
     			<td class="appTd">@@bold@@@@item2@@</font></td>
-    			<td class="appTd" style='text-align:left; padding-left:5px; height:25px;'><input type='text' name='todoCfOpn' value="@@item3@@" class="form-control" readonly="readonly"></td>
+    			<td class="appTd" style='text-align:left; padding-left:5px; height:25px;'><textarea type='text' name='todoCfOpn' value="@@item3@@" class="form-control" readonly="readonly"></textarea></td>
     			<td class="appTd">@@item4@@</td>
     			<td class="appTd">@@item5@@</td>
     		</tr>
@@ -216,7 +216,7 @@ function Approval(htmlParam, param, popParam) {
 		//승인 save
 		if( this.applyBtn ) {
 			//본인 결재의견
-			var todoCfOpn = $("#appLine tr").find("font").closest("tr").find("input[name=todoCfOpn]").val();
+			var todoCfOpn = $("#appLine tr").find("font").closest("tr").find("textarea[name=todoCfOpn]").val();
 			//입력값 set
 			var paramMap = {
 					  "todoId" 		: jwt.userId

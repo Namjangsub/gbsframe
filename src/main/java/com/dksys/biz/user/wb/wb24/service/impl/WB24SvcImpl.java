@@ -491,6 +491,12 @@ public class WB24SvcImpl implements WB24Svc {
 		return wb24Mapper.selectTeamManagerInfo(paramMap);
 	}
 
+    // 부서코드로 팀장 정보가져오기
+    @Override
+    public Map<String, String> selectDept2TeamManagerInfo(Map<String, String> paramMap) {
+        return wb24Mapper.selectDept2TeamManagerInfo(paramMap);
+    }
+
 	//조치담당자의 팀장 정보가져오기
 	@Override
 	public Map<String, String> selectTeamManagerSpecialInfo(Map<String, String> paramMap) {

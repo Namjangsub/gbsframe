@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.dksys.biz.admin.cm.cm16.mapper.CM16Mapper;
+import com.dksys.biz.user.im.im01.mapper.IM01Mapper;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
@@ -34,6 +35,9 @@ public class WB20SvcImpl implements WB20Svc {
 
 	@Autowired
 	CM16Mapper cm16Mapper;
+
+    @Autowired
+    IM01Mapper im01Mapper;
 
 	@Autowired
 	ExceptionThrower thrower;
@@ -142,6 +146,12 @@ public class WB20SvcImpl implements WB20Svc {
 		} else if ("TODODIV2130".equals(todoDiv2CodeId)) {
 			// ISS_STS: ISSSTS01 --> ISSSTS02 로 상태 변경처리
 			result += cm16Mapper.updateItoaIssueStChk(paramMap);
+        } else if ("TODODIV2150".equals(todoDiv2CodeId)) { // 개선 제안서 작성부서 결재라인
+            result += im01Mapper.updateImprvmStsCd(paramMap);
+            result += im01Mapper.updateImprvmReqIdTxt(paramMap);
+        } else if ("TODODIV2160".equals(todoDiv2CodeId)) { // 개선 제안서 조치부서 결재라인
+            result += im01Mapper.updateExecStsCd(paramMap);
+            result += im01Mapper.updateExecTeamIdTxt(paramMap);
 		}
 
 
@@ -210,8 +220,12 @@ public class WB20SvcImpl implements WB20Svc {
                 // 조치자가 팀장일경우 insertWbsApprovalList 에서 결재완료처리로 등록되므로 상태코드를 진행으로 변경하기 위해 아래 쿼리 실행함
                 // insertWbsApprovalList --> usrNm 을 todoId 에 저장하고 있음
                 if (dtl.get("userId").equals(dtl.get("todoId"))) {
-                    dtl.put("todoCfOpn", "자체승인");
-                    insertApprovalLine(dtl);
+                    if ("TODODIV2150".equals(dtl.get("todoDiv2CodeId")) || "TODODIV2160".equals(dtl.get("todoDiv2CodeId"))) { // 개선 제안서이면
+                        //개선 제안서이면 자체 승인처리 없음.  결재하면서 의견등록하기 위함
+                    } else {
+                        dtl.put("todoCfOpn", "자체승인");
+                        insertApprovalLine(dtl);
+                    }
                 }
 			}
 		}

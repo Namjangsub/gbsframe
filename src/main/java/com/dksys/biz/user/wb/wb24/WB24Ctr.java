@@ -165,7 +165,14 @@ public class WB24Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
-	
+
+    // 부서코드로 팀장 정보 가져오기
+    @PostMapping(value = "/selectDept2TeamManagerInfo")
+    public String selectDept2TeamManagerInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        Map<String, String> result = wb24Svc.selectDept2TeamManagerInfo(paramMap);
+        model.addAttribute("result", result);
+        return "jsonView";
+    }
 	
 	//조치담당자의 팀장 정보 가져오기
 	@PostMapping(value = "/selectTeamManagerSpecialInfo")
