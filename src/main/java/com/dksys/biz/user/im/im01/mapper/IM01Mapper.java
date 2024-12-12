@@ -35,5 +35,7 @@ public interface IM01Mapper {
     void updateDelApprovalList1(Map<String, String> paramMap);
 
     void deleteDelApprovalgList1(Map<String, String> paramMap);
+
+    void deleteImprovementNoAllList(Map<String, String> paramMap);
 	  
 }

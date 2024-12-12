@@ -211,9 +211,8 @@ public class IM01SvcImpl implements IM01Svc {
         // ---------------------------------------------------------------
         // 결재자 등록정보 일괄 삭제 처리 시작
         // ---------------------------------------------------------------
-        paramMap.put("salesCd", "");
         paramMap.put("reqNo", paramMap.get("imprvmNo"));
-        qm01Mapper.deleteWbsApprovalList(paramMap); // 개선제안서 공유, 결재 삭제
+        im01Mapper.deleteImprovementNoAllList(paramMap); // 개선제안서 공유, 결재 삭제
         // ---------------------------------------------------------------
         // 결재자 등록정보 일괄 삭제 끝
         // ---------------------------------------------------------------
