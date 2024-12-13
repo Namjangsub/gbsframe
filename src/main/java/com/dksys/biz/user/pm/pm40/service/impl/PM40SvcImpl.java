@@ -244,10 +244,7 @@ public class PM40SvcImpl implements PM40Svc{
         int result = 0;
         result = pm40Mapper.delete_pm40(paramMap);
 
-        List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap);
-        if (sharngChk.size() > 0) {
-            QM01Mapper.deleteWbsSharngList(paramMap);
-        }
+        QM01Mapper.deleteWorkReportSharngList(paramMap);
 
         return result;
     }
