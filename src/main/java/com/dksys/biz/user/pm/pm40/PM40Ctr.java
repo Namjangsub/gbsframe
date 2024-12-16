@@ -179,4 +179,12 @@ public class PM40Ctr {
 			}
         return "jsonView";
     }
+
+     // 작업일보 등록, 수정 및 삭제 방지
+    @PostMapping(value = "/monthWorkReportChk")
+    public String monthWorkReportChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        int result = pm40svc.monthWorkReportChk(paramMap);
+        model.addAttribute("result", result);
+        return "jsonView";
+    }
 }

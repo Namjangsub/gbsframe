@@ -38,4 +38,6 @@ public interface PM40Mapper {
     int select_result_count(Map<String, String> paramMap);
 
     int insert_pm40_p02(Map<String, String> paramMap);
+
+    int monthWorkReportChk(Map<String, String> paramMap);
 }

@@ -412,4 +412,12 @@ public class PM40SvcImpl implements PM40Svc{
 		public int select_result_count(Map<String, String> paramMap) {
 			return pm40Mapper.select_result_count(paramMap);
 		}
+
+    @Override
+    public int monthWorkReportChk(Map<String, String> paramMap) {
+        String workYm = paramMap.get("workRptDt").substring(0, 7).replace("-", "");
+        paramMap.put("workYm", workYm);
+
+        return pm40Mapper.monthWorkReportChk(paramMap);
+    }
 }

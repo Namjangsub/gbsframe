@@ -40,4 +40,6 @@ public interface PM40Svc {
     Map<String, String> insert_pm40_p02(Map<String, String> paramMap);
 
     Map<String, String> select_pm40_Check_Info(Map<String, String> paramMap);
+
+	int monthWorkReportChk(Map<String, String> paramMap);
 }

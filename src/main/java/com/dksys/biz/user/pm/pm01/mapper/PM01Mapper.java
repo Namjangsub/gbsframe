@@ -53,6 +53,4 @@ public interface PM01Mapper {
 	List<Map<String, String>> selectDailyWorkTripRows(Map<String, String> paramMap);
 
 	int updateTripRpt(Map<String, String> tripMap);
-
-	Map<String, String> dailyWorkConstrain(Map<String, String> paramMap);
 }

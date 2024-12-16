@@ -45,6 +45,4 @@ public interface PM01Svc {
 
 	List<Map<String, String>> selectDailyWorkTripRows(Map<String, String> paramMap);
 
-	Map<String, String> dailyWorkConstrain(Map<String, String> paramMap);
-
 }

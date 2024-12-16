@@ -369,8 +369,4 @@ public class PM01SvcImpl implements PM01Svc {
 		return pm01Mapper.selectDailyWorkTripRows(paramMap);
 	}
 
-	@Override
-    public Map<String, String> dailyWorkConstrain(Map<String, String> paramMap) {
-        return pm01Mapper.dailyWorkConstrain(paramMap);
-    }
 }
