@@ -310,4 +310,11 @@ public class PM01Ctr {
     return "jsonView";
   }
   
+  // 작업일보 등록, 수정 및 삭제 방지
+  @PostMapping(value = "/dailyWorkConstrain")
+  public String dailyWorkConstrain(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	Map<String, String> result = pm01Svc.dailyWorkConstrain(paramMap);
+    model.addAttribute("result", result);
+    return "jsonView";
+  }
 }
