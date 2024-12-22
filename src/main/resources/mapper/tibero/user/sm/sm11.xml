@@ -103,6 +103,7 @@
 		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM04%' THEN 'Y' ELSE 'N' END AS FLAG4
 		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM05%' THEN 'Y' ELSE 'N' END AS FLAG5
 		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM06%' THEN 'Y' ELSE 'N' END AS FLAG6
+		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM07%' THEN 'Y' ELSE 'N' END AS FLAG7
 		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM99%' THEN 'Y' ELSE 'N' END AS FLAG9
 		 				, B.CLNT_NM
 		 				, NVL(CR.EQP_NM, CM.CTRT_NM) AS EQP_NM			--수주상세 설비명
@@ -279,6 +280,9 @@
 						, PAY.*
 						, M.TRG_SALES_CD
 						, M.REQ_NO
+				        , M.CTRT_TOT_AMT
+				        , M.CTRT_NEGO_AMT
+				        , M.CTRT_ORDRS_QTY
 				FROM CT M
 						LEFT OUTER JOIN PLAN ON PLAN.CTRT_NO = M.CTRT_NO			--지급계획
 						LEFT OUTER JOIN PAY  ON PAY.CTRT_NO = M.CTRT_NO				--지급실적
@@ -350,6 +354,9 @@
 		        , M.VEND_HP_NO
 		        , M.VEND_MNG_MAIL
 		        , M.REQ_NO
+		        , M.CTRT_TOT_AMT
+		        , M.CTRT_NEGO_AMT
+		        , M.CTRT_ORDRS_QTY
 		FROM TB_SM11M01 M
 				LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
 				LEFT OUTER JOIN TB_CR02M01 C ON C.CO_CD = M.ORDRS_CO_CD
@@ -393,7 +400,7 @@
                  FN_CM05M01_CD_TO_NM(X.CO_CD) 			AS CO_CD_NM,
                  X.ORDRS_NO, -- 수주번호
                  X.SALES_CD, -- SALES CODE
-                 NVL2(D.SALES_CD, 'Y', 'N') 			AS CHK_SAVE_CD, 
+                 CASE WHEN NVL(D.ORDRS_AMT, 0) != 0 THEN  'Y' ELSE 'N' END 			AS CHK_SAVE_CD, 
                  Y.ORGN_SALES_CD, -- 원천 SALES CODE
                  Y.ORDRS_CLNT_CD, -- 고객사
                  A.CLNT_NM  							AS ORDRS_CLNT_NM,
@@ -405,7 +412,11 @@
                  P.PRDT_NM  PRDT_CD_NM,
                  X.ITEM_DIV, -- 아이템구분
                  FN_CM05M01_CD_TO_NM(X.ITEM_DIV) ITEM_DIV_NM,
-                 X.EQP_NM -- 설비명
+                 X.EQP_NM,	 -- 설비명
+                 X.ORDRS_QTY AS SALES_ORDRS_QTY, 
+                 D.ORDRS_QTY, 
+                 D.ORDRS_AMT,
+                 X.ORDRS_SEQ  -- SALES SEQ
             FROM TB_CR02D02 X
                   INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
                                           AND X.ORDRS_NO = Y.ORDRS_NO
@@ -413,11 +424,12 @@
                   LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터
                   LEFT OUTER JOIN TB_SM11D02 D ON X.CO_CD = D.ORDRS_CO_CD 
                   								AND X.ORDRS_NO = D.ORDRS_NO 
-                  								AND X.SALES_CD = D.SALES_CD
+                  								AND (X.SALES_CD = D.SALES_CD OR (X.SALES_CD IS NULL AND D.SALES_CD IS NULL))
+                  								AND X.ORDRS_SEQ = D.ORDRS_SEQ
                   								AND D.CTRT_NO  = #{ctrtNo}
           WHERE X.CO_CD = #{coCd}
             AND X.ORDRS_NO = #{ordrsNo}                
-            AND X.SALES_CD IS NOT NULL
+--            AND X.SALES_CD IS NOT NULL
           ORDER BY X.ORDRS_NO, X.SALES_CD
   </select>
 	
@@ -468,6 +480,9 @@
         , VEND_HP_NO
         , VEND_MNG_MAIL
         , REQ_NO
+        , CTRT_TOT_AMT
+        , CTRT_NEGO_AMT
+        , CTRT_ORDRS_QTY
       )
     VALUES
     (
@@ -506,6 +521,9 @@
         , #{vendHpNo, jdbcType=VARCHAR} -- 핸드폰
         , #{vendMngMail, jdbcType=VARCHAR} -- 이메일
         , #{reqNo, jdbcType=VARCHAR} -- 발주요청번호
+        , #{ctrtTotAmt, jdbcType=VARCHAR} -- 외주총금액
+        , #{ctrtNegoAmt, jdbcType=VARCHAR} -- 총nego금액
+        , #{ctrtOrdrsQty, jdbcType=VARCHAR} -- 총대수
     )
   </insert>
 
@@ -544,6 +562,9 @@
             , VEND_HP_NO			 = #{vendHpNo, jdbcType=VARCHAR} -- 핸드폰
             , VEND_MNG_MAIL			 = #{vendMngMail, jdbcType=VARCHAR} -- 이메일
             , REQ_NO				 = #{reqNo, jdbcType=VARCHAR} -- 발주요청번호
+            , CTRT_TOT_AMT			 = #{ctrtTotAmt, jdbcType=VARCHAR} -- 외주총금액
+            , CTRT_NEGO_AMT			 = #{ctrtNegoAmt, jdbcType=VARCHAR} -- 총nego금액
+            , CTRT_ORDRS_QTY			 = #{ctrtOrdrsQty, jdbcType=VARCHAR} -- 총nego금액
     WHERE CTRT_NO         = #{ctrtNo}
   </update>
   
@@ -563,7 +584,10 @@
 		CTRT_RMK,
 		CREAT_ID,       
 		CREAT_PGM,      
-		CREAT_DTTM
+		CREAT_DTTM,
+		ORDRS_QTY,
+		ORDRS_AMT,
+		ORDRS_SEQ
       )
     VALUES
     (
@@ -571,11 +595,14 @@
 		(SELECT NVL(max(CTRT_NO_SEQ),0)+1 FROM TB_SM11D02 WHERE CTRT_NO = #{ctrtNo}),
 		#{ordrsCoCd},
 		#{ordrsNo},
-		#{salesCd},
+		#{salesCd,  jdbcType=VARCHAR},
 		#{ctrtRmk,  jdbcType=VARCHAR},
 		#{userId},
 		#{pgmId},
-		SYSDATE
+		SYSDATE,
+		#{ordrsQty,  jdbcType=NUMERIC},
+		#{ordrsAmt,  jdbcType=NUMERIC},
+		#{ordrsSeq}
     )
   </insert>
   			
@@ -797,6 +824,7 @@
 							, CR.EQP_NM
 							, CR.ORDRS_QTY
 							, M.REQ_NO
+							, M.CTRT_ORDRS_QTY
 					FROM TB_SM11D01 P
 							LEFT OUTER JOIN TB_SM11M01 M ON P.CTRT_NO  = M.CTRT_NO  
 							LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
@@ -961,7 +989,10 @@
 			CHK_SAVE_CD,
 			CREAT_ID,       
 			CREAT_PGM,      
-			CREAT_DTTM
+			CREAT_DTTM,
+			ORDRS_QTY,
+			ORDRS_AMT,
+			ORDRS_SEQ
 		  )
 			SELECT 
 				  #{costNo}
@@ -972,6 +1003,9 @@
 				, #{userId}
 				, #{pgmId}
 				, SYSDATE
+				, ORDRS_QTY
+				, ORDRS_AMT
+				, ORDRS_SEQ
 			FROM TB_SM11D02
 			WHERE CTRT_NO = #{ctrtNo}
   </insert>
@@ -1055,6 +1089,7 @@
 						, MAX(M.CTRT_NM) 						AS CTRT_NM
 						, TO_CHAR(MAX(M.CTRT_DT), 'YYYY-MM-DD') AS CTRT_DT
 						, SUM(M.CTRT_AMT) 						AS CTRT_AMT
+						, SUM(M.CTRT_ORDRS_QTY) 				AS CTRT_ORDRS_QTY
 						, MAX(M.CTRT_RMK) 						AS CTRT_RMK
 						, COUNT(M.ORDRS_NO) 					AS CTRT_CNT
 						, max(C.CLNT_PJT)  						AS CLNT_PJT

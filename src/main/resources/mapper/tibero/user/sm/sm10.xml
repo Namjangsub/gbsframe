@@ -468,7 +468,8 @@
                  FN_CM05M01_CD_TO_NM(X.CO_CD) AS CO_CD_NM,
                  X.ORDRS_NO, -- 수주번호
                  X.SALES_CD, -- SALES CODE
-                 DECODE(D.CHK_SAVE_CD, 'PCHSCOSTDIV1030', 'Y', 'N') AS CHK_SAVE_CD, -- 저장형태 일단은 PCHSCOSTDIV1030
+--                 DECODE(D.CHK_SAVE_CD, 'PCHSCOSTDIV1030', 'Y', 'N') AS CHK_SAVE_CD, -- 저장형태 일단은 PCHSCOSTDIV1030
+                 CASE WHEN NVL(D.ORDRS_AMT, 0) != 0 THEN  'Y' ELSE 'N' END 			AS CHK_SAVE_CD, 
                  Y.ORGN_SALES_CD, -- 원천 SALES CODE
                  Y.ORDRS_CLNT_CD, -- 고객사
                  A.CLNT_NM  AS ORDRS_CLNT_NM,
@@ -486,10 +487,9 @@
                                           AND X.ORDRS_NO = Y.ORDRS_NO
                   LEFT OUTER JOIN TB_BM01M01 P ON X.PRDT_CD = P.PRDT_CD  --제품마스터
                   LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터
-                  LEFT OUTER JOIN TB_SM10D01 D ON X.CO_CD = D.CO_CD AND X.ORDRS_NO = D.ORDRS_NO AND X.SALES_CD = D.SALES_CD
+                  LEFT OUTER JOIN TB_SM10D01 D ON X.CO_CD = D.CO_CD AND X.ORDRS_NO = D.ORDRS_NO AND (X.SALES_CD = D.SALES_CD OR (X.SALES_CD IS NULL AND D.SALES_CD IS NULL))
           WHERE X.CO_CD = #{coCd}
             AND X.ORDRS_NO = #{ordrsNo}                
-            AND X.SALES_CD IS NOT NULL
       ) A
   </select>
   
@@ -502,7 +502,8 @@
                  FN_CM05M01_CD_TO_NM(X.CO_CD) AS CO_CD_NM,
                  X.ORDRS_NO, -- 수주번호
                  X.SALES_CD, -- SALES CODE
-                 NVL2(D.CHK_SAVE_CD, 'Y', 'N') AS CHK_SAVE_CD, -- 저장형태 일단은 PCHSCOSTDIV1030
+ --                NVL2(D.CHK_SAVE_CD, 'Y', 'N') AS CHK_SAVE_CD, -- 저장형태 일단은 PCHSCOSTDIV1030
+                 CASE WHEN NVL(D.ORDRS_AMT, 0) != 0 THEN  'Y' ELSE 'N' END 			AS CHK_SAVE_CD, 
                  D.CHK_SAVE_CD 				   AS CHK_SAVE_CD_ORG,
                  Y.ORGN_SALES_CD, -- 원천 SALES CODE
                  Y.ORDRS_CLNT_CD, -- 고객사
@@ -515,7 +516,11 @@
                  P.PRDT_NM  PRDT_CD_NM,
                  X.ITEM_DIV, -- 아이템구분
                  FN_CM05M01_CD_TO_NM(X.ITEM_DIV) ITEM_DIV_NM,
-                 X.EQP_NM -- 설비명
+                 X.EQP_NM, -- 설비명
+                 X.ORDRS_QTY AS SALES_ORDRS_QTY, 
+                 D.ORDRS_QTY, 
+                 D.ORDRS_AMT,
+                 X.ORDRS_SEQ  -- SALES SEQ
             FROM TB_CR02D02 X
                   INNER JOIN TB_CR02M01 Y  ON X.CO_CD = Y.CO_CD
                                           AND X.ORDRS_NO = Y.ORDRS_NO
@@ -523,11 +528,12 @@
                   LEFT OUTER JOIN TB_BM02M01 A ON Y.ORDRS_CLNT_CD = A.CLNT_CD --거래처마스터
                   LEFT OUTER JOIN TB_SM10D01 D ON X.CO_CD = D.CO_CD 
                                               AND X.ORDRS_NO = D.ORDRS_NO 
-                                              AND X.SALES_CD = D.SALES_CD
+                  							  AND (X.SALES_CD = D.SALES_CD OR (X.SALES_CD IS NULL AND D.SALES_CD IS NULL))
+                  							  AND X.ORDRS_SEQ = D.ORDRS_SEQ
                                               AND D.COST_NO = #{costNo}
           WHERE X.CO_CD = #{coCd}
             AND X.ORDRS_NO = #{ordrsNo}                
-            AND X.SALES_CD IS NOT NULL
+--            AND X.SALES_CD IS NOT NULL
           ORDER BY X.SALES_CD
       ) A
      WHERE ROWNUM BETWEEN ${firstIndex} AND ${lastIndex}
@@ -549,7 +555,10 @@
 		CHK_SAVE_CD,
 		CREAT_ID,       
 		CREAT_PGM,      
-		CREAT_DTTM
+		CREAT_DTTM,
+		ORDRS_QTY,
+		ORDRS_AMT,
+		ORDRS_SEQ
       )
     VALUES
     (
@@ -560,7 +569,10 @@
 		#{chkSaveCd,  jdbcType=VARCHAR},
 		#{userId},
 		#{pgmId},
-		SYSDATE
+		SYSDATE,
+		#{ordrsQty,  jdbcType=NUMERIC},
+		#{ordrsAmt,  jdbcType=NUMERIC},
+		#{ordrsSeq}
     )
   </insert>
   			

@@ -2,6 +2,10 @@
 	.readonly-checkbox {
 	    pointer-events: none;
 	}
+    .checkbox-container input[type="checkbox"] {
+        vertical-align: text-top;
+        margin-left: 20px;/* 선택 박스와 텍스트 사이의 간격 조정 */
+    }
 </style>
 <div class="popup_area of_a" style="width: 100%; height: 100%;">
     <div class="tit_contents">
@@ -90,7 +94,11 @@
 <!--         </tr> -->
 
         <tr>
-        	<th colspan=6 style="height: 50px"">비용정보</th>
+        	<th colspan=4 style="height: 50px">비용정보</th>
+        	<th>외주계약번호</th>
+        	<td>
+        		<input type="text" id="ctrtNo" name="ctrtNo" class="form-control">
+        	</td>
         </tr>
 
         <tr>
@@ -212,6 +220,7 @@
 				<input type="checkbox" id="CTRITEM04" name="ctrtItem" value="CTRITEM04" class="readonly-checkbox" data-label="슈퍼바이저"> 슈퍼바이저
 				<input type="checkbox" id="CTRITEM05" name="ctrtItem" value="CTRITEM05" class="readonly-checkbox" data-label="A/S"> A/S
 				<input type="checkbox" id="CTRITEM06" name="ctrtItem" value="CTRITEM06" class="readonly-checkbox" data-label="단품티칭"> 단품티칭
+				<input type="checkbox" id="CTRITEM07" name="ctrtItem" value="CTRITEM07" class="readonly-checkbox" data-label="외주용역"> 외주용역
 				<input type="checkbox" id="CTRITEM99" name="ctrtItem" value="CTRITEM99" class="readonly-checkbox" data-label="기타"> 기타
 			</div>
 			</td>
@@ -266,7 +275,32 @@
                     onDBLClick: function () {
                     },
                     onDataChanged: function () {
-//                     	console.log("선택:", this.item.__selected__, this.item.chkSaveCd);
+        				var row = this.dindex;
+        				var col = this.colIndex;
+                    	if (this.key == 'ordrsAmt'){
+                    		if (gPasIntChk(this.value) != 0) {
+	                    		turnKeyGridView.target.list[this.dindex].chkSaveCd = 'Y';
+	                    		if (gPasIntChk(this.item.ordrsQty) == 0) {
+	                    			turnKeyGridView.target.list[this.dindex].ordrsQty = this.item.salesOrdrsQty == 0 ? 1 : this.item.salesOrdrsQty;
+	                    		}
+	                    	} else {
+	                    		turnKeyGridView.target.list[this.dindex].chkSaveCd = 'N';
+	                			turnKeyGridView.target.list[this.dindex].ordrsQty = '';
+	        				}
+
+                    		let totalChkAmt = 0;
+                    		let turnKeyList = turnKeyGridView.target.getList();
+                    		if (turnKeyList.length > 0 ) {
+                    			$.each(turnKeyList, function (idx, elem) {
+                    				totalChkAmt += gPasIntChk(elem.ordrsAmt);
+                    	        });
+                    		}
+
+                    		$('#costAmt').val(addCommaStr(totalChkAmt));
+                    		
+							turnKeyGridView.target.repaint()
+                    	}
+                		
                     },
                 },
                 page: {
@@ -284,23 +318,33 @@
 				columns : [
 					{key : "coCd", 			  label : "회사",          hidden : true},
 					{key : "coCdNm", 		  label : "회사명",        align : "center", 	width : 80, hidden : true},
-					{key : "ordrsNo", 		  label : "수주번호",      align : "center", 	width : 60},
-					{key : "salesCd", 		  label : "Sales Code",   align : "left", 	width : 170},
-// 					{key : "eqpNm", 		  label : "설비명",        align : "center", width : 240},
-					{key : "eqpNm", 		  label : "설비명",        align : "left", 	width : "*"},
-					{key : "chkSaveCd" ,	  label : "턴키여부",		align: "center",	width: 60, align: "center", formatter: function () { return this.value =="Y" ? "대상":""; }},
+					{key : "ordrsNo", 		  label : "수주번호",      align : "center", 	width : 60, styleClass: function () { return (gPasIntChk(this.item.ordrsAmt) != 0)?"grid-no-msg-font-blue-bold":""; }},
+					{key : "ordrsSeq", 		  label : "순번",   		align : "center", 	width : 40, styleClass: function () { return (gPasIntChk(this.item.ordrsAmt) != 0)?"grid-no-msg-font-blue-bold":""; }},
+					{key : "salesCd", 		  label : "Sales Code",   align : "left", 	width : 170, styleClass: function () { return (gPasIntChk(this.item.ordrsAmt) != 0)?"grid-no-msg-font-blue-bold":""; }}, 
+					{key : "salesOrdrsQty",   label : "주문대수",   	align : "center",	width : 60, formatter: "money", styleClass: function () { return (gPasIntChk(this.item.ordrsAmt) != 0)?"grid-no-msg-font-blue-bold":""; }}, 
+					{key : "eqpNm", 		  label : "설비명",        align : "left", 	width : "*", styleClass: function () { return (gPasIntChk(this.item.ordrsAmt) != 0)?"grid-no-msg-font-blue-bold":""; }},
+					{key : "chkSaveCd" ,	  label : "턴키여부",		align: "center",	width: 60, formatter: function () { return this.value =="Y" ? "대상":""; }},
+					{key : "ordrsQty" ,	  	  label : "외주대수",		align: "center",	width: 60, editor: {type: "number"}, formatter: "money", styleClass: function () { return "grid-font-red"; }},
+					{key : "ordrsAmt" ,	  	  label : "외주금액",		align: "right",		width: 100, editor: {type: "number"}, formatter: "money", styleClass: function () { return "grid-font-red"; }},
 					{key : "ordrsClntCd", 	  label : "고객사",        hidden : true},
-					{key : "ordrsClntNm", 	  label : "고객사명",      align : "left", width : 160},
+					{key : "ordrsClntNm", 	  label : "고객사명",      align : "left", width : 150, styleClass: function () { return (gPasIntChk(this.item.ordrsAmt) != 0)?"grid-no-msg-font-blue-bold":""; }},
 					{key : "clntPjt", 		  label : "고객사 PJT",    align : "center", width : 100, hidden : true},
-					{key : "clntPjtNm", 	  label : "프로젝트",    	align : "center", width : 80, hidden : false},
+					{key : "clntPjtNm", 	  label : "프로젝트",    	align : "center", width : 80, styleClass: function () { return (gPasIntChk(this.item.ordrsAmt) != 0)?"grid-no-msg-font-blue-bold":""; }},
 					{key : "ordrsDtlDiv20",   label : "신작구분",      hidden : true},
-					{key : "ordrsDtlDiv20Nm", label : "신작구분",      align : "center", width : 60},
+					{key : "ordrsDtlDiv20Nm", label : "신작구분",      align : "center", width : 60, styleClass: function () { return (gPasIntChk(this.item.ordrsAmt) != 0)?"grid-no-msg-font-blue-bold":""; }},
 					{key : "prdtCd", 		  label : "제품구분",      hidden : true},
-					{key : "prdtCdNm", 		  label : "제품",        align : "left", width : 180},
+					{key : "prdtCdNm", 		  label : "제품",        align : "left", width : 180, styleClass: function () { return (gPasIntChk(this.item.ordrsAmt) != 0)?"grid-no-msg-font-blue-bold":""; }},
 					{key : "itemDiv", 		  label : "아이템구분",    align : "center", width: 100, hidden : true},
-					{key : "itemDivNm", 	  label : "아이템",    align : "left", width: 120},
-					{key : "orgnSalesCd", 	  label : "원 Sales Code", align : "left", width : 140},
-				]
+					{key : "itemDivNm", 	  label : "아이템",    align : "left", width: 120, styleClass: function () { return (gPasIntChk(this.item.ordrsAmt) != 0)?"grid-no-msg-font-blue-bold":""; }},
+					{key : "orgnSalesCd", 	  label : "원 Sales Code", align : "left", width : 140, styleClass: function () { return (gPasIntChk(this.item.ordrsAmt) != 0)?"grid-no-msg-font-blue-bold":""; }},
+				],
+        	    footSum: [
+        	        [
+        	            {label: "외주합계", align: "center", colspan: 6},
+        	            {key: "ordrsQty", 	collector: "sum", formatter: "money", align: "center"},
+        	            {key: "ordrsAmt", 	collector: "sum", formatter: "money", align: "right"},
+        	        ]
+        	    ],
             });
             return this;
         },
@@ -533,6 +577,12 @@
 				} else {
 					$('#actionBtn').show();
 				}
+				//ctrtNo  --> 외주관리에서 넘어온 자료인경우 수정안됨
+				if (data.result.ctrtNo != undefined && data.result.ctrtNo != "") {
+					//턴키에서 자동생성자료인경우 수정 불가영역 설정함.
+					$('#popForm input, #popForm textarea, #popForm select').prop('disabled', true);
+					$('#actionBtn').hide();
+				}
 				
 				//계산서 발행완료일경우
 // 				if (data.result.BILL_YN == "Y") {
@@ -597,20 +647,30 @@
 		});
 		// 폼데이터 생성
 		var formData = new FormData($("#popForm")[0]);
-		let firstSalesCd = "";
 		//턴키면 턴키 등록용 그리드
+		let firstSalesCd = "";//대표 Sales Code 저장용
+		let totalChkAmt = 0;
+		let ctrtOrdrsQty = 0;
 // 		if($("#pchsCostDiv10").val() == "PCHSCOSTDIV1030"){
-			let turnKeyList = turnKeyGridView.target.getList("selected");
+			let turnKeyList = turnKeyGridView.target.getList();
 			if (turnKeyList.length > 0 ) {
 				$.each(turnKeyList, function (idx, elem) {
 					// 턴키여부 대상만 저장
 					turnKeyList[idx].chkSaveCd = $("#pchsCostDiv10").val();
 					if (idx==0) firstSalesCd = turnKeyList[idx].salesCd; //SalesCd는 상세내역에 있음. 대표 세일즈코드 (선택된것중에 첫번째)
+					totalChkAmt += gPasIntChk(elem.ordrsAmt);
+					ctrtOrdrsQty += gPasIntChk(elem.ordrsQty);
 		        });
 				formData.append("detailArr", JSON.stringify(turnKeyList));
 			}
 // 		}
-
+		//외주관리에서 넘어온 자료가 아니면 (외주관리에서 자동생성된 자료는 번호가 있음 CTRTxxxxxx)
+		if ($('#ctrtNo').val() == "") {
+			if (totalChkAmt !=  gPasIntChk($('#costAmt').val()) ) {	
+		        alert('상세 내역금액(외주금액합계)과 구매비용이 상이합니다. 확인 바랍니다.');
+				return false;
+			}
+		}
 		formData.append("salesCd", firstSalesCd);	//SalesCd는 상세내역에 있음. 대표 세일즈코드 (선택된것중에 첫번째)
 		
 		//---------------------------------------------------------------  

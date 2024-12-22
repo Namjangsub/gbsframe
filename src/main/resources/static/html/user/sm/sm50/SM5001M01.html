@@ -44,6 +44,7 @@
 <script src="/static/js/ax5/ax5grid-inline-editor.js"></script>
 <script src="https://unpkg.com/exceljs/dist/exceljs.min.js"></script>
 <script src="/static/js/global.js"></script>
+<script src="/static/js/fileTree.js"></script>
 <!-- 도움말 팝업 -->
 <script src="/static/js/manualPopup.js"></script>
 <style>
@@ -207,7 +208,7 @@
 			<div style="float: right;">
 				<a id="treeExpandBtn" class="btn btn-default btn-sm" onclick="treeExpandClose()"><i class="fas fa-chevron-up"></i></a>
 			</div>          
-            <div id="deptTree" style="height: 690px;  width: 100%;" ></div>
+            <div id="deptTree" style="height: 710px;  width: 100%;" ></div>
         </div>
       </div>
       <div id="gridFrame" class="col-xs-10 resizable-div" style="padding-left: 0; padding-right: 0px;min-height:247px;">
@@ -218,7 +219,7 @@
           <div class="add_btn_small pdl10" style="margin: 0px; padding: 0px;">
 		    <a onclick="jsonToExcel(firstGrid);" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a> 
           </div>
-            <div data-ax5grid="first-grid" data-ax5grid-config="{}" style="height: 690px;  min-height:200px;"></div>
+            <div data-ax5grid="first-grid" data-ax5grid-config="{}" style="height: 710px;  min-height:200px;"></div>
 			<div data-ax5grid="grid_excel" data-ax5grid-config="{}" style="display: none;"></div>
         </div>
       </div>
@@ -279,13 +280,13 @@
 		           {key: "postProcAmt",     label: "후처리",      	align: "right",   	width: 90, formatter: "money", styleClass: function () { return gridStyle(this.item); }},
 		           {key: "etcAmt",      	label: "기타",      		align: "right",   	width: 90, formatter: "money", styleClass: function () { return gridStyle(this.item); }},  
 					]},          
-		           {key: "", label: "", width: 3, styleClass: function () {return "grid-cell-red";},},     
-		           {key: "dsgnNo", 		label: "도면번호", 	width: 200,align: "left",  hidden: false, styleClass: function () { return gridStyle(this.item); }},
+		           {key: "", label: "", width: 3, styleClass: function () {return "grid-cell-red";},},   
+	               {key: "matrRmk", 	label: "비고", 		width: 200,align: "left", styleClass: function () { return gridStyle(this.item); }},  
 	               {key: "clntNm", 		label: "공급사", 		width: 140,align: "left", styleClass: function () { return gridStyle(this.item); }},
+		           {key: "dsgnNo", 		label: "도면번호", 	width: 200,align: "left",  hidden: false, styleClass: function () { return gridStyle(this.item); }},
  	               {key: "matrUpr", 	label: "단가", 		width: 80,align: "right", formatter:"money", styleClass: function () { return gridStyle(this.item); }},
  	               {key: "partAmt", 	label: "금액", 		width: 80,align: "right", formatter:"money", styleClass: function () { return gridStyle(this.item); }},
  	               {key: "matrAvrgUpr", 	label: "평균단가", 		width: 80,align: "right", formatter:"money", styleClass: function () { return gridStyle(this.item); }},
-	               {key: "matrRmk", 	label: "비고", 		width: 200,align: "left", styleClass: function () { return gridStyle(this.item); }},
 	               {key: "matrMat", 	label: "소재/제조사", 	width: 100,align: "left", styleClass: function () { return gridStyle(this.item); }},
 	               {key: "matrSpec", 	label: "형번/규격", 	width: 160,align: "left", styleClass: function () { return gridStyle(this.item); }},
 	               {key: "matrSize", 	label: "크기", 		width: 160,align: "left", styleClass: function () { return gridStyle(this.item); }},
@@ -330,7 +331,7 @@
 // 						this.self.select(this.doindex);
 					},                
 					onDBLClick: function () {
-		        		gridFromCreateBom(this.item);
+						openCtrtDetailNew(this.item);
 		        	},
 		        	onDataChanged: function () {
 					},
@@ -443,7 +444,7 @@
 			});			
 			// 사이즈 조정 시 태그 자동 크기 조절
 			$("#treeFrame").resize(function() {
-				var workWidth = $("#main_area").width() - 10;
+				var workWidth = $("#main_area").width() - 20;
 				
 			    var tagHeight = $("#treeFrame").height() ;
 			    var tagWidth  = $("#treeFrame").width();
@@ -463,8 +464,9 @@
 			    chgWidth = (tagWidth + chgWidth) > workWidth ?  (workWidth - tagWidth) : chgWidth;
 			    $("#gridFrame").width(chgWidth);
 			});			
-			
 			authChk("SM5001M01");
+
+			$("#gridFrame").resize()
       });
 		      
   	// 트리 초기화
@@ -668,36 +670,61 @@
 			"salesCd"	: $('#salesCd_S').val()
 		}
 		postAjax("/user/cr/cr02/salesCdSearchOrderInfo", formData, null, function(data) {
-			if (data.result == undefined) {
-				$('#clntNm_S').val("");
-				$('#clntPjt').val("");
-				$('#clntPjtNm').val("");
-				$('#prdtCd').val("");
-				$('#prdtCdNm').val("");
-				$('#itemDiv').val("");
-				$('#itemDivNm').val("");
-				$('#ordrsNo').val("");
-				$('#eqpNm').val("");
-				trgtPchsPcost = 0;
-				$('#trgtPchsPcost').val(addCommaStr(trgtPchsPcost)+"원");
-				$('#trgtPchsPcostPct').val("0%");
+			// 폼 필드와 데이터 매핑
+			const fields = {
+			    ordrsClntNm	: '#clntNm_S',
+			    clntPjt		: '#clntPjt',
+			    clntPjtNm	: '#clntPjtNm',
+			    prdtCd		: '#prdtCd',
+			    prdtCdNm	: '#prdtCdNm',
+			    itemDiv		: '#itemDiv',
+			    itemDivNm	: '#itemDivNm',
+			    ordrsNo		: '#ordrsNo',
+			    eqpNm		: '#eqpNm'
+			};
+			function setFormFields(fields, data = {}) {
+			    Object.keys(fields).forEach(key => {
+			        const value = data[key] || ""; // 데이터가 없으면 빈 값으로 설정
+			        $(fields[key]).val(value);
+			    });
+			}
+			// 데이터 처리
+			if (data.result === undefined) {
+			    setFormFields(fields); // 모든 필드를 빈 값으로 설정
+			    trgtPchsPcost = 0;
+			    $('#trgtPchsPcost').val(addCommaStr(trgtPchsPcost) + "원");
+			    $('#trgtPchsPcostPct').val("0%");
 			} else {
-				$('#clntNm_S').val(data.result.ordrsClntNm);
-				$('#clntPjt').val(data.result.clntPjt);
-				$('#clntPjtNm').val(data.result.clntPjtNm);
-				$('#prdtCd').val(data.result.prdtCd);
-				$('#prdtCdNm').val(data.result.prdtCdNm);
-				$('#itemDiv').val(data.result.itemDiv);
-				$('#itemDivNm').val(data.result.itemDivNm);
-				$('#ordrsNo').val(data.result.ordrsNo);
-				$('#eqpNm').val(data.result.eqpNm);
-				trgtPchsPcost = gPasIntChk(data.result.totCost);
-				$('#trgtPchsPcost').val(addCommaStr(trgtPchsPcost)+"원");
-				$('#trgtPchsPcostPct').val("0%");
+			    setFormFields(fields, data.result); // 데이터를 폼에 바인딩
+			    trgtPchsPcost = gPasIntChk(data.result.totCost);
+			    $('#trgtPchsPcost').val(addCommaStr(trgtPchsPcost) + "원");
+			    $('#trgtPchsPcostPct').val("0%");
 			}
 		});
 	}
-	  
+
+	//턴키비용 팝업
+	function openCtrtDetailNew(param) {
+		if (param.coCd == "undefined" || param.coCd == "") {
+			alert("행을 선택해 주십시오.")
+			return;
+		}
+		//외주관리 아니면 Pass
+		if (!param.id.includes('CTRT'))  return false;
+		
+		var paramObj = {
+			"actionType"  : "T",
+			"ctrtNo"      : param.id,
+			"coCd" 	      : param.coCd,
+	       	"userId"      : jwt.userId,
+	       	"pgmId"       : "SM1101P01"
+		};
+		openModal("/static/html/user/sm/sm11/SM1101P01.html", 1500, $('body').height()-50, "", paramObj, function(data) {
+			gridView.setData(0);
+		});
+	}
+	
+	
 	</script>
   </body>
 </html>
