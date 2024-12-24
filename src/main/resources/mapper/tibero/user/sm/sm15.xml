@@ -27,6 +27,7 @@
 			 	    , SUM(AS_AMT) 			AS AS_AMT
 			 	    , SUM(AS_PAY_AMT) 		AS AS_PAY_AMT
 			 	    , SUM(AS_NON_PAY_AMT) 	AS AS_NON_PAY_AMT
+			 	    , SUM(HUMAN_AMT) 		AS HUMAN_AMT
 			 	    
 			 	    , SUM(PCHS_GOODS_AMT) 	AS PCHS_GOODS_AMT
 			 	    , SUM(RAW_MAT_AMT) 		AS RAW_MAT_AMT
@@ -54,6 +55,7 @@
 				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV03', 0, 'GOODSDIV07', 0, 'GOODSDIV08', 0, decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT) ))  	AS GER_AMT	--운송비('GOODSDIV08')는 제외
 				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV03', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT) ,0))  									AS ELEC_AMT
 				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV07', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT),0))  									AS TRUN_AMT
+				    		, 0 																																	AS HUMAN_AMT
 
 							, SUM(decode(J.GOODS_DIV,'GOODSDIV08', 0, decode(Q.PART_CD,'COBTP03',0,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT)))  	AS STD_AMT	--정상금액 --운송비('GOODSDIV08')는 제외
 							, SUM(decode(J.GOODS_DIV,'GOODSDIV08', 0, decode(Q.PART_CD,'COBTP03',IPGO.IN_DTL_AMT,0)))  							AS BAD_AMT --장애금액 --운송비('GOODSDIV08')는 제외
@@ -102,44 +104,41 @@
 						    , NVL(E.REQ_NO,'REQ9999999')  		AS REQ_NO
 						    , ED.SALES_CD
 							, E.COST_NO
-					 	    , 0 AS IN_QTY
-					 	    , 0 AS BAD_QTY
-					 	    , SUM(NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT)) 		AS COST_AMT
+					 	    , 0									AS IN_QTY
+					 	    , 0									AS BAD_QTY
+					 	    , SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0)))) 		AS IN_DTL_AMT
 					 	    , MIN(E.COST_DT) 		AS MIN_COST_DT
 					 	    , max(E.COST_DT) 		AS COST_DT
 			 	    		, '비용' 					AS STS
-			 	    		, SUM(decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1050', 0, 'PCHSCOSTDIV1030', 0, decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT))))   AS GER_AMT
-			 	    		, SUM(decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1050', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT)),0))  AS ELEC_AMT	--전기비용
-			 	    		, SUM(decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1030', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT)),0))  AS TRUN_AMT	--턴키비용
+			 	    		, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1050', 0, 'PCHSCOSTDIV1030', 0, decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0)))))   AS GER_AMT
+			 	    		, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1050', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0)),0)))  AS ELEC_AMT	--전기비용
+			 	    		, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1030', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0)),0)))  AS TRUN_AMT	--턴키비용
+			 	    		, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',NVL(ED.ORDRS_AMT, 0),0))  AS HUMAN_AMT	--외주용역
+			 	    		
+							, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'',NVL(ED.ORDRS_AMT, 0),'COBTP03',0,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0))))  	AS STD_AMT	--정상금액
+							, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP03',NVL(ED.ORDRS_AMT, 0),0)))  							AS BAD_AMT --장애금액
+							, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',NVL(ED.ORDRS_AMT, 0),'COBTP05',NVL(ED.ORDRS_AMT, 0),0)))  	AS AS_AMT --AS유무상금액
+							, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',NVL(ED.ORDRS_AMT, 0),0)))  	AS AS_PAY_AMT --AS유상금액
+							, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP05',NVL(ED.ORDRS_AMT, 0),0)))  	AS AS_NON_PAY_AMT --AS무상금액
 	 	    		
---			 	    		, MAX(EC.SL_CNT) 		AS SL_CNT
-							, SUM(decode(Q.PART_CD,'',NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT),'COBTP03',0,'COBTP04',0,'COBTP05',0,NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT)))  	AS STD_AMT	--정상금액
-							, SUM(decode(Q.PART_CD,'COBTP03',NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT),0))  							AS BAD_AMT --장애금액
-							, SUM(decode(Q.PART_CD,'COBTP04',NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT),
-												   'COBTP05',NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT),0))  	AS AS_AMT --AS유무상금액
-							, SUM(decode(Q.PART_CD,'COBTP04',NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT),0))  	AS AS_PAY_AMT --AS유상금액
-							, SUM(decode(Q.PART_CD,'COBTP05',NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT),0))  	AS AS_NON_PAY_AMT --AS무상금액
 			 	    		, 0
 			 	    		, 0
 			 	    		, 0
 			 	    		, 0
 			 	    		, 0
 			 	    		, 0
-			 	    		, SUM(decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL2(EC.SL_CNT,ROUND(E.COST_AMT/EC.SL_CNT,0),E.COST_AMT)))
+			 	    		, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0))))
 				    		, max(Q.PART_CD) AS PART_CD /* 발주분류명 */	
 				    		, max(Q.REQ_CD) AS REQ_CD   /* 발주요청구분명 */	
 				    		, max(Q.ORDRG_ID) AS ORDRG_ID /* 발주발행자명 */
 						FROM TB_SM10M01 E		/* 구매비용 */	
 								LEFT OUTER JOIN TB_SM10D01 ED ON E.COST_NO = ED.COST_NO
 								LEFT OUTER JOIN TB_BM02M01 D ON E.PCHS_CLNT_CD = D.CLNT_CD
-								LEFT OUTER JOIN (	SELECT    CO_CD
-															, COST_NO
-															, COUNT(SALES_CD) SL_CNT
-													  FROM TB_SM10D01 ED
-													  GROUP BY  CO_CD, COST_NO)	EC ON E.COST_NO = EC.COST_NO
 								LEFT OUTER JOIN TB_QM01M01 Q ON E.REQ_NO = Q.REQ_NO
+				             	LEFT OUTER JOIN TB_SM11M01 Y ON E.CTRT_NO  = Y.CTRT_NO   --외주계약마스터
 						WHERE 1 = 1
 						AND E.PCHS_CLNT_CD != 2	--건양트루넷이 구매처가 아닌것만 취합함
+						AND E.CTRT_NO IS NULL		--외주턴키계약건 제외처리
 					<!-- 회사코드 -->         
 					<if test="coCd != null and !coCd.equals('')">
 						AND E.CO_CD = #{coCd}   
@@ -156,6 +155,62 @@
 						AND NVL2(E.PCHS_NO,'Y','N') = #{cmpletYn}
 					</if>  
 						GROUP BY E.CO_CD, ED.SALES_CD, E.REQ_NO, E.COST_NO
+					UNION ALL --턴키비용집계현황
+						SELECT
+						      E.CO_CD
+						    , NVL(E.REQ_NO,'REQ9999999')  		AS REQ_NO
+						    , ED.SALES_CD
+							, E.CTRT_NO				AS COST_NO		--ORDRG_NO
+					 	    , SUM(ED.ORDRS_QTY)		AS IN_QTY
+					 	    , 0 					AS BAD_QTY
+					 	    , SUM(NVL(ED.ORDRS_AMT, 0)) 		AS COST_AMT
+					 	    , MIN(E.CTRT_DT) 		AS MIN_COST_DT
+					 	    , max(E.CTRT_DT) 		AS COST_DT
+			 	    		, '턴키' 					AS STS
+			 	    		, 0   					AS GER_AMT
+			 	    		, 0  					AS ELEC_AMT	--전기비용
+			 	    		, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0))))  AS TRUN_AMT	--턴키비용
+				    		, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',NVL(ED.ORDRS_AMT, 0),0)) 											  AS HUMAN_AMT
+				    		
+							, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'',NVL(ED.ORDRS_AMT, 0),'COBTP03',0,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0))))  	AS STD_AMT	--정상금액
+							, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP03',NVL(ED.ORDRS_AMT, 0),0)))  							AS BAD_AMT --장애금액
+							, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',NVL(ED.ORDRS_AMT, 0),
+												   'COBTP05',NVL(ED.ORDRS_AMT, 0),0)))  	AS AS_AMT --AS유무상금액
+							, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',NVL(ED.ORDRS_AMT, 0),0)))  	AS AS_PAY_AMT --AS유상금액
+							, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP05',NVL(ED.ORDRS_AMT, 0),0)))  	AS AS_NON_PAY_AMT --AS무상금액
+			 	    		, 0
+			 	    		, 0
+			 	    		, 0
+			 	    		, 0
+			 	    		, 0
+			 	    		, 0
+			 	    		, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0))))	  AS ETC_AMT
+				    		, max(Q.PART_CD) 		AS PART_CD /* 발주분류명 */	
+				    		, max(Q.REQ_CD) 		AS REQ_CD   /* 발주요청구분명 */	
+				    		, max(Q.ORDRG_ID) 		AS ORDRG_ID /* 발주발행자명 */
+						FROM TB_SM11D02 ED
+								LEFT OUTER JOIN TB_SM11M01 E ON ED.CTRT_NO = E.CTRT_NO
+								LEFT OUTER JOIN TB_BM02M01 D ON E.CLNT_CD = D.CLNT_CD
+								LEFT OUTER JOIN TB_QM01M01 Q ON E.REQ_NO = Q.REQ_NO
+						WHERE 1 = 1
+						AND E.CLNT_CD != 2	--건양트루넷이 구매처가 아닌것만 취합함
+						AND ED.ORDRS_AMT IS NOT NULL
+					<!-- 회사코드 -->         
+					<if test="coCd != null and !coCd.equals('')">
+						AND E.CO_CD = #{coCd}   
+					</if>
+					<if test="salesCd != null and !salesCd.equals('')">
+						AND ED.SALES_CD LIKE '%'|| #{salesCd} || '%'   
+					</if>
+					<!-- 매입구분 N: 발주,  Y:비용,  R:반품 -->         
+					<if test="pchsGb != null and !pchsGb.equals('')">
+					    AND 'Y' = #{pchsGb}
+					</if>  
+					<!-- 확정여부 -->       
+					<if test="cmpletYn != null and cmpletYn != ''">         
+						AND NVL2(E.PCHS_NO,'Y','N') = #{cmpletYn}
+					</if>  
+						GROUP BY E.CO_CD, ED.SALES_CD, E.REQ_NO, E.CTRT_NO
 					UNION ALL	
 						SELECT 
 							  E.CO_CD
@@ -172,6 +227,7 @@
 			 	    		, SUM(decode(J.GOODS_DIV,'GOODSDIV03', 0, 'GOODSDIV07', 0, 'GOODSDIV08', 0, R.RET_DTL_AMT))  AS GER_AMT  --운송비('GOODSDIV08')는 제외ㅍ
 			 	    		, SUM(decode(J.GOODS_DIV,'GOODSDIV03', R.RET_DTL_AMT,0))  AS ELEC_AMT
 			 	    		, SUM(decode(J.GOODS_DIV,'GOODSDIV07', R.RET_DTL_AMT,0))  AS TRUN_AMT
+			 	    		, 0														  AS HUMAN_AMT
 							, SUM(decode(J.GOODS_DIV,'GOODSDIV08', 0, R.RET_DTL_AMT))  		AS STD_AMT	--정상금액  --운송비('GOODSDIV08')는 제외
 							, 0  															AS BAD_AMT --장애금액
 							, 0  															AS AS_AMT --AS유무상금액
@@ -248,6 +304,7 @@
 			 	    , SUM(AS_AMT) 			AS AS_AMT
 			 	    , SUM(AS_PAY_AMT) 		AS AS_PAY_AMT
 			 	    , SUM(AS_NON_PAY_AMT) 	AS AS_NON_PAY_AMT
+			 	    , SUM(HUMAN_AMT) 		AS HUMAN_AMT
 			 	    
 			 	    , SUM(PCHS_GOODS_AMT) 	AS PCHS_GOODS_AMT
 			 	    , SUM(RAW_MAT_AMT) 		AS RAW_MAT_AMT
@@ -275,6 +332,7 @@
 				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV03', 0, 'GOODSDIV07', 0, 'GOODSDIV08', 0, decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT) ))  	AS GER_AMT	--운송비('GOODSDIV08')는 제외
 				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV03', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT) ,0))  									AS ELEC_AMT
 				    		, SUM(decode(J.GOODS_DIV,'GOODSDIV07', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT),0))  									AS TRUN_AMT
+				    		, 0 																																	AS HUMAN_AMT
 
 							, SUM(decode(J.GOODS_DIV,'GOODSDIV08', 0, decode(Q.PART_CD,'COBTP03',0,'COBTP04',0,'COBTP05',0,IPGO.IN_DTL_AMT)))  	AS STD_AMT	--정상금액 --운송비('GOODSDIV08')는 제외
 							, SUM(decode(J.GOODS_DIV,'GOODSDIV08', 0, decode(Q.PART_CD,'COBTP03',IPGO.IN_DTL_AMT,0)))  							AS BAD_AMT --장애금액 --운송비('GOODSDIV08')는 제외
@@ -323,37 +381,38 @@
 						    , NVL(E.REQ_NO,'REQ9999999')  		AS REQ_NO
 						    , ED.SALES_CD
 							, E.COST_NO
-					 	    , SUM(ED.ORDRS_QTY)		AS IN_QTY
-					 	    , 0 					AS BAD_QTY
-					 	    , SUM(NVL(ED.ORDRS_AMT, 0)) 		AS COST_AMT
+					 	    , 0									AS IN_QTY
+					 	    , 0									AS BAD_QTY
+					 	    , SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0)))) 		AS IN_DTL_AMT
 					 	    , MIN(E.COST_DT) 		AS MIN_COST_DT
 					 	    , max(E.COST_DT) 		AS COST_DT
 			 	    		, '비용' 					AS STS
-			 	    		, SUM(decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1050', 0, 'PCHSCOSTDIV1030', 0, decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0))))   AS GER_AMT
-			 	    		, SUM(decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1050', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0)),0))  AS ELEC_AMT	--전기비용
-			 	    		, SUM(decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1030', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0)),0))  AS TRUN_AMT	--턴키비용
-
---			 	    		, MAX(EC.SL_CNT) 		AS SL_CNT
-							, SUM(decode(Q.PART_CD,'',NVL(ED.ORDRS_AMT, 0),'COBTP03',0,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0)))  	AS STD_AMT	--정상금액
-							, SUM(decode(Q.PART_CD,'COBTP03',NVL(ED.ORDRS_AMT, 0),0))  							AS BAD_AMT --장애금액
-							, SUM(decode(Q.PART_CD,'COBTP04',NVL(ED.ORDRS_AMT, 0),
-												   'COBTP05',NVL(ED.ORDRS_AMT, 0),0))  	AS AS_AMT --AS유무상금액
-							, SUM(decode(Q.PART_CD,'COBTP04',NVL(ED.ORDRS_AMT, 0),0))  	AS AS_PAY_AMT --AS유상금액
-							, SUM(decode(Q.PART_CD,'COBTP05',NVL(ED.ORDRS_AMT, 0),0))  	AS AS_NON_PAY_AMT --AS무상금액
+			 	    		, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1050', 0, 'PCHSCOSTDIV1030', 0, decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0)))))   AS GER_AMT
+			 	    		, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1050', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0)),0)))  AS ELEC_AMT	--전기비용
+			 	    		, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(E.PCHS_COST_DIV10,'PCHSCOSTDIV1030', decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0)),0)))  AS TRUN_AMT	--턴키비용
+			 	    		, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',NVL(ED.ORDRS_AMT, 0),0))  AS HUMAN_AMT	--외주용역
+			 	    		
+							, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'',NVL(ED.ORDRS_AMT, 0),'COBTP03',0,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0))))  	AS STD_AMT	--정상금액
+							, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP03',NVL(ED.ORDRS_AMT, 0),0)))  							AS BAD_AMT --장애금액
+							, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',NVL(ED.ORDRS_AMT, 0),'COBTP05',NVL(ED.ORDRS_AMT, 0),0)))  	AS AS_AMT --AS유무상금액
+							, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',NVL(ED.ORDRS_AMT, 0),0)))  	AS AS_PAY_AMT --AS유상금액
+							, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP05',NVL(ED.ORDRS_AMT, 0),0)))  	AS AS_NON_PAY_AMT --AS무상금액
+	 	    		
 			 	    		, 0
 			 	    		, 0
 			 	    		, 0
 			 	    		, 0
 			 	    		, 0
 			 	    		, 0
-			 	    		, SUM(decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0)))	  AS ETC_AMT
-				    		, max(Q.PART_CD) 		AS PART_CD /* 발주분류명 */	
-				    		, max(Q.REQ_CD) 		AS REQ_CD   /* 발주요청구분명 */	
-				    		, max(Q.ORDRG_ID) 		AS ORDRG_ID /* 발주발행자명 */
+			 	    		, SUM(decode(Y.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0))))
+				    		, max(Q.PART_CD) AS PART_CD /* 발주분류명 */	
+				    		, max(Q.REQ_CD) AS REQ_CD   /* 발주요청구분명 */	
+				    		, max(Q.ORDRG_ID) AS ORDRG_ID /* 발주발행자명 */
 						FROM TB_SM10M01 E		/* 구매비용 */	
 								LEFT OUTER JOIN TB_SM10D01 ED ON E.COST_NO = ED.COST_NO
 								LEFT OUTER JOIN TB_BM02M01 D ON E.PCHS_CLNT_CD = D.CLNT_CD
 								LEFT OUTER JOIN TB_QM01M01 Q ON E.REQ_NO = Q.REQ_NO
+				             	LEFT OUTER JOIN TB_SM11M01 Y ON E.CTRT_NO  = Y.CTRT_NO   --외주계약마스터
 						WHERE 1 = 1
 						AND E.PCHS_CLNT_CD != 2	--건양트루넷이 구매처가 아닌것만 취합함
 						AND E.CTRT_NO IS NULL		--외주턴키계약건 제외처리
@@ -387,21 +446,22 @@
 			 	    		, '턴키' 					AS STS
 			 	    		, 0   					AS GER_AMT
 			 	    		, 0  					AS ELEC_AMT	--전기비용
-			 	    		, SUM(decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0)))  AS TRUN_AMT	--턴키비용
-
-							, SUM(decode(Q.PART_CD,'',NVL(ED.ORDRS_AMT, 0),'COBTP03',0,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0)))  	AS STD_AMT	--정상금액
-							, SUM(decode(Q.PART_CD,'COBTP03',NVL(ED.ORDRS_AMT, 0),0))  							AS BAD_AMT --장애금액
-							, SUM(decode(Q.PART_CD,'COBTP04',NVL(ED.ORDRS_AMT, 0),
-												   'COBTP05',NVL(ED.ORDRS_AMT, 0),0))  	AS AS_AMT --AS유무상금액
-							, SUM(decode(Q.PART_CD,'COBTP04',NVL(ED.ORDRS_AMT, 0),0))  	AS AS_PAY_AMT --AS유상금액
-							, SUM(decode(Q.PART_CD,'COBTP05',NVL(ED.ORDRS_AMT, 0),0))  	AS AS_NON_PAY_AMT --AS무상금액
+			 	    		, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0))))  AS TRUN_AMT	--턴키비용
+				    		, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',NVL(ED.ORDRS_AMT, 0),0)) 											  AS HUMAN_AMT
+				    		
+							, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'',NVL(ED.ORDRS_AMT, 0),'COBTP03',0,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0))))  	AS STD_AMT	--정상금액
+							, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP03',NVL(ED.ORDRS_AMT, 0),0)))  							AS BAD_AMT --장애금액
+							, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',NVL(ED.ORDRS_AMT, 0),
+												   'COBTP05',NVL(ED.ORDRS_AMT, 0),0)))  	AS AS_AMT --AS유무상금액
+							, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',NVL(ED.ORDRS_AMT, 0),0)))  	AS AS_PAY_AMT --AS유상금액
+							, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP05',NVL(ED.ORDRS_AMT, 0),0)))  	AS AS_NON_PAY_AMT --AS무상금액
 			 	    		, 0
 			 	    		, 0
 			 	    		, 0
 			 	    		, 0
 			 	    		, 0
 			 	    		, 0
-			 	    		, SUM(decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0)))	  AS ETC_AMT
+			 	    		, SUM(decode(E.CTRT_ITEMS,'CTRITEM07',0,decode(Q.PART_CD,'COBTP04',0,'COBTP05',0,NVL(ED.ORDRS_AMT, 0))))	  AS ETC_AMT
 				    		, max(Q.PART_CD) 		AS PART_CD /* 발주분류명 */	
 				    		, max(Q.REQ_CD) 		AS REQ_CD   /* 발주요청구분명 */	
 				    		, max(Q.ORDRG_ID) 		AS ORDRG_ID /* 발주발행자명 */
@@ -444,6 +504,7 @@
 			 	    		, SUM(decode(J.GOODS_DIV,'GOODSDIV03', 0, 'GOODSDIV07', 0, 'GOODSDIV08', 0, R.RET_DTL_AMT))  AS GER_AMT  --운송비('GOODSDIV08')는 제외ㅍ
 			 	    		, SUM(decode(J.GOODS_DIV,'GOODSDIV03', R.RET_DTL_AMT,0))  AS ELEC_AMT
 			 	    		, SUM(decode(J.GOODS_DIV,'GOODSDIV07', R.RET_DTL_AMT,0))  AS TRUN_AMT
+			 	    		, 0														  AS HUMAN_AMT
 							, SUM(decode(J.GOODS_DIV,'GOODSDIV08', 0, R.RET_DTL_AMT))  		AS STD_AMT	--정상금액  --운송비('GOODSDIV08')는 제외
 							, 0  															AS BAD_AMT --장애금액
 							, 0  															AS AS_AMT --AS유무상금액
@@ -593,7 +654,7 @@
 					, ROUND(ED.ORDRS_AMT/ED.ORDRS_QTY,0) 		AS IN_PRC
 					, ED.ORDRS_QTY								AS IN_QTY
 					, 0
-					, NVL(ED.ORDRS_QTY, 0)						AS IN_DTL_AMT
+					, NVL(ED.ORDRS_AMT, 0)						AS IN_DTL_AMT
 					, E.CURR_CD
 					, E.EXRATE
 					, E.COST_RMK
@@ -686,7 +747,7 @@
 					, ROUND(ED.ORDRS_AMT/ED.ORDRS_QTY,0) 		AS IN_PRC
 					, ED.ORDRS_QTY								AS IN_QTY
 					, 0
-					, NVL(ED.ORDRS_QTY, 0)						AS IN_DTL_AMT
+					, NVL(ED.ORDRS_AMT, 0)						AS IN_DTL_AMT
 					, E.CURR_CD
 					, E.EXRATE
 					, E.CTRT_RMK
