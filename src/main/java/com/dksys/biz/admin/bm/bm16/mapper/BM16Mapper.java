@@ -75,4 +75,8 @@ public interface BM16Mapper {
 
   int deleteProjectIssue(Map<String, String> paramMap);
 
+  Map<String, String> selectAsPrjct(Map<String, String> param);
+
+  int updateOrdrsPrjct(Map<String, String> param);
+
 }
