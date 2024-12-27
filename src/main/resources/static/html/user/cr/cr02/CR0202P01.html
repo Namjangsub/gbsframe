@@ -205,11 +205,11 @@
 					</td>
 
 					<!-- 빈값추가 -->
-					<th>프로젝트명</th>
+					<th class="hit" id="prjctTh">프로젝트명</th>
 					<td>
 						<div class="search_form">
 							<input type="text" id="prjctSeqNm" name="prjctSeqNm"  onkeydown="if(event.keyCode==13)openSecondProjectSearch(this.value);" readonly  msg="프로젝트명">
-							<input type="hidden" id="prjctSeq" name="prjctSeq"><a onclick="openSecondProjectSearch(document.getElementById('prjctSeqNm').value);"><i class="i_search_w"></i></a>
+							<input type="hidden" id="prjctSeq" name="prjctSeq"><a id="searchButton" onclick="openSecondProjectSearch(document.getElementById('prjctSeqNm').value);"><i class="i_search_w"></i></a>
 						</div>
 					</td>
 					<th>고객사PJT</th>
@@ -358,6 +358,8 @@
 	var fileTrgtTyp = "";
 	var gridOrdrsDetaildeleteArr = [];  //수주설비&원가 삭제저장용
 
+	let originalOrdrsInfo = null; // 처음 불러온 데이터를 원본 정보
+
 	function setComboOptionCode(selectComobo) {
 		var optionCode = [];
 		postAjaxSync("/admin/cm/cm05/selectChildCodeList", {"codeKind" : selectComobo} , null, function(data) {
@@ -394,7 +396,7 @@
 
 		$("#mngIdNm").val(jwt.userNm);
 		$("#mngId").val(jwt.userId);
-
+		
 		$('#fwdExchJoinDt').datepicker({
 			format: "yyyy-mm-dd",
 			language: "ko",
@@ -432,11 +434,25 @@
 		// 페이지 로드 시 초기 상태 설정
 		// toggleOrgnSalesCd();
 
+		// 고객사PJT 변경에 따른 적용
+		$('#clntPjt').on('change', function () {
+			$('#prjctSeqNm').val('');
+    		$('#prjctSeq').val('');
+		})
+		$('#inpexpCd').on('change', function () {
+			$('#prjctSeqNm').val('');
+			$('#prjctSeq').val('');
+		})
+
+		// 수주구분 변경에 따른 적용
 		$('#ordrsDiv').on('change', function () {
 			if(actionType == "C" || actionType == "U"){
+				$('#prjctSeqNm').val('');
+				$('#prjctSeq').val('');
 
 				const data = [];
 				const tempOrdrsDiv = $("#ordrsDiv").val();
+				const gridData = gridOrdrsDetail.getList();
 				if(tempOrdrsDiv == "ORDRSDIV3"){	//AS무상
 					$("#ordrsAmtTh").removeClass('hit');
 					$("#currCdTh").removeClass('hit');
@@ -456,6 +472,13 @@
 //         	                totalElements: data.length
 //         	            }
 //         	        });
+					gridData.forEach((row, index) => {
+						gridOrdrsDetail.setValue(index, "ordrsPrcMach", "");
+						gridOrdrsDetail.setValue(index, "ordrsPrcElcty", "");
+						gridOrdrsDetail.setValue(index, "ordrsPrc", "");
+					});
+					gridOrdrsDetail.repaint();
+
 				}else if(tempOrdrsDiv == "ORDRSDIV8" || tempOrdrsDiv == "ORDRSDIV9"){	//수주취소, 가수주
 					$("#ordrsAmtTh").removeClass('hit');
 					$("#currCdTh").removeClass('hit');
@@ -465,9 +488,31 @@
 					$("#currCdTh").addClass('hit');
 					$('#ordrsAmt').removeAttr('readonly', 'true');
 				}
+				if (tempOrdrsDiv === "ORDRSDIV2" || tempOrdrsDiv === "ORDRSDIV3") {
+					$('#prjctSeqNm').prop('disabled', true); 
+					$('#searchButton').addClass('hidden'); 
+					$('#clntPjt').prop('disabled', false);
+					gridData.forEach((row, index) => {
+						gridOrdrsDetail.setValue(index, "ordrsDtlDiv20", "ORDRSDTLDIV2040");
+					});
+					gridOrdrsDetail.repaint();
+					$("#prjctTh").removeClass('hit');
+				} else {
+					$('#prjctSeqNm').prop('disabled', false); 
+					$('#searchButton').removeClass('hidden');
+					$('#clntPjt').prop('disabled', true);
+					$('#clntPjt').val('');
+					gridData.forEach((row, index) => {
+						gridOrdrsDetail.setValue(index, "ordrsDtlDiv20", "ORDRSDTLDIV2010");
+					});
+					gridOrdrsDetail.repaint();
+					$("#prjctTh").addClass('hit');
+				}
 			}
 		})
 
+
+		// 선물환 CheckList 변경에 따른 적용
 		$('#fwdExchChkList').on('change', function () {
 
 			if($("#fwdExchChkList").val() == "N"){
@@ -482,6 +527,7 @@
 
 		})
 
+		// 수주금액 변경에 따른 적용
 		$("#ordrsAmt").change(function () {
 			calclateTotalClmnAmt();
 		});
@@ -555,7 +601,7 @@
 
 	});  /* document.ready */
 
-	// 거래처 검색 함수
+	// 고객사 검색 함수
 	function openSecondClntSearch(searchValue) {
 		//등록일 경우만 팝업처리
 		// if (actionType == "C") {
@@ -563,7 +609,7 @@
 				"searchValue" : searchValue,
 				"clntDivCd"   : "CLNTDIV12"
 			};
-			openSecondModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "거래처 검색", paramObj, function (grid) {
+			openSecondModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "고객사 검색", paramObj, function (grid) {
 				var row = grid.target.getList("selected")[0];
 
 				$('#ordrsClntCd').val(row.clntCd);
@@ -585,6 +631,7 @@
 		// }
 	}
 
+	// 견적서번호 검색
 	function openSecondEstSearch(searchValue) {
 		var aordrsDiv = $("#ordrsDiv").val();
 
@@ -640,7 +687,7 @@
 		});
 	}
 
-	// 사용자 검색 함수
+	// 담당자 검색 함수
 	function openSecondUserSearch() {
 		//등록일 경우만 팝업처리
 		if (actionType == "C") {
@@ -651,7 +698,7 @@
 				"useYn"  : "Y"
 			};
 
-			openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function (tree) {
+			openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "담당자 검색", paramObj, function (tree) {
 				var checkedId = tree.get_checked()[0];
 				var checkedNode = tree.get_node(checkedId);
 				$("#salesEmpId").val(checkedNode.id);
@@ -711,6 +758,11 @@
 		//---------------------------------------------------------------
 		//--첨부화일 처리를 위한 부분 끝\
 		//---------------------------------------------------------------
+
+		// 원본 데이터를 추가
+		if (originalOrdrsInfo) {
+			formData.append("originalOrdrsInfo", JSON.stringify(originalOrdrsInfo));
+		}
 
 		$.each($('#detailTable tr[name="detailRow"]'), function (idx, elem) {
 			var detailObj = {};
@@ -1052,6 +1104,7 @@
 
 	/* 그리드 관련 함수 */
 	// 그리드 생성
+	// 수금 정보 그리드
 	const gridOrdrsPlan = new ax5.ui.grid();
 
 	gridOrdrsPlan.setConfig({
@@ -1795,6 +1848,9 @@
 
 		postAjax("/user/cr/cr02/selectOrdrsInfo", paramObj, null, function (data) {
 			var parsedData = data;
+			// 원본 데이터를 깊은 복사로 저장
+			originalOrdrsInfo = JSON.parse(JSON.stringify(parsedData.ordrsInfo));
+
 			Object.keys(parsedData.ordrsInfo).forEach(function (key) {
 				var inputField = document.getElementById(key == 'estNo' ? 'estNoOrdrs' : key);
 				if (!inputField) return;
@@ -1961,15 +2017,17 @@
 
 	$("#addDetailButton").on("click", function () {
 		var row;
+		var date = dateToStr(new Date());
 		var newRowData = {
 			ordrsDtlDiv10 : "ORDRSDTLDIV1010",
 			prdtCd : "NVF",
 			itemDiv : "ITEMLIST01",
-			ordrsDtlDiv20 : "ORDRSDTLDIV2010",
+			ordrsDtlDiv20: ($('#ordrsDiv').val() === 'ORDRSDIV2' || $('#ordrsDiv').val() === 'ORDRSDIV3') ? "ORDRSDTLDIV2040" : "ORDRSDTLDIV2010",
 			ordrsDtlDiv30 : "ORDRSDTLDIV3010",
 			mctype : "MCT01",
 			salesCd : "",
 			eqpNm : "",
+			dudtIntendDt : date,
 			ordrsPrcMach : 0,
 			ordrsPrcElcty : 0,
 			ordrsQty : 0,
@@ -2030,7 +2088,6 @@
 			}
 		}
 	});
-
 
 	function insertOrdrs() {
 		if($('#coCd').val() == 'TRN' && $('#ordrsClntCd').val() == refCode) {
@@ -2144,7 +2201,7 @@
 					// ordrsDtlDiv10 : row.ordrsDtlDiv10,
 					prdtCd : row.prdtCd,
 					itemDiv : row.itemDiv,
-					ordrsDtlDiv20 : row.ordrsDtlDiv20,
+					ordrsDtlDiv20: ($('#ordrsDiv').val() === 'ORDRSDIV2' || $('#ordrsDiv').val() === 'ORDRSDIV3') ? "ORDRSDTLDIV2040" : row.ordrsDtlDiv20,
 					ordrsDtlDiv30 : row.ordrsDtlDiv30,
 					orgnSalesCd : row.salesCd,
 					eqpNm : row.eqpNm,
@@ -2519,6 +2576,16 @@
 			$("#ordrsAmtTh").addClass('hit');
 			$("#currCdTh").addClass('hit');
 			$('#ordrsAmt').removeAttr('readonly', 'true');
+		}
+		if ($("#ordrsDiv").val() == "ORDRSDIV2" || $("#ordrsDiv").val() == "ORDRSDIV3") {
+			$('#prjctTh').removeClass('hit')
+			$('#prjctSeqNm').prop('disabled', true); 
+			$('#searchButton').addClass('hidden'); 
+			$('#clntPjt').prop('disabled', false);
+		} else {
+			$('#prjctSeqNm').prop('disabled', false); 
+			$('#searchButton').removeClass('hidden');
+			$('#clntPjt').prop('disabled', true);
 		}
 		setInitInsert();
 	}
