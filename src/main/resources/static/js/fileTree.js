@@ -146,7 +146,11 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 									//첨부파일 이미지뷰
 									let tempType = this.item.fileType.toLowerCase();
 									if (tempType == 'jpg' || tempType == 'jpeg' || tempType == 'png' || tempType == 'gif') {
-										imageViewPopup(fileKey, this.item.fileName);
+										const imageList = this.self.list.filter(item => {
+											const fileType = item.fileType.toLowerCase();
+											return fileType === 'jpg' || fileType === 'jpeg' || fileType === 'png' || fileType === 'gif';
+										});
+										imageViewPopup(fileKey, this.item.fileName, imageList);
 									} else {
 										downLoadFile(fileKey, this.item.fileName);
 									}
