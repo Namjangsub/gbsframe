@@ -2401,11 +2401,12 @@ function gPasFloatChk (value) {
 
 
 //이미지뷰 팝업
-function imageViewPopup(_fileKey, _filename) {
+function imageViewPopup(_fileKey, _filename, fileList) {
 
 	var paramObj = {
 			"fileKey" 	: _fileKey,
 			"fileName" 	: _filename,
+			"fileList"  : fileList
 		};
 	openThirdModal("/static/html/cmn/modal/attachImageView.html", $('body').width()-40, $('body').height()-50, _filename, paramObj, function(data) {
 	});
