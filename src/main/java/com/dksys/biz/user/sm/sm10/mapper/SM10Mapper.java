@@ -38,5 +38,7 @@ public interface SM10Mapper {
 
   //매입확정자료가 존재하는제 체크하기
   int deletePchsCostCheck(Map<String, String> paramMap);
+
+    Map<String, String> selectPchsCostInfoByCostNo(Map<String, String> paramMap);
   
 }

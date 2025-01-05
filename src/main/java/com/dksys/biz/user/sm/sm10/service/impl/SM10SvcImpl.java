@@ -1,7 +1,6 @@
 package com.dksys.biz.user.sm.sm10.service.impl;
 
 import java.lang.reflect.Type;
-import java.text.Format.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -11,13 +10,12 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.user.sm.sm10.mapper.SM10Mapper;
-import com.dksys.biz.user.sm.sm10.service.SM10Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.user.sm.sm10.mapper.SM10Mapper;
+import com.dksys.biz.user.sm.sm10.service.SM10Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -47,7 +45,15 @@ public class SM10SvcImpl implements SM10Svc {
 
   @Override
   public Map<String, String> selectPchsCostInfo(Map<String, String> paramMap) {
-    return sm10Mapper.selectPchsCostInfo(paramMap);
+        String fileTrgtKey = paramMap.get("fileTrgtKey");
+
+        if (fileTrgtKey != null && fileTrgtKey.startsWith("COST")) {
+            // fileTrgtKey가 "COST"로 시작할 때의 처리
+            return sm10Mapper.selectPchsCostInfoByCostNo(paramMap);
+        } else {
+            // fileTrgtKey가 "COST"로 시작하지 않을 때의 처리
+            return sm10Mapper.selectPchsCostInfo(paramMap);
+        }
   }
 
   @Override
@@ -236,7 +242,8 @@ public class SM10SvcImpl implements SM10Svc {
 
 	
 	/* 메일발송 yn*/
-	public int updateMailEtcPchsOrderConfirm(Map<String, String> param) {
+	@Override
+    public int updateMailEtcPchsOrderConfirm(Map<String, String> param) {
 		int result = 0;
 		result += sm10Mapper.updateMailEtcPchsOrderConfirm(param);
 		return result;
