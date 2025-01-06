@@ -2401,7 +2401,7 @@ function gPasFloatChk (value) {
 
 
 //이미지뷰 팝업
-function imageViewPopup(_fileKey, _filename, fileList) {
+function imageViewPopup(_fileKey, _filename, fileList = []) {
 
 	var paramObj = {
 			"fileKey" 	: _fileKey,
