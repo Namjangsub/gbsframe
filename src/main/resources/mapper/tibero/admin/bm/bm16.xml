@@ -943,258 +943,21 @@
 
 	<select id="selectPrjctPlanCount" resultType="int">
         /*대일정계획 selectPrjctPlanCount */
-				WITH SJD AS --수주상세 
-					     ( 
-					      SELECT M.CO_CD                                                    AS CO_CD              --회사코드
-					            , (SELECT FN_CM05M01_CD_TO_NM(M.CO_CD) FROM DUAL)           AS CO_NM              --회사명 
-					            , M.ORDRS_NO                                                 AS ORDRS_NO           --수주번호
-					            , X.SALES_CD                                                 AS SALES_CD           --SALES Code
-					            , TO_CHAR(M.ORDRS_CLNT_CD)                                   AS CLNT_CD            --고객코드
-					            , C.CLNT_NM                                                  AS CLNT_NM            --고객명
-					            , M.CLNT_PJT                                                 AS CLNT_PJT           --고객사프로젝트 
-					            , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)        AS CLNT_PJT_NM        --고객사프로젝트명
-					            , X.EQP_NM                                                   AS EQP_NM             --설비명 
-					            , X.ORDRS_QTY                                                AS ORDRS_QTY          --수주수량 
-					            , X.ORDRS_DTL_DIV20                                          AS ORDRS_DTL_DIV20    --작업구분
-					            , (SELECT FN_CM05M01_CD_TO_NM(X.ORDRS_DTL_DIV20) FROM DUAL) AS ORDRS_DTL_DIV20_NM --작업구분명
-					            --, M.CTRT_DOC                                                 AS CTRT_DOC           --계약문서 
-					            , FN_CM05M01_CD_TO_NM(M.CTRT_DOC)                          AS CTRT_DOC           --계약문서 
-					            , TO_CHAR(X.DUDT_INTEND_DT, 'YYYY-MM-DD')                    AS DUDT_INTEND_DT     --납기예정일 
-					            , TO_CHAR(M.ORDRS_DT, 'YYYY-MM-DD')                          AS ORDRS_DT           --수주확정일
-				            	  , W.WBS_PLAN_CODE_ID   --계획 LVL1 Code
-					              , (SELECT FN_CM05M01_CD_TO_NM(W.WBS_PLAN_CODE_ID) FROM DUAL) AS PLAN_CD_NM        --계획 LVL1 명
-					              , TO_CHAR(W.WBS_PLANE_DT, 'YYYY-MM-DD') 					   AS PLANE_DT           --계획종료일
-					         FROM TB_CR02M01  M --수주마스터
-					              INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
-					              LEFT OUTER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
-						          LEFT OUTER JOIN TB_WB22M01 AS W ON X.CO_CD    = W.CO_CD 
-											                     AND X.SALES_CD = W.SALES_CD
-											                     AND W.WBS_PLAN_CODE_KIND = 'WBSCODE'
-					        WHERE 1=1
-					          AND M.CO_CD = #{coCd}
-					          AND M.ORDRS_DT <![CDATA[>=]]> TO_DATE(#{strtDt}, 'YYYYMMDD')
-					          AND M.ORDRS_DT <![CDATA[<=]]> TO_DATE(#{endDt}, 'YYYYMMDD')
-							  AND X.SALES_CD IS NOT NULL
-					        <if test="salesCd != null and !salesCd.equals('')">
-					          AND X.SALES_CD LIKE '%' || #{salesCd} || '%'
-					        </if>
-					        <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
-					          AND M.ORDRS_CLNT_CD = #{ordrsClntCd}
-					        </if>
-					        <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
-					          AND C.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'
-					        </if>
-					        <if test="clntPjt != null and !clntPjt.equals('')">
-					         AND M.CLNT_PJT IN ( ${clntPjt} )
-					        </if>
-					        <if test='planCheck == "Y"'>
-							  AND  EXISTS (SELECT * FROM TB_WB22M01 PL
-										   WHERE X.SALES_CD = PL.SALES_CD 
-										)
-					        </if>
-					        <if test='planCheck == "N"'>
-							  AND  NOT EXISTS (SELECT * FROM TB_WB22M01 PL
-										   WHERE X.SALES_CD = PL.SALES_CD 
-										)
-					        </if>
-					        <if test='planPrjct == "B"'>
-							  AND  1=2
-					        </if>
-					     )
-					    , PJT AS 
-					      (
-					       SELECT CO_CD
-					            , CO_NM
-					       	    , SALES_CD
-					       	    , CLNT_CD
-					       	    , CLNT_NM
-					       	    , CLNT_PJT
-					       	    , CLNT_PJT_NM        --고객사프로젝트명
-					       	    , EQP_NM             --설비명 
-					       	    , ORDRS_QTY          --수주수량
-					       	    , ORDRS_DTL_DIV20    --작업구분
-					       	    , ORDRS_DTL_DIV20_NM --작업구분명
-					       	    , CTRT_DOC           --계약문서 
-					       	    , DUDT_INTEND_DT     --예상납기일자
-					       	    , ORDRS_DT           --수주예정일자
-					       	    , CASE WHEN COL_DT = 'DSGN_DT'   THEN '설계완료'
-					                   WHEN COL_DT = 'PURCHS_DT' THEN '구매완료'
-					                   WHEN COL_DT = 'PRDCTN_DT' THEN '기계조립완료'
-					                   WHEN COL_DT = 'ACPTNC_DT' THEN '고객검수'
-					                   WHEN COL_DT = 'DLIVY_DT'  THEN '출고'
-					              END PLAN_CD_NM        --계획 LVL1 명
-									 
-					       	    , DT_VAL AS PLANE_DT
-					         FROM (
-					               SELECT T.CO_CD                                                AS CO_CD
-					                    , FN_CM05M01_CD_TO_NM(T.CO_CD)                           AS CO_NM
-					                    , ''                                                     AS SALES_CD
-					                    , T.CLNT_CD                                              AS CLNT_CD
-					                    , A.CLNT_NM                                              AS CLNT_NM
-					                    , T.PRJCT_CD                                             AS CLNT_PJT
-					                    , (SELECT FN_CM05M01_CD_TO_NM(T.PRJCT_CD) FROM DUAL)     AS CLNT_PJT_NM        --고객사프로젝트명
-					                    , T.EQP_NM                                               AS EQP_NM             --설비명 
-					                    , T.EQP_QTY                                              AS ORDRS_QTY          --수주수량
-					                    , T.NEW_PRDT_CD                                          AS ORDRS_DTL_DIV20    --작업구분
-					                    , (SELECT FN_CM05M01_CD_TO_NM(T.NEW_PRDT_CD) FROM DUAL)  AS ORDRS_DTL_DIV20_NM --작업구분명
-					                    , FN_CM05M01_CD_TO_NM(T.ODR_CD)                          AS CTRT_DOC           --계약문서 
-					                    , TO_CHAR(T.DUDT_PLAN_DT, 'YYYY-MM-DD')                  AS DUDT_INTEND_DT     --예상납기일자
-					                    , TO_CHAR(NVL(T.ORDRS_PLAN_DT,LAST_DAY(TO_DATE(T.YYYYMM, 'YYYYMM'))), 'YYYY-MM-DD')                 AS ORDRS_DT           --수주예정일자
-					                  --, TO_CHAR(T.ORDRS_DT, 'YYYY-MM-DD')                      AS ORDRS_DT           --수주일자
-					                    , TO_CHAR(T.DSGN_DT, 'YYYY-MM-DD')                       AS DSGN_DT            --설계일자
-					                    , TO_CHAR(T.PURCHS_DT, 'YYYY-MM-DD')                     AS PURCHS_DT          --구매일자
-					                    , TO_CHAR(T.PRDCTN_DT, 'YYYY-MM-DD')                     AS PRDCTN_DT          --생산일자
-					                    , TO_CHAR(T.ACPTNC_DT, 'YYYY-MM-DD')                     AS ACPTNC_DT          --검수일자
-					                    , TO_CHAR(T.DLIVY_DT, 'YYYY-MM-DD')                      AS DLIVY_DT           --출고일자
-					                 FROM TB_BM06M01 T --프로젝트마스터
-					                      LEFT OUTER JOIN TB_BM02M01 A  ON T.CLNT_CD = A.CLNT_CD --거래처마스터
-					                WHERE T.CO_CD = #{coCd}
-					                  AND T.YYYYMM  BETWEEN  SUBSTRING(#{strtDt},1,6) AND SUBSTRING(#{endDt},1,6)
-					                <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
-					                 AND T.CLNT_CD = #{ordrsClntCd}
-					                </if>
-					                <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
-							          AND A.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'
-							        </if>
-					                <if test="clntPjt != null and !clntPjt.equals('')">
-					                 AND T.PRJCT_CD IN ( ${clntPjt} )
-					                </if> 	
-					              )  
-					              UNPIVOT INCLUDE NULLS  ( DT_VAL FOR COL_DT IN (DSGN_DT, PURCHS_DT, PRDCTN_DT, ACPTNC_DT, DLIVY_DT ) )
-					      )
 	SELECT COUNT(*)
-	  FROM (SELECT *
-						  FROM (
-						        SELECT  S.CO_CD              --회사코드
-						              , S.CO_NM              --회사명
-									  , '1.일정계획'               AS GUBUN
-						              , S.SALES_CD           --SALES Code
-						              , S.CLNT_CD            --고객코드
-						              , S.CLNT_NM            --고객명
-						              , S.CLNT_PJT           --고객사프로젝트 
-						              , S.CLNT_PJT_NM        --고객사프로젝트명
-						              , S.EQP_NM             --설비명 
-						              , S.ORDRS_QTY          --수주수량 
-						              , S.ORDRS_DTL_DIV20    --작업구분
-						              , S.ORDRS_DTL_DIV20_NM --작업구분명
-						              , S.CTRT_DOC           --계약문서 
-						              , S.DUDT_INTEND_DT     --납기예정일 
-						              , S.ORDRS_DT           --수주확정일
-						              , S.PLAN_CD_NM         --계획 LVL1 명
-						              , S.PLANE_DT           --계획종료일
-						          FROM SJD S
-						         WHERE 1=1
-					        <if test='planPrjct != "N"'>
-						        UNION ALL --프로젝트 계획자료
-						        SELECT  P.CO_CD              --회사코드
-						              , P.CO_NM              --회사명
-									  , '0.예상수주'               AS GUBUN
-						              , P.SALES_CD           --SALES Code
-						              , P.CLNT_CD            --고객코드
-						              , P.CLNT_NM            --고객명
-						              , P.CLNT_PJT           --고객사프로젝트 
-						              , P.CLNT_PJT_NM        --고객사프로젝트명
-						              , P.EQP_NM             --설비명 
-						              , P.ORDRS_QTY          --수주수량 
-						              , P.ORDRS_DTL_DIV20    --작업구분
-						              , P.ORDRS_DTL_DIV20_NM --작업구분명
-						              , P.CTRT_DOC           --계약문서 
-						              , P.DUDT_INTEND_DT     --납기예정일 
-						              , P.ORDRS_DT           --수주확정일
-						              , P.PLAN_CD_NM         --계획 LVL1 명
-						              , P.PLANE_DT           --계획종료일
-						          FROM PJT P
-						         WHERE 1=1
-					        </if>
-						        UNION ALL --일정 수행결과 등록현황
-						         SELECT 
-									    S.CO_CD              --회사코드
-						              , S.CO_NM              --회사명
-									  , '2.수행결과'               AS GUBUN
-						              , S.SALES_CD           --SALES Code
-						              , S.CLNT_CD            --고객코드
-						              , S.CLNT_NM            --고객명
-						              , S.CLNT_PJT           --고객사프로젝트 
-						              , S.CLNT_PJT_NM        --고객사프로젝트명
-						              , S.EQP_NM             --설비명 
-						              , S.ORDRS_QTY          --수주수량 
-						              , S.ORDRS_DTL_DIV20    --작업구분
-						              , S.ORDRS_DTL_DIV20_NM --작업구분명
-						              , S.CTRT_DOC           --계약문서 
-						              , S.DUDT_INTEND_DT     --납기예정일 
-						              , S.ORDRS_DT           --수주확정일
-						              , S.PLAN_CD_NM							 AS PLAN_CD_NM   --계획 LVL1 명
-						              , (TO_CHAR(Z.RSLTSE_DT, 'YYYY-MM-DD') || 
-						              	DECODE(S.PLANE_DT, NULL,'', '(' || RC.RESULT_CNT / PC.PLAN_CNT * 100 || ')')) AS PLANE_DT
-								    FROM SJD S
-							        	LEFT OUTER JOIN (                  
-									                        SELECT 
-									                        	   WR.CO_CD
-									                        	 , WR.SALES_CD
-									                        	 , WR.WBS_PLAN_CODE_KIND
-									                             , MIN(WR.WBS_RSLTSS_DT)   AS RSLTSS_DT     --TASK실적시작일
-									                             , MAX(WR.WBS_RSLTSE_DT)   AS RSLTSE_DT     --TASK실적종료일 
-									                             , SUM(WR.DAYCNT)          AS RSLT_DAYCNT   --TASK실적소요일
-									                          FROM TB_WB23M01  WR--WBS실적 정보
-									                         GROUP BY WR.CO_CD, WR.SALES_CD, WR.WBS_PLAN_CODE_KIND
-									                      ) Z ON S.CO_CD  = Z.CO_CD
-					        								 AND S.SALES_CD  = Z.SALES_CD 
-					        								 AND S.WBS_PLAN_CODE_ID  = Z.WBS_PLAN_CODE_KIND
-					        			LEFT OUTER JOIN
-														  (
-															  SELECT W1.CO_CD, W1.SALES_CD, W1.WBS_PLAN_CODE_KIND, count(W1.WBS_PLAN_CODE_ID) PLAN_CNT
-														         FROM TB_WB22M01 W1
-														        WHERE W1.WBS_PLAN_CODE_KIND != 'WBSCODE'         
-														        GROUP BY W1.CO_CD, W1.SALES_CD, W1.WBS_PLAN_CODE_KIND
-													        
-													       ) PC    ON S.CO_CD    = PC.CO_CD
-														          AND S.SALES_CD = PC.SALES_CD    
-														          AND S.WBS_PLAN_CODE_ID = PC.WBS_PLAN_CODE_KIND
-							          LEFT OUTER JOIN
-													  (
-														  SELECT W2.CO_CD, W2.SALES_CD, W2.WBS_PLAN_CODE_KIND, count(W2.WBS_PLAN_CODE_ID) RESULT_CNT
-													         FROM TB_WB23M01 W2
-													        GROUP BY W2.CO_CD, W2.SALES_CD, W2.WBS_PLAN_CODE_KIND
-												        
-												       ) RC    ON S.CO_CD    = RC.CO_CD
-													          AND S.SALES_CD = RC.SALES_CD    
-													          AND S.WBS_PLAN_CODE_ID = RC.WBS_PLAN_CODE_KIND
-							       WHERE 1=1
-						       ) 
-					   PIVOT ( MAX(PLANE_DT) FOR PLAN_CD_NM IN (${wbscode}) --코드명 넣어주기 Ctrl에서 배열 생성함 $-->#으로 바꾸면 오류남 바꾸지 말것 
-					         )
-					 		 ORDER BY CLNT_NM, CLNT_PJT_NM, SUBSTR(ORDRS_DT,1,7), nvl(SALES_CD,' '), GUBUN  
+	  FROM (SELECT 1 FROM DUAL
 	        )
 	</select>
 
-	<select id="selectPrjctPlanList" resultType="CamelMap">
-	/* 대일정계획 selectPrjctPlanList */
+	<select id="selectPrjctPlanListOld" resultType="CamelMap">
+	/* 대일정계획 selectPrjctPlanListOld */
 	SELECT T.*
 	  FROM (
 			SELECT N.*,
 			      ROWNUM AS RN
 			  FROM (
-					WITH SCD AS		--현재 일정 수립계획중이고 시작일과 완료검수일 사이에있는 자료만
-						 (
-						  SELECT   P.SALES_CD
-						         , P.CO_CD
-						         , P.SJ_NM
-						         , NVL(MC.CLOSE_YN,'N') CLOSE_YN
-						         , P.BEGIN_DT
-						         , P.ACPTNC_DT
-							FROM TB_WB21M01 P
-										LEFT OUTER JOIN TB_WB25M01 MC ON MC.SALES_CD = P.SALES_CD
-						   WHERE 1 = 1
---						     AND BEGIN_DT  <![CDATA[<=]]> sysdate 	--시작일
---							 AND ACPTNC_DT <![CDATA[>=]]> sysdate	--완료검수일
-							 AND NVL(MC.CLOSE_YN,'N') != 'Y'
- 							 AND VER_NO IN (SELECT MAX(TO_NUMBER(PT.VER_NO)) FROM TB_WB21M01 PT WHERE PT.SJ_NO = P.SJ_NO) --최종 버젼 자료만 적용
- 							 AND EXISTS (SELECT 1 FROM TB_WB22M01 PL WHERE P.SALES_CD = PL.SALES_CD )	--계획 수립된 자료만 검색하기 위함
-						 )
-					, SJD AS --수주상세 
+					WITH SJD AS --수주상세 
 					     ( 
 					      SELECT M.CO_CD                                                    AS CO_CD              --회사코드
-					            , (SELECT FN_CM05M01_CD_TO_NM(M.CO_CD) FROM DUAL)           AS CO_NM              --회사명 
 					            , M.ORDRS_NO                                                 AS ORDRS_NO           --수주번호
 					            , X.SALES_CD                                                 AS SALES_CD           --SALES Code
 					            , TO_CHAR(M.ORDRS_CLNT_CD)                                   AS CLNT_CD            --고객코드
@@ -1215,16 +978,33 @@
 					              , W.VER_NO												  AS PLAN_VER_NO		--계획버전번호
 					              , X.DTL_RMK												  AS DTL_RMK			--설비비고
 					         FROM TB_CR02M01  M --수주마스터
-					              INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+					              INNER JOIN TB_CR02D02 AS X  ON X.CO_CD = M.CO_CD 				--수주상세   
+					              							 AND X.ORDRS_NO = M.ORDRS_NO
+					              							 AND X.SALES_CD IS NOT NULL
 					              LEFT OUTER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
 						          LEFT OUTER JOIN TB_WB22M01 AS W ON X.CO_CD    = W.CO_CD 
 											                     AND X.SALES_CD = W.SALES_CD
 											                     AND W.WBS_PLAN_CODE_KIND = 'WBSCODE'
+					        <if test="targetDate != null and !targetDate.equals('')">
+								 INNER JOIN (  --'Y': 현재일자 해당 자료만
+											  SELECT   P.SALES_CD
+											         , P.CO_CD
+											         , P.SJ_NM
+											         , NVL(MC.CLOSE_YN,'N') CLOSE_YN
+											         , P.BEGIN_DT
+											         , P.ACPTNC_DT
+												FROM TB_WB21M01 P
+															LEFT OUTER JOIN TB_WB25M01 MC ON MC.SALES_CD = P.SALES_CD
+											   WHERE 1 = 1
+												 AND NVL(MC.CLOSE_YN,'N') != 'Y'
+					 							 AND VER_NO IN (SELECT MAX(TO_NUMBER(PT.VER_NO)) FROM TB_WB21M01 PT WHERE PT.SJ_NO = P.SJ_NO) --최종 버젼 자료만 적용
+					 							 AND EXISTS (SELECT 1 FROM TB_WB22M01 PL WHERE P.SALES_CD = PL.SALES_CD )	--계획 수립된 자료만 검색하기 위함
+											 ) SCD ON X.SALES_CD = SCD.SALES_CD 
+					        </if>
 					        WHERE 1=1
 					          AND M.CO_CD = #{coCd}
 					          AND M.ORDRS_DT <![CDATA[>=]]> TO_DATE(#{strtDt}, 'YYYYMMDD')
 					          AND M.ORDRS_DT <![CDATA[<=]]> TO_DATE(#{endDt}, 'YYYYMMDD')
-							  AND X.SALES_CD IS NOT NULL
 					        <if test="salesCd != null and !salesCd.equals('')">
 					          AND X.SALES_CD LIKE '%' || #{salesCd} || '%'
 					        </if>
@@ -1248,20 +1028,8 @@
 										)
 					        </if>
 					        <if test='planPrjct == "B"'>  
-							  AND  1=2   --프로젝트 계획 자료만일경우에는 제외처용
+							  AND  1=2   --프로젝트 계획 자료만일경우에는 제외처리용  수주된 자료는 모두 제외함
 					        </if>
-					        <if test="targetDate != null and !targetDate.equals('')">
-					          AND  EXISTS (SELECT 1 FROM SCD
-										   WHERE X.SALES_CD = SCD.SALES_CD 
-										)
-					        </if>
-							<if test='completeCheck == "N" and completeCheck != null'>
-								AND NOT EXISTS (SELECT 1
-												FROM TB_WB23M01 A
-												WHERE A.SALES_CD = X.SALES_CD
-												  AND A.WBS_PLAN_CODE_KIND = 'WBSCODE14'
-											)
-							</if>
 					     )
 					    , PJT AS 
 					      (
@@ -1463,6 +1231,228 @@
       AND T.RN BETWEEN ${firstIndex} AND ${lastIndex}
 	</select>
 
+	<select id="selectPrjctPlanList" resultType="CamelMap">
+	/* 대일정계획 selectPrjctPlanList */
+	SELECT T.*
+	  FROM (
+			SELECT N.*,
+			      ROWNUM AS RN
+			  FROM (
+					WITH SJD AS --수주상세 
+					     ( 
+					      SELECT M.CO_CD                                                    AS CO_CD              --회사코드
+					            , M.ORDRS_NO                                                 AS ORDRS_NO           --수주번호
+					            , X.SALES_CD                                                 AS SALES_CD           --SALES Code
+					            , TO_CHAR(M.ORDRS_CLNT_CD)                                   AS CLNT_CD            --고객코드
+					            , C.CLNT_NM                                                  AS CLNT_NM            --고객명
+					            , M.CLNT_PJT                                                 AS CLNT_PJT           --고객사프로젝트 
+					            , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)        AS CLNT_PJT_NM        --고객사프로젝트명
+					            , X.EQP_NM                                                   AS EQP_NM             --설비명 
+					            , X.ORDRS_QTY                                                AS ORDRS_QTY          --수주수량 
+					            , X.ORDRS_DTL_DIV20                                          AS ORDRS_DTL_DIV20    --작업구분
+					            , (SELECT FN_CM05M01_CD_TO_NM(X.ORDRS_DTL_DIV20) FROM DUAL) AS ORDRS_DTL_DIV20_NM --작업구분명
+					            --, M.CTRT_DOC                                                 AS CTRT_DOC           --계약문서 
+					            , FN_CM05M01_CD_TO_NM(M.CTRT_DOC)                          AS CTRT_DOC           --계약문서 
+					            , TO_CHAR(X.DUDT_INTEND_DT, 'YYYY-MM-DD')                    AS DUDT_INTEND_DT     --납기예정일 
+					            , TO_CHAR(M.ORDRS_DT, 'YYYY-MM-DD')                          AS ORDRS_DT           --수주확정일
+					            , X.DTL_RMK												  AS DTL_RMK			--설비비고
+					         FROM TB_CR02M01  M --수주마스터
+					              INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD 
+					              							 AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
+					              							 AND X.SALES_CD IS NOT NULL
+					              LEFT OUTER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보
+					              LEFT OUTER JOIN VW_WB23M01_01 AS W ON X.SALES_CD  = W.SALES_CD 
+					        <if test="targetDate != null and !targetDate.equals('')">
+								 INNER JOIN (  --'Y': 현재일자 해당 자료만
+											  SELECT   P.SALES_CD
+											         , P.CO_CD
+											         , P.SJ_NM
+											         , NVL(MC.CLOSE_YN,'N') CLOSE_YN
+											         , P.BEGIN_DT
+											         , P.ACPTNC_DT
+												FROM TB_WB21M01 P
+															LEFT OUTER JOIN TB_WB25M01 MC ON MC.SALES_CD = P.SALES_CD
+											   WHERE 1 = 1
+												 AND NVL(MC.CLOSE_YN,'N') != 'Y'
+					 							 AND VER_NO IN (SELECT MAX(TO_NUMBER(PT.VER_NO)) FROM TB_WB21M01 PT WHERE PT.SJ_NO = P.SJ_NO) --최종 버젼 자료만 적용
+					 							 AND EXISTS (SELECT 1 FROM TB_WB22M01 PL WHERE P.SALES_CD = PL.SALES_CD )	--계획 수립된 자료만 검색하기 위함
+											 ) SCD ON X.SALES_CD = SCD.SALES_CD 
+					        </if>
+					        WHERE 1=1
+					          AND M.CO_CD = #{coCd}
+					          AND M.ORDRS_DT <![CDATA[>=]]> TO_DATE(#{strtDt}, 'YYYYMMDD')
+					          AND M.ORDRS_DT <![CDATA[<=]]> TO_DATE(#{endDt}, 'YYYYMMDD')
+					        <if test="salesCd != null and !salesCd.equals('')">
+					          AND X.SALES_CD LIKE '%' || #{salesCd} || '%'
+					        </if>
+					        <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
+					          AND M.ORDRS_CLNT_CD = #{ordrsClntCd}
+					        </if>
+					        <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
+					          AND C.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'
+					        </if>
+					        <if test="clntPjt != null and !clntPjt.equals('')">
+					         AND M.CLNT_PJT IN ( ${clntPjt} )
+					        </if>
+					        <if test='planCheck == "Y"'>
+							  AND  EXISTS (SELECT * FROM TB_WB22M01 PL		--계획수립자료
+										   WHERE X.SALES_CD = PL.SALES_CD 
+										)
+					        </if>
+					        <if test='planCheck == "N"'>
+							  AND  NOT EXISTS (SELECT * FROM TB_WB22M01 PL --계획없는 자료
+										   WHERE X.SALES_CD = PL.SALES_CD 
+										)
+					        </if>
+					        <if test='planPrjct == "B"'>  
+							  AND  1=2   --프로젝트 계획 자료만일경우에는 제외처리용  수주된 자료는 모두 제외함
+					        </if>
+			                <if test='completeCheck == "N"'>
+						      AND (W.WBSCODE14_PCT IS NULL OR W.WBSCODE14_PCT != '100')  --완료 미포함이면 일정내역중 진행율이 100이 아닌것만 가져오기   
+					        </if>
+					     )
+					    , PJT AS 
+					      (
+			               SELECT T.CO_CD                                                AS CO_CD
+			               		, ''  			 										 AS ORDRS_NO           --수주번호
+			               		, '' 													 AS SALES_CD  --수주전이므로 공백으로 처리
+			                    , T.CLNT_CD                                              AS CLNT_CD
+			                    , A.CLNT_NM                                              AS CLNT_NM
+			                    , T.PRJCT_CD                                             AS CLNT_PJT
+			                    , (SELECT FN_CM05M01_CD_TO_NM(T.PRJCT_CD) FROM DUAL)     AS CLNT_PJT_NM        --고객사프로젝트명
+			                    , DECODE(D.PRJCT_PRDT_CD, '' , T.EQP_NM, B.PRDT_NM)      AS EQP_NM             --제품내역이 있으면 제품내역으로 아니면 설비명 
+			                    , DECODE(D.PRJCT_PRDT_CD, '' , T.EQP_QTY, D.PRJCT_PRDT_QTY)   AS ORDRS_QTY          --수주수량
+			                    , DECODE(D.PRJCT_PRDT_CD, '' , T.NEW_PRDT_CD, D.PRJCT_PRDT_NEW_CD) AS ORDRS_DTL_DIV20    --작업구분
+			                    , (SELECT FN_CM05M01_CD_TO_NM(DECODE(D.PRJCT_PRDT_CD, '' , T.NEW_PRDT_CD, D.PRJCT_PRDT_NEW_CD)) FROM DUAL)  AS ORDRS_DTL_DIV20_NM --작업구분명
+			                    , FN_CM05M01_CD_TO_NM(T.ODR_CD)                          AS CTRT_DOC           --계약문서 
+			                    , TO_CHAR(T.DUDT_PLAN_DT, 'YYYY-MM-DD')                  AS DUDT_INTEND_DT     --예상납기일자
+			                    , TO_CHAR(NVL(T.ORDRS_PLAN_DT,LAST_DAY(TO_DATE(T.YYYYMM, 'YYYYMM'))), 'YYYY-MM-DD')                 AS ORDRS_DT           --수주예정일자
+					            , T.PRJCT_RMK			 													--프로젝트 비고
+			                    , T.PRJCT_SEQ
+			                    , NVL(PRJCT_PRDT_RMK, T.PRJCT_RMK) AS PRJCT_RMK		--프로젝트 설비 비고 
+			                    , D.PRJCT_SEQ || D.PRJCT_PRDT_CD || D.MCTYPE || D.PRJCT_PRDT_SEQ AS PRDT_MCKEY
+				        		, T.CO_CD
+				        		, '1'
+				        		, ''
+								, '0.예상수주'               AS GUBUN	
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , TO_CHAR(T.ORDRS_DT, 'YYYY-MM-DD')                      AS WBSCODE01           --수주일자
+			                    , ''
+			                    , TO_CHAR(T.DSGN_DT, 'YYYY-MM-DD')                       AS WBSCODE03            --설계일자 설계완료
+			                    , ''
+			                    , TO_CHAR(T.PURCHS_DT, 'YYYY-MM-DD')                     AS WBSCODE04          --구매일자 구매완료
+			                    , ''
+			                    , TO_CHAR(T.PRDCTN_DT, 'YYYY-MM-DD')                     AS WBSCODE05          --생산일자 기계조립완료
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , TO_CHAR(T.ACPTNC_DT, 'YYYY-MM-DD')                     AS WBSCODE09          --검수일자 고객검수
+			                    , ''
+			                    , TO_CHAR(T.DLIVY_DT, 'YYYY-MM-DD')                      AS WBSCODE11           --출고일자	
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+			                    , ''
+							   , ''	--PCT
+							   , ''
+							   , ''
+							   , ''
+							   , ''
+							   , ''
+							   , ''
+							   , ''
+							   , ''
+							   , ''
+							   , ''
+							   , ''
+							   , ''
+							   , ''
+							   , ''
+							   , ''
+							 FROM TB_BM06M01 T --프로젝트마스터
+							 	  full join TB_BM06D01 D ON T.PRJCT_SEQ = D.PRJCT_SEQ
+							      LEFT OUTER JOIN TB_BM02M01 A  ON T.CLNT_CD = A.CLNT_CD --거래처마스터
+							      LEFT OUTER JOIN TB_BM01M01 B  ON D.PRJCT_PRDT_CD = B.PRDT_CD --제품유형
+							WHERE T.PRJCT_SEQ IS NOT NULL 
+			                  AND T.CO_CD = #{coCd}
+			                  AND T.YYYYMM  BETWEEN  SUBSTRING(#{strtDt},1,6) AND SUBSTRING(#{endDt},1,6)
+			                <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
+			                 AND T.CLNT_CD = #{ordrsClntCd}
+			                </if>
+			                <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
+					          AND A.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'
+					        </if>
+			                <if test="clntPjt != null and !clntPjt.equals('')">
+			                 AND T.PRJCT_CD IN ( ${clntPjt} )
+			                </if> 	
+					      )
+					      --일정 계획 자료 현황
+						SELECT *
+						  FROM (
+						        SELECT  S.*
+						              , '' AS PRJCT_SEQ			--프로젝트 SEQ
+						              , S.DTL_RMK  AS PRJCT_RMK	--수주 설비 비고
+						              , '' AS PRDT_MCKEY		--설비추가구분자(MCTYPE+SEQ)
+						              , W.*
+						          FROM SJD S
+							          LEFT OUTER JOIN VW_WB22M01_01 AS W ON S.CO_CD    = W.CO_CD 
+												                        AND S.SALES_CD = W.SALES_CD
+						         WHERE 1=1
+					        <if test='planPrjct != "N" and targetDate != "Y"'>
+						        UNION ALL --프로젝트 계획자료
+						        SELECT  P.*
+						          FROM PJT P
+						         WHERE 1=1
+					        </if>
+					        <if test='execCheck == "Y"'>
+						        UNION ALL --일정 수행결과 등록현황
+						         SELECT S.*
+						              , '' AS PRJCT_SEQ			--프로젝트 SEQ
+						              , S.DTL_RMK  AS PRJCT_RMK	--수주 설비 비고
+						              , '' AS PRDT_MCKEY		--설비추가구분자(MCTYPE+SEQ)
+						              , W.*
+								    FROM SJD S
+							            LEFT OUTER JOIN VW_WB23M01_01 AS W ON S.CO_CD    = W.CO_CD 
+												                          AND S.SALES_CD = W.SALES_CD
+							       WHERE 1=1
+					        </if>
+						       ) AS AA
+					 		 ORDER BY CLNT_NM, CLNT_PJT_NM, SUBSTR(ORDRS_DT,1,7), nvl(AA.SALES_CD,' '), GUBUN  
+			 ) N
+	   )T
+ 	WHERE 1=1
+      AND T.RN BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>
 	
 	<select id="selectTodoIssueInfo" parameterType="Map" resultType="CamelMap">
        SELECT 
