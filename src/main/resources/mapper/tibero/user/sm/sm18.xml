@@ -844,7 +844,7 @@
 					SELECT A.* 
 								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN 'N' 
 								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN 'R' ELSE 'Y' END IS_COST
-								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN '' 
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN CR.ORDRS_NO 
 								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN '' ELSE C.ORDRS_NO END ORDRS_NO --수주번호
 								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD 
 								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN RM.SALES_CD ELSE C.SALES_CD END SALES_CD
@@ -863,6 +863,7 @@
 								, DECODE (substr(A.ORDRG_NO,0,3), 'COS', C.PCHS_PMNT_MTD_CD, '') 	AS SM10_PMNT_MTD_CD
 								, DECODE (substr(A.ORDRG_NO,0,3), 'COS', 'COST', '') 				AS SM10_CLMN_RMK
 				    			, CD.DEPT_NM
+								, C.PCHS_COST_DIV10							AS PCHS_COST_DIV10
 					FROM  TB_SM12D01 A /* 매입 확정 DETAIL */		
 							LEFT OUTER JOIN TB_SM02M01 M ON(A.ORDRG_NO = M.ORDRG_NO)		/* 발주마스터 */
 							LEFT OUTER JOIN TB_SM10M01 C ON(A.ORDRG_NO = C.COST_NO)			/* 비용마스터 */
@@ -870,6 +871,7 @@
 							LEFT OUTER JOIN TB_SM06M01 RM ON(RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)		/* 반품 상세 */
 							LEFT OUTER JOIN TB_CM06M01 U ON U.ID = A.CREAT_ID
 							LEFT OUTER JOIN TB_CM04M01 CD ON CD.DEPT_ID = SUBSTRING(U.DEPT_ID,0,5)
+							LEFT OUTER JOIN TB_CR02D02 CR ON CR.SALES_CD = M.SALES_CD
 				  WHERE 1=1 
 				    AND NVL(C.PAY_DIV,'PAYDIV02') = 'PAYDIV02'  --기타비용의 경우 청구(PAYDIV02)인 경우만 구매현황에 출력함.
 				    AND NVL(A.PAY_DIV,'PAYDIV02') = 'PAYDIV02'  --매입확정의 경우에도 청구(PAYDIV02)인 경우만 구매현황에 출력함.
@@ -987,6 +989,9 @@
 				, A.PART_CD_NM
 				, A.REQ_ORDRG_ID		---발주요청서 발행자ID
 				, A.ORDRG_ID_NM
+				, A.ORDRS_NO 
+				, A.PCHS_COST_DIV10 
+				, FN_CM05M01_CD_TO_NM(A.PCHS_COST_DIV10) AS PCHS_COST_DIV10_NM
 			  FROM
 			  (
 					SELECT 
@@ -1029,6 +1034,9 @@
 							, FN_CM05M01_CD_TO_NM(Q.PART_CD) AS PART_CD_NM
 							, Q.ORDRG_ID 	AS REQ_ORDRG_ID		---발주요청서 발행자ID
 							, FN_CM06M01_ID_TO_NM(Q.ORDRG_ID) AS ORDRG_ID_NM
+							, A.ORDRS_NO 			AS ORDRS_NO
+							, A.PCHS_COST_DIV10 	AS PCHS_COST_DIV10
+							, FN_CM05M01_CD_TO_NM(A.PCHS_COST_DIV10) AS PCHS_COST_DIV10_NM
 					FROM  IPGO A /* 매입 확정 DETAIL */		
 			                LEFT OUTER JOIN BAL AS D ON A.CO_CD = D.CO_CD AND A.ORDRG_NO = D.ORDRG_NO --발주상세
 			                LEFT OUTER JOIN IPGOTOT AS E ON A.CO_CD = E.CO_CD AND A.ORDRG_NO = E.ORDRG_NO --매입확정집계
