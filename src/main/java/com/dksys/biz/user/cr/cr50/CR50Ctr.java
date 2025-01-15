@@ -21,86 +21,83 @@ import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.cr.cr50.service.CR50Svc;
 import com.dksys.biz.util.MessageUtils;
 
-import net.minidev.json.JSONArray;
-import net.minidev.json.JSONObject;
-
 @Controller
 @Transactional(rollbackFor = Exception.class)
 @RequestMapping("/user/cr/cr50")
 public class CR50Ctr {
-	
-	private Logger logger = LoggerFactory.getLogger(CR50Ctr.class);
-	
-	@Autowired
-	MessageUtils messageUtils;
     
+    private Logger logger = LoggerFactory.getLogger(CR50Ctr.class);
+
+    @Autowired
+    MessageUtils messageUtils;
+
     @Autowired
     CR50Svc cr50Svc;
     
 
     
     @PostMapping(value = "/selectPfuList") 
-	public String selectPfuList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  int totalCnt = cr50Svc.selectPfuListCount(paramMap); 
-		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		  model.addAttribute("paginationInfo", paginationInfo);
-		  
-		  List<Map<String, String>> resultList = cr50Svc.selectPfuList(paramMap);
-		  model.addAttribute("resultList", resultList); 
-		  return "jsonView"; 
-	}
+    public String selectPfuList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        int totalCnt = cr50Svc.selectPfuListCount(paramMap);
+        PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+        model.addAttribute("paginationInfo", paginationInfo);
+
+        List<Map<String, String>> resultList = cr50Svc.selectPfuList(paramMap);
+        model.addAttribute("resultList", resultList);
+        return "jsonView";
+    }
     
     @PostMapping(value = "/selectPFUAreaItemList") 
-	public String selectPFUAreaItemList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> result = cr50Svc.selectPFUAreaItemList(paramMap);
-		model.addAttribute("result", result);
-	    	
-		return "jsonView";
+    public String selectPFUAreaItemList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        List<Map<String, String>> result = cr50Svc.selectPFUAreaItemList(paramMap);
+        model.addAttribute("result", result);
+
+        return "jsonView";
     }
     
     @PostMapping(value = "/selectPFUAreaRetriveList") 
     public String selectPFUAreaRetriveList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    	List<Map<String, String>> result = cr50Svc.selectPFUAreaRetriveList(paramMap);
-    	model.addAttribute("result", result);
-    	
-    	return "jsonView";
+        List<Map<String, String>> result = cr50Svc.selectPFUAreaRetriveList(paramMap);
+        model.addAttribute("result", result);
+
+        return "jsonView";
     }
     
     @PostMapping(value = "/selectPFUChangedList") 
     public String selectPFUChangedList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    	List<Map<String, String>> result = cr50Svc.selectPFUChangedList(paramMap);
-    	model.addAttribute("result", result);
-    	
-    	return "jsonView";
+        List<Map<String, String>> result = cr50Svc.selectPFUChangedList(paramMap);
+        model.addAttribute("result", result);
+
+        return "jsonView";
     }
 
 
     @PostMapping(value = "/selectPfuIsThereListCount") 
-	public String selectPfuIsThereListCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  int totalCnt = cr50Svc.selectPfuIsThereListCount(paramMap); 
-		  model.addAttribute("resultList", totalCnt);
-		  return "jsonView"; 
-	}
+    public String selectPfuIsThereListCount(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        int totalCnt = cr50Svc.selectPfuIsThereListCount(paramMap);
+        model.addAttribute("resultList", totalCnt);
+        return "jsonView";
+    }
     
     
     @PostMapping(value = "/selectStdPfuClobInfo") 
     public String selectStdPfuClobInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> resultImg = cr50Svc.selectStdPfuClobInfo(paramMap);
-		model.addAttribute("resultImg", resultImg);
-    	
-    	return "jsonView";
+        List<Map<String, String>> resultImg = cr50Svc.selectStdPfuClobInfo(paramMap);
+        model.addAttribute("resultImg", resultImg);
+
+        return "jsonView";
     }
     
     // salesCd 정보 조회
     @PostMapping(value = "/selectSalesCdInfo")
     public String selectSalesCdInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-    	Map<String, String> result = cr50Svc.selectSalesCdInfo(paramMap);
-    	model.addAttribute("result", result);
+        Map<String, String> result = cr50Svc.selectSalesCdInfo(paramMap);
+        model.addAttribute("result", result);
 
-//		String pfuCode = result.get("pfuCode");
-//		paramMap.put("prdtDiv", pfuCode);
-//		List<Map<String, String>> resultImg = cr50Svc.selectStdPfuClobInfo(paramMap);
-//		model.addAttribute("resultImg", resultImg);
+//      String pfuCode = result.get("pfuCode");
+//      paramMap.put("prdtDiv", pfuCode);
+//      List<Map<String, String>> resultImg = cr50Svc.selectStdPfuClobInfo(paramMap);
+//      model.addAttribute("resultImg", resultImg);
       return "jsonView";
     }
 
@@ -113,6 +110,13 @@ public class CR50Ctr {
       return "jsonView";
     }
 
+    @PostMapping(value = "/selectPfuInfoSalesCdList")
+    public String selectPfuInfoSalesCdList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        List<Map<String, String>> result = cr50Svc.selectPfuInfoSalesCdList(paramMap);
+        model.addAttribute("result", result);
+
+        return "jsonView";
+    }
 
     // PFU 정보 조회
 //    @PostMapping(value = "/selectPfuClobInfo")
@@ -126,86 +130,119 @@ public class CR50Ctr {
 
     @PostMapping(value = "/insertPfu")
     public String insertPfu(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  		try {
-  			if (cr50Svc.insertPfu(paramMap, mRequest) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-  			} else {
-  				model.addAttribute("resultCode", 500);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  			model.addAttribute("resultDBError", ((SQLException) e.getCause()).getSQLState());
-  			model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
+        try {
+            if (cr50Svc.insertPfu(paramMap, mRequest) != 0) {
+                model.addAttribute("resultCode", 200);
+                model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+            } else {
+                model.addAttribute("resultCode", 500);
+                model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+            }
+            ;
+        } catch (Exception e) {
+            model.addAttribute("resultCode", 900);
+            model.addAttribute("resultDBError", ((SQLException) e.getCause()).getSQLState());
+            model.addAttribute("resultMessage", e.getMessage());
+        }
+        return "jsonView";
     }
 
     @PostMapping(value = "/updatePfu")
     public String updatePfu(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  	  	try {
-  			if (cr50Svc.updatePfu(paramMap, mRequest) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-  			} else {
-  				model.addAttribute("resultCode", 500);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  			model.addAttribute("resultMessage", e.getMessage());
-  		}
-  	  	return "jsonView";
+        try {
+            if (cr50Svc.updatePfu(paramMap, mRequest) != 0) {
+                model.addAttribute("resultCode", 200);
+                model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+            } else {
+                model.addAttribute("resultCode", 500);
+                model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+            }
+            ;
+        } catch (Exception e) {
+            model.addAttribute("resultCode", 900);
+            model.addAttribute("resultMessage", e.getMessage());
+        }
+        return "jsonView";
     }
 
     @PutMapping(value = "/deletePfuNo")
     public String deletePfuNo(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
-  	  	try {
-  			if (cr50Svc.deletePfuNo(paramMap) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-  			} else {
-  				model.addAttribute("resultCode", 500);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  			model.addAttribute("resultMessage", e.getMessage());
-  		}
-  	  	return "jsonView";
+        try {
+            if (cr50Svc.deletePfuNo(paramMap) != 0) {
+                model.addAttribute("resultCode", 200);
+                model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+            } else {
+                model.addAttribute("resultCode", 500);
+                model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+            }
+            ;
+        } catch (Exception e) {
+            model.addAttribute("resultCode", 900);
+            model.addAttribute("resultMessage", e.getMessage());
+        }
+        return "jsonView";
     }
 
 
 
-	@PostMapping(value = "/copy_cr50")
-	public String copy_cr50(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-		try {
-			if (cr50Svc.copy_cr50(paramMap, mRequest) != 0 ) {
-				model.addAttribute("resultCode", 200);
-				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-			} else {
-				model.addAttribute("resultCode", 500);
-				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-			};
-		}catch(Exception e){
-			model.addAttribute("resultCode", 900);
-			model.addAttribute("resultMessage", e.getMessage());
-		}
-	  	return "jsonView";
-	}
-	
+    @PostMapping(value = "/copy_cr50")
+    public String copy_cr50(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+        try {
+            if (cr50Svc.copy_cr50(paramMap, mRequest) != 0) {
+                model.addAttribute("resultCode", 200);
+                model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+            } else {
+                model.addAttribute("resultCode", 500);
+                model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+            }
+            ;
+        } catch (Exception e) {
+            model.addAttribute("resultCode", 900);
+            model.addAttribute("resultMessage", e.getMessage());
+        }
+        return "jsonView";
+    }
 
     
     @PostMapping(value = "/selectPfuCopyTargetList") 
-	public String selectPfuCopyTargetList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  int totalCnt = cr50Svc.selectPfuCopyTargetListCount(paramMap); 
-		  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		  model.addAttribute("paginationInfo", paginationInfo);
-		  
-		  List<Map<String, String>> resultList = cr50Svc.selectPfuCopyTargetList(paramMap);
-		  model.addAttribute("resultList", resultList); 
-		  return "jsonView"; 
-	}
-    
-}	  
+    public String selectPfuCopyTargetList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        int totalCnt = cr50Svc.selectPfuCopyTargetListCount(paramMap);
+        PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+        model.addAttribute("paginationInfo", paginationInfo);
+
+        List<Map<String, String>> resultList = cr50Svc.selectPfuCopyTargetList(paramMap);
+        model.addAttribute("resultList", resultList);
+        return "jsonView";
+    }
+
+    @PostMapping(value = "/selectTagetSalesCodeList")
+    public String selectTagetSalesCodeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        List<Map<String, String>> result = cr50Svc.selectTagetSalesCodeList(paramMap);
+        model.addAttribute("result", result);
+        return "jsonView";
+    }
+
+    @PostMapping(value = "/selectPfuReferenceTargetList")
+    public String selectPfuReferenceTargetList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        int totalCnt = cr50Svc.selectPfuReferenceTargetListCount(paramMap);
+        PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+        model.addAttribute("paginationInfo", paginationInfo);
+        List<Map<String, String>> resultList = cr50Svc.selectPfuReferenceTargetList(paramMap);
+        model.addAttribute("resultList", resultList);
+        return "jsonView";
+    }
+
+    @PostMapping(value = "/selectIssueReferenceList")
+    public String selectIssueReferenceList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        List<Map<String, String>> result = cr50Svc.selectIssueReferenceList(paramMap);
+        model.addAttribute("result", result);
+        return "jsonView";
+    }
+
+    @PostMapping(value = "/selectImprovementReferenceList")
+    public String selectImprovementReferenceList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        List<Map<String, String>> result = cr50Svc.selectImprovementReferenceList(paramMap);
+        model.addAttribute("result", result);
+        return "jsonView";
+    }
+}
