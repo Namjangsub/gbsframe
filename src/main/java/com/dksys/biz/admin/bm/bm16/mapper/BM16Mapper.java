@@ -79,4 +79,6 @@ public interface BM16Mapper {
 
   int updateAsOrdrsOnlyPrjct(Map<String, String> param);
 
+    String selectAsPrjct2Seq(Map<String, String> param);
+
 }
