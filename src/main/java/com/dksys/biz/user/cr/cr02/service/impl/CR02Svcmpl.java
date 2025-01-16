@@ -442,8 +442,8 @@ public class CR02Svcmpl implements CR02Svc {
         //---------------------------------------------------------------
 
         if (isAfter) {
-            Map<String, String> originAsPrjct = bm16Mapper.selectAsPrjct(originalOrdrsInfo);  // 수정 전 데이터 기반 AS프로젝트 조회
-            Map<String, String> updateAsPrjct = bm16Mapper.selectAsPrjct(param);              // 수정 후 데이터 기반 AS프로젝트 조회
+            Map<String, String> originAsPrjct = bm16Mapper.selectAsPrjct(originalOrdrsInfo);  // 수정 전 데이터 기반 프로젝트 조회
+            Map<String, String> updateAsPrjct = bm16Mapper.selectAsPrjct(param);              // 수정 후 데이터 기반 프로젝트 조회
             List<Map<String, String>> detailArrFirst = gson.fromJson(param.get("detailArr"), mapList);
             HashMap<String, String> param2 = new HashMap<>();
             param2.putAll(param);
@@ -455,7 +455,7 @@ public class CR02Svcmpl implements CR02Svc {
             
             if (("ORDRSDIV2".equals(param.get("ordrsDiv")) || "ORDRSDIV3".equals(param.get("ordrsDiv")))) {
                 if (isDataChanged) {
-                    if (originAsPrjct != null) {    // originAsPrjct UPDATE
+                    if (originAsPrjct != null && originAsPrjct.get("newPrdtCd").equals("ORDRSDTLDIV2040")) {    // originAsPrjct UPDATE
                         param2.put("prjctSeq", originAsPrjct.get("prjctSeq"));
                         param2.put("ordrsAmtCase", "CASE1");
                         param2.put("oldOrdrsAmt", originalOrdrsInfo.get("exchangeAmt"));
@@ -498,7 +498,8 @@ public class CR02Svcmpl implements CR02Svc {
                         bm16Mapper.insertPrjct(param2);
                     } 
                 } 
-                if (updateAsPrjct != null) { // updateAsPrjct UPDATE
+                // updateAsPrjct UPDATE
+                if (updateAsPrjct != null && updateAsPrjct.get("newPrdtCd").equals("ORDRSDTLDIV2040")) { 
                     if (updateAsPrjct.get("prjctSeq").equals(originalOrdrsInfo.get("prjctSeq"))) {
                         param2.put("ordrsAmtCase", "CASE2");
                         param2.put("oldOrdrsAmt", originalOrdrsInfo.get("exchangeAmt"));
@@ -514,7 +515,7 @@ public class CR02Svcmpl implements CR02Svc {
                 }
             } else {
                 // AS수주에서 이외의 수주(정상수주, 수주취소, 가수주)로 변경 => originAsPrjct UPDATE
-                if (originAsPrjct != null && isDataChanged) {
+                if (originAsPrjct != null && isDataChanged && originAsPrjct.get("newPrdtCd").equals("ORDRSDTLDIV2040")) {
                     param2.put("prjctSeq", originAsPrjct.get("prjctSeq"));
                     param2.put("ordrsAmtCase", "CASE1");
                     param2.put("oldOrdrsAmt", originalOrdrsInfo.get("exchangeAmt"));
