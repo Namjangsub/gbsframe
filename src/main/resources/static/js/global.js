@@ -2312,10 +2312,13 @@ function kakaoSendReal(talkJson, talkParam, param) {
 //	    	console.log('status:' + data.status);
 	    	let err = data.status;
 	    	if( err.indexOf("ERR") > -1 || err.indexOf("KKO")> -1 ) {
+	    		let errorMsg = err;
 	    		let find = kakaoErr.find(e => e.codeId === err);
-				if( typeof(find.codeNm) != "undefined" ) {
-		    		var errorMsg = find.codeNm;
-				}
+	    		if( typeof(find) != "undefined" ) {
+					if( typeof(find.codeNm) != "undefined" ) {
+			    		errorMsg = find.codeNm;
+					}
+	    		}
 		    	insertKakaoMessage(err, talkDeJson, param);
 	    		alert("오류코드: ["+param.nameTo+" Hp."+ talkDeJson.mobile + "] "+data.status+"\r\n\r\n" + errorMsg+"로 메세지 전송 실패하였습니다.");
 	    	} else if( data.status == "OK" ) {
