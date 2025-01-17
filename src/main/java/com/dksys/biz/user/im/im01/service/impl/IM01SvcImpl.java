@@ -1,5 +1,7 @@
 package com.dksys.biz.user.im.im01.service.impl;
 
+import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -17,6 +19,10 @@ import com.dksys.biz.user.im.im01.service.IM01Svc;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
+
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -64,36 +70,36 @@ public class IM01SvcImpl implements IM01Svc {
         // wb20Svc.insertTodoMaster(paramMap); 에서는 결재자 정보를 approvalArr 키값으로 처리하고 있음
         // ---------------------------------------------------------------
         // Gson 객체 생성
-//        Gson gson = new Gson();
-//        Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
-//        Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {
-//        }.getType();
+        Gson gson = new Gson();
+        Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+        Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {
+        }.getType();
 
-//        if (paramMap.containsKey("imprApprovalArr")) {
-//
-//            // 새로운 리스트 초기화
-//            List<Map<String, String>> newdetailMap = new ArrayList<>();
-//            List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("imprApprovalArr"), dtlMap);
-//            // 각 맵 수정 및 추가
-//            for (Map<String, String> dtl : detailMap) {
-//
-//                // JSON 문자열을 JsonObject로 변환
-//                String pgParam = dtl.get("pgParam");
-//                JsonObject jsonObject = gson.fromJson(pgParam, JsonObject.class);
-//                // "imprvmNo" 값을 "등록값으로"로 변경
-//                jsonObject.addProperty("imprvmNo", paramMap.get("imprvmNo"));
-//                jsonObject.addProperty("rsltNo", paramMap.get("imprvmNo"));
-//
-//                dtl.put("todoNo", paramMap.get("imprvmNo")); // "todoNo" 수정
-//                dtl.put("todoFileTrgtKey", paramMap.get("imprvmNo")); // "todoNo" 수정
-//                dtl.put("pgParam", gson.toJson(jsonObject));
-//                newdetailMap.add(dtl); // 수정된 맵 추가
-//            }
-//            // 결과를 paramMap에 저장
-//            paramMap.put("approvalArr", gson.toJson(newdetailMap));
-//            // 결제라인 insert
-//            result += wb20Svc.insertTodoMaster(paramMap);
-//        }
+        if (paramMap.containsKey("imprApprovalArr")) {
+
+            // 새로운 리스트 초기화
+            List<Map<String, String>> newdetailMap = new ArrayList<>();
+            List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("imprApprovalArr"), dtlMap);
+            // 각 맵 수정 및 추가
+            for (Map<String, String> dtl : detailMap) {
+
+                // JSON 문자열을 JsonObject로 변환
+                String pgParam = dtl.get("pgParam");
+                JsonObject jsonObject = gson.fromJson(pgParam, JsonObject.class);
+                // "imprvmNo" 값을 "등록값으로"로 변경
+                jsonObject.addProperty("imprvmNo", paramMap.get("imprvmNo"));
+                jsonObject.addProperty("rsltNo", paramMap.get("imprvmNo"));
+
+                dtl.put("todoNo", paramMap.get("imprvmNo")); // "todoNo" 수정
+                dtl.put("todoFileTrgtKey", paramMap.get("imprvmNo")); // "todoNo" 수정
+                dtl.put("pgParam", gson.toJson(jsonObject));
+                newdetailMap.add(dtl); // 수정된 맵 추가
+            }
+            // 결과를 paramMap에 저장
+            paramMap.put("approvalArr", gson.toJson(newdetailMap));
+            // 결제라인 insert
+            result += wb20Svc.insertTodoMaster(paramMap);
+        }
 
 //        if (paramMap.containsKey("execApprovalArr")) {
 //            // 새로운 리스트 초기화
