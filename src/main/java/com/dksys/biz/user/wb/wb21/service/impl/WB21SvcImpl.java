@@ -268,7 +268,9 @@ public class WB21SvcImpl implements WB21Svc {
 	@Override
 	public int sjConfirmY(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 	
-	
+        // 확정전 수정자료 자동 저장후 확정 처리함. (수정 + 확정)
+        int sjUpdate = sjUpdate(paramMap, mRequest);
+
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 		//---------------------------------------------------------------
 		//공유처리[]
