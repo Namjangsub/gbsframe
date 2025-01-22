@@ -68,13 +68,9 @@ public class CR16SvcImpl implements CR16Svc {
 		List<Map<String, String>> arr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (arr != null && arr.size() > 0 ) {
 			for (Map<String, String> arrMap : arr) {
-	            try {                                    
 	            	 cr16Mapper.deleteSalesYearPlanM(arrMap);
 	            	 cr16Mapper.deleteSalesYearPlanD(arrMap);
 	            	 result++;
-	            } catch (Exception e) {
-	                 System.out.println("error2"+e.getMessage());
-	            }
 	        }
 		}
 		return result;
@@ -98,13 +94,30 @@ public class CR16SvcImpl implements CR16Svc {
     @Override
     public int salesPlanYearInsert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		int result = 0;
+        Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+        Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {
+        }.getType();
+
+        // ---------------------------------------------------------------
+        // 첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+        // 필수값 : jobType, userId, comonCd
+        // ---------------------------------------------------------------
+        List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
+        if (uploadFileList.size() > 0) {
+            // 접근 권한 없으면 Exception 발생
+            paramMap.put("jobType", "fileUp");
+            cm15Svc.selectFileAuthCheck(paramMap);
+        }
+        // ---------------------------------------------------------------
+        // 첨부 화일 권한체크 끝
+        // ---------------------------------------------------------------
+
 		Gson gson = new Gson();
 	    Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> arr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		int fileTrgtKey = cr16Mapper.selectSalesYearPlanSeqNext(paramMap);
 		if (arr != null && arr.size() > 0 ) {
 			for (Map<String, String> arrMap : arr) {
-	            try {   	            	    
 	            	arrMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
 	            	
 	            	//수주와 매출을 동시에 입력해야 하므로 한줄당 2번의 업데이트 발생
@@ -117,41 +130,22 @@ public class CR16SvcImpl implements CR16Svc {
 	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt20").toString());
 	            	arrMap.put("salesPlanDiv", "SALESPLANDIV20");
 	            	cr16Mapper.salesPlanYearInsert(arrMap);
-
-	            	//계산서
-	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt30").toString());
-	            	arrMap.put("salesPlanDiv", "SALESPLANDIV30");
-	            	cr16Mapper.salesPlanYearInsert(arrMap);
-
-	            	//수금
-	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt40").toString());
-	            	arrMap.put("salesPlanDiv", "SALESPLANDIV40");
-	            	cr16Mapper.salesPlanYearInsert(arrMap);
 	            	
+// 계산서계획,수금계획은 연간수주및 미수금통합관리에서 자동 생성됩ㅁ
+//	            	//계산서
+//	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt30").toString());
+//	            	arrMap.put("salesPlanDiv", "SALESPLANDIV30");
+//	            	cr16Mapper.salesPlanYearInsert(arrMap);
+//
+//	            	//수금
+//	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt40").toString());
+//	            	arrMap.put("salesPlanDiv", "SALESPLANDIV40");
+//	            	cr16Mapper.salesPlanYearInsert(arrMap);
+
 	            	result++;	            	 
-	            } catch (Exception e) {
-	                 System.out.println("error2"+e.getMessage());
-	            }
 	        }
 		}
 		
-		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
-	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-	    
-		//---------------------------------------------------------------  
-		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
-	  	//   필수값 :  jobType, userId, comonCd
-		//---------------------------------------------------------------  
-		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
-		if (uploadFileList.size() > 0) {
-				//접근 권한 없으면 Exception 발생
-				paramMap.put("jobType", "fileUp");
-				cm15Svc.selectFileAuthCheck(paramMap);
-		}
-		//---------------------------------------------------------------  
-		//첨부 화일 권한체크  끝 
-		//---------------------------------------------------------------  
-
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------  
@@ -170,43 +164,6 @@ public class CR16SvcImpl implements CR16Svc {
     
     @Override
     public int salesPlanYearUpdate(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-    	int result = 0;
-		Gson gson = new Gson();
-	    Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> arr = gson.fromJson(paramMap.get("rowListArr"), stringList);
-		if (arr != null && arr.size() > 0 ) {
-			for (Map<String, String> arrMap : arr) {
-	            try {   
-	            	
-            		//수주와 매출을 동시에 입력해야 하므로 한줄당 2번의 업데이트 발생
-            		//수주
-	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt10").toString());
-	            	arrMap.put("salesPlanDiv", "SALESPLANDIV10");
-	            	cr16Mapper.salesPlanYearUpdate(arrMap);
-	            	
-	            	//매출
-	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt20").toString());
-	            	arrMap.put("salesPlanDiv", "SALESPLANDIV20");
-	            	cr16Mapper.salesPlanYearUpdate(arrMap);
-
-	            	//계산서
-	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt30").toString());
-	            	arrMap.put("salesPlanDiv", "SALESPLANDIV30");
-	            	cr16Mapper.salesPlanYearUpdate(arrMap);
-
-	            	//수금
-	            	arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt40").toString());
-	            	arrMap.put("salesPlanDiv", "SALESPLANDIV40");
-	            	cr16Mapper.salesPlanYearUpdate(arrMap);
-	            	
-	            	result++;	            	 
-	            } catch (Exception e) {
-	                 System.out.println("error2"+e.getMessage());
-	            }
-	        }
-		}
-    	
-		
     	Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
 	
@@ -236,7 +193,40 @@ public class CR16SvcImpl implements CR16Svc {
 		//---------------------------------------------------------------  
 		//첨부 화일 권한체크  끝 
 		//---------------------------------------------------------------  
-    	
+
+        int result = 0;
+        Gson gson = new Gson();
+        Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {
+        }.getType();
+        List<Map<String, String>> arr = gson.fromJson(paramMap.get("rowListArr"), stringList);
+        if (arr != null && arr.size() > 0) {
+            for (Map<String, String> arrMap : arr) {
+                // 수주와 매출을 동시에 입력해야 하므로 한줄당 2번의 업데이트 발생
+                // 수주
+                arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt10").toString());
+                arrMap.put("salesPlanDiv", "SALESPLANDIV10");
+                cr16Mapper.salesPlanYearUpdate(arrMap);
+
+                // 매출
+                arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt20").toString());
+                arrMap.put("salesPlanDiv", "SALESPLANDIV20");
+                cr16Mapper.salesPlanYearUpdate(arrMap);
+
+                // 계산서계획,수금계획은 연간수주및 미수금통합관리에서 자동 생성됩ㅁ
+//                  //계산서
+//                  arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt30").toString());
+//                  arrMap.put("salesPlanDiv", "SALESPLANDIV30");
+//                  cr16Mapper.salesPlanYearUpdate(arrMap);
+//
+//                  //수금
+//                  arrMap.put("salesPlanAmt", arrMap.get("salesPlanAmt40").toString());
+//                  arrMap.put("salesPlanDiv", "SALESPLANDIV40");
+//                  cr16Mapper.salesPlanYearUpdate(arrMap);
+//                  
+                result++;
+            }
+        }
+
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작 
 		//---------------------------------------------------------------  
@@ -267,7 +257,6 @@ public class CR16SvcImpl implements CR16Svc {
 		List<Map<String, String>> arr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (arr != null && arr.size() > 0 ) {
 			for (Map<String, String> arrMap : arr) {
-	            try {   	            	
 		            	List<Map<String, String>> listChk = cr16Mapper.salesYearPlanCloseChk(arrMap);
 		    			if (listChk.size() == 0) {
 		    				cr16Mapper.salesYearPlanCloseInsert(arrMap);
@@ -278,9 +267,6 @@ public class CR16SvcImpl implements CR16Svc {
 			            	result++;
 		    			}
 		    			cr16Mapper.salesYearPlanCloseChkUpdateY(arrMap);
-	            } catch (Exception e) {
-	                 System.out.println("error2"+e.getMessage());
-	            }
 	        }
 		}		
 		return result;
@@ -294,13 +280,9 @@ public class CR16SvcImpl implements CR16Svc {
 		List<Map<String, String>> arr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (arr != null && arr.size() > 0 ) {
 			for (Map<String, String> arrMap : arr) {
-	            try {   	            	
 	            		cr16Mapper.salesYearPlanCloseDelete(arrMap);
 	            		cr16Mapper.salesYearPlanCloseChkUpdateN(arrMap);
 	            		result++;           	 
-	            } catch (Exception e) {
-	                 System.out.println("error2"+e.getMessage());
-	            }
 	        }
 		}		
 		return result;
