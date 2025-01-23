@@ -309,6 +309,7 @@
 	var fileTrgtKey = null;
     var approvalList = null;
     var reqNo = null;
+    var rsltNo = null;
     var clntPjt = "";
     var teleNo = ""; //카카오 접수자 전화번호변수
  	// 카톡 정상알림 카운터 변수
@@ -518,6 +519,8 @@
 	$(document).ready(function() {
 		actionType = modalStack.last().paramObj.actionType;
 		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
+		reqNo = modalStack.last().paramObj.reqNo;
+		rsltNo = modalStack.last().paramObj.rsltNo;
 		$("#popForm2 #fileTrgtKey").val(fileTrgtKey);
 
 		setCommonSelect($("#popForm2 select[data-kind]"));
@@ -553,14 +556,9 @@
 		$("#popForm2 #creatId").val(modalStack.last().paramObj.userId);
 
 		if (actionType == "C") {
-
-// 			reqNo = modalStack.last().paramObj.rsltNo;
-			reqNo = ""; //처음 생성시에는 결과 등록번호가 없음.
-
+			rsltNo = '';
 			createCheckBox(userDept);	//부서별 장애원인 자동 생성 (수정일경우 등록된 자료에 따라 재설정함.)
-
-			selectQtyReqInfo();
-
+			
 			$("#qmPopFormRslt #actionBtn").text("등록");
 			$('#qmPopFormRslt #actionBtn').on("click", function() {
 				insertQualityResp();
@@ -568,19 +566,15 @@
 
 		} else if (actionType == "U" || actionType == "I") {
 			$('#qmPopFormRslt').find('.tit').text('요인별 발주 및 출장결과 수정');
-			reqNo = modalStack.last().paramObj.rsltNo;
-
-			selectQtyReqInfo();
-
-			selectApprovalCheck(reqNo);//결재가 되었는지 안되었는지 체크
 
 			$('#qmPopFormRslt #actionBtn').text("수정");
 			$('#qmPopFormRslt #actionBtn').on("click", function() {
 				updateQualityResp();
 			});
-
 		}
 
+		selectQtyReqInfo();
+		
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작
 		//---------------------------------------------------------------
@@ -738,59 +732,78 @@
 	function selectQtyReqInfo() {						//그리드에 뿌리는 데이터
 		var formData = {
 			"fileTrgtKey" : fileTrgtKey,
+	        "reqNo" 		: reqNo,
 		}
 
 		postAjaxSync("/user/qm/qm01/selectQtyReqInfo", formData, null, function(data) {
-			 //workRptNo = issNo : 문제등록번호가 존재하면 문제건임 ==> "ISS"
+			//workRptNo = issNo : 문제등록번호가 존재하면 문제건임 ==> "ISS"
 
-	            //발행자에 따라 등록사유 선택항목 재생성 작업
-	            //if (data.result.ordrgId.slice(0,7) == 'gyrsult') return false
-	            //    -->퇴사자인경우 작성자를 기준으로 생성해야함므로 작성자의 부서가 필요함
-	            // 작성자의 부서는 작성자 정보 출력시 저장해야함.
-	            if (data.result.ordrgId.slice(0,7) == 'gyrsult') {
-	          		createCheckBox(data.result.regDeptId);	//퇴사자인경우 작성자기준으로 등록사유 생성함
-	            } else {
-	    			createCheckBox(data.result.deptCd);	//부서별 장애원인 자동 생성 (수정일경우 등록된 자료에 따라 재설정함.)
-	            }
-	            
-	         	// 체크 대상 키들을 배열로 정의
-	            const checkKeys = ['reqCd', 'partCd', 'subCd', 'bustCd01', 'bustCd02', 'inwkCd01', 'inwkCd02'];
-
-	            for (const key in data.result) {
-	                if (data.result.hasOwnProperty(key)) {
-	                    const value = data.result[key];
-	                    
-	                    // 체크박스 처리
-	                    if (checkKeys.includes(key)) {
-	                        $('#popForm2 #' + value).prop("checked", true);
-	                    } else 	                    
-	                    // 특수한 키 'clntPjtNm' 처리
-	                    if (key === 'clntPjtNm') {
-	                        clntPjt = value;
-	                    } else 
-		                    // 텍스트 입력 필드에 값 설정
-	                    {
-	                    	$('#popForm2 #' + key).val(value);
-	                    }
-	                }
-	            }
-				if (actionType == 'C'){
-					$("#popForm2 #rsltNo").val('RES' + $("#popForm2 #reqNo").val().substr(3,10));
-					$("#popForm2 #mcPartCd").val('');
-					$("#popForm2 #impactCd").val('');
-					$("#popForm2 #importantCd").val('');
-				}
-
-				if ($("#popForm2 #ordrgId").val() != jwt.userId && $("#popForm2 #regId").val() != jwt.userId){
-					$("#qmPopFormRslt #actionBtn").hide();
-				}
+			if (data.approval[0] == 'Y'){	//결재가 한개라도 진행이 되었으면 알림창
+			    //input readonly, radio.checkbox disabled
+				$.each($('#popForm2  select, input, textarea'), function(idx, elem){
+					var id = $(elem).attr("ID");
+					if( id ) {
+						var eleId = '#qmPopFormRslt #'+id;
+						if( $(elem).prop('tagName') == "INPUT" ) $(eleId).attr("readonly", true);
+						if( $(elem).prop('tagName') == "TEXTAREA" ) $(eleId).attr("readonly", true);
+						if( $(elem).prop('tagName') == "SELECT" ) $(eleId).css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+						if( $(elem).prop('type') == "checkbox" || $(elem).prop('type') == "radio") $(eleId).on('click', function(e) {e.preventDefault();});
+					}
+				});
 				
-				// 각 텍스트 에어리어 크기 조절
-				txtareaHeightResize($('#popForm2 #reqRmk'));
+				$('#qmPopFormRslt #actionBtn').remove();
+				$('#qmPopFormRslt #plus-minus').remove();
+				$('#qmPopFormRslt .tit').text('요인별 발주 및 출장요청 조회');
+			}
+				
+            //발행자에 따라 등록사유 선택항목 재생성 작업
+            //if (data.result.ordrgId.slice(0,7) == 'gyrsult') return false
+            //    -->퇴사자인경우 작성자를 기준으로 생성해야함므로 작성자의 부서가 필요함
+            // 작성자의 부서는 작성자 정보 출력시 저장해야함.
+            if (data.result.ordrgId.slice(0,7) == 'gyrsult') {
+          		createCheckBox(data.result.regDeptId);	//퇴사자인경우 작성자기준으로 등록사유 생성함
+            } else {
+    			createCheckBox(data.result.deptCd);	//부서별 장애원인 자동 생성 (수정일경우 등록된 자료에 따라 재설정함.)
+            }
+            
+         	// 체크 대상 키들을 배열로 정의
+            const checkKeys = ['reqCd', 'partCd', 'subCd', 'bustCd01', 'bustCd02', 'inwkCd01', 'inwkCd02'];
 
-				selectQtyReqRespInfo();
+            for (const key in data.result) {
+                if (data.result.hasOwnProperty(key)) {
+                    const value = data.result[key];
+                    
+                    // 체크박스 처리
+                    if (checkKeys.includes(key)) {
+                        $('#popForm2 #' + value).prop("checked", true);
+                    } else 	                    
+                    // 특수한 키 'clntPjtNm' 처리
+                    if (key === 'clntPjtNm') {
+                        clntPjt = value;
+                    } else 
+	                    // 텍스트 입력 필드에 값 설정
+                    {
+                    	$('#popForm2 #' + key).val(value);
+                    }
+                }
+            }
+			if (actionType == 'C'){
+				$("#popForm2 #rsltNo").val('RES' + $("#popForm2 #reqNo").val().substr(3,10));
+				$("#popForm2 #mcPartCd").val('');
+				$("#popForm2 #impactCd").val('');
+				$("#popForm2 #importantCd").val('');
+			}
 
-				gridViewPop1.setData();
+			if ($("#popForm2 #ordrgId").val() != jwt.userId && $("#popForm2 #regId").val() != jwt.userId){
+				$("#qmPopFormRslt #actionBtn").hide();
+			}
+			
+			// 각 텍스트 에어리어 크기 조절
+			txtareaHeightResize($('#popForm2 #reqRmk'));
+
+			selectQtyReqRespInfo();
+
+			gridViewPop1.setData();
 
 		});
 	}
@@ -1015,7 +1028,7 @@
 
 	function selectQtyReqRespInfo() {						//그리드에 뿌리는 데이터
 		var formData = {
-			"rsltNo" : reqNo,
+			"rsltNo" : rsltNo,
 		}
 
 		postAjaxSync("/user/qm/qm01/selectQtyReqRespInfo", formData, null, function(data) {
@@ -1083,34 +1096,6 @@
 		}
 	}
 
-	function selectApprovalCheck(value) {
-		var formData = {
-				"reqNo" : value
-		}
-
-		postAjaxSync("/user/qm/qm01/selectApprovalChk", formData, null, function(data) {//결재가 진행이 되었는지 안되었는지 DB체크
-			var list = data.result[0]
-		    if (list == 'Y'){//결재가 한개라도 진행이 되었으면 알림창
-
-		        //input readonly, radio.checkbox disabled
-// 				$.each($('#popForm2 select, input, textarea'), function(idx, elem){
-// 					var id = $(elem).attr("ID");
-// 					if( id ) {
-// 						var eleId = "#popForm2 #"+id;
-// 						if( $(elem).prop('tagName') == "INPUT" ) $(eleId).attr("readonly", true);
-// 						if( $(elem).prop('tagName') == "TEXTAREA" ) $(eleId).attr("readonly", true);
-// 						if( $(elem).prop('tagName') == "SELECT" ) $(eleId).css({'background-color':'#e6e6e6', 'pointer-events':'none'});
-// 						if( $(elem).prop('type') == "checkbox" || $(elem).prop('type') == "radio") $(eleId).prop("disabled", true);
-// 					}
-
-// 				});
-
-// 				$("#resDt").prop("disabled", true);
-		    	$("#qmPopFormRslt #actionBtn").hide();
-		        $("#qmPopFormRslt #plus-minus").hide();
-		    }
-		});
-	}
 
 	/*
 	#	TODO 알림톡발송 시작
