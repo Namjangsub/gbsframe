@@ -1,6 +1,8 @@
 package com.dksys.biz.user.qm.qm01.service.impl;
 
 import java.lang.reflect.Type;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -123,71 +125,98 @@ public class QM01SvcImpl implements QM01Svc {
   @Override
   public int updateQualityReq(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 //	Gson gson = new Gson();
-	Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
-	Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+        Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+        Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {
+        }.getType();
 
-	//---------------------------------------------------------------  
-	//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
-  	//   필수값 :  jobType, userId, comonCd
-	//---------------------------------------------------------------  
-    HashMap<String, String> param = new HashMap<>();
-    param.put("userId", paramMap.get("userId"));
-    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
-    
-    String midCode = paramMap.get("CODECOBGB");
-	String midCd = midCode.substring(0, 7);
-	paramMap.put("midCd", midCd);
-    
-	List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
-	if (uploadFileList.size() > 0) {
-			//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
-			param.put("jobType", "fileUp");
-			cm15Svc.selectFileAuthCheck(param);
-	}
-	String[] deleteFileArr = gsonDtl.fromJson(paramMap.get("deleteFileArr"), String[].class);
-	List<String> deleteFileList = Arrays.asList(deleteFileArr);
-    for(String fileKey : deleteFileList) {  // 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
-		    Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
-			//접근 권한 없으면 Exception 발생
-		    param.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
-		    param.put("jobType", "fileDelete");
-			cm15Svc.selectFileAuthCheck(param);
-	}
-	//---------------------------------------------------------------  
-	//첨부 화일 권한체크  끝 
-	//---------------------------------------------------------------  
-	int result = QM01Mapper.updateQualityReq(paramMap);
+        // ---------------------------------------------------------------
+        // 첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+        // 필수값 : jobType, userId, comonCd
+        // ---------------------------------------------------------------
+        HashMap<String, String> param = new HashMap<>();
+        param.put("userId", paramMap.get("userId"));
+        param.put("comonCd", paramMap.get("comonCd")); // 프로트엔드에 넘어온 화일 저장 위치 정보
+
+        String midCode = paramMap.get("CODECOBGB");
+        String midCd = midCode.substring(0, 7);
+        paramMap.put("midCd", midCd);
+
+        List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
+        if (uploadFileList.size() > 0) {
+            // 접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
+            param.put("jobType", "fileUp");
+            cm15Svc.selectFileAuthCheck(param);
+        }
+        String[] deleteFileArr = gsonDtl.fromJson(paramMap.get("deleteFileArr"), String[].class);
+        List<String> deleteFileList = Arrays.asList(deleteFileArr);
+        for (String fileKey : deleteFileList) { // 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
+            Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
+            // 접근 권한 없으면 Exception 발생
+            param.put("comonCd", fileInfo.get("comonCd")); // 삭제할 파일이 보관된 저장 위치 정보
+            param.put("jobType", "fileDelete");
+            cm15Svc.selectFileAuthCheck(param);
+        }
+        // ---------------------------------------------------------------
+        // 첨부 화일 권한체크 끝
+        // ---------------------------------------------------------------
+        int result = QM01Mapper.updateQualityReq(paramMap);
 	
-	//---------------------------------------------------------------  
-	//첨부 화일 처리 시작 
-	//---------------------------------------------------------------  
-    if (uploadFileList.size() > 0) {
-	    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-	    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-	    cm08Svc.uploadFile(paramMap, mRequest);
-    }
-    
-    for(String fileKey : deleteFileList) {
-    	cm08Svc.deleteFile(fileKey);
-    }
-	//---------------------------------------------------------------  
-	//첨부 화일 처리  끝 
-	//---------------------------------------------------------------  
+        /**********************************************************************************
+         * 2025.01.21 남장섭 수정 시작 - 요인별발주요청서 작성과 결과등록 처리 기능을 하나로 합침 - 아래는 요인별 발주요청서 결과등록 처리하는 로직을 복사함
+         **********************************************************************************/
+        String procType = paramMap.get("sameTimeResult"); // 결과 분리여부
+        if (procType.equals("Y")) {
+            // 현재 날짜를 yyyyMMdd 형식으로 저장
+            String 현재일 = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            paramMap.put("resDt", 현재일); // 실적일자
+            paramMap.put("resDeptCd", paramMap.get("deptCd")); // 소속부서 대분류
+            paramMap.put("copArr", paramMap.get("deptCd2")); // 소속부서 분류
+            paramMap.put("resMidCd", paramMap.get("midCd")); // 중분류
+
+            paramMap.put("resRegId", paramMap.get("regId")); // 결과등록자
+            paramMap.put("thghRst", ""); // 고찰
+            paramMap.put("rsltRmk", paramMap.get("reqRmk")); // 결과등록자
+            paramMap.put("resRegId", paramMap.get("regId")); // 결과등록자
+            paramMap.put("sameTimeResult", "Y"); // 발주요청서와 결과를 동시에 처리한경우 'Y'
+
+            int result2 = QM01Mapper.updateQualityResp(paramMap);
+            result2 = QM01Mapper.updateReqRsltChg(paramMap);// 실적등록 여부 갱신 RSLT_YN = 'Y'
+            result2 = QM01Mapper.updateReqStRslt(paramMap);// // 상태코드 결과처리완료로 변경 REQ_ST = 'REQST03'
+        }
+        /**********************************************************************************
+         * 2025.01.21 남장섭 수정 끝 - 요인별발주요청서 작성과 결과등록 처리 기능을 하나로 합침 - 아래는 요인별 발주요청서 결과등록 처리하는 로직을 복사함
+         **********************************************************************************/
+
+        // ---------------------------------------------------------------
+        // 첨부 화일 처리 시작
+        // ---------------------------------------------------------------
+        if (uploadFileList.size() > 0) {
+            paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+            paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+            cm08Svc.uploadFile(paramMap, mRequest);
+        }
+
+        for (String fileKey : deleteFileList) {
+            cm08Svc.deleteFile(fileKey);
+        }
+        // ---------------------------------------------------------------
+        // 첨부 화일 처리 끝
+        // ---------------------------------------------------------------
 
 
-	//---------------------------------------------------------------  
-	// 결재라인 처리 시작 
-	//---------------------------------------------------------------	
-	if( paramMap.containsKey("approvalArr") ) {	
-        		//결제라인 insert
-        		result += wb20Svc.insertTodoMaster(paramMap);	
-	}		
-	//---------------------------------------------------------------  
-	// 결재라인 처리 end
-	//---------------------------------------------------------------
+        // ---------------------------------------------------------------
+        // 결재라인 처리 시작
+        // ---------------------------------------------------------------
+        if (paramMap.containsKey("approvalArr")) {
+            // 결제라인 insert
+            result += wb20Svc.insertTodoMaster(paramMap);
+        }
+        // ---------------------------------------------------------------
+        // 결재라인 처리 end
+        // ---------------------------------------------------------------
 
 
-     return result;
+        return result;
   }
   
   @Override
@@ -288,6 +317,35 @@ public class QM01SvcImpl implements QM01Svc {
 		paramMap.put("reqNo", reqNo);
 		int result = QM01Mapper.insertQualityReq(paramMap);
 		
+        /**********************************************************************************
+         * 2025.01.21 남장섭 수정 시작 - 요인별발주요청서 작성과 결과등록 처리 기능을 하나로 합침 - 아래는 요인별 발주요청서 결과등록 처리하는 로직을 복사함
+         **********************************************************************************/
+        String procType = paramMap.get("procType"); // 결과 분리여부
+        if (procType.equals("결과일괄등록")) {
+            String rsltNoCopy = "RES" + reqNo.substring(3, 10);
+            paramMap.put("rsltNo", rsltNoCopy);
+
+            // 현재 날짜를 yyyyMMdd 형식으로 저장
+            String 현재일 = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            paramMap.put("resDt", 현재일); // 실적일자
+            paramMap.put("resDeptCd", paramMap.get("deptCd")); // 소속부서 대분류
+            paramMap.put("copArr", paramMap.get("deptCd2")); // 소속부서 분류
+            paramMap.put("resMidCd", paramMap.get("midCd")); // 중분류
+
+            paramMap.put("resRegId", paramMap.get("regId")); // 결과등록자
+            paramMap.put("thghRst", ""); // 고찰
+            paramMap.put("rsltRmk", paramMap.get("reqRmk")); // 결과등록자
+            paramMap.put("resRegId", paramMap.get("regId")); // 결과등록자
+            paramMap.put("sameTimeResult", "Y"); // 발주요청서와 결과를 동시에 처리한경우 'Y'
+
+            int result2 = QM01Mapper.insertQualityResp(paramMap);
+            result2 = QM01Mapper.updateReqRsltChg(paramMap);// 실적등록 여부 갱신 RSLT_YN = 'Y'
+            result2 = QM01Mapper.updateReqStRslt(paramMap);// // 상태코드 결과처리완료로 변경 REQ_ST = 'REQST03'
+        }
+        /**********************************************************************************
+         * 2025.01.21 남장섭 수정 끝 - 요인별발주요청서 작성과 결과등록 처리 기능을 하나로 합침 - 아래는 요인별 발주요청서 결과등록 처리하는 로직을 복사함
+         **********************************************************************************/
+
 		//문제발생내역의 발주요청번호 update 처리하기 (ISSNO에 해당하는 문제에 발주요청번호 Update 처리함.
 		result += QM01Mapper.updateWbsIssueReqNo(paramMap);
 		
@@ -467,19 +525,51 @@ public class QM01SvcImpl implements QM01Svc {
 		//---------------------------------------------------------------  
 
 
+        // 1. 발주요청서 자료 삭제
 	  	int result = QM01Mapper.deleteQualityReq(paramMap);
+
+        // 2. 문제현황 자료에서 발주요청서 번호 필드 clear 처리
 		//문제발생내역의 발주요청번호 update 처리하기 (ISSNO에 해당하는 문제에 발주요청번호 clear 처리함.
 		if( paramMap.containsKey("issNo") ) {	
 			if (paramMap.get("issNo") != null && !paramMap.get("issNo").isEmpty()) {	
 				result += QM01Mapper.clearWbsIssueReqNo(paramMap);
 			}
 		}
-	  	
+
+        // 3. 발주요청서 결재자 정보 삭제 처리
 		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
 			if (sharngChk.size() > 0) {
 				QM01Mapper.deleteWbsSharngList(paramMap); 
 			 }
-	  
+
+//	        // 발주요청서 요청 및 결과 동시처리건이면 결과도 함게 삭제처리함.
+//	        if (paramMap.containsKey("sameTimeResult")) {
+//	            if (paramMap.get("sameTimeResult").equals("Y")) {
+//	                result += QM01Mapper.deleteQualityResp(paramMap);
+//	            }
+//	        }
+
+        // **************************************************************************************
+        // 여기서부터는 발주요청 결과자료 삭제처리 시작입니다.
+        // **************************************************************************************
+        // 4.발주요청서 자료가 삭제되면 결과도 같이 삭제처리합니다. (남장섭, 2025.01.23) 위의 동시처리와 무관하게 진행되어야 함.
+        result += QM01Mapper.deleteQualityResp(paramMap);
+
+        // 5.결과자료에 대한 결재자 정보가 있으면 삭제처리합니다.
+        // --> reqNo 에 rsltNo=결과처리번호에 해당하는 결재정보 삭제처리 진행
+        HashMap<String, String> paramApproval = new HashMap<>();
+        paramApproval.put("salesCd", paramMap.get("salesCd"));
+        paramApproval.put("reqNo", paramMap.get("rsltNo"));
+        paramApproval.put("histNo", "");
+        sharngChk = QM01Mapper.deleteWbsSharngListChk(paramApproval);
+        if (sharngChk.size() > 0) {
+            QM01Mapper.deleteWbsSharngList(paramApproval);
+        }
+        // **************************************************************************************
+        // 여기까지 발주요청 결과자료 삭제처리 끝입니다. --아래 7번 첨부파일 삭제 까지 처리되어야 합니다.
+        // **************************************************************************************
+
+        // 6. 발주요청서 첨부자료 삭제 처리
 	  	//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------  
@@ -489,15 +579,23 @@ public class QM01SvcImpl implements QM01Svc {
 			    cm08Svc.deleteFile( fileKey );
 		    }
 		}
+
+        // 7.결과에 등록된 첨부파일도 같이 삭제처해야함. 현재의 Class의 마지막에 파일 삭제처리해야함.~~꼭
+        // WHERE FILE_TRGT_TYP = #{fileTrgtTyp} --> 결과는 'QM0101P03'으로 저장됨.
+        // AND FILE_TRGT_KEY = #{fileTrgtKey} --> 발주요청서의 fileTrgtKey 값으로 동일하게 처리함.
+        HashMap<String, String> paramResultFile = new HashMap<>();
+        paramResultFile.put("fileTrgtTyp", "QM0101P03");
+        paramResultFile.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+        deleteFileList = cm08Svc.selectFileListAll(paramResultFile);
+        if (deleteFileList.size() > 0) {
+            for (Map<String, String> deleteDtl : deleteFileList) {
+                String fileKey = deleteDtl.get("fileKey").toString();
+                cm08Svc.deleteFile(fileKey);
+            }
+        }
 		//---------------------------------------------------------------  
 		//첨부 화일 처리  끝 
 		//---------------------------------------------------------------  
-
-//	  List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
-//		if (sharngChk.size() > 0) {
-//			QM01Mapper.deleteWbsSharngList(paramMap); 
-//		 }
-
 		 	  
 	    return result;
   }

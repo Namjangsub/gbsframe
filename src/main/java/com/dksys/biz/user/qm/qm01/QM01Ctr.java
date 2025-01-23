@@ -1,13 +1,11 @@
 package com.dksys.biz.user.qm.qm01;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,8 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.user.qm.qm01.service.QM01Svc;
 import com.dksys.biz.cmn.vo.PaginationInfo;
+import com.dksys.biz.user.qm.qm01.service.QM01Svc;
 import com.dksys.biz.util.MessageUtils;
 
 @Controller
@@ -55,9 +53,11 @@ public class QM01Ctr {
   //요청 정보 
   @PostMapping(value = "/selectQtyReqInfo")
   public String selectQtyReqInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	Map<String, String> result = qm01Svc.selectQtyReqInfo(paramMap);
-    model.addAttribute("result", result);
-    return "jsonView";
+        Map<String, String> result = qm01Svc.selectQtyReqInfo(paramMap);
+        model.addAttribute("result", result);
+        List<Map<String, String>> approval = qm01Svc.selectApprovalChk(paramMap);
+        model.addAttribute("approval", approval);
+        return "jsonView";
   }
   
 //요청 정보2 
