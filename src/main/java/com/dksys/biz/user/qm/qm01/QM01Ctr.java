@@ -55,6 +55,8 @@ public class QM01Ctr {
   public String selectQtyReqInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
         Map<String, String> result = qm01Svc.selectQtyReqInfo(paramMap);
         model.addAttribute("result", result);
+
+        // 결재정보 확인
         List<Map<String, String>> approval = qm01Svc.selectApprovalChk(paramMap);
         model.addAttribute("approval", approval);
         return "jsonView";
@@ -63,9 +65,13 @@ public class QM01Ctr {
 //요청 정보2 
   @PostMapping(value = "/selectQtyReqRespInfo")
   public String selectQtyReqRespInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
-	Map<String, String> result = qm01Svc.selectQtyReqRespInfo(paramMap);
-    model.addAttribute("result", result);
-    return "jsonView";
+        Map<String, String> result = qm01Svc.selectQtyReqRespInfo(paramMap);
+        model.addAttribute("result", result);
+
+        // 결재정보 확인 reqNo에 결과서 번호를 넣어야 함.
+        List<Map<String, String>> approval = qm01Svc.selectApprovalChk(paramMap);
+        model.addAttribute("approval", approval);
+        return "jsonView";
   }
   
   @PostMapping(value = "/selectShareUserlst")
