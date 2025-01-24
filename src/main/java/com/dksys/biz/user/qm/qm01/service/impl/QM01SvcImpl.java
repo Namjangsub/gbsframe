@@ -552,18 +552,20 @@ public class QM01SvcImpl implements QM01Svc {
         // **************************************************************************************
         // 여기서부터는 발주요청 결과자료 삭제처리 시작입니다.
         // **************************************************************************************
-        // 4.발주요청서 자료가 삭제되면 결과도 같이 삭제처리합니다. (남장섭, 2025.01.23) 위의 동시처리와 무관하게 진행되어야 함.
-        result += QM01Mapper.deleteQualityResp(paramMap);
+        if (paramMap.containsKey("rsltNo")) {
+            // 4.발주요청서 자료가 삭제되면 결과도 같이 삭제처리합니다. (남장섭, 2025.01.23) 위의 동시처리와 무관하게 진행되어야 함.
+            result += QM01Mapper.deleteQualityResp(paramMap);
 
-        // 5.결과자료에 대한 결재자 정보가 있으면 삭제처리합니다.
-        // --> reqNo 에 rsltNo=결과처리번호에 해당하는 결재정보 삭제처리 진행
-        HashMap<String, String> paramApproval = new HashMap<>();
-        paramApproval.put("salesCd", paramMap.get("salesCd"));
-        paramApproval.put("reqNo", paramMap.get("rsltNo"));
-        paramApproval.put("histNo", "");
-        sharngChk = QM01Mapper.deleteWbsSharngListChk(paramApproval);
-        if (sharngChk.size() > 0) {
-            QM01Mapper.deleteWbsSharngList(paramApproval);
+            // 5.결과자료에 대한 결재자 정보가 있으면 삭제처리합니다.
+            // --> reqNo 에 rsltNo=결과처리번호에 해당하는 결재정보 삭제처리 진행
+            HashMap<String, String> paramApproval = new HashMap<>();
+            paramApproval.put("salesCd", paramMap.get("salesCd"));
+            paramApproval.put("reqNo", paramMap.get("rsltNo"));
+            paramApproval.put("histNo", "");
+            sharngChk = QM01Mapper.deleteWbsSharngListChk(paramApproval);
+            if (sharngChk.size() > 0) {
+                QM01Mapper.deleteWbsSharngList(paramApproval);
+            }
         }
         // **************************************************************************************
         // 여기까지 발주요청 결과자료 삭제처리 끝입니다. --아래 7번 첨부파일 삭제 까지 처리되어야 합니다.
@@ -580,17 +582,19 @@ public class QM01SvcImpl implements QM01Svc {
 		    }
 		}
 
-        // 7.결과에 등록된 첨부파일도 같이 삭제처해야함. 현재의 Class의 마지막에 파일 삭제처리해야함.~~꼭
-        // WHERE FILE_TRGT_TYP = #{fileTrgtTyp} --> 결과는 'QM0101P03'으로 저장됨.
-        // AND FILE_TRGT_KEY = #{fileTrgtKey} --> 발주요청서의 fileTrgtKey 값으로 동일하게 처리함.
-        HashMap<String, String> paramResultFile = new HashMap<>();
-        paramResultFile.put("fileTrgtTyp", "QM0101P03");
-        paramResultFile.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-        deleteFileList = cm08Svc.selectFileListAll(paramResultFile);
-        if (deleteFileList.size() > 0) {
-            for (Map<String, String> deleteDtl : deleteFileList) {
-                String fileKey = deleteDtl.get("fileKey").toString();
-                cm08Svc.deleteFile(fileKey);
+        if (paramMap.containsKey("rsltNo")) {
+            // 7.결과에 등록된 첨부파일도 같이 삭제처해야함. 현재의 Class의 마지막에 파일 삭제처리해야함.~~꼭
+            // WHERE FILE_TRGT_TYP = #{fileTrgtTyp} --> 결과는 'QM0101P03'으로 저장됨.
+            // AND FILE_TRGT_KEY = #{fileTrgtKey} --> 발주요청서의 fileTrgtKey 값으로 동일하게 처리함.
+            HashMap<String, String> paramResultFile = new HashMap<>();
+            paramResultFile.put("fileTrgtTyp", "QM0101P03");
+            paramResultFile.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+            deleteFileList = cm08Svc.selectFileListAll(paramResultFile);
+            if (deleteFileList.size() > 0) {
+                for (Map<String, String> deleteDtl : deleteFileList) {
+                    String fileKey = deleteDtl.get("fileKey").toString();
+                    cm08Svc.deleteFile(fileKey);
+                }
             }
         }
 		//---------------------------------------------------------------  
