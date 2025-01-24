@@ -344,6 +344,7 @@ function checkGridRow(grid, type){
 var tokenErrorMsg = ["unauthorized", "invalid_token"];
 
 function postAjax(url, data, contentType, callback) {
+	if (typeof $.blockUI === 'function') openProgress(true);
 //	console.log(`postAjax url = ${url} `);
 	if(contentType == null) {
 		contentType = "application/json; charset=utf-8";
@@ -373,6 +374,9 @@ function postAjax(url, data, contentType, callback) {
 					location.href = "/static/index.html";
 				}
         	}
+        },
+        complete: function() {
+        	if (typeof $.blockUI === 'function') openProgress(false);
         }
 	});
 }
@@ -408,11 +412,15 @@ function postAjaxSync(url, data, contentType, callback) {
 					location.href = "/static/index.html";
 				}
         	}
+        },
+        complete: function() {
+        	if (typeof $.blockUI === 'function') openProgress(false);
         }
 	});
 }
 
 function deleteAjax(url, data, contentType, callback) {
+	if (typeof $.blockUI === 'function') openProgress(true);
 	if(contentType == null) {
 		contentType = "application/json; charset=utf-8";
 	}
@@ -437,11 +445,15 @@ function deleteAjax(url, data, contentType, callback) {
 					location.href = "/static/index.html";
 				}
         	}
+        },
+        complete: function() {
+        	if (typeof $.blockUI === 'function') openProgress(false);
         }
 	});
 }
 
 function putAjax(url, data, contentType, callback) {
+	if (typeof $.blockUI === 'function') openProgress(true);
 	if(contentType == null) {
 		contentType = "application/json; charset=utf-8";
 	}
@@ -465,11 +477,15 @@ function putAjax(url, data, contentType, callback) {
 					location.href = "/static/index.html";
 				}
         	}
+        },
+        complete: function() {
+        	if (typeof $.blockUI === 'function') openProgress(false);
         }
 	});
 }
 
 function filePostAjax(url, data, callback) {
+	if (typeof $.blockUI === 'function') openProgress(true);
 	$.ajax({
 //		enctype: 'multipart/form-data',
 	    type: "POST",
@@ -493,11 +509,48 @@ function filePostAjax(url, data, callback) {
 					location.href = "/static/index.html";
 				}
         	}
+        },
+        complete: function() {
+        	if (typeof $.blockUI === 'function') openProgress(false);
+        }
+	});
+}
+
+function filePostAjaxButton(url, data, callback) {
+	if (typeof $.blockUI === 'function') openProgress(true);
+
+	$.ajax({
+//		enctype: 'multipart/form-data',
+	    type: "POST",
+	    url: url,
+	    processData: false,
+		contentType: false,
+	    data: data,
+	    beforeSend: function (request) {
+            request.setRequestHeader("Authorization", authorizationToken);
+        },
+	    success: function(data){
+	    	callback(data);
+	    },
+        error: function (data) {
+        	if(tokenErrorMsg.indexOf(data.responseJSON.error) > -1){
+//        		alert("토큰이 만료되었습니다.");
+
+        		if(isMobile()){
+					location.href = "/static/mobile/index.html";
+				}else{
+					location.href = "/static/index.html";
+				}
+        	}
+        },
+        complete: function() {
+        	if (typeof $.blockUI === 'function') openProgress(true);
         }
 	});
 }
 
 function filePutAjax(url, data, callback) {
+	if (typeof $.blockUI === 'function') openProgress(true);
 	$.ajax({
 //		enctype: 'multipart/form-data',
 	    type: "PUT",
@@ -520,6 +573,9 @@ function filePutAjax(url, data, callback) {
 					location.href = "/static/index.html";
 				}
         	}
+        },
+        complete: function() {
+        	if (typeof $.blockUI === 'function') openProgress(false);
         }
 	});
 }
@@ -2279,7 +2335,7 @@ function inCloseChk(chkValue){
 	 if(boolean){
 			$.blockUI.defaults.overlayCSS.opacity = 0.1;
 			$.blockUI({
-				message: "<img src='/static/img/progress.gif'/> <font color='blue'>실행중 기다려 주십시요.</font>",
+				message: "<div><img src='/static/img/progress.gif'/> <font size='5' color='blue'> 실행중 기다려 주십시요.</font></div>",
 				css: {
 					backgroundColor: 'rgba(0,0,0,0.0)',
 					color: '#000000',
