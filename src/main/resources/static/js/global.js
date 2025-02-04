@@ -343,8 +343,8 @@ function checkGridRow(grid, type){
 
 var tokenErrorMsg = ["unauthorized", "invalid_token"];
 
-function postAjax(url, data, contentType, callback) {
-	if (typeof $.blockUI === 'function') openProgress(true);
+function postAjax(url, data, contentType, callback, blockProc=true) {
+	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 //	console.log(`postAjax url = ${url} `);
 	if(contentType == null) {
 		contentType = "application/json; charset=utf-8";
@@ -376,7 +376,7 @@ function postAjax(url, data, contentType, callback) {
         	}
         },
         complete: function() {
-        	if (typeof $.blockUI === 'function') openProgress(false);
+        	if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
         }
 	});
 }
@@ -412,15 +412,12 @@ function postAjaxSync(url, data, contentType, callback) {
 					location.href = "/static/index.html";
 				}
         	}
-        },
-        complete: function() {
-        	if (typeof $.blockUI === 'function') openProgress(false);
         }
 	});
 }
 
-function deleteAjax(url, data, contentType, callback) {
-	if (typeof $.blockUI === 'function') openProgress(true);
+function deleteAjax(url, data, contentType, callback, blockProc=true) {
+	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 	if(contentType == null) {
 		contentType = "application/json; charset=utf-8";
 	}
@@ -447,13 +444,13 @@ function deleteAjax(url, data, contentType, callback) {
         	}
         },
         complete: function() {
-        	if (typeof $.blockUI === 'function') openProgress(false);
+        	if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
         }
 	});
 }
 
-function putAjax(url, data, contentType, callback) {
-	if (typeof $.blockUI === 'function') openProgress(true);
+function putAjax(url, data, contentType, callback, blockProc=true) {
+	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 	if(contentType == null) {
 		contentType = "application/json; charset=utf-8";
 	}
@@ -479,13 +476,13 @@ function putAjax(url, data, contentType, callback) {
         	}
         },
         complete: function() {
-        	if (typeof $.blockUI === 'function') openProgress(false);
+        	if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
         }
 	});
 }
 
-function filePostAjax(url, data, callback) {
-	if (typeof $.blockUI === 'function') openProgress(true);
+function filePostAjax(url, data, callback, blockProc=true) {
+	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 	$.ajax({
 //		enctype: 'multipart/form-data',
 	    type: "POST",
@@ -511,13 +508,13 @@ function filePostAjax(url, data, callback) {
         	}
         },
         complete: function() {
-        	if (typeof $.blockUI === 'function') openProgress(false);
+        	if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
         }
 	});
 }
 
-function filePostAjaxButton(url, data, callback) {
-	if (typeof $.blockUI === 'function') openProgress(true);
+function filePostAjaxButton(url, data, callback, blockProc=true) {
+	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 
 	$.ajax({
 //		enctype: 'multipart/form-data',
@@ -544,13 +541,13 @@ function filePostAjaxButton(url, data, callback) {
         	}
         },
         complete: function() {
-        	if (typeof $.blockUI === 'function') openProgress(true);
+        	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
         }
 	});
 }
 
-function filePutAjax(url, data, callback) {
-	if (typeof $.blockUI === 'function') openProgress(true);
+function filePutAjax(url, data, callback, blockProc=true) {
+	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 	$.ajax({
 //		enctype: 'multipart/form-data',
 	    type: "PUT",
@@ -575,7 +572,7 @@ function filePutAjax(url, data, callback) {
         	}
         },
         complete: function() {
-        	if (typeof $.blockUI === 'function') openProgress(false);
+        	if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
         }
 	});
 }
