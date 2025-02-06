@@ -1,5 +1,7 @@
 package com.dksys.biz.admin.cm.cm06.service.impl;
 
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -20,6 +22,9 @@ public class CM06SvcImpl implements CM06Svc {
     
     @Autowired
     CM04Mapper cm04Mapper;
+
+	@Autowired
+	CM06Svc cm06Svc;
 
     @Override
 	public int selectUserCount(Map<String, String> paramMap) {
@@ -56,11 +61,31 @@ public class CM06SvcImpl implements CM06Svc {
 	public void insertUser(Map<String, String> paramMap) throws Exception{
 		cm06Mapper.insertUser(paramMap);
 		cm06Mapper.insertUserOauth(paramMap);
+
+		// 이미지 업로드를 위한 로직 (타입 변경 및 필요 매개변수 삽입)
+		// 이미지 Insert 및 Update에 관한 모듈로 분리
+		if (paramMap.containsKey("userImg")) {
+			Map<String, Object> imgParam = new HashMap<>();
+			imgParam.put("userId", paramMap.get("userId"));
+			imgParam.put("userImg", paramMap.get("userImg"));
+			
+			cm06Svc.updateUserImg(imgParam);
+		}
 	}
 	
 	@Override
 	public void updateUser(Map<String, String> paramMap) throws Exception {
 		cm06Mapper.updateUser(paramMap);
+
+		// 이미지 업로드를 위한 로직 (타입 변경 및 필요 매개변수 삽입)
+		// 이미지 Insert 및 Update에 관한 모듈로 분리
+		if (paramMap.containsKey("userImg")) {
+			Map<String, Object> imgParam = new HashMap<>();
+			imgParam.put("userId", paramMap.get("userId"));
+			imgParam.put("userImg", paramMap.get("userImg"));
+			
+			cm06Svc.updateUserImg(imgParam);
+		}
 	}
 
 	@Override
@@ -112,5 +137,25 @@ public class CM06SvcImpl implements CM06Svc {
 	@Override
 	public Map<String, String> checkUserIdImage(Map<String, String> paramMap) {
 		return cm06Mapper.checkUserIdImage(paramMap);
+	}
+
+	// 이미지 업로드
+	@Override
+	public void updateUserImg(Map<String, Object> paramMap) throws Exception {
+		if (paramMap.containsKey("userImg")) {
+			Object userImgObj = paramMap.get("userImg");
+			if (userImgObj instanceof String) {
+				String userImgStr = (String) userImgObj;
+				// 원하는 형식인 경우에만 바이트 배열로 변환하여 저장합니다.
+				if (userImgStr != null && userImgStr.startsWith("data:application/octet-stream;base64,")) {
+					// 단순히 문자열을 UTF-8 바이트 배열로 변환합니다.
+					byte[] userImgBytes = userImgStr.getBytes(StandardCharsets.UTF_8);
+					paramMap.put("userImg", userImgBytes);
+				} else {
+					paramMap.put("userImg", null);
+				}
+			}
+		}
+		cm06Mapper.updateUserImg(paramMap);
 	}
 }
