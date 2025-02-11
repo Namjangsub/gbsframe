@@ -2328,20 +2328,25 @@ function inCloseChk(chkValue){
  * Open Progress
  * @param progress bar 호출할 함수
  */
- openProgress = function(boolean){
-	 if(boolean){
-			$.blockUI.defaults.overlayCSS.opacity = 0.1;
-			$.blockUI({
-				message: "<div><img src='/static/img/progress.gif'/> <font size='5' color='blue'> 실행중 기다려 주십시요.</font></div>",
-				css: {
-					backgroundColor: 'rgba(0,0,0,0.0)',
-					color: '#000000',
-					border: '0px solid #a00'
-				}
-			});
-	 }else{
-			$.unblockUI();
-	 }
+openProgress = function(boolean){
+	if(boolean){
+		let path = window.location.pathname;
+		let message = "<div><img src='/static/img/progress.gif'/> <font size='5' color='blue'> 실행중 기다려 주십시요.</font></div>";
+		if (path.includes('/static/mobile')) {
+			message = "<div style='white-space: nowrap;'><img src='/static/img/progress.gif'/> <font size='2' color='blue'> 실행중 기다려 주십시요.</font></div>";
+		}
+		$.blockUI.defaults.overlayCSS.opacity = 0.1;
+		$.blockUI({
+			message: message,
+			css: {
+				backgroundColor: 'rgba(0,0,0,0.0)',
+				color: '#000000',
+				border: '0px solid #a00'
+			}
+		});
+	}else{
+		$.unblockUI();
+	}
 };
 
 

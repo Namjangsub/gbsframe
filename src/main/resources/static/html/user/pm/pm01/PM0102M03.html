@@ -34,6 +34,7 @@
 <script src="/static/js/jstree/jstree.min.js"></script>
 <script src="/static/js/global.js"></script>
 <script src="/static/js/fileTree.js"></script>
+<script src="/static/js/jquery.blockUI.js"></script>
 </head>
 
 <body>
@@ -66,10 +67,10 @@
             <td>
               <div class="date_input">
                 <input id="reqDtFrom_S" name="reqDtFrom"  class="input_calendar" autocomplete="off" onkeyup="dateMask(this);"
-                  msg="시작일자" data-search="reqDtFrom" onchange="gridView.setData(0);">
+                  msg="시작일자" data-search="reqDtFrom">
                 <span>~</span>
                 <input id="reqDtTo_S" name="reqDtTo"  class="input_calendar" autocomplete="off" onkeyup="dateMask(this);"
-                  msg="종료일자" data-search="reqDtTo" onchange="gridView.setData(0);">
+                  msg="종료일자" data-search="reqDtTo">
               </div>
             </td>
 			
@@ -248,16 +249,22 @@ var gridView = {
 				"workRptS" 		: $("#workRptS_S").val(),
 			}
 			formData["userName"] = userName;
-			
 			postAjax("/user/pm/pm01/selectWorkPrtList", formData, null, function(data){
-				var list = data.result;
-				targetObj.setData({
-						list : list,
-						page : {
-							totalElements : list.count,
-						}
-				});
-				gridHeightResize(gridView, 194); // 194 = 919 - 725 : 화면 Body 높이 - 그리드 기본크기 725
+				try {
+					var list = data.result;
+					targetObj.setData({
+							list : list,
+							page : {
+								totalElements : list.count,
+							}
+					});
+					gridHeightResize(gridView, 194); // 194 = 919 - 725 : 화면 Body 높이 - 그리드 기본크기 725
+				} catch {
+					alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+					return null; // 오류 발생 시 null 반환
+				} finally {
+					// console.log("함수 실행 완료.");
+				}
 			});
 		}
 	}
@@ -319,13 +326,13 @@ var gridView = {
 							{key: "user8", 		collector: "sum", formatter:"money", align: "right"},
 							{key: "user9", 		collector: "sum", formatter:"money", align: "right"},
 							{key: "user10", 	collector: "sum", formatter:"money", align: "right"},
-	    					{key: "user11", 	collector: "sum", formatter:"money", align: "right"},
-	    					{key: "user12", 	collector: "sum", formatter:"money", align: "right"},
-	    					{key: "user13", 	collector: "sum", formatter:"money", align: "right"},
-	    					{key: "user14", 	collector: "sum", formatter:"money", align: "right"},
-	    					{key: "user15", 	collector: "sum", formatter:"money", align: "right"},
-			                 ]
-					    ],
+							{key: "user11", 	collector: "sum", formatter:"money", align: "right"},
+							{key: "user12", 	collector: "sum", formatter:"money", align: "right"},
+							{key: "user13", 	collector: "sum", formatter:"money", align: "right"},
+							{key: "user14", 	collector: "sum", formatter:"money", align: "right"},
+							{key: "user15", 	collector: "sum", formatter:"money", align: "right"},
+							]
+						],
 
 			});
 			return this;
@@ -334,7 +341,6 @@ var gridView = {
 
 
   	$(document).ready(function() {
-
   		mainDefaultLoad("공통업무", "부서별작업일보현황(업무별)");			// 페이지 타이틀 설정
   		setCommonSelect($("#main_area select[data-kind]"));		// 공통코드 set
 
@@ -345,51 +351,46 @@ var gridView = {
 
 		// 시작일 (현재날짜의 월 첫일)
 		$('#reqDtFrom_S').datepicker({
-  			format : "yyyy-mm-dd",
-  			language : "ko",
-  			autoclose : true
-  		})
+			format : "yyyy-mm-dd",
+			language : "ko",
+			autoclose : true
+		})
+		.datepicker("setDate", moment(new Date()).startOf("month").toDate())
+		.on("changeDate", function(){
+			if($('#reqDtFrom_S').val() > $('#reqDtTo_S').val()){
+				alert("날짜를 확인해주세요");
+				$('#reqDtFrom_S').datepicker("setDate", new Date($('#reqDtTo_S').val()));
+			}
+		});
 
-  		.datepicker("setDate", moment(new Date()).startOf("month").toDate())
-  		.on("changeDate", function(){
-  			if($('#reqDtFrom_S').val() > $('#reqDtTo_S').val()){
-  				alert("날짜를 확인해주세요");
-  				$('#reqDtFrom_S').datepicker("setDate", new Date($('#reqDtTo_S').val()));
-  			}
-  		});
+		// 종료일 (현재날짜의 월 말일)
+		$('#reqDtTo_S').datepicker({
+			format : "yyyy-mm-dd",
+			language : "ko",
+			autoclose : true
+		})
+		.datepicker("setDate", moment(new Date()).endOf("month").toDate())
+		.on("changeDate", function(){
+			if($('#reqDtFrom_S').val() > $('#reqDtTo_S').val()){
+				alert("날짜를 확인해주세요");
+				$('#reqDtTo_S').datepicker("setDate", new Date($('#reqDtFrom_S').val()));
+			}
+		});
 
-  		// 종료일 (현재날짜의 월 말일)
-  		$('#reqDtTo_S').datepicker({
-  			format : "yyyy-mm-dd",
-  			language : "ko",
-  			autoclose : true
-  		})
-  		.datepicker("setDate", moment(new Date()).endOf("month").toDate())
-  		.on("changeDate", function(){
-  			if($('#reqDtFrom_S').val() > $('#reqDtTo_S').val()){
-  				alert("날짜를 확인해주세요");
-  				$('#reqDtTo_S').datepicker("setDate", new Date($('#reqDtFrom_S').val()));
-  			}
-  		});
-  		
-        // 검색조건 이벤트 bind
-  		$('[data-search]').on("change", function(){
-  			gridView.setData(0);
-  		});
-  		
-  		gridView.initView();
-  		excelView.initView();
+		gridView.initView();
+		excelView.initView();
 
-  		
-  		GridHeaderWrite();
+		// 검색조건 이벤트 bind
+		$('[data-search]').on("change", function(){
+			gridView.setData(0);
+		});
+		
+		GridHeaderWrite();
 
-  		gridView.setData(0);
-  		//권한체크
+		//권한체크
+		authChk();
 
-  		authChk();
-
-  	});
-
+	});
 
 	// 초기화 버튼용
 	function initSearch() {
@@ -406,19 +407,19 @@ var gridView = {
 		$("#reqDtFrom_S").val(dateToStr(moment(new Date()).startOf("month").toDate()));
 		$("#reqDtTo_S").val(dateToStr(moment(new Date()).endOf("month").toDate()));
 
-  		gridView.initView();
-  		excelView.initView();
+		gridView.initView();
+		excelView.initView();
 
-  		GridHeaderWrite();
-  		gridView.setData(0);
+		GridHeaderWrite();
+		gridView.setData(0);
 	}
 
 	// 작성자 검색 //
 	function openUserSearch() {
 		var paramObj = {
-			  "coCd" : $('#coCd').val(),
-			  "userId" : $('#workRptId_S').val(),
-			  "userNm" : $('#workRptIdNm_S').val(),
+			"coCd" : $('#coCd').val(),
+			"userId" : $('#workRptId_S').val(),
+			"userNm" : $('#workRptIdNm_S').val(),
 		};
 
 		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {

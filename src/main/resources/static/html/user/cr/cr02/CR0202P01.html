@@ -1722,47 +1722,53 @@
 						"pageNo" : _pageNo + 1
 					}
 					postAjax("/user/wb/wb20/selectSignResUserlst", formData, null, function(data){
-						var list = data.result;
-						if( list.length > 0 ) {
-							var inCnt = 0;
-							var inGb = 0; //해당 결재개수 변수
+						try {
+							var list = data.result;
+							if( list.length > 0 ) {
+								var inCnt = 0;
+								var inGb = 0; //해당 결재개수 변수
 
-							let processChk = false;	//결재 진행여부 체크 (결재가 하나라도  진행되면 true)
-							list.forEach(elem => {
-								if (elem.gb === "결재") {  // 결재와 공유 중 결재 갯수 파악
-									if (elem.todoId !== jwt.userId) {	//결재자가 동일하면 제외
-										//상태가 'Y'인 경우
-										if (elem.sanctnSttus === "Y") {
-											processChk = true;
-											inCnt++;
+								let processChk = false;	//결재 진행여부 체크 (결재가 하나라도  진행되면 true)
+								list.forEach(elem => {
+									if (elem.gb === "결재") {  // 결재와 공유 중 결재 갯수 파악
+										if (elem.todoId !== jwt.userId) {	//결재자가 동일하면 제외
+											//상태가 'Y'인 경우
+											if (elem.sanctnSttus === "Y") {
+												processChk = true;
+												inCnt++;
+											}
+
+											inGb++;
 										}
-
-										inGb++;
 									}
+								});
+								// 기본 상태: 숨김 처리
+								$('#createHistory, #actionOrdrsBtn').hide();
+
+								if (processChk && inCnt == inGb) {
+									// 결재자가 있고 결재가 완료된 경우
+									$('#createHistory').show();
+								} else if (list.length > 0 && inCnt > 0) {
+									// 결재자가 있고, 결재가 진행 중일 경우 (결재자가 1명 이상일 때)
+									// 이미 숨김 처리된 상태이므로 추가 처리 불필요
+								} else {
+									// 결재자가 없거나 아무도 결재를 하지 않았을 경우
+									// 이미 기본 숨김 처리되어 있으므로 추가 처리 불필요
+									$('#actionOrdrsBtn').show();
+								}
+							}
+							targetObj.setData({
+								list : list,
+								page : {
+									totalElements : list.length
 								}
 							});
-// debugger;
-							// 기본 상태: 숨김 처리
-							$('#createHistory, #actionOrdrsBtn').hide();
-
-							if (processChk && inCnt == inGb) {
-								// 결재자가 있고 결재가 완료된 경우
-								$('#createHistory').show();
-							} else if (list.length > 0 && inCnt > 0) {
-								// 결재자가 있고, 결재가 진행 중일 경우 (결재자가 1명 이상일 때)
-								// 이미 숨김 처리된 상태이므로 추가 처리 불필요
-							} else {
-								// 결재자가 없거나 아무도 결재를 하지 않았을 경우
-								// 이미 기본 숨김 처리되어 있으므로 추가 처리 불필요
-								$('#actionOrdrsBtn').show();
-							}
+						} catch {
+							alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+							return null; // 오류 발생 시 null 반환
+						} finally {
+							// console.log("함수 실행 완료.");
 						}
-						targetObj.setData({
-							list : list,
-							page : {
-								totalElements : list.length
-							}
-						});
 					});
 				},
 
@@ -1776,16 +1782,24 @@
 				}
 				,
 				setData3 : function(_pageNo) {
-				var targetObj = this.target;
-				var paramObj = { "userId": jwt.userId
-							, "appDiv": 'APPDIV09'		//수주원가관리 결재라인
-				};
+					var targetObj = this.target;
+					var paramObj = { "userId": jwt.userId
+								, "appDiv": 'APPDIV09'		//수주원가관리 결재라인
+					};
 					postAjax("/user/wb/wb20/selectSignResUserlstInit", paramObj, null, function(data){
-					var list = data.result;
-					targetObj.setData({
-							list : list,
-							page : { totalElements : list.length }
-						});
+						try {
+							var list = data.result;
+							targetObj.setData({
+								list : list,
+								page : { totalElements : list.length }
+							});
+						} catch {
+							alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+							return null; // 오류 발생 시 null 반환
+						} finally {
+							// console.log("함수 실행 완료.");
+						}
+					
 					});
 				}
 	}
@@ -2736,59 +2750,58 @@
 
 	//결재 여부
 	function approvalYn() {
-	var gridList = gridViewPop7.target.getList();
-	var inCnt = 0;
-	if( gridList.length > 0 ) {
-			var msgArr = [];
-			$.each(gridList, function (idx, elem) {
-			//결재자가 본인이 아니면서 상태가 Y인 경우
-			if( elem.todoId != jwt.userId && elem.sanctnSttus == "Y" ) inCnt++;
-			})
-	}
+		var gridList = gridViewPop7.target.getList();
+		var inCnt = 0;
+		if( gridList.length > 0 ) {
+				var msgArr = [];
+				$.each(gridList, function (idx, elem) {
+				//결재자가 본인이 아니면서 상태가 Y인 경우
+				if( elem.todoId != jwt.userId && elem.sanctnSttus == "Y" ) inCnt++;
+				})
+		}
 	return inCnt;
 	}
 
 	function deleteShareUser1(){
-
 		if( approvalYn() ) {
-		alert("결재가 이미 진행중입니다.");
-		return;
-	}
+			alert("결재가 이미 진행중입니다.");
+			return;
+		}
 
 		var selRow = parseInt(gridViewPop7.target.selectedDataIndexs);
 		if( isNaN(selRow) ) {
-		alert("선택된 행이 없습니다.");
-		return;
+			alert("선택된 행이 없습니다.");
+			return;
 		} else {
 			if( selRow > -1 ) {
 				var todoKey = gridViewPop7.target.getList()[selRow].todoKey;
 				var gridList = gridViewPop7.target.getList("selected")[0];
-			if( typeof(todoKey) == "undefined" ) {
-				gridViewPop7.target.removeRow(selRow);
-				$.gridNoSet(gridViewPop7, "sanctnSn");
-			} else {
-				var paramObj = {
-					todoNo: $("#popForm #ordrsNo").val(),
-					todoKey: gridList.todoKey,
-					sanctnSn: gridList.sanctnSn,
-					todoDiv1CodeId: gridList.todoDiv1CodeId,
-					todoDiv2CodeId: gridList.todoDiv2CodeId
+				if( typeof(todoKey) == "undefined" ) {
+					gridViewPop7.target.removeRow(selRow);
+					$.gridNoSet(gridViewPop7, "sanctnSn");
+				} else {
+					var paramObj = {
+						todoNo: $("#popForm #ordrsNo").val(),
+						todoKey: gridList.todoKey,
+						sanctnSn: gridList.sanctnSn,
+						todoDiv1CodeId: gridList.todoDiv1CodeId,
+						todoDiv2CodeId: gridList.todoDiv2CodeId
+					}
+						//  if( confirm("선택행을 삭제하시겠습니까?")) {
+							deleteAjax("/user/wb/wb20/deleteTodoMaster", paramObj, null, function(data) {
+							if (data.resultCode == 200) {
+								alert(data.resultMessage);
+								gridViewPop7.setData(0);
+							} else {
+								alert("삭제중 오류가 발생했습니다");
+							}
+							});
+					//      }
+					//    } else {
+					//       alert("삭제중 오류가 발생했습니다.")
+					//    }
 				}
-					//  if( confirm("선택행을 삭제하시겠습니까?")) {
-						deleteAjax("/user/wb/wb20/deleteTodoMaster", paramObj, null, function(data) {
-						if (data.resultCode == 200) {
-							alert(data.resultMessage);
-							gridViewPop7.setData(0);
-						} else {
-							alert("삭제중 오류가 발생했습니다");
-						}
-						});
-				//      }
-				//    } else {
-				//       alert("삭제중 오류가 발생했습니다.")
-				//    }
 			}
-		}
 		}
 	}
 
