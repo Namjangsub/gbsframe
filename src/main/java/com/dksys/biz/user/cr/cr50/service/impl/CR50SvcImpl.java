@@ -445,6 +445,8 @@ public class CR50SvcImpl implements CR50Svc {
         int result = cr50Mapper.deletePfuNo(paramMap);
 //          //상세내역 삭제
         result += cr50Mapper.deletePfuAreaAll(paramMap);
+        // SalesCd 삭제
+        result += cr50Mapper.deletePfuSalesCdAll(paramMap);
 
         // 결재요청정보 삭제처리
         result += wb20Mapper.deleteAllTodoMaster(paramMap);
@@ -489,6 +491,7 @@ public class CR50SvcImpl implements CR50Svc {
 //                  resultDel = cr50Mapper.delete_cr50_detail(dtl);
                 result += cr50Mapper.copy_cr50_master(dtl); // TB_CR50M01 마스터 정보 복사
                 result += cr50Mapper.copy_cr50_detail(dtl); // TB_CR50D01 상세내역 복사
+                result += cr50Mapper.copy_cr50_salescd(dtl); // TB_CR50D02 salesCd내역 복사
             }
         }
         // 데이터 처리 끝
@@ -535,6 +538,72 @@ public class CR50SvcImpl implements CR50Svc {
     @Override
     public List<Map<String, String>> selectImprovementReferenceList(Map<String, String> paramMap) {
         return cr50Mapper.selectImprovementReferenceList(paramMap);
+    }
+
+    @Override
+    public int updatePfuVersionUpProcess(Map<String, String> paramMap) throws Exception {
+
+        // 버전업시 첨부 파일 처리에 대한 copy 기능 구현 필요
+        //
+        // ---------------------------------------------------------------
+        // 첨부 화일 권한체크 시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
+        // 필수값 : jobType, userId, comonCd
+        // ---------------------------------------------------------------
+//        List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
+//        HashMap<String, String> param = new HashMap<>();
+//        param.put("jobType", "fileDelete");
+//        param.put("userId", paramMap.get("userId"));
+//        if (deleteFileList.size() > 0) {
+//            for (Map<String, String> dtl : deleteFileList) {
+//                // 접근 권한 없으면 Exception 발생
+//                param.put("comonCd", dtl.get("comonCd"));
+//
+//                cm15Svc.selectFileAuthCheck(param);
+//            }
+//        }
+        // ---------------------------------------------------------------
+        // 첨부 화일 권한체크 끝
+        // ---------------------------------------------------------------
+
+        // 1명이라도 결재완료이면 'Y' 아니면 'N'
+//        String deleteCheck = cr50Mapper.selectPfuDeleteCheck(paramMap);
+//        if ("Y".equals(deleteCheck)) {
+//            // 한명이라도 결재가 완료되면 삭제는 불가능합니다.
+//            throw new Exception("결재완료건이 있습니다. 확인바랍니다.");
+//        }
+
+        // 버젼업 작업 진행 내역
+        // 1. TB_CR50M01의 자료를 TB_CR50M01_HIST에 복사
+        // 2. TB_CR50D01의 자료를 TB_CR50D01_HIST에 복사 TB_CR50M01의 VER_NO 적용
+        // 3. TB_CR50D02의 자료를 TB_CR50D02_HIST에 복사 TB_CR50M01의 VER_NO 적용
+        // 4. TB_CR50M01의 VER_NO + 1 로 변경함.
+        // 5. 결재정보는 버젼별로 관리됨으로 조회 안됨.
+
+        // Master 이력
+        int result = cr50Mapper.insertPfuMasterHistory(paramMap);
+        // 상세내역 이력
+        result += cr50Mapper.insertPfuDetailHistory(paramMap);
+        // SalesCd 이력
+        result += cr50Mapper.insertPfuSalesCdHistory(paramMap);
+
+        // MasterVerNo + 1
+        result += cr50Mapper.updatePfuMasterVersionUp(paramMap);
+        // 결재요청정보 삭제처리
+//        result += cr50Mapper.insertPfuTodoMaster(paramMap);
+
+        // ---------------------------------------------------------------
+        // 첨부 화일 처리 시작 (처음 등록시에는 화일 삭제할게 없음)
+        // ---------------------------------------------------------------
+//        if (deleteFileList.size() > 0) {
+//            for (Map<String, String> deleteDtl : deleteFileList) {
+//                String fileKey = deleteDtl.get("fileKey").toString();
+//                cm08Svc.deleteFile(fileKey);
+//            }
+//        }
+//        // ---------------------------------------------------------------
+        // 첨부 화일 처리 끝
+        // ---------------------------------------------------------------
+        return result;
     }
 
 }

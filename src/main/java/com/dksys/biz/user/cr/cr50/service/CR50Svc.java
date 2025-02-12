@@ -54,5 +54,6 @@ public interface CR50Svc {
 
     List<Map<String, String>> selectImprovementReferenceList(Map<String, String> paramMap);
 
+    int updatePfuVersionUpProcess(Map<String, String> paramMap) throws Exception;
 
 }

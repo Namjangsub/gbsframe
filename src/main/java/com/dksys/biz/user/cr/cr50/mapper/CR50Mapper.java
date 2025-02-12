@@ -52,6 +52,8 @@ public interface CR50Mapper {
 
     int copy_cr50_detail(Map<String, String> dtl);
 
+    int copy_cr50_salescd(Map<String, String> dtl);
+
     int delete_cr50(Map<String, String> dtl);
 
     int selectPfuCopyTargetListCount(Map<String, String> paramMap);
@@ -78,6 +80,14 @@ public interface CR50Mapper {
     List<Map<String, String>> selectIssueReferenceList(Map<String, String> paramMap);
 
     List<Map<String, String>> selectImprovementReferenceList(Map<String, String> paramMap);
+
+    int insertPfuMasterHistory(Map<String, String> paramMap);
+
+    int insertPfuDetailHistory(Map<String, String> paramMap);
+
+    int insertPfuSalesCdHistory(Map<String, String> paramMap);
+
+    int updatePfuMasterVersionUp(Map<String, String> paramMap);
 
 }
 

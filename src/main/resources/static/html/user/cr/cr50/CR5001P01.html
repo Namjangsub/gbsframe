@@ -1131,6 +1131,7 @@
                     }
                     postAjax("/user/wb/wb20/selectSignResUserlst", formData, null, function(data){
 						try {
+							
 							var list = data.result;
 							if( list.length > 0 ) {
 								var inCnt = 0;
@@ -1241,6 +1242,7 @@
     $(document).ready(function () {
     	$('#fileTrgtKey').val(modalStack.last().paramObj.fileTrgtKey);
     	$('#salesCd').val(modalStack.last().paramObj.salesCd)
+    	$('#verNo').val(modalStack.last().paramObj.verNo)
     	paramActionType = modalStack.last().paramObj.actionType;
     	
     	//조회모드 (결재, 공유) 이면 그리드 편집 못하게 수정
@@ -1310,10 +1312,10 @@
 			$(this).addClass('active');
 			
 			const tabMappings = {
-				    "#tab01": { gridView: AREA01GridView, initFlag: 'tab01' },
-				    "#tab02": { gridView: AREA02GridView, initFlag: 'tab02' },
-				    "#tab04": { gridView: AREA04GridView, initFlag: 'tab04' },
-				    "#tab05": { gridView: AREA05GridView, initFlag: 'tab05' },
+// 				    "#tab01": { gridView: AREA01GridView, initFlag: 'tab01' },
+// 				    "#tab02": { gridView: AREA02GridView, initFlag: 'tab02' },
+// 				    "#tab04": { gridView: AREA04GridView, initFlag: 'tab04' },
+// 				    "#tab05": { gridView: AREA05GridView, initFlag: 'tab05' },
 				    "#tab06": { gridView: AREA06GridView, initFlag: 'tab06' },
 				    "#tab08": { gridView: AREA08GridView, initFlag: 'tab08' },
 // 				    "#tab09": { gridView: fileTreeGridView, initFlag: 'tab09', customMethod: 'reqSetData' },
@@ -1324,7 +1326,7 @@
 			currentTabName = href;
 			const tabInfo = tabMappings[href];
 	    	if (currentTabName == '#tab01' || currentTabName == '#tab03') return false; //제품정보, 고객요청사항은 제외 처리함
-	    	if (currentTabName == '#tab09') return false; //첨무파일 오류 체크 필요
+	    	if (currentTabName == '#tab09') return false; //첨부파일 오류 체크 필요
 			if (tabInfo && tabArrInit[tabInfo.initFlag]) {
 		    	const list = tabInfo.gridView.target.list;
 			    if (tabInfo.customMethod) {
@@ -1408,9 +1410,9 @@
 	    // 그리드 내용 붙여넣기 이벤트 처리-->간헐적 실행으로 오작동~~~ 원인을 모르겠음 아래이벤트로 대체
 	    // Ctrl + V 단축키 이벤트 처리
 // 		AREA01GridView.target.$target.on("paste", function (e, a) { gridPaste("AREA01GridView", thisGridRow, thisGridCol); });
-		AREA02GridView.target.$target.on("paste", function (e, a) { gridPaste("AREA02GridView", thisGridRow, thisGridCol); });
-		AREA04GridView.target.$target.on("paste", function (e, a) { gridPaste("AREA04GridView", thisGridRow, thisGridCol); });
-		AREA05GridView.target.$target.on("paste", function (e, a) { gridPaste("AREA05GridView", thisGridRow, thisGridCol); });
+// 		AREA02GridView.target.$target.on("paste", function (e, a) { gridPaste("AREA02GridView", thisGridRow, thisGridCol); });
+// 		AREA04GridView.target.$target.on("paste", function (e, a) { gridPaste("AREA04GridView", thisGridRow, thisGridCol); });
+// 		AREA05GridView.target.$target.on("paste", function (e, a) { gridPaste("AREA05GridView", thisGridRow, thisGridCol); });
 // 		AREA06GridView.target.$target.on("paste", function (e, a) { gridPaste("AREA06GridView", thisGridRow, thisGridCol); });
 		
 		// 그리드의 onClick 이벤트 핸들러
@@ -1768,6 +1770,8 @@
 			deleteHyphen(elem);
 		});
 		
+		if ($('#verNo').val() == "") $('#verNo').val(1);		//최초 등록이면 버젼 1로 자동 설정함.
+		
 		// 폼데이터 생성
 		var formData = new FormData($("#popForm")[0]);
 
@@ -1954,6 +1958,7 @@
 			"coCd" 			: $('#coCd').val(),
 			"salesCd" 		: $('#salesCd').val(),
 			"fileTrgtKey" 	: $('#fileTrgtKey').val(),
+			"verNo" 		: $('#verNo').val(),
 // 			"prdtDiv" 		: $('#prdtDiv').val(),  //'PRDTDIV01',
 // 			"prdtTyp" 		: $('#prdtTyp').val(),  //'PFU0201',
 // 			"pfuPrdtDiv" 	: $('#prdtDiv option:selected').data('rprc'),  //'PFU01',
@@ -2654,6 +2659,32 @@
 		callReport(fileName, arg, "1050", "700", "PFU출력" + "B");
 	}
     
+ 	//Ver.Up 클릭시 실행될 함수
+ 	function createHistory() {
+ 		//버젼업 작업 진행 내역
+ 		// 1. TB_CR50M01의 자료를 TB_CR50M01_HIST에 복사
+ 		// 2. TB_CR50D01의 자료를 TB_CR50D01_HIST에 복사 TB_CR50M01의 VER_NO 적용
+ 		// 3. TB_CR50D02의 자료를 TB_CR50D02_HIST에 복사 TB_CR50M01의 VER_NO 적용
+ 		// 4. TB_CR50M01의 VER_NO + 1 로 변경함.
+ 		// 5. 결재정보는 버젼별로 관리됨으로 조회 안됨.
+ 		let pfuNo = $('#fileTrgtKey').val();
+		var formData = {
+			"pfuNo" 		: pfuNo,
+			"verNo" 		: $('#verNo').val(),
+			"coCd"        	: $('#coCd').val(),
+			"todoNo" 		: pfuNo,
+			"userId"      	: jwt.userId,
+			"pgmId" 		: "CR5001P01"
+		}
+	    
+		if (confirm(pfuNo +"의 결재정보가 무시됩니다. 버젼업 하시겠습니까?")) {
+			putAjax("/user/cr/cr50/updatePfuVersionUpProcess", formData, null, function(data) {
+				alert(data.resultMessage);
+				if (data.resultCode == 200) {
+				}
+			});
+		}
+ 	}
 </script>
 
 </body>
