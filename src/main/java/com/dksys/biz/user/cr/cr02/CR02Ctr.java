@@ -252,4 +252,18 @@ public class CR02Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/deleteDetailChk")
+	public String deleteDetailChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = cr02Svc.deleteDetailChk(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/ordrsDivChangeChk")
+	public String ordrsDivChangeChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = cr02Svc.ordrsDivChangeChk(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
 }

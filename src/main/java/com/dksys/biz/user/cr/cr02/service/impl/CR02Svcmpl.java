@@ -1248,4 +1248,14 @@ public class CR02Svcmpl implements CR02Svc {
 
         return param2;
     }
+
+    @Override
+    public Map<String, String> deleteDetailChk(Map<String, String> paramMap) {
+        return cr02Mapper.deleteDetailChk(paramMap);
+    }
+
+    @Override
+    public Map<String, String> ordrsDivChangeChk(Map<String, String> paramMap) {
+        return cr02Mapper.ordrsDivChangeChk(paramMap);
+    }
 }

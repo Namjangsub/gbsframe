@@ -67,4 +67,8 @@ public interface CR02Svc {
     List<Map<String, String>> selectOrderChangeTitle(Map<String, String> paramMap);
 
 	int clmnPlanRmkUpdate(Map<String, String> paramMap) throws Exception;
+
+    Map<String, String> deleteDetailChk(Map<String, String> paramMap);
+
+    Map<String, String> ordrsDivChangeChk(Map<String, String> paramMap);
 }

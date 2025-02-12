@@ -447,12 +447,32 @@
 		// 수주구분 변경에 따른 적용
 		$('#ordrsDiv').on('change', function () {
 			if(actionType == "C" || actionType == "U"){
+				const data = [];
+				// const tempOrdrsDiv = $("#ordrsDiv").val();
+				const tempOrdrsDiv = $(this).val();
+				const gridData = gridOrdrsDetail.getList();
+
+				// 발주요청서, 구매발주서, 외주관리에 등록되어 있으면 변경 불가, 메세지
+				if (tempOrdrsDiv == "ORDRSDIV8") {
+					paramObj={"ordrsNo" : $("#ordrsNo").val()};
+					postAjaxSync("/user/cr/cr02/ordrsDivChangeChk", paramObj, null, function(data){
+						if(data.result) {
+							let msg = data.result.msg;
+							if (msg && msg.trim() !== "") {
+								alert("해당 수주는 " + msg + "에 이미 등록되어 있어, 변경하실 수 없습니다.");
+								$('#ordrsDiv').val($('#ordrsDiv').data('prevVal'));
+							}
+						}
+					});
+					if ($('#ordrsDiv').val() !== tempOrdrsDiv) {
+						// 변경이 취소되었으므로, 더 이상의 처리는 하지 않음.
+						return;
+					}
+				}
+
 				$('#prjctSeqNm').val('');
 				$('#prjctSeq').val('');
 
-				const data = [];
-				const tempOrdrsDiv = $("#ordrsDiv").val();
-				const gridData = gridOrdrsDetail.getList();
 				if(tempOrdrsDiv == "ORDRSDIV3"){	//AS무상
 					$("#ordrsAmtTh").removeClass('hit');
 					$("#currCdTh").removeClass('hit');
@@ -510,6 +530,11 @@
 				}
 			}
 		})
+
+		// 수주구분 요소가 포커스를 받을 때 이전 값을 저장
+		$('#ordrsDiv').on('focus', function () {
+			$(this).data('prevVal', $(this).val());
+		});
 
 
 		// 선물환 CheckList 변경에 따른 적용
@@ -2090,15 +2115,39 @@
 			alert("선택된 행이 없습니다.");
 			return false;
 		} else {
+			if (gridList.salesCd) {
+				paramObj = {
+					"salesCd" 	: gridList.salesCd,
+					"coCd"	  	: gridList.coCd,
+					"ordrsNo"	: gridList.ordrsNo,
+					"ordrsSeq" 	: gridList.ordrsSeq
+				};
+				postAjaxSync("/user/cr/cr02/deleteDetailChk", paramObj, null, function(data){
+					if (data.result) {
+						let msg = data.result.msg;
+						if (msg && msg.trim() !== "") {
+							alert(gridList.salesCd + "는 " + msg + "에 이미 등록되어 있어 삭제할 수 없습니다.");
+							return;
+						} else {
+							deleteRow(gridList);
+						}
+					}
+				});
+			} else {
+				deleteRow(gridList);
+			}
+		}
+		// 해당 로우 삭제하는 함수
+		function deleteRow(gridList) {
 			let todoKey = gridList.ordrsSeq;
 			let selRow = gridList.__index;
-			if( typeof(todoKey) == "undefined" ) {
-					gridOrdrsDetail.removeRow(selRow);
+			if (typeof(todoKey) === "undefined") {
+				gridOrdrsDetail.removeRow(selRow);
 			} else {
-					if (gridList.cudCheck != "C") {
-						gridOrdrsDetaildeleteArr.push(gridList);
-					}
-						gridOrdrsDetail.removeRow(selRow);
+				if (gridList.cudCheck !== "C") {
+					gridOrdrsDetaildeleteArr.push(gridList);
+				}
+				gridOrdrsDetail.removeRow(selRow);
 			}
 		}
 	});

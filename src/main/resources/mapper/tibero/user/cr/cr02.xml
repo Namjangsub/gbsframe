@@ -1978,4 +1978,48 @@
           AND CLMN_PLAN_SEQ = #{clmnPlanSeq}
     </update>
 
+
+	<resultMap id="msgMap" type="java.util.HashMap">
+		<result property="msg" column="MSG"/>
+	</resultMap>
+	<select id="deleteDetailChk" parameterType="map" resultMap="msgMap">
+		SELECT 
+			RTRIM(
+				CASE WHEN EXISTS (SELECT 1 FROM TB_PM01M01 B WHERE B.SALES_CD = A.SALES_CD)
+					THEN '작업일보, ' ELSE '' END ||
+				CASE WHEN EXISTS (SELECT 1 FROM TB_WB21M01 C WHERE C.SALES_CD = A.SALES_CD)
+					THEN '일정현황, ' ELSE '' END ||
+				CASE WHEN EXISTS (SELECT 1 FROM TB_WB24M02 D WHERE D.SALES_CD = A.SALES_CD)
+					THEN '문제관리, ' ELSE '' END ||
+				CASE WHEN EXISTS (SELECT 1 FROM TB_QM01M01 E WHERE E.SALES_CD = A.SALES_CD)
+					THEN '발주요청, ' ELSE '' END,
+				', '
+			) AS MSG
+		FROM TB_CR02D02 A
+		WHERE A.SALES_CD = #{salesCd}
+		  AND A.CO_CD = #{coCd}
+		  AND A.ORDRS_NO = #{ordrsNo}
+		  AND A.ORDRS_SEQ = #{ordrsSeq}
+	</select>
+
+	<select id="ordrsDivChangeChk" parameterType="map" resultMap="msgMap">
+		WITH SALES_CD_LIST AS (
+			SELECT SALES_CD FROM TB_CR02D02 WHERE ORDRS_NO = #{ordrsNo}
+		)
+		SELECT 
+			RTRIM(
+				CASE WHEN EXISTS (
+					SELECT 1 FROM TB_QM01M01 B WHERE B.SALES_CD IN (SELECT SALES_CD FROM SALES_CD_LIST)
+				) THEN '발주요청서, ' ELSE '' END ||
+				CASE WHEN EXISTS (
+					SELECT 1 FROM TB_SM02M01 C WHERE C.SALES_CD IN (SELECT SALES_CD FROM SALES_CD_LIST)
+				) THEN '구매발주서, ' ELSE '' END ||
+				CASE WHEN EXISTS (
+					SELECT 1 FROM TB_SM11M01 D WHERE D.ORDRS_NO = #{ordrsNo}
+				) THEN '외주관리, ' ELSE '' END,
+				', ') AS MSG
+		FROM TB_CR02M01 A
+		WHERE A.ORDRS_NO = #{ordrsNo}
+	</select>
+
 </mapper>
