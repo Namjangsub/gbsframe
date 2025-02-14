@@ -68,6 +68,8 @@ public interface CR02Svc {
 
 	int clmnPlanRmkUpdate(Map<String, String> paramMap) throws Exception;
 
+    Map<String, String> ordrsDeleteChk(Map<String, String> paramMap);
+
     Map<String, String> deleteDetailChk(Map<String, String> paramMap);
 
     Map<String, String> ordrsDivChangeChk(Map<String, String> paramMap);

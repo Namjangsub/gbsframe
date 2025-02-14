@@ -252,6 +252,15 @@ public class CR02Ctr {
 		return "jsonView";
 	}
 
+	// 수주정보 삭제 시 작업일보, 문제현황, 일정현황, 발주요청에 등록되어 있는지 체크
+	@PostMapping(value = "/ordrsDeleteChk")
+	public String ordrsDeleteChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = cr02Svc.ordrsDeleteChk(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	// 설비삭제 가능여부 체크 (작업일보, 문제현황, 일정현황, 발주요청)
 	@PostMapping(value = "/deleteDetailChk")
 	public String deleteDetailChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		Map<String, String> result = cr02Svc.deleteDetailChk(paramMap);
@@ -259,6 +268,7 @@ public class CR02Ctr {
 		return "jsonView";
 	}
 
+	// 수주구분 수주취소 가능여부 체크(발주요청서, 구매발주서, 외주관리)
 	@PostMapping(value = "/ordrsDivChangeChk")
 	public String ordrsDivChangeChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		Map<String, String> result = cr02Svc.ordrsDivChangeChk(paramMap);

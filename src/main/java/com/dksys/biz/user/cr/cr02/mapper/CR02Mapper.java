@@ -106,6 +106,8 @@ public interface CR02Mapper {
 
     int clmnPlanRmkUpdate(Map<String, String> dtl);
 
+    Map<String, String> ordrsDeleteChk(Map<String, String> paramMap);
+
     Map<String, String> deleteDetailChk(Map<String, String> paramMap);
 
     Map<String, String> ordrsDivChangeChk(Map<String, String> paramMap);
