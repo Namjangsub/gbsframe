@@ -43,6 +43,7 @@
 
 <script src="/static/js/global.js"></script>
 <script src="/static/js/fileTree.js"></script>
+<script src="/static/js/jquery.blockUI.js"></script>
 <!-- 도움말 팝업 -->
 <script src="/static/js/manualPopup.js"></script>
 </head>
@@ -125,7 +126,7 @@
 							<input type="hidden" id="ordrsClntCd_S" name="ordrsClntCd_S" data-search="ordrsClntCd">
 							<div class="search_form">
 								<input type="text" id="ordrsClntNm_S" name="ordrsClntNm_S" data-search="ordrsClntNm"
-								onkeyup="event.keyCode == 8 ? ordrsClntCd_S.value = '' : event.keyCode == 13 ? DataSearch() : ''">
+								onkeyup="event.keyCode == 8 || event.keyCode == 46 ? ordrsClntCd_S.value = '' :event.keyCode == 13 ? DataSearch() :''">
 								<a onclick="opendClntSearch($('#ordrsClntNm_S').val());"><i class="i_search_w"></i></a>
 							</div>
 						</td>
@@ -134,7 +135,7 @@
 						<td>
 		         			<div class="search_form">						
 				    			<input type="hidden" id="mngId_S" name="mngId_S" data-search="mngId">
-			           			<input type="text"	id="mngNm_S" name="mngNm_S" data-search="mngNm" onkeyup="event.keyCode == 8 ? mngId_S.value='' : event.keyCode == 13 ? DataSearch() : '' ">
+			           			<input type="text"	id="mngNm_S" name="mngNm_S" data-search="mngNm" onkeyup="event.keyCode == 8 || event.keyCode == 46 ? mngId_S.value='' : event.keyCode == 13 ? DataSearch() : '' ">
 			               		<a onclick="openSecondUserSearch5();"><i class="i_search_w"></i></a>
 		           			</div>
 						</td>
@@ -329,18 +330,25 @@
 				formData["pageNo"]    = _pageNo + 1;
 				formData["recordCnt"] = $('#recordCnt').val();
 				postAjax("/user/cr/cr05/grid1_selectList", formData, null, function(data) {
-					gridHeightResize(gridView, 194); // 194 = 919 - 725 : 화면 Body 높이 - 그리드 기본크기 725
-					var list = data.result;
-					//debugger;
-					targetObj.setData({
-						list : list,
-						page : {
-							currentPage   : _pageNo,
-							pageSize      : data.paginationInfo.pageSize,
-							totalElements : data.paginationInfo.totalRecordCount,
-							totalPages    : data.paginationInfo.totalPageCount
-						}
-					});
+					try {
+						gridHeightResize(gridView, 194); // 194 = 919 - 725 : 화면 Body 높이 - 그리드 기본크기 725
+						var list = data.result;
+						//debugger;
+						targetObj.setData({
+							list : list,
+							page : {
+								currentPage   : _pageNo,
+								pageSize      : data.paginationInfo.pageSize,
+								totalElements : data.paginationInfo.totalRecordCount,
+								totalPages    : data.paginationInfo.totalPageCount
+							}
+						});
+					} catch {
+						alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+						return null; // 오류 발생 시 null 반환
+					} finally {
+						// console.log("함수 실행 완료.");
+					}
 				});
   			}
   		}
@@ -512,37 +520,32 @@
 	function insert_update_cr05_Modal(type) {
 		var row = gridView.target.getList("selected")[0];
 		
-		if(row) {
-			var fileTrgtKey = row.fileTrgtKey;
-			var clmnNo = row.clmnNo;
-			if (type = 'C') clmnNo = "";
-			if (clmnNo == "" || clmnNo == undefined ) {
-				type = 'C';
-			} else {
-				type = 'U';
-			}
-
-			// debugger;
-			
-			var paramObj = {
-				"actionType"  : type,
-				"fileTrgtKey" : row.fileTrgtKey,
-				"coCd" 	      : row.coCd,
-				"ordrsClntCd" : row.ordrsClntCd,
-				"ordrsClntNm" : row.ordrsClntNm,
-				"currCd"	  : row.currCd,
-				"userId"      : jwt.userId,
-				"sellVatCd"   : row.sellVatCd,
-				"sellVatVal"  : row.sellVatVal,
-				"pgmId"       : "CR0501M01"
-			};
-			
-			openModal("/static/html/user/cr/cr05/CR0501P01.html", 1600, 850, "", paramObj, function(data) {
-				DataSearch();
-			});
-		} else {
-			alert("계산서 발행 대상을 선택하세요.");
+		if (!row) {
+			alert("계산서 발행 대상을 선택하세요.")
+			return;
 		}
+		if (row.fileTrgtKey == 0 || row.fileTrgtKey == "" || row.fileTrgtKey == undefined) {
+			type = "C"
+		} else {
+			type = "U"
+		}
+		
+		var paramObj = {
+			"actionType"  : type,
+			"fileTrgtKey" : row.fileTrgtKey,
+			"coCd" 	      : row.coCd,
+			"ordrsClntCd" : row.ordrsClntCd,
+			"ordrsClntNm" : row.ordrsClntNm,
+			"currCd"	  : row.currCd,
+			"userId"      : jwt.userId,
+			"sellVatCd"   : row.sellVatCd,
+			"sellVatVal"  : row.sellVatVal,
+			"pgmId"       : "CR0501M01"
+		};
+		
+		openModal("/static/html/user/cr/cr05/CR0501P01.html", 1600, 850, "", paramObj, function(data) {
+			DataSearch();
+		});
 	}
 
 	// 삭제 버튼 클릭 시
