@@ -20,13 +20,10 @@ import org.springframework.util.FileCopyUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.admin.cm.cm02.service.CM02Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.cmn.vo.PaginationInfo;
@@ -175,7 +172,82 @@ public class CM08Ctr {
     		}
     	} 		
 	}
-	
+
+    @GetMapping(value="/fileDownloadAuth2")
+    public void fileDownloadAuth2(@RequestParam Map<String, String> param, HttpServletRequest request, HttpServletResponse response) throws Exception {
+        //-----------------------------------------------
+        //parameter 정보
+        //  fileKey : 이동하고자 하는 파일 일련번호
+        //  userId  : 이동 작업을 실행하는 사용자 ID
+        //-----------------------------------------------       
+        //해당 디렉토리 다운로드 권한이 있어야 작업 가능        
+        Map<String, String> tempParam = new HashMap<String, String>();
+        tempParam.putAll(param);
+        tempParam.put("jobType", "fileDown");
+//      String userId = request.getParameter("userId");
+        Map<String, String> fileInfo = cm08Svc.selectFileInfoUser(tempParam);
+        //
+        if (null != fileInfo.get("fileName"))  {
+//          String filePath = request.getParameter("filePath");
+            String filePath = fileInfo.get("filePath") + fileInfo.get("fileKey")+ '_' + fileInfo.get("fileName");
+            
+            BufferedInputStream bis = null;
+            ServletOutputStream sos = null;
+            
+            try{
+                File file = new File(filePath);
+                response.setContentType("application/octet-stream; charset=UTF-8");
+                response.setContentLength((int)file.length());
+
+                // 파일명 추출 및 disposition 설정
+                int idx = filePath.split("\\\\").length-1;
+                String fileName = filePath.split("\\\\")[idx];
+                fileName = fileName.substring(fileName.indexOf("_")+1);
+                cm08Svc.setDisposition(request, response, fileName);
+                
+                OutputStream out = response.getOutputStream();
+                FileInputStream fis = null;
+                
+                try {
+                    fis = new FileInputStream(file);
+                    FileCopyUtils.copy(fis, out);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    // 파일 복사 중 오류 발생 시, 응답을 재설정하고 오류 메시지를 본문에 출력
+                    response.reset(); // 이미 버퍼에 쓰여진 데이터 및 헤더 초기화
+                    response.setContentType("text/plain; charset=UTF-8");
+                    response.setCharacterEncoding("UTF-8");
+                    response.getWriter().write("파일 전송 중 오류 발생: " + e.getMessage());
+                } finally {
+                    if (fis != null) { try { fis.close(); } catch (Exception e2) {}}
+                    if (out != null) { try { out.close(); } catch (Exception e2) {}}
+                }
+                out.flush();
+                
+            } catch(IOException e){
+                e.printStackTrace();
+                // 파일 복사 중 오류 발생 시, 응답을 재설정하고 오류 메시지를 본문에 출력
+                response.reset(); // 이미 버퍼에 쓰여진 데이터 및 헤더 초기화
+                response.setContentType("text/plain; charset=UTF-8");
+                response.setCharacterEncoding("UTF-8");
+                response.getWriter().write("파일 전송 중 오류 발생: " + e.getMessage());
+            } finally{
+                if (bis != null) {
+                    try {
+                        bis.close();
+                    } catch (Exception e) {
+                    }
+                }
+                if (sos != null) {
+                    try {
+                        sos.close();
+                    } catch (Exception e) {
+                    }
+                }
+            }
+        }       
+    }
+    
 	@GetMapping(value="/excelDownload")
 	public void excelDownload(@RequestParam String fileName, HttpServletRequest request, HttpServletResponse response) throws Exception {
 		
