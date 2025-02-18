@@ -189,7 +189,7 @@ public class BM02SvcImpl implements BM02Svc {
 	
 	@Override
 	public void deleteBiz(Map<String,  Object> paramMap) {
-		
+        @SuppressWarnings("unchecked")
 		List<Map<String, String>> bizList =(List<Map<String, String>>) paramMap.get("bizArr");
 		if(bizList != null) {
 			// 이력관리 update
