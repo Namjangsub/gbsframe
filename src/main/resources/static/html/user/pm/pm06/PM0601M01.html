@@ -398,62 +398,126 @@
 		});
 	}
 
+	// function downloadSelectRow() {
+	// 	let rows = gridView.target.getList("selected");
+	// 	$.each(rows, function(idx, obj){
+	// 		//작성자-작성일자-비용항목-filename
+	// 		if (obj.tripRptFileNm) {
+	// 			let tempFileName = obj.workRptIdNm + '-' + obj.attchFileTrgtKey + '-' + obj.tripRptTypNm + '-' + obj.tripRptFileNm;
+	// 			downloadFile(obj.fileKey, tempFileName);
+	// 		}
+	// 	});
+	// }
+	
+// 	function downloadFile(_fileKey, _filename) {
+// // 	 	var paramObj = {
+// // 	 			"fileKey" : _fileKey,
+// // 	 			"userId"  : jwt.userId
+// // 	 		}		
+		
+// // 	 	postAjax("/admin/cm/cm08/fileDownInfoUser", paramObj, null, function(data){
+// // 	 		if(data.resultCode == 200){
+// // 	 			var fileInfo = data.fileInfo;
+// // 	 		    var blob = new Blob(['File Content'], { type: 'application/octet-stream' });
+// // 	 		    var url = URL.createObjectURL(blob);
+// // 	 		    var a = document.createElement('a');
+// // 	 		    a.download = _filename;
+// // 	 		    a.download = "안돼";
+// // 	 		    a.href = "/admin/cm/cm08/fileDownloadAuth?fileKey="+_fileKey+"&userId="+jwt.userId;
+// // 	 	        a.style.display = "none";
+	 	        
+// // 	 		    document.body.appendChild(a);
+// // 	 		    a.click();
+// // 	 		    document.body.removeChild(a);
+			    
+// // 	 		} else {
+// // 	 			alert("다운로드 권한이 없습니다.");	
+// // 	 		}
+// // 	 	});
+
+// 	 		  var xhr = new XMLHttpRequest();
+// 	 		  xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth?fileKey="+_fileKey+"&userId="+jwt.userId, true);
+// 	 		  xhr.responseType = 'blob';
+
+// 	 		  xhr.onload = function() {
+// 	 		      if (xhr.status === 200) {
+// 	 		          var blob = xhr.response;
+// 	 		          var url = window.URL.createObjectURL(blob);
+// 	 		          var a = document.createElement('a');
+// 	 		          a.href = url;
+// 	 		          a.download = _filename; // 파일명 변경은 여기서
+// 	 		          document.body.appendChild(a);
+// 	 		          a.click();
+// 	 		          document.body.removeChild(a);
+// 	 		          window.URL.revokeObjectURL(url);
+// 	 		      }
+// 	 		  };
+
+// 	 		 xhr.send();
+// 	}
+
 	function downloadSelectRow() {
 		let rows = gridView.target.getList("selected");
-		$.each(rows, function(idx, obj){
-			//작성자-작성일자-비용항목-filename
-			if ( obj.tripRptFileNm) {
+		let downloadPromises = [];
+
+		$.each(rows, function(idx, obj) {
+			if (obj.tripRptFileNm) {
 				let tempFileName = obj.workRptIdNm + '-' + obj.attchFileTrgtKey + '-' + obj.tripRptTypNm + '-' + obj.tripRptFileNm;
-				downloadFile(obj.fileKey, tempFileName);
+				downloadPromises.push(downloadFile(obj.fileKey, tempFileName));
+			}
+		});
+
+		Promise.allSettled(downloadPromises).then(function(results) {
+			let errors = results.filter(r => r.status === "rejected").map(r => r.reason);
+			if (errors.length > 0) {
+				alert("전산실 연락바랍니다.\n\n" + errors.join("\n"));
 			}
 		});
 	}
-	
+
 	function downloadFile(_fileKey, _filename) {
-// 	 	var paramObj = {
-// 	 			"fileKey" : _fileKey,
-// 	 			"userId"  : jwt.userId
-// 	 		}		
-		
-// 	 	postAjax("/admin/cm/cm08/fileDownInfoUser", paramObj, null, function(data){
-// 	 		if(data.resultCode == 200){
-// 	 			var fileInfo = data.fileInfo;
-// 	 		    var blob = new Blob(['File Content'], { type: 'application/octet-stream' });
-// 	 		    var url = URL.createObjectURL(blob);
-// 	 		    var a = document.createElement('a');
-// 	 		    a.download = _filename;
-// 	 		    a.download = "안돼";
-// 	 		    a.href = "/admin/cm/cm08/fileDownloadAuth?fileKey="+_fileKey+"&userId="+jwt.userId;
-// 	 	        a.style.display = "none";
-	 	        
-// 	 		    document.body.appendChild(a);
-// 	 		    a.click();
-// 	 		    document.body.removeChild(a);
-			    
-// 	 		} else {
-// 	 			alert("다운로드 권한이 없습니다.");	
-// 	 		}
-// 	 	});
+		return new Promise(function(resolve, reject) {
+			var xhr = new XMLHttpRequest();
+			xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + _fileKey + "&userId=" + jwt.userId, true);
+			xhr.responseType = "blob";
+			
+			xhr.onload = function() {
+				if (xhr.status === 200) {
+					var contentType = xhr.getResponseHeader("Content-Type");
+					// 오류 상황: Content-Type이 text/plain이면 서버가 오류 메시지를 반환한 것으로 간주
+					if (contentType && contentType.indexOf("text/plain") !== -1) {
+						var reader = new FileReader();
+						reader.onload = function(e) {
+							// reject 시, 파일명과 함께 오류 메시지 전달
+							reject("[" + _filename + "] " + e.target.result);
+						};
+						reader.readAsText(xhr.response);
+					} else {
+						// 정상적인 파일이면 다운로드 진행
+						var blob = xhr.response;
+						var url = window.URL.createObjectURL(blob);
+						var a = document.createElement('a');
+						a.href = url;
+						a.download = _filename;
+						document.body.appendChild(a);
+						a.click();
+						document.body.removeChild(a);
+						window.URL.revokeObjectURL(url);
+						resolve(); // 성공 시 resolve 호출
+					}
+				} else {
+					console.error("백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
+					reject("[" + _filename + "] 백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
+				}
+			};
 
-	 		  var xhr = new XMLHttpRequest();
-	 		  xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth?fileKey="+_fileKey+"&userId="+jwt.userId, true);
-	 		  xhr.responseType = 'blob';
+			xhr.onerror = function() {
+				console.error("네트워크 오류가 발생했습니다.");
+				reject("[" + _filename + "] 네트워크 오류가 발생했습니다.");
+			};
 
-	 		  xhr.onload = function() {
-	 		      if (xhr.status === 200) {
-	 		          var blob = xhr.response;
-	 		          var url = window.URL.createObjectURL(blob);
-	 		          var a = document.createElement('a');
-	 		          a.href = url;
-	 		          a.download = _filename; // 파일명 변경은 여기서
-	 		          document.body.appendChild(a);
-	 		          a.click();
-	 		          document.body.removeChild(a);
-	 		          window.URL.revokeObjectURL(url);
-	 		      }
-	 		  };
-
-	 		 xhr.send();
+			xhr.send();
+		});
 	}
 	
 	/*수정 or 등록 버튼 클릭 시*/

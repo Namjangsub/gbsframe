@@ -372,24 +372,78 @@
 		
 	}
 	
-	function downloadFile(idx) {
-        if (notiFileArr[idx].fileDown != 'Y') {
-        	alert('파일 다운로드 권한이 없습니다.')
-        	return false;
-        };
+	// function downloadFile(idx) {
+    //     if (notiFileArr[idx].fileDown != 'Y') {
+    //     	alert('파일 다운로드 권한이 없습니다.')
+    //     	return false;
+    //     };
 		
+	// 	var fileKey = notiFileArr[idx].fileKey;
+	// 	var paramObj = {
+	// 			"fileKey" : fileKey,
+	// 			"userId" : jwt.userId
+	// 		}		
+		
+	// 	postAjax("/admin/cm/cm08/fileDownInfoUser", paramObj, null, function(data){
+	// 		if(data.resultCode == 200){
+	// 			var fileInfo = data.fileInfo;
+	// 			location.href = "/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId;
+	// 		} else {
+	// 			alert("다운로드 권한이 없습니다.");	
+	// 		}
+	// 	});
+	// }
+
+	function downloadFile(idx) {
+		if (notiFileArr[idx].fileDown != 'Y') {
+			alert('파일 다운로드 권한이 없습니다.');
+			return false;
+		}
+
 		var fileKey = notiFileArr[idx].fileKey;
 		var paramObj = {
-				"fileKey" : fileKey,
-				"userId" : jwt.userId
-			}		
-		
-		postAjax("/admin/cm/cm08/fileDownInfoUser", paramObj, null, function(data){
-			if(data.resultCode == 200){
-				var fileInfo = data.fileInfo;
-				location.href = "/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId;
+			"fileKey": fileKey,
+			"userId": jwt.userId
+		};
+
+		postAjax("/admin/cm/cm08/fileDownInfoUser", paramObj, null, function(data) {
+			if (data.resultCode == 200) {
+				// 권한 체크가 완료되었으므로, 실제 파일 다운로드 요청 수행
+				var xhr = new XMLHttpRequest();
+				xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + fileKey + "&userId=" + jwt.userId, true);
+				xhr.responseType = "blob";
+				xhr.onload = function () {
+					if (xhr.status === 200) {
+						var contentType = xhr.getResponseHeader("Content-Type");
+						// 만약 응답 Content-Type이 text/plain이면, 오류 메시지가 담겨있는 경우입니다.
+						if (contentType && contentType.indexOf("text/plain") !== -1) {
+							var reader = new FileReader();
+							reader.onload = function (e) {
+								alert("전산실 연락바랍니다.\n\n" + e.target.result);
+							};
+							reader.readAsText(xhr.response);
+						} else {
+							// 정상적인 파일이면 바로 다운로드 진행
+							var blob = xhr.response;
+							var downloadUrl = URL.createObjectURL(blob);
+							var a = document.createElement("a");
+							a.href = downloadUrl;
+							a.download = notiFileArr[idx].fileName || 'download';
+							document.body.appendChild(a);
+							a.click();
+							document.body.removeChild(a);
+							URL.revokeObjectURL(downloadUrl);
+						}
+					} else {
+						console.error("백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
+					}
+				};
+				xhr.onerror = function () {
+					console.error("네트워크 오류가 발생했습니다.");
+				};
+				xhr.send();
 			} else {
-				alert("다운로드 권한이 없습니다.");	
+				alert("다운로드 권한이 없습니다.");
 			}
 		});
 	}

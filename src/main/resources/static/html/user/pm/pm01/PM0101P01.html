@@ -351,7 +351,7 @@
          
         //화면 필드 기능 추가 함수 모음
         fieldFunctionControl();
-	     
+
 		$("#field02").hide();
 		authChk();						// 권한체크
 	});
@@ -566,7 +566,7 @@
 			//수정시 폼 세팅
 			if ($("#issueYn").val() =='Y'){
 				  $("#field01").show();
-				  $("#field02").show();
+				  $("#field02").hide();  // -> 그리드 영역 숨김(2025-02-20 실장님 지시)
 			}
 			else {
 				$("#field01").hide();
@@ -979,7 +979,7 @@
 		if ($("#issueYn").val() == 'Y'){
 			//fileGridView.initView();
 		    $("#field01").show();
-		    $("#field02").show();
+		    $("#field02").hide();  // -> 그리드 영역 숨김(2025-02-20 실장님 지시)
 		}
 		else {
 			$("#field01").hide();
@@ -1032,7 +1032,6 @@
 			
 			
 	function setTripRptFile(elem){
-		debugger;
 		var tempFiles = elem.files;
 		$.each(tempFiles, function(idx, obj){
 			
@@ -1146,37 +1145,132 @@
 		});	
 	}
 
-	function downloadFile(idx) {
-	    if (notiFileArr[idx].fileDown != 'Y') {
-	    	alert('파일 다운로드 권한이 없습니다.')
-	    	return false;
-	    };
+	// function downloadFile(idx) {
+	//     if (notiFileArr[idx].fileDown != 'Y') {
+	//     	alert('파일 다운로드 권한이 없습니다.')
+	//     	return false;
+	//     };
+
+	// 	var fileKey = notiFileArr[idx].fileKey;
+	// 	var paramObj = {
+	// 			"fileKey" : fileKey,
+	// 			"userId" : jwt.userId
+	// 		}		
 		
-		var fileKey = notiFileArr[idx].fileKey;
-		var paramObj = {
-				"fileKey" : fileKey,
-				"userId" : jwt.userId
-			}		
-		
-		postAjax("/admin/cm/cm08/fileDownInfoUser", paramObj, null, function(data){
-			if(data.resultCode == 200){
-				var fileInfo = data.fileInfo;
-				location.href = "/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId;
-			} else {
-				alert("다운로드 권한이 없습니다.");	
-			}
-		});
-	}	
+	// 	postAjax("/admin/cm/cm08/fileDownInfoUser", paramObj, null, function(data){
+	// 		if(data.resultCode == 200){
+	// 			var fileInfo = data.fileInfo;
+	// 			location.href = "/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId;
+	// 		} else {
+	// 			alert("다운로드 권한이 없습니다.");	
+	// 		}
+	// 	});
+	// }	
 
 	//웹 자바스크립트에서 플로터 앱함수 fileDownloadApp call
 	//플러터앱에서 다운로드 하기
-	function downloadTripRptFile(i) {
-	  	let fileKey = $('#tripTable' + i + ' #fileKey').val();
-	    var host = window.location.origin;
-	    location.href = "/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId;
+	// function downloadTripRptFile(i) {
+	//   	let fileKey = $('#tripTable' + i + ' #fileKey').val();
+	//     var host = window.location.origin;
+	//     location.href = "/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId;
+	// }
+
+	function downloadFile(idx) {
+		if (notiFileArr[idx].fileDown != 'Y') {
+			alert('파일 다운로드 권한이 없습니다.');
+			return false;
+		}
+		var fileKey = notiFileArr[idx].fileKey;
+		if (fileKey == 0 || fileKey == '' || fileKey == null) {
+			return false;
+		}
+
+		var paramObj = {
+			"fileKey": fileKey,
+			"userId": jwt.userId
+		};
+
+		postAjax("/admin/cm/cm08/fileDownInfoUser", paramObj, null, function(data) {
+			if (data.resultCode == 200) {
+				// 권한 체크 후, 실제 파일 다운로드 요청 수행
+				var xhr = new XMLHttpRequest();
+				xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + fileKey + "&userId=" + jwt.userId, true);
+				xhr.responseType = "blob";
+				xhr.onload = function () {
+					if (xhr.status === 200) {
+						var contentType = xhr.getResponseHeader("Content-Type");
+						// 만약 응답 Content-Type이 text/plain이면, 오류 메시지가 담겨있는 경우입니다.
+						if (contentType && contentType.indexOf("text/plain") !== -1) {
+							var reader = new FileReader();
+							reader.onload = function (e) {
+								alert("전산실 연락바랍니다.\n\n" + e.target.result);
+							};
+							reader.readAsText(xhr.response);
+						} else {
+							// 정상적인 파일이면 바로 다운로드 진행
+							var blob = xhr.response;
+							var downloadUrl = URL.createObjectURL(blob);
+							var a = document.createElement("a");
+							a.href = downloadUrl;
+							a.download = notiFileArr[idx].fileName || 'download';
+							document.body.appendChild(a);
+							a.click();
+							document.body.removeChild(a);
+							URL.revokeObjectURL(downloadUrl);
+						}
+					} else {
+						console.error("백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
+					}
+				};
+				xhr.onerror = function () {
+					console.error("네트워크 오류가 발생했습니다.");
+				};
+				xhr.send();
+			} else {
+				alert("다운로드 권한이 없습니다.");
+			}
+		});
 	}
 
-	
+	function downloadTripRptFile(i) {
+		let fileKey = $('#tripTable' + i + ' #fileKey').val();
+		if(fileKey == 0 || fileKey == '' || fileKey == null) {
+			return false;
+		}
+		var xhr = new XMLHttpRequest();
+		xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + fileKey + "&userId=" + jwt.userId, true);
+		xhr.responseType = "blob";
+		xhr.onload = function() {
+			if (xhr.status === 200) {
+				var contentType = xhr.getResponseHeader("Content-Type");
+				// 만약 응답 Content-Type이 text/plain이면, 오류 메시지가 담겨있는 경우입니다.
+				if (contentType && contentType.indexOf("text/plain") !== -1) {
+					var reader = new FileReader();
+					reader.onload = function(e) {
+						alert("전산실 연락바랍니다.\n\n" + e.target.result);
+					};
+					reader.readAsText(xhr.response);
+				} else {
+					// 정상적인 파일이면 바로 다운로드 진행
+					var blob = xhr.response;
+					var downloadUrl = URL.createObjectURL(blob);
+					var a = document.createElement("a");
+					a.href = downloadUrl;
+					a.download = "download";
+					document.body.appendChild(a);
+					a.click();
+					document.body.removeChild(a);
+					URL.revokeObjectURL(downloadUrl);
+				}
+			} else {
+				console.error("백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
+			}
+		};
+		xhr.onerror = function() {
+			console.error("네트워크 오류가 발생했습니다.");
+		};
+		xhr.send();
+	}
 	
 	
 	
