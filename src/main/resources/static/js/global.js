@@ -2544,20 +2544,23 @@ function toastConfirm(type, vendCd, list={}) { //theme : default, primary, succe
 }
 
 
-
 function openapi(prompt) {
 	if ($('#'+prompt).is(':disabled') || $('#'+prompt).is('[readonly]') || $('#actionBtn').is(':hidden')) {
+		$('#'+prompt).val($('#'+prompt).val().replace("\n자료 저장할 권한이 없습니다.","") + "\n자료 저장할 권한이 없습니다.");
 		return false;
 	}
 	//chatGPT API Call	-->"aiType":"GPT"
 	//ollama API Call  --> "aiType":"OLLAMA"
-	postAjax("/user/bot/chatRtv", {"aiType":"OLLAMA","prompt": $('#'+prompt).val()+ " 이 문장을 정리해서 자연스럽게 수정. "}, null, function(data){
-
+	postAjax("/user/bot/chatRtv", {"aiType":"OLLAMA","prompt": $('#'+prompt).val()+ " 이 문장을 자연스럽게 정리해. "}, null, function(data){
 		try {
-			$('#'+prompt).val(data.chatgpt);
-			txtareaHeightResize($('#'+prompt));
+			if (data.chatgpt != undefined) {
+				$('#'+prompt).val(data.chatgpt);
+				txtareaHeightResize($('#'+prompt));
+			} else {
+				alert("AI실행 오류 발생!! 전산실 연락 바랍니다.\n"+ data.msg);
+			}
 		} catch {
-			alert("AI실행 오류 발생!! 전산실 연락 바랍니다", error.message);
+			alert("AI실행 오류 발생!! 전산실 연락 바랍니다.\n"+ error.message);
 			return false; 
 		} finally {
 			// 종료 처리;
