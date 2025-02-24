@@ -2551,7 +2551,7 @@ function openapi(prompt) {
 	}
 	//chatGPT API Call	-->"aiType":"GPT"
 	//ollama API Call  --> "aiType":"OLLAMA"
-	postAjax("/user/bot/chatRtv", {"aiType":"OLLAMA","prompt": $('#'+prompt).val()+ " 이 문장을 자연스럽게 정리해. "}, null, function(data){
+	postAjax("/user/bot/chatRtv", {"aiType":"OLLAMA","prompt": $('#'+prompt).val()+ "\n-문장을 자연스럽게 수정해줘 "}, null, function(data){
 		try {
 			if (data.chatgpt != undefined) {
 				$('#'+prompt).val(data.chatgpt);
