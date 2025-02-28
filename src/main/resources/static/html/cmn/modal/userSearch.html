@@ -93,7 +93,13 @@
 		paramObj["coCd"] = "";
 		paramObj["useYn"] = "Y";
 		postAjaxSync("/admin/cm/cm06/selectUserTree", paramObj, null, function(data){
-			userTree = data.userTree;
+			// userTree = data.userTree;
+			userTree = flattenTree(data.userTree);
+			if(paramObj.pgmId === "WB2401M01") { // 계획 및 실적 문제등록 시 조치담당자 실적관리용 노드 제외
+				userTree = userTree.filter(function(node) {
+					return node.id !== "GUN95" && node.parent !== "GUN95";
+				});
+			}
 		});
 		return userTree;
 	}
@@ -131,5 +137,31 @@
 
 		modalStack.last().callback(userTree);
 		modalStack.close();
+	}
+
+	// 트리 데이터 평탄화 - 중간 단계의 unit 노드를 제거하고, person 노드는 상위 허용 unit(부모가 "#", "GNG", "GUN", "TRN")에 직접 연결되도록 재할당)
+	function flattenTree(nodes) {
+		// 모든 노드를 id 기준으로 map생성
+		const nodeMap = nodes.reduce((map, node) => (map[node.id] = node, map), {});
+
+		// 허용된 unit 노드는 parent가 "#" 또는 "GNG", "GUN", "TRN"
+		const unitCheck = new Set(
+			nodes
+			.filter(node => node.type === 'unit' && ['#', 'GNG', 'GUN', 'TRN'].includes(node.parent))
+			.map(node => node.id)
+		);
+
+		// person 노드의 부모가 허용되지 않은 경우, 부모의 부모가 허용되면 재할당합니다.
+		nodes.forEach(node => {
+			if (node.type === 'person' && !unitCheck.has(node.parent)) {
+				const parent = nodeMap[node.parent];
+				if (parent && unitCheck.has(parent.parent)) {
+					node.parent = parent.parent;
+				}
+			}
+		});
+
+		// 최종적으로 허용되지 않은 unit 노드는 제거
+		return nodes.filter(node => node.type !== 'unit' || unitCheck.has(node.id));
 	}
 </script>
