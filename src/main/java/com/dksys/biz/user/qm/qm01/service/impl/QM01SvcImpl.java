@@ -316,6 +316,12 @@ public class QM01SvcImpl implements QM01Svc {
 		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
 		paramMap.put("reqNo", reqNo);
 		int result = QM01Mapper.insertQualityReq(paramMap);
+
+		// 문제발생내역의 발주요청번호 update 처리하기 (ISSNO에 해당하는 문제에 발주요청번호 Update 처리함.
+		result += QM01Mapper.updateWbsIssueReqNo(paramMap);
+
+		rtnMap.put("result", String.valueOf(result)); // 문자열로 변환하여 rtnMap에 "result"키로 저장
+		rtnMap.put("reqNo", reqNo);// rtnMap에 "reqNo"키로 저장
 		
         /**********************************************************************************
          * 2025.01.21 남장섭 수정 시작 - 요인별발주요청서 작성과 결과등록 처리 기능을 하나로 합침 - 아래는 요인별 발주요청서 결과등록 처리하는 로직을 복사함
@@ -346,12 +352,6 @@ public class QM01SvcImpl implements QM01Svc {
          * 2025.01.21 남장섭 수정 끝 - 요인별발주요청서 작성과 결과등록 처리 기능을 하나로 합침 - 아래는 요인별 발주요청서 결과등록 처리하는 로직을 복사함
          **********************************************************************************/
 
-		//문제발생내역의 발주요청번호 update 처리하기 (ISSNO에 해당하는 문제에 발주요청번호 Update 처리함.
-		result += QM01Mapper.updateWbsIssueReqNo(paramMap);
-		
-		rtnMap.put("result", String.valueOf(result)); //문자열로 변환하여 rtnMap에 "result"키로 저장
-		rtnMap.put("reqNo", reqNo);// rtnMap에 "reqNo"키로 저장
-		
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------  
