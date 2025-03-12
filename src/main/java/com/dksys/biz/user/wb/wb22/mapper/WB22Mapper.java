@@ -130,4 +130,7 @@ public interface WB22Mapper {
 
 	// wbs계획 관리 변경사항 저장
 	int updateWbsChanges(Map<String, String> paramMap);
+
+	// Ver.up Check
+	List<Map<String, String>> wbsVerUpInsertChk(Map<String, String> paramMap);
 }
