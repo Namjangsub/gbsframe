@@ -185,6 +185,14 @@ public class WB22SvcImpl implements WB22Svc {
 
 	@Override
 	public int wbsVerUpInsert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+		// Ver.up Check : 해당 버전에 ClOSE_YN이 Y인지 체크
+		List<Map<String, String>> chkList = wb22Mapper.wbsVerUpInsertChk(paramMap);
+
+		// 조회 결과가 없으면 이미 CLOSE_YN이 'N'인 상태이므로 실행 중지
+		if (chkList == null || chkList.isEmpty()) {
+			return 0;
+		}
+
 		int result = 0;
 		Gson gson = new Gson();
 		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {
