@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,9 +17,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.cmn.vo.PaginationInfo;
-import com.dksys.biz.exc.LogicException;
-import com.dksys.biz.util.MessageUtils;
 import com.dksys.biz.user.cr.cr16.service.CR16Svc;
+import com.dksys.biz.util.MessageUtils;
 
 @Controller
 @Transactional(rollbackFor = Exception.class)
@@ -63,6 +61,8 @@ public class CR16Ctr {
     	// 계획 이력 값
     	String salesPlanHistValue = paramMap.get("salesPlanHist");
     	// 없거나 계획 이력이면 현제 사업계획을
+		int totalCnt = cr16Svc.selectSalesYearPlanListCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
     	if (salesPlanHistValue == null || salesPlanHistValue.equals("0")) {
     	  List<Map<String, String>> fileList = cr16Svc.selectSalesYearPlanList(paramMap);
   		  model.addAttribute("fileList", fileList);
