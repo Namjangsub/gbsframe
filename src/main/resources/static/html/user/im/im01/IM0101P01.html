@@ -138,7 +138,7 @@
 					<th colspan="8" style='text-align: center; background-color: lemonchiffon; padding-top: 20px;'>검토부서
 				</tr>
 				<tr class='execArea'>
-					<th class="hit" id="mcPartCdTitle">기계분류</th>
+					<th class="hit fieldTitle">기계분류</th>
 					<td colspan="1">
 						<div>
 							<select id="mcPartCd" name="mcPartCd" data-kind="MCPARTCD" class="form-control" required msg="기계분류">
@@ -146,7 +146,7 @@
 							</select>
 						</div>
 					</td>
-					<th class="hit" id="importantCdTitle">중요도</th>
+					<th class="hit fieldTitle">중요도</th>
 					<td colspan="1">
 						<div>
 							<select id="importantCd" name="importantCd" data-kind="IMPORTANTCD" class="form-control" required msg="중요도">
@@ -154,7 +154,7 @@
 							</select>
 						</div>
 					</td>
-					<th class="hit" id="impactCdTitle">영향도</th>
+					<th class="hit fieldTitle">영향도</th>
 					<td colspan="1">
 						<div>
 							<select id="impactCd" name="impactCd" data-kind="IMPACTCD" class="form-control" required msg="영향도">
@@ -223,7 +223,7 @@
 				</tr>
 				<tr class='evalArea'>
 					<th>평가점수</th>
-					<td><input type="text" id="imprvmApprPoint" name="imprvmApprPoint" class="form-control" msg="평가점수" onkeyup="chechChange(this);" placeholder="사장님 평가 내용입니다."></td>
+					<td><input type="text" id="imprvmApprPoint" name="imprvmApprPoint" class="form-control" msg="평가점수" onkeyup="checkChange(this);" placeholder="사장님 평가 내용입니다."></td>
 				</tr>
 				<tr class='evalArea'>
 					<th>평가일자</th>
@@ -579,15 +579,12 @@
 		} else {
 			$("#salesCode").removeClass('hit');					// 업무, 아이디어, 기타만 체크된 경우	: hit 클래스 제거 
 			$("#salesCd").removeAttr("required");				// 업무, 아이디어, 기타만 체크된 경우 	: required 속성 제거
-			$("#mcPartCdTitle").removeClass('hit');				// 업무, 아이디어, 기타만 체크된 경우	: hit 클래스 제거 
+
+			$(".fieldTitle").removeClass('hit');				// 모든 타이틀에서 hit 클래스 제거
 			$("#mcPartCd").removeAttr("required");				// 업무, 아이디어, 기타만 체크된 경우 	: required 속성 제거
-			$("#importantCdTitle").removeClass('hit');			// 업무, 아이디어, 기타만 체크된 경우	: hit 클래스 제거 
 			$("#importantCd").removeAttr("required");			// 업무, 아이디어, 기타만 체크된 경우 	: required 속성 제거
-			$("#impactCdTitle").removeClass('hit');				// 업무, 아이디어, 기타만 체크된 경우	: hit 클래스 제거 
 			$("#impactCd").removeAttr("required");				// 업무, 아이디어, 기타만 체크된 경우 	: required 속성 제거
-			$('#mcPartCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
-			$('#importantCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
-			$('#impactCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+			$('#mcPartCd, #importantCd, #impactCd').css({'background-color':'#e6e6e6','pointer-events':'none'});
 		}
 	}
 
@@ -748,8 +745,9 @@
 			textAreas.forEach(textAreaId => {
 			    txtareaHeightResize($(textAreaId));
 			});
-				//마감체크
-// 				monthCloseChk($('#ctrtDt').val(), '', $('#coCd').val());
+
+			// 월마감체크 - 워킹데이기준
+			monthCloseWorkingChk($('#imprvmApprDttm').val());
 				
 			formControl(); //작업단계별 입력화면 변경
 
@@ -1574,11 +1572,45 @@
 		    obj.height(maxtargetHeight);
 		}
 	}
-	
-	
-	
     
-    function chechChange(elm) {
+    function checkChange(elm) {
     	elm.value = addCommaStr(gPasIntChk(elm.value));
     }
+
+	// 월마감체크 - 워킹데이기준
+	function monthCloseWorkingChk(chkValue) {
+		// 하이픈 제거
+		chkValue = chkValue.replaceAll("-", "");
+		if (!chkValue) return false;
+		
+		var menuUrl = window.location.href.substring(window.location.href.lastIndexOf("/") + 1, window.location.href.lastIndexOf("."));
+		
+		var paramObj = {
+			"coCd"       : $('#coCd').val(),
+			"menuUrl"    : menuUrl,
+			"actionType" : modalStack.last().paramObj.actionType,
+			"chkValue"   : chkValue
+		};
+		
+		postAjaxSync("/admin/cm/cm05/selectMonthCloseChk", paramObj, null, function(data) {
+			// 서버에서 받은 sysDate는 "YYYY-MM-DD" 형태, workDay는 정수
+			var sysDateObj = new Date(data.sysDate);
+			var workDay = parseInt(data.workDay, 10);
+			
+			// 기준 날짜 : sysDate에 workDay일(음수이면 빼기)을 적용
+			sysDateObj.setDate(sysDateObj.getDate() + workDay);
+			
+			// chkValue ("YYYYMMDD")를 Date 객체로 변환
+			var chkYear  = parseInt(chkValue.substring(0, 4), 10);
+			var chkMonth = parseInt(chkValue.substring(4, 6), 10) - 1;
+			var chkDay   = parseInt(chkValue.substring(6, 8), 10);
+			var chkDateObj = new Date(chkYear, chkMonth, chkDay);
+			
+			// Date 객체를 직접 비교: cutoff가 chkValue보다 늦으면 수정 불가
+			if (sysDateObj.getTime() > chkDateObj.getTime()) {
+				alert("마감된 일자입니다. " + dateToStr(sysDateObj) + "일 이전은 수정할 수가 없습니다.");
+			}
+		});
+	}
+
 </script>
