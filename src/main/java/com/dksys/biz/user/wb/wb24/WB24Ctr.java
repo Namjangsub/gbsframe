@@ -42,7 +42,7 @@ public class WB24Ctr {
 		List<Map<String, String>> fileList = wb24Svc.selectWbsIssueList(paramMap);
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
-    }	
+    }
     
 	@PostMapping(value = "/selectWbsIssueListDashboard") 
 	public String selectWbsIssueListDashboard(@RequestBody Map<String, String> paramMap, ModelMap model) {	
@@ -224,4 +224,21 @@ public class WB24Ctr {
         model.addAttribute("vendProblem", vendProblem);
         return "jsonView";
     }
+
+	// 발생공급업체 Update
+	@PutMapping(value = "/updateVendCd")
+	public String updateVendCd(@RequestBody Map<String, String> param, ModelMap model) {
+		wb24Svc.updateVendCd(param);
+		model.addAttribute("resultCode", 200);
+    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+		return "jsonView";
+	}
+
+	// 문제정보를 가지고 발주요청서 등록
+	@PostMapping(value = "/selectIssueInfo")
+	public String selectIssueInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = wb24Svc.selectIssueInfo(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 }

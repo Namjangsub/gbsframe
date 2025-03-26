@@ -548,7 +548,7 @@
 			 ORDER BY P.CLNT_CD, P.ORDRS_NO, P.SALES_CD, P.PATH, I.GUBUN
      </select>
 
-
+	
 
 
 
@@ -1264,5 +1264,118 @@
 		 ORDER BY CREAT_DTTM DESC, SALES_CD DESC
     </select>
 
+	<!-- 발생공급업체 Update -->
+	<update id="updateVendCd" parameterType="Map">
+		UPDATE TB_WB24M02
+				SET VEND_CD	    = #{vendCd}		--문제발생공급업체
+			WHERE ISS_NO =  #{issNo}
+	</update>
+
+	<!-- 문제정보를 가지고 발주요청서 등록 -->
+	<select id="selectIssueInfo" parameterType="Map" resultType="camelMap">
+        SELECT A.WBS_PLAN_NO
+             , A.WBS_RSLTS_NO
+             , A.WBS_PLAN_CODE_KIND
+             , A.WBS_PLAN_CODE_ID
+             , TO_CHAR(NVL(P.WBS_PLANS_DT,R.WBS_RSLTSS_DT),'YYYY-MM-DD') AS WBS_PLANS_DT
+             , TO_CHAR(NVL(P.WBS_PLANE_DT,R.WBS_RSLTSE_DT),'YYYY-MM-DD') AS WBS_PLANE_DT
+             , TO_CHAR(NVL(R.WBS_RSLTSS_DT,P.WBS_PLANS_DT),'YYYY-MM-DD') AS WBS_RSLTSS_DT
+             , TO_CHAR(NVL(R.WBS_RSLTSE_DT,P.WBS_PLANE_DT),'YYYY-MM-DD') AS WBS_RSLTSE_DT
+             , A.ISS_DIV
+             , R3.CODE_NM AS ISS_DIV_NM
+             , A.ISS_STS
+             , R4.CODE_NM AS ISS_STS_NM
+             , A.ISS_SJ
+             , A.ISS_CNTS
+             , A.ACT_ID			AS ACT_ID
+             , U.NAME 			AS ACT_NM
+             , U.DEPT_ID		AS ACT_DEPT_ID
+             , TO_CHAR(S.ACTS_DT,'YYYY-MM-DD') AS ACTS_DT
+             , TO_CHAR(S.ACTE_DT,'YYYY-MM-DD') AS ACTE_DT
+             , NVL(S.ACT_MH, 0)  AS ACT_MH
+             , NVL(S.ACT_AMT, 0) AS ACT_AMT
+			 , A.REQ_NO
+             , S.ACT_CNTS
+             , R1.CODE_NM AS WBS_PLAN_CODE_KIND_NM
+             , NVL(R2.CODE_NM, R1.CODE_NM) AS WBS_PLAN_CODE_NM
+             , A.ISS_NO
+             , A.FILE_TRGT_KEY
+             , A.FILE_TRGT_KEY  AS ISS_FILE_TRGT_KEY
+             , A.SALES_CD
+             , A.CO_CD
+             , A.CREAT_ID
+             , U2.NAME  			AS CREAT_ID_NM
+             , U2.DEPT_ID			AS CREAT_DEPT_ID
+             , A.CREAT_PGM
+             , A.CREAT_DTTM
+             , TO_CHAR(A.CREAT_DTTM,'YYYY-MM-DD') AS CREAT_DT
+             , A.UDT_ID
+             , A.UDT_PGM
+             , A.UDT_DTTM
+             , WB.APP_CNT
+             , WB.ACT_APP_CNT
+             , S.ACT_AMT_STS
+             , S.ACT_DNG			--담당자위험도평가
+		     , S.ACT_DNG_EVAL		--팀장위험도평가
+		     , S.MEAS_RST			--원인
+			 , A.MID_CD AS MID_CD
+			 , (SELECT FN_CM05M01_CD_TO_NM(A.MID_CD) FROM DUAL) AS MID_NM
+			 , A.SUB_CD AS SUB_CD
+			 , (SELECT FN_CM05M01_CD_TO_NM(A.SUB_CD) FROM DUAL) AS SUB_CD_NM
+			 , A.VEND_CD 		AS VEND_CD
+			 , B2.CLNT_NM 		AS VEND_CD_NM
+			 , Q.FILE_TRGT_KEY  AS REQ_FILE_TRGT_KEY	--발주요청서 유니크키값
+			 , Q.REQ_ST			AS REQ_ST				--발주요청서 진행상태코드 : REQST01, REQST02, REQST03
+			 , QP.RSLT_NO 		AS RSLT_NO
+			 , decode(NVL(QP.RSLT_NO,''), '', 'N', 'Y')   AS RSLT_YN --결과등록여부
+			 , Q.MID_CD 				AS REQ_MID_CD
+			 , Q.SUB_CD 				AS REQ_SUB_CD
+			 , NVL(QP.SUB_CD, '') 		AS RESLT_SUB_CD		--결과사유
+			 , CR.ORDRS_NO	--수주번호
+			 , CR.EQP_NM	--설비명
+			 , CM.CLNT_PJT	--프로젝트코드
+			 , (SELECT FN_CM05M01_CD_TO_NM(CR.ORDRS_DTL_DIV20) FROM DUAL) AS NEW_CD_NM
+			 , B3.CLNT_NM 				AS CLNT_NM
+			 , A.MC_PART_CD
+			 , A.IMPORTANT_CD
+			 , A.IMPACT_CD
+	         , (SELECT FN_CM05M01_CD_TO_NM(A.MC_PART_CD) FROM DUAL) AS MC_PART_CD_NM
+	         , (SELECT FN_CM05M01_CD_TO_NM(A.IMPORTANT_CD) FROM DUAL) AS IMPORTANT_CD_NM
+	         , (SELECT FN_CM05M01_CD_TO_NM(A.IMPACT_CD) FROM DUAL) AS IMPACT_CD_NM
+			 , TO_CHAR(CR.DUDT_INTEND_DT,'YYYY-MM-DD') AS CUST_REQ_DT	--납기예정일 ->고객요구일
+        FROM   TB_WB24M02 AS A
+               LEFT OUTER JOIN TB_WB22M01 AS P  ON P.CO_CD       = A.CO_CD
+                                               AND P.WBS_PLAN_NO = A.WBS_PLAN_NO
+                                               AND P.WBS_PLAN_CODE_ID = A.WBS_PLAN_CODE_ID
+               LEFT OUTER JOIN TB_WB23M01 AS R  ON R.CO_CD       = A.CO_CD
+                                               AND R.WBS_RSLTS_NO = A.WBS_RSLTS_NO
+                                               AND R.WBS_PLAN_CODE_ID = A.WBS_PLAN_CODE_ID
+               LEFT OUTER JOIN TB_WB24M03 AS S  ON S.ISS_NO = A.ISS_NO
+               LEFT OUTER JOIN TB_CM06M01 AS U  ON U.ID = A.ACT_ID
+               LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = A.WBS_PLAN_CODE_KIND
+               LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = A.WBS_PLAN_CODE_ID
+               LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = A.ISS_DIV
+               LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = A.ISS_STS
+               LEFT OUTER JOIN TB_CM06M01 AS U2  ON U2.ID = A.CREAT_ID
+               LEFT OUTER JOIN TB_BM02M01 AS B2  ON B2.CLNT_CD = A.VEND_CD
+               LEFT OUTER JOIN TB_QM01M01 AS Q  ON Q.REQ_NO = A.REQ_NO
+		 	   LEFT OUTER JOIN TB_QM01P01 AS QP  ON QP.REQ_NO = Q.REQ_NO
+		 	   LEFT OUTER JOIN TB_CR02D02 AS CR  ON CR.SALES_CD = A.SALES_CD
+		 	   LEFT OUTER JOIN TB_CR02M01 AS CM  ON CM.CO_CD =  A.CO_CD  
+		 	                                    AND CM.ORDRS_NO = CR.ORDRS_NO
+               LEFT OUTER JOIN TB_BM02M01 AS B3 ON B3.CLNT_CD = CM.ORDRS_CLNT_CD
+               LEFT OUTER JOIN
+				               (
+					                SELECT sum(CASE WHEN TODO_DIV2_CODE_ID = 'TODODIV2060' THEN 1 ELSE 0 END) AS  APP_CNT
+					                	,  sum(CASE WHEN TODO_DIV2_CODE_ID = 'TODODIV2090' THEN 1 ELSE 0 END) AS  ACT_APP_CNT
+					                	, MAX(TODO_NO) AS TODO_NO
+					                FROM   TB_WB20M03
+					                WHERE  1 = 1
+					                AND    TODO_NO= (SELECT A.ISS_NO FROM TB_WB24M02 AS A WHERE  A.FILE_TRGT_KEY = #{fileTrgtKey})
+					                AND    TODO_CF_DT IS NOT NULL
+				               ) AS WB ON A.ISS_NO  =  WB.TODO_NO
+        WHERE  1 = 1
+        AND    A.FILE_TRGT_KEY = #{fileTrgtKey}
+    </select>
 
 </mapper>

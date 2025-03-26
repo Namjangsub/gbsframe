@@ -19,6 +19,7 @@ import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.qm.qm01.service.QM01Svc;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
+import com.dksys.biz.user.wb.wb24.mapper.WB24Mapper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -38,6 +39,9 @@ public class QM01SvcImpl implements QM01Svc {
   
   @Autowired
   WB20Svc wb20Svc;
+
+  @Autowired
+  WB24Mapper wb24Mapper;
   
   @Override
   public int selectQualityReqCount(Map<String, String> paramMap) {
@@ -160,6 +164,8 @@ public class QM01SvcImpl implements QM01Svc {
         // 첨부 화일 권한체크 끝
         // ---------------------------------------------------------------
         int result = QM01Mapper.updateQualityReq(paramMap);
+
+        result += wb24Mapper.updateVendCd(paramMap);
 	
         /**********************************************************************************
          * 2025.01.21 남장섭 수정 시작 - 요인별발주요청서 작성과 결과등록 처리 기능을 하나로 합침 - 아래는 요인별 발주요청서 결과등록 처리하는 로직을 복사함
@@ -319,6 +325,9 @@ public class QM01SvcImpl implements QM01Svc {
 
 		// 문제발생내역의 발주요청번호 update 처리하기 (ISSNO에 해당하는 문제에 발주요청번호 Update 처리함.
 		result += QM01Mapper.updateWbsIssueReqNo(paramMap);
+
+    // 발주요청서 등록 시 발생공급업체 저장기능 추가
+    result += wb24Mapper.updateVendCd(paramMap);
 
 		rtnMap.put("result", String.valueOf(result)); // 문자열로 변환하여 rtnMap에 "result"키로 저장
 		rtnMap.put("reqNo", reqNo);// rtnMap에 "reqNo"키로 저장

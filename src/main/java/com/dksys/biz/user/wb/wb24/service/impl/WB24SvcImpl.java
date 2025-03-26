@@ -524,4 +524,16 @@ public class WB24SvcImpl implements WB24Svc {
         return wb24Mapper.selectVendProblemList(paramMap);
     }
 
+	// 발생공급업체 Update
+	@Override
+	public int updateVendCd(Map<String, String> param) {
+		return wb24Mapper.updateVendCd(param);
+	}
+
+
+	// 문제정보를 가지고 발주요청서 등록
+	@Override
+	public Map<String, String> selectIssueInfo(Map<String, String> paramMap) {
+		return wb24Mapper.selectIssueInfo(paramMap);
+	}
 }
