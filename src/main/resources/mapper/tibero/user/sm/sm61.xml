@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.sm.sm61.mapper.SM61Mapper">
+
+	<!-- 매입확정 리스트  개별매입 사용안함 -->
+	<select id="selectVendInitEstimateList" parameterType="Map" resultType="camelMap">
+		SELECT  
+				  T.CLNT_CD
+				, T.CLNT_NM
+				, T.CRN
+				, B1.BIZDEPT_SN
+				, B1.SALES_EMP_ID
+				, B1.SALES_EMP_ID_NM
+				, B1.SALES_CO_CD
+				, TO_CHAR(B2.ESTMT_DT , 'YYYY-MM-DD')		AS ESTMT_DT
+				, B2.CLNT_ESTMT_MNG
+				, (SELECT FN_CM06M01_ID_TO_NM(B2.CLNT_ESTMT_MNG) FROM DUAL) AS CLNT_ESTMT_MNG_NM
+				, B2.SUPL_EXP_SCORE
+				, B2.SIMIL_MC_SCORE
+				, B2.SUPPLE_SCORE
+				, B2.MAIN_CLIENT_SCORE
+				, B2.QC_SCORE
+				, B2.AS_SCORE
+				, B2.WARRENT_SCORE
+				, B2.BONUS_SCORE
+				, B2.TOTAL_SCORE
+				, B2.ESTMT_RMK
+				, B2.CREAT_ID
+				, B2.CREAT_DTTM
+				, B2.CREAT_PGM
+				, B2.UDT_ID
+				, B2.UDT_DTTM
+				, B2.UDT_PGM
+		 FROM TB_BM02M01 AS T
+	    			LEFT OUTER JOIN TB_BM02M20 B2 ON B2.CLNT_CD = T.CLNT_CD  --공급업체 최초평가
+					LEFT OUTER JOIN (
+	            						SELECT  B.*
+											  , (SELECT FN_CM06M01_ID_TO_NM(B.SALES_EMP_ID) FROM DUAL) AS SALES_EMP_ID_NM
+										FROM (
+										    SELECT 
+										          B.CLNT_CD
+										        , B.BIZDEPT_SN
+										        , B.SALES_EMP_ID
+										        , B.SALES_CO_CD
+										        , ROW_NUMBER() OVER (PARTITION BY B.CLNT_CD ORDER BY B.BIZDEPT_SN ASC) AS rn
+										    FROM TB_BM02D01 B
+--											    WHERE B.SALES_CO_CD = 'TRN'  --구매업무는 트루넷에서 처리함
+											) B
+										WHERE rn = 1
+    								) B1 ON B1.CLNT_CD = T.CLNT_CD
+	    	WHERE 1 = 1
+--	    	  AND T.PCHS_CLNT_CD IN (524, 2)
+			  <if test="pchsClntNm != null and !pchsClntNm.equals('')">
+	    	  AND T.CLNT_NM LIKE '%'|| #{pchsClntNm} || '%'
+	    	  </if>		
+	    	  <if test="mngIdCd != null and !mngIdCd.equals('')">
+	    	  AND B1.SALES_EMP_ID  IN ( ${mngIdCd} )
+	    	  </if>
+	    	  <if test="mngIdCdNm != null and !mngIdCdNm.equals('')">
+	    	  AND B1.SALES_EMP_ID_NM LIKE '%'|| #{mngIdCdNm} || '%'
+	    	  </if>
+	</select>	
+	
+		
+	<select id="select_mngId_code" parameterType="Map" resultType="camelMap">
+			SELECT DISTINCT
+						  B2.SALES_EMP_ID_NM			AS NAME
+						, B2.SALES_EMP_ID				AS CODE
+			FROM TB_BM02M01 AS T    --거래처마스터
+					LEFT OUTER JOIN (
+	            						SELECT  B.*
+											  , (SELECT FN_CM06M01_ID_TO_NM(B.SALES_EMP_ID) FROM DUAL) AS SALES_EMP_ID_NM
+										FROM (
+										    SELECT 
+										          B.CLNT_CD
+										        , B.BIZDEPT_SN
+										        , B.SALES_EMP_ID
+										        , B.SALES_CO_CD
+										        , ROW_NUMBER() OVER (PARTITION BY B.CLNT_CD ORDER BY B.BIZDEPT_SN ASC) AS rn
+										    FROM TB_BM02D01 B
+--										    WHERE B.SALES_CO_CD = 'TRN'  --구매업무는 트루넷에서 처리함
+											) B
+										WHERE rn = 1
+    								) B2 ON B2.CLNT_CD = T.CLNT_CD
+			  WHERE 1=1 
+			  ORDER BY B2.SALES_EMP_ID_NM	
+    </select>	
+     
+			
+	<!-- 평가점수 Update -->
+	<update id="updateVendInitEstimate" parameterType="Map">
+		MERGE INTO TB_BM02M20 A
+			USING DUAL
+			ON (A.CLNT_CD 	= #{clntCd} )
+		WHEN MATCHED THEN
+			UPDATE SET
+				  ESTMT_DT     		= SYSDATE
+				, CLNT_ESTMT_MNG    = #{userId    }
+				, SUPL_EXP_SCORE 	= #{suplExpScore }
+				, SIMIL_MC_SCORE 	= #{similMcScore }
+				, SUPPLE_SCORE 		= #{suppleScore  }
+				, MAIN_CLIENT_SCORE = #{mainClientScore}
+				, QC_SCORE			= #{qcScore      }
+				, AS_SCORE 			= #{asScore      }
+				, WARRENT_SCORE 	= #{warrentScore }
+				, BONUS_SCORE 		= #{bonusScore   }
+				, TOTAL_SCORE  		= #{totalScore  }
+				, ESTMT_RMK    		= #{estmtRmk, jdbcType=VARCHAR}
+				, UDT_ID       		= #{userId      }
+				, UDT_DTTM     		= SYSDATE
+				, UDT_PGM      		= #{pgmId      }
+		WHEN NOT MATCHED THEN
+			INSERT
+			(
+				  CLNT_CD, ESTMT_DT, CLNT_ESTMT_MNG
+				, SUPL_EXP_SCORE, SIMIL_MC_SCORE, SUPPLE_SCORE, MAIN_CLIENT_SCORE, QC_SCORE, AS_SCORE
+				, WARRENT_SCORE, BONUS_SCORE, TOTAL_SCORE
+				, ESTMT_RMK, CREAT_ID, CREAT_DTTM, CREAT_PGM
+			)
+			VALUES
+			(
+			 	  #{clntCd}, SYSDATE, #{userId}
+				, #{suplExpScore}, #{similMcScore}, #{suppleScore}, #{mainClientScore}, #{qcScore}, #{asScore}
+				, #{warrentScore}, #{bonusScore}, #{totalScore}
+				, #{estmtRmk, jdbcType=VARCHAR}, #{userId}, SYSDATE, #{pgmId}
+			)
+	</update>
+	
+	<!-- 평가점수 Delete -->
+	<delete id="deleteVendInitEstimate" parameterType="Map">
+		DELETE TB_BM02M20 WHERE CLNT_CD = #{clntCd}
+	</delete>
+	
+ </mapper>

@@ -72,19 +72,6 @@
 							</select>
 						</td>
 
-						<th class= "hit">평가년도</th>
-						<td>
-							<select id="trgYear_S" name="trgYear_S" data-search="trgYear" required="required" msg="회사">
-							</select>
-						</td>
-						<th class="hit">처리일자</th>
-						<td>
-						  <div class="date_input">
-			                <input id="ordrgDtFrom_S" name="ordrgDtFrom_S"  class="input_calendar" autocomplete="off" msg="확정 시작일자" data-search="ordrgDtFrom">
-			                <span>~</span>
-			                <input id="ordrgDtTo_S" name="ordrgDtTo_S"  class="input_calendar" autocomplete="off" msg="확정 종료일자" data-search="ordrgDtTo">
-						  </div>
-						</td>
 						<th>구매처</th>
 						<td>
 								<input type="hidden" id="pchsClntCd_S" name="pchsClntCd_S"  data-search="pchsClntCd">
@@ -100,12 +87,15 @@
 								</select>
 							</div>
 						</td>
+						
+						<th></th>
+						<td></td>
 					</tr>			     
 	            </table>
 				<!-- 검색조건 END -->	      
 <form id="mainForm" onSubmit="return false;">				      
 		<input type="hidden" id="userId"    name="userId">
-		<input type="hidden" id="pgmId"     name="pgmId" value="SM6001M01">
+		<input type="hidden" id="pgmId"     name="pgmId" value="SM6101M01">
 </form>			        
             </div>
         </div>        
@@ -114,13 +104,12 @@
 		<div class="contents no_bg">
 			<!-- 콘텐츠 타이틀 -->
 			<div class="contents_tit">
-				<span  style="height: 30px; line-height: 30px;font-size: 15px;">공급업체 평가 대상 리스트 </span>
-<!-- 				<span> 상단그리드의 </span><span style="color: blue; font-weight: bold;">구매처별 집계</span><span>는 입고내역 전체이며, 하단그리드의 </span><span  style="color: blue; font-weight: bold;">매입확정 리스트</span><span>는 검색조건의 매입확정일자 기준으로 출력됩니다.</span> -->
+				<span  style="height: 30px; line-height: 30px;font-size: 15px;">공급업체 최초 평가표 현황  </span>
 				<div class="add_btn_small pdl10">
 <!-- 					<a onclick="inserPurchase('C');" style="height: 30px; line-height: 28px;" authchk>+</a> -->
 					<a onclick="deleteVendEstimate();" style="height: 30px; line-height: 28px;" authChk>-</a>
 					<a onclick="updateVendEstimate();" style="height: 30px; line-height: 28px; width: 90px;" authChk><i class="fas fa-save"></i> 평가점수저장</a> 
-					<a onclick="setReportMulti();" style="height: 30px; line-height: 28px; width: 90px;" authChk><i class="fas fa-print"></i> 평가서발행</a> 
+<!-- 					<a onclick="setReportMulti();" style="height: 30px; line-height: 28px; width: 90px;" authChk><i class="fas fa-print"></i> 평가서발행</a>  -->
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;" authChk><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 			    </div>
 			</div>
@@ -135,6 +124,18 @@
 </html>
 
 <script type="text/javascript">
+//필드별 최대 점수 설정 (필드명: 최대 점수)
+const SCORE_LIMITS = {
+		suplExpScore: 20,        // 공급사업력
+		similMcScore: 15,       // 유사기계제작
+		suppleScore: 10,        // 안정적공급
+		mainClientScore: 20,    // 주거래고객사
+		qcScore: 20,       		// 품질기준
+		asScore: 10,        	// A/S기준
+		warrentScore: 5,        // 보증보험가입
+		bonusScore: 5,        	// 가산점
+};
+
 	
 var clntPurchaseGridView = {
 	initView: function(){
@@ -151,7 +152,7 @@ var clntPurchaseGridView = {
            selector: true
          },
          body: {
-		    mergeCells : ["ordrgNo", "ordrgSeq", "salesCd", "pchsClntNm", ],
+		    mergeCells : ["salesCd", "pchsClntNm", ],
 			onClick: function () {
 				this.self.clearSelect();				
 			    this.self.select(this.dindex);
@@ -161,11 +162,11 @@ var clntPurchaseGridView = {
 				this.self.select(this.dindex);
 				var row = this.dindex;
 				//거래처조회 화면 call
-				if (this.column.key == 'clntNm' || this.column.key == 'salesEmpIdNm' || this.column.key == 'pchsQty' || this.column.key == 'pchsAmt') {
+				if (this.column.key == 'clntNm' || this.column.key == 'salesEmpIdNm' ) {
 					var paramObj = {
 									actionType: "U",
 									crnTyp    : "CRNTYP01",
-									clntCd    : this.item.pchsClntCd,
+									clntCd    : this.item.clntCd,
 									};
 					openModal("/static/html/admin/bm/bm02/BM0202P01.html", 1500, 870, "", paramObj);
 				}
@@ -175,19 +176,25 @@ var clntPurchaseGridView = {
             	let row = this.dindex;
 			    let col = this.colIndex;
 			    
-			    if (this.key == 'badnScore' || this.key == 'cntmsrScore' || this.key == 'schdulScore' || 
-			    	this.key == 'emgcScore' || this.key == 'estScore' || this.key == 'prcScore') {
-			    	
-			    	//평가점수 최대치 설정 (긴급납기대응, 가격경쟁력은 10점평가)
-			    	if ((this.key == 'emgcScore' || this.key == 'estScore') & this.value > 10) {
-			    		this.self.setValue(this.dindex, this.key, 10);
-			    	} else if (this.value > 20) {
-			    		this.self.setValue(this.dindex, this.key, 20);
-			    	}
-			    	
-			    	let totalScore =  gPasIntChk(this.item.badnScore) + gPasIntChk(this.item.cntmsrScore) + gPasIntChk(this.item.schdulScore)
-			    				   + gPasIntChk(this.item.emgcScore) + gPasIntChk(this.item.estScore) + gPasIntChk(this.item.prcScore);
-			    	this.self.setValue(this.dindex, "totalScore", totalScore);
+			 	// 평가점수 최대치 설정
+			    if (Object.prototype.hasOwnProperty.call(SCORE_LIMITS, this.key)) {
+			        const maxScore = SCORE_LIMITS[this.key];
+			        let newValue = parseInt(this.value, 10) || 0; // 입력값을 정수로 변환, 유효하지 않으면 0
+
+			        // 입력 유효성 검사
+			        if (newValue < 0) {
+			            newValue = 0;
+			        } else if (newValue > maxScore) {
+			            newValue = maxScore;
+			        }
+			        this.self.setValue(this.dindex, this.key, newValue);
+
+			        // totalScore 계산 (SCORE_LIMITS에 정의된 모든 필드 포함)
+			        let totalScore = 0;
+			        for (let field in SCORE_LIMITS) {
+			            totalScore += parseInt(this.item[field], 10) || 0; // 각 필드 값을 정수로 변환 후 합산
+			        }
+			        this.self.setValue(this.dindex, "totalScore", totalScore);
 			    }
             },
 	   },
@@ -202,51 +209,29 @@ var clntPurchaseGridView = {
 			onChange: function () {
 				clntPurchaseGridView.setData(this.page.selectPage); 
 			}
-        },
-		footSum: [
-		    	[
-		    		{label: "합계", colspan:2, align:"center"},
-		    		{key: "pchsQty",		collector: "sum", formatter:"money", align: "center"},
-		    		{key: "pchsAmt",		collector: "sum", formatter:"money", align: "right"},
-		    		{key: "badnCnt",		collector: "sum", formatter:"money", align: "center"},
-		    		{key: "badnAmt",		collector: "sum", formatter:"money", align: "right"},
-// 		    		{key: "pchsVat",		collector: "sum", formatter:"money", align: "right"},
-// 		    		{key: "pchsTot",		collector: "sum", formatter:"money", align: "right"},
-                 ]
-		    ],          
+        },     
         columns: [
             {key: "coCd",      					label: "회사",          	hidden: true},
             {key: "coCdNm",      				label: "회사명",          hidden: true},
             {key: undefined, label: "공급사", columns: [         
-	            {key: "clntNm",      				label: "거래처명",      	align: "left",   	width: 160}, 
-	            {key: "salesEmpIdNm",      			label: "관리담당",      	align: "center",   	width: 70}, 
+	            {key: "clntNm",      				label: "거래처명",      	align: "left",   	width: 230}, 
+	            {key: "salesEmpIdNm",      			label: "관리담당",      	align: "center",   	width: 80}, 
 	        ]},
-            {key: undefined, label: "매입확정", columns: [
-	            {key: "pchsQty",     				label: "횟수",      		align: "center",	width: 50, formatter: "money"},
-	            {key: "pchsAmt",     				label: "거래금액",      	align: "right",		width: 110, formatter: "money"},              
-// 	            {key: "pchsVat",     				label: "부가세",      	align: "right",		width: 110, formatter: "money"},  
-// 	            {key: "pchsTot",     				label: "확정 합계",      	align: "right",		width: 120, formatter: "money"},
-            ]},
-            {key: undefined, label: "불량현황", columns: [
-	            {key: "badnCnt",    				label: "횟수",      		align: "center",	width: 50, formatter: "money", hidden: false},
-	            {key: "badnAmt",    				label: "금액",      		align: "right",		width: 110, formatter: "money"},             
-            ]},
-            {key: "estmYn",    						label: "평가완료",      	align: "center",	width: 70, hidden: true},             
-            {key: "estmtMngNm",    					label: "평가담당",      	align: "center",	width: 70, hidden: false},   
-            {key: "estmtDt",    					label: "평가일자",      	align: "center",	width: 80, hidden: false},             
+            {key: "clntEstmtMngNm",    				label: "평가담당",      	align: "center",	width: 80, hidden: false},   
+            {key: "estmtDt",    					label: "평가일자",      	align: "center",	width: 90, hidden: false},             
 	        {key: undefined, label: "평가현황", columns: [
-	            {key: "badnScore",    				label: "제품불량",      	align: "center",	width: 70, editor: {type: "number"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, },           
-	            {key: "cntmsrScore",    			label: "대응조치",      	align: "center",	width: 70, editor: {type: "number"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, },             
-	            {key: "schdulScore",    			label: "일정준수",      	align: "center",	width: 70, editor: {type: "number"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, },           
-	            {key: "emgcScore",    				label: "긴급납기대응",     	align: "center",	width: 90, editor: {type: "number"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, },              
-	            {key: "prcScore",    				label: "가격경쟁력",      	align: "center",	width: 80, editor: {type: "number"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, }, 
-	            {key: "estScore",    				label: "견적대응",      	align: "center",	width: 70, editor: {type: "number"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, },              
-	            {key: "totalScore",    				label: "평가합계",      	align: "center",	width: 80, hidden: false},            
+	        	{key: "suplExpScore",    			label: "공급사업력(20)",      	align: "center",	width: 100, editor: {type: "number"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, },           
+	        	{key: "similMcScore",    			label: "유사기계제작(15)",    	align: "center",	width: 110, editor: {type: "number"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, }, 
+	        	{key: "suppleScore",    			label: "안정적공급(10)",      	align: "center",	width: 100, editor: {type: "number"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, },              
+	        	{key: "mainClientScore",    		label: "주거래고객사(20)",     	align: "center",	width: 110, editor: {type: "number"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, },              
+	        	{key: "qcScore",    				label: "품질기준(20)",      	align: "center",	width: 90, editor: {type: "number"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, },              
+	        	{key: "asScore",    				label: "A/S기준(10)",      	align: "center",	width: 100, editor: {type: "number"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, },              
+	        	{key: "warrentScore",    			label: "보증보험가입(5)",     	align: "center",	width: 110, editor: {type: "number"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, },              
+	        	{key: "bonusScore",    				label: "가산점(5)",      		align: "center",	width: 80, editor: {type: "number"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, },              
             ]},            
-            {key: "estmtRmk",    					label: "평가비고",      	align: "left",		width: 200, editor: {type: "textarea"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, },             
-            {key: "initCurrTotalScore",				label: "평가합계<br>(최초+당기)",      	align: "center",	width: 80, hidden: false},             
-            {key: "totalScoreBefore",				label: "전년도평가",      	align: "center",	width: 80, hidden: false},             
-            {key: "pchsClntCd",    					label: "구매처",      	align: "center",	width: 60, hidden: false},             
+	        {key: "totalScore",    					label: "평가합계(105)",     	align: "center",	width: 100, hidden: false},              
+            {key: "estmtRmk",    					label: "평가비고",      	align: "left",		width: "*", editor: {type: "textarea"}, disabled: function () { if (this.item.estmYn == "Y") { return true; } }, },         
+//             {key: "pchsClntCd",    					label: "구매처",      	align: "center",	width: 80, hidden: false},     
         ]
 	});
 		return this;
@@ -273,21 +258,20 @@ var clntPurchaseGridView = {
 				paramObj["mngIdCd"] = mngIdCd.join(",");
 			}
 			
-			postAjax("/user/sm/sm60/selectVendEstimateList", paramObj, null, function(data){
+			postAjax("/user/sm/sm61/selectVendInitEstimateList", paramObj, null, function(data){
 				try {
 					let list = data.result;
 					//숫자필드  정수로 변경 숫자 정렬 처리
 					const fieldsToCheck = [
-						'pchsQty', 		'pchsAmt', 		'pchsVat', 		'pchsTot',
-						'badnCnt', 		'badnAmt', 		'badnScore', 	'cntmsrScore',
-						'schdulScore', 	'emgcScore', 	'prcScore', 	'totalScore',
-						'totalScoreBefore'
-					];
-					for (let i = 0; i < list.length; i++) {
-						for (const field of fieldsToCheck) {
-							list[i][field] = (list[i][field] === undefined) ? '' : gPasIntChk(list[i][field]);
-						}
-					}
+						'suplExpScore',		'similMcScore', 	'suppleScore', 		'mainClientScore',
+						'qcScore', 			'asScore', 			'warrentScore', 	'bonusScore',
+						'totalScore'
+					];// 숫자 필드 정수 변환
+					list.forEach(item => {
+					    fieldsToCheck.forEach(field => {
+					        item[field] = item[field] == undefined ? '' : gPasIntChk(item[field]);
+					    });
+					});
 					targetObj.setData({
 							list : list,
 							page : {
@@ -315,37 +299,28 @@ var clntPurchaseGridView = {
 		this.target.setConfig({
 		target: $('[data-ax5grid="excel-grid"]'),
 		columns: [
-            {key: "rn",      					label: "순번",          	lign: "center",   	width: 60}, 
-            {key: "coCd",      					label: "회사",          	hidden: true},
-            {key: "coCdNm",      				label: "회사명",          hidden: true},
-            {key: undefined, label: "공급사", columns: [         
-	            {key: "clntNm",      				label: "거래처명",      	align: "left",   	width: 160}, 
-	            {key: "salesEmpIdNm",      			label: "관리담당",      	align: "center",   	width: 70}, 
-	        ]},
-            {key: undefined, label: "매입확정", columns: [
-	            {key: "pchsQty",     				label: "횟수",      		align: "center",	width: 50, formatter: "money"},
-	            {key: "pchsAmt",     				label: "거래금액",      	align: "right",		width: 110, formatter: "money"},              
-// 	            {key: "pchsVat",     				label: "부가세",      	align: "right",		width: 110, formatter: "money"},  
-// 	            {key: "pchsTot",     				label: "확정 합계",      	align: "right",		width: 120, formatter: "money"},
-            ]},
-            {key: undefined, label: "불량현황", columns: [
-	            {key: "badnCnt",    				label: "횟수",      		align: "center",	width: 50, formatter: "money", hidden: false},
-	            {key: "badnAmt",    				label: "금액",      		align: "right",		width: 110, formatter: "money"},             
-            ]},
-            {key: "estmYn",    						label: "평가완료",      	align: "center",	width: 70, hidden: true},             
-            {key: "estmtMngNm",    					label: "평가담당",      	align: "center",	width: 70, hidden: false},   
-            {key: "estmtDt",    					label: "평가일자",      	align: "center",	width: 80, hidden: false},            
-	        {key: undefined, label: "평가현황", columns: [
-	            {key: "badnScore",    				label: "제품불량",      	align: "center",	width: 70, hidden: false},             
-	            {key: "cntmsrScore",    			label: "대응조치",      	align: "center",	width: 70, hidden: false},             
-	            {key: "schdulScore",    			label: "일정준수",      	align: "center",	width: 70, hidden: false},             
-	            {key: "emgcScore",    				label: "긴급납기대응",     	align: "center",	width: 90, hidden: false},             
-	            {key: "prcScore",    				label: "가격경쟁력",      	align: "center",	width: 80, hidden: false},             
-	            {key: "estScore",    				label: "견적대응",      	align: "center",	width: 70, hidden: false},             
-	            {key: "totalScore",    				label: "평가합계",      	align: "center",	width: 80, hidden: false}, 
-            ]},            
-            {key: "estmtRmk",    					label: "평가비고",      	align: "left",		width: 200, hidden: false},           
-           ]
+	            {key: "coCd",      					label: "회사",          	hidden: true},
+	            {key: "coCdNm",      				label: "회사명",          hidden: true},
+	            {key: undefined, label: "공급사", columns: [         
+		            {key: "clntNm",      				label: "거래처명",      	align: "left",   	width: 230}, 
+		            {key: "salesEmpIdNm",      			label: "관리담당",      	align: "center",   	width: 80}, 
+		        ]},
+	            {key: "clntEstmtMngNm",    				label: "평가담당",      	align: "center",	width: 80, hidden: false},   
+	            {key: "estmtDt",    					label: "평가일자",      	align: "center",	width: 90, hidden: false},             
+		        {key: undefined, label: "평가현황", columns: [
+		        	{key: "suplExpScore",    			label: "공급사업력(20)",      	align: "center",	width: 100,},           
+		        	{key: "similMcScore",    			label: "유사기계제작(15)",    	align: "center",	width: 110,}, 
+		        	{key: "suppleScore",    			label: "안정적공급(10)",      	align: "center",	width: 100,},              
+		        	{key: "mainClientScore",    		label: "주거래고객사(20)",     	align: "center",	width: 110,},              
+		        	{key: "qcScore",    				label: "품질기준(20)",      	align: "center",	width: 90,},              
+		        	{key: "asScore",    				label: "A/S기준(10)",      	align: "center",	width: 100,},              
+		        	{key: "warrentScore",    			label: "보증보험가입(5)",     	align: "center",	width: 110,},              
+		        	{key: "bonusScore",    				label: "가산점(5)",      		align: "center",	width: 80,},       
+	            ]},                  
+	        	{key: "totalScore",    				label: "평가합계(105)",     	align: "center",	width: 100, hidden: false},             
+	            {key: "pchsClntCd",    					label: "구매처",      	align: "center",	width: 80, hidden: false},       
+	            {key: "estmtRmk",    					label: "평가비고",      	align: "left",	width: 200, hidden: false},
+            ]
 		});
 		   return this;
     }
@@ -368,7 +343,7 @@ var clntPurchaseGridView = {
 
 	$(document).ready(function() {
 		//초기설정들		
-		mainDefaultLoad("외주관리", "공급업체평가");
+		mainDefaultLoad("외주관리", "공급업체 최초평가");
 		setCommonSelect($("#main_area select[data-kind]"));
 		SetYm();
 		
@@ -454,15 +429,15 @@ var clntPurchaseGridView = {
 					selRow[i].totalScore = gPasIntChk(selRow[i].totalScore);
 					selRow[i].trgYear = $('#trgYear_S').val();
 					selRow[i].userId = jwt.userId;
-					selRow[i].pgmId = "SM6001M01";
+					selRow[i].pgmId = "SM6101M01";
 				}
 				
 				var paramObj = {
 					"userId"    : jwt.userId,
-					"pgmId"     : "SM6001M01",
+					"pgmId"     : "SM6101M01",
 					"detailArr" : JSON.stringify(selRow)
 				};
-				postAjax("/user/sm/sm60/updateVendEstimate", paramObj, null, function(data) {
+				postAjax("/user/sm/sm61/updateVendInitEstimate", paramObj, null, function(data) {
 					if (data.resultCode == 200) {
 						clntPurchaseGridView.setData(0);
 					}
@@ -486,10 +461,10 @@ var clntPurchaseGridView = {
 				
 				var paramObj = {
 					"userId"    : jwt.userId,
-					"pgmId"     : "SM6001M01",
+					"pgmId"     : "SM6101M01",
 					"detailArr" : JSON.stringify(selRow)
 				};
-				putAjax("/user/sm/sm60/deleteVendEstimate", paramObj, null, function(data) {
+				putAjax("/user/sm/sm61/deleteVendInitEstimate", paramObj, null, function(data) {
 					if (data.resultCode == 200) {
 						clntPurchaseGridView.setData(0);
 					}
@@ -556,10 +531,10 @@ var clntPurchaseGridView = {
 		paramObj = {
 			"actionType" : "U",
 			"userId" : jwt.userId,
-			"pgmId" : "SM6001M01"
+			"pgmId" : "SM6101M01"
 		};
 		Object.assign(paramObj, param);
-		openModal("/static/html/user/sm/sm60/SM6001P01.html", 1000, 520, "", paramObj);
+		openModal("/static/html/user/sm/sm61/SM6101P01.html", 1000, 520, "", paramObj);
 	}
 	
 	//엑셀다운로드
@@ -581,7 +556,7 @@ var clntPurchaseGridView = {
 		} else {
 			paramObj["mngIdCd"] = mngIdCd.join(",");
 		}
-		postAjax("/user/sm/sm60/selectVendEstimateList", paramObj, null, function(data){
+		postAjax("/user/sm/sm61/selectVendInitEstimateList", paramObj, null, function(data){
 			let list = data.result;
 		  	excelView.target.setData({
 		  		list : list,
@@ -609,7 +584,7 @@ var clntPurchaseGridView = {
 		if(selectGridValidationM(clntPurchaseGridView.target)) return false;
 		var selDataList = clntPurchaseGridView.target.getList("selected");
 	    
-		var fileName = "SM6001R01.jrf";
+		var fileName = "SM6101R01.jrf";
 		var arg =  
 			  "coCd#"		+  $('#coCd_S').val()
 		    + "#clntCd#"	+  selDataList.map(item => item.pchsClntCd).join(",") 
