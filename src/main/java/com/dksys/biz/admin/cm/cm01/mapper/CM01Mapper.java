@@ -25,5 +25,20 @@ public interface CM01Mapper {
 	List<Map<String, Object>> selectMenuAuth(String[] menuArray);
 
 	List<Map<String, Object>> selectParentMenuAuth(String upMenuId);
-	
+
+	List<Map<String, Object>> selectFavoritesMenuList(Map<String, Object> param);
+
+	int insertFavoritesMenu(Map<String, String> param);
+
+	int deleteFavoritesMenu(Map<String, String> param);
+
+	int updateFavoritesMenu(Map<String, String> param);
+
+	int updateFavoritesMenuSeq(Map<String, String> param);
+
+	int selectFavoritesMenuCount(Map<String, String> param);
+
+	int selectIsFavoritesMenu(Map<String, String> param);
+
+	List<Map<String, Object>> selectRoleFromAuthNew(String[] authArray);
 }

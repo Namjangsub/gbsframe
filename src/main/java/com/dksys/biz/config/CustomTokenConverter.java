@@ -13,35 +13,35 @@ import org.springframework.security.oauth2.provider.token.store.JwtAccessTokenCo
 import com.dksys.biz.main.vo.User;
 
 public class CustomTokenConverter extends JwtAccessTokenConverter {
-	
-	@Autowired
+    
+    @Autowired
     private Environment env;
-	
-	@Override
-	public OAuth2AccessToken enhance(OAuth2AccessToken accessToken, OAuth2Authentication authentication) {
-		if (authentication.getOAuth2Request().getGrantType().equalsIgnoreCase("password")) {
-			User user = (User) authentication.getPrincipal();
-			final Map<String, Object> additionalInfo = new HashMap<String, Object>();
-			//토큰에 넣을 값 세팅
-			additionalInfo.put("userId", user.getId());
-			additionalInfo.put("userNm", user.getName());
-			additionalInfo.put("empNo", user.getEmpNo());
-			additionalInfo.put("coCd", user.getCoCd());
-			additionalInfo.put("mngCoCd", user.getMngCoCd());
-			additionalInfo.put("deptId", user.getDeptId());
-			additionalInfo.put("levelCd", user.getLevelCd());
-			additionalInfo.put("email", user.getEmail());
-			additionalInfo.put("enterDt", user.getEnterDt());
-			additionalInfo.put("authInfo", user.getAuthInfo());
-			additionalInfo.put("serverType", env.getActiveProfiles()[0]);
-			additionalInfo.put("userGrade", user.getUserGrade());
-			additionalInfo.put("clntCd", user.getClntCd());
-			
-			((DefaultOAuth2AccessToken) accessToken).setAdditionalInformation(additionalInfo);
-		}
-		accessToken = super.enhance(accessToken, authentication);
-		((DefaultOAuth2AccessToken) accessToken).setAdditionalInformation(new HashMap<>());
-		return accessToken;
-	}
+    
+    @Override
+    public OAuth2AccessToken enhance(OAuth2AccessToken accessToken, OAuth2Authentication authentication) {
+        if (authentication.getOAuth2Request().getGrantType().equalsIgnoreCase("password")) {
+            User user = (User) authentication.getPrincipal();
+            final Map<String, Object> additionalInfo = new HashMap<String, Object>();
+            //토큰에 넣을 값 세팅
+            additionalInfo.put("userId", user.getId());
+            additionalInfo.put("userNm", user.getName());
+            additionalInfo.put("empNo", user.getEmpNo());
+            additionalInfo.put("coCd", user.getCoCd());
+            additionalInfo.put("mngCoCd", user.getMngCoCd());
+            additionalInfo.put("deptId", user.getDeptId());
+            additionalInfo.put("levelCd", user.getLevelCd());
+            additionalInfo.put("email", user.getEmail());
+            additionalInfo.put("enterDt", user.getEnterDt());
+            additionalInfo.put("authInfo", user.getAuthInfo());
+            additionalInfo.put("serverType", env.getActiveProfiles()[0]);
+            additionalInfo.put("userGrade", user.getUserGrade());
+            additionalInfo.put("clntCd", user.getClntCd());
+            
+            ((DefaultOAuth2AccessToken) accessToken).setAdditionalInformation(additionalInfo);
+        }
+        accessToken = super.enhance(accessToken, authentication);
+        ((DefaultOAuth2AccessToken) accessToken).setAdditionalInformation(new HashMap<>());
+        return accessToken;
+    }
     
 }

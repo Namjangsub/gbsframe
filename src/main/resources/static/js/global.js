@@ -816,14 +816,15 @@ function deleteHyphenStr(value){
 	return value.replace(/-/g, "");
 }
 
-var authArr;
+//var authArr;
 // 권한에 따른 메뉴 보여주기
 function setMenuAuth() {
 	var formData = {
-		"authInfo" : jwt.authInfo
+		"authInfo" : jwt.authInfo,
+		"userId"   : jwt.userId
 	}
 	postAjax("/selectMenuAuth", formData, null, function(data) {
-		authArr = data.accessList;
+//		authArr = data.accessList;
 		checkMenuAuth(data.accessList);
 	});
 }
@@ -847,17 +848,77 @@ function checkMenuAuth(accessList) {
 
 		$.each(accessList, function(idx, item){
 			if(item.menuType == "HTML" && item.useYn == 'Y') {
-				html = '<dl><dd><a href="'+item.menuUrl+'" onclick="setCookie(\'menuSaveYn\', \''+item.saveYn+'\', 1); insertPgmHistory(\''+item.menuUrl+'\');">'+item.menuNm+'</a></dd></dl>';
-				//html = '<dl><dd><a href="'+item.menuUrl+'" onclick="insertPgmHistory(\''+item.menuUrl+'\');">'+item.menuNm+'</a></dd></dl>';
+				html = '<dl><dd><a href="'+item.menuUrl+'" id="'+item.originId+'" onclick="setCookie(\'menuSaveYn\', \''+item.saveYn+'\', 1); insertPgmHistory(\''+item.menuUrl+'\');">'+item.menuNm+'</a></dd></dl>';
 				$("#"+item.upMenuId).append(html);
 			}
 		});
+
+		//+, - ==> 문자 바꿀때는 주의할 것 백단에서 Insert, Delete문 분기문자로 인식하고 있음.
+		//if (jobType.equals("+")) 이면 insert 처리, else delete 처리
+		//id=U99 는 즐겨찾기 메뉴 ID, 제외하고 메뉴앞에 + 표지를 추가함
+		$("#U99 a").before('<span class="minus-icon">-</span>');
+		
+		//U99의 자손 a태그의 id를 배열로 추가
+		let U99DescendantIds = $("#U99 a")
+									    .filter(function() {
+									        return $(this).attr("id");
+									    })
+									    .map(function() {
+									        return $(this).attr("id");
+									    })
+									    .get();
+		$("dl:not(#U99) > dl > dd > a").each(function() {
+			const currentId = $(this).attr("id");
+			// #U99의 자손중에 동일 ID가 있는지  확인
+		    if (currentId && U99DescendantIds.includes(currentId)) {
+		        $(this).before('<span class="minus-icon">-</span>');
+		    } else{
+		        $(this).before('<span class="plus-icon">+</span>');
+		    }
+		});
+		
+
+        // +, - 클릭 시 addon() 실행
+        $(".plus-icon, .minus-icon").click(function(event) {
+            event.stopPropagation(); // 부모 요소로 이벤트 전파 방지
+            favoritesMenuControl(this);
+        });
+		
 	}
+
+
+function favoritesMenuControl(obj){
+	const jobType = $(obj).text().trim();	//+,- 텍스트 추출
+    const $nextA = $(obj).next('a');
+    const menuText = $nextA.length ? $nextA.text().trim() : '';
+    const menuId = $nextA.length ? $nextA.attr('id') : '';
+    
+    if (!menuId.startsWith("U")) return false; 
+	
+	var param = {
+		"jobType" 	: jobType,
+		"menuId" 	: menuId,
+		"menuText" 	: menuText,
+		"userId"	: jwt.userId
+	};
+	postAjaxSync("/admin/cm/cm01/favoritesMenuControl", param , null,  function(data){
+		let resultCode = data.resultCode;
+		if (resultCode == 200) {
+			//즐겨찾기 추가 삭제 완료
+			setMenuAuth();	//메뉴정보 갱신
+		} else {
+			alert(data.resultMessage);
+		}
+	})
+	
+}
 
 //로그아웃
 function logoutClick(){
 		deleteCookie("jwtToken");
 		deleteCookie("menuIdx");
+		deleteCookie("authArr");
+		deleteCookie("menuSaveYn");
 		location.href = "/";
 }
 
@@ -1155,32 +1216,60 @@ $.urlParam = function(name){
     }
 }
 
+//function authChk(menuUrl){
+//	if(!menuUrl){
+//		var url = window.location.href;
+//		menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
+//	}
+//	
+//		var arr = JSON.parse(getCookie("authArr"));
+//        var saveYn = "N";
+//
+//        //array함수로 기능 대체하고 버튼을 삭제함(버튼을 사용하는 프로그램은 오류 발생 가능)
+//        // 버튼 숨김으로 하면 소스 편집하여 강제처리가능으로 위험
+//        if (arr) {
+//	        const foundMenu = arr.find(item => item.m === menuUrl);
+//	        if (foundMenu && foundMenu.s === 'Y') {
+//	        	//정상적인 처리가능
+//	        } else {
+//	            $("[authchk]").remove();
+//	            return false;
+//	        }
+//        } else {
+//        	console.error('arr의 값이 비었습니다.');
+//        }
+////	// select 회사코드 disable (감사용 임시코드)
+////	$('select[data-kind="CO"]').prop("disabled", true);
+//    	return true;
+//}
+
+
 function authChk(menuUrl){
 	if(!menuUrl){
 		var url = window.location.href;
 		menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
 	}
+	
 		var arr = JSON.parse(getCookie("authArr"));
-        var saveYn = "N";
-
         //array함수로 기능 대체하고 버튼을 삭제함(버튼을 사용하는 프로그램은 오류 발생 가능)
         // 버튼 숨김으로 하면 소스 편집하여 강제처리가능으로 위험
         if (arr) {
-	        const foundMenu = arr.find(item => item.m === menuUrl);
-	        if (foundMenu && foundMenu.s === 'Y') {
+	        const foundMenu = arr[0][menuUrl];
+	        if (foundMenu === 'Y') {
 	        	//정상적인 처리가능
 	        } else {
 	            $("[authchk]").remove();
 	            return false;
 	        }
         } else {
-        	console.error('arr의 값이 비었습니다.');
+        	console.error('권한정보가 없습니다.');
+            $("[authchk]").remove();
+            return false;
         }
 //	// select 회사코드 disable (감사용 임시코드)
 //	$('select[data-kind="CO"]').prop("disabled", true);
     	return true;
 }
-
 
 // 버튼 컨펌
 function confirmBefore(btnElem){

@@ -90,27 +90,31 @@ public class HomeController {
     public String selectMenuAuth(@RequestBody Map<String, Object> param, Model model) {
     	String[] authArray = {"AUTH000"};
     	authArray = param.get("authInfo") != null ? param.get("authInfo").toString().split(",") : authArray;
-    	List<Map<String, Object>> accessList = cm01Svc.selectMenuAuth(authArray);
-    	model.addAttribute("accessList", accessList);
+//		List<Map<String, Object>> accessList = cm01Svc.selectMenuAuth(authArray, param);
+		List<Map<String, Object>> accessList = cm01Svc.selectMenuAuthNew(authArray, param);
+
+		model.addAttribute("accessList", accessList);
     	JSONArray jsonArray = new JSONArray();
-    	
+
+		JSONObject json = new JSONObject();
     	for (Map<String, Object> map : accessList) {
-    		JSONObject json = new JSONObject();
-			try {
-				String sValue = map.get("menuUrl").toString();
-				int lastDotIndex = sValue.lastIndexOf('.');
-				if (lastDotIndex != -1) {
-		            sValue = sValue.substring(sValue.lastIndexOf('/') + 1, lastDotIndex);
-		        } else {
-		            sValue = sValue.substring(sValue.lastIndexOf('/') + 1);
-		        }
-				json.put("m", sValue);
-				json.put("s", map.get("saveYn"));
-			} catch (JSONException e) {
-				e.printStackTrace();
+
+			if (map.get("menuType").toString().equals("HTML")) {
+				try {
+					String sValue = map.get("menuUrl").toString();
+					int lastDotIndex = sValue.lastIndexOf('.');
+					if (lastDotIndex != -1) {
+						sValue = sValue.substring(sValue.lastIndexOf('/') + 1, lastDotIndex);
+					} else {
+						sValue = sValue.substring(sValue.lastIndexOf('/') + 1);
+					}
+					json.put(sValue.toString(), map.get("saveYn").toString());
+				} catch (JSONException e) {
+					e.printStackTrace();
+				}
 			}
-    		jsonArray.put(json);
     	}
+		jsonArray.put(json);
     	model.addAttribute("accessJSON", jsonArray.toString());
     	return "jsonView";
     }

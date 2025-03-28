@@ -44,7 +44,7 @@ public class CM01SvcImpl implements CM01Svc {
 	}
 
 	@Override
-	public List<Map<String, Object>> selectMenuAuth(String[] authArray) {
+	public List<Map<String, Object>> selectMenuAuth(String[] authArray, Map<String, Object> param) {
 		String roleStr = "";
 		String menuStr = "";
 		
@@ -73,9 +73,26 @@ public class CM01SvcImpl implements CM01Svc {
 				}
 			}
 		}
+
+		// 즐겨찾기 메뉴 추가 삽입하기
+		List<Map<String, Object>> newEntries = cm01Mapper.selectFavoritesMenuList(param);
+		result.addAll(0, newEntries);
+
 		return result;
 	}
 
+
+	@Override
+	public List<Map<String, Object>> selectMenuAuthNew(String[] authArray, Map<String, Object> param) {
+		// auth에 해당하는 role 조회
+		List<Map<String, Object>> result = cm01Mapper.selectRoleFromAuthNew(authArray);
+
+		// 즐겨찾기 메뉴 추가 삽입하기
+		List<Map<String, Object>> newEntries = cm01Mapper.selectFavoritesMenuList(param);
+		result.addAll(0, newEntries);
+
+		return result;
+	}
 
 	@Override
 	public List<Map<String, Object>> selectSubMenuAuth(String[] authArray, String upMenuId) {
@@ -106,5 +123,33 @@ public class CM01SvcImpl implements CM01Svc {
 		String[] subMenuArray = subMenuStr.split(",");
 		List<Map<String, Object>> returnResult = cm01Mapper.selectMenuAuth(subMenuArray);
 		return returnResult;
+	}
+
+	@Override
+	public int insertFavoritesMenu(Map<String, String> param) {
+		int result = cm01Mapper.selectIsFavoritesMenu(param); // 해당 메뉴ID가 즐겨찾기에 있는지 확인하기
+		if (result == 0) {
+			// 마지막 등록되는 즐겨찾기 메뉴가 맨위쪽으로 배치하기위함
+			cm01Mapper.updateFavoritesMenu(param); // 기존자료 순번 변경
+
+			result = cm01Mapper.insertFavoritesMenu(param); // 신규 즐겨찾기 1번으로 등록
+
+			cm01Mapper.updateFavoritesMenuSeq(param); // 즐겨찾기 정렬순서 일련번호로 정리
+		}
+		return result;
+	}
+
+	@Override
+	public int deleteFavoritesMenu(Map<String, String> param) {
+		int result = cm01Mapper.selectIsFavoritesMenu(param); // 해당 메뉴ID가 즐겨찾기에 있는지 확인하기
+		if (result > 0) {
+			result = cm01Mapper.deleteFavoritesMenu(param);
+		}
+		return result;
+	}
+
+	@Override
+	public int selectFavoritesMenuCount(Map<String, String> param) {
+		return cm01Mapper.selectFavoritesMenuCount(param);
 	}
 }
