@@ -5,15 +5,13 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no,  maximum-scale=1.0, minimum-scale=1.0">
 
 	<link rel="icon" href="/static/favicon.ico"  type="image/x-icon">
-	<!-- <link rel="stylesheet" href="/static/css/ax5/ax5grid.css" /> -->
-	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css">
 	<link rel="stylesheet" href="/static/fontawesome/css/all.css">
+	<link rel="stylesheet" type="text/css" href="/static/css/bootstrap.min.css" />
 	<link rel="stylesheet" type="text/css" href="/static/css/m_common.css" />
     <link rel="stylesheet" type="text/css" href="/static/css/m_login.css" />
-	<!-- <link rel="stylesheet" type="text/css" href="../css/common.css" />
-  <link rel="stylesheet" type="text/css" href="../css/login.css" /> -->
 	<script src="/static/js/jquery-3.5.1.min.js"></script>
 	<script src="/static/js/global.js"></script>
+	<script src="/static/js/crypto-js.min.js"></script>
 </head>
 
 
@@ -49,37 +47,20 @@
 	  </div>
 </body>
 
-<!--
-<body>	
-  <div id="login">
-    <div class="login_box">
-      <h1 class="logo">
-        <img id="logoImg" src="" alt="건양ITT">
-      </h1>
-      <h2>Login - mobile</h2>
-      <ul>
-        <li><input id="id" type="text" placeholder="ID"></li>
-        <li><input id="pass" type="password" placeholder="Password"></li>
-        <li style="margin-top: 0px;">
-        	<input type="checkbox" id="idSaveCheck" style="width: 20px  !important; cursor: pointer;">
-        	<label style="font-size: larger;vertical-align:sub;">아이디 저장</label> 
-        </li>
-      </ul>
-      <button onclick="loginAction();">Login</button>
-    </div>
 
-  </div>
-</body>
--->
 <script type="text/javascript">	
+	var secretKey = "GUNYANGITTEDPSFUTUREcode";
 
 	$(document).ready(function() {
 		var loginId = getCookie("loginId");
 		var validYn = getCookie("jwtToken");
+		
+// 		$.getJSON('/mobileSecretKey', function(data) {
+// 			secretKey = data;
+// 		});
 
-		var passwordVal = getCookie('passwdVal');
-
-
+		var passwordVal = getDecryptedCookie('passwdVal');
+		
 		if(validYn != null) {            
 			checkToken();
 		}
@@ -120,7 +101,8 @@
 		$("#pwSaveCheck").change(function(){ // 체크박스에 변화가 발생시
 	        if($("#pwSaveCheck").is(":checked")){ // PW 저장하기 체크했을 때,
 	            var passwdVal = $("#pass").val();
-	            setCookie("passwdVal", passwdVal, 7); // 7일 동안 쿠키 보관
+// 	            setCookie("passwdVal", passwdVal, 7); // 7일 동안 쿠키 보관
+	            setEncryptedCookie("passwdVal", passwdVal, 7); // 7일 동안 쿠키 보관
 	        }else{ // ID 저장하기 체크 해제 시,
 	            deleteCookie("passwdVal");
 	        }
@@ -130,7 +112,8 @@
 	    $("#pass").keyup(function(){ // PW 입력 칸에 PW를 입력할 때,
 	        if($("#pwSaveCheck").is(":checked")){ // PW 저장하기를 체크한 상태라면,
 	            var passwdVal = $("#pass").val();
-	            setCookie("passwdVal", passwdVal, 7); // 7일 동안 쿠키 보관
+// 	            setCookie("passwdVal", passwdVal, 7); // 7일 동안 쿠키 보관
+	            setEncryptedCookie("passwdVal", passwdVal, 7); // 7일 동안 쿠키 보관
 	        }
 	    });
 
@@ -176,15 +159,14 @@
 			"password" : $("#pass").val()
 		}
 
-// 		console.log('mobile - getToken');	
-
 		$.post(
 			DOMAIN_URL + "/oauth/token",
 			formData,
 			function(data, status, request) {
 				setCookie("jwtToken", "Bearer "+data.access_token, 1);
 				authorizationToken = getCookie("jwtToken");
-				jwt = parseJwt(authorizationToken);				
+				jwt = parseJwt(authorizationToken);			
+				selectAuthInfo();	
 				location.href = "/static/mobile/menu.html";				
 			}
 		);
@@ -217,12 +199,41 @@
 		    contentType: "application/json; charset=utf-8",
 		    data: JSON.stringify(formData),
 		    success: function(data){
+	    		var usrInfo = data.usrInfo;
 		    	if(data.msg == "success"){
 		    		getToken();
 		    	} else {
-		    		alert(data.msg);
+		    		if(usrInfo){
+		    			if(Number(usrInfo.passErrCnt) >= Number(usrInfo.passChkCnt)) {
+							alert("비밀번호를 " + usrInfo.passChkCnt + "회이상 틀리셨습니다. 관리자에게 문의하세요.");
+						}else {
+							alert("비밀번호를 " + usrInfo.passErrCnt + "회 틀렸습니다.\n" + usrInfo.passChkCnt + "회 이상 틀리면 접속불가합니다.");		
+						}
+		    		}else{
+		    			alert(data.msg);
+		    		}
 		    	}
 		    }
+		});
+	}
+
+	function selectAuthInfo(){
+		var formData = {
+			"authInfo" : jwt.authInfo,
+			"userId"   : jwt.userId
+		}
+		postAjaxSync("/selectMenuAuth", formData, null, function(data) {
+			var authString = data.accessJSON;
+	        deleteCookie("authArr");
+
+	        setCookie("authArr", authString, 1);
+
+	        var checkCookie = getCookie("authArr");
+	        if (checkCookie) {
+// 	            alert("Cookie 'authArr' is set successfully!");
+	        } else {
+	            alert("쿠키 생성 실패 전산실 연락 바랍니다. 'authArr'.");
+	        }
 		});
 	}
 	
@@ -239,6 +250,24 @@
 		$("#logoImg").attr("src", imgUrl);
 		$("#mobile_login").css("background", "url("+bgImgUrl+") no-repeat center  100% 0% #ffffff");
 	}
-	
+
+
+	function setEncryptedCookie(name, value, days) {
+	    const encryptedValue = CryptoJS.AES.encrypt(value, secretKey).toString(); // AES 암호화
+	    const expires = new Date();
+	    expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000)); // days 일 후 만료
+// 	    document.cookie = `${name}=${encryptedValue}; expires=${expires.toUTCString()}; path=/; Secure`;
+	    document.cookie = `${name}=${encryptedValue}; expires=${expires.toUTCString()}; path=/;`;
+	}
+
+	function getDecryptedCookie(name) {
+		let chkCookie = getCookie(name);
+		let cookieValue = null;
+		if (chkCookie) {
+	        let bytes = CryptoJS.AES.decrypt(chkCookie, secretKey);
+	        cookieValue  = bytes.toString(CryptoJS.enc.Utf8); // AES 복호화
+		} 
+	    return cookieValue;
+	}
 </script>
 </html>

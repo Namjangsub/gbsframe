@@ -1257,13 +1257,26 @@ function authChk(menuUrl){
 	        const foundMenu = arr[0][menuUrl];
 	        if (foundMenu === 'Y') {
 	        	//정상적인 처리가능
-	        } else {
+	        } else if (foundMenu === 'N') {
+	        	//조회만 가능
 	            $("[authchk]").remove();
+	            return false;
+	        } else {
+	        	//권한이 없음
+				if(isMobile()){
+					location.href = "/static/mobile/index.html";
+				}else{
+					location.href = "/static/index.html";
+				}
 	            return false;
 	        }
         } else {
         	console.error('권한정보가 없습니다.');
-            $("[authchk]").remove();
+			if(isMobile()){
+				location.href = "/static/mobile/index.html";
+			}else{
+				location.href = "/static/index.html";
+			}
             return false;
         }
 //	// select 회사코드 disable (감사용 임시코드)
