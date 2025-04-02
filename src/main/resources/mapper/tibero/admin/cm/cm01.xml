@@ -98,12 +98,13 @@
 		)
 		, role_menu AS (
 				SELECT ROLE_MENU_NAME
-					, MAX(SAVE_YN) SAVE_YN
+					 , MAX(SAVE_YN) SAVE_YN
 				FROM (SELECT LV
 							, REGEXP_SUBSTR(ROLE_MENU,  '[^\,]+',1, LV) AS ROLE_MENU_NAME
 							, SAVE_YN
-						FROM (SELECT ROLE_MENU, SAVE_YN FROM TB_CM02M01
-								WHERE ROLE_ID IN ( SELECT AUTH_ROLE_NAME FROM auth_role)
+						FROM (SELECT ROLE_MENU, SAVE_YN 
+						        FROM TB_CM02M01
+						        		INNER JOIN auth_role ON auth_role.AUTH_ROLE_NAME = TB_CM02M01.ROLE_ID
 								ORDER BY SORT_NO ASC) S
 							, (SELECT LEVEL AS LV FROM DUAL CONNECT BY LEVEL <![CDATA[ <= ]]> 1000)
 						WHERE REGEXP_SUBSTR(ROLE_MENU,  '[^\,]+',1, LV) IS NOT NULL) 
@@ -112,30 +113,27 @@
 		, menu_info AS (
 				SELECT C.*, MENU_ID	AS ORIGIN_ID, role_menu.SAVE_YN
 				  FROM TB_CM03M01 AS C
-				  		LEFT OUTER JOIN role_menu ON C.MENU_ID = role_menu.ROLE_MENU_NAME
+				  		INNER JOIN role_menu ON C.MENU_ID = role_menu.ROLE_MENU_NAME
 				 WHERE 1 = 1
-				   AND role_menu.ROLE_MENU_NAME IS NOT NULL
 				   AND MENU_TYPE != 'FOLDER'
 				   AND USE_YN = 'Y'
 		)
 		, upmenu_info AS (
-				SELECT DISTINCT UP_MENU_ID, role_menu.SAVE_YN
+				SELECT UP_MENU_ID, MAX(SAVE_YN) SAVE_YN
 				  FROM menu_info AS C
-				  		LEFT OUTER JOIN role_menu ON C.MENU_ID = role_menu.ROLE_MENU_NAME
 				 WHERE 1 = 1
+				 GROUP BY UP_MENU_ID
 		)
-		SELECT C.*
-		  FROM menu_info AS C
+		SELECT menu_info.*
+		  FROM menu_info
 		 WHERE 1 = 1
-		   AND MENU_TYPE != 'FOLDER'
-		   AND USE_YN = 'Y'
 		UNION
 		SELECT C.*, MENU_ID	AS ORIGIN_ID, upmenu_info.SAVE_YN
 		  FROM upmenu_info 
 		  				inner JOIN TB_CM03M01 AS C ON C.MENU_ID = upmenu_info.UP_MENU_ID
-		 WHERE MENU_TYPE = 'FOLDER'
-		   AND USE_YN = 'Y'
-		ORDER BY SORT_NO ASC
+		 WHERE C.MENU_TYPE = 'FOLDER'
+		   AND C.USE_YN = 'Y'
+		ORDER BY UP_MENU_ID, MENU_ID, SORT_NO ASC
 	</select>
 	
 	

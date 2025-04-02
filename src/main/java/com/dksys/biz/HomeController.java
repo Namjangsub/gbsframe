@@ -1,5 +1,6 @@
 package com.dksys.biz;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import com.dksys.biz.admin.cm.cm01.service.CM01Svc;
+import com.dksys.biz.admin.cm.cm06.service.CM06Svc;
 import com.dksys.biz.rest.url.service.UrlService;
 import com.dksys.biz.util.WebClientUtil;
 
@@ -27,6 +29,9 @@ public class HomeController {
 
     @Autowired
     CM01Svc cm01Svc;
+
+	@Autowired
+	CM06Svc cm06Svc;
 	
     @Autowired
     private UrlService urlService;
@@ -118,6 +123,21 @@ public class HomeController {
     	model.addAttribute("accessJSON", jsonArray.toString());
     	return "jsonView";
     }
+
+	// 사용자별 접근 가능한 메뉴정보
+	@PostMapping("/selectMenuAuthFromUser")
+	public String selectMenuAuthFromUser(@RequestBody Map<String, Object> param, Model model) {
+		String[] authArray = { "AUTH000" };
+		Map<String, String> paramMap = new HashMap<>();
+		paramMap.put("userId", param.get("userId").toString());
+		Map<String, String> UserInfo = cm06Svc.selectUserInfo(paramMap);
+
+		authArray = UserInfo.get("authInfo").toString().split(",");
+				
+		List<Map<String, Object>> accessList = cm01Svc.selectMenuAuthNew(authArray, param);
+		model.addAttribute("accessList", accessList);
+		return "jsonView";
+	}
     
     // 접근 가능한 메뉴정보
     @PostMapping("/selectSubMenuAuth")
