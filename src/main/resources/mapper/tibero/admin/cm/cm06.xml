@@ -471,5 +471,83 @@
 		WHERE
 			ID = #{userId}
 	</update>
+
+	<resultMap id="imgMaps" type="hashMap">
+		<result property="id" column="ID" jdbcType="VARCHAR"/>
+		<result property="name" column="NAME" jdbcType="VARCHAR"/>
+		<result property="dept" column="DEPT" jdbcType="VARCHAR"/>
+		<result property="type" column="TYPE" jdbcType="VARCHAR"/>
+		<result property="deptNm" column="DEPT_NM" jdbcType="VARCHAR"/>
+		<result property="levelCd" column="LEVEL_CD" jdbcType="VARCHAR"/>
+		<result property="levelNm" column="LEVEL_NM" jdbcType="VARCHAR"/>
+		<result property="email" column="EMAIL" jdbcType="VARCHAR"/>
+		<result property="telNo" column="TEL_NO" jdbcType="VARCHAR"/>
+		<result property="offTelNo" column="OFF_TEL_NO" jdbcType="VARCHAR"/>
+		<result property="levelNm" column="LEVEL_NM" jdbcType="VARCHAR"/>
+		<result property="faxNo" column="FAX_NO" jdbcType="VARCHAR"/>
+		<result property="cnt" column="CNT" jdbcType="VARCHAR"/>
+		<result property="scdLoad" column="SCD_LOAD" jdbcType="VARCHAR"/>
+		<result property="qcLoad" column="QC_LOAD" jdbcType="VARCHAR"/>
+		<result property="jobLoad" column="JOB_LOAD" jdbcType="VARCHAR"/>
+		<result property="commLoad" column="COMM_LOAD" jdbcType="VARCHAR"/>
+		<result property="workRptS" column="WORK_RPT_S" jdbcType="VARCHAR"/>
+		<result property="workHolyNm" column="WORK_HOLY_NM" jdbcType="VARCHAR"/>
+		<result property="workRptRmk" column="WORK_RPT_RMK" jdbcType="VARCHAR"/>
+		<result property="userImg" column="USER_IMG" jdbcType="BLOB" javaType="byte[]"/>
+		<result property="message" column="MESSAGE" jdbcType="VARCHAR"/>
+	</resultMap>
+	
+	<select id="checkUserIdImageList" resultMap="imgMaps">
+	WITH DEPT_EMP_CNT AS 
+	(
+			SELECT SUBSTRING(VIEW_DEPT_ID,0,5) AS DEPT,
+				   COUNT(ID) AS CNT
+			  FROM TB_CM06M01
+			 WHERE CLNT_CD IS NULL
+			   AND USE_YN = 'Y'
+			 GROUP BY substring(VIEW_DEPT_ID,0,5)
+	),
+	WORK_HOLY AS 
+	(
+			SELECT WORK_RPT_ID, min(WORK_RPT_S) AS WORK_RPT_S, min(WORK_RPT_RMK) AS WORK_RPT_RMK
+			  FROM TB_PM01M01
+			 WHERE 	(WORK_RPT_S LIKE '%9901' OR  WORK_RPT_S LIKE '%9902' OR WORK_RPT_M = 'GUN6020') --생산팀출장
+			   AND  WORK_RPT_DT = to_char(sysdate,'YYYYMMDD')
+			 GROUP BY WORK_RPT_ID
+	) 
+		SELECT
+			A.ID 							AS ID,
+			A.NAME 							AS NAME,
+			substring(A.VIEW_DEPT_ID,0,5) 	AS DEPT,
+			'person' 						AS TYPE,
+			B.DEPT_NM,
+			A.LEVEL_CD,
+			C.LEVEL_NM,
+			A.EMAIL,
+			A.TEL_NO,
+			A.OFF_TEL_NO,
+	        (SELECT LEVEL_NM FROM TB_CM07M01 WHERE LEVEL_CD = A.LEVEL_CD) AS LEVEL_NM,
+			A.FAX_NO,
+			CC.CNT,
+			NVL(ST.SCD_LOAD,'comm1') SCD_LOAD,
+			NVL(ST.QC_LOAD,'comm1') QC_LOAD ,
+			NVL(ST.JOB_LOAD,'comm1') JOB_LOAD ,
+			NVL(ST.COMM_LOAD,'comm1') COMM_LOAD,
+			WORK_RPT_S,
+			FN_CM05M01_CD_TO_NM(WORK_RPT_S) AS WORK_HOLY_NM,
+			WORK_RPT_RMK,
+	        A.USER_IMG,
+	        ST.MESSAGE
+		FROM
+			TB_CM06M01 A	
+				LEFT OUTER JOIN DEPT_EMP_CNT AS CC ON substring(A.VIEW_DEPT_ID,0,5) = CC.DEPT	
+				INNER JOIN TB_CM07M01 C on A.LEVEL_CD = C.LEVEL_CD
+				INNER JOIN TB_CM04M01 B on CC.DEPT = B.DEPT_ID AND B.DEPT_TYPE = 'REAL'
+				LEFT OUTER JOIN TB_CM06D01 ST ON A.ID = ST.ID
+				LEFT OUTER JOIN WORK_HOLY AS G ON A.ID   = G.WORK_RPT_ID
+		WHERE CLNT_CD IS NULL
+		  AND A.USE_YN = 'Y'
+		ORDER BY substring(A.VIEW_DEPT_ID,0,5), A.TEAM_MANAGER, A.LEVEL_CD DESC, A.NAME
+	</select>
 	
 </mapper>

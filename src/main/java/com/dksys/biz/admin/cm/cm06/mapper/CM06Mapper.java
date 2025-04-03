@@ -45,4 +45,6 @@ public interface CM06Mapper {
 	Map<String, String> checkUserIdImage(Map<String, String> paramMap);
 
 	int updateUserImg(Map<String, Object> paramMap);
+
+	List<Map<String, String>> checkUserIdImageList(Map<String, String> paramMap);
 }

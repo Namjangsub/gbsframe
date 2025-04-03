@@ -36,5 +36,7 @@ public interface CM06Svc {
 	public Map<String, String> checkUserIdImage(Map<String, String> paramMap);
 
 	public void updateUserImg(Map<String, Object> paramMap) throws Exception;
+
+	List<Map<String, String>> checkUserIdImageList(Map<String, String> paramMap);
 	
 }

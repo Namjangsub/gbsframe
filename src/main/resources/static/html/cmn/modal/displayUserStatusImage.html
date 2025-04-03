@@ -1,0 +1,355 @@
+<style>
+/* body { */
+/*     font-family: Arial, sans-serif; */
+/*     background-color: #f5f7fa; */
+/*     margin: 20px; */
+/* } */
+
+.employee-container {
+    max-width: 100%;
+    max-height: 90vh; /* 뷰포트 높이의 90%로 제한 */
+    margin: 0 auto;
+    background-color: #ffffff;
+    padding-bottom: 0px;
+    padding-top: 0px;
+    padding-left: 10px;
+    padding-right: 10px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    overflow-y: auto;
+}
+
+.employee-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.org-header {
+    font-size: 20px;
+    font-weight: bold;
+    color: #343a40;
+    text-align: center;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.empTR {
+    vertical-align: middle;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.empTR th {
+    font-weight: bold;
+    color: #495057;
+    padding: 10px;
+    background-color: #f8f9fa;
+    text-align: left;
+    width: 15%;
+}
+
+.empTR td {
+    padding: 2px;
+    text-align: left;
+    width: 21%;
+}
+
+.employee-card {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.employee-photo {
+    width: 50px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.employee-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+#stsName {
+    font-weight: bold;
+    color: #343a40;
+    margin-bottom: 2px;
+}
+
+.status-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+.popup-trigger {
+    color: blue;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.popup {
+    position: absolute;
+    width: 240px;
+    border: 1px solid #ccc;
+    padding: 10px;
+    background-color: white;
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+    display: none;
+    border-radius: 8px;
+}
+
+.popup-content {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    text-align: center;
+}
+
+.popup-img {
+    width: 60px;
+    height: 70px;
+    object-fit: cover; /* 비율을 유지하며 크기에 맞춤 */
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.popup-text {
+    flex-grow: 1;
+    font-weight: bold;
+}
+
+.popup p {
+    margin: 0;
+}
+
+.zoomable {
+    transition: transform 0.3s ease;
+}
+
+.zoomed {
+    transform: scale(3); /* 3배 확대 */
+    z-index: 1000; /* 다른 요소들 위에 표시 */
+    transform-origin: 70% 20%;
+}
+</style>
+
+<div id="userStatusPopup">
+	<div class="employee-container">
+	    <div class="employee-table" id="employeeStatusListContainer">
+	        <div class="org-header">조직명</div>
+	    </div>
+	</div>
+    <div id="popup" class="popup">
+        <div class="popup-content">
+        	<table>
+		        <colgroup>
+		          <col width="30%">
+		          <col width="70%">
+		        </colgroup>
+	        	<tr>
+	        		<td rowspan=4>
+			            <img id="image1" src="" class="popup-img zoomable">
+	        		</td>
+	        		<td>
+	        		    <div class="popup-text">
+							<p id="name"></p>
+			            </div>
+			        </td>
+	        	</tr>
+	        	<tr>
+	        		<td>
+	        		    <div class="popup-text">
+			                <p id="telNo"></p>
+			            </div>
+			        </td>
+	        	</tr>
+	        	<tr>
+	        		<td>
+	        		    <div class="popup-text">
+			                <p id="offTelNo"></p>
+			            </div>
+			        </td>
+	        	</tr>
+	        	<tr>
+	        		<td>
+	        		    <div class="popup-text">
+			                <p id="message"></p>
+			            </div>
+			        </td>
+	        	</tr>
+        	</table>
+        </div>
+    </div>
+	<div class="popup_bottom_btn">
+		<button class="close_btn" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+
+<script type="text/javascript">
+var mouseX = 0;
+var mouseY = 0;
+$(document).ready(function() {
+    createEmployeeList();
+    $('.popup-trigger').on('click', function (event) {
+        event.stopPropagation();
+
+        const $popup = $('#popup');// 페이지 내의 좌표
+        mouseX = event.pageX;
+        mouseY = event.pageY;
+        let modalPosition = $('#userStatusPopup').offset();
+        let width = $('#userStatusPopup').width();
+        let height = $('#userStatusPopup').height();
+        
+        mouseX -= modalPosition.left;
+        mouseY -= modalPosition.top;
+//      // 팝업이 화면을 벗어나지 않도록 조정
+        if ((mouseX + 250) > width) {
+            mouseX = width - 250;
+        }
+
+        if ((mouseY + 160) > height) {
+            mouseY = height - 160;
+        }
+        
+        //서버에서 이미지와 관련 정보 가져오기
+//         imageFileChk($(this).data('img'));	
+        imageFileChk($(this));	
+
+        $popup.css({
+            top: mouseY,
+            left: mouseX
+        }).fadeIn();
+    });
+
+    $(document).on('click', function (event) {
+        const $popup = $('#popup');
+        if (!$popup.is(event.target) && !$popup.has(event.target).length) {
+            $popup.fadeOut();
+        }
+        if (!$(event.target).is('#image1')) {
+            $('#image1').removeClass('zoomed');
+        }
+    });
+
+    $('#popup').on('mouseleave', function () {
+        $(this).fadeOut();
+    });
+    
+    $('#image1').on('click', function () {
+        $(this).toggleClass('zoomed');
+    });
+});
+
+function createEmployeeList() {
+    $('#employeeStatusListContainer').empty();
+    var param = {};
+    postAjaxSync("/admin/cm/cm06/checkUserIdImageList", param, null, function(data) {
+        var codeList = data.result;
+        var container = $('#employeeStatusListContainer');
+        var table = $('<table>').addClass('employee-table').appendTo(container);
+        var lastDept = '';
+        var tableRow = null;
+        var tdCount = 0;
+
+        var orgName = codeList[0]?.orgNm || "조직명";
+        container.find('.org-header').text(orgName);
+        $.each(codeList, function(index, item) {
+            if (lastDept !== item.dept) {
+                if (tdCount > 0) {
+                    while (tdCount < 5) {
+                        $('<td>').appendTo(tableRow);
+                        tdCount++;
+                    }
+                }
+                tableRow = $('<tr>').addClass('empTR');
+                $('<th>').text(item.deptNm + " (" + item.cnt + ")").appendTo(tableRow);
+                container.find('table').append(tableRow); 
+                lastDept = item.dept;
+                tdCount = 0;
+            }
+
+            if (tdCount === 5) {
+                tableRow = $('<tr>').addClass('empTR');
+                $('<th>').appendTo(tableRow);
+                container.find('table').append(tableRow);
+                tdCount = 0;
+            }
+
+            var userName = item.name + " " + item.levelNm.replace(/\s+/g, '');
+            var txtTitle = `${userName}님은 정상 근무중입니다.`;
+            var workHoly = ''; 
+            var textColor = 'rgb(0, 69, 191)';
+
+            if (item.workHolyNm) {
+                workHoly = '(' + item.workHolyNm.slice(2) + ')';
+                textColor = 'rgb(255 0 242)';
+                txtTitle = `${userName}님은 ${item.workHolyNm.slice(2)}중입니다.\n${item.workRptRmk}`;
+            }
+
+            const tdElement = $('<td>');
+            const cardDiv = $('<div>').addClass('employee-card popup-trigger')
+                                      .attr({
+                                          'data-img': item.id,
+                                          'data-telno': item.telNo,
+                                          'data-offtelno': item.offTelNo,
+                                          'data-message': item.message,
+                                          'title': txtTitle
+                                      });
+
+            $('<img>')
+                .addClass('employee-photo')
+                .attr('src', item.userImg ? item.userImg.map(code => String.fromCharCode(code)).join('') : '')
+                .css('filter', workHoly == '' ? '' : 'grayscale(100%)')
+                .appendTo(cardDiv);
+
+            const infoDiv = $('<div>').addClass('employee-info').appendTo(cardDiv);
+
+            $('<span>')
+                .attr({ 'id': 'stsName', 'style': 'color:' + textColor })
+                .text(userName + workHoly)
+                .appendTo(infoDiv);
+
+            const statusIcons = $('<span>').addClass('status-icons').html(
+                `<i class="fa fa-calendar" style="color:${workHoly == '' ? setStatus(item.scdLoad) : 'gray'}"></i>` +
+                `<i class="fa fa-cog" style="color:${workHoly == '' ? setStatus(item.qcLoad) : 'gray'}"></i>` +
+                `<i class="fa fa-user-cog" style="color:${workHoly == '' ? setStatus(item.jobLoad) : 'gray'}"></i>` +
+                `<i class="fa fa-hands-helping" style="color:${workHoly == '' ? setStatus(item.commLoad) : 'gray'}"></i>`
+            );
+            infoDiv.append(statusIcons);
+            infoDiv.append(`<span style="color:gray">${item.telNo}</span>`);
+
+            tdElement.append(cardDiv);
+//             tableRow.append(tdElement);
+            tableRow.append(tdElement);
+
+            tdCount++;
+        });
+
+        if (tdCount > 0 && tdCount < 5) {
+            while (tdCount < 5) {
+                $('<td>').appendTo(tableRow);
+                tdCount++;
+            }
+        }
+    });
+}
+
+function setStatus(set) {
+//     return set === "COMM3" ? "emp_red" : set === "COMM2" ? "emp_orange" : "emp_blue";
+    return set === "COMM3" ? "red" : set === "COMM2" ? "orange" : "gray";
+}
+
+function imageFileChk(data) {
+	var src = $(data).closest('.employee-card').find('.employee-photo').attr('src');
+	$('#popup').find('img').attr('src', src);
+	$('#image1').removeClass('zoomed');
+
+	$('#name').text($(data).children('.employee-info').children('#stsName').text() ??'');
+	$('#telNo').text('H.' + $(data).data('telno') ?? '');
+	$('#offTelNo').text('O.' + $(data).data('offtelno') ?? '');
+	$('#message').text($(data).data('message') ?? '');
+}
+</script>

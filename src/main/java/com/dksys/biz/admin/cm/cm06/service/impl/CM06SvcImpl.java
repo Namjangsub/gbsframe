@@ -158,4 +158,9 @@ public class CM06SvcImpl implements CM06Svc {
 		}
 		cm06Mapper.updateUserImg(paramMap);
 	}
+
+	@Override
+	public List<Map<String, String>> checkUserIdImageList(Map<String, String> paramMap) {
+		return cm06Mapper.checkUserIdImageList(paramMap);
+	}
 }

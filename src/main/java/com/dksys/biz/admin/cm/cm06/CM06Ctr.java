@@ -1,7 +1,5 @@
 package com.dksys.biz.admin.cm.cm06;
 
-import java.util.Arrays;
-import java.util.Base64;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -9,7 +7,6 @@ import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
@@ -25,7 +22,6 @@ import com.dksys.biz.main.vo.User;
 import com.dksys.biz.util.MessageUtils;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.util.Base64Utils;
 
 @RequiredArgsConstructor
 @Controller
@@ -262,6 +258,21 @@ public class CM06Ctr {
         model.addAttribute("result",result);
         return "jsonView";
     }
+
+	// 사용자 사진 정보 조회
+	// [post body json : Map 방식]
+	// [경로 지정 : http://localhost:7000/saveImage]
+	// [body json 데이터 : {"idx":"1", "image":"data:image/png;base64,iVBORw ...."}]
+	// [input : 서비스에서 설정한 파라미터 개수와 같아야합니다]
+	// [output : 모델에서 설정한 return 타입으로 결과를 반환합니다]
+	@PostMapping("/checkUserIdImageList")
+	public String checkUserIdImageList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = cm06Svc.checkUserIdImageList(paramMap);// 서비스 호출 및 리턴 받은 데이터 확인 실시
+
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
     public byte[] convertObjectToByteArray(Object object) {
         if (object instanceof byte[]) {
             return (byte[]) object;
