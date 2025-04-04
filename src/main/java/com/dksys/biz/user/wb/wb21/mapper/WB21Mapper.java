@@ -74,4 +74,7 @@ public interface WB21Mapper {
     int updateSalesCdManual(Map<String, String> paramMap);
 
     int deleteSalesCdManual(Map<String, String> paramMap);
+
+	// 출고일 변경 Chk
+	List<Map<String, String>> deDtChangChk(Map<String, String> paramMap);
 }

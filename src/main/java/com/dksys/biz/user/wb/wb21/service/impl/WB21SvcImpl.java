@@ -480,4 +480,8 @@ public class WB21SvcImpl implements WB21Svc {
         return result;
     }
 
+	@Override
+	public List<Map<String, String>> deDtChangChk(Map<String, String> paramMap) {
+		return wb21Mapper.deDtChangChk(paramMap);
+	}
 }

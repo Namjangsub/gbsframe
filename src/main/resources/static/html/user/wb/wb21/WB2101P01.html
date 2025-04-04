@@ -240,6 +240,7 @@
 	var manualCall = '';
     var actionType = '';
 	var fileTrgtKey = '';
+	var originDeDt = '';
 	$(document).ready(function() {
 // 		console.log("팝업레뒤");
 		setCommonSelect($(".popup_area select[data-kind]"));
@@ -306,6 +307,11 @@
 			} else {
 				$('.popup_area .manualButton').hide();
 			}
+		});
+
+		// 출고일 변경에 따른 일정관리에 등록된 과제정보 체크
+		$('#popForm #deDt').on("change", function(){
+			deDtChangChk();
 		});
 		
 		
@@ -490,6 +496,7 @@
 						}
 					}
 				});
+				originDeDt = data.resultList.deDt; // 원래 날짜 정보 저장
 				//최종버전만 수정이든 뭐든 가능
 				if(data.resultList.maxVerNo == data.resultList.verNo) {
 					$('.tit').text('과제관리 수정');
@@ -964,4 +971,45 @@ function kakaoTodo() {
     	return calDay.workingDays;
     }
 
+	// 출고일 변경에 따른 체크
+	function deDtChangChk() {
+		var paramObj = {
+			"deDt": $("#deDt").val(),
+			"salesCd": $("#salesCd").val()
+		};
+		postAjaxSync("/user/wb/wb21/deDtChangChk", paramObj, null, function(data) {
+			var resultList = data.resultList;
+			if (resultList && resultList.length > 0) {
+				var parents = {};
+				var groups = {}; 
+
+				resultList.forEach(function(item) {
+					if (item.wbsPlanCodeKind === "WBSCODE") {
+						parents[item.wbsPlanCodeId] = item.codeNm;
+					} else {
+						var parentId = item.wbsPlanCodeKind;
+						if (!groups[parentId]) {
+							groups[parentId] = [];
+						}
+						groups[parentId].push(item.codeNm);
+					}
+				});
+
+				// 각 부모 그룹에 대해 두 줄 메시지 구성
+				// 첫 번째 줄: "일정 계획 : 부모이름"
+				// 두 번째 줄: "부모이름Task : 자식1, 자식2, ..."
+				var messageParts = [];
+				for (var parentId in groups) {
+					var parentName = parents[parentId] || parentId;
+					messageParts.push("일정 계획 : " + parentName + "\n" + parentName + "Task : " + groups[parentId].join(", "));
+				}
+				
+				var message = "출고일보다 늦은 계획 항목\n\n" + messageParts.join("\n\n") + "\n\n그래도 변경하시겠습니까?";
+				if (confirm(message)) {
+				} else {
+					$("#deDt").datepicker('setDate', originDeDt);
+				}
+			}
+		});
+	}
 </script>

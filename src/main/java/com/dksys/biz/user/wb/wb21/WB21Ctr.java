@@ -343,4 +343,11 @@ public class WB21Ctr {
         return "jsonView";
     }
 
+	// 출고일 변경 Chk
+	@PostMapping(value = "/deDtChangChk")
+	public String deDtChangChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = wb21Svc.deDtChangChk(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
 }
