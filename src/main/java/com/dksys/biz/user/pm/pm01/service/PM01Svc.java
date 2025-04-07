@@ -45,4 +45,8 @@ public interface PM01Svc {
 
 	List<Map<String, String>> selectDailyWorkTripRows(Map<String, String> paramMap);
 
+	int selectNewAllIssueWorkListCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectNewAllIssueWorkList(Map<String, String> paramMap);
+
 }

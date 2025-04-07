@@ -53,4 +53,8 @@ public interface PM01Mapper {
 	List<Map<String, String>> selectDailyWorkTripRows(Map<String, String> paramMap);
 
 	int updateTripRpt(Map<String, String> tripMap);
+
+	int selectNewAllIssueWorkListCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectNewAllIssueWorkList(Map<String, String> paramMap);
 }

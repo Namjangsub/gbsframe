@@ -10,7 +10,6 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
@@ -367,6 +366,16 @@ public class PM01SvcImpl implements PM01Svc {
 	@Override
 	public List<Map<String, String>> selectDailyWorkTripRows(Map<String, String> paramMap) {
 		return pm01Mapper.selectDailyWorkTripRows(paramMap);
+	}
+
+	@Override
+	public int selectNewAllIssueWorkListCount(Map<String, String> paramMap) {
+		return pm01Mapper.selectNewAllIssueWorkListCount(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectNewAllIssueWorkList(Map<String, String> paramMap) {
+		return pm01Mapper.selectNewAllIssueWorkList(paramMap);
 	}
 
 }

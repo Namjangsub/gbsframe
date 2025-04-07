@@ -1,13 +1,11 @@
 package com.dksys.biz.user.pm.pm01;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,12 +13,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.user.cr.cr02.mapper.CR02Mapper;
-import com.dksys.biz.user.pm.pm01.service.PM01Svc;
 import com.dksys.biz.admin.bm.bm01.mapper.BM01Mapper;
 import com.dksys.biz.admin.bm.bm02.mapper.BM02Mapper;
 import com.dksys.biz.admin.cm.cm05.mapper.CM05Mapper;
 import com.dksys.biz.cmn.vo.PaginationInfo;
+import com.dksys.biz.user.cr.cr02.mapper.CR02Mapper;
+import com.dksys.biz.user.pm.pm01.service.PM01Svc;
 import com.dksys.biz.util.MessageUtils;
 
 @Controller
@@ -309,4 +307,15 @@ public class PM01Ctr {
     model.addAttribute("result", result);
     return "jsonView";
   }
+
+   	// 작업일보 이슈 리스트 (고객사)조회
+	@PostMapping(value = "/selectNewAllIssueWorkList")
+	public String selectNewAllIssueWorkList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = pm01Svc.selectNewAllIssueWorkListCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = pm01Svc.selectNewAllIssueWorkList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 }
