@@ -1070,6 +1070,7 @@
 					        , ''		 AS USER_ID
 		                    , ''		 AS USER_NAME
 					        , ''		 AS DEPT_ID
+					        , 4 AS VIEW_SORT
 				        FROM   TB_PM01M01 AS T
 				               LEFT OUTER JOIN TB_CR02D02 AS CR  ON T.ORD_CO_CD= CR.CO_CD
 				                                                AND T.SALES_CD = CR.SALES_CD
@@ -1188,6 +1189,11 @@
 					        , B2.ID 			 AS USER_ID
 		                    , B2.NAME			 AS USER_NAME
 					        , B2.DEPT_ID		 AS DEPT_ID
+					        , CASE WHEN QM.REQ_ST = 'REQST03' THEN 3 
+					               WHEN ISU.ISS_STS = 'ISSSTS03' THEN 3
+					               WHEN QM.REQ_ST IS NOT NULL THEN 2
+					               WHEN ISU.ISS_STS = 'ISSSTS02' THEN 2
+					               ELSE 1 END VIEW_SORT
 		                FROM TB_WB24M02  AS ISU --WBS이슈 정보
 			            		LEFT OUTER JOIN TB_CR02D02 AS CR  ON ISU.CO_CD= CR.CO_CD
 			                                                	AND ISU.SALES_CD = CR.SALES_CD
@@ -1218,8 +1224,8 @@
 				        </when>
 				        <otherwise>
 		                AND (
-		                		(QM.REQ_ST = 'REQST03' AND  ISU.CREAT_DTTM BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD'))
-		                         OR (NVL(QM.REQ_ST,'REQST01') != 'REQST03')
+		                		((QM.REQ_ST = 'REQST03' OR  ISU.ISS_STS = 'ISSSTS03') AND  ISU.CREAT_DTTM BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD'))
+		                         OR (NVL(QM.REQ_ST,'REQST01') != 'REQST03' AND ISU.ISS_STS != 'ISSSTS03')
 		                         OR (NVL(ISU.ISS_STS,'ISSSTS01') != 'ISSSTS03' AND ISU.REQ_NO IS NULL)  
 		                    )
 				        </otherwise>
@@ -1274,12 +1280,25 @@
 												GROUP BY ME.REQ_NO
 												) AS REQ ON REQ.REQ_NO = A.REQ_NO
 				WHERE  1 = 1
-				ORDER BY ISS_STS, WORK_RPT_DT DESC, WORK_RPT_ID_NM,  ACT_ID_NM, SUB_CD_NM
+				ORDER BY VIEW_SORT, WORK_RPT_DT DESC, WORK_RPT_ID_NM,  ACT_ID_NM, SUB_CD_NM
 				) AS A
 			WHERE  1 = 1
 		   ) AS A
     </select>
 
+<!-- 정렬 순서 : 미처리건 1, 처리완료는 검색일자 조건내3, 작업일보     -->
+<!-- ISS_STS	 |  REQ_ST	| VIEW_SORT -->
+<!-- ISSSTS01 |          | 1 -->
+<!-- ISSSTS02 |          | 2 -->
+<!-- ISSSTS03 |          | 3 -->
+<!-- ISSSTS01 |  REQST01	| 2 -->
+<!-- ISSSTS02 |  REQST01	| 2 -->
+<!-- ISSSTS01 |  REQST02	| 2 -->
+<!-- ISSSTS02 |  REQST02	| 2 -->
+<!-- ISSSTS01 |  REQST03	| 3 -->
+<!-- ISSSTS02 |  REQST03	| 3 -->
+<!-- ISSSTS03 |  REQST03	| 3 -->
+<!-- 일보       |          | 4 -->
     <select id="selectAllIssueWorkList" parameterType="Map" resultType="CamelMap">
     SELECT A.*
 		FROM   (
@@ -1364,6 +1383,7 @@
 					        , '' AS OUT_APPROVAL_DT		--직접매출 결재
 					        , '' AS CUST_REQ_DT			--과제 납기예정일 ->고객요구일
 					        , '' AS DUDT_INTEND_DT		--수주 납기예정일 ->고객요구일
+					        , 4 AS VIEW_SORT
 				        FROM   TB_PM01M01 AS T
 				               LEFT OUTER JOIN TB_CR02D02 AS CR  ON T.ORD_CO_CD= CR.CO_CD
 				                                                AND T.SALES_CD = CR.SALES_CD
@@ -1498,6 +1518,11 @@
 					        , to_char(W4.TODO_CF_DT,'MM/DD')  AS OUT_APPROVAL_DT		--직접매출 결재
                             , TO_CHAR(W9.DE_DT, 'YYYY-MM-DD') AS CUST_REQ_DT			--과제 출고일 = 고객요구일
 					        , TO_CHAR(CR.DUDT_INTEND_DT,'YYYY-MM-DD') AS DUDT_INTEND_DT	--수주 납기예정일 ->고객요구일
+					        , CASE WHEN QM.REQ_ST = 'REQST03' THEN 3 
+					               WHEN ISU.ISS_STS = 'ISSSTS03' THEN 3
+					               WHEN QM.REQ_ST IS NOT NULL THEN 2
+					               WHEN ISU.ISS_STS = 'ISSSTS02' THEN 2
+					               ELSE 1 END VIEW_SORT
 		                FROM TB_WB24M02  AS ISU --WBS이슈 정보
 			            		LEFT OUTER JOIN TB_CR02D02 AS CR  ON ISU.CO_CD= CR.CO_CD
 			                                                	AND ISU.SALES_CD = CR.SALES_CD
@@ -1536,8 +1561,8 @@
 				        </when>
 				        <otherwise>
 		                AND (
-		                		(QM.REQ_ST = 'REQST03' AND  ISU.CREAT_DTTM BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD'))
-		                         OR (NVL(QM.REQ_ST,'REQST01') != 'REQST03')
+		                		((QM.REQ_ST = 'REQST03' OR  ISU.ISS_STS = 'ISSSTS03') AND  ISU.CREAT_DTTM BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD'))
+		                         OR (NVL(QM.REQ_ST,'REQST01') != 'REQST03' AND ISU.ISS_STS != 'ISSSTS03')
 		                         OR (NVL(ISU.ISS_STS,'ISSSTS01') != 'ISSSTS03' AND ISU.REQ_NO IS NULL)  
 		                    )
 				        </otherwise>
@@ -1592,7 +1617,7 @@
 												GROUP BY ME.REQ_NO
 												) AS REQ ON REQ.REQ_NO = A.REQ_NO
 				WHERE  1 = 1
-				ORDER BY ISS_STS, WORK_RPT_DT DESC, WORK_RPT_ID_NM,  ACT_ID_NM, SUB_CD_NM
+				ORDER BY VIEW_SORT, WORK_RPT_DT DESC, WORK_RPT_ID_NM,  ACT_ID_NM, SUB_CD_NM
 				) AS A
 			WHERE  1 = 1
 		   ) AS A
@@ -2022,9 +2047,9 @@
 				        </when>
 				        <otherwise>
 		                AND (
-		                		(QM.REQ_ST = 'REQST03' AND  ISU.CREAT_DTTM BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD'))
-		                         OR (NVL(QM.REQ_ST,'REQST01') != 'REQST03')
- 		                         OR (NVL(ISU.ISS_STS,'ISSSTS01') != 'ISSSTS03' AND ISU.REQ_NO IS NULL)
+		                		((QM.REQ_ST = 'REQST03' OR  ISU.ISS_STS = 'ISSSTS03') AND  ISU.CREAT_DTTM BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD'))
+		                         OR (NVL(QM.REQ_ST,'REQST01') != 'REQST03' AND ISU.ISS_STS != 'ISSSTS03')
+		                         OR (NVL(ISU.ISS_STS,'ISSSTS01') != 'ISSSTS03' AND ISU.REQ_NO IS NULL)  
 		                    )
 				        </otherwise>
 				    </choose>
@@ -2168,6 +2193,7 @@
 					        , '' AS OUT_APPROVAL_DT		--직접매출 결재
 					        , '' AS CUST_REQ_DT			--과제 납기예정일 ->고객요구일
 					        , '' AS DUDT_INTEND_DT		--수주 납기예정일 ->고객요구일
+					        , 4  AS VIEW_SORT
 				        FROM   TB_PM01M01 AS T
 				               LEFT OUTER JOIN TB_CR02D02 AS CR  ON T.ORD_CO_CD= CR.CO_CD
 				                                                AND T.SALES_CD = CR.SALES_CD
@@ -2302,6 +2328,11 @@
 					        , to_char(W4.TODO_CF_DT,'MM/DD')  AS OUT_APPROVAL_DT		--직접매출 결재
                             , TO_CHAR(W9.DE_DT, 'YYYY-MM-DD') AS CUST_REQ_DT			--과제 출고일 = 고객요구일
 					        , TO_CHAR(CR.DUDT_INTEND_DT,'YYYY-MM-DD') AS DUDT_INTEND_DT	--수주 납기예정일 ->고객요구일
+					        , CASE WHEN QM.REQ_ST = 'REQST03' THEN 3 
+					               WHEN ISU.ISS_STS = 'ISSSTS03' THEN 3
+					               WHEN QM.REQ_ST IS NOT NULL THEN 2
+					               WHEN ISU.ISS_STS = 'ISSSTS02' THEN 2
+					               ELSE 1 END VIEW_SORT
 		                FROM TB_WB24M02  AS ISU --WBS이슈 정보
 			            		LEFT OUTER JOIN TB_CR02D02 AS CR  ON ISU.CO_CD= CR.CO_CD
 			                                                	AND ISU.SALES_CD = CR.SALES_CD
@@ -2343,9 +2374,9 @@
 				        </when>
 				        <otherwise>
 		                AND (
-		                		(QM.REQ_ST = 'REQST03' AND  ISU.CREAT_DTTM BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD'))
-		                         OR (NVL(QM.REQ_ST,'REQST01') != 'REQST03')
- 		                         OR (NVL(ISU.ISS_STS,'ISSSTS01') != 'ISSSTS03' AND ISU.REQ_NO IS NULL) 
+		                		((QM.REQ_ST = 'REQST03' OR  ISU.ISS_STS = 'ISSSTS03') AND  ISU.CREAT_DTTM BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD'))
+		                         OR (NVL(QM.REQ_ST,'REQST01') != 'REQST03' AND ISU.ISS_STS != 'ISSSTS03')
+		                         OR (NVL(ISU.ISS_STS,'ISSSTS01') != 'ISSSTS03' AND ISU.REQ_NO IS NULL)  
 		                    )
 				        </otherwise>
 				    </choose>
@@ -2399,7 +2430,7 @@
 												GROUP BY ME.REQ_NO
 												) AS REQ ON REQ.REQ_NO = A.REQ_NO
 				WHERE  1 = 1
-				ORDER BY CLNT_NM, ORDRS_NO DESC, ISS_STS, SALES_CD DESC, WORK_RPT_DT DESC
+				ORDER BY CLNT_NM, ORDRS_NO DESC, VIEW_SORT, SALES_CD DESC, WORK_RPT_DT DESC
 				) AS A
 			WHERE  1 = 1
 		   ) AS A
