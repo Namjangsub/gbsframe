@@ -94,7 +94,8 @@ public class BM14Ctr {
 			};
 		}catch(Exception e){
 			model.addAttribute("resultCode", 900);
-			model.addAttribute("resultMessage", e.getMessage());
+			model.addAttribute("resultMessage", "자식노드에 구매BOM이 등록되면 수정이나 삭제 할 수 없습니다.");
+			model.addAttribute("resultErrorMessage", e.getMessage());
 		}
 
 		// try {
