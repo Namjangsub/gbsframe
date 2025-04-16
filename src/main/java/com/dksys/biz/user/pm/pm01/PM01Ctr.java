@@ -311,9 +311,6 @@ public class PM01Ctr {
    	// 작업일보 이슈 리스트 (고객사)조회
 	@PostMapping(value = "/selectNewAllIssueWorkList")
 	public String selectNewAllIssueWorkList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = pm01Svc.selectNewAllIssueWorkListCount(paramMap);
-		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		model.addAttribute("paginationInfo", paginationInfo);
 		List<Map<String, String>> result = pm01Svc.selectNewAllIssueWorkList(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";

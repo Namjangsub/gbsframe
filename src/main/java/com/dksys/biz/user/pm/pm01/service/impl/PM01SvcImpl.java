@@ -369,11 +369,6 @@ public class PM01SvcImpl implements PM01Svc {
 	}
 
 	@Override
-	public int selectNewAllIssueWorkListCount(Map<String, String> paramMap) {
-		return pm01Mapper.selectNewAllIssueWorkListCount(paramMap);
-	}
-
-	@Override
 	public List<Map<String, String>> selectNewAllIssueWorkList(Map<String, String> paramMap) {
 		return pm01Mapper.selectNewAllIssueWorkList(paramMap);
 	}
