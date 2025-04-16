@@ -186,6 +186,7 @@ public class BM14SvcImpl implements BM14Svc {
 				dtl.put("UPPER_KEY", paramMap.get("fileTrgtKey") );
 				dtl.put("UPPER_CD", paramMap.get("lowerCd") );
 				dtl.put("SALES_CD_TO", paramMap.get("salesCdTo"));
+				dtl.put("ORDRS_NO_TO", paramMap.get("ordrsNoTo"));
 				dtl.put("CHANGE_YN", paramMap.get("changeYn"));
 				dtl.put("USER_ID", paramMap.get("userId"));
 				dtl.put("PGM_ID", paramMap.get("pgmId"));
