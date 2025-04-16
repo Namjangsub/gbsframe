@@ -158,6 +158,14 @@
 				</tr>
 			</table>
             <div  id="dayilyRpt" style="margin-bottom: 40px;"></div>
+			<div class="issue-contents" style="display: none; text-align: left;">
+				<span style="height: 30px; line-height: 30px;font-size: 15px;margin-left: 15px">문제 현황 리스트</span>
+				<div class="contents" style="min-width:700px;">
+					<div class="ax5_grid">
+						<div data-ax5grid="issue-grid" data-ax5grid-config="{}" style="height: 300px; max-width:740px "></div>
+					</div>
+				</div>
+			</div>
 		</div>
 	</form>
 </div>
@@ -172,6 +180,24 @@
 </div>
 
 <script type="text/javascript">
+
+	ax5.ui.grid.formatter["bilgYn"] = function () {
+	// 		var color = (this.value == "ISSSTS03" || this.value == "REQST03" ) ? "color-circle_02.png" : "color-circle_01.png";
+	//빨강:접수, 회색:문제처리진행중, 녹색:요인별 발주요청 진행중, 파랑:조치완료
+		if (this.value == "E") {
+			return 'E';
+		} else if (this.value == "ISSSTS03" || this.value == "REQST03" ) {
+			return '<span style="font-size:11px;color:blue">●</span>';
+		} else if (this.value == "ISSSTS01" || this.value == "REQST01" ) {
+			return '<span style="font-size:11px;color:red">●</span>';
+		} else if (this.value == "ISSSTS02" || this.value == "REQST02" ) {
+			if (this.item.reqNo == undefined || this.item.reqNo == "") {
+				return '<span style="font-size:11px;color:silver">●</span>';
+			} else {
+				return '<span style="font-size:11px;color:green">●</span>';
+			}
+		}
+	};
 	var actionType = null;
 	var fileTrgtKey = null;
 	var fileParam = null;
@@ -190,52 +216,164 @@
 	var tripRptRowDeleteArr = []; //경비 등록내용 삭제 임시저장
 	var tripRptRowFileDeleteArr = []; //경비 등록내용중 첨부파일만 삭제 임시저장
 	var lastPosition = "";
+
+	var issueSearchValue = ""; // 문제현황 그리드 불러오기 위한 고객사이름 저장 변수
 	
-	var fileGridView = {
-		initView: function(){
+	// var fileGridView = {
+	// 	initView: function(){
+	// 		this.target = new ax5.ui.grid();
+	// 		this.target.setConfig({
+	// 			target: $('[data-ax5grid="file-grid"]'),
+	// 			showLineNumber: true,
+	// 			showRowSelector: false,
+	//         	multipleSelect: false,
+	// 			header: {selector: false},
+	// 			body: {
+	// 	        	onClick: function () {
+	// 	                this.self.select(this.dindex);
+	// 	            },
+	// 	            onDBLClick: function () {
+	// 	            	downloadFile(this.dindex);
+	// 	            },
+	// 	        	},
+	// 			columns: [
+	// 					{key: "fileName", label: "파일명", width: 240},
+	// 					{key: "fileType", label: "파일타입", width: 80, align: "center"},
+	// 					{key: "fileSize", label: "파일크기", width: 80,  align: "right", formatter: "money"},
+	// 					{key: "fileDelBtn", label: "삭제", width:50,
+	// 						formatter:function() {return (this.item.fileDelete == "Y") ? '<button style="height: 18px; padding:0px;" type="button" onclick="deleteFile('+this.dindex+')">삭제</button>' : '불가'}
+	// 					},
+	// 					{key : "fileList",  label : "list",	 width : 60, align: "center", hidden: true},
+	// 					{key : "fileUp",  label : "up",	 width : 60, align: "center", hidden: true},
+	// 					{key : "fileDown",  label : "down",	 width : 60, align: "center", hidden: true},
+	// 					{key : "fileUpdate",  label : "update",	 width : 60, align: "center", hidden: true},
+	// 					{key : "fileDelete",  label : "delete",	 width : 60, align: "center", hidden: true},
+	// 			]
+	// 		});
+	// 	},
+	// 	setData: function(){
+	// 		var targetObj = this.target;
+	// 		targetObj.setData({
+	// 			list: notiFileArr,
+	// 			page : {
+	// 				totalElements : notiFileArr.length
+	// 			}
+	// 		});
+	// 	}
+	// }
+
+	var issueGridView = {
+		initView : function() {
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
-				target: $('[data-ax5grid="file-grid"]'),
-				showLineNumber: true,
 				showRowSelector: false,
-	        	multipleSelect: false,
-				header: {selector: false},
+				multipleSelect: false,
+				sortable: true,
+				target: $('[data-ax5grid="issue-grid"]'),
+				header: {
+					align: "center",
+					selector: true
+				},
 				body: {
-		        	onClick: function () {
-		                this.self.select(this.dindex);
-		            },
-		            onDBLClick: function () {
-		            	downloadFile(this.dindex);
-		            },
-		        	},
-				columns: [
-						{key: "fileName", label: "파일명", width: 240},
-						{key: "fileType", label: "파일타입", width: 80, align: "center"},
-						{key: "fileSize", label: "파일크기", width: 80,  align: "right", formatter: "money"},
-						{key: "fileDelBtn", label: "삭제", width:50,
-							formatter:function() {return (this.item.fileDelete == "Y") ? '<button style="height: 18px; padding:0px;" type="button" onclick="deleteFile('+this.dindex+')">삭제</button>' : '불가'}
-						},
-						{key : "fileList",  label : "list",	 width : 60, align: "center", hidden: true},
-						{key : "fileUp",  label : "up",	 width : 60, align: "center", hidden: true},
-						{key : "fileDown",  label : "down",	 width : 60, align: "center", hidden: true},
-						{key : "fileUpdate",  label : "update",	 width : 60, align: "center", hidden: true},
-						{key : "fileDelete",  label : "delete",	 width : 60, align: "center", hidden: true},
+					// mergeCells : ["workRptDt", "workRptDeptNm", "workRptIdNm", "actDeptNm", "actIdNm","subCdNm", "reqNo",],
+					// mergeCells : ["clntNm", "ordrsNo", "salesCd"],
+					onClick: function () {
+						this.self.select(this.dindex);
+					},
+					onDBLClick: function () {
+						// wbsIssModal(this.item);
+					},
+					columnHeight: 40
+				},
+				page : {
+					navigationItemCount : 10,
+					height : 30,
+					display : true,
+					firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+					prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+					nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+					lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+					onChange : function() {
+						issueGridView.setData(this.page.selectPage);
+					}
+				},
+				columns : [
+					{key: "fileTrgtKey",	label: "파일대상KEY",	width: 50,		align: "center", 	hidden:true}
+					,{key: "coCd",	    	label: "회사코드",		width: 100,		align: "center", 	hidden:true}
+					,{key: "coNm",	    	label: "회사",			width: 70,		align: "center", 	hidden:true}
+					,{key: "workRptDt", 	label: "발생일자", 		width: 80,		align: "center"}
+					,{key: "workRptDeptNm",	label: "작성부서",		width: 80,		align: "left"}
+					,{key: "workRptIdNm",	label: "작성자",		width: 55,		align: "center"}
+					,{key: "issSts", 	    label: "상태", 			width: 50,		align: "center", formatter: "bilgYn"}
+					,{key: "issStsNm", 	    label: "상태", 			width: 50,		align: "center", 	hidden:true}
+					,{key: "acteDt", 		label: "완료일자", 		width: 80,		align: "center"}
+					,{key: "salesCd", 		label: "Sales Code", 	width: 110,		align: "left"}
+					,{key: "issueTitle",  	label: "문제제목",		width: 275,		align: "left",      styleClass: function () {
+						return (this.item.issSts != "ISSSTS03" && this.item.issSts != "REQST03") ? "grid-font-red" : "";},}
 				]
 			});
+			return this;
 		},
-		setData: function(){
+		setData : function(_pageNo) {
+			// if (isFirst) return;
 			var targetObj = this.target;
-			targetObj.setData({
-				list: notiFileArr,
-				page : {
-					totalElements : notiFileArr.length
+			var formData = {
+				"pageNo"   		: 1,
+				"recordCnt" 	: 10000,
+				"actId"			: "",
+				"actIdNm"		: "",
+				"coCd"			: "",
+				"issSts"		: "",
+				"prdtCd"		: "",
+				"prdtDiv"		: "",
+				"prdtNm"		: "",
+				"prjctCd"		: "",
+				"workRptId"		: "",
+				"workRptIdNm"	: "",
+				"reqDtFrom"	 	: "20200101",
+				"reqDtTo"		: "20991231"
+			};
+			if (issueSearchValue == undefined || issueSearchValue == '') {
+				formData["salesCd"] = $("#clntNm").val();
+			} else {
+				formData["salesCd"] = issueSearchValue;
+			}
+			
+			postAjax("/user/pm/pm01/selectNewAllIssueWorkList", formData, null, function(data) {
+				try {
+					var list = data.result;
+					list = list.filter(function(item){
+						return item.issSts !== 'REQST03' && item.issSts !== 'ISSSTS03';
+					});
+					if (list.length > 0 ) {
+						var pageSize   = data.paginationInfo.pageSize;
+						var totalCount = list.length;
+						var totalPages = Math.ceil(totalCount / pageSize)
+						targetObj.setData({
+							list : list,
+							page : {
+								currentPage   : _pageNo,
+								pageSize      : pageSize,
+								totalElements : totalCount,
+								totalPages    : totalPages
+							}
+						});
+					} else {
+						$('.issue-contents').hide();
+						adjustModalHeight(false);	// 자료가 없으면 팝업창 크기 그대로
+					}
+				} catch {
+					alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+					return null; // 오류 발생 시 null 반환
+				} finally {
+					// console.log("함수 실행 완료.");
 				}
 			});
 		}
 	}
 
 	$(document).ready(function() {
-		fileGridView.initView();
+		// fileGridView.initView();
 		$("#popForm #coCd").val(modalStack.last().paramObj.coCd);
 
 		setCommonSelect($(".popup_area select[data-kind]"));
@@ -343,12 +481,17 @@
 	              $("#popForm #telNo").val("051-312-2400");  
 	          }
 	          else {
-	              $("#popForm #telNo").val(data.result[0].telNo);           
+	              $("#popForm #telNo").val(data.result[0].telNo);
 	          }
 	      }); 
 	     //---------------------------------------
-	     
-         
+		
+		issueGridView.initView();	// 문제현황 그리드 초기화
+		$('#workRptS, #salesCd, #ordrsNo, #clntCd').on('change', toggleIssueGrid);	// 작업구분이 출장일때 salesCd, 수주번호, 고객사 변경에 따른 팝업창 크기 조정 및 그리드 setData
+
+		// 페이지 로드 시에도 한 번 상태 맞춰 주기
+		toggleIssueGrid();
+        
         //화면 필드 기능 추가 함수 모음
         fieldFunctionControl();
 
@@ -498,8 +641,8 @@
 		if ($("#salesCd").val()== "") {
 			clntNm.value = '';
 			eqpNm.value = '';
-			clntPjtNm.value = '';
-			itemDivNm.value = '';
+			clntPjt.value = '';
+			// itemDivNm.value = '';
 			prdtCdNm.value = '';
 		}
 	}
@@ -840,14 +983,15 @@
             $('#ordrsNo').val(row.ordrsNo);
             $('#salesCd').val(row.salesCd);
             $('#clntPjt').val(row.clntPjt);
-            $('#clntPjtNm').val(row.clntPjtNm);
             $('#clntCd').val(row.ordrsClntCd);
             $('#clntNm').val(row.ordrsClntNm);
             $('#prdtCd').val(row.prdtCd);
 			$('#prdtCdNm').val(row.prdtCdNm);
             $('#itemDiv').val(row.itemDiv);
-            $('#itemDivNm').val(row.itemDivNm);
             $('#eqpNm').val(row.eqpNm);
+
+			issueSearchValue = row.ordrsClntNm;
+			$('#salesCd').trigger('change');
         });
     }
 
@@ -917,6 +1061,9 @@
 						"clntCd" : row.clntCd
 					}
 // 					setMngInfo(paramObj);
+
+					issueSearchValue = row.clntNm;
+					$('#clntCd').trigger('change');
 				});
 	}	
 	
@@ -931,10 +1078,13 @@
             $('#ordCoCd').val(row.coCd);
             $('#ordrsNo').val(row.ordrsNo);
             $('#clntPjt').val(row.clntPjt);
-            $('#clntPjtNm').val(row.clntPjtNm);
-            $('#clntCd').val(row.clntCd);
+            // $('#clntPjtNm').val(row.clntPjtNm);
+            $('#clntCd').val(row.ordrsClntCd);
             $('#clntNm').val(row.clntNm);
             $('#ctrtNm').val(row.ctrtNm);
+
+			issueSearchValue = row.clntNm;
+			$('#ordrsNo').trigger('change');
         });
     }	
     
@@ -1007,7 +1157,7 @@
 			});
 		});
 		// 첨부파일 그리드 set
-		fileGridView.setData();
+		// fileGridView.setData();
 	}
 	
 	function setNotiFile(elem){
@@ -1022,7 +1172,7 @@
 		      	'file' : obj,
 		      	'fileDelete':'Y'
 			});
-		fileGridView.setData();
+		// fileGridView.setData();
 		$(elem).val("");
 		});
 	}
@@ -1113,7 +1263,7 @@
         	return false;
         };
 		
-		fileGridView.target.removeRow(rowIndex);
+		// fileGridView.target.removeRow(rowIndex);
 		
 		if(notiFileArr[rowIndex].fileKey){
 		// 기 등록되어 있는 파일 삭제시
@@ -1474,5 +1624,47 @@
 
 		return isRegistered;
 	}
-	
+
+	// 문제현황 그리드 셋팅 시 자료가 없으면 팝업창 조정 방지 함수
+	function adjustModalHeight(showGrid) {
+        const $modal     = $('#ax5-modal-7');
+        const $body      = $modal.find('.ax-modal-body');
+        const $header    = $modal.find('.ax-modal-header');
+        const $footer    = $modal.find('.popup_bottom_btn');
+        const contentH   = showGrid ? 750 : 560;
+        $body.css('height', contentH + 'px');
+        const totalH = $header.outerHeight() + contentH + $footer.outerHeight();
+        const winH   = $(window).height();
+        const top    = Math.max((winH - totalH) / 2, 10);
+        $modal.css({ height: totalH + 'px', top: top + 'px' });
+    }
+
+	// 작업구분이 출장일 때 salesCd(Sales Code), ordrsNo(수주번호), clntCd(고객사) 값이 들어오면 그리드 영역 보이주기
+	function toggleIssueGrid(){
+		const $modal       = $('#ax5-modal-7');
+		const $modalBody   = $modal.find('.ax-modal-body');
+		const $header      = $modal.find('.ax-modal-header');
+		const $footer      = $modal.find('.popup_bottom_btn');
+
+		const workRptS = $('#workRptS').val();
+		const hasCodes = $('#salesCd').val() || $('#ordrsNo').val() || $('#clntCd').val();
+		const showGrid = workRptS === 'GUN809902' && hasCodes;
+
+		if (showGrid) {
+			$('.issue-contents').show();
+		} else {
+			$('.issue-contents').hide();
+		}
+
+		const contentH = showGrid ? 750 : 560;
+		$modalBody.css('height', contentH + 'px');
+		const totalH = $header.outerHeight() + contentH + $footer.outerHeight();
+		const winH   = $(window).height();
+		const newTop = Math.max((winH - totalH) / 2, 10);
+		$modal.css({ 'height': totalH + 'px', 'top': newTop + 'px' });
+
+		if (showGrid) {
+			issueGridView.setData(0);
+		}
+	}
 </script>
