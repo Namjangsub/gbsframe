@@ -65,7 +65,7 @@
 					<td>
 			            <input type="hidden" id="clntCd" name="clntCd" data-search="clntCd" msg="고객사">
 			            <div class="search_form">
-			              <input type="text" id="clntNm" name="clntNm" class="form-control" data-search="clntNm"  onchange="clntSearch();" onkeyup="event.keyCode == 8 ? clntCd.value = '' : event.keyCode == 13 ? clntSearch() : ''" >
+			              <input type="text" id="clntNm" name="clntNm" class="form-control" data-search="clntNm"  onchange="clntSearch();" readonly onkeyup="event.keyCode == 8 ? clntCd.value = '' : event.keyCode == 13 ? clntSearch() : ''" >
 			              <a onclick="clntSearch();"><i class="i_search_w"></i>
 			              </a>
 			            </div>
@@ -100,7 +100,7 @@
 					
 					<th>설비명</th>
 					<td colspan="1">
-						<input type="text" class="form-control" id="eqpNm" name="eqpNm" data-search="eqpNm" msg="설비명">
+						<input type="text" class="form-control" id="eqpNm" name="eqpNm" data-search="eqpNm" readonly msg="설비명">
 					</td>
 				</tr>
 				
@@ -301,12 +301,25 @@
 			return this;
 		},
 		setData : function(_pageNo) {
-			var targetObj = this.target;
-			var formData = {};
 
-			$.each($('#popForm [data-search]'), function(idx, elem) {
-				formData[$(elem).data("search")] = $(elem).val();
-			});
+			//해당 고객사와 관련 미해결 문제 일괄 조회 되게 수정 -남장섭 2025.04.17
+			const $popForm = $('#popForm');
+			const tempClntCd = $popForm.find('#clntCd').val();
+			const tempClntNm = $popForm.find('#clntNm').val();
+			if (!(tempClntCd || tempClntNm)) {
+			    return false;
+			}
+			
+			var formData = {
+					clntCd : tempClntCd,
+					clntNm : tempClntNm
+			};
+
+// 			$.each($('#popForm [data-search]'), function(idx, elem) {
+// 				formData[$(elem).data("search")] = $(elem).val();
+// 			});
+			
+			var targetObj = this.target;
 			postAjax("/user/pm/pm01/selectNewAllIssueWorkList", formData, null, function(data) {
 				try {
 					var list = data.result;
@@ -445,13 +458,23 @@
 	     //---------------------------------------
 		
 		issueGridView.initView();	// 문제현황 그리드 초기화
-		$('#popForm #workRptS, #popForm #salesCd, #popForm #ordrsNo, #popForm #clntCd').change(function() {	// 작업구분이 출장일때 salesCd, 수주번호, 고객사 변경에 따른 팝업창 크기 조정 및 그리드 setData
+
+
+		$('#popForm #workRptS').change(function() {	// 작업구분이 출장일때 salesCd, 수주번호, 고객사 변경에 따른 팝업창 크기 조정 및 그리드 setData
 			lastValue.ordrsNo = $("#popForm #ordrsNo").val();
 			lastValue.salesCd = $("#popForm #salesCd").val();
 			toggleIssueGrid();
 		});
+
+		$('#popForm #salesCd, #popForm #ordrsNo').on('input paste drop compositionend', function () {
+			clearSalesCodeField(this);
+		});
 		
 
+		$('#popForm #clntNm').on('input paste drop compositionend', function () {
+			toggleIssueGrid();
+		});
+		
         //화면 필드 기능 추가 함수 모음
         fieldFunctionControl();
 
@@ -610,8 +633,7 @@
 			opendOrdrsSearch();
 		} else 
 		if (elm.name == 'salesCd' && lastValue.salesCd != elm.value) {
-			if (lastValue.ordrsNo  != $('#popForm #ordrsNo').val()) {
-				debugger;
+			if (lastValue.salesCd  != $('#popForm #salesCd').val()) {
 				$('#popForm #ordrsNo').val(elm.value.slice(0, 5));
 				$('#popForm #clntCd').val('');
 				$('#popForm #clntNm').val('');
@@ -697,16 +719,16 @@
 				$("#field02").hide();
 			}
 			//본인 작업일보만 수정가능함.
-			if ($('#workRptId').val() != jwt.userId) {
+			if ($('#popForm #workRptId').val() != jwt.userId) {
 				$('#actionBtn').hide();
 			}
-		  	txtareaHeightResize($('#workRptRmk'));  //비고 크기 조절하기
+		  	txtareaHeightResize($('#popForm #workRptRmk'));  //비고 크기 조절하기
 		  	  
 			//상위코드 연동으로 바뀌기 전에 저장값 설정되므로 재설정 필요함
-			selectCodeList($("#workRptL"),0);
+			selectCodeList($("#popForm #workRptL"),0);
 			$('#popForm #workRptM').val(data.result.workRptM);
 			
-			selectCodeList($("#workRptM"),1);
+			selectCodeList($("#popForm #workRptM"),1);
 			$('#popForm #workRptS').val(data.result.workRptS);
     	 	//경비내용 처리를 위한 루틴
     	 	let tripRows = data.tripRows;
@@ -980,7 +1002,7 @@
 
 	//작성자 검색 //
 	function openUserTree(gbn) {
-		if($('#workRptIdNm').prop("disabled")) return false;
+		if($('#popForm #workRptIdNm').prop("disabled")) return false;
 
 		var paramObj = {
 			"coCd" : $('#popForm #coCd').val(),
@@ -991,8 +1013,8 @@
 		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function (tree){
 			var checkedId = tree.get_checked()[0];
 			var checkedNode = tree.get_node(checkedId);
-			$('#workRptId').val(checkedNode.id);
-			$('#workRptIdNm').val(checkedNode.text);
+			$('#popForm #workRptId').val(checkedNode.id);
+			$('#popForm #workRptIdNm').val(checkedNode.text);
 			setWorkPtDept(checkedNode.parent);//자동분류 자동선택
 		});
 	}
@@ -1623,7 +1645,8 @@
 			if (dept1 == 'GUN6020' || dept2 == '9902') deptChk = true; //출장관련 코드가 아니면 처리 제외
 		}
 		
-		const hasCodes = $('#popForm #salesCd').val() + $('#popForm #ordrsNo').val() + $('#popForm #clntCd').val();
+// 		const hasCodes = $('#popForm #salesCd').val() + $('#popForm #ordrsNo').val() + $('#popForm #clntCd').val();
+		const hasCodes = $('#popForm #clntCd').val() + $('#popForm #clntNm').val();
 		if (deptChk && hasCodes) {	//작업일보 코드가 출자이면서 수주번호, SalesCd, 고객사중에 하나라도 있으면 문제현황중 미결사항만 가져오기
 			$('#popForm #issue-contents').show();
 			issueGridView.initView().setData(0);
