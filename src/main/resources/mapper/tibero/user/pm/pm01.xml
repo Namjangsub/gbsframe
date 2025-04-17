@@ -1935,4 +1935,614 @@
 			ORDER BY CLNT_NM, ORDRS_NO DESC, SALES_CD DESC
     </select>
 
+
+	<select id="selectCustomAllIssueWorkListCount" parameterType="Map" resultType="int">
+		SELECT COUNT(*)
+			FROM   (
+				SELECT ROWNUM AS RNUM
+					 , A.*
+				FROM   ( SELECT
+						   A.*
+						 , REQ.REQ_AMT
+					FROM   (
+							SELECT '일보' AS GUBUN
+								  , T.FILE_TRGT_KEY
+								 , T.CO_CD
+								 , FN_CM05M01_CD_TO_NM(T.CO_CD) CO_NM
+								 , T.WORK_RPT_NO
+								 , T.WORK_RPT_ID
+								 , B.NAME					 AS WORK_RPT_ID_NM
+								 , B1.DEPT_NM				 AS WORK_RPT_DEPT_NM
+								 , TO_CHAR(T.WORK_RPT_DT,'YYYY-MM-DD') AS WORK_RPT_DT
+								 , T.ORDRS_NO
+								 , T.SALES_CD
+								 , T.PRDT_CD
+								 , C.PRDT_NM                        AS PRDT_CD_NM
+								 , T.ITEM_DIV
+								 , FN_CM05M01_CD_TO_NM(T.ITEM_DIV) AS ITEM_DIV_NM
+								 , T.WORK_RPT_RMK
+								 , T.ISSUE_TITLE
+								 , T.CLNT_CD
+								 , A.CLNT_NM
+								 , T.CLNT_PJT
+								 , FN_CM05M01_CD_TO_NM(T.CLNT_PJT)  AS CLNT_PJT_NM
+								 , T.EQP_NM
+								 , '작업일보' as JOB_DIV
+								 , ''        AS ISS_DIV
+								 , ''        AS ISS_DIV_NM
+								 , 'ISSSTS03'  AS ISS_STS
+								 , '발생으로완료'  AS ISS_STS_NM
+								 , ''        AS ACT_ID
+								 , ''        AS ACT_ID_NM
+								 , '' 		 AS ACT_DEPT_NM		  --조치부서
+								 , '' 		 AS ACT_DEPT_ID		  --조치부서
+								 , ''        AS ACTS_DT
+								 , ''        AS ACTE_DT
+								 , ''        AS ACT_MH
+								 , ''        AS ACT_AMT
+								 , ''        AS WBS_RSLTSS_DT
+								 , ''        AS WBS_RSLTSE_DT
+								 , '' 		 AS ACT_AMT_STS
+								 , ''		 AS ACT_AMT_STS_NM
+								 , ''		 AS ACT_DNG
+								 , '' 		 AS ACT_DNG_NM
+								 , '' 		 AS ACT_DNG_EVAL
+								 , '' 		 AS ACT_DNG_EVAL_NM
+								, C.PRDT_GRP 	AS PRDT_DIV_CD
+								, C7.CODE_NM    AS PRDT_DIV_NM
+								, ''  AS MID_CD
+								, ''  AS MID_CD_NM
+								, ''  AS SUB_CD
+								, ''  AS SUB_CD_NM
+								, ''  AS REQ_NO
+								, ''  AS RES_FILE_TRGT_KEY
+								, ''  AS ACT_COMP_DGN_FILE_NM --도면반영파일명
+								, 'REQST03' AS REQ_ST
+								, ''  AS ACT_CNTS	--결과
+								, ''  AS MEAS_RST	--원인
+								, ''  AS RSLT_NO
+								, ''		 AS USER_ID
+								, ''		 AS USER_NAME
+								, ''		 AS DEPT_ID
+							FROM   TB_PM01M01 AS T
+								   LEFT OUTER JOIN TB_CR02D02 AS CR  ON T.ORD_CO_CD= CR.CO_CD
+																	AND T.SALES_CD = CR.SALES_CD
+								   LEFT OUTER JOIN TB_CR02M01 AS Y  ON T.ORD_CO_CD= Y.CO_CD
+																   AND T.ORDRS_NO = Y.ORDRS_NO
+								   LEFT OUTER JOIN TB_BM02M01 AS A  ON T.CLNT_CD = A.CLNT_CD
+								   LEFT OUTER JOIN TB_CM06M01 AS B  ON T.WORK_RPT_ID = B.ID
+								   LEFT OUTER JOIN TB_CM04M01 AS B1 ON B1.DEPT_ID = SUBSTRING(B.DEPT_ID,0,5)
+								   LEFT OUTER JOIN TB_BM01M01 AS C  ON T.PRDT_CD = C.PRDT_CD
+								   LEFT OUTER JOIN TB_CM05M01 AS C7 ON C7.CODE_ID = C.PRDT_GRP
+							WHERE  T.ISSUE_YN = 'Y'
+							<if test="coCd !=null and !coCd.equals('')">
+							AND    T.CO_CD = #{coCd}
+							</if>
+						<choose>
+							<when test="salesCd != null and !salesCd.equals('')">
+							AND    T.SALES_CD LIKE  '%'||#{salesCd}||'%'
+							</when>
+							<otherwise>
+							AND    T.WORK_RPT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD')
+							</otherwise>
+						</choose>
+						<choose>
+							<when test="issSts == 'STS04' or issSts.equals('STS04')">
+							AND  1 = 1
+							</when>
+							<otherwise>
+							AND  1 = 2
+							</otherwise>
+						</choose>
+							<if test="workRptId !=null and !workRptId.equals('')">
+							AND    T.WORK_RPT_ID = #{workRptId}
+							</if>
+							<if test="prjctCd != null and !prjctCd.equals('')">
+							AND    T.CLNT_PJT = #{prjctCd}
+							</if>
+							<!-- <if test="prdtCd != null and !prdtCd.equals('')">
+							AND    T.PRDT_CD = #{prdtCd}
+							</if> -->
+							<if test="itemDiv != null and !itemDiv.equals('')">
+							AND    T.ITEM_DIV = #{itemDiv}
+							</if>
+							<if test="workRptId.equals('') and workRptIdNm !=null and !workRptIdNm.equals('')">
+							AND    B.NAME LIKE  '%'||#{workRptIdNm}||'%'
+							</if>
+							<!-- <if test="prdtCd.equals('') and prdtNm !=null and !prdtNm.equals('')">
+							AND    C.PRDT_NM LIKE  '%'||#{prdtNm}||'%'
+							</if> -->
+							<if test="actId != null and !actId.equals('')">
+							AND    1 = 0
+							</if>
+							<if test="actId.equals('') and actIdNm !=null and !actIdNm.equals('')">
+							AND    1 = 0
+							</if>
+							<!-- <if test="prdtDiv !=null and !prdtDiv.equals('')">
+							AND    C.PRDT_GRP = #{prdtDiv}
+							</if> -->
+					UNION ALL
+						  SELECT '실적'  AS GUBUN
+								, ISU.FILE_TRGT_KEY                                       --이슈 FILE_TRGT_KEY
+								, ISU.CO_CD                                               --회사코드
+								 , FN_CM05M01_CD_TO_NM(ISU.CO_CD) CO_NM
+								, ISU.ISS_NO        		 AS WORK_RPT_NO               --이슈번호
+								, ISU.CREAT_ID  --생성자
+								 , B.NAME					 AS WORK_RPT_ID_NM
+								, B1.DEPT_NM				 AS WORK_RPT_DEPT_NM
+								, TO_CHAR(ISU.CREAT_DTTM,'YYYY-MM-DD') AS CREAT_DTTM   --생성일자
+								, Y.ORDRS_NO
+								, ISU.SALES_CD                                			--SALES Code
+								, CR.PRDT_CD
+								, C.PRDT_NM                        AS PRDT_CD_NM
+								, CR.ITEM_DIV
+								, FN_CM05M01_CD_TO_NM(CR.ITEM_DIV) AS ITEM_DIV_NM
+								, ISU.ISS_CNTS                                            --이슈내용
+								, ISU.ISS_SJ                                              --이슈제목
+								, TO_CHAR(Y.ORDRS_CLNT_CD)  AS  CLNT_CD
+								, A.CLNT_NM
+								, Y.CLNT_PJT
+								, FN_CM05M01_CD_TO_NM(Y.CLNT_PJT)  AS CLNT_PJT_NM
+								, CR.EQP_NM
+								, '일정관리' as JOB_DIV
+								, ISU.ISS_DIV                                             --이슈유형
+								, (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_DIV) FROM DUAL) AS ISS_DIV_NM
+								, decode(ISU.REQ_NO, '', ISU.ISS_STS, QM.REQ_ST)      AS ISS_STS	--이슈상태
+								, (SELECT FN_CM05M01_CD_TO_NM( decode(ISU.REQ_NO, '', ISU.ISS_STS, QM.REQ_ST)) FROM DUAL) AS ISS_STS_NM
+								, decode(ISU.REQ_NO, '', ISU.ACT_ID, QM.ORDRG_ID)       					AS ACT_ID    --조치담당자
+								, decode(ISU.REQ_NO, '', B2.NAME, B4.NAME) 			 						AS ACT_ID_NM
+								, decode(ISU.REQ_NO, '', B3.DEPT_NM,B5.DEPT_NM) 							AS ACT_DEPT_NM		  --조치부서
+								, SUBSTRING(decode(ISU.REQ_NO, '', B2.DEPT_ID,B4.DEPT_ID),0,5) 		 		AS ACT_DEPT_ID		  --조치부서
+								, TO_CHAR(decode(ISU.REQ_NO, '', ACT.ACTS_DT, QM.ORDRG_DT),'YYYY-MM-DD')  	AS ACTS_DT           --조치 시작일
+								, TO_CHAR(decode(ISU.REQ_NO, '', ACT.ACTE_DT, QP.RSLT_DT),'YYYY-MM-DD')  	AS ACTE_DT           --조치 종료일
+	--		                    , decode(ISU.REQ_NO, '', ACT.ACT_MH, QP.ACT_MH)          					AS ACT_MH   --조치 투입공수
+								, ACT.ACT_MH          					AS ACT_MH   --조치 투입공수
+								, ACT.ACT_AMT                                             --조치 투입비용
+								, TO_CHAR(RSL.WBS_RSLTSS_DT,'YYYY-MM-DD') 									AS WBS_RSLTSS_DT--실적시작일
+								, TO_CHAR(RSL.WBS_RSLTSE_DT,'YYYY-MM-DD') 									AS WBS_RSLTSE_DT--실적종료일
+								, ACT.ACT_AMT_STS
+								, (SELECT FN_CM05M01_CD_TO_NM(ACT.ACT_AMT_STS) FROM DUAL) AS ACT_AMT_STS_NM
+								, ACT.ACT_DNG
+								, (SELECT FN_CM05M01_CD_TO_NM(ACT.ACT_DNG) FROM DUAL) AS ACT_DNG_NM
+								, ACT.ACT_DNG_EVAL
+								, (SELECT FN_CM05M01_CD_TO_NM(ACT.ACT_DNG_EVAL) FROM DUAL) AS ACT_DNG_EVAL_NM
+								, C.PRDT_GRP 	AS PRDT_DIV_CD
+								, C7.CODE_NM    AS PRDT_DIV_NM
+								, ISU.MID_CD
+								, (SELECT FN_CM05M01_CD_TO_NM(ISU.MID_CD) FROM DUAL) AS MID_CD_NM
+								, ISU.SUB_CD
+								, (SELECT FN_CM05M01_CD_TO_NM(ISU.SUB_CD) FROM DUAL) AS SUB_CD_NM
+								, ISU.REQ_NO
+								, QM.FILE_TRGT_KEY 								 AS RES_FILE_TRGT_KEY
+								, QM.ACT_COMP_DGN_FILE_NM --도면반영파일명
+								, QM.REQ_ST
+								, NVL2(QP.RESLT_RST, QP.RESLT_RST, ACT.ACT_CNTS) 		 AS ACT_CNTS	--결과(ISU.REQ_NO가 Null이 아니면 QP.결과, null이면 ACT.결과)
+								, NVL2(QP.MEAS_RST, QP.MEAS_RST, ACT.MEAS_RST)		 AS MEAS_RST	--원인
+								, QP.RSLT_NO
+								, B2.ID 			 AS USER_ID
+								, B2.NAME			 AS USER_NAME
+								, B2.DEPT_ID		 AS DEPT_ID
+							FROM TB_WB24M02  AS ISU --WBS이슈 정보
+									LEFT OUTER JOIN TB_CR02D02 AS CR  ON ISU.CO_CD= CR.CO_CD
+																	AND ISU.SALES_CD = CR.SALES_CD
+									LEFT OUTER JOIN TB_CR02M01 AS Y  ON ISU.CO_CD= Y.CO_CD
+																	  AND CR.ORDRS_NO = Y.ORDRS_NO
+									LEFT OUTER JOIN TB_BM02M01 AS A  ON Y.ORDRS_CLNT_CD = A.CLNT_CD
+									   LEFT OUTER JOIN TB_CM06M01 AS B  ON ISU.CREAT_ID = B.ID
+									LEFT OUTER JOIN TB_CM04M01 AS B1 ON B1.DEPT_ID = SUBSTRING(B.DEPT_ID,0,5)
+									   LEFT OUTER JOIN TB_CM06M01 AS B2 ON ISU.ACT_ID = B2.ID
+									LEFT OUTER JOIN TB_CM04M01 AS B3 ON B3.DEPT_ID = SUBSTRING(B2.DEPT_ID,0,5)
+									  LEFT OUTER JOIN TB_BM01M01 AS C  ON CR.PRDT_CD = C.PRDT_CD
+									LEFT OUTER JOIN TB_CM05M01 AS C7 ON C7.CODE_ID = C.PRDT_GRP
+									LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --실적이슈 조치내용
+									  LEFT OUTER JOIN TB_WB23M01 AS RSL ON ISU.CO_CD = RSL.CO_CD AND ISU.SALES_CD = RSL.SALES_CD AND ISU.WBS_PLAN_CODE_KIND = RSL.WBS_PLAN_CODE_KIND AND ISU.WBS_PLAN_CODE_ID = RSL.WBS_PLAN_CODE_ID AND ISU.WBS_RSLTS_NO = RSL.WBS_RSLTS_NO
+									  LEFT OUTER JOIN TB_QM01M01 AS QM ON QM.REQ_NO = ISU.REQ_NO
+									LEFT OUTER JOIN TB_QM01P01 AS QP ON QP.REQ_NO = ISU.REQ_NO
+									   LEFT OUTER JOIN TB_CM06M01 AS B4 ON QM.ORDRG_ID = B4.ID
+									LEFT OUTER JOIN TB_CM04M01 AS B5 ON B5.DEPT_ID = SUBSTRING(B4.DEPT_ID,0,5)
+						   WHERE 1=1
+							<if test="coCd !=null and !coCd.equals('')">
+							AND    ISU.CO_CD = #{coCd}
+							</if>
+						<choose>
+							<when test="salesCd != null and !salesCd.equals('')">
+							AND    (ISU.SALES_CD LIKE  '%'||#{salesCd}||'%'		-- SALES CODE
+							OR    ISU.ISS_NO LIKE  '%'||#{salesCd}||'%'			-- 문제
+							OR    ISU.REQ_NO LIKE  '%'||#{salesCd}||'%'			-- 발주
+							OR    A.CLNT_NM LIKE  '%'||#{salesCd}||'%'			-- 고객사
+							OR    Y.ORDRS_NO LIKE  '%'||#{salesCd}||'%'			-- 수주번호
+							)
+							</when>
+							<otherwise>
+							AND (
+									((QM.REQ_ST = 'REQST03' OR  ISU.ISS_STS = 'ISSSTS03') AND  ISU.CREAT_DTTM BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD'))
+									 OR (NVL(QM.REQ_ST,'REQST01') != 'REQST03' AND ISU.ISS_STS != 'ISSSTS03')
+									 OR (NVL(ISU.ISS_STS,'ISSSTS01') != 'ISSSTS03' AND ISU.REQ_NO IS NULL)  
+								)
+							</otherwise>
+						</choose>
+						<choose>
+							<when test="issSts == 'STS01' or issSts.equals('STS01')">
+							AND  ((ISU.REQ_NO IS NOT NULL AND QM.REQ_ST = 'REQST01')
+							OR  (ISU.REQ_NO IS NULL AND ISU.ISS_STS = 'ISSSTS01'))
+							--decode(ISU.REQ_NO, '', ISU.ISS_STS, QM.REQ_ST)      AS ISS_STS	--이슈상태
+							</when>
+							<when test="issSts == 'STS04' or issSts.equals('STS04')">
+							AND  ((ISU.REQ_NO IS NOT NULL AND QM.REQ_ST = 'REQST03')
+							OR  (ISU.REQ_NO IS NULL AND ISU.ISS_STS = 'ISSSTS03'))
+							</when>
+							<when test="issSts == 'STS02' or issSts.equals('STS02')">
+							AND  (ISU.REQ_NO IS NULL AND ISU.ISS_STS = 'ISSSTS02')
+							</when>
+							<when test="issSts == 'STS03' or issSts.equals('STS03')">
+							AND  (ISU.REQ_NO IS NOT NULL AND QM.REQ_ST = 'REQST02')
+							</when>
+						</choose>
+							<if test="workRptId !=null and !workRptId.equals('')">
+							AND    ISU.CREAT_ID = #{workRptId}
+							</if>
+							<if test="prjctCd != null and !prjctCd.equals('')">
+							AND    Y.CLNT_PJT = #{prjctCd}
+							</if>
+							<!-- <if test="prdtCd != null and !prdtCd.equals('')">
+							AND    CR.PRDT_CD = #{prdtCd}
+							</if> -->
+							<if test="itemDiv != null and !itemDiv.equals('')">
+							AND    CR.ITEM_DIV = #{itemDiv}
+							</if>
+							<if test="workRptId.equals('') and workRptIdNm !=null and !workRptIdNm.equals('')">
+							AND    B.NAME LIKE  '%'||#{workRptIdNm}||'%'
+							</if>
+							<!-- <if test="prdtCd.equals('') and prdtNm !=null and !prdtNm.equals('')">
+							AND    C.PRDT_NM LIKE  '%'||#{prdtNm}||'%'
+							</if> -->
+							<if test="actId != null and !actId.equals('')">
+							AND    ISU.ACT_ID = #{actId}
+							</if>
+							<if test="actId.equals('') and actIdNm !=null and !actIdNm.equals('')">
+							AND    B2.NAME LIKE  '%'||#{actIdNm}||'%'
+							</if>
+							<!-- <if test="prdtDiv !=null and !prdtDiv.equals('')">
+							AND    C.PRDT_GRP = #{prdtDiv}
+							</if> -->
+						   ) AS A
+								   LEFT OUTER JOIN ( SELECT ME.REQ_NO, sum(ME.PCHS_AMT) AS REQ_AMT
+													FROM TB_SM12D01 ME
+													GROUP BY ME.REQ_NO
+													) AS REQ ON REQ.REQ_NO = A.REQ_NO
+					WHERE  1 = 1
+					ORDER BY CLNT_NM, ORDRS_NO DESC, ISS_STS, SALES_CD DESC, WORK_RPT_DT DESC
+					) AS A
+				WHERE  1 = 1
+			   ) AS A
+		</select>
+	
+		<select id="selectCustomAllIssueWorkList" parameterType="Map" resultType="CamelMap">
+		SELECT A.*
+			FROM   (
+				SELECT ROWNUM AS RNUM
+					 , A.*
+				FROM   ( SELECT
+						   A.*
+						 , REQ.REQ_AMT
+					FROM   (
+							SELECT '일보' AS GUBUN
+								  , T.FILE_TRGT_KEY
+								 , T.CO_CD
+								 , FN_CM05M01_CD_TO_NM(T.CO_CD) CO_NM
+								 , T.WORK_RPT_NO
+								 , T.WORK_RPT_ID
+								 , B.NAME					 AS WORK_RPT_ID_NM
+								 , B1.DEPT_NM				 AS WORK_RPT_DEPT_NM
+								 , TO_CHAR(T.WORK_RPT_DT,'YYYY-MM-DD') AS WORK_RPT_DT
+								 , T.ORDRS_NO
+								 , T.SALES_CD
+								 , T.PRDT_CD
+								 , C.PRDT_NM                        AS PRDT_CD_NM
+								 , T.ITEM_DIV
+								 , FN_CM05M01_CD_TO_NM(T.ITEM_DIV) AS ITEM_DIV_NM
+								 , T.WORK_RPT_RMK
+								 , T.ISSUE_TITLE
+								 , T.CLNT_CD
+								 , A.CLNT_NM
+								 , T.CLNT_PJT
+								 , FN_CM05M01_CD_TO_NM(T.CLNT_PJT)  AS CLNT_PJT_NM
+								 , T.EQP_NM
+								 , '작업일보' as JOB_DIV
+								 , ''        AS ISS_DIV
+								 , ''        AS ISS_DIV_NM
+								 , 'ISSSTS03'  AS ISS_STS
+								 , '발생으로완료'  AS ISS_STS_NM
+								 , ''        AS ACT_ID
+								 , ''        AS ACT_ID_NM
+								 , '' 		 AS ACT_DEPT_NM		  --조치부서
+								 , '' 		 AS ACT_DEPT_ID		  --조치부서
+								 , ''        AS ACTS_DT
+								 , ''        AS ACTE_DT
+								 , ''        AS ACT_MH
+								 , ''        AS ACT_AMT
+								 , ''        AS WBS_RSLTSS_DT
+								 , ''        AS WBS_RSLTSE_DT
+								 , '' 		 AS ACT_AMT_STS
+								 , ''		 AS ACT_AMT_STS_NM
+								 , ''		 AS ACT_DNG
+								 , '' 		 AS ACT_DNG_NM
+								 , '' 		 AS ACT_DNG_EVAL
+								 , '' 		 AS ACT_DNG_EVAL_NM
+								, C.PRDT_GRP 	AS PRDT_DIV_CD
+								, C7.CODE_NM    AS PRDT_DIV_NM
+								, ''  AS MID_CD
+								, ''  AS MID_CD_NM
+								, ''  AS SUB_CD
+								, ''  AS SUB_CD_NM
+								, ''  AS REQ_NO
+								, ''  AS RES_FILE_TRGT_KEY
+								, ''  AS ACT_COMP_DGN_FILE_NM --도면반영파일명
+								, 'REQST03' AS REQ_ST
+								, ''  AS ACT_CNTS	--결과
+								, ''  AS MEAS_RST	--원인
+								, ''  AS RSLT_NO
+								, '' AS USER_ID
+								, '' AS USER_NAME
+								, '' AS DEPT_ID
+								, '' AS MC_PART_CD	--기계분류
+								, '' AS IMPORTANT_CD	--중요도
+								, '' AS IMPACT_CD	--영향도
+								, '' AS MC_PART_CD_NM
+								, '' AS IMPORTANT_CD_NM
+								, '' AS IMPACT_CD_NM
+								, '' AS LAB_STS		--연구소 결재
+								, '' AS PUR_STS		--구매 결재
+								, '' AS PRD_STS		--생산 결재
+								, '' AS OUT_STS		--직접매출 결재
+								, '' AS LAB_APPROVAL_DT		--연구소 결재
+								, '' AS PUR_APPROVAL_DT		--구매 결재
+								, '' AS PRD_APPROVAL_DT		--생산 결재
+								, '' AS OUT_APPROVAL_DT		--직접매출 결재
+								, '' AS CUST_REQ_DT			--과제 납기예정일 ->고객요구일
+								, '' AS DUDT_INTEND_DT		--수주 납기예정일 ->고객요구일
+								, 4  AS VIEW_SORT
+							FROM   TB_PM01M01 AS T
+								   LEFT OUTER JOIN TB_CR02D02 AS CR  ON T.ORD_CO_CD= CR.CO_CD
+																	AND T.SALES_CD = CR.SALES_CD
+								   LEFT OUTER JOIN TB_CR02M01 AS Y  ON T.ORD_CO_CD= Y.CO_CD
+																   AND T.ORDRS_NO = Y.ORDRS_NO
+								   LEFT OUTER JOIN TB_BM02M01 AS A  ON T.CLNT_CD = A.CLNT_CD
+								   LEFT OUTER JOIN TB_CM06M01 AS B  ON T.WORK_RPT_ID = B.ID
+								   LEFT OUTER JOIN TB_CM04M01 AS B1 ON B1.DEPT_ID = SUBSTRING(B.DEPT_ID,0,5)
+								   LEFT OUTER JOIN TB_BM01M01 AS C  ON T.PRDT_CD = C.PRDT_CD
+								   LEFT OUTER JOIN TB_CM05M01 AS C7 ON C7.CODE_ID = C.PRDT_GRP
+							WHERE  T.ISSUE_YN = 'Y'
+							<if test="coCd !=null and !coCd.equals('')">
+							AND    T.CO_CD = #{coCd}
+							</if>
+						<choose>
+							<when test="salesCd != null and !salesCd.equals('')">
+							AND    T.SALES_CD LIKE  '%'||#{salesCd}||'%'
+							</when>
+							<otherwise>
+							AND    T.WORK_RPT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD')
+							</otherwise>
+						</choose>
+						<choose>
+							<when test="issSts == 'STS04' or issSts.equals('STS04')">
+							AND  1 = 1
+							</when>
+							<otherwise>
+							AND  1 = 2
+							</otherwise>
+						</choose>
+							<if test="workRptId !=null and !workRptId.equals('')">
+							AND    T.WORK_RPT_ID = #{workRptId}
+							</if>
+							<if test="prjctCd != null and !prjctCd.equals('')">
+							AND    T.CLNT_PJT = #{prjctCd}
+							</if>
+							<!-- <if test="prdtCd != null and !prdtCd.equals('')">
+							AND    T.PRDT_CD = #{prdtCd}
+							</if> -->
+							<if test="itemDiv != null and !itemDiv.equals('')">
+							AND    T.ITEM_DIV = #{itemDiv}
+							</if>
+							<if test="workRptId.equals('') and workRptIdNm !=null and !workRptIdNm.equals('')">
+							AND    B.NAME LIKE  '%'||#{workRptIdNm}||'%'
+							</if>
+							<!-- <if test="prdtCd.equals('') and prdtNm !=null and !prdtNm.equals('')">
+							AND    C.PRDT_NM LIKE  '%'||#{prdtNm}||'%'
+							</if> -->
+							<if test="actId != null and !actId.equals('')">
+							AND    1 = 0
+							</if>
+							<if test="actId.equals('') and actIdNm !=null and !actIdNm.equals('')">
+							AND    1 = 0
+							</if>
+							<!-- <if test="prdtDiv !=null and !prdtDiv.equals('')">
+							AND    C.PRDT_GRP = #{prdtDiv}
+							</if> -->
+					UNION ALL
+						  SELECT '실적'  AS GUBUN
+								, ISU.FILE_TRGT_KEY                                       --이슈 FILE_TRGT_KEY
+								, ISU.CO_CD                                               --회사코드
+								 , FN_CM05M01_CD_TO_NM(ISU.CO_CD) CO_NM
+								, ISU.ISS_NO        		 AS WORK_RPT_NO               --이슈번호
+								, ISU.CREAT_ID  --생성자
+								 , B.NAME					 AS WORK_RPT_ID_NM
+								, B1.DEPT_NM				 AS WORK_RPT_DEPT_NM
+								, TO_CHAR(ISU.CREAT_DTTM,'YYYY-MM-DD') AS CREAT_DTTM   --생성일자
+								, Y.ORDRS_NO
+								, ISU.SALES_CD                                			--SALES Code
+								, CR.PRDT_CD
+								, C.PRDT_NM                        AS PRDT_CD_NM
+								, CR.ITEM_DIV
+								, FN_CM05M01_CD_TO_NM(CR.ITEM_DIV) AS ITEM_DIV_NM
+								, ISU.ISS_CNTS                                            --이슈내용
+								, ISU.ISS_SJ                                              --이슈제목
+								, TO_CHAR(Y.ORDRS_CLNT_CD)  AS  CLNT_CD
+								, A.CLNT_NM
+								, Y.CLNT_PJT
+								, FN_CM05M01_CD_TO_NM(Y.CLNT_PJT)  AS CLNT_PJT_NM
+								, CR.EQP_NM
+								, '일정관리' as JOB_DIV
+								, ISU.ISS_DIV                                             --이슈유형
+								, (SELECT FN_CM05M01_CD_TO_NM(ISU.ISS_DIV) FROM DUAL) AS ISS_DIV_NM
+								, decode(ISU.REQ_NO, '', ISU.ISS_STS, QM.REQ_ST)      AS ISS_STS	--이슈상태
+								, (SELECT FN_CM05M01_CD_TO_NM( decode(ISU.REQ_NO, '', ISU.ISS_STS, QM.REQ_ST)) FROM DUAL) AS ISS_STS_NM
+								, decode(ISU.REQ_NO, '', ISU.ACT_ID, QM.ORDRG_ID)       					AS ACT_ID    --조치담당자
+								, decode(ISU.REQ_NO, '', B2.NAME, B4.NAME) 			 						AS ACT_ID_NM
+								, decode(ISU.REQ_NO, '', B3.DEPT_NM,B5.DEPT_NM) 							AS ACT_DEPT_NM		  --조치부서
+								, SUBSTRING(decode(ISU.REQ_NO, '', B2.DEPT_ID,B4.DEPT_ID),0,5) 		 		AS ACT_DEPT_ID		  --조치부서
+								, TO_CHAR(decode(ISU.REQ_NO, '', ACT.ACTS_DT, QM.ORDRG_DT),'YYYY-MM-DD')  	AS ACTS_DT           --조치 시작일
+								, TO_CHAR(decode(ISU.REQ_NO, '', ACT.ACTE_DT, QP.RSLT_DT),'YYYY-MM-DD')  	AS ACTE_DT           --조치 종료일
+	--		                    , decode(ISU.REQ_NO, '', ACT.ACT_MH, QP.ACT_MH)          					AS ACT_MH   --조치 투입공수
+								, ACT.ACT_MH          					AS ACT_MH   --조치 투입공수
+								, ACT.ACT_AMT                                             --조치 투입비용
+								, TO_CHAR(RSL.WBS_RSLTSS_DT,'YYYY-MM-DD') 									AS WBS_RSLTSS_DT--실적시작일
+								, TO_CHAR(RSL.WBS_RSLTSE_DT,'YYYY-MM-DD') 									AS WBS_RSLTSE_DT--실적종료일
+								, ACT.ACT_AMT_STS
+								, (SELECT FN_CM05M01_CD_TO_NM(ACT.ACT_AMT_STS) FROM DUAL) AS ACT_AMT_STS_NM
+								, ACT.ACT_DNG
+								, (SELECT FN_CM05M01_CD_TO_NM(ACT.ACT_DNG) FROM DUAL) AS ACT_DNG_NM
+								, ACT.ACT_DNG_EVAL
+								, (SELECT FN_CM05M01_CD_TO_NM(ACT.ACT_DNG_EVAL) FROM DUAL) AS ACT_DNG_EVAL_NM
+								, C.PRDT_GRP 	AS PRDT_DIV_CD
+								, C7.CODE_NM    AS PRDT_DIV_NM
+								, ISU.MID_CD
+								, (SELECT FN_CM05M01_CD_TO_NM(ISU.MID_CD) FROM DUAL) AS MID_CD_NM
+								, ISU.SUB_CD
+								, (SELECT FN_CM05M01_CD_TO_NM(ISU.SUB_CD) FROM DUAL) AS SUB_CD_NM
+								, ISU.REQ_NO
+								, QM.FILE_TRGT_KEY 								 AS RES_FILE_TRGT_KEY
+								, QM.ACT_COMP_DGN_FILE_NM --도면반영파일명
+								, QM.REQ_ST
+								, NVL2(QP.RESLT_RST, QP.RESLT_RST, ACT.ACT_CNTS) 		 AS ACT_CNTS	--결과(ISU.REQ_NO가 Null이 아니면 QP.결과, null이면 ACT.결과)
+								, NVL2(QP.MEAS_RST, QP.MEAS_RST, ACT.MEAS_RST)		 AS MEAS_RST	--원인
+								, QP.RSLT_NO
+								, B2.ID 			 AS USER_ID
+								, B2.NAME			 AS USER_NAME
+								, B2.DEPT_ID		 AS DEPT_ID
+								, decode(QP.MC_PART_CD	, '', decode(QM.MC_PART_CD	, '', ISU.MC_PART_CD	, QM.MC_PART_CD)	, QP.MC_PART_CD)	 AS MC_PART_CD	--기계분류
+								, decode(QP.IMPORTANT_CD, '', decode(QM.IMPORTANT_CD, '', ISU.IMPORTANT_CD	, QM.IMPORTANT_CD)	, QP.IMPORTANT_CD)	 AS IMPORTANT_CD	--중요도
+								, decode(QP.IMPACT_CD	, '', decode(QM.IMPACT_CD	, '', ISU.IMPACT_CD		, QM.IMPACT_CD)		, QP.IMPACT_CD)		 AS IMPACT_CD	--영향도
+								, (SELECT FN_CM05M01_CD_TO_NM(decode(QP.MC_PART_CD	, '', decode(QM.MC_PART_CD	, '', ISU.MC_PART_CD	, QM.MC_PART_CD)	, QP.MC_PART_CD)	) FROM DUAL) AS MC_PART_CD_NM
+								, (SELECT FN_CM05M01_CD_TO_NM(decode(QP.IMPORTANT_CD, '', decode(QM.IMPORTANT_CD, '', ISU.IMPORTANT_CD	, QM.IMPORTANT_CD)	, QP.IMPORTANT_CD)	) FROM DUAL) AS IMPORTANT_CD_NM
+								, (SELECT FN_CM05M01_CD_TO_NM(decode(QP.IMPACT_CD	, '', decode(QM.IMPACT_CD	, '', ISU.IMPACT_CD		, QM.IMPACT_CD)		, QP.IMPACT_CD)		) FROM DUAL) AS IMPACT_CD_NM
+								, W1.SANCTN_STTUS AS LAB_STS		--연구소 결재
+								, W2.SANCTN_STTUS AS PUR_STS		--구매 결재
+								, W3.SANCTN_STTUS AS PRD_STS		--생산 결재
+								, W4.SANCTN_STTUS AS OUT_STS		--직접매출 결재
+								, to_char(W1.TODO_CF_DT,'MM/DD')  AS LAB_APPROVAL_DT		--연구소 결재
+								, to_char(W2.TODO_CF_DT,'MM/DD')  AS PUR_APPROVAL_DT		--구매 결재
+								, to_char(W3.TODO_CF_DT,'MM/DD')  AS PRD_APPROVAL_DT		--생산 결재
+								, to_char(W4.TODO_CF_DT,'MM/DD')  AS OUT_APPROVAL_DT		--직접매출 결재
+								, TO_CHAR(W9.DE_DT, 'YYYY-MM-DD') AS CUST_REQ_DT			--과제 출고일 = 고객요구일
+								, TO_CHAR(CR.DUDT_INTEND_DT,'YYYY-MM-DD') AS DUDT_INTEND_DT	--수주 납기예정일 ->고객요구일
+								, CASE WHEN QM.REQ_ST = 'REQST03' THEN 3 
+									   WHEN ISU.ISS_STS = 'ISSSTS03' THEN 3
+									   WHEN QM.REQ_ST IS NOT NULL THEN 2
+									   WHEN ISU.ISS_STS = 'ISSSTS02' THEN 2
+									   ELSE 1 END VIEW_SORT
+							FROM TB_WB24M02  AS ISU --WBS이슈 정보
+									LEFT OUTER JOIN TB_CR02D02 AS CR  ON ISU.CO_CD= CR.CO_CD
+																	AND ISU.SALES_CD = CR.SALES_CD
+									LEFT OUTER JOIN TB_CR02M01 AS Y  ON ISU.CO_CD= Y.CO_CD
+																	  AND CR.ORDRS_NO = Y.ORDRS_NO
+									LEFT OUTER JOIN TB_BM02M01 AS A  ON Y.ORDRS_CLNT_CD = A.CLNT_CD
+									   LEFT OUTER JOIN TB_CM06M01 AS B  ON ISU.CREAT_ID = B.ID
+									LEFT OUTER JOIN TB_CM04M01 AS B1 ON B1.DEPT_ID = SUBSTRING(B.DEPT_ID,0,5)
+									   LEFT OUTER JOIN TB_CM06M01 AS B2 ON ISU.ACT_ID = B2.ID
+									LEFT OUTER JOIN TB_CM04M01 AS B3 ON B3.DEPT_ID = SUBSTRING(B2.DEPT_ID,0,5)
+									  LEFT OUTER JOIN TB_BM01M01 AS C  ON CR.PRDT_CD = C.PRDT_CD
+									LEFT OUTER JOIN TB_CM05M01 AS C7 ON C7.CODE_ID = C.PRDT_GRP
+									LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --실적이슈 조치내용
+									  LEFT OUTER JOIN TB_WB23M01 AS RSL ON ISU.CO_CD = RSL.CO_CD AND ISU.SALES_CD = RSL.SALES_CD AND ISU.WBS_PLAN_CODE_KIND = RSL.WBS_PLAN_CODE_KIND AND ISU.WBS_PLAN_CODE_ID = RSL.WBS_PLAN_CODE_ID AND ISU.WBS_RSLTS_NO = RSL.WBS_RSLTS_NO
+									  LEFT OUTER JOIN TB_QM01M01 AS QM ON QM.REQ_NO = ISU.REQ_NO
+									LEFT OUTER JOIN TB_QM01P01 AS QP ON QP.REQ_NO = ISU.REQ_NO
+									   LEFT OUTER JOIN TB_CM06M01 AS B4 ON QM.ORDRG_ID = B4.ID
+									LEFT OUTER JOIN TB_CM04M01 AS B5 ON B5.DEPT_ID = SUBSTRING(B4.DEPT_ID,0,5)
+									LEFT OUTER JOIN TB_WB20M03 AS W1 ON W1.TODO_NO = ISU.REQ_NO AND W1.TODO_DIV2_CODE_ID='TODODIV2020' AND W1.TODO_ID='kimjhv' 		--김재현상무
+									LEFT OUTER JOIN TB_WB20M03 AS W2 ON W2.TODO_NO = ISU.REQ_NO AND W2.TODO_DIV2_CODE_ID='TODODIV2020' AND W2.TODO_ID='h4ng10'		--허상렬팀장
+									LEFT OUTER JOIN TB_WB20M03 AS W3 ON W3.TODO_NO = ISU.REQ_NO AND W3.TODO_DIV2_CODE_ID='TODODIV2020' AND W3.TODO_ID='K98452000'	--김동현이사
+									LEFT OUTER JOIN TB_WB20M03 AS W4 ON W4.TODO_NO = ISU.REQ_NO AND W4.TODO_DIV2_CODE_ID='TODODIV2020' AND W4.TODO_ID='choigss'		--최경식이사
+									LEFT OUTER JOIN (
+													SELECT W9.*, ROW_NUMBER() OVER (PARTITION BY SALES_CD ORDER BY VER_NO DESC) AS rn
+													FROM TB_WB21M01 W9
+												) W9 ON W9.CO_CD = CR.CO_CD AND W9.SALES_CD = CR.SALES_CD AND W9.rn = 1  --마지막 버전의 과제정보 가져오기
+						   WHERE 1=1
+							<if test="coCd !=null and !coCd.equals('')">
+							AND    ISU.CO_CD = #{coCd}
+							</if>
+						<choose>
+							<when test="salesCd != null and !salesCd.equals('')">
+							AND    (ISU.SALES_CD LIKE  '%'||#{salesCd}||'%'		-- SALES CODE
+							OR    ISU.ISS_NO LIKE  '%'||#{salesCd}||'%'			-- 문제
+							OR    ISU.REQ_NO LIKE  '%'||#{salesCd}||'%'			-- 발주
+							OR    A.CLNT_NM LIKE  '%'||#{salesCd}||'%'			-- 고객사
+							OR    Y.ORDRS_NO LIKE  '%'||#{salesCd}||'%'			-- 수주번호
+							)
+							</when>
+							<otherwise>
+							AND (
+									((QM.REQ_ST = 'REQST03' OR  ISU.ISS_STS = 'ISSSTS03') AND  ISU.CREAT_DTTM BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD'))
+									 OR (NVL(QM.REQ_ST,'REQST01') != 'REQST03' AND ISU.ISS_STS != 'ISSSTS03')
+									 OR (NVL(ISU.ISS_STS,'ISSSTS01') != 'ISSSTS03' AND ISU.REQ_NO IS NULL)  
+								)
+							</otherwise>
+						</choose>
+						<choose>
+							<when test="issSts == 'STS01' or issSts.equals('STS01')">
+							AND  ((ISU.REQ_NO IS NOT NULL AND QM.REQ_ST = 'REQST01')
+							OR  (ISU.REQ_NO IS NULL AND ISU.ISS_STS = 'ISSSTS01'))
+							--decode(ISU.REQ_NO, '', ISU.ISS_STS, QM.REQ_ST)      AS ISS_STS	--이슈상태
+							</when>
+							<when test="issSts == 'STS04' or issSts.equals('STS04')">
+							AND  ((ISU.REQ_NO IS NOT NULL AND QM.REQ_ST = 'REQST03')
+							OR  (ISU.REQ_NO IS NULL AND ISU.ISS_STS = 'ISSSTS03'))
+							</when>
+							<when test="issSts == 'STS02' or issSts.equals('STS02')">
+							AND  (ISU.REQ_NO IS NULL AND ISU.ISS_STS = 'ISSSTS02')
+							</when>
+							<when test="issSts == 'STS03' or issSts.equals('STS03')">
+							AND  (ISU.REQ_NO IS NOT NULL AND QM.REQ_ST = 'REQST02')
+							</when>
+						</choose>
+							<if test="workRptId !=null and !workRptId.equals('')">
+							AND    ISU.CREAT_ID = #{workRptId}
+							</if>
+							<if test="prjctCd != null and !prjctCd.equals('')">
+							AND    Y.CLNT_PJT = #{prjctCd}
+							</if>
+							<!-- <if test="prdtCd != null and !prdtCd.equals('')">
+							AND    CR.PRDT_CD = #{prdtCd}
+							</if> -->
+							<if test="itemDiv != null and !itemDiv.equals('')">
+							AND    CR.ITEM_DIV = #{itemDiv}
+							</if>
+							<if test="workRptId.equals('') and workRptIdNm !=null and !workRptIdNm.equals('')">
+							AND    B.NAME LIKE  '%'||#{workRptIdNm}||'%'
+							</if>
+							<!-- <if test="prdtCd.equals('') and prdtNm !=null and !prdtNm.equals('')">
+							AND    C.PRDT_NM LIKE  '%'||#{prdtNm}||'%'
+							</if> -->
+							<if test="actId != null and !actId.equals('')">
+							AND    ISU.ACT_ID = #{actId}
+							</if>
+							<if test="actId.equals('') and actIdNm !=null and !actIdNm.equals('')">
+							AND    B2.NAME LIKE  '%'||#{actIdNm}||'%'
+							</if>
+							<!-- <if test="prdtDiv !=null and !prdtDiv.equals('')">
+							AND    C.PRDT_GRP = #{prdtDiv}
+							</if> -->
+						   ) AS A
+								   LEFT OUTER JOIN ( SELECT ME.REQ_NO, sum(ME.PCHS_AMT) AS REQ_AMT
+													FROM TB_SM12D01 ME
+													GROUP BY ME.REQ_NO
+													) AS REQ ON REQ.REQ_NO = A.REQ_NO
+					WHERE  1 = 1
+					ORDER BY CLNT_NM, ORDRS_NO DESC, VIEW_SORT, SALES_CD DESC, WORK_RPT_DT DESC
+					) AS A
+				WHERE  1 = 1
+			   ) AS A
+			WHERE  A.RNUM BETWEEN #{firstIndex} AND #{lastIndex}
+		</select>
+
 </mapper>

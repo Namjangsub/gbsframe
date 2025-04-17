@@ -308,11 +308,22 @@ public class PM01Ctr {
     return "jsonView";
   }
 
-   	// 작업일보 이슈 리스트 (고객사)조회
+   	// 작업일보 출장일때 문제현황 조회
 	@PostMapping(value = "/selectNewAllIssueWorkList")
 	public String selectNewAllIssueWorkList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> result = pm01Svc.selectNewAllIssueWorkList(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
+	}
+
+	// 작업일보 이슈 리스트 (고객사)조회
+	@PostMapping(value = "/selectCustomAllIssueWorkList")
+	public String selectCustomAllIssueWorkList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	  int totalCnt = pm01Svc.selectCustomAllIssueWorkListCount(paramMap);
+	  PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+	  model.addAttribute("paginationInfo", paginationInfo);
+	  List<Map<String, String>> result = pm01Svc.selectCustomAllIssueWorkList(paramMap);
+	  model.addAttribute("result", result);
+	  return "jsonView";
 	}
 }

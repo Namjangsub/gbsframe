@@ -373,4 +373,14 @@ public class PM01SvcImpl implements PM01Svc {
 		return pm01Mapper.selectNewAllIssueWorkList(paramMap);
 	}
 
+	@Override
+	public int selectCustomAllIssueWorkListCount(Map<String, String> paramMap) {
+		return pm01Mapper.selectCustomAllIssueWorkListCount(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectCustomAllIssueWorkList(Map<String, String> paramMap) {
+		return pm01Mapper.selectCustomAllIssueWorkList(paramMap);
+	}
+
 }
