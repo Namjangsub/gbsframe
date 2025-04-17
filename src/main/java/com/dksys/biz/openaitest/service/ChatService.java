@@ -29,7 +29,8 @@ public class ChatService {
 
 	public String queryOpenApi(Map<String, String> param) {
 
-		ChatGPTRequest request = new ChatGPTRequest(apimodel, param.get("prompt"));
+		String queryMessage = param.get("originMsg") + param.get("prompt");
+		ChatGPTRequest request = new ChatGPTRequest(apimodel, queryMessage);
 		ChatGPTResponse chatGPTResponse = template.postForObject(apiURL, request, ChatGPTResponse.class);
 		return chatGPTResponse.getChoices().get(0).getMessage().getContent();
 	}

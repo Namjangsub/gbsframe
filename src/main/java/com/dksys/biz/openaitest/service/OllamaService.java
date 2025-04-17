@@ -44,8 +44,9 @@ public class OllamaService {
 
 		// 요청 본문 구성
 		Map<String, Object> requestBody = new HashMap<>();
+		String queryMessage = param.get("originMsg") + param.get("prompt");
 		requestBody.put("model", ollamaModel);
-		requestBody.put("prompt", param.get("prompt"));
+		requestBody.put("prompt", queryMessage);
 		requestBody.put("stream", false);
 
 		HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);

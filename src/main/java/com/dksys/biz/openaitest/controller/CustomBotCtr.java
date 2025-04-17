@@ -30,6 +30,14 @@ public class CustomBotCtr {
 	@Value("${ollama.model:phi4:latest}")
 	private String ollamaModel;
 
+	// OpenApi사용 유무 application.properties 에서 주입
+	@Value("${openai.enabled}")
+	private Boolean openaiExec;
+
+	// ollama사용 유무 application.properties 에서 주입
+	@Value("${ollama.enabled}")
+	private Boolean ollamaExec;
+	
 	@Autowired
 	private RestTemplate template;
 
@@ -51,9 +59,17 @@ public class CustomBotCtr {
 		String aiType = param.get("aiType");
 		String chatTempString = "";
 		if ("GPT".equals(aiType)) {
-			chatTempString = chatService.queryOpenApi(param);
+			if (openaiExec) {
+				chatTempString = chatService.queryOpenApi(param);
+			} else {
+				chatTempString = param.get("originMsg");
+			}
 		} else {
-			chatTempString = ollamaService.queryOllama(param);
+			if (ollamaExec) {
+				chatTempString = ollamaService.queryOllama(param);
+			} else {
+				chatTempString = param.get("originMsg");
+			}
 		}
 		model.addAttribute("chatgpt", chatTempString);
 		return "jsonView";
