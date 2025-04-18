@@ -2713,4 +2713,76 @@ function openapi(prompt) {
 		}
 	});
 	
-}	
+}
+
+function disableFormAll(formId) {
+	const $form = $('#' + formId);
+
+	$form.find('input, select, textarea, button, a').each(function () {
+		const $el = $(this);
+		const tag = $el.prop('tagName');
+		const type = $el.prop('type');
+
+		if ($el.hasClass('close_btn') || $el.hasClass('report_btn')) {
+			//닫기버튼은 무조건 활성화
+			return false;
+		} else {
+			// 공통 스타일: 회색 배경
+			$el.css({ 'background-color': '#e6e6e6'});
+		}
+
+		// input, textarea
+		if (tag === 'INPUT' || tag === 'TEXTAREA') {
+			$el.attr('readonly', true).removeAttr('onclick').off('click');
+			// ax5picker 제거 (input_calendar)
+			if ($el.hasClass('input_calendar')) {
+				const ax5picker = $el.data('ax5picker');
+				if (ax5picker) ax5picker.remove();
+				$el.removeClass('input_calendar').datepicker('destroy');
+			}
+		}
+
+		// select (기본)
+		if (tag === 'SELECT') {
+			$el.prop('disabled', true);
+		}
+
+		// checkbox, radio
+		if (type === 'checkbox' || type === 'radio') {
+			$el.on('click', function (e) { e.preventDefault(); });
+		}
+
+		// button
+		if (tag === 'BUTTON') {
+			$el.prop('disabled', true);
+		}
+
+		// ax5select (ax5select 대상은 별도 처리 필요)
+		if ($el.hasClass('ax5select')) {
+			const instance = $el.data('ax5select');
+			if (instance) {
+				instance.disable();
+			}
+		}
+
+		// ax5picker / datepicker
+		if ($el.hasClass('input-calendar') || $el.hasClass('datepicker')) {
+			$el.attr('readonly', true).removeAttr('onclick').off('click');
+		}
+
+		// autocomplete (jQuery UI 등 커스텀일 경우 readonly 처리)
+		if ($el.hasClass('ui-autocomplete-input')) {
+			$el.attr('readonly', true);
+		}
+
+		// a 태그: 클릭 차단
+		if (tag === 'A') {
+			$el.removeAttr('onclick')
+			.removeAttr('href')
+			.off('click')
+			.on('click', function (e) { e.preventDefault(); })  // 안전망
+			.css({ 'pointer-events': 'none', 'opacity': 0.5 });
+			
+			}
+	});
+}

@@ -509,8 +509,17 @@
 							   '" data-label="' + item.codeNm +
 				     '" onchange="fnc(this)" style="margin-left:20px"> ' + item.codeNm + '\n';
 
+			     let etcInput = '';
+	             if (item.codeId.length > 2) {
+		             if (item.codeId.slice(-2) =='99'){
+		            	 etcInput =
+		            		 '<span id="etcInputWrapper" style="display:none; margin-left:5px;">' +
+		            	     '<input type="text" id="etcInput" name="etcInput" msg="기타사유" placeholder="기타사유" style="width:150px;">' +
+		            	     '</span>\n';
+		             }
+	             }
 				const tdElement  = $('<td>').attr('style', 'text-align:left;height:20px;').text('').appendTo(tableRow);
-				tdElement.append(iHtml);
+				tdElement.append(iHtml + etcInput);
 
 			});
 		})
@@ -519,15 +528,29 @@
 
 
 	function fnc(thisButton) {
-		const inputType = $(thisButton).attr('type');
-
-		if (inputType === 'radio') {
+       const inputType = thisButton.type;
+       const inputName = thisButton.name;
+       const inputvalue = thisButton.value;
+       
+// 		if (inputType === 'radio') {
 // 			console.log(thisButton.dataset.label + ' radio button. = ' + $("input[name='COBTP']:checked").val() + ' 선택');
-		} else if (inputType === 'checkbox') {
+// 		} else if (inputType === 'checkbox') {
 // 			console.log(thisButton.dataset.label + ' checkbox. = ' + thisButton.value + '의 상태는 ' + thisButton.checked);
-		}
+// 		}
 		if (thisButton.id == 'COBTP99') {
 			$("#popForm2 #COBGB9999").prop("checked", $("#popForm2 #COBTP99")[0].checked);
+		}
+
+		if (inputName === 'CODECOBGB' && inputvalue.length > 2) {
+			const etcField = inputvalue.slice(-2); 
+	      
+			if (etcField == '99') {
+				$('#popForm2 #etcInputWrapper').show();
+				$('#popForm2 #etcInput').focus().attr('required', true);
+			} else {
+				$('#popForm2 #etcInputWrapper').hide();
+				$('#popForm2 #etcInput').val('').removeAttr('required', 'true');
+			}
 		}
 	}
 /*************************************************************************************
@@ -590,6 +613,7 @@
 			$('#qmPopFormRslt #actionBtn').on("click", function() {
 				updateQualityResp();
 			});
+			
 		}
 
 		selectQtyReqInfo();
@@ -804,27 +828,25 @@
 				if (data.result.subCd == 'COBGB1204' || data.result.subCd == 'COBGB1205' || data.result.subCd == 'COBGB1206' || data.result.subCd == 'COBGB1301' || data.result.subCd == 'COBGB1301' || data.result.subCd == 'COBGB1303' ||
 					data.result.subCd == 'COBGB2101'|| data.result.subCd == 'COBGB2102' || data.result.subCd == 'COBGB3001' || data.result.subCd == 'COBGB4501'					
 				) {	
-					$("#mcPartCd").closest('td').prev('th').removeClass('hit');
-					$("#mcPartCd").removeAttr('required', 'true');
-					$("#mcPartCd").css({'background-color':'#e6e6e6', 'pointer-events':'none'})
-					$("#impactCd").closest('td').prev('th').removeClass('hit');
-					$("#impactCd").removeAttr('required', 'true');
-					$("#impactCd").css({'background-color':'#e6e6e6', 'pointer-events':'none'})
-					$("#importantCd").closest('td').prev('th').removeClass('hit');
-					$("#importantCd").removeAttr('required', 'true');
-					$("#importantCd").css({'background-color':'#e6e6e6', 'pointer-events':'none'})
+					$("#popForm2 #mcPartCd").removeAttr('required').closest('td').prev('th').removeClass('hit')
+					  						.css({ 'background-color': '#e6e6e6', 'pointer-events': 'none' })
+					$("#popForm2 #impactCd").removeAttr('required').closest('td').prev('th').removeClass('hit')
+					  						.css({ 'background-color': '#e6e6e6', 'pointer-events': 'none' })
+					$("#popForm2 #importantCd").removeAttr('required').closest('td').prev('th').removeClass('hit')
+					  						.css({ 'background-color': '#e6e6e6', 'pointer-events': 'none' })
 				}
 			}
 
 			if ($("#popForm2 #ordrgId").val() != jwt.userId && $("#popForm2 #regId").val() != jwt.userId){
 				$("#qmPopFormRslt #actionBtn").hide();
+				
 			}
 
 			// 발행자의 Id가 gyrsult로 시작할 경우 작성자는 로그인한 유저
 			if (actionType == 'C' || actionType == 'U') {
-				if ($("#ordrgId").val().slice(0, 7) == 'gyrsult') {
-					$("#regId").val(jwt.userId);
-					$("#regNm").val(jwt.userNm);
+				if ($("#popForm2 #ordrgId").val().slice(0, 7) == 'gyrsult') {
+					$("#popForm2 #regId").val(jwt.userId);
+					$("#popForm2 #regNm").val(jwt.userNm);
 					$("#qmPopFormRslt #actionBtn").show();
 				}
 			}
@@ -834,6 +856,14 @@
 
 			selectQtyReqRespInfo();
 
+			//문제등록사유 코드의 끝 2자리가 99이면 기타 이며, 기타인경우 사유가 있음
+			if (data.result.subCd.slice(-2) === '99') {
+				$('#popForm2 #etcInputWrapper').show();
+				$('#popForm2 #etcInput').val(data.result.etcInput).attr('required', true);
+			} else {
+				$('#popForm2 #etcInputWrapper').hide();
+				$('#popForm2 #etcInput').val('').removeAttr('required');
+			}
 		});
 	}
 
@@ -1098,11 +1128,25 @@
 					$('#qmPopFormRslt #actionBtn').remove();
 					$('#qmPopFormRslt #plus-minus').remove();
 					$('#qmPopFormRslt .tit').text('요인별 발주 및 출장요청 조회');
+
+					//모든 입력 기능 통제하기
+					disableFormAll('popForm2');
 				}
-							
+
+				//문제등록사유 코드의 끝 2자리가 99이면 기타 이며, 기타인경우 사유가 있음
+				if (data.result.subCd.slice(-2) === '99') {
+					$('#popForm2 #etcInputWrapper').show();
+					$('#popForm2 #etcInput').val(data.result.etcInput).attr('required', true);
+				} else {
+					$('#popForm2 #etcInputWrapper').hide();
+					$('#popForm2 #etcInput').val('').removeAttr('required');
+				}
+				
 				//발주요청서와 결과를 동시에 입력한자료인 경우 수정기능 없음(발주요청서에서 처리함)
 				if (data.result.sameTimeResult == 'Y') {
 					$("#qmPopFormRslt #actionBtn").hide();
+					//모든 입력 기능 통제하기
+					disableFormAll('popForm2');
 				}
 				// 각 텍스트 에어리어 크기 조절
 				txtareaHeightResize($('#popForm2 #actCompDgnFileNm'));
@@ -1479,8 +1523,8 @@
 		}
 		openSecondModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "거래처 검색", paramObj, function (grid) {
 			var row = grid.target.getList("selected")[0];
-			$('#vendCd').val(row.clntCd);
-			$('#vendCdNm').val(row.clntNm);
+			$('#popForm2 #vendCd').val(row.clntCd);
+			$('#popForm2 #vendCdNm').val(row.clntNm);
 		});
 	}
 </script>
