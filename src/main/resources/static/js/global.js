@@ -150,6 +150,9 @@ var openModal = function(url, width, height, title, paramObj, callback) {
 //	                label: '<i class="fa fa-times-circle" aria-hidden="true"></i>',
 	                label: '<img src="/static/img/close.ico" style="width: 20px; height: 20px;" alt="Close Icon">',
 	                onClick: function () {
+	                	if (typeof setMouseTrackerVisible === 'function') {
+	                		setMouseTrackerVisible(false);
+	                	}
 	                	modalStack.close();
 	                }
 	            }
@@ -189,6 +192,9 @@ var openSecondModal = function(url, width, height, title, paramObj, callback) {
 //	                label: '<i class="fa fa-times-circle" aria-hidden="true"></i>',
 	                label: '<img src="/static/img/close.ico" style="width: 20px; height: 20px;" alt="Close Icon">',
 	                onClick: function () {
+	                	if (typeof setMouseTrackerVisible === 'function') {
+	                		setMouseTrackerVisible(false);
+	                	}
 	                	modalStack.close();
 	                }
 	            }
@@ -227,6 +233,9 @@ var openThirdModal = function(url, width, height, title, paramObj, callback) {
 //	                label: '<i class="fa fa-times-circle" aria-hidden="true"></i>',
 	                label: '<img src="/static/img/close.ico" style="width: 20px; height: 20px;" alt="Close Icon">',
 	                onClick: function () {
+	                	if (typeof setMouseTrackerVisible === 'function') {
+	                		setMouseTrackerVisible(false);
+	                	}
 	                	modalStack.close();
 	                }
 	            }
@@ -265,6 +274,9 @@ var openFourthModal = function(url, width, height, title, paramObj, callback) {
 //	                label: '<i class="fa fa-times-circle" aria-hidden="true"></i>',
 	                label: '<img src="/static/img/close.ico" style="width: 20px; height: 20px;" alt="Close Icon">',
 	                onClick: function () {
+	                	if (typeof setMouseTrackerVisible === 'function') {
+	                		setMouseTrackerVisible(false);
+	                	}
 	                	modalStack.close();
 	                }
 	            }
