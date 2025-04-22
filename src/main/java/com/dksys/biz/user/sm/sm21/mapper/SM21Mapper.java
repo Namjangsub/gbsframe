@@ -1,13 +1,9 @@
 package com.dksys.biz.user.sm.sm21.mapper;
 
-import org.apache.ibatis.annotations.Mapper;
-
-import com.google.gson.reflect.TypeToken;
-
-import java.lang.reflect.Type;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface SM21Mapper {
@@ -28,6 +24,14 @@ public interface SM21Mapper {
 	int update_sm21(Map<String, String> paramMap);
 	
 	int update_sm21_Del(Map<String, String> paramMap);
+
+	String select_sm21_SeqNext(Map<String, String> paramMap);
+
+	int insert_sm21_payChk(Map<String, String> paramMap);
+
+	int update_sm21_payChk(Map<String, String> paramMap);
+
+	int delete_sm21_payChk(Map<String, String> paramMap);
 }
 
 
