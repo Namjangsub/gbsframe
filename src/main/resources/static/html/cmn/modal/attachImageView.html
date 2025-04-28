@@ -1,281 +1,281 @@
-<style>
-    .resized-image {
-        width: 1300px;
-        height: 860px;
-        object-fit: contain; /* Maintain aspect ratio */
-    }
-    #viewImgData {
-        transition: transform 0s ease-in-out;
-    }
+<script src="/static/js/pdf.min.js"></script>
+    <style>
+        .image-container {
+            position: relative;
+            width: 100%;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 180px;
+        }
+        .resized-image {
+            width: 1300px;
+            height: 860px;
+            object-fit: contain;
+        }
+        #viewArea {
+            width: 1300px;
+            height: 860px;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #pdfControls {
+            display: none;
+            text-align: center;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
 
-	.image-container {
-		position: relative;
-		width: 100%;
-		bottom: 0px;
-		padding: 0px;
-		font-size: 14px;
-		text-align: center;
-		display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 180px;
-	
-	}
-</style>
-<div id="commonViewPopup">
-		<div class="popup_table">
-			<div class="image-container">
-				<button id="prevButton">이전</button>
-				<img id="viewImgData" name="viewImgData" class="resized-image" src="data:image/png;base64," onclick="modalStack.close();">
-				<button id="nextButton">다음</button>
-			</div>
-		</div>
-	<div class="popup_bottom_btn">
-    	<button id="rotateButton">그림회전</button>
-        <button id="zoomInButton">Zoom In</button>
-        <button id="zoomOutButton">Zoom Out</button>
-        <button id="resetButton">Reset</button>
-		<button class="close_btn" onclick="modalStack.close();">닫기</button>
-	</div>
+<div class="image-container">
+    <button id="prevButton">이전</button>
+
+    <div id="viewArea">
+        </div>
+
+    <button id="nextButton">다음</button>
+</div>
+
+<div id="pdfControls" class="popup_bottom_btn"  style="text-align: center; margin: 10px 0;">
+    <button id="pdfPrevButton">◀ 이전 페이지</button>
+    <input type="number" id="currentPageInput" min="1" style="width: 50px; text-align: center;" value="1">
+    <span id="pageInfo">/ 1</span>
+    <button id="pdfNextButton">다음 페이지 ▶</button>
+    <button class="close_btn" onclick="modalStack.close();">닫기</button>
+</div>
+
+<div id="imageControls" class="popup_bottom_btn" style="text-align: center; margin-top: 10px;">
+    <button id="rotateButton">그림회전</button>
+    <button id="zoomInButton">Zoom In</button>
+    <button id="zoomOutButton">Zoom Out</button>
+    <button id="resetButton">Reset</button>
+    <button class="close_btn" onclick="modalStack.close();">닫기</button>
 </div>
 <script type="text/javascript">
-	$(document).ready(function() {
+let rotationAngle = 0;
+let scaleFactor = 1;
+let originalWidth = 1300;
+let originalHeight = 860;
+let currentPage = 1;
+let totalPages = 1;
+let pdfDoc = null;
+let currentFile = null;
+let currentIsImage = true;
+let imageList = [];
+let currentIndex = 0;
 
-		// =========================================================================
-		// 이미지 이전, 다음 기능 구현
-		const paramObj = modalStack.last().paramObj; // 팝업 호출 시 전달된 데이터
-		if (Array.isArray(paramObj.fileList) && paramObj.fileList.length > 0) {
-			imageList = paramObj.fileList;              // 전체 이미지 리스트
-			currentIndex = imageList.findIndex(file => file.fileKey === paramObj.fileKey);
+// pdf.js 설정
+let pdfjsLib;
 
-			if (currentIndex !== -1) {
-			loadImage(imageList[currentIndex]); // 첫 번째 이미지 표시
-			} else {
-				alert("이미지를 찾을 수 없습니다.");
-			}
+$(document).ready(function () {
+    pdfjsLib = window['pdfjs-dist/build/pdf'];
+    if (pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/js/pdf.worker.min.js'; // 올바른 워커 파일 경로 설정
+        initializeViewer();
+    } else {
+        console.error("PDF.js 초기화 실패");
+        alert("PDF를 표시할 수 없습니다.");
+    }
+});
 
-			// 버튼 상태 설정
-			if (currentIndex === 0) {
-				$('#prevButton').css('visibility', 'hidden');
-			} else {
-				$('#prevButton').css('visibility', 'visible');
-			}
+function initializeViewer() {
+    const paramObj = modalStack.last().paramObj;
+    if (Array.isArray(paramObj.fileList) && paramObj.fileList.length > 0) {
+        imageList = paramObj.fileList;
+        currentIndex = imageList.findIndex(file => file.fileKey === paramObj.fileKey);
 
-			if (currentIndex === imageList.length - 1) {
-				$('#nextButton').css('visibility', 'hidden');
-			} else {
-				$('#nextButton').css('visibility', 'visible');
-			}
-		} else {
-			loadImage(paramObj);
-			$('#prevButton, #nextButton').css('visibility', 'hidden');
-		}	
+        if (currentIndex !== -1) {
+            loadFile(imageList[currentIndex]);
+        } else {
+            alert("파일을 찾을 수 없습니다.");
+        }
+        updateButtonState();
+    } else {
+        loadFile(paramObj);
+        $('#prevButton, #nextButton').css('visibility', 'hidden');
+    }
 
-		
-		// =========================================================================
+    $('#prevButton').on('click', function () {
+        if (currentIndex > 0) {
+            currentIndex--;
+            loadFile(imageList[currentIndex]);
+            updateButtonState();
+        }
+    });
 
-	    // '이미지 다운로드' 버튼 클릭 시 이미지 다운로드
-// 	    var fileKey = modalStack.last().paramObj.fileKey;
-// 	    var fileName = modalStack.last().paramObj.fileName;
-// 		var xhr = new XMLHttpRequest();
-// 		xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId, true);
-// 		xhr.responseType = 'blob';
-// 		xhr.onload = function() {
-// 			if (xhr.status === 200) {
-// 				var blob = xhr.response;
+    $('#nextButton').on('click', function () {
+        if (currentIndex < imageList.length - 1) {
+            currentIndex++;
+            loadFile(imageList[currentIndex]);
+            updateButtonState();
+        }
+    });
 
-// 				// Blob을 base64 데이터 URL로 변환
-// 				var reader = new FileReader();
-// 		        if (fileName && fileName.split('.').pop().toLowerCase() === 'heic') {
-//             		file = new File([blob], fileName.split('.')[0] + ".jpg", {type: "image/jpeg", lastModified: new Date().getTime()});
-// // 	 	            console.log(file);
-// 		            // Convert HEIC to JPG
-// 		            heic2any({blob: file, toType: "image/jpeg"})
-// 		                .then(function(resultBlob) {
-// 		                	file = new File([resultBlob], file.name.split('.')[0] + ".jpg", {type: "image/jpeg", lastModified: new Date().getTime()});
-// // 	 	                    console.log(file);
+    $('#rotateButton').on('click', function () {
+        rotationAngle = (rotationAngle + 90) % 360;
+        applyTransform();
+    });
 
-// 	 	    		        var reader = new FileReader();
-// 	 	                    reader.readAsDataURL(file);
-// 	 	                    reader.onloadend = function() {
-// 	 	                        var imageDataUrl = reader.result;
-// // 	 	                        console.log(imageDataUrl);
-// 								$('#viewImgData').attr('src', imageDataUrl);
-// // 	 	    					var imgElement = document.getElementById('viewImgData');
-// // 	 	    					imgElement.src = imageDataUrl;
-// 	 	                    };
-// 		                })
-// 		                .catch(function(error) {
-// 		                    console.error("Conversion error:", error);
-// 		                });
-// 		        } else {
-// 	 				reader.readAsDataURL(blob);
-// 	 				reader.onloadend = function() {
-// 	 					var base64data = reader.result;
-// 	 					// base64 데이터를 이미지로 표시하는 img 요소에 설정
-// 	 					$('#viewImgData').attr('src', base64data);
-// // 	 					var imgElement = document.getElementById('viewImgData');
-// // 	 					imgElement.src = base64data;
-// 	 				};
-// 		        }
-// 			}
-// 		};
-	
-// 		xhr.send();
-		
-		//마우스 오른쪽 클릭 파일저장함
-//         document.getElementById('viewImgData').addEventListener('contextmenu', function(event) {
-//             // Prevent the default context menu from showing
-//             event.preventDefault();
-            
-//             // Create a temporary link element for downloading
-//             const link = document.createElement('a');
-//             link.href = event.target.src;
-//             link.download = fileName;
-//             document.body.appendChild(link);
-//             link.click();
-//             document.body.removeChild(link);
-//         });
-		
-		
+    $('#zoomInButton').on('click', function () {
+        scaleFactor += 0.1;
+        applyTransform();
+    });
 
-         let rotationAngle = 0;
-         let scaleFactor = 1;
-         const originalWidth = $('#viewImgData').width();
-         const originalHeight = $('#viewImgData').height();
+    $('#zoomOutButton').on('click', function () {
+        scaleFactor = Math.max(0.1, scaleFactor - 0.1);
+        applyTransform();
+    });
 
-         
-        $('#rotateButton').on('click', function() {
-            rotationAngle = (rotationAngle + 90) % 360;
-            $('#viewImgData').css('transform', `rotate(${rotationAngle}deg)`);
-        });
-        $('#zoomInButton').on('click', function() {
-            scaleFactor += 0.1;
-            $('#viewImgData').css('transform', `rotate(${rotationAngle}deg) scale(${scaleFactor})`);
-        });
+    $('#resetButton').on('click', function () {
+        rotationAngle = 0;
+        scaleFactor = 1;
+        applyTransform();
+    });
 
-        $('#zoomOutButton').on('click', function() {
-            scaleFactor = Math.max(0.1, scaleFactor - 0.1);
-            $('#viewImgData').css('transform', `rotate(${rotationAngle}deg) scale(${scaleFactor})`);
-        });
+    $('#pdfPrevButton').on('click', function () {
+        if (currentPage > 1) {
+            currentPage--;
+            renderPage();
+            updatePageInfo();
+        }
+    });
 
-        $('#resetButton').on('click', function() {
-            rotationAngle = 0;
-            scaleFactor = 1;
-            $('#viewImgData').css({
-                'transform': `rotate(0deg) scale(1)`,
-                'width': originalWidth,
-                'height': originalHeight
-            });
-        });
+    $('#pdfNextButton').on('click', function () {
+        if (currentPage < totalPages) {
+            currentPage++;
+            renderPage();
+            updatePageInfo();
+        }
+    });
+    
+    $('#currentPageInput').on('change', function () {
+        let inputPage = parseInt($(this).val(), 10);
+        if (!isNaN(inputPage) && inputPage >= 1 && inputPage <= totalPages) {
+            currentPage = inputPage;
+            renderPage();
+            updatePageInfo();
+        } else {
+            alert(`1부터 ${totalPages} 사이의 숫자를 입력해주세요.`);
+            $(this).val(currentPage); // 잘못 입력시 복구
+        }
+    });
+    
+    $('#viewArea').on('wheel', function (event) {
+        if (!currentIsImage && !pdfDoc) return;
+        event.preventDefault();
+        if (event.originalEvent.deltaY < 0) {
+            scaleFactor += 0.2;
+        } else {
+            scaleFactor = Math.max(0.2, scaleFactor - 0.2);
+        }
+        applyTransform();
+    });
+}
 
-		// 이전 영역 클릭 이벤트
-		$('#prevButton').on('click', function () {
-			if (currentIndex > 0) {
-				currentIndex -= 1;
-				loadImage(imageList[currentIndex]);
-				if (currentIndex === 0) {
-					$('#prevButton').css('visibility', 'hidden');
-				} else {
-					$('#prevButton').css('visibility', 'visible');
-				}
+function updateButtonState() {
+    $('#prevButton').css('visibility', currentIndex === 0 ? 'hidden' : 'visible');
+    $('#nextButton').css('visibility', currentIndex === imageList.length - 1 ? 'hidden' : 'visible');
+}
 
-				$('#nextButton').css('visibility', 'visible');
-			}
-		});
+function loadFile(file) {
+    currentFile = file;
+    rotationAngle = 0;
+    scaleFactor = 1;
+    $('#viewArea').empty();
 
-		// 다음 영역 클릭 이벤트
-		$('#nextButton').on('click', function () {
-			if (currentIndex < imageList.length - 1) {
-				currentIndex += 1;
-				loadImage(imageList[currentIndex]);
-				if (currentIndex === 0) {
-					$('#prevButton').css('visibility', 'hidden');
-				} else {
-					$('#prevButton').css('visibility', 'visible');
-				}
+    const fileName = file.fileName || '';
+    const extension = fileName.split('.').pop().toLowerCase();
+    $(".ax-modal-header").last().contents().first().replaceWith(fileName);
 
-				$('#nextButton').css('visibility', 'visible');
-			}
-			if (currentIndex === imageList.length - 1) {
-				$('#nextButton').css('visibility', 'hidden');
-			} else {
-				$('#nextButton').css('visibility', 'visible');
-			}
-		});
-        
+    if (extension === 'pdf') {
+        currentIsImage = false;
+        loadPdf(file);
+        $('#imageControls').hide();
+        $('#pdfControls').show(); // PDF 컨트롤러는 항상 보이도록 수
+    } else {
+        currentIsImage = true;
+        loadImage(file);
+        $('#pdfControls').hide(); // 이미지일 경우 PDF 컨트롤러 숨김정
+        $('#imageControls').show();
+    }
+}
 
-        $('#viewImgData').on('wheel', function(event) {
-            event.preventDefault();
-            if (event.originalEvent.deltaY < 0) {
-                // Scroll up
-                scaleFactor += 0.2;
-            } else {
-                // Scroll down
-                scaleFactor = Math.max(0.2, scaleFactor - 0.2);
-            }
-            $('#viewImgData').css('transform', `rotate(${rotationAngle}deg) scale(${scaleFactor})`);
-        });
-	});
+function loadImage(file) {
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + file.fileKey + "&userId=" + jwt.userId, true);
+    xhr.responseType = "blob";
+    xhr.onload = function () {
+        if (xhr.status === 200) {
+            var blob = xhr.response;
+            var reader = new FileReader();
+            reader.onloadend = function () {
+                var img = $('<img>', {
+                    id: 'viewImgData',
+                    class: 'resized-image',
+                    src: reader.result,
+                    style: 'transform: rotate(0deg) scale(1)',
+                    click: function () { modalStack.close(); }
+                });
+                $('#viewArea').append(img);
+            };
+            reader.readAsDataURL(blob);
+        }
+    };
+    xhr.send();
+}
 
-	// 이미지 불러오는 함수
-	function loadImage(image) {
-		var fileKey = image.fileKey;
-		var fileName = image.fileName;
-		$(".ax-modal-header").last().contents().first().replaceWith(fileName);
-		
-		var xhr = new XMLHttpRequest();
-		xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + fileKey + "&userId=" + jwt.userId, true);
-		xhr.responseType = "blob";
-		xhr.onload = function () {
-			if (xhr.status === 200) {
+async function loadPdf(file) {
+    const pdfUrl = "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + file.fileKey + "&userId=" + jwt.userId;
+    pdfDoc = await pdfjsLib.getDocument(pdfUrl).promise;
+    currentPage = 1;
+    totalPages = pdfDoc.numPages;
 
-		        var contentType = xhr.getResponseHeader("Content-Type");
-		        // 만약 응답 Content-Type이 text/plain이면, 오류 메시지가 담겨있는 경우입니다.
-		        if (contentType && contentType.indexOf("text/plain") !== -1) {
-		            var reader = new FileReader();
-		            reader.onload = function (e) {
-		                // 오류 메시지 출력
-		                alert("전산실 연락바랍니다.\n\n" + e.target.result);
-		            };
-		            reader.readAsText(xhr.response);
-		        } else {
-					
-					var blob = xhr.response;
-					openProgress(true);
-					// Blob -> Base64 변환
-					var reader = new FileReader();
-					if (fileName && fileName.split('.').pop().toLowerCase() === 'heic') {
-						heic2any({ blob: blob, toType: "image/jpeg" })
-							.then(function (resultBlob) {
-								var reader = new FileReader();
-								reader.readAsDataURL(resultBlob);
-								reader.onloadend = function () {
-									$('#viewImgData').attr('src', reader.result);
-								};
-							})
-							.catch(function (error) {
-								console.error("HEIC 변환 오류:", error);
-							});
-					} else {
-						reader.readAsDataURL(blob);
-						reader.onloadend = function () {
-							$('#viewImgData').attr('src', reader.result);
-						};
-					}
-					openProgress(false);
-		        }
-			} else {
-		        // 상태 코드가 200이 아닌 경우, 백엔드에서 오류가 발생한 것으로 간주하고 로그 남김
-		        console.error("백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
-		    }
-		};
-		// 네트워크 오류 처리
-		xhr.onerror = function () {
-		    console.error("네트워크 오류가 발생했습니다.");
-		};
-		
-		xhr.send();
-	}
+    $('#currentPageInput').val(currentPage); // 초기 값 설정
+    if (totalPages > 1) {
+        $('#pdfControls').show();
+    } else {
+        $('#pdfControls').hide();
+    }
 
+    updatePageInfo();
+    renderPage();
+}
+async function renderPage() {
+    const page = await pdfDoc.getPage(currentPage);
+    const scale = scaleFactor;
+    const viewport = page.getViewport({ scale: scale });
+
+    const canvas = document.createElement('canvas');
+    canvas.id = 'pdfCanvas';
+    const context = canvas.getContext('2d');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    $('#viewArea').empty().append(canvas);
+
+    const renderContext = {
+        canvasContext: context,
+        viewport: viewport
+    };
+    await page.render(renderContext).promise;
+
+    canvas.style.transform = `rotate(${rotationAngle}deg)`;
+}
+
+function applyTransform() {
+    if (currentIsImage) {
+        $('#viewImgData').css('transform', `rotate(${rotationAngle}deg) scale(${scaleFactor})`);
+    } else {
+        renderPage(); // PDF는 다시 그려야 함
+    }
+}
+
+function updatePageInfo() {
+    $('#pageInfo').text(`/ ${totalPages}`);
+    $('#currentPageInput').val(currentPage);
+}
 </script>

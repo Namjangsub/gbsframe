@@ -196,14 +196,39 @@ public class CM08Ctr {
             
             try{
                 File file = new File(filePath);
-                response.setContentType("application/octet-stream; charset=UTF-8");
-                response.setContentLength((int)file.length());
+//                response.setContentType("application/octet-stream; charset=UTF-8");
+//                response.setContentLength((int)file.length());
+//
+//                // 파일명 추출 및 disposition 설정
+//                int idx = filePath.split("\\\\").length-1;
+//                String fileName = filePath.split("\\\\")[idx];
+//                fileName = fileName.substring(fileName.indexOf("_")+1);
+//                cm08Svc.setDisposition(request, response, fileName);
 
-                // 파일명 추출 및 disposition 설정
-                int idx = filePath.split("\\\\").length-1;
-                String fileName = filePath.split("\\\\")[idx];
-                fileName = fileName.substring(fileName.indexOf("_")+1);
-                cm08Svc.setDisposition(request, response, fileName);
+				String fileName = file.getName();
+				fileName = fileName.substring(fileName.indexOf("_") + 1); // 실제 파일명 추출
+				String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase(); // 확장자 추출
+
+				// Content-Type 및 Content-Disposition 설정
+				String contentType = "application/octet-stream";
+				String dispositionType = "attachment";
+
+				if ("pdf".equals(extension)) {
+					contentType = "application/pdf";
+					dispositionType = "inline";
+				} else if ("jpg".equals(extension) || "jpeg".equals(extension)) {
+					contentType = "image/jpeg";
+					dispositionType = "inline";
+				} else if ("png".equals(extension)) {
+					contentType = "image/png";
+					dispositionType = "inline";
+				} // 필요한 경우 다른 이미지 포맷 추가 가능
+
+				response.setContentType(contentType + "; charset=UTF-8");
+				response.setContentLengthLong(file.length());
+				response.setHeader("Content-Disposition",
+						dispositionType + "; filename=\"" + java.net.URLEncoder.encode(fileName, "UTF-8").replaceAll("\\+", "%20") + "\"");
+
                 
                 OutputStream out = response.getOutputStream();
                 FileInputStream fis = null;

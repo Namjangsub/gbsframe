@@ -145,10 +145,10 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 								if (this.column.key == "fileName") {
 									//첨부파일 이미지뷰
 									let tempType = this.item.fileType.toLowerCase();
-									if (tempType == 'jpg' || tempType == 'jpeg' || tempType == 'png' || tempType == 'gif') {
+									if (tempType == 'jpg' || tempType == 'jpeg' || tempType == 'png' || tempType == 'gif'|| tempType == 'pdf') {
 										const imageList = this.self.list.filter(item => {
 											const fileType = item.fileType.toLowerCase();
-											return fileType === 'jpg' || fileType === 'jpeg' || fileType === 'png' || fileType === 'gif';
+											return fileType === 'jpg' || fileType === 'jpeg' || fileType === 'png' || fileType === 'gif'|| tempType == 'pdf';
 										});
 										imageViewPopup(fileKey, this.item.fileName, imageList);
 									} else {
