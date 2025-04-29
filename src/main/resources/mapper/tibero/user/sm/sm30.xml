@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.sm.sm30.mapper.SM30Mapper">
+
+	<select id="selectPjtInfo" resultType="CamelMap">
+		WITH BILL AS (
+				SELECT
+						  T.CTRT_NO
+						, MAX(T.CTRT_TOT_AMT)   AS CTRT_TOT_AMT
+						, SUM(D.CLMN_AMT)	 	AS CLMN_AMT
+						, max(M20.BILL_NO)		AS BILL_NO
+						, SUM(M20.BILL_AMT)		AS BILL_AMT
+						, LISTAGG(M20.BILL_DT || '(' || TO_CHAR(ROUND(M20.BILL_AMT / T.CTRT_TOT_AMT * 100, 0)) || '%)', ',') WITHIN GROUP (ORDER BY M20.BILL_DT) AS BILL_DT
+				FROM TB_SM11M01 T
+							LEFT OUTER JOIN TB_SM11D01 AS D ON D.CTRT_NO = T.CTRT_NO	--외주관리 대금현황
+							LEFT OUTER JOIN TB_SM10M01 AS M10 ON M10.CTRT_NO = D.CTRT_NO AND M10.CTRT_NO_SEQ = D.CTRT_NO_SEQ  --   S10.COST_NO = T.CLNT_CD 	--기타비용
+							LEFT OUTER JOIN TB_SM12D01 AS D12 ON D12.ORDRG_NO = M10.COST_NO  --매입확정
+							LEFT OUTER JOIN TB_SM20D01 AS D20 ON D20.PCHS_NO = M10.PCHS_NO  --계산서상세
+							LEFT OUTER JOIN TB_SM20M01 AS M20 ON M20.BILL_NO = D20.BILL_NO  --계산서상세  매입확정별 계산서 발행임 매입확정을 여러건의 계산서로 분할 금지.
+				--  			LEFT OUTER JOIN TB_SM21M01 AS M21 ON M21.BILL_NO = D20.BILL_NO  --지불내역상세  계산서:지급 = 1:N
+				WHERE 1 = 1
+				AND T.CO_CD = #{coCd}
+				AND D20.BILL_NO IS NOT NULL
+				AND T.ORDRS_NO = #{ordrsNo}
+				GROUP BY T.CTRT_NO
+		)
+		SELECT 
+				  FN_CM05M01_CD_TO_NM(T.CO_CD) AS CO_CD_NM
+				, T.CO_CD
+				, T.ORDRS_NO
+				, T.MNG_ID
+				, (SELECT FN_CM06M01_ID_TO_NM(T.MNG_ID ) FROM DUAL) MNG_ID_NM
+				, CM.CLNT_PJT
+				, FN_CM05M01_CD_TO_NM(CM.CLNT_PJT) 	AS CLNT_PJT_NM
+				, T.CTRT_TOT_AMT  					AS ORDRS_AMT
+				, TO_CHAR(T.CTRT_ORDRS_DT, 'YYYY-MM-DD') AS ORDRS_DT
+				, T.CTRT_NO
+				, D2.BILL_NO
+				, D2.BILL_DT
+		FROM TB_SM11M01 T
+					LEFT OUTER JOIN TB_CR02M01 CM ON T.ORDRS_NO = CM.ORDRS_NO	--수주마스터
+					LEFT OUTER JOIN BILL D2 ON T.CTRT_NO = D2.CTRT_NO	--청구 임시테이블
+		WHERE 1 = 1
+		AND T.CO_CD = #{coCd}
+		AND T.ORDRS_NO = #{ordrsNo}
+	</select>
+
+	<select id="selectPjtInfoDetail" parameterType="Map" resultType="CamelMap">
+		SELECT
+				  T.CTRT_NO
+				, T.CLNT_CD
+				, B.CLNT_NM
+				, T.ORDRS_NO
+				, T.CTRT_DT
+				, D.CLMN_PLAN_DIV
+				, FN_CM05M01_CD_TO_NM(D.CLMN_PLAN_DIV) AS CLMN_PLAN_DIV_NM
+				, D.CTRT_NO_SEQ
+				, D.CLMN_RATE
+				, D.CLMN_AMT
+				, D.CLMN_DT
+				, M20.BILL_DT	--계산서발행일자
+				, M20.BILL_NO   --계산서번호
+				, M21.PAY_TOT 	--실지금금액
+				, M21.PAY_DT 	--'실지급일자'
+				, T.CTRT_NM
+				, D2.SALES_CD
+				, D.CLMN_PLAN_RMK
+				, D.CLMN_MGMT_STATUS
+		FROM TB_SM11M01 AS T
+					LEFT OUTER JOIN TB_SM11D01 AS D ON D.CTRT_NO = T.CTRT_NO	--외주관리 대금현황
+					LEFT OUTER JOIN TB_SM10M01 AS M10 ON M10.CTRT_NO = D.CTRT_NO AND M10.CTRT_NO_SEQ = D.CTRT_NO_SEQ  --   S10.COST_NO = T.CLNT_CD 	--기타비용
+					LEFT OUTER JOIN TB_SM12D01 AS D12 ON D12.ORDRG_NO = M10.COST_NO  --매입확정
+					LEFT OUTER JOIN TB_SM20D01 AS D20 ON D20.PCHS_NO = M10.PCHS_NO  --계산서상세
+					LEFT OUTER JOIN TB_SM20M01 AS M20 ON M20.BILL_NO = D20.BILL_NO  --계산서상세
+					LEFT OUTER JOIN (
+									SELECT BILL_NO, SUM(PAY_TOT) AS PAY_TOT, MAX(PAY_DT) AS PAY_DT, MAX(PAY_PMNTMTD) AS PAY_PMNTMTD
+									FROM TB_SM21M01
+									WHERE CO_CD = 'TRN'
+									AND BILL_NO IS NOT NULL
+									GROUP BY BILL_NO
+									) AS M21 ON M21.BILL_NO = D20.BILL_NO  --지불내역상세
+					LEFT OUTER JOIN (
+									SELECT ORDRS_NO, CTRT_NO,
+										LISTAGG(SALES_CD, ',') WITHIN GROUP (ORDER BY SALES_CD) AS SALES_CD
+									FROM TB_SM11D02 AS D2 
+									WHERE D2.ORDRS_AMT != 0
+									GROUP BY ORDRS_NO, CTRT_NO
+								) AS D2 ON D2.CTRT_NO = T.CTRT_NO
+					LEFT OUTER JOIN TB_BM02M01 AS B ON B.CLNT_CD = T.CLNT_CD 
+					LEFT OUTER JOIN TB_CM06M01 AS C ON C.ID = T.MNG_ID
+		WHERE T.ORDRS_NO = #{ordrsNo}
+		  AND T.CO_CD = #{coCd}
+		  AND C.DEPT_ID = #{deptId}
+		ORDER BY T.CO_CD, T.CTRT_NO, T.CLNT_CD, D.CLMN_PLAN_DIV, D.CTRT_NO_SEQ
+	</select>
+
+	<select id="select_sm30_SeqNext" parameterType="map" resultType="String">
+		SELECT CASE WHEN MAX(FILE_TRGT_KEY) IS NULL THEN 'APR' || TO_CHAR(SYSDATE, 'YY') || '00001'
+			ELSE 'APR' || TO_CHAR(SYSDATE, 'YY') || LPAD(TO_NUMBER(SUBSTR(MAX(FILE_TRGT_KEY),LENGTH('APR' || TO_CHAR(SYSDATE,'YY')) + 1,5)) + 1, 5, '0')END AS FILE_TRGT_KEY
+		FROM TB_SM30M01
+	</select>
+
+	<insert id="insert_sm30" parameterType="Map">
+		INSERT INTO TB_SM30M01
+			(
+				  FILE_TRGT_KEY
+				, PAY_YYMM
+				, CO_CD
+				, PCHS_CLMN_DAY
+				, DEPT_ID
+				, TRUN_DIV
+				, PAY_DIV
+				, CREAT_ID
+				, CREAT_PGM
+				, CREAT_DTTM
+			)
+		VALUES
+			(
+				  #{fileTrgtKey}
+				, #{closeYm}
+				, #{coCd}
+				, #{pchsClmnDay}
+				, #{deptId}
+				, #{trunDiv}
+				, #{payDiv}
+				, #{userId}
+				, #{pgmId}
+				, SYSDATE
+			)
+	</insert>
+
+	<insert id="insert_sm30_list" parameterType="Map">
+		<selectKey keyProperty="seq" resultType="int" order="BEFORE">
+			SELECT NVL(MAX(SEQ), 0) + 1
+			FROM   TB_SM30D01
+			WHERE  FILE_TRGT_KEY = #{fileTrgtKey}
+		</selectKey>
+		INSERT INTO TB_SM30D01
+			(
+				  FILE_TRGT_KEY
+				, SEQ
+				, CO_CD
+				, CUST_ID
+				, CLNT_PJT
+				, ORDRS_NO
+				, CTRT_NO
+				, CLNT_CD
+				, PCHS_AMT
+				, PCHS_VAT
+				, PCHS_TOT
+				, BILL_DT
+				, BILL_AMT
+				, BILL_VAT
+				, BILL_TOT
+				, BILL_RMK
+				, CREAT_ID
+				, CREAT_DTTM
+				, CREAT_PGM
+				, BILL_NO
+			)
+			VALUES
+			(
+				  #{fileTrgtKey}
+				, #{seq}
+				, #{coCd}
+				, #{custId}
+				, #{clntPjt}
+				, #{ordrsNo}
+				, #{ctrtNo}
+				, #{clntCd}
+				, #{pchsAmt}
+				, #{pchsVat}
+				, #{pchsTot}
+				, #{billDt}
+				, #{compAmt}
+				, #{compVat}
+				, #{compTot}
+				, #{billRmk, jdbcType=VARCHAR}
+				, #{userId}
+				, SYSDATE
+				, #{pgmId}
+				, #{billNo}
+			)
+	</insert>
+</mapper>

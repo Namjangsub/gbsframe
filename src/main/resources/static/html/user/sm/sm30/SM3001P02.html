@@ -1,0 +1,390 @@
+<div class="popup_area of_a" style="width: 100%; height: 100%;">
+    <div class="tit_contents">
+      <h4 class="tit">매입 대금 지급 실적 엑셀업로드</h4>
+    </div>
+  <div class="form-group popup_table">
+   <form id="popForm" onSubmit="return false;" method="post" enctype="multipart/form-data">
+		<input type="hidden" id="userId" name="userId">
+		<input type="hidden" id="fileTrgtTyp" name="fileTrgtTyp" value="SM2001P02">
+		<input type="hidden" id="fileTrgtKey" name="fileTrgtKey">
+		<input type="hidden" id="pgmId" name="pgmId" value="SM2001P02">
+      <table>
+
+        <colgroup>
+          <col width="10%">
+          <col width="8%">
+          <col width="10%">
+          <col width="8%">
+          <col width="10%">
+          <col width="10%">
+          <col width="10%">
+          <col width="14%">
+          <col width="10%">
+          <col width="14%">
+        </colgroup>
+
+        <tr>
+			<th class="hit">회사</th>
+			<td colspan="5">
+			  <select id="coCd" name="coCd" data-kind="CO" class="form-control" required="required" msg="회사" readonly="readonly">
+			  </select>
+			</td>
+			<th class="hit">지급년월</th>
+			<td colspan="2">
+				<input id="closeYm" name="closeYm" class="form-control input_calendar" autocomplete="off" onkeyup="dateMask(this)" required msg="지급년월";>
+			</tr>
+        </tr>
+
+        <tr>
+			<th>Excel Upload</th>
+			<td colspan="5">
+				<input type="file" style="width:400px;float:left;margin-left:20px;margin-top:3px;" class="form-control input-sm" id="fileInput" name="fileInput">
+				<button style="width:100px;float:left;margin-left:20px;" class="btn btn-primary btn-sm" type="button" disabled="disabled" id="actionExcel"><i class="fas fa-upload"></i>엑셀 업로드</button>
+			</td>
+			<th class="hit">송금일자</th>
+			<td colspan="2">
+				<input id="payDt" name="payDt" class="input_calendar form-control" autocomplete="off" onkeyup="dateMask(this)" required msg="송금일자";>
+			</td>
+        </tr>
+
+      </table>
+    </form>
+
+	<!-- 콘텐츠 -->
+	  <div class="contents" style="margin-top: 10px;">
+	      <!-- 리스트 -->
+	      <div class="ax5_grid" style="width: 100%">
+	        <ul class="ul_list" style="height:350px; width: 100%">
+	            <li style="width: 100%;">
+	                <div class="table_list_tit" style="width: 100%;">
+	                	<h5 style="color: #444;font-size: 16px;float:left; margin-left: 8px; margin-top: 8px; margin-bottom: 8px;">매입 대금 지급</h5>
+		                <div class="add_btn pdl10" style="margin-right:8px; margin-top: 8px;">
+		                </div>
+	                </div>
+	                <div>
+	                	<div data-ax5grid="upload-grid" data-ax5grid-config="{}" style="height:600px; width: 100%" ></div>
+	                	<div data-ax5grid="upload-excel-grid" data-ax5grid-config="{}" style="display: none;"></div>
+	                </div>
+	            </li>
+	        </ul>
+	    </div>
+	  </div>
+	</div>
+ 	<div class="col-xs-2" style="height: 70px;">
+	</div>
+    <!-- 하단 버튼 -->
+	<div class ="popup_bottom_btn" style="margin-bottom:20px;">
+		<button type="button" id="actionBtnSave" authChk>적용</button>
+		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+
+<script type="text/javascript">
+var actionType = null;
+var isBeforeData = false;
+
+var salesCd = null;
+var fileTrgtKey = null;
+
+var uploadGridView = {
+		initView: function(){
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showRowSelector: false,
+				showLineNumber: false,
+				lineNumberColumnWidth: 40,
+				multipleSelect: true,
+				sortable: false,
+				target: $('[data-ax5grid="upload-grid"]'),
+				header: {
+						align: "center",
+						selector: false
+				},
+				body: {
+					columnHeight: 23,
+// 					 mergeCells : ["salesCd"],//editor 는 merge 안됨
+				},
+
+				footSum: [
+					[
+						{label: "합계", colspan:6, align:"senter"},
+						{key: "payTot", collector: "sum", formatter:"money", align: "center"}
+					]
+				],
+				columns : [
+					{key: "fileTrgtKey",		label: "파일대상KEY",			width: 50,	align: "left",  hidden: true},
+					{key: "coCd",				label: "회사",			width: 50,	align: "left", hidden: true},
+					{key: "uploadSeq",			label: "순번", 			width: 50, align: "center", formatter: function() {return this.dindex+1;}},
+					{key: "clntCd",				label: "구매처",		width: 70,	align: "center"},
+					{key: "clntNm",				label: "구매처명",		width: 200,	align: "center", styleClass: function(){return this.item.errClntNm === 'Y' ? 'grid-cell-red' : '';}},
+					{key: "repstNm",			label: "대표자",		width: 70,	align: "center", styleClass: function(){return this.item.errRepstNm === 'Y' ? 'grid-cell-red' : '';}},
+					{key: "crn",				label: "사업자번호",	width: 120,align: "center", styleClass: function(){return this.item.errCrn === 'Y' ? 'grid-cell-red' : '';}},
+					{key: "payInterval",		label: "공백1",			width: 70,align: "center"},
+					{key: "payTot",				label: "금액(VAT포함)",	width: 120,align: "center", formatter: "money"},
+					{key: "payAmt",				label: "금액",			width: 120,align: "center", formatter: "money", hidden: true},
+					{key: "payPmntmtd",			label: "결제방식CD",		width: 100,align: "center", hidden: true},
+					{key: "payPmntmtdNm",		label: "결제방식",		width: 100,align: "center", styleClass: function(){return this.item.errPayPmtNm === 'Y' ? 'grid-cell-red' : '';}},
+					{key: "payExpDt",			label: "전자어음(만기일)",		width: 120,align: "center", styleClass: function(){return this.item.errExpDtMissing === 'Y' ? 'grid-cell-red' : '';}},
+					{key: "payExtLoanExpDt",			label: "전자외담대(만기일)",		width: 120,align: "center", styleClass: function(){return this.item.errExtLoanExpDtMissing === 'Y' ? 'grid-cell-red' : '';}},
+					{key: "uploadDttm",				label: "세금계산서발행일자",		width: 120,align: "center"},
+					{key: "billNo",				label: "세금계산서발행번호",		width: 120,align: "center"},
+					{key: "excelUseYn", 		label: "적용대상", 		width: 80 ,align: "center",  hidden: false, styleClass: function () {return (this.item.excelUseYn === "N") ? "grid-cell-red" : "";}},
+					{key: "excelCheckResult",  	label: "확인내용", 		width: 200,align: "center",  hidden: false, styleClass: function () {return (this.item.excelUseYn === "N") ? "grid-cell-red" : "";}},
+				],
+			});
+			return this;
+		},
+		//setData
+	}
+	
+ 	$(document).ready(function() {
+		setComboOptions($(".popup_area select[data-kind]"));
+		// setByCoCd(jwt.coCd);
+
+		// 지급년월
+		$('#closeYm').datepicker({
+			format : "yyyy-mm",
+			language : "ko",
+			autoclose : true,
+			minViewMode: "months"
+		}).datepicker("setDate", new Date());
+
+		// 송금일자
+		$('#payDt').datepicker({
+			format : "yyyy-mm-dd",
+			language : "ko",
+			autoclose : true
+		}).datepicker("setDate", new Date());
+
+		// $("#userId").val(jwt.userId);
+
+		$('#actionBtnSave').hide();
+		$('#actionBtnSave').on("click", function() {
+			insert_sm21_excelUpload();
+		});
+
+		$("#actionExcel").prop("disabled", false);
+		$('#actionExcel').on("click", function() {
+			actionExcel();
+		});
+
+		$('#fileInput').on("change", function() {
+		    // 선택된 파일 가져오기
+		    var selectedFile = this.files[0];
+		    
+		    // 파일이 존재하는지 확인
+		    if (selectedFile) {	        
+	 			$("#actionExcel").prop("disabled", false);
+
+		    } else {
+		        // 파일이 존재하지 않는 경우
+// 		        console.log("파일이 선택되지 않았습니다.");
+		        
+	 			$("#actionExcel").prop("disabled", true);
+	 			$('#actionBtnSave').hide();
+		    }
+		});
+
+		uploadGridView.initView();
+
+		authChk();// 권한체크
+
+ 	});
+
+	function actionExcel() {
+		if(isEmpty($("#fileInput").val())) {
+			alert("파일을 선택하여야 합니다.");
+			return;
+		}
+		var formData = getFormData("#popForm");
+
+		//아래의 주소로 공통으로 업로드 가능함.
+		// filePostAjax("/user/sm/sm01/uploadExcelFile", formData, function(data){
+		filePostAjax("/user/sm/sm01/newUploadExcelFile", formData, function(data){
+			if(!isEmpty(data.resultMessage)) {
+				alert(data.resultMessage);
+				$('#actionBtnSave').hide();
+				return;
+			}else{
+				//upload 컬럼은 아래로 고정-수동컬럼지정
+				// var uploadColumnsKey = ["rowNo","salesCd","upperCd","lowerCd","matrCd","matrNm","matrMat","lowerUnit","lowerQty","matrMno","matrSpec","matrRmk","matrMakrNm","matrYn","dsgnNo","excelUseYn","excelCheckResult"];
+
+				// 엑셀의 컬럼 이름으로 엑셀 데이터 맵핑
+				var excelHeaderMap = {
+					"구매처": "clntCd",
+					"구매처명": "clntNm",
+					"대표자": "repstNm",
+					"사업자번호": "crn",
+					"공백1": "payInterval",
+					"금액(VAT포함)": "payTot",
+					"결제방식":      "payPmntmtdNm",
+					"결제방식CD": "payPmntmtd",
+					"전자어음(만기일)": "payExpDt",
+					"전자외담대(만기일)": "payExtLoanExpDt",
+					"세금계산서발행일자": "uploadDttm",
+					"세금계산서발행번호": "billNo",
+					"적용대상": "excelUseYn",
+					"확인내용": "excelCheckResult"
+				};
+
+				// 엑셀파일을 읽고 각 컬럼의 값들을 매핑
+				var excelReadData = getGridExcelDataWithMapping(excelHeaderMap, data.resultList);
+				if(excelReadData == null) return;
+
+				// 2) 마지막 행(합계) & 실제 데이터 분리
+				var lastIdx  = excelReadData.length - 1;
+				var summary  = excelReadData[lastIdx];
+				var dataRows = excelReadData.slice(0, lastIdx);
+
+				// 엑셀파일 합계 금액 가져오기
+				var excelSum = parseFloat(summary.payTot.toString().replace(/,/g, ''));
+
+				// 합계를 제외한 금액 계산하기
+				var computedSum = dataRows.reduce(function(acc, row) {
+					return acc + parseFloat(
+						row.payTot.toString().replace(/,/g, '')
+					);
+				}, 0);
+
+				// 엑셀에 있는 합계 로우 제외시키기
+				excelReadData = excelReadData.filter(row => row.clntCd != "합계");
+				excelReadData = excelReadData.map(row => {
+					row.payTot = Number(row.payTot);
+					return row;
+				})
+
+				uploadGridView.target.setData({
+					list: excelReadData,
+					page: { totalElements: excelReadData.length }
+				});
+
+				// 엑셀의 합계와 실제 계산된 합계가 다르면 return
+				if (computedSum !== excelSum) {
+					alert("엑셀 파일의 마지막 합계(" + excelSum.toLocaleString() + ")와 실제 합계(" +computedSum.toLocaleString() + ")가 다릅니다.");
+					$('#actionBtnSave').hide();
+					return;
+				}
+				//업로드 후 적용확인
+				checkList();
+				// $('#actionBtnSave').show();
+			}
+		});
+	}
+
+	function insert_sm21_excelUpload (){
+		if (!confirm("적용하시겠습니까?")) return false;
+		var formData = new FormData($("#popForm")[0]);
+
+		// 값이 빈 필드도 같이 보내기 위해서 그리드 배열 재정렬
+		const payload = uploadGridView.target.list.map((row, idx) => ({
+			// 그리드에 정의된 모든 키
+			fileTrgtKey:   	row.fileTrgtKey    || "",
+			coCd:          	row.coCd           || "",
+			uploadSeq:     	row.uploadSeq      != null ? row.uploadSeq : idx + 1,
+			clntCd:        	row.clntCd         || "",
+			clntNm: 		row.clntNm         || "",
+			repstNm:		row.repstNm        || "",
+			crn:            row.crn            || "",
+			payInterval:    row.payInterval    || "",
+			payTot:         row.payTot         != null ? row.payTot : 0,
+			payAmt:         row.payAmt         != null ? row.payAmt : 0,
+			payPmntmtd:     row.payPmntmtd     || "",
+			payExpDt:   	(row.payPmntmtd === 'PMNTMTD03') ? (row.payExpDt || "") :			// 전자어음 일때
+							(row.payPmntmtd === 'PMNTMTD04')? (row.payExtLoanExpDt || ""): "", 	// 전자외담대 일때
+			uploadDttm:     row.uploadDttm     || "",
+			billNo:         row.billNo         || ""
+		}));
+		formData.set("userId", jwt.userId);;
+		formData.append("uploadGridView", JSON.stringify(payload));
+
+		filePostAjax("/user/sm/sm30/insert_sm21_excelUpload", formData, function(data) {
+			alert(data.resultMessage);
+			if (data.resultCode == 200) {
+				gridView1.setData(0);
+				modalStack.close();
+			}
+		});
+	}
+
+	function checkList() {
+		var formData = {
+			"userId" : jwt.userId,
+			"uploadGridView" : uploadGridView.target.list
+		}
+
+		postAjax("/user/sm/sm21/select_sm21_chk", formData, null, function(data) {
+			// data.result 의 배열 안에 각 내용은 객체형태로 담겨있음
+			if (data.resultCode == 200) {
+				var rows = data.result;
+				
+				uploadGridView.target.setData({
+					list: rows,
+					page: { totalElements: rows.length }
+				});
+
+				// 수정대상(이미 등록된 데이터) 체크
+				const hasExisting = rows.some(function(row) {
+					return row.excelUseYn === "N" && row.excelCheckResult === "수정대상";
+				});
+				if (hasExisting) {
+					alert("이미 등록된 데이터가 있습니다. 수정 대상 항목이 포함되어 있습니다.");
+					$('#actionBtnSave').hide();
+				return;
+				}
+
+				// 에레 체크 (서버에서 받은 플래그 사용)
+				var hasError = rows.some(function(r) { return r.excelUseYn === "N"; });
+				if (hasError) {
+					alert("엑셀 데이터에 오류가 있습니다. 수정 후 다시 업로드 해주세요.");
+					$('#actionBtnSave').hide();
+				} else {
+					alert(data.resultMessage);
+					$('#actionBtnSave').show();
+				}
+			} else {
+				alert("검사 중 에러가 발생했습니다: 코드 " + data.resultCode);
+			}
+		});
+	}
+
+	// 업로드한 엑셀파일 헤더와 값 매핑 함수
+	function getGridExcelDataWithMapping(headerMap, dataList) {
+		var resultData = [];
+		if (!dataList || dataList.length < 1) return resultData;
+
+		// 헤더 행에서 컬럼 매핑
+		var headerRow = dataList[0];
+		var mappingIndex = {};
+		var usedKeys = {};  // 이미 매핑한 키 추적
+
+		for (var i = 0; ; i++) {
+			var h = headerRow["key" + (i + 1)];
+			if (h === undefined) break;
+			if (headerMap[h]) {
+				var key = headerMap[h];
+				// 같은 키는 첫 번째 인덱스만 사용
+				if (!usedKeys[key]) {
+					mappingIndex[i] = key;
+					usedKeys[key] = true;
+				}
+			}
+		}
+
+		// 데이터 행마다 반복 돌면서 매핑
+		for (var r = 1; r < dataList.length; r++) {
+			var elem = dataList[r];
+			var data = {};
+			for (var colIdx in mappingIndex) {
+				var key = mappingIndex[colIdx];
+				var val = elem["key" + (parseInt(colIdx,10) + 1)];
+				// 빈 값이면 아예 할당하지 않음 → 이전 값이 덮어써지지 않음
+				if (val != null && val !== "") {
+					data[key] = val;
+				}
+			}
+			resultData.push(data);
+		}
+		return resultData;
+	}
+
+</script>

@@ -3,16 +3,24 @@ package com.dksys.biz.user.sm.sm01;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
-import org.apache.poi.hssf.usermodel.HSSFSheet;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.poifs.filesystem.NotOLE2FileException;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
@@ -54,71 +62,195 @@ public class SM01Ctr {
 	@PostMapping("/uploadExcelFile")
 	public String uploadExcelFile(MultipartHttpServletRequest request, ModelMap model) {
 		String dateTime = DateUtil.getCurrentDateTime();
-        String path = uploadDir + File.separator + "tmp_excel" + File.separator;
-        boolean isSaveExists = false;
-        MultipartFile file = null;
-        File saveFile = null;
+		String path = uploadDir + File.separator + "tmp_excel" + File.separator;
+		boolean isSaveExists = false;
+		MultipartFile file = null;
+		File saveFile = null;
 		Iterator<String> iterator = request.getFileNames();
 		String resultMessage = "";
-		if(iterator.hasNext()) {
+		
+		if (iterator.hasNext()) {
 			file = request.getFile(iterator.next());
-			//String fileName = file.getOriginalFilename();
-			//String ext = fileName.substring(fileName.lastIndexOf(".") + 1);
-            try {
-                //String saveFileName = dateTime+"."+ext;
-                String saveFileName = dateTime;
-                File f = new File(path);
-                if (!f.isDirectory()) f.mkdirs();
-                saveFile = new File(path + saveFileName);
-                saveFile.createNewFile();
-                file.transferTo(saveFile);
-                isSaveExists = saveFile.exists();
-            } catch (IllegalStateException e) {
-            	if(isSaveExists) saveFile.delete();
-            	resultMessage = "파일 저장 실패 하였습니다. IllegalStateException";
-                e.printStackTrace();
-            } catch (IOException e) {
-            	if(isSaveExists) saveFile.delete();
-            	resultMessage = "파일 저장 실패 하였습니다. IOException";
-                e.printStackTrace();
-            }
+			try {
+				String saveFileName = dateTime;
+				File f = new File(path);
+				if (!f.isDirectory()) {
+					f.mkdirs();
+				}
+				saveFile = new File(path + saveFileName);
+				saveFile.createNewFile();
+				file.transferTo(saveFile);
+				isSaveExists = saveFile.exists();
+			} catch (IllegalStateException e) {
+				if (isSaveExists) {
+					saveFile.delete();
+				}
+				resultMessage = "파일 저장 실패 하였습니다. IllegalStateException";
+				e.printStackTrace();
+			} catch (IOException e) {
+				if (isSaveExists) {
+					saveFile.delete();
+				}
+				resultMessage = "파일 저장 실패 하였습니다. IOException";
+				e.printStackTrace();
+			}
 		}
-		List<Map<String, String>> list = new ArrayList<Map<String,String>>();
-		try {
-			workbook = new HSSFWorkbook(new FileInputStream(saveFile));
-			HSSFSheet sheet = workbook.getSheetAt(0);
-			for (int i = 0; i < sheet.getLastRowNum()+1; i++) {
+		
+		List<Map<String, String>> list = new ArrayList<Map<String, String>>();
+		try (FileInputStream fis = new FileInputStream(saveFile)) {
+			// WorkbookFactory.create()가 .xls와 .xlsx 모두 자동으로 감지하여 읽어줍니다.
+			Workbook workbook = WorkbookFactory.create(fis);
+			Sheet sheet = workbook.getSheetAt(0);
+			int lastRowNum = sheet.getLastRowNum();
+			for (int i = 0; i < lastRowNum + 1; i++) {
 				Map<String, String> map = new HashMap<String, String>();
 				Row row = sheet.getRow(i);
-				if(null == row) {
+				if (null == row) {
 					continue;
 				}
-
-				for (int j = 0; j < row.getLastCellNum(); j++) {
-					map.put("key"+(j+1), row.getCell(j).toString());
+				int lastCellNum = row.getLastCellNum();
+				for (int j = 0; j < lastCellNum; j++) {
+					Cell cell = row.getCell(j);
+					// 셀 값이 null일 경우 빈 문자열로 처리
+					String cellValue = (cell == null) ? "" : cell.toString();
+					map.put("key" + (j + 1), cellValue);
 				}
 				list.add(map);
 			}
 		} catch (NotOLE2FileException e) {
-			if(isSaveExists) saveFile.delete();
+			if (isSaveExists) {
+				saveFile.delete();
+			}
 			resultMessage = "파일읽기 실패 하였습니다. 정상적인 엑셀 파일이 아닙니다.";
 			e.printStackTrace();
 		} catch (IOException e) {
-			if(isSaveExists) saveFile.delete();
+			if (isSaveExists) {
+				saveFile.delete();
+			}
 			resultMessage = "파일읽기 실패 하였습니다. IOException";
 			e.printStackTrace();
 		} catch (Exception e) {
-			if(isSaveExists) saveFile.delete();
+			if (isSaveExists) {
+				saveFile.delete();
+			}
 			resultMessage = "파일읽기 실패 하였습니다. Exception";
 			e.printStackTrace();
 		}
-
-		if(isSaveExists) saveFile.delete();
-
+		
+		if (isSaveExists) {
+			saveFile.delete();
+		}
+		
 		model.addAttribute("resultList", list);
 		model.addAttribute("resultMessage", resultMessage);
 		return "jsonView";
 	}
+
+	@PostMapping("/newUploadExcelFile")
+    public String newUploadExcelFile(MultipartHttpServletRequest request, ModelMap model) {
+        // 1) 파일명용 타임스탬프
+        String dateTime = DateUtil.getCurrentDateTime();
+        String path = uploadDir + File.separator + "tmp_excel" + File.separator;
+        boolean isSaveExists = false;
+        File saveFile = null;
+        String resultMessage = "";
+
+        // 2) 파일 저장
+        Iterator<String> iterator = request.getFileNames();
+        if (iterator.hasNext()) {
+            try {
+                MultipartHttpServletRequest multipart = request;
+                saveFile = new File(path + dateTime);
+                if (!saveFile.getParentFile().isDirectory()) {
+                    saveFile.getParentFile().mkdirs();
+                }
+                multipart.getFile(iterator.next()).transferTo(saveFile);
+                isSaveExists = saveFile.exists();
+            } catch (Exception e) {
+                if (isSaveExists) saveFile.delete();
+                resultMessage = "파일 저장 실패: " + e.getClass().getSimpleName();
+                e.printStackTrace();
+            }
+        }
+
+        // 3) POI 셀 읽기 + 포맷팅
+        List<Map<String, String>> list = new ArrayList<>();
+        DataFormatter dataFormatter = new DataFormatter(Locale.KOREA);
+        SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
+
+        try (FileInputStream fis = new FileInputStream(saveFile)) {
+            Workbook workbook = WorkbookFactory.create(fis);
+            Sheet sheet = workbook.getSheetAt(0);
+            int lastRowNum = sheet.getLastRowNum();
+
+            for (int i = 0; i <= lastRowNum; i++) {
+                Row row = sheet.getRow(i);
+                if (row == null) continue;
+
+                Map<String, String> map = new HashMap<>();
+                int lastCellNum = row.getLastCellNum();
+
+                for (int j = 0; j < lastCellNum; j++) {
+                    Cell cell = row.getCell(j);
+                    String cellValue = "";
+
+                    if (cell != null) {
+                        CellType type = cell.getCellType();
+                        switch (type) {
+                            case STRING:
+                                cellValue = cell.getStringCellValue();
+                                break;
+                            case BOOLEAN:
+                                cellValue = Boolean.toString(cell.getBooleanCellValue());
+                                break;
+                            case FORMULA:
+                                cellValue = dataFormatter.formatCellValue(cell);
+                                break;
+                            case NUMERIC:
+                                // 날짜 셀 감지 (POI DateUtil)
+                                if (org.apache.poi.ss.usermodel.DateUtil.isCellDateFormatted(cell)) {
+                                    cellValue = dateFormatter.format(cell.getDateCellValue());
+                                } else {
+                                    double d = cell.getNumericCellValue();
+                                    long l = (long) d;
+                                    if (d == l) {
+                                        cellValue = String.valueOf(l);
+                                    } else {
+                                        cellValue = BigDecimal.valueOf(d)
+                                                            .stripTrailingZeros()
+                                                            .toPlainString();
+                                    }
+                                }
+                                break;
+                            default:
+                                cellValue = "";
+                        }
+                    }
+                    map.put("key" + (j + 1), cellValue);
+                }
+                list.add(map);
+            }
+        } catch (NotOLE2FileException e) {
+            if (isSaveExists) saveFile.delete();
+            resultMessage = "파일읽기 실패: 정상적인 엑셀 파일이 아닙니다.";
+            e.printStackTrace();
+        } catch (IOException e) {
+            if (isSaveExists) saveFile.delete();
+            resultMessage = "파일읽기 실패: IOException";
+            e.printStackTrace();
+        } catch (Exception e) {
+            if (isSaveExists) saveFile.delete();
+            resultMessage = "파일읽기 실패: " + e.getClass().getSimpleName();
+            e.printStackTrace();
+        } finally {
+            if (isSaveExists) saveFile.delete();
+        }
+
+        // 4) 결과 반환
+        model.addAttribute("resultList", list);
+        model.addAttribute("resultMessage", resultMessage);
+        return "jsonView";
+    }
 
 	// BOM 전체 정전개 트리 조회
     @PostMapping("/selectBomSalesTreeList")
