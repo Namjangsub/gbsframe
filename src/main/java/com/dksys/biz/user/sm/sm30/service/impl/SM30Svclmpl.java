@@ -13,10 +13,10 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
+import com.dksys.biz.user.sm.sm20.mapper.SM20Mapper;
 import com.dksys.biz.user.sm.sm21.mapper.SM21Mapper;
 import com.dksys.biz.user.sm.sm30.mapper.SM30Mapper;
 import com.dksys.biz.user.sm.sm30.service.SM30Svc;
-import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -27,6 +27,9 @@ public class SM30Svclmpl implements SM30Svc {
 
 	@Autowired
     QM01Mapper QM01Mapper;
+
+	@Autowired
+	SM20Mapper sm20Mapper;
 
 	@Autowired
     SM21Mapper sm21Mapper;
@@ -40,8 +43,6 @@ public class SM30Svclmpl implements SM30Svc {
 	@Autowired
     CM08Svc cm08Svc;
 
-	@Autowired
-    WB20Svc wb20Svc;
 
 	@Override
 	public Map<String, String> selectPjtInfo(Map<String, String> paramMap) {
@@ -88,8 +89,14 @@ public class SM30Svclmpl implements SM30Svc {
 			dtl.put("payAmt", dtl.get("payTot"));
 			dtl.put("uploadId", paramMap.get("userId"));
 			dtl.put("pgmId", paramMap.get("pgmId"));
-
+			// 대금지급등록연결
 			sm21Mapper.insert_sm21_payChk(dtl);
+
+			// 대금지급연결
+			sm21Mapper.update_sm21_payChk_billNo(dtl);
+			// 대금 지불 완료/미결 처리
+			sm20Mapper.update_sm20_payCompleteChke(dtl);
+
 			result++;
 		}
 		return result;

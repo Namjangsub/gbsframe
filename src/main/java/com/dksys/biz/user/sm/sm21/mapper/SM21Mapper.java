@@ -31,6 +31,8 @@ public interface SM21Mapper {
 
 	int update_sm21_payChk(Map<String, String> paramMap);
 
+	int update_sm21_payChk_billNo(Map<String, String> paramMap);
+
 	int delete_sm21_payChk(Map<String, String> paramMap);
 }
 
