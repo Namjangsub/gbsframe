@@ -49,7 +49,7 @@ public class SM30Ctr {
 			if (!result.isEmpty()) {
 				model.addAttribute("result", result);
 				model.addAttribute("resultCode", 200);
-				model.addAttribute("resultMessage", "적용 되었습니다.");
+				model.addAttribute("resultMessage", "Upload 적용 가능합니다.");
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail")); 

@@ -78,7 +78,7 @@ public class SM30Svclmpl implements SM30Svc {
 
 		List<Map<String, String>> excelList = gsonDtl.fromJson(paramMap.get("uploadGridView"), dtlMap);
 		for (Map<String, String> dtl : excelList) {
-			String fileTrgtKey = sm30Mapper.select_sm21_SeqNext(paramMap);
+			String fileTrgtKey = sm21Mapper.select_sm21_SeqNext(paramMap);
 
 			dtl.put("fileTrgtKey", fileTrgtKey);
 			dtl.put("coCd", paramMap.get("coCd"));
