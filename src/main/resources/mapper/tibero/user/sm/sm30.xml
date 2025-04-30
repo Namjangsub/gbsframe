@@ -143,6 +143,91 @@
 		FROM TB_SM30M01
 	</select>
 
+	<select id="select_sm21_chk" parameterType="map" resultType="camelMap">
+		<!-- 엑셀에서 넘어온 한 행을 가상테이블로 정의 -->
+		WITH EXCEL_DATA AS (
+			SELECT
+				  #{coCd            , jdbcType=VARCHAR}		AS CO_CD
+				, #{clntCd          , jdbcType=VARCHAR}		AS CLNT_CD
+				, #{clntNm          , jdbcType=VARCHAR}		AS CLNT_NM
+				, #{repstNm         , jdbcType=VARCHAR}		AS REPST_NM
+				, #{crn             , jdbcType=VARCHAR}		AS CRN
+				, #{payInterval     , jdbcType=VARCHAR}		AS PAY_INTERVAL
+				, #{payTot          , jdbcType=NUMERIC}		AS PAY_TOT
+				, #{payAmt          , jdbcType=NUMERIC}		AS PAY_AMT
+				, #{payPmntmtd      , jdbcType=VARCHAR}		AS PAY_PMNTMTD
+				, #{payPmntmtdNm    , jdbcType=VARCHAR}		AS PAY_PMNTMTD_NM
+				, #{payExpDt        , jdbcType=VARCHAR}		AS PAY_EXP_DT
+				, #{payExtLoanExpDt , jdbcType=VARCHAR}		AS PAY_EXT_LOAN_EXP_DT
+				, #{uploadDttm		, jdbcType=VARCHAR}		AS UPLOAD_DTTM
+				, #{payDt           , jdbcType=VARCHAR}		AS PAY_DT
+				, #{billNo          , jdbcType=VARCHAR}		AS BILL_NO
+			FROM DUAL
+		)
+
+		<!-- 가상테이블에 마스터·실적·코드마스터 조인 후, 플래그를 CASE로 한 번에 처리 -->
+		SELECT
+			EX.*  
+				, CASE
+					WHEN BM.CLNT_CD IS NULL																THEN 'N'
+					WHEN NOT (BM.CLNT_NM  = EX.CLNT_NM AND BM.CRN = EX.CRN AND BM.REPST_NM = EX.REPST_NM) THEN 'N'
+					WHEN CM.CODE_ID IS NULL																THEN 'N'
+					WHEN NOT (CM.CODE_NM = EX.PAY_PMNTMTD_NM)											THEN 'N'
+					WHEN EX.PAY_PMNTMTD = 'PMNTMTD03' AND (EX.PAY_EXP_DT IS NULL OR EX.PAY_EXP_DT = '')	THEN 'N'
+					WHEN EX.PAY_PMNTMTD = 'PMNTMTD04' AND (EX.PAY_EXT_LOAN_EXP_DT IS NULL OR EX.PAY_EXT_LOAN_EXP_DT = '') THEN 'N'
+					WHEN SM.CLNT_CD IS NULL																THEN 'Y'
+					ELSE																					'N'
+				END AS EXCEL_USE_YN
+
+				, CASE
+					WHEN BM.CLNT_CD IS NULL																THEN '미등록된 거래처 코드'
+					WHEN NOT (BM.CLNT_NM    = EX.CLNT_NM AND BM.CRN        = EX.CRN AND BM.REPST_NM   = EX.REPST_NM) THEN '구매처 정보 불일치'
+					WHEN CM.CODE_ID IS NULL																THEN '미등록된 결제방식 코드'
+					WHEN NOT (CM.CODE_NM = EX.PAY_PMNTMTD_NM)											THEN '확인필요'
+					WHEN EX.PAY_PMNTMTD = 'PMNTMTD03' AND (EX.PAY_EXP_DT IS NULL OR EX.PAY_EXP_DT = '')	THEN '전자어음(만기일) 필수'
+					WHEN EX.PAY_PMNTMTD = 'PMNTMTD04' AND (EX.PAY_EXT_LOAN_EXP_DT IS NULL OR EX.PAY_EXT_LOAN_EXP_DT = '') THEN '전자외담대(만기일) 필수'
+					WHEN SM.CLNT_CD IS NULL																THEN '입력대상'
+					ELSE																					'수정대상'
+				END AS EXCEL_CHECK_RESULT
+
+				<!-- 오류 플래그 설정 -->
+				, CASE WHEN NOT (BM.CLNT_NM = EX.CLNT_NM)                       THEN 'Y' ELSE 'N' END AS ERR_CLNT_NM
+				, CASE WHEN NOT (BM.CRN     = EX.CRN)                          THEN 'Y' ELSE 'N' END AS ERR_CRN
+				, CASE WHEN NOT (BM.REPST_NM= EX.REPST_NM)                      THEN 'Y' ELSE 'N' END AS ERR_REPST_NM
+				, CASE WHEN CM.CODE_ID                        IS NULL
+						OR NOT (CM.CODE_NM = EX.PAY_PMNTMTD_NM)            THEN 'Y' ELSE 'N' END AS ERR_PAY_PMT_NM
+				, CASE WHEN EX.PAY_PMNTMTD = 'PMNTMTD03'
+						AND (EX.PAY_EXP_DT IS NULL OR EX.PAY_EXP_DT = '') THEN 'Y' ELSE 'N' END AS ERR_EXP_DT_MISSING
+				, CASE WHEN EX.PAY_PMNTMTD = 'PMNTMTD04'
+						AND (EX.PAY_EXT_LOAN_EXP_DT IS NULL OR EX.PAY_EXT_LOAN_EXP_DT = '') THEN 'Y' ELSE 'N' END AS ERR_EXT_LOAN_EXP_DT_MISSING
+
+		FROM EXCEL_DATA EX
+						LEFT JOIN TB_CM05M01   CM ON CM.CODE_ID       = EX.PAY_PMNTMTD
+						LEFT JOIN TB_BM02M01   BM ON BM.CLNT_CD       = EX.CLNT_CD
+						LEFT JOIN TB_SM21M01   SM ON SM.CLNT_CD       = EX.CLNT_CD
+												<if test="payInterval != null and payInterval != ''">
+												  AND SM.PAY_INTERVAL = EX.PAY_INTERVAL
+												</if>
+												<if test="payTot != null">
+												  AND SM.PAY_TOT      = EX.PAY_TOT
+												</if>
+												<if test="payAmt != null">
+												  AND SM.PAY_AMT      = EX.PAY_AMT
+												</if>
+												<if test="payPmntmtd != null and payPmntmtd != ''">
+												  AND SM.PAY_PMNTMTD  = EX.PAY_PMNTMTD
+												</if>
+												<if test="payExpDt != null and payExpDt != ''">
+												  AND SM.PAY_EXP_DT   = EX.PAY_EXP_DT
+												</if>
+												<if test="payDt != null and payDt != ''">
+												  AND SM.PAY_DT       = EX.PAY_DT
+												</if>
+												<if test="billNo != null and billNo != ''">
+												  AND SM.BILL_NO      = EX.BILL_NO
+												</if>
+	</select>
+
 	<insert id="insert_sm30" parameterType="Map">
 		INSERT INTO TB_SM30M01
 			(
