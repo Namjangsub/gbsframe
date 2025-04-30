@@ -6,7 +6,6 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,7 +16,6 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.sm.sm20.service.SM20Svc;
 import com.dksys.biz.util.MessageUtils;
-import com.dksys.biz.util.ObjectUtil;
 
 @Controller
 @RequestMapping("/user/sm/sm20")
@@ -39,8 +37,8 @@ public class SM20Ctr {
 	// 거래처별 매입 확정 상세 조회
 	@PostMapping(value = "/sm20_main_grid2_selectList")
 	public String sm20_main_grid2_selectList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> result = sm20Svc.sm20_main_grid2_selectList(paramMap);
-		model.addAttribute("result", result);
+		model.addAttribute("result", sm20Svc.sm20_main_grid2_selectList(paramMap));
+		model.addAttribute("grid3", sm20Svc.sm20_main_grid3_selectList(paramMap));
 		return "jsonView";
 	}
 

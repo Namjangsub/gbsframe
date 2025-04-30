@@ -1,25 +1,26 @@
 package com.dksys.biz.user.sm.sm20.service.impl;
 
-import com.google.gson.*;
-import com.google.gson.reflect.TypeToken;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
-
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
-import com.dksys.biz.util.ExceptionThrower;
-import com.dksys.biz.user.sm.sm20.mapper.SM20Mapper;
-import com.dksys.biz.user.sm.sm20.service.SM20Svc;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
+
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.user.sm.sm20.mapper.SM20Mapper;
+import com.dksys.biz.user.sm.sm20.service.SM20Svc;
+import com.dksys.biz.user.sm.sm21.mapper.SM21Mapper;
+import com.dksys.biz.util.ExceptionThrower;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -28,6 +29,9 @@ public class SM20SvcImpl implements SM20Svc {
 	@Autowired
 	SM20Mapper sm20Mapper;
 	
+	@Autowired
+	SM21Mapper sm21Mapper;
+
 	@Autowired
 	SM20Svc sm20Svc;
 	
@@ -48,6 +52,11 @@ public class SM20SvcImpl implements SM20Svc {
 	@Override
 	public List<Map<String, String>> sm20_main_grid2_selectList(Map<String, String> paramMap) {		
 		return sm20Mapper.sm20_main_grid2_selectList(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> sm20_main_grid3_selectList(Map<String, String> paramMap) {
+		return sm20Mapper.sm20_main_grid3_selectList(paramMap);
 	}
 
 	// 그리드 카운트
@@ -85,26 +94,54 @@ public class SM20SvcImpl implements SM20Svc {
 	public int update_sm20_payYn(Map<String, String> paramMap) throws Exception {
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap);
 		
-		//---------------------------------------------------------------
-		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
-		//   필수값 :  jobType, userId, comonCd
-		//---------------------------------------------------------------
-		HashMap<String, String> param = new HashMap<>();
-		param.put("userId", paramMap.get("userId"));
-		param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
-		
+//		HashMap<String, String> param = new HashMap<>();
+//		param.put("userId", paramMap.get("userId"));
+//		param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
+		String jobYn = paramMap.get("jobYn"); // Y:지급등록, N:지급취소, U:지급연결(대량데이터 연결 처리)
+
 		int result = 0;
-		
-		//upate
-		for(Map<String, String> dtl : detailMap) {
-			dtl.put("userId", paramMap.get("userId"));
-			dtl.put("pgmId", paramMap.get("pgmId"));
-			dtl.put("creatId", paramMap.get("userId"));
-			
-			result += sm20Mapper.update_sm20_payYn(dtl);
+
+		// ---------------------------------------------------------------
+		// 지급 처리 구분자
+		// Y : 대금지급 개별 등록 (계산서 발행번호 필수)
+		// N : 대금지금 취소처리 (계산서 발행번호 필수, 지급내겨 선택 필수)
+		// U : 지금지급 연결처리 (계산서 발행번호 필수, 지급내겨 선택 필수)
+		// D : 지급내역 삭제처리 (계산서 발행번호 필수, 지급내겨 선택 필수)
+		// ---------------------------------------------------------------
+//		result += sm20Mapper.update_sm20_payYn(paramMap);
+
+		if (jobYn.equals("Y")) { // 대금지급
+			paramMap.put("fileTrgtKey", sm21Mapper.select_sm21_SeqNext(paramMap));
+			result += sm21Mapper.insert_sm21_payChk(paramMap);
 		}
+
+		//upate
+		if (!jobYn.equals("Y")) { // 대금지급연결
+//			String payType = paramMap.get("payType");
+//			String payInterval = paramMap.get("payInterval");
+//			String payDt = paramMap.get("payDt");
+			List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("makeArr"), dtlMap); // 대금 결제현황정보 리스트 정보
+			for (Map<String, String> dtl : detailMap) {
+    			if (jobYn.equals("U")) { // 대금지급연결
+					dtl.put("billNo", paramMap.get("billNo"));
+					dtl.put("userId", paramMap.get("userId"));
+					dtl.put("pgmId", paramMap.get("pgmId"));
+					result += sm21Mapper.update_sm21_payChk(dtl);
+				} else if (jobYn.equals("N")) { // 취소처리
+					dtl.put("billNo", "");
+					dtl.put("userId", paramMap.get("userId"));
+					dtl.put("pgmId", paramMap.get("pgmId"));
+					result += sm21Mapper.update_sm21_payChk(dtl);
+				} else if (jobYn.equals("D")) { // 삭제처리
+					result += sm21Mapper.delete_sm21_payChk(dtl);
+    			}
+
+			}
+		}
+		// 대금 지불 완료/미결 처리
+		result += sm20Mapper.update_sm20_payCompleteChke(paramMap);
+
 		return result;
 	}
 	

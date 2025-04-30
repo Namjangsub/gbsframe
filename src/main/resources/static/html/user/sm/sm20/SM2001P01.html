@@ -66,9 +66,12 @@
 						<input comma type="text" id="billAmt" name="billAmt" readonly="readonly">
 					</td>
 
-					<!-- 빈값추가 -->
-					<th></th>
-					<th></th>
+					<th>발행부서</th>
+					<td>
+						<input type="hidden" id="deptId" name="deptId" readonly="readonly">
+						<input type="text" id="deptNm" name="deptNm" readonly="readonly">
+					</td>
+
 				</tr>
 
 				<!-- 3행 -->
@@ -102,15 +105,25 @@
 	</form>
 	
 	<!-- 콘텐츠 -->
-	<div class="contents">
-		<!-- 리스트 -->
-		<div class="ax5_grid">
-			<div>
-				<div data-ax5grid="first-grid-modal" data-ax5grid-config="{}" style="height:500px; width: 100%" ></div>
-			</div>
+	<div class="contents2">
+	    <!-- 리스트 -->
+		<div class="ax5_grid" style="width: 100%">
+	        <ul class="ul_list" style="width: 100%">
+	            <li style="width: 100%;">
+	                <div class="table_list_tit" style="width: 100%;">
+	                	<h5 class="tit" style="float:left; margin-left: 8px; margin-top: 1px; margin-bottom: 1px;">상세 리스트</h5>       
+	                </div>      
+		                <div class="add_btn pdl10" style="margin-right:8px;">
+<!-- 		                    <a id="inProcessCheck" style="height: 30px; line-height: 25px; width: 80px;" authchk><i class="fas fa-check-double"></i> 전체선택 </a> -->
+		                    <input type="checkbox" id="inProcessCheck" name="inProcessCheck" value="Y" data-label="전체선택"><label for="inProcessCheck">전체선택</label>
+		                </div>	   
+	                <div>
+	                	<div data-ax5grid="first-grid-modal" data-ax5grid-config="{}" style="height:500px; width: 100%" ></div>
+	                </div>
+	            </li>
+	        </ul>	
 		</div>
 	</div>
-	
 	<!-- 공통 파일 영역 -->
 	<div id="fileList_area"></div>
 </div>
@@ -126,6 +139,10 @@
 	var fileTrgtKey = null;
 	var clntCd = null;
 	var clntNm = null;
+	var deptId = null;
+	var deptNm = null;
+	var pchsClmnDay = null;
+	var trunDiv = null;
 	var detailArr   = []; // 상세 그리드내용
 	let loadData = {};
 
@@ -136,7 +153,7 @@
 				//frozenColumnIndex : 3,
 				showLineNumber : true,
 				// 체크박스
-				//showRowSelector: true,
+				showRowSelector: false,
 				multipleSelect : false,
 				sortable       : true,
 				target : $('[data-ax5grid="first-grid-modal"]'),
@@ -144,28 +161,25 @@
 					align   : "center",
 					selector: false
 				},
-				
 				body : {
 					mergeCells : ["ordrgNo", "ordrgSeq", "pchsNo", "pchsSeq", "salesCd", "dsgnNo"],
 					onClick: function () {
 						this.self.select(this.dindex);
 						var row = this.dindex;
 						var col = this.colIndex;
-						var key = this.column.key;						
-						var paramObj = {"row" : row};
-					    var vatRate = 10;
+						var key = this.column.key;		
+// 					    var vatRate = 10;
 						//체크박스일 경우 실행
 						if( key == "chk" ) {
-							setAmt(ModalgridView, this.item.chk , this.item.pchsAmt, row, vatRate);                        		
+							setAmt(ModalgridView, this.item.chk , this.item.pchsAmt, row, this.item.vatRate);                        		
 						}
 					},
 					onDBLClick: function () {
-						//this.self.select(this.dindex);
+						//this.self.select(this.dindex);	
 					},
 					onDataChanged: function () {
-					},
+					}
 				},
-				
 				page : {
 					navigationItemCount: 9,
 					height: 30,
@@ -180,7 +194,7 @@
 				},
 				footSum : [
 					[
-						{label: "합계", colspan:4, align:"center"},
+						{label: "합계", colspan:5, align:"center"},
 						{key: "pchsAmt"   , collector: "sum", formatter:"money", align: "right"},
 						{key: "pchsVat"   , collector: "sum", formatter:"money", align: "right"},
 						{key: "pchsSumAmt", collector: "sum", formatter:"money", align: "right"},
@@ -192,21 +206,22 @@
 					]
 				],
 				columns: [
-					{key: "ordrgNo"   , label: "발주(비용)번호", align: "center", width: 120},
+					{key: "ordrgNo"   , label: "발주(비용)번호", align: "center", width: 100},
 					{key: "ordrgSeq"  , label: "순번"          , align: "center", width: 120, hidden: true},
-					{key: "pchsNo"    , label: "매입번호"      , align: "center", width: 120},
-					{key: "pchsSeq"   , label: "순번"          , align: "center", width: 120, hidden: true},
-					{key: "salesCd"   , label: "Sales Code"    , align: "center", width: 150},
+					{key: "pchsNo"    , label: "매입번호"      , align: "center", width: 100},
+					{key: "ctrtNo"    , label: "계약번호"      , align: "center", width: 100},
+					{key: "pchsSeq"   , label: "순번"          , align: "center", width: 40, hidden: true},
+					{key: "salesCd"   , label: "Sales Code"    , align: "center", width: 120},
 					{key: "dsgnNo"    , label: "대표도번"      , align: "left"  , width: 250},
 					{key: "pchsAmt"   , label: "매입금액"      , align: "right" , width: 100, formatter: "money"},
 					{key: "pchsVat"   , label: "부가세"        , align: "right" , width: 100, formatter: "money"},
 					{key: "pchsSumAmt", label: "합계금액"      , align: "right" , width: 100, formatter: "money"},
 					{key: "pchsDt"    , label: "확정일자"      , align: "center", width: 90},
-					{key: "creatIdNm" , label: "담당자"        , align: "center", width: 100},
+					{key: "creatIdNm" , label: "담당자"        , align: "center", width: 80},
 					{key: "billDtlAmt"   , label: "발행금액"    , align: "right" , width: 100, formatter: "money"},
 					{key: "billDtlVat"   , label: "발행부가세"  , align: "right" , width: 100, formatter: "money"},
 					{key: "billDtlTot"   , label: "발행금액합계", align: "right" , width: 100, formatter: "money"},
-					{key: "chk"       , label: "선택"          , align: "center", width: 40 , sortable: false,
+					{key: "chk"       , label: "선택"          , align: "center", width: 60 , sortable: false,
 						editor: {
 							type   : "checkbox",
 							config : {
@@ -229,10 +244,17 @@
 			if (billNo == "") {
 				formData = {
 					"coCd": $('#coCd').val(),
-					"clntCd": $('#clntCd').val(),
-					"currCd": $('#currCd').val()
+					"clntCd": clntCd,
+					"currCd": $('#currCd').val(),
+					"deptId": deptId,
+					"deptNm": deptNm,
+					"pchsDtfrom" : $('#pchsDtfrom_S').val().replace(/-/g, ''),
+					"pchsDtto" : $('#pchsDtto_S').val().replace(/-/g, ''),
+					"pchsClmnDay" : pchsClmnDay,
+					"trunDiv" : trunDiv,
+					"clntCd" : clntCd,
+					"clntNm" : clntNm
 				}
-				// debugger;
 				postAjax("/user/sm/sm20/select_sm20_insert_target_modal", formData, null, function(data) {
 					var list = data.result;
 					gridResize(list.length); //그리드 높이 조정
@@ -242,15 +264,22 @@
 							totalElements: list.length
 						}
 					});
+					$('#inProcessCheck').prop('checked', true);
+					for (let i = 0; i < list.length; i++) {
+						targetObj.setValue(i, 'chk', "Y");
+						setAmt(ModalgridView, 'Y' , list[i].pchsAmt, i, list[i].vatRate);
+				    }
 				});
 			} else {
 				formData = {
 					"coCd": $('#coCd').val(),
 					"billNo": $('#billNo').val()
 				}
-				// debugger;
 				postAjax("/user/sm/sm20/select_sm20_Info_Dtl", formData, null, function(data) {
 					var list = data.result;
+					$.each(list, function (idx, elem) {
+						list[idx].__selected__ = true;
+					});
 					gridResize(list.length); //그리드 높이 조정
 					targetObj.setData({
 						list : list,
@@ -266,7 +295,6 @@
 	
 	//화면 초기 설정
 	$(document).ready(function() {
-		// debugger;
 		
 		setCommonSelect($(".popup_area select[data-kind]"));
 		setByCoCd(modalStack.last().paramObj.coCd);
@@ -298,6 +326,10 @@
 		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
 		clntCd = modalStack.last().paramObj.clntCd;
 		clntNm = modalStack.last().paramObj.clntNm;
+		deptId = modalStack.last().paramObj.deptId;
+		deptNm = modalStack.last().paramObj.deptNm;
+		pchsClmnDay = modalStack.last().paramObj.pchsClmnDay;
+		trunDiv = modalStack.last().paramObj.trunDiv;
 		if (actionType == "C") {			
 			$('#popForm .coCd').addClass('hit');
 			$('#popForm input#coCd').attr('required', 'required');
@@ -315,6 +347,8 @@
 			if (clntCd != undefined) {
 				$("#popForm #clntCd").val(clntCd);
 				$("#popForm #clntNm").val(clntNm);
+				$("#popForm #deptId").val(deptId);
+				$("#popForm #deptNm").val(deptNm);
 				Modal_DataSearch();
 			}
 
@@ -343,9 +377,8 @@
 			$('#billVat').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
 			
 			// 입력용 체크박스 컬럼 삭제
-			// debugger;
-			ModalgridView.target.removeColumn(14);
-
+			ModalgridView.target.removeColumn(15); //수정일경우 선택필드 제거함.
+			$("#inProcessCheck").hide().next("label").hide();
 			//수정 모드 데이터 가져오기
 			select_sm20_Info();
 			
@@ -357,6 +390,20 @@
 				update_sm20();
 			});
 		}
+		
+		//전체 선택 버튼 기능
+	    $("#inProcessCheck").on("click", function () {
+	        let rowList = ModalgridView.target.list;
+	        if (!rowList) {
+	            return false;
+	        }
+	        const status = $("#inProcessCheck").is(":checked") ? 'Y' : 'N';
+	        $.each(rowList, function (idx, elem) {
+				setAmt(ModalgridView, status , elem.pchsAmt, elem.__index, elem.vatRate);  
+	        }); //$.each(rowList
+	        		
+	    });
+	        
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작
 		//---------------------------------------------------------------
@@ -376,7 +423,6 @@
 		var formData = {
 			"fileTrgtKey" : fileTrgtKey,
 		}
-		// debugger;
 		postAjaxSync("/user/sm/sm20/select_sm20_Info", formData, null, function(data) {
 			$.each(data.result, function(key, value) {
 				if ($('#popForm #' + key)[0]) {
@@ -399,7 +445,7 @@
 			var list = ModalgridView.target.list;
 			$.each(list,function(idx, obj) {
 				//신규
-				if (parseFloat(obj.billAmt) > 0 && obj.chk == 'Y') {
+				if (parseFloat(obj.billAmt) != 0 && obj.chk == 'Y') {
 					Insert_Cnt++;
 				}
 			});
@@ -494,7 +540,7 @@
 		
 		$.each(list,function(idx, obj) {
 			//신규
-			if (parseFloat(obj.billAmt) > 0 && obj.chk == 'Y') {
+			if (parseFloat(obj.billAmt) != 0 && obj.chk == 'Y') {
 				obj.dtaChk = 'I';
 				detailArr.push(obj);
 			}
@@ -506,7 +552,7 @@
 		});
 		formData.append("detailArr", JSON.stringify(detailArr));//선택된 ROW 만 formData에 저장
 		//상세자료 끝
-
+		
 		return formData;
 	}
 
@@ -550,7 +596,7 @@
 			var vatRate_s = parseInt(vatRate) / 100;
 
 			if(chkVal == "Y") {
-				if( Amt > 0 ) {
+				if( Amt != 0 ) {
 					gridObj.target.setValue(row, "billAmt", Amt);
 					gridObj.target.setValue(row, "billDtlAmt", Amt);
 					// 부가세 필드 추가한 부분 계산
@@ -571,6 +617,8 @@
 				gridObj.target.setValue(row, "billDtlVat", 0);
 				gridObj.target.setValue(row, "billDtlTot", 0);
 			}
+
+			gridObj.target.setValue(row, "chk", chkVal);
 			setSumAmt();
 		}
 	}
@@ -586,7 +634,7 @@
 
 			$.each(list,function(idx, obj) {
 				//신규
-				if (parseFloat(obj.billAmt) > 0 && obj.chk == 'Y') {
+				if (parseFloat(obj.billAmt) != 0 && obj.chk == 'Y') {
 					SumAmt = SumAmt + parseFloat(obj.billAmt);
 					billVat = billVat + parseFloat(obj.vatAmt);
 				}
@@ -650,13 +698,12 @@
 		
         $.each(list,function(idx, obj) {
             //신규
-            if (parseFloat(obj.billAmt) > 0) {
+            if (parseFloat(obj.billAmt) != 0) {
                 SumAmt = SumAmt + parseFloat(obj.billAmt);
             }
         });
 		billVat = parseInt( deleteCommaStr($('#billVat').val()) );
         printSumAmt = parseFloat(SumAmt) + parseFloat(billVat);
-		// debugger;
 
         $("#popForm #printSumAmt").val(addCommaStr(printSumAmt));
     }

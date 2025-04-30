@@ -63,72 +63,161 @@
 	<select id="sm20_main_grid1_selectList" parameterType="Map" resultType="camelMap">
 		WITH TOT AS
 		(
-		 SELECT DISTINCT D.CO_CD
-		      , CASE WHEN SUBSTR(D.ORDRG_NO,0,3) = 'BAL' THEN M.PCHS_CLNT_CD
-			         WHEN SUBSTR(D.ORDRG_NO,0,3) = 'RET' THEN RM.PCHS_CLNT_CD
-					                                     ELSE C.PCHS_CLNT_CD
-				END AS PCHS_CLNT_CD
-			  , CASE WHEN SUBSTR(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD
-			         WHEN SUBSTR(D.ORDRG_NO,0,3) = 'RET' THEN R.SALES_CD
-					                                     ELSE C.SALES_CD
-				END AS SALES_CD
-			  , D.PCHS_DT AS ORDRG_DT
-			  , CASE WHEN SUBSTR(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD
-			         WHEN SUBSTR(D.ORDRG_NO,0,3) = 'RET' THEN R.DSGN_NO
-					                                     ELSE C.SALES_CD
-				END AS DSGN_NO
-			  , 1 AS ORDRG_QTY            /*발주수량 */
-			  , M.ORDRG_AMT AS ORDRG_AMT  /*발주 금액 */
-			  , D.PCHS_AMT  AS PCHS_AMT   /* 매입금액 */
-			  , D.PCHS_VAT  AS PCHS_VAT   /* 부가세 */
-			  , D.PCHS_QTY  AS PCHS_QTY   /* 수량 */
-			  , TO_CHAR(D.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT
-			  , D.CMPLET_YN AS CMPLET_YN  /* 확정여부 */
-			  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 'N' ELSE 'Y' END AS BILL_YN
-			  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 0 ELSE B.BILL_DTL_AMT END AS COMP_AMT
-			  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 0 ELSE B.BILL_DTL_VAT END AS COMP_VAT
-			  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 0 ELSE B.BILL_DTL_TOT END AS COMP_TOT
-			  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN D.PCHS_AMT ELSE 0 END AS UNCOMP_AMT
-			  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN D.PCHS_VAT ELSE 0 END AS UNCOMP_VAT
-			  , NVL(D.BILL_NO, '') AS BILL_NO
-			  , TO_CHAR(BM.BILL_DT, 'YYYY-MM-DD') AS BILL_DT
-			  , NVL(BM.FILE_TRGT_KEY, 0) AS FILE_TRGT_KEY
-			  , BM.BILL_DT AS BILL_DT_S
-			  , D.PCHS_NO   AS PCHS_NO
-			  , D.PCHS_SEQ  AS PCHS_SEQ
-			  , D.ORDRG_NO  AS ORDRG_NO
-			  , D.ORDRG_SEQ AS ORDRG_SEQ
-		 FROM   TB_SM12D01 AS D  /* 매입 DETAIL */
-		        LEFT OUTER JOIN TB_SM02M01 AS M  ON (D.ORDRG_NO = M.ORDRG_NO)  /* 발주마스터 */
-		        LEFT OUTER JOIN TB_SM20M01 AS BM ON (BM.CO_CD   = D.CO_CD
-				                                 AND BM.BILL_NO = D.BILL_NO)  /* 매입계산서 */
-				LEFT OUTER JOIN TB_SM20D01 AS B  ON (B.CO_CD     = D.CO_CD
-				                                 AND B.BILL_NO   = D.BILL_NO
-												 AND B.PCHS_NO   = D.PCHS_NO
-												 AND B.PCHS_SEQ  = D.PCHS_SEQ
-												 AND B.ORDRG_NO  = D.ORDRG_NO
-												 AND B.ORDRG_SEQ = D.ORDRG_SEQ)  /* 매입계산서 */
-				LEFT OUTER JOIN TB_SM10M01 AS C  ON (D.ORDRG_NO = C.COST_NO)  /* 비용마스터 */
-				LEFT OUTER JOIN TB_SM06D01 AS R  ON (D.ORDRG_NO = R.RET_NO)  /* 반품 상세 */
-				LEFT OUTER JOIN TB_SM06M01 AS RM ON (RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)  /* 반품 상세 */
-		 WHERE  1 = 1
-		 <!-- 회사코드 -->
-		 <if test="coCd != null and !coCd.equals('')">
-		 AND    D.CO_CD = #{coCd}
-		 </if>
-		 <!-- 확정일자 -->
-		 <if test="pchsDtfrom != null and !pchsDtfrom.equals('')">
-		 	<if test="pchsDtto != null and !pchsDtto.equals('')">
-			AND    D.PCHS_DT BETWEEN #{pchsDtfrom} AND #{pchsDtto}
+		SELECT    A.*
+				, D1.CLNT_NM  	AS CLNT_NM
+				, D1.CRN 		/*사업자등록번호*/
+				, D1.REPST_NM 	/*대표자*/
+				, NVL(A.SM10_CLMN_DAY, D1.PCHS_CLMN_DAY) AS PCHS_CLMN_DAY  /*결제일 - 10*/	
+				, NVL2(A.SM10_CLMN_RMK, '', D1.PCHS_CLMN_RMK) AS PCHS_CLMN_RMK   /*결제일 - 다음달 10일*/
+				, NVL(A.SM10_PMNT_MTD_CD, D1.PCHS_PMNT_MTD_CD) AS PCHS_PMNT_MTD_CD  --결제조건 코드
+			    , FN_CM05M01_CD_TO_NM(NVL(A.SM10_PMNT_MTD_CD, D1.PCHS_PMNT_MTD_CD)) AS PCHS_PMNT_MTD_NM /*결제조건명*/
+		  FROM (
+				 SELECT DISTINCT D.CO_CD
+				      , CASE WHEN SUBSTR(D.ORDRG_NO,0,3) = 'BAL' THEN M.PCHS_CLNT_CD
+					         WHEN SUBSTR(D.ORDRG_NO,0,3) = 'RET' THEN RM.PCHS_CLNT_CD
+							                                     ELSE C.PCHS_CLNT_CD
+						END AS PCHS_CLNT_CD
+					  , CASE WHEN SUBSTR(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD
+					         WHEN SUBSTR(D.ORDRG_NO,0,3) = 'RET' THEN R.SALES_CD
+							                                     ELSE C.SALES_CD
+						END AS SALES_CD
+					  , D.PCHS_DT AS ORDRG_DT
+					  , CASE WHEN SUBSTR(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD
+					         WHEN SUBSTR(D.ORDRG_NO,0,3) = 'RET' THEN R.DSGN_NO
+							                                     ELSE C.SALES_CD
+						END AS DSGN_NO
+					  , 1 AS ORDRG_QTY            /*발주수량 */
+					  , M.ORDRG_AMT AS ORDRG_AMT  /*발주 금액 */
+					  , D.PCHS_AMT  AS PCHS_AMT   /* 매입금액 */
+					  , D.PCHS_VAT  AS PCHS_VAT   /* 부가세 */
+					  , D.PCHS_QTY  AS PCHS_QTY   /* 수량 */
+					  , TO_CHAR(D.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT
+					  , D.CMPLET_YN AS CMPLET_YN  /* 확정여부 */
+					  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 'N' ELSE 'Y' END AS BILL_YN
+					  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 0 ELSE B.BILL_DTL_AMT END AS COMP_AMT
+					  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 0 ELSE B.BILL_DTL_VAT END AS COMP_VAT
+					  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 0 ELSE B.BILL_DTL_TOT END AS COMP_TOT
+					  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN D.PCHS_AMT ELSE 0 END AS UNCOMP_AMT
+					  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN D.PCHS_VAT ELSE 0 END AS UNCOMP_VAT
+					  , NVL(D.BILL_NO, '') AS BILL_NO
+					  , TO_CHAR(BM.BILL_DT, 'YYYY-MM-DD') AS BILL_DT
+					  , NVL(BM.FILE_TRGT_KEY, 0) 		AS FILE_TRGT_KEY
+					  , BM.BILL_DT 						AS BILL_DT_S
+					  , BM.PAY_YN  						AS PAY_YN
+					  , BM.PAY_PMNTMTD					AS PAY_PMNTMTD
+					  , BM.PAY_INTERVAL 				AS PAY_INTERVAL
+					  , TO_CHAR(BM.PAY_DT, 'YYYY-MM-DD') AS PAY_DT
+					  , D.PCHS_NO   AS PCHS_NO
+					  , D.PCHS_SEQ  AS PCHS_SEQ
+					  , D.ORDRG_NO  AS ORDRG_NO
+					  , D.ORDRG_SEQ AS ORDRG_SEQ
+					  , NVL(M1.DEPT_ID, SUBSTRING(U.DEPT_ID,0,5))	AS DEPT_ID
+					  , NVL(CE.DEPT_NM, CD.DEPT_NM)	   			    AS DEPT_NM
+					, DECODE (substr(D.ORDRG_NO,0,3), 'COS', C.PCHS_CLMN_DAY, '') 		AS SM10_CLMN_DAY
+					, DECODE (substr(D.ORDRG_NO,0,3), 'COS', C.PCHS_CLMN_DIV_CD, '') 	AS SM10_CLMN_DIV_CD
+					, DECODE (substr(D.ORDRG_NO,0,3), 'COS', C.PCHS_PMNT_MTD_CD, '') 	AS SM10_PMNT_MTD_CD
+					, DECODE (substr(D.ORDRG_NO,0,3), 'COS', 'COST', '') 				AS SM10_CLMN_RMK
+					, CASE #{trunDiv} WHEN 'PCHSCOSTDIV' THEN '' ELSE C.PCHS_COST_DIV10 END	AS PCHS_COST_DIV10
+					, CASE #{trunDiv} WHEN 'PCHSCOSTDIV' THEN '' ELSE C.ORDRS_NO  END		AS ORDRS_NO
+					, CASE #{trunDiv} WHEN 'PCHSCOSTDIV' THEN '' ELSE C.CTRT_NO  END		AS CTRT_NO
+					, BM.APR_REQ_NO		AS APR_REQ_NO	--결재요청번호
+					, SM30.CREAT_ID		AS APR_REQ_ID	--결재요청자
+					, SM30.CREAT_DTTM	AS APR_REQ_DT	--결재요청일시
+					, W20.*
+				 FROM   TB_SM12D01 AS D  /* 매입 DETAIL */
+				        LEFT OUTER JOIN TB_SM12M01 AS M1  ON (D.PCHS_NO = M1.PCHS_NO)  /* 매입확정마스터 */
+				        LEFT OUTER JOIN TB_SM02M01 AS M  ON (D.ORDRG_NO = M.ORDRG_NO)  /* 발주마스터 */
+				        LEFT OUTER JOIN TB_SM20M01 AS BM ON (BM.CO_CD   = D.CO_CD
+						                                 AND BM.BILL_NO = D.BILL_NO)  /* 매입계산서 */
+						LEFT OUTER JOIN TB_SM20D01 AS B  ON (B.CO_CD     = D.CO_CD
+						                                 AND B.BILL_NO   = D.BILL_NO
+														 AND B.PCHS_NO   = D.PCHS_NO
+														 AND B.PCHS_SEQ  = D.PCHS_SEQ
+														 AND B.ORDRG_NO  = D.ORDRG_NO
+														 AND B.ORDRG_SEQ = D.ORDRG_SEQ)  /* 매입계산서 */
+						LEFT OUTER JOIN TB_SM10M01 AS C  ON (D.ORDRG_NO = C.COST_NO)  /* 비용마스터 */
+						LEFT OUTER JOIN TB_SM06D01 AS R  ON (D.ORDRG_NO = R.RET_NO)  /* 반품 상세 */
+						LEFT OUTER JOIN TB_SM06M01 AS RM ON (RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)  /* 반품 상세 */
+						LEFT OUTER JOIN TB_CM06M01 U ON U.ID = D.CREAT_ID
+						LEFT OUTER JOIN TB_CM04M01 CD ON CD.DEPT_ID = SUBSTRING(U.DEPT_ID,0,5)
+						LEFT OUTER JOIN TB_CM04M01 CE ON CE.DEPT_ID = SUBSTRING(M1.DEPT_ID,0,5)
+						LEFT OUTER JOIN TB_SM30M01 SM30 ON SM30.FILE_TRGT_KEY = BM.APR_REQ_NO
+			  			LEFT OUTER JOIN (
+								  			SELECT     
+											    min(TODO_NO) AS TODO_NO
+												, MAX(CASE WHEN TODO_ID = 'knj' THEN TODO_ID ELSE NULL END) 					AS APR_ID1
+												, MAX(CASE WHEN TODO_ID = 'knj' THEN NVL(SANCTN_STTUS, 'N') ELSE NULL END) 		AS APR_YN1
+												, MAX(CASE WHEN TODO_ID = 'knj' THEN NVL(TODO_CF_DT, '') ELSE NULL END) 		AS APR_DT1
+												, MAX(CASE WHEN TODO_ID = 'js.nam' THEN TODO_ID ELSE NULL END) 					AS APR_ID2
+												, MAX(CASE WHEN TODO_ID = 'js.nam' THEN NVL(SANCTN_STTUS, 'N') ELSE NULL END) 	AS APR_YN2
+												, MAX(CASE WHEN TODO_ID = 'js.nam' THEN NVL(TODO_CF_DT, '') ELSE NULL END) 		AS APR_DT2
+												, MAX(CASE WHEN TODO_ID = 'EMJ8105' THEN TODO_ID ELSE NULL END) 				AS APR_ID3
+												, MAX(CASE WHEN TODO_ID = 'EMJ8105' THEN NVL(SANCTN_STTUS, 'N') ELSE NULL END) 	AS APR_YN3
+												, MAX(CASE WHEN TODO_ID = 'EMJ8105' THEN NVL(TODO_CF_DT, '') ELSE NULL END) 	AS APR_DT3
+											 FROM TB_WB20M03
+											WHERE TODO_DIV2_CODE_ID = 'TODODIV2170'  -- 결제진행상태	  
+											GROUP BY  TODO_NO
+			  							) AS W20 ON W20.TODO_NO = BM.APR_REQ_NO
+				 WHERE  1 = 1
+				 <!-- 회사코드 -->
+				 <if test="coCd != null and !coCd.equals('')">
+				   AND D.CO_CD = #{coCd}
+				 </if>
+				 <!-- 확정일자 -->
+				 <if test="pchsDtfrom != null and !pchsDtfrom.equals('')">
+				 	<if test="pchsDtto != null and !pchsDtto.equals('')">
+				   AND D.PCHS_DT BETWEEN #{pchsDtfrom} AND #{pchsDtto}
+					</if>
+				 </if>
+				 <!-- 매입구분 -->
+				 <if test="pchsGb != null and !pchsGb.equals('')">
+				   AND substr(D.ORDRG_NO,0,3) = #{pchsGb} /* '':전체, 'BAL':발주, 'RET':반납, 'COS':비용*/
+				 </if>
+				 <!-- 청구/영수 구분 -->
+				 <if test="payDiv != null and !payDiv.equals('')">
+				   AND NVL(C.PAY_DIV,'PAYDIV02') = #{payDiv}  --기타비용의 경우 청구(PAYDIV02)인 경우만 구매현황에 출력함.
+				   AND D.PAY_DIV = #{payDiv} /* 영수, 청구 구분*/ --매입확정의 경우에도 청구(PAYDIV02)인 경우만 구매현황에 출력함.
+				 </if>	
+				 <!-- 부서구분 -->	
+				 <if test="deptId !=null and !deptId.equals('')">
+				 	 <if test="deptId.equals('TRN50')">
+				 	 AND SUBSTRING(M1.DEPT_ID,0,5) = #{deptId}
+					 </if>
+					 <if test="!deptId.equals('TRN50')">
+					 AND SUBSTRING(M1.DEPT_ID,0,5) != 'TRN50'
+					 </if>
+				 </if>	
+				 <if test="trunDiv != null and !trunDiv.equals('')">
+				 	 <if test="trunDiv.equals('PCHSCOSTDIV1030')">
+ 				   AND NVL(C.PCHS_COST_DIV10,'A') =  #{trunDiv}  --기타비용의 경우 턴키(PCHSCOSTDIV1030)인 경우만 처리됨
+					 </if>	
+					 <if test="!trunDiv.equals('PCHSCOSTDIV1030')">
+				   AND NVL(C.PCHS_COST_DIV10,'A') !=  'PCHSCOSTDIV1030'  --기타비용의 경우 턴키(PCHSCOSTDIV1030)가 아닌것
+					 </if> 
+				 </if>	 
+			) AS A
+     				LEFT OUTER JOIN TB_BM02M01 D1 ON A.PCHS_CLNT_CD = D1.CLNT_CD   --거래처마스터
+			WHERE 1 = 1
+			<!-- 청구/영수 구분 -->
+			<if test="pchsClmnDay != null and !pchsClmnDay.equals('')">
+			 AND NVL(A.SM10_CLMN_DAY, D1.PCHS_CLMN_DAY) =  #{pchsClmnDay}
 			</if>
-		 </if>
+			 <!-- 구매처 -->
+			 <if test="clntCd != null and !clntCd.equals('')">
+			 AND    A.PCHS_CLNT_CD = #{clntCd}
+			 </if>
+			 <if test="clntNm != null and !clntNm.equals('')">
+			 AND    D1.CLNT_NM LIKE '%'||#{clntNm}||'%'
+			 </if>
 		)
 		, MI AS
 		(
 		 --미발행
-		 SELECT DISTINCT A.CO_CD                      AS CO_CD
+		 SELECT A.CO_CD                      AS CO_CD
 		      , A.PCHS_CLNT_CD                        AS CLNT_CD
-			  , C.CLNT_NM                             AS CLNT_NM
+			  , A.CLNT_NM                             AS CLNT_NM
+			  , A.ORDRS_NO						  	  AS ORDRS_NO
+			  , A.CTRT_NO						  	  AS CTRT_NO
 			  , SUM(A.PCHS_QTY)                       AS PCHS_QTY    /* 수량 */
 			  , SUM(A.PCHS_AMT)                       AS PCHS_AMT    /* 매입금액 */
 			  , SUM(A.PCHS_VAT)                       AS PCHS_VAT    /* 부가세 */
@@ -143,28 +232,32 @@
 			  , MIN(A.BILL_NO)                        AS BILL_NO
 			  , MIN(A.BILL_DT)                        AS BILL_DT
 			  , 'N'                                   AS BILL_YN
-			  , NVL(MIN(B.PAY_YN), '')                AS PAY_YN
+			  , NVL(MIN(A.PAY_YN), '')                AS PAY_YN
+			  , MAX(A.PAY_PMNTMTD)  				  AS PAY_PMNTMTD
+			  , MAX(A.PAY_INTERVAL) 				  AS PAY_INTERVAL
+			  , MAX(A.PAY_DT) 				  		  AS PAY_DT
+			  , MAX(A.CRN)							  AS CRN
+			  , MAX(A.REPST_NM)						  AS REPST_NM
+			  , MAX(A.PCHS_PMNT_MTD_CD)				  AS PCHS_PMNT_MTD_CD
+			  , MAX(A.PCHS_PMNT_MTD_NM)				  AS PCHS_PMNT_MTD_NM
+			  , MAX(A.APR_REQ_NO)				  	  AS APR_REQ_NO
+			  , MAX(A.APR_YN2)				  		  AS APR_YN2
+			  , MAX(A.APR_YN3)				  		  AS APR_YN3
+			  , MAX(A.APR_REQ_ID)				  	  AS APR_REQ_ID
+			  , MAX(A.APR_REQ_DT)				  	  AS APR_REQ_DT
 		 FROM   TOT AS A
-				LEFT OUTER JOIN TB_SM20M01 AS B  ON A.CO_CD   = B.CO_CD
-		                                        AND A.BILL_NO = B.BILL_NO
-				LEFT OUTER JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD  --거래처마스터
 		 WHERE  1 = 1
 		 AND    A.BILL_YN = 'N'
-		 <!-- 구매처 -->
-		 <if test="clntCd != null and !clntCd.equals('')">
-		 AND    A.PCHS_CLNT_CD = #{clntCd}
-		 </if>
-		 <if test="clntNm != null and !clntNm.equals('')">
-		 AND    C.CLNT_NM LIKE '%'||#{clntNm}||'%'
-		 </if>
-		 GROUP BY A.CO_CD, A.PCHS_CLNT_CD, C.CLNT_NM, A.FILE_TRGT_KEY
+		 GROUP BY A.CO_CD, A.PCHS_CLNT_CD, A.ORDRS_NO, A.CLNT_NM, A.CTRT_NO, A.FILE_TRGT_KEY
 		)
 		, BILL AS
 		(
 		 --발행
 		 SELECT DISTINCT A.CO_CD                      AS CO_CD
 		      , A.PCHS_CLNT_CD                        AS CLNT_CD
-			  , C.CLNT_NM                             AS CLNT_NM
+			  , A.CLNT_NM                             AS CLNT_NM
+			  , A.ORDRS_NO						  	  AS ORDRS_NO
+			  , A.CTRT_NO						  	  AS CTRT_NO
 			  , SUM(A.PCHS_QTY)                       AS PCHS_QTY    /* 수량 */
 			  , SUM(A.PCHS_AMT)                       AS PCHS_AMT    /* 매입금액 */
 			  , SUM(A.PCHS_VAT)                       AS PCHS_VAT    /* 부가세 */
@@ -179,31 +272,29 @@
 			  , MIN(A.BILL_NO)                        AS BILL_NO
 			  , MIN(A.BILL_DT)                        AS BILL_DT
 			  , 'Y'                                   AS BILL_YN
-			  , NVL(MIN(B.PAY_YN), 'N')               AS PAY_YN
+			  , NVL(MIN(A.PAY_YN), 'N')               AS PAY_YN
+			  , MAX(A.PAY_PMNTMTD)  				  AS PAY_PMNTMTD
+			  , MAX(A.PAY_INTERVAL) 				  AS PAY_INTERVAL
+			  , MAX(A.PAY_DT) 				  		  AS PAY_DT
+			  , MAX(A.CRN)							  AS CRN
+			  , MAX(A.REPST_NM)						  AS REPST_NM
+			  , MAX(A.PCHS_PMNT_MTD_CD)				  AS PCHS_PMNT_MTD_CD
+			  , MAX(A.PCHS_PMNT_MTD_NM)				  AS PCHS_PMNT_MTD_NM
+			  , MAX(A.APR_REQ_NO)				  	  AS APR_REQ_NO
+			  , MAX(A.APR_YN2)				  		  AS APR_YN2
+			  , MAX(A.APR_YN3)				  		  AS APR_YN3
+			  , MAX(A.APR_REQ_ID)				  	  AS APR_REQ_ID
+			  , MAX(A.APR_REQ_DT)				  	  AS APR_REQ_DT
 		 FROM   TOT AS A
-		        LEFT OUTER JOIN TB_SM20M01 AS B  ON A.CO_CD   = B.CO_CD
-		                                        AND A.BILL_NO = B.BILL_NO
-				LEFT OUTER JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD  --거래처마스터
 		 WHERE  1 = 1
 		 AND    A.BILL_YN = 'Y'
-		 <!-- 구매처 -->
-		 <if test="clntCd != null and !clntCd.equals('')">
-		 AND    A.PCHS_CLNT_CD = #{clntCd}
-		 </if>
-		 <if test="clntNm != null and !clntNm.equals('')">
-		 AND    C.CLNT_NM LIKE '%'||#{clntNm}||'%'
-		 </if>
-		 <!-- 발행일자 -->
-		 <!-- <if test="dtfrom != null and !dtfrom.equals('')">
-		 	<if test="dtto != null and !dtto.equals('')">
-			AND    A.BILL_DT_S BETWEEN #{dtfrom} AND #{dtto}
-			</if>
-		 </if> -->
-		 GROUP BY A.CO_CD, A.PCHS_CLNT_CD, C.CLNT_NM, A.FILE_TRGT_KEY
+		 GROUP BY A.CO_CD, A.PCHS_CLNT_CD, A.ORDRS_NO, A.CLNT_NM, A.CTRT_NO, A.FILE_TRGT_KEY
 		)
 		SELECT DISTINCT A.CO_CD  AS CO_CD
 		     , A.CLNT_CD         AS CLNT_CD
 			 , A.CLNT_NM         AS CLNT_NM
+			 , A.ORDRS_NO		 AS ORDRS_NO
+			 , A.CTRT_NO		 AS CTRT_NO
 			 , SUM(A.PCHS_QTY)   AS PCHS_QTY
 			 , SUM(A.PCHS_AMT)   AS PCHS_AMT
 			 , SUM(A.PCHS_VAT)   AS PCHS_VAT
@@ -214,6 +305,31 @@
 			 , SUM(A.UNCOMP_AMT) AS UNCOMP_AMT
 			 , SUM(A.UNCOMP_VAT) AS UNCOMP_VAT
 			 , SUM(A.UNCOMP_TOT) AS UNCOMP_TOT
+			 , A.BILL_NO
+			 , A.BILL_DT
+			 , MAX(A.PAY_YN)     					AS PAY_YN
+			 , MAX(A.PAY_PMNTMTD)   				AS PAY_PMNTMTD
+			 , FN_CM05M01_CD_TO_NM(MAX(A.PAY_PMNTMTD)) AS PAY_PMNTMTD_NM
+			 , MAX(A.PAY_INTERVAL) 					AS PAY_INTERVAL
+			 , MAX(A.PAY_DT) 						AS PAY_DT
+			 , MAX(A.CRN)							  AS CRN
+			 , MAX(A.REPST_NM)						  AS REPST_NM
+			 , MAX(A.PCHS_PMNT_MTD_CD)				  AS PCHS_PMNT_MTD_CD
+			 , MAX(A.PCHS_PMNT_MTD_NM)				  AS PCHS_PMNT_MTD_NM
+			 , CR.CLNT_PJT
+			 , FN_CM05M01_CD_TO_NM(CR.CLNT_PJT) 	AS CLNT_PJT_NM
+			 , CR.ORDRS_CLNT_CD					AS CUST_ID
+			 , D1.CLNT_NM						AS CUST_NM
+			 , A.CTRT_NO
+			  , MAX(A.APR_REQ_NO)				  	  AS APR_REQ_NO
+			  , MAX(A.APR_YN2)				  		  AS APR_YN2
+			  , MAX(A.APR_YN3)				  		  AS APR_YN3
+			  , DECODE(MAX(A.APR_REQ_NO),'','N','Y')  AS APR_REQ_STS
+			  , MAX(A.APR_REQ_ID)				  	  AS APR_REQ_ID
+			  , FN_CM06M01_ID_TO_NM(MAX(A.APR_REQ_ID)) AS APR_REQ_ID_NM
+			  , TO_CHAR(MAX(A.APR_REQ_DT),'YYYY-MM-DD')  	  AS APR_REQ_DT
+			  , MAX(SM11.FILE_TRGT_KEY)			  		AS SM11_FILE_TRGT_KEY
+			  , SM11.CTRT_APPROVAL_NO			  	AS CTRT_APPROVAL_NO
 		FROM   (
 		        SELECT *
 		        FROM   (
@@ -227,79 +343,138 @@
 		                WHERE  1 = 1
 		                <!-- 발행여부 -->
 						<if test="billYn != null and !billYn.equals('')">
-						AND    A.BILL_YN LIKE #{billYn}
+						AND    A.BILL_YN = #{billYn}
 						</if>
 		               ) AS A
 		        WHERE  1 = 1
 		       ) AS A
+		           LEFT OUTER JOIN TB_CR02M01 AS CR ON CR.ORDRS_NO = A.ORDRS_NO 		--수주마스터 
+				   LEFT OUTER JOIN TB_BM02M01 AS D1 ON CR.ORDRS_CLNT_CD = D1.CLNT_CD   --거래처마스터 CTRT_NO, CTRT_NO_SEQ
+				   LEFT OUTER JOIN TB_SM11M01 SM11 ON SM11.CTRT_NO = A.CTRT_NO
 		WHERE  1 = 1
-		GROUP BY A.CO_CD, A.CLNT_CD, A.CLNT_NM
-		ORDER BY A.CO_CD, A.CLNT_CD, A.CLNT_NM
+		GROUP BY A.CO_CD, SM11.CTRT_APPROVAL_NO, D1.CLNT_NM, CR.ORDRS_CLNT_CD, CR.CLNT_PJT, A.ORDRS_NO, A.CTRT_NO, A.CLNT_NM, A.CLNT_CD, A.BILL_NO, A.BILL_DT
+		ORDER BY A.CO_CD, SM11.CTRT_APPROVAL_NO, D1.CLNT_NM, CR.ORDRS_CLNT_CD, CR.CLNT_PJT, A.ORDRS_NO, A.CTRT_NO, A.CLNT_NM, A.CLNT_CD, A.BILL_NO, A.BILL_DT
 	</select>
 
 	<select id="sm20_main_grid2_selectList" parameterType="Map" resultType="camelMap">
 		WITH TOT AS
 		(
-		 --매입확정전체
-		 SELECT DISTINCT D.CO_CD
-		      , CASE WHEN SUBSTR(D.ORDRG_NO,0,3) = 'BAL' THEN M.PCHS_CLNT_CD
-			         WHEN SUBSTR(D.ORDRG_NO,0,3) = 'RET' THEN RM.PCHS_CLNT_CD
-					                                     ELSE C.PCHS_CLNT_CD
-				END AS PCHS_CLNT_CD
-			  , CASE WHEN SUBSTR(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD
-			         WHEN SUBSTR(D.ORDRG_NO,0,3) = 'RET' THEN R.SALES_CD
-					                                     ELSE C.SALES_CD
-				END AS SALES_CD
-			  , D.PCHS_DT AS ORDRG_DT
-			  , CASE WHEN SUBSTR(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD
-			         WHEN SUBSTR(D.ORDRG_NO,0,3) = 'RET' THEN R.DSGN_NO
-					                                     ELSE C.SALES_CD
-				END AS DSGN_NO
-			  , 1 AS ORDRG_QTY            /*발주수량 */
-			  , M.ORDRG_AMT AS ORDRG_AMT  /*발주 금액 */
-			  , D.PCHS_AMT  AS PCHS_AMT   /* 매입금액 */
-			  , D.PCHS_VAT  AS PCHS_VAT   /* 부가세 */
-			  , D.PCHS_QTY  AS PCHS_QTY   /* 수량 */
-			  , TO_CHAR(D.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT
-			  , D.CMPLET_YN AS CMPLET_YN  /* 확정여부 */
-			  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 'N' ELSE 'Y' END AS BILL_YN
-			  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 0 ELSE B.BILL_DTL_AMT END AS COMP_AMT
-			  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 0 ELSE B.BILL_DTL_VAT END AS COMP_VAT
-			  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 0 ELSE B.BILL_DTL_TOT END AS COMP_TOT
-			  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN D.PCHS_AMT ELSE 0 END AS UNCOMP_AMT
-			  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN D.PCHS_VAT ELSE 0 END AS UNCOMP_VAT
-			  , NVL(D.BILL_NO, '') AS BILL_NO
-			  , TO_CHAR(BM.BILL_DT, 'YYYY-MM-DD') AS BILL_DT
-			  , NVL(BM.FILE_TRGT_KEY, 0) AS FILE_TRGT_KEY
-			  , BM.BILL_DT AS BILL_DT_S
-			  , D.PCHS_NO   AS PCHS_NO
-			  , D.PCHS_SEQ  AS PCHS_SEQ
-			  , D.ORDRG_NO  AS ORDRG_NO
-			  , D.ORDRG_SEQ AS ORDRG_SEQ
-		 FROM   TB_SM12D01 AS D  /* 매입 DETAIL */
-		        LEFT OUTER JOIN TB_SM02M01 AS M  ON (D.ORDRG_NO = M.ORDRG_NO)  /* 발주마스터 */
-		        LEFT OUTER JOIN TB_SM20M01 AS BM ON (BM.CO_CD   = D.CO_CD
-				                                 AND BM.BILL_NO = D.BILL_NO)  /* 매입계산서 */
-				LEFT OUTER JOIN TB_SM20D01 AS B  ON (B.CO_CD     = D.CO_CD
-				                                 AND B.BILL_NO   = D.BILL_NO
-												 AND B.PCHS_NO   = D.PCHS_NO
-												 AND B.PCHS_SEQ  = D.PCHS_SEQ
-												 AND B.ORDRG_NO  = D.ORDRG_NO
-												 AND B.ORDRG_SEQ = D.ORDRG_SEQ)  /* 매입계산서 */
-				LEFT OUTER JOIN TB_SM10M01 AS C  ON (D.ORDRG_NO = C.COST_NO)  /* 비용마스터 */
-				LEFT OUTER JOIN TB_SM06D01 AS R  ON (D.ORDRG_NO = R.RET_NO)  /* 반품 상세 */
-				LEFT OUTER JOIN TB_SM06M01 AS RM ON (RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)  /* 반품 상세 */
-		 WHERE  1 = 1
-		 <!-- 회사코드 -->
-		 <if test="coCd != null and !coCd.equals('')">
-		 AND    D.CO_CD = #{coCd}
-		 </if>
-		 <!-- 확정일자 -->
-		 <if test="pchsDtfrom != null and !pchsDtfrom.equals('')">
-		 	<if test="pchsDtto != null and !pchsDtto.equals('')">
-			AND    D.PCHS_DT BETWEEN #{pchsDtfrom} AND #{pchsDtto}
-			</if>
-		 </if>
+			SELECT    A.*
+					, D1.CLNT_NM  AS PCHS_CLNT_NM
+					, D1.CRN /*사업자등록번호*/
+					, NVL(A.SM10_CLMN_DAY, D1.PCHS_CLMN_DAY) AS PCHS_CLMN_DAY  /*결제일 - 10*/	
+					, NVL2(A.SM10_CLMN_RMK, '', D1.PCHS_CLMN_RMK) AS PCHS_CLMN_RMK   /*결제일 - 다음달 10일*/
+					, NVL(A.SM10_PMNT_MTD_CD, D1.PCHS_PMNT_MTD_CD) AS PCHS_PMNT_MTD_CD  --결제조건 코드
+				    , FN_CM05M01_CD_TO_NM(NVL(A.SM10_PMNT_MTD_CD, D1.PCHS_PMNT_MTD_CD)) AS PCHS_PMNT_MTD_NM /*결제조건명*/
+			  FROM (
+				 --매입확정전체
+				 SELECT DISTINCT D.CO_CD
+				      , CASE WHEN SUBSTR(D.ORDRG_NO,0,3) = 'BAL' THEN M.PCHS_CLNT_CD
+					         WHEN SUBSTR(D.ORDRG_NO,0,3) = 'RET' THEN RM.PCHS_CLNT_CD
+							                                     ELSE C.PCHS_CLNT_CD
+						END AS PCHS_CLNT_CD
+					  , CASE WHEN SUBSTR(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD
+					         WHEN SUBSTR(D.ORDRG_NO,0,3) = 'RET' THEN R.SALES_CD
+							                                     ELSE C.SALES_CD
+						END AS SALES_CD
+					  , D.PCHS_DT AS ORDRG_DT
+					  , CASE WHEN SUBSTR(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD
+					         WHEN SUBSTR(D.ORDRG_NO,0,3) = 'RET' THEN R.DSGN_NO
+							                                     ELSE C.SALES_CD
+						END AS DSGN_NO
+					  , 1 AS ORDRG_QTY            /*발주수량 */
+					  , M.ORDRG_AMT AS ORDRG_AMT  /*발주 금액 */
+					  , D.PCHS_AMT  AS PCHS_AMT   /* 매입금액 */
+					  , D.PCHS_VAT  AS PCHS_VAT   /* 부가세 */
+					  , D.PCHS_QTY  AS PCHS_QTY   /* 수량 */
+					  , TO_CHAR(D.PCHS_DT, 'YYYY-MM-DD') AS PCHS_DT
+					  , D.CMPLET_YN AS CMPLET_YN  /* 확정여부 */
+					  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 'N' ELSE 'Y' END AS BILL_YN
+					  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 0 ELSE B.BILL_DTL_AMT END AS COMP_AMT
+					  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 0 ELSE B.BILL_DTL_VAT END AS COMP_VAT
+					  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN 0 ELSE B.BILL_DTL_TOT END AS COMP_TOT
+					  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN D.PCHS_AMT ELSE 0 END AS UNCOMP_AMT
+					  , CASE WHEN NVL(D.BILL_NO, '.') = '.' THEN D.PCHS_VAT ELSE 0 END AS UNCOMP_VAT
+					  , NVL(D.BILL_NO, '') AS BILL_NO
+					  , TO_CHAR(BM.BILL_DT, 'YYYY-MM-DD') AS BILL_DT
+					  , NVL(BM.FILE_TRGT_KEY, 0) AS FILE_TRGT_KEY
+					  , BM.BILL_DT AS BILL_DT_S
+					  , D.PCHS_NO   AS PCHS_NO
+					  , D.PCHS_SEQ  AS PCHS_SEQ
+					  , D.ORDRG_NO  AS ORDRG_NO
+					  , D.ORDRG_SEQ AS ORDRG_SEQ
+					  , BM.PAY_YN  						AS PAY_YN
+					  , BM.PAY_PMNTMTD 					AS PAY_PMNTMTD
+					  , BM.PAY_INTERVAL 				AS PAY_INTERVAL
+					, U.NAME											 AS CREAT_ID_NM
+					, DECODE (substr(D.ORDRG_NO,0,3), 'COS', C.PCHS_CLMN_DAY, '') 		AS SM10_CLMN_DAY
+					, DECODE (substr(D.ORDRG_NO,0,3), 'COS', C.PCHS_CLMN_DIV_CD, '') 	AS SM10_CLMN_DIV_CD
+					, DECODE (substr(D.ORDRG_NO,0,3), 'COS', C.PCHS_PMNT_MTD_CD, '') 	AS SM10_PMNT_MTD_CD
+					, DECODE (substr(D.ORDRG_NO,0,3), 'COS', 'COST', '') 				AS SM10_CLMN_RMK
+<!-- 	    			, CD.DEPT_NM -->
+					, TO_CHAR(BM.PAY_DT, 'YYYY-MM-DD') AS PAY_DT
+<!-- 					, SUBSTRING(U.DEPT_ID,0,5) 		   AS DEPT_ID -->
+					, D.CREAT_ID 		   			   			AS MNG_ID
+					, NVL(M1.DEPT_ID, SUBSTRING(U.DEPT_ID,0,5))	AS DEPT_ID
+					, NVL(CE.DEPT_NM, CD.DEPT_NM)	   			AS DEPT_NM
+				 FROM   TB_SM12D01 AS D  /* 매입 DETAIL */
+				        LEFT OUTER JOIN TB_SM12M01 AS M1 ON (D.PCHS_NO = M1.PCHS_NO)  /* 매입확정마스터 */
+				        LEFT OUTER JOIN TB_SM02M01 AS M  ON (D.ORDRG_NO = M.ORDRG_NO)  /* 발주마스터 */
+				        LEFT OUTER JOIN TB_SM20M01 AS BM ON (BM.CO_CD   = D.CO_CD
+						                                 AND BM.BILL_NO = D.BILL_NO)  /* 매입계산서 */
+						LEFT OUTER JOIN TB_SM20D01 AS B  ON (B.CO_CD     = D.CO_CD
+						                                 AND B.BILL_NO   = D.BILL_NO
+														 AND B.PCHS_NO   = D.PCHS_NO
+														 AND B.PCHS_SEQ  = D.PCHS_SEQ
+														 AND B.ORDRG_NO  = D.ORDRG_NO
+														 AND B.ORDRG_SEQ = D.ORDRG_SEQ)  /* 매입계산서 */
+						LEFT OUTER JOIN TB_SM10M01 AS C  ON (D.ORDRG_NO = C.COST_NO)  /* 비용마스터 */
+						LEFT OUTER JOIN TB_SM11M01 AS S11 ON S11.CTRT_NO = C.CTRT_NO
+						LEFT OUTER JOIN TB_SM06D01 AS R  ON (D.ORDRG_NO = R.RET_NO)  /* 반품 상세 */
+						LEFT OUTER JOIN TB_SM06M01 AS RM ON (RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)  /* 반품 상세 */
+						LEFT OUTER JOIN TB_CM06M01 U ON U.ID = D.CREAT_ID
+						LEFT OUTER JOIN TB_CM04M01 CD ON CD.DEPT_ID = SUBSTRING(U.DEPT_ID,0,5)
+						LEFT OUTER JOIN TB_CM04M01 CE ON CE.DEPT_ID = SUBSTRING(M1.DEPT_ID,0,5)
+				 WHERE  1 = 1
+				 <!-- 회사코드 -->
+				 <if test="coCd != null and !coCd.equals('')">
+				 AND    D.CO_CD = #{coCd}
+				 </if>
+				 <!-- 확정일자 -->
+				 <if test="pchsDtfrom != null and !pchsDtfrom.equals('')">
+				 	<if test="pchsDtto != null and !pchsDtto.equals('')">
+					AND    D.PCHS_DT BETWEEN #{pchsDtfrom} AND #{pchsDtto}
+					</if>
+				 </if>	
+				<!-- 발행여부 -->
+				<if test="billYn != null and !billYn.equals('')">
+				    AND    D.BILL_YN LIKE #{billYn}
+				</if>	
+				<!-- 계약등록번호 -->
+				<if test="ctrtNo != null and !ctrtNo.equals('')">
+				    AND    C.CTRT_NO = #{ctrtNo}
+				</if>	
+				<!-- 계약등록번호 -->
+				<if test="ctrtApprovalNo != null and !ctrtApprovalNo.equals('')">
+				    AND    S11.CTRT_APPROVAL_NO = #{ctrtApprovalNo}
+				</if>	
+				<if test="deptId !=null and !deptId.equals('')">
+					<if test="deptId.equals('TRN50')">
+					AND SUBSTRING(M1.DEPT_ID,0,5) = #{deptId}
+					</if>
+					<if test="!deptId.equals('TRN50')">
+					AND SUBSTRING(M1.DEPT_ID,0,5) != 'TRN50'
+					</if>
+				</if>		
+			) A
+    				LEFT OUTER JOIN TB_BM02M01 D1 ON A.PCHS_CLNT_CD = D1.CLNT_CD   --거래처마스터
+		 WHERE 1 = 1
+		<if test="pchsClntNm != null and !pchsClntNm.equals('')">
+			AND D1.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'   
+		</if>
+		<if test="pchsClmnDay != null and !pchsClmnDay.equals('')">
+			AND NVL(A.SM10_CLMN_DAY, D1.PCHS_CLMN_DAY) =  #{pchsClmnDay}
+		</if>				
 		)
 		, MI AS
 		(
@@ -321,10 +496,14 @@
 			  , MIN(A.BILL_NO)                        AS BILL_NO
 			  , MIN(A.BILL_DT)                        AS BILL_DT
 			  , 'N'                                   AS BILL_YN
-			  , NVL(MIN(B.PAY_YN), '')                AS PAY_YN
+			  , MAX(A.PAY_YN)     					  AS PAY_YN
+			  , MAX(A.PAY_PMNTMTD)   				  AS PAY_PMNTMTD
+			  , FN_CM05M01_CD_TO_NM(MAX(A.PAY_PMNTMTD))  AS PAY_PMNTMTD_NM
+			  , MAX(A.PAY_INTERVAL) 				  AS PAY_INTERVAL
+			  , MAX(A.PAY_DT) 						  AS PAY_DT
+			  , MAX(A.DEPT_ID) 						  AS DEPT_ID
+			  , MAX(A.DEPT_NM) 						  AS DEPT_NM
 		 FROM   TOT AS A
-				LEFT OUTER JOIN TB_SM20M01 AS B  ON A.CO_CD   = B.CO_CD
-		                                        AND A.BILL_NO = B.BILL_NO
 				LEFT OUTER JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD  --거래처마스터
 		 WHERE  1 = 1
 		 AND    A.BILL_YN = 'N'
@@ -332,7 +511,7 @@
 		 <if test="pchsClntCd != null and !pchsClntCd.equals('')">
 		 AND    A.PCHS_CLNT_CD = #{pchsClntCd}
 		 </if>
-		 GROUP BY A.CO_CD, A.PCHS_CLNT_CD, C.CLNT_NM, A.FILE_TRGT_KEY
+		 GROUP BY A.CO_CD, C.CLNT_NM, A.PCHS_CLNT_CD, A.FILE_TRGT_KEY
 		)
 		, BILL AS
 		(
@@ -354,10 +533,14 @@
 			  , MIN(A.BILL_NO)                        AS BILL_NO
 			  , MIN(A.BILL_DT)                        AS BILL_DT
 			  , 'Y'                                   AS BILL_YN
-			  , NVL(MIN(B.PAY_YN), 'N')               AS PAY_YN
+			  , MAX(A.PAY_YN)     					  AS PAY_YN
+			  , MAX(A.PAY_PMNTMTD)   				  AS PAY_PMNTMTD
+			  , FN_CM05M01_CD_TO_NM(MAX(A.PAY_PMNTMTD))  AS PAY_PMNTMTD_NM
+			  , MAX(A.PAY_INTERVAL) 				  AS PAY_INTERVAL
+			  , MAX(A.PAY_DT) 						  AS PAY_DT
+			  , MAX(A.DEPT_ID) 						  AS DEPT_ID
+			  , MAX(A.DEPT_NM) 						  AS DEPT_NM
 		 FROM   TOT AS A
-		        LEFT OUTER JOIN TB_SM20M01 AS B  ON A.CO_CD   = B.CO_CD
-		                                        AND A.BILL_NO = B.BILL_NO
 				LEFT OUTER JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD  --거래처마스터
 		 WHERE  1 = 1
 		 AND    A.BILL_YN = 'Y'
@@ -371,25 +554,95 @@
 			AND    A.BILL_DT_S BETWEEN #{dtfrom} AND #{dtto}
 			</if>
 		 </if> -->
-		 GROUP BY A.CO_CD, A.PCHS_CLNT_CD, C.CLNT_NM, A.FILE_TRGT_KEY
+		 GROUP BY A.CO_CD, C.CLNT_NM, A.PCHS_CLNT_CD, A.FILE_TRGT_KEY --세금계산서발행번호별 채번 : A.FILE_TRGT_KEY
+		)
+		, PAY AS
+		(
+		 --지급
+		 SELECT A.CO_CD                      		  AS CO_CD
+		      , A.PAY_YYMM                        	  AS PAY_YYMM
+		      , A.CLNT_CD                        	  AS CLNT_CD
+			  , A.CLNT_NM                             AS CLNT_NM
+			  , A.BILL_NO                             AS BILL_NO
+			  , NVL(SUM(A.PAY_AMT),0)                 AS PAY_AMT    /* 매입금액 */
+			  , NVL(SUM(A.PAY_VAT),0)                 AS PAY_VAT    /* 부가세 */
+			  , NVL(SUM(A.PAY_TOT),0)                 AS PAY_TOT    /* 합계 */
+			  , MAX(A.PAY_DT)                         AS PAY_DT
+			  , MAX(A.PAY_PMNTMTD)   				  AS PAY_PMNTMTD
+			  , FN_CM05M01_CD_TO_NM(MAX(A.PAY_PMNTMTD))  AS PAY_PMNTMTD_NM
+		 FROM   TB_SM21M01 AS A
+		 WHERE  1 = 1
+		   AND  A.PAY_YYMM = #{closeYm}
+		 <!-- 구매처 -->
+		 <if test="pchsClntCd != null and !pchsClntCd.equals('')">
+		   AND  A.CLNT_CD = #{pchsClntCd}
+		 </if>
+		<if test="pchsClntNm != null and !pchsClntNm.equals('')">
+		   AND A.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'   
+		</if>
+		   AND EXISTS (SELECT 1 FROM TOT WHERE TOT.BILL_NO = A.BILL_NO)
+		 GROUP BY A.CO_CD, A.PAY_YYMM, A.CLNT_NM, A.CLNT_CD, A.BILL_NO
 		)
 		SELECT *
 		FROM   (
 		        SELECT A.*
+		             , NVL(C.PAY_TOT,0)  				AS PAY_TOT /* 합계 */
+		             , (A.COMP_TOT - NVL(C.PAY_TOT,0))  AS REM_TOT --미지급금합계
 		             , ROWNUM AS RN
 		        FROM   (
 		                SELECT * FROM MI
 		                UNION ALL
 		                SELECT * FROM BILL
 		               ) AS A
+					LEFT OUTER JOIN PAY AS C ON A.BILL_NO = C.BILL_NO  --지급내역파일
 		        WHERE  1 = 1
 				<!-- 발행여부 -->
 				<if test="billYn != null and !billYn.equals('')">
-				AND    A.BILL_YN LIKE #{billYn}
+				AND    A.BILL_YN = #{billYn}
 				</if>
 		       ) AS A
 		WHERE  1 = 1
-		ORDER BY A.CO_CD, A.CLNT_CD, A.CLNT_NM, A.FILE_TRGT_KEY
+	</select>
+	
+
+	<select id="sm20_main_grid3_selectList" parameterType="Map" resultType="camelMap">
+		SELECT 
+			   	 T.FILE_TRGT_KEY
+			   , T.CO_CD
+			   , TO_CHAR(TO_DATE(T.PAY_YYMM, 'YYYYMM'), 'YYYY-MM')		AS PAY_YYMM
+			   , T.CLNT_CD
+			   , T.CLNT_NM
+			   , T.CRN
+			   , T.REPST_NM
+			   , TO_CHAR(T.PAY_DT, 'YYYY-MM-DD') 		AS PAY_DT
+			   , T.PAY_PMNTMTD
+			   , FN_CM05M01_CD_TO_NM(T.PAY_PMNTMTD) 	AS PAY_PMNTMTD_NM
+			   , T.PAY_INTERVAL
+			   , TO_CHAR(T.PAY_EXP_DT, 'YYYY-MM-DD') 	AS PAY_EXP_DT
+			   , T.PAY_AMT
+			   , T.PAY_VAT
+			   , T.PAY_TOT
+			   , T.PAY_RMK
+			   , T.BILL_NO
+			   , T.UPLOAD_ID
+			   , FN_CM06M01_ID_TO_NM(T.UPLOAD_ID)		AS UPLOAD_ID_NM
+			   , TO_CHAR(T.UPLOAD_DTTM, 'YYYY-MM-DD') 	AS UPLOAD_DTTM
+			   , T.UPLOAD_SEQ
+			   , T.PROC_YN
+		  FROM TB_SM21M01 T		
+				 LEFT OUTER JOIN TB_SM20M01 P ON P.BILL_NO = T.BILL_NO /* 매입 확정 DETAIL */
+		 WHERE 1 = 1
+		 <!-- 회사코드 -->
+		 <if test="coCd != null and !coCd.equals('')">
+		   AND T.CO_CD = #{coCd}
+		 </if>
+		   AND T.CLNT_CD = #{pchsClntCd}
+		 <!-- 확정일자 -->
+		 <if test="pchsDtto != null and !pchsDtto.equals('')">
+		   AND T.PAY_YYMM = substr(#{pchsDtto}, 0, 6)
+		 </if>
+		   AND (T.BILL_NO IS NULL OR P.BILL_NO = T.BILL_NO)
+		   ORDER BY T.PAY_DT, T.PAY_EXP_DT
 	</select>
 	
 	<!-- 매입계산서 리스트  카운트 -->
@@ -701,8 +954,11 @@
 		     , A.BILL_SPEC
 		     , A.UDT_RESN
 		     , 'U' AS DATA_CHK
+		     , A.DEPT_ID
+		     , CE.DEPT_NM
 		FROM   TB_SM20M01 AS A
                LEFT OUTER JOIN TB_BM02M01 AS S ON S.CLNT_CD = A.CLNT_CD
+			   LEFT OUTER JOIN TB_CM04M01 CE ON CE.DEPT_ID = SUBSTRING(A.DEPT_ID,0,5)
 		WHERE  1 = 1
 		AND    A.FILE_TRGT_KEY = #{fileTrgtKey}
     </select>
@@ -796,9 +1052,12 @@
 			 , NVL(A.BILL_DTL_AMT, 0) AS BILL_DTL_AMT
 		     , NVL(A.BILL_DTL_VAT, 0) AS BILL_DTL_VAT
 		     , NVL(A.BILL_DTL_TOT, 0) AS BILL_DTL_TOT
+			 , C.CTRT_NO				--외주계약번호
+			 , C.CTRT_NO_SEQ			--외주계약일련번호
 		FROM   BILL AS A
 		       LEFT OUTER JOIN BAL AS B  ON A.CO_CD    = B.CO_CD
 										AND A.ORDRG_NO = B.ORDRG_NO
+			   LEFT OUTER JOIN TB_SM10M01 AS C  ON A.ORDRG_NO = C.COST_NO	--구매비용
 			   LEFT OUTER JOIN TB_SM12D01 AS I  ON I.CO_CD     = A.CO_CD
 		                                       AND I.PCHS_NO   = A.PCHS_NO
 		                                       AND I.PCHS_SEQ  = A.PCHS_SEQ
@@ -812,24 +1071,69 @@
 		WITH IPGO AS
 		(
 		 --입고
-		 SELECT A.*
-		      , CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN D1.CLNT_NM ELSE D2.CLNT_NM END AS PCHS_CLNT_NM
-			  , CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN 'N' ELSE 'Y' END AS IS_COST
-			  , CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN '' ELSE C.ORDRS_NO END AS ORDRS_NO
-			  , CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD ELSE C.SALES_CD END AS SALES_CD
-			  , CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.PCHS_CLNT_CD ELSE C.PCHS_CLNT_CD END AS PCHS_CLNT_CD
-			  , CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.FILE_TRGT_KEY ELSE C.FILE_TRGT_KEY END AS FILE_TRGT_KEY
-			  , (SELECT FN_CM06M01_ID_TO_NM(A.CREAT_ID) FROM DUAL) AS CREAT_ID_NM
-		 FROM   TB_SM12D01 AS A
-		        LEFT OUTER JOIN TB_SM02M01 AS M  ON A.ORDRG_NO = M.ORDRG_NO
-				LEFT OUTER JOIN TB_SM10M01 AS C  ON A.ORDRG_NO = C.COST_NO
-				LEFT OUTER JOIN TB_BM02M01 AS D1 ON M.PCHS_CLNT_CD = D1.CLNT_CD
-				LEFT OUTER JOIN TB_BM02M01 AS D2 ON C.PCHS_CLNT_CD = D2.CLNT_CD
+		 SELECT D.*
+		      , D1.CLNT_NM 		AS CLNT_NM 
+			  , CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN 'N' ELSE 'Y' END AS IS_COST
+			  , CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN '' ELSE C.ORDRS_NO END AS ORDRS_NO
+			  , CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD ELSE C.SALES_CD END AS SALES_CD
+			  , CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.PCHS_CLNT_CD ELSE C.PCHS_CLNT_CD END AS PCHS_CLNT_CD
+			  , CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.FILE_TRGT_KEY ELSE C.FILE_TRGT_KEY END AS FILE_TRGT_KEY
+			  , (SELECT FN_CM06M01_ID_TO_NM(D.CREAT_ID) FROM DUAL) AS CREAT_ID_NM
+			  , NVL(R5.CODE_RPRC,10) 		AS VAT_RATE	--설정 없으면 무조건 10%부가세 적용
+			  , M1.DEPT_ID							    AS DEPT_ID
+			  , CE.DEPT_NM					   			AS DEPT_NM
+			, D1.PCHS_CLMN_DAY		--거래처 정보의 결재일
+			, DECODE (substr(D.ORDRG_NO,0,3), 'COS', C.PCHS_CLMN_DAY, '') 		AS SM10_CLMN_DAY	--비용처리시 결재일자
+			, DECODE (substr(D.ORDRG_NO,0,3), 'COS', C.PCHS_CLMN_DIV_CD, '') 	AS SM10_CLMN_DIV_CD
+			, DECODE (substr(D.ORDRG_NO,0,3), 'COS', C.PCHS_PMNT_MTD_CD, '') 	AS SM10_PMNT_MTD_CD
+			, DECODE (substr(D.ORDRG_NO,0,3), 'COS', 'COST', '') 				AS SM10_CLMN_RMK
+			, C.PCHS_COST_DIV10							AS PCHS_COST_DIV10
+			, C.CTRT_NO				--외주계약번호
+			, C.CTRT_NO_SEQ			--외주계약일련번호
+		 FROM   TB_SM12D01 AS D		--매입처리마스터
+				LEFT OUTER JOIN TB_SM12M01 AS M1 ON (D.PCHS_NO = M1.PCHS_NO)  /* 매입확정마스터 */
+		        LEFT OUTER JOIN TB_SM02M01 AS M  ON D.ORDRG_NO = M.ORDRG_NO	--발주
+				LEFT OUTER JOIN TB_SM10M01 AS C  ON D.ORDRG_NO = C.COST_NO	--구매비용
+				LEFT OUTER JOIN TB_BM02M01 AS D1 ON D.CLNT_CD = D1.CLNT_CD	--공급사
+                LEFT OUTER JOIN TB_CM05M01 AS R5 ON R5.CODE_ID = D1.PCHS_VAT_CD		--부가세% 
+				LEFT OUTER JOIN TB_CM04M01 CE ON CE.DEPT_ID = SUBSTRING(M1.DEPT_ID,0,5)
+				LEFT OUTER JOIN TB_BM02M01 D1 ON D.CLNT_CD = D1.CLNT_CD   --거래처마스터
 		 WHERE  1 = 1
-		 AND    A.BILL_NO IS NULL
+		 AND    D.BILL_NO IS NULL
 		 <if test="coCd != null and !coCd.equals('')">
-		 AND    A.CO_CD = #{coCd}
+		 AND    D.CO_CD = #{coCd}
 		 </if>
+		 <!-- 확정일자 -->
+		 <if test="pchsDtfrom != null and !pchsDtfrom.equals('')">
+		 	<if test="pchsDtto != null and !pchsDtto.equals('')">
+		 AND    D.PCHS_DT BETWEEN #{pchsDtfrom} AND #{pchsDtto}
+			</if>
+		 </if>
+		 <if test="deptId !=null and !deptId.equals('')">
+			 <if test="deptId.equals('TRN50')">
+			 AND SUBSTRING(M1.DEPT_ID,0,5) = #{deptId}
+			 </if>
+			 <if test="!deptId.equals('TRN50')">
+			 AND SUBSTRING(M1.DEPT_ID,0,5) != 'TRN50'
+			 </if>
+		 </if>		
+	 <if test="trunDiv != null and !trunDiv.equals('')">
+	 	<if test="trunDiv.equals('PCHSCOSTDIV1030')">
+		AND NVL(C.PCHS_COST_DIV10,'A') =  #{trunDiv}  --기타비용의 경우 턴키(PCHSCOSTDIV1030)인 경우만 처리됨
+		</if>	
+		<if test="!trunDiv.equals('PCHSCOSTDIV1030')">
+	 	AND NVL(C.PCHS_COST_DIV10,'A') !=  'PCHSCOSTDIV1030'  --기타비용의 경우 턴키(PCHSCOSTDIV1030)가 아닌것
+		 </if> 
+	 </if>	 
+		<if test="pchsClmnDay != null and !pchsClmnDay.equals('')">
+		AND DECODE(substr(D.ORDRG_NO,0,3), 'COS', C.PCHS_CLMN_DAY, D1.PCHS_CLMN_DAY)  =  #{pchsClmnDay}
+		</if>		
+		<if test="clntCd != null and !clntCd.equals('')">
+		AND    D.CLNT_CD = #{clntCd}
+		</if>
+		<if test="clntNm != null and !clntNm.equals('')">
+		AND    D1.CLNT_NM LIKE  '%${clntNm}%'
+		</if>
 		)
 		, IPGOTOT AS
 		(
@@ -865,8 +1169,8 @@
 			 , A.ORDRG_SEQ
 			 , A.DSGN_NO
 			 , A.SALES_CD
-			 , A.PCHS_CLNT_CD
-			 , A.PCHS_CLNT_NM
+			 , A.CLNT_CD
+			 , A.CLNT_NM
 			 , A.MATR_CD
 			 , A.ORDRG_QTY
 			 , A.ORDRG_AMT
@@ -892,13 +1196,16 @@
 			 , 0   AS BILL_DTL_AMT
 			 , 0   AS BILL_DTL_VAT
 			 , 0   AS BILL_DTL_TOT
+			 , A.VAT_RATE
+			 , A.CTRT_NO				--외주계약번호
+			 , A.CTRT_NO_SEQ			--외주계약일련번호
 		FROM   (
 			    SELECT A.CO_CD
 					, A.ORDRG_NO
 					, A.ORDRG_SEQ
 					, NVL(A.SALES_CD, '.') AS SALES_CD
-					, A.PCHS_CLNT_CD
-					, A.PCHS_CLNT_NM
+					, A.CLNT_CD
+					, A.CLNT_NM
 					, '' AS MATR_CD --자재명 없음
 					, A.PCHS_DT AS ORDRG_DT
 					, D.DSGN_NO  AS DSGN_NO
@@ -919,6 +1226,9 @@
 					, A.FILE_TRGT_KEY
 					, A.PCHS_SEQ
 					, A.CREAT_ID_NM
+					, A.VAT_RATE
+					, A.CTRT_NO				--외주계약번호
+					, A.CTRT_NO_SEQ			--외주계약일련번호
 				FROM   IPGO AS A
 				       LEFT OUTER JOIN BAL AS D  ON A.CO_CD    = D.CO_CD
 												AND A.ORDRG_NO = D.ORDRG_NO
@@ -927,9 +1237,6 @@
 				WHERE  1 = 1
 		       ) AS A
 		WHERE  1 = 1
-		<if test="clntCd != null and !clntCd.equals('')">
-		AND    A.PCHS_CLNT_CD = #{clntCd}
-		</if>
 		ORDER BY A.CO_CD, A.ORDRG_DT ASC, A.ORDRG_NO DESC, A.SALES_CD DESC, A.PCHS_NO DESC
     </select>
 
@@ -951,17 +1258,20 @@
 		                                      ELSE 'BILL'||SUBSTR(#{billDt}, 3, 2)||LPAD(TO_NUMBER(SUBSTR(MAX(BILL_NO), -5)) + 1, 5, 0)
 			   END AS MNGM_NO
 		FROM   TB_SM20M01
-		WHERE  CO_CD = #{coCd}
+		WHERE  1 = 1
 		AND    BILL_DT LIKE SUBSTR(#{billDt}, 0, 4)||'%'
     </select>
 
 	<!-- BILL개별 건별_YN 수정 -->
 	<update id="update_sm20_payYn" parameterType="Map">
 		UPDATE TB_SM20M01
-		SET    PAY_YN = #{payYn, jdbcType=VARCHAR}
-			 , UDT_ID   = #{userId}
-			 , UDT_PGM  = #{pgmId}
-			 , UDT_DTTM = SYSDATE
+		SET    PAY_YN 		= #{payYn, jdbcType=VARCHAR}
+			 , PAY_PMNTMTD  = #{payPmntmtd, jdbcType=VARCHAR}
+			 , PAY_INTERVAL = #{payInterval, jdbcType=VARCHAR}
+			 , PAY_DT   	= #{payDt, jdbcType=VARCHAR}
+			 , UDT_ID   	= #{userId}
+			 , UDT_PGM  	= #{pgmId}
+			 , UDT_DTTM 	= SYSDATE
 		WHERE  FILE_TRGT_KEY = #{fileTrgtKey}
 	</update>
 	
@@ -1125,6 +1435,50 @@
 		WHERE  CO_CD   = #{coCd}
 		AND    BILL_NO = #{billNo}
 	</delete>
+	
+	<!-- 최종입금내역 Flag 변경 처리하기위한 쿼리 -->
+	<update id="update_sm20_payCompleteChke" parameterType="map">
+		MERGE INTO TB_SM20M01 M
+		USING (
+			  SELECT 
+			    P.BILL_NO,
+			    CASE 
+			      WHEN NVL(SUM(P.PAY_TOT), 0) = NVL(MAX(A.BILL_TOT),0) THEN 'Y'
+			      ELSE 'N'
+			    END AS PAY_YN,
+			    NVL(SUM(P.PAY_TOT), 0) AS BILL_TOT,
+			    MAX(P.PAY_PMNTMTD)     AS PAY_PMNTMTD,
+			    MAX(P.PAY_INTERVAL)    AS PAY_INTERVAL,
+			    MAX(P.PAY_DT)          AS PAY_DT
+			  FROM TB_SM21M01 AS P
+			  		LEFT OUTER JOIN TB_SM20M01 AS A  ON (A.BILL_NO = P.BILL_NO)
+			  WHERE P.BILL_NO = #{billNo}
+			  GROUP BY P.BILL_NO
+			UNION ALL
+			  -- 데이터가 없을 경우 기본값을 가진 가짜 행 (보장)
+			  SELECT 
+			    #{billNo}	  AS BILL_NO,
+			    'N'           AS PAY_YN,
+			    0             AS BILL_TOT,
+			    NULL          AS PAY_PMNTMTD,
+			    NULL          AS PAY_INTERVAL,
+			    NULL          AS PAY_DT
+			  FROM DUAL
+			  WHERE NOT EXISTS (
+			    SELECT 1 FROM TB_SM21M01 WHERE BILL_NO = #{billNo}
+			  )
+		) S
+		ON (M.BILL_NO = S.BILL_NO)
+		WHEN MATCHED THEN
+		  UPDATE SET 
+		    M.PAY_YN        = S.PAY_YN,
+		    M.ETC_FIELD2    = S.BILL_TOT,
+		    M.PAY_PMNTMTD   = S.PAY_PMNTMTD,
+		    M.PAY_INTERVAL  = S.PAY_INTERVAL,
+		    M.PAY_DT        = S.PAY_DT
+		  WHERE M.BILL_NO = #{billNo}
+    </update>
+	
 	
 	<select id="select_prjct_code" parameterType="Map" resultType="camelMap">
 	   /* select_prjct_code  */

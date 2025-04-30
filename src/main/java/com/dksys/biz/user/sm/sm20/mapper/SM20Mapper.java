@@ -1,19 +1,17 @@
 package com.dksys.biz.user.sm.sm20.mapper;
 
-import org.apache.ibatis.annotations.Mapper;
-
-import com.google.gson.reflect.TypeToken;
-
-import java.lang.reflect.Type;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface SM20Mapper {
 	List<Map<String, String>> sm20_main_grid1_selectList(Map<String, String> paramMap);
 
 	List<Map<String, String>> sm20_main_grid2_selectList(Map<String, String> paramMap);
+
+	List<Map<String, String>> sm20_main_grid3_selectList(Map<String, String> paramMap);
 
 	int update_sm20_payYn(Map<String, String> param);
 	
@@ -61,6 +59,8 @@ public interface SM20Mapper {
 	List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
 
 	List<Map<String, String>> select_mngId_code(Map<String, String> paramMap);
+
+	int update_sm20_payCompleteChke(Map<String, String> paramMap);
 }
 
 

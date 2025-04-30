@@ -10,6 +10,8 @@ public interface SM20Svc {
 
 	List<Map<String, String>> sm20_main_grid2_selectList(Map<String, String> paramMap);
 
+	List<Map<String, String>> sm20_main_grid3_selectList(Map<String, String> paramMap);
+
 	int update_sm20_payYn(Map<String, String> paramMap) throws Exception;
 
 	int grid1_selectCount(Map<String, String> paramMap);
