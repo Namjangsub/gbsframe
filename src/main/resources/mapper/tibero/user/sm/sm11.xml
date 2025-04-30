@@ -53,7 +53,10 @@
 		           AND CD.DEPT_NM LIKE '%'||#{deptNm}||'%'
 	          </if>
 	          <if test="deptId !=null and !deptId.equals('')">
-		           AND SUBSTR(U.DEPT_ID, 0, 5) LIKE #{deptId}
+		           AND SUBSTR(U.DEPT_ID, 0, 5) = #{deptId}
+	          </if>
+	          <if test="ctrtApprovalNo !=null and !ctrtApprovalNo.equals('')">
+		           AND M.CTRT_APPROVAL_NO = #{ctrtApprovalNo}
 	          </if>
 	 			)
 	 	, PAY AS (
@@ -166,7 +169,10 @@
 		           AND CD.DEPT_NM LIKE '%'||#{deptNm}||'%'
 	          </if>
 	          <if test="deptId !=null and !deptId.equals('')">
-		           AND SUBSTR(U.DEPT_ID, 0, 5) LIKE #{deptId}
+		           AND SUBSTR(U.DEPT_ID, 0, 5) = #{deptId}
+	          </if>
+	          <if test="ctrtApprovalNo !=null and !ctrtApprovalNo.equals('')">
+		           AND M.CTRT_APPROVAL_NO = #{ctrtApprovalNo}
 	          </if>
 	 			)
 	 	, PLAN AS (
@@ -289,6 +295,7 @@
 				        , M.CTRT_TOT_AMT
 				        , M.CTRT_NEGO_AMT
 				        , M.CTRT_ORDRS_QTY
+				        , M.CTRT_APPROVAL_NO
 				FROM CT M
 						LEFT OUTER JOIN PLAN ON PLAN.CTRT_NO = M.CTRT_NO			--지급계획
 						LEFT OUTER JOIN PAY  ON PAY.CTRT_NO = M.CTRT_NO				--지급실적
@@ -297,7 +304,7 @@
      	          AND ((M.CTRT_AMT - NVL(PAY_AMT19, 0) = 0 AND #{cmpletYn} = 'Y')
      	           OR (M.CTRT_AMT - NVL(PAY_AMT19, 0) != 0 AND #{cmpletYn} = 'N'))
 		         </if>
-		         ORDER BY M.CO_CD, M.CTRT_DT DESC, M.CTRT_NO DESC, M.DEPT_ID_NM, M.CLNT_NM
+		         ORDER BY M.CO_CD, M.CTRT_APPROVAL_NO DESC, M.CTRT_NO DESC,  M.CTRT_DT DESC, M.DEPT_ID_NM, M.CLNT_NM
 				) AS a
 			) A
 		WHERE  RNUM BETWEEN #{firstIndex} AND #{lastIndex}
@@ -341,7 +348,8 @@
 				, FN_CM05M01_CD_TO_NM(M.CURR_CD) AS CURR_CD_NM
 				, M.EXRATE
 				, M.MNG_ID
-				, (SELECT FN_CM06M01_ID_TO_NM(M.MNG_ID) FROM DUAL) MNG_ID_NM
+				, C6.NAME					AS MNG_ID_NM
+				, C6.DEPT_ID				AS DEPT_ID
 				, M.CTRT_RMK
 				, M.ETC_FIELD1
 				, M.ETC_FIELD2
@@ -363,11 +371,13 @@
 		        , M.CTRT_TOT_AMT
 		        , M.CTRT_NEGO_AMT
 		        , M.CTRT_ORDRS_QTY
+		        , M.CTRT_APPROVAL_NO
 		FROM TB_SM11M01 M
 				LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
 				LEFT OUTER JOIN TB_CR02M01 C ON C.CO_CD = M.ORDRS_CO_CD
 				                            AND C.ORDRS_NO = M.ORDRS_NO
 				LEFT OUTER JOIN TB_BM02M01 D ON D.CLNT_CD = C.ORDRS_CLNT_CD
+				LEFT OUTER JOIN TB_CM06M01 C6 ON C6.ID = M.MNG_ID
        WHERE M.CTRT_NO = #{ctrtNo}
   </select>
   
@@ -490,6 +500,7 @@
         , CTRT_TOT_AMT
         , CTRT_NEGO_AMT
         , CTRT_ORDRS_QTY
+        , CTRT_APPROVAL_NO
       )
     VALUES
     (
@@ -531,6 +542,7 @@
         , #{ctrtTotAmt, jdbcType=VARCHAR} -- 외주총금액
         , #{ctrtNegoAmt, jdbcType=VARCHAR} -- 총nego금액
         , #{ctrtOrdrsQty, jdbcType=VARCHAR} -- 총대수
+        , #{ctrtApprovalNo, jdbcType=VARCHAR} -- 사전품의서번호
     )
   </insert>
 
@@ -571,7 +583,8 @@
             , REQ_NO				 = #{reqNo, jdbcType=VARCHAR} -- 발주요청번호
             , CTRT_TOT_AMT			 = #{ctrtTotAmt, jdbcType=VARCHAR} -- 외주총금액
             , CTRT_NEGO_AMT			 = #{ctrtNegoAmt, jdbcType=VARCHAR} -- 총nego금액
-            , CTRT_ORDRS_QTY			 = #{ctrtOrdrsQty, jdbcType=VARCHAR} -- 총nego금액
+            , CTRT_ORDRS_QTY		 = #{ctrtOrdrsQty, jdbcType=VARCHAR} -- 총nego금액
+            , CTRT_APPROVAL_NO		 = #{ctrtApprovalNo, jdbcType=VARCHAR} -- 사전품의서번호
     WHERE CTRT_NO         = #{ctrtNo}
   </update>
   
@@ -832,6 +845,7 @@
 							, CR.ORDRS_QTY
 							, M.REQ_NO
 							, M.CTRT_ORDRS_QTY
+							, M.CTRT_APPROVAL_NO
 					FROM TB_SM11D01 P
 							LEFT OUTER JOIN TB_SM11M01 M ON P.CTRT_NO  = M.CTRT_NO  
 							LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
@@ -1055,9 +1069,9 @@
               <if test="coCd !=null and !coCd.equals('')">
      	           AND M.CO_CD = #{coCd}
               </if>
-			  <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
-				   AND M.CTRT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD')
-			  </if>
+<!-- 			  <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" > -->
+<!-- 				   AND M.CTRT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD') -->
+<!-- 			  </if> -->
               <if test="clntCd !=null and !clntCd.equals('')">
      	           AND M.CLNT_CD = #{clntCd}
               </if>
@@ -1079,7 +1093,11 @@
               <if test="mngIdNm !=null and !mngIdNm.equals('')">
      	           AND U.NAME LIKE '%'||#{mngIdNm}||'%'
               </if>
-				 GROUP BY M.CO_CD, M.ORDRS_NO, M.MNG_ID	
+              <if test="deptId !=null and !deptId.equals('')">
+		           AND SUBSTR(U.DEPT_ID, 0, 5) = #{deptId}
+              </if>
+				 GROUP BY M.CO_CD, M.CTRT_APPROVAL_NO, M.ORDRS_NO, M.ORDRS_CO_CD, M.MNG_ID
+				 ORDER BY M.CO_CD, M.CTRT_APPROVAL_NO DESC, M.ORDRS_NO DESC, M.ORDRS_CO_CD, M.MNG_ID
 			)
 	</select>
 	
@@ -1092,7 +1110,7 @@
 
 			FROM
 			(
-				SELECT 	  M.CO_CD, M.ORDRS_NO, M.MNG_ID
+				SELECT 	  M.CO_CD, M.CTRT_APPROVAL_NO, M.ORDRS_NO, M.MNG_ID
 						, (SELECT FN_CM06M01_ID_TO_NM(M.MNG_ID) FROM DUAL) MNG_ID_NM
 						, FN_CM05M01_CD_TO_NM(M.CO_CD) 			AS CO_CD_NM
 						, MAX(M.CTRT_NM) 						AS CTRT_NM
@@ -1115,9 +1133,9 @@
               <if test="coCd !=null and !coCd.equals('')">
      	           AND M.CO_CD = #{coCd}
               </if>
-			  <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
-				   AND M.CTRT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD')
-			  </if>
+<!-- 			  <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" > -->
+<!-- 				   AND M.CTRT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD') -->
+<!-- 			  </if> -->
               <if test="clntCd !=null and !clntCd.equals('')">
      	           AND M.CLNT_CD = #{clntCd}
               </if>
@@ -1139,7 +1157,11 @@
               <if test="mngIdNm !=null and !mngIdNm.equals('')">
      	           AND U.NAME LIKE '%'||#{mngIdNm}||'%'
               </if>
-				 GROUP BY M.CO_CD, M.ORDRS_NO, M.ORDRS_CO_CD, M.MNG_ID
+              <if test="deptId !=null and !deptId.equals('')">
+		           AND SUBSTR(U.DEPT_ID, 0, 5) = #{deptId}
+              </if>
+				 GROUP BY M.CO_CD, M.CTRT_APPROVAL_NO, M.ORDRS_NO, M.ORDRS_CO_CD, M.MNG_ID
+				 ORDER BY M.CO_CD, M.CTRT_APPROVAL_NO DESC, M.ORDRS_NO DESC, M.ORDRS_CO_CD, M.MNG_ID
 				) AS a
 			) A
 		WHERE  RNUM BETWEEN #{firstIndex} AND #{lastIndex}
