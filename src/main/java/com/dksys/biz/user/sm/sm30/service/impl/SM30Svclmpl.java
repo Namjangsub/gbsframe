@@ -2,6 +2,7 @@ package com.dksys.biz.user.sm.sm30.service.impl;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -162,9 +163,7 @@ public class SM30Svclmpl implements SM30Svc {
 		
 		String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
 		pgParam1 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\",";
-		pgParam1 += "\"coCd\":\""+ paramMap.get("coCd") +"\",";
-		//pgParam1 += "\"salesCd\":\""+ param.get("salesCd") +"\",";
-		// pgParam1 += "\"ordrsNo\":\""+ paramMap.get("ordrsNo") +"\"}";
+		pgParam1 += "\"coCd\":\""+ paramMap.get("coCd") +"\"}";
 		//공유
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gsonDtl.fromJson(paramMap.get("rowSharngListArr"), stringList2);
@@ -177,10 +176,9 @@ public class SM30Svclmpl implements SM30Svc {
 						sharngMap.put("fileTrgtKey", fileTrgtKey);
 						sharngMap.put("pgmId", paramMap.get("pgmId"));
 						sharngMap.put("userId", paramMap.get("userId"));
-						sharngMap.put("histNo", "1");
 						sharngMap.put("sanCtnSn",Integer.toString(i+1));
 						sharngMap.put("pgParam", pgParam1);
-						sharngMap.put("todoTitle", paramMap.get("todoTitle"));
+						// sharngMap.put("todoTitle", paramMap.get("todoTitle"));
 						QM01Mapper.insertWbsSharngList(sharngMap);
 					i++;
 				} catch (Exception e) {
@@ -191,9 +189,7 @@ public class SM30Svclmpl implements SM30Svc {
 
 		String pgParam2 = "{\"actionType\":\""+ "S" +"\",";
 		pgParam2 += "\"fileTrgtKey\":\""+ paramMap.get("fileTrgtKey") +"\",";
-		pgParam2 += "\"coCd\":\""+ paramMap.get("coCd") +"\",";
-		//pgParam2 += "\"salesCd\":\""+ param.get("salesCd") +"\",";
-		// pgParam2 += "\"ordrsNo\":\""+ paramMap.get("ordrsNo") +"\"}";
+		pgParam2 += "\"coCd\":\""+ paramMap.get("coCd") +"\"}";
 		//결재
 		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> approvalArr = gsonDtl.fromJson(paramMap.get("rowApprovalListArr"), stringList3);
@@ -206,10 +202,9 @@ public class SM30Svclmpl implements SM30Svc {
 						approvalMap.put("fileTrgtKey", fileTrgtKey);
 						approvalMap.put("pgmId", paramMap.get("pgmId"));
 						approvalMap.put("userId", paramMap.get("userId"));
-						approvalMap.put("histNo", "1");
 						approvalMap.put("sanCtnSn",Integer.toString(i+1));
 						approvalMap.put("pgParam", pgParam2);
-						approvalMap.put("todoTitle", paramMap.get("todoTitle"));
+						// approvalMap.put("todoTitle", paramMap.get("todoTitle"));
 						QM01Mapper.insertWbsApprovalList(approvalMap);
 						i++;
 				} catch (Exception e) {
@@ -220,6 +215,98 @@ public class SM30Svclmpl implements SM30Svc {
 
         return result;
 	}
+
+	@Override
+	public Map<String, String> select_sm30_info(Map<String, String> paramMap) {
+		return sm30Mapper.select_sm30_info(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> sm30_pop_grid1_selectList(Map<String, String> paramMap) {
+		return sm30Mapper.sm30_pop_grid1_selectList(paramMap);
+	}
+
+	@Override
+	public int delete_all_sm30_info(Map<String, String> paramMap) throws Exception {
+
+		//---------------------------------------------------------------  
+		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
+	  	//   필수값 :  jobType, userId, comonCd
+		//---------------------------------------------------------------  
+	    List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
+	    HashMap<String, String> param = new HashMap<>();
+	    param.put("jobType", "fileDelete");
+	    param.put("userId", paramMap.get("userId"));
+	    if (deleteFileList.size() > 0) {
+		    for (Map<String, String> dtl : deleteFileList) {
+					//접근 권한 없으면 Exception 발생
+		            param.put("comonCd",  dtl.get("comonCd"));
+			    	
+					cm15Svc.selectFileAuthCheck(param);
+			}
+	    }
+		//---------------------------------------------------------------  
+		//첨부 화일 권한체크 끝 
+		//---------------------------------------------------------------  
+
+
+        // 1. 매입대금 지급결재 기본 정보 자료 삭제
+	  	int result = sm30Mapper.delete_sm30_info(paramMap);
+
+        // 2. 매입대금 지급결재 결재자 정보 삭제 처리
+		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
+		if (sharngChk.size() > 0) {
+			QM01Mapper.deleteWbsSharngList(paramMap); 
+		}
+		// Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		// Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+
+		// // // 매입대금 지급 결재 대상 리스트 자료 삭제
+		// List<Map<String, String>> dtlList = gsonDtl.fromJson(paramMap.get("seq"), dtlMap);
+		// for (Map<String, String> dtl : dtlList) {
+		// 	// delete_sm30_List 에 필요한 파라미터만 새 맵에 담아서 호출
+		// 	Map<String, String> deleteParam = new HashMap<>();
+		// 	deleteParam.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		// 	deleteParam.put("seq", dtl.get("seq"));
+		// 	result += sm30Mapper.delete_sm30_List(deleteParam);
+		// }
+
+		return result;
+	}
+
+	@Override
+	public List<Map<String, String>> delete_sm30_List(Map<String, Object> paramMap) throws Exception {
+		// 1) 클라이언트에서 보낸 rows 배열을 꺼내기
+		// @SuppressWarnings("unchecked")
+		List<Map<String, Object>> rows = (List<Map<String, Object>>) paramMap.get("rows");
 	
+		String fileTrgtKey = (String) paramMap.get("fileTrgtKey");
+		List<Map<String, String>> resultList = new ArrayList<>();
 	
+		// 2) 한 건씩 delete 호출
+		for (Map<String, Object> row : rows) {
+			String seq = String.valueOf(row.get("seq"));
+	
+			Map<String, String> deleteParam = new HashMap<>();
+			deleteParam.put("fileTrgtKey", fileTrgtKey);
+			deleteParam.put("seq", seq);
+	
+			sm30Mapper.delete_sm30_List(deleteParam);
+	
+			// 리턴용 맵에 seq만 담아서 반환
+			Map<String, String> res = new HashMap<>();
+			res.put("seq", seq);
+			resultList.add(res);
+		}
+	
+		// 3) 컨트롤러에서 isEmpty 체크용으로 사용
+		return resultList;
+	}
+
+	@Override
+	public List<Map<String, String>> selectApprovalUserChk(Map<String, String> paramMap) {
+		return sm30Mapper.selectApprovalUserChk(paramMap);
+	}
+
+
 }

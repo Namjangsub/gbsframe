@@ -18,4 +18,16 @@ public interface SM30Svc {
 	int insert_sm21_excelUpload(Map<String, String> paramMap);
 
 	int insert_sm30(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
+	Map<String, String> select_sm30_info(Map<String, String> paramMap);
+
+	List<Map<String, String>> sm30_pop_grid1_selectList(Map<String, String> paramMap);
+
+	int delete_all_sm30_info(Map<String, String> paramMap) throws Exception;
+
+	// int delete_sm30_List(Map<String, String> paramMap) throws Exception;
+
+	List<Map<String, String>> delete_sm30_List(Map<String, Object> paramMap) throws Exception;
+
+	List<Map<String, String>> selectApprovalUserChk(Map<String, String> paramMap);
 }

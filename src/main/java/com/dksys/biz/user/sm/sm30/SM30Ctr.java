@@ -7,11 +7,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import com.dksys.biz.user.qm.qm01.service.QM01Svc;
 import com.dksys.biz.user.sm.sm30.service.SM30Svc;
 import com.dksys.biz.util.MessageUtils;
 
@@ -24,6 +26,9 @@ public class SM30Ctr {
 
 	@Autowired
     SM30Svc sm30Svc;
+
+	@Autowired
+	QM01Svc qm01Svc;
 
 	// PJT 정보 조회
 	@PostMapping(value = "/selectPjtInfo")
@@ -82,7 +87,7 @@ public class SM30Ctr {
     	return "jsonView";
     }
 	
-	// 
+	// 매입대금 지급 결재요청 등록
 	@PostMapping(value = "/insert_sm30")
     public String insert_sm30(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
         try {
@@ -100,4 +105,62 @@ public class SM30Ctr {
         }        
         return "jsonView";
     }
+
+	// 매입대금 지급 결재요청 기본 정보 조회
+	@PostMapping(value = "/select_sm30_info")
+	public String select_sm30_info(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = sm30Svc.select_sm30_info(paramMap);
+		model.addAttribute("result", result);
+
+		// 결재정보 확인
+		paramMap.put("reqNo", paramMap.get("fileTrgtKey"));
+		List<Map<String, String>> approval = qm01Svc.selectApprovalChk(paramMap);
+		model.addAttribute("approval", approval);
+		return "jsonView";
+	}
+
+	// 매입대금 지급 결재요청 리스트 정보 조회
+	@PostMapping(value = "/sm30_pop_grid1_selectList")
+	public String sm30_pop_grid1_selectList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = sm30Svc.sm30_pop_grid1_selectList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	// 매입대금 지급 결재 요청 기본 정보 삭제
+	@PutMapping(value = "/delete_all_sm30_info")
+	public String delete_all_sm30_info(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			int result = sm30Svc.delete_all_sm30_info(paramMap);
+			if (result > 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	// 매입대금 지급 결재 요청 기본 리스트 삭제
+	@PutMapping(value = "/delete_sm30_list")
+	public String delete_sm30_list(@RequestBody Map<String, Object> paramMap, ModelMap model) throws Exception {
+
+		List<Map<String, String>> result = sm30Svc.delete_sm30_List(paramMap);
+		model.addAttribute("result", result);
+
+		return "jsonView";
+	}
+
+	// 결재여부 유저정보 반환
+	@PostMapping(value = "/selectApprovalUserChk")
+	public String selectApprovalUserChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = sm30Svc.selectApprovalUserChk(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 }
