@@ -2,7 +2,6 @@ package com.dksys.biz.user.sm.sm30.service.impl;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -129,24 +128,24 @@ public class SM30Svclmpl implements SM30Svc {
         paramMap.put("todoFileTrgtKey", fileTrgtKey);
         paramMap.put("reqNo", fileTrgtKey);
         paramMap.put("issNo", fileTrgtKey);
-        paramMap.put("salesCd", fileTrgtKey);
+		paramMap.put("salesCd", "");
 
         int result = sm30Mapper.insert_sm30(paramMap);
 
 		List<Map<String, String>> dtlList = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
 		for (Map<String, String> dtl : dtlList) {
 			dtl.put("fileTrgtKey", fileTrgtKey);
+			dtl.put("aprReqNo", fileTrgtKey);
 			dtl.put("coCd", paramMap.get("coCd"));
 			dtl.put("userId", paramMap.get("userId"));
 			dtl.put("pgmId", paramMap.get("pgmId"));
 			sm30Mapper.insert_sm30_list(dtl);
 
-			// 결재진행 요청시 TB_SM20M01 테이블 APR_REQ_NO 컬럼 업데이트
-			sm30Mapper.update_sm20_aprReqNo(dtl);
+			// 매입계산서 발행내역에 결제요청번호 등록하기
+			sm20Mapper.update_sm20_Approval(dtl);
 		}
 
 		
-		// result = sm30Mapper.update_sm20_aprReqNo(paramMap);
 
         //---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
@@ -233,79 +232,46 @@ public class SM30Svclmpl implements SM30Svc {
 	}
 
 	@Override
-	public int delete_all_sm30_info(Map<String, String> paramMap) throws Exception {
-
-		//---------------------------------------------------------------  
-		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
-	  	//   필수값 :  jobType, userId, comonCd
-		//---------------------------------------------------------------  
-	    List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
-	    HashMap<String, String> param = new HashMap<>();
-	    param.put("jobType", "fileDelete");
-	    param.put("userId", paramMap.get("userId"));
-	    if (deleteFileList.size() > 0) {
-		    for (Map<String, String> dtl : deleteFileList) {
-					//접근 권한 없으면 Exception 발생
-		            param.put("comonCd",  dtl.get("comonCd"));
-			    	
-					cm15Svc.selectFileAuthCheck(param);
-			}
-	    }
-		//---------------------------------------------------------------  
-		//첨부 화일 권한체크 끝 
-		//---------------------------------------------------------------  
-
+	public int delete_all_sm30(Map<String, String> paramMap) throws Exception {
 
         // 1. 매입대금 지급결재 기본 정보 자료 삭제
-	  	int result = sm30Mapper.delete_sm30_info(paramMap);
+		int result = sm30Mapper.delete_sm30_master(paramMap);
+		sm30Mapper.delete_sm30_all(paramMap);
 
         // 2. 매입대금 지급결재 결재자 정보 삭제 처리
-		List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
-		if (sharngChk.size() > 0) {
-			QM01Mapper.deleteWbsSharngList(paramMap); 
+		// fileTrgtKey
+		QM01Mapper.deleteApprovalList(paramMap);
+
+		// 매입계산서 발행내역에 결재요청 번호 제거하기
+		sm20Mapper.update_sm20_Approval_All_clear(paramMap);
+
+		return result;
+	}
+
+	@Override
+	public int delete_sm30_detail(Map<String, String> paramMap) throws Exception {
+
+		int result = sm30Mapper.delete_sm30_detail(paramMap);
+
+		// 매입계산서 발행내역에 결제요청번호 지우기
+		paramMap.put("aprReqNo", "");
+		sm20Mapper.update_sm20_Approval(paramMap);
+
+		// 마지막 상세내역이면 마스터 삭제 처리
+		if (paramMap.get("totCount").equals("1")) {
+			// 마지막 상세건이면 마스터 삭제
+			sm30Mapper.delete_sm30_master(paramMap);
+			// 매입대금 지급결재 결재자 정보 삭제 처리
+			QM01Mapper.deleteApprovalList(paramMap);
+			// 매입계산서 발행내역에 결재요청 번호 제거하기
+			sm20Mapper.update_sm20_Approval_All_clear(paramMap);
 		}
 
 		return result;
 	}
 
 	@Override
-	public List<Map<String, String>> delete_sm30_List(Map<String, Object> paramMap) throws Exception {
-		// 1) 클라이언트에서 보낸 rows 배열을 꺼내기
-		// @SuppressWarnings("unchecked")
-		List<Map<String, Object>> rows = (List<Map<String, Object>>) paramMap.get("rows");
-	
-		String fileTrgtKey = (String) paramMap.get("fileTrgtKey");
-		List<Map<String, String>> resultList = new ArrayList<>();
-	
-		// 2) 한 건씩 delete 호출
-		for (Map<String, Object> row : rows) {
-			String seq = String.valueOf(row.get("seq"));
-			String ctrtNo = (String) row.get("ctrtNo");
-			String clntCd = (String) row.get("clntCd");
-	
-			Map<String, String> deleteParam = new HashMap<>();
-			deleteParam.put("fileTrgtKey", fileTrgtKey);
-			deleteParam.put("seq", seq);
-			deleteParam.put("clntCd", clntCd);
-			deleteParam.put("ctrtNo", ctrtNo);
-	
-			sm30Mapper.delete_sm30_List(deleteParam);
-
-			// TB_SM20M01 APR_REQ_NO 초기화
-			sm30Mapper.update_sm20_aprReqNo_is_null(deleteParam);
-	
-			// 리턴용 맵에 seq만 담아서 반환
-			Map<String, String> res = new HashMap<>();
-			res.put("seq", seq);
-			resultList.add(res);
-		}
-	
-		// 3) 컨트롤러에서 isEmpty 체크용으로 사용
-		return resultList;
-	}
-
-	@Override
-	public List<Map<String, String>> selectApprovalUserChk(Map<String, String> paramMap) {
+	public Map<String, String> selectApprovalUserChk(Map<String, String> paramMap) {
 		return sm30Mapper.selectApprovalUserChk(paramMap);
 	}
 

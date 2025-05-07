@@ -15,6 +15,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.user.qm.qm01.service.QM01Svc;
 import com.dksys.biz.user.sm.sm30.service.SM30Svc;
+import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.dksys.biz.util.MessageUtils;
 
 @Controller
@@ -25,7 +26,10 @@ public class SM30Ctr {
     MessageUtils messageUtils;
 
 	@Autowired
-    SM30Svc sm30Svc;
+	WB20Svc wb20Svc;
+
+	@Autowired
+	SM30Svc sm30Svc;
 
 	@Autowired
 	QM01Svc qm01Svc;
@@ -112,9 +116,10 @@ public class SM30Ctr {
 		Map<String, String> result = sm30Svc.select_sm30_info(paramMap);
 		model.addAttribute("result", result);
 
-		// 결재정보 확인
 		paramMap.put("reqNo", paramMap.get("fileTrgtKey"));
-		List<Map<String, String>> approval = qm01Svc.selectApprovalChk(paramMap);
+		// 결재정보 확인
+		// 결재정보 확인 최종 Y, N 만 가져옴.
+		Map<String, String> approval = sm30Svc.selectApprovalUserChk(paramMap);
 		model.addAttribute("approval", approval);
 		return "jsonView";
 	}
@@ -128,10 +133,10 @@ public class SM30Ctr {
 	}
 
 	// 매입대금 지급 결재 요청 기본 정보 삭제
-	@PutMapping(value = "/delete_all_sm30_info")
-	public String delete_all_sm30_info(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+	@PutMapping(value = "/delete_all_sm30")
+	public String delete_all_sm30(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 		try {
-			int result = sm30Svc.delete_all_sm30_info(paramMap);
+			int result = sm30Svc.delete_all_sm30(paramMap);
 			if (result > 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
@@ -147,11 +152,22 @@ public class SM30Ctr {
 	}
 
 	// 매입대금 지급 결재 요청 기본 리스트 삭제
-	@PutMapping(value = "/delete_sm30_list")
-	public String delete_sm30_list(@RequestBody Map<String, Object> paramMap, ModelMap model) throws Exception {
-
-		List<Map<String, String>> result = sm30Svc.delete_sm30_List(paramMap);
-		model.addAttribute("result", result);
+	@PutMapping(value = "/delete_sm30_detail")
+	public String delete_sm30_detail(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			int result = sm30Svc.delete_sm30_detail(paramMap);
+			if (result > 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
 
 		return "jsonView";
 	}
@@ -159,7 +175,7 @@ public class SM30Ctr {
 	// 결재여부 유저정보 반환
 	@PostMapping(value = "/selectApprovalUserChk")
 	public String selectApprovalUserChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> result = sm30Svc.selectApprovalUserChk(paramMap);
+		Map<String, String> result = sm30Svc.selectApprovalUserChk(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}

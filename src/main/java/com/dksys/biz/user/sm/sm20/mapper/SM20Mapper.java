@@ -61,6 +61,13 @@ public interface SM20Mapper {
 	List<Map<String, String>> select_mngId_code(Map<String, String> paramMap);
 
 	int update_sm20_payCompleteChke(Map<String, String> paramMap);
+
+	// APPROVAL
+
+	int update_sm20_Approval(Map<String, String> paramMap);
+
+	int update_sm20_Approval_All_clear(Map<String, String> paramMap);
+
 }
 
 

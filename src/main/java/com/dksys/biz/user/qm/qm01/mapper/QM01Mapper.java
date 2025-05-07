@@ -105,6 +105,8 @@ public interface QM01Mapper {
 
 	int deleteApprovalList(Map<String, String> paramMap);
 
+	int deleteApprovalListTodoNo(Map<String, String> paramMap);
+
 	// 과제확정 공유자 삭제
 	int deleteSJApprovalList1(Map<String, String> paramMap);
 

@@ -6,7 +6,6 @@
 	<form id="popForm" onSubmit="return false;" method="post" enctype="multipart/form-data">
 		<input type="hidden" id="userId" name="userId">
 		<input type="hidden" id="fileTrgtTyp" name="fileTrgtTyp" value="SM3002P01">
-		<input type="hidden" id="fileTrgtKey" name="fileTrgtKey">
 		<input type="hidden" id="pgmId" name="pgmId" value="SM3002P01">
 
 		<table>
@@ -30,7 +29,7 @@
 
 				<th>지급년월</th>
 				<td>
-					<input type="text" class="input_calendar" autocomplete="off" onkeyup="dateMask(this);" id="closeYm" name="closeYm" date class="form-control" required>
+					<input type="text" id="closeYm" name="closeYm"  class="form-control" required>
 				</td>
 
 				<th>결제일자</th>
@@ -53,13 +52,9 @@
 			</tr>
 			<!-- 2행 -->
 			<tr>
-				<th>구매처</th>
+				<th>결재요청번호</th>
 				<td>
-					<input type="hidden" id="clntCd" name="clntCd" data-search="clntCd">
-					<div class="search_form">
-						<input type="text" id="clntNm" name="clntNm"  data-search="clntNm" onkeyup="event.keyCode == 8 ? clntCd_S.value = '' : event.keyCode == 13 ? clntSearch() : ''">
-						<a onclick="clntSearch('S');"><i class="i_search_w"></i></a>
-					</div>
+					<input type="text" id="fileTrgtKey" name="fileTrgtKey" readonly>
 				</td>
 				<th>부서명</th>
 				<td>
@@ -143,7 +138,7 @@
 	<!-- 하단 버튼 -->
 	<div class ="popup_bottom_btn" style="margin-bottom:20px;">
 		<button type="button" id="actionBtn1" authChk>등록</button>
-		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+		<button type="button" class="close_btn" onclick="executeCallback();">닫기</button>
 		<button type="button" id="actionBtn2" authChk>삭제</button>
 	</div>
 </div>
@@ -163,6 +158,7 @@
 	// 카톡 정상알림 카운터 변수
 	var kakaoCnt = 0;
 	var kakaoErr = [];
+	var todoTitleSt ='';
 
 	var deleteFileArr = [];
 
@@ -180,7 +176,7 @@
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
 				showRowSelector: false,
-				showLineNumber: false,
+				showLineNumber: true,
 				lineNumberColumnWidth: 40,
 				multipleSelect: true,
 				sortable: false,
@@ -208,7 +204,7 @@
 						formatter: function() {return '<button type="button" '+   'onclick="delete_sm30_select_list('+ this.dindex + ',' + this.item.seq + ')" '+   'style="margin-left:3px; height:18px;padding:0" authchk>삭제</button>';}
 					},
 					{key: "fileTrgtKey",	label: "파일대상KEY",		width: 50,	align: "center",  hidden: true},
-					{key: "seq",			label: "순번",				width: 50,	align: "center",  hidden: false},
+					{key: "seq",			label: "순번",				width: 50,	align: "center",  hidden: true},
 					{key: "coCd",			label: "회사",				width: 50,	align: "left", hidden: true},
 					{key: "custId",			label: "고객사CD", 			width: 180, align: "left", hidden: true},
 					{key: "custNm",			label: "고객사",			width: 180,	align: "left"},
@@ -264,6 +260,8 @@
 			});
 		}
 	}
+	
+	
 
 	//공유 결재 그리드
 	var gridViewPop2 = {
@@ -326,82 +324,19 @@
 					var formData = {
 						"fileTrgtKey" : $("#fileTrgtKey").val(),
 						"reqNo" : $("#fileTrgtKey").val(),
-						"pageNo" : _pageNo + 1
 					}
 					postAjax("/user/wb/wb20/selectSignResUserlst", formData, null, function(data){
 						try {
 							var list = data.result;
 							if( list.length > 0 ) {
-								var inCnt = 0;
-								var inGb = 0; //해당 결재개수 변수
-								let processChk = false;	//결재 진행여부 체크 (결재가 하나라도  진행되면 true)
-								list.forEach(elem => {
-									if (elem.gb === "결재") {  // 결재와 공유 중 결재 갯수 파악
-										if (elem.todoId !== jwt.userId) {	//결재자가 동일하면 제외
-											//상태가 'Y'인 경우
-											if (elem.sanctnSttus === "Y") {
-												processChk = true;
-												inCnt++;
-											}
-
-											inGb++;
-										}
+								targetObj.setData({
+									list : list,
+									page : {
+										totalElements : list.length
 									}
-								});
-								// 작성자랑 결재자 같은지 check
-								postAjax("/user/sm/sm30/selectApprovalUserChk", formData, null, function(res) {
-									var list = res.result;
-									var myId = $("#userId").val();
-
-									// 나 빼고(Y) 가 있는지
-									var othersHaveY = list.some(item =>
-										item.todoId !== myId && item.sanctnSttus === 'Y'
-									);
-									// 나만(Y) 인지
-									var meHasY = list.some(item =>
-										item.todoId === myId && item.sanctnSttus === 'Y'
-									);
-
-									// 하단 삭제 버튼
-									if (meHasY && !othersHaveY && ((actionType != "S") && actionType !="T")) {
-										$("#actionBtn2").show();
-									} else {
-										$("#actionBtn2").hide();
-									}
-
-									// 그리드 deleteBtn 컬럼
-									var cfg = gridViewPop1.target.config;
-									cfg.columns.forEach(function(col) {
-										if (col.key === 'deleteBtn' && ((actionType != "S") && actionType !="T")) {
-										// 다른 사람 승인 중일 때만 숨기기
-										col.hidden = othersHaveY;
-										}
-									});
-									gridViewPop1.target.setConfig(cfg);
-									gridViewPop1.target.repaint();
 								});
 							}
-							targetObj.setData({
-								list : list,
-								page : {
-									totalElements : list.length
-								}
-							});
-							// 모든 sanctnSttus 가 'Y' 인지 검사
-							var allY = list.length > 0 && list.every(function(row){
-								return row.sanctnSttus === 'Y';
-							});
-
-							// gridViewPop1 그리드의 aprReqSts 칼럼을 Y/N 으로 세팅
-							var mainList = gridViewPop1.target.list;
-							mainList.forEach(function(item, idx){
-								gridViewPop1.target.setValue(idx, 'aprReqSts', allY ? 'Y' : 'N');
-							});
-
-							// gridViewPop1 그리드 다시 그림
-							gridViewPop1.target.repaint();
-
-						} catch {
+						} catch (error){
 							alert("오류 발생!! 전산실 연락 바랍니다", error.message);
 							return null; // 오류 발생 시 null 반환
 						} finally {
@@ -412,17 +347,18 @@
 
 				setData2 : function(_list) {
 					this.target.setData({
-								list : _list,
-								page : {
-										totalElements :  _list.length,
-							}
-							});
+						list : _list,
+						page : {
+								totalElements :  _list.length,
+							   }
+					});
 				}
 				,
 				setData3 : function(_pageNo) {
 					var targetObj = this.target;
-					var paramObj = { "userId": jwt.userId
-								, "appDiv": 'APPDIV09'		//수주원가관리 결재라인
+					var paramObj = { 
+							      "userId": jwt.userId
+								, "appDiv": 'APPDIV20'		//매입대금 결재라인
 					};
 					postAjax("/user/wb/wb20/selectSignResUserlstInit", paramObj, null, function(data){
 						try {
@@ -431,7 +367,7 @@
 								list : list,
 								page : { totalElements : list.length }
 							});
-						} catch {
+						} catch(error){
 							alert("오류 발생!! 전산실 연락 바랍니다", error.message);
 							return null; // 오류 발생 시 null 반환
 						} finally {
@@ -453,17 +389,12 @@
 		$('#clntNm').off('keyup').css('pointer-events', 'none');
 		$('.search_form a').removeAttr('onclick').off('click').css('pointer-events', 'none');
 
-		// 지급년월
-		$('#closeYm').datepicker({
-			format : "yyyy-mm",
-			language : "ko",
-			autoclose : true,
-			minViewMode: "months"
-		}).datepicker("setDate", new Date());
-
 		gridViewPop1.initView();
 		gridViewPop2.initView();
 
+		//전체 삭제기능 버튼은 수정시만 활성화됨
+		$("#actionBtn2").hide();
+		
 		if (actionType == "C") {
 			$("#coCd").val(param.coCd);
 			$("#closeYm").val(param.closeYm);
@@ -477,32 +408,29 @@
 				if( $("#popForm").find("#" + key).length > 0 ) {
 					$("#popForm").find("#" + key).val(val);
 				}
-				if (key === "closeYm") {
-					$('#popForm #' + key).datepicker("update");
-				}
 			});
 
 			gridViewPop1.target.setData({
 				list : gridData,
 				page : { totalElements: gridData.length}
 			})
-			$("#actionBtn2").hide();
+			gridViewPop2.setData3();
+			
 			$("#actionBtn1").text("등록");
 			$('#actionBtn1').on("click", function() {
 				insert_sm30();
 			});
 		} else if (actionType == "U" || actionType == "S" || actionType == "T") {
-			$('#closeYm').off('click focus');
 			fileTrgtKey = param.fileTrgtKey;
 			coCd = param.coCd;
+			
+			//헤더 정보 가져오기
 			select_sm30_info()
-			$("#actionBtn1").hide();
-			$("#actionBtn2").hide();
-
+			
 			if (actionType == "U") {
-				
+				$("#actionBtn1").hide();
 				$('#actionBtn2').on("click", function() {
-					delete_all_sm30_info();
+					delete_all_sm30();
 				});
 			} else {
 				$("#plus-minus").hide();
@@ -536,10 +464,8 @@
 			// 응답 데이터를 폼에 채워 넣음
 			$.each(data.result, function(key, value) {
 				if (key === "payYymm") {
-					var formatted = value.substr(0,4) + "-" + value.substr(4,2);
-					$("#closeYm").val(formatted).datepicker("update", new Date(value.substr(0,4), parseInt(value.substr(4,2),10)-1));
-					return; // 다음 key 로
-				}
+					$("#closeYm").val(value.substr(0,4) + "-" + value.substr(4,2));
+				} else 
 				if ($('#popForm #' + key)[0]) {
 					$('#popForm #' + key).val(value);
 					
@@ -547,15 +473,30 @@
 					if ($('#popForm #' + key).is('[comma]')) {
 						onlyNumber($('#popForm #' + key)[0]);
 					}
-				}
+				} else 
 				if (key === "creatId") {
 					$("#userId").val(value)
 				}
 			});
+			$('.tit').text($("#closeYm").val() + "월 " + $("#deptId option:selected").text()  +" 매입대금 지급 결재 조회");
+			const chk_sanctnSttus  = data.approval ==null ? 'N' : data.approval.sanctnSttus;
+			//전체 삭제 버튼 기능 적용 
+			if (actionType == "U" && chk_sanctnSttus == 'N') {
+				//결재 진행 여부에 따라 삭제버튼 비활성화 하기	
+				$("#actionBtn1").show();
+				$("#actionBtn2").show();
+				// 그리드 deleteBtn 컬럼 보이기
+				var updatedColumns = gridViewPop1.target.columns;
+				updatedColumns[0].hidden = false;
+				gridViewPop1.target.setConfig({ columns: updatedColumns });
+			} else {
+				$("#actionBtn1").hide();
+				$("#actionBtn2").hide();
+			}
+
 			gridViewPop1.setData();
 			gridViewPop2.setData();
-			$('.tit').text($("#closeYm").val() + "월 " + $("#deptId option:selected").text()  +" 매입대금 지급 결재 조회");
-
+			
 		});
 	}
 
@@ -608,16 +549,16 @@
 		formData.append("detailArr", JSON.stringify(detailArr));
 
 		// title 지정 코드
-		var uniqueClntNms = Array.from(new Set(detailArr.map(item => item.clntNm))); 
-		var clntNmString = uniqueClntNms.join(', ');
-		var todoTitleStr = "[대금지불] " + clntNmString + " "+ $("#closeYm").val().slice(0, 4) + "년 " + $("#closeYm").val().slice(-2)+ "월"+ " 대금지불 요청건";
-
+// 		var uniqueClntNms = Array.from(new Set(detailArr.map(item => item.clntNm))); 
+// 		var clntNmString = uniqueClntNms.join(', ');
+// 		var todoTitleStr = "[대금지불] " + clntNmString + " "+ $("#closeYm").val() + "월 " + $("#trunDiv").val() + "일"  결제 대금지불 요청건";
+		
+		todoTitleStr = `[대금지불]${$("#deptId option:selected").text()}  ${$("#closeYm").val()}월 ${$("#trunDiv option:selected").text()} ${$("#pchsClmnDay").val()}일자 대금 지불`;
 
 		// 공유대상자 리스트  TODO LIST에 등록하기 위한 모듈 추가
 		// 공유 : TODODIV10, TODODIV1170  결재 :TODODIV20, TODODIV2170
 
 		/*	결재그리드 insert make start */
-
 		//결재그리드
 		var rowSharngList = gridViewPop2.target.list;
 		var ParamObj = modalStack.last().paramObj;
@@ -629,7 +570,6 @@
 			$.each(rowSharngList, function(idx, elem) {
 				var rowSharngListObj = elem;
 				var rowApprovalListObj = elem;
-
 				if (elem.gb == '공유') {
 					rowSharngListObj["gb"] = elem.gb;
 					rowSharngListObj["coCd"] = $('#coCd').val();
@@ -681,10 +621,10 @@
 			if (formData) {
 				filePostAjax("/user/sm/sm30/insert_sm30", formData, function(data) {
 					if (data.resultCode == 200) {
-						alert("등록되었습니다.")
 						$("#fileTrgtKey").val(data.fileTrgtKey);
+						alert("등록되었습니다.")
 						kakaoTodo();				//kakaoTodo() 호출
-						modalStack.close();
+						executeCallback();
 					}
 				});
 			}
@@ -692,43 +632,35 @@
 	}
 
 	// 전체 삭제
-	function delete_all_sm30_info() {
+	function delete_all_sm30() {
 		var rows = gridViewPop1.target.getList();
 		if (actionType == 'C') {
 			alert("잘못된 접근 입니다. 전산실에 연락바랍니다.")
-			return;
+			return false;
 		}
+		postAjaxSync("/user/sm/sm30/selectApprovalUserChk", {reqNo:$("#fileTrgtKey").val()}, null, function(res) {
+			const chk_sanctnSttus  = res.result ==null ? 'N' : res.result.sanctnSttus;
+			//전체 삭제 버튼 기능 적용 
+			// (this.userId) 제외, 누군가 Y 이면 삭제 금지
+			if (chk_sanctnSttus == 'Y') {
+				alert("결재 진행중인 자료는 삭제할 수 없습니다.\n\n결재 진행 상태 확인 바랍니다.");
+				return false;
+			}
+		});
+		
 		var formData = {
 			"fileTrgtKey" 	: $("#fileTrgtKey").val(),
 			"reqNo" 		: $("#fileTrgtKey").val(),
-			"salesCd" 		: $("#fileTrgtKey").val(),
+			"aprReqNo" 		: $("#fileTrgtKey").val(),
 			"coCd"			: $("#coCd").val(),
 			"userId"		: $("#userId").val(),
 			"fileTrgtTyp"  	: $('#pgmId').val(),
 		}
-
 		if (confirm("매입대금 지급 결재 요청을 삭제하시겠습니까?")) {
-			postAjaxSync("/user/sm/sm30/selectApprovalUserChk", formData, null, function(res) {
-				var list = res.result; 
-					// (this.userId) 제외, 누군가 Y 이면 삭제 금지
-					var othersApproved = list.some(function(item) {
-					return item.todoId !== formData.userId && item.sanctnSttus === 'Y';
-				});
-				if (othersApproved) {
-					alert("결재 진행중인 자료는 삭제할 수 없습니다.\n\n결재 진행 상태 확인 바랍니다.");
-					return;
-				}
-				else { //안되었으면 삭제 진행[TB_WB20M03] 테이블도 삭제 처리
-					putAjax("/user/sm/sm30/delete_all_sm30_info", formData, null, function(data) {
-						if (data.resultCode == 200) {
-							// 상세 리스트 삭제
-							formData ["rows"] = rows
-							putAjax("/user/sm/sm30/delete_sm30_list", formData, null, function(data) {
-								alert("삭제되었습니다.");
-								modalStack.close();
-							});
-						}
-					});
+			putAjax("/user/sm/sm30/delete_all_sm30", formData, null, function(data) {
+				if (data.resultCode == 200) {
+					// 상세 리스트 삭제
+					executeCallback();
 				}
 			});
 		}
@@ -736,23 +668,28 @@
 
 	// 리스트 건별 삭제
 	function delete_sm30_select_list(rowIndex, seq) {
-		var allRows = gridViewPop1.target.getList();
-		var row = allRows[rowIndex];
-
+		var row = gridViewPop1.target.list[rowIndex];
+		const gridLength = gridViewPop1.target.list.length;
 		var formData = {
-			fileTrgtKey: $("#fileTrgtKey").val(),
-			rows: [{
-				seq		: seq,
-				clntCd 	: row.clntCd,
-				ctrtNo	: row.ctrtNo
-			}]
+			fileTrgtKey	: $("#fileTrgtKey").val(),
+			aprReqNo	: $("#fileTrgtKey").val(),
+			seq			: seq,
+			clntCd 		: row.clntCd,
+			ctrtNo		: row.ctrtNo,
+			billNo		: row.billNo,
+			totCount 	: gridLength
 		};
 
-		putAjax("/user/sm/sm30/delete_sm30_list", formData, null, function(data) {
-			if (data && data.result && data.result.length > 0) {
+		putAjax("/user/sm/sm30/delete_sm30_detail", formData, null, function(data) {
+			if (data.resultCode == 200) {
+				alert("삭제되었습니다.");
+				
+				if (gridLength == 1) {
+					executeCallback();
+					return false;
+				}
 				// 그리드에서 해당 인덱스의 행을 삭제
 				gridViewPop1.target.removeRow(rowIndex);
-				alert("삭제되었습니다.");
 			} else {
 				alert("삭제에 실패했습니다.");
 			}
@@ -1002,7 +939,7 @@
 			, "todoDiv2CodeId": "TODODIV2170"               //공통코드 해당업무 - 결재 - 발주서
 			, "todoDiv1CodeNm": "결재"                  //공통코드 해당업무 - 결재 - 발주서
 			//, "todoDiv2CodeNm": "발주 및 출장 요청"                  //공통코드 해당업무 - 결재 - 발주서
-			, "title": "매입대금 지급"
+			, "title": todoTitleStr
 			//[대금지불]흥진유압 2025년3월 대금지불 요청건
 			, "sanctnDiv2": "결재"                     //템플릿 결재구분2    #{sanctnDiv2} 처리 바랍니다.
 			// , "histNo": $("#popForm #histNo").val()   //수주차수
@@ -1022,7 +959,7 @@
 			, "todoDiv1CodeId": "TODODIV10"               //공통코드 해당업무 - 결재
 			, "todoDiv2CodeId": "TODODIV1170"               //공통코드 해당업무 - 결재 - 발주서
 			, "todoDiv1CodeNm": "공유"                  //공통코드 해당업무 - 결재 - 발주서
-			, "title": "매입대금 지급"
+			, "title": todoTitleStr
 			, "sanctnDiv2": "공유"                     //템플릿 결재구분2    #{sanctnDiv2} 처리 바랍니다.
 			// , "histNo": $("#popForm #histNo").val()   //수주차수
 			, "todoNo": $("#fileTrgtKey").val()
@@ -1064,7 +1001,6 @@
 			}
 		});
 		//user search ajax end
-
 		//대상 loop
 		$.each(sendList, function (key, sendObj) {
 			maxMessageId = sendObj.maxMessageId;
@@ -1076,7 +1012,7 @@
 			param.nameTo = sendObj.name;            //todo 수신자명
 			//title      = sendObj.todoTitl;
 			todoDiv2CodeNm =   sendObj.todoTitl;
-			param.todoDiv2CodeNm = todoDiv2CodeNm;
+			param.todoDiv2CodeNm = '매입대금지불 결제 건';
 			//param.title = title;                        //요청내용제목
 			param.sendDt = sendObj.sendDt;
 
@@ -1228,7 +1164,12 @@
 			if (!item.usrNm.includes('gyrsult')) {
 				if (item.gb === "결재") {
 					appArray.push(item);
-				}
+	            } else {
+	            	//공유일경우 작성자가 공유에 있으면 제외처리함.
+	            	if (item.usrNm != tempActId) {
+	            		shaArray.push(item);
+	            	}
+	            }
 			}
 		});
 		//------------------------------------------------
@@ -1237,7 +1178,7 @@
 
 		appArray = approvalTeamManagerInfoData(tempActId, appArray);		// 작성자 팀장
 		appArray = approvalUserInfoData(tempActId, appArray);				// 작성자
-		appArray = approvalTeamManagerSpecialInfoData('EMJ8105', appArray);	// 부사장님
+// 		appArray = approvalTeamManagerSpecialInfoData('EMJ8105', appArray);	// 부사장님
 	
 		gridViewPop2.setData2(appArray.concat(shaArray));
 	}
@@ -1329,4 +1270,8 @@
 		return appArray;
 	}
 
+	function executeCallback() {
+		modalStack.last().callback("200");
+		modalStack.close();
+	}
 </script>
