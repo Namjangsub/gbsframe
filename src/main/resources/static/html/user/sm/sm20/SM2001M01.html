@@ -1342,41 +1342,59 @@
     }
 	
 	//공급사 대금 지급 결재 요청 작업
-	function projectApproval(type) {
-		var row = gridView1.target.getList("selected", true);
-		if (row.length == 0) {
+	function projectApproval() {
+		const row = gridView1.target.getList("selected", true);
+		if (!row.length) {
 			alert("결제요청자료를 선택한 후 작업가능합니다.");
 			return false;
 		}
 
-		const hasValue = row.some(item => item.aprReqNo != null && item.aprReqNo !== '');
-		if (hasValue != '') {
-			alert("이전에 결제요청한 자료가 포함되어 있습니다. 확인 바랍니다.");
-			return false;
-		}
-		if (type == "C") {
-			var paramObj = {
-					"actionType"   : type,
-					"coCd" 			: $("#coCd_S").val(),
-					"closeYm" 		: $("#closeYm_S").val(),
-					"pchsDtfrom" 	: $("#pchsDtfrom_S").val(),
-					"pchsDtto" 		: $("#pchsDtto_S").val(),
-					"pchsClmnDay" 	: $("#pchsClmnDay_S").val(),
-					"billYn" 		: $("#billYn").val(),
-					"deptId" 		: $("#deptId_S").val(),
-					"deptNm" 		: $("#deptId_S option:selected").text(),
-					"trunDiv" 		: $("#trunDiv_S ").val(),
-					"payDiv" 		: $("#payDiv").val(),
-					"userId" 		: $("#userId").val(),
-					"row"       	: row,
+		// aprReqNo가 빈 문자열이나 null인 경우 ""로 통일
+		const aprReqNos = row.map(r => r.aprReqNo || "");
+		const filledCount = aprReqNos.filter(v => v !== "").length;
+		const uniqueAprNos = [...new Set(aprReqNos.filter(v => v !== ""))];
+
+		let actionType, paramObj;
+
+		if (filledCount === 0) {
+			// 1) 모든 항목이 신규(요청번호 없음)
+			actionType = "C";
+			paramObj = {
+				actionType,
+				coCd: $("#coCd_S").val(),
+				closeYm: $("#closeYm_S").val(),
+				pchsDtfrom: $("#pchsDtfrom_S").val(),
+				pchsDtto: $("#pchsDtto_S").val(),
+				pchsClmnDay: $("#pchsClmnDay_S").val(),
+				billYn: $("#billYn").val(),
+				deptId: $("#deptId_S").val(),
+				deptNm: $("#deptId_S option:selected").text(),
+				trunDiv: $("#trunDiv_S").val(),
+				payDiv: $("#payDiv").val(),
+				userId: $("#userId").val(),
+				row  // 선택된 모든 행 전달
 			};
-			
-		} else {
-			var paramObj = {
-				"actionType" 	: type,		// "U"
-				"coCd"			: $("#coCd_S").val(),
-				"fileTrgtKey"	: "APR2500003" // 어떤 fileTrgtKey 를 싸야 할지 모르겠습니다.
+		}
+		else if (filledCount === row.length) {
+			// 2) 모두 이미 요청된 건
+			if (uniqueAprNos.length === 1) {
+				// 2-1) 같은 요청번호로만 구성
+				actionType = "U";
+				paramObj = {
+					actionType,
+					coCd: $("#coCd_S").val(),
+					fileTrgtKey: uniqueAprNos[0]
+				};
+			} else {
+				// 2-2) 요청번호가 서로 다르면 오류
+				alert("여러 다른 요청번호가 선택되었습니다. 하나의 요청번호만 선택해주세요.");
+				return false;
 			}
+		}
+		else {
+			// 3) 신규와 기등록 건이 혼합된 경우
+			alert("신규 요청건과 이미 요청된 건이 혼합되어 있습니다. 확인해주세요.");
+			return false;
 		}
 		openModal("/static/html/user/sm/sm30/SM3002P01.html", 1600, 850, "", paramObj, function(data) {
 			DataSearch();

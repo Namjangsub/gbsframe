@@ -22,6 +22,8 @@ public interface SM30Mapper {
 
 	int insert_sm30_list(Map<String, String> paramMap);
 
+	int update_sm20_aprReqNo(Map<String, String> paramMap);
+
 	Map<String, String> select_sm30_info(Map<String, String> paramMap);
 
 	List<Map<String, String>> sm30_pop_grid1_selectList(Map<String, String> paramMap);
@@ -29,6 +31,8 @@ public interface SM30Mapper {
 	int delete_sm30_info(Map<String, String> paramMap);
 
 	int delete_sm30_List(Map<String, String> paramMap);
+
+	int update_sm20_aprReqNo_is_null(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectApprovalUserChk(Map<String, String> paramMap);
 }

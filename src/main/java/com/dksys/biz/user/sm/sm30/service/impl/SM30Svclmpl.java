@@ -140,7 +140,13 @@ public class SM30Svclmpl implements SM30Svc {
 			dtl.put("userId", paramMap.get("userId"));
 			dtl.put("pgmId", paramMap.get("pgmId"));
 			sm30Mapper.insert_sm30_list(dtl);
+
+			// 결재진행 요청시 TB_SM20M01 테이블 APR_REQ_NO 컬럼 업데이트
+			sm30Mapper.update_sm20_aprReqNo(dtl);
 		}
+
+		
+		// result = sm30Mapper.update_sm20_aprReqNo(paramMap);
 
         //---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
@@ -258,18 +264,6 @@ public class SM30Svclmpl implements SM30Svc {
 		if (sharngChk.size() > 0) {
 			QM01Mapper.deleteWbsSharngList(paramMap); 
 		}
-		// Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
-		// Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-
-		// // // 매입대금 지급 결재 대상 리스트 자료 삭제
-		// List<Map<String, String>> dtlList = gsonDtl.fromJson(paramMap.get("seq"), dtlMap);
-		// for (Map<String, String> dtl : dtlList) {
-		// 	// delete_sm30_List 에 필요한 파라미터만 새 맵에 담아서 호출
-		// 	Map<String, String> deleteParam = new HashMap<>();
-		// 	deleteParam.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-		// 	deleteParam.put("seq", dtl.get("seq"));
-		// 	result += sm30Mapper.delete_sm30_List(deleteParam);
-		// }
 
 		return result;
 	}
@@ -286,12 +280,19 @@ public class SM30Svclmpl implements SM30Svc {
 		// 2) 한 건씩 delete 호출
 		for (Map<String, Object> row : rows) {
 			String seq = String.valueOf(row.get("seq"));
+			String ctrtNo = (String) row.get("ctrtNo");
+			String clntCd = (String) row.get("clntCd");
 	
 			Map<String, String> deleteParam = new HashMap<>();
 			deleteParam.put("fileTrgtKey", fileTrgtKey);
 			deleteParam.put("seq", seq);
+			deleteParam.put("clntCd", clntCd);
+			deleteParam.put("ctrtNo", ctrtNo);
 	
 			sm30Mapper.delete_sm30_List(deleteParam);
+
+			// TB_SM20M01 APR_REQ_NO 초기화
+			sm30Mapper.update_sm20_aprReqNo_is_null(deleteParam);
 	
 			// 리턴용 맵에 seq만 담아서 반환
 			Map<String, String> res = new HashMap<>();
