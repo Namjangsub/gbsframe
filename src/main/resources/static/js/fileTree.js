@@ -69,7 +69,6 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 			// 결재, 승인 버튼활성화를 위해서는 modalStack.last().paramObj.gridObj 에 결재 승인을 위한 파라메터 값이 있어야 함.
 			//--------------------------------------------------------------------
 //        	console.log(modalStack.last().paramObj.gridObj);
-
 			if (modalStack.last() != undefined) {
 				approvalWorkingGrid = modalStack.last().paramObj.gridObj; //결재 승인을 위한 파라메터 전역변수에 저장함
 				if (approvalWorkingGrid != undefined) { //To-Do List에서 넘어온 작업임
@@ -84,6 +83,16 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 						$('#popForm a:has(i.i_search_w)').removeAttr('onclick');  //popForm ID안에 있는 <a>태그중 자식으로 i태그 i_search_w 클래스가 있으면 onclick 제거--> 결재창과 중복 방지를 위함
 						$('#popForm a:has(i.i_search_w)').remove();  //I 태그도 삭제
 						$('.popup_bottom_btn').last().append(callCmd);
+
+						//발주요청처리결과화면이면
+						if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
+							$('#measRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
+							$('#resltRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
+						} else if (params.fileTrgtTyp == 'WB2401P01' || params.fileTrgtTyp == 'WB2401P11') {
+							$('#measRst').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+							$('#actCnts').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+							$('.issAct').removeClass('no-click');
+						}
 					}
 				} else {	//To-Do List가 아닌경우 각 화면에서 결재대상이면 처리하기 위함
 					if (params.todoNo != undefined && params.fileTrgtKey != '0' && params.fileTrgtKey != undefined) {
@@ -109,6 +118,16 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 								$('#popForm a:has(i.i_search_w)').removeAttr('onclick');  //popForm ID안에 있는 <a>태그중 자식으로 i태그 i_search_w 클래스가 있으면 onclick 제거--> 결재창과 중복 방지를 위함
 								$('#popForm a:has(i.i_search_w)').remove();  //I 태그도 삭제
 								$('.popup_bottom_btn').last().append(callCmd);	//마지막 popup_bottom_btn class에서 버튼 추가
+								
+								//발주요청처리결과화면이면
+								if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
+									$('#measRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
+									$('#resltRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
+								} else if (params.fileTrgtTyp == 'WB2401P01' || params.fileTrgtTyp == 'WB2401P11') {
+									$('#measRst').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+									$('#actCnts').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+									$('.issAct').removeClass('no-click');
+								}
 							}
 						});
 					}

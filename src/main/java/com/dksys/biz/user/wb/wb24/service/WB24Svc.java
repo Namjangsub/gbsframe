@@ -17,6 +17,8 @@ public interface WB24Svc {
 	
 	int wbsIssueUpdate(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
+	int updateIssueComment(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
 	int wbsIssCloseYnConfirm(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	
 	List<Map<String, String>> selectTodoRsltsView(Map<String, String> paramMap);	

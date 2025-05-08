@@ -378,6 +378,11 @@ public class WB24SvcImpl implements WB24Svc {
 	}
 
 	@Override
+	public int updateIssueComment(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+		return wb24Mapper.updateIssueComment(paramMap);
+	}
+
+	@Override
 	public int wbsIssCloseYnConfirm(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		int result = 0;
 		Gson gson = new Gson();

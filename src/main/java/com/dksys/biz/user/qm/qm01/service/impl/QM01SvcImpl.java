@@ -290,6 +290,12 @@ public class QM01SvcImpl implements QM01Svc {
      return result;
   }
 
+	// 결재시 원인/결과에 대한 수정작업
+	@Override
+	public int updateQualityResultComment(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+		return QM01Mapper.updateQualityResultComment(paramMap);
+	}
+
   @Override
   public Map<String, String> insertQualityReq(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
