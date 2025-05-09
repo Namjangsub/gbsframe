@@ -184,9 +184,14 @@
 					, '-'		AS MENU_URL
 					, 'FOLDER'	AS MENU_TYPE
 					, 'Y'		AS USE_YN
+					, 'creatId'		AS CREAT_ID
+					, sysdate		AS CREAT_DTTM
+					, 'udtId'		AS UDT_ID
+					, sysdate		AS UDT_DTTM
+					, 'UDT_PGM'		AS UDT_PGM
 					, 0			AS SORT_NO
 					, 'Y'		AS SAVE_YN
-			 		, ''		AS ORIGIN_ID
+			 		, 'U99'		AS ORIGIN_ID
 			  FROM DUAL
 			 WHERE 1 = (SELECT 1 FROM menu_data WHERE ROWNUM = 1)
 		UNION ALL
@@ -197,6 +202,11 @@
 			 		, MENU_URL							AS MENU_URL
 			 		, MENU_TYPE							AS MENU_TYPE
 			 		, USE_YN							AS USE_YN
+					, 'creatId'		AS CREAT_ID
+					, sysdate		AS CREAT_DTTM
+					, 'udtId'		AS UDT_ID
+					, sysdate		AS UDT_DTTM
+					, 'UDT_PGM'		AS UDT_PGM
 			 		, ID_SEQ 							AS SORT_NO
 			 		, 'Y'								AS SAVE_YN
 			 		, MENU_ID							AS ORIGIN_ID
@@ -262,4 +272,45 @@
 		   AND MENU_ID 	= #{menuId}
 	</select>
 	
+	
+	
+	<select id="selectCheckAuthority" parameterType="ArrayList" resultType="CamelMap">
+		WITH auth_role AS (
+			    SELECT DISTINCT TRIM(REGEXP_SUBSTR(AUTH_ROLE, '[^,]+', 1, LEVEL)) AS AUTH_ROLE_NAME
+			      FROM TB_CM01M01
+			    WHERE AUTH_ID IN <foreach collection="authArray" item="item" index="index" separator="," open="(" close=")">#{item}</foreach>
+			    CONNECT BY LEVEL <![CDATA[ <= ]]> REGEXP_COUNT(AUTH_ROLE, ',') + 1
+			       AND PRIOR AUTH_ID = AUTH_ID
+			       AND PRIOR DBMS_RANDOM.VALUE IS NOT NULL
+			    ORDER BY AUTH_ROLE_NAME
+		)
+		, role_menu AS (
+				SELECT ROLE_MENU_NAME
+					 , MAX(SAVE_YN) SAVE_YN
+				FROM (SELECT LV
+							, REGEXP_SUBSTR(ROLE_MENU,  '[^\,]+',1, LV) AS ROLE_MENU_NAME
+							, SAVE_YN
+						FROM (SELECT ROLE_MENU, SAVE_YN 
+						        FROM TB_CM02M01
+						        		INNER JOIN auth_role ON auth_role.AUTH_ROLE_NAME = TB_CM02M01.ROLE_ID
+								ORDER BY SORT_NO ASC) S
+							, (SELECT LEVEL AS LV FROM DUAL CONNECT BY LEVEL <![CDATA[ <= ]]> 1000)
+						WHERE REGEXP_SUBSTR(ROLE_MENU,  '[^\,]+',1, LV) IS NOT NULL) 
+				GROUP BY ROLE_MENU_NAME
+		)
+		SELECT C.*, MENU_ID	AS ORIGIN_ID, NVL(role_menu.SAVE_YN, 'U') AS SAVE_YN
+		  FROM (SELECT
+--					LEVEL LV,
+					A.*
+				FROM
+					TB_CM03M01 A
+				WHERE USE_YN = 'Y'
+					START WITH UP_MENU_ID = 'ROOT'
+					CONNECT BY PRIOR MENU_ID = UP_MENU_ID
+					ORDER SIBLINGS BY SORT_NO
+			) AS C
+		  		LEFT OUTER JOIN role_menu ON C.MENU_ID = role_menu.ROLE_MENU_NAME
+		 WHERE 1 = 1
+		   AND USE_YN = 'Y'
+	</select>
 </mapper>

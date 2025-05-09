@@ -26,4 +26,6 @@ public interface CM01Svc {
 	public int deleteFavoritesMenu(Map<String, String> param);
 
 	public int selectFavoritesMenuCount(Map<String, String> param);
+
+	public List<Map<String, Object>> selectCheckAuthority(Map<String, Object> param);
 }

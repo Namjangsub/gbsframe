@@ -41,4 +41,6 @@ public interface CM01Mapper {
 	int selectIsFavoritesMenu(Map<String, String> param);
 
 	List<Map<String, Object>> selectRoleFromAuthNew(String[] authArray);
+
+	List<Map<String, Object>> selectCheckAuthority(String[] authArray);
 }

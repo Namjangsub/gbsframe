@@ -150,4 +150,14 @@ public class HomeController {
     	model.addAttribute("accessSubList", accessSubList);
     	return "jsonView";
     }
+
+	// 접근 가능한 메뉴정보
+	@PostMapping("/selectCheckAuthority")
+	public String selectCheckAuthority(@RequestBody Map<String, Object> param, Model model) {
+		List<Map<String, Object>> accessList = cm01Svc.selectCheckAuthority(param);
+
+		model.addAttribute("accessList", accessList);
+		return "jsonView";
+	}
+
 }

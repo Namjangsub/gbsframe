@@ -1,6 +1,7 @@
 package com.dksys.biz.admin.cm.cm01.service.impl;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -10,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.dksys.biz.admin.cm.cm01.mapper.CM01Mapper;
 import com.dksys.biz.admin.cm.cm01.service.CM01Svc;
+import com.dksys.biz.admin.cm.cm06.mapper.CM06Mapper;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -17,6 +19,9 @@ public class CM01SvcImpl implements CM01Svc {
 	
     @Autowired
     CM01Mapper cm01Mapper;
+
+	@Autowired
+	CM06Mapper cm06Mapper;
 
 	@Override
 	public List<Map<String, String>> selectAuthList() {
@@ -151,5 +156,25 @@ public class CM01SvcImpl implements CM01Svc {
 	@Override
 	public int selectFavoritesMenuCount(Map<String, String> param) {
 		return cm01Mapper.selectFavoritesMenuCount(param);
+	}
+
+	@Override
+	public List<Map<String, Object>> selectCheckAuthority(Map<String, Object> param)
+	{
+
+//		authArray = param.get("authInfo") != null ? param.get("authInfo").toString().split(",") : authArray;
+		Map<String, String> paramMap = new HashMap<>();
+		paramMap.put("userId", param.get("userId").toString());
+		Map<String, String> UserInfo = cm06Mapper.selectUserInfo(paramMap);
+
+		String[] authArray = UserInfo.get("authInfo") != null ? UserInfo.get("authInfo").toString().split(",") : null;
+		// auth에 해당하는 role 조회
+		List<Map<String, Object>> result = cm01Mapper.selectCheckAuthority(authArray);
+
+		// 즐겨찾기 메뉴 추가 삽입하기
+//		List<Map<String, Object>> newEntries = cm01Mapper.selectFavoritesMenuList(param);
+//		result.addAll(0, newEntries);
+
+		return result;
 	}
 }
