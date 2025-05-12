@@ -124,6 +124,9 @@
 					, SM30.CREAT_ID		AS APR_REQ_ID	--결재요청자
 					, SM30.CREAT_DTTM	AS APR_REQ_DT	--결재요청일시
 					, W20.*
+					, SM30D.HOLD_ID
+					, SM30D.HOLD_DTTM
+					, SM30D.HOLD_YN 
 				 FROM   TB_SM12D01 AS D  /* 매입 DETAIL */
 				        LEFT OUTER JOIN TB_SM12M01 AS M1  ON (D.PCHS_NO = M1.PCHS_NO)  /* 매입확정마스터 */
 				        LEFT OUTER JOIN TB_SM02M01 AS M  ON (D.ORDRG_NO = M.ORDRG_NO)  /* 발주마스터 */
@@ -142,19 +145,24 @@
 						LEFT OUTER JOIN TB_CM04M01 CD ON CD.DEPT_ID = SUBSTRING(U.DEPT_ID,0,5)
 						LEFT OUTER JOIN TB_CM04M01 CE ON CE.DEPT_ID = SUBSTRING(M1.DEPT_ID,0,5)
 						LEFT OUTER JOIN TB_SM30M01 SM30 ON SM30.FILE_TRGT_KEY = BM.APR_REQ_NO
+						LEFT OUTER JOIN TB_SM30D01 SM30D ON SM30D.FILE_TRGT_KEY = BM.APR_REQ_NO 
+														AND SM30D.CO_CD = BM.CO_CD 
+														AND SM30D.CLNT_CD = BM.CLNT_CD
+														AND SM30D.CTRT_NO = C.CTRT_NO
 			  			LEFT OUTER JOIN (
 								  			SELECT     
 											    min(TODO_NO) AS TODO_NO
-												, MAX(CASE WHEN TODO_ID = #{userId} THEN TODO_ID ELSE NULL END) 					AS APR_ID1
-												, MAX(CASE WHEN TODO_ID = #{userId} THEN NVL(SANCTN_STTUS, 'N') ELSE NULL END) 	AS APR_YN1
-												, MAX(CASE WHEN TODO_ID = #{userId} THEN NVL(TODO_CF_DT, '') ELSE NULL END) 		AS APR_DT1
-												, MAX(CASE WHEN TODO_ID = (SELECT MNG_ID  FROM TB_CM04M01 WHERE DEPT_ID = ( SELECT substr(DEPT_ID,0, 5) FROM tb_cm06M01 WHERE id = #{userId} )) THEN TODO_ID ELSE NULL END) 					AS APR_ID2
-												, MAX(CASE WHEN TODO_ID = (SELECT MNG_ID  FROM TB_CM04M01 WHERE DEPT_ID = ( SELECT substr(DEPT_ID,0, 5) FROM tb_cm06M01 WHERE id = #{userId} )) THEN NVL(SANCTN_STTUS, 'N') ELSE NULL END) 	AS APR_YN2
-												, MAX(CASE WHEN TODO_ID = (SELECT MNG_ID  FROM TB_CM04M01 WHERE DEPT_ID = ( SELECT substr(DEPT_ID,0, 5) FROM tb_cm06M01 WHERE id = #{userId} )) THEN NVL(TODO_CF_DT, '') ELSE NULL END) 		AS APR_DT2
+												, MAX(CASE WHEN TODO_ID = SM30.CREAT_ID THEN TODO_ID ELSE NULL END) 					AS APR_ID1
+												, MAX(CASE WHEN TODO_ID = SM30.CREAT_ID THEN NVL(SANCTN_STTUS, 'N') ELSE NULL END) 	AS APR_YN1
+												, MAX(CASE WHEN TODO_ID = SM30.CREAT_ID THEN NVL(TODO_CF_DT, '') ELSE NULL END) 		AS APR_DT1
+												, MAX(CASE WHEN TODO_ID = (SELECT MNG_ID  FROM TB_CM04M01 WHERE DEPT_ID = ( SELECT substr(DEPT_ID,0, 5) FROM tb_cm06M01 WHERE id = SM30.CREAT_ID )) THEN TODO_ID ELSE NULL END) 					AS APR_ID2
+												, MAX(CASE WHEN TODO_ID = (SELECT MNG_ID  FROM TB_CM04M01 WHERE DEPT_ID = ( SELECT substr(DEPT_ID,0, 5) FROM tb_cm06M01 WHERE id = SM30.CREAT_ID )) THEN NVL(SANCTN_STTUS, 'N') ELSE NULL END) 	AS APR_YN2
+												, MAX(CASE WHEN TODO_ID = (SELECT MNG_ID  FROM TB_CM04M01 WHERE DEPT_ID = ( SELECT substr(DEPT_ID,0, 5) FROM tb_cm06M01 WHERE id = SM30.CREAT_ID )) THEN NVL(TODO_CF_DT, '') ELSE NULL END) 		AS APR_DT2
 												, MAX(CASE WHEN TODO_ID = 'EMJ8105' THEN TODO_ID ELSE NULL END) 				AS APR_ID3
 												, MAX(CASE WHEN TODO_ID = 'EMJ8105' THEN NVL(SANCTN_STTUS, 'N') ELSE NULL END) 	AS APR_YN3
 												, MAX(CASE WHEN TODO_ID = 'EMJ8105' THEN NVL(TODO_CF_DT, '') ELSE NULL END) 	AS APR_DT3
-											 FROM TB_WB20M03
+											 FROM TB_WB20M03 WB20
+											 		LEFT OUTER JOIN TB_SM30M01 AS SM30 ON SM30.FILE_TRGT_KEY = WB20.TODO_NO
 											WHERE TODO_DIV2_CODE_ID = 'TODODIV2170'  -- 결제진행상태	  
 											GROUP BY  TODO_NO
 			  							) AS W20 ON W20.TODO_NO = BM.APR_REQ_NO
@@ -210,101 +218,21 @@
 			 AND    D1.CLNT_NM LIKE '%'||#{clntNm}||'%'
 			 </if>
 		)
-		, MI AS
-		(
-		 --미발행
-		 SELECT A.CO_CD                      AS CO_CD
-		      , A.PCHS_CLNT_CD                        AS CLNT_CD
-			  , A.CLNT_NM                             AS CLNT_NM
-			  , A.ORDRS_NO						  	  AS ORDRS_NO
-			  , A.CTRT_NO						  	  AS CTRT_NO
-			  , SUM(A.PCHS_QTY)                       AS PCHS_QTY    /* 수량 */
-			  , SUM(A.PCHS_AMT)                       AS PCHS_AMT    /* 매입금액 */
-			  , SUM(A.PCHS_VAT)                       AS PCHS_VAT    /* 부가세 */
-			  , SUM(A.PCHS_AMT) + SUM(A.PCHS_VAT)     AS PCHS_TOT    /* 합계 */
-			  , SUM(A.COMP_AMT)                       AS COMP_AMT    /* 매입금액 */
-			  , SUM(A.COMP_VAT)                       AS COMP_VAT    /* 부가세 */
-			  , SUM(A.COMP_TOT)                       AS COMP_TOT    /* 합계 */
-			  , SUM(A.UNCOMP_AMT)                     AS UNCOMP_AMT  /* 수량 */
-			  , SUM(A.UNCOMP_VAT)                     AS UNCOMP_VAT  /* 부가세 */
-			  , SUM(A.UNCOMP_AMT) + SUM(A.UNCOMP_VAT) AS UNCOMP_TOT  /* 합계 */
-			  , A.FILE_TRGT_KEY
-			  , MIN(A.BILL_NO)                        AS BILL_NO
-			  , MIN(A.BILL_DT)                        AS BILL_DT
-			  , 'N'                                   AS BILL_YN
-			  , NVL(MIN(A.PAY_YN), '')                AS PAY_YN
-			  , MAX(A.PAY_PMNTMTD)  				  AS PAY_PMNTMTD
-			  , MAX(A.PAY_INTERVAL) 				  AS PAY_INTERVAL
-			  , MAX(A.PAY_DT) 				  		  AS PAY_DT
-			  , MAX(A.CRN)							  AS CRN
-			  , MAX(A.REPST_NM)						  AS REPST_NM
-			  , MAX(A.PCHS_PMNT_MTD_CD)				  AS PCHS_PMNT_MTD_CD
-			  , MAX(A.PCHS_PMNT_MTD_NM)				  AS PCHS_PMNT_MTD_NM
-			  , MAX(A.APR_REQ_NO)				  	  AS APR_REQ_NO
-			  , MAX(A.APR_YN2)				  		  AS APR_YN2
-			  , MAX(A.APR_YN3)				  		  AS APR_YN3
-			  , MAX(A.APR_REQ_ID)				  	  AS APR_REQ_ID
-			  , MAX(A.APR_REQ_DT)				  	  AS APR_REQ_DT
-		 FROM   TOT AS A
-		 WHERE  1 = 1
-		 AND    A.BILL_YN = 'N'
-		 GROUP BY A.CO_CD, A.PCHS_CLNT_CD, A.ORDRS_NO, A.CLNT_NM, A.CTRT_NO, A.FILE_TRGT_KEY
-		)
-		, BILL AS
-		(
-		 --발행
-		 SELECT DISTINCT A.CO_CD                      AS CO_CD
-		      , A.PCHS_CLNT_CD                        AS CLNT_CD
-			  , A.CLNT_NM                             AS CLNT_NM
-			  , A.ORDRS_NO						  	  AS ORDRS_NO
-			  , A.CTRT_NO						  	  AS CTRT_NO
-			  , SUM(A.PCHS_QTY)                       AS PCHS_QTY    /* 수량 */
-			  , SUM(A.PCHS_AMT)                       AS PCHS_AMT    /* 매입금액 */
-			  , SUM(A.PCHS_VAT)                       AS PCHS_VAT    /* 부가세 */
-			  , SUM(A.PCHS_AMT) + SUM(A.PCHS_VAT)     AS PCHS_TOT    /* 합계 */
-			  , SUM(A.COMP_AMT)                       AS COMP_AMT    /* 매입금액 */
-			  , SUM(A.COMP_VAT)                       AS COMP_VAT    /* 부가세 */
-			  , SUM(A.COMP_TOT)                       AS COMP_TOT    /* 합계 */
-			  , SUM(A.UNCOMP_AMT)                     AS UNCOMP_AMT  /* 수량 */
-			  , SUM(A.UNCOMP_VAT)                     AS UNCOMP_VAT  /* 부가세 */
-			  , SUM(A.UNCOMP_AMT) + SUM(A.UNCOMP_VAT) AS UNCOMP_TOT  /* 합계 */
-			  , A.FILE_TRGT_KEY
-			  , MIN(A.BILL_NO)                        AS BILL_NO
-			  , MIN(A.BILL_DT)                        AS BILL_DT
-			  , 'Y'                                   AS BILL_YN
-			  , NVL(MIN(A.PAY_YN), 'N')               AS PAY_YN
-			  , MAX(A.PAY_PMNTMTD)  				  AS PAY_PMNTMTD
-			  , MAX(A.PAY_INTERVAL) 				  AS PAY_INTERVAL
-			  , MAX(A.PAY_DT) 				  		  AS PAY_DT
-			  , MAX(A.CRN)							  AS CRN
-			  , MAX(A.REPST_NM)						  AS REPST_NM
-			  , MAX(A.PCHS_PMNT_MTD_CD)				  AS PCHS_PMNT_MTD_CD
-			  , MAX(A.PCHS_PMNT_MTD_NM)				  AS PCHS_PMNT_MTD_NM
-			  , MAX(A.APR_REQ_NO)				  	  AS APR_REQ_NO
-			  , MAX(A.APR_YN2)				  		  AS APR_YN2
-			  , MAX(A.APR_YN3)				  		  AS APR_YN3
-			  , MAX(A.APR_REQ_ID)				  	  AS APR_REQ_ID
-			  , MAX(A.APR_REQ_DT)				  	  AS APR_REQ_DT
-		 FROM   TOT AS A
-		 WHERE  1 = 1
-		 AND    A.BILL_YN = 'Y'
-		 GROUP BY A.CO_CD, A.PCHS_CLNT_CD, A.ORDRS_NO, A.CLNT_NM, A.CTRT_NO, A.FILE_TRGT_KEY
-		)
 		SELECT DISTINCT A.CO_CD  AS CO_CD
-		     , A.CLNT_CD         AS CLNT_CD
+		     , A.PCHS_CLNT_CD         AS CLNT_CD
 			 , A.CLNT_NM         AS CLNT_NM
 			 , A.ORDRS_NO		 AS ORDRS_NO
 			 , A.CTRT_NO		 AS CTRT_NO
 			 , SUM(A.PCHS_QTY)   AS PCHS_QTY
 			 , SUM(A.PCHS_AMT)   AS PCHS_AMT
 			 , SUM(A.PCHS_VAT)   AS PCHS_VAT
-			 , SUM(A.PCHS_TOT)   AS PCHS_TOT
+			 , SUM(A.PCHS_AMT) + SUM(A.PCHS_VAT)     AS PCHS_TOT    /* 합계 */
 			 , SUM(A.COMP_AMT)   AS COMP_AMT
 			 , SUM(A.COMP_VAT)   AS COMP_VAT
 			 , SUM(A.COMP_TOT)   AS COMP_TOT
 			 , SUM(A.UNCOMP_AMT) AS UNCOMP_AMT
 			 , SUM(A.UNCOMP_VAT) AS UNCOMP_VAT
-			 , SUM(A.UNCOMP_TOT) AS UNCOMP_TOT
+			 , SUM(A.UNCOMP_AMT) + SUM(A.UNCOMP_VAT) AS UNCOMP_TOT  /* 합계 */
 			 , A.BILL_NO
 			 , A.BILL_DT
 			 , MAX(A.PAY_YN)     					AS PAY_YN
@@ -320,40 +248,30 @@
 			 , FN_CM05M01_CD_TO_NM(CR.CLNT_PJT) 	AS CLNT_PJT_NM
 			 , CR.ORDRS_CLNT_CD					AS CUST_ID
 			 , D1.CLNT_NM						AS CUST_NM
-			 , A.CTRT_NO
 			  , MAX(A.APR_REQ_NO)				  	  AS APR_REQ_NO
 			  , MAX(A.APR_YN2)				  		  AS APR_YN2
-			  , MAX(A.APR_YN3)				  		  AS APR_YN3
+			  , DECODE(NVL(MAX(A.HOLD_YN),'N'), 'Y', 'H', MAX(A.APR_YN3)) AS APR_YN3 --부사장님 보류지정건이면 'H' 아니면결재완료 여부를 Update 
 			  , DECODE(MAX(A.APR_REQ_NO),'','N','Y')  AS APR_REQ_STS
 			  , MAX(A.APR_REQ_ID)				  	  AS APR_REQ_ID
 			  , FN_CM06M01_ID_TO_NM(MAX(A.APR_REQ_ID)) AS APR_REQ_ID_NM
-			  , TO_CHAR(MAX(A.APR_REQ_DT),'YYYY-MM-DD')  	  AS APR_REQ_DT
+			  , TO_CHAR(MAX(A.APR_REQ_DT),'YYYY-MM-DD') AS APR_REQ_DT
 			  , MAX(SM11.FILE_TRGT_KEY)			  		AS SM11_FILE_TRGT_KEY
-			  , SM11.CTRT_APPROVAL_NO			  	AS CTRT_APPROVAL_NO
-		FROM   (
-		        SELECT *
-		        FROM   (
-		                SELECT A.*
-		                     , ROWNUM AS RN
-		                FROM   (
-		                        SELECT * FROM MI
-		                        UNION ALL
-		                        SELECT * FROM BILL
-		                       ) AS A
-		                WHERE  1 = 1
-		                <!-- 발행여부 -->
-						<if test="billYn != null and !billYn.equals('')">
-						AND    A.BILL_YN = #{billYn}
-						</if>
-		               ) AS A
-		        WHERE  1 = 1
-		       ) AS A
+			  , SM11.CTRT_APPROVAL_NO			  		AS CTRT_APPROVAL_NO
+			  , MAX(A.HOLD_ID)			  				AS HOLD_ID
+			  , TO_CHAR(MAX(A.HOLD_DTTM),'YYYY-MM-DD')  AS HOLD_DTTM
+			  , MAX(NVL(A.HOLD_YN,'N'))			  		AS HOLD_YN
+			  , A.BILL_YN
+		FROM   TOT AS A
 		           LEFT OUTER JOIN TB_CR02M01 AS CR ON CR.ORDRS_NO = A.ORDRS_NO 		--수주마스터 
 				   LEFT OUTER JOIN TB_BM02M01 AS D1 ON CR.ORDRS_CLNT_CD = D1.CLNT_CD   --거래처마스터 CTRT_NO, CTRT_NO_SEQ
 				   LEFT OUTER JOIN TB_SM11M01 SM11 ON SM11.CTRT_NO = A.CTRT_NO
 		WHERE  1 = 1
-		GROUP BY A.CO_CD, SM11.CTRT_APPROVAL_NO, D1.CLNT_NM, CR.ORDRS_CLNT_CD, CR.CLNT_PJT, A.ORDRS_NO, A.CTRT_NO, A.CLNT_NM, A.CLNT_CD, A.BILL_NO, A.BILL_DT
-		ORDER BY A.CO_CD, SM11.CTRT_APPROVAL_NO, D1.CLNT_NM, CR.ORDRS_CLNT_CD, CR.CLNT_PJT, A.ORDRS_NO, A.CTRT_NO, A.CLNT_NM, A.CLNT_CD, A.BILL_NO, A.BILL_DT
+              <!-- 발행여부 -->
+		<if test="billYn != null and !billYn.equals('')">
+		AND    A.BILL_YN = #{billYn}
+		</if>
+		GROUP BY A.CO_CD, SM11.CTRT_APPROVAL_NO, D1.CLNT_NM, CR.ORDRS_CLNT_CD, CR.CLNT_PJT, A.ORDRS_NO, A.CTRT_NO, A.CLNT_NM, A.PCHS_CLNT_CD, A.BILL_NO, A.BILL_DT, A.BILL_YN
+		ORDER BY A.CO_CD, SM11.CTRT_APPROVAL_NO, D1.CLNT_NM, CR.ORDRS_CLNT_CD, CR.CLNT_PJT, A.ORDRS_NO, A.CTRT_NO, A.CLNT_NM, A.PCHS_CLNT_CD, A.BILL_NO, A.BILL_DT, A.BILL_YN
 	</select>
 
 	<select id="sm20_main_grid2_selectList" parameterType="Map" resultType="camelMap">
