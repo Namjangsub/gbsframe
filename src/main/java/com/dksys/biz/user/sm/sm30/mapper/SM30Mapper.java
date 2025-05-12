@@ -33,4 +33,6 @@ public interface SM30Mapper {
 	int delete_sm30_detail(Map<String, String> paramMap);
 
 	Map<String, String> selectApprovalUserChk(Map<String, String> paramMap);
+
+	int updateApprovalHold(Map<String, String> paramMap);
 }

@@ -140,6 +140,7 @@
 		<button type="button" id="actionBtn1" authChk>등록</button>
 		<button type="button" class="close_btn" onclick="executeCallback();">닫기</button>
 		<button type="button" id="actionBtn2" authChk>삭제</button>
+		<!-- <button type="button" id="actionBtn3" authChk>보류업데이트</button> -->
 	</div>
 </div>
 
@@ -162,6 +163,8 @@
 	var todoTitleSt ='';
 
 	var deleteFileArr = [];
+
+	var holdChanged = false;		// 보류 체크박스가 한 번이라도 변경됐는지 표시
 
 	ax5.ui.grid.formatter["bilgYn"] = function () {
 		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
@@ -189,6 +192,17 @@
 				body: {
 					columnHeight: 23,
 					mergeCells : ["custId"],//editor 는 merge 안됨
+
+					onClick: function () {
+						if (this.column.key === "holdYn") {
+							var row = this.list[this.dindex];
+							row.holdYn = (row.holdYn === "Y" ? "N" : "Y");
+							this.self.repaint();
+
+							holdChanged = true;
+							toggleApprovalButtonByHold();
+						}
+					},
 					onDBLClick: function () {
 						var row = this.list[this.dindex];
 						if (this.column.key == 'ctrtApprovalNo' && this.item.ctrtApprovalNo) {	//수주품의번호이면서 번호가 존재하면 팝업 생성 
@@ -231,6 +245,9 @@
 				columns : [
 					{key: "deleteBtn",		label: "삭제", width: 60, align: "center", hidden: true,
 						formatter: function() {return '<button type="button" '+   'onclick="delete_sm30_select_list('+ this.dindex + ',' + this.item.seq + ')" '+   'style="margin-left:3px; height:18px;padding:0" authchk>삭제</button>';}
+					},
+					{key: "holdYn",			label: "보류", width: 50, align: "center", hidden: true,
+						formatter: function() {return '<input type="checkbox" '+ (this.value === "Y" ? 'checked' : '') +' />';}
 					},
 					{key: "fileTrgtKey",	label: "파일대상KEY",		width: 50,	align: "center",  hidden: true},
 					{key: "seq",			label: "순번",			width: 50,	align: "center",  hidden: true},
@@ -424,7 +441,9 @@
 		gridApproval2.initView();
 
 		//전체 삭제기능 버튼은 수정시만 활성화됨
-		$("#actionBtn2").hide();	
+		$("#actionBtn2").hide()
+		// 보류업데이트 버튼 기본 숨김
+		// $("#actionBtn3").hide()
 		
 		// 턴키제외로 들어온 정보는 해당 컬럼 숨김
 		if (param.trunDiv == "PCHSCOSTDIV") {
@@ -463,19 +482,17 @@
 			
 			//헤더 정보 가져오기
 			select_sm30_info()
-			
 			if (actionType == "U") {
 				$("#areaApproval #actionBtn1").hide();
 				$('#areaApproval #actionBtn2').on("click", function() {
 					delete_all_sm30();
 				});
-			} else {
+			} else { // actionType == "S" || actionType == "T"
 				$("#areaApproval #plus-minus").hide();
 			}
 		} else {
 			alert("오류 발생! 전산실에 연락바랍니다.")
 		}
-
 		//---------------------------------------------------------------  
 		//첨부 화일 처리 시작 
 		//---------------------------------------------------------------  
@@ -491,6 +508,27 @@
 		authChk();// 권한체크
 
 	});
+
+	// 결재 보류 수정
+	function updateApprovalHold(){
+		var list = gridApproval1.target.getList();
+		var gridData = list.map(row => ({
+			fileTrgtKey: row.fileTrgtKey,
+			seq        : row.seq,
+			holdYn    : row.holdYn === "Y" ? "Y" : "N",
+			holdId     : jwt.userId
+		}));
+		var formData = new FormData();
+		formData.append("detailArr", JSON.stringify(gridData));
+		filePostAjax("/user/sm/sm30/updateApprovalHold", formData,function(data) {
+			if (data.resultCode == 200) {
+				alert("보류 상태가 업데이트되었습니다.");
+				modalStack.close();
+            } else {
+				alert("업데이트 실패: " + data.resultMessage);
+			}
+		});
+	}
 
 	function select_sm30_info() {
 		var formData = {
@@ -518,7 +556,7 @@
 			$('#areaApproval .tit').text($("#popFormApproval #closeYm").val() + "월 " + $("#popFormApproval #deptId option:selected").text() + " [" + trunDivNm +" 매입대금] 지급 결재 요청 조회");
 			const chk_sanctnSttus  = data.approval ==null ? 'N' : data.approval.sanctnSttus;
 			//전체 삭제 버튼 기능 적용 
-			if (actionType == "U" && chk_sanctnSttus == 'N') {
+			if (actionType == "U" && chk_sanctnSttus == 'N' && jwt.userId == $("#popFormApproval #userId").val()) {
 				//결재 진행 여부에 따라 삭제버튼 비활성화 하기	
 				$("#areaApproval #actionBtn1").show();
 				$("#areaApproval #actionBtn2").show();
@@ -533,13 +571,34 @@
 				$("#areaApproval #plus-minus").hide();
 			}
 
+			// 턴키제외 일때 해당 컬럼 숨김
 			if (data.result.trunDiv == "PCHSCOSTDIV") {
 				gridApproval1_columns_hide();
+			} 
+			// 부사장님이 해당 팝업창 오픈 시 결재 보류 체크박스 컬럼 보이게 해놓기
+			// if (jwt.userId == 'test20') {
+			if ((actionType == 'T' || actionType == 'S') && jwt.userId == 'EMJ8105') {
+				var updatedColumns = gridApproval1.target.columns;
+				var idx = updatedColumns.findIndex(function(col) {
+					return col.key === 'holdYn';
+				});
+
+				if (idx !== -1) {
+					// 김태호 부사장님 일때만 보이고, 아니면 숨김
+					// updatedColumns[idx].hidden = (jwt.userId !== 'EMJ8105');
+					// updatedColumns[idx].hidden = (jwt.userId !== 'test20');
+					updatedColumns[idx].hidden = (jwt.userId !== 'EMJ8105');
+
+					// 변경된 컬럼 설정을 그리드에 반영
+					gridApproval1.target.setConfig({ columns: updatedColumns });
+				}
+				// $("#actionBtn3").show();
 			}
 
 			gridApproval1.setData();
 			gridApproval2.setData();
-			
+
+			toggleApprovalButtonByHold();
 		});
 	}
 
@@ -1293,12 +1352,48 @@
 
 	// 턴키제외일때 해당 컬럼 숨김
 	function gridApproval1_columns_hide() {
-		var updatedColumns = gridApproval1.target.columns;
-			updatedColumns[5].hidden  = true;	// 고객사
-			updatedColumns[6].hidden  = true;	// 품의번호
-			updatedColumns[8].hidden  = true;	// PJT
-			updatedColumns[9].hidden  = true;	// 수주번호
-			updatedColumns[10].hidden = true;	// 계약번호
-			gridApproval1.target.setConfig({ columns: updatedColumns });
+		const keysToHide = [
+			"custNm",          	// 고객사CD
+			"ctrtApprovalNo",  	// 품의번호
+			"clntPjtNm",        // PJTCD
+			"ordrsNo",        	// 수주번호
+			"ctrtNo"           	// 계약번호
+		];
+
+		const cols = gridApproval1.target.config.columns;
+
+		// key 목록에 포함된 컬럼은 hidden=true 처리
+		cols.forEach(col => {
+		if (keysToHide.includes(col.key)) {
+			col.hidden = true;
+		}
+		});
+
+		gridApproval1.target.setConfig({ columns: cols });
 	}
+
+	// 보류 컬럼의 체크가 하나라도 변경되면 EMJ8105에게만 '결재승인' 버튼을 보이게 하는 함수
+	function toggleApprovalButtonByHold() {
+		// 1) EMJ8105(=test20)가 아니면 무시
+		if (jwt.userId !== 'test20') return;
+
+		// 2) 보류 한 번도 안 바뀌었으면 무시
+		if (!holdChanged) return;
+
+		// 결재자가 처음 결재승인 버튼 중복 생성 금지
+		if ($('.callApprovalWorking').length > 0) return;
+
+		// 보류업데이트 버튼
+		if ($('.actionBtn3').length > 0) return;
+
+		// 4) 버튼 생성
+		const btnHtml = `
+			<button class="actionBtn3"
+					onclick="updateApprovalHold()">
+			결재승인
+			</button>
+		`;
+		$('.popup_bottom_btn').append(btnHtml);
+	}
+
 </script>

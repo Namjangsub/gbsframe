@@ -179,4 +179,24 @@ public class SM30Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+
+	// 결재보류 업데이트
+	@PostMapping(value = "/updateApprovalHold")
+	public String updateApprovalHold(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model)
+			throws Exception {
+		try {
+			if (sm30Svc.updateApprovalHold(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 }

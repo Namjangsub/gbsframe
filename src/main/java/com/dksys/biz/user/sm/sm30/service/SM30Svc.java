@@ -30,4 +30,6 @@ public interface SM30Svc {
 	int delete_sm30_detail(Map<String, String> paramMap) throws Exception;
 
 	Map<String, String> selectApprovalUserChk(Map<String, String> paramMap);
+
+	int updateApprovalHold(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 }
