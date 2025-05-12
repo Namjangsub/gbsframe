@@ -127,7 +127,7 @@
 								<div id="addrow1" class="add_btn_small pdl10">
 									<a id="btn15" onclick="copyAllPlanPopUp();" data-grid-control="row-add1" style="width:60px;height: 30px; line-height: 28px;">복사</a>
 									<a id="btn1" onclick="wbsLevel1Insert();" data-grid-control="row-add1" style="width:60px;height: 30px; line-height: 28px;">저장</a>
-									<a id="btn2" onClick="updateWbsChanges()"; data-grid-control="row-add1" style="width:100px;height: 30px; line-height: 28px;">변경요청 저장</a>
+									<a id="btn2" onClick="updateWbsChanges();" data-grid-control="row-add1" style="width:100px;height: 30px; line-height: 28px;">변경요청 저장</a>
 									<!-- <a id="btn2" onclick="wbsLevel1confirm('N');" data-grid-control="row-add2" style="width:60px;height: 30px; line-height: 28px;">미확정</a> -->
 									<a id="btn3" onclick="wbsLevel1confirm('Y');" data-grid-control="row-add3" style="width:60px;height: 30px; line-height: 28px;">확정</a>
 									<a id="btn4" onclick="createVerUp();" data-grid-control="row-add3" style="width:60px;height: 30px; line-height: 28px;">Ver. Up</a>
@@ -144,7 +144,12 @@
 						</td>
 						<th>일정예외사항</th>
 						<td colspan="3">
-							<input type="hidden" id="planExcept" name="planExcept" readonly>
+							
+							<select id="planExcept" name="planExcept" data-kind="PLANEXCEPT" class="form-control" onchange="onPlanExceptChange(this.value)">
+						</select>
+					
+							<!-- <input type="hidden" id="planExcept" name="planExcept" readonly> -->
+							
 							<input type="text" id="planExceptNm" name="planExceptNm" style="color: blue;" readonly>
 						</td>
 						<th style="color: blue;">확정</th>
@@ -560,6 +565,15 @@
 								var color2 = val2 == "Y" ? "color-circle_02.png" : "color-circle_01.png";
 								var html2 = '<img src="/static/img/'+color2+'" align="center" style="width: 10px;height: 10px;"></img>';
 								$("#popForm #wbsPlanClose").html(html2);
+								
+							    if (val2 === 'Y') {
+							        $('#planExcept').hide();        // select 숨김
+							        $('#planExceptNm').show();      // input 표시
+							    } else if (val2 === 'N') {
+							        $('#planExcept').show();        // select 표시
+							        $('#planExceptNm').hide();      // input 숨김
+							    }
+								
 							}
 							i++;
 						});
@@ -594,7 +608,7 @@
 			var smrizeId = $('#smrizeId').val();
 
 			// 1. 총괄 PM인 경우만 수정 +  윤치영부장(ycy)
-			if(smrizeId == jwt.userId || jwt.userId == 'ycy' || jwt.userId == 'js.nam' || jwt.userId == 'ssj'){
+			if(smrizeId == jwt.userId || jwt.userId == 'ycy' || jwt.userId == 'js.nam' || jwt.userId == 'ssj' || jwt.userId == 'test10' ){
 				$("#popForm #addrow1").show();
 			}else{
 				$("#popForm #addrow1").hide();
@@ -983,7 +997,18 @@
 
 		//복사버튼 설정
 		setCopyButton();
+	
+		
+		const wbsPlanCloseYn = $("#wbsPlancloseYn").val();
 
+	    if (wbsPlanCloseYn === 'Y') {
+	        $('#planExcept').hide();        // select 숨김
+	        $('#planExceptNm').show();      // input 표시
+	    } else if (wbsPlanCloseYn === 'N') {
+	        $('#planExcept').show();        // select 표시
+	        $('#planExceptNm').hide();      // input 숨김
+	    }
+		
 	});
 
 
@@ -1111,6 +1136,10 @@
 			formData.append("rowListArr", JSON.stringify(rowListArr));
 		}
 
+		//예외사항 변경부분 저장
+		createWb21VerUp();
+		
+		
 		filePostAjax("/user/wb/wb22/wbsLevel1Insert", formData, function(data) {
 			alert(data.resultMessage);
 			if (data.resultCode == 200) {
@@ -2487,4 +2516,128 @@
 			}
 		});
 	}
+	
+	
+	function onPlanExceptChange(value){
+		
+		
+		
+		$("#popForm #btn1").show();
+		//alert($("#popForm #fileTrgtKey").val());
+		sjVerUpMakeFromData();
+		var rowList = gridView1.target.getList();
+		if (value != 'PLANEXCEPT01') {
+			$.each(rowList, function(idx, elem) {
+				if (["WBSCODE11", "WBSCODE12", "WBSCODE13", "WBSCODE14"].includes(elem.wbsPlanCodeId)) {
+					
+					
+					console.log(elem);
+					elem.wbsPlanMngId = "";
+					elem.wbsPlanMngNm = "";
+					elem.daycnt = "";
+					elem.wbsPlansDt = "";
+					elem.wbsPlaneDt = "";
+				}
+			});
+			gridView1.target.setData(rowList);
+			
+		}	
+	}
+	
+	function createWb21VerUp() {
+		var planData = {
+			"coCd" : $("#popForm #coCd").val(),
+			"sjNo" : $("#popForm #sjNo").val(),
+			"salesCd" : $("#popForm #salesCd").val(),
+		};
+		var newVerNo;
+		var aftCnt;
+		var aftText = "";
+		postAjaxSync("/user/wb/wb21/selectSjVerNoNext", planData, null, function(data) {
+			newVerNo = data.result[0].verNo
+			aftCnt = data.result[0].aftCnt
+		});
+
+		if(aftCnt > 0) {
+			aftText = "\n진행중인 WBS계획이 있습니다!\n버전 변경 시 확정 전까지 일정수정이 불가합니다!";
+		}
+
+		if(confirm("버젼 변경을 하시겠습니까?"+aftText)) {
+			$("#verNo").val(newVerNo);
+				var codeId = null;
+				var formData = sjVerUpMakeFromData();
+				
+				
+				 filePostAjax("/user/wb/wb21/sjVerUpInsert", formData, function(data) {
+					alert(data.resultMessage);
+					if (data.resultCode == 200) {
+						var salesCd = $("#popForm #salesCd").val();
+						var verNo = $("#popForm #verNo").val();
+						fileTrgtKey = data.fileTrgtKey;
+						$('.popup_area #confirm').show();
+					} else {
+						alert("예외사항 변경 작업 실패했습니다." + data );
+					}
+				}); 
+
+		}
+	}
+	
+	function sjVerUpMakeFromData(){
+		
+		
+		var formData = new FormData($("#popForm")[0]);
+		var paramData = {
+				"fileTrgtKey" : $("#popForm #fileTrgtKey").val()
+			};
+		
+		
+		postAjaxSync("/user/wb/wb21/selectSjInfo", paramData, null, function(data) {
+			
+			const resultList = data.resultList;
+			for (let key in resultList) {
+				  if (resultList.hasOwnProperty(key)) {
+				    const value = resultList[key];
+				    formData.append(key, value);
+				  }
+				}
+				if (!formData.has("sjRmk")) {
+					  formData.append("sjRmk", null);  // 또는 '', '없음', etc.
+					}
+
+		});
+		
+		formData.append("fileTrgtKey", fileTrgtKey);
+		formData.append("verNo", $("#verNo").val());
+		//---------------------------------------------------------------
+		//-------itemarr  --첨부화일 처리를 위한 부분 시작
+		//---------------------------------------------------------------
+		// 유저아이디 추가
+		formData.append("userId", jwt.userId);
+        formData.append("comonCd", treeModule.getFileNodeId()); //첨부화일용
+
+        var fileUploadArr = [];
+        var tempArr = [];
+        tempArr = treeModule.getFileArr();
+        $.each(tempArr, function(idx, obj) {
+            if (obj.fileKey == 0) {
+                formData.append("files", obj.file);
+                obj.file = '';
+                fileUploadArr.push(obj);
+            }
+        });
+		
+        formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
+        formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
+
+		return formData;
+		
+		
+		
+	}
+	
+	
+	
+	
+	
 </script>

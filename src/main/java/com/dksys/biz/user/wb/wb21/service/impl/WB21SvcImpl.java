@@ -337,7 +337,15 @@ public class WB21SvcImpl implements WB21Svc {
 	            }
 	        }
 		}
-
+		
+		
+		if((paramMap.get("sjRmk")).equals("null")) {
+			paramMap.put("sjRmk", "");
+		}
+		
+		System.out.println("@@@@@"+paramMap.get("closeYn"));
+		System.out.println("!!!!!"+paramMap.get("closeYn"));
+		
 		int result = wb21Mapper.sjInsert(paramMap);
 		if(result != 0) {
 			return fileTrgtKey;
