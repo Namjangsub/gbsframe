@@ -6,6 +6,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 	var fileTreeParamObj;
 	var currPgmAuthChk = true; // true:저장권한, false:저장권한 없음
 	var fileTempCocd = '';
+	var fileTree_fileList_area = '';
 	//최초 진입시점---
 	//   1. 파일트리명 = 각 화면의 트리구조를 보여줄 div테그 ID ex) <div id="deptTree" ></div>
 	//   2. 그리드명  = 각 화면의 ax5-grid Html Tag ID  ex) <div id="my-grid" data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 100%; width: 100%"></div>
@@ -25,14 +26,13 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		}
 
 		gridSelector = gridSelector.replace('-',''); 
-
 		//첨부파일영역 설정값이 없으면 기본은 : fileList_area 로 명영함.
 		if (_fileList_area == '' || _fileList_area == undefined) {
 			_fileList_area = "#fileList_area";
 		} else {
 			_fileList_area = "#" + _fileList_area;
 		}
-
+		fileTree_fileList_area = _fileList_area;
 //    	let popSelector = $('.popup_area.of_a:last').attr('id');		//마지막 .popup_area.of_a의  class ID 추출
 		let popSelector = '.popup_area:last';		//마지막 .popup_area.of_a의  class ID 추출
 		//일정관리에서 이슈등록은 fileList_area영역이 일정관리와 이슈화면영역과 겹침 발생
@@ -62,7 +62,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 
 			currPgmAuthChk = authChk(); // true:저장권한, false:저장권한 없음
 
-			fileTreeGridView.init(gridSelector);
+			fileTreeGridView.init(gridSelector, _fileList_area);
 
 			//--------------------------------------------------------------------
 			//To-Do List에서 팝업창을 뛰우면 정보확인하고 결재버튼 클릭시 결재 처리를 위한 버튼 추가  시작
@@ -223,8 +223,8 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 			var targetObj = this.target;
 			//첨부 자료가 있으면 파일 영역 표시함
 			if (list.length > 0) {
-				$("#fileAttachTxt").hide();
-				$("#fileAttachCnts").show();
+				$(fileTree_fileList_area + " #fileAttachTxt").hide();
+				$(fileTree_fileList_area + " #fileAttachCnts").show();
 			};
 
 			targetObj.setData({
