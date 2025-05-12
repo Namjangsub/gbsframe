@@ -275,5 +275,19 @@ public class SM30Svclmpl implements SM30Svc {
 		return sm30Mapper.selectApprovalUserChk(paramMap);
 	}
 
+	@Override
+	public int updateApprovalHold(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+		// detailArr: '[{"fileTrgtKey":"...","seq":"1","holdYn":"Y"}, {...}]'
+		Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+		Type listType = new TypeToken<ArrayList<Map<String,String>>>(){}.getType();
+		List<Map<String,String>> dtlList = gson.fromJson(paramMap.get("detailArr"), listType);
+
+		int cnt = 0;
+		for (Map<String,String> dtl : dtlList) {
+			// 보류 업데이트진행
+			cnt += sm30Mapper.updateApprovalHold(dtl);
+		}
+		return cnt;
+	}
 
 }

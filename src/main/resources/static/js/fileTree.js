@@ -672,6 +672,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 						gridView.initView().setData(0);
 					}
 					modalStack.close();
+					if ($('#areaApproval').length && jwt.userId == 'EMJ8105') updateApprovalHold();
 				}
 			});
 		}
