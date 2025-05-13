@@ -2707,7 +2707,7 @@ function openapi(prompt) {
 	const paramObj = {
 			 "aiType"		: "OLLAMA"
 			,"originMsg"	: $('#'+prompt).val()
-			,"prompt"		: "\n-문장을 자연스럽게 수정해줘 "
+			,"prompt"		: "\n -여기까지 오타 확인하고 문장을 자연스럽게 수정해줘 "
 	}
 	postAjax("/user/bot/chatRtv", paramObj, null, function(data){
 		try {
