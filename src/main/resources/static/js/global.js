@@ -2507,44 +2507,50 @@ openProgress = function(boolean){
 function kakaoSendReal(talkJson, talkParam, param) {
 	let talkDeJson = JSON.parse(talkJson);
 	let sendCnt = 0;
-	//알림톡
-	$.ajax({
-	    type: "POST",
-	    url: "https://talkapi.lgcns.com/request/kakao.json",
-	    contentType: "x-www-form-urlencoded; charset=utf-8",
-	    data: talkJson,
-      beforeSend: function (xhr) {
-          xhr.setRequestHeader("authToken", talkParam.authToken);
-          xhr.setRequestHeader("serverName", talkParam.serverName);
-          xhr.setRequestHeader("paymentType", talkParam.paymentType);
-      },
-	    async: false,
-	    success: function(data){
-//	    	console.log('status:' + data.status);
-	    	let err = data.status;
-	    	if( err.indexOf("ERR") > -1 || err.indexOf("KKO")> -1 ) {
-	    		let errorMsg = err;
-	    		let find = kakaoErr.find(e => e.codeId === err);
-	    		if( typeof(find) != "undefined" ) {
-					if( typeof(find.codeNm) != "undefined" ) {
-			    		errorMsg = find.codeNm;
-					}
-	    		}
-		    	insertKakaoMessage(err, talkDeJson, param);
-	    		alert("오류코드: ["+param.nameTo+" Hp."+ talkDeJson.mobile + "] "+data.status+"\r\n\r\n" + errorMsg+"로 메세지 전송 실패하였습니다.");
-	    	} else if( data.status == "OK" ) {
-	    		//alert("알림톡 정상 발송되었습니다.");
-	    		sendCnt++;
-		    	insertKakaoMessage(err, talkDeJson, param);
-	    	}
-	    },
-      error: function (data) {
-      	insertKakaoMessage(data.status, talkDeJson, param);
-//      	console.log('---ajax error---');
-      }
-	});
-//	console.log('---success---' + sendCnt);
-	return sendCnt;
+	if (jwt.serverType =='prod' ||jwt.kakaoSend) {	//KAKAO-SEND 설정은 application.yml에 설정됨, 운영모드와 kakaoSend :true일때만  카카오톡 발송처리함. 아닌경우 이력만 남김
+		//알림톡
+		$.ajax({
+		    type: "POST",
+		    url: "https://talkapi.lgcns.com/request/kakao.json",
+		    contentType: "x-www-form-urlencoded; charset=utf-8",
+		    data: talkJson,
+	      beforeSend: function (xhr) {
+	          xhr.setRequestHeader("authToken", talkParam.authToken);
+	          xhr.setRequestHeader("serverName", talkParam.serverName);
+	          xhr.setRequestHeader("paymentType", talkParam.paymentType);
+	      },
+		    async: false,
+		    success: function(data){
+	//	    	console.log('status:' + data.status);
+		    	let err = data.status;
+		    	if( err.indexOf("ERR") > -1 || err.indexOf("KKO")> -1 ) {
+		    		let errorMsg = err;
+		    		let find = kakaoErr.find(e => e.codeId === err);
+		    		if( typeof(find) != "undefined" ) {
+						if( typeof(find.codeNm) != "undefined" ) {
+				    		errorMsg = find.codeNm;
+						}
+		    		}
+			    	insertKakaoMessage(err, talkDeJson, param);
+		    		alert("오류코드: ["+param.nameTo+" Hp."+ talkDeJson.mobile + "] "+data.status+"\r\n\r\n" + errorMsg+"로 메세지 전송 실패하였습니다.");
+		    	} else if( data.status == "OK" ) {
+		    		//alert("알림톡 정상 발송되었습니다.");
+		    		sendCnt++;
+			    	insertKakaoMessage(err, talkDeJson, param);
+		    	}
+		    },
+	      error: function (data) {
+	      	insertKakaoMessage(data.status, talkDeJson, param);
+	//      	console.log('---ajax error---');
+	      }
+		});
+	//	console.log('---success---' + sendCnt);
+		return sendCnt;
+	} else { //운영모드에서만 카카오톡 발송처리함.  이력만 남김
+		sendCnt++;
+    	insertKakaoMessage('OK', talkDeJson, param);
+		return sendCnt;
+	}
 }
 
 //알림톡전송로크

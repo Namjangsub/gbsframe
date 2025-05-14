@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.security.oauth2.common.DefaultOAuth2AccessToken;
 import org.springframework.security.oauth2.common.OAuth2AccessToken;
@@ -17,6 +18,9 @@ public class CustomTokenConverter extends JwtAccessTokenConverter {
     @Autowired
     private Environment env;
     
+	@Value("${kakaoSend:false}") // KAKAO-SEND 키가 없으면 false 사용
+	private boolean kakaoSend;
+
     @Override
     public OAuth2AccessToken enhance(OAuth2AccessToken accessToken, OAuth2Authentication authentication) {
         if (authentication.getOAuth2Request().getGrantType().equalsIgnoreCase("password")) {
@@ -34,6 +38,7 @@ public class CustomTokenConverter extends JwtAccessTokenConverter {
             additionalInfo.put("enterDt", user.getEnterDt());
             additionalInfo.put("authInfo", user.getAuthInfo());
             additionalInfo.put("serverType", env.getActiveProfiles()[0]);
+			additionalInfo.put("kakaoSend", kakaoSend);
             additionalInfo.put("userGrade", user.getUserGrade());
             additionalInfo.put("clntCd", user.getClntCd());
             
