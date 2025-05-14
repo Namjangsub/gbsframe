@@ -199,4 +199,22 @@ public class SM30Ctr {
 		}
 		return "jsonView";
 	}
+
+	// 결재자 추가
+	@PostMapping(value = "/updateShareUser")
+    public String updateShareUser(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+        try {
+            if(sm30Svc.updateShareUser(paramMap, mRequest) !=0 ) {
+                model.addAttribute("resultCode", 200);
+                model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+            } else {
+                model.addAttribute("resultCode", 500);
+                model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+            }
+        } catch(Exception e) {
+            model.addAttribute("resultCode", 900);
+            model.addAttribute("resultMessage", e.getMessage());
+        }        
+        return "jsonView";
+    }
 }

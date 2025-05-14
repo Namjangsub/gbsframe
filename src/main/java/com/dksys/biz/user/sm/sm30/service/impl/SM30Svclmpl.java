@@ -2,6 +2,7 @@ package com.dksys.biz.user.sm.sm30.service.impl;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -277,17 +278,161 @@ public class SM30Svclmpl implements SM30Svc {
 
 	@Override
 	public int updateApprovalHold(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-		// detailArr: '[{"fileTrgtKey":"...","seq":"1","holdYn":"Y"}, {...}]'
+		int cnt = 0;
+
 		Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 		Type listType = new TypeToken<ArrayList<Map<String,String>>>(){}.getType();
-		List<Map<String,String>> dtlList = gson.fromJson(paramMap.get("detailArr"), listType);
 
-		int cnt = 0;
+		List<Map<String,String>> dtlList = gson.fromJson(paramMap.get("detailArr"), listType);		
 		for (Map<String,String> dtl : dtlList) {
+			dtl.put("userId",   paramMap.get("userId"));
+			dtl.put("holdId",   paramMap.get("userId"));
+			dtl.put("pgmId",   paramMap.get("pgmId"));
 			// 보류 업데이트진행
 			cnt += sm30Mapper.updateApprovalHold(dtl);
 		}
+
+		// 결재자 이력업데이트
+		List<Map<String,String>> todoList = gson.fromJson(paramMap.get("todoArr"), listType);
+		if (!todoList.isEmpty()) {
+			Map<String,String> todo = todoList.get(0);
+			todo.put("userId", paramMap.get("userId"));
+			todo.put("pgmId",  paramMap.get("pgmId"));
+			cnt += sm30Mapper.updateApprovalSm30(todo);
+		}
+
 		return cnt;
+	}
+
+	@Override
+	public int updateShareUser(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+
+		Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+		Type listType = new TypeToken<List<Map<String, String>>>() {}.getType();
+
+		int result = 0;
+		String fileTrgtKey = paramMap.get("fileTrgtKey");
+
+		paramMap.put("reqNo", fileTrgtKey);
+		paramMap.put("salesCd", fileTrgtKey);
+		// 기존 결재자 및 공유자 조회
+		List<Map<String, String>> existingUserEntries = QM01Mapper.deleteWbsSharngListChk(paramMap);
+
+		List<Map<String, String>> newSharedUsers = gson.fromJson(paramMap.get("rowSharngListArr"), listType);
+		List<Map<String, String>> newApprovals = gson.fromJson(paramMap.get("rowApprovalListArr"), listType);
+		
+		// -----------------------------------START--------------------------------------------------------------
+		// 1. 공유자 및 결재자 프론트에서 넘어온 리스트와 DB에서 조회된 리스트와 비교해서
+		// 2. 각각 DELETE 작업 후 INSERT 작업
+		// ------------------------------------------------------------------------------------------------------
+		// 공유자 DELETE
+		for (Map<String, String> existingEntry : existingUserEntries) {
+			if (!"TODODIV10".equals(existingEntry.get("todoDiv1CodeId"))) {
+				continue;
+			}
+			boolean isRetainedInRequest = newSharedUsers.stream().anyMatch(requestedUser ->
+				requestedUser.get("todoId").equals(existingEntry.get("todoId")) &&
+				requestedUser.get("sanctnSn").equals(existingEntry.get("sanctnSn"))
+			);
+			if (!isRetainedInRequest) {
+				Map<String, String> deleteParams = new HashMap<>();
+				deleteParams.put("reqNo",    fileTrgtKey);
+				deleteParams.put("salesCd",  fileTrgtKey);
+				deleteParams.put("todoKey",  existingEntry.get("todoKey"));
+				deleteParams.put("sanctnSn", existingEntry.get("sanctnSn"));
+				result += sm30Mapper.deleteShareUser(deleteParams);
+			}
+		}
+		// 순번 재계산 후 신규 공유자 INSERT
+		int nextShareIndex = (int) existingUserEntries.stream()
+			.filter(e -> "TODODIV10".equals(e.get("todoDiv1CodeId")))
+			.filter(e -> newSharedUsers.stream().anyMatch(requestedUser ->
+				requestedUser.get("todoId").equals(e.get("todoId")) &&
+				requestedUser.get("sanctnSn").equals(e.get("sanctnSn"))
+			))
+			.count();
+
+		String sharePgParam = String.format(
+			"{\"actionType\":\"T\",\"fileTrgtKey\":\"%s\",\"coCd\":\"%s\"}",
+			fileTrgtKey, paramMap.get("coCd")
+		);
+
+		for (Map<String, String> requestedUser : newSharedUsers) {
+			boolean alreadyExists = existingUserEntries.stream().anyMatch(existingEntry ->
+				"TODODIV10".equals(existingEntry.get("todoDiv1CodeId")) &&
+				requestedUser.get("todoId").equals(existingEntry.get("todoId")) &&
+				requestedUser.get("sanctnSn").equals(existingEntry.get("sanctnSn"))
+			);
+			if (alreadyExists) {
+				continue;
+			}
+			nextShareIndex++;
+			requestedUser.put("reqNo",       fileTrgtKey);
+			requestedUser.put("salesCd",     fileTrgtKey);
+			requestedUser.put("fileTrgtKey", fileTrgtKey);
+			requestedUser.put("pgmId",       paramMap.get("pgmId"));
+			requestedUser.put("userId",      paramMap.get("userId"));
+			requestedUser.put("sanCtnSn",    Integer.toString(nextShareIndex));
+			requestedUser.put("pgParam",     sharePgParam);
+			result += sm30Mapper.insertSm30ApprovalList(requestedUser);
+		}
+
+		// 결재자 DELETE
+		for (Map<String, String> existingEntry : existingUserEntries) {
+			if (!"TODODIV20".equals(existingEntry.get("todoDiv1CodeId"))) {
+				continue;
+			}
+			boolean isRetainedInRequest = newApprovals.stream().anyMatch(requestedApproval ->
+				requestedApproval.get("todoId").equals(existingEntry.get("todoId")) &&
+				requestedApproval.get("sanctnSn").equals(existingEntry.get("sanctnSn"))
+			);
+			if (!isRetainedInRequest) {
+				Map<String, String> deleteParams = new HashMap<>();
+				deleteParams.put("reqNo",    fileTrgtKey);
+				deleteParams.put("salesCd",  fileTrgtKey);
+				deleteParams.put("todoKey",  existingEntry.get("todoKey"));
+				deleteParams.put("sanctnSn", existingEntry.get("sanctnSn"));
+				result += sm30Mapper.deleteShareUser(deleteParams);
+			}
+		}
+
+		// 순번 재계산 후 신규 결재자 INSERT
+		int nextApprovalIndex = (int) existingUserEntries.stream()
+			.filter(e -> "TODODIV20".equals(e.get("todoDiv1CodeId")))
+			.filter(e -> newApprovals.stream().anyMatch(requestedApproval ->
+				requestedApproval.get("todoId").equals(e.get("todoId")) &&
+				requestedApproval.get("sanctnSn").equals(e.get("sanctnSn"))
+			))
+			.count();
+
+		String approvalPgParam = String.format(
+			"{\"actionType\":\"S\",\"fileTrgtKey\":\"%s\",\"coCd\":\"%s\"}",
+			fileTrgtKey, paramMap.get("coCd")
+		);
+
+		for (Map<String, String> requestedApproval : newApprovals) {
+			boolean alreadyExists = existingUserEntries.stream().anyMatch(existingEntry ->
+				"TODODIV20".equals(existingEntry.get("todoDiv1CodeId")) &&
+				requestedApproval.get("todoId").equals(existingEntry.get("todoId")) &&
+				requestedApproval.get("sanctnSn").equals(existingEntry.get("sanctnSn"))
+			);
+			if (alreadyExists) {
+				continue;
+			}
+			nextApprovalIndex++;
+			requestedApproval.put("reqNo",       fileTrgtKey);
+			requestedApproval.put("salesCd",     fileTrgtKey);
+			requestedApproval.put("fileTrgtKey", fileTrgtKey);
+			requestedApproval.put("pgmId",       paramMap.get("pgmId"));
+			requestedApproval.put("userId",      paramMap.get("userId"));
+			requestedApproval.put("sanCtnSn",    Integer.toString(nextApprovalIndex));
+			requestedApproval.put("pgParam",     approvalPgParam);
+			result += sm30Mapper.insertSm30ApprovalList(requestedApproval);
+		}
+
+		return result;
+
+		// -----------------------------------END--------------------------------------------------------------
 	}
 
 }

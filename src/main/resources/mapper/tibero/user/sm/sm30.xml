@@ -389,13 +389,168 @@
 		  AND TODO_DIV2_CODE_ID='TODODIV2170'
 	</select>
 
+	<select id="selectShareUserChk" parameterType="Map" resultType="camelMap">
+		SELECT 
+				*
+		FROM TB_WB20M03
+		WHERE 1=1
+		  AND TODO_NO = #{reqNo}
+		  AND TODO_DIV2_CODE_ID='TODODIV2170'
+	</select>
+
 	<update id="updateApprovalHold" parameterType="Map">
 		UPDATE TB_SM30D01
 		SET
-			  HOLD_ID 		= #{holdId}
+			  UDT_ID		= #{userId}
+			, UDT_DTTM		= SYSDATE
+			, UDT_PGM		= #{pgmId}
+			, HOLD_ID 		= #{holdId}
 			, HOLD_DTTM 	= SYSDATE
 			, HOLD_YN 		= #{holdYn}
 		WHERE FILE_TRGT_KEY = #{fileTrgtKey}
-		AND SEQ = #{seq}
+		  AND SEQ = #{seq}
 	</update>
+
+	<!-- 결재 승인 -->
+	<update id="updateApprovalSm30" parameterType="Map">
+		UPDATE TB_WB20M03
+		SET
+		  TODO_CF_DT = SYSDATE
+		, SANCTN_STTUS = 'Y'
+		, UDT_ID 			= #{userId}
+		, UDT_PGM			= #{pgmId}
+		, UDT_DTTM 			= SYSDATE
+		WHERE TODO_KEY 				= #{todoKey}
+		  AND TODO_ID 				= #{userId}
+		  AND SANCTN_SN 			= #{sanctnSn}
+		  AND TODO_DIV1_CODE_ID 	= #{todoDiv1CodeId}
+		  AND TODO_DIV2_CODE_ID 	= #{todoDiv2CodeId}
+	</update>
+
+	<!-- 요청자와 결재자가 동일한경우에 처리하기 위함 (ex.팀장이 생성할경우 본인작성건 본인이 결재해야함) -->
+	<insert id="insertSm30ApprovalList" parameterType="Map">
+        <selectKey keyProperty="toDoKey" resultType="Int" order="BEFORE">
+            SELECT NVL(MAX(TODO_KEY), 0) + 1 AS TODO_KEY FROM TB_WB20M03
+        </selectKey>
+    <choose>
+        <when test="userId == usrNm">
+        --생성자와 결재자가 동일하면 결재완료로 등록하기
+	        INSERT INTO TB_WB20M03
+	        (
+	            TODO_KEY,
+	            SANCTN_SN,
+	            CO_CD,
+	            TODO_DIV1_CODE_ID,
+	            TODO_DIV2_CODE_ID,
+	            TODO_ID,
+	            SALES_CD,
+	            PG_PATH,
+	            TODO_FILE_TRGT_KEY,
+	            TODO_CO_CD,
+	            TODO_NO,
+	            CREAT_ID,
+	            CREAT_PGM,
+	            CREAT_DTTM,
+	            PG_PARAM,
+	            TODO_TITL,
+	            ETC_FIELD2,
+				ETC_FIELD3,
+				TODO_CODE_ID,
+				TODO_CF_DT, 
+				TODO_CF_OPN, 
+				SANCTN_STTUS
+	        )
+	        VALUES
+	        (
+	            #{toDoKey},
+	            #{sanCtnSn},
+	            #{coCd},
+	            #{todoDiv1CodeId},
+	            #{todoDiv2CodeId},
+	            #{usrNm},
+	            #{salesCd, jdbcType=VARCHAR},
+	            #{pgPath},
+	            #{fileTrgtKey},
+	            #{todoCoCd},
+	            #{reqNo},
+	            #{userId},
+	            #{pgmId},
+				SYSDATE,
+	            #{pgParam},
+	            #{todoTitle, jdbcType=VARCHAR},
+	            #{histNo, jdbcType=VARCHAR},
+				'N',
+				'insertWbsApprovalLi-',
+				SYSDATE,
+				'',
+				'Y'
+	        )
+        </when>
+        <otherwise>
+	        INSERT INTO TB_WB20M03
+	        (
+	            TODO_KEY,
+	            SANCTN_SN,
+	            CO_CD,
+	            TODO_DIV1_CODE_ID,
+	            TODO_DIV2_CODE_ID,
+	            TODO_ID,
+	            SALES_CD,
+	            PG_PATH,
+	            TODO_FILE_TRGT_KEY,
+	            TODO_CO_CD,
+	            TODO_NO,
+	            CREAT_ID,
+	            CREAT_PGM,
+	            CREAT_DTTM,
+	            PG_PARAM,
+	            TODO_TITL,
+	            ETC_FIELD2,
+				ETC_FIELD3,
+				TODO_CODE_ID
+	        )
+	        VALUES
+	        (
+	            #{toDoKey},
+	            #{sanCtnSn},
+	            #{coCd},
+	            #{todoDiv1CodeId},
+	            #{todoDiv2CodeId},
+	            #{usrNm},
+	            #{salesCd, jdbcType=VARCHAR},
+	            #{pgPath},
+	            #{fileTrgtKey},
+	            #{todoCoCd},
+	            #{reqNo},
+	            #{userId},
+	            #{pgmId},
+				  ( SELECT nvl(max(CREAT_DTTM), SYSDATE)  AS LAST_DTTM
+					  FROM TB_WB20M03 T
+					 WHERE T.TODO_FILE_TRGT_KEY = #{fileTrgtKey}
+					   AND T.TODO_NO            = #{reqNo}
+					   AND T.CREAT_PGM          = #{pgmId, jdbcType=VARCHAR}
+	             	  <if test="histNo != null and !histNo.equals('')" >
+					  AND T.ETC_FIELD2         = #{histNo, jdbcType=VARCHAR}
+	             	  </if>
+	              ),
+	            #{pgParam},
+	            #{todoTitle, jdbcType=VARCHAR},
+	            #{histNo, jdbcType=VARCHAR},
+				'N',
+				'insertWbsApprovalLi-'
+	        )
+        </otherwise>
+    </choose>
+	</insert>
+
+	<!-- 결재자 삭제 -->
+	<delete id="deleteShareUser" parameterType="Map">
+        DELETE 
+		FROM TB_WB20M03
+		WHERE SALES_CD  = #{salesCd}
+		  AND TODO_NO  = #{reqNo}
+		  AND TODO_KEY = #{todoKey}
+		  AND SANCTN_SN = #{sanctnSn}
+		  AND TODO_DIV2_CODE_ID IN ('TODODIV1170','TODODIV2170')
+	</delete>
 </mapper>

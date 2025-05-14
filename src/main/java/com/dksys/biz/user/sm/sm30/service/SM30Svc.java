@@ -32,4 +32,6 @@ public interface SM30Svc {
 	Map<String, String> selectApprovalUserChk(Map<String, String> paramMap);
 
 	int updateApprovalHold(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
+	int updateShareUser(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 }

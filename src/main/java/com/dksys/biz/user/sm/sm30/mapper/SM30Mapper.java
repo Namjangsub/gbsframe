@@ -34,5 +34,15 @@ public interface SM30Mapper {
 
 	Map<String, String> selectApprovalUserChk(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectShareUserChk(Map<String, String> paramMap);
+
 	int updateApprovalHold(Map<String, String> paramMap);
+
+	int updateApprovalSm30(Map<String, String> paramMap);
+
+	int insertSm30ApprovalList(Map<String, String> paramMap);
+
+	int deleteShareUser(Map<String, String> paramMap);
+
+	
 }

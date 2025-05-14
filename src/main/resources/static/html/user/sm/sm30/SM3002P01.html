@@ -60,17 +60,17 @@
 				<td>
 					<select id="deptId" name="deptId" data-search="deptId">
 						<option value="" selected>전체</option>
-						<option value="TRN50">트루넷구매팀</option>
-						<option value="TRN30">트루넷직접매출</option>
+						<option value="TRN50">구매팀</option>
+						<option value="TRN30">직접매출</option>
 					</select>
 				</td>
 
-				<th>턴키제외</th>
+				<th>턴키구분</th>
 				<td>
 					<select id="trunDiv" name="trunDiv" data-search="trunDiv">
 						<option value="">전체</option>
 						<option value="PCHSCOSTDIV1030" selected>턴키자료만</option>
-						<option value="PCHSCOSTDIV" selected>턴키제외</option>
+						<option value="PCHSCOSTDIV" selected>구매및가공</option>
 					</select>
 				</td>
 
@@ -140,7 +140,7 @@
 		<button type="button" id="actionBtn1" authChk>등록</button>
 		<button type="button" class="close_btn" onclick="executeCallback();">닫기</button>
 		<button type="button" id="actionBtn2" authChk>삭제</button>
-		<!-- <button type="button" id="actionBtn3" authChk>보류업데이트</button> -->
+		<button type="button" id="updateApprovalBtn" onclick="updateShareUser()">결재자 수정</button>
 	</div>
 </div>
 
@@ -166,6 +166,9 @@
 
 	var holdChanged = false;		// 보류 체크박스가 한 번이라도 변경됐는지 표시
 
+	let titleCoCd = null;
+	let titltDeptNm = null;
+
 	ax5.ui.grid.formatter["bilgYn"] = function () {
 		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
 		if (this.value == "E") {
@@ -173,6 +176,10 @@
 		} else {
 			return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
 		}
+	};
+
+	ax5.ui.grid.formatter["holdYnNm"] = function () {
+		return (this.value === "Y") ? "보류" : "";
 	};
 
 	var gridApproval1 = {
@@ -243,12 +250,13 @@
 					]
 				],
 				columns : [
-					{key: "deleteBtn",		label: "삭제", width: 60, align: "center", hidden: true,
+					{key: "deleteBtn",		label: "삭제", width: 50, align: "center", hidden: true,
 						formatter: function() {return '<button type="button" '+   'onclick="delete_sm30_select_list('+ this.dindex + ',' + this.item.seq + ')" '+   'style="margin-left:3px; height:18px;padding:0" authchk>삭제</button>';}
 					},
-					{key: "holdYn",			label: "보류", width: 50, align: "center", hidden: true,
+					{key: "holdYn",			label: "보류", width: 40, align: "center", hidden: true,
 						formatter: function() {return '<input type="checkbox" style="width:14px; height:14px; margin:0; vertical-align:middle;" '+ (this.value==="Y" ? 'checked' : '') + ' />';}
 					},
+					{key: "holdYn",			label: "승인",		width: 50,	align: "center", formatter: "holdYnNm", styleClass: function () {return (this.item.holdYn == "Y") ? "grid-font-red" : "";}},
 					{key: "fileTrgtKey",	label: "파일대상KEY",		width: 50,	align: "center",  hidden: true},
 					{key: "seq",			label: "순번",			width: 50,	align: "center",  hidden: true},
 					{key: "coCd",			label: "회사",			width: 50,	align: "left", styleClass: function () {return (this.item.holdYn == "Y") ? "grid-font-red" : "";},},
@@ -262,19 +270,19 @@
 					{key: "clntCd",			label: "구매처CD",		width: 180,	align: "left", hidden: true},
 					{key: "clntNm",			label: "구매처명",			width: 180,	align: "left", styleClass: function () {return (this.item.holdYn == "Y") ? "grid-font-red" : "";},},
 					{key: undefined, 		label: "매입확정" , columns : [
-						{key: "pchsAmt", 		label: "확정금액", 	width: 110,	align: "right", formatter: "money", styleClass: function () {return (this.item.holdYn == "Y") ? "grid-font-red" : "";},},
-						{key: "pchsVat", 		label: "부가세",		width: 110,	align: "right", formatter: "money", styleClass: function () {return (this.item.holdYn == "Y") ? "grid-font-red" : "";},},
-						{key: "pchsTot", 		label: "확정 합계", 	width: 110,	align: "right", formatter: "money", styleClass: function () {return (this.item.holdYn == "Y") ? "grid-font-red" : "";},},
+						{key: "pchsAmt", 		label: "확정금액", 	width: 100,	align: "right", formatter: "money", styleClass: function () {return (this.item.holdYn == "Y") ? "grid-font-red" : "";},},
+						{key: "pchsVat", 		label: "부가세",		width: 100,	align: "right", formatter: "money", styleClass: function () {return (this.item.holdYn == "Y") ? "grid-font-red" : "";},},
+						{key: "pchsTot", 		label: "확정 합계", 	width: 100,	align: "right", formatter: "money", styleClass: function () {return (this.item.holdYn == "Y") ? "grid-font-red" : "";},},
 					]},
 					{key: undefined, 		label: "세금계산서 발행 완료" , columns : [
-						{key: "billTot", 		label: "발행 합계", 	width: 110,	align: "right", formatter: "money", styleClass: function () {return (this.item.holdYn == "Y") ? "grid-font-red" : "";},},
-						{key: "billNo", 		label: "계산서번호", 	width: 110,	align: "center", styleClass: function () {return (this.item.holdYn == "Y") ? "grid-font-red" : "";},},
-						{key: "billDt",		 	label: "발행일자", 	width: 110,	align: "center", styleClass: function () {return (this.item.holdYn == "Y") ? "grid-font-red" : "";},},
+						{key: "billTot", 		label: "발행 합계", 	width: 100,	align: "right", formatter: "money", styleClass: function () {return (this.item.holdYn == "Y") ? "grid-font-red" : "";},},
+						{key: "billNo", 		label: "계산서번호", 	width: 100,	align: "center", styleClass: function () {return (this.item.holdYn == "Y") ? "grid-font-red" : "";},},
+						{key: "billDt",		 	label: "발행일자", 	width: 100,	align: "center", styleClass: function () {return (this.item.holdYn == "Y") ? "grid-font-red" : "";},},
 					]},
 					{key: undefined, 		label: "결재요청" , columns : [
-						{key: "aprReqSts", 		label: "상태", 		width: 80,	align: "center", formatter: "bilgYn"},
+						{key: "aprReqSts", 		label: "상태", 		width: 40,	align: "center", formatter: "bilgYn"},
 						{key: "aprovalDt", 		label: "요청일", 		width: 80,	align: "center"},
-						{key: "aprovalNm", 		label: "요청자", 		width: 80,	align: "center"},
+						{key: "aprovalNm", 		label: "요청자", 		width: 70,	align: "center"},
 					]},
 					{key: "sm11FileTrgtKey", label: "sm11파일대상KEY",			width: 180,	align: "left", hidden: true},
 
@@ -384,6 +392,7 @@
 									}
 								});
 							}
+							togglePlusMinusButtons();  // 결재자 추가 및 삭제 버튼 토글함수
 						} catch (error){
 							alert("오류 발생!! 전산실 연락 바랍니다", error.message);
 							return null; // 오류 발생 시 null 반환
@@ -440,11 +449,9 @@
 		gridApproval1.initView();
 		gridApproval2.initView();
 
-		//전체 삭제기능 버튼은 수정시만 활성화됨
-		$("#actionBtn2").hide()
-		// 보류업데이트 버튼 기본 숨김
-		// $("#actionBtn3").hide()
-		
+		$('#plus-minus').hide();
+		$("#actionBtn2").hide()	//전체 삭제기능 버튼은 수정시만 활성화됨
+		$('#updateApprovalBtn').hide();	// 결재자 수정버튼
 		// 턴키제외로 들어온 정보는 해당 컬럼 숨김
 		if (param.trunDiv == "PCHSCOSTDIV") {
 			gridApproval1_columns_hide();
@@ -457,20 +464,40 @@
 			$("#popFormApproval #pchsClmnDay").val(param.pchsClmnDay);
 			$("#popFormApproval #billYn").val(param.billYn);
 			$("#popFormApproval #payDiv").val(param.payDiv);
-			const gridData = param.row;
 
-			$('#areaApproval .tit').text(param.closeYm + "월 " + param.deptNm + " [" + trunDivNm + " 매입대금] 지급 결재 요청");	// 제목처리
 			$.each(param, function (key, val) {
 				if( $("#popFormApproval").find("#" + key).length > 0 ) {
 					$("#popFormApproval").find("#" + key).val(val);
 				}
 			});
+			// 팝업창 제목 처리
+			titleCoCd = $("#popFormApproval #coCd").val() == 'GUN' ?  '아이티티' : '트루넷'
+			titltDeptNm = $("#popFormApproval #deptId").val() == 'TRN50' ? '구매팀' : '직접매출'
+			$('#areaApproval .tit').text(param.closeYm + "월 " + titleCoCd + ' ' + titltDeptNm + " [" + trunDivNm + " 매입대금] 지급 결재 요청");	// 제목처리
+
+			const cols = gridApproval1.target.config.columns.map(col => {
+				if (col.key === "holdYn" && col.label === "승인") {
+				return { ...col, hidden: true };
+				}
+				return col;
+			});
+			gridApproval1.target.setConfig({ columns: cols });
+
+			// 발행합계 매칭 : compTot -> billTot
+			const gridData = param.row.map(row => ({
+				...row,
+				billTot: row.compTot
+			}));
 
 			gridApproval1.target.setData({
 				list : gridData,
 				page : { totalElements: gridData.length}
 			})
+			
+
 			gridApproval2.setData3();
+
+			$('#plus-minus').show();
 			
 			$("#areaApproval #actionBtn1").text("등록");
 			$('#areaApproval #actionBtn1').on("click", function() {
@@ -488,7 +515,7 @@
 					delete_all_sm30();
 				});
 			} else { // actionType == "S" || actionType == "T"
-				$("#areaApproval #plus-minus").hide();
+				// $("#areaApproval #plus-minus").hide();
 			}
 		} else {
 			alert("오류 발생! 전산실에 연락바랍니다.")
@@ -512,19 +539,30 @@
 	// 결재 보류 수정
 	function updateApprovalHold(){
 		if (jwt.userId != 'EMJ8105') return false;
-		var list = gridApproval1.target.getList();
-		var gridData = list.map(row => ({
-			fileTrgtKey: row.fileTrgtKey,
-			seq        : row.seq,
-			holdYn    : row.holdYn === "Y" ? "Y" : "N",
-			holdId     : jwt.userId
-		}));
+
+		// gridApproval1 그리드 정보
+		var rawList = gridApproval1.target.getList();
+		// 각 행에 대해 holdYn 이 'Y' 인 경우만 'Y', 그렇지 않으면 'N' 으로 명시
+		var gridApproval1List = rawList.map(function(row){
+			return {
+				...row,
+				holdYn: row.holdYn === 'Y' ? 'Y' : 'N'
+			};
+		});
+
+		// gridApproval2 그리드 정보
+		var gridApproval2List = gridApproval2.target.getList().filter(item => item.todoId === jwt.userId);
+
 		var formData = new FormData();
-		formData.append("detailArr", JSON.stringify(gridData));
+
+		formData.append("userId", jwt.userId);
+		formData.append("pgmId", "SM3002P01");
+		formData.append("detailArr", JSON.stringify(gridApproval1List));
+		formData.append("todoArr", JSON.stringify(gridApproval2List));
 		filePostAjax("/user/sm/sm30/updateApprovalHold", formData,function(data) {
 			if (data.resultCode == 200) {
 				alert("완료되었습니다.");
-				modalStack.close();
+				if (modalStack.modalArr.length > 0) modalStack.close();
             } else {
 				alert("업데이트 실패: " + data.resultMessage);
 			}
@@ -554,7 +592,7 @@
 					$("#popFormApproval #userId").val(value)
 				}
 			});
-			$('#areaApproval .tit').text($("#popFormApproval #closeYm").val() + "월 " + $("#popFormApproval #deptId option:selected").text() + " [" + trunDivNm +" 매입대금] 지급 결재 요청 조회");
+			
 			const chk_sanctnSttus  = data.approval ==null ? 'N' : data.approval.sanctnSttus;
 			//전체 삭제 버튼 기능 적용 
 			if (actionType == "U" && chk_sanctnSttus == 'N' && jwt.userId == $("#popFormApproval #userId").val()) {
@@ -569,12 +607,13 @@
 				$("#areaApproval #actionBtn1").hide();
 				$("#areaApproval #actionBtn2").hide();
 
-				$("#areaApproval #plus-minus").hide();
+				// $("#areaApproval #plus-minus").hide();
 			}
 
 			// 턴키제외 일때 해당 컬럼 숨김
 			if (data.result.trunDiv == "PCHSCOSTDIV") {
 				gridApproval1_columns_hide();
+				trunDivNm = '일반';
 			} 
 			// 부사장님이 해당 팝업창 오픈 시 결재 보류 체크박스 컬럼 보이게 해놓기
 			if ((actionType == 'T' || actionType == 'S') && jwt.userId == 'EMJ8105') {
@@ -585,19 +624,22 @@
 
 				if (idx !== -1) {
 					// 김태호 부사장님 일때만 보이고, 아니면 숨김
-					// updatedColumns[idx].hidden = (jwt.userId !== 'test20');
 					updatedColumns[idx].hidden = (jwt.userId !== 'EMJ8105');
 
 					// 변경된 컬럼 설정을 그리드에 반영
 					gridApproval1.target.setConfig({ columns: updatedColumns });
 				}
-				// $("#actionBtn3").show();
 			}
+
+			titleCoCd = $("#popFormApproval #coCd").val() == 'GUN' ?  '아이티티' : '트루넷'
+			titltDeptNm = $("#popFormApproval #deptId").val() == 'TRN50' ? '구매팀' : '직접매출'
+			$('#areaApproval .tit').text($("#popFormApproval #closeYm").val() + "월 " + titleCoCd + ' ' + titltDeptNm + " [" + trunDivNm +" 매입대금] 지급 결재 요청 조회");
 
 			gridApproval1.setData();
 			gridApproval2.setData();
 
-			toggleApprovalButtonByHold();
+			togglePlusMinusButtons();  // 결재자 추가 및 삭제 버튼 토글함수
+			toggleApprovalButtonByHold(); // 등록되어 있는 자료에 대해 결재자 추가버튼 토글함수
 		});
 	}
 
@@ -771,6 +813,11 @@
 	// 리스트 건별 삭제
 	function delete_sm30_select_list(rowIndex, seq) {
 		var row = gridApproval1.target.list[rowIndex];
+		if (row.holdYn == 'Y') {
+			alert("보류건은 삭제할 수 없습니다.");
+			return false;
+		}
+		
 		const gridLength = gridApproval1.target.list.length;
 		var formData = {
 			fileTrgtKey	: $("#popFormApproval #fileTrgtKey").val(),
@@ -798,73 +845,66 @@
 		});
 	}
 
-
-
-
-	// 공유대상자 추가//
+	// 공유대상자 추가
 	function insertShareUserModal1() {
+		// 현재 그리드에 담긴 리스트(기존 공유+결재) 가져오기
+		var appshaList = gridApproval2.target.getList();
 
-		if( approvalYn() ) {
-			alert("결재가 이미 진행중입니다.");
-			return;
-		}
-		var paramObj = {};
-		var appshaList = gridApproval2.target.list;
-		paramObj["coCd"] = $('#popFormApproval #coCd').val();
-		paramObj["useYn"] =  "Y";
-		// paramObj["userId"] =  $('#ordrgId').val();
-		// paramObj["userNm"] =  $('#ordrgNm').val();
-		paramObj["userId"] =  jwt.userId;
-		paramObj["userNm"] =  jwt.userNm;
-		paramObj["approvalGrid"] = $.grep(appshaList, function(item) {return item.gb === "결재";
-				}).map(function(item) {
-						return {
-							gb: "결재",
-							id: item.usrNm,
-							coCd: item.coCd,
-							text: item.name,
-							parent: item.jik,
-							deptNm: item.dtNm,
-							telNo: item.telNo,
-							offTelNo: item.offTelNo,
-							email: item.email,
-							todoId: item.id
-							, todoKey: item.todoKey
-							, sanctnSn: item.sanctnSn
-							, sanctnSttus: item.sanctnSttus
-							, todoCfDt: item.todoCfDt
-							, todoCfOpn: item.todoCfOpn
-							, flag: item.flag
-						};
-				});
-		paramObj["shareGrid"] =  $.grep(appshaList, function(item) { return item.gb === "공유";
-				}).map(function(item) {
-						return {
-							gb: "공유",
-							id: item.usrNm,
-							coCd: item.coCd,
-							text: item.name,
-							parent: item.jik,
-							deptNm: item.dtNm,
-							telNo: item.telNo,
-							offTelNo: item.offTelNo,
-							email: item.email,
-							todoId: item.id
-							, todoKey: item.todoKey
-							, sanctnSn: item.sanctnSn
-							, sanctnSttus: item.sanctnSttus
-							, todoCfDt: item.todoCfDt
-							, todoCfOpn: item.todoCfOpn
-							, flag: item.flag
-						};
-				});
-	
-		openSecondModal("/static/html/cmn/modal/userLstSearch.html", 900, 500, "작성자 검색", paramObj, function (approvalGrid, shareGrid){
-			// console.log('결재라인 : ', approvalGrid.target.list);
-			// console.log('공유라인 : ', shareGrid.target.list);
-	
-			var appArray = approvalGrid.target.list.map(function(item) {
+		// 팝업에 전달할 파라미터 세팅
+		var paramObj = {
+			coCd: $('#popFormApproval #coCd').val(),
+			useYn: "Y",
+			userId: jwt.userId,
+			userNm: jwt.userNm,
+			// 기존 그리드에 있는 결재 행만 팝업에 전달
+			approvalGrid: $.grep(appshaList, function(item) { return item.gb === "결재"; }).map(function(item) {
 				return {
+					gb: "결재",
+					id: item.usrNm,
+					coCd: item.coCd,
+					text: item.name,
+					parent: item.jik,
+					deptNm: item.dtNm,
+					telNo: item.telNo,
+					offTelNo: item.offTelNo,
+					email: item.email,
+					todoId: item.todoId,
+					todoKey: item.todoKey,
+					sanctnSn: item.sanctnSn,
+					sanctnSttus: item.sanctnSttus,
+					todoCfDt: item.todoCfDt,
+					todoCfOpn: item.todoCfOpn,
+					flag: item.flag
+				};
+			}),
+			// 기존 그리드에 있는 공유 행만 팝업에 전달
+			shareGrid: $.grep(appshaList, function(item) { return item.gb === "공유"; }).map(function(item) {
+				return {
+					gb: "공유",
+					id: item.usrNm,
+					coCd: item.coCd,
+					text: item.name,
+					parent: item.jik,
+					deptNm: item.dtNm,
+					telNo: item.telNo,
+					offTelNo: item.offTelNo,
+					email: item.email,
+					todoId: item.todoId,
+					todoKey: item.todoKey,
+					sanctnSn: item.sanctnSn,
+					sanctnSttus: item.sanctnSttus,
+					todoCfDt: item.todoCfDt,
+					todoCfOpn: item.todoCfOpn,
+					flag: item.flag
+				};
+			})
+		};
+
+		openSecondModal("/static/html/cmn/modal/userLstSearch.html", 900, 500, "작성자 검색", paramObj,
+			function (approvalGrid, shareGrid) {
+				// 팝업에서 다시 선택된 결재 리스트
+				var selectedApproval = approvalGrid.target.list.map(function(item) {
+					return {
 						gb: "결재",
 						usrNm: item.id,
 						coCd: item.coCd,
@@ -874,18 +914,20 @@
 						telNo: item.telNo,
 						offTelNo: item.offTelNo,
 						email: item.email,
-						todoId: item.id
-						, todoKey: item.todoKey
-						, sanctnSn: item.sanctnSn
-						, sanctnSttus: item.sanctnSttus
-						, todoCfDt: item.todoCfDt
-						, todoCfOpn: item.todoCfOpn
-						, flag: item.flag
+						todoId: item.todoId,
+						todoKey: item.todoKey,
+						sanctnSn: item.sanctnSn,
+						sanctnSttus: item.sanctnSttus,
+						todoCfDt: item.todoCfDt,
+						todoCfOpn: item.todoCfOpn,
+						flag: item.flag
 					};
-			});
-			var shaArray = shareGrid.target.list.map(function(item) {
-				return {
-							gb: "공유",
+				});
+
+				// 팝업에서 다시 선택된 공유 리스트
+				var selectedShare = shareGrid.target.list.map(function(item) {
+					return {
+						gb: "공유",
 						usrNm: item.id,
 						coCd: item.coCd,
 						name: item.text,
@@ -894,20 +936,38 @@
 						telNo: item.telNo,
 						offTelNo: item.offTelNo,
 						email: item.email,
-						todoId: item.id
-						, todoKey: item.todoKey
-						, sanctnSn: item.sanctnSn
-						, sanctnSttus: item.sanctnSttus
-						, todoCfDt: item.todoCfDt
-						, todoCfOpn: item.todoCfOpn
-						, flag: item.flag
+						todoId: item.todoId,
+						todoKey: item.todoKey,
+						sanctnSn: item.sanctnSn,
+						sanctnSttus: item.sanctnSttus,
+						todoCfDt: item.todoCfDt,
+						todoCfOpn: item.todoCfOpn,
+						flag: item.flag
 					};
-			});
-			gridApproval2.setData2(appArray.concat(shaArray));
-	
-		});
+				});
 
+				// 그리드에 남아 있는 기존 결재/공유 리스트
+				var existing = gridApproval2.target.getList();
+				var existingApproval = existing.filter(item => item.gb === "결재");
+				var existingShare    = existing.filter(item => item.gb === "공유");
+
+				// 중복 검사: usrNm 기준으로, 기존에 없는 항목만 추가
+				var toAddApproval = selectedApproval.filter(function(sel) {
+					return !existingApproval.some(function(ex) { return ex.usrNm === sel.usrNm; });
+				});
+				var toAddShare    = selectedShare.filter(function(sel) {
+					return !existingShare.some(function(ex) { return ex.usrNm === sel.usrNm; });
+				});
+
+				// 병합 후 그리드 갱신
+				gridApproval2.setData2(existingApproval.concat(toAddApproval).concat(existingShare.concat(toAddShare)));
+				if (actionType != "C") {
+					$('#updateApprovalBtn').show();
+				}
+			}
+		);
 	}
+
 
 	//결재 여부
 	function approvalYn() {
@@ -924,43 +984,41 @@
 	}
 
 	function deleteShareUser1(){
-		if( approvalYn() ) {
-			alert("결재가 이미 진행중입니다.");
-			return;
-		}
-
-		var selRow = parseInt(gridApproval2.target.selectedDataIndexs);
-		if( isNaN(selRow) ) {
+		var sel = gridApproval2.target.selectedDataIndexs;
+		var selRow = parseInt(sel);
+		if (isNaN(selRow)) {
 			alert("선택된 행이 없습니다.");
 			return;
-		} else {
-			if( selRow > -1 ) {
-				var todoKey = gridApproval2.target.getList()[selRow].todoKey;
-				var gridList = gridApproval2.target.getList("selected")[0];
-				if( typeof(todoKey) == "undefined" ) {
-					gridApproval2.target.removeRow(selRow);
-					$.gridNoSet(gridApproval2, "sanctnSn");
-				} else {
-					var paramObj = {
-						todoNo: $("#popFormApproval #fileTrgtKey").val(),
-						todoKey: gridList.todoKey,
-						sanctnSn: gridList.sanctnSn,
-						todoDiv1CodeId: gridList.todoDiv1CodeId,
-						todoDiv2CodeId: gridList.todoDiv2CodeId
-					}
-					deleteAjax("/user/wb/wb20/deleteTodoMaster", paramObj, null, function(data) {
-						if (data.resultCode == 200) {
-							alert(data.resultMessage);
-							gridApproval2.setData(0);
-						} else {
-							alert("삭제중 오류가 발생했습니다");
-						}
-					});
-
-				}
-			}
 		}
+		var item = gridApproval2.target.getList()[selRow];
+		// 1) 이미 승인된(Y) 결재자는 삭제 불가
+		if (item.sanctnSttus === "Y") {
+			alert("이미 승인된 결재자는 삭제할 수 없습니다.");
+			return;
+		}
+		// 2) 신규 등록된 경우 로컬에서만 삭제
+		if (typeof item.todoKey === "undefined") {
+			gridApproval2.target.removeRow(selRow);
+			$.gridNoSet(gridApproval2, "sanctnSn");
+			return;
+		}
+		var paramObj = {
+			todoNo:   $("#popFormApproval #fileTrgtKey").val(),
+			todoKey:  item.todoKey,
+			sanctnSn: item.sanctnSn,
+			todoDiv1CodeId: item.todoDiv1CodeId,
+			todoDiv2CodeId: item.todoDiv2CodeId
+		};
+		deleteAjax("/user/wb/wb20/deleteTodoMaster", paramObj, null, function(data) {
+			if (data.resultCode == 200) {
+				alert(data.resultMessage);
+				gridApproval2.setData(0);
+			} else {
+				alert("삭제중 오류가 발생했습니다");
+			}
+		});
 	}
+
 	/*
 	#   TODO 알림톡발송 시작
 	#
@@ -986,7 +1044,7 @@
 		let clntNm = (jwt.coCd=="GUN") ? "(주)건양ITT" : "트루넷";
 		// Kakao 알림톡 보내는사람(userID) 연락처 조회 값 세팅
 		var paramObj1 = {
-			"coCd" 	  : $("#popFormApproval #coCd").val(),
+			"coCd" 	  : jwt.coCd,
 			"userId"  : jwt.userId
 		};
 		postAjaxSync("/user/wb/wb24/selectMemberTelNo", paramObj1, null, function(data) {
@@ -999,7 +1057,7 @@
 
 		let param = {
 			"tmplatDiv": "TMPLATDIV02"
-			, "coCd": $("#popFormApproval #coCd").val()            //해당 결재 담당자의 소솟coCd(트르넷발주 TRN )
+			// , "coCd": $("#popFormApproval #coCd").val()            //해당 결재 담당자의 소속 (오류때문에 주석)
 			, "todoDiv1CodeId": "TODODIV20"               //공통코드 해당업무 - 결재
 			, "todoDiv2CodeId": "TODODIV2170"               //공통코드 해당업무 - 결재 - 발주서
 			, "todoDiv1CodeNm": "결재"                  //공통코드 해당업무 - 결재 - 발주서
@@ -1019,7 +1077,7 @@
 		//공유
 		let param2 = {
 			"tmplatDiv": "TMPLATDIV02"
-			, "coCd": $("#popFormApproval #coCd").val()            //해당 결재 담당자의 소솟coCd(트르넷발주 TRN )
+			// , "coCd": $("#popFormApproval #coCd").val()            //해당 결재 담당자의 소속 (오류때문에 주석)
 			, "todoDiv1CodeId": "TODODIV10"               //공통코드 해당업무 - 결재
 			, "todoDiv2CodeId": "TODODIV1170"               //공통코드 해당업무 - 결재 - 발주서
 			, "todoDiv1CodeNm": "공유"                  //공통코드 해당업무 - 결재 - 발주서
@@ -1243,9 +1301,9 @@
 		//이슈등록, 조치결과 등록시 결재자 정보를 메모리에 가져오기  end
 		//------------------------------------------------
 
+		appArray = approvalTeamManagerSpecialInfoData('EMJ8105', appArray);	// 부사장님
 		appArray = approvalTeamManagerInfoData(tempActId, appArray);		// 작성자 팀장
 		appArray = approvalUserInfoData(tempActId, appArray);				// 작성자
-// 		appArray = approvalTeamManagerSpecialInfoData('EMJ8105', appArray);	// 부사장님
 	
 		gridApproval2.setData2(appArray.concat(shaArray));
 	}
@@ -1352,29 +1410,39 @@
 	// 턴키제외일때 해당 컬럼 숨김
 	function gridApproval1_columns_hide() {
 		const keysToHide = [
-			"custNm",          	// 고객사CD
-			"ctrtApprovalNo",  	// 품의번호
+			"custNm",           // 고객사CD
+			"ctrtApprovalNo",   // 품의번호
 			"clntPjtNm",        // PJTCD
-			"ordrsNo",        	// 수주번호
-			"ctrtNo"           	// 계약번호
+			"ordrsNo",          // 수주번호
+			"ctrtNo"            // 계약번호
 		];
 
+		// 컬럼 숨김
 		const cols = gridApproval1.target.config.columns;
-
-		// key 목록에 포함된 컬럼은 hidden=true 처리
 		cols.forEach(col => {
-		if (keysToHide.includes(col.key)) {
-			col.hidden = true;
-		}
+			if (keysToHide.includes(col.key)) {
+				col.hidden = true;
+			}
 		});
 
-		gridApproval1.target.setConfig({ columns: cols });
+		// footSum 부분 다시 설정
+		gridApproval1.target.setConfig({
+			columns: cols,
+			footSum: [
+				[
+					{ label: "합계", colspan: 3, align: "center" },
+					{ key: "pchsAmt", collector: "sum", formatter:"money", align:"center" },
+					{ key: "pchsVat", collector: "sum", formatter:"money", align:"center" },
+					{ key: "pchsTot", collector: "sum", formatter:"money", align:"center" },
+					{ key: "billTot", collector: "sum", formatter:"money", align:"center" }
+				]
+			]
+		});
 	}
 
 	// 보류 컬럼의 체크가 하나라도 변경되면 부사장님(EMJ8105)에게만 '결재승인' 버튼을 보이게 하는 함수
 	function toggleApprovalButtonByHold() {
 		// 부사장님이 아니면 무시
-		// if (jwt.userId !== 'test20') return false;
 		if (jwt.userId !== 'EMJ8105') return false;
 
 		// 보류 한 번도 안 바뀌었으면 무시
@@ -1383,7 +1451,6 @@
 		// 결재자가 처음 결재승인 버튼 중복 생성 금지
 		if ($('.callApprovalWorking').length > 0) return false;
 
-		// 보류업데이트 버튼
 		if ($('.actionBtn3').length > 0) return false;
 
 		// 버튼 생성
@@ -1394,6 +1461,33 @@
 			</button>
 		`;
 		$('.popup_bottom_btn').append(btnHtml);
+	}
+
+	// 결재자 추가
+	function updateShareUser() {
+		var formData = makeFormData();
+		if (formData) {
+			filePostAjax("/user/sm/sm30/updateShareUser", formData, function(data) {
+				if (data.resultCode == 200) {
+					alert("결재자 수정이 완료되었습니다.")
+					executeCallback();
+				}
+			});
+		}
+	}
+
+	// 결재자 추가 및 삭제 버튼 해당 공유 및 결재자에 추가된 인원만 보이게끔
+	function togglePlusMinusButtons() {
+		// gridApproval2의 현재 리스트를 가져와서
+		const list = gridApproval2.target.getList();
+		// 내 todoId가 있으면 true
+		const hasMe = list.some(item => item.todoId === jwt.userId);
+		// 버튼 보이기/숨기기
+		if (hasMe) {
+			$('#plus-minus').show();
+		} else {
+			$('#plus-minus').hide();
+		}
 	}
 
 </script>
