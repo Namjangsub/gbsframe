@@ -437,6 +437,14 @@
     var act_approval_Yn = 'N';
 
     var rowData = {};
+
+	// 크기 조절할 textarea ID 리스트
+	const textAreas = [
+	    '#issCnts', 			// 내용
+	    '#actCompDgnFileNm',  	// 조치 도면 저장명
+	    '#measRst',  			// 원인
+	    '#actCnts'  			// 결과/근본대책
+	];
     
     setCommonSelect($(".popup_area select[data-kind]"));
 
@@ -893,6 +901,12 @@
         //---------------------------------------------------------------
         //첨부 화일 처리 끝
         //---------------------------------------------------------------
+
+		// 크기 조절할 textarea ID 리스트
+		$(textAreas.join(',')).on('input paste drop change', function () {
+			// 각 textarea에 대해 크기 조절 함수 호출
+			txtareaHeightResize($(this));
+		});
 
         
 		// 결재시 수정하면 change 이벤트 적용
@@ -1852,6 +1866,12 @@
 		appArray = approvalTeamManagerInfoData(tempActId, appArray);
 		appArray = approvalTeamManagerInfoData(jwt.userId, appArray);
 
+		// 계획 문제 등록 시 영업 및 연구소가 등록 시 해당 특정 유저 결재권자 자동 추가
+		if (jwt.deptId.slice(0, 5) == 'GUN30') {
+			appArray = approvalTeamManagerSpecialInfoData('EMJ8105', appArray);		// 영업이 등록 시 김태호 부사장님 추가
+		} else if (jwt.deptId.slice(0, 5) == 'GUN40') {
+			appArray = approvalTeamManagerSpecialInfoData('kimjhv', appArray);		// 연구소가 등록 시 김재현 전무님 추가
+		}
 
 		if ($("#issSts").val() != 'ISSSTS03') {  //문제생성시 조치자 팀장
 			gridViewPop.setData2(appArray.concat(shaArray));
@@ -1888,7 +1908,34 @@
 		return appArray;
 	}
 
+	//특정담당자 정보 가져오기
+	function approvalTeamManagerSpecialInfoData(appUserId, appArray) {
+		var formData = {
+				"userId" : appUserId,
+		}
+		postAjaxSync("/user/wb/wb24/selectTeamManagerSpecialInfo", formData, null, function(data) {
+			if (data.result != '' && data.result!=null) {
+				//결자자 정보 가져오기
+				let list = data.result;
+				if (appArray.some(item => item.usrNm === list.id)) {
+					//Array에 usrNm 의 값중에 list.id와 같은 값이 있으면 true
+				} else {
+					appArray.push({
+								gb: "결재",
+								usrNm: list.id,
+								name: list.name,
+								jik: list.levelNm,
+								dtNm: list.deptNm,
+								telNo: list.telNo,
+								offTelNo: list.offTelNo,
+								email: list.email,
 
+							});
+				}
+			}
+		});
+		return appArray;
+	}
 
     //담당자 팀장 정보 가져오기
 	function approvalTeamManagerInfoData(appUserId, appArray) {
