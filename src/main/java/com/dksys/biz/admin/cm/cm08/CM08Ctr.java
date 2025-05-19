@@ -219,6 +219,9 @@ public class CM08Ctr {
 				} else if ("jpg".equals(extension) || "jpeg".equals(extension)) {
 					contentType = "image/jpeg";
 					dispositionType = "inline";
+				} else if ("heic".equals(extension)) {
+					contentType = "image/heic";
+					dispositionType = "inline";
 				} else if ("png".equals(extension)) {
 					contentType = "image/png";
 					dispositionType = "inline";

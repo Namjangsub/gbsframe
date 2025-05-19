@@ -204,28 +204,72 @@ function loadFile(file) {
     }
 }
 
-function loadImage(file) {
-    var xhr = new XMLHttpRequest();
-    xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + file.fileKey + "&userId=" + jwt.userId, true);
-    xhr.responseType = "blob";
-    xhr.onload = function () {
-        if (xhr.status === 200) {
-            var blob = xhr.response;
-            var reader = new FileReader();
-            reader.onloadend = function () {
-                var img = $('<img>', {
-                    id: 'viewImgData',
-                    class: 'resized-image',
-                    src: reader.result,
-                    style: 'transform: rotate(0deg) scale(1)',
-                    click: function () { modalStack.close(); }
-                });
-                $('#viewArea').append(img);
-            };
-            reader.readAsDataURL(blob);
-        }
-    };
-    xhr.send();
+
+function loadImage(image) {
+	var fileKey = image.fileKey;
+	var fileName = image.fileName;
+	$(".ax-modal-header").last().contents().first().replaceWith(fileName);
+	
+	var xhr = new XMLHttpRequest();
+	xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + fileKey + "&userId=" + jwt.userId, true);
+	xhr.responseType = "blob";
+	xhr.onload = function () {
+		if (xhr.status === 200) {
+
+	        var contentType = xhr.getResponseHeader("Content-Type");
+	        // 만약 응답 Content-Type이 text/plain이면, 오류 메시지가 담겨있는 경우입니다.
+	        if (contentType && contentType.indexOf("text/plain") !== -1) {
+	            var reader = new FileReader();
+	            reader.onload = function (e) {
+	                // 오류 메시지 출력
+	                alert("전산실 연락바랍니다.\n\n" + e.target.result);
+	            };
+	            reader.readAsText(xhr.response);
+	        } else {
+				
+				var blob = xhr.response;
+				openProgress(true);
+				// Blob -> Base64 변환
+				var reader = new FileReader();
+				if (fileName && fileName.split('.').pop().toLowerCase() === 'heic') {
+					heic2any({ blob: blob, toType: "image/jpeg" })
+						.then(function (resultBlob) {
+							var reader = new FileReader();
+							reader.readAsDataURL(resultBlob);
+							reader.onloadend = function () {
+// 								$('#viewImgData').attr('src', reader.result);
+								var img = $('<img>', {
+				                    id: 'viewImgData',
+				                    class: 'resized-image',
+				                    src: reader.result,
+				                    style: 'transform: rotate(0deg) scale(1)',
+				                    click: function () { modalStack.close(); }
+				                });
+								$('#viewArea').append(img);
+							};
+						})
+						.catch(function (error) {
+							console.error("HEIC 변환 오류:", error);
+						});
+				} else {
+					reader.readAsDataURL(blob);
+					reader.onloadend = function () {
+						$('#viewImgData').attr('src', reader.result);
+					};
+				}
+				openProgress(false);
+	        }
+		} else {
+	        // 상태 코드가 200이 아닌 경우, 백엔드에서 오류가 발생한 것으로 간주하고 로그 남김
+	        console.error("백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
+	    }
+	};
+	// 네트워크 오류 처리
+	xhr.onerror = function () {
+	    console.error("네트워크 오류가 발생했습니다.");
+	};
+	
+	xhr.send();
 }
 
 async function loadPdf(file) {
