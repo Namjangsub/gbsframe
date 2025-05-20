@@ -10,6 +10,18 @@ public interface PM10Mapper {
 
 	List<Map<String, String>> selectMnList(Map<String, String> paramMap);
 
+	int pm10_main_insert(Map<String, String> param);
+
+	int pm10_d01_insert(Map<String, String> param);
+
+	int pm10_d01_update(Map<String, String> param);
+
+	int pm10_d03_insert(Map<String, String> param);
+
+	int pm10_d03_update(Map<String, String> param);
+
+	int insertMn(Map<String, String> param);
+
 	int updateMn(Object paramMap);
 
 	int deleteMn(Map<String, String> paramMap);

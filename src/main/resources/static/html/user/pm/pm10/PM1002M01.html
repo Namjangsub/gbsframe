@@ -21,7 +21,6 @@
 	<link rel="stylesheet" href="/static/css/sub.css">
 	<link rel="stylesheet" href="/static/css/common.css">
 	
-          
 	<script src="/static/js/jquery-latest.min.js"></script>
 	<script src="/static/js/jquery.serializeObject.js"></script>
 	<script src="/static/bootstrap/js/bootstrap.min.js"></script>
@@ -54,7 +53,7 @@
 				<li class="btn_r">
 					<a onclick="manualPopup();"> <button type="button" class="bg_gray" onclick="manualPopup();">도움말</button></a>
 					<a onclick="initSearch();"><button class="bg_gray">초기화</button></a>
-					<a onclick="mnGridView.setData(0);"><button class="bg_gray">검 색</button></a>			 
+					<a onclick="mnGridView.setData(0);"><button class="bg_gray">검 색</button></a>
 	            </li>
             </ul>
         </div>
@@ -68,7 +67,7 @@
 					<tr>
 						<th class= "hit">회사</th>
 						<td>
-							<select id="coCd" name="coCd" data-kind="CO" data-search="coCd" required="required" msg="회사">
+							<select id="coCd_S" name="coCd_S" data-kind="CO" data-search="coCd" required="required" msg="회사">
 							</select>
 						</td>
 
@@ -85,9 +84,10 @@
 						<td></td>
 					</tr>			     
 	            </table>
-				<!-- 검색조건 END -->	      
-<form id="mainForm" onSubmit="return false;">				      
+				<!-- 검색조건 END -->
+<form id="mainForm" onSubmit="return false;">
 		<input type="hidden" id="userId"    name="userId">
+		<input type="hidden" id="deptId"     name="deptId">
 		<input type="hidden" id="pgmId"     name="pgmId" value="PM1002M01">
 </form>			        
             </div>
@@ -99,9 +99,10 @@
 			<div class="contents_tit">
 				<span  style="height: 30px; line-height: 30px;font-size: 15px;">임팀장 주간회의 자료</span>
 				<div class="add_btn_small pdl10">
-					<a onclick="inserPurchase('C');" style="height: 30px; line-height: 28px;" authchk>+</a>
-					<a onclick="deleteVendEstimate();" style="height: 30px; line-height: 28px;" authChk>-</a>
-					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;" authChk><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+					<!-- <a onclick="insertMn();" style="height: 30px; line-height: 28px;">저장</a> -->
+					<a onclick="addRow();" style="height: 30px; line-height: 28px;">+</a>
+					<a onclick="deleteMn();" style="height: 30px; line-height: 28px;">-</a>
+					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 			    </div>
 			</div>
 		    <!-- 리스트 -->
@@ -116,10 +117,21 @@
 
 <script type="text/javascript">
 
+var existData = false;
+
+const detailInserted = {};
+
 //formatter 공통 함수
 function valueFormatter() {
- return (this.value) ? '<span style="display: block; white-space: pre;">' + this.value + '</span>' : '';
+	return (this.value) ? '<span style="display: block; white-space: pre;">' + this.value + '</span>' : '';
 }
+
+// 부서 코드 매핑
+const deptCodeMap = {
+	gun00MnCnts:'GUN00', gun60MnCnts:'GUN60', gun30MnCnts:'GUN30',
+	gun40MnCnts:'GUN40', trn5010MnCnts:'TRN5010', trn5020MnCnts:'TRN5020',
+	gun10MnCnts:'GUN10', gun80MnCnts:'GUN80'
+};
 
 var mnGridView = {
 	initView: function(){
@@ -132,33 +144,35 @@ var mnGridView = {
 		lineNumberColumnWidth: 30,
 		target: $('[data-ax5grid="mnGrid-grid"]'),
 		header: {
-           align: "center",
-           selector: false
-         },
-         body: {
-		    mergeCells : ["ordrgNo"],
+			align: "center",
+			selector: false
+		},
+		body: {
 			onClick: function () {
 				this.self.clearSelect();				
-			    this.self.select(this.dindex);
+				this.self.select(this.dindex);
 			},
 			onDBLClick: function () {
-				this.self.clearSelect();
-				this.self.select(this.dindex);
-				var row = this.dindex;
-				//거래처조회 화면 call
-				if (this.column.key == 'clntNm' || this.column.key == 'salesEmpIdNm' || this.column.key == 'pchsQty' || this.column.key == 'pchsAmt') {
-					var paramObj = {
-									actionType: "U",
-									crnTyp    : "CRNTYP01",
-									clntCd    : this.item.pchsClntCd,
-									};
-					openModal("/static/html/user/pm/pm10/PM1002P01.html", 1500, 870, "", paramObj);
-				}
 			},
-			//그리드값 변경시 실행
-            onDataChanged: function () {
-            },
-	   },
+			onDataChanged: function(){
+				const colKey = this.key;
+				if (!colKey || colKey === 'mnSubject') return;
+				const item   = this.item;
+				const subSeq = item.mnSubSeq;
+				if (!subSeq) return alert('먼저 주제를 입력해주세요.');
+
+				const deptCd = deptCodeMap[colKey];
+				const mapKey = subSeq + '_' + deptCd;
+debugger;
+				if (!detailInserted[mapKey]) {
+					// INSERT
+					pm10_d03_insert(item, colKey, this.value);
+				} else {
+					// UPDATE
+					pm10_d03_update(item, colKey, this.value);
+				}
+			}
+		},
         page: {
 			navigationItemCount: 9,
 			height: 30,
@@ -168,32 +182,36 @@ var mnGridView = {
 			nextIcon: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
 			lastIcon: '<i class="fa fa-step-forward" aria-hidden="true"></i>',
 			onChange: function () {
-				mnGridView.setData(this.page.selectPage); 
+				mnGridView.setData(this.page.selectPage);
 			}
         },
         columns: [
-            { key: "mnSubject", 	label: "PTOJECT<br>/<br>주제", 		align: "left", width: 100 },
-            { key: "gun00MnCnts", 	label: "임원", 						align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
-            { key: "gun60MnCnts", 	label: "생산", 						align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
-            { key: "gun30MnCnts", 	label: "영업<br>국내.해외", 			align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
-            { key: "gun40MnCnts", 	label: "연구소", 						align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
-            {
-                key: undefined, 	label: "트루넷", columns: [
-                    { key: "trn5010MnCnts", label: "기계", 				align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
-                    { key: "trn5020MnCnts", label: "전기", 				align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter }
-                ]
-            },
-            { key: "gun10MnCnts", 	label: "경영지원팀<br>총무/인사/제조혁신", 	align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
-            { key: "gun80MnCnts", 	label: "전산실", 						align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
-            { key: "mnStatus", 		label: "진행/완료", 					align: "left", width: 70 },
-            { key: "mnEtcAll", 		label: "특이사항", 					align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter }
-        
-        ]
-	});
+					{ key: "mnSubject", 	label: "PROJECT<br>/<br>주제", 	align: "left", width: 100, editor: {type: "textarea"}, formatter: valueFormatter},
+					{ key: "mnSubSeq", 		label: "순번", 					align: "left", width: 100, hidden: true},
+					{ key: "gun00MnCnts", 	label: "임원", 					align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+					{ key: "gun60MnCnts", 	label: "생산", 					align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+					{ key: "gun30MnCnts", 	label: "영업<br>국내.해외", 	align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+					{ key: "gun40MnCnts", 	label: "연구소", 				align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+					{
+						key: undefined, 	label: "트루넷", columns: [
+							{ key: "trn5010MnCnts", label: "기계", 		align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+							{ key: "trn5020MnCnts", label: "전기", 		align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter }
+						]
+					},
+					{ key: "gun10MnCnts", 	label: "경영지원팀<br>총무/인사/제조혁신", 	align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+					{ key: "gun80MnCnts", 	label: "전산실", 				align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+					{ key: "mnStatus", 		label: "진행/완료", 			align: "left", width: 70 },
+					{ key: "mnEtcAll", 		label: "특이사항", 				align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter }
+				]
+		});
 		return this;
+	},	
+	addRow: function() {
+		// 빈 로우 추가
+		this.target.addRow({}, "last")
 	},
-     setData: function(_pageNo) {
-   	    	var targetObj = this.target;
+	setData: function(_pageNo) {
+			var targetObj = this.target;
 			var paramObj = {};
 			$.each($('#main_area [data-search]'), function(idx, elem){
 				if( $(elem).attr("class") == "input_calendar" ) {
@@ -201,17 +219,20 @@ var mnGridView = {
 				} else {
 					paramObj[$(elem).data("search")] = $(elem).val();	
 				}
-			});			
+			});
 			
 			postAjax("/user/pm/pm10/selectMnList", paramObj, null, function(data){
 				try {
 					let list = data.result;
+					pm10_data_list = list;
 					targetObj.setData({
 							list : list,
 							page : {
 								totalElements : list.length,
 							} 
-					});	
+					});
+					if (list != '' || list == undefined) existData = true;
+					
 
 				} catch (error) {
 					alert("오류 발생!! 전산실 연락 바랍니다", error.message);
@@ -219,35 +240,36 @@ var mnGridView = {
 				} finally {
 					// console.log("함수 실행 완료.");
 				}
-           });
-      } 
+			});
+		} 
 	}
+
+	
 
 
 	var excelView = {
 		initView: function(){
-		this.target = new ax5.ui.grid();
-		this.target.setConfig({
-		target: $('[data-ax5grid="excel-grid"]'),
-		columns: [     
-           ]
-		});
-		   return this;
-    }
-}        
-  
-    
-	function initSearch() {
-	    // datepicker를 제외한 select, input 값 모두 초기화
-	    $(".contents.search select").val("");
-	    $(".contents.search input").val("");    
-	    // 회사 초기화
-	    $("#coCd").val(jwt.coCd);
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				target: $('[data-ax5grid="excel-grid"]'),
+				columns: [     
+						]
+			});
+			return this;
+		}
+	}
 	
-	    $.dayInit();
-	    
-	    // 재검색
-	    mnGridView.setData(0);
+	function initSearch() {
+		// datepicker를 제외한 select, input 값 모두 초기화
+		$(".contents.search select").val("");
+		$(".contents.search input").val("");    
+		// 회사 초기화
+		$("#coCd_S").val(jwt.coCd);
+	
+		$.dayInit();
+		
+		// 재검색
+		mnGridView.setData(0);
 	}
 
 
@@ -255,49 +277,159 @@ var mnGridView = {
 		//초기설정들		
 		mainDefaultLoad("사업계획", "임팀장주간회의록");
 		setCommonSelect($("#main_area select[data-kind]"));
+
+		$("#userI").val(jwt.userId);
+		$("#deptId").val(jwt.deptId);
+		$("#userI").val(jwt.userId)
 		
 		$.dayInit = function() {
-	
 			// 종료일 (현재날짜의 월 말일)
 			$('#mnDate_S').datepicker({
 				format : "yyyy-mm-dd",
 				language : "ko",
 				autoclose : true,
-			    beforeShowDay: function(date) {
-			        // 5 = 금요일만 선택가능하게 하기
-			        return date.getDay() === 5;
-			    }
+				beforeShowDay: function(date) {
+					// 5 = 금요일만 선택가능하게 하기
+					return date.getDay() === 5;
+				}
 			}).datepicker("setDate", moment().day(5).toDate());
 			
 		}
+
+		// 회의일자 변경 시 주차 계산
+		$('#mnDate_S').on('change', dateToWeek);
+
+		dateToWeek();	// 주차 계산
 	
 		// 접속자 회사 set
-		$("#coCd").val(jwt.coCd);
-	    $("#userId").val(jwt.userId);
-	    $.dayInit();
-	    
-	    mnGridView.initView().setData(0);
+		$("#coCd_S").val(jwt.coCd);
+		$("#userId").val(jwt.userId);
+		$.dayInit();
+		
+		mnGridView.initView().setData(0);
 		excelView.initView();
 		//권한체크
 // 		authChk();	
 			
-	 });
-	 
+	});
 
-	//평가내역 팝업
-	function openCostDetailNew(param) {
-		if (param.coCd == "undefined" || param.coCd == "") {
-			alert("수정할 자료를 선택해 주세요.");
-			return;
+	// 삭제
+	function deleteMn() {
+		postAjax("/user/pm/pm10/updateMn", formData, function(data) {
+			if (data.resultCode == 200) {
+				mnGridView.setData();
+			}
+		});
+	}
+
+	
+
+	// 행 추가
+	function addRow() {
+		if (existData) {
+			mnGridView.addRow();
+		} else {
+			var paramObj = {
+				"mnDate" 	: $('#mnDate_S').val().replace(/-/g,''),
+				"mnWeeks" 	: $('#mnWeeks_S').val(),
+				"mnRmk" 	: '',
+				"userId"  	: $('#userId').val(),
+				"pgmId"		: $('#pgmId').val() 
+			}
+			postAjax("/user/pm/pm10/pm10_main_insert", paramObj, null, function(data) {
+				if (data.resultCode == 200) {
+					mnGridView.addRow();
+					mnGridView.setData();
+				} else {
+					alert('헤더 저장 실패: ' + data.resultMessage);
+				}
+			});
 		}
+	}
 
-		paramObj = {
-			"actionType" : "U",
-			"userId" : jwt.userId,
-			"pgmId" : "PM1002M01"
+	function pm10_d01_insert(item) {
+		var paramObj = {
+				mnDate   : $('#mnDate_S').val().replace(/-/g,''),
+				mnSubject: item.mnSubject,
+				userId   : $('#userId').val(),
+				pgmId    : $('#pgmId').val()
 		};
-		Object.assign(paramObj, param);
-		openModal("/static/html/user/pm/pm10/PM1002P01.html", 1000, 520, "", paramObj);
+		postAjax('/user/pm/pm10/pm10_d01_insert', paramObj, null, function(data) {
+			if (data.resultCode === 200) {
+			} else {
+				alert('등록 실패: ' + data.resultMessage);
+			}
+			mnGridView.setData(0);
+		});
+	}
+
+	function pm10_d01_update(item) {
+		var paramObj = {
+				mnDate   : $('#mnDate_S').val().replace(/-/g,''),
+				mnSubSeq : item.mnSubSeq,
+				mnSubject: item.mnSubject,
+				userId   : $('#userId').val(),
+				pgmId    : $('#pgmId').val()
+		};
+		postAjax('/user/pm/pm10/pm10_d01_update', paramObj, null, function(data) {
+			if (data.resultCode == 200) {
+			} else {
+				alert('수정 실패: ' + data.resultMessage);
+			}
+			mnGridView.setData(0);
+		});
+	}
+
+	function pm10_d03_insert(item, colKey, value) {
+		const deptCode = deptCodeMap[colKey]; 
+		const mapKey = item.mnSubSeq + '_' + deptCode;
+		
+		var paramObj = {
+			mnDate   	: $('#mnDate_S').val().replace(/-/g,''),
+			mnSubSeq 	: item.mnSubSeq,
+			mnDeptCd 	: deptCode,
+			mnCnts		: value,
+			mnEtc		: '',
+			mnResult	: '',
+			mnStatus	: '',
+			clntPjt		: '',
+			clntCd		: '',
+			userId   	: $('#userId').val(),
+			pgmId    	: $('#pgmId').val()
+		};
+		postAjax('/user/pm/pm10/pm10_d03_insert', paramObj, null, function(data) {
+			if (data.resultCode === 200) {
+				detailInserted[mapKey] = true;
+			} else {
+				alert('등록 실패: ' + data.resultMessage);
+			}
+			mnGridView.setData(0);
+		});
+	}
+
+	function pm10_d03_update(item, colKey, value) {
+		const deptCode = deptCodeMap[colKey]; 
+		var paramObj = {
+			mnDate   	: $('#mnDate_S').val().replace(/-/g,''),
+			mnSubSeq 	: item.mnSubSeq,
+			mnDeptCd 	: deptCode,
+			mnCnts		: value,
+			mnEtc		: '',
+			mnResult	: '',
+			mnStatus	: '',
+			clntPjt		: '',
+			clntCd		: '',
+			userId   	: $('#userId').val(),
+			pgmId    	: $('#pgmId').val()
+		};
+debugger
+		postAjax('/user/pm/pm10/pm10_d03_update', paramObj, null, function(data) {
+			if (data.resultCode === 200) {
+			} else {
+				alert('수정 실패: ' + data.resultMessage);
+			}
+			mnGridView.setData(0);
+		});
 	}
 	
 	//엑셀다운로드
@@ -321,7 +453,7 @@ var mnGridView = {
  			var todayDate = new Date().format('yyyyMMddHHmmss');
 			excelView.target.exportExcel("공급업체평가_"+todayDate+".xls");
 		});       
-	}  
+	}
 	
  
     function gridResize(size) {
@@ -332,35 +464,13 @@ var mnGridView = {
         mnGridView.target.setHeight(tagHeight);
     }
     
-
-	//공급업체평가표 출력
-	function setReportMulti(_type = "") {
-		if(selectGridValidationM(mnGridView.target)) return false;
-		var selDataList = mnGridView.target.getList("selected");
-	    
-		var fileName = "PM1002R01.jrf";
-		var arg =  
-			  "coCd#"		+  $('#coCd_S').val()
-		    + "#clntCd#"	+  selDataList.map(item => item.pchsClntCd).join(",") 
-	    	+ "#year#"		+  $('#trgYear_S').val()
-	    	+ "#";                 
-	
-		if (_type == '' || _type == undefined ) {
-			callReport(fileName, arg, 1150, 720, '공급업체평가표');
-		} else { //Export 작업
-			ubiExportAjax(fileName, arg, function(response) {
-				if (response.resultCode === 200) {
-					var base64FileData = response.base64FileData;
-					var fileName = response.exportFileName;
-					downloadPDFFromBase64(base64FileData, fileName);
-				} else {
-					alert('PDF 내보내기 실패: ' + response.resultText);
-				}
-	
-			});
-		}
-	
-	}    
+	// 일자 기준 주차 변환 함수
+	function dateToWeek() {
+		const dateStr = $('#mnDate_S').val();      // "2025-05-20"
+		if (!dateStr) return;
+		const week = moment(dateStr, 'YYYY-MM-DD').isoWeek();
+		$('#mnWeeks_S').val(week);
+	}
 
     
 </script>

@@ -55,7 +55,7 @@
 					    MAX(CASE WHEN D3.MN_DEPT_CD = 'GUN80' THEN D3.MN_RESULT END) AS GUN80_MN_RESULT
 				FROM TB_PM10M01 T
 							LEFT OUTER JOIN TB_PM10D01 D1 ON D1.MN_DATE = T.MN_DATE
-							LEFT OUTER JOIN TB_PM10D02 D2 ON D2.MN_DATE = T.MN_DATE
+							<!-- LEFT OUTER JOIN TB_PM10D02 D2 ON D2.MN_DATE = T.MN_DATE -->
 							LEFT OUTER JOIN TB_PM10D03 D3 ON D3.MN_DATE = T.MN_DATE AND D3.MN_SUB_SEQ = D1.MN_SUB_SEQ
 				WHERE 1 = 1
 		        <if test="mnDate !=null and !mnDate.equals('')">
@@ -68,5 +68,174 @@
 				ORDER BY T.MN_DATE, D1.MN_SUB_SEQ, D1.MN_SUBJECT
 		       ) AS A
     </select>
+
+	<insert id="pm10_main_insert" parameterType="Map">
+		INSERT INTO TB_PM10M01
+			(
+				  MN_DATE
+				, MN_WEEKS
+				, MN_RMK
+				, CREAT_ID
+				, CREAT_DTTM
+				, CREAT_PGM
+			)
+		VALUES
+			(
+				  #{mnDate}
+				, #{mnWeeks}
+				, #{mnRmk,  jdbcType=VARCHAR}
+				, #{userId}
+				, SYSDATE
+				, #{pgmId}
+			)
+	</insert>
+
+	<insert id="pm10_d01_insert" parameterType="Map">
+		<selectKey keyProperty="mnSubSeq" resultType="int" order="BEFORE">
+			SELECT NVL(MAX(MN_SUB_SEQ), 0) + 1
+			FROM   TB_PM10D01
+			WHERE  MN_DATE = #{mnDate}
+		</selectKey>
+		INSERT INTO TB_PM10D01
+			(
+				  MN_DATE
+				, MN_SUB_SEQ
+				, MN_SORT_NO
+				, MN_SUBJECT
+				, CLNT_PJT
+				, CLNT_CD
+				, ORDRS_NO
+				, CREAT_ID
+				, CREAT_DTTM
+				, CREAT_PGM
+			)
+		VALUES
+			(
+				  #{mnDate}
+				, #{mnSubSeq}
+				, #{mnSubSeq}
+				, #{mnSubject}
+				, #{clntPjt, jdbcType=VARCHAR}
+				, #{clntCd, jdbcType=VARCHAR}
+				, #{ordrsNo, jdbcType=VARCHAR}
+				, #{userId}
+				, SYSDATE
+				, #{pgmId}
+			)
+	</insert>
+
+	<update id="pm10_d01_update" parameterType="Map">
+		UPDATE TB_PM10D01
+		SET
+			  MN_SUBJECT		= #{mnSubject}
+			, CLNT_PJT			= #{clntPjt, jdbcType=VARCHAR}
+			, CLNT_CD			= #{clntCd, jdbcType=VARCHAR}
+			, ORDRS_NO			= #{ordrsNo, jdbcType=VARCHAR}
+			, UDT_ID			= #{userId}
+			, UDT_DTTM			= SYSDATE
+			, UDT_PGM			= #{pgmId}
+		WHERE MN_DATE 		= #{mnDate}
+		  AND MN_SUB_SEQ 	= #{mnSubSeq}
+	</update>
+
+	<insert id="pm10_d03_insert" parameterType="Map">
+		INSERT INTO TB_PM10D03
+			(
+				  MN_DATE
+				, MN_SUB_SEQ
+				, MN_DEPT_CD
+				, MN_CNTS
+				, MN_ETC
+				, MN_RESULT
+				, MN_STATUS
+				, CLNT_PJT
+				, CLNT_CD
+				, CREAT_ID
+				, CREAT_DTTM
+				, CREAT_PGM
+			)
+		VALUES
+			(
+				  #{mnDate}
+				, #{mnSubSeq}
+				, #{mnDeptCd}
+				, #{mnCnts}
+				, #{mnEtc, jdbcType=VARCHAR}
+				, #{mnResult, jdbcType=VARCHAR}
+				, #{mnStatus, jdbcType=VARCHAR}
+				, #{clntPjt, jdbcType=VARCHAR}
+				, #{clntCd, jdbcType=VARCHAR}
+				, #{userId}
+				, SYSDATE
+				, #{pgmId}
+			)
+	</insert>
+
+	<update id="pm10_d03_update" parameterType="Map">
+		UPDATE TB_PM10D03
+		SET
+			  MN_CNTS			= #{mnCnts}
+			, MN_ETC			= #{mnEtc, jdbcType=VARCHAR}
+			, MN_RESULT			= #{mnResult, jdbcType=VARCHAR}
+			, MN_STATUS			= #{mnStatus, jdbcType=VARCHAR}
+			, CLNT_PJT			= #{clntPjt, jdbcType=VARCHAR}
+			, CLNT_CD			= #{clntCd, jdbcType=VARCHAR}
+			, UDT_ID			= #{userId}
+			, UDT_DTTM			= SYSDATE
+			, UDT_PGM			= #{pgmId}
+		WHERE MN_DATE 		= #{mnDate}
+		  AND MN_SUB_SEQ 	= #{mnSubSeq}
+		  AND MN_DEPT_CD	= #{mnDeptCd}
+	</update>
+
+	<insert id="qwewq" parameterType="Map">
+		MERGE INTO TB_CM05M01 A
+			USING DUAL
+			ON (A.CODE_ID = #{codeId})
+		WHEN MATCHED THEN
+			UPDATE SET
+				CODE_NM = #{codeNm},
+				CODE_KIND = #{codeKind},
+				CODE_DESC = #{codeDesc},
+				CODE_RPRC = #{codeRprc},
+				CODE_ETC  = #{codeEtc},
+				SORT_NO = #{sortNo},
+				USE_YN = #{useYn},
+				UDT_ID = #{userId},
+				UDT_PGM = #{pgmId},
+				UDT_DTTM = SYSDATE,
+				DZ_CODE = #{dzCode, jdbcType=VARCHAR}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+			CODE_ID,
+			CODE_NM,
+			CODE_KIND,
+			CODE_DESC,
+			CODE_RPRC,
+			CODE_ETC,
+			SORT_NO,
+			USE_YN,
+			CREAT_ID,
+			CREAT_PGM,
+			CREAT_DTTM,
+			DZ_CODE
+		)
+		VALUES(
+			#{codeId},
+			#{codeNm},
+			#{codeKind},
+			#{codeDesc},
+			#{codeRprc},
+			#{codeEtc},
+			#{sortNo},
+			#{useYn},
+			#{userId},
+			#{pgmId},
+			SYSDATE,
+			LTRIM(#{dzCode, jdbcType=VARCHAR})
+		)
+	</insert>
+
     
 </mapper>

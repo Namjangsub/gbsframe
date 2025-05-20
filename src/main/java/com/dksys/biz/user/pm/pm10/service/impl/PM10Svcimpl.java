@@ -23,14 +23,51 @@ public class PM10Svcimpl implements PM10Svc {
 	}
 
 	@Override
-	public int updateMn(Map<String, String> param) {
+	public int pm10_main_insert(Map<String, String> param) throws Exception {
+		System.out.println("pm10Mapper = " + pm10Mapper);
+		return pm10Mapper.pm10_main_insert(param);
+	}
+
+	@Override
+	public int pm10_d03_insert(Map<String, String> param) throws Exception {
+		return pm10Mapper.pm10_d03_insert(param);
+	}
+
+	@Override
+	public int pm10_d03_update(Map<String, String> param) throws Exception {
+		return pm10Mapper.pm10_d03_update(param);
+	}
+
+	@Override
+	public int insertMn(Map<String, String> param) throws Exception {
+		return pm10Mapper.insertMn(param);
+	}
+
+	@Override
+	public int updateMn(Map<String, String> param) throws Exception {
 		return pm10Mapper.updateMn(param);
 	}
 
 	@Override
-	public int deleteMn(Map<String, String> paramMap) {
+	public int deleteMn(Map<String, String> paramMap) throws Exception {
 		return pm10Mapper.deleteMn(paramMap);
 	}
+
+	@Override
+	public int pm10_d01_insert(Map<String, String> param) throws Exception {
+		return pm10Mapper.pm10_d01_insert(param);
+	}
+
+	@Override
+	public int pm10_d01_update(Map<String, String> param) throws Exception {
+		return pm10Mapper.pm10_d01_update(param);
+	}
+
+	
+
+	
+
+	
 
   
 }
