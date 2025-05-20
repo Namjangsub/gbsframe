@@ -341,6 +341,11 @@
     var kakaoCnt = 0;
 	var kakaoErr = [];
 
+	// 코칭 수정 변수
+	var originMeasRst = null;	// 기존 원인 값
+	var originResltRst = null;	// 기존 결과/근본대책 값
+	let kakaoDiff = null;		// 변경된 원인, 결과 값 알림 메세지 삽입 변수
+
 
 	// 크기 조절할 textarea ID 리스트
 	const textAreas = [
@@ -902,7 +907,7 @@
 		
 		// 결재시 수정하면 change 이벤트 적용
 		$(currDivId + ' #resltRst, ' + currDivId + ' #measRst').on('input paste drop change', function() {
-			if ($(currDivId + ' #commentBtn').length === 0) {
+			if ($(currDivId + ' #commentBtn').length === 0 && (actionType == 'S' || actionType == 'T')) {
 				const callCmdBtn = '<button id="commentBtn">코칭수정</button>';
 				$('.popup_bottom_btn').first().prepend(callCmdBtn);
 				$(currDivId + ' #commentBtn').on("click", function() { updateQualityResultComment('결과수정'); });
@@ -1285,7 +1290,10 @@
 				 //조회나, 결재일경우에는   기타 입력 방지
 				 $(currFormId + ' #etcInput').removeAttr('required').closest('td').prev('th').removeClass('hit');
 			}
-	    	  
+
+			originMeasRst = data.result.measRst;	// 원인
+			originResltRst = data.result.resltRst;	// 결과
+
 			// 각 텍스트 에리어 크기 조절
 			txtareaHeightResize($(currFormId + ' #actCompDgnFileNm'));
 			txtareaHeightResize($(currFormId + ' #measRst'));
@@ -1376,7 +1384,43 @@
 		var formData = makeFormData();
 		filePostAjax("/user/qm/qm01/updateQualityResultComment", formData,function(data) {
 			if (data.resultCode == 200) {
-				$(currDivId + ' #commentBtn').remove();
+				$('#qmPopFormRslt #commentBtn').remove();
+				// 카카오톡 메세지 문구 추가 설정
+				// 원인
+				const newMeasRaw = formData.get("measRst");
+				const originMeasRaw = originMeasRst;
+				const newMeasClean    = newMeasRaw.replace(/\r\n/g, "\n");
+				const originMeasClean = originMeasRaw.replace(/\r\n/g, "\n");
+
+				let diffMeas = "";
+				if (newMeasClean.startsWith(originMeasClean)) {
+					diffMeas = newMeasClean.slice(originMeasClean.length);
+				} else if (newMeasClean.includes(originMeasClean)) {
+					diffMeas = newMeasClean.split(originMeasClean)[1];
+				}
+				diffMeas = diffMeas.replace(/^[\r\n]+/, "");
+
+				// 결과/근본대책
+				const newResltRaw    = formData.get("resltRst");
+				const originResltRaw = originResltRst;
+				const newResltClean    = newResltRaw.replace(/\r\n/g, "\n");
+				const originResltClean = originResltRaw.replace(/\r\n/g, "\n");
+
+				let diffReslt = "";
+				if (newResltClean.startsWith(originResltClean)) {
+					diffReslt = newResltClean.slice(originResltClean.length);
+				} else if (newResltClean.includes(originResltClean)) {
+					diffReslt = newResltClean.split(originResltClean)[1];
+				}
+				diffReslt = diffReslt.replace(/^[\r\n]+/, "");
+
+				// 전역 kakaoDiff 설정
+				kakaoDiff = { cause: diffMeas, result: diffReslt };
+
+				// diff가 있으면 카톡 발송
+				if (diffMeas || diffReslt) {
+					kakaoTodo();
+				}
             }
 		});
 	}
@@ -1396,7 +1440,7 @@
 		//1. 조치담당자 결재 자동등록 처리하기
 		//2. 조치담당자 팀장 결재 자동등록 처리하기
 		//3. 이슈 등록자 담당팀장 결재 자동 등록 처리하기
-		selectTeamManagerApprovalAdd();  //($("#issSts").val() == 'ISSSTS03')에달 등록인지 결과인지 판단함
+		// selectTeamManagerApprovalAdd();  //($("#issSts").val() == 'ISSSTS03')에달 등록인지 결과인지 판단함
 
       
       // 폼데이터 생성
@@ -1933,6 +1977,21 @@
          maxMessageId = sendObj.maxMessageId;
          talkMessage = sendObj.messageDesc;
          mobile =  sendObj.telNo;
+debugger;
+		 if (kakaoDiff) {
+			// 변경내용 추가
+			let insertLines = "";
+			if (kakaoDiff.cause)  insertLines += `원인 : ${kakaoDiff.cause}\n`;
+			if (kakaoDiff.result) insertLines += `결과/근본대책 : ${kakaoDiff.result}\n`;
+
+			// 변경된 게 있으면 “요청업무” 바로 아래에 삽입
+			if (insertLines) {
+				talkMessage = talkMessage.replace(
+				/(요청업무\s*:[^\r\n]*)(\r?\n)/,
+				`$1$2${insertLines}`
+				);
+			}
+		 }
          //로그용
          param.rcvId = sendObj.todoId;         //todo 수신id
          param.rcvNm = sendObj.name;            //todo 수신자명

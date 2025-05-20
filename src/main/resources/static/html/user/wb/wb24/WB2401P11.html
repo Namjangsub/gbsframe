@@ -402,6 +402,11 @@
     const currDivId = "#wbsPopupIss";		//현재화면의 Form ID,  poup 화면을 중복으로 Call 할시 필드명 중복으로 구분 안됨
     var rowData = {};
 
+	// 코칭 수정 변수
+	var originActCnts = null;	// 기존 원인 값
+	var originMeasRst = null;	// 기존 결과/근본대책 값
+	let kakaoDiff = null;		// 변경된 원인, 결과 값 알림 메세지 삽입 변수
+
 	// 크기 조절할 textarea ID 리스트
 	const textAreas = [
 	    '#issCnts', 			// 내용
@@ -899,7 +904,7 @@
 
 		// 결재시 수정하면 change 이벤트 적용
 		$(currFormId + ' #measRst, ' + currFormId + ' #actCnts').on('input paste drop change', function() {
-			if ($(currDivId + ' #commentBtn').length === 0) {
+			if ($(currDivId + ' #commentBtn').length === 0 && actionType == 'I') {
 				const callCmdBtn = '<button id="commentBtn">코칭수정</button>';
 				$(currDivId + ' .popup_bottom_btn').first().prepend(callCmdBtn);
 				$(currDivId + ' #commentBtn').on("click", function() { updateIssueComment('결과수정'); });
@@ -932,7 +937,44 @@
         filePostAjax("/user/wb/wb24/updateIssueComment", formData, function(data) {
 			if (data.resultCode == 200) {
 				$(currDivId + ' #commentBtn').remove();
-	           }
+
+				// 카카오톡 메세지 문구 추가 설정
+				// 원인
+				const newMeasRaw = formData.get("measRst");
+				const originMeasRaw = originMeasRst;
+				const newMeasClean    = newMeasRaw.replace(/\r\n/g, "\n");
+				const originMeasClean = originMeasRaw.replace(/\r\n/g, "\n");
+
+				let diffMeas = "";
+				if (newMeasClean.startsWith(originMeasClean)) {
+					diffMeas = newMeasClean.slice(originMeasClean.length);
+				} else if (newMeasClean.includes(originMeasClean)) {
+					diffMeas = newMeasClean.split(originMeasClean)[1];
+				}
+				diffMeas = diffMeas.replace(/^[\r\n]+/, "");
+
+				// 결과/근본대책
+				const newActRaw    = formData.get("actCnts");
+				const originActRaw = originActCnts;
+				const newActClean    = newActRaw.replace(/\r\n/g, "\n");
+				const originActClean = originActRaw.replace(/\r\n/g, "\n");
+
+				let diffAct = "";
+				if (newActClean.startsWith(originActClean)) {
+					diffAct = newActClean.slice(originActClean.length);
+				} else if (newActClean.includes(originActClean)) {
+					diffAct = newActClean.split(originActClean)[1];
+				}
+				diffAct = diffAct.replace(/^[\r\n]+/, "");
+
+				// 전역 kakaoDiff 설정
+				kakaoDiff = { cause: diffMeas, result: diffAct };
+
+				// diff가 있으면 카톡 발송
+				if (diffMeas || diffAct) {
+					kakaoTodo();
+				}
+			}
 		});
 	}
 				
@@ -1481,6 +1523,10 @@
 	  				}
 
 				});
+
+				originMeasRst = data.result.measRst;	// 원인
+				originActCnts =  data.result.actCnts;	// 결과
+
 	            //결재카운트 기준 문제정보 입력 제어
 	            if (data.result.appCnt == "0" || data.result.appCnt == undefined) {
 	                approval_Yn = 'N';
@@ -1728,6 +1774,21 @@
             maxMessageId = sendObj.maxMessageId;
             talkMessage = sendObj.messageDesc;
             mobile =  sendObj.telNo;
+
+			if (kakaoDiff) {
+				// 변경내용 추가
+				let insertLines = "";
+				if (kakaoDiff.cause)  insertLines += `원인 : ${kakaoDiff.cause}\n`;
+				if (kakaoDiff.result) insertLines += `결과/근본대책 : ${kakaoDiff.result}\n`;
+
+				// 변경된 게 있으면 “요청업무” 바로 아래에 삽입
+				if (insertLines) {
+					talkMessage = talkMessage.replace(
+					/(요청업무\s*:[^\r\n]*)(\r?\n)/,
+					`$1$2${insertLines}`
+					);
+				}
+			}
 
             //로그용
             param.rcvId = sendObj.todoId; //todo 수신id
