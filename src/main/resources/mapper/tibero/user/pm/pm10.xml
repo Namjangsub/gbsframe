@@ -8,9 +8,9 @@
 		     , A.*
 		FROM   (
 				SELECT
-					    T.MN_DATE,
-					    MAX(T.MN_WEEKS)              AS MN_WEEKS,
-					    MAX(T.MN_RMK)                AS MN_RMK,
+					    TO_CHAR(T.MN_DATE, 'YYYY-MM-DD') 	AS MN_DATE,
+					    MAX(T.MN_WEEKS)              		AS MN_WEEKS,
+					    MAX(T.MN_RMK)                		AS MN_RMK,
 					    D1.MN_SUB_SEQ,
 					    D1.MN_SUBJECT,
 					
@@ -52,7 +52,11 @@
 					    -- GUN80: 전산실
 					    MAX(CASE WHEN D3.MN_DEPT_CD = 'GUN80' THEN D3.MN_CNTS   END) AS GUN80_MN_CNTS,
 					    MAX(CASE WHEN D3.MN_DEPT_CD = 'GUN80' THEN D3.MN_ETC    END) AS GUN80_MN_ETC,
-					    MAX(CASE WHEN D3.MN_DEPT_CD = 'GUN80' THEN D3.MN_RESULT END) AS GUN80_MN_RESULT
+					    MAX(CASE WHEN D3.MN_DEPT_CD = 'GUN80' THEN D3.MN_RESULT END) AS GUN80_MN_RESULT,
+					    D1.MN_SORT_NO,
+					    MAX(D1.MN_ETC_ALL) 	AS MN_ETC_ALL,
+					    MAX(D1.MN_STATUS)	AS MN_STATUS,
+					    MAX(T.MN_WEEKS)	AS MN_WEEKS
 				FROM TB_PM10M01 T
 							LEFT OUTER JOIN TB_PM10D01 D1 ON D1.MN_DATE = T.MN_DATE
 							<!-- LEFT OUTER JOIN TB_PM10D02 D2 ON D2.MN_DATE = T.MN_DATE -->
@@ -64,83 +68,119 @@
 		        <if test="mnDeptCd !=null and !mnDeptCd.equals('')">
 		        AND D3.MN_DEPT_CD = #{mnDeptCd}
 		        </if>
-				GROUP BY T.MN_DATE, D1.MN_SUB_SEQ, D1.MN_SUBJECT
-				ORDER BY T.MN_DATE, D1.MN_SUB_SEQ, D1.MN_SUBJECT
+				GROUP BY T.MN_DATE, D1.MN_SORT_NO, D1.MN_SUBJECT, D1.MN_SUB_SEQ
+				ORDER BY T.MN_DATE, D1.MN_SORT_NO, D1.MN_SUBJECT, D1.MN_SUB_SEQ
 		       ) AS A
     </select>
 
-	<insert id="pm10_main_insert" parameterType="Map">
-		INSERT INTO TB_PM10M01
-			(
+	<update id="pm10_main_update" parameterType="Map">
+		MERGE INTO TB_PM10M01 A
+			USING DUAL
+			ON (
+					MN_DATE 	= #{mnDate}
+			   )
+		WHEN MATCHED THEN
+			UPDATE SET
+					  MN_WEEKS			= #{mnWeeks}
+					, MN_RMK			= #{mnRmk,  jdbcType=VARCHAR}
+					, UDT_ID			= #{userId}
+					, UDT_DTTM			= SYSDATE
+					, UDT_PGM			= #{pgmId}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
 				  MN_DATE
 				, MN_WEEKS
 				, MN_RMK
 				, CREAT_ID
 				, CREAT_DTTM
 				, CREAT_PGM
-			)
-		VALUES
-			(
+		)
+		VALUES(
 				  #{mnDate}
 				, #{mnWeeks}
 				, #{mnRmk,  jdbcType=VARCHAR}
 				, #{userId}
 				, SYSDATE
 				, #{pgmId}
-			)
-	</insert>
+		)
+	</update>
 
-	<insert id="pm10_d01_insert" parameterType="Map">
-		<selectKey keyProperty="mnSubSeq" resultType="int" order="BEFORE">
-			SELECT NVL(MAX(MN_SUB_SEQ), 0) + 1
-			FROM   TB_PM10D01
-			WHERE  MN_DATE = #{mnDate}
-		</selectKey>
-		INSERT INTO TB_PM10D01
-			(
+	<update id="pm10_d01_update" parameterType="Map">
+		MERGE INTO TB_PM10D01 A
+			USING DUAL
+			ON (
+					MN_DATE 	= #{mnDate}
+				AND MN_SUB_SEQ 	= #{mnSubSeq}
+			   )
+		WHEN MATCHED THEN
+			UPDATE SET
+					  MN_SORT_NO        = #{mnSortNo}                   
+					, MN_SUBJECT        = #{mnSubject}                  
+					, CLNT_PJT          = #{clntPjt, jdbcType=VARCHAR}  
+					, CLNT_CD           = #{clntCd, jdbcType=VARCHAR}   
+					, ORDRS_NO          = #{ordrsNo, jdbcType=VARCHAR}  
+					, MN_ETC_ALL        = #{mnEtcAll, jdbcType=VARCHAR}  
+					, MN_STATUS         = #{mnStatus, jdbcType=VARCHAR}  
+					, UDT_ID			= #{userId}
+					, UDT_DTTM			= SYSDATE
+					, UDT_PGM			= #{pgmId}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
 				  MN_DATE
 				, MN_SUB_SEQ
 				, MN_SORT_NO
 				, MN_SUBJECT
 				, CLNT_PJT
 				, CLNT_CD
+				, MN_ETC_ALL
+				, MN_STATUS
 				, ORDRS_NO
 				, CREAT_ID
 				, CREAT_DTTM
 				, CREAT_PGM
-			)
-		VALUES
-			(
+		)
+		VALUES(
 				  #{mnDate}
-				, #{mnSubSeq}
-				, #{mnSubSeq}
+				, (SELECT NVL(MAX(MN_SUB_SEQ), 0) + 1 FROM   TB_PM10D01 WHERE  MN_DATE = #{mnDate})
+				, #{mnSortNo}
 				, #{mnSubject}
 				, #{clntPjt, jdbcType=VARCHAR}
 				, #{clntCd, jdbcType=VARCHAR}
 				, #{ordrsNo, jdbcType=VARCHAR}
+				, #{mnEtcAll, jdbcType=VARCHAR}
+				, #{mnStatus, jdbcType=VARCHAR}
 				, #{userId}
 				, SYSDATE
 				, #{pgmId}
-			)
-	</insert>
-
-	<update id="pm10_d01_update" parameterType="Map">
-		UPDATE TB_PM10D01
-		SET
-			  MN_SUBJECT		= #{mnSubject}
-			, CLNT_PJT			= #{clntPjt, jdbcType=VARCHAR}
-			, CLNT_CD			= #{clntCd, jdbcType=VARCHAR}
-			, ORDRS_NO			= #{ordrsNo, jdbcType=VARCHAR}
-			, UDT_ID			= #{userId}
-			, UDT_DTTM			= SYSDATE
-			, UDT_PGM			= #{pgmId}
-		WHERE MN_DATE 		= #{mnDate}
-		  AND MN_SUB_SEQ 	= #{mnSubSeq}
+		)
 	</update>
 
-	<insert id="pm10_d03_insert" parameterType="Map">
-		INSERT INTO TB_PM10D03
-			(
+
+
+	<update id="pm10_d03_update" parameterType="Map">
+		MERGE INTO TB_PM10D03 A
+			USING DUAL
+			ON (
+					MN_DATE 	= #{mnDate}
+				AND MN_SUB_SEQ 	= #{mnSubSeq}
+		 		AND MN_DEPT_CD	= #{mnDeptCd}
+			   )
+		WHEN MATCHED THEN
+			UPDATE SET
+					  MN_CNTS			= #{mnCnts}
+					, MN_ETC			= #{mnEtc, jdbcType=VARCHAR}
+					, MN_RESULT			= #{mnResult, jdbcType=VARCHAR}
+					, MN_STATUS			= #{mnStatus, jdbcType=VARCHAR}
+					, CLNT_PJT			= #{clntPjt, jdbcType=VARCHAR}
+					, CLNT_CD			= #{clntCd, jdbcType=VARCHAR}
+					, UDT_ID			= #{userId}
+					, UDT_DTTM			= SYSDATE
+					, UDT_PGM			= #{pgmId}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
 				  MN_DATE
 				, MN_SUB_SEQ
 				, MN_DEPT_CD
@@ -153,9 +193,8 @@
 				, CREAT_ID
 				, CREAT_DTTM
 				, CREAT_PGM
-			)
-		VALUES
-			(
+		)
+		VALUES(
 				  #{mnDate}
 				, #{mnSubSeq}
 				, #{mnDeptCd}
@@ -168,74 +207,28 @@
 				, #{userId}
 				, SYSDATE
 				, #{pgmId}
-			)
-	</insert>
-
-	<update id="pm10_d03_update" parameterType="Map">
-		UPDATE TB_PM10D03
-		SET
-			  MN_CNTS			= #{mnCnts}
-			, MN_ETC			= #{mnEtc, jdbcType=VARCHAR}
-			, MN_RESULT			= #{mnResult, jdbcType=VARCHAR}
-			, MN_STATUS			= #{mnStatus, jdbcType=VARCHAR}
-			, CLNT_PJT			= #{clntPjt, jdbcType=VARCHAR}
-			, CLNT_CD			= #{clntCd, jdbcType=VARCHAR}
-			, UDT_ID			= #{userId}
-			, UDT_DTTM			= SYSDATE
-			, UDT_PGM			= #{pgmId}
-		WHERE MN_DATE 		= #{mnDate}
-		  AND MN_SUB_SEQ 	= #{mnSubSeq}
-		  AND MN_DEPT_CD	= #{mnDeptCd}
+		)
 	</update>
 
-	<insert id="qwewq" parameterType="Map">
-		MERGE INTO TB_CM05M01 A
-			USING DUAL
-			ON (A.CODE_ID = #{codeId})
-		WHEN MATCHED THEN
-			UPDATE SET
-				CODE_NM = #{codeNm},
-				CODE_KIND = #{codeKind},
-				CODE_DESC = #{codeDesc},
-				CODE_RPRC = #{codeRprc},
-				CODE_ETC  = #{codeEtc},
-				SORT_NO = #{sortNo},
-				USE_YN = #{useYn},
-				UDT_ID = #{userId},
-				UDT_PGM = #{pgmId},
-				UDT_DTTM = SYSDATE,
-				DZ_CODE = #{dzCode, jdbcType=VARCHAR}
-		WHEN NOT MATCHED THEN
-		INSERT
-		(
-			CODE_ID,
-			CODE_NM,
-			CODE_KIND,
-			CODE_DESC,
-			CODE_RPRC,
-			CODE_ETC,
-			SORT_NO,
-			USE_YN,
-			CREAT_ID,
-			CREAT_PGM,
-			CREAT_DTTM,
-			DZ_CODE
-		)
-		VALUES(
-			#{codeId},
-			#{codeNm},
-			#{codeKind},
-			#{codeDesc},
-			#{codeRprc},
-			#{codeEtc},
-			#{sortNo},
-			#{useYn},
-			#{userId},
-			#{pgmId},
-			SYSDATE,
-			LTRIM(#{dzCode, jdbcType=VARCHAR})
-		)
-	</insert>
+<!-- 	M01 : 회의 날자 Record 삭제 -->
+	<delete id="deleteMnM01"  parameterType="Map">
+		DELETE FROM TB_PM10M01
+		WHERE NOT EXISTS (SELECT 1 FROM tb_pm10D01 WHERE MN_DATE = #{mnDate}) 
+	</delete>
 
+<!-- 	D01 : 회의 주제 Record 삭제 -->
+	<delete id="deleteMnD01"  parameterType="Map">
+		DELETE FROM TB_PM10D01
+		 WHERE MN_DATE     = #{mnDate}
+		   AND MN_SUB_SEQ  = #{mnSubSeq}
+	</delete>
+    
+<!-- 	D03 : 팀별 세부내용 삭제 -->
+	<delete id="deleteMnD03"  parameterType="Map">
+		DELETE FROM TB_PM10D03
+		 WHERE MN_DATE		= #{mnDate}
+		   AND MN_SUB_SEQ	= #{mnSubSeq}
+	</delete>
+    
     
 </mapper>

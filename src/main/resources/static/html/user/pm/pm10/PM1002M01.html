@@ -15,6 +15,7 @@
 	<link rel="stylesheet" href="/static/css/ax5/ax5mask.css">
 	<link rel="stylesheet" href="/static/css/ax5/ax5modal.css">
 	<link rel="stylesheet" href="/static/css/ax5/ax5toast.css">
+	<link rel="stylesheet" href="/static/css/ax5/ax5select.css">
 	<link rel="stylesheet" href="/static/css/jstree/style.min.css">
 	<link rel="stylesheet" href="/static/css/gnb.css">
 	<link rel="stylesheet" href="/static/css/main.css">
@@ -34,6 +35,7 @@
 	<script src="/static/js/ax5/ax5modal.min.js"></script>
 	<script src="/static/js/ax5/ax5toast.min.js"></script>
 	<script src="/static/js/ax5/ax5formatter.min.js"></script>
+	<script src="/static/js/ax5/ax5select.min.js"></script>
 	<script src="/static/js/jstree/jstree.min.js"></script>
 	<script src="/static/js/global.js"></script>
 	<script src="/static/js/fileTree.js"></script>
@@ -100,8 +102,8 @@
 				<span  style="height: 30px; line-height: 30px;font-size: 15px;">임팀장 주간회의 자료</span>
 				<div class="add_btn_small pdl10">
 					<!-- <a onclick="insertMn();" style="height: 30px; line-height: 28px;">저장</a> -->
-					<a onclick="addRow();" style="height: 30px; line-height: 28px;">+</a>
-					<a onclick="deleteMn();" style="height: 30px; line-height: 28px;">-</a>
+					<a id="addRow" style="height: 30px; line-height: 28px;">+</a>
+					<a id="deleteRow" style="height: 30px; line-height: 28px;">-</a>
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 			    </div>
 			</div>
@@ -117,14 +119,18 @@
 
 <script type="text/javascript">
 
-var existData = false;
-
 const detailInserted = {};
 
 //formatter 공통 함수
 function valueFormatter() {
 	return (this.value) ? '<span style="display: block; white-space: pre;">' + this.value + '</span>' : '';
 }
+
+const mnStatusCode = [
+	{'CD' : '', 'NM' : ''},
+	{'CD' : 'N', 'NM' : '진행'},
+	{'CD' : 'Y', 'NM' : '완료'}
+]
 
 // 부서 코드 매핑
 const deptCodeMap = {
@@ -155,22 +161,16 @@ var mnGridView = {
 			onDBLClick: function () {
 			},
 			onDataChanged: function(){
-				const colKey = this.key;
-				if (!colKey || colKey === 'mnSubject') return;
-				const item   = this.item;
-				const subSeq = item.mnSubSeq;
-				if (!subSeq) return alert('먼저 주제를 입력해주세요.');
+// 				const subSeq = this.item.mnSubSeq;
+// 				if (!subSeq) alert('먼저 주제를 입력해주세요.');
 
-				const deptCd = deptCodeMap[colKey];
-				const mapKey = subSeq + '_' + deptCd;
-debugger;
-				if (!detailInserted[mapKey]) {
-					// INSERT
-					pm10_d03_insert(item, colKey, this.value);
-				} else {
-					// UPDATE
-					pm10_d03_update(item, colKey, this.value);
+				
+				if (this.key === 'mnSubject' || this.key === 'mnStatus' || this.key === 'mnEtcAll') {	//주제 테이블 변경자료
+					pm10_d01_update(this.item, this.key, this.value); 
+				} else {										
+					pm10_d03_update(this.item, this.key, this.value);
 				}
+
 			}
 		},
         page: {
@@ -200,16 +200,24 @@ debugger;
 					},
 					{ key: "gun10MnCnts", 	label: "경영지원팀<br>총무/인사/제조혁신", 	align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
 					{ key: "gun80MnCnts", 	label: "전산실", 				align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
-					{ key: "mnStatus", 		label: "진행/완료", 			align: "left", width: 70 },
-					{ key: "mnEtcAll", 		label: "특이사항", 				align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter }
+					{ key: "mnStatus", 		label: "진행/완료", 			align: "left", width: 70, 
+						editor: {
+							type: 'select', config: {
+								columnKeys: { optionValue: 'CD', optionText: 'NM' },
+								options : mnStatusCode
+							}
+						},
+						formatter : function() {
+							return getComboName(mnStatusCode, this)
+						}
+					},
+					{ key: "mnEtcAll", 		label: "특이사항", 			align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+					{ key: "mnSortNo", 		label: "정렬순서", 			align: "center", width: 80 },
+					{ key: "mnWeeks", 		label: "주차", 				align: "center", width: 80 },
 				]
 		});
 		return this;
 	},	
-	addRow: function() {
-		// 빈 로우 추가
-		this.target.addRow({}, "last")
-	},
 	setData: function(_pageNo) {
 			var targetObj = this.target;
 			var paramObj = {};
@@ -231,8 +239,6 @@ debugger;
 								totalElements : list.length,
 							} 
 					});
-					if (list != '' || list == undefined) existData = true;
-					
 
 				} catch (error) {
 					alert("오류 발생!! 전산실 연락 바랍니다", error.message);
@@ -278,9 +284,8 @@ debugger;
 		mainDefaultLoad("사업계획", "임팀장주간회의록");
 		setCommonSelect($("#main_area select[data-kind]"));
 
-		$("#userI").val(jwt.userId);
+		$("#userId").val(jwt.userId);
 		$("#deptId").val(jwt.deptId);
-		$("#userI").val(jwt.userId)
 		
 		$.dayInit = function() {
 			// 종료일 (현재날짜의 월 말일)
@@ -293,29 +298,103 @@ debugger;
 					return date.getDay() === 5;
 				}
 			}).datepicker("setDate", moment().day(5).toDate());
-			
+
+			dateToWeek();	// 주차 계산
 		}
 
-		// 회의일자 변경 시 주차 계산
-		$('#mnDate_S').on('change', dateToWeek);
-
-		dateToWeek();	// 주차 계산
 	
 		// 접속자 회사 set
 		$("#coCd_S").val(jwt.coCd);
 		$("#userId").val(jwt.userId);
 		$.dayInit();
 		
+
+	    $("#addRow").on("click", function () {
+	    	insertMn();
+	    });
+
+	    $("#deleteRow").on("click", function () {
+	    	deleteMn();
+	    });
+		
 		mnGridView.initView().setData(0);
 		excelView.initView();
+		
+
+		// 회의일자 변경 시 주차 계산
+		$('#mnDate_S').on('change', function (){
+			dateToWeek();
+			mnGridView.setData(0);
+		});
+
+		
 		//권한체크
 // 		authChk();	
 			
 	});
 
+	
+	
+	function insertMn() {
+        var rows = mnGridView.target.list;
+        
+        // rnum의 최대값 구하기
+        const maxRnum = gPasIntChk(Math.max(...rows.map(item => item.rnum))) + 1;
+        //하나라도 등록되어 있으면 마지막 자료를 복사하고
+        //없으면 초기화
+        var newRowData ={};
+        if (rows.length > 0) {
+        	newRowData = JSON.parse(JSON.stringify(rows[rows.length - 1])); //깊은 복사로 변경처리됨 (그냥 대입은 레퍼러스 형태임)
+        	newRowData.mnSubSeq = maxRnum;
+        	newRowData.rnum = maxRnum;
+        	newRowData.mnWeeks = $("#mnWeeks_S").val();
+        	newRowData.mnStatus = "";
+        	newRowData.mnEtcAll = "";
+        	newRowData.__original_index= rows.length;
+        	newRowData.__index= rows.length;
+        } else {
+			newRowData = 
+					{
+					    rnum: rows.length+1,
+					    mnDate: $("#mnDate_S").val(),
+					    mnWeeks: $('#mnWeeks_S').val(),
+					    mnSubSeq: maxRnum,			//마지막 등록값에서 +1을 함.
+					    mnSubject: "",
+					    gun00MnCnts: "",
+					    gun60MnCnts: "",
+					    gun30MnCnts: "",
+					    gun40MnCnts: "",
+					    trn5010MnCnts: "",
+					    trn5020MnCnts: "",
+					    gun10MnCnts: "",
+					    gun80MnCnts: "",
+					    mnStatus: "",
+					    mnEtcAll: "",
+					    __original_index: rows.length,
+					    __index: rows.length,
+					};
+    	}
+		mnGridView.target.addRow(newRowData, rows.length);
+	}
+	
 	// 삭제
 	function deleteMn() {
-		postAjax("/user/pm/pm10/updateMn", formData, function(data) {
+		console.log(mnGridView.target.getList("selected"));
+		const rows = mnGridView.target.getList("selected")[0];
+		if (rows.length = 0){
+			alert("삭제할 주제를 선택하세요!");
+			return false;
+		}
+		
+// 		if (rows.전체 컬럼의 값이 있으면 삭제여부 확인할것]) {
+// 			alert("자료가 등록된 상태입니다. 삭제 할까요?");
+// 			return false;
+// 		}
+		var formData = {
+				mnDate 		: rows.mnDate,
+				mnSubSeq 	: rows.mnSubSeq
+		} 
+		postAjax("/user/pm/pm10/deleteMn", formData, null, function(data) {
 			if (data.resultCode == 200) {
 				mnGridView.setData();
 			}
@@ -323,96 +402,40 @@ debugger;
 	}
 
 	
-
-	// 행 추가
-	function addRow() {
-		if (existData) {
-			mnGridView.addRow();
-		} else {
-			var paramObj = {
-				"mnDate" 	: $('#mnDate_S').val().replace(/-/g,''),
-				"mnWeeks" 	: $('#mnWeeks_S').val(),
-				"mnRmk" 	: '',
-				"userId"  	: $('#userId').val(),
-				"pgmId"		: $('#pgmId').val() 
-			}
-			postAjax("/user/pm/pm10/pm10_main_insert", paramObj, null, function(data) {
-				if (data.resultCode == 200) {
-					mnGridView.addRow();
-					mnGridView.setData();
-				} else {
-					alert('헤더 저장 실패: ' + data.resultMessage);
-				}
-			});
-		}
-	}
-
-	function pm10_d01_insert(item) {
+	//회의 주제 Insert, Update
+	function pm10_d01_update(item, colKey, value) {
+		const rows = mnGridView.target.list;
+		item[colKey] = value;
 		var paramObj = {
-				mnDate   : $('#mnDate_S').val().replace(/-/g,''),
-				mnSubject: item.mnSubject,
-				userId   : $('#userId').val(),
-				pgmId    : $('#pgmId').val()
-		};
-		postAjax('/user/pm/pm10/pm10_d01_insert', paramObj, null, function(data) {
-			if (data.resultCode === 200) {
-			} else {
-				alert('등록 실패: ' + data.resultMessage);
-			}
-			mnGridView.setData(0);
-		});
-	}
-
-	function pm10_d01_update(item) {
-		var paramObj = {
-				mnDate   : $('#mnDate_S').val().replace(/-/g,''),
+				mnDate   : $('#mnDate_S').val(),
+			    mnWeeks	 : $('#mnWeeks_S').val(),
 				mnSubSeq : item.mnSubSeq,
 				mnSubject: item.mnSubject,
+				mnSortNo : item.mnSortNo,
+				mnEtcAll : item.mnEtcAll,
+				mnStatus : item.mnStatus,
+				mnSortNo : gPasIntChk(Math.max(...rows.map(item => item.rnum))) + 1,
 				userId   : $('#userId').val(),
 				pgmId    : $('#pgmId').val()
 		};
 		postAjax('/user/pm/pm10/pm10_d01_update', paramObj, null, function(data) {
 			if (data.resultCode == 200) {
+// 				mnGridView.setData();
 			} else {
 				alert('수정 실패: ' + data.resultMessage);
 			}
-			mnGridView.setData(0);
 		});
 	}
 
-	function pm10_d03_insert(item, colKey, value) {
-		const deptCode = deptCodeMap[colKey]; 
-		const mapKey = item.mnSubSeq + '_' + deptCode;
-		
-		var paramObj = {
-			mnDate   	: $('#mnDate_S').val().replace(/-/g,''),
-			mnSubSeq 	: item.mnSubSeq,
-			mnDeptCd 	: deptCode,
-			mnCnts		: value,
-			mnEtc		: '',
-			mnResult	: '',
-			mnStatus	: '',
-			clntPjt		: '',
-			clntCd		: '',
-			userId   	: $('#userId').val(),
-			pgmId    	: $('#pgmId').val()
-		};
-		postAjax('/user/pm/pm10/pm10_d03_insert', paramObj, null, function(data) {
-			if (data.resultCode === 200) {
-				detailInserted[mapKey] = true;
-			} else {
-				alert('등록 실패: ' + data.resultMessage);
-			}
-			mnGridView.setData(0);
-		});
-	}
-
+	//팀별 회의 내용 Insert, Update
 	function pm10_d03_update(item, colKey, value) {
-		const deptCode = deptCodeMap[colKey]; 
 		var paramObj = {
-			mnDate   	: $('#mnDate_S').val().replace(/-/g,''),
+			mnDate   	: $('#mnDate_S').val(),
+		    mnWeeks	 	: $('#mnWeeks_S').val(),
+		    mnSubject 	: item.mnSubject,
 			mnSubSeq 	: item.mnSubSeq,
-			mnDeptCd 	: deptCode,
+			mnSortNo 	: gPasIntChk(item.mnSortNo),
+			mnDeptCd 	: deptCodeMap[colKey],
 			mnCnts		: value,
 			mnEtc		: '',
 			mnResult	: '',
@@ -422,13 +445,11 @@ debugger;
 			userId   	: $('#userId').val(),
 			pgmId    	: $('#pgmId').val()
 		};
-debugger
 		postAjax('/user/pm/pm10/pm10_d03_update', paramObj, null, function(data) {
 			if (data.resultCode === 200) {
 			} else {
 				alert('수정 실패: ' + data.resultMessage);
 			}
-			mnGridView.setData(0);
 		});
 	}
 	
@@ -472,5 +493,16 @@ debugger
 		$('#mnWeeks_S').val(week);
 	}
 
-    
+
+	//Select 선택 코드값 체크하여 명을 출력
+	function getComboName(comboArray, key) {
+		let rtnNm = "";
+		for (const element of comboArray) {
+			if (key.value == element.CD) {
+				rtnNm = element.NM;
+				break;
+			}
+		}
+		return rtnNm;
+	}  
 </script>

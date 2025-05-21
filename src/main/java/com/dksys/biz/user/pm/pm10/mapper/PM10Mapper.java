@@ -10,20 +10,16 @@ public interface PM10Mapper {
 
 	List<Map<String, String>> selectMnList(Map<String, String> paramMap);
 
-	int pm10_main_insert(Map<String, String> param);
-
-	int pm10_d01_insert(Map<String, String> param);
+	int pm10_main_update(Map<String, String> param);
 
 	int pm10_d01_update(Map<String, String> param);
 
-	int pm10_d03_insert(Map<String, String> param);
-
 	int pm10_d03_update(Map<String, String> param);
 
-	int insertMn(Map<String, String> param);
+	int deleteMnM01(Map<String, String> paramMap); // M01 삭제용 SQL 없음.
 
-	int updateMn(Object paramMap);
+	int deleteMnD01(Map<String, String> paramMap);
 
-	int deleteMn(Map<String, String> paramMap);
+	int deleteMnD03(Map<String, String> paramMap);
 
 }
