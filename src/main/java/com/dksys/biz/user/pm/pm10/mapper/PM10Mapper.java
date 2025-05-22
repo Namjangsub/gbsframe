@@ -26,8 +26,6 @@ public interface PM10Mapper {
 
 	int pm10_d01_sortNo_update(Map<String, Object> param);
 
-	int pm10_d02_fix_insert(Map<String, Object> param);
-
 	int pm10_d02_update(Map<String, Object> param);
 
 	int pm10_d02_delete(Map<String, Object> param);

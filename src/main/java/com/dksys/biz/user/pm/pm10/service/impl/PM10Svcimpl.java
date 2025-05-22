@@ -47,7 +47,9 @@ public class PM10Svcimpl implements PM10Svc {
 		// D03 삭제
 		result += pm10Mapper.deleteMnD03(paramMap);
 
-		pm10Mapper.deleteMnM01(paramMap);
+		// if ("해당 날짜에 해당하는 주제 및 내용이 없다면 메인 삭제, 참석자 테이블도 삭제") {
+		// 	pm10Mapper.deleteMnM01(paramMap);
+		// }
 
 		return result;
 	}
@@ -68,20 +70,6 @@ public class PM10Svcimpl implements PM10Svc {
 			dtl.put("userId", paramMap.get("userId"));
 			dtl.put("pgmId",  paramMap.get("pgmId"));
 			result += pm10Mapper.pm10_d01_sortNo_update(dtl);
-		}
-		return result;
-	}
-	
-	@Override
-	public int pm10_d02_fix_insert(Map<String, Object> paramMap) throws Exception {
-		int result = 0;
-		List<Map<String,Object>> attedList = (List<Map<String,Object>>) paramMap.get("attendList");
-		
-		for (Map<String,Object> dtl : attedList) {
-			dtl.put("mnDate", paramMap.get("mnDate"));
-			dtl.put("userId", paramMap.get("userId"));
-			dtl.put("pgmId",  paramMap.get("pgmId"));
-			result += pm10Mapper.pm10_d02_fix_insert(dtl);
 		}
 		return result;
 	}

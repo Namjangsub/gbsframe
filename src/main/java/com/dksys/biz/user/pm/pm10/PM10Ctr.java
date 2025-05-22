@@ -126,24 +126,6 @@ public class PM10Ctr {
 		return "jsonView";
 	}
 
-	// 참석자 고정 맴버 insert
-	@PostMapping("/pm10_d02_fix_insert")
-	public String pm10_d02_fix_insert(@RequestBody Map<String,Object> paramMap, ModelMap model) throws Exception {
-		try {
-			if (pm10Svc.pm10_d02_fix_insert(paramMap) != 0) {
-				model.addAttribute("resultCode", 200);
-				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-			} else {
-				model.addAttribute("resultCode", 500);
-				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-			};
-		} catch(Exception e) {
-			model.addAttribute("resultCode", 900);
-			model.addAttribute("resultMessage", e.getMessage());
-		}
-		return "jsonView";
-	}
-
 	// 참석자 update
 	@PostMapping("/pm10_d02_update")
 	public String pm10_d02_update(@RequestBody Map<String,Object> paramMap, ModelMap model) throws Exception {

@@ -19,8 +19,6 @@ public interface PM10Svc {
 
 	int pm10_d01_sortNo_update(Map<String, Object> paramMap) throws Exception;
 
-	int pm10_d02_fix_insert(Map<String, Object> paramMap) throws Exception;
-
 	int pm10_d02_update(Map<String, Object> paramMap) throws Exception;
 
 	int pm10_d02_delete(Map<String, Object> paramMap) throws Exception;
