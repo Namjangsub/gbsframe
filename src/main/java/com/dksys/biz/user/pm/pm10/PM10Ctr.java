@@ -29,18 +29,12 @@ public class PM10Ctr {
 		
 		List<Map<String, String>> result = pm10Svc.selectMnList(paramMap);
 		model.addAttribute("result", result);
+		// 임팀장회의록 참석자 조회
+		List<Map<String, String>> d02List = pm10Svc.select_p10_d02_List(paramMap);
+		model.addAttribute("d02List", d02List);
 		return "jsonView";
 	}
 
-	// 임팀장회의록 참석자 조회
-	@PostMapping(value = "/select_p10_d02_List")
-	public String select_p10_d02_List(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		
-		List<Map<String, String>> result = pm10Svc.select_p10_d02_List(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-	}
-	
 	// 메인
 	@PostMapping("/pm10_main_update")
 	public String pm10_main_update(@RequestBody Map<String, String> param, ModelMap model) throws Exception {

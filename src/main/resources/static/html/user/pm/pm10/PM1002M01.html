@@ -189,6 +189,7 @@ var mnGridView = {
 	initView: function(){
 	this.target = new ax5.ui.grid();
 	this.target.setConfig({
+        frozenColumnIndex : 1,
 		showRowSelector: false,
 		multipleSelect: false,
 		sortable: false,
@@ -200,9 +201,7 @@ var mnGridView = {
 			selector: false
 		},
 		body: {
-			scrollX: true, 
-			scrollY: true,
-			dynamicRowHeight: true,
+			columnHeight: 50,
 			onClick: function () {
 				this.self.clearSelect();
 				this.self.select(this.dindex);
@@ -210,6 +209,10 @@ var mnGridView = {
 			onDBLClick: function () {
 			},
 			onDataChanged: function(){
+// 				const subSeq = this.item.mnSubSeq;
+// 				if (!subSeq) alert('먼저 주제를 입력해주세요.');
+
+				
 				if (this.key === 'mnSubject' || this.key === 'mnStatus' || this.key === 'mnEtcAll') {	//주제 테이블 변경자료
 					pm10_d01_update(this.item, this.key, this.value); 
 				} else {
@@ -277,7 +280,6 @@ var mnGridView = {
 			postAjax("/user/pm/pm10/selectMnList", paramObj, null, function(data){
 				try {
 					let list = data.result;
-					pm10_data_list = list;
 					targetObj.setData({
 							list : list,
 							page : {
@@ -285,11 +287,15 @@ var mnGridView = {
 							} 
 					});
 
+					select_p10_d02_List(data.d02List);
+
 				} catch (error) {
 					alert("오류 발생!! 전산실 연락 바랍니다", error.message);
 					return null; // 오류 발생 시 null 반환
 				} finally {
 					// console.log("함수 실행 완료.");
+					syncRowHeights();
+// 					gridMaxHeightResize();
 				}
 			});
 		} 
@@ -334,6 +340,15 @@ var mnGridView = {
 			return this;
 		}
 	}
+	
+	function initSearch() {
+		// datepicker를 제외한 select, input 값 모두 초기화
+		$(".contents.search select").val("");
+		$(".contents.search input").val("");    
+		// 회사 초기화
+		$("#coCd_S").val(jwt.coCd);
+		$('#mnDate_S').val(moment().day(5).format('YYYY-MM-DD'));
+	}
 
 	$(document).ready(function() {
 		//초기설정들
@@ -343,32 +358,22 @@ var mnGridView = {
 		$("#userId").val(jwt.userId);
 		$("#deptId").val(jwt.deptId);
 		
-		$.dayInit = function() {
-			// 종료일 (현재날짜의 월 말일)
-			$('#mnDate_S').datepicker({
-				format : "yyyy-mm-dd",
-				language : "ko",
-				autoclose : true,
-				beforeShowDay: function(date) {
-					// 5 = 금요일만 선택가능하게 하기
-					return date.getDay() === 5;
-				}
-			}).datepicker("setDate", moment().day(5).toDate())
-			.on('changeDate', function(e) {
-				dateToWeek();	// 주차 계산
-				mnGridView.setData(0);
-				select_p10_d02_List();
-			});	
-		}
-
+		// 종료일 (현재날짜의 월 말일)
+		$('#mnDate_S').datepicker({
+			format : "yyyy-mm-dd",
+			language : "ko",
+			autoclose : true,
+			beforeShowDay: function(date) {
+				// 5 = 금요일만 선택가능하게 하기
+				return date.getDay() === 5;
+			}
+		}).datepicker("setDate", moment().day(5).toDate());
+		$('#mnWeeks_S').val(moment($('#mnDate_S').val(), 'YYYY-MM-DD').isoWeek());
+		
 		// 접속자 회사 set
 		$("#coCd_S").val(jwt.coCd);
 		$("#userId").val(jwt.userId);
-		$.dayInit();
-		dateToWeek();
 		
-		select_p10_d02_List(); // 참석자 리스트 
-
 
 		$('#removeAttendBtn').on('click', () => {
 			const toRemoveIds = $('.attend-item.to-remove')
@@ -387,6 +392,7 @@ var mnGridView = {
 
 		// 회의일자 변경 시 주차 계산
 		$('#mnDate_S').on('change', function (){
+			$('#mnWeeks_S').val(moment($('#mnDate_S').val(), 'YYYY-MM-DD').isoWeek());
 			mnGridView.setData(0);
 		});
 		
@@ -401,19 +407,16 @@ var mnGridView = {
 		$(".contents.search input").val("");    
 		// 회사 초기화
 		$("#coCd_S").val(jwt.coCd);
-	
-		$.dayInit();
+
+		$('#mnDate_S').val(moment().day(5).format('YYYY-MM-DD'));
+		$('#mnWeeks_S').val(moment($('#mnDate_S').val(), 'YYYY-MM-DD').isoWeek());
 		
 		// 재검색
 		mnGridView.setData(0);
-		select_p10_d02_List();
 	}
 
 	// 참석자 리스트 불러오기 & 렌더링
-	function select_p10_d02_List() {
-		var paramObj = { mnDate: $('#mnDate_S').val() };
-		postAjax('/user/pm/pm10/select_p10_d02_List', paramObj, null, function(data) {
-			var list = data.result || [];
+	function select_p10_d02_List(list) {
 			if (list.length > 0) {
 				attendList = list.map(user => ({
 					id:       user.id,
@@ -433,12 +436,11 @@ var mnGridView = {
 		
 			// DB에서 Y인 것만 체크
 			attendList.forEach(item => {
-			if (item.reasonCd === 'Y') {
-				$(`#attendCheckboxContainer .attend-item[data-id="${item.id}"] .attend-checkbox`)
-				.prop('checked', true);
-			}
+				if (item.reasonCd === 'Y') {
+					$(`#attendCheckboxContainer .attend-item[data-id="${item.id}"] .attend-checkbox`)
+					.prop('checked', true);
+				}
 			});
-		});
 	}
 	
 	
@@ -482,7 +484,6 @@ var mnGridView = {
 					};
 		}
 		mnGridView.target.addRow(newRowData, rows.length);
-		mnGridView.target.repaint(true);
 	}
 	
 	// 삭제
@@ -509,7 +510,7 @@ var mnGridView = {
 	
 	//회의 주제 Insert, Update
 	function pm10_d01_update(item, colKey, value) {
-		var rows = mnGridView.target.list;
+		const rows = mnGridView.target.list;
 		item[colKey] = value;
 		var paramObj = {
 				mnDate   : $('#mnDate_S').val(),
@@ -683,22 +684,34 @@ var mnGridView = {
 		}
 		);
 	}
-
-    function gridResize(size) {
-        let tagHeight = (size) * 27 + 50 ;
-        tagHeight = tagHeight > 750 ? 750 : tagHeight;
-        tagHeight = tagHeight < 320 ? 320 : tagHeight;
-        
-        mnGridView.target.setHeight(tagHeight);
-    }
+	
     
-	// 일자 기준 주차 변환 함수
-	function dateToWeek() {
-		const dateStr = $('#mnDate_S').val();
-		if (!dateStr) return;
-		const week = moment(dateStr, 'YYYY-MM-DD').isoWeek();
-		$('#mnWeeks_S').val(week);
+    function gridMaxHeightResize() {
+		var gridHeigth  = $('[data-ax5grid="mnGrid-grid"]').find('[data-ax5grid-panel-scroll="body"]').height() 
+						+ $('[data-ax5grid="mnGrid-grid"]').find('[data-ax5grid-panel="header"]').height();
+		console.log(gridHeigth);
+		if (gridHeigth > 755) {
+			mnGridView.target.setHeight(gridHeigth);
+		}
+    }
+
+
+	// ax5grid 세팅 후 아래 함수 호출
+	function syncRowHeights() {
+		var $rows = $('[data-ax5grid="mnGrid-grid"]').find('[data-ax5grid-panel-scroll="body"] tr');
+		var maxHeight = 30;
+		$rows.each(function(){
+		    var rowHeight = $(this).outerHeight();
+		    if(rowHeight > maxHeight) maxHeight = rowHeight;
+		});
+		// grid에 적용
+		var oldConfig = mnGridView.target.config.body || {};
+	    mnGridView.target.setConfig({
+	        body: $.extend({}, oldConfig, { columnHeight: maxHeight })
+	    });
+	    mnGridView.target.repaint();
 	}
+	
 
 	// 선택된 행 하나를 위로 한 칸 이동
 	function moveSelectedUp() {
