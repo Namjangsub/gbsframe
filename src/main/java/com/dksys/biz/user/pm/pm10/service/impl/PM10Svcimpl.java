@@ -43,9 +43,15 @@ public class PM10Svcimpl implements PM10Svc {
 	@Override
 	public int deleteMn(Map<String, String> paramMap) throws Exception {
 		// D01 삭제
-		Integer result = pm10Mapper.deleteMnD01(paramMap);
-		// D03 삭제
-		result += pm10Mapper.deleteMnD03(paramMap);
+
+		Integer result = 0;
+
+		Object mnSubSeq = paramMap.get("mnSubSeq");
+		if (mnSubSeq != null && !"".equals(mnSubSeq)) {
+			result += pm10Mapper.deleteMnD01(paramMap);
+			// D03 삭제
+			result += pm10Mapper.deleteMnD03(paramMap);
+		}
 
 		// if ("해당 날짜에 해당하는 주제 및 내용이 없다면 메인 삭제, 참석자 테이블도 삭제") {
 		// 	pm10Mapper.deleteMnM01(paramMap);
