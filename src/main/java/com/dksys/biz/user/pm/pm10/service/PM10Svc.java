@@ -7,6 +7,8 @@ public interface PM10Svc {
 
 	List<Map<String, String>> selectMnList(Map<String, String> paramMap);
 
+	List<Map<String, String>> select_p10_d02_List(Map<String, String> paramMap);
+
 	int pm10_main_update(Map<String, String> param) throws Exception;
 
 	int pm10_d01_update(Map<String, String> param) throws Exception;
@@ -15,4 +17,11 @@ public interface PM10Svc {
 
 	int deleteMn(Map<String, String> paramMap) throws Exception;
 
+	int pm10_d01_sortNo_update(Map<String, Object> paramMap) throws Exception;
+
+	int pm10_d02_fix_insert(Map<String, Object> paramMap) throws Exception;
+
+	int pm10_d02_update(Map<String, Object> paramMap) throws Exception;
+
+	int pm10_d02_delete(Map<String, Object> paramMap) throws Exception;
 }

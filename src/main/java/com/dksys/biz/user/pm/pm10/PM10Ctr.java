@@ -31,8 +31,17 @@ public class PM10Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+
+	// 임팀장회의록 참석자 조회
+	@PostMapping(value = "/select_p10_d02_List")
+	public String select_p10_d02_List(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		
+		List<Map<String, String>> result = pm10Svc.select_p10_d02_List(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 	
-	// 메인 등록
+	// 메인
 	@PostMapping("/pm10_main_update")
 	public String pm10_main_update(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
 		try {
@@ -47,42 +56,42 @@ public class PM10Ctr {
     }
 
 
-	// 주제 수정
+	// 주제
 	@PostMapping(value = "/pm10_d01_update")
 	public String pm10_d01_update(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
-  		try {
+		try {
 			if (pm10Svc.pm10_d01_update(param) != 0) {
-  				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-  			} else {
-  				model.addAttribute("resultCode", 500);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  			model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }  
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 
 
-	// 팀별내용 수정
+	// 팀별내용
 	@PostMapping(value = "/pm10_d03_update")
 	public String pm10_d03_update(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
-  		try {
+		try {
 			if (pm10Svc.pm10_d03_update(param) != 0) {
-  				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
-  			} else {
-  				model.addAttribute("resultCode", 500);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  			model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }  
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 
 
 
@@ -105,4 +114,76 @@ public class PM10Ctr {
 		return "jsonView";
 	}
 
+	// // 정렬번호 업데이트
+	@PostMapping(value = "/pm10_d01_sortNo_update")
+	public String pm10_d01_sortNo_update(@RequestBody Map<String,Object> paramMap, ModelMap model) throws Exception {
+		try {
+			if (pm10Svc.pm10_d01_sortNo_update(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		} catch(Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	// 참석자 고정 맴버 insert
+	@PostMapping("/pm10_d02_fix_insert")
+	public String pm10_d02_fix_insert(@RequestBody Map<String,Object> paramMap, ModelMap model) throws Exception {
+		try {
+			if (pm10Svc.pm10_d02_fix_insert(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		} catch(Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	// 참석자 update
+	@PostMapping("/pm10_d02_update")
+	public String pm10_d02_update(@RequestBody Map<String,Object> paramMap, ModelMap model) throws Exception {
+		try {
+			if (pm10Svc.pm10_d02_update(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		} catch(Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	// 참석자 삭제
+	@PostMapping(value = "/pm10_d02_delete")
+	public String pm10_d02_delete(@RequestBody Map<String, Object> paramMap, ModelMap model) throws Exception {
+		try {
+			if (pm10Svc.pm10_d02_delete(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 }

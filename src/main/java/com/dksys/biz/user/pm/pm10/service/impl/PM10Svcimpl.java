@@ -1,5 +1,6 @@
 package com.dksys.biz.user.pm.pm10.service.impl;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -20,6 +21,11 @@ public class PM10Svcimpl implements PM10Svc {
 	@Override
 	public List<Map<String, String>> selectMnList(Map<String, String> paramMap) {
 		return pm10Mapper.selectMnList(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> select_p10_d02_List(Map<String, String> paramMap) {
+		return pm10Mapper.select_p10_d02_List(paramMap);
 	}
 
 	@Override
@@ -52,11 +58,61 @@ public class PM10Svcimpl implements PM10Svc {
 		return pm10Mapper.pm10_d01_update(param);
 	}
 
+	@Override
+	public int pm10_d01_sortNo_update(Map<String,Object> paramMap) throws Exception {
+		int result = 0;
+		List<Map<String,Object>> list = (List<Map<String,Object>>) paramMap.get("list");
+		
+		for (Map<String,Object> dtl : list) {
+			dtl.put("mnDate", paramMap.get("mnDate"));
+			dtl.put("userId", paramMap.get("userId"));
+			dtl.put("pgmId",  paramMap.get("pgmId"));
+			result += pm10Mapper.pm10_d01_sortNo_update(dtl);
+		}
+		return result;
+	}
 	
+	@Override
+	public int pm10_d02_fix_insert(Map<String, Object> paramMap) throws Exception {
+		int result = 0;
+		List<Map<String,Object>> attedList = (List<Map<String,Object>>) paramMap.get("attendList");
+		
+		for (Map<String,Object> dtl : attedList) {
+			dtl.put("mnDate", paramMap.get("mnDate"));
+			dtl.put("userId", paramMap.get("userId"));
+			dtl.put("pgmId",  paramMap.get("pgmId"));
+			result += pm10Mapper.pm10_d02_fix_insert(dtl);
+		}
+		return result;
+	}
+
+	@Override
+	public int pm10_d02_update(Map<String, Object> paramMap) throws Exception {
+		int result = 0;
+		List<Map<String,Object>> attedList = (List<Map<String,Object>>) paramMap.get("attendList");
+		
+		for (Map<String,Object> dtl : attedList) {
+			dtl.put("mnDate", paramMap.get("mnDate"));
+			dtl.put("userId", paramMap.get("userId"));
+			dtl.put("pgmId",  paramMap.get("pgmId"));
+			result += pm10Mapper.pm10_d02_update(dtl);
+		}
+		return result;
+	}
+
+	@Override
+	public int pm10_d02_delete(Map<String,Object> paramMap) throws Exception {
+		int result = 0;
+		List<String> ids = (List<String>) paramMap.get("attendIds");
+		for (String id : ids) {
+			Map<String,Object> p = new HashMap<>();
+			p.put("mnDate", paramMap.get("mnDate"));
+			p.put("userId", id);
+			result += pm10Mapper.pm10_d02_delete(p);
+		}
+		return result;
+	}
 
 	
 
-	
-
-  
 }

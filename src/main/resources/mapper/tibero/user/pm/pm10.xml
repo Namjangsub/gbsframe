@@ -73,6 +73,22 @@
 		       ) AS A
     </select>
 
+	<select id="select_p10_d02_List" parameterType="Map" resultType="CamelMap">
+		SELECT
+				  TO_CHAR(T.MN_DATE, 'YYYY-MM-DD')					AS MN_DATE
+				, T.USER_ID											AS ID
+				, (SELECT FN_CM06M01_ID_TO_NM(T.USER_ID) FROM DUAL)	AS NAME
+				, T.REASON_CD
+				, T.REASON_RMK
+				, B.LEVEL_CD
+				, B.LEVEL_NM 										AS TITLE
+		FROM TB_PM10D02 T
+						LEFT OUTER JOIN TB_CM06M01 A ON A.ID = T.USER_ID
+						LEFT OUTER JOIN TB_CM07M01 B ON B.LEVEL_CD = A.LEVEL_CD
+
+		WHERE MN_DATE = #{mnDate}
+    </select>
+
 	<update id="pm10_main_update" parameterType="Map">
 		MERGE INTO TB_PM10M01 A
 			USING DUAL
@@ -229,6 +245,82 @@
 		 WHERE MN_DATE		= #{mnDate}
 		   AND MN_SUB_SEQ	= #{mnSubSeq}
 	</delete>
-    
+
+	<!-- D01 : 정렬순서 변경 -->
+	<update id="pm10_d01_sortNo_update" parameterType="Map">
+		UPDATE TB_PM10D01
+		SET
+			  MN_SORT_NO = #{mnSortNo}
+			, UDT_ID   	= #{userId}
+			, UDT_PGM  	= #{pgmId}
+			, UDT_DTTM 	= SYSDATE
+		WHERE MN_DATE     = #{mnDate}
+		  AND MN_SUB_SEQ  = #{mnSubSeq}
+	</update>
+	
+	<insert id="pm10_d02_fix_insert" parameterType="Map">
+		
+		INSERT INTO TB_PM10D02
+		(
+			  MN_DATE
+			, USER_ID
+			, REASON_CD
+			, REASON_RMK
+			, CREAT_ID
+			, CREAT_DTTM
+			, CREAT_PGM
+		)
+		VALUES(
+			  #{mnDate}
+			, #{attendId}
+			, #{reasonCd}
+			, #{reasonRmk, jdbcType=VARCHAR}
+			, #{userId}
+			, SYSDATE
+			, #{pgmId}
+		)
+	</insert>
+
+	<update id="pm10_d02_update" parameterType="Map">
+		MERGE INTO TB_PM10D02 A
+			USING DUAL
+			ON (
+					MN_DATE 	= #{mnDate}
+					AND USER_ID = #{attendId}
+			   )
+		WHEN MATCHED THEN
+			UPDATE SET
+					  REASON_CD			= NVL(#{reasonCd}, 'N')
+					, REASON_RMK		= #{reasonRmk, jdbcType=VARCHAR}
+					, UDT_ID			= #{userId}
+					, UDT_DTTM			= SYSDATE
+					, UDT_PGM			= #{pgmId}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+				  MN_DATE
+				, USER_ID
+				, REASON_CD
+				, REASON_RMK
+				, CREAT_ID
+				, CREAT_DTTM
+				, CREAT_PGM
+		)
+		VALUES(
+				  #{mnDate}
+				, #{attendId}
+				, NVL(#{reasonCd}, 'N')
+				, #{reasonRmk, jdbcType=VARCHAR}
+				, #{userId}
+				, SYSDATE
+				, #{pgmId}
+		)
+	</update>
+
+	<delete id="pm10_d02_delete"  parameterType="Map">
+		DELETE FROM TB_PM10D02
+		 WHERE MN_DATE		= #{mnDate}
+		   AND USER_ID		= #{userId}
+	</delete>
     
 </mapper>

@@ -1,5 +1,23 @@
 <!DOCTYPE html>
 <html lang="ko">
+<style>
+	.attend-item {
+		display: inline-block;
+		margin: 5px;
+		padding: 4px 8px;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		cursor: pointer;
+		user-select: none;
+	}
+	.attend-item.to-remove {
+		background-color: #fdd;
+	}
+	.attend-item input {
+		margin-right: 4px;
+		cursor: auto;
+	}
+</style>
 <head>
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -80,7 +98,7 @@
 						
 						<th>주차</th>
 						<td>
-							<input type="test" id="mnWeeks_S" name="mnWeeks_S"  data-search="mnWeeks">
+							<input type="test" id="mnWeeks_S" name="mnWeeks_S"  data-search="mnWeeks" readonly>
 						</td>
 						<td></td>
 						<td></td>
@@ -102,14 +120,28 @@
 				<span  style="height: 30px; line-height: 30px;font-size: 15px;">임팀장 주간회의 자료</span>
 				<div class="add_btn_small pdl10">
 					<!-- <a onclick="insertMn();" style="height: 30px; line-height: 28px;">저장</a> -->
-					<a id="addRow" style="height: 30px; line-height: 28px;">+</a>
-					<a id="deleteRow" style="height: 30px; line-height: 28px;">-</a>
+					<a onclick="moveSelectedUp();" id="moveUp"    style="height: 30px; line-height: 28px; margin:0 5px;">▲</a>
+					<a onclick="moveSelectedDown();" id="moveDown"  style="height: 30px; line-height: 28px;">▼</a>
+					<a onclick="insertMn();" id="addRow" style="height: 30px; line-height: 28px;">+</a>
+					<a onclick="deleteMn();" id="deleteRow" style="height: 30px; line-height: 28px;">-</a>
 					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
-			    </div>
+				</div>
 			</div>
-		    <!-- 리스트 -->
-		      <div class="ax5_grid" data-ax5grid="mnGrid-grid" data-ax5grid-config="{}" style="height: 755px; width: 100%" ></div>
-		      <div data-ax5grid="excel-grid" data-ax5grid-config="{}" style="display: none;"></div>
+			<!-- 리스트 -->
+			<div class="ax5_grid" data-ax5grid="mnGrid-grid" data-ax5grid-config="{}" style="height: 650px; width: 100%; overflow-y: auto;" ></div>
+			<div data-ax5grid="excel-grid" data-ax5grid-config="{}" style="display: none;"></div>
+		</div>
+
+		<div class="contents_tit">
+			<span style="font-size:15px;">참석자 리스트</span>
+			<div class="add_btn_small pdl10">
+				<a onclick="openUserSearch()" id="addAttendBtn" style="height: 30px; line-height: 28px;">+</a>
+				<a onclick="pm10_d02_delete()" id="removeAttendBtn" style="height: 30px; line-height: 28px;">-</a>
+				<a onclick="pm10_d02_update();" id="saveAttendBtn"   style="height:30px; line-height:28px;">저장</a>
+			</div>
+		</div>
+		<div class="contents">
+			<div id="attendCheckboxContainer"></div>
 		</div>
 		
     </div>
@@ -119,7 +151,21 @@
 
 <script type="text/javascript">
 
-const detailInserted = {};
+const DEFAULT_ATTEND_LIST = [
+	{ id: 'EMJ8105',    name: '김태호',   title: '부사장' },
+	{ id: 'kimjhv',     name: '김재현',   title: '전 무' },
+	{ id: 'kimihz',     name: '김일희',   title: '상 무' },
+	{ id: 'K98452000',  name: '김동현',   title: '상 무' },
+	{ id: 'shjung',     name: '정상훈',   title: '부 장' },
+	{ id: 'h4ng10',     name: '허상렬',   title: '부 장' },
+	{ id: 'canmtb',     name: '한동주',   title: '과 장' },
+	{ id: 'js.nam',     name: '남장섭',   title: '실 장' },
+	{ id: 'cyh',        name: '조영희',   title: '부 장' },
+	{ id: 'ycy',        name: '윤치영',   title: '부 장' },
+];
+let attendList = DEFAULT_ATTEND_LIST.map(u => ({ ...u }));
+
+const FIXED_ORDER = DEFAULT_ATTEND_LIST.map(u => u.id);
 
 //formatter 공통 함수
 function valueFormatter() {
@@ -154,23 +200,22 @@ var mnGridView = {
 			selector: false
 		},
 		body: {
+			scrollX: true, 
+			scrollY: true,
+			dynamicRowHeight: true,
 			onClick: function () {
-				this.self.clearSelect();				
+				this.self.clearSelect();
 				this.self.select(this.dindex);
 			},
 			onDBLClick: function () {
 			},
 			onDataChanged: function(){
-// 				const subSeq = this.item.mnSubSeq;
-// 				if (!subSeq) alert('먼저 주제를 입력해주세요.');
-
-				
 				if (this.key === 'mnSubject' || this.key === 'mnStatus' || this.key === 'mnEtcAll') {	//주제 테이블 변경자료
 					pm10_d01_update(this.item, this.key, this.value); 
-				} else {										
+				} else {
 					pm10_d03_update(this.item, this.key, this.value);
 				}
-
+				this.self.repaint(true);
 			}
 		},
         page: {
@@ -212,7 +257,7 @@ var mnGridView = {
 						}
 					},
 					{ key: "mnEtcAll", 		label: "특이사항", 			align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
-					{ key: "mnSortNo", 		label: "정렬순서", 			align: "center", width: 80 },
+					{ key: "mnSortNo", 		label: "정렬순서", 			align: "center", width: 80, hidden: true},
 					{ key: "mnWeeks", 		label: "주차", 				align: "center", width: 80 },
 				]
 		});
@@ -250,37 +295,48 @@ var mnGridView = {
 		} 
 	}
 
-	
-
-
 	var excelView = {
 		initView: function(){
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
 				target: $('[data-ax5grid="excel-grid"]'),
-				columns: [     
+				columns: [
+							{ key: "mnSubject", 	label: "PROJECT<br>/<br>주제", 	align: "left", width: 100, editor: {type: "textarea"}, formatter: valueFormatter},
+							{ key: "mnSubSeq", 		label: "순번", 					align: "left", width: 100, hidden: true},
+							{ key: "gun00MnCnts", 	label: "임원", 					align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+							{ key: "gun60MnCnts", 	label: "생산", 					align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+							{ key: "gun30MnCnts", 	label: "영업<br>국내.해외", 	align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+							{ key: "gun40MnCnts", 	label: "연구소", 				align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+							{
+								key: undefined, 	label: "트루넷", columns: [
+									{ key: "trn5010MnCnts", label: "기계", 		align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+									{ key: "trn5020MnCnts", label: "전기", 		align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter }
+								]
+							},
+							{ key: "gun10MnCnts", 	label: "경영지원팀<br>총무/인사/제조혁신", 	align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+							{ key: "gun80MnCnts", 	label: "전산실", 				align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+							{ key: "mnStatus", 		label: "진행/완료", 			align: "left", width: 70, 
+								editor: {
+									type: 'select', config: {
+										columnKeys: { optionValue: 'CD', optionText: 'NM' },
+										options : mnStatusCode
+									}
+								},
+								formatter : function() {
+									return getComboName(mnStatusCode, this)
+								}
+							},
+							{ key: "mnEtcAll", 		label: "특이사항", 			align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+							{ key: "mnSortNo", 		label: "정렬순서", 			align: "center", width: 80, hidden: true},
+							{ key: "mnWeeks", 		label: "주차", 				align: "center", width: 80 },
 						]
 			});
 			return this;
 		}
 	}
-	
-	function initSearch() {
-		// datepicker를 제외한 select, input 값 모두 초기화
-		$(".contents.search select").val("");
-		$(".contents.search input").val("");    
-		// 회사 초기화
-		$("#coCd_S").val(jwt.coCd);
-	
-		$.dayInit();
-		
-		// 재검색
-		mnGridView.setData(0);
-	}
-
 
 	$(document).ready(function() {
-		//초기설정들		
+		//초기설정들
 		mainDefaultLoad("사업계획", "임팀장주간회의록");
 		setCommonSelect($("#main_area select[data-kind]"));
 
@@ -297,47 +353,97 @@ var mnGridView = {
 					// 5 = 금요일만 선택가능하게 하기
 					return date.getDay() === 5;
 				}
-			}).datepicker("setDate", moment().day(5).toDate());
-
-			dateToWeek();	// 주차 계산
+			}).datepicker("setDate", moment().day(5).toDate())
+			.on('changeDate', function(e) {
+				dateToWeek();	// 주차 계산
+				mnGridView.setData(0);
+				select_p10_d02_List();
+			});	
 		}
 
-	
 		// 접속자 회사 set
 		$("#coCd_S").val(jwt.coCd);
 		$("#userId").val(jwt.userId);
 		$.dayInit();
+		dateToWeek();
 		
+		select_p10_d02_List(); // 참석자 리스트 
 
-	    $("#addRow").on("click", function () {
-	    	insertMn();
-	    });
 
-	    $("#deleteRow").on("click", function () {
-	    	deleteMn();
-	    });
-		
+		$('#removeAttendBtn').on('click', () => {
+			const toRemoveIds = $('.attend-item.to-remove')
+								.map((_,el)=>$(el).data('id'))
+								.get();
+			if (!toRemoveIds.length) {
+				return;
+			}
+			attendList = attendList.filter(u => !toRemoveIds.includes(u.id));
+			renderAttendList();
+		});
+				
 		mnGridView.initView().setData(0);
 		excelView.initView();
 		
 
 		// 회의일자 변경 시 주차 계산
 		$('#mnDate_S').on('change', function (){
-			dateToWeek();
 			mnGridView.setData(0);
 		});
-
 		
 		//권한체크
 // 		authChk();	
 			
 	});
 
+	function initSearch() {
+		// datepicker를 제외한 select, input 값 모두 초기화
+		$(".contents.search select").val("");
+		$(".contents.search input").val("");    
+		// 회사 초기화
+		$("#coCd_S").val(jwt.coCd);
+	
+		$.dayInit();
+		
+		// 재검색
+		mnGridView.setData(0);
+		select_p10_d02_List();
+	}
+
+	// 참석자 리스트 불러오기 & 렌더링
+	function select_p10_d02_List() {
+		var paramObj = { mnDate: $('#mnDate_S').val() };
+		postAjax('/user/pm/pm10/select_p10_d02_List', paramObj, null, function(data) {
+			var list = data.result || [];
+			if (list.length > 0) {
+				attendList = list.map(user => ({
+					id:       user.id,
+					name:     user.name,
+					title:    user.title,
+					reasonCd: user.reasonCd
+				}));
+			} else {
+				attendList = DEFAULT_ATTEND_LIST.map(user => ({ ...user }));
+			}
+
+			// 고정 멤버 순서대로 정렬
+			reorderAttendList();
+
+			// 렌더링
+			renderAttendList();
+		
+			// DB에서 Y인 것만 체크
+			attendList.forEach(item => {
+			if (item.reasonCd === 'Y') {
+				$(`#attendCheckboxContainer .attend-item[data-id="${item.id}"] .attend-checkbox`)
+				.prop('checked', true);
+			}
+			});
+		});
+	}
 	
 	
 	function insertMn() {
         var rows = mnGridView.target.list;
-        
         // rnum의 최대값 구하기
         const maxRnum = gPasIntChk(Math.max(...rows.map(item => item.rnum))) + 1;
         //하나라도 등록되어 있으면 마지막 자료를 복사하고
@@ -345,66 +451,65 @@ var mnGridView = {
         var newRowData ={};
         if (rows.length > 0) {
         	newRowData = JSON.parse(JSON.stringify(rows[rows.length - 1])); //깊은 복사로 변경처리됨 (그냥 대입은 레퍼러스 형태임)
-        	newRowData.mnSubSeq = maxRnum;
-        	newRowData.rnum = maxRnum;
-        	newRowData.mnWeeks = $("#mnWeeks_S").val();
-        	newRowData.mnStatus = "";
-        	newRowData.mnEtcAll = "";
-        	newRowData.__original_index= rows.length;
-        	newRowData.__index= rows.length;
+			newRowData.mnSubSeq = maxRnum;
+			newRowData.mnSortNo = maxRnum;
+			newRowData.rnum = maxRnum;
+			newRowData.mnWeeks = $("#mnWeeks_S").val();
+			newRowData.mnStatus = "";
+			newRowData.mnEtcAll = "";
+			newRowData.__original_index= rows.length;
+			newRowData.__index= rows.length;
         } else {
 			newRowData = 
 					{
-					    rnum: rows.length+1,
-					    mnDate: $("#mnDate_S").val(),
-					    mnWeeks: $('#mnWeeks_S').val(),
-					    mnSubSeq: maxRnum,			//마지막 등록값에서 +1을 함.
-					    mnSubject: "",
-					    gun00MnCnts: "",
-					    gun60MnCnts: "",
-					    gun30MnCnts: "",
-					    gun40MnCnts: "",
-					    trn5010MnCnts: "",
-					    trn5020MnCnts: "",
-					    gun10MnCnts: "",
-					    gun80MnCnts: "",
-					    mnStatus: "",
-					    mnEtcAll: "",
-					    __original_index: rows.length,
-					    __index: rows.length,
+						rnum: rows.length+1,
+						mnDate: $("#mnDate_S").val(),
+						mnWeeks: $('#mnWeeks_S').val(),
+						mnSubSeq: maxRnum,			//마지막 등록값에서 +1을 함.
+						mnSubject: "",
+						gun00MnCnts: "",
+						gun60MnCnts: "",
+						gun30MnCnts: "",
+						gun40MnCnts: "",
+						trn5010MnCnts: "",
+						trn5020MnCnts: "",
+						gun10MnCnts: "",
+						gun80MnCnts: "",
+						mnStatus: "",
+						mnEtcAll: "",
+						__original_index: rows.length,
+						__index: rows.length,
 					};
-    	}
+		}
 		mnGridView.target.addRow(newRowData, rows.length);
+		mnGridView.target.repaint(true);
 	}
 	
 	// 삭제
 	function deleteMn() {
-		console.log(mnGridView.target.getList("selected"));
-		const rows = mnGridView.target.getList("selected")[0];
+		var rows = mnGridView.target.getList("selected")[0];
 		if (rows.length = 0){
 			alert("삭제할 주제를 선택하세요!");
 			return false;
 		}
 		
-// 		if (rows.전체 컬럼의 값이 있으면 삭제여부 확인할것]) {
-// 			alert("자료가 등록된 상태입니다. 삭제 할까요?");
-// 			return false;
-// 		}
 		var formData = {
 				mnDate 		: rows.mnDate,
 				mnSubSeq 	: rows.mnSubSeq
-		} 
+		}
 		postAjax("/user/pm/pm10/deleteMn", formData, null, function(data) {
 			if (data.resultCode == 200) {
 				mnGridView.setData();
 			}
+
+			recalcSortOrder();
 		});
 	}
 
 	
 	//회의 주제 Insert, Update
 	function pm10_d01_update(item, colKey, value) {
-		const rows = mnGridView.target.list;
+		var rows = mnGridView.target.list;
 		item[colKey] = value;
 		var paramObj = {
 				mnDate   : $('#mnDate_S').val(),
@@ -414,13 +519,14 @@ var mnGridView = {
 				mnSortNo : item.mnSortNo,
 				mnEtcAll : item.mnEtcAll,
 				mnStatus : item.mnStatus,
-				mnSortNo : gPasIntChk(Math.max(...rows.map(item => item.rnum))) + 1,
 				userId   : $('#userId').val(),
 				pgmId    : $('#pgmId').val()
 		};
 		postAjax('/user/pm/pm10/pm10_d01_update', paramObj, null, function(data) {
 			if (data.resultCode == 200) {
 // 				mnGridView.setData();
+				recalcSortOrder();
+
 			} else {
 				alert('수정 실패: ' + data.resultMessage);
 			}
@@ -452,6 +558,65 @@ var mnGridView = {
 			}
 		});
 	}
+
+	// 참석자 update
+	function pm10_d02_update() {
+		const list = attendList.map(item => {
+			const isChecked = $(`#attendCheckboxContainer .attend-item[data-id="${item.id}"] .attend-checkbox`)
+								.is(':checked');
+			return {
+				attendId:  item.id,
+				reasonCd:  isChecked ? 'Y' : 'N',
+				reasonRmk: ''
+			};
+		});
+
+		paramObj = {
+			mnDate:     $('#mnDate_S').val(),
+			userId:     $('#userId').val(),
+			pgmId:      $('#pgmId').val(),
+			attendList: list
+		}
+		postAjax('/user/pm/pm10/pm10_d02_update', paramObj, null, data => {
+			if (data.resultCode == 200) {
+			} else {
+				alert('참석자 저장 실패: ' + data.resultMessage);
+			}
+		});
+	}
+
+	// 참석자 삭제
+	function pm10_d02_delete() {
+		const toRemoveIds = $('.attend-item.to-remove').map((_, el) => $(el).data('id')).get();
+		if (!toRemoveIds.length) {
+			alert('삭제할 대상을 클릭해 선택하세요.');
+			return;
+		}
+		const existing = attendList.filter(i => toRemoveIds.includes(i.id) && i.reasonCd !== undefined).map(i => i.id);
+		const localOnly = toRemoveIds.filter(id => !existing.includes(id));
+
+		// 화면단에만 있는 정보 삭제
+		if (localOnly.length) {
+			attendList = attendList.filter(u => !localOnly.includes(u.id));
+		}
+		// 테이블에 있는 참석자 삭제
+		if (existing.length) {
+			paramObj = {
+				mnDate:    $('#mnDate_S').val(),
+				attendIds: existing
+			}
+			postAjax('/user/pm/pm10/pm10_d02_delete', paramObj, null, function(data) {
+				if (data.resultCode === 200) {
+					attendList = attendList.filter(u => !existing.includes(u.id));
+					renderAttendList();
+				} else {
+					alert('참석자 삭제 실패: ' + data.resultMessage);
+				}
+			});
+		} else {
+			renderAttendList();
+		}
+	}
 	
 	//엑셀다운로드
 	function excelDown() {
@@ -462,21 +627,63 @@ var mnGridView = {
 			} else {
 				paramObj[$(elem).data("search")] = $(elem).val();	
 			}
-		});			
+		});
 		postAjax("/user/pm/pm10/selectMnList", paramObj, null, function(data){
 			let list = data.result;
-		  	excelView.target.setData({
-		  		list : list,
-		  		page : {
-		                  totalElements : list.length
-		        			}
-		  	});
- 			var todayDate = new Date().format('yyyyMMddHHmmss');
-			excelView.target.exportExcel("공급업체평가_"+todayDate+".xls");
+			excelView.target.setData({
+				list : list,
+				page : {
+						totalElements : list.length
+							}
+			});
+			var todayDate = new Date().format('yyyyMMddHHmmss');
+			excelView.target.exportExcel("임팀장주간회의록"+todayDate+".xls");
 		});       
 	}
 	
- 
+	// 체크박스 렌더링 함수
+	function renderAttendList() {
+		const container = $('#attendCheckboxContainer').empty();
+		attendList.forEach(item => {
+			// 체크 상태( reasonCd === 'Y' )를 반영해서 input 에 checked 속성 추가
+			const isChecked = item.reasonCd === 'Y';
+			const $item = $(`
+			<div class="attend-item" data-id="${item.id}">
+				<input type="checkbox" class="attend-checkbox" ${isChecked ? 'checked' : ''}/>
+				${item.name} ${item.title}
+			</div>`);
+
+			$item.on('click', function(e) {
+			if (!$(e.target).hasClass('attend-checkbox')) {
+				$(this).toggleClass('to-remove');
+			}
+			});
+			container.append($item);
+		});
+	}
+
+	// 참석자 검색
+	function openUserSearch() {
+		var paramObj = {
+			coCd: $('#coCd_S').val(),      // 필요시 조정
+			userId: '', userNm: ''
+		};
+		openSecondModal("/static/html/cmn/modal/userSearch.html",450, 650, "사용자 검색",paramObj,function(tree) {
+			const sel = tree.get_checked()[0];
+			const node = tree.get_node(sel);
+			if (!attendList.some(u => u.id === node.id)) {
+				attendList.push({
+					id: node.id,
+					name: node.text,
+					title: node.original.levelNm
+				});
+				reorderAttendList(); // 참석자 정렬
+				renderAttendList();  // 추가한 참석자 랜더링
+			}
+		}
+		);
+	}
+
     function gridResize(size) {
         let tagHeight = (size) * 27 + 50 ;
         tagHeight = tagHeight > 750 ? 750 : tagHeight;
@@ -487,10 +694,64 @@ var mnGridView = {
     
 	// 일자 기준 주차 변환 함수
 	function dateToWeek() {
-		const dateStr = $('#mnDate_S').val();      // "2025-05-20"
+		const dateStr = $('#mnDate_S').val();
 		if (!dateStr) return;
 		const week = moment(dateStr, 'YYYY-MM-DD').isoWeek();
 		$('#mnWeeks_S').val(week);
+	}
+
+	// 선택된 행 하나를 위로 한 칸 이동
+	function moveSelectedUp() {
+		const list = mnGridView.target.list;
+		const row = mnGridView.target.getList("selected");
+
+		if (!row.length) { alert("이동할 행을 선택하세요"); return; }
+
+		const idx = list.findIndex(item =>
+			item.mnSubSeq === row[0].mnSubSeq &&
+			item.mnDate   === row[0].mnDate
+		);
+		if (idx <= 0) return;
+		[list[idx-1], list[idx]] = [list[idx], list[idx-1]];
+		mnGridView.target.setData({ list, page:{ totalElements: list.length } });
+		recalcSortOrder();
+	}
+
+	// 선택된 행 하나를 아래로 한 칸 이동
+	function moveSelectedDown() {
+		const list = mnGridView.target.list;
+		const row = mnGridView.target.getList("selected");
+
+		if (!row.length) { alert("이동할 행을 선택하세요"); return; }
+
+		const idx = list.findIndex(item =>
+			item.mnSubSeq === row[0].mnSubSeq &&
+			item.mnDate   === row[0].mnDate
+		);
+		if (idx < 0 || idx === list.length - 1) return;
+		[list[idx], list[idx+1]] = [list[idx+1], list[idx]];
+		mnGridView.target.setData({ list, page:{ totalElements: list.length } });
+		recalcSortOrder();
+	}
+
+	// 정렬번호 재계산
+	function recalcSortOrder() {
+		const list = mnGridView.target.list;
+
+		list.forEach((item, i) => item.mnSortNo = i + 1);
+		mnGridView.target.setData({ list, page:{ totalElements: list.length } });
+
+		var paramObj = {
+				mnDate	:   $('#mnDate_S').val(),
+				userId	:   $('#userId').val(),
+				pgmId	:   $('#pgmId').val(),
+				list	:   list
+		};
+		postAjax('/user/pm/pm10/pm10_d01_sortNo_update',paramObj, null, function(data) {
+			if (data.resultCode !== 200) {
+				alert('정렬순서 저장 실패: ' + data.resultMessage);
+			}
+		});
 	}
 
 
@@ -505,4 +766,16 @@ var mnGridView = {
 		}
 		return rtnNm;
 	}  
+
+	// 참석자 정렬 함수
+	function reorderAttendList() {
+		attendList.sort((a, b) => {
+			const ia = FIXED_ORDER.indexOf(a.id);
+			const ib = FIXED_ORDER.indexOf(b.id);
+			if (ia !== -1 && ib !== -1) return ia - ib;  // 둘 다 기본 → 순서대로
+			if (ia !== -1) return -1;                    // a는 기본, b는 신규 → a 우선
+			if (ib !== -1) return 1;                     // b는 기본, a는 신규 → b 우선
+			return 0;                                    // 둘 다 신규 → 추가된 순서 유지
+		});
+	}
 </script>
