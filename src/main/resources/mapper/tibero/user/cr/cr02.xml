@@ -211,7 +211,7 @@
 		       , SM.CLNT_NM                                    AS CLNT_NM            --고객사명
 		       , SM.CLNT_PJT                                   AS CLNT_PJT           --고객사PJT
 		       , SM.CTRT_NM                                    AS CTRT_NM            --계약명
-		       , ROUND(SM.ORDRS_AMT / 1000, 1)                 AS ORDRS_AMT          --수주금액
+		       , DECODE(SM.CURR_CD,'CURR01', ROUND(SM.ORDRS_AMT / 1000, 1) , ROUND(SM.ORDRS_AMT / 1000, 2))  AS ORDRS_AMT          --수주금액 (원화는 소수1자리 외화는 소수2자리)
 		       , ROUND(SM.ORDRS_AMT * EXRATE / 1000, 1)        AS EXCHANGE_AMT       --원화금액
 		       , SM.EST_NO                                     AS EST_NO             --견적번호
 		       , SM.EST_DEG                                    AS EST_DEG            --견적차수
@@ -262,75 +262,13 @@
 		       , SM.MNG_NM
 		       , SM.HIST_NO
 		       , SM.APP_STATUS
+		       , SM.CURR_CD
+		       , SM.EXRATE
 		  FROM   SJM AS SM --수주마스터
 		         LEFT OUTER JOIN TB_CR02D02 AS SD  ON SM.CO_CD    = SD.CO_CD
 		                                          AND SM.ORDRS_NO = SD.ORDRS_NO
 		         LEFT OUTER JOIN TB_BM01M01 AS P   ON SD.PRDT_CD  = P.PRDT_CD
 		  WHERE  1 = 1
-		)
-		, SJG1 AS
-		(
-		  SELECT CO_CD                                   AS CO_CD        --회사코드
-		       , ORDRS_CLNT_CD                           AS CLNT_CD      --고객사
-		       , MAX(CLNT_NM)                            AS CLNT_NM
-		       , SUM(ROUND(NVL(ORDRS_AMT, 0) / 1000, 1)) AS ORDRS_AMT --수주금액
-		       , SUM(ROUND(ORDRS_AMT * EXRATE / 1000, 1))  AS EXCHANGE_AMT       --원화금액
-		       , SUM(ORDRS_PRC_MACH)                     AS ORDRS_PRC_MACH     --수주가-기계파트
-		       , SUM(ORDRS_PRC_ELCTY)                    AS ORDRS_PRC_ELCTY    --수주가-전기파트
-		       , SUM(ORDRS_PRC)                          AS ORDRS_PRC          --수주가
-		       , SUM(ORDRS_QTY)                          AS ORDRS_QTY          --수량
-		       , SUM(EST_EPCT_MAT_PRC)                   AS EST_EPCT_MAT_PRC   --견적예상재료비
-		       , SUM(TRGT_PCHS_PCOST_MACH)               AS TRGT_PCHS_PCOST_MACH           --목표구매원가-기계
-		       , SUM(TRGT_PCHS_PCOST_ELCTY)              AS TRGT_PCHS_PCOST_ELCTY          --목표구매원가-전기
-			   , SUM(TRGT_PCHS_PCOST_TOT)                AS TRGT_PCHS_PCOST_TOT            --목표구매원가-합계
-		       , SUM(TRGT_PCHS_PCOST_IN_HOUSE_PRCSN)     AS TRGT_PCHS_PCOST_IN_HOUSE_PRCSN --목표구매원가-기자체가공
-			   , SUM(TRGT_PCHS_PCOST_MACH2)              AS TRGT_PCHS_PCOST_MACH2          --목표구매원가-차감 후 기계
-			   , SUM(ACT_RGL_MACH)                       AS ACT_RGL_MACH        --실행원가-정상-기계
-			   , SUM(ACT_OBS_MACH)                       AS ACT_OBS_MACH        --실행원가-장애-기계
-			   , SUM(ACT_TOT_MACH)                       AS ACT_TOT_MACH        --실행원가-기계
-			   , SUM(ACT_RGL_ELCTY)                      AS ACT_RGL_ELCTY       --실행원가-정상-전기
-			   , SUM(ACT_OBS_ELCTY)                      AS ACT_OBS_ELCTY       --실행원가-장애-전기
-			   , SUM(ACT_TOT_ELCTY)                      AS ACT_TOT_ELCTY       --실행원가-전기
-			   , SUM(ACT_TOT_MACH) + SUM(ACT_TOT_ELCTY)  AS ACT_TOT
-			   , SUM(LABOR_COST_MFG_COST)                AS LABOR_COST_MFG_COST --노무비및제조경비
-			   , SUM(ACT_EXP_COST)                       AS ACT_EXP_COST        --실행원가-경비관리비
-			   , SUM(EST_TRGT_COST)                      AS EST_TRGT_COST       --수주목표원가
-			   , SUM(ACT_TOT_MACH) + SUM(ACT_TOT_ELCTY) + SUM(LABOR_COST_MFG_COST) AS WONGA_TOT
-		       , SUM(ORDRS_PRC) - (SUM(ACT_TOT_MACH) + SUM(ACT_TOT_ELCTY) + SUM(LABOR_COST_MFG_COST)) - SUM(ACT_EXP_COST) AS FIT
-		       , MAX(FILE_TRGT_KEY)                      AS FILE_TRGT_KEY
-		  FROM   SJM
-		  GROUP BY CO_CD, ORDRS_CLNT_CD
-		)
-		, SJG2 AS
-		(
-		  SELECT CO_CD                                   AS CO_CD        --회사코드
-		       , SUM(ROUND(NVL(ORDRS_AMT, 0) / 1000, 1)) AS ORDRS_AMT --수주금액
-		       , SUM(ROUND(ORDRS_AMT * EXRATE / 1000, 1))  AS EXCHANGE_AMT       --원화금액
-		       , SUM(ORDRS_PRC_MACH)                     AS ORDRS_PRC_MACH     --수주가-기계파트
-		       , SUM(ORDRS_PRC_ELCTY)                    AS ORDRS_PRC_ELCTY    --수주가-전기파트
-		       , SUM(ORDRS_PRC)                          AS ORDRS_PRC          --수주가
-		       , SUM(ORDRS_QTY)                          AS ORDRS_QTY          --수량
-		       , SUM(EST_EPCT_MAT_PRC)                   AS EST_EPCT_MAT_PRC   --견적예상재료비
-		       , SUM(TRGT_PCHS_PCOST_MACH)               AS TRGT_PCHS_PCOST_MACH           --목표구매원가-기계
-		       , SUM(TRGT_PCHS_PCOST_ELCTY)              AS TRGT_PCHS_PCOST_ELCTY          --목표구매원가-전기
-			   , SUM(TRGT_PCHS_PCOST_TOT)                AS TRGT_PCHS_PCOST_TOT            --목표구매원가-합계
-		       , SUM(TRGT_PCHS_PCOST_IN_HOUSE_PRCSN)     AS TRGT_PCHS_PCOST_IN_HOUSE_PRCSN --목표구매원가-기자체가공
-			   , SUM(TRGT_PCHS_PCOST_MACH2)              AS TRGT_PCHS_PCOST_MACH2          --목표구매원가-차감 후 기계
-			   , SUM(ACT_RGL_MACH)                       AS ACT_RGL_MACH        --실행원가-정상-기계
-			   , SUM(ACT_OBS_MACH)                       AS ACT_OBS_MACH        --실행원가-장애-기계
-			   , SUM(ACT_TOT_MACH)                       AS ACT_TOT_MACH        --실행원가-기계
-			   , SUM(ACT_RGL_ELCTY)                      AS ACT_RGL_ELCTY       --실행원가-정상-전기
-			   , SUM(ACT_OBS_ELCTY)                      AS ACT_OBS_ELCTY       --실행원가-장애-전기
-			   , SUM(ACT_TOT_ELCTY)                      AS ACT_TOT_ELCTY       --실행원가-전기
-			   , SUM(ACT_TOT_MACH) + SUM(ACT_TOT_ELCTY)  AS ACT_TOT
-			   , SUM(LABOR_COST_MFG_COST)                AS LABOR_COST_MFG_COST --노무비및제조경비
-			   , SUM(ACT_EXP_COST)                       AS ACT_EXP_COST        --실행원가-경비관리비
-			   , SUM(EST_TRGT_COST)                      AS EST_TRGT_COST       --수주목표원가
-			   , SUM(ACT_TOT_MACH) + SUM(ACT_TOT_ELCTY) + SUM(LABOR_COST_MFG_COST) AS WONGA_TOT
-		       , SUM(ORDRS_PRC) - (SUM(ACT_TOT_MACH) + SUM(ACT_TOT_ELCTY) + SUM(LABOR_COST_MFG_COST)) - SUM(ACT_EXP_COST) AS FIT
-		       , MAX(FILE_TRGT_KEY)                      AS FILE_TRGT_KEY
-		  FROM   SJM
-		  GROUP BY CO_CD
 		)
 		, SJALL AS
 		(
@@ -345,7 +283,7 @@
 		     , CLNT_PJT                        AS CLNT_PJT     --고객사PJT
 			 , (SELECT FN_CM05M01_CD_TO_NM(CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM --고객사PJT명
 		     , CTRT_NM                         AS CTRT_NM   --계약명
-		     , ROUND(NVL(ORDRS_AMT, 0) / 1000, 1) AS ORDRS_AMT --수주금액
+		     , DECODE(CURR_CD,'CURR01', ROUND(ORDRS_AMT / 1000, 1) , ROUND(ORDRS_AMT / 1000, 2))  AS ORDRS_AMT          --수주금액 (원화는 소수1자리 외화는 소수2자리)
 		     , ROUND(ORDRS_AMT * EXRATE / 1000, 1)        AS EXCHANGE_AMT       --원화금액
 		     , EST_NO                          AS EST_NO    --견적번호
 		     , EST_DEG                         AS EST_DEG   --견적차수
@@ -429,6 +367,8 @@
 		     , HIST_NO
 		     , APP_STATUS
 		     , 1 AS LVL
+		     , CURR_CD
+		     , EXRATE
 		FROM   SJM
 		UNION ALL
 		SELECT CO_CD                           AS CO_CD        --회사코드
@@ -525,15 +465,13 @@
 		     , HIST_NO
 		     , APP_STATUS
 		     , 2		 AS LVL
+		     , CURR_CD
+		     , EXRATE
 		FROM   SJD
 		)
 		SELECT SJALL.*
-		     , ECR2.CURR_CD
-		     , FN_CM05M01_CD_TO_NM(ECR2.CURR_CD) AS CURR_NM
-		     , ECR2.EXRATE
+		     , FN_CM05M01_CD_TO_NM(SJALL.CURR_CD) AS CURR_NM
 		FROM   SJALL
-		       LEFT OUTER JOIN TB_CR02M01 ECR2  ON SJALL.CO_CD    = ECR2.CO_CD
-			                                   AND SJALL.ORDRS_NO = ECR2.ORDRS_NO
 		<if test="listFormat =='orderNo'">
 		WHERE 	COLLAPSE <![CDATA[<]]>  2
 		ORDER BY CO_CD,
@@ -541,10 +479,10 @@
 			        WHEN SUBSTRING(ORDRS_NO, 1, 2) = 'AS' THEN 1
 			        ELSE 0
 			    END,
-				ECR2.ORDRS_NO DESC, COLLAPSE, SALES_CD
+				SJALL.ORDRS_NO DESC, COLLAPSE, SALES_CD
 		</if>
 		<if test="listFormat !='orderNo'">
-		ORDER BY CO_CD, CLNT_NM, CLNT_PJT_NM, ECR2.ORDRS_NO DESC, COLLAPSE, SALES_CD
+		ORDER BY CO_CD, CLNT_NM, CLNT_PJT_NM, SJALL.ORDRS_NO DESC, COLLAPSE, SALES_CD
 		</if>
     </select>
 
