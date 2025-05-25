@@ -125,16 +125,20 @@ public class SM20SvcImpl implements SM20Svc {
 			for (Map<String, String> dtl : detailMap) {
     			if (jobYn.equals("U")) { // 대금지급연결
 					dtl.put("billNo", paramMap.get("billNo"));
+					dtl.put("ctrtNo", paramMap.get("ctrtNo"));
 					dtl.put("userId", paramMap.get("userId"));
 					dtl.put("pgmId", paramMap.get("pgmId"));
 					result += sm21Mapper.update_sm21_payChk(dtl);
 				} else if (jobYn.equals("N")) { // 취소처리
 					dtl.put("billNo", "");
+					dtl.put("ctrtNo", "");
 					dtl.put("userId", paramMap.get("userId"));
 					dtl.put("pgmId", paramMap.get("pgmId"));
 					result += sm21Mapper.update_sm21_payChk(dtl);
 				} else if (jobYn.equals("D")) { // 삭제처리
 					result += sm21Mapper.delete_sm21_payChk(dtl);
+					dtl.put("billNo", paramMap.get("billNo"));
+					dtl.put("ctrtNo", paramMap.get("ctrtNo"));
     			}
 
 			}
