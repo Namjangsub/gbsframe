@@ -81,8 +81,8 @@
 		<!-- 검색 콘텐츠 -->
 		<div class="contents search">
 			<div class="">
-				<!-- 테이블 인풋 4분할 -->
-				<table class="table_input type04">
+				<!-- 테이블 인풋 5분할 -->
+				<table class="table_input type05">
 
 					<tr>
 						<!-- <th class= "hit">회사</th>
@@ -96,14 +96,20 @@
 						<td>
 							<input id="mnDate_S" name="mnDate_S" data-search="mnDate" required="required" msg="회의일자">
 						</td>
-						
-						<th>주차</th>
+						<td style="width: 120px">
+							<input id="mnWeeks_S" name="mnWeeks_S" data-search="mnWeeks" style="width:18px; font-size:15px; vertical-align: middle; margin-right:4px;" readonly>
+							<span style="font-size:15px; vertical-align: middle;">주차</span>
+						</td>
+						<th>구분</th>
 						<td>
-							<input type="test" id="mnWeeks_S" name="mnWeeks_S"  data-search="mnWeeks" readonly>
+							<select id="mnDiv_S" name="mnDiv_S" data-search="mnDiv"  onchange="mnGridView.setData(0);">
+								<option value="" selected>회의내용</option>
+								<option value="mnResult">회의결과</option>
+                            </select>
 						</td>
 						<td></td>
 						<td>
-							<div class="add_btn_small pdl10" style="width:500px">
+							<div class="add_btn_small pdl10" style="width:400px;">
 								<!-- <a onclick="insertMn();" style="height: 30px; line-height: 28px;">저장</a> -->
 								<a onclick="moveSelectedUp();" id="moveUp"    style="height: 30px; line-height: 28px; margin:0 5px;">▲</a>
 								<a onclick="moveSelectedDown();" id="moveDown"  style="height: 30px; line-height: 28px;">▼</a>
@@ -122,17 +128,13 @@
 </form>
             </div>
         </div>
-
-		<div class="contents_tit" style="margin-top:20px;">
-			<span style="font-size:15px; ">참석자 리스트</span>
-			<div class="add_btn_small pdl10">
-				<a onclick="openUserSearch()" id="addAttendBtn" style="width: 80px; height: 30px; line-height: 28px;">참석자 추가</a>
-				<a onclick="pm10_d02_delete()" id="removeAttendBtn" style="width: 80px; height: 30px; line-height: 28px;">참석자 삭제</a>
-				<a onclick="pm10_d02_update();" id="saveAttendBtn"   style="height:30px; line-height:28px;">저장</a>
+		<div class="contents" style="display: flex; align-items: center;">
+			<div id="attendCheckboxContainer" style="flex: 1;"></div>
+			<div class="add_btn_small pdl10" style="margin-left: auto; margin-right: 30px">
+				<a onclick="openUserSearch()"   id="addAttendBtn"    style="height:30px; line-height:28px;">+</a>
+				<a onclick="pm10_d02_delete()"  id="removeAttendBtn" style="height:30px; line-height:28px;">-</a>
+				<!-- <a onclick="pm10_d02_update()"  id="saveAttendBtn"   style="width:80px; height:30px; line-height:28px;">저장</a> -->
 			</div>
-		</div>
-		<div class="contents">
-			<div id="attendCheckboxContainer"></div>
 		</div>
 
 		<!-- 콘텐츠 -->
@@ -146,11 +148,17 @@
 		
 		
     </div>
-                    
+    <input type="file" id="fileInput" multiple style="display:none" />                
 </body>
 </html>
 
 <script type="text/javascript">
+
+let fileRowInserted = false;
+let currentFileRow = null;
+let currentFileColumn = null;
+var mnFileArr = [];
+var deleteFileArr = [];
 
 const DEFAULT_ATTEND_LIST = [
 	{ id: 'EMJ8105',    name: '김태호',   title: '부사장' },
@@ -172,6 +180,49 @@ const FIXED_ORDER = DEFAULT_ATTEND_LIST.map(u => u.id);
 function valueFormatter() {
 	return (this.value) ? '<span style="display: block; white-space: pre;">' + this.value + '</span>' : '';
 }
+
+// 파일 첨부 셀 함수
+function fileCellFormatter() {
+	if (!this.item.isFileRow) return valueFormatter.call(this);
+
+	const colKey = this.key;
+	// filesByColumn 에 fileType 까지 담아두었다고 가정
+	const files  = (this.item.filesByColumn && this.item.filesByColumn[colKey]) || [];
+
+	// 1) 파일 리스트
+	const listHtml = files.length ? 
+		`<ul class="file-list" style="padding:0; margin:0; list-style:none;">
+			${files.map((f,i) =>
+			`<li data-idx="${i}" data-col="${colKey}" style="margin:6px 0; display:flex; align-items:center;">
+				<button class="file-remove" data-idx="${i}" data-col="${colKey}"
+						style="font-size:11px; padding:4px 10px; margin-right:6px; background-color:rgb(255,50,0); cursor:pointer;">삭제
+				</button>
+				<!-- preview 가능한 span: fileType 도 data-attr 로 달아줌 -->
+				<span class="file-preview"
+						style="white-space: nowrap; text-decoration:underline; cursor:pointer;" data-filekey="${f.fileKey}" data-filename="${f.name}" data-filetype="${f.fileType}">${f.name}
+				</span>
+				</li>`
+			).join('')}
+		</ul>`
+		: '';
+
+	// 2) 추가 버튼
+	const btnHtml = files.length ? 
+		`<div class="file-add-wrap" style="width:100%; text-align:center; margin-top:12px;">
+			<button class="file-add-btn" data-col="${colKey}"style="font-size:11px; padding:4px 10px; cursor:pointer;">추가</button>
+		</div>`
+		: '';
+
+	return listHtml + btnHtml;
+}
+
+const baseFileCol = {
+	editor: {
+		type: "textarea",
+		disabled: function(){ return this.item.isFileRow; }
+	},
+	formatter: fileCellFormatter
+};
 
 const mnStatusCode = [
 	{'CD' : '', 'NM' : ''},
@@ -206,18 +257,35 @@ var mnGridView = {
 			onClick: function () {
 				this.self.clearSelect();
 				this.self.select(this.dindex);
+
+				const colKey = this.column.key;
+				const files = (this.item.filesByColumn && this.item.filesByColumn[colKey]) || [];
+				if (this.item.mnSubject === '파일첨부' && files.length === 0) {
+					const normalRows = this.self.list.filter(r => !r.isFileRow);
+					const hasDeptValue = normalRows.some(r => r[colKey] && r[colKey].trim());
+					if (!hasDeptValue) {
+						alert('먼저 해당 부서에 회의 내용을 입력한 뒤에 파일을 첨부할 수 있습니다.');
+						return;
+					}
+					currentFileRow    = this.item;
+					currentFileColumn = colKey;
+					$('#fileInput').click();
+				}
+
 			},
 			onDBLClick: function () {
 			},
 			onDataChanged: function(){
 // 				const subSeq = this.item.mnSubSeq;
 // 				if (!subSeq) alert('먼저 주제를 입력해주세요.');
+				if (this.item.isFileRow) return;
 
 				if (this.key === 'mnSubject' || this.key === 'mnStatus' || this.key === 'mnEtcAll') {	//주제 테이블 변경자료
 					pm10_d01_update(this.item, this.key, this.value); 
 				} else {
 					pm10_d03_update(this.item, this.key, this.value);
 				}
+
 				this.self.repaint(true);
 			}
 		},
@@ -234,20 +302,20 @@ var mnGridView = {
 			}
         },
         columns: [
-					{ key: "mnSubject", 	label: "PROJECT<br>/<br>주제", 	align: "left", width: 100, editor: {type: "textarea"}, formatter: valueFormatter},
+					{ key: "mnSubject", 	label: "PROJECT<br>/<br>주제", 	align: "left", width: 100, editor: {type: "textarea",disabled: function () {return this.item.isFileRow;}}, formatter: valueFormatter},
 					{ key: "mnSubSeq", 		label: "순번", 					align: "left", width: 100, hidden: true},
-					{ key: "gun00MnCnts", 	label: "임원", 					align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
-					{ key: "gun60MnCnts", 	label: "생산", 					align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
-					{ key: "gun30MnCnts", 	label: "영업<br>국내.해외", 	align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
-					{ key: "gun40MnCnts", 	label: "연구소", 				align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+					{ key: "gun00MnCnts", 	label: "임원", 					align: "left", width: 220, ...baseFileCol},
+					{ key: "gun60MnCnts", 	label: "생산", 					align: "left", width: 220, ...baseFileCol},
+					{ key: "gun30MnCnts", 	label: "영업<br>국내.해외", 	align: "left", width: 220, ...baseFileCol},
+					{ key: "gun40MnCnts", 	label: "연구소", 				align: "left", width: 220, ...baseFileCol},
 					{
 						key: undefined, 	label: "트루넷", columns: [
-							{ key: "trn5010MnCnts", label: "기계", 		align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
-							{ key: "trn5020MnCnts", label: "전기", 		align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter }
+							{ key: "trn5010MnCnts", label: "기계", 		align: "left", width: 220, ...baseFileCol},
+							{ key: "trn5020MnCnts", label: "전기", 		align: "left", width: 220, ...baseFileCol},
 						]
 					},
-					{ key: "gun10MnCnts", 	label: "경영지원팀<br>총무/인사/제조혁신", 	align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
-					{ key: "gun80MnCnts", 	label: "전산실", 				align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+					{ key: "gun10MnCnts", 	label: "경영지원팀<br>총무/인사/제조혁신", 	align: "left", width: 220, ...baseFileCol},
+					{ key: "gun80MnCnts", 	label: "전산실", 				align: "left", width: 220, ...baseFileCol},
 					{ key: "mnStatus", 		label: "진행/완료", 			align: "left", width: 70, 
 						editor: {
 							type: 'select', config: {
@@ -261,7 +329,8 @@ var mnGridView = {
 					},
 					{ key: "mnEtcAll", 		label: "특이사항", 			align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
 					{ key: "mnSortNo", 		label: "정렬순서", 			align: "center", width: 80, hidden: true},
-					{ key: "mnWeeks", 		label: "주차", 				align: "center", width: 80 },
+					{ key: "mnWeeks", 		label: "주차", 				align: "center", width: 80, hidden: true},
+					
 				]
 		});
 		return this;
@@ -276,15 +345,55 @@ var mnGridView = {
 					paramObj[$(elem).data("search")] = $(elem).val();	
 				}
 			});
-			
+			paramObj.userId = jwt.userId;
 			postAjax("/user/pm/pm10/selectMnList", paramObj, null, function(data){
 				try {
 					let list = data.result;
+					const fileRow = {
+						rnum:        0,
+						mnDate:      $('#mnDate_S').val(),
+						mnWeeks:     $('#mnWeeks_S').val(),
+						mnSubSeq:    0,
+						mnSubject:   '파일첨부',
+						// deptCodeMap의 키들만큼 빈 배열로 초기화
+						gun00MnCnts: '', gun60MnCnts: '', gun30MnCnts: '',
+						gun40MnCnts: '', trn5010MnCnts: '', trn5020MnCnts: '',
+						gun10MnCnts: '', gun80MnCnts: '',
+						mnStatus:    '', mnEtcAll: '',
+						mnSortNo:    0,
+						isFileRow:   true,
+						filesByColumn: {}   // 여길 채워줄 거임
+					};
+
+					// 파일첨부 정보
+					data.result.forEach(row => {
+						if (!row.files) return;
+						const parsed = JSON.parse(row.files);
+						parsed.forEach(f => {
+							// parsed 안의 각 객체에서 fileTrgtKey 추출
+							const fileTrgtKey = f.fileTrgtKey;       // ex. "20250530-GUN00"
+							const deptCode    = fileTrgtKey.substring(9); // "GUN00"
+							// deptCodeMap에서 값이 deptCode인 키 찾기
+							const colKey = Object.keys(deptCodeMap)
+												.find(k => deptCodeMap[k] === deptCode);
+							if (!colKey) return;
+							// 해당 컬럼 배열이 없으면 빈 배열 생성
+							fileRow.filesByColumn[colKey] = fileRow.filesByColumn[colKey] || [];
+							// 파일명·키 정보만 넣기
+							fileRow.filesByColumn[colKey].push({
+								name:    f.fileName,
+								fileKey: f.fileKey,
+								fileType: f.fileType
+							});
+						});
+					});
+					list.push(fileRow);
+
 					targetObj.setData({
 							list : list,
 							page : {
 								totalElements : list.length,
-							} 
+							}
 					});
 
 					select_p10_d02_List(data.d02List);
@@ -334,7 +443,7 @@ var mnGridView = {
 							},
 							{ key: "mnEtcAll", 		label: "특이사항", 			align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
 							{ key: "mnSortNo", 		label: "정렬순서", 			align: "center", width: 80, hidden: true},
-							{ key: "mnWeeks", 		label: "주차", 				align: "center", width: 80 },
+							{ key: "mnWeeks", 		label: "주차", 				align: "center", width: 80, hidden: true},
 						]
 			});
 			return this;
@@ -391,7 +500,7 @@ var mnGridView = {
 			renderAttendList();
 		});
 				
-		mnGridView.initView().setData(0);
+		mnGridView.initView();
 		excelView.initView();
 		
 
@@ -405,8 +514,101 @@ var mnGridView = {
 		$('.off_btn').on('click', function(e){
 			mnGridView.setData(0);
 		});
+
+		$('#fileInput').off('change').on('change', function(){
+			if (!currentFileRow || !currentFileColumn) return;
+			Array.from(this.files).forEach(file => {
+				// 서버 전송용 배열에 넣고
+				mnFileArr.push({ fileKey: 0, file, row: currentFileRow, column: currentFileColumn });
+				// 화면용 컬럼별 배열에 추가
+				currentFileRow.filesByColumn = currentFileRow.filesByColumn || {};
+				currentFileRow.filesByColumn[currentFileColumn] = currentFileRow.filesByColumn[currentFileColumn] || [];
+				currentFileRow.filesByColumn[currentFileColumn].push({ name: file.name, fileKey: 0 });
+			});
+			mnGridView.target.repaint();
+
+			mnUploadFile();
+			$(this).val('');
+			currentFileRow = null;
+			currentFileColumn = null;
+		});
+
+		// 파일 추가
+		$(document).on('click', '.file-add-btn', function(e) {
+			const colKey = $(this).data('col');
+			// 클릭된 버튼이 속한 행 (파일첨부 전용 행)
+			const $li    = $(this).closest('[data-ax5grid-data-index]');
+			const dindex = +$li.attr('data-ax5grid-data-index');
+			const fileRow = mnGridView.target.list[dindex];
+
+			// 1) 일반 데이터 행만 필터링
+			const normalRows = mnGridView.target.list.filter(r => !r.isFileRow);
+			// 2) 그 중에 해당 부서(colKey)에 값이 하나라도 있는지 확인
+			const hasDeptValue = normalRows.some(r => r[colKey] && r[colKey].trim());
+			if (!hasDeptValue) {
+				alert('먼저 해당 부서에 대한 회의 내용을 입력한 후에만 파일을 첨부할 수 있습니다.');
+				return;
+			}
+
+			// 3) 조건 만족 시에만 파일첨부 창 열기
+			currentFileRow    = fileRow;
+			currentFileColumn = colKey;
+			$('#fileInput').click();
+		});
+
+		// 파일 삭제
+		$(document).on('click', '.file-remove', function(e) {
+			e.stopPropagation();  // 그리드 셀 클릭 이벤트가 트리거되지 않도록
+			const $btn   = $(this);
+			const idx    = $btn.data('idx');   // li 인덱스
+			const colKey = $btn.data('col');   // 컬럼 키
+			currentFileColumn = colKey;
+
+			// 해당 버튼이 속한 행의 data-index 가져오기
+			const $rowElem = $btn.closest('[data-ax5grid-data-index]');
+			const dindex   = +$rowElem.attr('data-ax5grid-data-index');
+
+			const row = mnGridView.target.list[dindex];
+			if (row.filesByColumn && row.filesByColumn[colKey]) {
+				const removed = row.filesByColumn[colKey].splice(idx, 1)[0];
+				deleteFileArr.push({ fileKey: removed.fileKey });
+
+				mnGridView.target.repaint();
+				mnUploadFile();
+			}
+		});
+
+		// 파일 미리보기
+		// $(document).on('click', '.file-preview', function(e) {
+		// 	e.stopPropagation();   // 그리드 셀 클릭 이벤트 방지
+		// 	const fileKey  = $(this).data('filekey');
+		// 	const fileName = $(this).data('filename');
+		// 	// 필요하다면 tempFileName 조합 로직 추가
+		// 	imageViewPopup(fileKey, fileName);
+		// });
 		
-		
+		$(document).on('click', '.file-preview', function() {
+			const fileKey  = $(this).data('filekey');
+			const fileName = $(this).data('filename');
+			const $li      = $(this).closest('li');
+			const colKey   = $li.data('col');
+			const dindex   = +$li.closest('[data-ax5grid-data-index]').attr('data-ax5grid-data-index');
+			const row      = mnGridView.target.list[dindex];
+
+			const allFiles = row.filesByColumn[colKey] || [];
+			// const imageList = allFiles
+			// 	.filter(f => {
+			// 		const ft = (f.fileType || '').toLowerCase();
+			// 		return ['jpg','jpeg','png','gif','pdf'].includes(ft);
+			// 	})
+			// 	.map(f => ({
+			// 		fileKey:  f.fileKey,
+			// 		fileName: f.name
+			// 	}));
+
+			imageViewPopup(fileKey, fileName);
+		});
+
 		$(window).on('resize', showSize);
 		$(function() { showSize(); });
 		
@@ -446,7 +648,8 @@ var mnGridView = {
 					reasonCd: user.reasonCd
 				}));
 			} else {
-				attendList = DEFAULT_ATTEND_LIST.map(user => ({ ...user }));
+				// 기본 참여자 전부를 reasonCd: 'Y' 로 설정
+				attendList = DEFAULT_ATTEND_LIST.map(user => ({...user, reasonCd: 'Y'}));
 			}
 
 			// 고정 멤버 순서대로 정렬
@@ -467,13 +670,19 @@ var mnGridView = {
 	
 	function insertMn() {
         var rows = mnGridView.target.list;
+
+		// “파일첨부” 행의 인덱스 찾기
+		const fileRowIndex = rows.findIndex(item => item.isFileRow);
+		// 일반 데이터 행만 필터링
+    	const normalRows = rows.filter(item => !item.isFileRow);
         // rnum의 최대값 구하기
-        const maxRnum = gPasIntChk(Math.max(...rows.map(item => item.rnum))) + 1;
+        const maxRnum = gPasIntChk(Math.max(...normalRows.map(item => item.rnum))) + 1;
         //하나라도 등록되어 있으면 마지막 자료를 복사하고
         //없으면 초기화
         var newRowData ={};
-        if (rows.length > 0) {
-        	newRowData = JSON.parse(JSON.stringify(rows[rows.length - 1])); //깊은 복사로 변경처리됨 (그냥 대입은 레퍼러스 형태임)
+        if (normalRows.length > 0) {
+        	// newRowData = JSON.parse(JSON.stringify(rows[rows.length - 1])); //깊은 복사로 변경처리됨 (그냥 대입은 레퍼러스 형태임)
+        	newRowData = JSON.parse(JSON.stringify(normalRows[normalRows.length - 1])); //깊은 복사로 변경처리됨 (그냥 대입은 레퍼러스 형태임)
 			newRowData.mnSubSeq = maxRnum;
 			newRowData.mnSortNo = maxRnum;
 			newRowData.rnum = maxRnum;
@@ -504,7 +713,9 @@ var mnGridView = {
 						__index: rows.length,
 					};
 		}
-		mnGridView.target.addRow(newRowData, rows.length);
+		const insertIndex = fileRowIndex >= 0 ? fileRowIndex : rows.length;
+		// mnGridView.target.addRow(newRowData, rows.length);
+		mnGridView.target.addRow(newRowData, insertIndex); 
 	}
 	
 	// 삭제
@@ -547,6 +758,7 @@ var mnGridView = {
 		};
 		postAjax('/user/pm/pm10/pm10_d01_update', paramObj, null, function(data) {
 			if (data.resultCode == 200) {
+				pm10_d02_update();
 				mnGridView.setData();
 // 				recalcSortOrder();
 
@@ -558,6 +770,7 @@ var mnGridView = {
 
 	//팀별 회의 내용 Insert, Update
 	function pm10_d03_update(item, colKey, value) {
+		const div = $('#mnDiv_S').val();	// 구분 값 읽기
 		var paramObj = {
 			mnDate   	: $('#mnDate_S').val(),
 		    mnWeeks	 	: $('#mnWeeks_S').val(),
@@ -565,7 +778,6 @@ var mnGridView = {
 			mnSubSeq 	: (item.mnSubSeq)?item.mnSubSeq : 1,
 			mnSortNo 	: gPasIntChk(item.mnSortNo),
 			mnDeptCd 	: deptCodeMap[colKey],
-			mnCnts		: value,
 			mnEtc		: '',
 			mnResult	: '',
 			mnStatus	: '',
@@ -574,6 +786,8 @@ var mnGridView = {
 			userId   	: $('#userId').val(),
 			pgmId    	: $('#pgmId').val()
 		};
+		const key = (div === 'mnResult') ? 'mnResult' : 'mnCnts';
+		paramObj[key] = value;
 		postAjax('/user/pm/pm10/pm10_d03_update', paramObj, null, function(data) {
 			if (data.resultCode === 200) {
 				mnGridView.setData();
@@ -594,7 +808,6 @@ var mnGridView = {
 				reasonRmk: ''
 			};
 		});
-
 		paramObj = {
 			mnDate:     $('#mnDate_S').val(),
 			userId:     $('#userId').val(),
@@ -617,12 +830,12 @@ var mnGridView = {
 			return;
 		}
 		const existing = attendList.filter(i => toRemoveIds.includes(i.id) && i.reasonCd !== undefined).map(i => i.id);
-		const localOnly = toRemoveIds.filter(id => !existing.includes(id));
+		// const localOnly = toRemoveIds.filter(id => !existing.includes(id));
 
-		// 화면단에만 있는 정보 삭제
-		if (localOnly.length) {
-			attendList = attendList.filter(u => !localOnly.includes(u.id));
-		}
+		// // 화면단에만 있는 정보 삭제
+		// if (localOnly.length) {
+		// 	attendList = attendList.filter(u => !localOnly.includes(u.id));
+		// }
 		// 테이블에 있는 참석자 삭제
 		if (existing.length) {
 			paramObj = {
@@ -640,6 +853,37 @@ var mnGridView = {
 		} else {
 			renderAttendList();
 		}
+	}
+
+	// 첨부파일 Start
+	function mnUploadFile () {
+		var formData = new FormData();
+
+		formData.append("userId", $("#userId").val());
+		formData.append("pgmId",  $("#pgmId").val());
+
+		// 신규 업로드 파일들
+		$.each(mnFileArr, function(idx, obj){
+			if(obj.fileKey === 0){
+			formData.append("files", obj.file);
+			}
+		});
+
+		// 삭제할 파일 키들
+		formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
+		formData.append(
+			"fileTrgtKey",
+			$("#mnDate_S").val().replace(/-/g, "") + "-" + deptCodeMap[currentFileColumn]
+		);
+		formData.append("userId", $("#userId").val());
+		formData.append("pgmId",  $("#pgmId").val());
+
+		filePostAjax("/user/pm/pm10/mnUploadFile", formData, function(data){
+			alert(data.resultMessage);
+			mnGridView.setData();
+			mnFileArr = [];
+			deleteFileArr = [];
+		});
 	}
 	
 	//엑셀다운로드
@@ -672,15 +916,20 @@ var mnGridView = {
 			// 체크 상태( reasonCd === 'Y' )를 반영해서 input 에 checked 속성 추가
 			const isChecked = item.reasonCd === 'Y';
 			const $item = $(`
-			<div class="attend-item" data-id="${item.id}">
-				<input type="checkbox" class="attend-checkbox" ${isChecked ? 'checked' : ''}/>
-				${item.name} ${item.title}
-			</div>`);
+				<div class="attend-item" data-id="${item.id}">
+					<input type="checkbox" class="attend-checkbox" ${isChecked ? 'checked' : ''}/>
+					${item.name} ${item.title}
+				</div>`
+			);
 
 			$item.on('click', function(e) {
-			if (!$(e.target).hasClass('attend-checkbox')) {
-				$(this).toggleClass('to-remove');
-			}
+				if (!$(e.target).hasClass('attend-checkbox')) {
+					$(this).toggleClass('to-remove');
+				}
+			});
+
+			$item.find('.attend-checkbox').on('change', function() {
+				pm10_d02_update();
 			});
 			container.append($item);
 		});
@@ -699,10 +948,12 @@ var mnGridView = {
 				attendList.push({
 					id: node.id,
 					name: node.text,
-					title: node.original.levelNm
+					title: node.original.levelNm,
+					reasonCd: 'Y'
 				});
 				reorderAttendList(); // 참석자 정렬
 				renderAttendList();  // 추가한 참석자 랜더링
+				pm10_d02_update();	 // 추가한 참석자 Update
 			}
 		}
 		);
@@ -814,4 +1065,6 @@ var mnGridView = {
 			return 0;                                    // 둘 다 신규 → 추가된 순서 유지
 		});
 	}
+
+	
 </script>

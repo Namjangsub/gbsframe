@@ -1,15 +1,23 @@
 package com.dksys.biz.user.pm.pm10.service.impl;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.pm.pm10.mapper.PM10Mapper;
 import com.dksys.biz.user.pm.pm10.service.PM10Svc;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -18,9 +26,49 @@ public class PM10Svcimpl implements PM10Svc {
 	@Autowired
 	PM10Mapper pm10Mapper;
 
+	@Autowired
+	CM08Svc cm08Svc;
+
+	@Autowired
+    CM15Svc cm15Svc;
+
 	@Override
-	public List<Map<String, String>> selectMnList(Map<String, String> paramMap) {
-		return pm10Mapper.selectMnList(paramMap);
+	public List<Map<String, String>> selectMnList(Map<String, String> paramMap) throws Exception {
+		List<Map<String, String>> mnList = pm10Mapper.selectMnList(paramMap);
+		Gson gson = new Gson();
+
+		for (Map<String, String> row : mnList) {
+			String rawDate = row.get("mnDate").replace("-", "");  // "20250530"
+
+			// 키의 뒤의 값이 MnCnts인 컬럼 키만 뽑아 리스트로 만듬
+			List<String> cntsCols = row.keySet().stream()
+									.filter(k -> k.endsWith("MnCnts"))
+									.collect(Collectors.toList());
+
+			// 조회한 파일들을 빈 리스트
+			List<Map<String, String>> allFiles = new ArrayList<>();
+
+			for (String colKey : cntsCols) {
+				String deptCode = colKey.substring(0, colKey.indexOf("MnCnts"))
+										.toUpperCase();           // ex: "GUN00"
+				String fileTrgtKey = rawDate + "-" + deptCode;      // "20250530-GUN00"
+
+				Map<String, String> fileMap = new HashMap<>(paramMap);
+				fileMap.put("comonCd",     "FITR9901");
+				fileMap.put("fileTrgtTyp", "PM1002M01");
+				fileMap.put("fileTrgtKey", fileTrgtKey);
+				fileMap.put("jobType",     "fileList");
+
+				// 파일 조회
+				List<Map<String, String>> files = cm08Svc.selectFileList(fileMap);
+
+				// 리스트에 추가
+				allFiles.addAll(files);
+			}
+			row.put("files", gson.toJson(allFiles));
+		}
+
+		return mnList;
 	}
 
 	@Override
@@ -107,6 +155,39 @@ public class PM10Svcimpl implements PM10Svc {
 		return result;
 	}
 
-	
+	@Override
+	public int mnUploadFile(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+		int result = 0;
+
+		// 삭제할 키부터 삭제
+		String deleteJson = paramMap.get("deleteFileArr");
+		if (deleteJson != null && !deleteJson.isEmpty()) {
+			List<Map<String, String>> deleteList = new Gson().fromJson(
+				deleteJson,
+				new TypeToken<List<Map<String, String>>>(){}.getType()
+			);
+			for (Map<String, String> entry : deleteList) {
+				String fileKey = entry.get("fileKey");
+				cm08Svc.deleteFile(fileKey);
+			}
+		}
+
+		// 업로드할 파일이 있으면 업로드
+		List<MultipartFile> fileList = mRequest.getFiles("files");
+		if (!fileList.isEmpty()) {
+			//"FITR05"은 공통코드에서 사진,미디어 첨부 디렉토리임
+			paramMap.put("comonCd",        "FITR05");
+			paramMap.put("jobType",        "fileUp");
+			paramMap.put("fileTrgtTyp",    "PM1002M01");
+			paramMap.put("fileTrgtKey",    mRequest.getParameter("fileTrgtKey"));
+			cm15Svc.selectFileAuthCheck(paramMap);
+
+			// 업로드
+			result = cm08Svc.uploadFile(paramMap, mRequest);
+		}
+
+		return result;
+	}
+
 
 }

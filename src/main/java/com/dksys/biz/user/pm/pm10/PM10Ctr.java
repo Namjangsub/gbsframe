@@ -9,6 +9,8 @@ import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.user.pm.pm10.service.PM10Svc;
 import com.dksys.biz.util.MessageUtils;
@@ -25,7 +27,7 @@ public class PM10Ctr {
 
 	// 임팀장회의록 현황 조회
 	@PostMapping(value = "/selectMnList")
-	public String selectClntPurchaseList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	public String selectClntPurchaseList(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 		
 		List<Map<String, String>> result = pm10Svc.selectMnList(paramMap);
 		model.addAttribute("result", result);
@@ -160,6 +162,25 @@ public class PM10Ctr {
 			model.addAttribute("resultCode", 900);
 			model.addAttribute("resultMessage", e.getMessage());
 		}
+		return "jsonView";
+	}
+
+	// 파일업로드
+	@PostMapping("/mnUploadFile")
+	public String mnUploadFile(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
+		try {
+			if (pm10Svc.mnUploadFile(paramMap, mRequest) >= 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		
 		return "jsonView";
 	}
 }
