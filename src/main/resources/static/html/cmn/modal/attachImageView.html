@@ -21,12 +21,14 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: grab; overflow: hidden;
         }
         #pdfControls {
             display: none;
             text-align: center;
             margin: 10px 0;
         }
+		#mainImage { user-select: none; pointer-events: none; } /* 드래그 중 선택 방지 */
     </style>
 </head>
 <body>
@@ -58,6 +60,14 @@
 <script type="text/javascript">
 let rotationAngle = 0;
 let scaleFactor = 1;
+let translateX = 0;
+let translateY = 0;
+let isDragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
+let originX = 0;
+let originY = 0;
+
 let originalWidth = 1300;
 let originalHeight = 860;
 let currentPage = 1;
@@ -174,6 +184,37 @@ function initializeViewer() {
         }
         applyTransform();
     });
+    
+
+	 // mousedown: 드래그 시작
+	 $('#viewArea').on('mousedown', function (event) {
+	     isDragging = true;
+	     dragStartX = event.clientX;
+	     dragStartY = event.clientY;
+	     originX = translateX;
+	     originY = translateY;
+	     $(this).css('cursor', 'grabbing');
+	 });
+	
+	 // mousemove: 드래그 중이면 이동
+	 $(document).on('mousemove', function (event) {
+	     if (isDragging) {
+	         let dx = event.clientX - dragStartX;
+	         let dy = event.clientY - dragStartY;
+	         translateX = originX + dx;
+	         translateY = originY + dy;
+	         applyTransform();
+	     }
+	 });
+	
+	 // mouseup: 드래그 종료
+	 $(document).on('mouseup', function (event) {
+	     if (isDragging) {
+	         isDragging = false;
+	         $('#viewArea').css('cursor', 'default');
+	     }
+	 });
+
 }
 
 function updateButtonState() {
@@ -243,7 +284,7 @@ function loadImage(image) {
 				                    class: 'resized-image',
 				                    src: reader.result,
 				                    style: 'transform: rotate(0deg) scale(1)',
-				                    click: function () { modalStack.close(); }
+// 				                    click: function () { modalStack.close(); }
 				                });
 								$('#viewArea').append(img);
 							};
@@ -260,7 +301,7 @@ function loadImage(image) {
 		                    class: 'resized-image',
 		                    src: reader.result,
 		                    style: 'transform: rotate(0deg) scale(1)',
-		                    click: function () { modalStack.close(); }
+// 		                    click: function () { modalStack.close(); }
 		                });
 						$('#viewArea').append(img);
 					};
@@ -315,12 +356,15 @@ async function renderPage() {
     };
     await page.render(renderContext).promise;
 
-    canvas.style.transform = `rotate(${rotationAngle}deg)`;
+    canvas.style.transform =
+        `translate(${translateX}px, ${translateY}px) rotate(${rotationAngle}deg)`;
 }
 
 function applyTransform() {
-    if (currentIsImage) {
-        $('#viewImgData').css('transform', `rotate(${rotationAngle}deg) scale(${scaleFactor})`);
+    if (currentIsImage) {$('#viewImgData').css(
+            'transform',
+            `translate(${translateX}px, ${translateY}px) rotate(${rotationAngle}deg) scale(${scaleFactor})`
+        );
     } else {
         renderPage(); // PDF는 다시 그려야 함
     }
