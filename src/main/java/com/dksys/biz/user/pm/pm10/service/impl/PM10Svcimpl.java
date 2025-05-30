@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -34,35 +33,25 @@ public class PM10Svcimpl implements PM10Svc {
 
 	@Override
 	public List<Map<String, String>> selectMnList(Map<String, String> paramMap) throws Exception {
+
+    	String[] deptCodes = new Gson().fromJson(paramMap.get("deptCodes"), String[].class);
 		List<Map<String, String>> mnList = pm10Mapper.selectMnList(paramMap);
 		Gson gson = new Gson();
 
-		for (Map<String, String> row : mnList) {
-			String rawDate = row.get("mnDate").replace("-", "");  // "20250530"
+		for (Map<String,String> row : mnList) {
+			String rawDate = row.get("mnDate").replace("-", "");
+			List<Map<String,String>> allFiles = new ArrayList<>();
 
-			// 키의 뒤의 값이 MnCnts인 컬럼 키만 뽑아 리스트로 만듬
-			List<String> cntsCols = row.keySet().stream()
-									.filter(k -> k.endsWith("MnCnts"))
-									.collect(Collectors.toList());
-
-			// 조회한 파일들을 빈 리스트
-			List<Map<String, String>> allFiles = new ArrayList<>();
-
-			for (String colKey : cntsCols) {
-				String deptCode = colKey.substring(0, colKey.indexOf("MnCnts"))
-										.toUpperCase();           // ex: "GUN00"
-				String fileTrgtKey = rawDate + "-" + deptCode;      // "20250530-GUN00"
-
-				Map<String, String> fileMap = new HashMap<>(paramMap);
+			for (String deptCode : deptCodes) {
+				String fileTrgtKey = rawDate + "-" + deptCode;
+				Map<String,String> fileMap = new HashMap<>(paramMap);
 				fileMap.put("comonCd",     "FITR9901");
 				fileMap.put("fileTrgtTyp", "PM1002M01");
 				fileMap.put("fileTrgtKey", fileTrgtKey);
 				fileMap.put("jobType",     "fileList");
 
-				// 파일 조회
-				List<Map<String, String>> files = cm08Svc.selectFileList(fileMap);
-
-				// 리스트에 추가
+				// 해당 부서코드로 무조건 파일 조회
+				List<Map<String,String>> files = cm08Svc.selectFileList(fileMap);
 				allFiles.addAll(files);
 			}
 			row.put("files", gson.toJson(allFiles));
