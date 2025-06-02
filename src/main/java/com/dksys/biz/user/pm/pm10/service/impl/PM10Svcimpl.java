@@ -33,31 +33,43 @@ public class PM10Svcimpl implements PM10Svc {
 
 	@Override
 	public List<Map<String, String>> selectMnList(Map<String, String> paramMap) throws Exception {
-
-    	String[] deptCodes = new Gson().fromJson(paramMap.get("deptCodes"), String[].class);
-		List<Map<String, String>> mnList = pm10Mapper.selectMnList(paramMap);
+		String[] deptCodes = new Gson().fromJson(paramMap.get("deptCodes"), String[].class);
 		Gson gson = new Gson();
 
-		for (Map<String,String> row : mnList) {
-			String rawDate = row.get("mnDate").replace("-", "");
-			List<Map<String,String>> allFiles = new ArrayList<>();
+		// 회의록 리스트 조회
+		List<Map<String, String>> mnList = pm10Mapper.selectMnList(paramMap);
 
-			for (String deptCode : deptCodes) {
-				String fileTrgtKey = rawDate + "-" + deptCode;
-				Map<String,String> fileMap = new HashMap<>(paramMap);
-				fileMap.put("comonCd",     "FITR9901");
-				fileMap.put("fileTrgtTyp", "PM1002M01");
-				fileMap.put("fileTrgtKey", fileTrgtKey);
-				fileMap.put("jobType",     "fileList");
+		// 결과를 담을 새로운 리스트에 회의록 복사
+		List<Map<String, String>> resultList = new ArrayList<>(mnList);
 
-				// 해당 부서코드로 무조건 파일 조회
-				List<Map<String,String>> files = cm08Svc.selectFileList(fileMap);
+		// 첫 번째 회의록의 날짜(rawDate)만 사용
+		String rawDate = mnList.get(0).get("mnDate").replace("-", "");
+
+		// 모든 부서코드로 파일 조회하여 allFiles 에 모으기
+		List<Map<String, String>> allFiles = new ArrayList<>();
+		for (String deptCode : deptCodes) {
+			String fileTrgtKey = rawDate + "-" + deptCode;
+			Map<String, String> fileMap = new HashMap<>(paramMap);
+			fileMap.put("comonCd",     "FITR9901");
+			fileMap.put("fileTrgtTyp", "PM1002M01");
+			fileMap.put("fileTrgtKey", fileTrgtKey);
+			fileMap.put("jobType",     "fileList");
+
+			List<Map<String, String>> files = cm08Svc.selectFileList(fileMap);
+			if (files != null && !files.isEmpty()) {
 				allFiles.addAll(files);
 			}
-			row.put("files", gson.toJson(allFiles));
 		}
 
-		return mnList;
+		// 조회된 파일이 하나라도 있으면, 맨 뒤에 파일 전용 row 추가
+		if (!allFiles.isEmpty()) {
+			Map<String, String> fileRow = new HashMap<>();
+			// fileRow에는 원본 회의록과 구분하기 위해 "files"키에만 JSON 문자열을 담음
+			fileRow.put("files", gson.toJson(allFiles));
+			resultList.add(fileRow);
+		}
+
+		return resultList;
 	}
 
 	@Override
@@ -89,10 +101,7 @@ public class PM10Svcimpl implements PM10Svc {
 			// D03 삭제
 			result += pm10Mapper.deleteMnD03(paramMap);
 		}
-
-		// if ("해당 날짜에 해당하는 주제 및 내용이 없다면 메인 삭제, 참석자 테이블도 삭제") {
-		// 	pm10Mapper.deleteMnM01(paramMap);
-		// }
+		pm10Mapper.deleteMnM01(paramMap);
 
 		return result;
 	}
