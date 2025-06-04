@@ -271,6 +271,7 @@ const deptCodeMap = {
 				onDBLClick: function () {
 				},
 				onDataChanged: function(){
+					pm10_d02_update();	// 참석자 update
 					if (this.key === 'mnSubject' || this.key === 'mnStatus' || this.key === 'mnEtcAll') {
 						pm10_d01_update(this.item, this.key, this.value);
 					} else {
@@ -746,9 +747,14 @@ const deptCodeMap = {
 	// 행 삭제
 	function deleteMn() {
 		const grid = mnGridView.target;
+		const fileRow = grid.list.find(r => r.isFileRow);
 		const sel  = grid.getList("selected")[0];
 		if (!sel) {
 			alert("삭제할 주제를 선택하세요!");
+			return false;
+		}
+		
+		if (sel.mnSubject == "파일첨부") {
 			return false;
 		}
 
@@ -781,10 +787,10 @@ const deptCodeMap = {
 		if (!confirm("선택한 행을 정말 삭제하시겠습니까?")) {
 			return false;
 		}
-
-		paramObj = {
-			mnDate		:   sel.mnDate,
-			mnSubSeq	: sel.mnSubSeq
+		var paramObj = {
+			mnDate		: sel.mnDate,
+			mnSubSeq	: sel.mnSubSeq,
+			fileInfoJson 	: JSON.stringify(fileRow.filesByColumn)
 		}
 		postAjax("/user/pm/pm10/deleteMn", paramObj, null, function(data) {
 			if (data.resultCode == 200) {
@@ -848,8 +854,7 @@ const deptCodeMap = {
 
 	//팀별 회의 내용 Insert, Update
 	function pm10_d03_update(item, colKey, value) {
-		const dataRows = mnGridView.target.list.filter(r => !r.isFileRow && !r.isNoticeRow);
-
+		const dataRows = mnGridView.target.list.filter(r =>!r.isFileRow && !r.isNoticeRow && r.mnSubSeq > 0);
 		var paramObj = {
 			mnDate   	: $('#mnDate_S').val(),
 			mnWeeks	 	: $('#mnWeeks_S').val(),
@@ -870,6 +875,7 @@ const deptCodeMap = {
 		postAjax('/user/pm/pm10/pm10_d03_update', paramObj, null, function(data) {
 			if (data.resultCode === 200) {
 				mnGridView.setData();
+				recalcSortOrder();
 			} else {
 				alert('수정 실패: ' + data.resultMessage);
 			}
@@ -958,10 +964,7 @@ const deptCodeMap = {
 
 		// 삭제할 파일 키들
 		formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
-		formData.append(
-			"fileTrgtKey",
-			$("#mnDate_S").val().replace(/-/g, "") + "-" + deptCodeMap[currentFileColumn]
-		);
+		formData.append("fileTrgtKey", $("#mnDate_S").val().replace(/-/g, "") + "-" + deptCodeMap[currentFileColumn]);
 		formData.append("userId", $("#userId").val());
 		formData.append("pgmId",  $("#pgmId").val());
 
@@ -1173,7 +1176,8 @@ const deptCodeMap = {
 		};
 
 		postAjax('/user/pm/pm10/pm10_d01_sortNo_update', paramObj, null, function(data) {
-			if (data.resultCode !== 200) {
+			if (data.resultCode == 200) {
+				mnGridView.setData();
 			}
 		});
 	}

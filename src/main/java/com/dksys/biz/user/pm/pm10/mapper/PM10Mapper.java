@@ -22,7 +22,11 @@ public interface PM10Mapper {
 
 	int deleteMnD01(Map<String, String> paramMap);
 
+	int deleteMnD02(Map<String, String> paramMap);
+
 	int deleteMnD03(Map<String, String> paramMap);
+
+	int deleteMnFile(Map<String, String> paramMap);
 
 	int pm10_d01_sortNo_update(Map<String, Object> param);
 

@@ -1,5 +1,6 @@
 package com.dksys.biz.user.pm.pm10.service.impl;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -97,11 +98,43 @@ public class PM10Svcimpl implements PM10Svc {
 
 		Object mnSubSeq = paramMap.get("mnSubSeq");
 		if (mnSubSeq != null && !"".equals(mnSubSeq)) {
+			// D01 삭제 (주제)
 			result += pm10Mapper.deleteMnD01(paramMap);
-			// D03 삭제
+			// D02 삭제 (참석자)
+			result += pm10Mapper.deleteMnD02(paramMap);
+			// D03 삭제 (회의 내용)
 			result += pm10Mapper.deleteMnD03(paramMap);
 		}
-		pm10Mapper.deleteMnM01(paramMap);
+		int deleteM01Count = pm10Mapper.deleteMnM01(paramMap);  
+
+		String fileInfoJson = paramMap.get("fileInfoJson");
+
+		if (deleteM01Count > 0 && fileInfoJson != null && !fileInfoJson.isEmpty()) {
+			Map<String, List<Map<String, Object>>> fileInfoMap = new Gson().fromJson(fileInfoJson, new TypeToken<Map<String, List<Map<String, Object>>>>(){}.getType());
+
+			for (Map.Entry<String, List<Map<String, Object>>> entry : fileInfoMap.entrySet()) {
+				List<Map<String, Object>> fileList = entry.getValue();
+				for (Map<String, Object> file : fileList) {
+					String fileKey = String.valueOf(file.get("fileKey"));
+					if (fileKey != null && !fileKey.isEmpty()) {
+
+						Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
+						String filePath = fileInfo.get("filePath") + fileKey + "_" + fileInfo.get("fileName");
+
+						Map<String, String> deleteParam = new HashMap<>();
+						deleteParam.put("fileKey", fileKey);
+						deleteParam.put("mnDate", paramMap.get("mnDate"));
+						result = pm10Mapper.deleteMnFile(deleteParam);	// 임팀장 회의록 파일첨부 삭제 코드
+						try {
+							File f = new File(filePath);
+							f.delete();
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+		}
 
 		return result;
 	}
