@@ -342,12 +342,200 @@
 			ORDER BY C1.CLNT_NM, A.MATR_NM,  A.MATR_MAT, A.MATR_SPEC
 	</sql>
 
+	<!-- 여러개의 구매업체가 등록되어 있는 경우 자재검색 시 해당 리스트 조회쿼리 -->
+	<sql id="selectMatModalNewSql">
+	WITH BASE AS 
+		(
+		SELECT
+			  A.FILE_TRGT_KEY
+			, A.CO_CD
+			, R.CODE_NM          AS CO_NM
+			, A.MATR_CD
+			, A.MATR_NM
+			, A.GOODS_DIV
+			, R1.CODE_NM         AS GOODS_DIV_NM
+			, A.MATR_CLNT_DIV
+			, R2.CODE_NM         AS MATR_CLNT_DIV_NM
+			, A.MATR_DIV
+			, R3.CODE_NM         AS MATR_DIV_NM
+			, A.MATR_GRP
+			, R4.CODE_NM         AS MATR_GRP_NM
+			, A.MATR_MAT
+			, A.MATR_SIZE
+			, A.MATR_SPEC
+			, A.MATR_MAKR_NM
+			, A.MATR_MNO
+			, A.MATR_WT
+			, A.MATR_UNIT
+			, R5.CODE_NM         AS MATR_UNIT_NM
+			, A.ORIGIN_NM
+			, A.MATR_DRW_NO
+			, A.MATR_TEST_DIV
+			, R6.CODE_NM         AS MATR_TEST_DIV_NM
+			, A.DLVR_RQM_DAY
+			, A.MATR_PURC_DIV
+			, R7.CODE_NM         AS MATR_PURC_DIV_NM
+			, A.MIN_ORDRG_QTY
+			, A.MATR_SAFT_QTY
+			, A.MATR_STOCK_CD
+			, A.DSGN_2D_MD
+			, A.AVRG_2D_MD
+			, A.DSGN_3D_MD
+			, A.AVRG_3D_MD
+			, A.PRDCTN_RQM_MD
+			, A.PRDCTN_AVRG_MD
+			, A.USE_YN
+			, A.MATR_PART_NO
+			-- 세 개 구매업체 컬럼을 그대로 가져오되, UNPIVOT할 때 참조하기 위해 남겨둠
+			, A.PCHS_CLNT_CD1
+			, C1.CLNT_NM         AS PCHS_CLNT_NM1
+			, A.PCHS_CLNT_CD2
+			, C2.CLNT_NM         AS PCHS_CLNT_NM2
+			, A.PCHS_CLNT_CD3
+			, C3.CLNT_NM         AS PCHS_CLNT_NM3
+			, A.MATR_UPR
+			, A.MATR_AVRG_UPR
+			, A.MATR_RMK
+			, TO_CHAR(A.MATR_LAST_TRST_DT, 'YYYY-MM-DD') AS MATR_LAST_TRST_DT
+			, A.MATR_ATNT_CD
+			, A.MATR_NO
+			, A.DSGN_TRGT_YN
+			, A.ETC_FIELD1
+			, A.ETC_FIELD2
+			, A.ETC_FIELD3
+			, A.CREAT_ID
+			, U1.NAME            AS CREAT_NM
+			, A.CREAT_PGM
+			, TO_CHAR(A.CREAT_DTTM,   'YYYY-MM-DD') AS CREAT_DTTM
+			, A.UDT_ID
+			, U2.NAME            AS UDT_NM
+			, A.UDT_PGM
+			, TO_CHAR(A.UDT_DTTM,     'YYYY-MM-DD') AS UDT_DTTM
+			, A.MATR_MNG_ID
+			, U3.NAME            AS MATR_MNG_ID_NM
+		FROM TB_BM05M01 A
+						LEFT JOIN TB_CM05M01 R   ON R.CODE_ID  = A.CO_CD
+						LEFT JOIN TB_CM05M01 R1  ON R1.CODE_ID = A.GOODS_DIV
+						LEFT JOIN TB_CM05M01 R2  ON R2.CODE_ID = A.MATR_CLNT_DIV
+						LEFT JOIN TB_CM05M01 R3  ON R3.CODE_ID = A.MATR_DIV
+						LEFT JOIN TB_CM05M01 R4  ON R4.CODE_ID = A.MATR_GRP
+						LEFT JOIN TB_CM05M01 R5  ON R5.CODE_ID = A.MATR_UNIT
+						LEFT JOIN TB_CM05M01 R6  ON R6.CODE_ID = A.MATR_TEST_DIV
+						LEFT JOIN TB_CM05M01 R7  ON R7.CODE_ID = A.MATR_PURC_DIV
+						LEFT JOIN TB_BM02M01 C1  ON C1.CLNT_CD = A.PCHS_CLNT_CD1
+						LEFT JOIN TB_BM02M01 C2  ON C2.CLNT_CD = A.PCHS_CLNT_CD2
+						LEFT JOIN TB_BM02M01 C3  ON C3.CLNT_CD = A.PCHS_CLNT_CD3
+						LEFT JOIN TB_CM06M01 U1  ON U1.ID      = A.CREAT_ID
+						LEFT JOIN TB_CM06M01 U2  ON U2.ID      = A.UDT_ID
+						LEFT JOIN TB_CM06M01 U3  ON U3.ID      = A.MATR_MNG_ID
+		WHERE A.CO_CD = 'GUN'
+		  AND NVL2(#{matrClntDiv}, A.MATR_CLNT_DIV, '.') = NVL(#{matrClntDiv}, '.')
+		  AND REPLACE(REPLACE(A.SEARCH_DATA, '-', ''), ' ', '') LIKE '%' || REPLACE(REPLACE(UPPER(#{searchValue}), '-', ''), ' ', '') || '%'
+		)
+
+	-- 최종적으로 UNPIVOT을 통해 PCHS_CLNT_CD1~3, PCHS_CLNT_NM1~3 을 (pcode, pname)이라는 두 컬럼으로 합쳐서
+	-- NULL이 아닌 구매업체만 뽑아낸다.
+		SELECT
+			  ROW_NUMBER() OVER (ORDER BY U.CO_CD, U.MATR_CD) AS RN
+			, U.FILE_TRGT_KEY
+			, U.CO_CD
+			, U.CO_NM
+			, U.MATR_CD
+			, U.MATR_NM
+			, U.GOODS_DIV
+			, U.GOODS_DIV_NM
+			, U.MATR_CLNT_DIV
+			, U.MATR_CLNT_DIV_NM
+			, U.MATR_DIV
+			, U.MATR_DIV_NM
+			, U.MATR_GRP
+			, U.MATR_GRP_NM
+			, U.MATR_MAT
+			, U.MATR_SIZE
+			, U.MATR_SPEC
+			, U.MATR_MAKR_NM
+			, U.MATR_MNO
+			, U.MATR_WT
+			, U.MATR_UNIT
+			, U.MATR_UNIT_NM
+			, U.ORIGIN_NM
+			, U.MATR_DRW_NO
+			, U.MATR_TEST_DIV
+			, U.MATR_TEST_DIV_NM
+			, U.DLVR_RQM_DAY
+			, U.MATR_PURC_DIV
+			, U.MATR_PURC_DIV_NM
+			, U.MIN_ORDRG_QTY
+			, U.MATR_SAFT_QTY
+			, U.MATR_STOCK_CD
+			, U.DSGN_2D_MD
+			, U.AVRG_2D_MD
+			, U.DSGN_3D_MD
+			, U.AVRG_3D_MD
+			, U.PRDCTN_RQM_MD
+			, U.PRDCTN_AVRG_MD
+			, U.USE_YN
+			, U.MATR_PART_NO
+			-- UNPIVOT 결과 컬럼
+			, U.pcode         AS PCHS_CLNT_CD
+			, U.pname         AS PCHS_CLNT_NM
+			, U.MATR_UPR
+			, U.MATR_AVRG_UPR
+			, U.MATR_RMK
+			, U.MATR_LAST_TRST_DT
+			, U.MATR_ATNT_CD
+			, U.MATR_NO
+			, U.DSGN_TRGT_YN
+			, U.ETC_FIELD1
+			, U.ETC_FIELD2
+			, U.ETC_FIELD3
+			, U.CREAT_ID
+			, U.CREAT_NM
+			, U.CREAT_PGM
+			, U.CREAT_DTTM
+			, U.UDT_ID
+			, U.UDT_NM
+			, U.UDT_PGM
+			, U.UDT_DTTM
+			, U.MATR_MNG_ID
+			, U.MATR_MNG_ID_NM
+		FROM BASE
+			UNPIVOT (
+				(pcode, pname) FOR ord IN (
+					(PCHS_CLNT_CD1, PCHS_CLNT_NM1) AS '1'
+				, (PCHS_CLNT_CD2, PCHS_CLNT_NM2) AS '2'
+				, (PCHS_CLNT_CD3, PCHS_CLNT_NM3) AS '3'
+				)
+			) U
+		WHERE U.pcode IS NOT NULL
+		ORDER BY U.CO_CD, U.MATR_CD
+	</sql>
+
+
+	<!-- 자재마스터 팝업 그리드 조회 카운트-->
+	<!-- <select id="MatModal_selectCount" parameterType="Map" resultType="int">
+        SELECT
+        COUNT(*)
+        FROM (
+        	<include refid="selectMatModalSql"></include>
+        )
+	</select> -->
+
+	<!-- 자재마스터 팝업 그리드 조회 -->
+	<!-- <select id="MatModal_selectList" parameterType="Map" resultType="camelMap">
+		SELECT *
+		FROM    (
+				<include refid="selectMatModalSql"></include>
+				) AS A
+		WHERE A.RN BETWEEN #{firstIndex} AND #{lastIndex}
+	</select> -->
+
 	<!-- 자재마스터 팝업 그리드 조회 카운트-->
 	<select id="MatModal_selectCount" parameterType="Map" resultType="int">
         SELECT
         COUNT(*)
         FROM (
-        	<include refid="selectMatModalSql"></include>
+        	<include refid="selectMatModalNewSql"></include>
         )
 	</select>
 
@@ -355,7 +543,7 @@
 	<select id="MatModal_selectList" parameterType="Map" resultType="camelMap">
 		SELECT *
 		FROM    (
-				<include refid="selectMatModalSql"></include>
+				<include refid="selectMatModalNewSql"></include>
 				) AS A
 		WHERE A.RN BETWEEN #{firstIndex} AND #{lastIndex}
 	</select>
