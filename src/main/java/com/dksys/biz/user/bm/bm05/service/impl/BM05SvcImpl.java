@@ -1,7 +1,6 @@
 package com.dksys.biz.user.bm.bm05.service.impl;
 
 import java.lang.reflect.Type;
-import java.text.Format.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -11,13 +10,12 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.user.bm.bm05.mapper.BM05Mapper;
-import com.dksys.biz.user.bm.bm05.service.BM05Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.user.bm.bm05.mapper.BM05Mapper;
+import com.dksys.biz.user.bm.bm05.service.BM05Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -50,17 +48,30 @@ public class BM05SvcImpl implements BM05Svc {
 		return bm05Mapper.grid1_selectList(paramMap);
 	}
 
-	// 팝업 그리드 카운트
+	// 팝업(설계BOM) 그리드 카운트
 	@Override
 	public int MatModal_selectCount(Map<String, String> paramMap) {
 		int result = bm05Mapper.MatModal_selectCount(paramMap);
 		return result;
 	}
 
-	// 팝업 그리드 리스트
+	// 팝업(설계BOM) 그리드 리스트
 	@Override
 	public List<Map<String, String>> MatModal_selectList(Map<String, String> paramMap) {
 		return bm05Mapper.MatModal_selectList(paramMap);
+	}
+
+	// 팝업(구매BOM) 그리드 카운트
+	@Override
+	public int MatModal_pchs_selectCount(Map<String, String> paramMap) {
+		int result = bm05Mapper.MatModal_pchs_selectCount(paramMap);
+		return result;
+	}
+
+	// 팝업(구매BOM) 그리드 리스트
+	@Override
+	public List<Map<String, String>> MatModal_pchs_selectList(Map<String, String> paramMap) {
+		return bm05Mapper.MatModal_pchs_selectList(paramMap);
 	}
 
 	// 수정화면 정보

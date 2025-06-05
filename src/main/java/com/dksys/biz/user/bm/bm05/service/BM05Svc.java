@@ -13,9 +13,13 @@ public interface BM05Svc {
 	// 그리드 리스트
 	List<Map<String, String>> grid1_selectList(Map<String, String> paramMap);
 	
-	// 팝업 그리드 리스트
+	// 팝업(설계BOM) 그리드 리스트
 	int MatModal_selectCount(Map<String, String> paramMap);
 	List<Map<String, String>> MatModal_selectList(Map<String, String> paramMap);
+
+	// 팝업(구매BOM) 그리드 리스트
+	int MatModal_pchs_selectCount(Map<String, String> paramMap);
+	List<Map<String, String>> MatModal_pchs_selectList(Map<String, String> paramMap);
 	
 	// 수정화면 정보
 	Map<String, String> select_bm05_Info(Map<String, String> paramMap);

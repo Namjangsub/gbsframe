@@ -1,13 +1,11 @@
 package com.dksys.biz.user.bm.bm05;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,8 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.user.bm.bm05.service.BM05Svc;
 import com.dksys.biz.cmn.vo.PaginationInfo;
+import com.dksys.biz.user.bm.bm05.service.BM05Svc;
 import com.dksys.biz.util.MessageUtils;
 
 @Controller
@@ -40,13 +38,24 @@ public class BM05Ctr {
 		return "jsonView";
 	}
 
-	//팝업 그리드 리스트
+	//팝업(설계BOM) 그리드 리스트
 	@PostMapping(value = "/MatModal_selectList")
 	public String MatModal_selectList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		int totalCnt = bm05Svc.MatModal_selectCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
 		List<Map<String, String>> result = bm05Svc.MatModal_selectList(paramMap);
+		model.addAttribute("MatModalList", result);
+		return "jsonView";
+	}
+
+	//팝업(구매BOM) 그리드 리스트
+	@PostMapping(value = "/MatModal_pchs_selectList")
+	public String MatModal_pchs_selectList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = bm05Svc.MatModal_pchs_selectCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = bm05Svc.MatModal_pchs_selectList(paramMap);
 		model.addAttribute("MatModalList", result);
 		return "jsonView";
 	}
