@@ -128,7 +128,7 @@
 </form>
             </div>
         </div>
-		<div class="contents" style="display: flex; align-items: center;">
+		<div class="contents attend-area" style="display: flex; align-items: center;">
 			<div id="attendCheckboxContainer" style="flex: 1;"></div>
 			<div class="add_btn_small pdl10" style="margin-left: auto; margin-right: 30px">
 				<a onclick="openUserSearch()"   id="addAttendBtn"    style="height:30px; line-height:28px;">+</a>
@@ -158,6 +158,7 @@ let currentFileRow = null;
 let currentFileColumn = null;
 var mnFileArr = [];
 var deleteFileArr = [];
+let attendFlag = true;	// 구분이 회의결과일 때 참석자 리스트 update를 위한 flag
 
 const DEFAULT_ATTEND_LIST = [
 	{ id: 'EMJ8105',    name: '김태호',   title: '부사장' },
@@ -271,7 +272,6 @@ const deptCodeMap = {
 				onDBLClick: function () {
 				},
 				onDataChanged: function(){
-					pm10_d02_update();	// 참석자 update
 					if (this.key === 'mnSubject' || this.key === 'mnStatus' || this.key === 'mnEtcAll') {
 						pm10_d01_update(this.item, this.key, this.value);
 					} else {
@@ -453,6 +453,7 @@ const deptCodeMap = {
 					});
 
 					select_p10_d02_List(data.d02List || []);
+					recalcSortOrder();
 				} catch (error) {
 					alert("오류 발생!! 전산실 연락 바랍니다: " + error.message);
 				} finally {
@@ -555,13 +556,35 @@ const deptCodeMap = {
 				
 		mnGridView.initView().setData();
 		excelView.initView();
-		
 
 		// 회의일자 변경 시
 		$('#mnDate_S').on('change', function (){
 			$('#mnWeeks_S').val(moment($('#mnDate_S').val(), 'YYYY-MM-DD').isoWeek());
 			mnGridView.initView().setData(0);
 		})
+
+		// 구분 변경 시
+		$('#mnDiv_S').on('change', function (){
+			if ($('#mnDiv_S').val() === 'MNDIV01') {
+				$('.attend-area').hide();
+				
+			}
+			else if ($('#mnDiv_S').val() === 'MNDIV02') {
+				// 구분이 회의결과로 바뀌면 참석자 리스트 UPDATE 하고 attendFlag를 false로 변경 -> 이 로직은 회의결과로 들어왔을 때 딱 한번 참석자 리스트 업데이트 하기 위함
+				if (attendFlag) {
+					pm10_d02_update();
+				}
+
+				$('.attend-area').show().css('pointer-events', 'auto');
+				$('#addAttendBtn, #removeAttendBtn').show();
+				$('#attendCheckboxContainer input.attend-checkbox').prop('disabled', false).css('pointer-events', 'auto').css('cursor', 'pointer');
+			}
+			else if ($('#mnDiv_S').val() === 'MNDIV99') {
+				$('.attend-area').show().css('pointer-events', 'none');
+				$('#addAttendBtn, #removeAttendBtn').hide();
+				$('#attendCheckboxContainer input.attend-checkbox').prop('disabled', true).css('pointer-events', 'none').css('cursor', 'default');
+			}
+		});
 
 		// 왼쪽 사이드바 닫기 버튼 클릭 시 그리드 데이터 셋팅 
 		$('.off_btn').on('click', function(e){
@@ -754,7 +777,7 @@ const deptCodeMap = {
 			return false;
 		}
 		
-		if (sel.mnSubject == "파일첨부") {
+		if (sel.mnSubject == "파일첨부" || ((sel.mnSubSeq == 0) && (sel.mnSubject == '공지사항'))) {
 			return false;
 		}
 
@@ -769,7 +792,7 @@ const deptCodeMap = {
 				grid.list.splice(idx, 1);
 				// 다시 렌더링 및 순서 재계산
 				grid.setData({ list: grid.list, page: { totalElements: grid.list.length } });
-				recalcSortOrder();
+				// recalcSortOrder();
 			}
 			return;
 		}
@@ -795,7 +818,6 @@ const deptCodeMap = {
 		postAjax("/user/pm/pm10/deleteMn", paramObj, null, function(data) {
 			if (data.resultCode == 200) {
 				mnGridView.setData();
-				recalcSortOrder();
 			} else {
 				alert("삭제 실패: " + data.resultMessage);
 			}
@@ -807,10 +829,11 @@ const deptCodeMap = {
 		item[colKey] = value;
 
 		// 일반 주제행 목록
-		const normalRows = mnGridView.target.list
-		.filter(r => !r.isFileRow && !r.isNoticeRow);
+		const normalRows = mnGridView.target.list.filter(r => !r.isFileRow && !r.isNoticeRow);
 
-		let newSubSeq, newSortNo;
+		let newSubSeq;
+		let newSortNo;
+
 		if (item.isNoticeRow) {
 			// 신규 공지사항: 아직 subSeq가 0일 때만 마지막+1
 			newSubSeq  = item.mnSubSeq > 0 ? item.mnSubSeq : normalRows.length + 1;
@@ -840,11 +863,6 @@ const deptCodeMap = {
 
 		postAjax('/user/pm/pm10/pm10_d01_update', paramObj, null, function(data) {
 			if (data.resultCode === 200) {
-				// 서버가 새 mnSubSeq를 반환했으면 반영하고 다시 로딩
-				if (data.newSubSeq) {
-					item.mnSubSeq = data.newSubSeq;
-					recalcSortOrder();
-				}
 				mnGridView.setData();
 			} else {
 				alert('수정 실패: ' + data.resultMessage);
@@ -854,28 +872,37 @@ const deptCodeMap = {
 
 	//팀별 회의 내용 Insert, Update
 	function pm10_d03_update(item, colKey, value) {
-		const dataRows = mnGridView.target.list.filter(r =>!r.isFileRow && !r.isNoticeRow && r.mnSubSeq > 0);
+		// 기존 행들 중 공지·파일 행을 제외하고, seq가 0보다 큰 행만 모은다
+		const dataRows = mnGridView.target.list.filter(r => 
+			!r.isFileRow && !r.isNoticeRow && r.mnSubSeq > 0
+		);
+
+		// 현재 존재하는 mnSubSeq의 최대값을 구한다. 없으면 0
+		const maxSeq = dataRows.reduce((max, r) => Math.max(max, r.mnSubSeq || 0), 0);
+
+		// 신규이면 maxSeq + 1, 아니면 기존 seq 유지
+		const newSubSeq = item.mnSubSeq > 0 ? item.mnSubSeq : (maxSeq + 1);
+
 		var paramObj = {
-			mnDate   	: $('#mnDate_S').val(),
-			mnWeeks	 	: $('#mnWeeks_S').val(),
-			mnDiv		: $("#mnDiv_S").val(),
-			mnSubject 	: item.mnSubject,
-			mnSubSeq  	: item.mnSubSeq > 0 ? item.mnSubSeq : dataRows.length + 1,
-			mnSortNo  	: item.isNoticeRow ? dataRows.length + 1 : gPasIntChk(item.mnSortNo),
-			mnDeptCd 	: deptCodeMap[colKey],
-			mnCnts		: $("#mnDiv_S").val() == 'MNDIV01'? value : '',  //사전공지
-			mnEtc		: '',
-   			mnResult	: $("#mnDiv_S").val() == 'MNDIV02'? value : '',		//회의결과
-			mnStatus	: '',
-			clntPjt		: '',
-			clntCd		: '',
-			userId   	: $('#userId').val(),
-			pgmId    	: $('#pgmId').val()
+			mnDate    : $('#mnDate_S').val(),
+			mnWeeks   : $('#mnWeeks_S').val(),
+			mnDiv     : $("#mnDiv_S").val(),
+			mnSubject : item.mnSubject,
+			mnSubSeq  : newSubSeq,
+			mnSortNo  : item.isNoticeRow ? (dataRows.length + 1) : gPasIntChk(item.mnSortNo),
+			mnDeptCd  : deptCodeMap[colKey],
+			mnCnts    : $("#mnDiv_S").val() === 'MNDIV01' ? value : '',  // 사전공지
+			mnEtc     : '',
+			mnResult  : $("#mnDiv_S").val() === 'MNDIV02' ? value : '',  // 회의결과
+			mnStatus  : '',
+			clntPjt   : '',
+			clntCd    : '',
+			userId    : $('#userId').val(),
+			pgmId     : $('#pgmId').val()
 		};
 		postAjax('/user/pm/pm10/pm10_d03_update', paramObj, null, function(data) {
 			if (data.resultCode === 200) {
 				mnGridView.setData();
-				recalcSortOrder();
 			} else {
 				alert('수정 실패: ' + data.resultMessage);
 			}
@@ -884,6 +911,9 @@ const deptCodeMap = {
 
 	// 참석자 update
 	function pm10_d02_update() {
+		if ($("#mnDiv_S").val() == 'MNDIV99') {
+			return false;
+		}
 		const list = attendList.map(item => {
 			const isChecked = $(`#attendCheckboxContainer .attend-item[data-id="${item.id}"] .attend-checkbox`)
 								.is(':checked');
@@ -901,6 +931,9 @@ const deptCodeMap = {
 		}
 		postAjax('/user/pm/pm10/pm10_d02_update', paramObj, null, data => {
 			if (data.resultCode == 200) {
+				if ($("#mnDiv_S").val() == 'MNDIV02') {
+					attendFlag = false;			// 프래그 해제
+				}
 			} else {
 				alert('참석자 저장 실패: ' + data.resultMessage);
 			}
@@ -1141,6 +1174,11 @@ const deptCodeMap = {
 		const noticeRow = allRows.find(r => r.isNoticeRow);
 		const dataRows  = allRows.filter(r => !r.isFileRow && !r.isNoticeRow);
 
+		// 로우가 없으면 정렬순서 계산 return
+		if (dataRows.length == 0 && noticeRow.mnSortNo == 0) {
+			return false;
+		}
+
 		dataRows.forEach((row, idx) => {
 			row.mnSortNo = idx + 1;
 		});
@@ -1177,7 +1215,7 @@ const deptCodeMap = {
 
 		postAjax('/user/pm/pm10/pm10_d01_sortNo_update', paramObj, null, function(data) {
 			if (data.resultCode == 200) {
-				mnGridView.setData();
+				// mnGridView.setData();
 			}
 		});
 	}
