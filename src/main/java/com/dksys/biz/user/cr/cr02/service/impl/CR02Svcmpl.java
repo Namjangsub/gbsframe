@@ -6,8 +6,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -189,6 +191,18 @@ public class CR02Svcmpl implements CR02Svc {
 
 //        List<Map<String, String>> detailArr = gson.fromJson(removeEmptyObjects(param.get("detailArr")), mapList);
         List<Map<String, String>> detailArr = gson.fromJson(param.get("detailArr"), mapList);
+
+		// 설비정보 salesCode 중복 체크
+		Set<String> salesCdCheck = new HashSet<>();
+		for (Map<String, String> detailMap : detailArr) {
+			String salesCd = detailMap.get("salesCd");
+			if (salesCd != null && !salesCd.trim().isEmpty()) {
+				if (!salesCdCheck.add(salesCd)) {
+					// 중복이면 바로 예외 발생시켜 catch로 이동
+					throw new RuntimeException("중복된 salesCd 존재가 존재합니다.");
+				}
+			}
+		}
 
         for (Map<String, String> detailMap : detailArr) {
             try {
@@ -552,6 +566,17 @@ public class CR02Svcmpl implements CR02Svc {
 
       //2. 설비정보 추가, 수정 건 처리
         List<Map<String, String>> detailArr = gson.fromJson(param.get("detailArr"), mapList);
+		// 설비정보 salesCode 중복 체크
+		Set<String> salesCdCheck = new HashSet<>();
+		for (Map<String, String> detailMap : detailArr) {
+			String salesCd = detailMap.get("salesCd");
+			if (salesCd != null && !salesCd.trim().isEmpty()) {
+				if (!salesCdCheck.add(salesCd)) {
+					// 중복이면 바로 예외 발생시켜 catch로 이동
+					throw new RuntimeException("중복된 salesCd 존재가 존재합니다.");
+				}
+			}
+		}
         String jobType = "";  //추가="C",  수정 = "U" 코드 저장용
         for (Map<String, String> detailMap : detailArr) {
             try {
