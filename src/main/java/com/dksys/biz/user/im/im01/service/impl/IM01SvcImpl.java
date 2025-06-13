@@ -75,11 +75,11 @@ public class IM01SvcImpl implements IM01Svc {
         Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {
         }.getType();
 
-        if (paramMap.containsKey("imprApprovalArr")) {
+        if (paramMap.containsKey("approvalArr")) {
 
             // 새로운 리스트 초기화
             List<Map<String, String>> newdetailMap = new ArrayList<>();
-            List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("imprApprovalArr"), dtlMap);
+            List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
             // 각 맵 수정 및 추가
             for (Map<String, String> dtl : detailMap) {
 
@@ -154,17 +154,24 @@ public class IM01SvcImpl implements IM01Svc {
         // wb20Svc.insertTodoMaster(paramMap); 에서는 결재자 정보를 approvalArr 키값으로 처리하고 있음
         // ---------------------------------------------------------------
 
+		String approvalJson = paramMap.get("approvalArr");
         HashMap<String, String> wbDelChkParam = new HashMap<>();
         wbDelChkParam.put("reqNo", paramMap.get("imprvmNo")); // 개선제안서 번호를 키로 검색함
-        im01Mapper.updateDelApprovalList1(wbDelChkParam);// TB_WB20M03 --> SET ETC_FIELD3 = 'DEL' 로 변경처리
+        if (approvalJson != null && !"undefined".equals(approvalJson.trim())) {
+			// Gson 으로 List<Map> 형태로 파싱
+			Gson gson = new Gson();
+			List<Map<String,String>> approvalList = gson.fromJson(approvalJson, new TypeToken<List<Map<String,String>>>(){}.getType());
+			for (Map<String,String> app : approvalList) {
+				String todoId = app.get("todoId");
+				if (todoId != null) {
+					wbDelChkParam.put("todoId", todoId);
+					im01Mapper.updateDelApprovalList1(wbDelChkParam);
+				}
+			}
+		}
 
-        if (paramMap.containsKey("imprApprovalArr")) {
-            paramMap.put("approvalArr", paramMap.get("imprApprovalArr"));
-            // 결제라인 insert
-            result += wb20Svc.insertTodoMaster(paramMap);
-        }
-        if (paramMap.containsKey("execApprovalArr")) {
-            paramMap.put("approvalArr", paramMap.get("execApprovalArr"));
+        if (!"undefined".equals(paramMap.get("approvalArr")) && paramMap.containsKey("approvalArr")) {
+            paramMap.put("approvalArr", paramMap.get("approvalArr"));
             // 결제라인 insert
             result += wb20Svc.insertTodoMaster(paramMap);
         }

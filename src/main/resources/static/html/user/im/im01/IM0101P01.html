@@ -252,7 +252,7 @@
 
 	/***********전역변수****************/
 	let actionType = null;		//C:등록,  U: 수정
-	let joblevel = 0;		//0:등록,  1:검토부서 처리, 2:검토부서의견, 3:평가결과 등록 
+	let jobLevel = 0;		//0:등록,  1:검토부서 처리, 2:검토부서의견, 3:평가결과 등록 
 	let currFormId = '#popForm';
 	let imprvmNo = '';
     var approvalList = null;
@@ -723,10 +723,13 @@
 					}
 				}
 			});
-			
 			//작업 컨트롤을 위한 Data의 작업 단계를 저장함
 			$(currFormId + ' #imprvmStsCdOrg').val(data.result.imprvmStsCd);
-			
+
+			// 
+			if (jobLevel == '1' && $("#imprvmStsCd").val() !== 'IMPRSTS01') {
+				$('#actionBtn').hide();
+			}
 			
 			let tmpReqInfo = data.result.imprvmReqDttm == undefined ? '' : `${data.result.imprvmReqIdNm}\n${data.result.imprvmReqDttm}`;
 			let tmpExecInfo = data.result.execTeamDttm == undefined ? '' : `${data.result.execTeamIdNm}\n${data.result.execTeamDttm}`;
@@ -760,7 +763,6 @@
 
 	 // 등록
 	function insertImprovement() {
-		debugger;
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 			if($("input[name='imprvmType']:checked").val() == undefined){
 	            alert("분류 항목을 체크하세요");
@@ -808,7 +810,6 @@
 	//----------------------------------------------//
 	
 	function makeFormData() {
-		debugger;
 
 		// 폼데이터 생성
 		var formData = new FormData($(currFormId)[0]);
@@ -819,25 +820,19 @@
         	tempValues.push($(this).val());
         });
         formData.set("imprvmType", tempValues.join(', '));
-    	
-		/*	결재그리드 insert make start */
-	    //개선제안시 작성자 팀장, 조치부서 팀장 정보 자동 등록하기
-//     	if (['IMPRSTS01'].includes($(currFormId + ' #imprvmStsCd').val())) {
-    		selectTeamManagerApprovalAdd();
-    		
-        	// 개선 제안서 결재그리드 처리
-        	const imprApprovalArr = [];
-//         	const imprApprovalArr = processApprovalGrid(gridViewPop1, "approvalArr", modalStack.last().paramObj, currFormId, modalStack);
-        	formData.set("imprApprovalArr", JSON.stringify(imprApprovalArr));
-//     	}
 
-    	let execApprovalArr = [];
-    	// 개선 조치결과 결재그리드 처리
-//     	if (['IMPRSTS03', 'IMPRSTS04'].includes($(currFormId + ' #imprvmStsCd').val())) {
-//     		execApprovalArr = processApprovalGrid(gridViewPop2, "execApprovalArr", modalStack.last().paramObj, currFormId, modalStack);
-//     	}
-    	formData.set("execApprovalArr", JSON.stringify(execApprovalArr));
-    	
+		selectTeamManagerApprovalAdd();
+
+		const formDataKey = (jobLevel == '1' || jobLevel == '2')  ? 'approvalArr' : ''
+		const approvalArr = processApprovalGrid(
+			gridViewPop1,               // 결재자 그리드 객체
+			formDataKey,              // 폼 필드명
+			modalStack.last().paramObj, // 모달 파라미터 (rsltNo 등 포함)
+			currFormId,                 // 폼 선택자
+			modalStack
+		);
+		formData.set("approvalArr", JSON.stringify(approvalArr));
+			
 //     	formData.set("imprvmReqId", imprvmReqId);	//작성자 팀장 ID정보
 	    	
 		//*********************************************************************************************************
@@ -891,66 +886,65 @@
 	}
 
 	function processApprovalGrid(gridView, formDataKey, paramObj, currFormId, modalStack) {
-	    const rowSharngList = gridView.target.list;
-	    const ParamObj = { ...paramObj };
-	    ParamObj.rsltNo = $(`${currFormId} #imprvmNo`).val();
-	    ParamObj.actionType = 'U'; // 결재모드는 수정으로 접근하기 위함
+		const rowSharngList = gridView.target.list;
+		const ParamObj = { ...paramObj };
+		ParamObj.rsltNo = $(`${currFormId} #imprvmNo`).val();
+		ParamObj.actionType = 'U'; // 결재모드는 수정으로 접근하기 위함
 
-	    if (rowSharngList.length > 0) {
-	        const approvalArr = [];
+		if (rowSharngList.length > 0) {
+			const approvalArr = [];
 
-	        // 공통 파라미터 설정
-	        const addParam = {
-	            coCd: $(`${currFormId} #coCd`).val(),
-	            salesCd: $(`${currFormId} #salesCd`).val(),
-	            pgmId: $(`${currFormId} #pgmId`).val(),
-	            pgPath: "/user/im/im01/IM0101P01.html",
-	            sanctnSttus: "N",
-	            todoCoCd: $(`${currFormId} #coCd`).val(),
-	            todoNo: $(`${currFormId} #imprvmNo`).val(),
-	            todoFileTrgtKey: modalStack.last().paramObj.imprvmNo,
-	            pgParam: JSON.stringify(ParamObj),
-	            userId: jwt.userId,
-	            todoTitl: `${$(`${currFormId} #unitNo`).val()} 개선 제안서`,
-	            todoKey: "",
-	            todoCodeKind: "",
-	            todoCodeId: "",
-	        };
+			// 공통 파라미터 설정
+			const addParam = {
+				coCd: $(`${currFormId} #coCd`).val(),
+				salesCd: $(`${currFormId} #salesCd`).val(),
+				pgmId: $(`${currFormId} #pgmId`).val(),
+				pgPath: "/user/im/im01/IM0101P01.html",
+				sanctnSttus: "N",
+				todoCoCd: $(`${currFormId} #coCd`).val(),
+				todoNo: $(`${currFormId} #imprvmNo`).val(),
+				todoFileTrgtKey: modalStack.last().paramObj.imprvmNo,
+				pgParam: JSON.stringify(ParamObj),
+				userId: jwt.userId,
+				todoTitl: `${$(`${currFormId} #unitNo`).val()} 개선 제안서`,
+				todoKey: "",
+				todoCodeKind: "",
+				todoCodeId: "",
+			};
 
-	        let 결재순번 = 0;
-	        let 공유순번 = 0;
+			let 결재순번 = 0;
+			let 공유순번 = 0;
 
-	        $.each(rowSharngList, function (idx, elem) {
-	            if (!elem.usrNm.includes('gyrsult')) {
-	                const approvalListObj = { ...elem };
+			$.each(rowSharngList, function (idx, elem) {
+				if (!elem.usrNm.includes('gyrsult')) {
+					const approvalListObj = { ...elem };
 
-	                addParam["todoId"] = elem.usrNm;
-	                addParam["empNo"] = elem.empNo;
-	                addParam["name"] = elem.name;
-	                addParam["telNo"] = elem.telNo;
-	                addParam["email"] = elem.eMail;
-	                addParam["gb"] = elem.gb;
+					addParam["todoId"] = elem.usrNm;
+					addParam["empNo"] = elem.empNo;
+					addParam["name"] = elem.name;
+					addParam["telNo"] = elem.telNo;
+					addParam["email"] = elem.eMail;
+					addParam["gb"] = elem.gb;
 
-	                if (elem.gb === '공유') {
-	                                   공유순번 += 1;
-	                    approvalListObj["sanctnSn"] = 공유순번;
-	                    approvalListObj["todoDiv1CodeId"] = "TODODIV10";
-	                    approvalListObj["todoDiv2CodeId"] = formDataKey === "approvalArr" ? "TODODIV1150" : "TODODIV1160";
-	                } else if (elem.gb === '결재') {
-	                                   결재순번 += 1;
-	                    approvalListObj["sanctnSn"] = 결재순번;
-	                    approvalListObj["todoDiv1CodeId"] = "TODODIV20";
-	                    approvalListObj["todoDiv2CodeId"] = formDataKey === "approvalArr" ? "TODODIV2150" : "TODODIV2160";
-	                }
+					if (elem.gb === '공유') {
+									공유순번 += 1;
+						approvalListObj["sanctnSn"] = 공유순번;
+						approvalListObj["todoDiv1CodeId"] = "TODODIV10";
+						approvalListObj["todoDiv2CodeId"] = formDataKey === "approvalArr" ? "TODODIV1150" : "TODODIV1160";
+					} else if (elem.gb === '결재') {
+									결재순번 += 1;
+						approvalListObj["sanctnSn"] = 결재순번;
+						approvalListObj["todoDiv1CodeId"] = "TODODIV20";
+						approvalListObj["todoDiv2CodeId"] = formDataKey === "approvalArr" ? "TODODIV2150" : "TODODIV2160";
+					}
 
-	                approvalArr.push({ ...addParam, ...approvalListObj });
-	            }
-	        });
+					approvalArr.push({ ...addParam, ...approvalListObj });
+				}
+			});
 
-	        return approvalArr;
-	    }
+			return approvalArr;
+		}
 	}
-
 
 	// 공유대상자 추가//
     function insertShareUserModal1(_grid) {
@@ -1205,12 +1199,13 @@
 	          }
 	      });
 	     //---------------------------------------
-
+		const appDiv20 = (jobLevel == '1' || jobLevel == '2')  ? 'TODODIV2150' : 'TODODIV2160'
+		const shaDiv20 = (jobLevel == '1' || jobLevel == '2')  ? 'TODODIV1150' : 'TODODIV1160'
 		let param = {
 				"tmplatDiv": "TMPLATDIV02"
 				, "coCd": $(currFormId + ' #coCd').val()				//해당업무의 coCd(트르넷발주 TRN )
 				, "todoDiv1CodeId": "TODODIV20"					//공통코드 해당업무 - 결재
-				, "todoDiv2CodeId": "TODODIV2150"					//공통코드 해당업무 - 결재 - 발주서
+				, "todoDiv2CodeId": appDiv20					//공통코드 해당업무 - 결재 - 발주서
 				, "todoDiv1CodeNm": "결재"						//공통코드 해당업무 - 결재 - 발주서
 				//, "todoDiv2CodeNm": "발주 및 출장 요청"						//공통코드 해당업무 - 결재 - 발주서
 				, "title": "개선 제안서"
@@ -1229,7 +1224,7 @@
 				"tmplatDiv": "TMPLATDIV02"
 					, "coCd":  $(currFormId + ' #coCd').val()				//				//해당업무의 coCd(트르넷발주 TRN )
 					, "todoDiv1CodeId": "TODODIV10"					//공통코드 해당업무 - 결재
-					, "todoDiv2CodeId": "TODODIV1150"					//공통코드 해당업무 - 결재 - 발주서
+					, "todoDiv2CodeId": shaDiv20					//공통코드 해당업무 - 결재 - 발주서
 					, "todoDiv1CodeNm": "공유"						//공통코드 해당업무 - 결재 - 발주서
 					, "title": "개선 제안서"
 					, "sanctnDiv2": "공유"							//템플릿 결재구분2    #{sanctnDiv2} 처리 바랍니다.
@@ -1350,13 +1345,8 @@
 	}
 
 
-    //개선제안서 작성자 팀장 및 조치 부서 팀장 정보 가져오기
+    //개선제안서 결재자 정보 추가
 	function selectTeamManagerApprovalAdd() {
-		debugger;
-//     	//------------------------------------------------
-//     	//개선제안서 등록시 결재자 정보를 메모리에 가져오기  start
-//     	//결재자 정보와 공유자 정보를 분리하고 개선제안 작성자, 조치부서 팀장추가 및 조치부서 팀장이 공유에 있으면 제외 처리함.
-//     	//------------------------------------------------
     	let appshaList = gridViewPop1.target.getList();
 
 		var appArray = [];	//결재권자 정보
@@ -1365,35 +1355,18 @@
         appshaList.forEach(item => (item.gb === "결재" ? appArray : shaArray).push(item));
 
 // 		//작성자의 팀장 정보 가져와서  결제자에  추가
-		appArray = approvalTeamManagerInfoData( 'ycy', appArray, shaArray);
+		if (jobLevel == '1' || jobLevel == '3') {
+			appArray = approvalTeamManagerSpecialInfoData('ycy', appArray);
+			if (jobLevel == '3') {
+				appArray = approvalTeamManagerSpecialInfoData($("#imprvmId").val(), appArray)
+			}
+		} else if (jobLevel == '2') {
+			appArray = selectDept2TeamManagerInfo($("#execActDept").val(), appArray);
+		}
+		
 		gridViewPop1.setData2(appArray.concat(shaArray));
 
 		$.gridNoSet(gridViewPop1, "sanctnSn");
-// 		//------------------------------------------------
-// 		//개선제안서 결재자 정보를 메모리에 가져오기  end
-// 		//------------------------------------------------
-		
-		
-// 		//조치담당부서 결재자 처리
-//     	let appshaList2 = gridViewPop2.target.getList();
-
-// 		var appArray2 = [];	//결재권자 정보
-// 		var shaArray2 = [];	//공유자 정보
-
-//         appshaList2.forEach(item => (item.gb === "결재" ? appArray2 : shaArray2).push(item));
-// 		//조치부서 팀장정보가져와서 결제자에 추가
-// 		appArray2 = selectDept2TeamManagerInfo( $(currFormId + ' #execActDept').val(), appArray2, shaArray2);
-// 		//조치부서가 기술연구소이면 정상훈 공유자로 자동 추가함
-// 		if ($(currFormId + ' #execActDept').val() == 'GUN40') {
-// 			appArray2 = approvalUserInfoData('shjung', appArray2, shaArray2);
-// 		}
-		
-// 		gridViewPop2.setData2(appArray2.concat(shaArray2));
-
-// 		$.gridNoSet(gridViewPop2, "sanctnSn");
-		//------------------------------------------------
-		//개선조치부서 결재자 정보를 메모리에 가져오기  end
-		//------------------------------------------------
 	}
 
     //조치담당자정보 자동 추가하기
@@ -1423,6 +1396,35 @@
         		// 공유영역에 usrNm 값이 list.id 와 같은 결제자는 삭제
         		shaArray = shaArray.filter(item => item.usrNm !== list.id);
 	    	}
+		});
+		return appArray;
+	}
+
+	//특정담당자 정보 가져오기
+	function approvalTeamManagerSpecialInfoData(appUserId, appArray) {
+		var formData = {
+				"userId" : appUserId,
+		}
+		postAjaxSync("/user/wb/wb24/selectTeamManagerSpecialInfo", formData, null, function(data) {
+			if (data.result != '' && data.result!=null) {
+				//결자자 정보 가져오기
+				let list = data.result;
+				if (appArray.some(item => item.usrNm === list.id)) {
+					//Array에 usrNm 의 값중에 list.id와 같은 값이 있으면 true
+				} else {
+					appArray.push({
+								gb: "결재",
+								usrNm: list.id,
+								name: list.name,
+								jik: list.levelNm,
+								dtNm: list.deptNm,
+								telNo: list.telNo,
+								offTelNo: list.offTelNo,
+								email: list.email,
+
+							});
+				}
+			}
 		});
 		return appArray;
 	}
@@ -1463,7 +1465,7 @@
 	
 
     //부서코드로 팀장 정보 가져오기
-	function selectDept2TeamManagerInfo(deptId, appArray, shaArray) {
+	function selectDept2TeamManagerInfo(deptId, appArray) {
 	    var formData = {
 		        "deptId" : deptId,
 		}
@@ -1489,7 +1491,6 @@
 
         		execTeamId = list.id;	//조치부서 팀장 ID정보 백엔드로 보내기위해 저장함.
         		// 공유영역에 usrNm 값이 list.id 와 같은 결제자는 삭제
-        		shaArray = shaArray.filter(item => item.usrNm !== list.id);
         	}
 		});
 		return appArray;
