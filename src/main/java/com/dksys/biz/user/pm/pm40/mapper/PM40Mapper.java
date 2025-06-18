@@ -20,6 +20,9 @@ public interface PM40Mapper {
     // DATA UPDATE
     int update_pm40(Map<String, String> paramMap);
 
+	// DATA UPDATE
+	int followUp_update_pm40(Map<String, String> paramMap);
+
     // DATA DELETE
     int delete_pm40(Map<String, String> paramMap);
 

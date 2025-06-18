@@ -20,6 +20,9 @@ public interface PM40Svc {
     // DATA UPDATE
     int update_pm40(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
+	// DATA UPDATE
+	int followUp_update_pm40(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
     // DATA DELETE
     int delete_pm40(Map<String, String> paramMap) throws Exception;
 

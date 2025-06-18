@@ -239,6 +239,12 @@ public class PM40SvcImpl implements PM40Svc{
         return result;
     }
 
+	@Override
+	public int followUp_update_pm40(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+		int result = pm40Mapper.followUp_update_pm40(paramMap);
+		return result;
+	}
+
     @Override
     public int delete_pm40(Map<String, String> paramMap) throws Exception {
         int result = 0;

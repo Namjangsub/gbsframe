@@ -96,6 +96,26 @@ public class PM40Ctr {
         return "jsonView";
     }
 
+	// UPDATE
+	@PostMapping(value = "/followUp_update_pm40")
+	public String followUp_update_pm40(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model)
+			throws Exception {
+		try {
+			if (pm40svc.followUp_update_pm40(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
     // DELETE
     @PutMapping(value = "/delete_pm40")
     public String delete_pm40(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
