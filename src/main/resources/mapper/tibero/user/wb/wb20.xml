@@ -63,6 +63,28 @@
 		WHERE 1 = 1
 		<include refid="selectToDoListCondition"></include>
 	</select>
+	
+	
+	<select id="selectToDoCountNewSql" parameterType="Map" resultType="int">
+	SELECT 
+		(SELECT COUNT(*)
+		 FROM TB_WB20M03 T
+				LEFT OUTER JOIN TB_CM05M01 X ON  X.CODE_ID = T.TODO_DIV2_CODE_ID
+				LEFT OUTER JOIN TB_CM06M01 B  ON T.TODO_ID = B.ID
+		WHERE 1 = 1
+		<include refid="selectToDoListCondition"></include>
+		) + 
+		(SELECT COUNT(*)															AS VIEW_SORT
+            FROM TB_WB24M02  AS ISU --WBS이슈 정보
+          			LEFT OUTER JOIN TB_QM01M01 AS QM ON QM.REQ_NO = ISU.REQ_NO
+           WHERE 1=1
+            AND ( (NVL(QM.REQ_ST,'REQST01') != 'REQST03' AND ISU.ISS_STS != 'ISSSTS03')
+                    OR (NVL(ISU.ISS_STS,'ISSSTS01') != 'ISSSTS03' AND ISU.REQ_NO IS NULL)  
+                )
+			AND (ISU.ACT_ID = #{salesMngId} OR QM.ORDRG_ID = #{salesMngId} )
+		)
+	FROM DUAL;
+	</select>
 
 	<!-- ToDo List 메인 화면 조회 리스트  -->
 	<select id="selectToDoList" parameterType="Map" resultType="camelMap">
@@ -118,7 +140,130 @@
 					WHERE 1 = 1
 						<include refid="selectToDoListCondition"></include>
 						/* ORDER BY T.SALES_CD DESC, T.TODO_NO DESC, T.SANCTN_SN DESC */
-					ORDER BY TODO_DIV1_CODE_NM,  TODO_DIV2_CODE_NM, SALES_CD DESC, TODO_NM
+					ORDER BY TODO_DIV1_CODE_NM, TODO_DIV2_CODE_NM, T.CREAT_DTTM DESC, SALES_CD DESC, TODO_NM
+				) AS X
+				WHERE 1=1
+			) AS Z
+		WHERE  1 = 1
+		  AND  Z.RN BETWEEN ${firstIndex} AND ${lastIndex}
+	</select>
+
+	<!-- ToDo List 메인 화면 조회 리스트  -->
+	<select id="selectToDoListNewSql" parameterType="Map" resultType="camelMap">
+		SELECT Z.*
+		FROM
+		(
+			SELECT X.*
+					, ROWNUM AS RN
+			FROM
+				(
+					SELECT T.CO_CD
+					    , TO_CHAR(T.TODO_KEY) AS  TODO_KEY --TO DO KEY
+						, T.TODO_DIV1_CODE_ID --TO DO 구분(공유-결재)
+						, T.TODO_DIV2_CODE_ID
+						, FN_CM05M01_CD_TO_NM(T.TODO_DIV1_CODE_ID) AS TODO_DIV1_CODE_NM --TO DO 구분(공유-결재) 명
+						, X.CODE_NM  			AS TODO_DIV2_CODE_NM 	 --발생프로그램 명
+						, T.SALES_CD --Sales Code
+						, T.TODO_NO  --관리번호
+						, T.SANCTN_SN  --결제순번
+						,T.TODO_ID
+						, B.NAME       AS TODO_NM --대상자명
+						/* 결재요청자와 결재자가 같은 팀이면 팀장구분을 리턴하고 그외는 공백으로 처리함(이슈 결재처리시 위험도평가에서 사용함 */
+--						, DECODE(substr(C.DEPT_ID,0,5), substr(B.DEPT_ID,0,5),B.TEAM_MANAGER,'') AS TEAM_MANAGER		/* 팀장구분 */
+						, DECODE(T.TODO_DIV2_CODE_ID, 'TODODIV2090',DECODE(substr(C.DEPT_ID,0,5), substr(B.DEPT_ID,0,5),'평가',''),'') AS TEAM_MANAGER		/* 팀장구분 */
+						, T.SANCTN_STTUS
+						, T.PG_PATH
+						, T.TODO_FILE_TRGT_KEY
+						, T.TODO_NO
+						, CASE WHEN (T.TODO_DIV2_CODE_ID = 'TODODIV2100' OR T.TODO_DIV2_CODE_ID = 'TODODIV1100') THEN (T.TODO_NO ||' ' || T.ETC_FIELD2 || '차')
+						       ELSE T.TODO_NO
+						       END AS SHW_TODO_NO
+						, T.PG_PARAM
+						, TO_CHAR(T.TODO_CF_DT, 'YYYY-MM-DD') AS TODO_CF_DT  --확인일자
+						, T.TODO_CF_OPN  --확인의견
+						, T.CREAT_ID  --생성자
+						, C.NAME      AS CREAT_NM	/*생성자명 */
+						, TO_CHAR(T.CREAT_DTTM, 'YYYY-MM-DD') AS CREAT_DTTM  --생성일시
+						, T.UDT_ID  --최종변경자
+						,
+						(
+							SELECT A.NAME
+								FROM TB_CM06M01 AS A
+							WHERE A.ID = T.UDT_ID
+						) AS UDT_NM	/*변경자명 */
+						, TO_CHAR(T.UDT_DTTM, 'YYYY-MM-DD') AS UDT_DTTM  --최종변경일자
+						, T.TODO_TITL AS TODO_TITL
+						, T.CREAT_PGM
+						, T.ETC_FIELD2
+						, '' AS ORDRS_NO
+						, '' AS WORK_RPT_RMK
+						, '' AS ISS_STS
+						, '' AS REQ_ST
+						, '' AS DUDT_INTEND_DT
+						, '' AS VIEW_SORT
+					FROM TB_WB20M03 T
+							LEFT OUTER JOIN TB_CM05M01 X ON  X.CODE_ID = T.TODO_DIV2_CODE_ID
+							LEFT OUTER JOIN TB_CM06M01 B  ON T.TODO_ID = B.ID
+							LEFT OUTER JOIN TB_CM06M01 C  ON T.CREAT_ID = C.ID
+					WHERE 1 = 1
+						<include refid="selectToDoListCondition"></include>
+				 UNION ALL 
+					 SELECT
+	                      ISU.CO_CD                             AS CO_CD			--회사코드
+	                    , ISU.FILE_TRGT_KEY                     AS FILE_TRGT_KEY	--이슈 FILE_TRGT_KEY
+	                    , 'TODODIV99'                    		AS TODO_DIV1_CODE_ID
+	                    , 'TODODIV9999'                    		AS TODO_DIV2_CODE_ID
+	              	    , '문제'  								AS TODO_DIV1_CODE_NM
+	              	    , '문제미완료현황'  						AS TODO_DIV2_CODE_NM
+	                    , ISU.SALES_CD                          AS SALES_CD     	--SALES Code
+	                    , ISU.ISS_NO                          	AS TODO_NO
+	                    , 1                          			AS SANCTN_SN
+	                    , decode(ISU.REQ_NO, '', ISU.ACT_ID, QM.ORDRG_ID)       					AS TODO_ID    --조치담당자
+						, decode(ISU.REQ_NO, '', B2.NAME, B4.NAME) 			 						AS TODO_NM
+						, ''									AS TEAM_MANAGER
+						, 'N'									AS SANCTN_STTUS
+						, 'PG_PATH'								AS PG_PATH
+						, QM.FILE_TRGT_KEY 						AS TODO_FILE_TRGT_KEY
+	                    , ISU.REQ_NO         		 			AS TODO_NO      
+						, ISU.ISS_NO 							AS SHW_TODO_NO --이슈번호
+						, ''									AS PG_PARAM
+						, ''									AS TODO_CF_DT
+						, ''									AS TODO_CF_OPN
+						, ISU.CREAT_ID							AS CREAT_ID
+						, B.NAME								AS CREAT_NM
+						, TO_CHAR(ISU.CREAT_DTTM,'YYYY-MM-DD')	AS CREAT_DTTM
+						, ''									AS UDT_ID
+						, ''									AS UDT_NM
+						, ''									AS UDT_DTTM
+						, ISU.ISS_SJ							AS TODO_TITL	--이슈제목
+						, ''									AS CREAT_PGM
+						, ''									AS ETC_FIELD2
+	                    , Y.ORDRS_NO							AS ORDRS_NO
+	                    , ISU.ISS_CNTS							AS WORK_RPT_RMK     --이슈내용
+	                    , decode(ISU.REQ_NO, '', ISU.ISS_STS, QM.REQ_ST)      AS ISS_STS	--이슈상태
+				        , QM.REQ_ST																	AS REQ_ST
+				        , TO_CHAR(CR.DUDT_INTEND_DT,'YYYY-MM-DD') 									AS DUDT_INTEND_DT	--수주 납기예정일 ->고객요구일
+				        , CASE WHEN QM.REQ_ST = 'REQST03' THEN 3 
+				               WHEN ISU.ISS_STS = 'ISSSTS03' THEN 3
+				               WHEN QM.REQ_ST IS NOT NULL THEN 2
+				               WHEN ISU.ISS_STS = 'ISSSTS02' THEN 2
+				               ELSE 1 END 															AS VIEW_SORT
+	                FROM TB_WB24M02  AS ISU --WBS이슈 정보
+		            		LEFT OUTER JOIN TB_CR02D02 AS CR  ON ISU.CO_CD= CR.CO_CD
+		                                                	AND ISU.SALES_CD = CR.SALES_CD
+		            		LEFT OUTER JOIN TB_CR02M01 AS Y  ON ISU.CO_CD= Y.CO_CD
+	                                                      	AND CR.ORDRS_NO = Y.ORDRS_NO
+		           			LEFT OUTER JOIN TB_CM06M01 AS B  ON ISU.CREAT_ID = B.ID
+		           			LEFT OUTER JOIN TB_CM06M01 AS B2 ON ISU.ACT_ID = B2.ID
+	            			LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --실적이슈 조치내용
+	              			LEFT OUTER JOIN TB_QM01M01 AS QM ON QM.REQ_NO = ISU.REQ_NO
+		           			LEFT OUTER JOIN TB_CM06M01 AS B4 ON QM.ORDRG_ID = B4.ID
+	               WHERE 1=1
+	                AND ( (NVL(QM.REQ_ST,'REQST01') != 'REQST03' AND ISU.ISS_STS != 'ISSSTS03')
+	                        OR (NVL(ISU.ISS_STS,'ISSSTS01') != 'ISSSTS03' AND ISU.REQ_NO IS NULL)  
+	                    )
+					AND (ISU.ACT_ID = #{salesMngId} OR QM.ORDRG_ID = #{salesMngId} )
+					ORDER BY TODO_DIV1_CODE_NM, TODO_DIV2_CODE_NM, CREAT_DTTM DESC, SALES_CD DESC, TODO_NM
 				) AS X
 				WHERE 1=1
 			) AS Z
