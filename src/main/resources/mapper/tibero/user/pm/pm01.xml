@@ -1389,6 +1389,9 @@
 					        , '' AS DUDT_INTEND_DT		--수주 납기예정일 ->고객요구일
 					        , 4 AS VIEW_SORT
 					        , 'N' AS SAME_TIME_RESULT
+							, ''  AS VEND_CD
+							, ''  AS VEND_CD_NM
+							, ''  AS REQ_DT
 				        FROM   TB_PM01M01 AS T
 				               LEFT OUTER JOIN TB_CR02D02 AS CR  ON T.ORD_CO_CD= CR.CO_CD
 				                                                AND T.SALES_CD = CR.SALES_CD
@@ -1524,7 +1527,7 @@
 					        , to_char(W2.TODO_CF_DT,'MM/DD')  AS PUR_APPROVAL_DT		--구매 결재
 					        , to_char(W3.TODO_CF_DT,'MM/DD')  AS PRD_APPROVAL_DT		--생산 결재
 					        , to_char(W4.TODO_CF_DT,'MM/DD')  AS OUT_APPROVAL_DT		--직접매출 결재
-                            , TO_CHAR(W9.DE_DT, 'YYYY-MM-DD') AS CUST_REQ_DT			--과제 출고일 = 고객요구일
+                            , TO_CHAR(NVL(QM.CUST_REQ_DT, NVL(ISU.CUST_REQ_DT, W9.DE_DT)), 'YYYY-MM-DD') AS CUST_REQ_DT		--과제 출고일 = 고객요구일
 					        , TO_CHAR(CR.DUDT_INTEND_DT,'YYYY-MM-DD') AS DUDT_INTEND_DT	--수주 납기예정일 ->고객요구일
 					        , CASE WHEN QM.REQ_ST = 'REQST03' THEN 3 
 					               WHEN ISU.ISS_STS = 'ISSSTS03' THEN 3
@@ -1532,6 +1535,9 @@
 					               WHEN ISU.ISS_STS = 'ISSSTS02' THEN 2
 					               ELSE 1 END VIEW_SORT
                         	, NVL(QP.SAME_TIME_RESULT,'N')  AS SAME_TIME_RESULT	--발주요청서와 결과를 동시에 등록한 자료인면 수정 금지
+							, ISU.VEND_CD 		AS VEND_CD
+							, BM2.CLNT_NM 		AS VEND_CD_NM
+                            , TO_CHAR(NVL(QM.REQ_DT, ISU.REQ_DT), 'YYYY-MM-DD') AS REQ_DT
 		                FROM TB_WB24M02  AS ISU --WBS이슈 정보
 			            		LEFT OUTER JOIN TB_CR02D02 AS CR  ON ISU.CO_CD= CR.CO_CD
 			                                                	AND ISU.SALES_CD = CR.SALES_CD
@@ -1558,6 +1564,7 @@
 											    SELECT W9.*, ROW_NUMBER() OVER (PARTITION BY SALES_CD ORDER BY VER_NO DESC) AS rn
 											    FROM TB_WB21M01 W9
 											) W9 ON W9.CO_CD = CR.CO_CD AND W9.SALES_CD = CR.SALES_CD AND W9.rn = 1  --마지막 버전의 과제정보 가져오기
+               					LEFT OUTER JOIN TB_BM02M01 AS BM2  ON BM2.CLNT_CD = ISU.VEND_CD
 		               WHERE 1=1
 				        <if test="coCd !=null and !coCd.equals('')">
 				        AND    ISU.CO_CD = #{coCd}
