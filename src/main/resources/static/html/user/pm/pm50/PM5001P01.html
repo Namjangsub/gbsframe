@@ -1,0 +1,404 @@
+<div class="popup_area of_a" style="width: 100%; height: 100%;">
+	<div class="tit_contents">
+		<h4 class="tit">출장자 사진 파일 Upload작업</h4>
+	</div>
+		<!-- <input type="file" id="notiFile" style="display:none" multiple="multiple" onchange="setNotiFile(this);"/> -->
+	<form id="popForm" onSubmit="return false;">
+		<input type="hidden" id="fileTrgtKey"  	name="fileTrgtKey">
+		<input type="hidden" id="pgmId"     	name="pgmId"	value="PM5001P01_M">
+		<input type="hidden" id="coCd" name="coCd" required msg="회사">
+		<div class="form-group popup_table" style="width: 100%;">
+			<table>
+				<colgroup>
+					<col width="22%">
+					<col width="28%">
+					<col width="22%">
+					<col width="28%">
+				</colgroup>
+
+				<tr>
+					<th class="hit">SalesCode</th>
+					<td>
+						<div class="search_form">
+							<input type="text" id="salesCd" name="salesCd" required class="form-control" msg="Sales Code" >
+							<a id="salesTarget" onclick="wbsSalesCodeSearch();"><i class="i_search_w"></i></a>
+						</div>
+					</td>
+					<th class="hit">등록담당자</th>
+					<td>
+						<div class="search_form">
+							<input type="hidden" id="reqId" name="reqId" required msg="등록담당자"> <a onclick="openUserSearch();"><i class="i_search_w"></i></a>
+							<input type="text" id="reqIdNm" name="reqIdNm"  onkeyup="event.keyCode === 8 ? reqId.value = '' : (event.keyCode === 13 ? openUserSearch() : true);" required msg="등록 담당자">
+						</div>
+					</td>
+				</tr>
+				<tr>
+					<th>설비명</th>
+					<td colspan="3">
+						<input type="text" id="eqpNm" name="eqpNm" readonly>
+					</td>
+				</tr>
+				<tr>
+					<th>고객사</th>
+					<td>
+						<input type="hidden" id="ordrsClntCd" name="ordrsClntCd">
+						<input type="text" id="ordrsClntNm" name="ordrsClntNm" class="form-control" readonly>
+					</td>
+					<th>차종</th>
+					<td>
+						<input type="hidden" id="clntPjt" name="clntPjt">
+						<input type="text" id="clntPjtNm" name="clntPjtNm" class="form-control" readonly>
+					</td>
+				</tr>
+				<tr>
+					<th>제품명</th>
+					<td>
+						<input type="hidden" id="prdtCd" name="prdtCd">
+						<input type="text" id="prdtCdNm" name="prdtCdNm" class="form-control" readonly>
+					</td>
+					<th>총괄PM</th>
+					<td>
+						<input type="hidden" id="pmId" name="pmId">
+						<input type="text" id="pmNm" name="pmNm" class="form-control" readonly>
+					</td>
+				</tr>
+			</table>
+		</div>
+	</form>
+	<input type="file" id="fileUploader" multiple style="display:none" />
+	<!-- <div id="contents" style="display: none; text-align: left;width: 100%">
+		<div class="contents" style="width: 100%"> -->
+			<div data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 300px; width: 100%"></div>
+		<!-- </div>
+	</div> -->
+	
+
+
+</div>
+<!-- 하단 버튼 -->
+<div class ="popup_bottom_btn">
+	<button type="button" id="actionBtn">저장</button>
+	<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+</div>
+
+
+
+<script type="text/javascript">
+	var fileList = [];
+	var actionType = null;
+	var fileTrgtKey = null;
+	var paramObj = null;
+    var windowWidth = $(window).width();
+    var windowHeight = $(window).height();
+	var rowClicked = false;
+
+	var currPgmAuthChk = true;
+	var deleteFileArr = [];
+
+	var fileGridView = {
+		initView : function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showRowSelector: false,
+				multipleSelect: false,
+				sortable: true,
+				target: $('[data-ax5grid="file-grid"]'),
+				header: {
+					align: "center",
+					selector: true
+				},
+				body: {
+					onClick: function () {
+						this.self.select(this.dindex);
+						
+					},
+					onDBLClick: function () {
+						var fileKey = this.item.fileKey;
+						if (fileKey) {
+							rowClicked = true;
+							if (this.item.fileDown == 'Y') {
+								if (this.column.key == "fileName") {
+									//첨부파일 이미지뷰
+									let tempType = this.item.fileType.toLowerCase();
+									if (tempType == 'jpg' || tempType == 'jpeg' || tempType == 'png' || tempType == 'gif'|| tempType == 'pdf') {
+										const imageList = this.self.list.filter(item => {
+											const fileType = item.fileType.toLowerCase();
+											return fileType === 'jpg' || fileType === 'jpeg' || fileType === 'png' || fileType === 'gif'|| tempType == 'pdf';
+										});
+										imageViewPopup(fileKey, this.item.fileName, imageList);
+									} else {
+										downLoadFile(fileKey);	// 모바일 다운로드
+									}
+								} else {
+									downLoadFile(fileKey);	// 모바일 다운로드
+								}
+							} else {
+								alert('파일 다운로드 권한이 없습니다.');
+							}
+						}
+					},
+				},
+				columns: [
+
+					{key: "fileTrgtKey", 	label: "파일타겟키", 		hidden: true},
+					{key : "nodeId",  		label : "nodeId",	 	width : 120, align: "center", hidden: true},
+					{key : "fileUp",  		label : "up",	 		width : 60, align: "center", hidden: true},
+					{key : "fileDown",  	label : "down",	 		width : 60, align: "center", hidden: true},
+					{key : "fileUpdate",  	label : "update",	 	width : 60, align: "center", hidden: true},
+					{key : "fileDelete",  	label : "delete",	 	width : 60, align: "center", hidden: true},
+					{key: "fileKey", 		label: "파일키", 			hidden: true},
+					{key: "fileName", 		label: "파일명", 			width: 120, align: "left"},
+					{key: "fileType", 		label: "종류", 			width: 70, align: "center"},
+					{key: "fileSize", 		label: "파일크기", 		width: 90, align: "right", formatter: "money"},
+					{key: "creatDttm",		label: "등록일자", width: 100,align: "center",formatter: function() {return this.value ? moment(this.value).format("YYYY-MM-DD"): "";}},
+					{key: "creatNm", 		label: "등록자", 			width: 80, align: "center"},
+					{key: "clntCd", 		label: "거래처", 			width: 50, align: "center", hidden: true},
+					{key: "clntNm", 		label: "거래처명", 		width: 110, align: "center", hidden: true},
+					{key: "prdtCd", 		label: "제품코드", 		width: 50, align: "center", hidden: true},
+					{key: "prdtNm", 		label: "제품명", 			width: 100, align: "center", hidden: true},
+					{key: "itemCd", 		label: "아이템", 			width: 50, align: "center", hidden: true},
+					{key: "salesCd", 		label: "Sales코드", 		width: 120, align: "center"},
+					{key : "lpath",  		label : "저장위치",	 	width : 120, align: "left", hidden: false},
+					{ key: "fileDelete", label: "삭제", width:80, align:"center",
+						formatter: function() {
+							if (!(this.item.fileDelete=="Y" || this.item.fileKey==0) || !currPgmAuthChk) {
+								return '불가';
+							}
+							return '<button style="height:18px;padding:0" '
+								+ 'onclick="event.stopPropagation(); deleteFile('+this.dindex+');">삭제</button>';
+						}
+					}
+				],
+				page: {
+					display: false
+				}
+			});
+			this.target.$target.on("click", "[data-delete-row]", function (event) {
+				const rowIndex = parseInt(event.target.getAttribute("data-delete-row"), 10);
+				deleteFile(rowIndex);
+			});
+
+			return this;
+		},
+		setData: function () {
+			var targetObj = this.target;
+			targetObj.setData({
+				list: fileList,
+				page: {
+					totalElements: fileList.length
+				}
+			});
+		}
+	}
+
+
+	$(document).ready(function() {
+
+		actionType =  modalStack.last().paramObj.actionType;
+		$("#coCd").val(modalStack.last().paramObj.coCd)
+		fileGridView.initView();
+
+		if (actionType == "C") {
+			$("#reqId").val(jwt.userId);
+			$("#reqIdNm").val(jwt.userNm);
+		} else if (actionType == "U") {
+			$("#reqId").val(modalStack.last().paramObj.creatId);
+			$("#reqIdNm").val(modalStack.last().paramObj.creatNm);
+			select_pm50_Info(modalStack.last().paramObj.fileTrgtKey);	// fileTrgtKey = salesCd
+		}
+
+		$('.tit').text('출장자 사진 파일 Upload작업')
+		$("#actionBtn").text("저장");
+		$('#actionBtn').on("click", function() {
+			upLoadFiles();
+		});
+
+		$('[data-ax5grid-panel="body"]').on('click', function(e) {
+			// 클릭된 요소가 scroll-body(= rows) 안이라면 무시
+			if ($(e.target).closest('[data-ax5grid-panel-scroll="body"]').length) return false;
+
+			$('#fileUploader').click();
+		});
+
+		$('#fileUploader').on('change', function(e){
+			var files = e.target.files;
+			Array.prototype.forEach.call(files, function(f){
+				var ext = f.name.split('.').pop().toLowerCase();
+				fileList.push({
+					fileKey: 0, fileName: f.name, fileType: ext,
+					fileSize: f.size, file: f, fileDelete: 'Y'
+				});
+			});
+			fileGridView.setData(0);
+			$(this).val('');
+		});
+	});
+
+	// salesCd별 파일 업로드
+	function upLoadFiles() {
+		if (inputValidation($('.popup_area [required]'))) {
+			
+			var formData = makeFormData();
+			filePostAjax("/user/pm/pm50/upLoadFiles", formData, function(data) {
+				if (data.resultCode == 200) {
+					gridView.setData(0);
+					modalStack.close();	
+				}
+			});
+		}
+	}
+
+	function makeFormData() {
+		// 날짜 하이픈 제거
+		$.each($('.popup_area input[date]'), function(idx, elem) {
+			deleteHyphen(elem);
+		});
+
+		// 폼데이터 생성
+		var formData = new FormData($("#popForm")[0]);
+		formData.append("userId", $("#reqId").val());
+		formData.append("pgmId",  $("#pgmId").val());
+		// 첨부파일 추가
+		$.each(fileList, function(idx, obj){
+			// 신규파일만 추가
+			if(obj.fileKey == 0){
+				formData.append("files", obj.file);
+			}
+		});
+
+		if(actionType == "U"){
+			formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
+			formData.append("fileTrgtKey", $("#salesCd").val());
+		}
+
+		return formData;
+	}
+
+		// SalesCd 검색
+		function wbsSalesCodeSearch() {
+			var paramObj = {
+				"coCd" : $('#coCd').val(),
+				"salesCd": $('#salesCd').val()
+			};
+			openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1068, 650, "SALES CODE 검색", paramObj, function (grid) {
+				var row = grid.target.getList("selected")[0];
+				$('#ordCoCd').val(row.coCd);
+				$('#ordrsNo').val(row.ordrsNo);
+				$('#salesCd').val(row.salesCd);
+				$('#clntPjt').val(row.clntPjt);
+				$('#clntPjtNm').val(row.clntPjtNm);
+				$('#clntCd').val(row.ordrsClntCd);
+				$('#clntNm').val(row.ordrsClntNm);
+				$('#prdtCd').val(row.prdtCd);
+				$('#prdtCdNm').val(row.prdtCdNm);
+				$('#itemDiv').val(row.itemDiv);
+				$('#itemDivNm').val(row.itemDivNm);
+				$('#eqpNm').val(row.eqpNm);
+				$('#salesCd').val(row.salesCd);
+
+				select_pm50_Info(row.salesCd);
+			});
+		}
+
+	// 담당자 검색함수
+	function openUserSearch() {
+		var paramObj = {
+			"coCd" : $('#coCd').val(),
+			"userId" : $('#reqId').val(),
+			"userNm" : $('#reqIdNm').val(),
+		};
+		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "요청자 검색", paramObj, function(tree) {
+				var checkedId = tree.get_checked()[0];
+				var checkedNode = tree.get_node(checkedId);
+				var deptName = checkedNode.original.deptNm;			// 요청자 reqDept 설정
+				var coCd = checkedNode.original.coCd;				// 요청자 회사코드 설정
+
+				$('#reqId').val(checkedNode.id);
+				$('#reqIdNm').val(checkedNode.text);
+
+				// 요청자에 따라 reqDept 설정
+				if (deptName) {
+					$('#reqDept').val(deptName);
+				}
+				// 요청자에 따라 회사 코드 설정
+				if (coCd) {
+					$('#coCd').val(coCd);  // 회사 코드 자동 설정
+				}
+
+			});
+	}
+
+	// QR로 넘어온 SALES_CD값을 가지고 정보 불러오기
+	function select_pm50_Info (salesCd) {
+		var paramObj = {
+				// "coCd": coCd,
+				"coCd": 'GUN',
+				"salesCd": salesCd,
+				"userId" : jwt.userId
+			};
+		postAjaxSync("/user/pm/pm50/select_pm50_Info", paramObj, null, function(data){
+			var list = data.result.select_pm50_Info;
+			var keyMapping = {
+				sjNm:     'eqpNm',
+				clntCd:   'ordrsClntCd',
+				clntNm:   'ordrsClntNm',
+				smrizeId: 'pmId',
+				smrizeNm: 'pmNm',
+				prdtCd:   'prdtCd',
+				prdtNm:   'prdtCdNm'
+			};
+
+			// 'list' 객체 순회하며, map 에 정의된 키는 매핑된 id 로, 아니면 key 그대로 사용
+			$.each(list, function(key, val) {
+				var targetId = keyMapping[key] || key;
+				var $el = $('#popForm #' + targetId);
+				if (!$el.length) return;
+				$el.val(val);
+				if ($el.is('[comma]')) {
+					onlyNumber($el[0]);
+				}
+			});
+
+			fileList = data.result.fileList.map(function(f){
+				// lpath 프로퍼티 복사
+				f.lpath = f.filePath;
+				return f;
+			});
+
+			// form에 등록 담당자 값 세팅 (첫 번째 파일의 생성자 정보로)
+			if (fileList.length > 0) {
+				$('#reqId').val(fileList[0].creatId);
+				$('#reqIdNm').val(fileList[0].creatNm);
+			}
+
+			fileGridView.setData();
+		});
+	}
+
+	function deleteFile(rowIndex) {
+		// 삭제 권한 체크
+		const file = fileList[rowIndex];
+		if (!file || (file.fileKey !== 0 && file.fileDelete !== 'Y')) return;
+
+		// 기존 파일( key>0 ) 은 서버로 삭제 요청할 key 리스트에 담아두기
+		if (file.fileKey !== 0) {
+			deleteFileArr.push(file.fileKey);
+		}
+
+		// 화면 목록에서도 제거
+		fileList.splice(rowIndex, 1);
+
+		// 그리드 갱신
+		fileGridView.setData(0);
+	}
+
+	// 파일 다운로드
+	function downLoadFile(fileKey) {
+		postAjax("/admin/cm/cm08/fileDownInfo", {"fileKey": fileKey}, null, function(data){
+			var fileInfo = data.fileInfo;
+			var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName , "UTF-8");
+			location.href = "/admin/cm/cm08/fileDownload?filePath="+filePath;
+		});
+	}
+</script>
+
