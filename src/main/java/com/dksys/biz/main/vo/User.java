@@ -39,6 +39,8 @@ public class User implements UserDetails {
     private String passChkCnt;
     private String userGrade;
     private String clntCd;
+	private String serverType;
+	private String kakaoSend;
     
     @Builder.Default
     private List<String> roles = new ArrayList<>();

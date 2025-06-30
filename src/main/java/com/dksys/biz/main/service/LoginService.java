@@ -10,4 +10,10 @@ public interface LoginService {
 
 	int insertUserHistory(User user);
 
+	int updateLastLoginTime(String username, String refreshToken, String userAgent, String ipAddress);
+
+	String isLoginWithin24Hours(String username, String userAgent, String ipAddress);
+
+	String getRefreshToken(String username);
+
 }

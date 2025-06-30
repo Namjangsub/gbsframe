@@ -26,8 +26,17 @@ if(isMobile()){
 	//DOMAIN_URL = "http://10.90.4.142";
 }
 
-var authorizationToken = getCookie("jwtToken");
-var jwt = parseJwt(authorizationToken);
+var accessToken = localStorage.getItem("access_token");
+var authorizationToken = '';
+var jwt = '';
+if (accessToken) {
+   var authorizationToken = "Bearer " + accessToken;
+   var jwt = parseJwt(authorizationToken);
+} else {
+   // 토큰이 없는 경우 처리
+   console.log("Access token not found");
+   // redirectToLogin();
+}
 var menuIdx = getCookie("menuIdx");
 
 if (typeof ax5 !== 'undefined' && typeof ax5.ui !== 'undefined') {
@@ -109,7 +118,7 @@ ModalStack.prototype.close = function(){
 var modalStack = new ModalStack();
 
 var ubiprefix = "";
-//debugger;
+
 if(jwt){
 	switch (jwt.serverType){
     case "prod" :
@@ -392,16 +401,84 @@ function checkGridRow(grid, type){
 	return isValid;
 }
 
-var tokenErrorMsg = ["unauthorized", "invalid_token"];
 
-function postAjax(url, data, contentType, callback, blockProc=true) {
+
+function setupAuthorization(headerValue) {
+	$.ajaxSetup({
+		contentType: "application/x-www-form-urlencoded; charset=utf-8",
+		beforeSend: function (request)
+        {
+            request.setRequestHeader("Authorization", headerValue);
+        }
+	});
+}
+
+
+// refresh_token 요청용 함수
+const clientId = "frontend-app";
+const clientSecret = "gunyang";
+const basicAuth = btoa(`${clientId}:${clientSecret}`);
+
+function refreshAccessToken(callback) {
+    const refreshData = {
+        grant_type: "refresh_token",
+		refresh_token: localStorage.getItem("refresh_token"),
+		username  	: jwt.userId,
+		id  		: jwt.userId,
+    };
+
+    $.ajax({
+        type: "POST",
+        url: "/oauth/token",
+        data: $.param(refreshData),
+        async: false,                               // ← 동기 호출
+        xhrFields: { withCredentials: true }, // 반드시 있어야 쿠키 전송 refresh_token은 필수임
+        headers: {
+            "Authorization": "Basic " + basicAuth,
+            "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+            "Accept": "application/json",
+        },
+        success: function(data) {
+            if (data.access_token) {
+                localStorage.setItem("access_token", data.access_token);
+                authorizationToken = "Bearer " + data.access_token;
+                jwt = parseJwt(authorizationToken);
+                callback(true);
+            } else {
+                callback(false);
+            }
+        },
+        error: function(xhr, textStatus, errorThrown) {
+            console.error("❌ Refresh Token 실패");
+            logoutClick();
+            location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+//            if (xhr.status === 401) {
+//                logoutClick();
+//                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+//            } else if (xhr.status === 400) {
+//                try {
+//                    const errorResponse = JSON.parse(xhr.responseText);
+//                } catch (e) {
+//                    console.error("📋 에러 응답 파싱 실패:", xhr.responseText);
+//                }
+//            } else {
+//                console.warn("🔴 알 수 없는 오류 발생");
+//            }
+            callback(false);
+        }
+    });
+}
+
+var tokenErrorMsg = ["unauthorized", "invalid_token", "invalid_grant"];
+
+function postAjax(url, data, contentType, callback, blockProc=true, retryCount = 0) {
 	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 //	console.log(`postAjax url = ${url} `);
 	if(contentType == null) {
 		contentType = "application/json; charset=utf-8";
 		data = JSON.stringify(data);
 	} else if(contentType == "form") {
-		contentType = "x-www-form-urlencoded; charset=utf-8";
+		contentType = "application/x-www-form-urlencoded; charset=utf-8";
 	} else {
 		contentType = contentType;
 	}
@@ -410,22 +487,28 @@ function postAjax(url, data, contentType, callback, blockProc=true) {
 	    url: url,
 	    contentType: contentType,
 	    data: data,
-	    beforeSend: function (request) {
-            request.setRequestHeader("Authorization", authorizationToken);
-        },
+	    headers: {"Authorization": authorizationToken},
 	    success: function(data){
 	    	callback(data);
 	    },
-        error: function (data) {
-        	if(tokenErrorMsg.indexOf(data.responseJSON.error) > -1) {
-//        		alert("토큰이 만료되었습니다.");
-				if(isMobile()){
-					location.href = "/static/mobile/index.html";
-				}else{
-					location.href = "/static/index.html";
-				}
-        	}
-        },
+	    error: function (xhr) {
+            const error = xhr.responseJSON?.error;
+            if (tokenErrorMsg.indexOf(error) > -1) {
+                // refresh 요청
+                refreshAccessToken(function(success) {
+                    if (success) {
+                    	postAjax(url, data, contentType, callback, blockProc, 1); // 또는 실패 시 callback 재시도 등
+                    } else {
+                        location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+                    }
+                });
+
+                return;
+            }
+
+            // 기타 오류가 있으면 로그 출력
+            console.error("요청 실패:", xhr);
+	    },
         complete: function() {
         	if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
         }
@@ -433,7 +516,7 @@ function postAjax(url, data, contentType, callback, blockProc=true) {
 }
 
 
-function postAjaxSync(url, data, contentType, callback) {
+function postAjaxSync(url, data, contentType, callback, retryCount = 0) {
 
 //	console.log(`postAjaxSync url = ${url} `);
 	if(contentType == null) {
@@ -454,20 +537,28 @@ function postAjaxSync(url, data, contentType, callback) {
 	    success: function(data){
 	    	callback(data);
 	    },
-        error: function (data) {
-        	if(tokenErrorMsg.indexOf(data.responseJSON.error) > -1) {
-//        		alert("토큰이 만료되었습니다.");
-				if(isMobile()){
-					location.href = "/static/mobile/index.html";
-				}else{
-					location.href = "/static/index.html";
-				}
-        	}
-        }
+	    error: function (xhr) {
+            const error = xhr.responseJSON?.error;
+            if (tokenErrorMsg.indexOf(error) > -1) {
+                // refresh 요청
+                refreshAccessToken(function(success) {
+                    if (success) {
+                    	postAjaxSync(url, data, contentType, callback, 1); // 또는 실패 시 callback 재시도 등
+                    } else {
+                        location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+                    }
+                });
+
+                return;
+            }
+
+            // 기타 오류가 있으면 로그 출력
+            console.error("요청 실패:", xhr);
+	    },
 	});
 }
 
-function deleteAjax(url, data, contentType, callback, blockProc=true) {
+function deleteAjax(url, data, contentType, callback, blockProc=true, retryCount = 0) {
 	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 	if(contentType == null) {
 		contentType = "application/json; charset=utf-8";
@@ -483,24 +574,31 @@ function deleteAjax(url, data, contentType, callback, blockProc=true) {
 	    success: function(data){
 	    	callback(data);
 	    },
-        error: function (data) {
-        	if(tokenErrorMsg.indexOf(data.responseJSON.error) > -1){
-//        		alert("토큰이 만료되었습니다.");
+	    error: function (xhr) {
+            const error = xhr.responseJSON?.error;
+            if (tokenErrorMsg.indexOf(error) > -1) {
+                // refresh 요청
+                refreshAccessToken(function(success) {
+                    if (success) {
+                    	deleteAjax(url, data, contentType, callback, blockProc, 1); // 또는 실패 시 callback 재시도 등
+                    } else {
+                        location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+                    }
+                });
 
-				if(isMobile()){
-					location.href = "/static/mobile/index.html";
-				}else{
-					location.href = "/static/index.html";
-				}
-        	}
-        },
+                return;
+            }
+
+            // 기타 오류가 있으면 로그 출력
+            console.error("요청 실패:", xhr);
+	    },
         complete: function() {
         	if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
         }
 	});
 }
 
-function putAjax(url, data, contentType, callback, blockProc=true) {
+function putAjax(url, data, contentType, callback, blockProc=true, retryCount = 0) {
 	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 	if(contentType == null) {
 		contentType = "application/json; charset=utf-8";
@@ -516,23 +614,31 @@ function putAjax(url, data, contentType, callback, blockProc=true) {
 	    success: function(data){
 	    	callback(data);
 	    },
-        error: function (data) {
-        	if(tokenErrorMsg.indexOf(data.responseJSON.error) > -1){
-//        		alert("토큰이 만료되었습니다.");
-        		if(isMobile()){
-					location.href = "/static/mobile/index.html";
-				}else{
-					location.href = "/static/index.html";
-				}
-        	}
-        },
+	    error: function (xhr) {
+            const error = xhr.responseJSON?.error;
+            if (tokenErrorMsg.indexOf(error) > -1) {
+                // refresh 요청
+                refreshAccessToken(function(success) {
+                    if (success) {
+                    	putAjax(url, data, contentType, callback, blockProc, 1); // 또는 실패 시 callback 재시도 등
+                    } else {
+                        location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+                    }
+                });
+
+                return;
+            }
+
+            // 기타 오류가 있으면 로그 출력
+            console.error("요청 실패:", xhr);
+	    },
         complete: function() {
         	if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
         }
 	});
 }
 
-function filePostAjax(url, data, callback, blockProc=true) {
+function filePostAjax(url, data, callback, blockProc=true, retryCount = 0) {
 	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 	$.ajax({
 //		enctype: 'multipart/form-data',
@@ -547,24 +653,31 @@ function filePostAjax(url, data, callback, blockProc=true) {
 	    success: function(data){
 	    	callback(data);
 	    },
-        error: function (data) {
-        	if(tokenErrorMsg.indexOf(data.responseJSON.error) > -1){
-//        		alert("토큰이 만료되었습니다.");
+	    error: function (xhr) {
+            const error = xhr.responseJSON?.error;
+            if (tokenErrorMsg.indexOf(error) > -1) {
+                // refresh 요청
+                refreshAccessToken(function(success) {
+                    if (success) {
+                    	filePostAjax(url, data, callback, blockProc, 1); // 또는 실패 시 callback 재시도 등
+                    } else {
+                        location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+                    }
+                });
 
-        		if(isMobile()){
-					location.href = "/static/mobile/index.html";
-				}else{
-					location.href = "/static/index.html";
-				}
-        	}
-        },
+                return;
+            }
+
+            // 기타 오류가 있으면 로그 출력
+            console.error("요청 실패:", xhr);
+	    },
         complete: function() {
         	if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
         }
 	});
 }
 
-function filePostAjaxButton(url, data, callback, blockProc=true) {
+function filePostAjaxButton(url, data, callback, blockProc=true, retryCount = 0) {
 	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 
 	$.ajax({
@@ -580,24 +693,31 @@ function filePostAjaxButton(url, data, callback, blockProc=true) {
 	    success: function(data){
 	    	callback(data);
 	    },
-        error: function (data) {
-        	if(tokenErrorMsg.indexOf(data.responseJSON.error) > -1){
-//        		alert("토큰이 만료되었습니다.");
+	    error: function (xhr) {
+            const error = xhr.responseJSON?.error;
+            if (tokenErrorMsg.indexOf(error) > -1) {
+                // refresh 요청
+                refreshAccessToken(function(success) {
+                    if (success) {
+                    	filePostAjaxButton(url, data, callback, blockProc, 1); // 또는 실패 시 callback 재시도 등
+                    } else {
+                        location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+                    }
+                });
 
-        		if(isMobile()){
-					location.href = "/static/mobile/index.html";
-				}else{
-					location.href = "/static/index.html";
-				}
-        	}
-        },
+                return;
+            }
+
+            // 기타 오류가 있으면 로그 출력
+            console.error("요청 실패:", xhr);
+	    },
         complete: function() {
         	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
         }
 	});
 }
 
-function filePutAjax(url, data, callback, blockProc=true) {
+function filePutAjax(url, data, callback, blockProc=true, retryCount = 0) {
 	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
 	$.ajax({
 //		enctype: 'multipart/form-data',
@@ -612,16 +732,24 @@ function filePutAjax(url, data, callback, blockProc=true) {
 	    success: function(data){
 	    	callback(data);
 	    },
-        error: function (data) {
-        	if(tokenErrorMsg.indexOf(data.responseJSON.error) > -1){
-//        		alert("토큰이 만료되었습니다.");
-        		if(isMobile()){
-					location.href = "/static/mobile/index.html";
-				}else{
-					location.href = "/static/index.html";
-				}
-        	}
-        },
+	    error: function (xhr) {
+            const error = xhr.responseJSON?.error;
+            if (tokenErrorMsg.indexOf(error) > -1) {
+                // refresh 요청
+                refreshAccessToken(function(success) {
+                    if (success) {
+                    	filePutAjax(url, data, callback, blockProc, 1); // 또는 실패 시 callback 재시도 등
+                    } else {
+                        location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+                    }
+                });
+
+                return;
+            }
+
+            // 기타 오류가 있으면 로그 출력
+            console.error("요청 실패:", xhr);
+	    },
         complete: function() {
         	if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
         }
@@ -875,8 +1003,10 @@ function setMenuAuth() {
 		"userId"   : jwt.userId
 	}
 	postAjax("/selectMenuAuth", formData, null, function(data) {
-//		authArr = data.accessList;
-		checkMenuAuth(data.accessList);
+		if (Array.isArray(data?.accessList) && data.accessList.length > 0) {
+//			authArr = data.accessList;
+			checkMenuAuth(data.accessList);
+		}
 	});
 }
 
@@ -966,11 +1096,22 @@ function favoritesMenuControl(obj){
 
 //로그아웃
 function logoutClick(){
-		deleteCookie("jwtToken");
-		deleteCookie("menuIdx");
-		deleteCookie("authArr");
-		deleteCookie("menuSaveYn");
-		location.href = "/";
+	localStorage.removeItem("access_token");
+	localStorage.removeItem("refresh_token");
+	
+	deleteCookie("menuIdx");
+	deleteCookie("authArr");
+	deleteCookie("menuSaveYn");
+	
+	$.ajax({
+	    type: "GET",
+	    url: "/customLogout",
+	    xhrFields: { withCredentials: true }, 
+	    success: function() {
+	        location.href = "/";
+	    }
+	});
+//	location.href = "/";
 }
 
 //공통코드 검색 함수
@@ -2512,6 +2653,10 @@ function kakaoSendReal(talkJson, talkParam, param) {
 		$.ajax({
 		    type: "POST",
 		    url: "https://talkapi.lgcns.com/request/kakao.json",
+	        headers: {
+	            "Authorization": "Basic " + basicAuth,
+	            "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+	        },
 		    contentType: "x-www-form-urlencoded; charset=utf-8",
 		    data: talkJson,
 	      beforeSend: function (xhr) {

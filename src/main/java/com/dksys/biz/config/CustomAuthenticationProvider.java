@@ -2,7 +2,6 @@ package com.dksys.biz.config;
 
 import java.util.HashMap;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -20,10 +19,8 @@ import lombok.RequiredArgsConstructor;
 public class CustomAuthenticationProvider implements AuthenticationProvider {
 
     private final PasswordEncoder passwordEncoder;
+	private final LoginService loginService;
 
-    @Autowired
-    LoginService loginService;
-    
     @Override
     public Authentication authenticate(Authentication authentication) {
 
@@ -33,7 +30,7 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
 
         User user = loginService.selectUserInfo(map);
         if (!passwordEncoder.matches(password, user.getPassword()))
-            throw new BadCredentialsException("password is not valid");
+			throw new BadCredentialsException("비밀번호가 일치하지 않습니다.");
 
         return new UsernamePasswordAuthenticationToken(user, password, user.getAuthorities());
     }
@@ -42,4 +39,5 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
     public boolean supports(Class<?> authentication) {
         return authentication.equals(UsernamePasswordAuthenticationToken.class);
     }
+
 }

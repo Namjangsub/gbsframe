@@ -38,10 +38,9 @@
 	</div>
 </body>
 <script type="text/javascript">
-
 	$(document).ready(function() {        
 		var loginId = getCookie("loginId");
-		var validYn = getCookie("jwtToken");
+		var validYn = localStorage.getItem("access_token");
 		if(validYn != null) {
 			checkToken();
 		}
@@ -49,12 +48,6 @@
 			$("#id").val(loginId);
 			$("#idSaveCheck").prop("checked", true);
 		}
-// 		$("body").keydown(function(key) {
-// 			console.log('key:', key);
-// 			if (key.keyCode == 13) {
-// 				loginAction();
-// 			}
-// 		});
 		$("#idSaveCheck").change(function(){ // 체크박스에 변화가 발생시
 	        if($("#idSaveCheck").is(":checked")){ // ID 저장하기 체크했을 때,
 	            var loginId = $("#id").val();
@@ -68,7 +61,10 @@
 	        if($("#idSaveCheck").is(":checked")){ // ID 저장하기를 체크한 상태라면,
 	            var loginId = $("#id").val();
 	            setCookie("loginId", loginId, 7); // 7일 동안 쿠키 보관
-	        }
+	        } else {
+	        	deleteCookie("loginId");
+	        } 
+	        	
 	    });
 	    setImg();
 	    document.addEventListener('keydown', function(event) {
@@ -83,13 +79,8 @@
 	    
         $('#switch').click(function() {
             var passwordField = $('#pass');
-            var fieldType = passwordField.attr('type');
-
-            if (fieldType === 'password') {
-                passwordField.attr('type', 'text');
-            } else {
-                passwordField.attr('type', 'password');
-            }
+            var currentType  = passwordField.attr('type');
+            passwordField.attr('type', currentType === "password" ? "text" : "password");
         });
 
 	});
@@ -110,43 +101,119 @@
 	        }
 		});
 	}
-	
-	function setupAuthorization(headerValue) {
-		$.ajaxSetup({
-			contentType: "application/x-www-form-urlencoded; charset=utf-8",
-			beforeSend: function (request)
-            {
-                request.setRequestHeader("Authorization", headerValue);
-            }
+	function loginAction() {
+		var isValid = true;
+		$("input").each(function(index, item){
+			if($(this)[0].id != '_retVal12'){
+				if($(this).val() == "") {
+					isValid = false;
+					return false;
+				}
+			}
+		});
+		if(!isValid) {
+			alert("모든 정보를 입력하셔야 합니다.");
+			return;
+		}
+		var formData = {
+			grant_type 	: "password",	
+			username  	: $("#id").val(),
+			id 			: $("#id").val(),
+			password 	: $("#pass").val(),
+		}
+		$.ajax({
+		    type: "POST",
+		    url: "/login",
+		    contentType: "application/json; charset=utf-8",
+		    data: JSON.stringify(formData),
+		    xhrFields: { withCredentials: true }, // 반드시 있어야 쿠키 전송 refresh_token은 필수임
+		    success: function(data){
+	    		var usrInfo = data.usrInfo;
+		    	if(data.msg == "success"){
+	    			getToken();
+		    		
+// 		    		if(usrInfo.passYn == "Y") { //암호관리적용
+// 			    		if(usrInfo.passChg == "1") {  //암호변경주기 초과
+// 			    			openModal("/static/html/cmn/modal/updatePw.html", 500, 200, "비밀번호 변경");
+// 				    		window.open("/static/html/cmn/modal/updatePw.html", "비밀번호 변경", "width=500, height=200, left=30, top=30");
+// 			    		}
+// 		    		} else {
+// 		    		}
+		    	} else {
+		    		if(usrInfo){
+		    			if(Number(usrInfo.passErrCnt) >= Number(usrInfo.passChkCnt)) {
+							alert("비밀번호를 " + usrInfo.passChkCnt + "회이상 틀리셨습니다. 관리자에게 문의하세요.");
+						}else {
+							alert("비밀번호를 " + usrInfo.passErrCnt + "회 틀렸습니다.\n" + usrInfo.passChkCnt + "회 이상 틀리면 접속불가합니다.");		
+						}
+		    		}else{
+		    			alert(data.msg);
+		    		}
+		    	}
+		    }
 		});
 	}
+
 	
 	function getToken() {
 		//헤더 세팅
-		setupAuthorization("Basic "+btoa($("#id").val()+":"+$("#pass").val()));
-		
+		setupAuthorization("Basic " + basicAuth);
 		var formData = {
-			"grant_type" : "password",	
-			"id" : $("#id").val(),
-			"password" : $("#pass").val()
+			grant_type 	: "password",	
+			username  	: $("#id").val(),
+			id  		: $("#id").val(),
+			password 	: $("#pass").val(),
 		}
-		$.post(
-			"/oauth/token",
-			formData,
-			function(data, status, request) {
-				setCookie("jwtToken", "Bearer "+data.access_token, 1);
-				authorizationToken = getCookie("jwtToken");
-				jwt = parseJwt(authorizationToken);
+		$.post("/oauth/token", formData, function(data) {
+	        localStorage.setItem("access_token", data.access_token);
+	        localStorage.setItem("refresh_token", data.refresh_token);
+	        authorizationToken = "Bearer " + data.access_token;
+	        if  (data.access_token) {
+	        	jwt = parseJwt(authorizationToken);
 				menuIdx = getCookie("menuIdx");
 				selectAuthInfo();
-			}
-		);
+	        }
+		});
+	}
+	
+	function selectAuthInfo(){
+		var formData = {
+			"authInfo" : jwt.authInfo,
+			"userId"   : jwt.userId
+		}
+		postAjaxSync("/selectMenuAuth", formData, null, function(data) {
+			var authString = data.accessJSON;
+// 	         console.log("Received authString: ", authString);
+
+	         // Check size of authString
+// 	         var authStringSize = new Blob([authString]).size;
+// 	         console.log("Size of authString: ", authStringSize, " bytes");
+// 	         if (authStringSize > 4096) {
+// 	            console.log("Size of authString exceeds the cookie limit of 4KB.");
+// 	         }
+
+	         deleteCookie("authArr");
+
+	         setCookie("authArr", authString, 1);
+
+	         // Check the cookie value
+	         var checkCookie = getCookie("authArr");
+// 	         console.log("Value of 'authArr' cookie after setting: ", checkCookie);
+
+	         if (checkCookie) {
+// 	            alert("Cookie 'authArr' is set successfully!");
+	         } else {
+	            alert("쿠키 생성 실패 전산실 연락 바랍니다. 'authArr'.");
+	         }
+// 	         location.href = "/static/html/admin/cm/cm10/CM1002M01.html";
+			openNotiPop();
+		});
 	}
 	
 	function openNotiPop() {
 		var defaultUrl = "/static/html/admin/cm/cm10/CM1002M01.html";
 // 		var defaultUrl = "/static/html/main.html";
-		postAjax("/admin/cm/cm09/selectNotiPopList", {}, null, function(data){
+		postAjaxSync("/admin/cm/cm09/selectNotiPopList", {}, null, function(data){
 			var list = data.result;
 			var left = 30;
 			var top = 30;
@@ -185,90 +252,6 @@
 		});
 	}
 	
-	function loginAction() {
-		var isValid = true;
-		$("input").each(function(index, item){
-			if($(this)[0].id != '_retVal12'){
-				if($(this).val() == "") {
-					isValid = false;
-					return false;
-				}
-			}
-		});
-		if(!isValid) {
-			alert("모든 정보를 입력하셔야 합니다.");
-			return;
-		}
-		var formData = {
-			"grant_type" : "password",	
-			"id" : $("#id").val(),
-			"password" : $("#pass").val()
-		}
-		$.ajax({
-		    type: "POST",
-		    url: "/login",
-		    contentType: "application/json; charset=utf-8",
-		    data: JSON.stringify(formData),
-		    success: function(data){
-	    		var usrInfo = data.usrInfo;
-		    	if(data.msg == "success"){
-	    			getToken();
-		    		
-// 		    		if(usrInfo.passYn == "Y") { //암호관리적용
-// 			    		if(usrInfo.passChg == "1") {  //암호변경주기 초과
-// 			    			openModal("/static/html/cmn/modal/updatePw.html", 500, 200, "비밀번호 변경");
-// 				    		window.open("/static/html/cmn/modal/updatePw.html", "비밀번호 변경", "width=500, height=200, left=30, top=30");
-// 			    		}
-// 		    		} else {
-// 		    		}
-		    	} else {
-		    		if(usrInfo){
-		    			if(Number(usrInfo.passErrCnt) >= Number(usrInfo.passChkCnt)) {
-							alert("비밀번호를 " + usrInfo.passChkCnt + "회이상 틀리셨습니다. 관리자에게 문의하세요.");
-						}else {
-							alert("비밀번호를 " + usrInfo.passErrCnt + "회 틀렸습니다.\n" + usrInfo.passChkCnt + "회 이상 틀리면 접속불가합니다.");		
-						}
-		    		}else{
-		    			alert(data.msg);
-		    		}
-		    	}
-		    }
-		});
-	}
-
-	function selectAuthInfo(){
-		var formData = {
-			"authInfo" : jwt.authInfo,
-			"userId"   : jwt.userId
-		}
-		postAjaxSync("/selectMenuAuth", formData, null, function(data) {
-			var authString = data.accessJSON;
-// 	         console.log("Received authString: ", authString);
-
-	         // Check size of authString
-// 	         var authStringSize = new Blob([authString]).size;
-// 	         console.log("Size of authString: ", authStringSize, " bytes");
-// 	         if (authStringSize > 4096) {
-// 	            console.log("Size of authString exceeds the cookie limit of 4KB.");
-// 	         }
-
-	         deleteCookie("authArr");
-
-	         setCookie("authArr", authString, 1);
-
-	         // Check the cookie value
-	         var checkCookie = getCookie("authArr");
-// 	         console.log("Value of 'authArr' cookie after setting: ", checkCookie);
-
-	         if (checkCookie) {
-// 	            alert("Cookie 'authArr' is set successfully!");
-	         } else {
-	            alert("쿠키 생성 실패 전산실 연락 바랍니다. 'authArr'.");
-	         }
-	         
-			openNotiPop();
-		});
-	}
 	
 	function setImg() {
 		var imgUrl = "/static/img/Logo_gunyangitt.gif";

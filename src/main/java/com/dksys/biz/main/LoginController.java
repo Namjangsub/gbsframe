@@ -2,6 +2,7 @@ package com.dksys.biz.main;
 
 import java.util.Map;
 
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -28,7 +29,7 @@ import lombok.RequiredArgsConstructor;
 public class LoginController {
 
     private final PasswordEncoder passwordEncoder;
-    
+
     @Autowired
 	MessageUtils messageUtils;
     
@@ -59,6 +60,7 @@ public class LoginController {
     @RequestMapping("/login")
     public String login(@RequestBody Map<String, String> param, ModelMap model) {
     	User user = loginService.selectUserInfo(param);
+
     	if(user == null) {
     		model.addAttribute("msg", "ID를 확인해주세요.");
     	}else {
@@ -75,16 +77,50 @@ public class LoginController {
     	    		model.addAttribute("msg", "success");
     	    		param.put("isPwErr", "N");
     	    		param.put("userId", param.get("id"));
-    	    		model.addAttribute("usrInfo", cm06Svc.updatePwErrCnt(param));
+					Map<String, String> usrInfo = cm06Svc.updatePwErrCnt(param);
+					model.addAttribute("usrInfo", usrInfo);
     	    	}
     		}
     	}
         return "jsonView";
     }
     
-    @GetMapping(value = "/logout")
-    public String logoutPage(HttpServletRequest request, HttpServletResponse response) {
-      new SecurityContextLogoutHandler().logout(request, response, SecurityContextHolder.getContext().getAuthentication());
-      return "redirect:/";
+//    @GetMapping(value = "/logout")
+//    public String logoutPage(HttpServletRequest request, HttpServletResponse response) {
+//      new SecurityContextLogoutHandler().logout(request, response, SecurityContextHolder.getContext().getAuthentication());
+//      return "redirect:/";
+//    }
+//    
+
+	// 쿠키 삭제 처리 (로그아웃 시)
+
+	// 토큰 갱신 클라이언트 흐름 (요약)
+	// 1. 브라우저에서 API 호출
+	// 2. AccessToken 만료 → 401 Unauthorized 발생
+	// 3. JS에서 자동 `/oauth/token` POST 요청:
+	// - grant_type=refresh_token
+	// - 쿠키의 refresh_token 자동 포함 (withCredentials: true)
+	// 4. 서버에서 쿠키에서 refresh_token 추출 후 검증
+	// 5. 최근 로그인 24시간 초과 시 `InvalidGrantException` 반환 (재로그인 유도)
+	// 6. 통과하면 새로운 access_token 발급
+	// 7. 클라이언트는 다시 원래 요청 재시도 (retry mechanism)
+	@GetMapping("/customLogout")
+	public String logout(HttpServletRequest request, HttpServletResponse response) {
+		SecurityContextLogoutHandler logoutHandler = new SecurityContextLogoutHandler();
+		logoutHandler.logout(request, response, SecurityContextHolder.getContext().getAuthentication());
+
+		deleteCookie("access_token", response);
+		deleteCookie("refresh_token", response);
+		System.out.println("-------->  로그아웃 처리 완료됨~~");
+		return "redirect:/";
+	}
+
+	private void deleteCookie(String name, HttpServletResponse response) {
+		Cookie cookie = new Cookie(name, null);
+		cookie.setPath("/");
+		cookie.setHttpOnly(true);
+		cookie.setMaxAge(0);
+		response.addCookie(cookie);
     }
+
 }
