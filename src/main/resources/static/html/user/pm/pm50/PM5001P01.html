@@ -1,11 +1,11 @@
 <div class="popup_area of_a" style="width: 100%; height: 100%;">
 	<div class="tit_contents">
-		<h4 class="tit">출장자 사진 파일 Upload작업</h4>
+		<h4 class="tit">출장자 사진 파일 Upload작업 등록</h4>
 	</div>
-		<!-- <input type="file" id="notiFile" style="display:none" multiple="multiple" onchange="setNotiFile(this);"/> -->
+	<input type="file" id="fileUploader" style="display:none" onchange="setBfuFile(this);"/>
 	<form id="popForm" onSubmit="return false;">
 		<input type="hidden" id="fileTrgtKey"  	name="fileTrgtKey">
-		<input type="hidden" id="pgmId"     	name="pgmId"	value="PM5001P01_M">
+		<input type="hidden" id="pgmId"     	name="pgmId"	value="PM5001P01">
 		<input type="hidden" id="coCd" name="coCd" required msg="회사">
 		<div class="form-group popup_table" style="width: 100%;">
 			<table>
@@ -62,22 +62,22 @@
 						<input type="text" id="pmNm" name="pmNm" class="form-control" readonly>
 					</td>
 				</tr>
+				<tr class="tripAreaButton">
+					<th colspan=1>사진 등록</th>
+					<th>
+						<button type="button" id="addBfuFileButton" class="btn btn-primary btn-sm" style="line-height: 15px;">사진추가</button> 
+						<button type="button" id="removeBfuFileButton" class="btn btn-primary btn-sm" style="line-height: 15px; display: none;">사진삭제</button>
+					</th>
+				</tr>
 			</table>
+			<!-- 사진파일 처리 영역 -->
+            <div  id="bfuFile" style="margin-bottom: 40px;"></div>
 		</div>
 	</form>
-	<input type="file" id="fileUploader" multiple style="display:none" />
-	<!-- <div id="contents" style="display: none; text-align: left;width: 100%">
-		<div class="contents" style="width: 100%"> -->
-			<div data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 300px; width: 100%"></div>
-		<!-- </div>
-	</div> -->
-	
-
-
 </div>
 <!-- 하단 버튼 -->
 <div class ="popup_bottom_btn">
-	<button type="button" id="actionBtn">저장</button>
+	<button type="button" id="actionBtn">등록</button>
 	<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
 </div>
 
@@ -87,6 +87,7 @@
 	var fileList = [];
 	var actionType = null;
 	var fileTrgtKey = null;
+	var salesCd = null;
 	var paramObj = null;
     var windowWidth = $(window).width();
     var windowHeight = $(window).height();
@@ -95,158 +96,165 @@
 	var currPgmAuthChk = true;
 	var deleteFileArr = [];
 
-	var fileGridView = {
-		initView : function() {
-			this.target = new ax5.ui.grid();
-			this.target.setConfig({
-				showRowSelector: false,
-				multipleSelect: false,
-				sortable: true,
-				target: $('[data-ax5grid="file-grid"]'),
-				header: {
-					align: "center",
-					selector: true
-				},
-				body: {
-					onClick: function () {
-						this.self.select(this.dindex);
-						
-					},
-					onDBLClick: function () {
-						var fileKey = this.item.fileKey;
-						if (fileKey) {
-							rowClicked = true;
-							if (this.item.fileDown == 'Y') {
-								if (this.column.key == "fileName") {
-									//첨부파일 이미지뷰
-									let tempType = this.item.fileType.toLowerCase();
-									if (tempType == 'jpg' || tempType == 'jpeg' || tempType == 'png' || tempType == 'gif'|| tempType == 'pdf') {
-										const imageList = this.self.list.filter(item => {
-											const fileType = item.fileType.toLowerCase();
-											return fileType === 'jpg' || fileType === 'jpeg' || fileType === 'png' || fileType === 'gif'|| tempType == 'pdf';
-										});
-										imageViewPopup(fileKey, this.item.fileName, imageList);
-									} else {
-										downLoadFile(fileKey);	// 모바일 다운로드
-									}
-								} else {
-									downLoadFile(fileKey);	// 모바일 다운로드
-								}
-							} else {
-								alert('파일 다운로드 권한이 없습니다.');
-							}
-						}
-					},
-				},
-				columns: [
-
-					{key: "fileTrgtKey", 	label: "파일타겟키", 		hidden: true},
-					{key : "nodeId",  		label : "nodeId",	 	width : 120, align: "center", hidden: true},
-					{key : "fileUp",  		label : "up",	 		width : 60, align: "center", hidden: true},
-					{key : "fileDown",  	label : "down",	 		width : 60, align: "center", hidden: true},
-					{key : "fileUpdate",  	label : "update",	 	width : 60, align: "center", hidden: true},
-					{key : "fileDelete",  	label : "delete",	 	width : 60, align: "center", hidden: true},
-					{key: "fileKey", 		label: "파일키", 			hidden: true},
-					{key: "fileName", 		label: "파일명", 			width: 120, align: "left"},
-					{key: "fileType", 		label: "종류", 			width: 70, align: "center"},
-					{key: "fileSize", 		label: "파일크기", 		width: 90, align: "right", formatter: "money"},
-					{key: "creatDttm",		label: "등록일자", width: 100,align: "center",formatter: function() {return this.value ? moment(this.value).format("YYYY-MM-DD"): "";}},
-					{key: "creatNm", 		label: "등록자", 			width: 80, align: "center"},
-					{key: "clntCd", 		label: "거래처", 			width: 50, align: "center", hidden: true},
-					{key: "clntNm", 		label: "거래처명", 		width: 110, align: "center", hidden: true},
-					{key: "prdtCd", 		label: "제품코드", 		width: 50, align: "center", hidden: true},
-					{key: "prdtNm", 		label: "제품명", 			width: 100, align: "center", hidden: true},
-					{key: "itemCd", 		label: "아이템", 			width: 50, align: "center", hidden: true},
-					{key: "salesCd", 		label: "Sales코드", 		width: 120, align: "center"},
-					{key : "lpath",  		label : "저장위치",	 	width : 120, align: "left", hidden: false},
-					{ key: "fileDelete", label: "삭제", width:80, align:"center",
-						formatter: function() {
-							if (!(this.item.fileDelete=="Y" || this.item.fileKey==0) || !currPgmAuthChk) {
-								return '불가';
-							}
-							return '<button style="height:18px;padding:0" '
-								+ 'onclick="event.stopPropagation(); deleteFile('+this.dindex+');">삭제</button>';
-						}
-					}
-				],
-				page: {
-					display: false
-				}
-			});
-			this.target.$target.on("click", "[data-delete-row]", function (event) {
-				const rowIndex = parseInt(event.target.getAttribute("data-delete-row"), 10);
-				deleteFile(rowIndex);
-			});
-
-			return this;
-		},
-		setData: function () {
-			var targetObj = this.target;
-			targetObj.setData({
-				list: fileList,
-				page: {
-					totalElements: fileList.length
-				}
-			});
-		}
-	}
-
+	var bfuFileArr = []; 				//항목별별 첨부파일 정보 임시저장
+	var bfuFileRowDeleteArr = []; 		//사진 등록내용 삭제 임시저장
+	var bfuRowFileDeleteArr = []; 	//사진 등록내용중 첨부파일만 삭제 임시저장
+	var lastPosition = "";
 
 	$(document).ready(function() {
-
+		$("#popForm #coCd").val(modalStack.last().paramObj.coCd);
 		actionType =  modalStack.last().paramObj.actionType;
-		$("#coCd").val(modalStack.last().paramObj.coCd)
-		fileGridView.initView();
 
 		if (actionType == "C") {
 			$("#reqId").val(jwt.userId);
 			$("#reqIdNm").val(jwt.userNm);
+
+			$("#actionBtn").text("등록");
+			$('#actionBtn').on("click", function() {
+				insert_pm50();
+			});
+
 		} else if (actionType == "U") {
-			$("#reqId").val(modalStack.last().paramObj.creatId);
-			$("#reqIdNm").val(modalStack.last().paramObj.creatNm);
-			select_pm50_Info(modalStack.last().paramObj.fileTrgtKey);	// fileTrgtKey = salesCd
+			fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
+			salesCd = modalStack.last().paramObj.salesCd;
+
+			$('.tit').text('출장자 사진 파일 Upload작업 수정')
+
+			select_pm50_Info(fileTrgtKey);	// fileTrgtKey = BFU250001
+
+			$("#actionBtn").text("수정");
+			$('#actionBtn').on("click", function() {
+				update_pm50();
+			});
 		}
 
-		$('.tit').text('출장자 사진 파일 Upload작업')
-		$("#actionBtn").text("저장");
-		$('#actionBtn').on("click", function() {
-			upLoadFiles();
+		// 사진추가 버튼
+		$('#addBfuFileButton').click(function() {
+			bfuFileAdd();
 		});
 
-		$('[data-ax5grid-panel="body"]').on('click', function(e) {
-			// 클릭된 요소가 scroll-body(= rows) 안이라면 무시
-			if ($(e.target).closest('[data-ax5grid-panel-scroll="body"]').length) return false;
-
-			$('#fileUploader').click();
-		});
-
-		$('#fileUploader').on('change', function(e){
-			var files = e.target.files;
-			Array.prototype.forEach.call(files, function(f){
-				var ext = f.name.split('.').pop().toLowerCase();
-				fileList.push({
-					fileKey: 0, fileName: f.name, fileType: ext,
-					fileSize: f.size, file: f, fileDelete: 'Y'
-				});
-			});
-			fileGridView.setData(0);
-			$(this).val('');
+		// 사진삭제 버튼
+		$('#removeBfuFileButton').click(function() {
+			let fileCnt = $('.fileTable').length;
+			if (fileCnt == 0)  return false;
+			if (fileCnt == 1) $('#removeBfuFileButton').hide();
+			
+			if ($('#fileTable' + fileCnt + ' #updCheck').val() == 'U') {
+				$('#fileTable' + fileCnt + ' #updCheck').val('D');		//DB에서 불러오면 수정임 'U', 처음 등록시 C, 제거시 'D'
+	    		bfuFileRowDeleteArr.push(bfuRow(fileCnt));	//삭제대상으로 저장함
+			} 
+			
+			$('#fileTable' + fileCnt).remove();  //마지막 테이블 지우기
+			
 		});
 	});
 
-	// salesCd별 파일 업로드
-	function upLoadFiles() {
-		if (inputValidation($('.popup_area [required]'))) {
+	function bfuFileAdd() {
+		let fileCnt = $('.fileTable').length;
+		$('#removeBfuFileButton').show();
+		if ($('#fileTable' + fileCnt).css('display') === 'none') {
+				if ($('#fileTable' + fileCnt + ' #updCheck').val() == 'D') {
+					$('#fileTable' + fileCnt + ' #updCheck').val('U');		//DB에서 불러오면 수정임 'U' --> D --> U
+				} else {
+					$('#fileTable' + fileCnt + ' #updCheck').val('C');		//처음 생성한다음 삭제인경우 C --> null --> C
+				}
+				$('#fileTable' + fileCnt).show();  //마지막 테이블 숨기기
+			} else {
+				fileCnt += 1;
+		
+				let newRow = 
+					$('<table id="fileTable'+ (fileCnt) +'" class="fileTable" style="margin-top: 20px; display:break"> ' +
+						'<colgroup>' +
+						'<col width="22%">' +
+						'<col width="28%">' +
+						'<col width="22%">' +
+						'<col width="28%">' +
+						'</colgroup>' +
+						'<tr class="tripArea">' +
+							'<th>' +
+								'<button type="button" id="buttonFile3" class="btn btn-primary btn-sm" style="height: 30px; line-height: 10px;" onclick="fileUpload(' + fileCnt + ' );">파일선택</button>' +
+							'</th>' +
+							'<td colspan="3">' +
+								'<input type="text" id="bfuFileNm" name="bfuFileNm" class="form-control" readonly onclick="downLoadFile(' + fileCnt +');"msg="첨부파일명">' +
+								'<input type="hidden" id="fileKey" name="fileKey" class="form-control" msg="첨부파일명">' +
+							'</td>' +
+						'</tr>' +
+						'<tr class="fileArea">' +
+							'<th>내용</th>' +
+							'<td colspan="3">' +
+								'<input type="hidden" id="fileTrgtKey" name="fileTrgtKey" value="">' +
+								'<input type="hidden" id="updCheck" name="updCheck" value="C">' +
+								'<input type="hidden" id="fileSeq" name="fileSeq" value=' + fileCnt +'>' +
+								'<textarea rows="4" class="form-control" id="bfuCnts" name="bfuCnts"></textarea>' +
+							'</td>' +
+						'</tr>' +
+					'</table>');
+				$('#bfuFile').append(newRow);
+			}
+	}
+
+	function fileUpload(index) {
+		lastPosition = index;
+		$('#fileUploader').click();
+	}
+
+	function setBfuFile(elem){
+		var tempFiles = elem.files;
+		$.each(tempFiles, function(idx, obj){
 			
+	        var file = obj;
+			var testArr = file.name.split(".");
+			bfuFileArr.push({
+				'bfuFileNo' : lastPosition,
+				'fileKey' : 0,
+				'fileName' : file.name,
+				'fileType' : testArr[testArr.length-1],
+				'fileSize' : file.size,
+				'file' : file,
+				'fileDelete': 'Y'
+			});
+			let tempFileName = $('#fileTable' + lastPosition + ' #bfuFileNm').val();
+
+			let tempFileKey = $('#fileTable' + lastPosition + ' #fileKey').val();
+			let tempUpdCheck = $('#fileTable' + lastPosition + ' #updCheck').val();
+			if (tempFileName != "" && tempFileKey != 0 && tempUpdCheck == 'U') {	//수정이면서 기존 파일명이 있고 파일 등록된 번호가 있을경우만 파일 삭제대상임 
+				bfuRowFileDeleteArr.push({
+					fileKey 	: tempFileKey,
+					fileName 	: tempFileName
+					});
+			}
+			$('#fileTable' + lastPosition + ' #bfuFileNm').val(file.name);
+			$('#fileTable' + lastPosition + ' #bfuFileNm').removeAttr('onclick');
+		});
+		$(elem).val("");
+	}
+
+	// 등록
+	function insert_pm50() {
+		if (inputValidation($('.popup_area [required]'))) {
 			var formData = makeFormData();
-			filePostAjax("/user/pm/pm50/upLoadFiles", formData, function(data) {
+			filePostAjax("/user/pm/pm50/insert_pm50", formData, function(data) {
 				if (data.resultCode == 200) {
 					gridView.setData(0);
-					modalStack.close();	
+					modalStack.close();
 				}
 			});
 		}
 	}
+
+	// 수정
+	function update_pm50() {
+		if (inputValidation($('.popup_area [required]'))) {
+			var formData = makeFormData();
+			filePostAjax("/user/pm/pm50/update_pm50", formData, function(data) {
+				if (data.resultCode == 200) {
+					gridView.setData(0);
+					modalStack.close();
+				}
+			});
+		}
+	}
+
 
 	function makeFormData() {
 		// 날짜 하이픈 제거
@@ -256,49 +264,86 @@
 
 		// 폼데이터 생성
 		var formData = new FormData($("#popForm")[0]);
+		formData.append("coCd",  $("#coCd").val());
 		formData.append("userId", $("#reqId").val());
 		formData.append("pgmId",  $("#pgmId").val());
 		// 첨부파일 추가
-		$.each(fileList, function(idx, obj){
+		$.each(bfuFileArr, function(idx, obj){
 			// 신규파일만 추가
 			if(obj.fileKey == 0){
 				formData.append("files", obj.file);
+				var fileCnt = String(idx + 1).padStart(4, '0');
+				formData.append("fileCnt", fileCnt);
 			}
 		});
 
 		if(actionType == "U"){
 			formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
-			formData.append("fileTrgtKey", $("#salesCd").val());
 		}
+
+		formData.append("comonCd", "FITR05");	//첨부화일용
+
+		//경비 테이블의 값을 arry로 변환하여 저장하기
+		let fileCnt = $('.fileTable').length;
+		let bfuS = [];	// 사진정보 저장,  파일정보는 별도 보관됨 bfuFileArr에 보관되어 있음
+		for (var i = 1; i < fileCnt+1; i++) {
+	    	bfuS.push(bfuRow(i));
+		}
+		formData.append("bfuS",  JSON.stringify(bfuS)); //수정된 경비내역 서버로 전송
+		formData.append("bfuFileRowDeleteArr",  JSON.stringify(bfuFileRowDeleteArr));  //삭제된 경비내역 서버로 전송
+		formData.append("bfuRowFileDeleteArr",  JSON.stringify(bfuRowFileDeleteArr));  //경비내역 수정시 삭제된 첨부파일정보
+		//file object만 별도 추출 
+		$.each(bfuFileArr, function(idx, obj){
+			// 신규파일만 추가
+			formData.append("bfuFiles" + obj.bfuFileNo, obj.file);
+		});
 
 		return formData;
 	}
 
-		// SalesCd 검색
-		function wbsSalesCodeSearch() {
-			var paramObj = {
-				"coCd" : $('#coCd').val(),
-				"salesCd": $('#salesCd').val()
-			};
-			openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1068, 650, "SALES CODE 검색", paramObj, function (grid) {
-				var row = grid.target.getList("selected")[0];
-				$('#ordCoCd').val(row.coCd);
-				$('#ordrsNo').val(row.ordrsNo);
-				$('#salesCd').val(row.salesCd);
-				$('#clntPjt').val(row.clntPjt);
-				$('#clntPjtNm').val(row.clntPjtNm);
-				$('#clntCd').val(row.ordrsClntCd);
-				$('#clntNm').val(row.ordrsClntNm);
-				$('#prdtCd').val(row.prdtCd);
-				$('#prdtCdNm').val(row.prdtCdNm);
-				$('#itemDiv').val(row.itemDiv);
-				$('#itemDivNm').val(row.itemDivNm);
-				$('#eqpNm').val(row.eqpNm);
-				$('#salesCd').val(row.salesCd);
-
-				select_pm50_Info(row.salesCd);
-			});
+	//사진 처리 변경 내역 저장 단 U인경우 삭제된것만 저장하면됨 
+	//사진테이블의 값을 추출하기
+	function bfuRow(i) {
+		let updCheck = $('#fileTable' + i + ' #updCheck').val();
+		let fileTrgtKey = $('#fileTable' + i + ' #fileTrgtKey').val();
+		let fileSeq = $('#fileTable' + i + ' #fileSeq').val();
+		let bfuFileNm = $('#fileTable' + i + ' #bfuFileNm').val();
+		let fileKey = $('#fileTable' + i + ' #fileKey').val();
+		let bfuCnts = $('#fileTable' + i + ' #bfuCnts').val();
+		let bfuS = {
+				updCheck 		: updCheck,		//파일저장정보 구분
+				fileTrgtKey 	: $("#fileTrgtKey").val(),
+				fileSeq 		: fileSeq,		//파일저장정보 인덱스
+				bfuFileNm		: bfuFileNm,
+				fileKey			: fileKey,
+				bfuCnts			: bfuCnts,
+				coCd			: jwt.coCd,
+				userId			: jwt.userId,
+				pgmId			: 'PM5001P01'
 		}
+		return bfuS;
+	}
+
+	// SalesCd 검색
+	function wbsSalesCodeSearch() {
+		var paramObj = {
+			"coCd" : $('#coCd').val(),
+			"salesCd": $('#salesCd').val()
+		};
+		openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1068, 650, "SALES CODE 검색", paramObj, function (grid) {
+			var row = grid.target.getList("selected")[0];
+			$('#salesCd').val(row.salesCd);
+			$('#eqpNm').val(row.eqpNm);
+			$('#clntPjt').val(row.clntPjt);
+			$('#clntPjtNm').val(row.clntPjtNm);
+			$('#clntCd').val(row.ordrsClntCd);
+			$('#ordrsClntNm').val(row.ordrsClntNm);
+			$('#prdtCd').val(row.prdtCd);
+			$('#prdtCdNm').val(row.prdtCdNm);
+			$('#pmId').val(row.pmId);
+			$('#pmNm').val(row.pmNm);
+		});
+	}
 
 	// 담당자 검색함수
 	function openUserSearch() {
@@ -328,77 +373,80 @@
 			});
 	}
 
-	// QR로 넘어온 SALES_CD값을 가지고 정보 불러오기
-	function select_pm50_Info (salesCd) {
+	// 조회
+	function select_pm50_Info (fileTrgtKey) {
 		var paramObj = {
-				// "coCd": coCd,
-				"coCd": 'GUN',
-				"salesCd": salesCd,
-				"userId" : jwt.userId
+				"coCd"			: $("#popForm #coCd").val(),
+				"fileTrgtKey"	: fileTrgtKey,
+				"salesCd"		: salesCd,
+				"userId" 		: jwt.userId
 			};
 		postAjaxSync("/user/pm/pm50/select_pm50_Info", paramObj, null, function(data){
-			var list = data.result.select_pm50_Info;
-			var keyMapping = {
-				sjNm:     'eqpNm',
-				clntCd:   'ordrsClntCd',
-				clntNm:   'ordrsClntNm',
-				smrizeId: 'pmId',
-				smrizeNm: 'pmNm',
-				prdtCd:   'prdtCd',
-				prdtNm:   'prdtCdNm'
-			};
-
-			// 'list' 객체 순회하며, map 에 정의된 키는 매핑된 id 로, 아니면 key 그대로 사용
-			$.each(list, function(key, val) {
-				var targetId = keyMapping[key] || key;
-				var $el = $('#popForm #' + targetId);
-				if (!$el.length) return;
-				$el.val(val);
-				if ($el.is('[comma]')) {
-					onlyNumber($el[0]);
+			$.each(data.result, function(key, value) {
+				if ($('#popForm #' + key)[0]) {
+					$('#popForm #' + key).val(value);
 				}
 			});
 
-			fileList = data.result.fileList.map(function(f){
-				// lpath 프로퍼티 복사
-				f.lpath = f.filePath;
-				return f;
-			});
-
-			// form에 등록 담당자 값 세팅 (첫 번째 파일의 생성자 정보로)
-			if (fileList.length > 0) {
-				$('#reqId').val(fileList[0].creatId);
-				$('#reqIdNm').val(fileList[0].creatNm);
+			// 사진 처리
+			let bfuRows = data.bfuRows;
+			if (bfuRows && bfuRows.length > 0) {
+				for (var i = 0; i < bfuRows.length; i++) {
+					bfuFileAdd(); //입력필드 생성
+					$('#fileTable' + (i+1) + ' #updCheck').val('U');		//DB에서 불러오면 수정임 'U', 처음 등록시 C, 제거시 'D'
+					$.each(bfuRows[i], function(key, value) {
+						if ($('#fileTable' + (i+1) + ' #' + key)) {
+							// if ($('#fileTable' + (i+1) + ' #' + key).is('[comma]')) {
+							// 	$('#fileTable' + (i+1) + ' #' + key).val(addCommaStr(value));
+							// } else {
+								$('#fileTable' + (i+1) + ' #' + key).val(value);
+							// }
+						}
+					});
+				}
 			}
 
-			fileGridView.setData();
 		});
 	}
 
-	function deleteFile(rowIndex) {
-		// 삭제 권한 체크
-		const file = fileList[rowIndex];
-		if (!file || (file.fileKey !== 0 && file.fileDelete !== 'Y')) return;
-
-		// 기존 파일( key>0 ) 은 서버로 삭제 요청할 key 리스트에 담아두기
-		if (file.fileKey !== 0) {
-			deleteFileArr.push(file.fileKey);
+	function downLoadFile(i) {
+		let fileKey = $('#tripTable' + i + ' #fileKey').val();
+		if(fileKey == 0 || fileKey == '' || fileKey == null) {
+			return false;
 		}
-
-		// 화면 목록에서도 제거
-		fileList.splice(rowIndex, 1);
-
-		// 그리드 갱신
-		fileGridView.setData(0);
-	}
-
-	// 파일 다운로드
-	function downLoadFile(fileKey) {
-		postAjax("/admin/cm/cm08/fileDownInfo", {"fileKey": fileKey}, null, function(data){
-			var fileInfo = data.fileInfo;
-			var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName , "UTF-8");
-			location.href = "/admin/cm/cm08/fileDownload?filePath="+filePath;
-		});
+		var xhr = new XMLHttpRequest();
+		xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + fileKey + "&userId=" + jwt.userId, true);
+		xhr.responseType = "blob";
+		xhr.onload = function() {
+			if (xhr.status === 200) {
+				var contentType = xhr.getResponseHeader("Content-Type");
+				// 만약 응답 Content-Type이 text/plain이면, 오류 메시지가 담겨있는 경우입니다.
+				if (contentType && contentType.indexOf("text/plain") !== -1) {
+					var reader = new FileReader();
+					reader.onload = function(e) {
+						alert("전산실 연락바랍니다.\n\n" + e.target.result);
+					};
+					reader.readAsText(xhr.response);
+				} else {
+					// 정상적인 파일이면 바로 다운로드 진행
+					var blob = xhr.response;
+					var downloadUrl = URL.createObjectURL(blob);
+					var a = document.createElement("a");
+					a.href = downloadUrl;
+					a.download = "download";
+					document.body.appendChild(a);
+					a.click();
+					document.body.removeChild(a);
+					URL.revokeObjectURL(downloadUrl);
+				}
+			} else {
+				console.error("백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
+			}
+		};
+		xhr.onerror = function() {
+			console.error("네트워크 오류가 발생했습니다.");
+		};
+		xhr.send();
 	}
 </script>
 

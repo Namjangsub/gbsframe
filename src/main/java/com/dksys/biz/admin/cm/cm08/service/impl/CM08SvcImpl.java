@@ -58,7 +58,15 @@ public class CM08SvcImpl implements CM08Svc {
         	//rptTripFiles1, rptTripFiles2, rptTripFiles3으로 담겨져 넘어옴
 //        	fileList = mRequest.getFiles("rptTripFiles1");
         	fileList = mRequest.getFiles(lastPart);
-        } else {
+        } else if ("PM5001M01".equals(fileTrgtTyp)) {
+			String str = fileTrgtKey;
+			String lastPart = "bfuFiles";
+			int lastIndex = str.lastIndexOf('-'); // 마지막 '-'의 위치
+			if (lastIndex != -1 && lastIndex < str.length() - 1) { // 마지막 '-' 문자뒤에 있나?
+				lastPart += str.substring(lastIndex + 1); 
+			}
+			fileList = mRequest.getFiles(lastPart);
+		} else {
             fileList = mRequest.getFiles("files");
         }
         

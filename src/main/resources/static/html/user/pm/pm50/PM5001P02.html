@@ -1,0 +1,537 @@
+<div class="popup_area of_a" style="width: 100%; height: 100%;">
+	<div class="tit_contents">
+		<h4 class="tit">문제관리</h4>
+	</div>
+	<div class="contents no_bg">
+		<div class="contents_tit">
+			<div class="add_btn_small pdl10">
+				<!-- <a onclick="wbsIssueDelete();" style="height: 30px; line-height: 28px;" authchk>-</a> -->
+				<a id="cretRsltsIss" onclick="wbsIssRsltsModal();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-comment-medical"></i> 실적문제등록</a>
+			</div>
+			<!-- <select id="recordCnt" class="prae_select" onchange="salesGridView.setData(0);">
+				<option value="50" selected>50</option>
+				<option value="100">100</option>
+				<option value="500">500</option>
+				<option value="1000">1000</option>
+				<option value="9999999">전체</option>
+			</select> -->
+		</div>
+
+		<!-- 그리드1 -->
+		<div class="contents">
+			<div class="ax5_grid">
+				<div data-ax5grid="sales-grid" data-ax5grid-config="{}" style="height: 500px;  min-height:200px;"></div>
+				<div data-ax5grid="excel-grid" data-ax5grid-config="{}" style="display: none;"></div>
+			</div>
+		</div>
+	</div>
+</div>
+<!-- 하단 버튼 -->
+<div class ="popup_bottom_btn">
+	<!-- <button type="button" id="actionBtn">등록</button> -->
+	<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+</div>
+
+
+<script type="text/javascript">
+    var isFirst = true;
+    var coCd = null;
+    var salesCd = null;
+    var mEvlCloseChk = "N";
+	var fileListInfo = [];
+	var selectedPm50List = [];
+
+    ax5.ui.grid.formatter["chkYn"] = function () {
+//         var color = this.value == "Y" ? "color-circle_02.png" : "";
+        if (this.value == "Y"){
+            return '<img src="/static/img/color-circle_02.png" style="width: 10px;height: 10px;"></img>';
+        } else {
+            return ' ';
+        }
+    };
+
+    var salesGridView = {
+        initView : function() {
+            this.target = new ax5.ui.grid();
+            this.target.setConfig({
+                showLineNumber  : false,
+                showRowSelector : true,
+                // multipleSelect  : true,
+                sortable : false,
+                target : $('[data-ax5grid="sales-grid"]'),
+                header : {
+                    align : "center",
+                    selector : false
+                },
+                body: {
+                    mergeCells : ["clntNm","clntPjtNm","sjNm","salesCd"],
+                    columnHeight: 26,
+                    onClick: function () {
+                        var list = salesGridView.target.getList("selected");
+                        $.each(list, function(idx, obj) {
+                            salesGridView.target.select(obj.__origin_index__, {selected: false});
+                        });
+                        this.self.select(this.dindex);
+                    },
+                    onDBLClick: function () {
+                        var list = salesGridView.target.getList("selected");
+                        $.each(list, function(idx, obj) {
+                            salesGridView.target.select(obj.__origin_index__, {selected: false});
+                        })
+                        this.self.select(this.dindex);
+
+  		  	           if(this.column.key == "reqNo" ){    //reqNo = 발주요청번호 필드 선택시
+  		  	        		insertQualityReqModal(); 	//발주요청서 수정으로 진입
+  			  	       } else{
+  	                        wbsIssModal();
+  			  	       }
+                    },
+                    onDataChanged: function () {
+
+                    }
+                },
+                columns: [
+                    {key: "coCd",                label: "회사코드",          hidden:true},
+                    {key: "clntCd",              label: "고객코드",          hidden:true},
+                    {key: "clntPjt",             label: "고객사프로젝트",      hidden:true},
+                    {key: "clntNm",              label: "고객명",           width: 110,  align: "left", hidden:true},
+                    {key: "clntPjtNm",           label: "프로젝트명",        width: 80,   align: "left", hidden:true},
+                    {key: "sjNm",                label: "과제명",           width: 160,   align: "left", hidden:true },
+                    {key: "salesCd",             label: "SALES CODE",     width: 110,   align: "center"},
+                    {key: "ordrsNo",             label: "수주번호",          hidden:true},
+                    {key: "verNo",               label: "Ver.",           hidden:true},
+                    {key: "wbsPlanCodeKind",     label: "상위코드",         hidden:true},
+                    {key: "wbsPlanCodeId",       label: "TASK",           hidden:true},
+                    {key: "wbsMngNm",            label: "담당자",           hidden:true},
+                    {key: "pid",             label: "상위코드",          hidden:true},
+                    {key: "id",             label: "하위코드",          hidden:true},
+                    {key: "lvl",                 label: "lvl",            hidden:true},
+                    {key: "wbsPlanCodeNm",       label: "TASK명",         width: 180,   align: "left", hidden:false, treeControl: true},
+                    {key: "wbsPlansDt",          label: "시작일",          width: 80,   align: "center"},
+                    {key: "wbsPlaneDt",          label: "종료일",          width: 80,   align: "center"},
+                    {label: "등록여부",
+                        columns: [
+                            {key: "planYn",          label: "계획",           width: 40, align: "center", formatter: "chkYn"},
+                            {key: "rsltsYn",         label: "실적",           width: 40, align: "center", formatter: "chkYn"},
+                        ]
+                    },
+                    {label: "문제정보",
+                        columns: [
+                            {key: "gubun",           label: "구분",           width: 40,   align: "center" },
+                            {key: "issStsNm",        label: "진행상태",        width: 60,   align: "center"},
+                            {key: "issSj",           label: "제목",           width: 200,   align: "left"},
+                            {key: "issDivNm",        label: "유형",           width: 70,   align: "center"},
+                            {key: "issCnts",         label: "내용",           width: 230,   align: "left"},
+                        ]
+                    },
+                    {label: "조치내역",
+                        columns: [
+                            {key: "actIdNm",         label: "담당자",         width: 70,   align: "center"},
+                            {key: "reqNo",           label: "발주요청번호",     width: 90,   align: "center"},
+                            {key: "actsDt",          label: "시작일",         width: 80,   align: "center"},
+                            {key: "acteDt",          label: "종료일",         width: 80,   align: "center"},
+                            {key: "actMh",           label: "투입공수",        width: 70,   align: "right", formatter: "money"},
+                            {key: "actAmt",          label: "투입비용",        width: 70,   align: "right", formatter: "money"},
+                            {key: "actCnts",         label: "조치내용",        width: 150,   align: "left"}
+                        ]
+                    },
+                    {key: "wbsRsltssDt",         label: "시작일",         hidden:true},
+                    {key: "wbsRsltseDt",         label: "종료일",         hidden:true},
+                    {key: "issDiv",              label: "문제유형",       hidden:true},
+                    {key: "actId",               label: "조치담당자",        hidden:true},
+                    {key: "actDeptId",           label: "조치부서",        hidden:true},
+                    {key: "issSts",              label: "진행상태",       hidden:true},
+                    {key: "issNo",               label: "문제번호",        width: 100,   align: "center"},
+                    {key: "wbsPlanNo",           label: "문제계획번호",    hidden:true},
+                    {key: "wbsRsltsNo",          label: "문제실적번호",    hidden:true},
+                    {key: "pPlanNo",             label: "계획번호",       hidden:true},
+                    {key: "pRsltsNo",            label: "실적번호",       hidden:true},
+                    {key: "pPlanTrgtKey",        label: "계획타겟키",      hidden:true},
+                    {key: "pRsltsTrgtKey",       label: "실적타겟키",      hidden:true},
+                    {key: "issFileTrgtKey",      label: "ISS_FILE_TRGT_KEY", hidden:true},
+                    {key: "path",                label: "path", 		hidden:true},
+                    {key: "mcPartCd",            label: "기계분류", 		hidden:true},
+                    {key: "importantCd",         label: "중요도", 		hidden:true},
+                    {key: "impactCd",            label: "영향도", 		hidden:true},
+                ],
+                tree: {
+                    use: true,
+                    indentWidth: 15,
+                    arrowWidth: 15,
+                    iconWidth: 18,
+                    icons: {
+                        openedArrow: '<i class="fa fa-caret-down" aria-hidden="true"></i>',
+                        collapsedArrow: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+                        groupIcon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+                        collapsedGroupIcon: '<i class="fa fa-folder" aria-hidden="true"></i>',
+                        itemIcon: '<i class="fa fa-file" aria-hidden="true"></i>'
+                    },
+                    columnKeys: {
+                        parentKey: "pid",
+                        selfKey: "id",
+                        //collapse:"pid"
+                    },
+                },
+                page : {
+                    // navigationItemCount : 10,
+                    // height : 30,
+                    // display : true,
+                    // firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+                    // prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+                    // nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+                    // lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+                    // onChange : function() {
+                    //     salesGridView.setData(this.page.selectPage);
+                    // }
+					display: false
+                },
+            });
+            return this;
+        },
+        setData : function(_pageNo) {
+            var targetObj = this.target;
+            var paramObj = {
+                "coCd": coCd,
+                "ordrsClntNm" : '',
+                "salesCd": salesCd,
+                "clntPjt": '',
+                "wbsRsltssDt": '',
+                "wbsRsltseDt": '',
+                "issSts"	: '',
+				"pageNo"	: _pageNo + 1,
+				"recordCnt"	: 99999999,
+            };
+            postAjax("/user/wb/wb24/selectWbsIssueList", paramObj, null, function(data) {
+                try {
+                    var list = data.fileList;
+                    for (let i = 0; i < list.length; i++) {
+                        list[i].actMh = gPasFloatChk(list[i].actMh);
+                        list[i].actAmt = gPasFloatChk(list[i].actAmt);
+                    }
+                    targetObj.setData({
+                        list : list,
+                        page : {
+                            currentPage   : _pageNo,
+                            pageSize      : data.paginationInfo.pageSize,
+                            totalElements : data.paginationInfo.totalRecordCount,
+                            totalPages    : data.paginationInfo.totalPageCount,
+                        }
+                    });
+                    gridHeightResize(salesGridView, 194); // 194 = 919 - 725 : 화면 Body 높이 - 그리드 기본크기 725
+                } catch (error) {
+                    alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+                    return null; // 오류 발생 시 null 반환
+                } finally {
+                    // console.log("함수 실행 완료.");
+                }
+            });
+        }
+    }
+
+    var excelView = {
+        initView: function() {
+            this.target = new ax5.ui.grid();
+            this.target.setConfig({
+                target: $('[data-ax5grid="excel-grid"]'),
+                columns: [
+                    {key: "coCd",                label: "회사코드",          hidden:false},
+                    {key: "clntCd",              label: "고객코드",          hidden:false},
+                    {key: "clntPjt",             label: "고객사프로젝트",      hidden:false},
+                    {key: "clntNm",              label: "고객명",           width: 110,  align: "left", hidden:true},
+                    {key: "clntPjtNm",           label: "프로젝트명",        width: 80,   align: "left", hidden:true},
+                    {key: "sjNm",                label: "과제명",           width: 200,   align: "left", hidden:true},
+                    {key: "salesCd",             label: "SALES CODE",     width: 130,   align: "center"},
+                    {key: "ordrsNo",             label: "수주번호",          hidden:false},
+                    {key: "verNo",               label: "Ver.",           hidden:false},
+                    {key: "wbsPlanCodeKind",     label: "상위코드",         hidden:false},
+                    {key: "wbsPlanCodeId",       label: "TASK",           hidden:false},
+                    {key: "wbsMngNm",            label: "담당자",           hidden:false},
+                    {key: "upperCd",             label: "상위코드",          hidden:false},
+                    {key: "lowerCd",             label: "하위코드",          hidden:false},
+                    {key: "lvl",                 label: "lvl",            hidden:false},
+                    {key: "wbsPlanCodeNm",       label: "TASK명",         width: 300,   align: "left", hidden:false, treeControl: true},
+                    {key: "wbsPlansDt",          label: "시작일",          width: 100,   align: "center"},
+                    {key: "wbsPlaneDt",          label: "종료일",          width: 100,   align: "center"},
+                    {label: "등록여부",
+                        columns: [
+                            {key: "planYn",          label: "계획",           width: 40, align: "center"},
+                            {key: "rsltsYn",         label: "실적",           width: 40, align: "center"},
+                        ]
+                    },
+                    {label: "문제정보",
+                        columns: [
+                            {key: "gubun",           label: "구분",           width: 60,   align: "center" },
+                            {key: "issStsNm",        label: "진행상태",        width: 60,   align: "center"},
+                            {key: "issSj",           label: "제목",           width: 200,   align: "left"},
+                            {key: "issDivNm",        label: "유형",           width: 80,   align: "center"},
+                            {key: "issCnts",         label: "내용",           width: 230,   align: "left"},
+                        ]
+                    },
+                    {label: "조치내역",
+                        columns: [
+                            {key: "actIdNm",         label: "담당자",         width: 70,   align: "center"},
+                            {key: "actsDt",          label: "시작일",         width: 80,   align: "center"},
+                            {key: "acteDt",          label: "종료일",         width: 80,   align: "center"},
+                            {key: "reqNo",           label: "발주요청번호",     width: 90,   align: "center"},
+                            {key: "actMh",           label: "투입공수",        width: 70,   align: "right", formatter: "money"},
+                            {key: "actAmt",          label: "투입비용",        width: 70,   align: "right", formatter: "money"},
+                            {key: "actCnts",         label: "조치내용",        width: 150,   align: "left"}
+                        ]
+                    },
+                ],
+            });
+            return this;
+        }
+    }
+
+    // WBS 계획화면에서 문제 최초 등록 후 추가 등록 시 문제관리 메인화면으로 이동 시 salesCd를 넘김,
+    // get으로 넘기기 때문에 URL 부분에서 salesCd를 추출하여 가져오는 함수
+    function getParams() {
+        var url = window.location.search.replace('?','');
+	    var params = {};
+	    var urlArray = url.split('&');
+	    for(var i in urlArray)
+        {
+            var param = urlArray[i].split('=');
+            params[param[0]] = param[1];
+        }
+        return params;
+    }
+    // ----------------------------------------------------------
+
+    $(document).ready(function() {
+		coCd = modalStack.last().paramObj.coCd;
+		salesCd = modalStack.last().paramObj.salesCd;
+		fileListInfo = modalStack.last().paramObj.fileListInfo;
+		selectedPm50List = modalStack.last().paramObj.selectedPm50List;
+        isFirst = false;
+
+        $("#coCd_S").val(jwt.coCd);
+
+        // WBS 일정계획관리에서 문제 등록 후 추가 등록 시 문제관리 메인화면으로 이동 시 salesCd를 넘김,
+        // salesCd 존재할 경우 검색조건 salesCd 입력란에 자동입력 후 검색
+        const params = getParams();
+
+        if (params['salesCd'] != undefined) {
+            $('#salesCd_S').val(params['salesCd']);
+        }
+        //---------------------------------------------
+
+        // 메인화면 리스트 조회
+        salesGridView.initView().setData(0);
+
+        // 엑셀 그리드 초기화
+        excelView.initView()
+
+        //권한체크
+        authChk();
+    });
+
+
+    // 엑셀 다운로드
+    // function excelDown() {
+    //     var paramObj = {
+    //             "coCd": coCd,
+    //             "salesCd": salesCd,
+    //             "clntPjt": '',
+    //             "wbsRsltssDt": '',
+    //             "wbsRsltseDt": '',
+    //             "issSts"	: '',
+	// 			// "pageNo"	: _pageNo + 1,
+	// 			"recordCnt"	: 99999999,
+    //         };
+    //     postAjax("/user/wb/wb24/selectWbsIssueList", paramObj, null, function(data) {
+    //         var list = data.fileList;
+    //         excelView.target.setData({
+    //             list : list,
+    //             page : {
+    //                 totalElements : list.length,
+    //             }
+    //         });
+    //         var todayDate = new Date().format('yyyyMMddHHmmss');
+    //         excelView.target.exportExcel("WBS_문제관리 리스트"+todayDate+".xls");
+    //     });
+    // }
+
+
+    // WBS 실적 문제 등록 방법은 WBS 일정계획 (구분자:C3)화면과 문제 관리 화면(구분자:C4) 에서 등록 (2가지 방법)
+    function wbsIssRsltsModal() {
+        var row = salesGridView.target.getList("selected")[0];
+        if (row == undefined) {
+            alert("리스트에 SALES CODE를 선택하세요");
+            return;
+        }
+        else {
+            // WBS는 회사코드, salesCd를 선택 후 최초 과제를 등록 후 관리하기 때문에 해당 salesCd와 연계된 과제가 평가 완료시
+            // 알림처리
+            if (mEvlCloseChk == "Y") {
+                alert("해당 SALES CODE 과제는 평가 완료 되었습니다.");
+                return;
+            }
+
+        	// 문제관리 메인화면에서 트리구조형태로 되어 있어 맨상위 1,2레벨은 문제 등록 불가 알림처리,
+            // TASK 정보부분에 문제 등록 가능(맨마지막 레벨-파란색 동그라미 부분)
+            if (row.lvl == "1" || row.lvl == "2") {
+                alert("문제등록은 실적에 등록 가능합니다.");
+                return;
+            }
+        	else if (row.pRsltsNo == undefined) {
+                // 실적번호 (실적정보)가 존재하지 않는경우 알림 처리
+            	alert("실적 정보가 존재하지 않습니다.");
+                return;
+            }
+            else {
+				modalStack.close();	//문제 모달 popup닫기
+                // 문제관리에서 실적 문제 등록 구분자는 "C4"
+            	var paramObj = {
+                    "actionType"      : "C4",
+                    "coCd"            : row.coCd,
+					"clntPjtNm"       : row.clntPjtNm,
+					"clntNm"          : row.clntNm,
+					"salesCd"         : row.salesCd,
+					"wbsPlanNo"       : row.pPlanNo,
+					"wbsRsltsNo"      : row.pRsltsNo,
+					"wbsPlanCodeKind" : row.wbsPlanCodeKind,
+					"wbsPlanCodeId"   : row.wbsPlanCodeId,
+					"wbsPlanCodeNm"   : row.wbsPlanCodeNm,
+					"wbsMngNm"        : row.wbsMngNm,
+					"wbsRsltssDt"     : row.wbsRsltssDt,
+					"wbsRsltseDt"     : row.wbsRsltseDt,
+					"fileListInfo"	  : fileListInfo,
+					"selectedPm50List"	  : selectedPm50List
+                };
+                openSecondModal("/static/html/user/wb/wb24/WB2401P11.html", 1200, 870, "WBS 실적문제등록", paramObj, function () {
+                });
+            }
+        }
+    }
+
+    // WBS 계획 문제 수정 방법은 문제 관리 화면(구분자:U3) 에서 등록 (1가지 방법), 기존 WBS 일정계획 (구분자:U1)은 사용하지 않고 문제관리 화면으로 이동
+    // WBS 실적 문제 수정 방법은 문제 관리 화면(구분자:U4) 에서 등록 (1가지 방법), 기존 WBS 일정계획 (구분자:U2)은 사용하지 않고 문제관리 화면으로 이동
+    function wbsIssModal() {
+        var row = salesGridView.target.getList("selected")[0];
+        if (row == undefined) {
+            alert("리스트에 SALES CODE에 해당하는 실행TASK를 선택하세요");
+            return;
+        } else {
+            // 문제관리에서 계획 문제 수정 구분자는 "U3"
+            if (row.gubun == "계획" && row.issNo != undefined) {
+                var paramObj = {
+                    "actionType"     : "U3",
+                    "coCd"           : row.coCd,
+                    "issFileTrgtKey" : row.issFileTrgtKey,
+					"wbsPlanNo"      : row.pPlanNo,
+					"wbsRsltsNo"     : row.pRsltsNo,
+					"salesCd"     	 : row.salesCd,
+					// "fileListInfo"	 : fileListInfo,
+					// "selectedPm50List"	 : selectedPm50List
+                };
+                openSecondModal("/static/html/user/wb/wb24/WB2401P01.html", 1200, 870, "WBS 계획문제수정", paramObj, function (){
+
+                });
+            }
+    		else if (row.gubun == "실적" && row.issNo != undefined) {
+				modalStack.close();	//문제 모달 popup닫기
+                // 문제관리에서 등록 문제 수정 구분자는 "U4"
+                var paramObj = {
+                    "actionType"     : "U4",
+                    "coCd"           : row.coCd,
+                    "issFileTrgtKey" : row.issFileTrgtKey,
+                    "wbsPlanNo"      : row.pPlanNo,
+					"wbsRsltsNo"     : row.pRsltsNo,
+					"salesCd"     	 : row.salesCd,
+					// "fileListInfo"	 : fileListInfo,
+					// "selectedPm50List"	 : selectedPm50List
+                };
+                openSecondModal("/static/html/user/wb/wb24/WB2401P11.html", 1200, 870, "WBS 실적문제수정", paramObj, function (){
+
+                });
+            }
+        }
+    }
+
+	/*삭제 버튼 클릭 시*/
+// 	function wbsIssueDelete() {
+//         var row = salesGridView.target.getList("selected")[0];
+
+//         if( !row ) {
+//         	return false;
+//         }
+//         if( !row.issNo) {
+//         	return false;
+//         }
+//         if (row.reqNo) {
+//         	alert("요인별 발주요청서 연계처리가 있는 자료는 삭제할 수 없습니다.");
+//         	return false;
+//         }
+//         if (row.actCnts && row.actCnts != '') {
+//         	alert("조치결과가 있는 자료는 삭제할 수 없습니다.");
+//         	return false;
+//         }
+//         if (row.creatId != jwt.userId) {
+//         	alert("문제등록 자료는 등록한 사람만 삭제 가능합니다.");
+//         	return false;
+//         }
+// 		var formData = {
+// 				"fileTrgtKey" 	: row.issFileTrgtKey,
+// 		       	"fileTrgtTyp"   : row.issFileTrgtTyp,
+// 				"issNo" 	   	: row.issNo,
+// 				"coCd" 	   		: row.coCd,
+// 				"salesCd" 	   	: row.salesCd,
+// 		       	"userId"   		: jwt.userId,
+// 		}
+// // 		if(!monthCloseChk(row.ctrtDt, 'D', row.coCd)) return;  //마감일통제
+// 		if (confirm("삭제하시겠습니까?")) {
+// 			putAjax("/user/wb/wb24/wbsIssueDelete", formData, null, function(data) {
+// 				if (data.resultCode != 200) {
+// 		        	alert("결재완료 또는 발주요청 자료 등록시 삭제 불가합니다. 확인바랍니다.\n" + data.msg);
+// 				}
+// 				salesGridView.setData(0);
+// 			});
+// 		}
+// 	}
+
+
+	/*수정 or 등록 버튼 클릭 시*/
+	function insertQualityReqModal() {
+			var row = salesGridView.target.getList("selected")[0];
+			if (!row.issNo) {
+				alert("문제를 먼저 등록 바랍니다.")
+				return false;
+			}
+	    	if (row.reqNo) {
+	    		//발주요청번호가 존재하면 발주요청서 수정 업무 시작
+// 	    		insertQualityReqModal('U');
+
+				var paramObj = {
+					"actionType" : "U",
+//	 				"fileTrgtKey" : 0,		//정보 없음
+					"reqNo"    : row.reqNo,
+					"coCd" 	   : row.coCd,
+			       	"userId"   : jwt.userId,
+			       	"deptId"   : jwt.deptId,
+			       	"issNo"    : row.issNo,
+			       	"pgmId"    : "QM0101M01"
+				};
+				openSecondModal("/static/html/user/qm/qm01/QM0101P01.html", 1600, 850, "", paramObj, function(data) {
+				});
+			} else {
+				return false;
+			}
+			
+			// else {
+	    	// 	//발주요청서 신규 생성업무 시작
+		    // 	var paramObj = JSON.parse(JSON.stringify(row));
+		    //     paramObj.fromJobType = "ISS";	//발주요청서 자체 실행은 "REQ", 문제에서 전달하는것은 "ISS"
+		    //     paramObj.actionType  = "C";	//발주요청서 신규 생성
+		    //     paramObj.eqpNm  = row.sjNm;
+		    //     paramObj.workRptNo  = row.issNo;	//이슈등록번호
+		    //     paramObj.issueTitle  = row.issSj;
+		    //     paramObj.workRptRmk  = row.issCnts;
+		    //     openSecondModal("/static/html/user/qm/qm01/QM0101P01.html", 1200, 870, "요인별 발주 및 출장요청서 작성", paramObj, function (){
+		    //     	salesGridView.setData(0);
+		    //     });
+	    	// }
+	}
+</script>
+

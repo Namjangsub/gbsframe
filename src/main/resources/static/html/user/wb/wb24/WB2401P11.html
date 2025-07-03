@@ -434,6 +434,9 @@
     var kakaoCnt = 0;
 	var kakaoErr = [];
 
+	var fileListInfo= []; 	// 사진업로드 
+	var selectedPm50List = [];
+
     // 문제 공유 결재 리스트
     var gridViewApprovalSP11 = {
         initView : function() {
@@ -709,9 +712,11 @@
     	if (actionType == "I") {
     		$(currDivId + '  #actionBtn').remove();
     	}
-
         coCd = modalStack.last().paramObj.coCd;
         salesCd = modalStack.last().paramObj.salesCd;
+
+		fileListInfo = modalStack.last().paramObj.fileListInfo; // 출장자 사진업로드에서 가져온 파일 리스트
+		selectedPm50List = modalStack.last().paramObj.selectedPm50List; // 출장자 사진업로드에서 가져온 파일 메타데이터
 
         $(currFormId + ' #actionType').val(actionType);
         $(currFormId + ' #coCd').val(coCd);
@@ -914,7 +919,7 @@
         if ($(currFormId + ' #issSts').val() == "ISSSTS03") {
         	$(currFormId + ' #createQualityReq').hide();
         }
-        
+
         //---------------------------------------------------------------
         //첨부 화일 처리 시작
         //---------------------------------------------------------------
@@ -927,6 +932,45 @@
         //---------------------------------------------------------------
         //첨부 화일 처리 끝
         //---------------------------------------------------------------
+
+		// 출장자 사진업로드에서 가져온 파일첨부 내용 등록 시 처리 루트
+		$('#deptTreeOrdarsSP11').on('loaded.jstree', function () {
+			// if (actionType == "C") {
+				if (fileListInfo && fileListInfo.length) {
+					const tree = $(this).jstree(true);
+					// 부모(루트)도 확실히 열어 주고
+					tree.open_node('FILETREE', function () {
+						// FITR05(사진, 미디어) 선택
+						tree.deselect_all();
+						tree.select_node('FITR05');
+						// 데이터 강제 로드
+						treeModule.getAllFilesForNodes('FITR05');
+						// 그리고 파일리스트 영역 표시
+						$('#fileList_area_SP11 #fileAttachTxt').hide();
+						$('#fileList_area_SP11 #fileAttachCnts').show();
+					});
+					// 1) 파일 input 요소 찾기
+					const input = document.getElementById('fileList_area_SP11').querySelector('input[type="file"]');
+					if (input) {
+						// 2) DataTransfer 생성하고 파일 추가
+						const dt = new DataTransfer();
+						fileListInfo.forEach(f => dt.items.add(f));
+						// 3) input에 할당
+						input.files = dt.files;
+						// 4) change 이벤트 트리거
+						const evt = new Event('change', { bubbles: true });
+						input.dispatchEvent(evt);
+					}
+				}
+				if (selectedPm50List && selectedPm50List.length) {
+					const text = selectedPm50List
+						.map(item => item.bfuCnts || '')
+						.join('\n');
+					$('#issCnts').val(text);
+				}
+			// } else return false;
+			
+		});
 
 		// 크기 조절할 textarea ID 리스트
 		$(textAreas.join(',')).on('input paste drop change', function () {
@@ -942,6 +986,10 @@
 				$(currDivId + ' #commentBtn').on("click", function() { updateIssueComment('결과수정'); });
 			}
 		});
+
+		// if (fileInfo.length > 0) {
+
+		// }
 		
         
         
@@ -1065,6 +1113,9 @@
 	                    	if (typeof gridView2 !== "undefined") gridView2.setData(0);
 	                    	if (typeof salesGridView !== "undefined") salesGridView.setData(0);
 	                    	if (typeof issueGridView !== 'undefined') issueGridView.setData(0);
+
+							// 출장자 사진 업로드 프로그램에 문제등록 정보 업데이트
+							update_issue_pm50_d01(data.resultIssNo);
 		                    modalStack.close();
 		                }
 		            });
@@ -2213,4 +2264,21 @@
                 }
             });
     }
+
+	function update_issue_pm50_d01(issuNo) {
+		// 출장자 사진 업로드 프로그램에서 넘어온 경우 일때만 update 처리
+		if (selectedPm50List) {
+			paramObj = {
+				"pm50Info" 	: selectedPm50List,
+				"issuNo"	: issuNo,
+				"userId"	: jwt.userId,
+				"pgmId"		: $("#pgmId").val()
+			}
+			postAjax("/user/pm/pm50/update_issue_pm50_d01", paramObj, null, function(data) { 
+				gridView.setData(0);
+			})
+		} else {
+			return false;
+		}
+	}
 </script>
