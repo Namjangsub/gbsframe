@@ -14,6 +14,8 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.rest.url.Base62Util;
+import com.dksys.biz.rest.url.mapper.UrlMapper;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb22.mapper.WB22Mapper;
 import com.dksys.biz.user.wb.wb22.service.WB22Svc;
@@ -40,6 +42,12 @@ public class WB22SvcImpl implements WB22Svc {
 
 	@Autowired
 	QM01Mapper QM01Mapper;
+
+	@Autowired
+    private UrlMapper urlMapper;
+
+	@Autowired
+    private Base62Util base62Util;
 
 	@Autowired
 	ExceptionThrower thrower;
@@ -831,5 +839,44 @@ public class WB22SvcImpl implements WB22Svc {
 		}
 		
 		return result;
+	}
+
+	@Override
+	public Map<String, String> generateShortUrl(Map<String, String> paramMap) {
+
+		String hostAddress = paramMap.get("hostAddress");
+		String targetUrl = hostAddress + paramMap.get("tempUrl"); // hostAddress + "/static/redirectChkCode.html?" +
+
+		String longUrl = targetUrl;
+        String strId = urlMapper.getUrlIdByLongUrl(longUrl);
+        int id = 0;
+        if (strId == null || strId.equals("")) {
+        	String chkCode = "QRGNT"; // 비밀코드는 고정 문자열 -> DB에 저장용도임
+//        	Map<String, String> paramMap = new HashMap<>();
+        	paramMap.put("longUrl", longUrl);
+            paramMap.put("chkCode", chkCode);
+            id = urlMapper.insertLongUrl(paramMap);
+
+        	Object paramValue = paramMap.get("id");
+        	if (paramValue != null && paramValue instanceof Integer) {
+        		id = ((Integer) paramValue).intValue();
+        	}
+
+        	if (id > 0) {
+//        		id = Integer.parseInt(paramMap.get("id"));
+        	} else {
+        		throw new IllegalArgumentException("등록중 오류가 발생 했습니다.");
+        	}
+        	
+        } else {
+        	id = Integer.parseInt(strId);
+        }
+        String shortUrl = base62Util.encoding(id);
+
+    	Map<String, String> returnMap = new HashMap<>();
+    	returnMap.put("shortUrl", paramMap.get("hostAddress") + "/s/" + shortUrl);
+    	returnMap.put("chkCode", urlMapper.getChkCodeById(id));
+    	
+        return returnMap;
 	}
 }

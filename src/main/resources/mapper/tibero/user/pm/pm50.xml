@@ -4,41 +4,377 @@
 <mapper namespace="com.dksys.biz.user.pm.pm50.mapper.PM50Mapper">
 
 	<select id="select_pm50_ListCount" parameterType="Map"  resultType="int">
-		SELECT COUNT(*) 
-			FROM TB_CM08M01
-			WHERE 1 = 1
-			  AND FILE_TRGT_TYP = 'PM5001P01_M'
-			<if test="salesCd != null and salesCd != ''">
-			  AND SALES_CD = #{salesCd}
-			</if>
-			<if test="reqDtFrom != null or !reqDtFrom.equals('')">
-			  AND CREAT_DTTM BETWEEN TO_DATE(#{reqDtFrom},'YYYY-MM-DD') AND TO_DATE(#{reqDtTo} ,'YYYY-MM-DD')
-			</if>
-			<if test="reqId != null and reqId != ''">
-			  AND CREAT_ID = #{reqId}
-			</if>
+		SELECT 
+			COUNT(*)
+		FROM TB_PM50M01 T
+						LEFT OUTER JOIN TB_PM50D01 D ON D.FILE_TRGT_KEY = T.FILE_TRGT_KEY
+						LEFT OUTER JOIN TB_CR02D02 C ON C.SALES_CD = T.SALES_CD
+						LEFT OUTER JOIN TB_CR02D02 C ON C.SALES_CD = T.SALES_CD
+						LEFT OUTER JOIN (
+											    SELECT W1.*, ROW_NUMBER() OVER (PARTITION BY SALES_CD ORDER BY VER_NO DESC) AS rn
+											    FROM TB_WB21M01 W1
+											) W1 ON W1.CO_CD = C.CO_CD AND W1.SALES_CD = C.SALES_CD AND W1.rn = 1  --마지막 버전의 과제정보 가져오기
+						LEFT JOIN TB_CM08M01 CM ON CM.FILE_TRGT_KEY = D.FILE_TRGT_KEY || '-' || TO_CHAR(D.FILE_SEQ)
+		WHERE 1 = 1
+		<if test="coCd != null and coCd != ''">
+		  AND T.CO_CD = #{coCd}
+		</if>
+		<if test="salesCd != null and salesCd != ''">
+		  AND T.SALES_CD = #{salesCd}
+		</if>
+		<if test="reqDtFrom != null or !reqDtFrom.equals('')">
+		  AND T.CREAT_DTTM BETWEEN TO_DATE(#{reqDtFrom},'YYYY-MM-DD') AND TO_DATE(#{reqDtTo} ,'YYYY-MM-DD')
+		</if>
+		<if test="reqId != null and reqId != ''">
+		  AND T.CREAT_ID = #{reqId}
+		</if>
 	</select>
 
 	<select id="select_pm50_List" parameterType="Map" resultType="CamelMap">
 		SELECT 
-			  M08.*
-			, M06.NAME 														AS CREAT_NM
-			, W21.SMRIZE_ID													AS SMRIZE_ID		  --총괄PM ID
-			, (SELECT FN_CM06M01_ID_TO_NM(W21.SMRIZE_ID) FROM DUAL)          	AS SMRIZE_NM          --총괄PM명
-		FROM TB_CM08M01 M08
-							LEFT OUTER JOIN TB_CM06M01 M06 ON M06.ID = M08.CREAT_ID
-							LEFT OUTER JOIN TB_WB21M01 W21 ON W21.SALES_CD = M08.FILE_TRGT_KEY
-		WHERE M08.FILE_TRGT_TYP = 'PM5001P01_M'
-		<if test="salesCd != null and salesCd != ''">
-		  AND M08.SALES_CD = #{salesCd}
+			  T.FILE_TRGT_KEY
+			, T.CO_CD
+			, T.SALES_CD
+			, C.PRDT_CD
+			, P.PRDT_NM 										-- 제품명
+			, W1.SMRIZE_ID							AS PM_ID  -- 총괄PM
+			, FN_CM06M01_ID_TO_NM(W1.SMRIZE_ID) 	AS PM_NM
+			, T.CREAT_DTTM
+			, T.CREAT_ID							AS CREAT_ID
+			, FN_CM06M01_ID_TO_NM(T.CREAT_ID) 		AS CREAT_NM
+			, D.BFU_CNTS
+			, CM.FILE_KEY
+			, CM.FILE_SIZE
+			, CM.FILE_TYPE
+			, CM.FILE_NAME
+			, CM.FILE_TRGT_KEY						AS CM08_FILE_TRGT_KEY
+			, D.FILE_SEQ
+			, D.ISS_NO
+			, D.ISS_UPD_ID
+			, FN_CM06M01_ID_TO_NM(D.ISS_UPD_ID) 	AS ISS_UPD_NM
+			, D.ISS_UPD_DTTM 
+		FROM TB_PM50M01 T
+						LEFT OUTER JOIN TB_PM50D01 AS D ON D.FILE_TRGT_KEY = T.FILE_TRGT_KEY
+						LEFT OUTER JOIN TB_CR02D02 AS C ON C.SALES_CD = T.SALES_CD
+						LEFT OUTER JOIN TB_BM01M01 AS P ON P.PRDT_CD = C.PRDT_CD   --제품마스터
+						LEFT OUTER JOIN (
+											    SELECT W1.*, ROW_NUMBER() OVER (PARTITION BY SALES_CD ORDER BY VER_NO DESC) AS rn
+											    FROM TB_WB21M01 W1
+											) W1 ON W1.CO_CD = C.CO_CD AND W1.SALES_CD = C.SALES_CD AND W1.rn = 1  --마지막 버전의 과제정보 가져오기
+						LEFT JOIN TB_CM08M01 AS CM ON CM.FILE_TRGT_KEY = D.FILE_TRGT_KEY || '-' || TO_CHAR(D.FILE_SEQ)
+		WHERE 1 = 1
+		<if test="coCd != null and coCd != ''">
+		  AND T.CO_CD = #{coCd}
 		</if>
-		<if test="reqDtFrom != null and reqDtFrom != ''">
-		  AND M08.CREAT_DTTM BETWEEN TO_DATE(#{reqDtFrom}, 'YYYY-MM-DD') AND TO_DATE(#{reqDtTo},   'YYYY-MM-DD')
+		<if test="salesCd != null and salesCd != ''">
+		  AND T.SALES_CD = #{salesCd}
+		</if>
+		<if test="reqDtFrom != null or !reqDtFrom.equals('')">
+		  AND T.CREAT_DTTM BETWEEN TO_DATE(#{reqDtFrom},'YYYY-MM-DD') AND TO_DATE(#{reqDtTo}  || ' 23:59:59', 'YYYY-MM-DD HH24:MI:SS')
 		</if>
 		<if test="reqId != null and reqId != ''">
-		  AND M08.CREAT_ID = #{reqId}
+		  AND T.CREAT_ID = #{reqId}
 		</if>
+		ORDER BY T.CREAT_DTTM DESC, T.SALES_CD
 	</select>
+
+	<select id="selectSendFileCount" parameterType="Map" resultType="int">
+        SELECT
+        	COUNT(*)
+		    FROM
+		        TB_CM08M01 T left outer join TB_BM02M01 A ON T.CLNT_CD = A.CLNT_CD
+					            LEFT OUTER JOIN (
+											        SELECT  CODE_ID ID,
+											                CODE_NM TEXT,
+											                CODE_KIND PARENT,
+											                CODE_DESC PARENT_NM,
+											                SORT_NO,
+											                USE_YN,
+											                LPAD(' ', 3*(LEVEL-1)) || LEVEL lvl,
+											                REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_NM, '\'), '^\s+\-\>\s+', '') as LPATH,
+											                CONNECT_BY_ISLEAF AS IS_LEAF
+											        FROM TB_CM05M01
+											        START WITH CODE_ID ='FILETREE'
+											        CONNECT BY PRIOR CODE_ID = CODE_KIND
+											        ORDER SIBLINGS BY CODE_ID ASC) B1 ON T.COMON_CD = B1.ID
+<!-- 		            LEFT OUTER JOIN TB_BM06M01 C ON T.PRJCT_CD = C.PRJCT_SEQ -->
+		            LEFT OUTER JOIN TB_CM06M01 D ON T.CREAT_ID = D.ID
+		            LEFT OUTER JOIN TB_BM01M01 E ON T.PRDT_CD = E.PRDT_CD
+		            LEFT OUTER JOIN TB_CM05M01 F ON T.ITEM_CD = F.CODE_ID
+		            LEFT OUTER JOIN TB_CM15M01 G ON T.COMON_CD = G.COMON_CD
+        								        AND G.USER_ID = #{userId}
+		        WHERE 1=1
+		        <if test="coCd != null and !coCd.equals('')">
+		            AND T.CO_CD = #{coCd}
+		        </if>
+		        <if test="comonCd.equals('FITR90')">	        
+		        	AND (T.COMON_CD IS NULL OR T.COMON_CD = '' OR B1.ID IS NULL)
+		        </if>
+		        <if test="!comonCd.equals('FITR90')">	        
+					AND G.FILE_LIST = 'Y'
+		        	AND T.COMON_CD IN (
+								SELECT  CODE_ID ID
+								  FROM TB_CM05M01
+									START WITH CODE_ID = #{comonCd}
+									CONNECT BY PRIOR CODE_ID = CODE_KIND		            
+		  						) 
+		        </if>		  						
+		        <if test="fileTrgtKey != null and !fileTrgtKey.equals('')">
+		            AND T.FILE_TRGT_KEY LIKE #{fileTrgtKey} || '%'
+		            AND T.FILE_TRGT_TYP= #{fileTrgtTyp}
+		        </if>
+		        <if test="creatId != null and !creatId.equals('')">
+		            AND T.CREAT_ID= #{creatId}
+		        </if>
+		        <if test="creatNm != null and !creatNm.equals('')">
+		            AND D.NAME LIKE '%${creatNm}%'
+		        </if>
+		        <if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+		            AND T.CREAT_DTTM BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+		        </if>
+		        <if test="searchValue != null and !searchValue.equals('') and searchName != null and !searchName.equals('')">
+		            AND ${searchValue} LIKE '%${searchName}%'
+		        </if>
+		        <if test="clntCd != null and !clntCd.equals('')">
+		            AND T.CLNT_CD = #{clntCd}
+		        </if>
+		        <if test="clntNm != null and !clntNm.equals('')">
+		            AND A.CLNT_NM LIKE '%${clntNm}%'
+		        </if>
+		        <if test="prdtCd != null and !prdtCd.equals('')">
+		            AND T.PRDT_CD = #{prdtCd}
+		        </if>
+		        <if test="prdtNm != null and !prdtNm.equals('')">
+		            AND E.PRDT_NM LIKE '%${prdtNm}%'
+		        </if>
+		        <if test="prjctCd != null and !prjctCd.equals('')">
+		            AND C.PRJCT_NM LIKE '%${prjctCd}%'
+		        </if>
+		        <if test="salesCd != null and !salesCd.equals('')">
+		            AND T.SALES_CD LIKE '%${salesCd}%'
+		        </if>
+    </select>
+
+    <select id="selectSendFileList" parameterType="Map" resultType="CamelMap">
+		SELECT *
+		  FROM (     
+	        SELECT
+	        	ROWNUM AS RNUM, A.*
+	        FROM
+		        (
+		        SELECT
+		            T.CO_CD,
+		            T.FILE_KEY,
+		            T.FILE_SIZE,
+		            T.FILE_TYPE,
+		            T.FILE_NAME,
+		            T.FILE_PATH,
+		            T.FILE_TRGT_TYP,
+		            T.FILE_TRGT_KEY,
+		            T.USE_YN,
+		            T.CREAT_ID,
+		            D.NAME CREAT_NM,
+		            T.CREAT_PGM,
+		            TO_CHAR(T.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM,
+		            T.CLNT_CD,
+		            A.CLNT_NM,
+		            T.PRDT_CD,
+		            E.PRDT_NM,
+		            T.ITEM_CD,
+		            F.CODE_NM AS ITEM_NM,
+		            T.SALES_CD,
+		            T.PRJCT_CD,
+		            FN_CM05M01_CD_TO_NM(T.PRJCT_CD) PRJCT_NM,
+		            T.COMON_CD,
+		            B1.TEXT AS COMON_NM,
+		            NVL(B1.LPATH, NVL2(T.COMON_CD, T.COMON_CD, 'null'))  AS LPATH,
+		            G.FILE_UP,
+		            G.FILE_DOWN,
+		            G.FILE_UPDATE,
+		            G.FILE_DELETE
+		    FROM
+		        TB_CM08M01 T left outer join TB_BM02M01 A ON T.CLNT_CD = A.CLNT_CD
+					            LEFT OUTER JOIN (
+											        SELECT  CODE_ID ID,
+											                CODE_NM TEXT,
+											                CODE_KIND PARENT,
+											                CODE_DESC PARENT_NM,
+											                SORT_NO,
+											                USE_YN,
+											                LPAD(' ', 3*(LEVEL-1)) || LEVEL lvl,
+											                REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_NM, '\'), '^\s+\-\>\s+', '') as LPATH,
+											                CONNECT_BY_ISLEAF AS IS_LEAF
+											        FROM TB_CM05M01
+											        START WITH CODE_ID ='FILETREE'
+											        CONNECT BY PRIOR CODE_ID = CODE_KIND
+											        ORDER SIBLINGS BY CODE_ID ASC) B1 ON T.COMON_CD = B1.ID
+<!-- 		            LEFT OUTER JOIN TB_BM06M01 C ON T.PRJCT_CD = C.PRJCT_SEQ -->
+		            LEFT OUTER JOIN TB_CM06M01 D ON T.CREAT_ID = D.ID
+		            LEFT OUTER JOIN TB_BM01M01 E ON T.PRDT_CD = E.PRDT_CD
+		            LEFT OUTER JOIN TB_CM05M01 F ON T.ITEM_CD = F.CODE_ID
+		            LEFT OUTER JOIN TB_CM15M01 G ON T.COMON_CD = G.COMON_CD
+        								        AND G.USER_ID = #{userId}
+		        WHERE 1=1
+		        <if test="coCd != null and !coCd.equals('')">
+		            AND T.CO_CD = #{coCd}
+		        </if>
+		        <if test="comonCd.equals('FITR90')">	        
+		        	AND (T.COMON_CD IS NULL OR T.COMON_CD = '' OR B1.ID IS NULL) --저장위치 없는 파일
+		        </if>
+		        <if test="!comonCd.equals('FITR90')">	        
+					AND G.FILE_LIST = 'Y'
+		        	AND T.COMON_CD IN (
+								SELECT  CODE_ID ID
+								  FROM TB_CM05M01
+									START WITH CODE_ID = #{comonCd}
+									CONNECT BY PRIOR CODE_ID = CODE_KIND		            
+		  						) 
+		        </if>		  						
+		        <if test="fileTrgtKey != null and !fileTrgtKey.equals('')">
+		            AND T.FILE_TRGT_KEY LIKE #{fileTrgtKey} || '%'  --파일타겟 키값이 있으면 반드시 파일타겟 타입이 있어야 함
+		            AND T.FILE_TRGT_TYP= #{fileTrgtTyp}
+		        </if>
+		        <if test="creatId != null and !creatId.equals('')">
+		            AND T.CREAT_ID= #{creatId}
+		        </if>
+		        <if test="creatNm != null and !creatNm.equals('')">
+		            AND D.NAME LIKE '%${creatNm}%'
+		        </if>
+		        <if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+		            AND T.CREAT_DTTM BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+		        </if>
+		        <if test="searchValue != null and !searchValue.equals('') and searchName != null and !searchName.equals('')">
+		            AND ${searchValue} LIKE '%${searchName}%'
+		        </if>
+		        <if test="clntCd != null and !clntCd.equals('')">
+		            AND T.CLNT_CD = #{clntCd}
+		        </if>
+		        <if test="clntNm != null and !clntNm.equals('')">
+		            AND A.CLNT_NM LIKE '%${clntNm}%'
+		        </if>
+		        <if test="prdtCd != null and !prdtCd.equals('')">
+		            AND T.PRDT_CD = #{prdtCd}
+		        </if>
+		        <if test="prdtNm != null and !prdtNm.equals('')">
+		            AND E.PRDT_NM LIKE '%${prdtNm}%'
+		        </if>
+		        <if test="prjctCd != null and !prjctCd.equals('')">
+		            AND C.PRJCT_NM LIKE '%${prjctCd}%'
+		        </if>
+		        <if test="salesCd != null and !salesCd.equals('')">
+		            AND T.SALES_CD LIKE '%${salesCd}%'
+		        </if>
+		        ) A
+	    	)
+        WHERE
+              RNUM BETWEEN #{firstIndex} AND #{lastIndex}
+
+    </select>
+
+	<select id="select_pm50_Info" resultType="CamelMap">
+        SELECT 
+			  T.FILE_TRGT_KEY
+			, T.CO_CD
+			, T.SALES_CD
+			, C.EQP_NM
+			, R.ORDRS_CLNT_CD
+			, A.CLNT_NM 							AS ORDRS_CLNT_NM	-- 고객사
+			, R.CLNT_PJT
+			, FN_CM05M01_CD_TO_NM(R.CLNT_PJT)		AS CLNT_PJT_NM	-- 차종
+			, C.PRDT_CD
+			, P.PRDT_NM 							AS PRDT_CD_NM	-- 제품명
+			, W1.SMRIZE_ID							AS PM_ID  -- 총괄PM
+			, FN_CM06M01_ID_TO_NM(W1.SMRIZE_ID) 	AS PM_NM
+			, T.CREAT_DTTM
+			, T.CREAT_ID							AS REQ_ID
+			, FN_CM06M01_ID_TO_NM(T.CREAT_ID) 		AS REQ_ID_NM
+		FROM TB_PM50M01 T
+						LEFT OUTER JOIN TB_CR02D02 AS C ON C.SALES_CD = T.SALES_CD
+						LEFT OUTER JOIN TB_BM01M01 AS P ON P.PRDT_CD = C.PRDT_CD   --제품마스터
+						LEFT OUTER JOIN TB_CR02M01 AS R ON R.ORDRS_NO = C.ORDRS_NO
+						LEFT OUTER JOIN TB_BM02M01 AS A ON A.CLNT_CD = R.ORDRS_CLNT_CD  --거래처마스터
+						LEFT OUTER JOIN (
+											SELECT W1.*, ROW_NUMBER() OVER (PARTITION BY SALES_CD ORDER BY VER_NO DESC) AS rn
+											FROM TB_WB21M01 W1
+										) W1 ON W1.CO_CD = C.CO_CD AND W1.SALES_CD = C.SALES_CD AND W1.rn = 1  --마지막 버전의 과제정보 가져오기
+        WHERE T.FILE_TRGT_KEY = #{fileTrgtKey}
+    </select>
+
+	<select id="select_salesCd_info" resultType="CamelMap">
+		SELECT DISTINCT 
+				  X.CO_CD
+				, R1.CODE_NM AS CO_CD_NM
+				, X.ORDRS_NO
+				, X.SALES_CD
+				, NVL(X.ORGN_SALES_CD,Y.ORGN_SALES_CD)  AS ORGN_SALES_CD
+				, Y.ORDRS_CLNT_CD                       AS ORDRS_CLNT_CD
+				, A.CLNT_NM AS ORDRS_CLNT_NM
+				, Y.CLNT_PJT
+				, R2.CODE_NM AS CLNT_PJT_NM
+				, X.ORDRS_DTL_DIV20
+				, R3.CODE_NM AS ORDRS_DTL_DIV20_NM
+				, X.PRDT_CD
+				, P.PRDT_NM AS PRDT_CD_NM
+				, X.ITEM_DIV
+				, R4.CODE_NM AS ITEM_DIV_NM
+				, X.EQP_NM
+				, Y.CTRT_NM
+				, X.ORDRS_QTY
+				, Y.ORDRS_DIV
+				, FN_CM05M01_CD_TO_NM(Y.ORDRS_DIV) AS ORDRS_DIV_NM --수주구분명
+				, TO_CHAR(X.DUDT_INTEND_DT, 'YYYY-MM-DD') AS DUDT_INTEND_DT
+				, W1.VER_NO
+				, TO_CHAR(W1.DE_DT, 'YYYY-MM-DD') AS DE_DT	--과제 출고일 = 고객요구일
+				, W1.SMRIZE_ID	AS PM_ID	-- 총괄PM
+				, FN_CM06M01_ID_TO_NM(W1.SMRIZE_ID) AS PM_NM	-- 총괄PM명
+		FROM   TB_CR02D02 AS X
+				INNER JOIN TB_CR02M01 AS Y  ON X.CO_CD    = Y.CO_CD
+											AND X.ORDRS_NO = Y.ORDRS_NO
+				LEFT OUTER JOIN TB_BM01M01 AS P ON X.PRDT_CD = P.PRDT_CD  --제품마스터
+				LEFT OUTER JOIN TB_BM02M01 AS A ON Y.ORDRS_CLNT_CD = A.CLNT_CD  --거래처마스터
+				LEFT OUTER JOIN TB_CM05M01 AS R1 ON R1.CODE_ID = X.CO_CD  --회사
+				LEFT OUTER JOIN TB_CM05M01 AS R2 ON R2.CODE_ID = Y.CLNT_PJT  --고객사PJT
+				LEFT OUTER JOIN TB_CM05M01 AS R3 ON R3.CODE_ID = X.ORDRS_DTL_DIV20  --신작구분
+				LEFT OUTER JOIN TB_CM05M01 AS R4 ON R4.CODE_ID = X.ITEM_DIV  --아이템구분
+				LEFT OUTER JOIN (
+								SELECT W1.*, ROW_NUMBER() OVER (PARTITION BY SALES_CD ORDER BY VER_NO DESC) AS rn
+								FROM TB_WB21M01 W1
+							) W1 ON W1.CO_CD = X.CO_CD AND W1.SALES_CD = X.SALES_CD AND W1.rn = 1  --마지막 버전의 과제정보 가져오기
+		WHERE  1 = 1
+		AND    X.CO_CD = #{coCd}
+		AND X.SALES_CD = #{salesCd}
+    </select>
+
+	<select id="selectBfuAllFileRows" parameterType="Map" resultType="CamelMap">
+        SELECT
+			  T.FILE_SEQ
+			, T.BFU_CNTS
+			, C.FILE_KEY
+			, C.FILE_NAME 		AS BFU_FILE_NM
+			, C.FILE_TRGT_KEY
+        FROM   TB_PM50D01 AS T
+        		LEFT OUTER JOIN  TB_CM08M01 AS C  ON C.FILE_TRGT_TYP = 'PM5001M01'
+        		 							     AND C.FILE_TRGT_KEY = T.FILE_TRGT_KEY || '-' || T.FILE_SEQ
+        WHERE  1 = 1
+		AND T.FILE_TRGT_KEY = #{fileTrgtKey}
+    </select>
+
+	<select id="selectBfuFileRows" parameterType="Map" resultType="CamelMap">
+        SELECT
+			  T.FILE_SEQ
+			, T.BFU_CNTS
+			, C.FILE_KEY
+			, C.FILE_NAME 		AS BFU_FILE_NM
+			, C.FILE_TRGT_KEY
+        FROM   TB_PM50D01 AS T
+        		LEFT OUTER JOIN  TB_CM08M01 AS C  ON C.FILE_TRGT_TYP = 'PM5001M01'
+        		 							     AND C.FILE_TRGT_KEY = T.FILE_TRGT_KEY || '-' || T.FILE_SEQ
+        WHERE  1 = 1
+		AND T.FILE_TRGT_KEY = #{fileTrgtKey}
+		AND T.FILE_SEQ = #{fileSeq}
+        ORDER BY T.FILE_SEQ
+    </select>
+
 
 	<select id="selectFileList" parameterType="Map" resultType="CamelMap">
         SELECT 
@@ -54,9 +390,112 @@
        	  AND G.USER_ID = #{userId}
     </select>
 
-	<delete id="delete_pm50" parameterType="map">
-		DELETE
-		FROM TB_CM08M01
-		WHERE FILE_TRGT_KEY = #{fileTrgtKey}
-	</delete>
+	<select id="fileTrgtKeySeqNext" resultType="String">
+	SELECT 'BFU' || TO_CHAR(SYSDATE,'YY')|| LPAD(NVL(MAX(TO_NUMBER(SUBSTR(FILE_TRGT_KEY, -4))),0) + 1,4,'0')
+	FROM TB_PM50M01
+	WHERE FILE_TRGT_KEY LIKE 'BFU' || TO_CHAR(SYSDATE,'YY') || '%'
+	</select>
+
+	<insert id="insert_pm50_main" parameterType="Map">
+		INSERT INTO TB_PM50M01
+		(
+			  FILE_TRGT_KEY
+			, CO_CD
+			, SALES_CD
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+		)
+		VALUES
+		(
+			  #{fileTrgtKey}
+			, #{coCd}
+			, #{salesCd}
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+		)
+	</insert>
+
+	<insert id="insert_pm50_d01" parameterType="Map">
+		INSERT INTO TB_PM50D01
+		(
+			  FILE_TRGT_KEY
+			, FILE_SEQ
+			, BFU_CNTS
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+		)
+		VALUES
+		(
+			  #{fileTrgtKey}
+			, #{fileSeq}
+			, #{bfuCnts, jdbcType=VARCHAR}
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+		)
+	</insert>
+
+	<update id="update_pm50_main" parameterType="Map">
+        UPDATE TB_PM50M01 AS T
+        SET
+				  SALES_CD      	= #{salesCd}
+				, UDT_ID 			= #{userId}
+				, UDT_PGM 			= #{pgmId}
+				, UDT_DTTM 			= SYSDATE
+        WHERE 1 = 1
+		  AND T.FILE_TRGT_KEY 	= #{fileTrgtKey}
+    </update>
+
+	<update id="update_pm50_d01" parameterType="Map">
+        UPDATE TB_PM50D01 AS T
+        SET
+				  BFU_CNTS      	= #{bfuCnts, jdbcType=VARCHAR}
+				, UDT_ID 			= #{userId}
+				, UDT_PGM 			= #{pgmId}
+				, UDT_DTTM 			= SYSDATE
+        WHERE T.FILE_TRGT_KEY 	= #{fileTrgtKey}
+		  AND T.FILE_SEQ    	= #{fileSeq}
+    </update>
+
+	<update id="update_issue_pm50_d01" parameterType="Map">
+        UPDATE TB_PM50D01 AS T
+        SET
+				  ISS_NO			= #{issNo}
+				, ISS_UPD_ID		= #{userId}
+				, ISS_UPD_DTTM		= SYSDATE
+				, UDT_ID 			= #{userId}
+				, UDT_PGM 			= #{pgmId}
+				, UDT_DTTM 			= SYSDATE
+        WHERE T.FILE_TRGT_KEY 	= #{fileTrgtKey}
+		  AND T.FILE_SEQ    	= #{fileSeq}
+    </update>
+
+	<update id="update_issue_reset_pm50_d01" parameterType="Map">
+        UPDATE TB_PM50D01 AS T
+        SET
+				  ISS_NO			= ''
+				, ISS_UPD_ID		= ''
+				, ISS_UPD_DTTM		= ''
+				, UDT_ID 			= #{userId}
+				, UDT_PGM 			= #{pgmId}
+				, UDT_DTTM 			= SYSDATE
+        WHERE T.ISS_NO 	= #{issNo}
+    </update>
+
+	<delete id="delete_pm50_main" parameterType="Map">
+        DELETE
+        		TB_PM50M01
+        WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+    </delete>
+
+	<delete id="delete_pm50_d01" parameterType="Map">
+        DELETE
+        		TB_PM50D01
+        WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+          AND FILE_SEQ 		= #{fileSeq}
+    </delete>
+
 </mapper>

@@ -1,0 +1,172 @@
+ <style>
+    /* 팝업 전체 */
+    #qrGenerationPopup {
+		padding: 20px;
+		background: #fafafa;
+		text-align: center;
+    }
+    /* 제목 */
+    #qrGenerationPopup .tit_contents .tit {
+		margin: 0;
+		font-size: 18px;
+		font-weight: 600;
+		color: #333;
+    }
+    /* 그리드: 왼쪽 정렬, 2행 이상이면 세로 스크롤 */
+    .qr-slider {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: flex-start;
+		gap: 40px 20px;        /* 열간 40px, 행간 20px */
+		overflow-y: auto;
+		margin-top: 20px;
+		margin-left: 80px;
+		/* 두 줄까지만 보여주고, 그 이상엔 스크롤 */
+		max-height: 580px;
+	}
+    /* 각 아이템: 고정 크기 */
+    .qr-item {
+		flex: 0 0 auto;
+		width: 200px;
+		text-align: center;
+    }
+    .qr-item .salesCd {
+		font-size: 20px;
+		font-weight: bold;
+		margin-bottom: 6px;
+    }
+    .qr-item .sjNm {
+		font-size: 13px;
+		color: #555;
+		margin-bottom: 6px;
+    }
+    .qr-item .qrcode {
+		width: 200px;
+		height: 200px;
+		margin: 0 auto;
+    }
+	</style>
+
+	<div id="qrGenerationPopup">
+		<!-- QR들을 한 줄로 보여주는 컨테이너 -->
+		<div class="qr-slider"></div>
+		<!-- 닫기 버튼 -->
+		<div class="popup_bottom_btn">
+			<button type="button" onclick="downloadAllQRCodes()">QR 다운로드</button>
+			<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+		</div>
+	</div>
+
+<script>
+
+	var salesList = [];
+	var sjNmList = [];
+	var siteUrl   = "https://gbs.gunyangitt.co.kr/static/mobile/html/user/pm/pm50/PM5001P01_M.html";
+	// var siteUrl   = "http://192.168.1.197/static/mobile/html/user/pm/pm50/PM5001P01_M.html";	// 개발 모바일 확인용
+	var shortUrl = ''; // 서버에서 만들어진 shortUrl
+
+	var $qr, $ind, $salesCd, $prev, $next;
+	$(document).ready(function() {
+		// 파라미터에서 salesCd 배열 가져오기
+		salesList = modalStack.last().paramObj.salesCd;
+		sjNmList = modalStack.last().paramObj.sjNm;
+		renderAllQR();
+	});
+
+	// 들어온 모든 salesCd 로 QR 생성
+	function renderAllQR() {
+		var $slider = $(".qr-slider");
+		$slider.empty();
+
+		if (!salesList.length) {
+			$slider.text("생성할 코드가 없습니다.");
+			return false;
+		}
+
+		salesList.forEach(function(cd, index) {
+			var sj = sjNmList[index] || "";
+
+			// 각 아이템 마크업
+			var $item = $(
+				'<div class="qr-item">' +
+					'<div class="salesCd"></div>' +
+					'<div class="sjNm"></div>' +
+					'<div class="qrcode"></div>' +
+				"</div>"
+			);
+			$item.find(".salesCd").text(cd);
+			$item.find(".sjNm").text(sj);
+
+			var longUrl = siteUrl + "?salesCd=" + encodeURIComponent(cd)
+			var tempUrl = "/static/mobile/html/user/pm/pm50/PM5001P01_M.html"+ "?salesCd=" + encodeURIComponent(cd);
+			var formData = {
+				"longUrl"		: longUrl,
+				"hostAddress" 	: "https://gbs.gunyangitt.co.kr",
+				// "hostAddress" 	: "http://192.168.1.197",	// 개발환경 주소
+				"tempUrl"		: tempUrl,
+				"userId"		: jwt.userId,
+				"pgmId"			: "WB2201M02"
+			}
+			postAjaxSync("/user/wb/wb22/generateShortUrl", formData, null, function(data) {
+				if (data.resultCode == 200) {
+					shortUrl = data.shortUrl;
+				} else {
+					alert("단축 URL 생성에 실패했습니다. 전산실에 문의하세요.");
+					return false;
+				}
+			});
+
+			// QRCode 인스턴스
+			var qrDom = $item.find(".qrcode")[0];
+			new QRCode(qrDom, {
+				text: shortUrl,
+				width: 200,
+				height: 200
+			});
+			// $item.find(".qrcode")
+            //      .wrap($('<a>')
+            //        .attr('href', shortUrl)
+            //        .attr('target', '_blank')
+            //        .css('cursor', 'pointer')
+            //      );
+
+			$slider.append($item);
+		});
+	}
+
+	// QR 코드 이미지 내려받기
+	function downloadAllQRCodes() {
+		// .qr-item 각각에 대해
+		$(".qr-item").each(function() {
+			const $item = $(this);
+			const cd    = $item.find(".salesCd").text().trim();
+			const $qr   = $item.find(".qrcode");
+
+			// QRCode.js 가 <img> 태그를 만들었는지, <canvas>를 만들었는지 확인
+			const imgEl    = $qr.find("img")[0];
+			const canvasEl = $qr.find("canvas")[0];
+			let dataURL;
+
+			if (imgEl && imgEl.src) {
+				dataURL = imgEl.src;
+			} else if (canvasEl) {
+				dataURL = canvasEl.toDataURL("image/png");
+			} else {
+				console.warn("QR DOM 없음:", $qr);
+				return false; // 건너뜀
+			}
+
+			triggerDownload(dataURL, cd + ".png");
+		});
+	}
+
+	// dataURL → 실제 파일로 다운로드 트리거
+	function triggerDownload(dataURL, filename) {
+		const a = document.createElement("a");
+		a.href = dataURL;
+		a.download = filename;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+	}
+</script>
