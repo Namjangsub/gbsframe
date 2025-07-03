@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -187,51 +188,48 @@ public class CM08Ctr {
 //      String userId = request.getParameter("userId");
         Map<String, String> fileInfo = cm08Svc.selectFileInfoUser(tempParam);
         //
+        if (fileInfo == null || fileInfo.get("fileName") == null) {
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            response.setContentType("text/plain; charset=UTF-8");
+            response.getWriter().write("파일 정보를 찾을 수 없습니다.");
+            return;
+        }
+        
         if (null != fileInfo.get("fileName"))  {
-//          String filePath = request.getParameter("filePath");
             String filePath = fileInfo.get("filePath") + fileInfo.get("fileKey")+ '_' + fileInfo.get("fileName");
+            File file = new File(filePath);
             
+
+            if (!file.exists() || !file.isFile()) {
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                response.setContentType("text/plain; charset=UTF-8");
+                response.getWriter().write("파일이 존재하지 않습니다.");
+                return;
+            }
+
             BufferedInputStream bis = null;
             ServletOutputStream sos = null;
             
             try{
-                File file = new File(filePath);
-//                response.setContentType("application/octet-stream; charset=UTF-8");
-//                response.setContentLength((int)file.length());
-//
-//                // 파일명 추출 및 disposition 설정
-//                int idx = filePath.split("\\\\").length-1;
-//                String fileName = filePath.split("\\\\")[idx];
-//                fileName = fileName.substring(fileName.indexOf("_")+1);
-//                cm08Svc.setDisposition(request, response, fileName);
-
-				String fileName = file.getName();
-				fileName = fileName.substring(fileName.indexOf("_") + 1); // 실제 파일명 추출
+				String fileName = file.getName().substring(file.getName().indexOf("_") + 1); // 실제 파일명 추출
 				String extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase(); // 확장자 추출
 
 				// Content-Type 및 Content-Disposition 설정
 				String contentType = "application/octet-stream";
 				String dispositionType = "attachment";
 
-				if ("pdf".equals(extension)) {
-					contentType = "application/pdf";
-					dispositionType = "inline";
-				} else if ("jpg".equals(extension) || "jpeg".equals(extension)) {
-					contentType = "image/jpeg";
-					dispositionType = "inline";
-				} else if ("heic".equals(extension)) {
-					contentType = "image/heic";
-					dispositionType = "inline";
-				} else if ("png".equals(extension)) {
-					contentType = "image/png";
-					dispositionType = "inline";
-				} // 필요한 경우 다른 이미지 포맷 추가 가능
+				if (Arrays.asList("pdf", "jpg", "jpeg", "png", "heic").contains(extension)) {
+			        if ("pdf".equals(extension)) contentType = "application/pdf";
+			        if ("jpg".equals(extension) || "jpeg".equals(extension)) contentType = "image/jpeg";
+			        if ("png".equals(extension)) contentType = "image/png";
+			        if ("heic".equals(extension)) contentType = "image/heic";
+			        dispositionType = "inline";
+			    } // 필요한 경우 다른 이미지 포맷 추가 가능
 
 				response.setContentType(contentType + "; charset=UTF-8");
 				response.setContentLengthLong(file.length());
 				response.setHeader("Content-Disposition",
 						dispositionType + "; filename=\"" + java.net.URLEncoder.encode(fileName, "UTF-8").replaceAll("\\+", "%20") + "\"");
-
                 
                 OutputStream out = response.getOutputStream();
                 FileInputStream fis = null;
@@ -239,18 +237,18 @@ public class CM08Ctr {
                 try {
                     fis = new FileInputStream(file);
                     FileCopyUtils.copy(fis, out);
+                    out.flush();
                 } catch (Exception e) {
                     e.printStackTrace();
                     // 파일 복사 중 오류 발생 시, 응답을 재설정하고 오류 메시지를 본문에 출력
                     response.reset(); // 이미 버퍼에 쓰여진 데이터 및 헤더 초기화
+                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                     response.setContentType("text/plain; charset=UTF-8");
-                    response.setCharacterEncoding("UTF-8");
                     response.getWriter().write("파일 전송 중 오류 발생: " + e.getMessage());
                 } finally {
                     if (fis != null) { try { fis.close(); } catch (Exception e2) {}}
                     if (out != null) { try { out.close(); } catch (Exception e2) {}}
                 }
-                out.flush();
                 
             } catch(IOException e){
                 e.printStackTrace();
@@ -260,18 +258,8 @@ public class CM08Ctr {
                 response.setCharacterEncoding("UTF-8");
                 response.getWriter().write("파일 전송 중 오류 발생: " + e.getMessage());
             } finally{
-                if (bis != null) {
-                    try {
-                        bis.close();
-                    } catch (Exception e) {
-                    }
-                }
-                if (sos != null) {
-                    try {
-                        sos.close();
-                    } catch (Exception e) {
-                    }
-                }
+                if (bis != null) { try { bis.close(); } catch (Exception e) { } }
+                if (sos != null) { try { sos.close(); } catch (Exception e) { } }
             }
         }       
     }

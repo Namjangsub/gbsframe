@@ -15,8 +15,10 @@ public interface LoginMapper {
 
 	int updateLastLoginTime(String username, String refreshToken, String userAgent, String ipAddress);
 
+	int updateLogoutTime(String username, String userAgent, String ipAddress);
+
 	String isLoginWithin24Hours(String username, String userAgent, String ipAddress);
 
-	String getRefreshToken(String username);
+	String getRefreshToken(String username, String userAgent, String ipAddress);
 
 }

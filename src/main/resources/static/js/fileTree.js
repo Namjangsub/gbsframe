@@ -164,10 +164,11 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 								if (this.column.key == "fileName") {
 									//첨부파일 이미지뷰
 									let tempType = this.item.fileType.toLowerCase();
-									if (tempType == 'jpg' || tempType == 'jpeg' || tempType == 'png' || tempType == 'gif'|| tempType == 'pdf') {
+									const viewType = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'heic']
+									if (viewType.includes(tempType)) {
 										const imageList = this.self.list.filter(item => {
 											const fileType = item.fileType.toLowerCase();
-											return fileType === 'jpg' || fileType === 'jpeg' || fileType === 'png' || fileType === 'gif'|| tempType == 'pdf';
+											return viewType.includes(tempType);
 										});
 										imageViewPopup(fileKey, this.item.fileName, imageList);
 									} else {
@@ -508,7 +509,11 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 	// 파일 다운로드 함수 (fetch + Blob 방식 사용)
 	async function downLoadFile(fileKey, fileName) {
 		try {
-			const response = await fetch(`/admin/cm/cm08/fileDownloadAuth?fileKey=${fileKey}&userId=${jwt.userId}`);
+//			const response = await fetch(`/admin/cm/cm08/fileDownloadAuth?fileKey=${fileKey}&userId=${jwt.userId}`);
+			const response = await fetch(`/admin/cm/cm08/fileDownloadAuth2?fileKey=${fileKey}&userId=${jwt.userId}`, {
+				  method: "GET",
+				  headers: {"Authorization": authorizationToken}
+			});
 			if (!response.ok) throw new Error('다운로드 실패');
 			const blob = await response.blob();
 

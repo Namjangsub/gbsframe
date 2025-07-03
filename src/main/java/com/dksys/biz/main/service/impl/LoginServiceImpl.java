@@ -52,12 +52,17 @@ public class LoginServiceImpl implements LoginService {
 	}
 
 	@Override
+	public int updateLogoutTime(String username, String userAgent, String ipAddress) {
+		return loginMapper.updateLogoutTime(username, userAgent, ipAddress);
+	}
+
+	@Override
 	public String isLoginWithin24Hours(String username, String userAgent, String ipAddress) {
 		return loginMapper.isLoginWithin24Hours(username, userAgent, ipAddress);
 	}
 
 	@Override
-	public String getRefreshToken(String username) {
-		return loginMapper.getRefreshToken(username);
+	public String getRefreshToken(String username, String userAgent, String ipAddress) {
+		return loginMapper.getRefreshToken(username, userAgent, ipAddress);
 	}
 }

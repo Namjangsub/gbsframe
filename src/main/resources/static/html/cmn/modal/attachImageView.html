@@ -250,10 +250,16 @@ function loadImage(image) {
 	var fileKey = image.fileKey;
 	var fileName = image.fileName;
 	$(".ax-modal-header").last().contents().first().replaceWith(fileName);
-	
+// 	if (window.heic2any) {
+// 		console.error("heic2any 사용 가능");
+// 		} else {
+// 		  // heic2any 없음 → 건너뜀 또는 사용자 안내
+// 			console.error("heic2any 없음 → 건너뜀");
+// 		}
 	var xhr = new XMLHttpRequest();
 	xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + fileKey + "&userId=" + jwt.userId, true);
 	xhr.responseType = "blob";
+	xhr.setRequestHeader("Authorization", authorizationToken);
 	xhr.onload = function () {
 		if (xhr.status === 200) {
 
@@ -273,25 +279,30 @@ function loadImage(image) {
 				// Blob -> Base64 변환
 				var reader = new FileReader();
 				if (fileName && fileName.split('.').pop().toLowerCase() === 'heic') {
-					heic2any({ blob: blob, toType: "image/jpeg" })
-						.then(function (resultBlob) {
-							var reader = new FileReader();
-							reader.readAsDataURL(resultBlob);
-							reader.onloadend = function () {
-// 								$('#viewImgData').attr('src', reader.result);
-								var img = $('<img>', {
-				                    id: 'viewImgData',
-				                    class: 'resized-image',
-				                    src: reader.result,
-				                    style: 'transform: rotate(0deg) scale(1)',
-// 				                    click: function () { modalStack.close(); }
-				                });
-								$('#viewArea').append(img);
-							};
-						})
-						.catch(function (error) {
-							console.error("HEIC 변환 오류:", error);
-						});
+					if (typeof heic2any !== "undefined") {
+						heic2any({ blob: blob, toType: "image/jpeg" })
+							.then(function (resultBlob) {
+								var reader = new FileReader();
+								reader.readAsDataURL(resultBlob);
+								reader.onloadend = function () {
+	// 								$('#viewImgData').attr('src', reader.result);
+									var img = $('<img>', {
+					                    id: 'viewImgData',
+					                    class: 'resized-image',
+					                    src: reader.result,
+					                    style: 'transform: rotate(0deg) scale(1)',
+	// 				                    click: function () { modalStack.close(); }
+					                });
+									$('#viewArea').append(img);
+								};
+							})
+							.catch(function (error) {
+								console.error("HEIC 변환 오류:", error);
+							});
+					} else {
+						console.error("heic2any 라이브러리가 로딩되지 않음");
+						$('#viewArea').append('<p style="color: red; font-size: 24px; font-weight: bold; margin-top: 10px;">HEIC 이미지를 변환할 수 없습니다. 라이브러리 누락! 전산실 확인바랍니다.</p>');
+					}
 				} else {
 					reader.readAsDataURL(blob);
 					reader.onloadend = function () {
@@ -308,6 +319,9 @@ function loadImage(image) {
 				}
 				openProgress(false);
 	        }
+		} else if (xhr.status === 404) {
+			$('#viewArea').append('<p style="color: red; font-size: 24px; font-weight: bold; margin-top: 10px;">파일이 존재하지 않습니다. 전산실 확인바랍니다.</p>');
+
 		} else {
 	        // 상태 코드가 200이 아닌 경우, 백엔드에서 오류가 발생한 것으로 간주하고 로그 남김
 	        console.error("백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
@@ -323,17 +337,17 @@ function loadImage(image) {
 
 async function loadPdf(file) {
     const pdfUrl = "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + file.fileKey + "&userId=" + jwt.userId;
-    pdfDoc = await pdfjsLib.getDocument(pdfUrl).promise;
+//     pdfDoc = await pdfjsLib.getDocument(pdfUrl).promise;
+    const loadingTask = pdfjsLib.getDocument({
+        url: pdfUrl,
+        httpHeaders: {"Authorization": authorizationToken},
+        withCredentials: true // 필요한 경우 (쿠키 사용 시)
+      });
+    pdfDoc = await loadingTask.promise;
     currentPage = 1;
     totalPages = pdfDoc.numPages;
 
-//     $('#currentPageInput').val(currentPage); // 초기 값 설정
-//     if (totalPages > 1) {
-//         $('#pdfControls').show();
-//     } else {
-//         $('#pdfControls').hide();
-//     }
-
+    
     updatePageInfo();
     renderPage();
 }

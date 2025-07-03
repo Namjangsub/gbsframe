@@ -5,7 +5,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -15,6 +18,17 @@ public class RequestUtils {
 		// 생성자 막기 (유틸리티 클래스이므로)
 	}
 
+	public static void clearCookie(String name, HttpServletResponse response) {
+        ResponseCookie deleteCookie = ResponseCookie.from(name, "")
+            .path("/")
+            .httpOnly(true)
+            .secure(true)
+            .maxAge(0)
+            .sameSite("None")
+            .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, deleteCookie.toString());
+    }
+	
 	public static String getUserAgent() {
 		HttpServletRequest request = getCurrentHttpRequest();
 		if (request != null) {

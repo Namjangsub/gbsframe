@@ -1,5 +1,8 @@
 package com.dksys.biz.main;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
 
 import javax.servlet.http.Cookie;
@@ -7,9 +10,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,10 +23,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 import com.dksys.biz.admin.cm.cm01.service.CM01Svc;
 import com.dksys.biz.admin.cm.cm06.service.CM06Svc;
+import com.dksys.biz.config.RequestUtils;
 import com.dksys.biz.main.service.LoginService;
 import com.dksys.biz.main.vo.User;
 import com.dksys.biz.util.MessageUtils;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
@@ -42,6 +50,8 @@ public class LoginController {
     @Autowired
     CM06Svc cm06Svc;
 
+	@Value("${security.jwt.signing-key}")
+	private String signingKey;
 //    // 회원가입
 //    @PostMapping("/join")
 //    public String join(@RequestBody Map<String, String> user, ModelMap model) {
@@ -105,22 +115,97 @@ public class LoginController {
 	// 6. 통과하면 새로운 access_token 발급
 	// 7. 클라이언트는 다시 원래 요청 재시도 (retry mechanism)
 	@GetMapping("/customLogout")
-	public String logout(HttpServletRequest request, HttpServletResponse response) {
-		SecurityContextLogoutHandler logoutHandler = new SecurityContextLogoutHandler();
-		logoutHandler.logout(request, response, SecurityContextHolder.getContext().getAuthentication());
-
-		deleteCookie("access_token", response);
-		deleteCookie("refresh_token", response);
+//	public String logout(HttpServletRequest request, HttpServletResponse response) {
+	 public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
+		// 1. 클라이언트 access_token 헤더에서 추출
+	    String accessToken = resolveAccessToken(request);
+	    String username = null;
+		String userAgent = RequestUtils.getUserAgent();
+		String clientIp = RequestUtils.getClientIp();
+		// 2. 토큰이 있다면 블랙리스트 등록
+	    if (accessToken != null && !accessToken.isEmpty()) {
+			try {
+				Claims claims = parseJwt(accessToken);
+				username = claims.get("user_name", String.class); // 또는 "userId"
+				Date expiration = claims.getExpiration();
+				long remainingMillis = expiration.getTime() - System.currentTimeMillis();
+				if (remainingMillis > 0) {
+	                // 블랙리스트 처리
+//    				loginService.blacklistAccessToken(accessToken, remainingMillis);
+				}
+				loginService.updateLogoutTime(username, userAgent, clientIp);
+			} catch (JwtException e) {
+				// 만료 또는 잘못된 토큰 → 무시
+				// 무시하고 refresh_token에서 시도
+			}
+		}
+	    
+	 // 2. accessToken에서 username을 못 얻었다면 → refresh_token 시도
+	    if (username == null) {
+	        String refreshToken = extractRefreshToken(request);
+	        if (refreshToken != null && !refreshToken.isEmpty()) {
+	            try {
+	                Claims refreshClaims = parseJwt(refreshToken);
+	                username = refreshClaims.get("user_name", String.class); // 또는 "userId"
+	            } catch (JwtException e) {
+	                // refresh_token도 만료 또는 손상 → 무시
+	            	System.out.println("refresh_token JwtException 처리 불가~~"+e);
+	            } catch (Exception e) {
+	                // refresh_token도 만료 또는 손상 → 무시
+	            	System.out.println("refresh_token Exception 처리 불가~~"+e);
+	            }
+	        }
+	    }
+	    
+		// 3. 쿠키 삭제
+	    RequestUtils.clearCookie("access_token", response);
+	    RequestUtils.clearCookie("refresh_token", response);
+		// 4. SecurityContext 강제 초기화 (auth == null 일 수 있어도 상관 없음)
+		SecurityContextHolder.clearContext();
 		System.out.println("-------->  로그아웃 처리 완료됨~~");
-		return "redirect:/";
+//		return "redirect:/";
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("msg", "로그아웃 완료");
+        return ResponseEntity.ok().body(result);
 	}
 
-	private void deleteCookie(String name, HttpServletResponse response) {
-		Cookie cookie = new Cookie(name, null);
-		cookie.setPath("/");
-		cookie.setHttpOnly(true);
-		cookie.setMaxAge(0);
-		response.addCookie(cookie);
+
+//    private void clearCookie(String name, HttpServletResponse response) {
+//        ResponseCookie deleteCookie = ResponseCookie.from(name, "")
+//            .path("/")
+//            .httpOnly(true)
+//            .secure(true)
+//            .maxAge(0)
+//            .sameSite("None")
+//            .build();
+//        response.addHeader(HttpHeaders.SET_COOKIE, deleteCookie.toString());
+//    }
+
+	private String resolveAccessToken(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ")) {
+            return header.substring(7);
+        }
+        return null;
     }
 
+	private Claims parseJwt(String token) {
+        return Jwts.parser()
+            .setSigningKey(signingKey.getBytes(StandardCharsets.UTF_8))
+            .parseClaimsJws(token)
+            .getBody();
+	}
+
+
+    private String extractRefreshToken(HttpServletRequest request) {
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("refresh_token".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
+    }
 }

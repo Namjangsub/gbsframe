@@ -140,32 +140,6 @@
 	}
 	
 	
-	function getToken() {
-		//헤더 세팅
-		setupAuthorization("Basic " + basicAuth);
-		
-		var formData = {
-			grant_type 	: "password",	
-			username  	: $("#id").val(),
-			id  		: $("#id").val(),
-			password 	: $("#pass").val(),
-		}
-
-		$.post(
-			DOMAIN_URL + "/oauth/token",
-			formData,
-			function(data, status, request) {
-		        localStorage.setItem("access_token", data.access_token);
-		        localStorage.setItem("refresh_token", data.refresh_token);
-		        authorizationToken = "Bearer " + data.access_token;
-				jwt = parseJwt(authorizationToken);			
-				selectAuthInfo();	
-				location.href = "/static/mobile/menu.html";				
-			}
-		);
-	}
-	
-	
 	function loginAction() {
 		var isValid = true;
 		$("input").each(function(index, item){
@@ -181,30 +155,37 @@
 			return;
 		}
 		var formData = {
-			grant_typ" 	: "password",	
-			username  	: $("#id").val(),
-			id 			: $("#id").val(),
-			password 	: $("#pass").val()
+				grant_type 	: "password",	
+				username  	: $("#id").val(),
+				id 			: $("#id").val(),
+				password 	: $("#pass").val(),
 		}
-		
 		$.ajax({
 		    type: "POST",
 		    url: DOMAIN_URL + "/login",
 		    contentType: "application/json; charset=utf-8",
 		    data: JSON.stringify(formData),
 		    xhrFields: { withCredentials: true }, // 반드시 있어야 쿠키 전송 refresh_token은 필수임
-		    success: function(data){
+		    success: function(data, status, xhr) {
+		        const newToken = xhr.getResponseHeader("Authorization");
+// 		        console.log("access_token:", newToken);
+		        if (newToken) {
+	              localStorage.setItem("access_token", newToken);
+	              authorizationToken = newToken;
+	              jwt = parseJwt(authorizationToken);
+		        }
 	    		var usrInfo = data.usrInfo;
 		    	if(data.msg == "success"){
-		    		getToken();
+		    		menuIdx = getCookie("menuIdx");
+					selectAuthInfo();
 		    	} else {
 		    		if(usrInfo){
 		    			if(Number(usrInfo.passErrCnt) >= Number(usrInfo.passChkCnt)) {
 							alert("비밀번호를 " + usrInfo.passChkCnt + "회이상 틀리셨습니다. 관리자에게 문의하세요.");
-						}else {
+						} else {
 							alert("비밀번호를 " + usrInfo.passErrCnt + "회 틀렸습니다.\n" + usrInfo.passChkCnt + "회 이상 틀리면 접속불가합니다.");		
 						}
-		    		} else{
+		    		} else {
 		    			alert(data.msg);
 		    		}
 		    	}
@@ -219,15 +200,15 @@
 		}
 		postAjaxSync("/selectMenuAuth", formData, null, function(data) {
 			var authString = data.accessJSON;
-	        deleteCookie("authArr");
+			localStorage.removeItem("authArr");
+			localStorage.setItem("authArr", authString);
 
-	        setCookie("authArr", authString, 1);
-
-	        var checkCookie = getCookie("authArr");
+			var checkCookie = localStorage.getItem("authArr", authString);
 	        if (checkCookie) {
 // 	            alert("Cookie 'authArr' is set successfully!");
+				location.href = "/static/mobile/menu.html";	
 	        } else {
-	            alert("쿠키 생성 실패 전산실 연락 바랍니다. 'authArr'.");
+	            alert("권한 생성 실패 전산실 연락 바랍니다. 'authArr'.");
 	        }
 		});
 	}

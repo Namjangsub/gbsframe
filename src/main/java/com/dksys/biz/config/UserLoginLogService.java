@@ -8,12 +8,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.dksys.biz.main.mapper.LoginMapper;
-
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
 @Service
 public class UserLoginLogService {
-
+    
 	@Autowired
 	LoginMapper loginMapper;
 
@@ -45,36 +42,14 @@ public class UserLoginLogService {
 		}
 	}
 
-	public String getStoredRefreshToken(String username) {
-		return loginMapper.getRefreshToken(username);
+	public String getStoredRefreshToken(String username, String userAgent, String ipAddress) {
+		return loginMapper.getRefreshToken(username, userAgent, ipAddress);
 	}
 
 	// 토큰 비교 시 (해시 저장 및 비교)
-//	public boolean isRefreshTokenValid(String username, String incomingRefreshToken) {
-////		String hashedIncoming = TokenHashUtils.sha256(incomingRefreshToken);
-//		String storedHash = loginMapper.getRefreshToken(username);
-//		return incomingRefreshToken.equals(storedHash);
-//	}
-
-
-	public boolean isRefreshTokenValid(String username, String incomingRefreshToken) {
-		try {
-			// 🔐 JWT의 jti 필드 추출 (refresh_token의 UUID 원본)
-			Claims claims = Jwts.parser()
-				.setSigningKey("biz2020".getBytes()) // JwtAccessTokenConverter의 서명 키와 동일해야 함
-				.parseClaimsJws(incomingRefreshToken)
-				.getBody();
-
-			String jti = claims.getId(); // JWT의 jti → 원래 UUID 값
-
-			String storedHash = loginMapper.getRefreshToken(username); // DB에 저장된 UUID
-			System.out.println("✅ JWT jti(UUID): " + jti);
-			System.out.println("✅ DB stored: " + storedHash);
-
-			return jti.equals(storedHash); // ✅ 최종 비교
-		} catch (Exception e) {
-			System.err.println("❌ refresh_token JWT 파싱 실패: " + e.getMessage());
-			return false;
-		}
+	public boolean isRefreshTokenValid(String username, String incomingRefreshToken, String userAgent, String ipAddress) {
+		String storedHash = loginMapper.getRefreshToken(username, userAgent, ipAddress);
+		return incomingRefreshToken.equals(storedHash);
 	}
+
 }

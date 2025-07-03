@@ -26,16 +26,14 @@ if(isMobile()){
 	//DOMAIN_URL = "http://10.90.4.142";
 }
 
-var accessToken = localStorage.getItem("access_token");
-var authorizationToken = '';
+var authorizationToken = localStorage.getItem("access_token");
 var jwt = '';
-if (accessToken) {
-   var authorizationToken = "Bearer " + accessToken;
-   var jwt = parseJwt(authorizationToken);
+if (authorizationToken) {
+	var jwt = parseJwt(authorizationToken);
 } else {
-   // 토큰이 없는 경우 처리
-   console.log("Access token not found");
-   // redirectToLogin();
+	// 토큰이 없는 경우 처리
+	console.log("Access token not found");
+	// redirectToLogin();
 }
 var menuIdx = getCookie("menuIdx");
 
@@ -419,61 +417,8 @@ const clientId = "frontend-app";
 const clientSecret = "gunyang";
 const basicAuth = btoa(`${clientId}:${clientSecret}`);
 
-function refreshAccessToken(callback) {
-    const refreshData = {
-        grant_type: "refresh_token",
-		refresh_token: localStorage.getItem("refresh_token"),
-		username  	: jwt.userId,
-		id  		: jwt.userId,
-    };
-
-    $.ajax({
-        type: "POST",
-        url: "/oauth/token",
-        data: $.param(refreshData),
-        async: false,                               // ← 동기 호출
-        xhrFields: { withCredentials: true }, // 반드시 있어야 쿠키 전송 refresh_token은 필수임
-        headers: {
-            "Authorization": "Basic " + basicAuth,
-            "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-            "Accept": "application/json",
-        },
-        success: function(data) {
-            if (data.access_token) {
-                localStorage.setItem("access_token", data.access_token);
-                authorizationToken = "Bearer " + data.access_token;
-                jwt = parseJwt(authorizationToken);
-                callback(true);
-            } else {
-                callback(false);
-            }
-        },
-        error: function(xhr, textStatus, errorThrown) {
-            console.error("❌ Refresh Token 실패");
-            logoutClick();
-            location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
-//            if (xhr.status === 401) {
-//                logoutClick();
-//                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
-//            } else if (xhr.status === 400) {
-//                try {
-//                    const errorResponse = JSON.parse(xhr.responseText);
-//                } catch (e) {
-//                    console.error("📋 에러 응답 파싱 실패:", xhr.responseText);
-//                }
-//            } else {
-//                console.warn("🔴 알 수 없는 오류 발생");
-//            }
-            callback(false);
-        }
-    });
-}
-
-var tokenErrorMsg = ["unauthorized", "invalid_token", "invalid_grant"];
-
 function postAjax(url, data, contentType, callback, blockProc=true, retryCount = 0) {
 	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
-//	console.log(`postAjax url = ${url} `);
 	if(contentType == null) {
 		contentType = "application/json; charset=utf-8";
 		data = JSON.stringify(data);
@@ -487,27 +432,27 @@ function postAjax(url, data, contentType, callback, blockProc=true, retryCount =
 	    url: url,
 	    contentType: contentType,
 	    data: data,
-	    headers: {"Authorization": authorizationToken},
-	    success: function(data){
+	    beforeSend: function (request) {
+            request.setRequestHeader("Authorization", authorizationToken);
+        },
+	    success: function(data, status, xhr) {
+	        let newToken = xhr.getResponseHeader('X-New-Access-Token');
+	        if (newToken) {
+	        	newToken = "Bearer " + newToken;
+	        	localStorage.setItem("access_token", newToken);
+	        	authorizationToken = newToken;
+	        	jwt = parseJwt(authorizationToken);
+	        }
 	    	callback(data);
 	    },
 	    error: function (xhr) {
-            const error = xhr.responseJSON?.error;
-            if (tokenErrorMsg.indexOf(error) > -1) {
-                // refresh 요청
-                refreshAccessToken(function(success) {
-                    if (success) {
-                    	postAjax(url, data, contentType, callback, blockProc, 1); // 또는 실패 시 callback 재시도 등
-                    } else {
-                        location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
-                    }
-                });
-
-                return;
-            }
-
-            // 기타 오류가 있으면 로그 출력
-            console.error("요청 실패:", xhr);
+	            if (xhr.status === 401) {
+	                alert("로그인이 만료되었습니다.");
+	                logoutClick();
+	                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+	            }
+                console.error("요청 실패:", xhr);
+//                return;
 	    },
         complete: function() {
         	if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
@@ -518,7 +463,6 @@ function postAjax(url, data, contentType, callback, blockProc=true, retryCount =
 
 function postAjaxSync(url, data, contentType, callback, retryCount = 0) {
 
-//	console.log(`postAjaxSync url = ${url} `);
 	if(contentType == null) {
 		contentType = "application/json; charset=utf-8";
 		data = JSON.stringify(data);
@@ -529,30 +473,28 @@ function postAjaxSync(url, data, contentType, callback, retryCount = 0) {
 	    type: "POST",
 	    url: url,
 	    contentType: contentType,
+	    xhrFields: { withCredentials: true },
 	    data: data,
 	    async: false,
 	    beforeSend: function (request) {
             request.setRequestHeader("Authorization", authorizationToken);
         },
-	    success: function(data){
+	    success: function(data, status, xhr) {
+	        let newToken = xhr.getResponseHeader('X-New-Access-Token');
+	        if (newToken) {
+	        	newToken = "Bearer " + newToken;
+	        	localStorage.setItem("access_token", newToken);
+	        	authorizationToken = newToken;
+	        	jwt = parseJwt(authorizationToken);
+	        }
 	    	callback(data);
 	    },
 	    error: function (xhr) {
-            const error = xhr.responseJSON?.error;
-            if (tokenErrorMsg.indexOf(error) > -1) {
-                // refresh 요청
-                refreshAccessToken(function(success) {
-                    if (success) {
-                    	postAjaxSync(url, data, contentType, callback, 1); // 또는 실패 시 callback 재시도 등
-                    } else {
-                        location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
-                    }
-                });
-
-                return;
+            if (xhr.status === 401) {
+//                alert("로그인이 만료되었습니다.");
+//                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
             }
 
-            // 기타 오류가 있으면 로그 출력
             console.error("요청 실패:", xhr);
 	    },
 	});
@@ -571,25 +513,22 @@ function deleteAjax(url, data, contentType, callback, blockProc=true, retryCount
 	    beforeSend: function (request) {
             request.setRequestHeader("Authorization", authorizationToken);
         },
-	    success: function(data){
+	    success: function(data, status, xhr) {
+	        let newToken = xhr.getResponseHeader('X-New-Access-Token');
+	        if (newToken) {
+	        	newToken = "Bearer " + newToken;
+	        	localStorage.setItem("access_token", newToken);
+	        	authorizationToken = newToken;
+	        	jwt = parseJwt(authorizationToken);
+	        }
 	    	callback(data);
 	    },
 	    error: function (xhr) {
-            const error = xhr.responseJSON?.error;
-            if (tokenErrorMsg.indexOf(error) > -1) {
-                // refresh 요청
-                refreshAccessToken(function(success) {
-                    if (success) {
-                    	deleteAjax(url, data, contentType, callback, blockProc, 1); // 또는 실패 시 callback 재시도 등
-                    } else {
-                        location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
-                    }
-                });
-
-                return;
+            if (xhr.status === 401) {
+//                alert("로그인이 만료되었습니다.");
+//                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
             }
 
-            // 기타 오류가 있으면 로그 출력
             console.error("요청 실패:", xhr);
 	    },
         complete: function() {
@@ -611,25 +550,22 @@ function putAjax(url, data, contentType, callback, blockProc=true, retryCount = 
 	    beforeSend: function (request) {
             request.setRequestHeader("Authorization", authorizationToken);
         },
-	    success: function(data){
+	    success: function(data, status, xhr) {
+	        let newToken = xhr.getResponseHeader('X-New-Access-Token');
+	        if (newToken) {
+	        	newToken = "Bearer " + newToken;
+	        	localStorage.setItem("access_token", newToken);
+	        	authorizationToken = newToken;
+	        	jwt = parseJwt(authorizationToken);
+	        }
 	    	callback(data);
 	    },
 	    error: function (xhr) {
-            const error = xhr.responseJSON?.error;
-            if (tokenErrorMsg.indexOf(error) > -1) {
-                // refresh 요청
-                refreshAccessToken(function(success) {
-                    if (success) {
-                    	putAjax(url, data, contentType, callback, blockProc, 1); // 또는 실패 시 callback 재시도 등
-                    } else {
-                        location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
-                    }
-                });
-
-                return;
+            if (xhr.status === 401) {
+//                alert("로그인이 만료되었습니다.");
+//                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
             }
 
-            // 기타 오류가 있으면 로그 출력
             console.error("요청 실패:", xhr);
 	    },
         complete: function() {
@@ -650,25 +586,22 @@ function filePostAjax(url, data, callback, blockProc=true, retryCount = 0) {
 	    beforeSend: function (request) {
             request.setRequestHeader("Authorization", authorizationToken);
         },
-	    success: function(data){
+	    success: function(data, status, xhr) {
+	        let newToken = xhr.getResponseHeader('X-New-Access-Token');
+	        if (newToken) {
+	        	newToken = "Bearer " + newToken;
+	        	localStorage.setItem("access_token", newToken);
+	        	authorizationToken = newToken;
+	        	jwt = parseJwt(authorizationToken);
+	        }
 	    	callback(data);
 	    },
 	    error: function (xhr) {
-            const error = xhr.responseJSON?.error;
-            if (tokenErrorMsg.indexOf(error) > -1) {
-                // refresh 요청
-                refreshAccessToken(function(success) {
-                    if (success) {
-                    	filePostAjax(url, data, callback, blockProc, 1); // 또는 실패 시 callback 재시도 등
-                    } else {
-                        location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
-                    }
-                });
-
-                return;
+            if (xhr.status === 401) {
+//                alert("로그인이 만료되었습니다.");
+//                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
             }
 
-            // 기타 오류가 있으면 로그 출력
             console.error("요청 실패:", xhr);
 	    },
         complete: function() {
@@ -690,25 +623,22 @@ function filePostAjaxButton(url, data, callback, blockProc=true, retryCount = 0)
 	    beforeSend: function (request) {
             request.setRequestHeader("Authorization", authorizationToken);
         },
-	    success: function(data){
+	    success: function(data, status, xhr) {
+	        let newToken = xhr.getResponseHeader('X-New-Access-Token');
+	        if (newToken) {
+	        	newToken = "Bearer " + newToken;
+	        	localStorage.setItem("access_token", newToken);
+	        	authorizationToken = newToken;
+	        	jwt = parseJwt(authorizationToken);
+	        }
 	    	callback(data);
 	    },
 	    error: function (xhr) {
-            const error = xhr.responseJSON?.error;
-            if (tokenErrorMsg.indexOf(error) > -1) {
-                // refresh 요청
-                refreshAccessToken(function(success) {
-                    if (success) {
-                    	filePostAjaxButton(url, data, callback, blockProc, 1); // 또는 실패 시 callback 재시도 등
-                    } else {
-                        location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
-                    }
-                });
-
-                return;
+            if (xhr.status === 401) {
+//                alert("로그인이 만료되었습니다.");
+//                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
             }
 
-            // 기타 오류가 있으면 로그 출력
             console.error("요청 실패:", xhr);
 	    },
         complete: function() {
@@ -729,25 +659,22 @@ function filePutAjax(url, data, callback, blockProc=true, retryCount = 0) {
 	    beforeSend: function (request) {
             request.setRequestHeader("Authorization", authorizationToken);
         },
-	    success: function(data){
+	    success: function(data, status, xhr) {
+	        let newToken = xhr.getResponseHeader('X-New-Access-Token');
+	        if (newToken) {
+	        	newToken = "Bearer " + newToken;
+	        	localStorage.setItem("access_token", newToken);
+	        	authorizationToken = newToken;
+	        	jwt = parseJwt(authorizationToken);
+	        }
 	    	callback(data);
 	    },
 	    error: function (xhr) {
-            const error = xhr.responseJSON?.error;
-            if (tokenErrorMsg.indexOf(error) > -1) {
-                // refresh 요청
-                refreshAccessToken(function(success) {
-                    if (success) {
-                    	filePutAjax(url, data, callback, blockProc, 1); // 또는 실패 시 callback 재시도 등
-                    } else {
-                        location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
-                    }
-                });
-
-                return;
+            if (xhr.status === 401) {
+//                alert("로그인이 만료되었습니다.");
+//                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
             }
 
-            // 기타 오류가 있으면 로그 출력
             console.error("요청 실패:", xhr);
 	    },
         complete: function() {
@@ -995,7 +922,6 @@ function deleteHyphenStr(value){
 	return value.replace(/-/g, "");
 }
 
-//var authArr;
 // 권한에 따른 메뉴 보여주기
 function setMenuAuth() {
 	var formData = {
@@ -1004,7 +930,6 @@ function setMenuAuth() {
 	}
 	postAjax("/selectMenuAuth", formData, null, function(data) {
 		if (Array.isArray(data?.accessList) && data.accessList.length > 0) {
-//			authArr = data.accessList;
 			checkMenuAuth(data.accessList);
 		}
 	});
@@ -1097,15 +1022,17 @@ function favoritesMenuControl(obj){
 //로그아웃
 function logoutClick(){
 	localStorage.removeItem("access_token");
-	localStorage.removeItem("refresh_token");
+	localStorage.removeItem("authArr");
 	
 	deleteCookie("menuIdx");
-	deleteCookie("authArr");
 	deleteCookie("menuSaveYn");
 	
 	$.ajax({
 	    type: "GET",
 	    url: "/customLogout",
+	    beforeSend: function (request) {
+            request.setRequestHeader("Authorization", authorizationToken);
+        },
 	    xhrFields: { withCredentials: true }, 
 	    success: function() {
 	        location.href = "/";
@@ -1408,33 +1335,6 @@ $.urlParam = function(name){
     }
 }
 
-//function authChk(menuUrl){
-//	if(!menuUrl){
-//		var url = window.location.href;
-//		menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
-//	}
-//	
-//		var arr = JSON.parse(getCookie("authArr"));
-//        var saveYn = "N";
-//
-//        //array함수로 기능 대체하고 버튼을 삭제함(버튼을 사용하는 프로그램은 오류 발생 가능)
-//        // 버튼 숨김으로 하면 소스 편집하여 강제처리가능으로 위험
-//        if (arr) {
-//	        const foundMenu = arr.find(item => item.m === menuUrl);
-//	        if (foundMenu && foundMenu.s === 'Y') {
-//	        	//정상적인 처리가능
-//	        } else {
-//	            $("[authchk]").remove();
-//	            return false;
-//	        }
-//        } else {
-//        	console.error('arr의 값이 비었습니다.');
-//        }
-////	// select 회사코드 disable (감사용 임시코드)
-////	$('select[data-kind="CO"]').prop("disabled", true);
-//    	return true;
-//}
-
 
 function authChk(menuUrl){
 	if(!menuUrl){
@@ -1442,7 +1342,7 @@ function authChk(menuUrl){
 		menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
 	}
 	
-		var arr = JSON.parse(getCookie("authArr"));
+		var arr = JSON.parse(localStorage.getItem("authArr"));
         //array함수로 기능 대체하고 버튼을 삭제함(버튼을 사용하는 프로그램은 오류 발생 가능)
         // 버튼 숨김으로 하면 소스 편집하여 강제처리가능으로 위험
         if (arr) {
@@ -2653,11 +2553,7 @@ function kakaoSendReal(talkJson, talkParam, param) {
 		$.ajax({
 		    type: "POST",
 		    url: "https://talkapi.lgcns.com/request/kakao.json",
-	        headers: {
-	            "Authorization": "Basic " + basicAuth,
-	            "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-	        },
-		    contentType: "x-www-form-urlencoded; charset=utf-8",
+		    contentType: "application/json; charset=utf-8",
 		    data: talkJson,
 	      beforeSend: function (xhr) {
 	          xhr.setRequestHeader("authToken", talkParam.authToken);
@@ -2714,7 +2610,6 @@ function insertKakaoMessage(dStatus, talkDeJson, param){
 			, "creatId": jwt.userId
 			, "creatPgm": param.creatPgm
 	};
-
 	postAjax("/user/bm/bm18/insertKakaoMessage", formData, null, function(data) {
 		//alert(data.resultMessage);// 결과 메시지를 alert으로 출력
 			if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,

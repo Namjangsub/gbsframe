@@ -47,7 +47,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 	@Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-				.allowedOrigins("https://ai.gunyangitt.co.kr") // 실운영 도메인만 허용
+				.allowedOrigins("*") // 실운영 도메인만 허용
 				.allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS").allowedHeaders("*").allowCredentials(true).maxAge(3600);
 	}
 
@@ -58,7 +58,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 		CorsConfiguration config = new CorsConfiguration();
 
 		config.setAllowCredentials(true);
-		config.addAllowedOrigin("https://ai.gunyangitt.co.kr");
+		config.addAllowedOrigin("*");
 		config.addAllowedHeader("*");
 		config.addAllowedMethod("*");
 		config.addExposedHeader("Authorization");

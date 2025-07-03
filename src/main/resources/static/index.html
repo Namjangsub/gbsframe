@@ -92,7 +92,13 @@
 		    beforeSend: function (request) {
 	            request.setRequestHeader("Authorization", authorizationToken);
 	        },
-		    success: function(data){
+		    success: function(data, status, xhr) {
+		        let newToken = xhr.getResponseHeader('X-New-Access-Token');
+		        if (newToken) {
+	              localStorage.setItem("access_token", newToken);
+	              authorizationToken = "Bearer " + newToken;
+	              jwt = parseJwt(authorizationToken);
+		        }
 		    	menuIdx = getCookie("menuIdx");
 				openNotiPop();
 		    },
@@ -127,11 +133,19 @@
 		    contentType: "application/json; charset=utf-8",
 		    data: JSON.stringify(formData),
 		    xhrFields: { withCredentials: true }, // 반드시 있어야 쿠키 전송 refresh_token은 필수임
-		    success: function(data){
+		    success: function(data, status, xhr) {
+		        const newToken = xhr.getResponseHeader("Authorization");
+// 		        console.log("access_token:", newToken);
+		        if (newToken) {
+	              localStorage.setItem("access_token", newToken);
+	              authorizationToken = newToken;
+	              jwt = parseJwt(authorizationToken);
+		        }
 	    		var usrInfo = data.usrInfo;
 		    	if(data.msg == "success"){
-	    			getToken();
-		    		
+
+					menuIdx = getCookie("menuIdx");
+					selectAuthInfo();
 // 		    		if(usrInfo.passYn == "Y") { //암호관리적용
 // 			    		if(usrInfo.passChg == "1") {  //암호변경주기 초과
 // 			    			openModal("/static/html/cmn/modal/updatePw.html", 500, 200, "비밀번호 변경");
@@ -155,27 +169,6 @@
 	}
 
 	
-	function getToken() {
-		//헤더 세팅
-		setupAuthorization("Basic " + basicAuth);
-		var formData = {
-			grant_type 	: "password",	
-			username  	: $("#id").val(),
-			id  		: $("#id").val(),
-			password 	: $("#pass").val(),
-		}
-		$.post("/oauth/token", formData, function(data) {
-	        localStorage.setItem("access_token", data.access_token);
-	        localStorage.setItem("refresh_token", data.refresh_token);
-	        authorizationToken = "Bearer " + data.access_token;
-	        if  (data.access_token) {
-	        	jwt = parseJwt(authorizationToken);
-				menuIdx = getCookie("menuIdx");
-				selectAuthInfo();
-	        }
-		});
-	}
-	
 	function selectAuthInfo(){
 		var formData = {
 			"authInfo" : jwt.authInfo,
@@ -183,27 +176,15 @@
 		}
 		postAjaxSync("/selectMenuAuth", formData, null, function(data) {
 			var authString = data.accessJSON;
-// 	         console.log("Received authString: ", authString);
+	     	 localStorage.removeItem("authArr");
+		     localStorage.setItem("authArr", authString);
 
-	         // Check size of authString
-// 	         var authStringSize = new Blob([authString]).size;
-// 	         console.log("Size of authString: ", authStringSize, " bytes");
-// 	         if (authStringSize > 4096) {
-// 	            console.log("Size of authString exceeds the cookie limit of 4KB.");
-// 	         }
-
-	         deleteCookie("authArr");
-
-	         setCookie("authArr", authString, 1);
-
-	         // Check the cookie value
-	         var checkCookie = getCookie("authArr");
-// 	         console.log("Value of 'authArr' cookie after setting: ", checkCookie);
+	         var checkCookie = localStorage.getItem("authArr", authString);
 
 	         if (checkCookie) {
 // 	            alert("Cookie 'authArr' is set successfully!");
 	         } else {
-	            alert("쿠키 생성 실패 전산실 연락 바랍니다. 'authArr'.");
+	            alert("권한 생성 실패 전산실 연락 바랍니다. 'authArr'.");
 	         }
 // 	         location.href = "/static/html/admin/cm/cm10/CM1002M01.html";
 			openNotiPop();

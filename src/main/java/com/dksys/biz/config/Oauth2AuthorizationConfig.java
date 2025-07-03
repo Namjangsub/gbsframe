@@ -1,9 +1,5 @@
 package com.dksys.biz.config;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
@@ -12,26 +8,12 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.config.annotation.configurers.ClientDetailsServiceConfigurer;
 import org.springframework.security.oauth2.config.annotation.web.configuration.AuthorizationServerConfigurerAdapter;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableAuthorizationServer;
-import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerEndpointsConfigurer;
 import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerSecurityConfigurer;
-import org.springframework.security.oauth2.provider.ClientDetailsService;
-import org.springframework.security.oauth2.provider.CompositeTokenGranter;
-import org.springframework.security.oauth2.provider.OAuth2RequestFactory;
-import org.springframework.security.oauth2.provider.TokenGranter;
-import org.springframework.security.oauth2.provider.code.AuthorizationCodeServices;
-import org.springframework.security.oauth2.provider.code.AuthorizationCodeTokenGranter;
-import org.springframework.security.oauth2.provider.implicit.ImplicitTokenGranter;
-import org.springframework.security.oauth2.provider.password.ResourceOwnerPasswordTokenGranter;
-import org.springframework.security.oauth2.provider.token.AuthorizationServerTokenServices;
 import org.springframework.security.oauth2.provider.token.DefaultAccessTokenConverter;
-import org.springframework.security.oauth2.provider.token.DefaultTokenServices;
-import org.springframework.security.oauth2.provider.token.TokenEnhancerChain;
 import org.springframework.security.oauth2.provider.token.TokenStore;
 import org.springframework.security.oauth2.provider.token.store.JwtAccessTokenConverter;
 import org.springframework.security.oauth2.provider.token.store.JwtTokenStore;
@@ -43,11 +25,11 @@ public class Oauth2AuthorizationConfig extends AuthorizationServerConfigurerAdap
 	@Value("${security.jwt.signing-key}")
 	private String signingKey;
 
-	@Autowired
-	private AuthenticationManager authenticationManager;
-
-	@Autowired
-	private UserLoginLogService userLoginLogService;
+//	@Autowired
+//	private AuthenticationManager authenticationManager;
+//
+//	@Autowired
+//	private UserLoginLogService userLoginLogService;
 
 	@Autowired
 	@Qualifier("tiberoDataSource")
@@ -56,14 +38,14 @@ public class Oauth2AuthorizationConfig extends AuthorizationServerConfigurerAdap
 	@Autowired
 	private PasswordEncoder passwordEncoder;
 
-	@Autowired
-	private CustomTokenEnhancer customTokenEnhancer;
+//	@Autowired
+//	private CustomTokenEnhancer customTokenEnhancer;
 
-	@Autowired
-	private ClientDetailsService clientDetailsService;
-
-	@Autowired
-	private OAuth2RequestFactory requestFactory;
+//	@Autowired
+//	private ClientDetailsService clientDetailsService;
+//
+//	@Autowired
+//	private OAuth2RequestFactory requestFactory;
 
 	@Bean
 	public JwtAccessTokenConverter accessTokenConverter() {
@@ -81,51 +63,57 @@ public class Oauth2AuthorizationConfig extends AuthorizationServerConfigurerAdap
 		return new JwtTokenStore(accessTokenConverter());
 	}
 
-	@Bean
-	public TokenEnhancerChain tokenEnhancerChain() {
-		TokenEnhancerChain chain = new TokenEnhancerChain();
-		chain.setTokenEnhancers(Arrays.asList(customTokenEnhancer, accessTokenConverter()));
-		return chain;
-	}
+//	@Bean
+//	public TokenEnhancerChain tokenEnhancerChain() {
+//		TokenEnhancerChain chain = new TokenEnhancerChain();
+//		chain.setTokenEnhancers(Arrays.asList(customTokenEnhancer, accessTokenConverter()));
+//		return chain;
+//	}
 
-	@Bean
-	@Primary
-	public AuthorizationServerTokenServices tokenServices() {
-		DefaultTokenServices services = new DefaultTokenServices();
-		services.setTokenStore(tokenStore());
-		services.setTokenEnhancer(tokenEnhancerChain());
-		services.setSupportRefreshToken(true);
-		services.setReuseRefreshToken(true);
-		services.setAccessTokenValiditySeconds(120); // 테스트용 2분
-		services.setRefreshTokenValiditySeconds(86400); // 24시간
-		return services;
-	}
+//	@Bean
+//	@Primary
+//	/***********************************************
+//	 * JWT 토큰 자체의 만료 시간으로 서버가 발급한 토큰이 언제까지 유효한지 설정 서버에서 토큰을 수용할 수 있는 시간으로 초단위임 클라이언트가 쿠키를 보관 중이어도 서버에서 만료된 토큰이면 401 Unauthorized 발생 Spring
+//	 * DefaultTokenServices Bean
+//	 * 
+//	 * @return
+//	 */
+//	public AuthorizationServerTokenServices tokenServices() {
+//		DefaultTokenServices services = new DefaultTokenServices();
+//		services.setTokenStore(tokenStore());
+//		services.setTokenEnhancer(tokenEnhancerChain());
+//		services.setSupportRefreshToken(true);
+//		services.setReuseRefreshToken(true);
+//		services.setAccessTokenValiditySeconds(120); // 테스트용 2분
+//		services.setRefreshTokenValiditySeconds(300); // 24시간
+//		return services;
+//	}
 
-	@Bean
-	public CustomRefreshTokenGranter customRefreshTokenGranter() {
-		return new CustomRefreshTokenGranter(tokenServices(), clientDetailsService, requestFactory, userLoginLogService, accessTokenConverter(),
-				signingKey);
-	}
+//	@Bean
+//	public CustomRefreshTokenGranter customRefreshTokenGranter() {
+//		return new CustomRefreshTokenGranter(tokenServices(), clientDetailsService, requestFactory, userLoginLogService, accessTokenConverter(),
+//				signingKey);
+//	}
 
-	@Override
-	public void configure(AuthorizationServerEndpointsConfigurer endpoints) {
-		List<TokenGranter> granters = new ArrayList<>(getDefaultTokenGranters(endpoints));
-		granters.add(customRefreshTokenGranter());
+//	@Override
+//	public void configure(AuthorizationServerEndpointsConfigurer endpoints) {
+//		List<TokenGranter> granters = new ArrayList<>(getDefaultTokenGranters(endpoints));
+//		granters.add(customRefreshTokenGranter());
+//
+//		endpoints.authenticationManager(authenticationManager).tokenStore(tokenStore()).tokenEnhancer(tokenEnhancerChain())
+//				.accessTokenConverter(accessTokenConverter()).tokenServices(tokenServices()).tokenGranter(new CompositeTokenGranter(granters));
+//	}
 
-		endpoints.authenticationManager(authenticationManager).tokenStore(tokenStore()).tokenEnhancer(tokenEnhancerChain())
-				.accessTokenConverter(accessTokenConverter()).tokenServices(tokenServices()).tokenGranter(new CompositeTokenGranter(granters));
-	}
-
-	private List<TokenGranter> getDefaultTokenGranters(AuthorizationServerEndpointsConfigurer endpoints) {
-		AuthorizationServerTokenServices tokenServices = tokenServices();
-		AuthorizationCodeServices authorizationCodeServices = endpoints.getAuthorizationCodeServices();
-
-		List<TokenGranter> tokenGranters = new ArrayList<>();
-		tokenGranters.add(new AuthorizationCodeTokenGranter(tokenServices, authorizationCodeServices, clientDetailsService, requestFactory));
-		tokenGranters.add(new ImplicitTokenGranter(tokenServices, clientDetailsService, requestFactory));
-		tokenGranters.add(new ResourceOwnerPasswordTokenGranter(authenticationManager, tokenServices, clientDetailsService, requestFactory));
-		return tokenGranters;
-	}
+//	private List<TokenGranter> getDefaultTokenGranters(AuthorizationServerEndpointsConfigurer endpoints) {
+//		AuthorizationServerTokenServices tokenServices = tokenServices();
+//		AuthorizationCodeServices authorizationCodeServices = endpoints.getAuthorizationCodeServices();
+//
+//		List<TokenGranter> tokenGranters = new ArrayList<>();
+//		tokenGranters.add(new AuthorizationCodeTokenGranter(tokenServices, authorizationCodeServices, clientDetailsService, requestFactory));
+//		tokenGranters.add(new ImplicitTokenGranter(tokenServices, clientDetailsService, requestFactory));
+//		tokenGranters.add(new ResourceOwnerPasswordTokenGranter(authenticationManager, tokenServices, clientDetailsService, requestFactory));
+//		return tokenGranters;
+//	}
 
 	@Override
 	public void configure(ClientDetailsServiceConfigurer clients) throws Exception {
@@ -134,7 +122,9 @@ public class Oauth2AuthorizationConfig extends AuthorizationServerConfigurerAdap
 
 	@Override
 	public void configure(AuthorizationServerSecurityConfigurer security) {
-		security.tokenKeyAccess("permitAll()").checkTokenAccess("isAuthenticated()").allowFormAuthenticationForClients()
+		security.tokenKeyAccess("permitAll()")			// 공개 키 (tokenKey) 접근 허용
+				.checkTokenAccess("isAuthenticated()")	// /check_token 엔드포인트 인증 필요
+				.allowFormAuthenticationForClients()	// form 기반 client 인증 허용
 				.authenticationEntryPoint((req, res, ex) -> {
 					res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 					res.setContentType("application/json;charset=UTF-8");

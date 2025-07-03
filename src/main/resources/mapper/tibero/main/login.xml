@@ -56,11 +56,26 @@
 	</insert>
 	
 	<select id="isLoginWithin24Hours" resultType="string">
-		SELECT last_login_time 
-		  FROM USER_LOGIN_LOG 
-		 WHERE USERNAME = #{username}
-		   AND USER_AGENT = #{userAgent}
-		   AND IP_ADDRESS = #{ipAddress}
+		SELECT last_login_time
+		  FROM (
+		        SELECT last_login_time
+		          FROM USER_LOGIN_LOG
+				 WHERE USERNAME   = #{username}
+				   AND USER_AGENT = #{userAgent}
+				   AND IP_ADDRESS = #{ipAddress}
+				   AND LOG_OUT_TIME IS NULL
+		        UNION ALL
+		        SELECT TO_DATE('1000/01/01 01:01:01', 'YYYY/MM/DD HH24:MI:SS')
+		          FROM DUAL
+		         WHERE NOT EXISTS (
+		               SELECT 1
+		                 FROM USER_LOGIN_LOG
+						 WHERE USERNAME   = #{username}
+						   AND USER_AGENT = #{userAgent}
+						   AND IP_ADDRESS = #{ipAddress}
+						   AND LOG_OUT_TIME IS NULL
+		         )
+		      )		   
 	</select>
 	
 	<update id="updateLastLoginTime">
@@ -68,13 +83,14 @@
 			USING DUAL
 			ON (
 					USERNAME 	= #{username}
+				AND USER_AGENT  = #{userAgent}
+				AND IP_ADDRESS  = #{ipAddress}
 			   )
 		WHEN MATCHED THEN
 			UPDATE SET
 					  	LAST_LOGIN_TIME	= SYSTIMESTAMP,
 			            REFRESH_TOKEN = #{refreshToken, jdbcType=VARCHAR},
-			            USER_AGENT = #{userAgent, jdbcType=VARCHAR},
-			            IP_ADDRESS = #{ipAddress, jdbcType=VARCHAR}
+			            LOG_OUT_TIME = ''
 		WHEN NOT MATCHED THEN
 		INSERT
 		(
@@ -83,6 +99,7 @@
 				, REFRESH_TOKEN
 				, USER_AGENT
 				, IP_ADDRESS
+				, LOG_OUT_TIME
 		)
 		VALUES(
 				  #{username}
@@ -90,14 +107,27 @@
 				, #{refreshToken, jdbcType=VARCHAR}
 				, #{userAgent, jdbcType=VARCHAR}
 				, #{ipAddress, jdbcType=VARCHAR}
+				, ''
 		)
 	</update>
+	
+
+    <update id="updateLogoutTime">
+        UPDATE
+               USER_LOGIN_LOG
+           SET LOG_OUT_TIME = SYSTIMESTAMP 
+		 WHERE USERNAME    = #{username}
+		   AND USER_AGENT  = #{userAgent}
+		   AND IP_ADDRESS  = #{ipAddress}
+    </update>
 	
 	
 	<select id="getRefreshToken" resultType="string">
 		SELECT REFRESH_TOKEN  
 		  FROM USER_LOGIN_LOG 
-		 WHERE USERNAME = #{username}
+		 WHERE USERNAME    = #{username}
+		   AND USER_AGENT  = #{userAgent}
+		   AND IP_ADDRESS  = #{ipAddress}
 	</select>
 	
 </mapper>
