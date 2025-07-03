@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.ui.Model;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -463,4 +464,16 @@ public class WB22Ctr {
 		}
 		return "jsonView";
 	}
+
+	// QR에 sortUrl 생성 (일정관리에서 QR을 생성)
+	@PostMapping(value = "/generateShortUrl")
+    public String generateShortUrl(@RequestBody Map<String, String> paramMap, Model model) {
+    	String longUrl = paramMap.get("longUrl");
+    	Map<String, String> returnUrl = wb22Svc.generateShortUrl(paramMap);
+        model.addAttribute("longUrl", longUrl);
+        model.addAttribute("shortUrl", returnUrl.get("shortUrl"));
+        model.addAttribute("chkCode", returnUrl.get("chkCode"));
+        model.addAttribute("resultCode", 200);
+    	return "jsonView";
+    }
 }

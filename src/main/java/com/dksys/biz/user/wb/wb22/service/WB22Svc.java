@@ -92,4 +92,6 @@ public interface WB22Svc {
 	
 	// wbs계획 관리 변경사항 저장
 	int updateWbsChanges(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
+	Map<String, String> generateShortUrl(Map<String, String> paramMap);
 }
