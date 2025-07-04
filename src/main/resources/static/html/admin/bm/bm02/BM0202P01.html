@@ -656,7 +656,7 @@
 				body: {
 		            onDBLClick: function () {
 		            	if(this.item.fileKey){
-							downloadFile(this.item.fileKey);
+		            		downloadFile(this.item.fileKey, this.item.fileName);
 						}
 		            }
 		        },
@@ -990,13 +990,38 @@
 	}
 	
 	// 파일 다운로드
-	function downloadFile(fileKey) {
-		postAjax("/admin/cm/cm08/fileDownInfo", {"fileKey": fileKey}, null, function(data){
-			var fileInfo = data.fileInfo;
-			var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName , "UTF-8");
-			location.href = "/admin/cm/cm08/fileDownload?filePath="+filePath;
-		});
+	function downloadFile(fileKey, fileName) {
+	    postAjax("/admin/cm/cm08/fileDownInfo", { fileKey: fileKey }, null, function(data) {
+	        const fileInfo = data.fileInfo;
+	        const filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName, "UTF-8");
+	
+	        fetch(`/admin/cm/cm08/fileDownload?filePath=${filePath}`, {
+	            method: "GET",
+	            headers: {
+	                "Authorization": authorizationToken
+	            }
+	        })
+	        .then(response => {
+	            if (!response.ok) throw new Error("다운로드 실패");
+	            return response.blob();
+	        })
+	        .then(blob => {
+	            // 👉 자동 다운로드 처리
+	            const downloadUrl = window.URL.createObjectURL(blob);
+	            const link = document.createElement("a");
+	            link.href = downloadUrl;
+	            link.download = fileName;  // 다운로드될 파일 이름
+	            document.body.appendChild(link);
+	            link.click();
+	            document.body.removeChild(link);
+	            window.URL.revokeObjectURL(downloadUrl);
+	        })
+	        .catch(error => {
+	            console.error("파일 다운로드 중 오류:", error);
+	        });
+	    });
 	}
+
 	
 	// 등록
 	function insertClnt() {
