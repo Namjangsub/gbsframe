@@ -844,14 +844,11 @@ public class WB22SvcImpl implements WB22Svc {
 	@Override
 	public Map<String, String> generateShortUrl(Map<String, String> paramMap) {
 
-		String hostAddress = paramMap.get("hostAddress");
-		String targetUrl = hostAddress + paramMap.get("tempUrl"); // hostAddress + "/static/redirectChkCode.html?" +
-
-		String longUrl = targetUrl;
+		String longUrl = paramMap.get("longUrl");
         String strId = urlMapper.getUrlIdByLongUrl(longUrl);
         int id = 0;
         if (strId == null || strId.equals("")) {
-        	String chkCode = "QRGNT"; // 비밀코드는 고정 문자열 -> DB에 저장용도임
+        	String chkCode = "QRGeration"; // 비밀코드는 고정 문자열 -> DB에 저장용도임
 //        	Map<String, String> paramMap = new HashMap<>();
         	paramMap.put("longUrl", longUrl);
             paramMap.put("chkCode", chkCode);

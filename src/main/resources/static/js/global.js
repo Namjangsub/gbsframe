@@ -446,12 +446,13 @@ function postAjax(url, data, contentType, callback, blockProc=true, retryCount =
 	    	callback(data);
 	    },
 	    error: function (xhr) {
-	            if (xhr.status === 401) {
+	            if (xhr.status === 401 || xhr.status === 403) {
 	                alert("로그인이 만료되었습니다.");
 	                logoutClick();
 	                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
 	            }
                 console.error("요청 실패:", xhr);
+                callback(xhr);
 //                return;
 	    },
         complete: function() {
@@ -496,6 +497,7 @@ function postAjaxSync(url, data, contentType, callback, retryCount = 0) {
             }
 
             console.error("요청 실패:", xhr);
+            callback(xhr);
 	    },
 	});
 }
@@ -530,6 +532,7 @@ function deleteAjax(url, data, contentType, callback, blockProc=true, retryCount
             }
 
             console.error("요청 실패:", xhr);
+            callback(xhr);
 	    },
         complete: function() {
         	if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
@@ -567,6 +570,7 @@ function putAjax(url, data, contentType, callback, blockProc=true, retryCount = 
             }
 
             console.error("요청 실패:", xhr);
+            callback(xhr);
 	    },
         complete: function() {
         	if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
@@ -603,6 +607,7 @@ function filePostAjax(url, data, callback, blockProc=true, retryCount = 0) {
             }
 
             console.error("요청 실패:", xhr);
+            callback(xhr);
 	    },
         complete: function() {
         	if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
@@ -640,6 +645,7 @@ function filePostAjaxButton(url, data, callback, blockProc=true, retryCount = 0)
             }
 
             console.error("요청 실패:", xhr);
+            callback(xhr);
 	    },
         complete: function() {
         	if (typeof $.blockUI === 'function' && blockProc) openProgress(true);
@@ -676,6 +682,7 @@ function filePutAjax(url, data, callback, blockProc=true, retryCount = 0) {
             }
 
             console.error("요청 실패:", xhr);
+            callback(xhr);
 	    },
         complete: function() {
         	if (typeof $.blockUI === 'function' && blockProc) openProgress(false);
@@ -2548,7 +2555,7 @@ openProgress = function(boolean){
 function kakaoSendReal(talkJson, talkParam, param) {
 	let talkDeJson = JSON.parse(talkJson);
 	let sendCnt = 0;
-	if (jwt.serverType =='prod' ||jwt.kakaoSend) {	//KAKAO-SEND 설정은 application.yml에 설정됨, 운영모드와 kakaoSend :true일때만  카카오톡 발송처리함. 아닌경우 이력만 남김
+	if (jwt.serverType =='prod' || jwt.kakaoSend == 'true') {	//KAKAO-SEND 설정은 application.yml에 설정됨, 운영모드와 kakaoSend :true일때만  카카오톡 발송처리함. 아닌경우 이력만 남김
 		//알림톡
 		$.ajax({
 		    type: "POST",
