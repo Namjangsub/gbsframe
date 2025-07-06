@@ -299,6 +299,7 @@
 				, CREAT_PGM
 				, BILL_NO
 				, CTRT_APPROVAL_NO
+				, PMT_LIST
 			)
 			VALUES
 			(
@@ -323,6 +324,7 @@
 				, #{pgmId}
 				, #{billNo, jdbcType=VARCHAR}
 				, #{ctrtApprovalNo, jdbcType=VARCHAR}
+				, #{pmtList, jdbcType=VARCHAR}
 			)
 	</insert>
 
@@ -335,66 +337,38 @@
 	</select>
 
 	<select id="sm30_pop_grid1_selectList" parameterType="Map" resultType="camelMap">
-		WITH PC AS (
-			SELECT
-				D.CO_CD,
-				D.PCHS_NO,
-				D.PCHS_SEQ,
-				CASE
-				WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.PCHS_CLNT_CD
-				WHEN substr(D.ORDRG_NO,0,3) = 'RET' THEN RM.PCHS_CLNT_CD
-				ELSE C.PCHS_CLNT_CD
-				END                                     AS PCHS_CLNT_CD,
-				D.ORDRG_NO
-			FROM TB_SM12D01 D
-			LEFT JOIN TB_SM02M01 M  ON D.ORDRG_NO = M.ORDRG_NO
-			LEFT JOIN TB_SM10M01 C  ON D.ORDRG_NO = C.COST_NO
-			LEFT JOIN TB_SM06D01 R  ON D.ORDRG_NO = R.RET_NO
-			LEFT JOIN TB_SM06M01 RM ON RM.CO_CD    = R.CO_CD
-								AND RM.RET_NO  = R.RET_NO
-			WHERE D.CO_CD = #{coCd}
-		)
-		SELECT
-			A.FILE_TRGT_KEY
-			, A.SEQ
-			, A.CO_CD
-			, A.CUST_ID
-			, B.CLNT_NM                            AS CUST_NM
-			, A.CLNT_PJT
-			, FN_CM05M01_CD_TO_NM(A.CLNT_PJT)      AS CLNT_PJT_NM
-			, A.ORDRS_NO
-			, A.CTRT_NO
-			, A.CLNT_CD
-			, NVL(SM10.PCHS_PMNT_MTD_CD,D1.PCHS_PMNT_MTD_CD) 						AS PCHS_PMNT_MTD_CD
-			, FN_CM05M01_CD_TO_NM(NVL(SM10.PCHS_PMNT_MTD_CD,D1.PCHS_PMNT_MTD_CD))	AS PCHS_PMNT_MTD_NM
-			, C.CLNT_NM                            AS CLNT_NM
-			, A.PCHS_AMT
-			, A.PCHS_VAT
-			, A.PCHS_TOT
-			, A.BILL_TOT
-			, A.BILL_NO
-			, A.CTRT_APPROVAL_NO
-			, TO_CHAR(A.BILL_DT,    'YYYY-MM-DD') AS BILL_DT
-			, TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD') AS APROVAL_DT
-			, A.CREAT_ID                           AS APROVAL_ID
-			, FN_CM06M01_ID_TO_NM(A.CREAT_ID)      AS APROVAL_NM
-			, SM.FILE_TRGT_KEY                     AS SM11_FILE_TRGT_KEY
-			, A.HOLD_YN
+		SELECT 
+				  A.FILE_TRGT_KEY
+				, A.SEQ
+				, A.CO_CD
+				, FN_CM05M01_CD_TO_NM(A.CO_CD) 		AS CO_CD_NM
+				, A.CUST_ID
+				, B.CLNT_NM   						AS CUST_NM
+				, A.CLNT_PJT
+				, FN_CM05M01_CD_TO_NM(A.CLNT_PJT) CLNT_PJT_NM
+				, A.ORDRS_NO
+				, A.CTRT_NO
+				, A.CLNT_CD
+				, C.CLNT_NM							AS CLNT_NM
+				, A.PCHS_AMT
+				, A.PCHS_VAT
+				, A.PCHS_TOT
+				, A.BILL_TOT
+				, A.BILL_NO
+				, A.CTRT_APPROVAL_NO
+				, TO_CHAR(A.BILL_DT,    'YYYY-MM-DD') AS BILL_DT
+				, TO_CHAR(A.CREAT_DTTM, 'YYYY-MM-DD') AS APROVAL_DT
+				, A.CREAT_ID						AS APROVAL_ID
+				, FN_CM06M01_ID_TO_NM(A.CREAT_ID)  	AS APROVAL_NM
+				, SM.FILE_TRGT_KEY					AS SM11_FILE_TRGT_KEY
+				, A.HOLD_YN
+				, A.PMT_LIST
 		FROM TB_SM30D01 A
-		LEFT JOIN TB_BM02M01 B    ON B.CLNT_CD    = A.CUST_ID
-		LEFT JOIN TB_BM02M01 C    ON C.CLNT_CD    = A.CLNT_CD
-		LEFT JOIN TB_SM11M01 SM   ON SM.CTRT_NO   = A.CTRT_NO
-		LEFT JOIN TB_SM20M01 SM20 ON SM20.CO_CD   = A.CO_CD
-								  AND SM20.BILL_NO = A.BILL_NO
-		LEFT JOIN TB_SM20D01 DTL  ON DTL.CO_CD    = A.CO_CD
-								  AND DTL.BILL_NO  = A.BILL_NO
-		LEFT JOIN PC              ON PC.CO_CD     = DTL.CO_CD
-								  AND PC.PCHS_NO   = DTL.PCHS_NO
-								  AND PC.PCHS_SEQ  = DTL.PCHS_SEQ
-		LEFT JOIN TB_SM10M01 SM10 ON SM10.COST_NO = PC.ORDRG_NO
-		LEFT JOIN TB_BM02M01 D1   ON D1.CLNT_CD   = PC.PCHS_CLNT_CD
+						LEFT OUTER JOIN  TB_BM02M01 B ON B.CLNT_CD = A.CUST_ID
+						LEFT OUTER JOIN  TB_BM02M01 C ON C.CLNT_CD = A.CLNT_CD
+						LEFT OUTER JOIN  TB_SM11M01 SM ON SM.CTRT_NO = A.CTRT_NO
 		WHERE A.FILE_TRGT_KEY = #{fileTrgtKey}
-		  AND A.CO_CD         = #{coCd};
+		  AND A.CO_CD = #{coCd}
 	</select>
 
 	<delete id="delete_sm30_master" parameterType="Map">
