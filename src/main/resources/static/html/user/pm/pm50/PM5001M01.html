@@ -514,14 +514,56 @@
 		}
 
 		// 파일 객체 생성
-		const fileListInfo = await Promise.all(rows.map(async row => {
-			const url = `/admin/cm/cm08/fileDownloadAuth2?fileKey=${row.fileKey}&userId=${jwt.userId}`;
-			const res = await fetch(url);
-			if (!res.ok) throw new Error(`이미지 다운로드 실패 (${res.status})`);
-			const blob = await res.blob();
-			// File 생성: 두 번째 인자로 파일명, 세 번째 옵션으로 MIME 타입 지정
-			return new File([blob], row.fileName, { type: blob.type });
-		}));
+// 		const fileListInfo = await Promise.all(rows.map(async row => {
+// 			const url = `/admin/cm/cm08/fileDownloadAuth2?fileKey=${row.fileKey}&userId=${jwt.userId}`;
+// 			const res = await fetch(url);
+// 			if (!res.ok) throw new Error(`이미지 다운로드 실패 (${res.status})`);
+// 			const blob = await res.blob();
+// 			// File 생성: 두 번째 인자로 파일명, 세 번째 옵션으로 MIME 타입 지정
+// 			return new File([blob], row.fileName, { type: blob.type });
+// 		}));
+
+	    const fileListInfo = await Promise.all(rows.map(async (row) => {
+	        try {
+	            // 파일 정보 요청
+	            const fileInfoRes = await fetch("/admin/cm/cm08/fileDownInfo", {
+	                method: "POST",
+	                headers: {
+	                    "Content-Type": "application/json",
+	                    "Authorization": authorizationToken
+	                },
+	                body: JSON.stringify({ fileKey: row.fileKey })
+	            });
+
+	            if (!fileInfoRes.ok) throw new Error("파일 정보 요청 실패");
+
+	            const data = await fileInfoRes.json();
+	            const fileInfo = data.fileInfo;
+	            const filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName, "UTF-8");
+
+	            // 파일 다운로드 요청
+	            const fileRes = await fetch(`/admin/cm/cm08/fileDownload?filePath=${filePath}`, {
+	                method: "GET",
+	                headers: {
+	                    "Authorization": authorizationToken
+	                }
+	            });
+
+	            if (!fileRes.ok) throw new Error("파일 다운로드 실패");
+
+	            const blob = await fileRes.blob();
+
+	            // File 객체 생성
+	            return new File([blob], fileInfo.fileName, { type: blob.type });
+	        } catch (error) {
+	            console.error(`파일 처리 중 오류 (${row.fileKey}):`, error);
+	            return null;
+	        }
+	    }));
+
+	    // null 제거
+// 	    fileListInfo.filter(file => file !== null);
+		
 
 		var paramObj = {
 			"coCd"				: $("#coCd_S").val(),
