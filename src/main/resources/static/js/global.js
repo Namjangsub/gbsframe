@@ -2915,7 +2915,7 @@ function disableFormAll(formId) {
 
 let isModalOpen = false;
 
-function customAlert(message) {
+function customAlert(message, appendMessage='') {
     if (isModalOpen) {
         console.log("이미 모달이 열려있습니다.");
         return;
@@ -2958,7 +2958,8 @@ function customAlert(message) {
     $('body').append(modalHtml);
 
     // \n을 <br>로 변환하고 출력
-    $('#custom-alert-message').html(message.replace(/\n/g, '<br>'));
+    let fullMessage = appendMessage == '' ? message : message + '<br>' + appendMessage;
+    $('#custom-alert-message').html(fullMessage.replace(/\n/g, '<br>'));
 }
 
 function closeCustomAlert() {
