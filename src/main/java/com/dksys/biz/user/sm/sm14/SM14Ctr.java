@@ -8,7 +8,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -212,8 +211,17 @@ public class SM14Ctr {
 	// 매입관리 입고 조회 NAM 240226
 	@PostMapping(value = "/selectClntPurchaseInboundList")
 	public String selectClntPurchaseInboundList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		paramMap.put("clntPjt", ObjectUtil.sqlInCodeGen(paramMap.get("clntPjt")));
+		paramMap.put("mngIdCd", ObjectUtil.sqlInCodeGen(paramMap.get("mngIdCd")));
+		
 		List<Map<String, String>> result = sm14Svc.selectClntPurchaseInboundList(paramMap);
 		model.addAttribute("result", result);
+
+	   	List<Map<String, String>> resultPrjct = sm14Svc.select_prjct_code(paramMap);
+	   	model.addAttribute("resultPrjct", resultPrjct);
+
+	   	List<Map<String, String>> resultMngId = sm14Svc.select_mngId_code(paramMap);
+	   	model.addAttribute("resultMngId", resultMngId);
 		return "jsonView";
 	}
 	
