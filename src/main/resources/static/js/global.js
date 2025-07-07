@@ -1096,8 +1096,8 @@ function logoutClick(){
 	deleteCookie("menuSaveYn");
 	
 	$.ajax({
-	    type: "POST",
-	    url: "/customLogout",
+	    type: "GET",
+	    url: "/customLogout?userId=" + jwt.userId,
 	    beforeSend: function (request) {
             request.setRequestHeader("Authorization", authorizationToken);
         },

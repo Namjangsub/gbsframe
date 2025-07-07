@@ -15,7 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
@@ -112,7 +112,7 @@ public class LoginController {
 	// 5. 최근 로그인 24시간 초과 시 `InvalidGrantException` 반환 (재로그인 유도)
 	// 6. 통과하면 새로운 access_token 발급
 	// 7. 클라이언트는 다시 원래 요청 재시도 (retry mechanism)
-    @PostMapping("/customLogout")
+    @GetMapping("/customLogout")
 //	public String logout(HttpServletRequest request, HttpServletResponse response) {
 	 public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
 		
