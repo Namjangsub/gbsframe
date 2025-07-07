@@ -184,9 +184,20 @@ var openModal = function(url, width, height, title, paramObj, callback) {
         }
     }, function () {
     	var targetEl = this.$["body-frame"];
-    	$.get(url, function(data) {
-    		targetEl.append(data);
-      	});
+//    	$.get(url, function(data) {
+//    		targetEl.append(data);
+//      	});
+    	
+    	$.ajax({url: url, method: 'GET',
+    		  headers: {'Authorization': authorizationToken },
+    		  success: function(data) { targetEl.append(data); },
+    		  error: function(xhr) {
+  	            alert("로그인이 만료되었습니다.");
+  	            logoutClick();
+//  	            location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+//    			  console.error("모달 HTML 로딩 실패:", xhr.status, xhr.statusText);
+  	            }
+    		});
     });
 };
 
@@ -225,9 +236,20 @@ var openSecondModal = function(url, width, height, title, paramObj, callback) {
         }
     }, function () {
     	var targetEl = this.$["body-frame"];
-    	$.get(url, function(data) {
-    		targetEl.append(data);
-      	});
+//    	$.get(url, function(data) {
+//    		targetEl.append(data);
+//      	});
+    	
+    	$.ajax({url: url, method: 'GET',
+    		  headers: {'Authorization': authorizationToken },
+    		  success: function(data) { targetEl.append(data); },
+    		  error: function(xhr) {
+  	            alert("로그인이 만료되었습니다.");
+  	            logoutClick();
+//  	            location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+//    			  console.error("모달 HTML 로딩 실패:", xhr.status, xhr.statusText);
+  	            }
+    		});
     });
 };
 
@@ -266,9 +288,20 @@ var openThirdModal = function(url, width, height, title, paramObj, callback) {
         }
     }, function () {
     	var targetEl = this.$["body-frame"];
-    	$.get(url, function(data) {
-    		targetEl.append(data);
-      	});
+//    	$.get(url, function(data) {
+//    		targetEl.append(data);
+//      	});
+    	
+    	$.ajax({url: url, method: 'GET',
+    		  headers: {'Authorization': authorizationToken },
+    		  success: function(data) { targetEl.append(data); },
+    		  error: function(xhr) {
+  	            alert("로그인이 만료되었습니다.");
+  	            logoutClick();
+//  	            location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+//    			  console.error("모달 HTML 로딩 실패:", xhr.status, xhr.statusText);
+  	            }
+    		});
     });
 };
 
@@ -307,9 +340,20 @@ var openFourthModal = function(url, width, height, title, paramObj, callback) {
         }
     }, function () {
     	var targetEl = this.$["body-frame"];
-    	$.get(url, function(data) {
-    		targetEl.append(data);
-      	});
+//    	$.get(url, function(data) {
+//    		targetEl.append(data);
+//      	});
+    	
+    	$.ajax({url: url, method: 'GET',
+    		  headers: {'Authorization': authorizationToken },
+    		  success: function(data) { targetEl.append(data); },
+    		  error: function(xhr) {
+  	            alert("로그인이 만료되었습니다.");
+  	            logoutClick();
+//  	            location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+//    			  console.error("모달 HTML 로딩 실패:", xhr.status, xhr.statusText);
+  	            }
+    		});
     });
 };
 
@@ -335,9 +379,20 @@ var openBlindModal = function(url, width, height, title, paramObj, callback) {
         }
     }, function () {
     	var targetEl = this.$["body-frame"];
-    	$.get(url, function(data) {
-    		targetEl.append(data);
-      	});
+//    	$.get(url, function(data) {
+//    		targetEl.append(data);
+//      	});
+    	
+    	$.ajax({url: url, method: 'GET',
+    		  headers: {'Authorization': authorizationToken },
+    		  success: function(data) { targetEl.append(data); },
+    		  error: function(xhr) {
+  	            alert("로그인이 만료되었습니다.");
+  	            logoutClick();
+//  	            location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+//    			  console.error("모달 HTML 로딩 실패:", xhr.status, xhr.statusText);
+  	            }
+    		});
     });
 };
 
@@ -367,18 +422,18 @@ function parseJwt(token) {
 
 function selectGridValidation(obj) {
 	if(obj.getList("selected").length > 1) {
-		alert("한건 만 선택해주세요.");
+		customAlert("한건 만 선택해주세요.");
 		return true;
 	}
 	if(obj.getList("selected").length == 0) {
-		alert("선택된 데이터가 없습니다.");
+		customAlert("선택된 데이터가 없습니다.");
 		return true;
 	}
 }
 
 function selectGridValidationM(obj) {
 	if(obj.getList("selected").length == 0) {
-		alert("선택된 데이터가 없습니다.");
+		customAlert("선택된 데이터가 없습니다.");
 		return true;
 	}
 }
@@ -386,13 +441,13 @@ function selectGridValidationM(obj) {
 function checkGridRow(grid, type){
 	var isValid = true;
 	if(grid.getList("selected").length == 0){
-		alert("선택된 데이터가 없습니다.");
+		customAlert("선택된 데이터가 없습니다.");
 		isValid = false;
 	}
 
 	if(type == "single"){
 		if(grid.getList("selected").length > 1){
-			alert("한건 만 선택해주세요.");
+			customAlert("한건 만 선택해주세요.");
 			isValid = false;
 		}
 	}
@@ -491,9 +546,10 @@ function postAjaxSync(url, data, contentType, callback, retryCount = 0) {
 	    	callback(data);
 	    },
 	    error: function (xhr) {
-            if (xhr.status === 401) {
+	    	if (xhr.status === 401 || xhr.status === 403) {
 //                alert("로그인이 만료되었습니다.");
-//                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+                logoutClick();
+                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
             }
 
             console.error("요청 실패:", xhr);
@@ -526,9 +582,10 @@ function deleteAjax(url, data, contentType, callback, blockProc=true, retryCount
 	    	callback(data);
 	    },
 	    error: function (xhr) {
-            if (xhr.status === 401) {
-//                alert("로그인이 만료되었습니다.");
-//                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+	    	if (xhr.status === 401 || xhr.status === 403) {
+//              alert("로그인이 만료되었습니다.");
+                logoutClick();
+                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
             }
 
             console.error("요청 실패:", xhr);
@@ -564,9 +621,10 @@ function putAjax(url, data, contentType, callback, blockProc=true, retryCount = 
 	    	callback(data);
 	    },
 	    error: function (xhr) {
-            if (xhr.status === 401) {
-//                alert("로그인이 만료되었습니다.");
-//                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+	    	if (xhr.status === 401 || xhr.status === 403) {
+//              alert("로그인이 만료되었습니다.");
+                logoutClick();
+                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
             }
 
             console.error("요청 실패:", xhr);
@@ -601,9 +659,10 @@ function filePostAjax(url, data, callback, blockProc=true, retryCount = 0) {
 	    	callback(data);
 	    },
 	    error: function (xhr) {
-            if (xhr.status === 401) {
+	    	if (xhr.status === 401 || xhr.status === 403) {
 //                alert("로그인이 만료되었습니다.");
-//                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+                logoutClick();
+                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
             }
 
             console.error("요청 실패:", xhr);
@@ -639,9 +698,10 @@ function filePostAjaxButton(url, data, callback, blockProc=true, retryCount = 0)
 	    	callback(data);
 	    },
 	    error: function (xhr) {
-            if (xhr.status === 401) {
+	    	if (xhr.status === 401 || xhr.status === 403) {
 //                alert("로그인이 만료되었습니다.");
-//                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+                logoutClick();
+                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
             }
 
             console.error("요청 실패:", xhr);
@@ -676,9 +736,10 @@ function filePutAjax(url, data, callback, blockProc=true, retryCount = 0) {
 	    	callback(data);
 	    },
 	    error: function (xhr) {
-            if (xhr.status === 401) {
+	    	if (xhr.status === 401 || xhr.status === 403) {
 //                alert("로그인이 만료되었습니다.");
-//                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+                logoutClick();
+                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
             }
 
             console.error("요청 실패:", xhr);
@@ -800,7 +861,7 @@ function inputValidation(inputList) {
 		if($.trim(elem.value) == ""){
 			isValid = false;
 			var alertMsg = $(elem).attr("msg") || "필수값";
-			alert(alertMsg + "(을/를) 입력해주세요.");
+			customAlert(alertMsg + "(을/를) 입력해주세요.");
 			$(elem).focus();
 			return false;
 		}
@@ -1020,7 +1081,7 @@ function favoritesMenuControl(obj){
 			//즐겨찾기 추가 삭제 완료
 			setMenuAuth();	//메뉴정보 갱신
 		} else {
-			alert(data.resultMessage);
+			customAlert(data.resultMessage);
 		}
 	})
 	
@@ -1174,7 +1235,7 @@ function getMonth(type) {
 
 function dateValidation() {
 	if($(".input_calendar")[0].value > $(".input_calendar")[1].value) {
-		alert("날짜를 확인해주세요");
+		customAlert("날짜를 확인해주세요");
 		$(".input_calendar")[0].value = "";
 		return;
 	} else {
@@ -1277,7 +1338,7 @@ function dateMask(elem){
       }
 
       if (!isVaild) {
-        alert("잘못된 날짜입니다. \n다시 입력하세요.");
+        customAlert("잘못된 날짜입니다. \n다시 입력하세요.");
         elem.value = "";
         elem.focus();
         return;
@@ -2257,7 +2318,7 @@ function getGridExcelData(columnsKey, dataList){
 //---------------------------------------------------------------------------------
 function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'excel', _hiddenField = false) {
 	if (!_excelJsonData) {
-		alert('엑셀로 변환할 자료가 없습니다.')
+		customAlert('엑셀로 변환할 자료가 없습니다.')
 		return false;
 	}
 //	let _excelJsonData = _grid.target.getList();
@@ -2453,10 +2514,10 @@ function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 
 		if(rtnDate - chkValue > 0){
 //			$("#actionBtn").hide();
-			if(actionType === 'C') alert('마감된 일자입니다. ' + rtnDate + '일 이전은 데이터를 등록할 수가 없습니다.');
-			if(actionType === 'D') alert('마감된 일자입니다. ' + rtnDate + '일 이전은 삭제할 수가 없습니다.');
+			if(actionType === 'C') customAlert('마감된 일자입니다. ' + rtnDate + '일 이전은 데이터를 등록할 수가 없습니다.');
+			if(actionType === 'D') customAlert('마감된 일자입니다. ' + rtnDate + '일 이전은 삭제할 수가 없습니다.');
 //			if(actionType === 'U') setDisabledInputDate(true);
-			if(actionType === 'U') alert('마감된 일자입니다. ' + rtnDate + '일 이전은 수정할 수가 없습니다.');
+			if(actionType === 'U') customAlert('마감된 일자입니다. ' + rtnDate + '일 이전은 수정할 수가 없습니다.');
 			return false;
 		}else{
 //			$("#actionBtn").show();
@@ -2469,10 +2530,10 @@ function monthCloseChk(chkValue, chkType, coCd = jwt.coCd){
 		if (rtnVal === 'Y') {  //마감완료
 //			$("#actionOrdrsBtn").hide();
 //			$("#actionBtn").hide();
-			if(actionType === 'C') alert('마감된 일자입니다. ' + rtnDate + '일 이전은 데이터를 등록할 수가 없습니다.');
-			if(actionType === 'D') alert('마감된 일자입니다. ' + rtnDate + '일 이전은 삭제할 수가 없습니다.');
+			if(actionType === 'C') customAlert('마감된 일자입니다. ' + rtnDate + '일 이전은 데이터를 등록할 수가 없습니다.');
+			if(actionType === 'D') customAlert('마감된 일자입니다. ' + rtnDate + '일 이전은 삭제할 수가 없습니다.');
 //			if(actionType === 'U') setDisabledInputDate(true);
-			if(actionType === 'U') alert('마감된 일자입니다. ' + rtnDate + '일 이전은 수정할 수가 없습니다.');
+			if(actionType === 'U') customAlert('마감된 일자입니다. ' + rtnDate + '일 이전은 수정할 수가 없습니다.');
 			return false;
 		}else{
 //			$("#actionOrdrsBtn").show();
@@ -2580,9 +2641,9 @@ function kakaoSendReal(talkJson, talkParam, param) {
 						}
 		    		}
 			    	insertKakaoMessage(err, talkDeJson, param);
-		    		alert("오류코드: ["+param.nameTo+" Hp."+ talkDeJson.mobile + "] "+data.status+"\r\n\r\n" + errorMsg+"로 메세지 전송 실패하였습니다.");
+		    		customAlert("오류코드: ["+param.nameTo+" Hp."+ talkDeJson.mobile + "] "+data.status+"\r\n\r\n" + errorMsg+"로 메세지 전송 실패하였습니다.");
 		    	} else if( data.status == "OK" ) {
-		    		//alert("알림톡 정상 발송되었습니다.");
+		    		//customAlert("알림톡 정상 발송되었습니다.");
 		    		sendCnt++;
 			    	insertKakaoMessage(err, talkDeJson, param);
 		    	}
@@ -2618,7 +2679,7 @@ function insertKakaoMessage(dStatus, talkDeJson, param){
 			, "creatPgm": param.creatPgm
 	};
 	postAjax("/user/bm/bm18/insertKakaoMessage", formData, null, function(data) {
-		//alert(data.resultMessage);// 결과 메시지를 alert으로 출력
+		//customAlert(data.resultMessage);// 결과 메시지를 alert으로 출력
 			if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
 //				console.log('--알림톡 로그 정상 저장--');
 			} else {
@@ -2768,10 +2829,10 @@ function openapi(prompt) {
 				$('#'+prompt).val(data.chatgpt);
 				txtareaHeightResize($('#'+prompt));
 			} else {
-				alert("AI실행 오류 발생!! 전산실 연락 바랍니다.\n"+ data.msg);
+				customAlert("AI실행 오류 발생!! 전산실 연락 바랍니다.\n"+ data.msg);
 			}
 		} catch {
-			alert("AI실행 오류 발생!! 전산실 연락 바랍니다.\n"+ error.message);
+			customAlert("AI실행 오류 발생!! 전산실 연락 바랍니다.\n"+ error.message);
 			return false; 
 		} finally {
 			// 종료 처리;
@@ -2850,4 +2911,57 @@ function disableFormAll(formId) {
 			
 			}
 	});
+}
+
+let isModalOpen = false;
+
+function customAlert(message) {
+    if (isModalOpen) {
+        console.log("이미 모달이 열려있습니다.");
+        return;
+    }
+
+    isModalOpen = true;
+
+    const modalHtml = `
+        <div id="custom-alert-overlay">
+            <div style="
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: white;
+                padding: 20px 30px;
+                border: 2px solid #666;
+                border-radius: 10px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                z-index: 9999;
+                max-width: 400px;
+                font-size: 16px;
+                text-align: center;
+            ">
+                <div id="custom-alert-message" style="margin-bottom: 20px; font-size: 16px; color: #333;"></div>
+                <button onclick="closeCustomAlert()" style="padding: 5px 15px;">확인</button>
+            </div>
+            <div style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.4);
+                z-index: 9998;
+            "></div>
+        </div>
+    `;
+
+    $('body').append(modalHtml);
+
+    // \n을 <br>로 변환하고 출력
+    $('#custom-alert-message').html(message.replace(/\n/g, '<br>'));
+}
+
+function closeCustomAlert() {
+    $('#custom-alert-overlay').remove();
+    isModalOpen = false;
 }
