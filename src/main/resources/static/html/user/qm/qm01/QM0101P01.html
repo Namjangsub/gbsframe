@@ -222,9 +222,9 @@
 									</td>
 								</tr>
 								<tr>
-									<th class="hit">조치	파일 저장명</th>
+									<th class="hit">조치 파일 저장명</th>
 									<td colspan="3">
-										<textarea	class="form-control" id="actCompDgnFileNm" name="actCompDgnFileNm" rows="4" maxlength="1000" required msg="조치	파일 저장명" placeholder="예: 24011-01NVFIP-1230-001R1.dwg
+										<textarea	class="form-control" id="actCompDgnFileNm" name="actCompDgnFileNm" rows="4" maxlength="1000" required msg="조치 파일 저장명" placeholder="예: 24011-01NVFIP-1230-001R1.dwg
 								24011-01NVFIP-2530-001R1.dwg 처럼 여기에 저장된 도면 파일명을 입력하세요.
 							도면수정이 없거나 관련 없으면	'해당 사항 없음'으로 입력하세요."></textarea>
 									</td>
@@ -251,12 +251,18 @@
 									</td>
 								</tr>
 								<tr class="reqResultArea">
-									<th class="hit">결과/근본대책</th>
+									<th class="hit">결과</th>
 									<td colspan="3">
 										<div class="aiContainer">
-											<textarea	class="form-control" id="resltRst" name="resltRst" rows="4" maxlength="1000" required msg="처리 결과" placeholder="결과/근본대책을 입력하세요"></textarea>
+											<textarea	class="form-control" id="resltRst" name="resltRst" rows="4" maxlength="1000" required msg="처리 결과" placeholder="결과을 입력하세요"></textarea>
 											<div class="ai-mark" onclick="openapi('resltRst');">AI</div>
 										</div>
+									</td>
+								</tr>
+								<tr class="reqResultArea">
+									<th class="hit">근본대책</th>
+									<td colspan=3 style="text-align:left;">
+										<div id="FDMTSOLUT-radioButtonContainer" style="height: 60px;"></div>
 									</td>
 								</tr>
 								
@@ -527,6 +533,38 @@
 		})
 	}
 
+	// 근본대책 체크박스 설정 (위의 함수를 가공함)
+	function createRadioOption_FDMTSOLUT(groupName, _type) {
+		let codeEtc = '';
+		var param = {
+			"codeKind" : groupName,
+			"codeEtc"	: codeEtc
+		};
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", param , null,	function(data){
+			const codeList = data.childCodeList;
+			var container = $(currFormId +' #' + groupName + '-radioButtonContainer');
+			container.empty();
+			var typeStr = _type
+			codeList.forEach((item, idx) => {
+				const iHtml = `
+					<td style="width:50%;">
+					<input type="${typeStr}"
+							id="${item.codeId}"
+							name="${item.codeKind}"
+							value="${item.codeId}"
+							data-label="${item.codeNm}"
+							onchange="fnc(this)">
+					${item.codeNm}
+				`;
+				container.append(iHtml);
+				// 두 개를 추가했으면 줄바꿈
+				if ((idx + 1) % 2 === 0) {
+					container.append('<br/>');
+				}
+			});
+		})
+	}
+
 	function createCheckBox(deptCode) {
 		if (deptCode == 'TRN30') deptCode = 'TRN50';	//트루넷직접매출
 		if (deptCode == 'GUN70') deptCode = 'GUN60';	//생산관리
@@ -697,6 +735,7 @@
 		createRadioOptions('BUSTCD', "checkbox");	//출장자 구분
 		createRadioOptions('INWKCD', "checkbox");	//사내작업 구분
 		createRadioOptions('REQCD', "radio");	//요청구분 구분
+		createRadioOption_FDMTSOLUT('FDMTSOLUT', 'checkbox') // 근본대책 구분
 		
 		authChk();					// 권한체크
 		
@@ -1248,6 +1287,12 @@
 				if ($(currFormId + ' #' + key)[0]) {
 					$(currFormId + ' #' + key).val(value);
 				}
+				if (key == 'fdmtSolutCd') {	// 근본대책 체크하기
+					const codes = value.split(',');
+					codes.forEach(code => {
+						$(`input[name="FDMTSOLUT"][value="${code}"]`).prop('checked', true);
+					});
+				}
 			});
 			
 			const subCdElement = $(currFormId + ' #' + data.result.subCd);
@@ -1344,7 +1389,6 @@
 	// 등록
 	function insertQualityReq(_procType='결과일괄등록') {
 		formFieldControl(_procType);		//필수입력필드 조정
-		
 		if (inputValidation($('.popup_area [required]'))) {					// 필수 필드의 유효성 검사
 		if($(currFormId + " #salesCd").val() == ""){
 			alert("SalesCode를 선택해주세요");
@@ -1358,8 +1402,9 @@
 				alert("A/S유상 수주번호입니다. 분류코드 확인바랍니다.");
 		}else if ($("#ordrsDiv").val() == 'ORDRSDIV3' && $("input[name='COBTP']:checked").val() != 'COBTP05') { //A/S무상
 				alert("A/S무상 수주번호입니다. 분류코드 확인바랍니다.");
+		}else if (_procType=='결과일괄등록' && $("input[name='FDMTSOLUT']:checked").val() == undefined) {
+				alert("근본대책을 선택해주세요.");
 		}else {
-
 			if (inputValidationCheck()) {
 				var formData = makeFormData(_procType); 
 				filePostAjax("/user/qm/qm01/insertQualityReq", formData, function(data) {
@@ -1505,6 +1550,12 @@
 		deleteHyphen(elem);
 		});
 
+		// 근본대책 체크된 객체들 배열로 변환하고 조인
+		const rootCauses = $('#FDMTSOLUT-radioButtonContainer input[type="checkbox"]:checked')
+					.map(function() { return this.value; })
+					.get()   // jQuery 객체 -> 일반 배열
+					.join(',');  // ["A","B","C"] -> "A,B,C"
+
 		//1. 조치담당자 결재 자동등록 처리하기
 		//2. 조치담당자 팀장 결재 자동등록 처리하기
 		//3. 이슈 등록자 담당팀장 결재 자동 등록 처리하기
@@ -1519,6 +1570,7 @@
 		formData.append("deptCd2", userDeptId);	//부서코드 Full
 		formData.append("issNo",	$(currFormId + ' #workRptNo').val());	//문제등록번호
 		formData.append("vendCd", $(currFormId + ' #vendCd').val())	// 발생공급업체
+		formData.set('FDMTSOLUT', rootCauses); 
 		
 		//결과까지 일괄 처리할건가 분리할건가 구분자임 [결과일괄등록, 결과분리등록]
 		formData.append("procType", _procType);	

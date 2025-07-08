@@ -330,6 +330,13 @@
 						<!--                             </td> -->
 						<!--                         </tr> -->
 						<tr>
+                            <th style="color:blue;">근본대책</th>
+							<td colspan=3 style="text-align:left;">
+								<div id="FDMTSOLUT-radioButtonContainer" msg="근본대책"></div>
+							</td>
+                        </tr>
+                        <tr>
+						<tr>
 							<th style="color: blue;">원인</th>
 							<td colspan=3>
 								<div class="aiContainer">
@@ -339,10 +346,10 @@
 							</td>
 						</tr>
 						<tr>
-							<th style="color: blue;">결과/근본대책</th>
+							<th style="color: blue;">결과</th>
 							<td colspan=3>
 								<div class="aiContainer">
-									<textarea id="actCnts" name="actCnts" rows="4" msg="결과/근본대책"></textarea>
+									<textarea id="actCnts" name="actCnts" rows="4" msg="결과"></textarea>
 									<div class="ai-mark" onclick="openapi('actCnts');">AI</div>
 								</div>
 							</td>
@@ -613,6 +620,29 @@
         }
     }
 
+	function createRadioOptions(groupName, _type) {
+		let codeEtc = '';
+		var param = {
+			"codeKind" : groupName,
+			"codeEtc"	: codeEtc
+		};
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", param , null,	function(data){
+			const codeList = data.childCodeList;
+			var container = $(' #' + groupName + '-radioButtonContainer');
+			container.empty();
+			var typeStr = _type =="radio" ? "radio" : "checkbox";
+			codeList.forEach(item => {
+				const iHtml = '<td><input type="' + typeStr	+ '" id="' + item.codeId +
+											'" name="' + item.codeKind +
+										'" value="' + item.codeId +
+									'" data-label="' + item.codeNm +
+							'" onchange="fnc(this)"> ' + item.codeNm + ' </td>';
+				container.append(iHtml);
+			});
+			
+		})
+	}
+
     function createCheckBox(deptCode) {
         if (deptCode == 'TRN30') deptCode = 'TRN50';	//트루넷직접매출
         if (deptCode == 'GUN70') deptCode = 'GUN60';	//생산관리
@@ -744,6 +774,7 @@
 //         		$(currFormId + ' #actDng').attr('required', true);
         		$('#actCompDgnFileNm').parent('td').prev('th').addClass('hit');
         		$('#actCompDgnFileNm').attr('required', 'true');
+				$('#FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
         		$(currFormId + ' #btn_plus2').show();
         		$(currFormId + ' #btn_minus2').show();
         		if (act_approval_Yn == 'Y') {
@@ -772,6 +803,7 @@
 //         		$(currFormId + ' #actDng').removeAttr('required', 'true');
         		$('#actCompDgnFileNm').parent('td').prev('th').removeClass('hit');
         		$('#actCompDgnFileNm').removeAttr('required', 'true');
+				$('#FDMTSOLUT-radioButtonContainer').closest('td').prev('th').removeClass('hit');
         		$(currFormId + ' #btn_plus2').hide();
         		$(currFormId + ' #btn_minus2').hide();
         		if (approval_Yn == 'Y') {
@@ -862,6 +894,8 @@
         $(currFormId + ' #acteDt').val("");
 
         selectSjInfo();  //수주정보 화면에 표시
+
+		createRadioOptions('FDMTSOLUT', 'checkbox') // 근본대책 구분
 
     	if (actionType == "U3" || actionType == "U4" || actionType == "I")  {  //  actionType == "U3" or "U4"  or "I"
             //등록된 모드 데이터 가져오기
@@ -1128,7 +1162,9 @@
         if (inputValidation($(currFormId).find('[required]'))) {
 			if($(currFormId + " input[name='CODECOBGB']:checked").val() == undefined || $(currFormId + " input[name='CODECOBGB']:checked").val() == ""){
                 alert("등록사유를 선택해주세요");
-			} else {
+			} else if ($("input[name='FDMTSOLUT']:checked").val() == undefined) {
+				alert("근본대책을 선택해주세요.");
+			}else {
 				if (inputValidationCheck()) {
 		            var formData = makeFormData();
 		            filePostAjax("/user/wb/wb24/wbsIssueUpdate", formData, function(data) {
@@ -1198,6 +1234,11 @@
         else if (actionType == "C2" || actionType== "U2" || actionType == "C4" || actionType == "U4") {
             $(currFormId + ' #wbsPlanNo').val("");
         }
+		// 근본대책 체크된 객체들 배열로 변환하고 조인
+		const rootCauses = $('#FDMTSOLUT-radioButtonContainer input[type="checkbox"]:checked')
+					.map(function() { return this.value; })
+					.get()   // jQuery 객체 -> 일반 배열
+					.join(',');  // ["A","B","C"] -> "A,B,C"
 
 		//1. 조치담당자 결재 자동등록 처리하기
 		//2. 조치담당자 팀장 결재 자동등록 처리하기
@@ -1206,6 +1247,8 @@
 
         // 폼데이터 생성
         var formData = new FormData($("#popForm_SP11")[0]);
+
+		formData.set('FDMTSOLUT', rootCauses); 
 
         //-------itemarr  --첨부화일 처리를 위한 부분 시작
         formData.append("comonCd", treeModule.getFileNodeId()); //첨부화일용
@@ -1663,6 +1706,13 @@
 		            	$(currFormId + ' .reqMessageOn').removeClass('issHidden').addClass('issVisible');
 		                $(currFormId + ' .reqMessageOff').removeClass('issVisible').addClass('issHidden');
 	  				}
+
+					if (key == 'fdmtSolutCd') {	// 근본대책 체크하기
+						const codes = value.split(',');
+						codes.forEach(code => {
+							$(`input[name="FDMTSOLUT"][value="${code}"]`).prop('checked', true);
+						});
+					}
 
 				});
 
@@ -2242,7 +2292,7 @@
 		
 		paramObj.callRoute  = "대시보드문제현황에서실행하면이슈번호링크제거하기";
 		openFourthModal("/static/html/user/qm/qm01/QM0101P01.html", 1600, 870, "요인별 발주 및 출장요청서 작성", paramObj, function (){
-			gridView.setData(0);
+			salesGridView.setData(0);
 		});
 	}
 	

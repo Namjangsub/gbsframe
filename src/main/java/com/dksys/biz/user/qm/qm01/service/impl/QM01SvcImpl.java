@@ -172,6 +172,10 @@ public class QM01SvcImpl implements QM01Svc {
          **********************************************************************************/
         String procType = paramMap.get("sameTimeResult"); // 결과 분리여부
         if (procType.equals("Y")) {
+
+			String fdmtSolutCd = paramMap.get("FDMTSOLUT");
+			paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
+			
             // 현재 날짜를 yyyyMMdd 형식으로 저장
             String 현재일 = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
             paramMap.put("resDt", 현재일); // 실적일자
@@ -332,8 +336,8 @@ public class QM01SvcImpl implements QM01Svc {
 		// 문제발생내역의 발주요청번호 update 처리하기 (ISSNO에 해당하는 문제에 발주요청번호 Update 처리함.
 		result += QM01Mapper.updateWbsIssueReqNo(paramMap);
 
-    // 발주요청서 등록 시 발생공급업체 저장기능 추가
-    result += wb24Mapper.updateVendCd(paramMap);
+		// 발주요청서 등록 시 발생공급업체 저장기능 추가
+		result += wb24Mapper.updateVendCd(paramMap);
 
 		rtnMap.put("result", String.valueOf(result)); // 문자열로 변환하여 rtnMap에 "result"키로 저장
 		rtnMap.put("reqNo", reqNo);// rtnMap에 "reqNo"키로 저장
@@ -345,6 +349,9 @@ public class QM01SvcImpl implements QM01Svc {
         if (procType.equals("결과일괄등록")) {
             String rsltNoCopy = "RES" + reqNo.substring(3, 10);
             paramMap.put("rsltNo", rsltNoCopy);
+
+			String fdmtSolutCd = paramMap.get("FDMTSOLUT");
+			paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
 
             // 현재 날짜를 yyyyMMdd 형식으로 저장
             String 현재일 = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));

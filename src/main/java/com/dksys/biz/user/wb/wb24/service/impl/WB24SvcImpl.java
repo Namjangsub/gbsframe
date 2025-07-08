@@ -289,6 +289,8 @@ public class WB24SvcImpl implements WB24Svc {
 	    	//TB_WB24M03 테이블에 issNo 가 등록되어있는지 확인
 			List<Map<String, String>> issueResultChk = wb24Mapper.issueResultChk(paramMap);
 
+			String fdmtSolutCd = paramMap.get("FDMTSOLUT");
+			paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
 			if (issueResultChk.size() > 0) {
 				result += wb24Mapper.wbsActUpdate(paramMap);
 			} else {

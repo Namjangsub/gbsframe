@@ -254,13 +254,19 @@
 				      </td>
 				  </tr>
 				  <tr>
-				   <th class="hit">결과/근본대책</th>
+				   <th class="hit">결과</th>
 				     <td colspan="3">
 						<div class="aiContainer">
 					   		<textarea  class="form-control" id="resltRst" name="resltRst" rows="5" style="width:570px;" maxlength="1000" required msg="결과/근본대책을 입력하세요"></textarea>
 							<div class="ai-mark" onclick="openapi('resltRst');">AI</div>
 						</div>
 				     </td>
+				  </tr>
+				  <tr>
+					 <th class="hit">근본대책</th>
+					 <td colspan=3 style="text-align:left;">
+						<div id="FDMTSOLUT-radioButtonContainer" style="height: 60px;"></div>
+					 </td>
 				  </tr>
 <!-- 				  <tr> -->
 <!-- 				   <th class="hit">고찰 내용</th>  -->
@@ -466,6 +472,38 @@
 		})
 	}
 
+	// 근본대책 체크박스 설정 (위의 함수를 가공함)
+	function createRadioOption_FDMTSOLUT(groupName, _type) {
+		let codeEtc = '';
+		var param = {
+			"codeKind" : groupName,
+			"codeEtc"	: codeEtc
+		};
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", param , null,	function(data){
+			const codeList = data.childCodeList;
+			var container = $(' #' + groupName + '-radioButtonContainer');
+			container.empty();
+			var typeStr = _type
+			codeList.forEach((item, idx) => {
+				const iHtml = `
+					<td style="width:50%;">
+					<input type="${typeStr}"
+							id="${item.codeId}"
+							name="${item.codeKind}"
+							value="${item.codeId}"
+							data-label="${item.codeNm}"
+							onchange="fnc(this)">
+					${item.codeNm}
+				`;
+				container.append(iHtml);
+				// 두 개를 추가했으면 줄바꿈
+				if ((idx + 1) % 2 === 0) {
+					container.append('<br/>');
+				}
+			});
+		})
+	}
+
 	function createCheckBox(deptCode) {
 		if (deptCode == 'TRN30') deptCode = 'TRN50';	//트루넷직접매출
 		if (deptCode == 'GUN70') deptCode = 'GUN60';	//생산관리
@@ -590,6 +628,7 @@
 		createRadioOptions('BUSTCD', "checkbox");  //출장차 구분
 		createRadioOptions('INWKCD', "checkbox");  //사내작업 구분
 		createRadioOptions('REQCD', "radio");  //요청구분 구분
+		createRadioOption_FDMTSOLUT('FDMTSOLUT', 'checkbox') // 근본대책 구분
 
 		authChk();						// 권한체크
 
@@ -875,6 +914,13 @@
                     {
                     	$('#popForm2 #' + key).val(value);
                     }
+					
+					if (key == 'fdmtSolutCd') {	// 근본대책 체크하기
+					const codes = value.split(',');
+					codes.forEach(code => {
+						$(`input[name="FDMTSOLUT"][value="${code}"]`).prop('checked', true);
+					});
+				}
                 }
             }
 			if (actionType == 'C'){
@@ -942,14 +988,18 @@
 	        return false;
 		}
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
-			var formData = makeFormData();
-			filePostAjax("/user/qm/qm01/insertQualityResp", formData,function(data) {
-				if (data.resultCode == 200) {
-// 					kakaoTodo();
-					gridView.setData(0);
-					modalStack.close();
-				}
-			});
+			if ($("input[name='FDMTSOLUT']:checked").val() == undefined) {
+				alert("근본대책을 선택해주세요.");
+			} else {
+				var formData = makeFormData();
+				filePostAjax("/user/qm/qm01/insertQualityResp", formData,function(data) {
+					if (data.resultCode == 200) {
+	// 					kakaoTodo();
+						gridView.setData(0);
+						modalStack.close();
+					}
+				});
+			}
 		}
 	}
 
@@ -963,6 +1013,10 @@
 	        alert("등록사유를 선택해주세요");
 	        return false;
 		}
+		if ($("input[name='FDMTSOLUT']:checked").val() == undefined) {
+			alert("근본대책을 선택해주세요.");
+			return false;
+		} 
 		if (inputValidation($('.popup_area [required]'))) {
 			var formData = makeFormData();
 	      	filePostAjax("/user/qm/qm01/updateQualityResp", formData,function(data) {
