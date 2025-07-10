@@ -91,7 +91,7 @@
 		                this.self.select(this.dindex);
 		            },
 		            onDBLClick: function () {
-		            	downloadFile(this.dindex);
+		            	downloadFile(this.item.fileKey, this.item.fileName);
 		            },
 		        },
 	            columns: [
@@ -250,11 +250,57 @@
 		
 	}
 	
-	function downloadFile(idx) {
-		postAjax("/admin/cm/cm08/fileDownInfo", {"fileKey": notiFileArr[idx].fileKey}, null, function(data){
-			var fileInfo = data.fileInfo;
-			var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName , "UTF-8");
-			location.href = "/admin/cm/cm08/fileDownload?filePath="+filePath;
+	// function downloadFile(idx) {
+	// 	postAjax("/admin/cm/cm08/fileDownInfo", {"fileKey": notiFileArr[idx].fileKey}, null, function(data){
+	// 		var fileInfo = data.fileInfo;
+	// 		var filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName , "UTF-8");
+	// 		location.href = "/admin/cm/cm08/fileDownload?filePath="+filePath;
+	// 	});
+	// }
+
+	function downloadFile(_fileKey, _filename) {
+		return new Promise(function(resolve, reject) {
+			var xhr = new XMLHttpRequest();
+			xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + _fileKey + "&userId=" + jwt.userId, true);
+			xhr.responseType = "blob";
+			xhr.setRequestHeader("Authorization", authorizationToken);
+			
+			xhr.onload = function() {
+				if (xhr.status === 200) {
+					var contentType = xhr.getResponseHeader("Content-Type");
+					// 오류 상황: Content-Type이 text/plain이면 서버가 오류 메시지를 반환한 것으로 간주
+					if (contentType && contentType.indexOf("text/plain") !== -1) {
+						var reader = new FileReader();
+						reader.onload = function(e) {
+							// reject 시, 파일명과 함께 오류 메시지 전달
+							reject("[" + _filename + "] " + e.target.result);
+						};
+						reader.readAsText(xhr.response);
+					} else {
+						// 정상적인 파일이면 다운로드 진행
+						var blob = xhr.response;
+						var url = window.URL.createObjectURL(blob);
+						var a = document.createElement('a');
+						a.href = url;
+						a.download = _filename;
+						document.body.appendChild(a);
+						a.click();
+						document.body.removeChild(a);
+						window.URL.revokeObjectURL(url);
+						resolve(); // 성공 시 resolve 호출
+					}
+				} else {
+					console.error("백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
+					reject("[" + _filename + "] 백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
+				}
+			};
+
+			xhr.onerror = function() {
+				console.error("네트워크 오류가 발생했습니다.");
+				reject("[" + _filename + "] 네트워크 오류가 발생했습니다.");
+			};
+
+			xhr.send();
 		});
 	}
 	
