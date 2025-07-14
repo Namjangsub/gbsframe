@@ -262,6 +262,8 @@ public class QM01SvcImpl implements QM01Svc {
 	//---------------------------------------------------------------  
 	//첨부 화일 권한체크  끝 
 	//---------------------------------------------------------------  
+	String fdmtSolutCd = paramMap.get("FDMTSOLUT");
+	paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
 	int result = QM01Mapper.updateQualityResp(paramMap);
 	
 	//---------------------------------------------------------------  
@@ -294,7 +296,7 @@ public class QM01SvcImpl implements QM01Svc {
      return result;
   }
 
-	// 결재시 원인/결과에 대한 수정작업
+	// 결재시 원인/결과/근본원인에 대한 수정작업
 	@Override
 	public int updateQualityResultComment(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		return QM01Mapper.updateQualityResultComment(paramMap);
@@ -503,6 +505,8 @@ public class QM01SvcImpl implements QM01Svc {
 			String rsltNoCopy = "RES" + reqNo.substring(3,10); 
 			paramMap.put("rsltNo", rsltNoCopy);
 		}
+		String fdmtSolutCd = paramMap.get("FDMTSOLUT");
+		paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
 		int result = QM01Mapper.insertQualityResp(paramMap);		
 		int result2 = QM01Mapper.updateReqRsltChg(paramMap);// 실적등록 여부 갱신 
 		//---------------------------------------------------------------  
