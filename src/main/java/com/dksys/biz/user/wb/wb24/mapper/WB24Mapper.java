@@ -67,4 +67,6 @@ public interface WB24Mapper {
 	int updateVendCd(Map<String, String> paramMap);  // 발생공급업체 Update
 
 	Map<String, String> selectIssueInfo(Map<String, String> paramMap);		// 문제정보를 가지고 발주요청서 등록
+
+	int issueReqExistChk(Map<String, String> paramMap);
 }

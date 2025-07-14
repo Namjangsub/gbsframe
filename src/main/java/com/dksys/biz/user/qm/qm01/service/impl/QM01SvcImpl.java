@@ -333,6 +333,14 @@ public class QM01SvcImpl implements QM01Svc {
 		paramMap.put("reqNo", reqNo);
 		int result = QM01Mapper.insertQualityReq(paramMap);
 
+		// 발주요청서 등록시 해당 발주 요청서 문제와 연계될때 한개의 문제에서 여러개의 발주요청서를 등록 못하게 해야함
+		// 한개의 문제에는 한개의 발주요청서만 존재해야함
+		int issueReqExistChk = wb24Mapper.issueReqExistChk(paramMap);
+		if (issueReqExistChk > 0) {
+			throw new RuntimeException("이미 문제에 대한 발주요청서를 작성하셨습니다. 확인해주세요.");
+		}
+		
+
 		// 문제발생내역의 발주요청번호 update 처리하기 (ISSNO에 해당하는 문제에 발주요청번호 Update 처리함.
 		result += QM01Mapper.updateWbsIssueReqNo(paramMap);
 
