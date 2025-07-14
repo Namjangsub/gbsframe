@@ -41,5 +41,7 @@ public interface PM50Mapper {
 
 	int delete_pm50_d01(Map<String, String> tripMap);
 
+	int delete_file_approval(Map<String, String> paramMap);
+
 	
 }

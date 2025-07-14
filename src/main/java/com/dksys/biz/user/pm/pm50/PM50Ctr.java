@@ -15,6 +15,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.pm.pm50.service.PM50Svc;
+import com.dksys.biz.user.wb.wb24.mapper.WB24Mapper;
 import com.dksys.biz.util.MessageUtils;
 
 @Controller
@@ -27,6 +28,9 @@ public class PM50Ctr {
 	@Autowired
 	PM50Svc pm50Svc;
 
+	@Autowired
+	WB24Mapper wb24Mapper;
+
 	// 출장자 사진파일 리스트 조회
 	@PostMapping(value = "/select_pm50_List")
     public String select_pm50_List(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -35,7 +39,6 @@ public class PM50Ctr {
         model.addAttribute("paginationInfo", paginationInfo);
         List<Map<String, Object>> result = pm50Svc.select_pm50_List(paramMap);
         model.addAttribute("result", result);
-        
         return "jsonView";  
     }
 
@@ -58,6 +61,9 @@ public class PM50Ctr {
     	model.addAttribute("result", result);
 		List<Map<String, String>> bfuRows = pm50Svc.selectBfuAllFileRows(paramMap);
     	model.addAttribute("bfuRows", bfuRows);
+		paramMap.put("issNo", paramMap.get("fileTrgtKey"));
+		List<Map<String, String>> appChk = wb24Mapper.actChk(paramMap);
+		model.addAttribute("appChk", appChk);
     	return "jsonView";
     }
 
@@ -76,6 +82,7 @@ public class PM50Ctr {
 			if (pm50Svc.insert_pm50(paramMap, mRequest) != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+				model.addAttribute("fileTrgtKey", paramMap.get("fileTrgtKey"));
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -148,19 +155,19 @@ public class PM50Ctr {
 	// 출장자 사진파일 리스트 삭제
 	@PutMapping(value = "/delete_pm50")
 	public String delete_pm50(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
-			try {
-				if (pm50Svc.delete_pm50(paramMap) >= 0 ) {
-					model.addAttribute("resultCode", 200);
-					model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
-				} else {
-					model.addAttribute("resultCode", 500);
-					model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-				};
-			}catch(Exception e){
-				model.addAttribute("resultCode", 900);
-				model.addAttribute("resultMessage", e.getMessage());
-			}
-			return "jsonView";
+		try {
+			if (pm50Svc.delete_pm50(paramMap) >= 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
 	}
 
 }

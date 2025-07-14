@@ -15,9 +15,13 @@ import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.pm.pm50.mapper.PM50Mapper;
 import com.dksys.biz.user.pm.pm50.service.PM50Svc;
+import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.dksys.biz.user.wb.wb22.mapper.WB22Mapper;
+import com.dksys.biz.user.wb.wb24.mapper.WB24Mapper;
+import com.dksys.biz.util.ExceptionThrower;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 
 @Service
@@ -35,6 +39,15 @@ public class PM50SvcImpl implements PM50Svc{
 
 	@Autowired
     CM15Svc cm15Svc;
+
+	@Autowired
+    WB20Svc wb20Svc;
+
+	@Autowired
+	WB24Mapper wb24Mapper;
+
+	@Autowired
+	ExceptionThrower thrower;
 
 	@Override
 	public int select_pm50_ListCount(Map<String, String> paramMap) {
@@ -107,6 +120,27 @@ public class PM50SvcImpl implements PM50Svc{
 				}
 			}
         }
+		if (paramMap.containsKey("approvalArr")) {
+            // 새로운 리스트 초기화
+            List<Map<String, String>> newdetailMap = new ArrayList<>();
+            List<Map<String, String>> detailMap = gsonDtl.fromJson(paramMap.get("approvalArr"), dtlMap);
+            // 각 맵 수정 및 추가
+            for (Map<String, String> dtl : detailMap) {
+                String pgParam = dtl.get("pgParam");
+                JsonObject jsonObject = gsonDtl.fromJson(pgParam, JsonObject.class);
+                jsonObject.addProperty("fileTrgtKey", paramMap.get("fileTrgtKey"));
+
+                dtl.put("todoNo", paramMap.get("fileTrgtKey")); // "todoNo" 수정
+                dtl.put("todoFileTrgtKey", paramMap.get("fileTrgtKey")); // "todoFileTrgtKey" 수정
+                dtl.put("pgParam", gsonDtl.toJson(jsonObject));
+                newdetailMap.add(dtl); // 수정된 맵 추가
+            }
+            // 결과를 paramMap에 저장
+            paramMap.put("approvalArr", gsonDtl.toJson(newdetailMap));
+            // 결제라인 insert
+            result += wb20Svc.insertTodoMaster(paramMap);
+        }
+
 		return result;
 	}
 
@@ -214,7 +248,17 @@ public class PM50SvcImpl implements PM50Svc{
 	@Override
 	public int delete_pm50(Map<String, String> paramMap) throws Exception {
 		int result = 0;
-		//출장경비용 삭제
+		
+		//결재 진행여부 체크 한명이라도 결재처리 되었으면 삭제 물가 처리 start
+		paramMap.put("issNo", paramMap.get("fileTrgtKey"));
+		List<Map<String, String>> actChkList = wb24Mapper.actChk(paramMap);
+		if (actChkList.size() > 0) {
+			throw new RuntimeException("결재가 진행중입니다");
+		} else {
+			pm50Mapper.delete_file_approval(paramMap);
+		}
+
+		//출장 사진 삭제
 		List<Map<String, String>> deleteBfuFileList = pm50Mapper.selectBfuFileRows(paramMap); 
 		if (deleteBfuFileList.size() > 0) {		  
 		    for (Map<String, String> deleteDtl : deleteBfuFileList) {
@@ -234,9 +278,8 @@ public class PM50SvcImpl implements PM50Svc{
 		} else {
 			return 0;
 		}
+
 		return result;
 	}
-
-	
 
 }
