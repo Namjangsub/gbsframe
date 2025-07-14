@@ -486,6 +486,7 @@ function postAjax(url, data, contentType, callback, blockProc=true, retryCount =
 	    type: "POST",
 	    url: url,
 	    contentType: contentType,
+	    xhrFields: { withCredentials: true },
 	    data: data,
 	    beforeSend: function (request) {
             request.setRequestHeader("Authorization", authorizationToken);
@@ -567,6 +568,7 @@ function deleteAjax(url, data, contentType, callback, blockProc=true, retryCount
 	    type: "DELETE",
 	    url: url,
 	    contentType: contentType,
+	    xhrFields: { withCredentials: true },
 	    data: JSON.stringify(data),
 	    beforeSend: function (request) {
             request.setRequestHeader("Authorization", authorizationToken);
@@ -606,6 +608,7 @@ function putAjax(url, data, contentType, callback, blockProc=true, retryCount = 
 	    type: "PUT",
 	    url: url,
 	    contentType: contentType,
+	    xhrFields: { withCredentials: true },
 	    data: JSON.stringify(data),
 	    beforeSend: function (request) {
             request.setRequestHeader("Authorization", authorizationToken);
@@ -644,6 +647,7 @@ function filePostAjax(url, data, callback, blockProc=true, retryCount = 0) {
 	    url: url,
 	    processData: false,
 		contentType: false,
+	    xhrFields: { withCredentials: true },
 	    data: data,
 	    beforeSend: function (request) {
             request.setRequestHeader("Authorization", authorizationToken);
@@ -683,6 +687,7 @@ function filePostAjaxButton(url, data, callback, blockProc=true, retryCount = 0)
 	    url: url,
 	    processData: false,
 		contentType: false,
+	    xhrFields: { withCredentials: true },
 	    data: data,
 	    beforeSend: function (request) {
             request.setRequestHeader("Authorization", authorizationToken);
@@ -721,6 +726,7 @@ function filePutAjax(url, data, callback, blockProc=true, retryCount = 0) {
 	    url: url,
 	    processData: false,
 		contentType: false,
+	    xhrFields: { withCredentials: true },
 	    data: data,
 	    beforeSend: function (request) {
             request.setRequestHeader("Authorization", authorizationToken);
