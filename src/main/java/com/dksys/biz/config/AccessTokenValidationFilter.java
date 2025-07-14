@@ -53,15 +53,55 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
         String header = request.getHeader("Authorization");
 
         if (header == null || !header.startsWith("Bearer ") || header.length() <= 7) {
-            chain.doFilter(request, response);
-            return;
+        	// 쿠키에서 refresh_token 추출
+            String refreshToken = extractRefreshTokenFromCookie(request);
+
+            if (refreshToken != null) {
+                try {
+                    Claims refreshClaims = parseJwt(refreshToken);
+                    String username = refreshClaims.get("user_name", String.class);
+                    String userAgent = RequestUtils.getUserAgent();
+                    String clientIp = RequestUtils.getClientIp();
+
+                    if (!userLoginLogService.isLoginWithin24Hours(username, userAgent, clientIp)) {
+                        loginService.updateLogoutTime(username, userAgent, clientIp);
+                        RequestUtils.clearCookie("access_token", response);
+                        RequestUtils.clearCookie("refresh_token", response);
+                        SecurityContextHolder.clearContext();
+                        reject(response, "로그인 24시간 초과");
+                        return;
+                    }
+
+                    // access_token 재발급
+                    String newAccessToken = tokenService.reissueAccessToken(refreshClaims);
+
+                    // SecurityContext 인증 객체 주입
+                    Authentication authentication = buildAuthentication(refreshClaims);
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                    // 응답 헤더에 새 토큰 전달
+                    response.setHeader("X-New-Access-Token", newAccessToken);
+
+                    chain.doFilter(request, response);
+                    return;
+                } catch (JwtException e) {
+                    SecurityContextHolder.clearContext();
+//                    reject(response, "refresh_token 유효성 실패");
+                    chain.doFilter(request, response);
+                    return;
+                }
+            } else {
+//                reject(response, "Authorization 헤더와 Refresh Token 모두 없음");
+                chain.doFilter(request, response);
+                return;
+            }
         }
 
         String token = header.substring(7).trim();
-        if (token.isEmpty()) {
-            chain.doFilter(request, response);
-            return;
-        }
+//        if (token.isEmpty()) {
+//            chain.doFilter(request, response);
+//            return;
+//        }
 
         Claims claims;
         try {
