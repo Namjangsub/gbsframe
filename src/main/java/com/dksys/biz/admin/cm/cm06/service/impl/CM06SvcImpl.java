@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.dksys.biz.admin.cm.cm04.mapper.CM04Mapper;
 import com.dksys.biz.admin.cm.cm06.mapper.CM06Mapper;
 import com.dksys.biz.admin.cm.cm06.service.CM06Svc;
+import com.dksys.biz.config.RequestUtils;
 
 @Service
 @Transactional
@@ -118,6 +119,10 @@ public class CM06SvcImpl implements CM06Svc {
     
 	@Override
 	public List<Map<String, String>> selectUserStatusList(Map<String, String> paramMap) {
+		String userAgent = RequestUtils.getUserAgent();
+		String clientIp = RequestUtils.getClientIp();
+		paramMap.put("userAgent", userAgent);
+		paramMap.put("clientIp", clientIp);
 		return cm06Mapper.selectUserStatusList(paramMap); 
 	}
 
