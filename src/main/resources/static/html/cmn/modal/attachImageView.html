@@ -64,6 +64,7 @@
     <input type="number" id="currentPageInput" min="1" style="width: 50px; text-align: center;" value="1">
     <span id="pageInfo">/ 1</span>
     <button id="pdfNextButton">다음 페이지 ▶</button>
+	<button id="printPdf">현재페이지출력
     <button class="close_btn" onclick="modalStack.close();">닫기</button>
 </div>
 
@@ -72,6 +73,7 @@
     <button id="zoomInButton">Zoom In</button>
     <button id="zoomOutButton">Zoom Out</button>
     <button id="resetButton">Reset</button>
+    <button id="printImage">그림출력</button>
     <button class="close_btn" onclick="modalStack.close();">닫기</button>
 </div>
 
@@ -170,6 +172,10 @@ function initializeViewer() {
         applyTransform();
     });
 
+    $('#printImage').on('click', printImage);
+    
+    $('#printPdf').on('click', printPdfCanvas);
+    
     $('#pdfPrevButton').on('click', function () {
         if (currentPage > 1) {
             currentPage--;
@@ -465,4 +471,106 @@ function loadVideo(file) {
 	$('#pauseButton').off('click').on('click', () => $video[0].pause());
 	$('#stopButton').off('click').on('click',  () => {$video[0].pause(); $video[0].currentTime = 0;});
 }
+
+
+
+/* <img id="viewImgData"> 를 프린트  */
+function printImage() {
+	  const dataURL = $('#viewImgData').attr('src');
+	  const win = window.open('', '_blank');   // about:blank 팝업
+
+	  // ① 빈 문서 구조와 인쇄 전용 스타일 삽입
+	  $(win.document).ready(function () {
+	    $(win.document.head).append(`
+	      <title>이미지 출력 (가로)</title>
+	      <style>
+	        /* ---------- 인쇄 전용 ---------- */
+	        @page {
+	          /* A4 가로로 고정하려면 'A4 landscape' 로 명시 가능 */
+	          size: landscape;
+	          margin: 0;
+	        }
+	        /* ---------- 화면·인쇄 공통 ---------- */
+	        html, body {
+	          margin: 0;
+	          height: 100%;
+	        }
+	        body {
+	          display: flex;
+	          justify-content: center;
+	          align-items: center;
+	        }
+	        img {
+	          max-width: 100%;
+	          max-height: 100vh; /* 높이는 가로모드 한계치로 */
+	        }
+	      </style>
+	    `);
+
+	    // ② 이미지 엘리먼트 삽입
+	    const $img = $('<img>', { src: dataURL });
+	    $(win.document.body).append($img);
+
+	    // ③ 이미지 로드 완료 후 인쇄 → 창 닫기
+	    $img.on('load', function () {
+	      win.focus();   // 일부 브라우저 포커스 필요
+	      win.print();   // 인쇄 다이얼로그 호출
+	      win.close();   // 사용자가 닫기 누르면 자동 종료
+	    });
+	  });
+}
+
+/**
+ * #pdfCanvas 를 가로(landscape) 방향으로 즉시 인쇄
+ */
+function printPdfCanvas() {
+  const canvas = document.getElementById('pdfCanvas');
+  if (!canvas) {
+    console.error('pdfCanvas 요소를 찾을 수 없습니다.');
+    return;
+  }
+
+  // 1. 캔버스를 PNG Data-URL 로 변환
+  const dataURL = canvas.toDataURL('image/png');
+
+  // 2. 새 팝업 창 생성
+  const win = window.open('', '_blank');
+
+  // 3. 인쇄용 HTML + 스타일 주입
+  $(win.document).ready(function () {
+    $(win.document.head).append(`
+      <title>PDF 캔버스 출력 (가로)</title>
+      <style>
+        /* ---------- 인쇄 전용 ---------- */
+        @page {
+          size: landscape;  /* 'A4 landscape' 로 명시해도 무방 */
+          margin: 0;
+        }
+        /* ---------- 화면·인쇄 공통 ---------- */
+        html,body{margin:0;height:100%}
+        body{
+          display:flex;
+          justify-content:center;
+          align-items:center;
+        }
+        img{
+          max-width:100%;
+          max-height:100vh;
+        }
+      </style>
+    `);
+
+    // 4. Data-URL 이미지를 삽입
+    const $img = $('<img>', { src: dataURL });
+    $(win.document.body).append($img);
+
+    // 5. 이미지 로드 완료 후 인쇄
+    $img.on('load', () => {
+      win.focus();
+      win.print();
+      win.close();
+    });
+  });
+}
+
 </script>
