@@ -45,9 +45,10 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             .and()
             .authorizeRequests()
+            // 1) 화이트리스트를 **먼저** 선언
+            .antMatchers("/", "/oauth/**", "/login", "/customLogout", "/error", "/static/**", "/download/**", "/s/**", "/favicon.ico", "/index.html").permitAll()
+            // 2) 그 뒤에 개별 규칙
             .antMatchers("/static/html/cmn/modal/**").authenticated()
-            .antMatchers("/", "/oauth/**", "/login", "/customLogout", "/error", "/static/**", "/download/**", "/s/**", "/favicon.ico", "/index.html")
-            .permitAll()
             .anyRequest().authenticated()
             .and()
             .addFilterAt(jsonLoginFilter, UsernamePasswordAuthenticationFilter.class)
