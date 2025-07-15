@@ -117,13 +117,18 @@ public class LoginController {
 	 public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
 		
 		//토큰 필요없이 userId만 있음면 됨. (logout)
-		String username = request.getParameter("userId");
-		// 1. 클라이언트 access_token 헤더에서 추출
-//	    String accessToken = resolveAccessToken(request);
-//	    String username = null;
-		String userAgent = RequestUtils.getUserAgent();
-		String clientIp = RequestUtils.getClientIp();
-		loginService.updateLogoutTime(username, userAgent, clientIp);
+    	try {
+    		String username = request.getParameter("userId");
+    		// 1. 클라이언트 access_token 헤더에서 추출
+//    	    String accessToken = resolveAccessToken(request);
+//    	    String username = null;
+    		String userAgent = RequestUtils.getUserAgent();
+            String deviceType = RequestUtils.detectDeviceType(userAgent);
+    		String clientIp = RequestUtils.getClientIp();
+    		loginService.updateLogoutTime(username, userAgent, clientIp, deviceType);
+		} catch (Exception e) {
+			// 오류 처리하지 않음
+		}
 		
 //		// 2. 토큰이 있다면 블랙리스트 등록
 //	    if (accessToken != null && !accessToken.isEmpty()) {

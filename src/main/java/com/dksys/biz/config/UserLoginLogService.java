@@ -14,14 +14,14 @@ public class UserLoginLogService {
 	@Autowired
 	LoginMapper loginMapper;
 
-	public void updateLastLoginTime(String username, String refreshToken, String userAgent, String ipAddress) {
+	public void updateLastLoginTime(String username, String refreshToken, String userAgent, String ipAddress, String deviceType) {
 //		String hashedToken = TokenHashUtils.sha256(refreshToken);
-		loginMapper.updateLastLoginTime(username, refreshToken, userAgent, ipAddress);
+		loginMapper.updateLastLoginTime(username, refreshToken, userAgent, ipAddress, deviceType);
 	}
 
-	public boolean isLoginWithin24Hours(String username, String userAgent, String ipAddress) {
+	public boolean isLoginWithin24Hours(String username, String userAgent, String ipAddress, String deviceType) {
 		try {
-			String lastLogin = loginMapper.isLoginWithin24Hours(username, userAgent, ipAddress);
+			String lastLogin = loginMapper.isLoginWithin24Hours(username, userAgent, ipAddress, deviceType);
 
 //			Timestamp lastLogin = Timestamp.valueOf("2025-06-20 08:00:00");
 			Timestamp lastLoginTimestamp = Timestamp.valueOf(lastLogin);
@@ -42,13 +42,13 @@ public class UserLoginLogService {
 		}
 	}
 
-	public String getStoredRefreshToken(String username, String userAgent, String ipAddress) {
-		return loginMapper.getRefreshToken(username, userAgent, ipAddress);
+	public String getStoredRefreshToken(String username, String userAgent, String ipAddress, String deviceType) {
+		return loginMapper.getRefreshToken(username, userAgent, ipAddress, deviceType);
 	}
 
 	// 토큰 비교 시 (해시 저장 및 비교)
-	public boolean isRefreshTokenValid(String username, String incomingRefreshToken, String userAgent, String ipAddress) {
-		String storedHash = loginMapper.getRefreshToken(username, userAgent, ipAddress);
+	public boolean isRefreshTokenValid(String username, String incomingRefreshToken, String userAgent, String ipAddress, String deviceType) {
+		String storedHash = loginMapper.getRefreshToken(username, userAgent, ipAddress, deviceType);
 		return incomingRefreshToken.equals(storedHash);
 	}
 

@@ -120,9 +120,11 @@ public class CM06SvcImpl implements CM06Svc {
 	@Override
 	public List<Map<String, String>> selectUserStatusList(Map<String, String> paramMap) {
 		String userAgent = RequestUtils.getUserAgent();
+        String deviceType = RequestUtils.detectDeviceType(userAgent);
 		String clientIp = RequestUtils.getClientIp();
 		paramMap.put("userAgent", userAgent);
 		paramMap.put("clientIp", clientIp);
+		paramMap.put("deviceType", deviceType);
 		return cm06Mapper.selectUserStatusList(paramMap); 
 	}
 

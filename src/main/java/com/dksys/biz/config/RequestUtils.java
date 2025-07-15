@@ -3,6 +3,7 @@ package com.dksys.biz.config;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -38,17 +39,34 @@ public class RequestUtils {
 		return "UNKNOWN";
 	}
 
+
+	private static final Pattern MOBILE_INDICATOR = Pattern.compile(
+		    "(?i)" +               // 대소문자 무시
+		    "android|webos|iphone|ipad|ipod|blackberry|iemobile|blackberry|opera mini|mobile"
+		);
+    public static String detectDeviceType(String ua) {
+        if (ua == null) {
+            return "DESKTOP";          // UA 없으면 데스크톱으로 간주
+        }
+		return MOBILE_INDICATOR.matcher(ua).find()
+		           ? "MOBILE"
+		           : "DESKTOP";
+    }
+    	
 	public static String getClientIp() {
 		HttpServletRequest request = getCurrentHttpRequest();
 		if (request != null) {
 			// 프록시를 통한 실제 IP 확인 (우선순위 순)
+			// 게이트웨이를 거치는 경우, 클라이언트의 실제 IP는 보통 X-Forwarded-For 헤더에
+			// X-Forwarded-For: client1, proxy1, proxy2
 			String[] headers = { "X-Forwarded-For", "X-Real-IP", "X-Forwarded", "X-Cluster-Client-IP", "CF-Connecting-IP" // Cloudflare
 			};
 
 			for (String header : headers) {
 				String ip = request.getHeader(header);
 				if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
-					return ip.split(",")[0].trim();
+//					return ip.split(",")[0].trim();
+	                return ip.trim(); // 모든 IP 체인을 그대로 리턴
 				}
 			}
 			return request.getRemoteAddr();

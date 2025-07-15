@@ -2,6 +2,7 @@ package com.dksys.biz.config;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -23,6 +24,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.dksys.biz.main.service.LoginService;
@@ -46,10 +48,28 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
 	@Autowired
     private TokenService tokenService;
 
+    private static final AntPathMatcher pathMatcher = new AntPathMatcher();
+    private static final List<String> WHITELIST = Arrays.asList(
+        "/login", "/oauth/**", "/customLogout", "/error",
+        "/static/**", "/download/**", "/s/**", "/favicon.ico", "/index.html"
+    );
+
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        return WHITELIST.stream()
+                .anyMatch(p -> pathMatcher.match(p, request.getServletPath()));
+    }
+    
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
 
+        if (shouldNotFilter(request)) {             // 화이트리스트면 패스
+            chain.doFilter(request, response);
+            return;
+        }
+        
         String header = request.getHeader("Authorization");
 
         if (header == null || !header.startsWith("Bearer ") || header.length() <= 7) {
@@ -61,10 +81,11 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
                     Claims refreshClaims = parseJwt(refreshToken);
                     String username = refreshClaims.get("user_name", String.class);
                     String userAgent = RequestUtils.getUserAgent();
+                    String deviceType = RequestUtils.detectDeviceType(userAgent);
                     String clientIp = RequestUtils.getClientIp();
 
-                    if (!userLoginLogService.isLoginWithin24Hours(username, userAgent, clientIp)) {
-                        loginService.updateLogoutTime(username, userAgent, clientIp);
+                    if (!userLoginLogService.isLoginWithin24Hours(username, userAgent, clientIp, deviceType)) {
+                        loginService.updateLogoutTime(username, userAgent, clientIp, deviceType);
                         RequestUtils.clearCookie("access_token", response);
                         RequestUtils.clearCookie("refresh_token", response);
                         SecurityContextHolder.clearContext();
@@ -121,9 +142,10 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
                     Claims refreshClaims = parseJwt(refreshToken);
                     String username = refreshClaims.get("user_name", String.class);
 					String userAgent = RequestUtils.getUserAgent();
+                    String deviceType = RequestUtils.detectDeviceType(userAgent);
 					String clientIp = RequestUtils.getClientIp();
-					if (!userLoginLogService.isLoginWithin24Hours(username, userAgent, clientIp)) {
-						loginService.updateLogoutTime(username, userAgent, clientIp); // 로그아웃 처리
+					if (!userLoginLogService.isLoginWithin24Hours(username, userAgent, clientIp, deviceType)) {
+						loginService.updateLogoutTime(username, userAgent, clientIp, deviceType); // 로그아웃 처리
 
 						RequestUtils.clearCookie("access_token", response);
 						RequestUtils.clearCookie("refresh_token", response);

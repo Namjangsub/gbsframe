@@ -62,8 +62,9 @@ public class CustomLoginSuccessHandler implements AuthenticationSuccessHandler {
         if ("password".equalsIgnoreCase(grantType) && principal instanceof User) {
             User user = (User) principal;
             String userAgent = RequestUtils.getUserAgent();
+            String deviceType = RequestUtils.detectDeviceType(userAgent);
             String clientIp = RequestUtils.getClientIp();
-            userLoginLogService.updateLastLoginTime(user.getId(), refreshToken, userAgent, clientIp);
+            userLoginLogService.updateLastLoginTime(user.getId(), refreshToken, userAgent, clientIp, deviceType);
         }
         
         ResponseCookie cookie = ResponseCookie.from("refresh_token", refreshToken)
