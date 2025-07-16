@@ -53,26 +53,77 @@ public class RequestUtils {
 		           : "DESKTOP";
     }
     	
-	public static String getClientIp() {
+	public static String getClientIpOld() {
 		HttpServletRequest request = getCurrentHttpRequest();
 		if (request != null) {
-			// 프록시를 통한 실제 IP 확인 (우선순위 순)
-			// 게이트웨이를 거치는 경우, 클라이언트의 실제 IP는 보통 X-Forwarded-For 헤더에
-			// X-Forwarded-For: client1, proxy1, proxy2
-			String[] headers = { "X-Forwarded-For", "X-Real-IP", "X-Forwarded", "X-Cluster-Client-IP", "CF-Connecting-IP" // Cloudflare
-			};
-
-			for (String header : headers) {
-				String ip = request.getHeader(header);
-				if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
-//					return ip.split(",")[0].trim();
-	                return ip.trim(); // 모든 IP 체인을 그대로 리턴
-				}
-			}
-			return request.getRemoteAddr();
+			return "UNKNOWN";
 		}
-		return "UNKNOWN";
+		// 프록시를 통한 실제 IP 확인 (우선순위 순)
+		// 게이트웨이를 거치는 경우, 클라이언트의 실제 IP는 보통 X-Forwarded-For 헤더에
+		// X-Forwarded-For: client1, proxy1, proxy2
+		String[] headers = { "X-Forwarded-For", "X-Real-IP", "X-Forwarded", "X-Cluster-Client-IP", "CF-Connecting-IP" // Cloudflare
+		};
+
+		for (String header : headers) {
+			String ip = request.getHeader(header);
+			if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
+				// X-Forwarded-For 헤더의 경우, 가장 첫 번째 IP가 실제 클라이언트 IP
+                if ("X-Forwarded-For".equalsIgnoreCase(header)) {
+                    return ip.split(",")[0].trim();
+                }
+                return ip.trim();
+			}
+		}
+		return request.getRemoteAddr();
 	}
+
+    public static String getClientIp() {
+		HttpServletRequest request = getCurrentHttpRequest();
+        if (request == null) {
+            return "UNKNOWN";
+        }
+
+        // 1. X-Forwarded-For (XFF) 헤더: 가장 표준적이며 널리 사용됨
+        // X-Forwarded-For: <client>, <proxy1>, <proxy2>
+        String xffHeader = request.getHeader("X-Forwarded-For");
+        if (xffHeader != null && !xffHeader.isEmpty() && !"unknown".equalsIgnoreCase(xffHeader)) {
+            // 헤더 값에 여러 IP가 쉼표로 구분되어 있는 경우, 가장 첫 번째 IP가 실제 클라이언트 IP
+            return xffHeader.split(",")[0].trim();
+        }
+
+        // 2. 다른 일반적인 프록시 관련 헤더들 (신뢰도 순)
+        String[] otherHeaders = {
+            "Proxy-Client-IP",      // Apache 웹 서버 모듈 (mod_proxy)
+            "WL-Proxy-Client-IP",   // WebLogic 서버
+            "Forwarded",			// 표준화 RFC 7239
+            "X-Real-IP",            // Nginx 프록시
+            "HTTP_CLIENT_IP",       // 일부 프록시
+            "X-Cluster-Client-IP",	// 서버 클러스터 환경
+            "HTTP_X_FORWARDED_FOR", // 일부 오래된 프레임워크나 설정
+            "HTTP_X_FORWARDED",		//일부 구형 환경/변형
+            "HTTP_X_CLUSTER_CLIENT_IP", //클러스터 환경
+            "HTTP_FORWARDED_FOR",
+            "HTTP_FORWARDED",
+            "HTTP_VIA",
+            "REMOTE_ADDR"           // 마지막 대체 수단
+        };
+
+        for (String header : otherHeaders) {
+            String ip = request.getHeader(header);
+            if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
+                return ip.trim();
+            }
+        }
+
+        // 3. 모든 헤더에 IP가 없는 경우, 최종적으로 getRemoteAddr() 사용
+        // 이것은 직접 연결되었거나, 마지막 프록시의 IP일 수 있음
+        String remoteAddr = request.getRemoteAddr();
+        if (remoteAddr != null && !remoteAddr.isEmpty()) {
+            return remoteAddr;
+        }
+        
+        return "UNKNOWN";
+    }
 
 	// 브라우저/디바이스 정보 ex) https://ai.gunyangitt.co.kr/static/index.html
 	public static String getReferer() {
