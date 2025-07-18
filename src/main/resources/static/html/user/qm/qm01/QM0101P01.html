@@ -704,286 +704,9 @@
  * radio button,	checkbox 공통코드에서 가져오기 end
  */
 //*************************************************************************************
-	$(document).ready(function() {
-		actionType = modalStack.last().paramObj.actionType;
-		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
-		issFileTrgtKey = modalStack.last().paramObj.issFileTrgtKey;
-		reqNo = modalStack.last().paramObj.reqNo;
-		if (reqNo == undefined) fileTrgtKey = 0; //이슈에서 넘어온 fileTrgtKey는 이슈등록에 대한 번호임.
-		$(currFormId + " #fileTrgtKey").val(fileTrgtKey);
 
-
-		setCommonSelect($(".popup_area select[data-kind]"));
-		setByCoCd(modalStack.last().paramObj.coCd);
-
-
-		$(currFormId + " #coCd").prop("disabled", true);
-		$(currFormId + " #clntPjt").css({'background-color':'#e6e6e6', 'pointer-events':'none'});
-
-		//발행일자//
-		$(currFormId + " #ordrgDt").datepicker({format : "yyyy-mm-dd", language : "ko", autoclose : true})
-									.datepicker("setDate", new Date());
-
-		//요구일정//
-		$(currFormId + " #reqDt").datepicker({format : "yyyy-mm-dd", language : "ko", autoclose : true})
-								.datepicker("setDate", new Date());
-
-		//요구일정//
-		$(currFormId + " #custReqDt").datepicker({format : "yyyy-mm-dd", language : "ko", autoclose : true});
-		//분류,등록사유 자동생성시 20240708이전에는 전체 옵션 표시, 이후에는 정상, 문제 분리 표시용 start
-		currentDate =	$(currFormId + " #ordrgDt").val(); //발주요청서 처리 절차변경일자기준 20240708일자로 코드 변경처리함
-		//분류,등록사유 자동생성시 20240708이전에는 전체 옵션 표시, 이후에는 정상, 문제 분리 표시용 end
-
-		selectAuth(jwt.deptId); //발행자 부서코드
-
-		createRadioOptions('COBTP', "radio");	//분류 자동 생성
-		createRadioOptions('BUSTCD', "checkbox");	//출장자 구분
-		createRadioOptions('INWKCD', "checkbox");	//사내작업 구분
-		createRadioOptions('REQCD', "radio");	//요청구분 구분
-		createRadioOption_FDMTSOLUT('FDMTSOLUT', 'checkbox') // 근본원인 구분
-		
-		authChk();					// 권한체크
-		
-		// if (modalStack.last().paramObj.actDeptId == undefined){
-		//		alert("비정상적으로 실행되었습니다.");
-		//		modalStack.close();
-		//	return false;
-		// }
-		$(currFormId + " #reportRegBtn").hide();	//발주요청서 출력버튼 기본은 숨김 처리--> 1번결재자가 결재완료 되면 보임. 2023.11.27 정상훈차장 요청
-		let savedSubCd = ""; // 등록사유 변수
-		let savedEtcInput = ""; // 등록사유 변수
-		if (actionType == "C") {
-			$(currFormId + " #ordrgDt").parent('td').addClass('no-click'); //발행일자
-			$(currFormId + " #regNm").parent('div').addClass('no-click');	//작성자
-			if (fromJobType == "REQ") {
-				$(currFormId + " #ordrgId").val(jwt.userId);
-				$(currFormId + " #ordrgNm").val(jwt.userNm);
-				$(currFormId + " #regId").val(jwt.userId);
-				$(currFormId + " #regNm").val(jwt.userNm);
-			} else { //"ISS" 인경우 문제관리정보를 불러옴
-				$(currFormId + " #regId").val(jwt.userId);
-				$(currFormId + " #regNm").val(jwt.userNm);
-				var formData = {
-					"fileTrgtKey" : issFileTrgtKey
-				}
-				postAjaxSync("/user/wb/wb24/selectIssueInfo", formData, null, function(data) {
-					// key와 태그 id의 매핑 객체 정의
-					const keyToTagMap = {
-						actId			: "ordrgId",
-						actNm			: "ordrgNm",
-						issNo			: "workRptNo",
-						newCdNm		: "newCd",
-						mcPartCdNm	: "mcPartCdIssNm",
-						importantCdNm	: "importantCdIssNm",
-						impactCdNm	: "impactCdIssNm"
-					};
-					let title = '';
-					let contents = '';
-					//부서별 발주요청서 등록사유 자동 생성하기
-					if (data.result) {
-						$.each(data.result, function(key, value) {
-							// 문제에서 발주요청서 등록 시 기계분류, 영향도, 중요도 셋팅X 사용자가 직접 선택하게
-							if (key === 'mcPartCd' || key === 'impactCd' || key === 'importantCd') {
-								return true;
-							}
-							const tagId = keyToTagMap[key] || key;
-							const $elem = $(currFormId + ' #' + tagId);
-
-							if ($elem.length) {
-								$elem.val(value);
-
-								if ($elem.is('[comma]')) {
-										onlyNumber($elem[0]);
-								}
-							}
-							if (key == 'salesCd'){$('#matrDrwNo').val(value);} // 도면번호 처리
-							if (key == 'actDeptId'){selectAuth(value)};
-							if (key == 'subCd'){savedSubCd = value;}	// 등록사유 저장해놓고 나중에 등록사유 태그쪽에 값 넣기
-							if (key == 'etcInput'){savedEtcInput = value;}	// 등록사유 저장해놓고 나중에 등록사유 태그쪽에 값 넣기
-							if (key == 'issSj') {title = value;}	// 제목 처리
-							if (key == 'issCnts') {contents = value;} // 내용 처리
-
-							if (key == 'custReqDt') {$(currFormId + ' #custReqDt').datepicker("setDate", value);} // 내용 처리
-						});
-						// 제목과 내용을 합쳐서 reqRmk 필드에 설정
-						if (title !== '' || contents !== '') {
-							let tempRmk = "제목:" + title + "\n\n" + "내용:" + contents;
-							$(currFormId + " #reqRmk").val(tempRmk);
-							$(currFormId + " #salesCd").parent('div').addClass('no-click');
-						}
-					}
-				});
-			}
-			//REQ, ISS 에 따라 부서가 달라지므로 여기에 위치시킴
-			createCheckBox(userDept);	//부서별 장애원인 자동 생성
-				gridViewPop.setData3();		//결재라인에 등록된 결재선 가져오기
-
-			//발주요청서 발행 btn 없애기~입력시에는 사용 안함
-			$(currDivId + ' #reportRegBtn').remove();
-
-			$(currDivId + ' #actionBtn').text("결과일괄등록");
-			$(currDivId + ' #actionBtn').on("click", function() { insertQualityReq('결과일괄등록');	});
-			
-			$(currDivId + ' #actionBtn2').text("요청서등록(구매)");
-			$(currDivId + ' #actionBtn2').on("click", function() { insertQualityReq('결과분리등록'); });
-
-			//등록사유체크하기(ISS=이슈에서 시작하면 이슈의 등록정보를 재활용)
-			if (fromJobType == "ISS") {
-				if (savedSubCd) {
-					$(currFormId + ' #' + savedSubCd).prop("checked", true).trigger("change");	//문제에서 조회한 등록사유 설정
-//					fnc($(currFormId + ' #' + savedSubCd)[0]);
-				}
-				$(currFormId + ' #COBTP03').prop("checked", true);	//분류 --> 장애
-			}
-
-
-			//문제등록사유 코드의 끝 2자리가 99이면 기타 이며, 기타인경우 사유가 있음
-			if (savedSubCd.slice(-2) === '99') {
-				$('#popFormQ01 #etcInputWrapper').show();
-				$('#popFormQ01 #etcInput').val(savedEtcInput).attr('required', true).closest('td').prev('th').addClass('hit');
-			} else {
-				$('#popFormQ01 #etcInputWrapper').hide();
-				$('#popFormQ01 #etcInput').val('').removeAttr('required').closest('td').prev('th').removeClass('hit');
-			}
-
-		} else if (actionType == "U" || actionType == "S" || actionType == "T" ) {
-			$(currDivId + ' .tit').text('요인별 발주 및 출장요청 수정');
-
-			if (fileTrgtKey == '0' || fileTrgtKey == '' ) {
-				alert('정보 불일치가 발생되었습니다.	전산실 연락 바랍니다.');
-				return false;
-			}
-
-			if (reqNo == '0' || reqNo == '' || reqNo == undefined) {
-				alert('자료조회 불가. 정보 불일치가 발생되었습니다.	전산실 연락 바랍니다.');
-				return false;
-			}
-
-			selectQtyReqInfo();
-			if (actionType == "S" || actionType == "T" ) {	//결재모드인면 필수입력 제외처리 (조치 도면 반영 일시, 조치 도면 파일 저장명)
-				$(currDivId + ' .tit').text('요인별 발주 및 출장요청 조회');
-				$(currFormId + ' #actCompDgnFileNm').removeAttr('required');
-				$(currFormId + ' #actCompDttm').removeAttr('required');
-			}
-
-			$(currFormId + ' input#coCd').attr('required', 'required');
-			$(currFormId + ' #coCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
-			$(currFormId + ' #salesCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
-
-			$(currFormId + " #ordrgDt").prop("disabled", true);
-//				$(currFormId + " #reqDt").prop("disabled", true);
-			$(currFormId + " #regNm").prop("disabled", true);
-			$(currFormId + " #ordrgNm").prop("disabled", true);
-			gridViewPop.initView().setData(0);
-
-			$(currDivId + " #actionBtn").text("수정");
-			$(currDivId + " #actionBtn").on("click", function() { updateQualityReq(); });
-			$(currDivId + " #actionBtn2").remove();
-
-		}
-		// TODO 리스트에서 호출 시 공유 : actionType:T	결재: actionType:S 처리 부분
-		var _todoViewMode =modalStack.last().paramObj.todoView;
-		if (_todoViewMode != undefined && _todoViewMode == "INQ") {
-			$(currDivId + ' .tit').text('요인별 발주 및 출장요청 조회');
-
-			$(currDivId + ' #actionBtn').remove();
-			$(currDivId + " #plus-minus").remove();
-			//모든 입력 기능 통제하기
-			disableFormAll('popFormQ01');
-			//조회나, 결재일경우에는	기타 입력 방지
-			$(currFormId + ' #etcInput').removeAttr('required').closest('td').prev('th').removeClass('hit');
-
-			//input readonly, radio.checkbox disabled
-			$.each($(currFormId + ' select, input, textarea'), function(idx, elem){
-				var id = $(elem).attr("ID");
-				if( id ) {
-					var eleId = currFormId + ' #'+id;
-					if( $(elem).prop('tagName') == "INPUT" ) $(eleId).attr("readonly", true);
-					if( $(elem).prop('tagName') == "TEXTAREA" ) $(eleId).attr("readonly", true);
-					if( $(elem).prop('tagName') == "SELECT" ) $(eleId).css({'background-color':'#e6e6e6', 'pointer-events':'none'});
-					if( $(elem).prop('type') == "checkbox" || $(elem).prop('type') == "radio") $(eleId).on('click', function(e) {e.preventDefault();});
-				}
-
-			});
-
-
-		}
-
-		//문제에서 넘어온것이 아닌 정상 출도인경우 분류코드는 필수 아님
-		if (fromJobType != 'ISS'){
-			$(currFormId + " #mcPartCdReq").closest('td').prev('th').removeClass('hit');
-			$(currFormId + " #mcPartCdReq").removeAttr('required', 'true');
-			$(currFormId + " #mcPartCdReq").css({'background-color':'#e6e6e6', 'pointer-events':'none'})
-			$(currFormId + " #impactCdReq").closest('td').prev('th').removeClass('hit');
-			$(currFormId + " #impactCdReq").removeAttr('required', 'true');
-			$(currFormId + " #impactCdReq").css({'background-color':'#e6e6e6', 'pointer-events':'none'})
-			$(currFormId + " #importantCdReq").closest('td').prev('th').removeClass('hit');
-			$(currFormId + " #importantCdReq").removeAttr('required', 'true');
-			$(currFormId + " #importantCdReq").css({'background-color':'#e6e6e6', 'pointer-events':'none'})
-		}
-		
-
-		if (modalStack.last().paramObj.callRoute != "대시보드문제현황에서실행하면이슈번호링크제거하기") {
-			//이슈번호 클릭시 이슈내용 조회화면 호출하기
-			$('#popFormQ01 #workRptNo').on("click", function() {
-				if (this.value) {
-					// 문제관리에서 계획 문제 수정 구분자는 "U3"
-					var paramObj = {
-							"actionType"	: "I",
-							"coCd"			: $(currFormId + ' #coCd').val(),
-							"salesCd"		: $(currFormId + ' #salesCd').val(),
-							"issFileTrgtKey" : $(currFormId + ' #issFileTrgtKey').val(),		//문제번호???? TB_WB24M02.FILE_TRGT_KEY = #{fileTrgtKey}
-						};
-					openSecondModal("/static/html/user/wb/wb24/WB2401P11.html", 1200, 870, "WBS 문제 현황 확인", paramObj, function (){
-					});
-				}
-			});
-		}
-		//---------------------------------------------------------------
-		//첨부 화일 처리 시작
-		//---------------------------------------------------------------
-		fileParam = {
-			fileTrgtTyp		: $(currFormId + " #pgmId").val(),
-			fileTrgtKey		: fileTrgtKey,
-			todoNo			: $(currFormId + " #reqNo").val(),		//결재정보처리를 위함
-		}
-		treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
-		//---------------------------------------------------------------
-		//첨부 화일 처리 끝
-		//---------------------------------------------------------------
-
-		// 크기 조절할 textarea ID 리스트
-		$(textAreas.join(',')).on('input paste drop change', function () {
-			// 각 textarea에 대해 크기 조절 함수 호출
-				txtareaHeightResize($(this));
-		});
-		
-		let currDate = new Date().format("yyyy-MM-dd");
-		// 사내요구일자는 현재일 이전은 등록안되게 차단하기 2025.03.10 남장섭
-		$('#reqDt').on('change', function() {
-			if ($('#reqDt').val() < currDate) {
-				alert('사내요구일자는 이전일자로 설정 불가합니다.');
-				$('#reqDt').datepicker("setDate", currDate);
-			}
-		});
-
-		
-		// 결재시 수정하면 change 이벤트 적용
-		$(currFormId).on('input paste drop change', '#measRst, #resltRst, #FDMTSOLUT-radioButtonContainer input[type=checkbox]',function() {
-			if ($(currDivId + ' #commentBtn').length === 0 && (actionType == 'S' || actionType == 'T')) {
-				const callCmdBtn = '<button id="commentBtn">코칭수정</button>';
-				$('.popup_bottom_btn').first().prepend(callCmdBtn);
-				$(currDivId + ' #commentBtn').on("click", function() { updateQualityResultComment('결과수정'); });
-			}
-		});
-		
-//		if (approvalList.length == 0) {
-//			alert("결재선 지정 정보가 존재하지 않습니다. 기준관리에서 결재선을 추가 하세요");
-//		}
-	});
-
-
-
+	
+var ModalApp = (function() {
 	//결재 여부
 	function approvalYn() {
 		var gridList = gridViewPop.target.getList();
@@ -2452,4 +2175,317 @@
 		});
 	}
 
+    return {
+        approvalYn: approvalYn,
+        insertShareUserModal,
+        deleteShareUser,
+        openFirstUserSearch,
+        openSecondUserSearch,
+        selectQtyReqInfo,
+        formFieldControl,
+        insertQualityReq,
+        updateQualityReq,
+        inputValidationCheck,
+        updateQualityResultComment,
+        makeFormData,
+        wordRemove,
+        opendOrdrsSearch,
+        wbsSalesCodeSearch,
+        setByCoCd: setByCoCd,
+        selectAuth,
+        setReportMain,
+        kakaoTodo,
+        commKaKaoSendTodo,
+        selectTeamManagerInfo,
+        selectTeamManagerApprovalAdd,
+        approvalUserInfoData,
+        approvalTeamManagerInfoData,
+        approvalTeamManagerSpecialInfoData,
+        setCurrentDateTime,
+        gridResize: gridResize,
+        txtareaHeightResize,
+        openClntSearch
+    };
+	})();
+
+	
+
+	$(document).ready(function() {
+		actionType = modalStack.last().paramObj.actionType;
+		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
+		issFileTrgtKey = modalStack.last().paramObj.issFileTrgtKey;
+		reqNo = modalStack.last().paramObj.reqNo;
+		if (reqNo == undefined) fileTrgtKey = 0; //이슈에서 넘어온 fileTrgtKey는 이슈등록에 대한 번호임.
+		$(currFormId + " #fileTrgtKey").val(fileTrgtKey);
+
+
+		setCommonSelect($(".popup_area select[data-kind]"));
+		ModalApp.setByCoCd(modalStack.last().paramObj.coCd);
+
+
+		$(currFormId + " #coCd").prop("disabled", true);
+		$(currFormId + " #clntPjt").css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+
+		//발행일자//
+		$(currFormId + " #ordrgDt").datepicker({format : "yyyy-mm-dd", language : "ko", autoclose : true})
+									.datepicker("setDate", new Date());
+
+		//요구일정//
+		$(currFormId + " #reqDt").datepicker({format : "yyyy-mm-dd", language : "ko", autoclose : true})
+								.datepicker("setDate", new Date());
+
+		//요구일정//
+		$(currFormId + " #custReqDt").datepicker({format : "yyyy-mm-dd", language : "ko", autoclose : true});
+		//분류,등록사유 자동생성시 20240708이전에는 전체 옵션 표시, 이후에는 정상, 문제 분리 표시용 start
+		currentDate =	$(currFormId + " #ordrgDt").val(); //발주요청서 처리 절차변경일자기준 20240708일자로 코드 변경처리함
+		//분류,등록사유 자동생성시 20240708이전에는 전체 옵션 표시, 이후에는 정상, 문제 분리 표시용 end
+
+		ModalApp.selectAuth(jwt.deptId); //발행자 부서코드
+
+		createRadioOptions('COBTP', "radio");	//분류 자동 생성
+		createRadioOptions('BUSTCD', "checkbox");	//출장자 구분
+		createRadioOptions('INWKCD', "checkbox");	//사내작업 구분
+		createRadioOptions('REQCD', "radio");	//요청구분 구분
+		createRadioOption_FDMTSOLUT('FDMTSOLUT', 'checkbox') // 근본원인 구분
+		
+		authChk();					// 권한체크
+		
+		// if (modalStack.last().paramObj.actDeptId == undefined){
+		//		alert("비정상적으로 실행되었습니다.");
+		//		modalStack.close();
+		//	return false;
+		// }
+		$(currFormId + " #reportRegBtn").hide();	//발주요청서 출력버튼 기본은 숨김 처리--> 1번결재자가 결재완료 되면 보임. 2023.11.27 정상훈차장 요청
+		let savedSubCd = ""; // 등록사유 변수
+		let savedEtcInput = ""; // 등록사유 변수
+		if (actionType == "C") {
+			$(currFormId + " #ordrgDt").parent('td').addClass('no-click'); //발행일자
+			$(currFormId + " #regNm").parent('div').addClass('no-click');	//작성자
+			if (fromJobType == "REQ") {
+				$(currFormId + " #ordrgId").val(jwt.userId);
+				$(currFormId + " #ordrgNm").val(jwt.userNm);
+				$(currFormId + " #regId").val(jwt.userId);
+				$(currFormId + " #regNm").val(jwt.userNm);
+			} else { //"ISS" 인경우 문제관리정보를 불러옴
+				$(currFormId + " #regId").val(jwt.userId);
+				$(currFormId + " #regNm").val(jwt.userNm);
+				var formData = {
+					"fileTrgtKey" : issFileTrgtKey
+				}
+				postAjaxSync("/user/wb/wb24/selectIssueInfo", formData, null, function(data) {
+					// key와 태그 id의 매핑 객체 정의
+					const keyToTagMap = {
+						actId			: "ordrgId",
+						actNm			: "ordrgNm",
+						issNo			: "workRptNo",
+						newCdNm		: "newCd",
+						mcPartCdNm	: "mcPartCdIssNm",
+						importantCdNm	: "importantCdIssNm",
+						impactCdNm	: "impactCdIssNm"
+					};
+					let title = '';
+					let contents = '';
+					//부서별 발주요청서 등록사유 자동 생성하기
+					if (data.result) {
+						$.each(data.result, function(key, value) {
+							// 문제에서 발주요청서 등록 시 기계분류, 영향도, 중요도 셋팅X 사용자가 직접 선택하게
+							if (key === 'mcPartCd' || key === 'impactCd' || key === 'importantCd') {
+								return true;
+							}
+							const tagId = keyToTagMap[key] || key;
+							const $elem = $(currFormId + ' #' + tagId);
+
+							if ($elem.length) {
+								$elem.val(value);
+
+								if ($elem.is('[comma]')) {
+										onlyNumber($elem[0]);
+								}
+							}
+							if (key == 'salesCd'){$('#matrDrwNo').val(value);} // 도면번호 처리
+							if (key == 'actDeptId'){selectAuth(value)};
+							if (key == 'subCd'){savedSubCd = value;}	// 등록사유 저장해놓고 나중에 등록사유 태그쪽에 값 넣기
+							if (key == 'etcInput'){savedEtcInput = value;}	// 등록사유 저장해놓고 나중에 등록사유 태그쪽에 값 넣기
+							if (key == 'issSj') {title = value;}	// 제목 처리
+							if (key == 'issCnts') {contents = value;} // 내용 처리
+
+							if (key == 'custReqDt') {$(currFormId + ' #custReqDt').datepicker("setDate", value);} // 내용 처리
+						});
+						// 제목과 내용을 합쳐서 reqRmk 필드에 설정
+						if (title !== '' || contents !== '') {
+							let tempRmk = "제목:" + title + "\n\n" + "내용:" + contents;
+							$(currFormId + " #reqRmk").val(tempRmk);
+							$(currFormId + " #salesCd").parent('div').addClass('no-click');
+						}
+					}
+				});
+			}
+			//REQ, ISS 에 따라 부서가 달라지므로 여기에 위치시킴
+			createCheckBox(userDept);	//부서별 장애원인 자동 생성
+				gridViewPop.setData3();		//결재라인에 등록된 결재선 가져오기
+
+			//발주요청서 발행 btn 없애기~입력시에는 사용 안함
+			$(currDivId + ' #reportRegBtn').remove();
+
+			$(currDivId + ' #actionBtn').text("결과일괄등록");
+			$(currDivId + ' #actionBtn').on("click", function() { insertQualityReq('결과일괄등록');	});
+			
+			$(currDivId + ' #actionBtn2').text("요청서등록(구매)");
+			$(currDivId + ' #actionBtn2').on("click", function() { insertQualityReq('결과분리등록'); });
+
+			//등록사유체크하기(ISS=이슈에서 시작하면 이슈의 등록정보를 재활용)
+			if (fromJobType == "ISS") {
+				if (savedSubCd) {
+					$(currFormId + ' #' + savedSubCd).prop("checked", true).trigger("change");	//문제에서 조회한 등록사유 설정
+//					fnc($(currFormId + ' #' + savedSubCd)[0]);
+				}
+				$(currFormId + ' #COBTP03').prop("checked", true);	//분류 --> 장애
+			}
+
+
+			//문제등록사유 코드의 끝 2자리가 99이면 기타 이며, 기타인경우 사유가 있음
+			if (savedSubCd.slice(-2) === '99') {
+				$('#popFormQ01 #etcInputWrapper').show();
+				$('#popFormQ01 #etcInput').val(savedEtcInput).attr('required', true).closest('td').prev('th').addClass('hit');
+			} else {
+				$('#popFormQ01 #etcInputWrapper').hide();
+				$('#popFormQ01 #etcInput').val('').removeAttr('required').closest('td').prev('th').removeClass('hit');
+			}
+
+		} else if (actionType == "U" || actionType == "S" || actionType == "T" ) {
+			$(currDivId + ' .tit').text('요인별 발주 및 출장요청 수정');
+
+			if (fileTrgtKey == '0' || fileTrgtKey == '' ) {
+				alert('정보 불일치가 발생되었습니다.	전산실 연락 바랍니다.');
+				return false;
+			}
+
+			if (reqNo == '0' || reqNo == '' || reqNo == undefined) {
+				alert('자료조회 불가. 정보 불일치가 발생되었습니다.	전산실 연락 바랍니다.');
+				return false;
+			}
+
+			ModalApp.selectQtyReqInfo();
+			if (actionType == "S" || actionType == "T" ) {	//결재모드인면 필수입력 제외처리 (조치 도면 반영 일시, 조치 도면 파일 저장명)
+				$(currDivId + ' .tit').text('요인별 발주 및 출장요청 조회');
+				$(currFormId + ' #actCompDgnFileNm').removeAttr('required');
+				$(currFormId + ' #actCompDttm').removeAttr('required');
+			}
+
+			$(currFormId + ' input#coCd').attr('required', 'required');
+			$(currFormId + ' #coCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+			$(currFormId + ' #salesCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+
+			$(currFormId + " #ordrgDt").prop("disabled", true);
+//				$(currFormId + " #reqDt").prop("disabled", true);
+			$(currFormId + " #regNm").prop("disabled", true);
+			$(currFormId + " #ordrgNm").prop("disabled", true);
+			gridViewPop.initView().setData(0);
+
+			$(currDivId + " #actionBtn").text("수정");
+			$(currDivId + " #actionBtn").on("click", function() { updateQualityReq(); });
+			$(currDivId + " #actionBtn2").remove();
+
+		}
+		// TODO 리스트에서 호출 시 공유 : actionType:T	결재: actionType:S 처리 부분
+		var _todoViewMode =modalStack.last().paramObj.todoView;
+		if (_todoViewMode != undefined && _todoViewMode == "INQ") {
+			$(currDivId + ' .tit').text('요인별 발주 및 출장요청 조회');
+
+			$(currDivId + ' #actionBtn').remove();
+			$(currDivId + " #plus-minus").remove();
+			//모든 입력 기능 통제하기
+			disableFormAll('popFormQ01');
+			//조회나, 결재일경우에는	기타 입력 방지
+			$(currFormId + ' #etcInput').removeAttr('required').closest('td').prev('th').removeClass('hit');
+
+			//input readonly, radio.checkbox disabled
+			$.each($(currFormId + ' select, input, textarea'), function(idx, elem){
+				var id = $(elem).attr("ID");
+				if( id ) {
+					var eleId = currFormId + ' #'+id;
+					if( $(elem).prop('tagName') == "INPUT" ) $(eleId).attr("readonly", true);
+					if( $(elem).prop('tagName') == "TEXTAREA" ) $(eleId).attr("readonly", true);
+					if( $(elem).prop('tagName') == "SELECT" ) $(eleId).css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+					if( $(elem).prop('type') == "checkbox" || $(elem).prop('type') == "radio") $(eleId).on('click', function(e) {e.preventDefault();});
+				}
+
+			});
+
+
+		}
+
+		//문제에서 넘어온것이 아닌 정상 출도인경우 분류코드는 필수 아님
+		if (fromJobType != 'ISS'){
+			$(currFormId + " #mcPartCdReq").closest('td').prev('th').removeClass('hit');
+			$(currFormId + " #mcPartCdReq").removeAttr('required', 'true');
+			$(currFormId + " #mcPartCdReq").css({'background-color':'#e6e6e6', 'pointer-events':'none'})
+			$(currFormId + " #impactCdReq").closest('td').prev('th').removeClass('hit');
+			$(currFormId + " #impactCdReq").removeAttr('required', 'true');
+			$(currFormId + " #impactCdReq").css({'background-color':'#e6e6e6', 'pointer-events':'none'})
+			$(currFormId + " #importantCdReq").closest('td').prev('th').removeClass('hit');
+			$(currFormId + " #importantCdReq").removeAttr('required', 'true');
+			$(currFormId + " #importantCdReq").css({'background-color':'#e6e6e6', 'pointer-events':'none'})
+		}
+		
+
+		if (modalStack.last().paramObj.callRoute != "대시보드문제현황에서실행하면이슈번호링크제거하기") {
+			//이슈번호 클릭시 이슈내용 조회화면 호출하기
+			$('#popFormQ01 #workRptNo').on("click", function() {
+				if (this.value) {
+					// 문제관리에서 계획 문제 수정 구분자는 "U3"
+					var paramObj = {
+							"actionType"	: "I",
+							"coCd"			: $(currFormId + ' #coCd').val(),
+							"salesCd"		: $(currFormId + ' #salesCd').val(),
+							"issFileTrgtKey" : $(currFormId + ' #issFileTrgtKey').val(),		//문제번호???? TB_WB24M02.FILE_TRGT_KEY = #{fileTrgtKey}
+						};
+					openSecondModal("/static/html/user/wb/wb24/WB2401P11.html", 1200, 870, "WBS 문제 현황 확인", paramObj, function (){
+					});
+				}
+			});
+		}
+		//---------------------------------------------------------------
+		//첨부 화일 처리 시작
+		//---------------------------------------------------------------
+		fileParam = {
+			fileTrgtTyp		: $(currFormId + " #pgmId").val(),
+			fileTrgtKey		: fileTrgtKey,
+			todoNo			: $(currFormId + " #reqNo").val(),		//결재정보처리를 위함
+		}
+		treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
+		//---------------------------------------------------------------
+		//첨부 화일 처리 끝
+		//---------------------------------------------------------------
+
+		// 크기 조절할 textarea ID 리스트
+		$(textAreas.join(',')).on('input paste drop change', function () {
+			// 각 textarea에 대해 크기 조절 함수 호출
+				txtareaHeightResize($(this));
+		});
+		
+		let currDate = new Date().format("yyyy-MM-dd");
+		// 사내요구일자는 현재일 이전은 등록안되게 차단하기 2025.03.10 남장섭
+		$('#reqDt').on('change', function() {
+			if ($('#reqDt').val() < currDate) {
+				alert('사내요구일자는 이전일자로 설정 불가합니다.');
+				$('#reqDt').datepicker("setDate", currDate);
+			}
+		});
+
+		
+		// 결재시 수정하면 change 이벤트 적용
+		$(currFormId).on('input paste drop change', '#measRst, #resltRst, #FDMTSOLUT-radioButtonContainer input[type=checkbox]',function() {
+			if ($(currDivId + ' #commentBtn').length === 0 && (actionType == 'S' || actionType == 'T')) {
+				const callCmdBtn = '<button id="commentBtn">코칭수정</button>';
+				$('.popup_bottom_btn').first().prepend(callCmdBtn);
+				$(currDivId + ' #commentBtn').on("click", function() { updateQualityResultComment('결과수정'); });
+			}
+		});
+		
+//		if (approvalList.length == 0) {
+//			alert("결재선 지정 정보가 존재하지 않습니다. 기준관리에서 결재선을 추가 하세요");
+//		}
+	});
+	
 </script>	
