@@ -107,6 +107,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 								"useYn" 			: 'Y',
 						}
 						postAjax("/user/wb/wb20/selectCurrentUserApprovalDataList", paramObj, null, function(data){
+							debugger;
 							if (data.resultList.length > 0) {
 								approvalWorkingGrid = data.resultList[0]; //결재 승인을 위한 파라메터 전역변수에 저장함
 
