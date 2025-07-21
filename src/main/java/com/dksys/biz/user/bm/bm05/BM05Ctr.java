@@ -153,4 +153,22 @@ public class BM05Ctr {
 		model.addAttribute("resultList", result);
 		return "jsonView";
 	}
+	
+	//UPDATE
+	@PostMapping(value = "/bm05_dlvrRqmDay_update")
+	public String bm05_dlvrRqmDay_update(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (bm05Svc.bm05_dlvrRqmDay_update(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+	}
 }

@@ -43,4 +43,6 @@ public interface BM05Svc {
 	List<Map<String, String>> BOM_selectMatrMnoList(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectMatrMatSpecToDuplicateList(Map<String, String> paramMap);
+
+	int bm05_dlvrRqmDay_update(Map<String, String> paramMap);
 }

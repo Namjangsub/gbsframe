@@ -237,4 +237,11 @@ public class BM05SvcImpl implements BM05Svc {
 	public List<Map<String, String>> selectMatrMatSpecToDuplicateList(Map<String, String> paramMap) {
 		return bm05Mapper.selectMatrMatSpecToDuplicateList(paramMap);
 	}
+	
+	//DATA UPDATE
+	@Override
+	public int bm05_dlvrRqmDay_update(Map<String, String> paramMap) {
+		return bm05Mapper.bm05_dlvrRqmDay_update(paramMap);
+	}
+	
 }
