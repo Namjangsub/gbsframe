@@ -56,6 +56,10 @@ public interface WB24Mapper {
 
 	int updateWbsIssueResultEvaluate(Map<String, String> paramMap);
 
+	int updateWbsIssueActMn(Map<String, String> paramMap);
+
+	int updateWbsIssueActMdCancle(Map<String, String> paramMap);
+
 	int updateWbsIssueStChk(Map<String, String> paramMap);
 
 	Map<String, String> select_wb2401p01_planInfo(Map<String, String> paramMap);

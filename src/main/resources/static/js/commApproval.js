@@ -47,6 +47,7 @@ function Approval(htmlParam, param, popParam) {
 			    		<colgroup>
 			    			<col width="8%">
 			    			<col width="10%">
+			    			<col width="8%">
 			    			<col width="*%">
 			    			<col width="10%">
 			    			<col width="15%">
@@ -54,6 +55,7 @@ function Approval(htmlParam, param, popParam) {
 			    		<tr id="appH" stye="text-align:center; border-bottom:1px solid #dbdbdb; height:25px;">
 			    			<th class="appTh">순번</th>
 			    			<th class="appTh">결재자</th>
+			    			<th class="appTh">투입공수</th>
 			    			<th class="appTh">결재의견</th>
 			    			<th class="appTh">상태</th>
 			    			<th class="appTh">결재일자</th>
@@ -87,22 +89,23 @@ function Approval(htmlParam, param, popParam) {
 						`;
 			var confrmActDngEval = '';
 			//결재라인 read
+			var sameTimeResultChk = this.param.sameTimeResultChk;	// 발주요청서 결재시 해당 건 동시등록여부 체크
 			postAjaxSync("/user/wb/wb20/selectGetApprovalList", this.param, null
 				, function(data){
 					var list = data.resultList;
 					var todoCfOpnHid = "";
 	 				if( data.resultList.length > 0 ) {
-
 	 					var htmlTr = "";
 		 				$("#appLine tr").eq(0).next().remove();
 				        $.each(list, function (idx, data) {
 		 					var html = trTempl;
+							html = html.replace(/@@deptId@@/g, data.deptId); // 각 행의 부서 코드
 							//html = html.replace(/@@item1@@/gi, (idx+1));		//순번
 							html = html.replace(/@@item1@@/gi, data.sanctnSn);		//순번
 							html = html.replace(/@@item2@@/gi, data.todoNm);		//결재자명
 							var todoCfOpn = data.todoCfOpn;
 							if( typeof(todoCfOpn)== "undefined" || todoCfOpn=="" ) todoCfOpn = "";
-							html = html.replace(/@@item3@@/gi, todoCfOpn);		//결재의견
+							html = html.replace(/@@item4@@/gi, todoCfOpn);		//결재의견
 							//본인해당시 볼드처리 - button 활성화
 							if( data.todoId != "undefined" && (data.todoId == jwt.userId ) ) {
 								html = html.replace(/@@bold@@/gi, boldFont);
@@ -142,9 +145,45 @@ function Approval(htmlParam, param, popParam) {
 							} else {
 								html = html.replace(/@@bold@@/gi, "");
 							}
-							//console.log('--applyBtn--' + applyBtn);
-							html = html.replace(/@@item4@@/gi, data.sanctnSttusNm);		//상태명
-							html = html.replace(/@@item5@@/gi, data.todoCfDt);		//확인(결재)일자
+							// ==============================================================================================
+							// 1. 문제, 발주요청서(결과따로/결과일괄) 결재시 팀장 공수입력 처리
+							// 2. 문제(결과)에 대한 결재(TODODIV2090)
+							// 3. 발주요청서 결과 따로 등록 건은 TODODIV2030 이렇게 들어오기 때문에 결과팝업창에서 처리가능
+							// 4. 발주요청서결과 일괄등록 건은 TODODIV2020 이 구분자만 존재하므로 this.param.sameTimeResultChk 에서 동시 여부 판단
+							// 5. this.param.sameTimeResultChk == 'Y' 이면 동시 등록
+							// 6. this.param.sameTimeResultChk == 'N' 이면 따로 등록
+							if (data.todoDiv2CodeId === 'TODODIV2020' || data.todoDiv2CodeId === 'TODODIV2030' || data.todoDiv2CodeId === 'TODODIV2090') {
+								let editable = false; // 투입공수 입력여부 플래그
+								// 본인결재건이면서 팀장일때
+								if (applyBtn && data.deptTeamManager === 'TEAM01' && jwt.userId === data.todoId) {
+									if (data.todoDiv2CodeId === 'TODODIV2020' && sameTimeResultChk === 'Y') {
+											editable = true;	
+										} else if (data.todoDiv2CodeId === 'TODODIV2090' || data.todoDiv2CodeId === 'TODODIV2030') {
+											editable = true;
+										}
+									}
+								// 투입공수 입력가능
+								if (editable) {
+									html = html.replace(
+										/@@item3@@/gi,
+										`<input type="text" name="actMh" class="form-control" value="${data.actMh || 0}" style='text-align:left; padding-left:5px; height:40px;' comma onkeyup="onlyNumber(this)" required msg="투입공수">`
+									);
+								} else {
+									// 읽기전용
+									html = html.replace(
+										/@@item3@@/gi,
+										`<input type="text" name="actMh" class="form-control" readonly value="${data.actMh || 0}" style='text-align:left; padding-left:5px; height:40px;'>`
+									);
+								}
+							} else {
+								html = html.replace(
+									/@@item3@@/gi,
+									`<input type="text" name="actMh" class="form-control" readonly value="0" style='text-align:left; padding-left:5px; height:40px;'>`
+								);
+							}
+							// ==============================================================================================
+							html = html.replace(/@@item5@@/gi, data.sanctnSttusNm);		//상태명
+							html = html.replace(/@@item6@@/gi, data.todoCfDt);		//확인(결재)일자
 							htmlTr += html;
 						});
 					}
@@ -188,12 +227,13 @@ function Approval(htmlParam, param, popParam) {
 	//loop contents html
 	this.htmlTr = function() {
 		var html = `
-    		<tr style="border-bottom:1px solid #dbdbdb;">
+    		<tr data-dept-id="@@deptId@@" style="border-bottom:1px solid #dbdbdb;">
     			<td class="appTd">@@item1@@</td>
     			<td class="appTd">@@bold@@@@item2@@</font></td>
-    			<td class="appTd" style='text-align:left; padding-left:5px; height:25px;'><textarea type='text' name='todoCfOpn' value="@@item3@@" class="form-control" readonly="readonly"></textarea></td>
-    			<td class="appTd">@@item4@@</td>
+    			<td class="appTd">@@item3@@</td>
+    			<td class="appTd" style='text-align:left; padding-left:5px; height:25px;'><textarea type='text' name='todoCfOpn' class="form-control" readonly="readonly">@@item4@@</textarea></td>
     			<td class="appTd">@@item5@@</td>
+    			<td class="appTd">@@item6@@</td>
     		</tr>
 			`;
 		return html;
@@ -223,9 +263,25 @@ function Approval(htmlParam, param, popParam) {
 					, "todoCfOpn" 	: todoCfOpn
 					, "issNo" 		: $('#issNo').val()
 					, "actDngEval"	: $('#actDngEvalTodo').val()
+					, saleTeamMd:  0
+					, dsgnTeamMd:  0
+					, matrTeamMd:  0
+					, prodTeamMd:  0
+					, "sameTimeResultChk" : this.param.sameTimeResultChk || ''
 			}
 			let anchorText = $("#appConfirmAnchor").text();
 			let confirmText = (anchorText == "의견수정") ? "수정" : "승인"
+
+			// 각 행의 deptId 속성 + actMh 값을 읽어서 분기
+			$('#appLine tr[data-dept-id]').each(function() {
+				var deptId = $(this).data('dept-id');
+				var md  = $(this).find('input[name="actMh"]').val().replace(/,/g,'') || 0;
+
+				if (deptId === 'GUN30')			paramMap.saleTeamMd = md;
+				else if (deptId === 'GUN40')	paramMap.dsgnTeamMd = md;
+				else if (deptId === 'TRN50')	paramMap.matrTeamMd = md;
+				else if (deptId === 'GUN60')	paramMap.prodTeamMd = md;
+			})
 			Object.assign(paramMap, this.param);
 
 			postAjaxSync("/user/wb/wb20/insertApprovalLine", paramMap, null, function(data){

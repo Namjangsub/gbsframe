@@ -2,6 +2,7 @@ package com.dksys.biz.user.wb.wb20.service.impl;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -125,12 +126,17 @@ public class WB20SvcImpl implements WB20Svc {
 			} else {
 				result += qm01Mapper.updateReqSt(paramMap);
 			}
+			// 결과일괄 등록 자료 결재시 투입공수 업데이트
+			if ("Y".equals(paramMap.get("sameTimeResultChk"))) {
+				result += qm01Mapper.updateReqActMnRslt(paramMap);	// 결과자료 투입시간 업데이트
+			}
 
 			// TODODIV2030:발주 및 출장 요청 결과자료 상태코드 바꾸기
 		} else if ("TODODIV2030".equals(todoDiv2CodeId)) {
 			// REQ_ST: REQST02 --> REQST03 로 상태 변경처리
 			paramMap.put("reqNo", "REQ" + tempReqNo.substring(3, 10));
 			result += qm01Mapper.updateReqStRslt(paramMap);
+			result += qm01Mapper.updateReqActMnRslt(paramMap);	// 결과자료 투입시간 업데이트
 
 			// TODODIV2060:WBS이슈 발생에 대한 결재이면 이슈상태 변경처리
 		} else if ("TODODIV2060".equals(todoDiv2CodeId)) {
@@ -145,6 +151,7 @@ public class WB20SvcImpl implements WB20Svc {
 					result += wb24Mapper.updateWbsIssueResultEvaluate(paramMap);
 				}
 			}
+			result += wb24Mapper.updateWbsIssueActMn(paramMap);	// 이슈조치 투입시간 업데이트
 		} else if ("TODODIV2130".equals(todoDiv2CodeId)) {
 			// ISS_STS: ISSSTS01 --> ISSSTS02 로 상태 변경처리
 			result += cm16Mapper.updateItoaIssueStChk(paramMap);
@@ -254,7 +261,29 @@ public class WB20SvcImpl implements WB20Svc {
 
 	@Override
 	public int updateApprovalCancle(Map<String, String> paramMap) {
-		return wb20Mapper.updateApprovalCancle(paramMap);
+		int result = wb20Mapper.updateApprovalCancle(paramMap);
+		if ("Y".equals(paramMap.get("teamManager"))) {
+			if ("TODODIV2030".equals(paramMap.get("todoDiv2CodeId"))) {	// 발주요청서 따로 결과등록
+				paramMap.put("reqNo", paramMap.get("todoNo"));
+				result += qm01Mapper.updateReqActMdCancle(paramMap);
+			} else if ("TODODIV2090".equals(paramMap.get("todoDiv2CodeId"))) {	// 문제조치
+				paramMap.put("issNo", paramMap.get("todoNo"));
+				result += wb24Mapper.updateWbsIssueActMdCancle(paramMap);
+			} else if ("TODODIV2020".equals(paramMap.get("todoDiv2CodeId"))){
+				// 동시 입력건인지 체크하고 결과동시 등로건이면 각 부서별 투입공수 초기화
+				Map<String, String> paramMap2 = new HashMap<>();
+				paramMap2.put("fileTrgtKey", paramMap.get("todoFileTrgtKey"));
+				paramMap2.put("reqNo", paramMap.get("todoNo"));
+				Map<String, String> selectQtyReqInfo = qm01Mapper.selectQtyReqInfo(paramMap2);
+				if (!selectQtyReqInfo.isEmpty() && "Y".equals(selectQtyReqInfo.get("sameTimeResult"))) {
+					paramMap.put("reqNo", paramMap.get("todoNo"));
+					result += qm01Mapper.updateReqActMdCancle(paramMap);
+				}
+			} else {
+			}
+		}
+		
+		return result;
 	}
 
 	@Override

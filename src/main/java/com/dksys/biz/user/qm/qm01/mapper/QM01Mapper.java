@@ -89,6 +89,10 @@ public interface QM01Mapper {
 
 	int updateReqStRslt(Map<String, String> paramMap);
 
+	int updateReqActMnRslt(Map<String, String> paramMap);	// 투입공수 업데이트
+
+	int updateReqActMdCancle(Map<String, String> paramMap);	// 투입공수 업데이트
+
 	int updateReqStChk(Map<String, String> paramMap);
 
 	int updateCheckDept(Map<String, String> paramMap);

@@ -671,6 +671,9 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 					, "userId": jwt.userId
 					, "histNo" : row.etcField2
 			};
+			if (row.todoDiv2CodeId === "TODODIV2020") {
+				paramObj.sameTimeResultChk = sameTimeResultChk;
+			}
 			openThirdModal("/static/html/user/wb/wb20/WB2001P01.html", 730, 300, "", paramObj, function(data){
 				if (data == "승인완료") {
 					$('.callApprovalWorking').last().remove();		//마지막 callApprovalWorking class에서 버튼 제거
