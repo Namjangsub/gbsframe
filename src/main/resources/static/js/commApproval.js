@@ -166,19 +166,19 @@ function Approval(htmlParam, param, popParam) {
 								if (editable) {
 									html = html.replace(
 										/@@item3@@/gi,
-										`<input type="text" name="actMh" class="form-control" value="${data.actMh || 0}" style='text-align:left; padding-left:5px; height:40px;' comma onkeyup="onlyNumber(this)" required msg="투입공수">`
+										`<input type="text" name="actMh" class="form-control" value="${data.actMh || 0}" style='text-align:right; padding-right:5px; height:40px;' comma onkeyup="onlyNumber(this)" required msg="투입공수">`
 									);
 								} else {
 									// 읽기전용
 									html = html.replace(
 										/@@item3@@/gi,
-										`<input type="text" name="actMh" class="form-control" readonly value="${data.actMh || 0}" style='text-align:left; padding-left:5px; height:40px;'>`
+										`<input type="text" name="actMh" class="form-control" readonly value="${data.actMh || 0}" style='text-align:right; padding-right:5px; height:40px;'>`
 									);
 								}
 							} else {
 								html = html.replace(
 									/@@item3@@/gi,
-									`<input type="text" name="actMh" class="form-control" readonly value="0" style='text-align:left; padding-left:5px; height:40px;'>`
+									`<input type="text" name="actMh" class="form-control" readonly value="0" style='text-align:left; padding-right:5px; height:40px;'>`
 								);
 							}
 							// ==============================================================================================
@@ -248,6 +248,14 @@ function Approval(htmlParam, param, popParam) {
         $("#impactCd").removeAttr('required', 'true');
         $("#importantCd").closest('td').prev('th').removeClass('hit');
         $("#importantCd").removeAttr('required', 'true');
+
+		// 투입공수 60이하 입력만 가능하게 제약
+		if ($('#appLine input[name="actMh"]').filter(function(){
+			return Number(this.value.replace(/,/g,'')) > 60;
+		}).length) {
+			customAlert('투입공수는 60 이하로 입력해주세요.');
+			return false;
+		}
 		
 		if (!inputValidation($('.popup_area [required]'))) {
 			return false;
@@ -263,10 +271,11 @@ function Approval(htmlParam, param, popParam) {
 					, "todoCfOpn" 	: todoCfOpn
 					, "issNo" 		: $('#issNo').val()
 					, "actDngEval"	: $('#actDngEvalTodo').val()
-					, saleTeamMd:  0
-					, dsgnTeamMd:  0
-					, matrTeamMd:  0
-					, prodTeamMd:  0
+					, saleTeamMd	:  0
+					, dsgnTeamMd	:  0
+					, matrTeamMd	:  0
+					, prodTeamMd	:  0
+					, "deptId"		: jwt.deptId
 					, "sameTimeResultChk" : this.param.sameTimeResultChk || ''
 			}
 			let anchorText = $("#appConfirmAnchor").text();

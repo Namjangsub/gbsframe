@@ -262,7 +262,11 @@ public class WB20SvcImpl implements WB20Svc {
 	@Override
 	public int updateApprovalCancle(Map<String, String> paramMap) {
 		int result = wb20Mapper.updateApprovalCancle(paramMap);
-		if ("Y".equals(paramMap.get("teamManager"))) {
+		String deptId = paramMap.get("deptId");
+		// 허용할 팀장 부서 접두어 목록 검사
+		boolean isManagerDept = deptId != null && (deptId.startsWith("GUN30")|| deptId.startsWith("GUN40")|| deptId.startsWith("TRN50")|| deptId.startsWith("GUN60"));
+
+		if ("Y".equals(paramMap.get("teamManager")) && isManagerDept) {
 			if ("TODODIV2030".equals(paramMap.get("todoDiv2CodeId"))) {	// 발주요청서 따로 결과등록
 				paramMap.put("reqNo", paramMap.get("todoNo"));
 				result += qm01Mapper.updateReqActMdCancle(paramMap);
