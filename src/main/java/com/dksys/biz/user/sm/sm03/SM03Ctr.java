@@ -8,7 +8,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -234,7 +233,41 @@ public class SM03Ctr {
   			model.addAttribute("resultMessage", e.getMessage());
   		}
   		return "jsonView";
-    }   	  
-  
+    }   	  	  
+
+	// 장납기 파트 현황 리스트
+	@PostMapping(value = "/select_sm03_List")
+	public String select_sm03_List(@RequestBody Map<String, String> paramMap, ModelMap model) {
+
+
+		paramMap.put("prdtGrp", ObjectUtil.sqlInCodeGen(paramMap.get("prdtGrp")));
+		
+		int totalCnt = sm03Svc.select_sm03_ListCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = sm03Svc.select_sm03_List(paramMap);
+		model.addAttribute("result", result);
+	   	
+		return "jsonView";
+	}
+
+
+	// 장납기 파트 리스트용 기계종류 Select 선택목록
+	@PostMapping(value = "/selectMultiPrdtGrpCodeList")
+	public String selectMultiPrdtGrpCodeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = sm03Svc.selectMultiPrdtGrpCodeList(paramMap);
+		model.addAttribute("prdtGrpCodeList", result);
+		return "jsonView";
+	}
+
+
+
+	// 장납기 파트 현황 리스트 - 상세팝업
+	@PostMapping(value = "/select_sm03_List_Pop")
+	public String select_sm03_List_Pop(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = sm03Svc.select_sm03_List_Pop(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 
 }

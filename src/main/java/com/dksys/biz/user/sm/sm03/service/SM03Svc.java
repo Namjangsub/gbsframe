@@ -50,4 +50,13 @@ public interface SM03Svc {
 	List<Map<String, String>> selectDashBoardWareHousingList(Map<String, String> paramMap);
 
 	int updateDudtIntendDt(Map<String, String> param);
+	
+	// 장납기 파트 현황	
+	int select_sm03_ListCount(Map<String, String> paramMap);
+		
+	List<Map<String, String>> select_sm03_List(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectMultiPrdtGrpCodeList(Map<String, String> paramMap);
+
+	List<Map<String, String>> select_sm03_List_Pop(Map<String, String> paramMap);
 }
