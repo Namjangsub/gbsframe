@@ -121,7 +121,7 @@ function Approval(htmlParam, param, popParam) {
 			 				$("#appLine tr").eq(0).next().remove();
 					        $.each(list, function (idx, data) {
 			 					var html = trTempl;
-								html = html.replace(/@@deptId@@/g, data.deptId); // 각 행의 부서 코드
+								html = html.replace(/@@deptId@@/g, data.todoId); // 각 행의 부서 코드
 								//html = html.replace(/@@item1@@/gi, (idx+1));		//순번
 								html = html.replace(/@@item1@@/gi, data.sanctnSn);		//순번
 								html = html.replace(/@@item2@@/gi, data.todoNm);		//결재자명
@@ -174,35 +174,30 @@ function Approval(htmlParam, param, popParam) {
 								// 4. 발주요청서결과 일괄등록 건은 TODODIV2020 이 구분자만 존재하므로 this.param.sameTimeResultChk 에서 동시 여부 판단
 								// 5. this.param.sameTimeResultChk == 'Y' 이면 동시 등록
 								// 6. this.param.sameTimeResultChk == 'N' 이면 따로 등록
-								if (data.todoDiv2CodeId === 'TODODIV2020' || data.todoDiv2CodeId === 'TODODIV2030' || data.todoDiv2CodeId === 'TODODIV2090') {
-									let editable = false; // 투입공수 입력여부 플래그
-									// 본인결재건이면서 팀장일때
-									if (applyBtn && data.deptTeamManager === 'TEAM01' && jwt.userId === data.todoId) {
-										if (data.todoDiv2CodeId === 'TODODIV2020' && sameTimeResultChk === 'Y') {
-												editable = true;	
-											} else if (data.todoDiv2CodeId === 'TODODIV2090' || data.todoDiv2CodeId === 'TODODIV2030') {
-												editable = true;
-											}
-										}
-									// 투입공수 입력가능
-									if (editable) {
-										html = html.replace(
-											/@@item3@@/gi,
-											`<input type="text" name="actMh" class="form-control" value="${data.actMh || 0}" style='text-align:right; padding-right:5px; height:40px;' comma onkeyup="onlyNumber(this)" required msg="투입공수">`
-										);
-									} else {
-										// 읽기전용
-										html = html.replace(
-											/@@item3@@/gi,
-											`<input type="text" name="actMh" class="form-control" readonly value="${data.actMh || 0}" style='text-align:right; padding-right:5px; height:40px;'>`
-										);
+								let editable = false; // 투입공수 입력여부 플래그
+								// 본인결재건이면서 팀장일때
+								if (applyBtn && data.deptTeamManager === 'TEAM01' && jwt.userId === data.todoId) {
+									if  ((data.todoDiv2CodeId === 'TODODIV2020' && sameTimeResultChk === 'Y') 
+											|| (data.todoDiv2CodeId === 'TODODIV2090' || data.todoDiv2CodeId === 'TODODIV2030')){
+											editable = true;
 									}
-								} else {
+								}
+								// 투입공수 입력가능
+								if (editable) {
 									html = html.replace(
 										/@@item3@@/gi,
-										`<input type="text" name="actMh" class="form-control" readonly value="0" style='text-align:right; padding-right:5px; height:40px;'>`
+										`<input type="text" name="actMh" class="form-control" value="${gPasIntChk((data.actMh)) || ''}" style='text-align:center; padding-right:5px; height:40px;' comma onkeyup="onlyNumber(this)" required msg="투입공수">
+										 <input type="hidden" name="actTeamManager" value="${data.deptTeamManager}">
+										 <input type="hidden" name="requiredMh" value="YES">`
+									);
+								} else {
+									// 읽기전용
+									html = html.replace(
+										/@@item3@@/gi,
+										`<input type="text" name="actMh" readonly value="${gPasIntChk((data.actMh)) || ''}" style='text-align:center; padding-right:5px; height:40px;' comma>`
 									);
 								}
+								
 								// ==============================================================================================
 								
 								//console.log('--applyBtn--' + applyBtn);
@@ -284,12 +279,23 @@ function Approval(htmlParam, param, popParam) {
 				return true;
 			} else if( this.param.todoDiv1CodeNm == "결재" ) {
 
-				// 투입공수 60이하 입력만 가능하게 제약
-				if ($('#appLine input[name="actMh"]').filter(function(){
-					return Number(this.value.replace(/,/g,'')) > 60;
-				}).length) {
-					customAlert('투입공수는 60 이하로 입력해주세요.');
-					return false;
+				// dept-id 기준으로 대상 tr 선택
+				var $tr = $('tr[data-dept-id='+ jwt.userId+']');
+				
+				// 각 항목 추출
+				var actMh = gPasIntChk($tr.find('input[name="actMh"]').val());
+				var requiredMh = $tr.find('input[name="requiredMh"]').val();
+				var actTeamManager = $tr.find('input[name="actTeamManager"]').val();
+				var todoCfOpn = $tr.find('textarea[name="todoCfOpn"]').val();
+
+				//부서코드 영업, 기술연구소, 구매, 생산팀의 팀장이면 결과 등록시 해당팀의 소요공수 입력 필수임
+				// $('#requiredMh').val() == 'YES'   담당팀 투입공수 필수입력 대상임 
+				if (requiredMh == 'YES') {
+					// 투입공수 60이하 입력만 가능하게 제약
+					if (actMh > 60) {
+						customAlert('투입공수는 60 이하로 입력해주세요.');
+						return false;
+					}
 				}
 
 				if (!inputValidation($('.popup_area [required]'))) {
@@ -303,24 +309,14 @@ function Approval(htmlParam, param, popParam) {
 						"todoId" : jwt.userId
 						, "todoCfOpn" : todoCfOpn
 						, "issNo" 		: $('#issNo').val()
-						, "actDngEval" 	: $('#actDngEvalTodo').val()
-						, saleTeamMd	:  0
-						, dsgnTeamMd	:  0
-						, matrTeamMd	:  0
-						, prodTeamMd	:  0
-						, "sameTimeResultChk" : this.param.sameTimeResultChk || '' 
+						, "etcField1"	: actMh			//팀장 작업공수 입력용으로 활용 2025.07.22
+						, "actTeamManager"		:  actTeamManager
+						, "issNo" 		: $('#issNo').val()
+						, "reqNo" 		: $('#reqNo').val()
+						, "actDngEval"	: $('#actDngEvalTodo').val()
+						, "deptId"		: jwt.deptId.slice(0,5)
+						, "sameTimeResultChk" : this.param.sameTimeResultChk || ''
 				}
-
-				// 각 행의 deptId 속성 + actMh 값을 읽어서 분기
-				$('#appLine tr[data-dept-id]').each(function() {
-					var deptId = $(this).data('dept-id');
-					var md  = $(this).find('input[name="actMh"]').val().replace(/,/g,'') || 0;
-
-					if (deptId === 'GUN30')			paramMap.saleTeamMd = md;
-					else if (deptId === 'GUN40')	paramMap.dsgnTeamMd = md;
-					else if (deptId === 'TRN50')	paramMap.matrTeamMd = md;
-					else if (deptId === 'GUN60')	paramMap.prodTeamMd = md;
-				})
 
 				Object.assign(paramMap, this.param);
 				postAjaxSync("/user/wb/wb20/insertApprovalLine", paramMap, null, function(data){
