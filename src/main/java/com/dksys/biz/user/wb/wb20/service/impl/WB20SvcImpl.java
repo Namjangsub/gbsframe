@@ -127,8 +127,10 @@ public class WB20SvcImpl implements WB20Svc {
 				result += qm01Mapper.updateReqSt(paramMap);
 			}
 			// 결과일괄 등록 자료 결재시 투입공수 업데이트
-			if ("Y".equals(paramMap.get("sameTimeResultChk"))) {
-				result += qm01Mapper.updateReqActMnRslt(paramMap);	// 결과자료 투입시간 업데이트
+			if ("TEAM01".equals(paramMap.get("actTeamManager"))) {
+    			if ("Y".equals(paramMap.get("sameTimeResultChk"))) {
+    				result += qm01Mapper.updateReqActMnRslt(paramMap);	// 결과자료 투입시간 업데이트
+    			}
 			}
 
 			// TODODIV2030:발주 및 출장 요청 결과자료 상태코드 바꾸기
@@ -136,8 +138,10 @@ public class WB20SvcImpl implements WB20Svc {
 			// REQ_ST: REQST02 --> REQST03 로 상태 변경처리
 			paramMap.put("reqNo", "REQ" + tempReqNo.substring(3, 10));
 			result += qm01Mapper.updateReqStRslt(paramMap);
-			result += qm01Mapper.updateReqActMnRslt(paramMap);	// 결과자료 투입시간 업데이트
 
+			if ("TEAM01".equals(paramMap.get("actTeamManager"))) {
+				result += qm01Mapper.updateReqActMnRslt(paramMap);	// 결과자료 투입시간 업데이트
+			}
 			// TODODIV2060:WBS이슈 발생에 대한 결재이면 이슈상태 변경처리
 		} else if ("TODODIV2060".equals(todoDiv2CodeId)) {
 			// ISS_STS: ISSSTS01 --> ISSSTS02 로 상태 변경처리
@@ -262,11 +266,19 @@ public class WB20SvcImpl implements WB20Svc {
 	@Override
 	public int updateApprovalCancle(Map<String, String> paramMap) {
 		int result = wb20Mapper.updateApprovalCancle(paramMap);
-		String deptId = paramMap.get("deptId");
-		// 허용할 팀장 부서 접두어 목록 검사
-		boolean isManagerDept = deptId != null && (deptId.startsWith("GUN30")|| deptId.startsWith("GUN40")|| deptId.startsWith("TRN50")|| deptId.startsWith("GUN60"));
 
-		if ("Y".equals(paramMap.get("teamManager")) && isManagerDept) {
+		
+		/***************************************************************************************
+		 * 결재 취소 처리시 팀장인경우에만 투입공수 Clear 처리 가능함 -- 처리시작
+		 ***************************************************************************************/
+		// 허용할 팀장 부서 접두어 목록 검사
+
+		String deptId = paramMap.get("deptId");
+		boolean isManagerDept = deptId != null && (deptId.startsWith("GUN30")|| deptId.startsWith("GUN40")|| deptId.startsWith("TRN50")|| deptId.startsWith("GUN60"));
+		// deptId 로 팀장 id 가져오기~~
+		Map<String, String> detailMap = wb24Mapper.selectDept2TeamManagerInfo(paramMap);
+		
+		if (detailMap.get("id").equals(paramMap.get("userId")) && isManagerDept) {
 			if ("TODODIV2030".equals(paramMap.get("todoDiv2CodeId"))) {	// 발주요청서 따로 결과등록
 				paramMap.put("reqNo", paramMap.get("todoNo"));
 				result += qm01Mapper.updateReqActMdCancle(paramMap);
@@ -283,9 +295,11 @@ public class WB20SvcImpl implements WB20Svc {
 					paramMap.put("reqNo", paramMap.get("todoNo"));
 					result += qm01Mapper.updateReqActMdCancle(paramMap);
 				}
-			} else {
 			}
 		}
+		/***************************************************************************************
+		 * 결재 취소 처리시 팀장인경우에만 투입공수 Clear 처리 가능함 -- 처리종료
+		 ***************************************************************************************/
 		
 		return result;
 	}

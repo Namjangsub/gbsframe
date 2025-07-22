@@ -201,10 +201,12 @@
 						, '' AS REQ_ST
 						, '' AS DUDT_INTEND_DT
 						, '' AS VIEW_SORT
+						, NVL(QP.SAME_TIME_RESULT,'N')  AS SAME_TIME_RESULT	--발주요청서와 결과를 동시에 등록한 자료 구분
 					FROM TB_WB20M03 T
 							LEFT OUTER JOIN TB_CM05M01 X ON  X.CODE_ID = T.TODO_DIV2_CODE_ID
 							LEFT OUTER JOIN TB_CM06M01 B  ON T.TODO_ID = B.ID
 							LEFT OUTER JOIN TB_CM06M01 C  ON T.CREAT_ID = C.ID
+							LEFT OUTER JOIN TB_QM01P01 AS QP ON QP.REQ_NO = T.TODO_NO
 					WHERE 1 = 1
 						<include refid="selectToDoListCondition"></include>
 				 UNION ALL 
@@ -248,6 +250,7 @@
 				               WHEN QM.REQ_ST IS NOT NULL THEN 2
 				               WHEN ISU.ISS_STS = 'ISSSTS02' THEN 2
 				               ELSE 1 END 															AS VIEW_SORT
+						, NVL(QP.SAME_TIME_RESULT,'N')  AS SAME_TIME_RESULT	--발주요청서와 결과를 동시에 등록한 자료 구분
 	                FROM TB_WB24M02  AS ISU --WBS이슈 정보
 		            		LEFT OUTER JOIN TB_CR02D02 AS CR  ON ISU.CO_CD= CR.CO_CD
 		                                                	AND ISU.SALES_CD = CR.SALES_CD
@@ -258,6 +261,7 @@
 	            			LEFT OUTER JOIN TB_WB24M03 AS ACT ON ISU.ISS_NO = ACT.ISS_NO --실적이슈 조치내용
 	              			LEFT OUTER JOIN TB_QM01M01 AS QM ON QM.REQ_NO = ISU.REQ_NO
 		           			LEFT OUTER JOIN TB_CM06M01 AS B4 ON QM.ORDRG_ID = B4.ID
+							LEFT OUTER JOIN TB_QM01P01 AS QP ON QP.REQ_NO = QM.REQ_NO
 	               WHERE 1=1
 	                AND ( (NVL(QM.REQ_ST,'REQST01') != 'REQST03' AND ISU.ISS_STS != 'ISSSTS03')
 	                        OR (NVL(ISU.ISS_STS,'ISSSTS01') != 'ISSSTS03' AND ISU.REQ_NO IS NULL)  
@@ -517,17 +521,18 @@
 	<!-- 결재 승인 -->
 	<update id="updateApprovalLine" parameterType="Map">
 		UPDATE TB_WB20M03
-			SET
-		TODO_CF_DT = SYSDATE
-		, SANCTN_STTUS = 'Y'
-		, TODO_CF_OPN = #{todoCfOpn}
-		, UDT_ID = #{userId}
-		, UDT_PGM = #{pgmId}
-		, UDT_DTTM = SYSDATE
+		   SET
+				  TODO_CF_DT = SYSDATE
+				, SANCTN_STTUS = 'Y'
+				, TODO_CF_OPN = #{todoCfOpn}
+				, UDT_ID = #{userId}
+				, UDT_PGM = #{pgmId}
+				, UDT_DTTM = SYSDATE
+				, ETC_FIELD1 = #{etcField1, jdbcType=VARCHAR} --팀장 작업공수 입력용으로 활용 2025.07.22
 		WHERE TODO_KEY = #{todoKey}
-			AND SANCTN_SN = #{sanctnSn}
-			AND TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
-			AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
+		  AND SANCTN_SN = #{sanctnSn}
+		  AND TODO_DIV1_CODE_ID = #{todoDiv1CodeId}
+		  AND TODO_DIV2_CODE_ID = #{todoDiv2CodeId}
 	</update>
 
 
@@ -541,6 +546,7 @@
 				, UDT_ID = #{userId}
 				, UDT_PGM = #{pgmId}
 				, UDT_DTTM = SYSDATE
+				, ETC_FIELD1 = #{etcField1, jdbcType=VARCHAR} --팀장 작업공수 입력용으로 활용 2025.07.22
 		WHERE TODO_NO = #{todoNo}  --해당업무 마스터 번호
 			AND SANCTN_SN = #{sanctnSn}  --결재순번
 		    AND TODO_ID   = #{userId}	  --결재대상자ID
