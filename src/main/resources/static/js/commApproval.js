@@ -164,7 +164,7 @@ function Approval(htmlParam, param, popParam) {
 							if (editable) {
 								html = html.replace(
 									/@@item3@@/gi,
-									`<input type="text" name="actMh" class="form-control" value="${gPasIntChk((data.actMh)) || ''}" style='text-align:center; padding-right:5px; height:40px;' comma onkeyup="onlyNumber(this)" required msg="투입공수">
+									`<input type="text" name="actMh" class="form-control" value="${gPasFloatChk((data.actMh)) || ''}" style='text-align:center; padding-right:5px; height:40px;' comma onkeyup="onlyNumber(this)" required msg="투입공수">
 									 <input type="hidden" name="actTeamManager" value="${data.deptTeamManager}">
 									 <input type="hidden" name="requiredMh" value="YES">`
 								);
@@ -172,7 +172,7 @@ function Approval(htmlParam, param, popParam) {
 								// 읽기전용
 								html = html.replace(
 									/@@item3@@/gi,
-									`<input type="text" name="actMh" readonly value="${gPasIntChk((data.actMh)) || ''}" style='text-align:center; padding-right:5px; height:40px;' comma>`
+									`<input type="text" name="actMh" readonly value="${gPasFloatChk((data.actMh)) || ''}" style='text-align:center; padding-right:5px; height:40px;' comma>`
 								);
 							}
 							
@@ -248,7 +248,7 @@ function Approval(htmlParam, param, popParam) {
 		var $tr = $('tr[data-dept-id='+ jwt.userId+']');
 		
 		// 각 항목 추출
-		var actMh = gPasIntChk($tr.find('input[name="actMh"]').val());
+		var actMh = gPasFloatChk($tr.find('input[name="actMh"]').val());
 		var requiredMh = $tr.find('input[name="requiredMh"]').val();
 		var actTeamManager = $tr.find('input[name="actTeamManager"]').val();
 		var todoCfOpn = $tr.find('textarea[name="todoCfOpn"]').val();
