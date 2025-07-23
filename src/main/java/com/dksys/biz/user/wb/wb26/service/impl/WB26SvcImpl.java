@@ -1,17 +1,13 @@
 package com.dksys.biz.user.wb.wb26.service.impl;
 
 import java.lang.reflect.Type;
-import java.text.Format.Field;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.user.wb.wb26.mapper.WB26Mapper;
@@ -91,4 +87,15 @@ public class WB26SvcImpl implements WB26Svc {
 	// public List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap) {
 	// 	return cr05Mapper.selectPmntmtdCd(paramMap);
 	// }
+	
+	@Override
+	public int select_wb2602_List_Count(Map<String, String> paramMap) {
+		return wb26Mapper.select_wb2602_List_Count(paramMap);
+	}
+
+	// 그리드 리스트
+	@Override
+	public List<Map<String, String>> select_wb2602_List(Map<String, String> paramMap) {
+		return wb26Mapper.select_wb2602_List(paramMap);
+	}
 }

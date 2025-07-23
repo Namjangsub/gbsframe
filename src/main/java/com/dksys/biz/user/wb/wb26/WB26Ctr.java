@@ -1,23 +1,21 @@
 package com.dksys.biz.user.wb.wb26;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.user.wb.wb26.service.WB26Svc;
 import com.dksys.biz.cmn.vo.PaginationInfo;
+import com.dksys.biz.user.wb.wb26.service.WB26Svc;
 import com.dksys.biz.util.MessageUtils;
+import com.dksys.biz.util.ObjectUtil;
 
 @Controller
 @RequestMapping("/user/wb/wb26")
@@ -81,4 +79,20 @@ public class WB26Ctr {
 	// 	model.addAttribute("result", result);
 	// 	return "jsonView";
 	// }
+	
+
+    //리스트 조회
+	@PostMapping(value = "/select_wb2602_List")
+	public String select_wb2602_List(@RequestBody Map<String, String> paramMap, ModelMap model) {
+
+		paramMap.put("prdtGrp", ObjectUtil.sqlInCodeGen(paramMap.get("prdtGrp")));
+		
+		int totalCnt = wb26svc.select_wb2602_List_Count(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = wb26svc.select_wb2602_List(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
 }

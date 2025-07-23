@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.ibatis.annotations.Mapper;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 @Mapper
 public interface WB26Mapper {
@@ -21,6 +20,9 @@ public interface WB26Mapper {
 	int update_wb26(Map<String, String> paramMap);
 
 	int update_wb26_confirmYn(Map<String, String> param);
+
+	int select_wb2602_List_Count(Map<String, String> paramMap);
+	List<Map<String, String>> select_wb2602_List(Map<String, String> paramMap);
 
     // // 수금유형 검색
 	// List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap);
