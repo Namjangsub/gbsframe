@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import com.dksys.biz.admin.cm.cm06.service.CM06Svc;
+import com.dksys.biz.config.RequestUtils;
 import com.dksys.biz.main.service.LoginService;
 import com.dksys.biz.main.vo.User;
 import com.dksys.biz.util.MessageUtils;
@@ -50,7 +51,8 @@ public class CM06Ctr {
     // 사용자 리스트 조회
     @PostMapping("/insertPgmHistory")
     public String insertPgmHistory(@RequestBody Map<String, String> paramMap, HttpServletRequest servletRequest, ModelMap model) {
-    	String clientIp = servletRequest.getRemoteAddr();
+//    	String clientIp = servletRequest.getRemoteAddr();
+    	String clientIp = RequestUtils.getClientIp();
     	paramMap.put("clientIp", clientIp);
     	cm06Svc.insertPgmHistory(paramMap);
     	return "jsonView";
