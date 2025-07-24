@@ -15,6 +15,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 
+import com.dksys.biz.admin.cm.cm06.service.CM06Svc;
+import com.dksys.biz.main.service.LoginService;
 import com.dksys.biz.main.vo.User;
 
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,13 @@ public class CustomLoginSuccessHandler implements AuthenticationSuccessHandler {
 
 	@Autowired
 	private UserLoginLogService userLoginLogService;
+
+    @Autowired
+    private LoginService loginService;
+    
+
+    @Autowired
+    CM06Svc cm06Svc;
 	
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication)
@@ -65,6 +74,13 @@ public class CustomLoginSuccessHandler implements AuthenticationSuccessHandler {
             String deviceType = RequestUtils.detectDeviceType(userAgent);
             String clientIp = RequestUtils.getClientIp();
             userLoginLogService.updateLastLoginTime(user.getId(), refreshToken, userAgent, clientIp, deviceType);
+            // 1) 로그인 이력 저장 (단 한 번)
+    		loginService.insertUserHistory(user);
+            Map<String,String> param = new HashMap<String,String>();
+    		param.put("isPwErr", "N");
+    		param.put("userId", user.getId());
+    		// 2)암호오류 리셋 (단 한 번)
+			Map<String, String> usrInfo = cm06Svc.updatePwErrCnt(param);
         }
         
         ResponseCookie cookie = ResponseCookie.from("refresh_token", refreshToken)

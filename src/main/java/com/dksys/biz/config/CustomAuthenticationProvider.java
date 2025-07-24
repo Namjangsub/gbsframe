@@ -4,7 +4,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
@@ -38,9 +37,11 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
 //        System.out.println(">>> 입력 비밀번호: [" + password + "]");
 //        System.out.println(">>> DB 비밀번호: [" + user.getPassword() + "]");
 //        System.out.println(">>> matches 결과: " + passwordEncoder.matches(password, user.getPassword()));
-
-        if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new BadCredentialsException("비밀번호가 일치하지 않습니다.");
+        // 암호가 다르거나, 사용않는 아이디인경우 접근 오류 처리
+        if ((!passwordEncoder.matches(password, user.getPassword())) || ("N".equals(user.getUseYn()))) {
+//            throw new BadCredentialsException("비밀번호가 일치하지 않습니다.");
+            throw new LoginFailureException("INVALID_CREDENTIALS", user);
+            
         }
 
         return new UsernamePasswordAuthenticationToken(user, password, user.getAuthorities());

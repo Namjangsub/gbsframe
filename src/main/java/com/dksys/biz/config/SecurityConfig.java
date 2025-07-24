@@ -10,7 +10,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -26,6 +25,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     private final AccessTokenValidationFilter accessTokenValidationFilter;
     private final CustomLoginSuccessHandler customLoginSuccessHandler;
+    private final CustomLoginFailureHandler customLoginFailureHandler; 
     
 //    @Bean
 //    public PasswordEncoder passwordEncoder() {
@@ -36,7 +36,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     protected void configure(HttpSecurity http) throws Exception {
         JsonLoginAuthenticationFilter jsonLoginFilter = new JsonLoginAuthenticationFilter(authenticationManager());
         jsonLoginFilter.setAuthenticationSuccessHandler(customLoginSuccessHandler);
-        jsonLoginFilter.setAuthenticationFailureHandler(new SimpleUrlAuthenticationFailureHandler());
+//        jsonLoginFilter.setAuthenticationFailureHandler(new SimpleUrlAuthenticationFailureHandler());
+        jsonLoginFilter.setAuthenticationFailureHandler(customLoginFailureHandler);
 
         http.cors().and()
             .csrf().disable()
