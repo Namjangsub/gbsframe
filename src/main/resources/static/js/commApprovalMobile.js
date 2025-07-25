@@ -280,7 +280,7 @@ function Approval(htmlParam, param, popParam) {
 			} else if( this.param.todoDiv1CodeNm == "결재" ) {
 
 				// dept-id 기준으로 대상 tr 선택
-				var $tr = $('tr[data-dept-id='+ jwt.userId+']');
+				var $tr = $('tr[data-dept-id="'+ jwt.userId+'"]');
 				
 				// 각 항목 추출
 				var actMh = gPasIntChk($tr.find('input[name="actMh"]').val());
