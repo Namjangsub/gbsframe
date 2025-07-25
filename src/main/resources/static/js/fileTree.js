@@ -83,19 +83,21 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 						$('#popForm a:has(i.i_search_w)').removeAttr('onclick');  //popForm ID안에 있는 <a>태그중 자식으로 i태그 i_search_w 클래스가 있으면 onclick 제거--> 결재창과 중복 방지를 위함
 						$('#popForm a:has(i.i_search_w)').remove();  //I 태그도 삭제
 						$('.popup_bottom_btn').last().append(callCmd);
-
-						//발주요청처리결과화면이면
-						if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
-							$('#measRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
-							$('#resltRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
-							$('#fdmtSolutCd').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-							$('#fdmtSolutCnt').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
-						} else if (params.fileTrgtTyp == 'WB2401P01' || params.fileTrgtTyp == 'WB2401P11') {
-							$('#measRst').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-							$('#actCnts').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-							$('#fdmtSolutCd').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-							$('#fdmtSolutCnt').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-							$('.issAct').removeClass('no-click');
+						debugger;
+						if (approvalWorkingGrid.teamManager) {
+							//발주요청처리결과화면이면
+							if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
+								$('#measRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
+								$('#resltRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
+								$('#fdmtSolutCd').css('pointer-events', 'auto').prop('disabled', false).css('background-color', '#ffffff');
+								$('#fdmtSolutCnt').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
+							} else if (params.fileTrgtTyp == 'WB2401P01' || params.fileTrgtTyp == 'WB2401P11') { //계획문제, 결과문제
+								$('#measRst').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+								$('#actCnts').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+								$('#fdmtSolutCd').css('pointer-events', 'auto').prop('disabled', false).css('background-color', '#ffffff');
+								$('#fdmtSolutCnt').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+								$('.issAct').removeClass('no-click');
+							}
 						}
 					}
 				} else {	//To-Do List가 아닌경우 각 화면에서 결재대상이면 처리하기 위함
@@ -123,18 +125,20 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 								$('#popForm a:has(i.i_search_w)').remove();  //I 태그도 삭제
 								$('.popup_bottom_btn').last().append(callCmd);	//마지막 popup_bottom_btn class에서 버튼 추가
 								
-								//발주요청처리결과화면이면
-								if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
-									$('#measRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
-									$('#resltRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
-									$('#fdmtSolutCd').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-									$('#fdmtSolutCnt').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
-								} else if (params.fileTrgtTyp == 'WB2401P01' || params.fileTrgtTyp == 'WB2401P11') {
-									$('#measRst').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-									$('#actCnts').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-									$('#fdmtSolutCd').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-									$('#fdmtSolutCnt').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-									$('.issAct').removeClass('no-click');
+								if (data.resultList.teamManager == '평가') {
+									//발주요청처리결과화면이면 수정 가능하게 속성 변경 처리
+									if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
+										$('#measRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
+										$('#resltRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
+										$('#fdmtSolutCd').css('pointer-events', 'auto').prop('disabled', false).css('background-color', '#ffffff');
+										$('#fdmtSolutCnt').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
+									} else if (params.fileTrgtTyp == 'WB2401P01' || params.fileTrgtTyp == 'WB2401P11') {
+										$('#measRst').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+										$('#actCnts').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+										$('#fdmtSolutCd').css('pointer-events', 'auto').prop('disabled', false).css('background-color', '#ffffff');
+										$('#fdmtSolutCnt').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+										$('.issAct').removeClass('no-click');
+									}
 								}
 							}
 						});
