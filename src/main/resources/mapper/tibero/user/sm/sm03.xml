@@ -1191,68 +1191,111 @@
 		  	SELECT COUNT(*)
 		  	 FROM 
 			   (
-				SELECT    MAX(ORDRG_NO)         AS ORDRG_NO
-						, MAX(SALES_CD)         AS SALES_CD
-						, MIN(발주납기요청기간)     AS 요청기간최소
-						, MAX(발주납기요청기간)     AS 요청기간최대
-						, MIN(입고기간)           AS 입고기간최소
-						, MAX(입고기간)           AS 입고기간최대
-				  FROM (
-						SELECT 
-								  T.ORDRG_NO, T.SALES_CD
-								, (SELECT FN_CM05M01_CD_TO_NM(B1.PRDT_GRP) FROM DUAL) AS 제품유형
-								, B1.PRDT_NM
-								, C2.PRDT_CD
-								, T.PCHS_CLNT_CD, T.ORDRG_DT, T.DUDT_DEQ_DT, T.CREAT_DTTM
-								, S3.IN_NO, S3.IN_SEQ, S3.MATR_CD, S3.IN_PRC, S3.IN_QTY, S3.IN_DTL_AMT, S3.IN_DT, S3.CREAT_DTTM
-								, B2.CLNT_NM
-								, B5.MATR_NM, B5.MATR_MAT, B5.MATR_SIZE, B5.MATR_SPEC
-								, TRUNC(T.DUDT_DEQ_DT - T.ORDRG_DT) 	AS 발주납기요청기간
-								, TRUNC(S3.IN_DT - T.ORDRG_DT)			AS 입고기간
-						  FROM TB_SM02M01 T
-						  			LEFT OUTER JOIN TB_SM03D01 AS S3 ON T.ORDRG_NO = S3.ORDRG_NO
-						  			LEFT OUTER JOIN TB_BM02M01 AS B2 ON T.PCHS_CLNT_CD = B2.CLNT_CD
-						  			LEFT OUTER JOIN TB_BM05M01 AS B5 ON S3.MATR_CD = B5.MATR_CD
-						  			LEFT OUTER JOIN TB_CR02D02 AS C2 ON T.SALES_CD = C2.SALES_CD
-						  			LEFT OUTER JOIN TB_BM01M01 AS B1 ON C2.PRDT_CD = B1.PRDT_CD
-						 WHERE 1 = 1
-							<!-- 입고일자 -->
-				            AND T.ORDRG_DT BETWEEN #{strtDt} AND #{endDt}  
-							<!-- SalesCode -->
-							<if test="salesCd != null and !salesCd.equals('')">
-							AND T.SALES_CD LIKE  '%' || #{salesCd} || '%'
-							</if>
-							<!-- 구매처 -->
-							<if test="pchsClntCd != null and !pchsClntCd.equals('')">
-							AND T.PCHS_CLNT_CD = #{pchsClntCd}
-							</if>
-							<if test="pchsClntNm != null and !pchsClntNm.equals('')">
-							AND B2.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'
-							</if>
-							<!-- 발주번호 -->
-							<if test="ordrgNo != null and !ordrgNo.equals('')">
-							AND T.ORDRG_NO LIKE '%'||#{ordrgNo}||'%'
-							</if>
-							<!-- 제품유형 -->
-					        <if test="prdtGrp != null and !prdtGrp.equals('')">
-					        AND B1.PRDT_GRP IN ( ${prdtGrp} )
-							</if>
-							<!-- 자재코드 -->
-<!-- 					        <if test="matrCd != null and !matrCd.equals('')"> -->
-<!-- 					        AND S3.MATR_CD LIKE '%'||#{matrCd}||'%' -->
-<!-- 							</if> -->
-							<!-- 자재명 -->
-					        <if test="matrNm != null and !matrNm.equals('')">
-					        AND (S3.MATR_CD LIKE '%'||#{matrNm}||'%' OR 
-					             B5.MATR_NM LIKE '%'||#{matrNm}||'%' OR 
-					       		 B5.MATR_MAT LIKE '%'||#{matrNm}||'%' OR 
-					       		 B5.MATR_SIZE LIKE '%'||#{matrNm}||'%' OR 
-					       		 B5.MATR_SPEC LIKE '%'||#{matrNm}||'%') 
-							</if>
-		                    AND TRUNC(S3.IN_DT - T.ORDRG_DT) <![CDATA[ > ]]> #{delayDay}
-		                    AND B5.MATR_GRP in ('MATRGRP02', 'MATRGRP03')
-				 		) AS T
-				 GROUP BY T.CLNT_NM, T.PCHS_CLNT_CD, T.MATR_NM, T.MATR_SIZE, T.MATR_CD
+			   -- 특정 기간별 구매 자재 거래정보 현황	
+				WITH MT AS (	--조건별 자재거래 정보	 
+						SELECT    t.*
+								, S3.IN_NO, S3.REQ_NO, S3.SALES_CD		--마지막 입고된 자료의 입고번호, 발주요청서번호, SalesCd
+						  FROM (
+								SELECT    S3.MATR_CD
+										, B5.MATR_GRP
+										, MIN(S3.IN_PRC)           					AS MIN_IN_PRC		--최소단가
+										, MAX(S3.IN_PRC)           					AS MAX_IN_PRC		--최대단가
+										, MIN(TRUNC(S2.DUDT_DEQ_DT - S2.ORDRG_DT)) 	AS 요청기간최소
+										, MAX(TRUNC(S2.DUDT_DEQ_DT - S2.ORDRG_DT)) 	AS 요청기간최대
+										, MIN(TRUNC(S3.IN_DT - S2.ORDRG_DT))  		AS 입고기간최소
+										, MAX(TRUNC(S3.IN_DT - S2.ORDRG_DT))  		AS 입고기간최대
+										, MAX(B5.DLVR_RQM_DAY)						AS DLVR_RQM_DAY		--납기소요일
+										, MAX(S2.ORDRG_NO)            				AS ORDRG_NO			--마지막발주번호
+										, TO_CHAR(MAX(S2.ORDRG_DT),'YYYY-MM-DD')    AS ORDRG_DT			--마지막발주일
+										, TO_CHAR(MAX(S2.DUDT_DEQ_DT),'YYYY-MM-DD')	AS DUDT_DEQ_DT		--마지막납기요청일
+										, TO_CHAR(MAX(S3.IN_DT),'YYYY-MM-DD')		AS IN_DT			--마지막입고일
+										, MAX(S3.IN_NO)            					AS IN_NO			--마지막입고번호
+										, B5.MATR_NM
+										, B5.MATR_MAT
+										, B5.MATR_SIZE
+										, B5.MATR_SPEC
+								  FROM TB_SM03D01 S3
+										 LEFT OUTER JOIN TB_BM05M01 AS B5 ON S3.MATR_CD = B5.MATR_CD
+								 		 LEFT OUTER JOIN TB_SM02M01 AS S2 ON S2.ORDRG_NO = S3.ORDRG_NO
+						  				 LEFT OUTER JOIN TB_BM02M01 AS B2 ON S2.PCHS_CLNT_CD = B2.CLNT_CD
+										 LEFT OUTER JOIN TB_CR02D02 AS C2 ON S2.SALES_CD = C2.SALES_CD
+										 LEFT OUTER JOIN TB_BM01M01 AS B1 ON C2.PRDT_CD = B1.PRDT_CD
+								WHERE 1 = 1
+								<!-- 입고일자 -->
+					            AND S2.ORDRG_DT BETWEEN #{strtDt} AND #{endDt}  
+								<!-- SalesCode -->
+								<if test="salesCd != null and !salesCd.equals('')">
+								AND S2.SALES_CD LIKE  '%' || #{salesCd} || '%'
+								</if>
+								<!-- 구매처 -->
+								<if test="pchsClntCd != null and !pchsClntCd.equals('')">
+								AND S2.PCHS_CLNT_CD = #{pchsClntCd}
+								</if>
+								<if test="pchsClntNm != null and !pchsClntNm.equals('')">
+								AND B2.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'
+								</if>
+								<!-- 발주번호 -->
+								<if test="ordrgNo != null and !ordrgNo.equals('')">
+								AND S2.ORDRG_NO LIKE '%'||#{ordrgNo}||'%'
+								</if>
+								<!-- 제품유형 -->
+						        <if test="prdtGrp != null and !prdtGrp.equals('')">
+						        AND B1.PRDT_GRP IN ( ${prdtGrp} )
+								</if>
+								<!-- 자재명 -->
+						        <if test="matrNm != null and !matrNm.equals('')">
+						        AND (S3.MATR_CD LIKE '%'||#{matrNm}||'%' OR 
+						             B5.MATR_NM LIKE '%'||#{matrNm}||'%' OR 
+						       		 B5.MATR_MAT LIKE '%'||#{matrNm}||'%' OR 
+						       		 B5.MATR_SIZE LIKE '%'||#{matrNm}||'%' OR 
+						       		 B5.MATR_SPEC LIKE '%'||#{matrNm}||'%') 
+								</if>
+			                    AND TRUNC(S3.IN_DT - S2.ORDRG_DT) <![CDATA[ > ]]> #{delayDay}
+			                    AND B5.MATR_GRP in ('MATRGRP02', 'MATRGRP03')
+								GROUP BY S3.MATR_CD, B5.MATR_GRP, B5.MATR_NM, B5.MATR_MAT, B5.MATR_SIZE, B5.MATR_SPEC
+							) AS T
+									LEFT OUTER JOIN TB_SM03M01 AS S3 ON T.IN_NO = S3.IN_NO	--마지막 입고자료정보 확인용
+						)			
+						SELECT *
+						  FROM (
+									SELECT 
+											  (SELECT FN_CM05M01_CD_TO_NM(B1.PRDT_GRP) FROM DUAL) AS 제품유형
+											, B1.PRDT_NM
+											, C2.PRDT_CD
+											, S2.PCHS_CLNT_CD
+											, B2.CLNT_NM
+											, T.MATR_CD
+									  FROM TB_SM03D01 T
+									  			LEFT OUTER JOIN TB_SM02M01 AS S2 ON T.ORDRG_NO = S2.ORDRG_NO
+									  			LEFT OUTER JOIN TB_BM02M01 AS B2 ON S2.PCHS_CLNT_CD = B2.CLNT_CD
+									  			LEFT OUTER JOIN TB_CR02D02 AS C2 ON T.SALES_CD = C2.SALES_CD
+									  			LEFT OUTER JOIN TB_BM01M01 AS B1 ON C2.PRDT_CD = B1.PRDT_CD
+									 WHERE 1 = 1
+										<!-- SalesCode -->
+										<if test="salesCd != null and !salesCd.equals('')">
+										AND S2.SALES_CD LIKE  '%' || #{salesCd} || '%'
+										</if>
+										<!-- 구매처 -->
+										<if test="pchsClntCd != null and !pchsClntCd.equals('')">
+										AND S2.PCHS_CLNT_CD = #{pchsClntCd}
+										</if>
+										<if test="pchsClntNm != null and !pchsClntNm.equals('')">
+										AND B2.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'
+										</if>
+										<!-- 발주번호 -->
+										<if test="ordrgNo != null and !ordrgNo.equals('')">
+										AND S2.ORDRG_NO LIKE '%'||#{ordrgNo}||'%'
+										</if>
+										<!-- 제품유형 -->
+								        <if test="prdtGrp != null and !prdtGrp.equals('')">
+								        AND B1.PRDT_GRP IN ( ${prdtGrp} )
+										</if>
+							            AND S2.ORDRG_DT BETWEEN #{strtDt} AND #{endDt}  
+			                    		AND TRUNC(T.IN_DT - S2.ORDRG_DT) <![CDATA[ > ]]> #{delayDay}
+						             GROUP BY  B1.PRDT_GRP, B1.PRDT_NM, C2.PRDT_CD, S2.PCHS_CLNT_CD, B2.CLNT_NM, T.MATR_CD
+						         ) AS T
+								  	INNER JOIN MT 				 ON T.MATR_CD = MT.MATR_CD
+					 ORDER BY 입고기간최대 DESC, MATR_NM, MATR_SPEC, MATR_MAT
 			) T
 	</select>
 	
@@ -1264,90 +1307,112 @@
 		  	SELECT rownum  AS RN, T.*
 		  	 FROM 
 			   (
-				SELECT    MAX(ORDRG_NO)         AS ORDRG_NO
-						, MAX(SALES_CD)         AS SALES_CD
-						, MIN(제품유형)       		AS  제품유형
-						, MAX(PRDT_NM)          AS PRDT_NM
-						, MAX(PRDT_CD)          AS PRDT_CD
-						, PCHS_CLNT_CD          AS PCHS_CLNT_CD
-						, TO_CHAR(MAX(ORDRG_DT),'YYYY-MM-DD')    AS ORDRG_DT
-						, TO_CHAR(MAX(DUDT_DEQ_DT),'YYYY-MM-DD')      AS DUDT_DEQ_DT
-						, MAX(IN_NO)            AS IN_NO
-						, MAX(IN_SEQ)           AS IN_SEQ
-						, MATR_CD               AS MATR_CD
-						, MIN(IN_PRC)           AS MIN_IN_PRC
-						, MAX(IN_PRC)           AS MAX_IN_PRC
-						, MAX(IN_QTY)           AS IN_QTY
-						, MAX(IN_DTL_AMT)       AS IN_DTL_AMT
-						, TO_CHAR(MAX(IN_DT),'YYYY-MM-DD')            AS IN_DT
-						, CLNT_NM               AS CLNT_NM
-						, MATR_NM               AS MATR_NM
-						, MAX(MATR_MAT)         AS MATR_MAT
-						, MATR_SIZE             AS MATR_SIZE
-						, MAX(MATR_SPEC)        AS MATR_SPEC
-						, MIN(발주납기요청기간)     AS 요청기간최소
-						, MAX(발주납기요청기간)     AS 요청기간최대
-						, MIN(입고기간)           AS 입고기간최소
-						, MAX(입고기간)           AS 입고기간최대
-						, max(DLVR_RQM_DAY)    AS DLVR_RQM_DAY
-				  FROM (
-						SELECT 
-								  T.ORDRG_NO, T.SALES_CD
-								, (SELECT FN_CM05M01_CD_TO_NM(B1.PRDT_GRP) FROM DUAL) AS 제품유형
-								, B1.PRDT_NM
-								, C2.PRDT_CD
-								, T.PCHS_CLNT_CD, T.ORDRG_DT, T.DUDT_DEQ_DT, T.CREAT_DTTM
-								, S3.IN_NO, S3.IN_SEQ, S3.MATR_CD, S3.IN_PRC, S3.IN_QTY, S3.IN_DTL_AMT, S3.IN_DT, S3.CREAT_DTTM
-								, B2.CLNT_NM
-								, B5.MATR_NM, B5.MATR_MAT, B5.MATR_SIZE, B5.MATR_SPEC
-								, TRUNC(T.DUDT_DEQ_DT - T.ORDRG_DT) 	AS 발주납기요청기간
-								, TRUNC(S3.IN_DT - T.ORDRG_DT)			AS 입고기간
-								, B5.DLVR_RQM_DAY																/* 납품소요일자 */
-						  FROM TB_SM02M01 T
-						  			LEFT OUTER JOIN TB_SM03D01 AS S3 ON T.ORDRG_NO = S3.ORDRG_NO
-						  			LEFT OUTER JOIN TB_BM02M01 AS B2 ON T.PCHS_CLNT_CD = B2.CLNT_CD
-						  			LEFT OUTER JOIN TB_BM05M01 AS B5 ON S3.MATR_CD = B5.MATR_CD
-						  			LEFT OUTER JOIN TB_CR02D02 AS C2 ON T.SALES_CD = C2.SALES_CD
-						  			LEFT OUTER JOIN TB_BM01M01 AS B1 ON C2.PRDT_CD = B1.PRDT_CD
-						 WHERE 1 = 1
-							<!-- 입고일자 -->
-				            AND T.ORDRG_DT BETWEEN #{strtDt} AND #{endDt}  
-							<!-- SalesCode -->
-							<if test="salesCd != null and !salesCd.equals('')">
-							AND T.SALES_CD LIKE  '%' || #{salesCd} || '%'
-							</if>
-							<!-- 구매처 -->
-							<if test="pchsClntCd != null and !pchsClntCd.equals('')">
-							AND T.PCHS_CLNT_CD = #{pchsClntCd}
-							</if>
-							<if test="pchsClntNm != null and !pchsClntNm.equals('')">
-							AND B2.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'
-							</if>
-							<!-- 발주번호 -->
-							<if test="ordrgNo != null and !ordrgNo.equals('')">
-							AND T.ORDRG_NO LIKE '%'||#{ordrgNo}||'%'
-							</if>
-							<!-- 제품유형 -->
-					        <if test="prdtGrp != null and !prdtGrp.equals('')">
-					        AND B1.PRDT_GRP IN ( ${prdtGrp} )
-							</if>
-							<!-- 자재코드 -->
-<!-- 					        <if test="matrCd != null and !matrCd.equals('')"> -->
-<!-- 					        AND S3.MATR_CD LIKE '%'||#{matrCd}||'%' -->
-<!-- 							</if> -->
-							<!-- 자재명 -->
-					        <if test="matrNm != null and !matrNm.equals('')">
-					        AND (S3.MATR_CD LIKE '%'||#{matrNm}||'%' OR 
-					             B5.MATR_NM LIKE '%'||#{matrNm}||'%' OR 
-					       		 B5.MATR_MAT LIKE '%'||#{matrNm}||'%' OR 
-					       		 B5.MATR_SIZE LIKE '%'||#{matrNm}||'%' OR 
-					       		 B5.MATR_SPEC LIKE '%'||#{matrNm}||'%') 
-							</if>
-		                    AND TRUNC(S3.IN_DT - T.ORDRG_DT) <![CDATA[ > ]]> #{delayDay}
-		                    AND B5.MATR_GRP in ('MATRGRP02', 'MATRGRP03')
-				 		) AS T
-				 GROUP BY T.CLNT_NM, T.PCHS_CLNT_CD, T.MATR_NM, T.MATR_SIZE, T.MATR_CD
-				 ORDER BY MAX(입고기간) DESC, 제품유형, T.MATR_NM, T.CLNT_NM
+			   -- 특정 기간별 구매 자재 거래정보 현황	
+				WITH MT AS (	--조건별 자재거래 정보	 
+						SELECT    t.*
+								, S3.IN_NO, S3.REQ_NO, S3.SALES_CD		--마지막 입고된 자료의 입고번호, 발주요청서번호, SalesCd
+						  FROM (
+								SELECT    S3.MATR_CD
+										, B5.MATR_GRP
+										, MIN(S3.IN_PRC)           					AS MIN_IN_PRC		--최소단가
+										, MAX(S3.IN_PRC)           					AS MAX_IN_PRC		--최대단가
+										, MIN(TRUNC(S2.DUDT_DEQ_DT - S2.ORDRG_DT)) 	AS 요청기간최소
+										, MAX(TRUNC(S2.DUDT_DEQ_DT - S2.ORDRG_DT)) 	AS 요청기간최대
+										, MIN(TRUNC(S3.IN_DT - S2.ORDRG_DT))  		AS 입고기간최소
+										, MAX(TRUNC(S3.IN_DT - S2.ORDRG_DT))  		AS 입고기간최대
+										, MAX(B5.DLVR_RQM_DAY)						AS DLVR_RQM_DAY		--납기소요일
+										, MAX(S2.ORDRG_NO)            				AS ORDRG_NO			--마지막발주번호
+										, TO_CHAR(MAX(S2.ORDRG_DT),'YYYY-MM-DD')    AS ORDRG_DT			--마지막발주일
+										, TO_CHAR(MAX(S2.DUDT_DEQ_DT),'YYYY-MM-DD')	AS DUDT_DEQ_DT		--마지막납기요청일
+										, TO_CHAR(MAX(S3.IN_DT),'YYYY-MM-DD')		AS IN_DT			--마지막입고일
+										, MAX(S3.IN_NO)            					AS IN_NO			--마지막입고번호
+										, B5.MATR_NM
+										, B5.MATR_MAT
+										, B5.MATR_SIZE
+										, B5.MATR_SPEC
+								  FROM TB_SM03D01 S3
+										 LEFT OUTER JOIN TB_BM05M01 AS B5 ON S3.MATR_CD = B5.MATR_CD
+								 		 LEFT OUTER JOIN TB_SM02M01 AS S2 ON S2.ORDRG_NO = S3.ORDRG_NO
+						  				 LEFT OUTER JOIN TB_BM02M01 AS B2 ON S2.PCHS_CLNT_CD = B2.CLNT_CD
+										 LEFT OUTER JOIN TB_CR02D02 AS C2 ON S2.SALES_CD = C2.SALES_CD
+										 LEFT OUTER JOIN TB_BM01M01 AS B1 ON C2.PRDT_CD = B1.PRDT_CD
+								WHERE 1 = 1
+								<!-- 입고일자 -->
+					            AND S2.ORDRG_DT BETWEEN #{strtDt} AND #{endDt}  
+								<!-- SalesCode -->
+								<if test="salesCd != null and !salesCd.equals('')">
+								AND S2.SALES_CD LIKE  '%' || #{salesCd} || '%'
+								</if>
+								<!-- 구매처 -->
+								<if test="pchsClntCd != null and !pchsClntCd.equals('')">
+								AND S2.PCHS_CLNT_CD = #{pchsClntCd}
+								</if>
+								<if test="pchsClntNm != null and !pchsClntNm.equals('')">
+								AND B2.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'
+								</if>
+								<!-- 발주번호 -->
+								<if test="ordrgNo != null and !ordrgNo.equals('')">
+								AND S2.ORDRG_NO LIKE '%'||#{ordrgNo}||'%'
+								</if>
+								<!-- 제품유형 -->
+						        <if test="prdtGrp != null and !prdtGrp.equals('')">
+						        AND B1.PRDT_GRP IN ( ${prdtGrp} )
+								</if>
+								<!-- 자재명 -->
+						        <if test="matrNm != null and !matrNm.equals('')">
+						        AND (S3.MATR_CD LIKE '%'||#{matrNm}||'%' OR 
+						             B5.MATR_NM LIKE '%'||#{matrNm}||'%' OR 
+						       		 B5.MATR_MAT LIKE '%'||#{matrNm}||'%' OR 
+						       		 B5.MATR_SIZE LIKE '%'||#{matrNm}||'%' OR 
+						       		 B5.MATR_SPEC LIKE '%'||#{matrNm}||'%') 
+								</if>
+			                    AND TRUNC(S3.IN_DT - S2.ORDRG_DT) <![CDATA[ > ]]> #{delayDay}
+			                    AND B5.MATR_GRP in ('MATRGRP02', 'MATRGRP03')
+								GROUP BY S3.MATR_CD, B5.MATR_GRP, B5.MATR_NM, B5.MATR_MAT, B5.MATR_SIZE, B5.MATR_SPEC
+							) AS T
+									LEFT OUTER JOIN TB_SM03M01 AS S3 ON T.IN_NO = S3.IN_NO	--마지막 입고자료정보 확인용
+						)			
+						SELECT *
+						  FROM (
+									SELECT 
+											  (SELECT FN_CM05M01_CD_TO_NM(B1.PRDT_GRP) FROM DUAL) AS 제품유형
+											, B1.PRDT_NM
+											, C2.PRDT_CD
+											, S2.PCHS_CLNT_CD
+											, B2.CLNT_NM
+											, T.MATR_CD
+									  FROM TB_SM03D01 T
+									  			LEFT OUTER JOIN TB_SM02M01 AS S2 ON T.ORDRG_NO = S2.ORDRG_NO
+									  			LEFT OUTER JOIN TB_BM02M01 AS B2 ON S2.PCHS_CLNT_CD = B2.CLNT_CD
+									  			LEFT OUTER JOIN TB_CR02D02 AS C2 ON T.SALES_CD = C2.SALES_CD
+									  			LEFT OUTER JOIN TB_BM01M01 AS B1 ON C2.PRDT_CD = B1.PRDT_CD
+									 WHERE 1 = 1
+										<!-- SalesCode -->
+										<if test="salesCd != null and !salesCd.equals('')">
+										AND S2.SALES_CD LIKE  '%' || #{salesCd} || '%'
+										</if>
+										<!-- 구매처 -->
+										<if test="pchsClntCd != null and !pchsClntCd.equals('')">
+										AND S2.PCHS_CLNT_CD = #{pchsClntCd}
+										</if>
+										<if test="pchsClntNm != null and !pchsClntNm.equals('')">
+										AND B2.CLNT_NM LIKE '%'||#{pchsClntNm}||'%'
+										</if>
+										<!-- 발주번호 -->
+										<if test="ordrgNo != null and !ordrgNo.equals('')">
+										AND S2.ORDRG_NO LIKE '%'||#{ordrgNo}||'%'
+										</if>
+										<!-- 제품유형 -->
+								        <if test="prdtGrp != null and !prdtGrp.equals('')">
+								        AND B1.PRDT_GRP IN ( ${prdtGrp} )
+										</if>
+							            AND S2.ORDRG_DT BETWEEN #{strtDt} AND #{endDt}  
+			                    		AND TRUNC(T.IN_DT - S2.ORDRG_DT) <![CDATA[ > ]]> #{delayDay}
+						             GROUP BY  B1.PRDT_GRP, B1.PRDT_NM, C2.PRDT_CD, S2.PCHS_CLNT_CD, B2.CLNT_NM, T.MATR_CD
+						         ) AS T
+								  	INNER JOIN MT 				 ON T.MATR_CD = MT.MATR_CD
+					 ORDER BY 입고기간최대 DESC, MATR_NM, MATR_SPEC, MATR_MAT
+		  	
 			) T
 		) T
 		WHERE 1=1
