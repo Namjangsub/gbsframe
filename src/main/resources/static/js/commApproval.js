@@ -154,7 +154,7 @@ function Approval(htmlParam, param, popParam) {
 							// 6. this.param.sameTimeResultChk == 'N' 이면 따로 등록
 							let editable = false; // 투입공수 입력여부 플래그
 							// 본인결재건이면서 팀장일때
-							if (applyBtn && data.deptTeamManager === 'TEAM01' && jwt.userId === data.todoId) {
+							if (applyBtn && data.deptTeamManager === 'TEAM01' && jwt.userId === data.todoId && ['GUN30', 'GUN40', 'TRN50', 'GUN60'].includes(jwt.deptId)) {
 								if  ((data.todoDiv2CodeId === 'TODODIV2020' && sameTimeResultChk === 'Y') 
 										|| (data.todoDiv2CodeId === 'TODODIV2090' || data.todoDiv2CodeId === 'TODODIV2030')){
 										editable = true;

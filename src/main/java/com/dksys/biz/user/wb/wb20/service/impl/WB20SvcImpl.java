@@ -166,7 +166,12 @@ public class WB20SvcImpl implements WB20Svc {
 				}
 			}
 			if ("TEAM01".equals(paramMap.get("actTeamManager"))) { 
-				result += wb24Mapper.updateWbsIssueActMn(paramMap);	// 이슈조치 투입시간 업데이트
+    				if ("GUN30".equals(paramMap.get("deptId")) ||
+    					"GUN40".equals(paramMap.get("deptId")) ||
+    					"TRN50".equals(paramMap.get("deptId")) ||
+    					"GUN60".equals(paramMap.get("deptId"))) {
+    						result += wb24Mapper.updateWbsIssueActMn(paramMap);	// 이슈조치 투입시간 업데이트
+    				}
 			}
 		} else if ("TODODIV2130".equals(todoDiv2CodeId)) {
 			// ISS_STS: ISSSTS01 --> ISSSTS02 로 상태 변경처리
@@ -300,8 +305,13 @@ public class WB20SvcImpl implements WB20Svc {
         				result += qm01Mapper.updateReqActMdCancle(paramMap);
 				}
 			} else if ("TODODIV2090".equals(paramMap.get("todoDiv2CodeId"))) {	// 문제조치
-				paramMap.put("issNo", paramMap.get("todoNo"));
-				result += wb24Mapper.updateWbsIssueActMdCancle(paramMap);
+				if ("GUN30".equals(paramMap.get("deptId")) ||
+					"GUN40".equals(paramMap.get("deptId")) ||
+					"TRN50".equals(paramMap.get("deptId")) ||
+					"GUN60".equals(paramMap.get("deptId"))) {
+        				paramMap.put("issNo", paramMap.get("todoNo"));
+        				result += wb24Mapper.updateWbsIssueActMdCancle(paramMap);
+				}
 			} else if ("TODODIV2020".equals(paramMap.get("todoDiv2CodeId"))){
 				// 동시 입력건인지 체크하고 결과동시 등로건이면 각 부서별 투입공수 초기화
 				Map<String, String> paramMap2 = new HashMap<>();
