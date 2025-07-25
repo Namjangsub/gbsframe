@@ -129,7 +129,12 @@ public class WB20SvcImpl implements WB20Svc {
 			// 결과일괄 등록 자료 결재시 투입공수 업데이트
 			if ("TEAM01".equals(paramMap.get("actTeamManager"))) {
     			if ("Y".equals(paramMap.get("sameTimeResultChk"))) {
-    				result += qm01Mapper.updateReqActMnRslt(paramMap);	// 결과자료 투입시간 업데이트
+    				if ("GUN30".equals(paramMap.get("deptId")) ||
+    					"GUN40".equals(paramMap.get("deptId")) ||
+    					"TRN50".equals(paramMap.get("deptId")) ||
+    					"GUN60".equals(paramMap.get("deptId"))) {
+    						result += qm01Mapper.updateReqActMnRslt(paramMap);	// 결과자료 투입시간 업데이트
+    					}
     			}
 			}
 
@@ -140,7 +145,12 @@ public class WB20SvcImpl implements WB20Svc {
 			result += qm01Mapper.updateReqStRslt(paramMap);
 
 			if ("TEAM01".equals(paramMap.get("actTeamManager"))) {
-				result += qm01Mapper.updateReqActMnRslt(paramMap);	// 결과자료 투입시간 업데이트
+				if ("GUN30".equals(paramMap.get("deptId")) ||
+					"GUN40".equals(paramMap.get("deptId")) ||
+					"TRN50".equals(paramMap.get("deptId")) ||
+					"GUN60".equals(paramMap.get("deptId"))) {
+					result += qm01Mapper.updateReqActMnRslt(paramMap);	// 결과자료 투입시간 업데이트
+				}
 			}
 			// TODODIV2060:WBS이슈 발생에 대한 결재이면 이슈상태 변경처리
 		} else if ("TODODIV2060".equals(todoDiv2CodeId)) {
@@ -282,8 +292,13 @@ public class WB20SvcImpl implements WB20Svc {
 		
 		if (detailMap.get("id").equals(paramMap.get("userId")) && isManagerDept) {
 			if ("TODODIV2030".equals(paramMap.get("todoDiv2CodeId"))) {	// 발주요청서 따로 결과등록
-				paramMap.put("reqNo", paramMap.get("todoNo"));
-				result += qm01Mapper.updateReqActMdCancle(paramMap);
+				if ("GUN30".equals(paramMap.get("deptId")) ||
+					"GUN40".equals(paramMap.get("deptId")) ||
+					"TRN50".equals(paramMap.get("deptId")) ||
+					"GUN60".equals(paramMap.get("deptId"))) {
+        				paramMap.put("reqNo", paramMap.get("todoNo"));
+        				result += qm01Mapper.updateReqActMdCancle(paramMap);
+				}
 			} else if ("TODODIV2090".equals(paramMap.get("todoDiv2CodeId"))) {	// 문제조치
 				paramMap.put("issNo", paramMap.get("todoNo"));
 				result += wb24Mapper.updateWbsIssueActMdCancle(paramMap);
@@ -294,8 +309,13 @@ public class WB20SvcImpl implements WB20Svc {
 				paramMap2.put("reqNo", paramMap.get("todoNo"));
 				Map<String, String> selectQtyReqInfo = qm01Mapper.selectQtyReqInfo(paramMap2);
 				if (!selectQtyReqInfo.isEmpty() && "Y".equals(selectQtyReqInfo.get("sameTimeResult"))) {
-					paramMap.put("reqNo", paramMap.get("todoNo"));
-					result += qm01Mapper.updateReqActMdCancle(paramMap);
+					if ("GUN30".equals(paramMap.get("deptId")) ||
+						"GUN40".equals(paramMap.get("deptId")) ||
+						"TRN50".equals(paramMap.get("deptId")) ||
+						"GUN60".equals(paramMap.get("deptId"))) {
+        					paramMap.put("reqNo", paramMap.get("todoNo"));
+        					result += qm01Mapper.updateReqActMdCancle(paramMap);
+					}
 				}
 			}
 		}
