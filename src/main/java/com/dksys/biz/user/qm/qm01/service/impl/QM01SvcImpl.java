@@ -173,8 +173,8 @@ public class QM01SvcImpl implements QM01Svc {
         String procType = paramMap.get("sameTimeResult"); // 결과 분리여부
         if (procType.equals("Y")) {
 
-			String fdmtSolutCd = paramMap.get("FDMTSOLUT");
-			paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
+			// String fdmtSolutCd = paramMap.get("FDMTSOLUT");
+			// paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
 			
             // 현재 날짜를 yyyyMMdd 형식으로 저장
             String 현재일 = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -262,8 +262,8 @@ public class QM01SvcImpl implements QM01Svc {
 	//---------------------------------------------------------------  
 	//첨부 화일 권한체크  끝 
 	//---------------------------------------------------------------  
-	String fdmtSolutCd = paramMap.get("FDMTSOLUT");
-	paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
+	// String fdmtSolutCd = paramMap.get("FDMTSOLUT");
+	// paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
 	int result = QM01Mapper.updateQualityResp(paramMap);
 	
 	//---------------------------------------------------------------  
@@ -360,8 +360,8 @@ public class QM01SvcImpl implements QM01Svc {
             String rsltNoCopy = "RES" + reqNo.substring(3, 10);
             paramMap.put("rsltNo", rsltNoCopy);
 
-			String fdmtSolutCd = paramMap.get("FDMTSOLUT");
-			paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
+			// String fdmtSolutCd = paramMap.get("FDMTSOLUT");
+			// paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
 
             // 현재 날짜를 yyyyMMdd 형식으로 저장
             String 현재일 = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -505,8 +505,8 @@ public class QM01SvcImpl implements QM01Svc {
 			String rsltNoCopy = "RES" + reqNo.substring(3,10); 
 			paramMap.put("rsltNo", rsltNoCopy);
 		}
-		String fdmtSolutCd = paramMap.get("FDMTSOLUT");
-		paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
+		// String fdmtSolutCd = paramMap.get("FDMTSOLUT");
+		// paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
 		int result = QM01Mapper.insertQualityResp(paramMap);		
 		int result2 = QM01Mapper.updateReqRsltChg(paramMap);// 실적등록 여부 갱신 
 		//---------------------------------------------------------------  

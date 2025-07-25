@@ -88,10 +88,13 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 						if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
 							$('#measRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
 							$('#resltRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
-							$('#FDMTSOLUT-radioButtonContainer input[type="checkbox"]').off('click');
+							$('#fdmtSolutCd').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+							$('#fdmtSolutCnt').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
 						} else if (params.fileTrgtTyp == 'WB2401P01' || params.fileTrgtTyp == 'WB2401P11') {
 							$('#measRst').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
 							$('#actCnts').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+							$('#fdmtSolutCd').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+							$('#fdmtSolutCnt').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
 							$('.issAct').removeClass('no-click');
 						}
 					}
@@ -124,9 +127,13 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 								if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
 									$('#measRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
 									$('#resltRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
+									$('#fdmtSolutCd').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+									$('#fdmtSolutCnt').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
 								} else if (params.fileTrgtTyp == 'WB2401P01' || params.fileTrgtTyp == 'WB2401P11') {
 									$('#measRst').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
 									$('#actCnts').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+									$('#fdmtSolutCd').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
+									$('#fdmtSolutCnt').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
 									$('.issAct').removeClass('no-click');
 								}
 							}
