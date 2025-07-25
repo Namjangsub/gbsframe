@@ -83,7 +83,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 						$('#popForm a:has(i.i_search_w)').removeAttr('onclick');  //popForm ID안에 있는 <a>태그중 자식으로 i태그 i_search_w 클래스가 있으면 onclick 제거--> 결재창과 중복 방지를 위함
 						$('#popForm a:has(i.i_search_w)').remove();  //I 태그도 삭제
 						$('.popup_bottom_btn').last().append(callCmd);
-						debugger;
+						
 						if (approvalWorkingGrid.teamManager) {
 							//발주요청처리결과화면이면
 							if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
