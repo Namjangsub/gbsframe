@@ -2418,15 +2418,25 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 			cell.value = number;
 			if (typeof number === 'number') {
 				cell.numFmt = '#,##0'; // 숫자 형식 지정
-				cell.alignment = { horizontal: 'right' }; // 오른쪽 정렬
+				cell.alignment = { horizontal: 'right', vertical: 'top', wrapText: true }; // 숫자: 오른쪽 정렬 + 줄바꿈
+			} else {
+				cell.alignment = { horizontal: 'left', vertical: 'top', wrapText: true }; // 문자열: 왼쪽 정렬 + 줄바꿈
 			}
 
 		    cell.font = dataFont;
 			cell.border = headerBorder;
+			// 셀 폭 조정 (가장 긴 줄 기준)
+			const getMaxLineLength = (value) => {
+			    if (typeof value !== 'string') return value.toString().length;
+			    return value.split(/\r?\n/).reduce((max, line) => Math.max(max, line.length), 0);
+			};
+			
+			
 			//셀폭은 기본 그리드 헤드 넓이를 기준으로 70% 크기의 셀폭을 최소 길이로 하고 컬럼 문자길이에 따라 조정합니다.
 			var cellValue = number !== undefined ? number.toString() : '';
+			const maxLineLength = getMaxLineLength(cellValue);
 			const curWidth = worksheet.getColumn(col + 1).width;
-			worksheet.getColumn(col + 1).width = Math.max(curWidth, cellValue.toString().length * 1.0);
+			worksheet.getColumn(col + 1).width = Math.max(curWidth, maxLineLength * 1.0);
 		});
 
 		lastRow = row + 2;
