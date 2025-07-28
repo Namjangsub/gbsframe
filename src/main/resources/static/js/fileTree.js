@@ -79,7 +79,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 					if (approvalWorkingGrid.sanctnSttus == "N" && approvalWorkingGrid.todoId == jwt.userId) {
 						const actionType = (approvalWorkingGrid.todoDiv1CodeNm == '결재') ? '결재승인' : '공유확인';
 						const todoKey = approvalWorkingGrid.todoKey;	//TO-Do 고유번호
-						const callCmd = `<button class="callApprovalWorking" onclick="treeModule.callApprovalWorking('${todoKey}')">${actionType}</button>`;
+						const callCmd = `<button class="callApprovalWorking" onclick="treeModule.callApprovalWorking('${todoKey}', '${approvalWorkingGrid.creatPgm}')">${actionType}</button>`;
 						$('#popForm a:has(i.i_search_w)').removeAttr('onclick');  //popForm ID안에 있는 <a>태그중 자식으로 i태그 i_search_w 클래스가 있으면 onclick 제거--> 결재창과 중복 방지를 위함
 						$('#popForm a:has(i.i_search_w)').remove();  //I 태그도 삭제
 						$('.popup_bottom_btn').last().append(callCmd);
@@ -112,6 +112,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 								"userId" 			: jwt.userId,
 								"useYn" 			: 'Y',
 						}
+						
 						postAjax("/user/wb/wb20/selectCurrentUserApprovalDataList", paramObj, null, function(data){
 							if (data.resultList.length > 0) {
 								approvalWorkingGrid = data.resultList[0]; //결재 승인을 위한 파라메터 전역변수에 저장함
@@ -119,13 +120,13 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 								//결재전이면 결재승인버튼 추가
 								const actionType = (approvalWorkingGrid.todoDiv1CodeNm == '결재') ? '결재승인' : '공유확인';
 								const todoKey = approvalWorkingGrid.todoKey;	//TO-Do 고유번호
-								const callCmd = `<button class="callApprovalWorking" onclick="treeModule.callApprovalWorking('${todoKey}')">${actionType}</button>`;
+								const callCmd = `<button class="callApprovalWorking" onclick="treeModule.callApprovalWorking('${todoKey}', '${params.fileTrgtTyp}')">${actionType}</button>`;
 
 								$('#popForm a:has(i.i_search_w)').removeAttr('onclick');  //popForm ID안에 있는 <a>태그중 자식으로 i태그 i_search_w 클래스가 있으면 onclick 제거--> 결재창과 중복 방지를 위함
 								$('#popForm a:has(i.i_search_w)').remove();  //I 태그도 삭제
 								$('.popup_bottom_btn').last().append(callCmd);	//마지막 popup_bottom_btn class에서 버튼 추가
 								
-								if (data.resultList.teamManager == '평가') {
+								if (approvalWorkingGrid.teamManager == '평가') {
 									//발주요청처리결과화면이면 수정 가능하게 속성 변경 처리
 									if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
 										$('#measRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
@@ -619,8 +620,20 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 	}
 
 
-	function callApprovalWorking(todoKey){
-
+	function callApprovalWorking(todoKey, callPgm = ''){
+		//코칭수정 버튼이 활성화 상태이면 결과 Update 처리 선행
+		//필요시 프로그램 에 따라 분기 처리
+		let chkFlag = false;
+		if (callPgm =='QM0101P01') {
+			chkFlag = ModalApp.updateQualityResultComment('결과수정');
+		} else if (callPgm == 'QM0101P03') {
+			chkFlag = updateQualityResultComment('결과수정');
+		} else  if (callPgm == 'WB2401P01' || callPgm == 'WB2401P11') {
+			chkFlag = updateIssueComment('결과수정');
+		}
+		
+		if (!chkFlag) {return false;}
+		
 		paramObj = {
 				"todoKey" : todoKey,
 				"userId"  : jwt.userId,
