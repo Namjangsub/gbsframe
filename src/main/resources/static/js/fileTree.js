@@ -98,6 +98,11 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 								$('#fdmtSolutCnt').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
 								$('.issAct').removeClass('no-click');
 							}
+
+						} else {  //평가자가 아닌경우 필수 입력 필드 제외 처리
+							$('#fdmtSolutCd').removeAttr('required').closest('td').prev('th').removeClass('hit');
+							$('#fdmtSolutCnt').removeAttr('required').closest('td').prev('th').removeClass('hit');
+							$('#actMh').removeAttr('required').closest('td').prev('th').removeClass('hit');
 						}
 					}
 				} else {	//To-Do List가 아닌경우 각 화면에서 결재대상이면 처리하기 위함
@@ -140,6 +145,10 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 										$('#fdmtSolutCnt').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
 										$('.issAct').removeClass('no-click');
 									}
+								} else {  //평가자가 아닌경우 필수 입력 필드 제외 처리
+									$('#fdmtSolutCd').removeAttr('required').closest('td').prev('th').removeClass('hit');
+									$('#fdmtSolutCnt').removeAttr('required').closest('td').prev('th').removeClass('hit');
+									$('#actMh').removeAttr('required').closest('td').prev('th').removeClass('hit');
 								}
 							}
 						});
