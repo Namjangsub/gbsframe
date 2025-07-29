@@ -2407,7 +2407,9 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 				lcCellKey.indexOf('rate') !== -1 ||
 				lcCellKey.indexOf('cost') !== -1 ||
 				lcCellKey.indexOf('size') !== -1 ||
-				lcCellKey.indexOf('pct') !== -1
+				lcCellKey.indexOf('pct') !== -1 ||
+				lcCellKey.indexOf('mh') !== -1 ||
+				lcCellKey.indexOf('md') !== -1
 			) {
 					if (/^\d+$/.test(data[cellKey])) {
 						number = parseFloat(data[cellKey]);
@@ -2415,15 +2417,37 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 
 			}
 
-			cell.value = number;
+			// 특정 코드 처리: ISSSTS01 = 빨간 ●, ISSSTS02 = 녹색 ●
+			if (number == 'ISSSTS01' || number == "REQST01") {
+				cell.value = '●';
+				cell.font = { ...dataFont, color: { argb: 'FF0000' } }; // 빨간색
+			} else if (number === 'ISSSTS03' || number == 'REQST03') {
+				cell.value = '●';
+				cell.font = { ...dataFont, color: { argb: '0000FF' } }; // 파란색
+			} else if (number === 'ISSSTS02' || number == 'REQST02') {
+				cell.value = '●';
+//				cell.font = { ...dataFont, color: { argb: '008000' } }; // 녹색
+				cell.font = { ...dataFont, color: { argb: '808080' } }; // 회색
+			} else {
+				cell.value = number;
+			    cell.font = dataFont;
+			}
+			
+			
 			if (typeof number === 'number') {
-				cell.numFmt = '#,##0'; // 숫자 형식 지정
+				// 소숫점 이하 존재 여부 판단
+				if (Number.isInteger(number)) {
+					cell.numFmt = '#,##0'; // 정수: 천단위 콤마
+				} else {
+					// 소숫점 자릿수에 따라 동적으로 서식 설정 (최대 소숫점 3자리까지 예시)
+					const decimalPlaces = number.toString().split('.')[1]?.length || 0;
+					cell.numFmt = '#,##0.' + '0'.repeat(decimalPlaces); // 예: #,##0.00
+				}
 				cell.alignment = { horizontal: 'right', vertical: 'middle', wrapText: true }; // 숫자: 오른쪽 정렬 + 줄바꿈
 			} else {
 				cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }; // 문자열: 왼쪽 정렬 + 줄바꿈
 			}
 
-		    cell.font = dataFont;
 			cell.border = headerBorder;
 			// 셀 폭 조정 (가장 긴 줄 기준)
 			const getMaxLineLength = (value) => {
