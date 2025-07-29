@@ -2418,9 +2418,9 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 			cell.value = number;
 			if (typeof number === 'number') {
 				cell.numFmt = '#,##0'; // 숫자 형식 지정
-				cell.alignment = { horizontal: 'right', vertical: 'top', wrapText: true }; // 숫자: 오른쪽 정렬 + 줄바꿈
+				cell.alignment = { horizontal: 'right', vertical: 'middle', wrapText: true }; // 숫자: 오른쪽 정렬 + 줄바꿈
 			} else {
-				cell.alignment = { horizontal: 'left', vertical: 'top', wrapText: true }; // 문자열: 왼쪽 정렬 + 줄바꿈
+				cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }; // 문자열: 왼쪽 정렬 + 줄바꿈
 			}
 
 		    cell.font = dataFont;
@@ -2434,7 +2434,8 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 			
 			//셀폭은 기본 그리드 헤드 넓이를 기준으로 70% 크기의 셀폭을 최소 길이로 하고 컬럼 문자길이에 따라 조정합니다.
 			var cellValue = number !== undefined ? number.toString() : '';
-			const maxLineLength = getMaxLineLength(cellValue);
+			let maxLineLength = getMaxLineLength(cellValue);
+			maxLineLength = maxLineLength > 60 ? 60 : maxLineLength;
 			const curWidth = worksheet.getColumn(col + 1).width;
 			worksheet.getColumn(col + 1).width = Math.max(curWidth, maxLineLength * 1.0);
 		});
