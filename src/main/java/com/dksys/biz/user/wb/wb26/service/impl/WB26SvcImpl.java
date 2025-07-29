@@ -98,4 +98,15 @@ public class WB26SvcImpl implements WB26Svc {
 	public List<Map<String, String>> select_wb2602_List(Map<String, String> paramMap) {
 		return wb26Mapper.select_wb2602_List(paramMap);
 	}
+	
+	@Override
+	public int select_wb2603_List_Count(Map<String, String> paramMap) {
+		return wb26Mapper.select_wb2603_List_Count(paramMap);
+	}
+
+	// 그리드 리스트
+	@Override
+	public List<Map<String, String>> select_wb2603_List(Map<String, String> paramMap) {
+		return wb26Mapper.select_wb2603_List(paramMap);
+	}
 }

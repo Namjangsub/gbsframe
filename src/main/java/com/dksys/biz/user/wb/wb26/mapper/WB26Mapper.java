@@ -24,6 +24,9 @@ public interface WB26Mapper {
 	int select_wb2602_List_Count(Map<String, String> paramMap);
 	List<Map<String, String>> select_wb2602_List(Map<String, String> paramMap);
 
+	int select_wb2603_List_Count(Map<String, String> paramMap);
+	List<Map<String, String>> select_wb2603_List(Map<String, String> paramMap);
+
     // // 수금유형 검색
 	// List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap);
 }

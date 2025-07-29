@@ -79,7 +79,7 @@ public class WB26Ctr {
 	// 	model.addAttribute("result", result);
 	// 	return "jsonView";
 	// }
-	
+
 
     //리스트 조회
 	@PostMapping(value = "/select_wb2602_List")
@@ -91,6 +91,20 @@ public class WB26Ctr {
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
 		List<Map<String, String>> result = wb26svc.select_wb2602_List(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+    //리스트 조회
+	@PostMapping(value = "/select_wb2603_List")
+	public String select_wb2603_List(@RequestBody Map<String, String> paramMap, ModelMap model) {
+
+		paramMap.put("prdtGrp", ObjectUtil.sqlInCodeGen(paramMap.get("prdtGrp")));
+		
+		int totalCnt = wb26svc.select_wb2603_List_Count(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = wb26svc.select_wb2603_List(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
