@@ -39,6 +39,7 @@
 	<script type="text/javascript" src="/static/js/ax5/ax5toast.min.js"></script>
 	<script type="text/javascript" src="/static/js/workingDayCalc.js"></script>
 	<script type="text/javascript" src="/static/js/korean-lunar-calendar.min.js"></script>
+	<script src="/static/js/exceljs.min.js"></script>
 	<script type="text/javascript" src="/static/js/global.js"></script>
 	<script src="/static/js/heic2any.min.js"></script>
 	<script type="text/javascript" src="/static/js/fileTree.js"></script>
@@ -210,7 +211,8 @@
 <!-- 					<a onclick="insertDailyWorkModal('C');" style="height: 30px; line-height: 28px;" authchk>+</a> -->
 <!-- 					<a onclick="deleteDailyWork();" style="height: 30px; line-height: 28px;" authchk>-</a> -->
 					<a onclick="insertQualityReqModal();" style="height: 30px; line-height: 28px; width: 110px;"><i class="fas fa-folder"></i>요인별발주요청서</a>
-					<a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
+					<!-- <a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a> -->
+					<a onclick="jsonToExcel(gridView);" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 				</div>
 				<select id="recordCnt" class="prae_select" data-search="recordCnt" onchange="gridView.setData(0);">
 					<option value="25">25</option>
@@ -334,8 +336,9 @@
 					,{key: "delayDay",		label: "지연일수",			width: 70,		align: "center"}
 					,{key: "subCdNm", 		label: "등록사유", 		width: 100,		align: "left"}
 					,{key: "actFdmtSolutCd",label: "근본원인cd", 		width: 165,		align: "left", hidden:true}
-					,{key: "actFdmtSolutNm",label: "근본원인",		width: 165, 	align: "left", formatter: function(){
-						return (this.value || '') + (this.item.actFdmtSolutCnt ? '<br>(' + this.item.actFdmtSolutCnt + ')' : '')} }
+					,{key: "actFdmtSolutNm",label: "근본원인명",		width: 165, 	align: "left", hidden:true}
+					,{key: "actFdmtSolutNmCnt",label: "근본원인", 		width: 165,		align: "left", formatter: function () {
+						return (this.value) ? '<span style="display: block; white-space: pre;; max-height: 60px;">'+this.value+'</span>' : ''}}
 					,{key: "vendCdNm",		label: "외주업체",			width: 80,		align: "left"}
 					,{key: "reqDt", 		label: "사내완료일", 		width: 80,		align: "center"}
 					,{key: "custReqDt", 	label: "고객완료일", 		width: 80,		align: "center"}
@@ -452,8 +455,8 @@
 						,{key: "issDivNm",		label: "유형",			width: 60,		align: "center"}
 						,{key: "subCdNm", 		label: "등록사유", 		width: 100,		align: "left"}
 						,{key: "actFdmtSolutCd",label: "근본원인cd", 		width: 165,		align: "left", hidden:true}
-						,{key: "actFdmtSolutNm",label: "근본원인",		width: 165, 	align: "left", formatter: function(){
-							return (this.value || '') + (this.item.actFdmtSolutCnt ? '\n(' + this.item.actFdmtSolutCnt + ')' : '')} }
+						,{key: "actFdmtSolutNm",label: "근본원인명",		width: 165, 	align: "left", hidden:true}
+						,{key: "actFdmtSolutNmCnt",label: "근본원인", 		width: 165,		align: "left"}
 						,{key: "vendCdNm",		label: "외주업체",			width: 80,		align: "left"}
 						,{key: "reqDt", 		label: "사내완료일", 		width: 80,		align: "center"}
 						,{key: "custReqDt", 	label: "고객완료일", 		width: 80,		align: "center"}
@@ -651,32 +654,40 @@
 		});
 	}
 
-	//엑셀다운로드
-	function excelDown() {
+	// //엑셀다운로드
+	// function excelDown() {
 
-		var formData = {
-			"pageNo"   : 1,
-			"recordCnt": 9999999
-		};
+	// 	var formData = {
+	// 		"pageNo"   : 1,
+	// 		"recordCnt": 9999999
+	// 	};
 
-		$.each($('#main_area [data-search]'), function(idx, elem) {
-			formData[$(elem).data('search')] = elem.value;
-		});
-		formData["reqDtFrom"] = $("#reqDtFrom_S").val().replace(/\-/g, '');
-		formData["reqDtTo"]   = $("#reqDtTo_S").val().replace(/\-/g, '');
+	// 	$.each($('#main_area [data-search]'), function(idx, elem) {
+	// 		formData[$(elem).data('search')] = elem.value;
+	// 	});
+	// 	formData["reqDtFrom"] = $("#reqDtFrom_S").val().replace(/\-/g, '');
+	// 	formData["reqDtTo"]   = $("#reqDtTo_S").val().replace(/\-/g, '');
 
-		postAjax("/user/pm/pm01/selectAllIssueWorkList", formData, null, function(data){
-			var list = data.result;
-			excelView.target.setData({
-				list : list,
-				page : {
-					totalElements : data.paginationInfo.totalRecordCount
-				}
-			});
-			var todayDate = new Date().format('yyyyMMddHHmmss');
-			excelView.target.exportExcel("기간별 문제 현황_"+todayDate+".xls");
-		});
+	// 	postAjax("/user/pm/pm01/selectAllIssueWorkList", formData, null, function(data){
+	// 		var list = data.result;
+	// 		excelView.target.setData({
+	// 			list : list,
+	// 			page : {
+	// 				totalElements : data.paginationInfo.totalRecordCount
+	// 			}
+	// 		});
+	// 		var todayDate = new Date().format('yyyyMMddHHmmss');
+	// 		excelView.target.exportExcel("기간별 문제 현황_"+todayDate+".xls");
+	// 	});
+	// }
+
+	// 엑셀다운로드2
+	function jsonToExcel (grid) {
+		const list = grid.target.getList();
+		const header = grid.target.colGroup;
+		exportJSONToExcel(list, header,  '기간별 문제 현황');
 	}
+
 
 	// WBS 계획 문제 수정 방법은 문제 관리 화면(구분자:U3) 에서 등록 (1가지 방법), 기존 WBS 일정계획 (구분자:U1)은 사용하지 않고 문제관리 화면으로 이동
 	// WBS 실적 문제 수정 방법은 문제 관리 화면(구분자:U4) 에서 등록 (1가지 방법), 기존 WBS 일정계획 (구분자:U2)은 사용하지 않고 문제관리 화면으로 이동
