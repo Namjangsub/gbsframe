@@ -54,6 +54,21 @@
   	<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-multiselect.css">
  	<script src="/static/bootstrap/js/bootstrap-multiselect.min.js"></script>
     <script src="/static/js/manualPopup.js"></script>
+    
+<!-- AX5-grid body영역의 Cell Style변경처리 해당화면의 모든 그리드 셀 포멧이 바뀌게 됩니다. -->
+<style type="text/css">
+	[data-ax5grid] [data-ax5grid-container="root"] [data-ax5grid-container="body"] [data-ax5grid-panel] table tr td [data-ax5grid-cellHolder] {
+	    display: block;
+	    box-sizing: border-box;
+	    padding: 1px 1px;
+	    font-size: 9px;
+	    line-height: 1;
+	    white-space: nowrap;
+	    overflow: hidden;
+	    text-overflow: ellipsis
+	}
+</style>
+    
 </head>
 <body>
 	<div id="head_area"></div>
@@ -141,8 +156,15 @@
 								<option value="">전체</option>
 							</select>
 						</td>
-						<th></th>
-						<td></td>
+						<th>분석기준</th>
+						<td>
+							<select id="qryType_S" name="qryType_S" data-search="qryType">
+								<option value="일수">일수</option>
+								<option value="시작일">시작일</option>
+								<option value="종료일">종료일</option>
+<!-- 								<option value="공수">공수</option> -->
+							</select>
+						</td>
 					</tr>
 
 				</table>
@@ -154,10 +176,10 @@
 			<!-- 콘텐츠 타이틀 -->
 			<div class="contents_tit">
 				<span style="height: 30px; line-height: 30px;font-size: 15px;margin-left: 15px">설비별 일정분석 자료
-					<span style="font-size:11px;color:black; background-color: darkgray">
+					<span style="font-size:14px;color:black; background-color: darkgray">
 						[ 색상구분 : 
 						<span style="color:#d35cff">■</span>:계획대비 일수 증가,  
-						<span style="color:#ff9b46">■</span>:계획대비 일수 감소, 
+						<span style="color:#fffd81">■</span>:계획대비 일수 감소, 
 						<span style="color:#ffc5c5">■</span>:실적없는자료, 
 						<span style="color:#cceaff">■</span>:PM계획자료]
 					</span>
@@ -193,28 +215,37 @@
 		let rtnColor = "";
 // 		let minMhTot = item.minResultMhTot;	//최대 투입공수
 		if (item.planType == 'PM계획') {
-			rtnColor = "grid-cell-blue ";
+			rtnColor = "grid-cell-blue";
 		} else if (key.includes('Cha')) {
 			const tempVal = gPasIntChk(item[key]);
 			if (tempVal > 0) {
-				rtnColor = "grid-cell-pupple ";
+				rtnColor = "grid-cell-pupple";
 			} else if (tempVal < 0) {
-				rtnColor = "grid-cell-orange ";
+				rtnColor = "grid-cell-orange";
+			}
+		} else if (item.planType == '담당실적') {
+			if (['plan0', 'plan1'].includes(key.slice(0, 5))) {
+				const targetKey = key.slice(0, 6) + 'Sdt';	//planxxSdt 의 값을 추출하기 위함
+				const thisPlanRow = gridSourceList[item.__index-2];  //담당실적에 해당하는 계획자료 추출
+				if (thisPlanRow[targetKey]) {							//planxxSdt 계획일정이 있는데 실적이 없으면 붉은색 배경처리
+					if (!item[targetKey]) {								//실적이 없으면 붉은색 배경으로 표시함
+						rtnColor = "grid-cell-red";
+					}
+				} 
+
+				const targetChaKey = key.slice(0, 6) + 'Cha';	//planxxCha 의 값을 추출하기 위함
+				const tempVal = gPasIntChk(item[targetChaKey]);
+				if (tempVal > 0) {	//planxxCha실적에 따라 배경처리
+					rtnColor = "grid-cell-pupple";
+				} else if (tempVal < 0) {
+					rtnColor = "grid-row-yellow";
+				}
 			}
 		}
 
-		if (item.planType == '담당실적') {
-			
-// 			debugger;
-			if (['plan0', 'plan1'].includes(key.slice(0, 5))) {
-			const targetKey = key.slice(0, 6) + 'Sdt';	//planxxSdt 의 값을 추출하기 위함
-			const thisPlanRow = gridSourceList[item.__index-2];  //담당실적에 해당하는 계획자료 추출
-			if (thisPlanRow[targetKey]) {							//planxxSdt 계획일정이 있는데 실적이 없으면 붉은색 배경처리
-				if (!item[targetKey]) {								//실적이 없으면 붉은색 배경으로 표시함
-					rtnColor = "grid-cell-red ";
-				}
-			}
-			}
+		const qryType = $('#qryType_S').val(); //분석기준에 따라 어떤 컬럼이 기준인지 기준 컬럼을 파란색으로 표시함
+		if (qryType == '일수' && key.includes('Cha') || qryType == '시작일' && key.includes('Sdt') || qryType == '종료일' && key.includes('Edt')) {
+			rtnColor = rtnColor + ' grid-font-blue-bold'; 
 		}
 		
 		return rtnColor;
@@ -232,12 +263,14 @@
 				target : $('[data-ax5grid="grid1"]'),
 				header : {
 					align: "center",
-// 					 columnHeight: 40,
+                    columnHeight: 20,
 					selector: false
 				},
 
 				body: {
-					columnHeight: 26,
+					columnHeight: 18,styleClass: function () {
+					      return "ax5-cell-custom-font";
+				    },
 					mergeCells : ["기계종류", "수주구분", "아이템구분", "기계구분",  "salesCd"],
 					onClick: function () {
 						var list = gridView.target.getList("selected");
@@ -263,14 +296,14 @@
 				},
 
 				columns : [		
-					{key: "기계종류"    	, label: "기계종류" 			, align: "left", width: 120 },
-					{key: "coCd"  		, label: "회사"     			, align: "center", width: 60, hidden: true},
+					{key: "기계종류"    	, label: "기계종류" 			, align: "left", width: 100 },
+					{key: "coCd"  		, label: "회사"     			, align: "center", width: 50, hidden: true},
 // 					{key: "pchsClntCd"  , label: "공급사"     		, align: "center", width: 60, hidden: true},
 					{key: "수주구분"   	, label: "수주구분" 			, align: "left", width: 70},
 // 					{key: "아이템구분"   	, label: "아이템구분" 			, align: "left", width: 140},
-					{key: "기계구분"   	, label: "구분" 				, align: "left", width: 60, styleClass: function () {return gridColor(this.item, this.key);}},
-					{key: "salesCd"   	, label: "salesCd" 			, align: "center", width: 105, styleClass: function () {return gridColor(this.item, this.key);}},
-					{key: "planType"   	, label: "구분" 				, align: "center", width: 60, styleClass: function () {return gridColor(this.item, this.key);}},
+					{key: "기계구분"   	, label: "구분" 				, align: "left", width: 50, styleClass: function () {return gridColor(this.item, this.key);}},
+					{key: "salesCd"   	, label: "salesCd" 			, align: "center", width: 80, styleClass: function () {return gridColor(this.item, this.key);}},
+					{key: "planType"   	, label: "구분" 				, align: "center", width: 50, styleClass: function () {return gridColor(this.item, this.key);}},
 // 		    		{label: "전체 합계"		,columns: [
 // 		    		       {key: "minTermDayTot",	   	label: "↓일수",		    width: 60,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 // 		    		     , {key: "maxTermDayTot",	   	label: "↑일수",		    width: 60,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
@@ -279,116 +312,116 @@
 // 	    			]},   
 		            {label: "공정구분"		,columns: [
 			    		 {label: "수주확정"		,columns: [ 
-			    		       {key: "plan01Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan01Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan01Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan01Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan01Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan01Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan01Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan01Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan01Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan01Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]},   
 			    		 {label: "목표원가및PFU"		,columns: [
-			    		       {key: "plan02Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan02Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan02Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan02Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan02Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan02Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan02Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan02Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan02Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan02Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]},   
 			    		 {label: "설계완료"		,columns: [
-			    		       {key: "plan03Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan03Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan03Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan03Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan03Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan03Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan03Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan03Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan03Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan03Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]},   
 			    		 {label: "모델링완료"		,columns: [
-			    		       {key: "plan17Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan17Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan17Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan17Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan17Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan17Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan17Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan17Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan17Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan17Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]},   
 			    		 {label: "구매완료"		,columns: [
-			    		       {key: "plan04Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan04Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan04Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan04Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan04Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan04Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan04Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan04Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan04Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan04Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]},   
 			    		 {label: "제품(샘플)공급완료"		,columns: [
-			    		       {key: "plan18Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan18Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan18Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan18Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan18Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan18Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan18Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan18Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan18Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan18Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]},   
 			    		 {label: "기계조립완료"		,columns: [
-			    		       {key: "plan05Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan05Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan05Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan05Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan05Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan05Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan05Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan05Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan05Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan05Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]},   
 			    		 {label: "전기완료"		,columns: [
-			    		       {key: "plan06Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan06Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan06Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan06Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan06Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan06Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan06Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan06Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan06Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan06Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]},   
 			    		 {label: "자체시운전완료"		,columns: [
-			    		       {key: "plan07Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan07Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan07Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan07Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan07Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan07Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan07Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan07Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan07Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan07Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]},   
 			    		 {label: "외부제작검수"		,columns: [
-			    		       {key: "plan16Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan16Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan16Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan16Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan16Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan16Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan16Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan16Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan16Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan16Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]},   
 			    		 {label: "고객검수"		,columns: [
-			    		       {key: "plan06Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan06Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan06Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan06Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan06Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan06Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan06Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan06Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan06Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan06Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]},   
 			    		 {label: "포장"		,columns: [
-			    		       {key: "plan10Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan10Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan10Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan10Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan10Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan10Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan10Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan10Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan10Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan10Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]},   
 			    		 {label: "출고"		,columns: [
-			    		       {key: "plan11Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan11Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan11Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan11Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan11Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan11Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan11Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan11Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan11Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan11Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]},   
 			    		 {label: "도착"		,columns: [
-			    		       {key: "plan12Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan12Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan12Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan12Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan12Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan12Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan12Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan12Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan12Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan12Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]},   
 			    		 {label: "설치시운전(출발일)"		,columns: [
-			    		       {key: "plan13Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan13Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan13Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan13Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan13Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan13Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan13Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan13Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan13Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan13Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]},   
 			    		 {label: "설치시운전(복귀일)"		,columns: [
-			    		       {key: "plan14Sdt",	   	label: "시작일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan14Edt",	   	label: "종료일",		    width: 80,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan14Mh",	   	label: "공수",		   	width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan14Day",	   	label: "일수",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
-			    		     , {key: "plan14Cha",	   	label: "차이",		    width: 40,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		       {key: "plan14Sdt",	   	label: "시작일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan14Edt",	   	label: "종료일",		    width: 55,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan14Mh",	   	label: "공수",		   	width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan14Day",	   	label: "일수",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
+			    		     , {key: "plan14Cha",	   	label: "차이",		    width: 35,	sortable: false, 	align: "center", styleClass: function () {return gridColor(this.item, this.key);}}
 			    		 ]}   
 		            ]}
 				    	 , {key: "prjctRmk",		label: "특이사항",	         width: 200,	align: "left", styleClass: function () {return gridColor(this.item, this.key);}}
@@ -631,7 +664,7 @@
  	function jsonToExcel () {
  		const list = gridView.target.getList();
  		const header = gridView.target.colGroup;
- 		debugger;
+ 		
 		var todayDate = new Date().format('yyyyMMddHHmmss');
  		exportJSONToExcel(list, header,  "설비별 일정분석 현황_"+todayDate); 	 		
  	}	
