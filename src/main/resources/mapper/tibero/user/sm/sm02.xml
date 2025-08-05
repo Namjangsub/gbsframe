@@ -38,17 +38,22 @@
 							ELSE ''
 						END AS CNT_NM
 	                , Q.PART_CD
+					, S.CO_CD												 AS ORDRS_CO_CD		-- 수주회사
                 FROM TB_SM02M01 A --발주마스터
                 	  LEFT OUTER JOIN TB_SM02D01 B ON(A.ORDRG_NO=B.ORDRG_NO AND B.ORDRG_SEQ =  (SELECT MIN(ORDRG_SEQ) FROM TB_SM02D01 WHERE ORDRG_NO = B.ORDRG_NO))		/* 발주디테일 */
                 	  LEFT OUTER JOIN (SELECT count(*) AS CNT, ORDRG_NO FROM TB_SM02D01 GROUP BY ORDRG_NO) BB ON (A.ORDRG_NO=BB.ORDRG_NO)
                       LEFT OUTER JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD--거래처마스터    
 					  LEFT OUTER JOIN TB_QM01M01 Q ON Q.REQ_NO = A.REQ_NO
+					  LEFT OUTER JOIN TB_CR02D02 S ON S.SALES_CD = A.SALES_CD
 		       WHERE 1=1
                 <if test="coCd != null and !coCd.equals('')">
                  AND A.CO_CD = #{coCd}
                 </if>
                 <if test="ordrgDtFrom != null and !ordrgDtFrom.equals('') and  ordrgDtTo != null and !ordrgDtTo.equals('')" >
                   AND A.ORDRG_DT BETWEEN TO_DATE( #{ordrgDtFrom},'YYYYMMDD') AND TO_DATE( #{ordrgDtTo},'YYYYMMDD') +1
+                </if>
+				<if test="ordrsCoCd != null and !ordrsCoCd.equals('')">
+                 AND S.CO_CD = #{ordrsCoCd}
                 </if>
                 <if test="salesCd != null and !salesCd.equals('')">
                 AND A.SALES_CD LIKE '%' || UPPER(#{salesCd}) || '%'   --조회조건 : SALES_CD
@@ -286,7 +291,9 @@
 							 , MATR_NM || CNT_NM  AS MATR_NM		
            					 , TO_CHAR(IP.MIN_IPGO_DT, 'YYYY-MM-DD')     				AS MIN_IPGO_DT		--입고시작일자		
            					 , A.PART_CD
-	              			 , (SELECT FN_CM05M01_CD_TO_NM(A.PART_CD) FROM DUAL) AS PART_CD_NM							 				 			 
+	              			 , (SELECT FN_CM05M01_CD_TO_NM(A.PART_CD) FROM DUAL) AS PART_CD_NM
+							 , A.ORDRS_CO_CD															-- 수주회사
+							 , (SELECT FN_CM05M01_CD_TO_NM(A.ORDRS_CO_CD) FROM DUAL) AS ORDRS_CO_CD_NM	-- 수주회사명
 		                  FROM BJM A
 		                       LEFT OUTER JOIN SJD AS B ON A.SALES_CD = B.SALES_CD
 		                       LEFT OUTER JOIN TDO AS T ON A.SALES_CD = T.SALES_CD AND A.ORDRG_NO = T.TODO_NO

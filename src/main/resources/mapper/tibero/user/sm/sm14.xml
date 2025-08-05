@@ -556,7 +556,9 @@
 							, A.CREAT_ID_NM
 							, A.PAY_DIV
 							, TO_CHAR(A.PAY_DIV_DT, 'YYYY-MM-DD') 	AS PAY_DIV_DT
-							, (SELECT FN_CM05M01_CD_TO_NM(A.PAY_DIV) FROM DUAL)   AS PAY_DIV_NM	
+							, (SELECT FN_CM05M01_CD_TO_NM(A.PAY_DIV) FROM DUAL)   AS PAY_DIV_NM
+							, A.ORDRS_CO_CD		-- 수주회사
+							, A.ORDRS_CO_CD_NM	-- 수주회사명
 						  FROM
 						  (
 								WITH IPGO AS (
@@ -577,12 +579,16 @@
 														, (SELECT FN_CM06M01_ID_TO_NM(A.CREAT_ID) FROM DUAL) AS CREAT_ID_NM
 														, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN '' 
 															   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN ''  ELSE C.PCHS_CLMN_DAY END AS PCHS_CLMN_DAY
-														, A.* 
+														, A.*
+														, CD.CO_CD 										AS ORDRS_CO_CD		-- 수주회사
+														, (SELECT FN_CM05M01_CD_TO_NM(CD.CO_CD) FROM DUAL) AS ORDRS_CO_CD_NM	-- 수주회사명
 											FROM  TB_SM12D01 A /* 매입 확정 DETAIL */		
 													LEFT OUTER JOIN TB_SM02M01 M ON(A.ORDRG_NO = M.ORDRG_NO)		/* 발주마스터 */
 													LEFT OUTER JOIN TB_SM10M01 C ON(A.ORDRG_NO = C.COST_NO)			/* 비용마스터 */
 													LEFT OUTER JOIN TB_SM06D01 R ON(A.ORDRG_NO = R.RET_NO)		/* 반품 상세 */
 													LEFT OUTER JOIN TB_SM06M01 RM ON(RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)		/* 반품 상세 */
+													LEFT OUTER JOIN TB_CR02D02 CD ON CD.SALES_CD = CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD
+																									   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN RM.SALES_CD ELSE C.SALES_CD END
 										  WHERE 1=1 
 										<!-- 회사코드 -->         
 										<if test="coCd != null and !coCd.equals('')">
@@ -612,6 +618,10 @@
 										<!-- 청구/영수 구분 -->
 										<if test="payDiv != null and !payDiv.equals('')">
 											AND A.PAY_DIV = #{payDiv} /* 영수, 청구 구분*/
+										</if>
+										<!-- 수주회사 구분 -->
+										<if test="ordrsCoCd != null and !ordrsCoCd.equals('')">
+											AND CD.CO_CD = #{ordrsCoCd}
 										</if>
 										) A
            									LEFT OUTER JOIN TB_BM02M01 D1 ON A.PCHS_CLNT_CD = D1.CLNT_CD   --거래처마스터
@@ -675,6 +685,8 @@
 											, A.CREAT_ID_NM
 											, A.PAY_DIV
 											, A.PAY_DIV_DT
+											, A.ORDRS_CO_CD		-- 수주회사
+											, A.ORDRS_CO_CD_NM	-- 수주회사명
 									FROM  IPGO A /* 매입 확정 DETAIL */		
 							                LEFT OUTER JOIN BAL AS D ON A.CO_CD = D.CO_CD AND A.ORDRG_NO = D.ORDRG_NO --발주상세
 							                LEFT OUTER JOIN IPGOTOT AS E ON A.CO_CD = E.CO_CD AND A.ORDRG_NO = E.ORDRG_NO --매입확정집계
@@ -2540,6 +2552,8 @@
 									, CMM.CODE_NM  AS CLNT_PJT_NM
 									, A.CREAT_ID 											AS ORDRG_MNG_ID
 									, (SELECT FN_CM06M01_ID_TO_NM(A.CREAT_ID) FROM DUAL) 	AS ORDRG_MNG_NM   /*생성자명 */	
+									, SJD.CO_CD												AS ORDRS_CO_CD		-- 수주회사
+									, (SELECT FN_CM05M01_CD_TO_NM(SJD.CO_CD) FROM DUAL) 	AS ORDRS_CO_CD_NM	-- 수주회사명
 							FROM TB_SM02M01 A --발주마스터
 				                LEFT OUTER JOIN TB_BM02M01 AS C ON A.PCHS_CLNT_CD = C.CLNT_CD--거래처마스터    
 								LEFT OUTER JOIN TB_CR02D02  SJD  ON SJD.SALES_CD  = A.SALES_CD
@@ -2577,6 +2591,8 @@
 									, CMM.CODE_NM  AS CLNT_PJT_NM
 									, E.CREAT_ID 											AS ORDRG_MNG_ID
 									, (SELECT FN_CM06M01_ID_TO_NM(E.CREAT_ID) FROM DUAL) 	AS ORDRG_MNG_NM   /*생성자명 */	
+									, SJD.CO_CD												AS ORDRS_CO_CD		-- 수주회사
+									, (SELECT FN_CM05M01_CD_TO_NM(SJD.CO_CD) FROM DUAL) 	AS ORDRS_CO_CD_NM	-- 수주회사명
 								FROM TB_SM10M01 E		/* 구매비용 */		
 									LEFT OUTER JOIN TB_CR02D02  SJD  ON SJD.SALES_CD  = E.SALES_CD
 									LEFT OUTER JOIN TB_CR02M01  SJM  ON SJM.ORDRS_NO  = SJD.ORDRS_NO
@@ -2601,6 +2617,8 @@
 									, CMM.CODE_NM  AS CLNT_PJT_NM
 									, E.CREAT_ID 											AS ORDRG_MNG_ID
 									, (SELECT FN_CM06M01_ID_TO_NM(E.CREAT_ID) FROM DUAL) 	AS ORDRG_MNG_NM   /*생성자명 */	
+									, SJD.CO_CD												AS ORDRS_CO_CD		-- 수주회사
+									, (SELECT FN_CM05M01_CD_TO_NM(SJD.CO_CD) FROM DUAL) 	AS ORDRS_CO_CD_NM	-- 수주회사명
 								FROM TB_SM06M01 E		/* 반품 */	
 									INNER JOIN (
 												SELECT SUM(RET_DTL_AMT) AS RET_DTL_AMT

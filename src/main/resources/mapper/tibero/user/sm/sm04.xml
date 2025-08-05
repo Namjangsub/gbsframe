@@ -56,8 +56,17 @@
 									, T.UDT_ID_NM
 									, T.UDT_DTTM
 									, T.LVL
+									, CASE WHEN T.LVL = 1 THEN 1 ELSE 0 END AS COLLAPSE
+									, A.SOC_YN
+									, A.SOC_CLNT_CD
+									, B.CLNT_NM     AS SOC_CLNT_CD_NM
+									, A.ORDRS_CO_CD												-- 수주회사
+									, FN_CM05M01_CD_TO_NM(A.ORDRS_CO_CD	)  AS ORDRS_CO_CD_NM  	-- 수주회사명
 								FROM   (
-										SELECT DISTINCT A.FILE_TRGT_KEY --파일대상KEY
+										SELECT DISTINCT   A.FILE_TRGT_KEY --파일대상KEY
+														, A.SOC_YN
+														, A.SOC_CLNT_CD
+														, S.CO_CD	AS ORDRS_CO_CD      -- 수주회사 
 										FROM   TB_SM04M01 AS A
 											LEFT OUTER JOIN (
 																SELECT DISTINCT SM.CO_CD    --회사
@@ -80,56 +89,38 @@
 											LEFT OUTER JOIN TB_SM04D01 AS B  ON B.CO_CD = A.CO_CD
 																			AND B.IO_NO = A.IO_NO
 											LEFT OUTER JOIN TB_BM05M01 AS M  ON M.MATR_CD = B.MATR_CD
+											LEFT OUTER JOIN TB_CR02D02 AS S ON S.SALES_CD = A.SALES_CD
 										WHERE  1 = 1
 										<if test="coCd != null and !coCd.equals('')">
-										AND    A.CO_CD = #{coCd}
+										  AND    A.CO_CD = #{coCd}
 										</if>
 										<if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')" >
-										AND    A.IO_DT BETWEEN TO_DATE( #{strtDt},'YYYYMMDD') AND TO_DATE( #{endDt},'YYYYMMDD')
+										  AND    A.IO_DT BETWEEN TO_DATE( #{strtDt},'YYYYMMDD') AND TO_DATE( #{endDt},'YYYYMMDD')
 										</if>
-										<if test="salesCd != null and !salesCd.equals('')">
-										AND    A.SALES_CD LIKE '%' || #{salesCd} || '%'
+										<if test="ordrsCoCd != null and !ordrsCoCd.equals('')">
+										  AND S.CO_CD = #{ordrsCoCd}
 										</if>
 										<if test="outWhCd != null and !outWhCd.equals('')">
-										AND    A.OUT_WH_CD = #{outWhCd}
-										</if>
-										<if test="OrdrsClntCd != null and !OrdrsClntCd.equals('')">
-										AND    O.CLNT_CD = #{OrdrsClntCd}
-										</if>
-										<if test="clntNm != null and !clntNm.equals('')">
-										AND    O.CLNT_NM LIKE '%' || #{clntNm} || '%'
-										</if>
-										<if test="prdtCd != null and !prdtCd.equals('')">
-										AND    O.PRDT_CD = #{prdtCd}
-										</if>
-										<if test="itemDiv != null and !itemDiv.equals('')">
-										AND    O.ITEM_DIV = #{itemDiv}
-										</if>
-										<if test="matrCd != null and !matrCd.equals('')">
-										AND    B.MATR_CD LIKE '%' || #{matrCd} || '%'
-										</if>
-										<if test="matrNm != null and !matrNm.equals('')">
-										AND    M.MATR_NM LIKE '%' || #{matrNm} || '%'
-										</if>
-										<if test="matrMno != null and !matrMno.equals('')">
-										AND    M.MATR_MNO LIKE '%' || #{matrMno} || '%'
-										</if>
-										<if test="matrSpec != null and !matrSpec.equals('')">
-										AND    M.MATR_SPEC LIKE '%' || #{matrSpec} || '%'
-										</if>
-										<if test="matrClntDiv != null and !matrClntDiv.equals('')">
-										AND    M.MATR_CLNT_DIV = #{matrClntDiv}
-										</if>
-										<if test="matrMat != null and !matrMat.equals('')">
-										AND    M.MATR_MAT LIKE '%' || #{matrMat} || '%'
-										</if>
-										<if test="matrMakrNm != null and !matrMakrNm.equals('')">
-										AND    M.MATR_MAKR_NM LIKE '%' || #{matrMakrNm} || '%'
+										  AND    A.OUT_WH_CD = #{outWhCd}
 										</if>
 										<if test="socSelectCd != null and !socSelectCd.equals('')">
-										AND    A.SOC_YN = #{socSelectCd}
+										  AND    A.SOC_YN = #{socSelectCd}
 										</if>
+										<if test="salesCd != null and !salesCd.equals('')">
+										  AND    A.SALES_CD LIKE '%' || #{salesCd} || '%'
+										</if>
+										<if test="OrdrsClntCd != null and !OrdrsClntCd.equals('')">
+										  AND    O.CLNT_CD = #{OrdrsClntCd}
+										</if>
+										<if test="clntNm != null and !clntNm.equals('')">
+										  AND    O.CLNT_NM LIKE '%' || #{clntNm} || '%'
+										</if>
+										<if test="matrCd != null and !matrCd.equals('')">
+										  AND    B.MATR_CD LIKE '%' || #{matrCd} || '%'
+										</if>
+										
 									) AS A
+									LEFT OUTER JOIN TB_BM02M01 B ON B.CLNT_CD = A.SOC_CLNT_CD
 									LEFT OUTER JOIN (
 														SELECT DISTINCT T.PID
 															, T.ID
@@ -365,10 +356,13 @@
 							, A.SOC_YN
 							, A.SOC_CLNT_CD
 							, B.CLNT_NM     AS SOC_CLNT_CD_NM
+							, A.ORDRS_CO_CD												-- 수주회사
+							, FN_CM05M01_CD_TO_NM(A.ORDRS_CO_CD	)  AS ORDRS_CO_CD_NM  	-- 수주회사명
 						FROM   (
 								SELECT DISTINCT A.FILE_TRGT_KEY --파일대상KEY
 												, A.SOC_YN
 												, A.SOC_CLNT_CD
+												, S.CO_CD	AS ORDRS_CO_CD      -- 수주회사 
 								FROM   TB_SM04M01 AS A
 									LEFT OUTER JOIN (
 														SELECT DISTINCT SM.CO_CD    --회사
@@ -391,54 +385,34 @@
 									LEFT OUTER JOIN TB_SM04D01 AS B  ON B.CO_CD = A.CO_CD
 																	AND B.IO_NO = A.IO_NO
 									LEFT OUTER JOIN TB_BM05M01 AS M  ON M.MATR_CD = B.MATR_CD
+									LEFT OUTER JOIN TB_CR02D02 AS S ON S.SALES_CD = A.SALES_CD
 								WHERE  1 = 1
 								<if test="coCd != null and !coCd.equals('')">
-								AND    A.CO_CD = #{coCd}
+								  AND    A.CO_CD = #{coCd}
 								</if>
 								<if test="strtDt != null and !strtDt.equals('') and endDt != null and !endDt.equals('')" >
-								AND    A.IO_DT BETWEEN TO_DATE( #{strtDt},'YYYYMMDD') AND TO_DATE( #{endDt},'YYYYMMDD')
+								  AND    A.IO_DT BETWEEN TO_DATE( #{strtDt},'YYYYMMDD') AND TO_DATE( #{endDt},'YYYYMMDD')
 								</if>
-								<if test="salesCd != null and !salesCd.equals('')">
-								AND    A.SALES_CD LIKE '%' || #{salesCd} || '%'
+								<if test="ordrsCoCd != null and !ordrsCoCd.equals('')">
+								  AND S.CO_CD = #{ordrsCoCd}
 								</if>
 								<if test="outWhCd != null and !outWhCd.equals('')">
-								AND    A.OUT_WH_CD = #{outWhCd}
-								</if>
-								<if test="OrdrsClntCd != null and !OrdrsClntCd.equals('')">
-								AND    O.CLNT_CD = #{OrdrsClntCd}
-								</if>
-								<if test="clntNm != null and !clntNm.equals('')">
-								AND    O.CLNT_NM LIKE '%' || #{clntNm} || '%'
-								</if>
-								<if test="prdtCd != null and !prdtCd.equals('')">
-								AND    O.PRDT_CD = #{prdtCd}
-								</if>
-								<if test="itemDiv != null and !itemDiv.equals('')">
-								AND    O.ITEM_DIV = #{itemDiv}
-								</if>
-								<if test="matrCd != null and !matrCd.equals('')">
-								AND    B.MATR_CD LIKE '%' || #{matrCd} || '%'
-								</if>
-								<if test="matrNm != null and !matrNm.equals('')">
-								AND    M.MATR_NM LIKE '%' || #{matrNm} || '%'
-								</if>
-								<if test="matrMno != null and !matrMno.equals('')">
-								AND    M.MATR_MNO LIKE '%' || #{matrMno} || '%'
-								</if>
-								<if test="matrSpec != null and !matrSpec.equals('')">
-								AND    M.MATR_SPEC LIKE '%' || #{matrSpec} || '%'
-								</if>
-								<if test="matrClntDiv != null and !matrClntDiv.equals('')">
-								AND    M.MATR_CLNT_DIV = #{matrClntDiv}
-								</if>
-								<if test="matrMat != null and !matrMat.equals('')">
-								AND    M.MATR_MAT LIKE '%' || #{matrMat} || '%'
-								</if>
-								<if test="matrMakrNm != null and !matrMakrNm.equals('')">
-								AND    M.MATR_MAKR_NM LIKE '%' || #{matrMakrNm} || '%'
+								  AND    A.OUT_WH_CD = #{outWhCd}
 								</if>
 								<if test="socSelectCd != null and !socSelectCd.equals('')">
-								AND    A.SOC_YN = #{socSelectCd}
+								  AND    A.SOC_YN = #{socSelectCd}
+								</if>
+								<if test="salesCd != null and !salesCd.equals('')">
+								  AND    A.SALES_CD LIKE '%' || #{salesCd} || '%'
+								</if>
+								<if test="OrdrsClntCd != null and !OrdrsClntCd.equals('')">
+								  AND    O.CLNT_CD = #{OrdrsClntCd}
+								</if>
+								<if test="clntNm != null and !clntNm.equals('')">
+								  AND    O.CLNT_NM LIKE '%' || #{clntNm} || '%'
+								</if>
+								<if test="matrCd != null and !matrCd.equals('')">
+								  AND    B.MATR_CD LIKE '%' || #{matrCd} || '%'
 								</if>
 							) AS A
 							LEFT OUTER JOIN TB_BM02M01 B ON B.CLNT_CD = A.SOC_CLNT_CD

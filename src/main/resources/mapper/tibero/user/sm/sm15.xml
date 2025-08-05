@@ -1076,6 +1076,8 @@
 								, DECODE (substr(A.ORDRG_NO,0,3), 'COS', C.PCHS_CLMN_DIV_CD, '') 	AS SM10_CLMN_DIV_CD
 								, DECODE (substr(A.ORDRG_NO,0,3), 'COS', C.PCHS_PMNT_MTD_CD, '') 	AS SM10_PMNT_MTD_CD
 								, DECODE (substr(A.ORDRG_NO,0,3), 'COS', 'COST', '') 				AS SM10_CLMN_RMK
+								, CD.CO_CD 															AS ORDRS_CO_CD		--수주회사
+								, FN_CM05M01_CD_TO_NM(CD.CO_CD) 									AS ORDRS_CO_CD_NM  --수주회사명
 					FROM  TB_SM12D01 A /* 매입 확정 DETAIL */		
 							LEFT OUTER JOIN TB_SM02M01 M ON(A.ORDRG_NO = M.ORDRG_NO)		/* 발주마스터 */
 --							LEFT OUTER JOIN TB_SM03D01 I ON(A.PCHS_NO = I.PCHS_NO AND A.PCHS_SEQ = I.PCHS_SEQ)		/* 입고 상세 */
@@ -1083,32 +1085,36 @@
 							LEFT OUTER JOIN TB_SM10M01 C ON(A.ORDRG_NO = C.PCHS_NO)			/* 비용마스터 */
 							LEFT OUTER JOIN TB_SM06D01 R ON(A.ORDRG_NO = R.PCHS_NO)		/* 반품 상세 */
 							LEFT OUTER JOIN TB_SM06M01 RM ON(RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)		/* 반품 상세 */
+							LEFT OUTER JOIN TB_CR02D02 CD ON CD.SALES_CD = CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD ELSE C.SALES_CD END
 				  WHERE 1=1
 				    AND NVL(C.PAY_DIV,'PAYDIV02') = 'PAYDIV02'  --기타비용의 경우 청구(PAYDIV02)인 경우만 구매현황에 출력함.
-				<!-- 회사코드 -->         
-				<if test="coCd != null and !coCd.equals('')">
-					AND A.CO_CD = #{coCd}   
-				</if>     
-				<!-- 확정일자 -->         
-				<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')">
-				<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
-	              	AND A.PCHS_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
-				</if>   
-				</if>
+					<!-- 회사코드 -->         
+					<if test="coCd != null and !coCd.equals('')">
+						AND A.CO_CD = #{coCd}   
+					</if>     
+					<!-- 확정일자 -->         
+					<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')">
+						<if test="ordrgDtTo != null and !ordrgDtTo.equals('')">
+							AND A.PCHS_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+						</if>   
+					</if>
 				) A
-     			LEFT OUTER JOIN TB_BM02M01 D1 ON A.PCHS_CLNT_CD = D1.CLNT_CD   --거래처마스터
-			 WHERE 1 = 1
+					LEFT OUTER JOIN TB_BM02M01 D1 ON A.PCHS_CLNT_CD = D1.CLNT_CD   --거래처마스터
+				WHERE 1 = 1
 				<if test="pchsClmnDay != null and !pchsClmnDay.equals('')">
-				AND NVL(A.SM10_CLMN_DAY, D1.PCHS_CLMN_DAY) = #{pchsClmnDay}
+				  AND NVL(A.SM10_CLMN_DAY, D1.PCHS_CLMN_DAY) = #{pchsClmnDay}
 				</if>
 				<if test="salesCd != null and !salesCd.equals('')">
-				AND A.SALES_CD LIKE '%' || #{salesCd} || '%'
+				  AND A.SALES_CD LIKE '%' || #{salesCd} || '%'
+				</if>
+				<if test="ordrsCoCd != null and !ordrsCoCd.equals('')">
+				  AND A.ORDRS_CO_CD = #{ordrsCoCd}  -- 수주회사
 				</if>
 				<if test="pchsClntNm != null and !pchsClntNm.equals('')">
-				AND D1.CLNT_NM LIKE '%' || #{pchsClntNm} || '%'
+				  AND D1.CLNT_NM LIKE '%' || #{pchsClntNm} || '%'
 				</if>
 				<if test="pchsGb != null and !pchsGb.equals('')">
-				AND A.IS_DIV =  #{pchsGb}
+				  AND A.IS_DIV =  #{pchsGb}
 				</if>
 		)
 		,  IPGOAMT AS --입고집계
