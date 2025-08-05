@@ -89,18 +89,19 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 							if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
 								$('#measRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
 								$('#resltRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
-								$('#fdmtSolutCd').css('pointer-events', 'auto').prop('disabled', false).css('background-color', '#ffffff');
+								$('#FDMTSOLUT-radioButtonContainer').css({'background-color':'#ffffff','pointer-events':'auto'}).find('input[type=radio], input[type=checkbox]').off('click').prop('readonly', false).removeAttr('readonly');
 								$('#fdmtSolutCnt').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
+								$('#COBGB-checkboxContainer').css({'background-color':'#ffffff','pointer-events':'auto'}).find('input[type=radio], input[type=checkbox]').off('click');
 							} else if (params.fileTrgtTyp == 'WB2401P01' || params.fileTrgtTyp == 'WB2401P11') { //계획문제, 결과문제
 								$('#measRst').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
 								$('#actCnts').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-								$('#fdmtSolutCd').css('pointer-events', 'auto').prop('disabled', false).css('background-color', '#ffffff');
+								$('#FDMTSOLUT-radioButtonContainer').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
 								$('#fdmtSolutCnt').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
 								$('.issAct').removeClass('no-click');
 							}
 
 						} else {  //평가자가 아닌경우 필수 입력 필드 제외 처리
-							$('#fdmtSolutCd').removeAttr('required').closest('td').prev('th').removeClass('hit');
+							$('#FDMTSOLUT-radioButtonContainer').removeAttr('required').closest('td').prev('th').removeClass('hit');
 							$('#fdmtSolutCnt').removeAttr('required').closest('td').prev('th').removeClass('hit');
 							$('#actMh').removeAttr('required').closest('td').prev('th').removeClass('hit');
 						}
@@ -136,17 +137,18 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 									if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
 										$('#measRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
 										$('#resltRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
-										$('#fdmtSolutCd').css('pointer-events', 'auto').prop('disabled', false).css('background-color', '#ffffff');
+										$('#FDMTSOLUT-radioButtonContainer').css({'background-color':'#ffffff','pointer-events':'auto'}).find('input[type=radio], input[type=checkbox]').off('click').prop('readonly', false).removeAttr('readonly');
 										$('#fdmtSolutCnt').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
+										$('#COBGB-checkboxContainer').css({'background-color':'#ffffff','pointer-events':'auto'}).find('input[type=radio], input[type=checkbox]').off('click');
 									} else if (params.fileTrgtTyp == 'WB2401P01' || params.fileTrgtTyp == 'WB2401P11') {
 										$('#measRst').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
 										$('#actCnts').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
-										$('#fdmtSolutCd').css('pointer-events', 'auto').prop('disabled', false).css('background-color', '#ffffff');
+										$('#FDMTSOLUT-radioButtonContainer').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
 										$('#fdmtSolutCnt').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
 										$('.issAct').removeClass('no-click');
 									}
 								} else {  //평가자가 아닌경우 필수 입력 필드 제외 처리
-									$('#fdmtSolutCd').removeAttr('required').closest('td').prev('th').removeClass('hit');
+									$('#FDMTSOLUT-radioButtonContainer').removeAttr('required').closest('td').prev('th').removeClass('hit');
 									$('#fdmtSolutCnt').removeAttr('required').closest('td').prev('th').removeClass('hit');
 									$('#actMh').removeAttr('required').closest('td').prev('th').removeClass('hit');
 								}

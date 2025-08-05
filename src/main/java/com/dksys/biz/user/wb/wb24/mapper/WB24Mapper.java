@@ -23,6 +23,8 @@ public interface WB24Mapper {
 	int wbsIssueUpdate(Map<String, String> paramMap);
 	
 	int updateIssueComment(Map<String, String> paramMap);
+	
+	int updateCobgb(Map<String, String> paramMap);
 
 	int wbsActUpdate(Map<String, String> paramMap);
 	

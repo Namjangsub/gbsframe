@@ -56,6 +56,8 @@ public interface QM01Mapper {
 
 	int updateQualityResultComment(Map<String, String> paramMap);
 
+	int updateQualityResultCobgbComment(Map<String, String> paramMap);
+
 	int deleteQualityReq(Map<String, String> paramMap);
 
 	int deleteQualityResp(Map<String, String> paramMap);

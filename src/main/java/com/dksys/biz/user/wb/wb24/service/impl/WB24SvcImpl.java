@@ -289,8 +289,8 @@ public class WB24SvcImpl implements WB24Svc {
 	    	//TB_WB24M03 테이블에 issNo 가 등록되어있는지 확인
 			List<Map<String, String>> issueResultChk = wb24Mapper.issueResultChk(paramMap);
 
-			// String fdmtSolutCd = paramMap.get("FDMTSOLUT");
-			// paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
+			String fdmtSolutCd = paramMap.get("FDMTSOLUT");
+			paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
 			if (issueResultChk.size() > 0) {
 				result += wb24Mapper.wbsActUpdate(paramMap);
 			} else {
@@ -381,7 +381,19 @@ public class WB24SvcImpl implements WB24Svc {
 
 	@Override
 	public int updateIssueComment(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-		return wb24Mapper.updateIssueComment(paramMap);
+		int result = 0;
+		// 기존 코멘트 업데이트 (원인, 결과, 근본원인, 근본대책)
+		String fdmtSolutCd = paramMap.get("FDMTSOLUT");
+		paramMap.put("fdmtSolutCd", fdmtSolutCd);		// 선택된 근본대책 추가 (FDMTSOLUT=FDMTSOLUT01,FDMTSOLUT02,FDMTSOLUT03..)
+		result += wb24Mapper.updateIssueComment(paramMap);
+
+		String cobgbCode = paramMap.get("CODECOBGB");
+		String midCd = cobgbCode.substring(0, 7);
+		paramMap.put("midCd", midCd);
+		paramMap.put("subCd", cobgbCode);
+		// 장애유형 업데이트
+		result += wb24Mapper.updateCobgb(paramMap);
+		return result;
 	}
 
 	@Override
