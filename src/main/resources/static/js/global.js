@@ -42,12 +42,13 @@ if (typeof ax5 !== 'undefined' && typeof ax5.ui !== 'undefined') {
 		var mask = new ax5.ui.mask();
 		var secondMask = new ax5.ui.mask();
 		var thirdMask = new ax5.ui.mask();
+		var fourthMask = new ax5.ui.mask();
 	}
 	if (typeof ax5.ui.modal === 'function') {
 		var modal = new ax5.ui.modal();			//메인모달
 		var secondModal = new ax5.ui.modal();	//popup모달
 		var thirdModal = new ax5.ui.modal();	//추가1
-		var openFourthModal = new ax5.ui.modal();	//추가2
+		var fourthModal = new ax5.ui.modal();	//추가2
 		var blindModal = new ax5.ui.modal();
 	}
 	if (typeof ax5.ui.toast === 'function') {
@@ -306,7 +307,7 @@ var openThirdModal = function(url, width, height, title, paramObj, callback) {
 };
 
 var openFourthModal = function(url, width, height, title, paramObj, callback) {
-	thirdModal.open({
+	fourthModal.open({
 		header: {
 			title: title,
 			btns: {
@@ -327,7 +328,7 @@ var openFourthModal = function(url, width, height, title, paramObj, callback) {
         closeToEsc: false,
         onStateChanged: function () {
         	if (this.state === "open") {
-                thirdMask.open();
+                fourthMask.open();
         		var modalObj = {
                 	"target": this.self,
                 	"paramObj": paramObj,
@@ -335,7 +336,7 @@ var openFourthModal = function(url, width, height, title, paramObj, callback) {
                 }
                 modalStack.push(modalObj);
         	} else if (this.state === "close") {
-        		thirdMask.close();
+        		fourthMask.close();
             }
         }
     }, function () {
