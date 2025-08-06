@@ -5,6 +5,7 @@
   <form id="popForm2" onSubmit="return false;">
     <div class="form-group popup_table">
 		<input type="hidden" id="fileTrgtKey"  	name="fileTrgtKey">
+		<input type="hidden" id="deptCd"     	name="deptCd">
 		<input type="hidden" id="pgmId"     	name="pgmId"	value="QM0101P03">
  	<table>
         <colgroup>
@@ -108,6 +109,7 @@
         <tr>
 			<th>분류</th>
 			<td>
+				<input type="hidden" id="partCd" name="partCd">
 				<input type="text" id="partCdNm" name="partCdNm" readonly="readonly">
 			</td>
 			<th>요청 등록 사유</th>
@@ -237,6 +239,14 @@
 		                	<input type="text" id="importantCdReqNm" name="importantCdReqNm" readonly>
 				      </td>
 				  </tr>
+				  <tr>
+					 <th>지연일수</th>
+					 <td colspan="3">
+						<div>
+							<input type="text" id="delayDay" name="delayDay" comma onkeyup="onlyNumber(this)" msg="지연일수" placeholder="해당건으로 지연된 일수를 입력">
+						</div>
+					 </td>
+				  </tr>
 				  <!-- <tr>
 				  		<td colspan="4">-</td>
 				  </tr> -->
@@ -262,29 +272,22 @@
 						</div>
 				     </td>
 				  </tr>
-				  <tr>
-					<th class="hit">근본원인</th>
-					<td class="hit" colspan=3 style="text-align:left;">
+				  <tr class="teamManagerApproval">
+					<th>근본원인</th>
+					<td colspan=3 style="text-align:left;">
 						<div id="FDMTSOLUT-radioButtonContainer"></div>
 						<!-- <select id="fdmtSolutCd" name="fdmtSolutCd" data-kind="FDMTSOLUT" required msg="근본원인">
 							<option value="">선택하세요</option>
 						</select> -->
 					</td>					
 				  </tr>
-				  <tr>
-					<th>근본대책<br>(세부실행 대책)</th>
+				  <tr class="teamManagerApproval">
+					<th>근본예방대책<br><span style="font-size:11px;">(핵심목적이므로 책임자가 목적에 맞게 기록 요망)</span></th>
 					<td colspan="3">
-						<textarea	class="form-control" id="fdmtSolutCnt" name="fdmtSolutCnt" rows="2" maxlength="500" required msg="근본대책(세부실행 대책)"></textarea>
+						<textarea	class="form-control" id="fdmtSolutCnt" name="fdmtSolutCnt" rows="2" maxlength="500" msg="근본대책(세부실행 대책)"></textarea>
 					</td>
 				 </tr>
-				  <tr>
-					 <th>지연일수</th>
-					 <td colspan="3">
-						<div>
-							<input type="text" id="delayDay" name="delayDay" comma onkeyup="onlyNumber(this)" msg="지연일수" placeholder="해당건으로 지연된 일수를 입력">
-						</div>
-					 </td>
-				  </tr>
+				  
 <!-- 				  <tr> -->
 <!-- 				   <th class="hit">고찰 내용</th>  -->
 <!-- 				     <td colspan="3"> -->
@@ -347,6 +350,7 @@
     var reqNo = null;
     var rsltNo = null;
     var clntPjt = "";
+	var teamManagerFlag = false;
     var teleNo = ""; //카카오 접수자 전화번호변수
  	// 카톡 정상알림 카운터 변수
     var kakaoCnt = 0;
@@ -430,7 +434,6 @@
      	        			"reqNo"  : rsltNo,
      	        			"pageNo" : _pageNo + 1
      	    		}
-
    					postAjax("/user/wb/wb20/selectSignResUserlst", formData, null, function(data){
 						try {
 							var list = data.result;
@@ -440,6 +443,23 @@
 											totalElements : list.length
 								}
 							});
+							// 결재자가 해당 작성자의 부서 팀장여부 확인 
+							// teamManagerFlag == true 이면 근본원인, 근본예방대책 필드 필수입력 및 활성화 2025-08-06 최지상
+							list.forEach(function(item){
+								if (item.deptId.slice(0,5) === $("#deptCd").val() && item.teamManager === 'Y' && item.todoId === jwt.userId) {
+									teamManagerFlag = true;
+								}
+							});
+
+							if (teamManagerFlag && !['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
+								$('#FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
+								$('#fdmtSolutCnt').closest('td').prev('th').addClass('hit');
+								$('#fdmtSolutCnt').attr('required', 'true');
+								$('.teamManagerApproval').removeClass('no-click');
+							} else {
+								$('#FDMTSOLUT-radioButtonContainer').addClass('disabled-area').find(':radio, :checkbox').on('click', function(e){e.preventDefault();});
+							}
+
 
 							gridResize(gridViewPop1, list.length); //그리드 높이 조정
 						} catch (error) {
@@ -684,6 +704,7 @@
 			});
 			
 		}
+		$('.teamManagerApproval').addClass('no-click');		// 근본원인, 근본예방대책 필드 비활성화
 
 		selectQtyReqInfo();
 	
@@ -699,7 +720,7 @@
 		
 		// 결재시 수정하면 change 이벤트 적용
 		$('#qmPopFormRslt').on('input paste drop change','#measRst, #resltRst, #FDMTSOLUT-radioButtonContainer input[type=checkbox], #fdmtSolutCnt, #COBGB-checkboxContainer input[type=radio]',function() {
-			if ($('#qmPopFormRslt  #commentBtn').length === 0 && gridObj) {	// 결재 정보 그리드가 있어야지 코칭수정 버튼 활성화
+			if ($('#qmPopFormRslt  #commentBtn').length === 0 && gridObj && teamManagerFlag) {	// 결재 정보 그리드가 있어야지 코칭수정 버튼 활성화
 				const callCmdBtn = '<button id="commentBtn">코칭수정</button>';
 				$('#qmPopFormRslt .popup_bottom_btn').first().prepend(callCmdBtn);
 				$('#qmPopFormRslt #commentBtn').on("click", function() { updateQualityResultComment('결과수정'); });
@@ -713,6 +734,7 @@
 				fileTrgtTyp	: $("#popForm2 #pgmId").val(),
 				fileTrgtKey	: fileTrgtKey,
 	            todoNo		: rsltNo,	//결재정보처리를 위함
+				partCd		: $("#popForm2 #partCd").val()
 		}
   		treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
 		//---------------------------------------------------------------
@@ -726,6 +748,9 @@
 	// 결재시 코멘트 추가 수정
 	function updateQualityResultComment(){
 		if (inputValidation($('.popup_area [required]'))) {
+			if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val()) && $("input[name='FDMTSOLUT']:checked").val() == undefined) {
+				customAlert("근본원인을 선택해주세요.");
+			} else {
 				var formData = makeFormData();
 				filePostAjax("/user/qm/qm01/updateQualityResultComment", formData,function(data) {
 					if (data.resultCode == 200) {
@@ -769,7 +794,7 @@
 		            }
 				});
 				return true;
-				
+			}
 		} else { return false;}
 	}
 	
@@ -927,10 +952,12 @@
             for (const key in data.result) {
                 if (data.result.hasOwnProperty(key)) {
                     const value = data.result[key];
-                    
                     // 체크박스 처리
                     if (checkKeys.includes(key)) {
                         $('#popForm2 #' + value).prop("checked", true);
+						if (key == "partCd") {
+							$('#popForm2 #' + key).val(value);
+						}
                     } else 	                    
                     // 특수한 키 'clntPjtNm' 처리
                     if (key === 'clntPjtNm') {
@@ -983,14 +1010,14 @@
 				}
 			}
 
-			// 분류에 따른 근본원인 필드 필수여부
-			if (data.result.partCd == 'COBTP01' || data.result.partCd == 'COBTP04' || data.result.partCd == 'COBTP06' || data.result.partCd == 'COBTP08' || data.result.partCd == 'COBTP09')  {
-				$('#popForm2 #FDMTSOLUT-radioButtonContainer').removeAttr('required').closest('td').prev('th').removeClass('hit');
-				$('#popForm2 #fdmtSolutCnt').removeAttr('required').closest('td').prev('th').removeClass('hit');
-			} else {
-				// $('#popForm2 #FDMTSOLUT-radioButtonContainer').attr('required', true).closest('td').prev('th').addClass('hit');
-				$('#popForm2 #fdmtSolutCnt').attr('required', true).closest('td').prev('th').addClass('hit');
-			}
+			// // 분류에 따른 근본원인 필드 필수여부
+			// if (data.result.partCd == 'COBTP01' || data.result.partCd == 'COBTP04' || data.result.partCd == 'COBTP06' || data.result.partCd == 'COBTP08' || data.result.partCd == 'COBTP09')  {
+			// 	$('#popForm2 #FDMTSOLUT-radioButtonContainer').removeAttr('required').closest('td').prev('th').removeClass('hit');
+			// 	$('#popForm2 #fdmtSolutCnt').removeAttr('required').closest('td').prev('th').removeClass('hit');
+			// } else {
+			// 	// $('#popForm2 #FDMTSOLUT-radioButtonContainer').attr('required', true).closest('td').prev('th').addClass('hit');
+			// 	$('#popForm2 #fdmtSolutCnt').attr('required', true).closest('td').prev('th').addClass('hit');
+			// }
 			
 			// 발행자의 Id가 gyrsult로 시작할 경우 작성자는 로그인한 유저
 			if (actionType == 'C' || actionType == 'U') {
@@ -1046,9 +1073,9 @@
 	        return false;
 		}
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
-			if ($("input[name='FDMTSOLUT']:checked").val() == undefined) {
-				customAlert("근본원인을 선택해주세요.");
-			} else {
+			// if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val()) && $("input[name='FDMTSOLUT']:checked").val() == undefined) {
+			// 	customAlert("근본원인을 선택해주세요.");
+			// } else {
 				var formData = makeFormData();
 				filePostAjax("/user/qm/qm01/insertQualityResp", formData,function(data) {
 					if (data.resultCode == 200) {
@@ -1057,7 +1084,7 @@
 						modalStack.close();
 					}
 				});
-			}
+			// }
 		}
 	}
 
@@ -1071,10 +1098,10 @@
 	        customAlert("등록사유를 선택해주세요");
 	        return false;
 		}
-		if ($("input[name='FDMTSOLUT']:checked").val() == undefined) {
-			customAlert("근본원인을 선택해주세요.");
-			return false;
-		} 
+		// if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val()) && $("input[name='FDMTSOLUT']:checked").val() == undefined) {
+		// 	customAlert("근본원인을 선택해주세요.");
+		// 	return false;
+		// } 
 		if (inputValidation($('.popup_area [required]'))) {
 			var formData = makeFormData();
 	      	filePostAjax("/user/qm/qm01/updateQualityResp", formData,function(data) {
@@ -1287,7 +1314,7 @@
 						if(value == 'Y'){
 							//결재대상자 load
 							gridViewPop1.initView().setData(0);
-							}
+						}
 					} else
 					if ($('#popForm2 #' + key)[0]) {
 						$('#popForm2 #' + key).val(value);

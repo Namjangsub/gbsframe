@@ -29,6 +29,7 @@
 				<input type="hidden" id="clntPjtNm" name="clntPjtNm">
 				<input type="hidden" id="clntNm" name="clntNm">
 				<input type="hidden" id="telNo" name="telNo">
+				<input type="hidden" id="actDeptId" name="actDeptId">
 
 				<table class="popup_table">
 					<colgroup>
@@ -330,7 +331,7 @@
 						<!--                         </tr> -->
 						<tr>
 							<th style="color:blue;">지연일수</th>
-							<td>
+						<td>
 								<input type="text" id="delayDay" name="delayDay" comma onkeyup="onlyNumber(this)"  msg="지연일수">
 							</td>
 						</tr>
@@ -352,7 +353,7 @@
 								</div>
 							</td>
 						</tr>
-						<tr>
+						<tr class="issActApproval">
                             <th style="color:blue;">근본원인</th>
 							<td colspan=3 style="text-align:left;">
 								<div id="FDMTSOLUT-radioButtonContainer" msg="근본원인"></div>
@@ -361,8 +362,8 @@
 								</select> -->
 							</td>
                         </tr>
-						<tr>
-							<th style="color:blue;">근본대책(세부실행 대책)</th>
+						<tr class="issActApproval">
+							<th style="color:blue;">근본예방대책<br><span style="font-size:11px;">(핵심목적이므로 책임자가 목적에 맞게 기록 요망)</span></th>
 							<td colspan="3">
 								<textarea	class="form-control" id="fdmtSolutCnt" name="fdmtSolutCnt" rows="2" maxlength="500" msg="근본대책(세부실행 대책)"></textarea>
 							</td>
@@ -428,6 +429,7 @@
     var wbsRsltseDt = null;
     var approval_Yn = 'N';
     var act_approval_Yn = 'N';
+	var teamManagerFlag = false;
     const currFormId = "#popForm_SP11";	//현재화면의 Form ID,  poup 화면을 중복으로 Call 할시 필드명 중복으로 구분 안됨
     const currDivId = "#wbsPopupIss";		//현재화면의 Form ID,  poup 화면을 중복으로 Call 할시 필드명 중복으로 구분 안됨
 
@@ -529,7 +531,7 @@
                     });
                     gridResize1(); //그리드 높이 조정
                 } catch (error) {
-                    alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+                    customAlert("오류 발생!! 전산실 연락 바랍니다", error.message);
                     return null; // 오류 발생 시 null 반환
                 } finally {
                     // console.log("함수 실행 완료.");
@@ -616,9 +618,26 @@
                             totalElements :  data.paginationInfo.totalRecordCount,
                         }
                     });
+
+					// 결재자가 해당 작성자의 부서 팀장여부 확인 
+					// teamManagerFlag == true 이면 근본원인, 근본예방대책 필드 필수입력 및 활성화 2025-08-06 최지상
+					list.forEach(function(item){
+						if (item.deptId.slice(0,5) === $("#actDeptId").val().slice(0,5) && item.teamManager === 'Y' && item.todoId === jwt.userId) {
+							teamManagerFlag = true;
+						}
+					});
+					if (teamManagerFlag && !['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
+						$('#FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
+						$('#fdmtSolutCnt').closest('td').prev('th').addClass('hit');
+						$('#fdmtSolutCnt').attr('required', 'true');
+						$('.teamManagerApproval').removeClass('no-click');
+					} else {
+						$('#FDMTSOLUT-radioButtonContainer').addClass('disabled-area').find(':radio, :checkbox').on('click', function(e){e.preventDefault();});
+					}
+
                     gridResize2(); //그리드 높이 조정
                 } catch (error) {
-                    alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+                    customAlert("오류 발생!! 전산실 연락 바랍니다", error.message);
                     return null; // 오류 발생 시 null 반환
                 } finally {
                     // console.log("함수 실행 완료.");
@@ -804,9 +823,8 @@
         		$('#actCompDgnFileNm').attr('required', 'true');
 				// $('#fdmtSolutCd').closest('td').prev('th').addClass('hit');
 				// $('#fdmtSolutCd').attr('required', 'true');
-				$('#FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
-				$('#fdmtSolutCnt').closest('td').prev('th').addClass('hit');
-				$('#fdmtSolutCnt').attr('required', 'true');
+				// $('#FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
+				// $('#fdmtSolutCnt').closest('td').prev('th').addClass('hit').attr('required', 'true');
 
 				// 조치내용 입력시 문제정보의 유형이 일정이면 지연일수 필드 필수 입력
 				if ($(currFormId + ' #issDiv').val() == 'ISSDIV10') {
@@ -825,6 +843,7 @@
         			$(currDivId).find('#actionBtn').show();
         		}
             	$(currDivId).find('.issAct').removeClass('no-click');
+            	$(currDivId).find('.issActApproval').addClass('no-click');	// 근본원인,근본예방대책 필드는 결재시 팀장만 입력하겠끔
 
         	} else {
         		$(currFormId + ' #actsDt').closest('td').prev('th').removeClass('hit');
@@ -847,8 +866,8 @@
         		$('#actCompDgnFileNm').removeAttr('required', 'true');
 				// $('#fdmtSolutCd').closest('td').prev('th').removeClass('hit');
 				// $('#fdmtSolutCd').removeAttr('required', 'true');
-				$('#FDMTSOLUT-radioButtonContainer').closest('td').prev('th').removeClass('hit');
-				$('#fdmtSolutCnt').closest('td').prev('th').removeClass('hit');
+				// $('#FDMTSOLUT-radioButtonContainer').closest('td').prev('th').removeClass('hit');
+				// $('#fdmtSolutCnt').closest('td').prev('th').removeClass('hit').removeAttr('required', 'true');
 				
 				// 조치내용 입력시 문제정보의 유형이 일정이면 지연일수 필드 필수 입력
 				if ($(currFormId + ' #issDiv').val() == 'ISSDIV10') {
@@ -902,14 +921,14 @@
             //조치 시작일자 종료일자 체크
             //1. 조치시작일자는 계획 시작일자 이전일 수 없다.
             if( $(currFormId + ' #actsDt').val() != undefined && $(currFormId + ' #actsDt').val() < $(currFormId + ' #wbsRsltssDt').val()) {
-                alert("조치 시작일은 계획 시작일 이전일 수 없습니다.");
+                customAlert("조치 시작일은 계획 시작일 이전일 수 없습니다.");
                 $(currFormId + ' #actsDt').datepicker("setDate", new Date($(currFormId + ' #wbsRsltssDt').val()));
                 return;
             }
 
             //2. 조치 시작일자는 조치 종료일자 이후 일 수 없다. 하지만 종료일자가 없으면 체크 안해야지
             if( $(currFormId + ' #actsDt').val() != undefined && $(currFormId + ' #acteDt').val() != undefined && $(currFormId + ' #actsDt').val() > $(currFormId + ' #acteDt').val()) {
-                alert("조치 시작일은 조치 종료일 이전일 수 없습니다.");
+                customAlert("조치 시작일은 조치 종료일 이전일 수 없습니다.");
                 $(currFormId + ' #acteDt').datepicker("setDate", $(currFormId + ' #actsDt').val());
                 return;
             }
@@ -923,7 +942,7 @@
         .datepicker("setDate",  moment(new Date()).endOf("month").toDate())
         .on("changeDate", function(){
             if( $(currFormId + ' #actsDt').val() != undefined && $(currFormId + ' #acteDt').val() != undefined && $(currFormId + ' #actsDt').val() > $(currFormId + ' #acteDt').val()) {
-                alert("조치 종료일은 조치 시작일 이전일 수 없습니다.");
+                customAlert("조치 종료일은 조치 시작일 이전일 수 없습니다.");
                 $(currFormId + ' #actsDt').datepicker("setDate", $(currFormId + ' #acteDt').val());
             }
         });
@@ -1088,7 +1107,7 @@
 
 		// 결재시 수정하면 change 이벤트 적용
 		$(currFormId).on('input paste drop change', '#measRst, #actCnts, #FDMTSOLUT-radioButtonContainer input[type=checkbox], #fdmtSolutCnt, #COBGB-checkboxContainer-P11 input[type=radio]',function() {
-			if ($(currDivId + ' #commentBtn').length === 0 && actionType === 'I') {
+			if ($(currDivId + ' #commentBtn').length === 0 && actionType === 'I' && teamManagerFlag) {
 				const callCmdBtn = '<button id="commentBtn">코칭수정</button>';
 				$(currDivId + ' .popup_bottom_btn').first().prepend(callCmdBtn);
 				$(currDivId + ' #commentBtn').on('click', () => updateIssueComment('결과수정'));
@@ -1122,51 +1141,55 @@
 	// 결재시 코멘트 추가 수정
 	function updateIssueComment(){
 		if (inputValidation($('.popup_area [required]'))) {
-	        var formData = makeFormData();
-	        filePostAjax("/user/wb/wb24/updateIssueComment", formData, function(data) {
-				if (data.resultCode == 200) {
-					$(currDivId + ' #commentBtn').remove();
-	
-					// 카카오톡 메세지 문구 추가 설정
-					// 원인
-					const newMeasRaw = formData.get("measRst");
-					const originMeasRaw = originMeasRst;
-					const newMeasClean    = newMeasRaw.replace(/\r\n/g, "\n");
-					const originMeasClean = originMeasRaw.replace(/\r\n/g, "\n");
-	
-					let diffMeas = "";
-					if (newMeasClean.startsWith(originMeasClean)) {
-						diffMeas = newMeasClean.slice(originMeasClean.length);
-					} else if (newMeasClean.includes(originMeasClean)) {
-						diffMeas = newMeasClean.split(originMeasClean)[1];
+			if ($("input[name='FDMTSOLUT']:checked").val() == undefined) {
+				customAlert("근본원인을 선택해주세요.");
+				return false;
+			} else {
+				var formData = makeFormData();
+				filePostAjax("/user/wb/wb24/updateIssueComment", formData, function(data) {
+					if (data.resultCode == 200) {
+						$(currDivId + ' #commentBtn').remove();
+		
+						// 카카오톡 메세지 문구 추가 설정
+						// 원인
+						const newMeasRaw = formData.get("measRst");
+						const originMeasRaw = originMeasRst;
+						const newMeasClean    = newMeasRaw.replace(/\r\n/g, "\n");
+						const originMeasClean = originMeasRaw.replace(/\r\n/g, "\n");
+		
+						let diffMeas = "";
+						if (newMeasClean.startsWith(originMeasClean)) {
+							diffMeas = newMeasClean.slice(originMeasClean.length);
+						} else if (newMeasClean.includes(originMeasClean)) {
+							diffMeas = newMeasClean.split(originMeasClean)[1];
+						}
+						diffMeas = diffMeas.replace(/^[\r\n]+/, "");
+		
+						// 결과
+						const newActRaw    = formData.get("actCnts");
+						const originActRaw = originActCnts;
+						const newActClean    = newActRaw.replace(/\r\n/g, "\n");
+						const originActClean = originActRaw.replace(/\r\n/g, "\n");
+		
+						let diffAct = "";
+						if (newActClean.startsWith(originActClean)) {
+							diffAct = newActClean.slice(originActClean.length);
+						} else if (newActClean.includes(originActClean)) {
+							diffAct = newActClean.split(originActClean)[1];
+						}
+						diffAct = diffAct.replace(/^[\r\n]+/, "");
+		
+						// 전역 kakaoDiff 설정
+						kakaoDiff = { cause: diffMeas, result: diffAct };
+		
+						// diff가 있으면 카톡 발송
+						if (diffMeas || diffAct) {
+							kakaoTodo();
+						}
 					}
-					diffMeas = diffMeas.replace(/^[\r\n]+/, "");
-	
-					// 결과
-					const newActRaw    = formData.get("actCnts");
-					const originActRaw = originActCnts;
-					const newActClean    = newActRaw.replace(/\r\n/g, "\n");
-					const originActClean = originActRaw.replace(/\r\n/g, "\n");
-	
-					let diffAct = "";
-					if (newActClean.startsWith(originActClean)) {
-						diffAct = newActClean.slice(originActClean.length);
-					} else if (newActClean.includes(originActClean)) {
-						diffAct = newActClean.split(originActClean)[1];
-					}
-					diffAct = diffAct.replace(/^[\r\n]+/, "");
-	
-					// 전역 kakaoDiff 설정
-					kakaoDiff = { cause: diffMeas, result: diffAct };
-	
-					// diff가 있으면 카톡 발송
-					if (diffMeas || diffAct) {
-						kakaoTodo();
-					}
-				}
-			});
-	        return true;
-			
+				});
+				return true;
+			}
 		} else { return false;}
 	}
 				
@@ -1210,14 +1233,14 @@
     function insertWbsIssue() {
         if (inputValidation($(currFormId).find('[required]'))) {
         	 if($(currFormId + " input[name='CODECOBGB']:checked").val() == undefined || $(currFormId + " input[name='CODECOBGB']:checked").val() == ""){
-                 alert("등록사유를 선택해주세요");
+                 customAlert("장애유형을 선택해주세요");
             } else {
 
 				if (inputValidationCheck()) {
 	            	$(currFormId + ' #issSts').val('ISSSTS01');
 		            var formData = makeFormData();
 		            filePostAjax("/user/wb/wb24/wbsIssueInsert", formData, function(data) {
-		                alert(data.resultMessage);
+		                customAlert(data.resultMessage);
 		                if (data.resultCode == 200) {
 		                	$(currFormId + ' #issNo').val(data.resultIssNo);
 		                    kakaoTodo();
@@ -1239,14 +1262,16 @@
     function updateWbsIssue() {
         if (inputValidation($(currFormId).find('[required]'))) {
 			if($(currFormId + " input[name='CODECOBGB']:checked").val() == undefined || $(currFormId + " input[name='CODECOBGB']:checked").val() == ""){
-                alert("등록사유를 선택해주세요");
-			} else if ($("#issSts").val() == 'ISSSTS03' && $("input[name='FDMTSOLUT']:checked").val() == undefined) {
-				alert("근본원인을 선택해주세요.");
-			} else {
+                customAlert("장애유형을 선택해주세요");
+			} 
+			// else if ($("#issSts").val() == 'ISSSTS03' && $("input[name='FDMTSOLUT']:checked").val() == undefined) {
+			// 	customAlert("근본원인을 선택해주세요.");
+			// } 
+			else {
 				if (inputValidationCheck()) {
 		            var formData = makeFormData();
 		            filePostAjax("/user/wb/wb24/wbsIssueUpdate", formData, function(data) {
-		                alert(data.resultMessage);
+		                customAlert(data.resultMessage);
 		                if (data.resultCode == 200) {
 		                    kakaoTodo();
 	                    	if (typeof gridView !== "undefined") gridView.setData(0);
@@ -1273,12 +1298,12 @@
     	
     	if (deDt < todayStr) {
 	    	if (reqDt < todayStr) {
-	    		alert('사내요구일자가 현재일보다 작을수 없습니다.');
+	    		customAlert('사내요구일자가 현재일보다 작을수 없습니다.');
 	    		$(currFormId + ' #reqDt').focus();
 	    		return false;
 	    	} 
 	    	if (custReqDt < todayStr) {
-	    		alert('고객요구일자가 현재일보다 작을수 없습니다.')
+	    		customAlert('고객요구일자가 현재일보다 작을수 없습니다.')
 	    		$(currFormId + ' #custReqDt').focus();
 	    		return false;
 	    	} 
@@ -1493,7 +1518,7 @@
                     gridViewApprovalSP11.target.setValue(row, "todoCfOpn",""); // 확인의견
                     gridViewApprovalSP11.target.setValue(row, "telNo",data.resultList[0].telNo); // 핸드폰번호
                 } else {
-                    alert("중복 공유를 지정할 수 없습니다.");
+                    customAlert("중복 공유를 지정할 수 없습니다.");
                     return;
                 }
             });
@@ -1514,12 +1539,12 @@
     //공유대상자 추가//
     function insertShareUserModal() {
         if (evlCloseChk == "Y") {
-            alert("해당 SALES CODE 과제는 평가 완료 되었습니다.");
+            customAlert("해당 SALES CODE 과제는 평가 완료 되었습니다.");
             return;
         }
 
         if( approvalYn() ) {
-            alert("결재가 이미 진행중입니다.");
+            customAlert("결재가 이미 진행중입니다.");
             return;
         }
 
@@ -1588,12 +1613,12 @@
 
     function deleteShareUser() {
         if (evlCloseChk == "Y") {
-            alert("해당 SALES CODE 과제는 평가 완료 되었습니다.");
+            customAlert("해당 SALES CODE 과제는 평가 완료 되었습니다.");
             return;
         }
 
         if( approvalYn() ) {
-            alert("결재가 이미 진행중입니다.");
+            customAlert("결재가 이미 진행중입니다.");
             return;
         }
 
@@ -1611,12 +1636,12 @@
     //공유대상자 추가//
     function insertShareUserModal2() {
         if (evlCloseChk == "Y") {
-            alert("해당 SALES CODE 과제는 평가 완료 되었습니다.");
+            customAlert("해당 SALES CODE 과제는 평가 완료 되었습니다.");
             return;
         }
 
         if( approvalYn2() ) {
-            alert("결재가 이미 진행중입니다.");
+            customAlert("결재가 이미 진행중입니다.");
             return;
         }
 
@@ -1685,12 +1710,12 @@
 
     function deleteShareUser2() {
         if (evlCloseChk == "Y") {
-            alert("해당 SALES CODE 과제는 평가 완료 되었습니다.");
+            customAlert("해당 SALES CODE 과제는 평가 완료 되었습니다.");
             return;
         }
 
         if( approvalYn2() ) {
-            alert("결재가 이미 진행중입니다.");
+            customAlert("결재가 이미 진행중입니다.");
             return;
         }
 
@@ -2040,7 +2065,7 @@
                 if( data.resultList[0].maxMessageId != "" ) {
                     sendList = data.resultList;
                 } else {
-                    alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
+                    customAlert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
                     return;
                 }
             }
@@ -2080,12 +2105,12 @@
             param.sendDt = sendObj.sendDt;
 
             if(mobile == "" || mobile == null) {
-                alert('수신전화번호가 없습니다.\r\n['+clntNm+'] 거래처관리의 사업부 첫번째 항목을 확인해 주십시오.');
+                customAlert('수신전화번호가 없습니다.\r\n['+clntNm+'] 거래처관리의 사업부 첫번째 항목을 확인해 주십시오.');
                 return;
             }
 
             if(talkMessage == "" || talkMessage == null) {
-                alert('발송할 내용이 없습니다.\r\n알림톡템플릿관리를 확인해 주십시오.');
+                customAlert('발송할 내용이 없습니다.\r\n알림톡템플릿관리를 확인해 주십시오.');
                 return;
             }
 
@@ -2378,7 +2403,7 @@
 
 	function createQualityReqModal() {
 		if ($('#issNo').val() == '신규등록') {
-			alert('문제신규등록 완료 후 발주요청서 작성이 가능합니다.')			
+			customAlert('문제신규등록 완료 후 발주요청서 작성이 가능합니다.')			
 			return false;
 		}
 		modalStack.close();	//문제 모달 popup닫기
@@ -2410,7 +2435,7 @@
         }
             putAjax("/user/wb/wb24/updateVendCd", paramObj, null, function(data) {
                 if (data.resultCode == 200) {
-                    alert("저장되었습니다.");
+                    customAlert("저장되었습니다.");
                     modalStack.close();
                 }
             });

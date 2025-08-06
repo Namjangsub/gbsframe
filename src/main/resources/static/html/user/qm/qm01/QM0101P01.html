@@ -6,6 +6,7 @@
 		<div class="form-group popup_table">
 			<input type="hidden" id="fileTrgtKey"			name="fileTrgtKey">
 			<input type="hidden" id="issFileTrgtKey"		name="issFileTrgtKey">
+			<input type="hidden" id="deptCd"				name="deptCd">
 			<input type="hidden" id="pgmId"				name="pgmId"	value="QM0101P01">
 			<table>
 				<colgroup>
@@ -112,6 +113,7 @@
 					<th class="hit">분류</th>
 					<td colspan= "3" >
 						<div id="COBTP-radioButtonContainer"></div>
+						<input type="hidden" id="partCd" name="partCd">
 					</td>
 					<th>고객사</th>
 					<td>
@@ -144,7 +146,7 @@
 				</tr>
 		
 				<tr>
-					<th rowspan="1">등록 사유</th>
+					<th rowspan="1" id="cobgb">등록 사유</th>
 					<td rowspan="1" colspan= "3" style="text-align:left; vertical-align:top;">
 						<div id="COBGB-checkboxContainer"></div>
 					</td>
@@ -243,6 +245,14 @@
 									</td>
 								</tr>
 								<tr class="reqResultArea">
+									<th>지연일수</th>
+									<td colspan="3">
+										<div>
+											<input type="text" id="delayDay" name="delayDay" comma onkeyup="onlyNumber(this)" msg="지연일수" placeholder="해당건으로 지연된 일수를 입력">
+										</div>
+									</td>
+								</tr>
+								<tr class="reqResultArea">
 									<th class="hit">조치자 원인등록</th>
 									<td colspan="3">
 										<div class="aiContainer">
@@ -260,28 +270,16 @@
 										</div>
 									</td>
 								</tr>
-								<tr class="reqResultArea">
-									<th class="hit">근본원인</th>
-									<td class="hit" colspan=3 style="text-align:left;">
+								<tr class="teamManagerApproval">
+									<th>근본원인</th>
+									<td colspan=3 style="text-align:left;">
 										<div id="FDMTSOLUT-radioButtonContainer"></div>
-										<!-- <select id="fdmtSolutCd" name="fdmtSolutCd" data-kind="FDMTSOLUT" required msg="근본원인">
-											<option value="">선택하세요</option>
-										</select> -->
 									</td>
 								</tr>
-								<tr>
-									<th class="hit">근본대책<br>(세부실행 대책)</th>
+								<tr class="teamManagerApproval">
+									<th>근본예방대책<br><span style="font-size:11px;">(핵심목적이므로 책임자가 목적에 맞게 기록 요망)</span></th>
 									<td colspan="3">
-										<textarea	class="form-control" id="fdmtSolutCnt" name="fdmtSolutCnt" rows="2" maxlength="500" required msg="근본대책(세부실행 대책)"></textarea>
-									</td>
-								</tr>
-								
-								<tr class="reqResultArea">
-									<th>지연일수</th>
-									<td colspan="3">
-										<div>
-											<input type="text" id="delayDay" name="delayDay" comma onkeyup="onlyNumber(this)" msg="지연일수" placeholder="해당건으로 지연된 일수를 입력">
-										</div>
+										<textarea	class="form-control" id="fdmtSolutCnt" name="fdmtSolutCnt" rows="2" maxlength="500" msg="근본대책(세부실행 대책)"></textarea>
 									</td>
 								</tr>
 								<!-- 공유대상자-->
@@ -352,6 +350,7 @@
 	const currFormId = "#popFormQ01";	//현재화면의 Form ID,	poup 화면을 중복으로 Call 할시 필드명 중복으로 구분 안됨
 	const currDivId = "#qmpopFormQ01";		//현재화면의 Form ID,	poup 화면을 중복으로 Call 할시 필드명 중복으로 구분 안됨
 	var sameTimeResultChk = "";
+	var teamManagerFlag = false;
 	
 	//담당자가 바뀌었을때 문제등록 사유 유지하기 위함 변수 설정
 	var tempCOBTP =	''; //$("input[name='COBTP']:checked").val();
@@ -467,6 +466,21 @@
 						}
 						if (sameTimeResultChk == 'Y') {
 							ModalApp.gridResize(gridViewPop, list.length); //그리드 높이 조정
+						}
+						// 결재자가 해당 작성자의 부서 팀장여부 확인 
+						// teamManagerFlag == true 이면 근본원인, 근본예방대책 필드 필수입력 및 활성화 2025-08-06 최지상
+						list.forEach(function(item){
+							if (item.deptId.slice(0,5) === $("#deptCd").val() && item.teamManager === 'Y' && item.todoId === jwt.userId) {
+								teamManagerFlag = true;
+							}
+						});
+						if (teamManagerFlag && !['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($(currFormId + " #partCd").val())) {
+							$(currFormId + ' #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
+							$(currFormId + ' #fdmtSolutCnt').closest('td').prev('th').addClass('hit');
+							$(currFormId + ' #fdmtSolutCnt').attr('required', 'true');
+							$(currFormId + ' .teamManagerApproval').removeClass('no-click');
+						} else {
+							$('#FDMTSOLUT-radioButtonContainer').addClass('disabled-area').find(':radio, :checkbox').on('click', function(e){e.preventDefault();});
 						}
 					} catch (error) {
 						alert("오류 발생!! 전산실 연락 바랍니다", error.message);
@@ -1017,6 +1031,9 @@ var ModalApp = (function() {
 				// 키가 목록에 있는 경우 체크하기
 				if (checkKeys.includes(key)) {
 					$(currFormId + ' #' + value).prop("checked", true);
+					if (key === 'partCd') {
+						$(currFormId + ' #partCd').val(value);
+					}
 				} else 
 				if (checkDateKeys.includes(key)) {
 					$(currFormId + ' #' + key).val(value);
@@ -1087,16 +1104,6 @@ var ModalApp = (function() {
 // 				$(currFormId + ' #fdmtSolutCnt').removeAttr('required').closest('td').prev('th').removeClass('hit');
 // 			}
 
-			// 정상 발주요청서 발행되는 분류(근본원인 필드 필수 제외 처리)
-			// 정상출도, A/S유상, Spare유상, 고객E/O, 설치시운전 정상
-			if (['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes(data.result.partCd))  {
-				$(currFormId + ' #FDMTSOLUT-radioButtonContainer').removeAttr('required').closest('td').prev('th').removeClass('hit');
-				$(currFormId + ' #fdmtSolutCnt').removeAttr('required').closest('td').prev('th').removeClass('hit');
-			} else {
-				$(currFormId + ' #FDMTSOLUT-radioButtonContainer').attr('required', true).closest('td').prev('th').addClass('hit');
-				$(currFormId + ' #fdmtSolutCnt').attr('required', true).closest('td').prev('th').addClass('hit');
-			}
-			
 			monthCloseChk(data.result.ordrgDt);
 
 			if ( data.result.sameTimeResult == 'Y') { //결과일괄등록
@@ -1190,8 +1197,6 @@ var ModalApp = (function() {
 					alert("A/S유상 수주번호입니다. 분류코드 확인바랍니다.");
 			} else if ($("#ordrsDiv").val() == 'ORDRSDIV3' && $("input[name='COBTP']:checked").val() != 'COBTP05') { //A/S무상
 					alert("A/S무상 수주번호입니다. 분류코드 확인바랍니다.");
-			} else if ($("#workRptNo").val() != '' && _procType=='결과일괄등록' && $("input[name='FDMTSOLUT']:checked").val() == undefined) {
-				alert("근본원인을 선택해주세요.");
 			} else if (inputValidationCheck()) {
 					var formData = makeFormData(_procType); 
 					filePostAjax("/user/qm/qm01/insertQualityReq", formData, function(data) {
@@ -1281,6 +1286,9 @@ var ModalApp = (function() {
 	// 결재시 코멘트 추가 수정
 	function updateQualityResultComment(){
 		if (inputValidation($('.popup_area [required]'))) {
+			if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val()) && $("input[name='FDMTSOLUT']:checked").val() == undefined) {
+				customAlert("근본원인을 선택해주세요.");
+			}
 			var formData = makeFormData();
 			filePostAjax("/user/qm/qm01/updateQualityResultComment", formData,function(data) {
 				if (data.resultCode == 200) {
@@ -2317,6 +2325,10 @@ var ModalApp = (function() {
 		//	return false;
 		// }
 		$(currFormId + " #reportRegBtn").hide();	//발주요청서 출력버튼 기본은 숨김 처리--> 1번결재자가 결재완료 되면 보임. 2023.11.27 정상훈차장 요청
+		if (fromJobType == "ISS") {
+			$(currDivId + ' #cobgb').text("장애유형");
+		}
+
 		let savedSubCd = ""; // 등록사유 변수
 		let savedEtcInput = ""; // 등록사유 변수
 		if (actionType == "C") {
@@ -2450,6 +2462,9 @@ var ModalApp = (function() {
 			$(currDivId + " #actionBtn2").remove();
 
 		}
+		// 팝업창 열릴때 근본원인, 근본예방대책 필드 클릭방지
+		$(currFormId + ' .teamManagerApproval').addClass('no-click');
+
 		// TODO 리스트에서 호출 시 공유 : actionType:T	결재: actionType:S 처리 부분
 		var _todoViewMode =modalStack.last().paramObj.todoView;
 		if (_todoViewMode != undefined && _todoViewMode == "INQ") {
@@ -2520,7 +2535,7 @@ var ModalApp = (function() {
 			fileTrgtTyp		: $(currFormId + " #pgmId").val(),
 			fileTrgtKey		: fileTrgtKey,
 			todoNo			: $(currFormId + " #reqNo").val(),		//결재정보처리를 위함
-			sameTimeResultChk : sameTimeResultChk	// 해당 건이 결과일괄 등록 여부 -> 결재에서 투입공수 입력을 필수 여부 확인을 위해
+			sameTimeResultChk : sameTimeResultChk,	// 해당 건이 결과일괄 등록 여부 -> 결재에서 투입공수 입력을 필수 여부 확인을 위해
 		}
 		treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
 		//---------------------------------------------------------------
@@ -2545,7 +2560,7 @@ var ModalApp = (function() {
 		
 		// 결재시 수정하면 change 이벤트 적용
 		$(currFormId).on('input paste drop change', '#measRst, #resltRst, #FDMTSOLUT-radioButtonContainer input[type=checkbox], #fdmtSolutCnt, #COBGB-checkboxContainer input[type=radio]',function() {
-			if ($(currDivId + ' #commentBtn').length === 0 && (actionType == 'S' || actionType == 'T')) {
+			if ($(currDivId + ' #commentBtn').length === 0 && teamManagerFlag) {
 				const callCmdBtn = '<button id="commentBtn">코칭수정</button>';
 				$('.popup_bottom_btn').first().prepend(callCmdBtn);
 				$(currDivId + ' #commentBtn').on("click", function() { ModalApp.updateQualityResultComment('결과수정'); });

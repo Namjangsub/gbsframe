@@ -152,12 +152,15 @@ function Approval(htmlParam, param, popParam) {
 							// 4. 발주요청서결과 일괄등록 건은 TODODIV2020 이 구분자만 존재하므로 this.param.sameTimeResultChk 에서 동시 여부 판단
 							// 5. this.param.sameTimeResultChk == 'Y' 이면 동시 등록
 							// 6. this.param.sameTimeResultChk == 'N' 이면 따로 등록
+							// 7. 정상건은 투입공수 입력패스 (정상출도, A/S유상, Spare유상, 고객E/O, 설치시운전 정상)
 							let editable = false; // 투입공수 입력여부 플래그
 							// 본인결재건이면서 팀장일때
 							if (applyBtn && data.deptTeamManager === 'TEAM01' && jwt.userId === data.todoId && ['GUN30', 'GUN40', 'TRN50', 'GUN60'].includes(jwt.deptId.slice(0, 5))) {
-								if  ((data.todoDiv2CodeId === 'TODODIV2020' && sameTimeResultChk === 'Y') 
+								if (!['COBTP01','COBTP04','COBTP06','COBTP08','COBTP09'].includes($("#partCd").val())) {
+									if  ((data.todoDiv2CodeId === 'TODODIV2020' && sameTimeResultChk === 'Y') 
 										|| (data.todoDiv2CodeId === 'TODODIV2090' || data.todoDiv2CodeId === 'TODODIV2030')){
 										editable = true;
+									}
 								}
 							}
 							// 투입공수 입력가능

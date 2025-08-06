@@ -632,20 +632,6 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 
 
 	function callApprovalWorking(todoKey, callPgm = ''){
-		//코칭수정 버튼이 활성화 상태이면 결과 Update 처리 선행
-		//필요시 프로그램 에 따라 분기 처리
-		if ($("#commentBtn").is(":enabled")) { //코칭 수정이면 코칭만 저장함
-			let chkFlag = false;
-			if (callPgm =='QM0101P01') {
-				chkFlag = ModalApp.updateQualityResultComment('결과수정');
-			} else if (callPgm == 'QM0101P03') {
-				chkFlag = updateQualityResultComment('결과수정');
-			} else  if (callPgm == 'WB2401P01' || callPgm == 'WB2401P11') {
-				chkFlag = updateIssueComment('결과수정');
-			}
-			if (!chkFlag) {return false;}
-		}
-		
 		paramObj = {
 				"todoKey" : todoKey,
 				"userId"  : jwt.userId,
@@ -663,6 +649,35 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 				return false;
 			}
 		}
+
+		// 1. 정상발주 제외일때만
+		// 2. 문제발주요청서, 결과등록, 문제조치로 들어온 결제일 때 유효성 검사(팀장구분은 사전에 검사됨)
+		if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
+			if ((row.todoDiv2CodeId === "TODODIV2020") || (row.todoDiv2CodeId === "TODODIV2030") || (row.todoDiv2CodeId === "TODODIV2090"))  {
+				if (!inputValidation($('.popup_area [required]'))) {
+					return false;
+				}
+				if (!$("input[name='FDMTSOLUT']:checked").val()) {
+					customAlert("근본원인을 선택해주세요.");
+					return false;
+				}
+			}
+		}
+		
+		//코칭수정 버튼이 활성화 상태이면 결과 Update 처리 선행
+		//필요시 프로그램 에 따라 분기 처리
+		if ($("#commentBtn").is(":enabled")) { //코칭 수정이면 코칭만 저장함
+			let chkFlag = false;
+			if (callPgm =='QM0101P01') {
+				chkFlag = ModalApp.updateQualityResultComment('결과수정');
+			} else if (callPgm == 'QM0101P03') {
+				chkFlag = updateQualityResultComment('결과수정');
+			} else  if (callPgm == 'WB2401P01' || callPgm == 'WB2401P11') {
+				chkFlag = updateIssueComment('결과수정');
+			}
+			if (!chkFlag) {return false;}
+		}
+
 		if( row.todoDiv1CodeNm == "공유" ) {
 			if( row.sanctnSttus == "N" ) {
 				if( confirm("확인 처리 하시겠습니까?") ) {
