@@ -141,7 +141,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 										$(currFormId + ' #FDMTSOLUT-radioButtonContainer').css({'background-color':'#ffffff','pointer-events':'auto'}).find('input[type=radio], input[type=checkbox]').off('click').prop('readonly', false).removeAttr('readonly');
 										$(currFormId + ' #fdmtSolutCnt').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
 
-										$(currFormId + ' #FDMTSOLUT-radioButtonContainer').attr('required', true).closest('td').prev('th').addClass('hit');
+										$(currFormId + ' #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
 										$(currFormId + ' #fdmtSolutCnt').attr('required', true).closest('td').prev('th').addClass('hit');
 										$(currFormId + ' #COBGB-checkboxContainer').css({'background-color':'#ffffff','pointer-events':'auto'}).find('input[type=radio], input[type=checkbox]').off('click');
 									} else if (params.fileTrgtTyp == 'WB2401P01' || params.fileTrgtTyp == 'WB2401P11') {
@@ -730,6 +730,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 				paramObj.sameTimeResultChk = sameTimeResultChk;
 			}
 			openThirdModal("/static/html/user/wb/wb20/WB2001P01.html", 730, 300, "", paramObj, function(data){
+			// openFourthModal("/static/html/user/wb/wb20/WB2001P01.html", 730, 300, "", paramObj, function(data){
 				if (data == "승인완료") {
 					$('.callApprovalWorking').last().remove();		//마지막 callApprovalWorking class에서 버튼 제거
 					if (typeof gridView !== 'undefined') {
