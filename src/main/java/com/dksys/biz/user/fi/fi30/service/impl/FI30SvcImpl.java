@@ -29,4 +29,9 @@ public class FI30SvcImpl implements FI30Svc {
 	public List<Map<String, String>> select_fi30_List(Map<String, String> paramMap) {
 		return fi30Mapper.select_fi30_List(paramMap);
 	}
+
+	@Override
+	public Map<String, String> select_fi30_detail_info(Map<String, String> paramMap) {
+		return fi30Mapper.select_fi30_detail_info(paramMap);
+	}
 }

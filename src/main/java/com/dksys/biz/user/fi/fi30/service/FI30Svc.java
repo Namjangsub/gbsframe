@@ -10,4 +10,7 @@ public interface FI30Svc {
 	
 	// 그리드 리스트
 	List<Map<String, String>> select_fi30_List(Map<String, String> paramMap);
+
+	// 상세 정보 조회
+	Map<String, String> select_fi30_detail_info(Map<String, String> paramMap);
 }

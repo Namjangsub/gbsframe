@@ -34,4 +34,12 @@ public class FI30Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+
+	 // 상세 정보 조회
+    @PostMapping(value = "/select_fi30_detail_info")
+    public String select_fi30_detail_info(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        Map<String, String> result = fi30svc.select_fi30_detail_info(paramMap);
+        model.addAttribute("result", result);
+        return "jsonView";
+    }
 }

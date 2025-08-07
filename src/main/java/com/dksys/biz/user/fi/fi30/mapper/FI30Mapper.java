@@ -12,4 +12,6 @@ public interface FI30Mapper {
 
 	// 그리드 리스트
 	List<Map<String, String>> select_fi30_List(Map<String, String> paramMap);
+
+	Map<String, String> select_fi30_detail_info(Map<String, String> paramMap);
 }
