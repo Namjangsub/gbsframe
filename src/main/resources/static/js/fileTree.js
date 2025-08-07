@@ -136,13 +136,16 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 									//발주요청처리결과화면이면 수정 가능하게 속성 변경 처리
 									if (params.fileTrgtTyp == 'QM0101P03' || params.fileTrgtTyp == 'QM0101P01') {
 										const currFormId = (params.fileTrgtTyp == 'QM0101P03') ? '#popForm2' : '#popFormQ01';
+										const issCheck = !['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($(currFormId + " #partCd").val());	// 정상건인지 문제건인지 체크
+										if (issCheck && data.resultList[0].teamManagerCheck == 'Y') {
+											$(currFormId + ' #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
+											$(currFormId + ' #fdmtSolutCnt').closest('td').prev('th').addClass('hit');
+											$(currFormId + ' #fdmtSolutCnt').attr('required', 'true');
+										}
 										$(currFormId + ' #measRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
 										$(currFormId + ' #resltRst').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
-										$(currFormId + ' #FDMTSOLUT-radioButtonContainer').css({'background-color':'#ffffff','pointer-events':'auto'}).find('input[type=radio], input[type=checkbox]').off('click').prop('readonly', false).removeAttr('readonly');
+										$(currFormId + ' #FDMTSOLUT-radioButtonContainer').css({'background-color':'#ffffff','pointer-events':'auto'}).find('input[type=radio], input[type=checkbox]').off('click');
 										$(currFormId + ' #fdmtSolutCnt').attr('readonly', false).css({'background-color': '#ffffff', 'color': '#00000'});
-
-										$(currFormId + ' #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
-										$(currFormId + ' #fdmtSolutCnt').attr('required', true).closest('td').prev('th').addClass('hit');
 										$(currFormId + ' #COBGB-checkboxContainer').css({'background-color':'#ffffff','pointer-events':'auto'}).find('input[type=radio], input[type=checkbox]').off('click');
 									} else if (params.fileTrgtTyp == 'WB2401P01' || params.fileTrgtTyp == 'WB2401P11') {
 										$('#measRst').css('pointer-events', 'auto').prop('readonly', false).css('background-color', '#ffffff');
@@ -656,12 +659,12 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 
 		// 1. 정상발주 제외일때만
 		// 2. 문제발주요청서, 결과등록, 문제조치로 들어온 결제일 때 유효성 검사(팀장구분은 사전에 검사됨)
-		if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
+		if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val()) && approvalWorkingGrid.teamManagerCheck == 'Y') {
 			if ((row.todoDiv2CodeId === "TODODIV2020") || (row.todoDiv2CodeId === "TODODIV2030") || (row.todoDiv2CodeId === "TODODIV2090"))  {
 				if (!inputValidation($('.popup_area [required]'))) {
 					return false;
 				}
-				if (!$("input[name='FDMTSOLUT']:checked").val()) {
+				if (!$("input[name='FDMTSOLUT']:checked").val() && sameTimeResultChk == 'Y') {
 					customAlert("근본원인을 선택해주세요.");
 					return false;
 				}
