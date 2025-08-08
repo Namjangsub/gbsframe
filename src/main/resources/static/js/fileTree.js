@@ -657,14 +657,25 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 			}
 		}
 
-		// 1. 정상발주 제외일때만
-		// 2. 문제발주요청서, 결과등록, 문제조치로 들어온 결제일 때 유효성 검사(팀장구분은 사전에 검사됨)
-		if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val()) && approvalWorkingGrid.teamManagerCheck == 'Y') {
-			if ((row.todoDiv2CodeId === "TODODIV2020") || (row.todoDiv2CodeId === "TODODIV2030") || (row.todoDiv2CodeId === "TODODIV2090"))  {
+		// 1. 문제발주요청서, 결과등록, 문제조치로 들어온 결제 이면서 팀장일 때 유효성 검사
+		// 2. 정상발주 제외일때만 유효성 체크
+		// 3. 문제조치는 팀장 결재시 유효성 체크
+		if (((row.todoDiv2CodeId === "TODODIV2020") || (row.todoDiv2CodeId === "TODODIV2030") || (row.todoDiv2CodeId === "TODODIV2090")) && approvalWorkingGrid.teamManager == '평가' ) {
+			if ((row.todoDiv2CodeId === "TODODIV2020") || (row.todoDiv2CodeId === "TODODIV2030")) {
+				if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
+					if (!inputValidation($('.popup_area [required]'))) {
+						return false;
+					}
+					if (!$("input[name='FDMTSOLUT']:checked").val() && approvalWorkingGrid.sameTimeResult == 'Y') {
+						customAlert("근본원인을 선택해주세요.");
+						return false;
+					}
+				}
+			} else {
 				if (!inputValidation($('.popup_area [required]'))) {
 					return false;
 				}
-				if (!$("input[name='FDMTSOLUT']:checked").val() && sameTimeResultChk == 'Y') {
+				if (!$("input[name='FDMTSOLUT']:checked").val()) {
 					customAlert("근본원인을 선택해주세요.");
 					return false;
 				}
