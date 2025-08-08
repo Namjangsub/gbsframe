@@ -37,64 +37,54 @@
 
 	<!-- 그리드 조회 -->
 	<select id="select_fi30_List" parameterType="Map" resultType="camelMap">
-	SELECT *
-		FROM (
-		SELECT
-			  T.*
-			, CASE WHEN T.BUYER_REG_NO='606-81-64873' THEN '건양ITT' ELSE '건양트루넷' END AS CO_CD,
-				NVL(
-					CASE WHEN T.E_TAX_TYPE LIKE '%수정%' THEN
-						SUBSTR(T.REMARK, INSTR(T.REMARK,'(')+1, INSTR(T.REMARK,')')-INSTR(T.REMARK,'(')-1)
-					END,
-					T.APPROVAL_NO
-				) AS GROUP_KEY,
-				MAX(T.WRITE_DATE) OVER (
-					PARTITION BY NVL(
-						CASE WHEN T.E_TAX_TYPE LIKE '%수정%' THEN
-						SUBSTR(T.REMARK, INSTR(T.REMARK,'(')+1, INSTR(T.REMARK,')')-INSTR(T.REMARK,'(')-1)
-						END,
-						T.APPROVAL_NO
-					)
-				) AS GROUP_MAX_DATE,
-				DECODE(
-					T.APPROVAL_NO,
-					NVL(
-						CASE WHEN T.E_TAX_TYPE LIKE '%수정%' THEN
-						SUBSTR(T.REMARK, INSTR(T.REMARK,'(')+1, INSTR(T.REMARK,')')-INSTR(T.REMARK,'(')-1)
-						END,
-						T.APPROVAL_NO
-					),
-					T.APPROVAL_NO, 0, 1
-				) AS ORDER2
-		
-		FROM TB_FI03M01 T
-		WHERE 1=1
-		<if test="coCd != null and !coCd.equals('')">
-			<choose>
-			<when test="coCd == 'GUN'">AND T.BUYER_REG_NO='606-81-64873'</when>
-			<otherwise>AND T.BUYER_REG_NO='606-86-05786'</otherwise>
-			</choose>
-		</if>
-		<if test="writeDtFrom != null and !writeDtFrom.equals('') and writeDtTo != null and !writeDtTo.equals('')">
-			AND T.WRITE_DATE BETWEEN TO_DATE(#{writeDtFrom},'YYYYMMDD') AND TO_DATE(#{writeDtTo},'YYYYMMDD')
-		</if>
-		<if test="clntCd != null and !clntCd.equals('')">
-			AND T.CLNT_CD=#{clntCd}
-		</if>
-		<if test="payDiv != null and payDiv != ''">
-			<choose>
-			<when test="payDiv == 'PAYDIV01'">AND T.RECEIPT_TYPE LIKE '%'||'영수'||'%'</when>
-			<otherwise>AND T.RECEIPT_TYPE LIKE '%'||'청구'||'%'</otherwise>
-			</choose>
-		</if>
+		SELECT *
+		FROM 
+		(
+			SELECT
+				T.*
+				, CASE WHEN T.BUYER_REG_NO='606-81-64873' THEN '건양ITT' ELSE '건양트루넷' END AS CO_CD
+				, NVL(CASE WHEN T.E_TAX_TYPE LIKE '%수정%' THEN SUBSTR(T.REMARK, INSTR(T.REMARK,'(')+1, INSTR(T.REMARK,')')-INSTR(T.REMARK,'(')-1) END, T.APPROVAL_NO) AS GROUP_KEY
+				, MAX(T.WRITE_DATE) OVER (PARTITION BY NVL(CASE WHEN T.E_TAX_TYPE LIKE '%수정%' THEN SUBSTR(T.REMARK, INSTR(T.REMARK,'(')+1, INSTR(T.REMARK,')')-INSTR(T.REMARK,'(')-1) END, T.APPROVAL_NO)) AS GROUP_MAX_DATE
+				, DECODE(NVL(CASE WHEN T.E_TAX_TYPE LIKE '%수정%' THEN SUBSTR(T.REMARK,INSTR(T.REMARK,'(')+1,INSTR(T.REMARK,')')-INSTR(T.REMARK,'(')-1) END,T.APPROVAL_NO),T.APPROVAL_NO,0,1) AS ORDER2
+				, FN_CM05M01_CD_TO_NM(T.BILL_TYPE)  AS BILL_TYPE_NM
+			FROM TB_FI03M01 T
+			WHERE 1=1
+			<if test="coCd != null and !coCd.equals('')">
+				<choose>
+					<when test="coCd == 'GUN'">
+						AND T.BUYER_REG_NO='606-81-64873'
+					</when>
+					<otherwise>
+						AND T.BUYER_REG_NO='606-86-05786'
+					</otherwise>
+				</choose>
+			</if>
+			<if test="writeDtFrom != null and !writeDtFrom.equals('') and writeDtTo != null and !writeDtTo.equals('')">
+				AND T.WRITE_DATE BETWEEN TO_DATE(#{writeDtFrom},'YYYYMMDD') AND TO_DATE(#{writeDtTo},'YYYYMMDD')
+			</if>
+			<if test="clntCd != null and !clntCd.equals('')">
+				AND T.CLNT_CD=#{clntCd}
+			</if>
+			<if test="payDiv != null and payDiv != ''">
+				<choose>
+					<when test="payDiv == 'PAYDIV01'">
+						AND T.RECEIPT_TYPE LIKE '%'||'영수'||'%'
+					</when>
+					<otherwise>
+						AND T.RECEIPT_TYPE LIKE '%'||'청구'||'%'
+					</otherwise>
+				</choose>
+			</if>
 		)
 	ORDER BY GROUP_MAX_DATE DESC, GROUP_KEY, ORDER2 DESC, WRITE_DATE DESC, ISSUE_DATE DESC, SEND_DATE DESC
 	</select>
 
-	<!-- 그리드 조회 -->
+	<!-- 상세정보 조회 -->
 	<select id="select_fi30_detail_info" parameterType="Map" resultType="camelMap">
-	SELECT 
+		SELECT 
 			  T.APPROVAL_NO 											-- 승인번호
+			, T.BILL_TYPE												-- 계산서종류(매입, 매출)
+			, FN_CM05M01_CD_TO_NM(T.BILL_TYPE)  AS BILL_TYPE_NM			-- 계산서종류명
 			, T.SELLER_REG_NO 											-- 공급자 등록번호
 			, T.BRANCH_NO 					AS SELLER_BRANCH_NO  		-- 공급자 종사업장번호
 			, T.COMPANY_NAME				AS SELLER_COMPANY_NAME		-- 공급자 상호
