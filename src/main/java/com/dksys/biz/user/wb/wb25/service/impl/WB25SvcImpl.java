@@ -1,26 +1,24 @@
 package com.dksys.biz.user.wb.wb25.service.impl;
 
 import java.lang.reflect.Type;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.collections4.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.util.ExceptionThrower;
-import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
-import com.dksys.biz.user.wb.wb25.mapper.WB25Mapper;
-import com.dksys.biz.user.wb.wb25.service.WB25Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
+import com.dksys.biz.user.sm.sm50.mapper.SM50Mapper;
+import com.dksys.biz.user.wb.wb25.mapper.WB25Mapper;
+import com.dksys.biz.user.wb.wb25.service.WB25Svc;
+import com.dksys.biz.util.ExceptionThrower;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -34,6 +32,9 @@ public class WB25SvcImpl implements WB25Svc {
 
 	@Autowired
 	WB25Svc wb25Svc;
+	
+	@Autowired
+    SM50Mapper bm50Mapper;
 
     @Autowired
     CM08Svc cm08Svc;
@@ -301,6 +302,7 @@ public class WB25SvcImpl implements WB25Svc {
 
 	@Override
 	public List<Map<String, String>> selectWbsTaskEvlResultList(Map<String, String> paramMap) {
+		bm50Mapper.callBomTempUpd(paramMap);
 		return wb25Mapper.selectWbsTaskEvlResultList(paramMap);
 	}
 	
