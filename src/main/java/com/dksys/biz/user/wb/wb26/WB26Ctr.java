@@ -108,5 +108,17 @@ public class WB26Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+
+
+    //리스트 조회
+	@PostMapping(value = "/select_wb2604_List")
+	public String select_wb2604_List(@RequestBody Map<String, String> paramMap, ModelMap model) {
+
+		paramMap.put("prdtGrp", ObjectUtil.sqlInCodeGen(paramMap.get("prdtGrp")));
+		
+		List<Map<String, String>> result = wb26svc.select_wb2604_List(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 	
 }
