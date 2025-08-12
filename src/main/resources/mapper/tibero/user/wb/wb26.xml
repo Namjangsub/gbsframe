@@ -1528,7 +1528,14 @@
 									, C2.ORDRS_NO
 									, W2.WBS_PLAN_CODE_KIND
 									, MIN(W2.WBS_RSLTSS_DT)		AS WBS_PLANS_DT
-									, MAX(W2.WBS_RSLTSE_DT)		AS WBS_PLANE_DT
+									, MAX(
+										  CASE
+										    WHEN W2.WBS_RSLTSS_DT <![CDATA[ < ]]> TRUNC(SYSDATE)
+										         AND W2.WBS_RSLTSE_DT IS NULL
+										    THEN SYSDATE
+										    ELSE W2.WBS_RSLTSE_DT
+										  END
+										) AS WBS_PLANE_DT
 									, SUM(W2.WBS_RSLTS_MH)			AS EXPECT_MH		--계획공수
 					--				, SUM(W2.DAYCNT)				AS DAYCNT			--소요일수
 									, TRUNC(MAX(W2.WBS_RSLTSE_DT) - MIN(W2.WBS_RSLTSS_DT) + 1) AS CAL_DAY
@@ -1570,6 +1577,23 @@
 								</if> 
 							 GROUP BY W2.CO_CD, C2.ORDRS_NO, W2.SALES_CD, W2.WBS_PLAN_CODE_KIND
 					) 
+					 , SCD AS (
+						SELECT    CO_CD, SALES_CD
+								, MIN(WBS_PLANS_DT) AS WBS_PLANS_DT
+								, MAX(WBS_PLANE_DT) AS WBS_PLANE_DT
+						  FROM RST AS T
+						 WHERE PLAN_TYPE = 'PM계획'
+						 GROUP BY CO_CD, SALES_CD
+						 <if test="scdStatus == '진행중'">
+						 HAVING MIN(WBS_PLANS_DT) <![CDATA[ <= ]]> SYSDATE AND SYSDATE <![CDATA[ <= ]]> MAX(WBS_PLANE_DT)
+  						 </if>
+						 <if test="scdStatus == '완료된'">
+						 HAVING  SYSDATE <![CDATA[ > ]]> MAX(WBS_PLANE_DT)
+  						 </if>
+						 <if test="scdStatus == '미도래'">
+						 HAVING  MIN(WBS_PLANS_DT) <![CDATA[ > ]]> SYSDATE
+  						 </if>
+					)
 					SELECT T.*
 						   ,  TO_CHAR(T.WBS_PLANS_DT, 'YYYY-MM-DD') 				AS WBS_PLANS_DT_FM
 						   ,  TO_CHAR(T.WBS_PLANE_DT, 'YYYY-MM-DD') 				AS WBS_PLANE_DT_FM
@@ -1580,6 +1604,8 @@
 						   , (SELECT FN_CM05M01_CD_TO_NM(WBS_PLAN_CODE_ID) FROM DUAL)   	AS WBS_PLAN_CODE_NM
 						   , (SELECT FN_CM06M01_ID_TO_NM(MNG_ID) FROM DUAL)   		AS MNG_ID_NM
 					   FROM RST AS T
+					   WHERE 1 = 1
+					     AND EXISTS (SELECT 1 FROM SCD WHERE SCD.SALES_CD = T.SALES_CD)
 					  ORDER BY T.CO_CD, T.PRDT_GRP, T.ORDRS_NO DESC, T.SALES_CD, T.PLAN_TYPE, 	T.WBS_PLAN_CODE_ID
 							 
                  ) AS X
