@@ -156,7 +156,7 @@ function Approval(htmlParam, param, popParam) {
 							let editable = false; // 투입공수 입력여부 플래그
 							// 본인결재건이면서 팀장일때
 							if (applyBtn && data.deptTeamManager === 'TEAM01' && jwt.userId === data.todoId && ['GUN30', 'GUN40', 'TRN50', 'GUN60'].includes(jwt.deptId.slice(0, 5))) {
-								if  ((data.todoDiv2CodeId === 'TODODIV2020' && sameTimeResultChk === 'Y' && !['COBTP01','COBTP04','COBTP06','COBTP08','COBTP09'].includes(data.partCd)) 
+								if  ((data.todoDiv2CodeId === 'TODODIV2020' && (sameTimeResultChk === 'Y' || data.sameTimeResult == 'Y') && !['COBTP01','COBTP04','COBTP06','COBTP08','COBTP09'].includes(data.partCd)) 
 									|| (data.todoDiv2CodeId === 'TODODIV2090') || (data.todoDiv2CodeId === 'TODODIV2030' && !['COBTP01','COBTP04','COBTP06','COBTP08','COBTP09'].includes(data.partCd))){
 									editable = true;
 								}
