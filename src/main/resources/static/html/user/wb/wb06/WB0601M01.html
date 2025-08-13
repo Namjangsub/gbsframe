@@ -250,13 +250,12 @@
   }
 
 	/* 트랙은 스크롤되며, 폭은 기간 totalW와 동일해야 함 */
-
 	.row-track{
-	position: relative;
-	z-index: 1;
-	min-height: calc(var(--lane-height) + var(--track-vpad)*2);
-	border:1px solid #cfe0ff; border-radius:12px; padding:var(--track-vpad) 0;
-	background: #fff;
+		position: relative;
+		z-index: 1;
+		min-height: calc(var(--lane-height) + var(--track-vpad)*2);
+		border:1px solid #cfe0ff; border-radius:12px; padding:var(--track-vpad) 0;
+		background: #fff;
 	}
 	.row-track::before{
 		content:"";
@@ -293,14 +292,14 @@
 	.shade.today  { background:rgba(255,0,0,.50) }      /* 오늘 */
 	/* ── SVG 막대 ─────────────────────────────────────── */
 	svg{ display:block; }
-	.bar{ fill:#BAD9F8; stroke:#8bb6ff; opacity:1; }
+	.bar{ fill:#BAD9F8; stroke:#8bb6ff; opacity:.5; }
 	/* 겹침 팔레트 */
-	.bar.overlap.ci-0{ fill:#4e79a7; stroke:#3b638c; opacity:.50; }
-	.bar.overlap.ci-1{ fill:#f28e2b; stroke:#cf741b; opacity:.50; }
-	.bar.overlap.ci-2{ fill:#59a14f; stroke:#45823e; opacity:.50; }
-	.bar.leader.overlap.ci-0{ fill:#4e79a7; stroke:#3b638c; opacity:.50; }
-	.bar.leader.overlap.ci-1{ fill:#f28e2b; stroke:#cf741b; opacity:.50; }
-	.bar.leader.overlap.ci-2{ fill:#59a14f; stroke:#45823e; opacity:.40; }
+ 	.bar.overlap.ci-0{ fill:#4e79a7; stroke:#3b638c; opacity:.50; } 
+ 	.bar.overlap.ci-1{ fill:#f28e2b; stroke:#cf741b; opacity:.50; } 
+ 	.bar.overlap.ci-2{ fill:#59a14f; stroke:#45823e; opacity:.50; } 
+ 	.bar.leader.overlap.ci-0{ fill:#4e79a7; stroke:#3b638c; opacity:.50; } 
+ 	.bar.leader.overlap.ci-1{ fill:#f28e2b; stroke:#cf741b; opacity:.50; } 
+ 	.bar.leader.overlap.ci-2{ fill:#59a14f; stroke:#45823e; opacity:.40; } 
 	
 	.bar-label{
 		font-size:var(--bar-font-size); 
@@ -454,7 +453,7 @@
 								<option value="">전체</option>
 							</select>
 						</td>
-						<th>진행상태</th>
+						<th>PM계획상태</th>
 						<td>
 							<select id="scdStatus_S" name="scdStatus_S" data-search="scdStatus">
 								<option value="">전체</option>
@@ -531,6 +530,7 @@
 
 	// ===== 렌더 =====
 	function renderAll(){
+
 		buildHeader();
 		buildRows();
 		$('.row-track').each(function(){
@@ -541,7 +541,9 @@
 		});
 		drawTodayLine();
 		paintTrackShading();  
-	
+
+		syncTimelineWidths();
+		try { openProgress(false); } catch(e){}
 	}
 
 
@@ -653,6 +655,9 @@
 
 	function searchData () {
 		if (inputValidation($('input[required]'))) {
+
+			try { openProgress(true); } catch(e){}
+			
 			var formData = {};
 			$.each($('[data-search]'), function(idx, elem){
 				// class에 input_calendar가 포함된 경우에만 '-' 제거
@@ -672,23 +677,34 @@
 			} else {
 				formData["prdtGrp"]    =  selectPrdtGrp.join(","); 		//['PRJCT115', 'PRJCT135'] --> "PRJCT115,PRJCT135" 변환해서 쿼리 in 조건에 맞게 변환
 			}
+
 			postAjax("/user/wb/wb26/select_wb2604_List", formData, null, function(data) {
 				try {
 					var list = data.result;
 
+					// 1) 오늘/끝일 입력값 문자열 준비 (YYYY-MM-DD 가정)
+					//    - list의 wbsPlansDtFm/wbsPlaneDtFm 도 동일 포맷 가정
+					const today = new Date();
+					const pad = n => (n < 10 ? '0' + n : '' + n);
+					const todayStr = today.getFullYear() + '-' + pad(today.getMonth() + 1) + '-' + pad(today.getDate());
+					
+					// endDt_S는 한 번만 읽기
+					const $endInput = $('#endDt_S');
+					const endDtS = ($endInput && $endInput.length) ? String($endInput.val() || '') : '';
+
 					// 정렬(시작일 오름차순, 같으면 종료일)
 					const sorter = (a, b) =>
-					  (a.start < b.start ? -1 : a.start > b.start ? 1 :
-					   a.end   < b.end   ? -1 : a.end   > b.end   ? 1 : 0);
+						(a.start < b.start ? -1 : a.start > b.start ? 1 :
+						 a.end   < b.end   ? -1 : a.end   > b.end   ? 1 : 0);
 
 
 					// PLAN_TYPE → 카테고리 매핑
 					// 'PM계획' → PM, '담당실적'/'실적' → DO, 나머지 → PLAN (필요 시 규칙 추가)
 					const catFrom = (planType='') => {
-					  const t = String(planType).toUpperCase();
-					  if (t.includes('PM')) return 'PM';
-					  if (t.includes('실적')) return 'DO';
-					  return 'PLAN';
+						const t = planType.toUpperCase();
+						if (t.includes('PM')) return 'PM';
+						if (t.includes('실적')) return 'DO';
+						return 'PLAN';
 					};
 					
 					// ───────── 변환 본체 ─────────
@@ -698,80 +714,97 @@
 					 *                 wbsPlanCodeId(키 후보), wbsPlanCodeNm(라벨)
 					 * @returns {Object} { [salesCd]: { PM:[], PLAN:[], DO:[] } }
 					 */
-					 function buildGantt(rows) {
-						  const rowsData  = {};            // { [salesCd]: { PM:[], PLAN:[], DO:[] } }
-						  const metaMap   = new Map();     // salesCd -> { label,key,기계종류,mngIdNm,수주구분,아이템구분,기계구분 }
-						  
-						  var todayStr = moment().format("YYYY-MM-DD");
-						  let minDate = todayStr;
-						  let maxDate = todayStr;
-						  
-						  for (const r of list){
-								const sales = String(r.salesCd || '').trim();
-								if (!sales) continue;
-								
-								const rec = {
-									  key:   r.wbsPlanCodeId,
-									  label: r.wbsPlanCodeNm ? String(r.wbsPlanCodeNm).trim() : (r.wbsPlanCodeId || ''),
-									  start: (r.wbsPlansDtFm || ''),
-									  end:   (r.wbsPlaneDtFm || '')
-								};
-								
-							    
-								// 버킷 생성 및 push
-								if (!rowsData[sales]) rowsData[sales] = { PM: [], PLAN: [], DO: [] };
-						  
-								rowsData[sales][catFrom(r.planType)].push(rec);
-								 
-								// 메타 수집(최초 채운 값 유지)
-								if (!metaMap  .has(sales)) {
-									metaMap  .set(sales, {
-										label: sales,
-										key: sales,
-										기계종류: String(r['기계종류'] || '').trim(),
-										mngIdNm: String(r.mngIdNm || '').trim(),
-										eqpNm: String(r.eqpNm || '').trim().slice(0, 20),
-										수주구분: String(r['수주구분'] || '').trim(),
-										아이템구분: String(r['아이템구분'] || '').trim(),
-										기계구분: String(r['기계구분'] || '').trim()
-									});
-								}
-								
-								 // 최소 날짜 갱신
-							    if (r.wbsPlansDtFm && (!minDate || r.wbsPlansDtFm < minDate)) minDate = r.wbsPlansDtFm;
-							    if (r.wbsPlaneDtFm && (!minDate || r.wbsPlaneDtFm < minDate)) minDate = r.wbsPlaneDtFm;
 
-							    // 최대 날짜 갱신
-							    if (r.wbsPlansDtFm && (!maxDate || r.wbsPlansDtFm > maxDate)) maxDate = r.wbsPlansDtFm;
-							    if (r.wbsPlaneDtFm && (!maxDate || r.wbsPlaneDtFm > maxDate)) maxDate = r.wbsPlaneDtFm;
-						 }
-						  return { rowsData , rowDefs: Array.from(metaMap.values()) , minDate, maxDate  };
-					 }
+					const rowsData = Object.create(null);         // { [salesCd]: { PM:[], PLAN:[], DO:[] } }
+					const metaMap  = new Map();                   // salesCd -> meta
+					let minDate = null;                           // 문자열 비교용(YYYY-MM-DD)
+					let maxDate = null;
 					
-					 const { rowsData, rowDefs, minDate, maxDate } = buildGantt(list);
-					 
-					// 간트 상태에 주입
-					 state.rowDefs = rowDefs;
-					 state.rowsData = rowsData;
-
-					 state.viewStart = new Date(minDate)
-					 if (maxDate < $('#endDt_S').val()) {
-						 state.viewEnd = new Date($('#endDt_S').val());
-					 } else {
-						 state.viewEnd   = new Date(maxDate)
-					 }
+					
+					for (let i = 0; i < list.length; i++) {
+						const r = list[i];
+						
+						// salesCd 필수
+						const sales = (r && r.salesCd) ? String(r.salesCd).trim() : '';
+						if (!sales) continue;
+						
+						// 날짜(문자열) 준비: 파싱 없이 그대로 사용
+						const start = r.wbsPlansDtFm || '';
+						const end   = r.wbsPlaneDtFm || '';
+						
+						// 레코드 구성(라벨 가공은 최소화)
+						const rec = {
+							key:   r.wbsPlanCodeId,
+							label: r.wbsPlanCodeNm ? String(r.wbsPlanCodeNm).trim() : (r.wbsPlanCodeId || ''),
+							start,
+							end
+						};
+						
+						
+						// 버킷 지연 생성
+						let bucket = rowsData[sales];
+						if (!bucket) {
+							bucket = rowsData[sales] = { PM: [], PLAN: [], DO: [] };
+						}
+						bucket[catFrom(r.planType)].push(rec);
+						
+						
+						// 메타는 최초 1회만
+						if (!metaMap.has(sales)) {
+							metaMap.set(sales, {
+								label: sales,
+								key: sales,
+								기계종류: (r['기계종류'] || '').toString().trim(),
+								mngIdNm: (r.mngIdNm || '').toString().trim(),
+								eqpNm:   (r.eqpNm || '').toString().trim().slice(0, 20),
+								수주구분: (r['수주구분'] || '').toString().trim(),
+								아이템구분: (r['아이템구분'] || '').toString().trim(),
+								기계구분: (r['기계구분'] || '').toString().trim()
+							});
+						}
+						
+						
+						// min/max 갱신: 유효한 날짜만 비교 (YYYY-MM-DD 문자열 비교)
+						if (start) {
+							if (!minDate || start < minDate) minDate = start;
+							if (!maxDate || start > maxDate) maxDate = start;
+						}
+						if (end) {
+							if (!minDate || end < minDate) minDate = end;
+							if (!maxDate || end > maxDate) maxDate = end;
+						}
+					}
+					
+					
+					const rowDefs = Array.from(metaMap.values());
+					
+					// 6) view 구간 계산: 문자열→Date 변환은 마지막 1회만
+					//    타임존 이슈 방지를 위해 'T00:00:00' 명시
+					const toDate = (s) => s ? new Date(s + 'T00:00:00') : null;
+					
+					const viewStart = toDate(minDate || todayStr);
+					
+					// maxDate와 endDt_S 비교: 둘 다 문자열이므로 날짜형식 동일 시 문자열 비교 OK
+					const endBoundStr = (endDtS && endDtS.length === 10) ? endDtS : (maxDate || todayStr);
+					const viewEnd = toDate((maxDate && endDtS && endDtS > maxDate) ? endDtS : (maxDate || todayStr));
+					
+					// 7) 상태 갱신(한 번에) + 렌더
+					state.rowDefs  = rowDefs;
+					state.rowsData = rowsData;
+					state.viewStart = viewStart || new Date();
+					state.viewEnd   = viewEnd   || new Date();
+					      
 					 
 					 renderAll();
-					 syncTimelineWidths();
-
+					 
 				} catch (error) {
 					alert("오류 발생!! 전산실 연락 바랍니다", error.message);
 					return null; // 오류 발생 시 null 반환
 				} finally {
 					// console.log("함수 실행 완료.");
 				}
-			});
-
+			}, false);
+			
 		}
 	}  
   
