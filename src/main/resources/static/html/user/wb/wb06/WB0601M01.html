@@ -370,6 +370,11 @@
 	.datepicker {
 		z-index: 12000 !important;   /* 필요시 9999 이상 */
 	}
+	
+	/* 드래그 패닝 UX 개선 */
+	#timeline { cursor: grab; }
+	#timeline.panning { cursor: grabbing; }
+	#timeline.panning, #timeline.panning * { user-select: none; }
 
 </style>
 </head>
@@ -415,17 +420,17 @@
 								<input type="text" id="endDt_S" name="endDt_S" class="input_calendar" onkeyup="dateMask(this);" autocomplete="off" required data-search="endDt">
 							</div>
 						</td>
-						<th>수주구분</th>
+						
+						<th class="">기계종류</th>
 						<td>
-							<select id="ordrsDiv_S" name="ordrsDiv_S" data-kind="ORDRSDIV" data-search="ordrsDiv">
-								<option value="">전체</option>
-							</select>
+							<div class="">
+							    <select id="multiple-checkboxes-prdtGrp" multiple="multiple">
+							    </select>
+							</div>
 						</td>
-						<th>아이템구분</th>
+						
+						<th></th>
 						<td>
-							<select id="itemDiv_S" name="itemDiv_S" data-kind="ITEMLIST" data-search="itemDiv">
-								<option value="">전체</option>
-							</select>
 						</td>
 
 					</tr>
@@ -439,20 +444,23 @@
 						    	<a onclick="wbsSalesCodeSearch($('#salesCd_S').val());"><i class="i_search_w"></i></a>
 						    </div>
 						</td>
-						<th class="">기계종류</th>
+						<th>고객사PJT</th>
 						<td>
-							<div class="">
-							    <select id="multiple-checkboxes-prdtGrp" multiple="multiple">
-							    </select>
-							</div>
-						</td>
-
-						<th>기계구분</th>
-						<td>
-							<select id="mctype_S" name="mctype_S" data-kind="MCTYPE" data-search="mctype">
+                            <select id="clntPjt_S" name="clntPjt_S" data-kind="PRJCTCD" data-search="clntPjt">
 								<option value="">전체</option>
 							</select>
 						</td>
+
+						<th class="">고객사</th>
+						<td>
+							<input type="hidden" id="ordrsClntCd_S" name="ordrsClntCd_S" data-search="ordrsClntCd">
+							<div class="search_form">
+								<input type="text" id="ordrsClntNm_S" name="ordrsClntNm_S" data-search="ordrsClntNm"
+								onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' : event.keyCode == 13 ? searchData() : ''">
+								<a onclick="opendClntSearch($('#ordrsClntNm_S').val());"><i class="i_search_w"></i></a>
+							</div>
+						</td>
+						
 						<th>PM계획상태</th>
 						<td>
 							<select id="scdStatus_S" name="scdStatus_S" data-search="scdStatus">
@@ -651,6 +659,38 @@
 			
 		//권한체크
 		authChk();
+		
+		// 드래그로 스크롤 (좌/우만 또는 상/하만 - 축 고정)
+		(function enableFreePan(){
+			const $viewport = $('#timeline');
+			let panning=false, id=null, sx=0, sy=0, sl0=0, st0=0;
+			
+			$(document).on('pointerdown', '.group-box', function(e){
+				const isLeft = e.pointerType === 'mouse' ? e.button === 0 : true;
+				if (!isLeft) return;
+				if ($(e.target).closest('.bar, .handle').length) return;
+				
+				panning = true; id = e.pointerId || 1;
+				sx = e.clientX; sy = e.clientY;
+				sl0 = $viewport.scrollLeft(); st0 = $viewport.scrollTop();
+				e.target.setPointerCapture?.(id);
+				$viewport.addClass('panning');
+				e.preventDefault();
+			});
+			
+			$(document).on('pointermove', function(e){
+				if (!panning) return;
+				const dx = e.clientX - sx;
+				const dy = e.clientY - sy;
+				$viewport.scrollLeft(sl0 - dx);  // 좌우
+				$viewport.scrollTop(st0 - dy);   // 상하
+			});
+			
+			$(document).on('pointerup pointercancel', function(){
+				if (!panning) return;
+				panning=false; id=null; $viewport.removeClass('panning');
+			});
+		})();
 	});
 
 	function searchData () {
@@ -759,7 +799,9 @@
 								eqpNm:   (r.eqpNm || '').toString().trim().slice(0, 20),
 								수주구분: (r['수주구분'] || '').toString().trim(),
 								아이템구분: (r['아이템구분'] || '').toString().trim(),
-								기계구분: (r['기계구분'] || '').toString().trim()
+								기계구분: (r['기계구분'] || '').toString().trim(),
+								clntPjtNm: (r['clntPjtNm'] || '').toString().trim(),
+								clntNm: (r['clntNm'] || '').toString().trim()
 							});
 						}
 						
@@ -911,9 +953,9 @@
 			.html('<span style="color:white;">'+row.label+'</span><span style="color:yellow;">'
 			                                   +row.기계종류+'</span><span style="color:white;">'
 			                                   +row.eqpNm+'</span><span style="color:yellow;">'
-			                                   +row.mngIdNm+'</span><span style="color:white;">'
+			                                   +row.mngIdNm + ' - ' + row.수주구분 +'</span><span style="color:white;">'
 			                                   +row.기계구분+'</span><span style="color:white;">'
-			                                   +row.수주구분+'</span>')
+			                                   +row.clntNm+'('+row.clntPjtNm+')</span>')
 			.appendTo($group);
 			
 			$group.css('width', (leftRailW + totalW) + 'px'); // ★ 포인트
