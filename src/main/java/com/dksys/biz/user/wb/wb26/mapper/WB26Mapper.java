@@ -28,6 +28,8 @@ public interface WB26Mapper {
 	List<Map<String, String>> select_wb2603_List(Map<String, String> paramMap);
 
 	List<Map<String, String>> select_wb2604_List(Map<String, String> paramMap);
+	
+	List<Map<String, String>> select_wb2605_List(Map<String, String> paramMap);
 
     // // 수금유형 검색
 	// List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap);

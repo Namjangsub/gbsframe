@@ -25,6 +25,8 @@ public interface WB26Svc {
 
 	List<Map<String, String>> select_wb2604_List(Map<String, String> paramMap);
 
+	List<Map<String, String>> select_wb2605_List(Map<String, String> paramMap);
+
 	// // 수금유형 조회
 	// List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap);
 }
