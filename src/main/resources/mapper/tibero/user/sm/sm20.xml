@@ -126,7 +126,9 @@
 					, W20.*
 					, SM30D.HOLD_ID
 					, SM30D.HOLD_DTTM
-					, SM30D.HOLD_YN 
+					, SM30D.HOLD_YN
+					, CR.CO_CD							AS ORDRS_CO_CD 		-- 수주회사
+					, FN_CM05M01_CD_TO_NM(CR.CO_CD) 	AS ORDRS_CO_CD_NM 	-- 수주회사명
 				 FROM   TB_SM12D01 AS D  /* 매입 DETAIL */
 				        LEFT OUTER JOIN TB_SM12M01 AS M1  ON (D.PCHS_NO = M1.PCHS_NO)  /* 매입확정마스터 */
 				        LEFT OUTER JOIN TB_SM02M01 AS M  ON (D.ORDRG_NO = M.ORDRG_NO)  /* 발주마스터 */
@@ -172,11 +174,26 @@
 											WHERE TODO_DIV2_CODE_ID = 'TODODIV2170'  -- 결제진행상태	  
 											GROUP BY  TODO_NO
 			  							) AS W20 ON W20.TODO_NO = BM.APR_REQ_NO
+						LEFT OUTER JOIN TB_CR02D02 CR ON CR.SALES_CD = CASE WHEN substr(D.ORDRG_NO,1,3) = 'BAL' THEN M.SALES_CD
+																			WHEN substr(D.ORDRG_NO,1,3) = 'RET' THEN RM.SALES_CD
+																			ELSE C.SALES_CD
+																		END
 				 WHERE  1 = 1
 				 <!-- 회사코드 -->
 				 <if test="coCd != null and !coCd.equals('')">
 				   AND D.CO_CD = #{coCd}
 				 </if>
+				 <!-- 수주회사 -->
+				 <choose>
+					<when test="ordrsCoCd == 'TRN'">
+						AND CR.CO_CD = 'TRN'
+					</when>
+					<when test="ordrsCoCd == 'GUN'">
+						AND (CR.CO_CD IS NULL OR CR.CO_CD != 'TRN')
+					</when>
+					<otherwise>
+					</otherwise>
+				 </choose>
 				 <!-- 확정일자 -->
 				 <if test="pchsDtfrom != null and !pchsDtfrom.equals('')">
 				 	<if test="pchsDtto != null and !pchsDtto.equals('')">
@@ -267,6 +284,8 @@
 			  , TO_CHAR(MAX(A.HOLD_DTTM),'YYYY-MM-DD')  AS HOLD_DTTM
 			  , MAX(NVL(A.HOLD_YN,'N'))			  		AS HOLD_YN
 			  , A.BILL_YN
+			  , MAX(A.ORDRS_CO_CD)						AS ORDRS_CO_CD
+			  , MAX(A.ORDRS_CO_CD_NM)					AS ORDRS_CO_CD_NM
 		FROM   TOT AS A
 		           LEFT OUTER JOIN TB_CR02M01 AS CR ON CR.ORDRS_NO = A.ORDRS_NO 		--수주마스터 
 				   LEFT OUTER JOIN TB_BM02M01 AS D1 ON CR.ORDRS_CLNT_CD = D1.CLNT_CD   --거래처마스터 CTRT_NO, CTRT_NO_SEQ
@@ -360,11 +379,26 @@
 						LEFT OUTER JOIN TB_CM06M01 U ON U.ID = D.CREAT_ID
 						LEFT OUTER JOIN TB_CM04M01 CD ON CD.DEPT_ID = SUBSTRING(U.DEPT_ID,0,5)
 						LEFT OUTER JOIN TB_CM04M01 CE ON CE.DEPT_ID = SUBSTRING(M1.DEPT_ID,0,5)
+						LEFT OUTER JOIN TB_CR02D02 CR ON CR.SALES_CD = CASE WHEN substr(D.ORDRG_NO,1,3) = 'BAL' THEN M.SALES_CD
+																			WHEN substr(D.ORDRG_NO,1,3) = 'RET' THEN RM.SALES_CD
+																			ELSE C.SALES_CD
+																		END
 				 WHERE  1 = 1
 				 <!-- 회사코드 -->
 				 <if test="coCd != null and !coCd.equals('')">
 				 AND    D.CO_CD = #{coCd}
 				 </if>
+				 <!-- 수주회사 -->
+				 <choose>
+					<when test="ordrsCoCd == 'TRN'">
+						AND CR.CO_CD = 'TRN'
+					</when>
+					<when test="ordrsCoCd == 'GUN'">
+						AND (CR.CO_CD IS NULL OR CR.CO_CD != 'TRN')
+					</when>
+					<otherwise>
+					</otherwise>
+				 </choose>
 				 <!-- 확정일자 -->
 				 <if test="pchsDtfrom != null and !pchsDtfrom.equals('')">
 				 	<if test="pchsDtto != null and !pchsDtto.equals('')">
@@ -898,6 +932,7 @@
 		     , A.UDT_RESN
 		     , 'U' AS DATA_CHK
 		     , A.DEPT_ID
+			 , A.ORDRS_CO_CD
 		     , CE.DEPT_NM
 		FROM   TB_SM20M01 AS A
                LEFT OUTER JOIN TB_BM02M01 AS S ON S.CLNT_CD = A.CLNT_CD
@@ -935,12 +970,16 @@
 		      , (SELECT FN_CM06M01_ID_TO_NM(A.CREAT_ID) FROM DUAL) AS CREAT_ID_NM
 		      , A.CREAT_PGM
 		      , A.CREAT_DTTM
-			  , CD.CO_CD		AS ORDRS_CO_CD		-- 수주회사
+			  , CASE WHEN substr(A.ORDRG_NO,1,3) = 'BAL' OR substr(A.ORDRG_NO,1,3) = 'RET' THEN CD.CO_CD ELSE C.ORDRS_CO_CD
+			    END AS ORDRS_CO_CD
 		 FROM   TB_SM20D01 AS A
 		        LEFT OUTER JOIN TB_SM20M01 AS M  ON M.CO_CD   = A.CO_CD
 		                                        AND M.BILL_NO = A.BILL_NO
 		        LEFT OUTER JOIN TB_BM02M01 AS S  ON S.CLNT_CD = M.CLNT_CD
-				LEFT OUTER JOIN TB_CR02D02 AS CD ON CD.SALES_CD = A.SALES_CD
+				LEFT OUTER JOIN TB_SM10M01 AS C  ON A.ORDRG_NO = C.COST_NO	--구매비용
+				LEFT OUTER JOIN TB_CR02D02 AS CD ON CD.SALES_CD = CASE WHEN substr(A.ORDRG_NO,1,3) = 'BAL' OR substr(A.ORDRG_NO,1,3) = 'RET' THEN A.SALES_CD
+																	   ELSE C.SALES_CD
+																  END
 		 WHERE  1 = 1
 		 <if test="coCd != null and !coCd.equals('')">
 		 AND    A.CO_CD = #{coCd}
@@ -1037,16 +1076,24 @@
 			, C.PCHS_COST_DIV10							AS PCHS_COST_DIV10
 			, C.CTRT_NO				--외주계약번호
 			, C.CTRT_NO_SEQ			--외주계약일련번호
-			, CD.CO_CD															AS ORDRS_CO_CD		-- 수주회사
+			, CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' OR substr(D.ORDRG_NO,0,3) = 'RET' THEN CD.CO_CD ELSE C.ORDRS_CO_CD
+			  END AS ORDRS_CO_CD
+			<!-- , CD.CO_CD															AS ORDRS_CO_CD -->
 		 FROM   TB_SM12D01 AS D		--매입처리마스터
 				LEFT OUTER JOIN TB_SM12M01 AS M1 ON (D.PCHS_NO = M1.PCHS_NO)  /* 매입확정마스터 */
 		        LEFT OUTER JOIN TB_SM02M01 AS M  ON D.ORDRG_NO = M.ORDRG_NO	--발주
 				LEFT OUTER JOIN TB_SM10M01 AS C  ON D.ORDRG_NO = C.COST_NO	--구매비용
+				LEFT OUTER JOIN TB_SM11M01 AS S11 ON S11.CTRT_NO = C.CTRT_NO
+				LEFT OUTER JOIN TB_SM06D01 AS R  ON (D.ORDRG_NO = R.RET_NO)  /* 반품 상세 */
+				LEFT OUTER JOIN TB_SM06M01 AS RM ON (RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)  /* 반품 상세 */
 				LEFT OUTER JOIN TB_BM02M01 AS D1 ON D.CLNT_CD = D1.CLNT_CD	--공급사
                 LEFT OUTER JOIN TB_CM05M01 AS R5 ON R5.CODE_ID = D1.PCHS_VAT_CD		--부가세% 
 				LEFT OUTER JOIN TB_CM04M01 CE ON CE.DEPT_ID = SUBSTRING(M1.DEPT_ID,0,5)
 				LEFT OUTER JOIN TB_BM02M01 D1 ON D.CLNT_CD = D1.CLNT_CD   --거래처마스터
-				LEFT OUTER JOIN TB_CR02D02 AS CD ON CD.SALES_CD = CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD ELSE C.SALES_CD END
+				LEFT OUTER JOIN TB_CR02D02 AS CD ON CD.SALES_CD = CASE WHEN substr(D.ORDRG_NO,1,3) = 'BAL' THEN M.SALES_CD
+																	   WHEN substr(D.ORDRG_NO,1,3) = 'RET' THEN RM.SALES_CD
+																	   ELSE C.SALES_CD
+																  END
 		 WHERE  1 = 1
 		 AND    D.BILL_NO IS NULL
 		 <if test="coCd != null and !coCd.equals('')">
@@ -1083,6 +1130,17 @@
 		<if test="clntNm != null and !clntNm.equals('')">
 		AND    D1.CLNT_NM LIKE  '%${clntNm}%'
 		</if>
+		<!-- 수주회사 -->
+		<choose>
+			<when test="ordrsCoCd == 'TRN'">
+				AND CD.CO_CD = 'TRN'
+			</when>
+			<when test="ordrsCoCd == 'GUN'">
+				AND (CD.CO_CD IS NULL OR CD.CO_CD != 'TRN')
+			</when>
+			<otherwise>
+			</otherwise>
+		</choose>
 		)
 		, IPGOTOT AS
 		(
@@ -1254,6 +1312,7 @@
 		, ETC_FIELD1
 		, ETC_FIELD2
 		, ETC_FIELD3
+		, ORDRS_CO_CD
 		, CREAT_ID
 		, CREAT_PGM
 		, CREAT_DTTM
@@ -1283,6 +1342,7 @@
 		, #{etcField1, jdbcType=VARCHAR}
 		, #{etcField2, jdbcType=VARCHAR}
 		, #{etcField3, jdbcType=VARCHAR}
+		, #{ordrsCoCd, jdbcType=VARCHAR}
 		, #{userId}
 		, #{pgmId}
 		, SYSDATE

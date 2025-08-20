@@ -50,13 +50,21 @@
 				
 				<!-- 2행 -->
 				<tr>
+					<th>수주회사</th>
+					<td>
+						<!-- <input type="hidden" id="ordrsCoCd" name="ordrsCoCd" readonly="readonly">
+						<input type="text" id="ordrsCoCdNm" name="ordrsCoCdNm" readonly="readonly"> -->
+						<select id="ordrsCoCd" name="ordrsCoCd" data-kind="CO" data-search="ordrsCoCd">
+							<option value="" selected>전체</option>
+						</select>
+					</td>
+					
 					<th>통화단위</th>
 					<td>
 						<select id="currCd" name="currCd" data-kind="CURR" class="form-control input-sm" onchange="Chk_currCd();">
 						</select>
 					</td>
-
-					<th colspan="2"></th>
+					<!-- <th colspan="2"></th> -->
 					<!-- <td>
 						<input data-number type="text" id="exrate" name="exrate" class="form-control" maxlength="10" onchange="Chk_Exrate();" readonly="readonly">
 					</td> -->
@@ -143,6 +151,7 @@
 	var deptNm = null;
 	var pchsClmnDay = null;
 	var trunDiv = null;
+	var ordrsCoCd = null;
 	var detailArr   = []; // 상세 그리드내용
 	let loadData = {};
 
@@ -255,7 +264,8 @@
 					"pchsClmnDay" : pchsClmnDay,
 					"trunDiv" : trunDiv,
 					"clntCd" : clntCd,
-					"clntNm" : clntNm
+					"clntNm" : clntNm,
+					"ordrsCoCd" : ordrsCoCd
 				}
 				postAjax("/user/sm/sm20/select_sm20_insert_target_modal", formData, null, function(data) {
 					var list = data.result;
@@ -271,6 +281,18 @@
 						targetObj.setValue(i, 'chk', "Y");
 						setAmt(ModalgridView, 'Y' , list[i].pchsAmt, list[i].pchsVat, i, list[i].vatRate);
 				    }
+					const codes = Array.from(new Set(
+						(list || []).map(r => (r.ordrsCoCd ?? '')).filter(Boolean)
+					));
+
+					if (codes.length === 1) {
+						const code = codes[0];
+
+						$('#ordrsCoCd').val(code).trigger('change');
+					} else {
+						// 서로 다른 코드가 섞여 있으면 "전체" 유지
+						$('#ordrsCoCd').val('').trigger('change');
+					}
 				});
 			} else {
 				formData = {
@@ -332,6 +354,7 @@
 		deptNm = modalStack.last().paramObj.deptNm;
 		pchsClmnDay = modalStack.last().paramObj.pchsClmnDay;
 		trunDiv = modalStack.last().paramObj.trunDiv;
+		ordrsCoCd = modalStack.last().paramObj.ordrsCoCd;
 		if (actionType == "C") {			
 			$('#popForm .coCd').addClass('hit');
 			$('#popForm input#coCd').attr('required', 'required');
@@ -343,6 +366,8 @@
 			$("#popForm #billQty").val("1");
 			$("#popForm #billPrc").val("0");
 			
+			$("#popForm #ordrsCoCd").val(ordrsCoCd);
+
 			//버튼명 변경
 			$("#actionBtn").text("등록");
 
@@ -369,6 +394,9 @@
 			//거래처 비활성화
 			$('#popForm .clntNm').removeClass('hit');
 			$('#clntNm').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
+
+			//수주회사 비활성화
+			$('#ordrsCoCd').css({'background-color':'#e6e6e6', 'pointer-events':'none'});
 			
 			//통화 비활성화
 			$('#popForm .currCd').removeClass('hit');
@@ -454,6 +482,10 @@
 
 			if (Insert_Cnt == 0) {
 				return;
+			}
+			if (list.filter(r => r.chk === 'Y').some(r => r.ordrsCoCd ? r.ordrsCoCd !== $('#ordrsCoCd').val() : $('#ordrsCoCd').val() !== 'GUN')) {
+				alert('수주회사가 다른 리스트가 존재합니다. 확인해주세요.');
+				return false;
 			}
 			//상세대상이 없는 경우 저장 안되게 처리 끝
 			
