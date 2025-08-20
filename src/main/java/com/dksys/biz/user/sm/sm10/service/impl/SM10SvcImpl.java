@@ -155,7 +155,10 @@ public class SM10SvcImpl implements SM10Svc {
 		
 		int fileTrgtKey = sm10Mapper.selectPchsCostSeqNext(paramMap);
 		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
-		
+
+		if ("undefined".equals(paramMap.get("salesCd"))) { 
+			paramMap.put("salesCd", ""); 
+		}
 		int result = sm10Mapper.insertPchsCost(paramMap);
 	
 		List<Map<String, String>> detailArr = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
