@@ -83,6 +83,11 @@ public class WB26SvcImpl implements WB26Svc {
 		return result;
 	}
 
+	@Override
+	public int update_wb26(Map<String, String> paramMap) {
+		return wb26Mapper.update_wb26(paramMap);
+	}
+
 	// @Override
 	// public List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap) {
 	// 	return cr05Mapper.selectPmntmtdCd(paramMap);
@@ -120,5 +125,15 @@ public class WB26SvcImpl implements WB26Svc {
 	@Override
 	public List<Map<String, String>> select_wb2605_List(Map<String, String> paramMap) {
 		return wb26Mapper.select_wb2605_List(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> select_wb2605_metaList(Map<String, String> paramMap) {
+		return wb26Mapper.select_wb2605_metaList(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectWbsTaskTempletGantList(Map<String, String> paramMap) {
+		return wb26Mapper.selectWbsTaskTempletGantList(paramMap);
 	}
 }

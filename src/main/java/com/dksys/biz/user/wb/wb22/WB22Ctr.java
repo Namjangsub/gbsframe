@@ -476,4 +476,84 @@ public class WB22Ctr {
         model.addAttribute("resultCode", 200);
     	return "jsonView";
     }
+	
+
+
+	@PostMapping(value = "/wbsLevel1GantUpdate")
+	public String wbsLevel1GantUpdate(@RequestBody Map<String, String> paramMap,ModelMap model) throws Exception {
+		try {
+			if (wb22Svc.wbsLevel1GantUpdate(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+
+
+	@PostMapping(value = "/wbsLevel2GantInsert")
+	public String wbsLevel2GantInsert(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			if (wb22Svc.wbsLevel2GantInsert(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+
+
+	@PostMapping(value = "/wbsRsltsGantInsert")
+	public String wbsRsltsGantInsert(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			if (wb22Svc.wbsRsltsGantInsert(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("fileTrgtKey", paramMap.get("fileTrgtKey"));
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+
+	@PostMapping(value = "/wbsRsltsGantDelete")
+	public String wbsRsltsGantDelete(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			if (wb22Svc.wbsRsltsGantDelete(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 }

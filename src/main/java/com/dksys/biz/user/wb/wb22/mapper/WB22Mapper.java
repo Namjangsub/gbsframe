@@ -133,4 +133,8 @@ public interface WB22Mapper {
 
 	// Ver.up Check
 	List<Map<String, String>> wbsVerUpInsertChk(Map<String, String> paramMap);
+
+	int wbsLevel1GantUpdate(Map<String, String> paramMap);
+
+	int wbsRsltsGantDelete(Map<String, String> paramMap);
 }

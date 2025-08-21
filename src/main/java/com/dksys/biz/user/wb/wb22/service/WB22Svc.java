@@ -94,4 +94,12 @@ public interface WB22Svc {
 	int updateWbsChanges(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
 	Map<String, String> generateShortUrl(Map<String, String> paramMap);
+
+	int wbsLevel1GantUpdate(Map<String, String> paramMap) throws Exception;
+
+	int wbsRsltsGantInsert(Map<String, String> paramMap);
+	
+	int wbsRsltsGantDelete(Map<String, String> paramMap);
+
+	int wbsLevel2GantInsert(Map<String, String> paramMap);
 }

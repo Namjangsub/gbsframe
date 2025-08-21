@@ -876,4 +876,54 @@ public class WB22SvcImpl implements WB22Svc {
     	
         return returnMap;
 	}
+	
+
+
+	@Override
+	public int wbsLevel1GantUpdate(Map<String, String> paramMap) {
+		return wb22Mapper.wbsLevel1GantUpdate(paramMap);
+	}
+	
+	@Override
+	public int wbsLevel2GantInsert(Map<String, String> paramMap) {
+		String fileTrgtKey = wb22Mapper.selectWbsSeqNext(paramMap);
+		paramMap.put("fileTrgtKey", fileTrgtKey);
+
+		String wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
+		paramMap.put("wbsPlanNo", wbsPlanNo);
+		
+		int wbsPlanCodeId = wb22Mapper.selectMaxWbsCode(paramMap);
+
+		String codeId = "";
+		if (wbsPlanCodeId < 10) {
+			codeId = "0" + String.valueOf(wbsPlanCodeId);
+		} else {
+			codeId = String.valueOf(wbsPlanCodeId);
+		}
+		paramMap.put("wbsPlanCodeId", paramMap.get("wbsPlanCodeKind") + codeId);
+		
+		return wb22Mapper.wbsLevel2Insert(paramMap);
+	}
+	
+	@Override
+	public int wbsRsltsGantInsert(Map<String, String> paramMap) {
+		int fileTrgtKey = wb22Mapper.selectWbsRstlsSeqNext(paramMap);
+		paramMap.put("rsltsFileTrgtKey", Integer.toString(fileTrgtKey));
+
+		return wb22Mapper.wbsRsltsInsert(paramMap);
+	}
+	
+	//간트에서 일정 삭제 요청 처리
+	@Override
+	public int wbsRsltsGantDelete(Map<String, String> paramMap) {
+		String cat = paramMap.get("cat");
+		if (cat == null || cat.equals("PLAN")) {
+			return wb22Mapper.wbsLevel2Delete(paramMap);	// 담당자 계획 삭제
+		} else if (cat == null || cat.equals("DO")) {
+			return wb22Mapper.wbsRsltsGantDelete(paramMap);		// 담당자 실적 삭제
+		} else {
+			return 0;
+		}
+	}
+	
 }
