@@ -60,6 +60,11 @@ function openContextMenu(ev, payload = {}) {
 		$ctx.find('[data-action="edit"]').trigger('click'); // 편집 클릭을 프로그램적으로 발생
 		return;
 	}
+	// ★ PM 바에서의 일반 우클릭은 컨텍스트 메뉴 미표시
+	if (enriched.cat === 'PM') {
+	  return; // 아무 액션 없이 차단(더블클릭은 위에서 이미 처리됨)
+	}
+	
 	// 일반 우클릭은 메뉴 표시
 	ctx.open(ev, enriched);
 }
@@ -108,7 +113,6 @@ function dateFromPointerOnTrack($track, pointer) {
 }
 
 
-
 function clampToPlanBoundsIfNeeded(cat, salesCd, keyPrefix9, sDate, eDate) {
     if (cat !== 'PLAN') return { s: sDate, e: eDate };
     const b = GanttApp._makeCoreOptions(cat).getPlanBounds?.(keyPrefix9);
@@ -118,40 +122,18 @@ function clampToPlanBoundsIfNeeded(cat, salesCd, keyPrefix9, sDate, eDate) {
     return { s, e };
 }
 
-////===== Context Menu bootstrap (app.js 상단) =====
-//(function ensureBarContextMenu(){
-//	if (!document.getElementById('barContextMenu')) {
-//		const menu = document.createElement('div');
-//		menu.id = 'barContextMenu';
-//		menu.style.display = 'none';
-//		menu.style.position = 'fixed';
-//		menu.style.zIndex = '10050';
-//		menu.innerHTML = `
-//			<ul class="ctx-list">
-//				<li data-action="openDetail">상세 보기</li>
-//				<li data-action="edit">편집</li>
-//				<li data-action="duplicate">기간 복사</li>
-//				<li data-action="delete" class="danger">삭제</li>
-//			</ul>`;
-//		document.body.appendChild(menu);
-//		const style = document.createElement('style');
-//		style.textContent = `
-//			#barContextMenu{min-width:160px;background:#111;color:#fff;border-radius:8px;
-//				box-shadow:0 8px 24px rgba(0,0,0,.25);padding:6px 0;user-select:none;}
-//			#barContextMenu .ctx-list{list-style:none;margin:0;padding:0;}
-//			#barContextMenu .ctx-list>li{padding:8px 12px;cursor:pointer;font-size:13px;line-height:1.2;}
-//			#barContextMenu .ctx-list>li:hover{background:#1e293b;}
-//			#barContextMenu .ctx-list>li.danger:hover{background:#7f1d1d;}
-//			#barContextMenu .ctx-list>li.disabled{opacity:.35;pointer-events:none;}`;
-//		document.head.appendChild(style);
-//	}
-//})();
-
 // 전역 유틸: 항상 payload를 DOM에 저장
 function showBarContext(ev, payload){
+    const $menu = $('#barContextMenu');
+    if (!$menu.length) return;
+
+    // ★ DO 행이거나, item 이 없으면 "일정 추가" 숨김 (단일 토글로 일관 처리)
+    const canInsert = !!(payload && payload.item) && payload.cat !== 'DO';
+    $menu.find('li[data-action="insert"]').toggle(canInsert);
+    
 	const $ctx = $('#barContextMenu');
 	if (!$ctx.length) { console.error('barContextMenu 엘리먼트 없음'); return; }
-
+	
     const $t = payload.$track || $(ev?.target).closest('.row-track');
 
     // ★ 포인터/오픈 날짜가 없으면 여기서 보강
@@ -188,18 +170,38 @@ function showBarContext(ev, payload){
 	$ctx.css({ left:x, top:y, display:'block', position:'fixed', zIndex:10050 });
 
 	// 4) 바깥클릭/ESC/스크롤로 닫기
-	setTimeout(() => {
-		$(document)
-			.on('mousedown.ctx', (e)=>{ if (!$(e.target).closest('#barContextMenu').length) hideBarContext(); })
-			.on('keydown.ctx',  (e)=>{ if (e.key === 'Escape') hideBarContext(); })
-			.on('contextmenu.ctx', (e)=>{ if (!$(e.target).closest('#barContextMenu').length) hideBarContext(); });
-		$(window).on('scroll.ctx resize.ctx', hideBarContext);
-	}, 0);
+	// ★ capture 단계 전역 닫기 리스너
+	const onDocClickCap = (e) => { if (!e.target.closest('#barContextMenu')) hideBarContext(); };
+	const onCtxMenuCap  = (e) => { if (!e.target.closest('#barContextMenu')) hideBarContext(); };
+	const onKeydownCap  = (e) => { if (e.key === 'Escape') hideBarContext(); };
+	const onScrollWin   = ()  => hideBarContext();
+	const onResizeWin   = ()  => hideBarContext();
+	document.addEventListener('click',       onDocClickCap, true);
+	document.addEventListener('mousedown',   onDocClickCap, true);
+	document.addEventListener('contextmenu', onCtxMenuCap,  true);
+	document.addEventListener('keydown',     onKeydownCap,  true);
+	window.addEventListener('scroll',  onScrollWin, { passive:true });
+	window.addEventListener('resize',  onResizeWin);
+	$ctx.data('__cap', { onDocClickCap, onCtxMenuCap, onKeydownCap, onScrollWin, onResizeWin });
+	 
 }
 
 function hideBarContext(){
 	const $ctx = $('#barContextMenu');
+	if (!$ctx.length) return;
+	// 캡처 리스너 해제
+	const cap = $ctx.data('__cap');
+	if (cap) {
+		document.removeEventListener('click',       cap.onDocClickCap, true);
+		document.removeEventListener('mousedown',   cap.onDocClickCap, true);
+		document.removeEventListener('contextmenu', cap.onCtxMenuCap,  true);
+		document.removeEventListener('keydown',     cap.onKeydownCap,  true);
+		window.removeEventListener('scroll', cap.onScrollWin);
+		window.removeEventListener('resize', cap.onResizeWin);
+		$ctx.removeData('__cap');
+	}
 	$ctx.hide().removeData('payload');
+	// (호환용) 기존 네임스페이스 리스너도 제거
 	$(document).off('.ctx'); $(window).off('.ctx');
 }
 //=== 2.1 캐시 & 백엔드 로더 ===
@@ -219,9 +221,10 @@ function loadInsertMenuItems(salesCd, cat) {
 	if (cat == 'PLAN') {
 		execUrl = '/user/wb/wb26/selectWbsTaskTempletGantList'
 	} else if (cat == 'DO') {
-		execUrl = '/user/wb/wb26/selectWbsTaskTempletGantList'
+//		execUrl = '/user/wb/wb26/selectWbsTaskTempletGantList'
+		return Promise.resolve([]);
 	} else {
-		Promise.reject('추가할 일정이 없습니다.');
+		return Promise.resolve([]);
 	}
 	
     const key = salesCd + '|' + cat;
@@ -242,18 +245,23 @@ function loadInsertMenuItems(salesCd, cat) {
 
 // === 2.2 서브메뉴 DOM 렌더/위치 ===
 function showInsertSubmenu(payload) {
+    if ((payload.cat === 'DO') || (!payload || !payload.item)) { // 바(item)가 없으면 서브메뉴 실행 막기
+        hideInsertSubmenu();   // 혹시 남아있던 서브메뉴 초기화
+        return;                // 아예 실행하지 않음
+    }
+
     const $menu = $('#barContextMenu');
     if (!$menu.length) return;
-
+    
+    $menu.find('.submenu').remove(); 
+    
     // 1) 앵커(li[data-action="insert"]) 기준 위치 계산
     const $anchor = $menu.find('.ctx-list > li[data-action="insert"]');
     if (!$anchor.length) return;
-    let $sub = $menu.find('.submenu');
-    if (!$sub.length) {
-        $sub = $('<div class="submenu" />').appendTo($menu);
-        // 메뉴 밖 클릭 시 닫히도록 기존 hide 로직과 함께 동작
-    }
-
+    
+    // 새 submenu DOM 생성
+    const $sub = $('<div class="submenu" />').appendTo($menu);
+    
     // 2) 일단 "로딩..." 표출
     $sub.empty().append('<div class="empty">불러오는 중...</div>').show();
 
@@ -295,11 +303,17 @@ function showInsertSubmenu(payload) {
     });
 }
 
+//닫기
 function hideInsertSubmenu() {
     $('#barContextMenu .submenu').hide().empty();
 }
 
-
+//메뉴 바깥 클릭 시 닫기
+$(document).on('click', (e) => {
+    if (!$(e.target).closest('#barContextMenu').length) {
+        hideInsertSubmenu();
+    }
+});
 
 // === 2.3 항목 클릭 시 실행 (신규 바 생성 → 부분렌더 → 저장 API) ===
 $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
@@ -355,7 +369,7 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
         expectMh: 0,
         wbsPlanMngId: jwt.userId,
         wbsPlanMngIdNm: jwt.userNm,
-        daycnt: Number.isFinite(Number(dayCnt)) ? Number(dayCnt) : undefined
+        daycnt: Number.isFinite(Number(dayCnt)) ? Number(dayCnt) : undefined,
     };
     arr.push(newItem);
 
@@ -437,16 +451,29 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 		});
 	});
 	ctx.on('insert', (payload) => {
+	    if (!payload || !payload.item) {
+	        // 바가 선택되지 않은 상태 → 무시
+	        return false;
+	    }
 		// TODO: 편집 패널
-//		console.log('[insert]', salesCd, cat, item);
+	    const salesCd = payload.salesCd;
+	    const cat     = payload.cat;
+	    const item    = payload.item;
+
+	    console.log('[insert]', salesCd, cat, item);
 	    // 서브메뉴 열기
-		showInsertSubmenu(payload);
-		return false; // ← 메뉴 닫지 말고 유지!
+	    if (cat == 'PLAN') {
+			showInsertSubmenu(payload);
+			return false; // ← 메뉴 닫지 말고 유지!
+	    } else if (cat == 'DO') {
+	    	customAlert('실행결과 추가는 PLAN에 있는 일정을 마우스 드롭다운으로 처리하세요!')
+	    }
 	});
 	ctx.on('edit', ({ salesCd, cat, item }) => {
 		// TODO: 편집 패널
 		console.log('[edit]', salesCd, cat, item);
-
+		try { ctx.hide?.(); } catch {}
+		try { hideBarContext?.(); } catch {}
 		openModal("/static/html/user/wb/wb22/WB2201P01.html", 1200, 900, "WBS 계획등록", {
 			coCd: $('#coCd_S').val(),
 			salesCd,
@@ -518,6 +545,74 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 			console.log('[delete]', salesCd, cat, item);
 			
 	    }
+	});
+	// 문제등록 메뉴 라우팅
+	ctx.on('problem',  ({ salesCd, cat, item }) => {
+
+		console.log('[problem]', salesCd, cat, item);
+        // TODO: 삭제 API
+//		{
+//		    "key": "WBSCODE0405",
+//		    "salesCd": "25079-13USFWG",
+//		    "coCd": "GUN",
+//		    "ordrsNo": "25079",
+//		    "wbsPlanNo": "20250007082",
+//		    "wbsPlanCodeKind": "WBSCODE04",
+//		    "label": "설계진행 ▷승인 완료",
+//		    "start": "2025-06-30",
+//		    "end": "2025-09-10",
+//		    "cat": "PLAN",
+//		    "confirmYn": "Y",
+//		    "doneYn": "N",
+//		    "progress": 0,
+//		    "expectMh": 0,
+//		    "fileTrgtKey": "24979",
+//		    "wbsPlanMngId": "h4ng10",
+//		    "wbsPlanMngIdNm": "허상렬",
+//		    "smrizeId": "danhergy",
+//		    "smrizeIdNm": "김상화",
+//		    "s": "2025-06-29T15:00:00.000Z",
+//		    "e": "2025-09-09T15:00:00.000Z",
+//		    "lane": 3,
+//		    "colorIdx": 0
+//		}
+		if (cat =='PLAN') {
+			var paramObj = {
+					"actionType"      : "C1",
+					"coCd"            : item.coCd,
+					"salesCd"         : item.salesCd,
+					"wbsPlanNo"       : item.wbsPlanNo,
+					"wbsPlanCodeKind" : item.wbsPlanCodeKind,
+					"wbsPlanCodeId"   : item.key,
+					"wbsPlanCodeNm"   : item.label,
+					"wbsPlanMngNm"    : item.wbsPlanMngIdNm,
+					"wbsPlansDt"      : item.s,
+					"wbsPlaneDt"      : item.e,
+				};
+				openSecondModal("/static/html/user/wb/wb24/WB2401P01.html", 1200, $('body').height()-41, "계획문제등록", paramObj, function () {
+
+				});
+		} else if (cat =='DO') {
+				var paramObj = {
+					"actionType"      : "C2",
+					"coCd"            : item.coCd,
+					"salesCd"         : item.salesCd,
+					"wbsPlanNo"       : item.wbsPlanNo,
+					"wbsRsltsNo"      : item.wbsPlanNo,
+					"wbsPlanCodeKind" : item.wbsPlanCodeKind,
+					"wbsPlanCodeId"   : item.key,
+					"wbsPlanCodeNm"   : item.label,
+					"wbsPlanMngNm"    : item.wbsPlanMngIdNm,
+					"wbsRsltssDt"     : item.s,
+					"wbsRsltseDt"     : item.e,
+				};
+				openSecondModal("/static/html/user/wb/wb24/WB2401P11.html", 1200, $('body').height()-41, "실적문제등록", paramObj, function (){
+
+				});
+		} else {
+			return;
+		}
+		
 	});
 	
 	
@@ -1135,6 +1230,8 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 				const item = {
 					key: r.wbsPlanCodeId,
 					salesCd: r.salesCd,
+					coCd: r.coCd,
+					ordrsNo: r.ordrsNo,
 					wbsPlanNo: r.wbsPlanNo,
 					wbsPlanCodeKind: r.wbsPlanCodeKind,
 					label: (r.wbsPlanCodeNm || r.wbsPlanCodeId || '').toString().trim(),
@@ -1181,13 +1278,64 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 			.on('change', function () { loadAndRender(); });
 
 		// 빈 트랙 마우스 우클릭 → 신규 컨텍스트
-		$(document).on('contextmenu', '.row-track', function (ev) {
-			if ($(ev.target).is('rect, text')) return;
-			ev.preventDefault();
+//		$(document).on('contextmenu', '.row-track', function (ev) {
+//			if ($(ev.target).is('rect, text')) return;
+//			ev.preventDefault();
+//			
+//			const $t = $(this);
+//			const salesCd = $t.data('row');
+//			const cat = $t.data('cat');
+//			const rowMeta = state.rowDefs.find(r => r.key === salesCd) || {};
+////			if (cat === 'PM' || cat === 'PLAN') {	//PM 전체일정은 입력 화면에서만 입력가능하게 제한처리
+//			if (cat === 'PM') {	//PM 전체일정은 입력 화면에서만 입력가능하게 제한처리
+//				openModal("/static/html/user/wb/wb22/WB2201P01.html", 1200, 900, "WBS 계획등록", {
+//					coCd: $('#coCd_S').val(),
+//					salesCd,
+//					histYn: "N",
+//				}, function (result) { 
+//					GanttApp.loadAndRender();
+//				});
+//				return;
+//			} else {
+//			
+//				// PLAN/DO: 규칙 체크 후 메뉴 열기
+//				if (!GC.rules.canAddTask(cat, rowMeta)) {
+//					alert('지금은 이 카테고리에 신규 등록할 수 없습니다.');
+//					return;
+//				}
+//				console.log("[menu inser]", salesCd, cat, rowMeta)
+//				
+//				// ★ 우클릭 위치를 날짜로 환산해 payload에 포함
+//			    const openDateObj = mapEventToDateOnTrack(ev, $t);
+//			    const payload = {
+//			        salesCd,
+//			        cat,
+//			        item: { label: '새 작업', start: GanttApp.state.viewStart, end: GanttApp.state.viewStart },
+//			        isNew: true,
+//			        $track: $t,
+//			        pointer: { clientX: ev.clientX, clientY: ev.clientY, pageX: ev.pageX, pageY: ev.pageY },
+//			        openDateObj,
+//			        openDate: openDateObj ? GanttCommon.fmt(openDateObj) : undefined,
+//			    };
+//	
+//			    showBarContext(ev, payload);
+//			}
+//		});
+		
+		$(document).on('contextmenu', '.bar', function (ev) {
+		    ev.preventDefault();
+
+			const $bar    = $(this);
+			const $row    = $bar.closest('.row-track');
+			const salesCd = $row.data('row');
+			const cat     = $row.data('cat');
+			const key     = $bar.data('key'); // 렌더링 시 부여된 키
 			
-			const $t = $(this);
-			const salesCd = $t.data('row');
-			const cat = $t.data('cat');
+			const itemArr = state.rowsData[salesCd]?.[cat] || [];
+			const item    = itemArr.find(x => x.key === key);
+			
+			if (!item) return;			
+			
 			const rowMeta = state.rowDefs.find(r => r.key === salesCd) || {};
 //			if (cat === 'PM' || cat === 'PLAN') {	//PM 전체일정은 입력 화면에서만 입력가능하게 제한처리
 			if (cat === 'PM') {	//PM 전체일정은 입력 화면에서만 입력가능하게 제한처리
@@ -1199,32 +1347,27 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 					GanttApp.loadAndRender();
 				});
 				return;
-			}
+			} else {
 			
-			// PLAN/DO: 규칙 체크 후 메뉴 열기
-			if (!GC.rules.canAddTask(cat, rowMeta)) {
-				alert('지금은 이 카테고리에 신규 등록할 수 없습니다.');
-				return;
+				// ★ 우클릭 위치를 날짜로 환산해 payload에 포함
+			    const openDateObj = mapEventToDateOnTrack(ev, $row);
+			    const payload = {
+			        salesCd,
+			        cat,
+			        item,
+			        isNew: false,
+			        $track: $row,
+			        $bar: $bar,
+			        pointer: { clientX: ev.clientX, clientY: ev.clientY, pageX: ev.pageX, pageY: ev.pageY },
+			        openDateObj,
+			        openDate: openDateObj ? GanttCommon.fmt(openDateObj) : undefined,
+			    };
+	
+			        		
+			    showBarContext(ev, payload);
 			}
-			console.log("[menu inser]", salesCd, cat, rowMeta)
-			
-			// ★ 우클릭 위치를 날짜로 환산해 payload에 포함
-		    const openDateObj = mapEventToDateOnTrack(ev, $t);
-		    const payload = {
-		        salesCd,
-		        cat,
-		        item: { label: '새 작업', start: GanttApp.state.viewStart, end: GanttApp.state.viewStart },
-		        isNew: true,
-		        $track: $t,
-		        pointer: { clientX: ev.clientX, clientY: ev.clientY, pageX: ev.pageX, pageY: ev.pageY },
-		        openDateObj,
-		        openDate: openDateObj ? GanttCommon.fmt(openDateObj) : undefined,
-		    };
-
-		    showBarContext(ev, payload);
 		});
-		
-
+		    
 		/*******************************************************************
 		 *  PM 배지를 클릭할 때마다 토글되는 기능
 		 *******************************************************************/

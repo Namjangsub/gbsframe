@@ -49,6 +49,16 @@
 			ev.preventDefault();
 			hide();
 
+			// ▼ 1) 전체 화면 투명 백드롭 생성 (메뉴 아래, 콘텐츠 위)
+			const $bd = $('<div class="ctx-backdrop" />').appendTo(document.body);
+			// 여백 클릭/터치/우클릭 모두 → 메뉴 닫기
+			$bd.on('mousedown.gctx click.gctx contextmenu.gctx touchstart.gctx', function (e) {
+			  e.preventDefault();
+			  hide();
+			});
+			// 메뉴 객체에 백드롭 보관 (hide 시 제거)
+			$ctx.data('__bd', $bd);
+			
 			// ✅ payload 보강: 바/트랙에서 salesCd, cat, $track 채워넣기
 			const $t = payload.$track || $(ev.target).closest('.row-track');
 			const salesCd = payload.salesCd ?? ($t && $t.data('row'));
@@ -69,17 +79,39 @@
 			$ctx.data('payload', enriched)
 				.css({ left: x, top: y, display: 'block', visibility: 'visible', position: 'fixed', zIndex: 10050 });
 
-			// 바깥 클릭/ESC/스크롤로 닫기
-			setTimeout(() => {
-				$(document).on('mousedown.gctx', (e) => { if (!$(e.target).closest(selector).length) hide(); });
-				$(document).on('contextmenu.gctx', (e) => { if (!$(e.target).closest(selector).length) hide(); });
-				$(document).on('keydown.gctx', (e) => { if (e.key === 'Escape') hide(); });
-				$(window).on('scroll.gctx resize.gctx', hide);
-			}, 0);
+			// ★ 바깥 클릭/우클릭/ESC/스크롤을 capture 단계에서 감지해 닫기
+
+			// ★ 바깥 클릭/우클릭/ESC/스크롤을 capture 단계에서 감지해 닫기
+			const onDocClickCap = (e) => { if (!e.target.closest(selector)) hide(); };
+			const onCtxMenuCap  = (e) => { if (!e.target.closest(selector)) hide(); };
+			const onKeydownCap  = (e) => { if (e.key === 'Escape') hide(); };
+			const onScrollWin   = ()  => hide();
+			const onResizeWin   = ()  => hide();
+			document.addEventListener('click',       onDocClickCap, true);
+			document.addEventListener('mousedown',   onDocClickCap, true);
+			document.addEventListener('contextmenu', onCtxMenuCap,  true);
+			document.addEventListener('keydown',     onKeydownCap,  true);
+			window.addEventListener('scroll',  onScrollWin, { passive:true });
+			window.addEventListener('resize',  onResizeWin);
+			// 해제를 위해 핸들 보관
+			$ctx.data('__cap', { onDocClickCap, onCtxMenuCap, onKeydownCap, onScrollWin, onResizeWin });
+
 		}
 
 		function hide() {
+			// 캡처 리스너 해제
+			const cap = $ctx.data('__cap');
+			if (cap) {
+				document.removeEventListener('click',       cap.onDocClickCap, true);
+				document.removeEventListener('mousedown',   cap.onDocClickCap, true);
+				document.removeEventListener('contextmenu', cap.onCtxMenuCap,  true);
+				document.removeEventListener('keydown',     cap.onKeydownCap,  true);
+				window.removeEventListener('scroll', cap.onScrollWin);
+				window.removeEventListener('resize', cap.onResizeWin);
+				$ctx.removeData('__cap');
+			}
 			$ctx.hide().removeData('payload');
+			// (호환용) 기존 네임스페이스 리스너도 제거
 			$(document).off('.gctx'); $(window).off('.gctx');
 		}
 
@@ -104,6 +136,38 @@
 		return { open, hide, on, trigger, el: $ctx, _handlers: handlers };
 	}
 
+		// 드래그로 스크롤 (좌/우만 또는 상/하만 - 축 고정)
+		(function enableFreePan(){
+			const $viewport = $('#timeline');
+			let panning=false, id=null, sx=0, sy=0, sl0=0, st0=0;
+			
+			$(document).on('pointerdown', '.group-box', function(e){
+				const isLeft = e.pointerType === 'mouse' ? e.button === 0 : true;
+				if (!isLeft) return;
+				if ($(e.target).closest('.bar, .handle').length) return;
+				
+				panning = true; id = e.pointerId || 1;
+				sx = e.clientX; sy = e.clientY;
+				sl0 = $viewport.scrollLeft(); st0 = $viewport.scrollTop();
+				e.target.setPointerCapture?.(id);
+				$viewport.addClass('panning');
+				e.preventDefault();
+			});
+			
+			$(document).on('pointermove', function(e){
+				if (!panning) return;
+				const dx = e.clientX - sx;
+				const dy = e.clientY - sy;
+				$viewport.scrollLeft(sl0 - dx);  // 좌우
+				$viewport.scrollTop(st0 - dy);   // 상하
+			});
+			
+			$(document).on('pointerup pointercancel', function(){
+				if (!panning) return;
+				panning=false; id=null; $viewport.removeClass('panning');
+			});
+		})();
+		
 	// 상태 룰(예시)
 	function canDragOrResize(cat, item) {
 		if (cat === 'PM') return item.confirmYn !== 'Y';
