@@ -47,8 +47,22 @@
 				T.*
 				, CASE WHEN T.BUYER_REG_NO='606-81-64873' THEN '건양ITT' ELSE '건양트루넷' END AS CO_CD
 				, NVL(CASE WHEN T.E_TAX_TYPE LIKE '%수정%' THEN SUBSTR(T.REMARK, INSTR(T.REMARK,'(')+1, INSTR(T.REMARK,')')-INSTR(T.REMARK,'(')-1) END, T.APPROVAL_NO) AS GROUP_KEY
-				, MAX(T.WRITE_DATE) OVER (PARTITION BY NVL(CASE WHEN T.E_TAX_TYPE LIKE '%수정%' THEN SUBSTR(T.REMARK, INSTR(T.REMARK,'(')+1, INSTR(T.REMARK,')')-INSTR(T.REMARK,'(')-1) END, T.APPROVAL_NO)) AS GROUP_MAX_DATE
-				, DECODE(NVL(CASE WHEN T.E_TAX_TYPE LIKE '%수정%' THEN SUBSTR(T.REMARK,INSTR(T.REMARK,'(')+1,INSTR(T.REMARK,')')-INSTR(T.REMARK,'(')-1) END,T.APPROVAL_NO),T.APPROVAL_NO,0,1) AS ORDER2
+				<!-- , DECODE(NVL(CASE WHEN T.E_TAX_TYPE LIKE '%수정%' THEN SUBSTR(T.REMARK,INSTR(T.REMARK,'(')+1,INSTR(T.REMARK,')')-INSTR(T.REMARK,'(')-1) END,T.APPROVAL_NO),T.APPROVAL_NO,0,1) AS ORDER2 -->
+				, ROW_NUMBER() OVER (
+					PARTITION BY NVL(
+						CASE WHEN T.E_TAX_TYPE LIKE '%수정%' 
+							THEN SUBSTR(T.REMARK, INSTR(T.REMARK,'(')+1, INSTR(T.REMARK,')')-INSTR(T.REMARK,'(')-1) 
+						END, T.APPROVAL_NO
+					) 
+					ORDER BY 
+						CASE 
+							WHEN NVL(T.E_TAX_TYPE,'일반')='일반' THEN 0 
+							WHEN T.E_TAX_TYPE LIKE '%수정%' AND (NVL(T.SUPPLY_AMT,0)+NVL(T.TAX_AMT,0)) &lt; 0 THEN 1 
+							WHEN T.E_TAX_TYPE LIKE '%수정%' THEN 2 
+							ELSE 9 
+						END,
+						T.APPROVAL_NO
+				) - 1 AS ORDER2
 				, FN_CM05M01_CD_TO_NM(T.BILL_TYPE)  AS BILL_TYPE_NM
 			FROM TB_FI03M01 T
 			WHERE 1=1
@@ -82,7 +96,7 @@
 				</choose>
 			</if>
 		)
-	ORDER BY GROUP_MAX_DATE DESC, GROUP_KEY, ORDER2 ASC, WRITE_DATE DESC, ISSUE_DATE DESC, SEND_DATE DESC
+	ORDER BY GROUP_KEY DESC, ORDER2 ASC, WRITE_DATE DESC, ISSUE_DATE DESC, SEND_DATE DESC
 	</select>
 
 	<!-- 상세정보 조회 -->
@@ -93,30 +107,28 @@
 			, FN_CM05M01_CD_TO_NM(T.BILL_TYPE)  AS BILL_TYPE_NM			-- 계산서종류명
 			, T.SELLER_REG_NO 											-- 공급자 등록번호
 			, T.BRANCH_NO 					AS SELLER_BRANCH_NO  		-- 공급자 종사업장번호
-			, T.COMPANY_NAME				AS SELLER_COMPANY_NAME		-- 공급자 상호
-			, T.CEO_NAME					AS SELLER_CEO_NAME			-- 공급자 성명
-			, B.BIZ_ADDR  					AS SELLER_BIZ_ADDR			--공급자 사업장
-			, B.BIZCON_NM 					AS SELLER_BIZCON_NM			--공급자 업태
-			, B.BSTY_NM						AS SELLER_BSTY_NM			--공급자 종목
-			, T.SELLER_EMAIL											--공급자 이메일
-			, T.BUYER_REG_NO											--공급받는자 등록번호
-			, C.CLNT_NM						AS BUYER_COMPANY_NAME		--공급받는자 상호
-			, C.REPST_NM					AS BUYER_CEO_NAME			--공급받는자 성명
-			, C.BIZ_ADDR					AS BUYER_BIZ_ADDR			--공급받는자 사업장
-			, C.BIZCON_NM 					AS BUYER_BIZCON_NM			--공급받는자 업태
-			, C.BSTY_NM						AS BUYER_BSTY_NM			--공급받는자 종목
-			, T.BUYER_EMAIL1											--공급받는자 이메일1
-			, T.BUYER_EMAIL2											--공급받는자 이메일2
+			, CASE WHEN #{billType} = 'SELPCH1' THEN T.COMPANY_NAME ELSE B.CLNT_NM END AS SELLER_COMPANY_NAME	-- 공급자상호
+			, CASE WHEN #{billType} = 'SELPCH1' THEN T.CEO_NAME ELSE B.REPST_NM END AS SELLER_CEO_NAME	-- 공급자 성명
+			, B.BIZ_ADDR  					AS SELLER_BIZ_ADDR			-- 공급자 사업장
+			, B.BIZCON_NM 					AS SELLER_BIZCON_NM			-- 공급자 업태
+			, B.BSTY_NM						AS SELLER_BSTY_NM			-- 공급자 종목
+			, T.SELLER_EMAIL											-- 공급자 이메일
+			, T.BUYER_REG_NO											-- 공급받는자 등록번호
+			, CASE WHEN #{billType} = 'SELPCH1' THEN C.CLNT_NM ELSE T.COMPANY_NAME END AS BUYER_COMPANY_NAME	-- 공급받는자 상호
+			, CASE WHEN #{billType} = 'SELPCH1' THEN C.REPST_NM ELSE T.CEO_NAME END AS BUYER_CEO_NAME	-- 공급받는자 성명
+			, C.BIZ_ADDR					AS BUYER_BIZ_ADDR			-- 공급받는자 사업장
+			, C.BIZCON_NM 					AS BUYER_BIZCON_NM			-- 공급받는자 업태
+			, C.BSTY_NM						AS BUYER_BSTY_NM			-- 공급받는자 종목
+			, T.BUYER_EMAIL1											-- 공급받는자 이메일1
+			, T.BUYER_EMAIL2											-- 공급받는자 이메일2
 			, TO_CHAR(T.WRITE_DATE, 'YYYY-MM-DD')  AS WRITE_DATE		-- 작성일자
 			, T.SUPPLY_AMT												-- 공급가액
 			, T.TAX_AMT													-- 세액
 			, DECODE(T.E_TAX_TYPE, '일반', '해당없음', T.E_TAX_TYPE) AS E_TAX_TYPE -- 수정사유
 			, T.REMARK													-- 비고
 		FROM TB_FI03M01 T
-						LEFT OUTER JOIN TB_BM02M01 AS B ON B.CLNT_CD = T.CLNT_CD
+						LEFT OUTER JOIN TB_BM02M01 AS B ON B.CRN = T.SELLER_REG_NO
 						LEFT OUTER JOIN TB_BM02M01 AS C ON C.CRN = T.BUYER_REG_NO
 		WHERE T.APPROVAL_NO = #{approvalNo}
 	</select>
-
-
 </mapper>
