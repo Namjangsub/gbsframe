@@ -40,9 +40,9 @@ function openContextMenu(ev, payload = {}) {
 	const $t = payload.$track || $(ev?.target).closest('.row-track');
 	const enriched = {
 			...payload,
-			$track: $t,
-			salesCd: payload.salesCd ?? $t?.data('row'),
-			cat:     payload.cat     ?? $t?.data('cat'),
+			$track		: $t,
+			salesCd		: payload.salesCd ?? $t?.data('row'),
+			cat			: payload.cat     ?? $t?.data('cat'),
 	};
 
     // ★ 오픈 시점 날짜를 즉시 계산해 저장
@@ -130,6 +130,23 @@ function showBarContext(ev, payload){
     // ★ DO 행이거나, item 이 없으면 "일정 추가" 숨김 (단일 토글로 일관 처리)
     const canInsert = !!(payload && payload.item) && payload.cat !== 'DO';
     $menu.find('li[data-action="insert"]').toggle(canInsert);
+
+	$menu.find('li[data-action="complete"]').toggle(false);
+	$menu.find('li[data-action="delete"]').toggle(false);
+	$menu.find('li[data-action="cancle"]').toggle(false);
+	if (payload.item.wbsPlanMngId == jwt.userId) {
+	    if (payload.cat == 'DO') {
+	    	if (payload && payload.item.expectMh && payload.item.doneYn!='Y' ) {
+	    		$menu.find('li[data-action="complete"]').toggle(true);
+	    		$menu.find('li[data-action="delete"]').toggle(true);
+	    		$menu.find('li[data-action="cancle"]').toggle(false);
+	    	} else {
+	    		$menu.find('li[data-action="cancle"]').toggle(true);
+	    	}
+	    } else {
+	    	$menu.find('li[data-action="delete"]').toggle(true);
+	    }
+	}
     
 	const $ctx = $('#barContextMenu');
 	if (!$ctx.length) { console.error('barContextMenu 엘리먼트 없음'); return; }
@@ -190,6 +207,8 @@ function hideBarContext(){
 	const $ctx = $('#barContextMenu');
 	if (!$ctx.length) return;
 	// 캡처 리스너 해제
+	// 특정 엘리먼트 트리 안에서의 동작을 캡처: click, mousedown, keydown, contextmenu (사용자 입력 관련 이벤트)
+	// windows에서만 걸러지는 이벤트임  : resize, scroll, focus, blur  (뷰포트 변화 이벤트)
 	const cap = $ctx.data('__cap');
 	if (cap) {
 		document.removeEventListener('click',       cap.onDocClickCap, true);
@@ -357,19 +376,19 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 
     const newItem = {
         salesCd,
-        key: code,                         // 서버에서 최종 key 내려줄 수 있음
-        wbsPlanCodeKind: codeKind,
-        label: name,
-        start: s,
-        end: e,
+        key					: code,                         // 서버에서 최종 key 내려줄 수 있음
+        wbsPlanCodeKind		: codeKind,
+        label				: name,
+        start				: s,
+        end					: e,
         cat,
-        confirmYn: (cat === 'PLAN' ? 'Y' : 'N'),
-        doneYn: 'N',
-        progress: 0,
-        expectMh: 0,
-        wbsPlanMngId: jwt.userId,
-        wbsPlanMngIdNm: jwt.userNm,
-        daycnt: Number.isFinite(Number(dayCnt)) ? Number(dayCnt) : undefined,
+        confirmYn			: (cat === 'PLAN' ? 'Y' : 'N'),
+        doneYn				: 'N',
+        progress			: 0,
+        expectMh			: 0,
+        wbsPlanMngId		: jwt.userId,
+        wbsPlanMngIdNm		: jwt.userNm,
+        daycnt				: Number.isFinite(Number(dayCnt)) ? Number(dayCnt) : undefined,
     };
     arr.push(newItem);
 
@@ -384,27 +403,27 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
         const rowListObj = {
             ...newItem,
             coCd,
-            wbsPlanCodeId: '',
-            salesCd: newItem.salesCd,
-            verNo: (payload.rowMeta?.verNo ?? 1),      // TODO: 실제 verNo 소스 연결
-            wbsPlanCodeNm: newItem.label,
-            wbsPlanMngId: newItem.wbsPlanMngId,
-            wbsPlansDt: newItem.start,
-            wbsPlaneDt: newItem.end,
-            daycnt: totalDays,
-            expectMh: newItem.expectMh,
-            creatId: jwt.userId,
-            creatPgm: "WB0602M01",
-            seq: 1,
-            year: new Date().getFullYear(),
-            wbsPlanStsCodeId: 'WBSPLANSTS10',
+            wbsPlanCodeId		: '',
+            salesCd				: newItem.salesCd,
+            verNo				: (payload.rowMeta?.verNo ?? 1),      // TODO: 실제 verNo 소스 연결
+            wbsPlanCodeNm		: newItem.label,
+            wbsPlanMngId		: newItem.wbsPlanMngId,
+            wbsPlansDt			: newItem.start,
+            wbsPlaneDt			: newItem.end,
+            daycnt				: totalDays,
+            expectMh			: newItem.expectMh,
+            creatId				: jwt.userId,
+            creatPgm			: "WB0602M01",
+            seq					: 1,
+            year				: new Date().getFullYear(),
+            wbsPlanStsCodeId	: 'WBSPLANSTS10',
         };
 
         postAjax("/user/wb/wb22/wbsLevel2GantInsert", rowListObj, null, function (data) {
             if (data.resultCode != 200) {
                 alert(data.resultMessage);
             } else {
-            	 GanttApp.loadAndRender(); // 복구
+            	GanttApp.loadAndRender(); // 복구
             }
         });
     } catch (err) {
@@ -450,6 +469,7 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 			GanttApp.loadAndRender();
 		});
 	});
+	
 	ctx.on('insert', (payload) => {
 	    if (!payload || !payload.item) {
 	        // 바가 선택되지 않은 상태 → 무시
@@ -482,16 +502,7 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 		}, function (result) { 
 			GanttApp.loadAndRender();
 		});
-		//WB2201P02.html 공용 사용 안됨 ----------------------> 보완 또는 화면 개발 필요
-//		var paramObj = {};
-//		if (item.rsltsFileTrgtKey != undefined) {
-//			paramObj["actionType"] = "U";
-//		} else {
-//			paramObj["actionType"] = "C";
-//		}
-//		openSecondModal("/static/html/user/wb/wb22/WB2201P02.html", 1200,700, "WBS 실적등록", paramObj, function (){
-//
-//		});
+
 	});
 	ctx.on('duplicate', ({ salesCd, cat, item }) => {
 //		const dstCat = (cat === 'PM') ? 'PLAN' : 'DO';
@@ -503,7 +514,7 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 		const $row = $(`.row-track[data-row="${salesCd}"][data-cat="${dstCat}"]`);
 	    CORE.renderRowSVG($row, arr, state, makeCoreOptions(dstCat, $row, salesCd));
 
-	    // ✅ 메뉴/핸들러 정리
+	    // 메뉴/핸들러 정리
 	    try { ctx.hide?.(); } catch {}
 	    hideBarContext?.();
 	    $(document).off('.ctx .gctx');
@@ -517,6 +528,10 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 
 		const formData = {
 				fileTrgtKey		: item.fileTrgtKey,
+				coCd			: item.coCd,
+				salesCd			: item.salesCd,
+				wbsPlanCodeId	: item.key,
+				wbsRsltsNo		: item.wbsPlanNo,
 				cat				: cat,
 		}
 		// 백엔드에서  PLAN --> wb22Mapper.wbsLevel2Delete(paramMap);		// 담당자 계획 삭제
@@ -525,57 +540,120 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 	        if (data.resultCode != 200) {
 	        	customAlert(data.resultMessage);
 	        	return;
+	        } else {
+
+	    		const arr = state.rowsData[salesCd][cat];
+	    		const idx = arr.findIndex(a => a.key === item.key);
+	    		if (idx > -1) {
+	    			arr.splice(idx, 1);
+
+	    	        const $row = $(`.row-track[data-row="${salesCd}"][data-cat="${cat}"]`);
+	    	        CORE.renderRowSVG($row, arr, state, makeCoreOptions(cat, $row, salesCd));
+
+	    	        // ✅ 메뉴/핸들러 정리
+	    	        try { ctx.hide?.(); } catch {}
+	    	        hideBarContext?.();
+	    	        $(document).off('.ctx .gctx');
+	    	        $(window).off('.ctx .gctx');
+	    	        // TODO: 삭제 API
+	    			console.log('[delete]', salesCd, cat, item);
+	    			
+	    	    }
 	        }
 	    });
 		
-		const arr = state.rowsData[salesCd][cat];
-		const idx = arr.findIndex(a => a.key === item.key);
-		if (idx > -1) {
-			arr.splice(idx, 1);
+	});
+	// 일정확정 메뉴 라우팅
+	ctx.on('complete',  ({ salesCd, cat, item }) => {
 
-	        const $row = $(`.row-track[data-row="${salesCd}"][data-cat="${cat}"]`);
-	        CORE.renderRowSVG($row, arr, state, makeCoreOptions(cat, $row, salesCd));
+		console.log('[complete]', salesCd, cat, item);
+        // TODO: 삭제 API
+		if (cat =='DO') {
+			completeMh(item.label, item.expectMh).then(mh => {
+			    if (mh !== null) { console.log("입력:", mh); }
 
-	        // ✅ 메뉴/핸들러 정리
-	        try { ctx.hide?.(); } catch {}
-	        hideBarContext?.();
-	        $(document).off('.ctx .gctx');
-	        $(window).off('.ctx .gctx');
-	        // TODO: 삭제 API
-			console.log('[delete]', salesCd, cat, item);
-			
-	    }
+			    const sDt = GanttCommon.parse(item.start); // Date
+			    const eDt = GanttCommon.parse(item.end);   // Date
+			    const days = Math.max(1, GanttCommon.days(sDt, eDt) + 1); // 양끝 포함
+				const formData = {
+				    	rsltFileTrgtKey		: item.fileTrgtKey,
+				    	rsltRate			: 100,
+				    	rsltIntocnt			: gPasFloatChk(mh),
+				    	rsltDaycnt			: days,
+				        rsltStrtDt			: item.start,
+				        rsltEndDt			: item.end,
+				        userId				: jwt.userId,
+				        pgmId				: $('#pgmId').val(),
+				        flag				: 'Y',
+					}
+				
+				postAjax("/user/wb/wb26/update_wb26", formData, null, function (data) {
+			        if (data.resultCode != 200) {
+			        	customAlert(data.resultMessage);
+			        } else {
+						var formData = new FormData();
+						formData.append("flag", 'Y');
+						formData.append("rsltsFileTrgtKey", item.fileTrgtKey);
+						formData.append("userId", jwt.userId);
+						formData.append("pgmId", $("#pgmId").val());
+						filePostAjax("/user/wb/wb22/wbsRsltsconfirm", formData, function(data){
+							if(data.resultCode != 200){
+								customAlert(data.resultMessage);
+							} else {
+					            // 성공 시점: 바 상태 갱신
+					            // 1) item 객체 속성 수정
+								item.doneYn = 'Y';
+								
+								// 2) 간트 바 재렌더
+								const arr = GanttApp.state.rowsData[salesCd][cat];
+								const $row = $(`.row-track[data-row="${salesCd}"][data-cat="${cat}"]`);
+								GanttCore.renderRowSVG($row, arr, GanttApp.state, makeCoreOptions(cat, $row, salesCd));
+							}
+						});
+			        }
+			    });
+				
+
+	
+			});
+		}
+		
+	});
+	
+
+	// 일정확정취소 메뉴 라우팅
+	ctx.on('cancle',  ({ salesCd, cat, item }) => {
+
+		console.log('[cancle]', salesCd, cat, item);
+        // TODO: 삭제 API
+		if (cat =='DO') {
+			var formData = new FormData();
+			formData.append("flag", 'N');
+			formData.append("rsltsFileTrgtKey", item.fileTrgtKey);
+			formData.append("userId", jwt.userId);
+			formData.append("pgmId", $("#pgmId").val());
+			filePostAjax("/user/wb/wb22/wbsRsltsconfirm", formData, function(data){
+				if(data.resultCode != 200){
+					customAlert(data.resultMessage);
+				} else {
+		            // 성공 시점: 바 상태 갱신
+		            // 1) item 객체 속성 수정
+					item.doneYn = 'N';
+
+					// 2) 간트 바 재렌더
+					const arr = GanttApp.state.rowsData[salesCd][cat];
+					const $row = $(`.row-track[data-row="${salesCd}"][data-cat="${cat}"]`);
+					GanttCore.renderRowSVG($row, arr, GanttApp.state, makeCoreOptions(cat, $row, salesCd));
+				}
+			});
+		}
+		
 	});
 	// 문제등록 메뉴 라우팅
 	ctx.on('problem',  ({ salesCd, cat, item }) => {
 
 		console.log('[problem]', salesCd, cat, item);
         // TODO: 삭제 API
-//		{
-//		    "key": "WBSCODE0405",
-//		    "salesCd": "25079-13USFWG",
-//		    "coCd": "GUN",
-//		    "ordrsNo": "25079",
-//		    "wbsPlanNo": "20250007082",
-//		    "wbsPlanCodeKind": "WBSCODE04",
-//		    "label": "설계진행 ▷승인 완료",
-//		    "start": "2025-06-30",
-//		    "end": "2025-09-10",
-//		    "cat": "PLAN",
-//		    "confirmYn": "Y",
-//		    "doneYn": "N",
-//		    "progress": 0,
-//		    "expectMh": 0,
-//		    "fileTrgtKey": "24979",
-//		    "wbsPlanMngId": "h4ng10",
-//		    "wbsPlanMngIdNm": "허상렬",
-//		    "smrizeId": "danhergy",
-//		    "smrizeIdNm": "김상화",
-//		    "s": "2025-06-29T15:00:00.000Z",
-//		    "e": "2025-09-09T15:00:00.000Z",
-//		    "lane": 3,
-//		    "colorIdx": 0
-//		}
 		if (cat =='PLAN') {
 			var paramObj = {
 					"actionType"      : "C1",
@@ -614,7 +692,40 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 		}
 		
 	});
+
+	// 메뉴 라우팅
+	ctx.on('workreport', ({ salesCd, cat, item }) => {
+		console.log('[workreport]', salesCd, cat, item);
+        // TODO: 삭제 API
+		openModal("/static/html/user/pm/pm01/PM0101P01.html",  1100, 750, "작업일보등록", {
+			actionType		: 'C',
+			coCd			: item.coCd,
+			ordrsNo			: item.ordrsNo,
+			salesCd,
+			wbsPlanCodeKind	: item.wbsPlanCodeKind,
+			wbsPlanCodeId	: item.key,
+			wbsPlanCodeIdNm	: item.label,
+			wbsPlanNo		: item.wbsPlanNo,
+			cat				: item.cat,
+			workRptId		: item.wbsPlanMngId,
+			workRptIdNm		: item.wbsPlanMngIdNm,
+			start			: item.start,
+			end				: item.end,
+			workRptRmk		: '일정관리에서 생성',
+		}, function (result) { 
+//			GanttApp.loadAndRender();
+		});
+	});
 	
+	async function completeMh(label, expectMh=0.0) {
+		const val = await customPrompt(
+		        `${label} 작업에 투입된 공수를 입력하세요:`,
+		        expectMh,
+		        "해당 작업을 위해 투입된 일수"
+		    );
+		    // 확인 버튼: 문자열, 취소: null
+		    return val === null ? null : String(val).trim();
+	}
 	
 	function makeCoreOptions(cat, $track, rowKey, extraOpts = {}) {
 		return {
@@ -1228,24 +1339,24 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 				const start = r.wbsPlansDtFm || '';
 				const end = r.wbsPlaneDtFm ? r.wbsPlaneDtFm :GanttCommon.fmt(new Date());
 				const item = {
-					key: r.wbsPlanCodeId,
-					salesCd: r.salesCd,
-					coCd: r.coCd,
-					ordrsNo: r.ordrsNo,
-					wbsPlanNo: r.wbsPlanNo,
-					wbsPlanCodeKind: r.wbsPlanCodeKind,
-					label: (r.wbsPlanCodeNm || r.wbsPlanCodeId || '').toString().trim(),
+					key					: r.wbsPlanCodeId,
+					salesCd				: r.salesCd,
+					coCd				: r.coCd,
+					ordrsNo				: r.ordrsNo,
+					wbsPlanNo			: r.wbsPlanNo,
+					wbsPlanCodeKind		: r.wbsPlanCodeKind,
+					label				: (r.wbsPlanCodeNm || r.wbsPlanCodeId || '').toString().trim(),
 					start, end,
-					cat: catFrom(r.planType),
-					confirmYn: confirmYnFromMeta,  		// PM/PLAN 확정 여부 ('Y'|'N')
-					doneYn: r.doneYn || 'N',        	// DO 실적확정 ('Y'|'N')
-					progress: r.wbsRsltsRate || 0,      // 진척율(0~100), 선택
-					expectMh: r.expectMh || 0,      	// 투입공수
-					fileTrgtKey: r.fileTrgtKey || null,
-					wbsPlanMngId: r.wbsPlanMngId || null,
-					wbsPlanMngIdNm: r.wbsPlanMngIdNm || null,
-					smrizeId: r.smrizeId || null,      // 담당자, 선택
-					smrizeIdNm: r.smrizeIdNm || null,  // 담당자, 선택
+					cat					: catFrom(r.planType),
+					confirmYn			: confirmYnFromMeta,  		// PM/PLAN 확정 여부 ('Y'|'N')
+					doneYn				: r.pmCloseYn || 'N',        	// DO 실적확정 ('Y'|'N')
+					progress			: r.wbsRsltsRate || 0,      // 진척율(0~100), 선택
+					expectMh			: r.expectMh || 0,      	// 투입공수
+					fileTrgtKey			: r.fileTrgtKey || null,
+					wbsPlanMngId		: r.wbsPlanMngId || null,
+					wbsPlanMngIdNm		: r.wbsPlanMngIdNm || null,
+					smrizeId			: r.smrizeId || null,      // 담당자, 선택
+					smrizeIdNm			: r.smrizeIdNm || null,  // 담당자, 선택
 				};
 
 				let bucket = rowsData[sales];

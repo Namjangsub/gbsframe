@@ -918,7 +918,11 @@ public class WB22SvcImpl implements WB22Svc {
 	public int wbsRsltsGantDelete(Map<String, String> paramMap) {
 		String cat = paramMap.get("cat");
 		if (cat == null || cat.equals("PLAN")) {
-			return wb22Mapper.wbsLevel2Delete(paramMap);	// 담당자 계획 삭제
+			if (wb22Mapper.wbsRsltsGantDeleteChk(paramMap) > 0 ) {	// 실적자료가 존재하면 삭제 불가능
+				return 0;
+			} else {
+				return wb22Mapper.wbsLevel2Delete(paramMap);	// 담당자 계획 삭제
+			}
 		} else if (cat == null || cat.equals("DO")) {
 			return wb22Mapper.wbsRsltsGantDelete(paramMap);		// 담당자 실적 삭제
 		} else {

@@ -57,7 +57,7 @@
 		.line-badge{ flex:0 0 var(--badge-col-width); min-width:var(--badge-col-width); height:calc(var(--lane-height) + var(--track-vpad) * 2); padding:0 6px; border-radius:var(--badge-radius); background:#768EA5; color:white; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; letter-spacing:.5px; box-shadow:0 1px 2px rgba(0,0,0,.08) inset; font:10px/1.4 system-ui,"맑은 고딕"; }
 		.group-box{ grid-column:2 / -1; border:1px solid #cfe0ff; border-radius:16px; background:#fff; padding:8px; display:flex; flex-direction:column; gap:1px; box-sizing:border-box; }
 		.group-line{ display:flex; gap:8px; align-items:flex-start; }
-		.row-track{ position:relative; z-index:1; min-height:calc(var(--lane-height) + var(--track-vpad)*2); border:1px solid #cfe0ff; border-radius:12px; padding:var(--track-vpad) 0; background:#fff; }
+		.row-track{ position: relative; z-index: 1; height: calc(var(--lane-height) + var(--track-vpad)*2); /* 정확히 lane + 여백*2 */ padding-block: var(--track-vpad); border: 1px solid #cfe0ff; border-radius: 12px; background: #fff; display: flex; align-items: center; }
 		.row-track::before{ content:""; position:absolute; left:0; right:0; top:0; bottom:0; pointer-events:none; background-image:repeating-linear-gradient(to right, var(--grid-line-color) 0 1px, transparent 1px var(--px-per-day)); z-index:0; }
 		.timeline::before{ content:""; position:sticky; left:0; top:0; bottom:0; width:calc(var(--label-width) + var(--col-gap) + var(--badge-col-width)); background:#fff; z-index:8; pointer-events:none; }
 		.row-track .shade{ position:absolute; top:0; bottom:0; pointer-events:none; z-index:1; }
@@ -141,7 +141,6 @@
 		/* 선택: 겹침일 때 라벨 투명도 조절 */
 		.row-track svg .bar-label { opacity: .9; }
 		.row-track svg:first-child[data-stacked="true"] .bar-label { opacity: .7; } /* 필요 시 data-attr로 제어 */
-		
 
 	</style>
 </head>
@@ -162,7 +161,7 @@
 				<li class="btn_r">
 					<a onclick="manualPopup();"><button type="button" class="bg_gray">도움말</button></a>
 					<a onclick="initSearch();"><button class="bg_gray">초기화</button></a>
-					<a onclick="GanttApp.loadAndRender();"><button class="bg_gray">검 색</button></a>
+					<a onclick="DataSearch();"><button class="bg_gray">검 색</button></a>
 				</li>
 			</ul>
 		</div>
@@ -188,14 +187,22 @@
 <!-- 						<td> -->
 <!-- 							<select id="multiple-checkboxes-prdtGrp" multiple="multiple"></select> -->
 <!-- 						</td> -->
-						<th></th><td></td>
+						<th>담당자</th>
+						<td>
+							<div class="search_form">
+								<input type="hidden" id="wbsPlanMngId_S"   name="wbsPlanMngId_S"   data-search="wbsPlanMngId">
+								<input type="text"   id="wbsPlanMngIdNm_S" name="wbsPlanMngIdNm_S" data-search="wbsPlanMngIdNm"
+								onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = '' : event.keyCode == 13 ? DataSearch() : '';">
+								<a onclick="openUserSearch();"><i class="i_search_w"></i></a>
+							</div>
+						</td>
 						<th></th><td></td>
 					</tr>
 					<tr>
 						<th>SalesCode</th>
 						<td>
 							<div class="search_form">
-								<input type="text" id="salesCd_S" name="salesCd_S" data-search="salesCd" value="25079" onkeyup="event.keyCode==13?GanttApp.loadAndRender():''">
+								<input type="text" id="salesCd_S" name="salesCd_S" data-search="salesCd" value="25079" onkeyup="event.keyCode==13 ? DataSearch() :''">
 								<a onclick="wbsSalesCodeSearch($('#salesCd_S').val());"><i class="i_search_w"></i></a>
 							</div>
 						</td>
@@ -210,7 +217,7 @@
 							<input type="hidden" id="ordrsClntCd_S" name="ordrsClntCd_S" data-search="ordrsClntCd">
 							<div class="search_form">
 								<input type="text" id="ordrsClntNm_S" name="ordrsClntNm_S" data-search="ordrsClntNm"
-									onkeyup="(event.keyCode==8||event.keyCode==46)?ordrsClntCd_S.value='':event.keyCode==13?GanttApp.loadAndRender():''">
+									onkeyup="(event.keyCode==8||event.keyCode==46)?ordrsClntCd_S.value='':event.keyCode==13 ? DataSearch() :''">
 								<a onclick="opendClntSearch($('#ordrsClntNm_S').val());"><i class="i_search_w"></i></a>
 							</div>
 						</td>
@@ -254,10 +261,13 @@
 			<li data-action="openDetail">상세 보기</li>
 			<li data-action="insert">일정 추가</li>
 			<li data-action="edit">일정 편집</li>
+			<li data-action="complete">일정 결과 확정</li>
+			<li data-action="cancle">일정 결과 확정 취소</li>
 <!-- 			<li data-action="duplicate">일정 복사</li> -->
 			<li data-action="delete" class="danger">일정 삭제</li>
 			<li data-action="">-----------------</li>
 			<li data-action="problem" class="danger">문제 등록</li>
+			<li data-action="workreport" class="info">작업일보등록</li>
 		</ul>
 	</div>
 
@@ -301,6 +311,8 @@
 		$('#main_area').toggleClass('on');
 		//회사 기본값지정
 		$("#coCd_S").val('GUN');
+		$('#wbsPlanMngId_S').val(jwt.userId);
+		$('#wbsPlanMngIdNm_S').val(jwt.userNm);
 	
 		// 시작일 (현재날짜의 월 첫일)
 		$('#strtDt_S').datepicker({
@@ -337,7 +349,7 @@
 		
 		
 		// 검색조건 이벤트 bind
-		$('[data-search]').on("change", function(){ GanttApp.loadAndRender(); });
+		$('[data-search]').on("change", function(){ DataSearch(); });
 		
 
 	});
@@ -355,8 +367,59 @@
 		$("#endDt_S").val(dateToStr(moment(new Date()).endOf("month").toDate()));
 	
 		// 검색조건 이벤트 bind
-		$('[data-search]').on("change", function(){ GanttApp.loadAndRender(); });
+		$('[data-search]').on("change", function(){ DataSearch(); });
 	
+	}
+	
+
+	// 거래처 검색 함수
+	function opendClntSearch(inputValue) {
+		var paramObj = {
+	            "searchValue" : inputValue,
+	            "clntDivCd"   : "CLNTDIV12"
+	        };
+		openModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "거래처 검색", paramObj, function(grid) {
+			var row = grid.target.getList("selected")[0];
+			$('#ordrsClntCd_S').val(row.clntCd);
+			$('#ordrsClntNm_S').val(row.clntNm);
+			//gridView.setData(0);
+			DataSearch();
+		});
+	}
+
+	//Sales Code (수주마스터, 수주상세테이블 조인) 검색
+	function wbsSalesCodeSearch() {
+	    var paramObj = {
+	       "coCd" : $('#coCd_S').val(),
+	       "searchValue": $('#salesCd_S').val()
+	    };
+	    openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1068, 650, "SALES CODE 검색", paramObj, function (grid){
+	        var row = grid.target.getList("selected")[0];
+	        $('#salesCd_S').val(row.salesCd);
+	        DataSearch();
+	    });
+	}
+
+	// 작성자 검색 //
+	function openUserSearch() {
+		var paramObj = {
+			  "coCd" : $('#coCd').val(),
+			  "userId" : $('#wbsPlanMngId_S').val(),
+			  "userNm" : $('#wbsPlanMngIdNm_S').val(),
+		};
+
+		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
+					var checkedId = tree.get_checked()[0];
+					var checkedNode = tree.get_node(checkedId);
+					$('#wbsPlanMngId_S').val(checkedNode.id);
+					$('#wbsPlanMngIdNm_S').val(checkedNode.text);
+					DataSearch();
+				});
+	}
+
+	
+	function DataSearch() {
+		GanttApp.loadAndRender();
 	}
 </script>
 	<!-- 공통/코어/앱 -->

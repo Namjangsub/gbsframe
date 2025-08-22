@@ -3008,3 +3008,87 @@ function closeCustomAlert() {
     $('#custom-alert-overlay').remove();
     isModalOpen = false;
 }
+
+let isPromptOpen = false;
+
+function customPrompt(message, defaultValue = '', appendMessage = '') {
+    return new Promise((resolve, reject) => {
+        if (isPromptOpen) {
+            console.log("이미 입력 모달이 열려있습니다.");
+            reject("already_open");
+            return;
+        }
+
+        isPromptOpen = true;
+
+        const modalHtml = `
+            <div id="custom-prompt-overlay">
+                <div style="
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: white;
+                    padding: 20px 30px;
+                    border: 2px solid #666;
+                    border-radius: 10px;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                    z-index: 9999;
+                    max-width: 400px;
+                    font-size: 16px;
+                    text-align: center;
+                ">
+                    <div id="custom-prompt-message" style="margin-bottom: 15px; font-size: 16px; color: #333;"></div>
+                    <input type="text" id="custom-prompt-input" value="${defaultValue}" 
+                           style="width: 90%; padding: 5px; margin-bottom: 20px; font-size: 14px; border: 1px solid #aaa; border-radius: 5px;" />
+                    <div style="display:flex; justify-content: center; gap: 10px;">
+                        <button id="custom-prompt-ok" style="padding: 5px 15px;">확인</button>
+                        <button id="custom-prompt-cancel" style="padding: 5px 15px;">취소</button>
+                    </div>
+                </div>
+                <div style="
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0,0,0,0.4);
+                    z-index: 9998;
+                "></div>
+            </div>
+        `;
+
+        $('body').append(modalHtml);
+
+        // 메시지 세팅
+        let fullMessage = appendMessage === '' ? message : message + '<br>' + appendMessage;
+        $('#custom-prompt-message').html(fullMessage.replace(/\n/g, '<br>'));
+
+        // 확인 이벤트
+        $('#custom-prompt-ok').on('click', function () {
+            const value = $('#custom-prompt-input').val();
+            closeCustomPrompt();
+            resolve(value);
+        });
+
+        // 취소 이벤트
+        $('#custom-prompt-cancel').on('click', function () {
+            closeCustomPrompt();
+            resolve(null); // 취소 시 null 반환
+        });
+
+        // Enter/ESC 키 지원
+        $('#custom-prompt-input').focus().on('keydown', function (e) {
+            if (e.key === 'Enter') {
+                $('#custom-prompt-ok').click();
+            } else if (e.key === 'Escape') {
+                $('#custom-prompt-cancel').click();
+            }
+        });
+    });
+}
+
+function closeCustomPrompt() {
+    $('#custom-prompt-overlay').remove();
+    isPromptOpen = false;
+}

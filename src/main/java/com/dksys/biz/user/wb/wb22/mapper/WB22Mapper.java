@@ -137,4 +137,6 @@ public interface WB22Mapper {
 	int wbsLevel1GantUpdate(Map<String, String> paramMap);
 
 	int wbsRsltsGantDelete(Map<String, String> paramMap);
+
+	int wbsRsltsGantDeleteChk(Map<String, String> paramMap);
 }

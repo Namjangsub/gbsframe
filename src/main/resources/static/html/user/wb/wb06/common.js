@@ -170,6 +170,7 @@
 		
 	// 상태 룰(예시)
 	function canDragOrResize(cat, item) {
+		if (item.wbsPlanMngId != jwt.userId) return false;
 		if (cat === 'PM') return item.confirmYn !== 'Y';
 		if (cat === 'PLAN') return item.confirmYn === 'Y';
 		if (cat === 'DO') return item.doneYn !== 'Y';
