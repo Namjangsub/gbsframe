@@ -104,6 +104,8 @@
 				? bucket.DO.some(d => String(d.key) === String(it.key) && d.doneYn === 'Y')
 				: false;
 
+
+				
 			const isOwn = (String(it.wbsPlanMngId || '') === String(jwt?.userId || ''));
 //			const isOwn =
 //			    (String(it.wbsPlanMngId || '') === String(jwt?.userId || '')) ||
@@ -115,13 +117,13 @@
 			const isOverduePlan = (cat === 'PLAN' && it.s < today && !hasDoneInDO);
 		    
 			if (isOverduePlan)   cls.push('overdue');
-			else if (isExpired)  cls.push('expired'); // 필요 시 유지
+			else if (isExpired)     cls.push('expired'); // 필요 시 유지
 			
 			if (isOwn) cls.push('own');            // 담당자 본인건 표시
 			
 			const rect = GC.makeSvgEl('rect', {
 				x: x0, y: y, width: bw, height: laneH, rx: 8, ry: 8,
-				class: cls.join(' '), 'data-key': it.key           // 담당자 본인건 표시
+				class: cls.join(' '), 'data-key': it.key           // ← 담당자 본인건 표시
 			});
 			rect.style.pointerEvents = 'auto';
 
@@ -141,42 +143,14 @@
 			else { rect.classList.remove('locked'); rect.style.cursor = 'move'; }
 			// 마우스 왼쪽 클릭 시 툴팁 표시
 //			rect.addEventListener('pointerdown', (ev) => { if (ev.button !== 0) return; /* 왼쪽 버튼만 */ GC.showTip(ev.clientX, ev.clientY, GC.fmtRange(it.s, it.e, it.label, GC.days)); });
-			rect.addEventListener('pointerdown', (ev) => {
-			    if (ev.button !== 0) return; // 왼쪽 버튼만
-
-			    const text = `
-			    	<b>${it.label}</b><br>
-			    	기간: ${GC.fmt(it.s)} ~ ${GC.fmt(it.e)} (${GC.days(it.s, it.e) + 1}일)<br>
-			    	담당자: ${it.wbsPlanMngIdNm || '-'}<br>
-			    	완료여부: ${it.doneYn === 'Y' ? '완료' : '미완료'}
-			    	`;
-			    	GC.showTip(ev.clientX, ev.clientY, text);
-			});
+			rect.addEventListener('pointerdown', (ev) => { if (ev.button !== 0) return; /* 왼쪽 버튼만 */ GC.showTip(ev.clientX, ev.clientY, makeTooltipHtml(it)); });
 			// 마우스 버튼 놓으면 툴팁 숨김
 			rect.addEventListener('pointerup', (ev) => { if (ev.button !== 0) return; /* 왼쪽 버튼만 */ GC.hideTip(); });
 			// 좌측 핸들 클릭 → 툴팁 표시
-			lh.addEventListener('pointerdown', (ev) => {
-			    if (ev.button !== 0) return;
-			    const text = `
-			    	<b>${it.label} - 시작포인트</b><br>
-			    	기간: ${GC.fmt(it.s)} ~ ${GC.fmt(it.e)} (${GC.days(it.s, it.e) + 1}일)<br>
-			    	담당자: ${it.wbsPlanMngIdNm || '-'}<br>
-			    	완료여부: ${it.doneYn === 'Y' ? '완료' : '미완료'}
-			    	`;
-			    GC.showTip(ev.clientX, ev.clientY, text);
-			});
+			lh.addEventListener('pointerdown', (ev) => { if (ev.button !== 0) return; GC.showTip(ev.clientX, ev.clientY, makeTooltipHtml(it)); });
 			lh.addEventListener('pointerup', (ev) => { if (ev.button !== 0) return; GC.hideTip(); });
 			// 우측 핸들 클릭 → 툴팁 표시
-			rh.addEventListener('pointerdown', (ev) => {
-			    if (ev.button !== 0) return;
-			    const text = `
-			    	<b>${it.label} - 종료포인트</b><br>
-			    	기간: ${GC.fmt(it.s)} ~ ${GC.fmt(it.e)} (${GC.days(it.s, it.e) + 1}일)<br>
-			    	담당자: ${it.wbsPlanMngIdNm || '-'}<br>
-			    	완료여부: ${it.doneYn === 'Y' ? '완료' : '미완료'}
-			    	`;
-			    GC.showTip(ev.clientX, ev.clientY, text);
-			});
+			rh.addEventListener('pointerdown', (ev) => { if (ev.button !== 0) return; GC.showTip(ev.clientX, ev.clientY, makeTooltipHtml(it)); });
 			rh.addEventListener('pointerup', (ev) => { if (ev.button !== 0) return; GC.hideTip(); });
 			
 			enableDragResize(svg, rect, label, lh, rh, it, y, laneH, state, { cat, $track, ...options, locked });
@@ -196,6 +170,21 @@
 		return svg.__gcState;
 	}
 
+	function makeTooltipHtml(it, s, e) {
+	    const start = GC.fmt(s || it.s);
+	    const end   = GC.fmt(e || it.e);
+	    const days  = GC.days(s || it.s, e || it.e) + 1;
+	    const manager = it.wbsPlanMngIdNm || '-';
+	    const done = it.doneYn === 'Y' ? '완료' : '미완료';
+
+	    return `
+	        <b>${it.label}</b><br>
+	        기간: ${start} ~ ${end} (${days}일)<br>
+	        담당자: ${manager}<br>
+	        완료여부: ${done}
+	    `;
+	}
+	
 	function enableDragResize(svg, rect, label, lh, rh, it, baseY, laneH, state, opts) {
 		const { locked, cat, $track, onApplyChange, onCopy, onContext, getPlanBounds } = opts;
 
@@ -213,6 +202,7 @@
 			$(document).off('.gcore');
 		}
 
+		
 		function startDrag(mode) {
 			return (ev) => {
 				// 오른쪽 버튼 또는 잠김 상태는 무시
@@ -325,7 +315,8 @@
 			ne = GC.clampDate(ne, state.viewStart, state.viewEnd);
 
 			syncBarVisual(dragState, ns, ne, state);
-			GC.moveTip(e.clientX, e.clientY, GC.fmtRange(ns, ne, dragState.name, GC.days));
+//			GC.moveTip(e.clientX, e.clientY, GC.fmtRange(ns, ne, dragState.name, GC.days));
+			GC.moveTip(e.clientX, e.clientY, makeTooltipHtml(dragState.item, ns, ne));
 			
 
 

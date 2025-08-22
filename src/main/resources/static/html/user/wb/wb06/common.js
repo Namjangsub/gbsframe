@@ -38,10 +38,11 @@
 	const tipPad = 14;
 //	const showTip = (x, y, text) => $tt.text(text).css({ left: x + tipPad, top: y + tipPad, display: 'block' });
 	const showTip = (x, y, html) => $tt.html(html).css({ left: x + tipPad, top: y + tipPad, display: 'block' });
-	const moveTip = (x, y, text) => $tt.text(text).css({ left: x + tipPad, top: y + tipPad });
+	const moveTip = (x, y, html) => $tt.html(html).css({ left: x + tipPad, top: y + tipPad });
 	const hideTip = () => $tt.hide();
 	const fmtRange = (s, e, name, daysFn) => `${name} : ${fmt(s)} ~ ${fmt(e)} (${daysFn(s, e) + 1}일)`;
-
+	
+	
 	// 컨텍스트 메뉴(공통 매니저)
 	function createContextMenu(selector) {
 		const $ctx = $(selector);
