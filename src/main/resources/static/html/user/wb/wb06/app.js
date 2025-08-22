@@ -461,10 +461,10 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 	// 메뉴 라우팅
 	ctx.on('openDetail', ({ salesCd, item }) => {
 		openModal("/static/html/user/wb/wb22/WB2201P01.html", 1200, 900, "WBS 계획등록", {
-			coCd: $('#coCd_S').val(),
+			coCd			: item.coCd,
 			salesCd,
-			histYn: "N",
-			wbsPlanCodeId: item.key
+			histYn			: "N",
+			wbsPlanCodeId	: item.key
 		}, function (result) { 
 			GanttApp.loadAndRender();
 		});
@@ -495,10 +495,10 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 		try { ctx.hide?.(); } catch {}
 		try { hideBarContext?.(); } catch {}
 		openModal("/static/html/user/wb/wb22/WB2201P01.html", 1200, 900, "WBS 계획등록", {
-			coCd: $('#coCd_S').val(),
+			coCd			: item.coCd,
 			salesCd,
-			histYn: "N",
-			wbsPlanCodeId: item.key
+			histYn			: "N",
+			wbsPlanCodeId	: item.key
 		}, function (result) { 
 			GanttApp.loadAndRender();
 		});
@@ -1316,18 +1316,18 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 				if (!metaMap.has(sales)) {
 					if (r.planType =='PM계획') {
 						metaMap.set(sales, {
-							label: sales, key: sales,
-							pmCloseYn: (r.pmCloseYn === 'Y') ? 'Y' : 'N',		//PM일정 확정여부
-							closeYn: (r.closeYn   === 'Y') ? 'Y' : 'N',			//과제 확정여부
-							기계종류: (r['기계종류'] || '').toString().trim(),
-							mngIdNm: (r.smrizeIdNm || '').toString().trim(),
-							eqpNm: (r.eqpNm || '').toString().trim().slice(0, 20),
-							수주구분: (r['수주구분'] || '').toString().trim(),
-							아이템구분: (r['아이템구분'] || '').toString().trim(),
-							기계구분: (r['기계구분'] || '').toString().trim(),
-							clntPjtNm: (r['clntPjtNm'] || '').toString().trim(),
-							clntNm: (r['clntNm'] || '').toString().trim(),
-							외주업체: (r.mkerCdNm || '').toString().trim()
+							label		: sales, key: sales,
+							pmCloseYn	: (r.pmCloseYn === 'Y') ? 'Y' : 'N',			//PM일정 확정여부
+							closeYn		: (r.closeYn   === 'Y') ? 'Y' : 'N',			//과제 확정여부
+							기계종류		: (r['기계종류'] || '').toString().trim(),
+							mngIdNm		: (r.smrizeIdNm || '').toString().trim(),
+							eqpNm		: (r.eqpNm || '').toString().trim().slice(0, 20),
+							수주구분		: (r['수주구분'] || '').toString().trim(),
+							아이템구분		: (r['아이템구분'] || '').toString().trim(),
+							기계구분		: (r['기계구분'] || '').toString().trim(),
+							clntPjtNm	: (r['clntPjtNm'] || '').toString().trim(),
+							clntNm		: (r['clntNm'] || '').toString().trim(),
+							외주업체		: (r.mkerCdNm || '').toString().trim()
 						});
 					}
 				}
@@ -1348,15 +1348,15 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 					label				: (r.wbsPlanCodeNm || r.wbsPlanCodeId || '').toString().trim(),
 					start, end,
 					cat					: catFrom(r.planType),
-					confirmYn			: confirmYnFromMeta,  		// PM/PLAN 확정 여부 ('Y'|'N')
+					confirmYn			: confirmYnFromMeta,  			// PM/PLAN 확정 여부 ('Y'|'N')
 					doneYn				: r.pmCloseYn || 'N',        	// DO 실적확정 ('Y'|'N')
-					progress			: r.wbsRsltsRate || 0,      // 진척율(0~100), 선택
-					expectMh			: r.expectMh || 0,      	// 투입공수
+					progress			: r.wbsRsltsRate || 0,      	// 진척율(0~100), 선택
+					expectMh			: r.expectMh || 0,      		// 투입공수
 					fileTrgtKey			: r.fileTrgtKey || null,
 					wbsPlanMngId		: r.wbsPlanMngId || null,
 					wbsPlanMngIdNm		: r.wbsPlanMngIdNm || null,
-					smrizeId			: r.smrizeId || null,      // 담당자, 선택
-					smrizeIdNm			: r.smrizeIdNm || null,  // 담당자, 선택
+					smrizeId			: r.smrizeId || null,      		// 담당자, 선택
+					smrizeIdNm			: r.smrizeIdNm || null,  		// 담당자, 선택
 				};
 
 				let bucket = rowsData[sales];
@@ -1388,51 +1388,6 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 		$('#multiple-checkboxes-prdtGrp').multiselect({ includeSelectAllOption: true })
 			.on('change', function () { loadAndRender(); });
 
-		// 빈 트랙 마우스 우클릭 → 신규 컨텍스트
-//		$(document).on('contextmenu', '.row-track', function (ev) {
-//			if ($(ev.target).is('rect, text')) return;
-//			ev.preventDefault();
-//			
-//			const $t = $(this);
-//			const salesCd = $t.data('row');
-//			const cat = $t.data('cat');
-//			const rowMeta = state.rowDefs.find(r => r.key === salesCd) || {};
-////			if (cat === 'PM' || cat === 'PLAN') {	//PM 전체일정은 입력 화면에서만 입력가능하게 제한처리
-//			if (cat === 'PM') {	//PM 전체일정은 입력 화면에서만 입력가능하게 제한처리
-//				openModal("/static/html/user/wb/wb22/WB2201P01.html", 1200, 900, "WBS 계획등록", {
-//					coCd: $('#coCd_S').val(),
-//					salesCd,
-//					histYn: "N",
-//				}, function (result) { 
-//					GanttApp.loadAndRender();
-//				});
-//				return;
-//			} else {
-//			
-//				// PLAN/DO: 규칙 체크 후 메뉴 열기
-//				if (!GC.rules.canAddTask(cat, rowMeta)) {
-//					alert('지금은 이 카테고리에 신규 등록할 수 없습니다.');
-//					return;
-//				}
-//				console.log("[menu inser]", salesCd, cat, rowMeta)
-//				
-//				// ★ 우클릭 위치를 날짜로 환산해 payload에 포함
-//			    const openDateObj = mapEventToDateOnTrack(ev, $t);
-//			    const payload = {
-//			        salesCd,
-//			        cat,
-//			        item: { label: '새 작업', start: GanttApp.state.viewStart, end: GanttApp.state.viewStart },
-//			        isNew: true,
-//			        $track: $t,
-//			        pointer: { clientX: ev.clientX, clientY: ev.clientY, pageX: ev.pageX, pageY: ev.pageY },
-//			        openDateObj,
-//			        openDate: openDateObj ? GanttCommon.fmt(openDateObj) : undefined,
-//			    };
-//	
-//			    showBarContext(ev, payload);
-//			}
-//		});
-		
 		$(document).on('contextmenu', '.bar', function (ev) {
 		    ev.preventDefault();
 
@@ -1466,12 +1421,12 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 			        salesCd,
 			        cat,
 			        item,
-			        isNew: false,
-			        $track: $row,
-			        $bar: $bar,
-			        pointer: { clientX: ev.clientX, clientY: ev.clientY, pageX: ev.pageX, pageY: ev.pageY },
+			        isNew		: false,
+			        $track		: $row,
+			        $bar		: $bar,
+			        pointer		: { clientX: ev.clientX, clientY: ev.clientY, pageX: ev.pageX, pageY: ev.pageY },
 			        openDateObj,
-			        openDate: openDateObj ? GanttCommon.fmt(openDateObj) : undefined,
+			        openDate	: openDateObj ? GanttCommon.fmt(openDateObj) : undefined,
 			    };
 	
 			        		

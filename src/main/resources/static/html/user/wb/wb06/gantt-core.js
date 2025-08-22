@@ -90,21 +90,34 @@
 		const xFromDate = GC.makeXFromDate(state);
 		const today = GC.sod(new Date());
 		const cat = $track.data('cat');
+		const salesCd = $track.data('row'); // 트랙에서 현재 sales 코드 취득
 
 		laid.forEach((it) => {
 			const x0 = xFromDate(it.s);
 			const bw = Math.max(12, (GC.days(it.s, it.e) + 1) * state.pxPerDay);
 			const y = (options.stackToFirstLane === true) ? 0 : (it.lane * laneH);
 			const isExpired = it.e < today;
-			
+
+			// 동일 sales의 DO 버킷에서 같은 key의 완료 여부 확인
+			const bucket = state.rowsData?.[salesCd];
+			const hasDoneInDO = Array.isArray(bucket?.DO)
+				? bucket.DO.some(d => String(d.key) === String(it.key) && d.doneYn === 'Y')
+				: false;
+
+
+			// 조건: PLAN && 종료일 경과 && DO 완료 아님 → overdue
+			const isOverduePlan = (cat === 'PLAN' && isExpired && !hasDoneInDO);	
+				
 			const isOwn = (String(it.wbsPlanMngId || '') === String(jwt?.userId || ''));
 //			const isOwn =
 //			    (String(it.wbsPlanMngId || '') === String(jwt?.userId || '')) ||
 //			    (String(it.smrizeId     || '') === String(jwt?.userId || '')); // PM 담당자까지 포함하고 싶을 때
 
 			const cls = ['bar', `ci-${it.colorIdx}`];
-			if (isExpired) cls.push('expired');
-			if (isOwn) cls.push('own');            // ← 담당자 본인건 표시
+			if (isOverduePlan)      cls.push('overdue');
+			else if (isExpired)     cls.push('expired'); // 필요 시 유지
+			
+			if (isOwn) cls.push('own');            // 담당자 본인건 표시
 			
 			const rect = GC.makeSvgEl('rect', {
 				x: x0, y: y, width: bw, height: laneH, rx: 8, ry: 8,
@@ -124,9 +137,24 @@
 			svg.appendChild(rect); svg.appendChild(label); svg.appendChild(lh); svg.appendChild(rh);
 
 			const locked = !GC.rules.canDragOrResize(cat, it);
-			if (locked) { rect.classList.add('locked'); rect.style.cursor = 'not-allowed'; }
+			if (locked) { rect.classList.add('locked'); rect.style.cursor = 'not-allowed'; rect.style.pointerEvents = 'auto'; }
 			else { rect.classList.remove('locked'); rect.style.cursor = 'move'; }
+			// 마우스 왼쪽 클릭 시 툴팁 표시
+//			rect.addEventListener('pointerdown', (ev) => { if (ev.button !== 0) return; /* 왼쪽 버튼만 */ GC.showTip(ev.clientX, ev.clientY, GC.fmtRange(it.s, it.e, it.label, GC.days)); });
+			rect.addEventListener('pointerdown', (ev) => {
+			    if (ev.button !== 0) return; // 왼쪽 버튼만
 
+			    const text = `
+			    	<b>${it.label}</b><br>
+			    	기간: ${GC.fmt(it.s)} ~ ${GC.fmt(it.e)} (${GC.days(it.s, it.e) + 1}일)<br>
+			    	담당자: ${it.wbsPlanMngIdNm || '-'}<br>
+			    	완료여부: ${it.doneYn === 'Y' ? '완료' : '미완료'}
+			    	`;
+			    	GC.showTip(ev.clientX, ev.clientY, text);
+			});
+			// 마우스 버튼 놓으면 툴팁 숨김
+			rect.addEventListener('pointerup', (ev) => { if (ev.button !== 0) return; /* 왼쪽 버튼만 */ GC.hideTip(); });
+			
 			enableDragResize(svg, rect, label, lh, rh, it, y, laneH, state, { cat, $track, ...options, locked });
 		});
 
@@ -176,25 +204,37 @@
 				lastPointerX = pageX(ev);
 
 				dragState = {
-					mode, key: it.key, name: it.label,
-					startX: pageX(ev), origStart: it.s, origEnd: it.e,
-					widthDays: Math.max(0, GC.days(it.s, it.e)), // inclusive 계산은 pointerup에서 처리
+					mode, 
+					key				: it.key, 
+					name			: it.label,
+					startX			: pageX(ev), 
+					origStart		: it.s, 
+					origEnd			: it.e,
+					widthDays		: Math.max(0, GC.days(it.s, it.e)), // inclusive 계산은 pointerup에서 처리
 					svg, rect, label, lh, rh,
-					pointerId: ev.pointerId || 1, target: ev.target,
-					baseY, laneH, item: it,
+					pointerId		: ev.pointerId || 1, target: ev.target,
+					baseY, laneH, 
+					item			: it,
 
-				    sourceTrack: $track,
-				    sourceSalesCd: $track?.data('row'),
-				    sourceCat: cat,
-				    targetTrack: null,
-				    targetSalesCd: null,
-				    targetCat: null,
-				    options: opts
+				    sourceTrack		: $track,
+				    sourceSalesCd	: $track?.data('row'),
+				    sourceCat		: cat,
+				    targetTrack		: null,
+				    targetSalesCd	: null,
+				    targetCat		: null,
+				    options			: opts
 				};
 
 				svg.classList.add('dragging');
 				// 왼쪽 버튼 드래그에서만 툴팁
-				GC.showTip(ev.clientX, ev.clientY, GC.fmtRange(it.s, it.e, it.label, GC.days));
+//				GC.showTip(ev.clientX, ev.clientY, GC.fmtRange(it.s, it.e, it.label, GC.days));
+				const text = `
+					<b>${it.label}</b><br>
+					기간: ${GC.fmt(it.s)} ~ ${GC.fmt(it.e)} (${GC.days(it.s, it.e) + 1}일)<br>
+					담당자: ${it.wbsPlanMngIdNm || '-'}<br>
+					완료여부: ${it.doneYn === 'Y' ? '완료' : '미완료'}
+					`;
+				GC.showTip(ev.clientX, ev.clientY, text);
 
 				// 문서 레벨로 바인딩 (브라우저별 setPointerCapture 이슈 대비)
 				bindDocEvents();
