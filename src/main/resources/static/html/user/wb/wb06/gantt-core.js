@@ -104,24 +104,24 @@
 				? bucket.DO.some(d => String(d.key) === String(it.key) && d.doneYn === 'Y')
 				: false;
 
-
-			// 조건: PLAN && 종료일 경과 && DO 완료 아님 → overdue
-			const isOverduePlan = (cat === 'PLAN' && isExpired && !hasDoneInDO);	
-				
 			const isOwn = (String(it.wbsPlanMngId || '') === String(jwt?.userId || ''));
 //			const isOwn =
 //			    (String(it.wbsPlanMngId || '') === String(jwt?.userId || '')) ||
 //			    (String(it.smrizeId     || '') === String(jwt?.userId || '')); // PM 담당자까지 포함하고 싶을 때
 
 			const cls = ['bar', `ci-${it.colorIdx}`];
-			if (isOverduePlan)      cls.push('overdue');
-			else if (isExpired)     cls.push('expired'); // 필요 시 유지
+			
+			// 조건: PLAN && 시작일 경과 && DO 완료 아님 → overdue
+			const isOverduePlan = (cat === 'PLAN' && it.s < today && !hasDoneInDO);
+		    
+			if (isOverduePlan)   cls.push('overdue');
+			else if (isExpired)  cls.push('expired'); // 필요 시 유지
 			
 			if (isOwn) cls.push('own');            // 담당자 본인건 표시
 			
 			const rect = GC.makeSvgEl('rect', {
 				x: x0, y: y, width: bw, height: laneH, rx: 8, ry: 8,
-				class: cls.join(' '), 'data-key': it.key           // ← 담당자 본인건 표시
+				class: cls.join(' '), 'data-key': it.key           // 담당자 본인건 표시
 			});
 			rect.style.pointerEvents = 'auto';
 
@@ -154,6 +154,30 @@
 			});
 			// 마우스 버튼 놓으면 툴팁 숨김
 			rect.addEventListener('pointerup', (ev) => { if (ev.button !== 0) return; /* 왼쪽 버튼만 */ GC.hideTip(); });
+			// 좌측 핸들 클릭 → 툴팁 표시
+			lh.addEventListener('pointerdown', (ev) => {
+			    if (ev.button !== 0) return;
+			    const text = `
+			    	<b>${it.label} - 시작포인트</b><br>
+			    	기간: ${GC.fmt(it.s)} ~ ${GC.fmt(it.e)} (${GC.days(it.s, it.e) + 1}일)<br>
+			    	담당자: ${it.wbsPlanMngIdNm || '-'}<br>
+			    	완료여부: ${it.doneYn === 'Y' ? '완료' : '미완료'}
+			    	`;
+			    GC.showTip(ev.clientX, ev.clientY, text);
+			});
+			lh.addEventListener('pointerup', (ev) => { if (ev.button !== 0) return; GC.hideTip(); });
+			// 우측 핸들 클릭 → 툴팁 표시
+			rh.addEventListener('pointerdown', (ev) => {
+			    if (ev.button !== 0) return;
+			    const text = `
+			    	<b>${it.label} - 종료포인트</b><br>
+			    	기간: ${GC.fmt(it.s)} ~ ${GC.fmt(it.e)} (${GC.days(it.s, it.e) + 1}일)<br>
+			    	담당자: ${it.wbsPlanMngIdNm || '-'}<br>
+			    	완료여부: ${it.doneYn === 'Y' ? '완료' : '미완료'}
+			    	`;
+			    GC.showTip(ev.clientX, ev.clientY, text);
+			});
+			rh.addEventListener('pointerup', (ev) => { if (ev.button !== 0) return; GC.hideTip(); });
 			
 			enableDragResize(svg, rect, label, lh, rh, it, y, laneH, state, { cat, $track, ...options, locked });
 		});
@@ -258,6 +282,22 @@
 			if (dragState.mode === 'move') {
 				ns = dateFromX(xFromDate(dragState.origStart) + dd * state.pxPerDay);
 				ne = new Date(+ns + dragState.widthDays * GC.MS);
+
+				// 전체 이동(move) PLAN 바는 항상 소속된 PM 일정 안에서만 이동 가능
+			    if (cat === 'PLAN' && typeof getPlanBounds === 'function') {
+			        const pm = getPlanBounds(String(dragState.key || '').slice(0, 9));
+			        if (pm && pm.s && pm.e) {
+			            // 시작/끝을 PM 범위 안으로 조정
+			            if (ns < pm.s) {
+			                ns = pm.s;
+			                ne = new Date(+ns + dragState.widthDays * GC.MS);
+			            }
+			            if (ne > pm.e) {
+			                ne = pm.e;
+			                ns = new Date(+ne - dragState.widthDays * GC.MS);
+			            }
+			        }
+			    }
 			} else if (dragState.mode === 'e') {
 				ne = new Date(+dragState.origEnd + dd * GC.MS);
 				// 최소 1일 보장
