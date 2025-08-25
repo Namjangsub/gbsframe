@@ -573,7 +573,11 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
         // TODO: 삭제 API
 		if (cat =='DO') {
 			completeMh(item.label, item.expectMh).then(mh => {
-			    if (mh !== null) { console.log("입력:", mh); }
+				if (mh.status === "cancel") {
+			        console.log("사용자가 취소를 눌렀습니다.");
+			        return;
+			    }
+				console.log("입력된 공수:", String(mh.value).trim());
 
 			    const sDt = GanttCommon.parse(item.start); // Date
 			    const eDt = GanttCommon.parse(item.end);   // Date
@@ -581,7 +585,7 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 				const formData = {
 				    	rsltFileTrgtKey		: item.fileTrgtKey,
 				    	rsltRate			: 100,
-				    	rsltIntocnt			: gPasFloatChk(mh),
+				    	rsltIntocnt			: gPasFloatChk(String(mh.value).trim()),
 				    	rsltDaycnt			: days,
 				        rsltStrtDt			: item.start,
 				        rsltEndDt			: item.end,
@@ -721,13 +725,19 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 	});
 	
 	async function completeMh(label, expectMh=0.0) {
-		const val = await customPrompt(
-		        `${label} 작업에 투입된 공수를 입력하세요:`,
-		        expectMh,
-		        "해당 작업을 위해 투입된 일수"
-		    );
-		    // 확인 버튼: 문자열, 취소: null
-		    return val === null ? null : String(val).trim();
+		const result  = await customPrompt(
+	        `${label} 작업에 투입된 공수를 입력하세요:`,
+	        expectMh,
+	        "해당 작업을 위해 투입된 일수"
+	    );
+		return result;
+	    // 확인 버튼: 문자열, 취소: null
+		// result = { status: "ok" | "cancel", value: string|null }
+//		if (result.status === "cancel") {
+//			return null;  // 취소 시 null 반환
+//	    }
+//
+//	    return String(result.value).trim(); // 확인 시 입력값 문자열 반환
 	}
 	
 	function makeCoreOptions(cat, $track, rowKey, extraOpts = {}) {

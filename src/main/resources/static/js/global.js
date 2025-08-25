@@ -3068,13 +3068,13 @@ function customPrompt(message, defaultValue = '', appendMessage = '') {
         $('#custom-prompt-ok').on('click', function () {
             const value = $('#custom-prompt-input').val();
             closeCustomPrompt();
-            resolve(value);
+            resolve({ status: "ok", value: value });
         });
 
         // 취소 이벤트
         $('#custom-prompt-cancel').on('click', function () {
             closeCustomPrompt();
-            resolve(null); // 취소 시 null 반환
+            resolve({ status: "cancel", value: null }); // 취소 시 null 반환
         });
 
         // Enter/ESC 키 지원
