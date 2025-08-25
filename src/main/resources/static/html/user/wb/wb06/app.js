@@ -423,7 +423,8 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
             if (data.resultCode != 200) {
                 alert(data.resultMessage);
             } else {
-            	GanttApp.loadAndRender(); // 복구
+//            	GanttApp.loadAndRender(); // 복구
+				reloadAndRenderRow(newItem.salesCd);
             }
         });
     } catch (err) {
@@ -466,7 +467,8 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 			histYn			: "N",
 			wbsPlanCodeId	: item.key
 		}, function (result) { 
-			GanttApp.loadAndRender();
+//			GanttApp.loadAndRender();
+			reloadAndRenderRow(salesCd);
 		});
 	});
 	
@@ -500,7 +502,8 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 			histYn			: "N",
 			wbsPlanCodeId	: item.key
 		}, function (result) { 
-			GanttApp.loadAndRender();
+//			GanttApp.loadAndRender();
+			reloadAndRenderRow(salesCd);
 		});
 
 	});
@@ -942,7 +945,8 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 			        	customAlert('추가 실패입니다.  전산실 확인 바랍니다!');
 			        	return false; 
 			        }
-	                GanttApp.loadAndRender(); // 복구
+//	                GanttApp.loadAndRender(); // 복구
+					reloadAndRenderRow(item.salesCd);
 	            });
 
 	            return true; // 드롭 확정
@@ -1282,6 +1286,7 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 		return 'PLAN';
 	}
 
+	// 전체  기계의 데이터 서버에서 불러와 다시 그림
 	function loadAndRender() {
 		if (!inputValidation($('input[required]'))) return;
 		try { openProgress(true); } catch { }
@@ -1380,7 +1385,86 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 			renderAll();
 		}, false);
 	}
+	
+	// 전체 재렌더링 없이 특정 기계의 데이터만 서버에서 불러와 다시 그림
+	function renderSingleRow(salesCd) {
+	    for (const cat of GanttApp.state.categories) {
+	        const $track = $(`.row-track[data-row="${salesCd}"][data-cat="${cat}"]`);
+	        const items = GanttApp.state.rowsData?.[salesCd]?.[cat] || [];
+	        const stacked = !UNSTACKED[cat].has(salesCd);
+	        const extra = {
+	            stackToFirstLane: stacked,
+	            sortBars: true,
+	            keepLane: true,
+	            writeBackLane: !stacked
+	        };
+	        GanttCore.renderRowSVG($track, items, GanttApp.state, makeCoreOptions(cat, $track, salesCd, extra));
+	    }
+	}
 
+	// 전체 재렌더링 없이 특정 기계의 데이터만 서버에서 불러와 다시 그림
+	function reloadAndRenderRow(salesCd) {
+		const formData = {};
+		$('[data-search]').each(function () {
+			formData[$(this).data('search')] = $(this).hasClass('input_calendar')
+				? $(this).val().replace(/\-/g, '')
+				: $(this).val();
+		});
+		formData.pageNo = 1;
+		formData.recordCnt = $('#recordCnt').val();
+
+		const val = $('#multiple-checkboxes-prdtGrp').val();
+		formData.prdtGrp = val ? val.join(',') : '';
+		formData.salesCd = salesCd;
+		postAjax("/user/wb/wb26/select_wb2605_List", formData, null, function (data) {
+				const list = data.result || [];					// WBS 상세 정보
+	            if (!data || !data.result.length) {
+	                console.warn('해당 salesCd의 데이터 없음:', salesCd);
+	                return;
+	            }
+
+
+				const rowsData = Object.create(null);
+				for (const r of list) {
+					const sales = (r && r.salesCd) ? String(r.salesCd).trim() : '';
+					if (!sales) continue;
+					
+				    
+					const start = r.wbsPlansDtFm || '';
+					const end = r.wbsPlaneDtFm ? r.wbsPlaneDtFm :GanttCommon.fmt(new Date());
+					const item = {
+						key					: r.wbsPlanCodeId,
+						salesCd				: r.salesCd,
+						coCd				: r.coCd,
+						ordrsNo				: r.ordrsNo,
+						wbsPlanNo			: r.wbsPlanNo,
+						wbsPlanCodeKind		: r.wbsPlanCodeKind,
+						label				: (r.wbsPlanCodeNm || r.wbsPlanCodeId || '').toString().trim(),
+						start, end,
+						cat					: r.planType,
+						confirmYn			: r.confirmYn || 'N',  			// PM/PLAN 확정 여부 ('Y'|'N')
+						doneYn				: r.pmCloseYn || 'N',        	// DO 실적확정 ('Y'|'N')
+						overdue				: r.overDue || 'N',        		// 일정지연여부
+						progress			: r.wbsRsltsRate || 0,      	// 진척율(0~100), 선택
+						expectMh			: r.expectMh || 0,      		// 투입공수
+						fileTrgtKey			: r.fileTrgtKey || null,
+						wbsPlanMngId		: r.wbsPlanMngId || null,
+						wbsPlanMngIdNm		: r.wbsPlanMngIdNm || null,
+						smrizeId			: r.smrizeId || null,      		// 담당자, 선택
+						smrizeIdNm			: r.smrizeIdNm || null,  		// 담당자, 선택
+					};
+
+					let bucket = rowsData[sales];
+					if (!bucket) bucket = rowsData[sales] = { PM: [], PLAN: [], DO: [] };
+					bucket[item.cat].push(item);
+				}
+				GanttApp.state.rowsData[salesCd] = rowsData[salesCd];
+
+	            // 특정 트랙 다시 렌더링
+	            renderSingleRow(salesCd);
+	    });
+	}
+	
 	// UI 바인딩
 	function bindUI() {
 		$('#zoom').on('change', function () { setZoom(+this.value); });
@@ -1411,7 +1495,8 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 					salesCd,
 					histYn: "N",
 				}, function (result) { 
-					GanttApp.loadAndRender();
+//					GanttApp.loadAndRender();
+					reloadAndRenderRow(salesCd);
 				});
 				return;
 			} else {
