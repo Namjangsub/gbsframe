@@ -1668,44 +1668,35 @@
                 SELECT X.*
                      , ROWNUM AS RN
                 FROM   (
-                	WITH RST AS (
-							SELECT 
-									  W2.SALES_CD
-									, W2.CO_CD
-									, C2.ORDRS_NO
-									, W2.WBS_PLAN_NO
-									, W2.WBS_PLAN_CODE_KIND 	AS WBS_PLAN_CODE_KIND
-									, W2.WBS_PLAN_CODE_ID
-						   			, (SELECT FN_CM05M01_CD_TO_NM(W2.WBS_PLAN_CODE_ID) FROM DUAL)   	AS WBS_PLAN_CODE_NM
-									, W2.WBS_PLANS_DT
-									, W2.WBS_PLANE_DT
-									, ''						AS WBS_RSLTS_RATE
-									, W2.EXPECT_MH
-									, TRUNC(W2.WBS_PLANE_DT - W2.WBS_PLANS_DT + 1) AS CAL_DAY
-									, 'PM계획' AS PLAN_TYPE
-		                            , C2.ITEM_DIV				AS ITEM_DIV		 --ITEM 구분
-                          			, C2.MCTYPE					AS MCTYPE	 	 --기계구분
-		                            , M2.ORDRS_DIV				AS ORDRS_DIV	 --수주구분
-                          			, B1.PRDT_GRP				AS PRDT_GRP
-                          			, M2.MNG_ID					AS MNG_ID
-                          			, M2.CLNT_PJT				AS CLNT_PJT
-                          			, C2.EQP_NM					AS EQP_NM
-                          			, B2.CLNT_NM				AS CLNT_NM
-                          			, W2.FILE_TRGT_KEY			AS FILE_TRGT_KEY
-                          			, W2.WBS_PLAN_MNG_ID		AS WBS_PLAN_MNG_ID
-                          			, W2.CLOSE_YN				AS PM_CLOSE_YN
-							  FROM TB_WB22M01 W2
+                	WITH SCD AS (
+						SELECT    W2.CO_CD, C2.ORDRS_NO, W2.SALES_CD
+								, MIN(W2.WBS_PLANS_DT) 			AS WBS_PLANS_DT
+								, MAX(W2.WBS_PLANE_DT) 			AS WBS_PLANE_DT
+								, MAX(W21.FILE_TRGT_KEY)		AS FILE_TRGT_KEY
+								, MAX(W2.CLOSE_YN)				AS CONFIRM_YN		--일정 확정여부
+							    , MAX(W21.SMRIZE_ID)			AS SMRIZE_ID		--총괄PM담당자
+							    , MAX(W21.CLOSE_YN)				AS CLOSE_YN			--과제 확정여부
+						  FROM TB_WB22M01 AS W2
 							  			LEFT OUTER JOIN TB_CR02D02 AS C2 ON W2.SALES_CD = C2.SALES_CD
 							  			LEFT OUTER JOIN TB_BM01M01 AS B1 ON C2.PRDT_CD = B1.PRDT_CD
 							  			LEFT OUTER JOIN TB_CR02M01 AS M2 ON C2.ORDRS_NO = M2.ORDRS_NO
 							  			LEFT OUTER JOIN TB_BM02M01 AS B2 ON M2.ORDRS_CLNT_CD = B2.CLNT_CD
 							  			LEFT OUTER JOIN TB_CM06M01 AS C6 ON C6.ID = W2.WBS_PLAN_MNG_ID
-							 WHERE 1 = 1
-					           AND W2.CO_CD = #{coCd}
-								<if test="salesCd == null or salesCd == ''">
-					           AND M2.ORDRS_DT BETWEEN TO_DATE(#{strtDt},'YYYYMMDD') AND TO_DATE(#{endDt},'YYYYMMDD')  
-								</if>
-							   AND W2.WBS_PLAN_CODE_KIND = 'WBSCODE'
+					   			LEFT OUTER JOIN TB_WB21M01 AS W21 ON W2.CO_CD = W21.CO_CD 
+					   			                                 AND W2.SALES_CD = W21.SALES_CD 
+					   			                                 AND W21.VER_NO = (
+																			       SELECT MAX(W21_SUB.VER_NO)
+																			         FROM TB_WB21M01 W21_SUB
+																			        WHERE W21_SUB.CO_CD   = W2.CO_CD
+																			          AND W21_SUB.SALES_CD= W2.SALES_CD
+																				  )
+							  	LEFT OUTER JOIN TB_BM02M01 AS B21  ON W21.MKER_CD = B21.CLNT_CD
+						 WHERE 1 = 1
+					       AND W2.CO_CD = #{coCd}
+						   AND W2.WBS_PLAN_CODE_KIND = 'WBSCODE'
+							<if test="salesCd == null or salesCd == ''">
+				           AND M2.ORDRS_DT BETWEEN TO_DATE(#{strtDt},'YYYYMMDD') AND TO_DATE(#{endDt},'YYYYMMDD')  
+							</if>
 								<!-- SalesCode -->
 								<if test="salesCd != null and !salesCd.equals('')">
 								AND W2.SALES_CD LIKE  '%' || #{salesCd} || '%'
@@ -1747,10 +1738,73 @@
 						        AND C6.NAME like '%' || #{wbsPlanMngIdNm} || '%'
 								</if>  
 							   AND W2.WBS_PLANS_DT IS NOT NULL
+						 GROUP BY W2.CO_CD, C2.ORDRS_NO, W2.SALES_CD
+						 <if test="scdStatus == '진행중'">
+						 HAVING MIN(W2.WBS_PLANS_DT) <![CDATA[ <= ]]> SYSDATE AND SYSDATE <![CDATA[ <= ]]> MAX(W2.WBS_PLANE_DT)
+  						 </if>
+						 <if test="scdStatus == '완료된'">
+						 HAVING  SYSDATE <![CDATA[ > ]]> MAX(W2.WBS_PLANE_DT)
+  						 </if>
+						 <if test="scdStatus == '미도래'">
+						 HAVING  MIN(W2.WBS_PLANS_DT) <![CDATA[ > ]]> SYSDATE
+  						 </if>
+					), 
+					RST AS (
+							SELECT 
+									  W2.SALES_CD
+									, W2.CO_CD
+									, SCD.ORDRS_NO
+									, W2.WBS_PLAN_NO
+									, W2.WBS_PLAN_CODE_KIND 	AS WBS_PLAN_CODE_KIND
+									, W2.WBS_PLAN_CODE_ID
+						   			, (SELECT FN_CM05M01_CD_TO_NM(W2.WBS_PLAN_CODE_ID) FROM DUAL)   	AS WBS_PLAN_CODE_NM
+									, W2.WBS_PLANS_DT
+									, W2.WBS_PLANE_DT
+									, ''						AS WBS_RSLTS_RATE
+									, W2.EXPECT_MH
+									, TRUNC(W2.WBS_PLANE_DT - W2.WBS_PLANS_DT + 1) AS CAL_DAY
+									, 'PM' 						AS PLAN_TYPE
+                          			, W2.FILE_TRGT_KEY			AS FILE_TRGT_KEY
+                          			, W2.WBS_PLAN_MNG_ID		AS WBS_PLAN_MNG_ID
+                          			, C6.NAME					AS WBS_PLAN_MNG_ID_NM
+                          			, W2.CLOSE_YN				AS PM_CLOSE_YN
+						   			, SCD.CLOSE_YN				AS CLOSE_YN
+						   			, SCD.CONFIRM_YN			AS CONFIRM_YN
+						   			, CASE WHEN NVL(W22.PLAN_CNT,0)  <![CDATA[ > ]]> 0 
+						   			          THEN 'N'
+						   				      ELSE 'Y' END 		AS OVER_DUE
+							  FROM TB_WB22M01 W2
+							  			INNER JOIN SCD  ON W2.CO_CD = SCD.CO_CD AND W2.SALES_CD = SCD.SALES_CD
+							  			LEFT OUTER JOIN TB_CM06M01 AS C6 ON C6.ID = W2.WBS_PLAN_MNG_ID
+							  			LEFT OUTER JOIN ( 
+													    SELECT W22.CO_CD,
+													           W22.SALES_CD,
+													           W22.WBS_PLAN_CODE_KIND,
+													           MIN(W22.WBS_PLANS_DT)   AS WBS_PLANS_DT,
+													           MAX(W22.WBS_PLANE_DT)   AS WBS_PLANE_DT,
+													           COUNT(W22.WBS_PLAN_NO)  AS PLAN_CNT
+													    FROM   TB_WB22M01 W22
+													    WHERE  W22.WBS_PLAN_CODE_KIND != 'WBSCODE'
+													    GROUP BY W22.CO_CD, W22.SALES_CD, W22.WBS_PLAN_CODE_KIND
+													) W22
+													   ON W22.CO_CD              = W2.CO_CD
+													  AND W22.SALES_CD           = W2.SALES_CD
+													  AND W22.WBS_PLAN_CODE_KIND = W2.WBS_PLAN_CODE_ID
+							 WHERE 1 = 1
+						  	   AND W2.WBS_PLAN_CODE_KIND = 'WBSCODE'
+							   AND W2.WBS_PLANS_DT IS NOT NULL
+								<!-- 당당자 -->
+						        <if test="wbsPlanMngId != null and !wbsPlanMngId.equals('')">
+						        AND W2.WBS_PLAN_MNG_ID = #{wbsPlanMngId}
+								</if>  
+								<!-- 당당자 -->
+						        <if test="wbsPlanMngIdNm != null and !wbsPlanMngIdNm.equals('')">
+						        AND C6.NAME like '%' || #{wbsPlanMngIdNm} || '%'
+								</if>  
 						UNION ALL   
 							SELECT W2.SALES_CD
 									, W2.CO_CD
-									, C2.ORDRS_NO
+									, SCD.ORDRS_NO
 									, W2.WBS_PLAN_NO
 									, W2.WBS_PLAN_CODE_KIND 	AS WBS_PLAN_CODE_KIND
 									, W2.WBS_PLAN_CODE_ID 		AS WBS_PLAN_CODE_ID
@@ -1760,30 +1814,128 @@
 									, ''						AS WBS_RSLTS_RATE
 									, W2.EXPECT_MH				AS EXPECT_MH		--계획공수
 									, TRUNC(W2.WBS_PLANE_DT - W2.WBS_PLANS_DT + 1) AS CAL_DAY
-									, '담당계획' AS PLAN_TYPE
-		                            , C2.ITEM_DIV				AS ITEM_DIV		 --ITEM 구분
-                          			, C2.MCTYPE					AS MCTYPE	 	 --기계구분
-		                            , M2.ORDRS_DIV				AS ORDRS_DIV	 --수주구분
-                          			, B1.PRDT_GRP				AS PRDT_GRP
-                          			, M2.MNG_ID					AS MNG_ID
-                          			, M2.CLNT_PJT				AS CLNT_PJT
-                          			, C2.EQP_NM					AS EQP_NM
-                          			, B2.CLNT_NM				AS CLNT_NM
+									, 'PLAN' 					AS PLAN_TYPE
 									, W2.FILE_TRGT_KEY			AS FILE_TRGT_KEY
-									, W2.WBS_PLAN_MNG_ID		AS WBS_PLAN_MNG_ID
-									, W2.CLOSE_YN				AS PM_CLOSE_YN
+									, NVL(W2.WBS_PLAN_MNG_ID, W2.CREAT_ID)		AS WBS_PLAN_MNG_ID
+                          			, C6.NAME					AS WBS_PLAN_MNG_ID_NM
+									, W23.CLOSE_YN				AS PM_CLOSE_YN
+						   			, SCD.CLOSE_YN				AS CLOSE_YN
+						   			, SCD.CONFIRM_YN			AS CONFIRM_YN
+						   			, CASE WHEN  W2.WBS_PLANS_DT  <![CDATA[ <= ]]> SYSDATE AND NVL(W23.CLOSE_YN,'N') != 'Y'
+						   			          THEN 'Y'
+						   				      ELSE 'N' END 		AS OVER_DUE
 							  FROM TB_WB22M01 W2
+							  			INNER JOIN SCD  ON W2.CO_CD = SCD.CO_CD AND W2.SALES_CD = SCD.SALES_CD
+							  			LEFT OUTER JOIN TB_WB23M01 AS W23 ON W2.WBS_PLAN_NO = W23.WBS_RSLTS_NO
+							  			LEFT OUTER JOIN TB_CM06M01 AS C6 ON C6.ID = NVL(W2.WBS_PLAN_MNG_ID, W2.CREAT_ID)
+							 WHERE 1 = 1
+						  	   AND W2.WBS_PLAN_CODE_KIND != 'WBSCODE'
+								<!-- 당당자 -->
+						        <if test="wbsPlanMngId != null and !wbsPlanMngId.equals('')">
+						        AND W2.WBS_PLAN_MNG_ID = #{wbsPlanMngId}
+								</if>  
+								<!-- 당당자 -->
+						        <if test="wbsPlanMngIdNm != null and !wbsPlanMngIdNm.equals('')">
+						        AND C6.NAME like '%' || #{wbsPlanMngIdNm} || '%'
+								</if> 
+						UNION ALL 
+							SELECT    W2.SALES_CD
+									, W2.CO_CD
+									, SCD.ORDRS_NO
+									, W2.WBS_RSLTS_NO
+									, W2.WBS_PLAN_CODE_KIND
+									, W2.WBS_PLAN_CODE_ID
+									, W22.WBS_PLAN_CODE_NM      AS WBS_PLAN_CODE_NM
+									, W2.WBS_RSLTSS_DT			AS WBS_PLANS_DT
+									, W2.WBS_RSLTSE_DT			AS WBS_PLANE_DT
+									, W2.WBS_RSLTS_RATE			AS WBS_RSLTS_RATE
+									, W2.WBS_RSLTS_MH			AS EXPECT_MH		--계획공수
+									, TRUNC(W2.WBS_RSLTSE_DT - W2.WBS_RSLTSS_DT + 1) AS CAL_DAY
+									, 'DO' 						AS PLAN_TYPE
+									, W2.FILE_TRGT_KEY			AS FILE_TRGT_KEY
+									, NVL(W2.WBS_RSLTS_ID, W2.CREAT_ID)			AS WBS_PLAN_MNG_ID
+                          			, C6.NAME					AS WBS_PLAN_MNG_ID_NM
+									, W2.CLOSE_YN				AS PM_CLOSE_YN		--일정 확정여부
+						   			, SCD.CLOSE_YN				AS CLOSE_YN
+						   			, SCD.CONFIRM_YN			AS CONFIRM_YN
+						   			, 'N' 						AS OVER_DUE			--실적자료는 무조건 N으로 설정함
+							  FROM TB_WB23M01 W2
+							  			INNER JOIN SCD  ON W2.CO_CD = SCD.CO_CD AND W2.SALES_CD = SCD.SALES_CD
+							  			LEFT OUTER JOIN TB_WB22M01 AS W22 ON W22.WBS_PLAN_NO = W2.WBS_RSLTS_NO
+							  			LEFT OUTER JOIN TB_CM06M01 AS C6 ON C6.ID = NVL(W2.WBS_RSLTS_ID, W2.CREAT_ID)
+							 WHERE 1 = 1
+								<!-- 당당자 -->
+						        <if test="wbsPlanMngId != null and !wbsPlanMngId.equals('')">
+						        AND W2.WBS_RSLTS_ID = #{wbsPlanMngId}
+								</if>  
+								<!-- 당당자 -->
+						        <if test="wbsPlanMngIdNm != null and !wbsPlanMngIdNm.equals('')">
+						        AND C6.NAME like '%' || #{wbsPlanMngIdNm} || '%'
+								</if> 
+					) 
+					SELECT T.*
+						   ,  TO_CHAR(T.WBS_PLANS_DT, 'YYYY-MM-DD') 				AS WBS_PLANS_DT_FM
+						   ,  TO_CHAR(T.WBS_PLANE_DT, 'YYYY-MM-DD') 				AS WBS_PLANE_DT_FM
+					   FROM RST AS T
+					   WHERE 1 = 1
+					     AND EXISTS (SELECT 1 FROM SCD WHERE SCD.SALES_CD = T.SALES_CD)
+					  ORDER BY T.CO_CD, T.ORDRS_NO DESC, T.SALES_CD, T.PLAN_TYPE, 	T.WBS_PLAN_CODE_ID
+							 
+                 ) AS X
+           ) AS Z
+        WHERE  1 = 1
+<!--         AND    RN BETWEEN #{firstIndex} AND #{lastIndex} -->
+    </select>
+    
+    
+    <select id="select_wb2605_metaList" parameterType="Map" resultType="camelMap">
+        SELECT    Z.*
+        FROM   (
+                SELECT X.*
+                     , ROWNUM AS RN
+                FROM   (
+                	WITH SCD AS (
+						SELECT    W2.CO_CD, C2.ORDRS_NO, W2.SALES_CD
+								, MIN(W2.WBS_PLANS_DT) 			AS WBS_PLANS_DT
+								, MAX(W2.WBS_PLANE_DT) 			AS WBS_PLANE_DT
+								, MAX(W2.WBS_PLAN_MNG_ID) 		AS WBS_PLAN_MNG_ID
+								, MAX(C6.NAME) 					AS WBS_PLAN_MNG_ID_NM
+								
+	                            , MAX(C2.ITEM_DIV)				AS ITEM_DIV		 --ITEM 구분
+                         		, MAX(C2.MCTYPE)				AS MCTYPE	 	 --기계구분
+	                            , MAX(M2.ORDRS_DIV)				AS ORDRS_DIV	 --수주구분
+                        		, MAX(B1.PRDT_GRP)				AS PRDT_GRP
+                        		, MAX(M2.MNG_ID)				AS MNG_ID
+                        		, MAX(M2.CLNT_PJT)				AS CLNT_PJT
+                        		, MAX(C2.EQP_NM)				AS EQP_NM
+                        		, MAX(B2.CLNT_NM)				AS CLNT_NM
+								, MAX(W2.FILE_TRGT_KEY)			AS FILE_TRGT_KEY
+								, MAX(W2.CLOSE_YN)				AS PM_CLOSE_YN		--일정 확정여부
+							    , MAX(W21.MKER_CD)				AS MKER_CD
+							    , MAX(B21.CLNT_NM)				AS MKER_CD_NM
+							    , MAX(W21.SMRIZE_ID)			AS SMRIZE_ID
+							    , MAX(W21.CLOSE_YN)				AS CLOSE_YN
+						  FROM TB_WB22M01 AS W2
 							  			LEFT OUTER JOIN TB_CR02D02 AS C2 ON W2.SALES_CD = C2.SALES_CD
 							  			LEFT OUTER JOIN TB_BM01M01 AS B1 ON C2.PRDT_CD = B1.PRDT_CD
 							  			LEFT OUTER JOIN TB_CR02M01 AS M2 ON C2.ORDRS_NO = M2.ORDRS_NO
 							  			LEFT OUTER JOIN TB_BM02M01 AS B2 ON M2.ORDRS_CLNT_CD = B2.CLNT_CD
 							  			LEFT OUTER JOIN TB_CM06M01 AS C6 ON C6.ID = W2.WBS_PLAN_MNG_ID
-							 WHERE 1 = 1
-					           AND W2.CO_CD = #{coCd}
-								<if test="salesCd == null or salesCd == ''">
-					           AND M2.ORDRS_DT BETWEEN TO_DATE(#{strtDt},'YYYYMMDD') AND TO_DATE(#{endDt},'YYYYMMDD')  
-								</if>
-							   AND W2.WBS_PLAN_CODE_KIND != 'WBSCODE'
+					   			LEFT OUTER JOIN TB_WB21M01 AS W21 ON W2.CO_CD = W21.CO_CD 
+					   			                                 AND W2.SALES_CD = W21.SALES_CD 
+					   			                                 AND W21.VER_NO = (
+																			       SELECT MAX(W21_SUB.VER_NO)
+																			         FROM TB_WB21M01 W21_SUB
+																			        WHERE W21_SUB.CO_CD   = W2.CO_CD
+																			          AND W21_SUB.SALES_CD= W2.SALES_CD
+																				  )
+							  	LEFT OUTER JOIN TB_BM02M01 AS B21  ON W21.MKER_CD = B21.CLNT_CD
+						 WHERE 1 = 1
+					       AND W2.CO_CD = #{coCd}
+						   AND W2.WBS_PLAN_CODE_KIND = 'WBSCODE'
+							<if test="salesCd == null or salesCd == ''">
+				           AND M2.ORDRS_DT BETWEEN TO_DATE(#{strtDt},'YYYYMMDD') AND TO_DATE(#{endDt},'YYYYMMDD')  
+							</if>
 								<!-- SalesCode -->
 								<if test="salesCd != null and !salesCd.equals('')">
 								AND W2.SALES_CD LIKE  '%' || #{salesCd} || '%'
@@ -1823,140 +1975,44 @@
 								<!-- 당당자 -->
 						        <if test="wbsPlanMngIdNm != null and !wbsPlanMngIdNm.equals('')">
 						        AND C6.NAME like '%' || #{wbsPlanMngIdNm} || '%'
-								</if> 
-						UNION ALL 
-							SELECT    W2.SALES_CD
-									, W2.CO_CD
-									, C2.ORDRS_NO
-									, W2.WBS_RSLTS_NO
-									, W2.WBS_PLAN_CODE_KIND
-									, W2.WBS_PLAN_CODE_ID
-									, W22.WBS_PLAN_CODE_NM      AS WBS_PLAN_CODE_NM
-									, W2.WBS_RSLTSS_DT			AS WBS_PLANS_DT
-									, W2.WBS_RSLTSE_DT			AS WBS_PLANE_DT
-									, W2.WBS_RSLTS_RATE			AS WBS_RSLTS_RATE
-									, W2.WBS_RSLTS_MH			AS EXPECT_MH		--계획공수
-					--				, SUM(W2.DAYCNT)				AS DAYCNT			--소요일수
-									, TRUNC(W2.WBS_RSLTSE_DT - W2.WBS_RSLTSS_DT + 1) AS CAL_DAY
-									, '담당실적' 					AS PLAN_TYPE
-		                            , C2.ITEM_DIV				AS ITEM_DIV		 --ITEM 구분
-                          			, C2.MCTYPE					AS MCTYPE	 	 --기계구분
-		                            , M2.ORDRS_DIV				AS ORDRS_DIV	 --수주구분
-                          			, B1.PRDT_GRP				AS PRDT_GRP
-                          			, M2.MNG_ID						AS MNG_ID
-                          			, M2.CLNT_PJT				AS CLNT_PJT
-                          			, C2.EQP_NM					AS EQP_NM
-                          			, B2.CLNT_NM				AS CLNT_NM
-									, W2.FILE_TRGT_KEY			AS FILE_TRGT_KEY
-									, W2.WBS_RSLTS_ID			AS WBS_PLAN_MNG_ID
-									, W2.CLOSE_YN				AS PM_CLOSE_YN		--일정 확정여부
-							  FROM TB_WB23M01 W2
-							  			LEFT OUTER JOIN TB_CR02D02 AS C2 ON W2.SALES_CD = C2.SALES_CD
-							  			LEFT OUTER JOIN TB_BM01M01 AS B1 ON C2.PRDT_CD = B1.PRDT_CD
-							  			LEFT OUTER JOIN TB_CR02M01 AS M2 ON C2.ORDRS_NO = M2.ORDRS_NO
-							  			LEFT OUTER JOIN TB_BM02M01 AS B2 ON M2.ORDRS_CLNT_CD = B2.CLNT_CD
-							  			LEFT OUTER JOIN TB_WB22M01 AS W22 ON W22.WBS_PLAN_NO = W2.WBS_RSLTS_NO
-							  			LEFT OUTER JOIN TB_CM06M01 AS C6 ON C6.ID = W2.WBS_RSLTS_ID
-							 WHERE 1 = 1
-					           AND W2.CO_CD = #{coCd}
-								<if test="salesCd == null or salesCd == ''">
-					           AND M2.ORDRS_DT BETWEEN TO_DATE(#{strtDt},'YYYYMMDD') AND TO_DATE(#{endDt},'YYYYMMDD')  
-								</if>
-								<!-- SalesCode -->
-								<if test="salesCd != null and !salesCd.equals('')">
-								AND W2.SALES_CD LIKE  '%' || #{salesCd} || '%'
-								</if>
-								<!-- 기계종류 -->
-						        <if test="prdtGrp != null and !prdtGrp.equals('')">
-						        AND B1.PRDT_GRP IN ( ${prdtGrp} )
-								</if>
-								<!-- 수주구분 -->
-						        <if test="ordrsDiv != null and !ordrsDiv.equals('')">
-						        AND M2.ORDRS_DIV = #{ordrsDiv}
-								</if>
-								<!-- 아이템구분 -->
-						        <if test="itemDiv != null and !itemDiv.equals('')">
-						        AND C2.ITEM_DIV = #{itemDiv}
-								</if>
-								<!-- 기계구분 -->
-						        <if test="mctype != null and !mctype.equals('')">
-						        AND C2.MCTYPE = #{mctype}
-								</if>
-								<!-- 고객사PJT -->
-						        <if test="clntPjt != null and !clntPjt.equals('')">
-						        AND M2.CLNT_PJT = #{clntPjt}
-								</if> 
-								<!-- 고객사 -->
-						        <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
-						        AND M2.ORDRS_CLNT_CD = #{ordrsClntCd}
 								</if>  
-								<!-- 고객사 -->
-						        <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
-						        AND B2.CLNT_NM like '%' || #{ordrsClntNm} || '%'
-								</if>  
-								<!-- 당당자 -->
-						        <if test="wbsPlanMngId != null and !wbsPlanMngId.equals('')">
-						        AND W2.WBS_RSLTS_ID = #{wbsPlanMngId}
-								</if>  
-								<!-- 당당자 -->
-						        <if test="wbsPlanMngIdNm != null and !wbsPlanMngIdNm.equals('')">
-						        AND C6.NAME like '%' || #{wbsPlanMngIdNm} || '%'
-								</if> 
-					) 
-					 , SCD AS (
-						SELECT    CO_CD, SALES_CD
-								, MIN(WBS_PLANS_DT) AS WBS_PLANS_DT
-								, MAX(WBS_PLANE_DT) AS WBS_PLANE_DT
-						  FROM RST AS T
-						 WHERE PLAN_TYPE = 'PM계획'
-						 GROUP BY CO_CD, SALES_CD
+							   AND W2.WBS_PLANS_DT IS NOT NULL
+						 GROUP BY W2.CO_CD, C2.ORDRS_NO, W2.SALES_CD
 						 <if test="scdStatus == '진행중'">
-						 HAVING MIN(WBS_PLANS_DT) <![CDATA[ <= ]]> SYSDATE AND SYSDATE <![CDATA[ <= ]]> MAX(WBS_PLANE_DT)
+						 HAVING MIN(W2.WBS_PLANS_DT) <![CDATA[ <= ]]> SYSDATE AND SYSDATE <![CDATA[ <= ]]> MAX(W2.WBS_PLANE_DT)
   						 </if>
 						 <if test="scdStatus == '완료된'">
-						 HAVING  SYSDATE <![CDATA[ > ]]> MAX(WBS_PLANE_DT)
+						 HAVING  SYSDATE <![CDATA[ > ]]> MAX(W2.WBS_PLANE_DT)
   						 </if>
 						 <if test="scdStatus == '미도래'">
-						 HAVING  MIN(WBS_PLANS_DT) <![CDATA[ > ]]> SYSDATE
+						 HAVING  MIN(W2.WBS_PLANS_DT) <![CDATA[ > ]]> SYSDATE
   						 </if>
 					)
-					SELECT T.*
-						   ,  TO_CHAR(T.WBS_PLANS_DT, 'YYYY-MM-DD') 				AS WBS_PLANS_DT_FM
-						   ,  TO_CHAR(T.WBS_PLANE_DT, 'YYYY-MM-DD') 				AS WBS_PLANE_DT_FM
-						   , (SELECT FN_CM05M01_CD_TO_NM(T.PRDT_GRP) FROM DUAL) 	AS 기계종류
-						   , (SELECT FN_CM05M01_CD_TO_NM(T.ORDRS_DIV) FROM DUAL) 	AS 수주구분
-						   , (SELECT FN_CM05M01_CD_TO_NM(T.ITEM_DIV) FROM DUAL) 	AS 아이템구분
-						   , (SELECT FN_CM05M01_CD_TO_NM(T.MCTYPE) FROM DUAL)   	AS 기계구분
-						   , (SELECT FN_CM05M01_CD_TO_NM(T.CLNT_PJT) FROM DUAL)   	AS CLNT_PJT_NM
-						   , (SELECT FN_CM06M01_ID_TO_NM(T.MNG_ID) FROM DUAL)   	AS MNG_ID_NM
-						   , FN_CM06M01_ID_TO_NM(T.WBS_PLAN_MNG_ID)					AS WBS_PLAN_MNG_ID_NM
-						   , W21.MKER_CD											AS MKER_CD
-						   , B2.CLNT_NM												AS MKER_CD_NM
-						   , W21.SMRIZE_ID											AS SMRIZE_ID
-						   , FN_CM06M01_ID_TO_NM(W21.SMRIZE_ID)						AS SMRIZE_ID_NM
-						   , W21.CLOSE_YN											AS CLOSE_YN
-					   FROM RST AS T
-					   			LEFT OUTER JOIN TB_WB21M01 AS W21 ON T.CO_CD = W21.CO_CD 
-					   			                                 AND T.SALES_CD = W21.SALES_CD 
-					   			                                 AND W21.VER_NO = (
-																			       SELECT MAX(W21_SUB.VER_NO)
-																			         FROM TB_WB21M01 W21_SUB
-																			        WHERE W21_SUB.CO_CD   = T.CO_CD
-																			          AND W21_SUB.SALES_CD= T.SALES_CD
-																				  )
-							  	LEFT OUTER JOIN TB_BM02M01 AS B2  ON W21.MKER_CD = B2.CLNT_CD
+					SELECT    T.SALES_CD
+							, T.CO_CD
+							, T.ORDRS_NO
+							, T.WBS_PLAN_MNG_ID
+							, T.WBS_PLAN_MNG_ID_NM
+							, T.CLNT_NM
+							, T.EQP_NM
+							, T.PM_CLOSE_YN
+						    , (SELECT FN_CM05M01_CD_TO_NM(T.PRDT_GRP) FROM DUAL) 	AS 기계종류
+						    , (SELECT FN_CM05M01_CD_TO_NM(T.ORDRS_DIV) FROM DUAL) 	AS 수주구분
+						    , (SELECT FN_CM05M01_CD_TO_NM(T.ITEM_DIV) FROM DUAL) 	AS 아이템구분
+						    , (SELECT FN_CM05M01_CD_TO_NM(T.MCTYPE) FROM DUAL)   	AS 기계구분
+						    , (SELECT FN_CM05M01_CD_TO_NM(T.CLNT_PJT) FROM DUAL)   	AS CLNT_PJT_NM
+						    , (SELECT FN_CM06M01_ID_TO_NM(T.MNG_ID) FROM DUAL)   	AS MNG_ID_NM
+						    , FN_CM06M01_ID_TO_NM(T.SMRIZE_ID)						AS SMRIZE_ID_NM
+						    , T.SMRIZE_ID											AS SMRIZE_ID
+						    , T.CLOSE_YN											AS CLOSE_YN
+					   FROM SCD AS T
 					   WHERE 1 = 1
-					     AND EXISTS (SELECT 1 FROM SCD WHERE SCD.SALES_CD = T.SALES_CD)
-					  ORDER BY T.CO_CD, T.PRDT_GRP, T.ORDRS_NO DESC, T.SALES_CD, T.PLAN_TYPE, 	T.WBS_PLAN_CODE_ID
+					  ORDER BY T.CO_CD, T.PRDT_GRP, T.ORDRS_NO DESC, T.SALES_CD
 							 
                  ) AS X
            ) AS Z
         WHERE  1 = 1
 <!--         AND    RN BETWEEN #{firstIndex} AND #{lastIndex} -->
-    </select>
-    
-    
-    <select id="select_wb2605_metaList" parameterType="Map" resultType="camelMap">
     </select>
     
     

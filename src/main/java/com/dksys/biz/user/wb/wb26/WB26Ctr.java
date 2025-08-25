@@ -145,8 +145,14 @@ public class WB26Ctr {
 	public String select_wb2605_List(@RequestBody Map<String, String> paramMap, ModelMap model) {
 
 		paramMap.put("prdtGrp", ObjectUtil.sqlInCodeGen(paramMap.get("prdtGrp")));
-		
+		long start = System.currentTimeMillis();
+		List<Map<String, String>> resultMetaList = wb26svc.select_wb2605_metaList(paramMap);
+		model.addAttribute("resultMetaList", resultMetaList);
+		long end = System.currentTimeMillis();
 		List<Map<String, String>> result = wb26svc.select_wb2605_List(paramMap);
+		long end2 = System.currentTimeMillis();
+		System.out.println("실행 시간(ms)1: " + (end - start));
+		System.out.println("실행 시간(ms)2: " + (end2 - end));
 		model.addAttribute("result", result);
 		return "jsonView";
 	}

@@ -114,9 +114,10 @@
 			const cls = ['bar', `ci-${it.colorIdx}`];
 			
 			// 조건: PLAN && 시작일 경과 && DO 완료 아님 → overdue
-			const isOverduePlan = (cat === 'PLAN' && it.s < today && !hasDoneInDO);
+//			const isOverduePlan = (cat === 'PLAN' && it.s < today && !hasDoneInDO);
+			const isOverduePlan = (it.overdue == 'Y');
 		    
-			if (isOverduePlan)   cls.push('overdue');
+			if (isOverduePlan)      cls.push('overdue');
 			else if (isExpired)     cls.push('expired'); // 필요 시 유지
 			
 			if (isOwn) cls.push('own');            // 담당자 본인건 표시

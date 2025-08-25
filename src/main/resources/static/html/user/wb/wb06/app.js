@@ -1162,7 +1162,7 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 		const leftRailW = labelW + gapW + badgeW;
 
 		state.rowDefs.forEach(row => {
-			const $group = $('<div class="row-group"></div>)');
+			const $group = $('<div class="row-group"></div>');
 			$('<div class="group-label"></div>')
 				.html(
 					'<span style="color:white;">' + row.label + '</span>' +
@@ -1239,14 +1239,14 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 		document.documentElement.style.setProperty('--bar-font-size', clamp(12 * ratio) + 'px');
 	}
 
-	function setZoom(px) {
+	function setZoom(px, renderCall=true) {
 		try { openProgress(true); } catch { }
 		px = Math.max(2, Math.min(64, px | 0));
 		state.pxPerDay = px;
 		document.documentElement.style.setProperty('--px-per-day', px + 'px');
 		$('#zoom').val(px); $('#zoomVal').text(px);
 		updateFontSizes(px);
-		renderAll();
+		if (renderCall) renderAll();	//초기 설정시에 실행 제외
 	}
 
 	function renderAll() {
@@ -1298,7 +1298,8 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 		formData.prdtGrp = val ? val.join(',') : '';
 
 		postAjax("/user/wb/wb26/select_wb2605_List", formData, null, function (data) {
-			const list = data.result || [];
+			const list = data.result || [];					// WBS 상세 정보
+			const metaList = data.resultMetaList || [];		// SalesCd Meta 정보
 			const today = new Date();
 			const pad = n => (n < 10 ? '0' + n : '' + n);
 			const todayStr = today.getFullYear() + '-' + pad(today.getMonth() + 1) + '-' + pad(today.getDate());
@@ -1306,35 +1307,38 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 
 			const rowsData = Object.create(null);
 			const metaMap = new Map();
-			let minDate = null, maxDate = null;
+			let minDate = null, maxDate = $(endDt_S).val();
 
-
-			for (const r of list) {
+			for (const r of metaList) {
 				const sales = (r && r.salesCd) ? String(r.salesCd).trim() : '';
 				if (!sales) continue;
 
 				if (!metaMap.has(sales)) {
-					if (r.planType =='PM계획') {
-						metaMap.set(sales, {
-							label		: sales, key: sales,
-							pmCloseYn	: (r.pmCloseYn === 'Y') ? 'Y' : 'N',			//PM일정 확정여부
-							closeYn		: (r.closeYn   === 'Y') ? 'Y' : 'N',			//과제 확정여부
-							기계종류		: (r['기계종류'] || '').toString().trim(),
-							mngIdNm		: (r.smrizeIdNm || '').toString().trim(),
-							eqpNm		: (r.eqpNm || '').toString().trim().slice(0, 20),
-							수주구분		: (r['수주구분'] || '').toString().trim(),
-							아이템구분		: (r['아이템구분'] || '').toString().trim(),
-							기계구분		: (r['기계구분'] || '').toString().trim(),
-							clntPjtNm	: (r['clntPjtNm'] || '').toString().trim(),
-							clntNm		: (r['clntNm'] || '').toString().trim(),
-							외주업체		: (r.mkerCdNm || '').toString().trim()
-						});
-					}
+					metaMap.set(sales, {
+						label		: sales, 
+						key			: sales,
+						pmCloseYn	: (r.pmCloseYn === 'Y') ? 'Y' : 'N',			//PM일정 확정여부
+						closeYn		: (r.closeYn   === 'Y') ? 'Y' : 'N',			//과제 확정여부
+						기계종류		: (r['기계종류'] || '').toString().trim(),
+						mngIdNm		: (r.smrizeIdNm || '').toString().trim(),
+						eqpNm		: (r.eqpNm || '').toString().trim().slice(0, 20),
+						수주구분		: (r['수주구분'] || '').toString().trim(),
+						아이템구분		: (r['아이템구분'] || '').toString().trim(),
+						기계구분		: (r['기계구분'] || '').toString().trim(),
+						clntPjtNm	: (r['clntPjtNm'] || '').toString().trim(),
+						clntNm		: (r['clntNm'] || '').toString().trim(),
+						외주업체		: (r.mkerCdNm || '').toString().trim()
+					});
 				}
-				// ★ meta에서 pmCloseYn('Y'/'N')을 가져와 confirmYn에 적용
-			    const meta = metaMap.get(sales);
-			    const confirmYnFromMeta = meta?.pmCloseYn ?? 'N';  // meta 없으면 'N' 기본
-			    
+			}
+
+			state.rowDefs = Array.from(metaMap.values());
+			
+			
+			for (const r of list) {
+				const sales = (r && r.salesCd) ? String(r.salesCd).trim() : '';
+				if (!sales) continue;
+				
 			    
 				const start = r.wbsPlansDtFm || '';
 				const end = r.wbsPlaneDtFm ? r.wbsPlaneDtFm :GanttCommon.fmt(new Date());
@@ -1347,9 +1351,10 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 					wbsPlanCodeKind		: r.wbsPlanCodeKind,
 					label				: (r.wbsPlanCodeNm || r.wbsPlanCodeId || '').toString().trim(),
 					start, end,
-					cat					: catFrom(r.planType),
-					confirmYn			: confirmYnFromMeta,  			// PM/PLAN 확정 여부 ('Y'|'N')
+					cat					: r.planType,
+					confirmYn			: r.confirmYn || 'N',  			// PM/PLAN 확정 여부 ('Y'|'N')
 					doneYn				: r.pmCloseYn || 'N',        	// DO 실적확정 ('Y'|'N')
+					overdue				: r.overDue || 'N',        		// 일정지연여부
 					progress			: r.wbsRsltsRate || 0,      	// 진척율(0~100), 선택
 					expectMh			: r.expectMh || 0,      		// 투입공수
 					fileTrgtKey			: r.fileTrgtKey || null,
@@ -1367,7 +1372,6 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 				if (end) { if (!minDate || end < minDate) minDate = end; if (!maxDate || end > maxDate) maxDate = end; }
 			}
 
-			state.rowDefs = Array.from(metaMap.values());
 			const toDate = s => s ? new Date(s + 'T00:00:00') : null;
 			state.viewStart = toDate(minDate || todayStr) || new Date();
 			state.viewEnd = toDate((maxDate && endDtS && endDtS > maxDate) ? endDtS : (maxDate || todayStr)) || new Date();
@@ -1380,13 +1384,10 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 	// UI 바인딩
 	function bindUI() {
 		$('#zoom').on('change', function () { setZoom(+this.value); });
-		$('#timeline').on('wheel', function (e) {
-			if (e.ctrlKey) { e.preventDefault(); setZoom(state.pxPerDay + (e.originalEvent.deltaY > 0 ? -2 : 2)); }
-		});
+		$('#zoom').on('input', function () { const val = $(this).val(); $('#zoomVal').text(val);});
+		$('#timeline').on('wheel', function (e) { if (e.ctrlKey) { e.preventDefault(); setZoom(state.pxPerDay + (e.originalEvent.deltaY > 0 ? -2 : 2)); } });
 
-		$('[data-search]').on("change", function () { loadAndRender(); });
-		$('#multiple-checkboxes-prdtGrp').multiselect({ includeSelectAllOption: true })
-			.on('change', function () { loadAndRender(); });
+		$('#multiple-checkboxes-prdtGrp').multiselect({ includeSelectAllOption: true }).on('change', function () { loadAndRender(); });
 
 		$(document).on('contextmenu', '.bar', function (ev) {
 		    ev.preventDefault();
@@ -1470,20 +1471,11 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 		};
 	}
 
-
-//	function hideContextMenu() {
-//		const $menu = $("#barContextMenu");
-//		$menu.hide().removeData("payload");
-//		$(document).off(".ctx");
-//		$(window).off(".ctx");
-//	}
-//	
-
 	// 페이지 로드시
 	$(function () {
-		bindUI();
-		root.GanttApp.setZoom(state.pxPerDay);
+		root.GanttApp.setZoom(state.pxPerDay, false);
 		loadAndRender();
+		bindUI();
 	});
 	
 
