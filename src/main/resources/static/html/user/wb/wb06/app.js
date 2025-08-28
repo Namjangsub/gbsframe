@@ -424,7 +424,7 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
                 alert(data.resultMessage);
             } else {
 //            	GanttApp.loadAndRender(); // 복구
-				reloadAndRenderRow(newItem.salesCd);
+            	GanttApp.reloadAndRenderRow(newItem.salesCd);
             }
         });
     } catch (err) {
@@ -468,7 +468,7 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 			wbsPlanCodeId	: item.key
 		}, function (result) { 
 //			GanttApp.loadAndRender();
-			reloadAndRenderRow(salesCd);
+			GanttApp.reloadAndRenderRow(salesCd);
 		});
 	});
 	
@@ -503,7 +503,7 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 			wbsPlanCodeId	: item.key
 		}, function (result) { 
 //			GanttApp.loadAndRender();
-			reloadAndRenderRow(salesCd);
+			GanttApp.reloadAndRenderRow(salesCd);
 		});
 
 	});
@@ -956,7 +956,7 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 			        	return false; 
 			        }
 //	                GanttApp.loadAndRender(); // 복구
-					reloadAndRenderRow(item.salesCd);
+			        GanttApp.reloadAndRenderRow(item.salesCd);
 	            });
 
 	            return true; // 드롭 확정
@@ -1578,7 +1578,8 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 	// 공개 API
 	root.GanttApp = {
 		state, renderAll, loadAndRender, setZoom,
-		_makeCoreOptions: makeCoreOptions
+		_makeCoreOptions: makeCoreOptions,
+		reloadAndRenderRow
 	};
 	
 
