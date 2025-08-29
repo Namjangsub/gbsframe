@@ -1336,7 +1336,7 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 						closeYn		: (r.closeYn   === 'Y') ? 'Y' : 'N',			//과제 확정여부
 						기계종류		: (r['기계종류'] || '').toString().trim(),
 						mngIdNm		: (r.smrizeIdNm || '').toString().trim(),
-						eqpNm		: (r.eqpNm || '').toString().trim().slice(0, 20),
+						eqpNm		: (r.eqpNm || '').toString().trim().slice(0, 24),
 						수주구분		: (r['수주구분'] || '').toString().trim(),
 						아이템구분		: (r['아이템구분'] || '').toString().trim(),
 						기계구분		: (r['기계구분'] || '').toString().trim(),

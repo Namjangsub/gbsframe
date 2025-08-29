@@ -176,14 +176,12 @@
 	    const end   = GC.fmt(e || it.e);
 	    const days  = GC.days(s || it.s, e || it.e) + 1;
 	    const manager = it.wbsPlanMngIdNm || '-';
-	    const done = it.doneYn === 'Y' ? '완료' : '미완료';
+	    const status = (it.cat === 'DO') ? `<br>완료여부: ${it.doneYn === 'Y' ? '완료' : '미완료'}, 진척율 : ${it.progress}, 공수: ${it.expectMh}` : '';
 
 	    return `
 	        <b>${it.label}</b><br>
 		       기간: ${start} ~ ${end} (${days}일)<br>
-		       담당자: ${manager}<br
-			투입공수: ${it.expectMh}<br>
-	        완료여부: ${done}, 진척율 : ${it.progress}
+		       담당자: ${manager}${status}
 	    `;
 	}
 	
@@ -244,12 +242,13 @@
 				svg.classList.add('dragging');
 				// 왼쪽 버튼 드래그에서만 툴팁
 //				GC.showTip(ev.clientX, ev.clientY, GC.fmtRange(it.s, it.e, it.label, GC.days));
+
+			    const status = (it.cat === 'DO') ? `<br>완료여부: ${it.doneYn === 'Y' ? '완료' : '미완료'}, 진척율 : ${it.progress}, 공수: ${it.expectMh}` : '';
+
 				const text = `
 					<b>${it.label}</b><br>
 					기간: ${GC.fmt(it.s)} ~ ${GC.fmt(it.e)} (${GC.days(it.s, it.e) + 1}일)<br>
-					담당자: ${it.wbsPlanMngIdNm || '-'}<br>
-					투입공수: ${it.expectMh}<br>
-					완료여부: ${it.doneYn === 'Y' ? '완료' : '미완료'}, 진척율 : ${it.progress}
+					담당자: ${it.wbsPlanMngIdNm || '-'}${status}
 					`;
 				GC.showTip(ev.clientX, ev.clientY, text);
 
