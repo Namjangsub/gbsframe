@@ -1255,7 +1255,7 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 
 	function setZoom(px, renderCall=true) {
 		try { openProgress(true); } catch { }
-		px = Math.max(2, Math.min(64, px | 0));
+		px = Math.max(2, Math.min(26, px | 0));
 		state.pxPerDay = px;
 		document.documentElement.style.setProperty('--px-per-day', px + 'px');
 		$('#zoom').val(px); $('#zoomVal').text(px);

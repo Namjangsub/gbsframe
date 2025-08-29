@@ -180,9 +180,10 @@
 
 	    return `
 	        <b>${it.label}</b><br>
-	        기간: ${start} ~ ${end} (${days}일)<br>
-	        담당자: ${manager}<br>
-	        완료여부: ${done}
+		       기간: ${start} ~ ${end} (${days}일)<br>
+		       담당자: ${manager}<br
+			투입공수: ${it.expectMh}<br>
+	        완료여부: ${done}, 진척율 : ${it.progress}
 	    `;
 	}
 	
@@ -247,7 +248,8 @@
 					<b>${it.label}</b><br>
 					기간: ${GC.fmt(it.s)} ~ ${GC.fmt(it.e)} (${GC.days(it.s, it.e) + 1}일)<br>
 					담당자: ${it.wbsPlanMngIdNm || '-'}<br>
-					완료여부: ${it.doneYn === 'Y' ? '완료' : '미완료'}
+					투입공수: ${it.expectMh}<br>
+					완료여부: ${it.doneYn === 'Y' ? '완료' : '미완료'}, 진척율 : ${it.progress}
 					`;
 				GC.showTip(ev.clientX, ev.clientY, text);
 
