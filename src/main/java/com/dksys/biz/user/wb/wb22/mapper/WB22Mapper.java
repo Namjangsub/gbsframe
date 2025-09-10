@@ -139,4 +139,7 @@ public interface WB22Mapper {
 	int wbsRsltsGantDelete(Map<String, String> paramMap);
 
 	int wbsRsltsGantDeleteChk(Map<String, String> paramMap);
+
+	// Task(level2) 저장시 check
+	int wbsLevel2InsertChk(Map<String, String> paramMap);
 }

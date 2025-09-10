@@ -143,6 +143,12 @@ public class WB22SvcImpl implements WB22Svc {
 
 		int result = 0;
 
+		// Task 계획 저장시 해당 과제가 확정(Y)이면서 Task등록하는 일정이있어야하며 확정 Check
+		int wbsLevel2InsertChk = wb22Mapper.wbsLevel2InsertChk(paramMap);
+		if (wbsLevel2InsertChk == 0) {
+			return 0;
+		}
+
 		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {
 		}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);

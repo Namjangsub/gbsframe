@@ -304,9 +304,9 @@
 							}
 							deleteRowArr = [];
 							addRowArr = [];
-
+							
 							wbsPlanCodeKind = this.item.wbsPlanCodeId;
-
+							
 							// Validation 체크 총괄PM이 아니면 자기담당인TASK만 조회가능
 							var smrizeId = $('#smrizeId').val();
 							var row = gridView1.target.getList("selected")[0];
@@ -549,6 +549,7 @@
 									$("#popForm #btn4").hide();
 									$("#popForm #btn3").show();
 									$("#popForm #btn1").hide();
+									$("#popForm #addrow2").hide();	// 일정미확정일경우 Task 버튼영역 숨김
 								}
 								$("#popForm #wbsPlancloseYn").val(val2);
 								var color2 = val2 == "Y" ? "color-circle_02.png" : "color-circle_01.png";
@@ -1194,11 +1195,17 @@
 
 		var formData = new FormData();
 		var actionType = null;
+		if (wbsPlanCodeKind == '' || wbsPlanCodeKind == undefined) {
+			var row = gridView1.target.getList("selected")[0]
+			wbsPlanCodeKind = row.wbsPlanCodeId
+		}
 
 		formData.append("coCd", $('#coCd').val());
 		formData.append("year", $('#beginDt').val().substring(0,4));
 		formData.append("wbsPlanCodeKind", wbsPlanCodeKind);
 		formData.append("salesCd", salesCd);
+		formData.append("sjVerNo", $('#verNo').val());		//과제버전
+		formData.append("verNo", $('#wbsPlanVerNo').val());	//일정버전
 		actionType = "C";
 		if(rowList.length > 0) {
 			var rowListArr = [];
@@ -1217,6 +1224,7 @@
 					wbsPlanStsCodeId = elem.wbsPlanStsCodeId;
 				}
 				rowListObj["wbsPlanStsCodeId"] = wbsPlanStsCodeId;
+				rowListObj["wbsPlanMngId"] = jwt.userId;
 				rowListObj["creatId"] = jwt.userId;
 				rowListObj["creatPgm"] = "WB2201M01";
 				rowListArr.push(rowListObj);
@@ -1226,13 +1234,14 @@
 
 		formData.append("deleteRowArr", JSON.stringify(deleteRowArr));
 		filePostAjax("/user/wb/wb22/wbsLevel2Insert", formData, function(data) {
-// 					alert(data.resultMessage);
-					if (data.resultCode == 200) {
-						gridView2.setData(0);
-						deleteRowArr.length = 0;
-						addRowArr.length = 0;
-					}
-					gridView1.setData(0);
+				if (data.resultCode !=200) {
+					customAlert(data.resultMessage);
+					$("#popForm #addrow2").hide();
+				}
+				deleteRowArr.length = 0;
+				addRowArr.length = 0;
+				gridView1.setData(0);
+				gridView2.setData(0);
 		});
 	}
 
@@ -1375,79 +1384,85 @@
 			//  }
 		}
 
-		if(confirm("기존 데이터를 버전 변경 하시겠습니까?")){
+		// 버전업 클릭시 버전업 사유 입력받고 진행
+		verUpReason($('#wbsPlanVerNo').val(), '').then(function(reason) {
+			if (!reason || reason.status !== 'ok') {
+				return false; // alert 없음
+			}
 
-			// 버전업 클릭시 버전업 사유 입력받고 진행
-			verUpReason($('#wbsPlanVerNo').val(), '').then(function(reason) {
-				const verUpReasonValue = (reason && reason.status === 'ok') ? String(reason.value || '').trim() : null;
+			// 버전업 사유 Validation 체크
+			const verUpReasonValue = String(reason.value || '').trim();
+			if (!verUpReasonValue) {
+				customAlert('Ver.Up 사유를 입력하세요.');
+				return false;
+			}
 
-				var formData = new FormData();
-				formData.append("coCd", coCd);
-				formData.append("salesCd", salesCd);
-				formData.append("verNo", row.verNo);
-				if (verUpReasonValue !== null) {
-					formData.append("verUpReason", verUpReasonValue);
-				}
+			var formData = new FormData();
+			formData.append("coCd", coCd);
+			formData.append("salesCd", salesCd);
+			formData.append("verNo", row.verNo);
+			formData.append("verUpReason", verUpReasonValue);
 
-				var strYear = new Date().toISOString().substring(2, 4);
-				var planData = {
-					"coCd" : coCd,
-					"salesCd" : salesCd
-				};
-				postAjaxSync("/user/wb/wb22/selectVerNoNext", planData, null, function(data){
-					formData.append("newVerNo", data.result[0].verNo);
-				});
-
-				var rowList = gridView1.target.getList();
-				var rowListArr = [];
-				$.each(rowList, function(idx, elem){
-					var row = gridView1.target.getList()[idx];
-					var rowListObj = elem;
-					if (elem.fileTrgtKey != undefined) {
-						rowListObj["coCd"] = elem.coCd;
-						rowListObj["fileTrgtKey"] = elem.fileTrgtKey;
-						rowListObj["wbsPlanNo"] = elem.wbsPlanNo;
-						rowListObj["wbsPlanCodeId"] = elem.wbsPlanCodeId;
-						rowListObj["salesCd"] = elem.salesCd;
-						rowListObj["verNo"] = elem.verNo;
-						if (elem.wbsPlanCodeNm != undefined) {
-							rowListObj["wbsPlanCodeNm"] = elem.wbsPlanCodeNm;
-						}
-						else {
-							rowListObj["wbsPlanCodeNm"] = "";
-						}
-
-						if (elem.wbsPlanMngId != undefined) {
-							rowListObj["wbsPlanMngId"] = elem.wbsPlanMngId;
-						}
-						else {
-							rowListObj["wbsPlanMngId"] = "";
-						}
-
-						rowListObj["wbsPlansDt"] = elem.wbsPlansDt;
-						rowListObj["wbsPlaneDt"] = elem.wbsPlaneDt;
-						rowListObj["daycnt"] = elem.daycnt;
-						rowListObj["wbsPlanStsCodeId"] = elem.wbsPlanStsCodeId;
-						rowListObj["closeYn"] = elem.closeYn;
-						rowListObj["creatId"] = jwt.userId;
-						rowListObj["creatPgm"] = "WB2201M01";
-						rowListObj["verUpReason"] = verUpReasonValue;
-						rowListArr.push(rowListObj);
-					}
-				});
-				formData.append("rowListArr", JSON.stringify(rowListArr));
-
-				filePostAjax("/user/wb/wb22/wbsVerUpInsert", formData, function(data) {
-					if (data.resultCode == 200) {
-	// 					alert(data.resultMessage);
-						gridView1.setData(0);
-					} else {
-						alert("미확정 상태입니다.")
-						gridView1.setData(0);
-					}
-				});
+			var strYear = new Date().toISOString().substring(2, 4);
+			var planData = {
+				"coCd" : coCd,
+				"salesCd" : salesCd
+			};
+			postAjaxSync("/user/wb/wb22/selectVerNoNext", planData, null, function(data){
+				formData.append("newVerNo", data.result[0].verNo);
 			});
-		}
+
+			var rowList = gridView1.target.getList();
+			var rowListArr = [];
+			$.each(rowList, function(idx, elem){
+				var row = gridView1.target.getList()[idx];
+				var rowListObj = elem;
+				if (elem.fileTrgtKey != undefined) {
+					rowListObj["coCd"] = elem.coCd;
+					rowListObj["fileTrgtKey"] = elem.fileTrgtKey;
+					rowListObj["wbsPlanNo"] = elem.wbsPlanNo;
+					rowListObj["wbsPlanCodeId"] = elem.wbsPlanCodeId;
+					rowListObj["salesCd"] = elem.salesCd;
+					rowListObj["verNo"] = elem.verNo;
+					if (elem.wbsPlanCodeNm != undefined) {
+						rowListObj["wbsPlanCodeNm"] = elem.wbsPlanCodeNm;
+					}
+					else {
+						rowListObj["wbsPlanCodeNm"] = "";
+					}
+
+					if (elem.wbsPlanMngId != undefined) {
+						rowListObj["wbsPlanMngId"] = elem.wbsPlanMngId;
+					}
+					else {
+						rowListObj["wbsPlanMngId"] = "";
+					}
+
+					rowListObj["wbsPlansDt"] = elem.wbsPlansDt;
+					rowListObj["wbsPlaneDt"] = elem.wbsPlaneDt;
+					rowListObj["daycnt"] = elem.daycnt;
+					rowListObj["wbsPlanStsCodeId"] = elem.wbsPlanStsCodeId;
+					rowListObj["closeYn"] = elem.closeYn;
+					rowListObj["creatId"] = jwt.userId;
+					rowListObj["creatPgm"] = "WB2201M01";
+					rowListObj["verUpReason"] = verUpReasonValue;
+					rowListArr.push(rowListObj);
+				}
+			});
+			formData.append("rowListArr", JSON.stringify(rowListArr));
+
+			filePostAjax("/user/wb/wb22/wbsVerUpInsert", formData, function(data) {
+				if (data.resultCode == 200) {
+// 					alert(data.resultMessage);
+					gridView1.setData(0);
+				} else {
+					alert("미확정 상태입니다.")
+					gridView1.setData(0);
+				}
+			});
+		}).catch(function(err){
+			return false;
+		});
 	}
 
 	//확정 버튼클릭시 처리 함수
@@ -2722,12 +2737,21 @@
 
 	// 버전업 사유를 입력받는 프롬프트 생성
 	async function verUpReason(preVer , defaultReason ="") {
-		const result  = await customPrompt(
+		const result  = customPrompt(
 			`Ver Up 사유를 입력해주세요.`,
 			defaultReason ,
 			`Ver.${preVer}에 대한 변경 사유`
+			
 		);
-		return result;
+		// customPrompt 최소 사이즈 변경
+		requestAnimationFrame(() => {
+			const $dlg = $('#custom-prompt-overlay > div').first();
+			if ($dlg.length) {
+				$dlg.css('min-width', '350px'); // 최소 가로 크기 지정
+			}
+		});
+		
+		return await result;
 	}
 	
 </script>
