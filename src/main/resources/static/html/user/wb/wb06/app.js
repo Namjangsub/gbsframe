@@ -329,10 +329,25 @@ function hideInsertSubmenu() {
 
 //메뉴 바깥 클릭 시 닫기
 $(document).on('click', (e) => {
-    if (!$(e.target).closest('#barContextMenu').length) {
-        hideInsertSubmenu();
-    }
+  if (!$(e.target).closest('#barContextMenu').length) {
+      hideInsertSubmenu();
+  }
 });
+
+
+////구분배지 클릭시 펼치기 모두 취소
+//$(document).on('click', '#planBadge', () => {
+//	  collapseAllExpanded();
+//	  console.log("모든 펼쳐진 Row가 접혔습니다.");
+////	// 상태 플래그 초기화
+////	for (const k in UNSTACKED) UNSTACKED[k].clear();
+////
+////	// 상태 → 화면 반영 (전체 재렌더)
+////	GanttApp.renderAll();
+////
+//	console.log("펼쳐진 줄만 접고, 상태 초기화 완료");
+//});
+
 
 // === 2.3 항목 클릭 시 실행 (신규 바 생성 → 부분렌더 → 저장 API) ===
 $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
@@ -739,6 +754,30 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 //
 //	    return String(result.value).trim(); // 확인 시 입력값 문자열 반환
 	}
+	
+	// collapseAllExpanded는 전역에서도 쓰이므로 export
+	window.collapseAllExpanded = function() {
+		for (const cat of ["PM", "PLAN", "DO"]) {
+			// 현재 접힘 상태로 기록된 rowKey들 순회
+			for (const rowKey of UNSTACKED[cat]) {
+				const $track = $(`.row-track[data-cat="${cat}"][data-row="${rowKey}"]`);
+				if ($track.length === 0) continue;
+		
+				const items = GanttApp.state.rowsData?.[rowKey]?.[cat] || [];
+				const extra = {
+				  stackToFirstLane: true,   // 접기
+				  sortBars: true,
+				  keepLane: true,
+				  writeBackLane: false
+				};
+		
+				CORE.renderRowSVG( $track, items, GanttApp.state, makeCoreOptions(cat, $track, rowKey, extra) );
+			}
+	
+			// 다 그린 후 상태 초기화
+			UNSTACKED[cat].clear();
+		}
+	};
 	
 	function makeCoreOptions(cat, $track, rowKey, extraOpts = {}) {
 		return {
@@ -1402,12 +1441,7 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 	        const $track = $(`.row-track[data-row="${salesCd}"][data-cat="${cat}"]`);
 	        const items = GanttApp.state.rowsData?.[salesCd]?.[cat] || [];
 	        const stacked = !UNSTACKED[cat].has(salesCd);
-	        const extra = {
-	            stackToFirstLane: stacked,
-	            sortBars: true,
-	            keepLane: true,
-	            writeBackLane: !stacked
-	        };
+	        const extra = { stackToFirstLane: stacked, sortBars: true, keepLane: true, writeBackLane: !stacked };
 	        GanttCore.renderRowSVG($track, items, GanttApp.state, makeCoreOptions(cat, $track, salesCd, extra));
 	    }
 	}
@@ -1551,6 +1585,18 @@ $(document).on('click', '#barContextMenu .submenu .submenu-item', function () {
 			const extra   = { stackToFirstLane: stacked, sortBars: true, keepLane: true, writeBackLane: !stacked }; // 클릭 재렌더는 정렬 ON
 
 			CORE.renderRowSVG($track, items, GanttApp.state, makeCoreOptions(cat, $track, rowKey, extra));
+		});
+		
+
+		/*******************************************************************
+		 *  구분 타이틀 배지영역 클릭하면 모든 펼쳐진 영역을 접기 기능
+		 *******************************************************************/
+		//구분배지 클릭시 펼치기 모두 취소
+		$(document).on('click', '#planBadge', () => {
+			collapseAllExpanded();
+//			for (const k in UNSTACKED) UNSTACKED[k].clear();
+//			GanttApp.renderAll();
+			console.log("펼쳐진 줄만 접고, 상태 초기화 완료");
 		});
 
 	}
