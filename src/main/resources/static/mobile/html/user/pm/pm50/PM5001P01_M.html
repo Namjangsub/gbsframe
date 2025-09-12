@@ -70,6 +70,7 @@
 			<input type="hidden" id="pgmId"     	name="pgmId"	value="PM5001P01_M">
 			<input type="hidden" id="coCd" name="coCd" required msg="회사">
 			<input type="hidden" id="reqId" name="reqId" required msg="등록자">
+			<input type="hidden" id="reqIdNm" name="reqIdNm" required msg="등록자">
             <div class="form-group popup_table" style="width: 100%;">
                 <table>
                     <colgroup>
@@ -157,6 +158,13 @@
 	var bfuRowFileDeleteArr = []; 	//사진 등록내용중 첨부파일만 삭제 임시저장
 	var lastPosition = "";
 	var salesCdParam = "";
+
+	var appArray = [];	//결재권자 정보
+	var shaArray = [];	//공유자 정보
+	var teleNo = ""; //카카오 접수자 전화번호변수
+ 	// 카톡 정상알림 카운터 변수
+    var kakaoCnt = 0;
+	var kakaoErr = [];
 
 	$(document).ready(function() {
 		$("body").css("font-size", "12px");
@@ -349,6 +357,8 @@
 			var formData = makeFormData();
 			filePostAjax("/user/pm/pm50/insert_pm50", formData, function(data) {
 				if (data.resultCode == 200) {
+					$('#fileTrgtKey').val(data.fileTrgtKey);
+					kakaoTodo();
 					if (salesCdParam) {
 						location.href = "/static/mobile/menu.html";
 					} else {
@@ -365,6 +375,7 @@
 			var formData = makeFormData();
 			filePostAjax("/user/pm/pm50/update_pm50", formData, function(data) {
 				if (data.resultCode == 200) {
+					kakaoTodo();
 					window.history.back();
 				}
 			});
@@ -413,7 +424,77 @@
 			formData.append("bfuFiles" + obj.bfuFileNo, obj.file);
 		});
 
+		// 출장자 사진업로드 결재는 등록 시에만 알림 발송
+		if (actionType == "C") {
+			selectTeamManagerApprovalAdd();
+			const approvalArr = processApprovalGrid(
+				// gridViewPop1,               // 결재자 그리드 객체
+				paramObj, // 모달 파라미터 (rsltNo 등 포함)
+			);
+			formData.append('approvalArr', JSON.stringify(approvalArr));
+		}
+
 		return formData;
+	}
+
+	function processApprovalGrid(paramObj) {
+		// const rowSharngList = gridView.target.list;
+		const ParamObj = { ...paramObj };
+		ParamObj.actionType = 'U'; // 결재모드는 수정으로 접근하기 위함
+		ParamObj.salesCd = $('#salesCd').val()
+		if (appArray.length > 0) {
+			const approvalArr = [];
+
+			// 공통 파라미터 설정
+			const addParam = {
+				coCd: $('#coCd').val(),
+				salesCd: $('#salesCd').val(),
+				pgmId: $('#pgmId').val(),
+				pgPath: "/user/pm/pm50/PM5001P01.html",
+				sanctnSttus: "N",
+				todoCoCd: $('#coCd').val(),
+				todoNo: $('#fileTrgtKey').val(),
+				todoFileTrgtKey: $('#fileTrgtKey').val(),
+				pgParam: JSON.stringify(ParamObj),
+				userId: jwt.userId,
+				todoTitl: `${$(`#salesCd`).val()} 사진 등록`,
+				todoKey: "",
+				todoCodeKind: "",
+				todoCodeId: "",
+			};
+
+			let 결재순번 = 0;
+			let 공유순번 = 0;
+
+			$.each(appArray, function (idx, elem) {
+				if (!elem.usrNm.includes('gyrsult')) {
+					const approvalListObj = { ...elem };
+
+					addParam["todoId"] = elem.usrNm;
+					addParam["empNo"] = elem.empNo;
+					addParam["name"] = elem.name;
+					addParam["telNo"] = elem.telNo;
+					addParam["email"] = elem.eMail;
+					addParam["gb"] = elem.gb;
+
+					if (elem.gb === '공유') {
+									공유순번 += 1;
+						approvalListObj["sanctnSn"] = 공유순번;
+						approvalListObj["todoDiv1CodeId"] = "TODODIV10";
+						approvalListObj["todoDiv2CodeId"] = "TODODIV1180";
+					} else if (elem.gb === '결재') {
+									결재순번 += 1;
+						approvalListObj["sanctnSn"] = 결재순번;
+						approvalListObj["todoDiv1CodeId"] = "TODODIV20";
+						approvalListObj["todoDiv2CodeId"] = "TODODIV2180";
+					}
+
+					approvalArr.push({ ...addParam, ...approvalListObj });
+				}
+			});
+
+			return approvalArr;
+		}
 	}
 	
 	function validateBfuFileInputs() {
@@ -601,6 +682,213 @@
 		var host = window.location.origin;
 		var paramMsg = host + "/admin/cm/cm08/fileDownloadAuth?fileKey="+fileKey+"&userId="+jwt.userId +"," + fileList[idx].fileName;
 		fileDownloadApp.postMessage(paramMsg);
+	}
+
+	function kakaoTodo() {
+        //message load
+        if (kakaoErr.length == 0) {
+			var paramObj = {
+				"userId" 	 : jwt.userId
+				, "codeKind" : "KAKAOMSG"
+			};
+			postAjaxSync("/user/sm/sm02/selectCurrToday", paramObj, null, function(data) {
+				if(data.resultList.length > 0 ) {
+					kakaoErr = data.resultList;
+				}
+			});
+		}
+		let clntNm = (jwt.coCd=="GUN") ? "(주)건양ITT" : "트루넷";
+
+		// Kakao 알림톡 보내는사람(userID) 연락처 조회 값 세팅
+		var paramObj1 = {
+				"coCd" 	: $('#coCd').val(),
+				"userId" 	: $('#reqId').val()
+			};
+		postAjaxSync("/user/wb/wb24/selectMemberTelNo", paramObj1, null, function(data){
+			if (data.result[0] == undefined
+				|| data.result[0].telNo == "") {
+				teleNo = "051-312-2400";
+			}
+			else {
+				teleNo = data.result[0].telNo;
+
+			}
+		});
+		//---------------------------------------
+		let param = {
+				"tmplatDiv": "TMPLATDIV02"
+				, "coCd": $('#coCd').val()				//해당업무의 coCd(트르넷발주 TRN )
+				, "todoDiv1CodeId": "TODODIV20"					//공통코드 해당업무 - 결재
+				, "todoDiv2CodeId": "TODODIV2180"					//공통코드 해당업무 - 결재 - 발주서
+				, "todoDiv1CodeNm": "결재"						//공통코드 해당업무 - 결재 - 발주서
+				, "title": "사진업로드"
+				, "sanctnDiv2": "결재"							//템플릿 결재구분2    #{sanctnDiv2} 처리 바랍니다.
+				, "todoNo": $('#fileTrgtKey').val()
+				, "clntCd": "1"					//발신회사는 로그인사용자 회사
+				, "clntNm": clntNm				//로그의 수신거래처명
+				, "ordrgMngNm":  $('#reqIdNm').val()		//발주작성자(담당자)
+				, "ordrgMngTelNo": teleNo		//담당자전화번호
+				, "creatPgm"  : 'PM5001P01'
+		}
+		commKaKaoSendTodo(param);
+		if (kakaoCnt > 0) {
+			kakaoCnt = 0;
+// 	    	alert("알림톡이 정상 발송되었습니다.");
+		}
+	}
+
+	//to-do결재요청 알림톡
+	function commKaKaoSendTodo(param) {
+// 		console.log('---카카오 발주및출장결과서 알림톡발송시작 --' + param);
+		//알림톡수신번호 채번
+		var maxMessageId = null;			//message id(unique key)
+		var talkMessage = null 				//발송될 내용 template
+		var mobile = null					//수신인 휴대전화번호
+		//var title = null					//todo title
+		var todoDiv2CodeNm = null					//todo title
+		var sendList = [];
+		let talkParam = {};
+		let talkBody = {};
+		let sendCnt = 0;
+		postAjaxSync("/user/bm/bm18/selectMaxMessageIdTodo", param, null
+					, function(data) {
+						if(data.resultList.length > 0 ) {
+							if( data.resultList[0].maxMessageId != "" ) {
+								sendList = data.resultList;
+							} else {
+								alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
+								return;
+							}
+
+						}
+		});
+		//user search ajax end
+
+		//대상 loop
+		$.each(sendList, function (key, sendObj) {
+			maxMessageId = sendObj.maxMessageId;
+			talkMessage = sendObj.messageDesc;
+			mobile =  sendObj.telNo;
+			//로그용
+			param.rcvId = sendObj.todoId;			//todo 수신id
+			param.rcvNm = sendObj.name;				//todo 수신자명
+			param.nameTo = sendObj.name;				//todo 수신자명
+			//title		= sendObj.todoTitl;
+			todoDiv2CodeNm =   sendObj.todoTitl;
+			param.todoDiv2CodeNm = todoDiv2CodeNm;
+			//param.title = title;								//요청내용제목
+			param.sendDt = sendObj.sendDt;
+
+			if(mobile == "" || mobile == null) {
+				alert('수신전화번호가 없습니다.\r\n['+clntNm+'] 거래처관리의 사업부 첫번째 항목을 확인해 주십시오.');
+				return;
+			}
+			if(talkMessage == "" || talkMessage == null) {
+				alert('발송할 내용이 없습니다.\r\n알림톡템플릿관리를 확인해 주십시오.');
+				return;
+			}
+			//message 치환
+			let message = talkMessage;
+			let splitStr = Array.from(message.matchAll('\\{(.*?)\\}'), match => `${match[0]}`);
+			//loop
+			$.each(splitStr, function (key, val) {
+				let compKey = val.substring(1, val.length-1);
+				if( compKey != "" && compKey != "undefined" ) {
+					if( typeof(param[compKey]) != "undefined" ) {
+						let val2 = '#'+val;
+						message = message.replaceAll(val2, param[compKey]);
+					}
+				}
+			});
+
+			talkParam.authToken = "e/eDfZOFCsrBqadaECQ0+g==";
+			talkParam.serverName = "gyitt2400";
+			talkParam.paymentType = "P";
+			talkBody.service = "2310086157";				//서비스번호(1000000000 - 예시  real : 2310086157
+			talkBody.messageId = maxMessageId;			//고객사에서 관리하는 메시지No - 40byte (unique 값);
+			talkBody.title = param.title;					//알림톡 타이틀 -
+			talkBody.message = message;				//알림톡 메시지 (1000 byte)
+			talkBody.mobile = mobile;				//휴대전화번호
+			talkBody.template = "10003";			//템플릿관리화면 템플릿ID	- 발주서 V2
+			let talkJson = JSON.stringify(talkBody);
+			sendCnt = kakaoSendReal(talkJson, talkParam, param);
+		});
+		//대상 loop end
+		if( sendCnt > 0 ) {
+			//alert("알림톡 정상 발송되었습니다.");
+			kakaoCnt++;
+		}
+	}
+
+
+	// 출장자 사진업로드 작업 결재자 정보 추가
+	function selectTeamManagerApprovalAdd() {
+		appArray = approvalTeamManagerSpecialInfoData('lej', appArray);	// 출장자 사진업로드 등록 시 임은지 과장에게 결재 알림 발송
+
+		// shaArray의 요소들을 appArray에 합치기
+		shaArray.forEach(item => appArray.push(item));
+
+		return appArray;
+	}
+
+	//특정담당자 정보 가져오기
+	function approvalTeamManagerSpecialInfoData(appUserId, appArray) {
+		var formData = {
+				"userId" : appUserId,
+		}
+		postAjaxSync("/user/wb/wb24/selectTeamManagerSpecialInfo", formData, null, function(data) {
+			if (data.result != '' && data.result!=null) {
+				//결자자 정보 가져오기
+				let list = data.result;
+				if (appArray.some(item => item.usrNm === list.id)) {
+					//Array에 usrNm 의 값중에 list.id와 같은 값이 있으면 true
+				} else {
+					appArray.push({
+								gb: "결재",
+								usrNm: list.id,
+								name: list.name,
+								jik: list.levelNm,
+								dtNm: list.deptNm,
+								telNo: list.telNo,
+								offTelNo: list.offTelNo,
+								email: list.email,
+							});
+				}
+			}
+		});
+		return appArray;
+	}
+
+	//작성자 팀장 정보 가져오기
+	function approvalTeamManagerInfoData(appUserId, appArray, shaArray) {
+		var formData = {
+				"userId" : appUserId,
+		}
+		postAjaxSync("/user/wb/wb24/selectTeamManagerInfo", formData, null, function(data) {
+			if (data.result != '' && data.result!=null) {
+				//결자자 정보 가져오기
+				let list = data.result;
+				if (appArray.some(item => item.usrNm === list.id)) {
+					//Array에 usrNm 의 값중에 list.id와 같은 값이 있으면 true
+				} else {
+					appArray.push({
+								gb: "결재",
+								usrNm: list.id,
+								name: list.name,
+								jik: list.levelNm,
+								dtNm: list.deptNm,
+								telNo: list.telNo,
+								offTelNo: list.offTelNo,
+								email: list.email,
+
+							});
+				}
+				imprvmReqId = list.id;	//작성자 팀장 ID정보 백엔드로 보내기위해 저장함.
+				// 공유영역에 usrNm 값이 list.id 와 같은 결제자는 삭제
+				shaArray = shaArray.filter(item => item.usrNm !== list.id);
+			}
+		});
+		return appArray;
 	}
 
 
