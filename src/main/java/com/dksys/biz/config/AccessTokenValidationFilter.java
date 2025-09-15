@@ -51,7 +51,8 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
     private static final AntPathMatcher pathMatcher = new AntPathMatcher();
     private static final List<String> WHITELIST = Arrays.asList(
         "/login", "/oauth/**", "/customLogout", "/error",
-        "/static/**", "/download/**", "/s/**", "/favicon.ico", "/index.html"
+        "/static/**", "/download/**", "/s/**", "/favicon.ico", "/index.html",
+        "/api/audit-ingest" 
     );
 
 
