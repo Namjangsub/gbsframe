@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.dw.dw01.mapper.DW01Mapper">
+
+	<select id="selectDrawDocTreeList" parameterType="Map" resultType="CamelMap">
+		WITH P AS (
+			SELECT DISTINCT 
+					REPLACE(PATH_BASE,'\','/') AS FULL_PATH
+			FROM TB_DRAWING_DOC
+			WHERE 1 = 1
+			
+			<choose>
+				<when test="docSt == 'all'">
+				</when>
+				<otherwise>
+					AND DOC_ST = 'A'
+				</otherwise>
+			</choose>
+			AND PATH_BASE IS NOT NULL
+			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+				AND CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+			</if>
+			<if test="salesCd != null and !salesCd.equals('')">
+				AND SALES_CD LIKE  '%'||#{salesCd}||'%'
+			</if>
+		),
+		N AS (  -- 최대 폴더 깊이 만큼 조정
+			SELECT LEVEL AS LV
+			FROM DUAL
+			CONNECT BY LEVEL <![CDATA[ <= ]]> 50
+		)
+		SELECT DISTINCT
+				CASE WHEN N.LV = 1 THEN '#'
+					ELSE SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV-1) - 1)
+				END AS PARENT,
+				SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV) - 1) AS ID,
+				CASE
+					WHEN N.LV = 1 THEN SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, 1) - 1)
+					ELSE REGEXP_SUBSTR(SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV) - 1), '[^/]+$')
+				END AS TEXT,
+				NULL AS DOC_ID,
+				NULL AS DOC_NO,
+				NULL AS FILE_NAME,
+				SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV) - 1) AS PATH_BASE,
+				0 AS IS_LEAF,
+				'unit' AS TYPE,
+				'Y' AS CODE_ETC
+		FROM P
+		JOIN N
+		ON INSTR(P.FULL_PATH||'/', '/', 1, N.LV) > 0
+		ORDER BY ID
+
+	</select>
+
+		<select id="selectDrawTreeFileListCount" parameterType="Map" resultType="int">
+		WITH BASE AS (
+			SELECT
+				  T.DOC_ID                                 		AS FILE_KEY
+				, T.DOC_NO                                		AS DOC_NO
+				, T.FILE_NAME                              		AS FILE_NAME
+				, T.EXT                                   		AS FILE_TYPE
+				, ''                       		AS FILE_SIZE
+				, REPLACE(T.PATH_BASE,'\','/')             		AS LPATH
+				, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD') 			AS CREAT_DTTM
+				, T.CREATED_BY                             		AS CREAT_NM
+				, T.ACTIVE_VER                             		AS VER_NO
+
+				, ''                                       		AS CLNT_NM
+				, ''                                       		AS PRJCT_NM
+				, ''                                       		AS PRDT_NM
+				, ''                                       		AS ITEM_NM
+				, T.SALES_CD                               		AS SALES_CD
+
+				, 'Y'                                      AS FILE_DOWN
+				, 'Y'                                      AS FILE_UPDATE
+				, 'Y'                                      AS FILE_DELETE
+			FROM TB_DRAWING_DOC T
+			WHERE 1 = 1
+			<choose>
+				<when test="docSt == 'all'">
+				</when>
+				<otherwise>
+					AND DOC_ST = 'A'
+				</otherwise>
+			</choose>
+			AND REPLACE(T.PATH_BASE,'\','/') = #{comonCd}
+			<if test="salesCd == null and salesCd.equals('')">
+				AND T.CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+			</if>
+			<if test="salesCd != null and !salesCd.equals('')">
+				AND T.SALES_CD LIKE  '%'||#{salesCd}||'%'
+			</if>
+		)
+		SELECT COUNT(*)
+		FROM (
+		SELECT B.*,
+				ROW_NUMBER() OVER (ORDER BY B.FILE_NAME) AS RN
+		FROM BASE B
+		)
+	</select>
+
+
+	<select id="selectDrawTreeFileList" parameterType="Map" resultType="CamelMap">
+		WITH BASE AS (
+			SELECT
+				  T.DOC_ID                                 		AS FILE_KEY
+				, T.DOC_NO                                		AS DOC_NO
+				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS FILE_NAME
+				, T.EXT                                   		AS FILE_TYPE
+				, REPLACE(T.PATH_BASE,'\','/')             		AS LPATH
+				, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD') 				AS CREAT_DTTM
+				, T.CREATED_BY                             		AS CREAT_NM
+				, T.ACTIVE_VER                             		AS VER_NO
+				, T.SALES_CD                               		AS SALES_CD
+				, T.DOC_ST
+				, 'Y'                                      AS FILE_DOWN
+				, 'Y'                                      AS FILE_UPDATE
+				, 'Y'                                      AS FILE_DELETE
+			FROM TB_DRAWING_DOC T
+			WHERE 1 = 1
+			<choose>
+				<when test="docSt == 'all'">
+				</when>
+				<otherwise>
+					AND DOC_ST = 'A'
+				</otherwise>
+			</choose>
+			AND REPLACE(T.PATH_BASE,'\','/') = #{comonCd}
+			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+				AND T.CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+			</if>
+			<if test="salesCd != null and !salesCd.equals('')">
+				AND T.SALES_CD LIKE  '%'||#{salesCd}||'%'
+			</if>
+		)
+		SELECT *
+		FROM (
+		SELECT B.*,
+				ROW_NUMBER() OVER (ORDER BY B.FILE_NAME) AS RN
+		FROM BASE B
+		)
+		WHERE RN BETWEEN #{firstIndex} AND #{lastIndex}
+		ORDER BY FILE_NAME
+
+	</select>
+
+
+
+
+</mapper>
