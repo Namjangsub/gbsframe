@@ -147,12 +147,22 @@ let attendList = DEFAULT_ATTEND_LIST.map(u => ({ ...u }));
 
 const FIXED_ORDER = DEFAULT_ATTEND_LIST.map(u => u.id);
 
+const mnStatusCode = [
+	{'CD' : '', 'NM' : ''},
+	{'CD' : 'N', 'NM' : '진행'},
+	{'CD' : 'Y', 'NM' : '완료'}
+]
+
+const STATUS_LABEL = Object.fromEntries(mnStatusCode.map(o => [o.CD, o.NM])); // 'N'->'진행'
+const STATUS_CODE  = Object.fromEntries(mnStatusCode.map(o => [o.NM, o.CD])); // '진행'->'N'
+
+
  // 부서 코드 매핑
- const deptCodeMap = {
- 	gun00MnCnts:'GUN00', gun60MnCnts:'GUN60', gun30MnCnts:'GUN30',
- 	gun40MnCnts:'GUN40', trn5010MnCnts:'TRN5010', trn5020MnCnts:'TRN5020',
- 	gun10MnCnts:'GUN10', gun80MnCnts:'GUN80'
- };
+const deptCodeMap = {
+	gun00MnCnts:'GUN00', gun60MnCnts:'GUN60', gun30MnCnts:'GUN30',
+	gun40MnCnts:'GUN40', trn5010MnCnts:'TRN5010', trn5020MnCnts:'TRN5020',
+	gun10MnCnts:'GUN10', gun80MnCnts:'GUN80'
+};
 
 	//formatter 공통 함수
 	function valueFormatter(params) {
@@ -306,7 +316,6 @@ const FIXED_ORDER = DEFAULT_ATTEND_LIST.map(u => u.id);
 	// 컬럼 정의
 	let columnDefs = [
  		{ field: "mnSubject", headerName: "PROJECT\n주제", pinned:'left',  editable: true, cellEditor: CustomTextAreaEditor, cellEditorPopup: true, autoHeight: true, minWidth: 50, width: 100, cellRenderer: params => valueFormatter(params),  cellClass: "vcenter-cell", cellStyle: { textAlign: "center"} },
- 		{ field: "gun00MnCnts", headerName: "임원", 						  editable: true, cellEditor: CustomTextAreaEditor, cellEditorPopup: true, autoHeight: true, minWidth: 100, cellRenderer: params => valueFormatter(params)},
  		{ field: "gun30MnCnts", headerName: "영업\n국내.해외", 				  editable: true, cellEditor: CustomTextAreaEditor, cellEditorPopup: true, autoHeight: true, minWidth: 220, width: 220, cellRenderer: params => valueFormatter(params)},
  		{ field: "gun60MnCnts", headerName: "생산", 						  editable: true, cellEditor: CustomTextAreaEditor, cellEditorPopup: true, autoHeight: true, minWidth: 220, width: 220, cellRenderer: params => valueFormatter(params)},
  		{ field: "gun40MnCnts", headerName: "연구소", 					  editable: true, cellEditor: CustomTextAreaEditor, cellEditorPopup: true, autoHeight: true, minWidth: 220, width: 220, cellRenderer: params => valueFormatter(params)},
@@ -314,15 +323,19 @@ const FIXED_ORDER = DEFAULT_ATTEND_LIST.map(u => u.id);
  		{ field: "trn5020MnCnts", headerName: "트루넷\n전기", 				  editable: true, cellEditor: CustomTextAreaEditor, cellEditorPopup: true, autoHeight: true, minWidth: 220, width: 220, cellRenderer: params => valueFormatter(params)},
  		{ field: "gun80MnCnts", headerName: "전산실", 					  editable: true, cellEditor: CustomTextAreaEditor, cellEditorPopup: true, autoHeight: true, minWidth: 220, width: 220, cellRenderer: params => valueFormatter(params)},
  		{ field: "gun10MnCnts", headerName: "경영지원팀\n총무/인사/제조혁신",	  editable: true, cellEditor: CustomTextAreaEditor, cellEditorPopup: true, autoHeight: true, minWidth: 220, width: 220, cellRenderer: params => valueFormatter(params)},
- 		{ field: "mnStatus", headerName: "진행/완료", 						  editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: {
- 	        values: ['', '진행', '완료']  // 빈값, '진행', '완료' 3가지
- 	    },
- 	    minWidth: 50, width: 50,
- 	    cellRenderer: function(params) {
- 	        // 값이 없을 때(빈값) 공백 반환
- 	        if (params.value === '') return '';
- 	        return params.value;
- 	    }},
+ 		{ field: "gun00MnCnts", headerName: "임원", 						  editable: true, cellEditor: CustomTextAreaEditor, cellEditorPopup: true, autoHeight: true, minWidth: 100, cellRenderer: params => valueFormatter(params)},
+ 		{ field: "mnStatus", headerName: "진행/완료", 						editable: true, cellEditor: "agSelectCellEditor", cellEditorParams: { values: mnStatusCode.map(o => o.CD) },
+			// 셀 표시는 한글로
+			valueFormatter: p => STATUS_LABEL[p.value] ?? p.value,
+			// 붙여넣기나 사용자가 한글을 입력했을 때 코드로 변환
+			valueParser: p => {
+				const newVal = p.newValue;
+				if (STATUS_CODE[newVal] !== undefined) return STATUS_CODE[newVal];
+				if (STATUS_LABEL[newVal] !== undefined) return newVal;
+				return newVal;
+			},
+			minWidth: 50, width: 50,
+		},
  		{ field: "mnEtcAll", headerName: "특이사항", 						  editable: true, cellEditor: CustomTextAreaEditor, cellEditorPopup: true, autoHeight: true, minWidth: 50, width: 50, cellRenderer: params => valueFormatter(params)},
 	];
 		
@@ -580,71 +593,73 @@ const FIXED_ORDER = DEFAULT_ATTEND_LIST.map(u => u.id);
 			paramObj.deptCodes = JSON.stringify(Object.values(deptCodeMap));	// 서버에 첨부파일 조회를 위한 부서코드 보냄
 			postAjax("/user/pm/pm10/selectMnList", paramObj, null, function(data){
 				try {
-					let list = data.result.filter(r => r.mnSubject && r.mnSubject !== '파일첨부');
-					let noticeRow = list.find(r => r.mnSubject === '공지사항');
-					if (noticeRow) {
-						noticeRow.isNoticeRow = true;
-						// const subjectCount = list
-						// 	.filter(r => r.mnSubject !== '공지사항')
-						// 	.length;
-					} else {
+					// data.result가 없으면 빈 배열 처리
+					var list = Array.isArray(data.result) ? data.result : [];
+
+					// rnum이 있는 회의록만 추출
+					var rows = list.filter(r => r.rnum !== undefined);
+
+					// 공지사항 기본 구조
+					let noticeRow = rows.find(r => r.mnSubject === '공지사항');
+					if (!noticeRow) {
 						noticeRow = {
-							mnDate: $('#mnDate_S').val(),
-							mnWeeks: $('#mnWeeks_S').val(),
-							mnSubSeq: 0,
-							mnSubject: '공지사항',
-							mnSortNo: 0,
+							mnDate:      $('#mnDate_S').val(),
+							mnWeeks:     $('#mnWeeks_S').val(),
+							mnSubSeq:    0,
+							mnSubject:   '공지사항',
+							mnSortNo:    0,
 							isNoticeRow: true,
-							isFileRow: false
+							gun00MnCnts: '', gun30MnCnts: '', gun40MnCnts: '', gun60MnCnts: '',
+							trn5010MnCnts: '', trn5020MnCnts: '', gun10MnCnts: '', gun80MnCnts: '',
+							mnStatus:    '', mnEtcAll:   ''
 						};
+					} else {
+						noticeRow.isNoticeRow = true;
 					}
 
-					// 파일첨부 행 준비
+					// 파일첨부 처리: data.result 중 files 키를 가진 객체에서 JSON 파싱
+					const fileEntry   = list.find(r => typeof r.files === 'string');
+					const parsedFiles = fileEntry ? JSON.parse(fileEntry.files) : [];
+
+					// fileRow 기본 구조
 					const fileRow = {
-						mnDate: $('#mnDate_S').val(),
-						mnWeeks: $('#mnWeeks_S').val(),
-						mnSubSeq: 0,
-						mnSubject: '파일첨부',
-						gun00MnCnts: '', gun60MnCnts: '', gun30MnCnts: '',
-						gun40MnCnts: '', trn5010MnCnts: '', trn5020MnCnts: '',
-						gun10MnCnts: '', gun80MnCnts: '',
-						mnStatus:    '', mnEtcAll: '',
-						mnSortNo: 0,
-						isFileRow: true,
+						mnDate:        $('#mnDate_S').val(),
+						mnWeeks:       $('#mnWeeks_S').val(),
+						mnSubSeq:      0,
+						mnSubject:     '파일첨부',
+						gun00MnCnts:   '', gun30MnCnts:   '', gun40MnCnts:   '', gun60MnCnts:   '',
+						trn5010MnCnts: '', trn5020MnCnts: '', gun10MnCnts:   '', gun80MnCnts:   '',
+						mnStatus:      '', mnEtcAll:      '',
+						mnSortNo:      0,
+						isFileRow:     true,
 						filesByColumn: {}
 					};
 
-					// 파일첨부 정보
-					const seenFileKeys = new Set();
+					// parsedFiles 배열 돌면서 deptCodeMap에 맞춰 바로 filesByColumn에 추가
+					parsedFiles.forEach(f => {
+						const deptCode = String(f.fileTrgtKey).split('-').length >= 2 ? String(f.fileTrgtKey).split('-')[1] : '';
+						const colKey = Object.keys(deptCodeMap)
+											.find(key => deptCodeMap[key] === deptCode);
+						if (!colKey) return;
 
-					data.result.forEach(row => {
-					if (!row.files) return;
-						const parsed = JSON.parse(row.files);
-						parsed.forEach(f => {
-							if (seenFileKeys.has(f.fileKey)) return;      // 이미 처리한 파일이면 스킵
-							seenFileKeys.add(f.fileKey);
-
-							const deptCode    = f.fileTrgtKey.substring(9);  // "GUN00"
-							const colKey = Object
-							.entries(deptCodeMap)
-							.find(([k,v]) => v === deptCode)?.[0];
-							if (!colKey) return;
-
-							fileRow.filesByColumn[colKey] = fileRow.filesByColumn[colKey] || [];
-							fileRow.filesByColumn[colKey].push({
-								name:     f.fileName,
-								fileKey:  f.fileKey,
-								fileType: f.fileType
-							});
+						if (!fileRow.filesByColumn[colKey]) {
+							fileRow.filesByColumn[colKey] = [];
+						}
+						fileRow.filesByColumn[colKey].push({
+							name:     f.fileName,
+							fileKey:  f.fileKey,
+							fileType: f.fileType
 						});
 					});
 
-					const merged = [...list.filter(r => !r.isNoticeRow), noticeRow, fileRow].sort((a, b) => {
+					// merged 배열 생성
+					const nonNoticeRows = rows.filter(r => r.mnSubject !== '공지사항');
+					const merged = [...nonNoticeRows, noticeRow, fileRow].sort((a, b) => {
 						if (a.isFileRow) return 1;
 						if (b.isFileRow) return -1;
 						if (a.isNoticeRow) return 1;
 						if (b.isNoticeRow) return -1;
-						return a.mnSortNo - b.mnSortNo;
+						return ( (a.mnSortNo || 0) - (b.mnSortNo || 0) );
 					});
 
 						
@@ -653,10 +668,9 @@ const FIXED_ORDER = DEFAULT_ATTEND_LIST.map(u => u.id);
 					const deptCols = Object.keys(deptCodeMap);
 					merged.forEach(item => {
 						deptCols.forEach(colKey => {
-							const cntsVal    = item[colKey] || '';
-							const resultKey  = colKey.replace('MnCnts','MnResult');
-							const resultVal  = item[resultKey] || '';
-							const resVal     = resultVal || cntsVal;
+							const cntsVal   = item[colKey] || '';
+							const resultKey = colKey.replace('MnCnts','MnResult');
+							const resultVal = item[resultKey] || '';
 
 							if ($('#mnDiv_S').val() === 'MNDIV01') {
 								// 사전공지
@@ -1095,7 +1109,7 @@ const FIXED_ORDER = DEFAULT_ATTEND_LIST.map(u => u.id);
     			if (data.resultCode !== 200) {
     			}
     		});
-    	}
+		}  
 
 
     	// 참석자 정렬 함수
