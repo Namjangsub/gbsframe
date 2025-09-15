@@ -1,13 +1,8 @@
 package com.dksys.biz.user.dw.dw01.service;
 
-import java.util.List;
-import java.util.Map;
+import com.dksys.biz.user.dw.dw01.model.AuditIngestReq;
 
 public interface DW01Svc {
-	
-	List<Map<String, String>> selectDrawDocTreeList(Map<String, String> paramMap);
-
-	int selectDrawTreeFileListCount(Map<String, String> paramMap);
-
-	List<Map<String, String>> selectDrawTreeFileList(Map<String, String> paramMap);
+    void insertHistory(AuditIngestReq req);
+    void ingestAudit(AuditIngestReq req);
 }

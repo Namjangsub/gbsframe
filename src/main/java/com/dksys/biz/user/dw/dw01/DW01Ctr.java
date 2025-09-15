@@ -1,49 +1,30 @@
 package com.dksys.biz.user.dw.dw01;
 
-import java.util.List;
-import java.util.Map;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RestController;
 
-import com.dksys.biz.cmn.vo.PaginationInfo;
+import com.dksys.biz.user.dw.dw01.model.AuditIngestReq;
 import com.dksys.biz.user.dw.dw01.service.DW01Svc;
-import com.dksys.biz.util.MessageUtils;
 
 import lombok.RequiredArgsConstructor;
 
+@RestController
 @RequiredArgsConstructor
-@Controller
-@RequestMapping("/user/dw/dw01")
 public class DW01Ctr {
-	
-	@Autowired
-	MessageUtils messageUtils;
 
-    @Autowired
-    DW01Svc dw01Svc;
+    private final DW01Svc dw01Svc;
 
-	// 도면 트리 리스트 조회
-    @PostMapping("/selectDrawDocTreeList")
-	public String selectDrawDocTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> docTreeList = dw01Svc.selectDrawDocTreeList(paramMap);
-		model.addAttribute("docTreeList", docTreeList);
-		return "jsonView";
-	}
-
-	//카테고리별 파일정보 리스트 조회
-	@PostMapping("/selectDrawTreeFileList")
-	public String selectDrawTreeFileList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = dw01Svc.selectDrawTreeFileListCount(paramMap);
-		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
-		model.addAttribute("paginationInfo", paginationInfo);
-		
-		List<Map<String, String>> fileList = dw01Svc.selectDrawTreeFileList(paramMap);
-		model.addAttribute("fileList", fileList);
-		return "jsonView";
+    // PowerShell 수집기 수신 엔드포인트
+    @PostMapping("/api/audit-ingest")
+    public ResponseEntity<?> ingestAudit(@RequestBody AuditIngestReq req,
+                                         @RequestHeader(value = "Authorization", required = false) String authorization,
+                                         @RequestHeader(value = "X-API-TOKEN", required = false) String xApiToken) {
+        // TODO: 필요 시 토큰 검증(Authorization: Bearer ... 또는 X-API-TOKEN) 추가
+    	dw01Svc.insertHistory(req);
+        dw01Svc.ingestAudit(req);
+        return ResponseEntity.ok().build();
     }
 }
