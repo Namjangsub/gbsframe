@@ -1,0 +1,33 @@
+package com.dksys.biz.user.dw.dw03.service.impl;
+
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.dksys.biz.user.dw.dw03.mapper.DW03Mapper;
+import com.dksys.biz.user.dw.dw03.service.DW03Svc;
+
+@Service
+public class DW03Svcmpl implements DW03Svc {
+
+	@Autowired
+    DW03Mapper dw03Mapper;
+
+	@Override
+	public List<Map<String, String>> selectDrawDocTreeList(Map<String, String> paramMap) {
+		return dw03Mapper.selectDrawDocTreeList(paramMap);
+	}
+
+	@Override
+	public int selectDrawTreeFileListCount(Map<String, String> paramMap) {
+		return dw03Mapper.selectDrawTreeFileListCount(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectDrawTreeFileList(Map<String, String> paramMap) {
+		return dw03Mapper.selectDrawTreeFileList(paramMap);
+	}
+	
+}
