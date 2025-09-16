@@ -33,13 +33,13 @@ public class DW01SvcImpl implements DW01Svc {
     
     @Override
 	public void insertHistory(AuditIngestReq req) {
-    	String auditLog;
+        String auditLog;
 
         try {
             auditLog = objectMapper.writeValueAsString(req);
         } catch (JsonProcessingException e) {
 //            throw new IllegalStateException("AuditIngestReq JSON 직렬화 실패", e);
-        	auditLog =  "AuditIngestReq JSON 직렬화 실패";
+            auditLog =  "AuditIngestReq JSON 직렬화 실패";
         }
 
         // 2) 파일 경로: 기본 fullPath, RENAME인 경우 newPath 우선
@@ -90,87 +90,86 @@ public class DW01SvcImpl implements DW01Svc {
         String normChkPath  =  ("RENAMED".equals(reqAction)) ? normOldPath : normFullPath;
         boolean noPath = isEmpty(fullPath);
         
-         // 파일명/확장자 후보 (경로 없어도 최대한 추정)
-         String candidateForName = !isEmpty(fullPath) ? fullPath : oldPath;
-    
-         String fileNameExtMin;
-         try {
-             Path pForName = Paths.get(candidateForName);
-             fileNameExtMin = pForName.getFileName() != null ? pForName.getFileName().toString() : "UNKNOWN";
-         } catch (Exception ignore) {
-             fileNameExtMin = isEmpty(candidateForName) ? "UNKNOWN" : candidateForName;
-         }
-         String extMin      = Optional.ofNullable(FilenameUtils.getExtension(fileNameExtMin)).orElse("");
-         String fileNameMin = isEmpty(extMin) ? fileNameExtMin : FilenameUtils.getBaseName(fileNameExtMin);
-         String salesCdFromName = DwgNameParser.parseFromPath(fileNameExtMin)
-        	        .map(r -> r.salesCd)
-        	        .orElse(null);
-         
-         // 중복 선언 금지: checksum은 여기 한 번만 선언
-         String checksum = Optional.ofNullable(req.getFileObj())
-        	        .map(f -> f.getSha256())
-        	        .orElse(null);
-         String ip = Optional.ofNullable(req.getHost())
-        	        .map(h -> h.getMachine())
-        	        .orElse(null);
-         String evtId = Optional.ofNullable(req.getActorProcess())
-        	        .map(a -> a.getEventId())
-        	        .orElse(null);
-    
-         // 앱 이름
-         String appName = Optional.ofNullable(req.getActorProcess())
-        	        .map(a -> a.getProcessName())
-        	        .filter(s -> s != null && !s.trim().isEmpty())  // JDK 8에서는 trim() + isEmpty()
-        	        .orElse("PS-AuditCollector");
-         String sourceEvtType =  Optional.ofNullable(req.getFsEvent())
-        	        .map(f -> f.getType())
-        	        .map(Object::toString)
-        	        .orElse(null);
-         String accessMask   = Optional.ofNullable(req.getActorProcess())
-        	        .map(a -> a.getAccessMask())
-        	        .map(Object::toString)
-        	        .orElse(null);
-         String recordId =  Optional.ofNullable(req.getActorProcess())
-        	        .map(a -> a.getEventNo())
-        	        .orElse(null);
-         recordId = (recordId != null) ? recordId :  "0";
-         
-         String rawMessage     = String.valueOf(req.getRawMessage());
-                 
+        // 파일명/확장자 후보 (경로 없어도 최대한 추정)
+        String candidateForName = !isEmpty(fullPath) ? fullPath : oldPath;
 
-         
-         // 2) 경로가 끝내 없으면 AUDIT만 남기고 종료
-         if (noPath) {
-             Map<String, Object> insA = new HashMap<>();
-             insA.put("docId", null);
-             insA.put("verId", null);
-             insA.put("action", ( "DELETED".equals(reqAction) ? "DELETED" :
-                                  "RENAMED".equals(reqAction) ? "RENAMED" :
-                                  "CREATED".equals(reqAction) ? "CREATED" : "TOUCH") + "/NOPATH");
-             insA.put("salesCd", (salesCdFromName != null) ? salesCdFromName : "SALESCD_NOT");
-             insA.put("docNo", recordId);
+        String fileNameExtMin;
+        try {
+            Path pForName = Paths.get(candidateForName);
+            fileNameExtMin = pForName.getFileName() != null ? pForName.getFileName().toString() : "UNKNOWN";
+        } catch (Exception ignore) {
+            fileNameExtMin = isEmpty(candidateForName) ? "UNKNOWN" : candidateForName;
+        }
+        String extMin      = Optional.ofNullable(FilenameUtils.getExtension(fileNameExtMin)).orElse("");
+        String fileNameMin = isEmpty(extMin) ? fileNameExtMin : FilenameUtils.getBaseName(fileNameExtMin);
+        String salesCdFromName = DwgNameParser.parseFromPath(fileNameExtMin)
+                .map(r -> r.salesCd)
+                .orElse(null);
+        
+        // 중복 선언 금지: checksum은 여기 한 번만 선언
+        String checksum = Optional.ofNullable(req.getFileObj())
+                .map(f -> f.getSha256())
+                .orElse(null);
+        String ip = Optional.ofNullable(req.getHost())
+                .map(h -> h.getMachine())
+                .orElse(null);
+        String evtId = Optional.ofNullable(req.getActorProcess())
+                .map(a -> a.getEventId())
+                .orElse(null);
     
-             insA.put("fileName", "UNKNOWN".equals(fileNameExtMin) ? "N/A" : fileNameMin);
-             insA.put("ext",      extMin);
-             insA.put("fileSize", req.getFile().getSize());
-             insA.put("checksum", checksum);
-             insA.put("clientIp", ip);
-             insA.put("userId",   deriveUserId(req));
-             insA.put("userName", deriveUserName(req));
-             insA.put("appName",  appName);
-             insA.put("rawMessage", rawMessage);
+        // 앱 이름
+        String appName = Optional.ofNullable(req.getActorProcess())
+                .map(a -> a.getProcessName())
+                .filter(s -> s != null && !s.trim().isEmpty())  // JDK 8에서는 trim() + isEmpty()
+                .orElse("PS-AuditCollector");
+        String sourceEvtType =  Optional.ofNullable(req.getFsEvent())
+                .map(f -> f.getType())
+                .map(Object::toString)
+                .orElse(null);
+        String accessMask   = Optional.ofNullable(req.getActorProcess())
+                .map(a -> a.getAccessMask())
+                .map(Object::toString)
+                .orElse(null);
+        String recordId =  Optional.ofNullable(req.getActorProcess())
+                .map(a -> a.getEventNo())
+                .orElse(null);
+        recordId = (recordId != null) ? recordId :  "0";
+        
+        String rawMessage     = String.valueOf(req.getRawMessage());
+                
+
+        
+        // 2) 경로가 끝내 없으면 AUDIT만 남기고 종료
+        if (noPath) {
+            Map<String, Object> insA = new HashMap<>();
+            insA.put("docId", null);
+            insA.put("verId", null);
+            insA.put("action", ( "DELETED".equals(reqAction) ? "DELETED" :
+                                "RENAMED".equals(reqAction) ? "RENAMED" :
+                                "CREATED".equals(reqAction) ? "CREATED" : "TOUCH") + "/NOPATH");
+            insA.put("salesCd", (salesCdFromName != null) ? salesCdFromName : "SALESCD_NOT");
+            insA.put("docNo", recordId);
+
+            insA.put("fileName", "UNKNOWN".equals(fileNameExtMin) ? "N/A" : fileNameMin);
+            insA.put("ext",      extMin);
+            insA.put("fileSize", req.getFile().getSize());
+            insA.put("checksum", checksum);
+            insA.put("clientIp", ip);
+            insA.put("userId",   deriveUserId(req));
+            insA.put("userName", deriveUserName(req));
+            insA.put("appName",  appName);
+            insA.put("rawMessage", rawMessage);
 //             insA.put("rawXml",     req.getRawXml());
-             if (!isEmpty(oldPath)) insA.put("oldPath", oldPath);
-             if (!isEmpty(fullPath)) insA.put("newPath", fullPath);
-    
-             // ★ 스키마에 RECORD_ID가 없으면 아래 줄은 지우고, SOURCE_EVT_ID를 쓰세요.
-             insA.put("recordId", recordId);
-             insA.put("sourceEvtType", sourceEvtType);
-             insA.put("sourceEvtId", evtId);
-    
-             dw01Mapper.insertAudit(insA);
-             return;
-         }
+            if (!isEmpty(oldPath)) insA.put("oldPath", oldPath);
+            if (!isEmpty(fullPath)) insA.put("newPath", fullPath);
+
+            insA.put("recordId", recordId);
+            insA.put("sourceEvtType", sourceEvtType);
+            insA.put("sourceEvtId", evtId);
+
+            dw01Mapper.insertAudit(insA);
+            return;
+        }
         
      	// 3) 경로가 있는 정상 흐름
         Path p = Paths.get(fullPath);
@@ -237,7 +236,7 @@ public class DW01SvcImpl implements DW01Svc {
             resolvedAction = (lastChecksum == null) ? "CREATED" : (checksum == null ? "TOUCH" : (Objects.equals(lastChecksum, checksum) ? "TOUCH" : "MODIFY"));
         }
 /***********************************************************************************************************************************************
-                 액션			  FILE_NAME			EXT			NEW_PATH				OLD_PATH			CHECKSUM		비고
+        액션			  FILE_NAME			EXT			NEW_PATH				OLD_PATH			CHECKSUM		비고
 **********************************************************************************************************************************************
         CREATE				base			ext			normFullPath			NULL				sha256			VER 생성
         MODIFY				base			ext			normFullPath			NULL				sha256			VER 생성
@@ -246,12 +245,12 @@ public class DW01SvcImpl implements DW01Svc {
         DELETE				base			ext			normFullPath (삭제 전 경로)	NULL				NULL			VER 증가 없음
         UNTRACKED/NOPATH	base or "N/A"	ext or ""	(가능하면)					(가능하면)				NULL			DOC/VER 생성 금지
 ***********************************************************************************************************************************************/
-     // 3) ★★★ DELETE 처리 전용 분기 ★★★
-     if ("DELETED".equals(resolvedAction)) {
-         // 3-1) 경로 매칭 성공: 기존 문서/버전에 삭제 이력만 남김
-    	 // 경로 매칭 성공/실패에 따라 AUDIT만 남기고 return
-         if (verByPath != null) {
-             // (선택) UPDATED_BY 스탬핑만 수행 (버전증가/헤더 변화 없음)
+    // 3) ★★★ DELETE 처리 전용 분기 ★★★
+    if ("DELETED".equals(resolvedAction)) {
+        // 3-1) 경로 매칭 성공: 기존 문서/버전에 삭제 이력만 남김
+        // 경로 매칭 성공/실패에 따라 AUDIT만 남기고 return
+        if (verByPath != null) {
+            // (선택) UPDATED_BY 스탬핑만 수행 (버전증가/헤더 변화 없음)
 //         	Integer currentVerNoForRename = (lastNo != null) ? lastNo : 1; // 최소 1로 방어
 //             // 버전 증가 없이 헤더만 최신화
 //             Map<String, Object> mapperParam = new HashMap<>();
@@ -261,79 +260,79 @@ public class DW01SvcImpl implements DW01Svc {
 //             mapperParam.put("verNo",    currentVerNoForRename);
 //             mapperParam.put("userId",   userIdDerived);
 //             dw01Mapper.updateDocHead(mapperParam);
-        	 
-             // 문서 상태를 DELETED 로 표시 (예: DOC_ST='D' 또는 DELETED_YN='Y')
-             Map<String, Object> delHead = new HashMap<>();
-             delHead.put("docId",  docId);
-             delHead.put("userId", userIdDerived);
-             dw01Mapper.markDocDeleted(delHead); 
-             // SQL 예:
-             // UPDATE TB_DRAWING_DOC
-             //    SET DOC_ST='D', UPDATED_BY=#{userId}, UPDATED_AT=SYSDATE
-             //  WHERE DOC_ID=#{docId}
-         }
+            
+            // 문서 상태를 DELETED 로 표시 (예: DOC_ST='D' 또는 DELETED_YN='Y')
+            Map<String, Object> delHead = new HashMap<>();
+            delHead.put("docId",  docId);
+            delHead.put("userId", userIdDerived);
+            dw01Mapper.markDocDeleted(delHead); 
+            // SQL 예:
+            // UPDATE TB_DRAWING_DOC
+            //    SET DOC_ST='D', UPDATED_BY=#{userId}, UPDATED_AT=SYSDATE
+            //  WHERE DOC_ID=#{docId}
+        }
 
-         // AUDIT 적재 (verId/docId 포함)
-         Map<String,Object> insA = new HashMap<>();
-         insA.put("docId",    (docId != null ? docId :  0));
-         insA.put("verId",    (verId != null ? verId :  0));
-         insA.put("action",   (verByPath != null) ? "DELETED" : "DELETED/UNTRACKED");
-         insA.put("salesCd",  salesCd);
-         insA.put("docNo",    recordId);
-         insA.put("partNo",   partNo);
-         insA.put("unitNo",   unitNo);
-         insA.put("revNo",    revNo);
-         insA.put("fileName", normFullPath);
-         insA.put("ext",      ext);
-         insA.put("fileSize", req.getFile().getSize()); // 보통 null
-         insA.put("checksum", checksum);                 // 대부분 null
-         insA.put("clientIp", ip);
-         insA.put("userId",   userIdDerived);
-         insA.put("userName", userNameDerived);
-         insA.put("appName",  appName);
-         insA.put("rawMessage", rawMessage);
+        // AUDIT 적재 (verId/docId 포함)
+        Map<String,Object> insA = new HashMap<>();
+        insA.put("docId",    (docId != null ? docId :  0));
+        insA.put("verId",    (verId != null ? verId :  0));
+        insA.put("action",   (verByPath != null) ? "DELETED" : "DELETED/UNTRACKED");
+        insA.put("salesCd",  salesCd);
+        insA.put("docNo",    recordId);
+        insA.put("partNo",   partNo);
+        insA.put("unitNo",   unitNo);
+        insA.put("revNo",    revNo);
+        insA.put("fileName", normFullPath);
+        insA.put("ext",      ext);
+        insA.put("fileSize", req.getFile().getSize()); // 보통 null
+        insA.put("checksum", checksum);                 // 대부분 null
+        insA.put("clientIp", ip);
+        insA.put("userId",   userIdDerived);
+        insA.put("userName", userNameDerived);
+        insA.put("appName",  appName);
+        insA.put("rawMessage", rawMessage);
 //         insA.put("rawXml",     req.getRawXml());
-         if (!isEmpty(oldPath)) insA.put("oldPath", oldPath);
-         if (!isEmpty(fullPath)) insA.put("newPath", fullPath);
-         // ★ 스키마 컬럼에 맞춰 SOURCE_EVT_ID 사용
-         insA.put("recordId", recordId);
-         insA.put("sourceEvtType", sourceEvtType);
-         insA.put("sourceEvtId", evtId);
+        if (!isEmpty(oldPath)) insA.put("oldPath", oldPath);
+        if (!isEmpty(fullPath)) insA.put("newPath", fullPath);
+        // ★ 스키마 컬럼에 맞춰 SOURCE_EVT_ID 사용
+        insA.put("recordId", recordId);
+        insA.put("sourceEvtType", sourceEvtType);
+        insA.put("sourceEvtId", evtId);
 
-         dw01Mapper.insertAudit(insA);
-         
-         return;
-     }  
+        dw01Mapper.insertAudit(insA);
+        
+        return;
+    }  
 
-     if (verByPath == null) {
-         Map<String, Object> ins = new HashMap<>();
-         ins.put("salesCd",  salesCd);
-         ins.put("docNo",    recordId);
-         ins.put("verNo",    0);
-         ins.put("fileName", normFullPath);
-         ins.put("ext",      ext);
-         ins.put("pathBase", p.getParent() != null ? p.getParent().toString() : "");
-         ins.put("userId",   userIdDerived);
-         dw01Mapper.insertDoc(ins); // selectKey
-         docId = ins.get("docId") != null ? ((Number) ins.get("docId")).longValue() : null;
-         
-         
-         Map<String, Object> insV = new HashMap<>();
-         insV.put("docId",     (docId != null ? docId :  0));
-         insV.put("verNo",     0);
-         insV.put("fileSize",  req.getFile().getSize());
-         insV.put("checksum",  checksum);
-         insV.put("storedPath", normFullPath);
-         insV.put("comment",    quarantined ? (resolvedAction + "/QUARANTINE") : resolvedAction);
-         insV.put("userId",     userIdDerived);
-         dw01Mapper.insertVersion(insV);
-         verId = insV.get("verId") != null ? ((Number) insV.get("verId")).longValue() : null; // (O)
-     } 
+    if (verByPath == null) {
+        Map<String, Object> ins = new HashMap<>();
+        ins.put("salesCd",  salesCd);
+        ins.put("docNo",    recordId);
+        ins.put("verNo",    0);
+        ins.put("fileName", normFullPath);
+        ins.put("ext",      ext);
+        ins.put("pathBase", p.getParent() != null ? p.getParent().toString() : "");
+        ins.put("userId",   userIdDerived);
+        dw01Mapper.insertDoc(ins); // selectKey
+        docId = ins.get("docId") != null ? ((Number) ins.get("docId")).longValue() : null;
+        
+        
+        Map<String, Object> insV = new HashMap<>();
+        insV.put("docId",     (docId != null ? docId :  0));
+        insV.put("verNo",     0);
+        insV.put("fileSize",  req.getFile().getSize());
+        insV.put("checksum",  checksum);
+        insV.put("storedPath", normFullPath);
+        insV.put("comment",    quarantined ? (resolvedAction + "/QUARANTINE") : resolvedAction);
+        insV.put("userId",     userIdDerived);
+        dw01Mapper.insertVersion(insV);
+        verId = insV.get("verId") != null ? ((Number) insV.get("verId")).longValue() : null; // (O)
+    } 
+
     
-     
-     if ("RENAMED".equals(resolvedAction)) {
-	    // RENAME/UNTRACKED로 AUDIT만 남기고 return
-	    if ((verByPath != null) && (!isEmpty(fullPath))) {
+    if ("RENAMED".equals(resolvedAction)) {
+        // RENAME/UNTRACKED로 AUDIT만 남기고 return
+        if ((verByPath != null) && (!isEmpty(fullPath))) {
 	    	// VERSION 경로 동기화
             Map<String, Object> updV = new HashMap<>();
             updV.put("verId",      verId);
@@ -355,8 +354,8 @@ public class DW01SvcImpl implements DW01Svc {
                 mapperParam.put("pathBase", newBase);
             }
             dw01Mapper.updateDocHead(mapperParam);
-	    } 
-	    
+        } 
+        
 
         Map<String, Object> insA = new HashMap<>();
         insA.put("docId",    (docId != null ? docId :  0));
@@ -389,74 +388,74 @@ public class DW01SvcImpl implements DW01Svc {
 
         return;
     }
-       
+    
 
-        // 6) 버전 INSERT / 헤더 갱신
-     if (!"TOUCH".equals(resolvedAction)) {
-    	 // bumpActiveVer → insertVersion → updateDocHead
-    	 
-        	Map<String, Object> bumpParam = new HashMap<>();
-            bumpParam.put("docId", docId);
-            bumpParam.put("userId", userIdDerived);
-            dw01Mapper.bumpActiveVer(bumpParam); // UPDATE ACTIVE_VER = NVL(ACTIVE_VER,0)+1
-            
-
-            Integer verNo = dw01Mapper.getActiveVerForUpdate(docId); // SELECT ... FOR UPDATE
-            if (verNo == null || verNo < 1) verNo = 1;
-
-           
-            Map<String, Object> insV = new HashMap<>();
-            insV.put("docId",     docId);
-            insV.put("verNo",     verNo);
-            insV.put("fileSize",  req.getFile().getSize());
-            insV.put("checksum",  checksum);
-            insV.put("storedPath", normFullPath);
-            insV.put("comment",    quarantined ? (resolvedAction + "/QUARANTINE") : resolvedAction);
-            insV.put("userId",     userIdDerived);
-            dw01Mapper.insertVersion(insV);
-            verId = insV.get("verId") != null ? ((Number) insV.get("verId")).longValue() : null; // (O)
-
-
-            // 헤더 최신화
-            Map<String, Object> mapperParam = new HashMap<>();
-            mapperParam.put("docId",   docId);
-            mapperParam.put("fileName", normFullPath);
-            mapperParam.put("ext",      ext);
-            mapperParam.put("verNo",    verNo);
-            mapperParam.put("userId",  userIdDerived);
-            dw01Mapper.updateDocHead(mapperParam);
-        }
+    // 6) 버전 INSERT / 헤더 갱신
+    if (!"TOUCH".equals(resolvedAction)) {
+        // bumpActiveVer → insertVersion → updateDocHead
         
-        // 7) 감사 기록 INSERT
-        Map<String, Object> insA = new HashMap<>();
-        insA.put("docId",    (docId != null ? docId :  0));
-        insA.put("verId",    verId);
-        insA.put("action",   resolvedAction);
-        insA.put("salesCd",  salesCd);
-        insA.put("docNo",    recordId);
-        insA.put("partNo",   partNo);
-        insA.put("unitNo",   unitNo);
-        insA.put("revNo",    revNo);
-        insA.put("fileName", normFullPath);
-        insA.put("ext",      ext);
-        insA.put("fileSize", req.getFile().getSize());
-        insA.put("checksum", checksum);
-        insA.put("clientIp", ip);
-        insA.put("userId",   userIdDerived);
-        insA.put("userName", userNameDerived);
-        insA.put("appName",  appName);
-        // 보강 원본
-        insA.put("rawMessage", rawMessage);
-//        insA.put("rawXml",     req.getRawXml());
-        // RENAME 보강(선택 컬럼)
-        if (!isEmpty(oldPath)) insA.put("oldPath", oldPath);
-        if (!isEmpty(fullPath)) insA.put("newPath", fullPath);
-        insA.put("recordId", recordId);
-        insA.put("sourceEvtId", evtId);
-        insA.put("sourceEvtType", sourceEvtType);
+        Map<String, Object> bumpParam = new HashMap<>();
+        bumpParam.put("docId", docId);
+        bumpParam.put("userId", userIdDerived);
+        dw01Mapper.bumpActiveVer(bumpParam); // UPDATE ACTIVE_VER = NVL(ACTIVE_VER,0)+1
+        
 
-        dw01Mapper.insertAudit(insA);
+        Integer verNo = dw01Mapper.getActiveVerForUpdate(docId); // SELECT ... FOR UPDATE
+        if (verNo == null || verNo < 1) verNo = 1;
+
+        
+        Map<String, Object> insV = new HashMap<>();
+        insV.put("docId",     docId);
+        insV.put("verNo",     verNo);
+        insV.put("fileSize",  req.getFile().getSize());
+        insV.put("checksum",  checksum);
+        insV.put("storedPath", normFullPath);
+        insV.put("comment",    quarantined ? (resolvedAction + "/QUARANTINE") : resolvedAction);
+        insV.put("userId",     userIdDerived);
+        dw01Mapper.insertVersion(insV);
+        verId = insV.get("verId") != null ? ((Number) insV.get("verId")).longValue() : null; // (O)
+
+
+        // 헤더 최신화
+        Map<String, Object> mapperParam = new HashMap<>();
+        mapperParam.put("docId",   docId);
+        mapperParam.put("fileName", normFullPath);
+        mapperParam.put("ext",      ext);
+        mapperParam.put("verNo",    verNo);
+        mapperParam.put("userId",  userIdDerived);
+        dw01Mapper.updateDocHead(mapperParam);
     }
+        
+    // 7) 감사 기록 INSERT
+    Map<String, Object> insA = new HashMap<>();
+    insA.put("docId",    (docId != null ? docId :  0));
+    insA.put("verId",    verId);
+    insA.put("action",   resolvedAction);
+    insA.put("salesCd",  salesCd);
+    insA.put("docNo",    recordId);
+    insA.put("partNo",   partNo);
+    insA.put("unitNo",   unitNo);
+    insA.put("revNo",    revNo);
+    insA.put("fileName", normFullPath);
+    insA.put("ext",      ext);
+    insA.put("fileSize", req.getFile().getSize());
+    insA.put("checksum", checksum);
+    insA.put("clientIp", ip);
+    insA.put("userId",   userIdDerived);
+    insA.put("userName", userNameDerived);
+    insA.put("appName",  appName);
+    // 보강 원본
+    insA.put("rawMessage", rawMessage);
+//  insA.put("rawXml",     req.getRawXml());
+    // RENAME 보강(선택 컬럼)
+    if (!isEmpty(oldPath)) insA.put("oldPath", oldPath);
+    if (!isEmpty(fullPath)) insA.put("newPath", fullPath);
+    insA.put("recordId", recordId);
+    insA.put("sourceEvtId", evtId);
+    insA.put("sourceEvtType", sourceEvtType);
+
+    dw01Mapper.insertAudit(insA);
+}
 
     private static boolean isEmpty(String s) {
         return s == null || s.trim().isEmpty();

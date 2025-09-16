@@ -2,149 +2,203 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.dksys.biz.user.dw.dw01.mapper.DW01Mapper">
+	
+	<select id="searchAuditsCount" resultType="int">
+		SELECT 
+	 		COUNT(T.AUDIT_ID) 
+		  FROM TB_DRAWING_AUDIT T
+		    		LEFT OUTER JOIN TB_CM06M01 AS C ON T.USER_ID = C.ID
+	    WHERE CREATED_AT BETWEEN #{from} AND #{to}
+		      <if test="userId 		!= null and userId 	 != ''">AND USER_ID 		= #{userId}</if>
+		      <if test="userIdNm 	!= null and userIdNm != ''">AND C.NAME 	LIKE '%'||#{userIdNm}||'%'</if>
+		      <if test="salesCd 	!= null and salesCd  != ''">AND SALES_CD 		= #{salesCd}</if>
+		      <if test="docNo 		!= null and docNo 	 != ''">AND DOC_NO 	LIKE '%'||#{docNo}||'%'</if>
+	</select>
+	
+	
+	<select id="searchAuditsList" resultType="CamelMap">
+	SELECT
+		*
+	FROM
+	(
+		SELECT
+			ROWNUM AS RNUM, A.*
+		FROM
+		(
+		    SELECT T.AUDIT_ID,  	T.DOC_ID,  		T.VER_ID,  		T.ACTION_TYPE,  	T.SALES_CD,  		T.DOC_NO,  
+		           T.DOC_NO,		T.FILE_NAME,  	T.EXT,  		T.FILE_SIZE,  		T.CHECKSUM_SHA256,  T.CLIENT_IP,  
+		           T.USER_ID,  		T.USER_NAME,  	T.APP_NAME,  	T.SOURCE_EVT_ID,  	T.SOURCE_EVT_TYPE,  T.CREATED_AT,
+		           T.PART_NO,  		T.UNIT_NO,  	T.REV_NO,  		T.OLD_PATH,  		T.NEW_PATH,  		T.RECORD_ID,
+		           C.NAME				AS USER_ID_NM 
+		    FROM TB_DRAWING_AUDIT AS T
+		    		LEFT OUTER JOIN TB_CM06M01 AS C ON T.USER_ID = C.ID
+		    WHERE CREATED_AT BETWEEN #{from} AND #{to}
+		      <if test="userId 		!= null and userId 	 != ''">AND USER_ID 		= #{userId}</if>
+		      <if test="userIdNm 	!= null and userIdNm != ''">AND C.NAME 	LIKE '%'||#{userIdNm}||'%'</if>
+		      <if test="salesCd 	!= null and salesCd  != ''">AND SALES_CD 		= #{salesCd}</if>
+		      <if test="docNo 		!= null and docNo 	 != ''">AND DOC_NO 	LIKE '%'||#{docNo}||'%'</if>
+		    ORDER BY CREATED_AT DESC
+		) A			
+	)
+	WHERE
+			RNUM BETWEEN #{firstIndex} AND #{lastIndex}
+	</select>
+	
 
-	<select id="selectDrawDocTreeList" parameterType="Map" resultType="CamelMap">
-		WITH P AS (
-			SELECT DISTINCT 
-					REPLACE(PATH_BASE,'\','/') AS FULL_PATH
-			FROM TB_DRAWING_DOC
-			WHERE 1 = 1
-			
-			<choose>
-				<when test="docSt == 'all'">
-				</when>
-				<otherwise>
-					AND DOC_ST = 'A'
-				</otherwise>
-			</choose>
-			AND PATH_BASE IS NOT NULL
-			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
-				AND CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
-			</if>
-			<if test="salesCd != null and !salesCd.equals('')">
-				AND SALES_CD LIKE  '%'||#{salesCd}||'%'
-			</if>
-		),
-		N AS (  -- 최대 폴더 깊이 만큼 조정
-			SELECT LEVEL AS LV
-			FROM DUAL
-			CONNECT BY LEVEL <![CDATA[ <= ]]> 50
-		)
-		SELECT DISTINCT
-				CASE WHEN N.LV = 1 THEN '#'
-					ELSE SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV-1) - 1)
-				END AS PARENT,
-				SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV) - 1) AS ID,
-				CASE
-					WHEN N.LV = 1 THEN SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, 1) - 1)
-					ELSE REGEXP_SUBSTR(SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV) - 1), '[^/]+$')
-				END AS TEXT,
-				NULL AS DOC_ID,
-				NULL AS DOC_NO,
-				NULL AS FILE_NAME,
-				SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV) - 1) AS PATH_BASE,
-				0 AS IS_LEAF,
-				'unit' AS TYPE,
-				'Y' AS CODE_ETC
-		FROM P
-		JOIN N
-		ON INSTR(P.FULL_PATH||'/', '/', 1, N.LV) > 0
-		ORDER BY ID
+  <select id="searchAudits" parameterType="map" resultType="map">
+    SELECT T.AUDIT_ID,  	T.DOC_ID,  		T.VER_ID,  		T.ACTION_TYPE,  	T.SALES_CD,  		T.DOC_NO,  
+		           T.DOC_NO,		T.FILE_NAME,  	T.EXT,  		T.FILE_SIZE,  		T.CHECKSUM_SHA256,  T.CLIENT_IP,  
+		           T.USER_ID,  		T.USER_NAME,  	T.APP_NAME,  	T.SOURCE_EVT_ID,  	T.SOURCE_EVT_TYPE,  T.CREATED_AT,
+		           T.PART_NO,  		T.UNIT_NO,  	T.REV_NO,  		T.OLD_PATH,  		T.NEW_PATH,  		T.RECORD_ID
+	 FROM TB_DRAWING_AUDIT AS T
+    WHERE CREATED_AT BETWEEN #{from} AND #{to}
+      <if test="userId != null and userId != ''">AND USER_ID = #{userId}</if>
+      <if test="salesCd != null and salesCd != ''">AND SALES_CD = #{salesCd}</if>
+      <if test="docNo != null and docNo != ''">AND DOC_NO LIKE '%'||#{docNo}||'%'</if>
+    ORDER BY CREATED_AT DESC
+  </select>
+  
+	
+  <!-- 1) DOC 조회 -->	
+  <select id="findDoc" parameterType="map" resultType="map">
+    SELECT * 
+      FROM TB_DRAWING_DOC 
+     WHERE DOC_NO 	= #{docNo}
+  </select>
 
+  <insert id="insertDoc" parameterType="map">
+    <selectKey keyProperty="docId" order="BEFORE" resultType="long">
+      SELECT SEQ_DRAWING_DOC.NEXTVAL FROM DUAL
+    </selectKey>
+    INSERT INTO TB_DRAWING_DOC (
+        DOC_ID, SALES_CD, DOC_NO, FILE_NAME, EXT, ACTIVE_VER, PATH_BASE,
+        CREATED_AT, CREATED_BY, DOC_ST
+    ) VALUES (
+        #{docId}, #{salesCd}, #{docNo}, #{fileName}, #{ext}, #{verNo}, #{pathBase},
+        SYSTIMESTAMP, #{userId}, 'A'
+    )
+  </insert>
+  
+  
+  <!-- 3) DOC 헤더 갱신 (RENAME/버전 반영) -->
+  <update id="updateDocHead" parameterType="map">
+    UPDATE TB_DRAWING_DOC
+       SET FILE_NAME = #{fileName}, EXT = #{ext}, ACTIVE_VER = #{verNo}, 
+          <if test="pathBase != null">
+            PATH_BASE = #{pathBase},
+          </if>
+          UPDATED_AT = SYSTIMESTAMP, UPDATED_BY = #{userId},
+          DOC_ST     = 'A'
+     WHERE DOC_ID = #{docId}
+  </update>
+
+  <!-- 4) 최신 버전 조회 -->
+  <select id="findLastVersion" parameterType="long" resultType="map">
+    SELECT v.VER_ID, v.VER_NO, v.CHECKSUM_SHA256
+      FROM TB_DRAWING_VERSION v
+     WHERE v.DOC_ID = #{docId}
+       AND v.VER_NO = (SELECT MAX(VER_NO)
+                         FROM TB_DRAWING_VERSION
+                        WHERE DOC_ID = #{docId})
+  </select>
+  
+  <!-- 5) VERSION 생성 (verId selectKey) -->
+  <insert id="insertVersion" parameterType="map">
+    <selectKey keyProperty="verId" order="BEFORE" resultType="long">
+      SELECT SEQ_DRAWING_VER.NEXTVAL FROM DUAL
+    </selectKey>
+    INSERT INTO TB_DRAWING_VERSION (VER_ID, DOC_ID, VER_NO, FILE_SIZE, CHECKSUM_SHA256, STORED_PATH, COMMENT_TXT, CREATED_AT, CREATED_BY)
+    VALUES (#{verId}, #{docId}, #{verNo}, #{fileSize, jdbcType=VARCHAR}, #{checksum, jdbcType=VARCHAR}, #{storedPath}, #{comment}, SYSTIMESTAMP, #{userId})
+  </insert>
+  
+
+  <!-- 6) (RENAME) 활성 버전 경로 동기화 -->
+  <update id="updateVersionPath" parameterType="map">
+    UPDATE TB_DRAWING_VERSION
+       SET STORED_PATH = #{storedPath}
+     WHERE VER_ID = #{verId}
+  </update>
+
+  <!-- 7) ACTIVE_VER 원자 증가 -->
+  <update id="bumpActiveVer" parameterType="map">
+    UPDATE TB_DRAWING_DOC
+       SET ACTIVE_VER = NVL(ACTIVE_VER, 0) + 1,
+           UPDATED_AT = SYSTIMESTAMP,
+           UPDATED_BY = #{userId},
+           DOC_ST     = 'A'
+     WHERE DOC_ID = #{docId}
+  </update>
+  
+
+  <!-- 8) 현재 ACTIVE_VER 조회 (행잠금) -->
+  <select id="getActiveVerForUpdate" parameterType="long" resultType="int">
+    SELECT ACTIVE_VER
+      FROM TB_DRAWING_DOC
+     WHERE DOC_ID = #{docId}
+     FOR UPDATE
+  </select>
+
+  <!-- 9) AUDIT 적재 (auditId selectKey) -->
+  <insert id="insertAudit" parameterType="map">
+    <selectKey keyProperty="auditId" order="BEFORE" resultType="long">
+      SELECT SEQ_DRAWING_AUD.NEXTVAL FROM DUAL
+    </selectKey>
+    INSERT INTO TB_DRAWING_AUDIT (
+      AUDIT_ID, DOC_ID, VER_ID, ACTION_TYPE, SALES_CD, DOC_NO, FILE_NAME, EXT, FILE_SIZE,
+      CHECKSUM_SHA256, CLIENT_IP, USER_ID, USER_NAME, APP_NAME, CREATED_AT,
+      PART_NO, UNIT_NO, REV_NO, RAW_MESSAGE, RAW_XML,
+      OLD_PATH, NEW_PATH, RECORD_ID, SOURCE_EVT_ID, SOURCE_EVT_TYPE)
+    VALUES (
+      #{auditId}, #{docId}, #{verId, jdbcType=VARCHAR}, #{action}, #{salesCd}, #{docNo}, #{fileName}, #{ext}, #{fileSize, jdbcType=VARCHAR},
+      #{checksum, jdbcType=VARCHAR}, #{clientIp, jdbcType=VARCHAR}, #{userId, jdbcType=VARCHAR}, #{userName, jdbcType=VARCHAR}, #{appName}, SYSTIMESTAMP,
+      #{partNo, jdbcType=VARCHAR}, #{unitNo, jdbcType=VARCHAR}, #{revNo, jdbcType=VARCHAR}, #{rawMessage, jdbcType=CLOB}, #{rawXml, jdbcType=CLOB},
+      #{oldPath,jdbcType=VARCHAR}, #{newPath,jdbcType=VARCHAR}, #{recordId,jdbcType=VARCHAR}, #{sourceEvtId,jdbcType=VARCHAR}, #{sourceEvtType,jdbcType=VARCHAR})
+  </insert>
+  
+	
+	<!-- 10) (선택) 인입 원본 로그 저장 -->
+	<insert id="insertHistory" parameterType="map">
+    INSERT INTO TB_DRAWING_HIST (
+      AUDIT_TIME, ACTION, SALES_CD, RECORD_ID, FILE_PATH, AUDIT_LOG
+    ) VALUES (
+      SYSTIMESTAMP,
+      #{action, 	jdbcType=VARCHAR},
+      #{salesCd, 	jdbcType=VARCHAR},
+      #{recordId, 	jdbcType=VARCHAR},
+      #{fullPath, 	jdbcType=VARCHAR},
+      #{auditLog, 	jdbcType=CLOB}
+    )
+	</insert>
+  
+    <!-- 경로로 최신 버전 1건 -->
+	<select id="findVersionByPath" parameterType="string" resultType="map">
+	  SELECT VER_ID, VER_NO, DOC_ID, CHECKSUM_SHA256
+	  FROM (
+	    SELECT v.VER_ID, v.VER_NO, v.DOC_ID, v.CHECKSUM_SHA256
+	      FROM TB_DRAWING_VERSION v
+	     WHERE v.STORED_PATH = #{path}
+	     ORDER BY v.VER_NO DESC
+	  )
+	  WHERE ROWNUM = 1
 	</select>
 
-		<select id="selectDrawTreeFileListCount" parameterType="Map" resultType="int">
-		WITH BASE AS (
-			SELECT
-				  T.DOC_ID                                 		AS FILE_KEY
-				, T.DOC_NO                                		AS DOC_NO
-				, T.FILE_NAME                              		AS FILE_NAME
-				, T.EXT                                   		AS FILE_TYPE
-				, ''                       		AS FILE_SIZE
-				, REPLACE(T.PATH_BASE,'\','/')             		AS LPATH
-				, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD') 			AS CREAT_DTTM
-				, T.CREATED_BY                             		AS CREAT_NM
-				, T.ACTIVE_VER                             		AS VER_NO
 
-				, ''                                       		AS CLNT_NM
-				, ''                                       		AS PRJCT_NM
-				, ''                                       		AS PRDT_NM
-				, ''                                       		AS ITEM_NM
-				, T.SALES_CD                               		AS SALES_CD
+	<update id="markDocDeleted" parameterType="map">
+	  UPDATE TB_DRAWING_DOC
+	     SET DOC_ST='D', 
+	         UPDATED_AT = SYSTIMESTAMP,
+	         UPDATED_BY = #{userId}
+	   WHERE DOC_ID = #{docId}
+	</update>
+  
 
-				, 'Y'                                      AS FILE_DOWN
-				, 'Y'                                      AS FILE_UPDATE
-				, 'Y'                                      AS FILE_DELETE
-			FROM TB_DRAWING_DOC T
-			WHERE 1 = 1
-			<choose>
-				<when test="docSt == 'all'">
-				</when>
-				<otherwise>
-					AND DOC_ST = 'A'
-				</otherwise>
-			</choose>
-			AND REPLACE(T.PATH_BASE,'\','/') = #{comonCd}
-			<if test="salesCd == null and salesCd.equals('')">
-				AND T.CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
-			</if>
-			<if test="salesCd != null and !salesCd.equals('')">
-				AND T.SALES_CD LIKE  '%'||#{salesCd}||'%'
-			</if>
-		)
-		SELECT COUNT(*)
-		FROM (
-		SELECT B.*,
-				ROW_NUMBER() OVER (ORDER BY B.FILE_NAME) AS RN
-		FROM BASE B
-		)
-	</select>
-
-
-	<select id="selectDrawTreeFileList" parameterType="Map" resultType="CamelMap">
-		WITH BASE AS (
-			SELECT
-				  T.DOC_ID                                 		AS FILE_KEY
-				, T.DOC_NO                                		AS DOC_NO
-				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS FILE_NAME
-				, T.EXT                                   		AS FILE_TYPE
-				, REPLACE(T.PATH_BASE,'\','/')             		AS LPATH
-				, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD') 				AS CREAT_DTTM
-				, T.CREATED_BY                             		AS CREAT_NM
-				, T.ACTIVE_VER                             		AS VER_NO
-				, T.SALES_CD                               		AS SALES_CD
-				, T.DOC_ST
-				, 'Y'                                      AS FILE_DOWN
-				, 'Y'                                      AS FILE_UPDATE
-				, 'Y'                                      AS FILE_DELETE
-			FROM TB_DRAWING_DOC T
-			WHERE 1 = 1
-			<choose>
-				<when test="docSt == 'all'">
-				</when>
-				<otherwise>
-					AND DOC_ST = 'A'
-				</otherwise>
-			</choose>
-			AND REPLACE(T.PATH_BASE,'\','/') = #{comonCd}
-			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
-				AND T.CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
-			</if>
-			<if test="salesCd != null and !salesCd.equals('')">
-				AND T.SALES_CD LIKE  '%'||#{salesCd}||'%'
-			</if>
-		)
-		SELECT *
-		FROM (
-		SELECT B.*,
-				ROW_NUMBER() OVER (ORDER BY B.FILE_NAME) AS RN
-		FROM BASE B
-		)
-		WHERE RN BETWEEN #{firstIndex} AND #{lastIndex}
-		ORDER BY FILE_NAME
-
-	</select>
-
+	<update id="markDocActevated" parameterType="map">
+	  UPDATE TB_DRAWING_DOC
+	     SET DOC_ST='A', 
+	         UPDATED_AT = SYSTIMESTAMP,
+	         UPDATED_BY = #{userId}
+	   WHERE DOC_ID = #{docId}
+	</update>
 
 
 
