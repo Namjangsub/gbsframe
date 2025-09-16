@@ -782,14 +782,14 @@
 	    });
 
 		//계약금액, Nego금액일 변경되면 재계산한기 위한 부분임
-        $("#ctrtAmt, #ctrtNegoAmt").on("keyup", function () {
-        	let tempVal = gPasIntChk($("#ctrtTotAmt").val()); 
-        	tempVal -=  gPasIntChk(this.value);
-        	tempVal = addCommaStr(tempVal);
-        	(this.name == "ctrtAmt") ? $("#ctrtNegoAmt").val(tempVal) : $("#ctrtAmt").val(tempVal) ;
-        	
-            calclateTotalClmnAmt();
-        });
+		$("#ctrtAmt, #ctrtNegoAmt").off("keyup").on("change blur", function () {
+			let tempVal = gPasIntChk($("#ctrtTotAmt").val());
+			tempVal -= gPasIntChk(this.value);
+			tempVal = addCommaStr(tempVal);
+			(this.name == "ctrtAmt") ? $("#ctrtNegoAmt").val(tempVal) : $("#ctrtAmt").val(tempVal);
+			
+			calclateTotalClmnAmt();
+		});
 
 		$("#ctrtTotAmt").change(function () {
 			let ctrTotVal = $("#ctrtTotAmt").val().replace(/,/g, '');
@@ -798,6 +798,7 @@
 			let ctrtAmtVal = ctrTotVal - ctrNeogoVal;
 			ctrtAmtVal = addCommaStr(ctrtAmtVal);
 			$("#ctrtAmt").val(ctrtAmtVal);
+			calclateTotalClmnAmt();
         });
 
 //         $("#ctrtAmt, #ctrtTotAmt, #ctrtNegoAmt").change(function () {
@@ -1033,14 +1034,16 @@
         	tempValues.push($(this).val());
         });
         formData.append("ctrtItems", tempValues.join(', '));
-		
+
+		const floatHapper = v => Math.round(parseFloat(v || 0) * 100); // 부동소수계산을 위한 헬퍼 함수
 
         let ctrtAmt = gPasIntChk($("#ctrtAmt").val());
         let totalRate = 0;
         let totalAmt = 0;
 		let clmnPlanList = gridClmnPlan.getList();
         for (var i = 0; i < clmnPlanList.length; i++) {
-            totalRate += gPasIntChk(clmnPlanList[i].clmnRate);
+            // totalRate += gPasIntChk(clmnPlanList[i].clmnRate);
+            totalRate += floatHapper(clmnPlanList[i].clmnRate)
             totalAmt += gPasFloatChk(clmnPlanList[i].clmnAmt);
 //             if (clmnPlanList[i].clmnDt == undefined || clmnPlanList[i].clmnDt == "") {
 //             	customAlert('지급예정일자가 없습니다.');
@@ -1062,12 +1065,12 @@
 				clmnPlanList[i].clmnDivSeq = "1";
 			}
         }
-        
-        if (totalRate > 100) {
+
+        if (totalRate > 10000) {
             customAlert('비율의 합계는 100%를 초과할 수 없습니다.');
 			return false;
         }
-        if (totalRate < 100) {
+        if (totalRate < 10000) {
             customAlert('비율의 합계를 100%로 맞춰 주세요.');
 			return false;
         }
@@ -1474,29 +1477,73 @@
 	}
 
 	//계약금액과 지급정보의 금액을 일치하기 위한 자동계산 부분
-    function calclateTotalClmnAmt () {
-    	let tempVal = gPasIntChk($("#ctrtTotAmt").val()) - gPasIntChk($("#ctrtAmt").val());
-    	tempVal = addCommaStr(tempVal);
-    	$("#ctrtNegoAmt").val(tempVal);
-    	
-        var ctrtAmt = gPasIntChk($("#ctrtAmt").val());
-        var data = gridClmnPlan.getList();
-        var totClmnAmt = 0; 
-        for (var i = 0; i < data.length; i++) {
-            data[i].clmnAmt = gPasIntChk(ctrtAmt * gPasIntChk(data[i].clmnRate) / 100 + 0.5); 
-            totClmnAmt += data[i].clmnAmt; 
-        }
-        if (data.length > 0){
-            data[data.length-1].clmnAmt += ctrtAmt - totClmnAmt; //오더금액과 수금금액 차이는 마지막 수금에 포함 처리
-        }
+	function calclateTotalClmnAmt () {
+		const ctrtAmt = gPasFloatChk($("#ctrtAmt").val() || 0);
+		const rows = gridClmnPlan.getList();
+		if (!rows || rows.length === 0) return;
 
-        gridClmnPlan.setData(data);
-    } 
-    
+		const isLocked = r => gPasFloatChk(r.매입등록금액) > 0 || gPasFloatChk(r.매입확정금액) > 0;
+
+		// 매입확정금액이 있는행 : 금액 고정, 비율만 재계산
+		let lockedAmt = 0, lockedRate = 0;
+		rows.forEach(r => {
+			if (isLocked(r)) {
+			const amt = gPasFloatChk(r.clmnAmt || 0);
+			r.clmnRate = ctrtAmt ? round2(amt / ctrtAmt * 100) : 0;
+			lockedAmt += amt;
+			lockedRate += r.clmnRate;
+			}
+		});
+
+		// 계획금액만 있는 행
+		const unlocked = rows
+			.filter(r => !isLocked(r))
+			.sort((a,b)=> (Number(a.clmnDivSeq||0) - Number(b.clmnDivSeq||0)));
+
+		const targetUnlockedRate = Math.max(0, round2(100 - lockedRate));
+		if (unlocked.length === 0) {
+			const diff = ctrtAmt - rows.reduce((s,r)=> s + gPasFloatChk(r.clmnAmt||0), 0);
+			if (diff !== 0) customAlert('모든 지급행이 매입등록 상태입니다. 계약금액과 지급합계를 맞출 수 없습니다.');
+			gridClmnPlan.setData({ list: rows, page: { totalElements: rows.length }});
+			return;
+		}
+
+		// 비율 계산
+		let w = unlocked.map(r => Number(r.clmnRate || 0));
+		let wsum = w.reduce((s,x)=> s + x, 0);
+		if (wsum <= 0) {
+			w = unlocked.map(r => gPasFloatChk(r.clmnAmt || 0));
+			wsum = w.reduce((s,x)=> s + x, 0);
+		}
+		if (wsum <= 0) {
+			w = unlocked.map(_ => 1);
+			wsum = unlocked.length;
+		}
+
+		// 매입확정 금액이 있는 행만 제외한 비율 보정(마지막 계획금액만 있는 행)
+		let accRate = 0, accAmt = 0;
+		unlocked.forEach((r, i) => {
+			if (i < unlocked.length - 1) {
+				const nr = round2(targetUnlockedRate * w[i] / wsum);
+				r.clmnRate = nr;
+				const a = gPasFloatChk(Math.round(ctrtAmt * nr / 100));
+				r.clmnAmt = a;
+				accRate += nr; accAmt += a;
+			} else {
+				r.clmnRate = round2(targetUnlockedRate - accRate);
+				r.clmnAmt  = gPasFloatChk(ctrtAmt - lockedAmt - accAmt);
+			}
+		});
+
+		gridClmnPlan.setData({ list: rows, page: { totalElements: rows.length }});
+	}
+
+	function round2(x){ return Number((parseFloat(x)||0).toFixed(2)); }
+
     function chechChange(elm) {
     	elm.value = addCommaStr(gPasIntChk(elm.value));
     }
-    
+
 
     function  gridPaste(thisGrid, thisGridRow, thisGridCol, _type = "DETAIL" ) {
         var pasteData = "";
