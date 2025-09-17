@@ -56,21 +56,16 @@
 		<select id="selectDrawTreeFileListCount" parameterType="Map" resultType="int">
 		WITH BASE AS (
 			SELECT
-				  T.DOC_ID                                 		AS FILE_KEY
+				  T.DOC_ID                                 		AS DOC_ID
 				, T.DOC_NO                                		AS DOC_NO
-				, T.FILE_NAME                              		AS FILE_NAME
+				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS FILE_NAME
 				, T.EXT                                   		AS FILE_TYPE
-				, ''                       		AS FILE_SIZE
 				, REPLACE(T.PATH_BASE,'\','/')             		AS LPATH
-				, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD') 			AS CREAT_DTTM
-				, T.CREATED_BY                             		AS CREAT_NM
+				, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD HH24:MI:SS') AS WORK_DTTM
+				, T.CREATED_BY                             		AS WORK_NM
 				, T.ACTIVE_VER                             		AS VER_NO
-
-				, ''                                       		AS CLNT_NM
-				, ''                                       		AS PRJCT_NM
-				, ''                                       		AS PRDT_NM
-				, ''                                       		AS ITEM_NM
 				, T.SALES_CD                               		AS SALES_CD
+				, T.DOC_ST
 				, A.FILE_SIZE
 				, A.VER_NO
 			FROM TB_DRAWING_DOC T
@@ -104,13 +99,13 @@
 	<select id="selectDrawTreeFileList" parameterType="Map" resultType="CamelMap">
 		WITH BASE AS (
 			SELECT
-				  T.DOC_ID                                 		AS FILE_KEY
+				  T.DOC_ID                                 		AS DOC_ID
 				, T.DOC_NO                                		AS DOC_NO
 				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS FILE_NAME
 				, T.EXT                                   		AS FILE_TYPE
 				, REPLACE(T.PATH_BASE,'\','/')             		AS LPATH
-				, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD') 				AS CREAT_DTTM
-				, T.CREATED_BY                             		AS CREAT_NM
+				, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD HH24:MI:SS') AS WORK_DTTM
+				, T.CREATED_BY                             		AS WORK_NM
 				, T.ACTIVE_VER                             		AS VER_NO
 				, T.SALES_CD                               		AS SALES_CD
 				, T.DOC_ST
@@ -137,19 +132,50 @@
 		)
 		SELECT *
 		FROM (
-		SELECT B.*,
-				ROW_NUMBER() OVER (ORDER BY B.FILE_NAME) AS RN
-		FROM BASE B
-		)
+				SELECT B.*,
+						ROW_NUMBER() OVER (ORDER BY B.FILE_NAME) AS RN
+				FROM BASE B
+			)
 		WHERE RN BETWEEN #{firstIndex} AND #{lastIndex}
 		ORDER BY FILE_NAME
 
 	</select>
 
 	<select id="select_dw03_detailList" parameterType="Map" resultType="CamelMap">
-		SELECT *
-		FROM TB_DRAWING_VERSION
-		WHERE DOC_ID = #{docId}
+		WITH VER AS (
+			SELECT
+				  VER_ID
+				, DOC_ID
+				, VER_NO
+				, STORED_PATH
+				, FILE_SIZE
+				, CREATED_AT
+				, CREATED_BY
+				, INSTR(STORED_PATH, '\', -1) AS LAST_BS
+				, COMMENT_TXT
+			FROM TB_DRAWING_VERSION
+			WHERE DOC_ID = #{docId}
+		)
+		SELECT
+			  VER_ID
+			, DOC_ID
+			, VER_NO
+			, STORED_PATH
+			, FILE_SIZE
+			, TO_CHAR(CREATED_AT, 'YYYY-MM-DD HH24:MI:SS') AS WORK_DTTM
+			, CREATED_BY                                   AS WORK_NM
+			, CASE
+				WHEN UPPER(SUBSTR(STORED_PATH, -4)) = '.DWG' AND LAST_BS <![CDATA[ > ]]>  0 THEN SUBSTR(STORED_PATH, LAST_BS + 1)	--파일명
+				ELSE NULL
+				END AS FILE_NAME
+			, CASE
+				WHEN UPPER(SUBSTR(STORED_PATH, -4)) = '.DWG' AND LAST_BS <![CDATA[ > ]]> 0 THEN SUBSTR(STORED_PATH, 1, LAST_BS - 1)	--경로
+				ELSE STORED_PATH
+				END AS DIR_PATH
+			, COMMENT_TXT	--상세이력
+		FROM VER
+		ORDER BY VER_NO
+
 	</select>
 
 
