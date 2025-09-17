@@ -46,4 +46,12 @@ public class DW03Ctr {
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
     }
+
+	// 도면 이력 리스트 조회
+    @PostMapping("/select_dw03_detailList")
+	public String select_dw03_detailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = dw03Svc.select_dw03_detailList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 }

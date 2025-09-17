@@ -10,5 +10,7 @@ public interface DW03Mapper {
 	int selectDrawTreeFileListCount(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectDrawTreeFileList(Map<String, String> paramMap);
+
+	List<Map<String, String>> select_dw03_detailList(Map<String, String> paramMap);
 	
 }

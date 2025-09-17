@@ -29,5 +29,10 @@ public class DW03Svcmpl implements DW03Svc {
 	public List<Map<String, String>> selectDrawTreeFileList(Map<String, String> paramMap) {
 		return dw03Mapper.selectDrawTreeFileList(paramMap);
 	}
+
+	@Override
+	public List<Map<String, String>> select_dw03_detailList(Map<String, String> paramMap) {
+		return dw03Mapper.select_dw03_detailList(paramMap);
+	}
 	
 }

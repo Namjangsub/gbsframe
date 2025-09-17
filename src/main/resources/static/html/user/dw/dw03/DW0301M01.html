@@ -115,7 +115,7 @@
 	<div id="head_area"></div>
 	<div id="top_area"></div>
 	<div id="main_area">
-		<inpupt type="hidden" id="pgmId_S" name="pgmId_S" value="DW0103M01">
+		<inpupt type="hidden" id="pgmId_S" name="pgmId_S" value="DW0301M01">
 		<inpupt type="hidden" id="coCd_S" name="coCd_S">
 		<inpupt type="hidden" id="userId_S" name="userId_S">
 	<!-- 페이지 상단 -->
@@ -166,11 +166,6 @@
 		<div class="contents no_bg">
 		<!-- 콘텐츠 타이틀 -->
 		<div class="contents_tit" style="margin: 0px;">
-				<div class="add_btn_small pdl10" style="margin: 0px; padding: 0px;">
-					<a onclick="moveFile();" style="height: 30px; line-height: 28px; width: 50px;" authchk><i class="fas fa-retweet"></i> 이동</a> 
-					<a onclick="uploadFile();" style="height: 30px; line-height: 28px; width: 50px;" authchk ; title="거래처, 제품, 아이템, Sales등 입력처리해야하므로 업로드는 보류!"><i class="fas fa-upload"></i> 등록</a> 
-					<a onclick="deleteFile();" style="height: 30px; line-height: 28px; width: 50px;" authchk><i class="fas fa-trash"></i> 삭제</a> 
-				</div>
 				<div class="add_btn_small pdl10">
 					<select id="recordCnt" class="prae_select" data-search="recordCnt" style="height: 30px" onchange="gridView.setData(0);">
 						<option value="25">25</option>
@@ -192,7 +187,7 @@
 				<div style="float: right;">
 					<a id="treeExpandBtn" class="btn btn-default btn-sm" onclick="treeExpandClose()"><i class="fas fa-chevron-up"></i></a>
 				</div>
-				<div id="deptTree" style="height: 690px;  width: 100%;" ></div>
+				<div id="deptTree" style="height: 747px;  width: 100%;" ></div>
 			</div>
 		</div>
 		<div id="gridFrame" class="col-xs-9 resizable-div" style="padding-left: 0; padding-right: 0px;min-height:247px;">
@@ -200,12 +195,16 @@
 			<h3 class="location">
 				<span class="page_tit" style="text-align: right;"> 문서현황</span>
 			</h3>
-				<div data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 690px;  min-height:200px;"></div>
+				<div data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 725px;  min-height:200px;"></div>
 			</div>
 		</div>
 	</div>
 
 	<script type="text/javascript">
+
+	var isRefreshing = false;          // refresh 중 프로그램적 재선택 플래그
+	var lastSelectedId = null;         // 최근 선택 노드 id
+	var wantGridAfterRefresh = false; 
 
 	function gridStyle(row) {
 		if (!row) return "";
@@ -222,7 +221,7 @@
 // 			        showLineNumber: true,
 // 	                lineNumberColumnWidth: 40,
 				showRowSelector : true,
-				multipleSelect : true,
+				multipleSelect : false,
 				sortable : true,
 				target: $('[data-ax5grid="file-grid"]'),
 				header : {
@@ -233,21 +232,16 @@
 					onClick : function() {
 						this.self.select(this.dindex);
 					},
-					onDBLClick : function() {
-						var docId = this.item["docId"];
-						if (docId) {
-							if (this.item["fileDown"] == 'Y') {
-								downloadFile(this.item.docId, this.item.fileName);
-							} else {
-								alert('파일 다운로드 권한이 없습니다.')
-							};
-						}							
+					onDBLClick: function () {
+						select_dw03_modal();
 					},
 				},
 				columns : [
 						{key : "rn",		label : "No",			width : 40, align: "center", hidden: false},
+						{key : "verNo",		label : "Ver",			width : 40, align: "center", hidden: true},
 						{key : "docId",		label : "파일Id", hidden: true},
 						{key : "fileName",	label : "파일명", 		width : 260, align: "left"},
+						{key : "fileSize",	label : "파일크기", 	width : 80, align: "right" , formatter: "money"},
 						{key : "fileType",	label : "확장자",		width : 60, align: "center"},
 						{key : "salesCd", 	label : "Sales코드",	width : 120, align: "center"},
 						{key : "creatNm", 	label : "작업자",		width : 80, align: "center"},
@@ -314,19 +308,20 @@
 					$('#treeview').height($('body').height() - 285) // 화면 Body 높이 919 - 그리드 기본크기 700px = 264
 					$('#file_tree_area').height($('body').height() - 219) // 화면 Body 높이 919 - 그리드 기본크기 700px = 264
 					$('#file_area').height($('body').height() - 264) // 화면 Body 높이 919 - 그리드 기본크기 655 = 264
+					gridHeightResize(gridView, 194);
 				} catch (error) {
 					alert("오류 발생!! 전산실 연락 바랍니다", error.message);
 					return null; // 오류 발생 시 null 반환
 				} finally {
 					// console.log("함수 실행 완료.");
 				}
-			});
+			}, false);
 		}
 	}
 		
 	$(document.body).ready(function () {
+		resizeTreeAreaAuto();
 		//권한체크
-		authChk();
 		mainDefaultLoad("기준관리", "도면파일관리");
 		setCommonSelect($("#main_area select[data-kind]"));
 		$("#coCd_S").val(jwt.coCd);
@@ -357,7 +352,7 @@
 				customAlert("날짜를 확인해주세요");
 				$('#reqDtFrom_S').datepicker("setDate", new Date($('#reqDtTo_S').val()));
 			}
-		});	
+		});
 
 		gridView.initView();
 
@@ -392,7 +387,7 @@
 			$("#treeFrame").width(chgWidth);
 			$('#deptTree').width(chgWidth);
 			$('#treeFrame .contents').width(chgWidth);
-		});			
+		});
 		// 사이즈 조정 시 태그 자동 크기 조절
 		$("#treeFrame").resize(function() {
 			var workWidth = $("#main_area").width() - 10;
@@ -414,10 +409,29 @@
 			var chgWidth = workWidth - tagWidth;
 			chgWidth = (tagWidth + chgWidth) > workWidth ?  (workWidth - tagWidth) : chgWidth;
 			$("#gridFrame").width(chgWidth);
-		});			
-		
+		});
+
 		authChk();
 	});
+
+	// 팝업창
+	function select_dw03_modal() {
+		// 선택된 로우가 없으면 빈 객체로 처리
+		var row = gridView.target.getList("selected")[0];
+
+		var paramObj = {
+			"docId"		: row.docId,
+			"fileName" 	: row.fileName,
+			"salesCd"	: row.salesCd,
+			"creatNm" 	: row.creatNm,
+			"verNo" 	: row.verNo
+		};
+
+		// 팝업 창 열기
+		openModal("/static/html/user/dw/dw03/DW0301P01.html", 1400, 650, "", paramObj, function(data) {
+// 			gridView.setData(0);
+		});
+	}
 
 	function initSearch() {
 		$('[data-search]').off("change");	//바인딩기능 오프
@@ -435,120 +449,109 @@
 		initDeptTree();
 		
   		$('[data-search]').on("change", function(){ //검색조건 이벤트 bind
-  			gridView.setData(0);
-  		});	
+			gridView.setData(0);
+		});
 	}
 			
 	// 트리 초기화
 	function initDeptTree() {
-		$("#deptTree").jstree("destroy");
-		$("#deptTree").jstree(
-		{
-			plugins : ['types'],
-			core : {
-				check_callback: true,
-				data : selectDeptTree(),
-				
-				check_callback: function (operation, node, node_parent, node_position, more) {
-					if (operation === 'delete_node') {
-						if (node.original.isLeaf == 0) {
-							return true; // 삭제가능
-						} else {
-							return false; // 살제불가
-						}
-					}
-					// 삭제가능
-					return true;
+		var $tree = $('#deptTree');
+		var hasTree = !!$tree.data('jstree');
+
+		if (!hasTree) {
+			$tree.jstree({
+				plugins : ['types'],
+				core : {
+					check_callback: true,
+					data : selectDeptTree()
 				},
-			},
-			types : {
-  				'leaf' : {"icon" : 'glyphicon glyphicon-file'},
-  				'unit' : {'icon' : 'glyphicon glyphicon-folder-close'},
-  				'unit-open' : {'icon' : 'glyphicon glyphicon-folder-open'}
-			}
-		}).on("loaded.jstree", function() {
-			var tree = $('#deptTree').jstree(true);
-			var json = tree ? tree.get_json() : [];
-			if (json && json.length) {
-				// 최상위(루트) 첫 노드 열고 선택
-				var firstRootId = json[0].id;
-				try { tree.open_node(firstRootId); } catch(e){ /* ignore */ }
-				tree.deselect_all();
-				tree.select_node(firstRootId);
-
-				// 기존에 FILETREE 고정으로 호출하던 함수가 있으면 첫 루트로 호출
-				if (typeof searchAndDelete === 'function') {
-					try { searchAndDelete(tree, firstRootId, firstRootId); } catch(e){ console.warn(e); }
+				types : {
+					'leaf' : {"icon" : 'glyphicon glyphicon-file'},
+					'unit' : {'icon' : 'glyphicon glyphicon-folder-close'},
+					'unit-open' : {'icon' : 'glyphicon glyphicon-folder-open'}
 				}
-			} else {
-				console.warn('deptTree loaded but empty');
-			}
-							
-		}).on("refresh.jstree", function() {
-		// 리프레시 완료 시
-			var selectedId = $('#deptTree').jstree(true).get_selected()[0];
-			$('#deptTree').jstree(true).deselect_all();
-			$('#deptTree').jstree(true).select_node(selectedId);
-		}).on("select_node.jstree", function(e, data) {
-		// 노드 선택 시 발생 이벤트
-			if (!data || !data.node) return;
+			})
+			.on("loaded.jstree", function() {
+				var tree = $tree.jstree(true);
+				var json = tree ? tree.get_json('#') : [];
+				if (json && json.length) {
+					tree.deselect_all();
+					tree.open_node(json[0].id);
+					tree.select_node(json[0].id); // 첫 진입 시 그리드 setData는 select_node에서 1회 수행됨
+				}
+			})
+			.on("refresh.jstree", function() {
+				var tree = $tree.jstree(true);
+				// refresh 후 재선택
+				if (lastSelectedId && tree.get_node(lastSelectedId)) {
+					isRefreshing = true;
+					tree.deselect_all();
+					tree.select_node(lastSelectedId);
+					isRefreshing = false;
+				} else {
+					var json = tree.get_json('#');
+					if (json && json.length) {
+					isRefreshing = true;
+					tree.deselect_all();
+					tree.open_node(json[0].id);
+					tree.select_node(json[0].id);
+					isRefreshing = false;
+					}
+				}
+				// 검색 버튼·검색조건 트리거일 때만 refresh 뒤 그리드 1회 호출
+				if (wantGridAfterRefresh) {
+					wantGridAfterRefresh = false;
+					gridView.setData(0);
+				}
+			})
+			.on("select_node.jstree", function(e, data) {
+				if (!data || !data.node) return;
+				if (isRefreshing) return; // 프로그램적 재선택 차단
 
-			var node = data.node;
-			var orig = node.original || {};
+				var node = data.node;
+				lastSelectedId = node.id;
 
-			// 툴팁 처리 (codeEtc 검사)
-			var nodeEl = $('#' + escapeSelector(node.id));
-			if (orig.codeEtc === 'N') {
-				nodeEl.attr("title","자료를 저장할 수 없는 폴더입니다.");
-			} else {
-				nodeEl.attr("title","");
-				if(!$('#deptTree').is(":visible")) $('#deptTree').show();
-			}
+				// 노드 클릭 시 즉시 문서현황 조회
+				gridView.setData(0);
 
-			// 선택된 노드 기준으로 comonCd 계산: (우선 pathBase 우선, 없으면 id)
-			// pathBase는 서버에서 내려온 정규화된 경로(REPLACE('\\','/'))여야 함.
-			var comonCdForGrid = orig.pathBase || orig.PATH_BASE || node.id;
-			if (typeof comonCdForGrid === 'string') comonCdForGrid = comonCdForGrid.replace(/\\/g,'/');
+				//트리 최신화(실시간 반영). 동일 노드로 재선택.
+				var tree = data.instance;
+				isRefreshing = true;
+				wantGridAfterRefresh = false; // 클릭 흐름에서는 refresh 뒤 그리드 재호출 안 함
+				tree.settings.core.data = selectDeptTree(); // 최신 데이터로 교체
+				$('#deptTree').one('refresh.jstree', function(){ isRefreshing = false; });
+				tree.refresh();
+			})
+			.on('open_node.jstree', function(e, data){ data.instance.set_type(data.node, 'unit-open'); })
+			.on('close_node.jstree', function(e, data){ data.instance.set_type(data.node, 'unit'); });
 
-			// 파일 태그(우측 상단)에는 선택노드 텍스트 사용
-			$("#file_tag").html(node.text + (orig.codeEtc == 'N' ? "에는 저장할 수 없습니다." : "") );
-
-			// gridView.setData에 comonCd 전달이 내부에서 계산되므로
-			// 대신 현재 selected node id/path를 보관해두고 grid 호출
-			$('#deptTree').data('selectedComonCd', comonCdForGrid);
-			gridView.setData(0);
-		}).on('hover_node.jstree',function(e, data){
-			if (!data || !data.node) return;
-			var nodeEl = $('#' + escapeSelector(data.node.id));
-			if (data.node.original && data.node.original.codeEtc == 'N') {
-				nodeEl.attr("title","자료를 저장할 수 없는 폴더입니다.");
-			} else {
-				nodeEl.attr("title","");
-			}
-  		}).on('open_node.jstree', function(e, data) {
-		// 노드 열릴 때
-			data.instance.set_type(data.node, 'unit-open');
-		}).on('close_node.jstree', function(e, data) {
-		// 노드 닫힐 때
-			data.instance.set_type(data.node, 'unit');
-		}).on('delete_node.jstree', function(e, data) {
-// 	          console.log(data);
-		})
+		} else {
+			// 이미 생성된 상태: 검색 버튼/조건 변경 → 선택 유지하며 트리 재로딩 + refresh 뒤 그리드 1회
+			var tree = $tree.jstree(true);
+			lastSelectedId = (tree.get_selected() || [null])[0];
+			tree.settings.core.data = selectDeptTree(); // 최신 데이터로 교체
+			wantGridAfterRefresh = true; // 검색 트리거 시 setData 1회
+			tree.refresh();
+		}
 	}
+
 
 	// 트리 데이터 select 
 	function selectDeptTree() {
 		var deptTree = null;
 		var paramObj = {
-			"coCd": $('#coCd_S').val(), //"GUN",
-			"useYn": "Y",
-			"userId" : jwt.userId,
-			"docSt" 	: $('#docSt_S').val()
+			"coCd"		: $('#coCd_S').val(),
+			"useYn"		: 'Y',
+			"userId"	: jwt.userId,
+			"docSt"		: $('#docSt_S').val(),
+			"salesCd"	: $('#salesCd_S').val(),
+			"reqDtFrom"	: $('#reqDtFrom_S').val(),
+			"reqDtTo"	: $('#reqDtTo_S').val()
 		};
 		postAjaxSync("/user/dw/dw03/selectDrawDocTreeList", paramObj, null, function(data){
 			var raw = data && Array.isArray(data.docTreeList) ? data.docTreeList : [];
-        	deptTree = normalizeFoldersOnly(raw);
-		});
+			deptTree = normalizeFoldersOnly(raw);
+		}, false);
 		return deptTree;
 	}
 
@@ -565,29 +568,21 @@
 			)
 		}));
 	}
-
-	function escapeSelector(id){
-		if (!id) return id;
-		if (window.CSS && CSS.escape) return CSS.escape(id);
-		return String(id).replace(/([ #;?%&,.+*~':"!^$\[\]()=>|\/\\])/g,'\\$1');
-	}
-
-
 	
 	//Sales Code (수주마스터, 수주상세테이블 조인) 검색
     function wbsSalesCodeSearch() {
         var paramObj = {
-           "coCd" : $('#coCd_S').val(),
-           "salesCd": $('#salesCd_S').val()
+			"coCd" : $('#coCd_S').val(),
+			"salesCd": $('#salesCd_S').val()
         };
         openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1068, 650, "SALES CODE 검색", paramObj, function (grid){
             var row = grid.target.getList("selected")[0];
             $('#salesCd_S').val(row.salesCd);
-//             $('#salesNm_S').val(row.clntPjt);
-//             $('#eqp_nm').val(row.eqNm);
+			initSearch();
         });
     }
 	
+	// 파일트리영역, 문서현황영역 사이즈 조절 함수
 	function treeExpandClose(selector) {
 		selector = selector ? selector : "deptTree" ;
 		var node = $('#' + selector).jstree(true).get_selected()[0];
@@ -595,11 +590,11 @@
 		// 특정 노드의 펼침/접힘 상태 확인
 		var isOpen = $('#' + selector).jstree("is_open", node);
 		if (isOpen) {
-		//console.log("노드가 펼쳐져 있습니다.");
-		$('#' + selector).jstree("close_all", node)
+			//console.log("노드가 펼쳐져 있습니다.");
+			$('#' + selector).jstree("close_all", node)
 		} else {
-		//console.log("노드가 접혀 있습니다.");
-		$('#' + selector).jstree("open_all", node)
+			//console.log("노드가 접혀 있습니다.");
+			$('#' + selector).jstree("open_all", node)
 		}
 
 		var iconElement = $("#treeExpandBtn i");
@@ -611,133 +606,31 @@
 		} else if (currentClass == "fas fa-chevron-up") {
 			iconElement.removeClass("fas fa-chevron-up");
 			iconElement.addClass("fas fa-chevron-down");
-		}    	
-		
-	}
-	function moveFile(docId) {
-		var rowLength = gridView.target.getList("selected").length;
-		if(rowLength < 1){
-			alert("이동할 문서를 선택하여야 작업이 가능합니다.");
-			return false;
-		} else if (rowLength > 1){
-			alert("문서는 하나씩 이동 가능합니다.");
-			return false;
-		} 
-		
-		var row = gridView.target.getList("selected")[0];
-        if (row.fileUpdate != 'Y') {
-        	alert('파일 이동 권한이 없습니다.')
-        	return false;
-        };		
-		
-		var docId = row.docId;
-		var paramObj = {
-			"docId" : docId,
-			"userId" : jwt.userId
-		}	
-		openSecondModal("/static/html/cmn/modal/treeSearch.html", 500, 720, "파일트리 검색", paramObj, function (tree) {
-			var checkedId = tree.get_checked()[0];
-			var checkedNode = tree.get_node(checkedId);
-			paramObj.comonCd = checkedNode.id;
-			paramObj.comonCdText = checkedNode.text;
-			
-			if(confirm( '"' + checkedNode.text + '" 폴더로 이동 하시겠습니까?')){
-				postAjax("/admin/cm/cm08/moveFile", paramObj, null, function(data){
-					if(data.resultCode == 200){
-						alert(data.resultMessage);
-						gridView.setData(0);
-					} else {
-						alert(data.resultMessage);	
-					}
-				});
-			}
-		});
-
-	}
-		
-	function deleteFile(docId) {
-		var rowLength = gridView.target.getList("selected").length;
-		if(rowLength < 1){
-			alert("삭제할 문서를 선택하여야 작업이 가능합니다.");
-			return false;
-		} else if (rowLength > 1){
-			alert("문서는 하나씩 삭제 가능합니다.");
-			return false;
-		} 
-		
-		var row = gridView.target.getList("selected")[0];
-        if (row.fileDelete != 'Y') {
-        	alert('파일 삭제 권한이 없습니다.')
-        	return false;
-        };		
-		var paramObj = {
-			"docId" : row.docId,
-			"userId" : jwt.userId
-		}		
-		if(confirm(row.fileName + " 삭제하시겠습니까?")){
-			deleteAjax("/admin/cm/cm08/deleteFileCallAuth", paramObj, null, function(data){
-				if(data.resultCode == 200){
-					alert(data.deleteCount + '건 ' +  data.resultMessage);
-					gridView.setData(0);
-				} else if(data.resultCode == 500){
-					alert(" 파일 삭제 작업에 오류가 발생하였습니다.");	
-				} else if(data.resultCode == 900){
-					alert(data.resultMessage);	
-				}
-			});
 		}
 	}
-	
-	function downloadFile(_docId, _filename) {
-		return new Promise(function(resolve, reject) {
-			var xhr = new XMLHttpRequest();
-			xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?docId=" + _docId + "&userId=" + jwt.userId, true);
-			xhr.responseType = "blob";
-			xhr.setRequestHeader("Authorization", authorizationToken);
-			
-			xhr.onload = function() {
-				if (xhr.status === 200) {
-					var contentType = xhr.getResponseHeader("Content-Type");
-					// 오류 상황: Content-Type이 text/plain이면 서버가 오류 메시지를 반환한 것으로 간주
-					if (contentType && contentType.indexOf("text/plain") !== -1) {
-						var reader = new FileReader();
-						reader.onload = function(e) {
-							// reject 시, 파일명과 함께 오류 메시지 전달
-							reject("[" + _filename + "] " + e.target.result);
-						};
-						reader.readAsText(xhr.response);
-					} else {
-						// 정상적인 파일이면 다운로드 진행
-						var blob = xhr.response;
-						var url = window.URL.createObjectURL(blob);
-						var a = document.createElement('a');
-						a.href = url;
-						a.download = _filename;
-						document.body.appendChild(a);
-						a.click();
-						document.body.removeChild(a);
-						window.URL.revokeObjectURL(url);
-						resolve(); // 성공 시 resolve 호출
-					}
-				} else {
-					console.error("백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
-					reject("[" + _filename + "] 백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
-				}
-			};
 
-			xhr.onerror = function() {
-				console.error("네트워크 오류가 발생했습니다.");
-				reject("[" + _filename + "] 네트워크 오류가 발생했습니다.");
-			};
+	// 파일트리 사이즈재조정 함순
+	function resizeTreeAreaAuto() {
+		var $treeFrame = $("#treeFrame");
+		var $contents  = $treeFrame.children(".contents");
 
-			xhr.send();
-		});
+		var top = $contents.offset().top;
+		var vh  = window.innerHeight;
+		var gap = 10;
+
+		var H = Math.max(200, vh - top - gap);
+		var $treeFrame = $("#treeFrame");
+		var $contents  = $treeFrame.children(".contents");
+
+		$treeFrame.height(H);
+		$contents.height(H);
+
+		var headerH = $contents.find("h3.location").outerHeight(true) || 45;
+		$("#deptTree").height(Math.max(100, H - headerH));
+
+		var inst = $("#deptTree").data("jstree") && $("#deptTree").jstree(true);
+		if (inst && inst.redraw) inst.redraw(true);
 	}
-	
-	function uploadFile() {
-		alert("거래처, 제품, 아이템, SalesCode등 필수 정보가 필요하여\n통합파일관리 화면에서의 파일 업로드는 보류!\n\n관련 자료 관리화면에서 업로드하세요!.");	
-	}
-	
 	</script>
 </body>
 </html>
