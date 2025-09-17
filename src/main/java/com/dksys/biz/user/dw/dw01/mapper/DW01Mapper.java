@@ -23,5 +23,9 @@ public interface DW01Mapper {
     int insertHistory(Map<String, Object> param);                    // 감사기록
     int markDocDeleted(Map<String, Object> param);
     int markDocActevated(Map<String, Object> param);
+
+    Map<String, Object> pathExists(Map<String, Object> param);
+    int deletePath(Map<String, Object> param);
+    int deletePathVersion(Map<String, Object> param);
     
 }
