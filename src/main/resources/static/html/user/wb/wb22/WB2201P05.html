@@ -42,7 +42,7 @@
                     <tr style="text-align: left;">
 					    <td colspan="8"> 
 					    	<div>
-	                          <div class="ax5_grid" data-ax5grid="first-grid-modal" data-ax5grid-config="{}" style="height: 220px; width: 100%;" ></div>
+	                          <div class="ax5_grid" data-ax5grid="first-grid-modal" data-ax5grid-config="{}" style="height: 270px; width: 100%;" ></div>
 	                        </div>
                         </td>
 					</tr> 
@@ -65,8 +65,8 @@ var gridTaskPop = {
         initView : function() {
             this.target = new ax5.ui.grid();
             this.target.setConfig({
-                showRowSelector: false,
-                multipleSelect: false,
+                showRowSelector: true,
+                multipleSelect: true,
                 sortable: false,
                 target: $('[data-ax5grid="first-grid-modal"]'),
                 header: {
@@ -94,9 +94,10 @@ var gridTaskPop = {
                     }
                 },
                 columns : [
-                	      {key: "codeId", label: "TASK명", hidden:true}
-                        , {key: "codeNm", label: "TASK명", label: "<span style='color: red;'>*</span>TASK명",    align: "left",   width: 380, editor: {type: "text"}},
-                      ]
+							{key: "rn",     label: "No.", align: "center",   width: 40, hidden : true},
+							{key: "codeId", label: "TASK명", hidden:true},
+							{key: "codeNm", label: "TASK명", label: "<span style='color: red;'>*</span>TASK명",    align: "left",   width: 405, editor: {type: "text"}},
+						]
                     });
                     return this;
                 },
@@ -105,7 +106,8 @@ var gridTaskPop = {
                     var targetObj = this.target;
                     var formData = {
                             "wbsPlanCodeId" : $("#popFormTask #wbsPlanCodeId").val(),
-                            "wbsPlanCodeNm" :  $("#popFormTask #wbsPlanCodeNm").val(), 
+                            "wbsPlanCodeNm" : $("#popFormTask #wbsPlanCodeNm").val(),
+                            "userId" : jwt.userId, 
                             "pageNo" : _pageNo + 1
                     }
                     postAjax("/user/wb/wb22/selectWbsTaskTempletList", formData, null, function(data){   
@@ -117,6 +119,12 @@ var gridTaskPop = {
                                             totalElements :  data.paginationInfo.totalRecordCount,
                                 } 
                             });
+							// 팀장여부에 따른 Task 템플릿 수정 권한 제한 (팀장이면 수정가능)
+							if (list[0].teamManager != 'Y' ) {
+								$("#popFormTask #addrow2").hide();
+							} else {
+								$("#popFormTask #addrow2").show();
+							}
                             //추가/ 삭제 내역 초기화
                             taskDeleteRowArr = [];
                             taskAddRowArr = [];
@@ -211,47 +219,46 @@ function taskTempletSave() {
 	});
 }
 
-function addTaskTempletSave(){
-	 
-	//조회결과 저장된 게 없다면 
-	var formData = {
-		"wbsPlanCodeId" : wbsPlanCodeKind,
-	    "pageNo" : 0 + 1
-	}
- 	postAjaxSync("/user/wb/wb22/selectWbsTaskTempletList", formData, null, function(data){
-   	   var list = data.result;
-          $.each(list, function(idx, elem){
-     	   var row = gridView1.target.getList("selected")[0];
-     	   var rowListObj = elem;
-           var newRow = {};
-               newRow = {
-                    rn:"", 
-                    fileTrgtKey: "", 
-                    coCd: jwt.coCd, 
-                    salesCd: salesCd, 
-                    wbsPlanNo: "",
-                    wbsPlanCodeKind: row.wbsPlanCodeId,                    
-                    wbsPlanCodeKindNm: row.wbsPlanCodeNm,
-                    wbsPlanCodeId: rowListObj.codeId,
-                    wbsPlanCodeNm: rowListObj.codeNm,
-                    verNo: row.verNo,
-                    wbsPlanMngId: row.wbsPlanMngId,
-                    wbsPlanMngNm: row.wbsPlanMngNm,
-                    wbsPlansDt: row.wbsPlansDt,                 
-                    wbsPlaneDt: row.wbsPlaneDt,
-                    daycnt: calculateCalendarCnt(row.wbsPlansDt, row.wbsPlaneDt),
-                    wbsPlanStsCodeId: "WBSPLANSTS10",
-                    rsltsCloseYn: "N",
-                    closeYn: "N"
-                    };
-            gridView2.target.addRow($.extend({}, newRow), "last"); 
-            addRowArr.push(newRow); 
-        });
-        gridView2.target.select(0, {selected: true});
+function addTaskTempletSave() {
+	var gridTaskPopRow = gridTaskPop.target.getList("selected");
+	if (!gridTaskPopRow?.length) { alert("적용할 TASK를 선택하세요."); return; }
+	var row1 = gridView1.target.getList("selected")[0];
+	if (!row1) { alert("기준 행을 먼저 선택하세요."); return; }
 
-		gridResize(gridView2.target.list.length); //그리드 높이 조정
-        modalStack.close();
-    });
+	// 선택행을 rn 오름차순으로 정렬
+	const gridTaskPopSorted = [...gridTaskPopRow].sort((a,b) => (a.rn||0) - (b.rn||0));
+
+	// 선택행만 추가. rn 그대로 복사
+	var row2 = gridView2.target.getList();
+	gridTaskPopSorted.forEach(tpl => {
+		const dup = row2.some(r => r.wbsPlanCodeId === tpl.codeId);
+		if (dup) return false;
+		var newRow = {};
+		newRow = {
+			rn: tpl.rn, // 정렬 키로 사용
+			fileTrgtKey: "",
+			coCd: jwt.coCd,
+			salesCd: salesCd,
+			wbsPlanNo: "",
+			wbsPlanCodeKind: row1.wbsPlanCodeId,
+			wbsPlanCodeKindNm: row1.wbsPlanCodeNm,
+			wbsPlanCodeId: tpl.codeId,
+			wbsPlanCodeNm: tpl.codeNm,
+			verNo: row1.verNo,
+			wbsPlanMngId: row1.wbsPlanMngId,
+			wbsPlanMngNm: row1.wbsPlanMngNm,
+			wbsPlansDt: row1.wbsPlansDt,
+			wbsPlaneDt: row1.wbsPlaneDt,
+			daycnt: calculateCalendarCnt(row1.wbsPlansDt, row1.wbsPlaneDt),
+			wbsPlanStsCodeId: "WBSPLANSTS10",
+			rsltsCloseYn: "N",
+			closeYn: "N"
+		};
+		gridView2.target.addRow($.extend({}, newRow), "last");
+		addRowArr.push(newRow);
+	});
+	gridResize(gridView2.target.list.length); //그리드 높이 조정
+	modalStack.close();
 }
 
 // 캘린더 데이 계산 함수 (종료일 - 시작일)
