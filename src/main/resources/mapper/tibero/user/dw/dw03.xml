@@ -178,5 +178,132 @@
 
 	</select>
 
+	<select id="selectSalesCdDrawDocTreeList" parameterType="Map" resultType="CamelMap">
+		WITH BASE AS (
+			SELECT DISTINCT T.SALES_CD, T.PART_NO, T.UNIT_NO
+			FROM TB_DRAWING_DOC T
+			WHERE 1=1
+			<choose>
+				<when test="docSt == 'all'"></when>
+				<otherwise>AND T.DOC_ST = 'A'</otherwise>
+			</choose>
+			AND T.PATH_BASE IS NOT NULL
+			<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
+				AND T.CREATED_AT BETWEEN TO_DATE(REPLACE(#{reqDtFrom},'-',''))
+									AND TO_DATE(REPLACE(#{reqDtTo},  '-','')) + 1
+			</if>
+			AND T.SALES_CD = #{salesCd}
+		),
+		L1 AS (
+			SELECT DISTINCT
+				'#' AS PARENT
+				, B.SALES_CD AS ID
+				, B.SALES_CD AS TEXT
+				, 'sales'    AS TYPE
+				, B.SALES_CD AS SALES_CD
+				, NULL       AS PART_NO
+				, NULL       AS UNIT_NO
+			FROM BASE B
+		),
+		L2 AS (
+			SELECT DISTINCT
+				B.SALES_CD AS PARENT
+				, B.SALES_CD || '/' || B.PART_NO AS ID
+				, B.PART_NO  AS TEXT
+				, 'part'     AS TYPE
+				, B.SALES_CD AS SALES_CD
+				, B.PART_NO  AS PART_NO
+				, NULL       AS UNIT_NO
+			FROM BASE B
+			WHERE B.PART_NO IS NOT NULL
+		),
+		L3 AS (
+			SELECT DISTINCT
+				B.SALES_CD || '/' || B.PART_NO AS PARENT
+				, B.SALES_CD || '/' || B.PART_NO || '/' || B.UNIT_NO AS ID
+				, B.UNIT_NO  AS TEXT
+				, 'unit'     AS TYPE
+				, B.SALES_CD AS SALES_CD
+				, B.PART_NO  AS PART_NO
+				, B.UNIT_NO  AS UNIT_NO
+			FROM BASE B
+			WHERE B.PART_NO IS NOT NULL
+			AND B.UNIT_NO IS NOT NULL
+		)
+		SELECT
+			X.PARENT, X.ID, X.TEXT
+			, NULL AS DOC_ID, NULL AS DOC_NO, NULL AS FILE_NAME
+			, X.ID AS PATH_BASE
+			, 0 AS IS_LEAF
+			, X.TYPE
+			, 'Y' AS CODE_ETC
+			, X.SALES_CD, X.PART_NO, X.UNIT_NO   <!-- 추가 -->
+		FROM (SELECT * FROM L1 UNION ALL SELECT * FROM L2 UNION ALL SELECT * FROM L3) X
+		ORDER BY X.ID
+	</select>
+
+
+	<select id="selectSalesCdDrawFileListCount" parameterType="Map" resultType="int">
+		/* SALES_CD / PART_NO / UNIT_NO 기준 파일 카운트 */
+		WITH BASE AS (
+			SELECT 1
+			FROM TB_DRAWING_DOC T
+			WHERE 1=1
+			<if test="docSt != null and docSt != 'all'">
+				AND T.DOC_ST = 'A'
+			</if>
+			<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
+				AND T.CREATED_AT BETWEEN TO_DATE(#{reqDtFrom}, 'YYYY-MM-DD')
+									AND TO_DATE(#{reqDtTo},   'YYYY-MM-DD') + 1
+			</if>
+				AND T.SALES_CD = #{salesCd,jdbcType = VARCHAR}
+				AND T.PART_NO = #{partNo,jdbcType = VARCHAR}
+				AND T.UNIT_NO = #{unitNo,jdbcType = VARCHAR}
+		)
+		SELECT COUNT(1) FROM BASE
+	</select>
+
+	<select id="selectSalesCdDrawFileList" parameterType="Map" resultType="CamelMap">
+		/* SALES_CD / PART_NO / UNIT_NO 기준 파일 리스트 (페이징) */
+		WITH BASE AS (
+			SELECT
+				T.DOC_ID                                   AS DOC_ID
+				, T.DOC_NO                                   AS DOC_NO
+				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS FILE_NAME
+				, T.EXT                                      AS FILE_TYPE
+				, REPLACE(T.PATH_BASE,'\','/')               AS LPATH
+				, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD HH24:MI:SS') AS WORK_DTTM
+				, T.CREATED_BY                               AS WORK_NM
+				, T.ACTIVE_VER                               AS VER_NO
+				, T.SALES_CD                                 AS SALES_CD
+				, T.DOC_ST                                   AS DOC_ST
+				, A.FILE_SIZE                                AS FILE_SIZE
+				, A.VER_NO                                   AS VER_NO    -- (주의) 컬럼명 중복 시 마지막 값이 매핑됨
+			FROM TB_DRAWING_DOC T
+			LEFT OUTER JOIN TB_DRAWING_VERSION A
+			ON T.DOC_ID = A.DOC_ID
+			AND T.ACTIVE_VER = A.VER_NO
+			WHERE 1=1
+			<if test="docSt != null and docSt != 'all'">
+				AND T.DOC_ST = 'A'
+			</if>
+			<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
+				AND T.CREATED_AT BETWEEN TO_DATE(#{reqDtFrom}, 'YYYY-MM-DD')
+									AND TO_DATE(#{reqDtTo},   'YYYY-MM-DD') + 1
+			</if>
+				AND T.SALES_CD = #{salesCd ,jdbcType = VARCHAR}
+				AND T.PART_NO = #{partNo ,jdbcType = VARCHAR}
+				AND T.UNIT_NO = #{unitNo ,jdbcType = VARCHAR}
+		)
+		SELECT *
+		FROM (
+			SELECT B.*,
+				ROW_NUMBER() OVER (ORDER BY B.FILE_NAME) AS RN
+			FROM BASE B
+		)
+		WHERE RN BETWEEN #{firstIndex} AND #{lastIndex}
+		ORDER BY FILE_NAME
+	</select>
+
 
 </mapper>

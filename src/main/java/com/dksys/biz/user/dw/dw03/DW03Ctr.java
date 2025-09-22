@@ -47,11 +47,32 @@ public class DW03Ctr {
 		return "jsonView";
     }
 
-	// 도면 이력 리스트 조회
+	// 도면 이력 버전별 리스트 상세 조회
     @PostMapping("/select_dw03_detailList")
 	public String select_dw03_detailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> result = dw03Svc.select_dw03_detailList(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+
+	// SALES CODE별 도면 트리 리스트 조회
+    @PostMapping("/selectSalesCdDrawDocTreeList")
+	public String selectSalesCdDrawDocTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> docTreeList = dw03Svc.selectSalesCdDrawDocTreeList(paramMap);
+		model.addAttribute("docTreeList", docTreeList);
+		return "jsonView";
+	}
+
+
+	// SALES CODE 하위 카테고리별 파일정보 리스트 조회
+	@PostMapping("/selectSalesCdDrawFileList")
+	public String selectSalesCdDrawFileList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = dw03Svc.selectSalesCdDrawFileListCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		
+		List<Map<String, String>> fileList = dw03Svc.selectSalesCdDrawFileList(paramMap);
+		model.addAttribute("fileList", fileList);
+		return "jsonView";
+    }
 }

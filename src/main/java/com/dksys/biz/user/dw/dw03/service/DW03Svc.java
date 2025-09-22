@@ -13,4 +13,10 @@ public interface DW03Svc {
 
 	List<Map<String, String>> select_dw03_detailList(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectSalesCdDrawDocTreeList(Map<String, String> paramMap);
+
+	int selectSalesCdDrawFileListCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectSalesCdDrawFileList(Map<String, String> paramMap);
+
 }
