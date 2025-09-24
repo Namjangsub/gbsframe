@@ -200,6 +200,7 @@
 	var isRefreshing = false;          // refresh 중 프로그램적 재선택 플래그
 	var lastSelectedId = null;         // 최근 선택 노드 id
 	var wantGridAfterRefresh = false; 
+	var preserveInProgress = false;
 
 	function gridStyle(row) {
 		if (!row) return "";
@@ -455,78 +456,63 @@
 
 		if (!hasTree) {
 			$tree.jstree({
-				plugins : ['types'],
-				core : {
-					check_callback: true,
-					data : selectDeptTree()
-				},
-				types : {
-					'leaf' : {"icon" : 'glyphicon glyphicon-file'},
-					'unit' : {'icon' : 'glyphicon glyphicon-folder-close'},
-					'unit-open' : {'icon' : 'glyphicon glyphicon-folder-open'}
-				}
+			plugins : ['types'],
+			core : { check_callback: true, data : selectDeptTree() },
+			types : {
+				'leaf' : {"icon" : 'glyphicon glyphicon-file'},
+				'unit' : {'icon' : 'glyphicon glyphicon-folder-close'},
+				'unit-open' : {'icon' : 'glyphicon glyphicon-folder-open'}
+			}
 			})
 			.on("loaded.jstree", function() {
-				var tree = $tree.jstree(true);
-				var json = tree ? tree.get_json('#') : [];
-				if (json && json.length) {
-					tree.deselect_all();
-					tree.open_node(json[0].id);
-					tree.select_node(json[0].id); // 첫 진입 시 그리드 setData는 select_node에서 1회 수행됨
-				}
+			var tree = $tree.jstree(true);
+			var json = tree ? tree.get_json('#') : [];
+			if (json && json.length) {
+				tree.deselect_all();
+				tree.open_node(json[0].id);
+				tree.select_node(json[0].id); // 최초 진입 시 그리드 조회는 select_node에서 처리됨
+			}
 			})
 			.on("refresh.jstree", function() {
 				var tree = $tree.jstree(true);
-				// refresh 후 재선택
+
+				// 프로그램적 복원 중이면 여기서는 아무 것도 하지 않음
+				if (preserveInProgress) return;
+
+				// 사용자가 수동으로 refresh한 경우 최소한의 선택 복원
 				if (lastSelectedId && tree.get_node(lastSelectedId)) {
-					isRefreshing = true;
 					tree.deselect_all();
 					tree.select_node(lastSelectedId);
-					isRefreshing = false;
 				} else {
 					var json = tree.get_json('#');
 					if (json && json.length) {
-					isRefreshing = true;
-					tree.deselect_all();
-					tree.open_node(json[0].id);
-					tree.select_node(json[0].id);
-					isRefreshing = false;
+						tree.deselect_all();
+						tree.open_node(json[0].id);
+						tree.select_node(json[0].id);
 					}
-				}
-				// 검색 버튼·검색조건 트리거일 때만 refresh 뒤 그리드 1회 호출
-				if (wantGridAfterRefresh) {
-					wantGridAfterRefresh = false;
-					gridView.setData(0);
 				}
 			})
 			.on("select_node.jstree", function(e, data) {
 				if (!data || !data.node) return;
-				if (isRefreshing) return; // 프로그램적 재선택 차단
+				if (preserveInProgress) return;   // 프로그램적 복원 중이면 무시
 
-				var node = data.node;
-				lastSelectedId = node.id;
+				// 선택된 노드 저장
+				lastSelectedId = data.node.id;
 
-				// 노드 클릭 시 즉시 문서현황 조회
-				gridView.setData(0);
+				data.instance.open_node(data.node, null, true);
 
-				//트리 최신화(실시간 반영). 동일 노드로 재선택.
-				var tree = data.instance;
-				isRefreshing = true;
-				wantGridAfterRefresh = false; // 클릭 흐름에서는 refresh 뒤 그리드 재호출 안 함
-				tree.settings.core.data = selectDeptTree(); // 최신 데이터로 교체
-				$('#deptTree').one('refresh.jstree', function(){ isRefreshing = false; });
-				tree.refresh();
+				wantGridAfterRefresh = true;
+				refreshTreePreserveOpen($tree);
 			})
-			.on('open_node.jstree', function(e, data){ data.instance.set_type(data.node, 'unit-open'); })
-			.on('close_node.jstree', function(e, data){ data.instance.set_type(data.node, 'unit'); });
+			.on('open_node.jstree',  function(e, d){ d.instance.set_type(d.node, 'unit-open'); })
+			.on('close_node.jstree', function(e, d){ d.instance.set_type(d.node, 'unit'); });
 
 		} else {
-			// 이미 생성된 상태: 검색 버튼/조건 변경 → 선택 유지하며 트리 재로딩 + refresh 뒤 그리드 1회
+			// 검색 버튼/조건 변경: 트리 서버 재조회 + 상태 유지 + 그리드 1회
 			var tree = $tree.jstree(true);
-			lastSelectedId = (tree.get_selected() || [null])[0];
-			tree.settings.core.data = selectDeptTree(); // 최신 데이터로 교체
-			wantGridAfterRefresh = true; // 검색 트리거 시 setData 1회
-			tree.refresh();
+			lastSelectedId = (tree.get_selected() || [null])[0] || null;
+			wantGridAfterRefresh = true;
+			refreshTreePreserveOpen($tree);
 		}
 	}
 
@@ -562,6 +548,66 @@
 			{ isLeaf: '0', type: 'unit' }      // 안전용 보정
 			)
 		}));
+	}
+
+	function refreshTreePreserveOpen($tree){
+		var tree = $tree.jstree(true);
+		if (!tree) return;
+
+		// 현재 열린/선택 상태 저장
+		var st = tree.get_state ? tree.get_state() : {};
+		var openedIds = (st.opened || []).slice();
+		var selectedIds = tree.get_selected ? tree.get_selected().slice() : [];
+
+		// 서버 데이터로 교체
+		tree.settings.core.data = selectDeptTree();
+
+		// 프로그램적 refresh 시작
+		preserveInProgress = true;
+
+		$tree.one('refresh.jstree', function(){
+			var t = $tree.jstree(true);
+			if (!t) { preserveInProgress = false; return; }
+
+			// 먼저 열린 노드 복원. 모두 열린 뒤 finish 실행.
+			var targets = openedIds.filter(function(id){ return !!t.get_node(id); });
+			var left = targets.length;
+
+			function doneOpen(){
+				// 선택 복원(이벤트 억제)
+				if (selectedIds.length && t.get_node(selectedIds[0])) {
+					var cur = (t.get_selected() || [null])[0];
+					if (cur !== selectedIds[0]) t.select_node(selectedIds[0], true, true);
+				}
+
+				// 트리 DOM 갱신 후 다음 프레임에 그리드 1회
+				t.redraw(true);
+				requestAnimationFrame(function(){
+					preserveInProgress = false;
+					if (wantGridAfterRefresh) {
+						wantGridAfterRefresh = false;
+						gridView.setData(0);
+					}
+				});
+			}
+
+			if (left === 0) {
+				doneOpen();
+			} else {
+				var handler = function(){
+					left--; 
+					if (left <= 0) {
+						t.off('after_open.jstree', handler);
+						doneOpen();
+					}
+				};
+				t.on('after_open.jstree', handler);
+				// 리스너 건 뒤에 open 호출
+				targets.forEach(function(id){ t.open_node(id); });
+			}
+		});
+
+		tree.refresh();
 	}
 	
 	//Sales Code (수주마스터, 수주상세테이블 조인) 검색

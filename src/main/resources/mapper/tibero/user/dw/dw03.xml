@@ -184,126 +184,391 @@
 			FROM TB_DRAWING_DOC T
 			WHERE 1=1
 			<choose>
-				<when test="docSt == 'all'"></when>
-				<otherwise>AND T.DOC_ST = 'A'</otherwise>
+				<when test="docSt == 'all'">
+				</when>
+				<otherwise>
+					AND T.DOC_ST = 'A'
+				</otherwise>
 			</choose>
-			AND T.PATH_BASE IS NOT NULL
+			  AND T.PATH_BASE IS NOT NULL
 			<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
-				AND T.CREATED_AT BETWEEN TO_DATE(REPLACE(#{reqDtFrom},'-',''))
-									AND TO_DATE(REPLACE(#{reqDtTo},  '-','')) + 1
+			  AND T.CREATED_AT BETWEEN TO_DATE(REPLACE(#{reqDtFrom},'-',''))
+			  AND TO_DATE(REPLACE(#{reqDtTo},  '-','')) + 1
 			</if>
-			AND T.SALES_CD = #{salesCd}
+			  AND T.SALES_CD = #{salesCd}
 		),
 		L1 AS (
 			SELECT DISTINCT
-				'#' AS PARENT
-				, B.SALES_CD AS ID
-				, B.SALES_CD AS TEXT
-				, 'sales'    AS TYPE
-				, B.SALES_CD AS SALES_CD
-				, NULL       AS PART_NO
-				, NULL       AS UNIT_NO
+				  '#' PARENT
+				, B.SALES_CD ID
+				, B.SALES_CD TEXT
+				, 'sales' TYPE
+				, B.SALES_CD
+				, NULL PART_NO
+				, NULL UNIT_NO
+				, NULL DOC_ID
+				, NULL DOC_NO
+				, NULL FILE_NAME
+				, B.SALES_CD PATH_BASE
+				, 0 IS_LEAF
+				, 'Y' CODE_ETC
 			FROM BASE B
 		),
 		L2 AS (
 			SELECT DISTINCT
-				B.SALES_CD AS PARENT
-				, B.SALES_CD || '/' || B.PART_NO AS ID
-				, B.PART_NO  AS TEXT
-				, 'part'     AS TYPE
-				, B.SALES_CD AS SALES_CD
-				, B.PART_NO  AS PART_NO
-				, NULL       AS UNIT_NO
+				  B.SALES_CD PARENT
+				, B.SALES_CD||'/'||B.PART_NO ID
+				, B.PART_NO TEXT
+				, 'part' TYPE
+				, B.SALES_CD
+				, B.PART_NO
+				, NULL UNIT_NO
+				, NULL DOC_ID
+				, NULL DOC_NO
+				, NULL FILE_NAME
+				, B.SALES_CD||'/'||B.PART_NO PATH_BASE
+				, 0 IS_LEAF
+				, 'Y' CODE_ETC
 			FROM BASE B
 			WHERE B.PART_NO IS NOT NULL
 		),
 		L3 AS (
 			SELECT DISTINCT
-				B.SALES_CD || '/' || B.PART_NO AS PARENT
-				, B.SALES_CD || '/' || B.PART_NO || '/' || B.UNIT_NO AS ID
-				, B.UNIT_NO  AS TEXT
-				, 'unit'     AS TYPE
-				, B.SALES_CD AS SALES_CD
-				, B.PART_NO  AS PART_NO
-				, B.UNIT_NO  AS UNIT_NO
+				  B.SALES_CD||'/'||B.PART_NO PARENT
+				, B.SALES_CD||'/'||B.PART_NO||'/'||B.UNIT_NO ID
+				, B.UNIT_NO TEXT
+				, 'unit' TYPE
+				, B.SALES_CD
+				, B.PART_NO
+				, B.UNIT_NO
+				, NULL DOC_ID
+				, NULL DOC_NO
+				, NULL FILE_NAME
+				, B.SALES_CD||'/'||B.PART_NO||'/'||B.UNIT_NO PATH_BASE
+				, 0 IS_LEAF
+				, 'Y' CODE_ETC
 			FROM BASE B
-			WHERE B.PART_NO IS NOT NULL
-			AND B.UNIT_NO IS NOT NULL
+			WHERE B.PART_NO IS NOT NULL AND B.UNIT_NO IS NOT NULL
+		),
+		L4 AS (
+			SELECT
+				  T.SALES_CD||'/'||T.PART_NO||'/'||T.UNIT_NO      		AS PARENT
+				, 'F|'||T.DOC_ID                                  		AS ID
+				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) 	AS TEXT
+				, 'file'                                          		AS TYPE
+				, T.SALES_CD
+				, T.PART_NO
+				, T.UNIT_NO
+				, T.DOC_ID
+				, T.DOC_NO
+				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) 	AS FILE_NAME
+				, REPLACE(T.PATH_BASE,'\','/')                    		AS PATH_BASE
+				, 1                                               		AS IS_LEAF
+				, 'Y'                                             		AS CODE_ETC
+			FROM TB_DRAWING_DOC T
+			WHERE 1=1
+				<choose>
+					<when test="docSt == 'all'">
+					</when>
+					<otherwise>
+						AND T.DOC_ST = 'A'
+					</otherwise>
+				</choose>
+				AND T.PATH_BASE IS NOT NULL
+				<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
+				AND T.CREATED_AT BETWEEN TO_DATE(REPLACE(#{reqDtFrom},'-',''))
+									AND TO_DATE(REPLACE(#{reqDtTo},  '-','')) + 1
+				</if>
+				AND T.SALES_CD = #{salesCd}
+				AND T.PART_NO IS NOT NULL
+				AND T.UNIT_NO IS NOT NULL
 		)
-		SELECT
-			X.PARENT, X.ID, X.TEXT
-			, NULL AS DOC_ID, NULL AS DOC_NO, NULL AS FILE_NAME
-			, X.ID AS PATH_BASE
-			, 0 AS IS_LEAF
-			, X.TYPE
-			, 'Y' AS CODE_ETC
-			, X.SALES_CD, X.PART_NO, X.UNIT_NO   <!-- 추가 -->
-		FROM (SELECT * FROM L1 UNION ALL SELECT * FROM L2 UNION ALL SELECT * FROM L3) X
-		ORDER BY X.ID
+		SELECT PARENT, ID, TEXT, DOC_ID, DOC_NO, FILE_NAME, PATH_BASE, IS_LEAF, TYPE, CODE_ETC,SALES_CD, PART_NO, UNIT_NO
+		FROM (
+			SELECT * FROM L1
+			UNION ALL SELECT * FROM L2
+			UNION ALL SELECT * FROM L3
+			UNION ALL SELECT * FROM L4
+		)
+		ORDER BY ID
 	</select>
+
 
 
 	<select id="selectSalesCdDrawFileListCount" parameterType="Map" resultType="int">
-		/* SALES_CD / PART_NO / UNIT_NO 기준 파일 카운트 */
 		WITH BASE AS (
-			SELECT 1
+			SELECT
+			  T.DOC_ID                                   AS DOC_ID
+			, T.SALES_CD                                 AS SALES_CD
+			, T.PART_NO                                  AS PART_NO
+			, T.UNIT_NO                                  AS UNIT_NO
+			, T.DOC_NO                                   AS DOC_NO
+			, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS FILE_NAME
+			, T.EXT                                      AS FILE_TYPE
+			, REPLACE(T.PATH_BASE,'\','/')               AS LPATH
+			, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD HH24:MI:SS') AS WORK_DTTM
+			, T.CREATED_BY                               AS WORK_NM
+			, T.ACTIVE_VER                               AS VER_NO
+			, T.DOC_ST                                   AS DOC_ST
+			, V.FILE_SIZE                                AS FILE_SIZE
 			FROM TB_DRAWING_DOC T
-			WHERE 1=1
+			LEFT JOIN TB_DRAWING_VERSION V ON V.DOC_ID = T.DOC_ID
+										AND V.VER_NO = T.ACTIVE_VER
+			WHERE 1 = 1
+			  AND T.SALES_CD = #{salesCd}
 			<if test="docSt != null and docSt != 'all'">
-				AND T.DOC_ST = 'A'
+			  AND T.DOC_ST = 'A'
 			</if>
 			<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
-				AND T.CREATED_AT BETWEEN TO_DATE(#{reqDtFrom}, 'YYYY-MM-DD')
-									AND TO_DATE(#{reqDtTo},   'YYYY-MM-DD') + 1
+			  AND T.CREATED_AT BETWEEN TO_DATE(#{reqDtFrom}, 'YYYY-MM-DD')
+			  AND TO_DATE(#{reqDtTo},   'YYYY-MM-DD') + 1
 			</if>
-				AND T.SALES_CD = #{salesCd,jdbcType = VARCHAR}
-				AND T.PART_NO = #{partNo,jdbcType = VARCHAR}
-				AND T.UNIT_NO = #{unitNo,jdbcType = VARCHAR}
+			<if test="partNo != null and partNo != ''">
+			  AND T.PART_NO = #{partNo}
+			</if>
+			<if test="unitNo != null and unitNo != ''">
+			  AND T.UNIT_NO = #{unitNo}
+			</if>
+		),
+		SALES AS (
+			SELECT
+				  'S|'||SALES_CD					AS ID
+				, NULL								AS PID
+				, 0									AS LVL
+				, SALES_CD							AS NAME
+				, 'SALES'							AS NODE_TYPE
+				, SALES_CD							AS SALES_CD
+				, CAST(NULL AS VARCHAR2(64))		AS PART_NO
+				, CAST(NULL AS VARCHAR2(64))		AS UNIT_NO
+				, CAST(NULL AS NUMBER)				AS DOC_ID
+				, CAST(NULL AS VARCHAR2(1000))		AS FILE_NAME
+				, CAST(NULL AS VARCHAR2(20))		AS FILE_TYPE
+				, CAST(NULL AS VARCHAR2(1000))		AS LPATH
+				, CAST(NULL AS VARCHAR2(19))		AS WORK_DTTM
+				, CAST(NULL AS VARCHAR2(60))		AS WORK_NM
+				, CAST(NULL AS NUMBER)				AS FILE_SIZE
+				, CAST(NULL AS VARCHAR2(1))			AS DOC_ST
+				, CAST(NULL AS NUMBER)				AS VER_NO
+			FROM (SELECT DISTINCT SALES_CD FROM BASE)
+		),
+		PARTS AS (
+			SELECT DISTINCT
+				  'P|'||SALES_CD||'|'||PART_NO AS ID
+				, CASE
+					WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL
+					OR #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN NULL
+					ELSE 'S|'||SALES_CD END AS PID
+				, CASE
+					WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL
+					OR #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 0
+					ELSE 1 END AS LVL
+				, PART_NO AS NAME
+				, 'PART' AS NODE_TYPE
+				, SALES_CD, PART_NO
+				, CAST(NULL AS VARCHAR2(64)) AS UNIT_NO
+				, CAST(NULL AS NUMBER) AS DOC_ID
+				, CAST(NULL AS VARCHAR2(1000)) AS FILE_NAME
+				, CAST(NULL AS VARCHAR2(20)) AS FILE_TYPE
+				, CAST(NULL AS VARCHAR2(1000)) AS LPATH
+				, CAST(NULL AS VARCHAR2(19)) AS WORK_DTTM
+				, CAST(NULL AS VARCHAR2(60)) AS WORK_NM
+				, CAST(NULL AS NUMBER) AS FILE_SIZE
+				, CAST(NULL AS VARCHAR2(1)) AS DOC_ST
+				, CAST(NULL AS NUMBER) AS VER_NO
+			FROM BASE
+		),
+
+		/* UNITS */
+		UNITS AS (
+			SELECT DISTINCT
+				  'U|'||SALES_CD||'|'||PART_NO||'|'||UNIT_NO AS ID
+				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN NULL
+					ELSE 'P|'||SALES_CD||'|'||PART_NO END AS PID
+				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 0 ELSE 1 END AS LVL
+				, UNIT_NO AS NAME
+				, 'UNIT' AS NODE_TYPE
+				, SALES_CD, PART_NO, UNIT_NO
+				, CAST(NULL AS NUMBER) AS DOC_ID
+				, CAST(NULL AS VARCHAR2(1000)) AS FILE_NAME
+				, CAST(NULL AS VARCHAR2(20)) AS FILE_TYPE
+				, CAST(NULL AS VARCHAR2(1000)) AS LPATH
+				, CAST(NULL AS VARCHAR2(19)) AS WORK_DTTM
+				, CAST(NULL AS VARCHAR2(60)) AS WORK_NM
+				, CAST(NULL AS NUMBER) AS FILE_SIZE
+				, CAST(NULL AS VARCHAR2(1)) AS DOC_ST
+				, CAST(NULL AS NUMBER) AS VER_NO
+			FROM BASE
+		),
+		FILES AS (
+			SELECT
+				  'F|'||DOC_ID AS ID
+				, 'U|'||SALES_CD||'|'||PART_NO||'|'||UNIT_NO AS PID
+				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 1
+					   WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL THEN 2
+					   ELSE 3 END AS LVL
+				, FILE_NAME AS NAME
+				, 'FILE' AS NODE_TYPE
+				, SALES_CD, PART_NO, UNIT_NO
+				, DOC_ID, FILE_NAME, FILE_TYPE, LPATH, WORK_DTTM, WORK_NM, FILE_SIZE, DOC_ST, VER_NO
+			FROM BASE
 		)
-		SELECT COUNT(1) FROM BASE
+		SELECT COUNT(*) FROM (
+			<if test="(partNo == null or partNo == '') and (unitNo == null or unitNo == '')">
+			SELECT * FROM SALES
+			UNION ALL
+			</if>
+			<if test="unitNo == null or unitNo == ''">
+			SELECT * FROM PARTS
+			UNION ALL
+			</if>
+			SELECT * FROM UNITS
+			UNION ALL
+			SELECT * FROM FILES
+		)
+		ORDER BY
+			SALES_CD,
+			CASE NODE_TYPE WHEN 'SALES' THEN 0 WHEN 'PART'  THEN 1 WHEN 'UNIT'  THEN 2 ELSE 3 END,
+			PART_NO,
+			UNIT_NO,
+			NAME
 	</select>
 
 	<select id="selectSalesCdDrawFileList" parameterType="Map" resultType="CamelMap">
-		/* SALES_CD / PART_NO / UNIT_NO 기준 파일 리스트 (페이징) */
 		WITH BASE AS (
 			SELECT
-				T.DOC_ID                                   AS DOC_ID
-				, T.DOC_NO                                   AS DOC_NO
-				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS FILE_NAME
-				, T.EXT                                      AS FILE_TYPE
-				, REPLACE(T.PATH_BASE,'\','/')               AS LPATH
-				, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD HH24:MI:SS') AS WORK_DTTM
-				, T.CREATED_BY                               AS WORK_NM
-				, T.ACTIVE_VER                               AS VER_NO
-				, T.SALES_CD                                 AS SALES_CD
-				, T.DOC_ST                                   AS DOC_ST
-				, A.FILE_SIZE                                AS FILE_SIZE
-				, A.VER_NO                                   AS VER_NO    -- (주의) 컬럼명 중복 시 마지막 값이 매핑됨
+			  T.DOC_ID                                   AS DOC_ID
+			, T.SALES_CD                                 AS SALES_CD
+			, T.PART_NO                                  AS PART_NO
+			, T.UNIT_NO                                  AS UNIT_NO
+			, T.DOC_NO                                   AS DOC_NO
+			, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS FILE_NAME
+			, T.EXT                                      AS FILE_TYPE
+			, REPLACE(T.PATH_BASE,'\','/')               AS LPATH
+			, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD HH24:MI:SS') AS WORK_DTTM
+			, T.CREATED_BY                               AS WORK_NM
+			, T.ACTIVE_VER                               AS VER_NO
+			, T.DOC_ST                                   AS DOC_ST
+			, V.FILE_SIZE                                AS FILE_SIZE
 			FROM TB_DRAWING_DOC T
-			LEFT OUTER JOIN TB_DRAWING_VERSION A
-			ON T.DOC_ID = A.DOC_ID
-			AND T.ACTIVE_VER = A.VER_NO
-			WHERE 1=1
+			LEFT JOIN TB_DRAWING_VERSION V ON V.DOC_ID = T.DOC_ID
+										AND V.VER_NO = T.ACTIVE_VER
+			WHERE 1 = 1
+			  AND T.SALES_CD = #{salesCd}
 			<if test="docSt != null and docSt != 'all'">
-				AND T.DOC_ST = 'A'
+			  AND T.DOC_ST = 'A'
 			</if>
 			<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
-				AND T.CREATED_AT BETWEEN TO_DATE(#{reqDtFrom}, 'YYYY-MM-DD')
-									AND TO_DATE(#{reqDtTo},   'YYYY-MM-DD') + 1
+			  AND T.CREATED_AT BETWEEN TO_DATE(#{reqDtFrom}, 'YYYY-MM-DD')
+			  AND TO_DATE(#{reqDtTo},   'YYYY-MM-DD') + 1
 			</if>
-				AND T.SALES_CD = #{salesCd ,jdbcType = VARCHAR}
-				AND T.PART_NO = #{partNo ,jdbcType = VARCHAR}
-				AND T.UNIT_NO = #{unitNo ,jdbcType = VARCHAR}
-		)
-		SELECT *
-		FROM (
-			SELECT B.*,
-				ROW_NUMBER() OVER (ORDER BY B.FILE_NAME) AS RN
-			FROM BASE B
-		)
-		WHERE RN BETWEEN #{firstIndex} AND #{lastIndex}
-		ORDER BY FILE_NAME
-	</select>
+			<if test="partNo != null and partNo != ''">
+			  AND T.PART_NO = #{partNo}
+			</if>
+			<if test="unitNo != null and unitNo != ''">
+			  AND T.UNIT_NO = #{unitNo}
+			</if>
+		),
+		SALES AS (
+			SELECT
+				  'S|'||SALES_CD					AS ID
+				, NULL								AS PID
+				, 0									AS LVL
+				, SALES_CD							AS NAME
+				, 'SALES'							AS NODE_TYPE
+				, SALES_CD							AS SALES_CD
+				, CAST(NULL AS VARCHAR2(64))		AS PART_NO
+				, CAST(NULL AS VARCHAR2(64))		AS UNIT_NO
+				, CAST(NULL AS NUMBER)				AS DOC_ID
+				, CAST(NULL AS VARCHAR2(1000))		AS FILE_NAME
+				, CAST(NULL AS VARCHAR2(20))		AS FILE_TYPE
+				, CAST(NULL AS VARCHAR2(1000))		AS LPATH
+				, CAST(NULL AS VARCHAR2(19))		AS WORK_DTTM
+				, CAST(NULL AS VARCHAR2(60))		AS WORK_NM
+				, CAST(NULL AS NUMBER)				AS FILE_SIZE
+				, CAST(NULL AS VARCHAR2(1))			AS DOC_ST
+				, CAST(NULL AS NUMBER)				AS VER_NO
+			FROM (SELECT DISTINCT SALES_CD FROM BASE)
+		),
+		PARTS AS (
+			SELECT DISTINCT
+				  'P|'||SALES_CD||'|'||PART_NO AS ID
+				, CASE
+					WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL
+					OR #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN NULL
+					ELSE 'S|'||SALES_CD END AS PID
+				, CASE
+					WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL
+					OR #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 0
+					ELSE 1 END AS LVL
+				, PART_NO AS NAME
+				, 'PART' AS NODE_TYPE
+				, SALES_CD, PART_NO
+				, CAST(NULL AS VARCHAR2(64)) AS UNIT_NO
+				, CAST(NULL AS NUMBER) AS DOC_ID
+				, CAST(NULL AS VARCHAR2(1000)) AS FILE_NAME
+				, CAST(NULL AS VARCHAR2(20)) AS FILE_TYPE
+				, CAST(NULL AS VARCHAR2(1000)) AS LPATH
+				, CAST(NULL AS VARCHAR2(19)) AS WORK_DTTM
+				, CAST(NULL AS VARCHAR2(60)) AS WORK_NM
+				, CAST(NULL AS NUMBER) AS FILE_SIZE
+				, CAST(NULL AS VARCHAR2(1)) AS DOC_ST
+				, CAST(NULL AS NUMBER) AS VER_NO
+			FROM BASE
+		),
 
+		/* UNITS */
+		UNITS AS (
+			SELECT DISTINCT
+				  'U|'||SALES_CD||'|'||PART_NO||'|'||UNIT_NO AS ID
+				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN NULL
+					ELSE 'P|'||SALES_CD||'|'||PART_NO END AS PID
+				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 0 ELSE 1 END AS LVL
+				, UNIT_NO AS NAME
+				, 'UNIT' AS NODE_TYPE
+				, SALES_CD, PART_NO, UNIT_NO
+				, CAST(NULL AS NUMBER) AS DOC_ID
+				, CAST(NULL AS VARCHAR2(1000)) AS FILE_NAME
+				, CAST(NULL AS VARCHAR2(20)) AS FILE_TYPE
+				, CAST(NULL AS VARCHAR2(1000)) AS LPATH
+				, CAST(NULL AS VARCHAR2(19)) AS WORK_DTTM
+				, CAST(NULL AS VARCHAR2(60)) AS WORK_NM
+				, CAST(NULL AS NUMBER) AS FILE_SIZE
+				, CAST(NULL AS VARCHAR2(1)) AS DOC_ST
+				, CAST(NULL AS NUMBER) AS VER_NO
+			FROM BASE
+		),
+		FILES AS (
+			SELECT
+				  'F|'||DOC_ID AS ID
+				, 'U|'||SALES_CD||'|'||PART_NO||'|'||UNIT_NO AS PID
+				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 1
+					   WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL THEN 2
+					   ELSE 3 END AS LVL
+				, FILE_NAME AS NAME
+				, 'FILE' AS NODE_TYPE
+				, SALES_CD, PART_NO, UNIT_NO
+				, DOC_ID, FILE_NAME, FILE_TYPE, LPATH, WORK_DTTM, WORK_NM, FILE_SIZE, DOC_ST, VER_NO
+			FROM BASE
+		)
+		SELECT * FROM (
+			<if test="(partNo == null or partNo == '') and (unitNo == null or unitNo == '')">
+			SELECT * FROM SALES
+			UNION ALL
+			</if>
+			<if test="unitNo == null or unitNo == ''">
+			SELECT * FROM PARTS
+			UNION ALL
+			</if>
+			SELECT * FROM UNITS
+			UNION ALL
+			SELECT * FROM FILES
+		)
+		ORDER BY
+			SALES_CD,
+			CASE NODE_TYPE WHEN 'SALES' THEN 0 WHEN 'PART'  THEN 1 WHEN 'UNIT'  THEN 2 ELSE 3 END,
+			PART_NO,
+			UNIT_NO,
+			NAME
+	</select>
 
 </mapper>

@@ -201,6 +201,7 @@
 	var lastSelectedId = null;         // 최근 선택 노드 id
 	var wantGridAfterRefresh = false; 
 	var treeRefreshFlag = false;
+	var preserveInProgress = false; // refresh 중 이벤트 억제
 
 	function gridStyle(row) {
 		if (!row) return "";
@@ -220,6 +221,23 @@
 				multipleSelect : false,
 				sortable : true,
 				target: $('[data-ax5grid="file-grid"]'),
+				tree: {
+					use: true,
+					indentWidth: 15,
+					arrowWidth: 15,
+					iconWidth: 18,
+					icons: {
+						openedArrow: '<i class="fa fa-caret-down" aria-hidden="true"></i>',
+						collapsedArrow: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+						groupIcon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+						collapsedGroupIcon: '<i class="fa fa-folder" aria-hidden="true"></i>',
+						itemIcon: '<i class="fa fa-cog" aria-hidden="true"></i>'
+					},
+					columnKeys: {
+						parentKey: "pid",
+						selfKey: "id"
+					}
+				},
 				header : {
 					align : "center",
 					selector : true
@@ -233,16 +251,23 @@
 					},
 				},
 				columns : [
-						{key : "rn",		label : "No",			width : 40, align: "center", hidden: false},
-						{key : "verNo",		label : "Ver",			width : 40, align: "center", hidden: true},
-						{key : "docId",		label : "파일Id", hidden: true},
+						{key : "nodeNm",	label: "이름",	width: 280, align: "left", treeControl: true,
+							formatter: function () {
+								const it = this.item || {};
+								return it.nodeNm || it.fileName || it.unitNo || it.partNo || it.salesCd || "";
+							}
+						},
+						{key : "id",  hidden: true },
+						{key : "pid", hidden: true },
 						{key : "fileName",	label : "파일명", 		width : 260, align: "left"},
 						{key : "fileSize",	label : "파일크기", 	width : 80, align: "right" , formatter: "money"},
 						{key : "fileType",	label : "확장자",		width : 60, align: "center"},
-						{key : "salesCd", 	label : "Sales코드",	width : 120, align: "center"},
+						{key : "salesCd", 	label : "Sales코드",	width : 120, align: "center", hidden: true},
 						{key : "workNm", 	label : "작업자",		width : 80, align: "center"},
 						{key : "workDttm",	label : "저장일시",		width : 130,	align: "center",},
 						{key : "lpath",  	label : "저장위치",		width : "*", align: "left"},
+						{key : "docId",  	label: "파일Id", hidden: true },
+    					{key : "verNo",  	label: "Ver",    hidden: true },
 						{key : "docSt",  	label : "존재여부",		width : "*", align: "left", hidden: true},
 				],
 				page : {
@@ -462,131 +487,68 @@
 
 		if (!hasTree) {
 			$tree.jstree({
-				plugins : ['types'],
-				core : {
-					check_callback: true,
-					data : selectSalesCdDrawDocTreeList()
-				},
-				types : {
-					'leaf' : {"icon" : 'glyphicon glyphicon-file'},
-					'unit' : {'icon' : 'glyphicon glyphicon-folder-close'},
-					'unit-open' : {'icon' : 'glyphicon glyphicon-folder-open'}
-				}
+			plugins: ['types'],
+			core: { check_callback: true, data: selectSalesCdDrawDocTreeList() },
+			types: {
+				'unit': {'icon': 'glyphicon glyphicon-folder-close'},
+				'unit-open': {'icon': 'glyphicon glyphicon-folder-open'},
+				'file': {'icon': 'glyphicon glyphicon-file'}
+			}
 			})
-			.on("loaded.jstree", function () {
-				var tree = $tree.jstree(true);
-				var code = ($('#salesCd_S').val() || '').trim();
+			.on('loaded.jstree', function () {
+			var tree = $tree.jstree(true);
+			var code = S($('#salesCd_S').val());
 
-				// salesCd 노드 탐색: id 우선, 없으면 original.SALES_CD 매칭
-				var node = code && tree.get_node(code);
-				if (!node && code) {
-					var flat = tree.get_json('#', { flat:true }) || [];
-					var hit = flat.find(n => {
-					var o = n && n.original || {};
-					return (o.salesCd === code || o.SALES_CD === code || n.text === code);
-					});
-					if (hit) node = tree.get_node(hit.id);
-				}
+			// salesCd 우선 선택
+			var node = code && tree.get_node(code);
+			if (!node && code) {
+				var flat = tree.get_json('#', { flat: true }) || [];
+				var hit = flat.find(function(n){
+				var o = n.original || {};
+				return S(o.salesCd || o.SALES_CD) === code || S(n.text) === code || S(n.id) === code;
+				});
+				if (hit) node = tree.get_node(hit.id);
+			}
 
-				if (node) {
-					wantGridAfterRefresh = false; // select_node가 그리드 1회 호출
-					isRefreshing = true;
-					tree.deselect_all();
-					tree.open_node(node, function(){ tree.open_all(node); });
-					tree.select_node(node);
-					lastSelectedId = node.id;
-					isRefreshing = false;
-					return; // 기본(첫 노드 선택) 스킵
-				}
-
-				// ▼ 기존 기본 동작
-				var json = tree ? tree.get_json('#') : [];
-				if (json && json.length) {
-					tree.deselect_all();
-					tree.open_node(json[0].id);
-					tree.select_node(json[0].id);
-				}
-			})
-
-			.on("refresh.jstree", function () {
-				var tree = $tree.jstree(true);
-				var code = ($('#salesCd_S').val() || '').trim();
-
-				// salesCd 노드 재탐색
-				var node = code && tree.get_node(code);
-				if (!node && code) {
-					var flat = tree.get_json('#', { flat:true }) || [];
-					var hit = flat.find(n => {
-						var o = n && n.original || {};
-						return (o.salesCd === code || o.SALES_CD === code || n.text === code);
-					});
-					if (hit) node = tree.get_node(hit.id);
-				}
-
-				if (node) {
-					wantGridAfterRefresh = false;
-					isRefreshing = true;
-					tree.deselect_all();
-					tree.open_node(node);
-					tree.select_node(node);
-					lastSelectedId = node.id;
-					isRefreshing = false;
-					return; // 아래 기본 재선택 스킵
-				}
-
-				// ▼ 기존 재선택 로직
-				if (lastSelectedId && tree.get_node(lastSelectedId)) {
-					isRefreshing = true;
-					tree.deselect_all();
-					tree.select_node(lastSelectedId);
-					isRefreshing = false;
-				} else {
-					var json = tree.get_json('#');
-					if (json && json.length) {
-						isRefreshing = true;
-						tree.deselect_all();
-						tree.open_node(json[0].id);
-						tree.select_node(json[0].id);
-						isRefreshing = false;
-					}
-				}
-				if (wantGridAfterRefresh) {
-					wantGridAfterRefresh = false;
-					gridView.setData(0);
-				}
-			})
-			.on("select_node.jstree", function(e, data) {
-				if (!data || !data.node) return;
-				if (isRefreshing) return; // 프로그램적 재선택 차단
-
-				var node = data.node;
+			if (node) {
+				tree.open_node(node, null, true);
+				tree.select_node(node);           // select_node 이벤트에서 refresh + grid 호출까지 이어짐
 				lastSelectedId = node.id;
-
-				// 노드 클릭 시 즉시 문서현황 조회
-				gridView.setData(0);
-
-				if (!data.event) return false;
-
-				//트리 최신화(실시간 반영). 동일 노드로 재선택.
-				var tree = data.instance;
-				isRefreshing = true;
-				wantGridAfterRefresh = false; // 클릭 흐름에서는 refresh 뒤 그리드 재호출 안 함
-				tree.settings.core.data = selectSalesCdDrawDocTreeList(); // 최신 데이터로 교체
-				$('#deptTree').one('refresh.jstree', function(){ isRefreshing = false; });
-				tree.refresh();
+			} else {
+				// 루트 fallback
+				var roots = tree.get_json('#');
+				if (roots && roots.length) {
+				tree.open_node(roots[0].id);
+				tree.select_node(roots[0].id);  // select_node 이벤트 흐름 동일
+				}
+			}
 			})
-			.on('open_node.jstree', function(e, data){ data.instance.set_type(data.node, 'unit-open'); })
-			.on('close_node.jstree', function(e, data){ data.instance.set_type(data.node, 'unit'); });
+			.on('select_node.jstree', function(e, data){
+			if (!data || !data.node || preserveInProgress) return;
+
+			// 파일 노드는 선택 막고 상위로 되돌림
+			if (S(data.node.type).toLowerCase() === 'file') {
+				data.instance.deselect_node(data.node);
+				data.instance.select_node(data.node.parent);
+				return;
+			}
+
+			lastSelectedId = data.node.id;
+			data.instance.open_node(data.node, null, true);   // 클릭 시 바로 펼침
+
+			// 여기서는 그리드 호출하지 않고, 트리 새로고침 끝난 뒤 1회만 호출
+			wantGridAfterRefresh = true;
+			refreshTreePreserveOpen($('#deptTree'));
+			})
+			.on('open_node.jstree',  function(e, d){ d.instance.set_type(d.node, 'unit-open'); })
+			.on('close_node.jstree', function(e, d){ d.instance.set_type(d.node, 'unit'); });
 
 		} else {
-			// 이미 생성된 상태: 검색 버튼/조건 변경 → 선택 유지하며 트리 재로딩 + refresh 뒤 그리드 1회
-			var tree = $tree.jstree(true);
-			lastSelectedId = (tree.get_selected() || [null])[0];
-			tree.settings.core.data = selectSalesCdDrawDocTreeList(); // 최신 데이터로 교체
-			wantGridAfterRefresh = true; // 검색 트리거 시 setData 1회
-			tree.refresh();
+			// 이미 만들어진 트리 → 서버데이터 갱신 + 상태 유지
+			wantGridAfterRefresh = true;              // refresh 후 그리드 1회
+			refreshTreePreserveOpen($tree);
 		}
-	}
+		}
 
 
 	// 트리 데이터 select 
@@ -603,33 +565,135 @@
 		};
 		postAjaxSync("/user/dw/dw03/selectSalesCdDrawDocTreeList", paramObj, null, function(data){
 			var raw = data && Array.isArray(data.docTreeList) ? data.docTreeList : [];
-			deptTree = normalizeFoldersOnly(raw);
+			deptTree = normalizeTree(raw);
 		}, false);
 		return deptTree;
 	}
 
-	function normalizeFoldersOnly(raw){
-		return raw.map(n => {
-			const salesCd = n.salesCd || n.SALES_CD || '';
-			const partNo  = n.partNo  || n.PART_NO  || '';
-			const unitNo  = n.unitNo  || n.UNIT_NO  || '';
+	function S(x){ return (x==null ? '' : (''+x)).trim(); }
 
-			// 계층 경로 구성
-			const idPath = [salesCd, partNo, unitNo].filter(Boolean).join('/');
-			let parentPath = '#';
-			if (unitNo) parentPath = [salesCd, partNo].join('/');
-			else if (partNo) parentPath = [salesCd].join('/');
+	function normalizeTree(raw){
+		return raw.map(function(n){
+			var type    = S(n.type || n.TYPE).toLowerCase();     // 'sales' | 'part' | 'unit' | 'file'
+			var salesCd = S(n.salesCd || n.SALES_CD);
+			var partNo  = S(n.partNo  || n.PART_NO);
+			var unitNo  = S(n.unitNo  || n.UNIT_NO);
+			var docId   = n.docId || n.DOC_ID || null;
+
+			var id = n.id || n.ID;
+			var parent = n.parent || n.PARENT;
+
+			if (!id) {
+				if (type === 'sales') id = salesCd;
+				else if (type === 'part') id = [salesCd, partNo].join('/');
+				else if (type === 'unit') id = [salesCd, partNo, unitNo].join('/');
+				else if (type === 'file') id = 'F|' + docId;
+			}
+			if (!parent) {
+				if (type === 'sales') parent = '#';
+				else if (type === 'part') parent = salesCd;
+				else if (type === 'unit') parent = [salesCd, partNo].join('/');
+				else if (type === 'file') parent = [salesCd, partNo, unitNo].join('/');
+			}
+
+			var text = n.text || n.TEXT || (type === 'file' ? (n.fileName || n.FILE_NAME || '') : (unitNo || partNo || salesCd));
 
 			return {
-				id     : idPath || (n.id || n.ID),
-				parent : parentPath || (n.parent || n.PARENT || '#'),
-				text   : n.text || n.TEXT || (unitNo || partNo || salesCd),
-				type   : 'unit', // 폴더 고정으로 안정화
-				li_attr: { 'data-path': n.pathBase || n.PATH_BASE || '' },
-				data   : { salesCd, partNo, unitNo }
+				id,
+				parent: parent || '#',
+				text,
+				type: (type === 'file' ? 'file' : 'unit'),
+				li_attr: { 'data-path': S(n.pathBase || n.PATH_BASE) },
+				data: { salesCd, partNo, unitNo, docId },
+				// 보조 검색용
+				salesCd, partNo, unitNo
 			};
 		});
 	}
+
+	function refreshTreePreserveOpen($tree){
+		var tree = $tree.jstree(true);
+		if (!tree) return;
+
+		var code = S($('#salesCd_S').val()); // 폴백용
+		var st = (tree.get_state && tree.get_state()) || {};
+		var openedIds   = (st.opened || []).slice();
+		var selectedIds = (tree.get_selected && tree.get_selected()) || [];
+		var preferId    = lastSelectedId || selectedIds[0] || null; // ← 사용자가 방금 선택한 노드 우선
+
+		// 최신 데이터로 교체
+		tree.settings.core.data = selectSalesCdDrawDocTreeList();
+
+		preserveInProgress = true;
+		$tree.one('refresh.jstree', function(){
+			var t = $tree.jstree(true);
+			if (!t) { preserveInProgress = false; return; }
+
+			// 1) 방금 선택한 노드 복원 시도
+			var target = (preferId && t.get_node(preferId)) ? t.get_node(preferId) : null;
+
+			// 2) 없으면 salesCd로 폴백
+			if (!target && code) {
+				target = t.get_node(code);
+				if (!target) {
+					var flat = t.get_json('#', { flat: true }) || [];
+					var hit = flat.find(function(n){
+					return S(n.id) === code ||
+							(n.data && S(n.data.salesCd) === code) ||
+							S(n.text) === code ||
+							(n.original && (S(n.original.salesCd) === code || S(n.original.SALES_CD) === code));
+					});
+					if (hit) target = t.get_node(hit.id);
+				}
+			}
+
+			function finishAndDrawOnce(){
+				t.redraw(true);
+				requestAnimationFrame(function(){
+					preserveInProgress = false;
+					if (wantGridAfterRefresh) {
+					wantGridAfterRefresh = false;
+					gridView.setData(0); // ← 최종 1회만 그리드 호출
+					}
+				});
+			}
+
+			if (target) {
+				// 파일 노드면 부모로 승격
+				if (S(target.type).toLowerCase() === 'file') target = t.get_node(target.parent);
+
+				// 조상 먼저 열고 대상 열기+선택
+				(target.parents || []).forEach(function(pid){
+					if (pid && pid !== '#') t.open_node(pid);
+				});
+				t.open_node(target, null, true);
+				t.deselect_all();
+				t.select_node(target);
+				lastSelectedId = target.id;
+				finishAndDrawOnce();
+				return;
+			}
+
+			// 3) 둘 다 실패하면 이전 상태 복구
+			var toOpen = openedIds.filter(function(id){ return !!t.get_node(id); });
+			function done(){
+				if (selectedIds.length && t.get_node(selectedIds[0])) {
+					t.deselect_all();
+					t.select_node(selectedIds[0], true, true);
+					lastSelectedId = selectedIds[0];
+				}
+				finishAndDrawOnce();
+			}
+			if (!toOpen.length) return done();
+			var left = toOpen.length;
+			var handler = function(){ if(--left<=0){ t.off('after_open.jstree', handler); done(); } };
+			t.on('after_open.jstree', handler);
+			toOpen.forEach(function(id){ t.open_node(id); });
+		});
+
+		tree.refresh();
+	}
+
 	//Sales Code (수주마스터, 수주상세테이블 조인) 검색
     function wbsSalesCodeSearch() {
         var paramObj = {
