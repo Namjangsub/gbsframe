@@ -115,9 +115,9 @@
 	<div id="head_area"></div>
 	<div id="top_area"></div>
 	<div id="main_area">
-		<inpupt type="hidden" id="pgmId_S" name="pgmId_S" value="DW0301M01">
-		<inpupt type="hidden" id="coCd_S" name="coCd_S">
-		<inpupt type="hidden" id="userId_S" name="userId_S">
+		<inupt type="hidden" id="pgmId_S" name="pgmId_S" value="DW0301M01">
+		<inupt type="hidden" id="coCd_S" name="coCd_S">
+		<inupt type="hidden" id="userId_S" name="userId_S">
 	<!-- 페이지 상단 -->
 	<div class="contents no_bg">
 		<ul class="btn_ul">
@@ -150,11 +150,12 @@
 							<input type="text" id="reqDtTo_S" class="input_calendar" onkeyup="dateMask(this);" data-search="reqDtTo" autocomplete="off">
 						</div>
 					</td>
-					<th style="width:100px;">파일이력</th>
+					<th style="width:100px;">서버종류</th>
 					<td>
-						<select id="docSt_S" name="docSt_S" data-search="docSt">
-							<option value="" selected>현재자료만</option>
-							<option value="all">삭제포함</option>
+						<select id="serverName_S" name="serverName_S" data-search="serverName">
+							<option value="" >전체</option>
+							<option value="TEST" selected>TEST</option>
+							<option value="PS">PS</option>
 						</select>
 					</td>
 				</tr>
@@ -251,7 +252,7 @@
 					},
 				},
 				columns : [
-						{key : "nodeNm",	label: "이름",	width: 280, align: "left", treeControl: true,
+						{key : "nodeNm",	label: "파일명",	width: 280, align: "left", treeControl: true,
 							formatter: function () {
 								const it = this.item || {};
 								return it.nodeNm || it.fileName || it.unitNo || it.partNo || it.salesCd || "";
@@ -259,7 +260,7 @@
 						},
 						{key : "id",  hidden: true },
 						{key : "pid", hidden: true },
-						{key : "fileName",	label : "파일명", 		width : 260, align: "left"},
+						{key : "fileName",	label : "파일명", 		width : 260, align: "left", hidden: true},
 						{key : "fileSize",	label : "파일크기", 	width : 80, align: "right" , formatter: "money"},
 						{key : "fileType",	label : "확장자",		width : 60, align: "center"},
 						{key : "salesCd", 	label : "Sales코드",	width : 120, align: "center", hidden: true},
@@ -383,7 +384,8 @@
 
 		gridView.initView();
 
-		initSearch()
+		// initSearch()
+		initDeptTree();
 
 		$('.off_btn').click();
 
@@ -475,8 +477,12 @@
 		
 		initDeptTree();
 		
-  		$('[data-search]').on("change", function(){ //검색조건 이벤트 bind
-			gridView.setData(0);
+  		// 검색조건 변경 시 트리만 갱신(그리드는 refresh 끝에서 1회만 호출됨)
+		$('[data-search]').on('change', function(){
+			wantGridAfterRefresh = true;
+			var $tree = $('#deptTree');
+			if ($tree.data('jstree')) refreshTreePreserveOpen($tree);
+			else initDeptTree();
 		});
 	}
 			
@@ -496,49 +502,50 @@
 			}
 			})
 			.on('loaded.jstree', function () {
-			var tree = $tree.jstree(true);
-			var code = S($('#salesCd_S').val());
+				var tree = $tree.jstree(true);
+				var code = S($('#salesCd_S').val());
 
-			// salesCd 우선 선택
-			var node = code && tree.get_node(code);
-			if (!node && code) {
-				var flat = tree.get_json('#', { flat: true }) || [];
-				var hit = flat.find(function(n){
-				var o = n.original || {};
-				return S(o.salesCd || o.SALES_CD) === code || S(n.text) === code || S(n.id) === code;
-				});
-				if (hit) node = tree.get_node(hit.id);
-			}
-
-			if (node) {
-				tree.open_node(node, null, true);
-				tree.select_node(node);           // select_node 이벤트에서 refresh + grid 호출까지 이어짐
-				lastSelectedId = node.id;
-			} else {
-				// 루트 fallback
-				var roots = tree.get_json('#');
-				if (roots && roots.length) {
-				tree.open_node(roots[0].id);
-				tree.select_node(roots[0].id);  // select_node 이벤트 흐름 동일
+				// salesCd 우선 선택
+				var node = code && tree.get_node(code);
+				if (!node && code) {
+					var flat = tree.get_json('#', { flat: true }) || [];
+					var hit = flat.find(function(n){
+						var o = n.original || {};
+						return S(o.salesCd || o.SALES_CD) === code || S(n.text) === code || S(n.id) === code;
+					});
+					if (hit) node = tree.get_node(hit.id);
 				}
-			}
+
+				if (node) {
+					tree.open_node(node, null, true);
+					tree.select_node(node);           // select_node 이벤트에서 refresh + grid 호출까지 이어짐
+					lastSelectedId = node.id;
+				} else {
+					// 루트 fallback
+					var roots = tree.get_json('#');
+					if (roots && roots.length) {
+					tree.open_node(roots[0].id);
+					tree.select_node(roots[0].id);  // select_node 이벤트 흐름 동일
+					}
+				}
 			})
 			.on('select_node.jstree', function(e, data){
-			if (!data || !data.node || preserveInProgress) return;
+				if (!data || !data.node || preserveInProgress) return;
+				if (lastSelectedId === data.node.id && !wantGridAfterRefresh) return;
 
-			// 파일 노드는 선택 막고 상위로 되돌림
-			if (S(data.node.type).toLowerCase() === 'file') {
-				data.instance.deselect_node(data.node);
-				data.instance.select_node(data.node.parent);
-				return;
-			}
+				// 파일 노드는 선택 막고 상위로 되돌림
+				if (S(data.node.type).toLowerCase() === 'file') {
+					data.instance.deselect_node(data.node);
+					data.instance.select_node(data.node.parent);
+					return;
+				}
 
-			lastSelectedId = data.node.id;
-			data.instance.open_node(data.node, null, true);   // 클릭 시 바로 펼침
+				lastSelectedId = data.node.id;
+				data.instance.open_node(data.node, null, true);   // 클릭 시 바로 펼침
 
-			// 여기서는 그리드 호출하지 않고, 트리 새로고침 끝난 뒤 1회만 호출
-			wantGridAfterRefresh = true;
-			refreshTreePreserveOpen($('#deptTree'));
+				// 여기서는 그리드 호출하지 않고, 트리 새로고침 끝난 뒤 1회만 호출
+				wantGridAfterRefresh = true;
+				refreshTreePreserveOpen($('#deptTree'));
 			})
 			.on('open_node.jstree',  function(e, d){ d.instance.set_type(d.node, 'unit-open'); })
 			.on('close_node.jstree', function(e, d){ d.instance.set_type(d.node, 'unit'); });
@@ -558,7 +565,8 @@
 			"coCd"		: $('#coCd_S').val(),
 			"useYn"		: 'Y',
 			"userId"	: jwt.userId,
-			"docSt"		: $('#docSt_S').val(),
+			// "docSt"		: $('#docSt_S').val(),
+			"serverName": $('#serverName_S').val(),
 			"salesCd"	: $('#salesCd_S').val(),
 			"reqDtFrom"	: $('#reqDtFrom_S').val(),
 			"reqDtTo"	: $('#reqDtTo_S').val()
@@ -615,13 +623,12 @@
 		var tree = $tree.jstree(true);
 		if (!tree) return;
 
-		var code = S($('#salesCd_S').val()); // 폴백용
+		var code = S($('#salesCd_S').val());
 		var st = (tree.get_state && tree.get_state()) || {};
 		var openedIds   = (st.opened || []).slice();
 		var selectedIds = (tree.get_selected && tree.get_selected()) || [];
-		var preferId    = lastSelectedId || selectedIds[0] || null; // ← 사용자가 방금 선택한 노드 우선
+		var preferId    = lastSelectedId || selectedIds[0] || null;
 
-		// 최신 데이터로 교체
 		tree.settings.core.data = selectSalesCdDrawDocTreeList();
 
 		preserveInProgress = true;
@@ -629,70 +636,67 @@
 			var t = $tree.jstree(true);
 			if (!t) { preserveInProgress = false; return; }
 
-			// 1) 방금 선택한 노드 복원 시도
 			var target = (preferId && t.get_node(preferId)) ? t.get_node(preferId) : null;
-
-			// 2) 없으면 salesCd로 폴백
 			if (!target && code) {
-				target = t.get_node(code);
-				if (!target) {
-					var flat = t.get_json('#', { flat: true }) || [];
-					var hit = flat.find(function(n){
-					return S(n.id) === code ||
-							(n.data && S(n.data.salesCd) === code) ||
-							S(n.text) === code ||
-							(n.original && (S(n.original.salesCd) === code || S(n.original.SALES_CD) === code));
-					});
-					if (hit) target = t.get_node(hit.id);
-				}
+			target = t.get_node(code);
+			if (!target) {
+				var flat = t.get_json('#', { flat: true }) || [];
+				var hit = flat.find(n => S(n.id)===code ||
+										(n.data && S(n.data.salesCd)===code) ||
+										S(n.text)===code ||
+										(n.original && (S(n.original.salesCd)===code || S(n.original.SALES_CD)===code)));
+				if (hit) target = t.get_node(hit.id);
+			}
 			}
 
 			function finishAndDrawOnce(){
-				t.redraw(true);
-				requestAnimationFrame(function(){
-					preserveInProgress = false;
-					if (wantGridAfterRefresh) {
-					wantGridAfterRefresh = false;
-					gridView.setData(0); // ← 최종 1회만 그리드 호출
-					}
-				});
+			t.redraw(true);
+			requestAnimationFrame(function(){
+				preserveInProgress = false;
+				if (wantGridAfterRefresh) { wantGridAfterRefresh = false; gridView.setData(0); }
+			});
 			}
 
 			if (target) {
-				// 파일 노드면 부모로 승격
-				if (S(target.type).toLowerCase() === 'file') target = t.get_node(target.parent);
-
-				// 조상 먼저 열고 대상 열기+선택
-				(target.parents || []).forEach(function(pid){
-					if (pid && pid !== '#') t.open_node(pid);
-				});
-				t.open_node(target, null, true);
-				t.deselect_all();
-				t.select_node(target);
-				lastSelectedId = target.id;
-				finishAndDrawOnce();
-				return;
+			if (S(target.type).toLowerCase() === 'file') target = t.get_node(target.parent);
+			(target.parents || []).forEach(pid => { if (pid && pid !== '#') t.open_node(pid); });
+			t.open_node(target, null, true);
+			t.deselect_all(); t.select_node(target);
+			lastSelectedId = target.id;
+			finishAndDrawOnce();
+			return;
 			}
 
-			// 3) 둘 다 실패하면 이전 상태 복구
-			var toOpen = openedIds.filter(function(id){ return !!t.get_node(id); });
+			// === 여기 추가: 이전 열린 목록이 없고 code가 있으면 code 루트를 강제 오픈 ===
+			var toOpen = openedIds.filter(id => !!t.get_node(id));
+			if (!toOpen.length && code && t.get_node(code)) {
+			var nd = t.get_node(code);
+			(nd.parents || []).forEach(pid => { if (pid && pid !== '#') t.open_node(pid); });
+			t.open_node(nd, null, true);
+			t.deselect_all(); t.select_node(nd);
+			lastSelectedId = nd.id;
+			finishAndDrawOnce();
+			return;
+			}
+			// =====================================================================
+
 			function done(){
-				if (selectedIds.length && t.get_node(selectedIds[0])) {
-					t.deselect_all();
-					t.select_node(selectedIds[0], true, true);
-					lastSelectedId = selectedIds[0];
-				}
-				finishAndDrawOnce();
+			if (selectedIds.length && t.get_node(selectedIds[0])) {
+				t.deselect_all(); t.select_node(selectedIds[0], true, true);
+				lastSelectedId = selectedIds[0];
+			}
+			finishAndDrawOnce();
 			}
 			if (!toOpen.length) return done();
 			var left = toOpen.length;
 			var handler = function(){ if(--left<=0){ t.off('after_open.jstree', handler); done(); } };
 			t.on('after_open.jstree', handler);
-			toOpen.forEach(function(id){ t.open_node(id); });
+			toOpen.forEach(id => t.open_node(id));
 		});
 
 		tree.refresh();
-	}
+		}
+
 
 	//Sales Code (수주마스터, 수주상세테이블 조인) 검색
     function wbsSalesCodeSearch() {
@@ -702,8 +706,18 @@
         };
         openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1068, 650, "SALES CODE 검색", paramObj, function (grid){
             var row = grid.target.getList("selected")[0];
-            $('#salesCd_S').val(row.salesCd);
-			initSearch();
+			$('#salesCd_S').val(row.salesCd);
+
+			lastSelectedId = row.salesCd;
+			wantGridAfterRefresh = true;           // 갱신 후 1회 그리드 로드
+
+			var $tree = $('#deptTree');
+			if ($tree.data('jstree')) {
+				refreshTreePreserveOpen($tree);
+			} else {
+				// 처음이면 트리 생성
+				initDeptTree();
+			}
         });
     }
 	

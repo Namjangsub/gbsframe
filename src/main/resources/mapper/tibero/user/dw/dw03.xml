@@ -5,55 +5,45 @@
 
 	<select id="selectDrawDocTreeList" parameterType="Map" resultType="CamelMap">
 		WITH P AS (
-			SELECT DISTINCT 
-					REPLACE(PATH_BASE,'\','/') AS FULL_PATH
-			FROM TB_DRAWING_DOC
-			WHERE 1 = 1
-			
-			<choose>
-				<when test="docSt == 'all'">
-				</when>
-				<otherwise>
-					AND DOC_ST = 'A'
-				</otherwise>
-			</choose>
-			AND PATH_BASE IS NOT NULL
-			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
-				AND CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+			SELECT DISTINCT
+					REPLACE(T.PATH_BASE,'\','/') AS FULL_PATH
+			FROM TB_DRAWING_DOC T
+			WHERE 1=1
+			  AND T.SERVER_NAME = #{serverName}
+			<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
+			  AND T.CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) 
+			  AND to_date(REPLACE(#{reqDtTo},'-',''))+1
 			</if>
-			<if test="salesCd != null and !salesCd.equals('')">
-				AND SALES_CD LIKE  '%'||#{salesCd}||'%'
+			<if test="salesCd != null and salesCd != ''">
+			  AND T.SALES_CD LIKE ('%' || #{salesCd} || '%')
 			</if>
+			  AND T.PATH_BASE IS NOT NULL
 		),
-		N AS (  -- 최대 폴더 깊이 만큼 조정
-			SELECT LEVEL AS LV
-			FROM DUAL
-			CONNECT BY LEVEL <![CDATA[ <= ]]> 50
+		N AS (
+			SELECT LEVEL AS LV FROM DUAL CONNECT BY LEVEL <![CDATA[ <= ]]> 100
 		)
 		SELECT DISTINCT
-				CASE WHEN N.LV = 1 THEN '#'
+			CASE WHEN N.LV = 1 THEN '#'
 					ELSE SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV-1) - 1)
-				END AS PARENT,
-				SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV) - 1) AS ID,
-				CASE
-					WHEN N.LV = 1 THEN SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, 1) - 1)
-					ELSE REGEXP_SUBSTR(SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV) - 1), '[^/]+$')
-				END AS TEXT,
-				NULL AS DOC_ID,
-				NULL AS DOC_NO,
-				NULL AS FILE_NAME,
-				SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV) - 1) AS PATH_BASE,
-				0 AS IS_LEAF,
-				'unit' AS TYPE,
-				'Y' AS CODE_ETC
-		FROM P
-		JOIN N
-		ON INSTR(P.FULL_PATH||'/', '/', 1, N.LV) > 0
+			END AS PARENT,
+			SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV) - 1) AS ID,
+			CASE
+				WHEN N.LV = 1 THEN SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, 1) - 1)
+				ELSE REGEXP_SUBSTR(SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV) - 1), '[^/]+$')
+			END AS TEXT,
+			NULL AS DOC_ID,
+			NULL AS DOC_NO,
+			NULL AS FILE_NAME,
+			SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV) - 1) AS PATH_BASE,
+			0 AS IS_LEAF,
+			'unit' AS TYPE,
+			'Y' AS CODE_ETC
+		FROM P 
+				JOIN N ON INSTR(P.FULL_PATH||'/', '/', 1, N.LV) > 0
 		ORDER BY ID
-
 	</select>
 
-		<select id="selectDrawTreeFileListCount" parameterType="Map" resultType="int">
+	<select id="selectDrawTreeFileListCount" parameterType="Map" resultType="int">
 		WITH BASE AS (
 			SELECT
 				  T.DOC_ID                                 		AS DOC_ID
@@ -72,26 +62,22 @@
 								LEFT OUTER JOIN TB_DRAWING_VERSION AS A ON T.DOC_ID = A.DOC_ID
 																	   AND T.ACTIVE_VER = A.VER_NO
 			WHERE 1 = 1
-			<choose>
-				<when test="docSt == 'all'">
-				</when>
-				<otherwise>
-					AND T.DOC_ST = 'A'
-				</otherwise>
-			</choose>
-			AND REPLACE(T.PATH_BASE,'\','/') = #{comonCd}
+			<if test="serverName != null and !serverName.equals('')">
+			  AND T.SERVER_NAME = #{serverName}
+			</if>
 			<if test="salesCd == null and salesCd.equals('')">
-				AND T.CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+			  AND T.CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
 			</if>
 			<if test="salesCd != null and !salesCd.equals('')">
-				AND T.SALES_CD LIKE  '%'||#{salesCd}||'%'
+			  AND T.SALES_CD LIKE  '%'||#{salesCd}||'%'
 			</if>
+			  AND REPLACE(T.PATH_BASE,'\','/') = #{comonCd}
 		)
 		SELECT COUNT(*)
 		FROM (
-		SELECT B.*,
-				ROW_NUMBER() OVER (ORDER BY B.FILE_NAME) AS RN
-		FROM BASE B
+			SELECT B.*,
+					ROW_NUMBER() OVER (ORDER BY B.FILE_NAME) AS RN
+			FROM BASE B
 		)
 	</select>
 
@@ -111,24 +97,19 @@
 				, T.DOC_ST
 				, A.FILE_SIZE
 				, A.VER_NO
+				, T.SERVER_NAME
 			FROM TB_DRAWING_DOC T
 								LEFT OUTER JOIN TB_DRAWING_VERSION AS A ON T.DOC_ID = A.DOC_ID
 																	   AND T.ACTIVE_VER = A.VER_NO
 			WHERE 1 = 1
-			<choose>
-				<when test="docSt == 'all'">
-				</when>
-				<otherwise>
-					AND T.DOC_ST = 'A'
-				</otherwise>
-			</choose>
-			AND REPLACE(T.PATH_BASE,'\','/') = #{comonCd}
 			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
-				AND T.CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+			  AND T.CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
 			</if>
 			<if test="salesCd != null and !salesCd.equals('')">
-				AND T.SALES_CD LIKE  '%'||#{salesCd}||'%'
+			  AND T.SALES_CD LIKE  '%'||#{salesCd}||'%'
 			</if>
+			  AND T.SERVER_NAME = #{serverName}
+			  AND REPLACE(T.PATH_BASE,'\','/') = #{comonCd}
 		)
 		SELECT *
 		FROM (
@@ -174,7 +155,7 @@
 				END AS DIR_PATH
 			, COMMENT_TXT	--상세이력
 		FROM VER
-		ORDER BY VER_NO
+		ORDER BY CREATED_AT DESC
 
 	</select>
 
@@ -183,117 +164,109 @@
 			SELECT DISTINCT T.SALES_CD, T.PART_NO, T.UNIT_NO
 			FROM TB_DRAWING_DOC T
 			WHERE 1=1
-			<choose>
-				<when test="docSt == 'all'">
-				</when>
-				<otherwise>
-					AND T.DOC_ST = 'A'
-				</otherwise>
-			</choose>
+			<if test="serverName != null and !serverName.equals('')">
+			  AND T.SERVER_NAME = #{serverName}
+			</if>
 			  AND T.PATH_BASE IS NOT NULL
-			<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
-			  AND T.CREATED_AT BETWEEN TO_DATE(REPLACE(#{reqDtFrom},'-',''))
-			  AND TO_DATE(REPLACE(#{reqDtTo},  '-','')) + 1
+			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+			  AND CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
 			</if>
 			  AND T.SALES_CD = #{salesCd}
 		),
-		L1 AS (
+		L1 AS ( /* SALES */
 			SELECT DISTINCT
-				  '#' PARENT
-				, B.SALES_CD ID
-				, B.SALES_CD TEXT
-				, 'sales' TYPE
-				, B.SALES_CD
-				, NULL PART_NO
-				, NULL UNIT_NO
-				, NULL DOC_ID
-				, NULL DOC_NO
-				, NULL FILE_NAME
-				, B.SALES_CD PATH_BASE
-				, 0 IS_LEAF
-				, 'Y' CODE_ETC
+				  '#' AS PARENT
+				, B.SALES_CD AS ID
+				, B.SALES_CD AS TEXT
+				, 'sales'    AS TYPE
+				, B.SALES_CD AS SALES_CD
+				, NULL       AS PART_NO
+				, NULL       AS UNIT_NO
+				, NULL       AS DOC_ID
+				, NULL       AS DOC_NO
+				, NULL       AS FILE_NAME
+				, B.SALES_CD AS PATH_BASE
+				, 0          AS IS_LEAF
+				, 'Y'        AS CODE_ETC
+				, 1          AS DEPTH
 			FROM BASE B
 		),
-		L2 AS (
+		L2 AS ( /* PART */
 			SELECT DISTINCT
-				  B.SALES_CD PARENT
-				, B.SALES_CD||'/'||B.PART_NO ID
-				, B.PART_NO TEXT
-				, 'part' TYPE
+				  B.SALES_CD AS PARENT
+				, B.SALES_CD||'/'||B.PART_NO AS ID
+				, B.PART_NO  AS TEXT
+				, 'part'     AS TYPE
 				, B.SALES_CD
 				, B.PART_NO
-				, NULL UNIT_NO
-				, NULL DOC_ID
-				, NULL DOC_NO
-				, NULL FILE_NAME
-				, B.SALES_CD||'/'||B.PART_NO PATH_BASE
-				, 0 IS_LEAF
-				, 'Y' CODE_ETC
+				, NULL       AS UNIT_NO
+				, NULL       AS DOC_ID
+				, NULL       AS DOC_NO
+				, NULL       AS FILE_NAME
+				, B.SALES_CD||'/'||B.PART_NO AS PATH_BASE
+				, 0          AS IS_LEAF
+				, 'Y'        AS CODE_ETC
+				, 2          AS DEPTH
 			FROM BASE B
 			WHERE B.PART_NO IS NOT NULL
 		),
-		L3 AS (
+		L3 AS ( /* UNIT */
 			SELECT DISTINCT
-				  B.SALES_CD||'/'||B.PART_NO PARENT
-				, B.SALES_CD||'/'||B.PART_NO||'/'||B.UNIT_NO ID
-				, B.UNIT_NO TEXT
-				, 'unit' TYPE
+				  B.SALES_CD||'/'||B.PART_NO AS PARENT
+				, B.SALES_CD||'/'||B.PART_NO||'/'||B.UNIT_NO AS ID
+				, B.UNIT_NO  AS TEXT
+				, 'unit'     AS TYPE
 				, B.SALES_CD
 				, B.PART_NO
 				, B.UNIT_NO
-				, NULL DOC_ID
-				, NULL DOC_NO
-				, NULL FILE_NAME
-				, B.SALES_CD||'/'||B.PART_NO||'/'||B.UNIT_NO PATH_BASE
-				, 0 IS_LEAF
-				, 'Y' CODE_ETC
+				, NULL       AS DOC_ID
+				, NULL       AS DOC_NO
+				, NULL       AS FILE_NAME
+				, B.SALES_CD||'/'||B.PART_NO||'/'||B.UNIT_NO AS PATH_BASE
+				, 0          AS IS_LEAF
+				, 'Y'        AS CODE_ETC
+				, 3          AS DEPTH
 			FROM BASE B
 			WHERE B.PART_NO IS NOT NULL AND B.UNIT_NO IS NOT NULL
 		),
-		L4 AS (
+		L4 AS ( /* FILE */
 			SELECT
-				  T.SALES_CD||'/'||T.PART_NO||'/'||T.UNIT_NO      		AS PARENT
-				, 'F|'||T.DOC_ID                                  		AS ID
-				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) 	AS TEXT
-				, 'file'                                          		AS TYPE
+				  T.SALES_CD||'/'||T.PART_NO||'/'||T.UNIT_NO AS PARENT
+				, 'F|'||T.DOC_ID                             AS ID
+				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS TEXT
+				, 'file'     AS TYPE
 				, T.SALES_CD
 				, T.PART_NO
 				, T.UNIT_NO
 				, T.DOC_ID
 				, T.DOC_NO
-				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) 	AS FILE_NAME
-				, REPLACE(T.PATH_BASE,'\','/')                    		AS PATH_BASE
-				, 1                                               		AS IS_LEAF
-				, 'Y'                                             		AS CODE_ETC
+				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS FILE_NAME
+				, REPLACE(T.PATH_BASE,'\','/') AS PATH_BASE
+				, 1          AS IS_LEAF
+				, 'Y'        AS CODE_ETC
+				, 4          AS DEPTH
 			FROM TB_DRAWING_DOC T
 			WHERE 1=1
-				<choose>
-					<when test="docSt == 'all'">
-					</when>
-					<otherwise>
-						AND T.DOC_ST = 'A'
-					</otherwise>
-				</choose>
-				AND T.PATH_BASE IS NOT NULL
-				<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
-				AND T.CREATED_AT BETWEEN TO_DATE(REPLACE(#{reqDtFrom},'-',''))
-									AND TO_DATE(REPLACE(#{reqDtTo},  '-','')) + 1
-				</if>
-				AND T.SALES_CD = #{salesCd}
-				AND T.PART_NO IS NOT NULL
-				AND T.UNIT_NO IS NOT NULL
+			<if test="serverName != null and !serverName.equals('')">
+			  AND T.SERVER_NAME = #{serverName}
+			</if>
+			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+			  AND CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+			</if>
+			  AND T.SALES_CD = #{salesCd}
+			  AND T.PART_NO IS NOT NULL
+			  AND T.UNIT_NO IS NOT NULL
+			  AND T.PATH_BASE IS NOT NULL
 		)
-		SELECT PARENT, ID, TEXT, DOC_ID, DOC_NO, FILE_NAME, PATH_BASE, IS_LEAF, TYPE, CODE_ETC,SALES_CD, PART_NO, UNIT_NO
+		SELECT PARENT, ID, TEXT, DOC_ID, DOC_NO, FILE_NAME, PATH_BASE, IS_LEAF, TYPE, CODE_ETC, SALES_CD, PART_NO, UNIT_NO
 		FROM (
 			SELECT * FROM L1
 			UNION ALL SELECT * FROM L2
 			UNION ALL SELECT * FROM L3
 			UNION ALL SELECT * FROM L4
 		)
-		ORDER BY ID
+		ORDER BY DEPTH, ID
 	</select>
-
-
 
 	<select id="selectSalesCdDrawFileListCount" parameterType="Map" resultType="int">
 		WITH BASE AS (
@@ -316,8 +289,8 @@
 										AND V.VER_NO = T.ACTIVE_VER
 			WHERE 1 = 1
 			  AND T.SALES_CD = #{salesCd}
-			<if test="docSt != null and docSt != 'all'">
-			  AND T.DOC_ST = 'A'
+			<if test="serverName != null and !serverName.equals('')">
+			  AND T.SERVER_NAME = #{serverName}
 			</if>
 			<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
 			  AND T.CREATED_AT BETWEEN TO_DATE(#{reqDtFrom}, 'YYYY-MM-DD')
@@ -454,8 +427,8 @@
 										AND V.VER_NO = T.ACTIVE_VER
 			WHERE 1 = 1
 			  AND T.SALES_CD = #{salesCd}
-			<if test="docSt != null and docSt != 'all'">
-			  AND T.DOC_ST = 'A'
+			<if test="serverName != null and !serverName.equals('')">
+			  AND T.SERVER_NAME = #{serverName}
 			</if>
 			<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
 			  AND T.CREATED_AT BETWEEN TO_DATE(#{reqDtFrom}, 'YYYY-MM-DD')
