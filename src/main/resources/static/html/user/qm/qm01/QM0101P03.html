@@ -351,6 +351,7 @@
     var rsltNo = null;
     var clntPjt = "";
 	var teamManagerFlag = false;
+	var ordrsDiv3Chk = false;
     var teleNo = ""; //카카오 접수자 전화번호변수
  	// 카톡 정상알림 카운터 변수
     var kakaoCnt = 0;
@@ -968,6 +969,9 @@
                     {
                     	$('#popForm2 #' + key).val(value);
                     }
+					if (key === 'ordrsDiv') {
+						ordrsDiv3Chk = (value === 'ORDRSDIV3');
+					}
 					
 					if (key == 'fdmtSolutCd') {	// 근본원인 체크하기
 						const codes = value.split(',');
@@ -1638,25 +1642,27 @@
 		//이슈등록, 조치결과 등록시 결재자 정보를 메모리에 가져오기  end
 		//------------------------------------------------
 
-		//발행자의 팀장 정보 가져오기 결제자 정보 추가
-// 		appArray = approvalUserInfoData(tempActId, appArray);
-		appArray = approvalTeamManagerInfoData(tempActId, appArray);
-// 		appArray = approvalTeamManagerInfoData(jwt.userId, appArray);
-
-		//발행자와 결과등록자가 다른 경우 발행자 결제자동등록 처리
-		if ($("#popForm2 #ordrgId").val() != $("#popForm2 #resRegId").val()) appArray = approvalUserInfoData($("#popForm2 #ordrgId").val(), appArray);
-
 		// 중요도가 최상(비용상, 빈도상)이면 사장님 결재라인에 자동 등록
 		if ($('#importantCd').val() == 'IMPORTCD01') {
 			appArray = approvalTeamManagerSpecialInfoData('ceo', appArray);
 		}
-
 		// 발주요청서 등록 시 영업 및 연구소가 등록 시 해당 특정 유저 결재권자 자동 추가
-		if ($('#deptCd').val() == 'GUN30') {
+		if ($('#deptCd').val() == 'GUN30' && ordrsDiv3Chk == false) {
 			appArray = approvalTeamManagerSpecialInfoData('EMJ8105', appArray);		// 영업이 등록 시 김태호 부사장님 추가
 		} else if ($('#deptCd').val() == 'GUN40') {
 			appArray = approvalTeamManagerSpecialInfoData('kimjhv', appArray);		// 연구소가 등록 시 김재현 전무님 추가
 		}
+
+		if (ordrsDiv3Chk) {
+			appArray = approvalTeamManagerSpecialInfoData('EMJ8105', appArray);
+			ordrsDiv3Chk = false;
+		}
+
+		//발행자의 팀장 정보 가져오기 결제자 정보 추가
+		appArray = approvalTeamManagerInfoData(tempActId, appArray);
+
+		//발행자와 결과등록자가 다른 경우 발행자 결제자동등록 처리
+		if ($("#popForm2 #ordrgId").val() != $("#popForm2 #resRegId").val()) appArray = approvalUserInfoData($("#popForm2 #ordrgId").val(), appArray);
 
 		gridViewPop1.setData2(appArray.concat(shaArray));
 	}
@@ -1821,7 +1827,7 @@
 
 		// 결재자 여부 확인
 		const list = (gridViewPop1 && gridViewPop1.target && typeof gridViewPop1.target.getList === 'function') ? gridViewPop1.target.getList() : [];
-		const myAppRow = list.find(r => r.gb === '결재' && (r.todoId === userId || r.usrNm === jwt.userId));
+		const myAppRow = list.find(r => r.gb === '결재' && (r.todoId === jwt.userId || r.usrNm === jwt.userId));
 
 		if (myAppRow) {
 			// 결재 완료(Y)면 표시, 미결재면 숨김
