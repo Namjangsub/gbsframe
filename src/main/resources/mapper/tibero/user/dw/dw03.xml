@@ -59,6 +59,9 @@
 				, A.FILE_SIZE
 				, A.VER_NO
 				, T.SERVER_NAME
+				, TO_CHAR(A.CONFIRM_AT,'YYYY-MM-DD HH24:MI:SS') AS CONFIRM_AT
+				, A.CONFIRM_BY
+				, A.CONFIRM_ACT_NO
 			FROM TB_DRAWING_DOC T
 								LEFT OUTER JOIN TB_DRAWING_VERSION AS A ON T.DOC_ID = A.DOC_ID
 																	   AND T.ACTIVE_VER = A.VER_NO
@@ -97,6 +100,9 @@
 				, A.FILE_SIZE
 				, A.VER_NO
 				, T.SERVER_NAME
+				, TO_CHAR(A.CONFIRM_AT,'YYYY-MM-DD HH24:MI:SS') AS CONFIRM_AT
+				, A.CONFIRM_BY
+				, A.CONFIRM_ACT_NO
 			FROM TB_DRAWING_DOC T
 								LEFT OUTER JOIN TB_DRAWING_VERSION AS A ON T.DOC_ID = A.DOC_ID
 																	   AND T.ACTIVE_VER = A.VER_NO
@@ -133,6 +139,9 @@
 				, CREATED_BY
 				, INSTR(STORED_PATH, '\', -1) AS LAST_BS
 				, COMMENT_TXT
+				, TO_CHAR(CONFIRM_AT,'YYYY-MM-DD HH24:MI:SS') AS CONFIRM_AT
+				, CONFIRM_BY
+				, CONFIRM_ACT_NO
 			FROM TB_DRAWING_VERSION
 			WHERE DOC_ID = #{docId}
 		)
@@ -153,6 +162,9 @@
 				ELSE STORED_PATH
 				END AS DIR_PATH
 			, COMMENT_TXT	--상세이력
+			, CONFIRM_AT
+			, CONFIRM_BY
+			, CONFIRM_ACT_NO
 		FROM VER
 		ORDER BY CREATED_AT DESC
 
@@ -266,22 +278,25 @@
 	<select id="selectSalesCdDrawFileListCount" parameterType="Map" resultType="int">
 		WITH BASE AS (
 			SELECT
-			  T.DOC_ID                                   AS DOC_ID
-			, T.SALES_CD                                 AS SALES_CD
-			, T.PART_NO                                  AS PART_NO
-			, T.UNIT_NO                                  AS UNIT_NO
-			, T.DOC_NO                                   AS DOC_NO
-			, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS FILE_NAME
-			, T.EXT                                      AS FILE_TYPE
-			, REPLACE(T.PATH_BASE,'\','/')               AS LPATH
-			, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD HH24:MI:SS') AS WORK_DTTM
-			, T.CREATED_BY                               AS WORK_NM
-			, T.ACTIVE_VER                               AS VER_NO
-			, T.DOC_ST                                   AS DOC_ST
-			, V.FILE_SIZE                                AS FILE_SIZE
+				  T.DOC_ID                                   AS DOC_ID
+				, T.SALES_CD                                 AS SALES_CD
+				, T.PART_NO                                  AS PART_NO
+				, T.UNIT_NO                                  AS UNIT_NO
+				, T.DOC_NO                                   AS DOC_NO
+				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS FILE_NAME
+				, T.EXT                                      AS FILE_TYPE
+				, REPLACE(T.PATH_BASE,'\','/')               AS LPATH
+				, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD HH24:MI:SS') AS WORK_DTTM
+				, T.CREATED_BY                               AS WORK_NM
+				, T.ACTIVE_VER                               AS VER_NO
+				, T.DOC_ST                                   AS DOC_ST
+				, V.FILE_SIZE                                AS FILE_SIZE
+				, TO_CHAR(V.CONFIRM_AT,'YYYY-MM-DD HH24:MI:SS') AS CONFIRM_AT
+				, V.CONFIRM_BY
+				, V.CONFIRM_ACT_NO
 			FROM TB_DRAWING_DOC T
-			LEFT JOIN TB_DRAWING_VERSION V ON V.DOC_ID = T.DOC_ID
-										AND V.VER_NO = T.ACTIVE_VER
+								LEFT JOIN TB_DRAWING_VERSION V ON V.DOC_ID = T.DOC_ID
+															   AND V.VER_NO = T.ACTIVE_VER
 			WHERE 1 = 1
 			  AND T.SALES_CD = #{salesCd}
 			  AND T.SERVER_NAME = #{serverName}
@@ -298,23 +313,23 @@
 		),
 		SALES AS (
 			SELECT
-				  'S|'||SALES_CD					AS ID
-				, NULL								AS PID
-				, 0									AS LVL
-				, SALES_CD							AS NAME
-				, 'SALES'							AS NODE_TYPE
-				, SALES_CD							AS SALES_CD
-				, CAST(NULL AS VARCHAR2(64))		AS PART_NO
-				, CAST(NULL AS VARCHAR2(64))		AS UNIT_NO
-				, CAST(NULL AS NUMBER)				AS DOC_ID
-				, CAST(NULL AS VARCHAR2(1000))		AS FILE_NAME
-				, CAST(NULL AS VARCHAR2(20))		AS FILE_TYPE
-				, CAST(NULL AS VARCHAR2(1000))		AS LPATH
-				, CAST(NULL AS VARCHAR2(19))		AS WORK_DTTM
-				, CAST(NULL AS VARCHAR2(60))		AS WORK_NM
-				, CAST(NULL AS NUMBER)				AS FILE_SIZE
-				, CAST(NULL AS VARCHAR2(1))			AS DOC_ST
-				, CAST(NULL AS NUMBER)				AS VER_NO
+				  'S|'||SALES_CD		AS ID
+				, NULL					AS PID
+				, 0						AS LVL
+				, SALES_CD				AS NAME
+				, 'SALES'				AS NODE_TYPE
+				, SALES_CD				AS SALES_CD
+				, '' 					AS PART_NO
+				, '' 					AS UNIT_NO
+				, '' 					AS DOC_ID
+				, '' 					AS FILE_NAME
+				, '' 					AS FILE_TYPE
+				, '' 					AS LPATH
+				, '' 					AS WORK_DTTM
+				, '' 					AS WORK_NM
+				, '' 					AS FILE_SIZE
+				, ''					AS DOC_ST
+				, ''					AS VER_NO
 			FROM (SELECT DISTINCT SALES_CD FROM BASE)
 		),
 		PARTS AS (
@@ -328,19 +343,20 @@
 					WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL
 					OR #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 0
 					ELSE 1 END AS LVL
-				, PART_NO AS NAME
-				, 'PART' AS NODE_TYPE
-				, SALES_CD, PART_NO
-				, CAST(NULL AS VARCHAR2(64)) AS UNIT_NO
-				, CAST(NULL AS NUMBER) AS DOC_ID
-				, CAST(NULL AS VARCHAR2(1000)) AS FILE_NAME
-				, CAST(NULL AS VARCHAR2(20)) AS FILE_TYPE
-				, CAST(NULL AS VARCHAR2(1000)) AS LPATH
-				, CAST(NULL AS VARCHAR2(19)) AS WORK_DTTM
-				, CAST(NULL AS VARCHAR2(60)) AS WORK_NM
-				, CAST(NULL AS NUMBER) AS FILE_SIZE
-				, CAST(NULL AS VARCHAR2(1)) AS DOC_ST
-				, CAST(NULL AS NUMBER) AS VER_NO
+				, PART_NO 		AS NAME
+				, 'PART' 		AS NODE_TYPE
+				, SALES_CD
+				, PART_NO
+				, '' 			AS UNIT_NO
+				, '' 			AS DOC_ID
+				, '' 			AS FILE_NAME
+				, '' 			AS FILE_TYPE
+				, '' 			AS LPATH
+				, '' 			AS WORK_DTTM
+				, '' 			AS WORK_NM
+				, '' 			AS FILE_SIZE
+				, '' 			AS DOC_ST
+				, '' 			AS VER_NO
 			FROM BASE
 		),
 
@@ -351,31 +367,43 @@
 				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN NULL
 					ELSE 'P|'||SALES_CD||'|'||PART_NO END AS PID
 				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 0 ELSE 1 END AS LVL
-				, UNIT_NO AS NAME
-				, 'UNIT' AS NODE_TYPE
-				, SALES_CD, PART_NO, UNIT_NO
-				, CAST(NULL AS NUMBER) AS DOC_ID
-				, CAST(NULL AS VARCHAR2(1000)) AS FILE_NAME
-				, CAST(NULL AS VARCHAR2(20)) AS FILE_TYPE
-				, CAST(NULL AS VARCHAR2(1000)) AS LPATH
-				, CAST(NULL AS VARCHAR2(19)) AS WORK_DTTM
-				, CAST(NULL AS VARCHAR2(60)) AS WORK_NM
-				, CAST(NULL AS NUMBER) AS FILE_SIZE
-				, CAST(NULL AS VARCHAR2(1)) AS DOC_ST
-				, CAST(NULL AS NUMBER) AS VER_NO
+				, UNIT_NO 		AS NAME
+				, 'UNIT' 		AS NODE_TYPE
+				, SALES_CD
+				, PART_NO
+				, UNIT_NO
+				, '' 			AS DOC_ID
+				, '' 			AS FILE_NAME
+				, '' 			AS FILE_TYPE
+				, '' 			AS LPATH
+				, ''			AS WORK_DTTM
+				, '' 			AS WORK_NM
+				, '' 			AS FILE_SIZE
+				, ''			AS DOC_ST
+				, '' 			AS VER_NO
 			FROM BASE
 		),
 		FILES AS (
 			SELECT
-				  'F|'||DOC_ID AS ID
+				  'F|'||DOC_ID 		AS ID
 				, 'U|'||SALES_CD||'|'||PART_NO||'|'||UNIT_NO AS PID
 				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 1
 					   WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL THEN 2
 					   ELSE 3 END AS LVL
-				, FILE_NAME AS NAME
-				, 'FILE' AS NODE_TYPE
-				, SALES_CD, PART_NO, UNIT_NO
-				, DOC_ID, FILE_NAME, FILE_TYPE, LPATH, WORK_DTTM, WORK_NM, FILE_SIZE, DOC_ST, VER_NO
+				, FILE_NAME 		AS NAME
+				, 'FILE' 			AS NODE_TYPE
+				, SALES_CD
+				, PART_NO
+				, UNIT_NO
+				, DOC_ID
+				, FILE_NAME
+				, FILE_TYPE
+				, LPATH
+				, WORK_DTTM
+				, WORK_NM
+				, FILE_SIZE
+				, DOC_ST
+				, VER_NO
 			FROM BASE
 		)
 		SELECT COUNT(*) FROM (
@@ -416,9 +444,11 @@
 				, T.DOC_ST                                   AS DOC_ST
 				, V.FILE_SIZE                                AS FILE_SIZE
 				, T.SERVER_NAME                              AS SERVER_NAME
+				, TO_CHAR(V.CONFIRM_AT,'YYYY-MM-DD HH24:MI:SS') AS CONFIRM_AT
+				, V.CONFIRM_BY
+				, V.CONFIRM_ACT_NO
 			FROM TB_DRAWING_DOC T
-			LEFT JOIN TB_DRAWING_VERSION V
-				ON V.DOC_ID = T.DOC_ID AND V.VER_NO = T.ACTIVE_VER
+								LEFT JOIN TB_DRAWING_VERSION V ON V.DOC_ID = T.DOC_ID AND V.VER_NO = T.ACTIVE_VER
 			WHERE 1=1
 			  AND T.SALES_CD = #{salesCd}
 			  AND T.SERVER_NAME = #{serverName}
@@ -435,51 +465,58 @@
 		),
 		SALES AS (  -- SALES 단일행 + SERVER_NAME 포함
 			SELECT
-				  'S|'||SALES_CD                    AS ID
-				, NULL                              AS PID
-				, 0                                 AS LVL
-				, SALES_CD                          AS NAME
-				, 'SALES'                           AS NODE_TYPE
+				  'S|'||SALES_CD		AS ID
+				, NULL					AS PID
+				, 0						AS LVL
+				, SALES_CD 				AS NAME
+				, 'SALES' 				AS NODE_TYPE
 				, SALES_CD
-				, CAST(NULL AS VARCHAR2(64))        AS PART_NO
-				, CAST(NULL AS VARCHAR2(64))        AS UNIT_NO
-				, CAST(NULL AS NUMBER)              AS DOC_ID
-				, CAST(NULL AS VARCHAR2(1000))      AS FILE_NAME
-				, CAST(NULL AS VARCHAR2(20))        AS FILE_TYPE
-				, CAST(NULL AS VARCHAR2(1000))      AS LPATH
-				, CAST(NULL AS VARCHAR2(19))        AS WORK_DTTM
-				, CAST(NULL AS VARCHAR2(60))        AS WORK_NM
-				, CAST(NULL AS NUMBER)              AS FILE_SIZE
-				, CAST(NULL AS VARCHAR2(1))         AS DOC_ST
-				, CAST(NULL AS NUMBER)              AS VER_NO
-				, MAX(SERVER_NAME)                  AS SERVER_NAME
+				, '' 					AS PART_NO
+				, '' 					AS UNIT_NO
+				, ''					AS DOC_ID
+				, ''					AS FILE_NAME
+				, '' 					AS FILE_TYPE
+				, ''					AS LPATH
+				, ''					AS WORK_DTTM
+				, ''					AS WORK_NM
+				, ''					AS FILE_SIZE
+				, ''					AS DOC_ST
+				, ''					AS VER_NO
+				, MAX(SERVER_NAME)		AS SERVER_NAME
+				, ''					AS CONFIRM_AT
+				, ''					AS CONFIRM_BY
+				, ''					AS CONFIRM_ACT_NO
 			FROM BASE
 			GROUP BY SALES_CD
 		),
 		PARTS AS (
-		SELECT
-			  'P|'||SALES_CD||'|'||PART_NO AS ID
-			, CASE WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL
-					OR #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN NULL
-				ELSE 'S|'||SALES_CD END AS PID
-			, CASE WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL
-					OR #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 0 ELSE 1 END AS LVL
-			, PART_NO AS NAME
-			, 'PART'  AS NODE_TYPE
-			, SALES_CD, PART_NO
-			, CAST(NULL AS VARCHAR2(64)) AS UNIT_NO
-			, CAST(NULL AS NUMBER)       AS DOC_ID
-			, CAST(NULL AS VARCHAR2(1000)) AS FILE_NAME
-			, CAST(NULL AS VARCHAR2(20)) AS FILE_TYPE
-			, CAST(NULL AS VARCHAR2(1000)) AS LPATH
-			, CAST(NULL AS VARCHAR2(19)) AS WORK_DTTM
-			, CAST(NULL AS VARCHAR2(60)) AS WORK_NM
-			, CAST(NULL AS NUMBER)       AS FILE_SIZE
-			, CAST(NULL AS VARCHAR2(1))  AS DOC_ST
-			, CAST(NULL AS NUMBER)       AS VER_NO
-			, MAX(SERVER_NAME)           AS SERVER_NAME
-		FROM BASE
-		GROUP BY SALES_CD, PART_NO
+			SELECT
+				  'P|'||SALES_CD||'|'||PART_NO AS ID
+				, CASE WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL
+						OR #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN NULL
+					ELSE 'S|'||SALES_CD END AS PID
+				, CASE WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL
+						OR #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 0 ELSE 1 END AS LVL
+				, PART_NO 				AS NAME
+				, 'PART'  				AS NODE_TYPE
+				, SALES_CD
+				, PART_NO
+				, '' 					AS UNIT_NO
+				, ''      				AS DOC_ID
+				, '' 					AS FILE_NAME
+				, '' 					AS FILE_TYPE
+				, '' 					AS LPATH
+				, '' 					AS WORK_DTTM
+				, '' 					AS WORK_NM
+				, ''       				AS FILE_SIZE
+				, ''  					AS DOC_ST
+				, ''       				AS VER_NO
+				, MAX(SERVER_NAME)      AS SERVER_NAME
+				, ''					AS CONFIRM_AT
+				, ''					AS CONFIRM_BY
+				, ''					AS CONFIRM_ACT_NO
+			FROM BASE
+			GROUP BY SALES_CD, PART_NO
 		),
 		UNITS AS (
 			SELECT
@@ -487,35 +524,52 @@
 				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN NULL
 					ELSE 'P|'||SALES_CD||'|'||PART_NO END AS PID
 				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 0 ELSE 1 END AS LVL
-				, UNIT_NO AS NAME
-				, 'UNIT'  AS NODE_TYPE
-				, SALES_CD, PART_NO, UNIT_NO
-				, CAST(NULL AS NUMBER)        AS DOC_ID
-				, CAST(NULL AS VARCHAR2(1000)) AS FILE_NAME
-				, CAST(NULL AS VARCHAR2(20))  AS FILE_TYPE
-				, CAST(NULL AS VARCHAR2(1000)) AS LPATH
-				, CAST(NULL AS VARCHAR2(19))  AS WORK_DTTM
-				, CAST(NULL AS VARCHAR2(60))  AS WORK_NM
-				, CAST(NULL AS NUMBER)        AS FILE_SIZE
-				, CAST(NULL AS VARCHAR2(1))   AS DOC_ST
-				, CAST(NULL AS NUMBER)        AS VER_NO
-				, MAX(SERVER_NAME)            AS SERVER_NAME
+				, UNIT_NO 			AS NAME
+				, 'UNIT'  			AS NODE_TYPE
+				, SALES_CD
+				, PART_NO
+				, UNIT_NO
+				, ''        		AS DOC_ID
+				, '' 				AS FILE_NAME
+				, ''  				AS FILE_TYPE
+				, '' 				AS LPATH
+				, ''  				AS WORK_DTTM
+				, '' 				AS WORK_NM
+				, ''       			AS FILE_SIZE
+				, ''   				AS DOC_ST
+				, ''        		AS VER_NO
+				, MAX(SERVER_NAME)  AS SERVER_NAME
+				, ''				AS CONFIRM_AT
+				, ''				AS CONFIRM_BY
+				, ''				AS CONFIRM_ACT_NO
 			FROM BASE
 			GROUP BY SALES_CD, PART_NO, UNIT_NO
 		),
 		FILES AS (
-		SELECT
-			  'F|'||DOC_ID AS ID
-			, 'U|'||SALES_CD||'|'||PART_NO||'|'||UNIT_NO AS PID
-			, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 1
-				WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL THEN 2
-				ELSE 3 END AS LVL
-			, FILE_NAME AS NAME
-			, 'FILE' AS NODE_TYPE
-			, SALES_CD, PART_NO, UNIT_NO
-			, DOC_ID, FILE_NAME, FILE_TYPE, LPATH, WORK_DTTM, WORK_NM, FILE_SIZE, DOC_ST, VER_NO
-			, SERVER_NAME
-		FROM BASE
+			SELECT
+				  'F|'||DOC_ID AS ID
+				, 'U|'||SALES_CD||'|'||PART_NO||'|'||UNIT_NO AS PID
+				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 1
+					WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL THEN 2
+					ELSE 3 END AS LVL
+				, FILE_NAME AS NAME
+				, 'FILE' AS NODE_TYPE
+				, SALES_CD
+				, PART_NO, UNIT_NO
+				, DOC_ID
+				, FILE_NAME
+				, FILE_TYPE
+				, LPATH
+				, WORK_DTTM
+				, WORK_NM
+				, FILE_SIZE
+				, DOC_ST
+				, VER_NO
+				, SERVER_NAME
+				, CONFIRM_AT
+				, CONFIRM_BY
+				, CONFIRM_ACT_NO
+			FROM BASE
 		)
 		SELECT *
 		FROM (

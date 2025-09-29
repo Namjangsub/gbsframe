@@ -215,11 +215,9 @@
 		initView : function() {
 			this.target = new ax5.ui.grid();
 			this.target.setConfig({
-// 			        showLineNumber: true,
-// 	                lineNumberColumnWidth: 40,
 				showRowSelector : true,
-				multipleSelect : false,
-				sortable : true,
+				multipleSelect : true,
+				sortable : false,
 				target: $('[data-ax5grid="file-grid"]'),
 				tree: {
 					use: true,
@@ -244,14 +242,42 @@
 				},
 				body : {
 					onClick : function() {
-						this.self.select(this.dindex);
+						var list = gridView.target;
+						const lvl = String(this.item && this.item.lvl);
+						if (lvl === '0' || lvl === '1' || lvl === '2') return;
+						//현재 선택된 것만 해제
+						const selected = list.getList("selected");
+						for (let i = 0; i < selected.length; i++) {
+							list.select(selected[i].__index, { selected: false });
+						}
+
+						// 클릭한 행만 단일 선택 (트리 접힘/펼침 무관)
+						list.select(this.dindex, { selected: true });
+
+						// 인덱스 저장은 뷰 인덱스로 통일
+						window.select_index = this.dindex;
 					},
 					onDBLClick: function () {
-						select_dw03_modal();
+						const t = gridView.target;
+						const lvl = String(this.item && this.item.lvl);
+
+						if (lvl === '0' || lvl === '1' || lvl === '2') return;
+						// 기존 선택 해제
+						const sel = t.getList("selected") || [];
+						for (const r of sel) {
+							if (Number.isInteger(r?.__index)) t.select(r.__index, { selected:false });
+						}
+
+						// 현재 더블클릭한 행만 선택
+						t.select(this.dindex, { selected:true });
+						window.select_index = this.dindex;
+
+						// 현재 행으로 팝업 호출
+						select_dw03_modal(this.item); 
 					},
 				},
 				columns : [
-						{key : "nodeNm",	label: "파일명",	width: 280, align: "left", treeControl: true,
+						{key : "nodeNm",	label: "파일명",	width: 340, align: "left", treeControl: true,
 							formatter: function () {
 								const it = this.item || {};
 								return it.nodeNm || it.fileName || it.unitNo || it.partNo || it.salesCd || "";
@@ -259,16 +285,20 @@
 						},
 						{key : "id",  hidden: true },
 						{key : "pid", hidden: true },
-						{key : "fileName",	label : "파일명", 		width : 260, align: "left", hidden: true},
-						{key : "fileSize",	label : "파일크기", 	width : 80, align: "right" , formatter: "money"},
-						{key : "fileType",	label : "확장자",		width : 60, align: "center"},
-						{key : "salesCd", 	label : "Sales코드",	width : 120, align: "center", hidden: true},
-						{key : "workNm", 	label : "작업자",		width : 80, align: "center"},
-						{key : "workDttm",	label : "저장일시",		width : 130,	align: "center",},
-						{key : "lpath",  	label : "저장위치",		width : "*", align: "left"},
-						{key : "docId",  	label: "파일Id", hidden: true },
-    					{key : "verNo",  	label: "Ver",    hidden: true },
-						{key : "docSt",  	label : "존재여부",		width : "*", align: "left", hidden: true},
+						{key : "fileName",		label : "파일명", 		width : 260, align: "left", hidden: true},
+						{key : "fileSize",		label : "파일크기", 	width : 80, align: "right" , formatter: "money"},
+						{key : "fileType",		label : "확장자",		width : 60, align: "center"},
+						{key : "salesCd", 		label : "Sales코드",	width : 120, align: "center", hidden: true},
+						{key : "workNm", 		label : "작업자",		width : 80, align: "center"},
+						{key : "workDttm",		label : "저장일시",		width : 130,	align: "center",},
+						{key : "lpath",  		label : "저장위치",		width : 400, align: "left"},
+						{key : "docId",  		label : "파일Id", hidden: true },
+    					{key : "verNo",  		label : "Ver",    hidden: true },
+						// {key : "docSt",  	label : "존재여부",		width : 40, align: "center", hidden: true},
+						{key : "confirmBy",		label : "확정자",		width : 80,	align: "center"},
+						{key : "confirmAt", 	label : "확정일시",		width : 130, align: "center"},
+						{key : "confirmActNo",	label : "문제관리번호", width : 100,	align: "center"},
+						{key : "serverName",	label : "서버이름",		width : 60, align: "center", hidden: true}
 				],
 				page : {
 					navigationItemCount : 10,
@@ -443,9 +473,10 @@
 	});
 
 	// 팝업창
-	function select_dw03_modal() {
+	function select_dw03_modal(row) {
 		// 선택된 로우가 없으면 빈 객체로 처리
-		var row = gridView.target.getList("selected")[0];
+		if (!row) row = gridView.target.getList("selected")[0];
+		if (!row) return false;
 
 		var paramObj = {
 			"docId"		: row.docId,
