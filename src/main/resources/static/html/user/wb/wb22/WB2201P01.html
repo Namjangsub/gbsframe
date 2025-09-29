@@ -240,6 +240,7 @@
 	var firstRow = '';
 	var thisGridRow = 0;
 	var thisGridCol = 0;
+	var teamManagerYnFlag = false;
 
 	var beforeGridSize = 0; //수주상세그리드의 갯수용 그리드컨텐츠 높이조절용
 	//카톡 정상알림 카운터 변수
@@ -338,12 +339,13 @@
 					onDBLClick: function () {
 						var idx = this.dindex;
 						// Validation 체크
-						if (this.item.closeYn == "Y") {
+						if (this.item.closeYn == "Y" && !teamManagerYnFlag) {
 							//alert("확정된 상태입니다.");
 							return;
 						}
 
 						if (this.column.key=='wbsPlanMngNm') {
+							var closeYn = this.item.closeYn;
 							var paramObj = {
 								"coCd" : coCd,
 								"userId": '',
@@ -352,10 +354,25 @@
 							openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "담당자 검색", paramObj, function (tree){
 								var checkedId = tree.get_checked()[0];
 								var checkedNode = tree.get_node(checkedId);
+
+								if (closeYn == "Y" && teamManagerYnFlag && (checkedNode.original.parent.slice(0,5) != jwt.deptId.slice(0,5))) {
+									customAlert("같은 부서원만 선택 가능합니다.");
+									return false;
+								}
+
 								gridView1.target.updateRow($.extend({}, gridView1.target.list[idx], {wbsPlanMngId : checkedNode.id}), idx);
 								gridView1.target.updateRow($.extend({}, gridView1.target.list[idx], {wbsPlanMngNm : checkedNode.text}), idx);
 
-								$("#popForm #btn1").show();  //저장버튼
+								if (teamManagerYnFlag) {
+									$("#popForm #addrow1").show();
+									$("#popForm #addrow1 a:not(#btn1)").hide();
+									$("#popForm #btn1").show();                  // 저장만 표시
+									
+								} else {
+									$("#popForm #btn1").show();                  // 저장만 표시
+								}
+								
+								
 							});
 						}
 
@@ -546,7 +563,7 @@
 								var reason = list[i].verUpReason;
 								$("#popForm #wbsPlanVerNo").val(ver);
 								$("#popForm #wbsPlanVerUpReason").val(reason);
-
+								
 								var val2 = list[i].closeYn;
 								if (val2 == "Y") {
 									$("#popForm #btn4").show();  //Ver.Up버튼
@@ -637,7 +654,7 @@
 						var idx = this.dindex;
 
 						// Validation 체크
-						if (this.item.rsltsCloseYn == "Y" ) {
+						if (this.item.rsltsCloseYn == "Y") {
 							//alert("확정된 상태입니다.");
 							return;
 						}
@@ -853,10 +870,10 @@
 						});
 					}
 					// Validation 체크 - 2레벨 담당자 체크 버튼 보임 처리
-	// 				var row = gridView1.target.getList("selected")[0];
-					if (row != undefined && row.wbsPlanMngId != jwt.userId) {
+					var row1 = gridView1.target.getList("selected")[0];
+					if (row != undefined && row.wbsPlanMngId != jwt.userId || row1.closeYn == "N") {
 						$("#popForm #addrow2").hide();
-					}else {
+					} else {
 						$("#popForm #addrow2").show();
 						// noGrid2List(list);
 					}
@@ -916,6 +933,7 @@
 		salesCd = modalStack.last().paramObj.salesCd;
 		planVerNo = modalStack.last().paramObj.planVerNo;
 		histYn = modalStack.last().paramObj.histYn;
+		teamManagerYnFlag = jwt.authInfo.includes("AUTH001");
 		
 		//권한처리하면 기본적으로  버튼은 숨겨야함
 		$("#popForm #addrow1").hide();
@@ -1061,7 +1079,7 @@
 		//Validation 체크
 		var row = gridView1.target.getList()[0];
 		if (row != undefined) {
-			if (row.closeYn == "Y") {
+			if (row.closeYn == "Y" && !teamManagerYnFlag) {
 				alert("확정된 상태입니다.");
 				return;
 			}
@@ -1224,8 +1242,8 @@
 				}
 				rowListObj["wbsPlanStsCodeId"] = wbsPlanStsCodeId;
 
-				// 전산관리자가 Task 수정시 해당 Task의 담당자 id,nm이 들어가겠끔
-				if (jwt.userId == 'js.nam' || jwt.userId == 'ssj') {
+				// 전산관리자, 팀장이 Task 수정시 해당 Task의 담당자 id,nm이 들어가겠끔
+				if (jwt.userId == 'js.nam' || jwt.userId == 'ssj' || teamManagerYnFlag) {
 					rowListObj["wbsPlanMngId"] = row1.wbsPlanMngId;
 					rowListObj["wbsPlanMngNm"] = row1.wbsPlanMngNm;
 				} else {

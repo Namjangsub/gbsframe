@@ -142,4 +142,7 @@ public interface WB22Mapper {
 
 	// Task(level2) 저장시 check
 	int wbsLevel2InsertChk(Map<String, String> paramMap);
+
+	// 실적Id 업데이트
+	int wbsRsltsMngIdUpdate(Map<String, String> paramMap);
 }

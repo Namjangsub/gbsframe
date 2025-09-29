@@ -108,6 +108,8 @@ public class WB22SvcImpl implements WB22Svc {
 					} else {
 						// level1 담당자로 TASK 담당자 일괄 수정
 						result += wb22Mapper.wbsLevel2MngIdUpdate(sharngMap);
+						// 실적이 있으면 실적테이블의 id도 수정
+						result += wb22Mapper.wbsRsltsMngIdUpdate(sharngMap);
 					}
 				}
 
@@ -143,10 +145,10 @@ public class WB22SvcImpl implements WB22Svc {
 
 		int result = 0;
 
-		// Task 계획 저장시 해당 과제가 확정(Y)이면서 Task등록하는 일정이있어야하며 확정 Check
+		// Task 계획 저장시 해당 과제가 확정(Y)이면서 Task등록하는 일정이있어야하며 해당 일정도 Y인지 Check
 		int wbsLevel2InsertChk = wb22Mapper.wbsLevel2InsertChk(paramMap);
 		if (wbsLevel2InsertChk == 0) {
-			return 0;
+			throw new RuntimeException("Task 계획을 저장할 수 없습니다. 일정확인 후 다시 시도해주세요.");
 		}
 
 		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {
