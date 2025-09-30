@@ -6,7 +6,7 @@
 	<select id="selectDrawDocTreeList" parameterType="Map" resultType="CamelMap">
 		WITH P AS (
 			SELECT DISTINCT
-					REPLACE(T.PATH_BASE,'\','/') AS FULL_PATH
+					  REPLACE(T.PATH_BASE,'\','/') AS FULL_PATH
 			FROM TB_DRAWING_DOC T
 			WHERE 1=1
 			  AND T.SERVER_NAME = #{serverName}
@@ -23,7 +23,7 @@
 			SELECT LEVEL AS LV FROM DUAL CONNECT BY LEVEL <![CDATA[ <= ]]> 100
 		)
 		SELECT DISTINCT
-			CASE WHEN N.LV = 1 THEN '#'
+			  CASE WHEN N.LV = 1 THEN '#'
 					ELSE SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV-1) - 1)
 			END AS PARENT,
 			SUBSTR(P.FULL_PATH, 1, INSTR(P.FULL_PATH||'/', '/', 1, N.LV) - 1) AS ID,
@@ -176,85 +176,101 @@
 			FROM TB_DRAWING_DOC T
 			WHERE 1=1
 			  AND T.SERVER_NAME = #{serverName}
+			  AND T.SALES_CD = #{salesCd}
 			  AND T.PATH_BASE IS NOT NULL
 			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
 			  AND CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
 			</if>
-			  AND T.SALES_CD = #{salesCd}
+		),
+		BM AS (
+			SELECT
+				TRIM(DSGN_NO) AS DSGN_NO,
+				MIN(MATR_NM)   AS MATR_NM,
+				MIN(LOWER_QTY) AS LOWER_QTY
+			FROM TB_BM14M01
+			WHERE SALES_CD = #{salesCd}
+			  AND DSGN_NO IS NOT NULL
+			GROUP BY TRIM(DSGN_NO)
 		),
 		L1 AS ( /* SALES */
 			SELECT DISTINCT
 				  '#' AS PARENT
-				, B.SALES_CD AS ID
-				, B.SALES_CD AS TEXT
-				, 'sales'    AS TYPE
-				, B.SALES_CD AS SALES_CD
-				, NULL       AS PART_NO
-				, NULL       AS UNIT_NO
-				, NULL       AS DOC_ID
-				, NULL       AS DOC_NO
-				, NULL       AS FILE_NAME
-				, B.SALES_CD AS PATH_BASE
-				, 0          AS IS_LEAF
-				, 'Y'        AS CODE_ETC
-				, 1          AS DEPTH
+				, B.SALES_CD 	AS ID
+				, B.SALES_CD || CASE WHEN BM.MATR_NM IS NOT NULL THEN '('||BM.MATR_NM||') x '||BM.LOWER_QTY ELSE '' END AS TEXT
+				, 'sales'		AS TYPE
+				, B.SALES_CD 	AS SALES_CD
+				, ''			AS PART_NO
+				, ''			AS UNIT_NO
+				, ''			AS DOC_ID
+				, ''			AS DOC_NO
+				, ''			AS FILE_NAME
+				, B.SALES_CD 	AS PATH_BASE
+				, 0				AS IS_LEAF
+				, 'Y'			AS CODE_ETC
+				, 1 			AS DEPTH
 			FROM BASE B
+						LEFT JOIN BM ON BM.DSGN_NO = B.SALES_CD
 		),
 		L2 AS ( /* PART */
 			SELECT DISTINCT
-				  B.SALES_CD AS PARENT
-				, B.SALES_CD||'/'||B.PART_NO AS ID
-				, B.PART_NO  AS TEXT
-				, 'part'     AS TYPE
+				  B.SALES_CD 					AS PARENT
+				, B.SALES_CD||'-'||B.PART_NO	AS ID
+				, B.PART_NO || CASE WHEN BM.MATR_NM IS NOT NULL THEN '('||BM.MATR_NM||') x '||BM.LOWER_QTY ELSE '' END AS TEXT
+				, 'part'     					AS TYPE
 				, B.SALES_CD
 				, B.PART_NO
-				, NULL       AS UNIT_NO
-				, NULL       AS DOC_ID
-				, NULL       AS DOC_NO
-				, NULL       AS FILE_NAME
-				, B.SALES_CD||'/'||B.PART_NO AS PATH_BASE
-				, 0          AS IS_LEAF
-				, 'Y'        AS CODE_ETC
-				, 2          AS DEPTH
+				, ''							AS UNIT_NO
+				, ''							AS DOC_ID
+				, ''							AS DOC_NO
+				, ''							AS FILE_NAME
+				, B.SALES_CD||'/'||B.PART_NO 	AS PATH_BASE
+				, 0          					AS IS_LEAF
+				, 'Y'        					AS CODE_ETC
+				, 2         					AS DEPTH
 			FROM BASE B
+						LEFT JOIN BM ON BM.DSGN_NO = B.SALES_CD||'-'||B.PART_NO
 			WHERE B.PART_NO IS NOT NULL
 		),
 		L3 AS ( /* UNIT */
 			SELECT DISTINCT
-				  B.SALES_CD||'/'||B.PART_NO AS PARENT
-				, B.SALES_CD||'/'||B.PART_NO||'/'||B.UNIT_NO AS ID
-				, B.UNIT_NO  AS TEXT
-				, 'unit'     AS TYPE
+				  B.SALES_CD||'-'||B.PART_NO 					AS PARENT
+				, B.SALES_CD||'-'||B.PART_NO||'-'||B.UNIT_NO 	AS ID
+				, B.UNIT_NO || CASE WHEN BM.MATR_NM IS NOT NULL THEN '('||BM.MATR_NM||') x '||BM.LOWER_QTY ELSE '' END AS TEXT
+				, 'unit'     									AS TYPE
 				, B.SALES_CD
 				, B.PART_NO
 				, B.UNIT_NO
-				, NULL       AS DOC_ID
-				, NULL       AS DOC_NO
-				, NULL       AS FILE_NAME
-				, B.SALES_CD||'/'||B.PART_NO||'/'||B.UNIT_NO AS PATH_BASE
-				, 0          AS IS_LEAF
-				, 'Y'        AS CODE_ETC
-				, 3          AS DEPTH
+				, ''       										AS DOC_ID
+				, ''       										AS DOC_NO
+				, ''      										AS FILE_NAME
+				, B.SALES_CD||'/'||B.PART_NO||'/'||B.UNIT_NO 	AS PATH_BASE
+				, 0          									AS IS_LEAF
+				, 'Y'        									AS CODE_ETC
+				, 3         									AS DEPTH
 			FROM BASE B
+						 LEFT JOIN BM ON BM.DSGN_NO = B.SALES_CD||'-'||B.PART_NO||'-'||B.UNIT_NO
 			WHERE B.PART_NO IS NOT NULL AND B.UNIT_NO IS NOT NULL
 		),
 		L4 AS ( /* FILE */
 			SELECT
-				  T.SALES_CD||'/'||T.PART_NO||'/'||T.UNIT_NO AS PARENT
-				, 'F|'||T.DOC_ID                             AS ID
-				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS TEXT
-				, 'file'     AS TYPE
+				  T.SALES_CD||'-'||T.PART_NO||'-'||T.UNIT_NO 			AS PARENT
+				, 'F|'||T.DOC_ID										AS ID
+				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) ||
+					CASE WHEN BM.MATR_NM IS NOT NULL THEN ' ('||BM.MATR_NM||') x '||BM.LOWER_QTY ELSE ''
+					END AS TEXT
+				, 'file'												AS TYPE
 				, T.SALES_CD
 				, T.PART_NO
 				, T.UNIT_NO
 				, T.DOC_ID
 				, T.DOC_NO
-				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS FILE_NAME
-				, REPLACE(T.PATH_BASE,'\','/') AS PATH_BASE
-				, 1          AS IS_LEAF
-				, 'Y'        AS CODE_ETC
-				, 4          AS DEPTH
+				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1)	AS FILE_NAME
+				, REPLACE(T.PATH_BASE,'\','/') 							AS PATH_BASE
+				, 1														AS IS_LEAF
+				, 'Y'													AS CODE_ETC
+				, 4														AS DEPTH
 			FROM TB_DRAWING_DOC T
+								LEFT JOIN BM ON BM.DSGN_NO = T.SALES_CD||'-'||T.PART_NO||'-'||T.UNIT_NO
 			WHERE 1=1
 			  AND T.SERVER_NAME = #{serverName}
 			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
