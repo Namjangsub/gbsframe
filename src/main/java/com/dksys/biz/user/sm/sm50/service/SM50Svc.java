@@ -1,7 +1,5 @@
 package com.dksys.biz.user.sm.sm50.service;
 
-import org.springframework.web.multipart.MultipartHttpServletRequest;
-
 import java.util.List;
 import java.util.Map;
 
@@ -23,4 +21,5 @@ public interface SM50Svc {
 
 	Map<String, String> selectBomTrgtPchsPcostInfo(Map<String, String> paramMap);
 
+	int insertUpdateBomRemark(Map<String, String> paramMap) throws Exception;
 }

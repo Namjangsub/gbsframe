@@ -215,19 +215,24 @@
       </div>
       <div id="gridFrame" class="col-xs-10 resizable-div" style="padding-left: 0; padding-right: 0px;min-height:247px;">
         <div class="contents " style="margin:0px; padding:0px; height: 100%; width: 100%; min-height:200px; min-width: 245px">
-          <h3 class="location">
-            <span class="page_tit"> BOM 상세 매입 원가</span>
-          </h3>
-          <div class="add_btn_small pdl10" style="margin: 0px; padding: 0px;">
-		    <a onclick="jsonToExcel(firstGrid);" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a> 
-          </div>
-            <div data-ax5grid="first-grid" data-ax5grid-config="{}" style="height: 710px;  min-height:200px;"></div>
+			<h3 class="location">
+				<span class="page_tit"> BOM 상세 매입 원가</span>
+				<span style="display:inline-flex;align-items:center;margin-left:100px;gap:8px;">
+					<span style="color:initial !important; font-size: 12px;">BOM원가의견 :</span>
+					<input type="text" id="bomRemark" name="bomRemark" class="form-control input-sm" style="width:800px; font-size: 15px;">
+				</span>
+			</h3>
+			<div class="add_btn_small pdl10" style="margin: 0px; padding: 0px;">
+				<a onclick="jsonToExcel(firstGrid);" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a> 
+			</div>
+			<div data-ax5grid="first-grid" data-ax5grid-config="{}" style="height: 710px;  min-height:200px;"></div>
 			<div data-ax5grid="grid_excel" data-ax5grid-config="{}" style="display: none;"></div>
         </div>
       </div>
     </div>
   
     <script type="text/javascript">
+	var teamManagerYn = false;
 	var trgtPchsPcost = 0;		//목표원가
 	var realPchsPcost = 0;		//실집행원가
 	function gridStyle(row) {
@@ -478,8 +483,24 @@
 			    var chgWidth = workWidth - tagWidth;
 			    chgWidth = (tagWidth + chgWidth) > workWidth ?  (workWidth - tagWidth) : chgWidth;
 			    $("#gridFrame").width(chgWidth);
-			});			
+			});
 			authChk("SM5001M01");
+
+			$("#bomRemark").prop("readonly", true);
+
+			$(document).off('.bomRemark')
+				.on('compositionstart.bomRemark', '#bomRemark', function(){ $(this).data('ime', true); })
+				.on('compositionend.bomRemark',   '#bomRemark', function(){ $(this).data('ime', false); })
+				.on('focus.bomRemark',            '#bomRemark', function(){ $(this).data('last', this.value || ''); })
+				.on('keydown.bomRemark',          '#bomRemark', function(e){if (e.key === 'Enter' && !$(this).data('ime')) {e.preventDefault();this.blur();}})
+				.on('blur.bomRemark change.bomRemark', '#bomRemark', function(){
+					const prev = $(this).data('last') ?? '';
+					const curr = this.value ?? '';
+					if (curr !== prev) {
+						$(this).data('last', curr);
+						insertUpdateBomRemark(curr);
+					}
+				});
 
 			$("#gridFrame").resize()
       });
@@ -685,7 +706,8 @@
 	function selectSalesCdSearchOrderInfo() {						//그리드에 뿌리는 데이터
 		var formData = {
 			"ordCoCd"	: $('#coCd_S').val(),
-			"salesCd"	: $('#salesCd_S').val()
+			"salesCd"	: $('#salesCd_S').val(),
+			"userId"	: jwt.userId
 		}
 		postAjax("/user/cr/cr02/salesCdSearchOrderInfo", formData, null, function(data) {
 
@@ -701,6 +723,11 @@
 			    ordrsNo		: '#ordrsNo',
 			    eqpNm		: '#eqpNm'
 			};
+			if (data.result != null && data.result.bomRemark) {
+				$('#bomRemark').val(data.result.bomRemark).css('color', 'red');
+			} else {
+				$('#bomRemark').val("");
+			}
 			function setFormFields(fields, data = {}) {
 			    Object.keys(fields).forEach(key => {
 			        const value = data[key] || ""; // 데이터가 없으면 빈 값으로 설정
@@ -718,6 +745,11 @@
 			    trgtPchsPcost = gPasIntChk(data.result.totCost);
 			    $('#trgtPchsPcost').val(addCommaStr(trgtPchsPcost) + "원");
 			    $('#trgtPchsPcostPct').val("0%");
+			}
+			// 팀장플래그 설정
+			if (data.result != null && data.result.teamManagerYn == 'Y' && jwt.deptId.slice(0,5) == "TRN50") {
+				$("#bomRemark").prop("readonly", false).css('color', 'initial');
+				teamManagerYn = true;
 			}
 		});
 	}
@@ -754,6 +786,29 @@
 		}
 	}
 	
+	// BOM원가의견 입력/수정
+	function insertUpdateBomRemark() {
+		if ($('#salesCd_S').val() == "") {
+			return false;
+		}
+		if (!teamManagerYn && jwt.deptId != "TRN50") {
+			customAlert("구매외주팀장만 입력하실 수 있습니다.")
+			return false;
+		}
+
+		var paramObj = {
+			"userId" 		: jwt.userId,
+			"coCd" 			: $("#coCd_S").val(),
+			"salesCd" 		: $("#salesCd_S").val(),
+			"bomRemark" 	: $('#bomRemark').val(),
+			"pgmId" 		: $('#pgmId').val()
+		}
+		postAjax("/user/sm/sm50/insertUpdateBomRemark", paramObj, null, function(data) {
+			if (data.resultCode != 200) {
+				customAlert("저장에 실패하였습니다. 전산실에 문의 바랍니다.");
+			}
+		});
+	}
 	
 	</script>
   </body>

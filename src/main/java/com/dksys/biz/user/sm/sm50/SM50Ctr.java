@@ -9,10 +9,7 @@ import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.sm.sm50.service.SM50Svc;
 import com.dksys.biz.util.MessageUtils;
 
@@ -73,6 +70,24 @@ public class SM50Ctr {
     	return "jsonView";
     }
 	
+	// BOM원가의견
+	@PostMapping(value = "/insertUpdateBomRemark")
+	public String pm10_d01_update(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (sm50Svc.insertUpdateBomRemark(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
 
     
 }

@@ -24,4 +24,6 @@ public interface SM50Mapper {
 
 	Map<String, String> selectBomTrgtPchsPcostInfo(Map<String, String> paramMap);
 
+	int insertUpdateBomRemark(Map<String, String> paramMap) throws Exception;
+
 }
