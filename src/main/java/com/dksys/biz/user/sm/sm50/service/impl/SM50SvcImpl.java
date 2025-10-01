@@ -77,4 +77,9 @@ public class SM50SvcImpl implements SM50Svc {
 		return bm50Mapper.insertUpdateBomRemark(paramMap);
 	}
 
+	@Override
+	public Map<String, String> selectSalesCdSearchSm50Info(Map<String, String> paramMap) {
+		return bm50Mapper.selectSalesCdSearchSm50Info(paramMap);
+	}
+
 }

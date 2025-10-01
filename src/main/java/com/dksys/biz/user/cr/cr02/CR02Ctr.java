@@ -276,4 +276,10 @@ public class CR02Ctr {
 		return "jsonView";
 	}
 
+	@PostMapping(value = "/selectOrdrsAllInfo")
+	public String selectOrdrsAllInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, Object> ordrsInfo = cr02Svc.selectOrdrsAllInfo(paramMap);
+		model.addAttribute("ordrsInfo", ordrsInfo);
+		return "jsonView";
+	}
 }

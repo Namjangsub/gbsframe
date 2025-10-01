@@ -22,4 +22,6 @@ public interface SM50Svc {
 	Map<String, String> selectBomTrgtPchsPcostInfo(Map<String, String> paramMap);
 
 	int insertUpdateBomRemark(Map<String, String> paramMap) throws Exception;
+
+	Map<String, String> selectSalesCdSearchSm50Info(Map<String, String> paramMap);
 }

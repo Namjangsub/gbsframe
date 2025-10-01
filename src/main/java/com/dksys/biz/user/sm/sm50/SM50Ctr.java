@@ -87,7 +87,13 @@ public class SM50Ctr {
 		}
 		return "jsonView";
 	}
-
+	// 헤더 정보 조회
+	@PostMapping(value = "/selectSalesCdSearchSm50Info")
+	public String selectSalesCdSearchSm50Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = sm50Svc.selectSalesCdSearchSm50Info(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 
     
 }
