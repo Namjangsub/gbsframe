@@ -58,5 +58,7 @@ public interface SM11Mapper {
   int selectClntCrtrListCount(Map<String, String> paramMap);
   
   List<Map<String, String>> selectClntCrtrList(Map<String, String> paramMap);
+
+  int selectContractBillExistChk(Map<String, String> paramMap); 	// 기타매입 존재여부 체크
   
 }
