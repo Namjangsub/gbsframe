@@ -103,9 +103,12 @@
 				, TO_CHAR(A.CONFIRM_AT,'YYYY-MM-DD HH24:MI:SS') AS CONFIRM_AT
 				, A.CONFIRM_BY
 				, A.CONFIRM_ACT_NO
+				, NVL(Q.REQ_RMK, W.ISS_SJ) 					 AS ISS_TEXT
 			FROM TB_DRAWING_DOC T
 								LEFT OUTER JOIN TB_DRAWING_VERSION AS A ON T.DOC_ID = A.DOC_ID
 																	   AND T.ACTIVE_VER = A.VER_NO
+								LEFT JOIN TB_WB24M02 W ON A.CONFIRM_ACT_NO = W.ISS_NO	--이슈자료
+								LEFT JOIN TB_QM01M01 Q ON A.CONFIRM_ACT_NO = Q.REQ_NO 	--발주요청자료
 			WHERE 1 = 1
 			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
 			  AND T.CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
@@ -130,20 +133,23 @@
 	<select id="select_dw03_detailList" parameterType="Map" resultType="CamelMap">
 		WITH VER AS (
 			SELECT
-				  VER_ID
-				, DOC_ID
-				, VER_NO
-				, STORED_PATH
-				, FILE_SIZE
-				, CREATED_AT
-				, CREATED_BY
-				, INSTR(STORED_PATH, '\', -1) AS LAST_BS
-				, COMMENT_TXT
-				, TO_CHAR(CONFIRM_AT,'YYYY-MM-DD HH24:MI:SS') AS CONFIRM_AT
-				, CONFIRM_BY
-				, CONFIRM_ACT_NO
-			FROM TB_DRAWING_VERSION
-			WHERE DOC_ID = #{docId}
+				  V.VER_ID
+				, V.DOC_ID
+				, V.VER_NO
+				, V.STORED_PATH
+				, V.FILE_SIZE
+				, V.CREATED_AT
+				, V.CREATED_BY
+				, INSTR(V.STORED_PATH, '\', -1) AS LAST_BS
+				, V.COMMENT_TXT
+				, TO_CHAR(V.CONFIRM_AT,'YYYY-MM-DD HH24:MI:SS') AS CONFIRM_AT
+				, V.CONFIRM_BY
+				, V.CONFIRM_ACT_NO
+				, NVL(Q.REQ_RMK, W.ISS_SJ) 					 AS ISS_TEXT
+			FROM TB_DRAWING_VERSION V
+						LEFT JOIN TB_WB24M02 W ON V.CONFIRM_ACT_NO = W.ISS_NO	--이슈자료
+						LEFT JOIN TB_QM01M01 Q ON V.CONFIRM_ACT_NO = Q.REQ_NO 	--발주요청자료
+			WHERE V.DOC_ID = #{docId}
 		)
 		SELECT
 			  VER_ID
@@ -165,6 +171,7 @@
 			, CONFIRM_AT
 			, CONFIRM_BY
 			, CONFIRM_ACT_NO
+			, ISS_TEXT
 		FROM VER
 		ORDER BY CREATED_AT DESC
 
@@ -463,8 +470,11 @@
 				, TO_CHAR(V.CONFIRM_AT,'YYYY-MM-DD HH24:MI:SS') AS CONFIRM_AT
 				, V.CONFIRM_BY
 				, V.CONFIRM_ACT_NO
+				, NVL(Q.REQ_RMK, W.ISS_SJ) 					 AS ISS_TEXT
 			FROM TB_DRAWING_DOC T
 								LEFT JOIN TB_DRAWING_VERSION V ON V.DOC_ID = T.DOC_ID AND V.VER_NO = T.ACTIVE_VER
+								LEFT JOIN TB_WB24M02 W ON V.CONFIRM_ACT_NO = W.ISS_NO	--이슈자료
+								LEFT JOIN TB_QM01M01 Q ON V.CONFIRM_ACT_NO = Q.REQ_NO 	--발주요청자료
 			WHERE 1=1
 			  AND T.SALES_CD = #{salesCd}
 			  AND T.SERVER_NAME = #{serverName}
@@ -502,6 +512,7 @@
 				, ''					AS CONFIRM_AT
 				, ''					AS CONFIRM_BY
 				, ''					AS CONFIRM_ACT_NO
+				, '' 					AS ISS_TEXT
 			FROM BASE
 			GROUP BY SALES_CD
 		),
@@ -531,6 +542,7 @@
 				, ''					AS CONFIRM_AT
 				, ''					AS CONFIRM_BY
 				, ''					AS CONFIRM_ACT_NO
+				, '' 					AS ISS_TEXT
 			FROM BASE
 			GROUP BY SALES_CD, PART_NO
 		),
@@ -558,6 +570,7 @@
 				, ''				AS CONFIRM_AT
 				, ''				AS CONFIRM_BY
 				, ''				AS CONFIRM_ACT_NO
+				, '' 					AS ISS_TEXT
 			FROM BASE
 			GROUP BY SALES_CD, PART_NO, UNIT_NO
 		),
@@ -585,6 +598,7 @@
 				, CONFIRM_AT
 				, CONFIRM_BY
 				, CONFIRM_ACT_NO
+				, ISS_TEXT
 			FROM BASE
 		)
 		SELECT *
