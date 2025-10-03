@@ -776,6 +776,3 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 
 
 })();
-
-
-
