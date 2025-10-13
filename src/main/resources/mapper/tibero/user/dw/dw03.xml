@@ -3,7 +3,7 @@
 
 <mapper namespace="com.dksys.biz.user.dw.dw03.mapper.DW03Mapper">
 
-	<select id="selectDrawDocTreeList" parameterType="Map" resultType="CamelMap">
+	<select id="selectDrawDocTreeListOld" parameterType="Map" resultType="CamelMap">
 		WITH P AS (
 			SELECT DISTINCT
 					  REPLACE(T.PATH_BASE,'\','/') AS FULL_PATH
@@ -42,6 +42,54 @@
 				JOIN N ON INSTR(P.FULL_PATH||'/', '/', 1, N.LV) > 0
 		ORDER BY ID
 	</select>
+	
+	
+	<select id="selectDrawDocTreeList" parameterType="Map" resultType="CamelMap">
+		<choose>
+  			<when test="salesCd != null and salesCd != ''">	
+			-- :leaf_id 바인드에 "마지막 노드의 NODE_ID" 입력
+			SELECT DISTINCT 
+			--    LEVEL                                        AS hop,          -- 리프=1, 부모=2, ... 루트=최대
+			    n.NODE_ID									 AS id,      -- 고유 ID
+			    NVL(TO_CHAR(n.PARENT_NODE_ID), '#')			 AS parent,  -- 루트는 '#'
+			    n.NAME                              		 AS text,    -- 표시 이름
+			--    n.PATH_PREFIX                       		 AS path_base,
+			    'unit'                            			 AS type,    -- 필요 시 유형 구분
+			    '0'                                			 AS is_leaf  -- 폴더 노드 표시(문서 리프 붙일 땐 1)
+			FROM TB_PATH_NODE n
+			START WITH n.NODE_ID IN (
+									SELECT NODE_ID
+									   FROM TB_DRAWING_DOC D
+									               LEFT OUTER JOIN TB_NODE_DOC N ON D.DOC_ID = N.DOC_ID
+									   WHERE SALES_CD LIKE ('%' || #{salesCd} || '%')
+									     AND SERVER_NAME = #{serverName}
+									   GROUP BY NODE_ID
+								  )
+			CONNECT BY PRIOR n.PARENT_NODE_ID = n.NODE_ID   --  위로(부모방향) 진행
+			--ORDER BY LEVEL DESC                             -- 루트→리프 순으로 보고 싶으면 DESC, 리프→루트는 ASC
+		  </when>
+		
+		  <otherwise>
+		-- jsTree 기본 포맷: parent, id, text
+			SELECT
+			    NVL(TO_CHAR(PARENT_NODE_ID), '#') AS parent,  -- 루트는 '#'
+			    TO_CHAR(NODE_ID)                  AS id,      -- 고유 ID
+			    NAME                              AS text,    -- 표시 이름
+--			    PATH_PREFIX                       AS path_base,
+			    'unit'                            AS type,    -- 필요 시 유형 구분
+			    '0'                               AS is_leaf  -- 폴더 노드 표시(문서 리프 붙일 땐 1)
+			FROM TB_PATH_NODE T
+			WHERE 1=1
+			  AND T.SERVER_NAME = #{serverName}
+			<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
+			  AND T.CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) 
+			  AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+			</if>
+		   ORDER BY PATH_PREFIX
+		  </otherwise>
+		</choose>
+	</select>
+	
 
 	<select id="selectDrawTreeFileListCount" parameterType="Map" resultType="int">
 		WITH BASE AS (
@@ -84,7 +132,7 @@
 	</select>
 
 
-	<select id="selectDrawTreeFileList" parameterType="Map" resultType="CamelMap">
+	<select id="selectDrawTreeFileListOld" parameterType="Map" resultType="CamelMap">
 		WITH BASE AS (
 			SELECT
 				  T.DOC_ID                                 		AS DOC_ID
@@ -128,6 +176,52 @@
 		WHERE RN BETWEEN #{firstIndex} AND #{lastIndex}
 		ORDER BY FILE_NAME
 
+	</select>
+
+	<select id="selectDrawTreeFileList" parameterType="Map" resultType="CamelMap">
+		WITH BASE AS (
+			SELECT
+				  T.DOC_ID                                 		AS DOC_ID
+				, T.DOC_NO                                		AS DOC_NO
+				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS FILE_NAME
+				, T.EXT                                   		AS FILE_TYPE
+				, REPLACE(T.PATH_BASE,'\','/')             		AS LPATH
+				, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD HH24:MI:SS') AS WORK_DTTM
+				, T.CREATED_BY                             		AS WORK_NM
+				, T.ACTIVE_VER                             		AS VER_NO
+				, T.SALES_CD                               		AS SALES_CD
+				, T.DOC_ST
+				, A.FILE_SIZE
+				, A.VER_NO
+				, T.SERVER_NAME
+				, TO_CHAR(A.CONFIRM_AT,'YYYY-MM-DD HH24:MI:SS') AS CONFIRM_AT
+				, A.CONFIRM_BY
+				, A.CONFIRM_ACT_NO
+				, NVL(Q.REQ_RMK, W.ISS_SJ) 					 AS ISS_TEXT
+			FROM TB_NODE_DOC N 
+						LEFT OUTER JOIN TB_DRAWING_DOC T ON N.DOC_ID = T.DOC_ID
+								LEFT OUTER JOIN TB_DRAWING_VERSION AS A ON T.DOC_ID = A.DOC_ID
+																	   AND T.ACTIVE_VER = A.VER_NO
+								LEFT JOIN TB_WB24M02 W ON A.CONFIRM_ACT_NO = W.ISS_NO	--이슈자료
+								LEFT JOIN TB_QM01M01 Q ON A.CONFIRM_ACT_NO = Q.REQ_NO 	--발주요청자료
+			WHERE 1 = 1
+			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+			  AND T.CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+			</if>
+			<if test="salesCd != null and !salesCd.equals('')">
+			  AND T.SALES_CD LIKE  '%'||#{salesCd}||'%'
+			</if>
+			  AND T.SERVER_NAME = #{serverName}
+			  AND N.NODE_ID = #{comonCd}
+			ORDER BY FILE_NAME
+		)
+		SELECT *
+		FROM (
+				SELECT B.*,
+						ROW_NUMBER() OVER (ORDER BY B.FILE_NAME) AS RN
+				FROM BASE B
+			)
+		WHERE RN BETWEEN #{firstIndex} AND #{lastIndex}
 	</select>
 
 	<select id="select_dw03_detailList" parameterType="Map" resultType="CamelMap">
