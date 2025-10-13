@@ -49,5 +49,15 @@ public class DW03Svcmpl implements DW03Svc {
 	public List<Map<String, String>> selectSalesCdDrawFileList(Map<String, String> paramMap) {
 		return dw03Mapper.selectSalesCdDrawFileList(paramMap);
 	}
-	
+
+	@Override
+    public Map<String, String> dwgFileDownInfo(Map<String, String> paramMap) throws Exception {
+        return dw03Mapper.dwgFileDownInfo(paramMap);
+    }
+
+	@Override
+	public int selectFileDownAuthChk(Map<String, String> paramMap) {
+		return dw03Mapper.selectFileDownAuthChk(paramMap);
+	}
+
 }

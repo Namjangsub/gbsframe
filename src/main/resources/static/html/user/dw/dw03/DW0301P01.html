@@ -84,6 +84,9 @@
 							this.self.select(this.dindex);
 						},
 						onDBLClick: function () {
+							if (this.column.key == "fileName") {
+								fileDownload(this.item)
+							}
 						},
 					},
 					page : {
@@ -112,6 +115,7 @@
 								{key: "issText",		label: "문제제목", 	width :260,		align: "left"},
 								{key: "dirPath",        label: "파일경로",		width: 600, 	align: "left"},
 								{key: "workNm", 		label: "작업자",		width : 80, 	align: "center"},
+								{key: "serverName", 	label: "서버종류",		width : 80, 	align: "center", hidden: false},
 							]
 					});
 					return this;
@@ -158,5 +162,51 @@
 		// authChk();
 
 	});
+
+	// 도면파일 다운로드
+	function fileDownload(row) {
+		var paramObj = {
+			"userId" 	: jwt.userId,
+			"docId"		: row.docId,
+			"verNo" 	: row.verNo,
+			"serverName": row.serverName,
+			"fileName"	: row.fileName,
+			"dirPath" 	: row.dirPath
+		};
+		
+		postAjax("/user/dw/dw03/dwgFileDownInfo", paramObj, null, function(data) {
+			if (data.selectFileDownAuthChk == 0) {
+				customAlert("도면파일 다운로드 권한이 없습니다.");
+				return false;
+			} else {
+				const fileInfo = data.fileInfo;
+				const filePath = encodeURI(fileInfo.dirPath, "UTF-8");
+
+				fetch(`/admin/cm/cm08/fileDownload?filePath=${filePath}`, {
+					method: "GET",
+					headers: {
+						"Authorization": authorizationToken
+					}
+				})
+				.then(response => {
+					if (!response.ok) throw new Error("다운로드 실패");
+					return response.blob();
+				})
+				.then(blob => {
+					const downloadUrl = window.URL.createObjectURL(blob);
+					const link = document.createElement("a");
+					link.href = downloadUrl;
+					link.download = row.fileName;  // 다운로드될 파일 이름
+					document.body.appendChild(link);
+					link.click();
+					document.body.removeChild(link);
+					window.URL.revokeObjectURL(downloadUrl);
+				})
+				.catch(error => {
+					console.error("파일 다운로드 중 오류:", error);
+				});
+			}
+		});
+	}
 	
 </script>

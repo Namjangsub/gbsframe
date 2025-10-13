@@ -75,4 +75,13 @@ public class DW03Ctr {
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
     }
+
+	@PostMapping("/dwgFileDownInfo")
+	public String dwgFileDownInfo(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		int selectFileDownAuthChk = dw03Svc.selectFileDownAuthChk(paramMap);
+		Map<String, String> fileInfo = dw03Svc.dwgFileDownInfo(paramMap);
+		model.addAttribute("fileInfo", fileInfo);
+		model.addAttribute("selectFileDownAuthChk", selectFileDownAuthChk);
+		return "jsonView";
+	}
 }

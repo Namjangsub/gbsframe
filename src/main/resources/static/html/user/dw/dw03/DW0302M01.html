@@ -243,13 +243,14 @@
 				body : {
 					onClick : function() {
 						if (this.item.__children__.length != 0) return false; // 자식이 아니면 패스
-						gridView.target.select(this.doindex, { selected: !this.item.__selected__ });
+
+						$.each($.extend({}, this.list), function(idx, obj) {
+							gridView.target.select(obj.__index, {selected: false});
+						});
+						gridView.target.select(this.doindex, {selected: true}); 
 					},
 					onDBLClick: function () {
 						if (this.item.__children__.length != 0) return false; // 자식이 아니면 패스
-
-						// 필요 시 더블클릭 항목을 확실히 선택
-						gridView.target.select(this.doindex, { selected:true });
 						select_dw03_modal(this.item);
 					},
 				},
@@ -268,7 +269,8 @@
 						{key : "verNo",			label : "Ver",			width : 40, align: "center"},
 						{key : "fileType",		label : "확장자",			width : 60, align: "center"},
 						// {key : "docSt",  	label : "존재여부",		width : 40, align: "left", hidden: true},
-						{key : "confirmBy",		label : "확정자",			width : 80,	align: "center"},
+						{key : "confirmBy",		label : "확정자Id",			width : 80,	align: "center", hidden: true},
+						{key : "confirmByNm",	label : "확정자",			width : 80,	align: "center"},
 						{key : "confirmAt", 	label : "확정일시",		width : 130, align: "center"},
 						{key : "confirmActNo",	label : "문제관리번호",	 	width : 100, align: "center"},
 						{key : "issText",		label : "문제제목",	 	width : 240, align: "left"},
@@ -557,7 +559,7 @@
 			.on('close_node.jstree', function(e, d){ d.instance.set_type(d.node, 'unit'); });
 
 		} else {
-			// 이미 만들어진 트리 → 서버데이터 갱신 + 상태 유지
+			// 이미 만들어진 트리 서버데이터 갱신 + 상태 유지
 			wantGridAfterRefresh = true;              // refresh 후 그리드 1회
 			refreshTreePreserveOpen($tree);
 		}
@@ -644,45 +646,45 @@
 
 			var target = (preferId && t.get_node(preferId)) ? t.get_node(preferId) : null;
 			if (!target && code) {
-			target = t.get_node(code);
-			if (!target) {
-				var flat = t.get_json('#', { flat: true }) || [];
-				var hit = flat.find(n => S(n.id)===code ||
-										(n.data && S(n.data.salesCd)===code) ||
-										S(n.text)===code ||
-										(n.original && (S(n.original.salesCd)===code || S(n.original.SALES_CD)===code)));
-				if (hit) target = t.get_node(hit.id);
-			}
+				target = t.get_node(code);
+				if (!target) {
+					var flat = t.get_json('#', { flat: true }) || [];
+					var hit = flat.find(n => S(n.id)===code ||
+											(n.data && S(n.data.salesCd)===code) ||
+											S(n.text)===code ||
+											(n.original && (S(n.original.salesCd)===code || S(n.original.SALES_CD)===code)));
+					if (hit) target = t.get_node(hit.id);
+				}
 			}
 
 			function finishAndDrawOnce(){
-			t.redraw(true);
-			requestAnimationFrame(function(){
-				preserveInProgress = false;
-				if (wantGridAfterRefresh) { wantGridAfterRefresh = false; gridView.setData(0); }
-			});
+				t.redraw(true);
+				requestAnimationFrame(function(){
+					preserveInProgress = false;
+					if (wantGridAfterRefresh) { wantGridAfterRefresh = false; gridView.setData(0); }
+				});
 			}
 
 			if (target) {
-			if (S(target.type).toLowerCase() === 'file') target = t.get_node(target.parent);
-			(target.parents || []).forEach(pid => { if (pid && pid !== '#') t.open_node(pid); });
-			t.open_node(target, null, true);
-			t.deselect_all(); t.select_node(target);
-			lastSelectedId = target.id;
-			finishAndDrawOnce();
-			return;
+				if (S(target.type).toLowerCase() === 'file') target = t.get_node(target.parent);
+				(target.parents || []).forEach(pid => { if (pid && pid !== '#') t.open_node(pid); });
+				t.open_node(target, null, true);
+				t.deselect_all(); t.select_node(target);
+				lastSelectedId = target.id;
+				finishAndDrawOnce();
+				return;
 			}
 
 			// === 여기 추가: 이전 열린 목록이 없고 code가 있으면 code 루트를 강제 오픈 ===
 			var toOpen = openedIds.filter(id => !!t.get_node(id));
 			if (!toOpen.length && code && t.get_node(code)) {
-			var nd = t.get_node(code);
-			(nd.parents || []).forEach(pid => { if (pid && pid !== '#') t.open_node(pid); });
-			t.open_node(nd, null, true);
-			t.deselect_all(); t.select_node(nd);
-			lastSelectedId = nd.id;
-			finishAndDrawOnce();
-			return;
+				var nd = t.get_node(code);
+				(nd.parents || []).forEach(pid => { if (pid && pid !== '#') t.open_node(pid); });
+				t.open_node(nd, null, true);
+				t.deselect_all(); t.select_node(nd);
+				lastSelectedId = nd.id;
+				finishAndDrawOnce();
+				return;
 			}
 			// =====================================================================
 
@@ -754,7 +756,7 @@
 		}
 	}
 
-	// 파일트리 사이즈재조정 함순
+	// 파일트리 사이즈재조정 함수
 	function resizeTreeAreaAuto() {
 		var $treeFrame = $("#treeFrame");
 		var $contents  = $treeFrame.children(".contents");

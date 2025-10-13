@@ -18,5 +18,11 @@ public interface DW03Mapper {
 	int selectSalesCdDrawFileListCount(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectSalesCdDrawFileList(Map<String, String> paramMap);
+
+	Map<String, String> dwgFileDownInfo(Map<String, String> paramMap);
+
+	int selectFileDownAuthChk(Map<String, String> paramMap);
+
+	int updateDwConfirm(Map<String, String> paramMap);
 	
 }

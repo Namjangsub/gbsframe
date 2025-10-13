@@ -19,4 +19,7 @@ public interface DW03Svc {
 
 	List<Map<String, String>> selectSalesCdDrawFileList(Map<String, String> paramMap);
 
+	Map<String, String> dwgFileDownInfo(Map<String, String> paramMap) throws Exception;
+
+	int selectFileDownAuthChk(Map<String, String> paramMap);
 }

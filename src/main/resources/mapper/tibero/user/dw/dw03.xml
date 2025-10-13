@@ -240,6 +240,7 @@
 				, V.CONFIRM_BY
 				, V.CONFIRM_ACT_NO
 				, NVL(Q.REQ_RMK, W.ISS_SJ) 					 AS ISS_TEXT
+				, V.SERVER_NAME 								AS SERVER_NAME
 			FROM TB_DRAWING_VERSION V
 						LEFT JOIN TB_WB24M02 W ON V.CONFIRM_ACT_NO = W.ISS_NO	--이슈자료
 						LEFT JOIN TB_QM01M01 Q ON V.CONFIRM_ACT_NO = Q.REQ_NO 	--발주요청자료
@@ -253,19 +254,16 @@
 			, FILE_SIZE
 			, TO_CHAR(CREATED_AT, 'YYYY-MM-DD HH24:MI:SS') AS WORK_DTTM
 			, CREATED_BY                                   AS WORK_NM
-			, CASE
-				WHEN UPPER(SUBSTR(STORED_PATH, -4)) = '.DWG' AND LAST_BS <![CDATA[ > ]]>  0 THEN SUBSTR(STORED_PATH, LAST_BS + 1)	--파일명
-				ELSE NULL
-				END AS FILE_NAME
-			, CASE
-				WHEN UPPER(SUBSTR(STORED_PATH, -4)) = '.DWG' AND LAST_BS <![CDATA[ > ]]> 0 THEN SUBSTR(STORED_PATH, 1, LAST_BS - 1)	--경로
-				ELSE STORED_PATH
-				END AS DIR_PATH
+			, CASE WHEN LAST_BS <![CDATA[ > ]]> 0 THEN SUBSTR(STORED_PATH, LAST_BS + 1) ELSE STORED_PATH
+      		  END AS FILE_NAME
+			, CASE WHEN LAST_BS <![CDATA[ > ]]> 0 THEN SUBSTR(STORED_PATH, 1, LAST_BS - 1) ELSE NULL
+      		  END AS DIR_PATH
 			, COMMENT_TXT	--상세이력
 			, CONFIRM_AT
 			, CONFIRM_BY
 			, CONFIRM_ACT_NO
 			, ISS_TEXT
+			, SERVER_NAME
 		FROM VER
 		ORDER BY CREATED_AT DESC
 
@@ -408,158 +406,6 @@
 				, T.ACTIVE_VER                               AS VER_NO
 				, T.DOC_ST                                   AS DOC_ST
 				, V.FILE_SIZE                                AS FILE_SIZE
-				, TO_CHAR(V.CONFIRM_AT,'YYYY-MM-DD HH24:MI:SS') AS CONFIRM_AT
-				, V.CONFIRM_BY
-				, V.CONFIRM_ACT_NO
-			FROM TB_DRAWING_DOC T
-								LEFT JOIN TB_DRAWING_VERSION V ON V.DOC_ID = T.DOC_ID
-															   AND V.VER_NO = T.ACTIVE_VER
-			WHERE 1 = 1
-			  AND T.SALES_CD = #{salesCd}
-			  AND T.SERVER_NAME = #{serverName}
-			<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
-			  AND T.CREATED_AT BETWEEN TO_DATE(#{reqDtFrom}, 'YYYY-MM-DD')
-			  AND TO_DATE(#{reqDtTo},   'YYYY-MM-DD') + 1
-			</if>
-			<if test="partNo != null and partNo != ''">
-			  AND T.PART_NO = #{partNo}
-			</if>
-			<if test="unitNo != null and unitNo != ''">
-			  AND T.UNIT_NO = #{unitNo}
-			</if>
-		),
-		SALES AS (
-			SELECT
-				  'S|'||SALES_CD		AS ID
-				, NULL					AS PID
-				, 0						AS LVL
-				, SALES_CD				AS NAME
-				, 'SALES'				AS NODE_TYPE
-				, SALES_CD				AS SALES_CD
-				, '' 					AS PART_NO
-				, '' 					AS UNIT_NO
-				, '' 					AS DOC_ID
-				, '' 					AS FILE_NAME
-				, '' 					AS FILE_TYPE
-				, '' 					AS LPATH
-				, '' 					AS WORK_DTTM
-				, '' 					AS WORK_NM
-				, '' 					AS FILE_SIZE
-				, ''					AS DOC_ST
-				, ''					AS VER_NO
-			FROM (SELECT DISTINCT SALES_CD FROM BASE)
-		),
-		PARTS AS (
-			SELECT DISTINCT
-				  'P|'||SALES_CD||'|'||PART_NO AS ID
-				, CASE
-					WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL
-					OR #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN NULL
-					ELSE 'S|'||SALES_CD END AS PID
-				, CASE
-					WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL
-					OR #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 0
-					ELSE 1 END AS LVL
-				, PART_NO 		AS NAME
-				, 'PART' 		AS NODE_TYPE
-				, SALES_CD
-				, PART_NO
-				, '' 			AS UNIT_NO
-				, '' 			AS DOC_ID
-				, '' 			AS FILE_NAME
-				, '' 			AS FILE_TYPE
-				, '' 			AS LPATH
-				, '' 			AS WORK_DTTM
-				, '' 			AS WORK_NM
-				, '' 			AS FILE_SIZE
-				, '' 			AS DOC_ST
-				, '' 			AS VER_NO
-			FROM BASE
-		),
-
-		/* UNITS */
-		UNITS AS (
-			SELECT DISTINCT
-				  'U|'||SALES_CD||'|'||PART_NO||'|'||UNIT_NO AS ID
-				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN NULL
-					ELSE 'P|'||SALES_CD||'|'||PART_NO END AS PID
-				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 0 ELSE 1 END AS LVL
-				, UNIT_NO 		AS NAME
-				, 'UNIT' 		AS NODE_TYPE
-				, SALES_CD
-				, PART_NO
-				, UNIT_NO
-				, '' 			AS DOC_ID
-				, '' 			AS FILE_NAME
-				, '' 			AS FILE_TYPE
-				, '' 			AS LPATH
-				, ''			AS WORK_DTTM
-				, '' 			AS WORK_NM
-				, '' 			AS FILE_SIZE
-				, ''			AS DOC_ST
-				, '' 			AS VER_NO
-			FROM BASE
-		),
-		FILES AS (
-			SELECT
-				  'F|'||DOC_ID 		AS ID
-				, 'U|'||SALES_CD||'|'||PART_NO||'|'||UNIT_NO AS PID
-				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 1
-					   WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL THEN 2
-					   ELSE 3 END AS LVL
-				, FILE_NAME 		AS NAME
-				, 'FILE' 			AS NODE_TYPE
-				, SALES_CD
-				, PART_NO
-				, UNIT_NO
-				, DOC_ID
-				, FILE_NAME
-				, FILE_TYPE
-				, LPATH
-				, WORK_DTTM
-				, WORK_NM
-				, FILE_SIZE
-				, DOC_ST
-				, VER_NO
-			FROM BASE
-		)
-		SELECT COUNT(*) FROM (
-			<if test="(partNo == null or partNo == '') and (unitNo == null or unitNo == '')">
-			SELECT * FROM SALES
-			UNION ALL
-			</if>
-			<if test="unitNo == null or unitNo == ''">
-			SELECT * FROM PARTS
-			UNION ALL
-			</if>
-			SELECT * FROM UNITS
-			UNION ALL
-			SELECT * FROM FILES
-		)
-		ORDER BY
-			SALES_CD,
-			CASE NODE_TYPE WHEN 'SALES' THEN 0 WHEN 'PART'  THEN 1 WHEN 'UNIT'  THEN 2 ELSE 3 END,
-			PART_NO,
-			UNIT_NO,
-			NAME
-	</select>
-
-	<select id="selectSalesCdDrawFileList" parameterType="Map" resultType="CamelMap">
-		WITH BASE AS (
-			SELECT
-				  T.DOC_ID                                   AS DOC_ID
-				, T.SALES_CD                                 AS SALES_CD
-				, T.PART_NO                                  AS PART_NO
-				, T.UNIT_NO                                  AS UNIT_NO
-				, T.DOC_NO                                   AS DOC_NO
-				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS FILE_NAME
-				, T.EXT                                      AS FILE_TYPE
-				, REPLACE(T.PATH_BASE,'\','/')               AS LPATH
-				, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD HH24:MI:SS') AS WORK_DTTM
-				, T.CREATED_BY                               AS WORK_NM
-				, T.ACTIVE_VER                               AS VER_NO
-				, T.DOC_ST                                   AS DOC_ST
-				, V.FILE_SIZE                                AS FILE_SIZE
 				, T.SERVER_NAME                              AS SERVER_NAME
 				, TO_CHAR(V.CONFIRM_AT,'YYYY-MM-DD HH24:MI:SS') AS CONFIRM_AT
 				, V.CONFIRM_BY
@@ -571,7 +417,9 @@
 								LEFT JOIN TB_QM01M01 Q ON V.CONFIRM_ACT_NO = Q.REQ_NO 	--발주요청자료
 			WHERE 1=1
 			  AND T.SALES_CD = #{salesCd}
+			<if test="serverName != null and serverName != ''">
 			  AND T.SERVER_NAME = #{serverName}
+			</if>
 			<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
 			  AND T.CREATED_AT BETWEEN TO_DATE(#{reqDtFrom}, 'YYYY-MM-DD')
 									AND TO_DATE(#{reqDtTo},   'YYYY-MM-DD') + 1
@@ -695,6 +543,195 @@
 				, ISS_TEXT
 			FROM BASE
 		)
+		SELECT COUNT(*) FROM (
+			<if test="(partNo == null or partNo == '') and (unitNo == null or unitNo == '')">
+			SELECT * FROM SALES
+			UNION ALL
+			</if>
+			<if test="unitNo == null or unitNo == ''">
+			SELECT * FROM PARTS
+			UNION ALL
+			</if>
+			SELECT * FROM UNITS
+			UNION ALL
+			SELECT * FROM FILES
+		)
+		ORDER BY
+			SALES_CD,
+			CASE NODE_TYPE WHEN 'SALES' THEN 0 WHEN 'PART'  THEN 1 WHEN 'UNIT'  THEN 2 ELSE 3 END,
+			PART_NO,
+			UNIT_NO,
+			NAME
+	</select>
+
+	<select id="selectSalesCdDrawFileList" parameterType="Map" resultType="CamelMap">
+		WITH BASE AS (
+			SELECT
+				  T.DOC_ID                                   AS DOC_ID
+				, T.SALES_CD                                 AS SALES_CD
+				, T.PART_NO                                  AS PART_NO
+				, T.UNIT_NO                                  AS UNIT_NO
+				, T.DOC_NO                                   AS DOC_NO
+				, SUBSTR(T.FILE_NAME, INSTR(T.FILE_NAME, '\', -1) + 1) AS FILE_NAME
+				, T.EXT                                      AS FILE_TYPE
+				, REPLACE(T.PATH_BASE,'\','/')               AS LPATH
+				, TO_CHAR(T.CREATED_AT,'YYYY-MM-DD HH24:MI:SS') AS WORK_DTTM
+				, T.CREATED_BY                               AS WORK_NM
+				, T.ACTIVE_VER                               AS VER_NO
+				, T.DOC_ST                                   AS DOC_ST
+				, V.FILE_SIZE                                AS FILE_SIZE
+				, T.SERVER_NAME                              AS SERVER_NAME
+				, TO_CHAR(V.CONFIRM_AT,'YYYY-MM-DD HH24:MI:SS') AS CONFIRM_AT
+				, V.CONFIRM_BY
+				, FN_CM06M01_ID_TO_NM(V.CONFIRM_BY)			 AS CONFIRM_BY_NM   --확정자명
+				, V.CONFIRM_ACT_NO
+				, NVL(Q.REQ_RMK, W.ISS_SJ) 					 AS ISS_TEXT
+			FROM TB_DRAWING_DOC T
+								LEFT JOIN TB_DRAWING_VERSION V ON V.DOC_ID = T.DOC_ID AND V.VER_NO = T.ACTIVE_VER
+								LEFT JOIN TB_WB24M02 W ON V.CONFIRM_ACT_NO = W.ISS_NO	--이슈자료
+								LEFT JOIN TB_QM01M01 Q ON V.CONFIRM_ACT_NO = Q.REQ_NO 	--발주요청자료
+			WHERE 1=1
+			  AND T.SALES_CD = #{salesCd}
+			<if test="serverName != null and serverName != ''">
+			  AND T.SERVER_NAME = #{serverName}
+			</if>
+			<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
+			  AND T.CREATED_AT BETWEEN TO_DATE(#{reqDtFrom}, 'YYYY-MM-DD')
+									AND TO_DATE(#{reqDtTo},   'YYYY-MM-DD') + 1
+			</if>
+			<if test="partNo != null and partNo != ''">
+			  AND T.PART_NO = #{partNo}
+			</if>
+			<if test="unitNo != null and unitNo != ''">
+			  AND T.UNIT_NO = #{unitNo}
+			</if>
+		),
+		BM AS (
+			SELECT
+				TRIM(DSGN_NO) AS DSGN_NO,
+				MIN(MATR_NM)   AS MATR_NM,
+				MIN(LOWER_QTY) AS LOWER_QTY
+			FROM TB_BM14M01
+			WHERE SALES_CD = #{salesCd}
+			  AND DSGN_NO IS NOT NULL
+			GROUP BY TRIM(DSGN_NO)
+		),
+		SALES AS (  -- SALES 단일행 + SERVER_NAME 포함
+			SELECT
+				  'S|'||SALES_CD		AS ID
+				, NULL					AS PID
+				, 0						AS LVL
+				, SALES_CD 				AS NAME
+				, 'SALES' 				AS NODE_TYPE
+				, SALES_CD
+				, '' 					AS PART_NO
+				, '' 					AS UNIT_NO
+				, ''					AS DOC_ID
+				, ''					AS FILE_NAME
+				, '' 					AS FILE_TYPE
+				, ''					AS LPATH
+				, ''					AS WORK_DTTM
+				, ''					AS WORK_NM
+				, ''					AS FILE_SIZE
+				, ''					AS DOC_ST
+				, ''					AS VER_NO
+				, MAX(SERVER_NAME)		AS SERVER_NAME
+				, ''					AS CONFIRM_AT
+				, ''					AS CONFIRM_BY
+				, ''					AS CONFIRM_BY_NM
+				, ''					AS CONFIRM_ACT_NO
+				, '' 					AS ISS_TEXT
+			FROM BASE
+			GROUP BY SALES_CD
+		),
+		PARTS AS (
+			SELECT
+				  'P|'||SALES_CD||'|'||PART_NO AS ID
+				, CASE WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL
+						OR #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN NULL
+					ELSE 'S|'||SALES_CD END AS PID
+				, CASE WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL
+						OR #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 0 ELSE 1 END AS LVL
+				, PART_NO 				AS NAME
+				, 'PART'  				AS NODE_TYPE
+				, SALES_CD
+				, PART_NO
+				, '' 					AS UNIT_NO
+				, ''      				AS DOC_ID
+				, '' 					AS FILE_NAME
+				, '' 					AS FILE_TYPE
+				, '' 					AS LPATH
+				, '' 					AS WORK_DTTM
+				, '' 					AS WORK_NM
+				, ''       				AS FILE_SIZE
+				, ''  					AS DOC_ST
+				, ''       				AS VER_NO
+				, MAX(SERVER_NAME)      AS SERVER_NAME
+				, ''					AS CONFIRM_AT
+				, ''					AS CONFIRM_BY
+				, ''					AS CONFIRM_BY_NM
+				, ''					AS CONFIRM_ACT_NO
+				, '' 					AS ISS_TEXT
+			FROM BASE
+			GROUP BY SALES_CD, PART_NO
+		),
+		UNITS AS (
+			SELECT
+				  'U|'||SALES_CD||'|'||PART_NO||'|'||UNIT_NO AS ID
+				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN NULL
+					ELSE 'P|'||SALES_CD||'|'||PART_NO END AS PID
+				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 0 ELSE 1 END AS LVL
+				, UNIT_NO 			AS NAME
+				, 'UNIT'  			AS NODE_TYPE
+				, SALES_CD
+				, PART_NO
+				, UNIT_NO
+				, ''        		AS DOC_ID
+				, '' 				AS FILE_NAME
+				, ''  				AS FILE_TYPE
+				, '' 				AS LPATH
+				, ''  				AS WORK_DTTM
+				, '' 				AS WORK_NM
+				, ''       			AS FILE_SIZE
+				, ''   				AS DOC_ST
+				, ''        		AS VER_NO
+				, MAX(SERVER_NAME)  AS SERVER_NAME
+				, ''				AS CONFIRM_AT
+				, ''				AS CONFIRM_BY
+				, ''				AS CONFIRM_BY_NM
+				, ''				AS CONFIRM_ACT_NO
+				, '' 					AS ISS_TEXT
+			FROM BASE
+			GROUP BY SALES_CD, PART_NO, UNIT_NO
+		),
+		FILES AS (
+			SELECT
+				  'F|'||DOC_ID AS ID
+				, 'U|'||SALES_CD||'|'||PART_NO||'|'||UNIT_NO AS PID
+				, CASE WHEN #{unitNo,jdbcType=VARCHAR} IS NOT NULL THEN 1
+					WHEN #{partNo,jdbcType=VARCHAR} IS NOT NULL THEN 2
+					ELSE 3 END AS LVL
+				, FILE_NAME AS NAME
+				, 'FILE' AS NODE_TYPE
+				, SALES_CD
+				, PART_NO, UNIT_NO
+				, DOC_ID
+				, FILE_NAME
+				, FILE_TYPE
+				, LPATH
+				, WORK_DTTM
+				, WORK_NM
+				, FILE_SIZE
+				, DOC_ST
+				, VER_NO
+				, SERVER_NAME
+				, CONFIRM_AT
+				, CONFIRM_BY
+				, CONFIRM_BY_NM
+				, CONFIRM_ACT_NO
+				, ISS_TEXT
+			FROM BASE
+		)
 		SELECT *
 		FROM (
 		<if test="(partNo == null or partNo == '') and (unitNo == null or unitNo == '')">
@@ -717,5 +754,68 @@
 			NAME,
 			CASE WHEN NODE_TYPE='FILE' THEN REGEXP_COUNT(NVL(LPATH,''), '/') ELSE 0 END
 	</select>
+
+	<!-- 	디렉토리 접근권한 관리 (사용자별 접근권한 체크로 임의의 값이 오면 해당 폴더 권한이 있어야 조회됨 -->
+    <select id="selectFileDownAuthChk" parameterType="Map" resultType="int">
+        SELECT COUNT(*)
+          FROM TB_CM15M01
+         WHERE USER_ID 		= #{userId}
+		   AND COMON_CD 	= 'FITR0301'
+		   AND FILE_DOWN 	= 'Y'
+    </select>
+
+	<select id="dwgFileDownInfo" parameterType="Map" resultType="CamelMap">
+		WITH VER AS (
+			SELECT
+				  V.VER_ID
+				, V.DOC_ID
+				, V.VER_NO
+				, V.STORED_PATH
+				, V.FILE_SIZE
+				, V.CREATED_AT
+				, V.CREATED_BY
+				, INSTR(V.STORED_PATH, '\', -1) AS LAST_BS_SP
+				, INSTR(V.BACKUP_PATH, '\', -1) AS LAST_BS_BP
+				, V.COMMENT_TXT
+				, TO_CHAR(V.CONFIRM_AT,'YYYY-MM-DD HH24:MI:SS') AS CONFIRM_AT
+				, V.CONFIRM_BY
+				, V.CONFIRM_ACT_NO
+				, NVL(Q.REQ_RMK, W.ISS_SJ) 					 AS ISS_TEXT
+				, V.BACKUP_PATH
+			FROM TB_DRAWING_VERSION V
+						LEFT JOIN TB_WB24M02 W ON V.CONFIRM_ACT_NO = W.ISS_NO	--이슈자료
+						LEFT JOIN TB_QM01M01 Q ON V.CONFIRM_ACT_NO = Q.REQ_NO 	--발주요청자료
+			WHERE V.DOC_ID = #{docId}
+			  AND V.VER_NO = #{verNo}
+			  AND SERVER_NAME = #{serverName}
+		)
+		SELECT
+			  VER_ID
+			, DOC_ID
+			, VER_NO
+			, STORED_PATH
+			, FILE_SIZE
+			, TO_CHAR(CREATED_AT, 'YYYY-MM-DD HH24:MI:SS') AS WORK_DTTM
+			, CREATED_BY                                   AS WORK_NM
+			, CASE WHEN LAST_BS_SP <![CDATA[ > ]]> 0 THEN SUBSTR(STORED_PATH, LAST_BS_SP + 1) ELSE STORED_PATH END AS FILE_NAME
+			, BACKUP_PATH AS DIR_PATH
+			, COMMENT_TXT	--상세이력
+			, CONFIRM_AT
+			, CONFIRM_BY
+			, CONFIRM_ACT_NO
+			, ISS_TEXT
+		FROM VER
+    </select>
+
+	<update id="updateDwConfirm" parameterType="Map">
+		UPDATE TB_DRAWING_VERSION
+				SET
+					  CONFIRM_AT 		= SYSDATE
+					, CONFIRM_BY 		= #{userId}
+					, CONFIRM_ACT_NO 	= #{issNo}
+			WHERE DOC_ID =  #{docId}
+			  AND VER_NO =  #{verNo}
+			  AND SERVER_NAME = #{serverName}
+	</update>
 
 </mapper>
