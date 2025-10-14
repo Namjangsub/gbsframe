@@ -56,4 +56,6 @@ public interface BM14Mapper {
 	int selectPchsBomCheck(Map<String, String> paramMap);
 
 	int confirmBom(Map<String, String> paramMap);
+
+	int recommendBom(Map<String, String> paramMap);
 }

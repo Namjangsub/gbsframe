@@ -1,9 +1,9 @@
 package com.dksys.biz.user.bm.bm14.service;
 
-import org.springframework.web.multipart.MultipartHttpServletRequest;
-
 import java.util.List;
 import java.util.Map;
+
+import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface BM14Svc {
 
@@ -47,5 +47,7 @@ public interface BM14Svc {
 	Map<String, String> deleteMatrbomChk(Map<String, String> paramMap);
 
 	int confirmBom(Map<String, String> paramMap);
+
+	int recommendBom(Map<String, String> paramMap);
 	
 }

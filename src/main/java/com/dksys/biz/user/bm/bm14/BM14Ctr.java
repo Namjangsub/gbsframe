@@ -287,5 +287,23 @@ public class BM14Ctr {
     	 }
     	 return "jsonView";
     }
+
+    // BOM 추천Part지정, 취소 설정하기
+    @PostMapping("/recommendBom")
+    public String recommendBom(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		 try {
+    	 	if (bm14svc.recommendBom(paramMap) != 0 ) {
+    	 		model.addAttribute("resultCode", 200);
+    	 		model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+    	 	} else {
+    	 		model.addAttribute("resultCode", 500);
+    	 		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));    			
+    	 	}
+    	 }catch(Exception e) {
+    	 	model.addAttribute("resultCode", 900);
+    	 	model.addAttribute("resultMessage", e.getMessage());
+    	 }
+    	 return "jsonView";
+    }
     
 }

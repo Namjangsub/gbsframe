@@ -302,5 +302,10 @@ public class BM14SvcImpl implements BM14Svc {
 	public int confirmBom(Map<String, String> paramMap) {
 		return bm14Mapper.confirmBom(paramMap);
 	}
+	
+	@Override
+	public int recommendBom(Map<String, String> paramMap) {
+		return bm14Mapper.recommendBom(paramMap);
+	}
 
 }
