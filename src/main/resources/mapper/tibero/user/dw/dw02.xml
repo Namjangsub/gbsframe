@@ -62,5 +62,208 @@
     ORDER BY CREATED_AT DESC
   </select>
   
+ 
+
+
+	<select id="selectDrawDocTreeList" parameterType="Map" resultType="CamelMap">
+		SELECT 
+			CODE_KIND		AS PARENT,
+			CODE_ID			AS ID,
+			SORT_NO || '.' || CODE_NM			AS TEXT,
+			CODE_RPRC 		AS CODE_RPRC,
+			CODE_ETC 		AS CODE_ETC,
+			1 				AS IS_LEAF,
+			'unit' 			AS TYPE
+		FROM TB_CM05M01 
+		WHERE CODE_KIND = 'PRDTDIV'
+		--ORDER BY SORT_NO, CODE_ID
+		union all SELECT '#', 'PRDTDIV', '제품그룹', '','',0,'UNIT' from dual  
+	</select>
+	
+	
+	<select id="selectDrawTreeFileListCount" parameterType="Map" resultType="int">
+		WITH BASE AS (
+			SELECT T.DWG_NO
+			     , T.PRDT_GRP
+			     , C.CODE_NM  					AS PRDT_GRP_NM
+			     , T.SALES_CD
+			     , T.EQUIP_NM
+			     , T.CLNT_CD
+			     , T.CLNT_NM
+			     , T.DSGN_EMP_CD
+			     , T.DSGN_EMP_NM
+			     , T.START_DT
+			     , T.REL_DT
+			     , T.PAGE_CNT
+			     , T.REMARK
+			     , T.CREAT_ID
+			     , TO_CHAR(T.CREAT_DTTM,'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
+			     , T.CREAT_PGM
+			     , T.UDT_ID
+			     , T.UDT_DTTM
+			     , T.UDT_PGM
+			FROM TB_DRAWING_MASTER T
+						LEFT OUTER JOIN TB_CM05M01 C ON T.PRDT_GRP = C.CODE_ID AND C.CODE_KIND = 'PRDTDIV'
+			WHERE 1 = 1
+			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+			  AND T.CREAT_DTTM BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+			</if>
+			<if test="salesCd != null and !salesCd.equals('')">
+			  AND T.SALES_CD LIKE  '%'||#{salesCd}||'%'
+			</if>
+			<if test="comonCd != 'PRDTDIV'">
+			  AND T.PRDT_GRP = #{comonCd}
+			</if>
+		)
+		SELECT COUNT(*)
+		FROM (
+			SELECT B.*,
+					ROW_NUMBER() OVER (ORDER BY B.DWG_NO) AS RN
+			FROM BASE B
+		)
+	</select>
+	 
+	<select id="selectDrawTreeFileList" parameterType="Map" resultType="CamelMap">
+		WITH BASE AS (
+			SELECT T.DWG_NO
+			     , T.PRDT_GRP
+			     , C.CODE_NM  					AS PRDT_GRP_NM
+			     , T.SALES_CD
+			     , T.EQUIP_NM
+			     , T.CLNT_CD
+			     , T.CLNT_NM
+			     , T.DSGN_EMP_CD
+			     , T.DSGN_EMP_NM
+			     , TO_CHAR(T.START_DT,'YYYY-MM-DD') AS START_DT
+			     , TO_CHAR(T.REL_DT,'YYYY-MM-DD')   AS REL_DT
+			     , T.PAGE_CNT
+			     , T.REMARK
+			     , T.CREAT_ID
+			     , TO_CHAR(T.CREAT_DTTM,'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
+			     , T.CREAT_PGM
+			     , T.UDT_ID
+			     , T.UDT_DTTM
+			     , T.UDT_PGM
+			FROM TB_DRAWING_MASTER T
+						LEFT OUTER JOIN TB_CM05M01 C ON T.PRDT_GRP = C.CODE_ID AND C.CODE_KIND = 'PRDTDIV'
+			WHERE 1 = 1
+			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+			  AND T.CREAT_DTTM BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+			</if>
+			<if test="salesCd != null and !salesCd.equals('')">
+			  AND T.SALES_CD LIKE  '%'||#{salesCd}||'%'
+			</if>
+			<if test="comonCd != 'PRDTDIV'">
+			  AND T.PRDT_GRP = #{comonCd}
+			</if>
+			ORDER BY T.DWG_NO
+		)
+		SELECT *
+		FROM (
+				SELECT B.*,
+						ROW_NUMBER() OVER (ORDER BY B.DWG_NO) AS RN
+				FROM BASE B
+			)
+		WHERE RN BETWEEN #{firstIndex} AND #{lastIndex}
+	</select>
   
+
+	<select id="selectDrawDocItemInfo" resultType="CamelMap">
+		SELECT 
+			    C.CO_CD
+			  , C.ORDRS_NO
+			  , C.ORDRS_CLNT_CD
+			  , (SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = C.ORDRS_CLNT_CD) AS ORDRS_CLNT_CD_NM 
+			  , C.CLNT_PJT
+			  , (SELECT FN_CM05M01_CD_TO_NM(C.CLNT_PJT) FROM DUAL) AS CLNT_PJT_NM
+			  , D.DWG_NO
+			  , NVL(D.PRDT_GRP, B.PRDT_GRP)                                                    AS PRDT_GRP
+			  , (SELECT FN_CM05M01_CD_TO_NM(NVL(D.PRDT_GRP, B.PRDT_GRP)) FROM DUAL)            AS PRDT_GRP_NM
+			  , D.SALES_CD
+			  , NVL(D.EQUIP_NM, C2.EQP_NM)                                                     AS EQUIP_NM
+			  , NVL(D.CLNT_CD, C.ORDRS_CLNT_CD)                                                AS CLNT_CD
+			  , NVL(D.CLNT_NM, (SELECT CLNT_NM FROM TB_BM02M01 WHERE CLNT_CD = C.ORDRS_CLNT_CD)) AS CLNT_NM
+			  , D.DSGN_EMP_CD
+			  , D.DSGN_EMP_NM
+			  , TO_CHAR(D.START_DT, 'YYYY-MM-DD') AS START_DT
+			  , TO_CHAR(D.REL_DT,   'YYYY-MM-DD') AS REL_DT
+			  , D.PAGE_CNT
+			  , D.REMARK
+			  , B.PRDT_GRP                               AS ODRDS_PRDT_GRP
+			  , (SELECT FN_CM05M01_CD_TO_NM(B.PRDT_GRP) FROM DUAL) AS ODRDS_PRDT_GRP_NM
+		FROM ( SELECT #{salesCd} AS SALES_CD FROM DUAL ) S              -- ★ 앵커(파라미터 1행)
+				LEFT JOIN TB_CR02D02      C2 ON C2.SALES_CD = S.SALES_CD        -- C2가 없어도 계속 진행
+				LEFT JOIN TB_CR02M01      C  ON C.ORDRS_NO  = C2.ORDRS_NO
+				LEFT JOIN TB_BM01M01      B  ON B.PRDT_CD   = C2.PRDT_CD
+				LEFT JOIN TB_DRAWING_MASTER D ON D.SALES_CD = S.SALES_CD        -- D로도 조회 가능
+		WHERE (C2.SALES_CD IS NOT NULL OR D.SALES_CD IS NOT NULL);      -- 둘 다 없으면 0건	
+	</select>
+  
+  
+  <insert id="insertDrawItem" parameterType="Map">
+    INSERT INTO TB_DRAWING_MASTER
+      (
+		  DWG_NO
+		, PRDT_GRP
+		, SALES_CD
+		, EQUIP_NM
+		, CLNT_CD
+		, CLNT_NM
+		, DSGN_EMP_CD
+		, DSGN_EMP_NM
+		, START_DT
+		, REL_DT
+		, PAGE_CNT
+		, REMARK
+		, CREAT_ID
+		, CREAT_DTTM
+		, CREAT_PGM
+      )
+    VALUES
+    (
+		  #{dwgNo     }
+		, #{prdtGrp   }
+		, #{salesCd   }
+		, #{equipNm   , jdbcType=VARCHAR}
+		, #{clntCd    , jdbcType=VARCHAR}
+		, #{clntNm    , jdbcType=VARCHAR}
+		, #{dsgnEmpCd , jdbcType=VARCHAR}
+		, #{dsgnEmpNm , jdbcType=VARCHAR}
+		, #{startDt   , jdbcType=VARCHAR}
+		, #{relDt     , jdbcType=VARCHAR}
+		, #{pageCnt   , jdbcType=VARCHAR}
+		, #{remark    , jdbcType=VARCHAR}
+		, #{userId}
+		, SYSDATE
+		, #{pgmId}
+    )
+  </insert>
+
+  <update id="updateDrawItem" parameterType="Map">
+    UPDATE TB_DRAWING_MASTER
+		SET
+			  PRDT_GRP      = #{prdtGrp   }
+			, SALES_CD      = #{salesCd   }
+			, EQUIP_NM      = #{equipNm   , jdbcType=VARCHAR}
+			, CLNT_CD       = #{clntCd    , jdbcType=VARCHAR}
+			, CLNT_NM       = #{clntNm    , jdbcType=VARCHAR}
+			, DSGN_EMP_CD   = #{dsgnEmpCd , jdbcType=VARCHAR}
+			, DSGN_EMP_NM   = #{dsgnEmpNm , jdbcType=VARCHAR}
+			, START_DT      = #{startDt   , jdbcType=VARCHAR}
+			, REL_DT        = #{relDt     , jdbcType=VARCHAR}
+			, PAGE_CNT      = #{pageCnt   , jdbcType=VARCHAR}
+			, REMARK        = #{remark    , jdbcType=VARCHAR}
+			, UDT_ID        = #{userId}
+			, UDT_DTTM      = SYSDATE
+			, UDT_PGM       = #{pgmId}
+    WHERE DWG_NO   = #{dwgNo}
+  </update>
+	
+    <delete id="deleteDrawDocItem" parameterType="Map">
+        DELETE  TB_DRAWING_MASTER 
+        WHERE DWG_NO = #{dwgNo}
+    </delete>
+
+
+	
 </mapper>

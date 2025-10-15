@@ -1,0 +1,237 @@
+
+<div id="popDivDw02" class="popup_area of_a">
+	<form id="drgForm">
+		<table class="form-group popup_table">
+			<colgroup>
+				<col width="20%">
+				<col width="30%">
+				<col width="20%">
+				<col width="30%">
+			</colgroup>
+			<tr>
+				<th class="hit">salesCd</th>
+				<td>
+					<div class="search_form">
+						<input type="text" id="salesCd" name="salesCd" data-search="salesCd" disabled>
+						<a onclick="wbsSalesCodeSearchPop();"><i class="i_search_w"></i></a>
+					</div>
+				</td>
+				<th class="hit">제품구분</th>
+				<td>
+		            <select id="prdtGrp" name="prdtGrp" class="form-control" data-kind="PRDTDIV" msg="제품구분" disabled>
+		            </select>
+				</td>		
+			</tr>
+			<tr>
+				<th class="hit">장비명</th>
+				<td colspan=3><input type="text" class="form-control" id="equipNm" name="equipNm" required></td>
+			</tr>
+			<tr>
+				<th class="hit">고객사명</th>
+				<td>
+					<input type="hidden" id="clntCd" name="clntCd" >
+					<input type="text" class="form-control" id="clntNm" name="clntNm" disabled>
+				</td>
+				<th class="hit">설계담당자</th>
+				<td><input type="text" class="form-control" id="dsgnEmpNm" name="dsgnEmpNm" required></td>
+			</tr>
+			<tr>
+				<th class="hit">착수일</th>
+				<td>
+				    <input id="startDt" name="startDt" class="input_calendar form-control" autocomplete="off" onkeyup="dateMask(this);" date required></td>
+				<th>출도일</th>
+				<td><input id="relDt" name="relDt" class="input_calendar form-control" autocomplete="off" onkeyup="dateMask(this);" date></td>
+			</tr>
+			<tr>
+				<th>매수</th>
+				<td><input type="text" class="form-control" id="pageCnt" name="pageCnt" comma></td>
+				<th></th>
+				<td></td>
+			</tr>
+	        <tr>
+	        	<th>비고</th>
+				<td colspan="3">
+					<textarea class="form-control" id="remark" name="remark" msg="비고" style="height: 60px;" maxlength="2000"></textarea>
+				</td>			
+	        </tr>
+		</table>
+	</form>
+	<div>
+		<button type="button" class="btn btn-default btn-sm" id="actionBtn"></button>
+		<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+<script type="text/javascript">
+	var prdtGrp = null;
+	var salesCd = null;
+	$(document).ready(function() {
+		// 공통코드 set
+		setCommonSelect($('#drgForm select[data-kind]'));
+		
+		var actionType = modalStack.last().paramObj.actionType;
+		prdtGrp = modalStack.last().paramObj.prdtGrp;
+		salesCd = modalStack.last().paramObj.salesCd;
+
+		//착수일//
+		$('#startDt').datepicker({ format : "yyyy-mm-dd", language : "ko", autoclose : true });
+		//출도일//
+		$('#relDt').datepicker({ format : "yyyy-mm-dd", language : "ko", autoclose : true });
+
+		if (actionType == "C") {
+			$("#popDivDw02 #actionBtn").text("등록");
+			$('#popDivDw02 #actionBtn').on("click", function() { insertDrawItem(); });
+
+		} else if (actionType == "U") {
+			$('#popDivDw02 #actionBtn').text("수정");
+			$('#popDivDw02 #actionBtn').on("click", function() { updateDrawItem(); });
+			selectCodeInfo(salesCd);
+		}
+
+
+		//매수
+		$("#pageCnt").change(function () {
+			let tempVal = gPasIntChk(this.value);
+			tempVal = addCommaStr(tempVal);
+			$("#pageCnt").val(tempVal);
+		});
+		
+	});
+	
+	function selectCodeInfo(salesCd){
+		var paramObj = {
+			coCd   : 'GUN',
+			salesCd: salesCd
+		};
+		postAjax("/user/dw/dw02/selectDrawDocItemInfo", paramObj, null, function(data){
+			setDrawInfo(data.drawInfo);
+		});
+	}
+	
+	function setDrawInfo(codeInfo){
+		$.each(codeInfo, function(key, value){
+			$('#'+key).val(value);
+		});
+	}
+	
+	function insertDrawItem() {
+		if (inputValidation($('.popup_area  [required]'))) {
+			var formData = makeFormData();
+			formData.userId = jwt.userId;
+			formData.pgmId = "DW0201P01";
+			formData.actionType = modalStack.last().paramObj.actionType;
+			if (formData) {
+				putAjax("/user/dw/dw02/insertDrawItem", formData, null, function(data) {
+						if (data.resultCode == 200) {
+							const tree = $('#deptTree').jstree(true);   // 인스턴스
+							const nodeId = $('#prdtGrp').val();         // jsTree의 node.id (li의 id)
+							tree.deselect_all();                        // 필요 시 초기화
+							tree.select_node(nodeId);                   // 선택 상태로 세팅 (이벤트 발생)
+							tree.open_node(nodeId);                     // 펼치기 (보이도록)
+									
+// 							gridView.setData(0);
+							modalStack.close();	
+						} else {
+							customAlert(data.resultMessage);
+						}
+					});
+			} else {
+				dateCommaFormat();
+			}
+		}
+	}
+
+	// 수정
+	function updateDrawItem() {
+		if (inputValidation($('.popup_area [required]'))) {
+			var formData = makeFormData();
+			if (formData) {
+				putAjax("/user/dw/dw02/updateDrawItem", formData, null, function(data) {
+						if (data.resultCode == 200) {
+// 							const tree = $('#deptTree').jstree(true);   // 인스턴스
+// 							const nodeId = $('#prdtGrp').val();         // jsTree의 node.id (li의 id)
+// 							tree.deselect_all();                        // 필요 시 초기화
+// 							tree.select_node(nodeId);                   // 선택 상태로 세팅 (이벤트 발생)
+// 							tree.open_node(nodeId);                     // 펼치기 (보이도록)
+							
+							gridView.setData(0);
+							
+							modalStack.close();
+						} else {
+							customAlert(data.resultMessage);
+						}
+					});
+			} else {
+				dateCommaFormat();
+			}
+		}
+	}
+	
+
+	//날자필드 및 숫자 필드에 하이픈 및 콤마 추가하기
+	function dateCommaFormat() {
+		$('#startDt').val($('#startDt').val().replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
+		$('#relDt').val($('#relDt').val().replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'))
+
+		$.each($('.popup_area input[comma]'), function(idx, elem) {
+			onlyNumber(elem);
+		});
+	} 
+	
+
+	//----------------------------------------------//
+	function makeFormData() {
+		// 금액 콤마 제거
+		$.each($('.popup_area input[comma]'), function(idx, elem) {
+			deleteComma(elem);
+		});
+		// 날짜 하이픈 제거
+		$.each($('.popup_area input[date]'), function(idx, elem) {
+			deleteHyphen(elem);
+		});
+		// 폼데이터 생성
+		var formData = $('#drgForm').serializeObject();
+		formData.salesCd = $('#salesCd').val();
+		formData.dwgNo = $('#salesCd').val();
+		formData.prdtGrp = $('#prdtGrp').val();
+		formData.clntNm = $('#clntNm').val();
+		formData.clntCd = $('#clntCd').val();
+
+		formData.userId = jwt.userId;
+		formData.pgmId = "DW0201P01";
+		formData.actionType = modalStack.last().paramObj.actionType;
+		return formData;
+	}
+
+	//Sales Code (수주마스터, 수주상세테이블 조인) 검색
+    function wbsSalesCodeSearchPop() {
+        var paramObj = {
+			coCd   : 'GUN',
+			salesCd: $('#salesCd').val()
+        };
+        openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1068, 650, "SALES CODE 검색", paramObj, function (grid){
+            var row = grid.target.getList("selected")[0];
+            $('#salesCd').val(row.salesCd);
+//             row.ordrsNo
+//             row.eqpNm
+//             row.clntPjt
+//             row.clntPjtNm
+//             row.itemDivNm
+
+    		var paramObj = {
+    			salesCd: row.salesCd,
+    			ordrsNo: row.ordrsNo
+    		};
+    		postAjax("/user/dw/dw02/selectDrawDocItemInfo", paramObj, null, function(data){
+    			setDrawInfo(data.drawInfo);
+    			if (data.drawInfo.dwgNo) {	//기존 등록된 자료가 있으면 수정모드로 진입하기
+    				customAlert('해당도면은 등록되어 있습니다. 수정가능합니다.')
+    				actionType = 'U'
+    				$('#popDivDw02 #actionBtn').text("수정");
+    				$('#popDivDw02 #actionBtn').off('click').on('click.insertDrawItem', updateDrawItem);
+    			}
+    		});
+        });
+    }
+
+	
+</script>

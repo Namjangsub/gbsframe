@@ -29,4 +29,39 @@ public class DW02SvcImpl implements DW02Svc {
 		return  dw02Mapper.searchAuditsList(paramMap);
 	}
 
+	@Override
+	public List<Map<String, String>> selectDrawDocTreeList(Map<String, String> paramMap) {
+		return dw02Mapper.selectDrawDocTreeList(paramMap);
+	}
+
+	@Override
+	public int selectDrawTreeFileListCount(Map<String, String> paramMap) {
+		return dw02Mapper.selectDrawTreeFileListCount(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectDrawTreeFileList(Map<String, String> paramMap) {
+		return dw02Mapper.selectDrawTreeFileList(paramMap);
+	}
+
+	@Override
+	public Map<String, Object> selectDrawDocItemInfo(Map<String, String> paramMap) {
+		return dw02Mapper.selectDrawDocItemInfo(paramMap);
+	}
+
+	@Override
+	public int insertDrawItem(Map<String, String> paramMap) {
+		return dw02Mapper.insertDrawItem(paramMap);
+	}
+
+	@Override
+	public int updateDrawItem(Map<String, String> paramMap) {
+		return dw02Mapper.updateDrawItem(paramMap);
+	}
+	
+    @Override
+    public int deleteDrawDocItem(Map<String, String> paramMap) throws Exception {
+        return dw02Mapper.deleteDrawDocItem(paramMap);
+    }
+
 }

@@ -9,4 +9,19 @@ public interface DW02Svc {
 
 	List<Map<String, String>> searchAuditsList(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectDrawDocTreeList(Map<String, String> paramMap);
+
+	int selectDrawTreeFileListCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectDrawTreeFileList(Map<String, String> paramMap);
+
+    // DATA DELETE
+    int deleteDrawDocItem(Map<String, String> paramMap) throws Exception;
+
+	Map<String, Object> selectDrawDocItemInfo(Map<String, String> paramMap);
+
+	int insertDrawItem(Map<String, String> paramMap);
+
+	int updateDrawItem(Map<String, String> paramMap);
+
 }
