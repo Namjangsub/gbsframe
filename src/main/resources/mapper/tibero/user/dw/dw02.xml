@@ -118,11 +118,7 @@
 			</if>
 		)
 		SELECT COUNT(*)
-		FROM (
-			SELECT B.*,
-					ROW_NUMBER() OVER (ORDER BY B.DWG_NO) AS RN
-			FROM BASE B
-		)
+		  FROM BASE B
 	</select>
 	 
 	<select id="selectDrawTreeFileList" parameterType="Map" resultType="CamelMap">
@@ -146,8 +142,16 @@
 			     , T.UDT_ID
 			     , T.UDT_DTTM
 			     , T.UDT_PGM
+			     , DIV.DIV_CODE
 			FROM TB_DRAWING_MASTER T
 						LEFT OUTER JOIN TB_CM05M01 C ON T.PRDT_GRP = C.CODE_ID AND C.CODE_KIND = 'PRDTDIV'
+						LEFT OUTER JOIN (SELECT DWG_NO
+											 , CASE 
+										         WHEN REGEXP_LIKE(TRIM(DWG_NO), '^[A-Za-z]') THEN 'Y'
+										         ELSE 'N'
+										       END AS DIV_CODE
+										  FROM TB_DRAWING_MASTER
+										  ) DIV ON DIV.DWG_NO = T.DWG_NO
 			WHERE 1 = 1
 			<if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
 			  AND T.CREAT_DTTM BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
@@ -158,12 +162,12 @@
 			<if test="comonCd != 'PRDTDIV'">
 			  AND T.PRDT_GRP = #{comonCd}
 			</if>
-			ORDER BY T.DWG_NO
+			ORDER BY DIV.DIV_CODE, T.DWG_NO DESC
 		)
 		SELECT *
 		FROM (
 				SELECT B.*,
-						ROW_NUMBER() OVER (ORDER BY B.DWG_NO) AS RN
+						ROW_NUMBER() OVER (ORDER BY DIV_CODE, DWG_NO DESC) AS RN
 				FROM BASE B
 			)
 		WHERE RN BETWEEN #{firstIndex} AND #{lastIndex}
