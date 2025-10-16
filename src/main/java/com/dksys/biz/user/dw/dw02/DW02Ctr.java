@@ -33,12 +33,12 @@ public class DW02Ctr {
 	DW02Svc dw02Svc;
 	
 	@PostMapping(value = "/drawingAuditsList")
-	public String selectWbsSjList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		int totalCnt = dw02Svc.searchAuditsCount(paramMap);
+	public String drawingAuditsList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = dw02Svc.drawingAuditsListCount(paramMap);
 		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
 		model.addAttribute("paginationInfo", paginationInfo);
 
-		List<Map<String, String>> resultList = dw02Svc.searchAuditsList(paramMap);
+		List<Map<String, String>> resultList = dw02Svc.drawingAuditsList(paramMap);
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
 	}

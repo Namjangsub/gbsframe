@@ -20,13 +20,13 @@ public class DW02SvcImpl implements DW02Svc {
 	DW02Mapper dw02Mapper;
 	
 	@Override
-	public int searchAuditsCount(Map<String, String> paramMap) {
-		return dw02Mapper.searchAuditsCount(paramMap);
+	public int drawingAuditsListCount(Map<String, String> paramMap) {
+		return dw02Mapper.drawingAuditsListCount(paramMap);
 	}
 
 	@Override
-	public List<Map<String, String>> searchAuditsList(Map<String, String> paramMap) {
-		return  dw02Mapper.searchAuditsList(paramMap);
+	public List<Map<String, String>> drawingAuditsList(Map<String, String> paramMap) {
+		return  dw02Mapper.drawingAuditsList(paramMap);
 	}
 
 	@Override

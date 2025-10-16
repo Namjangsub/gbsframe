@@ -8,9 +8,9 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface DW02Mapper {
 
-	int searchAuditsCount(Map<String, String> paramMap);
+	int drawingAuditsListCount(Map<String, String> paramMap);
 
-	List<Map<String, String>> searchAuditsList(Map<String, String> paramMap);
+	List<Map<String, String>> drawingAuditsList(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectDrawDocTreeList(Map<String, String> paramMap);
 
