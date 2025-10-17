@@ -22,4 +22,9 @@ public interface DW03Svc {
 	Map<String, String> dwgFileDownInfo(Map<String, String> paramMap) throws Exception;
 
 	int selectFileDownAuthChk(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectDw03FileListInfo(Map<String, String> paramMap);
+
+	int initialDw03(Map<String, String> paramMap) throws Exception;
+	
 }

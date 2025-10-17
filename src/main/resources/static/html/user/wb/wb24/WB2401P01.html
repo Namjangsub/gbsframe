@@ -324,7 +324,11 @@
 				            <td rowspan="4">
 				               <textarea  class="form-control" id="actCompDgnFileNm" name="actCompDgnFileNm" rows="5" maxlength="1000" msg="조치  도면 저장명" placeholder="예: 24011-01NVFIP-1230-001R1.dwg
 24011-01NVFIP-2530-001R1.dwg처럼 저장된 도면명을 입력하세요.
-도면수정이 없거나 관련 없으면  '해당 사항 없음'으로 입력하세요."></textarea>
+도면수정이 없거나 관련 없으면  '해당 사항 없음'으로 입력하세요." onclick="selectSalesCdDrawFileListModal()"></textarea>
+								<input type="hidden" id="actCompDgnFileId" name="actCompDgnFileId">
+								<input type="hidden" id="actCompDgnFileJson">
+								<input type="hidden" id="actCompDgnFileVer" name="actCompDgnFileVer">
+								<input type="hidden" id="actCompDgnFileServerNm" name="actCompDgnFileServerNm">
 				            </td>
                         </tr>
                         <tr>
@@ -899,6 +903,24 @@
         	}
 		})
 
+		$(document).on('input', '#actCompDgnFileNm', function(){
+			const $js = $('#actCompDgnFileJson');
+			const prev = JSON.parse($js.val() || '[]');          // [{id,name}]
+			const byName = new Map(prev.map(x => [x.name, x]));  // 이름→객체
+
+			const names = $(this).val().split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+
+			// 이름이 남아있는 것만 순서대로 유지. 이름 바꾸면 매칭 안되니 제거 처리.
+			const seen = new Set();
+			const next = [];
+			names.forEach(n => {
+				const it = byName.get(n);
+				if (it && !seen.has(it.id)) { next.push(it); seen.add(it.id); }
+			});
+
+			setJson(next); // ids와 JSON 동시 반영
+		});
+
 		// 근본원인 change이벤트에 따른 내용입력 필드 필수여부
 		// $('#fdmtSolutCd').change(function () {
 		// 	if ($('#fdmtSolutCd').val() != '') {
@@ -1325,6 +1347,8 @@
         //---------------------------------------------------------------
         //--첨부화일 처리를 위한 부분 끝
         //---------------------------------------------------------------
+
+		formData.append("actFilesJson", $('#actCompDgnFileJson').val() || "[]");	// 조치파일저장명 json형태 -> 도면테이블쪽 update시 사용
 
         // 문제정보 공유 결재 리스트 저장 넘김
         var rowSharngList = gridViewApprovalSP01.target.list;
@@ -2404,4 +2428,68 @@
                 }
             });
     }
+
+	function renderFromJson() {
+		const $ta  = $('#actCompDgnFileNm');
+		const $ids = $('#actCompDgnFileId');
+		const $ver = $('#actCompDgnFileVer');
+		const $server = $('#actCompDgnFileServerNm');
+		const $js  = $('#actCompDgnFileJson');
+
+		const arr = JSON.parse($js.val() || '[]'); // [{id,name,verNo, serverName}]
+		$ta .val(arr.map(x => x.fileName).join('\n'));
+		$ids.val(arr.map(x => x.docId  ).join('\n'));
+		$ver.val(arr.map(x => x.verNo ?? '').join('\n'));
+		$server.val(arr.map(x => x.serverName ?? '').join('\n'));
+	}
+
+	function setJson(arr) { // arr: [{id,name,verNo, serverName}]
+		$('#actCompDgnFileJson').val(JSON.stringify(arr));
+		renderFromJson();
+	}
+
+	function validateActFiles(){
+		const names = ($('#actCompDgnFileNm').val()||'').split(/\r?\n/).filter(Boolean);
+		const ids   = ($('#actCompDgnFileId').val()||'').split(/\r?\n/).filter(Boolean);
+		const vers  = ($('#actCompDgnFileVer').val()||'').split(/\r?\n/); // ver는 빈값 허용
+		if (names.length !== ids.length || ids.length !== vers.length) { alert('파일명·docId·ver 개수가 불일치합니다.'); return false; }
+		if (new Set(ids).size !== ids.length) { alert('docId 중복이 있습니다.'); return false; }
+		return true;
+	}
+
+	// SalesCd별 도면파일 리스트 팝업
+	function selectSalesCdDrawFileListModal () {
+		const precheckedIds =
+			($('#actCompDgnFileId').val()||'')
+			.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+
+		var paramObj = {
+			"salesCd" : $('#salesCd').val(),
+			"precheckedIds" : precheckedIds
+		}
+
+		openSecondModal("/static/html/user/dw/dw03/DW0302P11.html", 1600, 850, "SalesCd별 도면파일 리스트", paramObj, function (grid) {
+			if (!grid) {
+				$('#actCompDgnFileJson').val('[]').trigger('change');
+				$('#actCompDgnFileNm').val('해당 사항 없음').trigger('change');
+				return false;
+			}
+			const rows = grid.target.getList("selected")
+				.filter(r => !(r.__children__ && r.__children__.length));
+
+			const seen = new Set();
+			const next = [];
+			rows.forEach(r => {
+				const id = (r.docId || r.DOC_ID || '').toString().trim();
+				const name = (r.fileName || r.nodeNm || '').trim();
+				const verNo = (r.verNo || r.VER_NO || '').toString().trim();
+				const serverName = (r.serverName || r.SERVER_NAME || '').toString().trim();
+				if (!id || seen.has(id)) return;
+				seen.add(id);
+				next.push({ docId: id, fileName: name, verNo: verNo, serverName : serverName });
+			});
+
+			setJson(next);
+		});
+	}
 </script>

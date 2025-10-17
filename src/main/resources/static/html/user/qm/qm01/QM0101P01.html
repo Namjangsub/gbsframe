@@ -229,7 +229,11 @@
 										<textarea	class="form-control" id="actCompDgnFileNm" name="actCompDgnFileNm" rows="4" maxlength="1000" required msg="조치 파일 저장명" 
 										placeholder="예: 24011-01NVFIP-1230-001R1.dwg
 24011-01NVFIP-2530-001R1.dwg 처럼 여기에 저장된 도면 파일명을 입력하세요.
-도면수정이 없거나 관련 없으면   '해당 사항 없음'으로 입력하세요."></textarea>
+도면수정이 없거나 관련 없으면   '해당 사항 없음'으로 입력하세요." onclick="ModalApp.selectSalesCdDrawFileListModal();"></textarea>
+									<input type="hidden" id="actCompDgnFileId" name="actCompDgnFileId">
+									<input type="hidden" id="actCompDgnFileJson">
+									<input type="hidden" id="actCompDgnFileVer" name="actCompDgnFileVer">
+									<input type="hidden" id="actCompDgnFileServerNm" name="actCompDgnFileServerNm">
 									</td>
 								</tr>
 						
@@ -1062,6 +1066,10 @@ var ModalApp = (function() {
 					});
 				}
 			});
+
+			// if ($(currFormId + ' #actCompDgnFileNm').val() != '해당 사항 없음' || ) {
+				selectDw03FileListInfo();
+			// }
 			
 			const subCdElement = $(currFormId + ' #' + data.result.subCd);
 			if (subCdElement.length) {
@@ -1425,6 +1433,8 @@ var ModalApp = (function() {
 		//---------------------------------------------------------------
 		//--첨부화일 처리를 위한 부분 끝
 		//---------------------------------------------------------------
+
+		formData.append("actFilesJson", $(currFormId + ' #actCompDgnFileJson').val() || "[]");	// 조치파일저장명 json형태 -> 도면테이블쪽 update시 사용
 
 		// 공유대상자 리스트	TODO LIST에 등록하기 위한 모듈 추가
 		// 공유 : TODODIV10, TODODIV1040	결재 :TODODIV20, TODODIV2020
@@ -2254,6 +2264,112 @@ var ModalApp = (function() {
 		});
 	}
 
+	function renderFromJson() {
+		const $ta  = $(currFormId + ' #actCompDgnFileNm');
+		const $ids = $(currFormId + ' #actCompDgnFileId');
+		const $ver = $(currFormId + ' #actCompDgnFileVer');
+		const $server = $(currFormId + ' #actCompDgnFileServerNm');
+		const $js  = $(currFormId + ' #actCompDgnFileJson');
+
+		const arr = JSON.parse($js.val() || '[]'); // [{id,name,verNo, serverName}]
+		$ta .val(arr.map(x => x.fileName).join('\n'));
+		$ids.val(arr.map(x => x.docId  ).join('\n'));
+		$ver.val(arr.map(x => x.verNo ?? '').join('\n'));
+		$server.val(arr.map(x => x.serverName ?? '').join('\n'));
+	}
+
+	function setJson(arr) { // arr: [{id,name,verNo, serverName}]
+		$(currFormId + ' #actCompDgnFileJson').val(JSON.stringify(arr));
+		renderFromJson();
+	}
+
+	// SalesCd별 도면파일 리스트 팝업
+	function selectSalesCdDrawFileListModal () {
+		const precheckedIds =
+			($(currFormId + ' #actCompDgnFileId').val()||'')
+			.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+
+		var paramObj = {
+			"salesCd" : $(currFormId + ' #salesCd').val(),
+			"precheckedIds" : precheckedIds
+		}
+		
+		openSecondModal("/static/html/user/dw/dw03/DW0302P11.html", 1600, 850, "SalesCd별 도면파일 리스트", paramObj, function (grid) {
+			if (!grid) {
+				$(currFormId + ' #actCompDgnFileJson').val('[]').trigger('change');
+				$(currFormId + ' #actCompDgnFileNm').val('해당 사항 없음').trigger('change');
+				return false;
+			}
+			const rows = grid.target.getList("selected").filter(r => !(r.__children__ && r.__children__.length));
+
+			const seen = new Set();
+			const next = [];
+			let maxWorkDttm = null;
+
+			rows.forEach(r => {
+				const id = (r.docId || r.DOC_ID || '').toString().trim();
+				const name = (r.fileName || r.nodeNm || '').trim();
+				const verNo = (r.verNo || r.VER_NO || '').toString().trim();
+				const serverName = (r.serverName || r.SERVER_NAME || '').toString().trim();
+				const workDttm = (r.workDttm || r.WORK_DTTM || '').trim();
+
+				if (!id || seen.has(id)) return;
+				seen.add(id);
+				next.push({ docId: id, fileName: name, verNo: verNo, serverName : serverName });
+
+				if (workDttm) {
+					const ts = new Date(workDttm.replace(' ', 'T'));
+					if (!maxWorkDttm || ts > maxWorkDttm) maxWorkDttm = ts;
+				}
+			});
+
+			setJson(next);
+
+			if (maxWorkDttm) {
+				const iso = maxWorkDttm.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+				$(currFormId + ' #actCompDttm').val(iso);
+			}
+		});
+	}
+
+	// DW03 도면파일 리스트 정보조회
+	function selectDw03FileListInfo () {
+		var paramObj = {
+			"salesCd": $(currFormId + ' #salesCd').val(),
+			"reqNo"  : $(currFormId + ' #reqNo').val()
+		};
+
+		postAjaxSync("/user/dw/dw03/selectDw03FileListInfo", paramObj, null, function (data) {
+			const rows = data?.resultList || [];
+			const byName = new Map();
+			rows.forEach(r => {
+				const rec = {
+					docId: String(r.DOC_ID ?? r.docId ?? '').trim(),
+					verNo: String(r.VER_NO ?? r.verNo ?? '').trim(),
+					serverName: String(r.SERVER_NAME ?? r.serverName ?? '').trim(),
+					fileName: String(r.FILE_NAME ?? r.fileName ?? r.NODE_NM ?? r.nodeNm ?? '').trim(),
+				};
+				if (!rec.fileName) return;
+				const key = rec.fileName.toLowerCase();
+				if (!byName.has(key)) byName.set(key, rec);
+			});
+
+			// 현재 화면의 파일명 순서를 보존해 JSON 재구성
+			const names = ($(currFormId + ' #actCompDgnFileNm').val() || '')
+			.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+
+			const next = names.map(n => {
+				const key1 = n.toLowerCase();
+				const key2 = n.split(/\\|\//).pop().toLowerCase();
+				const rec = byName.get(key1) || byName.get(key2) || {};
+				return { docId: rec.docId || '', fileName: n, verNo: rec.verNo || '', serverName: rec.serverName || '' };
+			});
+
+			setJson(next);
+    		renderFromJson();
+		});
+	}
+
     return {
         approvalYn: approvalYn,
         insertShareUserModal,
@@ -2283,7 +2399,11 @@ var ModalApp = (function() {
         setCurrentDateTime,
         gridResize: gridResize,
         txtareaHeightResize,
-        openClntSearch
+        openClntSearch,
+		renderFromJson,
+		setJson,
+		selectSalesCdDrawFileListModal,
+		selectDw03FileListInfo
     };
 	})();
 
@@ -2588,6 +2708,24 @@ var ModalApp = (function() {
 			} else {
 				$(currFormId + ' #delayDay').attr('required', true).closest('td').prev('th').addClass('hit');
 			}
+		});
+
+		$(document).on('input', currFormId + ' #actCompDgnFileNm', function(){
+			const $js = $(currFormId + ' #actCompDgnFileJson');
+			const prev = JSON.parse($js.val() || '[]');
+			const byName = new Map(prev.map(x => [x.name, x]));
+
+			const names = $(this).val().split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+
+			// 이름이 남아있는 것만 순서대로 유지. 이름 바꾸면 매칭 안되니 제거 처리.
+			const seen = new Set();
+			const next = [];
+			names.forEach(n => {
+				const it = byName.get(n);
+				if (it && !seen.has(it.id)) { next.push(it); seen.add(it.id); }
+			});
+
+			setJson(next); // ids와 JSON 동시 반영
 		});
 
 		// // 분류 check에 따른 근본원인 필드 필수여부 change 이벤트 적용

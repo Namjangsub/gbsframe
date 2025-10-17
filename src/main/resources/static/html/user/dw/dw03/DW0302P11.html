@@ -1,0 +1,184 @@
+<div class="popup_area of_a" style="width: 100%; height: 100%;">
+	<div class="tit_contents">
+		<h4 class="tit">SalesCd별 도면파일 리스트</h4>
+	</div>
+	<!-- <div class="contents no_bg">
+		<div class="contents_tit">
+		</div> -->
+		<table>
+			<colgroup>
+				<col width="10%">
+				<col width="15%">
+				<col width="10%">
+				<col width="15%">
+				<col width="10%">
+				<col width="15%">
+				<col width="10%">
+				<col width="15%">
+			</colgroup>
+			<tr style="height:28px;">
+				<th>Sales Code</th>
+				<td>
+					<input type="text" id="salesCdDw03P11" name="salesCdDw03P11" readonly>
+				</td>
+				<th>서버종류</th>
+				<td>
+					<input type="text" id="serverName" name="serverName" value="PS" readonly>
+				</td>
+			</tr>
+		</table>
+		<!-- 그리드1 -->
+		<div class="contents">
+			<div class="ax5_grid">
+				<div data-ax5grid="file-grid" data-ax5grid-config="{}" style="height: 700px;  min-height:200px;"></div>
+			</div>
+		</div>
+	<!-- </div> -->
+</div>
+<!-- 하단 버튼 -->
+<div class ="popup_bottom_btn">
+	<button type="button" id="cancelBtn" onclick="executeCallback('N');">해당사항없음</button>
+	<button type="button" id="actionBtn" onclick="executeCallback('Y');">적용</button>
+	<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+</div>
+	<script type="text/javascript">	
+	var salesCd = "";
+	var prechecked = [];
+
+	var gridViewDw03P11 = {
+		initView : function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showRowSelector : true,
+				multipleSelect : true,
+				sortable : false,
+				target: $('[data-ax5grid="file-grid"]'),
+				tree: {
+					use: true,
+					indentWidth: 15,
+					arrowWidth: 15,
+					iconWidth: 18,
+					icons: {
+						openedArrow: '<i class="fa fa-caret-down" aria-hidden="true"></i>',
+						collapsedArrow: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+						groupIcon: '<i class="fa fa-folder-open" aria-hidden="true"></i>',
+						collapsedGroupIcon: '<i class="fa fa-folder" aria-hidden="true"></i>',
+						itemIcon: '<i class="fa fa-cog" aria-hidden="true"></i>'
+					},
+					columnKeys: {
+						parentKey: "pid",
+						selfKey: "id"
+					}
+				},
+				header : {
+					align : "center",
+					selector : true
+				},
+				body : {
+					onClick : function() {
+						if (this.item.__children__.length != 0) return false; // 자식이 아니면 패스
+						gridViewDw03P11.target.select(this.doindex, { selected: !this.item.__selected__ });
+					},
+					onDBLClick: function () {
+						if (this.item.__children__.length != 0) return false; // 자식이 아니면 패스
+
+						// // 필요 시 더블클릭 항목을 확실히 선택
+						// gridView.target.select(this.doindex, { selected:true });
+						// select_dw03_modal(this.item);
+					},
+				},
+				columns : [
+						{key : "nodeNm",	label: "파일명",	width: 340, align: "left", treeControl: true,
+							formatter: function () {
+								const it = this.item || {};
+								return it.nodeNm || it.fileName || it.unitNo || it.partNo || it.salesCd || "";
+							}
+						},
+						{key : "id",  hidden: true },
+						{key : "pid", hidden: true },
+						{key : "fileName",		label : "파일명", 		width : 260, align: "left", hidden: true},
+						{key : "docId",			label : "관리번호", 		width : 260, align: "left", hidden: true},
+						{key : "workDttm",		label : "저장일시",		width : 130,	align: "center",},
+						{key : "fileSize",		label : "파일크기", 		width : 80, align: "right" , formatter: "money"},
+						{key : "verNo",			label : "Ver",			width : 40, align: "center"},
+						{key : "fileType",		label : "확장자",			width : 60, align: "center"},
+						// {key : "docSt",  	label : "존재여부",		width : 40, align: "left", hidden: true},
+						{key : "confirmBy",		label : "확정자Id",			width : 80,	align: "center", hidden: true},
+						{key : "confirmByNm",	label : "확정자",			width : 80,	align: "center", hidden: true},
+						{key : "confirmAt", 	label : "확정일시",		width : 130, align: "center", hidden: true},
+						{key : "confirmActNo",	label : "문제관리번호",	 	width : 100, align: "center", hidden: true},
+						{key : "issText",		label : "문제제목",	 	width : 240, align: "left", hidden: true},
+						{key : "lpath",  		label : "저장위치",		width : 700, align: "left"},
+						{key : "workNm", 		label : "작업자",			width : 80, align: "center"},
+						{key : "serverName",	label : "서버이름",		width : 60, align: "center", hidden: true},
+				],
+				page : {
+					display : false,
+				},
+			});
+			return this;
+		},
+		setData : function(_pageNo) {
+			var targetObj = this.target;
+			var paramObj = {};
+			paramObj["pageNo"] = _pageNo + 1;
+			paramObj["salesCd"] = salesCd;
+			paramObj["serverName"] = $("#serverName").val();
+			paramObj["exclusionSet"] = "Y";	// 확정된 도면 제외 플래그
+			postAjax("/user/dw/dw03/selectSalesCdDrawFileList", paramObj, null, function(data){
+				try {
+					var list = data.fileList;
+					if (list != undefined) {
+						targetObj.setData({
+							list : list,
+							page : {
+								currentPage : _pageNo,
+								totalElements : data.paginationInfo.totalRecordCount,
+								totalPages : data.paginationInfo.totalPageCount
+							}
+						});
+						const want = new Set((modalStack.last().paramObj.precheckedIds || []).map(x => x.toString().trim()));
+						const rows = gridViewDw03P11.target.getList();
+						rows.forEach((r,i)=>{
+							if (r.__children__ && r.__children__.length) return;
+							const id = (r.docId || r.DOC_ID || '').toString().trim();
+							if (id && want.has(id)) gridViewDw03P11.target.select(i, { selected: true });
+						});
+					}
+				} catch (error) {
+					alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+					return null; // 오류 발생 시 null 반환
+				} finally {
+					// console.log("함수 실행 완료.");
+				}
+			}, false);
+		}
+	}
+		
+	$(document.body).ready(function () {
+		salesCd = modalStack.last().paramObj.salesCd;
+		$("#salesCdDw03P11").val(salesCd);
+		prechecked = modalStack.last().paramObj.prechecked || [];
+		gridViewDw03P11.initView().setData(0);
+
+		$('[data-search]').on("change", function(){
+			gridViewDw03P11.setData(0);
+		});
+	});
+
+	function executeCallback(Flag){
+		if (Flag == "Y") {
+			if(selectGridValidationM(gridViewDw03P11.target)) return;
+			modalStack.last().callback(gridViewDw03P11);
+			modalStack.close();
+		} else if (Flag == "N") {
+			const selectedRows = gridViewDw03P11.target.getList("selected").filter(r => !(r.__children__ && r.__children__.length));
+			if (selectedRows.length > 0) {
+				alert("선택된 행이 있습니다. 선택 해제 후 다시 시도하세요.");
+				return false;
+			}
+			modalStack.last().callback(null);
+			modalStack.close();
+		}
+	}
+</script>

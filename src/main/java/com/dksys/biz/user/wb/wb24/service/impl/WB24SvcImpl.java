@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.user.dw.dw03.mapper.DW03Mapper;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb24.mapper.WB24Mapper;
 import com.dksys.biz.user.wb.wb24.service.WB24Svc;
@@ -40,6 +41,9 @@ public class WB24SvcImpl implements WB24Svc {
 
     @Autowired
     QM01Mapper QM01Mapper;
+
+	@Autowired
+	DW03Mapper dw03Mapper;
 
 	@Autowired
 	ExceptionThrower thrower;
@@ -295,6 +299,18 @@ public class WB24SvcImpl implements WB24Svc {
 				result += wb24Mapper.wbsActUpdate(paramMap);
 			} else {
 				result += wb24Mapper.wbsActInsert(paramMap);
+			}
+
+			// DW Version테이블에 확정정보 Update 처리
+			Type listType = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+			List<Map<String, String>> actFiles = gson.fromJson(paramMap.get("actFilesJson"), listType);
+
+			if (actFiles != null && !actFiles.isEmpty()) {
+				for (Map<String, String> fileMap : actFiles) {
+					fileMap.put("confirmActNo",  paramMap.get("issNo"));
+					fileMap.put("userId",  paramMap.get("userId"));
+					result += dw03Mapper.updateDwConfirm(fileMap);
+				}
 			}
 
   	    /************************************************************************

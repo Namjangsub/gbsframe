@@ -60,4 +60,13 @@ public class DW03Svcmpl implements DW03Svc {
 		return dw03Mapper.selectFileDownAuthChk(paramMap);
 	}
 
+	@Override
+	public List<Map<String, String>> selectDw03FileListInfo(Map<String, String> paramMap) {
+		return dw03Mapper.selectDw03FileListInfo(paramMap);
+	}
+
+	@Override
+	public int initialDw03(Map<String, String> paramMap) throws Exception {
+		return dw03Mapper.initialDw03(paramMap);
+	}
 }

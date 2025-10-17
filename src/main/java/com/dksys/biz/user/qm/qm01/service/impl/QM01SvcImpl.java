@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.user.dw.dw03.mapper.DW03Mapper;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.qm.qm01.service.QM01Svc;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
@@ -42,6 +43,9 @@ public class QM01SvcImpl implements QM01Svc {
 
   @Autowired
   WB24Mapper wb24Mapper;
+
+  @Autowired
+  DW03Mapper dw03Mapper;
   
   @Override
   public int selectQualityReqCount(Map<String, String> paramMap) {
@@ -166,6 +170,25 @@ public class QM01SvcImpl implements QM01Svc {
         int result = QM01Mapper.updateQualityReq(paramMap);
 
         result += wb24Mapper.updateVendCd(paramMap);
+
+		Gson gson2 = new Gson();
+		// DW Version테이블에 확정정보 Update 처리
+		Type listType = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+		List<Map<String, String>> actFiles = gson2.fromJson(paramMap.get("actFilesJson"), listType);
+
+		if (actFiles != null && !actFiles.isEmpty()) {
+			// DW Version테이블에 확정정보 초기화 처리
+			List<Map<String, String>> selectDw03FileListInfo = dw03Mapper.selectDw03FileListInfo(paramMap);
+			if (selectDw03FileListInfo.size() >0) {
+				result += dw03Mapper.initialDw03(paramMap);
+			}
+
+			for (Map<String, String> fileMap : actFiles) {
+				fileMap.put("confirmActNo",  paramMap.get("reqNo"));
+				fileMap.put("userId",  paramMap.get("userId"));
+				result += dw03Mapper.updateDwConfirm(fileMap);
+			}
+		}
 	
         /**********************************************************************************
          * 2025.01.21 남장섭 수정 시작 - 요인별발주요청서 작성과 결과등록 처리 기능을 하나로 합침 - 아래는 요인별 발주요청서 결과등록 처리하는 로직을 복사함
@@ -346,6 +369,19 @@ public class QM01SvcImpl implements QM01Svc {
 		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
 		paramMap.put("reqNo", reqNo);
 		int result = QM01Mapper.insertQualityReq(paramMap);
+
+		Gson gson2 = new Gson();
+		// DW Version테이블에 확정정보 Update 처리
+		Type listType = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+		List<Map<String, String>> actFiles = gson2.fromJson(paramMap.get("actFilesJson"), listType);
+
+		if (actFiles != null && !actFiles.isEmpty()) {
+			for (Map<String, String> fileMap : actFiles) {
+				fileMap.put("confirmActNo",  reqNo);
+				fileMap.put("userId",  paramMap.get("userId"));
+				result += dw03Mapper.updateDwConfirm(fileMap);
+			}
+		}
 
 		// 발주요청서 등록시 해당 발주 요청서 문제와 연계될때 한개의 문제에서 여러개의 발주요청서를 등록 못하게 해야함
 		// 한개의 문제에는 한개의 발주요청서만 존재해야함

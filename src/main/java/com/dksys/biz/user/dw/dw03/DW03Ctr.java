@@ -84,4 +84,30 @@ public class DW03Ctr {
 		model.addAttribute("selectFileDownAuthChk", selectFileDownAuthChk);
 		return "jsonView";
 	}
+
+	// 도면 확정리스트 조회
+	@PostMapping("/selectDw03FileListInfo")
+	public String selectDw03FileListInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = dw03Svc.selectDw03FileListInfo(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+    }
+
+	// 도면 확정 취소
+	@PostMapping(value = "/initialDw03")
+	public String initialDw03(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (dw03Svc.initialDw03(paramMap) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));				
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 }

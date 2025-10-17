@@ -24,5 +24,10 @@ public interface DW03Mapper {
 	int selectFileDownAuthChk(Map<String, String> paramMap);
 
 	int updateDwConfirm(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectDw03FileListInfo(Map<String, String> paramMap);
 	
+	int dwgChangeChk(Map<String, String> paramMap) throws Exception;
+	
+	int initialDw03(Map<String, String> paramMap) throws Exception;
 }
