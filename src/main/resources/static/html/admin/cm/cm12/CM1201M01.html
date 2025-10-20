@@ -196,12 +196,12 @@
 		<div class="contents no_bg">
 			<!-- 콘텐츠 타이틀 -->
 			<div class="contents_tit" style="margin: 0px;">
-				<div class="add_btn_small pdl10" style="margin: 0px; padding: 0px;">
-					<a onclick="moveFile();" style="height: 30px; line-height: 28px; width: 50px;" authchk><i class="fas fa-retweet"></i> 이동</a> 
-					<a onclick="uploadFile();" style="height: 30px; line-height: 28px; width: 50px;" authchk ; title="거래처, 제품, 아이템, Sales등 입력처리해야하므로 업로드는 보류!"><i class="fas fa-upload"></i> 등록</a> 
-					<a onclick="deleteFile();" style="height: 30px; line-height: 28px; width: 50px;" authchk><i class="fas fa-trash"></i> 삭제</a> 
+				<div id="selectBtnAuth" class="add_btn_small pdl10" style="margin: 0px; padding: 0px;">
+					<a id="btnMove" onclick="moveFile();" style="height: 30px; line-height: 28px; width: 50px;" authchk><i class="fas fa-retweet"></i> 이동</a> 
+					<a id="btnUpload" onclick="uploadFile();" style="height: 30px; line-height: 28px; width: 50px;" authchk ; title="거래처, 제품, 아이템, Sales등 입력처리해야하므로 업로드는 보류!"><i class="fas fa-upload"></i> 등록</a> 
+					<a id="btnDelete" onclick="deleteFile();" style="height: 30px; line-height: 28px; width: 50px;" authchk><i class="fas fa-trash"></i> 삭제</a> 
 				</div>
-				<div class="add_btn_small pdl10">
+				<div class="add_btn_small pdl10" style="display:flex; align-items:center; gap:8px;">
 					<select id="recordCnt" class="prae_select" data-search="recordCnt" style="height: 30px" onchange="gridView.setData(0);">
 						<option value="25">25</option>
 						<option value="50" selected>50</option>
@@ -209,6 +209,7 @@
 						<option value="500">500</option>
 						<option value="9999999">전체</option>
 					</select>
+					<a onclick="downloadSelectRow();" style="height: 30px; line-height: 28px; width: 100px;"><i class="fas fa-file-download"></i> 파일다운로드</a>
 				</div>
 			</div>
 		</div>
@@ -259,17 +260,22 @@
 					},
 					body : {
 						onClick : function() {
+							this.self.clearSelect();
 							this.self.select(this.dindex);
+							updateButtonsBySelection();
 						},
 						onDBLClick : function() {
-	                        var fileKey = this.item["fileKey"];
-	                        if (fileKey) {
-	                            if (this.item["fileDown"] == 'Y') {
-	                            	downloadFile(this.item.fileKey, this.item.fileName);
-	                            } else {
-	                            	alert('파일 다운로드 권한이 없습니다.')
-	                            };
-	                        }							
+							this.self.clearSelect();
+							this.self.select(this.dindex);
+							if (this.column.key == "fileName") {
+								//첨부파일 다운로드
+								let obj = this.item;
+								//작성자-작성일자-비용항목-filename
+								if (obj.fileName) {
+									let tempFileName = obj.lpath + '-' + obj.fileName;
+									imageViewPopup(obj.fileKey, tempFileName);
+								}
+							}
 						},
 					},
 					columns : [
@@ -356,6 +362,7 @@
 								}
 							});
 						}
+						updateButtonsBySelection();
 						$('#treeview').height($('body').height() - 285) // 화면 Body 높이 919 - 그리드 기본크기 700px = 264
 						$('#file_tree_area').height($('body').height() - 219) // 화면 Body 높이 919 - 그리드 기본크기 700px = 264
 						$('#file_area').height($('body').height() - 264) // 화면 Body 높이 919 - 그리드 기본크기 655 = 264
@@ -382,7 +389,7 @@
 			language : "ko",
 			autoclose : true
 		})
-		.datepicker("setDate", moment(new Date()).startOf("month").toDate())
+		.datepicker("setDate", moment().startOf("month").add(-3, "M").toDate())
 		.on("changeDate", function(){
 			if($('#reqDtFrom').val() > $('#reqDtTo').val()){
 				customAlert("날짜를 확인해주세요");
@@ -403,12 +410,13 @@
 				$('#reqDtFrom').datepicker("setDate", new Date($('#reqDtTo').val()));
 			}
 		});
-
+		initDeptTree();
 		gridView.initView();
 		
-		initSearch()
+		// initSearch()
 
 		$('.off_btn').click();
+		$('#selectBtnAuth').hide();
 		
 		// 검색조건 이벤트 bind
 		$('[data-search]').on("change", function(){
@@ -431,7 +439,7 @@
 		$("#userNm_S").val(jwt.userNm);	
 		
 		// 날짜 초기화
-		$('#reqDtFrom').datepicker("setDate", moment(new Date()).startOf("month").toDate());
+		$('#reqDtFrom').datepicker("setDate", moment().startOf("month").add(-3, "M").toDate());
 		$('#reqDtTo').datepicker("setDate", moment(new Date()).endOf("month").toDate());
 		
 		initDeptTree();
@@ -754,6 +762,57 @@
 	
 	function uploadFile() {
 		alert("거래처, 제품, 아이템, SalesCode등 필수 정보가 필요하여\n통합파일관리 화면에서의 파일 업로드는 보류!\n\n관련 자료 관리화면에서 업로드하세요!.");	
+	}
+
+	function downloadSelectRow() {
+		let rows = gridView.target.getList("selected");
+		let downloadPromises = [];
+
+		if (rows.length === 0) {
+			return false;
+		}
+
+		const denied = rows.filter(r => r.fileDown !== 'Y');
+		if (denied.length > 0) {
+			const names = denied.map(r => `[${r.rnum ?? ''}] ${r.fileName ?? '(이름없음)'}`).join('\n');
+			alert("파일 다운로드 권한이 없는 항목이 있습니다.\n\n" + names);
+			return false;
+		}
+
+		$.each(rows, function(idx, obj) {
+			if (obj.fileName) {
+				let tempFileName = obj.lpath + '-' + obj.fileName;
+				downloadPromises.push(downloadFile(obj.fileKey, tempFileName));
+			}
+		});
+
+		Promise.allSettled(downloadPromises).then(function(results) {
+			let errors = results.filter(r => r.status === "rejected").map(r => r.reason);
+			if (errors.length > 0) {
+				alert("전산실 연락바랍니다.\n\n" + errors.join("\n"));
+			}
+		});
+	}
+
+	function updateButtonsBySelection() {
+		const rows = gridView.target.getList("selected");
+		// 등록: 선택된 모든 행이 fileUp === 'Y' 일 때만
+		const canUpload = rows.length > 0 && rows.every(r => r.fileUp === 'Y');
+
+		// 이동: 단일 선택 + 그 행이 fileUpdate === 'Y'
+		const canMove = rows.length === 1 && rows[0].fileUpdate === 'Y';
+
+		// 삭제: 선택된 모든 행이 fileDelete === 'Y' 일 때만
+		const canDelete = rows.length > 0 && rows.every(r => r.fileDelete === 'Y');
+
+		if (canUpload || canMove || canDelete) {
+			$('#selectBtnAuth').show();
+		} else {
+			$('#selectBtnAuth').hide();
+		}
+		$('#btnUpload').toggle(canUpload);
+		$('#btnMove').toggle(canMove);
+		$('#btnDelete').toggle(canDelete);
 	}
 	
 </script>
