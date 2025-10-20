@@ -16,6 +16,7 @@ import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.rest.url.Base62Util;
 import com.dksys.biz.rest.url.mapper.UrlMapper;
+import com.dksys.biz.user.dw.dw02.mapper.DW02Mapper;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb22.mapper.WB22Mapper;
 import com.dksys.biz.user.wb.wb22.service.WB22Svc;
@@ -42,6 +43,9 @@ public class WB22SvcImpl implements WB22Svc {
 
 	@Autowired
 	QM01Mapper QM01Mapper;
+
+	@Autowired
+	DW02Mapper dw02Mapper;
 
 	@Autowired
     private UrlMapper urlMapper;
@@ -195,6 +199,12 @@ public class WB22SvcImpl implements WB22Svc {
 				result = wb22Mapper.wbsLevel2Delete(sharngMap);
 			}
 		}
+		// 해당 계획에 대한 모든 실적과 Task 계획이 삭제되었으면 도면관리 대장에도 삭제
+		int wbsRsltsLevel2Count = wb22Mapper.selectWbsRsltsLevel2Count(paramMap);
+		if (wbsRsltsLevel2Count ==  0 && "WBSCODE03".equals(paramMap.get("wbsPlanCodeKind"))) {
+			paramMap.put("dwgNo", paramMap.get("salesCd"));
+			result += dw02Mapper.deleteDrawDocItem(paramMap);
+		}
 
 		return result;
 	}
@@ -292,6 +302,32 @@ public class WB22SvcImpl implements WB22Svc {
 		}.getType();
 
 		int result = wb22Mapper.wbsRsltsInsert(paramMap);
+
+		// WBS Task실적 등록시 해당 Task의 WBS_PLAN_CODE_KIND가 'WBSCODE03'(설계완료)이고 실적등록하는 SALES_CD가 도면관리 대장에 없으면 자동 등록처리
+		int wbsPlanCodeKindCount = wb22Mapper.selectWbsPlanCodeKindCount(paramMap);
+		if (wbsPlanCodeKindCount == 1 && "WBSCODE03".equals(paramMap.get("wbsPlanCodeKind2_P"))) {
+
+			Map<String, String> salesCdMap = new HashMap<>();
+			salesCdMap.put("salesCd", paramMap.get("salesCd2_P"));
+			Map<String, Object> selectDrawDocItemInfo = dw02Mapper.selectDrawDocItemInfo(salesCdMap);
+
+			Map<String, String> paramMap2 = new HashMap<>();
+			paramMap2.put("prdtGrp", (String) selectDrawDocItemInfo.get("prdtGrp"));
+			paramMap2.put("equipNm", (String) selectDrawDocItemInfo.get("equipNm"));
+			paramMap2.put("clntCd",  (String) selectDrawDocItemInfo.get("clntCd"));
+			paramMap2.put("clntNm",  (String) selectDrawDocItemInfo.get("clntNm"));
+
+			paramMap2.put("dwgNo", paramMap.get("salesCd2_P"));
+			paramMap2.put("salesCd", paramMap.get("salesCd2_P"));
+			paramMap2.put("dsgnEmpNm", paramMap.get("userNm"));
+			paramMap2.put("startDt", paramMap.get("wbsRsltssDt"));
+			paramMap2.put("remark", paramMap.get("wbsRsltsCnts"));
+			paramMap2.put("userId", paramMap.get("userId"));
+			paramMap2.put("pgmId", paramMap.get("pgmId"));
+
+			result += dw02Mapper.insertDrawItem(paramMap2);
+		}
+
 		Gson gson = new Gson();
 
 		// String pgParam1 = "{\"actionType\":\""+ "T" +"\",";
@@ -518,6 +554,16 @@ public class WB22SvcImpl implements WB22Svc {
 		int result = 0;
 //		try {
 		result = wb22Mapper.wbsRsltsconfirm(paramMap);
+
+		// 실적 확정시 모든 실적 확정 상태이면 해당 과제의 REL_DT 업데이트 처리
+		int closeYnChk = wb22Mapper.wbsRsltsCloseChk(paramMap);
+		if (closeYnChk == 1 && "WBSCODE03".equals(paramMap.get("wbsPlanCodeKind"))) {
+			result += dw02Mapper.updateRelDtNew(paramMap);
+		} else {
+			if ("N".equals(paramMap.get("flag"))) {
+				result += dw02Mapper.updateRelDtInit(paramMap);
+			}
+		}
 //		} catch (Exception e) {
 //			System.out.println("error2" + e.getMessage());
 //		}

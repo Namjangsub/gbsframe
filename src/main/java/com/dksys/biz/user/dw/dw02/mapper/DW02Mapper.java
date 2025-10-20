@@ -26,5 +26,8 @@ public interface DW02Mapper {
 
 	int updateDrawItem(Map<String, String> paramMap);
 
+	int updateRelDtNew(Map<String, String> paramMap);
+
+	int updateRelDtInit(Map<String, String> paramMap);
 	
 }

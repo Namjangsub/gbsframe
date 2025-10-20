@@ -145,4 +145,12 @@ public interface WB22Mapper {
 
 	// 실적Id 업데이트
 	int wbsRsltsMngIdUpdate(Map<String, String> paramMap);
+
+	// 실적등록시 해당 task가 1개가 등록된 경우 도면관리번호쪽 insert
+	int selectWbsPlanCodeKindCount(Map<String, String> paramMap);
+
+	// 실적확정시 해당 salesCd 모든Task실적이 closeYn이 Y인지 체크
+	int wbsRsltsCloseChk(Map<String, String> paramMap);
+
+	int selectWbsRsltsLevel2Count(Map<String, String> paramMap);
 }
