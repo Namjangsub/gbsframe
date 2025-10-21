@@ -162,7 +162,7 @@ public class SM03SvcImpl implements SM03Svc {
 		//---------------------------------------------------------------  
 	    if (uploadFileList.size() > 0) {
 		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+//		    paramMap.put("fileTrgtKey", paramMap.get("maxInNo"));
 		    cm08Svc.uploadFile(paramMap, mRequest);
 	    }
 	    
@@ -247,7 +247,7 @@ public class SM03SvcImpl implements SM03Svc {
 		//---------------------------------------------------------------  
 	    if (uploadFileList.size() > 0) {
 		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+//		    paramMap.put("fileTrgtKey", paramMap.get("inNo"));
 		    cm08Svc.uploadFile(paramMap, mRequest);
 	    }
 	    
