@@ -23,7 +23,8 @@
             SALES_CD,
             PRJCT_CD,
             CO_CD,
-            COMON_CD
+            COMON_CD,
+            ORDRS_NO
         ) VALUES(
 			#{fileKey},
 			#{fileSize},
@@ -42,7 +43,8 @@
             #{salesCd, jdbcType=VARCHAR},
             #{prjctCd, jdbcType=VARCHAR},
             #{coCd, jdbcType=VARCHAR},
-            #{comonCd, jdbcType=VARCHAR}
+            #{comonCd, jdbcType=VARCHAR},
+            #{ordrsNo, jdbcType=VARCHAR}
         )
     </insert>
 
@@ -329,9 +331,31 @@
 	<select id="selectMByTarget" resultType="CamelMap">
 	/* fileTrgtTyp = SALES_CD | ORDRS_NO | CLNT_PJT | CLNT_CD | CO_CD */
 		<choose>
-		<!-- 작업일보관리 첨부파일 -->
+		<!-- 1. 물류진행요청 등록 -->
+		<when test="fileTrgtTyp == 'CR1001P01'">
+			SELECT M.CO_CD, M.ORDRS_NO, M.CLNT_PJT, D.SALES_CD, M.FILE_TRGT_KEY, M.LGIST_NO
+			FROM TB_CR11M01 M 
+					LEFT OUTER JOIN TB_CR11D01 D ON D.LGIST_NO = M.LGIST_NO
+			WHERE M.FILE_TRGT_KEY = #{fileTrgtKey}
+			ORDER BY SALES_CD
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!-- 2. PFU관리 -->
+		<when test="fileTrgtTyp == 'CR5001P01'">
+			SELECT FILE_TRGT_KEY, CO_CD, CLNT_CD, ORDRS_NO, SALES_CD, CLNT_PJT FROM TB_CR50M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!-- 3. 작업일보관리 -->
+		<when test="fileTrgtTyp == 'PM0101M01'">
+			SELECT ORD_CO_CD AS CO_CD, CLNT_CD, ORDRS_NO, SALES_CD, CLNT_PJT, PRDT_CD, ITEM_DIV, FILE_TRGT_KEY FROM TB_PM01M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+		
+		<!-- 4. 작업일보관리 첨부파일 -->
 		<when test="fileTrgtTyp == 'PM0101M01_M'">
-			SELECT M.SALES_CD, M.CLNT_CD, M.ORDRS_NO, M.CLNT_PJT, M.PRDT_CD, M.ITEM_DIV, M.ORD_CO_CD
+			SELECT M.ORD_CO_CD AS CO_CD, M.CLNT_CD, M.ORDRS_NO, M.SALES_CD, M.CLNT_PJT, M.PRDT_CD, M.ITEM_DIV, M.FILE_TRGT_KEY
 			  FROM TB_PM01D01 D
 					LEFT OUTER JOIN TB_PM01M01 M ON M.WORK_RPT_NO = D.WORK_RPT_NO
 			 WHERE D.WORK_RPT_NO =  SUBSTR(#{fileTrgtKey}, 1, INSTR(#{fileTrgtKey}, '-', -1) - 1) -- 'DM20240509-6575' 
@@ -339,67 +363,92 @@
 			 FETCH FIRST 1 ROWS ONLY
 		</when>
 	
-		<!-- WBS 계획 문제 -->
+		<!--5 출장자 사진 Upload작업 -->
+		<when test="fileTrgtTyp == 'PM5001M01'">
+			SELECT FILE_TRGT_KEY, CO_CD, SALES_CD FROM TB_PM50M01 WHERE FILE_TRGT_KEY = SUBSTR(#{fileTrgtKey}, 1, INSTR(#{fileTrgtKey}, '-', 1, 1) - 1)
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!--6 출장자 사진 Upload작업 -->
+		<when test="fileTrgtTyp == 'PM5001P01_M'">
+			SELECT #{fileTrgtKey} AS SALES_CD FROM DUAL
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!--7. 요인별 발주 및 출장요청 -->
+		<when test="fileTrgtTyp == 'QM0101P01'">
+			SELECT FILE_TRGT_KEY, CO_CD, SALES_CD FROM TB_QM01M01 WHERE FILE_TRGT_KEY = = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!--8. 요인별 발주 및 출장결과 -->
+		<when test="fileTrgtTyp == 'QM0101P03'">
+			SELECT FILE_TRGT_KEY, CO_CD, SALES_CD FROM TB_QM01M01 WHERE FILE_TRGT_KEY = = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!--9. 매입 발주 등록 -->
+		<when test="fileTrgtTyp == 'SM0201P01'">
+			SELECT  SALES_CD, ORDRG_NO, REQ_NO FROM TB_SM02M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+	
+		<!--10. 매입 입고 -->
+		<when test="fileTrgtTyp == 'SM0301P01'">
+			SELECT  SALES_CD, IN_NO, REQ_NO FROM TB_SM03M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+	
+		<!--11. 구매비용 -->
+		<when test="fileTrgtTyp == 'SM1001P01'">
+			SELECT  COST_NO, SALES_CD, ORDRS_NO, REQ_NO FROM TB_SM10M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+	
+		<!--12. 외주관리 -->
+		<when test="fileTrgtTyp == 'SM1101P01'">
+			SELECT M.CTRT_NO, M.CLNT_CD, M.ORDRS_CO_CD CO_CD, M.ORDRS_NO, D.SALES_CD
+			FROM TB_SM11M01 M
+					LEFT OUTER JOIN TB_SM11D02 D ON D.CTRT_NO = M.CTRT_NO AND NVL(D.ORDRS_AMT, 0) != 0
+			WHERE M.FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+	
+		<!--13. 과제관리 -->
+		<when test="fileTrgtTyp == 'WB2101M02'">
+			SELECT  SJ_NO, SALES_CD FROM TB_WB21M01 WHERE SJ_NO = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+	
+		<!--14. 과제관리 메뉴얼-->
+		<when test="fileTrgtTyp == 'WB2101P01'">
+			SELECT  SJ_NO, SALES_CD FROM TB_WB21M01 WHERE FILE_TRGT_KEY = SUBSTR(#{fileTrgtKey}, 1, INSTR(#{fileTrgtKey}, '-', 1, 1) - 1)
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+	
+		<!--15. TASK 실적등록 -->
+		<when test="fileTrgtTyp == 'WB2201P02'">
+			SELECT CO_CD, SALES_CD, WBS_PLAN_CODE_KIND, FILE_TRGT_KEY FROM TB_WB23M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+	
+		<!--16. WBS 계획 문제 -->
 		<when test="fileTrgtTyp == 'WB2401P01'">
-			SELECT CO_CD, SALES_CD, WBS_PLAN_CODE_KIND, FILE_TRGT_KEY FROM TB_WB22M01 WHERE FILE_TRGT_KEY = (#{fileTrgtKey}
+			SELECT CO_CD, SALES_CD, WBS_PLAN_CODE_KIND, FILE_TRGT_KEY FROM TB_WB22M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
 			FETCH FIRST 1 ROWS ONLY
 		</when>
 	
 	
-		<!-- WBS 실적 문제 -->
+		<!--17. WBS 실적 문제 -->
 		<when test="fileTrgtTyp == 'WB2401P11'">
-			SELECT CO_CD, SALES_CD, WBS_PLAN_CODE_KIND, FILE_TRGT_KEY  FROM TB_WB23M01 WHERE FILE_TRGT_KEY = (#{fileTrgtKey}
-			FETCH FIRST 1 ROWS ONLY
-		</when>
-	
-	
-		<!-- 물류진행요청 등록 -->
-		<when test="fileTrgtTyp == 'CR1001P01'">
-			SELECT M.CO_CD, M.ORDRS_NO, M.CLNT_PJT, D.SALES_CD, M.FILE_TRGT_KEY, M.LGIST_NO
-			FROM TB_CR11M01 M 
-					LEFT OUTER JOIN TB_CR11D01 D ON D.LGIST_NO = M.LGIST_NO
-			WHERE M.FILE_TRGT_KEY = '40'
-			ORDER BY SALES_CD
-			FETCH FIRST 1 ROWS ONLY
-		</when>
-		
-		
-		<!-- 3) CLNT_PJT 경로 -->
-		<when test="fileTrgtTyp == 'CLNT_PJT'">
-			SELECT
-				D.SALES_CD, D.CLNT_CD,
-				C.ORDRS_NO, C.CLNT_PJT, D.PRDT_CD, D.ITEM_DIV, C.ORD_CO_CD
-			FROM TB_CR02M01 C
-			JOIN TB_CR02D02 C2 ON C2.ORDRS_NO = C.ORDRS_NO
-			JOIN TB_DRAWING_MASTER D ON D.SALES_CD = C2.SALES_CD
-			WHERE C.CLNT_PJT = #{fileTrgtKey}
-			ORDER BY NVL(D.REL_DT, D.START_DT) DESC, D.SALES_CD DESC
-			FETCH FIRST 1 ROWS ONLY
-		</when>
-	
-		<!-- 4) CLNT_CD 경로 (주문서에서 고객사로 역추적) -->
-		<when test="fileTrgtTyp == 'CLNT_CD'">
-			SELECT
-				D.SALES_CD, D.CLNT_CD,
-				C.ORDRS_NO, C.CLNT_PJT, D.PRDT_CD, D.ITEM_DIV, C.ORD_CO_CD
-			FROM TB_CR02M01 C
-			JOIN TB_CR02D02 C2 ON C2.ORDRS_NO = C.ORDRS_NO
-			JOIN TB_DRAWING_MASTER D ON D.SALES_CD = C2.SALES_CD
-			WHERE C.ORDRS_CLNT_CD = #{fileTrgtKey}
-			ORDER BY NVL(D.REL_DT, D.START_DT) DESC, D.SALES_CD DESC
-			FETCH FIRST 1 ROWS ONLY
-		</when>
-	
-		<!-- 5) ORD_CO_CD 경로 (발주사 코드) -->
-		<when test="fileTrgtTyp == 'ORD_CO_CD'">
-			SELECT
-				D.SALES_CD, D.CLNT_CD,
-				C.ORDRS_NO, C.CLNT_PJT, D.PRDT_CD, D.ITEM_DIV, C.ORD_CO_CD
-			FROM TB_CR02M01 C
-			JOIN TB_CR02D02 C2 ON C2.ORDRS_NO = C.ORDRS_NO
-			JOIN TB_DRAWING_MASTER D ON D.SALES_CD = C2.SALES_CD
-			WHERE C.ORD_CO_CD = #{fileTrgtKey}
-			ORDER BY NVL(D.REL_DT, D.START_DT) DESC, D.SALES_CD DESC
+			SELECT CO_CD, SALES_CD, WBS_PLAN_CODE_KIND, FILE_TRGT_KEY  FROM TB_WB23M01 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
 			FETCH FIRST 1 ROWS ONLY
 		</when>
 	
@@ -410,4 +459,68 @@
 		</choose>
 	</select>    
   
+  
+  
+	<select id="selectMByRetriveValue" resultType="CamelMap">
+	/* fileTrgtTyp = SALES_CD | ORDRS_NO | CLNT_PJT | CLNT_CD | CO_CD */
+		<choose>
+		<!-- 1. SALES_CD -->
+		<when test="type == 'SALES_CD'">
+			SELECT T.CO_CD
+				 , M.ORDRS_CLNT_CD  AS CLNT_CD
+				 , M.CLNT_PJT  		AS PRJCT_CD
+				 , T.SALES_CD 
+				 , T.PRDT_CD 
+				 , T.ITEM_DIV
+				 , M.ORDRS_NO 
+			FROM TB_CR02D02 T
+					LEFT OUTER JOIN TB_CR02M01 M ON T.ORDRS_NO = M.ORDRS_NO AND T.CO_CD = M.CO_CD 
+	         WHERE T.SALES_CD = #{salesCd}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!-- 2. ORDRS_NO -->
+		<when test="type == 'ORDRS_NO'">
+			SELECT M.CO_CD
+				 , M.ORDRS_NO 
+				 , M.ORDRS_CLNT_CD  AS CLNT_CD
+				 , M.CLNT_PJT  		AS PRJCT_CD
+				 , '' 				AS SALES_CD 
+				 , '' 				AS PRDT_CD 
+				 , '' 				AS ITEM_DIV 
+			FROM TB_CR02M01 M 
+	       WHERE M.ORDRS_NO = #{ordrsNo}
+			FETCH FIRST 1 ROWS ONLY
+		</when>
+	
+		<!-- 3. CLNT_CD -->
+		<when test="type == 'CLNT_CD'">
+			SELECT #{coCd}			AS CO_CD
+				 , ''				AS ORDRS_NO 
+				 , #{clntCd}  		AS CLNT_CD
+				 , ''		  		AS PRJCT_CD
+				 , '' 				AS SALES_CD 
+				 , '' 				AS PRDT_CD 
+				 , '' 				AS ITEM_DIV 
+			FROM DUAL
+		</when>
+		
+		<!-- 4. CO_CD -->
+		<when test="type == 'CO_CD'">
+			SELECT #{coCd}			AS CO_CD
+				 , ''				AS ORDRS_NO 
+				 , ''  				AS CLNT_CD
+				 , ''		  		AS PRJCT_CD
+				 , '' 				AS SALES_CD 
+				 , '' 				AS PRDT_CD 
+				 , '' 				AS ITEM_DIV 
+			FROM DUAL
+		</when>
+	
+		<!-- 예외 -->
+		<otherwise>
+			SELECT NULL SALES_CD, NULL CLNT_CD, NULL ORDRS_NO, NULL CLNT_PJT, NULL PRDT_CD, NULL ITEM_DIV, NULL CO_CD FROM DUAL
+		</otherwise>
+		</choose>
+	</select>    
 </mapper>
