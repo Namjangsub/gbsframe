@@ -17,7 +17,6 @@ import com.dksys.biz.admin.bm.bm16.service.BM16Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
-
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -85,6 +84,7 @@ public class BM16SvcImpl implements BM16Svc {
 	//---------------------------------------------------------------  
     HashMap<String, String> param = new HashMap<>();
     param.put("userId", paramMap.get("userId"));
+    param.put("coCd", paramMap.get("coCd"));
     param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
     
 	List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
@@ -99,6 +99,7 @@ public class BM16SvcImpl implements BM16Svc {
 		    Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
 			//접근 권한 없으면 Exception 발생
 		    param.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
+		    param.put("coCd", paramMap.get("coCd"));
 		    param.put("jobType", "fileDelete");
 			cm15Svc.selectFileAuthCheck(param);
 	}
@@ -387,6 +388,7 @@ public class BM16SvcImpl implements BM16Svc {
 		//---------------------------------------------------------------  
 	    HashMap<String, String> param = new HashMap<>();
    	    param.put("userId", paramMap.get("userId"));
+   	    param.put("coCd", paramMap.get("coCd"));
 	    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
 	    
 		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
@@ -523,6 +525,7 @@ public class BM16SvcImpl implements BM16Svc {
 		//---------------------------------------------------------------  
 	    HashMap<String, String> param = new HashMap<>();
    	    param.put("userId", paramMap.get("userId"));
+   	    param.put("coCd", paramMap.get("coCd"));
 	    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
 	    
 		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
