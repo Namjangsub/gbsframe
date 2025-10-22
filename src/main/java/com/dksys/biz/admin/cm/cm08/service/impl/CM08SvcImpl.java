@@ -610,6 +610,9 @@ public class CM08SvcImpl implements CM08Svc {
         
 
         // 이외의 경우: DB 조회
+        /******************************************************************************************
+         * 1. 각 업무별 테이블에 있는 값을 기준으로설정하기
+         *******************************************************************************************/
         Map<String, String> m = cm08Mapper.selectMByTarget(paramMap);
         m.put("FILE_TRGT_TYP",typ);
 
@@ -629,7 +632,10 @@ public class CM08SvcImpl implements CM08Svc {
 
         Map<String, String> out = outMap();
         Map<String, String> rm;
-        
+
+        /******************************************************************************************
+         * 2. 추출가능한 자료를 기준으로 파일 저장 테이블 설정하기
+         *******************************************************************************************/
         if ("SALES_CD".equals(type)) {
             m.put("TYPE", "SALES_CD");
             m.put("salesCd", salesCd);
@@ -656,16 +662,14 @@ public class CM08SvcImpl implements CM08Svc {
                     null, null, null, null);
             return out;
 
-        } else if ("CO_CD".equals(type)) {
+        }
+//        } else if ("CO_CD".equals(type)) {
             // coCd만
             fillOut(out,
                     coCd, null, null,
                     null, null, null, null);
             return out;
-        }
 
-        // 기본(도달하지 않음)
-        return out;
     }
 	
 }
