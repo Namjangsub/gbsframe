@@ -179,6 +179,9 @@ public class CM08SvcImpl implements CM08Svc {
     		if (!"".equals(mRequest.getParameter("itemCd"))) {
     			param.put("itemCd", mRequest.getParameter("itemCd"));
     		}
+    		if (!"".equals(mRequest.getParameter("itemDiv"))) {
+    			param.put("itemCd", mRequest.getParameter("itemDiv"));
+    		}
     		if (!"".equals(mRequest.getParameter("salesCd"))) {
     			param.put("salesCd", mRequest.getParameter("salesCd"));
     		}
@@ -600,7 +603,7 @@ public class CM08SvcImpl implements CM08Svc {
 
 
         // 즉시 반환 그룹 3: 거래처/프로젝트코드 관련
-        if (anyEqualsIgnoreCase(typ, "BM1601P02","CR0202P01","CR0501P01","CR0801P01","IM0101P01")) {
+        if (anyEqualsIgnoreCase(typ, "BM1601P01", "BM1601P02","CR0202P01","CR0501P01","CR0801P01","IM0101P01")) {
             Map<String, String> out = outMap();
             fillOut(out,
                     nz(paramMap,"coCd"), nz(paramMap,"clntCd"), nz(paramMap,"prjctCd"),
