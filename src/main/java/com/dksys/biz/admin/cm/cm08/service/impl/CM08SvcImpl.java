@@ -102,16 +102,18 @@ public class CM08SvcImpl implements CM08Svc {
             param.put("pgmId", fileTrgtTyp);
             param.put("coCd", mRequest.getParameter("coCd"));
             param.put("comonCd", mRequest.getParameter("comonCd"));
-
-    		Map<String, String> chk = fetchAllowedDataMap(param);
-    		param.put("coCd",    nz(chk,"coCd")    == null ? "" : nz(chk,"coCd"));
-    		param.put("clntCd",  nz(chk,"clntCd")  == null ? "" : nz(chk,"clntCd"));
-    		param.put("prjctCd", nz(chk,"prjctCd") == null ? "" : nz(chk,"prjctCd"));
-    		param.put("ordrsNo", nz(chk,"ordrsNo") == null ? "" : nz(chk,"ordrsNo"));
-    		param.put("itemCd",  nz(chk,"itemDiv") == null ? "" : nz(chk,"itemDiv")); 
-    		param.put("prdtCd",  nz(chk,"prdtCd")  == null ? "" : nz(chk,"prdtCd"));
-    		param.put("salesCd", nz(chk,"salesCd") == null ? "" : nz(chk,"salesCd"));
-    		
+            if ("TB_BM02M01".equals(fileTrgtTyp)) {
+            	param.put("clntCd", fileTrgtKey);
+            } else {
+        		Map<String, String> chk = fetchAllowedDataMap(param);
+        		param.put("coCd",    nz(chk,"coCd")    == null ? "" : nz(chk,"coCd"));
+        		param.put("clntCd",  nz(chk,"clntCd")  == null ? "" : nz(chk,"clntCd"));
+        		param.put("prjctCd", nz(chk,"prjctCd") == null ? "" : nz(chk,"prjctCd"));
+        		param.put("ordrsNo", nz(chk,"ordrsNo") == null ? "" : nz(chk,"ordrsNo"));
+        		param.put("itemCd",  nz(chk,"itemDiv") == null ? "" : nz(chk,"itemDiv")); 
+        		param.put("prdtCd",  nz(chk,"prdtCd")  == null ? "" : nz(chk,"prdtCd"));
+        		param.put("salesCd", nz(chk,"salesCd") == null ? "" : nz(chk,"salesCd"));
+            }
             try {
                 cm08Mapper.insertFile(param);
                 String saveFile = param.get("fileKey") + "_" + originFileName;
