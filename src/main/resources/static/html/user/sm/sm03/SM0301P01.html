@@ -212,6 +212,8 @@ var limit_list_yn = "N";
 var thisGridRow=0; // 선택된 행 정보 저장할 변수
 var thisGridCol=0; // 선택된 열 정보 저장할 변수
 var beforeGridSize = 0; //수주상세그리드의 갯수용 그리드컨텐츠 높이조절용
+var param_fileTrgtKey;
+
 var gridViewPop = {
     	initView: function(){
 			this.target = new ax5.ui.grid();
@@ -239,7 +241,7 @@ var gridViewPop = {
                         //수정시 체크해제 불가
                         if( this.column.key == "userChk" && actionType == "U" ) {
                             gridViewPop.target.setValue(row, "userChk", "Y");
-                            alert("수정시는 체크 해제 할 수 없습니다.");       
+                            customAlert("수정시는 체크 해제 할 수 없습니다.");       
                             return;
                         }                        
 					},
@@ -309,17 +311,17 @@ var gridViewPop = {
 								if( this.item.inQty != "" && this.item.inQty > 0  ) {
 									var calcuOrdrgQty = parseFloat( Number(this.item.ordrgQty) - Number(this.item.preInQty) );
 									if( this.item.inQty == 0 ) {
-										alert("합격수량은 0 보다 커야 합니다.");
+										customAlert("합격수량은 0 보다 커야 합니다.");
 										gridViewPop.target.setValue(row, "inQty", "");
 										return;
 									} else if( calcuOrdrgQty == 0 ) {
-										alert("입고 가능 수량이 0입니다.");
+										customAlert("입고 가능 수량이 0입니다.");
 										gridViewPop.target.setValue(row, "inQty", this.item.ordrgQty);
 										return;
 									} else if( calcuOrdrgQty < this.item.inQty ) {
 										//등록일때만 값 초기화
 										if( actionType == "C" ) gridViewPop.target.setValue(row, "inQty", "");
-										alert("입고 수량은 "+ calcuOrdrgQty+" (와)과 같거나 작아야 합니다");
+										customAlert("입고 수량은 "+ calcuOrdrgQty+" (와)과 같거나 작아야 합니다");
 										return;
 									}
 								}
@@ -329,11 +331,11 @@ var gridViewPop = {
 							if ( this.key == "inDt") {
 								// console.log(this.item.inDt, this.item.ordrgDt, this.item.arrDttm);
 								if( this.item.inDt < this.item.ordrgDt ) {
-									alert("발주일자 이전날자로 입고 처리 할 수 없습니다.");
+									customAlert("발주일자 이전날자로 입고 처리 할 수 없습니다.");
 									return false;
 								}
 								if( this.item.inDt < this.item.arrDttm ) {
-									alert("입고확인일자 이전날자로 입고 처리 할 수 없습니다.");
+									customAlert("입고확인일자 이전날자로 입고 처리 할 수 없습니다.");
 									return false;
 								}
 								// 제한일자 체크
@@ -509,7 +511,7 @@ var gridViewPop = {
 					//메세지 뿌리기
 					toastMsg('M', $('#pchsClntCd').val(), list);	// (M:업무구분, $('#pchsClntCd').val():공급사코드, list:자재리스트)
 				} catch (error) {
-					alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+					customAlert("오류 발생!! 전산실 연락 바랍니다", error.message);
 					return null; // 오류 발생 시 null 반환
 				} finally {
 					// console.log("함수 실행 완료.");
@@ -518,32 +520,6 @@ var gridViewPop = {
       	   
 		} 
 	}	
-
-// 권한체크    
-authChk();		
-	
-gridViewPop.initView();
-
-// 제한일자 지정
-limitDate = modalStack.last().paramObj.limitDate;
-
-//등록/수정 버튼
-actionType = modalStack.last().paramObj.actionType;
-if (actionType == "C") {
-	$("#actionBtn").text("등록");
-	$('#actionBtn').on("click", function() {
-		insertWareHousing();
-	});
-	//발주서발행 btn hide
-	$("#reportRegBtn").remove();
-} else if (actionType == "U") {
-	$('.tit_contents .tit').text('입고 수정')
-	
-	$('#actionBtn').text("수정");
-	$('#actionBtn').on("click", function() {
-		updateWareHousing();
-	});
-}
 
 // 등록 - done
 function insertWareHousing() {
@@ -563,14 +539,15 @@ function insertWareHousing() {
 	    		return false;
 	    	}
     	}
-        
+        debugger;
 		if(makeArr.length<1) {
-			alert("입고 항목은 최소 1개 이상이어야 합니다.");
+			customAlert("입고 항목은 최소 1개 이상이어야 합니다.");
 			return;
 		} else {
 			//입고번호가 있을경우 set
-			if( typeof(modalStack.last().paramObj.inNo) != "undefined" ) {
-				formData.append("inNo", modalStack.last().paramObj.inNo);
+			const inNo = modalStack.last()?.paramObj?.inNo;
+			if (inNo != null && String(inNo).trim() !== '') {
+				formData.append("inNo", inNo);
 				formData.append("fileTrgtKey", param_fileTrgtKey);
 			} else {
 				formData.append("inNo", "");	
@@ -580,10 +557,11 @@ function insertWareHousing() {
 		}          
 		filePostAjax("/user/sm/sm03/insertWareHousing", formData,		// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
 			function(data) {
-				// alert(data.resultMessage);								// 결과 메시지를 alert으로 출력
 				if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
 					gridView.setData(0);
 					modalStack.close();									// 모달을 닫음
+				} else {
+					customAlert(data.resultMessage);
 				}
 		});
 	}
@@ -609,7 +587,7 @@ function updateWareHousing() {
     	}
         
 		if(makeArr.length<1) {
-			alert("입고 항목은 최소 1개 이상이어야 합니다.");
+			customAlert("입고 항목은 최소 1개 이상이어야 합니다.");
 			return;
 		} else {
 	        //입고번호 set
@@ -620,10 +598,11 @@ function updateWareHousing() {
 		formData.append("fileTrgtKey", param_fileTrgtKey);
 		filePostAjax("/user/sm/sm03/updateWareHousingDetail", formData,		// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행		
 			function(data) {
-				// alert(data.resultMessage);								// 결과 메시지를 alert으로 출력
 				if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridViewPop.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
 					gridView.setData(0);
 					modalStack.close();									// 모달을 닫음
+				} else {
+					customAlert(data.resultMessage);
 				}
 		});
 		
@@ -679,22 +658,32 @@ function makeFormData() {
 }
 
 
-var param_fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
-//---------------------------------------------------------------  
-//첨부 화일 처리 시작 
-//---------------------------------------------------------------  
-fileParam = {
-		fileTrgtTyp	: $("#popForm #pgmId").val(),
-		fileTrgtKey : param_fileTrgtKey
-}
-		treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
-//---------------------------------------------------------------  
-//첨부 화일 처리 끝
-//---------------------------------------------------------------
-
-
-
 $(document).ready(function() {
+	//권한체크    
+	authChk();		
+		
+	gridViewPop.initView();
+
+	//제한일자 지정
+	limitDate = modalStack.last().paramObj.limitDate;
+
+	//등록/수정 버튼
+	actionType = modalStack.last().paramObj.actionType;
+	if (actionType == "C") {
+		$("#actionBtn").text("등록");
+		$('#actionBtn').on("click", function() {
+			insertWareHousing();
+		});
+		//발주서발행 btn hide
+		$("#reportRegBtn").remove();
+	} else if (actionType == "U") {
+		$('.tit_contents .tit').text('입고 수정')
+		
+		$('#actionBtn').text("수정");
+		$('#actionBtn').on("click", function() {
+			updateWareHousing();
+		});
+	}
 
 	toast.init();
 
@@ -860,7 +849,7 @@ $(document).ready(function() {
 
     	//입고 잔량 쳌
     	if( Number(notInQty) == 0 ) {
-    		alert("입고 가능한 잔량이 없습니다.");
+    		customAlert("입고 가능한 잔량이 없습니다.");
 			gridObj.target.setValue(idx, "userChk", "N");		//입고수량 view    		
     		return;
     	}
@@ -957,7 +946,7 @@ $(document).ready(function() {
 	        });			
 	        //error alert 후 종료
 	        if( msgArr.length > 0 ) {
-	        	alert(msgArr.join("\r\n"));
+	        	customAlert(msgArr.join("\r\n"));
 	        	return false;
 	        }
 		}
@@ -967,7 +956,7 @@ $(document).ready(function() {
 	$("#deleteDetailButton").on("click", function () {
  		var selRow = parseInt(gridViewPop.target.selectedDataIndexs);
  		if( isNaN(selRow) ) {
- 			alert("선택된 행이 없습니다.");
+ 			customAlert("선택된 행이 없습니다.");
  			return;
  		} else { 			
 			if(actionType == "U") { 				
@@ -989,7 +978,7 @@ $(document).ready(function() {
 					if( confirm("선택행을 삭제하시겠습니까?\n\n그리드에 변경중인 내용이 초기화 됩니다.")) {
 						deleteAjax("/user/sm/sm03/deleteWareHousingDetail", paramObj, null, function(data) {
 							if (data.resultCode == 200) {
-								alert(data.resultMessage);
+								customAlert(data.resultMessage);
 
 								gridViewPop.setData(0);
 								$.initViewPop();
@@ -1002,7 +991,7 @@ $(document).ready(function() {
 								}
 							} else {
 								//삭제오류 (매입확정 완료된경우 개별 삭제 불가능함)
-								alert("매입확정 완료된 자료입니다. 삭제 불가능합니다.");
+								customAlert("매입확정 완료된 자료입니다. 삭제 불가능합니다.");
 							}
 						}); 						
  					}				 							 				
@@ -1075,9 +1064,27 @@ $(document).ready(function() {
         //단가가 0인자료가 존재하면 오류 알림
 		if (zeroPrcCheck) {
 			gridViewPop.target.focus(zeroPrcRowIndex);
-			alert("단가가 없는 자료가 있습니다. 확인하세요!")
+			customAlert("단가가 없는 자료가 있습니다. 확인하세요!")
 		}
     });  //$("#inProcessCheck").on("click", function ()
+    		
+    		
+
+
+	param_fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
+	//---------------------------------------------------------------  
+	//첨부 화일 처리 시작 
+	//---------------------------------------------------------------  
+	fileParam = {
+			fileTrgtTyp	: $("#popForm #pgmId").val(),
+			fileTrgtKey : param_fileTrgtKey
+	}
+			treeModule.initAll('deptTreeOrdars', 'file-grid', 'FILETREE', fileParam);
+	//---------------------------------------------------------------  
+	//첨부 화일 처리 끝
+	//---------------------------------------------------------------
+
+
 });
 
 
@@ -1115,14 +1122,14 @@ function sendMailCall() {
 	    for (var i = 0; i < selDataList.length; i++) {
 			if (selDataList[i].pchsClntCd !== clntValue) {
 				// clnt 값이 다른 경우 오류 처리
-				alert('동일 거래처만 처리 가능합니다.');
+				customAlert('동일 거래처만 처리 가능합니다.');
 				return false;
 			}
 
 			let notInQty = selDataList[i].notInQty;
 			//매입 yn	
 			if( typeof(notInQty)=="undefiend" || parseFloat(notInQty) != 0  ) {
-				alert('매입처리가  완료되지 않았습니다.');
+				customAlert('매입처리가  완료되지 않았습니다.');
 				return false;		
 			}
 	    }
@@ -1142,7 +1149,7 @@ function sendMailCall() {
 					var fileName = response.exportFileName;
 					downloadPDFFromBase64(base64FileData, fileName);
 				} else {
-					alert('PDF 내보내기 실패: ' + response.resultText);
+					customAlert('PDF 내보내기 실패: ' + response.resultText);
 				}
 
 			});
@@ -1153,14 +1160,14 @@ function sendMailCall() {
 function approvalConfirmCheck() {
 	// //확인일자 체크
 	// if (editVal.todoYn != "Y") {
-	// 	alert("결재 승인전 발송 할 수 없습니다.");
+	// 	customAlert("결재 승인전 발송 할 수 없습니다.");
 	// 	return false;
 	// }
 	
 	// var todoCfDtChk = gridViewPopApproval.target.list;
 	// todoCfDtChk.forEach(function (item) {
 	// 	if (item.gb == "결재" && item.todoCfDt !== undefined) {
-	// 		alert(item.name + "님께서 결재 승인하지 않았습니다.");
+	// 		customAlert(item.name + "님께서 결재 승인하지 않았습니다.");
 	// 		return false;
 	// 	}
 	// });
@@ -1174,14 +1181,14 @@ async function sendMailExec() {
     for (var i = 0; i < selDataList.length; i++) {
 		if (selDataList[i].pchsClntCd !== clntValue) {
 			// clnt 값이 다른 경우 오류 처리
-			alert('동일 거래처만 처리 가능합니다.');
+			customAlert('동일 거래처만 처리 가능합니다.');
 			return false;
 		}
 
 		let notInQty = selDataList[i].notInQty;
 		//매입 yn	
 		if( typeof(notInQty)=="undefiend" || parseFloat(notInQty) != 0  ) {
-			alert('매입처리가  완료되지 않았습니다.');
+			customAlert('매입처리가  완료되지 않았습니다.');
 			return false;		
 		}
     }
@@ -1302,14 +1309,14 @@ function commKaKaoSendOrder(param) {
 							mobile =  data.resultList[0].mngMoblphonNo;
 							param.nameTo =  data.resultList[0].mngNm; //수신인 이름
 						} else {
-							alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
+							customAlert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
 							return;
 						} 
 
 					}
 	});     //user search ajax end
 	if(mobile == "" || mobile == null) {
-		// alert('수신전화번호가 없습니다.\r\n['+clntNm+'] 거래처관리의 사업부 첫번째 항목을 확인해 주십시오.');
+		// customAlert('수신전화번호가 없습니다.\r\n['+clntNm+'] 거래처관리의 사업부 첫번째 항목을 확인해 주십시오.');
 		return;
 	}
 	
@@ -1350,7 +1357,7 @@ function commKaKaoSendOrder(param) {
 	//kakaoSendReal(talkJson, talkParam, param);
 	
 	if( sendCnt > 0 ) {
-		// alert("알림톡 정상 발송되었습니다.");		
+		// customAlert("알림톡 정상 발송되었습니다.");		
 	}	
 }
 
@@ -1359,7 +1366,7 @@ function limit_date_chk(chkValue) {
 	//debugger;
 	if (limitDate != null) {
 		if (limitDate > chkValue ) {
-			alert('제한된 일자입니다. ' + limitDate + '일 이전은 데이터를 등록 및 수정할 수가 없습니다.');
+			customAlert('제한된 일자입니다. ' + limitDate + '일 이전은 데이터를 등록 및 수정할 수가 없습니다.');
 			//$('#actionBtn').remove();
 			$("#actionBtn").hide();
 		} else {
@@ -1391,7 +1398,7 @@ function limit_date_listchk() {
 		// }
 		
 		if (limit_list_yn == 'Y') {
-			// alert('제한된 일자입니다. ' + limitDate + '일 이전은 데이터를 등록 및 수정할 수가 없습니다.');
+			// customAlert('제한된 일자입니다. ' + limitDate + '일 이전은 데이터를 등록 및 수정할 수가 없습니다.');
 			//$('#actionBtn').remove();
 			$("#actionBtn").hide();
 		} else {
