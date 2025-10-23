@@ -109,11 +109,15 @@ public class CR10SvcImpl implements CR10Svc {
 	    	dtl.put("lgistNo", lgistNo);
 	    	dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
+	    	
+
+			paramMap.put("salesCd", dtl.get("salesCd"));
+			
 	    	String dtaChk = dtl.get("dtaChk").toString();
 	    	if ("I".equals(dtaChk)) {
 	    		cr10Mapper.insertLgistDetail(dtl);
 	    	} else if ("U".equals(dtaChk)) {
-	   		cr10Mapper.updateLgistDetail(dtl);
+	    		cr10Mapper.updateLgistDetail(dtl);
 	    	} else if ("D".equals(dtaChk)) {
 	    		cr10Mapper.deleteLgistDetail(dtl);
 	    	}
@@ -124,7 +128,7 @@ public class CR10SvcImpl implements CR10Svc {
 		//---------------------------------------------------------------
 		if (uploadFileList.size() > 0) {
 		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+//		    paramMap.put("fileTrgtKey", lgistNo);
 		    cm08Svc.uploadFile(paramMap, mRequest);
 		}
 		//---------------------------------------------------------------
@@ -255,6 +259,10 @@ public class CR10SvcImpl implements CR10Svc {
     for (Map<String, String> dtl : salesCdList) {
     	dtl.put("userId", paramMap.get("userId"));
     	dtl.put("pgmId", paramMap.get("pgmId"));
+    	
+
+		paramMap.put("salesCd", dtl.get("salesCd"));
+		
     	//      반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
     	String dtaChk = dtl.get("dtaChk").toString();
     	/* "dtaChk" 값을 확인하여
@@ -276,7 +284,7 @@ public class CR10SvcImpl implements CR10Svc {
 	//---------------------------------------------------------------
     if (uploadFileList.size() > 0) {
 	    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-	    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+//	    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 	    cm08Svc.uploadFile(paramMap, mRequest);
     }
 

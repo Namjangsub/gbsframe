@@ -128,7 +128,10 @@ public class CR05SvcImpl implements CR05Svc {
 	    	dtl.put("exrateM", paramMap.get("exrate"));
 	    	//dtl["currCd"] = paramMap.get("currCd");
 	    	//dtl["exrate"] = paramMap.get("exrate");
-	    	
+
+			paramMap.put("prjctCd", dtl.get("clntPjt"));
+			paramMap.put("ordrsNo", dtl.get("ordrsNo"));
+			
 	    	String dataChk = dtl.get("dataChk").toString();
 			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
 	    	if ("I".equals(dataChk)) {
@@ -208,6 +211,11 @@ public class CR05SvcImpl implements CR05Svc {
 	    	//반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
 			dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
+	    	
+	    	
+			paramMap.put("prjctCd", dtl.get("clntPjt"));
+			paramMap.put("ordrsNo", dtl.get("ordrsNo")); 
+			
 			
 			String dataChk = dtl.get("dataChk").toString();	    	
 			//"dataChk" 값을 확인하여 "I"인 경우 세부정보를 삽입
