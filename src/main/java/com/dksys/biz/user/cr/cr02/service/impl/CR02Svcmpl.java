@@ -242,7 +242,7 @@ public class CR02Svcmpl implements CR02Svc {
             //---------------------------------------------------------------
             if (uploadFileList.size() > 0) {
                 param.put("fileTrgtTyp", param.get("pgmId"));
-                param.put("fileTrgtKey", param.get("fileTrgtKey"));
+                param.put("fileTrgtKey", param.get("fileTrgtKey")); 
                 cm08Svc.uploadFile(param, mRequest);
             }
             //---------------------------------------------------------------
@@ -348,6 +348,8 @@ public class CR02Svcmpl implements CR02Svc {
         HashMap<String, String> paramMap = new HashMap<>();
         paramMap.put("userId", param.get("userId"));
         paramMap.put("comonCd", param.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
+        paramMap.put("coCd", param.get("coCd"));
+        paramMap.put("ordrsNo", param.get("ordrsNo"));
         paramMap.put("uploadFileArr", param.get("uploadFileArr"));
 
         List<Map<String, String>> uploadFileList = gson.fromJson(paramMap.get("uploadFileArr"), mapList);
@@ -830,6 +832,7 @@ public class CR02Svcmpl implements CR02Svc {
         HashMap<String, String> paramMap = new HashMap<>();
         paramMap.put("userId", param.get("userId"));
         paramMap.put("comonCd", param.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
+        paramMap.put("coCd", param.get("coCd"));
         paramMap.put("uploadFileArr", param.get("uploadFileArr"));
 
         List<Map<String, String>> uploadFileList = gson.fromJson(paramMap.get("uploadFileArr"), mapList);
@@ -1077,6 +1080,7 @@ public class CR02Svcmpl implements CR02Svc {
         List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
         HashMap<String, String> param = new HashMap<>();
         param.put("jobType", "fileDelete");
+		param.put("coCd", paramMap.get("coCd"));
         param.put("userId", paramMap.get("userId"));
         if (deleteFileList.size() > 0) {
             for (Map<String, String> dtl : deleteFileList) {

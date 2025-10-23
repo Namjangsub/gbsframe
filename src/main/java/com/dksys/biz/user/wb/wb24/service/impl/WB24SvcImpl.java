@@ -173,6 +173,7 @@ public class WB24SvcImpl implements WB24Svc {
   		//---------------------------------------------------------------
   	    HashMap<String, String> param = new HashMap<>();
      	param.put("userId", paramMap.get("userId"));
+		param.put("coCd", paramMap.get("coCd"));
   	    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
 
   		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
@@ -465,6 +466,7 @@ public class WB24SvcImpl implements WB24Svc {
 			// 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
 			//접근 권한 없으면 Exception 발생
 			param.put("comonCd", deleteFile.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
+			param.put("coCd", paramMap.get("coCd"));
 			param.put("jobType", "fileDelete");
 			cm15Svc.selectFileAuthCheck(param);
 		}

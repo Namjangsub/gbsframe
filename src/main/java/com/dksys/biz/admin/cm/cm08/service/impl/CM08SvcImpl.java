@@ -164,30 +164,41 @@ public class CM08SvcImpl implements CM08Svc {
     		param.put("fileTrgtTyp", fileTrgtTyp);
     		param.put("fileTrgtKey", fileTrgtKey);
     		param.put("pgmId", fileTrgtTyp);
-       		if (!"".equals(mRequest.getParameter("userId"))) {
-       			param.put("userId", mRequest.getParameter("userId"));
-    		}
-    		if (!"".equals(mRequest.getParameter("coCd"))) {
-    			param.put("coCd", mRequest.getParameter("coCd"));
-    		}
-    		if (!"".equals(mRequest.getParameter("clntCd"))) {
-    			param.put("clntCd", mRequest.getParameter("clntCd"));
-    		}
-    		if (!"".equals(mRequest.getParameter("prdtCd"))) {
-    			param.put("prdtCd", mRequest.getParameter("prdtCd"));
-    		}
-    		if (!"".equals(mRequest.getParameter("itemCd"))) {
-    			param.put("itemCd", mRequest.getParameter("itemCd"));
-    		}
-    		if (!"".equals(mRequest.getParameter("itemDiv"))) {
-    			param.put("itemCd", mRequest.getParameter("itemDiv"));
-    		}
-    		if (!"".equals(mRequest.getParameter("salesCd"))) {
-    			param.put("salesCd", mRequest.getParameter("salesCd"));
-    		}
-    		if (!"".equals(mRequest.getParameter("prjctCd"))) {
-    			param.put("prjctCd", mRequest.getParameter("prjctCd"));
-    		}
+    		String raw = mRequest.getParameter("coCd");
+    		String coCd = (raw == null ? null : raw.trim());
+    		if (coCd != null && !coCd.isEmpty() && !"null".equalsIgnoreCase(coCd) && !"undefined".equalsIgnoreCase(coCd)) { param.put("coCd", coCd); }
+    		
+    		raw = mRequest.getParameter("userId");
+    		String userId = (raw == null ? null : raw.trim());
+    		if (userId != null && !userId.isEmpty() && !"null".equalsIgnoreCase(userId) && !"undefined".equalsIgnoreCase(userId)) { param.put("userId", userId); }
+    		
+    		raw = mRequest.getParameter("clntCd");
+    		String clntCd = (raw == null ? null : raw.trim());
+    		if (clntCd != null && !clntCd.isEmpty() && !"null".equalsIgnoreCase(clntCd) && !"undefined".equalsIgnoreCase(clntCd)) { param.put("clntCd", clntCd); }
+    		
+    		raw = mRequest.getParameter("prdtCd");
+    		String prdtCd = (raw == null ? null : raw.trim());
+    		if (prdtCd != null && !prdtCd.isEmpty() && !"null".equalsIgnoreCase(prdtCd) && !"undefined".equalsIgnoreCase(prdtCd)) { param.put("prdtCd", prdtCd); }
+    		
+    		raw = mRequest.getParameter("itemCd");
+    		String itemCd = (raw == null ? null : raw.trim());
+    		if (itemCd != null && !itemCd.isEmpty() && !"null".equalsIgnoreCase(itemCd) && !"undefined".equalsIgnoreCase(itemCd)) { param.put("itemCd", itemCd); }
+    		
+    		raw = mRequest.getParameter("itemDiv");
+    		String itemDiv = (raw == null ? null : raw.trim());
+    		if (itemDiv != null && !itemDiv.isEmpty() && !"null".equalsIgnoreCase(itemDiv) && !"undefined".equalsIgnoreCase(itemDiv)) { param.put("itemDiv", itemDiv); }
+    		
+    		raw = mRequest.getParameter("salesCd");
+    		String salesCd = (raw == null ? null : raw.trim());
+    		if (salesCd != null && !salesCd.isEmpty() && !"null".equalsIgnoreCase(salesCd) && !"undefined".equalsIgnoreCase(salesCd)) { param.put("salesCd", salesCd); }
+    		
+    		raw = mRequest.getParameter("prjctCd");
+    		String prjctCd = (raw == null ? null : raw.trim());
+    		if (prjctCd != null && !prjctCd.isEmpty() && !"null".equalsIgnoreCase(prjctCd) && !"undefined".equalsIgnoreCase(prjctCd)) { param.put("prjctCd", prjctCd); }
+
+    		raw = mRequest.getParameter("ordrsNo");
+    		String ordrsNo = (raw == null ? null : raw.trim());
+    		if (ordrsNo != null && !ordrsNo.isEmpty() && !"null".equalsIgnoreCase(ordrsNo) && !"undefined".equalsIgnoreCase(ordrsNo)) { param.put("ordrsNo", ordrsNo); }
     		
     		 		
     		Map<String, String> chk = fetchAllowedDataMap(param);
@@ -603,11 +614,11 @@ public class CM08SvcImpl implements CM08Svc {
 
 
         // 즉시 반환 그룹 3: 거래처/프로젝트코드 관련
-        if (anyEqualsIgnoreCase(typ, "BM1601P01", "BM1601P02","CR0202P01","CR0501P01","CR0801P01","IM0101P01")) {
+        if (anyEqualsIgnoreCase(typ, "BM1601P01", "BM1601P02","CR0202P01","CR0501P01", "CR0701P01", "CR0801P01","IM0101P01")) {
             Map<String, String> out = outMap();
             fillOut(out,
                     nz(paramMap,"coCd"), nz(paramMap,"clntCd"), nz(paramMap,"prjctCd"),
-                    null, null, null, null);
+                    nz(paramMap,"ordrsNo"), null, null, null);
             return out;
         }
         

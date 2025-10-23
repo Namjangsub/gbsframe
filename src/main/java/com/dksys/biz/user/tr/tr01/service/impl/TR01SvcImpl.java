@@ -12,10 +12,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.user.tr.tr01.mapper.TR01Mapper;
-import com.dksys.biz.user.tr.tr01.service.TR01Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.user.tr.tr01.mapper.TR01Mapper;
+import com.dksys.biz.user.tr.tr01.service.TR01Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -61,6 +61,7 @@ public class TR01SvcImpl implements TR01Svc {
 	//---------------------------------------------------------------  
     HashMap<String, String> param = new HashMap<>();
     param.put("userId", paramMap.get("userId"));
+	param.put("coCd", paramMap.get("coCd"));
     param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
     
 	List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
@@ -184,6 +185,7 @@ public class TR01SvcImpl implements TR01Svc {
 	    List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
 	    HashMap<String, String> param = new HashMap<>();
 	    param.put("jobType", "fileDelete");
+		param.put("coCd", paramMap.get("coCd"));
 	    param.put("userId", paramMap.get("userId"));
 	    if (deleteFileList.size() > 0) {
 		    for (Map<String, String> dtl : deleteFileList) {

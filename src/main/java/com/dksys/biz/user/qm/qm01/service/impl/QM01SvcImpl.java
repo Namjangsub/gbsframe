@@ -593,6 +593,7 @@ public class QM01SvcImpl implements QM01Svc {
 	    List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
 	    HashMap<String, String> param = new HashMap<>();
 	    param.put("jobType", "fileDelete");
+		param.put("coCd", paramMap.get("coCd"));
 	    param.put("userId", paramMap.get("userId"));
 	    if (deleteFileList.size() > 0) {
 		    for (Map<String, String> dtl : deleteFileList) {

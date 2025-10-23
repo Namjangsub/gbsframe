@@ -1,7 +1,6 @@
 package com.dksys.biz.user.bm.bm11.service.impl;
 
 import java.lang.reflect.Type;
-import java.text.Format.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -11,13 +10,12 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.user.bm.bm11.mapper.BM11Mapper;
-import com.dksys.biz.user.bm.bm11.service.BM11Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.user.bm.bm11.mapper.BM11Mapper;
+import com.dksys.biz.user.bm.bm11.service.BM11Svc;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -123,6 +121,7 @@ public class BM11SvcImpl implements BM11Svc {
 		//---------------------------------------------------------------
 		HashMap<String, String> param = new HashMap<>();
 		param.put("userId", paramMap.get("userId"));
+	    param.put("coCd", paramMap.get("coCd"));
 		param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
 		
 		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
@@ -180,6 +179,7 @@ public class BM11SvcImpl implements BM11Svc {
 		List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
 		HashMap<String, String> param = new HashMap<>();
 		param.put("jobType", "fileDelete");
+		param.put("coCd", paramMap.get("coCd"));
 		param.put("userId", paramMap.get("userId"));
 		if (deleteFileList.size() > 0) {
 			for (Map<String, String> dtl : deleteFileList) {

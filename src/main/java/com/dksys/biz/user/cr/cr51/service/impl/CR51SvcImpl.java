@@ -1,12 +1,12 @@
 package com.dksys.biz.user.cr.cr51.service.impl;
 
-import java.util.function.Consumer;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -19,7 +19,8 @@ import com.dksys.biz.user.cr.cr51.mapper.CR51Mapper;
 import com.dksys.biz.user.cr.cr51.service.CR51Svc;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
 import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
-import com.google.gson.*;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
 @Service
@@ -138,7 +139,7 @@ public class CR51SvcImpl implements CR51Svc {
 		            detailMap.put("pfuSeq", Integer.toString(newSeq));
 		            detailMap.put("sortNo", Integer.toString(newSeq));
 
-		            String area = (String) detailMap.get("partDiv");
+		            String area = detailMap.get("partDiv");
 		            String resultString = area + String.format("%02d", newSeq);
 		            detailMap.put("partId", resultString);
 
@@ -256,6 +257,7 @@ public class CR51SvcImpl implements CR51Svc {
 		//---------------------------------------------------------------  
 	    HashMap<String, String> param = new HashMap<>();
 	    param.put("userId", paramMap.get("userId"));
+		param.put("coCd", paramMap.get("coCd"));
 	    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
 	    
 		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
@@ -322,12 +324,12 @@ public class CR51SvcImpl implements CR51Svc {
 		            detailMap.put("pfuSeq", Integer.toString(newSeq));
 		            detailMap.put("sortNo", Integer.toString(newSeq));
 
-		            String area = (String) detailMap.get("partDiv");
+		            String area = detailMap.get("partDiv");
 		            String resultString = area + String.format("%02d", newSeq);
 		            detailMap.put("partId", resultString);
 
-		            String originData = (String) detailMap.get("originData");
-		            String checkData = (String) detailMap.get("checkData");
+		            String originData = detailMap.get("originData");
+		            String checkData = detailMap.get("checkData");
 		            if ("I".equals(detailMap.get("updChk"))) {  //추가항목 추가항목은 신규 Insert 임.
 			            detailMap.put("creatId", paramMap.get("userId"));
 			            detailMap.put("creatDttm", sysCreateDttm);
@@ -433,6 +435,7 @@ public class CR51SvcImpl implements CR51Svc {
 		    List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
 		    HashMap<String, String> param = new HashMap<>();
 		    param.put("jobType", "fileDelete");
+			param.put("coCd", paramMap.get("coCd"));
 		    param.put("userId", paramMap.get("userId"));
 		    if (deleteFileList.size() > 0) {
 			    for (Map<String, String> dtl : deleteFileList) {

@@ -1,25 +1,23 @@
 package com.dksys.biz.user.sm.sm14.service.impl;
 
-import com.google.gson.*;
-import com.google.gson.reflect.TypeToken;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
-
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
-import com.dksys.biz.util.ExceptionThrower;
-import com.dksys.biz.user.sm.sm14.mapper.SM14Mapper;
-import com.dksys.biz.user.sm.sm14.service.SM14Svc;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.user.sm.sm14.mapper.SM14Mapper;
+import com.dksys.biz.user.sm.sm14.service.SM14Svc;
+import com.dksys.biz.util.ExceptionThrower;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -191,6 +189,7 @@ public class SM14SvcImpl implements SM14Svc {
 		//---------------------------------------------------------------  
 	    HashMap<String, String> param = new HashMap<>();
 	    param.put("userId", paramMap.get("userId"));
+		param.put("coCd", paramMap.get("coCd"));
 	    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
 	    	
 		int result = 0;	    	    
@@ -248,6 +247,7 @@ public class SM14SvcImpl implements SM14Svc {
 		//---------------------------------------------------------------  
 	    HashMap<String, String> param = new HashMap<>();
 	    param.put("userId", paramMap.get("userId"));
+		param.put("coCd", paramMap.get("coCd"));
 	    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
 	    	
 		int result = 0;	    	    
@@ -283,6 +283,7 @@ public class SM14SvcImpl implements SM14Svc {
 		//---------------------------------------------------------------  
 	    HashMap<String, String> param = new HashMap<>();
 	    param.put("userId", paramMap.get("userId"));
+		param.put("coCd", paramMap.get("coCd"));
 	    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
 	    	
 		int result = 0;	    	    

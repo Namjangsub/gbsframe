@@ -52,6 +52,7 @@ public class PM10Svcimpl implements PM10Svc {
 			String fileTrgtKey = rawDate + "-" + deptCode;
 			Map<String, String> fileMap = new HashMap<>(paramMap);
 			fileMap.put("comonCd",     "FITR9901");
+			paramMap.put("coCd",       "GUN");
 			fileMap.put("fileTrgtTyp", "PM1002M01");
 			fileMap.put("fileTrgtKey", fileTrgtKey);
 			fileMap.put("jobType",     "fileList");
@@ -208,6 +209,7 @@ public class PM10Svcimpl implements PM10Svc {
 		if (!fileList.isEmpty()) {
 			//"FITR05"은 공통코드에서 사진,미디어 첨부 디렉토리임
 			paramMap.put("comonCd",        "FITR05");
+			paramMap.put("coCd",           "GUN");
 			paramMap.put("jobType",        "fileUp");
 			paramMap.put("fileTrgtTyp",    "PM1002M01");
 			paramMap.put("fileTrgtKey",    mRequest.getParameter("fileTrgtKey"));

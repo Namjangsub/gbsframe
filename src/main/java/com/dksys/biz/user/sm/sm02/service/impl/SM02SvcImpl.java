@@ -1,34 +1,27 @@
 package com.dksys.biz.user.sm.sm02.service.impl;
 
-import java.io.File;
-import java.io.IOException;
 import java.lang.reflect.Type;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.collections4.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-import com.dksys.biz.util.DateUtil;
-import com.dksys.biz.util.ExceptionThrower;
+import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
+import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.sm.sm02.mapper.SM02Mapper;
 import com.dksys.biz.user.sm.sm02.service.SM02Svc;
 import com.dksys.biz.user.wb.wb20.mapper.WB20Mapper;
 import com.dksys.biz.user.wb.wb20.service.WB20Svc;
+import com.dksys.biz.util.ExceptionThrower;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
-import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
-import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -107,6 +100,7 @@ public class SM02SvcImpl implements SM02Svc {
 		//---------------------------------------------------------------  
 	    HashMap<String, String> param = new HashMap<>();
 	    param.put("userId", paramMap.get("userId"));
+		param.put("coCd", paramMap.get("coCd"));
 	    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
 	    
 		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
@@ -311,6 +305,7 @@ public class SM02SvcImpl implements SM02Svc {
 	}			
 	
 	/* 발주 master detail 삭제 */
+	@Override
 	public int deleteOrder(Map<String, String> param) {
 		int result = 0;
 		result += sm02Mapper.deleteOrderDetailAll(param);
@@ -319,6 +314,7 @@ public class SM02SvcImpl implements SM02Svc {
 	}
 	
 	/* 메일발송 yn*/
+	@Override
 	public int updateMailConfirm(Map<String, String> param) {
 		int result = 0;
 		result += sm02Mapper.updateMailConfirm(param);

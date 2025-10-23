@@ -73,6 +73,7 @@ public class SM10SvcImpl implements SM10Svc {
 	//---------------------------------------------------------------  
     HashMap<String, String> param = new HashMap<>();
     param.put("userId", paramMap.get("userId"));
+	param.put("coCd", paramMap.get("coCd"));
     param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
     
 	List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
@@ -201,6 +202,7 @@ public class SM10SvcImpl implements SM10Svc {
 	    List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
 	    HashMap<String, String> param = new HashMap<>();
 	    param.put("jobType", "fileDelete");
+		param.put("coCd", paramMap.get("coCd"));
 	    param.put("userId", paramMap.get("userId"));
 	    if (deleteFileList.size() > 0) {
 		    for (Map<String, String> dtl : deleteFileList) {
