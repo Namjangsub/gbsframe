@@ -156,6 +156,9 @@ public class PM03SvcImpl implements PM03Svc {
 		for (Map<String, String> dtl : salesCdList) {
 			dtl.put("userId", paramMap.get("userId"));
 			dtl.put("pgmId", paramMap.get("pgmId"));
+
+			paramMap.put("salesCd", dtl.get("salesCd"));
+			
 			pm03Mapper.updateLgistSalesCd(dtl);
 			//String dtaChk = dtl.get("dtaChk").toString();
 			/* "dtaChk" 값을 확인하여
