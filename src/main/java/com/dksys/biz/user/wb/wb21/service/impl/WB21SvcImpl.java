@@ -167,22 +167,26 @@ public class WB21SvcImpl implements WB21Svc {
 	
 	@Override
 	public int sjInsert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+
+		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+
+		//--------------------------------------------------------------- 
+		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+	  	//   필수값 :  jobType, userId, comonCd
+		//---------------------------------------------------------------  
+		List<Map<String, String>> uploadFileArr = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
+		if (uploadFileArr.size() > 0) {
+				//접근 권한 없으면 Exception 발생
+				paramMap.put("jobType", "fileUp");
+				cm15Svc.selectFileAuthCheck(paramMap);
+		}
+		//---------------------------------------------------------------  
+		//첨부 화일 권한체크  끝 
+		//--------------------------------------------------------------- 
 	
 		int fileTrgtKey = wb21Mapper.selectSjSeqNext(paramMap);
 		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
-		
-		Gson gson = new Gson(); 
-		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
-		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
-		if (sharngArr != null && sharngArr.size() > 0 ) {
-	        for (Map<String, String> sharngMap : sharngArr) {
-	            try {
-            	    wb21Mapper.insertSjDtlList(sharngMap);
-	            } catch (Exception e) {
-	                System.out.println("error2"+e.getMessage());
-	            }
-	        }
-		}
 
 		int result = wb21Mapper.sjInsert(paramMap);
 	    return result;
@@ -363,10 +367,69 @@ public class WB21SvcImpl implements WB21Svc {
 	//DATA DELETE
 	@Override
 	public int deleteSjNo(Map<String, String> paramMap) throws Exception {
-		int result = 0;
+		//---------------------------------------------------------------  
+		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
+	  	//   필수값 :  jobType, userId, comonCd
+		//---------------------------------------------------------------  
+        List<Map<String, String>> deleteFileList = cm08Svc.selectFileList(paramMap);
+        HashMap<String, String> param = new HashMap<>();
+	    param.put("jobType", "fileDelete");
+		param.put("coCd", paramMap.get("coCd"));
+	    param.put("userId", paramMap.get("userId"));
+	    if (deleteFileList.size() > 0) {
+		    for (Map<String, String> dtl : deleteFileList) {
+					//접근 권한 없으면 Exception 발생
+		            param.put("comonCd",  dtl.get("comonCd"));
+			    	
+					cm15Svc.selectFileAuthCheck(param);
+			}
+	    }
+        //---------------------------------------------------------------  
+		//첨부 화일 권한체크 끝 
+		//--------------------------------------------------------------- 
 
-		//데이터 처리
-		result = wb21Mapper.deleteSjNo(paramMap);
+		//과제 삭제 처리
+		int result = wb21Mapper.deleteSjNo(paramMap);
+
+		//---------------------------------------------------------------  
+		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
+		//---------------------------------------------------------------
+        if (deleteFileList.size() > 0) {		  
+		    for (Map<String, String> deleteDtl : deleteFileList) {
+		    	String fileKey = deleteDtl.get("fileKey");
+		        if (fileKey != null && !fileKey.isEmpty()) {	//경비내역이 있으면 처리함.
+		        	cm08Svc.deleteFile( fileKey );
+		        }
+		    }
+		}
+        //---------------------------------------------------------------  
+		//첨부 화일 처리  끝 
+		//---------------------------------------------------------------  
+
+		// 매뉴얼 삭제 시작
+		String manualMc  = "";
+		String manualElec = "";
+		List<Map<String, String>> selectManualRows = wb21Mapper.selectManualRows(paramMap);
+		if (selectManualRows.size() > 0) {		  
+		    for (Map<String, String> deleteDtl : selectManualRows) {
+				String trgt   = deleteDtl.getOrDefault("fileTrgtKey", "");
+		    	String fileKey = deleteDtl.get("fileKey");
+
+				// 매뉴얼별 fileKey 보관
+				if (trgt.endsWith("-manualMc")) {
+					manualMc = fileKey;
+				} else if (trgt.endsWith("-manualElec")) {
+					manualElec = fileKey;
+				}
+		        if (fileKey != null && !fileKey.isEmpty()) {	//매뉴얼이 있으면 처리함.
+					//첨부파일 상세내역 연계자료 삭제 처리
+				    cm08Svc.deleteFile( fileKey );
+		        }
+		    }
+			paramMap.put("manualMc", manualMc);
+			paramMap.put("manualElec", manualElec);
+			wb21Mapper.deleteManualInfo(paramMap);
+		}
 		
 		return result;
 	}

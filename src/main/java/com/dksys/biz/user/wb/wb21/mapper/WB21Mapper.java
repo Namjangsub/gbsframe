@@ -77,4 +77,8 @@ public interface WB21Mapper {
 
 	// 출고일 변경 Chk
 	List<Map<String, String>> deDtChangChk(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectManualRows(Map<String, String> paramMap);
+
+	int deleteManualInfo(Map<String, String> paramMap);
 }
