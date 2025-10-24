@@ -65,7 +65,7 @@ public class PM01SvcImpl implements PM01Svc {
 	//---------------------------------------------------------------  
 	//첨부 화일 처리 시작 
 	//---------------------------------------------------------------
-	cm08Svc.uploadFile("PM0101M01", paramMap.get("fileTrgtKey"), mRequest);
+	cm08Svc.uploadFile("PM0101M01_M", paramMap.get("fileTrgtKey"), mRequest);
 	Gson gson = new Gson();
 	String[] deleteFileArr = gson.fromJson(paramMap.get("deleteFileArr"), String[].class);
 	List<String> deleteFileList = Arrays.asList(deleteFileArr);
