@@ -186,7 +186,7 @@ public class PM01SvcImpl implements PM01Svc {
 		//작업일보 등록
 		int result = pm01Mapper.insertDailyWork(paramMap);
 		//작업일보는 작업권한 체크없으 무조건 등록가능 첨부파일 처리
-		cm08Svc.uploadFile("PM0101M01", paramMap.get("fileTrgtKey"), mRequest);
+		cm08Svc.uploadFile("PM0101M01_M", paramMap.get("fileTrgtKey"), mRequest);
 		
 		
 		//경비 Insert 처리

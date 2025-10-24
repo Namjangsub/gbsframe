@@ -144,6 +144,7 @@ public class QM01SvcImpl implements QM01Svc {
         HashMap<String, String> param = new HashMap<>();
         param.put("userId", paramMap.get("userId"));
         param.put("comonCd", paramMap.get("comonCd")); // 프로트엔드에 넘어온 화일 저장 위치 정보
+        param.put("coCd", paramMap.get("coCd"));
 
         String midCode = paramMap.get("CODECOBGB");
         String midCd = midCode.substring(0, 7);

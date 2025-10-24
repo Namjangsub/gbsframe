@@ -60,7 +60,7 @@ public class CM08SvcImpl implements CM08Svc {
         	//rptTripFiles1, rptTripFiles2, rptTripFiles3으로 담겨져 넘어옴
 //        	fileList = mRequest.getFiles("rptTripFiles1");
         	fileList = mRequest.getFiles(lastPart);
-        } else if ("PM5001M01".equals(fileTrgtTyp)) {
+        } else if ("PM5001P01_M".equals(fileTrgtTyp)) {
 			String str = fileTrgtKey;
 			String lastPart = "bfuFiles";
 			int lastIndex = str.lastIndexOf('-'); // 마지막 '-'의 위치
@@ -535,7 +535,7 @@ public class CM08SvcImpl implements CM08Svc {
      * 수주 등록				: CR0202P01         O	O	O			
      * 수금 등록				: CR0501P01         O	O	O			
      * 매출계산서 등록			: CR0801P01         O	O	O	
-     * 개선 제안서 등록			: IM0101P01         O	O	O					
+     * 개선 제안서 등록			: IM0101P01         O	O	O	O	O	O		
      * 물류진행요청 등록			: CR1001P01     	O	O	O	O	O	O
      * PFU관리				: CR5001P01         O	O	O	O	O	O
      * 작업일보관리				: PM0101M01         O	O	O	O	O	O
@@ -587,7 +587,7 @@ public class CM08SvcImpl implements CM08Svc {
 
 
         // 즉시 반환 그룹 3: 거래처/프로젝트코드 관련
-        if (anyEqualsIgnoreCase(typ, "BM1601P01", "BM1601P02","CR0202P01","CR0501P01", "CR0701P01", "CR0801P01","IM0101P01")) {
+        if (anyEqualsIgnoreCase(typ, "BM1601P01", "BM1601P02","CR0202P01","CR0501P01", "CR0701P01", "CR0801P01")) {
             Map<String, String> out = outMap();
             fillOut(out,
                     nz(paramMap,"coCd"), nz(paramMap,"clntCd"), nz(paramMap,"prjctCd"),

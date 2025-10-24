@@ -434,6 +434,7 @@ public class WB22SvcImpl implements WB22Svc {
 		// ---------------------------------------------------------------
 		HashMap<String, String> param = new HashMap<>();
 		param.put("userId", paramMap.get("userId"));
+		param.put("coCd", paramMap.get("coCd"));
 		param.put("comonCd", paramMap.get("comonCd")); // 프로트엔드에 넘어온 화일 저장 위치 정보
 
 		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);

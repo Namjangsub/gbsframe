@@ -114,7 +114,7 @@ public class PM50SvcImpl implements PM50Svc{
 					pm50Mapper.insert_pm50_d01(fileMap);
 					
 					// 첨부파일처리
-					String fileTrgtTyp = "PM5001M01";
+					String fileTrgtTyp = "PM5001P01_M";
 					String fileTrgtKey = bfuFileTrgtKey +  "-" + fileMap.get("fileSeq");
 					cm08Svc.uploadFile(fileTrgtTyp, fileTrgtKey, mRequest) ;
 				}
@@ -156,7 +156,7 @@ public class PM50SvcImpl implements PM50Svc{
 		if (bfuFileRowDeleteArr != null && !bfuFileRowDeleteArr.isEmpty()) {	// 첨부파일이 있으면 처리함.
 			for (Map<String, String> fileMap : bfuFileRowDeleteArr) {
 				// fileTrgtKey : PM5001M01 으로 저장함.
-				String fileTrgtTyp = "PM5001M01";
+				String fileTrgtTyp = "PM5001P01_M";
 				String fileTrgtKey = fileMap.get("fileTrgtKey") +  "-" + fileMap.get("fileSeq");
 				String updCheck = fileMap.get("updCheck"); //구분코드 C, U, D  : 처음 등록시에는 C, 수정은 U, 삭제는 D.
 				if ("D".equals(updCheck)) { //구분코드 C, U, D  : 처음 등록시에는 C, 수정은 U, 삭제는 D.
@@ -190,7 +190,7 @@ public class PM50SvcImpl implements PM50Svc{
 			for (Map<String, String> fileMap : bfuArr) {
 				//상세관련 첨부파일은 아래 함수를 활용함
 				// fileTrgtKey : PM5001M01 으로 저장함.
-				String fileTrgtTyp = "PM5001M01";
+				String fileTrgtTyp = "PM5001P01_M";
 				//세부내역별 키값에 대한부분은 등록번호 + 사진인련번호로 구성함
 				String fileTrgtKey = paramMap.get("fileTrgtKey") +  "-" + fileMap.get("fileSeq");
 
