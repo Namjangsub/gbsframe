@@ -24,7 +24,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		} else {
 			fileTempCocd = _coCd;
 		}
-debugger;
+
 		gridSelector = gridSelector.replace('-',''); 
 		//첨부파일영역 설정값이 없으면 기본은 : fileList_area 로 명영함.
 		if (_fileList_area == '' || _fileList_area == undefined) {
