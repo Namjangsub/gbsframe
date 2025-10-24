@@ -48,10 +48,11 @@ public class BM99SvcImpl implements BM99Svc {
 		
 		fileMap.putAll(paramMap);
 		//"FITR9999"은 공통코드에서 공지사항 첨부 디렉토리임
-		fileMap.put("comonCd", "FITR9999");
-		fileMap.put("fileTrgtTyp", "TB_BM99P01");
-		fileMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-		fileMap.put("jobType", "fileList");
+		fileMap.put("comonCd", 		"FITR9999");
+		fileMap.put("fileTrgtTyp", 	"TB_BM99P01");
+		fileMap.put("coCd", 		"GUN");
+		fileMap.put("fileTrgtKey", 	paramMap.get("fileTrgtKey"));
+		fileMap.put("jobType", 		"fileList");
 		
 		return cm08Svc.selectFileList(fileMap);
 	}

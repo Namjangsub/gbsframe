@@ -44,7 +44,7 @@ public class PM50Ctr {
 
 	//카테고리별 파일정보 리스트 조회
     @PostMapping("/selectSendFileList")
-    public String selectFileList(@RequestBody Map<String, String> param, ModelMap model) {
+    public String selectSendFileList(@RequestBody Map<String, String> param, ModelMap model) {
     	int totalCnt = pm50Svc.selectSendFileCount(param);
 		PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
     	model.addAttribute("paginationInfo", paginationInfo);

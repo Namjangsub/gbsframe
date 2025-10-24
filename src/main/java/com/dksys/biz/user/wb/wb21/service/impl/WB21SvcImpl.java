@@ -242,7 +242,7 @@ public class WB21SvcImpl implements WB21Svc {
 		//---------------------------------------------------------------  
 	    if (uploadFileList.size() > 0) {
 		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
-		    paramMap.put("fileTrgtKey", paramMap.get("sjNo"));
+		    paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 		    cm08Svc.uploadFile(paramMap, mRequest);
 	    }
 	    
@@ -400,6 +400,7 @@ public class WB21SvcImpl implements WB21Svc {
         // ---------------------------------------------------------------
         HashMap<String, String> param = new HashMap<>();
         param.put("userId", paramMap.get("userId"));
+        param.put("coCd", paramMap.get("coCd"));
         param.put("comonCd", paramMap.get("comonCd")); // 프로트엔드에 넘어온 화일 저장 위치 정보
 
         String tripfileTrgtTyp = "WB2101P01";

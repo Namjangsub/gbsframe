@@ -24,7 +24,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		} else {
 			fileTempCocd = _coCd;
 		}
-
+debugger;
 		gridSelector = gridSelector.replace('-',''); 
 		//첨부파일영역 설정값이 없으면 기본은 : fileList_area 로 명영함.
 		if (_fileList_area == '' || _fileList_area == undefined) {
@@ -52,13 +52,14 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 //            treeComonCd = codeId; //무시
 			treeComonCd = 'FILETREE';             //최상위 트리 강제로 할당 (파라메터값 무시)
 			params["comonCd"] = treeComonCd;      //comonCd는 xML 쿼리에서 트리ID 보관 필드명
-			params["userId"] = jwt.userId;        //캐시에 보관된 사용자 ID
+			params["userId"]  = jwt.userId;       //캐시에 보관된 사용자 ID
+			params["coCd"]    = fileTempCocd; //화면에 활성화된 coCd -->첫번째 파라미터로 전달받고 없으면 화면에 있는값 $('#coCd').val();
 
 			fileTreeParamObj = params;  //
 			fileArr=[];
 			deleteFileArr = [];
 
-			initDeptTree(popSelector + ' #' + selector, popSelector);
+			initDeptTree(popSelector + ' #' + selector, popSelector, fileTempCocd);
 
 			currPgmAuthChk = authChk(); // true:저장권한, false:저장권한 없음
 
@@ -201,12 +202,12 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 											const fileType = item.fileType.toLowerCase();
 											return viewType.includes(tempType);
 										});
-										imageViewPopup(fileKey, this.item.fileName, imageList);
+										imageViewPopup(this.item.coCd, fileKey, this.item.fileName, imageList);
 									} else {
-										downLoadFile(fileKey, this.item.fileName);
+										downLoadFile(this.item.coCd, fileKey, this.item.fileName);
 									}
 								} else {
-									downLoadFile(fileKey, this.item.fileName);
+									downLoadFile(this.item.coCd, fileKey, this.item.fileName);
 								}
 							} else {
 								alert('파일 다운로드 권한이 없습니다.');
@@ -268,14 +269,14 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		}
 	}
 
-	function initDeptTree(selector, popSelector) {	//selector = '.popup_area:last #deptTree'
+	function initDeptTree(selector, popSelector, coCd = fileTempCocd) {	//selector = '.popup_area:last #deptTree'
 		$(selector).jstree('destroy');
 		$(selector).jstree(
 			{
 				plugins: ['types'],
 				core : {
 					check_callback: true,
-					data : selectDeptTree(),
+					data : selectDeptTree(coCd),
 
 					check_callback: function (operation, node, node_parent, node_position, more) {
 						if (operation === 'delete_node') {
@@ -424,9 +425,9 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		});
 	}
 
-	function selectDeptTree() {
+	function selectDeptTree(coCd = fileTempCocd) {
 		var deptTree = null;
-		fileTreeParamObj["coCd"] = fileTempCocd;
+		fileTreeParamObj["coCd"] = coCd;
 		fileTreeParamObj["userId"] = jwt.userId;
 		fileTreeParamObj["useYn"] = 'Y';
 
@@ -527,7 +528,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		let downLoadList = fileTreeGridView.target.list;
 		for (const elem of downLoadList) {
 //        	console.log(elem.fileName);
-			const result = await downLoadFile(elem.fileKey, elem.fileName);
+			const result = await downLoadFile(elem.coCd, elem.fileKey, elem.fileNam);
 			if (result === 'ERROR') {
 				alert(`파일 다운로드 중 오류가 발생했습니다. 파일 이름: ${elem.fileName}. 관리자에게 문의하세요.`);
 			}
@@ -538,10 +539,10 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 	
 	
 	// 파일 다운로드 함수 (fetch + Blob 방식 사용)
-	async function downLoadFile(fileKey, fileName) {
+	async function downLoadFile(coCd, fileKey, fileName) {
 		try {
-//			const response = await fetch(`/admin/cm/cm08/fileDownloadAuth?fileKey=${fileKey}&userId=${jwt.userId}`);
-			const response = await fetch(`/admin/cm/cm08/fileDownloadAuth2?fileKey=${fileKey}&userId=${jwt.userId}`, {
+//			const response = await fetch(`/admin/cm/cm08/fileDownloadAuth?fileKey=${fileKey}&userId=${jwt.userId}&coCd=${coCd}`);
+			const response = await fetch(`/admin/cm/cm08/fileDownloadAuth2?fileKey=${fileKey}&userId=${jwt.userId}&coCd=${coCd}`, {
 				  method: "GET",
 				  headers: {"Authorization": authorizationToken}
 			});
