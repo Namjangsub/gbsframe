@@ -3093,3 +3093,30 @@ function closeCustomPrompt() {
     $('#custom-prompt-overlay').remove();
     isPromptOpen = false;
 }
+
+
+// 다양한 입력(Y/N, 1/0, true/false, "on"/"off", 빈값)을 일괄 정규화
+function toBool(v){
+  if (v === true || v === 1) return true;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    return s === 'y' || s === '1' || s === 'true' || s === 'on';
+  }
+  return false;
+}
+
+/**
+ * 권한코드 생성기
+ * @param {object} p - { fileList, fileUp, fileDown, fileMove, fileDelete }
+ * @param {boolean} spaced - true면 "L U D M X" (가독성↑), false면 "LRDMX"
+ */
+function buildPermCode(p, spaced = false) {
+  const L = toBool(p.fileList)   ? 'L' : '-';
+  const U = toBool(p.fileUp)     ? 'U' : '-';
+  const D = toBool(p.fileDown)   ? 'D' : '-';
+  const M = toBool(p.fileMove)   ? 'M' : '-';   // 입력 없으면 기본 false
+  const X = toBool(p.fileDelete) ? 'X' : '-';
+
+  const raw = [L, U, D, M, X].join('');
+  return spaced ? raw.split('').join(' ') : raw;
+}

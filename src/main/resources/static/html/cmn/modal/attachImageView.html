@@ -391,38 +391,68 @@ function loadImage(image) {
 async function loadPdf(file) {
     const pdfUrl = "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + file.fileKey + "&userId=" + jwt.userId + "&coCd=" + file.coCd;
 //     pdfDoc = await pdfjsLib.getDocument(pdfUrl).promise;
-    const loadingTask = pdfjsLib.getDocument({
-        url: pdfUrl,
-        httpHeaders: {"Authorization": authorizationToken},
-        withCredentials: true // 필요한 경우 (쿠키 사용 시)
-      });
-    pdfDoc = await loadingTask.promise;
-    currentPage = 1;
-    totalPages = pdfDoc.numPages;
 
-    
-    updatePageInfo();
-    renderPage();
+  try {
+	    const loadingTask = pdfjsLib.getDocument({
+	        url: pdfUrl,
+	        httpHeaders: {"Authorization": authorizationToken},
+	        withCredentials: true // 필요한 경우 (쿠키 사용 시)
+	      });
+	    pdfDoc = await loadingTask.promise;
+	    currentPage = 1;
+	    totalPages = pdfDoc.numPages;
+	
+	    
+	    updatePageInfo();
+	    renderPage();
+
+  } catch (err) {
+    // PDF.js 표준 예외 매핑
+    let userMsg = '파일을 불러오는 중 오류가 발생했습니다.';
+    if (err?.name === 'MissingPDFException') {
+      userMsg = '파일을 찾을 수 없습니다. (삭제되었거나 권한이 없습니다)';
+    } else if (err?.name === 'InvalidPDFException') {
+      userMsg = '유효한 PDF가 아닙니다. (서버가 PDF 대신 다른 응답을 보냈을 수 있습니다)';
+    } else if (err?.name === 'UnexpectedResponseException') {
+      // err.status 가 있을 수 있음
+      userMsg = `서버 응답 오류(${err?.status ?? '알수없음'}). 관리자에게 문의하세요.`;
+    }
+    showError(userMsg, err?.message || String(err));
+  }
 }
 async function renderPage() {
 
-    const page = await pdfDoc.getPage(currentPage);
-    const viewport = page.getViewport({ scale: 1.5 }); // 항상 1로 렌더
-    const canvas = document.createElement('canvas');
-    canvas.id = 'pdfCanvas';
-    const context = canvas.getContext('2d');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    $('#viewArea').empty().append(canvas);
-
-    const renderContext = {
-        canvasContext: context,
-        viewport: viewport
-    };
-    await page.render(renderContext).promise;
-    applyTransform(); // transform만으로 이동/확대/회전
+	try {
+	    const page = await pdfDoc.getPage(currentPage);
+	    const viewport = page.getViewport({ scale: 1.5 }); // 항상 1로 렌더
+	    const canvas = document.createElement('canvas');
+	    canvas.id = 'pdfCanvas';
+	    const context = canvas.getContext('2d');
+	    canvas.width = viewport.width;
+	    canvas.height = viewport.height;
+	    $('#viewArea').empty().append(canvas);
+	
+	    const renderContext = {
+	        canvasContext: context,
+	        viewport: viewport
+	    };
+	    await page.render(renderContext).promise;
+	    applyTransform(); // transform만으로 이동/확대/회전
+	  } catch (err) {
+		    showError('페이지 렌더링 중 오류가 발생했습니다.', err?.message || String(err));
+	  }
 }
-
+function showError(msg, detail) {
+	  console.error('[PDF-ERROR]', msg, detail || '');
+	  $('#viewArea').html(
+	    `<div class="pdf-error" style="padding:16px;border:1px solid #f0b4b4;background:#fff4f4;color:#a50000;border-radius:8px;">
+	       <div style="font-weight:600;margin-bottom:6px;">PDF 로드 실패</div>
+	       <div>${msg}</div>
+	       ${detail ? `<pre style="margin-top:8px;white-space:pre-wrap;">${detail}</pre>` : ''}
+	     </div>`
+	  );
+	}
+	
 function applyTransform() {
     if (currentIsImage) {$('#viewImgData').css(
             'transform',

@@ -433,6 +433,12 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 
 		postAjaxSync("/admin/cm/cm05/selectDocTreeListAuth", fileTreeParamObj, null, function(data){
 			deptTree = data.docTreeList;
+			for (let i = 0; i < deptTree.length; i++) {
+				if (deptTree[i].isLeaf == '1') {
+					deptTree[i].permCode = buildPermCode(deptTree[i]);
+					deptTree[i].text = deptTree[i].text + ' (' + deptTree[i].permCode +')';
+				}
+			}
 		});
 		return deptTree;
 	}
