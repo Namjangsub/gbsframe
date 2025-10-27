@@ -186,6 +186,7 @@
             <a onclick="excelUpload();" style="height: 30px; line-height: 28px; width: 80px;" authChk><i class="fa fa-upload"></i> 엑셀업로드</a>
 		    <a onclick="jsonToExcel(firstGrid);" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
 		    <a onclick="jsonToExcelFromSpare(firstGrid);" style="height: 30px; line-height: 28px; width: 120px;"><i class="fas fa-file-excel"></i> 추천SparePart엑셀</a>
+            <a onclick="setReportMulti('T')" style="height: 30px; line-height: 28px; width: 130px;" authchk><i class="fas fa-print"></i>Spare Part(9000)출력</a> 
             <a onclick="setReportMulti('S')" style="height: 30px; line-height: 28px; width: 130px;" authchk><i class="fas fa-print"></i> Spare PartList출력</a> 
           </div>
         </div>
@@ -445,20 +446,29 @@
   		$("#deptTree").jstree(
   		{
   			//dnd 기능 제거 남장섭 240328 작업자 오류 발생 가능
-  			plugins : ['types', 'contextmenu', 'search' ],
+  			plugins : ['types', 'contextmenu', 'search', 'checkbox' ],
   			core : {
 //   				"check_callback": checkOperation,
+				multiple: true,
   				dblclick_toggle: false,
   				data : selectDeptTree()
   			},
+			checkbox: {
+				three_state: false,      // 부모-자식 연동 강제 X
+				cascade: 'up+down',      // 연동하려면 'up+down'
+				tie_selection: false     // 체크와 선택 분리
+			},
   			
 //   			1. plugins에 Contextmenu를 추가한다.
 //   			2. item에서 넘어오는 $node는 메뉴 클릭할 때 선택한 node를 가르킨다. 
 //   			3. return 항목에 메뉴들을 정의한다.
 //   			4. 메뉴에 action에 메뉴를 클릭하면 실행할 코드를 넣는다 
   			'contextmenu' : {
+				select_node: false,
   				"items" : function($node) {
 //   					var tree = $("#deptTree").jstree(true);
+					const isSet = ($node.original.etcField3 !== 'SPARE'); // 지정 모드 여부
+					const labelText = isSet ? "추천 Spare 지정" : "추천 Spare 취소";
   					return {
 	  					"create" : { 
 	  		        		"separator_before" : false,
@@ -474,7 +484,7 @@
 	  						"icon": "glyphicon glyphicon-check",
 	  						"label" : ($node.original.etcField3=='SPARE') ? "추천 Spare 취소" : "추천 Spare 지정",
 	  						"_disabled": ($node.type != 'leaf'),
-	  						"action" : function(obj){recommendBom($node)}
+	  						"action" : function(){recommendBom($node, labelText)}
 	  					},
 	  					"remove" : {
 	  						"separator_before" : false,
@@ -522,7 +532,7 @@
   			$('#deptTree').jstree(true).open_node($('#deptTree li[aria-level=1]').eq(0).attr('id'));
   			//첫번째 노드 검색해서 선택하기
   			var firstNode = $('#deptTree').jstree(true).get_node('#').children[0];
-  			$('#deptTree').jstree(true).activate_node(firstNode);
+  			$('#deptTree').jstree(true).select_node(firstNode);
   		}).on("refresh.jstree", function() {
   		// 리프레시 완료 시
   			var selectedId = $('#deptTree').jstree(true).get_selected()[0];
@@ -540,7 +550,12 @@
   					$('#deptTree').jstree(true).refresh();
   				}
   			}
-  		}).on('open_node.jstree', function(e, data) {
+  		}).on('check_node.jstree', function(e, data) {
+			$('#deptTree').jstree(true).deselect_all(true);
+			$('#deptTree').jstree(true).select_node(data.node);
+			// 체크 클릭도 마지막 대상 기준으로 우측 갱신
+			firstGrid.setData(data.node.id);
+		}).on('open_node.jstree', function(e, data) {
   		// 노드 열릴 때
   			data.instance.set_type(data.node, 'unit-open');
   		}).on('close_node.jstree', function(e, data) {
@@ -828,28 +843,57 @@
 	}
 	
 	//추천 SPARE PART 처리 (ETC_FIELD3 = SPARE)
-	function  recommendBom(_node) {
-		if (_node.type != 'leaf') {
-			customAlert('추천 SparePart는 엔드노디에서만 지정 가능합니다.')
+	function recommendBom($node, labelText) {
+		const tree = $('#deptTree').jstree(true);
+		const checked = tree.get_checked(true);
+		if (!checked || checked.length === 0) { customAlert("체크된 항목이 없습니다."); return; }
+
+		const isSet = String(labelText||'').indexOf("지정") > -1; // true=지정, false=취소
+
+		// 9000 하위 여부 판단
+		const isUnder9000 = (n) => {
+			if (String(n.original.lowerCd||'') === '9000') return true; // 자기 자신이 9000
+			for (const pid of n.parents || []) {
+				if (pid === '#') continue;
+				const p = tree.get_node(pid);
+				if (p && p.original && String(p.original.lowerCd||'') === '9000') return true;
+			}
+			return false;
+		};
+
+		// 지정: SPARE 아닌 leaf, 취소: SPARE 인 leaf, 9000 하위는 제외
+		const targets = checked.filter(n =>
+			n.type === 'leaf' &&
+			!isUnder9000(n) &&
+			(isSet ? String(n.original.etcField3||'').toUpperCase() !== 'SPARE'
+				: String(n.original.etcField3||'').toUpperCase() === 'SPARE')
+		);
+
+		if (targets.length === 0) {
+			customAlert(isSet ? "지정할 대상이 없습니다." : "취소할 대상이 없습니다.");
 			return false;
 		}
-// 		let msg = _flag == 'Y' ? "BOM 작업완료로 설정" : "BOM 작업완료 취소";
-		let flag = (_node.original.etcField3=='SPARE') ? "" : "SPARE"
-		let selText = _node.original.lowerCd + "(" + _node.original.matrNm + ") "
-			var paramObj = {
-				"coCd"        : $('#coCd_S').val(),
-				"salesCd"     : $('#salesCd_S').val(),
-				"etcField3"   : flag,
-				"lowerKey"    : _node.id
+
+		const items = targets.map(n => ({
+			coCd		: $('#coCd_S').val(),
+			salesCd		: $('#salesCd_S').val(),
+			etcField3	: isSet ? 'SPARE' : '',   // 목표 상태로 고정
+			isSpare		: isSet ? 'Y' : 'N',
+			lowerKey	: n.id,
+			fileTrgtKey	: n.original.fileTrgtKey,
+			userId		: jwt.userId,
+			pgmId		: $('#pgmId').val(),
+			parentId	: n.parents[1]
+		}));
+
+		postAjax("/user/bm/bm14/recommendBom", { recommendArr: JSON.stringify(items) }, null, function (data) {
+			if (data.resultCode === 200) {
+				$('#deptTree').jstree(true).settings.core.data = selectDeptTree();
+				$('#deptTree').jstree(true).refresh();
+			} else {
+				customAlert(data.resultMessage);
 			}
-			postAjax("/user/bm/bm14/recommendBom", paramObj, null, function(data){
-				if (data.resultCode == 200) {
-					$('#deptTree').jstree(true).settings.core.data = selectDeptTree();
-					$('#deptTree').jstree(true).refresh();
-				} else {
-  					customAlert(data.resultMessage);
-  				}
-			});
+		});
 	}
 	
     //Sales Code (수주마스터, 수주상세테이블 조인) 검색
@@ -1015,7 +1059,8 @@
 
 	//Part List 출력
 	function setReportMulti(_type = "") {
-		var selectedNodeIds = $('#deptTree').jstree('get_selected');
+		// var selectedNodeIds = $('#deptTree').jstree('get_selected');
+		var selectedNodeIds = $('#deptTree').jstree(true).get_checked();
 // 			/* Sample Data
 // 				    "original": {
 // 				        "parent": "#",
@@ -1046,6 +1091,8 @@
 		}
 		
 		if (targetPart == '') targetPart = 'ALLPART'; //선택된 내용이 없으면 전체 출력으로 인식함.
+		// Spare Part List 인지 구분하기 위함
+		if (_type === 'T') targetPart = '9000'
 
 	  	var arg =  
 	  		  "coCd#"		+  $('#coCd_S').val()
@@ -1054,8 +1101,9 @@
 	      	+ "#userId#"	+  jwt.userId
 	      	+ "#";                 
 
-	  	var fileName = (_type == 'S') ? "BM1401R02.jrf" : "BM1401R01.jrf"; //S 이면 SparePArtList(전체) 출력하고 아니면 구매품 Part list 출력
-	  	if (_type == '' || _type == 'S' || _type == undefined ) {
+	  	// var fileName = (_type == 'S') ? "BM1401R02.jrf" : "BM1401R01.jrf"; //S 이면 SparePArtList(전체) 출력하고 아니면 구매품 Part list 출력
+	  	var fileName = (_type == 'S') ? "BM1401R02.jrf" :  ((_type == 'T') ? "BM1401R03.jrf" : "BM1401R01.jrf" ); //S 이면 SparePArtList(전체) 또는 선택한거 출력하고 T이면 9000대만 출력, 아니면 구매품 Part list 출력
+	  	if (_type == '' || _type == 'S' || _type == 'T' || _type == undefined ) {
 	  		callReport(fileName, arg, 1150, 720, 'PartList');
 	  	} else { //Export 작업
 	  		ubiExportAjax(fileName, arg, function(response) {

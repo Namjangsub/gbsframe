@@ -58,4 +58,17 @@ public interface BM14Mapper {
 	int confirmBom(Map<String, String> paramMap);
 
 	int recommendBom(Map<String, String> paramMap);
+
+	Map<String, String> selectSpareInfo(Map<String, String> paramMap);
+
+	Map<String, String> selectSparePart(Map<String, String> paramMap);
+
+	Map<String, String> selectSparePartDtl(Map<String, String> paramMap);
+
+	int deleteCancelSpareDtl(Map<String, String> paramMap);
+
+	int allCancelSpareBom(Map<String, String> paramMap);
+	
+	int cancelSpareBom(Map<String, String> paramMap);
+
 }

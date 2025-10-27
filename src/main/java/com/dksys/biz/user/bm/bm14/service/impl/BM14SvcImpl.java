@@ -96,6 +96,29 @@ public class BM14SvcImpl implements BM14Svc {
 					} else if ("D".equals(updChk)) {
 						if (bm14Mapper.selectPchsBomCheck(dtl) == 0) {
 							result += bm14Mapper.deleteBom(dtl);
+							
+							// SPARE PART 관련 처리
+							if (paramMap.get("salesCd").equals(dtl.get("upperCd"))) { // 최상단 (salesCd)에서 해당 9000 삭제시
+								bm14Mapper.allCancelSpareBom(dtl);
+							} else if ("9000".equals(dtl.get("upperCd"))) { // 상위가 9000번일 경우
+								Map<String,String> param = new HashMap<>();
+								param.put("salesCd", dtl.get("salesCd"));
+								param.put("coCd", dtl.get("coCd"));
+								param.put("etcField3", "");
+								param.put("upperCd", dtl.get("lowerCd"));
+								bm14Mapper.cancelSpareBom(param);
+							} else {	// 제일 아래 단계 일경우
+								// 삭제 후 추천 SPARE 취소
+								Map<String, String> selectSparePart = bm14Mapper.selectSparePart(dtl);
+								if (selectSparePart != null) {
+									Map<String,String> param = new HashMap<>();
+									param.put("salesCd", dtl.get("salesCd"));
+									param.put("coCd", dtl.get("coCd"));
+									param.put("etcField3", "");
+									param.put("lowerKey", selectSparePart.get("lowerKey"));
+									bm14Mapper.recommendBom(param);
+								}
+							}
 						} else {
 							//error 구매BOM 작업완료 삭제 불가
 							throw new IllegalArgumentException("구매BOM 작업완료 삭제 불가");
@@ -305,7 +328,150 @@ public class BM14SvcImpl implements BM14Svc {
 	
 	@Override
 	public int recommendBom(Map<String, String> paramMap) {
-		return bm14Mapper.recommendBom(paramMap);
+		Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+		Type mapList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+		int result = 0;
+		String fileTrgtKey = "";
+
+		List<Map<String, String>> listArr = gson.fromJson(paramMap.get("recommendArr"), mapList);
+		if (listArr != null && listArr.size() > 0 ) {
+			int i = 0;
+			for (Map<String, String> listArrMap : listArr) {
+				try {
+					
+					result = bm14Mapper.recommendBom(listArrMap);
+
+					Map<String, String> updateRow = bm14Mapper.selectBomInfo(listArrMap);				// 추천 Spare Part가 된 row 정보
+					Map<String, String> selectSpareInfo = bm14Mapper.selectSpareInfo(listArrMap);		// 해당 SalesCd의 기존 Spare Part(9000) 정보 조회
+
+					if ("SPARE".equals(listArrMap.get("etcField3"))) {	// 추천 spare part 지정시
+						if (selectSpareInfo != null) {
+							Map<String,String> param = new HashMap<>();
+							param.put("coCd", listArrMap.get("coCd"));
+							param.put("salesCd", listArrMap.get("salesCd"));
+							param.put("upperCd", selectSpareInfo.get("lowerCd"));
+							param.put("lowerCd", updateRow.get("upperCd"));
+							Map<String, String> selectSparePart = bm14Mapper.selectSparePart(param);
+
+							if (selectSparePart == null) {
+								fileTrgtKey = Integer.toString(bm14Mapper.selectBomSeqNext(listArrMap));
+								String upperKey = selectSpareInfo.get("lowerKey");
+								String dsgnNo = listArrMap.get("salesCd") + "-" + updateRow.get("upperCd");
+								Map<String,String> param1 = new HashMap<>();
+								param1.putAll(updateRow);
+								param1.put("upperKey", upperKey);
+								param1.put("userId", listArrMap.get("userId"));
+								param1.put("pgmId", listArrMap.get("pgmId"));
+								param1.put("upperKey", upperKey);
+								param1.put("fileTrgtKey", fileTrgtKey);
+								param1.put("upperCd", "9000");
+								param1.put("lowerCd", updateRow.get("upperCd"));
+								param1.put("dsgnNo", dsgnNo);
+								param1.put("unitNo", "");
+								param1.put("etcField3", "");
+								param1.put("matrSpec", "");
+								result += bm14Mapper.insertBomTree(param1);	// 9000 하위에 추천 spare part 추가
+
+								Map<String, String> dtlMap = new HashMap<>();
+								String fileTrgtKey2 = Integer.toString(bm14Mapper.selectBomSeqNext(listArrMap));
+								dtlMap.putAll(updateRow);
+								dtlMap.put("upperKey", fileTrgtKey);
+								dtlMap.put("fileTrgtKey", fileTrgtKey2);
+								dtlMap.put("userId", listArrMap.get("userId"));
+								dtlMap.put("pgmId", listArrMap.get("pgmId"));
+								dtlMap.put("etcField3", "");
+								result += bm14Mapper.insertBomTree(dtlMap);	// 추천 spare part의 상세정보 추가
+							} else {
+								Map<String, String> dtlMap2 = new HashMap<>();
+								String fileTrgtKey2 = Integer.toString(bm14Mapper.selectBomSeqNext(listArrMap));
+								dtlMap2.putAll(updateRow);
+								dtlMap2.put("upperKey", selectSparePart.get("lowerKey"));
+								dtlMap2.put("fileTrgtKey", fileTrgtKey2);
+								dtlMap2.put("userId", listArrMap.get("userId"));
+								dtlMap2.put("pgmId", listArrMap.get("pgmId"));
+								dtlMap2.put("etcField3", "");
+								result += bm14Mapper.insertBomTree(dtlMap2);
+							}
+						} else {
+							Map<String, String> insertMap = new HashMap<>();
+							String fileTrgtKey3 = Integer.toString(bm14Mapper.selectBomSeqNext(listArrMap));
+							insertMap.put("coCd", listArrMap.get("coCd"));
+							insertMap.put("salesCd", listArrMap.get("salesCd"));
+							insertMap.put("upperKey", listArrMap.get("parentId"));
+							insertMap.put("fileTrgtKey", fileTrgtKey3);
+							insertMap.put("upperCd", listArrMap.get("salesCd"));
+							insertMap.put("lowerCd", "9000");
+							insertMap.put("dsgnNo", listArrMap.get("salesCd") + "-9000");
+							insertMap.put("partNo", listArrMap.get("salesCd"));
+							insertMap.put("unitNo", "9000");
+							insertMap.put("matrNm", "SPARE PART");
+							insertMap.put("matrRmk", "SPARE PART");
+							insertMap.put("avlbStrtDt", "");
+							insertMap.put("useYn", "Y");
+							insertMap.put("matr", "N");
+							insertMap.put("userId", listArrMap.get("userId"));
+							insertMap.put("pgmId", listArrMap.get("pgmId"));
+							insertMap.put("ordrsNo", listArrMap.get("salesCd").split("-")[0]);
+							result += bm14Mapper.insertBomTree(insertMap);	// salesCd 아래에 SPARE PART(9000) 추가
+
+							Map<String, String> selectSpareInfo2 = bm14Mapper.selectSpareInfo(listArrMap);		// 해당 SalesCd의 기존 Spare Part(9000) 정보 조회
+							fileTrgtKey = Integer.toString(bm14Mapper.selectBomSeqNext(listArrMap));
+							String upperKey = selectSpareInfo2.get("lowerKey");
+							String dsgnNo = listArrMap.get("salesCd") + "-" + updateRow.get("upperCd");
+							Map<String,String> param1 = new HashMap<>();
+							param1.putAll(updateRow);
+							param1.put("upperKey", upperKey);
+							param1.put("userId", listArrMap.get("userId"));
+							param1.put("pgmId", listArrMap.get("pgmId"));
+							param1.put("upperKey", upperKey);
+							param1.put("fileTrgtKey", fileTrgtKey);
+							param1.put("upperCd", "9000");
+							param1.put("lowerCd", updateRow.get("upperCd"));
+							param1.put("dsgnNo", dsgnNo);
+							param1.put("unitNo", "");
+							param1.put("etcField3", "");
+							param1.put("matrSpec", "");
+							result += bm14Mapper.insertBomTree(param1);
+
+							Map<String, String> dtlMap = new HashMap<>();
+							String fileTrgtKey2 = Integer.toString(bm14Mapper.selectBomSeqNext(listArrMap));
+							dtlMap.putAll(updateRow);
+							dtlMap.put("upperKey", fileTrgtKey);
+							dtlMap.put("fileTrgtKey", fileTrgtKey2);
+							dtlMap.put("userId", listArrMap.get("userId"));
+							dtlMap.put("pgmId", listArrMap.get("pgmId"));
+							dtlMap.put("etcField3", "");
+							result += bm14Mapper.insertBomTree(dtlMap);
+						}
+					} else if ("".equals(listArrMap.get("etcField3"))) {		// 추천 spare part 취소시
+						Map<String, String> partMap = new HashMap<>(listArrMap);
+						partMap.put("upperCd", "9000");
+						partMap.put("lowerCd", updateRow.get("upperCd"));
+						Map<String, String> selectSparePart = bm14Mapper.selectSparePart(partMap);	// 9000폴더 정보 조회
+						Map<String, String> deletMap = new HashMap<>();
+						deletMap.put("coCd", listArrMap.get("coCd"));
+						deletMap.put("salesCd", listArrMap.get("salesCd"));
+						deletMap.put("upperKey", selectSparePart.get("lowerKey"));
+						deletMap.put("upperCd", updateRow.get("upperCd"));
+						deletMap.put("lowerCd", updateRow.get("lowerCd"));
+						int deleteCancelSpareDtl = bm14Mapper.deleteCancelSpareDtl(deletMap);	// 9000폴더 하위의 추천 spare part 삭제
+
+						Map<String, String> selectSparePartDtl = bm14Mapper.selectSparePartDtl(deletMap);	// 9000폴더 하위의 추천 spare part 상세정보 조회
+						if (selectSparePartDtl == null || selectSparePartDtl.isEmpty()) {
+							deletMap.put("upperKey", selectSpareInfo.get("lowerKey"));
+							deletMap.put("upperCd", "9000");
+							deletMap.put("lowerCd", updateRow.get("upperCd"));
+							bm14Mapper.deleteCancelSpareDtl(deletMap);
+						}
+					}
+					i++;
+				} catch (Exception e) {
+					System.out.println("error2"+e.getMessage());
+				}
+			}
+		}
+		
+		return result;
 	}
 
 }
