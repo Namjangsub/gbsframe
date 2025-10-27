@@ -4,9 +4,32 @@
 <mapper namespace="com.dksys.biz.user.sm.sm11.mapper.SM11Mapper">
 
 	<select id="selectContractCount" parameterType="Map" resultType="int">
-	 	WITH CT AS (
-		 		SELECT M.*
+	/* selectContractCount */
+	 WITH CT AS (
+		 		SELECT 
+						  M.CLNT_CD  				AS VEND_CD	--공급사
+						, B.CLNT_NM  				AS VEND_NM	--공급사명
+						, CM.ORDRS_CLNT_CD 			AS CUST_CD	--수주고객사
+						, D.CLNT_NM					AS CUST_NM  --수주고객사명
+		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM01%' THEN 'Y' ELSE 'N' END AS FLAG1
+		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM02%' THEN 'Y' ELSE 'N' END AS FLAG2
+		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM03%' THEN 'Y' ELSE 'N' END AS FLAG3
+		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM04%' THEN 'Y' ELSE 'N' END AS FLAG4
+		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM05%' THEN 'Y' ELSE 'N' END AS FLAG5
+		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM06%' THEN 'Y' ELSE 'N' END AS FLAG6
+		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM07%' THEN 'Y' ELSE 'N' END AS FLAG7
+		 				, CASE WHEN M.CTRT_ITEMS LIKE '%CTRITEM99%' THEN 'Y' ELSE 'N' END AS FLAG9
 		 				, B.CLNT_NM
+		 				, NVL(CR.EQP_NM, CM.CTRT_NM) AS EQP_NM			--수주상세 설비명
+		 				, CR.ORDRS_QTY		--수주상세 대수
+						, CM.CLNT_PJT							--고객사프로젝트
+						, M.*
+						, CD.DEPT_NM					 AS MNG_DEPT_NM
+						, U.NAME 						 AS MNG_ID_NM
+						, (SELECT LISTAGG(SALES_CD, ',') WITHIN GROUP (ORDER BY SALES_CD) AS TRG_SALES_CD
+							 FROM TB_SM11D02
+							 WHERE CTRT_NO = M.CTRT_NO
+							) AS TRG_SALES_CD
 		 		  FROM TB_SM11M01 M
 						LEFT OUTER JOIN TB_BM02M01 B ON M.CLNT_CD = B.CLNT_CD
 						LEFT OUTER JOIN (
@@ -16,8 +39,8 @@
 										 GROUP BY MM.CTRT_NO, MM.ORDRS_CO_CD, MM.SALES_CD
 										) AS MD ON MD.CTRT_NO = M.CTRT_NO
 						LEFT OUTER JOIN TB_CR02D02 CR ON CR.SALES_CD = MD.SALES_CD
-						LEFT OUTER JOIN TB_CR02M01 CM ON CM.CO_CD    = CR.CO_CD
-						                             AND CM.ORDRS_NO = CR.ORDRS_NO
+						LEFT OUTER JOIN TB_CR02M01 CM ON CM.CO_CD    = M.ORDRS_CO_CD
+						                             AND CM.ORDRS_NO = M.ORDRS_NO
 						LEFT OUTER JOIN TB_BM02M01 D ON D.CLNT_CD = CM.ORDRS_CLNT_CD
 						LEFT OUTER JOIN TB_CM06M01 U ON U.ID = M.MNG_ID
 						LEFT OUTER JOIN TB_CM04M01 CD ON CD.DEPT_ID = M.MNG_DEPT_CD
@@ -25,7 +48,7 @@
               <if test="coCd !=null and !coCd.equals('')">
      	           AND M.CO_CD = #{coCd}
               </if>
-			   <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
+			  <if test="reqDtFrom != null and !reqDtFrom.equals('') and  reqDtTo != null and !reqDtTo.equals('')" >
 				   AND M.CTRT_DT BETWEEN TO_DATE( #{reqDtFrom},'YYYYMMDD') AND TO_DATE( #{reqDtTo},'YYYYMMDD')
 			  </if>
               <if test="clntCd !=null and !clntCd.equals('')">
@@ -52,8 +75,8 @@
 	          <if test="deptNm !=null and !deptNm.equals('')">
 		           AND CD.DEPT_NM LIKE '%'||#{deptNm}||'%'
 	          </if>
-	          <if test="deptId !=null and !deptId.equals('')">
-		           AND M.MNG_DEPT_CD = #{deptId}
+	          <if test="mngDeptCd !=null and !mngDeptCd.equals('')">
+		           AND M.MNG_DEPT_CD = #{mngDeptCd}
 	          </if>
 	          <if test="ctrtApprovalNo !=null and !ctrtApprovalNo.equals('')">
 		           AND M.CTRT_APPROVAL_NO = #{ctrtApprovalNo}
@@ -68,6 +91,27 @@
 					OR REPLACE(REPLACE(NVL(CR.EQP_NM, CM.CTRT_NM), '-', ''), ' ', '') LIKE '%'|| REPLACE(REPLACE(UPPER(#{searchValue}), '-', ''), ' ', '')||'%'
 					)
 			  </if>
+	 			)
+	 	, PLAN AS (
+					SELECT   
+					         CTRT_NO
+						   , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2010',CLMN_RATE)) AS PLAN_YUL1
+					       , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2010',CLMN_AMT))  AS PLAN_AMT1
+					       , MAX(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2010',CLMN_DT))   AS PLAN_DT1
+					       , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2020',CLMN_RATE)) AS PLAN_YUL2
+					       , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2020',CLMN_AMT))  AS PLAN_AMT2
+					       , MAX(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2020',CLMN_DT))   AS PLAN_DT2
+					       , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2030',CLMN_RATE)) AS PLAN_YUL3
+					       , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2030',CLMN_AMT))  AS PLAN_AMT3
+					       , MAX(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2030',CLMN_DT))   AS PLAN_DT3
+					       , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2040',CLMN_RATE)) AS PLAN_YUL4
+					       , SUM(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2040',CLMN_AMT))  AS PLAN_AMT4
+					       , MAX(decode(CLMN_PLAN_DIV,'PCHSCOSTDIV2040',CLMN_DT))   AS PLAN_DT4
+					       , SUM(CLMN_AMT) 											AS PLAN_AMT9
+					FROM TB_SM11D01 P
+					WHERE 1 = 1
+					  AND EXISTS (SELECT 1 FROM CT WHERE  P.CTRT_NO = CT.CTRT_NO)
+					GROUP BY P.CTRT_NO
 	 			)
 	 	, PAY AS (
 			 	SELECT R.CTRT_NO
@@ -93,16 +137,13 @@
 				  AND EXISTS (SELECT 1 FROM CT WHERE  R.CTRT_NO = CT.CTRT_NO)
 				GROUP BY R.CTRT_NO
 	 		)
-		SELECT
-            count(*)
-		FROM  CT M
-				LEFT OUTER JOIN PAY  ON PAY.CTRT_NO = M.CTRT_NO				--지급실적
-         WHERE 1=1
-         <if test="cmpletYn !=null and !cmpletYn.equals('')">
-   	       AND ((M.CTRT_AMT - NVL(PAY_AMT19, 0) = 0 AND #{cmpletYn} = 'Y')
-   	        OR (M.CTRT_AMT - NVL(PAY_AMT19, 0) != 0 AND #{cmpletYn} = 'N'))
-	     </if>
-
+	 		SELECT 	 count(*)
+				FROM CT M
+		         WHERE 1=1
+              	 <if test="cmpletYn !=null and !cmpletYn.equals('')">
+     	          AND ((M.CTRT_AMT - NVL(PAY_AMT19, 0) = 0 AND #{cmpletYn} = 'Y')
+     	           OR (M.CTRT_AMT - NVL(PAY_AMT19, 0) != 0 AND #{cmpletYn} = 'N'))
+		         </if>
 	</select>
 
 	<select id="selectContractList" parameterType="Map" resultType="CamelMap">
