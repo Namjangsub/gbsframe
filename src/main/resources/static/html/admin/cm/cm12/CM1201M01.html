@@ -385,7 +385,7 @@
 						$('#file_tree_area').height($('body').height() - 220) // 화면 Body 높이 919 - 그리드 기본크기 700px = 264
 						$('#file_area').height($('body').height() - 264) // 화면 Body 높이 919 - 그리드 기본크기 655 = 264
 					} catch (error) {
-						alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+						customAlert("오류 발생!! 전산실 연락 바랍니다", error.message);
 						return null; // 오류 발생 시 null 반환
 					} finally {
 						// console.log("함수 실행 완료.");
@@ -542,7 +542,7 @@
 		}).on("select_node.jstree", function(e, data) {
 		// 노드 선택 시 발생 이벤트
 			if (data.node.original.codeEtc == 'N') {
-// 				alert("자료를 저장할 수 없는 폴더입니다.");
+// 				customAlert("자료를 저장할 수 없는 폴더입니다.");
 				$("#"+data.node.id).attr("title","자료를 저장할 수 없는 폴더입니다.");
 			} else {			
 				//파일정보 show
@@ -667,23 +667,29 @@
 	function moveFile(fileKey) {
 		var rowLength = gridView.target.getList("selected").length;
 		if(rowLength < 1){
-			alert("이동할 문서를 선택하여야 작업이 가능합니다.");
+			customAlert("이동할 문서를 선택하여야 작업이 가능합니다.");
 			return false;
 		} else if (rowLength > 1){
-			alert("문서는 하나씩 이동 가능합니다.");
+			customAlert("문서는 하나씩 이동 가능합니다.");
 			return false;
 		} 
 		
 		var row = gridView.target.getList("selected")[0];
         if (row.fileUpdate != 'Y') {
-        	alert('파일 이동 권한이 없습니다.')
+        	customAlert('파일 이동 권한이 없습니다.')
         	return false;
         };		
-		
+
+        if (row.creatId != jwt.userId) {
+        	customAlert('파일 이동은 자룔를 등록한 담당자만 변경 가능합니다.')
+        	return false;
+        };		
+        
 		var fileKey = row.fileKey;
 		var paramObj = {
 			"fileKey" : fileKey,
-			"userId" : jwt.userId
+	        "coCd"    : $('#coCd_S').val(),
+			"userId"  : jwt.userId
 		}	
 		openSecondModal("/static/html/cmn/modal/treeSearch.html", 500, 720, "파일트리 검색", paramObj, function (tree) {
 			var checkedId = tree.get_checked()[0];
@@ -694,10 +700,10 @@
 			if(confirm( '"' + checkedNode.text + '" 폴더로 이동 하시겠습니까?')){
 				postAjax("/admin/cm/cm08/moveFile", paramObj, null, function(data){
 					if(data.resultCode == 200){
-						alert(data.resultMessage);
+						customAlert(data.resultMessage);
 						gridView.setData(0);
 					} else {
-						alert(data.resultMessage);	
+						customAlert(data.resultMessage);	
 					}
 				});
 			}
@@ -708,18 +714,24 @@
 	function deleteFile(fileKey) {
 		var rowLength = gridView.target.getList("selected").length;
 		if(rowLength < 1){
-			alert("삭제할 문서를 선택하여야 작업이 가능합니다.");
+			customAlert("삭제할 문서를 선택하여야 작업이 가능합니다.");
 			return false;
 		} else if (rowLength > 1){
-			alert("문서는 하나씩 삭제 가능합니다.");
+			customAlert("문서는 하나씩 삭제 가능합니다.");
 			return false;
 		} 
 		
 		var row = gridView.target.getList("selected")[0];
         if (row.fileDelete != 'Y') {
-        	alert('파일 삭제 권한이 없습니다.')
+        	customAlert('파일 삭제 권한이 없습니다.')
         	return false;
         };		
+		
+        if (row.creatId != jwt.userId) {
+        	customAlert('파일 삭제는 자룔를 등록한 담당자만 삭제 가능합니다.')
+        	return false;
+        };		
+        
 		var paramObj = {
 			"fileKey" : row.fileKey,
 			"userId" : jwt.userId
@@ -727,53 +739,88 @@
 		if(confirm(row.fileName + " 삭제하시겠습니까?")){
 			deleteAjax("/admin/cm/cm08/deleteFileCallAuth", paramObj, null, function(data){
 				if(data.resultCode == 200){
-					alert(data.deleteCount + '건 ' +  data.resultMessage);
+					customAlert(data.deleteCount + '건 ' +  data.resultMessage);
 					gridView.setData(0);
 				} else if(data.resultCode == 500){
-					alert(" 파일 삭제 작업에 오류가 발생하였습니다.");	
+					customAlert(" 파일 삭제 작업에 오류가 발생하였습니다.");	
 				} else if(data.resultCode == 900){
-					alert(data.resultMessage);	
+					customAlert(data.resultMessage);	
 				}
 			});
 		}
 	}
-	
+
 	function downloadFile(_fileKey, _filename) {
 		return new Promise(function(resolve, reject) {
 			var xhr = new XMLHttpRequest();
 			xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + _fileKey + "&userId=" + jwt.userId + "&coCd=" + $('#coCd_S').val(), true);
 			xhr.responseType = "blob";
 			xhr.setRequestHeader("Authorization", authorizationToken);
-			
-			xhr.onload = function() {
-				if (xhr.status === 200) {
-					var contentType = xhr.getResponseHeader("Content-Type");
-					// 오류 상황: Content-Type이 text/plain이면 서버가 오류 메시지를 반환한 것으로 간주
-					if (contentType && contentType.indexOf("text/plain") !== -1) {
-						var reader = new FileReader();
-						reader.onload = function(e) {
-							// reject 시, 파일명과 함께 오류 메시지 전달
-							reject("[" + _filename + "] " + e.target.result);
-						};
-						reader.readAsText(xhr.response);
-					} else {
-						// 정상적인 파일이면 다운로드 진행
-						var blob = xhr.response;
-						var url = window.URL.createObjectURL(blob);
-						var a = document.createElement('a');
-						a.href = url;
-						a.download = _filename;
-						document.body.appendChild(a);
-						a.click();
-						document.body.removeChild(a);
-						window.URL.revokeObjectURL(url);
-						resolve(); // 성공 시 resolve 호출
-					}
-				} else {
-					console.error("백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
-					reject("[" + _filename + "] 백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
-				}
-			};
+			xhr.onload = async function () {
+			  try {
+			        const status = xhr.status;
+			        const ct = (xhr.getResponseHeader("Content-Type") || "").toLowerCase();
+			        const cl = xhr.getResponseHeader("Content-Length");
+			        const dispo = xhr.getResponseHeader("Content-Disposition") || "";
+			        const xMsg = xhr.getResponseHeader("X-Error-Message") || "";
+			        const blob = xhr.response;
+
+			        // ---- 공통: 본문 없음(빈 파일) → 오류 ----
+			        const contentLengthIsZero = cl && String(cl).trim() === "0";
+			        const blobIsEmpty = !blob || blob.size === 0;
+
+			        if (status === 200) {
+			          // 1) 빈 바디면 오류(파일 없음으로 처리)
+			          if (contentLengthIsZero || blobIsEmpty) {
+			            const msg = `[${_filename}] 파일이 없습니다.`; // 정책에 따라 "권한이 없습니다."로 바꿔도 됨
+			            console.error(msg, "(HTTP 200 but empty body)");
+			            return reject(msg);
+			          }
+
+
+			          // 2) 서버가 메시지를 text/json으로 보냈다면 오류
+			          if (ct.startsWith("text/") || ct.includes("application/json") || ct.includes("html")) {
+			            let text = "";
+			            try { text = await readBlobAsText(blob); } catch {}
+			            const msgFromServer = xMsg || text || "다운로드 중 오류가 발생했습니다.";
+			            const normMsg = /권한|unauthoriz|forbidden/i.test(msgFromServer)
+			              ? `[${_filename}] 권한이 없습니다.`
+			              : `[${_filename}] ${msgFromServer}`;
+			            console.error(normMsg);
+			            return reject(normMsg);
+			          }
+
+			          // (선택) Content-Disposition 없이 오는 비정상 케이스를 방지하고 싶다면:
+			          // if (!/filename/i.test(dispo)) { return reject(`[${_filename}] 파일 헤더가 올바르지 않습니다.`); }
+
+			          // ---- 정상 파일 다운로드 ----
+			          const a = document.createElement('a');
+			          const blobUrl = URL.createObjectURL(blob);
+			          a.href = blobUrl;
+			          a.download = _filename || 'download';
+			          document.body.appendChild(a);
+			          a.click();
+			          document.body.removeChild(a);
+			          URL.revokeObjectURL(blobUrl);
+			          return resolve();
+			        }
+
+			        // ---- 200이 아닌 경우: 상태별 메시지 ----
+			        if (status === 401 || status === 403 || status === 404) {
+			          return reject(`[${_filename}]\n다운로드 권한이 없거나  파일이 없습니다.`);
+			        }
+// 			        if (status === 404) {
+// 			          return reject(`[${_filename}] 파일이 없습니다.`);
+// 			        }
+
+			        // 기타 오류: 본문에 메시지가 있으면 노출
+			        let text = "";
+			        try { text = await readBlobAsText(blob); } catch {}
+			        return reject(`[${_filename}] 서버 오류(${status}). ${xMsg || text || xhr.statusText}`);
+			      } catch (e) {
+			        return reject(`[${_filename}] 처리 중 예외: ${e.message || e}`);
+			      }
+			    };
 
 			xhr.onerror = function() {
 				console.error("네트워크 오류가 발생했습니다.");
@@ -785,7 +832,7 @@
 	}
 	
 	function uploadFile() {
-		alert("거래처, 제품, 아이템, SalesCode등 필수 정보가 필요하여\n통합파일관리 화면에서의 파일 업로드는 보류!\n\n관련 자료 관리화면에서 업로드하세요!.");	
+		customcustomAlert("거래처, 제품, 아이템, SalesCode등 필수 정보가 필요하여\n통합파일관리 화면에서의 파일 업로드는 보류!\n\n각 팀별 해당 업무 화면에서 업로드하세요!.");	
 	}
 
 	function downloadSelectRow() {
@@ -799,7 +846,7 @@
 		const denied = rows.filter(r => r.fileDown !== 'Y');
 		if (denied.length > 0) {
 			const names = denied.map(r => `[${r.rnum ?? ''}] ${r.fileName ?? '(이름없음)'}`).join('\n');
-			alert("파일 다운로드 권한이 없는 항목이 있습니다.\n\n" + names);
+			customAlert("파일 다운로드 권한이 없는 항목이 있습니다.\n\n" + names);
 			return false;
 		}
 
@@ -813,7 +860,7 @@
 		Promise.allSettled(downloadPromises).then(function(results) {
 			let errors = results.filter(r => r.status === "rejected").map(r => r.reason);
 			if (errors.length > 0) {
-				alert("전산실 연락바랍니다.\n\n" + errors.join("\n"));
+				customAlert("전산실 연락바랍니다.\n\n" + errors.join("\n"));
 			}
 		});
 	}
@@ -823,7 +870,10 @@
 		const rows = gridView.target.getList("selected");
 		
 		const canApproval = rows.length > 0 && rows.every(r => r.creatId === jwt.userId);
-		if (!canApproval) return;
+		if (!canApproval) {
+			$('#selectBtnAuth').hide();
+			return;
+		}
 		// 등록: 선택된 모든 행이 fileUp === 'Y' 일 때만
 		const canUpload = rows.length > 0 && rows.every(r => r.fileUp === 'Y');
 
