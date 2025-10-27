@@ -1,6 +1,5 @@
 package com.dksys.biz.admin.cm.cm09.service.impl;
 
-import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -15,7 +14,6 @@ import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm09.mapper.CM09Mapper;
 import com.dksys.biz.admin.cm.cm09.service.CM09Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
-import com.dksys.biz.util.DateUtil;
 import com.dksys.biz.util.ExceptionThrower;
 import com.google.gson.Gson;
 
@@ -71,6 +69,7 @@ public class CM09SvcImpl implements CM09Svc {
 		Map<String, String> fileMap = new HashMap<String, String>();
 		fileMap.putAll(paramMap);
 		//"FITR9901"은 공통코드에서 공지사항 첨부 디렉토리임
+		fileMap.put("coCd", paramMap.get("coCd"));
 		fileMap.put("comonCd", "FITR9901");
 		fileMap.put("fileTrgtTyp", "TB_CM09M01");
 		fileMap.put("fileTrgtKey", paramMap.get("notiKey"));
