@@ -52,7 +52,7 @@ public class PM10Svcimpl implements PM10Svc {
 			String fileTrgtKey = rawDate + "-" + deptCode;
 			Map<String, String> fileMap = new HashMap<>(paramMap);
 			fileMap.put("comonCd",     "FITR9901");
-			paramMap.put("coCd",       "GUN");
+			fileMap.put("coCd",       "GUN");
 			fileMap.put("fileTrgtTyp", "PM1002M01");
 			fileMap.put("fileTrgtKey", fileTrgtKey);
 			fileMap.put("jobType",     "fileList");
