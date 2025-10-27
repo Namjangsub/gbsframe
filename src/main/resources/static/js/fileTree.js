@@ -324,6 +324,15 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 				// 노드 선택 시 발생 이벤트
 
 				let targetTree = $(selector).jstree('get_selected',true)[0];
+				
+				if(data.node.original.isLeaf != "1" && data.node.id != "FILETREE"){
+					if (data.node.state.opened) {
+						$(selector).jstree(true).close_node(data.node.id);
+					} else {
+						$(selector).jstree(true).open_node(data.node.id);
+					}
+				}
+				
 				if (targetTree == undefined) {
 					$(popSelector + " #file_tag").html("파일저장Tree에는 문서를 저장할 수 없습니다.");
 					treeComonCd = "FILETREE";
@@ -375,8 +384,8 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 				// 노드 열릴 때
 				data.instance.set_type(data.node, 'unit-open');
 			}).on('close_node.jstree', function (e, data) {
-			// 노드 닫힐 때
-			data.instance.set_type(data.node, 'unit');
+				// 노드 닫힐 때
+				data.instance.set_type(data.node, 'unit');
 		})
 	}
 
