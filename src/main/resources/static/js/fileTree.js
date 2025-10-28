@@ -342,7 +342,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 					selectedNodeEtc = data.node.original.codeEtc;
 					var buttonFile = $(popSelector + " #button_file");
 					if (buttonFile.length) {
-						if (selectedNodeEtc == 'N') {
+						if (selectedNodeEtc == 'N' || targetTree.original.fileUp == 'N') {
 							buttonFile.hide();
 						} else {
 							buttonFile.show();
@@ -426,6 +426,9 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		tempObj["recordCnt"] = 99999999;
 		if (nodeId) {
 			tempObj["comonCd"] = nodeId;
+		}
+		if (fileTreeParamObj.fileTrgtTyp  == 'BM0501P01') {
+			tempObj["coC"] = '';
 		}
 //		tempObj["userId"] = jwt.userId; //initAll에서 처리
 		postAjax("/admin/cm/cm08/selectTreeFileList", tempObj, null, function (data) {
@@ -543,9 +546,10 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		let downLoadList = fileTreeGridView.target.list;
 		for (const elem of downLoadList) {
 //        	console.log(elem.fileName);
-			const result = await downLoadFile(elem.coCd, elem.fileKey, elem.fileNam);
+			const result = await downLoadFile(elem.coCd, elem.fileKey, elem.fileName);
 			if (result === 'ERROR') {
-				alert(`파일 다운로드 중 오류가 발생했습니다. 파일 이름: ${elem.fileName}. 관리자에게 문의하세요.`);
+				// alert(`파일 다운로드 중 오류가 발생했습니다. 파일 이름: ${elem.fileName}. 관리자에게 문의하세요.`);
+				customAlert(`권한이 없거나 파일이 없습니다. 파일 이름: ${elem.fileName}. 관리자에게 문의하세요.`);
 			}
 			// 0.1초 딜레이 추가
 			await delay(100);

@@ -105,7 +105,8 @@ public class BM05SvcImpl implements BM05Svc {
 		//---------------------------------------------------------------
 		HashMap<String, String> param = new HashMap<>();
 		param.put("userId", paramMap.get("userId"));
-		param.put("coCd", paramMap.get("coCd"));
+		// param.put("coCd", paramMap.get("coCd"));
+		param.put("coCd", "TRN");
 		param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
 		
 		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
@@ -138,6 +139,7 @@ public class BM05SvcImpl implements BM05Svc {
 		if (uploadFileList.size() > 0) {
 			paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
 			paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+			paramMap.put("coCd", "TRN");
 			cm08Svc.uploadFile(paramMap, mRequest);
 		}
 		
@@ -162,8 +164,11 @@ public class BM05SvcImpl implements BM05Svc {
 		//---------------------------------------------------------------
 		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
 		if (uploadFileList.size() > 0) {
+			HashMap<String, String> param = new HashMap<>();
 			//접근 권한 없으면 Exception 발생
-			paramMap.put("jobType", "fileUp");
+			param.putAll(paramMap);
+			param.put("jobType", "fileUp");
+			param.put("coCd", "TRN");
 			cm15Svc.selectFileAuthCheck(paramMap);
 		}
 		//---------------------------------------------------------------
@@ -180,6 +185,7 @@ public class BM05SvcImpl implements BM05Svc {
 		if (uploadFileList.size() > 0) {
 			paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
 			paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+			paramMap.put("coCd", "TRN");
 			cm08Svc.uploadFile(paramMap, mRequest);
 		}
 		//---------------------------------------------------------------
@@ -198,7 +204,7 @@ public class BM05SvcImpl implements BM05Svc {
 		List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
 		HashMap<String, String> param = new HashMap<>();
 		param.put("jobType", "fileDelete");
-		param.put("coCd", paramMap.get("coCd"));
+		param.put("coCd", "TRN");
 		param.put("userId", paramMap.get("userId"));
 		if (deleteFileList.size() > 0) {
 			for (Map<String, String> dtl : deleteFileList) {
