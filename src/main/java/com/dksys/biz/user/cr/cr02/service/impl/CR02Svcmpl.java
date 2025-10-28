@@ -350,6 +350,8 @@ public class CR02Svcmpl implements CR02Svc {
         paramMap.put("comonCd", param.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
         paramMap.put("coCd", param.get("coCd"));
         paramMap.put("ordrsNo", param.get("ordrsNo"));
+        paramMap.put("clntCd", param.get("clntCd"));
+        paramMap.put("prjctCd", param.get("prjctCd"));
         paramMap.put("uploadFileArr", param.get("uploadFileArr"));
 
         List<Map<String, String>> uploadFileList = gson.fromJson(paramMap.get("uploadFileArr"), mapList);
