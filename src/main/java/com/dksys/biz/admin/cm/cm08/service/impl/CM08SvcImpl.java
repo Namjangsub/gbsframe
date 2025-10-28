@@ -600,7 +600,9 @@ public class CM08SvcImpl implements CM08Svc {
         /******************************************************************************************
          * 1. 각 업무별 테이블에 있는 값을 기준으로설정하기
          *******************************************************************************************/
-        Map<String, String> m = cm08Mapper.selectMByTarget(paramMap);
+        Map<String, String> targetInfo = cm08Mapper.selectMByTarget(paramMap);
+		HashMap<String, String> m = new HashMap<>();
+		m.putAll(targetInfo);
         m.put("FILE_TRGT_TYP",typ); //String typ = nz(paramMap, "fileTrgtTyp");
 
         // 타입 결정 우선순위: salesCd > ordrsNo > clntCd > coCd
