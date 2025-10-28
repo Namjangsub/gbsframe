@@ -626,7 +626,7 @@ public class CM08SvcImpl implements CM08Svc {
          * 2. 추출가능한 자료를 기준으로 파일 저장 테이블 설정하기
          *******************************************************************************************/
         if ("SALES_CD".equals(type)) {
-            m.put("TYPE", "SALES_CD");
+            m.put("type", "SALES_CD");
             m.put("salesCd", salesCd);
             rm = cm08Mapper.selectMByRetriveValue(m); // 전부 허용
             if (rm == null) rm = Collections.<String,String>emptyMap();
@@ -636,7 +636,7 @@ public class CM08SvcImpl implements CM08Svc {
             return out;
 
         } else if ("ORDRS_NO".equals(type)) {
-            m.put("TYPE", "ORDRS_NO");
+            m.put("type", "ORDRS_NO");
             m.put("ordrsNo", ordrsNo);
             rm = cm08Mapper.selectMByRetriveValue(m); // ordrsNo, clntPjt, clntCd, coCd
             if (rm == null) rm = Collections.<String,String>emptyMap();
