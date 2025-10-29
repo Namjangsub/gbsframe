@@ -86,6 +86,7 @@
         </table>
               <input type="hidden" id="userId"    name="userId" data-search="userId" >
               <input type="hidden" id="pgmId"     name="pgmId" data-search="pgmId" value="PM0101M01">
+			  <select id="prdMngChk" data-kind="SPECRTS" hidden></select>
       </div>
     </div>
 
@@ -130,6 +131,7 @@
 	var today = new Date();  //카렌더 생성용
 	var lastDay = "01";  //상단 그리드의 마지막 선택일자 저장용
 	var lastMainIndex = "";  //상단 그리드의 마지막 선택 index 저장용
+	var prdMngChk = false;
 
 	ax5.ui.grid.formatter["issYn"] = function () {
 		var color = this.value == "N" ? "color-circle_02.png" : "color-circle_01.png";
@@ -452,7 +454,7 @@
 		postAjax("/admin/cm/cm04/selectDeptInfo", paramObj, null, function(data){
 			$("#deptNm_S").val(data.deptInfo.deptNm);
 		});
-	  	setByCoCd($("#coCd_S").val());
+	  	setByCoCd();
 
 	  	const today = new Date().toISOString();
 	  	$('#workYm').val(today.slice(0, 7));
@@ -479,8 +481,19 @@
 
 	// 사용자에 따른 코드 설정 , 회사코드 set
 	function setByCoCd() {
-		$('#coCd_S option:not([value="'+jwt.coCd+'"])').remove();		//사용자 coCd 코드 외 제거
-
+		if (jwt.userGrade == "USERS" || jwt.deptId == 'GUN20') {
+		} else {
+			$('#coCd_S option:not([value="'+jwt.coCd+'"])').remove();		//사용자 coCd 코드 외 제거
+			$('#workRptL_S option:not([value="'+jwt.deptId+'"])').remove();	//사용자 부서 코드외 제거
+			if ($('#prdMngChk option').attr('data-etc').replace(/\s/g,'').split(',').includes(jwt.userId)) {
+				$('#coCd_S option:not([value="'+jwt.coCd+'"])').remove();		//사용자 coCd 코드 외 제거
+				prdMngChk = true;
+			} else {
+				$('#deptNm_S').prop('readonly', true).val();		//사용자이름설정하고 읽기전용
+				$('a[onclick="openDeptTree();"]').remove();					//사용자검색 돋보기 제거
+				$('#coCd_S option:not([value="'+jwt.coCd+'"])').remove();		//사용자 coCd 코드 외 제거
+			}
+		}
 	}
 
 	// 월이바뀌면 그리드 헤드부터 새로 그리기
@@ -529,7 +542,8 @@
 			"coCd" : $('#coCd_S').val(),
 			"deptId": $('#deptId_S').val(),
 			"deptNm": $('#deptNm_S').val(),
-			"useYn": "Y"
+			"useYn": "Y",
+			"prdMngChk" : prdMngChk
 		};
 		openSecondModal("/static/html/cmn/modal/deptSearch.html", 300, 500, "부서 검색", paramObj, function (tree){
 			var checkedId = tree.get_checked()[0];

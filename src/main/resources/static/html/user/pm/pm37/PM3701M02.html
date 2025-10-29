@@ -99,6 +99,7 @@
         </table>
         	  <input type="hidden" id="deptId"    name="deptId">
               <input type="hidden" id="pgmId"     name="pgmId" value="PM3701M01">
+			  <select id="prdMngChk" data-kind="SPECRTS" hidden></select>
       </div>
     </div>
 
@@ -125,6 +126,7 @@
 
 <script type="text/javascript">
 var userName = '';
+var prdMngChk = false;
 
 var gridView = {
 	initView : function() {
@@ -267,18 +269,8 @@ var gridView = {
 
 		$("#coCd_S").val(jwt.coCd);
 		$("#deptId").val(jwt.deptId);
-		setByCoCd($("#coCd_S").val());
+		setByCoCd();
 
-		//슈퍼유저
-		if( jwt.userGrade == 'USERS') {
-			//작성자 비활성화
-			$("#workRptId_S").val(jwt.userId);
-			$("#workRptIdNm_S").val(jwt.userNm);
-		} else {
-			$('#workRptId_S').prop('readonly', true).val(jwt.userId);		//사용자iD 설정하고 읽기전용
-			$('#workRptIdNm_S').prop('readonly', true).val(jwt.userNm);		//사용자이름설정하고 읽기전용
-			$('a[onclick="openUserSearch();"]').remove();					//사용자검색 돋보기 제거
-		}
 
 		selectCodeList(workRptM_S);
 		
@@ -355,6 +347,7 @@ var gridView = {
 			  "coCd" : $('#coCd').val(),
 			  "userId" : $('#workRptId_S').val(),
 			  "userNm" : $('#workRptIdNm_S').val(),
+			  "prdMngChk"	: prdMngChk
 		};
 
 		openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
@@ -374,11 +367,24 @@ var gridView = {
 
 	// 사용자에 따른 코드 설정 , 회사코드 set 
 	function setByCoCd() {
-		$('#coCd_S option:not([value="'+jwt.coCd+'"])').remove();		//사용자 coCd 코드 외 제거
-		$('#workRptL_S option:not([value="'+jwt.deptId+'"])').remove();	//사용자 부서 코드외 제거
-		//$('#workRptId_S').prop('readonly', true).val(jwt.userId);		//사용자iD 설정하고 읽기전용
-		//$('#workRptIdNm_S').prop('readonly', true).val(jwt.userNm);		//사용자이름설정하고 읽기전용
-		//$('a[onclick="openUserSearch();"]').remove();					//사용자검색 돋보기 제거
+		if( jwt.userGrade == 'USERS' || jwt.deptId == 'GUN20') {
+			//작성자 비활성화
+			$("#workRptId_S").val(jwt.userId);
+			$("#workRptIdNm_S").val(jwt.userNm);
+		} else {
+			$('#coCd_S option:not([value="'+jwt.coCd+'"])').remove();		//사용자 coCd 코드 외 제거
+			$('#workRptL_S option:not([value="'+jwt.deptId+'"])').remove();	//사용자 부서 코드외 제거
+
+			if ($('#prdMngChk option').attr('data-etc').replace(/\s/g,'').split(',').includes(jwt.userId)) {
+				$("#workRptId_S").val(jwt.userId);
+				$("#workRptIdNm_S").val(jwt.userNm);
+				prdMngChk = true;
+			} else {
+				$('#workRptId_S').prop('readonly', true).val(jwt.userId);		//사용자iD 설정하고 읽기전용
+				$('#workRptIdNm_S').prop('readonly', true).val(jwt.userNm);		//사용자이름설정하고 읽기전용
+				$('a[onclick="openUserSearch();"]').remove();					//사용자검색 돋보기 제거
+			}
+		}
  	}
 
 	//Sales Code (수주마스터, 수주상세테이블 조인) 검색
@@ -399,33 +405,33 @@ var gridView = {
 	
 	
 	//작업 대분류/중분류/소분류
-	function selectCodeList(obj,value) {
-
+	function selectCodeList(obj, value) {
 		var listid = obj.id;
 		var codeKind = '';
 		var deptId = $("#deptId").val();
-		$("#workRptM_S").empty();
 
-		if (listid == 'workRptM_S'){
+		if (listid === 'workRptM_S') {
+			// 대분류 갱신
+			$('#workRptM_S').empty();
+			$('#workRptS_S').empty().append('<option value="">선택</option>'); // 소분류 초기화
 			codeKind = deptId.substr(0, 5);
+		} else if (listid === 'workRptS_S') {
+			// 소분류 갱신
+			$('#workRptS_S').empty();
+			codeKind = value; // 선택된 대분류 코드ID
+		} else {
+			return;
 		}
-		else {
-			codeKind = value;
-		}
-		
-		var paramObj = {"codeKind": codeKind};
+
+		var paramObj = { codeKind: codeKind };
 
 		postAjaxSync("/admin/cm/cm05/selectChildCodeList", paramObj, null, function(data){
-			var optionHtml = '';
-			var childCodeList = data.childCodeList;
-			
-			$.each(childCodeList, function(index, item){
-				optionHtml += '<option value='+item.codeId+'>';
-				optionHtml += item.codeNm;
-				optionHtml += '</option>';
+			var optionHtml = '<option value="">선택</option>';
+			var childCodeList = data.childCodeList || [];
+			$.each(childCodeList, function(_, item){
+				optionHtml += '<option value="' + item.codeId + '">' + item.codeNm + '</option>';
 			});
-
-			$('#'+listid).append(optionHtml);
+			$('#' + listid).append(optionHtml);
 		});
 		if($("#workRptM_S").val() == "" || $("#workRptM_S").val() == undefined){//리스트 박스 다시 선택값 선택시 리셋
 			$('#workRptS_S option[value!=""]').remove(); 
