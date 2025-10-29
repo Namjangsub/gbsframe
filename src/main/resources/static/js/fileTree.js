@@ -421,6 +421,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 			return false;
 		}
 		fileArr=[];
+		deleteFileArr = [];
 		tempObj = fileTreeParamObj;
 		tempObj["pageNo"] = 1;
 		tempObj["recordCnt"] = 99999999;

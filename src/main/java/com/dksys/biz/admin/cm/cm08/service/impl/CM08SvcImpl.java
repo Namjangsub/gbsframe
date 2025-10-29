@@ -600,9 +600,7 @@ public class CM08SvcImpl implements CM08Svc {
         /******************************************************************************************
          * 1. 각 업무별 테이블에 있는 값을 기준으로설정하기
          *******************************************************************************************/
-        Map<String, String> targetInfo = cm08Mapper.selectMByTarget(paramMap);
-		HashMap<String, String> m = new HashMap<>();
-		m.putAll(targetInfo);
+        Map<String, String> m = cm08Mapper.selectMByTarget(paramMap);
         m.put("FILE_TRGT_TYP",typ); //String typ = nz(paramMap, "fileTrgtTyp");
 
         // 타입 결정 우선순위: salesCd > ordrsNo > clntCd > coCd
@@ -623,11 +621,13 @@ public class CM08SvcImpl implements CM08Svc {
         Map<String, String> rm;
 
         /******************************************************************************************
-         * 2. 추출가능한 자료를 기준으로 파일 저장 테이블 설정하기
+         * 2. 추출가능한 자료를 기준으로 파일 저장 테이블 설정하기 
+         *    m --> camelMap 으로 생성되므로 값변경시 UPPER_SNAKE_CASE(모든글자 대문자, 단어사이는 _(underScore)로 구분
+         *    m.put("SALES_CD", salesCd)
          *******************************************************************************************/
         if ("SALES_CD".equals(type)) {
             m.put("type", "SALES_CD");
-            m.put("salesCd", salesCd);
+            m.put("SALES_CD", salesCd);
             rm = cm08Mapper.selectMByRetriveValue(m); // 전부 허용
             if (rm == null) rm = Collections.<String,String>emptyMap();
             fillOut(out,
@@ -637,7 +637,7 @@ public class CM08SvcImpl implements CM08Svc {
 
         } else if ("ORDRS_NO".equals(type)) {
             m.put("type", "ORDRS_NO");
-            m.put("ordrsNo", ordrsNo);
+            m.put("ORDRS_NO", ordrsNo);
             rm = cm08Mapper.selectMByRetriveValue(m); // ordrsNo, clntPjt, clntCd, coCd
             if (rm == null) rm = Collections.<String,String>emptyMap();
             fillOut(out,
