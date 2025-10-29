@@ -428,9 +428,6 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		if (nodeId) {
 			tempObj["comonCd"] = nodeId;
 		}
-		if (fileTreeParamObj.fileTrgtTyp  == 'BM0501P01') {
-			tempObj["coC"] = '';
-		}
 //		tempObj["userId"] = jwt.userId; //initAll에서 처리
 		postAjax("/admin/cm/cm08/selectTreeFileList", tempObj, null, function (data) {
 			fileArr = data.fileList;
