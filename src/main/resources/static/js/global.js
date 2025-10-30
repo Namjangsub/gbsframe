@@ -961,6 +961,7 @@ function deleteComma(elem) {
 
 // 원단위 콤마 추가 스트링변수용
 function addCommaStr(value) {
+	if (value === undefined || value === null) return "";  // 안전장치 추가
 	if(typeof value == "number"){
 		value = String(parseFloat(value.toFixed(3)));
 	}
