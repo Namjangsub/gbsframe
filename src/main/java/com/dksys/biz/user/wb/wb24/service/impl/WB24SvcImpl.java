@@ -227,7 +227,7 @@ public class WB24SvcImpl implements WB24Svc {
   	     *       -rowApprovalListArr : 문제등록의 결재정보
   	     *************************************************************************/
 
-	    if (!"ISSSTS03".equals(paramMap.get("issSts"))) {	//접수, 또는 진행중이면
+	    if (!"ISSSTS03".equals(paramMap.get("issSts")) && !"ISSSTS04".equals(paramMap.get("issSts"))) {	//접수, 또는 진행중이면
             QM01Mapper.updateWb24SharngList1(paramMap); // TB_WB20M03 --> SET ETC_FIELD3 = 'DEL' 로 변경처리
             QM01Mapper.updateWb24ApprovalList1(paramMap); // TB_WB20M03 --> SET ETC_FIELD3 = 'DEL' 로 변경처리
 
@@ -288,7 +288,7 @@ public class WB24SvcImpl implements WB24Svc {
   	     *    2-2. 문제처리 결과 등록 또는 수정 작업 진행
   	     *
   	     *************************************************************************/
-	    //진행상태가 완료("ISSSTS03") 일경우 결과 등록 또는 Update 진행
+	    //진행상태가 완료("ISSSTS03") 또는 진행상태("ISSSTS04") 일경우 결과 등록 또는 Update 진행
 //	    if ("ISSSTS03".equals(paramMap.get("issSts"))) {
 //			paramMap.put("reqNo", paramMap.get("actReqNo"));
 	    	//TB_WB24M03 테이블에 issNo 가 등록되어있는지 확인
