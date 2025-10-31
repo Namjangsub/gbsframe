@@ -65,6 +65,8 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 
 			fileTreeGridView.init(gridSelector, _fileList_area);
 
+			bindFileDropToGrid(_fileList_area);	// 파일첨부시 드래그 기능
+
 			//--------------------------------------------------------------------
 			//To-Do List에서 팝업창을 뛰우면 정보확인하고 결재버튼 클릭시 결재 처리를 위한 버튼 추가  시작
 			// 결재, 승인 버튼활성화를 위해서는 modalStack.last().paramObj.gridObj 에 결재 승인을 위한 파라메터 값이 있어야 함.
@@ -340,6 +342,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 					selectedNodeId = data.node.id;
 					selectedNodeText = data.node.text;
 					selectedNodeEtc = data.node.original.codeEtc;
+					window.selectedNodeFileUp = data.node.original.fileUp;	// 업로드 권한 확인
 					var buttonFile = $(popSelector + " #button_file");
 					if (buttonFile.length) {
 						if (selectedNodeEtc == 'N' || targetTree.original.fileUp == 'N') {
@@ -504,6 +507,51 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		//화면 그리드에서 삭제
 		fileTreeGridView.target.removeRow(rowIndex);
 
+	}
+
+	// 여러 파일 드래그로 파일첨부 기능 
+	function bindFileDropToGrid(fileListAreaSelector) {
+		var $area = $(fileListAreaSelector);
+		if (!$area.length) return false;
+
+		var $grid = $area.find('[data-ax5grid]');
+		if (!$grid.length) return false;
+
+		function prevent(e) {
+			e.preventDefault();
+			e.stopPropagation();
+		}
+
+		$grid.on('dragenter dragover', function(e){
+			prevent(e);
+			$grid.addClass('file-drop-hover');
+		});
+
+		$grid.on('dragleave', function(e){
+			prevent(e);
+			$grid.removeClass('file-drop-hover');
+		});
+
+		$grid.on('drop', function(e){
+			prevent(e);
+			$grid.removeClass('file-drop-hover');
+
+			var files = e.originalEvent.dataTransfer && e.originalEvent.dataTransfer.files
+				? e.originalEvent.dataTransfer.files
+				: null;
+			if (!files || !files.length) return false;
+
+			if (window.selectedNodeEtc === 'N') {
+				customAlert('저장하실 수 없는 폴더입니다.');
+				return false;
+			}
+			if (window.selectedNodeFileUp === 'N') {
+				customAlert('파일 업로드 권한이 없습니다.');
+				return false;
+			}
+
+			addFileToTree({ files: files });
+		});
 	}
 
 //    function downLoadFileAll() {
@@ -790,6 +838,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		downLoadFile:downLoadFile,
 		button_zoomUp:button_zoomUp,
 		callApprovalWorking:callApprovalWorking,
+		bindFileDropToGrid:bindFileDropToGrid
 	};
 
 
