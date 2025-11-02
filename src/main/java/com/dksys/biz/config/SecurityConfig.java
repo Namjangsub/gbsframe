@@ -39,7 +39,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 //        jsonLoginFilter.setAuthenticationFailureHandler(new SimpleUrlAuthenticationFailureHandler());
         jsonLoginFilter.setAuthenticationFailureHandler(customLoginFailureHandler);
 
-        http.cors().and()
+        http
+            .headers()
+            .frameOptions().sameOrigin()   // pdf.js, iframe 같은 오리진은 허용
+            .and()
+        	.cors().and()
             .csrf().disable()
             .formLogin().disable()
             .logout().disable()
