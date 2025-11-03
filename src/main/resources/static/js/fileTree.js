@@ -73,7 +73,9 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 			//--------------------------------------------------------------------
 //        	console.log(modalStack.last().paramObj.gridObj);
 			if (modalStack.last() != undefined) {
-				approvalWorkingGrid = modalStack.last().paramObj.gridObj; //결재 승인을 위한 파라메터 전역변수에 저장함
+//				approvalWorkingGrid = modalStack.last().paramObj.gridObj; //결재 승인을 위한 파라메터 전역변수에 저장함
+				const v = modalStack.last().paramObj?.gridObj;
+				approvalWorkingGrid = (typeof v === 'string') ? JSON.parse(v) : v;
 				if (approvalWorkingGrid != undefined) { //To-Do List에서 넘어온 작업임
 					modalStack.last().paramObj.gridObj = "";	//AJAX 직렬화 하지 않은 배열은 실행오류 발생됨으로 배열변수 Clear 처리함
 
