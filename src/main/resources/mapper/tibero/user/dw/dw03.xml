@@ -45,8 +45,6 @@
 	
 	
 	<select id="selectDrawDocTreeList" parameterType="Map" resultType="CamelMap">
-		<choose>
-  			<when test="salesCd != null and salesCd != ''">	
 			-- :leaf_id 바인드에 "마지막 노드의 NODE_ID" 입력
 			SELECT DISTINCT 
 			--    LEVEL                                        AS hop,          -- 리프=1, 부모=2, ... 루트=최대
@@ -61,33 +59,22 @@
 									SELECT NODE_ID
 									   FROM TB_DRAWING_DOC D
 									               LEFT OUTER JOIN TB_NODE_DOC N ON D.DOC_ID = N.DOC_ID
-									   WHERE SALES_CD LIKE ('%' || #{salesCd} || '%')
-									     AND SERVER_NAME = #{serverName}
+									   WHERE SERVER_NAME = #{serverName}
+					<choose>
+			  			<when test="salesCd != null and salesCd != ''">	
+										AND SALES_CD LIKE ('%' || #{salesCd} || '%')
+					  </when>
+					  <otherwise>
+						<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
+									    AND NVL(D.UPDATED_AT, D.CREATED_AT) BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) 
+									    AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+						</if>
+					  </otherwise>
+					</choose>
 									   GROUP BY NODE_ID
 								  )
 			CONNECT BY PRIOR n.PARENT_NODE_ID = n.NODE_ID   --  위로(부모방향) 진행
 			--ORDER BY LEVEL DESC                             -- 루트→리프 순으로 보고 싶으면 DESC, 리프→루트는 ASC
-		  </when>
-		
-		  <otherwise>
-		-- jsTree 기본 포맷: parent, id, text
-			SELECT
-			    NVL(TO_CHAR(PARENT_NODE_ID), '#') AS parent,  -- 루트는 '#'
-			    TO_CHAR(NODE_ID)                  AS id,      -- 고유 ID
-			    NAME                              AS text,    -- 표시 이름
---			    PATH_PREFIX                       AS path_base,
-			    'unit'                            AS type,    -- 필요 시 유형 구분
-			    '0'                               AS is_leaf  -- 폴더 노드 표시(문서 리프 붙일 땐 1)
-			FROM TB_PATH_NODE T
-			WHERE 1=1
-			  AND T.SERVER_NAME = #{serverName}
-			<if test="reqDtFrom != null and reqDtFrom != '' and reqDtTo != null and reqDtTo != ''">
-			  AND T.CREATED_AT BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) 
-			  AND to_date(REPLACE(#{reqDtTo},'-',''))+1
-			</if>
-		   ORDER BY PATH_PREFIX
-		  </otherwise>
-		</choose>
 	</select>
 	
 
