@@ -186,6 +186,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 				showLineNumber: true,
 				showRowSelector: false,
 				multipleSelect: false,
+				sortable : true,
 				header: {
 					selector: false
 				},
@@ -258,6 +259,9 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		},
 		reqSetData: function (list) {
 			var targetObj = this.target;
+			for (let i = 0; i < list.length; i++) {
+				list[i].fileSize = gPasFloatChk(list[i].fileSize);
+			}
 			//첨부 자료가 있으면 파일 영역 표시함
 			if (list.length > 0) {
 				$(fileTree_fileList_area + " #fileAttachTxt").hide();
