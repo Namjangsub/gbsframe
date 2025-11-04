@@ -111,10 +111,11 @@ public class SM07SvcImpl implements SM07Svc {
 			paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
 			paramMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 			cm08Svc.uploadFile(paramMap, mRequest);
+			result ++;
 		}
 		
 		for(String fileKey : deleteFileList) {
-			cm08Svc.deleteFile(fileKey);
+			result += cm08Svc.deleteFile(fileKey);
 		}
 		//---------------------------------------------------------------
 		//첨부 화일 처리  끝
