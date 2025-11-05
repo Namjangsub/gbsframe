@@ -82,7 +82,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 					//결재전이면 결재승인버튼 추가
 					//결재안된 상태이고 User와 결재자가 동일하면 결재버튼 활성화
 					if (approvalWorkingGrid.sanctnSttus == "N" && approvalWorkingGrid.todoId == jwt.userId) {
-						const actionType = (approvalWorkingGrid.todoDiv1CodeNm == '결재') ? '결재승인' : '공유확인';
+						const actionType = (approvalWorkingGrid.todoDiv1CodeNm == '결재') ? '결재처리' : '공유처리';
 						const todoKey = approvalWorkingGrid.todoKey;	//TO-Do 고유번호
 						const callCmd = `<button class="callApprovalWorking" onclick="treeModule.callApprovalWorking('${todoKey}', '${approvalWorkingGrid.creatPgm}')">${actionType}</button>`;
 						$('#popForm a:has(i.i_search_w)').removeAttr('onclick');  //popForm ID안에 있는 <a>태그중 자식으로 i태그 i_search_w 클래스가 있으면 onclick 제거--> 결재창과 중복 방지를 위함
@@ -129,7 +129,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 								approvalWorkingGrid = data.resultList[0]; //결재 승인을 위한 파라메터 전역변수에 저장함
 
 								//결재전이면 결재승인버튼 추가
-								const actionType = (approvalWorkingGrid.todoDiv1CodeNm == '결재') ? '결재승인' : '공유확인';
+								const actionType = (approvalWorkingGrid.todoDiv1CodeNm == '결재') ? '결재처리' : '공유처리';
 								const todoKey = approvalWorkingGrid.todoKey;	//TO-Do 고유번호
 								const callCmd = `<button class="callApprovalWorking" onclick="treeModule.callApprovalWorking('${todoKey}', '${params.fileTrgtTyp}')">${actionType}</button>`;
 

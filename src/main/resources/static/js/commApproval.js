@@ -4,6 +4,11 @@ function approvalConfirm() {
 	commApproval.confirmApproval();
 }
 
+//보완요청 버튼
+function approvalMemoComment() {
+	commApproval.approvalMemoComment();
+}
+
 //결재 메인
 function Approval(htmlParam, param, popParam) {
 	this.htmlParam = htmlParam;		//결재창 출력영역
@@ -63,6 +68,7 @@ function Approval(htmlParam, param, popParam) {
 			    	</table>
 			    	<div class="popup_bottom_btn" id="appBtnDiv">
 						<button id="appConfirmAnchor"  onclick="approvalConfirm();">결재승인</button>
+						<button id="appConfirmAnchor"  onclick="approvalMemoComment();">보완요청</button>
 					</div>
 		        </div>
 				<!--결재 테이블 end-->
@@ -100,6 +106,7 @@ function Approval(htmlParam, param, popParam) {
 				        $.each(list, function (idx, data) {
 		 					var html = trTempl;
 							html = html.replace(/@@deptId@@/g, data.todoId); // 각 행의 부서 코드
+							html = html.replace(/@@todoKey@@/g, data.todoKey); // 각 행의 부서 코드
 							//html = html.replace(/@@item1@@/gi, (idx+1));		//순번
 							html = html.replace(/@@item1@@/gi, data.sanctnSn);		//순번
 							html = html.replace(/@@item2@@/gi, data.todoNm);		//결재자명
@@ -198,7 +205,7 @@ function Approval(htmlParam, param, popParam) {
 				Object.assign(this.param, approvalParam);
 			}
 		} else {
-			alert( '결재란 영역을 찾을수 없습니다. \r\nex) <div id="approval_area"></div>');
+			customAlert( '결재란 영역을 찾을수 없습니다. \r\nex) <div id="approval_area"></div>');
 		}
 	}
 
@@ -207,9 +214,14 @@ function Approval(htmlParam, param, popParam) {
 		if( this.applyBtn ) {
 			$("#appBtnDiv").show();
 			$("#appConfirmAnchor").attr("onclick", "approvalConfirm()");
+			
+			const $tr = $("#appLine tr").find("font").closest("tr");
 			//본인 결재의견
-			let todoCfOpn = $("#appLine tr").find("font").closest("tr").find("textarea[name=todoCfOpn]").val();
-			if( todoCfOpn != "" ) {
+			const todoCfOpn = ($tr.find('textarea[name="todoCfOpn"]').val() ?? '').trim();
+			// 2) 상태값: textarea가 들어있는 td의 "바로 다음 td"
+			const status = $tr.find('textarea[name="todoCfOpn"]').closest('td').next('td').text().trim();   // "미승인" 또는 "승인"
+
+			if(status === '승인') {
 				$("#appConfirmAnchor").text("의견수정");
 			}
 		} else {
@@ -223,7 +235,7 @@ function Approval(htmlParam, param, popParam) {
 	//loop contents html
 	this.htmlTr = function() {
 		var html = `
-    		<tr data-dept-id="@@deptId@@" style="border-bottom:1px solid #dbdbdb;">
+    		<tr data-dept-id="@@deptId@@" data-todoKey="@@todoKey@@" style="border-bottom:1px solid #dbdbdb;">
     			<td class="appTd">@@item1@@</td>
     			<td class="appTd">@@bold@@@@item2@@</font></td>
     			<td class="appTd">@@item3@@</td>
@@ -252,7 +264,8 @@ function Approval(htmlParam, param, popParam) {
 		var actMh = gPasFloatChk($tr.find('input[name="actMh"]').val());
 		var requiredMh = $tr.find('input[name="requiredMh"]').val();
 		var actTeamManager = $tr.find('input[name="actTeamManager"]').val();
-		var todoCfOpn = $tr.find('textarea[name="todoCfOpn"]').val();
+//		var todoCfOpn = $tr.find('textarea[name="todoCfOpn"]').val();
+		var todoCfOpn = ($tr.find('textarea[name="todoCfOpn"]').val() ?? '').trim();
 
         //부서코드 영업, 기술연구소, 구매, 생산팀의 팀장이면 결과 등록시 해당팀의 소요공수 입력 필수임
         // $('#requiredMh').val() == 'YES'   담당팀 투입공수 필수입력 대상임 
@@ -292,12 +305,14 @@ function Approval(htmlParam, param, popParam) {
 				if(data.resultCode == 200){
 					confirmYn = true;
 					let todoYn = data.result.todoYn;
-					if( todoYn == "Y" ) {
+					if( todoYn == "Y" || todoCfOpn != '') {		//모든 결재요청이 완료되면 카톡 전송
+						paramMap.bigo = "";		//보완요청일경우만 자료가 있음.
+						
 						sendTodoFinal(paramMap);
 					}
 
 				} else {
-					alert("승인중 오류가 발생 되었습니다.");
+					customAlert("승인중 오류가 발생 되었습니다.");
 				}
 			});
 
@@ -312,7 +327,48 @@ function Approval(htmlParam, param, popParam) {
 			return false;
 		}
 	}
+
+	//보완요청 ajax
+	this.approvalMemoComment = function(param) {
+
+		// dept-id 기준으로 대상 tr 선택
+		var $tr = $('tr[data-dept-id="'+ jwt.userId+'"]').first();	
+		var todoCfOpn = ($tr.find('textarea[name="todoCfOpn"]').val() ?? '').trim();
+			// 조건에 맞는 첫 번째 tr의 data-todokey 값
+		const todoKey = $tr.attr('data-todokey');
+		if (todoCfOpn == '' ) {
+			customAlert('결재의견에 보완요청사항을 입력하고 보완요청 바랍니다.');
+			return false;
+		}
+		var paramMap = {
+				  userId 		: jwt.userId
+				, todoKey 		: todoKey
+				, todoCfOpn 	: todoCfOpn
+				, pgmId 		: "WB2001P01"
+		}
+		postAjaxSync("/user/wb/wb20/insertApprovalMemoComment", paramMap, null, function(data){
+			var list = data.result;
+			if (list != undefined) {
+//			    $.each(list, function (key, val) {  
+//			        if ($('#mForm #' + key)[0]) { 	                        	   
+//			            if (key == "todoDiv2CodeNm"){
+//			                $('.tit').text(val +' 보기');                             
+//			            }
+//			            $('#mForm #' + key).val(val);
+//			         }
+//			    });  
+			}
+			if(data.resultCode == 200){
+				list.creatPgm = "WB2001P01";
+				list.pgmId = "WB2001P01";
+				list.bigo = "보완요청";
+				
+				sendTodoFinal(list);
+			} else {
+				customAlert("보완요청 처리중 오류가 있습니다.  전산실 확인 바랍니다.");
+			}
+		});
+
+		return true;
+	}
 }
-
-
-

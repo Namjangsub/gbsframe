@@ -192,6 +192,20 @@ public class WB20SvcImpl implements WB20Svc {
 
 		return resultMap;
 	}
+	
+	/* 공통결재 보완요청 insert */
+	@Override
+	public Map<String, String> insertApprovalMemoComment(Map<String, String> paramMap) {
+		
+		int result = 0;
+		result += wb20Mapper.insertApprovalMemoComment(paramMap);
+		
+		// 최종결재 완료시 알림톡 발송 대상인지 확인
+		Map<String, String> resultMap = wb20Mapper.selectMobileTodoSelect(paramMap);
+		resultMap.put("resultCount", Integer.toString(result));
+
+		return resultMap;
+	}
 
 	// 결재라인 싱글 셀렉트 read
 	@Override
@@ -271,7 +285,7 @@ public class WB20SvcImpl implements WB20Svc {
 	}
 
 	@Override
-	public List<Map<String, String>> selectMobileTodoSelect(Map<String, String> paramMap) {
+	public Map<String, String> selectMobileTodoSelect(Map<String, String> paramMap) {
 		return wb20Mapper.selectMobileTodoSelect(paramMap);
 	}
 

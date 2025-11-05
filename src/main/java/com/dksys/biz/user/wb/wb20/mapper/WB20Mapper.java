@@ -56,7 +56,7 @@ public interface WB20Mapper {
 	int updateTodoMasterSanctnSn(Map<String, String> paramMap);
 
 
-	List<Map<String, String>> selectMobileTodoSelect(Map<String, String> paramMap);
+	Map<String, String> selectMobileTodoSelect(Map<String, String> paramMap);
 
 	Map<String, String> selectTodoFinalYn(Map<String, String> paramMap);
 
@@ -71,5 +71,7 @@ public interface WB20Mapper {
 	List<Map<String, String>> selectCurrentUserApprovalDataList(Map<String, String> paramMap);
 
     List<Map<String, String>> selectCurrentUserApprovalDataListFromTodoKey(Map<String, String> paramMap);
+
+	int insertApprovalMemoComment(Map<String, String> paramMap);
 
 }

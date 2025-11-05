@@ -143,6 +143,23 @@ public class WB20Ctr {
 
 	    	return "jsonView";
     }
+	  
+	  //공통 보완요청 버튼 백(등록)
+	  @PostMapping(value = "/insertApprovalMemoComment")
+	  public String insertApprovalMemoComment(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		  try {
+			  Map<String, String> result = wb20Svc.insertApprovalMemoComment(paramMap);
+	    	  model.addAttribute("result", result);
+	    	  
+			  model.addAttribute("resultCode", 200);
+			  model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+		  }catch(Exception e) {
+			  model.addAttribute("resultCode", 500);
+			  model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		  }
+		  
+		  return "jsonView";
+	  }
 
 	  // 결재라인 싱글 셀렉트 read
 	  @PostMapping(value = "/selectSignResUserlst")
@@ -185,7 +202,7 @@ public class WB20Ctr {
 
 	@PostMapping(value = "/selectMobileTodoSelect")
 	  public String selectMobileTodoSelect(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		  List<Map<String, String>> result = wb20Svc.selectMobileTodoSelect(paramMap);
+		  Map<String, String> result = wb20Svc.selectMobileTodoSelect(paramMap);
 		  model.addAttribute("result", result);
 		  return "jsonView";
 	  }
