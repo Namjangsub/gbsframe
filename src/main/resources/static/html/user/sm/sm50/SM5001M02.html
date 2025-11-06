@@ -406,7 +406,7 @@
 					} finally {
 						// console.log("함수 실행 완료.");
 					}
-				});
+				}, false);
      	}
 	}
 
@@ -547,9 +547,9 @@
   			$('#deptTree').jstree(true).deselect_all();
   			$('#deptTree').jstree(true).select_node(selectedId);
   		}).on("select_node.jstree", function(e, data) {
-			 if (!data.event) return;
-				const fileTrgtKey = data.node.original.rawId;     // LOWER_CD
-				const parentKey   = data.node.original.rawParent; 
+			//  if (!data.event) return;
+			const fileTrgtKey = data.node.original.rawId;     // LOWER_CD
+			const parentKey   = data.node.original.rawParent; 
   			// BOM정보 set
 //   			setBomInfo(data.node);
 			firstGrid.setData(fileTrgtKey, parentKey);
@@ -579,11 +579,10 @@
   		// 노드 생성 시
   			$('#deptTree').jstree(true).deselect_all();
   			$('#deptTree').jstree(true).select_node(data.node.id);
-  			setBomInfo(data.node);
   		}).on('dblclick.jstree', function(e, data) {
   			// 노드 더블클릭 시
-  			var node = $(this).jstree(true).get_node(this);
-  			createBom('U');
+			var node = $(this).jstree(true).get_node(this);
+			openOrFocusTab("/static/html/user/sm/sm50/SM5001M01.html");
   		}).on('copy_node.jstree', function(e, data) {
   		}).on('move_node.jstree', function(e, data){
   		// 노드 이동완료 시
@@ -617,36 +616,6 @@
 			deptTree = data.result;
 		});
 		return deptTree;
-	}
-		
-
-	// BOM 생성, 수정
-	function createBom(actionType){
-		if (!$("#bomUpdateBtn").length) return false; //수정버튼이 없는 사용자는 작업권한이 없어 수정 못함
-		var $deptTree = $("#deptTree").jstree(true);
-		if(!$deptTree.get_node('new')){
-			var bomId = $deptTree.get_selected()[0];
-			var parentNode = $deptTree.get_node(bomId);
-// 			$("#deptTree").jstree("open_all", bomId);  //해당노드 열기 실행
-			if(parentNode){
-		        var paramObj = {
-		                "coCd" : $('#coCd_S').val(),
-		                "actionType" : actionType,
-		                "fromJob"   :  'tree',
-		                "node" : parentNode,
-		                "rowData" : '',
-		            };
-		            openSecondModal("/static/html/user/sm/sm50/BM1401P02.html", $('body').width(), $('body').height()-40, "BOM 등록", paramObj, function (formData){
-						$('#deptTree').jstree(true).settings.core.data = selectDeptTree();
-		            	$('#deptTree').jstree(true).refresh();
-		            });				
-			}else{
-				alert("상위 BOM을 선택해 주세요.");
-			}
-			
-		}else{
-			alert("신규로 추가한 BOM을 저장해 주세요.");
-		}
 	}
 
 	function opendOrdrsSearch() {
@@ -772,31 +741,32 @@
 			});
 		}
 	}
-	
-	// BOM원가의견 입력/수정
-	function insertUpdateBomRemark() {
-		if ($('#salesCd_S').val() == "") {
-			return false;
-		}
-		if (!teamManagerYn && jwt.deptId != "TRN50") {
-			customAlert("구매외주팀장만 입력하실 수 있습니다.")
-			return false;
-		}
 
-		var paramObj = {
-			"userId" 		: jwt.userId,
-			"coCd" 			: $("#coCd_S").val(),
-			"salesCd" 		: $("#salesCd_S").val(),
-			"bomRemark" 	: $('#bomRemark').val(),
-			"pgmId" 		: $('#pgmId').val()
-		}
-		postAjax("/user/sm/sm50/insertUpdateBomRemark", paramObj, null, function(data) {
-			if (data.resultCode != 200) {
-				customAlert("저장에 실패하였습니다. 전산실에 문의 바랍니다.");
+	// 기존 모달 대신 새 탭으로 열기, 쿼리스트링에 정보를 담아 salesCd를 활용한다
+	// function openOrFocusTab(url) {
+	function openOrFocusTab(url) {
+		const tabName = "SM5001M01_TAB";	// 동일 탭 재사용용 이름
+		var $deptTree = $("#deptTree").jstree(true);
+		if(!$deptTree.get_node('new')){
+			var bomId = $deptTree.get_selected()[0];
+			var parentNode = $deptTree.get_node(bomId);
+			if(parentNode && parentNode.parent == $('#ordrsNo_S').val()){
+				var paramObj = {
+					"coCd" 		: $('#coCd_S').val(),
+					"salesCd" 	: parentNode.original.salesCd,
+				};
+				// 파라미터가 있으면 쿼리스트링 추가
+				const query = $.param(paramObj);
+				const finalUrl = query ? `${url}?${query}` : url;
+				const w = window.open(finalUrl, tabName);      // 이미 있으면 재사용
+
+				if (!w) { alert('팝업 차단을 해제하세요.'); return; }
+				w.focus();
+			}else{
+				customAlert("SALES CODE를 선택해 주세요.");
 			}
-		});
+		}
 	}
-	
 	</script>
   </body>
 </html>
