@@ -1,5 +1,6 @@
 package com.dksys.biz.user.sm.sm50.service.impl;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -80,6 +81,38 @@ public class SM50SvcImpl implements SM50Svc {
 	@Override
 	public Map<String, String> selectSalesCdSearchSm50Info(Map<String, String> paramMap) {
 		return bm50Mapper.selectSalesCdSearchSm50Info(paramMap);
+	}
+
+	@Override
+	public Map<String, String> selectOrdrsSearchSm50Info(Map<String, String> paramMap) {
+		return bm50Mapper.selectOrdrsSearchSm50Info(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectOrdrsBomCostTreeList(Map<String, String> paramMap) {
+
+		// 수주번호로 설비(salesCd)를 가져와서 반복해서 BOM비용산정 프로시저 호출
+		List<Map<String, String>> dtlList = bm50Mapper.selectSalesCdListByOrdrsNo(paramMap);
+		if (dtlList.size() > 0) {
+			
+			for (Map<String, String> dtl : dtlList) {
+				Map<String,String> param = new HashMap<>(paramMap);
+				param.put("salesCd", dtl.get("salesCd"));
+				// BOM비용 산정 프로시져 호출
+				bm50Mapper.callBomTempUpd(param);
+			}
+		}
+		return bm50Mapper.selectOrdrsBomCostTreeList(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectOrdrsBomAllCostList(Map<String, String> paramMap) {
+		return bm50Mapper.selectOrdrsBomAllCostList(paramMap);
+	}
+
+	@Override
+	public Map<String, String> selectOrdrsBomTrgtPchsPcostInfo(Map<String, String> paramMap) {
+		return bm50Mapper.selectOrdrsBomTrgtPchsPcostInfo(paramMap);
 	}
 
 }

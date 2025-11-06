@@ -539,27 +539,27 @@
 	</update>
 
 	<select id="selectSalesCdSearchSm50Info" parameterType="map" resultType="CamelMap">
-     SELECT T.*,
-            ORDRS_CLNT_CD,
-            ORDRS_DT,
-            ORDRS_DIV,
-            FN_CM05M01_CD_TO_NM(ORDRS_DIV) 	AS ORDRS_DIV_NM,
-            (SELECT PRDT_NM FROM TB_BM01M01 A WHERE A.PRDT_CD = T.PRDT_CD) AS PRDT_CD_NM,
-            FN_CM05M01_CD_TO_NM(ITEM_DIV) 	AS ITEM_DIV_NM,
-            CLNT_PJT,
-            FN_CM05M01_CD_TO_NM(CLNT_PJT) 	AS CLNT_PJT_NM,
-            CTRT_NM,
-            CURR_CD,
-            FN_CM05M01_CD_TO_NM(CURR_CD) 	AS CURR_CD_NM,
-            EXRATE,
-            ORDRS_AMT,
-            INPEXP_CD,
-            FN_CM05M01_CD_TO_NM(INPEXP_CD) 	AS INPEXP_CD_NM,
-            B.CLNT_NM  						AS ORDRS_CLNT_NM,
-            T.TRGT_PCHS_PCOST_MACH,
-            T.TRGT_PCHS_PCOST_ELCTY,
-            T.TRGT_PCHS_PCOST_MACH + T.TRGT_PCHS_PCOST_ELCTY  AS TRGT_PCHS_PCOST,
-            TOT.TOT_COST		--총원가(참조salesCd 포함 금액)
+     SELECT   T.*
+            , ORDRS_CLNT_CD
+            , ORDRS_DT
+            , ORDRS_DIV
+            , FN_CM05M01_CD_TO_NM(ORDRS_DIV) 	AS ORDRS_DIV_NM
+            , (SELECT PRDT_NM FROM TB_BM01M01 A WHERE A.PRDT_CD = T.PRDT_CD) AS PRDT_CD_NM
+            , FN_CM05M01_CD_TO_NM(ITEM_DIV) 	AS ITEM_DIV_NM
+            , CLNT_PJT
+            , FN_CM05M01_CD_TO_NM(CLNT_PJT) 	AS CLNT_PJT_NM
+            , CTRT_NM
+            , CURR_CD
+            , FN_CM05M01_CD_TO_NM(CURR_CD) 	AS CURR_CD_NM
+            , EXRATE
+            , ORDRS_AMT
+            , INPEXP_CD
+            , FN_CM05M01_CD_TO_NM(INPEXP_CD) 	AS INPEXP_CD_NM
+            , B.CLNT_NM  						AS ORDRS_CLNT_NM
+            , T.TRGT_PCHS_PCOST_MACH
+            , T .TRGT_PCHS_PCOST_ELCTY
+            , T.TRGT_PCHS_PCOST_MACH + T.TRGT_PCHS_PCOST_ELCTY  AS TRGT_PCHS_PCOST
+            , TOT.TOT_COST		--총원가(참조salesCd 포함 금액)
 			<if test="userId != null and userId != ''">
 			, (
 				  SELECT CASE WHEN COUNT(1) <![CDATA[ > ]]> 0 THEN 'Y' ELSE 'N' END
@@ -585,4 +585,382 @@
 		AND T.SALES_CD = #{salesCd}
 		AND T.CO_CD    = #{ordCoCd}
     </select>
+
+	<select id="selectOrdrsSearchSm50Info" parameterType="map" resultType="CamelMap">
+		WITH S AS (
+			SELECT
+				  CO_CD
+				, ORDRS_NO
+				, NVL(SUM(NVL(ORDRS_PRC_MACH,0)),0)                     AS TOT_ORDRS_PRC_MACH
+				, NVL(SUM(NVL(ORDRS_PRC_ELCTY,0)),0)                    AS TOT_ORDRS_PRC_ELCTY
+				, NVL(SUM(NVL(ORDRS_PRC,0)),0)                          AS TOT_ORDRS_PRC
+				, NVL(SUM(NVL(EST_EPCT_MAT_PRC,0)),0)                   AS TOT_EST_EPCT_MAT_PRC
+				, NVL(SUM(NVL(TRGT_PCHS_PCOST_MACH,0)),0)               AS TOT_TRGT_PCHS_PCOST_MACH
+				, NVL(SUM(NVL(TRGT_PCHS_PCOST_ELCTY,0)),0)              AS TOT_TRGT_PCHS_PCOST_ELCTY
+				, NVL(SUM(NVL(TRGT_PCHS_PCOST_IN_HOUSE_PRCSN,0)),0)     AS TOT_TRGT_PCHS_PCOST_IN_HOUSE_PRCSN
+				, NVL(SUM(NVL(LABOR_COST_MFG_COST,0)),0)                AS TOT_LABOR_COST_MFG_COST
+				, NVL(SUM(NVL(EST_TRGT_COST,0)),0)                      AS TOT_EST_TRGT_COST
+			FROM TB_CR02D02
+			WHERE CO_CD 	= #{coCd}
+			  AND ORDRS_NO 	= #{ordrsNo}
+			GROUP BY CO_CD, ORDRS_NO
+		)
+		SELECT
+			  M.CO_CD
+			, M.ORDRS_NO
+			, M.ORDRS_CLNT_CD
+			, M.ORDRS_DT
+			, M.ORDRS_DIV
+			, FN_CM05M01_CD_TO_NM(M.ORDRS_DIV)          AS ORDRS_DIV_NM
+			, M.CLNT_PJT
+			, FN_CM05M01_CD_TO_NM(M.CLNT_PJT)           AS CLNT_PJT_NM
+			, M.CTRT_NM
+			, M.CURR_CD
+			, FN_CM05M01_CD_TO_NM(M.CURR_CD)            AS CURR_CD_NM
+			, M.EXRATE
+			, M.ORDRS_AMT
+			, M.INPEXP_CD
+			, FN_CM05M01_CD_TO_NM(M.INPEXP_CD)          AS INPEXP_CD_NM
+			, B.CLNT_NM                                  AS ORDRS_CLNT_NM
+			, NVL(S.TOT_ORDRS_PRC_MACH,0)                AS TOT_ORDRS_PRC_MACH
+			, NVL(S.TOT_ORDRS_PRC_ELCTY,0)               AS TOT_ORDRS_PRC_ELCTY
+			, NVL(S.TOT_ORDRS_PRC,0)                     AS TOT_ORDRS_PRC
+			, NVL(S.TOT_EST_EPCT_MAT_PRC,0)              AS TOT_EST_EPCT_MAT_PRC
+			, NVL(S.TOT_TRGT_PCHS_PCOST_MACH,0)          AS TOT_TRGT_PCHS_PCOST_MACH
+			, NVL(S.TOT_TRGT_PCHS_PCOST_ELCTY,0)         AS TOT_TRGT_PCHS_PCOST_ELCTY
+			, NVL(S.TOT_TRGT_PCHS_PCOST_IN_HOUSE_PRCSN,0)AS TOT_TRGT_PCHS_PCOST_IN_HOUSE_PRCSN
+			, NVL(S.TOT_LABOR_COST_MFG_COST,0)           AS TOT_LABOR_COST_MFG_COST
+			, NVL(S.TOT_EST_TRGT_COST,0)                 AS TOT_EST_TRGT_COST
+			, NVL(S.TOT_TRGT_PCHS_PCOST_MACH,0) + NVL(S.TOT_TRGT_PCHS_PCOST_ELCTY,0)         AS TOT_COST
+		FROM TB_CR02M01 M
+						LEFT JOIN S ON S.CO_CD = M.CO_CD
+								   AND S.ORDRS_NO = M.ORDRS_NO
+						LEFT JOIN TB_BM02M01 B ON B.CLNT_CD = M.ORDRS_CLNT_CD
+		WHERE M.CO_CD 		= #{coCd}
+		  AND M.ORDRS_NO 	= #{ordrsNo}
+	</select>
+
+	<select id="selectOrdrsBomCostTreeList" parameterType="Map" resultType="CamelMap">
+		WITH
+			SALES_LIST AS ( /* ORDRS_NO에 속한 SALES_CD 목록 */
+				SELECT DISTINCT SALES_CD
+				FROM BOM_TEMP
+				WHERE CO_CD    = #{coCd}
+				AND ORDRS_NO = #{ordrsNo}
+				AND UPPER_CD = 'top'
+			),
+			SRC AS (        /* 해당 ORDRS_NO의 SALES_CD들만 범위로 */
+				SELECT T.*
+				FROM BOM_TEMP T
+				JOIN SALES_LIST S
+					ON T.SALES_CD = S.SALES_CD
+				WHERE T.CO_CD = #{coCd}
+			),
+			PCHS_BOM AS (   /* 부모(UPPER_CD)별 자식 수 */
+				SELECT CO_CD, UPPER_CD, COUNT(*) AS PCHS_BOM_CNT
+				FROM SRC
+				GROUP BY CO_CD, UPPER_CD
+			)
+			SELECT
+				  '#'            AS PARENT
+				, #{ordrsNo}     AS ID
+				, 'top'          AS UPPER_CD
+				, #{ordrsNo}     AS LOWER_CD
+				, <![CDATA['<span style=''color: red;''>' || #{ordrsNo} || '</span>' ]]>  AS TEXT
+				, 0              AS LVL
+				, NULL           AS DSGN_NO
+				, 'unit'         AS TYPE
+				, #{ordrsNo}     AS PATH
+				, #{coCd}        AS CO_CD
+				, NULL           AS SALES_CD
+				, NULL           AS MATR_NM
+				, NULL           AS BOM_QTY
+				, NULL           AS MATR_SPEC
+				, NULL           AS MATR_SIZE
+				, NULL           AS MATR_MAT
+				, NULL           AS MATR_RMK
+				, NULL           AS UPPER_NM
+				, #{ordrsNo}     AS LOWER_NM
+				, #{ordrsNo}     AS ORDRS_NO
+				, 0              AS PCHS_BOM_CNT
+				, #{ordrsNo}     AS RAW_ID
+				, 'top'          AS RAW_PARENT
+			FROM DUAL
+			WHERE EXISTS (SELECT 1 FROM SRC)
+			UNION ALL
+			SELECT
+				CASE WHEN T.UPPER_CD = 'top' THEN #{ordrsNo}
+					ELSE T.SALES_CD || '/' || T.UPPER_CD END				AS PARENT
+				, T.SALES_CD || '/' || T.LOWER_CD							AS ID
+				, T.UPPER_CD
+				, T.LOWER_CD
+				, <![CDATA[
+				(CASE WHEN NVL(D.PCHS_BOM_CNT,0) > 0
+					THEN '<span style=''color: red;''>' || T.LOWER_NM ||
+						CASE WHEN T.MATR_NM IS NOT NULL THEN '(' || T.MATR_NM || ')' ELSE '' END ||
+						' x ' || T.BOM_QTY || '</span>'
+					ELSE T.LOWER_NM ||
+						CASE WHEN T.MATR_NM IS NOT NULL THEN '(' || T.MATR_NM || ')' ELSE '' END ||
+						' x ' || T.BOM_QTY
+				END
+				|| ' [' || TO_CHAR(NVL(T.STD_AMT,0)+NVL(T.BAD_AMT,0),'FM999,999,999,999') || ']')
+				]]>                                                                    AS TEXT
+				, (LEVEL)                                                               AS LVL
+				, T.DSGN_NO
+				, CASE WHEN CONNECT_BY_ISLEAF = 1 THEN 'leaf' ELSE 'unit' END           AS TYPE
+				, REGEXP_REPLACE(
+					REPLACE(SYS_CONNECT_BY_PATH(T.LOWER_CD, ' -> '),
+						' -> '||T.SALES_CD||' -> ',
+						' -> '||#{ordrsNo}||' -> '||T.SALES_CD||' -> ')
+					, '^\s+\-\>\s+', '')                                                  AS PATH
+				, T.CO_CD
+				, T.SALES_CD
+				, T.MATR_NM
+				, T.BOM_QTY
+				, T.MATR_SPEC
+				, T.MATR_SIZE
+				, T.MATR_MAT
+				, T.MATR_RMK
+				, T.UPPER_NM
+				, T.LOWER_NM
+				, T.ORDRS_NO
+				, NVL(D.PCHS_BOM_CNT,0)                                                 AS PCHS_BOM_CNT
+				, T.LOWER_CD												AS RAW_ID      /* 서버 질의용 원본키 */
+				, T.UPPER_CD												AS RAW_PARENT
+			FROM SRC T
+						LEFT JOIN PCHS_BOM D ON D.CO_CD    = T.CO_CD
+											AND D.UPPER_CD = T.LOWER_CD
+			/* 다중 루트: 해당 ORDRS_NO의 각 SALES_CD 최상위에서 시작 */
+			START WITH T.UPPER_CD = 'top'
+					AND T.ORDRS_NO = #{ordrsNo}
+			CONNECT BY PRIOR T.LOWER_CD = T.UPPER_CD
+			ORDER BY LOWER_NM
+	</select>
+
+	<select id="selectSalesCdListByOrdrsNo" parameterType="Map" resultType="CamelMap">
+		SELECT SALES_CD
+		FROM TB_CR02D02
+		WHERE ORDRS_NO = #{ordrsNo}
+		AND SALES_CD IS NOT NULL
+	</select>
+
+	<select id="selectOrdrsBomAllCostList" parameterType="Map" resultType="CamelMap">
+		<!-- 1) 루트(수주번호) 가상행: 합계는 bomLevel과 무관 -->
+		<if test="fileTrgtKey == ordrsNo">
+			SELECT
+				  ''                AS PID
+				, #{ordrsNo}        AS ID
+				, #{ordrsNo}        AS VIEW_ID
+				, '.'||0            AS LVL
+				, #{ordrsNo}        AS PATH
+				, ''                AS MATR_UNIT_CD_NM
+				, ''                AS MATR_WT
+				, ''                AS MATR_UPR
+				, ''                AS MATR_AVRG_UPR
+				, ''                AS MATR_LAST_TRST_DT
+				, ''                AS PART_AMT
+				, ''                AS MATR_MAT
+				, ''                AS MATR_SPEC
+				, ''                AS MATR_SIZE
+				, ''                AS MATR_RMK
+				, #{coCd}           AS CO_CD
+				, #{ordrsNo}        AS ORDRS_NO
+				, ''                AS SALES_CD
+				, 'top'             AS UPPER_CD
+				, #{ordrsNo}        AS LOWER_CD
+				, ''                AS BOM_LVL
+				, ''                AS DSGN_NO
+				, ''                AS BOM_QTY
+				, ''                AS BOM_UPR
+				, ''                AS BOM_AMT
+				, '#'               AS UPPER_NM
+				, #{ordrsNo}        AS LOWER_NM
+				, ''                AS BOM_SEQ
+				, ''                AS BOM_TYPE
+				, ''                AS MATR_SEQ
+				, ''                AS MATR_CD
+				, ''                AS MATR_NM
+				, ''                AS BOM_PATH
+				, SUMS.STD_AMT      AS STD_AMT
+				, SUMS.BAD_AMT      AS BAD_AMT
+				, 0                 AS AS_AMT
+				, SUMS.GER_AMT      AS GER_AMT
+				, SUMS.ELEC_AMT     AS ELEC_AMT
+				, SUMS.TRUN_AMT     AS TRUN_AMT
+				, 0                 AS IN_PRC
+				, 0                 AS IN_QTY
+				, 0                 AS BAD_QTY
+				, 0                 AS IN_DTL_AMT
+				, ''                AS CREAT_ID
+				, SYSDATE           AS CREAT_DTTM
+				, SUMS.PCHS_GOODS_AMT AS PCHS_GOODS_AMT
+				, SUMS.RAW_MAT_AMT  AS RAW_MAT_AMT
+				, SUMS.PROC_GOODS_AMT AS PROC_GOODS_AMT
+				, SUMS.POST_PROC_AMT AS POST_PROC_AMT
+				, SUMS.TRANS_AMT    AS TRANS_AMT
+				, SUMS.ETC_AMT      AS ETC_AMT
+				, ''                AS MATR_GOODS_DIV
+				, ''                AS PCHS_CLNT_CD
+				, SUMS.CAM_AMT      AS CAM_AMT
+				, ''                AS MATR_SPEC2
+				, ''                AS MATR_SIZE2
+				, ''                AS MATR_MAT2
+				, ''                AS MATR_RMK2
+				, SUMS.AS_NON_PAY_AMT AS AS_NON_PAY_AMT
+				, SUMS.AS_PAY_AMT   AS AS_PAY_AMT
+				, SUMS.HUMAN_AMT    AS HUMAN_AMT
+				, ''                AS CLNT_NM
+			FROM (
+				SELECT
+					  NVL(SUM(CASE WHEN leaf_yn='Y' THEN STD_AMT        ELSE 0 END),0) AS STD_AMT
+					, NVL(SUM(CASE WHEN leaf_yn='Y' THEN BAD_AMT        ELSE 0 END),0) AS BAD_AMT
+					, NVL(SUM(CASE WHEN leaf_yn='Y' THEN AS_NON_PAY_AMT ELSE 0 END),0) AS AS_NON_PAY_AMT
+					, NVL(SUM(CASE WHEN leaf_yn='Y' THEN AS_PAY_AMT     ELSE 0 END),0) AS AS_PAY_AMT
+					, NVL(SUM(CASE WHEN leaf_yn='Y' THEN TRANS_AMT      ELSE 0 END),0) AS TRANS_AMT
+					, NVL(SUM(CASE WHEN leaf_yn='Y' THEN GER_AMT        ELSE 0 END),0) AS GER_AMT
+					, NVL(SUM(CASE WHEN leaf_yn='Y' THEN ELEC_AMT       ELSE 0 END),0) AS ELEC_AMT
+					, NVL(SUM(CASE WHEN leaf_yn='Y' THEN TRUN_AMT       ELSE 0 END),0) AS TRUN_AMT
+					, NVL(SUM(CASE WHEN leaf_yn='Y' THEN HUMAN_AMT      ELSE 0 END),0) AS HUMAN_AMT
+					, NVL(SUM(CASE WHEN leaf_yn='Y' THEN PCHS_GOODS_AMT ELSE 0 END),0) AS PCHS_GOODS_AMT
+					, NVL(SUM(CASE WHEN leaf_yn='Y' THEN RAW_MAT_AMT    ELSE 0 END),0) AS RAW_MAT_AMT
+					, NVL(SUM(CASE WHEN leaf_yn='Y' THEN PROC_GOODS_AMT ELSE 0 END),0) AS PROC_GOODS_AMT
+					, NVL(SUM(CASE WHEN leaf_yn='Y' THEN CAM_AMT        ELSE 0 END),0) AS CAM_AMT
+					, NVL(SUM(CASE WHEN leaf_yn='Y' THEN POST_PROC_AMT  ELSE 0 END),0) AS POST_PROC_AMT
+					, NVL(SUM(CASE WHEN leaf_yn='Y' THEN ETC_AMT        ELSE 0 END),0) AS ETC_AMT
+				FROM (
+					SELECT T.*,
+							CASE WHEN T.BOM_TYPE='M'
+									OR NOT EXISTS (
+										SELECT 1
+											FROM BOM_TEMP C
+											WHERE C.CO_CD    = T.CO_CD
+											AND C.ORDRS_NO = T.ORDRS_NO
+											AND C.UPPER_CD = T.LOWER_CD
+									)
+								THEN 'Y' ELSE 'N' END AS leaf_yn
+					FROM BOM_TEMP T
+					WHERE T.CO_CD    = #{coCd}
+						AND T.ORDRS_NO = #{ordrsNo}
+				) T
+				WHERE T.CO_CD    = #{coCd}
+				  AND T.ORDRS_NO = #{ordrsNo}
+			) SUMS
+		UNION ALL
+		</if>
+		SELECT
+			  CASE WHEN T.UPPER_CD = 'top' AND #{fileTrgtKey} = #{ordrsNo} THEN #{ordrsNo}
+				ELSE (CASE WHEN T.LOWER_CD = #{fileTrgtKey} THEN '' ELSE T.UPPER_CD END)
+			  END                                            AS PID
+			, T.LOWER_CD                                     AS ID
+			, DECODE(T.BOM_TYPE,'M', T.MATR_CD, T.LOWER_NM)  AS VIEW_ID
+			, (CASE WHEN #{fileTrgtKey} = #{ordrsNo} THEN '.'||LEVEL ELSE '.'||(LEVEL-1) END) AS LVL
+			, (CASE WHEN #{fileTrgtKey} = #{ordrsNo}
+					THEN #{ordrsNo} || ' -> ' ||
+						LTRIM(REGEXP_REPLACE(SYS_CONNECT_BY_PATH(T.LOWER_NM,' -> '),'^\s*\-\>\s*',''))
+					ELSE LTRIM(REGEXP_REPLACE(SYS_CONNECT_BY_PATH(T.LOWER_NM,' -> '),'^\s*\-\>\s*',''))
+			  END)                                         AS PATH
+			, FN_CM05M01_CD_TO_NM(M.MATR_UNIT)               AS MATR_UNIT_CD_NM
+			, M.MATR_WT
+			, M.MATR_UPR
+			, M.MATR_AVRG_UPR
+			, TO_CHAR(M.MATR_LAST_TRST_DT,'YYYY-MM-DD')      AS MATR_LAST_TRST_DT
+			, M.MATR_UPR * T.BOM_QTY                         AS PART_AMT
+			, DECODE(T.BOM_TYPE,'M',M.MATR_MAT,  T.MATR_MAT) AS MATR_MAT
+			, DECODE(T.BOM_TYPE,'M',M.MATR_SPEC, T.MATR_SPEC)AS MATR_SPEC
+			, DECODE(T.BOM_TYPE,'M',M.MATR_SIZE, T.MATR_SIZE)AS MATR_SIZE
+			, DECODE(T.BOM_TYPE,'M',M.MATR_RMK,  T.MATR_RMK) AS MATR_RMK
+			, T.CO_CD
+			, T.ORDRS_NO
+			, T.SALES_CD
+			, T.UPPER_CD
+			, T.LOWER_CD
+			, T.BOM_LVL
+			, T.DSGN_NO
+			, T.BOM_QTY
+			, T.BOM_UPR
+			, T.BOM_AMT
+			, T.UPPER_NM
+			, T.LOWER_NM
+			, T.BOM_SEQ
+			, T.BOM_TYPE
+			, T.MATR_SEQ
+			, T.MATR_CD
+			, T.MATR_NM
+			, T.BOM_PATH
+			, T.STD_AMT
+			, T.BAD_AMT
+			, T.AS_AMT
+			, T.GER_AMT
+			, T.ELEC_AMT
+			, T.TRUN_AMT
+			, T.IN_PRC
+			, T.IN_QTY
+			, T.BAD_QTY
+			, T.IN_DTL_AMT
+			, T.CREAT_ID
+			, T.CREAT_DTTM
+			, T.PCHS_GOODS_AMT
+			, T.RAW_MAT_AMT
+			, T.PROC_GOODS_AMT
+			, T.POST_PROC_AMT
+			, T.TRANS_AMT
+			, T.ETC_AMT
+			, T.MATR_GOODS_DIV
+			, T.PCHS_CLNT_CD
+			, T.CAM_AMT
+			, DECODE(T.BOM_TYPE,'M', M.MATR_SPEC, T.MATR_SPEC) AS MATR_SPEC2
+			, DECODE(T.BOM_TYPE,'M', M.MATR_SIZE, T.MATR_SIZE) AS MATR_SIZE2
+			, DECODE(T.BOM_TYPE,'M', M.MATR_MAT,  T.MATR_MAT)  AS MATR_MAT2
+			, DECODE(T.BOM_TYPE,'M', M.MATR_RMK,  T.MATR_RMK)  AS MATR_RMK2
+			, T.AS_NON_PAY_AMT
+			, T.AS_PAY_AMT
+			, T.HUMAN_AMT
+			, C.CLNT_NM
+		FROM BOM_TEMP T
+					LEFT OUTER JOIN TB_BM05M01 M ON T.MATR_CD = M.MATR_CD
+					LEFT OUTER JOIN TB_BM02M01 C ON T.PCHS_CLNT_CD = C.CLNT_CD
+		WHERE T.CO_CD    = #{coCd}
+		  AND T.ORDRS_NO = #{ordrsNo}
+		<if test="bomLevel != null and bomLevel != ''">
+			<choose>
+				<when test="fileTrgtKey == ordrsNo">
+					AND LEVEL <![CDATA[<=]]> (#{bomLevel} + 1)
+				</when>
+				<otherwise>
+					AND (LEVEL - 1) <![CDATA[<=]]> #{bomLevel}
+				</otherwise>
+			</choose>
+		</if>
+		<choose>
+			<when test="fileTrgtKey == ordrsNo">
+				START WITH T.UPPER_CD = 'top'
+				AND T.ORDRS_NO = #{ordrsNo}
+			</when>
+			<otherwise>
+				START WITH T.LOWER_CD = #{fileTrgtKey}
+							AND UPPER_CD = #{parent}
+			</otherwise>
+		</choose>
+		CONNECT BY PRIOR T.LOWER_CD = T.UPPER_CD
+		ORDER BY PATH
+	</select>
+
+
+
+
+
+	<select id="selectOrdrsBomTrgtPchsPcostInfo" parameterType="Map" resultType="CamelMap">
+		SELECT 
+			T.CO_CD
+			, T.ORDRS_NO
+			, SUM(NVL(T.STD_AMT,0))  AS STD_AMT
+			, SUM(NVL(T.BAD_AMT,0))  AS BAD_AMT
+			, SUM(NVL(T.AS_AMT,0))   AS AS_AMT
+			, SUM(NVL(T.HUMAN_AMT,0))AS HUMAN_AMT
+		FROM BOM_TEMP T
+		WHERE T.CO_CD = #{coCd}
+		AND T.ORDRS_NO = #{ordrsNo}
+		AND T.UPPER_CD = 'top'
+		GROUP BY T.CO_CD, T.ORDRS_NO
+	</select>
 </mapper>

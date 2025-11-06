@@ -95,5 +95,33 @@ public class SM50Ctr {
 		return "jsonView";
 	}
 
+	// 프로젝트별 매입원가현황 헤더 정보 조회
+	@PostMapping(value = "/selectOrdrsSearchSm50Info")
+	public String selectOrdrsSearchSm50Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = sm50Svc.selectOrdrsSearchSm50Info(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	// 프로젝트별 매입원가현황 BOM 정전개 트리 조회
+	@PostMapping("/selectOrdrsBomCostTreeList")
+	public String selectOrdrsBomCostTreeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		
+		List<Map<String, String>> result = sm50Svc.selectOrdrsBomCostTreeList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	// 프로젝트별 그리드 자식 트리 전체 리스트 조회
+    @PostMapping("/selectOrdrsBomAllCostList")
+    public String selectOrdrsBomAllCostList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+
+    	List<Map<String, String>> result = sm50Svc.selectOrdrsBomAllCostList(paramMap);
+    	model.addAttribute("result", result);
+    	Map<String, String> pcostInfo = sm50Svc.selectOrdrsBomTrgtPchsPcostInfo(paramMap);
+    	model.addAttribute("pcostInfo", pcostInfo);
+    	return "jsonView";
+    }
+
     
 }

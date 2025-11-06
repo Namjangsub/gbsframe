@@ -28,4 +28,14 @@ public interface SM50Mapper {
 
 	Map<String, String> selectSalesCdSearchSm50Info(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectOrdrsBomCostTreeList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectSalesCdListByOrdrsNo(Map<String, String> paramMap);
+
+	Map<String, String> selectOrdrsSearchSm50Info(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectOrdrsBomAllCostList(Map<String, String> paramMap);
+
+	Map<String, String> selectOrdrsBomTrgtPchsPcostInfo(Map<String, String> paramMap);
+
 }

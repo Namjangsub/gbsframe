@@ -11,8 +11,6 @@ public interface SM50Svc {
 	
 	List<Map<String, String>> selectBomAllCostList(Map<String, String> paramMap);
 
-	
-
 	List<Map<String, String>> selectBomAllLevelTempList(Map<String, String> paramMap);
 
 	Map<String, String> callBomTempUpd(Map<String, String> paramMap);
@@ -24,4 +22,12 @@ public interface SM50Svc {
 	int insertUpdateBomRemark(Map<String, String> paramMap) throws Exception;
 
 	Map<String, String> selectSalesCdSearchSm50Info(Map<String, String> paramMap);
+
+	Map<String, String> selectOrdrsSearchSm50Info(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectOrdrsBomCostTreeList(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectOrdrsBomAllCostList(Map<String, String> paramMap);
+
+	Map<String, String> selectOrdrsBomTrgtPchsPcostInfo(Map<String, String> paramMap);
 }
