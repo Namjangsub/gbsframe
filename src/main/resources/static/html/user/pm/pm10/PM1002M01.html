@@ -190,7 +190,6 @@ function fileCellFormatter() {
 	if (!this.item.isFileRow) return valueFormatter.call(this);
 
 	const colKey = this.key;
-	// filesByColumn 에 fileType 까지 담아두었다고 가정
 	const files  = (this.item.filesByColumn && this.item.filesByColumn[colKey]) || [];
 
 	// 1) 파일 리스트
@@ -203,7 +202,8 @@ function fileCellFormatter() {
 						: ''}
 					<span class="file-preview"
 						style="white-space: nowrap; text-decoration:underline; cursor:pointer;" 
-						data-filekey="${f.fileKey}" data-filename="${f.name}" data-filetype="${f.fileType}">${f.name}</span>
+						data-col="${colKey}" data-filekey="${f.fileKey}" data-filename="${f.name}" data-filetype="${f.fileType}">${f.name}
+					</span>
 				</li>`
 			).join('')}
 		</ul>`
@@ -411,7 +411,7 @@ const deptCodeMap = {
 
 						
 
-						// 구분에 따른 그리드 화면 조회
+					// 구분에 따른 그리드 화면 조회
 					const deptCols = Object.keys(deptCodeMap);
 					merged.forEach(item => {
 						deptCols.forEach(colKey => {
@@ -566,9 +566,8 @@ const deptCodeMap = {
 		// 파일 추가
 		$('[data-ax5grid="mnGrid-grid"]').on('click', '.file-add-btn', function(e) {
 			const colKey = $(this).data('col');
-			const $li = $(this).closest('[data-ax5grid-data-index]');
-			const dindex = +$li.attr('data-ax5grid-data-index');
-			const fileRow = mnGridView.target.list[dindex];
+			const fileRow = mnGridView.target.list.find(r => r.isFileRow === true);
+			if (!fileRow) return;
 
 			const normalRows = mnGridView.target.list.filter(r => !r.isFileRow);
 			const hasDeptValue = normalRows.some(r => r[colKey] && r[colKey].trim());
@@ -585,14 +584,9 @@ const deptCodeMap = {
 		// 파일 삭제
 		$('[data-ax5grid="mnGrid-grid"]').on('click', '.file-remove', function(e) {
 			e.stopPropagation();
-			const $btn = $(this);
-			const idx = $btn.data('idx');
-			const colKey = $btn.data('col');
-			currentFileColumn = colKey;
-
-			const $rowElem = $btn.closest('[data-ax5grid-data-index]');
-			const dindex = +$rowElem.attr('data-ax5grid-data-index');
-			const row = mnGridView.target.list[dindex];
+			const idx = $(this).data('idx');
+			const colKey = $(this).data('col');
+			const row = mnGridView.target.getList("selected")[0]
 
 			if (row.filesByColumn && row.filesByColumn[colKey]) {
 				const removed = row.filesByColumn[colKey].splice(idx, 1)[0];
@@ -607,20 +601,16 @@ const deptCodeMap = {
 		$('[data-ax5grid="mnGrid-grid"]').on('click', '.file-preview', function() {
 			const fileKey = $(this).data('filekey');
 			const fileName = $(this).data('filename');
-			const $li = $(this).closest('li');
-			const colKey = $li.data('col');
-			const dindex = +$li.closest('[data-ax5grid-data-index]').attr('data-ax5grid-data-index');
-			const row = mnGridView.target.list[dindex];
+			const colKey = $(this).data('col');
 
-			const allFiles = row.filesByColumn[colKey] || [];
+			const row = mnGridView.target.getList("selected")[0]
+			const allFiles = row.filesByColumn[colKey];
 			const imageList = allFiles
-// 				.filter(f => ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'heic'].includes((f.fileType || '').toLowerCase()))
 				.map(f => ({
 					fileKey: Number(f.fileKey),
 					fileName: f.name,
 					coCd: $('#coCd_S').val()
 				}));
-			
 			imageViewPopup('GUN', fileKey, fileName, imageList);
 		});
 
