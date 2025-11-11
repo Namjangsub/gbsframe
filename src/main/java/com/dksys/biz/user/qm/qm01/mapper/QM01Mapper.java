@@ -143,7 +143,8 @@ public interface QM01Mapper {
 
 	int clearWbsIssueReqNo(Map<String, String> paramMap);
 
-	String selectReqStCurrentStatus(Map<String, String> paramMap);
+	// String selectReqStCurrentStatus(Map<String, String> paramMap);
+	Map<String, String> selectReqStCurrentStatus(Map<String, String> paramMap);
 
     void deleteWorkReportSharngList(Map<String, String> paramMap);
 

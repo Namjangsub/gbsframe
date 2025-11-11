@@ -118,13 +118,18 @@ public class WB20SvcImpl implements WB20Svc {
 			// REQ_ST: REQST01 --> REQST02 로 상태 변경처
 			// result += qm01Mapper.updateReqStChk(paramMap);
 			paramMap.put("reqNo", tempReqNo);
-			String currReqSt = qm01Mapper.selectReqStCurrentStatus(paramMap);
-			if ("REQST03".equals(currReqSt)) {
+			// String currReqSt = qm01Mapper.selectReqStCurrentStatus(paramMap);
+			Map<String, String> currReqSt = qm01Mapper.selectReqStCurrentStatus(paramMap);
+			if ("REQST03".equals(currReqSt.get("reqSt"))) {
 				// 이미 완료처리이면 상태코드 변경안함
 				// 발주요청서 결재전에 발주요청서 결과 등록하여 결재완료인 경우 상태코드가 REQST03 으로 바뀌어 있음.
 				// 이후 발주요청서 결재처리하게되면 상태코드가 진행증:REQST02 로 바뀌는 문제 발생됨
 			} else {
-				result += qm01Mapper.updateReqSt(paramMap);
+				result += qm01Mapper.updateReqSt(paramMap);			// REQST02로 변경
+			}
+			// 동시처리건이면 팀장결재일때만 상태코드를 REQST03(완료)로 변경
+			if ("Y".equals(currReqSt.get("sameTimeResult"))) {
+				result += qm01Mapper.updateReqStRslt(paramMap);
 			}
 			// 결과일괄 등록 자료 결재시 투입공수 업데이트
 			if ("TEAM01".equals(paramMap.get("actTeamManager"))) {

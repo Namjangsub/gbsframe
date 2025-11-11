@@ -12,6 +12,17 @@ function approvalConfirm() {
 	}
 	$('#appConfirmAnchor').show();
 }
+
+//보완요청 버튼
+function approvalMemoComment() {
+	$('#appConfirmAnchor').hide();
+	if (commApproval.approvalMemoComment()) {
+		window.history.back();
+		return true;
+	}
+	$('#appConfirmAnchor').show();
+}
+
 //결재 메인
 function Approval(htmlParam, param, popParam) {
 	this.htmlParam = htmlParam;		//결재창 출력영역
@@ -78,6 +89,7 @@ function Approval(htmlParam, param, popParam) {
 			    	</table>
 			    	<div class="mobile_mid_btn" style="text-align: center; float:center; padding-top:10px;" id="appBtnDiv">
 					<button	type="button" style="height: 40px;  width: 90px;" id="appConfirmAnchor" onclick="approvalConfirm();" >${actionType}</button>
+					<button type="button" style="height: 40px;  width: 90px;" id="appConfirmAnchor"  onclick="approvalMemoComment();">보완요청</button>
 					<button type="button" class="close_btn" style="height: 40px;  width: 90px;" id="appConfirmAnchor" onclick="window.history.back();" >닫기</button>
 					</div>
 		        </div>
@@ -122,6 +134,7 @@ function Approval(htmlParam, param, popParam) {
 					        $.each(list, function (idx, data) {
 			 					var html = trTempl;
 								html = html.replace(/@@deptId@@/g, data.todoId); // 각 행의 부서 코드
+								html = html.replace(/@@todoKey@@/g, data.todoKey);
 								//html = html.replace(/@@item1@@/gi, (idx+1));		//순번
 								html = html.replace(/@@item1@@/gi, data.sanctnSn);		//순번
 								html = html.replace(/@@item2@@/gi, data.todoNm);		//결재자명
@@ -227,6 +240,16 @@ function Approval(htmlParam, param, popParam) {
 		if( this.applyBtn ) {
 			$("#appBtnDiv").show();
 			$("#appConfirmAnchor").attr("onclick", "approvalConfirm()");
+
+			const $tr = $("#appLine tr").find("font").closest("tr");
+			//본인 결재의견
+			const todoCfOpn = ($tr.find('textarea[name="todoCfOpn"]').val() ?? '').trim();
+			// 2) 상태값: textarea가 들어있는 td의 "바로 다음 td"
+			const status = $tr.find('textarea[name="todoCfOpn"]').closest('td').next('td').text().trim();   // "미승인" 또는 "승인"
+
+			if(status === '승인') {
+				$("#appConfirmAnchor").text("의견수정");
+			}
 		} else {
 			//hide
 			$("#appBtnDiv").hide();
@@ -238,7 +261,7 @@ function Approval(htmlParam, param, popParam) {
 	//loop contents html
 	this.htmlTr = function() {
 		var html = `
-    		<tr data-dept-id="@@deptId@@" style="border-bottom:1px solid #dbdbdb;">
+    		<tr data-dept-id="@@deptId@@" data-todoKey="@@todoKey@@" style="border-bottom:1px solid #dbdbdb;">
     			<td class="appTd">@@item1@@</td>
     			<td class="appTd">@@bold@@@@item2@@</font></td>
 				<td class="appTd">@@item3@@</td>
@@ -286,7 +309,9 @@ function Approval(htmlParam, param, popParam) {
 				var actMh = gPasIntChk($tr.find('input[name="actMh"]').val());
 				var requiredMh = $tr.find('input[name="requiredMh"]').val();
 				var actTeamManager = $tr.find('input[name="actTeamManager"]').val();
-				var todoCfOpn = $tr.find('textarea[name="todoCfOpn"]').val();
+				// var todoCfOpn = $tr.find('textarea[name="todoCfOpn"]').val();
+				var todoCfOpn = ($tr.find('textarea[name="todoCfOpn"]').val() ?? '').trim();
+
 
 				//부서코드 영업, 기술연구소, 구매, 생산팀의 팀장이면 결과 등록시 해당팀의 소요공수 입력 필수임
 				// $('#requiredMh').val() == 'YES'   담당팀 투입공수 필수입력 대상임 
@@ -323,12 +348,14 @@ function Approval(htmlParam, param, popParam) {
 					if(data.resultCode == 200){
 						confirmYn = true;
 						let todoYn = data.result.todoYn;
-						if( todoYn == "Y" ) {
+						if( todoYn == "Y" || todoCfOpn != '') {		//모든 결재요청이 완료되면 카톡 전송
+							paramMap.bigo = "";		//보완요청일경우만 자료가 있음.
+							
 							sendTodoFinal(paramMap);
 						}
 
 					} else {
-						alert("승인중 오류가 발생 되었습니다.");
+						customAlert("승인중 오류가 발생 되었습니다.");
 					}
 				});
 				if( confirmYn ) {
@@ -338,6 +365,48 @@ function Approval(htmlParam, param, popParam) {
 				}
 				return true;
 			} //결재 END
+	}
+
+	//보완요청 ajax
+	this.approvalMemoComment = function(param) {
+		// dept-id 기준으로 대상 tr 선택
+		var $tr = $('tr[data-dept-id="'+ jwt.userId+'"]').first();	
+		var todoCfOpn = ($tr.find('textarea[name="todoCfOpn"]').val() ?? '').trim();
+			// 조건에 맞는 첫 번째 tr의 data-todokey 값
+		const todoKey = $tr.attr('data-todokey');
+		if (todoCfOpn == '' ) {
+			customAlert('결재의견에 보완요청사항을 입력하고 보완요청 바랍니다.');
+			return false;
+		}
+		var paramMap = {
+				  userId 		: jwt.userId
+				, todoKey 		: todoKey
+				, todoCfOpn 	: todoCfOpn
+				, pgmId 		: "WB2001P01"
+		}
+		postAjaxSync("/user/wb/wb20/insertApprovalMemoComment", paramMap, null, function(data){
+			var list = data.result;
+			if (list != undefined) {
+//			    $.each(list, function (key, val) {  
+//			        if ($('#mForm #' + key)[0]) { 	                        	   
+//			            if (key == "todoDiv2CodeNm"){
+//			                $('.tit').text(val +' 보기');                             
+//			            }
+//			            $('#mForm #' + key).val(val);
+//			         }
+//			    });  
+			}
+			if(data.resultCode == 200){
+				list.creatPgm = "WB2001P01";
+				list.pgmId = "WB2001P01";
+				list.bigo = "보완요청";
+				sendTodoFinal(list);
+			} else {
+				customAlert("보완요청 처리중 오류가 있습니다.  전산실 확인 바랍니다.");
+			}
+		});
+
+		return true;
 	}
 
 
@@ -360,104 +429,149 @@ function Approval(htmlParam, param, popParam) {
 
 		//TODO 결재완료 알림톡
 		let paramSend = {
-				"tmplatDiv": "TMPLATDIV03"		//발송템플릿관리번호
-				, "todoDiv1CodeId": param.todoDiv1CodeId					//공통코드 해당업무 - 결재
-				, "todoDiv2CodeId": param.todoDiv2CodeId					//공통코드 해당업무 - 결재 - 발주서
+				"tmplatDiv"		  : "TMPLATDIV05"				//발송템플릿관리번호
+				, "todoDiv1CodeId": param.todoDiv1CodeId		//공통코드 해당업무 - 결재
+				, "todoDiv2CodeId": param.todoDiv2CodeId		//공통코드 해당업무 - 결재 - 발주서
 				, "todoDiv1CodeNm": "결재"						//공통코드 해당업무 - 결재 - 발주서
-				, "todoDiv2CodeNm": param.todoTitl + "["+param.todoDiv2CodeNm + param.todoNo +"]"  //공통코드 해당업무 - 결재 - 발주서 -- 템플릿 승인 후에는 삭제요망
-				, "sanctnDiv2": "결재"							//템플릿 결재구분2    #{sanctnDiv2} 처리 바랍니다.
-				, "todoNo": param.todoNo
-				, "clntCd": "1"					//발신회사는 로그인사용자 회사
-				, "creatPgm": param.pgmId
-				, "sanctnSn": "1"			//결재순번 1번을 결재상신자로 본다
+				, "todoDiv2CodeNm": param.todoDiv2CodeNm  		//공통코드 해당업무 - 결재 - 발주서 -- 템플릿 승인 후에는 삭제요망
+				, "sanctnDiv2"	  : "결재"						//템플릿 결재구분2    #{sanctnDiv2} 처리 바랍니다.
+				, "todoNo"	   	  : param.todoNo
+				, "clntCd"		  : "1"							//발신회사는 로그인사용자 회사
+				, "creatPgm"	  : param.pgmId
+				, "sanctnSn"	  : "1"							//결재순번 1번을 결재상신자로 본다
+				, "todoKey"		  : param.todoKey				//결재 고유 등록번호
+				, "todoTitl"	  : param.todoTitl
+				, "bigo"		  : (param?.bigo ?? '').trim()	//list.bigo = "보완요청";  결제 버튼 보완요청 처리시에만 전달됨
 		}
 		commKaKaoSendTodo(paramSend);
 	}
 
-	//to-do결재요청 알림톡
+	//to-do결재완료 메세지 알림톡
 	function commKaKaoSendTodo(param) {
-//	 	console.log('---카카오 발주서 결재모두완료시 알림톡발송시작 --' + param);
-		//알림톡수신번호 채번
-		var maxMessageId = null;			//message id(unique key)
-		var talkMessage = null 				//발송될 내용 template
-		var mobile = null					//수신인 휴대전화번호
-		var title = null					//todo title
-		var sendList = [];
-		let talkParam = {};
-		let talkBody = {};
+		//알림톡 API헤더 정보
+		let talkParam = {
+			authToken 	: "e/eDfZOFCsrBqadaECQ0+g==",
+			serverName 	: "gyitt2400",
+			paymentType : "P",
+		};
+		let talkBody = {
+			service :"2310086157",		//서비스번호(1000000000 - 예시  real : 2310086157
+			template: "10009",			//템플릿관리화면 템플릿ID	- 10004 번 결재완료시 템플릿으로 교체요망
+	// 		buttons : [{				//알림톡 타이틀, 버튼 설정 필수
+	// 		        name		: "웹링크버튼",
+	// 		        type		: "WL",
+	// 		        url_pc		: "http://pc.com/111",
+	// 		        url_mobile	: "http://moible.com/222"
+	// 		      }]
+		};
 		let sendCnt = 0;
-		postAjaxSync("/user/bm/bm18/selectMaxMessageIdTodo", param, null
-					, function(data) {
-						if(data.resultList.length > 0 ) {
-							if( data.resultList[0].maxMessageId != "" ) {
-								sendList = data.resultList;
-							} else {
-								alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
-								return;
-							}
 
-						}
-		});
-		//user search ajax end
+		postAjaxSync("/user/bm/bm18/selectMaxMessageIdTodoCompleted", param, null, function(data) {
 
-		//대상 loop
-		$.each(sendList, function (key, sendObj) {
-			maxMessageId = sendObj.maxMessageId;
-			talkMessage = sendObj.messageDesc;
-			mobile =  sendObj.telNo;
-			//로그용
-			param.rcvId = sendObj.todoId;			//todo 수신id
-			param.rcvNm = sendObj.name;				//todo 수신자명
-			param.nameTo = sendObj.name;				//todo 수신자명
-			title =   sendObj.name + " " + param.todoDiv2CodeNm   //sendObj.todoTitl;
-			param.title = title;								//요청내용제목
-			param.sendDt = sendObj.sendDt;
-			if (sendObj.todoCfOpn){
-				param.todoDiv2CodeNm += "\n["+ sendObj.name + " 코멘트:" + sendObj.todoCfOpn + "]";
-			}
-			var todayDate = new Date().format('yyyy-MM-dd HH:mm');
-			param.endDt = todayDate;
-
-			if(mobile == "" || mobile == null) {
-				alert('수신전화번호가 없습니다.\r\n['+clntNm+'] 거래처관리의 사업부 첫번째 항목을 확인해 주십시오.');
-				return;
-			}
-			if(talkMessage == "" || talkMessage == null) {
-				alert('발송할 내용이 없습니다.\r\n알림톡템플릿관리를 확인해 주십시오.');
-				return;
-			}
-			//message 치환
-			let message = talkMessage;
-			let splitStr = Array.from(message.matchAll('\\{(.*?)\\}'), match => `${match[0]}`);
-			//loop
-			$.each(splitStr, function (key, val) {
-				let compKey = val.substring(1, val.length-1);
-				if( compKey != "" && compKey != "undefined" ) {
-					if( typeof(param[compKey]) != "undefined" ) {
-						let val2 = '#'+val;
-						message = message.replaceAll(val2, param[compKey]);
-					}
+			if (data.resultList.length == 1 ) {
+				if( data.resultList[0].maxMessageId == "" ) {
+					alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
+					return false;
 				}
-			});
+				let sendObj = data.resultList[0]; 	//결재완료 통보대상자 정보
 
-			talkParam.authToken = "e/eDfZOFCsrBqadaECQ0+g==";
-			talkParam.serverName = "gyitt2400";
-			talkParam.paymentType = "P";
-			talkBody.service = "2310086157";				//서비스번호(1000000000 - 예시  real : 2310086157
-			talkBody.messageId = maxMessageId;			//고객사에서 관리하는 메시지No - 40byte (unique 값);
-			if (title.length > 50) {
-				title = title.substring(0, 49); // 50자까지만 자르기
+				let mobile = sendObj.telNo; 		//수신인 휴대전화번호
+				if(mobile == "" || mobile == null) {
+					return false;
+				}
+
+				//message 치환
+				let message = sendObj.messageDesc;	//발송될 내용 template
+				if(message == "" || message == null) {
+					return false;
+				}
+	// 			let title = sendObj.name + " " + param.todoDiv2CodeNm   //sendObj.todoTitl;
+				let title = "[" + param.todoDiv2CodeNm + " " + param.todoNo + "]"   //sendObj.todoTitl;
+				if (title.length > 50) {
+					title = title.substring(0, 49); // 50자까지만 자르기
+				}
+				title += " " + param.sanctnDiv2;
+				param.rcvId = sendObj.todoId;			//todo 수신id
+				param.rcvNm = sendObj.name;				//todo 수신자명
+				// param.nameTo = jwt.userNm;				//from 발신자명
+				param.nameTo = sendObj.name;			//todo 수신자명
+				param.sendDt = sendObj.sendDt;
+				param.mobile = sendObj.telNo;			//수신번호
+	// 			param.bussinessCnts = sendObj.todoTitl + " " + param.cnts;
+				param.bussinessCnts = `${(sendObj?.todoTitl ?? '').toString().trim()} ${(param?.cnts ?? '').toString().trim()}`.trim();
+				param.cnts = title;
+
+				const bigo = (param?.bigo ?? '').trim();	//보완요청건인지 체크하기 위함, "보완요청" --> 정상처리시 공백
+				if (sendObj.todoCfOpn){
+					if (bigo) {
+						param.confirmCnts = `[${jwt.userNm} 보완요청 결재보류 코멘트: ${sendObj.todoCfOpn}]\n보류 확인`;
+						param.cnts = title + " 보류 보완 요청";
+					} else {
+						param.confirmCnts = `[${jwt.userNm} 완료 코멘트: ${sendObj.todoCfOpn}]\n결재 확인`;
+						param.cnts = title + " 확인 요청";
+					}
+				} else {
+					param.confirmCnts = `[${jwt.userNm} ${param.sanctnDiv2} 완료 확인`;
+					param.cnts = title + " 요청";
+				}
+				var todayDate = new Date().format('yyyy-MM-dd HH:mm');
+				param.endDt = todayDate;
+	// 			let splitStr = Array.from(message.matchAll('\\{(.*?)\\}'), match => `${match[0]}`);
+	// 			//loop
+	// 			$.each(splitStr, function (key, val) {
+	// 				let compKey = val.substring(1, val.length-1);
+	// 				if( compKey != "" && compKey != "undefined" ) {
+	// 					if( typeof(param[compKey]) != "undefined" ) {
+	// 						let val2 = '#'+val;
+	// 						message = message.replaceAll(val2, param[compKey]);
+	// 					}
+	// 				}
+	// 			});
+				/*  내용 : #{cnts}
+					업무 : #{bussinessCnts}
+					요청일시 : #{sendDt}
+					요청자 : #{rcvNm}
+					#{confirmCnts} 바랍니다.
+					(주)건양아이티티/051-312-2400
+					
+					내용 : [발주/출장요청 REQ2503169] 결재 요청 건
+					업무 : 지상거래처,AK,출도(정상), 정상[발주/출장요청REQ2503169]
+					요청일시 : 2025-10-31 14:46
+					요청자 : 최지상
+					[남장섭 보완요청 코멘트(결재보류):현재 대응상황 점검 확인후 별도 보고 바람.] 확인 바랍니다.
+					(주)건양아이티티/051-312-2400
+					*/
+				// `{key}` 패턴을 찾아 `param` 객체에서 대응하는 값을 치환
+				Array.from(message.matchAll(/\{(.*?)\}/g), match => match[1]).forEach(compKey => {
+					if (compKey && param[compKey] !== undefined) {
+						message = message.replaceAll(`#{${compKey}}`, param[compKey]);
+					}
+				});
+				talkBody.messageId = sendObj.maxMessageId;			//고객사에서 관리하는 메시지No - 40byte (unique 값);
+				talkBody.mobile = mobile;				//휴대전화번호
+				talkBody.title = param.cnts;					//알림톡 타이틀 -
+				talkBody.message = message;				//알림톡 메시지 (1000 byte)
+	// 			talkBody =  {"service": "2310086157","title":"[최지상 발주/출장요청REQ2503169] 자료보완 요청","message": "내용 : 최지상 지상거래처,AK,출도(정상), 정상[발주/출장요청REQ2503169] 요청 건\n업무 : 지상거래처,AK,출도(정상), 정상[발주/출장요청REQ2503169]\n\n요청일시 : 2025-10-31 14:46\n요청자 : 남장섭\n\n[최지상 보완요청 코멘트(결재보류):현재 대응상황 점검 확인후 별도 보고 바람.] 확인 바랍니다.\n\n(주)건양아이티티/051-312-2400","messageId":"KKO25053097","mobile": "01063393764","template": "10009","buttons":[{"name":"웹링크버튼","type":"WL","url_pc":"http://pc.com/111","url_mobile":"http://moible.com/222"}]}
+				/*  최종 전대 메시지 JSON 형태
+					{
+						"service": "2310086157",
+						"template": "10009",
+						"messageId": "KKO25053072",
+						"mobile": "01063393764",
+						"title": "자료보완 요청",
+						"message": "내용 : 최지상 지상거래처,AK,출도(정상), 정상[발주/출장요청REQ2503169] 요청 건\n업무 : 지상거래처,AK,출도(정상), 정상[발주/출장요청REQ2503169]\n\n요청일시 : 2025-10-31 14:46\n요청자 : 남장섭\n\n[최지상 보완요청 코멘트(결재보류):현재 대응상황 점검 확인후 별도 보고 바람.] 확인 바랍니다.\n\n(주)건양아이티티/051-312-2400",
+					}
+				*/
+				
+				let talkJson = JSON.stringify(talkBody);
+				sendCnt = kakaoSendReal(talkJson, talkParam, param);
 			}
-			talkBody.title = title;					//알림톡 타이틀 -
-			talkBody.message = message;				//알림톡 메시지 (1000 byte)
-			talkBody.mobile = mobile;				//휴대전화번호
-			talkBody.template = "10006";			//템플릿관리화면 템플릿ID	- 10004 번 결재완료시 템플릿으로 교체요망
-			let talkJson = JSON.stringify(talkBody);
-			sendCnt = kakaoSendReal(talkJson, talkParam, param);
-		});
+			
+		});	//user search ajax end
+				
 		//대상 loop end
 		if( sendCnt > 0 ) {
-//	 		alert("알림톡 정상 발송되었습니다.");
+	// 		alert("알림톡 정상 발송되었습니다.");
 		}
-	}
+}
 }
