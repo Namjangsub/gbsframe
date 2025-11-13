@@ -2324,7 +2324,7 @@ function getGridExcelData(columnsKey, dataList){
 // 		exportJSONToExcel(targetJson, targetHeader, '프로젝트이슈');
 // 	}
 //---------------------------------------------------------------------------------
-function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'excel', _hiddenField = false) {
+function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'excel', _hiddenField = false, _footSumConfig = null) {
 	if (!_excelJsonData) {
 		customAlert('엑셀로 변환할 자료가 없습니다.')
 		return false;
@@ -2413,9 +2413,9 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 				lcCellKey.indexOf('mh') !== -1 ||
 				lcCellKey.indexOf('md') !== -1
 			) {
-					if (/^\d+$/.test(data[cellKey])) {
-						number = parseFloat(data[cellKey]);
-					}
+				if (typeof number === 'string' && /^\d+(\.\d+)?$/.test(number.replace(/,/g,''))) {
+				    number = parseFloat(number.replace(/,/g,''));
+				}
 
 			}
 
@@ -2453,13 +2453,14 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 			cell.border = headerBorder;
 			// 셀 폭 조정 (가장 긴 줄 기준)
 			const getMaxLineLength = (value) => {
-			    if (typeof value !== 'string') return value.toString().length;
-			    return value.split(/\r?\n/).reduce((max, line) => Math.max(max, line.length), 0);
+				if (value === null || value === undefined) return 0;
+				if (typeof value !== 'string') return value.toString().length;
+				return value.split(/\r?\n/).reduce((max, line) => Math.max(max, line.length), 0);
 			};
 			
 			
 			//셀폭은 기본 그리드 헤드 넓이를 기준으로 70% 크기의 셀폭을 최소 길이로 하고 컬럼 문자길이에 따라 조정합니다.
-			var cellValue = number !== undefined ? number.toString() : '';
+			var cellValue = (cell.value !== undefined && cell.value !== null) ? cell.value.toString() : '';
 			let maxLineLength = getMaxLineLength(cellValue);
 			maxLineLength = maxLineLength > 60 ? 60 : maxLineLength;
 			const curWidth = worksheet.getColumn(col + 1).width;
@@ -2479,6 +2480,72 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 //	let cell = worksheet.getCell(lastRow, 7);
 //	cell.value = { formula: 'SUM(A1:D1)' };
 
+	// ===================== (추가) footSum → 마지막 행 생성 =====================
+	const sumCells = normalizeFootSumConfig(_footSumConfig);
+	if (sumCells && sumCells.length > 0) {
+	    const totalCols = outFieldArr.length;     // 엑셀 내보내는 실제 열 개수
+	    let col = 1;                              // 1-based column index
+	    let sumRowIdx = (lastRow || 1) + 1;       // 데이터 다음 줄(데이터 없으면 헤더 다음)
+	
+	    // 합계 행 스타일
+	    const sumFill = { type: "pattern", pattern: "solid", fgColor: { argb: "EEEEEE" } };
+	    const sumFont = { name: '나눔고딕', size: 10, bold: true, color: { argb: "000000" } };
+	    const sumBorder = { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} };
+	
+	    sumCells.forEach(cellInfo => {
+	        if (col > totalCols) return; // 남은 열 없음
+	
+	        const span = Math.min(cellInfo.colspan || 1, totalCols - col + 1);
+	        const cell = worksheet.getCell(sumRowIdx, col);
+	
+	        // 값 계산/설정
+	        let raw = '';
+	        if (cellInfo.key && (cellInfo.collector || '').toLowerCase() === 'sum') {
+	            const val = sumOfKey(_excelJsonData, cellInfo.key);
+	            raw = val; // 숫자
+	            cell.value = val;
+				
+
+
+				if (typeof val === 'number') {
+					// 소숫점 이하 존재 여부 판단
+					if (Number.isInteger(val)) {
+						cell.numFmt = '#,##0'; // 정수: 천단위 콤마
+					} else {
+						cell.numFmt = '#,##0.00';  // 항상 소수점 둘째 자리까지 고정
+					}
+					cell.alignment = { horizontal: 'right', vertical: 'middle', wrapText: true }; // 숫자: 오른쪽 정렬 + 줄바꿈
+				} else {
+					cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }; // 문자열: 왼쪽 정렬 + 줄바꿈
+				}
+	        } else {
+	            raw = (cellInfo.label || '');
+	            cell.value = raw;
+	            let align = cellInfo.align || 'left';
+	            if (/총계|합계|계/i.test(raw)) align = 'center';
+	            cell.alignment = { horizontal: align, vertical: 'middle' };
+	        }
+	
+	        // 병합
+	        if (span > 1) {
+	            worksheet.mergeCells(sumRowIdx, col, sumRowIdx, col + span - 1);
+	        }
+	
+	        // 스타일(병합 영역 포함)
+	        for (let c = col; c < col + span; c++) {
+	            const cCell = worksheet.getCell(sumRowIdx, c);
+	            cCell.fill = sumFill;
+	            cCell.font = sumFont;
+	            cCell.border = sumBorder;
+	        }
+	
+	        col += span;
+	    });
+	
+	    lastRow = sumRowIdx;
+	}
+	// ===================== (추가 끝) ==========================================
+
 	// 파일 저장
 	workbook.xlsx.writeBuffer().then(function(buffer) {
 		let blob = new Blob([buffer], { type: "application/octet-stream" });
@@ -2494,6 +2561,51 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 			link.click();
 		}
 	});
+}
+
+// footSum 설정을 단일 배열[{label?, key?, collector?, formatter?, align?, colspan}]로 정규화
+function normalizeFootSumConfig(_footSumConfig) {
+  if (!_footSumConfig) return null;
+
+  // 형식 A: [ [ {...}, {...} ] ]
+  if (Array.isArray(_footSumConfig) && Array.isArray(_footSumConfig[0])) {
+    return _footSumConfig[0].map(c => ({
+      label: c.label || '',
+      key: c.key,
+      collector: c.collector,
+      formatter: c.formatter,
+      align: c.align || 'center',
+      colspan: Math.max(parseInt(c.colspan || 1, 10), 1)
+    }));
+  }
+
+  // 형식 B: { rows: [ { cols: [ {...} ] } ] }
+  if (_footSumConfig.rows && Array.isArray(_footSumConfig.rows) &&
+      _footSumConfig.rows[0] && Array.isArray(_footSumConfig.rows[0].cols)) {
+    return _footSumConfig.rows[0].cols.map(c => ({
+      label: (c.label === '&nbsp;' ? '' : (c.label || '')),
+      key: c.key,
+      collector: c.collector,
+      formatter: c.formatter,
+      align: c.align || 'center',
+      colspan: Math.max(parseInt(c.colspan || 1, 10), 1)
+    }));
+  }
+
+  return null;
+}
+
+// 숫자 합계 계산(문자열 숫자, 콤마 포함 케이스 허용)
+function sumOfKey(rows, key) {
+  let s = 0;
+  for (const r of rows) {
+    let v = r[key];
+    if (v === null || v === undefined || v === '') continue;
+    if (typeof v === 'string') v = v.replace(/,/g, '');
+    const num = Number(v);
+    if (!Number.isNaN(num)) s += num;
+  }
+  return s;
 }
 
 //********************************************************
