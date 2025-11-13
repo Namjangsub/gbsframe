@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import com.dksys.biz.admin.cm.cm12.service.CM12Svc;
+import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.util.MessageUtils;
 
 @Controller
@@ -43,4 +44,25 @@ public class CM12Ctr {
     	return "jsonView";
     }
 	
+
+
+    // 파일정보 트리 리스트 조회
+    @PostMapping("/selectDocFileTreeList")
+    public String selectDocFileTreeList(@RequestBody Map<String, String> param, ModelMap model) {
+    	List<Map<String, String>> docTreeList = cm12Svc.selectDocFileTreeList(param);
+    	model.addAttribute("docTreeList", docTreeList);
+    	return "jsonView";
+    }
+
+    //카테고리별 파일정보 리스트 조회
+    @PostMapping("/selectDocCustTreeFileList")
+    public String selectDocTreeFileList(@RequestBody Map<String, String> param, ModelMap model) {
+    	int totalCnt = cm12Svc.selectDocCustTreeFileCount(param);
+		PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
+    	model.addAttribute("paginationInfo", paginationInfo);
+    	
+    	List<Map<String, String>> fileList = cm12Svc.selectDocCustTreeFileList(param);
+    	model.addAttribute("fileList", fileList);
+        return "jsonView";
+    }
 }

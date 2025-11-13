@@ -9,4 +9,380 @@
 		WHERE CAL_DIV_CD = #{calDivCd}	 
 	</select>
 	
+
+	<select id="selectDocFileTreeList"  parameterType="Map" resultType="CamelMap">
+		WITH DT AS (
+			SELECT
+		          T.CO_CD
+		        , T.FILE_KEY
+		        , T.FILE_SIZE
+		        , T.FILE_TYPE
+		        , T.FILE_NAME
+		        , T.FILE_PATH
+		        , T.FILE_TRGT_TYP
+		        , F2.CODE_NM 										AS FILE_TRGT_TYP_NM
+		        , T.FILE_TRGT_KEY
+		        , T.USE_YN
+		        , T.CREAT_ID
+		        , D.NAME 											AS CREAT_NM
+		        , T.CREAT_PGM
+		        , T.CREAT_DTTM
+		        , A.CLNT_NM
+		        , NVL(A.CLNT_DIV_CD, 'CLNTDIV99') 					AS CLNT_DIV_CD
+		        , E.PRDT_NM
+		        , F.CODE_NM 										AS ITEM_NM
+		        , FN_CM05M01_CD_TO_NM(T.PRJCT_CD) 					AS PRJCT_NM
+		        , G.FILE_UP
+		        , G.FILE_DOWN
+		        , G.FILE_UPDATE
+		        , G.FILE_DELETE
+		        , TO_CHAR(NVL(T.CLNT_CD, 999999)) 	AS CLNT_CD
+		        , NVL(T.PRJCT_CD, 'ZZZZZ') 			AS PRJCT_CD
+		        , NVL(T.ORDRS_NO, 'ZZZZZ') 			AS ORDRS_NO
+		        , NVL(T.SALES_CD, 'ZZZZZ') 			AS SALES_CD
+		        , T.PRDT_CD
+		        , T.ITEM_CD
+		        , T.COMON_CD
+			FROM TB_CM08M01 T left outer join TB_BM02M01 A ON T.CLNT_CD = A.CLNT_CD
+		        LEFT OUTER JOIN TB_CM06M01 D ON T.CREAT_ID = D.ID
+		        LEFT OUTER JOIN TB_BM01M01 E ON T.PRDT_CD = E.PRDT_CD
+		        LEFT OUTER JOIN TB_CM05M01 F ON T.ITEM_CD = F.CODE_ID
+		        LEFT OUTER JOIN TB_CM05M01 F2 ON F2.CODE_KIND = 'DRPDIV' AND  F2.CODE_RPRC = T.FILE_TRGT_TYP
+		        LEFT OUTER JOIN TB_CM15M01 G ON T.COMON_CD = G.COMON_CD
+		    								AND G.CO_CD   = T.CO_CD
+									        AND G.USER_ID = #{userId}
+			WHERE 1=1
+	        <if test="coCd != null and !coCd.equals('')">
+	        AND T.CO_CD = #{coCd}
+	        </if>
+	    <if test="creatId != null and !creatId.equals('')">
+	        AND T.CREAT_ID= #{creatId}
+	    </if>
+	    <if test="creatNm != null and !creatNm.equals('')">
+	        AND D.NAME LIKE '%' || #{creatNm} || '%'
+	    </if>
+	    <if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+	        AND T.CREAT_DTTM BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+	    </if>
+	    <if test="searchValue != null and !searchValue.equals('') and searchName != null and !searchName.equals('')">
+	        AND ${searchValue} LIKE '%' || #{searchName} || '%'
+	    </if>
+	    <if test="clntCd != null and !clntCd.equals('')">
+	        AND T.CLNT_CD = #{clntCd}
+	    </if>
+	    <if test="clntNm != null and !clntNm.equals('')">
+	        AND A.CLNT_NM LIKE '%' || #{clntNm} || '%'
+	    </if>
+	    <if test="prdtCd != null and !prdtCd.equals('')">
+	        AND T.PRDT_CD = #{prdtCd}
+	    </if>
+	    <if test="prdtNm != null and !prdtNm.equals('')">
+	        AND E.PRDT_NM LIKE '%' || #{prdtNm} || '%'
+	    </if>
+	    <if test="prjctCd != null and !prjctCd.equals('')">
+	        AND T.PRJCT_CD LIKE #{prjctCd}
+	    </if>
+	    <if test="salesCd != null and !salesCd.equals('')">
+	        AND T.SALES_CD LIKE '%' || #{salesCd} || '%'
+	    </if>
+	    <if test="fileType != null and !fileType.equals('')">
+	        AND T.FILE_TRGT_TYP = #{fileType}
+	    </if>
+	    <if test="fileName != null and !fileName.equals('')">
+	        AND T.FILE_NAME LIKE '%' || #{fileName} || '%'
+	    </if>
+	    <if test="ordrsNo != null and !ordrsNo.equals('')">
+	        AND T.ORDRS_NO LIKE '%' || #{ordrsNo} || '%'
+	    </if>
+		)
+		SELECT 
+		          'CLNTDIV12' 					AS ID
+		        , '1.고객사' 					AS TEXT
+		        , '#'							AS PARENT  
+		        , 0								AS lvl
+		        , 0 AS IS_LEAF
+		        , 'unit'  AS TYPE
+		        , '' CLNT_CD
+		        , '' PRJCT_CD
+		        , '' ORDRS_NO
+		        , '' SALES_CD
+		        , 'CLNTDIV12'					AS CLNT_DIV_CD
+		FROM DUAL
+		UNION 
+		SELECT 
+		          'CLNTDIV99' 					AS ID
+		        , '9.공급사' 					AS TEXT
+		        , '#'							AS PARENT  
+		        , 0								AS lvl
+		        , 0 AS IS_LEAF
+		        , 'unit'  AS TYPE
+		        , '' CLNT_CD
+		        , '' PRJCT_CD
+		        , '' ORDRS_NO
+		        , '' SALES_CD
+		        , 'CLNTDIV99'					AS CLNT_DIV_CD
+		FROM DUAL
+		union	
+		SELECT DISTINCT 
+		          T.CO_CD||T.CLNT_CD	 					AS ID
+		        , NVL(T.CLNT_NM, '거래처없음') 				AS TEXT
+		        , CASE WHEN T.CLNT_DIV_CD = 'CLNTDIV12' THEN T.CLNT_DIV_CD ELSE 'CLNTDIV99' END AS PARENT  
+		        , 1											AS lvl
+		        , 0 AS IS_LEAF
+		        , 'unit'  AS TYPE
+		        , T.CLNT_CD
+		        , '' PRJCT_CD
+		        , '' ORDRS_NO
+		        , '' SALES_CD
+		        , T.CLNT_DIV_CD
+		FROM DT T
+		union	
+		SELECT DISTINCT 
+		          T.CO_CD||T.CLNT_CD ||T.PRJCT_CD		 	AS ID
+		        , NVL(T.PRJCT_NM, '프로젝트없음') 			AS TEXT
+		        , T.CO_CD||T.CLNT_CD						AS PARENT  
+		        , 2											AS lvl
+		        , 0 AS IS_LEAF
+		        , 'unit'  AS TYPE
+		        , T.CLNT_CD
+		        , T.PRJCT_CD
+		        , '' ORDRS_NO
+		        , '' SALES_CD
+		        , T.CLNT_DIV_CD
+		FROM DT T
+		union	
+		SELECT DISTINCT 
+		          T.CO_CD||T.CLNT_CD ||T.PRJCT_CD||T.ORDRS_NO AS ID
+		        , CASE WHEN T.ORDRS_NO = 'ZZZZZ' THEN '수주번호없음' ELSE T.ORDRS_NO END AS TEXT
+		        , T.CO_CD||T.CLNT_CD ||T.PRJCT_CD			AS PARENT  
+		        , 3											AS lvl
+		        , 0 AS IS_LEAF
+		        , 'unit'  AS TYPE
+		        , T.CLNT_CD
+		        , T.PRJCT_CD
+		        , T.ORDRS_NO
+		        , '' SALES_CD
+		        , T.CLNT_DIV_CD
+		FROM DT T
+		union	
+		SELECT DISTINCT 
+		          T.CO_CD||T.CLNT_CD ||T.PRJCT_CD||T.ORDRS_NO||T.SALES_CD AS ID
+		        , CASE WHEN T.SALES_CD = 'ZZZZZ' THEN '기계번호없음' ELSE T.SALES_CD END AS TEXT
+		        , T.CO_CD||T.CLNT_CD ||T.PRJCT_CD||T.ORDRS_NO	AS PARENT  
+		        , 4												AS lvl
+		        , 1 AS IS_LEAF
+		        , 'leaf'  AS TYPE
+		        , T.CLNT_CD
+		        , T.PRJCT_CD
+		        , T.ORDRS_NO
+		        , T.SALES_CD
+		        , T.CLNT_DIV_CD
+		FROM DT T
+		ORDER BY PARENT, TEXT, ID
+	</select>
+	
+    <select id="selectDocCustTreeFileCount" parameterType="Map" resultType="int">
+        SELECT
+        	COUNT(*)
+		    FROM
+		        TB_CM08M01 T left outer join TB_BM02M01 A ON T.CLNT_CD = A.CLNT_CD
+					            LEFT OUTER JOIN (
+											        SELECT  CODE_ID ID,
+											                CODE_NM TEXT,
+											                CODE_KIND PARENT,
+											                CODE_DESC PARENT_NM,
+											                SORT_NO,
+											                USE_YN,
+											                LPAD(' ', 3*(LEVEL-1)) || LEVEL lvl,
+											                REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_NM, '\'), '^\s+\-\>\s+', '') as LPATH,
+											                CONNECT_BY_ISLEAF AS IS_LEAF
+											        FROM TB_CM05M01
+											        START WITH CODE_ID ='FILETREE'
+											        CONNECT BY PRIOR CODE_ID = CODE_KIND
+											        ORDER SIBLINGS BY CODE_ID ASC) B1 ON T.COMON_CD = B1.ID
+		            LEFT OUTER JOIN TB_CM06M01 D ON T.CREAT_ID = D.ID
+		            LEFT OUTER JOIN TB_BM01M01 E ON T.PRDT_CD = E.PRDT_CD
+		            LEFT OUTER JOIN TB_CM05M01 F ON T.ITEM_CD = F.CODE_ID
+		            LEFT OUTER JOIN TB_CM15M01 G ON T.COMON_CD = G.COMON_CD
+		        								AND G.CO_CD   = T.CO_CD
+        								        AND G.USER_ID = #{userId}
+		        WHERE 1=1
+		        <if test="coCd != null and !coCd.equals('')">
+		            AND T.CO_CD = #{coCd}
+		        </if>
+		        <if test="clntDivCd.equals('CLNTDIV12')">	--고객사인 경우 고객사만 선택        
+		        	AND A.CLNT_DIV_CD = 'CLNTDIV12'
+		        </if>
+		        <if test="!clntDivCd.equals('CLNTDIV12')"> --공급사인 경우 고객사가 아닌 거래처만 선택	           
+		        	AND NVL(A.CLNT_DIV_CD, 'CLNTDIV99') != 'CLNTDIV12'
+		        </if>		  						
+		        <if test="fileTrgtKey != null and !fileTrgtKey.equals('')">
+		            AND T.FILE_TRGT_KEY= #{fileTrgtKey}  --파일타겟 키값이 있으면 반드시 파일타겟 타입이 있어야 함
+		            AND T.FILE_TRGT_TYP= #{fileTrgtTyp}
+		        </if>
+		        <if test="creatId != null and !creatId.equals('')">
+		            AND T.CREAT_ID= #{creatId}
+		        </if>
+		        <if test="creatNm != null and !creatNm.equals('')">
+		            AND D.NAME LIKE '%' || #{creatNm} || '%'
+		        </if>
+		        <if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+		            AND T.CREAT_DTTM BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+		        </if>
+		        <if test="searchValue != null and !searchValue.equals('') and searchName != null and !searchName.equals('')">
+		            AND ${searchValue} LIKE '%' || #{searchName} || '%'
+		        </if>
+		        <if test="clntCd != null and !clntCd.equals('')">
+		            AND TO_CHAR(NVL(T.CLNT_CD, 999999)) = #{clntCd}
+		        </if>
+		        <if test="clntNm != null and !clntNm.equals('')">
+		            AND A.CLNT_NM LIKE '%' || #{clntNm} || '%'
+		        </if>
+		        <if test="prdtCd != null and !prdtCd.equals('')">
+		            AND T.PRDT_CD = #{prdtCd}
+		        </if>
+		        <if test="prdtNm != null and !prdtNm.equals('')">
+		            AND E.PRDT_NM LIKE '%' || #{prdtNm} || '%'
+		        </if>
+		        <if test="prjctCd != null and !prjctCd.equals('')">
+		            AND NVL(T.PRJCT_CD, 'ZZZZZ') LIKE #{prjctCd}
+		        </if>
+		        <if test="salesCd != null and !salesCd.equals('')">
+		            AND NVL(T.SALES_CD, 'ZZZZZ') LIKE '%' || #{salesCd} || '%'
+		        </if>
+		        <if test="fileType != null and !fileType.equals('')">
+		            AND T.FILE_TRGT_TYP = #{fileType}
+		        </if>
+		        <if test="fileName != null and !fileName.equals('')">
+		            AND T.FILE_NAME LIKE '%' || #{fileName} || '%'
+		        </if>
+		        <if test="ordrsNo != null and !ordrsNo.equals('')">
+		            AND NVL(T.ORDRS_NO, 'ZZZZZ') LIKE '%' || #{ordrsNo} || '%'
+		        </if>
+    </select>
+
+    <select id="selectDocCustTreeFileList" parameterType="Map" resultType="CamelMap">
+		SELECT *
+		  FROM (     
+	        SELECT
+	        	ROWNUM AS RNUM, A.*
+	        FROM
+		        (
+		        SELECT
+		            T.CO_CD,
+		            T.FILE_KEY,
+		            T.FILE_SIZE,
+		            T.FILE_TYPE,
+		            T.FILE_NAME,
+		            T.FILE_PATH,
+		            T.FILE_TRGT_TYP,
+		            F2.CODE_NM 											AS FILE_TRGT_TYP_NM,
+		            T.FILE_TRGT_KEY,
+		            T.USE_YN,
+		            T.CREAT_ID,
+		            D.NAME CREAT_NM,
+		            T.CREAT_PGM,
+		            TO_CHAR(T.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') 		AS CREAT_DTTM,
+		            T.CLNT_CD,
+		            A.CLNT_NM,
+		            T.PRDT_CD,
+		            E.PRDT_NM,
+		            T.ITEM_CD,
+		            F.CODE_NM 											AS ITEM_NM,
+		            T.SALES_CD,
+		            T.PRJCT_CD,
+		            FN_CM05M01_CD_TO_NM(T.PRJCT_CD) 					AS PRJCT_NM,
+		            T.COMON_CD,
+		            B1.TEXT 											AS COMON_NM,
+		            NVL(B1.LPATH, NVL2(T.COMON_CD, T.COMON_CD, 'null')) AS LPATH,
+		            G.FILE_UP,
+		            G.FILE_DOWN,
+		            G.FILE_UPDATE,
+		            G.FILE_DELETE,
+		            T.ORDRS_NO
+		    FROM
+		        TB_CM08M01 T left outer join TB_BM02M01 A ON T.CLNT_CD = A.CLNT_CD
+					            LEFT OUTER JOIN (
+											        SELECT  CODE_ID ID,
+											                CODE_NM TEXT,
+											                CODE_KIND PARENT,
+											                CODE_DESC PARENT_NM,
+											                SORT_NO,
+											                USE_YN,
+											                LPAD(' ', 3*(LEVEL-1)) || LEVEL lvl,
+											                REGEXP_REPLACE(SYS_CONNECT_BY_PATH(CODE_NM, '\'), '^\s+\-\>\s+', '') as LPATH,
+											                CONNECT_BY_ISLEAF AS IS_LEAF
+											        FROM TB_CM05M01
+											        START WITH CODE_ID ='FILETREE'
+											        CONNECT BY PRIOR CODE_ID = CODE_KIND
+											        ORDER SIBLINGS BY CODE_ID ASC) B1 ON T.COMON_CD = B1.ID
+		            LEFT OUTER JOIN TB_CM06M01 D ON T.CREAT_ID = D.ID
+		            LEFT OUTER JOIN TB_BM01M01 E ON T.PRDT_CD = E.PRDT_CD
+		            LEFT OUTER JOIN TB_CM05M01 F ON T.ITEM_CD = F.CODE_ID
+		            LEFT OUTER JOIN TB_CM05M01 F2 ON F2.CODE_KIND = 'DRPDIV' AND  F2.CODE_RPRC = T.FILE_TRGT_TYP
+		            LEFT OUTER JOIN TB_CM15M01 G ON T.COMON_CD = G.COMON_CD
+		        								AND G.CO_CD   = T.CO_CD
+        								        AND G.USER_ID = #{userId}
+		        WHERE 1=1
+		        <if test="coCd != null and !coCd.equals('')">
+		            AND T.CO_CD = #{coCd}
+		        </if>
+		        <if test="clntDivCd.equals('CLNTDIV12')">	--고객사인 경우 고객사만 선택        
+		        	AND A.CLNT_DIV_CD = 'CLNTDIV12'
+		        </if>
+		        <if test="!clntDivCd.equals('CLNTDIV12')"> --공급사인 경우 고객사가 아닌 거래처만 선택	         
+		        	AND NVL(A.CLNT_DIV_CD, 'CLNTDIV99') != 'CLNTDIV12'
+		        </if>		  						
+		        <if test="fileTrgtKey != null and !fileTrgtKey.equals('')">
+		            AND T.FILE_TRGT_KEY= #{fileTrgtKey}  --파일타겟 키값이 있으면 반드시 파일타겟 타입이 있어야 함
+		            AND T.FILE_TRGT_TYP= #{fileTrgtTyp}
+		        </if>
+		        <if test="creatId != null and !creatId.equals('')">
+		            AND T.CREAT_ID= #{creatId}
+		        </if>
+		        <if test="creatNm != null and !creatNm.equals('')">
+		            AND D.NAME LIKE '%' || #{creatNm} || '%'
+		        </if>
+		        <if test="reqDtFrom != null and !reqDtFrom.equals('') and reqDtTo != null and !reqDtTo.equals('')">
+		            AND T.CREAT_DTTM BETWEEN to_date(REPLACE(#{reqDtFrom},'-','')) AND to_date(REPLACE(#{reqDtTo},'-',''))+1
+		        </if>
+		        <if test="searchValue != null and !searchValue.equals('') and searchName != null and !searchName.equals('')">
+		            AND ${searchValue} LIKE '%' || #{searchName} || '%'
+		        </if>
+		        <if test="clntCd != null and !clntCd.equals('')">
+		            AND TO_CHAR(NVL(T.CLNT_CD, 999999)) = #{clntCd}
+		        </if>
+		        <if test="clntNm != null and !clntNm.equals('')">
+		            AND A.CLNT_NM LIKE '%' || #{clntNm} || '%'
+		        </if>
+		        <if test="prdtCd != null and !prdtCd.equals('')">
+		            AND T.PRDT_CD = #{prdtCd}
+		        </if>
+		        <if test="prdtNm != null and !prdtNm.equals('')">
+		            AND E.PRDT_NM LIKE '%' || #{prdtNm} || '%'
+		        </if>
+		        <if test="prjctCd != null and !prjctCd.equals('')">
+		            AND NVL(T.PRJCT_CD, 'ZZZZZ') LIKE #{prjctCd}
+		        </if>
+		        <if test="salesCd != null and !salesCd.equals('')">
+		            AND NVL(T.SALES_CD, 'ZZZZZ') LIKE '%' || #{salesCd} || '%'
+		        </if>
+		        <if test="fileType != null and !fileType.equals('')">
+		            AND T.FILE_TRGT_TYP = #{fileType}
+		        </if>
+		        <if test="fileName != null and !fileName.equals('')">
+		            AND T.FILE_NAME LIKE '%' || #{fileName} || '%'
+		        </if>
+		        <if test="ordrsNo != null and !ordrsNo.equals('')">
+		            AND NVL(T.ORDRS_NO, 'ZZZZZ') LIKE '%' || #{ordrsNo} || '%'
+		        </if>
+				ORDER BY T.CREAT_DTTM DESC
+		        ) A
+	    	)
+        WHERE
+              RNUM BETWEEN #{firstIndex} AND #{lastIndex}
+
+    </select>
+
+	
 </mapper>

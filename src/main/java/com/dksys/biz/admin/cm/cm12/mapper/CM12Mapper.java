@@ -9,5 +9,11 @@ import org.apache.ibatis.annotations.Mapper;
 public interface CM12Mapper {
 
     List<Map<String, String>> selectSolarLunarEventHolidaysList(Map<String, String> paramMap);
-	
+
+	List<Map<String, String>> selectDocFileTreeList(Map<String, String> param);
+
+	int selectDocCustTreeFileCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectDocCustTreeFileList(Map<String, String> paramMap);
+
 }

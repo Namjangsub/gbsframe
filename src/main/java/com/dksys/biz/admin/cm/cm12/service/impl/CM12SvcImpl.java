@@ -23,4 +23,20 @@ public class CM12SvcImpl implements CM12Svc {
         return cm12Mapper.selectSolarLunarEventHolidaysList(paramMap);
 	}
 
+
+	@Override
+	public List<Map<String, String>> selectDocFileTreeList(Map<String, String> param) {
+		return cm12Mapper.selectDocFileTreeList(param);
+	}
+	
+
+	@Override
+	public int  selectDocCustTreeFileCount(Map<String, String> paramMap) {
+		return cm12Mapper.selectDocCustTreeFileCount(paramMap);
+	}
+    @Override
+    public List<Map<String, String>> selectDocCustTreeFileList(Map<String, String> paramMap) {
+        return cm12Mapper.selectDocCustTreeFileList(paramMap);
+    }
+    
 }
