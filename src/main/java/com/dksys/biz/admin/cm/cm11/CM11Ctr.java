@@ -176,7 +176,7 @@ public class CM11Ctr {
     	objCols1.put("type", "string");
     	objCols1.put("label", "고객사");
     	objCols2.put("type", "number");
-    	objCols2.put("label", "장애건수");
+    	objCols2.put("label", "문제건수");
     	objCols3.put("type", "number");
     	objCols3.put("label", "미완료");
 
