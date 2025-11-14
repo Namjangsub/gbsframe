@@ -1,13 +1,9 @@
 package com.dksys.biz.user.sm.sm14.mapper;
 
-import org.apache.ibatis.annotations.Mapper;
-
-import com.google.gson.reflect.TypeToken;
-
-import java.lang.reflect.Type;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface SM14Mapper {
@@ -89,6 +85,8 @@ public interface SM14Mapper {
 	int updateETCIpgoDataPurchaseBillNo(Map<String, String> paramMap);
 
 	int updateETCIpgoDataPurchaseBillNoClear(Map<String, String> param);
+
+	int selectBillExistChk(Map<String, String> paramMap);	
 
 }
 

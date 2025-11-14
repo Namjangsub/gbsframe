@@ -115,12 +115,21 @@ public class SM14Ctr {
     
 	//매입 detail 삭제    
 	@DeleteMapping(value = "/deletePurchaseDetail")
-	public String deletePurchaseDetail(@RequestBody Map<String, String> param, ModelMap model) {
-		sm14Svc.deletePurchaseDetail(param);
-		model.addAttribute("resultCode", 200);
-    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+	public String deletePurchaseDetail(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
+		try {
+			if (sm14Svc.deletePurchaseDetail(param) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+			}
 		return "jsonView";
-	} 
+	}
 
 	//세금계산서발행여부 
 	@PostMapping(value = "/updateBillYn")

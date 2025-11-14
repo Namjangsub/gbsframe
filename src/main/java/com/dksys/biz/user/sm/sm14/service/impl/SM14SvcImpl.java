@@ -212,7 +212,13 @@ public class SM14SvcImpl implements SM14Svc {
 	}	
 	
 	@Override
-	public int deletePurchaseDetail(Map<String, String> param) {
+	public int deletePurchaseDetail(Map<String, String> param) throws Exception {
+
+		int selectBillExistChk = sm14Mapper.selectBillExistChk(param);
+		if (selectBillExistChk > 0) {
+			throw new RuntimeException("매입계산서가 이미 등록되어 있어 삭제하실 수 없습니다.");
+		}
+
 		int result = 0;
 		result = sm14Mapper.deletePurchaseDetail(param);
 

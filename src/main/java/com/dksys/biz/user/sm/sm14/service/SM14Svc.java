@@ -3,8 +3,6 @@ package com.dksys.biz.user.sm.sm14.service;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.web.multipart.MultipartHttpServletRequest;
-
 public interface SM14Svc {
 	
 	int selectPurchaseListCount(Map<String, String> paramMap);
@@ -28,7 +26,7 @@ public interface SM14Svc {
 		
 	int updatePurchaseBillDetail(Map<String, String> paramMap) throws Exception;			
 	
-	int deletePurchaseDetail(Map<String, String> param);	
+	int deletePurchaseDetail(Map<String, String> param) throws Exception;	
 	
 	int updateBillYn(Map<String, String> paramMap) throws Exception;
 
