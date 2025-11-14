@@ -66,6 +66,8 @@ public interface SM03Mapper {
 	List<Map<String, String>> selectMultiPrdtGrpCodeList(Map<String, String> paramMap);
 
 	List<Map<String, String>> select_sm03_List_Pop(Map<String, String> paramMap);
+
+	int selectPchsExistChk(Map<String, String> param);	
 	
 }
 

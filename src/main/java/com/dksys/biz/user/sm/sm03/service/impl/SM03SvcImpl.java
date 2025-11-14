@@ -278,7 +278,13 @@ public class SM03SvcImpl implements SM03Svc {
 	}	
 	
 	@Override
-	public int deleteWareHousingInno(Map<String, String> param) {
+	public int deleteWareHousingInno(Map<String, String> param) throws Exception {
+		// 입고삭제시 매입확정내역이 있으면 삭제 불가
+		int selectPchsExistChk = sm03Mapper.selectPchsExistChk(param);
+		if (selectPchsExistChk > 0) {
+			throw new RuntimeException("매입확정 내역이 있습니다. 매입확정 취소후 가능합니다.");
+		}
+
 		int result = 0;	   
 		result = sm03Mapper.deleteWareHousingDirectMaster(param);
 		result += sm03Mapper.deleteWareHousingDirectDetail(param);

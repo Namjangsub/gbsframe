@@ -31,7 +31,7 @@ public interface SM03Svc {
 	
 	int deleteWareHousingDetail(Map<String, String> param);			
 	
-	int deleteWareHousingInno(Map<String, String> param);	
+	int deleteWareHousingInno(Map<String, String> param) throws Exception;	
 
 	List<Map<String, String>> select_prjct_code(Map<String, String> paramMap);
 

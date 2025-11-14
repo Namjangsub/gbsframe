@@ -154,12 +154,23 @@ public class SM03Ctr {
 	
 	//입고내역중 입고번호에 해당하는 내역 Direct 삭제  (마스터 삭제후 모든 상세내역 삭제처리 함.)    
 	@DeleteMapping(value = "/deleteWareHousingInno")
-	public String deleteWareHousingInno(@RequestBody Map<String, String> param, ModelMap model) {
-		sm03Svc.deleteWareHousingInno(param);
-		model.addAttribute("resultCode", 200);
-    	model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+	public String deleteWareHousingInno(@RequestBody Map<String, String> param, ModelMap model) throws Exception{
+		try {
+			if (sm03Svc.deleteWareHousingInno(param) != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		;
+		
 		return "jsonView";
-	} 
+	}
 
     //헤더 multi select 코드 검색
     @PostMapping(value = "/select_prjct_code")
