@@ -1657,7 +1657,9 @@ $.urlParam = function(name){
 
 
 function authChk(menuUrl){
-	DynamicViewport.apply(1920, {mode: 'physical', designHeight: 1024, lockScale:true, scalable:false });
+	if (deviceType != 'phone') {	//모바일일경우 제외
+		DynamicViewport.apply(1920, {mode: 'physical', designHeight: 1024, lockScale:true, scalable:false });
+	}
 	if(!menuUrl){
 		var url = window.location.href;
 		menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
