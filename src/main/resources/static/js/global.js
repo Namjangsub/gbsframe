@@ -95,6 +95,102 @@ function isTabletModel(s) {
   if (/\b(Mi ?Pad|Mipad|Pad [0-9])\b/i.test(s)) return true;
   return false;
 }
+(function (global) {
+  /**
+   * 디자인 기준폭 대비 initial-scale 자동 계산 후 meta viewport 설정
+   *
+   * @param {number} designWidth - 화면 설계 기준 가로 해상도(예: 1920, 1600 등)
+   * @param {object} options
+   *   - mode:       'css' | 'physical'  (기본 'css')
+   *   - designHeight: 물리기준일 때 기준 세로 해상도 (예: 1080, 1200 등, 없으면 가로비율로 추정)
+   *   - lockScale: true 이면 maximum-scale를 initial과 같게 고정 (기본 true)
+   *   - scalable:  false 이면 user-scalable=no (줌 금지), true 이면 줌 허용
+   */
+  function applyDynamicViewport(designWidth = 1920, options) {
+    if (!designWidth || designWidth <= 0) return;
+
+    var opts = Object.assign({
+      mode: 'physical',         // 'css' 또는 'physical'
+      designHeight: null,  // physical 모드일 때 기준 세로 해상도
+      lockScale: true,
+      scalable: false
+    }, options || {});
+
+    // 1) viewport meta 찾기 (없으면 생성)
+    var meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'viewport';
+      document.head.appendChild(meta);
+    }
+
+    // 2) 기기 현재 폭/높이, DPR
+    var cssWidth  = window.innerWidth  || document.documentElement.clientWidth;
+    var cssHeight = window.innerHeight || document.documentElement.clientHeight;
+
+    var screenCssWidth  = (window.screen && window.screen.width)  ? window.screen.width  : cssWidth;
+    var screenCssHeight = (window.screen && window.screen.height) ? window.screen.height : cssHeight;
+
+    var dpr = window.devicePixelRatio || 1;
+
+    var scale;
+
+    if (opts.mode === 'physical') {
+      // ===== 물리 해상도 기준 =====
+      var physicalWidth  = screenCssWidth  * 1;
+      var physicalHeight = screenCssHeight * 1;
+
+      // 기준 세로 해상도 (없으면 현재 기기 종횡비를 기준폭에 맞춰 추정)
+      var designHeight = opts.designHeight;
+      if (!designHeight || designHeight <= 0) {
+        // 예) 2560x1600 기기에 designWidth=1920 이면
+        //     designHeight ≈ 1600 * 1920 / 2560
+        designHeight = Math.round(physicalHeight * (designWidth / physicalWidth));
+      }
+
+      // 가로/세로 스케일 각각 계산
+      var scaleW = physicalWidth  / designWidth;
+      var scaleH = physicalHeight / designHeight;
+
+      // ★ 가로/세로 비율 중 작은 값 적용 (컨텐츠가 화면 안에 다 들어오게)
+      scale = Math.min(scaleW, scaleH);
+
+    } else {
+      // ===== CSS 뷰포트 기준 (권장) =====
+      // 기존 로직과 동일: 기기 CSS 가로폭 / 기준 가로폭
+      scale = cssWidth / designWidth;
+    }
+
+    // 너무 커지면 1.0으로 제한
+    if (scale > 1) {
+      scale = 1;
+    }
+
+    // 소수점 정리
+    scale = Math.round(scale * 1000) / 1000;
+
+    // 3) content 문자열 구성
+    var content = 'width=device-width, initial-scale=' + scale;
+
+//    if (opts.lockScale) {
+//      // 확대율을 고정하려면 maximum-scale도 동일하게
+//      content += ', maximum-scale=' + scale;
+//    }
+
+    if (!opts.scalable) {
+      // 줌 막고 싶으면 user-scalable=no
+      content += ', user-scalable=no';
+    }
+
+    meta.setAttribute('content', content);
+  }
+
+  // 전역에서 사용 가능하도록 export
+  global.DynamicViewport = {
+    apply: applyDynamicViewport
+  };
+
+})(window);
 
 
 //function getResolutionInfo() {
@@ -1561,6 +1657,7 @@ $.urlParam = function(name){
 
 
 function authChk(menuUrl){
+	DynamicViewport.apply(1920, {mode: 'physical', designHeight: 1024, lockScale:true, scalable:false });
 	if(!menuUrl){
 		var url = window.location.href;
 		menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
