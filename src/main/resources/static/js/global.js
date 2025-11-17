@@ -174,7 +174,7 @@ async function setFormFactorCookie() {
 
 // 예시 사용
 setFormFactorCookie().then(ff => {
-  console.log('detected form factor:', ff);
+//  console.log('detected form factor:', ff);
   // ff === 'tablet' 이면 태블릿 전용 레이아웃/그리드 설정 등 분기
 });
 
