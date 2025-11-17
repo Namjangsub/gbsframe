@@ -15,6 +15,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 
+import com.dksys.biz.HomeController;
+import com.dksys.biz.HomeController.FormFactor;
 import com.dksys.biz.admin.cm.cm06.service.CM06Svc;
 import com.dksys.biz.main.service.LoginService;
 import com.dksys.biz.main.vo.User;
@@ -32,11 +34,15 @@ public class CustomLoginSuccessHandler implements AuthenticationSuccessHandler {
 
     @Autowired
     private LoginService loginService;
-    
+
+    @Autowired
+    private HomeController homeController;
+    enum FormFactor { DESKTOP, PHONE, TABLET, UNKNOWN }
 
     @Autowired
     CM06Svc cm06Svc;
-	
+
+    
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication)
             throws IOException {
@@ -72,6 +78,9 @@ public class CustomLoginSuccessHandler implements AuthenticationSuccessHandler {
             User user = (User) principal;
             String userAgent = RequestUtils.getUserAgent();
             String deviceType = RequestUtils.detectDeviceType(userAgent);
+
+            com.dksys.biz.HomeController.FormFactor ff = homeController.detectFormFactor(request);
+            deviceType = ff.name();
             String clientIp = RequestUtils.getClientIp();
             userLoginLogService.updateLastLoginTime(user.getId(), refreshToken, userAgent, clientIp, deviceType);
             // 1) 로그인 이력 저장 (단 한 번)

@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Excel → Luckysheet 프리뷰 (이미지 DOM 우회)</title>
+
+  <!-- jQuery -->
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+
+  <!-- ExcelJS -->
+  <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+
+  <!-- Luckysheet 전역 자리 -->
+  <script>
+    // luckysheet UMD가 전역에 바로 쓰게 미리 만들어 둠
+  window.luckysheetConfig = window.luckysheetConfig || {};
+  window.luckysheetConfig.hook = window.luckysheetConfig.hook || {};
+
+  window.luckysheetConfig.hook.sheetActivate = function (index) {
+    // 탭 클릭 → 시트 전환 → 이미지 다시 뿌리기
+    setTimeout(function () {
+      insertImagesToLuckysheet(index);
+    }, 30);
+  };
+  </script>
+
+  <!-- 당신 서버 경로 대신 CDN 쓰면 404 안 납니다 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/luckysheet@2.1.13/dist/plugins/css/pluginsCss.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/luckysheet@2.1.13/dist/plugins/plugins.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/luckysheet@2.1.13/dist/css/luckysheet.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/luckysheet@2.1.13/dist/assets/iconfont/iconfont.css" />
+  <script src="https://cdn.jsdelivr.net/npm/luckysheet@2.1.13/dist/plugins/js/plugin.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luckysheet@2.1.13/dist/luckysheet.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<!--   <link rel="stylesheet" href="/static/css/luckysheet/pluginsCss.css" /> -->
+<!--   <link rel="stylesheet" href="/static/css/luckysheet/plugins.css" /> -->
+<!--   <link rel="stylesheet" href="/static/css/luckysheet/luckysheet.css" /> -->
+<!--   <link rel="stylesheet" href="/static/css/luckysheet/iconfont.css" /> -->
+<!--   <script src="/static/js/luckysheet/plugin.js"></script> -->
+<!--   <script src="/static/js/luckysheet/luckysheet.umd.js"></script> -->
+  <style>
+    body { margin:0; padding:10px; font-family: "Noto Sans KR", sans-serif; }
+    .toolbar { margin-bottom:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    #luckysheet { width:100%; height:78vh; }
+
+    /* 우리가 DOM으로 뿌리는 이미지 */
+    .ls-preview-img {
+      position: absolute;
+      z-index: 999;   /* 셀보다 위에 */
+      pointer-events: none;
+      box-sizing: border-box;
+    }
+    /* 혹시 CDN도 못 나갈 때 로딩 이미지 404 숨기기용 */
+    .luckysheet-waffle-container,
+    .luckysheet-waffle-image { background-image:none !important; }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <label>엑셀 선택: <input id="file" type="file" accept=".xlsx" /></label>
+    <label>시트: <select id="sheet"></select></label>
+    <span id="sheetMeta" style="font-size:12px;color:#666;"></span>
+  </div>
+  <input type="file" id="upload" />
+  <div id="excelViewer" style="display:none;">
+  	<div id="luckysheet"></div>
+  </div>
+<div id="pdfViewer" style="display:none;">
+  <iframe id="pdfFrame" style="width:100%;height:70vh;border:none;"></iframe>
+</div>
+<script>
+  const upload = document.getElementById('upload');
+  upload.addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const name = f.name.toLowerCase();
+
+    const formData = new FormData();
+    formData.append("file", f);
+
+    if (name.endsWith(".xlsx")) {
+      // 지금까지 만든 ExcelJS → Luckysheet 로직 호출
+      // excelViewer만 보이게
+      document.getElementById('excelViewer').style.display = 'block';
+      document.getElementById('pdfViewer').style.display = 'none';
+      // ... 기존 로직 ...
+    } else if (name.endsWith(".pptx") || name.endsWith(".docx") || name.endsWith(".ppt") || name.endsWith(".doc")) {
+      // 서버 전송해서 pdf url 받기
+      const res = await fetch("/api/convert/pdf", {
+        method: "POST",
+        body: formData
+      });
+      const pdfUrl = await res.text(); // 위 컨트롤러는 문자열로 url을 줬음
+
+      document.getElementById('excelViewer').style.display = 'none';
+      document.getElementById('pdfViewer').style.display = 'block';
+      document.getElementById('pdfFrame').src =
+        "/pdfjs/web/viewer.html?file=" + encodeURIComponent(pdfUrl);
+    } else {
+      alert("지원하지 않는 형식입니다.");
+    }
+  });
+</script>
+
+  <script>
+    /* ---------------- 공통 상수/함수 ---------------- */
+    const DEFAULT_COL_PX = 72;
+    const DEFAULT_ROW_PX = 20;
+    const EMU_PER_INCH = 914400;
+    const PX_PER_INCH = 96;
+    const IMG_CLASS = "ls-preview-img";
+
+    // functionlist 비어있는 경우 경고만
+    if (!window.luckysheet.functionlist) {
+      window.luckysheet.functionlist = {};
+      console.warn("functionlist 가 비어있어 임시 객체로 대체했습니다.");
+    }
+
+    function arrayBufferToBase64(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        const sub = bytes.subarray(i, i + chunk);
+        binary += String.fromCharCode.apply(null, sub);
+      }
+      return btoa(binary);
+    }
+    function emuToPx(emu) {
+      if (!emu || isNaN(emu)) return 0;
+      return (emu / EMU_PER_INCH) * PX_PER_INCH;
+    }
+    function charWidthToPx(charWidth) {
+      if (!charWidth || isNaN(charWidth)) return DEFAULT_COL_PX;
+      return Math.round(charWidth * 7 + 5);
+    }
+    function pointsToPx(points) {
+      if (!points || isNaN(points)) return DEFAULT_ROW_PX;
+      return Math.round(points * 96 / 72);
+    }
+    function colStrToNum(colStr) {
+      let n = 0;
+      for (let i = 0; i < colStr.length; i++) {
+        n = n * 26 + (colStr.charCodeAt(i) - 64);
+      }
+      return n;
+    }
+    function normalizeAnchor(pt) {
+      if (!pt) return null;
+      return {
+        col: (typeof pt.col === "number" ? pt.col : 0) + 1,
+        row: (typeof pt.row === "number" ? pt.row : 0) + 1,
+        colOff: pt.colOff,
+        rowOff: pt.rowOff,
+      };
+    }
+    function cellPointToPixel(pt, colWidths, rowHeights) {
+      const colIndex = Math.max(1, pt.col);
+      const rowIndex = Math.max(1, pt.row);
+      const cInt = Math.floor(colIndex);
+      const rInt = Math.floor(rowIndex);
+      const cFrac = colIndex - cInt;
+      const rFrac = rowIndex - rInt;
+
+      let left = 0;
+      for (let c = 1; c < cInt; c++) left += colWidths[c - 1] || DEFAULT_COL_PX;
+      left += (colWidths[cInt - 1] || DEFAULT_COL_PX) * cFrac;
+
+      let top = 0;
+      for (let r = 1; r < rInt; r++) top += rowHeights[r - 1] || DEFAULT_ROW_PX;
+      top += (rowHeights[rInt - 1] || DEFAULT_ROW_PX) * rFrac;
+
+      if (typeof pt.colOff === "number") left += emuToPx(pt.colOff);
+      if (typeof pt.rowOff === "number") top  += emuToPx(pt.rowOff);
+
+      return { left: Math.round(left), top: Math.round(top) };
+    }
+
+    /* ---------------- 전역 상태 ---------------- */
+    const $file = document.getElementById("file");
+    const $sheet = document.getElementById("sheet");
+    const $sheetMeta = document.getElementById("sheetMeta");
+
+    let gWorkbook = null;
+    let gSheets   = [];   // [{sheetJson, imgs, colWidths, rowHeights}]
+    let gImageMap = {};
+    let gLoaded   = false;
+
+    /* workbook media → map */
+    function buildImageMapFromWorkbook(workbook) {
+      const map = {};
+      const media = (workbook.model && workbook.model.media) ? workbook.model.media : [];
+      media.forEach((m, idx) => {
+        const ext = (m.extension || "png").replace(".", "");
+        let base64 = "";
+        if (m.buffer) base64 = arrayBufferToBase64(m.buffer);
+        else if (m.data) base64 = arrayBufferToBase64(m.data);
+        const imageId = (m.index != null) ? m.index : idx;
+        map[imageId] = { base64, ext };
+      });
+      return map;
+    }
+
+    /* ---------------- Excel → Luckysheet 변환 ---------------- */
+    function excelSheetToLuckySheet(ws, index) {
+      let maxCols = ws.actualColumnCount || ws.columnCount || 50;
+      let maxRows = ws.actualRowCount || ws.rowCount || 200;
+
+      // 이미지 보고 시트 크기 확장
+      const imgs = (typeof ws.getImages === "function") ? ws.getImages() : [];
+      let imgMaxCol = 0, imgMaxRow = 0;
+      for (const im of imgs) {
+        const range = im.range || im.rng;
+        if (!range) continue;
+        const tl = range.tl ? normalizeAnchor(range.tl) : null;
+        const br = range.br ? normalizeAnchor(range.br) : null;
+        const endCol = br ? br.col : (tl ? tl.col : 0);
+        const endRow = br ? br.row : (tl ? tl.row : 0);
+        imgMaxCol = Math.max(imgMaxCol, endCol);
+        imgMaxRow = Math.max(imgMaxRow, endRow);
+      }
+      maxCols = Math.max(maxCols, imgMaxCol);
+      maxRows = Math.max(maxRows, imgMaxRow);
+
+      const colWidths = [];
+      const rowHeights = [];
+      for (let c = 1; c <= maxCols; c++) {
+        const col = ws.getColumn(c);
+        colWidths.push(charWidthToPx(col && col.width));
+      }
+      for (let r = 1; r <= maxRows; r++) {
+        const row = ws.getRow(r);
+        rowHeights.push(pointsToPx(row && row.height));
+      }
+
+      const celldata = [];
+      for (let r = 1; r <= maxRows; r++) {
+        for (let c = 1; c <= maxCols; c++) {
+          const cell = ws.getCell(r, c);
+          if (!cell || (cell.value == null && !cell.style)) continue;
+
+          const v = cell.value;
+          let vText = "";
+          if (v == null) {
+            vText = "";
+          } else if (typeof v === "object") {
+            if (v.richText) vText = v.richText.map(rt => rt.text).join("");
+            else if (v.text) vText = String(v.text);
+            else if (v.result != null) vText = String(v.result);
+            else if (v.formula) vText = (cell.result != null) ? String(cell.result) : "";
+            else vText = String(v);
+          } else {
+            vText = String(v);
+          }
+
+          const luckyCell = {
+            r: r - 1,
+            c: c - 1,
+            v: { v: vText, m: vText }
+          };
+
+          const al = cell.alignment || {};
+          if (al.horizontal) luckyCell.v.ht = al.horizontal;
+          if (al.vertical)   luckyCell.v.vt = al.vertical;
+          if (al.wrapText)   luckyCell.v.tb = 1;
+
+          const ft = cell.font || {};
+          if (ft.bold)   luckyCell.v.bl = 1;
+          if (ft.italic) luckyCell.v.it = 1;
+          if (ft.size)   luckyCell.v.fs = Math.round(ft.size);
+          if (ft.color && ft.color.argb) {
+            luckyCell.v.fc = "#" + ft.color.argb.slice(2);
+          }
+
+          const fill = cell.fill;
+          if (fill && fill.type === "pattern" && fill.fgColor && fill.fgColor.argb) {
+            luckyCell.v.bg = "#" + fill.fgColor.argb.slice(2);
+          }
+
+          celldata.push(luckyCell);
+        }
+      }
+
+      // 병합정보: 로컬 빌드가 sheet.merge 를 요구하므로 둘 다 채움
+      const merges = (ws.model && ws.model.merges) ? ws.model.merges : [];
+      const mergeObj = {};
+      if (Array.isArray(merges)) {
+        merges.forEach(range => {
+          const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(range);
+          if (!m) return;
+          const startCol = colStrToNum(m[1]) - 1;
+          const startRow = parseInt(m[2], 10) - 1;
+          const endCol   = colStrToNum(m[3]) - 1;
+          const endRow   = parseInt(m[4], 10) - 1;
+          const key = `${startRow}_${startCol}`;
+          mergeObj[key] = {
+            r: startRow,
+            c: startCol,
+            rs: endRow - startRow + 1,
+            cs: endCol - startCol + 1
+          };
+        });
+      }
+
+      const config = {
+        rowlen: {},
+        columnlen: {},
+        merge: mergeObj
+      };
+      rowHeights.forEach((h, idx) => {
+        if (h && h !== DEFAULT_ROW_PX) config.rowlen[idx] = h;
+      });
+      colWidths.forEach((w, idx) => {
+        if (w && w !== DEFAULT_COL_PX) config.columnlen[idx] = w;
+      });
+
+      return {
+        sheetJson: {
+          name: ws.name || `Sheet${index+1}`,
+          index: index,
+          order: index,
+          status: index === 0 ? 1 : 0,
+          row: maxRows,
+          column: maxCols,
+          celldata: celldata,
+          config: config,
+          merge: mergeObj   // ← 이게 있어야 “Merge info is null …” 줄어듦
+        },
+        imgs,
+        colWidths,
+        rowHeights
+      };
+    }
+    function insertShapesToLuckysheet(sheetIndex) {
+    	  const grid = document.querySelector('#luckysheet .luckysheet-cell-main');
+    	  if (!grid) return;
+    	  grid.style.position = 'relative';
+
+    	  // 1) 기존 도형 지우기
+    	  grid.querySelectorAll('.ls-preview-shape').forEach(el => el.remove());
+
+    	  const shapes = gShapes[sheetIndex] || [];
+    	  shapes.forEach(sh => {
+    	    const pos = cellPointToPixel(
+    	      { col: sh.fromCol+1, row: sh.fromRow+1, colOff: sh.fromColOff, rowOff: sh.fromRowOff },
+    	      sh.colWidths,
+    	      sh.rowHeights
+    	    );
+    	    const wPx = /* from/to 계산해서 px로 */;
+    	    const hPx = /* from/to 계산해서 px로 */;
+
+    	    const box = document.createElement('div');
+    	    box.className = 'ls-preview-shape';
+    	    box.textContent = sh.text;
+    	    box.style.position = 'absolute';
+    	    box.style.left = pos.left + 'px';
+    	    box.style.top  = pos.top + 'px';
+    	    box.style.width  = wPx + 'px';
+    	    box.style.height = hPx + 'px';
+    	    box.style.background = 'rgba(255,255,200,0.6)';   // 임시
+    	    box.style.border = '1px solid #888';
+    	    box.style.pointerEvents = 'none';
+    	    box.style.whiteSpace = 'pre-wrap';
+
+    	    grid.appendChild(box);
+    	  });
+    	}
+
+    /* ---------------- 이미지 DOM으로 직접 붙이기 ---------------- */
+    function clearPreviewImages() {
+      document.querySelectorAll('#luckysheet .' + IMG_CLASS).forEach(el => el.remove());
+    }
+
+    function insertImagesToLuckysheet(sheetIndex) {
+      const info = gSheets[sheetIndex];
+      if (!info) return;
+//       grid.querySelectorAll('.ls-preview-img').forEach(el => el.remove());
+      const { imgs, colWidths, rowHeights } = info;
+      if (!imgs || !imgs.length) {
+        clearPreviewImages();
+        return;
+      }
+
+      // Luckysheet 그리드 영역
+      const grid = document.querySelector('#luckysheet .luckysheet-cell-main');
+      if (!grid) return;
+      grid.style.position = 'relative';
+
+      clearPreviewImages();
+
+      imgs.forEach(im => {
+        const range = im.range || im.rng;
+        if (!range || !range.tl) return;
+
+        const tl = normalizeAnchor(range.tl);
+        const br = range.br ? normalizeAnchor(range.br) : null;
+        const ex = range.ext || null;
+
+        const tlPx = cellPointToPixel(tl, colWidths, rowHeights);
+        let imgW = 120, imgH = 90;
+
+        if (ex && (ex.width || ex.w) && (ex.height || ex.h)) {
+          imgW = Math.round(emuToPx(ex.width || ex.w));
+          imgH = Math.round(emuToPx(ex.height || ex.h));
+        } else if (br) {
+          const brPx = cellPointToPixel(br, colWidths, rowHeights);
+          imgW = Math.max(2, brPx.left - tlPx.left);
+          imgH = Math.max(2, brPx.top  - tlPx.top);
+        }
+
+        // 이미지 데이터 가져오기
+        let imgObj = gImageMap[im.imageId];
+        if (!imgObj && gWorkbook && typeof gWorkbook.getImage === "function") {
+          const meta = gWorkbook.getImage(im.imageId);
+          if (meta) {
+            let base64;
+            if (meta.base64) base64 = meta.base64;
+            else if (meta.buffer) base64 = arrayBufferToBase64(meta.buffer);
+            else if (meta.data)   base64 = arrayBufferToBase64(meta.data);
+            const ext = (meta.extension || "png").replace(".", "");
+            imgObj = { base64, ext };
+          }
+        }
+        if (!imgObj || !imgObj.base64) return;
+
+        imgW = Math.max(20, imgW);
+        imgH = Math.max(20, imgH);
+
+        const src = `data:image/${imgObj.ext};base64,${imgObj.base64}`;
+
+        const el = document.createElement('img');
+        el.className = IMG_CLASS;
+        el.src = src;
+        el.style.left = tlPx.left + 'px';
+        el.style.top  = tlPx.top + 'px';
+        el.style.width  = imgW + 'px';
+        el.style.height = imgH + 'px';
+
+        grid.appendChild(el);
+      });
+    }
+
+    /* ---------------- 기타 ---------------- */
+    function updateSheetMeta() {
+      if (!gWorkbook) { $sheetMeta.textContent = ""; return; }
+      const idx = parseInt($sheet.value || "0", 10);
+      const ws = gWorkbook.worksheets[idx];
+      if (!ws) { $sheetMeta.textContent = ""; return; }
+      const rows = ws.actualRowCount || ws.rowCount || 0;
+      const cols = ws.actualColumnCount || ws.columnCount || 0;
+      $sheetMeta.textContent = ` (행 ${rows} × 열 ${cols})`;
+    }
+
+    // luckysheet가 만들어지고 난 뒤 merge 없어서 지랄하는 시트를 한 번 보정
+    function afterCreateFixMerge() {
+      const files = luckysheet.getLuckysheetfile && luckysheet.getLuckysheetfile();
+      if (!files) return;
+      files.forEach(f => {
+        if (!f.config) f.config = {};
+        if (!f.config.merge) f.config.merge = {};
+        if (!f.merge) f.merge = f.config.merge;
+      });
+    }
+
+    /* ---------------- 초기 한 장 띄우기 ---------------- */
+    luckysheet.create({
+      container: 'luckysheet',
+      title: 'Excel Preview',
+      showinfobar: false,
+      hook: {                     // ★ 여기 추가
+    	    sheetActivate: function (index) {
+    	      setTimeout(function () {
+    	        insertImagesToLuckysheet(index);
+    	        insertShapesToLuckysheet(index);
+    	      }, 30);
+    	    }
+    	  },
+      data: [{
+        name: 'Sheet1',
+        index: 0,
+        order: 0,
+        status: 1,
+        row: 20,
+        column: 10,
+        celldata: [
+          { r:0, c:0, v:{ v:'엑셀 파일을 선택하세요', m:'엑셀 파일을 선택하세요' } }
+        ],
+        config: { merge: {} },
+        merge: {}
+      }]
+    });
+    afterCreateFixMerge();
+
+    /* ---------------- 파일 선택 ---------------- */
+    $file.addEventListener("change", async (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+
+      const buf = await f.arrayBuffer();
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf);
+      gWorkbook = wb;
+      gImageMap = buildImageMapFromWorkbook(wb);
+
+      gSheets = [];
+      $sheet.innerHTML = "";
+
+      wb.worksheets.forEach((ws, idx) => {
+        const conv = excelSheetToLuckySheet(ws, idx);
+        gSheets.push(conv);
+
+        const opt = document.createElement("option");
+        opt.value = String(idx);
+        opt.textContent = ws.name || `Sheet${idx+1}`;
+        $sheet.appendChild(opt);
+      });
+
+
+   // 2) JSZip으로 원본 XLSX 열기
+   const zip = await JSZip.loadAsync(buf);
+
+   // 3) drawings 밑에 뭐가 있는지 스캔
+   const drawingEntries = [];
+   zip.folder("xl/drawings").forEach((relPath, file) => {
+     // relPath 예: "drawing1.xml"
+     drawingEntries.push("xl/drawings/" + relPath);
+   });
+
+
+// 4) 각 drawing xml 파싱
+const gShapes = {};  // 시트인덱스 -> [shape...]
+for (const path of drawingEntries) {
+  const xmlStr = await zip.file(path).async("string");
+
+  // 여기서 xmlStr을 파싱해서
+  // - from / to (col, row, colOff, rowOff)
+  // - 텍스트 (txBody, v:textbox, a:t ...)
+  // 를 뽑는다
+  // 브라우저면 DOMParser 써서 파싱
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(xmlStr, "application/xml");
+
+  // <xdr:twoCellAnchor> 처럼 생긴 것들 찾기
+  const anchors = xml.getElementsByTagNameNS("*", "twoCellAnchor");
+
+  for (let i = 0; i < anchors.length; i++) {
+    const anc = anchors[i];
+    const from = anc.getElementsByTagNameNS("*", "from")[0];
+    const to   = anc.getElementsByTagNameNS("*", "to")[0];
+
+    // col, row, colOff, rowOff 추출
+    const fromCol = Number(from.getElementsByTagNameNS("*", "col")[0].textContent);
+    const fromRow = Number(from.getElementsByTagNameNS("*", "row")[0].textContent);
+    const fromColOff = Number(from.getElementsByTagNameNS("*", "colOff")[0]?.textContent || 0);
+    const fromRowOff = Number(from.getElementsByTagNameNS("*", "rowOff")[0]?.textContent || 0);
+
+    const toCol = Number(to.getElementsByTagNameNS("*", "col")[0].textContent);
+    const toRow = Number(to.getElementsByTagNameNS("*", "row")[0].textContent);
+
+    // 텍스트는 <a:t> 에 있는 경우가 많음
+    const texts = anc.getElementsByTagNameNS("*", "t");
+    let textVal = "";
+    for (let j = 0; j < texts.length; j++) {
+      textVal += texts[j].textContent;
+    } 
+
+    // 어느 시트에 붙어있는지 찾으려면
+    // sheetN.xml -> drawing rel -> drawing1.xml 이 매핑돼야 함
+    // 이 부분은 sheet <drawing r:id="rId1"> 를 한 번 더 읽어와야 함
+  }
+}
+   
+      // 전체 다시 그리기
+      luckysheet.destroy();
+		luckysheet.create({
+		  container: 'luckysheet',
+		  title: f.name,
+		  showinfobar: false,
+		  hook: {                       // ★ 여기도 추가
+		    sheetActivate: function (index) {
+		      setTimeout(function () {
+		        insertImagesToLuckysheet(index);
+		        insertShapesToLuckysheet(index);
+		      }, 30);
+		    }
+		  },
+		  data: gSheets.map(s => s.sheetJson)
+		});
+      afterCreateFixMerge();
+
+      updateSheetMeta();
+      // 첫 시트 이미지
+      setTimeout(() => insertImagesToLuckysheet(0), 30);
+      gLoaded = true;
+    });
+
+    /* ---------------- 시트 변경 ---------------- */
+    $sheet.addEventListener("change", () => {
+      if (!gLoaded) return;
+      const idx = parseInt($sheet.value, 10) || 0;
+      luckysheet.setSheetActive(idx);
+      updateSheetMeta();
+      setTimeout(() => insertImagesToLuckysheet(idx), 30);
+    });
+  </script>
+</body>
+</html>

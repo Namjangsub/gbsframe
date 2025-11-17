@@ -1,6 +1,7 @@
 package com.dksys.biz.main;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+import com.dksys.biz.HomeController;
 import com.dksys.biz.admin.cm.cm01.service.CM01Svc;
 import com.dksys.biz.admin.cm.cm06.service.CM06Svc;
 import com.dksys.biz.config.RequestUtils;
@@ -47,6 +49,10 @@ public class LoginController {
     
     @Autowired
     CM06Svc cm06Svc;
+
+    @Autowired
+    private HomeController homeController;
+    enum FormFactor { DESKTOP, PHONE, TABLET, UNKNOWN }
 
 	@Value("${security.jwt.signing-key}")
 	private String signingKey;
@@ -118,14 +124,24 @@ public class LoginController {
 		
 		//토큰 필요없이 userId만 있음면 됨. (logout)
     	try {
+//    	    Map<String, String[]> map = request.getParameterMap();
+//    	    for (String key : map.keySet()) {
+//    	        String[] values = map.get(key);
+//    	        System.out.println("PARAM " + key + " = " + Arrays.toString(values));
+//    	    }
+    	    
     		String username = request.getParameter("userId");
-    		// 1. 클라이언트 access_token 헤더에서 추출
-//    	    String accessToken = resolveAccessToken(request);
-//    	    String username = null;
-    		String userAgent = RequestUtils.getUserAgent();
-            String deviceType = RequestUtils.detectDeviceType(userAgent);
-    		String clientIp = RequestUtils.getClientIp();
-    		loginService.updateLogoutTime(username, userAgent, clientIp, deviceType);
+    		if (!"undefined".equals(username)) {
+	    		// 1. 클라이언트 access_token 헤더에서 추출
+	//    	    String accessToken = resolveAccessToken(request);
+	//    	    String username = null;
+	    		String userAgent = RequestUtils.getUserAgent();
+	            String deviceType = RequestUtils.detectDeviceType(userAgent);
+	            com.dksys.biz.HomeController.FormFactor ff = homeController.detectFormFactor(request);
+	            deviceType = ff.name();
+	    		String clientIp = RequestUtils.getClientIp();
+	    		loginService.updateLogoutTime(username, userAgent, clientIp, deviceType);
+    		}
 		} catch (Exception e) {
 			// 오류 처리하지 않음
 		}

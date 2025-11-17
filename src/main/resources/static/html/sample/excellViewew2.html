@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>Excel → Luckysheet 프리뷰 (이미지 + 도형)</title>
+
+  <!-- jQuery -->
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+
+  <!-- ExcelJS -->
+  <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+
+  <!-- JSZip (도형용) -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <!-- Luckysheet (CDN) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/luckysheet@2.1.13/dist/plugins/css/pluginsCss.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/luckysheet@2.1.13/dist/plugins/plugins.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/luckysheet@2.1.13/dist/css/luckysheet.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/luckysheet@2.1.13/dist/assets/iconfont/iconfont.css" />
+  <script src="https://cdn.jsdelivr.net/npm/luckysheet@2.1.13/dist/plugins/js/plugin.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luckysheet@2.1.13/dist/luckysheet.umd.js"></script>
+
+  <style>
+    body { margin:0; padding:10px; font-family:"Noto Sans KR",sans-serif; }
+    .toolbar { margin-bottom:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    #luckysheet { width:100%; height: calc(100vh - 40px); }
+
+    .ls-preview-img {
+      position:absolute;
+      z-index:999;
+      pointer-events:none;
+      box-sizing:border-box;
+    }
+    .ls-preview-shape {
+      position:absolute;
+      z-index:998;
+      pointer-events:none;
+      background:rgba(255,255,200,0.55);
+      border:1px solid rgba(120,120,120,0.7);
+      white-space:pre-wrap;
+      font-size:12px;
+      line-height:1.2;
+      box-sizing:border-box;
+    }
+.ls-preview-img {
+  position: absolute;
+  z-index: 999;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+  /* 그리드 하단의 Add / Back to the top 숨김 */
+  
+  .luckysheet-bottom-controll {
+    display: none !important;
+  }
+  .luckysheet-bottom-controll-row{
+    display: none !important;
+  }
+.ls-preview-shape {
+  position: absolute;
+  z-index: 2000;       /* 이미지보다 위 */
+  pointer-events: none;
+  background: transparent;
+  border: none;
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.2;
+  box-sizing: border-box;
+}
+
+    /* CDN 이미지 404 뜨는 경우 숨김 */
+    .luckysheet-waffle-container,
+    .luckysheet-waffle-image { background-image:none !important; }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <label>엑셀 선택: <input id="file" type="file" accept=".xlsx" /></label>
+    <label>시트: <select id="sheet"></select></label>
+    <span id="sheetMeta" style="font-size:12px;color:#666;"></span>
+  </div>
+  <div id="luckysheet"></div>
+
+  <script>
+    /* ===== 전역 공통 ===== */
+    const DEFAULT_COL_PX = 72;
+    const DEFAULT_ROW_PX = 20;
+    const EMU_PER_INCH   = 914400;
+    const PX_PER_INCH    = 96;
+    const IMG_CLASS      = "ls-preview-img";
+
+    const $file      = document.getElementById("file");
+    const $sheet     = document.getElementById("sheet");
+    const $sheetMeta = document.getElementById("sheetMeta");
+
+    let gWorkbook      = null;
+    let gSheets        = [];   // 시트별 변환 결과
+    let gImageMap      = {};   // imageId -> {base64, ext}
+    let gShapesBySheet = [];   // 시트index -> [도형...]
+    let gLoaded        = false;
+
+    // luckysheet 기본 functionlist 없을 때 경고만
+    if (!window.luckysheet) window.luckysheet = {};
+    if (!window.luckysheet.functionlist) {
+      window.luckysheet.functionlist = {};
+      console.warn("functionlist 가 비어있어 임시 객체로 대체했습니다.");
+    }
+
+    /* ===== 유틸 함수 ===== */
+    function arrayBufferToBase64(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        const sub = bytes.subarray(i, i + chunk);
+        binary += String.fromCharCode.apply(null, sub);
+      }
+      return btoa(binary);
+    }
+
+    function emuToPx(emu) {
+      if (!emu || isNaN(emu)) return 0;
+      return (emu / EMU_PER_INCH) * PX_PER_INCH;
+    }
+
+    function charWidthToPx(charWidth) {
+      if (!charWidth || isNaN(charWidth)) return DEFAULT_COL_PX;
+      return Math.round(charWidth * 7 + 5);
+    }
+
+    function pointsToPx(points) {
+      if (!points || isNaN(points)) return DEFAULT_ROW_PX;
+      return Math.round(points * 96 / 72);
+    }
+
+    function colStrToNum(colStr) {
+      let n = 0;
+      for (let i = 0; i < colStr.length; i++) {
+        n = n * 26 + (colStr.charCodeAt(i) - 64);
+      }
+      return n;
+    }
+
+    function normalizeAnchor(pt) {
+      if (!pt) return null;
+      return {
+        col: (typeof pt.col === "number" ? pt.col : 0) + 1,
+        row: (typeof pt.row === "number" ? pt.row : 0) + 1,
+        colOff: pt.colOff,
+        rowOff: pt.rowOff,
+      };
+    }
+
+    function cellPointToPixel(pt, colWidths, rowHeights) {
+      const colIndex = Math.max(1, pt.col);
+      const rowIndex = Math.max(1, pt.row);
+      const cInt  = Math.floor(colIndex);
+      const rInt  = Math.floor(rowIndex);
+      const cFrac = colIndex - cInt;
+      const rFrac = rowIndex - rInt;
+
+      let left = 0;
+      for (let c = 1; c < cInt; c++) left += colWidths[c - 1] || DEFAULT_COL_PX;
+      left += (colWidths[cInt - 1] || DEFAULT_COL_PX) * cFrac;
+
+      let top = 0;
+      for (let r = 1; r < rInt; r++) top += rowHeights[r - 1] || DEFAULT_ROW_PX;
+      top += (rowHeights[rInt - 1] || DEFAULT_ROW_PX) * rFrac;
+
+      if (typeof pt.colOff === "number") left += emuToPx(pt.colOff);
+      if (typeof pt.rowOff === "number") top  += emuToPx(pt.rowOff);
+
+      return { left: Math.round(left), top: Math.round(top) };
+    }
+
+    /* >>> 이게 빠져서 에러가 난 함수입니다 <<< */
+    function buildImageMapFromWorkbook(workbook) {
+      const map = {};
+      const media = (workbook.model && workbook.model.media) ? workbook.model.media : [];
+      media.forEach((m, idx) => {
+        const ext = (m.extension || "png").replace(".", "");
+        let base64 = "";
+        if (m.buffer) base64 = arrayBufferToBase64(m.buffer);
+        else if (m.data) base64 = arrayBufferToBase64(m.data);
+        const imageId = (m.index != null) ? m.index : idx;
+        map[imageId] = { base64, ext };
+      });
+      return map;
+    }
+
+    /* ===== Excel → Luckysheet 변환 ===== */
+    function excelSheetToLuckySheet(ws, index) {
+      let maxCols = ws.actualColumnCount || ws.columnCount || 50;
+      let maxRows = ws.actualRowCount || ws.rowCount || 200;
+
+      const imgs = (typeof ws.getImages === "function") ? ws.getImages() : [];
+      let imgMaxCol = 0, imgMaxRow = 0;
+      for (const im of imgs) {
+        const range = im.range || im.rng;
+        if (!range) continue;
+        const tl = range.tl ? normalizeAnchor(range.tl) : null;
+        const br = range.br ? normalizeAnchor(range.br) : null;
+        const endCol = br ? br.col : (tl ? tl.col : 0);
+        const endRow = br ? br.row : (tl ? tl.row : 0);
+        imgMaxCol = Math.max(imgMaxCol, endCol);
+        imgMaxRow = Math.max(imgMaxRow, endRow);
+      }
+      maxCols = Math.max(maxCols, imgMaxCol);
+      maxRows = Math.max(maxRows, imgMaxRow);
+
+      const colWidths = [];
+      const rowHeights = [];
+      for (let c = 1; c <= maxCols; c++) {
+        const col = ws.getColumn(c);
+        colWidths.push(charWidthToPx(col && col.width));
+      }
+      for (let r = 1; r <= maxRows; r++) {
+        const row = ws.getRow(r);
+        rowHeights.push(pointsToPx(row && row.height));
+      }
+
+      const celldata = [];
+      for (let r = 1; r <= maxRows; r++) {
+        for (let c = 1; c <= maxCols; c++) {
+          const cell = ws.getCell(r, c);
+          if (!cell || (cell.value == null && !cell.style)) continue;
+
+          const v = cell.value;
+          let vText = "";
+          if (v == null) {
+            vText = "";
+          } else if (typeof v === "object") {
+            if (v.richText) vText = v.richText.map(rt => rt.text).join("");
+            else if (v.text) vText = String(v.text);
+            else if (v.result != null) vText = String(v.result);
+            else if (v.formula) vText = (cell.result != null) ? String(cell.result) : "";
+            else vText = String(v);
+          } else {
+            vText = String(v);
+          }
+
+          const luckyCell = {
+            r: r - 1,
+            c: c - 1,
+            v: { v: vText, m: vText }
+          };
+
+          const al = cell.alignment || {};
+          if (al.horizontal) luckyCell.v.ht = al.horizontal;
+          if (al.vertical)   luckyCell.v.vt = al.vertical;
+          if (al.wrapText)   luckyCell.v.tb = 1;
+
+          const ft = cell.font || {};
+          if (ft.bold)   luckyCell.v.bl = 1;
+          if (ft.italic) luckyCell.v.it = 1;
+          if (ft.size)   luckyCell.v.fs = Math.round(ft.size);
+          if (ft.color && ft.color.argb) {
+            luckyCell.v.fc = "#" + ft.color.argb.slice(2);
+          }
+
+          const fill = cell.fill;
+          if (fill && fill.type === "pattern" && fill.fgColor && fill.fgColor.argb) {
+            luckyCell.v.bg = "#" + fill.fgColor.argb.slice(2);
+          }
+
+          celldata.push(luckyCell);
+        }
+      }
+
+      // 병합
+      const merges = (ws.model && ws.model.merges) ? ws.model.merges : [];
+      const mergeObj = {};
+      if (Array.isArray(merges)) {
+        merges.forEach(range => {
+          const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(range);
+          if (!m) return;
+          const startCol = colStrToNum(m[1]) - 1;
+          const startRow = parseInt(m[2], 10) - 1;
+          const endCol   = colStrToNum(m[3]) - 1;
+          const endRow   = parseInt(m[4], 10) - 1;
+          const key = `${startRow}_${startCol}`;
+          mergeObj[key] = {
+            r: startRow,
+            c: startCol,
+            rs: endRow - startRow + 1,
+            cs: endCol - startCol + 1
+          };
+        });
+      }
+
+      const config = { rowlen:{}, columnlen:{}, merge:mergeObj };
+      rowHeights.forEach((h, idx) => {
+        if (h && h !== DEFAULT_ROW_PX) config.rowlen[idx] = h;
+      });
+      colWidths.forEach((w, idx) => {
+        if (w && w !== DEFAULT_COL_PX) config.columnlen[idx] = w;
+      });
+
+      return {
+        sheetJson: {
+          name: ws.name || `Sheet${index+1}`,
+          index: index,
+          order: index,
+          status: index === 0 ? 1 : 0,
+          row: maxRows,
+          column: maxCols,
+          celldata: celldata,
+          config: config,
+          merge: mergeObj
+        },
+        imgs,
+        colWidths,
+        rowHeights
+      };
+    }
+
+    /* ===== 이미지 DOM 붙이기 ===== */
+    function clearPreviewImages() {
+      document.querySelectorAll('#luckysheet .' + IMG_CLASS).forEach(el => el.remove());
+    }
+    function insertImagesToLuckysheet(sheetIndex) {
+      const info = gSheets[sheetIndex];
+      if (!info) return;
+
+      const grid = document.querySelector('#luckysheet .luckysheet-cell-main');
+      if (!grid) return;
+      grid.style.position = 'relative';
+
+      clearPreviewImages();
+
+      const { imgs, colWidths, rowHeights } = info;
+      if (!imgs || !imgs.length) return;
+
+      imgs.forEach(im => {
+        const range = im.range || im.rng;
+        if (!range || !range.tl) return;
+
+        const tl = normalizeAnchor(range.tl);
+        const br = range.br ? normalizeAnchor(range.br) : null;
+        const ex = range.ext || null;
+
+        const tlPx = cellPointToPixel(tl, colWidths, rowHeights);
+        let imgW = 120, imgH = 90;
+
+        if (ex && (ex.width || ex.w) && (ex.height || ex.h)) {
+          imgW = Math.round(emuToPx(ex.width || ex.w));
+          imgH = Math.round(emuToPx(ex.height || ex.h));
+        } else if (br) {
+          const brPx = cellPointToPixel(br, colWidths, rowHeights);
+          imgW = Math.max(2, brPx.left - tlPx.left);
+          imgH = Math.max(2, brPx.top  - tlPx.top);
+        }
+
+        let imgObj = gImageMap[im.imageId];
+        if (!imgObj && gWorkbook && typeof gWorkbook.getImage === "function") {
+          const meta = gWorkbook.getImage(im.imageId);
+          if (meta) {
+            let base64;
+            if (meta.base64) base64 = meta.base64;
+            else if (meta.buffer) base64 = arrayBufferToBase64(meta.buffer);
+            else if (meta.data)   base64 = arrayBufferToBase64(meta.data);
+            const ext = (meta.extension || "png").replace(".", "");
+            imgObj = { base64, ext };
+          }
+        }
+        if (!imgObj || !imgObj.base64) return;
+
+        imgW = Math.max(20, imgW);
+        imgH = Math.max(20, imgH);
+
+        const el = document.createElement('img');
+        el.className = IMG_CLASS;
+        el.src = `data:image/${imgObj.ext};base64,${imgObj.base64}`;
+        el.style.left = tlPx.left + 'px';
+        el.style.top  = tlPx.top  + 'px';
+        el.style.width  = imgW + 'px';
+        el.style.height = imgH + 'px';
+        grid.appendChild(el);
+      });
+    }
+
+    /* ===== 도형 DOM 붙이기 ===== */
+    function clearPreviewShapes() {
+      document.querySelectorAll('#luckysheet .ls-preview-shape').forEach(el => el.remove());
+    }
+    function insertShapesToLuckysheet(sheetIndex) {
+      const grid = document.querySelector('#luckysheet .luckysheet-cell-main');
+      if (!grid) return;
+      grid.style.position = 'relative';
+
+      clearPreviewShapes();
+
+      const shapes = gShapesBySheet[sheetIndex] || [];
+      if (!shapes.length) return;
+
+      const sheetInfo  = gSheets[sheetIndex];
+      const colWidths  = sheetInfo ? sheetInfo.colWidths  : [];
+      const rowHeights = sheetInfo ? sheetInfo.rowHeights : [];
+
+      shapes.forEach(sh => {
+        const fromPx = cellPointToPixel({
+          col: sh.fromCol + 1,
+          row: sh.fromRow + 1,
+          colOff: sh.fromColOff,
+          rowOff: sh.fromRowOff,
+        }, colWidths, rowHeights);
+
+        const toPx = cellPointToPixel({
+          col: sh.toCol + 1,
+          row: sh.toRow + 1,
+          colOff: sh.toColOff,
+          rowOff: sh.toRowOff,
+        }, colWidths, rowHeights);
+
+        const wPx = Math.max(20, toPx.left - fromPx.left);
+        const hPx = Math.max(18, toPx.top  - fromPx.top);
+
+        const box = document.createElement('div');
+        box.className = 'ls-preview-shape';
+        box.textContent = sh.text || "";
+        box.style.position = 'absolute';
+        box.style.left = fromPx.left + 'px';
+        box.style.top  = fromPx.top  + 'px';
+        box.style.width  = wPx + 'px';
+        box.style.height = hPx + 'px';
+
+        box.style.background = 'transparent';      // 배경 투명
+        box.style.border = 'none';                 // 테두리 제거
+        box.style.color = '#000';                  // 글자는 보이게
+        box.style.pointerEvents = 'none';
+        box.style.whiteSpace = 'pre-wrap';
+        box.style.zIndex = 2000;                   // 이미지(999)보다 위
+        
+        grid.appendChild(box);
+      });
+    }
+
+    /* ===== 시트 정보 표시 ===== */
+    function updateSheetMeta() {
+      if (!gWorkbook) { $sheetMeta.textContent = ""; return; }
+      const idx = parseInt($sheet.value || "0", 10);
+      const ws = gWorkbook.worksheets[idx];
+      if (!ws) { $sheetMeta.textContent = ""; return; }
+      const rows = ws.actualRowCount || ws.rowCount || 0;
+      const cols = ws.actualColumnCount || ws.columnCount || 0;
+      $sheetMeta.textContent = ` (행 ${rows} × 열 ${cols})`;
+    }
+
+    /* ===== merge 보정 ===== */
+    function afterCreateFixMerge() {
+      const files = luckysheet.getLuckysheetfile && luckysheet.getLuckysheetfile();
+      if (!files) return;
+      files.forEach(f => {
+        if (!f.config) f.config = {};
+        if (!f.config.merge) f.config.merge = {};
+        if (!f.merge) f.merge = f.config.merge;
+      });
+    }
+
+    /* ===== 초기 화면 ===== */
+    luckysheet.create({
+      container: 'luckysheet',
+      title: 'Excel Preview',
+      showtoolbar: false,               // ★ 상단 툴바 제거
+      showinfobar: false,               // ★ info bar 제거
+      showsheetbar: true,               // ★ 시트 탭은 보이게
+      showsheetbarConfig: {
+        add: false,                     // ★ 시트 추가(+) 숨김
+        menu: false,                    // ★ 우측 메뉴 숨김
+        sheet: true
+      },
+      data: [{
+        name: 'Sheet1',
+        index: 0,
+        order: 0,
+        status: 1,
+        row: 20,
+        column: 10,
+        celldata: [
+          { r:0, c:0, v:{ v:'엑셀 파일을 선택하세요', m:'엑셀 파일을 선택하세요' } }
+        ],
+        config: { merge: {} },
+        merge: {}
+      }],
+      hook: {
+        sheetActivate: function (index) {
+          setTimeout(function () {
+            insertImagesToLuckysheet(index);
+            insertShapesToLuckysheet(index);
+          }, 30);
+        }
+      }
+    });
+    afterCreateFixMerge();
+
+    /* ===== 파일 선택 ===== */
+    $file.addEventListener("change", async (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+
+      const buf = await f.arrayBuffer();
+
+      // 1) ExcelJS 로드
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf);
+      gWorkbook = wb;
+
+      // 2) 통합 이미지 맵
+      gImageMap = buildImageMapFromWorkbook(wb);
+
+      // 3) Excel -> Luckysheet 변환
+      gSheets = [];
+      $sheet.innerHTML = "";
+      wb.worksheets.forEach((ws, idx) => {
+        const conv = excelSheetToLuckySheet(ws, idx);
+        gSheets.push(conv);
+
+        const opt = document.createElement("option");
+        opt.value = String(idx);
+        opt.textContent = ws.name || `Sheet${idx+1}`;
+        $sheet.appendChild(opt);
+      });
+
+      // 4) 도형 파싱 (JSZip)
+      const zip = await JSZip.loadAsync(buf);
+      gShapesBySheet = new Array(wb.worksheets.length).fill(null).map(() => []);
+
+      for (let i = 0; i < wb.worksheets.length; i++) {
+        const relPath = `xl/worksheets/_rels/sheet${i+1}.xml.rels`;
+        const relFile = zip.file(relPath);
+        const drawingTargets = [];
+
+        if (relFile) {
+          const relXmlStr = await relFile.async("string");
+          const relDoc = new DOMParser().parseFromString(relXmlStr, "application/xml");
+          const rels = relDoc.getElementsByTagName("Relationship");
+          for (let r = 0; r < rels.length; r++) {
+            const rel = rels[r];
+            const type = rel.getAttribute("Type") || "";
+            const target = rel.getAttribute("Target") || "";
+            if (type.indexOf("/drawing") !== -1 && target) {
+              drawingTargets.push(target.replace("../", "xl/"));
+            }
+          }
+        }
+
+        for (const dpath of drawingTargets) {
+          const dfile = zip.file(dpath);
+          if (!dfile) continue;
+          const dxmlStr = await dfile.async("string");
+          const ddoc = new DOMParser().parseFromString(dxmlStr, "application/xml");
+
+          const anchors = ddoc.getElementsByTagNameNS("*", "twoCellAnchor");
+          for (let a = 0; a < anchors.length; a++) {
+            const anc = anchors[a];
+            const from = anc.getElementsByTagNameNS("*", "from")[0];
+            const to   = anc.getElementsByTagNameNS("*", "to")[0];
+            if (!from || !to) continue;
+
+            const fromCol    = Number(from.getElementsByTagNameNS("*", "col")[0]?.textContent || 0);
+            const fromRow    = Number(from.getElementsByTagNameNS("*", "row")[0]?.textContent || 0);
+            const fromColOff = Number(from.getElementsByTagNameNS("*", "colOff")[0]?.textContent || 0);
+            const fromRowOff = Number(from.getElementsByTagNameNS("*", "rowOff")[0]?.textContent || 0);
+
+            const toCol    = Number(to.getElementsByTagNameNS("*", "col")[0]?.textContent || fromCol);
+            const toRow    = Number(to.getElementsByTagNameNS("*", "row")[0]?.textContent || fromRow);
+            const toColOff = Number(to.getElementsByTagNameNS("*", "colOff")[0]?.textContent || 0);
+            const toRowOff = Number(to.getElementsByTagNameNS("*", "rowOff")[0]?.textContent || 0);
+
+            // 텍스트 추출
+            const texts = anc.getElementsByTagNameNS("*", "t");
+            let textVal = "";
+            for (let t = 0; t < texts.length; t++) {
+              textVal += texts[t].textContent;
+            }
+
+            gShapesBySheet[i].push({
+              fromCol, fromRow, fromColOff, fromRowOff,
+              toCol, toRow, toColOff, toRowOff,
+              text: textVal
+            });
+          }
+        }
+      }
+
+      // 5) luckysheet 다시 그림
+      luckysheet.destroy();
+      luckysheet.create({
+        container: 'luckysheet',
+        title: f.name,
+        showtoolbar: false,               // ★
+        showinfobar: false,               // ★
+        showsheetbar: true,               // ★
+        showsheetbarConfig: {
+          add: false,                     // ★ 하단 + 제거
+          menu: false,
+          sheet: true
+        },
+        data: gSheets.map(s => s.sheetJson),
+        hook: {
+          sheetActivate: function (index) {
+            setTimeout(function () {
+              insertImagesToLuckysheet(index);
+              insertShapesToLuckysheet(index);
+            }, 30);
+          }
+        }
+      });
+      afterCreateFixMerge();
+
+      updateSheetMeta();
+      setTimeout(() => {
+        insertImagesToLuckysheet(0);
+        insertShapesToLuckysheet(0);
+      }, 30);
+
+      gLoaded = true;
+    });
+
+    /* ===== select 변경 ===== */
+    $sheet.addEventListener("change", () => {
+      if (!gLoaded) return;
+      const idx = parseInt($sheet.value, 10) || 0;
+      luckysheet.setSheetActive(idx);
+      updateSheetMeta();
+      setTimeout(() => {
+        insertImagesToLuckysheet(idx);
+        insertShapesToLuckysheet(idx);
+      }, 30);
+    });
+
+  </script>
+</body>
+</html>

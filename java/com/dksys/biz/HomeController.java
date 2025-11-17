@@ -39,12 +39,17 @@ public class HomeController {
 	// 웰컴 페이지
     @GetMapping("/")
     public String welcome(HttpServletRequest request) {
-    	Device device = DeviceUtils.getCurrentDevice(request);
+//    	Device device = DeviceUtils.getCurrentDevice(request);
+
+        com.dksys.biz.HomeController.FormFactor ff = homeController.detectFormFactor(request);
+        String deviceType = ff.name();
     	String redirectUrl = "";
-    	if(device.isNormal()) {
+    	if ("desktop".equals(deviceType)) {
     		redirectUrl = "/static/index.html";
-    	}else {
+    	}else if ("mobile".equals(deviceType)){
     		redirectUrl = "/static/mobile/index.html";
+    	} else {
+    		redirectUrl = "/static/tablet/index.html";
     	}
     	return "redirect:"+redirectUrl;
     }

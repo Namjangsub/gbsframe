@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+	<link rel="stylesheet" type="text/css" href="/static/bootstrap/css/bootstrap.min.css" />
+	<link rel="stylesheet" type="text/css" href="/static/css/common.css" />
+	<link rel="stylesheet" type="text/css" href="/static/css/login.css" />
+	<link rel="stylesheet" type="text/css" href="/static/tablet/css/mobile.css" />
+	<script src="/static/js/jquery-3.5.1.min.js"></script>
+	<script src="/static/js/global.js"></script>
+</head>
+<body>
+	<div id="login">
+		<div class="login_box">
+			<h1 class="logo">
+				<img id="logoImg" src="/static/img/Logo_gunyangitt.gif" alt="건양ITT">
+			</h1>
+			<h2>Login</h2>
+			<input id="id" type="text" placeholder="ID">
+			<input id="pass" type="password" placeholder="Password" style="margin-top: 20px;">
+
+			<input type="checkbox" id="idSaveCheck" style="width: 20px !important; cursor: pointer;">
+			<label style="font-size: larger; vertical-align: sub;">아이디 저장</label>
+		    <input type="checkbox" id="switch" style="width: 20px !important; cursor: pointer;">
+		    <label style="font-size: larger; vertical-align: sub;">암호보이기 </label>
+		    <label id="capsLockStatus"></label><br>
+		    
+			
+			<button onclick="loginAction();">Login</button>
+		</div>
+	</div>
+</body>
+<script type="text/javascript">
+	$(document).ready(function() {        
+		var loginId = getCookie("loginId");
+		var validYn = localStorage.getItem("access_token");
+		if(validYn != null) {
+			checkToken();
+		}
+		if(loginId != null) {
+			$("#id").val(loginId);
+			$("#idSaveCheck").prop("checked", true);
+		}
+		$("#idSaveCheck").change(function(){ // 체크박스에 변화가 발생시
+	        if($("#idSaveCheck").is(":checked")){ // ID 저장하기 체크했을 때,
+	            var loginId = $("#id").val();
+	            setCookie("loginId", loginId, 7); // 7일 동안 쿠키 보관
+	        }else{ // ID 저장하기 체크 해제 시,
+	            deleteCookie("loginId");
+	        }
+	    });
+		// ID 저장하기를 체크한 상태에서 ID를 입력하는 경우, 이럴 때도 쿠키 저장.
+	    $("#id").keyup(function(){ // ID 입력 칸에 ID를 입력할 때,
+	        if($("#idSaveCheck").is(":checked")){ // ID 저장하기를 체크한 상태라면,
+	            var loginId = $("#id").val();
+	            setCookie("loginId", loginId, 7); // 7일 동안 쿠키 보관
+	        } else {
+	        	deleteCookie("loginId");
+	        } 
+	        	
+	    });
+	    setImg();
+	    document.addEventListener('keydown', function(event) {
+	        var capsLockOn = event.getModifierState && event.getModifierState('CapsLock');
+	        $('#capsLockStatus').text(capsLockOn ? 'Caps Lock ON' : 'Caps Lock OFF');
+// 	        console.log('Caps Lock:', capsLockOn);
+
+			if (event.keyCode == 13) {
+				loginAction();
+			}
+	    });
+	    
+        $('#switch').click(function() {
+            var passwordField = $('#pass');
+            var currentType  = passwordField.attr('type');
+            passwordField.attr('type', currentType === "password" ? "text" : "password");
+        });
+
+	});
+	
+	function checkToken() {
+		$.ajax({
+		    type: "POST",
+		    url: "/admin/cm/cm02/selectRoleInfo",
+		    xhrFields: { withCredentials: true }, 
+		    beforeSend: function (request) {
+	            request.setRequestHeader("Authorization", authorizationToken);
+	        },
+		    success: function(data, status, xhr) {
+		    	let newToken = xhr.getResponseHeader("Authorization") || xhr.getResponseHeader("X-New-Access-Token");
+		        if (newToken) {
+	              localStorage.setItem("access_token", newToken);
+	              authorizationToken = "Bearer " + newToken;
+	              jwt = parseJwt(authorizationToken);
+		        }
+		    	menuIdx = getCookie("menuIdx");
+				openNotiPop();
+		    },
+	        error: function (data) {
+	        	logoutClick();
+	        	return;
+	        }
+		});
+	}
+	function loginAction() {
+		var isValid = true;
+		$("input").each(function(index, item){
+			if($(this)[0].id != '_retVal12'){
+				if($(this).val() == "") {
+					isValid = false;
+					return false;
+				}
+			}
+		});
+		if(!isValid) {
+			alert("모든 정보를 입력하셔야 합니다.");
+			return;
+		}
+		var formData = {
+			grant_type 	: "password",	
+			username  	: $("#id").val(),
+			id 			: $("#id").val(),
+			password 	: $("#pass").val(),
+		}
+		$.ajax({
+		    type: "POST",
+		    url: "/login",
+		    contentType: "application/json; charset=utf-8",
+		    data: JSON.stringify(formData),
+		    xhrFields: { withCredentials: true }, // 반드시 있어야 쿠키 전송 refresh_token은 필수임
+		    success: function(data, status, xhr) {
+		        const newToken = xhr.getResponseHeader("Authorization");
+// 		        console.log("access_token:", newToken);
+		        if (newToken) {
+	              localStorage.setItem("access_token", newToken);
+	              authorizationToken = newToken;
+	              jwt = parseJwt(authorizationToken);
+		        }
+	    		var usrInfo = data.usrInfo;
+		    	if(data.msg == "success"){
+
+					menuIdx = getCookie("menuIdx");
+					selectAuthInfo();
+// 		    		if(usrInfo.passYn == "Y") { //암호관리적용
+// 			    		if(usrInfo.passChg == "1") {  //암호변경주기 초과
+// 			    			openModal("/static/html/cmn/modal/updatePw.html", 500, 200, "비밀번호 변경");
+// 				    		window.open("/static/html/cmn/modal/updatePw.html", "비밀번호 변경", "width=500, height=200, left=30, top=30");
+// 			    		}
+// 		    		} else {
+// 		    		}
+		    	} else {
+		    		if(usrInfo){
+		    			if(Number(usrInfo.passErrCnt) >= Number(usrInfo.passChkCnt)) {
+							alert("비밀번호를 " + usrInfo.passChkCnt + "회이상 틀리셨습니다. 관리자에게 문의하세요.");
+						}else {
+							alert("비밀번호를 " + usrInfo.passErrCnt + "회 틀렸습니다.\n" + usrInfo.passChkCnt + "회 이상 틀리면 접속불가합니다.");		
+						}
+		    		}else{
+		    			alert(data.msg);
+		    		}
+		    	}
+		    },
+	        error: function (data) {
+	        	if (data.responseJSON) {
+					let tempUsrInfo = data.responseJSON.usrInfo;
+		    		if(tempUsrInfo){
+		    			if(Number(tempUsrInfo.passErrCnt) >= Number(tempUsrInfo.passChkCnt)) {
+							alert("비밀번호를 " + tempUsrInfo.passChkCnt + "회이상 틀리셨습니다. 관리자에게 문의하세요.");
+						}else {
+							alert("비밀번호를 " + tempUsrInfo.passErrCnt + "회 틀렸습니다.\n" + tempUsrInfo.passChkCnt + "회 이상 틀리면 접속불가합니다.");		
+						}
+		    		}else{
+		        		alert(data.responseJSON.msg);
+		    		}
+	        	}
+	        	logoutClick();
+	        	return;
+	        }
+		});
+	}
+
+	
+	function selectAuthInfo(){
+		var formData = {
+			"authInfo" : jwt.authInfo,
+			"userId"   : jwt.userId
+		}
+		postAjaxSync("/selectMenuAuth", formData, null, function(data) {
+			var authString = data.accessJSON;
+	     	 localStorage.removeItem("authArr");
+		     localStorage.setItem("authArr", authString);
+
+	         var checkCookie = localStorage.getItem("authArr", authString);
+
+	         if (checkCookie) {
+// 	            alert("Cookie 'authArr' is set successfully!");
+	         } else {
+	            alert("권한 생성 실패 전산실 연락 바랍니다. 'authArr'.");
+	         }
+// 	         location.href = "/static/html/admin/cm/cm10/CM1002M01.html";
+			openNotiPop();
+		});
+	}
+	
+	function openNotiPop() {
+		var defaultUrl = "/static/html/admin/cm/cm10/CM1002M01.html";
+// 		var defaultUrl = "/static/html/main.html";
+		postAjaxSync("/admin/cm/cm09/selectNotiPopList", {}, null, function(data){
+			var list = data.result;
+			var left = 30;
+			var top = 30;
+			var popupWidth = 600;
+			var popupHeight = 600;
+			for(var i=0; i<list.length; i++) {
+				if(getCookie(list[i]) == null){
+					
+					//윈도우 좌표가 아니라 현재 브러우저 기준으로 좌표 설정
+					left += 30;
+					top += 30;
+					var popupX = Math.round(window.screenX + left);
+				    var popupY = Math.round(window.screenY + top);
+				    
+				    // 윈도우 팝업창의 스타일 지정
+				    var featureWindow = `scrollbars=yes ,toolbar=yes, width=1200, height=800, left=${popupX},top=${popupY}`;
+					var popupWindow = window.open(`/static/html/cmn/notiPop.html?notiKey=${list[i]}`, `공지사항${i}`, featureWindow);	
+			        // 안전한 focus 처리
+	                if (popupWindow && !popupWindow.closed) {
+	                    try {
+	                    	popupWindow.focus();
+	                    } catch (e) {
+	                    	console.warn(`팝업 focus 중 오류 발생 (notiKey: ${list[i]}):`, e);
+	                    }
+	                } else {
+	                	console.warn(`팝업이 차단되었거나 열리지 않음 (notiKey: ${list[i]})`);
+	                }
+				}
+			}
+			//롤에 AUTH100이 있으면 임원으로 인식
+			if (jwt.userId == 'EMJ8105') {	//전무님 영업 대시보드로 보이게
+				defaultUrl = "/static/html/admin/cm/cm10/CM1001M01.html";
+			} else if(jwt.authInfo.indexOf("AUTH100") > -1){
+				defaultUrl = "/static/html/admin/cm/cm11/CM1101M01.html";
+			//조직코드가  GUN30으로 시작하면 영업부서인경우 영업부서 대시보드
+			} else if (jwt.deptId.slice(0,5) == 'GUN30' || jwt.deptId.slice(0,5) == 'GUN20'  ) {
+				defaultUrl = "/static/html/admin/cm/cm10/CM1001M01.html";
+			}
+			//유저권한이 파트너 이거나 롤메뉴에 PART01 파트너롤이 있으면 공급업체로 인식함
+			if(jwt.userGrade == 'USERP' || jwt.authInfo.indexOf("PART01") > -1) { 
+				defaultUrl = "/static/html/user/sm/sm07/SM0701M01.html";
+			}
+			location.href = defaultUrl;
+			
+		});
+	}
+	
+	
+	function setImg() {
+		var imgUrl = "/static/img/Logo_gunyangitt.gif";
+		var bgImgUrl = "/static/img/Login_bg_gunyangitt.jpg";
+// 		if(location.hostname == "gbs.gunyangitt.co.kr" || location.hostname == "m.gunyangitt.co.kr" || location.hostname == "localhost") {
+// 			imgUrl = "/static/img/건양ITT_White.png";
+// 			bgImgUrl = "/static/img/Login_bg_gunyangitt.jpg";
+// 		}else if(location.hostname == "nmes.gunyangitt.co.kr"){
+// 			imgUrl = "/static/img/건양ITT_White.png";
+// 			bgImgUrl = "/static/img/Login_bg_gunyangitt.jpg";
+// 		}else {
+// 			imgUrl = "/static/img/건양ITT_White.png";
+// 			bgImgUrl = "/static/img/Login_bg_gunyangitt.jpg";
+// 		}
+		$("#logoImg").attr("src", imgUrl);
+		$("#login").css("background", "url("+bgImgUrl+") no-repeat 100% 0% #ffffff");
+	}
+	
+	
+	function showNotiModal(notiKey) {
+	    const storageKey = "noti_shown_" + notiKey;
+
+	    // 이미 본 공지라면 표시 안 함
+	    if (localStorage.getItem(storageKey) === "Y") {
+	        return;
+	    }
+
+	    // 모달 열기
+	    $.get("/static/html/cmn/notiPop.html?notiKey=" + notiKey, function (html) {
+	        $('#notiContent').html(html);
+	        $('#notiModal').show();
+
+	        // 확인 시 storage에 표시 여부 저장
+	        $('#notiModalCloseBtn').off('click').on('click', function () {
+	            $('#notiModal').hide();
+	            localStorage.setItem(storageKey, "Y");  // 공지 확인 처리
+	        });
+	    });
+	}
+</script>
+</html>

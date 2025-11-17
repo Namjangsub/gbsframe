@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+	<script src="/static/js/moment/moment-with-locales.js"></script>
+	<script src="/static/js/global.js"></script>
+	<script src="/static/js/fileTree.js"></script>
+	<script src="/static/js/jquery.blockUI.js"></script>
+	<!-- 도움말 팝업 -->
+    <script src="/static/js/manualPopup.js"></script>
+
+    <meta charset="UTF-8">
+    <title>입팀장 주간회의 자료 (행 이동, 순서 번호)</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/colresizable@1.6.0/colResizable-1.6.min.js"></script>
+    <style>        
+    	.grip {
+		    background: #2380ff;    /* 더 진한 파란색 */
+		    width: 4px;
+		    height: 100%;
+		    cursor: col-resize;
+		    position: absolute;
+		    right: -2px;
+		    top: 0;
+		    z-index: 20;
+		    opacity: 0.7;
+		    border-radius: 2px;
+        }
+        .dragging {
+            border-right: 2px solid #2380ff !important;
+        }
+        th {
+            position: relative;
+        }
+        body {
+            background: #f7f8fa;
+        }
+        .top-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            padding-left: 8px;
+            padding-right: 8px;
+        }
+        .input-row {
+            display: flex;
+            align-items: center;
+        }
+        .input-group {
+            display: flex;
+            align-items: center;
+            margin-right: 40px;
+        }
+        .input-label {
+            font-size: 15px;
+            color: #666;
+            margin-right: 6px;
+            min-width: 70px;
+        }
+        .input-label.required::before {
+            content: "*";
+            color: #ee4848;
+            margin-right: 2px;
+            font-size: 14px;
+            vertical-align: middle;
+        }
+        .input-date {
+            font-size: 15px;
+            padding: 3px 7px;
+            border: 1.5px solid #e13c3c;
+            border-radius: 4px;
+            outline: none;
+            width: 135px;
+            box-sizing: border-box;
+            height: 28px;
+            background: #fff;
+            transition: border 0.15s;
+        }
+        .input-number {
+            font-size: 15px;
+            padding: 3px 7px;
+            border: 1.2px solid #ccc;
+            border-radius: 4px;
+            outline: none;
+            width: 60px;
+            box-sizing: border-box;
+            height: 28px;
+            background: #eee;
+            margin-left: 6px;
+            transition: border 0.15s;
+            color: #888;
+        }
+        .input-number[readonly] {
+            background: #eee;
+            cursor: default;
+        }
+        .title-flex-row {
+            display: flex;
+            align-items: center;
+            flex: 1 1 auto;
+            justify-content: center;
+            position: relative;
+            width: 100%;
+            min-width: 250px;
+        }
+        .center-title {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            color: #222;
+            margin: 0;
+            flex: 1 1 auto;
+        }
+        .button-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: 16px;
+            margin-right: 8px;
+        }
+        .table-btn {
+            border: 1.5px solid #ccc;
+            background: #fff;
+            color: #333;
+            font-size: 18px;
+            width: 42px;
+            height: 32px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: border 0.18s;
+            text-align: center;
+            outline: none;
+            padding: 0;
+            margin: 0;
+            vertical-align: middle;
+            line-height: 32px;
+            font-family: inherit;
+            font-weight: 400;
+            box-sizing: border-box;
+            position: relative;
+        }
+        .table-btn:active {
+            border: 1.5px solid #888;
+            background: #f0f0f0;
+        }
+        .excel-btn {
+            border: 1.5px solid #ccc;
+            background: #fff;
+            color: #333;
+            font-size: 15px;
+            height: 32px;
+            padding: 0 8px 0 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: 3px;
+            font-family: inherit;
+        }
+        .excel-icon {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            background: url('https://cdn.jsdelivr.net/gh/ionic-team/ionicons@5.5.2/src/svg/logo-microsoft-excel.svg') no-repeat center/contain;
+            vertical-align: middle;
+        }
+        @media (max-width: 900px) {
+            .top-row, .title-flex-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .button-group {
+                margin-left: 0;
+                margin-top: 10px;
+            }
+            .center-title {
+                margin-top: 10px;
+            }
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+thead th {
+    position: sticky;
+    top: 0;
+    z-index: 20;      /* sticky grip 겹침 방지 */
+    background: #f3f3f3;
+}
+th, td { 
+	min-width: 80px;
+    border: 1.5px solid #b8b8b8 !important; /* 기존보다 진하게 */
+    border-right: 1.5px solid #bbbbbb !important; /* 오른쪽 구분선 강조 */
+    border-bottom: 1.5px solid #bbbbbb !important;
+    background: #fff; }
+th:not(.seq-col):not(.subject-col):not(.note-col),
+td:not(.seq-col):not(.subject-col):not(.note-col) {
+    width: 220px !important;
+    min-width: 220px !important;
+    max-width: 220px !important;
+}
+        th {
+            background: #f3f3f3;
+            font-weight: bold;
+            text-align: center;
+        }
+        td {
+            text-align: left;
+            background: #fff;
+            transition: background 0.2s;
+        }
+        .editable-cell {
+            min-height: 30px;
+            cursor: pointer;
+        }
+        .editing {
+            background: #e7f3ff !important;
+        }
+        textarea.cell-editor {
+            width: 100%;
+            min-width: 200px;
+            max-width: 100%;
+            min-height: 100px;
+            font-size: 12px;
+            border: 1px solid #0090ff;
+            resize: none;
+            box-sizing: border-box;
+            padding: 6px;
+            margin: 0;
+            line-height: 1.5;
+            overflow-y: hidden;
+            text-align: left;
+            display: block;
+        }
+        select.status-select {
+            width: 100%;
+            min-width: 50px;
+            max-width: 100%;
+            height: 32px;
+            font-size: 12px;
+            border: 1px solid #0090ff;
+            box-sizing: border-box;
+            padding: 2px 4px;
+            margin: 0;
+            background: #fff;
+            text-align: left;
+            display: block;
+        }
+        tr.selected-row td {
+            background: #e3f0fa !important;
+            transition: background 0.2s;
+        }
+        /* 순서 칼럼 */
+th.seq-col, td.seq-col {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    text-align: center !important;
+    font-weight: bold;
+    background: #f9f9f9;
+    position: sticky;
+    left: 0;
+    z-index: 30;
+    background: #fff;
+    border-right: 1.5px solid #bbb;
+    box-shadow: 2px 0 4px -2px #d0d3d6;
+}
+/* 2번째 열(PROJECT/주제) */
+th.subject-col, td.subject-col {
+    width: 100px !important;
+    min-width: 100px !important;
+    max-width: 100px !important;
+    position: sticky;
+    left: 40px;  /* seq-col의 width값과 맞춤 */
+    z-index: 30;
+    background: #fff;
+    border-right: 1px solid #eee;
+    box-shadow: 2px 0 4px -2px #e3e3e3;
+}
+th.note-col, td.note-col {
+    width: 80px !important;
+    min-width: 80px !important;
+    max-width: 80px !important;
+}
+        th:first-child, td:first-child {
+            width: 48px !important;
+            min-width: 48px !important;
+            max-width: 48px !important;
+        }
+        th:nth-child(12), td:nth-child(12),
+        th:nth-last-child(2), td:nth-last-child(2),
+        th:last-child, td:last-child {
+            width: 100px !important;
+            min-width: 100px !important;
+            max-width: 100px !important;
+        }
+        th:nth-child(12), td:nth-child(12) {
+            width: 80px !important;
+            min-width: 80px !important;
+            max-width: 80px !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- 한 줄(가로)로 입력필드+타이틀+버튼 -->
+    <div class="top-row">
+        <div class="input-row">
+            <div class="input-group">
+                <span class="input-label required">회의일자</span>
+                <input type="date" class="input-date" id="mnDate_S" name="mnDate_S" data-search="mnDate"  required>
+            </div>
+            <div class="input-group">
+                <span class="input-label">주차</span>
+                <input type="number" class="input-number" id="mnWeeks_S" name="mnWeeks_S"  data-search="mnWeeks" readonly tabindex="-1">
+            </div>
+        </div>
+        <div class="title-flex-row">
+            <h3 class="center-title">임팀장 주간회의 자료</h3>
+            <div class="button-group">
+                <button type="button" class="table-btn" id="moveUpBtn">&#9650;</button>
+                <button type="button" class="table-btn" id="moveDownBtn">&#9660;</button>
+                <button type="button" class="table-btn" id="addRowBtn">+</button>
+                <button type="button" class="table-btn" id="delRowBtn">-</button>
+                <button type="button" class="excel-btn">
+                    <span class="excel-icon"></span>
+                    엑셀다운로드
+                </button>
+            </div>
+        </div>
+    </div>
+    <div style="overflow-x:auto; overflow-y:auto; height:750px; width:100%;">
+	    <table id="mainTable">
+	        <thead>
+	            <tr>
+	                <th class="seq-col">순서</th>
+	                <th class="subject-col">PROJECT<br>주제</th>
+	                <th>임원</th>
+	                <th>생산</th>
+	                <th>영업<br>국내,해외</th>
+	                <th>연구소</th>
+	                <th>기계</th>
+	                <th>전기</th>
+	                <th>경영지원팀<br>총무/인사/사전관리</th>
+	                <th>전산실</th>
+	                <th>진행/완료</th>
+	                <th>특이사항</th>
+	            </tr>
+	        </thead>
+	        <tbody>
+	            <tr>
+	                <td class="seq-col"></td>
+	                <td class="subject-col editable-cell">샤이언차 아산 QV</td>
+	                <td class="editable-cell">제품생산과정에 대한 지급승인 필요 등...</td>
+	                <td class="editable-cell">이벤트제품 생산 진행중...</td>
+	                <td class="editable-cell">제품생산이 원리적 요인 등...</td>
+	                <td class="editable-cell"></td><td class="editable-cell"></td><td class="editable-cell"></td><td class="editable-cell"></td>
+	                <td class="editable-cell"></td>
+	                <td class="note-col editable-cell">진행</td>
+	                <td class="editable-cell"></td>
+	            </tr>
+	            <tr>
+	                <td class="seq-col"></td>
+	                <td class="subject-col editable-cell">샤이언차 아산 SZ1e</td>
+	                <td class="editable-cell">지원, 정확한 원인...</td>
+	                <td class="editable-cell">석션 시험 진행예정...</td>
+	                <td class="editable-cell">원인분석 및 문제점 개선 중...</td>
+	                <td class="editable-cell"></td><td class="editable-cell"></td><td class="editable-cell"></td><td class="editable-cell"></td>
+	                <td class="editable-cell"></td>
+	                <td class="note-col editable-cell">완료</td>
+	                <td class="editable-cell"></td>
+	            </tr>
+	            <tr>
+	                <td class="seq-col"></td>
+	                <td class="subject-col editable-cell">젠티<br>LQ2 관공정차</td>
+	                <td class="editable-cell">생폴탑재, 금형 등 고객사 문제 발생...</td>
+	                <td class="editable-cell">도장과 금형공정과 설계팀의...</td>
+	                <td class="editable-cell">젠티 관공정장비 1차수량명 반정...</td>
+	                <td class="editable-cell"></td><td class="editable-cell"></td><td class="editable-cell"></td><td class="editable-cell"></td>
+	                <td class="editable-cell"></td>
+	                <td class="note-col editable-cell"></td>
+	                <td class="editable-cell"></td>
+	            </tr>
+	        </tbody>
+	    </table>
+	</div>
+    <script>
+    
+    $(document).ready(function () {
+    	dateToWeek();
+        $('#mnDate_S').on('change', function () {
+        	dateToWeek();
+        	backendData();
+        	
+        });
+        updateSeqCol();
+        
+
+    });
+    
+    function backendData() {
+        var paramObj = {};
+        // 검색 파라미터 수집
+        $.each($('#main_area [data-search]'), function(idx, elem){
+            if ($(elem).attr("class") === "input_calendar") {
+                paramObj[$(elem).data("search")] = deleteHyphenStr($(elem).val());
+            } else {
+                paramObj[$(elem).data("search")] = $(elem).val();    
+            }
+        });
+
+        postAjax("/user/pm/pm10/selectMnList", paramObj, null, function(data){
+            try {
+                let list = data.result;
+                if (!Array.isArray(list)) {
+                    alert("조회 결과가 없습니다.");
+                    return;
+                }
+
+                var $tbody = $('#mainTable tbody');
+                $tbody.empty(); // 기존 행 전체 삭제
+
+                // list.length가 0이면 빈 row 하나 추가 (필요시)
+                if (list.length === 0) {
+                    $tbody.append(makeTableRow({}));
+                }
+
+                // 데이터 행 추가
+                $.each(list, function(idx, item){
+                    $tbody.append(makeTableRow(item, idx));
+                });
+
+                updateSeqCol(); // 순서 컬럼 갱신 (함수는 앞서 구현한 것 그대로)
+
+            } catch (error) {
+                alert("오류 발생!! 전산실 연락 바랍니다\n" + error.message);
+            }
+        });
+    }
+
+    // item(행 데이터)을 받아 테이블 <tr>로 만들어주는 함수 (실무형 예시)
+    function makeTableRow(item, idx) {
+
+        // 상태 텍스트 변환
+        let statusText = '';
+        if (item.mnStatus === 'Y') statusText = '완료';
+        else if (item.mnStatus === 'N') statusText = '진행';
+
+        // item은 백엔드에서 받은 JSON 오브젝트 (key: field명, value: 데이터)
+        // 예: { project: ..., ceo: ..., prod: ..., ... }
+
+        // row 내 컬럼 수, 순서 등에 따라 맞춤
+        // 필드명 매핑은 실제 컬럼명과 맞춰서 수정
+        return `
+            <tr>
+                <td class="seq-col">${item.mnSortNo || ''}</td>
+                <td class="subject-col editable-cell">${item.mnSubject || ''}</td>
+                <td class="editable-cell">${item.gun00MnCnts || ''}</td>
+                <td class="editable-cell">${item.gun30MnCnts || ''}</td>
+                <td class="editable-cell">${item.gun40MnCnts || ''}</td>
+                <td class="editable-cell">${item.gun60MnCnts || ''}</td>
+                <td class="editable-cell">${item.trn5010MnCnts || ''}</td>
+                <td class="editable-cell">${item.trn5020MnCnts || ''}</td>
+                <td class="editable-cell">${item.gun60MnCnts || ''}</td>
+                <td class="editable-cell">${item.gun10MnCnts || ''}</td>
+                <td class="editable-cell">${item.gun80MnCnts || ''}</td>
+                <td class="note-col editable-cell status-cell" data-value="${item.mnStatus || ''}">${statusText}</td>
+                <td class="editable-cell">${item.mnEtcAll || ''}</td>
+            </tr>
+        `;
+    }
+    
+    
+    	// 일자 기준 주차 변환 함수
+    	function dateToWeek() {
+    		const dateStr = $('#mnDate_S').val();      // "2025-05-20"
+    		if (!dateStr) return;
+    		const week = moment(dateStr, 'YYYY-MM-DD').isoWeek();
+    		$('#mnWeeks_S').val(week);
+    	}
+
+        // 아래 코드 추가
+        $(function() {
+            $("#mainTable").colResizable({
+                liveDrag: true,
+                gripInnerHtml: "<div class='grip'></div>",
+                draggingClass: "dragging",
+//                 resizeMode: 'fit',
+                resizeMode: 'overflow',   // <== 핵심 옵션!
+                headerOnly: true
+            });
+        });
+
+        // 순서 번호 자동 갱신
+        function updateSeqCol() {
+            $('#mainTable tbody tr').each(function (idx) {
+                $(this).find('td.seq-col').text(idx + 1);
+            });
+        }
+
+        // 자동 세로 확장 함수
+        function autoResizeTextarea($textarea) {
+            $textarea.height(0);
+            $textarea.height($textarea[0].scrollHeight);
+        }
+        function moveToCell($currentCell, direction) {
+            var $cells = $('.editable-cell');
+            var idx = $cells.index($currentCell);
+            var nextIdx = direction === 'next' ? idx + 1 : idx - 1;
+            if (nextIdx >= 0 && nextIdx < $cells.length) {
+                $cells.eq(nextIdx).click();
+            }
+        }
+
+        $(document).on('click', '.editable-cell', function () {
+            var $cell = $(this);
+            var $row = $cell.closest('tr');
+            var $editingCell = $('.editable-cell.editing');
+            if ($editingCell.length && !$cell.is($editingCell)) {
+                $editingCell.find('textarea,select').blur();
+            }
+            $('tbody tr').removeClass('selected-row');
+            $row.addClass('selected-row');
+            if ($cell.hasClass('editing')) return;
+
+            var colIdx = $cell.index();
+
+            // 진행/완료 열 (12번째)
+            if (colIdx === 11) {
+                $cell.data('original', $cell.html());
+                $cell.addClass('editing');
+
+                // 상태값은 data-value에 저장된 값이 있으면 그걸 우선 사용(없으면 현재 텍스트로 판단)
+                var status = $cell.data('value');
+                if (typeof status === "undefined") {
+                    // 만약 data-value가 없고, 셀에 "진행"/"완료" 텍스트만 있다면
+                    var valText = $cell.text().trim();
+                    if (valText === "진행") status = "N";
+                    else if (valText === "완료") status = "Y";
+                    else status = "";
+                }
+
+                var select = $('<select class="status-select">' +
+                    '<option value="">선택</option>' +
+                    '<option value="N">진행</option>' +
+                    '<option value="Y">완료</option>' +
+                    '</select>');
+                select.val(status);
+
+                $cell.empty().append(select);
+                select.focus();
+
+                function saveSelect() {
+                    var selVal = select.val();
+                    var selText = selVal === "Y" ? "완료" : selVal === "N" ? "진행" : "";
+                    $cell.removeClass('editing');
+                    $cell.html(selText);
+                    $cell.data('value', selVal); // 실제 값 보관(서버 저장 등 활용)
+                }
+                function cancelSelect() {
+                    $cell.removeClass('editing');
+                    $cell.html($cell.data('original'));
+                }
+                select.on('blur', saveSelect);
+                select.on('keydown', function (e) {
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        select.off('blur');
+                        saveSelect();
+                        if (e.shiftKey) {
+                            moveToCell($cell, 'prev');
+                        } else {
+                            moveToCell($cell, 'next');
+                        }
+                    }
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        select.off('blur');
+                        cancelSelect();
+                    }
+                });
+                return;
+            }
+
+            // textarea 편집부(동일)
+            var value = $cell.html().replace(/<br\s*\/?>/gi, "\n");
+            $cell.data('original', $cell.html());
+            $cell.addClass('editing');
+            var textarea = $('<textarea class="cell-editor" rows="5"></textarea>').val(value);
+            $cell.empty().append(textarea);
+            textarea.focus();
+            textarea[0].setSelectionRange(textarea.val().length, textarea.val().length);
+            autoResizeTextarea(textarea);
+            textarea.on('input', function () { autoResizeTextarea(textarea); });
+            function save() {
+                var newValue = textarea.val().replace(/\n/g, '<br>');
+                $cell.removeClass('editing');
+                $cell.html(newValue);
+            }
+            function cancel() {
+                $cell.removeClass('editing');
+                $cell.html($cell.data('original'));
+            }
+            textarea.on('blur', save);
+            textarea.on('keydown', function (e) {
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    textarea.off('blur');
+                    save();
+                    if (e.shiftKey) { moveToCell($cell, 'prev'); }
+                    else { moveToCell($cell, 'next'); }
+                }
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    textarea.off('blur');
+                    cancel();
+                }
+            });
+        });
+
+
+        // + 버튼: 마지막에 빈 row 추가
+        $('#addRowBtn').on('click', function () {
+            var $table = $('#mainTable tbody');
+            var $rows = $table.find('tr');
+            var $last = $rows.last();
+            var newRow = $last.clone();
+            newRow.find('td').each(function (i, td) {
+                if ($(td).hasClass('seq-col')) {
+                    $(td).text('');
+                } else {
+                    $(td).removeClass('editing').html('').addClass('editable-cell');
+                    if (i === 11) $(td).html('');
+                }
+            });
+            newRow.removeClass('selected-row');
+            $table.append(newRow);
+            updateSeqCol();
+        });
+        // - 버튼: 선택된 row 삭제(마지막 한 줄은 삭제 금지)
+        $('#delRowBtn').on('click', function () {
+            var $table = $('#mainTable tbody');
+            var $rows = $table.find('tr');
+            var $selected = $table.find('tr.selected-row');
+            if ($rows.length <= 1) return alert('최소 1개 이상의 행이 필요합니다.');
+            if ($selected.length === 0) return alert('삭제할 행을 먼저 선택하세요.');
+            $selected.remove();
+            updateSeqCol();
+        });
+
+        // ▲ 버튼: 선택된 row 위로 이동
+        $('#moveUpBtn').on('click', function () {
+            var $selected = $('#mainTable tbody tr.selected-row');
+            if ($selected.length === 0) return alert('이동할 행을 선택하세요.');
+            var $prev = $selected.prev('tr');
+            if ($prev.length === 0) return; // 이미 첫 번째면 이동 불가
+            $selected.insertBefore($prev);
+            updateSeqCol();
+        });
+
+        // ▼ 버튼: 선택된 row 아래로 이동
+        $('#moveDownBtn').on('click', function () {
+            var $selected = $('#mainTable tbody tr.selected-row');
+            if ($selected.length === 0) return alert('이동할 행을 선택하세요.');
+            var $next = $selected.next('tr');
+            if ($next.length === 0) return; // 이미 마지막이면 이동 불가
+            $selected.insertAfter($next);
+            updateSeqCol();
+        });
+
+    </script>
+</body>
+</html>

@@ -17,14 +17,167 @@ var deleteCookie = function (name) {
 }
 
 var DOMAIN_URL = "";
-function isMobile() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+//function isMobile() {
+//    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+//}
+
+//const deviceType = isMobile(); //desktop, tablet, phone// ✅ async IIFE로 감싸서 await 사용
+var deviceType='';
+var connErrorUrl = '/static/index.html';
+(async () => {
+	deviceType = await isMobile();   // 'desktop'
+	if (deviceType != "desktop") connErrorUrl = `/static/${deviceType}/index.html`
+})();
+
+async function isMobile() {
+  const ff = await detectFormFactor();
+  return ff;
+}
+async function isMobileType() {
+  const ff = await detectFormFactor();
+  //  return ff === 'phone' || ff === 'tablet';
+  return (ff =="desktop") ? "" : ff;
+}
+/**
+ * 스마트폰/태블릿/데스크톱 판별 (크로스 브라우저 안전)
+ * 우선순위: UA-CH(model/mobile) → UA 모델 패턴 → Viewport(600dp) → 보조 휴리스틱
+ */
+async function detectFormFactor() {
+  // 1) Chromium의 User-Agent Client Hints (고정확) : model/mobile 등 고엔트로피 값
+  if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+    try {
+      const { model, mobile, platform, platformVersion } =
+        await navigator.userAgentData.getHighEntropyValues(['model','mobile','platform','platformVersion']);
+      // 모델 우선(삼성/레노버/화웨이/샤오미/아이패드 등)
+      if (isTabletModel(model) || /iPad/i.test(model)) return 'tablet';
+      if (isPhoneModel(model)) return 'phone';
+      // 모바일 플래그: true면 폰/태블릿 중 하나. 아래 뷰포트로 세분화
+      if (mobile === false && /Windows|macOS|Chrome OS|Linux/i.test(platform)) return 'desktop';
+    } catch (_) {}
+  }
+
+  // 2) UA 문자열 패턴 (iOS13+ 아이패드는 Mac처럼 보일 수 있으니 보정)
+  const ua = navigator.userAgent || '';
+  // iPadOS 13+ 보정: MacIntel + 터치
+  const isIPadOS13Up = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+
+  if (/iPad/i.test(ua) || isIPadOS13Up) return 'tablet';
+  if (isTabletModel(ua)) return 'tablet';
+  if (isPhoneModel(ua)) return 'phone';
+
+  // 3) 뷰포트 휴리스틱 (Material Design 기준 600dp 이상이면 태블릿)
+  const dpr = window.devicePixelRatio || 1;
+  const minCssPx = Math.min(window.screen.width, window.screen.height) / dpr; // CSS px ≈ dp
+  if (minCssPx >= 600) return 'tablet';
+
+  // 4) 보조 휴리스틱: Android이면서 UA에 Mobile이 없으면 태블릿일 가능성 (약함)
+  if (/Android/i.test(ua) && !/Mobile/i.test(ua)) return 'tablet';
+
+  // 5) 모바일 키워드
+  if (/Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return 'phone';
+
+  // 데스크톱 후보
+  if (/Windows|Macintosh|X11|Linux/i.test(ua)) return 'desktop';
+
+  return 'unknown';
 }
 
-if(isMobile()){
-	DOMAIN_URL = "";
-	//DOMAIN_URL = "http://10.90.4.142";
+// --- 모델 패턴 헬퍼들 ---
+function isTabletModel(s) {
+  if (!s) return false;
+  // 삼성 태블릿: SM-T*, SM-X*
+  if (/\bSM-[TX]\w+/i.test(s)) return true;
+  // 레노버 태블릿
+  if (/\bLenovo TB-\w+/i.test(s)) return true;
+  // 화웨이 태블릿
+  if (/\b(MediaPad|MatePad)\b/i.test(s)) return true;
+  // 샤오미 패드
+  if (/\b(Mi ?Pad|Mipad|Pad [0-9])\b/i.test(s)) return true;
+  return false;
 }
+
+
+//function getResolutionInfo() {
+//  const dpr = window.devicePixelRatio || 1;
+//
+//  // 화면(물리 px)
+//  const screenPx = {
+//    width:  window.screen.width,     // 물리 px (대부분)
+//    height: window.screen.height
+//  };
+//
+//  // 사용 가능 영역(물리 px) – OS 바/도킹 제외(브라우저마다 차이)
+//  const availPx = {
+//    width:  window.screen.availWidth,
+//    height: window.screen.availHeight
+//  };
+//
+//  // 레이아웃 뷰포트(CSS px) – 실제 렌더 기준
+//  const viewportCss = {
+//    width:  window.innerWidth,       // CSS px
+//    height: window.innerHeight
+//  };
+//
+//  // 시각적 뷰포트(줌 영향 받음, CSS px)
+//  const vv = window.visualViewport;
+//  const visualCss = vv ? { width: vv.width, height: vv.height, scale: vv.scale } : null;
+//
+//  // DP 추정 (안드로이드에서 CSS px ≈ dp)
+//  const minCss = Math.min(viewportCss.width, viewportCss.height);
+//  const approxDp = minCss; // 모바일에서 dp≈CSS px
+//
+//  // 디바이스 물리 px 재계산(뷰포트 기준)
+//  const effectiveDevicePx = {
+//    width:  Math.round(viewportCss.width  * dpr),
+//    height: Math.round(viewportCss.height * dpr)
+//  };
+//
+//  // 추가 정보
+//  const orientation = (screen.orientation && screen.orientation.type) || (viewportCss.width >= viewportCss.height ? 'landscape' : 'portrait');
+//  const aspect = (screenPx.width && screenPx.height) ? (Math.max(screenPx.width, screenPx.height) / Math.min(screenPx.width, screenPx.height)).toFixed(3) : null;
+//
+//  return {
+//    dpr,
+//    screenPx,         // 전체 물리 픽셀
+//    availPx,          // 작업표시줄 등 제외 물리 픽셀
+//    viewportCss,      // 레이아웃 뷰포트(CSS px)
+//    visualCss,        // 시각적 뷰포트(CSS px, 줌 반영)
+//    effectiveDevicePx,// viewport 기반 환산 물리 px
+//    approxDp,         // 태블릿/폰 판정에 쓰는 dp 근사
+//    orientation,
+//    aspect,
+//    colorDepth: window.screen.colorDepth,
+//    pixelDepth: window.screen.pixelDepth
+//  };
+//}
+//
+//// 예: 콘솔 출력 + 서버 전송
+//const resInfo = getResolutionInfo();
+//console.log('[RES]', resInfo);
+
+
+
+function isPhoneModel(s) {
+  if (!s) return false;
+  // 삼성 폰: SM-S*, SM-A*, SM-M*
+  if (/\bSM-[SAM]\w+/i.test(s)) return true;
+  // 기타 보완 가능
+  return false;
+}
+
+// --- 선택: 서버와 연계하기 위해 판정값을 쿠키로 넘김 ---
+async function setFormFactorCookie() {
+  const ff = await detectFormFactor();
+  document.cookie = "form_factor=" + ff + ";path=/;max-age=86400;SameSite=Lax";
+  return ff;
+}
+
+// 예시 사용
+setFormFactorCookie().then(ff => {
+  console.log('detected form factor:', ff);
+  // ff === 'tablet' 이면 태블릿 전용 레이아웃/그리드 설정 등 분기
+});
+
 
 var authorizationToken = localStorage.getItem("access_token");
 var jwt = '';
@@ -32,7 +185,7 @@ if (authorizationToken) {
 	var jwt = parseJwt(authorizationToken);
 } else {
 	// 토큰이 없는 경우 처리
-	console.log("Access token not found");
+//	console.log("Access token not found");
 	// redirectToLogin();
 }
 var menuIdx = getCookie("menuIdx");
@@ -195,7 +348,7 @@ var openModal = function(url, width, height, title, paramObj, callback) {
     		  error: function(xhr) {
   	            alert("로그인이 만료되었습니다.");
   	            logoutClick();
-//  	            location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+//  	            location.href = connErrorUrl;
 //    			  console.error("모달 HTML 로딩 실패:", xhr.status, xhr.statusText);
   	            }
     		});
@@ -247,7 +400,7 @@ var openSecondModal = function(url, width, height, title, paramObj, callback) {
     		  error: function(xhr) {
   	            alert("로그인이 만료되었습니다.");
   	            logoutClick();
-//  	            location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+//  	            location.href = connErrorUrl;
 //    			  console.error("모달 HTML 로딩 실패:", xhr.status, xhr.statusText);
   	            }
     		});
@@ -299,7 +452,7 @@ var openThirdModal = function(url, width, height, title, paramObj, callback) {
     		  error: function(xhr) {
   	            alert("로그인이 만료되었습니다.");
   	            logoutClick();
-//  	            location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+//  	            location.href = connErrorUrl;
 //    			  console.error("모달 HTML 로딩 실패:", xhr.status, xhr.statusText);
   	            }
     		});
@@ -351,7 +504,7 @@ var openFourthModal = function(url, width, height, title, paramObj, callback) {
     		  error: function(xhr) {
   	            alert("로그인이 만료되었습니다.");
   	            logoutClick();
-//  	            location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+//  	            location.href = connErrorUrl;
 //    			  console.error("모달 HTML 로딩 실패:", xhr.status, xhr.statusText);
   	            }
     		});
@@ -390,7 +543,7 @@ var openBlindModal = function(url, width, height, title, paramObj, callback) {
     		  error: function(xhr) {
   	            alert("로그인이 만료되었습니다.");
   	            logoutClick();
-//  	            location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+//  	            location.href = connErrorUrl;
 //    			  console.error("모달 HTML 로딩 실패:", xhr.status, xhr.statusText);
   	            }
     		});
@@ -401,14 +554,10 @@ function parseJwt(token) {
 
 //	console.log('parseJwt !!!');
 	if(token == null) {
-		if(location.href.search("/static/index.html") != -1  || location.href.search("/static/mobile/index.html") != -1 )  {
+		if(location.href.search("/static/index.html") != -1  || location.href.search("/static/mobile/index.html") != -1 || location.href.search("/static/tablet/index.html") != -1 )  {
 			return;
 		}else{
-			if(isMobile()){
-				location.href = "/static/mobile/index.html";
-			}else{
-				location.href = "/static/index.html";
-			}
+			location.href = connErrorUrl;
 		}
 	}
     var base64Url = token.split('.')[1];
@@ -506,7 +655,7 @@ function postAjax(url, data, contentType, callback, blockProc=true, retryCount =
 	            if (xhr.status === 401 || xhr.status === 403) {
 	                alert("로그인이 만료되었습니다.");
 	                logoutClick();
-	                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+	                location.href = connErrorUrl;
 	            }
                 console.error("요청 실패:", xhr);
                 callback(xhr);
@@ -551,7 +700,7 @@ function postAjaxSync(url, data, contentType, callback, retryCount = 0) {
 	    	if (xhr.status === 401 || xhr.status === 403) {
 //                alert("로그인이 만료되었습니다.");
                 logoutClick();
-                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+                location.href = connErrorUrl;
             }
 
             console.error("요청 실패:", xhr);
@@ -588,7 +737,7 @@ function deleteAjax(url, data, contentType, callback, blockProc=true, retryCount
 	    	if (xhr.status === 401 || xhr.status === 403) {
 //              alert("로그인이 만료되었습니다.");
                 logoutClick();
-                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+                location.href = connErrorUrl;
             }
 
             console.error("요청 실패:", xhr);
@@ -628,7 +777,7 @@ function putAjax(url, data, contentType, callback, blockProc=true, retryCount = 
 	    	if (xhr.status === 401 || xhr.status === 403) {
 //              alert("로그인이 만료되었습니다.");
                 logoutClick();
-                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+				location.href = connErrorUrl;
             }
 
             console.error("요청 실패:", xhr);
@@ -667,7 +816,7 @@ function filePostAjax(url, data, callback, blockProc=true, retryCount = 0) {
 	    	if (xhr.status === 401 || xhr.status === 403) {
 //                alert("로그인이 만료되었습니다.");
                 logoutClick();
-                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+				location.href = connErrorUrl;
             }
 
             console.error("요청 실패:", xhr);
@@ -707,7 +856,7 @@ function filePostAjaxButton(url, data, callback, blockProc=true, retryCount = 0)
 	    	if (xhr.status === 401 || xhr.status === 403) {
 //                alert("로그인이 만료되었습니다.");
                 logoutClick();
-                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+				location.href = connErrorUrl;
             }
 
             console.error("요청 실패:", xhr);
@@ -746,7 +895,7 @@ function filePutAjax(url, data, callback, blockProc=true, retryCount = 0) {
 	    	if (xhr.status === 401 || xhr.status === 403) {
 //                alert("로그인이 만료되었습니다.");
                 logoutClick();
-                location.href = isMobile() ? "/static/mobile/index.html" : "/static/index.html";
+				location.href = connErrorUrl;
             }
 
             console.error("요청 실패:", xhr);
@@ -1102,7 +1251,6 @@ function logoutClick(){
 	
 	deleteCookie("menuIdx");
 	deleteCookie("menuSaveYn");
-	
 	$.ajax({
 	    type: "GET",
 	    url: "/customLogout?userId=" + jwt.userId,
@@ -1431,20 +1579,12 @@ function authChk(menuUrl){
 	            return false;
 	        } else {
 	        	//권한이 없음
-				if(isMobile()){
-					location.href = "/static/mobile/index.html";
-				}else{
-					location.href = "/static/index.html";
-				}
+				location.href = connErrorUrl;
 	            return false;
 	        }
         } else {
         	console.error('권한정보가 없습니다.');
-			if(isMobile()){
-				location.href = "/static/mobile/index.html";
-			}else{
-				location.href = "/static/index.html";
-			}
+			location.href = connErrorUrl;
             return false;
         }
 //	// select 회사코드 disable (감사용 임시코드)

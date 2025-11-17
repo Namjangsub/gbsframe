@@ -90,7 +90,11 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
                         RequestUtils.clearCookie("access_token", response);
                         RequestUtils.clearCookie("refresh_token", response);
                         SecurityContextHolder.clearContext();
-                        reject(response, "로그인 24시간 초과");
+//                        reject(response, "로그인 24시간 초과");
+						String location = "/static/index.html";
+						response.sendRedirect(location);
+						response.setStatus(303); 
+						response.setHeader("Location", location);
                         return;
                     }
 
@@ -153,7 +157,11 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
 						// 4. SecurityContext 강제 초기화 (auth == null 일 수 있어도 상관 없음)
 						SecurityContextHolder.clearContext();
 						
-						reject(response, "로그인 24시간 초과");
+//						reject(response, "로그인 24시간 초과");
+						String location = "/static/index.html";
+						response.sendRedirect(location);
+						response.setStatus(303); 
+						response.setHeader("Location", location);
 						return;
 					}
 

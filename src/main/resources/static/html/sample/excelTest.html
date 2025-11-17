@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>JSON → Excel (정렬/스타일)</title>
+    <!-- use version 0.20.3 -->
+<script lang="javascript" src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<button onclick="exportExcel()">엑셀 다운로드</button>
+
+<script>
+function exportExcel() {
+    const jsonData = [
+        { 이름: "홍길동", 부서: "개발팀", 상태: { 입사일: "2023-01-15", 급여: 4500000 } },
+        { 이름: "김철수", 부서: "기획팀", 상태: { 입사일: "2022-08-03", 급여: 3800000 } },
+        { 이름: "이은영", 부서: "연구개발본부aaaaaaaa", 상태: { 입사일: "2021-11-21", 급여: 5200000 } }
+    ];
+
+    const headers = ["이름", "부서", "상태", null]; // 병합될 "상태"와 빈 셀 추가
+    const subHeaders = ["", "", "입사일", "급여"];
+
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, subHeaders]);
+
+    // 데이터 추가 (A3 셀부터)
+    jsonData.forEach((item, index) => {
+        const row = [item.이름, item.부서, item.상태.입사일, item.상태.급여];
+        XLSX.utils.sheet_add_aoa(worksheet, [row], { origin: `A${index + 3}` });
+    });
+
+    // "상태" 셀 병합
+    worksheet['!merges'] = [{ s: { r: 0, c: 2 }, e: { r: 0, c: 3 } }];
+
+    // 스타일 적용
+    const headerStyle = {
+        fill: { fgColor: { rgb: "D9E1F2" } },
+        font: { bold: true },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: {
+            top: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "thin", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "000000" } },
+            right: { style: "thin", color: { rgb: "000000" } }
+        }
+    };
+
+    // 헤더 스타일 적용
+    for (let c = 0; c < headers.length; ++c) {
+        const addrHeader = XLSX.utils.encode_cell({ r: 0, c: c });
+        if (worksheet[addrHeader]) worksheet[addrHeader].s = headerStyle;
+        const addrSubHeader = XLSX.utils.encode_cell({ r: 1, c: c });
+        if (worksheet[addrSubHeader]) worksheet[addrSubHeader].s = headerStyle;
+    }
+
+    // 데이터 셀 스타일 및 정렬, 테두리 적용
+    const borderStyle = {
+        top: { style: "thin", color: { rgb: "000000" } },
+        bottom: { style: "thin", color: { rgb: "000000" } },
+        left: { style: "thin", color: { rgb: "000000" } },
+        right: { style: "thin", color: { rgb: "000000" } }
+    };
+
+    jsonData.forEach((item, rIdx) => {
+        const rowStart = rIdx + 2;
+        const isNumber1 = typeof item.상태.입사일 === 'number';
+        const isNumber2 = typeof item.상태.급여 === 'number';
+
+        const addr1 = XLSX.utils.encode_cell({ r: rowStart, c: 2 });
+        if (worksheet[addr1]) worksheet[addr1].s = { alignment: { horizontal: isNumber1 ? 'right' : 'left', vertical: 'center' }, border: borderStyle };
+
+        const addr2 = XLSX.utils.encode_cell({ r: rowStart, c: 3 });
+        if (worksheet[addr2]) worksheet[addr2].s = { alignment: { horizontal: isNumber2 ? 'right' : 'left', vertical: 'center' }, border: borderStyle };
+
+        for (let c = 0; c < 2; ++c) { // 이름, 부서 열
+            const addr = XLSX.utils.encode_cell({ r: rowStart, c: c });
+            if (worksheet[addr]) worksheet[addr].s = { alignment: { horizontal: 'left', vertical: 'center' }, border: borderStyle };
+        }
+    });
+
+
+    // 열 너비 자동 조정 (데이터와 헤더 길이를 고려)
+    const colWidths = [
+        Math.max("이름".length, ...jsonData.map(row => String(row.이름).length)) + 2,
+        Math.max("부서".length, ...jsonData.map(row => String(row.부서).length)) + 2,
+        Math.max("입사일".length, ...jsonData.map(row => String(row.상태.입사일).length)) + 2,
+        Math.max("급여".length, ...jsonData.map(row => String(row.상태.급여).length)) + 2,
+    ];
+    worksheet['!cols'] = colWidths.map(width => ({ wch: width }));
+
+    // 워크북에 시트 추가 및 다운로드
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, '직원목록');
+    XLSX.writeFile(workbook, '직원목록_타이틀형식.xlsx');
+}
+</script>
+
+</body>
+</html>
