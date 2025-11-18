@@ -4,8 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<meta name="viewport"
-	content="width=device-width, initial-scale=1, minimum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
 <link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
 <!-- <link rel="stylesheet" href="/static/bootstrap/css/bootstrap-theme.min.css"> -->
@@ -94,6 +93,11 @@
 			<div class="popup_table" id="appViewArea"></div>
 			<br>
 			<form id="mForm">
+				<input type="hidden" id="userId" name="userId">
+				<input type="hidden" id="reqNo" name="reqNo">
+				<input type="hidden" id="rsltNo" name="rsltNo">
+				<input type="hidden" id="midCd" name="midCd">
+				<input type="hidden" id="subCd" name="subCd">
 				<input type="hidden" id="pgmId" name="pgmId" value="QM0101P01_M">
 				<table class="table_input">
 		             <colgroup>
@@ -154,7 +158,10 @@
 					</tr>
 					<tr>
 						<th>분류</th>
-						<td colspan="3"><input class="input" type="text" id="partCdNm" name="partCdNm" readonly></td>
+						<td colspan="3">
+							<input class="input" type="hidden" id="partCd" name="partCd" readonly>
+							<input class="input" type="text" id="partCdNm" name="partCdNm" readonly>
+						</td>
 					</tr>
 					<tr>
 						<th>소속부서</th>
@@ -253,23 +260,48 @@
 						+ ('0' + today.getDate()).slice(-2);
 				$('#todoCfDt').val(strDate);
 
+				$('#userId').val(jwt.userId);
+
+				
+
 				var formData1 = {
 					"fileTrgtKey" : paramObj.todoFileTrgtKey,
-					"reqNo" : paramObj.todoNo
+					"reqNo" : paramObj.todoNo,
+					"userId"	: jwt.userId
 				}
-				postAjaxSync("/user/qm/qm01/selectQtyReqInfo", formData1, null,
-						function(data) {
-							$.each(data.result, function(key, value) {
-								if (key == "coCd") {
-									coCd = value;
-								} else if (key == "salesCd") {
-									salesCd = value;
-								}
-								if ($("#mForm #" + key)[0]) {
-									$("#mForm #" + key).val(value);
-								}
-							});
-						});
+				postAjaxSync("/user/qm/qm01/selectQtyReqInfo", formData1, null, function(data) {
+					
+					if (data.result.teamManagerYn == 'Y' && !['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
+						const addHtml = `
+							<tr class="teamManagerApproval">
+								<th class='hit'>근본원인</th>
+								<td colspan="3" style="text-align:left;">
+									<div id="FDMTSOLUT-radioButtonContainer"></div>
+								</td>
+							</tr>
+							<tr class="teamManagerApproval">
+								<th class='hit'>근본예방<br>대책</th>
+								<td colspan="3">
+									<textarea class="form-control" id="fdmtSolutCnt" name="fdmtSolutCnt" rows="2" maxlength="500" msg="근본예방대책(세부실행 대책)" required></textarea>
+								</td>
+							</tr>
+						`;
+						$('#mForm .table_input').append(addHtml);
+
+						createRadioOption_FDMTSOLUT('FDMTSOLUT', 'checkbox') // 근본원인 구분
+					}
+
+					$.each(data.result, function(key, value) {
+						if (key == "coCd") {
+							coCd = value;
+						} else if (key == "salesCd") {
+							salesCd = value;
+						}
+						if ($("#mForm #" + key)[0]) {
+							$("#mForm #" + key).val(value);
+						}
+					});
+				});
 
 				var formData2 = {
 					"coCd" : coCd,
@@ -310,6 +342,71 @@
 		//alert(cHtml);
 		$("#appViewArea")[0].innerHTML = cHtml;
 	}
+
+	// 근본원인 체크박스 설정
+	function createRadioOption_FDMTSOLUT(groupName, _type) {
+		let codeEtc = '';
+		var param = {
+			"codeKind" : groupName,
+			"codeEtc"	: codeEtc
+		};
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", param , null,	function(data){
+			const codeList = data.childCodeList;
+			const container = $('#' + groupName + '-radioButtonContainer')
+				.empty()
+				.css({
+					display: 'grid',
+					'grid-template-columns': 'repeat(2, max-content)',
+					'margin-left': '10px',
+					'column-gap': '32px',
+			});
+			var typeStr = _type
+			codeList.forEach((item, idx) => {
+				const iHtml = `
+					<div>
+						<input type="${typeStr}" id="${item.codeId}" name="${item.codeKind}" value="${item.codeId}" data-label="${item.codeNm}"> ${item.codeNm}
+					</div>
+				`;
+				container.append(iHtml);
+			});
+		})
+	}
+
+	// 결재시 코멘트 추가 수정
+	function updateQualityResultComment(){
+		if (inputValidation($('.popup_area [required]'))) {
+			if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val()) && $("input[name='FDMTSOLUT']:checked").val() == undefined) {
+				customAlert("근본원인을 선택해주세요.");
+			}
+			var formData = makeFormData();
+			filePostAjax("/user/qm/qm01/updateQualityResultComment", formData,function(data) {
+				if (data.resultCode == 200) {
+				} else {
+					customAlert(data.resultMessage);
+					return false;
+				}
+			});
+			return true;
+				
+		} else { return false;}
+	}
+
+	
+	function makeFormData() {
+		// 근본원인 체크된 객체들 배열로 변환하고 조인
+		const rootCauses = $('#FDMTSOLUT-radioButtonContainer input[type="checkbox"]:checked')
+					.map(function() { return this.value; })
+					.get()   // jQuery 객체 -> 일반 배열
+					.join(',');  // ["A","B","C"] -> "A,B,C"
+
+		// 폼데이터 생성
+		var formData = new FormData($("#mForm")[0]);
+		formData.set('FDMTSOLUT', rootCauses); 
+		formData.set('CODECOBGB', $('#subCd').val()); 
+
+		return formData;
+	}
+
 </script>
 
 </html>

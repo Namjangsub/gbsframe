@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">    
-	<meta name="viewport" content="width=device-width, initial-scale=0.6, user-scalable=no">
+	<meta name="viewport" content="width=device-width, initial-scale=1>
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="/static/bootstrap/css/bootstrap-theme.min.css">
@@ -90,8 +90,10 @@
 		<div class="contents search">
 			<form id="popForm">   
 				<table class="table_input">
-					<input  type="hidden" id="coCd" name="coCd" readonly>
-					<input  type="hidden" id="issNo" name="issNo" readonly>
+					<input type="hidden" id="coCd" name="coCd" readonly>
+					<input type="hidden" id="issNo" name="issNo" readonly>
+					<input type="hidden" id="userId" name="userId">
+					<input type="hidden" id="pgmId" name="pgmId" value="WB2401P02_M">
 					
 					<colgroup>
 						<col width="20%">
@@ -140,7 +142,10 @@
 						<th>유형</th>
 						<td colspan="1"><input type="text" id="issDivNm" name="issDivNm" readonly></td>
 						<th>진행상태</th>
-						<td colspan="1"><input type="text" id="issStsNm" name="issStsNm" readonly></td>
+						<td colspan="1">
+							<input type="hidden" id="issSts" name="issSts" readonly>
+							<input type="text" id="issStsNm" name="issStsNm" readonly>
+						</td>
 					</tr>
 					<tr>
 						<th>제목</th>
@@ -159,7 +164,10 @@
 						</td>
 												
 						<th>등록사유</th>
-						<td><input type="text" id=subCdNm name="id=subCdNm" readonly></td>
+						<td>
+							<input type="hidden" id=subCd name="id=subCd" readonly>
+							<input type="text" id=subCdNm name="id=subCdNm" readonly>
+						</td>
 					</tr>
 					<tr>
 						<th>내용</th>
@@ -209,12 +217,6 @@
 					<tr>
                         <th>결과</th>
                         <td colspan=3><textarea id="actCnts" name="actCnts" rows="4"  style="border:none; width: 100%"></textarea></td>
-                    </tr> 
-					<tr>
-                        <th>근본원인</th>
-                        <td colspan=3>
-							<div id="FDMTSOLUT-radioButtonContainer" name="FDMTSOLUT-radioButtonContainer" readonly></div>
-						</td>
                     </tr> 
 					<tr>
 						<td colspan="4" >
@@ -436,15 +438,37 @@ var gridViewPop2 = {
 
 $(document).ready(function() {
 	const params = getParams();
-	createRadioOption_FDMTSOLUT('FDMTSOLUT', 'checkbox') // 근본원인 구분
+	$('#userId').val(jwt.userId);
 
 	var formData1 = {
-		"fileTrgtKey" : paramObj.todoFileTrgtKey
+		"fileTrgtKey" : paramObj.todoFileTrgtKey,
+		"userId"	  : jwt.userId
 	}
 	//    postAjaxSync("/user/wb/wb24/selectTodoRsltsView", paramObj, null, function(data){
 		postAjaxSync("/user/wb/wb24/select_wb2401p01_Info", formData1, null, function(data) {
+			debugger;
 			var list = data.result;
 			if (list != undefined) {
+				if (data.result.teamManagerYn == 'Y') {
+					const addHtml = `
+						<tr class="teamManagerApproval">
+							<th class='hit'>근본원인</th>
+							<td colspan="3" style="text-align:left;">
+								<div id="FDMTSOLUT-radioButtonContainer"></div>
+							</td>
+						</tr>
+						<tr class="teamManagerApproval">
+							<th class='hit'>근본예방<br>대책</th>
+							<td colspan="3">
+								<textarea class="form-control" id="fdmtSolutCnt" name="fdmtSolutCnt" rows="2" maxlength="500" msg="근본예방대책(세부실행 대책)" required></textarea>
+							</td>
+						</tr>
+					`;
+					$('#popForm .table_input').append(addHtml);
+
+					createRadioOption_FDMTSOLUT('FDMTSOLUT', 'checkbox') // 근본원인 구분
+				}
+
 				$.each(list, function (key, value) {
 					$("#popForm #" + key).val(value);
 					if ($('#popForm #' + key).is('[comma]')) {
@@ -471,41 +495,76 @@ $(document).ready(function() {
 	gridViewPop2.initView().setData(0);
 });
 
-function createRadioOption_FDMTSOLUT(groupName, _type) {
-	let codeEtc = '';
-	var param = {
-		"codeKind" : groupName,
-		"codeEtc"	: codeEtc
-	};
-	postAjaxSync("/admin/cm/cm05/selectChildCodeList", param , null,	function(data){
-		const codeList = data.childCodeList;
-		const container = $(' #' + groupName + '-radioButtonContainer')
-			.empty()
-			.css({
-				display: 'grid',
-                'grid-template-columns': 'repeat(1, max-content)',  // 한 열만
-                'row-gap': '8px',                        // 줄 사이 간격
-                'column-gap': '0',                       // 열 간격 없음
-                'margin-left': '10px'
-		});
-		var typeStr = _type
-		codeList.forEach((item, idx) => {
-			const iHtml = `
-				<div>
-					<input
-						type="${typeStr}"
-						id="${item.codeId}"
-						name="${item.codeKind}"
-						value="${item.codeId}"
-						data-label="${item.codeNm}"
-					>
-					${item.codeNm}
-				</div>
-			`;
-			container.append(iHtml);
-		});
-	})
-}
+	function createRadioOption_FDMTSOLUT(groupName, _type) {
+		let codeEtc = '';
+		var param = {
+			"codeKind" : groupName,
+			"codeEtc"	: codeEtc
+		};
+		postAjaxSync("/admin/cm/cm05/selectChildCodeList", param , null,	function(data){
+			const codeList = data.childCodeList;
+			const container = $(' #' + groupName + '-radioButtonContainer')
+				.empty()
+				.css({
+					display: 'grid',
+					'grid-template-columns': 'repeat(1, max-content)',  // 한 열만
+					'row-gap': '8px',                        // 줄 사이 간격
+					'column-gap': '0',                       // 열 간격 없음
+					'margin-left': '10px'
+			});
+			var typeStr = _type
+			codeList.forEach((item, idx) => {
+				const iHtml = `
+					<div>
+						<input
+							type="${typeStr}"
+							id="${item.codeId}"
+							name="${item.codeKind}"
+							value="${item.codeId}"
+							data-label="${item.codeNm}"
+						>
+						${item.codeNm}
+					</div>
+				`;
+				container.append(iHtml);
+			});
+		})
+	}
+
+// 결재시 코멘트 추가 수정
+	function updateIssueComment(){
+		if (inputValidation($('.popup_area [required]')) &&  $('#issSts').val() != 'ISSSTS04') {
+			if ($("input[name='FDMTSOLUT']:checked").val() == undefined) {
+				customAlert("근본원인을 선택해주세요.");
+				return false;
+			} else {
+				var formData = makeFormData();
+				filePostAjax("/user/wb/wb24/updateIssueComment", formData, function(data) {
+					if (data.resultCode == 200) {
+					} else {
+						customAlert(data.resultMessage);
+						return false;
+					}
+				});
+				return true;
+			}
+		} else { return false;}
+	}
+
+	function makeFormData() {
+		// 근본원인 체크된 객체들 배열로 변환하고 조인
+		const rootCauses = $('#FDMTSOLUT-radioButtonContainer input[type="checkbox"]:checked')
+					.map(function() { return this.value; })
+					.get()   // jQuery 객체 -> 일반 배열
+					.join(',');  // ["A","B","C"] -> "A,B,C"
+
+        // 폼데이터 생성
+        var formData = new FormData($("#popForm")[0]);
+		formData.set('FDMTSOLUT', rootCauses);
+		formData.set('CODECOBGB', $('#subCd').val()); 
+
+        return formData;
+    }
 </script>
 
 </html>

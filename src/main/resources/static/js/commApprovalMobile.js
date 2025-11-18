@@ -275,6 +275,38 @@ function Approval(htmlParam, param, popParam) {
 
 	//승인 ajax
 	this.confirmApproval = function(param) {
+
+		if (((this.param.todoDiv2CodeId === "TODODIV2020") || (this.param.todoDiv2CodeId === "TODODIV2030") || (this.param.todoDiv2CodeId === "TODODIV2090")) && this.param.teamManager == '평가' ) {
+			if ((this.param.todoDiv2CodeId === "TODODIV2020") || (this.param.todoDiv2CodeId === "TODODIV2030")) {
+				if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
+					if (!inputValidation($('.popup_area [required]'))) {
+						return false;
+					}
+					if (!$("input[name='FDMTSOLUT']:checked").val() && this.param.teamManager == '평가') {
+						customAlert("근본원인을 선택해주세요.");
+						return false;
+					}
+				}
+			} else {
+				if (!inputValidation($('.popup_area [required]'))) {
+					return false;
+				}
+				if (!$("input[name='FDMTSOLUT']:checked").val()) {
+					customAlert("근본원인을 선택해주세요.");
+					return false;
+				}
+			}
+		}
+		let chkFlag = false;
+		if (this.param.todoDiv2CodeId === "TODODIV2020" && this.param.teamManager == '평가') {
+			chkFlag = updateQualityResultComment('결과수정');
+		} else if (this.param.todoDiv2CodeId === "TODODIV2030" && this.param.teamManager == '평가') {
+			chkFlag = updateQualityResultComment('결과수정');
+		} else if (this.param.todoDiv2CodeId === "TODODIV2090" && this.param.teamManager == '평가') {
+			chkFlag = updateIssueComment('결과수정');
+		}
+		if (!chkFlag) {return false;}
+
 		//승인 save
 		if( !this.applyBtn ) {
 			  return false
