@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -15,6 +16,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.util.FileCopyUtils;
@@ -121,7 +123,20 @@ public class CM08Ctr {
 	
 	@GetMapping(value="/fileDownloadAuth")
 	public void fileDownloadAuth(@RequestParam Map<String, String> param, HttpServletRequest request, HttpServletResponse response) throws Exception {
-    	//-----------------------------------------------
+
+	    String source = request.getHeader("X-GBS-Source");
+	    if (!"pdfjs-viewer".equals(source)) {
+	        System.out.println("주소창/링크 등 기타 요청일 가능성");
+	        String json = "{\"error\":\"정상적인 접근이 아닙니다.\"}";
+
+	        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+	        response.setContentType("application/json;charset=UTF-8");
+	        response.getWriter().write(json);
+	        response.getWriter().flush();
+	        return;  // 이후 파일 다운로드 로직 실행하지 않도록 종료
+	    }
+        
+		//-----------------------------------------------
     	//parameter 정보
     	//  fileKey : 이동하고자 하는 파일 일련번호
     	//  userId  : 이동 작업을 실행하는 사용자 ID
@@ -176,6 +191,19 @@ public class CM08Ctr {
 
     @GetMapping(value="/fileDownloadAuth2")
     public void fileDownloadAuth2(@RequestParam Map<String, String> param, HttpServletRequest request, HttpServletResponse response) throws Exception {
+
+	    String source = request.getHeader("X-GBS-Source");
+	    if (!"pdfjs-viewer".equals(source)) {
+	        System.out.println("주소창/링크 등 기타 요청일 가능성");
+	        String json = "{\"error\":\"정상적인 접근이 아닙니다.\"}";
+
+	        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+	        response.setContentType("application/json;charset=UTF-8");
+	        response.getWriter().write(json);
+	        response.getWriter().flush();
+	        return;  // 이후 파일 다운로드 로직 실행하지 않도록 종료
+	    }
+        
         //-----------------------------------------------
         //parameter 정보
         //  fileKey : 이동하고자 하는 파일 일련번호
@@ -191,7 +219,7 @@ public class CM08Ctr {
         if (fileInfo == null || fileInfo.get("fileName") == null) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             response.setContentType("text/plain; charset=UTF-8");
-            response.getWriter().write("파일 정보를 찾을 수 없습니다.");
+            response.getWriter().write("권한이 없거나 파일 정보를 찾을 수 없습니다.");
             return;
         }
         

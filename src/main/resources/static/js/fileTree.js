@@ -615,7 +615,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 //			const response = await fetch(`/admin/cm/cm08/fileDownloadAuth?fileKey=${fileKey}&userId=${jwt.userId}&coCd=${coCd}`);
 			const response = await fetch(`/admin/cm/cm08/fileDownloadAuth2?fileKey=${fileKey}&userId=${jwt.userId}&coCd=${coCd}`, {
 				  method: "GET",
-				  headers: {"Authorization": authorizationToken}
+				  headers: {"Authorization": authorizationToken, "X-GBS-Source": "pdfjs-viewer"}
 			});
 			if (!response.ok) throw new Error('다운로드 실패');
 			const blob = await response.blob();
