@@ -283,7 +283,7 @@
 								<tr class="teamManagerApproval">
 									<th>근본예방대책<br><span style="font-size:11px;">(핵심목적이므로 책임자가 목적에 맞게 기록 요망)</span></th>
 									<td colspan="3">
-										<textarea	class="form-control" id="fdmtSolutCnt" name="fdmtSolutCnt" rows="2" maxlength="500" msg="근본대책(세부실행 대책)"></textarea>
+										<textarea	class="form-control" id="fdmtSolutCnt" name="fdmtSolutCnt" rows="2" maxlength="500" msg="근본예방대책(세부실행 대책)"></textarea>
 									</td>
 								</tr>
 								<!-- 공유대상자-->
@@ -1186,8 +1186,8 @@ var ModalApp = (function() {
 			$(currFormId + " #actMh").removeAttr('required').closest('td').prev('th').removeClass('hit');
 			$(currFormId + " #measRst").removeAttr('required').closest('td').prev('th').removeClass('hit');
 			$(currFormId + " #resltRst").removeAttr('required').closest('td').prev('th').removeClass('hit');
-			// $(currFormId + " #FDMTSOLUT-radioButtonContainer").removeAttr('required').closest('td').prev('th').removeClass('hit');
-			// $(currFormId + " #fdmtSolutCnt").removeAttr('required').closest('td').prev('th').removeClass('hit');
+			$(currFormId + " #FDMTSOLUT-radioButtonContainer").removeAttr('required').closest('td').prev('th').removeClass('hit');
+			$(currFormId + " #fdmtSolutCnt").removeAttr('required').closest('td').prev('th').removeClass('hit');
 			$(currFormId + " #delayDay").removeAttr('required').closest('td').prev('th').removeClass('hit');
 		}
 	}
@@ -1197,21 +1197,24 @@ var ModalApp = (function() {
 		formFieldControl(_procType);		//필수입력필드 조정
 		if (inputValidation($('.popup_area [required]'))) {					// 필수 필드의 유효성 검사
 			if ($(currFormId + " #salesCd").val() == ""){
-				alert("SalesCode를 선택해주세요");
+				customAlert("SalesCode를 선택해주세요");
 			} else if ($("input[name='REQCD']:checked").val() == undefined){
-					alert("요청구분을 선택해주세요");
+					customAlert("요청구분을 선택해주세요");
 			} else if ($("input[name='COBTP']:checked").val() == undefined || $("input[name='COBTP']:checked").val() == ""){
-					alert("등록 사유를	선택하세요");
+					customAlert("등록 사유를	선택하세요");
 			} else if ($("input[name='CODECOBGB']:checked").val() == undefined || $("input[name='CODECOBGB']:checked").val() == ""){
-					alert("등록사유를 선택해주세요");
+					customAlert("등록사유를 선택해주세요");
 			} else if ($("#ordrsDiv").val() == 'ORDRSDIV2' && $("input[name='COBTP']:checked").val() != 'COBTP04') { //A/S유상
-					alert("A/S유상 수주번호입니다. 분류코드 확인바랍니다.");
+					customAlert("A/S유상 수주번호입니다. 분류코드 확인바랍니다.");
 			} else if ($("#ordrsDiv").val() == 'ORDRSDIV3' && $("input[name='COBTP']:checked").val() != 'COBTP05') { //A/S무상
-					alert("A/S무상 수주번호입니다. 분류코드 확인바랍니다.");
+					customAlert("A/S무상 수주번호입니다. 분류코드 확인바랍니다.");
+			} else if (teamManagerFlag && !$("input[name='FDMTSOLUT']:checked").val() && _procType == '결과일괄등록') {
+					customAlert("근본원인을 선택해주세요.");
+					return false;
 			} else if (inputValidationCheck()) {
 					var formData = makeFormData(_procType); 
 					filePostAjax("/user/qm/qm01/insertQualityReq", formData, function(data) {
-						alert(data.resultMessage); 
+						customAlert(data.resultMessage); 
 						if (data.resultCode == 200) {
 	
 							tReqNo = data.reqNo;							//insert시 reqNo값 가지고오기 위함
@@ -1539,25 +1542,31 @@ var ModalApp = (function() {
 		} else {
 			if (!$(currFormId + ' #ordrgId').val().includes('gyrsult') && $(currFormId + ' #regId').val() != $(currFormId + ' #ordrgId').val()) {
 
-				addParam["todoId"] = $(currFormId + ' #ordrgId').val();
-				addParam["usrNm"] = $(currFormId + ' #ordrgId').val();
-				addParam["empNo"] = $(currFormId + ' #ordrgId').val();
-				addParam["name"] = $(currFormId + ' #ordrgNm').val();
-				addParam["telNo"] = '';
-				addParam["email"] = '';
-				addParam["gb"] = '공유';
-				ParamObj["actionType"] = "T";
-				addParam["pgParam"] = JSON.stringify(ParamObj);
+				// 이미 발행자가 결재로 추가되었을 경우 공유 결재 추가 방지
+				var existsApproval = approvalArr.some(function(item) {
+					return (item.todoId === $(currFormId + ' #ordrgId').val()) && item.gb === '결재';
+				});
+				if (!existsApproval) {
+					addParam["todoId"] = $(currFormId + ' #ordrgId').val();
+					addParam["usrNm"] = $(currFormId + ' #ordrgId').val();
+					addParam["empNo"] = $(currFormId + ' #ordrgId').val();
+					addParam["name"] = $(currFormId + ' #ordrgNm').val();
+					addParam["telNo"] = '';
+					addParam["email"] = '';
+					addParam["gb"] = '공유';
+					ParamObj["actionType"] = "T";
+					addParam["pgParam"] = JSON.stringify(ParamObj);
 
-				var approvalListObj = {};
+					var approvalListObj = {};
 
-					공유순번 += 1;
-					approvalListObj["sanctnSn"] = 공유순번;
-					approvalListObj["todoDiv1CodeId"] = "TODODIV10";
-					approvalListObj["todoDiv2CodeId"] = "TODODIV1040";
+						공유순번 += 1;
+						approvalListObj["sanctnSn"] = 공유순번;
+						approvalListObj["todoDiv1CodeId"] = "TODODIV10";
+						approvalListObj["todoDiv2CodeId"] = "TODODIV1040";
 
-				const mergedParam = {...addParam, ...approvalListObj}//속성합치기
-				approvalArr.push(mergedParam);
+					const mergedParam = {...addParam, ...approvalListObj}//속성합치기
+					approvalArr.push(mergedParam);
+				}
 			}
 		}
 		formData.append("approvalArr", JSON.stringify(approvalArr));
@@ -2479,7 +2488,8 @@ var ModalApp = (function() {
 				$(currFormId + " #regId").val(jwt.userId);
 				$(currFormId + " #regNm").val(jwt.userNm);
 				var formData = {
-					"fileTrgtKey" : issFileTrgtKey
+					"fileTrgtKey" 	: issFileTrgtKey,
+					"userId"		: jwt.userId
 				}
 				postAjaxSync("/user/wb/wb24/selectIssueInfo", formData, null, function(data) {
 					// key와 태그 id의 매핑 객체 정의
@@ -2517,6 +2527,7 @@ var ModalApp = (function() {
 							if (key == 'etcInput'){savedEtcInput = value;}	// 등록사유 저장해놓고 나중에 등록사유 태그쪽에 값 넣기
 							if (key == 'issSj') {title = value;}	// 제목 처리
 							if (key == 'issCnts') {contents = value;} // 내용 처리
+							if (key == 'teamManagerYn' && value == 'Y') {teamManagerFlag = true;} // 팀장여부 처리
 
 							if (key == 'custReqDt') {$(currFormId + ' #custReqDt').datepicker("setDate", value);} // 내용 처리
 
@@ -2604,7 +2615,17 @@ var ModalApp = (function() {
 
 		}
 		// 팝업창 열릴때 근본원인, 근본예방대책 필드 클릭방지
-		$(currFormId + ' .teamManagerApproval').addClass('no-click');
+		if (teamManagerFlag && $(currFormId + " #ordrgId").val() == jwt.userId) {
+			$(currFormId + ' #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
+			$(currFormId + ' #fdmtSolutCnt').closest('td').prev('th').addClass('hit');
+			$(currFormId + ' #fdmtSolutCnt').attr('required', 'true');
+			$(currFormId + ' .teamManagerApproval').removeClass('no-click');
+		} else {
+			$(currFormId + ' #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').removeClass('hit');
+			$(currFormId + ' #fdmtSolutCnt').closest('td').prev('th').removeClass('hit');
+			// $(currFormId + ' #fdmtSolutCnt').attr('required', 'false');
+			$(currFormId + ' .teamManagerApproval').addClass('no-click');
+		}
 
 		// TODO 리스트에서 호출 시 공유 : actionType:T	결재: actionType:S 처리 부분
 		var _todoViewMode =modalStack.last().paramObj.todoView;
@@ -2701,7 +2722,7 @@ var ModalApp = (function() {
 		
 		// 결재시 수정하면 change 이벤트 적용
 		$(currFormId).on('input paste drop change', '#measRst, #resltRst, #FDMTSOLUT-radioButtonContainer input[type=checkbox], #fdmtSolutCnt, #COBGB-checkboxContainer input[type=radio]',function() {
-			if ($(currDivId + ' #commentBtn').length === 0 && teamManagerFlag) {
+			if ($(currDivId + ' #commentBtn').length === 0 && teamManagerFlag && actionType != "C") {
 				const callCmdBtn = '<button id="commentBtn">코칭수정</button>';
 				$('.popup_bottom_btn').first().prepend(callCmdBtn);
 				$(currDivId + ' #commentBtn').on("click", function() { ModalApp.updateQualityResultComment('결과수정'); });

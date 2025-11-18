@@ -500,6 +500,9 @@ public class QM01SvcImpl implements QM01Svc {
 //                        QM01Mapper.updateReqSt(sharngMap);
                         sharngMap.put("todoCfOpn", "자체승인");
                         sharngMap.put("todoNo", sharngMap.get("reqNo"));
+						if ("결과일괄등록".equals(procType)) {
+							sharngMap.put("etcField1", paramMap.get("actMh"));
+						}
 
                         Object value = sharngMap.get("toDoKey");
 

@@ -739,7 +739,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 					if (!inputValidation($('.popup_area [required]'))) {
 						return false;
 					}
-					if (!$("input[name='FDMTSOLUT']:checked").val() && approvalWorkingGrid.sameTimeResult == 'Y') {
+					if (!$("input[name='FDMTSOLUT']:checked").val() && approvalWorkingGrid.teamManager == '평가') {
 						customAlert("근본원인을 선택해주세요.");
 						return false;
 					}

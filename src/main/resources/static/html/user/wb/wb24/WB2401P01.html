@@ -665,13 +665,15 @@
 							teamManagerFlag = true;
 						}
 					});
-					if (teamManagerFlag && !['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
-						$('#FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
-						$('#fdmtSolutCnt').closest('td').prev('th').addClass('hit');
-						$('#fdmtSolutCnt').attr('required', 'true');
-						$('.teamManagerApproval').removeClass('no-click');
+					// if (teamManagerFlag && !['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
+					if (teamManagerFlag && list.length > 0) {
+						// $('#FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
+						// $('#fdmtSolutCnt').closest('td').prev('th').addClass('hit');
+						// $('#fdmtSolutCnt').attr('required', 'true');
+						// $('.teamManagerApproval').removeClass('no-click');
+						teamManagerFieldControl(teamManagerFlag);
 					} else {
-						$('#FDMTSOLUT-radioButtonContainer').addClass('disabled-area').find(':radio, :checkbox').on('click', function(e){e.preventDefault();});
+						// $('#FDMTSOLUT-radioButtonContainer').addClass('disabled-area').find(':radio, :checkbox').on('click', function(e){e.preventDefault();});
 					}
 
                     gridResize2(); //그리드 높이 조정
@@ -863,7 +865,8 @@
         			$('#wbsPopupIss #actionBtn').show();
         		}
             	$('.issAct').removeClass('no-click');
-				$('.issActApproval').addClass('no-click');	// 근본원인,근본예방대책 필드는 결재시 팀장만 입력하겠끔
+				teamManagerFieldControl(teamManagerFlag);
+				// $('.issActApproval').addClass('no-click');	// 근본원인,근본예방대책 필드는 결재시 팀장만 입력하겠끔
 
         	} else {
         		$('#actsDt').removeAttr('required').closest('td').prev('th').removeClass('hit');
@@ -889,6 +892,8 @@
 					} else {
 						$('#wbsPopupIss #actionBtn').show();
 					}
+					$('#popForm_S #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').removeClass('hit');
+					$('#popForm_S #fdmtSolutCnt').closest('td').prev('th').removeClass('hit');
 					$('.issAct').removeClass('no-click');
 				} else {
 					if (act_approval_Yn == 'Y' || actionType == 'I') {
@@ -898,6 +903,7 @@
 					}
 					$('.issAct').addClass('no-click');
 				}
+				teamManagerFieldControl(teamManagerFlag);
 				$('#btn_plus2').hide();
 				$('#btn_minus2').hide();
         	}
@@ -1024,6 +1030,7 @@
 //             $("#actsDt, #acteDt, #actMh, #actAmt, #actCnts").prop('readonly', true);
 			//class="issAct"  --> 조치내역 전체 class 명임
         	$('.issAct').addClass('no-click');
+			teamManagerFieldControl(teamManagerFlag);
         }
 
 
@@ -1115,7 +1122,7 @@
         
 		// 결재시 수정하면 change 이벤트 적용
 		$('#popForm_S').on('input paste drop change','#measRst, #actCnts, #FDMTSOLUT-radioButtonContainer input[type=checkbox], #fdmtSolutCnt, #COBGB-checkboxContainer input[type=radio]',function() {
-			if ($('#wbsPopupIss #commentBtn').length === 0 && actionType === 'I' && teamManagerFlag) {
+			if ($('#wbsPopupIss #commentBtn').length === 0 && actionType != 'C' && teamManagerFlag && $("#popForm_S #issSts").val() != 'ISSSTS04') {
 				const callCmdBtn = '<button id="commentBtn">코칭수정</button>';
 				$('#wbsPopupIss .popup_bottom_btn').first().prepend(callCmdBtn);
 				$('#wbsPopupIss #commentBtn').on('click', function() {
@@ -1143,7 +1150,7 @@
 
 	// 결재시 코멘트 추가 수정
 	function updateIssueComment(){
-		if (inputValidation($('.popup_area [required]'))) {
+		if (inputValidation($('.popup_area [required]')) && $("#popForm_S #issSts").val() != 'ISSSTS04') {
 			if ($("input[name='FDMTSOLUT']:checked").val() == undefined) {
 				customAlert("근본원인을 선택해주세요.");
 				return false;
@@ -1261,6 +1268,8 @@
         if (inputValidation($('.popup_area [required]'))) {
 			if($("input[name='CODECOBGB']:checked").val() == undefined || $("input[name='CODECOBGB']:checked").val() == ""){
                 customAlert("장애유형을 선택해주세요");
+			} else if (teamManagerFlag && $("#issSts").val() == 'ISSSTS03' && $("input[name='FDMTSOLUT']:checked").val() == undefined) {
+				customAlert("근본원인을 선택해주세요.");
 			} else {
 				if (inputValidationCheck()) {
 		            var formData = makeFormData();
@@ -1791,7 +1800,8 @@
 		}
 
         var formData = {
-            "fileTrgtKey" : issFileTrgtKey
+            "fileTrgtKey" 	: issFileTrgtKey,
+			"userId"		: jwt.userId
         }
         postAjaxSync("/user/wb/wb24/select_wb2401p01_Info", formData, null, function(data) {
 
@@ -1825,6 +1835,9 @@
 				}
 				if (key == 'issSts' && value == 'ISSSTS04') {
 					$('#popForm_S #issSts').trigger('change');
+				}
+				if (key == 'teamManagerYn' && value == 'Y') {
+					teamManagerFlag = true;
 				}
 			});
 
@@ -1880,6 +1893,9 @@
             //결재카운트 기준 문제정보 입력 제어 끝
             
 			rowData = data.result; //발주요처 결과처리를 위한 임시저장
+
+			teamManagerFieldControl(teamManagerFlag);	//팀장여부에 따른 필드 제어
+
 	        $('.tit').text(data.result.salesCd + " " + data.result.wbsPlanCodeKindNm +"단계 WBS 계획 문제");
 		  	  txtareaHeightResize($('#wbsPopupIss #issCnts'));  //문제현황 크기 조절하기
 		  	  txtareaHeightResize($('#wbsPopupIss #actCnts'));  //조치내용 크기 조절하기
@@ -2170,6 +2186,27 @@
         // talkJson = JSON.stringify(talkBody);
         //kakaoSendReal(talkJson, talkParam, param);
     }
+
+	// 팀장일때 필드 활성화 처리 flag = teamManagerYn
+	function teamManagerFieldControl(flag) {
+		if (flag) {
+			if ($('#issSts').val() == 'ISSSTS03') {
+				$('#popForm_S #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
+				$('#popForm_S #fdmtSolutCnt').closest('td').prev('th').addClass('hit');
+				$('#popForm_S #fdmtSolutCnt').attr('required', 'true');
+			} else {
+				$('#popForm_S #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').removeClass('hit');
+				$('#popForm_S #fdmtSolutCnt').closest('td').prev('th').removeClass('hit');
+				$('#popForm_S #fdmtSolutCnt').removeAttr('required');
+			}
+			$('#popForm_S').find('.issActApproval').removeClass('no-click');
+		} else {
+			$('#popForm_S #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').removeClass('hit');
+			$('#popForm_S #fdmtSolutCnt').closest('td').prev('th').removeClass('hit');
+			$('#popForm_S #fdmtSolutCnt').removeAttr('required');
+			$('#popForm_S').find('.issActApproval').addClass('no-click');
+		}
+	}
 
 	function txtareaHeightResize(obj) {
 		const rowCount = obj.val().split(/\r\n|\r|\n/).length;

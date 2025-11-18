@@ -630,13 +630,16 @@
 							teamManagerFlag = true;
 						}
 					});
-					if (teamManagerFlag && !['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val())) {
-						$('#FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
-						$('#fdmtSolutCnt').closest('td').prev('th').addClass('hit');
-						$('#fdmtSolutCnt').attr('required', 'true');
-						$('.teamManagerApproval').removeClass('no-click');
+					// if (teamManagerFlag && !['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#mcPartCd").val()) && list.length > 0) {
+					if (teamManagerFlag && list.length > 0) {
+						// $('#FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
+						// $('#fdmtSolutCnt').closest('td').prev('th').addClass('hit');
+						// $('#fdmtSolutCnt').attr('required', 'true');
+						// $('.teamManagerApproval').removeClass('no-click');
+						teamManagerFieldControl(teamManagerFlag);	//팀장여부에 따른 필드 제어
 					} else {
-						$('#FDMTSOLUT-radioButtonContainer').addClass('disabled-area').find(':radio, :checkbox').on('click', function(e){e.preventDefault();});
+						// $('.teamManagerApproval').removeClass('no-click');
+						// $('#FDMTSOLUT-radioButtonContainer').addClass('disabled-area').find(':radio, :checkbox').on('click', function(e){e.preventDefault();});
 					}
 
                     gridResize2(); //그리드 높이 조정
@@ -838,7 +841,14 @@
         			$(currDivId).find('#actionBtn').show();
         		}
             	$(currDivId).find('.issAct').removeClass('no-click');
-            	$(currDivId).find('.issActApproval').addClass('no-click');	// 근본원인,근본예방대책 필드는 결재시 팀장만 입력하겠끔
+
+				teamManagerFieldControl(teamManagerFlag);	//팀장여부에 따른 필드 제어
+				// 근본원인,근본예방대책 필드는 결재시 팀장만 입력하겠끔
+				// if (teamManagerFlag) {
+	            // 	$(currDivId).find('.issActApproval').removeClass('no-click')
+				// } else {
+				// 	$(currDivId).find('.issActApproval').addClass('no-click');
+				// }
 			} else {
         		$(currFormId + ' #actsDt').closest('td').prev('th').removeClass('hit');
         		$(currFormId + ' #actsDt').removeAttr('required', 'true');
@@ -868,7 +878,10 @@
 					} else {
 						$(currDivId).find('#actionBtn').show();
 					}
+					// $(currDivId + ' #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').removeClass('hit');
+					// $(currDivId + ' #fdmtSolutCnt').closest('td').prev('th').removeClass('hit');
 					$(currDivId).find('.issAct').removeClass('no-click');
+					
 				} else {
 					if (approval_Yn == 'Y') {
 						$(currDivId).find('#actionBtn').hide();
@@ -878,6 +891,8 @@
             		$(currDivId).find('.issAct').addClass('no-click');
 
 				}
+
+				teamManagerFieldControl(teamManagerFlag);
 				$(currFormId + ' #btn_plus2').hide();
 				$(currFormId + ' #btn_minus2').hide();
 			}
@@ -1143,7 +1158,7 @@
 
 		// 결재시 수정하면 change 이벤트 적용
 		$(currFormId).on('input paste drop change', '#measRst, #actCnts, #FDMTSOLUT-radioButtonContainer input[type=checkbox], #fdmtSolutCnt, #COBGB-checkboxContainer-P11 input[type=radio]',function() {
-			if ($(currDivId + ' #commentBtn').length === 0 && actionType === 'I' && teamManagerFlag) {
+			if ($(currDivId + ' #commentBtn').length === 0 && actionType != 'C' && teamManagerFlag && $(currDivId + ' #issSts').val() != 'ISSSTS04') {
 				const callCmdBtn = '<button id="commentBtn">코칭수정</button>';
 				$(currDivId + ' .popup_bottom_btn').first().prepend(callCmdBtn);
 				$(currDivId + ' #commentBtn').on('click', () => updateIssueComment('결과수정'));
@@ -1176,7 +1191,7 @@
 
 	// 결재시 코멘트 추가 수정
 	function updateIssueComment(){
-		if (inputValidation($('.popup_area [required]'))) {
+		if (inputValidation($('.popup_area [required]')) &&  $(currDivId + ' #issSts').val() != 'ISSSTS04') {
 			if ($("input[name='FDMTSOLUT']:checked").val() == undefined) {
 				customAlert("근본원인을 선택해주세요.");
 				return false;
@@ -1299,11 +1314,9 @@
         if (inputValidation($(currFormId).find('[required]'))) {
 			if($(currFormId + " input[name='CODECOBGB']:checked").val() == undefined || $(currFormId + " input[name='CODECOBGB']:checked").val() == ""){
                 customAlert("장애유형을 선택해주세요");
-			} 
-			// else if ($("#issSts").val() == 'ISSSTS03' && $("input[name='FDMTSOLUT']:checked").val() == undefined) {
-			// 	customAlert("근본원인을 선택해주세요.");
-			// } 
-			else {
+			} else if (teamManagerFlag && $(currFormId + " #issSts").val() == 'ISSSTS03' && $("input[name='FDMTSOLUT']:checked").val() == undefined) {
+				customAlert("근본원인을 선택해주세요.");
+			} else {
 				if (inputValidationCheck()) {
 		            var formData = makeFormData();
 		            filePostAjax("/user/wb/wb24/wbsIssueUpdate", formData, function(data) {
@@ -1827,7 +1840,8 @@
 		}
 
         var formData = {
-            "fileTrgtKey" : issFileTrgtKey
+            "fileTrgtKey" 	: issFileTrgtKey,
+			"userId"		: jwt.userId
         }
         postAjaxSync("/user/wb/wb24/select_wb2401p01_Info", formData, null, function(data) {
 
@@ -1864,8 +1878,11 @@
 						$(currFormId + ' #issSts').trigger('change');
 					}
 
+					if (key == 'teamManagerYn' && value == 'Y') {
+						teamManagerFlag = true;
+					}
 				});
-
+				
 				originMeasRst = data.result.measRst;	// 원인
 				originActCnts =  data.result.actCnts;	// 결과
 
@@ -1918,11 +1935,13 @@
 	            //결재카운트 기준 문제정보 입력 제어 끝
 
 				rowData = data.result; //발주요처 결과처리를 위한 임시저장
+
+				teamManagerFieldControl(teamManagerFlag);	//팀장여부에 따른 필드 제어
 				
 		        $(currFormId + ' .tit').text(data.result.salesCd + " " + data.result.wbsPlanCodeKindNm +"단계 WBS 실적 문제");
-			  	  txtareaHeightResize($(currFormId + ' #issCnts'));  //문제현황 크기 조절하기
-			  	  txtareaHeightResize($(currFormId + ' #actCnts'));  //조치내용 크기 조절하기
-			  	  txtareaHeightResize($(currFormId + ' #measRst'));  //조치내용 크기 조절하기
+				txtareaHeightResize($(currFormId + ' #issCnts'));  //문제현황 크기 조절하기
+				txtareaHeightResize($(currFormId + ' #actCnts'));  //조치내용 크기 조절하기
+				txtareaHeightResize($(currFormId + ' #measRst'));  //조치내용 크기 조절하기
 
             }
 		});
@@ -2205,6 +2224,27 @@
         }
 
     }
+
+	// 팀장일때 필드 활성화 처리 flag = teamManagerYn
+	function teamManagerFieldControl(flag) {
+		if (flag) {
+			if ($(currDivId + ' #issSts').val() == 'ISSSTS03') {
+				$(currDivId + ' #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
+				$(currDivId + ' #fdmtSolutCnt').closest('td').prev('th').addClass('hit');
+				$(currDivId + ' #fdmtSolutCnt').attr('required', 'true');
+			} else {
+				$(currDivId + ' #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').removeClass('hit');
+				$(currDivId + ' #fdmtSolutCnt').closest('td').prev('th').removeClass('hit');
+				$(currDivId + ' #fdmtSolutCnt').removeAttr('required');
+			}
+			$(currDivId).find('.issActApproval').removeClass('no-click');
+		} else {
+			$(currDivId + ' #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').removeClass('hit');
+			$(currDivId + ' #fdmtSolutCnt').closest('td').prev('th').removeClass('hit');
+			$(currDivId + ' #fdmtSolutCnt').removeAttr('required');
+			$(currDivId).find('.issActApproval').addClass('no-click');
+		}
+	}
 
 
 	function txtareaHeightResize(obj) {

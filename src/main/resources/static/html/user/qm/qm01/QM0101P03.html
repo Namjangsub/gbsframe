@@ -290,7 +290,7 @@
 				  <tr class="teamManagerApproval">
 					<th>근본예방대책<br><span style="font-size:11px;">(핵심목적이므로 책임자가 목적에 맞게 기록 요망)</span></th>
 					<td colspan="3">
-						<textarea	class="form-control" id="fdmtSolutCnt" name="fdmtSolutCnt" rows="2" maxlength="500" msg="근본대책(세부실행 대책)"></textarea>
+						<textarea	class="form-control" id="fdmtSolutCnt" name="fdmtSolutCnt" rows="2" maxlength="500" msg="근본예방대책(세부실행 대책)"></textarea>
 					</td>
 				 </tr>
 				  
@@ -712,7 +712,6 @@
 			});
 			
 		}
-		$('.teamManagerApproval').addClass('no-click');		// 근본원인, 근본예방대책 필드 비활성화
 
 		selectQtyReqInfo();
 	
@@ -728,7 +727,7 @@
 		
 		// 결재시 수정하면 change 이벤트 적용
 		$('#qmPopFormRslt').on('input paste drop change','#measRst, #resltRst, #FDMTSOLUT-radioButtonContainer input[type=checkbox], #fdmtSolutCnt, #COBGB-checkboxContainer input[type=radio]',function() {
-			if ($('#qmPopFormRslt  #commentBtn').length === 0 && teamManagerFlag) {	// 결재 정보 그리드가 있어야지 코칭수정 버튼 활성화
+			if ($('#qmPopFormRslt  #commentBtn').length === 0 && teamManagerFlag && actionType != 'C') {	// 결재 정보 그리드가 있어야지 코칭수정 버튼 활성화
 				const callCmdBtn = '<button id="commentBtn">코칭수정</button>';
 				$('#qmPopFormRslt .popup_bottom_btn').first().prepend(callCmdBtn);
 				$('#qmPopFormRslt #commentBtn').on("click", function() { updateQualityResultComment('결과수정'); });
@@ -949,6 +948,7 @@
 			"fileTrgtKey" : fileTrgtKey,
 	        "reqNo" 		: reqNo,
 	        "rsltNo" 		: rsltNo,
+			"userId"		: jwt.userId
 		}
 
 		postAjaxSync("/user/qm/qm01/selectQtyReqInfo", formData, null, function(data) {
@@ -984,6 +984,9 @@
 						codes.forEach(code => {
 							$(`input[name="FDMTSOLUT"][value="${code}"]`).prop('checked', true);
 						});
+					}
+					if (key == 'teamManagerYn' && value == 'Y') {
+						teamManagerFlag = true;
 					}
                 }
             }
@@ -1070,6 +1073,18 @@
 				disableFormAll('popForm2');
 				//  setMouseTrackerVisible(true, `발행자 ${data.result.ordrgNm}만 결과 등록 가능합니다....`);
 			}
+
+			// 팀장여부에 따른 근본원인, 근본예방대책 필드 활성/비활성 처리
+			if (teamManagerFlag && ($('#popForm2 #ordrgId').val() == jwt.userId)) {
+				$('#popForm2 #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
+				$('#popForm2 #fdmtSolutCnt').closest('td').prev('th').addClass('hit');
+				$('#popForm2 #fdmtSolutCnt').attr('required', 'true');
+				$('#popForm2 .teamManagerApproval').removeClass('no-click');
+			} else {
+				$('#FDMTSOLUT-radioButtonContainer').closest('td').prev('th').removeClass('hit');
+				$('#fdmtSolutCnt').closest('td').prev('th').removeClass('hit');
+				$('.teamManagerApproval').addClass('no-click');		// 근본원인, 근본예방대책 필드 비활성화
+			}
 		});
 	
 
@@ -1082,6 +1097,10 @@
 		if($('#popForm2').find("input[name='CODECOBGB']:checked").val() == undefined || $('#popForm2').find("input[name='CODECOBGB']:checked").val() == ""){
 	        customAlert("등록사유를 선택해주세요");
 	        return false;
+		}
+		if (teamManagerFlag && !$("input[name='FDMTSOLUT']:checked").val()) {
+			customAlert("근본원인을 선택해주세요.");
+			return false;
 		}
 		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
 			// if (!['COBTP01', 'COBTP04', 'COBTP06', 'COBTP08', 'COBTP09'].includes($("#partCd").val()) && $("input[name='FDMTSOLUT']:checked").val() == undefined) {
@@ -1668,7 +1687,9 @@
 		appArray = approvalTeamManagerInfoData(tempActId, appArray);
 
 		//발행자와 결과등록자가 다른 경우 발행자 결제자동등록 처리
-		if ($("#popForm2 #ordrgId").val() != $("#popForm2 #resRegId").val()) appArray = approvalUserInfoData($("#popForm2 #ordrgId").val(), appArray);
+		if ($("#popForm2 #ordrgId").val() != $("#popForm2 #resRegId").val()) {
+			appArray = approvalUserInfoData($("#popForm2 #ordrgId").val(), appArray);
+		}
 
 		gridViewPop1.setData2(appArray.concat(shaArray));
 	}
