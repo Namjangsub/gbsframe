@@ -12747,6 +12747,8 @@ function validateResponseStatus(status) {
 
 
 function createFetchOptions(headers, withCredentials, abortController) {
+  headers.set("Authorization",localStorage.getItem("access_token"));
+  headers.set("X-GBS-Source", "pdfjs-viewer"); // 자동연결 표식 추가 - URL로 실행 못하게 막음.
   return {
     method: "GET",
     headers,

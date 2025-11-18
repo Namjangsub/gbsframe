@@ -664,12 +664,25 @@ function serverOfficeFiletoPdf(fileKey, userId, coCd, fileName) {
     $("#viewerFrame").css("height", "850px");
     $("#msg").text("서버 변환 중...");
     // 1단계: 변환 트리거 호출 (이건 JSON/text로 /api/convert/pdf/{id} 를 돌려줌)
-    fetch(`/api/convert/pdf?fileKey=${fileKey}&userId=${userId}&coCd=${coCd}`)
+    fetch(`/api/convert/pdf?fileKey=${fileKey}&userId=${userId}&coCd=${coCd}`, 
+    		{method: 'GET', headers: {'Authorization': authorizationToken, 'X-GBS-Source': 'pdfjs-viewer'}}) // 같은 도메인이면 credentials는 생략해도 됨 (세션 안 쓸 경우엔 상관 없음)
 		.then(res => {
-			if (!res.ok) throw new Error('변환 요청 실패');
+		    console.log('[convert/pdf] status =', res.status, 'ok =', res.ok);
+		    console.log('[convert/pdf] url =', res.url);
+		    // ★ 여기서 body를 콜백 파라미터로 받는다
+		    return res.text().then(body => {
+		      console.log('[convert/pdf] body =', body);
+		      if (res.status == 401 && body.includes("access_token 만료")){
+		    	  res.url = "/static/index.html";
+			  }
+		      if (!res.ok) {
+		        // 상태코드 포함해서 에러 던지기
+		        throw new Error(`변환 요청 실패 (status ${res.status})`);
+		      }
 
-		    $("#nextButton, #prevButton").show();
-			return res.text();            // 컨트롤러가 ResponseEntity.ok(pdfUrl) 하니까 text로 받음
+		      // 여기서의 body가 곧 pdfUrl 문자열
+		      return body;
+		    });
 		})
 		.then(pdfUrl => {
 // 			pdfUrl 예: "/api/convert/pdf/0f3c4d..."

@@ -158,10 +158,8 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
 						SecurityContextHolder.clearContext();
 						
 //						reject(response, "로그인 24시간 초과");
-						String location = "/static/index.html";
-						response.sendRedirect(location);
-						response.setStatus(303); 
-						response.setHeader("Location", location);
+						String location = request.getContextPath() + "/static/index.html";
+						response.sendRedirect(location); //status 가 기본 302
 						return;
 					}
 

@@ -1,6 +1,7 @@
 package com.dksys.biz;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -15,7 +16,9 @@ import javax.servlet.http.HttpServletResponse;
 import org.jodconverter.core.DocumentConverter;   // ★ 이게 핵심
 import org.jodconverter.core.office.OfficeException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -52,7 +55,14 @@ public class OfficeConvertController {
      * 1) 프런트에서 직접 파일 업로드해서 변환하는 경우
      */
     @PostMapping("/pdf")
-    public ResponseEntity<?> convertToPdf(@RequestParam("file") MultipartFile file) throws Exception {
+    public ResponseEntity<?> convertToPdf(@RequestParam("file") MultipartFile file, Authentication authentication) throws Exception {
+
+        System.out.println("[/api/convert/pdf] auth = {}" +  authentication);
+        if (authentication != null) {
+        	System.out.println("principal = {}"+ authentication.getName());
+        	System.out.println("authorities = {}" + authentication.getAuthorities());
+        }
+    	
         String originalName = file.getOriginalFilename();
         if (originalName == null) {
             originalName = "upload";
@@ -99,8 +109,24 @@ public class OfficeConvertController {
      * 2) 이미 서버에 저장된 파일(fileKey 등) → 변환
      */
     @GetMapping("/pdf")
-    public ResponseEntity<?> convertToPdf(@RequestParam Map<String, String> param, HttpServletRequest request) throws Exception {
+    public ResponseEntity<?> convertToPdf(@RequestParam Map<String, String> param, HttpServletRequest request, Authentication authentication) throws Exception {
 
+//        System.out.println("[/api/convert/pdf] auth = {}" +  authentication);
+//        if (authentication != null) {
+//        	System.out.println("principal = {}"+ authentication.getName());
+//        	System.out.println("authorities = {}" + authentication.getAuthorities());
+//        }
+
+        String source = request.getHeader("X-GBS-Source");
+        if (!"pdfjs-viewer".equals(source)) {
+            System.out.println("주소창/링크 등 기타 요청일 가능성");
+            String json = "{\"error\":\"정상적인 접근이 아닙니다.\"}";
+            // 정상적인 접근이 아닌 경우: 403 + 메시지 반환
+            return ResponseEntity.status(403)
+                    .header("Content-Type", "application/json;charset=UTF-8")
+                    .body(json.getBytes(StandardCharsets.UTF_8));   // byte[] 로 변환
+        }
+        
         //-----------------------------------------------
         //parameter 정보
         //  fileKey : 이동하고자 하는 파일 일련번호
@@ -114,7 +140,7 @@ public class OfficeConvertController {
         //
         if (fileInfo == null || fileInfo.get("fileName") == null) {
             return ResponseEntity.status(HttpServletResponse.SC_NOT_FOUND)
-                    .body("파일 정보를 찾을 수 없습니다.");
+                    .body("권한이 없거나 파일 정보를 찾을 수 없습니다.");
         }
         
         String filePath = fileInfo.get("filePath") + fileInfo.get("fileKey")+ '_' + fileInfo.get("fileName");
@@ -189,8 +215,23 @@ public class OfficeConvertController {
      * 3) 실제 PDF 내려주는 엔드포인트 (pdf.js가 여기로 다시 요청)
      */
     @GetMapping("/pdf/{id}")
-    public ResponseEntity<byte[]> getPdf(@PathVariable String id) throws Exception {
+    public ResponseEntity<byte[]> getPdf(@PathVariable String id, HttpServletRequest request, Authentication authentication) throws Exception {
 
+//        System.out.println("[/api/convert/pdf] auth = {}" +  authentication);
+//        if (authentication != null) {
+//        	System.out.println("principal = {}"+ authentication.getName());
+//        	System.out.println("authorities = {}" + authentication.getAuthorities());
+//        }       
+        String source = request.getHeader("X-GBS-Source");
+        if (!"pdfjs-viewer".equals(source)) {
+            System.out.println("주소창/링크 등 기타 요청일 가능성");
+            String json = "{\"error\":\"정상적인 접근이 아닙니다.\"}";
+            // 정상적인 접근이 아닌 경우: 403 + 메시지 반환
+            return ResponseEntity.status(403)
+                    .header("Content-Type", "application/json;charset=UTF-8")
+                    .body(json.getBytes(StandardCharsets.UTF_8));   // byte[] 로 변환
+        }
+        
         Path pdfPath= outputDir.resolve(id);
         if (!Files.exists(pdfPath)) {
             return ResponseEntity.notFound().build();

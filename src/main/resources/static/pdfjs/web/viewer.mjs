@@ -16792,6 +16792,9 @@ const PDFViewerApplication = {
         }
       }
     }
+	if (moreInfo.message.includes("Unexpected server response (403)")){
+		alert("로그인 만료 또는 권한이 없습니다.");
+	}
     console.error(`${message}\n\n${moreInfoText.join("\n")}`);
     return message;
   },

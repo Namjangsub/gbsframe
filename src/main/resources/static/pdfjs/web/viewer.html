@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <!--
 Copyright 2012 Mozilla Foundation
 
