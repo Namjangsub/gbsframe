@@ -30,4 +30,6 @@ public interface SM50Svc {
 	List<Map<String, String>> selectOrdrsBomAllCostList(Map<String, String> paramMap);
 
 	Map<String, String> selectOrdrsBomTrgtPchsPcostInfo(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectSalesCdBomRemarkList(Map<String, String> paramMap);
 }

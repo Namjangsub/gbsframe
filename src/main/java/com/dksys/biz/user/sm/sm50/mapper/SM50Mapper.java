@@ -38,4 +38,6 @@ public interface SM50Mapper {
 
 	Map<String, String> selectOrdrsBomTrgtPchsPcostInfo(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectSalesCdBomRemarkList(Map<String, String> paramMap);
+
 }

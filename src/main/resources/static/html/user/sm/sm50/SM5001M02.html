@@ -180,6 +180,12 @@
 					<input type="hidden" id="ordrsNo" name="ordrsNo">
 	
 				</td> -->
+				<th>Sales Code</th>
+				<td>
+					<select id="salesCdRemark" name="salesCdRemark">
+						<option value="" selected>전체</option>
+					</select>
+				</td>
 				<th>프로젝트</th>
 				<td>
 					<input type="hidden" id="clntPjt" name="clntPjt">
@@ -217,10 +223,10 @@
         <div class="contents " style="margin:0px; padding:0px; height: 100%; width: 100%; min-height:200px; min-width: 245px">
 			<h3 class="location">
 				<span class="page_tit"> BOM 상세 매입 원가</span>
-				<!-- <span style="display:inline-flex;align-items:center;margin-left:100px;gap:8px;">
+				<span style="display:inline-flex;align-items:center;margin-left:100px;gap:8px;">
 					<span style="color:initial !important; font-size: 12px;">BOM원가의견 :</span>
 					<input type="text" id="bomRemark" name="bomRemark" class="form-control input-sm" style="width:800px; font-size: 15px;">
-				</span> -->
+				</span>
 			</h3>
 			<div class="add_btn_small pdl10" style="margin: 0px; padding: 0px;">
 				<a onclick="jsonToExcel(firstGrid);" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a> 
@@ -486,25 +492,66 @@
 			});
 			authChk("SM5001M02");
 
-			// $("#bomRemark").prop("readonly", true);
+			$("#bomRemark").prop("readonly", true);
 
-			// $(document).off('.bomRemark')
-			// 	.on('compositionstart.bomRemark', '#bomRemark', function(){ $(this).data('ime', true); })
-			// 	.on('compositionend.bomRemark',   '#bomRemark', function(){ $(this).data('ime', false); })
-			// 	.on('focus.bomRemark',            '#bomRemark', function(){ $(this).data('last', this.value || ''); })
-			// 	.on('keydown.bomRemark',          '#bomRemark', function(e){if (e.key === 'Enter' && !$(this).data('ime')) {e.preventDefault();this.blur();}})
-			// 	.on('blur.bomRemark change.bomRemark', '#bomRemark', function(){
-			// 		const prev = $(this).data('last') ?? '';
-			// 		const curr = this.value ?? '';
-			// 		if (curr !== prev) {
-			// 			$(this).data('last', curr);
-			// 			insertUpdateBomRemark(curr);
-			// 		}
-			// 	});
+			$(document).off('.bomRemark')
+				.on('compositionstart.bomRemark', '#bomRemark', function(){ $(this).data('ime', true); })
+				.on('compositionend.bomRemark',   '#bomRemark', function(){ $(this).data('ime', false); })
+				.on('focus.bomRemark',            '#bomRemark', function(){ $(this).data('last', this.value || ''); })
+				.on('keydown.bomRemark',          '#bomRemark', function(e){if (e.key === 'Enter' && !$(this).data('ime')) {e.preventDefault();this.blur();}})
+				.on('blur.bomRemark change.bomRemark', '#bomRemark', function(){
+					const prev = $(this).data('last') ?? '';
+					const curr = this.value ?? '';
+					if (curr !== prev) {
+						$(this).data('last', curr);
+						insertUpdateBomRemark(curr);
+					}
+				});
 
 			$("#gridFrame").resize()
-      });
-		      
+
+			$('#salesCdRemark').off('change.salesCdRemark').on('change.salesCdRemark', function () {
+				var salesCd = $(this).val() || "";
+				var tree    = $("#deptTree").jstree(true);
+				var ordrsNo = $("#ordrsNo_S").val();
+
+				if (!tree) return;
+
+				if (!salesCd) {
+					// 전체 선택 시 수주번호 루트로
+					if (ordrsNo && tree.get_node(ordrsNo)) {
+						tree.deselect_all();
+						tree.select_node(ordrsNo);
+						tree.open_node(ordrsNo);
+					}
+					return;
+				}
+
+				var foundId = null;
+
+				// 수주번호 노드 기준으로만 SALES CD 추출
+				var rootNode = tree.get_node(ordrsNo);
+				if (!rootNode) return;
+
+				var children = rootNode.children || [];
+				for (var i = 0; i < children.length; i++) {
+					var childId   = children[i];
+					var childNode = tree.get_node(childId);
+
+					if (childNode && childNode.original && childNode.original.salesCd === salesCd) {
+						foundId = childNode.id;
+						break;
+					}
+				}
+
+				if (foundId) {
+					tree.deselect_all();
+					tree.select_node(foundId);  // select_node.jstree 이벤트 다시 타면서
+					// tree.open_node(foundId);    // 기존 로직 그대로 동작
+				}
+			});
+	});
+
   	// 트리 초기화
   	function initDeptTree() {
 
@@ -512,6 +559,9 @@
 		
 		//제품정보 확인
 		selectOrdrsSearchSm50Info();
+
+		// SALES_CD BOM REMARK 목록 셋팅
+		selectSalesCdBomRemarkList();
 
   		$("#deptTree").jstree("destroy");
   		$("#deptTree").jstree(
@@ -553,13 +603,28 @@
   			// BOM정보 set
 //   			setBomInfo(data.node);
 			firstGrid.setData(fileTrgtKey, parentKey);
+
+			var salesCd = data.node.original.salesCd || "";
+			$("#salesCdRemark").val(salesCd);
+			var remark = $("#salesCdRemark option[value='" + salesCd + "']").data("remark") || "";
+
+			if (!salesCd) {
+				$("#bomRemark").val("").prop("readonly", true).css("color", "red");
+			} else {
+				$("#bomRemark").val(remark);
+
+				if (teamManagerYn) {
+					$("#bomRemark").prop("readonly", false).css("color", "initial");
+				} else {
+					$("#bomRemark").prop("readonly", true).css("color", "red");
+				}
+			}
   			// 신규 노드 삭제
   			if($('#deptTree').jstree(true).get_node('new')){
   				if(data.node.id != "new"){
   					$('#deptTree').jstree(true).refresh();
   				}
   			}
-  			
   		    var iconElement = $("#treeExpandBtn i");
   		    // 노드가 열려있는지 확인
   		    if (data.node.state.opened) {
@@ -618,6 +683,47 @@
 		return deptTree;
 	}
 
+	function selectSalesCdBomRemarkList() {
+		var selectedSalesCd = "";
+		if ($("#deptTree").jstree(true)) {
+			var selId = $("#deptTree").jstree(true).get_selected()[0];
+			if (selId) {
+				var node = $("#deptTree").jstree(true).get_node(selId);
+				// 수주번호 루트 말고, salesCd가 있는 노드만 대상
+				if (node && node.original && node.original.salesCd) {
+					selectedSalesCd = node.original.salesCd;
+				}
+			}
+		}
+		var paramObj = {
+			"coCd": $("#coCd_S").val(),
+			"ordrsNo": $("#ordrsNo_S").val(),
+			"userId": jwt.userId
+		};
+		postAjaxSync("/user/sm/sm50/selectSalesCdBomRemarkList", paramObj, null, function(data){
+			let bomRemarkList = data.bomRemarkList;
+			$("#salesCdRemark").empty().append('<option value="" selected>전체</option>');
+
+			if (bomRemarkList && bomRemarkList.length > 0) {
+				$.each(bomRemarkList, function(idx, item) {
+					var value = item.salesCd || "";     // 값: SALES_CD
+					var text  = item.txt || value;      // 문구: TXT (없으면 salesCd)
+					var bomRemark = item.bomRemark || "";  // 비고: REMARK
+
+					$("#salesCdRemark").append(
+						'<option value="' + value + '" data-remark="'+bomRemark +'">' + text + '</option>'
+					);
+				});
+			}
+			if (selectedSalesCd) {
+				$("#salesCdRemark").val(selectedSalesCd);
+			} else {
+				// 수주번호(루트) 선택 상태면 "전체" 유지
+				$("#salesCdRemark").val("");
+			}
+		});
+	}
+
 	function opendOrdrsSearch() {
         var paramObj = {
             "searchValue" : $('#ordrsNo_S').val(),
@@ -633,6 +739,7 @@
             $('#clntNm_S').val(row.clntNm);
 
             initDeptTree();
+			
         });
     }
     
@@ -679,11 +786,11 @@
 			    clntPjtNm	: '#clntPjtNm',
 			    ordrsNo		: '#ordrsNo_S'
 			};
-			if (data.result != null && data.result.bomRemark) {
-				$('#bomRemark').val(data.result.bomRemark).css('color', 'red');
-			} else {
-				$('#bomRemark').val("");
-			}
+			// if (data.result != null && data.result.bomRemark) {
+			// 	$('#bomRemark').val(data.result.bomRemark).css('color', 'red');
+			// } else {
+			// 	$('#bomRemark').val("");
+			// }
 			function setFormFields(fields, data = {}) {
 			    Object.keys(fields).forEach(key => {
 			        const value = data[key] || ""; // 데이터가 없으면 빈 값으로 설정
@@ -702,11 +809,13 @@
 			    $('#trgtPchsPcost').val(addCommaStr(trgtPchsPcost) + "원");
 			    $('#trgtPchsPcostPct').val("0%");
 			}
-			// // 팀장플래그 설정
-			// if (data.result != null && data.result.teamManagerYn == 'Y' && jwt.deptId.slice(0,5) == "TRN50") {
-			// 	$("#bomRemark").prop("readonly", false).css('color', 'initial');
-			// 	teamManagerYn = true;
-			// }
+			// 팀장플래그 설정
+			if (data.result != null && data.result.teamManagerYn == 'Y' && jwt.deptId.slice(0,5) == "TRN50") {
+				// $("#bomRemark").prop("readonly", false).css('color', 'initial');
+				teamManagerYn = true;
+			} else {
+				teamManagerYn = false;
+			}
 		});
 	}
 
@@ -767,6 +876,32 @@
 			}
 		}
 	}
+
+	// BOM원가의견 입력/수정
+	function insertUpdateBomRemark() {
+		if ($('#salesCd_S').val() == "") {
+			return false;
+		}
+		if (!teamManagerYn && jwt.deptId != "TRN50") {
+			customAlert("구매외주팀장만 입력하실 수 있습니다.")
+			return false;
+		}
+
+		var paramObj = {
+			"userId" 		: jwt.userId,
+			"coCd" 			: $("#coCd_S").val(),
+			"salesCd" 		: $("#salesCdRemark").val(),
+			"bomRemark" 	: $('#bomRemark').val(),
+			"pgmId" 		: $('#pgmId').val()
+		}
+		postAjax("/user/sm/sm50/insertUpdateBomRemark", paramObj, null, function(data) {
+			if (data.resultCode != 200) {
+				customAlert("저장에 실패하였습니다. 전산실에 문의 바랍니다.");
+			}
+			selectSalesCdBomRemarkList();
+		});
+	}
+
 	</script>
   </body>
 </html>

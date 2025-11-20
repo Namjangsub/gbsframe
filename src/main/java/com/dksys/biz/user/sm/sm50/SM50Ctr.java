@@ -123,5 +123,13 @@ public class SM50Ctr {
     	return "jsonView";
     }
 
+	// BOM원가의견 조회
+	@PostMapping("/selectSalesCdBomRemarkList")
+	public String selectSalesCdBomRemarkList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> bomRemarkList = sm50Svc.selectSalesCdBomRemarkList(paramMap);
+		model.addAttribute("bomRemarkList", bomRemarkList);
+		return "jsonView";
+	}
     
+	
 }
