@@ -34,7 +34,7 @@ public class WB25SvcImpl implements WB25Svc {
 	WB25Svc wb25Svc;
 	
 	@Autowired
-    SM50Mapper bm50Mapper;
+    SM50Mapper sm50Mapper;
 
     @Autowired
     CM08Svc cm08Svc;
@@ -303,7 +303,7 @@ public class WB25SvcImpl implements WB25Svc {
 
 	@Override
 	public List<Map<String, String>> selectWbsTaskEvlResultList(Map<String, String> paramMap) {
-		bm50Mapper.callBomTempUpd(paramMap);
+		sm50Mapper.callBomTempUpd(paramMap);
 		return wb25Mapper.selectWbsTaskEvlResultList(paramMap);
 	}
 	
