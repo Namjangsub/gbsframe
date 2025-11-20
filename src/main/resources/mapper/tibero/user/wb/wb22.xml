@@ -287,7 +287,8 @@
 					NVL(XX.CLOSE_YN,'N') AS CLOSE_YN,
 					Y.CHG_REASON,
 					Y.VER_UP_REASON,
-					M.DEPT_ID
+					M.DEPT_ID,
+					LV.LEVEL_NM
 					FROM (
 								SELECT CODE_ID,
 										CODE_NM,
@@ -322,7 +323,18 @@
 										FROM TB_WB22M01
 								WHERE CO_CD = #{coCd}
 								AND SALES_CD = #{salesCd}) Y  ON X.CODE_ID = Y.WBS_PLAN_CODE_ID
-					LEFT OUTER JOIN TB_CM06M01 M ON Y.WBS_PLAN_MNG_ID = M.ID
+					CROSS JOIN ( --SalesCode별 등록여부를 체크하기 위함..최초 등록은 C,  수정은 U임
+							SELECT CASE WHEN count(NVL(SALES_CD,0)) > 0 THEN 'U' ELSE 'C' END AS UPD_MODE,
+									max(LOCK_YN) AS LOCK_YN,
+									max(CLOSE_YN) AS CLOSE_YN
+							FROM TB_WB22M01
+							WHERE CO_CD = #{coCd}
+								AND SALES_CD = #{salesCd}
+						) xx
+					LEFT OUTER JOIN TB_CM06M01 M ON M.ID = CASE WHEN xx.UPD_MODE = 'C' THEN NVL(X.CODE_RPRC, #{userId})
+                     									   ELSE Y.WBS_PLAN_MNG_ID
+														   END
+					LEFT OUTER JOIN TB_CM07M01 LV ON LV.LEVEL_CD = M.LEVEL_CD
 					LEFT OUTER JOIN (
 								WITH CD_Data AS (
 									SELECT 
@@ -354,15 +366,8 @@
 											FROM TB_WB22M01_HIST
 												WHERE CO_CD = #{coCd}
 												AND SALES_CD = #{salesCd})
-							) HZ    ON X.CODE_ID = HZ.WBS_PLAN_CODE_ID,
-					( --SalesCode별 등록여부를 체크하기 위함..최초 등록은 C,  수정은 U임
-							SELECT CASE WHEN count(NVL(SALES_CD,0)) > 0 THEN 'U' ELSE 'C' END AS UPD_MODE,
-									max(LOCK_YN) AS LOCK_YN,
-									max(CLOSE_YN) AS CLOSE_YN
-							FROM TB_WB22M01
-							WHERE CO_CD = #{coCd}
-								AND SALES_CD = #{salesCd}
-						) xx
+							) HZ    ON X.CODE_ID = HZ.WBS_PLAN_CODE_ID
+					
 					ORDER BY SORT_NO
 	</select>
 
@@ -1785,7 +1790,8 @@
 			NVL(Y.WBS_PLAN_STS_CODE_ID, 'WBSPLANSTS10') AS WBS_PLAN_STS_CODE_ID,
 			(SELECT T.CODE_NM FROM TB_CM05M01 T WHERE T.CODE_ID = NVL(Y.WBS_PLAN_STS_CODE_ID, 'WBSPLANSTS10')) AS WBS_PLAN_STS_CODE_ID_NM,
 			Y.LOCK_YN,
-			Y.CLOSE_YN
+			Y.CLOSE_YN,
+			Y.VER_UP_REASON
 	FROM (
 			SELECT CODE_ID,
 					CODE_NM,
@@ -1806,8 +1812,9 @@
 						DAYCNT,
 						WBS_PLAN_STS_CODE_ID,
 						LOCK_YN,
-						CLOSE_YN
-						FROM TB_WB22M01_HIST
+						CLOSE_YN,
+						VER_UP_REASON
+				FROM TB_WB22M01_HIST
 				WHERE CO_CD = #{coCd}
 					AND SALES_CD = #{salesCd}
 					AND VER_NO = #{planVerNo}
@@ -2716,5 +2723,35 @@
 			END AS CNT
 		FROM DUAL
 	</select>
+
+	<select id="wbsIssueExistChk" parameterType="map" resultType="int">
+		SELECT COUNT(*) 
+			FROM TB_WB24M02
+		WHERE SALES_CD = #{salesCd}
+			AND WBS_PLAN_CODE_KIND = #{wbsPlanCodeId}
+	</select>
+
+	<delete id="deleteWbsTask" parameterType="Map">
+			DELETE FROM TB_WB22M01
+				WHERE CO_CD = #{coCd}
+				AND SALES_CD = #{salesCd}
+				AND WBS_PLAN_CODE_KIND = #{wbsPlanCodeId}
+	</delete>
+
+	<select id="selectTrgtWbsRsltList" parameterType="map" resultType="camelMap">
+		SELECT 
+				  FILE_TRGT_KEY
+				, WBS_PLAN_CODE_ID
+			FROM TB_WB23M01
+		WHERE SALES_CD = #{salesCd}
+		  AND WBS_PLAN_CODE_KIND = #{wbsPlanCodeId}
+	</select>
+
+	<delete id="deleteWbsRslt" parameterType="Map">
+			DELETE FROM TB_WB23M01
+				WHERE CO_CD = #{coCd}
+				AND SALES_CD = #{salesCd}
+				AND WBS_PLAN_CODE_KIND = #{wbsPlanCodeId}
+	</delete>
 
 </mapper>

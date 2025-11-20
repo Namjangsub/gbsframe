@@ -153,4 +153,12 @@ public interface WB22Mapper {
 	int wbsRsltsCloseChk(Map<String, String> paramMap);
 
 	int selectWbsRsltsLevel2Count(Map<String, String> paramMap);
+
+	int wbsIssueExistChk(Map<String, String> paramMap);
+
+	int deleteWbsTask(Map<String, String> paramMap);
+
+	List<Map<String, String>> selectTrgtWbsRsltList(Map<String, String> paramMap);
+
+	int deleteWbsRslt(Map<String, String> paramMap);
 }

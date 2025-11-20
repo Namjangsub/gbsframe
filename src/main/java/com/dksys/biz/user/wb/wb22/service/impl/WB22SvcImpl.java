@@ -155,8 +155,15 @@ public class WB22SvcImpl implements WB22Svc {
 			throw new RuntimeException("Task 계획을 저장할 수 없습니다. 일정확인 후 다시 시도해주세요.");
 		}
 
-		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {
-		}.getType();
+		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+
+		List<Map<String, String>> deletArr = gson.fromJson(paramMap.get("deleteRowArr"), stringList);
+		if (deletArr != null && deletArr.size() > 0) {
+			for (Map<String, String> sharngMap : deletArr) {
+				
+			}
+		}
+
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (sharngArr != null && sharngArr.size() > 0) {
 			int i = 0;
@@ -983,6 +990,108 @@ public class WB22SvcImpl implements WB22Svc {
 		} else {
 			return 0;
 		}
+	}
+
+	@Override
+	public int updateWbsPlanVerUp(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+		List<Map<String, String>> chkList = wb22Mapper.wbsVerUpInsertChk(paramMap);
+		// 조회 결과가 없으면 이미 CLOSE_YN이 'N'인 상태이므로 실행 중지 -> 미확정으로 들어온 경우 방지
+		if (chkList == null || chkList.isEmpty()) {
+			return 0;
+		}
+		
+		int wbsIssueExistChk = wb22Mapper.wbsIssueExistChk(paramMap);
+		if (wbsIssueExistChk > 0) {
+			throw new RuntimeException("이미 문제가 등록되어 있어 삭제할 수 없습니다.");
+		}
+
+		int result = 0;
+
+		Gson gson = new Gson();
+		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {
+		}.getType();
+		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
+		if (sharngArr != null && sharngArr.size() > 0) {
+			int i = 0;
+			for (Map<String, String> sharngMap : sharngArr) {
+				sharngMap.put("seq", String.valueOf(i + 1));
+				wb22Mapper.wbsVerUpInsert(sharngMap);		// Histoty Insert
+				
+				result++;
+				i++;
+			}
+			wb22Mapper.wbsVerUpUpdate(paramMap);	// verNo Update
+			wb22Mapper.wbsLevel1confirmAll(paramMap); // 전체 Y 설정
+		}
+
+		// 삭제된 일정 업데이트
+		HashMap<String, String> dtlMap = new HashMap<>();
+		dtlMap.put("coCd", paramMap.get("coCd"));
+		dtlMap.put("salesCd", paramMap.get("salesCd"));
+		dtlMap.put("wbsPlanCodeId", paramMap.get("wbsPlanCodeId"));
+		dtlMap.put("wbsPlanMngId", "");
+		dtlMap.put("wbsPlansDt", "");
+		dtlMap.put("wbsPlaneDt", "");
+		dtlMap.put("daycnt", "0");
+		dtlMap.put("wbsPlanStsCodeId", "WBSPLANSTS10");
+		dtlMap.put("creatId", paramMap.get("creatId"));
+		dtlMap.put("creatPgm", paramMap.get("creatPgm"));
+		result += wb22Mapper.updateWbcPlan(dtlMap);
+
+		// TASK 계획삭제
+		result += wb22Mapper.deleteWbsTask(paramMap);
+		
+		List<Map<String, String>> selectTrgtWbsRsltList = wb22Mapper.selectTrgtWbsRsltList(paramMap);
+		//---------------------------------------------------------------
+  		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+  	  	//   필수값 :  jobType, userId, comonCd
+  		//---------------------------------------------------------------
+		HashMap<String, String> param = new HashMap<>();
+		param.put("userId", paramMap.get("userId"));
+
+		HashMap<String, String> param2 = new HashMap<>();
+		param2.putAll(paramMap);
+		param2.put("fileTrgtTyp", "WB2201P02");
+
+		// selectTrgtWbsRsltList 에서 FILE_TRGT_KEY 하나씩 꺼내서 처리
+		if (selectTrgtWbsRsltList != null) {
+			for (Map<String, String> trgt : selectTrgtWbsRsltList) {
+				// resultType="camelMap" 이라서 컬럼 FILE_TRGT_KEY → fileTrgtKey 로 들어옴
+				String fileTrgtKey = trgt.get("fileTrgtKey");
+				if (fileTrgtKey == null || fileTrgtKey.isEmpty()) {
+					continue;
+				}
+
+				// 현재 타겟키 세팅
+				param2.put("fileTrgtKey", fileTrgtKey);
+
+				// 해당 fileTrgtKey 에 매핑된 파일 전체 조회
+				List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(param2);
+
+				// 권한체크 + 삭제
+				for (Map<String, String> deleteFile : deleteFileList) {
+					// 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
+					// 접근 권한 없으면 Exception 발생
+					param.put("comonCd", deleteFile.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
+					param.put("coCd", param2.get("coCd"));
+					param.put("jobType", "fileDelete");
+					cm15Svc.selectFileAuthCheck(param);
+
+					//---------------------------------------------------------------
+					// 첨부 화일 처리  실제 삭제
+					//---------------------------------------------------------------
+					cm08Svc.deleteFile(deleteFile.get("fileKey"));
+				}
+			}
+		}
+		//---------------------------------------------------------------
+		//첨부 화일 처리  끝
+		//---------------------------------------------------------------
+		
+		// 실적삭제
+		result += wb22Mapper.deleteWbsRslt(paramMap);
+
+		return result;
 	}
 	
 }
