@@ -26,12 +26,9 @@
 		<div class="form-group popup_table">
 			<div id="createHistoryDiv" class="contents_tit">
 				<div class="add_btn_small pdl10">
-					<a id="ReportMain" onclick="setReportMain();"
-						style="height: 30px; line-height: 28px; width: 100px;">원가관리표
-						출력</a> <a id="viewHistory" onclick="comparison_cr14_Modal();"
-						style="height: 30px; line-height: 28px; width: 100px;">변경이력 조회</a>
-					<a id="createHistory" onclick="createHistory();" class="coAuthChk"
-						style="height: 30px; line-height: 28px; width: 60px;" authchk>Ver.Up</a>
+					<a id="ReportMain" onclick="setReportMain();" style="height: 30px; line-height: 28px; width: 100px;">원가관리표 출력</a>
+					<a id="viewHistory" onclick="comparison_cr14_Modal();" style="height: 30px; line-height: 28px; width: 100px;">변경이력 조회</a>
+					<a id="createHistory" onclick="createHistory();" class="coAuthChk" style="height: 30px; line-height: 28px; width: 60px;" authchk>Ver.Up</a>
 				</div>
 			</div>
 
@@ -361,7 +358,7 @@
 	const comboItemList = [...setComboOptionCode('ITEMLIST')];
 	const comboClmnPlanDiv = [...setComboOptionCode('CLMNPLANDIV')];
 
-	let refCode = setRefCode();
+	let refCode = setRefCode(); //공통코드에 있는 codeEtc = 1 -->현재 설정된값(GUN, 건양아이티티의 거래처등록번호임))
 
 	var actionType = modalStack.last().paramObj.actionType;
 	var paramObj = modalStack.last().paramObj;
@@ -388,6 +385,7 @@
 		return optionCode;
 	}
 
+	//(GUN, 건양아이티티의 거래처등록번호 추출 설정하기)
 	function setRefCode() {
 		var refCode = '';
 		postAjaxSync("/admin/cm/cm05/selectChildCodeList", {"codeKind" : "CO"} , null, function(data) {
@@ -938,7 +936,7 @@
 		}
 		//무상AS end
 
-		if($('#coCd').val() == 'TRN' && $('#ordrsClntCd').val() == refCode) { //투루넷,건양 start
+		if($('#coCd').val() == 'TRN' && $('#ordrsClntCd').val() == refCode) { //투루넷,건양 start //refCode = 1 (GUN, 건양아이티티의 거래처등록번호 추출 설정하기)
 		} else {
 			//설비&원가 정보
 			if (rowListDetail.length == 0) {
@@ -956,6 +954,9 @@
 			let eqpNmChk = false;
 			let orgnSalesCodeChk = false;	//AS의경우 원천 SalesCode 체크하기위한  스위치 변수
 
+
+			const seenNo2 = new Set(); 	//정산수주번호+순번 중복체크용
+			let seenNoDup = false;		//정산수주번호+순번 중복체크용
 			$.each(rowListDetail, function (idx, elem) {
 				var detailObj = {
 					"ordrsSeq"				: elem.ordrsSeq,
@@ -982,7 +983,9 @@
 					"trgtPchsPcostInHousePrcsn": pasIntChk(elem.trgtPchsPcostInHousePrcsn),
 					"machineValueAfterDeduction": pasIntChk(elem.trgtPchsPcostMach) - pasIntChk(elem.trgtPchsPcostInHousePrcsn),
 					"outtkClntNm"			: elem.outtkClntNm,
-					"estTrgtCost"			:  pasIntChk(elem.estTrgtCost)
+					"estTrgtCost"			:  pasIntChk(elem.estTrgtCost),
+					"unsettledOrdrsNo"		: elem.unsettledOrdrsNo,
+					"unsettledOrdrsSeq"		: elem.unsettledOrdrsSeq,
 				};
 
 				let orgnSalesCode = elem.orgnSalesCd;
@@ -1007,7 +1010,16 @@
 						return false;
 					}
 				}
-
+				//정산수주번호+순번 중복체크용
+				if (elem.unsettledOrdrsNo && seenNo2.has(elem.unsettledOrdrsNo+elem.unsettledOrdrsSeq)) {
+					alert(`정상상계처리를 동일 수주번호에서 2개로 분할 처리할 수 없습니다.\n수주번호: ${elem.unsettledOrdrsNo} - ${elem.unsettledOrdrsSeq}`);
+					seenNoDup = true;	//오류처리 flag
+					return false;
+				} else {
+				    seenNo2.add(elem.unsettledOrdrsNo+elem.unsettledOrdrsSeq);
+				}
+				
+				
 				if(ordrsDtlDiv20 == '' || ordrsDtlDiv20 == undefined) { //수주설비 작업구분
 					detailObj["ordrsDtlDiv20"] = "";
 				}
@@ -1048,6 +1060,52 @@
 				detailArr.push(detailObj);  //설비정보
 			});
 
+			// 정산관련 중복 및 잔액 점검 이상유무 확인
+			if(seenNoDup) {
+				return false;
+			}
+
+			//정산상계 처리건의 경우 설정금액을 초과되지 않았는지 점검하기
+			// 1) ordrsDtlDiv10 == ORDRSDTLDIV1050 인 행만 추출
+			const check1050 = rowListDetail.filter(row => row.ordrsDtlDiv10 === 'ORDRSDTLDIV1050');
+			// 2) 비정상인 자료 메세지 표시 
+			check1050.forEach((row, idx) => {
+				if (gPasIntChk(row.ordrsPrc) <= 0) {
+					alert(`정산상계 처리금액이 ${addCommaStr(row.ordrsPrc)}원 입니다.`)
+					seenNoDup = true;	//오류처리 flag
+					return false;
+				}
+				//DB에서 정산잔액 초과 여부 점검하기 (해당건을 제외한 잔액 산정후 초과 여부 체크하기)
+                paramObj = {
+					coCd	  			: row.coCd,
+					ordrsNo				: row.ordrsNo,
+					ordrsSeq			: row.ordrsSeq,
+					unsettledOrdrsNo	: row.unsettledOrdrsNo,
+					unsettledOrdrsSeq	: row.unsettledOrdrsSeq,
+				};
+				postAjaxSync("/user/cr/cr02/settledAmtCreditTotalAmt", paramObj, null, function(data){
+					if (data.result) {
+					    console.warn(
+					        `[${idx}] 비정상 eqpNm`,
+					        'code=', row.code,
+					        'eqpNm=', row.eqpNm,
+					        '원본 row=', row
+					        );
+					    // 최종잔여금액 = 다른수주에서 처리된 정산금액 - 현재수주에서 정산하려는 금액
+					    const remCheckAmt = gPasIntChk(data.result.remOrdrsPrc) - gPasIntChk(row.ordrsPrc);
+					    if (remCheckAmt < 0) {
+							alert(`추후정산 발생금액보다 정산상계 처리금액이 많습니다.\n${addCommaStr(remCheckAmt)}원 차액 발생 확인 바람니다.`)
+							seenNoDup = true;	//오류처리 flag
+							return false;
+					    }
+					}
+				});
+			});
+			// 정산관련 중복 및 잔액 점검 이상유무 확인
+			if(seenNoDup) {
+				return false;
+			}
+			
 			if(eqpNmChk) {
 				alert("설비명은 필수 입력입니다.");
 				return false;
@@ -1242,7 +1300,7 @@
 					return "grid-font-blue";
 				}
 			},
-			{key: "clmnMgmtStatus", label: "수금관리상황", width: 370, align: "left", editor: {type: "text"}},
+			{key: "clmnMgmtStatus", label: "수금관리상황", width: "*", align: "left", editor: {type: "text"}},
 		],
 		footSum: [
 			[
@@ -1404,6 +1462,18 @@
 		return rtnNm;
 	}
 
+	function gridStyle(row) {
+		if (!row) return "";
+		if (row.ordrsDtlDiv10 == "ORDRSDTLDIV1040" || row.ordrsDtlDiv10 == "ORDRSDTLDIV1050") {
+			if (row.ordrsPrcMach <  0) {
+				return "grid-row-blue grid-font-red-bold";
+			} else {
+				return "grid-row-blue grid-no-msg-font-blue-bold";
+			}
+		}
+		return "";
+	}
+	
 	const gridOrdrsDetail = new ax5.ui.grid();
 
 	gridOrdrsDetail.setConfig({
@@ -1416,12 +1486,12 @@
 		// frozenColumnIndex: 8,
 		columns: [
 			{key: "cudCheck",    label: "입력,삭제체크용", align: "left", width: 100, hidden: true},
-			{key: "seq", 			label: "No", 		width: 40, align: "center", formatter: function () { return this.item.__index + 1; }},
+			{key: "seq", 			label: "No", 		width: 40, align: "center", formatter: function () { return this.item.__index + 1; }, styleClass: function () { return gridStyle(this.item); }},
 			{key: "ordrsDtlDiv10", 	label: "입력구분", 	width: 60, align: "center", editor: { type: 'select',
 				config: {
 					columnKeys: { optionValue: 'CD', optionText: 'NM' },
 					options : comboOdd1
-				} }, formatter : function()  {return getComboName(comboOdd1, this)}},
+				} }, formatter : function()  {return getComboName(comboOdd1, this)}, styleClass: function () { return gridStyle(this.item); }},
 			{key: "devDiv", 	label: "개발", 	align: "center", width: 40, editor: { type: 'select',
 			config: {
 				columnKeys: { optionValue: 'CD', optionText: 'NM' },
@@ -1430,34 +1500,34 @@
 					{CD: "D", NM: "D"}
 						]
 					}
-				}
+				}, styleClass: function () { return gridStyle(this.item); }
 			},
 			{key: "ordrsSeq",	label: "ordrsSeq", 	align: "center", width: 50, hidden: true},
-			{key: "orgnSalesCd",	label: "원천SalesCode", 	align: "center", width: 110},
-			{key: "prdtCd", 		label: "제품구분", 	align: "center", width: 60},
+			{key: "orgnSalesCd",	label: "원천SalesCode", 	align: "center", width: 110, styleClass: function () { return gridStyle(this.item); }},
+			{key: "prdtCd", 		label: "제품구분", 	align: "center", width: 60, styleClass: function () { return gridStyle(this.item); }},
 			{key: "itemDiv", 		label: "아이템구분", 	align: "center", width: 80, editor: { type: 'select',
 				config: {
 					columnKeys: { optionValue: 'CD', optionText: 'NM' },
 					options : comboItemList
-				} }, formatter : function()  {return getComboName(comboItemList, this)}},
+				} }, formatter : function()  {return getComboName(comboItemList, this)}, styleClass: function () { return gridStyle(this.item); }},
 			{key: "ordrsDtlDiv20", 	label: "작업구분", 	align: "center", width: 60, editor: { type: 'select',
 				config: {
 					columnKeys: { optionValue: 'CD', optionText: 'NM' },
 					options : comboOdd2
-				} }, formatter : function()  {return getComboName(comboOdd2, this)}},
+				} }, formatter : function()  {return getComboName(comboOdd2, this)}, styleClass: function () { return gridStyle(this.item); }},
 			{key: "ordrsDtlDiv30", 	label: "자체구분", 	align: "center", width: 60, editor: { type: 'select',
 				config: {
 					columnKeys: { optionValue: 'CD', optionText: 'NM' },
 					options : comboOdd3
-				} }, formatter : function()  {return getComboName(comboOdd3, this)}},
+				} }, formatter : function()  {return getComboName(comboOdd3, this)}, styleClass: function () { return gridStyle(this.item); }},
 			{key: "mctype", 	label: "기계구분", 	align: "center", width: 60, editor: { type: 'select',
 			config: {
 				columnKeys: { optionValue: 'CD', optionText: 'NM' },
 				options : comboOdd4
-				} }, formatter : function()  {return getComboName(comboOdd4, this)}},
+				} }, formatter : function()  {return getComboName(comboOdd4, this)}, styleClass: function () { return gridStyle(this.item); }},
 			{key: "dataChk", 		label: "비활성화체크",	align: "center", width: 40, hidden: true},
-			{key: "salesCd", 	 label: "sales Code", 	align: "center", width: 120},
-			{key: "eqpNm", 			label: "설비명", 		align: "center", width: 255, editor: {type: "text"}},
+			{key: "salesCd", 	 label: "sales Code", 	align: "center", width: 120, styleClass: function () { return gridStyle(this.item); }},
+			{key: "eqpNm", 			label: "설비명", 		align: "center", width: 255, editor: {type: "text"}, styleClass: function () { return gridStyle(this.item); }},
 			{key: "dudtIntendDt",   label: "납기예정일", width: 100, align: "center", editor: {type: "date", config: { content: { config: { mode: "day", selectMode: "day" } } }},
 				formatter: function () {
 					//기존 데이터 있으면
@@ -1479,15 +1549,15 @@
 							return null;
 						}
 					}
-				}
+				}, styleClass: function () { return gridStyle(this.item); }
 			},
-			{key: "estTrgtCost", 	label: "수주목표가",align: "right", width: 80, editor: {type: "number"}, formatter: "money"},
+			{key: "estTrgtCost", 	label: "수주목표가",align: "right", width: 80, editor: {type: "number"}, formatter: "money", styleClass: function () { return gridStyle(this.item); }},
 			{key: undefined, 		label: "수주가", columns: [
-					{key: "ordrsPrcMach", label: "기계PART", align: "right", width: 80, editor: {type: "number"}, formatter: "money"},
-					{key: "ordrsPrcElcty", label: "전기PART", align: "right", width: 80, editor: {type: "number"}, formatter: "money"},
+					{key: "ordrsPrcMach", label: "기계PART", align: "right", width: 80, editor: {type: "number"}, formatter: "money", styleClass: function () { return gridStyle(this.item); }},
+					{key: "ordrsPrcElcty", label: "전기PART", align: "right", width: 80, editor: {type: "number"}, formatter: "money", styleClass: function () { return gridStyle(this.item); }},
 					{key: "ordrsPrc", label: "합계", align: "right", width: 80,
 						formatter: function () {return addCommaStr(pasIntChk(this.item.ordrsPrcMach) + pasIntChk(this.item.ordrsPrcElcty));},
-						styleClass: function () {return "grid-font-blue";} },
+						styleClass: function () {return "grid-font-blue";} , styleClass: function () { return gridStyle(this.item); }},
 				]},
 			{key: "ordrsQty", label: "수량", align: "right", width: 40, editor: {type: "number"}},
 			{key: "estEpctMatPrc", label: "견적 예상 재료비",align: "right", width: 100, editor: {type: "number"}, formatter: "money"},
@@ -1514,6 +1584,8 @@
 			//     ]},
 			{key: "outtkClntNm", label: "외주턴키", align: "left", width: 120, editor: {type: "text"}},
 			{key: "dtlRmk",      label: "비고", align: "left", width: 120, editor: {type: "text"}},
+			{key: "unsettledOrdrsNo",      label: "정상오더", align: "left", width: 100, hidden: false},
+			{key: "unsettledOrdrsSeq",      label: "정상오더순번", align: "left", width: 60, hidden: false},
 		],
 		footSum: [
 			[
@@ -1556,22 +1628,25 @@
 				thisGridRow = this.dindex;
 				thisGridCol = this.colIndex;
 				selectedRowKey2 = this.dindex;
-
-				// 제품구분(prdtCd)이거나 등록일 경우에만 실행하도록
-				if (this.column.key == 'prdtCd' && this.item.ordrsDtlDiv10 == 'ORDRSDTLDIV1010') {
-				// if (this.column.key == 'prdtCd' && this.item.ordrsDtlDiv10 == 'ORDRSDTLDIV1010' && this.item.dataChk != 'U') {
-				// if (this.column.key == 'prdtCd' && actionType == 'C' && this.item.ordrsDtlDiv10 == 'ORDRSDTLDIV1010' && this.item.dataChk != 'U') {
-					openSecondPrdtSearch();
+				
+				if (this.item.ordrsDtlDiv10 == 'ORDRSDTLDIV1050') { //정산상계, 추후정상(ORDRSDTLDIV1040)
+					let chkCol = this.column.key;
+					if (chkCol == 'devDiv' || chkCol == 'orgnSalesCd' || chkCol == 'prdtCd' || chkCol == 'itemDiv' || chkCol == 'ordrsDtlDiv20' || chkCol == 'ordrsDtlDiv30' || chkCol == 'mctype') {
+						openUnsettledAmtSearch(this.item);
+						return;
+					}
+				}
+				
+				if (this.item.ordrsDtlDiv10 == 'ORDRSDTLDIV1010') {	//설비이면
+					if (this.column.key == 'prdtCd' ) {	//제품구분
+						openSecondPrdtSearch();
+					} else if (this.column.key == 'orgnSalesCd') {	//원천SalesCd
+						openSalesCdSearch();
+					} 
 				}
 
-				if (this.column.key == 'orgnSalesCd') {
-				// if($('#ordrsDiv').val() == "ORDRSDIV1"){
-				// 	gridOrdrsDetail.setValue(this.dindex, "orgnSalesCd", "");
-				// 	return;
-				// }
-					openSalesCdSearch();
-				}
-
+			},
+			onDBLClick: function () {
 			},
 			columnHeight: 26,
 			onDataChanged: function () {
@@ -1653,7 +1728,34 @@
 					resetGridFocus(currEndRow, thisGridRow);
 				// }
 				gridOrdrsDetail.repaint();
-			}
+			},
+
+		    onContextMenu: function (e) {
+		      // e: { item, dindex, event, ... }
+		      var g       = this.self;
+		      var row     = e.item;
+		      var dindex  = e.dindex;
+		      var selCnt  = g.getList('selected').length;
+		      var readOnly = (window.APP_READONLY === true);
+		      var hasClip  = !!window.CLIPBOARD_TEXT;
+debugger;
+		      // 2) 여기서 “조건에 따라 items”만 구성
+		      //    ⚠ 비활성화는 disabled가 아니라 'disable'
+		      var dynamicItems = [
+		        { type: 1, label: '붙여넣기', action: 'paste',  disable: (readOnly || !hasClip) },
+		        { divide: true },
+		        (selCnt > 0) ? { type: 1, label: '삭제',   action: 'delete' } : null,
+		        (row && row.STATUS === 'DONE') ? { type: 1, label: '상세보기', action: 'detail' } : null
+		      ].filter(Boolean);
+
+		      // 3) 전체 setConfig(재렌더) 금지! → items만 교체
+		      g.config.contextMenu = g.config.contextMenu || {};
+		      g.config.contextMenu.items = dynamicItems;
+
+		      // 4) true를 반환하면 ax5 내장 컨텍스트 메뉴가 바로 뜸
+		      //    (e.event.preventDefault() 하지 마세요)
+		      return true;
+		    }
 		},
 		contextMenu: {
 			iconWidth: 20,
@@ -1663,15 +1765,16 @@
 				{
 					'arrow': '<i class="fa fa-caret-right"></i>'
 				},
-			items: [
-				{type: 1, label: "붙여넣기"},
-				{divide: true},
-				{type: 1, label: "줄추가"},
-				{type: 1, label: "내용 삭제"},
-				{type: 2, label: "줄삭제"},
-				{divide: true},
-				{type: 3, label: "관리용SalesCd생성"},
-			],
+				items: [], 
+// 			items: [
+// 				{type: 1, label: "붙여넣기"},
+// 				{divide: true},
+// 				{type: 1, label: "줄추가"},
+// 				{type: 1, label: "내용 삭제"},
+// 				{type: 2, label: "줄삭제"},
+// 				{divide: true},
+// 				{type: 3, label: "관리용SalesCd생성"},
+// 			],
 			popupFilter:
 
 				function (item, param) {
@@ -1743,7 +1846,7 @@
 		}
 
 	});
-
+	
 	//공유 결재 그리드
 	var gridViewPop7 = {
 		initView : function() {
@@ -1789,7 +1892,7 @@
 					{key: "jik",       			label: "직위",      	align: "center",   width: 60},
 					{key: "creatDttm",      	label: "요청일자", 	align: "center",   width: 90},
 					{key: "todoCfDt",      		label: "확인일자",		align: "center",   width: 130},
-					{key: "todoCfOpn",      	label: "확인의견", 	align: "left",     width: 200},
+					{key: "todoCfOpn",      	label: "확인의견", 	align: "left",     width: "*"},
 					{key: "telNo",      		label: "H.P",		align: "center",   width: 130},
 					{key: "todoKey",      		label: "todoKey",		align: "center",   width: 130, hidden: true},
 					{key: "sanctnSttus",      	label: "sanctnSttus",		align: "center",   width: 130, hidden: true},
@@ -2285,29 +2388,47 @@
 		if (gridList == undefined) {
 			alert("선택된 행이 없습니다.");
 			return false;
-		} else {
-			if (gridList.salesCd) {
-				paramObj = {
-					"salesCd" 	: gridList.salesCd,
-					"coCd"	  	: gridList.coCd,
-					"ordrsNo"	: gridList.ordrsNo,
-					"ordrsSeq" 	: gridList.ordrsSeq
-				};
-				postAjaxSync("/user/cr/cr02/deleteDetailChk", paramObj, null, function(data){
-					if (data.result) {
-						let msg = data.result.msg;
-						if (msg && msg.trim() !== "") {
-							alert(gridList.salesCd + "는 " + msg + "에 이미 등록되어 있어 삭제할 수 없습니다.");
-							return;
-						}
-					} else {
-						deleteRow(gridList);
-					}
-				});
-			} else {
-				deleteRow(gridList);
-			}
 		}
+		paramObj = {
+				"salesCd" 	: gridList.salesCd,
+				"coCd"	  	: gridList.coCd,
+				"ordrsNo"	: gridList.ordrsNo,
+				"ordrsSeq" 	: gridList.ordrsSeq
+			};
+		let processNoDelete = false;	//오류 체크용
+		if (gridList.ordrsDtlDiv10 == 'ORDRSDTLDIV1040') {
+			postAjaxSync("/user/cr/cr02/unsettledAmtCreditChk", paramObj, null, function(data){
+				const list = data.result;
+				if (list.length != 0) {
+					let msg = '';
+					for (let i = 0; i <list.length; i++) {
+						msg += '\n' + list[i].ordrsNo + '-' + list[i].ordrsSeq;
+					}
+					alert(`${gridList.eqpNm} 건은 정상상계처리가 등록되어 있어 삭제할 수 없습니다.` + msg);
+					processNoDelete = true; //삭제 불가능
+					return false;
+				}
+			});
+		} 
+		if (processNoDelete) return false; //삭제 불가능
+		
+		if (gridList.salesCd) {
+			postAjaxSync("/user/cr/cr02/deleteDetailChk", paramObj, null, function(data){
+				if (data.result) {
+					let msg = data.result.msg;
+					if (msg && msg.trim() !== "") 
+						{alert(gridList.salesCd + "는 " + msg + "에 이미 등록되어 있어 삭제할 수 없습니다.");
+						return false;
+					}
+				} else {
+					deleteRow(gridList);
+					return true;
+				}
+			});
+		} else {
+			deleteRow(gridList);
+		}
+
 		// 해당 로우 삭제하는 함수
 		function deleteRow(gridList) {
 			let todoKey = gridList.ordrsSeq;
@@ -2420,57 +2541,43 @@
 		});
 	}
 
-	//원천SalesCode 찾기(그리드)
-	function openSalesCdSearch() {
+	
+	//정상상계처리인경우 추후정상 대상 SalesCode 찾기(그리드)
+	function openUnsettledAmtSearch(row) {
 		var paramObj = {
-			"coCd" : $('#coCd').val(),
-			"salesCd": $('#orgnSalesCd').val()
+			coCd 		: $('#coCd').val(),
+			clntCd		: $('#ordrsClntCd').val(),
+			ordrsNo		: $('#ordrsNo').val(),	//자기오더내의 추후정산은 제외처리하기 위함.
+			ordrsAmt	: row.ordrsAmt,
 		};
-
-		openSecondModal("/static/html/cmn/modal/SalesCodeItemSearch.html", 1000, 500, "SALES CODE 검색", paramObj, function (grid) {
-			var row = grid.target.getList("selected")[0];
-			var rowIndex = gridOrdrsDetail.selectedDataIndexs[0];
-			var rowData = gridOrdrsDetail.getList()[rowIndex];
-			//설비인것만 세팅
-
-			if (rowData.ordrsDtlDiv10 == 'ORDRSDTLDIV1010') {
-				rowData = {
-					// ordrsDtlDiv10 : row.ordrsDtlDiv10,
-					prdtCd : row.prdtCd,
-					itemDiv : row.itemDiv,
-					ordrsDtlDiv20: ($('#ordrsDiv').val() === 'ORDRSDIV2' || $('#ordrsDiv').val() === 'ORDRSDIV3') ? "ORDRSDTLDIV2040" : row.ordrsDtlDiv20,
-					ordrsDtlDiv30 : row.ordrsDtlDiv30,
-					orgnSalesCd : row.salesCd,
-					eqpNm : row.eqpNm,
-					// ordrsPrcMach : 0,
-					// ordrsPrcElcty : 0,
-					// ordrsQty : 0,
-					// estEpctMatPrc : 0,
-					// trgtPchsPcostMach : 0,
-					// trgtPchsPcostElcty : 0,
-					// trgtPchsPcostInHousePrcsn : 0,
-					// laborCostMfgCost : 0,
-					dataChk : "U",
-					cudCheck : rowData.cudCheck,
-					// estTrgtCost : 0,   //수주목표원가
-				};
+		openSecondModal("/static/html/cmn/modal/unsettledAmtSearch.html", 1000, 700, "추후정상 대상 SALES CODE 검색", paramObj, function (grid) {
+			var selRow = grid.target.getList("selected")[0];
+			if (selRow.remOrdrsPrc < 0) {
+				alert("정산상계처리에서 마이너스금액을 처리 할 수 없습니다.");
+				return false;
+			}
+			
+			
+				rowIndex 			= row.__index;
+				rowData 			= row;
+				rowData.rowData				= "U";
+				rowData.cudCheck 			= row.cudCheck;
+				rowData.ordrsPrcMach 		= selRow.remOrdrsPrc;
+				rowData.ordrsPrcElcty 		= 0;
+				rowData.ordrsPrc 			= selRow.remOrdrsPrc;
+				rowData.unsettledOrdrsNo 	= selRow.ordrsNo;
+				rowData.unsettledOrdrsSeq 	= selRow.ordrsSeq;
+				rowData.eqpNm 				= `${selRow.ordrsNo}-${selRow.ordrsSeq}에서 정산 처리됨`;
 
 				if (rowData.cudCheck != "C") {
 					rowData.cudCheck = "U";   //추가, 수정, 삭제구분
 				}
-				gridOrdrsDetail.updateRow($.extend({}, gridOrdrsDetail.list[rowIndex], rowData), rowIndex);
-				// gridOrdrsDetail.updateRow(rowData, rowIndex);
-				//수주구분이 무상AS 이면 프로젝트 원천 Sales Code로 변경처리함.
-				if ($('#ordrsDiv').val() === "ORDRSDIV3" || ($('#prjctSeq').val()=="" &&  $('#clntPjt').val() == "")) {
-					// $('#ordrsDiv').val(row.prjctNm);
-					$('#prjctSeqNm').val(row.prjctNm);
-					$('#prjctSeq').val(row.prjctSeq);
-					$('#clntPjt').val(row.clntPjt);
-				}
-			}
+// 				gridOrdrsDetail.updateRow($.extend({}, gridOrdrsDetail.list[rowIndex], rowData), rowIndex);
+				gridOrdrsDetail.updateRow(rowData, rowIndex);
+
 		});
 	}
-
+	
 	$("#ordrsPlanHis").click(function () {
 		var paramObj = {
 			"coCd": $("#coCd").val(),
@@ -2670,6 +2777,42 @@
 		gridPaste(gridOrdrsDetail, thisGridRow, thisGridCol);
 	});
 
+	debugger;
+
+	// 2) 우클릭 캡처 → tr 찾아서 items 동적 구성 후 popup
+	document.addEventListener('contextmenu', function (e) {
+	  const gridSel = '[data-ax5grid="second-grid-modal"]';     // 실제 selector로 교체
+	  const grid = gridView.target;                      // ax5.ui.grid 인스턴스
+	  const container = e.target.closest(gridSel);
+	  if (!container) return;
+
+	  const tr = e.target.closest('[data-ax5grid-tr-data-index]');
+	  if (!tr) return;
+
+	  e.preventDefault();
+
+	  const dindex = +tr.getAttribute('data-ax5grid-tr-data-index');
+	  const row = grid.getList()[dindex];
+	  const selCnt = grid.getList('selected').length;
+	  const readOnly = window.APP_READONLY === true;
+
+	  const items = [
+	    { type:1, label:'붙여넣기'	, action:'paste', disabled: false },
+	    { divide:true },
+	    { type:1, label:'줄추가'	, action:'insert' },
+	    { type:2, label:'내용 삭제'	, action:'delete' },
+	    { type:3, label:'줄삭제'	, action:'delete' },
+	    { divide:true },
+	    { type:1, label:'관리용SalesCd생성', action:'detail', disabled: true}
+	  ].filter(Boolean);
+
+	  // 메뉴 항목 갱신 후 현재 좌표에 팝업
+// 	  gridOrdrsDetail.contextMenu.setConfig({items});
+	  gridOrdrsDetail.$target.contextmenu(items);
+// 	  gridOrdrsDetail.target.config.contextMenu.items = items;
+	}, true);
+		
+		
 	function pasIntChk (ivalue) {
 		let value = ivalue +' ';
 		const cvtValue = parseInt(value.replace(/[^0-9.-]/g, ''));

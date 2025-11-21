@@ -179,7 +179,7 @@ function isTabletModel(s) {
 
     if (!opts.scalable) {
       // 줌 막고 싶으면 user-scalable=no
-      content += ', user-scalable=no';
+      content += ', user-scalable=yes';
     }
 
     meta.setAttribute('content', content);
@@ -193,64 +193,173 @@ function isTabletModel(s) {
 })(window);
 
 
-//function getResolutionInfo() {
-//  const dpr = window.devicePixelRatio || 1;
-//
-//  // 화면(물리 px)
-//  const screenPx = {
-//    width:  window.screen.width,     // 물리 px (대부분)
-//    height: window.screen.height
-//  };
-//
-//  // 사용 가능 영역(물리 px) – OS 바/도킹 제외(브라우저마다 차이)
-//  const availPx = {
-//    width:  window.screen.availWidth,
-//    height: window.screen.availHeight
-//  };
-//
-//  // 레이아웃 뷰포트(CSS px) – 실제 렌더 기준
-//  const viewportCss = {
-//    width:  window.innerWidth,       // CSS px
-//    height: window.innerHeight
-//  };
-//
-//  // 시각적 뷰포트(줌 영향 받음, CSS px)
-//  const vv = window.visualViewport;
-//  const visualCss = vv ? { width: vv.width, height: vv.height, scale: vv.scale } : null;
-//
-//  // DP 추정 (안드로이드에서 CSS px ≈ dp)
-//  const minCss = Math.min(viewportCss.width, viewportCss.height);
-//  const approxDp = minCss; // 모바일에서 dp≈CSS px
-//
-//  // 디바이스 물리 px 재계산(뷰포트 기준)
-//  const effectiveDevicePx = {
-//    width:  Math.round(viewportCss.width  * dpr),
-//    height: Math.round(viewportCss.height * dpr)
-//  };
-//
-//  // 추가 정보
-//  const orientation = (screen.orientation && screen.orientation.type) || (viewportCss.width >= viewportCss.height ? 'landscape' : 'portrait');
-//  const aspect = (screenPx.width && screenPx.height) ? (Math.max(screenPx.width, screenPx.height) / Math.min(screenPx.width, screenPx.height)).toFixed(3) : null;
-//
-//  return {
-//    dpr,
-//    screenPx,         // 전체 물리 픽셀
-//    availPx,          // 작업표시줄 등 제외 물리 픽셀
-//    viewportCss,      // 레이아웃 뷰포트(CSS px)
-//    visualCss,        // 시각적 뷰포트(CSS px, 줌 반영)
-//    effectiveDevicePx,// viewport 기반 환산 물리 px
-//    approxDp,         // 태블릿/폰 판정에 쓰는 dp 근사
-//    orientation,
-//    aspect,
-//    colorDepth: window.screen.colorDepth,
-//    pixelDepth: window.screen.pixelDepth
-//  };
-//}
-//
-//// 예: 콘솔 출력 + 서버 전송
-//const resInfo = getResolutionInfo();
-//console.log('[RES]', resInfo);
+/**
+ * ax5grid용 롱터치(태블릿/모바일 전용)
+ *  - gridInstance : new ax5.ui.grid() 인스턴스
+ *  - handler(grid, dindex, item, $cell, colKey, evt)
+ */	
+function bindTabletLongPressForGrid(gridInstance, handler) {
+    if (!gridInstance) {
+//        console.warn("bindTabletLongPressForGrid: gridInstance is null/undefined");
+        return;
+    }
 
+    // 터치가 없는 환경(PC 브라우저)이면 롱터치 스킵
+	var isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+	if (!isTouchDevice) {
+//	    console.log("bindTabletLongPressForGrid: no real touch device, but keep binding for debug");
+		return;
+	}
+
+    var $root = gridInstance.$target || $(gridInstance.target);
+    if (!$root || $root.length === 0) {
+//        console.warn("bindTabletLongPressForGrid: root target not found");
+        return;
+    }
+	//   스크롤영역(body) + 프리징영역(left-body) 둘 다 대상
+    var $bodyPanel = 	$root.find(
+	        '[data-ax5grid-panel="body"],' +
+	        '[data-ax5grid-panel="left-body"]'
+	         + ',[data-ax5grid-panel="aside-body"]' //aside-body(행번호)도 추가
+	    );
+    if ($bodyPanel.length === 0) {
+//        console.warn("bindTabletLongPressForGrid: body panel not found");
+        return;
+    }
+
+//    console.log("bindTabletLongPressForGrid: bind on BODY", $bodyPanel.get(0));
+
+	// 디버그: BODY 까지 터치가 오는지 확인
+//	$bodyPanel.on("touchstart.gridLongPressDebug", function(e){
+//	    console.log("[DEBUG] body touchstart bubbled, target=", e.target);
+//	});
+	
+	// 이전 바인딩 제거
+    $bodyPanel.off(".gridLongPressTouch");
+
+    var LONG_PRESS_MS  = 600;	// 0.6초 이상 눌러야 롱프레스
+    var MOVE_THRESHOLD = 10; 	// 10px 이상 움직이면 취소
+
+    var pressTimer = null;
+    var moved      = false;
+    var startX     = 0;
+    var startY     = 0;
+
+    function clearPressTimer() {
+        if (pressTimer !== null) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
+        moved = false;
+    }
+	//   data-ax5grid-data-index 를 가진 TD 전체에 대해 롱터치 허용
+//    var CELL_SELECTOR = 'td[data-ax5grid-panel-name="body-scroll"]';
+//	var CELL_SELECTOR = 'td[data-ax5grid-data-index]';
+	var CELL_SELECTOR = 'td[data-ax5grid-column-attr="default"]';
+	
+	// 변경 : panel-name + column-attr 를 같이 사용
+//	var CELL_SELECTOR = 'td[data-ax5grid-column-attr="default"][data-ax5grid-panel-name="body-scroll"]';
+	  
+	// 기본 롱탭 메뉴(다운로드/공유/인쇄 등) 막기
+	// 우클릭/롱탭 메뉴 방지용
+	$bodyPanel
+	    .css({
+	        "-webkit-touch-callout": "none",
+	        "-webkit-user-select": "none",
+	        "user-select": "none"
+	    })
+	    .off("contextmenu.gridLongPressTouch")
+	    .on("contextmenu.gridLongPressTouch", function (e) {
+	        e.preventDefault();
+	        return false;
+	    });
+
+			
+    // colindex → 컬럼 key 로 매핑하는 헬퍼
+    function resolveColKeyFromCell($cell) {
+        // 1) 혹시라도 column-key 가 달려 있다면 우선 사용
+        var key = $cell.attr("data-ax5grid-column-key");
+        if (key) return key;
+
+        // 2) 일반적인 body 셀: colindex 기반
+        var colIndex = Number($cell.attr("data-ax5grid-column-colindex"));
+
+        // ax5grid 내부 컬럼 정의에서 찾아오기
+        var colGroup = gridInstance.colGroup ||
+                       (gridInstance.config && gridInstance.config.columns);
+
+        if (colGroup && colGroup[colIndex]) {
+            // 보통 key 필드에 필드명이 들어 있음 (fileName, fileType 등)
+            return colGroup[colIndex].key || colGroup[colIndex].field || null;
+        }
+        return null;
+    }
+
+    // touchstart
+
+//	$bodyPanel.on("pointerdown.gridLongPressTouch", CELL_SELECTOR, function (e) {
+    $bodyPanel.on("touchstart.gridLongPressTouch", CELL_SELECTOR, function (evt) {
+//		console.log("[LONGPRESS] touchstart RAW", evt, this);
+        var e = evt.originalEvent || evt;
+        if (!e.touches || e.touches.length === 0) return;
+
+        var touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+        moved  = false;
+
+        var $cell = $(this);
+
+        var $tr    = $cell.closest("[data-ax5grid-tr-data-index]");
+        var dindex = Number($tr.attr("data-ax5grid-tr-data-index"));
+        var doindex = Number($tr.attr("data-ax5grid-tr-data-o-index"));
+
+        // 여기서 필드명으로 변환
+        var colKey = resolveColKeyFromCell($cell);
+
+//        console.log("[LONGPRESS] touchstart cell", "dindex=", dindex, "doindex=", doindex, "colKey=", colKey  );
+
+        clearPressTimer();
+
+        pressTimer = setTimeout(function () {
+            pressTimer = null;
+            if (moved) return;
+
+//            var list = gridInstance.getList();
+//            var item = list[dindex];
+			var item = gridInstance.list[doindex];
+
+//            console.log(">>> [LONGPRESS] FIRED", "dindex=", dindex, "doindex=", doindex, "colKey=", colKey, "item=", item );
+
+            if (typeof handler === "function") {
+                handler(gridInstance, dindex, doindex,  item, $cell, colKey, evt);
+            }
+        }, LONG_PRESS_MS);
+    });
+
+    $bodyPanel.on("touchmove.gridLongPressTouch", CELL_SELECTOR, function (evt) {
+        if (!pressTimer) return;
+
+        var e = evt.originalEvent || evt;
+        if (!e.touches || e.touches.length === 0) return;
+        var touch = e.touches[0];
+
+        var dx = Math.abs(touch.clientX - startX);
+        var dy = Math.abs(touch.clientY - startY);
+
+        if (dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD) {
+            moved = true;
+            clearPressTimer();
+        }
+    });
+
+    $bodyPanel.on("touchend.gridLongPressTouch touchcancel.gridLongPressTouch",
+        CELL_SELECTOR,
+        function () {
+            clearPressTimer();
+        }
+    );
+}
 
 
 function isPhoneModel(s) {
@@ -3472,3 +3581,31 @@ function buildPermCode(p, spaced = false) {
   const raw = [L, U, D, M, X].join('');
   return spaced ? raw.split('').join(' ') : raw;
 }
+
+// ax5core, ax5grid 로딩 후, grid 설정 전에 실행
+(function () {
+    if (!window.ax5 || !ax5.util || !ax5.util.stopEvent) {
+        console.warn("ax5.util.stopEvent not found, skip patch.");
+        return;
+    }
+
+    var origStopEvent = ax5.util.stopEvent;
+
+    ax5.util.stopEvent = function (e) {
+        try {
+            // cancelable=false 이거나, 이벤트 객체 이상하면 그냥 넘김
+            if (!e || e.cancelable === false) {
+                // 그래도 버블링만 막고 싶으면 stopPropagation 정도만
+                if (e && e.stopPropagation) {
+                    e.stopPropagation();
+                }
+                return;
+            }
+        } catch (err) {
+            // 예외 나면 원래 함수에 넘김
+        }
+        return origStopEvent.call(this, e);
+    };
+
+    console.log("ax5.util.stopEvent patched for passive/cancelable issue.");
+})();

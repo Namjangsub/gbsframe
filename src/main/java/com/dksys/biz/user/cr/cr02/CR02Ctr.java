@@ -276,4 +276,34 @@ public class CR02Ctr {
 		return "jsonView";
 	}
 
+	//  체크
+	@PostMapping(value = "/unsettledAmtCreditChk")
+	public String unsettledAmtCreditChk(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, Object>> result = cr02Svc.unsettledAmtCreditChk(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
+	/****************************************************************************
+	 *  특정 수주번호+순번으로 추후정산 발생금액 및 정산상계, 잔액 추출하기
+	 *  입력 : coCd, ordrsNo (해당상계처리 등록 수주번호) - 동일 상계처리 수주번호는 1개만 가능
+	 *         unsettledOrdrsNo+unsettledOrdrsSeq (발생 수주번호+순번)
+	 *  사용 : 수주등록프로그램 프론트엔드에서 서버에 전달하기전에 점검하기 위함.
+	 ****************************************************************************/
+	@PostMapping(value = "/settledAmtCreditTotalAmt")
+	public String settledAmtCreditTotalAmt(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, Object> result = cr02Svc.settledAmtCreditTotalAmt(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
+	
+	// 추후정산 및 정산상계처리 현황 LIST
+	@PostMapping(value = "/selectUnsettledAmtSalesCodeList")
+	public String selectUnsettledAmtSalesCodeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, Object>> result = cr02Svc.selectUnsettledAmtSalesCodeList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
 }

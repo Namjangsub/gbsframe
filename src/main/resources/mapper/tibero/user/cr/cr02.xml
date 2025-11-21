@@ -130,6 +130,8 @@
 		       , ROUND(SUM(A.ACT_TOT_ELCTY) / 1000, 1)                  AS ACT_TOT_ELCTY                  --실행원가-전기
 		       , ROUND(SUM(A.ACT_EXP_COST) / 1000, 1)                   AS ACT_EXP_COST                   --실행원가-경비관리비
 		       , ROUND(SUM(A.EST_TRGT_COST) / 1000, 1)                  AS EST_TRGT_COST                  --수주목표원가
+		       , ROUND(SUM(A.UNSETTLED_AMT) / 1000, 1)                  AS UNSETTLED_AMT                  --추후정산금액
+		       , ROUND(SUM(A.SETTLEMENT_AMT) / 1000, 1)                 AS SETTLEMENT_AMT                 --정산상계금액
 		  FROM   (
 		          SELECT CO_CD
 				       , ORDRS_NO
@@ -155,6 +157,8 @@
 				       , NVL(ACT_RGL_ELCTY, 0) + NVL(ACT_OBS_ELCTY, 0)                         AS ACT_TOT_ELCTY                  --실행원가-전기
 				       , NVL(ACT_EXP_COST, 0)                                                  AS ACT_EXP_COST                   --실행원가-경비관리비
 				       , NVL(EST_TRGT_COST, 0)                                                 AS EST_TRGT_COST                  --수주목표원가
+				       , CASE WHEN D.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1040' THEN NVL(D.ORDRS_PRC, 0)*(-1) ELSE 0 END AS UNSETTLED_AMT --추후정산금액
+				       , CASE WHEN D.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1050' THEN NVL(D.ORDRS_PRC, 0)      ELSE 0 END AS SETTLEMENT_AMT --정산상계금액
 		          FROM   TB_CR02D02 D
 				  WHERE  1 = 1
 				    AND EXISTS (SELECT 1 FROM SJT WHERE SJT.ORDRS_NO = D.ORDRS_NO)
@@ -183,6 +187,8 @@
 							   , SDS.ACT_TOT_ELCTY                  --실행원가-전기
 							   , SDS.ACT_EXP_COST                   --실행원가-경비관리비
 							   , SDS.EST_TRGT_COST                  --수주목표원가
+							   , SDS.UNSETTLED_AMT                  --추후정산금액
+							   , SDS.SETTLEMENT_AMT                 --정산상계금액
 							   , U.NAME AS MNG_NM					--담당자명
 /*							   , (SELECT CASE WHEN ( COUNT(A.TODO_KEY) = SUM(DECODE(NVL(A.SANCTN_STTUS, 'N'), 'N', 0, 'Y', 1) ) )
 											  THEN 'Y'
@@ -252,6 +258,8 @@
 		       , ROUND((NVL(SD.ACT_RGL_ELCTY, 0) + NVL(SD.ACT_OBS_ELCTY, 0)) / 1000, 1) AS ACT_TOT_ELCTY                  --실행원가-전기
 		       , ROUND(NVL(SD.ACT_EXP_COST, 0) / 1000, 1)                             AS ACT_EXP_COST                   --실행원가-경비관리비
 		       , ROUND(NVL(SD.EST_TRGT_COST, 0) / 1000, 1)                            AS EST_TRGT_COST                  --수주목표원가
+		       , CASE WHEN SD.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1040' THEN ROUND(NVL(SD.ORDRS_PRC, 0)*(-1) / 1000, 1) ELSE 0 END AS UNSETTLED_AMT --추후정산금액
+		       , CASE WHEN SD.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1050' THEN ROUND(NVL(SD.ORDRS_PRC, 0)      / 1000, 1) ELSE 0 END AS SETTLEMENT_AMT --정산상계금액
 		       , SD.CREAT_ID                                   AS CREAT_ID      --작성자ID
 		       , FN_CM06M01_ID_TO_NM(SD.CREAT_ID)              AS CREAT_ID_NM   --작성자명
 		       , TO_CHAR(SD.CREAT_DTTM,'YYYY-MM-DD')           AS CREAT_DTTM    --작성일시
@@ -355,6 +363,8 @@
 		     , CASE WHEN ORDRS_PRC = 0 THEN 0
 			                            ELSE ROUND(((ORDRS_PRC - (ACT_TOT_MACH + ACT_TOT_ELCTY + LABOR_COST_MFG_COST) - ACT_EXP_COST) / ORDRS_PRC) * 100, 1)
 			   END                             AS FIT_PER
+	         , UNSETTLED_AMT 					AS UNSETTLED_AMT --추후정산금액
+	         , SETTLEMENT_AMT 					AS SETTLEMENT_AMT --정산상계금액
 		     , CREAT_ID                         AS CREAT_ID     --작성자ID
 		     , FN_CM06M01_ID_TO_NM(CREAT_ID)    AS CREAT_ID_NM  --작성자명
 		     , TO_CHAR(CREAT_DTTM,'YYYY-MM-DD') AS CREAT_DTTM   --작성일시
@@ -453,6 +463,8 @@
 		     , CASE WHEN ORDRS_PRC = 0 THEN 0
 			                            ELSE ROUND(((ORDRS_PRC - (ACT_TOT_MACH + ACT_TOT_ELCTY + LABOR_COST_MFG_COST) - ACT_EXP_COST) / ORDRS_PRC) * 100, 1)
 			   END                             AS FIT_PER
+	         , UNSETTLED_AMT 					AS UNSETTLED_AMT --추후정산금액
+	         , SETTLEMENT_AMT 					AS SETTLEMENT_AMT --정산상계금액
 		     , CREAT_ID      AS CREAT_ID     --작성자ID
 		     , CREAT_ID_NM   AS CREAT_ID_NM  --작성자명
 		     , CREAT_DTTM    AS CREAT_DTTM   --작성일시
@@ -709,6 +721,8 @@
              , OUTTK_CLNT_CD
              , OUTTK_CLNT_NM
              , EST_TRGT_COST
+             , UNSETTLED_ORDRS_NO
+             , UNSETTLED_ORDRS_SEQ
              , '' AS CUD_CHECK
         FROM TB_CR02D02 T
         WHERE CO_CD = #{coCd}
@@ -1061,7 +1075,9 @@
                 OUTTK_CLNT_CD,
                 OUTTK_CLNT_NM,
                 DATA_SEARCH,
-                EST_TRGT_COST
+                EST_TRGT_COST,
+                UNSETTLED_ORDRS_NO,
+                UNSETTLED_ORDRS_SEQ
             )
         VALUES (
                    -- 1. 회사 코드
@@ -1124,7 +1140,9 @@
 					     WHERE  CODE_ID = #{clntPjt}
 					       AND ( #{ordrsDtlDiv10} = 'ORDRSDTLDIV1010' OR #{salesCd} IS NOT NULL )	 --설비인경우 또는 salesCd가 있는 경우 검색필드 생성
 				   		),'') , --NVL
-					#{estTrgtCost}
+					#{estTrgtCost},
+					#{unsettledOrdrsNo, jdbcType=VARCHAR, jdbcType=VARCHAR},
+					#{unsettledOrdrsSeq, jdbcType=VARCHAR, jdbcType=VARCHAR}
                )
     </insert>
     <update id="updateOrdrsDetail" parameterType="map">
@@ -1163,7 +1181,9 @@
 												       AND ( #{ordrsDtlDiv10} = 'ORDRSDTLDIV1010' OR #{salesCd} IS NOT NULL )	 --설비인경우 또는 salesCd가 있는 경우 검색필드 생성
 											   		),''),  --NVL
 
-            EST_TRGT_COST			   	   = #{estTrgtCost}		-- 수주목표원가
+            EST_TRGT_COST			   	   = #{estTrgtCost},		-- 수주목표원가
+			UNSETTLED_ORDRS_NO 	  		   = #{unsettledOrdrsNo, jdbcType=VARCHAR},	--추후정산상계 수주번호
+			UNSETTLED_ORDRS_SEQ	  		   = #{unsettledOrdrsSeq, jdbcType=VARCHAR}	--추후정산상계 수주순번
         WHERE CO_CD = #{coCd}
           AND ORDRS_NO =  #{ordrsNo}
           AND ORDRS_SEQ = #{ordrsSeq}
@@ -1939,6 +1959,14 @@
 				EXISTS (SELECT 1 FROM TB_WB24M02 D WHERE D.SALES_CD = A.SALES_CD) OR
 				EXISTS (SELECT 1 FROM TB_QM01M01 E WHERE E.SALES_CD = A.SALES_CD)
 			)
+			UNION ALL  --추후정산 처리건의 경우 정상상계처리건이 있으면 삭제 불가능함
+			SELECT 1 
+			FROM TB_CR02D02 A
+			WHERE A.ORDRS_NO = #{ordrsNo}
+			AND A.CO_CD = #{coCd}
+			AND (
+				EXISTS (SELECT 1 FROM TB_CR02D02 F WHERE F.CO_CD = A.CO_CD AND F.UNSETTLED_ORDRS_NO = A.ORDRS_NO AND F.UNSETTLED_ORDRS_SEQ = A.ORDRS_SEQ)
+			)
 		) THEN 1 ELSE 0 END AS EXIST
 		FROM dual
     </select>
@@ -1987,4 +2015,120 @@
 		WHERE A.ORDRS_NO = #{ordrsNo}
 	</select>
 
+	<select id="unsettledAmtCreditChk" parameterType="map" resultType="camelMap">
+			SELECT ORDRS_NO, ORDRS_SEQ
+			FROM TB_CR02D02 CD
+			WHERE CD.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1050'
+			  AND CD.CO_CD = #{coCd}
+			  AND CD.UNSETTLED_ORDRS_NO  = #{ordrsNo} 
+			  AND CD.UNSETTLED_ORDRS_SEQ = #{ordrsSeq}
+	</select>
+	
+	<!-- 추후정산 발생금액과 정산상계 처리금액, 잔액 산출 (해당오더 내역은 제외처리함) -->
+	<select id="settledAmtCreditTotalAmt" parameterType="map" resultType="camelMap">
+		WITH CREDIT_TOT AS (
+			SELECT 
+					  CD.CO_CD
+					, CD.UNSETTLED_ORDRS_NO
+					, CD.UNSETTLED_ORDRS_SEQ
+					, sum(NVL(CD.ORDRS_PRC,0)) 						AS ORDRS_PRC	--정산금액
+			FROM TB_CR02D02 CD
+			WHERE CD.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1050'
+			  AND CD.UNSETTLED_ORDRS_NO IS NOT NULL 
+			  AND CD.ORDRS_NO != #{coCd}
+			  AND CD.ORDRS_NO != #{ordrsNo}
+			  AND CD.UNSETTLED_ORDRS_NO  = #{unsettledOrdrsNo}
+			  AND CD.UNSETTLED_ORDRS_SEQ = #{unsettledOrdrsSeq}
+			GROUP BY CD.CO_CD, CD.UNSETTLED_ORDRS_NO, CD.UNSETTLED_ORDRS_SEQ
+		)
+		  SELECT  ORDRS_NO, ORDRS_SEQ
+		  		, NVL(CD.ORDRS_PRC,0) * (-1) 					AS ORDRS_PRC 			--추후정상 발생금액
+		        , CT.ORDRS_PRC  								AS CREDIT_ORDRS_PRC		--정산상계 처리금액
+		        , NVL(CD.ORDRS_PRC,0) * (-1)  - CT.ORDRS_PRC 	AS REM_ORDRS_PRC --잔액
+			FROM TB_CR02D02 CD
+					LEFT OUTER JOIN CREDIT_TOT CT ON CT.CO_CD = CD.CO_CD AND CT.UNSETTLED_ORDRS_NO = CD.ORDRS_NO AND CT.UNSETTLED_ORDRS_SEQ = CD.ORDRS_SEQ
+		   WHERE CD.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1040'
+			 AND CD.CO_CD = #{coCd}
+			 AND CD.ORDRS_NO  = #{unsettledOrdrsNo}
+			 AND CD.ORDRS_SEQ = #{unsettledOrdrsSeq}
+	</select>
+	
+	
+
+
+	<select id="selectUnsettledAmtSalesCodeList" parameterType="Map" resultType="camelMap">
+		--추후정산분 발생금액 현황
+		WITH UN_TOT AS (
+			SELECT 
+					  CD.CO_CD
+					, CD.UNSETTLED_ORDRS_NO
+					, CD.UNSETTLED_ORDRS_SEQ
+					, sum(NVL(CD.ORDRS_PRC,0)) 						AS ORDRS_PRC	--정산금액
+					, SUM(NVL(CM.ORDRS_AMT,0) * NVL(CM.EXRATE,1))   	AS ORDRS_AMT	--오더금액
+					, max(NVL(CM.EXRATE,1))  						AS EXRATE		--환율
+			FROM TB_CR02D02 CD
+					LEFT OUTER JOIN TB_CR02M01 CM ON CM.CO_CD = CD.CO_CD AND CM.ORDRS_NO = CD.ORDRS_NO
+			WHERE CD.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1050'
+			  AND CD.UNSETTLED_ORDRS_NO IS NOT NULL 
+			  <if test="coCd != null and !coCd.equals('')">
+			  AND CD.CO_CD = #{coCd}
+			  </if>
+			  <if test="clntCd != null and !clntCd.equals('')">
+		  	  AND CM.ORDRS_CLNT_CD = #{clntCd}
+			  </if>
+			  <if test="ordrsNo != null and !ordrsNo.equals('')">
+		  	  AND CD.ORDRS_NO != #{ordrsNo}
+			  </if>
+			GROUP BY CD.CO_CD, CD.UNSETTLED_ORDRS_NO, CD.UNSETTLED_ORDRS_SEQ
+		)
+				SELECT 
+					    CM.CO_CD
+					  , CM.ORDRS_NO				--수주번호
+					  , CM.FILE_TRGT_KEY
+					  , CM.HIST_NO
+					  , CM.ORDRS_CLNT_CD		--고객사
+					  , BM.CLNT_NM				--고객사명
+					  , CM.ORDRS_DIV			--수주구분
+					  , FN_CM05M01_CD_TO_NM(CM.ORDRS_DIV)   AS ORDRS_DIV_NM
+					  , CM.CLNT_PJT				--프로젝트
+					  , FN_CM05M01_CD_TO_NM(CM.CLNT_PJT)   AS CLNT_PJT_NM
+					  , CM.CTRT_NM				--계약명
+					  , CM.EXRATE				--환율
+					  , CM.ORDRS_AMT*CM.EXRATE		AS ORDRS_AMT	--수주금액(원화)
+					  , CM.MNG_ID				--담당자
+					  , U.NAME	AS MNG_ID_NM	--담당자명
+					  , CD.ORDRS_SEQ			--수주항목순번
+					  , CD.ORDRS_DTL_DIV10		--비정산구분코드
+					  , FN_CM05M01_CD_TO_NM(CD.ORDRS_DTL_DIV10)   AS ORDRS_DTL_DIV10_NM
+					  , CD.EQP_NM				--기계명
+					  , NVL(CD.ORDRS_PRC, 0) *(-1)	AS ORDRS_PRC	--미정산금액
+					  , CM.PMNT_MTD				AS PMNT_MTD
+					  , FN_CM05M01_CD_TO_NM(CM.PMNT_MTD)   AS PMNT_MTD_NM
+		              , TO_CHAR(CM.ORDRS_DT, 'YYYY/MM/DD') AS ORDRS_DT
+					  , UT.CO_CD				AS UN_CO_CD
+					  , UT.UNSETTLED_ORDRS_NO	AS UN_ORDRS_NO
+					  , UT.UNSETTLED_ORDRS_SEQ	AS UN_ORDRS_SEQ	
+					  , NVL(UT.ORDRS_PRC, 0)	AS UN_ORDRS_PRC
+					  , NVL(CD.ORDRS_PRC,0) * (-1) - NVL(UT.ORDRS_PRC,0) 	AS REM_ORDRS_PRC --미정산금액
+					  , CASE WHEN (NVL(CD.ORDRS_PRC,0) * (-1) - NVL(UT.ORDRS_PRC,0)) = 0 THEN 'Y' ELSE 'N' END BILL_YN
+				FROM TB_CR02D02 CD 
+						LEFT OUTER JOIN TB_CR02M01 CM ON CM.CO_CD = CD.CO_CD AND CM.ORDRS_NO = CD.ORDRS_NO
+						LEFT OUTER JOIN UN_TOT     UT ON UT.CO_CD = CD.CO_CD AND UT.UNSETTLED_ORDRS_NO = CD.ORDRS_NO AND UT.UNSETTLED_ORDRS_SEQ = CD.ORDRS_SEQ
+						LEFT OUTER JOIN TB_BM02M01 BM ON BM.CLNT_CD = CM.ORDRS_CLNT_CD
+		                --영업담당자
+		                LEFT OUTER JOIN TB_CM06M01 AS U ON U.ID = CM.MNG_ID
+				WHERE CD.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1040'
+				  AND CD.ORDRS_PRC != 0
+				  <if test="coCd != null and !coCd.equals('')">
+				  AND CD.CO_CD = #{coCd}
+				  </if>
+				  <if test="clntCd != null and !clntCd.equals('')">
+			  	  AND CM.ORDRS_CLNT_CD = #{clntCd}
+				  </if>
+				  <if test="ordrsNo != null and !ordrsNo.equals('')">
+			  	  AND CD.ORDRS_NO != #{ordrsNo}
+				  </if>
+				  AND  NVL(CD.ORDRS_PRC,0) * (-1) - NVL(UT.ORDRS_PRC,0)  != 0
+				  ORDER BY CLNT_NM, CLNT_PJT_NM, ORDRS_NO
+	</select>
 </mapper>

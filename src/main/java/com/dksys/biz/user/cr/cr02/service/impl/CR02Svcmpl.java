@@ -1294,4 +1294,19 @@ public class CR02Svcmpl implements CR02Svc {
     public Map<String, String> ordrsDivChangeChk(Map<String, String> paramMap) {
         return cr02Mapper.ordrsDivChangeChk(paramMap);
     }
+    
+    @Override
+    public List<Map<String, Object>> unsettledAmtCreditChk(Map<String, String> paramMap) {
+    	return cr02Mapper.unsettledAmtCreditChk(paramMap);
+    }
+    
+    @Override
+    public Map<String, Object> settledAmtCreditTotalAmt(Map<String, String> paramMap) {
+    	return cr02Mapper.settledAmtCreditTotalAmt(paramMap);
+    }
+    
+    @Override
+    public List<Map<String, Object>> selectUnsettledAmtSalesCodeList(Map<String, String> paramMap) {
+    	return cr02Mapper.selectUnsettledAmtSalesCodeList(paramMap);
+    }
 }

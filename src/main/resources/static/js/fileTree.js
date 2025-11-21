@@ -64,9 +64,8 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 			currPgmAuthChk = authChk(); // true:저장권한, false:저장권한 없음
 
 			fileTreeGridView.init(gridSelector, _fileList_area);
-
+			
 			bindFileDropToGrid(_fileList_area);	// 파일첨부시 드래그 기능
-
 			//--------------------------------------------------------------------
 			//To-Do List에서 팝업창을 뛰우면 정보확인하고 결재버튼 클릭시 결재 처리를 위한 버튼 추가  시작
 			// 결재, 승인 버튼활성화를 위해서는 modalStack.last().paramObj.gridObj 에 결재 승인을 위한 파라메터 값이 있어야 함.
@@ -174,13 +173,15 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 			//--------------------------------------------------------------------
 		}
 	}
-
-
+	
+	
+	
+	
 	fileTreeGridView = {
 		target: new ax5.ui.grid(),
 
 		init: function (gridSelector) {
-
+			var _this = this; 
 			this.target.setConfig({
 				target: $("[data-ax5grid=\"" + gridSelector + "\"]"),
 				showLineNumber: true,
@@ -194,30 +195,19 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 					onClick: function () {
 						this.self.select(this.dindex);
 					},
-					onDBLClick: function () {
-						var fileKey = this.item.fileKey;
-						if (fileKey) {
-							if (this.item.fileDown == 'Y') {
-								if (this.column.key == "fileName") {
-									//첨부파일 이미지뷰
-									let tempType = this.item.fileType.toLowerCase();
-									const viewType = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'heic']
-//									if (viewType.includes(tempType)) {
-										const imageList = this.self.list.filter(item => {
-											const fileType = item.fileType.toLowerCase();
-											return viewType.includes(tempType);
-										});
-										imageViewPopup(this.item.coCd, fileKey, this.item.fileName, imageList);
-//									} else {
-//										downLoadFile(this.item.coCd, fileKey, this.item.fileName);
-//									}
-								} else {
-									downLoadFile(this.item.coCd, fileKey, this.item.fileName);
-								}
-							} else {
-								alert('파일 다운로드 권한이 없습니다.');
-							}
-						}
+					onDBLClick: function () {					// ax5grid 에서 제공하는 this 컨텍스트 사용
+						// this.self  : gridInstance
+						// this.dindex: 행 index
+						// this.item  : 행 데이터
+						// this.column: 컬럼 정보
+						var grid   = this.self;
+						var dindex = this.dindex;
+						var doindex = this.doindex;
+						var item   = this.item;
+						var colKey = this.column.key;
+						var evt    = '' //this.event;
+						var $cell  = '' //$(evt.target).closest("[data-ax5grid-column]"); // 여기서 셀 DOM 추출
+						_this.openFile(grid, dindex, doindex, item, $cell, colKey, evt);
 					},
 				},
 				columns: [
@@ -250,13 +240,47 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 					display: false
 				}
 			});
+			// setConfig 이후에만 $target 사용 가능
 			this.target.$target.on("click", "[data-delete-row]", function (event) {
 				const rowIndex = parseInt(event.target.getAttribute("data-delete-row"), 10);
 				deleteFile(rowIndex);
 			});
 
+			// 여기서 태블릿 롱터치 바인딩
+			bindTabletLongPressForGrid(this.target, function (grid, dindex, doindex, item, $cell, colKey, evt) {
+				_this.openFile(grid, dindex, doindex, item, $cell, colKey, evt); // 더블클릭과 동일한 처리
+			});
+			
 			return this;
 		},
+	    openFile: function (grid, dindex, doindex, item, $cell, colKey, evt) {
+//			console.log("openFile:", item);// 파일 열기/다운로드 등 공통 처리
+	        if (!item) return;
+			var fileKey = item.fileKey;
+			if (fileKey) {
+				if (item.fileDown == 'Y') {
+					if (colKey == "fileName") {
+						//첨부파일 이미지뷰
+						let tempType = item.fileType.toLowerCase();
+						const viewType = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'heic']
+//									if (viewType.includes(tempType)) {
+							const imageList = grid.list.filter(item => {
+								const fileType = item.fileType.toLowerCase();
+								return viewType.includes(tempType);
+							});
+							imageViewPopup(item.coCd, fileKey, item.fileName, imageList);
+//									} else {
+//										downLoadFile(this.item.coCd, fileKey, this.item.fileName);
+//									}
+					} else {
+						downLoadFile(item.coCd, fileKey, item.fileName);
+					}
+				} else {
+					alert('파일 다운로드 권한이 없습니다.');
+				}
+			}
+			
+	    },
 		reqSetData: function (list) {
 			var targetObj = this.target;
 			for (let i = 0; i < list.length; i++) {
@@ -276,7 +300,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 			});
 		}
 	}
-
+	
 	function initDeptTree(selector, popSelector, coCd = fileTempCocd) {	//selector = '.popup_area:last #deptTree'
 		$(selector).jstree('destroy');
 		$(selector).jstree(

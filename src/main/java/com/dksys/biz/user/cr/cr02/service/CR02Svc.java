@@ -73,4 +73,11 @@ public interface CR02Svc {
     Map<String, String> deleteDetailChk(Map<String, String> paramMap);
 
     Map<String, String> ordrsDivChangeChk(Map<String, String> paramMap);
+
+	List<Map<String, Object>> selectUnsettledAmtSalesCodeList(Map<String, String> paramMap);
+
+	List<Map<String, Object>> unsettledAmtCreditChk(Map<String, String> paramMap);
+
+	Map<String, Object> settledAmtCreditTotalAmt(Map<String, String> paramMap);
+
 }
