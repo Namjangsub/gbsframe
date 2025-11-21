@@ -1,0 +1,139 @@
+<div id="commonPopup">
+	<div class="popup_area_unsettled">
+		<div class="popup_table">
+			<table>
+				<colgroup>
+					<col width="20%">
+					<col width="20%">
+					<col width="">
+				</colgroup>
+				<tr>
+					<td>
+						<select id="coCd_PS" name="coCd_PS" data-kind="CO" data-search="coCd" required msg="회사" onchange="ModalSalesCodeGridView.setData(0);">
+						</select>
+					</td>
+					
+<!-- 					<td> -->
+<!-- 						<select data-search="searchType"> -->
+<!-- 	                		<option value="X.DATA_SEARCH">통합</option> -->
+<!-- 	                		<option value="CLNT_PJT_NM">고객사PJT</option> -->
+<!-- 	                		<option value="SALES_CD">SALES CODE</option> -->
+<!-- 	                		<option value="CLNT_NM">고객사</option> -->
+<!-- 	                		<option value="EQP_NM">설비명</option> -->
+<!-- 	              		</select>     -->
+<!-- 					</td> -->
+<!-- 					<td> -->
+<!-- 						<div class="search_form"> -->
+<!-- 							<input type="text" id="searchValue" name="searchValue" data-search="searchValue" onkeypress="if(event.keyCode == 13){ModalSalesCodeGridView.setData(0);}"> -->
+<!-- 							<a onclick="ModalSalesCodeGridView.setData(0);"> -->
+<!-- 								<i class="i_search_w"></i> -->
+<!-- 							</a> -->
+<!-- 						</div> -->
+<!-- 					</td> -->
+				</tr>
+			</table>
+			<div class="ax5_grid" data-ax5grid="ModalSalesCode-grid" data-ax5grid-config="{}" style="height: 630px; width: 100%"></div>
+		</div>
+	</div>
+	<div class="popup_bottom_btn">
+		<button type="button" onclick="executeCallback();">선택</button>
+		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+
+<script type="text/javascript">
+
+	function gridColor(dataValue) {
+		let cellColorSet = "";
+		let row = dataValue.item;
+		if (row.ordrsDiv == "ORDRSDIV8" || row.ordrsDiv == "ORDRSDIV9") {
+			cellColorSet = "grid-cell-red";
+		}
+		return cellColorSet
+	}
+	var ModalSalesCodeGridView = {
+		initView : function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showLineNumber  : true,
+				showRowSelector : true,
+				multipleSelect  : false,
+				target : $('[data-ax5grid="ModalSalesCode-grid"]'),
+				header : {
+					align : "center",
+					selector : false
+				},
+				body : {
+					onClick : function() {
+						this.self.select(this.dindex);
+					},
+					onDBLClick: function () {
+						executeCallback();
+					}
+				},
+				page : {
+					navigationItemCount : 10,
+					height    : 30,
+					display   : false,
+					firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+					prevIcon  : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+					nextIcon  : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+					lastIcon  : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+					onChange  : function() {
+						ModalSalesCodeGridView.setData(this.page.selectPage);
+					}
+				},
+				columns : [
+					{key : "ordrsNo", 		  label : "수주번호",      align : "center", width : 60, styleClass: function () {return gridColor(this);}},
+					{key : "ordrsSeq", 		  label : "순번",   	   align : "center", width : 40, styleClass: function () {return gridColor(this);}},
+					{key : "clntNm", 	  	  label : "고객사명",      align : "left", width : 130, styleClass: function () {return gridColor(this);}},
+					{key : "clntPjtNm", 	  label : "고객사 PJT",    align : "left", width : 90, styleClass: function () {return gridColor(this);}},
+					{key : "ordrsDivNm", 	  label : "수주구분",      align : "center", width : 80, styleClass: function () {return gridColor(this);}},
+					{key : "ordrsAmt",	  	  label : "수주금액",      align : "right", width: 90, formatter: "money", styleClass: function () {return gridColor(this);}},
+					{key : "eqpNm", 		  label : "설비명",        align : "left", width : "*", styleClass: function () {return gridColor(this);}},
+					{key : "ordrsPrc",	  	  label : "추후정산금액",  align : "right", width: 90, formatter: "money", styleClass: function () {return gridColor(this);}},
+					{key : "unOrdrsPrc",	  label : "정산상계금액",  align : "right", width: 90, formatter: "money", styleClass: function () {return gridColor(this);}},
+					{key : "remOrdrsPrc",	  label : "잔여금액",      align : "right", width: 90, formatter: "money", styleClass: function () {return gridColor(this);}},
+				]
+			});
+			return this;
+		},
+		setData : function(_pageNo) {
+			var targetObj = this.target;
+			var paramObj = {
+				coCd	: $('#coCd_PS').val(),
+				clntCd  : modalStack.last().paramObj.clntCd,
+				ordrsNo  : modalStack.last().paramObj.ordrsNo,	//자기자신의 추후정산은 제외처리함.
+			};
+			postAjax("/user/cr/cr02/selectUnsettledAmtSalesCodeList", paramObj, null, function(data) {
+				var list = data.result;
+				for (let i = 0; i < list.length; i++) {
+					list[i].ordrsAmt = gPasFloatChk(list[i].ordrsAmt);
+					list[i].ordrsPrc = gPasFloatChk(list[i].ordrsPrc);
+					list[i].unOrdrsPrc = gPasFloatChk(list[i].unOrdrsPrc);
+					list[i].remOrdrsPrc = gPasFloatChk(list[i].remOrdrsPrc);
+				}
+				targetObj.setData({
+					list : list,
+					page : {
+						totalElements : list.length,
+					}
+				});
+			});
+		}
+	}
+
+	$(document).ready(function() {
+// 		$('#searchValue').focus();
+		setCommonSelect($('#commonPopup select[data-kind]'));		
+// 		$('#searchValue').val(modalStack.last().paramObj.searchValue);
+
+		ModalSalesCodeGridView.initView().setData(0);
+	});
+
+	function executeCallback(){
+		if(selectGridValidation(ModalSalesCodeGridView.target)) return;
+		modalStack.last().callback(ModalSalesCodeGridView);
+		modalStack.close();
+	}
+</script>
