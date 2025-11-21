@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.cr.cr20.mapper.CR20Mapper">
+	
+	<!-- 그리드 조회 카운트-->
+    <select id="select_cr20m01_List_Count" parameterType="Map" resultType="int">
+    		WITH UNSETTLED AS (
+			SELECT 
+					  CD.CO_CD
+					, CD.ORDRS_NO
+					, CD.ORDRS_SEQ
+				    , CM.FILE_TRGT_KEY
+				    , CM.HIST_NO
+					, CD.UNSETTLED_ORDRS_NO
+					, CD.UNSETTLED_ORDRS_SEQ
+					, sum(CD.ORDRS_PRC) 			AS ORDRS_PRC	--정산금액
+					, sum(CM.ORDRS_AMT*CM.EXRATE)  	AS ORDRS_AMT	--오더금액
+					, max(CM.EXRATE)  				AS EXRATE		--환율
+					, MAX(CM.ORDRS_DT)				AS ORDRS_DT		--수주일자
+					, MAX(CM.PMNT_MTD)				AS PMNT_MTD		--결재방법
+					, MAX(CM.CLNT_PJT)				AS CLNT_PJT		--프로젝트
+					, MAX(CD.EQP_NM)				AS EQP_NM		--기계명
+			FROM TB_CR02D02 CD
+					LEFT OUTER JOIN TB_CR02M01 CM ON CM.CO_CD = CD.CO_CD AND CM.ORDRS_NO = CD.ORDRS_NO
+			WHERE CD.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1050'
+			   OR CD.UNSETTLED_ORDRS_NO IS NOT NULL 
+			GROUP BY CD.CO_CD, CD.ORDRS_NO, CD.ORDRS_SEQ, CD.UNSETTLED_ORDRS_NO, CD.UNSETTLED_ORDRS_SEQ, CM.FILE_TRGT_KEY, CM.HIST_NO
+		)
+		, UN_TOT AS (
+			SELECT 
+					  CD.CO_CD
+					, CD.UNSETTLED_ORDRS_NO
+					, CD.UNSETTLED_ORDRS_SEQ
+					, sum(CD.ORDRS_PRC) 			AS ORDRS_PRC	--정산금액
+					, sum(CM.ORDRS_AMT*CM.EXRATE)  	AS ORDRS_AMT	--오더금액
+					, max(CM.EXRATE)  				AS EXRATE		--환율
+			FROM TB_CR02D02 CD
+					LEFT OUTER JOIN TB_CR02M01 CM ON CM.CO_CD = CD.CO_CD AND CM.ORDRS_NO = CD.ORDRS_NO
+			WHERE CD.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1050'
+			   OR CD.UNSETTLED_ORDRS_NO IS NOT NULL 
+			GROUP BY CD.CO_CD,CD.UNSETTLED_ORDRS_NO, CD.UNSETTLED_ORDRS_SEQ
+		)
+			SELECT count(*)
+			FROM (
+				SELECT 
+					    CM.CO_CD
+					  , CM.ORDRS_NO				--수주번호
+					  , CM.FILE_TRGT_KEY
+					  , CM.HIST_NO
+					  , CASE WHEN (CD.ORDRS_PRC * (-1) - NVL(UT.ORDRS_PRC,0)) = 0 THEN 'Y' ELSE 'N' END BILL_YN
+				FROM TB_CR02D02 CD 
+						LEFT OUTER JOIN TB_CR02M01 CM ON CM.CO_CD = CD.CO_CD AND CM.ORDRS_NO = CD.ORDRS_NO
+						LEFT OUTER JOIN UN_TOT     UT ON UT.CO_CD = CD.CO_CD AND UT.UNSETTLED_ORDRS_NO = CD.ORDRS_NO AND UT.UNSETTLED_ORDRS_SEQ = CD.ORDRS_SEQ
+						LEFT OUTER JOIN UNSETTLED  UN ON UN.CO_CD = CD.CO_CD AND UN.UNSETTLED_ORDRS_NO = CD.ORDRS_NO AND UN.UNSETTLED_ORDRS_SEQ = CD.ORDRS_SEQ
+						LEFT OUTER JOIN TB_BM02M01 BM ON BM.CLNT_CD = CM.ORDRS_CLNT_CD
+		                --영업담당자
+		                LEFT OUTER JOIN TB_CM06M01 AS U ON U.ID = CM.MNG_ID
+				WHERE CD.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1040'
+				  AND CD.ORDRS_PRC != 0
+				 <if test="coCd != null and !coCd.equals('')">
+				  AND CD.CO_CD = #{coCd}
+				 </if>
+				 <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
+				  AND CM.ORDRS_CLNT_CD = #{ordrsClntCd}
+				 </if>
+				 <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
+				  AND BM.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'
+				 </if>
+				 <if test="ordrsNo != null and !ordrsNo.equals('')">
+				  AND CD.ORDRS_NO LIKE '%' || #{ordrsNo} || '%'
+				 </if>
+				 <if test="clntPjt != null and !clntPjt.equals('')">
+				  AND CM.CLNT_PJT = #{clntPjt}
+				 </if>
+				 <if test="ordrsDiv != null and !ordrsDiv.equals('')">
+				  AND CM.ORDRS_DIV = #{ordrsDiv}
+				 </if>
+				<if test="searchid != null and !searchid.equals('')">
+				  AND CM.MNG_ID = #{searchid}
+				</if>
+				<if test="searchidnm != null and !searchidnm.equals('')">
+				  AND U.NAME LIKE '%' || #{searchidnm} || '%'
+				</if>
+		 	) T
+		 	WHERE 1 = 1
+			 <if test="billyn != null and !billyn.equals('')">
+			  AND BILL_YN = #{billyn}
+			 </if>
+    </select>
+
+	<!-- 그리드 조회 -->
+	<select id="select_cr20m01_List" parameterType="Map" resultType="camelMap">--추후정산분 발생금액 현황
+		WITH UNSETTLED AS (
+			SELECT 
+					  CD.CO_CD
+					, CD.ORDRS_NO
+					, CD.ORDRS_SEQ
+				    , CM.FILE_TRGT_KEY
+				    , CM.HIST_NO
+					, CD.UNSETTLED_ORDRS_NO
+					, CD.UNSETTLED_ORDRS_SEQ
+					, sum(CD.ORDRS_PRC) 			AS ORDRS_PRC	--정산금액
+					, sum(CM.ORDRS_AMT*CM.EXRATE)  	AS ORDRS_AMT	--오더금액
+					, max(CM.EXRATE)  				AS EXRATE		--환율
+					, MAX(CM.ORDRS_DT)				AS ORDRS_DT		--수주일자
+					, MAX(CM.PMNT_MTD)				AS PMNT_MTD		--결재방법
+					, MAX(CM.CLNT_PJT)				AS CLNT_PJT		--프로젝트
+					, MAX(CD.EQP_NM)				AS EQP_NM		--기계명
+			FROM TB_CR02D02 CD
+					LEFT OUTER JOIN TB_CR02M01 CM ON CM.CO_CD = CD.CO_CD AND CM.ORDRS_NO = CD.ORDRS_NO
+			WHERE CD.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1050'
+			   OR CD.UNSETTLED_ORDRS_NO IS NOT NULL 
+			GROUP BY CD.CO_CD, CD.ORDRS_NO, CD.ORDRS_SEQ, CD.UNSETTLED_ORDRS_NO, CD.UNSETTLED_ORDRS_SEQ, CM.FILE_TRGT_KEY, CM.HIST_NO
+		)
+		, UN_TOT AS (
+			SELECT 
+					  CD.CO_CD
+					, CD.UNSETTLED_ORDRS_NO
+					, CD.UNSETTLED_ORDRS_SEQ
+					, sum(CD.ORDRS_PRC) 			AS ORDRS_PRC	--정산금액
+					, sum(CM.ORDRS_AMT*CM.EXRATE)  	AS ORDRS_AMT	--오더금액
+					, max(CM.EXRATE)  				AS EXRATE		--환율
+			FROM TB_CR02D02 CD
+					LEFT OUTER JOIN TB_CR02M01 CM ON CM.CO_CD = CD.CO_CD AND CM.ORDRS_NO = CD.ORDRS_NO
+			WHERE CD.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1050'
+			   OR CD.UNSETTLED_ORDRS_NO IS NOT NULL 
+			GROUP BY CD.CO_CD,CD.UNSETTLED_ORDRS_NO, CD.UNSETTLED_ORDRS_SEQ
+		)
+		SELECT *
+		FROM (
+			SELECT ROWNUM RRN, T.*
+			FROM (
+				SELECT 
+					    CM.CO_CD
+					  , CM.ORDRS_NO				--수주번호
+					  , CM.FILE_TRGT_KEY
+					  , CM.HIST_NO
+					  , CM.ORDRS_CLNT_CD		--고객사
+					  , BM.CLNT_NM				--고객사명
+					  , CM.ORDRS_DIV			--수주구분
+					  , FN_CM05M01_CD_TO_NM(CM.ORDRS_DIV)   AS ORDRS_DIV_NM
+					  , CM.CLNT_PJT				--프로젝트
+					  , FN_CM05M01_CD_TO_NM(CM.CLNT_PJT)   AS CLNT_PJT_NM
+					  , CM.CTRT_NM				--계약명
+					  , CM.EXRATE				--환율
+					  , CM.ORDRS_AMT*CM.EXRATE		AS ORDRS_AMT	--수주금액(원화)
+					  , CM.MNG_ID				--담당자
+					  , U.NAME	AS MNG_ID_NM	--담당자명
+					  , CD.ORDRS_SEQ			--수주항목순번
+					  , CD.ORDRS_DTL_DIV10		--비정산구분코드
+					  , FN_CM05M01_CD_TO_NM(CD.ORDRS_DTL_DIV10)   AS ORDRS_DTL_DIV10_NM
+					  , CD.EQP_NM				--기계명
+					  , CD.ORDRS_PRC * (-1)	AS ORDRS_PRC	--미정산금액
+					  , CM.PMNT_MTD				AS PMNT_MTD
+					  , FN_CM05M01_CD_TO_NM(CM.PMNT_MTD)   AS PMNT_MTD_NM
+		              , TO_CHAR(CM.ORDRS_DT, 'YYYY/MM/DD') AS ORDRS_DT
+					  , UN.CO_CD				AS UN_CO_CD
+					  , UN.ORDRS_NO				AS UN_ORDRS_NO
+					  , UN.FILE_TRGT_KEY		AS UN_FILE_TRGT_KEY
+					  , UN.HIST_NO				AS UN_HIST_NO
+					  , UN.ORDRS_SEQ			AS UN_ORDRS_SEQ	
+					  , UN.ORDRS_PRC			AS UN_ORDRS_PRC
+					  , UN.ORDRS_AMT			AS UN_ORDRS_AMT
+					  , UN.EXRATE				AS UN_EXRATE
+					  , UN.PMNT_MTD				AS UN_PMNT_MTD
+					  , FN_CM05M01_CD_TO_NM(UN.PMNT_MTD	)   AS UN_PMNT_MTD_NM
+					  , UN.CLNT_PJT				AS UN_CLNT_PJT
+					  , FN_CM05M01_CD_TO_NM(UN.CLNT_PJT)   AS UN_CLNT_PJT_NM
+					  , UN.EQP_NM				AS UN_EQP_NM
+					  , CD.ORDRS_PRC * (-1) - NVL(UT.ORDRS_PRC,0) AS UN_UNSETTLED_AMT
+		              , TO_CHAR(UN.ORDRS_DT, 'YYYY/MM/DD') 		AS UN_ORDRS_DT
+					  , CASE WHEN (CD.ORDRS_PRC * (-1) - NVL(UT.ORDRS_PRC,0)) = 0 THEN 'Y' ELSE 'N' END BILL_YN
+				FROM TB_CR02D02 CD 
+						LEFT OUTER JOIN TB_CR02M01 CM ON CM.CO_CD = CD.CO_CD AND CM.ORDRS_NO = CD.ORDRS_NO
+						LEFT OUTER JOIN UN_TOT     UT ON UT.CO_CD = CD.CO_CD AND UT.UNSETTLED_ORDRS_NO = CD.ORDRS_NO AND UT.UNSETTLED_ORDRS_SEQ = CD.ORDRS_SEQ
+						LEFT OUTER JOIN UNSETTLED  UN ON UN.CO_CD = CD.CO_CD AND UN.UNSETTLED_ORDRS_NO = CD.ORDRS_NO AND UN.UNSETTLED_ORDRS_SEQ = CD.ORDRS_SEQ
+						LEFT OUTER JOIN TB_BM02M01 BM ON BM.CLNT_CD = CM.ORDRS_CLNT_CD
+		                --영업담당자
+		                LEFT OUTER JOIN TB_CM06M01 AS U ON U.ID = CM.MNG_ID
+				WHERE CD.ORDRS_DTL_DIV10 = 'ORDRSDTLDIV1040'
+				  AND CD.ORDRS_PRC != 0
+				 <if test="coCd != null and !coCd.equals('')">
+				  AND CD.CO_CD = #{coCd}
+				 </if>
+				 <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
+				  AND CM.ORDRS_CLNT_CD = #{ordrsClntCd}
+				 </if>
+				 <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
+				  AND BM.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'
+				 </if>
+				 <if test="ordrsNo != null and !ordrsNo.equals('')">
+				  AND CD.ORDRS_NO LIKE '%' || #{ordrsNo} || '%'
+				 </if>
+				 <if test="clntPjt != null and !clntPjt.equals('')">
+				  AND CM.CLNT_PJT = #{clntPjt}
+				 </if>
+				 <if test="ordrsDiv != null and !ordrsDiv.equals('')">
+				  AND CM.ORDRS_DIV = #{ordrsDiv}
+				 </if>
+				<if test="searchid != null and !searchid.equals('')">
+				  AND CM.MNG_ID = #{searchid}
+				</if>
+				<if test="searchidnm != null and !searchidnm.equals('')">
+				  AND U.NAME LIKE '%' || #{searchidnm} || '%'
+				</if>
+				  ORDER BY CLNT_NM, CLNT_PJT_NM, ORDRS_NO
+		 	) T
+		 	WHERE 1 = 1
+			 <if test="billyn != null and !billyn.equals('')">
+			  AND BILL_YN = #{billyn}
+			 </if>
+			) T
+		WHERE 1 = 1
+		  AND T.RRN BETWEEN #{firstIndex} AND #{lastIndex}
+	</select>
+
+</mapper>
