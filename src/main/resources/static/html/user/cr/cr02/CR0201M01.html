@@ -293,13 +293,14 @@
     var gridView = {
         initView: function () {
             this.target = new ax5.ui.grid();
+			var _this = this; 
             this.target.setConfig({
+                target: $('[data-ax5grid="first-grid"]'),
                 frozenColumnIndex : 7,
 				showLineNumber    : false,
 				showRowSelector   : true,
 				// multipleSelect    : true,
 				sortable          : false,
-                target: $('[data-ax5grid="first-grid"]'),
                 header: {
                     align: "center",
                     selector: false
@@ -319,7 +320,18 @@
                          select_index = this.doindex;
                     },
                     onDBLClick: function () {
-                        insertProjectModal("U", this.doindex);
+						// this.self  : gridInstance
+						// this.dindex: 행 index
+						// this.item  : 행 데이터
+						// this.column: 컬럼 정보
+						var grid   = this.self;
+						var dindex = this.dindex;
+						var doindex = this.doindex;
+						var item   = this.item;
+						var colKey = this.column.key;
+						var evt    = '' //this.event;
+						var $cell  = '' //$(evt.target).closest("[data-ax5grid-column]"); // 여기서 셀 DOM 추출
+						_this.openFile(grid, dindex, doindex, item, $cell, colKey, evt);
                     },
                 },
                 page: {
@@ -352,6 +364,10 @@
                     {key: "currNm", label: "통화단위", align: "center", width: 60, styleClass: function () {return gridColorSet(this.item.collapse);}},
                     {key: "exrate", label: "환율", align: "right", width: 60, formatter: "money", styleClass: function () {return gridColorSet(this.item.collapse);}},
                     {key: "exchangeAmt", label: "원화금액<br>(단위:천원)", align: "right", width: 90, formatter: "money", styleClass: function () {return gridColorSet(this.item.collapse);}},
+                    {key: undefined			, label: "추후정산내역", columns: [
+						{key: "unsettledAmt"	, label: "발생금액"	, align: "right", width: 80, formatter: "money", styleClass: function () {return gridColorSet(this.item.collapse);}, styleClass: function () {return this.item.ordrsDiv =='ORDRSDIV8'||this.item.ordrsDiv =='ORDRSDIV9'||this.item.ctrtDoc=='CONTRACT01'? 'grid-font-blue-bold':''}},
+						{key: "settlementAmt"	, label: "상계처리금액"	, align: "right", width: 80, formatter: "money", styleClass: function () {return gridColorSet(this.item.collapse);}, styleClass: function () {return this.item.ordrsDiv =='ORDRSDIV8'||this.item.ordrsDiv =='ORDRSDIV9'||this.item.ctrtDoc=='CONTRACT01'? 'grid-font-blue-bold':''}},
+	                ]},
 					{key: "ordrsDtlDiv10Nm", label: "입력구분", align: "center", width: 60, styleClass: function () {return gridColorSet(this.item.collapse);}},
 					{key: "prdtNm", label: "제품구분", align: "center", width: 150, styleClass: function () {return gridColorSet(this.item.collapse);}},
 					{key: "itemDivNm", label: "아이템구분", align: "center", width: 80, styleClass: function () {return gridColorSet(this.item.collapse);}},
@@ -445,6 +461,36 @@
                     {key: "prdtCd"         , label: "제품구분코드"  , align: "center", width: 80, hidden: true},
                     {key: "itemDiv"        , label: "아이템구분코드", align: "center", width: 80, hidden: true},
                 ],
+				footSum: [
+  			    	[
+  			    		{label: "총계", colspan:8, align:"center"},
+                        {key: "sumOrdrsAmt"		, collector: "sum", formatter: "money", align: "right"},
+                        {},
+                        {},
+                        {key: "sumExchangeAmt"		, collector: "sum", formatter: "money", align: "right"},
+                        {key: "sumUnsettledAmt"		, collector: "sum", formatter: "money", align: "right"},
+                        {key: "sumSettlementAmt"	, collector: "sum", formatter: "money", align: "right"},
+                        {},
+                        {},
+                        {},
+                        {},
+                        {},
+                        {},
+                        {},
+                        {},
+                        {key: "sumOrdrsPrcMacht"	, collector: "sum", formatter: "money", align: "right"},
+                        {key: "sumOrdrsPrcElcty"	, collector: "sum", formatter: "money", align: "right"},
+                        {key: "sumOrdrsPrc"	, collector: "sum", formatter: "money", align: "right"},
+                        {},
+                        {key: "sumEstEpctMatPrc"	, collector: "sum", formatter: "money", align: "right"},
+                        {key: "sumTrgtPchsPcostMach"	, collector: "sum", formatter: "money", align: "right"},
+                        {key: "sumTrgtPchsPcostElcty"	, collector: "sum", formatter: "money", align: "right"},
+                        {key: "sumSum"	, collector: "sum", formatter: "money", align: "right"},
+                        {key: "sumTrgtPchsPcostInHousePrcsn"	, collector: "sum", formatter: "money", align: "right"},
+                        {key: "sumMachineValueAfterDeduction"	, collector: "sum", formatter: "money", align: "right"},
+
+  	                 ]
+  			    ],
                 tree : {
 					use         : true,
 					indentWidth : 15,
@@ -463,7 +509,16 @@
 					}
 				}
             });
-            return this;
+			// 여기서 태블릿 롱터치 바인딩
+			bindTabletLongPressForGrid(this.target, function (grid, dindex, doindex, item, $cell, colKey, evt) {
+				_this.openFile(grid, dindex, doindex, item, $cell, colKey, evt); // 더블클릭과 동일한 처리
+			});
+			return this;
+		},
+		openFile: function (grid, dindex, doindex, item, $cell, colKey, evt) {
+//				console.log("openFile:", item);// 파일 열기/다운로드 등 공통 처리
+	        if (!item) return;
+            insertProjectModal("U", doindex);
         },
         setData: function (_pageNo) {
             if (isFirst) return;
@@ -489,19 +544,81 @@
                			//회사코드가 GUN 인경우 임원실(GUN00), 영업(GUN30), 회계팀(GUN20), 전산팀(GUN80)
                			//회사코드가 TRN 인경우 임원실(GUN00), 트루넷(TRN),  회계팀(GUN20), 전산팀(GUN80)만 수주목표가 및 수주금액 조회가능 함.
 						let passChkDeptId = jwt.deptId;
+               			let userVisiable = false; //부서에 따라 일부 항목 숨김 처리를 위한 변수
                			if (($("#coCd_S").val() == 'GUN' && (passChkDeptId.includes('GUN00') || passChkDeptId.includes('GUN30') || passChkDeptId.includes('GUN20') || passChkDeptId.includes('GUN80'))) ||
                			    ($("#coCd_S").val() == 'TRN' && (passChkDeptId.includes('GUN00') || passChkDeptId.includes('TRN')   || passChkDeptId.includes('GUN20') || passChkDeptId.includes('GUN80')))) {
                				//정상 조회가능함
+                   			userVisiable = true;
                			} else {
-                            for (var i = 0; i < list.length; i++) {
-                                list[i].estTrgtCost = 0;		//수주목표
-                                list[i].ordrsAmt = 0;
-                                list[i].exchangeAmt = 0;
-                                list[i].ordrsPrcMach = 0;
-                                list[i].ordrsPrcElcty = 0;
-                                list[i].ordrsPrc = 0;
-                            }
+                   			userVisiable = true;
                         }
+
+               			
+
+						const seenNo2 = new Set();
+						for (let i = 0; i < list.length; i++) {
+							if (userVisiable) {	//ex.  영업팀은 조회가능하나 타팀은 금액확인 못하게
+								list[i].ordrsAmt = gPasFloatChk(list[i].ordrsAmt);
+								list[i].exchangeAmt = gPasFloatChk(list[i].exchangeAmt);
+								list[i].ordrsPrcMach = gPasFloatChk(list[i].ordrsPrcMach);
+								list[i].ordrsPrcElcty = gPasFloatChk(list[i].ordrsPrcElcty);
+								list[i].ordrsPrc = gPasFloatChk(list[i].ordrsPrc);
+							} else {
+                                list[i].ordrsAmt = 0;			//수주가
+                                list[i].exchangeAmt = 0;		//
+                                list[i].estTrgtCost = 0;		//수주목표
+                                list[i].ordrsPrcMach = 0;		//기계PART
+                                list[i].ordrsPrcElcty = 0;		//전기PART
+                                list[i].ordrsPrc = 0;			//전기PART
+							}
+							list[i].exrate = gPasFloatChk(list[i].exrate);
+							list[i].unsettledAmt = gPasFloatChk(list[i].unsettledAmt);
+							list[i].settlementAmt = gPasFloatChk(list[i].settlementAmt);
+							list[i].ordrsQty = gPasFloatChk(list[i].ordrsQty);
+							list[i].estEpctMatPrc = gPasFloatChk(list[i].estEpctMatPrc);
+							
+							list[i].trgtPchsPcostMach = gPasFloatChk(list[i].trgtPchsPcostMach);
+							list[i].trgtPchsPcostElcty = gPasFloatChk(list[i].trgtPchsPcostElcty);
+							list[i].sum = gPasFloatChk(list[i].sum);
+							list[i].trgtPchsPcostInHousePrcsn = gPasFloatChk(list[i].trgtPchsPcostInHousePrcsn);
+							list[i].machineValueAfterDeduction = gPasFloatChk(list[i].machineValueAfterDeduction);
+							list[i].ordrsNo = gPasIntChk(list[i].ordrsNo);
+							list[i].histNo = gPasIntChk(list[i].histNo);
+							if (seenNo2.has(list[i].ordrsNo)) {
+								list[i].sumOrdrsAmt = 0;            				// 중복 번호면 합계용 금액 0
+								list[i].sumExchangeAmt = 0;            				// 중복 번호면 합계용 금액 0
+								list[i].sumUnsettledAmt = 0;            			// 중복 번호면 합계용 금액 0
+								list[i].sumSettlementAmt = 0;            			// 중복 번호면 합계용 금액 0
+								list[i].sumOrdrsPrcMacht = 0;            			// 중복 번호면 합계용 금액 0
+								list[i].sumOrdrsPrcElcty = 0;            			// 중복 번호면 합계용 금액 0
+								list[i].sumOrdrsPrc = 0;            				// 중복 번호면 합계용 금액 0
+								list[i].sumEstEpctMatPrc = 0;            			// 중복 번호면 합계용 금액 0
+								list[i].sumTrgtPchsPcostMach = 0;           		// 중복 번호면 합계용 금액 0
+								list[i].sumTrgtPchsPcostElcty = 0;           	 	// 중복 번호면 합계용 금액 0
+								list[i].sumSum = 0;            						// 중복 번호면 합계용 금액 0
+								list[i].sumTrgtPchsPcostInHousePrcsn = 0;           // 중복 번호면 합계용 금액 0
+								list[i].sumMachineValueAfterDeduction = 0;          // 중복 번호면 합계용 금액 0
+							} else {
+							    seenNo2.add(list[i].ordrsNo);
+							    list[i].sumOrdrsAmt = list[i].ordrsAmt;   				// 첫 등장 번호면 원래 금액
+							    list[i].sumExchangeAmt = list[i].exchangeAmt;   		// 첫 등장 번호면 원래 금액
+							    list[i].sumUnsettledAmt = list[i].unsettledAmt;   		// 첫 등장 번호면 원래 금액
+							    list[i].sumSettlementAmt = list[i].settlementAmt;   	// 첫 등장 번호면 원래 금액
+							    
+							    list[i].sumOrdrsPrcMacht = list[i].ordrsPrcMach;   		// 첫 등장 번호면 원래 금액
+							    list[i].sumOrdrsPrcElcty = list[i].ordrsPrcElcty;   	// 첫 등장 번호면 원래 금액
+							    list[i].sumOrdrsPrc = list[i].ordrsPrc;   				// 첫 등장 번호면 원래 금액
+							    
+							    list[i].sumEstEpctMatPrc = list[i].estEpctMatPrc;   	// 첫 등장 번호면 원래 금액
+							    list[i].sumTrgtPchsPcostMach = list[i].trgtPchsPcostMach;   		// 첫 등장 번호면 원래 금액
+							    list[i].sumTrgtPchsPcostElcty = list[i].trgtPchsPcostElcty;   		// 첫 등장 번호면 원래 금액
+							    list[i].sumSum = list[i].trgtPchsPcostMach + list[i].trgtPchsPcostElcty 			// 첫 등장 번호면 원래 금액
+							    
+							    list[i].sumTrgtPchsPcostInHousePrcsn = list[i].trgtPchsPcostInHousePrcsn;   		// 첫 등장 번호면 원래 금액
+							    list[i].sumMachineValueAfterDeduction = list[i].trgtPchsPcostMach - list[i].trgtPchsPcostInHousePrcsn;   		// 첫 등장 번호면 원래 금액
+							}
+						}
+						
                         gridViewIn.setData({
                             list: list,
                             page: {
