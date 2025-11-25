@@ -1028,6 +1028,9 @@ function setNotiFile(elem){
 	      	'file' : obj,
 	      	'fileDelete':'Y'
 		});
+		//첨부파일을 upload 하기위한 준비작업
+		upSetFileUpload(obj.name, testArr[testArr.length-1], obj);
+// 		$('#tripTable'+lastPosition+' #tripRptFileNm').val(obj.name);
 	fileGridView.setData();
 	$(elem).val("");
 	});
@@ -1092,8 +1095,60 @@ var lastPosition = 0;
 function fromWebToApp(select, fileTrgtKey = "112233", rptPosition = 0) {
     lastPosition = rptPosition;
 	var paramMsg = select + ',' + fileTrgtKey;
-    toApp.postMessage(paramMsg);
+	// toApp 이 정의되어 있고 함수일 때만 호출
+	if (typeof window.toApp === 'function') {
+		try {
+    		toApp.postMessage(paramMsg);
+	    } catch (e) {
+	        console.error('toApp 호출 중 오류, 파일 선택으로 대체합니다.', e);
+			notiFile.click();
+		}
+	} else {
+		notiFile.click();
+	}
 }
+
+//첨부파일을 upload 하기위한 준비작업
+// 메모리에 파일객체 담기
+// 추가 비용항목에 해당 파일 할당하기
+function upSetFileUpload(fileName, fileType, file) {
+	const index = rptTripFileArr.findIndex(item => item.rptTripNo === lastPosition);
+	if (index > -1) { 
+		// 기존에 rptTripNo 값이 있으면 대c체
+		rptTripFileArr.splice(index, 1, {
+	        'rptTripNo': lastPosition,
+	        'fileKey': 0,
+	        'fileName': fileName,
+	        'fileType': fileType,
+	        'fileSize': file.size,
+	        'file': file,
+	        'fileDelete': 'Y'
+	    });
+	} else {
+		// 없으면 추가
+		rptTripFileArr.push({
+		        'rptTripNo': lastPosition,
+		        'fileKey': 0,
+		        'fileName': fileName,
+		        'fileType': fileType,
+		        'fileSize': file.size,
+		        'file': file,
+		        'fileDelete': 'Y'
+		});
+	}
+	
+	let tempFileName = $('#tripTable' + lastPosition + ' #tripRptFileNm').val();
+	let tempFileKey = $('#tripTable' + lastPosition + ' #fileKey').val();
+	let tempUpdCheck = $('#tripTable' + lastPosition + ' #updCheck').val();
+	if (tempFileName != "" && tempFileKey != 0 && tempUpdCheck == 'U') {	//수정이면서 기존 파일명이 있고 파일 등록된 번호가 있을경우만 파일 삭제대상임
+		tripRptRowFileDeleteArr.push({
+			fileKey 	: tempFileKey,
+			fileName 	: tempFileName
+			});
+	}
+	$('#tripTable' + lastPosition + ' #tripRptFileNm').val(fileName);
+}
+
 
 //플로터 앱에서 웹페이지 자바스크립트에 업로드 파일 전달하는 함수 call
 function uploadFile(fileName, base64ImageData, fileObj, type) {
@@ -1131,41 +1186,43 @@ function uploadFile(fileName, base64ImageData, fileObj, type) {
 			});
 			fileGridView.setData()
 		} else {		//0이 아닌경우 해당 경비항목으로 추가된 첨부화일임 (경비 1건에 첨부 1개만 가능함)
-			const index = rptTripFileArr.findIndex(item => item.rptTripNo === lastPosition);
-			if (index > -1) { 
-				// 기존에 rptTripNo 값이 있으면 대c체
-				rptTripFileArr.splice(index, 1, {
-			        'rptTripNo': lastPosition,
-			        'fileKey': 0,
-			        'fileName': fileName,
-			        'fileType': fileType,
-			        'fileSize': file.size,
-			        'file': file,
-			        'fileDelete': 'Y'
-			    });
-			} else {
-				// 없으면 추가
-				rptTripFileArr.push({
-				        'rptTripNo': lastPosition,
-				        'fileKey': 0,
-				        'fileName': fileName,
-				        'fileType': fileType,
-				        'fileSize': file.size,
-				        'file': file,
-				        'fileDelete': 'Y'
-				});
-			}
+			upSetFileUpload(fileName, fileType, file);
+		
+// 			const index = rptTripFileArr.findIndex(item => item.rptTripNo === lastPosition);
+// 			if (index > -1) { 
+// 				// 기존에 rptTripNo 값이 있으면 대c체
+// 				rptTripFileArr.splice(index, 1, {
+// 			        'rptTripNo': lastPosition,
+// 			        'fileKey': 0,
+// 			        'fileName': fileName,
+// 			        'fileType': fileType,
+// 			        'fileSize': file.size,
+// 			        'file': file,
+// 			        'fileDelete': 'Y'
+// 			    });
+// 			} else {
+// 				// 없으면 추가
+// 				rptTripFileArr.push({
+// 				        'rptTripNo': lastPosition,
+// 				        'fileKey': 0,
+// 				        'fileName': fileName,
+// 				        'fileType': fileType,
+// 				        'fileSize': file.size,
+// 				        'file': file,
+// 				        'fileDelete': 'Y'
+// 				});
+// 			}
 			
-			let tempFileName = $('#tripTable' + lastPosition + ' #tripRptFileNm').val();
-			let tempFileKey = $('#tripTable' + lastPosition + ' #fileKey').val();
-			let tempUpdCheck = $('#tripTable' + lastPosition + ' #updCheck').val();
-			if (tempFileName != "" && tempFileKey != 0 && tempUpdCheck == 'U') {	//수정이면서 기존 파일명이 있고 파일 등록된 번호가 있을경우만 파일 삭제대상임
-				tripRptRowFileDeleteArr.push({
-					fileKey 	: tempFileKey,
-					fileName 	: tempFileName
-					});
-			}
-			$('#tripTable' + lastPosition + ' #tripRptFileNm').val(fileName);
+// 			let tempFileName = $('#tripTable' + lastPosition + ' #tripRptFileNm').val();
+// 			let tempFileKey = $('#tripTable' + lastPosition + ' #fileKey').val();
+// 			let tempUpdCheck = $('#tripTable' + lastPosition + ' #updCheck').val();
+// 			if (tempFileName != "" && tempFileKey != 0 && tempUpdCheck == 'U') {	//수정이면서 기존 파일명이 있고 파일 등록된 번호가 있을경우만 파일 삭제대상임
+// 				tripRptRowFileDeleteArr.push({
+// 					fileKey 	: tempFileKey,
+// 					fileName 	: tempFileName
+// 					});
+// 			}
+// 			$('#tripTable' + lastPosition + ' #tripRptFileNm').val(fileName);
 		}
 	}
 }
@@ -1224,9 +1281,69 @@ function downloadTripRptFile(i) {
 	if(fileKey == 0 || fileKey == '' || fileKey == null) {
 		return false;
 	}
-    var host = window.location.origin;
-	var paramMsg = host + "/admin/cm/cm08/fileDownloadAuth2?fileKey="+fileKey+"&userId="+jwt.userId +"&coCd="+$('#coCd').val()+"," + tripRptFileNm;
-	fileDownloadApp.postMessage(paramMsg);
+
+	// toApp 이 정의되어 있고 함수일 때만 호출
+	if (typeof window.fileDownloadApp === 'function') {
+		try {
+		    var host = window.location.origin;
+			var paramMsg = host + "/admin/cm/cm08/fileDownloadAuth2?fileKey="+fileKey+"&userId="+jwt.userId +"&coCd="+$('#coCd').val()+"," + tripRptFileNm;
+			fileDownloadApp.postMessage(paramMsg);
+	    } catch (e) {
+	    	downloadFile(fileKey, tripRptFileNm);
+		}
+	} else {
+    	downloadFile(fileKey, tripRptFileNm);
+	}
+	
+}
+
+
+
+function downloadFile(_fileKey, _filename) {
+	return new Promise(function(resolve, reject) {
+		var xhr = new XMLHttpRequest();
+		xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + _fileKey + "&userId=" + jwt.userId + "&coCd="+$('#coCd').val(), true);
+		xhr.responseType = "blob";
+		xhr.setRequestHeader("Authorization", authorizationToken);
+		xhr.setRequestHeader("X-GBS-Source", "pdfjs-viewer");
+		
+		xhr.onload = function() {
+			if (xhr.status === 200) {
+				var contentType = xhr.getResponseHeader("Content-Type");
+				// 오류 상황: Content-Type이 text/plain이면 서버가 오류 메시지를 반환한 것으로 간주
+				if (contentType && contentType.indexOf("text/plain") !== -1) {
+					var reader = new FileReader();
+					reader.onload = function(e) {
+						// reject 시, 파일명과 함께 오류 메시지 전달
+						reject("[" + _filename + "] " + e.target.result);
+					};
+					reader.readAsText(xhr.response);
+				} else {
+					// 정상적인 파일이면 다운로드 진행
+					var blob = xhr.response;
+					var url = window.URL.createObjectURL(blob);
+					var a = document.createElement('a');
+					a.href = url;
+					a.download = _filename;
+					document.body.appendChild(a);
+					a.click();
+					document.body.removeChild(a);
+					window.URL.revokeObjectURL(url);
+					resolve(); // 성공 시 resolve 호출
+				}
+			} else {
+				console.error("백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
+				reject("[" + _filename + "] 백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
+			}
+		};
+
+		xhr.onerror = function() {
+			console.error("네트워크 오류가 발생했습니다.");
+			reject("[" + _filename + "] 네트워크 오류가 발생했습니다.");
+		};
+
+		xhr.send();
+	});
 }
 
 
