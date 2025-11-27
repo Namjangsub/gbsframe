@@ -104,9 +104,13 @@ public class CR02Ctr {
 	public String updateOrdrs(@RequestParam Map<String, String> param,MultipartHttpServletRequest mRequest, ModelMap model) {
 
 		try {
-			cr02Svc.updateOrdrs(param,mRequest);
-			model.addAttribute("resultCode", 200);
-			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			if (cr02Svc.updateOrdrs(param,mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 900);
+				model.addAttribute("resultMessage", "fail");
+			}
 		}catch(Exception e) {
 			model.addAttribute("resultCode", 500);
 			model.addAttribute("resultMessage", e.getLocalizedMessage());

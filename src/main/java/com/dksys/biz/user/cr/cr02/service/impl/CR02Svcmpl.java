@@ -220,6 +220,7 @@ public class CR02Svcmpl implements CR02Svc {
                 //Sales Cd 만들떄 ITEM_DIV의 CODE_ETC 값 추출
                 String ItemDoov = (selectItemDivEtc(detailMap));
                 String Salad = detailMap.get("salesCd");
+				String saveSalesCd = "";
                 //입력구분이 '설비'코드 일때 sales_cd 만들기(sales_cd 값이 빈칸, null, 길이 0 일떄)
                 if (detailMap.get("ordrsDtlDiv10").equals("ORDRSDTLDIV1010")) {
                     if ("".equals(Salad) || Salad == null || Salad.length() == 0) {
@@ -227,9 +228,21 @@ public class CR02Svcmpl implements CR02Svc {
                         OrderSeq = cr02Mapper.selectSalesCdLastNumberPlusOne(param);
                         String newSalesCode = param.get("ordrsNo") + "-" + OrderSeq.trim() + detailMap.get("prdtCd") + ItemDoov;
                         detailMap.put("salesCd", newSalesCode);
+						saveSalesCd = newSalesCode;
+						if (saveSalesCd != null && saveSalesCd.contains("null")) {
+							throw new RuntimeException("설비코드 생성오류입니다. 전산실에 문의해주세요.");
+						}
                     }
                 }
                 cr02Mapper.insertOrdrsDetail(detailMap);
+
+				// 해당 설비에 해당하는 설계BOM, 구매BOM 자료 있는지 확인(중복 등록 방지)
+				HashMap<String, String> bomParMap = new HashMap<>();
+				bomParMap.put("salesCd", saveSalesCd);
+				Map<String, String> selectBomCheck = cr02Mapper.selectBomCheck(bomParMap);
+				if (Integer.parseInt(selectBomCheck.get("bm14Cnt")) > 0 || Integer.parseInt(selectBomCheck.get("sm01Cnt")) > 0 ) {
+					throw new RuntimeException("설비 ("+ saveSalesCd + ")에 설계BOM 또는 구매BOM에 이미 등록되어 있습니다. 전산실에 문의해주세요.");
+				}
             } catch (Exception e) {
                 System.out.println("error3" + e.getMessage());
                 thrower.throwCommonException("설비&원가 추가오류!");
@@ -336,7 +349,8 @@ public class CR02Svcmpl implements CR02Svc {
     }
 
     @Override
-    public void updateOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception {
+    public int updateOrdrs(Map<String, String> param, MultipartHttpServletRequest mRequest) throws Exception {
+		int result = 0;
         Gson gson = new GsonBuilder().disableHtmlEscaping().create();
         Type mapList = new TypeToken<ArrayList<Map<String, String>>>() { }.getType();
         String OrderSeq = "";
@@ -474,7 +488,7 @@ public class CR02Svcmpl implements CR02Svc {
         if(!"".equals(param.get("estNoOrdrs")) || param.get("estNoOrdrs") != null) {
             cr01Svc.updateEstConfirm(param);
         }
-        cr02Mapper.updateOrdrs(param);
+        result += cr02Mapper.updateOrdrs(param);
 
         //////////////수금정보  update 수정////////
         updateOrdrsPmntPlanProcess(param, mRequest );
@@ -568,7 +582,7 @@ public class CR02Svcmpl implements CR02Svc {
         }
 
 
-      //2. 설비정보 추가, 수정 건 처리
+     	//2. 설비정보 추가, 수정 건 처리
         List<Map<String, String>> detailArr = gson.fromJson(param.get("detailArr"), mapList);
 		// 설비정보 salesCode 중복 체크
 		Set<String> salesCdCheck = new HashSet<>();
@@ -580,11 +594,13 @@ public class CR02Svcmpl implements CR02Svc {
 					throw new RuntimeException("중복된 salesCd 존재가 존재합니다.");
 				}
 			}
+			
 		}
         String jobType = "";  //추가="C",  수정 = "U" 코드 저장용
         for (Map<String, String> detailMap : detailArr) {
             try {
                 Object jobTypeObject = detailMap.get("cudCheck");
+				String saveSalesCd = "";
                 if (jobTypeObject != null) {
                     jobType = detailMap.get("cudCheck");
                     detailMap.put("coCd", param.get("coCd"));
@@ -602,6 +618,7 @@ public class CR02Svcmpl implements CR02Svc {
                     String ItemDoov = (selectItemDivEtc(detailMap));
                     //입력구분이 '설비'코드 일때 sales_cd 만들기(sales_cd 값이 빈칸, null, 길이 0 일떄)
                     //프론트엔드에서 cudCheck 값은 추가면 C코드가 수정이면 U 코드가 넘어온다.
+					
                     if (jobType.equals("U")) {
                         //입력구분이 '설비'코드 일때 sales_cd 만들기(sales_cd 값이 빈칸, null, 길이 0 일떄)
                         //수정모드일때는 설비이면 sales_cd 없으면 새로 만들고
@@ -614,6 +631,7 @@ public class CR02Svcmpl implements CR02Svc {
 
                                 newSalesCode = param.get("ordrsNo") + "-" + OrderSeq.trim() + detailMap.get("prdtCd") + ItemDoov;
                                 detailMap.put("salesCd", newSalesCode);
+								saveSalesCd = newSalesCode;
                             }
                         }
                         // 수주 상세 업데이트
@@ -626,11 +644,20 @@ public class CR02Svcmpl implements CR02Svc {
 
                                 String newSalesCode = param.get("ordrsNo") + "-" + OrderSeq.trim() + detailMap.get("prdtCd") + ItemDoov;
                                 detailMap.put("salesCd", newSalesCode);
+								saveSalesCd = newSalesCode;
                             }
                             cr02Mapper.insertOrdrsDetail(detailMap);
                     } // (jobType.equals("U") or jobType.equals("C"))
                 } //
                 //cr02Mapper.insertOrdrsDetail(detailMap);
+				// 해당 설비에 해당하는 설계BOM, 구매BOM 자료 있는지 확인(중복 등록 방지)
+				HashMap<String, String> bomParMap = new HashMap<>();
+				bomParMap.put("salesCd", saveSalesCd);
+				Map<String, String> selectBomCheck = cr02Mapper.selectBomCheck(bomParMap);
+				if (Integer.parseInt(selectBomCheck.get("bm14Cnt")) > 1 ||Integer.parseInt(selectBomCheck.get("sm01Cnt")) > 1 ) {
+					throw new RuntimeException("설비 ("+ saveSalesCd + ")에 설계BOM 또는 구매BOM에 이미 등록되어 있습니다. 전산실에 문의해주세요.");
+				}
+
             } catch (Exception e) {
                 System.out.println("error3" + e.getMessage());
                 thrower.throwCommonException("설비&원가 수정오류!");
@@ -737,6 +764,8 @@ public class CR02Svcmpl implements CR02Svc {
         if (param.get("prjctSeq").equals("")) {
             cr02Mapper.callUpdateProjectMaster(param);
         }
+
+		return result;
 
     }
 

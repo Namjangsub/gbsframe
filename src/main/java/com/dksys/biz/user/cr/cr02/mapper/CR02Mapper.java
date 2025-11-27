@@ -36,7 +36,8 @@ public interface CR02Mapper {
 
     int insertOrdrs(Map<String, String> param);
 
-    void updateOrdrs(Map<String, String> param);
+    // void updateOrdrs(Map<String, String> param);
+    int updateOrdrs(Map<String, String> param);
 
     int insertOrdrsDetail(Map<String, String> param);
 
@@ -117,4 +118,6 @@ public interface CR02Mapper {
 	List<Map<String, Object>> unsettledAmtCreditChk(Map<String, String> paramMap);
 	
 	Map<String, Object> settledAmtCreditTotalAmt(Map<String, String> paramMap);
+
+	Map<String, String> selectBomCheck(Map<String, String> paramMap);
 }
