@@ -314,7 +314,7 @@ public class WB20SvcImpl implements WB20Svc {
 		// deptId 로 팀장 id 가져오기~~
 		Map<String, String> detailMap = wb24Mapper.selectDept2TeamManagerInfo(paramMap);
 		
-		if (detailMap.get("id").equals(paramMap.get("userId")) && isManagerDept) {
+		if (detailMap != null && detailMap.get("id").equals(paramMap.get("userId")) && isManagerDept) {
 			if ("TODODIV2030".equals(paramMap.get("todoDiv2CodeId"))) {	// 발주요청서 따로 결과등록
 				if ("GUN30".equals(paramMap.get("deptId")) ||
 					"GUN40".equals(paramMap.get("deptId")) ||
