@@ -240,7 +240,7 @@ public class CR02Svcmpl implements CR02Svc {
 				HashMap<String, String> bomParMap = new HashMap<>();
 				bomParMap.put("salesCd", saveSalesCd);
 				Map<String, String> selectBomCheck = cr02Mapper.selectBomCheck(bomParMap);
-				if (Integer.parseInt(selectBomCheck.get("bm14Cnt")) > 0 || Integer.parseInt(selectBomCheck.get("sm01Cnt")) > 0 ) {
+				if (Integer.parseInt(selectBomCheck.get("bm14Cnt")) > 1 || Integer.parseInt(selectBomCheck.get("sm01Cnt")) > 1 ) {
 					throw new RuntimeException("설비 ("+ saveSalesCd + ")에 설계BOM 또는 구매BOM에 이미 등록되어 있습니다. 전산실에 문의해주세요.");
 				}
             } catch (Exception e) {
