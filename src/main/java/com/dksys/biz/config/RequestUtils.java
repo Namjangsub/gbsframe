@@ -39,19 +39,31 @@ public class RequestUtils {
 		return "UNKNOWN";
 	}
 
+	public static String detectDeviceType(String ua) {
+//        String ua = userAgent.getHeader("User-Agent");
+        if (ua == null) ua = "";
+        String s = ua.toLowerCase();
 
-	private static final Pattern MOBILE_INDICATOR = Pattern.compile(
-		    "(?i)" +               // 대소문자 무시
-		    "android|webos|iphone|ipad|ipod|blackberry|iemobile|blackberry|opera mini|mobile"
-		);
-    public static String detectDeviceType(String ua) {
-        if (ua == null) {
-            return "DESKTOP";          // UA 없으면 데스크톱으로 간주
+        if (s.contains("ipad")) return "TABLET";
+        if (s.contains("macintosh") && s.contains("mobile/")) return "TABLET";
+
+        if (s.contains("iphone") || s.contains("ipod")) return "PHONE";
+
+        if (s.contains("android")) {
+            return s.contains("mobile") ? "PHONE" : "TABLET";
         }
-		return MOBILE_INDICATOR.matcher(ua).find()
-		           ? "MOBILE"
-		           : "DESKTOP";
+
+        if (s.contains("iemobile") || s.contains("opera mini") || s.contains("webos") || s.contains("blackberry")) {
+            return "PHONE";
+        }
+
+        if (s.contains("windows") || s.contains("macintosh") || s.contains("x11") || s.contains("linux")) {
+            return "DESKTOP";
+        }
+
+        return "DESKTOP"; // UNKNOWN → DESKTOP 폴백
     }
+
     	
 	public static String getClientIpOld() {
 		HttpServletRequest request = getCurrentHttpRequest();

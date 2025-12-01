@@ -3,7 +3,6 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<!-- <meta name="viewport" content="width=device-width, initial-scale=0.6, viewport-fit=cover"> -->
 <meta name="viewport" content="width=device-width, initial-scale=0.6, user-scalable=no">
 <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
 <link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
@@ -269,11 +268,12 @@
 	var gridView = {
 		initView : function() {
 			this.target = new ax5.ui.grid();
+			var _this = this; 
 			this.target.setConfig({
+				target: $('[data-ax5grid="first-grid"]'),
 				showRowSelector: false,
 				multipleSelect: false,
 				sortable: true,
-				target: $('[data-ax5grid="first-grid"]'),
 				header: {
 					align: "center",
 					selector: true
@@ -284,31 +284,19 @@
 						this.self.select(this.dindex);
 					},
 					onDBLClick: function () {
-						  if (this.column.key == "reqNo" ){    //reqNo = 발주요청번호 필드 선택시
-							  if (this.item.issSts == 'ISSSTS03') {	//문제에서 완료처리된것
-								  wbsIssModal(this.item);			//이슈조회요청서 조회
-							  } else if (!this.item.acteDt) {	//문제에서 완료처리된것
-							  	  insertQualityReqModal(); 	//발주요청서 수정으로 진입
-							  } else {
-								   if (this.item.sameTimeResult == 'Y'){
-									   insertQualityReqModal();
-								   } else {
-									   insertQualityResultModal(this.item);
-								   }
-							  }
-						  } else if (this.column.key == "acteDt" ){    //acteDt = 완료일자
-							   if (!this.item.reqNo) {
-									wbsIssModal(this.item);			//이슈수정모드
-								   return false;	//발주요청 조치결과 번호가 없으면 패스함.
-							   } else if (this.item.sameTimeResult == 'Y'){
-								   insertQualityReqModal();
-							   } else {
-								   insertQualityResultModal(this.item);
-							   }
-						  } else{
-								 wbsIssModal(this.item);			//이슈수정모드
-						  }
-					},
+						// this.self  : gridInstance
+						// this.dindex: 행 index
+						// this.item  : 행 데이터
+						// this.column: 컬럼 정보
+						var grid   = this.self;
+						var dindex = this.dindex;
+						var doindex = this.doindex;
+						var item   = this.item;
+						var colKey = this.column.key;
+						var evt    = '' //this.event;
+						var $cell  = '' //$(evt.target).closest("[data-ax5grid-column]"); // 여기서 셀 DOM 추출
+						_this.openFile(grid, dindex, doindex, item, $cell, colKey, evt);
+                    },
 					columnHeight: 50
 				},
 				page : {
@@ -408,9 +396,41 @@
 					,{key: "sameTimeResult",label: "결과동시등록",		width: 60,		align: "center", 	hidden: true}
 				]
 			}); 
-			
+			// 여기서 태블릿 롱터치 바인딩
+			bindTabletLongPressForGrid(this.target, function (grid, dindex, doindex, item, $cell, colKey, evt) {
+				_this.openFile(grid, dindex, doindex, item, $cell, colKey, evt); // 더블클릭과 동일한 처리
+			});
 			return this;
 		},
+		openFile: function (grid, dindex, doindex, item, $cell, colKey, evt) {
+//				console.log("openFile:", item);// 파일 열기/다운로드 등 공통 처리
+	        if (!item) return;
+	        this.target.select((doindex==undefined)?dindex:doindex);
+			if (colKey == "reqNo" ){    //reqNo = 발주요청번호 필드 선택시
+				if (item.issSts == 'ISSSTS03') {	//문제에서 완료처리된것
+					wbsIssModal(item);			//이슈조회요청서 조회
+				} else if (!item.acteDt) {	//문제에서 완료처리된것
+					insertQualityReqModal(); 	//발주요청서 수정으로 진입
+				} else {
+					if (item.sameTimeResult == 'Y'){
+					   insertQualityReqModal();
+					} else {
+					   insertQualityResultModal(item);
+					}
+				}
+			} else if (colKey == "acteDt" ){    //acteDt = 완료일자
+				if (!item.reqNo) {
+					wbsIssModal(item);			//이슈수정모드
+					return false;	//발주요청 조치결과 번호가 없으면 패스함.
+				} else if (item.sameTimeResult == 'Y'){
+					insertQualityReqModal();
+				} else {
+					insertQualityResultModal(item);
+				}
+			} else{
+				wbsIssModal(item);			//이슈수정모드
+			}
+        },
 		setData : function(_pageNo) {
 			if (isFirst) return;
 

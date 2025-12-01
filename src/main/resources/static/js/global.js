@@ -23,10 +23,19 @@ var DOMAIN_URL = "";
 
 //const deviceType = isMobile(); //desktop, tablet, phone// ✅ async IIFE로 감싸서 await 사용
 var deviceType='';
+var ipadType='';
 var connErrorUrl = '/static/index.html';
 (async () => {
 	deviceType = await isMobile();   // 'desktop'
-	if (deviceType != "desktop") connErrorUrl = `/static/${deviceType}/index.html`
+	if (deviceType == "desktop") {
+		connErrorUrl = '/static/index.html';
+	} else if (deviceType == "phone") {
+		connErrorUrl = `/static/mobile/index.html`;
+	} else if (deviceType == "tablet") {
+		connErrorUrl = `/static/tablet/index.html`;
+	} else {
+		connErrorUrl = '/static/index.html';
+	}
 })();
 
 async function isMobile() {
@@ -36,19 +45,22 @@ async function isMobile() {
 async function isMobileType() {
   const ff = await detectFormFactor();
   //  return ff === 'phone' || ff === 'tablet';
-  return (ff =="desktop") ? "" : ff;
+//  return (ff =="desktop") ? "" : ff;
+  return ff;
 }
 /**
  * 스마트폰/태블릿/데스크톱 판별 (크로스 브라우저 안전)
  * 우선순위: UA-CH(model/mobile) → UA 모델 패턴 → Viewport(600dp) → 보조 휴리스틱
  */
 async function detectFormFactor() {
+  ipadType = "";
   // 1) Chromium의 User-Agent Client Hints (고정확) : model/mobile 등 고엔트로피 값
   if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
     try {
       const { model, mobile, platform, platformVersion } =
         await navigator.userAgentData.getHighEntropyValues(['model','mobile','platform','platformVersion']);
       // 모델 우선(삼성/레노버/화웨이/샤오미/아이패드 등)
+	  if (/iPad/i.test(model)) ipadType="iPad";
       if (isTabletModel(model) || /iPad/i.test(model)) return 'tablet';
       if (isPhoneModel(model)) return 'phone';
       // 모바일 플래그: true면 폰/태블릿 중 하나. 아래 뷰포트로 세분화
@@ -60,11 +72,14 @@ async function detectFormFactor() {
   const ua = navigator.userAgent || '';
   // iPadOS 13+ 보정: MacIntel + 터치
   const isIPadOS13Up = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+  if (/iPad/i.test(ua) || isIPadOS13Up)
+	{
+		ipadType = 'iPad';
+		return 'tablet';
+	} 
 
-  if (/iPad/i.test(ua) || isIPadOS13Up) return 'tablet';
   if (isTabletModel(ua)) return 'tablet';
   if (isPhoneModel(ua)) return 'phone';
-
   // 3) 뷰포트 휴리스틱 (Material Design 기준 600dp 이상이면 태블릿)
   const dpr = window.devicePixelRatio || 1;
   const minCssPx = Math.min(window.screen.width, window.screen.height) / dpr; // CSS px ≈ dp
@@ -95,23 +110,25 @@ function isTabletModel(s) {
   if (/\b(Mi ?Pad|Mipad|Pad [0-9])\b/i.test(s)) return true;
   return false;
 }
-(function (global) {
-  /**
-   * 디자인 기준폭 대비 initial-scale 자동 계산 후 meta viewport 설정
-   *
-   * @param {number} designWidth - 화면 설계 기준 가로 해상도(예: 1920, 1600 등)
-   * @param {object} options
-   *   - mode:       'css' | 'physical'  (기본 'css')
-   *   - designHeight: 물리기준일 때 기준 세로 해상도 (예: 1080, 1200 등, 없으면 가로비율로 추정)
-   *   - lockScale: true 이면 maximum-scale를 initial과 같게 고정 (기본 true)
-   *   - scalable:  false 이면 user-scalable=no (줌 금지), true 이면 줌 허용
-   */
-  function applyDynamicViewport(designWidth = 1920, options) {
+//  /**
+//   * 디자인 기준폭 대비 initial-scale 자동 계산 후 meta viewport 설정
+//   *
+//   * @param {number} designWidth - 화면 설계 기준 가로 해상도(예: 1920, 1600 등)
+//   * @param {object} options
+//   *   - mode:       'css' | 'physical'  (기본 'css')
+//   *   - designHeight: 물리기준일 때 기준 세로 해상도 (예: 1080, 1200 등, 없으면 가로비율로 추정)
+//   *   - lockScale: true 이면 maximum-scale를 initial과 같게 고정 (기본 true)
+//   *   - scalable:  false 이면 user-scalable=no (줌 금지), true 이면 줌 허용
+//   */
+// 전역 유틸 객체 (이미 있다면 내부만 취사선택해서 쓰시면 됩니다)
+var applyResponsiveViewport = (function () {
+
+  function applyResponsive(designWidth, options) {
     if (!designWidth || designWidth <= 0) return;
 
     var opts = Object.assign({
-      mode: 'physical',         // 'css' 또는 'physical'
-      designHeight: null,  // physical 모드일 때 기준 세로 해상도
+      mode: 'css',          // 'css' | 'physical'
+      designHeight: null,   // physical 모드일 때 기준 세로 해상도
       lockScale: true,
       scalable: false
     }, options || {});
@@ -124,73 +141,71 @@ function isTabletModel(s) {
       document.head.appendChild(meta);
     }
 
-    // 2) 기기 현재 폭/높이, DPR
-    var cssWidth  = window.innerWidth  || document.documentElement.clientWidth;
-    var cssHeight = window.innerHeight || document.documentElement.clientHeight;
+    // 2) 현재 뷰포트 크기(CSS px 기준)
+	if (deviceType == "desktop") {
+		cssWidth = window.innerWidth  || document.documentElement.clientWidth;
+		cssHeight = window.innerHeight || document.documentElement.clientHeight;
+	} else {
+		var cssWidth  = screen.width  || window.innerWidth;
+		var cssHeight = screen.height || window.innerHeight;
+	}
+    if (!cssWidth || !cssHeight) return;
 
-    var screenCssWidth  = (window.screen && window.screen.width)  ? window.screen.width  : cssWidth;
-    var screenCssHeight = (window.screen && window.screen.height) ? window.screen.height : cssHeight;
-
-    var dpr = window.devicePixelRatio || 1;
-
-    var scale;
-
-    if (opts.mode === 'physical') {
-      // ===== 물리 해상도 기준 =====
-      var physicalWidth  = screenCssWidth  * 1;
-      var physicalHeight = screenCssHeight * 1;
-
-      // 기준 세로 해상도 (없으면 현재 기기 종횡비를 기준폭에 맞춰 추정)
-      var designHeight = opts.designHeight;
-      if (!designHeight || designHeight <= 0) {
-        // 예) 2560x1600 기기에 designWidth=1920 이면
-        //     designHeight ≈ 1600 * 1920 / 2560
-        designHeight = Math.round(physicalHeight * (designWidth / physicalWidth));
-      }
-
-      // 가로/세로 스케일 각각 계산
-      var scaleW = physicalWidth  / designWidth;
-      var scaleH = physicalHeight / designHeight;
-
-      // ★ 가로/세로 비율 중 작은 값 적용 (컨텐츠가 화면 안에 다 들어오게)
-      scale = Math.min(scaleW, scaleH);
-
-    } else {
-      // ===== CSS 뷰포트 기준 (권장) =====
-      // 기존 로직과 동일: 기기 CSS 가로폭 / 기준 가로폭
-      scale = cssWidth / designWidth;
-    }
-
-    // 너무 커지면 1.0으로 제한
+	// === 단순 CSS 가로폭 기준 ===
+	var href = window.location.href || '';
+	if (href.indexOf('mobile') !== -1) {
+		scale = 1;
+	} else {
+		scale = cssWidth / designWidth;
+	}
+    // 3) 너무 커지는 경우 1로 제한 (PC 큰 해상도에서 확대 방지)
     if (scale > 1) {
       scale = 1;
     }
+	
+	if (deviceType != 'tablet') scale = scale * 0.95;
+	if (ipadType == 'iPad') scale = scale * 0.6;
+    // 4) 소수점 정리
+//    scale = Math.round(scale * 1000) / 1000;
+    scale = Math.floor(scale * 100) / 100;
 
-    // 소수점 정리
-    scale = Math.round(scale * 1000) / 1000;
-
-    // 3) content 문자열 구성
+    // 5) meta content 구성
     var content = 'width=device-width, initial-scale=' + scale;
 
-//    if (opts.lockScale) {
-//      // 확대율을 고정하려면 maximum-scale도 동일하게
-//      content += ', maximum-scale=' + scale;
-//    }
-
-    if (!opts.scalable) {
-      // 줌 막고 싶으면 user-scalable=no
-      content += ', user-scalable=yes';
+    if (opts.lockScale) {
+      content += ', maximum-scale=' + scale;
+    }
+	
+	console.log('innerWidth/innerHeight :', window.innerWidth, window.innerHeight);
+	console.log('visualViewport        :',
+	    window.visualViewport && window.visualViewport.width,
+	    window.visualViewport && window.visualViewport.height);
+	console.log('screen.width/height   :', screen.width, screen.height);
+	console.log('devicePixelRatio      :', window.devicePixelRatio);
+	
+	console.log('cssWidth=', cssWidth,
+	            'cssHeight=', cssHeight,
+	            'scaleW=', cssWidth / designWidth,
+	            'scaleH=', cssHeight / opts.designHeight,
+	            'scale(final)=', scale);
+//	alert('innerWidth/innerHeight :' + window.innerWidth + ', ' + window.innerHeight 
+//		+ '\nvisualViewport        :' + (window.visualViewport && window.visualViewport.width) 
+//		                              + ', ' + (window.visualViewport && window.visualViewport.height)
+//		+ '\nscreen.width/height   :'+screen.width + ', ' + screen.height 
+//		+ '\nscale(final)          :'+ scale
+//		+ '\ndevicePixelRatio      :' + window.devicePixelRatio);			
+    if (opts.scalable === false) {
+      content += ', user-scalable=no';
     }
 
     meta.setAttribute('content', content);
   }
 
-  // 전역에서 사용 가능하도록 export
-  global.DynamicViewport = {
-    apply: applyDynamicViewport
+  return {
+    applyResponsive: applyResponsive
   };
 
-})(window);
+})();
 
 
 /**
@@ -1766,9 +1781,19 @@ $.urlParam = function(name){
 
 
 function authChk(menuUrl){
-	if (deviceType != 'phone') {	//모바일일경우 제외
-		DynamicViewport.apply(1920, {mode: 'physical', designHeight: 1024, lockScale:true, scalable:false });
-	}
+//	if (deviceType != 'phone') {	//모바일일경우 제외
+		applyResponsiveViewport.applyResponsive(1920, {mode: 'physical', designHeight: 911, lockScale:false, scalable:true });
+//	}	 else {
+//	  // **PC/노트북/외부 모니터는** meta를 1.0 고정 (뷰포트 건드리지 않음)
+//	  var meta = document.querySelector('meta[name="viewport"]');
+//	  if (!meta) {
+//	    meta = document.createElement('meta');
+//	    meta.name = 'viewport';
+//	    document.head.appendChild(meta);
+//	  }
+//	  meta.setAttribute('content', 'width=device-width, initial-scale=1');
+//	}
+	
 	if(!menuUrl){
 		var url = window.location.href;
 		menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
