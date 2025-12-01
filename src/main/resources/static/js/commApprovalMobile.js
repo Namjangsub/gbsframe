@@ -297,15 +297,21 @@ function Approval(htmlParam, param, popParam) {
 				}
 			}
 		}
-		let chkFlag = false;
-		if (this.param.todoDiv2CodeId === "TODODIV2020" && this.param.teamManager == '평가') {
-			chkFlag = updateQualityResultComment('결과수정');
-		} else if (this.param.todoDiv2CodeId === "TODODIV2030" && this.param.teamManager == '평가') {
-			chkFlag = updateQualityResultComment('결과수정');
-		} else if (this.param.todoDiv2CodeId === "TODODIV2090" && this.param.teamManager == '평가') {
-			chkFlag = updateIssueComment('결과수정');
+
+		// 평가대상인지 확인하고 평가대상은 결재방지
+		let chkFlag = true;
+
+		if (this.param.teamManager == '평가') {
+			if (this.param.todoDiv2CodeId === "TODODIV2020" || this.param.todoDiv2CodeId === "TODODIV2030") {
+				chkFlag = updateQualityResultComment('결과수정');
+			} else if (this.param.todoDiv2CodeId === "TODODIV2090") {
+				chkFlag = updateIssueComment('결과수정');
+			}
+
+			if (!chkFlag) {
+				return false;
+			}
 		}
-		if (!chkFlag) {return false;}
 
 		//승인 save
 		if( !this.applyBtn ) {
