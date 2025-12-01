@@ -740,31 +740,41 @@ function downloadFile(fileKey, fileName, coCd) {
 			xhr.setRequestHeader("Authorization", authorizationToken);
 			xhr.setRequestHeader("X-GBS-Source", "pdfjs-viewer");
 			xhr.onload = function () {
-				if (xhr.status === 200 && !window.fileDownloadApp) {
-					var contentType = xhr.getResponseHeader("Content-Type");
-					// 만약 응답 Content-Type이 text/plain이면, 오류 메시지가 담겨있는 경우입니다.
-					if (contentType && contentType.indexOf("text/plain") !== -1) {
-						var reader = new FileReader();
-						reader.onload = function (e) {
-							customAlert("전산실 연락바랍니다.\n\n" + e.target.result);
-						};
-						reader.readAsText(xhr.response);
+				if (xhr.status === 200) {
+					if (window.fileDownloadApp && typeof window.fileDownloadApp.postMessage === "function") {
+						// 화면 주소 기준으로 도메인 부분 가져오기
+						var host = window.location.origin;
+
+						// 서버에서 실제 파일을 내려주는 URL (기존 파일 다운로드 URL 재사용)
+						var url =host +"/admin/cm/cm08/fileDownloadAuth2?fileKey=" + fileKey + "&userId=" + jwt.userId + "&coCd=" + coCd;
+
+						// 플러터에서 사용하는 형식: "url,파일명"
+						var paramMsg = url + "," + fileName;
+
+						// 네이티브(플러터)로 메시지 전송
+						window.fileDownloadApp.postMessage(paramMsg);
 					} else {
-						// 정상적인 파일이면 바로 다운로드 진행
-						var blob = xhr.response;
-						var downloadUrl = URL.createObjectURL(blob);
-						var a = document.createElement("a");
-						a.href = downloadUrl;
-						a.download = fileName || 'download';
-						document.body.appendChild(a);
-						a.click();
-						document.body.removeChild(a);
-						URL.revokeObjectURL(downloadUrl);
+						var contentType = xhr.getResponseHeader("Content-Type");
+						// 만약 응답 Content-Type이 text/plain이면, 오류 메시지가 담겨있는 경우입니다.
+						if (contentType && contentType.indexOf("text/plain") !== -1) {
+							var reader = new FileReader();
+							reader.onload = function (e) {
+								customAlert("전산실 연락바랍니다.\n\n" + e.target.result);
+							};
+							reader.readAsText(xhr.response);
+						} else {
+							// 정상적인 파일이면 바로 다운로드 진행
+							var blob = xhr.response;
+							var downloadUrl = URL.createObjectURL(blob);
+							var a = document.createElement("a");
+							a.href = downloadUrl;
+							a.download = fileName || 'download';
+							document.body.appendChild(a);
+							a.click();
+							document.body.removeChild(a);
+							URL.revokeObjectURL(downloadUrl);
+						}
 					}
-				} else if (xhr.status === 200 && window.fileDownloadApp) {
-					var host = window.location.origin;
-					var paramMsg = host + "/admin/cm/cm08/fileDownloadAuth2?fileKey="+fileKey+"&userId="+jwt.userId +"&coCd="+$('#coCd').val()+ true;
-					window.fileDownloadApp.postMessage(paramMsg);
 				} else {
 					console.error("백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
 					customAlert("파일이 존재하지 않습니다.  전산실 연락바랍니다.");
