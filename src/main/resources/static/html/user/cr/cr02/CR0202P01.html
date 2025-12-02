@@ -26,6 +26,7 @@
 		<div class="form-group popup_table">
 			<div id="createHistoryDiv" class="contents_tit">
 				<div class="add_btn_small pdl10">
+					<button type="button" id="taskBtn" onclick="openSecondModalTaskPop();">과제관리</button>
 					<a id="ReportMain" onclick="setReportMain();" style="height: 30px; line-height: 28px; width: 100px;">원가관리표 출력</a>
 					<a id="viewHistory" onclick="comparison_cr14_Modal();" style="height: 30px; line-height: 28px; width: 100px;">변경이력 조회</a>
 					<a id="createHistory" onclick="createHistory();" class="coAuthChk" style="height: 30px; line-height: 28px; width: 60px;" authchk>Ver.Up</a>
@@ -404,6 +405,7 @@
 	$(document).ready(function () {
 		setCommonSelect($(".popup_area select[data-kind]"));
 		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
+		$("#taskBtn").hide();
 
 		$("#mngIdNm").val(jwt.userNm);
 		$("#mngId").val(jwt.userId);
@@ -831,6 +833,22 @@
 		var detailArr = [];
 		let clmnDtCnt = 0;
 		let clmnAmtCnt = 0;
+
+		// 헤더에 PJT가 들어있는 경우에만 검사 (비어 있으면 통과)
+		if ($("#clntPjt").val()) {
+			for (var i = 0; i < rowListDetail.length; i++) {
+				var row = rowListDetail[i];
+
+				// 설비행(ORDRSDTLDIV1010)만 검사
+				if (row.ordrsDtlDiv10 === 'ORDRSDTLDIV1010') {
+					// openSalesCdSearch에서 넣어준 clntPjt 사용
+					if (row.clntPjt && row.clntPjt !== $("#clntPjt").val()) {
+						customAlert("고객사PJT가 다른 설비가 존재합니다. 동일한 고객사PJT의 원천 SALES CODE만 선택해 주세요.");
+						return false;
+					}
+				}
+			}
+		}
 
 		const tempOrdrsDiv = $("#ordrsDiv").val();
 		if(tempOrdrsDiv == "ORDRSDIV3" || tempOrdrsDiv == "ORDRSDIV8" || tempOrdrsDiv == "ORDRSDIV9"){ //무상AS start, 수주취소, 가수주건
@@ -2044,6 +2062,7 @@
 		$("#ReportMain").hide();
 		$("#viewHistory").hide();
 	} else if (actionType == "U") {
+		$('#taskBtn').show();
 		//타이틀명 변경
 		$('#cr02PopTit').text('수주 수정')
 
@@ -2561,8 +2580,14 @@
 			var row = grid.target.getList("selected")[0];
 			var rowIndex = gridOrdrsDetail.selectedDataIndexs[0];
 			var rowData = gridOrdrsDetail.getList()[rowIndex];
-			//설비인것만 세팅
 
+			// 선택한 원천 salesCd의 고객사 PJT가 기존에 등록되어 잇는 PJT가 다르면 return false 시키고 원복시켜야함
+			if ((actionType == 'U' && originalOrdrsInfo != undefined && originalOrdrsInfo.clntPjt != row.clntPjt)) {
+				customAlert("고객사PJT가 등록되어 있는 자료와 다릅니다. 확인하고 다시 입력해주세요.")
+				return false;
+			}
+
+			//설비인것만 세팅
 			if (rowData.ordrsDtlDiv10 == 'ORDRSDTLDIV1010') {
 				rowData = {
 					// ordrsDtlDiv10 : row.ordrsDtlDiv10,
@@ -2582,6 +2607,7 @@
 					// laborCostMfgCost : 0,
 					dataChk : "U",
 					cudCheck : rowData.cudCheck,
+					clntPjt : row.clntPjt
 					// estTrgtCost : 0,   //수주목표원가
 				};
 
@@ -3378,7 +3404,25 @@
 			//callBakc 처리없음			
 		});
 	}
+
 	
+	//과제 팝업
+	function openSecondModalTaskPop() {
+		var row = gridOrdrsDetail.getList("selected")[0];
+		if (!row) return false;
+		debugger;
+		var paramObj = {
+			"sjNo"        : row.ordrsNo,
+			"verNo"       : row.verNo,
+			"fileTrgtKey" : row.wb21FileTrgtKey,
+			"coCd" 	      : row.coCd,
+			"userId"      : jwt.userId,
+			"pgmId"       : "WB2101M02",
+			"actionType"  : "U",
+			"row"	      : row
+		};
+		openSecondModal("/static/html/user/wb/wb21/WB2101P01.html", 1200, 900, "과제관리수정", paramObj);
+	}
 	
 	</script>
 
