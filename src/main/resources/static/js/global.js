@@ -1479,7 +1479,7 @@ function logoutClick(){
         },
 	    xhrFields: { withCredentials: true }, 
 	    success: function() {
-	        location.href = "/";
+	        location.href = connErrorUrl; //접속 기기에 다른 로그인 Page로 이동
 	    }
 	});
 //	location.href = "/";
