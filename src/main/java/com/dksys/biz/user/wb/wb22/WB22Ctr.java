@@ -573,4 +573,30 @@ public class WB22Ctr {
 		}
 		return "jsonView";
 	}
+
+	// 실적등록여부
+	@PostMapping(value = "/wbsRsltsChkExist")
+	public String wbsRsltsChkExist(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = wb22Svc.wbsRsltsChkExist(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/copyAllPjtYn") 
+	public String copyAllPjtYn(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {	
+		try {
+			if (wb22Svc.copyAllPjtYn(paramMap, mRequest) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+    }
 }

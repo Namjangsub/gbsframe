@@ -161,4 +161,10 @@ public interface WB22Mapper {
 	List<Map<String, String>> selectTrgtWbsRsltList(Map<String, String> paramMap);
 
 	int deleteWbsRslt(Map<String, String> paramMap);
+
+	List<Map<String, String>> salesCdList(Map<String, String> paramMap);
+
+	Map<String, String> selectWbsPlanTarget(Map<String, String> paramMap);
+
+	List<Map<String, String>> wbsRsltsChkExist(Map<String, String> paramMap);
 }

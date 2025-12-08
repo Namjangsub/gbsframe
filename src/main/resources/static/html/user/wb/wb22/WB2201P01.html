@@ -138,14 +138,30 @@
 
 					<thead>
 						<tr>
-							<td colspan="9" style="height:30px;text-align: left;">▣ 일정계획정보 
-								<div id="addrow1" class="add_btn_small pdl10">
-									<a id="btn15" onclick="copyAllPlanPopUp();" data-grid-control="row-add1" style="width:60px;height: 30px; line-height: 28px;">복사</a>
-									<a id="btn1" onclick="wbsLevel1Insert();" data-grid-control="row-add1" style="width:60px;height: 30px; line-height: 28px;">저장</a>
-									<a id="btn2" onClick="updateWbsChanges();" data-grid-control="row-add1" style="width:100px;height: 30px; line-height: 28px;">변경요청 저장</a>
-									<!-- <a id="btn2" onclick="wbsLevel1confirm('N');" data-grid-control="row-add2" style="width:60px;height: 30px; line-height: 28px;">미확정</a> -->
-									<a id="btn3" onclick="wbsLevel1confirm('Y');" data-grid-control="row-add3" style="width:60px;height: 30px; line-height: 28px;">확정</a>
-									<a id="btn4" onclick="createVerUp();" data-grid-control="row-add3" style="width:60px;height: 30px; line-height: 28px;">Ver. Up</a>
+							<td colspan="9" style="height:30px;">
+								<div style="display:flex; justify-content:space-between; align-items:center;">
+									<div style="display:flex; align-items:center; text-align:left;">
+										<span style="margin-right:10px;">▣ 일정계획정보</span>
+
+										<div id="copyCheckBox">
+											<label style="margin-right:10px;">
+												<input type="checkbox" id="allPjtYn" class="copyChk" style="vertical-align: middle; margin-right:3px; margin-bottom:4px;"/>프로젝트 전체
+											</label>
+
+											<label style="margin-right:10px;">
+												<input type="checkbox" id="taskPlanYn" class="copyChk" style="vertical-align: middle; margin-right:3px; margin-bottom:4px;"/>TASK 계획 포함
+											</label>
+										</div>
+									</div>
+									<div id="addrow1" class="add_btn_small pdl10" style="white-space:nowrap;">
+										<a id="btn15" onclick="copyAllPlanPopUp();" style="width:60px;height:30px;line-height:28px;">복사</a>
+										<a id="btn1" onclick="wbsLevel1Insert();" style="width:60px;height:30px;line-height:28px;">저장</a>
+										<a id="btn2" onclick="updateWbsChanges();" style="width:100px;height:30px;line-height:28px;">변경요청 저장</a>
+										<!-- <a id="btn2" onclick="wbsLevel1confirm('N');" data-grid-control="row-add2" style="width:60px;height: 30px; line-height: 28px;">미확정</a> -->
+										<a id="btn3" onclick="wbsLevel1confirm('Y');" style="width:60px;height:30px;line-height:28px;">확정</a>
+										<a id="btn4" onclick="createVerUp();" style="width:60px;height:30px;line-height:28px;">Ver. Up</a>
+									</div>
+
 								</div>
 							</td>
 						</tr>
@@ -1054,8 +1070,156 @@
 	        $('#planExcept').show();        // select 표시
 	        $('#planExceptNm').hide();      // input 숨김
 	    }
-		
+
+		$('#allPjtYn').on('change', function () {
+			copyAllPjtYn('N', $(this).is(':checked'));  // 프로젝트 전체
+		});
+
+		$('#taskPlanYn').on('change', function () {
+			copyAllPjtYn('Y', $(this).is(':checked'));  // TASK 계획 포함
+		});
 	});
+
+	// 프로젝트 전체 체크, TASK 계획 포함 체크시 동작 함수
+	function copyAllPjtYn(taskYn, isChecked) {
+		// 체크 해제시
+		if (!isChecked) {
+			return false;
+		}
+		// 
+		if ($('#smrizeId').val() == jwt.userId || $('#prdMngChk option').attr('data-etc').replace(/\s/g,'').split(',').includes(jwt.userId) || jwt.authInfo.includes('AUTH999') ) {
+			// 로그인한 유저가 총괄PM, 생산관리, 시스템관리자는 해당 버튼 클릭가능
+		} else {
+			return false;
+		}
+		if (lastPlanExcept != $("#planExcept").val()) {
+			wb21ChangFlag = 'Y'
+		} else {
+			wb21ChangFlag = 'N'
+		}
+
+		let msg = "";
+		if (taskYn === 'Y') {
+			msg = "Task 계획을 포함한 다른 미확정 설비에도 복사하시겠습니까?";
+		} else {
+			msg = "프로젝트 일정을 다른 미확정 설비에도 복사하시겠습니까?";
+		}
+		if (wb21ChangFlag === 'Y') {
+			msg = "일정예외사항 변경 시 과제가 버전업됩니다.\n" + msg;
+		}
+		if (!confirm(msg)) {
+			if (taskYn == 'N') $("#allPjtYn").prop("checked", false);
+			else $("#taskPlanYn").prop("checked", false);
+			return false;
+		}
+
+		var rowList = gridView1.target.getList();
+		var formData = new FormData();
+		formData.append("coCd", $("#popForm #coCd").val());
+		formData.append("userId", jwt.userId);
+		formData.append("salesCd", $("#popForm #salesCd").val());
+		formData.append("pgmId", $("#popForm #pgmId").val());
+		formData.append("beginDt", $('#popForm #beginDt').val());
+		formData.append("acptncDt", $('#popForm #acptncDt').val());
+		formData.append("reqreDaycnt", $('#popForm #reqreDaycnt').val());
+		formData.append("year", $('#popForm #beginDt').val().substring(0,4));
+		formData.append("taskYn", taskYn);
+		formData.append("fileTrgtKey", $("#popForm #fileTrgtKey").val());
+		formData.append("wb21ChangFlag", wb21ChangFlag);
+		formData.append("planExcept",  $("#popForm #planExcept").val());
+
+		if(rowList.length > 0) {
+			var rowListArr = [];
+			$.each(rowList, function(idx, elem){
+				var rowListObj = elem;
+				rowListObj["coCd"] = elem.coCd;
+				rowListObj["wbsPlanCodeId"] = elem.wbsPlanCodeId;
+				rowListObj["wbsPlanCodeNm"] = elem.wbsPlanCodeNm;
+				rowListObj["wbsPlanNo"] = elem.wbsPlanNo;
+				rowListObj["salesCd"] = elem.salesCd;
+				rowListObj["verNo"] = elem.verNo;
+				rowListObj["wbsPlanMngId"] = elem.wbsPlanMngId;
+				rowListObj["wbsPlansDt"] = elem.wbsPlansDt;
+				rowListObj["wbsPlaneDt"] = elem.wbsPlaneDt;
+				rowListObj["daycnt"] = elem.daycnt;
+				rowListObj["wbsPlanStsCodeId"] = elem.wbsPlanStsCodeId;
+				rowListObj["creatId"] = jwt.userId;
+				rowListObj["creatPgm"] = "WB2201M01";
+				rowListArr.push(rowListObj);
+			});
+			formData.append("rowListArr", JSON.stringify(rowListArr));
+		}
+
+		var canProceed = true;
+		if (taskYn == 'Y') {
+			var paramObj = {
+				"coCd"		: $("#popForm #coCd").val(),
+				"salesCd"	: $("#popForm #salesCd").val(),
+				"ordrsNo" 	: $("#popForm #salesCd").val().slice(0,5)
+			}
+			postAjaxSync("/user/wb/wb22/wbsRsltsChkExist", paramObj , null, function(data) {
+				var list = data.result;
+				if (list.length > 0) {
+					var msgLines = [];
+					$.each(list, function(idx, row) {
+						msgLines.push(
+							row.salesCd + " : " + row.wbsPlanCodeKindNm + " 일정에 실적이 등록"
+						);
+					});
+					msgLines.push("");
+					msgLines.push("위 설비의 Task 계획및 실적을 삭제하고 현재 Task계획하고 실적을 복사하시겠습니까?");
+
+					var deleteMsg = msgLines.join("\n");
+
+					if (!confirm(deleteMsg)) {
+						$("#taskPlanYn").prop("checked", false);
+						canProceed = false;
+					}
+				} 
+			})
+		}
+
+		if (!canProceed) {
+			return false;
+		}
+
+		filePostAjax("/user/wb/wb22/copyAllPjtYn", formData, function(data) {
+			if (data.resultCode == 200) {
+				$("#btn1").hide();
+
+				var paramObj = {
+					"coCd": coCd,
+					"salesCd": salesCd,
+				};
+
+				postAjaxSync("/user/wb/wb22/selectSjInfo", paramObj, null, function(data){
+					var row = data.resultList;
+					if (row != undefined) {
+						$.each(row, function (key, val) {
+							$("#popForm #" + key).val(val);
+							if (key == "closeYn") {
+								var color = val == "Y" ? "color-circle_02.png" : "color-circle_01.png";
+								var html = '<img src="/static/img/'+color+'" align="center" style="width: 10px;height: 10px;"></img>';
+								$("#popForm #close").html(html)
+							}else if(key == "planExcept"){
+								lastPlanExcept = val;
+							}
+						});
+
+						// Validation 체크
+						if ($('#popForm #closeYn').val() == "N") {
+							alert("과제정보가 미확정입니다. 확정 후 입력 가능합니다.");
+						} else {
+							gridView1.setData(0);
+						}
+					}
+				});
+			} else {
+				customAlert("실패했습니다.");
+			}
+		});
+
+	}
 
 
 	function noGrid2List(list){
@@ -2581,8 +2745,8 @@
 				var codeId = null;
 				var formData = sjVerUpMakeFromData();
 				
-				
-				 filePostAjax("/user/wb/wb21/sjVerUpInsert", formData, function(data) {
+				formData.append("wb22Flag", "Y");	
+				filePostAjax("/user/wb/wb21/sjVerUpInsert", formData, function(data) {
 					//alert(data.resultMessage);
 					if (data.resultCode == 200) {
 						var salesCd = $("#popForm #salesCd").val();
