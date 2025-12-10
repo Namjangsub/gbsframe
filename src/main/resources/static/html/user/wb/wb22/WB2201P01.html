@@ -443,6 +443,10 @@
 						}else{
 							this.self.setValue(this.dindex, "daycnt", 0);
 						}
+						//  // 담당자 ID, 시작일자, 종료일자 변경시
+						if (this.key == "wbsPlanMngId" || this.key == "wbsPlansDt" || this.key == "wbsPlaneDt") {
+							chkRsltsExist(this.item);
+						}
 					},
 				},
 				contextMenu: {
@@ -1102,7 +1106,7 @@
 		if (taskYn === 'Y') {
 			msg = "Task 계획을 포함한 다른 미확정 설비에도 복사하시겠습니까?";
 		} else {
-			msg = "프로젝트 일정을 다른 미확정 설비에도 복사하시겠습니까?";
+			msg = "현재 설비의 일정을 해당 프로젝트의 다른 미확정 설비에도 복사하시겠습니까?";
 		}
 		if (wb21ChangFlag === 'Y') {
 			msg = "일정예외사항 변경 시 과제가 버전업됩니다.\n" + msg;
@@ -1149,40 +1153,6 @@
 			});
 			formData.append("rowListArr", JSON.stringify(rowListArr));
 		}
-
-		var canProceed = true;
-		if (taskYn == 'Y') {
-			var paramObj = {
-				"coCd"		: $("#popForm #coCd").val(),
-				"salesCd"	: $("#popForm #salesCd").val(),
-				"ordrsNo" 	: $("#popForm #salesCd").val().slice(0,5)
-			}
-			postAjaxSync("/user/wb/wb22/wbsRsltsChkExist", paramObj , null, function(data) {
-				var list = data.result;
-				if (list.length > 0) {
-					var msgLines = [];
-					$.each(list, function(idx, row) {
-						msgLines.push(
-							row.salesCd + " : " + row.wbsPlanCodeKindNm + " 일정에 실적이 등록"
-						);
-					});
-					msgLines.push("");
-					msgLines.push("위 설비의 Task 계획및 실적을 삭제하고 현재 Task계획하고 실적을 복사하시겠습니까?");
-
-					var deleteMsg = msgLines.join("\n");
-
-					if (!confirm(deleteMsg)) {
-						$("#taskPlanYn").prop("checked", false);
-						canProceed = false;
-					}
-				} 
-			})
-		}
-
-		if (!canProceed) {
-			return false;
-		}
-
 		filePostAjax("/user/wb/wb22/copyAllPjtYn", formData, function(data) {
 			if (data.resultCode == 200) {
 				$("#btn1").hide();
@@ -1219,6 +1189,66 @@
 			}
 		});
 
+	}
+
+	// 사용자에게 실적여부를 판단해서 해당 실적을 삭제할건지
+	function chkRsltsExist(item) {
+		if (!item) {
+			return false;
+		}
+		var paramObj = {
+			"coCd"				: $("#popForm #coCd").val(),
+			// "salesCd"			: $("#popForm #salesCd").val(),
+			"ordrsNo" 			: $("#popForm #salesCd").val().slice(0,5),
+			"wbsPlanCodeKind" 	: item.wbsPlanCodeId
+		}
+		postAjaxSync("/user/wb/wb22/wbsRsltsChkExist", paramObj , null, function(data) {
+			var list = data.result;
+			if (list.length > 0) {
+				var salesCdArr = [];
+				var wbsPlanName = "";
+				$.each(list, function(idx, row) {
+					wbsPlanName = row.wbsPlanCodeKindNm;
+					salesCdArr.push(row.salesCd);
+				});
+
+				var msgLines = [];
+				msgLines.push(
+					wbsPlanName + " 일정에 SALES CODE : " + salesCdArr.join(", ") + " 실적 등록이 되어 있습니다."
+				);
+				msgLines.push(""); 
+				msgLines.push("해당 일정의 Task 계획 및 실적을 삭제하시겠습니까?");
+
+				var deleteMsg = msgLines.join("\n");
+
+				if (confirm(deleteMsg)) {
+					var formData = new FormData();
+					formData.append("coCd", $("#popForm #coCd").val());
+					formData.append("verNo", item.verNo);
+					formData.append("userId", jwt.userId);
+					formData.append("salesCd", $("#popForm #salesCd").val());
+					formData.append("pgmId", $("#popForm #pgmId").val());
+					formData.append("year", $('#popForm #beginDt').val().substring(0,4));
+					formData.append("wbsPlanMngId", item.wbsPlanMngId);
+					formData.append("wbsPlanCodeId", item.wbsPlanCodeId);
+					formData.append("wbsPlanCodeKind", item.wbsPlanCodeId);
+					formData.append("wbsPlansDt", item.wbsPlansDt);		// 계획시작일
+					formData.append("wbsPlaneDt", item.wbsPlaneDt);		// 계획종료일
+					formData.append("daycnt", item.daycnt);
+					formData.append("wbsPlanStsCodeId", item.wbsPlanStsCodeId);
+					formData.append("verUpReason", item.verUpReason);
+
+					filePostAjax("/user/wb/wb22/deleteRslt", formData, function(data) {
+						if (data.resultCode == 200) {
+							wbsLevel1Insert();
+							gridView2.setData(0);
+						} else {
+							customAlert(data.resultMessage)
+						}
+					});
+				}
+			}
+		})
 	}
 
 
@@ -1356,9 +1386,7 @@
 			if (data.resultCode == 200) {
 				gridView1.setData(0);
 				if(fromConfirm){
-					
 					getGrid1RowList();
-					
 				}
 			}
 		});

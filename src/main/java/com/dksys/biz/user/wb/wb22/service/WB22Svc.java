@@ -107,5 +107,9 @@ public interface WB22Svc {
 
 	List<Map<String, String>> wbsRsltsChkExist(Map<String, String> paramMap);
 
+	int deleteRslt(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
 	int copyAllPjtYn(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
+	int wb22OrdrsNoVersionUp(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 }

@@ -154,7 +154,7 @@
             <div class="contents_tit">
                 <div class="add_btn_small pdl10">
 					<a onclick="qr_generation();" style="height: 30px; line-height: 28px; width: 100px;">QR생성</a>
-                    <a id="wb22confirmBtn" onclick="wb22OrdrsNoVersionUp();" style="height: 30px; line-height: 28px; width: 100px;">수주별 버젼업</a>
+                    <a id="wb22confirmBtn" onclick="wb22OrdrsNoVersionUp();" style="height: 30px; line-height: 28px; width: 100px;">수주별 일괄버젼업</a>
                     <a id="wb22confirmBtn" onclick="wb22confirmSearch();" style="height: 30px; line-height: 28px; width: 100px;">수주별 일괄확정</a>
                     <a id="wbsPlanInsertModal" onclick="wbsPlanInsertModal();" style="height: 30px; line-height: 28px; width: 100px;">WBS계획등록</a>
                     <a onclick="excelDown();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-file-excel"></i> 엑셀다운로드</a>
@@ -563,12 +563,12 @@
             // 리스트 선택 시
             paramObj["coCd"] = $('#coCd_S').val();
             // paramObj["searchValue"] = row.smrizeNm;
-            paramObj["searchValue"] = jwt.userNm;
+            paramObj["searchValue"] =row.ordrsNo;
             paramObj["pgmId"] = "WB2201M02";
         } else {
             // 리스트 미 선택 시
             paramObj["coCd"] = $('#coCd_S').val();
-            paramObj["searchValue"] = jwt.userNm;
+            paramObj["searchValue"] = ""
             paramObj["pgmId"] = "WB2201M02";
         }
         openModal("/static/html/cmn/modal/wb22confirmSearch.html", 1200, 650, "일괄확정 대상 검색", paramObj, function (grid) {
@@ -621,6 +621,65 @@
 		}
 		openModal("/static/html/cmn/modal/qrGeneration.html", popupW, popupH, "QR 코드 생성", paramObj, function(data) {
 		});
+	}
+
+	function wb22OrdrsNoVersionUp() {
+		// Validation 체크
+		var row = salesGridView.target.getList("selected")[0];
+		if (!row) {
+			customAlert("선택한 자료가 없습니다");
+			return false;
+		}
+
+		// 버전업 클릭시 버전업 사유 입력받고 진행
+		wb22mVerUpReason(row.ordrsNo, '').then(function(reason) {
+			if (!reason || reason.status !== 'ok') {
+				return false; // alert 없음
+			}
+
+			// 버전업 사유 Validation 체크
+			const verUpReasonValue = String(reason.value || '').trim();
+			if (!verUpReasonValue) {
+				customAlert('Ver.Up 사유를 입력하세요.');
+				return false;
+			}
+
+			var formData = new FormData();
+			formData.append("coCd", $("#coCd_S").val());
+			formData.append("userId", jwt.userId);
+			formData.append("ordrsNo", row.ordrsNo);
+			formData.append("salesCd", row.salesCd);
+			formData.append("verUpReason", verUpReasonValue);
+
+			filePostAjax("/user/wb/wb22/wb22OrdrsNoVersionUp", formData, function(data){
+				if (data.resultCode != 200){
+					customAlert("일괄 버전업에 실패했습니다. 전산실에 문의해주세요")
+				}
+				salesGridView.setData(0);
+			});
+
+		}).catch(function(err){
+			return false;
+		});
+	}
+
+	// 버전업 사유를 입력받는 프롬프트 생성
+	async function wb22mVerUpReason(ordrsNo , defaultReason ="") {
+		const result  = customPrompt(
+			`Ver Up 사유를 입력해주세요.`,
+			defaultReason ,
+			`수주번호 : ${ordrsNo}에 확정된 전체설비 버전업`
+			
+		);
+		// customPrompt 최소 사이즈 변경
+		requestAnimationFrame(() => {
+			const $dlg = $('#custom-prompt-overlay > div').first();
+			if ($dlg.length) {
+				$dlg.css('min-width', '350px'); // 최소 가로 크기 지정
+			}
+		});
+		
+		return await result;
 	}
 
 </script>

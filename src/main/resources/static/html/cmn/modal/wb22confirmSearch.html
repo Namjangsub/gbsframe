@@ -2,6 +2,7 @@
 	<div class="popup_area_wb22confirm">
 		<form id="popForm_wb22confirm" onSubmit="return false;">
 			<div class="popup_table">
+				<select id="prdMngChk" data-kind="SPECRTS" hidden></select>
 				<table>
 					<colgroup>
 						<col width="20%">
@@ -17,8 +18,8 @@
 						
 						<td>
 							<select data-search="searchType">
+								<option value="CR.ORDRS_NO" selected>수주별</option>
 								<option value="X.SMRIZE_NM">총괄PM명</option>
-								<option value="CR.ORDRS_NO">수주별</option>
 								<!-- <option value="SALES_CD">SALES CODE</option>
 								<option value="CLNT_NM">고객사</option>
 								<option value="CTRT_NM">프로젝트명</option>
@@ -179,7 +180,10 @@
 	function confirm_wb22() {
 		if (inputValidation($('.popup_area_wb22confirm [required]'))) {						// 필수 필드의 유효성 검사
 			var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
-			
+			if (!formData) {
+				return false;
+			}
+
 			filePostAjax("/user/wb/wb22/confirm_wb22", formData,function(data) {
 				alert(data.resultMessage);
 				
@@ -213,7 +217,8 @@
 		var list = Modalwb22noconfirmGridView.target.list;
 		var rowList = Modalwb22noconfirmGridView.target.getList();    
 		var fileKey = null;
-		
+
+		var hasNoAuth = false;
 		$.each(rowList, function(idx, elem) {
 			if (elem.__selected__) {
 				const obj = {
@@ -226,8 +231,17 @@
 					pgmId     : 'WB2201M02'
 				};
 				detailArr.push(obj);
+				if (elem.smrizeId == jwt.userId || $('#prdMngChk option').attr('data-etc').replace(/\s/g,'').split(',').includes(jwt.userId) || jwt.authInfo.includes('AUTH999') ) {
+				} else {
+					customAlert("권한이 없는 일정이 있습니다. 확인해보시고 다시 작업해주세요.");
+					hasNoAuth = true;
+					return false;
+				}
 			}
 		});
+		if (hasNoAuth) {
+			return null;    // confirm_wb22 에서 !formData 가 true 가 된다
+		}
 		
 		formData.append("detailArr", JSON.stringify(detailArr));//선택된 ROW 만 formData에 저장
 		//상세자료 끝
