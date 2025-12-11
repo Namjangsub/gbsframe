@@ -72,7 +72,6 @@ public class CM08Ctr {
     		model.addAttribute("resultCode", 200);
     		model.addAttribute("resultMessage", messageUtils.getMessage("excute"));
     		model.addAttribute("fileInfo", fileInfo);
-    		model.addAttribute("fileInfo", fileInfo);
     	}else {
 			model.addAttribute("resultCode", 500);
     		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
