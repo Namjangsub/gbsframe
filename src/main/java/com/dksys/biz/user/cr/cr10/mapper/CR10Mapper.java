@@ -53,5 +53,14 @@ public interface CR10Mapper {
   int updateTodoAppConfirm(Map<String, String> paramMap);
 
   int deleteTodoDetail(Map<String, String> paramMap);
+
+  int mergeLgistItemImageDetail(Map<String, String> paramMap);
+  int deleteLgistItemImageDetail(Map<String, String> paramMap);
+
+  List<Map<String, String>> selectLgistItemList(Map<String, String> paramMap);
+
+  Map<String, Object> checkLgistItemImage(Map<String, String> paramMap);
+
+  Map<String, Object> selectLgistItemListImage(Map<String, Object> p);
   
 }

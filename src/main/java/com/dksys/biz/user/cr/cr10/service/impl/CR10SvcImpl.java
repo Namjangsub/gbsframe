@@ -10,6 +10,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
@@ -66,7 +67,30 @@ public class CR10SvcImpl implements CR10Svc {
   public Map<String, String> selectLgistMastInfo(Map<String, String> paramMap) {
     return cr10Mapper.selectLgistMastInfo(paramMap);
   }
+  
+  @Override
+  public List<Map<String, String>> selectLgistItemList(Map<String, String> paramMap) {
+	  List<Map<String, String>> list = cr10Mapper.selectLgistItemList(paramMap);
 
+	  String lgistNo = paramMap.get("lgistNo");
+	  for (Map<String, String> row : list) {
+	      String seq = row.get("lgistNoSeq");
+	      String hasImg = row.get("hasImg");
+	      if ("Y".equalsIgnoreCase(hasImg)) {
+	          row.put("imgUrl", "/user/cr/cr10/itemListImage?lgistNo=" + lgistNo + "&lgistNoSeq=" + seq);
+	      } else {
+	          row.put("imgUrl", "");
+	      }
+	  }
+	  return list;
+  }
+
+
+  @Override
+  public Map<String, Object> checkLgistItemImage(Map<String, String> paramMap) {
+  	  return cr10Mapper.checkLgistItemImage(paramMap);
+  }
+	
   @Override
   public String selectLgistAppCount(Map<String, String> paramMap) {
 	  return cr10Mapper.selectLgistAppCount(paramMap);
@@ -279,6 +303,79 @@ public class CR10SvcImpl implements CR10Svc {
     	}
     }
 
+
+    List<Map<String, String>> tripRptS = gsonDtl.fromJson(paramMap.get("tripRptS"), dtlMap);
+
+	// 1) 업로드 파일/seq 수신
+	List<MultipartFile> files = mRequest.getFiles("lgistFiles");
+	String[] seqArr = mRequest.getParameterValues("lgistFilesSeq");
+
+	// 2) seq -> MultipartFile 매핑(Map)
+	Map<String, MultipartFile> fileMap = new HashMap<>();
+	if (files != null && seqArr != null) {
+	    int n = Math.min(files.size(), seqArr.length);
+	    for (int i = 0; i < n; i++) {
+	        String seq = (seqArr[i] == null) ? "" : seqArr[i].trim();
+	        MultipartFile mf = files.get(i);
+	        if (seq.isEmpty() || mf == null || mf.isEmpty()) continue;
+	        fileMap.put(seq, mf); // key = LGIST_NO_SEQ
+	    }
+	}
+	
+    for (Map<String, String> dtl : tripRptS) {
+    	dtl.put("userId", paramMap.get("userId"));
+    	dtl.put("pgmId", paramMap.get("pgmId"));
+
+
+        // dtl에서 매핑키(seq) 추출: 프론트에서 넣은 키명에 맞추세요
+        // 보통 lgistNoSeq 또는 workRptNoSeq 중 하나로 들어옵니다.
+        String seq = dtl.get("lgistNoSeq");
+        if (seq == null || (seq == null || seq.trim().isEmpty())) {
+            seq = dtl.get("workRptNoSeq"); // fallback
+        }
+
+        MultipartFile mf = (seq == null) ? null : fileMap.get(seq);
+
+        if (mf != null && !mf.isEmpty()) {
+            // BLOB 저장용 byte[]
+            byte[] blob = mf.getBytes();
+
+            // 파일명(컬럼 50자 제한 고려)
+            String orgName = safeFileName(mf.getOriginalFilename(), 50);
+            String mime = (mf.getContentType() == null) ? "" : mf.getContentType();
+
+            // MyBatis 파라미터로 넘길 값 세팅
+            // mapper XML에서 #{lgistItemImg, jdbcType=BLOB} 로 받도록
+            dtl.put("lgistItemImgNm", orgName);
+            dtl.put("lgistItemImgMime", mime);
+
+            // Map<String,String>에는 byte[]를 put할 수 없습니다.
+            // 해결: (A) Map<String,Object>로 바꾸거나, (B) 별도 파라미터 객체를 써야 합니다.
+            // 아래는 최소 수정으로 가능한 방식: Map을 Object로 캐스팅해서 byte[]를 넣는 우회
+            @SuppressWarnings("unchecked")
+            Map raw = (Map) dtl;
+            raw.put("lgistItemImg", blob);
+        } else {
+            // 파일이 없으면 이미지 컬럼은 넣지 않거나 null 처리
+            // update일 경우 기존 BLOB 유지하려면 XML에서 <if test="lgistItemImg != null"> 처리 필요
+            dtl.put("lgistItemImgNm", "");
+            dtl.put("lgistItemImgMime", "");
+            @SuppressWarnings("unchecked")
+            Map raw = (Map) dtl;
+            raw.put("lgistItemImg", null);
+        }
+
+    	String updCheck = dtl.get("updCheck").toString();
+    	/* "updCheck" 값을 확인하여 */
+    	if ("D".equals(updCheck)) {
+    		cr10Mapper.deleteLgistItemImageDetail(dtl);
+    	} else {
+    		cr10Mapper.mergeLgistItemImageDetail(dtl);
+    	}
+    }
+
+    
+    
 	//---------------------------------------------------------------
 	//첨부 화일 처리 시작
 	//---------------------------------------------------------------
@@ -380,7 +477,14 @@ public class CR10SvcImpl implements CR10Svc {
 	
     return result;
   }
-
+  
+  private static String safeFileName(String name, int maxLen) {
+	    if (name == null) return "";
+	    name = name.replace("\\", "/");
+	    if (name.contains("/")) name = name.substring(name.lastIndexOf('/') + 1);
+	    return (name.length() > maxLen) ? name.substring(name.length() - maxLen) : name;
+	}
+  
   @Override
   public int deleteLgistMast(Map<String, String> paramMap) throws Exception {
 	    //---------------------------------------------------------------

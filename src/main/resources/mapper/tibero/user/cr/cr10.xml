@@ -236,6 +236,7 @@
 	        FROM  SCR R
 	        WHERE 1=1
 	       ) T
+	      ORDER BY T.ORDRS_CLNT_NM, T.ORDRS_NO DESC
 		</sql>
 		
 	<sql id = "selectLgistReqSql1">
@@ -787,9 +788,12 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 			, X.CO_CD
 			, X.ORDRS_NO
 			, X.ORDRS_SEQ
+			, X.ORDRS_QTY					--수주대수
 			, X.SALES_CD
 			, #{lgistNo} AS LGIST_NO
 			, T.SALES_SEQ
+			, NVL(T.LGIST_QTY, X.ORDRS_QTY)		AS LGIST_QTY			--물류요청대수
+			, T.LGIST_REMARK											--비고
 			, CASE WHEN T.SALES_SEQ IS NOT NULL THEN 'Y' ELSE 'N' END AS CHK_YN
 			, #{clasDiv, jdbcType=VARCHAR} AS CLAS_DIV
 			, (SELECT CASE WHEN COUNT(*) = 0 THEN 'N' ELSE 'Y' END FROM TB_CR11M01 A1
@@ -810,6 +814,7 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 			, Y.CLNT_PJT -- 고객사 PJT
 			, FN_CM05M01_CD_TO_NM(X.ORDRS_DTL_DIV20) AS ORDRS_DTL_DIV20_NM -- 신작구분
 			, FN_CM05M01_CD_TO_NM(X.ORDRS_DTL_DIV30) AS ORDRS_DTL_DIV30_NM -- 자체구분
+			, FN_CM05M01_CD_TO_NM(X.MCTYPE) 		 AS MCTYPE_NM -- 기계구분
 			, X.PRDT_CD -- 제품구분
 			, P.PRDT_NM AS PRDT_CD_NM
 			, X.ITEM_DIV -- 아이템구분
@@ -965,6 +970,60 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 	  WHERE FILE_TRGT_KEY = #{fileTrgtKey}
 	</select>
 
+	<!-- 납품ITEM LIST -->
+	<select id="selectLgistItemList" parameterType="Map" resultType="camelMap">
+		SELECT 
+			    A.LGIST_NO,
+			    A.LGIST_NO_SEQ,
+			    A.LGIST_ITEM_NO,
+			    A.LGIST_ITEM_CODE,
+			    A.LGIST_ITEM_NM,
+			    A.LGIST_ITEM_DIV,
+			    A.LGIST_ITEM_QTY,
+			    A.LGIST_ITEM_IMG_NM,
+			    A.LGIST_ITEM_IMG_MIME,
+			    CASE WHEN A.LGIST_ITEM_IMG IS NULL THEN 'N' ELSE 'Y' END AS HAS_IMG
+		 FROM TB_CR11D02 A
+		WHERE LGIST_NO = #{lgistNo}
+		ORDER BY LGIST_NO_SEQ
+	</select>
+	
+	<!-- 납품ITEM LIST에 따른 이미지 자료 -->
+	<select id="selectLgistItemListImage" parameterType="map" resultType="map">
+		SELECT
+				LGIST_ITEM_IMG      AS "lgistItemImg",
+				LGIST_ITEM_IMG_MIME AS "lgistItemImgMime"
+		FROM TB_CR11D02
+		WHERE LGIST_NO = #{lgistNo}
+		  AND LGIST_NO_SEQ = #{lgistNoSeq}
+	</select>
+
+	
+	<resultMap id="itemImgMap" type="hashMap">
+		<result property="lgistItemImg" column="lgistItemImg" jdbcType="BLOB" javaType="byte[]"/>
+	</resultMap>
+	<select id="checkLgistItemImage" resultMap="itemImgMap">
+		SELECT
+			LGIST_ITEM_IMG			as lgistItemImg,
+			LGIST_ITEM_IMG_MIME		as lgistItemImgMime,
+			LGIST_NO				as lgistNo,
+			LGIST_NO_SEQ			as lgistNoSeq
+		FROM
+			TB_CR11D02   
+		WHERE LGIST_NO = #{lgistNo}
+		  AND LGIST_NO_SEQ = #{lgistNoSeq}
+	</select>
+
+<!-- 유저 이미지 Update -->
+	<update id="updateUserImg">
+		UPDATE
+			TB_CM06M01
+		SET
+			USER_IMG = #{userImg, jdbcType=BLOB}
+		WHERE
+			ID = #{userId}
+	</update>
+	
 	<!-- 결재선 체크 -->
 	<select id="selectLgistAppCount" resultType="String">
 		SELECT COUNT(*)
@@ -1160,6 +1219,9 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
         , CREAT_ID
         , CREAT_PGM
         , CREAT_DTTM
+        , ORDRS_QTY
+        , LGIST_QTY
+        , LGIST_REMARK
         )
         VALUES
         ( #{lgistNo, jdbcType=VARCHAR}
@@ -1171,6 +1233,9 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
         , #{userId}
         , #{pgmId}
         , SYSDATE
+        , #{ordrsQty}
+        , #{lgistQty}
+        , #{lgistRemark, jdbcType=VARCHAR}
         )
     </insert>
 
@@ -1183,6 +1248,9 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
             , UDT_ID        = #{userId}
             , UDT_PGM       = #{pgmId}
             , UDT_DTTM      = SYSDATE
+	        , ORDRS_QTY		= #{ordrsQty}
+	        , LGIST_QTY		= #{lgistQty}
+	        , LGIST_REMARK  = #{lgistRemark, jdbcType=VARCHAR}
 	  WHERE LGIST_NO = #{lgistNo}
 	    AND SALES_SEQ = #{salesSeq, jdbcType=VARCHAR}
     </update>
@@ -1308,4 +1376,79 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
           AND TODO_ID = #{todoId}
     </update>
 
+
+	<update id="mergeLgistItemImageDetail" parameterType="map">
+		MERGE INTO TB_CR11D02 T
+		USING (
+		  SELECT
+		    #{lgistNo}       					AS LGIST_NO,
+		    #{lgistNoSeq}    					AS LGIST_NO_SEQ,
+		    #{lgistItemNo}   					AS LGIST_ITEM_NO,
+		    #{lgistItemCode} 					AS LGIST_ITEM_CODE,
+		    #{lgistItemNm}   					AS LGIST_ITEM_NM,
+		    #{lgistItemDiv}  					AS LGIST_ITEM_DIV,
+		    #{lgistItemQty}  					AS LGIST_ITEM_QTY,
+		    #{lgistItemImg, jdbcType=BLOB}      AS LGIST_ITEM_IMG,
+		    #{lgistItemImgNm}                   AS LGIST_ITEM_IMG_NM,
+		    #{lgistItemImgMime}                 AS LGIST_ITEM_IMG_MIME,
+		    #{userId}        					AS CREAT_ID,
+		    #{pgmId}         					AS CREAT_PGM
+		  FROM DUAL
+		) S
+		ON (T.LGIST_NO = S.LGIST_NO AND T.LGIST_NO_SEQ = S.LGIST_NO_SEQ)
+		
+		WHEN MATCHED THEN
+		  UPDATE SET
+		    T.LGIST_ITEM_NO   = S.LGIST_ITEM_NO,
+		    T.LGIST_ITEM_CODE = S.LGIST_ITEM_CODE,
+		    T.LGIST_ITEM_NM   = S.LGIST_ITEM_NM,
+		    T.LGIST_ITEM_DIV  = S.LGIST_ITEM_DIV,
+		    T.LGIST_ITEM_QTY  = S.LGIST_ITEM_QTY,
+		    T.UDT_ID          = S.CREAT_ID,
+		    T.UDT_DTTM        = SYSTIMESTAMP,
+		    T.UDT_PGM         = S.CREAT_PGM
+		      , T.LGIST_ITEM_IMG      = S.LGIST_ITEM_IMG
+		      , T.LGIST_ITEM_IMG_NM   = S.LGIST_ITEM_IMG_NM
+		      , T.LGIST_ITEM_IMG_MIME = S.LGIST_ITEM_IMG_MIME
+		
+		WHEN NOT MATCHED THEN
+		  INSERT (
+		    LGIST_NO,
+		    LGIST_NO_SEQ,
+		    LGIST_ITEM_NO,
+		    LGIST_ITEM_CODE,
+		    LGIST_ITEM_NM,
+		    LGIST_ITEM_DIV,
+		    LGIST_ITEM_QTY,
+		    LGIST_ITEM_IMG,
+		    LGIST_ITEM_IMG_NM,
+		    LGIST_ITEM_IMG_MIME,
+		    CREAT_ID,
+		    CREAT_DTTM,
+		    CREAT_PGM
+		  )
+		  VALUES (
+		    S.LGIST_NO,
+		    S.LGIST_NO_SEQ,
+		    S.LGIST_ITEM_NO,
+		    S.LGIST_ITEM_CODE,
+		    S.LGIST_ITEM_NM,
+		    S.LGIST_ITEM_DIV,
+		    S.LGIST_ITEM_QTY,
+		    S.LGIST_ITEM_IMG,
+		    S.LGIST_ITEM_IMG_NM,
+		    S.LGIST_ITEM_IMG_MIME,
+		    S.CREAT_ID,
+		    SYSTIMESTAMP,
+		    S.CREAT_PGM
+		  )
+	</update>
+	
+
+	<delete id="deleteLgistItemImageDetail" parameterType="Map">
+	  DELETE TB_CR11D02
+	  WHERE LGIST_NO = #{lgistNo}
+	    AND LGIST_NO_SEQ = #{lgistNoSeq}
+	</delete>
+	
 </mapper>

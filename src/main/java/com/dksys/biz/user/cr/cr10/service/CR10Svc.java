@@ -31,4 +31,8 @@ public interface CR10Svc {
 
   int updateTodoAppConfirm(Map<String, String> paramMap) throws Exception;
 
+  List<Map<String, String>> selectLgistItemList(Map<String, String> paramMap);
+
+  Map<String, Object> checkLgistItemImage(Map<String, String> paramMap);
+
 }
