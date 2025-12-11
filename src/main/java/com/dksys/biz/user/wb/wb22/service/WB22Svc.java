@@ -85,7 +85,6 @@ public interface WB22Svc {
 	int confirm_wb22(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	// 일괄확정부분 끝
 	
-	
 	List<Map<String, String>> selectWbcPlanUpdteTodoList(Map<String, String> paramMap);
 
 	Map<String, String> wbsResultLastVerNoSearch(Map<String, String> paramMap);
@@ -106,10 +105,6 @@ public interface WB22Svc {
 	int updateWbsPlanVerUp(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
 	List<Map<String, String>> wbsRsltsChkExist(Map<String, String> paramMap);
-
-	int deleteRslt(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
-
-	int copyAllPjtYn(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
 	int wb22OrdrsNoVersionUp(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 }

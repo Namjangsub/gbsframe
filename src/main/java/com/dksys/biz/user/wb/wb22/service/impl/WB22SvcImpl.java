@@ -4,8 +4,10 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -84,6 +86,12 @@ public class WB22SvcImpl implements WB22Svc {
 	@Override
 	public int wbsLevel1Insert(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 
+		HashMap<String, String> param = new HashMap<>();
+		param.put("coCd", paramMap.get("coCd"));
+		param.put("ordrsNo", paramMap.get("salesCd").substring(0, 5));
+		// 해당하는 수주번호에 과제확정이면서 일정이 미확정인애들 + TARGET(C/U)
+		List<Map<String, String>> salesCdList = wb22Mapper.salesCdList(param);
+
 		int result = 0;
 		Gson gson = new Gson();
 		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {
@@ -92,6 +100,11 @@ public class WB22SvcImpl implements WB22Svc {
 		if (sharngArr != null && sharngArr.size() > 0) {
 			int i = 0;
 			for (Map<String, String> sharngMap : sharngArr) {
+				String wbsPlansDt = sharngMap.get("wbsPlansDt");
+				String wbsPlaneDt = sharngMap.get("wbsPlaneDt");
+				String daycnt = sharngMap.get("daycnt");
+				String creatId = sharngMap.get("creatId");
+				String creatPgm = sharngMap.get("creatPgm");
 				sharngMap.put("coCd", paramMap.get("coCd"));
 
 				if (!sharngMap.containsKey("fileTrgtKey")) {
@@ -120,8 +133,183 @@ public class WB22SvcImpl implements WB22Svc {
 						result += wb22Mapper.wbsRsltsMngIdUpdate(sharngMap);
 					}
 				}
-
 				i++;
+				// 프로젝트 전체일경우
+				if ("Y".equals(sharngMap.get("allPjtYn"))) {
+					for (Map<String, String> salesRow : salesCdList) {
+						String salesCd = salesRow.get("salesCd");
+						String target  = salesRow.get("target");					// 등록대상 : C , 수정대상 : U
+						String closeYn = salesRow.get("closeYn");					// 계획확정 여부
+						if ("N".equals(closeYn) && !salesCd.equals(sharngMap.get("salesCd"))) {	// 미확정일정에 대한 insert or update 작업
+							// salesCd 기준으로 반복이므로, 여기서 salesCd 세팅
+							sharngMap.put("salesCd", salesCd);
+							sharngMap.put("ordrsNo", salesRow.get("ordrsNo"));
+
+							if ("C".equals(target)) {
+								// 아직일정이 없는 설비는 제외처리
+							} else if ("U".equals(target)) { // UPDATE 대상
+								Map<String, String> updateTargetRow = wb22Mapper.selectWbsPlanTarget(sharngMap);
+								sharngMap.put("fileTrgtKey", updateTargetRow.get("fileTrgtKey"));
+								result += wb22Mapper.wbsLevel1Update(sharngMap);
+							} else {
+								throw new RuntimeException("생성오류!! 전산실에 문의해주세요.");
+							}
+						}
+					}
+				}
+				// Task계획 포함일경우
+				if ("Y".equals(sharngMap.get("taskPlanYn"))) {
+					for (Map<String, String> salesRow : salesCdList) {
+						String wbsPlanCodeId    = sharngMap.get("wbsPlanCodeId");
+						String coCd         = sharngMap.get("coCd");
+						String salesCd      = salesRow.get("salesCd"); 	
+						String closeYn 		= salesRow.get("closeYn");					// 계획확정 여부
+						
+						if ("N".equals(closeYn)) {
+							Map<String, String> param2 = new HashMap<>();
+							param2.put("coCd", coCd);
+							param2.put("salesCd", salesCd);
+							param2.put("wbsPlanCodeKind", wbsPlanCodeId);  // ★ Level2 쿼리는 부모 Level1 의 codeId 기준
+							List<Map<String, String>> selectWBS2Level = wb22Mapper.selectWBS2Level(param2);
+							for (Map<String, String> level2Map : selectWBS2Level) {
+								HashMap<String, String> taskParam = new HashMap<>(level2Map);
+								taskParam.put("wbsPlansDt", wbsPlansDt);
+								taskParam.put("wbsPlaneDt", wbsPlaneDt);
+								taskParam.put("daycnt", daycnt);
+								taskParam.put("creatId", creatId);
+								taskParam.put("creatPgm", creatPgm);
+								wb22Mapper.wbsLevel2Update(taskParam);
+							}
+						}
+					}
+				}
+				// 실적삭제할 경우
+				if ("Y".equals(sharngMap.get("rsltDete"))) {
+
+					 // 1) 실적이 있는 SALES_CD 목록 조회 (wbsRsltsChkExist 재사용)
+					Map<String, String> rsltParam = new HashMap<>();
+					rsltParam.put("coCd", paramMap.get("coCd"));
+					rsltParam.put("ordrsNo", paramMap.get("salesCd").substring(0, 5));
+					rsltParam.put("wbsPlanCodeKind", sharngMap.get("wbsPlanCodeId"));
+					List<Map<String, String>> rsltExistList = wb22Mapper.wbsRsltsChkExist(rsltParam);
+					// SALES_CD만 Set으로 뽑기
+					Set<String> rsltSalesCdSet = new HashSet<>();
+					for (Map<String, String> row : rsltExistList) {
+						rsltSalesCdSet.add(row.get("salesCd"));
+					}
+
+					for (Map<String, String> salesRow : salesCdList) {
+						String wbsPlanCodeId    = sharngMap.get("wbsPlanCodeId");
+						String coCd         = sharngMap.get("coCd");
+						String salesCd      = salesRow.get("salesCd"); 	
+						String closeYn 		= salesRow.get("closeYn");		// 계획확정 여부
+						String wb22VerNo 	= salesRow.get("wb22VerNo");	// 계획버전
+
+						// 계획 확정(Y)이면 건드리면 안되니 기존대로 필터링
+						if (!"N".equals(closeYn)) {
+							continue;
+						}
+
+						// 실적 없는 SALES_CD는 스킵
+						if (!rsltSalesCdSet.contains(salesCd)) {
+							continue;
+						}
+
+						Map<String, String> param3 = new HashMap<>();
+						param3.put("coCd", coCd);
+						param3.put("salesCd", salesRow.get("salesCd"));
+						param3.put("wbsPlanCodeKind", wbsPlanCodeId);
+						List<Map<String, String>> targetWBS2Level = wb22Mapper.selectWBS2Level(param3);
+						for (Map<String, String> trgRow : targetWBS2Level) {
+							if (trgRow.get("rsltsFileTrgtKey") != null) {
+								wb22Mapper.wbsRsltsDelete(trgRow);	// task 실적삭제
+
+								//---------------------------------------------------------------
+								//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+								//   필수값 :  jobType, userId, comonCd
+								//---------------------------------------------------------------
+								HashMap<String, String> fileParam = new HashMap<>();
+								fileParam.put("userId", paramMap.get("userId"));
+								HashMap<String, String> authParam = new HashMap<>();
+								authParam.putAll(paramMap);
+								authParam.put("fileTrgtTyp", "WB2201P02");
+
+								// selectTrgtWbsRsltList 에서 FILE_TRGT_KEY 하나씩 꺼내서 처리
+								String fileTrgtKey = trgRow.get("rsltsFileTrgtKey");
+								if (fileTrgtKey == null || fileTrgtKey.isEmpty()) {
+									continue;
+								}
+
+								// 현재 타겟키 세팅
+								authParam.put("fileTrgtKey", fileTrgtKey);
+
+								// 해당 fileTrgtKey 에 매핑된 파일 전체 조회
+								List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(authParam);
+
+								// 권한체크 + 삭제
+								for (Map<String, String> deleteFile : deleteFileList) {
+									// 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
+									// 접근 권한 없으면 Exception 발생
+									fileParam.put("comonCd", deleteFile.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
+									fileParam.put("coCd", authParam.get("coCd"));
+									fileParam.put("jobType", "fileDelete");
+									cm15Svc.selectFileAuthCheck(fileParam);
+
+									//---------------------------------------------------------------
+									// 첨부 화일 처리  실제 삭제
+									//---------------------------------------------------------------
+									cm08Svc.deleteFile(deleteFile.get("fileKey"));
+								}
+								//---------------------------------------------------------------
+								//첨부 화일 처리  끝
+								//---------------------------------------------------------------
+							}
+							wb22Mapper.wbsLevel2Delete(trgRow);	// task 계획삭제
+						}
+						// task새롭게 insert 작업
+						HashMap<String, String> insertMap = new HashMap<>();
+						insertMap.put("userId", paramMap.get("userId"));
+						insertMap.put("wbsPlanCodeId", wbsPlanCodeId);
+						List<Map<String, String>> selectWbsTaskTempletList = wb22Mapper.selectWbsTaskTempletList(insertMap);
+						if (selectWbsTaskTempletList != null && selectWbsTaskTempletList.size() > 0) {
+							int k = 0;
+							for (Map<String, String> tempMap : selectWbsTaskTempletList) {
+								HashMap<String, String> taskParam = new HashMap<>();
+								String wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
+								String newFileTrgtKey = wb22Mapper.selectWbsSeqNext(paramMap);
+								taskParam.put("fileTrgtKey", newFileTrgtKey);
+								taskParam.put("coCd", paramMap.get("coCd"));
+								taskParam.put("wbsPlanNo", wbsPlanNo);
+								taskParam.put("wbsPlanCodeKind", sharngMap.get("wbsPlanCodeId"));
+								taskParam.put("wbsPlanCodeNm", tempMap.get("codeNm"));
+								taskParam.put("salesCd", salesCd);
+								taskParam.put("verNo", wb22VerNo);
+								taskParam.put("wbsPlanMngId", sharngMap.get("wbsPlanMngId"));
+								taskParam.put("wbsPlansDt", sharngMap.get("wbsPlansDt"));
+								taskParam.put("wbsPlaneDt", sharngMap.get("wbsPlaneDt"));
+								taskParam.put("daycnt", sharngMap.get("daycnt"));
+								taskParam.put("wbsPlanStsCodeId", sharngMap.get("wbsPlanStsCodeId"));
+								taskParam.put("creatId", paramMap.get("userId"));
+								taskParam.put("creatPgm", "WB2201P01");
+								taskParam.put("verUpReason", sharngMap.get("verUpReason"));
+
+								int wbsPlanCodeId2 = wb22Mapper.selectMaxWbsCode(sharngMap);
+								String codeId = "";
+								if (wbsPlanCodeId2 < 10) {
+									codeId = "0" + String.valueOf(wbsPlanCodeId2);
+								} else {
+									codeId = String.valueOf(wbsPlanCodeId2);
+								}
+								taskParam.put("wbsPlanCodeId", sharngMap.get("wbsPlanCodeId") + codeId);
+								taskParam.put("seq", String.valueOf(k + 1));
+								
+								result = wb22Mapper.wbsLevel2Insert(taskParam);
+							}
+							k++;
+						}
+						
+					}
+				}
 			}
 		}
 		return result;
@@ -1103,297 +1291,41 @@ public class WB22SvcImpl implements WB22Svc {
 		return wb22Mapper.wbsRsltsChkExist(paramMap);
 	}
 
-	@Override
-	public int deleteRslt(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-		int result = 0;
-
-		// salesCdList 조회용 파라미터 (ordrsNo 추가)
-		HashMap<String, String> param = new HashMap<>();
-		param.putAll(paramMap);
-		param.put("ordrsNo", paramMap.get("salesCd").substring(0, 5));
-
-		// 해당하는 수주번호에 과제확정이면서 일정이 미확정인애들 + TARGET(C/U)
-		List<Map<String, String>> salesCdList = wb22Mapper.salesCdList(param);
-
-		for (Map<String, String> salesRow : salesCdList) {
-			String salesCd = salesRow.get("salesCd");
-			String closeYn = salesRow.get("closeYn");
-			String wb22VerNo = salesRow.get("wb22VerNo");
-			if ("N".equals(closeYn)) {
-				// 대상 Task 계획 리스트
-				Map<String, String> targetParam = new HashMap<>();
-				targetParam.put("coCd", paramMap.get("coCd"));
-				targetParam.put("salesCd", salesRow.get("salesCd"));
-				targetParam.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeId"));
-				List<Map<String, String>> targetWBS2Level = wb22Mapper.selectWBS2Level(targetParam);
-				for (Map<String, String> trgRow : targetWBS2Level) {
-					if (trgRow.get("rsltsFileTrgtKey") != null) {
-						wb22Mapper.wbsRsltsDelete(trgRow);	// task 실적삭제
-
-						//---------------------------------------------------------------
-						//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
-						//   필수값 :  jobType, userId, comonCd
-						//---------------------------------------------------------------
-						HashMap<String, String> fileParam = new HashMap<>();
-						fileParam.put("userId", paramMap.get("userId"));
-						HashMap<String, String> authParam = new HashMap<>();
-						authParam.putAll(paramMap);
-						authParam.put("fileTrgtTyp", "WB2201P02");
-
-						// selectTrgtWbsRsltList 에서 FILE_TRGT_KEY 하나씩 꺼내서 처리
-						String fileTrgtKey = trgRow.get("rsltsFileTrgtKey");
-						if (fileTrgtKey == null || fileTrgtKey.isEmpty()) {
-							continue;
-						}
-
-						// 현재 타겟키 세팅
-						authParam.put("fileTrgtKey", fileTrgtKey);
-
-						// 해당 fileTrgtKey 에 매핑된 파일 전체 조회
-						List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(authParam);
-
-						// 권한체크 + 삭제
-						for (Map<String, String> deleteFile : deleteFileList) {
-							// 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
-							// 접근 권한 없으면 Exception 발생
-							fileParam.put("comonCd", deleteFile.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
-							fileParam.put("coCd", authParam.get("coCd"));
-							fileParam.put("jobType", "fileDelete");
-							cm15Svc.selectFileAuthCheck(fileParam);
-
-							//---------------------------------------------------------------
-							// 첨부 화일 처리  실제 삭제
-							//---------------------------------------------------------------
-							cm08Svc.deleteFile(deleteFile.get("fileKey"));
-						}
-						//---------------------------------------------------------------
-						//첨부 화일 처리  끝
-						//---------------------------------------------------------------
-					}
-					wb22Mapper.wbsLevel2Delete(trgRow);	// task 계획삭제
-				}
-				// task새롭게 insert 작업
-				List<Map<String, String>> selectWbsTaskTempletList = wb22Mapper.selectWbsTaskTempletList(paramMap);
-				if (selectWbsTaskTempletList != null && selectWbsTaskTempletList.size() > 0) {
-					int i = 0;
-					for (Map<String, String> sharngMap : selectWbsTaskTempletList) {
-						HashMap<String, String> taskParam = new HashMap<>();
-						String wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
-						String newFileTrgtKey = wb22Mapper.selectWbsSeqNext(paramMap);
-						taskParam.put("fileTrgtKey", newFileTrgtKey);
-						taskParam.put("coCd", paramMap.get("coCd"));
-						taskParam.put("wbsPlanNo", wbsPlanNo);
-						taskParam.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeId"));
-						taskParam.put("wbsPlanCodeNm", sharngMap.get("codeNm"));
-						taskParam.put("salesCd", salesCd);
-						taskParam.put("verNo", wb22VerNo);
-						taskParam.put("wbsPlanMngId", paramMap.get("wbsPlanMngId"));
-						taskParam.put("wbsPlansDt", paramMap.get("wbsPlansDt"));
-						taskParam.put("wbsPlaneDt", paramMap.get("wbsPlaneDt"));
-						taskParam.put("daycnt", paramMap.get("daycnt"));
-						taskParam.put("wbsPlanStsCodeId", paramMap.get("wbsPlanStsCodeId"));
-						taskParam.put("creatId", paramMap.get("userId"));
-						taskParam.put("creatPgm", paramMap.get("pgmId"));
-						taskParam.put("verUpReason", paramMap.get("verUpReason"));
-
-						int wbsPlanCodeId = wb22Mapper.selectMaxWbsCode(paramMap);
-						String codeId = "";
-						if (wbsPlanCodeId < 10) {
-							codeId = "0" + String.valueOf(wbsPlanCodeId);
-						} else {
-							codeId = String.valueOf(wbsPlanCodeId);
-						}
-						taskParam.put("wbsPlanCodeId", paramMap.get("wbsPlanCodeId") + codeId);
-						taskParam.put("seq", String.valueOf(i + 1));
-						
-						result = wb22Mapper.wbsLevel2Insert(taskParam);
-					}
-					i++;
-				}
-			}
-			result++;
-		}
-		return result;
-	}
-
-	@Override
-	public int copyAllPjtYn(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
-		int result = 0;
-
-		// salesCdList 조회용 파라미터 (ordrsNo 추가)
-		HashMap<String, String> param = new HashMap<>();
-		param.putAll(paramMap);
-		param.put("ordrsNo", paramMap.get("salesCd").substring(0, 5));
-
-		// 해당하는 수주번호에 과제확정이면서 일정이 미확정인애들 + TARGET(C/U)
-		List<Map<String, String>> salesCdList = wb22Mapper.salesCdList(param);
-
-		Gson gson = new Gson();
-		Type stringList = new TypeToken<ArrayList<Map<String, String>>>() {
-		}.getType();
-		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
-		if (salesCdList != null && !salesCdList.isEmpty() && sharngArr != null && sharngArr.size() > 0) {
-			for (Map<String, String> salesRow : salesCdList) {
-				String salesCd = salesRow.get("salesCd");
-				String target  = salesRow.get("target");					// 등록대상 : C , 수정대상 : U
-				String closeYn = salesRow.get("closeYn");					// 계획확정 여부
-				String wb21VerNo = salesRow.get("wb21VerNo");				// 과제버전
-				String wb22VerNo = salesRow.get("wb22VerNo");				// 계획버전
-				String planExcept = salesRow.get("planExcept");			// 일정예외사항
-				String wb21FileTrgtKey = salesRow.get("wb21FileTrgtKey");	// 과제FileTrgtKeY
-				if ("N".equals(closeYn)) {	// 미확정일정에 대한 insert or update 작업
-					int i = 0;
-					for (Map<String, String> sharngMap : sharngArr) {
-						// salesCd 기준으로 반복이므로, 여기서 salesCd 세팅
-						sharngMap.put("salesCd", salesCd);
-						sharngMap.put("coCd",   salesRow.get("coCd"));
-						sharngMap.put("ordrsNo", salesRow.get("ordrsNo"));
-
-						if ("C".equals(target)) { // INSERT 대상
-							String wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(param);
-							sharngMap.put("wbsPlanNo", wbsPlanNo);
-
-							String fileTrgtKey = wb22Mapper.selectWbsSeqNext(param);
-							sharngMap.put("fileTrgtKey", fileTrgtKey);
-
-							sharngMap.put("seq", String.valueOf(i + 1));
-							// 신규 버전은 1로 시작
-							sharngMap.put("verNo", "1");
-							sharngMap.put("creatId",  paramMap.get("userId"));
-							sharngMap.put("creatPgm", paramMap.get("pgmId"));
-
-							result += wb22Mapper.wbsLevel1Insert(sharngMap);
-
-						} else if ("U".equals(target)) { // UPDATE 대상
-
-							Map<String, String> updateTargetRow = wb22Mapper.selectWbsPlanTarget(sharngMap);
-							sharngMap.put("fileTrgtKey", updateTargetRow.get("fileTrgtKey"));
-							result += wb22Mapper.wbsLevel1Update(sharngMap);
-						} else {
-							throw new RuntimeException("생성오류!! 전산실에 문의해주세요.");
-						}
-						i++;
-					}
-					// Task계획 포함일경우 task Insert or update
-					if ("Y".equals(paramMap.get("taskYn"))) {
-						for (Map<String, String> sharngMap2 : sharngArr) {
-							String level1CodeId    = sharngMap2.get("wbsPlanCodeId");
-							String srcCoCd         = sharngMap2.get("coCd");
-							String srcSalesCd      = paramMap.get("salesCd"); 	// 기준(원본) SALES_CD
-							String targetSalesCd   = salesCd;						// salesRow 에서 온 대상 SALES_CD
-
-							// 복사할 Task 계획 리스트 (원본)
-							Map<String, String> copyParam = new HashMap<>();
-							copyParam.put("coCd", srcCoCd);
-							copyParam.put("salesCd", srcSalesCd);
-							copyParam.put("wbsPlanCodeKind", level1CodeId);  // ★ Level2 쿼리는 부모 Level1 의 codeId 기준
-							List<Map<String, String>> copyWBS2Level = wb22Mapper.selectWBS2Level(copyParam);
-
-							// 복사 원본이 없으면 패스
-							if (copyWBS2Level == null || copyWBS2Level.isEmpty() || targetSalesCd.equals(srcSalesCd)) {
-								continue;
-							}
-
-							// 대상 Task 계획 리스트
-							Map<String, String> targetParam = new HashMap<>();
-							targetParam.put("coCd", srcCoCd);
-							targetParam.put("salesCd", targetSalesCd);
-							targetParam.put("wbsPlanCodeKind", level1CodeId);  // 같은 Level1 헤더에 매달리는 Task들
-							List<Map<String, String>> targetWBS2Level = wb22Mapper.selectWBS2Level(targetParam);
-							for (Map<String, String> trgRow : targetWBS2Level) { 
-								wb22Mapper.wbsLevel2Delete(trgRow);	// task 계획삭제
-							}
-							// 기준 키: Level2 의 wbsPlanCodeId
-							Map<String, Map<String, String>> targetRowByCodeId = new HashMap<>();
-							if (targetWBS2Level != null && !targetWBS2Level.isEmpty()) {
-								for (Map<String, String> t : targetWBS2Level) {
-									String key = t.get("wbsPlanCodeId");
-									if (key != null) {
-										targetRowByCodeId.put(key, t);
-									}
-								}
-							}
-
-							// SEQ 는 대상에 기존 row 가 있으면 그 뒤부터 이어붙이고 없으면 1부터 시작하게끔 세팅
-							int seqNo = (targetWBS2Level == null || targetWBS2Level.isEmpty()) ? 0 : targetWBS2Level.size();
-							for (Map<String, String> srcRow : copyWBS2Level) {
-								// =============== INSERT ===============
-								Map<String, String> sharngMap = new HashMap<>(srcRow);
-								String wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
-								String newFileTrgtKey = wb22Mapper.selectWbsSeqNext(paramMap);
-
-								sharngMap.put("coCd",    paramMap.get("coCd"));
-								sharngMap.put("salesCd", targetSalesCd);
-								sharngMap.put("wbsPlanNo", wbsPlanNo);
-								sharngMap.put("wbsPlanCodeKind", level1CodeId);
-								int nextDetailCodeSeq = wb22Mapper.selectMaxWbsCode(sharngMap);
-								String detailSuffix   = (nextDetailCodeSeq < 10) ? "0" + nextDetailCodeSeq : String.valueOf(nextDetailCodeSeq);
-								sharngMap.put("wbsPlanCodeId", level1CodeId + detailSuffix);
-								seqNo++;
-								sharngMap.put("seq", String.valueOf(seqNo));
-								sharngMap.put("fileTrgtKey", newFileTrgtKey);
-								sharngMap.put("verNo", wb22VerNo);
-								result += wb22Mapper.wbsLevel2Insert(sharngMap);
-							}
-						}
-					}
-				}
-				// 일정예외사항 변경시 과제 버전업 및 확정
-				if ("Y".equals(paramMap.get("wb21ChangFlag")) || !paramMap.get("planExcept").equals(planExcept)) {
-
-					Map<String, String> param2 = new HashMap<>();
-					param2.put("fileTrgtKey", wb21FileTrgtKey);
-					Map<String, String> selectSjInfo = wb21Mapper.selectSjInfo(param2);
-					wb21Mapper.sjConfirmN(param2);
-
-					param2.putAll(selectSjInfo);
-
-					int fileTrgtKey = wb21Mapper.selectSjSeqNext(paramMap);
-					param2.put("fileTrgtKey", Integer.toString(fileTrgtKey));
-					param2.put("verNo", String.valueOf(Integer.parseInt(selectSjInfo.get("maxVerNo")) + 1));
-					param2.put("planExcept", paramMap.get("planExcept"));
-					param2.put("mkerCd", "");
-					param2.put("sjRmk", "");
-					param2.put("userId", paramMap.get("userId"));
-					param2.put("pgmId", paramMap.get("pgmId"));
-					param2.put("wb22Flag", "Y");
-
-					wb21Mapper.sjInsert(param2);
-				}
-			}
-		}
-		return result;
-	}
 
 	@Override
 	public int wb22OrdrsNoVersionUp(Map<String, String> paramMap, MultipartHttpServletRequest mRequest)throws Exception {
+		// List<Map<String, String>> salesCdList = wb22Mapper.salesCdList(paramMap);
+
 		int result = 0;
-		List<Map<String, String>> salesCdList = wb22Mapper.salesCdList(paramMap);
-		if (salesCdList != null && !salesCdList.isEmpty()) {
-			for (Map<String, String> salesRow : salesCdList) {
-				if ("Y".equals(salesRow.get("closeYn"))) {
+		Gson gsonDtl = new Gson();
+		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {
+		}.getType();
+		List<Map<String, String>> dtlParam = gsonDtl.fromJson(paramMap.get("detailArr"), dtlMap);
+		if (dtlParam != null && !dtlParam.isEmpty()) {
+			for (Map<String, String> dtl : dtlParam) {
+				if ("Y".equals(dtl.get("closeYn"))) {
 					Map<String, String> param = new HashMap<>();
 					param.put("userId", paramMap.get("userId"));
-					param.put("coCd", salesRow.get("coCd"));
-					param.put("salesCd", salesRow.get("salesCd"));
-					param.put("beginDt", String.valueOf(salesRow.get("beginDt")));
-					param.put("acptncDt", String.valueOf(salesRow.get("acptncDt")));
-					param.put("reqreDaycnt", String.valueOf(salesRow.get("reqreDaycnt")));
+					param.put("coCd", dtl.get("coCd"));
+					param.put("salesCd", dtl.get("salesCd"));
+					param.put("beginDt", String.valueOf(dtl.get("beginDt")));
+					param.put("acptncDt", String.valueOf(dtl.get("acptncDt")));
+					param.put("reqreDaycnt", String.valueOf(dtl.get("reqreDaycnt")));
 					List<Map<String, String>> selectWBS1Level = wb22Mapper.selectWBS1Level(param);
 					if (selectWBS1Level != null && selectWBS1Level.size() > 0) {
 						int i = 0;
-						for (Map<String, String> sharngMap : selectWBS1Level) {
-							sharngMap.put("seq", String.valueOf(i + 1));
-							wb22Mapper.wbsVerUpInsert(sharngMap);
+						for (Map<String, String> level1Map : selectWBS1Level) {
+							level1Map.put("seq", String.valueOf(i + 1));
+							wb22Mapper.wbsVerUpInsert(level1Map);
 							result++;
 							i++;
 						}
 						Map<String, String> param2 = new HashMap<>();
-						param2.put("newVerNo", String.valueOf(Integer.parseInt(salesRow.get("wb22VerNo")) + 1));
+						param2.put("newVerNo", String.valueOf(Integer.parseInt(dtl.get("planVerNo")) + 1));
 						param2.put("verUpReason", paramMap.get("verUpReason"));
-						param2.put("coCd", salesRow.get("coCd"));
-						param2.put("salesCd", salesRow.get("salesCd"));
-						param2.put("verNo", salesRow.get("wb22VerNo"));
+						param2.put("coCd", dtl.get("coCd"));
+						param2.put("salesCd", dtl.get("salesCd"));
+						param2.put("verNo", dtl.get("planVerNo"));
 
 						wb22Mapper.wbsVerUpUpdate(param2);
 					}

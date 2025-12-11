@@ -143,7 +143,7 @@
 									<div style="display:flex; align-items:center; text-align:left;">
 										<span style="margin-right:10px;">▣ 일정계획정보</span>
 
-										<!-- <div id="copyCheckBox">
+										<div id="copyCheckBox">
 											<label style="margin-right:10px;">
 												<input type="checkbox" id="allPjtYn" class="copyChk" style="vertical-align: middle; margin-right:3px; margin-bottom:4px;"/>프로젝트 전체
 											</label>
@@ -151,7 +151,7 @@
 											<label style="margin-right:10px;">
 												<input type="checkbox" id="taskPlanYn" class="copyChk" style="vertical-align: middle; margin-right:3px; margin-bottom:4px;"/>TASK 계획 포함
 											</label>
-										</div> -->
+										</div>
 									</div>
 									<div id="addrow1" class="add_btn_small pdl10" style="white-space:nowrap;">
 										<a id="btn15" onclick="copyAllPlanPopUp();" style="width:60px;height:30px;line-height:28px;">복사</a>
@@ -257,6 +257,7 @@
 	var thisGridRow = 0;
 	var thisGridCol = 0;
 	var teamManagerYnFlag = false;
+	var rsltDelteFlag = "N"
 
 	var beforeGridSize = 0; //수주상세그리드의 갯수용 그리드컨텐츠 높이조절용
 	//카톡 정상알림 카운터 변수
@@ -443,10 +444,18 @@
 						}else{
 							this.self.setValue(this.dindex, "daycnt", 0);
 						}
-						// //  // 담당자 ID, 시작일자, 종료일자 변경시
-						// if (this.key == "wbsPlanMngId" || this.key == "wbsPlansDt" || this.key == "wbsPlaneDt") {
-						// 	chkRsltsExist(this.item);
-						// }
+						
+						if ($("#allPjtYn").is(":checked") && (this.key === "wbsPlanMngId" || this.key === "wbsPlansDt" || this.key === "wbsPlaneDt")) {
+							this.self.setValue(this.dindex, "allPjtYn", "Y");
+						}
+						if ($("#taskPlanYn").is(":checked") && (this.key === "wbsPlanMngId" || this.key === "wbsPlansDt" || this.key === "wbsPlaneDt")) {
+							this.self.setValue(this.dindex, "taskPlanYn", "Y");
+						}
+
+						//  // 담당자 ID, 시작일자, 종료일자 변경시
+						if (this.item.taskPlanYn == "Y" && (this.key == "wbsPlanMngId" || this.key == "wbsPlansDt" || this.key == "wbsPlaneDt")) {
+							chkRsltsExist(this.item);
+						}
 					},
 				},
 				contextMenu: {
@@ -564,7 +573,10 @@
 					{key: "udtId",        label: "최종변경자"		,  hidden: true},
 					{key: "udtNm",        label: "최종변경자명"		,  hidden: true},
 					{key: "udtDttm",      label: "최종변경일자"		,  hidden: true},
-					{key: "levelNm",      label: "직급"		,  hidden: true}
+					{key: "levelNm",      label: "직급"		,  hidden: true},
+					{key: "allPjtYn",     label: "프로젝트 전체"      ,  hidden: true},
+					{key: "taskPlanYn",   label: "Task계획 포함"      ,  hidden: true},
+					{key: "rsltDete",     label: "실적삭제여부"      ,  hidden: true}
 				]
 			});
 			return this;
@@ -599,6 +611,8 @@
 					var i = 0;
 					if (list != undefined) {
 						$.each(list, function(idx, obj){
+							obj.allPjtYn = "N";
+							obj.taskPlanYn = "N";
 							list[i].daycnt = calculateCalendarCnt (obj.wbsPlansDt, obj.wbsPlaneDt);
 							if(i == 0){
 	// 							console.log(list[i]);
@@ -1075,121 +1089,20 @@
 	        $('#planExceptNm').hide();      // input 숨김
 	    }
 
-		$('#allPjtYn').on('change', function () {
-			copyAllPjtYn('N', $(this).is(':checked'));  // 프로젝트 전체
-		});
+		$('.copyChk').on('change', function (e) {
+			// 권한 조건
+			var hasAuth =
+				$('#smrizeId').val() == jwt.userId ||
+				$('#prdMngChk option').attr('data-etc').replace(/\s/g,'').split(',').includes(jwt.userId) ||
+				jwt.authInfo.includes('AUTH999');
 
-		$('#taskPlanYn').on('change', function () {
-			copyAllPjtYn('Y', $(this).is(':checked'));  // TASK 계획 포함
-		});
-	});
-
-	// 프로젝트 전체 체크, TASK 계획 포함 체크시 동작 함수
-	function copyAllPjtYn(taskYn, isChecked) {
-		// 체크 해제시
-		if (!isChecked) {
-			return false;
-		}
-		// 
-		if ($('#smrizeId').val() == jwt.userId || $('#prdMngChk option').attr('data-etc').replace(/\s/g,'').split(',').includes(jwt.userId) || jwt.authInfo.includes('AUTH999') ) {
-			// 로그인한 유저가 총괄PM, 생산관리, 시스템관리자는 해당 버튼 클릭가능
-		} else {
-			return false;
-		}
-		if (lastPlanExcept != $("#planExcept").val()) {
-			wb21ChangFlag = 'Y'
-		} else {
-			wb21ChangFlag = 'N'
-		}
-
-		let msg = "";
-		if (taskYn === 'Y') {
-			msg = "Task 계획을 포함한 다른 미확정 설비에도 복사하시겠습니까?";
-		} else {
-			msg = "현재 설비의 일정을 해당 프로젝트의 다른 미확정 설비에도 복사하시겠습니까?";
-		}
-		if (wb21ChangFlag === 'Y') {
-			msg = "일정예외사항 변경 시 과제가 버전업됩니다.\n" + msg;
-		}
-		if (!confirm(msg)) {
-			if (taskYn == 'N') $("#allPjtYn").prop("checked", false);
-			else $("#taskPlanYn").prop("checked", false);
-			return false;
-		}
-
-		var rowList = gridView1.target.getList();
-		var formData = new FormData();
-		formData.append("coCd", $("#popForm #coCd").val());
-		formData.append("userId", jwt.userId);
-		formData.append("salesCd", $("#popForm #salesCd").val());
-		formData.append("pgmId", $("#popForm #pgmId").val());
-		formData.append("beginDt", $('#popForm #beginDt').val());
-		formData.append("acptncDt", $('#popForm #acptncDt').val());
-		formData.append("reqreDaycnt", $('#popForm #reqreDaycnt').val());
-		formData.append("year", $('#popForm #beginDt').val().substring(0,4));
-		formData.append("taskYn", taskYn);
-		formData.append("fileTrgtKey", $("#popForm #fileTrgtKey").val());
-		formData.append("wb21ChangFlag", wb21ChangFlag);
-		formData.append("planExcept",  $("#popForm #planExcept").val());
-
-		if(rowList.length > 0) {
-			var rowListArr = [];
-			$.each(rowList, function(idx, elem){
-				var rowListObj = elem;
-				rowListObj["coCd"] = elem.coCd;
-				rowListObj["wbsPlanCodeId"] = elem.wbsPlanCodeId;
-				rowListObj["wbsPlanCodeNm"] = elem.wbsPlanCodeNm;
-				rowListObj["wbsPlanNo"] = elem.wbsPlanNo;
-				rowListObj["salesCd"] = elem.salesCd;
-				rowListObj["verNo"] = elem.verNo;
-				rowListObj["wbsPlanMngId"] = elem.wbsPlanMngId;
-				rowListObj["wbsPlansDt"] = elem.wbsPlansDt;
-				rowListObj["wbsPlaneDt"] = elem.wbsPlaneDt;
-				rowListObj["daycnt"] = elem.daycnt;
-				rowListObj["wbsPlanStsCodeId"] = elem.wbsPlanStsCodeId;
-				rowListObj["creatId"] = jwt.userId;
-				rowListObj["creatPgm"] = "WB2201M01";
-				rowListArr.push(rowListObj);
-			});
-			formData.append("rowListArr", JSON.stringify(rowListArr));
-		}
-		filePostAjax("/user/wb/wb22/copyAllPjtYn", formData, function(data) {
-			if (data.resultCode == 200) {
-				$("#btn1").hide();
-
-				var paramObj = {
-					"coCd": coCd,
-					"salesCd": salesCd,
-				};
-
-				postAjaxSync("/user/wb/wb22/selectSjInfo", paramObj, null, function(data){
-					var row = data.resultList;
-					if (row != undefined) {
-						$.each(row, function (key, val) {
-							$("#popForm #" + key).val(val);
-							if (key == "closeYn") {
-								var color = val == "Y" ? "color-circle_02.png" : "color-circle_01.png";
-								var html = '<img src="/static/img/'+color+'" align="center" style="width: 10px;height: 10px;"></img>';
-								$("#popForm #close").html(html)
-							}else if(key == "planExcept"){
-								lastPlanExcept = val;
-							}
-						});
-
-						// Validation 체크
-						if ($('#popForm #closeYn').val() == "N") {
-							alert("과제정보가 미확정입니다. 확정 후 입력 가능합니다.");
-						} else {
-							gridView1.setData(0);
-						}
-					}
-				});
-			} else {
-				customAlert("실패했습니다.");
+			if (!hasAuth) {
+				$(this).prop('checked', !this.checked);
+				customAlert("체크할 권한이 없습니다.");
+				return false;
 			}
 		});
-
-	}
+	});
 
 	// 사용자에게 실적여부를 판단해서 해당 실적을 삭제할건지
 	function chkRsltsExist(item) {
@@ -1220,37 +1133,17 @@
 				msgLines.push("해당 일정의 Task 계획 및 실적을 삭제하시겠습니까?");
 
 				var deleteMsg = msgLines.join("\n");
-
-				if (confirm(deleteMsg)) {
-					var formData = new FormData();
-					formData.append("coCd", $("#popForm #coCd").val());
-					formData.append("verNo", item.verNo);
-					formData.append("userId", jwt.userId);
-					formData.append("salesCd", $("#popForm #salesCd").val());
-					formData.append("pgmId", $("#popForm #pgmId").val());
-					formData.append("year", $('#popForm #beginDt').val().substring(0,4));
-					formData.append("wbsPlanMngId", item.wbsPlanMngId);
-					formData.append("wbsPlanCodeId", item.wbsPlanCodeId);
-					formData.append("wbsPlanCodeKind", item.wbsPlanCodeId);
-					formData.append("wbsPlansDt", item.wbsPlansDt);		// 계획시작일
-					formData.append("wbsPlaneDt", item.wbsPlaneDt);		// 계획종료일
-					formData.append("daycnt", item.daycnt);
-					formData.append("wbsPlanStsCodeId", item.wbsPlanStsCodeId);
-					formData.append("verUpReason", item.verUpReason);
-
-					filePostAjax("/user/wb/wb22/deleteRslt", formData, function(data) {
-						if (data.resultCode == 200) {
-							wbsLevel1Insert();
-							gridView2.setData(0);
-						} else {
-							customAlert(data.resultMessage)
-						}
-					});
+				// customAlert(deleteMsg);
+				if (confirm(deleteMsg)){
+					item.rsltDete = "Y"
+				} else {
+					item.taskPlanYn = "N";
+					$("#taskPlanYn").prop("checked", false);
 				}
+					
 			}
 		})
 	}
-
 
 	function noGrid2List(list){
 		//조회결과 저장된 게 없다면
@@ -1314,6 +1207,8 @@
 
 		formData.append("coCd", coCd);
 		formData.append("year", $('#beginDt').val().substring(0,4));
+		formData.append("salesCd", $('#salesCd').val());
+		formData.append("userId", jwt.userId);
 		if(rowList.length > 0) {
 			var rowListArr = [];
 			$.each(rowList, function(idx, elem){
@@ -1369,6 +1264,9 @@
 				rowListObj["creatId"] = jwt.userId;
 				rowListObj["creatPgm"] = "WB2201M01";
 				rowListObj["chgReason"] = elem.chgReason;		// 변경사유
+				rowListObj["allPjtYn"] = elem.allPjtYn;			// 프로젝트 전체
+				rowListObj["taskPlanYn"] = elem.taskPlanYn;		// Task계획 포함
+				rowListObj["taskPlanYn"] = elem.taskPlanYn;		// Task실적 삭제 플래그
 
 				rowListArr.push(rowListObj);
 			});
@@ -1385,6 +1283,7 @@
 			}
 			if (data.resultCode == 200) {
 				gridView1.setData(0);
+				gridView2.setData(0);
 				if(fromConfirm){
 					getGrid1RowList();
 				}
@@ -1946,6 +1845,9 @@
 	}
 
 	function wbsRsltsInsertModal() {
+		if ($("#wbsPlanCloseYn").val() == 'N') {
+			return false;
+		}
 		if (addRowArr.length  > 0 || deleteRowArr.length  > 0) {
 			alert("추가 또는 삭제 내역이 존재합니다. 저장 후 처리하세요");
 			return;

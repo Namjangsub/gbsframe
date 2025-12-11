@@ -2,17 +2,32 @@
 	<div class="popup_area_wb22confirm">
 		<form id="popForm_wb22confirm" onSubmit="return false;">
 			<div class="popup_table">
+				<div id="createHistoryDiv" class="contents_tit">
+					<div class="add_btn_small pdl10">
+						<!-- <button type="button" onclick="confirm_wb22();">확정</button> -->
+						<a id="ReportMain" onclick="confirm_wb22();" style="height: 30px; line-height: 28px; width: 100px;">확정</a>
+						<a id="ReportMainVerUp" onclick="wb22OrdrsNoVersionUp();" style="height: 30px; line-height: 28px; width: 100px;">Ver/Up</a>
+					</div>
+				</div>
 				<select id="prdMngChk" data-kind="SPECRTS" hidden></select>
 				<table>
 					<colgroup>
-						<col width="20%">
-						<col width="20%">
+						<col width="7%">
+						<col width="7%">
+						<col width="7%">
 						<col width="">
 					</colgroup>
 
 					<tr>
-						<td>
+						<td >
 							<select id="coCd_PS" name="coCd_PS" data-kind="CO" data-search="coCd" required msg="회사" onchange="Modalwb22noconfirmGridView.setData(0);">
+							</select>
+						</td>
+						<td>
+							<select data-search="planCloseYn" onchange="Modalwb22noconfirmGridView.setData(0);">
+								<option value="" selected>전체</option>
+								<option value="Y">확정</option>
+								<option value="N">미확정</option>
 							</select>
 						</td>
 						
@@ -41,12 +56,13 @@
 		</form>
 	</div>
 	<div class="popup_bottom_btn">
-		<button type="button" onclick="confirm_wb22();">확정</button>
+		<!-- <button type="button" onclick="confirm_wb22();">확정</button> -->
 		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
 	</div>
 </div>
 
 <script type="text/javascript">
+	var planYnFlag = "";
 	ax5.ui.grid.formatter["chkYn"] = function () {
 		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
 		if (this.value == "E") {
@@ -178,6 +194,7 @@
 
 	// 일괄확정
 	function confirm_wb22() {
+		planYnFlag = 'CONFIRM';
 		if (inputValidation($('.popup_area_wb22confirm [required]'))) {						// 필수 필드의 유효성 검사
 			var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
 			if (!formData) {
@@ -222,20 +239,42 @@
 		$.each(rowList, function(idx, elem) {
 			if (elem.__selected__) {
 				const obj = {
-					dataChk   : 'U',
-					coCd      : elem.coCd,
-					salesCd   : elem.salesCd,
-					planVerNo : elem.planVerNo,
-					userId    : jwt.userId,
-					smrizeId  : elem.smrizeId,
-					pgmId     : 'WB2201M02'
+					dataChk		: 'U',
+					coCd		: elem.coCd,
+					salesCd		: elem.salesCd,
+					planVerNo	: elem.planVerNo,
+					userId		: jwt.userId,
+					smrizeId	: elem.smrizeId,
+					pgmId		: 'WB2201M02',
+					closeYn		: elem.planCloseYn,
+					beginDt		: elem.beginDt,
+					acptncDt	: elem.acptncDt,
+					reqreDaycnt	: elem.reqreDaycnt
 				};
 				detailArr.push(obj);
 				if (elem.smrizeId == jwt.userId || $('#prdMngChk option').attr('data-etc').replace(/\s/g,'').split(',').includes(jwt.userId) || jwt.authInfo.includes('AUTH999') ) {
 				} else {
 					customAlert("권한이 없는 일정이 있습니다. 확인해보시고 다시 작업해주세요.");
+					Modalwb22noconfirmGridView.setData(0);
 					hasNoAuth = true;
 					return false;
+				}
+				if (planYnFlag === 'CONFIRM') {
+                // 확정 버튼: 미확정(= 'N')만 선택 가능
+					if (elem.planCloseYn !== 'N') {
+						customAlert("확정 처리 시에는 미확정인 일정만 선택할 수 있습니다.");
+						Modalwb22noconfirmGridView.setData(0);
+						hasNoAuth = true;
+						return false;
+					}
+				} else if (planYnFlag === 'VERUP') {
+					// Ver/Up 버튼: 확정(= 'Y')만 선택 가능
+					if (elem.planCloseYn !== 'Y') {
+						customAlert("Ver.Up 처리 시에는 '계획확정 = Y(확정)' 인 일정만 선택할 수 있습니다.");
+						Modalwb22noconfirmGridView.setData(0);
+						hasNoAuth = true;
+						return false;
+					}
 				}
 			}
 		});
@@ -252,6 +291,64 @@
 	function executeCallback() {
 		modalStack.last().callback(Modalwb22noconfirmGridView);
 		modalStack.close();
+	}
+
+	function wb22OrdrsNoVersionUp() {
+		planYnFlag = 'VERUP';
+		// Validation 체크
+		// var row = salesGridView.target.getList("selected")[0];
+		// if (!row) {
+		// 	customAlert("선택한 자료가 없습니다");
+		// 	return false;
+		// }
+		// if (row.planCloseYn != 'N') {
+		// 	customAlert("미확정 일정은 버전업 대상이 아닙니다.");
+		// 	return false;
+		// }
+
+		// 버전업 클릭시 버전업 사유 입력받고 진행
+		wb22mVerUpReason('').then(function(reason) {
+			if (!reason || reason.status !== 'ok') {
+				return false; // alert 없음
+			}
+
+			// 버전업 사유 Validation 체크
+			const verUpReasonValue = String(reason.value || '').trim();
+			if (!verUpReasonValue) {
+				customAlert('Ver.Up 사유를 입력하세요.');
+				return false;
+			}
+			var formData = makeFormData();
+			formData.append("verUpReason", verUpReasonValue);
+			filePostAjax("/user/wb/wb22/wb22OrdrsNoVersionUp", formData, function(data){
+				if (data.resultCode != 200){
+					customAlert("일괄 버전업에 실패했습니다. 전산실에 문의해주세요")
+				}
+				Modalwb22noconfirmGridView.setData(0);
+				modalStack.close();
+			});
+
+		}).catch(function(err){
+			return false;
+		});
+	}
+
+	// 버전업 사유를 입력받는 프롬프트 생성
+	async function wb22mVerUpReason(defaultReason ="") {
+		const result  = customPrompt(
+			`Ver Up 사유를 입력해주세요.`,
+			defaultReason
+			
+		);
+		// customPrompt 최소 사이즈 변경
+		requestAnimationFrame(() => {
+			const $dlg = $('#custom-prompt-overlay > div').first();
+			if ($dlg.length) {
+				$dlg.css('min-width', '350px'); // 최소 가로 크기 지정
+			}
+		});
+		
+		return await result;
 	}
 
 </script>
