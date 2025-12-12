@@ -1,5 +1,6 @@
 package com.dksys.biz.user.cr.cr10.service;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -34,5 +35,7 @@ public interface CR10Svc {
   List<Map<String, String>> selectLgistItemList(Map<String, String> paramMap);
 
   Map<String, Object> checkLgistItemImage(Map<String, String> paramMap);
+
+  int updateLgistlistImage(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws IOException;
 
 }

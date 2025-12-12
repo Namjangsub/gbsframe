@@ -210,6 +210,29 @@ public class CR10Ctr {
 	  	return "jsonView";
 	}
 
+
+	@PostMapping(value = "/updateLgistlistImage")
+	public String updateLgistlistImage(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	  	try {
+	  		int result = cr10Svc.updateLgistlistImage(paramMap, mRequest);
+			if (result == 9999 ) {
+				model.addAttribute("resultCode", 9999);
+				model.addAttribute("resultMessage", "출하 설비 LIST에 처리할 자료가 없습니다.");
+			} else if (result != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+	}
+	
+	
 	@PutMapping(value = "/deleteLgistMast")
 	public String deleteLgistMast(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 	  	try {
