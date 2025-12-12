@@ -1,5 +1,7 @@
 package com.dksys.biz.config;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
@@ -308,5 +310,43 @@ public class RequestUtils {
 			return ((ServletRequestAttributes) attrs).getRequest();
 		}
 		return null;
+	}
+	
+
+	private static boolean isBlank(String s){ return s == null || s.trim().isEmpty(); }
+
+	public static String nvl(String a, String b){ return isBlank(a) ? b : a; }
+	public static String cut(String s, int max){
+	    if (s == null) return null;
+	    return s.length() <= max ? s : s.substring(0, max);
+	}
+
+	public static Long toLong(String s){
+	    try { return isBlank(s) ? null : Long.parseLong(s.trim()); }
+	    catch (Exception e) { return null; }
+	}
+	
+	public static String getClientIp(HttpServletRequest req){
+	    String xff = req.getHeader("X-Forwarded-For");
+	    if (!isBlank(xff)) return xff.split(",")[0].trim();
+	    return req.getRemoteAddr();
+	}
+
+	public static String guessContentType(String fileType){
+	    if (isBlank(fileType)) return "application/octet-stream";
+	    switch (fileType.toLowerCase()) {
+	        case "jpg":
+	        case "jpeg": return "image/jpeg";
+	        case "png":  return "image/png";
+	        case "gif":  return "image/gif";
+	        case "pdf":  return "application/pdf";
+	        case "zip":  return "application/zip";
+	        default:     return "application/octet-stream";
+	    }
+	}
+	
+	public static String contentDisposition(String filename) throws UnsupportedEncodingException {
+	    String encoded = URLEncoder.encode(filename, "UTF-8").replace("+", "%20");
+	    return "attachment; filename*=UTF-8''" + encoded;
 	}
 }

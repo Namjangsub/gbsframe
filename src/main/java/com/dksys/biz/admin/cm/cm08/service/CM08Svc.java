@@ -49,5 +49,11 @@ public interface CM08Svc {
 
 	int uploadFile(Map<String, String> paramMap, MultipartHttpServletRequest mRequest);
 
+	public long nextDlHistId();
+
+	public int insertDnldStart(Map<String, Object> hist);
+
+	public int updateDnldEnd(Map<String, Object> end);
+
 
 }

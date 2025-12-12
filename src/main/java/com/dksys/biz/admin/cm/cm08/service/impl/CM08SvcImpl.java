@@ -660,5 +660,23 @@ public class CM08SvcImpl implements CM08Svc {
             return out;
 
     }
-	
+
+
+    @Override
+    public long nextDlHistId() {
+        return cm08Mapper.nextDlHistId();
+    }
+
+
+    @Override
+    public int insertDnldStart(Map<String, Object> hist) {
+        return cm08Mapper.insertDnldStart(hist);
+    }
+    
+    
+    @Override
+    public int updateDnldEnd(Map<String, Object> end) {
+        return cm08Mapper.updateDnldEnd(end);
+    }
+    
 }

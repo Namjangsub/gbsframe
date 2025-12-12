@@ -30,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
+import com.dksys.biz.config.RequestUtils;
 
 @RestController
 @RequestMapping("/api/convert")
@@ -56,53 +57,54 @@ public class OfficeConvertController {
      */
     @PostMapping("/pdf")
     public ResponseEntity<?> convertToPdf(@RequestParam("file") MultipartFile file, Authentication authentication) throws Exception {
-
-        System.out.println("[/api/convert/pdf] auth = {}" +  authentication);
-        if (authentication != null) {
-        	System.out.println("principal = {}"+ authentication.getName());
-        	System.out.println("authorities = {}" + authentication.getAuthorities());
-        }
-    	
-        String originalName = file.getOriginalFilename();
-        if (originalName == null) {
-            originalName = "upload";
-        }
-
-        String ext = StringUtils.getFilenameExtension(originalName);
-        if (ext == null) {
-            return ResponseEntity.badRequest().body("no extension");
-        }
-        ext = ext.toLowerCase();
-
-        String id = UUID.randomUUID().toString().replace("-", "");
-        Path srcPath = outputDir.resolve(id + "." + ext);
-
-        // 업로드 파일을 작업폴더에 먼저 저장
-        file.transferTo(srcPath.toFile());
-
-        Path pdfPath = outputDir.resolve(id + ".pdf");
-        if ("pdf".equals(ext)) {
-        	//옵션 1) 다시 저장
-//        	Files.copy(srcPath, pdfPath);
-        	// 업로드가 pdf면 우리가 쓰는 파일명으로 맞춰서 복사
-//        	Files.move(srcPath, pdfPath, StandardCopyOption.REPLACE_EXISTING);
-        } else {
-        	// 3) pdf가 아니면 변환try {
-        	try {
-        	    converter.convert(srcPath.toFile())
-        	             .to(pdfPath.toFile())
-        	             .execute();
-        	} catch (OfficeException e) {
-        	    // 여기서 바로 또 convert() 하지 말고
-        	    // 프런트에 "503, 잠시 후 재요청" 보내는 게 안전
-        	    return ResponseEntity.status(503)
-        	        .body("변환 서버가 지금 바쁩니다. 3~5초 후 다시 요청해주세요.");
-        	}
-        }
-        
-        // 프런트는 이 URL을 pdf.js viewer.html?file=... 에 넘기면 됨
-        String pdfUrl = "/api/convert/pdf/" + id;
-        return ResponseEntity.ok(pdfUrl);
+//
+//        System.out.println("[/api/convert/pdf] auth = {}" +  authentication);
+//        if (authentication != null) {
+//        	System.out.println("principal = {}"+ authentication.getName());
+//        	System.out.println("authorities = {}" + authentication.getAuthorities());
+//        }
+//    	
+//        String originalName = file.getOriginalFilename();
+//        if (originalName == null) {
+//            originalName = "upload";
+//        }
+//
+//        String ext = StringUtils.getFilenameExtension(originalName);
+//        if (ext == null) {
+//            return ResponseEntity.badRequest().body("no extension");
+//        }
+//        ext = ext.toLowerCase();
+//
+//        String id = UUID.randomUUID().toString().replace("-", "");
+//        Path srcPath = outputDir.resolve(id + "." + ext);
+//
+//        // 업로드 파일을 작업폴더에 먼저 저장
+//        file.transferTo(srcPath.toFile());
+//
+//        Path pdfPath = outputDir.resolve(id + ".pdf");
+//        if ("pdf".equals(ext)) {
+//        	//옵션 1) 다시 저장
+////        	Files.copy(srcPath, pdfPath);
+//        	// 업로드가 pdf면 우리가 쓰는 파일명으로 맞춰서 복사
+////        	Files.move(srcPath, pdfPath, StandardCopyOption.REPLACE_EXISTING);
+//        } else {
+//        	// 3) pdf가 아니면 변환try {
+//        	try {
+//        	    converter.convert(srcPath.toFile())
+//        	             .to(pdfPath.toFile())
+//        	             .execute();
+//        	} catch (OfficeException e) {
+//        	    // 여기서 바로 또 convert() 하지 말고
+//        	    // 프런트에 "503, 잠시 후 재요청" 보내는 게 안전
+//        	    return ResponseEntity.status(503)
+//        	        .body("변환 서버가 지금 바쁩니다. 3~5초 후 다시 요청해주세요.");
+//        	}
+//        }
+//        
+//        // 프런트는 이 URL을 pdf.js viewer.html?file=... 에 넘기면 됨
+//        String pdfUrl = "/api/convert/pdf/" + id;
+//        return ResponseEntity.ok(pdfUrl);
+        return ResponseEntity.ok("Do not use PDF for submission/posting.");
     }
 
     /**
@@ -149,7 +151,32 @@ public class OfficeConvertController {
             return ResponseEntity.status(HttpServletResponse.SC_NOT_FOUND)
                                  .body("파일이 존재하지 않습니다.");
         }
-        
+
+        // ===== 1) 이력 START insert =====
+        long dlHistId = cm08Svc.nextDlHistId();
+
+        Map<String, Object> hist = new HashMap<>();
+        hist.put("dlHistId", dlHistId);
+
+        hist.put("fileKey", fileInfo.get("fileKey"));
+        hist.put("fileName", fileInfo.get("fileName")); 
+        hist.put("filePath", fileInfo.get("filePath"));
+
+        hist.put("userId", tempParam.get("userId"));
+
+        hist.put("deviceType", RequestUtils.detectDeviceType(RequestUtils.getUserAgent()));
+        hist.put("clientIp", RequestUtils.getClientIp());
+        hist.put("xffIp", RequestUtils.getClientIp());
+        hist.put("userAgent", RequestUtils.cut(RequestUtils.getUserAgent(), 900));
+        hist.put("referer", RequestUtils.cut(request.getHeader("Referer"), 900));
+
+        String reqId = UUID.randomUUID().toString().replace("-", "");
+        hist.put("reqId", reqId);
+        hist.put("reqUri", RequestUtils.cut(request.getRequestURI(), 900));
+        hist.put("httpMethod", request.getMethod());
+
+        cm08Svc.insertDnldStart(hist);
+
         // 확장자
         String fileName = fileInfo.get("fileName");           // 예: spec.pptx
 
@@ -177,14 +204,26 @@ public class OfficeConvertController {
         String outFileName = fileInfo.get("fileKey") + '_' + nameOnly + ".pdf";
         Path pdfPath = outputDir.resolve(outFileName); 
         File targetFile = pdfPath.toFile();
+        long bytesSent = 0L;
         if (!targetFile.exists()) {
             // pdf면 복사만, 아니면 변환
             if ("pdf".equalsIgnoreCase(ext)) {
             	Files.copy(originFile.toPath(), pdfPath, StandardCopyOption.REPLACE_EXISTING);
+            	bytesSent = RequestUtils.toLong(fileInfo.get("fileSize"));
             } else {
             	// 너무 큰 파일 차단
-                long size = originFile.length();
-                if (size > 150 * 1024 * 1024) { // 150MB 이상
+            	bytesSent = originFile.length();
+                if (bytesSent > 150 * 1024 * 1024) { // 150MB 이상
+
+                    // ===== 4) 실패 END update =====
+                    Map<String, Object> end = new HashMap<>();
+                    end.put("dlHistId", dlHistId);
+                    end.put("resultCd", "F");
+                    end.put("httpStatus",413);
+                    end.put("bytesSent", bytesSent);
+                    end.put("errMsg", "파일이 너무 큽니다. 150MB 이하만 미리보기 가능합니다.");
+                    try { cm08Svc.updateDnldEnd(end); } catch (Exception ignore) {}
+                    
                     return ResponseEntity
                         .status(413)
                         .body("파일이 너무 큽니다. 150MB 이하만 미리보기 가능합니다.");
@@ -196,15 +235,44 @@ public class OfficeConvertController {
             	             .to(pdfPath.toFile())
             	             .execute();
                 } catch (org.jodconverter.core.office.OfficeException e) {
+
+                    // ===== 4) 실패 END update =====
+                    Map<String, Object> end = new HashMap<>();
+                    end.put("dlHistId", dlHistId);
+                    end.put("resultCd", "F");
+                    end.put("httpStatus",503);
+                    end.put("bytesSent", bytesSent);
+                    end.put("errMsg", "변환 서버가 사용 중입니다. 잠시 후 다시 시도하세요.");
+                    try { cm08Svc.updateDnldEnd(end); } catch (Exception ignore) {}
+                    
                     // 오피스 프로세스 못 빌렸을 때
                     return ResponseEntity.status(503)
                             .body("변환 서버가 사용 중입니다. 잠시 후 다시 시도하세요. " + e.getMessage());
                 } catch (Exception e) {
+
+                    // ===== 4) 실패 END update =====
+                    Map<String, Object> end = new HashMap<>();
+                    end.put("dlHistId", dlHistId);
+                    end.put("resultCd", "F");
+                    end.put("httpStatus",500);
+                    end.put("bytesSent", bytesSent);
+                    end.put("errMsg", "문서 변환 중 오류가 발생했습니다.");
+                    try { cm08Svc.updateDnldEnd(end); } catch (Exception ignore) {}
+                    
                     return ResponseEntity.status(500)
                             .body("문서 변환 중 오류가 발생했습니다. " + e.getMessage());
                 }
             }
         }
+
+    	// ===== 3) 성공 END update =====
+        Map<String, Object> end = new HashMap<>();
+        end.put("dlHistId", dlHistId);
+        end.put("resultCd", "S");
+        end.put("httpStatus", 200);
+		end.put("bytesSent", bytesSent);
+        end.put("errMsg", null);
+        cm08Svc.updateDnldEnd(end);
         
         // 프론트가 이 URL로 다시 GET 하면 pdf 내려가게
         String pdfUrl = "/api/convert/pdf/" + outFileName;

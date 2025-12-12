@@ -41,4 +41,8 @@ public interface CM08Mapper {
 	Map<String, String> selectMByTarget(Map<String, String> paramMap);
 	Map<String, String> selectMByRetriveValue(Map<String, String> m);
 
+
+    long nextDlHistId();
+    int insertDnldStart(Map<String, Object> hist);
+    int updateDnldEnd(Map<String, Object> end);
 }

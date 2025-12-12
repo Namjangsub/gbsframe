@@ -5,18 +5,19 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.util.FileCopyUtils;
@@ -31,6 +32,7 @@ import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.util.MessageUtils;
+import com.dksys.biz.config.RequestUtils;
 
 @Controller
 @RequestMapping("/admin/cm/cm08")
@@ -72,6 +74,7 @@ public class CM08Ctr {
     		model.addAttribute("resultCode", 200);
     		model.addAttribute("resultMessage", messageUtils.getMessage("excute"));
     		model.addAttribute("fileInfo", fileInfo);
+    		model.addAttribute("fileInfo", fileInfo);
     	}else {
 			model.addAttribute("resultCode", 500);
     		model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -80,113 +83,6 @@ public class CM08Ctr {
 		return "jsonView";
 	}
 	
-	@GetMapping(value="/fileDownload")
-	public void fileDownload(@RequestParam String filePath, HttpServletRequest request, HttpServletResponse response) throws Exception {
-		
-		BufferedInputStream bis = null;
-		ServletOutputStream sos = null;
-
-		try{
-			File file = new File(filePath);
-			response.setContentType("application/octet-stream; charset=UTF-8");
-			response.setContentLength((int)file.length());
-			int idx = filePath.split("\\\\").length-1;
-			String fileName = filePath.split("\\\\")[idx];
-			fileName = fileName.substring(fileName.indexOf("_")+1);
-			cm08Svc.setDisposition(request, response, fileName);
-
-			OutputStream out = response.getOutputStream();
-	        FileInputStream fis = null;
-	         
-	        try {
-	            fis = new FileInputStream(file);
-	            FileCopyUtils.copy(fis, out);
-	        } catch (Exception e) {
-	            e.printStackTrace();
-	        } finally {
-	            if (fis != null) { try { fis.close(); } catch (Exception e2) {}}
-	            if (out != null) { try { out.close(); } catch (Exception e2) {}}
-	        }
-	        out.flush();
-	        
-		} catch(IOException e){
-			e.printStackTrace();
-		} finally{
-			if(bis != null)
-				bis.close();
-			if(sos != null)
-				sos.close();
-		}
-	}
-    
-	
-	@GetMapping(value="/fileDownloadAuth")
-	public void fileDownloadAuth(@RequestParam Map<String, String> param, HttpServletRequest request, HttpServletResponse response) throws Exception {
-
-	    String source = request.getHeader("X-GBS-Source");
-	    if (!"pdfjs-viewer".equals(source)) {
-	        System.out.println("주소창/링크 등 기타 요청일 가능성");
-	        String json = "{\"error\":\"정상적인 접근이 아닙니다.\"}";
-
-	        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-	        response.setContentType("application/json;charset=UTF-8");
-	        response.getWriter().write(json);
-	        response.getWriter().flush();
-	        return;  // 이후 파일 다운로드 로직 실행하지 않도록 종료
-	    }
-        
-		//-----------------------------------------------
-    	//parameter 정보
-    	//  fileKey : 이동하고자 하는 파일 일련번호
-    	//  userId  : 이동 작업을 실행하는 사용자 ID
-    	//-----------------------------------------------		
-	   	//해당 디렉토리 다운로드 권한이 있어야 작업 가능     	
-    	Map<String, String> tempParam = new HashMap<String, String>();
-    	tempParam.putAll(param);
-    	tempParam.put("jobType", "fileDown");
-//    	String userId = request.getParameter("userId");
-		Map<String, String> fileInfo = cm08Svc.selectFileInfoUser(tempParam);
-    	//
-    	if (null != fileInfo.get("fileName"))  {
-//    		String filePath = request.getParameter("filePath");
-    		String filePath = fileInfo.get("filePath") + fileInfo.get("fileKey")+ '_' + fileInfo.get("fileName");
-    		
-    		BufferedInputStream bis = null;
-    		ServletOutputStream sos = null;
-    		
-    		try{
-    			File file = new File(filePath);
-    			response.setContentType("application/octet-stream; charset=UTF-8");
-    			response.setContentLength((int)file.length());
-    			int idx = filePath.split("\\\\").length-1;
-    			String fileName = filePath.split("\\\\")[idx];
-    			fileName = fileName.substring(fileName.indexOf("_")+1);
-    			cm08Svc.setDisposition(request, response, fileName);
-    			
-    			OutputStream out = response.getOutputStream();
-    			FileInputStream fis = null;
-    			
-    			try {
-    				fis = new FileInputStream(file);
-    				FileCopyUtils.copy(fis, out);
-    			} catch (Exception e) {
-    				e.printStackTrace();
-    			} finally {
-    				if (fis != null) { try { fis.close(); } catch (Exception e2) {}}
-    				if (out != null) { try { out.close(); } catch (Exception e2) {}}
-    			}
-    			out.flush();
-    			
-    		} catch(IOException e){
-    			e.printStackTrace();
-    		} finally{
-    			if(bis != null)
-    				bis.close();
-    			if(sos != null)
-    				sos.close();
-    		}
-    	} 		
-	}
 
     @GetMapping(value="/fileDownloadAuth2")
     public void fileDownloadAuth2(@RequestParam Map<String, String> param, HttpServletRequest request, HttpServletResponse response) throws Exception {
@@ -233,9 +129,37 @@ public class CM08Ctr {
                 response.getWriter().write("파일이 존재하지 않습니다.");
                 return;
             }
+            
+            // ===== 1) 이력 START insert =====
+            long dlHistId = cm08Svc.nextDlHistId();
 
+            Map<String, Object> hist = new HashMap<>();
+            hist.put("dlHistId", dlHistId);
+
+            hist.put("fileKey", fileInfo.get("fileKey"));
+            hist.put("fileName", fileInfo.get("fileName")); 
+            hist.put("filePath", fileInfo.get("filePath"));
+
+            hist.put("userId", tempParam.get("userId"));
+
+            hist.put("deviceType", RequestUtils.detectDeviceType(RequestUtils.getUserAgent()));
+            hist.put("clientIp", RequestUtils.getClientIp());
+            hist.put("xffIp", RequestUtils.getClientIp());
+            hist.put("userAgent", RequestUtils.cut(RequestUtils.getUserAgent(), 900));
+            hist.put("referer", RequestUtils.cut(request.getHeader("Referer"), 900));
+
+            String reqId = UUID.randomUUID().toString().replace("-", "");
+            hist.put("reqId", reqId);
+            hist.put("reqUri", RequestUtils.cut(request.getRequestURI(), 900));
+            hist.put("httpMethod", request.getMethod());
+
+            cm08Svc.insertDnldStart(hist);
+
+            // ===== 2) 스트리밍 다운로드 =====
             BufferedInputStream bis = null;
             ServletOutputStream sos = null;
+
+            long bytesSent = 0L;
             
             try{
 				String fileName = file.getName().substring(file.getName().indexOf("_") + 1); // 실제 파일명 추출
@@ -257,15 +181,37 @@ public class CM08Ctr {
 				response.setContentLengthLong(file.length());
 				response.setHeader("Content-Disposition",
 						dispositionType + "; filename=\"" + java.net.URLEncoder.encode(fileName, "UTF-8").replaceAll("\\+", "%20") + "\"");
-                
+				response.setHeader("X-Request-Id", reqId);
+				
                 OutputStream out = response.getOutputStream();
                 FileInputStream fis = null;
                 
                 try {
                     fis = new FileInputStream(file);
-                    FileCopyUtils.copy(fis, out);
+                    //FileCopyUtils 은  int로 응답하므로 대용량(2GB 초과)시 문제 발생
+                    bytesSent = FileCopyUtils.copy(fis, out);
                     out.flush();
+                    
+                	// ===== 3) 성공 END update =====
+                    Map<String, Object> end = new HashMap<>();
+                    end.put("dlHistId", dlHistId);
+                    end.put("resultCd", "S");
+                    end.put("httpStatus", 200);
+                    end.put("bytesSent", bytesSent);
+                    end.put("errMsg", null);
+                    cm08Svc.updateDnldEnd(end);
+                    
+                    
                 } catch (Exception e) {
+                    // ===== 4) 실패 END update =====
+                    Map<String, Object> end = new HashMap<>();
+                    end.put("dlHistId", dlHistId);
+                    end.put("resultCd", "F");
+                    end.put("httpStatus", response.isCommitted() ? 200 : 500);
+                    end.put("bytesSent", bytesSent);
+                    end.put("errMsg", RequestUtils.cut(e.toString(), 1800));
+                    try { cm08Svc.updateDnldEnd(end); } catch (Exception ignore) {}
+                    
                     e.printStackTrace();
                     // 파일 복사 중 오류 발생 시, 응답을 재설정하고 오류 메시지를 본문에 출력
                     response.reset(); // 이미 버퍼에 쓰여진 데이터 및 헤더 초기화
@@ -278,6 +224,15 @@ public class CM08Ctr {
                 }
                 
             } catch(IOException e){
+                // ===== 4) 실패 END update =====
+                Map<String, Object> end = new HashMap<>();
+                end.put("dlHistId", dlHistId);
+                end.put("resultCd", "F");
+                end.put("httpStatus", response.isCommitted() ? 200 : 500);
+                end.put("bytesSent", bytesSent);
+                end.put("errMsg", RequestUtils.cut(e.toString(), 1800));
+                try { cm08Svc.updateDnldEnd(end); } catch (Exception ignore) {}
+                
                 e.printStackTrace();
                 // 파일 복사 중 오류 발생 시, 응답을 재설정하고 오류 메시지를 본문에 출력
                 response.reset(); // 이미 버퍼에 쓰여진 데이터 및 헤더 초기화
@@ -441,4 +396,5 @@ public class CM08Ctr {
     	}
     	return "jsonView";
     }
+    
 }
