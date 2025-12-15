@@ -39,7 +39,15 @@ public class BM02SvcImpl implements BM02Svc {
 
 	@Override
 	public Map<String, Object> selectClntInfo(Map<String, String> paramMap) {
-		return bm02Mapper.selectClntInfo(paramMap);
+		Map<String, Object> returnMap = new HashMap<String, Object>();
+		Map<String, String> fileMap = new HashMap<String, String>();
+		 // "FITR9903"은 공통코드에서 자료실 첨부 디렉토리임 -> 변경가능함
+        fileMap.put("comonCd", "FITR9903");
+		fileMap.put("fileTrgtTyp", "BM0201M01");
+		fileMap.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+		fileMap.put("jobType", "fileList");
+ 		returnMap.put("clntInfo", bm02Mapper.selectClntInfo(paramMap));
+		return returnMap;
 	}
 	
 	@Override

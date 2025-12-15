@@ -60,6 +60,7 @@
 			<input type="file" id="clntFile" style="display:none" multiple="multiple" onchange="setClntFile(this);"/>
 			<form id="clntForm">
 				<input type="hidden" id="pgmId" name="pgmId" value="BM0202P01">
+				<input type="hidden" id="coCd" name="coCd">
 				<input type="hidden" id="clntCd_P" name="clntCd_P">
 				<input type="hidden" id="targetCd" name="targetCd">
 				<!-- 기본정보 테이블 -->
@@ -655,15 +656,24 @@
 				header: {selector: false},
 				body: {
 		            onDBLClick: function () {
-		            	if(this.item.fileKey){
-		            		downloadFile(this.item.fileKey, this.item.fileName);
+						this.self.clearSelect();
+  		                this.self.select(this.dindex);
+						if (this.column.key == "fileName") {
+							let obj = this.item;
+							imageViewPopup($('#coCd').val(), obj.fileKey, obj.fileName);
+						} else {
+							downloadFile(this.dindex);
 						}
 		            }
 		        },
 	            columns: [
-	                {key: "fileName", label: "파일명", width: 500},
-	                {key: "fileType", label: "파일타입", width: 100},
-	                {key: "fileSize", label: "파일크기", width: 100},
+	                {key: "fileName", 			label: "파일명", 	width: 500},
+	                {key: "fileType", 			label: "파일타입", 	width: 100},
+	                {key: "fileSize", 			label: "파일크기",	 width: 100},
+					{key : "fileUp",			label : "up",		 width : 60, align: "center", hidden: true},
+					{key : "fileDown",			label : "down", 	width : 60, align: "center", hidden: true},
+					{key : "fileUpdate",		label : "update", 	width : 60, align: "center", hidden: true},
+					{key : "fileDelete",		label : "delete", 	width : 60, align: "center", hidden: true},
 	                {
 						key:"fileDelete", label: "삭제", width:60,
 						formatter:function() {
@@ -687,7 +697,7 @@
 	
 	$(document).ready(function() {
 		// 영역 접기/열기 이벤트 바인딩
-
+		$("#coCd").val(jwt.coCd);
 		$('a.tbody_more_btn').click(function() {
 			$(this).toggleClass('on');
 			$(this).closest('table').find('tbody').toggle();
@@ -716,7 +726,11 @@
 	});
 
 	function selectClntInfo() {
-		var paramObj = {"clntCd":  modalStack.last().paramObj.clntCd };
+		var paramObj = {
+				"clntCd"	:  modalStack.last().paramObj.clntCd, 
+				"userId" 	: jwt.userId, 
+				"coCd" 		: $("#coCd").val()
+			}
 		postAjax("/admin/bm/bm02/selectClntInfo", paramObj, null, function(data){
 			setClntInfo(data.clntInfo);
 		});
@@ -824,6 +838,11 @@
 		      	'fileName' : obj.fileName,
 		      	'fileType' : obj.fileType,
 		      	'fileSize' : obj.fileSize,
+		      	// 'fileDelete' : obj.fileDelete,
+		      	// 'fileDown' : obj.fileDown,
+		      	// 'fileList' : obj.fileList,
+		      	// 'fileUp' : obj.fileUp,
+		      	// 'fileUpdate' : obj.fileUpdate,
 		      	'file' : obj
 			});
 		});
@@ -988,38 +1007,44 @@
 		// 첨부파일 그리드 set
 		fileGridView.setData();
 	}
-	
+	clntFileArr
 	// 파일 다운로드
-	function downloadFile(fileKey, fileName) {
-	    postAjax("/admin/cm/cm08/fileDownInfo", { fileKey: fileKey }, null, function(data) {
-	        const fileInfo = data.fileInfo;
-	        const filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName, "UTF-8");
-	
-	        fetch(`/admin/cm/cm08/fileDownload?filePath=${filePath}`, {
-	            method: "GET",
-	            headers: {
-	                "Authorization": authorizationToken
-	            }
-	        })
-	        .then(response => {
-	            if (!response.ok) throw new Error("다운로드 실패");
-	            return response.blob();
-	        })
-	        .then(blob => {
-	            // 👉 자동 다운로드 처리
-	            const downloadUrl = window.URL.createObjectURL(blob);
-	            const link = document.createElement("a");
-	            link.href = downloadUrl;
-	            link.download = fileName;  // 다운로드될 파일 이름
-	            document.body.appendChild(link);
-	            link.click();
-	            document.body.removeChild(link);
-	            window.URL.revokeObjectURL(downloadUrl);
-	        })
-	        .catch(error => {
-	            console.error("파일 다운로드 중 오류:", error);
-	        });
-	    });
+	async function downloadFile(idx) {
+		if (clntFileArr[idx].file.fileDown != 'Y') {
+			alert('파일 다운로드 권한이 없습니다.');
+			return false;
+		}
+
+		var fileKey = clntFileArr[idx].fileKey;
+		
+		// 파일 다운로드 함수 (fetch + Blob 방식 사용)
+		try {
+			const response = await fetch(`/admin/cm/cm08/fileDownloadAuth2?fileKey=${fileKey}&userId=${jwt.userId}&coCd=${$('#coCd').val()}`, {
+				  method: "GET",
+				  headers: {"Authorization": authorizationToken, "X-GBS-Source": "pdfjs-viewer"}
+			});
+			if (!response.ok) throw new customAlert('다운로드 실패');
+			const blob = await response.blob();
+
+			saveBlobAsFile(blob, clntFileArr[idx].fileName);
+			return 'SUCCESS';
+			
+		} catch (error) {
+			customAlert("파일 다운로드 중 오류:", error);
+			return 'ERROR';
+		}
+	}
+
+	// 파일 저장 함수
+	function saveBlobAsFile(blob, fileName) {
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = fileName;
+		document.body.appendChild(a);
+		a.click();
+		URL.revokeObjectURL(url);
+		a.remove();
 	}
 
 	

@@ -104,6 +104,7 @@ public class CM08SvcImpl implements CM08Svc {
             param.put("comonCd", mRequest.getParameter("comonCd"));
             if ("TB_BM02M01".equals(fileTrgtTyp)) {
             	param.put("clntCd", fileTrgtKey);
+            	param.put("comonCd", "FITR9903"); //거래처 첨부 디렉토리
             } else {
         		Map<String, String> chk = fetchAllowedDataMap(param);
         		param.put("coCd",    nz(chk,"coCd")    == null ? "" : nz(chk,"coCd"));
