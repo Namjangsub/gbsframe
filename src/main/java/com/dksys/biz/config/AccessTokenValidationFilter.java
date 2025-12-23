@@ -121,8 +121,10 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
     
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
-        return WHITELIST.stream()
-                .anyMatch(p -> pathMatcher.match(p, request.getServletPath()));
+//        return WHITELIST.stream()
+//                .anyMatch(p -> pathMatcher.match(p, request.getServletPath()));
+        String path = normalizedPath(request);
+        return WHITELIST.stream().anyMatch(p -> pathMatcher.match(p, path));
     }
     
     @Override
@@ -595,9 +597,19 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
 	    return null;
 	}
 	
+	
+	private String normalizedPath(HttpServletRequest request) {
+	    String uri = request.getRequestURI();       // 예: /gbs.gunyangitt.co.kr/s/xxxx 또는 /s/xxxx
+	    String ctx = request.getContextPath();      // /gbs.gunyangitt.co.kr 또는 ""
+	    if (ctx != null && !ctx.isEmpty() && uri.startsWith(ctx)) {
+	        return uri.substring(ctx.length());     // 예: /s/xxxx
+	    }
+	    return uri;                                 // 예: /s/xxxx
+	}
+	
 	// mTLS 검사 생략 URL 클래스
 	private boolean isMtlsExcluded(HttpServletRequest request) {
-	    String path = request.getServletPath(); // 또는 getRequestURI()
+	    String path = normalizedPath(request);
 	    for (String pattern : EXCLUDE_PATTERNS) {
 	        if (pathMatcher.match(pattern, path)) {
 	            return true;
