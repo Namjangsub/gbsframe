@@ -74,6 +74,7 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
             "/favicon.ico", 
             "/index.html",
             "/api/audit-ingest",
+            "/static/redirectChkCode.html", //UBI REPORT View 실행
             "/s/**"   // 발주소조회 URL
     };
     // CCV 토큰 유효기간 (초) : 페이지 체류 시간 기준으로 5~10분 권장
