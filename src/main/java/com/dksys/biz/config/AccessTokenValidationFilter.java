@@ -66,6 +66,16 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
         "/api/audit-ingest" 
     );
 
+    // mTLS "검사를 생략"할 URL 패턴들
+    private static final String[] EXCLUDE_PATTERNS = {
+            "/login",
+            "/customLogout",
+            "/error",
+            "/favicon.ico", 
+            "/index.html",
+            "/api/audit-ingest",
+            "/s/**"   // 발주소조회 URL
+    };
     // CCV 토큰 유효기간 (초) : 페이지 체류 시간 기준으로 5~10분 권장
     private static final long CCV_TTL_SECONDS = 300L; // 5분
 
@@ -154,6 +164,13 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
             return;
         }
+        
+        // mTLS 예외 URL 여부
+        boolean mtlsExcluded = isMtlsExcluded(request);
+
+        // 아래에서 사용할 변수는 미리 선언
+        Map<String, String> mapping = null;
+        String serialHex = null;
 
         // ==========================
         // 1. mTLS 인증서 기본 체크
@@ -169,125 +186,127 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
          * CLIENT_CERT_SERIAL_MISMATCH : 시리얼 불일치
          * CLIENT_CERT_SUBJECT_MISMATCH : Subject DN 불일치
          * ============================== */
-        X509Certificate[] certs =
-            (X509Certificate[]) request.getAttribute("javax.servlet.request.X509Certificate");
-
-        if (certs == null || certs.length == 0) {
-            // mTLS를 필수로 강제한 경우: 인증서 없으면 바로 차단
-            reject(response, "CLIENT_CERT_REQUIRED",  "클라이언트 인증서가 필요합니다.");
-            return;
+        if (!mtlsExcluded) {
+	        X509Certificate[] certs =
+	            (X509Certificate[]) request.getAttribute("javax.servlet.request.X509Certificate");
+	
+	        if (certs == null || certs.length == 0) {
+	            // mTLS를 필수로 강제한 경우: 인증서 없으면 바로 차단
+	            reject(response, "CLIENT_CERT_REQUIRED",  "클라이언트 인증서가 필요합니다.");
+	            return;
+	        }
+	
+	        X509Certificate clientCert = certs[0];
+	
+	        String subjectDN = clientCert.getSubjectX500Principal().getName();
+	//        String serialHex = clientCert.getSerialNumber().toString(16);
+	        serialHex = clientCert.getSerialNumber().toString(16);
+	        Date   notBefore = clientCert.getNotBefore();
+	        Date   notAfter  = clientCert.getNotAfter();
+	
+	        // (옵션) 인증서 유효기간 체크
+	        Date now = new Date();
+	        if (now.before(notBefore) || now.after(notAfter)) {
+	            reject(response, "CLIENT_CERT_EXPIRED", "만료되었거나 아직 유효하지 않은 클라이언트 인증서입니다.");
+	            return;
+	        }
+	
+	        //String subjectDN = "CN=js_nam_desktop,OU=RND,O=GunyangITT";
+	        Map<String, String> r = DnParser.parse(subjectDN);
+			String rUserId = r.get("userId");       // js_nam
+			String rDevice = r.get("deviceType");   // desktop
+			String rOrg    = r.get("orgName");      // GunyangITT
+	        
+	
+	        // ==========================
+	        // 1-1. CCV Shortcut (페이지 단위 캐시)
+	        // ==========================
+	        String ccvToken = extractCookie(request, "CCV");   // 아래에 helper 추가
+	        if (ccvToken != null) {
+	            try {
+	//                // (1) Authorization 헤더 존재 여부만 확인
+	//                String authHeader = request.getHeader("Authorization");
+	//                if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+	//                    throw new JwtException("Authorization header missing for CCV shortcut");
+	//                }
+	                
+	                Claims ccvClaims = parseCcv(ccvToken);
+	
+	                // typ 이 CCV 인지 확인
+	                String typ = ccvClaims.get("typ", String.class);
+	                if (!"CCV".equals(typ)) {
+	                    throw new JwtException("Not a CCV token");
+	                }
+	
+	                String ccvUser  = ccvClaims.getSubject();              // uid
+	                String ccvDev   = ccvClaims.get("dev", String.class);  // deviceId
+	                String ccvCsn   = ccvClaims.get("csn", String.class);  // cert serial
+	
+	                // 인증서에서 파싱된 값과 CCV 내용이 모두 일치해야 신뢰
+	                if (rUserId != null && rUserId.equals(ccvUser)
+	                        && rDevice != null && rDevice.equals(ccvDev)
+	                        && serialHex.equalsIgnoreCase(ccvCsn)) {
+	
+	                    // page-level 캐시를 신뢰하고, 여기서 Authentication 바로 세팅
+	                    // 권한은 단순 ROLE_USER 정도면 충분 (필요하면 roles claim 추가)
+	                    List<GrantedAuthority> authorities =
+	                            Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
+	                    Authentication auth =
+	                            new UsernamePasswordAuthenticationToken(ccvUser, null, authorities);
+	                    SecurityContextHolder.getContext().setAuthentication(auth);
+	
+	                    // 이 요청은 DB 매핑 / access_token / refresh_token 로직 모두 스킵
+	                    chain.doFilter(request, response);
+	                    return;
+	                }
+	//            } catch (JwtException e) {
+	            } catch (io.jsonwebtoken.ExpiredJwtException ex) {
+	                // CCV 만료 -> 그냥 캐시 없다고 보고 full 검증으로 진행
+	                // System.out.println("[CCV] expired, fall back to full verification");
+	                SecurityContextHolder.clearContext();
+	            } catch (JwtException ex) {
+	                // 기타 JJWT 예외(서명 오류 등) -> 마찬가지로 full 검증
+	                // System.out.println("[CCV] invalid token, fall back to full verification");
+	                SecurityContextHolder.clearContext();
+	            }
+	        }
+	
+	        // ==========================
+	        // 2. 여기부터는 "CCV 없음/실패" -> 기존 full 검증 로직
+	        //    (인증서 DB 매핑 + access/refresh)
+	        // ==========================
+	
+	        // (핵심) 인증서 Serial 등으로 사전 등록된 단말/사용자인지 확인
+	        Map<String, String> clientCertParm = new HashMap<>();
+	        clientCertParm.put("serialHex"	, serialHex);
+	        clientCertParm.put("subjectDN"	, subjectDN);
+	        clientCertParm.put("userId"		, rUserId); 
+	        clientCertParm.put("deviceType"	, rDevice);
+	        clientCertParm.put("orgName"	, rOrg);
+	        
+	        mapping = clientCertService.findByCertSerial(clientCertParm);
+	        
+	
+	        // DB 쿼리에서 이미 USE_YN, EXP_DT 조건을 거르지만,
+	        // VO에도 isActive() 가 있으니 한 번 더 방어 로직을 둬도 됨.
+	        if (mapping == null) {
+	            reject(response, "CLIENT_CERT_NOT_REGISTERED", "등록되지 않은 단말/사용자입니다.");
+	            return;
+	        }
+	        if (!rUserId.equals(mapping.get("userId"))) {
+	            reject(response, "CLIENT_CERT_USER_MISMATCH", "등록된 사용자와 인증서 사용자가 일치하지 않습니다.");
+	            return;
+	        }
+	        if (!rDevice.equals(mapping.get("deviceId"))) {
+	            reject(response, "CLIENT_CERT_DEVICE_MISMATCH", "등록된 단말정보와 인증서 단말정보가 일치하지 않습니다.");
+	            return;
+	        }
+	
+	        // 필요 시, 이후 로직에서 쓸 수 있게 request에 심어두기
+	        request.setAttribute("CERT_USER_ID",   mapping.get("userId"));
+	        request.setAttribute("CERT_DEVICE_ID", mapping.get("deviceId"));
+	        request.setAttribute("CERT_SUBJECT_DN", subjectDN);
         }
-
-        X509Certificate clientCert = certs[0];
-
-        String subjectDN = clientCert.getSubjectX500Principal().getName();
-        String serialHex = clientCert.getSerialNumber().toString(16);
-        Date   notBefore = clientCert.getNotBefore();
-        Date   notAfter  = clientCert.getNotAfter();
-
-        // (옵션) 인증서 유효기간 체크
-        Date now = new Date();
-        if (now.before(notBefore) || now.after(notAfter)) {
-            reject(response, "CLIENT_CERT_EXPIRED", "만료되었거나 아직 유효하지 않은 클라이언트 인증서입니다.");
-            return;
-        }
-
-        //String subjectDN = "CN=js_nam_desktop,OU=RND,O=GunyangITT";
-        Map<String, String> r = DnParser.parse(subjectDN);
-		String rUserId = r.get("userId");       // js_nam
-		String rDevice = r.get("deviceType");   // desktop
-		String rOrg    = r.get("orgName");      // GunyangITT
-        
-
-        // ==========================
-        // 1-1. CCV Shortcut (페이지 단위 캐시)
-        // ==========================
-        String ccvToken = extractCookie(request, "CCV");   // 아래에 helper 추가
-        if (ccvToken != null) {
-            try {
-//                // (1) Authorization 헤더 존재 여부만 확인
-//                String authHeader = request.getHeader("Authorization");
-//                if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-//                    throw new JwtException("Authorization header missing for CCV shortcut");
-//                }
-                
-                Claims ccvClaims = parseCcv(ccvToken);
-
-                // typ 이 CCV 인지 확인
-                String typ = ccvClaims.get("typ", String.class);
-                if (!"CCV".equals(typ)) {
-                    throw new JwtException("Not a CCV token");
-                }
-
-                String ccvUser  = ccvClaims.getSubject();              // uid
-                String ccvDev   = ccvClaims.get("dev", String.class);  // deviceId
-                String ccvCsn   = ccvClaims.get("csn", String.class);  // cert serial
-
-                // 인증서에서 파싱된 값과 CCV 내용이 모두 일치해야 신뢰
-                if (rUserId != null && rUserId.equals(ccvUser)
-                        && rDevice != null && rDevice.equals(ccvDev)
-                        && serialHex.equalsIgnoreCase(ccvCsn)) {
-
-                    // page-level 캐시를 신뢰하고, 여기서 Authentication 바로 세팅
-                    // 권한은 단순 ROLE_USER 정도면 충분 (필요하면 roles claim 추가)
-                    List<GrantedAuthority> authorities =
-                            Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
-                    Authentication auth =
-                            new UsernamePasswordAuthenticationToken(ccvUser, null, authorities);
-                    SecurityContextHolder.getContext().setAuthentication(auth);
-
-                    // 이 요청은 DB 매핑 / access_token / refresh_token 로직 모두 스킵
-                    chain.doFilter(request, response);
-                    return;
-                }
-//            } catch (JwtException e) {
-            } catch (io.jsonwebtoken.ExpiredJwtException ex) {
-                // CCV 만료 -> 그냥 캐시 없다고 보고 full 검증으로 진행
-                // System.out.println("[CCV] expired, fall back to full verification");
-                SecurityContextHolder.clearContext();
-            } catch (JwtException ex) {
-                // 기타 JJWT 예외(서명 오류 등) -> 마찬가지로 full 검증
-                // System.out.println("[CCV] invalid token, fall back to full verification");
-                SecurityContextHolder.clearContext();
-            }
-        }
-
-        // ==========================
-        // 2. 여기부터는 "CCV 없음/실패" -> 기존 full 검증 로직
-        //    (인증서 DB 매핑 + access/refresh)
-        // ==========================
-
-        // (핵심) 인증서 Serial 등으로 사전 등록된 단말/사용자인지 확인
-        Map<String, String> clientCertParm = new HashMap<>();
-        clientCertParm.put("serialHex"	, serialHex);
-        clientCertParm.put("subjectDN"	, subjectDN);
-        clientCertParm.put("userId"		, rUserId); 
-        clientCertParm.put("deviceType"	, rDevice);
-        clientCertParm.put("orgName"	, rOrg);
-        
-        Map<String, String> mapping = clientCertService.findByCertSerial(clientCertParm);
-        
-
-        // DB 쿼리에서 이미 USE_YN, EXP_DT 조건을 거르지만,
-        // VO에도 isActive() 가 있으니 한 번 더 방어 로직을 둬도 됨.
-        if (mapping == null) {
-            reject(response, "CLIENT_CERT_NOT_REGISTERED", "등록되지 않은 단말/사용자입니다.");
-            return;
-        }
-        if (!rUserId.equals(mapping.get("userId"))) {
-            reject(response, "CLIENT_CERT_USER_MISMATCH", "등록된 사용자와 인증서 사용자가 일치하지 않습니다.");
-            return;
-        }
-        if (!rDevice.equals(mapping.get("deviceId"))) {
-            reject(response, "CLIENT_CERT_DEVICE_MISMATCH", "등록된 단말정보와 인증서 단말정보가 일치하지 않습니다.");
-            return;
-        }
-
-        // 필요 시, 이후 로직에서 쓸 수 있게 request에 심어두기
-        request.setAttribute("CERT_USER_ID",   mapping.get("userId"));
-        request.setAttribute("CERT_DEVICE_ID", mapping.get("deviceId"));
-        request.setAttribute("CERT_SUBJECT_DN", subjectDN);
-
 
         /* ==============================
          * 2. 기존 JWT / Refresh Token 처리
@@ -384,22 +403,26 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
 
             // [추가] access_token 유효 + 인증서 DB 매핑까지 끝난 시점 → CCV 발급
             Date accessExp = claims.getExpiration();
-            String ccv = createCcvToken(
-                    username,
-                    mapping.get("deviceId"),   // 위에서 얻어둔 mapping
-                    serialHex,
-                    accessExp
-            );
 
-            ResponseCookie ccvCookie = ResponseCookie.from("CCV", ccv)
-                    .httpOnly(true)
-                    .secure(true)
-                    .path("/")           // 필요 시 /mtls 등으로 축소
-                    .maxAge(CCV_TTL_SECONDS)
-                    .sameSite("None")
-                    .build();
-            response.addHeader("Set-Cookie", ccvCookie.toString());
-            
+	         // mTLS 제외 URL이면 CCV 발급 X
+	         if (!mtlsExcluded && mapping != null && serialHex != null) {
+	            String ccv = createCcvToken(
+	                    username,
+	                    mapping.get("deviceId"),   // 위에서 얻어둔 mapping
+	                    serialHex,
+	                    accessExp
+	            );
+	
+	            ResponseCookie ccvCookie = ResponseCookie.from("CCV", ccv)
+	                    .httpOnly(true)
+	                    .secure(true)
+	                    .path("/")           // 필요 시 /mtls 등으로 축소
+	                    .maxAge(CCV_TTL_SECONDS)
+	                    .sameSite("None")
+	                    .build();
+	            response.addHeader("Set-Cookie", ccvCookie.toString());
+	         }
+	         
             chain.doFilter(request, response);
         } catch (ExpiredJwtException ex) {
             // access token 만료 → refresh 로 재발급
@@ -442,21 +465,23 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
 
 
                     // [추가] CCV 발급
-                    String ccv = createCcvToken(
-                            username,
-                            mapping.get("deviceId"),
-                            serialHex,
-                            newAccessExp
-                    );
-                    ResponseCookie ccvCookie = ResponseCookie.from("CCV", ccv)
-                            .httpOnly(true)
-                            .secure(true)
-                            .path("/")
-                            .maxAge(CCV_TTL_SECONDS)
-                            .sameSite("None")
-                            .build();
-                    response.addHeader("Set-Cookie", ccvCookie.toString());
-                    
+
+                    if (!mtlsExcluded && mapping != null && serialHex != null) {
+	                    String ccv = createCcvToken(
+	                            username,
+	                            mapping.get("deviceId"),
+	                            serialHex,
+	                            newAccessExp
+	                    );
+	                    ResponseCookie ccvCookie = ResponseCookie.from("CCV", ccv)
+	                            .httpOnly(true)
+	                            .secure(true)
+	                            .path("/")
+	                            .maxAge(CCV_TTL_SECONDS)
+	                            .sameSite("None")
+	                            .build();
+	                    response.addHeader("Set-Cookie", ccvCookie.toString());
+                    }
 //                    System.out.println("▶ Set-Cookie Header: " + response.getHeader("Set-Cookie"));
                     
                     // 반드시 체인 흐름 재개
@@ -567,5 +592,16 @@ public class AccessTokenValidationFilter extends OncePerRequestFilter {
 	        }
 	    }
 	    return null;
+	}
+	
+	// mTLS 검사 생략 URL 클래스
+	private boolean isMtlsExcluded(HttpServletRequest request) {
+	    String path = request.getServletPath(); // 또는 getRequestURI()
+	    for (String pattern : EXCLUDE_PATTERNS) {
+	        if (pathMatcher.match(pattern, path)) {
+	            return true;
+	        }
+	    }
+	    return false;
 	}
 }
