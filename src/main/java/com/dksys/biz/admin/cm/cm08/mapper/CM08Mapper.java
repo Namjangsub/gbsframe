@@ -37,6 +37,8 @@ public interface CM08Mapper {
 	int deleteFileCall(Map<String, String> paramMap);
 	
 	Map<String, String> selectFileInfoUser(Map<String, String> paramMap);
+
+	Map<String, String> dwgFileDownInfo(Map<String, String> paramMap);
 	
 	Map<String, String> selectMByTarget(Map<String, String> paramMap);
 	Map<String, String> selectMByRetriveValue(Map<String, String> m);

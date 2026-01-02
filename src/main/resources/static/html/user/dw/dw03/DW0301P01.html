@@ -166,57 +166,45 @@
 	// 도면파일 다운로드
 	function fileDownload(row) {
 		var paramObj = {
+			"coCd"		: 'GUN',
 			"userId" 	: jwt.userId,
-			"docId"		: row.docId,
+			"fileKey"	: row.docId,
 			"verNo" 	: row.verNo,
-			"serverName": row.serverName,
-			"fileName"	: row.fileName,
-			"dirPath" 	: row.dirPath,
-			"coCd"		: 'GUN'
+			"dwFlag"	: "Y"
 		};
+		const queryString = new URLSearchParams(paramObj).toString();
 		
-		postAjax("/user/dw/dw03/dwgFileDownInfo", paramObj, null, function(data) {
-			if (data.selectFileDownAuthChk == 0) {
-				customAlert("도면파일 다운로드 권한이 없습니다.");
-				return false;
-			} else {
-				const fileInfo = data.fileInfo;
-				const filePath = encodeURI(fileInfo.dirPath, "UTF-8");
 
-				fetch(`/admin/cm/cm08/fileDownload?filePath=${filePath}`, {
-					method: "GET",
-					headers: {
-						"Authorization": authorizationToken
-					}
-				})
-				.then(response => {
-					if (!response.ok) throw new Error("다운로드 실패");
-					return response.blob();
-				})
-				.then(blob => {
-					if (blob.size === 0) {
-						customAlert("백업서버에 파일이 존재하지 않습니다.");
-						return false;
-					}
-					const downloadUrl = window.URL.createObjectURL(blob);
-					// 확장자 분리 후 버전 붙이기
-					const fileName = row.fileName;
-					const lastDot = fileName.lastIndexOf(".");
-					const baseName = lastDot > -1 ? fileName.substring(0, lastDot) : fileName;
-					const ext = lastDot > -1 ? fileName.substring(lastDot) : "";
-					const finalName = `${baseName}_v${row.verNo}${ext}`;
-					const link = document.createElement("a");
-					link.href = downloadUrl;
-					link.download = finalName  // 다운로드될 파일 이름
-					document.body.appendChild(link);
-					link.click();
-					document.body.removeChild(link);
-					window.URL.revokeObjectURL(downloadUrl);
-				})
-				.catch(error => {
-					console.error("파일 다운로드 중 오류:", error);
-				});
+		fetch(`/admin/cm/cm08/fileDownloadAuth2?${queryString}`, {
+			method: "GET",
+			headers: {"Authorization": authorizationToken, "X-GBS-Source": "pdfjs-viewer"}
+		})
+		.then(response => {
+			if (!response.ok) throw new Error("다운로드 실패");
+			return response.blob();
+		})
+		.then(blob => {
+			if (blob.size === 0) {
+				customAlert("백업서버에 파일이 존재하지 않습니다.");
+				return false;
 			}
+			const downloadUrl = window.URL.createObjectURL(blob);
+			// 확장자 분리 후 버전 붙이기
+			const fileName = row.fileName;
+			const lastDot = fileName.lastIndexOf(".");
+			const baseName = lastDot > -1 ? fileName.substring(0, lastDot) : fileName;
+			const ext = lastDot > -1 ? fileName.substring(lastDot) : "";
+			const finalName = `${baseName}_v${row.verNo}${ext}`;
+			const link = document.createElement("a");
+			link.href = downloadUrl;
+			link.download = finalName  // 다운로드될 파일 이름
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			window.URL.revokeObjectURL(downloadUrl);
+		})
+		.catch(error => {
+			console.error("파일 다운로드 중 오류:", error);
 		});
 	}
 	

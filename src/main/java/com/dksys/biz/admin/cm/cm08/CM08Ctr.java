@@ -5,8 +5,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -28,11 +26,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import com.dksys.biz.admin.cm.cm08.mapper.CM08Mapper;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.cmn.vo.PaginationInfo;
-import com.dksys.biz.util.MessageUtils;
 import com.dksys.biz.config.RequestUtils;
+import com.dksys.biz.util.MessageUtils;
 
 @Controller
 @RequestMapping("/admin/cm/cm08")
@@ -43,6 +42,9 @@ public class CM08Ctr {
 	
 	@Autowired
 	CM08Svc cm08Svc;
+
+	@Autowired
+    CM08Mapper cm08Mapper;
  	
 	@Autowired
 	CM15Svc cm15Svc;
@@ -104,25 +106,38 @@ public class CM08Ctr {
         //  fileKey : 이동하고자 하는 파일 일련번호
         //  userId  : 이동 작업을 실행하는 사용자 ID
         //-----------------------------------------------       
-        //해당 디렉토리 다운로드 권한이 있어야 작업 가능        
+        //해당 디렉토리 다운로드 권한이 있어야 작업 가능
         Map<String, String> tempParam = new HashMap<String, String>();
         tempParam.putAll(param);
         tempParam.put("jobType", "fileDown");
 //      String userId = request.getParameter("userId");
-        Map<String, String> fileInfo = cm08Svc.selectFileInfoUser(tempParam);
+
+		// 일반 경로랑 도면 경로 분기 처리
+		Map<String, String> fileInfo;
+		if ("Y".equals(param.get("dwFlag"))) {
+			fileInfo = cm08Mapper.dwgFileDownInfo(tempParam);		// 도면 파일 경로 조회
+		} else {
+			fileInfo = cm08Svc.selectFileInfoUser(tempParam);
+		}
         //
         if (fileInfo == null || fileInfo.get("fileName") == null) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             response.setContentType("text/plain; charset=UTF-8");
             response.getWriter().write("권한이 없거나 파일 정보를 찾을 수 없습니다.");
             return;
-        }
+        } 
         
         if (null != fileInfo.get("fileName"))  {
-            String filePath = fileInfo.get("filePath") + fileInfo.get("fileKey")+ '_' + fileInfo.get("fileName");
+        	String filePath = "";
+        	if ("Y".equals(param.get("dwFlag"))) {
+        		filePath = fileInfo.get("filePath") + "\\" +fileInfo.get("fileName");		// 도면 파일 경로 조합
+        	} else {
+        		filePath = fileInfo.get("filePath") + fileInfo.get("fileKey")+ '_' + fileInfo.get("fileName");
+        	}
+           
             File file = new File(filePath);
+			
             
-
             if (!file.exists() || !file.isFile()) {
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 response.setContentType("text/plain; charset=UTF-8");
