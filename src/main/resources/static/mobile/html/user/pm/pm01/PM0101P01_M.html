@@ -20,17 +20,19 @@
     <link rel="stylesheet" href="/static/css/m_common.css" />
 	<link rel="stylesheet" href="/static/css/mobile.css" />
 
-    <script src="/static/js/jquery-latest.min.js"></script>
-    <script src="/static/js/jquery.serializeObject.js"></script>
-    <script src="/static/bootstrap/js/bootstrap.min.js"></script>
-    <script src="/static/bootstrap/js/bootstrap-datepicker.min.js"></script>
-    <script src="/static/bootstrap/js/bootstrap-datepicker.ko.min.js"></script>
-    <script src="/static/js/moment/moment-with-locales.js"></script>
-    <script src="/static/js/ax5/ax5core.min.js"></script>
-    <script src="/static/js/ax5/ax5grid.min.js"></script>
-    <script src="/static/js/ax5/ax5mask.min.js"></script>
-    <script src="/static/js/ax5/ax5modal.min.js"></script>
-    <script src="/static/js/global.js"></script>
+<script src="/static/js/jquery-latest.min.js"></script>
+<script src="/static/js/jquery.serializeObject.js"></script>
+<script src="/static/bootstrap/js/bootstrap.min.js"></script>
+<script src="/static/bootstrap/js/bootstrap-datepicker.min.js"></script>
+<script src="/static/bootstrap/js/bootstrap-datepicker.ko.min.js"></script>
+<script src="/static/js/moment/moment-with-locales.js"></script>
+<script src="/static/js/ax5/ax5core.min.js"></script>
+<script src="/static/js/ax5/ax5grid.min.js"></script>
+<script src="/static/js/ax5/ax5mask.min.js"></script>
+<script src="/static/js/ax5/ax5modal.min.js"></script>
+<script src="/static/js/ax5/ax5toast.min.js"></script>
+<script src="/static/js/jstree/jstree.min.js"></script>
+<script src="/static/js/global.js"></script>
 	<script src="/static/js/jquery.blockUI.js"></script>
 	<script src="/static/js/heic2any.min.js"></script>
     <style>
@@ -206,6 +208,20 @@
                 </table>
             </div>
             <div  id="dayilyRpt"></div>
+            
+            
+            <!--  문제현황 list 영역 -->
+			<div id="issue-contents" style="display: none; text-align: left;width: 100%">
+				<span style="height: 30px; line-height: 30px;font-size: 15px;margin-left: 15px">문제 현황 리스트<br> 
+					<span style="font-size:11px;color:red">●:접수</span>, 
+					<span style="font-size:11px;color:silver">●:문제처리진행중</span>,
+					<span style="font-size:11px;color:green">●:요인별 발주요청 진행중</span>,
+					<span style="font-size:11px;color:blue">●:조치완료</span>
+				</span>
+				<div class="contents" style="width: 100%">
+					<div data-ax5grid="issue-grid" data-ax5grid-config="{}" style="height: 300px; width: 100%"></div>
+				</div>
+			</div>
         </form>
 		<br>
 		<br>
@@ -241,6 +257,31 @@
 	var rptTripFileArr = []; //경비항목별 첨부파일 정보 임시저장
 	var tripRptRowDeleteArr = []; //경비 등록내용 삭제 임시저장
 	var tripRptRowFileDeleteArr = []; //경비 등록내용중 첨부파일만 삭제 임시저장
+
+	var lastPosition = 0;
+	var lastValue = { // 수주번호, saelsCd 변경 체크용
+			'ordrsNo' : '',
+			'salesCd' : ''
+	};
+
+
+	ax5.ui.grid.formatter["bilgYn"] = function () {
+	// 		var color = (this.value == "ISSSTS03" || this.value == "REQST03" ) ? "color-circle_02.png" : "color-circle_01.png";
+	//빨강:접수, 회색:문제처리진행중, 녹색:요인별 발주요청 진행중, 파랑:조치완료
+		if (this.value == "E") {
+			return 'E';
+		} else if (this.value == "ISSSTS03" || this.value == "REQST03" ) {
+			return '<span style="font-size:11px;color:blue">●</span>';
+		} else if (this.value == "ISSSTS01" || this.value == "REQST01" ) {
+			return '<span style="font-size:11px;color:red">●</span>';
+		} else if (this.value == "ISSSTS02" || this.value == "REQST02" ) {
+			if (this.item.reqNo == undefined || this.item.reqNo == "") {
+				return '<span style="font-size:11px;color:silver">●</span>';
+			} else {
+				return '<span style="font-size:11px;color:green">●</span>';
+			}
+		}
+	};
 	var fileGridView = {
 		initView: function(){
 			this.target = new ax5.ui.grid();
@@ -286,6 +327,101 @@
 		}
 	}
 
+
+	var issueGridView = {
+		initView : function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showRowSelector: false,
+				multipleSelect: false,
+				sortable: true,
+				target: $('[data-ax5grid="issue-grid"]'),
+				header: {
+					align: "center",
+					selector: true
+				},
+				body: {
+					onClick: function () {
+						this.self.select(this.dindex);
+					},
+// 					onDBLClick: function () {
+// 						  if (this.column.key == "reqNo" ){    //reqNo = 발주요청번호 필드 선택시
+// 							  if (this.item.issSts == 'ISSSTS03') {	//문제에서 완료처리된것
+// 								  wbsIssModal(this.item);			//이슈조회요청서 조회
+// 							  } else if (!this.acteDt) {	//문제에서 완료처리된것
+// 							  	  insertQualityReqModal(); 	//발주요청서 수정으로 진입
+// 							  } 
+// 						  } else if (this.column.key == "acteDt" ){    //acteDt = 완료일자
+// 							   if (!this.item.reqNo) {
+// 									wbsIssModal(this.item);			//이슈수정모드
+// 								   return false;	//발주요청 조치결과 번호가 없으면 패스함.
+// 							   } else if (this.item.sameTimeResult == 'Y'){
+// 								   insertQualityReqModal();
+// 							   } else {
+// 								   insertQualityResultModal(this.item);
+// 							   }
+// 						  } else{
+// 								 wbsIssModal(this.item);			//이슈수정모드
+// 						  }
+// 					},
+					columnHeight: 40
+				},
+				page : {
+				},
+				columns : [
+					 {key: "creatDttm", 	label: "발생일자", 		width: 80,		align: "center"}
+					,{key: "workRptDeptNm",	label: "작성부서",			width: 80,		align: "left"}
+					,{key: "workRptIdNm",	label: "작성자",			width: 55,		align: "center"}
+					,{key: "issSts", 	    label: "상태", 			width: 50,		align: "center", formatter: "bilgYn"}
+					,{key: "issSj",  		label: "문제제목",			width: 220,		align: "left",      styleClass: function () {return "grid-font-red"}}
+					,{key: "issCnts",  		label: "내용",			width: "*",		align: "left",
+						formatter: function () { return (this.value) ? '<span style="display: block;white-space: pre; ">'+this.value+'</span>' : '' }}
+				]
+			});
+			return this;
+		},
+		setData : function(_pageNo) {
+
+			//해당 고객사와 관련 미해결 문제 일괄 조회 되게 수정 -남장섭 2025.04.17
+			const $popForm = $('#popForm');
+			const tempClntCd = $popForm.find('#clntCd').val();
+			const tempClntNm = $popForm.find('#clntNm').val();
+			if (!(tempClntCd || tempClntNm)) {
+			    return false;
+			}
+			
+			var formData = {
+					clntCd : tempClntCd,
+					clntNm : tempClntNm
+			};
+
+// 			$.each($('#popForm [data-search]'), function(idx, elem) {
+// 				formData[$(elem).data("search")] = $(elem).val();
+// 			});
+			
+			var targetObj = this.target;
+			postAjax("/user/pm/pm01/selectNewAllIssueWorkList", formData, null, function(data) {
+				try {
+					var list = data.result;
+					if (list.length > 0 ) {
+						targetObj.setData({
+							list : list,
+							page : {
+								totalElements : list.length,
+							}
+						});
+					} else {
+						$('#issue-contents').hide();
+					}
+				} catch (error) {
+					alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+					return null; // 오류 발생 시 null 반환
+				} finally {
+					// console.log("함수 실행 완료.");
+				}
+			});
+		}
+	}
 
 $(document).ready(function() {
 
@@ -387,6 +523,24 @@ $(document).ready(function() {
                  $("#popForm #telNo").val(data.result[0].telNo);
              }
          });
+	     //---------------------------------------
+ 		
+ 		$('#popForm #workRptS').change(function() {	// 작업구분이 출장일때 salesCd, 수주번호, 고객사 변경에 따른 팝업창 크기 조정 및 그리드 setData
+ 			lastValue.ordrsNo = $("#popForm #ordrsNo").val();
+ 			lastValue.salesCd = $("#popForm #salesCd").val();
+ 			toggleIssueGrid();
+ 		});
+
+ 		$('#popForm #salesCd, #popForm #ordrsNo').on('input paste drop compositionend', function () {
+ 			clearSalesCodeField(this);
+ 			$('#popForm #clntNm').attr('readonly', false);
+ 			$('#popForm #eqpNm').attr('readonly', false);
+ 		});
+ 		
+
+ 		$('#popForm #clntNm').on('input paste drop compositionend', function () {
+ 			toggleIssueGrid();
+ 		});
 
          //화면 필드 기능 추가 함수 모음
          fieldFunctionControl();
@@ -457,6 +611,33 @@ function fieldFunctionControl() {
 		}
 	});
 
+}
+
+function clearSalesCodeField(elm) {
+	if (elm.name == 'ordrsNo' && lastValue.ordrsNo != elm.value) {
+		$('#popForm #salesCd').val('');
+		$('#popForm #clntCd').val('');
+		$('#popForm #clntNm').val('');
+		$('#popForm #clntPjt').val('');
+		$('#popForm #prdtCd').val('');
+		$('#popForm #prdtCdNm').val('');
+		$('#popForm #itemDiv').val('');
+		$('#popForm #eqpNm').val('');
+		opendOrdrsSearch();
+	} else 
+	if (elm.name == 'salesCd' && lastValue.salesCd != elm.value) {
+		if (lastValue.salesCd  != $('#popForm #salesCd').val()) {
+			$('#popForm #ordrsNo').val(elm.value.slice(0, 5));
+			$('#popForm #clntCd').val('');
+			$('#popForm #clntNm').val('');
+			$('#popForm #clntPjt').val('');
+			$('#popForm #prdtCd').val('');
+			$('#popForm #prdtCdNm').val('');
+			$('#popForm #itemDiv').val('');
+			$('#popForm #eqpNm').val('');
+			wbsSalesCodeSearch();
+		}
+	}
 }
 
 //작업 대분류/중분류/소분류
@@ -654,6 +835,10 @@ function selectDailyWorkInfo() {                        //그리드에 뿌리는
    	        		}
     	 		}
     	 	}
+
+			lastValue.ordrsNo = $("#popForm #ordrsNo").val();
+			lastValue.salesCd = $("#popForm #salesCd").val();
+			toggleIssueGrid();
 
 			monthWorkReportChk();	// 작업일보고찰 등록chk
     });
@@ -879,6 +1064,12 @@ function wbsSalesCodeSearch() {
         $('#itemDiv').val(row.itemDiv);
         $('#itemDivNm').val(row.itemDivNm);
         $('#eqpNm').val(row.eqpNm);
+
+		$('#popForm #clntNm').attr('readonly', true);
+		lastValue.salesCd = $("#popForm #salesCd").val();
+		lastValue.ordrsNo = $('#popForm #ordrsNo').val();
+
+        toggleIssueGrid();
     });
 }
 
@@ -928,6 +1119,9 @@ function clntSearch() {
 					"clntCd" : row.clntCd
 				}
 //					setMngInfo(paramObj);
+				
+
+				toggleIssueGrid();
 			});
 }
 
@@ -946,6 +1140,11 @@ function opendOrdrsSearch(inputValue, coCd) {
         $('#clntCd').val(row.clntCd);
         $('#clntNm').val(row.clntNm);
         $('#ctrtNm').val(row.ctrtNm);
+
+		lastValue.ordrsNo = $('#popForm #ordrsNo').val();
+		$('#popForm #clntNm').attr('readonly', true);
+		
+        toggleIssueGrid();
     });
 }
 
@@ -998,6 +1197,28 @@ $("#popForm #issueYn").change(function() {
 	    $("#field02").hide(); //파일첨부영역
 	}
 });
+
+
+// 작업구분이 출장일 때 salesCd(Sales Code), ordrsNo(수주번호), clntCd(고객사) 값이 들어오면 그리드 영역 보이주기
+function toggleIssueGrid(){
+	let deptChk = false;
+	if ($('#workRptS').val().length) {
+		const dept1 = $('#workRptS').val().slice(0, 7); // 'GUN6020'생산팀 출장코드 추가 
+		const dept2 = $('#workRptS').val().slice($('#workRptS').val().length-4, $('#workRptS').val().length); // == '9902' //각부서 개인업무 출장코드
+		if (dept1 == 'GUN6020' || dept2 == '9902') deptChk = true; //출장관련 코드가 아니면 처리 제외
+	}
+
+//		const hasCodes = $('#popForm #salesCd').val() + $('#popForm #ordrsNo').val() + $('#popForm #clntCd').val();
+	const hasCodes = $('#popForm #clntCd').val() + $('#popForm #clntNm').val();
+	if (deptChk && hasCodes) {	//작업일보 코드가 출자이면서 수주번호, SalesCd, 고객사중에 하나라도 있으면 문제현황중 미결사항만 가져오기
+		$('#popForm #issue-contents').show();
+		issueGridView.initView().setData(0);
+	} else {
+		$('#popForm #issue-contents').hide();
+		return false;
+	}
+
+}
 
 function setNotiFileInfo(fileInfo) {
 	// 첨부파일 set
@@ -1091,7 +1312,6 @@ function fromAppToWeb(msg) {
     alert(msg);
 }
 
-var lastPosition = 0;
 //웹 자바스크립트에서 플로터 앱함수 call
 //rptPosition ==> 경비추가 영역의 인덱스 번호임
 function fromWebToApp(select, fileTrgtKey = "112233", rptPosition = 0) {
