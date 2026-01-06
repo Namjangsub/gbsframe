@@ -222,14 +222,14 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 					{key: "fileName", 		label: "파일명", 			width: 260, align: "left"},
 					{key: "fileType", 		label: "종류", 			width: 60, align: "center"},
 					{key: "fileSize", 		label: "파일크기", 		width: 90, align: "right", formatter: "money"},
-					{key: "creatDttm", 		label: "저장일자", 		width: 130, align: "center",},
-					{key: "creatNm", 		label: "등록자", 			width: 60, align: "center"},
+					{key: "creatDttm", 		label: "저장일자", 		width: 130, align: "center", hidden: true},
+					{key: "creatNm", 		label: "등록자", 			width: 60, align: "center", hidden: true},
 					{key: "clntCd", 		label: "거래처", 			width: 50, align: "center", hidden: true},
 					{key: "clntNm", 		label: "거래처명", 		width: 110, align: "center", hidden: true},
 					{key: "prdtCd", 		label: "제품코드", 		width: 50, align: "center", hidden: true},
 					{key: "prdtNm", 		label: "제품명", 			width: 100, align: "center", hidden: true},
 					{key: "itemCd", 		label: "아이템", 			width: 50, align: "center", hidden: true},
-					{key: "salesCd", 		label: "Sales코드", 		width: 110, align: "center"},
+					{key: "salesCd", 		label: "Sales코드", 		width: 110, align: "center", hidden: true},
 					// {key: "prjctCd", label: "프로젝트", width: 50, align: "center", hidden: true},
 					// {key: "prjctNm", label: "프로젝트명", width: 110, align: "center"},
 					{key : "lpath",  		label : "저장위치",	 	width : 160, align: "left", hidden: false},
@@ -705,12 +705,12 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 				</div>
 				<div class="contents  mg0 pd0" style="width: 100%; min-width: 200px; display: flex;flex-direction: column;">
 					<h3 class="location"><a class="file_tag pdl20 pdr10" id="file_tag" style="font-weight: bold; color: blue;"></a>
-										<span class="page_tit" id="file_tit" style="text-align: right;"> 문서현황 </span></h3>
-					<button type="button" id="button_file" style="height: 20px; line-height: 10px;" onclick="treeModule.fromWebToApp(1, 0, 0, '${selector}file');" authchk> 첨부파일</button>
+										<span class="page_tit" id="file_tit" style="text-align: right;"> 문서현황 </span>
+					<button type="button" id="button_file" style="height: 30px; line-height: 10px;" onclick="treeModule.fromWebToApp(1, 0, 0, '${selector}file');" authchk> 첨부파일</button></h3>
 					<div class="add_btn_small pdl10">
-						<a onclick="treeModule.downLoadFileAll('${popSelector}', '${fileGrid}');" style="width:90px; height: 25px;"><i class="fas fa-download"></i>전체다운로드</a>
-						<a onclick="treeModule.button_zoomUp('+', '${popSelector}', '${fileGrid}');" style="height: 25px;"><i class="fas fa-search-plus"></i>+</a>
-						<a onclick="treeModule.button_zoomUp('-', '${popSelector}', '${fileGrid}');" style="height: 25px;"><i class="fas fa-search-minus"></i>-</a>
+						<a onclick="treeModule.downLoadFileAll('${popSelector}', '${fileGrid}');" style="width:90px; height: 30px;"><i class="fas fa-download"></i>전체다운로드</a>
+						<a onclick="treeModule.button_zoomUp('+', '${popSelector}', '${fileGrid}');" style="height: 30px;"><i class="fas fa-search-plus"></i>+</a>
+						<a onclick="treeModule.button_zoomUp('-', '${popSelector}', '${fileGrid}');" style="height: 30px;"><i class="fas fa-search-minus"></i>-</a>
 					</div>
 					<div class="ax5_grid" data-ax5grid="${fileGrid}" data-ax5grid-config="{}" style="height: 300px; width: 100%"></div>
 				</div>
