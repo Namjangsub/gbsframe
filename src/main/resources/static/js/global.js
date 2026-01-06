@@ -628,6 +628,39 @@ var openSecondModal = function(url, width, height, title, paramObj, callback) {
 };
 
 var openThirdModal = function(url, width, height, title, paramObj, callback) {
+	var size = {width, height};
+	if (deviceType != 'desktop') {
+		// 1) 현재 뷰포트 기준으로 모달 크기 계산(좁으면 거의 풀스크린)
+		function resolveModalSize(w, h) {
+		  var vw = window.innerWidth || document.documentElement.clientWidth;
+		  var vh = window.innerHeight || document.documentElement.clientHeight;
+		
+		  var isNarrow = vw <= 900; // 모바일/좁은 폭 기준(필요시 조정)
+		  var margin = isNarrow ? 8 : 40;
+		
+		  // 숫자(px)만 들어온다고 가정하고 clamp (문자열 '100%' 등은 그대로 사용)
+		  function clampSize(v, max) {
+		    if (typeof v === "number") return Math.max(320, Math.min(v, max));
+		    return v; // '100%' 같은 값은 그대로
+		  }
+		
+		  if (isNarrow) {
+		    // 모바일: 화면에 맞춰 크게 열고, 스크롤은 body-frame에서 처리
+		    return {
+		      width: vw - margin,
+		      height: vh - margin - 36
+		    };
+		  }
+		  // 데스크톱: 원래 주어진 값 유지하되 화면 밖으로 나가지 않게만 clamp
+		  return {
+		    width: clampSize(w, vw - margin),
+		    height: clampSize(h, vh - margin - 36)
+		  };
+		}
+		
+		size = resolveModalSize(width, height);
+	}
+
 	thirdModal.open({
 		header: {
 			title: title,
@@ -644,8 +677,8 @@ var openThirdModal = function(url, width, height, title, paramObj, callback) {
 	            }
 	        }
 	    },
-        width: width,
-        height: height,
+        width: size.width,
+        height: size.height,
         closeToEsc: false,
         onStateChanged: function () {
         	if (this.state === "open") {
@@ -665,10 +698,36 @@ var openThirdModal = function(url, width, height, title, paramObj, callback) {
 //    	$.get(url, function(data) {
 //    		targetEl.append(data);
 //      	});
-    	
+		if (deviceType != 'desktop') {
+			// 2) ★ 모달 본문에서 스크롤이 생기도록 강제 (핵심)
+			//    (body-frame이 실제 스크롤 컨테이너가 됨)
+			targetEl.css({
+			  "overflow-y": "auto",
+			  "overflow-x": "hidden",
+			  "-webkit-overflow-scrolling": "touch"
+			});
+			
+			// 3) fragment를 누적 append 하지 말고, 매번 교체(레이아웃/이벤트 중복 방지)
+			targetEl.empty();
+		}
     	$.ajax({url: url, method: 'GET',
     		  headers: {'Authorization': authorizationToken },
-    		  success: function(data) { targetEl.append(data); },
+    		  success: function(data) { 
+					targetEl.append(data); 
+
+					if (deviceType != 'desktop') {
+						// 4) 좁은 폭에서 세로배치/스크롤이 확실히 먹게끔 “컨테이너 높이/스크롤” 보조
+						//    (fragment 안에 .container가 있으면 적용, 없으면 무시)
+						var $container = targetEl.find('.container').first();
+						if ($container.length) {
+						  // 모달 body-frame 안에서만 동작하도록: height를 100%로 두고 내부는 세로 스택 CSS가 처리
+						  $container.css({
+						    "max-width": "100%",
+						    "box-sizing": "border-box"
+						  });
+						}
+					}
+			  },
     		  error: function(xhr) {
   	            alert("로그인이 만료되었습니다.");
   	            logoutClick();
