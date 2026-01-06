@@ -91,14 +91,24 @@
 <!-- 						      <option value="">전체</option> -->
 							</select>
 						</td>
-						<th class= "hit">발주일자</th>
+<!-- 						<th class= "hit">발주일자</th> -->
+<!-- 						<td> -->
+<!-- 			              <div class="date_input"> -->
+<!-- 			                <input id="ordrgDtFrom_S" name="ordrgDtFrom_S"  class="input_calendar" autocomplete="off" -->
+<!-- 			                  msg="발주 시작일자" data-search="ordrgDtFrom"> -->
+<!-- 			                <span>~</span> -->
+<!-- 			                <input id="ordrgDtTo_S" name="ordrgDtTo_S"  class="input_calendar" autocomplete="off" -->
+<!-- 			                  msg="발주 종료일자" data-search="ordrgDtTo"> -->
+<!-- 			              </div> -->
+<!-- 						</td> -->
+						<th class= "hit">납기일자</th>
 						<td>
 			              <div class="date_input">
-			                <input id="ordrgDtFrom_S" name="ordrgDtFrom_S"  class="input_calendar" autocomplete="off"
-			                  msg="발주 시작일자" data-search="ordrgDtFrom">
+			                <input id="dudtDeqDtFrom_S" name="dudtDeqDtFrom_S"  class="input_calendar" autocomplete="off"
+			                  msg="납기요청 시작일자" data-search="dudtDeqDtFrom">
 			                <span>~</span>
-			                <input id="ordrgDtTo_S" name="ordrgDtTo_S"  class="input_calendar" autocomplete="off"
-			                  msg="발주 종료일자" data-search="ordrgDtTo">
+			                <input id="dudtDeqDtTo_S" name="dudtDeqDtTo_S"  class="input_calendar" autocomplete="off"
+			                  msg="납기요청 종료일자" data-search="dudtDeqDtTo">
 			              </div>
 						</td>
 						<!-- <th>발주요청분류</th>
@@ -422,7 +432,7 @@
   				paramObj["mngIdCd"]    =  mngIdCd.join(",");
   			}
 			postAjax("/user/sm/sm03/selectWareHousingList", paramObj, null, function(data) {
-			    try {
+// 			    try {
 					var list = data.result;
 					for (let i = 0; i < list.length; i++) {
 						list[i].ordrgQty = gPasFloatChk(list[i].ordrgQty);
@@ -440,22 +450,48 @@
 						}
 					});
 
+					//공백/NULL 정리
+					function norm(v){
+						v = (v ?? '').toString().trim();
+						return v === '' ? null : v;
+					}
+
+					// codeKey 기준으로 유니크, 결과는 {code, name}
+					function uniqueCodeName(arr, codeKey, nameKey){
+						const map = new Map(); // code -> {code, name}
+						arr.forEach(r => {
+							const code = norm(r[codeKey]);
+							if(!code) return;          // code 없으면 제외
+							if(map.has(code)) return;  // 이미 있으면 스킵(최초값 유지)
+		
+							const name = norm(r[nameKey]) || '';
+							map.set(code, { code, name });
+						});
+						return Array.from(map.values());
+					}
+
+					// 1) 발주담당자 유니크
+					var uniqOrdrgMng = uniqueCodeName(list, 'ordrgMngId', 'ordrgMngNm');
+
+					// 2) 프로젝트 유니크
+					var uniqClntPjt  = uniqueCodeName(list, 'clntPjt', 'clntPjtNm');
+
+// 					console.log(uniqOrdrgMng);
+// 					console.log(uniqClntPjt);
 					if (girdLastRowPosition)  gridView.target.focus(girdLastRowPosition); //그리드 마지막 위치로 이동
 					gridHeightResize(gridView, 194); // 194 = 919 - 725 : 화면 Body 높이 - 그리드 기본크기 725
 	
-					var list = data.resultPrjct;
-					multiPrjctSelectHtml(list, $('#multiple-checkboxes-clntPjt'));  //프로젝트 코드를 multi select 자동 생성
+					multiPrjctSelectHtml(uniqClntPjt, $('#multiple-checkboxes-clntPjt'));  //프로젝트 코드를 multi select 자동 생성
 					$('#multiple-checkboxes-clntPjt').multiselect('select', selectPrjctCd);  //이전 선택된 내용 복원하기
 	
-					var list = data.resultMngId;
-					multiPrjctSelectHtml(list, $('#multiple-checkboxes-mngId'));  //프로젝트 코드를 multi select 자동 생성
+					multiPrjctSelectHtml(uniqOrdrgMng, $('#multiple-checkboxes-mngId'));  //프로젝트 코드를 multi select 자동 생성
 					$('#multiple-checkboxes-mngId').multiselect('select', mngIdCd);  //이전 선택된 내용 복원하기
-			    } catch (error) {
-			        alert("오류 발생!! 전산실 연락 바랍니다", error.message);
-			        return null; // 오류 발생 시 null 반환
-			    } finally {
-// 			        console.log("함수 실행 완료.");
-			    }
+// 			    } catch (error) {
+// 			        alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+// 			        return null; // 오류 발생 시 null 반환
+// 			    } finally {
+// // 			        console.log("함수 실행 완료.");
+// 			    }
 			});
 		}
 	}
@@ -809,7 +845,35 @@ $(document).ready(function() {
 				$('#ordrgDtTo_S').datepicker("setDate", new Date($('#ordrgDtFrom_S').val()));
 			}
 		});
-
+		// 납기요청 종료일 (현재날짜의 월 말일)
+		$('#dudtDeqDtTo_S').datepicker({
+			format : "yyyy-mm-dd",
+			language : "ko",
+			autoclose : true
+		})
+		.datepicker("setDate", moment(new Date()).endOf("month").toDate())
+		.on("changeDate", function(){
+			if($('#dudtDeqDtFrom_S').val() > $('#dudtDeqDtTo_S').val()){
+				alert("날짜를 확인해주세요");
+				$('#dudtDeqDtFrom_S').datepicker("setDate", new Date($('#dudtDeqDtTo_S').val()));
+			}
+		});
+		// 납기요청 시작일 (현재날짜의 월 첫일)
+		$('#dudtDeqDtFrom_S').datepicker({
+				format : "yyyy-mm-dd",
+				language : "ko",
+				autoclose : true
+			})
+		//.datepicker("setDate", moment(new Date()).startOf("month").toDate())
+			//temp
+		.datepicker("setDate", beDay)
+		.on("changeDate", function(){
+			if($('#dudtDeqDtFrom_S').val() > $('#dudtDeqDtTo_S').val()){
+				alert("시작 날짜를 확인해주세요");
+				$('#dudtDeqDtTo_S').datepicker("setDate", new Date($('#dudtDeqDtFrom_S').val()));
+			}
+		});
+		
 	}
 
 	//초기설정들
@@ -952,7 +1016,7 @@ $(document).ready(function() {
  		    //+ "#ordrgNo#"	+  "'"+selDataList.map(item => item.ordrgNo).join("','")+"'"//여러건 출력 => 배열의 값을 하나의 문자로 생성
  		    + "#ordrgNo#"	+  selDataList.map(item => item.ordrgNo).join(",")
  		    + "#inNo#"	+  selDataList.map(item => item.inNo).join(",")
- 		    + "#rptDt#"	+  $('#ordrgDtTo_S').val()
+ 		    + "#rptDt#"	+  $('#dudtDeqDtTo_S').val()
  	    	+ "#";
  		if (_type == '' || _type == undefined ) {
  			callReport(fileName, arg, 1150, 720, '발주명세서');

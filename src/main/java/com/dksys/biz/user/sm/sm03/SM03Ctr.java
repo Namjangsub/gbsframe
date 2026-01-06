@@ -41,11 +41,11 @@ public class SM03Ctr {
 		model.addAttribute("result", result);
 		
 
-	   	List<Map<String, String>> resultPrjct = sm03Svc.select_prjct_code(paramMap);
-	   	model.addAttribute("resultPrjct", resultPrjct);
-
-	   	List<Map<String, String>> resultMngId = sm03Svc.select_mngId_code(paramMap);
-	   	model.addAttribute("resultMngId", resultMngId);
+//	   	List<Map<String, String>> resultPrjct = sm03Svc.select_prjct_code(paramMap);
+//	   	model.addAttribute("resultPrjct", resultPrjct);
+//
+//	   	List<Map<String, String>> resultMngId = sm03Svc.select_mngId_code(paramMap);
+//	   	model.addAttribute("resultMngId", resultMngId);
 	   	
 		return "jsonView";
 	}
