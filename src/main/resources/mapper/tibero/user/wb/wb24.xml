@@ -1126,10 +1126,12 @@
 			 , S.FDMT_SOLUT_CNT
 			 <if test="userId != null and userId != ''">
 			 , (
-				SELECT CASE WHEN COUNT(1) <![CDATA[ > ]]> 0 THEN 'Y' ELSE 'N' END
-					FROM TB_CM06M01 C
-				WHERE C.ID = #{userId}
-					AND C.TEAM_MANAGER = 'TEAM01'
+					SELECT CASE WHEN COUNT(1) <![CDATA[ > ]]> 0 THEN 'Y' ELSE 'N' END
+					  FROM TB_CM06M01 C
+										INNER JOIN TB_CM06M01 M ON M.ID = A.ACT_ID
+															   AND M.MNG_ID = C.ID
+					WHERE C.ID = #{userId}
+					  AND C.TEAM_MANAGER = 'TEAM01'
 				) AS TEAM_MANAGER_YN	--팀장여부
 			</if>
         FROM   TB_WB24M02 AS A
@@ -1180,24 +1182,21 @@
 
     <select id="selectTeamManagerInfo" parameterType="Map" resultType="camelMap">
 		SELECT *
-		FROM (
-			SELECT  ROWNUM AS RRN,
-			  		 CO_CD, ID, NAME, TEL_NO, DEPT_ID, LEVEL_CD, EMAIL, OFF_TEL_NO,
-					(SELECT LEVEL_NM FROM TB_CM07M01 WHERE LEVEL_CD = U.LEVEL_CD) AS LEVEL_NM,
-					(SELECT DEPT_NM FROM TB_CM04M01 WHERE DEPT_ID = U.DEPT_ID) DEPT_NM
-			FROM TB_CM06M01  U
-			WHERE U.DEPT_ID LIKE
-			(
-				SELECT
-						CASE WHEN SUBSTR(DEPT_ID, 1, 3) = 'TRN' THEN 'TRN50'		-- 트루넷직접매출(TRN30)의 팀장은 허상렬 부장으로 조회되게 해야함
-						ELSE SUBSTR(DEPT_ID, 1, 5)
-						END
-				FROM TB_CM06M01
-				WHERE ID = #{userId}
-			) || '%'
-			AND U.TEAM_MANAGER = 'TEAM01'
-		)
-		WHERE RRN  = 1
+		  FROM 
+		  		(
+					SELECT  ROWNUM AS RRN,
+							CO_CD, ID, NAME, TEL_NO, DEPT_ID, LEVEL_CD, EMAIL, OFF_TEL_NO,
+							(SELECT LEVEL_NM FROM TB_CM07M01 WHERE LEVEL_CD = U.LEVEL_CD) AS LEVEL_NM,
+							(SELECT DEPT_NM  FROM TB_CM04M01 WHERE DEPT_ID  = U.DEPT_ID)  AS DEPT_NM
+					FROM TB_CM06M01 U
+					WHERE U.ID = (
+							SELECT MNG_ID
+							FROM TB_CM06M01
+							WHERE ID = #{userId}
+						)
+					AND U.TEAM_MANAGER = 'TEAM01'
+				)
+		 WHERE RRN = 1
     </select>
 
 

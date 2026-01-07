@@ -781,7 +781,7 @@ var approvalWorkingGrid; //팝업화면에서 결재정보 저장용
 		
 		//코칭수정 버튼이 활성화 상태이면 결과 Update 처리 선행
 		//필요시 프로그램 에 따라 분기 처리
-		if ($("#commentBtn").is(":enabled")) { //코칭 수정이면 코칭만 저장함
+		if (row.teamManager == '평가') { // 팀장 결재시
 			let chkFlag = false;
 			if (callPgm =='QM0101P01') {
 				chkFlag = ModalApp.updateQualityResultComment('결과수정');

@@ -178,6 +178,9 @@ public class WB20SvcImpl implements WB20Svc {
     						result += wb24Mapper.updateWbsIssueActMn(paramMap);	// 이슈조치 투입시간 업데이트
     				}
 			}
+			if ("자체승인".equals(paramMap.get("todoCfOpn"))) {
+				result += wb24Mapper.updateWbsIssueActMn(paramMap);
+			}
 		} else if ("TODODIV2130".equals(todoDiv2CodeId)) {
 			// ISS_STS: ISSSTS01 --> ISSSTS02 로 상태 변경처리
 			result += cm16Mapper.updateItoaIssueStChk(paramMap);

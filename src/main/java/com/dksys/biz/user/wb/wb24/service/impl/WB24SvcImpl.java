@@ -16,6 +16,7 @@ import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.dw.dw03.mapper.DW03Mapper;
 import com.dksys.biz.user.qm.qm01.mapper.QM01Mapper;
+import com.dksys.biz.user.wb.wb20.service.WB20Svc;
 import com.dksys.biz.user.wb.wb24.mapper.WB24Mapper;
 import com.dksys.biz.user.wb.wb24.service.WB24Svc;
 import com.dksys.biz.util.ExceptionThrower;
@@ -32,6 +33,9 @@ public class WB24SvcImpl implements WB24Svc {
 
 	@Autowired
 	WB24Svc wb24Svc;
+
+	@Autowired
+	WB20Svc wb20Svc;
 
     @Autowired
     CM08Svc cm08Svc;
@@ -364,9 +368,24 @@ public class WB24SvcImpl implements WB24Svc {
                     approvalMap2.put("pgParam", pgParam);
                     approvalMap2.put("todoTitle", todoTitle4);
                     QM01Mapper.insertWb24SharngList(approvalMap2);// TB_WB20M03 --> SET T.ETC_FIELD3 = 'KAKAO'
+					String todoKey = approvalMap2.get("todoKey");
                     i++;
+
+					// 자체승인건 처리
+					if (approvalMap2.get("userId").equals(approvalMap2.get("todoId"))) {
+						approvalMap2.put("todoCfOpn", "자체승인");
+						approvalMap2.put("sanctnSn", approvalMap2.get("sanCtnSn"));
+						approvalMap2.put("todoKey", todoKey);
+						approvalMap2.put("todoNo", paramMap.get("issNo"));
+						approvalMap2.put("actMh", paramMap.get("actMh"));
+						approvalMap2.put("issNo", paramMap.get("issNo"));
+						approvalMap2.put("etcField1", paramMap.get("actMh"));
+                        wb20Svc.insertApprovalLine(approvalMap2);
+					}
                 }
 			}
+
+			
 
 			// 2024.03.20 김성욱 추가
 	        QM01Mapper.deleteWb24SharngList2(paramMap);	// TB_WB20M03 --> TODO_DIV2_CODE_ID = 'TODODIV1090' AND TRIM(ETC_FIELD3) = 'DEL' 정보 삭제처리
