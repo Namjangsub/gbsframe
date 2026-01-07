@@ -377,9 +377,15 @@ public class WB24SvcImpl implements WB24Svc {
 						approvalMap2.put("sanctnSn", approvalMap2.get("sanCtnSn"));
 						approvalMap2.put("todoKey", todoKey);
 						approvalMap2.put("todoNo", paramMap.get("issNo"));
-						approvalMap2.put("actMh", paramMap.get("actMh"));
 						approvalMap2.put("issNo", paramMap.get("issNo"));
-						approvalMap2.put("etcField1", paramMap.get("actMh"));
+
+						if ("GUN30".equals(approvalMap2.get("deptId")) ||
+							"GUN40".equals(approvalMap2.get("deptId")) ||
+							"TRN50".equals(approvalMap2.get("deptId")) ||
+							"GUN60".equals(approvalMap2.get("deptId"))) {
+								approvalMap2.put("actMh", paramMap.get("actMh"));
+								approvalMap2.put("etcField1", paramMap.get("actMh"));
+						}
                         wb20Svc.insertApprovalLine(approvalMap2);
 					}
                 }
