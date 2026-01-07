@@ -2553,6 +2553,7 @@
 							, IPGO_BALJU.PAY_DIV_NM
 							, TO_CHAR(IPGO_BALJU.TOT_PCHS_DT, 'YYYY-MM-DD') AS TOT_PCHS_DT
 						    , IPGO_BALJU.TOT_PCHS_NO_AMT_TOT
+						    , M.DEPT_ID
 						  FROM
 						  (
 							SELECT DISTINCT 
@@ -2658,6 +2659,7 @@
 								  AND EXISTS (SELECT 1 FROM IPGO_BALJU WHERE E.RET_NO = IPGO_BALJU.ORDRG_NO)	
 						  ) A		/* 발주+기타비용+반품 내역 */
 						  		LEFT OUTER JOIN IPGO_BALJU ON IPGO_BALJU.CO_CD = A.CO_CD AND IPGO_BALJU.ORDRG_NO = A.ORDRG_NO
+						  		LEFT OUTER JOIN TB_SM12M01 M ON M.PCHS_NO = IPGO_BALJU.PCHS_NO
 						  WHERE 1=1	
 						<!-- 확정여부 -->
 <!-- 						<if test="cmpletYn != null and !cmpletYn.equals('')"> -->
@@ -3166,7 +3168,7 @@
     </select>	
     
 	<!-- 매입확정 대상리스트  구매비용 포함-->
-	<select id="selectClntPurchaseInboundList" parameterType="Map" resultType="camelMap">   
+	<select id="selectClntPurchaseInboundListOld" parameterType="Map" resultType="camelMap">   
 			--입고내역-발주분          			
 			WITH IPGO AS 
 			(
@@ -3347,6 +3349,16 @@
 						, SUM(D.PCHS_QTY) 		AS PCHS_QTY
 						, COUNT(D.PCHS_NO) 		AS PCHS_CNT --확정횟수
 						, MAX(D.PCHS_DT) 		AS PCHS_DT --최종매입확정일자
+				        , CASE 
+						    -- 1. TRN30과 TRN50이 둘 다 존재하는 경우 -> 'TRN99'
+						    WHEN COUNT(CASE WHEN D.DEPT_ID = 'TRN30' THEN 1 END) > 0  AND COUNT(CASE WHEN D.DEPT_ID = 'TRN50' THEN 1 END) > 0  THEN '99'
+						    -- 2. (위 조건 제외) TRN30이 하나라도 있는 경우 -> 'TRN30'
+						    WHEN COUNT(CASE WHEN D.DEPT_ID = 'TRN30' THEN 1 END) > 0  THEN 'TRN30'
+						    -- 3. (위 조건 제외) TRN50이 하나라도 있는 경우 -> 'TRN50'
+						    WHEN COUNT(CASE WHEN D.DEPT_ID = 'TRN50' THEN 1 END) > 0  THEN 'TRN50'
+						    -- 4. 둘 다 없고 NULL인 경우 (혹은 다른 값만 있는 경우 기존 값 유지)
+						    ELSE MAX(D.DEPT_ID) 
+						    END                    AS DEPT_ID				
 				 FROM (		
 						SELECT 
 								  D.CO_CD
@@ -3355,6 +3367,7 @@
 								, D.PCHS_QTY
 								, D.PCHS_NO
 								, D.PCHS_DT
+								, DM.DEPT_ID
 								, CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.PCHS_CLNT_CD 
 									   WHEN substr(D.ORDRG_NO,0,3) = 'RET' THEN RM.PCHS_CLNT_CD ELSE C.PCHS_CLNT_CD END PCHS_CLNT_CD
 								, CASE WHEN substr(D.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD 
@@ -3366,6 +3379,7 @@
 								LEFT OUTER JOIN TB_SM10M01 C ON(D.ORDRG_NO = C.COST_NO)		/* 비용마스터 */
 								LEFT OUTER JOIN TB_SM06D01 R ON(D.ORDRG_NO = R.RET_NO)		/* 반품 상세 */
 								LEFT OUTER JOIN TB_SM06M01 RM ON(RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)		/* 반품 상세 */
+								LEFT JOIN TB_SM12M01 DM ON(D.PCHS_NO = DM.PCHS_NO)
 						WHERE 1=1
 					<!-- 확정일자 -->         
 					<if test="ordrgDtFrom != null and !ordrgDtFrom.equals('')">
@@ -3400,11 +3414,204 @@
 				 	, NVL(SUM(IPGO.IN_QTY),0) - NVL(SUM(COMP.PCHS_QTY),0) 		AS PCHS_QTY_REM	--미확정수량 (계산안됨 확정시 수량없음)
 				 	, MAX(IPGO.STS)				AS STS
 				 	, max(IPGO.PCHS_CLMN_DAY)   AS PCHS_CLMN_DAY	--결재일
+				 	, max(COMP.DEPT_ID)   	    AS DEPT_ID
 				-- 	IPGO.*
 			 FROM IPGO 
 			  			LEFT OUTER JOIN PUR ON IPGO.CO_CD = PUR.CO_CD AND IPGO.PCHS_CLNT_CD = PUR.PCHS_CLNT_CD
 			 			LEFT OUTER JOIN COMP ON IPGO.CO_CD = COMP.CO_CD AND IPGO.PCHS_CLNT_CD = COMP.PCHS_CLNT_CD
 			GROUP BY IPGO.CO_CD, IPGO.PCHS_CLNT_NM, IPGO.PCHS_CLNT_CD
+    </select>
+    
+    
+	<!-- 매입확정 대상리스트  구매비용 포함-->
+	<select id="selectClntPurchaseInboundList" parameterType="Map" resultType="camelMap">   
+		WITH
+			/* 발주(발주/거래처/담당자 등) */
+			PUR AS (
+			    SELECT  A.CO_CD,
+			            A.ORDRG_NO,
+			            A.PCHS_CLNT_CD,
+			            A.SALES_CD,
+			            A.CREAT_ID,
+			            SUM(NVL(D.ORDRG_QTY,0)) AS ORDRG_QTY,
+			            SUM(NVL(D.ORDRG_AMT,0)) AS ORDRG_AMT,
+			            MAX(D.DUDT_DEQ_DT)      AS DUDT_DEQ_DT,
+			            MAX(D.DUDT_INTEND_DT)   AS DUDT_INTEND_DT
+			      FROM TB_SM02M01 A
+			      JOIN TB_SM02D01 D
+			        ON D.CO_CD = A.CO_CD
+			       AND D.ORDRG_NO = A.ORDRG_NO
+			     WHERE A.CO_CD = #{coCd}
+			     GROUP BY A.CO_CD, A.ORDRG_NO, A.PCHS_CLNT_CD, A.SALES_CD, A.CREAT_ID
+			),
+			
+			/* 거래처명(선택필터 시 여기서 LIKE 적용 권장) */
+			CLNT AS (
+			    SELECT CLNT_CD, CLNT_NM, PCHS_CLMN_DAY, CLNT_DIV_CD
+			      FROM TB_BM02M01
+			     WHERE 1=1
+			       AND ( #{pchsClntNm} IS NULL OR CLNT_NM LIKE '%'||#{pchsClntNm}||'%' )
+			),
+			
+			/* SALES_CD(선택필터 시 여기서 LIKE 적용 권장) */
+			SALE AS (
+			    SELECT D.SALES_CD, M.CLNT_PJT
+			      FROM TB_CR02D02 D
+			      JOIN TB_CR02M01 M
+			        ON M.CO_CD = D.CO_CD
+			       AND M.ORDRS_NO = D.ORDRS_NO
+			     WHERE 1=1
+			       AND ( #{salesCd} IS NULL OR D.SALES_CD LIKE '%'||#{salesCd}||'%' )
+			       AND ( #{clntPjt} IS NULL OR M.CLNT_PJT IN (#{clntPjt}) )
+			),
+			
+			
+			/* [1] 기간입고: 기간 내 입고 존재 여부 + 기간 내 입고 집계 */
+			IN_PERIOD AS (
+			    SELECT  I.CO_CD,
+			            I.ORDRG_NO,
+			            SUM(NVL(I.IN_QTY,0))     AS IN_QTY,
+			            SUM(NVL(I.BAD_QTY,0))    AS BAD_QTY,
+			            SUM(NVL(I.IN_DTL_AMT,0)) AS IN_DTL_AMT,
+			            MAX(I.IN_DT)             AS LAST_IN_DT
+			      FROM TB_SM03D01 I
+			     WHERE I.CO_CD = #{coCd}
+			       AND I.IN_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+			     GROUP BY I.CO_CD, I.ORDRG_NO
+			),
+			
+			/* 전체 입고 누적(최초입고일 판단 + 이월 계산용) */
+			IN_ALL AS (
+			    SELECT  I.CO_CD,
+			            I.ORDRG_NO,
+			            SUM(NVL(I.IN_QTY,0))     AS IN_QTY_ALL,
+			            SUM(NVL(I.BAD_QTY,0))    AS BAD_QTY_ALL,
+			            SUM(NVL(I.IN_DTL_AMT,0)) AS IN_DTL_AMT_ALL,
+			            MIN(I.IN_DT)             AS FIRST_IN_DT,
+			            MAX(I.IN_DT)             AS LAST_IN_DT_ALL
+			      FROM TB_SM03D01 I
+			     WHERE I.CO_CD = #{coCd}
+			     GROUP BY I.CO_CD, I.ORDRG_NO
+			),
+			
+			/* 확정 누적: :toDt 상관없이 전체 확정(완료 여부 판단용) */
+			CONF_ALL AS (
+			    SELECT  D.CO_CD,
+			            D.ORDRG_NO,
+			            SUM(NVL(D.PCHS_AMT,0)) AS PCHS_AMT_ALL,
+			            SUM(NVL(D.PCHS_VAT,0)) AS PCHS_VAT_ALL,
+			            SUM(NVL(D.PCHS_QTY,0)) AS PCHS_QTY_ALL,
+			            COUNT(D.PCHS_NO)       AS PCHS_CNT_ALL,
+			            MAX(D.PCHS_DT)         AS LAST_PCHS_DT_ALL
+				        , CASE 
+						    -- 1. TRN30과 TRN50이 둘 다 존재하는 경우 -> 'TRN99'
+						    WHEN COUNT(CASE WHEN M.DEPT_ID = 'TRN30' THEN 1 END) > 0  AND COUNT(CASE WHEN M.DEPT_ID = 'TRN50' THEN 1 END) > 0  THEN '99'
+						    -- 2. (위 조건 제외) TRN30이 하나라도 있는 경우 -> 'TRN30'
+						    WHEN COUNT(CASE WHEN M.DEPT_ID = 'TRN30' THEN 1 END) > 0  THEN 'TRN30'
+						    -- 3. (위 조건 제외) TRN50이 하나라도 있는 경우 -> 'TRN50'
+						    WHEN COUNT(CASE WHEN M.DEPT_ID = 'TRN50' THEN 1 END) > 0  THEN 'TRN50'
+						    -- 4. 둘 다 없고 NULL인 경우 (혹은 다른 값만 있는 경우 기존 값 유지)
+						    ELSE MAX(M.DEPT_ID) 
+						    END                    AS DEPT_ID				
+			      FROM TB_SM12D01 D
+			      JOIN TB_SM12M01 M
+			        ON M.PCHS_NO = D.PCHS_NO
+			     WHERE D.CO_CD = #{coCd}
+			     GROUP BY D.CO_CD, D.ORDRG_NO
+			)
+			
+			/* =========================
+			 * [1] 기간입고(PERIOD)
+			 * ========================= */
+			SELECT
+			       'PERIOD' AS ROW_GB,
+			       P.CO_CD, P.ORDRG_NO, P.SALES_CD, P.CREAT_ID,
+			       P.PCHS_CLNT_CD, C.CLNT_NM AS PCHS_CLNT_NM,
+			
+			       P.ORDRG_QTY, P.ORDRG_AMT,
+			       TO_CHAR(P.DUDT_DEQ_DT, 'YYYY-MM-DD') 	 AS DUDT_DEQ_DT, 
+			       TO_CHAR(P.DUDT_INTEND_DT, 'YYYY-MM-DD') 	 AS DUDT_INTEND_DT,
+			
+			       IP.IN_QTY, IP.BAD_QTY, IP.IN_DTL_AMT,
+			       TO_CHAR(IP.LAST_IN_DT, 'YYYY-MM-DD') 	 AS IN_DT,
+			
+			       NVL(CF.PCHS_AMT_ALL,0) AS PCHS_AMT,
+			       NVL(CF.PCHS_VAT_ALL,0) AS PCHS_VAT,
+			       NVL(CF.PCHS_AMT_ALL,0) + NVL(CF.PCHS_VAT_ALL,0) AS PCHS_TOT,
+			       NVL(CF.PCHS_QTY_ALL,0) AS PCHS_QTY,
+			       NVL(CF.PCHS_CNT_ALL,0) AS PCHS_CNT,
+			       TO_CHAR(CF.LAST_PCHS_DT_ALL, 'YYYY-MM-DD') 	AS PCHS_DT,
+			
+			       /* 미확정금액(전체 누적 기준) */
+			       (NVL(IA.IN_DTL_AMT_ALL,0) - NVL(CF.PCHS_AMT_ALL,0)) AS PCHS_AMT_REM,
+			       TO_CHAR(IA.FIRST_IN_DT, 'YYYY-MM-DD') 	AS FIRST_IN_DT,
+			       C.PCHS_CLMN_DAY,
+			       CF.DEPT_ID
+			  FROM IN_PERIOD IP
+			  JOIN PUR P
+			    ON P.CO_CD = IP.CO_CD
+			   AND P.ORDRG_NO = IP.ORDRG_NO
+			  JOIN CLNT C
+			    ON C.CLNT_CD = P.PCHS_CLNT_CD
+			  LEFT JOIN IN_ALL IA
+			    ON IA.CO_CD = P.CO_CD
+			   AND IA.ORDRG_NO = P.ORDRG_NO
+			  LEFT JOIN CONF_ALL CF
+			    ON CF.CO_CD = P.CO_CD
+			   AND CF.ORDRG_NO = P.ORDRG_NO
+			
+			UNION ALL
+			
+			/* =========================
+			 * [2] 이월미확정(CARRY)
+			 * - 최초입고일 :fromDt보다 적은것
+			 * - 전체확정기준 미확정금액 > 0
+			 * - 이번기간 입고가 있는 발주는 제외(중복 방지)
+			 * ========================= */
+			SELECT
+			       'CARRY' AS ROW_GB,
+			       P.CO_CD, P.ORDRG_NO, P.SALES_CD, P.CREAT_ID,
+			       P.PCHS_CLNT_CD, C.CLNT_NM AS PCHS_CLNT_NM,
+			
+			       P.ORDRG_QTY, P.ORDRG_AMT,
+			       TO_CHAR(P.DUDT_DEQ_DT, 'YYYY-MM-DD') 	 AS DUDT_DEQ_DT, 
+			       TO_CHAR(P.DUDT_INTEND_DT, 'YYYY-MM-DD') 	 AS DUDT_INTEND_DT,
+			
+			       IA.IN_QTY_ALL  AS IN_QTY,
+			       IA.BAD_QTY_ALL AS BAD_QTY,
+			       IA.IN_DTL_AMT_ALL AS IN_DTL_AMT,
+			       TO_CHAR(IA.LAST_IN_DT_ALL, 'YYYY-MM-DD') 	 AS IN_DT,
+			
+			       NVL(CF.PCHS_AMT_ALL,0) AS PCHS_AMT,
+			       NVL(CF.PCHS_VAT_ALL,0) AS PCHS_VAT,
+			       NVL(CF.PCHS_AMT_ALL,0) + NVL(CF.PCHS_VAT_ALL,0) AS PCHS_TOT,
+			       NVL(CF.PCHS_QTY_ALL,0) AS PCHS_QTY,
+			       NVL(CF.PCHS_CNT_ALL,0) AS PCHS_CNT,
+			       TO_CHAR(CF.LAST_PCHS_DT_ALL, 'YYYY-MM-DD') 	AS PCHS_DT,
+			
+			       (NVL(IA.IN_DTL_AMT_ALL,0) - NVL(CF.PCHS_AMT_ALL,0)) AS PCHS_AMT_REM,
+			       TO_CHAR(IA.FIRST_IN_DT, 'YYYY-MM-DD') 	AS FIRST_IN_DT,
+			       C.PCHS_CLMN_DAY,
+			       CF.DEPT_ID
+			  FROM IN_ALL IA
+			  JOIN PUR P
+			    ON P.CO_CD = IA.CO_CD
+			   AND P.ORDRG_NO = IA.ORDRG_NO
+			  JOIN CLNT C
+			    ON C.CLNT_CD = P.PCHS_CLNT_CD
+			  LEFT JOIN CONF_ALL CF
+			    ON CF.CO_CD = P.CO_CD
+			   AND CF.ORDRG_NO = P.ORDRG_NO
+			 WHERE IA.FIRST_IN_DT <![CDATA[<]]> #{ordrgDtFrom}
+			   AND (NVL(IA.IN_DTL_AMT_ALL,0) - NVL(CF.PCHS_AMT_ALL,0)) > 0
+			   AND NOT EXISTS (  -- 이번 기간 입고가 있는 발주는 CARRY에서 제외
+			        SELECT 1
+			          FROM IN_PERIOD X
+			         WHERE X.CO_CD = IA.CO_CD
+			           AND X.ORDRG_NO = IA.ORDRG_NO
+			   )
+			
+   			ORDER BY PCHS_CLNT_NM  	 
     </select>	 
 
 	<select id="selectBillExistChk" parameterType="map" resultType="int">
