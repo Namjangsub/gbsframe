@@ -3693,3 +3693,45 @@ function buildPermCode(p, spaced = false) {
 
     console.log("ax5.util.stopEvent patched for passive/cancelable issue.");
 })();
+
+function fileUpload ($form) {
+
+	var formData = new FormData($form[0]);
+	formData.append("userId", jwt.userId);
+
+	//---------------------------------------------------------------
+	//-------itemarr  --첨부화일 처리를 위한 부분 시작
+	//---------------------------------------------------------------
+
+	formData.append("comonCd", treeModule.getFileNodeId());
+	var fileUploadArr = [];
+	var tempArr = [];
+
+	tempArr = treeModule.getFileArr();
+	$.each(tempArr, function(idx, obj) {
+		if (obj.fileKey == 0) {
+			formData.append("files", obj.file);
+			obj.file = '';
+			fileUploadArr.push(obj);
+		}
+	});
+	
+	if (fileUploadArr.length === 0 && treeModule.getDeleteFileArr().length === 0) {
+		customAlert("첨부/삭제할 파일이 없습니다.");
+		return false;
+	}
+
+	formData.append("uploadFileArr", JSON.stringify(fileUploadArr));
+	formData.append("deleteFileArr", JSON.stringify(treeModule.getDeleteFileArr()));
+	//---------------------------------------------------------------
+	//--첨부화일 처리를 위한 부분 끝
+	//---------------------------------------------------------------
+
+	filePostAjax("/admin/cm/cm08/fileUpload", formData, function(data) {
+		if (data.resultCode == 200) {
+			modalStack.close();
+		} else {
+			customAlert(data.resultMessage);
+		}
+	});
+}
