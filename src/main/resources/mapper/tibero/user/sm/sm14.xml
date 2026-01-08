@@ -3168,7 +3168,7 @@
     </select>	
     
 	<!-- 매입확정 대상리스트  구매비용 포함-->
-	<select id="selectClntPurchaseInboundList" parameterType="Map" resultType="camelMap">   
+	<select id="selectClntPurchaseInboundListOld" parameterType="Map" resultType="camelMap">   
 			--입고내역-발주분          			
 			WITH IPGO AS 
 			(
@@ -3424,50 +3424,103 @@
     
     
 	<!-- 매입확정 대상리스트  구매비용 포함-->
-	<select id="selectClntPurchaseInboundListNew" parameterType="Map" resultType="camelMap">   
+	<select id="selectClntPurchaseInboundList" parameterType="Map" resultType="camelMap"> 
 		WITH
-			/* 발주(발주/거래처/담당자 등) */
+			/* 1) 발주 */
 			PUR AS (
-			    SELECT  A.CO_CD,
-			            A.ORDRG_NO,
-			            A.PCHS_CLNT_CD,
-			            A.SALES_CD,
-			            A.CREAT_ID,
-			            SUM(NVL(D.ORDRG_QTY,0)) AS ORDRG_QTY,
-			            SUM(NVL(D.ORDRG_AMT,0)) AS ORDRG_AMT,
-			            MAX(D.DUDT_DEQ_DT)      AS DUDT_DEQ_DT,
-			            MAX(D.DUDT_INTEND_DT)   AS DUDT_INTEND_DT
+			    SELECT  
+				          A.CO_CD
+				        , A.ORDRG_NO
+				        , A.PCHS_CLNT_CD
+				        , A.SALES_CD
+				        , A.CREAT_ID
+				        , SUM(NVL(D.ORDRG_QTY,0))	AS ORDRG_QTY
+				        , SUM(NVL(D.ORDRG_AMT,0))	AS ORDRG_AMT
+				        , MAX(D.DUDT_DEQ_DT)		AS DUDT_DEQ_DT
+		 	    		, '매입' 					AS STS
+				 	    , ''						AS PCHS_PMNT_MTD_CD --구매비용의 경우 등록시 선태가능
+				 	    , ''						AS PCHS_CLMN_DAY 	--구매비용의 경우 등록시 선태가능
 			      FROM TB_SM02M01 A
-			      JOIN TB_SM02D01 D
-			        ON D.CO_CD = A.CO_CD
-			       AND D.ORDRG_NO = A.ORDRG_NO
+			      JOIN TB_SM02D01 D ON D.CO_CD = A.CO_CD AND D.ORDRG_NO = A.ORDRG_NO
 			     WHERE A.CO_CD = #{coCd}
 			     GROUP BY A.CO_CD, A.ORDRG_NO, A.PCHS_CLNT_CD, A.SALES_CD, A.CREAT_ID
-			),
+			)
+			
+			/* 2) 비용 */
+			, COST AS (
+				SELECT
+					      E.CO_CD
+					    , E.COST_NO
+						, E.PCHS_CLNT_CD
+						, E.SALES_CD
+						, E.CREAT_ID
+				 	    , count(*)					AS COST_QTY
+				 	    , SUM(NVL(E.COST_AMT,0))	AS COST_AMT
+				 	    , max(E.COST_DT) 			AS COST_DT
+		 	    		, '비용' 					AS STS
+				 	    , max(E.PCHS_PMNT_MTD_CD) 	AS PCHS_PMNT_MTD_CD	--구매비용의 경우 등록시 선태가능
+				 	    , max(E.PCHS_CLMN_DAY) 		AS PCHS_CLMN_DAY 	--구매비용의 경우 등록시 선태가능
+				  FROM TB_SM10M01 E		/* 구매비용 */	
+				 WHERE E.CO_CD = #{coCd}   
+				 GROUP BY E.CO_CD, E.COST_NO, E.PCHS_CLNT_CD, E.SALES_CD, E.CREAT_ID
+			)
+			
+			/* 3) 반품 */
+			, RET AS (
+				SELECT 
+						  E.CO_CD
+						, E.RET_NO
+						, E.PCHS_CLNT_CD
+						, E.SALES_CD
+						, E.CREAT_ID
+				 	    , SUM(NVL(R.RET_QTY,0))		AS RET_QTY
+				 	    , SUM(NVL(R.RET_DTL_AMT,0))	AS RET_DTL_AMT
+				 	    , MAX(E.RET_DT)				AS RET_DT
+		 	    		, '반품'					AS STS
+				 	    , ''						AS PCHS_PMNT_MTD_CD --구매비용의 경우 등록시 선태가능
+				 	    , ''						AS PCHS_CLMN_DAY 	--구매비용의 경우 등록시 선태가능
+				 FROM TB_SM06M01 E		/* 반품 */	
+				 JOIN TB_SM06D01 R ON R.CO_CD = E.CO_CD AND R.RET_NO = E.RET_NO	
+			    WHERE E.CO_CD = #{coCd}   
+			    GROUP BY E.CO_CD, E.RET_NO, E.PCHS_CLNT_CD, E.SALES_CD, E.CREAT_ID
+			)
+						
+			/* 매입관련 자료 통합 */
+			, TRN_ALL AS (
+						  SELECT * FROM PUR
+				UNION ALL SELECT * FROM COST
+				UNION ALL SELECT * FROM RET
+				
+			)
 			
 			/* 거래처명(선택필터 시 여기서 LIKE 적용 권장) */
-			CLNT AS (
-			    SELECT CLNT_CD, CLNT_NM, PCHS_CLMN_DAY, CLNT_DIV_CD
+			, CLNT AS (
+			    SELECT CLNT_CD, CLNT_NM, PCHS_PAY_DIV_CD, PCHS_CLMN_DAY, CLNT_DIV_CD
 			      FROM TB_BM02M01
 			     WHERE 1=1
-			       AND ( #{pchsClntNm} IS NULL OR CLNT_NM LIKE '%'||#{pchsClntNm}||'%' )
-			),
-			
+			       <if test="pchsClntNm != null and !pchsClntNm.equals('')">
+			       AND CLNT_NM LIKE '%'||#{pchsClntNm}||'%' </if>
+			)
+
 			/* SALES_CD(선택필터 시 여기서 LIKE 적용 권장) */
-			SALE AS (
+			, SALE AS (
 			    SELECT D.SALES_CD, M.CLNT_PJT
 			      FROM TB_CR02D02 D
 			      JOIN TB_CR02M01 M
 			        ON M.CO_CD = D.CO_CD
 			       AND M.ORDRS_NO = D.ORDRS_NO
 			     WHERE 1=1
-			       AND ( #{salesCd} IS NULL OR D.SALES_CD LIKE '%'||#{salesCd}||'%' )
-			       AND ( #{clntPjt} IS NULL OR M.CLNT_PJT IN (#{clntPjt}) )
-			),
-			
-			
-			/* [1] 기간입고: 기간 내 입고 존재 여부 + 기간 내 입고 집계 */
-			IN_PERIOD AS (
+			       AND D.SALES_CD IS NOT NULL
+			       <if test="salesCd != null and !salesCd.equals('')">
+			       AND D.SALES_CD LIKE '%'||#{salesCd}||'%' </if>
+		           <if test="clntPjt != null and !clntPjt.equals('')">
+		           AND M.CLNT_PJT IN ( ${clntPjt} )	 </if>
+			)
+
+			/* [기간 집계] - ORDRG_NO 기준 */
+			, IN_PERIOD AS 
+			(
+				/* 1) 입고(기간) */
 			    SELECT  I.CO_CD,
 			            I.ORDRG_NO,
 			            SUM(NVL(I.IN_QTY,0))     AS IN_QTY,
@@ -3478,10 +3531,45 @@
 			     WHERE I.CO_CD = #{coCd}
 			       AND I.IN_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
 			     GROUP BY I.CO_CD, I.ORDRG_NO
-			),
-			
-			/* 전체 입고 누적(최초입고일 판단 + 이월 계산용) */
-			IN_ALL AS (
+			UNION ALL
+				/* 2) 비용(기간) */
+				SELECT
+					      E.CO_CD
+					    , E.COST_NO
+				 	    , count(*)					AS COST_QTY
+				 	    , 0    						AS BAD_QTY
+				 	    , SUM(NVL(E.COST_AMT,0))	AS COST_AMT
+				 	    , MAX(E.COST_DT) 			AS LAST_COST_DT
+				  FROM TB_SM10M01 E		/* 구매비용 */	
+				 WHERE E.CO_CD = #{coCd}   
+			       AND E.COST_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+				 GROUP BY E.CO_CD, E.COST_NO
+			UNION ALL
+				/* 3) 반품(기간) */
+				SELECT 
+						  E.CO_CD
+						, E.RET_NO
+				 	    , SUM(NVL(R.RET_QTY,0))		AS RET_QTY
+				 	    , 0    						AS BAD_QTY
+				 	    , SUM(NVL(R.RET_DTL_AMT,0))	AS RET_DTL_AMT
+				 	    , MAX(E.RET_DT)				AS RET_DT
+				  FROM TB_SM06M01 E		/* 반품 */	
+				  JOIN TB_SM06D01 R ON R.CO_CD = E.CO_CD AND R.RET_NO = E.RET_NO	
+			     WHERE E.CO_CD = #{coCd}   
+			       AND E.RET_DT BETWEEN #{ordrgDtFrom} AND #{ordrgDtTo}
+			     GROUP BY E.CO_CD, E.RET_NO
+			)
+
+			/* 기간 존재 여부만(중복 제거) -> CARRY 제외용 */
+			, IN_PERIOD_KEY AS (
+			    SELECT /*+ MATERIALIZE */ CO_CD, ORDRG_NO --MATERIALIZE : CTE를 여러 번 참조할 때 “중복 실행” 방지
+			      FROM IN_PERIOD
+			     GROUP BY CO_CD, ORDRG_NO
+			)
+
+			/* [전체 누적] */
+			, IN_ALL AS (
+				/* 입고(전체) */
 			    SELECT  I.CO_CD,
 			            I.ORDRG_NO,
 			            SUM(NVL(I.IN_QTY,0))     AS IN_QTY_ALL,
@@ -3492,10 +3580,37 @@
 			      FROM TB_SM03D01 I
 			     WHERE I.CO_CD = #{coCd}
 			     GROUP BY I.CO_CD, I.ORDRG_NO
-			),
-			
+			UNION ALL
+				/* 비용(전체) */
+				SELECT
+					      E.CO_CD
+					    , E.COST_NO
+				 	    , count(*)					AS COST_QTY_ALL
+				 	    , 0    						AS BAD_QTY_ALL
+				 	    , SUM(NVL(E.COST_AMT,0))	AS COST_AMT_ALL
+				 	    , MIN(E.COST_DT) 			AS FIRST_COST_DT
+				 	    , MAX(E.COST_DT) 			AS LAST_COST_DT
+				  FROM TB_SM10M01 E		/* 구매비용 */	
+				 WHERE E.CO_CD = #{coCd}   
+				 GROUP BY E.CO_CD, E.COST_NO
+			UNION ALL
+				/* 반품(전체) */
+				SELECT 
+						  E.CO_CD
+						, E.RET_NO
+				 	    , SUM(NVL(R.RET_QTY,0))		AS RET_QTY_ALL
+				 	    , 0    						AS BAD_QTY_ALL
+				 	    , SUM(NVL(R.RET_DTL_AMT,0))	AS RET_DTL_AMT_ALL
+				 	    , MIN(E.RET_DT)				AS FIRST_RET_DT
+				 	    , MAX(E.RET_DT)				AS LAST_RET_DT
+				 FROM TB_SM06M01 E		/* 반품 */	
+				 JOIN TB_SM06D01 R ON R.CO_CD = E.CO_CD AND R.RET_NO = E.RET_NO	
+			    WHERE E.CO_CD = #{coCd}  
+			    GROUP BY E.CO_CD, E.RET_NO
+			)
+
 			/* 확정 누적: :toDt 상관없이 전체 확정(완료 여부 판단용) */
-			CONF_ALL AS (
+			, CONF_ALL AS (
 			    SELECT  D.CO_CD,
 			            D.ORDRG_NO,
 			            SUM(NVL(D.PCHS_AMT,0)) AS PCHS_AMT_ALL,
@@ -3520,98 +3635,143 @@
 			     GROUP BY D.CO_CD, D.ORDRG_NO
 			)
 			
-			/* =========================
-			 * [1] 기간입고(PERIOD)
-			 * ========================= */
-			SELECT
-			       'PERIOD' AS ROW_GB,
-			       P.CO_CD, P.ORDRG_NO, P.SALES_CD, P.CREAT_ID,
-			       P.PCHS_CLNT_CD, C.CLNT_NM AS PCHS_CLNT_NM,
-			
-			       P.ORDRG_QTY, P.ORDRG_AMT,
-			       TO_CHAR(P.DUDT_DEQ_DT, 'YYYY-MM-DD') 	 AS DUDT_DEQ_DT, 
-			       TO_CHAR(P.DUDT_INTEND_DT, 'YYYY-MM-DD') 	 AS DUDT_INTEND_DT,
-			
-			       IP.IN_QTY, IP.BAD_QTY, IP.IN_DTL_AMT,
-			       TO_CHAR(IP.LAST_IN_DT, 'YYYY-MM-DD') 	 AS IN_DT,
-			
-			       NVL(CF.PCHS_AMT_ALL,0) AS PCHS_AMT,
-			       NVL(CF.PCHS_VAT_ALL,0) AS PCHS_VAT,
-			       NVL(CF.PCHS_AMT_ALL,0) + NVL(CF.PCHS_VAT_ALL,0) AS PCHS_TOT,
-			       NVL(CF.PCHS_QTY_ALL,0) AS PCHS_QTY,
-			       NVL(CF.PCHS_CNT_ALL,0) AS PCHS_CNT,
-			       TO_CHAR(CF.LAST_PCHS_DT_ALL, 'YYYY-MM-DD') 	AS PCHS_DT,
-			
-			       /* 미확정금액(전체 누적 기준) */
-			       (NVL(IA.IN_DTL_AMT_ALL,0) - NVL(CF.PCHS_AMT_ALL,0)) AS PCHS_AMT_REM,
-			       TO_CHAR(IA.FIRST_IN_DT, 'YYYY-MM-DD') 	AS FIRST_IN_DT,
-			       C.PCHS_CLMN_DAY,
-			       CF.DEPT_ID
-			  FROM IN_PERIOD IP
-			  JOIN PUR P
-			    ON P.CO_CD = IP.CO_CD
-			   AND P.ORDRG_NO = IP.ORDRG_NO
-			  JOIN CLNT C
-			    ON C.CLNT_CD = P.PCHS_CLNT_CD
-			  LEFT JOIN IN_ALL IA
-			    ON IA.CO_CD = P.CO_CD
-			   AND IA.ORDRG_NO = P.ORDRG_NO
-			  LEFT JOIN CONF_ALL CF
-			    ON CF.CO_CD = P.CO_CD
-			   AND CF.ORDRG_NO = P.ORDRG_NO
-			
-			UNION ALL
-			
-			/* =========================
-			 * [2] 이월미확정(CARRY)
-			 * - 최초입고일 :fromDt보다 적은것
-			 * - 전체확정기준 미확정금액 > 0
-			 * - 이번기간 입고가 있는 발주는 제외(중복 방지)
-			 * ========================= */
-			SELECT
-			       'CARRY' AS ROW_GB,
-			       P.CO_CD, P.ORDRG_NO, P.SALES_CD, P.CREAT_ID,
-			       P.PCHS_CLNT_CD, C.CLNT_NM AS PCHS_CLNT_NM,
-			
-			       P.ORDRG_QTY, P.ORDRG_AMT,
-			       TO_CHAR(P.DUDT_DEQ_DT, 'YYYY-MM-DD') 	 AS DUDT_DEQ_DT, 
-			       TO_CHAR(P.DUDT_INTEND_DT, 'YYYY-MM-DD') 	 AS DUDT_INTEND_DT,
-			
-			       IA.IN_QTY_ALL  AS IN_QTY,
-			       IA.BAD_QTY_ALL AS BAD_QTY,
-			       IA.IN_DTL_AMT_ALL AS IN_DTL_AMT,
-			       TO_CHAR(IA.LAST_IN_DT_ALL, 'YYYY-MM-DD') 	 AS IN_DT,
-			
-			       NVL(CF.PCHS_AMT_ALL,0) AS PCHS_AMT,
-			       NVL(CF.PCHS_VAT_ALL,0) AS PCHS_VAT,
-			       NVL(CF.PCHS_AMT_ALL,0) + NVL(CF.PCHS_VAT_ALL,0) AS PCHS_TOT,
-			       NVL(CF.PCHS_QTY_ALL,0) AS PCHS_QTY,
-			       NVL(CF.PCHS_CNT_ALL,0) AS PCHS_CNT,
-			       TO_CHAR(CF.LAST_PCHS_DT_ALL, 'YYYY-MM-DD') 	AS PCHS_DT,
-			
-			       (NVL(IA.IN_DTL_AMT_ALL,0) - NVL(CF.PCHS_AMT_ALL,0)) AS PCHS_AMT_REM,
-			       TO_CHAR(IA.FIRST_IN_DT, 'YYYY-MM-DD') 	AS FIRST_IN_DT,
-			       C.PCHS_CLMN_DAY,
-			       CF.DEPT_ID
-			  FROM IN_ALL IA
-			  JOIN PUR P
-			    ON P.CO_CD = IA.CO_CD
-			   AND P.ORDRG_NO = IA.ORDRG_NO
-			  JOIN CLNT C
-			    ON C.CLNT_CD = P.PCHS_CLNT_CD
-			  LEFT JOIN CONF_ALL CF
-			    ON CF.CO_CD = P.CO_CD
-			   AND CF.ORDRG_NO = P.ORDRG_NO
-			 WHERE IA.FIRST_IN_DT <![CDATA[<]]> #{ordrgDtFrom}
-			   AND (NVL(IA.IN_DTL_AMT_ALL,0) - NVL(CF.PCHS_AMT_ALL,0)) > 0
-			   AND NOT EXISTS (  -- 이번 기간 입고가 있는 발주는 CARRY에서 제외
-			        SELECT 1
-			          FROM IN_PERIOD X
-			         WHERE X.CO_CD = IA.CO_CD
-			           AND X.ORDRG_NO = IA.ORDRG_NO
-			   )
-			
-   			ORDER BY PCHS_CLNT_NM  	 
+			/* PERIOD + CARRY 를 발주 단위로 만든 뒤, 최종은 거래처명으로 집계 */
+			, DOC_BASE AS (
+					/* =========================
+					 * [1] 기간입고(PERIOD)
+					 * ========================= */
+					SELECT
+					       'PERIOD' AS ROW_GB,
+					       P.CO_CD, P.ORDRG_NO, P.SALES_CD, P.CREAT_ID,
+					       P.PCHS_CLNT_CD, C.CLNT_NM AS PCHS_CLNT_NM,
+
+					       P.ORDRG_QTY, P.ORDRG_AMT,
+					       TO_CHAR(P.DUDT_DEQ_DT, 'YYYY-MM-DD') 	 AS DUDT_DEQ_DT, 
+		--			       TO_CHAR(P.DUDT_INTEND_DT, 'YYYY-MM-DD') 	 AS DUDT_INTEND_DT,
+
+					       IP.IN_QTY, IP.BAD_QTY, IP.IN_DTL_AMT,
+					       TO_CHAR(IP.LAST_IN_DT, 'YYYY-MM-DD') 	 AS IN_DT,
+
+					       NVL(CF.PCHS_AMT_ALL,0) AS PCHS_AMT,
+					       NVL(CF.PCHS_VAT_ALL,0) AS PCHS_VAT,
+					       NVL(CF.PCHS_AMT_ALL,0) + NVL(CF.PCHS_VAT_ALL,0) AS PCHS_TOT,
+					       NVL(CF.PCHS_QTY_ALL,0) AS PCHS_QTY,
+					       NVL(CF.PCHS_CNT_ALL,0) AS PCHS_CNT,
+					       TO_CHAR(CF.LAST_PCHS_DT_ALL, 'YYYY-MM-DD') 	AS PCHS_DT,
+
+					       /* 미확정금액(전체 누적 기준) */
+					       (NVL(IA.IN_DTL_AMT_ALL,0) - NVL(CF.PCHS_AMT_ALL,0)) AS PCHS_AMT_REM,
+					       TO_CHAR(IA.FIRST_IN_DT, 'YYYY-MM-DD') 	AS FIRST_IN_DT,
+					       CASE WHEN P.STS = '비용' THEN P.PCHS_CLMN_DAY ELSE C.PCHS_CLMN_DAY END AS PCHS_CLMN_DAY,
+					       CF.DEPT_ID
+					  FROM IN_PERIOD IP
+					  JOIN TRN_ALL P
+					    ON P.CO_CD = IP.CO_CD
+					   AND P.ORDRG_NO = IP.ORDRG_NO
+					  JOIN CLNT C
+					    ON C.CLNT_CD = P.PCHS_CLNT_CD
+					  LEFT JOIN IN_ALL IA
+					    ON IA.CO_CD = P.CO_CD
+					   AND IA.ORDRG_NO = P.ORDRG_NO
+					  LEFT JOIN CONF_ALL CF
+					    ON CF.CO_CD = P.CO_CD
+					   AND CF.ORDRG_NO = P.ORDRG_NO
+
+					UNION ALL
+
+					/* =========================
+					 * [2] 이월미확정(CARRY)
+					 * - 최초입고일 :fromDt보다 적은것
+					 * - 전체확정기준 미확정금액 > 0
+					 * - 이번기간 입고가 있는 발주는 제외(중복 방지)
+					 * ========================= */
+					SELECT
+					       'CARRY' AS ROW_GB,
+					       P.CO_CD, P.ORDRG_NO, P.SALES_CD, P.CREAT_ID,
+					       P.PCHS_CLNT_CD, C.CLNT_NM AS PCHS_CLNT_NM,
+
+					       P.ORDRG_QTY, P.ORDRG_AMT,
+					       TO_CHAR(P.DUDT_DEQ_DT, 'YYYY-MM-DD') 	 AS DUDT_DEQ_DT, 
+		--			       TO_CHAR(P.DUDT_INTEND_DT, 'YYYY-MM-DD') 	 AS DUDT_INTEND_DT,
+
+					       IA.IN_QTY_ALL  AS IN_QTY,
+					       IA.BAD_QTY_ALL AS BAD_QTY,
+					       IA.IN_DTL_AMT_ALL AS IN_DTL_AMT,
+					       TO_CHAR(IA.LAST_IN_DT_ALL, 'YYYY-MM-DD') 	 AS IN_DT,
+
+					       NVL(CF.PCHS_AMT_ALL,0) AS PCHS_AMT,
+					       NVL(CF.PCHS_VAT_ALL,0) AS PCHS_VAT,
+					       NVL(CF.PCHS_AMT_ALL,0) + NVL(CF.PCHS_VAT_ALL,0) AS PCHS_TOT,
+					       NVL(CF.PCHS_QTY_ALL,0) AS PCHS_QTY,
+					       NVL(CF.PCHS_CNT_ALL,0) AS PCHS_CNT,
+					       TO_CHAR(CF.LAST_PCHS_DT_ALL, 'YYYY-MM-DD') 	AS PCHS_DT,
+
+					       (NVL(IA.IN_DTL_AMT_ALL,0) - NVL(CF.PCHS_AMT_ALL,0)) AS PCHS_AMT_REM,
+					       TO_CHAR(IA.FIRST_IN_DT, 'YYYY-MM-DD') 	AS FIRST_IN_DT,
+					       CASE WHEN P.STS = '비용' THEN P.PCHS_CLMN_DAY ELSE C.PCHS_CLMN_DAY END AS PCHS_CLMN_DAY,
+					       CF.DEPT_ID
+					  FROM IN_ALL IA
+					  JOIN TRN_ALL P
+					    ON P.CO_CD = IA.CO_CD
+					   AND P.ORDRG_NO = IA.ORDRG_NO
+					  JOIN CLNT C
+					    ON C.CLNT_CD = P.PCHS_CLNT_CD
+					  LEFT JOIN CONF_ALL CF
+					    ON CF.CO_CD = P.CO_CD
+					   AND CF.ORDRG_NO = P.ORDRG_NO
+					 WHERE IA.FIRST_IN_DT   <![CDATA[ < ]]> #{ordrgDtFrom}
+					   AND (NVL(IA.IN_DTL_AMT_ALL,0) - NVL(CF.PCHS_AMT_ALL,0)) > 0
+					   AND NOT EXISTS (  -- 이번 기간 입고가 있는 발주는 CARRY에서 제외
+					        SELECT 1
+					          FROM IN_PERIOD_KEY X
+					         WHERE X.CO_CD = IA.CO_CD
+					           AND X.ORDRG_NO = IA.ORDRG_NO
+					   )
+				)
+   			
+				/* ===== 최종: 거래처명 기준 집계 ===== */
+				SELECT
+				    /* 그룹키 */
+				    PCHS_CLNT_NM
+				
+				  /* --- 건수/구분 카운트 --- */
+				  , COUNT(*) AS TRN_CNT
+				  , SUM(CASE WHEN ROW_GB = 'PERIOD' THEN 1 ELSE 0 END) AS PERIOD_TRN_CNT
+				  , SUM(CASE WHEN ROW_GB = 'CARRY'  THEN 1 ELSE 0 END) AS CARRY_TRN_CNT
+				
+				  /* --- 숫자형(합계) --- */
+				  , SUM(NVL(ORDRG_QTY,0))     AS ORDRG_QTY
+				  , SUM(NVL(ORDRG_AMT,0))     AS ORDRG_AMT
+				  , SUM(NVL(IN_QTY,0))        AS IN_QTY
+				  , SUM(NVL(BAD_QTY,0))       AS BAD_QTY
+				  , SUM(NVL(IN_DTL_AMT,0))    AS IN_DTL_AMT
+				  , SUM(NVL(PCHS_AMT,0))      AS PCHS_AMT
+				  , SUM(NVL(PCHS_VAT,0))      AS PCHS_VAT
+				  , SUM(NVL(PCHS_TOT,0))      AS PCHS_TOT
+				  , SUM(NVL(PCHS_QTY,0))      AS PCHS_QTY
+				  , SUM(NVL(PCHS_CNT,0))      AS PCHS_CNT
+				  , SUM(NVL(PCHS_AMT_REM,0))  AS PCHS_AMT_REM
+				
+				  /* --- 비숫자형(대표값: MAX) --- */
+				  , MAX(CO_CD)        AS CO_CD
+				  , MAX(PCHS_CLNT_CD) AS PCHS_CLNT_CD
+				
+				  , MAX(ORDRG_NO)     AS ORDRG_NO
+				  , MAX(SALES_CD)     AS SALES_CD
+				  , MAX(CREAT_ID)     AS CREAT_ID
+				  , MAX(DEPT_ID)      AS DEPT_ID
+				  
+				  /* --- 비숫자형(대표값: MIN) --- */
+				  , MIN(PCHS_CLMN_DAY) 		AS PCHS_CLMN_DAY
+				  
+				  /* 날짜가 DATE 타입이면 MAX 그대로, 문자열이면 TO_DATE/TO_CHAR 권장 */
+				  , MAX(DUDT_DEQ_DT) 		AS DUDT_DEQ_DT
+				  , MAX(IN_DT) 				AS IN_DT
+				  , MAX(PCHS_DT) 			AS PCHS_DT
+				  , MAX(FIRST_IN_DT) 		AS FIRST_IN_DT
+				FROM DOC_BASE
+				GROUP BY PCHS_CLNT_NM
+				ORDER BY PCHS_CLNT_NM
     </select>	 
 
 	<select id="selectBillExistChk" parameterType="map" resultType="int">
