@@ -937,7 +937,15 @@
 		      , SUBSTR(TO_CHAR(B.BILL_PBLS_DT, 'YYYYMMDD'), 3, 2) AS BILL_PBLS_YY
 		      , SUBSTR(TO_CHAR(B.BILL_PBLS_DT, 'YYYYMMDD'), 5, 2) AS BILL_PBLS_MM
 		      , NVL(B.CLMN_RATE, 0) AS CLMN_RATE
-		      , TO_CHAR(NVL(B.CLMN_RATE, 0))||'%' 	AS CLMN_RATE_NM
+		      , CASE
+				  WHEN ROUND(NVL(B.CLMN_RATE, 0), 2) = TRUNC(ROUND(NVL(B.CLMN_RATE, 0), 2))
+				    THEN TO_CHAR(TRUNC(ROUND(NVL(B.CLMN_RATE, 0), 2))) || '%'
+				  ELSE
+				    LTRIM(RTRIM(
+				      RTRIM(TO_CHAR(ROUND(NVL(B.CLMN_RATE, 0), 2), '990.00'), '0'),
+				      '.'
+				    )) || '%'
+				END AS CLMN_RATE_NM
 		      , round(A.EXRATE * NVL(B.CLMN_AMT, 0), 0) 		AS SUJU_CLMN_AMT
 		      , B.PMNT_DT_AFTER_BILL
 		      , A.FILE_TRGT_KEY 					AS SJM_FILE_TRGT_KEY
@@ -1076,6 +1084,7 @@
 		      , SUM(A.CLMN_AMT_01) 		AS CLMN_AMT_01
 		      , SUM(A.CLMN_AMT_02) 		AS CLMN_AMT_02
 		      , SUM(A.CLMN_AMT_AFTER) 	AS CLMN_AMT_AFTER
+		      , SUM(A.CLMN_AMT_BEFORE_MONTH) 		AS CLMN_AMT_BEFORE_MONTH
 		 FROM   (
 		         SELECT A.CO_CD
 		              , A.YYYYMM
@@ -1088,6 +1097,7 @@
 		              , CASE WHEN A.YYYYMM = (SELECT FROM_YYYYMM FROM YYYYMM) THEN A.CLMN_DTL_TOT ELSE 0 END AS CLMN_AMT_01
 		              , CASE WHEN A.YYYYMM = (SELECT TO_YYYYMM FROM YYYYMM)   THEN A.CLMN_DTL_TOT ELSE 0 END AS CLMN_AMT_02
 		              , CASE WHEN A.YYYYMM <![CDATA[ > ]]> (SELECT TO_YYYYMM FROM YYYYMM)   THEN A.CLMN_DTL_TOT ELSE 0 END AS CLMN_AMT_AFTER
+		              , CASE WHEN A.YYYYMM = (SELECT BEFORE_YYYYMM FROM YYYYMM) THEN A.CLMN_DTL_TOT ELSE 0 END AS CLMN_AMT_BEFORE_MONTH
 		         FROM   (
 		                 SELECT A.FILE_TRGT_KEY
 						      , A.CO_CD
@@ -1177,6 +1187,7 @@
 					END 																				AS PLAN_CLMN_AMT_02	--다음달계획
 			 , NVL(P.PLAN_CLMN_AMT_02, 0) 			AS ORIG_PLAN_CLMN_AMT_02	--다음달 수금예정 계획
 		     , NVL(B.BILL_AMT_BEFORE_MONTH, 0)      AS BILL_AMT_01_BEFORE_MONTH --이전달 계산서 발행(원화)
+		     , NVL(C.CLMN_AMT_BEFORE_MONTH, 0)      AS CLMN_AMT_01_BEFORE_MONTH --이전달 수금 현황(원화)
 		     , NVL(B.BILL_AMT_01, 0)      AS BILL_AMT_01 --해당월 계산서 실적(원화)
 		     , NVL(B.BILL_AMT_02, 0)      AS BILL_AMT_02 --다음월 계산서 실적(원화)
 		     , NVL(C.CLMN_AMT_01, 0)      AS CLMN_AMT_01 --해당월 수금 실적(원화)
@@ -1229,7 +1240,7 @@
 		  AND 	A.MNG_NM LIKE '%' || #{searchidnm} || '%'
 		</if>
 		<if test="useyn != null and !useyn.equals('')">
-		  AND   (DECODE((A.MI_CLMN_AMT+A.CLMN_AMT_01+A.CLMN_AMT_02),0,'Y','N') = #{useyn} OR NVL(A.BILL_AMT_01_BEFORE_MONTH, 0) != 0)
+		  AND   (DECODE((A.MI_CLMN_AMT+A.CLMN_AMT_01+A.CLMN_AMT_02),0,'Y','N') = #{useyn} OR NVL(A.BILL_AMT_01_BEFORE_MONTH, 0) != 0 OR NVL(A.CLMN_AMT_01_BEFORE_MONTH, 0) != 0)
 		</if>
 		AND    A.RRN BETWEEN #{firstIndex} AND #{lastIndex}
 		ORDER BY A.MNG_NM, A.CLNT_NM, A.CTRT_NM, A.CLMN_PLAN_SEQ
