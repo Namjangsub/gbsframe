@@ -37,8 +37,6 @@ public interface CM08Svc {
 
 	public List<Map<String, String>> selectTreeFileModule(Map<String, String> paramMap);
 
-
-
 	int selectConfirmCount(Map<String, String> paramMap);
 	
 	int moveFile(Map<String, String> paramMap);
@@ -54,6 +52,8 @@ public interface CM08Svc {
 	public int insertDnldStart(Map<String, Object> hist);
 
 	public int updateDnldEnd(Map<String, Object> end);
+
+	int fileUpload(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
 
 }
