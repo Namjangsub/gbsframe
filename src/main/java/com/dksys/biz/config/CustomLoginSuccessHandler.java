@@ -115,6 +115,7 @@ public class CustomLoginSuccessHandler implements AuthenticationSuccessHandler {
 		info.put("userNm", user.getName());
 		info.put("empNo", user.getEmpNo());
 		info.put("coCd", user.getCoCd());
+		info.put("originCoCd", user.getOriginCoCd());
 		info.put("mngCoCd", user.getMngCoCd());
 		info.put("deptId", user.getDeptId());
 		info.put("levelCd", user.getLevelCd());
@@ -125,6 +126,8 @@ public class CustomLoginSuccessHandler implements AuthenticationSuccessHandler {
 		info.put("kakaoSend", user.getKakaoSend());
 		info.put("userGrade", user.getUserGrade());
 		info.put("clntCd", user.getClntCd());
+		info.put("teamManager", user.getTeamManager());
+		info.put("mngId", user.getMngId());
 		
 	}
 

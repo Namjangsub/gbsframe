@@ -25,6 +25,7 @@ public class User implements UserDetails {
 	private String empNo;
 	private String name;
 	private String coCd;
+	private String originCoCd;
 	private String mngCoCd;
 	private String deptId;
 	private String levelCd;
@@ -39,6 +40,8 @@ public class User implements UserDetails {
     private String passChkCnt;
     private String userGrade;
     private String clntCd;
+    private String teamManager;
+    private String mngId;
 	private String serverType;
 	private String kakaoSend;
     

@@ -14,6 +14,7 @@ public class UserTokenInfoUtil {
 		info.put("userNm", user.getName());
 		info.put("empNo", user.getEmpNo());
 		info.put("coCd", user.getCoCd());
+		info.put("originCoCd", user.getOriginCoCd());
 		info.put("mngCoCd", user.getMngCoCd());
 		info.put("deptId", user.getDeptId());
 		info.put("levelCd", user.getLevelCd());
@@ -22,6 +23,8 @@ public class UserTokenInfoUtil {
 		info.put("authInfo", user.getAuthInfo());
 		info.put("userGrade", user.getUserGrade());
 		info.put("clntCd", user.getClntCd());
+		info.put("teamManager", user.getTeamManager());
+		info.put("mngId", user.getMngId());
 		info.put("kakaoSend", user.getKakaoSend());
 		info.put("serverType", user.getServerType());
 

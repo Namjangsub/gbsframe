@@ -27,6 +27,7 @@ public class TokenService {
         claims.put("roles", refreshClaims.get("roles"));
         claims.put("empNo", refreshClaims.get("empNo"));
         claims.put("coCd", refreshClaims.get("coCd"));
+        claims.put("originCoCd", refreshClaims.get("originCoCd"));
         claims.put("mngCoCd", refreshClaims.get("mngCoCd"));
         claims.put("deptId", refreshClaims.get("deptId"));
         claims.put("levelCd", refreshClaims.get("levelCd"));
@@ -37,6 +38,8 @@ public class TokenService {
         claims.put("kakaoSend", refreshClaims.get("kakaoSend"));
         claims.put("userGrade", refreshClaims.get("userGrade"));
         claims.put("clntCd", refreshClaims.get("clntCd"));
+        claims.put("teamManager", refreshClaims.get("teamManager"));
+        claims.put("mngId", refreshClaims.get("mngId"));
         claims.put("jti", UUID.randomUUID().toString());
         return createAccessToken(claims);
     }
