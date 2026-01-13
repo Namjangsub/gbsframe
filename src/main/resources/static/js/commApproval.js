@@ -270,9 +270,9 @@ function Approval(htmlParam, param, popParam) {
         //부서코드 영업, 기술연구소, 구매, 생산팀의 팀장이면 결과 등록시 해당팀의 소요공수 입력 필수임
         // $('#requiredMh').val() == 'YES'   담당팀 투입공수 필수입력 대상임 
         if (requiredMh == 'YES') {
-			// 투입공수 60이하 입력만 가능하게 제약
-			if (actMh > 60) {
-				customAlert('투입공수는 60 이하로 입력해주세요.');
+			// 투입공수 150이하 입력만 가능하게 제약
+			if (actMh > 150) {
+				customAlert('투입공수는 150 이하로 입력해주세요.');
 				return false;
 			}
         }
