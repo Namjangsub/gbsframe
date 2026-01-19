@@ -13,6 +13,12 @@
 		margin-bottom:8px;
 	}
 
+	.attend-row{
+		display:flex;
+		flex-wrap:wrap;
+		margin-bottom:4px;
+	}
+
 	.attend-item{
 		display:inline-block;
 		margin:2px;
@@ -114,13 +120,13 @@
 					<tr>
 						<th class="hit">회사</th>
 						<td>
-							<select id="coCd_S" name="coCd_S" data-kind="CO" data-search="coCd" required>
+							<select id="coCd_S" name="coCd_S" data-kind="CO" data-search="coCd" onchange="gridView.setData(0);" required>
 								<option value="">전체</option>
 							</select>
 						</td>
 						<th class="hit">업무구분</th>
 						<td>
-							<select id="bizDiv_S" name="bizDiv_S" data-search="bizDiv" onchange="gridView.setData(0);" required>
+							<select id="bizDiv_S" name="bizDiv_S" data-search="bizDiv" onchange="onBizDivChange();" required>
 								<option value="AGENDA01">프로젝트</option>
 								<option value="AGENDA02">일반회의</option>
 							</select>
@@ -280,16 +286,22 @@
 	function attendCellFormatter() {
 		const colKey = this.key;
 		const attends = (this.item.attendByColumn && this.item.attendByColumn[colKey]) || [];
+		const maxPerRow = 6; // 한 줄에 최대 6명
 
-		// 참석자 리스트
-		const listHtml = attends.length ?
-			`<div class="attend-list">
-				${attends.map((u, i) =>
-					`<div class="attend-item ${u.toRemove ? 'to-remove' : ''}" data-idx="${i}" data-col="${colKey}">
-						${u.name}
-					</div>`
-				).join('')}
-			</div>` : '';
+		// 참석자 리스트 (6명마다 줄바꿈)
+		let listHtml = '';
+		if (attends.length) {
+			let rows = [];
+			for (let i = 0; i < attends.length; i += maxPerRow) {
+				const rowItems = attends.slice(i, i + maxPerRow);
+				const rowHtml = rowItems.map((u, idx) => {
+					const realIdx = i + idx;
+					return `<div class="attend-item ${u.toRemove ? 'to-remove' : ''}" data-idx="${realIdx}" data-col="${colKey}">${u.name}</div>`;
+				}).join('');
+				rows.push(`<div class="attend-row">${rowHtml}</div>`);
+			}
+			listHtml = `<div class="attend-list">${rows.join('')}</div>`;
+		}
 
 		// 버튼
 		const btnHtml = `
@@ -430,20 +442,23 @@
 							return false;
 						}
 						if (this.key.startsWith('dateCol')) {
-							if ($("#salesCd_S").val() == "") {
-								customAlert("SALES CODE를 선택해주세요.");
-								this.self.setValue(this.dindex, this.key, prev);
-								lastEditBackup = null;
-								gridView.target.repaint(true);
-								return false;
-							}
+							// 프로젝트일 때만 salesCd/ordrsNo 필수 체크
+							if ($("#bizDiv_S").val() == "AGENDA01") {
+								if ($("#salesCd_S").val() == "") {
+									customAlert("SALES CODE를 선택해주세요.");
+									this.self.setValue(this.dindex, this.key, prev);
+									lastEditBackup = null;
+									gridView.target.repaint(true);
+									return false;
+								}
 
-							if ($("#ordrsNo_S").val() == "") {
-								customAlert("수주번호를 선택해주세요.");
-								this.self.setValue(this.dindex, this.key, prev);
-								lastEditBackup = null;
-								gridView.target.repaint(true);
-								return false;
+								if ($("#ordrsNo_S").val() == "") {
+									customAlert("수주번호를 선택해주세요.");
+									this.self.setValue(this.dindex, this.key, prev);
+									lastEditBackup = null;
+									gridView.target.repaint(true);
+									return false;
+								}
 							}
 							if (!dateColMap[this.key]) {
 								customAlert("날짜 컬럼이 유효하지 않습니다.");
@@ -508,6 +523,7 @@
 			return this;
 		},
 		setData: function(_pageNo) {
+			uniqueFileTrgtKey = "";
 			if ($("#bizDiv_S").val() == "") {
 				customAlert("업무구분을 선택해주세요.");
 				return false;
@@ -516,9 +532,24 @@
 			var targetObj = this.target;
 			var formData = {};
 			formData["userId"] = jwt.userId;
-			$.each($('#main_area [data-search]'), function(idx, elem){
-				formData[$(elem).data("search")] = $(elem).val();
-			});
+
+			// 프로젝트: 기존 검색조건 사용 / 일반회의: 담당자로 검색
+			if ($("#bizDiv_S").val() == "AGENDA02") {
+				formData["coCd"] = $("#coCd_S").val();
+				formData["bizDiv"] = $("#bizDiv_S").val();
+				formData["mngId"] = $("#mngId_S").val();
+				formData["dataSearch"] = $("#dataSearch_S").val();
+			} else {
+				// 프로젝트: salesCd 또는 ordrsNo 필수
+				if ($("#salesCd_S").val() == "" && $("#ordrsNo_S").val() == "") {
+					targetObj.setData({ list: [], page: { totalElements: 0 } });
+					return false;
+				}
+				// 프로젝트: 기존대로 모든 검색조건 사용
+				$.each($('#main_area [data-search]'), function(idx, elem){
+					formData[$(elem).data("search")] = $(elem).val();
+				});
+			}
 
 			postAjax("/user/pm/pm20/selectAgendaList", formData, null, function(data) {
 				try {
@@ -984,6 +1015,29 @@
 		// authChk();
 	});
 
+	// 업무구분 변경 이벤트
+	function onBizDivChange() {
+		const bizDiv = $("#bizDiv_S").val();
+
+		if (bizDiv == "AGENDA02") {
+			// 일반회의: 프로젝트 관련 검색필드 초기화
+			$("#salesCd_S").val("");
+			$("#ordrsNo_S").val("");
+			$("#ordrsClntCd_S").val("");
+			$("#ordrsClntNm_S").val("");
+			$("#clntPjt_S").val("");
+			$("#mngId_S").val(jwt.userId);
+			$("#mngIdNm_S").val(jwt.userNm || "");
+		} else {
+			// 프로젝트: 담당자 필드 초기화
+			$("#mngId_S").val("");
+			$("#mngIdNm_S").val("");
+		}
+
+		// 그리드 재조회
+		gridView.setData(0);
+	}
+
 	// 참석자 리스트 불러오기 & 렌더링
 	function select_p10_d02_List(list) {
 		if (list.length > 0) {
@@ -1015,12 +1069,15 @@
 	
 	// 주제별 안건 등록 및 수정
 	function insert_update_agenda_title(value, item, dindex, prevValue) {
-		if ($("#salesCd_S").val() == "" || $("#ordrsNo_S").val() == "") {
-			customAlert("SALES CODE/수주번호를 선택해주세요.");
-			if (typeof dindex === 'number') {
-				gridView.target.setValue(dindex, "agendaTitle", prevValue);
+		// 프로젝트일 때만 salesCd/ordrsNo 필수 체크
+		if ($("#bizDiv_S").val() == "AGENDA01") {
+			if ($("#salesCd_S").val() == "" || $("#ordrsNo_S").val() == "") {
+				customAlert("SALES CODE/수주번호를 선택해주세요.");
+				if (typeof dindex === 'number') {
+					gridView.target.setValue(dindex, "agendaTitle", prevValue);
+				}
+				return false;
 			}
-			return false;
 		}
 		var paramObj = {
 			"fileTrgtKey"	: uniqueFileTrgtKey,
@@ -1052,12 +1109,15 @@
 
 	// 안건 내용 등록 및 수정
 	function insert_update_agenda(item, key, value, dindex, prevValue) {
-		if ($("#salesCd_S").val() == "" || $("#ordrsNo_S").val() == "") {
-			customAlert("SALES CODE/수주번호를 선택해주세요.");
-			if (typeof dindex === 'number') {
-				gridView.target.setValue(dindex, key, prevValue);
+		// 프로젝트일 때만 salesCd/ordrsNo 필수 체크
+		if ($("#bizDiv_S").val() == "AGENDA01") {
+			if ($("#salesCd_S").val() == "" || $("#ordrsNo_S").val() == "") {
+				customAlert("SALES CODE/수주번호를 선택해주세요.");
+				if (typeof dindex === 'number') {
+					gridView.target.setValue(dindex, key, prevValue);
+				}
+				return false;
 			}
-			return false;
 		}
 		// 셀별 버전이 있으면 그걸 쓰고, 없으면 로우 최대+1
 		var cellVer = 0;
@@ -1214,9 +1274,45 @@
 	// 행 추가 (참석자 로우는 1개만, 항상 마지막)
 	function insertAg() {
 		const grid = gridView.target;
-		if (!$("#salesCd_S").val() || !$("#ordrsNo_S").val()) {
-			wbsSalesCodeSearch();
-			return;
+		// 프로젝트일 때만 salesCd/ordrsNo 필수 체크
+		if ($("#bizDiv_S").val() == "AGENDA01") {
+			if (!$("#salesCd_S").val() || !$("#ordrsNo_S").val()) {
+				wbsSalesCodeSearch();
+				return;
+			}
+		}
+
+		// 참석자/파일첨부 로우가 없으면 빈 로우 추가
+		const cols = grid.config.columns.map(c => c.key).filter(k => k && k.indexOf('dateCol') === 0);
+		let attendRow = grid.list.find(r => r && r.rowType === 'ATTEND');
+		let fileRow = grid.list.find(r => r && r.rowType === 'FILE');
+
+		if (!attendRow) {
+			attendRow = {
+				rowType: 'ATTEND',
+				agendaTitle: '참석자',
+				mnStatus: '',
+				attendByColumn: {}
+			};
+			cols.forEach(k => {
+				attendRow[k] = '';
+				attendRow.attendByColumn[k] = [];
+			});
+			grid.addRow(attendRow);
+		}
+
+		if (!fileRow) {
+			fileRow = {
+				rowType: 'FILE',
+				agendaTitle: '파일첨부',
+				mnStatus: '',
+				filesByColumn: {}
+			};
+			cols.forEach(k => {
+				fileRow[k] = '';
+				fileRow.filesByColumn[k] = [];
+			});
+			grid.addRow(fileRow);
 		}
 
 		let attendIdx = grid.list.findIndex(r => r && r.rowType === 'ATTEND');
@@ -1229,7 +1325,6 @@
 			insertIndex = Math.min(selAgenda.__index + 1, attendIdx);
 		}
 
-		const cols = grid.config.columns.map(c => c.key).filter(k => k && k.indexOf('dateCol') === 0);
 		const appendRow = (agendaNo) => {
 			const newAgendaRow = {
 				rowType: 'AGENDA',
@@ -1393,9 +1488,12 @@
 	// 날짜 추가 (진행여부 컬럼은 마지막 고정)
 	function addDateColumn() {
 		const grid = gridView.target;
-		if (!$("#salesCd_S").val() || !$("#ordrsNo_S").val()) {
-			wbsSalesCodeSearch();
-			return;
+		// 프로젝트일 때만 salesCd/ordrsNo 필수 체크
+		if ($("#bizDiv_S").val() == "AGENDA01") {
+			if (!$("#salesCd_S").val() || !$("#ordrsNo_S").val()) {
+				wbsSalesCodeSearch();
+				return;
+			}
 		}
 
 		const curDate = moment().format('YYYY-MM-DD');
@@ -1561,7 +1659,7 @@
 		};
 		postAjax('/user/pm/pm20/pm20_d02_update', paramObj, null, data => {
 			if (data.resultCode == 200) {
-				// 성공
+				gridView.setData();
 			} else {
 				alert('참석자 저장 실패: ' + data.resultMessage);
 			}
