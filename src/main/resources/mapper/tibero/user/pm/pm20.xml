@@ -50,6 +50,8 @@
 			, D1.AGENDA_NO                            AS AGENDA_NO
 			, D1.AGENDA_TITLE                         AS AGENDA_TITLE
 			, D1.AGENDA_STATUS                        AS AGENDA_STATUS
+			, D1.SALES_CD                             AS SALES_CD
+			, D1.ORDRS_NO                             AS ORDRS_NO
 
 			, TO_CHAR(D3.AGENDA_DATE, 'YYYY-MM-DD')   AS AGENDA_DATE
 			, D3.AGENDA_VER                           AS AGENDA_VER
@@ -270,6 +272,33 @@
 		)
 	</update>
 
+	<delete id="pm20_d03_delete_by_agenda" parameterType="Map">
+		DELETE FROM TB_PM20D03
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND AGENDA_NO = #{agendaNo}
+		   AND BIZ_DIV = #{bizDiv}
+	</delete>
+
+	<delete id="pm20_d01_delete" parameterType="Map">
+		DELETE FROM TB_PM20D01
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND AGENDA_NO = #{agendaNo}
+		   AND BIZ_DIV = #{bizDiv}
+	</delete>
+
+	<delete id="pm20_d03_delete_by_date" parameterType="Map">
+		DELETE FROM TB_PM20D03
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND AGENDA_DATE = #{agendaDate}
+		   AND BIZ_DIV = #{bizDiv}
+	</delete>
+
+	<delete id="pm20_d02_delete_by_date" parameterType="Map">
+		DELETE FROM TB_PM20D02
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND AGENDA_DATE = #{agendaDate}
+	</delete>
+
 	<update id="pm20_d02_update" parameterType="Map">
 		MERGE INTO TB_PM20D02 A
 			USING DUAL
@@ -310,5 +339,104 @@
 		   AND AGENDA_DATE		= #{agendaDate}
 		   AND USER_ID			= #{userId}
 	</delete>
+
+	<delete id="pm20_d02_delete_selected"  parameterType="Map">
+		DELETE FROM TB_PM20D02
+		 WHERE FILE_TRGT_KEY	= #{fileTrgtKey}
+		   AND AGENDA_DATE		= #{agendaDate}
+		   AND USER_ID			= #{userId}
+	</delete>
+
+	<update id="pm20_swap_agenda_no_d01" parameterType="Map">
+		UPDATE TB_PM20D01
+		   SET AGENDA_NO = CASE
+				WHEN AGENDA_NO = #{fromAgendaNo} THEN #{toAgendaNo}
+				WHEN AGENDA_NO = #{toAgendaNo} THEN #{fromAgendaNo}
+				ELSE AGENDA_NO
+			END,
+			UDT_ID = #{userId},
+			UDT_DTTM = SYSDATE,
+			UDT_PGM = #{pgmId}
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND AGENDA_NO IN (#{fromAgendaNo}, #{toAgendaNo})
+	</update>
+
+	<update id="pm20_swap_agenda_no_d03" parameterType="Map">
+		UPDATE TB_PM20D03
+		   SET AGENDA_NO = CASE
+				WHEN AGENDA_NO = #{fromAgendaNo} THEN #{toAgendaNo}
+				WHEN AGENDA_NO = #{toAgendaNo} THEN #{fromAgendaNo}
+				ELSE AGENDA_NO
+			END,
+			UDT_ID = #{userId},
+			UDT_DTTM = SYSDATE,
+			UDT_PGM = #{pgmId}
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND AGENDA_NO IN (#{fromAgendaNo}, #{toAgendaNo})
+	</update>
+
+	<update id="pm20_shift_agenda_no_d01" parameterType="Map">
+		UPDATE TB_PM20D01
+		   SET AGENDA_NO = TO_CHAR(TO_NUMBER(AGENDA_NO) + 1)
+		     , UDT_ID = #{userId}
+		     , UDT_DTTM = SYSDATE
+		     , UDT_PGM = #{pgmId}
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND BIZ_DIV = #{bizDiv}
+		   AND TO_NUMBER(AGENDA_NO) <![CDATA[>=]]> TO_NUMBER(#{fromAgendaNo})
+	</update>
+
+	<update id="pm20_shift_agenda_no_d03" parameterType="Map">
+		UPDATE TB_PM20D03
+		   SET AGENDA_NO = TO_CHAR(TO_NUMBER(AGENDA_NO) + 1)
+		     , UDT_ID = #{userId}
+		     , UDT_DTTM = SYSDATE
+		     , UDT_PGM = #{pgmId}
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND BIZ_DIV = #{bizDiv}
+		   AND TO_NUMBER(AGENDA_NO) <![CDATA[>=]]> TO_NUMBER(#{fromAgendaNo})
+	</update>
+
+	<update id="pm20_move_agenda_no_d01" parameterType="Map">
+		UPDATE TB_PM20D01
+		   SET AGENDA_NO = CASE
+				WHEN AGENDA_NO = #{fromAgendaNo} THEN #{toAgendaNo}
+				WHEN TO_NUMBER(#{fromAgendaNo}) <![CDATA[<]]> TO_NUMBER(#{toAgendaNo})
+				 AND TO_NUMBER(AGENDA_NO) <![CDATA[>]]> TO_NUMBER(#{fromAgendaNo})
+				 AND TO_NUMBER(AGENDA_NO) <![CDATA[<=]]> TO_NUMBER(#{toAgendaNo})
+				 THEN TO_CHAR(TO_NUMBER(AGENDA_NO) - 1)
+				WHEN TO_NUMBER(#{fromAgendaNo}) <![CDATA[>]]> TO_NUMBER(#{toAgendaNo})
+				 AND TO_NUMBER(AGENDA_NO) <![CDATA[>=]]> TO_NUMBER(#{toAgendaNo})
+				 AND TO_NUMBER(AGENDA_NO) <![CDATA[<]]> TO_NUMBER(#{fromAgendaNo})
+				 THEN TO_CHAR(TO_NUMBER(AGENDA_NO) + 1)
+				ELSE AGENDA_NO
+			END,
+			UDT_ID = #{userId},
+			UDT_DTTM = SYSDATE,
+			UDT_PGM = #{pgmId}
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND BIZ_DIV = #{bizDiv}
+	</update>
+
+	<update id="pm20_move_agenda_no_d03" parameterType="Map">
+		UPDATE TB_PM20D03
+		   SET AGENDA_NO = CASE
+				WHEN AGENDA_NO = #{fromAgendaNo} THEN #{toAgendaNo}
+				WHEN TO_NUMBER(#{fromAgendaNo}) <![CDATA[<]]> TO_NUMBER(#{toAgendaNo})
+				 AND TO_NUMBER(AGENDA_NO) <![CDATA[>]]> TO_NUMBER(#{fromAgendaNo})
+				 AND TO_NUMBER(AGENDA_NO) <![CDATA[<=]]> TO_NUMBER(#{toAgendaNo})
+				 THEN TO_CHAR(TO_NUMBER(AGENDA_NO) - 1)
+				WHEN TO_NUMBER(#{fromAgendaNo}) <![CDATA[>]]> TO_NUMBER(#{toAgendaNo})
+				 AND TO_NUMBER(AGENDA_NO) <![CDATA[>=]]> TO_NUMBER(#{toAgendaNo})
+				 AND TO_NUMBER(AGENDA_NO) <![CDATA[<]]> TO_NUMBER(#{fromAgendaNo})
+				 THEN TO_CHAR(TO_NUMBER(AGENDA_NO) + 1)
+				ELSE AGENDA_NO
+			END,
+			UDT_ID = #{userId},
+			UDT_DTTM = SYSDATE,
+			UDT_PGM = #{pgmId}
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND BIZ_DIV = #{bizDiv}
+	</update>
 
 </mapper>

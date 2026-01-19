@@ -18,9 +18,21 @@ public interface PM20Svc {
 
 	int insert_update_agenda(Map<String, String> paramMap) throws Exception;
 
+	int delete_agenda(Map<String, String> paramMap) throws Exception;
+
+	int delete_agenda_date(Map<String, String> paramMap) throws Exception;
+
+	int shift_agenda_order(Map<String, String> paramMap) throws Exception;
+
+	int move_agenda_order(Map<String, String> paramMap) throws Exception;
+
 	int pm20_d02_update(Map<String, Object> paramMap) throws Exception;
 
 	int pm20_d02_delete(Map<String, Object> paramMap) throws Exception;
+
+	int pm20_d02_delete_selected(Map<String, Object> paramMap) throws Exception;
+
+	int update_agenda_order(Map<String, String> paramMap) throws Exception;
 
 	public int agUploadFile(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 	

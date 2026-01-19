@@ -132,6 +132,114 @@ public class PM20Ctr {
 		return "jsonView";
 	}
 
+	// 참석자 선택 삭제
+	@PostMapping(value = "/pm20_d02_delete_selected")
+	public String pm20_d02_delete_selected(@RequestBody Map<String, Object> paramMap, ModelMap model) throws Exception {
+		try {
+			if (pm20Svc.pm20_d02_delete_selected(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	// 안건 삭제
+	@PostMapping(value = "/delete_agenda")
+	public String delete_agenda(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (pm20Svc.delete_agenda(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	// 날짜 삭제(해당 날짜의 안건 내용/참석자)
+	@PostMapping(value = "/delete_agenda_date")
+	public String delete_agenda_date(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (pm20Svc.delete_agenda_date(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	// 안건 순서 변경
+	@PostMapping(value = "/update_agenda_order")
+	public String update_agenda_order(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (pm20Svc.update_agenda_order(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	// 안건 추가를 위한 순서 밀기
+	@PostMapping(value = "/shift_agenda_order")
+	public String shift_agenda_order(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (pm20Svc.shift_agenda_order(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	// 안건 드래그 이동
+	@PostMapping(value = "/move_agenda_order")
+	public String move_agenda_order(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (pm20Svc.move_agenda_order(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
 	// 파일업로드
 	@PostMapping("/agUploadFile")
 	public String agUploadFile(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {

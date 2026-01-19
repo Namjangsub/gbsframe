@@ -23,8 +23,30 @@ public interface PM20Mapper {
 
 	int pm20_d3_insert_update(Map<String, String> param);
 
+	int pm20_d03_delete_by_agenda(Map<String, String> param);
+
+	int pm20_d01_delete(Map<String, String> param);
+
+	int pm20_d03_delete_by_date(Map<String, String> param);
+
+	int pm20_d02_delete_by_date(Map<String, String> param);
+
+	int pm20_shift_agenda_no_d01(Map<String, String> param);
+
+	int pm20_shift_agenda_no_d03(Map<String, String> param);
+
+	int pm20_move_agenda_no_d01(Map<String, String> param);
+
+	int pm20_move_agenda_no_d03(Map<String, String> param);
+
 	int pm20_d02_update(Map<String, Object> param);
 
 	int pm20_d02_delete(Map<String, Object> param);
+
+	int pm20_d02_delete_selected(Map<String, Object> param);
+
+	int pm20_swap_agenda_no_d01(Map<String, String> param);
+
+	int pm20_swap_agenda_no_d03(Map<String, String> param);
 
 }

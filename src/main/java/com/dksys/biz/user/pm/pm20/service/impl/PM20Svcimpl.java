@@ -142,6 +142,22 @@ public class PM20Svcimpl implements PM20Svc{
 	}
 
 	@Override
+	public int delete_agenda(Map<String, String> paramMap) throws Exception {
+		int result = 0;
+		result += pm20Mapper.pm20_d03_delete_by_agenda(paramMap);
+		result += pm20Mapper.pm20_d01_delete(paramMap);
+		return result;
+	}
+
+	@Override
+	public int delete_agenda_date(Map<String, String> paramMap) throws Exception {
+		int result = 0;
+		result += pm20Mapper.pm20_d03_delete_by_date(paramMap);
+		result += pm20Mapper.pm20_d02_delete_by_date(paramMap);
+		return result;
+	}
+
+	@Override
 	public int pm20_d02_update(Map<String, Object> paramMap) throws Exception {
 		int result = 0;
 		List<Map<String,Object>> attedList = (List<Map<String,Object>>) paramMap.get("attendList");
@@ -166,6 +182,45 @@ public class PM20Svcimpl implements PM20Svc{
 			p.put("userId", id);
 			result += pm20Mapper.pm20_d02_delete(p);
 		}
+		return result;
+	}
+
+	@Override
+	public int pm20_d02_delete_selected(Map<String, Object> paramMap) throws Exception {
+		int result = 0;
+		List<String> ids = (List<String>) paramMap.get("attendIds");
+		if (ids == null) return 0;
+		for (String id : ids) {
+			Map<String,Object> p = new HashMap<>();
+			p.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+			p.put("agendaDate", paramMap.get("agendaDate"));
+			p.put("userId", id);
+			result += pm20Mapper.pm20_d02_delete_selected(p);
+		}
+		return result;
+	}
+
+	@Override
+	public int update_agenda_order(Map<String, String> paramMap) throws Exception {
+		int result = 0;
+		result += pm20Mapper.pm20_swap_agenda_no_d03(paramMap);
+		result += pm20Mapper.pm20_swap_agenda_no_d01(paramMap);
+		return result;
+	}
+
+	@Override
+	public int shift_agenda_order(Map<String, String> paramMap) throws Exception {
+		int result = 0;
+		result += pm20Mapper.pm20_shift_agenda_no_d03(paramMap);
+		result += pm20Mapper.pm20_shift_agenda_no_d01(paramMap);
+		return result;
+	}
+
+	@Override
+	public int move_agenda_order(Map<String, String> paramMap) throws Exception {
+		int result = 0;
+		result += pm20Mapper.pm20_move_agenda_no_d03(paramMap);
+		result += pm20Mapper.pm20_move_agenda_no_d01(paramMap);
 		return result;
 	}
 
