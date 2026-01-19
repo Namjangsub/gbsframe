@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.pm.pm20.mapper.PM20Mapper">
+
+	<select id="selectList_pm20" parameterType="Map" resultType="CamelMap">
+		SELECT * 
+		FROM TB_PM20M01 T
+		WHERE T.CO_CD = #{coCd}
+		<if test="searchCondition != null and searchCondition != ''">
+			AND MN_SUBJECT LIKE CONCAT('%', #{searchCondition}, '%')
+		</if>
+		<if test="searchDateStart != null and searchDateStart != ''">
+			AND MN_REG_DATE &gt;= #{searchDateStart}
+		</if>
+		<if test="searchDateEnd != null and searchDateEnd != ''">
+			AND MN_REG_DATE &lt;= #{searchDateEnd}
+		</if>
+	</select>
+
+	<select id="select_pm20m_Info" parameterType="map" resultType="CamelMap">
+		SELECT * 
+		FROM TB_PM20M01 
+		WHERE CO_CD = #{coCd} 
+		AND SALES_CD = #{salesCd}
+		<if test="ordrsNo != null and ordrsNo != ''">
+			AND ORDRS_NO = #{ordrsNo}
+		</if>
+		<if test="bizDiv != null and bizDiv != ''">
+			AND BIZ_DIV = #{bizDiv}
+		</if>
+		<if test="clntPjt != null and clntPjt != ''">
+			AND CLNT_PJT = #{clntPjt}
+		</if>
+		<if test="ordrsClntCd != null and ordrsClntCd != ''">
+			AND CLNT_CD = #{ordrsClntCd}
+		</if>
+		<if test="ordrsNo != null and ordrsNo != ''">
+			AND ORDRS_NO = #{ordrsNo}
+		</if>
+		<if test="ordrsNo != null and ordrsNo != ''">
+			AND ORDRS_NO = #{ordrsNo}
+		</if>
+	</select>
+
+	<select id="selectAgendaList" parameterType="Map" resultType="CamelMap">
+		/* 안건(D1) + 날짜별 내용(D3) : 날짜 컬럼용(세로형 반환) */
+		SELECT
+			D1.FILE_TRGT_KEY                        AS FILE_TRGT_KEY
+			, D1.AGENDA_NO                            AS AGENDA_NO
+			, D1.AGENDA_TITLE                         AS AGENDA_TITLE
+			, D1.AGENDA_STATUS                        AS AGENDA_STATUS
+
+			, TO_CHAR(D3.AGENDA_DATE, 'YYYY-MM-DD')   AS AGENDA_DATE
+			, D3.AGENDA_VER                           AS AGENDA_VER
+			, D3.AGENDA_CNTS                          AS AGENDA_CNTS
+		FROM TB_PM20D01 D1
+		LEFT JOIN TB_PM20D03 D3
+		ON D3.FILE_TRGT_KEY = D1.FILE_TRGT_KEY
+		AND D3.AGENDA_NO     = D1.AGENDA_NO
+		WHERE 1=1
+		AND D1.CO_CD   = #{coCd}
+		AND D1.BIZ_DIV = #{bizDiv}
+
+		<if test="salesCd != null and salesCd != ''">
+		AND D1.SALES_CD LIKE '%' || #{salesCd} || '%'
+		</if>
+
+		<if test="ordrsNo != null and ordrsNo != ''">
+		AND D1.ORDRS_NO LIKE '%' || #{ordrsNo} || '%'
+		</if>
+
+		<if test="clntCd != null and clntCd != ''">
+		AND D1.CLNT_CD = #{clntCd}
+		</if>
+
+		<if test="clntPjt != null and clntPjt != ''">
+		AND D1.CLNT_PJT = #{clntPjt}
+		</if>
+
+		<if test="mngId != null and mngId != ''">
+		AND D1.MNG_ID = #{mngId}
+		</if>
+
+		<if test="dataSearch != null and dataSearch != ''">
+		AND (
+			D1.AGENDA_TITLE LIKE '%' || #{dataSearch} || '%'
+			OR D3.AGENDA_CNTS LIKE '%' || #{dataSearch} || '%'
+		)
+		</if>
+
+		ORDER BY
+			TO_NUMBER(D1.AGENDA_NO)
+			, D3.AGENDA_DATE
+			, D3.AGENDA_VER
+	</select>
+
+	<select id="select_pm20_d02_List" parameterType="Map" resultType="CamelMap">
+		SELECT
+				  T.FILE_TRGT_KEY										AS FILE_TRGT_KEY
+				, TO_CHAR(T.AGENDA_DATE, 'YYYY-MM-DD')				AS AGENDA_DATE
+				, T.USER_ID											AS ID
+				, (SELECT FN_CM06M01_ID_TO_NM(T.USER_ID) FROM DUAL)	AS NAME
+		FROM TB_PM20D02 T
+						LEFT OUTER JOIN TB_CM06M01 A ON A.ID = T.USER_ID
+						LEFT OUTER JOIN TB_CM07M01 B ON B.LEVEL_CD = A.LEVEL_CD
+		WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		ORDER BY CASE WHEN REGEXP_LIKE(B.LEVEL_CD, '[0-9]+') THEN TO_NUMBER(REGEXP_REPLACE(B.LEVEL_CD, '[^0-9]', '')) ELSE 0 END DESC
+				, A.NAME
+    </select>
+
+	<select id="selectMaxFileTrgtKeySeq" parameterType="Map" resultType="String">
+		SELECT LPAD(NVL(MAX(TO_NUMBER(SUBSTR(FILE_TRGT_KEY, 3, 4))), 0) + 1, 4, '0') AS MAX_SEQ
+		FROM TB_PM20M01
+		WHERE FILE_TRGT_KEY LIKE #{yy} || '%'
+	</select>
+
+	<update id="pm20_main_update" parameterType="Map">
+		MERGE INTO TB_PM20M01 A
+			USING DUAL
+			ON (
+					FILE_TRGT_KEY 	= #{fileTrgtKey}
+				)
+		WHEN MATCHED THEN
+			UPDATE SET
+				  UDT_ID	= #{userId}
+				, UDT_DTTM	= SYSDATE
+				, UDT_PGM	= #{pgmId}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+				  FILE_TRGT_KEY
+				, CO_CD
+				, MN_SUBJECT
+				, BIZ_DIV
+				, DEPT_ID
+				, MNG_ID
+				, CLNT_CD
+				, CLNT_PJT
+				, ORDRS_NO
+				, SALES_CD
+				, CREAT_ID
+				, CREAT_DTTM
+				, CREAT_PGM
+		)
+		VALUES(
+				  #{fileTrgtKey}
+				, #{coCd}
+				, #{mnSubject, jdbcType=VARCHAR}
+				, #{bizDiv, jdbcType=VARCHAR}
+				, #{deptId, jdbcType=VARCHAR}
+				, #{userId, jdbcType=VARCHAR}
+				, #{clntCd, jdbcType=VARCHAR}
+				, #{clntPjt, jdbcType=VARCHAR}
+				, #{ordrsNo, jdbcType=VARCHAR}
+				, #{salesCd, jdbcType=VARCHAR}
+				, #{userId}
+				, SYSDATE
+				, #{pgmId}
+		)
+	</update>
+
+	<update id="insert_update_agenda_title" parameterType="Map">
+		MERGE INTO TB_PM20D01 A
+			USING DUAL
+			ON (
+						FILE_TRGT_KEY 	= #{fileTrgtKey}
+					AND AGENDA_NO 		= #{agendaNo}
+				)
+		WHEN MATCHED THEN
+			UPDATE SET
+				  AGENDA_TITLE		= #{agendaTitle, jdbcType=VARCHAR}
+				, AGENDA_STATUS		= #{agendaStatus, jdbcType=VARCHAR}
+				, UDT_ID			= #{userId}
+				, UDT_DTTM			= SYSDATE
+				, UDT_PGM			= #{pgmId}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+				  CO_CD
+				, FILE_TRGT_KEY
+				, AGENDA_NO
+				, AGENDA_TITLE
+				, BIZ_DIV
+				, DEPT_ID
+				, MNG_ID
+				, CLNT_CD
+				, CLNT_PJT
+				, ORDRS_NO
+				, SALES_CD
+				, AGENDA_STATUS
+				, CREAT_ID
+				, CREAT_DTTM
+				, CREAT_PGM
+		)
+		VALUES(
+				  #{coCd}
+				, #{fileTrgtKey}
+				, #{agendaNo}
+				, #{agendaTitle, jdbcType=VARCHAR}
+				, #{bizDiv, jdbcType=VARCHAR}
+				, #{deptId, jdbcType=VARCHAR}
+				, #{userId, jdbcType=VARCHAR}
+				, #{clntCd, jdbcType=VARCHAR}
+				, #{clntPjt, jdbcType=VARCHAR}
+				, #{ordrsNo, jdbcType=VARCHAR}
+				, #{salesCd, jdbcType=VARCHAR}
+				, #{agendaStatus, jdbcType=VARCHAR}
+				, #{userId}
+				, SYSDATE
+				, #{pgmId}
+		)
+	</update>
+
+	<update id="pm20_d3_insert_update" parameterType="Map">
+		MERGE INTO TB_PM20D03 A
+			USING DUAL
+			ON (
+						FILE_TRGT_KEY 	= #{fileTrgtKey}
+					AND AGENDA_NO 		= #{agendaNo}
+					AND AGENDA_VER		= #{agendaVer}
+					<!-- AND AGENDA_DATE		= #{agendaDate} -->
+					AND BIZ_DIV			= #{bizDiv}
+				)
+		WHEN MATCHED THEN
+			UPDATE SET
+				  AGENDA_DATE		= #{agendaDate, jdbcType=VARCHAR}
+				, AGENDA_TITLE		= #{agendaTitle, jdbcType=VARCHAR}
+				, AGENDA_CNTS		= #{agendaCnts, jdbcType=VARCHAR}
+				, UDT_ID			= #{userId}
+				, UDT_DTTM			= SYSDATE
+				, UDT_PGM			= #{pgmId}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+				  FILE_TRGT_KEY
+				, AGENDA_NO
+				, AGENDA_VER
+				, AGENDA_DATE
+				, AGENDA_TITLE
+				, AGENDA_CNTS
+				, BIZ_DIV
+				, DEPT_ID
+				, MNG_ID
+				, CLNT_CD
+				, CLNT_PJT
+				, ORDRS_NO
+				, SALES_CD
+				, CREAT_ID
+				, CREAT_DTTM
+				, CREAT_PGM
+		)
+		VALUES(
+				  #{fileTrgtKey}
+				, #{agendaNo}
+				, #{agendaVer}
+				, #{agendaDate, jdbcType=VARCHAR}
+				, #{agendaTitle, jdbcType=VARCHAR}
+				, #{agendaCnts, jdbcType=VARCHAR}
+				, #{bizDiv, jdbcType=VARCHAR}
+				, #{deptId, jdbcType=VARCHAR}
+				, #{userId, jdbcType=VARCHAR}
+				, #{clntCd, jdbcType=VARCHAR}
+				, #{clntPjt, jdbcType=VARCHAR}
+				, #{ordrsNo, jdbcType=VARCHAR}
+				, #{salesCd, jdbcType=VARCHAR}
+				, #{userId}
+				, SYSDATE
+				, #{pgmId}
+		)
+	</update>
+
+	<update id="pm20_d02_update" parameterType="Map">
+		MERGE INTO TB_PM20D02 A
+			USING DUAL
+			ON (
+					FILE_TRGT_KEY 	= #{fileTrgtKey}
+					AND AGENDA_DATE = #{agendaDate}
+					AND USER_ID 	= #{attendId}
+			   )
+		WHEN MATCHED THEN
+			UPDATE SET
+					  UDT_ID			= #{userId}
+					, UDT_DTTM			= SYSDATE
+					, UDT_PGM			= #{pgmId}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+				  FILE_TRGT_KEY
+				, AGENDA_DATE
+				, USER_ID
+				, CREAT_ID
+				, CREAT_DTTM
+				, CREAT_PGM
+		)
+		VALUES(
+				  #{fileTrgtKey}
+				, #{agendaDate}
+				, #{attendId}
+				, #{userId}
+				, SYSDATE
+				, #{pgmId}
+		)
+	</update>
+
+	<delete id="pm20_d02_delete"  parameterType="Map">
+		DELETE FROM TB_PM20D02
+		 WHERE FILE_TRGT_KEY	= #{fileTrgtKey}
+		   AND AGENDA_NO		= #{agendaNo}
+		   AND AGENDA_DATE		= #{agendaDate}
+		   AND USER_ID			= #{userId}
+	</delete>
+
+</mapper>
