@@ -822,87 +822,140 @@
 		}
 	}
 
-	function downloadFile(_fileKey, _filename) {
-		return new Promise(function(resolve, reject) {
-			var xhr = new XMLHttpRequest();
-			xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + _fileKey + "&userId=" + jwt.userId + "&coCd=" + $('#coCd_S').val(), true);
-			xhr.responseType = "blob";
-			xhr.setRequestHeader("Authorization", authorizationToken);
-			xhr.setRequestHeader("X-GBS-Source", "pdfjs-viewer");
-			xhr.onload = async function () {
-			  try {
-			        const status = xhr.status;
-			        const ct = (xhr.getResponseHeader("Content-Type") || "").toLowerCase();
-			        const cl = xhr.getResponseHeader("Content-Length");
-			        const dispo = xhr.getResponseHeader("Content-Disposition") || "";
-			        const xMsg = xhr.getResponseHeader("X-Error-Message") || "";
-			        const blob = xhr.response;
+	function downloadFile(fileKey, fileName, coCd) {
+		var paramObj = {
+			"fileKey": fileKey,
+			"userId" : jwt.userId,
+			"coCd"   : coCd
+		};
 
-			        // ---- 공통: 본문 없음(빈 파일) → 오류 ----
-			        const contentLengthIsZero = cl && String(cl).trim() === "0";
-			        const blobIsEmpty = !blob || blob.size === 0;
-
-			        if (status === 200) {
-			          // 1) 빈 바디면 오류(파일 없음으로 처리)
-			          if (contentLengthIsZero || blobIsEmpty) {
-			            const msg = `[${_filename}] 파일이 없습니다.`; // 정책에 따라 "권한이 없습니다."로 바꿔도 됨
-			            console.error(msg, "(HTTP 200 but empty body)");
-			            return reject(msg);
-			          }
-
-
-			          // 2) 서버가 메시지를 text/json으로 보냈다면 오류
-			          if (ct.startsWith("text/") || ct.includes("application/json") || ct.includes("html")) {
-			            let text = "";
-			            try { text = await readBlobAsText(blob); } catch {}
-			            const msgFromServer = xMsg || text || "다운로드 중 오류가 발생했습니다.";
-			            const normMsg = /권한|unauthoriz|forbidden/i.test(msgFromServer)
-			              ? `[${_filename}] 권한이 없습니다.`
-			              : `[${_filename}] ${msgFromServer}`;
-			            console.error(normMsg);
-			            return reject(normMsg);
-			          }
-
-			          // (선택) Content-Disposition 없이 오는 비정상 케이스를 방지하고 싶다면:
-			          // if (!/filename/i.test(dispo)) { return reject(`[${_filename}] 파일 헤더가 올바르지 않습니다.`); }
-
-			          // ---- 정상 파일 다운로드 ----
-			          const a = document.createElement('a');
-			          const blobUrl = URL.createObjectURL(blob);
-			          a.href = blobUrl;
-			          a.download = _filename || 'download';
-			          document.body.appendChild(a);
-			          a.click();
-			          document.body.removeChild(a);
-			          URL.revokeObjectURL(blobUrl);
-			          return resolve();
-			        }
-
-			        // ---- 200이 아닌 경우: 상태별 메시지 ----
-			        if (status === 401 || status === 403 || status === 404) {
-			          return reject(`[${_filename}]\n다운로드 권한이 없거나  파일이 없습니다.`);
-			        }
-// 			        if (status === 404) {
-// 			          return reject(`[${_filename}] 파일이 없습니다.`);
-// 			        }
-
-			        // 기타 오류: 본문에 메시지가 있으면 노출
-			        let text = "";
-			        try { text = await readBlobAsText(blob); } catch {}
-			        return reject(`[${_filename}] 서버 오류(${status}). ${xMsg || text || xhr.statusText}`);
-			      } catch (e) {
-			        return reject(`[${_filename}] 처리 중 예외: ${e.message || e}`);
-			      }
-			    };
-
-			xhr.onerror = function() {
-				console.error("네트워크 오류가 발생했습니다.");
-				reject("[" + _filename + "] 네트워크 오류가 발생했습니다.");
-			};
-
-			xhr.send();
+		postAjax("/admin/cm/cm08/fileDownInfoUser", paramObj, null, function(data) {
+			if (data.resultCode == 200) {
+				// 권한 체크 후, 실제 파일 다운로드 요청 수행
+				var xhr = new XMLHttpRequest();
+				xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + fileKey + "&userId=" + jwt.userId + "&coCd=" + coCd, true);
+				xhr.responseType = "blob";
+				xhr.setRequestHeader("Authorization", authorizationToken);
+				xhr.setRequestHeader("X-GBS-Source", "pdfjs-viewer");
+				xhr.onload = function () {
+					if (xhr.status === 200) {
+						var contentType = xhr.getResponseHeader("Content-Type");
+						// 만약 응답 Content-Type이 text/plain이면, 오류 메시지가 담겨있는 경우입니다.
+						if (contentType && contentType.indexOf("text/plain") !== -1) {
+							var reader = new FileReader();
+							reader.onload = function (e) {
+								customAlert("전산실 연락바랍니다.\n\n" + e.target.result);
+							};
+							reader.readAsText(xhr.response);
+						} else {
+							// 정상적인 파일이면 바로 다운로드 진행
+							var blob = xhr.response;
+							var downloadUrl = URL.createObjectURL(blob);
+							var a = document.createElement("a");
+							a.href = downloadUrl;
+							a.download = fileName || 'download';
+							document.body.appendChild(a);
+							a.click();
+							document.body.removeChild(a);
+							URL.revokeObjectURL(downloadUrl);
+						}
+					} else {
+						console.error("백엔드 오류 발생: " + xhr.status + " - " + xhr.statusText);
+						customAlert("파일이 존재하지 않습니다.  전산실 연락바랍니다.");
+					}
+				};
+				xhr.onerror = function () {
+					console.error("네트워크 오류가 발생했습니다.");
+					customAlert("네트워크 오류가 발생했습니다.  전산실 연락바랍니다.");
+				};
+				xhr.send();
+			} else {
+				customAlert("다운로드 권한이 없습니다.");
+			}
 		});
 	}
+
+// 	function downloadFile(_fileKey, _filename) {
+// 		return new Promise(function(resolve, reject) {
+// 			var xhr = new XMLHttpRequest();
+// 			xhr.open("GET", "/admin/cm/cm08/fileDownloadAuth2?fileKey=" + _fileKey + "&userId=" + jwt.userId + "&coCd=" + $('#coCd_S').val(), true);
+// 			xhr.responseType = "blob";
+// 			xhr.setRequestHeader("Authorization", authorizationToken);
+// 			xhr.setRequestHeader("X-GBS-Source", "pdfjs-viewer");
+// 			xhr.onload = async function () {
+// 			  try {
+// 			        const status = xhr.status;
+// 			        const ct = (xhr.getResponseHeader("Content-Type") || "").toLowerCase();
+// 			        const cl = xhr.getResponseHeader("Content-Length");
+// 			        const dispo = xhr.getResponseHeader("Content-Disposition") || "";
+// 			        const xMsg = xhr.getResponseHeader("X-Error-Message") || "";
+// 			        const blob = xhr.response;
+
+// 			        // ---- 공통: 본문 없음(빈 파일) → 오류 ----
+// 			        const contentLengthIsZero = cl && String(cl).trim() === "0";
+// 			        const blobIsEmpty = !blob || blob.size === 0;
+
+// 			        if (status === 200) {
+// 			          // 1) 빈 바디면 오류(파일 없음으로 처리)
+// 			          if (contentLengthIsZero || blobIsEmpty) {
+// 			            const msg = `[${_filename}] 파일이 없습니다.`; // 정책에 따라 "권한이 없습니다."로 바꿔도 됨
+// 			            console.error(msg, "(HTTP 200 but empty body)");
+// 			            return reject(msg);
+// 			          }
+
+
+// 			          // 2) 서버가 메시지를 text/json으로 보냈다면 오류
+// 			          if (ct.startsWith("text/") || ct.includes("application/json") || ct.includes("html")) {
+// 			            let text = "";
+// 			            try { text = await readBlobAsText(blob); } catch {}
+// 			            const msgFromServer = xMsg || text || "다운로드 중 오류가 발생했습니다.";
+// 			            const normMsg = /권한|unauthoriz|forbidden/i.test(msgFromServer)
+// 			              ? `[${_filename}] 권한이 없습니다.`
+// 			              : `[${_filename}] ${msgFromServer}`;
+// 			            console.error(normMsg);
+// 			            return reject(normMsg);
+// 			          }
+
+// 			          // (선택) Content-Disposition 없이 오는 비정상 케이스를 방지하고 싶다면:
+// 			          // if (!/filename/i.test(dispo)) { return reject(`[${_filename}] 파일 헤더가 올바르지 않습니다.`); }
+
+// 			          // ---- 정상 파일 다운로드 ----
+// 			          const a = document.createElement('a');
+// 			          const blobUrl = URL.createObjectURL(blob);
+// 			          a.href = blobUrl;
+// 			          a.download = _filename || 'download';
+// 			          document.body.appendChild(a);
+// 			          a.click();
+// 			          document.body.removeChild(a);
+// 			          URL.revokeObjectURL(blobUrl);
+// 			          return resolve();
+// 			        }
+
+// 			        // ---- 200이 아닌 경우: 상태별 메시지 ----
+// 			        if (status === 401 || status === 403 || status === 404) {
+// 			          return reject(`[${_filename}]\n다운로드 권한이 없거나  파일이 없습니다.`);
+// 			        }
+// // 			        if (status === 404) {
+// // 			          return reject(`[${_filename}] 파일이 없습니다.`);
+// // 			        }
+
+// 			        // 기타 오류: 본문에 메시지가 있으면 노출
+// 			        let text = "";
+// 			        try { text = await readBlobAsText(blob); } catch {}
+// 			        return reject(`[${_filename}] 서버 오류(${status}). ${xMsg || text || xhr.statusText}`);
+// 			      } catch (e) {
+// 			        return reject(`[${_filename}] 처리 중 예외: ${e.message || e}`);
+// 			      }
+// 			    };
+
+// 			xhr.onerror = function() {
+// 				console.error("네트워크 오류가 발생했습니다.");
+// 				reject("[" + _filename + "] 네트워크 오류가 발생했습니다.");
+// 			};
+
+// 			xhr.send();
+// 		});
+// 	}
 	
 	function uploadFile() {
 		customcustomAlert("거래처, 제품, 아이템, SalesCode등 필수 정보가 필요하여\n통합파일관리 화면에서의 파일 업로드는 보류!\n\n각 팀별 해당 업무 화면에서 업로드하세요!.");	
@@ -926,7 +979,7 @@
 		$.each(rows, function(idx, obj) {
 			if (obj.fileName) {
 				let tempFileName = obj.lpath + '-' + obj.fileName;
-				downloadPromises.push(downloadFile(obj.fileKey, tempFileName));
+				downloadPromises.push(downloadFile(obj.fileKey, tempFileName, $('#coCd_S').val()));
 			}
 		});
 
