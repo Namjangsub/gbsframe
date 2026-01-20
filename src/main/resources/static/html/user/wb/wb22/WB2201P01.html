@@ -290,6 +290,25 @@
 		}
 		return rtnColor;
 	}
+	function canEditPlanRow(row) {
+		if (!row) return false;
+		const sameDeptTeamManager =
+			teamManagerYnFlag &&
+			row.deptId &&
+			jwt.deptId &&
+			row.deptId.slice(0, 5) == jwt.deptId.slice(0, 5);
+		const prdMngEtc = ($('#prdMngChk option').attr('data-etc') || '');
+		const prdMngIds = prdMngEtc.replace(/\s/g, '').split(',').filter(Boolean);
+		const privilegedUser =
+			$('#smrizeId').val() == jwt.userId ||
+			prdMngIds.includes(jwt.userId) ||
+			jwt.authInfo.includes('AUTH999') ||
+			jwt.userId == 'js.nam' ||
+			jwt.userId == 'ssj';
+		const unconfirmed = $("#wbsPlanCloseYn").val() !== "Y";
+
+		return sameDeptTeamManager || (unconfirmed && privilegedUser);
+	}
 	var gridView1 = {
 		initView: function() {
 			this.target = new ax5.ui.grid();
@@ -355,8 +374,8 @@
 					},
 					onDBLClick: function () {
 						var idx = this.dindex;
-						// Validation 체크
-						if (this.item.closeYn == "Y" && (!teamManagerYnFlag || this.item.deptId.slice(0,5) != jwt.deptId.slice(0,5))) {
+						// Validation 체크: 팀장이 아니거나 다른 부서인 경우 확정 상태에서 변경 불가
+						if (!canEditPlanRow(this.item)) {
 							//alert("확정된 상태입니다.");
 							return;
 						}
@@ -364,6 +383,7 @@
 						if (this.column.key=='wbsPlanMngNm') {
 							var closeYn = this.item.closeYn;
 							var deptId = this.item.deptId;
+							var oldMngNm = this.item.wbsPlanMngNm || '';  // 변경 전 담당자명 저장
 							var paramObj = {
 								"coCd" : coCd,
 								"userId": '',
@@ -372,30 +392,42 @@
 							openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "담당자 검색", paramObj, function (tree){
 								var checkedId = tree.get_checked()[0];
 								var checkedNode = tree.get_node(checkedId);
-
 								if (closeYn == "Y" && teamManagerYnFlag && (checkedNode.original.parent.slice(0,5) != jwt.deptId.slice(0,5))) {
 									customAlert("같은 부서원만 선택 가능합니다.");
 									return false;
 								}
 
+								var newMngNm = checkedNode.text;  // 변경 후 담당자명
+
 								gridView1.target.updateRow($.extend({}, gridView1.target.list[idx], {wbsPlanMngId : checkedNode.id}), idx);
-								gridView1.target.updateRow($.extend({}, gridView1.target.list[idx], {wbsPlanMngNm : checkedNode.text}), idx);
+								gridView1.target.updateRow($.extend({}, gridView1.target.list[idx], {wbsPlanMngNm : newMngNm}), idx);
 
 								$("#popForm #btn1").show();                  // 저장만 표시
 
-								if (closeYn == "Y" && teamManagerYnFlag && (deptId.slice(0,5) == jwt.deptId.slice(0,5))) {
-									wbsLevel1Insert();
+								// 팀장이 담당자를 변경한 경우 버전업 처리 (확정/미확정 상관없이)
+								if (teamManagerYnFlag && (checkedNode.original.originDeptId.slice(0,5) == jwt.deptId.slice(0,5))) {
+									// 담당자가 실제로 변경된 경우에만 버전업
+									if (oldMngNm !== newMngNm) {
+										updateWbsPlanVerUp(idx, 'mngId', { oldValue: oldMngNm, newValue: newMngNm });
+									} else {
+										wbsLevel1Insert();
+									}
 								}
 							});
+						} else if (this.column.key=='wbsPlansDt' || this.column.key=='wbsPlaneDt') {
+							
 						}
 
 					},
 					onDataChanged: function (param) {
+						var that = this;
+						var oldValue = this.before;  // 변경 전 값
+						var newValue = this.value;   // 변경 후 값
 
 						//하나라도 수정되면 저장버튼 활성화,
 						//   setValue는 onDataChanged 이벤트 없음.--> 해당함수에서 처리해야함
 
-						// Validation 체크
+						// Validation 체크 - 버튼 표시 로직
 						if (this.item.closeYn == "Y") {
 							$("#popForm #btn1").hide();  //  '저장' 버튼 숨기기
 							$("#popForm #btn2").show();  //  '변경요청 저장' 버튼 활성화
@@ -444,7 +476,15 @@
 						}else{
 							this.self.setValue(this.dindex, "daycnt", 0);
 						}
-						
+
+						// 팀장이 시작일자/종료일자를 변경한 경우 버전업 처리 (확정/미확정 상관없이)
+						if (teamManagerYnFlag && (this.item.deptId.slice(0,5) == jwt.deptId.slice(0,5))) {
+							if ((this.key === 'wbsPlansDt' || this.key === 'wbsPlaneDt') && oldValue !== newValue) {
+								// 일자 변경 (시작일자 또는 종료일자)
+								updateWbsPlanVerUp(this.dindex, 'date', null);
+							}
+						}
+
 						// if ($("#allPjtYn").is(":checked") && (this.key === "wbsPlanMngId" || this.key === "wbsPlansDt" || this.key === "wbsPlaneDt")) {
 						// 	this.self.setValue(this.dindex, "allPjtYn", "Y");
 						// }
@@ -504,14 +544,13 @@
 						if (item.label == "붙여넣기") {
 							gridPaste(gridView1.target, thisGridRow, thisGridCol);
 						} else if (item.label == "내용삭제") {
-							if ($('#wbsPlanCloseYn').val() == 'Y') {
-								// 일정계획이 확정이든 미확정이든 버전업처리
-								// 0. 상세일정에 문제 등록된 것이 없어야 삭제 가능
-								// 1. History백업
-								// 2. 현재자료 백업
-								// 3. 일정삭제 및 Task 계획 및 실적 일괄 삭제, 첨부파일 삭제
-								updateWbsPlanVerUp(thisGridRow);
-							} else {
+							// 일정계획이 확정이든 미확정이든 버전업처리
+							// 0. 상세일정에 문제 등록된 것이 없어야 삭제 가능
+							// 1. History백업
+							// 2. 현재자료 백업
+							// 3. 일정삭제 및 Task 계획 및 실적 일괄 삭제, 첨부파일 삭제
+							updateWbsPlanVerUp(thisGridRow, 'delete', null);
+							if (false) {  // 미확정일 때도 버전업 처리하므로 아래 로직은 사용하지 않음
 								let fromRowNo = param.dindex;
 								if (firstRow != "")  fromRowNo = firstRow;
 								for (var i = fromRowNo; i <= param.dindex; i++) {
@@ -543,11 +582,11 @@
 					{key: "wbsPlanMngNm",  label: "<span style='color: red;'>*</span>담당자명",    align: "center",   width: 80, styleClass: function () {return gridColor(this.item);}},
 					{key: "wbsPlansDt",    label: "<span style='color: red;'>*</span>시작일자",      align: "center",   width: 120,
 						editor: {type: "date", config: { content: { config: { mode: "day", selectMode: "day" } } },
-						disabled: function () { if (this.item.closeYn == "Y") { return true; } }, }
+						disabled: function () { return !canEditPlanRow(this.item); }, }
 						, styleClass: function () {return gridColor(this.item);}},
 					{key: "wbsPlaneDt",    label: "<span style='color: red;'>*</span>종료일자",      align: "center",   width: 120,
 						editor: { type: "date", config: { content: { config: { mode: "day", selectMode: "day" }, } },
-						disabled: function () { if (this.item.closeYn == "Y") { return true; }else{ return false; } }, }
+						disabled: function () { return !canEditPlanRow(this.item); }, }
 						, styleClass: function () {return gridColor(this.item);}},
 					{key: "daycnt",  label: "소요일수",    align: "center",   width: 80,  
 						formatter: function () {
@@ -2936,13 +2975,30 @@
 		return Math.floor((endDay - startDay) / 86400000) + 1; // 양끝 포함
 	}
 	
-	function updateWbsPlanVerUp(dindex) {
+	// changeType: 'delete' | 'mngId' | 'date'
+	// changeInfo: { oldValue, newValue } (담당자 변경 시: oldValue=이전담당자명, newValue=신규담당자명)
+	function updateWbsPlanVerUp(dindex, changeType, changeInfo) {
 		var row = gridView1.target.list[dindex];
-		var verUpReasonValue = jwt.userNm  + " " + row.levelNm + " ("+ row.wbsPlanCodeNm + " 일정 삭제)";
+		var verUpReasonValue = "";
+
+		// 변경 유형에 따라 버전업 사유 생성
+		if (changeType === 'delete') {
+			// 내용삭제: 기존 로직 유지
+			verUpReasonValue = jwt.userNm + ("수정" || '') + " (" + row.wbsPlanCodeNm + " 일정 삭제)";
+		} else if (changeType === 'mngId') {
+			// 담당자 변경
+			verUpReasonValue = jwt.userNm + ("수정" || '') + " (담당자 " + (changeInfo.oldValue || '') + "에서 " + (changeInfo.newValue || '') + "으로 변경)";
+		} else if (changeType === 'date') {
+			// 일자 변경 (시작일자 또는 종료일자)
+			verUpReasonValue = jwt.userNm + ("수정" || '') + " (" + row.wbsPlanCodeNm + " 일정수정)";
+		} else {
+			// 기본값 (기존 로직)
+			verUpReasonValue = jwt.userNm + ("수정" || '') + " (" + row.wbsPlanCodeNm + " 일정 삭제)";
+		}
 
 		var formData = new FormData();
 		formData.append("coCd", coCd);
-		// formData.append("wbsPlanFileTrgtKey", row.fileTrgtKey);
+		formData.append("year", $('#beginDt').val().substring(0,4));
 		formData.append("salesCd", salesCd);
 		formData.append("verNo", row.verNo);
 		formData.append("creatId", jwt.userId);
@@ -2950,7 +3006,8 @@
 		formData.append("creatPgm", $('#popForm #pgmId').val());
 		formData.append("verUpReason", verUpReasonValue);
 		formData.append("wbsPlanCodeId", row.wbsPlanCodeId);
-		formData.append("flag", 'Y');	// 확정 플래그
+		formData.append("changeType", changeType || 'delete');	// 변경 유형 전달
+		formData.append("flag", $("#wbsPlanCloseYn").val());	// 일정 확정 유무
 
 		var strYear = new Date().toISOString().substring(2, 4);
 		var planData = {
@@ -2963,50 +3020,49 @@
 
 		var rowList = gridView1.target.getList();
 		var rowListArr = [];
+		debugger;
 		$.each(rowList, function(idx, elem){
 			var row = gridView1.target.getList()[idx];
 			var rowListObj = elem;
-			if (elem.fileTrgtKey != undefined) {
-				rowListObj["coCd"] = elem.coCd;
-				rowListObj["fileTrgtKey"] = elem.fileTrgtKey;
-				rowListObj["wbsPlanNo"] = elem.wbsPlanNo;
-				rowListObj["wbsPlanCodeId"] = elem.wbsPlanCodeId;
-				rowListObj["salesCd"] = elem.salesCd;
-				rowListObj["verNo"] = elem.verNo;
-				if (elem.wbsPlanCodeNm != undefined) {
-					rowListObj["wbsPlanCodeNm"] = elem.wbsPlanCodeNm;
-				}
-				else {
-					rowListObj["wbsPlanCodeNm"] = "";
-				}
-
-				if (elem.wbsPlanMngId != undefined) {
-					rowListObj["wbsPlanMngId"] = elem.wbsPlanMngId;
-				}
-				else {
-					rowListObj["wbsPlanMngId"] = "";
-				}
-
-				rowListObj["wbsPlansDt"] = elem.wbsPlansDt;
-				rowListObj["wbsPlaneDt"] = elem.wbsPlaneDt;
-				rowListObj["daycnt"] = elem.daycnt;
-				rowListObj["wbsPlanStsCodeId"] = elem.wbsPlanStsCodeId;
-				rowListObj["closeYn"] = elem.closeYn;
-				rowListObj["creatId"] = jwt.userId;
-				rowListObj["creatPgm"] = "WB2201M01";
-				rowListObj["verUpReason"] = verUpReasonValue;
-				rowListArr.push(rowListObj);
+			rowListObj["coCd"] = elem.coCd;
+			rowListObj["fileTrgtKey"] = elem.fileTrgtKey;
+			rowListObj["wbsPlanNo"] = elem.wbsPlanNo;
+			rowListObj["wbsPlanCodeId"] = elem.wbsPlanCodeId;
+			rowListObj["salesCd"] = elem.salesCd;
+			rowListObj["verNo"] = elem.verNo;
+			if (elem.wbsPlanCodeNm != undefined) {
+				rowListObj["wbsPlanCodeNm"] = elem.wbsPlanCodeNm;
 			}
+			else {
+				rowListObj["wbsPlanCodeNm"] = "";
+			}
+
+			if (elem.wbsPlanMngId != undefined) {
+				rowListObj["wbsPlanMngId"] = elem.wbsPlanMngId;
+			}
+			else {
+				rowListObj["wbsPlanMngId"] = "";
+			}
+
+			rowListObj["wbsPlansDt"] = elem.wbsPlansDt;
+			rowListObj["wbsPlaneDt"] = elem.wbsPlaneDt;
+			rowListObj["daycnt"] = elem.daycnt;
+			rowListObj["wbsPlanStsCodeId"] = elem.wbsPlanStsCodeId;
+			rowListObj["closeYn"] = elem.closeYn;
+			rowListObj["creatId"] = jwt.userId;
+			rowListObj["creatPgm"] = "WB2201M01";
+			rowListObj["verUpReason"] = verUpReasonValue;
+			rowListArr.push(rowListObj);
 		});
 		formData.append("rowListArr", JSON.stringify(rowListArr));
 
 		filePostAjax("/user/wb/wb22/updateWbsPlanVerUp", formData, function(data){
 			if (data.resultCode == 200) {
-				gridView1.setData(0);
-				gridView2.setData(0);
 			} else {
 				customAlert(data.resultMessage);
 			}
+			gridView1.setData(0);
+			gridView2.setData(0);
 		});
 	}
 </script>
