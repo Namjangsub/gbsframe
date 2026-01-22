@@ -204,6 +204,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
+  <div class="bar-tooltip" id="barTooltip"></div>
 
   <!-- Modal -->
   <div class="modal-backdrop" id="modal">
@@ -259,6 +260,85 @@
         .replaceAll(">","&gt;")
         .replaceAll('"',"&quot;")
         .replaceAll("'","&#039;");
+    }
+
+    /* =========================
+     * 툴팁 기능
+     * ========================= */
+    function showBarTooltip(rowObj, mouseX, mouseY){
+      const $tooltip = $("#barTooltip");
+
+      // 상태에 따른 스타일
+      const statusMap = {
+        "PLN": { text: "계획", color: "#6b7280" },
+        "ING": { text: "진행", color: "#f59e0b" },
+        "DONE": { text: "완료", color: "#10b981" },
+        "HOLD": { text: "보류", color: "#ef4444" }
+      };
+      const status = statusMap[rowObj.status] || { text: rowObj.status || "PLN", color: "#6b7280" };
+
+      // 진행률 표시
+      const progress = rowObj.actProg || 0;
+      const progressText = rowObj.actSt ? `${progress}%` : "시작전";
+console.log(rowObj);
+      // 툴팁 내용 구성
+      const title = rowObj.fullNm || rowObj.deptNm || 'N/A';
+      const content = `
+        <div class="title">${escapeHtml(title)}</div>
+        <div class="info">
+          <div><span class="label">담당:</span> <span class="value">${escapeHtml(rowObj.wbsPlanMngNm || "미정")}</span></div>
+          <div><span class="label">상태:</span> <span class="value" style="color:${status.color}">${status.text}</span></div>
+          <div><span class="label">계획:</span> <span class="value">${rowObj.wbsPlansDtFm} ~ ${rowObj.wbsPlaneDtFm}</span></div>
+          ${rowObj.actSt ? `<div><span class="label">실적:</span> <span class="value">${rowObj.actSt}${rowObj.actEnd ? ' ~ ' + rowObj.actEnd : ''}</span></div>` : ''}
+          ${rowObj.actSt ? `<div><span class="label">진행률:</span> <span class="value">${progress}%</span></div>` : ''}
+          ${rowObj.memo ? `<div><span class="label">메모:</span> <span class="value">${escapeHtml(rowObj.memo)}</span></div>` : ''}
+        </div>
+      `;
+
+      $tooltip.html(content);
+      updateTooltipPosition(mouseX, mouseY);
+      $tooltip.addClass("show");
+    }
+
+    function hideBarTooltip(){
+      $("#barTooltip").removeClass("show");
+    }
+
+    function updateTooltipPosition(mouseX, mouseY){
+      const $tooltip = $("#barTooltip");
+      const tooltipWidth = $tooltip.outerWidth();
+      const tooltipHeight = $tooltip.outerHeight();
+      const windowWidth = $(window).width();
+      const windowHeight = $(window).height();
+
+      // 툴팁 위치 계산 (커서 오른쪽 위쪽 우선)
+      let left = mouseX + 15;
+      let top = mouseY - 15;
+
+      // 오른쪽 경계 체크
+      if(left + tooltipWidth > windowWidth) {
+        left = mouseX - tooltipWidth - 15;
+      }
+
+      // 아래쪽 경계 체크
+      if(top + tooltipHeight > windowHeight) {
+        top = mouseY + 15;
+      }
+
+      // 위쪽 경계 체크
+      if(top < 0) {
+        top = mouseY + 15;
+      }
+
+      // 왼쪽 경계 체크
+      if(left < 0) {
+        left = mouseX + 15;
+      }
+
+      $tooltip.css({
+        left: Math.max(0, left) + "px",
+        top: Math.max(0, top) + "px"
+      });
     }
     // business-day aware: count only weekdays (Mon-Fri)
     function daysBetween(a, b){
@@ -331,16 +411,16 @@
      *************************************************/
     const DEPT_DEFS = [
       // order(정렬) + short(엑셀/라벨용 약어) + css/back/text 일괄 관리
-      { deptCd:"S01", deptNm:"영업",     short:"영", colorClass:"dept-S01", backColor:"#1F77B4", textColor:"#FFFFFF", order: 10 },
+      { deptCd:"S01", deptNm:"영업",     short:"영", colorClass:"dept-S01", backColor:"#1F77B4", textColor:"#0f172a", order: 10 },
       { deptCd:"S03", deptNm:"설계",     short:"설", colorClass:"dept-S03", backColor:"#6D28D9", textColor:"#FFFFFF", order: 20 },
       { deptCd:"S04", deptNm:"구매",     short:"구", colorClass:"dept-S04", backColor:"#2E7D32", textColor:"#FFFFFF", order: 30 },
       { deptCd:"S06", deptNm:"제품입고", short:"제", colorClass:"dept-S06", backColor:"#D97706", textColor:"#FFFFFF", order: 40 },
       { deptCd:"S07", deptNm:"생산",     short:"생", colorClass:"dept-S07", backColor:"#C00000", textColor:"#FFFFFF", order: 50 },
       { deptCd:"S08", deptNm:"전기",     short:"전", colorClass:"dept-S08", backColor:"#0F766E", textColor:"#FFFFFF", order: 60 },
-      { deptCd:"S09", deptNm:"시운전",   short:"시", colorClass:"dept-S09", backColor:"#8D6E63", textColor:"#FFFFFF", order: 70 },
+      { deptCd:"S09", deptNm:"시운전",   short:"시", colorClass:"dept-S09", backColor:"#8D6E63", textColor:"#0f172a", order: 70 },
       { deptCd:"S11", deptNm:"고객검수", short:"고", colorClass:"dept-S11", backColor:"#22C1DC", textColor:"#1A1A1A", order: 80 },
       { deptCd:"S13", deptNm:"출하",     short:"출", colorClass:"dept-S13", backColor:"#F4B400", textColor:"#1A1A1A", order: 90 },
-      { deptCd:"S14", deptNm:"설치",     short:"치", colorClass:"dept-S14", backColor:"#1F77B4", textColor:"#FFFFFF", order: 99 },
+      { deptCd:"S14", deptNm:"설치",     short:"치", colorClass:"dept-S14", backColor:"#1F77B4", textColor:"#1A1A1A", order: 99 },
       // NOTE) 백엔드에서 S02(연/연구소) 등 들어오면 여기 한 줄만 추가하면 전체가 자동 반영됩니다.
       // { deptCd:"S02", deptNm:"연구소", short:"연", colorClass:"dept-S02", backColor:"#CC79A7", textColor:"#FFFFFF", order: 15 },
 
@@ -542,7 +622,6 @@
     	      </div>
     	    `);
     	    $bar.attr("data-summary", "1");
-    	    $bar.attr("title", `${seg.deptNm} | ${seg.wbsPlansDtFm} ~ ${seg.wbsPlaneDtFm}`);
     	    $canvas.append($bar);
     	  });
     }
@@ -780,6 +859,9 @@
 
     function setActiveBar($bar){
       try{
+        // 기존 툴팁 숨기기
+        hideBarTooltip();
+
         $(".bar.is-active").removeClass("is-active");
         $bar.addClass("is-active");
         ACTIVE_BAR_EL = $bar.get(0);
@@ -1211,7 +1293,6 @@
               </div>
             `);
             $bar.attr("data-summary", "1");
-            $bar.attr("title", `${seg.deptNm} | ${seg.wbsPlansDtFm} ~ ${seg.wbsPlaneDtFm}`);
             $canvas.append($bar);
           });
 
@@ -1253,7 +1334,6 @@
             </div>
             `);
             if(r.salesCd) $bar.attr("data-salescd", r.salesCd);
-            $bar.attr("title", `${seg.deptNm} | ${seg.wbsPlansDtFm} ~ ${seg.wbsPlaneDtFm}`);
             $canvas.append($bar);
           });
 
@@ -1303,6 +1383,8 @@
                  data-salescd="${escapeHtml(rowObj.salesCd || '')}"
                  data-ordrsno="${escapeHtml(rowObj.ordrsNo || '')}"
                  data-deptcd="${escapeHtml(rowObj.deptCd || '')}"
+                 data-wbsplanmngid="${escapeHtml(rowObj.wbsPlanMngCd || '')}"
+                 data-wbsplanmngnm="${escapeHtml(rowObj.wbsPlanMngNm || '')}"
                  data-deptnm="${deptNmSafe}"
                  data-start="${escapeHtml(startDate)}"
                  data-end="${escapeHtml(endDate)}"
@@ -1311,7 +1393,6 @@
             </div>
           `);
           $bar.data("rowobj", rowObj);
-          $bar.attr("title", `${rowObj.deptNm || 'N/A'} | ${startDate} ~ ${endDate}`);
           $canvas.append($bar);
         });
 
@@ -1438,6 +1519,36 @@
           });
         });
       });
+
+      // 간트 바 hover 툴팁
+      let tooltipTimeout;
+      $(document).on("mouseenter", ".bar[data-row]", function(e){
+        const $bar = $(this);
+        const rowId = $bar.data("row");
+        const rowObj = $bar.data("rowobj");
+
+        if(!rowObj || $bar.hasClass("is-active")) return;
+
+        // 기존 timeout 취소
+        clearTimeout(tooltipTimeout);
+
+        // 툴팁 표시
+        tooltipTimeout = setTimeout(() => {
+          showBarTooltip(rowObj, e.pageX, e.pageY);
+        }, 300); // 300ms delay
+      });
+
+      $(document).on("mouseleave", ".bar[data-row]", function(){
+        clearTimeout(tooltipTimeout);
+        hideBarTooltip();
+      });
+
+      $(document).on("mousemove", ".bar[data-row]", function(e){
+        const $tooltip = $("#barTooltip");
+        if($tooltip.hasClass("show")) {
+          updateTooltipPosition(e.pageX, e.pageY);
+        }
+      });
     }
 
     function applyBarChange($bar){
@@ -1529,7 +1640,6 @@
       $bar.data("end", e);
       $bar.attr("data-start", s);
       $bar.attr("data-end", e);
-      $bar.attr("title", `${row.deptNm} | ${s} ~ ${e}`);
 
       toast(`일정 변경: ${row.deptNm} (${s} ~ ${e})`);
       updateSummaryRowForOrdrs(ORDRS_NO);
@@ -1656,6 +1766,8 @@
     	      deptNm: row.fullNm,
     	      wbsPlansDtFm: row.wbsPlansDtFm,
     	      wbsPlaneDtFm: row.wbsPlaneDtFm,
+    	      wbsPlanMngCd: row.wbsPlanMngCd,
+    	      wbsPlanMngNm: row.wbsPlanMngNm,
     	      remarks: row.remarks
     	    });
     	  };
@@ -2485,6 +2597,8 @@
                 eqpNm: item.eqpNm || '',
                 remarks: item.wbsRemark || '',
                 closeYn: item.closeYn || '',
+                wbsPlanMngId: item.wbsPlanMngId || '',
+                wbsPlanMngNm: item.wbsPlanMngNm || '',
                 ...item
               };
 
