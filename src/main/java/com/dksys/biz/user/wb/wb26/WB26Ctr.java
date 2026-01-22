@@ -38,6 +38,14 @@ public class WB26Ctr {
 		return "jsonView";
 	}
 
+    //리스트 조회
+	@PostMapping(value = "/select_wb06_List")
+	public String select_wb06_List(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = wb26svc.select_wb06_List(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+	
 	@PostMapping(value = "/wb26save")
     public String wb26save(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
   		try {
@@ -166,4 +174,42 @@ public class WB26Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+	
+
+
+	@PostMapping(value = "/updateWbsRemarks")
+    public String updateWbsRemarks(@RequestBody Map<String, String> paramMap,  ModelMap model) throws Exception {
+  		try {
+  			if (wb26svc.updateWbsRemarks(paramMap) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }
+
+
+	@PostMapping(value = "/updateWbsSchedule")
+    public String updateWbsSchedule(@RequestBody Map<String, String> paramMap,  ModelMap model) throws Exception {
+  		try {
+  			if (wb26svc.updateWbsSchedule(paramMap) != 0 ) {
+  				model.addAttribute("resultCode", 200);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  			} else {
+  				model.addAttribute("resultCode", 500);
+  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+  			};
+  		}catch(Exception e){
+  			model.addAttribute("resultCode", 900);
+  			model.addAttribute("resultMessage", e.getMessage());
+  		}
+  		return "jsonView";
+    }
+	
 }

@@ -19,6 +19,7 @@ public interface WB26Svc {
 
 	int select_wb2602_List_Count(Map<String, String> paramMap);
 	List<Map<String, String>> select_wb2602_List(Map<String, String> paramMap);
+	List<Map<String, String>> select_wb06_List(Map<String, String> paramMap);
 
 	int select_wb2603_List_Count(Map<String, String> paramMap);
 	List<Map<String, String>> select_wb2603_List(Map<String, String> paramMap);
@@ -33,6 +34,8 @@ public interface WB26Svc {
 
 	List<Map<String, String>> selectWbsTaskTempletGantList(Map<String, String> paramMap);
 
+	int updateWbsRemarks(Map<String, String> paramMap);
+	int updateWbsSchedule(Map<String, String> paramMap) throws Exception;
 	// // 수금유형 조회
 	// List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap);
 }

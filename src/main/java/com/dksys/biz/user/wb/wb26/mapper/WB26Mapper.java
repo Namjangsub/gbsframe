@@ -12,6 +12,7 @@ public interface WB26Mapper {
 
 	// 그리드 리스트
 	List<Map<String, String>> select_wb26_List(Map<String, String> paramMap);
+	List<Map<String, String>> select_wb06_List(Map<String, String> paramMap);
 
 	int wb26save(Map<String, String> paramMap);
 
@@ -34,6 +35,12 @@ public interface WB26Mapper {
 	List<Map<String, String>> select_wb2605_metaList(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectWbsTaskTempletGantList(Map<String, String> paramMap);
+
+	// 프론트엔드의 간트차트에서 수정되는 내용 처리 용
+	int updateWbsRemarks(Map<String, String> param);
+	int updateWbsSchedule(Map<String, String> param);
+	int insertWbsScheduleHIST(Map<String, String> param);
+	int updateWbsScheduleVersionUp(Map<String, String> param);
 
     // // 수금유형 검색
 	// List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap);

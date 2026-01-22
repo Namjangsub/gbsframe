@@ -1,0 +1,2688 @@
+<!-- [조작 방법] -->
+<!-- 1) 타임라인의 컬러 바를 마우스로 좌우 드래그 → 시작일 이동(1일 단위) -->
+<!-- 2) 바의 좌/우 끝을 드래그(리사이즈) → 기간 변경(1일 단위) -->
+<!-- 3) 변경된 행은 SAVE CHANGES 클릭 시 변경 JSON 확인 -->
+<!-- 4) EXPORT EXCEL → 엑셀(xlsx) 다운로드 -->
+
+<!-- [구현 포인트] -->
+<!-- - 좌측(기계~salesCd) / 우측(Remarks) Sticky 처리 -->
+<!-- - 타임라인은 평일 기준 Day Grid + 월 라벨 + TODAY 표시 -->
+<!-- - jQuery UI draggable/resizable로 일정 수정(Stop에서 1일 단위 스냅) -->
+<!-- - SAVE 시점에 변경분만 백엔드 API로 전송 권장`; -->
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+  <title>실행계획 > 기계별 WBS현황 (HTML5 + jQuery)</title>
+
+  <link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/bootstrap/css/bootstrap-theme.min.css">
+  <link rel="stylesheet" href="/static/bootstrap/css/dashboard.css">
+  <link rel="stylesheet" href="/static/bootstrap/css/bootstrap-datepicker.css">
+  <link rel="stylesheet" href="/static/fontawesome/css/all.css">
+  <link rel="stylesheet" href="/static/css/ax5/ax5grid.css">
+  <link rel="stylesheet" href="/static/css/ax5/ax5mask.css">
+  <link rel="stylesheet" href="/static/css/ax5/ax5modal.css">
+  <link rel="stylesheet" href="/static/css/ax5/ax5toast.css">
+  <link rel="stylesheet" href="/static/css/ax5/ax5menu.css">
+  <link rel="stylesheet" href="/static/css/ax5/ax5calendar.css">
+  <link rel="stylesheet" href="/static/css/ax5/ax5picker.css">
+  <link rel="stylesheet" href="/static/css/ax5/ax5select.css">
+  <link rel="stylesheet" href="/static/css/jstree/style.min.css">
+  <link rel="stylesheet" href="/static/css/ax5/ax5combobox.css">
+  <link rel="stylesheet" href="/static/css/gnb.css">
+  <link rel="stylesheet" href="/static/css/main.css">
+  <link rel="stylesheet" href="/static/css/sub.css">
+  <link rel="stylesheet" href="/static/css/common.css">
+
+  <script type="text/javascript" src="/static/js/jquery-latest.min.js"></script>
+  <link rel="stylesheet" href="/static/css/jquery-ui.css">
+  <script src="/static/js/jquery-ui.min.js"></script>
+  <script type="text/javascript" src="/static/js/jquery.serializeObject.js"></script>
+  <script type="text/javascript" src="/static/bootstrap/js/bootstrap.min.js"></script>
+  <script type="text/javascript" src="/static/bootstrap/js/bootstrap-datepicker.min.js"></script>
+  <script type="text/javascript" src="/static/bootstrap/js/bootstrap-datepicker.ko.min.js"></script>
+  <script type="text/javascript" src="/static/js/moment/moment-with-locales.js"></script>
+  <script type="text/javascript" src="/static/js/jstree/jstree.min.js"></script>
+  <script type="text/javascript" src="/static/js/ax5/ax5core.min.js"></script>
+  <script type="text/javascript" src="/static/js/ax5/ax5grid.min.js"></script>
+  <script type="text/javascript" src="/static/js/ax5/ax5mask.min.js"></script>
+  <script type="text/javascript" src="/static/js/ax5/ax5modal.min.js"></script>
+  <script type="text/javascript" src="/static/js/ax5/ax5toast.min.js"></script>
+  <script src="/static/js/ax5/ax5calendar.min.js"></script>
+  <script src="/static/js/ax5/ax5picker.min.js"></script>
+  <script src="/static/js/ax5/ax5menu.min.js"></script>
+  <script src="/static/js/ax5/ax5formatter.min.js"></script>
+  <script src="/static/js/ax5/ax5combobox.min.js"></script>
+  <script src="/static/js/ax5/ax5select.min.js"></script>
+  <script src="/static/js/exceljs.min.js"></script>
+
+  <script type="text/javascript" src="/static/js/global.js"></script>
+  <script type="text/javascript" src="/static/js/fileTree.js"></script>
+  <script type="text/javascript" src="/static/js/workingDayCalc.js"></script>
+  <script type="text/javascript" src="/static/js/korean-lunar-calendar.min.js"></script>
+  <script src="/static/js/jquery.blockUI.js"></script>
+
+  <!-- 도움말 팝업 -->
+  <link rel="stylesheet" href="/static/bootstrap/css/bootstrap-multiselect.css">
+  <script src="/static/bootstrap/js/bootstrap-multiselect.min.js"></script>
+  <script src="/static/js/manualPopup.js"></script>
+
+  <!-- CDN (사내망/오프라인이면 파일로 내려받아 로컬 경로로 교체) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  
+  <link rel="stylesheet" href="./WB0603M02.css">
+
+
+</head>
+
+<body>
+  <div id="head_area"></div>
+  <div id="top_area"></div>
+  <div id="main_area">
+
+    <input type="hidden" id="pgmId"  name="pgmId" value="WB0603M02">
+	<select id="prdMngChk" data-kind="SPECRTS" hidden></select>
+    <!-- 페이지 상단 -->
+    <div class="contents no_bg">
+      <ul class="btn_ul">
+        <li class="btn_r">
+          <button type="button" id="btnHelp" class="bg_gray">도움말</button>
+          <button class="bg_gray" id="btnReset">초기화</button>
+          <button class="bg_gray" id="btnSearch">검 색</button>
+        </li>
+      </ul>
+    </div>
+
+    <!-- 검색조건 -->
+    <div class="contents search">
+      <div class="">
+        <table class="table_input type04">
+          <tr>
+            <th class="hit">회사</th>
+            <td>
+              <select id="coCd_S" name="coCd_S" data-kind="CO" data-search="coCd" required msg="회사"></select>
+            </td>
+
+            <th class="hit">수주일자</th>
+            <td>
+              <div class="date_input">
+                <input type="text" id="strtDt_S" name="strtDt_S" class="input_calendar" onkeyup="dateMask(this);" autocomplete="off" required data-search="strtDt">
+                <span>~</span>
+                <input type="text" id="endDt_S" name="endDt_S" class="input_calendar" onkeyup="dateMask(this);" autocomplete="off" required data-search="endDt">
+              </div>
+            </td>
+
+
+            <th></th>
+            <td></td>
+            <th></th>
+            <td></td>
+<!--             <th>수주구분</th> -->
+<!--             <td> -->
+<!--               <select id="ordrsDiv_S" name="ordrsDiv_S" data-kind="ORDRSDIV" data-search="ordrsDiv"> -->
+<!--                 <option value="">전체</option> -->
+<!--               </select> -->
+<!--             </td> -->
+          </tr>
+
+          <tr>
+            <th>SalesCode</th>
+            <td>
+              <div class="search_form">
+                <input type="text" id="salesCd_S" name="salesCd_S" data-search="salesCd" onkeyup="event.keyCode==13 ? searchData() :''">
+                <a onclick="wbsSalesCodeSearch($('#salesCd_S').val());"><i class="i_search_w"></i></a>
+              </div>
+            </td>
+
+            <th class="">고객사</th>
+            <td>
+              <input type="hidden" id="ordrsClntCd_S" name="ordrsClntCd_S" data-search="ordrsClntCd">
+              <div class="search_form">
+                <input type="text" id="ordrsClntNm_S" name="ordrsClntNm_S" data-search="ordrsClntNm"
+                       onkeyup="(event.keysalesCd == 8 || event.keysalesCd == 46) ? ordrsClntCd_S.value = '' : event.keysalesCd == 13 ? searchData() : ''">
+                <a onclick="opendClntSearch($('#ordrsClntNm_S').val());"><i class="i_search_w"></i></a>
+              </div>
+            </td>
+            <th>고객사PJT</th>
+            <td>
+              <select id="clntPjt_S" name="clntPjt_S" data-kind="PRJCTCD" data-search="clntPjt">
+                <option value="">전체</option>
+              </select>
+            </td>
+            <th></th>
+            <td></td>
+
+<!--             <th>PM계획상태</th> -->
+<!--             <td> -->
+<!--               <select id="scdStatus_S" name="scdStatus_S" data-search="scdStatus"> -->
+<!--                 <option value="">전체</option> -->
+<!--                 <option value="진행중" selected>진행중인상태</option> -->
+<!--                 <option value="완료된">완료된 상태</option> -->
+<!--                 <option value="미도래">미도래 상태</option> -->
+<!--               </select> -->
+<!--             </td> -->
+          </tr>
+
+        </table>
+      </div>
+    </div>
+    <!-- 검색조건 END -->
+
+    <div class="topbar">
+      <div class="legend">
+        <div id="legend"></div>
+
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+          <span style="color:var(--muted);font-weight:800;font-size:12px;">(줌: 슬라이더 또는 Ctrl+마우스휠)</span>
+          <label style="font-size:11px;color:#64748b;">줌(px/day):</label>
+          <input id="zoomSlider" type="range" min="2" max="20" value="8"/>
+          <span id="zoomVal" style="display:inline-block; min-width:30px;">8</span>
+        </div>
+
+        <div class="wbs-toolbar" style="padding-left: 30px;">
+          <span style="color:var(--muted);font-weight:800;font-size:12px;">
+            * 드래그/리사이즈로 일정 변경 가능 (SAVE CHANGES로 변경분 확인)
+          </span>
+          <button class="btn ghost" id="btnSave">SAVE CHANGES</button>
+          <button class="btn primary" id="btnExport">EXPORT EXCEL</button>
+          <button class="btn ghost" id="btnPrint">PRINT</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="page">
+      <div class="wbs-card">
+        <div class="wbs-scroll" id="wbsScroll">
+          <div id="wbs"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- Modal -->
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <div class="m-head">
+        <div id="modalTitle">내용</div>
+        <button class="btn ghost" id="modalClose">닫기</button>
+      </div>
+      <div class="m-body" id="modalBody"></div>
+      <div class="m-foot">
+        <button class="btn dark" id="modalCopy">복사</button>
+        <button class="btn dark" id="modalSave">저장</button>
+        <button class="btn primary" id="modalOk">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    "use strict";
+
+    /***********************
+     * 0) 공통 상수/유틸
+     ************************/
+    const MS = 86400000;
+    let AUTO_ZOOM_DONE = false; // 최초 조회 1회만 자동 줌 적용
+    const confirmedSalesCd = new Set(); // salesCd별 버전 변경 확인 완료 목록
+
+    function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
+    function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+
+    function ymd(d){
+      const yy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      return `${yy}-${mm}-${dd}`;
+    }
+    function parseYMD(s){
+      if(!s) return null;
+      const parts = String(s).split('-').map(Number);
+      if(parts.length !== 3 || parts.some(Number.isNaN)) return null;
+      return new Date(parts[0], parts[1]-1, parts[2]);
+    }
+    function timestampToYmd(ts){
+      if(!ts) return null;
+      const d = new Date(ts);
+      return ymd(d);
+    }
+    function escapeHtml(s){
+      return String(s ?? "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+    // business-day aware: count only weekdays (Mon-Fri)
+    function daysBetween(a, b){
+      const da = (typeof a === 'number') ? new Date(a) : parseYMD(a);
+      const db = (typeof b === 'number') ? new Date(b) : parseYMD(b);
+      if(!da || !db) return 0;
+      da.setHours(0,0,0,0);
+      db.setHours(0,0,0,0);
+      if(da.getTime() === db.getTime()) return 0;
+
+      let start = new Date(da), end = new Date(db);
+      let sign = 1;
+      if(start > end){ sign = -1; [start, end] = [end, start]; }
+
+      let cnt = 0;
+      const cur = new Date(start);
+      cur.setDate(cur.getDate() + 1);
+      while(cur <= end){
+        const wd = cur.getDay();
+        if(wd !== 0 && wd !== 6) cnt++;
+        cur.setDate(cur.getDate() + 1);
+      }
+      return sign * cnt;
+    }
+
+    // add business days (Mon-Fri) to a yyyy-mm-dd date string
+    function addDays(ymdStr, n){
+      const d = parseYMD(ymdStr);
+      if(!d) return ymd(new Date());
+      if(n === 0) return ymd(d);
+      const step = n > 0 ? 1 : -1;
+      let remaining = Math.abs(n);
+      while(remaining > 0){
+        d.setDate(d.getDate() + step);
+        const wd = d.getDay();
+        if(wd !== 0 && wd !== 6) remaining--;
+      }
+      return ymd(d);
+    }
+
+    function toast(msg){
+      const $t = $("#toast");
+      $t.stop(true,true).text(msg).fadeIn(120);
+      setTimeout(()=> $t.fadeOut(280), 1600);
+    }
+
+    /***********************
+     * 1) 환경/초기값
+     ************************/
+    // 전역 jwt가 있으면 사용, 없으면 안전한 기본값
+    const jwt = (window.jwt && typeof window.jwt === "object")
+      ? window.jwt
+      : { coCd: "", userId: "" };
+
+    let CELL_W = (function(){
+      try{
+        const cs = getComputedStyle(document.documentElement);
+        const v1 = cs.getPropertyValue('--px-per-day') || cs.getPropertyValue('--cellW');
+        if(v1){
+          return Math.max(4, Math.round(parseFloat(v1)));
+        }
+      }catch(e){}
+      return 28;
+    })();
+
+    const VIEW_START = "2026-01-01";
+    const VIEW_END   = "2026-04-30";
+    /*************************************************
+     * Dept Single Source of Truth (SSOT)
+     *************************************************/
+    const DEPT_DEFS = [
+      // order(정렬) + short(엑셀/라벨용 약어) + css/back/text 일괄 관리
+      { deptCd:"S01", deptNm:"영업",     short:"영", colorClass:"dept-S01", backColor:"#1F77B4", textColor:"#FFFFFF", order: 10 },
+      { deptCd:"S03", deptNm:"설계",     short:"설", colorClass:"dept-S03", backColor:"#6D28D9", textColor:"#FFFFFF", order: 20 },
+      { deptCd:"S04", deptNm:"구매",     short:"구", colorClass:"dept-S04", backColor:"#2E7D32", textColor:"#FFFFFF", order: 30 },
+      { deptCd:"S06", deptNm:"제품입고", short:"제", colorClass:"dept-S06", backColor:"#D97706", textColor:"#FFFFFF", order: 40 },
+      { deptCd:"S07", deptNm:"생산",     short:"생", colorClass:"dept-S07", backColor:"#C00000", textColor:"#FFFFFF", order: 50 },
+      { deptCd:"S08", deptNm:"전기",     short:"전", colorClass:"dept-S08", backColor:"#0F766E", textColor:"#FFFFFF", order: 60 },
+      { deptCd:"S09", deptNm:"시운전",   short:"시", colorClass:"dept-S09", backColor:"#8D6E63", textColor:"#FFFFFF", order: 70 },
+      { deptCd:"S11", deptNm:"고객검수", short:"고", colorClass:"dept-S11", backColor:"#22C1DC", textColor:"#1A1A1A", order: 80 },
+      { deptCd:"S13", deptNm:"출하",     short:"출", colorClass:"dept-S13", backColor:"#F4B400", textColor:"#1A1A1A", order: 90 },
+      { deptCd:"S14", deptNm:"설치",     short:"치", colorClass:"dept-S14", backColor:"#1F77B4", textColor:"#FFFFFF", order: 99 },
+      // NOTE) 백엔드에서 S02(연/연구소) 등 들어오면 여기 한 줄만 추가하면 전체가 자동 반영됩니다.
+      // { deptCd:"S02", deptNm:"연구소", short:"연", colorClass:"dept-S02", backColor:"#CC79A7", textColor:"#FFFFFF", order: 15 },
+
+    ];
+
+
+    /*************************************************
+     * Derived Cache (DEPT_DEFS에서 자동 파생)
+     * - 외부에서 DEPTS/SUMMARY_* 등을 더 이상 관리하지 않음
+     *************************************************/
+	 const Dept = (() => {
+    	  const byCd = new Map();
+    	  const byNm = new Map();
+    	  const byShort = new Map();
+
+    	  DEPT_DEFS.forEach(d => {
+    	    byCd.set(d.deptCd, d);
+    	    byNm.set(d.deptNm, d);
+    	    byShort.set(d.short, d);
+    	  });
+
+    	  // (기존 getDeptMeta에 있던 combo 처리 정책 유지)
+    	  const comboCdMap = Object.freeze({
+    	    "S12": "S01",
+    	    "S23": "S02",
+    	    "S34": "S03",
+    	    "S41": "S04"
+    	  });
+
+    	  function normalizeKey(k){
+    	    let key = String(k ?? "").trim();
+    	    if(!key) return "";
+    	    if(key.includes("/")) key = key.split("/")[0].trim(); // "영/설" 들어와도 첫 토큰으로
+    	    if(comboCdMap[key]) key = comboCdMap[key];
+    	    return key;
+    	  }
+
+    	  function getMeta(key){
+    	    const k = normalizeKey(key);
+    	    if(!k) return null;
+
+    	    // 1) deptCd
+    	    if(byCd.has(k)) return byCd.get(k);
+
+    	    // 2) short (예: "영")
+    	    if(byShort.has(k)) return byShort.get(k);
+
+    	    // 3) deptNm (예: "영업")
+    	    if(byNm.has(k)) return byNm.get(k);
+
+    	    return null;
+    	  }
+
+    	  function classOf(key){
+    	    const m = getMeta(key);
+    	    return m ? m.colorClass : "dept-RD";
+    	  }
+
+    	  function nameOfCd(cd){
+    	    const m = getMeta(cd);
+    	    return m ? m.deptNm : (cd === "S50" ? "S.PM" : "");
+    	  }
+
+    	  function shortLabel(deptNmOrShort){
+    	    const raw = String(deptNmOrShort ?? "").trim();
+    	    if(!raw) return "";
+    	    const m = getMeta(raw);
+    	    // raw가 이미 short면 그대로 유지, full명이면 short로 변환
+    	    if(m) return (raw === m.short ? raw : m.short);
+    	    return raw;
+    	  }
+
+    	  function summaryOrder(){
+    	    // order 기준 자동 정렬(정책이 바뀌면 DEPT_DEFS.order만 수정)
+    	    return DEPT_DEFS
+    	      .slice()
+    	      .sort((a,b)=> (a.order ?? 999) - (b.order ?? 999))
+    	      .map(d => d.deptCd);
+    	  }
+
+    	  return Object.freeze({ getMeta, classOf, nameOfCd, shortLabel, summaryOrder, defs: DEPT_DEFS });
+    	})();
+
+    /*************************************************
+     * Derived structures (자동 파생)
+     *************************************************/
+
+    const CHANGED_ROWS = new Map();
+
+    function applyDeptStyles(){
+   	  const css = (Dept.defs || [])
+   	    .filter(d => d.colorClass)
+   	    .map(d => `.${d.colorClass}{ background:${d.backColor}; color:${d.textColor}; }`)
+   	    .join("\n");
+    	  
+      let $style = $("#deptStyle");
+      if(!$style.length){
+        $style = $('<style id="deptStyle"></style>');
+        $("head").append($style);
+      }
+      $style.text(css);
+    }
+
+    function getDeptNameByCd(cd){
+    	return Dept.nameOfCd(cd);
+    }
+
+    function normalizeDeptPartsFromRow(row){
+    	  let raw = (row && row.deptNm) ? String(row.deptNm).trim() : "";
+    	  if(!raw && row && row.deptCd){
+    	    raw = Dept.nameOfCd(row.deptCd) || "";
+    	  }
+    	  if(!raw) return [];
+
+    	  return raw
+    	    .split("/")
+    	    .map(s => s.trim())
+    	    .filter(Boolean)
+    	    .map(token => {
+    	      const m = Dept.getMeta(token);
+    	      return m ? { deptCd: m.deptCd, deptNm: m.deptNm } : null;
+    	    })
+    	    .filter(Boolean);
+    	}
+
+    function mergeIntervalsForSummary(intervals){
+      if(!intervals.length) return [];
+      intervals.sort((a,b)=>a.start - b.start);
+      const merged = [intervals[0]];
+      for(let i=1;i<intervals.length;i++){
+        const cur = intervals[i];
+        const last = merged[merged.length-1];
+        const nextDay = new Date(last.end);
+        nextDay.setDate(nextDay.getDate() + 1);
+        if(cur.start <= nextDay){
+          if(cur.end > last.end) last.end = cur.end;
+        } else {
+          merged.push(cur);
+        }
+      }
+      return merged;
+    }
+
+    function buildSummarySegmentsFromRows(rows){
+      const intervalsByDept = {};
+      rows.forEach(r=>{
+        const startStr = (typeof r.wbsPlansDtFm === "number") ? timestampToYmd(r.wbsPlansDtFm) : r.wbsPlansDtFm;
+        const endStr   = (typeof r.wbsPlaneDtFm === "number") ? timestampToYmd(r.wbsPlaneDtFm) : r.wbsPlaneDtFm;
+        if(!startStr || !endStr) return;
+        const parts = normalizeDeptPartsFromRow(r);
+        parts.forEach(p=>{
+          intervalsByDept[p.deptCd] = intervalsByDept[p.deptCd] || [];
+          intervalsByDept[p.deptCd].push({
+            start: parseYMD(startStr),
+            end: parseYMD(endStr),
+            deptNm: p.deptNm
+          });
+        });
+      });
+
+      const segments = [];
+
+      const order = Dept.summaryOrder();
+      order.forEach(cd => {
+        const list = intervalsByDept[cd] || [];
+        if(!list.length) return;
+        const merged = mergeIntervalsForSummary(list);
+        const deptNm = Dept.nameOfCd(cd) || (merged[0] && merged[0].deptNm) || "";
+        merged.forEach(m => {
+          segments.push({
+            deptCd: cd,
+            deptNm: deptNm,
+            wbsPlansDtFm: ymd(m.start),
+            wbsPlaneDtFm: ymd(m.end)
+          });
+        });
+      });
+      
+      return segments;
+    }
+
+    function updateSummaryRowForOrdrs(ordrsNo){
+    	if(!ordrsNo) return;
+    	const rows = STATE.rows.filter(r => !r.type && String(r.ordrsNo || '') === String(ordrsNo));
+    	const segments = buildSummarySegmentsFromRows(rows);
+    	const $row = $(`.wbs-row.summary-row[data-rowid="${ordrsNo}-SUMMARY"]`);
+    	if(!$row.length) return;
+    	
+    	const $canvas = $row.find(".timeline-canvas");
+    	$canvas.find(".bar").remove();
+    	
+    	segments.forEach(seg=>{
+    	    const left = daysBetween(STATE.viewStart, seg.wbsPlansDtFm) * CELL_W;
+    	    const w = (daysBetween(seg.wbsPlansDtFm, seg.wbsPlaneDtFm) + 1) * CELL_W;
+    	    const cls = deptClass(seg.deptCd || seg.deptNm);
+    	    const $bar = $(`
+    	      <div class="bar ${cls}" style="left:${left}px;width:${w}px; cursor:default;">
+    	        <div class="txt">${seg.deptNm}</div>
+    	      </div>
+    	    `);
+    	    $bar.attr("data-summary", "1");
+    	    $bar.attr("title", `${seg.deptNm} | ${seg.wbsPlansDtFm} ~ ${seg.wbsPlaneDtFm}`);
+    	    $canvas.append($bar);
+    	  });
+    }
+
+    function formatMachineLabel(clntNm, clntPjtNm){
+      const a = (clntNm || "").trim();
+      const b = (clntPjtNm || "").trim();
+      if(a && b) return `${escapeHtml(a)}<br>${escapeHtml(b)}`;
+      return escapeHtml(a || b || "");
+    }
+
+    function getMachineLabelHtml(row){
+      const a = (row && row.clntNm ? row.clntNm : "").trim();
+      const b = (row && row.clntPjtNm ? row.clntPjtNm : "").trim();
+      return formatMachineLabel(a, b);
+    }
+
+    function getMachineKey(row){
+      const html = getMachineLabelHtml(row);
+      if(!html) return "";
+      return html.replace(/<br\s*\/?>/gi, "\n").trim();
+    }
+
+    /*****************************************************
+    *  salesCd별로 집계 row 생성하기
+    ******************************************************/
+    function buildSalesCdGroups(rows){
+      const map = new Map();
+      (rows || []).forEach(r=>{
+        if(r.type === 'group' || r.type === 'total' || r.type === 'summary') return;
+        if(!r.salesCd || !r.wbsPlansDtFm || !r.wbsPlaneDtFm) return;
+
+        if(!map.has(r.salesCd)){
+        	map.set(r.salesCd, {
+        		  salesCd: r.salesCd,
+        		  ordrsNo: r.ordrsNo || '',          // ★ 추가(필수)
+        		  coCd: r.coCd || '',
+        		  clntPjtNm: r.clntPjtNm || r.salesCd,
+        		  clntNm: r.clntNm || '',
+        		  eqpNm: r.eqpNm || r.deptNm || '',
+        		  remarks: r.remarks || '',
+        		  wbsCloseYn: r.wbsCloseYn || '',
+        		  closeYn: r.closeYn || '',
+        		  rows: []
+        		});
+        }
+        map.get(r.salesCd).rows.push(r);
+      });
+      return Array.from(map.values());
+    }
+
+
+
+    function flattenGroupRows(groups){
+      const out = [];
+      (groups || []).forEach(g=>{
+        if(g.rows && g.rows.length) out.push(...g.rows);
+      });
+      return out;
+    }
+
+    function buildMergeSpans(renderRows){
+      const spans = [];
+      let runStart = 0;
+
+      for(let i=0;i<renderRows.length;i++){
+        if(i===0){ runStart = 0; continue; }
+        const prev = renderRows[i-1];
+        const cur  = renderRows[i];
+        const curKey  = getMachineKey(cur);
+        const prevKey = getMachineKey(prev);
+        if(curKey && curKey === prevKey) continue;
+
+        const len = i - runStart;
+        const startKey = getMachineKey(renderRows[runStart]);
+        if(len > 1 && startKey){
+          spans.push({ key:startKey, label:getMachineLabelHtml(renderRows[runStart]), start:runStart, length:len });
+        }
+        runStart = i;
+      }
+
+      const tailLen = renderRows.length - runStart;
+      const tailKey = getMachineKey(renderRows[runStart]);
+      if(tailLen > 1 && renderRows[runStart] && tailKey){
+        spans.push({ key:tailKey, label:getMachineLabelHtml(renderRows[runStart]), start:runStart, length:tailLen });
+      }
+      return spans;
+    }
+
+    function buildRenderRows(rows){
+      const baseRows = buildSalesCdGroups(rows);
+      const renderRows = [];
+      let bucket = [];
+      let currentOrd = null;
+
+      baseRows.forEach(r=>{
+
+    	  const ord = (r.ordrsNo || '').trim();
+    	  if(currentOrd === null) currentOrd = ord;
+    	  if(ord !== currentOrd){
+    		  renderRows.push(...bucket);
+
+    		  const ordRows = flattenGroupRows(bucket);
+    		  renderRows.push({
+    		        type: "summary",
+    		        ordrsNo: currentOrd,
+    		        clntPjtNm: (bucket[0] && bucket[0].clntPjtNm) || "", 
+    		        clntNm: (bucket[0] && bucket[0].clntNm) || "",
+    		        wbsCloseYn: (bucket[0] && bucket[0].wbsCloseYn) || "",
+    		        eqpNm: currentOrd + " 집계",
+    		        salesCd: (bucket[0] && bucket[0].salesCd) || "",
+    		        remarks: "",
+    		        segments: buildSummarySegmentsFromRows(ordRows)
+    		      });
+
+
+    	      bucket = [];
+    	      currentOrd = ord;
+        }
+        bucket.push(r);
+      });
+
+      if(bucket.length){
+        renderRows.push(...bucket);
+        const ordRows = flattenGroupRows(bucket);
+        renderRows.push({
+            type: "summary",
+            ordrsNo: currentOrd,
+            clntPjtNm: (bucket[0] && bucket[0].clntPjtNm) || "",
+            clntNm: (bucket[0] && bucket[0].clntNm) || "",
+	        wbsCloseYn: (bucket[0] && bucket[0].wbsCloseYn) || "",
+            eqpNm: currentOrd + " 집계",
+            salesCd: (bucket[0] && bucket[0].salesCd) || "",
+            remarks: "",
+            segments: buildSummarySegmentsFromRows(ordRows)
+          });
+      }
+
+      return { renderRows, spans: buildMergeSpans(renderRows) };
+    }
+
+    function getDeptMeta(deptKey){
+    	return Dept.getMeta(deptKey);
+    }
+    
+    function deptClass(deptKey){
+   	  const meta = Dept.getMeta(deptKey);
+   	  return meta ? meta.colorClass : "dept-RD";
+   	}
+
+    // CSS.escape 대체(구형 브라우저 대비)
+    function cssEscape(v){
+      try{
+        if(window.CSS && CSS.escape) return CSS.escape(String(v));
+      }catch(e){}
+      return String(v).replace(/["\\]/g, "\\$&");
+    }
+
+
+    /***********************
+     * Overlap Bar Picker
+     ************************/
+    let ACTIVE_BAR_EL = null;
+    let overlapTimer = null;
+    let lastOverlapKey = null;
+
+    let overlapHideTimer = null;
+
+    // hover 상태 관리 (bar/picker 사이 이동 시 닫힘 방지)
+    const OVERLAP_HOVER = { overBar: false, overPicker: false };
+
+    function scheduleHideOverlapPicker(delayMs){
+      clearTimeout(overlapHideTimer);
+      overlapHideTimer = setTimeout(() => {
+        // bar와 picker 둘 다 밖이면 닫기
+        if(!OVERLAP_HOVER.overBar && !OVERLAP_HOVER.overPicker){
+          hideOverlapPicker();
+        }
+      }, delayMs);
+    }
+
+    function cancelHideOverlapPicker(){
+      clearTimeout(overlapHideTimer);
+    }
+
+    // picker 위로 마우스가 올라가면 닫힘 취소
+    function ensureOverlapPicker(){
+      let $p = $("#ganttOverlapPicker");
+      if($p.length) return $p;
+
+      $p = $(`
+        <div id="ganttOverlapPicker">
+          <div class="title">
+            <span>겹치는 간트바 선택</span>
+            <span class="hint">(클릭하여 선택)</span>
+          </div>
+          <div class="list"></div>
+        </div>
+      `);
+      $("body").append($p);
+
+      // picker 위로 마우스가 올라가면 닫힘 취소
+        $p.on("mouseenter", function(){
+          OVERLAP_HOVER.overPicker = true;
+          cancelHideOverlapPicker();
+        });
+
+        $p.on("mouseleave", function(){
+          OVERLAP_HOVER.overPicker = false;
+          // picker 밖으로 나가면 지연 후 닫기
+          scheduleHideOverlapPicker(250);
+        });
+    	
+      // 피커 외부 클릭 시 닫기
+      $(document).on("mousedown", function(e){
+        const $t = $(e.target);
+        if($t.closest("#ganttOverlapPicker").length) return;
+        hideOverlapPicker();
+      });
+
+      // 스크롤/리사이즈 시 닫기(위치 깨짐 방지)
+      $("#wbsScroll").on("scroll", hideOverlapPicker);
+      $(window).on("resize", hideOverlapPicker);
+
+      return $p;
+    }
+
+    function hideOverlapPicker(){
+    	lastOverlapKey = null;
+    	OVERLAP_HOVER.overBar = false;
+    	OVERLAP_HOVER.overPicker = false;
+    	cancelHideOverlapPicker();
+    	$("#ganttOverlapPicker").hide();
+    }
+
+    function setActiveBar($bar){
+      try{
+        $(".bar.is-active").removeClass("is-active");
+        $bar.addClass("is-active");
+        ACTIVE_BAR_EL = $bar.get(0);
+
+        // 선택된 바 정보 표시(원하면 openModal로 상세 가능)
+        const deptNm = ($bar.data("deptnm") || $bar.find(".txt").text() || "").trim();
+        const s = $bar.data("start") || "";
+        const e = $bar.data("end") || "";
+        if(deptNm && s && e) toast(`선택됨: ${deptNm} (${s} ~ ${e})`);
+      }catch(e){}
+    }
+
+    function getBarsAtClientX($canvas, clientX){
+      const list = [];
+      const bars = $canvas.find(".bar").filter(function(){
+        const $b = $(this);
+        if($b.data("summary") === 1 || $b.data("summary") === "1") return false;
+        return true;
+      });
+
+      bars.each(function(){
+        const el = this;
+        const r = el.getBoundingClientRect();
+        // clientX가 bar의 가로 범위에 포함되면 겹침 후보
+        if(clientX >= r.left && clientX <= r.right){
+          list.push($(el));
+        }
+      });
+
+      // z-index 기준으로 상단 우선
+      list.sort((a,b)=>{
+        const za = parseInt(a.css("z-index"),10) || 0;
+        const zb = parseInt(b.css("z-index"),10) || 0;
+        return zb - za;
+      });
+
+      return list;
+    }
+
+    function showOverlapPicker(items, pageX, pageY){
+    	  const $p = ensureOverlapPicker();
+    	  const $list = $p.find(".list").empty();
+
+    	  items.forEach($b=>{
+    	    // 1) key 추출(우선순위: deptCd > deptNm > 화면 텍스트)
+    	    const deptCd = ($b.data("deptcd") || $b.data("deptCd") || "").toString().trim();
+    	    const deptNm = ($b.data("deptnm") || $b.data("deptNm") || $b.find(".txt").text() || "").toString().trim();
+    	    const key    = deptCd || deptNm;
+
+    	    const meta = Dept.getMeta(key);
+
+    	    const displayNm = meta.deptNm;
+
+    	    const s = String($b.data("start") || "");
+    	    const e = String($b.data("end") || "");
+
+    	    const $item = $(`
+    	      <div class="item">
+    	        <div class="swatch"></div>
+    	        <div class="meta">
+    	          <div class="nm"></div>
+    	          <div class="dt"></div>
+          </div>
+        </div>
+    	    `);
+
+    	    // 4) 색상(우선순위: backColor > colorClass > fallback)
+    	    if(meta && meta.backColor){
+    	      $item.find(".swatch").css("background", meta.backColor);
+    	    }else if(typeof classOf === "function"){
+    	      $item.find(".swatch").addClass(classOf(key));
+    	    }else if(meta && meta.colorClass){
+    	      $item.find(".swatch").addClass(meta.colorClass);
+    	    }else{
+    	      $item.find(".swatch").css("background", "#94a3b8");
+    	    }
+
+    	    $item.find(".nm").text(displayNm || "N/A");
+    	    $item.find(".dt").text(`${s} ~ ${e}`);
+
+    	    $item.on("mousedown", function(ev){
+    	      ev.preventDefault();
+    	      ev.stopPropagation();
+    	      setActiveBar($b);
+    	      hideOverlapPicker();
+    	    });
+
+    	    $list.append($item);
+    	  });
+
+    	  // 위치 보정은 기존 로직 그대로...
+    	  const pad = 12, w = 360, h = 220;
+    	  const maxX = window.innerWidth - pad;
+    	  const maxY = window.innerHeight - pad;
+    	  let x = Math.min(pageX + 12, maxX - w);
+    	  let y = Math.min(pageY + 12, maxY - h);
+    	  x = Math.max(pad, x);
+    	  y = Math.max(pad, y);
+
+    	  $p.css({ left: x + "px", top: y + "px" }).show();
+    	}
+
+    function bindOverlapBarPicker(){
+      const $wbs = $("#wbs");
+      $wbs.off(".overlap");
+      hideOverlapPicker();
+
+      $wbs.on("mouseenter.overlap", ".timeline-canvas .bar", function(e){
+        const $bar = $(this);
+        if($bar.hasClass("dragging") || $bar.hasClass("resizing")) return;
+
+        OVERLAP_HOVER.overBar = true;
+        cancelHideOverlapPicker();
+
+        // 좌표는 지연 실행 전에 캡처 (핵심)
+        const pageX = e.pageX;
+        const pageY = e.pageY;
+        const clientX = e.clientX;
+
+        clearTimeout(overlapTimer);
+        overlapTimer = setTimeout(()=>{
+          const $canvas = $bar.closest(".timeline-canvas");
+          if(!$canvas.length) return;
+
+          const overlaps = getBarsAtClientX($canvas, clientX);
+
+          if(overlaps.length <= 1){
+            scheduleHideOverlapPicker(120);
+            return;
+          }
+
+          const key = `${$canvas.closest(".wbs-row").data("rowid") || ""}|${Math.floor(clientX)}|${overlaps.length}`;
+          if(key === lastOverlapKey) return;
+          lastOverlapKey = key;
+
+          showOverlapPicker(overlaps, pageX, pageY);
+        }, 160);
+      });
+
+      $wbs.on("mouseleave.overlap", ".timeline-canvas .bar", function(){
+        OVERLAP_HOVER.overBar = false;
+        clearTimeout(overlapTimer);
+        scheduleHideOverlapPicker(450);
+      });
+    }
+
+    
+    /***********************
+     * 2) 초기 데이터(샘플)
+     ************************/
+    const INITIAL = {
+      viewStart: VIEW_START,
+      viewEnd: VIEW_END,
+      today: ymd(new Date()),
+      rows: [
+        {
+          rowId:"R1", clntPjtNm:"NX5E", coCd:"GUN", salesCd:"25204-01FBFUP",
+          deptCd:"S01", deptNm:"영",
+          wbsPlansDtFm:1735747200000, wbsPlaneDtFm:1736860800000,
+          eqpNm:"감싸기 MOLD",
+          ordrsNo:"25204", ordrsClntCd:"201", clntNm:"(주)서연이화 울산공장", clntPjt:"PRJCT90",
+          remarks:"★ 출고 지연 예상"
+        },
+        {
+          rowId:"R2", clntPjtNm:"NX5E", coCd:"GUN", salesCd:"25204-01FBFUP",
+          deptCd:"S02", deptNm:"연",
+          wbsPlansDtFm:1737792000000, wbsPlaneDtFm:1737878400000,
+          eqpNm:"감싸기 MOLD",
+          ordrsNo:"25204", ordrsClntCd:"201", clntNm:"(주)서연이화 울산공장", clntPjt:"PRJCT90",
+          remarks:"★ 출고 지연 예상"
+        },
+        { type:"total", clntPjtNm:"NX5E", title:"전체 일정", salesCd:"(Total Progress)",
+          segments:[
+            {rowId:"T1", deptCd:"S01", deptNm:"영업",   wbsPlansDtFm:"2026-01-07", wbsPlaneDtFm:"2026-01-31"},
+            {rowId:"T2", deptCd:"S02", deptNm:"연구소", wbsPlansDtFm:"2026-02-01", wbsPlaneDtFm:"2026-02-28"},
+            {rowId:"T3", deptCd:"S03", deptNm:"구매",   wbsPlansDtFm:"2026-03-01", wbsPlaneDtFm:"2026-03-25"},
+            {rowId:"T4", deptCd:"S04", deptNm:"생산",   wbsPlansDtFm:"2026-03-26", wbsPlaneDtFm:"2026-04-10"},
+            {rowId:"T5", deptCd:"S34", deptNm:"시운전", wbsPlansDtFm:"2026-04-11", wbsPlaneDtFm:"2026-04-30"}
+         ],
+         remarks:""
+        }
+      ]
+    };
+     
+    let STATE = deepClone(INITIAL);
+
+    /***********************
+     * 3) 레전드/날짜
+     ************************/
+    function renderLegend(){
+   	  const $l = $("#legend").empty();
+   	  (Dept.defs || []).forEach(d => {
+   	    const $chip = $(`
+   	      <span class="chip">
+   	        <span class="dot" style="background:${d.backColor};"></span>
+   	        <span>${d.deptNm}</span>
+   	      </span>
+   	    `);
+   	    $l.append($chip);
+   	  });
+   	}
+
+    function initCoDefault(){
+      // 회사 값이 비어있을 때만 기본 coCd 반영(사용자 선택 덮어쓰기 방지)
+      if(!$('#coCd_S').val() && jwt.coCd){
+        $('#coCd_S').val(jwt.coCd);
+      }
+    }
+
+    /***********************
+     * 4) 모달
+     ************************/
+    function openModal(title, body){
+
+      let $modal = $("#modal");
+      if($modal.length === 0){
+        const $markup = $(`
+          <div class="modal-backdrop" id="modal">
+            <div class="modal">
+              <div class="m-head">
+                <div id="modalTitle">내용</div>
+                <button class="btn ghost" id="modalClose">닫기</button>
+              </div>
+              <div class="m-body" id="modalBody"></div>
+              <div class="m-foot">
+                <button class="btn dark" id="modalCopy">복사</button>
+                <button class="btn dark" id="modalSave">저장</button>
+                <button class="btn primary" id="modalOk">확인</button>
+              </div>
+            </div>
+          </div>
+        `);
+        $("body").append($markup);
+        $modal = $("#modal");
+
+        $("#modalClose, #modalOk").on("click", closeModal);
+        $("#modal").on("click", function(e){
+          if(e.target === this) closeModal();
+        });
+        $("#modalCopy").on("click", async function(){
+          try{
+            await navigator.clipboard.writeText($("#modalBody").text());
+            toast("클립보드에 복사되었습니다.");
+            closeModal();
+          }catch(err){
+            toast("복사 실패(브라우저 권한 확인 필요)");
+          }
+        });
+        $("#modalSave").on("click", async function(){
+            try{
+              console.log("일정변경내용 저장 완료하였습니다.");
+              
+              // 1. 작업자가 일정변경 권한이 있는지 확인하고 없으면 권한 없다고 표시
+              // 2. 기존 salesCd 백업 히스토리에 저장하고 현재자료 버전업 처리
+              // 3. 변경된 내역 테이블에 반영하기
+              // 특이사항 : 일정 확정 여부와 상관없이 수정처리는 어떻게 하나?
+              //	- 총괄 PM이나 일정관리 PM은 확정 상관없이 수정
+              //    - 각단계 팀장은 해당 단계만 일정 수정 가능함.
+              // PM 계획 변경시 --> TASK 계획/ 실적 처리방안.
+              //    일정 삭제인경우 - 문제 등록여부 확인후 없으면 처리가능. (첨부파일, 결재자료) 동시 삭제 처리 
+              //    TASK 일정 담당자 일괄 수정, 
+              //    실적 담당자  일괄 수정
+              
+              // 카카오톡 일정 확정시 일괄 담당자에게 전송
+              //          일정확정상태 변경시 전송 없음???-->(필요시 담당자 전송처리)
+              
+              
+              
+              
+              
+              
+              toast("일정변경내용 저장 완료하였습니다.");
+            }catch(err){
+              toast("백엔드 저장에 실패했습니다.");
+            }
+          });
+      }
+      $("#modalTitle").text(title);
+      if (title == '도움말') {  $("#modalSave").hide(); } else {$("#modalSave").show();}
+      $("#modalBody").text(body);
+      
+      $modal.stop(true,true)
+        .addClass("show")
+        .css({ display:"flex", opacity:1, visibility:"visible", position:"fixed", inset:0, zIndex:99999 })
+        .show();
+
+      requestAnimationFrame(() => {
+        const el = $modal.get(0);
+        if(!el || el.offsetWidth === 0 || el.offsetHeight === 0){
+          alert(body);
+        }
+      });
+    }
+    function closeModal(){ $("#modal").removeClass("show").fadeOut(120); }
+
+    /***********************
+     * 5) 타임라인 헤더
+     ************************/
+    function buildTimelineHeader(viewStart, viewEnd){
+      const start = parseYMD(viewStart);
+      const end   = parseYMD(viewEnd);
+      if(!start || !end) return { $wrap:$('<div class="timeline-header"></div>'), totalDays:0, totalWidth:0 };
+
+      const months = [];
+      let iter = new Date(start);
+      let currentKey = `${iter.getFullYear()}-${iter.getMonth()}`;
+      let count = 0;
+
+      const allDays = [];
+      while(iter <= end){
+        const key = `${iter.getFullYear()}-${iter.getMonth()}`;
+        if(key !== currentKey){
+          const [y,m] = currentKey.split('-').map(Number);
+          months.push({y, m, days: count});
+          currentKey = key;
+          count = 0;
+        }
+
+        const wd = iter.getDay();
+        const isWeekend = (wd === 0 || wd === 6);
+        if(!isWeekend){
+          allDays.push(new Date(iter));
+          count++;
+        }
+        iter.setDate(iter.getDate()+1);
+      }
+      { const [y,m] = currentKey.split('-').map(Number); months.push({y, m, days: count}); }
+
+      const $wrap = $('<div class="timeline-header"></div>');
+      const $months = $('<div class="timeline-months"></div>');
+      months.forEach(m=>{
+        if(m.days <= 0) return;
+        const w = m.days * CELL_W;
+        $months.append(`<div class="timeline-month" style="width:${w}px">${m.y}년 ${m.m+1}월</div>`);
+      });
+
+      const $days = $('<div class="timeline-days"></div>');
+      allDays.forEach(d=>{
+        $days.append(`<div class="timeline-day">${String(d.getDate()).padStart(2,'0')}</div>`);
+      });
+
+      $wrap.append($months).append($days);
+      return { $wrap, totalDays: allDays.length, totalWidth: allDays.length * CELL_W };
+    }
+
+    /***********************
+     * 6) 렌더링(핵심)
+     ************************/
+    const $WBS = $("#wbs");
+    let renderRaf = 0;
+
+
+    function renderAll(){
+      renderWbs();
+      bindBars();
+      bindRemarks();
+      // merge는 renderWbs 내부에서 수행(스팬 계산 포함)
+    }
+
+    function renderWbs(){
+      $WBS.empty();
+
+      // header + rows
+      const head = buildTimelineHeader(STATE.viewStart, STATE.viewEnd);
+      document.documentElement.style.setProperty('--timelineW', head.totalWidth + 'px');
+
+      const built = buildRenderRows(STATE.rows);
+      const renderRows = built.renderRows;
+      const spans = built.spans;
+
+      const $headerRow = $(`
+        <div class="wbs-row header">
+          <div class="pane-left">
+            <div class="cell c-clntPjtNm">기계</div>
+            <div class="cell c-eqpNm">설비명</div>
+            <div class="cell c-salesCd">salesCd</div>
+          </div>
+          <div class="pane-timeline"></div>
+          <div class="pane-right">
+            <div class="cell" style="border-right:0; justify-content:center;">비고 (Remarks)</div>
+          </div>
+        </div>
+      `);
+      $headerRow.find(".pane-timeline").append(head.$wrap);
+      $WBS.append($headerRow);
+
+      const todayOffset = daysBetween(STATE.viewStart, STATE.today);
+      const showToday = (todayOffset >= 0 && todayOffset <= head.totalDays-1);
+
+      let zebra = 0;
+
+      for(let idx=0; idx<renderRows.length; idx++){
+        const r = renderRows[idx];
+        const showclntPjtNm = true;
+        const zebraCls = (zebra%2?'alt':'');
+        const safeRemarks = (r.remarks ? escapeHtml(r.remarks) : '');
+        const remarksHtml = safeRemarks ? safeRemarks : '<small>&nbsp;</small>';
+
+        if(r.type === "summary"){
+        	const summaryKey = (r.ordrsNo || 'NOORD') + "-SUMMARY";
+          const $row = $(`
+            <div class="wbs-row summary-row" data-rowid="${summaryKey}" data-ordrsno="${escapeHtml(r.ordrsNo || '')}" data-salescd="${r.salesCd || ''}">
+              <div class="pane-left">
+                <div class="cell c-clntPjtNm ${showclntPjtNm ? '' : 'merged-hidden'}"><span class="clntPjtNm-text">${showclntPjtNm ? formatMachineLabel(r.clntNm, r.clntPjtNm) : ''}</span></div>
+                <div class="cell c-eqpNm">${escapeHtml(r.eqpNm || '')}</div>
+                <div class="cell c-salesCd"></div>
+              </div>
+              <div class="pane-timeline">
+                <div class="timeline-canvas ${zebraCls}" style="width:${head.totalWidth}px;"></div>
+              </div>
+              <div class="pane-right">
+                <div class="remarks" data-remarks="">${remarksHtml}</div>
+              </div>
+            </div>
+          `);
+
+          const $canvas = $row.find(".timeline-canvas");
+          if(showToday){
+            $canvas.append(`<div class="today-line" style="left:${todayOffset*CELL_W}px"></div>`);
+          }
+
+          (r.segments || []).forEach(seg=>{
+            const left = daysBetween(STATE.viewStart, seg.wbsPlansDtFm) * CELL_W;
+            const w = (daysBetween(seg.wbsPlansDtFm, seg.wbsPlaneDtFm) + 1) * CELL_W;
+            const cls = deptClass(seg.deptCd || seg.deptNm);
+            const $bar = $(`
+              <div class="bar ${cls}" style="left:${left}px;width:${w}px; cursor:default;">
+                <div class="txt">${escapeHtml(seg.deptNm)}</div>
+              </div>
+            `);
+            $bar.attr("data-summary", "1");
+            $bar.attr("title", `${seg.deptNm} | ${seg.wbsPlansDtFm} ~ ${seg.wbsPlaneDtFm}`);
+            $canvas.append($bar);
+          });
+
+          $WBS.append($row);
+          zebra++;
+          continue;
+        }
+
+        if(r.type === "total"){
+          const rowid = `${r.clntPjtNm}-TOTAL`;
+        const $row = $(`
+            <div class="wbs-row total-row" data-rowid="${escapeHtml(rowid)}" data-salescd="${escapeHtml(r.salesCd || '')}">
+            <div class="pane-left">
+                <div class="cell c-clntPjtNm ${showclntPjtNm ? '' : 'merged-hidden'}"><span class="clntPjtNm-text">${showclntPjtNm ? formatMachineLabel(r.clntNm, r.clntPjtNm) : ''}</span></div>
+                <div class="cell c-eqpNm">${escapeHtml(r.title || '')}</div>
+                <div class="cell c-salesCd">${escapeHtml(r.salesCd || '')}</div>
+              </div>
+              <div class="pane-timeline">
+                <div class="timeline-canvas ${zebraCls}" style="width:${head.totalWidth}px;"></div>
+              </div>
+              <div class="pane-right">
+                <div class="remarks" data-remarks="${safeRemarks}">${remarksHtml}</div>
+            </div>
+            </div>
+          `);
+
+          const $canvas = $row.find(".timeline-canvas");
+          if(showToday){
+            $canvas.append(`<div class="today-line" style="left:${todayOffset*CELL_W}px"></div>`);
+          }
+
+          (r.segments || []).forEach(seg=>{
+            const left = daysBetween(STATE.viewStart, seg.wbsPlansDtFm) * CELL_W;
+            const w = (daysBetween(seg.wbsPlansDtFm, seg.wbsPlaneDtFm) + 1) * CELL_W;
+            const cls = deptClass(seg.deptCd);
+            const $bar = $(`
+              <div class="bar ${cls}" style="left:${left}px;width:${w}px; cursor:default;">
+                <div class="txt">${escapeHtml(seg.deptNm)}</div>
+            </div>
+            `);
+            if(r.salesCd) $bar.attr("data-salescd", r.salesCd);
+            $bar.attr("title", `${seg.deptNm} | ${seg.wbsPlansDtFm} ~ ${seg.wbsPlaneDtFm}`);
+            $canvas.append($bar);
+          });
+
+          $WBS.append($row);
+          zebra++;
+          continue;
+        }
+
+        // salesCd 그룹 행
+        const $row = $(`
+          <div class="wbs-row data-row" data-rowid="${escapeHtml(r.salesCd)}" data-salescd="${escapeHtml(r.salesCd || '')}">
+            <div class="pane-left">
+              <div class="cell c-clntPjtNm ${showclntPjtNm ? '' : 'merged-hidden'}"><span class="clntPjtNm-text">${showclntPjtNm ? formatMachineLabel(r.clntNm, r.clntPjtNm) : ''}</span></div>
+              <div class="cell c-eqpNm">${escapeHtml(r.eqpNm || '')}</div>
+              <div class="cell c-salesCd ${r.wbsCloseYn=='Y'? 'closeY' : ''}">${escapeHtml(r.salesCd || '')}</div>
+            </div>
+            <div class="pane-timeline">
+              <div class="timeline-canvas ${zebraCls}" style="width:${head.totalWidth}px;"></div>
+            </div>
+            <div class="pane-right">
+              <div class="remarks" data-remarks="${safeRemarks}">${remarksHtml}</div>
+            </div>
+          </div>
+        `);
+
+        const $canvas = $row.find(".timeline-canvas");
+        if(showToday){
+          $canvas.append(`<div class="today-line" style="left:${todayOffset*CELL_W}px"></div>`);
+        }
+
+        (r.rows || []).forEach((rowObj, rowIdx)=>{
+          const startDate = (typeof rowObj.wbsPlansDtFm === "number") ? timestampToYmd(rowObj.wbsPlansDtFm) : rowObj.wbsPlansDtFm;
+          const endDate   = (typeof rowObj.wbsPlaneDtFm === "number") ? timestampToYmd(rowObj.wbsPlaneDtFm) : rowObj.wbsPlaneDtFm;
+          if(!startDate || !endDate) return;
+
+          const left = daysBetween(STATE.viewStart, startDate) * CELL_W;
+          const w = (daysBetween(startDate, endDate) + 1) * CELL_W;
+          const cls = deptClass(rowObj.deptCd || rowObj.deptNm);
+          const deptNmSafe = escapeHtml(rowObj.deptNm || 'N/A');
+
+          const $bar = $(`
+            <div class="bar ${cls}"
+                 data-row="${idx}"
+                 data-seg="${rowIdx}"
+                 data-rowid="${escapeHtml(rowObj.fileTrgtKey || '')}"
+                 data-sjfilefrgtkey="${escapeHtml(rowObj.sjFileTrgtKey || '')}"
+                 data-salescd="${escapeHtml(rowObj.salesCd || '')}"
+                 data-ordrsno="${escapeHtml(rowObj.ordrsNo || '')}"
+                 data-deptcd="${escapeHtml(rowObj.deptCd || '')}"
+                 data-deptnm="${deptNmSafe}"
+                 data-start="${escapeHtml(startDate)}"
+                 data-end="${escapeHtml(endDate)}"
+                 style="left:${left}px;width:${w}px;">
+              <div class="txt">${deptNmSafe}</div>
+            </div>
+          `);
+          $bar.data("rowobj", rowObj);
+          $bar.attr("title", `${rowObj.deptNm || 'N/A'} | ${startDate} ~ ${endDate}`);
+          $canvas.append($bar);
+        });
+
+        $WBS.append($row);
+        zebra++;
+      }
+
+      if(showToday){
+        const $badge = $(`<div class="today-badge">TODAY</div>`);
+        $badge.css("left", (todayOffset*CELL_W) + "px");
+        $headerRow.find(".pane-timeline").append($badge);
+        $headerRow.find(".pane-timeline").append(
+          `<div class="today-line" style="left:${todayOffset*CELL_W}px; top:0; bottom:0; position:absolute;"></div>`
+        );
+      }
+
+      // same-machine cell merge
+      try{
+        const $bodyRows = $WBS.find('.wbs-row').not('.header').not('.group-sep');
+
+        $bodyRows.removeClass('merge-master merge-slave');
+        $bodyRows.find('.c-clntPjtNm').removeClass('merged-start merged-hidden');
+        $bodyRows.find('.clntPjtNm-text').css({ height:'', minHeight:'' }).html('');
+        $bodyRows.find('.pane-left').css('z-index','');
+
+        spans.forEach(sp=>{
+          const $first = $($bodyRows.get(sp.start));
+          if(!$first || $first.length===0) return;
+
+          let totalH = 0;
+          for(let i=0;i<sp.length;i++){
+            const $r = $($bodyRows.get(sp.start + i));
+            totalH += ($r.outerHeight() || 0);
+            $r.addClass(i===0 ? 'merge-master' : 'merge-slave');
+          }
+
+          const $firstCell = $first.find('.c-clntPjtNm');
+          const $txt = $firstCell.find('.clntPjtNm-text');
+
+          $firstCell.removeClass('merged-hidden').addClass('merged-start');
+          $txt.css({ height: totalH + 'px', minHeight: totalH + 'px' })
+              .html(sp.label || '');
+
+          for(let i=1;i<sp.length;i++){
+            const $r = $($bodyRows.get(sp.start + i));
+            $r.find('.c-clntPjtNm').addClass('merged-hidden');
+            $r.find('.clntPjtNm-text').html('');
+          }
+        });
+      }catch(e){
+        console.warn('clntPjtNm merge error', e);
+      }
+    }
+
+    /***********************
+     * 7) 드래그/리사이즈
+     ************************/
+    function bindBars(){
+      // jQuery UI 객체 중복 생성 방지: destroy 후 재생성
+      $(".bar").each(function(){
+        const $b = $(this);
+
+        const segId = $b.data("seg");
+        const rowId = $b.data("row");
+        if(segId === undefined || rowId === undefined || segId === null || rowId === null) return; // total/summary 제외
+
+        if($b.data("uiDraggable")) { try{ $b.draggable("destroy"); }catch(e){} }
+        if($b.data("uiResizable")) { try{ $b.resizable("destroy"); }catch(e){} }
+
+        $b.draggable({
+          axis:"x",
+          containment:"parent",
+          grid:[CELL_W, 1],
+          cancel: ".ui-resizable-handle",
+          start: function(){
+            $(this).addClass("dragging");
+            // 원래 위치 저장
+            $(this).data("originalLeft", $(this).css("left"));
+            $(this).data("originalWidth", $(this).css("width"));
+          },
+          stop: function(){ $(this).removeClass("dragging"); applyBarChange($(this)); }
+        });
+
+        // resizable: 사용자 체감 유지(중간은 부드럽게, stop에서 스냅)
+        $b.resizable({
+          handles: "e,w",
+          grid: [1, 0],
+          containment:"parent",
+          minWidth: CELL_W,
+          create: function(){
+            // 핸들에 좌우 화살표 커서 적용
+            $(this).find('.ui-resizable-e').css('cursor', 'ew-resize');
+            $(this).find('.ui-resizable-w').css('cursor', 'ew-resize');
+          },
+          start: function(){
+            $(this).addClass("resizing");
+            $(this).find(".txt").hide();
+            // 원래 위치와 크기 저장
+            $(this).data("originalLeft", $(this).css("left"));
+            $(this).data("originalWidth", $(this).css("width"));
+          },
+          stop: function(e, ui){
+            $(this).removeClass("resizing");
+            const ratio = ui.size.width / CELL_W;
+            const cells = ratio <= 1.5 ? 1 : Math.round(ratio);
+            const snapped = Math.max(CELL_W, cells * CELL_W);
+            $(this).css("width", snapped + "px");
+            applyBarChange($(this));
+            $(this).find(".txt").show();
+          }
+        });
+
+        $b.off('dblclick.wbs').on('dblclick.wbs', function(){
+          if($(this).data('summary') === 1 || $(this).data('summary') === "1") return;
+          const salesCd = $(this).data('salescd') || $(this).closest('.wbs-row').data('salescd');
+          if(!salesCd) return;
+
+          openSecondModal("/static/html/user/wb/wb22/WB2201P01.html", 1200, 900, "WBS 계획등록", {
+            coCd: $('#coCd_S').val(),
+            salesCd: salesCd,
+            histYn: "N"
+          }, function(){
+            if (typeof searchData === "function") searchData();
+          });
+        });
+      });
+    }
+
+    function applyBarChange($bar){
+
+      // 일정확정된 자료는 버전 변경 확인 (salesCd별로 한 번만)
+      const salesCd = $bar.data("salescd") || $bar.closest('.wbs-row').data('salescd');
+      if ($bar.data("rowobj") && $bar.data("rowobj").wbsCloseYn == "Y" && salesCd && !confirmedSalesCd.has(salesCd)){
+        if (!confirm('일정확정된 자료는 Version이 변경됩니다. 진행하시겠습니까?')) {
+          // 취소 시 원래 위치와 크기로 복원
+          const originalLeft = $bar.data("originalLeft");
+          const originalWidth = $bar.data("originalWidth");
+          if (originalLeft !== undefined) {
+            $bar.css("left", originalLeft);
+          }
+          if (originalWidth !== undefined) {
+            $bar.css("width", originalWidth);
+          }
+          return;
+        } else {
+          // 확인 완료된 salesCd 기록
+          confirmedSalesCd.add(salesCd);
+        }
+      }
+
+      // 1) 키 값은 절대 free variable 금지: 항상 DOM/data에서 추출
+	  const ORDRS_NO =
+	    ($bar && $bar.data) ? ($bar.data("ordrsno")) : null
+	    || $bar?.closest?.(".wbs-row")?.data?.("ordrsno")
+	    || $bar?.attr?.("data-ordrsno")
+	    || "";
+
+	  const SALES_CD =
+	    ($bar && $bar.data) ? ($bar.data("salescd")) : null
+	    || $bar?.closest?.(".wbs-row")?.data?.("salescd")
+	    || "";
+	
+
+      const rowId = $bar.data("rowid") || $bar.data("row");
+      const leftPx = parseInt($bar.css("left"), 10) || 0;
+      const widthPx = Math.max(CELL_W, parseInt($bar.css("width"), 10) || CELL_W);
+
+      const startOffset = Math.round(leftPx / CELL_W);
+      const rawDays = widthPx / CELL_W;
+      const daysLen = Math.max(1, rawDays <= 1.5 ? 1 : Math.round(rawDays));
+
+      const newStart = addDays(STATE.viewStart, startOffset);
+      const newEnd   = addDays(newStart, daysLen - 1);
+
+      // clamp to view
+      const minStart = STATE.viewStart;
+      const maxEnd   = STATE.viewEnd;
+      let s = newStart;
+      let e = newEnd;
+
+      if(daysBetween(minStart, s) < 0) s = minStart;
+      if(daysBetween(e, maxEnd) < 0) e = maxEnd;
+
+      // snap visual
+      $bar.css({ left: (startOffset * CELL_W) + "px", width: (daysLen * CELL_W) + "px" });
+
+      // 데이터 업데이트(원본 rowobj 우선)
+      let row = $bar.data("rowobj") || (STATE.rows || []).find(x=>x.rowId===rowId);
+      if(!row){
+        const deptNm = ($bar.data("deptnm") || "").trim();
+        const oldStart = $bar.data("start");
+        const oldEnd = $bar.data("end");
+        if(SALES_CD && deptNm && oldStart && oldEnd){
+          row = (STATE.rows || []).find(x=>x.salesCd===SALES_CD && x.deptNm===deptNm && x.wbsPlansDtFm===oldStart && x.wbsPlaneDtFm===oldEnd);
+        }
+      }
+      if(!row) return;
+
+        // 수정권한이 있는지 점검하고 총괄PM이거나 공통코드의  SELECT CODE_ETC FROM TB_CM05M01 WHERE CODE_ID = 'SPECRTS01'
+		// 1. 총괄PM, 일정관리 담당자, 각단계 팀장, 전기는 한동주과장 가능
+		// 
+		const prdMngEtc = ($('#prdMngChk option').attr('data-etc') || '');
+		const prdMngIds = prdMngEtc.replace(/\s/g, '').split(',').filter(Boolean);
+		const cu = jwt.userId;
+		const hasSms = prdMngIds.includes(cu) || row.smrizeId == cu || row.teamMngId == cu || (row.fullNm == '전기' && cu == 'canmtb')  || cu =='js.nam';
+		
+		if (!hasSms){
+			alert('총괄PM, 일정관리담당자, 담당팀장만 일정 변경 가능합니다.');
+			return;
+		}
+		
+      row.wbsPlansDtFm = s;
+      row.wbsPlaneDtFm = e;
+      $bar.data("start", s);
+      $bar.data("end", e);
+      $bar.attr("data-start", s);
+      $bar.attr("data-end", e);
+      $bar.attr("title", `${row.deptNm} | ${s} ~ ${e}`);
+
+      toast(`일정 변경: ${row.deptNm} (${s} ~ ${e})`);
+      updateSummaryRowForOrdrs(ORDRS_NO);
+
+      // dirty
+      const $rowEl = $bar.closest(".wbs-row");
+      $rowEl.addClass("row-dirty");
+      const key = row.fileTrgtKey || `${row.salesCd}`;
+      CHANGED_ROWS.set(key, row);
+    }
+
+    function bindRemarks(){
+      const $wbs = $('#wbs');
+      $wbs.off('click.remarks').on('click.remarks', '.remarks', function(){
+        const $cell = $(this);
+        if($cell.hasClass('editing')) return;
+
+        const raw = String($cell.data('remarks') || '');
+        const $input = $('<textarea class="remarks-input"></textarea>').val(raw);
+        $cell.addClass('editing').empty().append($input);
+        $input.focus().select();
+
+        const commit = () => {
+          const val = String($input.val() || '').trim();
+          const originalVal = String($cell.data('remarks') || '');
+
+          // 값이 변경되지 않았으면 리턴
+          if(val === originalVal) {
+            $cell.removeClass('editing');
+            $cell.html(val ? escapeHtml(val) : '<small>&nbsp;</small>');
+            return;
+          }
+
+          $cell.removeClass('editing');
+          $cell.data('remarks', val);
+          $cell.html(val ? escapeHtml(val) : '<small>&nbsp;</small>');
+
+          // 로컬 STATE 업데이트
+          const $row = $cell.closest('.wbs-row');
+          const salesCd = $row.data('salescd');
+          let updatedRow = null;
+
+          if(salesCd){
+            STATE.rows.forEach(row => {
+              if(row.salesCd === salesCd) {
+                row.remarks = val;
+                updatedRow = row;
+              }
+            });
+          } else {
+            const rowId = $row.data('rowid');
+            updatedRow = STATE.rows.find(x => x.rowId === rowId);
+            if(updatedRow) updatedRow.remarks = val;
+          }
+
+          // 백엔드에 remarks 수정사항 전송
+          if(updatedRow) {
+            const updateData = {
+              sjFileTrgtKey: updatedRow.sjFileTrgtKey || '',
+              salesCd: updatedRow.salesCd || '',
+              remarks: val,
+              coCd: updatedRow.coCd || jwt?.coCd || '',
+              pgmId: $('#pgmId').val() || '',
+              userId: jwt?.userId || ''
+            };
+
+            console.log('Remarks 업데이트 요청:', updateData);
+
+            // 백엔드 API 호출
+            postAjax("/user/wb/wb26/updateWbsRemarks", updateData, null, function(response) {
+              if(response && response.resultCode === 200) {
+                toast('비고가 성공적으로 저장되었습니다.');
+                console.log('Remarks 업데이트 성공');
+              } else {
+                toast('비고 저장에 실패했습니다. 다시 시도해 주세요.');
+                console.error('Remarks 업데이트 실패:', response);
+                // 실패 시 로컬 상태도 원래대로 복원
+                $cell.data('remarks', originalVal);
+                $cell.html(originalVal ? escapeHtml(originalVal) : '<small>&nbsp;</small>');
+                if(updatedRow) updatedRow.remarks = originalVal;
+              }
+            }, function(error) {
+              toast('비고 저장 중 오류가 발생했습니다.');
+              console.error('Remarks 업데이트 오류:', error);
+              // 오류 시 로컬 상태 복원
+              $cell.data('remarks', originalVal);
+              $cell.html(originalVal ? escapeHtml(originalVal) : '<small>&nbsp;</small>');
+              if(updatedRow) updatedRow.remarks = originalVal;
+            });
+          }
+        };
+
+        const cancel = () => {
+          $cell.removeClass('editing');
+          $cell.html(raw ? escapeHtml(raw) : '<small>&nbsp;</small>');
+        };
+
+        $input.on('keydown', function(e){
+          if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); commit(); }
+          if(e.key === 'Escape'){ e.preventDefault(); cancel(); }
+        });
+        $input.on('blur', commit);
+      });
+    }
+
+    /***********************
+     * 8) 변경 수집/저장
+     ************************/
+     function collectChanges() {
+      const changes = [];
+
+    	  // 공통: row -> changes에 적재
+    	  const pushChange = (row) => {
+    	    if (!(row && row.wbsPlansDtFm && row.wbsPlaneDtFm)) return;
+
+        changes.push({
+    	      fileTrgtKey: row.fileTrgtKey,
+    	      sjFileTrgtKey: row.sjFileTrgtKey,
+    	      wbsCloseYn: row.wbsCloseYn,
+    	      clntNm: row.clntNm,
+    	      clntPjtNm: row.clntPjtNm,
+    	      salesCd: row.salesCd,
+    	      deptCd: row.deptCd,
+    	      deptNm: row.fullNm,
+    	      wbsPlansDtFm: row.wbsPlansDtFm,
+    	      wbsPlaneDtFm: row.wbsPlaneDtFm,
+    	      remarks: row.remarks
+    	    });
+    	  };
+
+    	  // 공통: salesCd -> fileTrgtKey 정렬
+    	  const sortChanges = () => {
+    	    changes.sort((a, b) => {
+    	      const salesCmp = String(a.salesCd ?? '').localeCompare(String(b.salesCd ?? ''), 'ko');
+    	      if (salesCmp !== 0) return salesCmp;
+
+    	      const aNum = Number(a.fileTrgtKey);
+    	      const bNum = Number(b.fileTrgtKey);
+    	      const aIsNum = Number.isFinite(aNum);
+    	      const bIsNum = Number.isFinite(bNum);
+
+    	      if (aIsNum && bIsNum) return aNum - bNum;
+
+    	      return String(a.fileTrgtKey ?? '').localeCompare(String(b.fileTrgtKey ?? ''), 'ko');
+    	    });
+    	  };
+
+    	  // 1) CHANGED_ROWS 우선
+    	  if (CHANGED_ROWS && CHANGED_ROWS.size > 0) {
+    	    CHANGED_ROWS.forEach(pushChange);
+    	    sortChanges();
+    	    return changes;
+    	  }
+
+    	  // 2) 없으면 dirty row 스캔
+    	  //  WBS 화면에서 변경된(Dirty) 행으로 표시된 row 엘리먼트 목록
+    	  $(".wbs-row.row-dirty").each(function () {
+    	    const rowId = $(this).data("rowid");
+    	    const row = STATE.rows.find(x => x.rowId === rowId);
+    	    pushChange(row);
+    	  });
+
+    	  sortChanges();
+      return changes;
+    }
+
+    function doSave(){
+      const changes = collectChanges();
+      if(!changes.length){
+        toast("변경된 내용이 없습니다.");
+        return;
+      }
+      openModal("변경사항(JSON)", JSON.stringify(changes, null, 2));
+    }
+
+    /***********************
+     * 9) 엑셀/출력/줌
+     ************************/
+    function getWorkdays(startYmd, endYmd){
+      const days = [];
+      let cur = parseYMD(startYmd);
+      const end = parseYMD(endYmd);
+      if(!cur || !end) return days;
+
+      while(cur <= end){
+        const wd = cur.getDay();
+        if(wd !== 0 && wd !== 6) days.push(ymd(cur));
+        cur.setDate(cur.getDate() + 1);
+      }
+      return days;
+    }
+
+    function buildLegendImage(){
+      const items = (Dept.defs || []).map(d => ({
+        label: d.deptNm,
+        cd: d.deptCd,
+        backColor: d.backColor,
+        textColor: d.textColor
+      }));
+      if(items.length === 0) return null;
+
+      const fontSize = 12;
+      const font = `${fontSize}px "Noto Sans KR", Arial, "dotum", sans-serif`;
+      const chipPadX = 10;
+      const chipPadY = 4;
+      const dotSize = 10;
+      const gap = 8;
+      const chipGap = 10;
+      const radius = 10;
+      const lineColor = "#dbe2ee";
+      const dpr = window.devicePixelRatio || 1;
+
+      const measure = document.createElement("canvas").getContext("2d");
+      measure.font = font;
+      const widths = items.map(i => measure.measureText(i.label).width);
+      const chipHeight = dotSize + chipPadY * 2;
+      const totalWidth = widths.reduce((sum, w) => sum + (chipPadX * 2 + dotSize + gap + w), 0) + chipGap * (items.length - 1);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(totalWidth * dpr);
+      canvas.height = Math.ceil(chipHeight * dpr);
+      const ctx = canvas.getContext("2d");
+      ctx.scale(dpr, dpr);
+      ctx.font = font;
+      ctx.textBaseline = "middle";
+      ctx.lineWidth = 1;
+
+      let x = 0;
+      items.forEach((it, idx) => {
+        const textW = widths[idx];
+        const chipW = chipPadX * 2 + dotSize + gap + textW;
+        const y = 0;
+
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = lineColor;
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + chipW - radius, y);
+        ctx.quadraticCurveTo(x + chipW, y, x + chipW, y + radius);
+        ctx.lineTo(x + chipW, y + chipHeight - radius);
+        ctx.quadraticCurveTo(x + chipW, y + chipHeight, x + chipW - radius, y + chipHeight);
+        ctx.lineTo(x + radius, y + chipHeight);
+        ctx.quadraticCurveTo(x, y + chipHeight, x, y + chipHeight - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = it.backColor || "#999999";
+        ctx.fillRect(x + chipPadX, y + (chipHeight - dotSize) / 2, dotSize, dotSize);
+
+        ctx.fillStyle = "#000000"; // text (always black for Excel legend image)
+        ctx.fillText(it.label, x + chipPadX + dotSize + gap, y + chipHeight / 2);
+
+        x += chipW + chipGap;
+      });
+
+      return { dataUrl: canvas.toDataURL("image/png"), width: canvas.width / dpr, height: canvas.height / dpr };
+    }
+
+    function doExport(){
+      if(typeof ExcelJS === "undefined"){
+        toast("ExcelJS 로드 실패");
+        return;
+      }
+      const legendImage = buildLegendImage();
+      if(legendImage){
+        doExportWithLegend(legendImage.dataUrl, legendImage.width, legendImage.height);
+        return;
+      }
+      doExportWithLegend(null, 0, 0);
+    }
+
+    const excelColorFromDept = (deptKey) => {
+    	  const meta = Dept.getMeta(deptKey);
+    	  if(meta && meta.backColor) return meta.backColor.replace("#", "");
+    	  return "999999";
+    	};
+    	
+    	
+    	// HEX(#RRGGBB or RRGGBB) 50:50 믹싱
+    	function mixHex50(hexA, hexB){
+    	  const norm = (h) => String(h || "").replace("#","").trim().toUpperCase();
+    	  const a = norm(hexA), b = norm(hexB);
+    	  if(a.length !== 6 || b.length !== 6) return a.length === 6 ? a : (b.length === 6 ? b : "999999");
+
+    	  const ar = parseInt(a.slice(0,2),16), ag = parseInt(a.slice(2,4),16), ab = parseInt(a.slice(4,6),16);
+    	  const br = parseInt(b.slice(0,2),16), bg = parseInt(b.slice(2,4),16), bb = parseInt(b.slice(4,6),16);
+
+    	  const r = Math.round((ar + br) / 2);
+    	  const g = Math.round((ag + bg) / 2);
+    	  const bl = Math.round((ab + bb) / 2);
+
+    	  return [r,g,bl].map(v => v.toString(16).padStart(2,"0")).join("").toUpperCase();
+    	}
+
+    	// ExcelJS Cell에서 현재 fill 색상(HEX RRGGBB) 얻기
+    	function getCellFillHex(cell){
+    	  try{
+    	    const fg = cell?.fill?.fgColor?.argb; // "FFRRGGBB"
+    	    if(typeof fg === "string" && fg.length === 8) return fg.slice(2).toUpperCase();
+    	  }catch(e){}
+    	  return null;
+    	}
+    	
+    	
+    	function hexToRgb(hex){
+    		  const h = String(hex || "").replace("#","").trim();
+    		  if(h.length !== 6) return null;
+    		  return {
+    		    r: parseInt(h.slice(0,2), 16),
+    		    g: parseInt(h.slice(2,4), 16),
+    		    b: parseInt(h.slice(4,6), 16),
+    		  };
+    		}
+
+    		function rgbToHex(r,g,b){
+    		  const clamp = (v)=>Math.max(0, Math.min(255, Math.round(v)));
+    		  return [clamp(r),clamp(g),clamp(b)].map(v=>v.toString(16).padStart(2,"0")).join("").toUpperCase();
+    		}
+
+    		function applyAvgMixFill(cell){
+    		  try{
+    		    const argb = cell?.fill?.fgColor?.argb; // "FFRRGGBB"
+    		    if(typeof argb === "string" && argb.length === 8) return argb.slice(2).toUpperCase();
+    		  }catch(e){}
+    		  return null;
+    		}
+
+    		/**
+    		 * 셀에 색을 1/N 평균 혼합으로 누적 적용한다.
+    		 * - cell.__mix = { rSum, gSum, bSum, n }
+    		 * - base(예: summary 회색) 같은 배경 fill은 혼합 대상으로 보지 않음
+    		 */
+    		function applyAvgMixFill(cell, nextHex, toArgb, ignoreHexSet){
+    		  const nh = String(nextHex || "").replace("#","").trim().toUpperCase();
+    		  const rgb = hexToRgb(nh);
+    		  if(!rgb) return;
+
+    		  // 최초 진입인데 기존 fill이 있고, 그것이 ignore가 아니면 mix 초기값으로 반영(안전장치)
+    		  if(!cell.__mix){
+    		    const prevHex = getCellFillHex(cell);
+    		    if(prevHex && !(ignoreHexSet && ignoreHexSet.has(prevHex))){
+    		      const prgb = hexToRgb(prevHex);
+    		      if(prgb){
+    		        cell.__mix = { rSum: prgb.r, gSum: prgb.g, bSum: prgb.b, n: 1 };
+    		      }
+    		    }
+    		  }
+
+    		  if(!cell.__mix){
+    		    cell.__mix = { rSum: 0, gSum: 0, bSum: 0, n: 0 };
+    		  }
+
+    		  cell.__mix.rSum += rgb.r;
+    		  cell.__mix.gSum += rgb.g;
+    		  cell.__mix.bSum += rgb.b;
+    		  cell.__mix.n += 1;
+
+    		  const m = cell.__mix;
+    		  const avgHex = rgbToHex(m.rSum / m.n, m.gSum / m.n, m.bSum / m.n);
+
+    		  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: toArgb(avgHex) } };
+    		}
+    	
+    function doExportWithLegend(legendDataUrl, legendW, legendH){
+      const excelColorFromDept = (deptKey) => {
+        const meta = getDeptMeta(deptKey);
+        if(meta && meta.backColor) return meta.backColor.replace("#", "");
+        return "999999";
+      };
+
+      const workdays = getWorkdays(STATE.viewStart, STATE.viewEnd);
+      const dayIndex = {};
+      workdays.forEach((d, i)=>{ dayIndex[d] = i; });
+
+      const startCol = 4;
+      const remarksCol = startCol + workdays.length;
+
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet("WBS");
+
+      ws.getColumn(1).width = 12;
+      ws.getColumn(2).width = 24;
+      ws.getColumn(3).width = 16;
+      for(let i=0;i<workdays.length;i++) ws.getColumn(startCol + i).width = 3;
+      ws.getColumn(remarksCol).width = 24;
+
+      const totalCols = remarksCol;
+      ws.mergeCells(1, 1, 1, totalCols);
+      const titleText = ($('#topSubMenu').text() || 'WBS').trim();
+      ws.getCell(1, 1).value = titleText;
+      ws.getRow(1).font = { bold: true, size: 14 };
+      ws.getRow(1).alignment = { vertical: "middle", horizontal: "left" };
+
+      const searchParts = [];
+      $('[data-search]').each(function(){
+        const $el = $(this);
+        let val = '';
+        if ($el.is('select')) val = $el.find('option:selected').text().trim();
+        else val = String($el.val() || '').trim();
+
+        if(!val) return;
+        const label = $el.closest('td').prevAll('th').first().text().trim();
+        if(label) searchParts.push(`${label}: ${val}`);
+      });
+      const metaText = searchParts.join(' | ');
+
+      let textStartCol = 1;
+      if(legendDataUrl){
+        const imageId = wb.addImage({ base64: legendDataUrl, extension: "png" });
+        ws.addImage(imageId, { tl: { col: 0, row: 1 }, ext: { width: legendW, height: legendH } });
+        const legendCols = Math.max(1, Math.ceil(legendW / 40));
+        textStartCol = Math.min(totalCols, legendCols + 1);
+        ws.getRow(2).height = Math.min(60, Math.round(legendH * 0.75));
+      }
+      if(textStartCol <= totalCols){
+        ws.mergeCells(2, textStartCol, 2, totalCols);
+        ws.getCell(2, textStartCol).value = metaText || ' ';
+        ws.getRow(2).alignment = { vertical: "middle", horizontal: "left" };
+      }
+
+      ws.mergeCells(3, 1, 4, 1);
+      ws.mergeCells(3, 2, 4, 2);
+      ws.mergeCells(3, 3, 4, 3);
+      ws.mergeCells(3, remarksCol, 4, remarksCol);
+      ws.getCell(3, 1).value = "기계";
+      ws.getCell(3, 2).value = "설비명";
+      ws.getCell(3, 3).value = "salesCd";
+      ws.getCell(3, remarksCol).value = "비고";
+
+      const months = [];
+      let currentKey = null;
+      let count = 0;
+      workdays.forEach((d) => {
+        const [y,m] = d.split("-").map(Number);
+        const key = `${y}-${m}`;
+        if(currentKey === null){ currentKey = key; count = 1; return; }
+        if(key === currentKey) count++;
+        else { months.push({key: currentKey, count}); currentKey = key; count = 1; }
+      });
+      if(currentKey) months.push({key: currentKey, count});
+
+      let offset = 0;
+      months.forEach(m=>{
+        const [y,mn] = m.key.split("-").map(Number);
+        const start = startCol + offset;
+        const end = start + m.count - 1;
+        ws.mergeCells(3, start, 3, end);
+        ws.getCell(3, start).value = `${y}년 ${mn}월`;
+        offset += m.count;
+      });
+
+      workdays.forEach((d, i)=>{
+        const day = Number(d.split("-")[2]);
+        ws.getCell(4, startCol + i).value = String(day).padStart(2, "0");
+      });
+
+      [ws.getRow(3), ws.getRow(4)].forEach(r=>{
+        r.font = { bold: true };
+        r.alignment = { vertical: "middle", horizontal: "center" };
+      });
+
+      const { renderRows } = buildRenderRows(STATE.rows);
+      // ===== [ADD] TODAY 표시 + 빨간 세로선(가이드) =====
+      (function applyTodayMarker(){
+        const todayRaw = STATE.today; // yyyy-mm-dd
+        const todayKey = findNearestWorkdayKey(todayRaw);
+
+        // TODAY가 범위 밖이면 아무 것도 하지 않음
+        if(!todayKey) return;
+
+        const todayCol = startCol + dayIndex[todayKey];
+
+
+        
+        // ===== [ADD] Excel TODAY column helper =====
+        function findNearestWorkdayKey(targetYmd){
+          if(!targetYmd) return null;
+          if(dayIndex[targetYmd] !== undefined) return targetYmd;
+
+          // 엑셀 타임라인은 "평일만" 있으므로, 오늘이 주말이면 가장 가까운 평일로 보정
+          const t = parseYMD(targetYmd);
+          // 앞으로 7일 탐색
+          for(let i=1;i<=7;i++){
+            const d = new Date(t);
+            d.setDate(d.getDate() + i);
+            const k = ymd(d);
+            if(dayIndex[k] !== undefined) return k;
+          }
+          // 뒤로 7일 탐색
+          for(let i=1;i<=7;i++){
+            const d = new Date(t);
+            d.setDate(d.getDate() - i);
+            const k = ymd(d);
+            if(dayIndex[k] !== undefined) return k;
+          }
+          return null;
+        }
+
+        
+        
+        // 1) 헤더(일자) 셀 강조 + TODAY 메모
+        const dayHeaderCell = ws.getCell(4, todayCol);
+        const dayText = String(todayKey.split("-")[2]).padStart(2,"0");
+
+        // 기존 day 숫자는 유지하면서 시각적 강조만 부여
+        dayHeaderCell.value = dayText;
+        dayHeaderCell.font = Object.assign({}, dayHeaderCell.font || {}, {
+          bold: true,
+          color: { argb: "FFDC2626" } // 빨강
+        });
+        dayHeaderCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFFFE4E6" } // 연한 빨강 배경
+        };
+
+        // ExcelJS note(주석). 뷰어에 따라 표시 방식이 다를 수 있음.
+        const noteMsg = (todayKey === todayRaw)
+          ? `TODAY: ${todayRaw}`
+          : `TODAY: ${todayRaw}\n(주말/비업무일 → 가장 가까운 업무일로 표시: ${todayKey})`;
+        try{ dayHeaderCell.note = noteMsg; }catch(e){ /* note 미지원 환경 무시 */ }
+
+        // 2) 빨간 세로선(컬럼 보더) - 헤더(월/일)부터 데이터 끝까지
+        // 데이터 시작 행: 5 (현재 코드 기준), 데이터 끝 행:
+        const firstLineRow = 3; // 월 헤더가 3행이므로 3부터 라인 적용
+        const lastDataRow = 4 + renderRows.length; // 데이터는 5행부터 renderRows 개수만큼
+     	// ===== SOLID + 굵게(3수준 느낌) =====
+        const borderDef = { style: "thick", color: { argb: "FFDC2626" } }; // 실선 굵게
+
+        for(let r = firstLineRow; r <= lastDataRow; r++){
+          const c = ws.getCell(r, todayCol);
+          // 기존 border가 있으면 유지하면서 left만 덮어씀
+          c.border = Object.assign({}, c.border || {}, { left: borderDef, right: borderDef});
+        }
+
+        // 3) (선택) TODAY 글자도 보이게 2행 메타에 추가 (원하면 켜세요)
+        // ws.getCell(2, textStartCol).value = (metaText ? metaText + " | " : "") + `TODAY: ${todayRaw}`;
+      })();
+
+      function getDeptShortLabel(deptNm){
+    	  return Dept.shortLabel(deptNm);
+    	}
+      const toArgb = (hex) => `FF${hex}`;
+      const summaryFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD1D5DB" } };
+  	  // 혼합에서 제외할 베이스 색(요약행 배경 회색)
+      const IGNORE_HEX = new Set(["D1D5DB"]);
+   
+      renderRows.forEach((r, idx)=>{
+        const rowIndex = 5 + idx;
+        const row = ws.getRow(rowIndex);
+        row.getCell(1).value = r.clntPjtNm || "";
+        row.getCell(2).value = r.eqpNm || "";
+        row.getCell(3).value = r.salesCd || "";
+        row.getCell(remarksCol).value = r.remarks || "";
+        for(let c=startCol;c<=remarksCol-1;c++) row.getCell(c).font = { size: 6 };
+
+        if(r.type === "summary"){
+          for(let c=1;c<=remarksCol;c++) row.getCell(c).fill = summaryFill;
+          (r.segments || []).forEach(seg=>{
+            const color = excelColorFromDept(seg.deptCd || seg.deptNm);
+            let cur = parseYMD(seg.wbsPlansDtFm);
+            const end = parseYMD(seg.wbsPlaneDtFm);
+            while(cur && end && cur <= end){
+              const wd = cur.getDay();
+              if(wd !== 0 && wd !== 6){
+                const key = ymd(cur);
+                if(dayIndex[key] !== undefined){
+                  const col = startCol + dayIndex[key];
+                  
+                  const cell = row.getCell(col);
+                  applyAvgMixFill(cell, color, toArgb, IGNORE_HEX);
+
+//                   row.getCell(col).fill = { type:"pattern", pattern:"solid", fgColor:{ argb: toArgb(color) } };
+                  const label = getDeptShortLabel(seg.deptNm);
+                  const prev = row.getCell(col).value;
+                  if(prev && prev !== label && !String(prev).split("/").includes(label)) row.getCell(col).value = `${prev}/${label}`;
+                  else if(!prev) row.getCell(col).value = label;
+                }
+              }
+              cur.setDate(cur.getDate() + 1);
+            }
+          });
+          return;
+        }
+
+        (r.rows || []).forEach(seg=>{
+          const color = excelColorFromDept(seg.deptCd || seg.deptNm);
+          let cur = parseYMD(seg.wbsPlansDtFm);
+          const end = parseYMD(seg.wbsPlaneDtFm);
+          while(cur && end && cur <= end){
+            const wd = cur.getDay();
+            if(wd !== 0 && wd !== 6){
+              const key = ymd(cur);
+              if(dayIndex[key] !== undefined){
+                const col = startCol + dayIndex[key];
+                
+                const cell = row.getCell(col);
+
+
+                applyAvgMixFill(cell, color, toArgb, null); // 일반행은 베이스 ignore 필요 없음
+//                 row.getCell(col).fill = { type:"pattern", pattern:"solid", fgColor:{ argb: toArgb(color) } };
+                const label = getDeptShortLabel(seg.deptNm);
+                const prev = row.getCell(col).value;
+                if(prev && prev !== label && !String(prev).split("/").includes(label)) row.getCell(col).value = `${prev}/${label}`;
+                else if(!prev) row.getCell(col).value = label;
+              }
+            }
+            cur.setDate(cur.getDate() + 1);
+          }
+        });
+      });
+
+      
+      wb.xlsx.writeBuffer().then(buf=>{
+        const blob = new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+        a.download = `WBS_${STATE.viewStart}_${STATE.viewEnd}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+        toast("Excel 내보내기 완료");
+      }).catch(err=>{
+        console.error(err);
+        toast("Excel 내보내기 실패");
+      });
+    }
+
+    function doPrint(){
+      const page = document.querySelector(".page");
+      if(!page){ toast("출력할 페이지 영역을 찾지 못했습니다."); return; }
+
+      const originalCellW = CELL_W;
+      const originalZoomVal = parseInt($('#zoomSlider').val(), 10);
+
+      const startDate = parseYMD(STATE.viewStart || VIEW_START);
+      const endDate = parseYMD(STATE.viewEnd || VIEW_END);
+      if(!startDate || !endDate){ toast("출력 범위 날짜가 올바르지 않습니다."); return; }
+
+      // (평일 기준 렌더 구조이므로) header 기준 day count로 너비 산정
+      const head = buildTimelineHeader(STATE.viewStart, STATE.viewEnd);
+      const totalDays = head.totalDays;
+      const currentTimelineWidth = totalDays * originalCellW;
+
+      const pane = document.querySelector(".pane-timeline");
+      const paneWidth = pane ? pane.clientWidth : (window.innerWidth - 350 - 180);
+      const availableWidth = Math.min(paneWidth, 1900);
+
+      if(currentTimelineWidth > availableWidth && totalDays > 0){
+        const printCellW = Math.max(4, Math.floor(availableWidth / totalDays));
+        setZoom(printCellW);
+        setTimeout(() => {
+          captureAndPrint(page, originalCellW, originalZoomVal);
+        }, 100);
+      } else {
+        captureAndPrint(page, originalCellW, originalZoomVal);
+      }
+    }
+
+    function captureAndPrint(page, originalCellW, originalZoomVal){
+      const scrollEl = document.getElementById("wbsScroll");
+      const prev = scrollEl ? {
+        height: scrollEl.style.height,
+        maxHeight: scrollEl.style.maxHeight,
+        overflow: scrollEl.style.overflow
+      } : null;
+
+      if(scrollEl){
+        scrollEl.style.height = "auto";
+        scrollEl.style.maxHeight = "none";
+        scrollEl.style.overflow = "visible";
+      }
+
+      html2canvas(page, {
+        scale: window.devicePixelRatio || 2,
+        useCORS: true,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: document.documentElement.clientWidth,
+        windowHeight: document.documentElement.clientHeight
+      }).then(canvas => {
+        if(scrollEl && prev){
+          scrollEl.style.height = prev.height;
+          scrollEl.style.maxHeight = prev.maxHeight;
+          scrollEl.style.overflow = prev.overflow;
+        }
+
+        // restore
+        setZoom(originalCellW);
+        $('#zoomSlider').val(originalZoomVal);
+        $('#zoomVal').text(originalZoomVal);
+
+        const dataUrl = canvas.toDataURL("image/png");
+        const w = window.open("", "_blank");
+        if(!w){ toast("팝업 차단을 해제하고 다시 시도하세요."); return; }
+
+        w.document.write(`<!doctype html><html lang="ko"><head>
+<meta charset="utf-8" />
+<title>WBS Print</title>
+<style>
+  body{margin:0;padding:0;background:#fff;text-align:center;}
+  img{max-width:100%;height:auto;}
+  @media print{ body{margin:0;padding:0;} img{max-width:100%;height:auto;} }
+</style>
+</head><body><img src="${dataUrl}"></body></html>`);
+        w.document.close();
+        w.focus();
+        w.onload = ()=> { w.print(); w.close(); };
+      }).catch(err => {
+        if(scrollEl && prev){
+          scrollEl.style.height = prev.height;
+          scrollEl.style.maxHeight = prev.maxHeight;
+          scrollEl.style.overflow = prev.overflow;
+        }
+        setZoom(originalCellW);
+        $('#zoomSlider').val(originalZoomVal);
+        $('#zoomVal').text(originalZoomVal);
+        console.error(err);
+        toast("출력 이미지 생성 중 오류가 발생했습니다.");
+      });
+    }
+
+    
+    let AUTO_SCROLL_TODAY_DONE = false; // 최초 1회만 TODAY 중앙 스크롤
+
+    function scrollToTodayCenter(){
+      const scrollEl = document.getElementById("wbsScroll");
+      if(!scrollEl) return;
+
+      // renderWbs에서 사용하는 동일 로직과 맞추기(평일 기준)
+      const workdays = getWorkdays(STATE.viewStart, STATE.viewEnd);
+      if(!workdays || workdays.length === 0) return;
+
+      const todayOffset = daysBetween(STATE.viewStart, STATE.today);
+      if(todayOffset < 0 || todayOffset > workdays.length - 1) return; // 범위 밖이면 스킵
+
+      const rootStyle = getComputedStyle(document.documentElement);
+      const leftW  = parseInt(rootStyle.getPropertyValue("--leftW"), 10) || 0;
+      const rightW = parseInt(rootStyle.getPropertyValue("--rightW"), 10) || 0;
+
+      // 타임라인 가시 폭(스크롤 컨테이너 폭 - sticky 좌/우 폭)
+      const visibleTimelineW = Math.max(0, scrollEl.clientWidth - leftW - rightW);
+      if(visibleTimelineW <= 0) return;
+
+      // TODAY 셀의 "중앙"을 화면 중앙으로
+      const todayCenterX = (todayOffset * CELL_W) + (CELL_W / 2);
+      const targetScrollLeft = Math.round(todayCenterX - (visibleTimelineW / 2));
+
+      const maxScrollLeft = Math.max(0, scrollEl.scrollWidth - scrollEl.clientWidth);
+      scrollEl.scrollLeft = clamp(targetScrollLeft, 0, maxScrollLeft);
+    }
+    
+    
+    
+    
+    // setZoom: 즉시 renderAll)
+    function setZoom(val){
+      const v = clamp(parseInt(val,10) || 8, 4, 20);
+      $('#zoomVal').text(v);
+      $('#zoomSlider').val(v);
+
+      document.documentElement.style.setProperty('--px-per-day', v + 'px');
+      document.documentElement.style.setProperty('--cellW', v + 'px');
+
+      CELL_W = v;
+
+      renderAll();
+    }
+
+    function fitTimelineToViewport(){
+      const scroll = document.getElementById("wbsScroll");
+      if(!scroll) return false;
+
+      let totalDays = document.querySelectorAll(".timeline-days .timeline-day").length;
+      if(!totalDays){
+        const workdays = getWorkdays(STATE.viewStart, STATE.viewEnd);
+        totalDays = workdays.length;
+      }
+      if(totalDays <= 0) return false;
+
+      const rootStyle = getComputedStyle(document.documentElement);
+      const leftW = parseInt(rootStyle.getPropertyValue("--leftW"), 10) || 0;
+      const rightW = parseInt(rootStyle.getPropertyValue("--rightW"), 10) || 0;
+      const available = Math.max(0, scroll.clientWidth - leftW - rightW);
+      if(!available) return false;
+
+      const target = clamp(Math.floor(available / totalDays), 4, 20);
+      if(target === CELL_W) return false;
+      
+//       setZoom(target); //초기 화면 로딩시 전체 일정을 볼수있게 줌변경하기
+
+		// 최초 조회 1회만 자동 줌
+		if (!AUTO_SCROLL_TODAY_DONE) {
+		  requestAnimationFrame(function () {
+		    try { scrollToTodayCenter(); } catch(e) { /* ignore */ }
+		    AUTO_SCROLL_TODAY_DONE = true;
+		  });
+		}
+      return true;
+    }
+
+    
+    /***********************
+     * 10) 도움말
+     ************************/
+    function showHelp(){
+      const msg =
+`WBS(Work Breakdown Structure) 기계별 현황을 간트차트로 시각화하여 프로젝트 일정을 관리할 수 있는 화면입니다.
+
+1. 상단 검색 영역
+  - Sales Code: 제품 코드를 입력하여 특정 제품 검색
+  - 고객사명: 고객사명을 입력하여 필터링
+  - 고객사PJT 선택: 드롭다운에서 조회할 고객사PJT를 선택
+  - 수주일자: 조회할 시작일과 종료일 선택
+2. 메인 차트 영역
+  - 좌측 고정 영역: 기계명, 설비명, Sales Code 표시
+  - 중앙 타임라인: 날짜별 간트차트 표시 영역
+  - 우측 고정 영역: 비고(remarks) 표시
+3. 차트 하단 도구
+  - 줌 슬라이더: 차트 확대/축소 (px/day 단위)
+  - 저장 버튼: 일정 변경사항 저장
+  - 엑셀 내보내기: 현재 데이터를 Excel 파일로 다운로드
+  - 인쇄 버튼: 차트를 이미지로 캡처하여 인쇄
+
+[기본 사용법]
+1. 데이터 조회
+1) [검 색] 버튼 클릭
+   - 백엔드에서 데이터를 가져와 차트에 표시
+   - 타임라인 범위가 자동으로 데이터 기간에 맞게 조정됨
+
+2) 일정수정   
+   간트 바 위에 마우스를 올리면 드래그/리사이즈 가능
+
+ 2-1) 바 전체 드래그:
+   - 마우스로 바를 잡고 좌우로 이동
+   - 시작일이 1일 단위로 변경됨
+
+ 2-2) 바 끝부분 리사이즈:
+   - 바의 좌측/우측 끝을 드래그
+   - 기간이 1일 단위로 늘어나거나 줄어듦
+
+3) 견치는 바에 대한 작업 방법
+   - 겹쳐진 바에 마우스를 가져다 놓으면 겹치는 바 선택 모달창이 활성화됨
+   - 해당 바를 선택하여 이동 또는 일정 변경 진행
+
+4) 변경사항은 [SAVE CHANGES] 버튼으로 저장해야 함   
+`;
+      openModal("도움말", msg);
+    }
+
+    /***********************
+     * 11) 검색/초기화
+     ************************/
+    // 거래처 검색
+    window.opendClntSearch = function(inputValue) {
+      var paramObj = { "searchValue" : inputValue, "clntDivCd" : "CLNTDIV12" };
+      openSecondModal("/static/html/cmn/modal/clntSearch.html", 650, 650, "거래처 검색", paramObj, function(grid) {
+        var row = grid.target.getList("selected")[0];
+        if ($('#ordrsClntNm_S').val() !=  row.clntNm) {
+	        $('#ordrsClntCd_S').val(row.clntCd);
+	        $('#ordrsClntNm_S').val(row.clntNm);
+	        searchData();
+        }
+      });
+    };
+
+    //Sales Code 검색
+    window.wbsSalesCodeSearch = function() {
+      var paramObj = { "coCd" : $('#coCd_S').val(), "searchValue": $('#salesCd_S').val() };
+      openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1200, 700, "SALES CODE 검색", paramObj, function (grid){
+        var row = grid.target.getList("selected")[0];
+
+        if ($('#salesCd_S').val() !=  row.salesCd) {
+	        $('#salesCd_S').val(row.salesCd);
+	        searchData();
+        }
+      });
+    };
+
+    // 작성자 검색
+    window.openUserSearch = function() {
+      var paramObj = { "coCd" : $('#coCd').val(), "userId" : $('#wbsPlanMngId_S').val(), "userNm" : $('#wbsPlanMngIdNm_S').val() };
+      openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "사용자 검색", paramObj, function(tree) {
+        var checkedId = tree.get_checked()[0];
+        var checkedNode = tree.get_node(checkedId);
+        if ($('#wbsPlanMngId_S').val() !=  checkedNode.id) {
+	        $('#wbsPlanMngId_S').val(checkedNode.id);
+	        $('#wbsPlanMngIdNm_S').val(checkedNode.text);
+			searchData();  //작성자가 변경되면 실행하기
+        }
+      });
+    };
+
+    window.searchData = function (isInitialLoad) {	// true: 최초 1회만
+      // 데이터 새로고침 시 확인 상태 초기화
+      confirmedSalesCd.clear();
+
+      if (typeof inputValidation === "function" && inputValidation($('input[required]'))) {
+
+        var formData = {};
+        $.each($('[data-search]'), function(idx, elem){
+          if ($(elem).hasClass("input_calendar") ) formData[$(elem).data("search")] = $(elem).val().replace(/\-/g, '');
+          else formData[$(elem).data("search")] = $(elem).val();
+        });
+
+        postAjax("/user/wb/wb26/select_wb06_List", formData, null, function(data) {
+          var list = data && data.result;
+          let minDate = null;
+          let maxDate = null;
+
+          if (Array.isArray(list)) {
+            const out = new Array(list.length);
+
+            for (let i = 0; i < list.length; i++) {
+              const item = list[i] || {};
+
+              // 백엔드가 yyyymmdd로 올 수도 있고 yyyy-mm-dd로 올 수도 있으니 최소한 방어
+              // (현행 로직은 yyyy-mm-dd를 전제로 parseYMD 사용)
+              let wbsPlansDtFm = item.wbsPlansDtFm || '';
+              let wbsPlaneDtFm = item.wbsPlaneDtFm || '';
+
+              // yyyymmdd 형태이면 yyyy-mm-dd로 변환
+              if(/^\d{8}$/.test(wbsPlansDtFm)){
+                wbsPlansDtFm = `${wbsPlansDtFm.substr(0,4)}-${wbsPlansDtFm.substr(4,2)}-${wbsPlansDtFm.substr(6,2)}`;
+              }
+              if(/^\d{8}$/.test(wbsPlaneDtFm)){
+                wbsPlaneDtFm = `${wbsPlaneDtFm.substr(0,4)}-${wbsPlaneDtFm.substr(4,2)}-${wbsPlaneDtFm.substr(6,2)}`;
+              }
+
+              const row = {
+                coCd: item.coCd || '',
+                salesCd: item.salesCd || '',
+                ordrsNo: item.ordrsNo || '',
+                deptCd: item.deptId || '',
+                deptNm: item.deptNm || '',
+                fullNm: item.fullNm || '',
+                teamMngId: item.teamMngId || '',		//각단계별 관리 팀장 ID
+                smrizeId: item.smrizeId || '',			//해당 과제 영업 총괄 PM ID
+                wbsPlansDtFm,
+                wbsPlaneDtFm,
+                fileTrgtKey: item.fileTrgtKey || '',
+                sjFileTrgtKey: item.sjFileTrgtKey,
+                wbsCloseYn: item.wbsCloseYn || '',
+                teamMngId: item.teamMngId || '',
+                smrizeId: item.smrizeId || '',
+                clntPjtNm: item.clntPjtNm || '',
+                clntNm: item.clntNm || '',
+                eqpNm: item.eqpNm || '',
+                remarks: item.wbsRemark || '',
+                closeYn: item.closeYn || '',
+                ...item
+              };
+
+              out[i] = row;
+
+              if (wbsPlansDtFm) {
+                const s = parseYMD(wbsPlansDtFm);
+                if (s && (!minDate || s < minDate)) minDate = s;
+              }
+              if (wbsPlaneDtFm) {
+                const e = parseYMD(wbsPlaneDtFm);
+                if (e && (!maxDate || e > maxDate)) maxDate = e;
+              }
+            }
+
+            list = out;
+
+            if (minDate && maxDate) {
+              const startDate = new Date(minDate);
+              startDate.setDate(startDate.getDate() - 7);
+
+              const endDate = new Date(maxDate);
+              endDate.setDate(endDate.getDate() + 7);
+
+              STATE.viewStart = ymd(startDate);
+              STATE.viewEnd   = ymd(endDate);
+            }
+          } else {
+            console.warn('백엔드 데이터가 올바르지 않습니다:', list);
+            list = [];
+          }
+
+          // 상태 업데이트
+          STATE.rows = deepClone(list);
+          CHANGED_ROWS.clear();
+
+          renderAll();
+          
+
+	       // 최초 조회 1회만 자동 줌
+	       if (isInitialLoad === true && !AUTO_ZOOM_DONE) {
+	         requestAnimationFrame(function () {
+	           try { fitTimelineToViewport(); } catch(e) { /* ignore */ }
+	           AUTO_ZOOM_DONE = true;
+	         });
+	       }
+        });
+      }
+    };
+
+    // 초기화 버튼
+    window.initSearch = function() {
+      $('[data-search]').off("change");
+      $('.contents.search select, .contents.search input').val("");
+
+      $("#coCd_S").val(jwt.coCd || '');
+
+      $("#strtDt_S").val(dateToStr(moment().subtract(6, "months").startOf("month").toDate()));
+      $("#endDt_S").val(dateToStr(moment(new Date()).endOf("month").toDate()));
+
+      $('[data-search]').on("change", function(){ searchData(false); });
+    };
+
+    /***********************
+     * 12) 초기 바인딩
+     ************************/
+    $(function(){
+      mainDefaultLoad("실행계획", "WBS 일정 관리");
+      setCommonSelect($("#main_area select[data-kind]"));
+
+      $('#head_area').toggleClass('off');
+      $('#top_area').toggleClass('on');
+      $('#main_area').toggleClass('on');
+
+      // 날짜picker
+      $('#strtDt_S').datepicker({
+        format : "yyyy-mm-dd",
+        language : "ko",
+        autoclose : true
+      })
+      .datepicker("setDate", moment().subtract(6, "months").startOf("month").toDate())
+      .on("changeDate", function(){
+        if($('#strtDt_S').val() > $('#endDt_S').val()){
+          alert("날짜를 확인해주세요");
+          $('#strtDt_S').datepicker("setDate", new Date($('#endDt_S').val()));
+        }
+      });
+
+      $('#endDt_S').datepicker({
+        format : "yyyy-mm-dd",
+        language : "ko",
+        autoclose : true
+      })
+      .datepicker("setDate", moment(new Date()).endOf("month").toDate())
+      .on("changeDate", function(){
+        if($('#strtDt_S').val() > $('#endDt_S').val()){
+          alert("날짜를 확인해주세요");
+          $('#endDt_S').datepicker("setDate", new Date($('#strtDt_S').val()));
+        }
+      });
+
+      applyDeptStyles();
+      renderLegend();
+      initCoDefault();
+
+      setZoom(parseInt($('#zoomSlider').val(), 10));
+      
+      // 최초 조회
+      searchData(true); // 최초 조회 1회만 자동 줌
+
+      $("#btnSearch").off("click.wbs").on("click.wbs", searchData(false));
+      $("#btnReset").off("click.wbs").on("click.wbs", initSearch);
+      $("#btnHelp").off("click.wbs").on("click.wbs", showHelp);
+      $("#btnSave").off("click.wbs").on("click.wbs", doSave);
+      $("#btnExport").off("click.wbs").on("click.wbs", doExport);
+      $("#btnPrint").off("click.wbs").on("click.wbs", doPrint);
+
+      // zoom
+      $('#zoomSlider').off('input.wbs').on('input.wbs', function(e){
+        setZoom(parseInt(e.target.value, 10));
+      });
+
+      $("#modalClose, #modalOk").off("click.wbs").on("click.wbs", closeModal);
+      $("#modal").off("click.wbs").on("click.wbs", function(e){ if(e.target === this) closeModal(); });
+      $("#modalCopy").off("click.wbs").on("click.wbs", async function(){
+        try{
+          await navigator.clipboard.writeText($("#modalBody").text());
+          toast("클립보드에 복사되었습니다.");
+        }catch(err){
+          toast("복사 실패(브라우저 권한 확인 필요)");
+        }
+      });
+
+      $("#modalSave").on("click", async function(){
+          try{
+              console.log("일정변경내용 저장 완료하였습니다.");
+              
+              // 1. 작업자가 일정변경 권한이 있는지 확인하고 없으면 권한 없다고 표시
+              // 2. 기존 salesCd 백업 히스토리에 저장하고 현재자료 버전업 처리
+              // 3. 변경된 내역 테이블에 반영하기
+              // 특이사항 : 일정 확정 여부와 상관없이 수정처리는 어떻게 하나?
+              //	- 총괄 PM이나 일정관리 PM은 확정 상관없이 수정
+              //    - 각단계 팀장은 해당 단계만 일정 수정 가능함.
+              // PM 계획 변경시 --> TASK 계획/ 실적 처리방안.
+              //    일정 삭제인경우 - 문제 등록여부 확인후 없으면 처리가능. (첨부파일, 결재자료) 동시 삭제 처리 
+              //    TASK 일정 담당자 일괄 수정, 
+              //    실적 담당자  일괄 수정
+              
+              // 카카오톡 일정 확정시 일괄 담당자에게 전송
+              //          일정확정상태 변경시 전송 없음???-->(필요시 담당자 전송처리)
+              
+              const raw = $('#modalBody').text().trim();   // 또는 .html()가 아니라 .text()
+              const data = JSON.parse(raw);               // data는 배열(Array)
+              
+              
+              console.log(data);
+              console.log(data[0].salesCd);
+          
+            const paramData = {
+              row: JSON.stringify(data), 
+              coCd: $('#coCd_S').val() || '',
+              pgmId: $('#pgmId').val() || '',
+              userId: jwt?.userId || '',
+            };
+
+            // 백엔드 API 호출
+            postAjax("/user/wb/wb26/updateWbsSchedule", paramData, null, function(response) {
+              if(response && response.resultCode === 200) {
+                toast('일정변경이 성공적으로 저장되었습니다.');
+                console.log('일정변경 업데이트 성공');
+              } else {
+                toast('일정변경 저장에 실패했습니다. 다시 시도해 주세요.');
+                console.error('일정변경 업데이트 실패:', response);
+              }
+            }, function(error) {
+              toast('일정변경 저장 중 오류가 발생했습니다.');
+              console.error('일정변경 업데이트 오류:', error);
+            });
+            
+            closeModal();
+          }catch(err){
+        	  toast("백엔드 저장에 실패했습니다.");
+          }
+      });
+      
+      // 검색조건 이벤트 bind
+      $('[data-search]').on("change", function(){ searchData(false); });
+
+      // 권한체크
+      authChk();
+      
+      
+      bindOverlapBarPicker(); // 겹침 선택 피커 바인딩(1회)
+    });
+
+  })();
+  
+
+  </script>
+</body>
+</html>
