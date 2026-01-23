@@ -1263,7 +1263,7 @@ public class WB22SvcImpl implements WB22Svc {
 	}
 
 	@Override
-	public int updateWbsPlanVerUp(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
+	public int updateWbsPlan(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		// 미확정 필터링 로직 제거: 확정/미확정 상관없이 버전업 처리
 		// List<Map<String, String>> chkList = wb22Mapper.wbsVerUpInsertChk(paramMap);
 		// 조회 결과가 없으면 이미 CLOSE_YN이 'N'인 상태이므로 실행 중지 -> 미확정으로 들어온 경우 방지
@@ -1272,7 +1272,7 @@ public class WB22SvcImpl implements WB22Svc {
 		// }
 
 		int wbsIssueExistChk = wb22Mapper.wbsIssueExistChk(paramMap);
-		if (wbsIssueExistChk > 0) {
+		if (wbsIssueExistChk > 0 && "delete".equals(paramMap.get("changeType"))) {
 			throw new RuntimeException("이미 문제가 등록되어 있어 삭제할 수 없습니다.");
 		}
 
@@ -1284,6 +1284,7 @@ public class WB22SvcImpl implements WB22Svc {
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowListArr"), stringList);
 		if (sharngArr != null && sharngArr.size() > 0) {
 			int i = 0;
+			// 최초 일정 변경시 insert 작업
 			for (Map<String, String> sharngMap : sharngArr) {
 				if (!sharngMap.containsKey("fileTrgtKey")) {
 					String wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
@@ -1296,23 +1297,24 @@ public class WB22SvcImpl implements WB22Svc {
 					sharngMap.put("verNo", "1");
 
 					result += wb22Mapper.wbsLevel1Insert(sharngMap);
-				} else {
-					sharngMap.put("seq", String.valueOf(i + 1));
-					wb22Mapper.wbsVerUpInsert(sharngMap);		// Histoty Insert
-				}
+				} 
+				// else {
+				// 	sharngMap.put("seq", String.valueOf(i + 1));
+				// 	wb22Mapper.wbsVerUpInsert(sharngMap);		// Histoty Insert
+				// }
 				result++;
 				i++;
 			}
-			wb22Mapper.wbsVerUpUpdate(paramMap);	// verNo Update
-			if (paramMap.get("flag") != null && "Y".equals(paramMap.get("flag"))) {
-				wb22Mapper.wbsLevel1confirmAll(paramMap); // 전체 Y 설정
-			}
+			// wb22Mapper.wbsVerUpUpdate(paramMap);	// verNo Update
+			// if (paramMap.get("flag") != null && "Y".equals(paramMap.get("flag"))) {
+			// 	wb22Mapper.wbsLevel1confirmAll(paramMap); // 전체 Y 설정
+			// }
 		}
 
 		// 내용삭제만 실적 및 파일삭제처리
 		String changeType = paramMap.get("changeType");
 		if ("delete".equals(changeType)) {
-			// 일정 WBS실적_변경
+			// 일정 WBS실적 변경
 			HashMap<String, String> dtlMap = new HashMap<>();
 			dtlMap.put("coCd", paramMap.get("coCd"));
 			dtlMap.put("salesCd", paramMap.get("salesCd"));
@@ -1344,7 +1346,6 @@ public class WB22SvcImpl implements WB22Svc {
 			// selectTrgtWbsRsltList 에서 FILE_TRGT_KEY 하나씩 꺼내서 처리
 			if (selectTrgtWbsRsltList != null) {
 				for (Map<String, String> trgt : selectTrgtWbsRsltList) {
-					// resultType="camelMap" 이라서 컬럼 FILE_TRGT_KEY → fileTrgtKey 로 들어옴
 					String fileTrgtKey = trgt.get("fileTrgtKey");
 					if (fileTrgtKey == null || fileTrgtKey.isEmpty()) {
 						continue;
@@ -1384,6 +1385,14 @@ public class WB22SvcImpl implements WB22Svc {
 				for (Map<String, String> sharngMap : sharngArr) {
 					// 변경된 데이터 업데이트
 					result += wb22Mapper.wbsLevel1Update(sharngMap);
+					// 실적 담당자 업데이트
+					if (sharngMap.get("wbsPlanCodeId").equals(paramMap.get("wbsPlanCodeId"))) {
+						sharngMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeId"));
+						// level1 담당자로 TASK 담당자 일괄 수정
+						result += wb22Mapper.wbsLevel2MngIdUpdate(sharngMap);
+						// 실적이 있으면 실적테이블의 id도 수정
+						result += wb22Mapper.wbsRsltsMngIdUpdate(sharngMap);
+					}
 				}
 			}
 		}

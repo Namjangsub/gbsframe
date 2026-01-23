@@ -102,7 +102,7 @@ public interface WB22Svc {
 
 	int wbsLevel2GantInsert(Map<String, String> paramMap);
 
-	int updateWbsPlanVerUp(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+	int updateWbsPlan(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
 	List<Map<String, String>> wbsRsltsChkExist(Map<String, String> paramMap);
 

@@ -556,10 +556,10 @@ public class WB22Ctr {
 		return "jsonView";
 	}
 
-	@PostMapping(value = "/updateWbsPlanVerUp")
-	public String updateWbsPlanVerUp(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	@PostMapping(value = "/updateWbsPlan")
+	public String updateWbsPlan(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
 		try {
-			if (wb22Svc.updateWbsPlanVerUp(paramMap, mRequest) != 0) {
+			if (wb22Svc.updateWbsPlan(paramMap, mRequest) != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 			} else {
