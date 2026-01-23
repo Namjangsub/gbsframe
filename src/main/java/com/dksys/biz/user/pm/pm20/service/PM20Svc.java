@@ -6,17 +6,20 @@ import java.util.Map;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface PM20Svc {
-	List<Map<String, String>> selectList_pm20(Map<String, String> paramMap) throws Exception;
-
-	Map<String, String> select_pm20m_Info(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectAgendaList(Map<String, String> paramMap);
+
+	List<Map<String, String>> select_agenda_no_by_date(Map<String, String> paramMap);
 
 	List<Map<String, String>> select_pm20_d02_List(Map<String, String> paramMap);
 
 	int insert_update_agenda_title(Map<String, String> paramMap) throws Exception;
 
 	int insert_update_agenda(Map<String, String> paramMap) throws Exception;
+
+	int pm20_update_status(Map<String, String> paramMap) throws Exception;
+
+	int pm20_update_agenda_date(Map<String, String> paramMap) throws Exception;
 
 	int delete_agenda(Map<String, String> paramMap) throws Exception;
 

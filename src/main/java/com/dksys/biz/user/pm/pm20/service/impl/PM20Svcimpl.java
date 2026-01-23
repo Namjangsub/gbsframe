@@ -35,16 +35,6 @@ public class PM20Svcimpl implements PM20Svc{
     CM15Svc cm15Svc;
 
 	@Override
-	public List<Map<String, String>> selectList_pm20(Map<String, String> paramMap) throws Exception {
-		return pm20Mapper.selectList_pm20(paramMap);
-	}
-
-	@Override
-	public Map<String, String> select_pm20m_Info(Map<String, String> paramMap) {
-		return pm20Mapper.select_pm20m_Info(paramMap);
-	}
-
-	@Override
 	public List<Map<String, String>> selectAgendaList(Map<String, String> paramMap) {
 		Gson gson = new Gson();
 
@@ -55,29 +45,32 @@ public class PM20Svcimpl implements PM20Svc{
 		List<Map<String, String>> resultList = new ArrayList<>(agendaList);
 
 		// ----------------------------
-		// (fileTrgtKey, agendaDate) 유니크 조합 수집
+		// (fileTrgtKey, agendaNo, agendaDate) 유니크 조합 수집
 		// ----------------------------
 		Set<String> keyPairs = new LinkedHashSet<>();
 		if (agendaList != null) {
 			for (Map<String, String> row : agendaList) {
 				String fileTrgtKey = row.get("fileTrgtKey");
+				String agendaNo    = row.get("agendaNo");
 				String agendaDate  = row.get("agendaDate");
 				if (fileTrgtKey != null && !fileTrgtKey.isEmpty()
+					&& agendaNo != null && !agendaNo.isEmpty()
 					&& agendaDate != null && !agendaDate.isEmpty()) {
-					keyPairs.add(fileTrgtKey + "|" + agendaDate);
+					keyPairs.add(fileTrgtKey + "|" + agendaNo + "|" + agendaDate);
 				}
 			}
 		}
 
-		// (fileTrgtKey, agendaDate)별 파일 조회
+		// (fileTrgtKey, agendaNo, agendaDate)별 파일 조회
 		List<Map<String, String>> allFiles = new ArrayList<>();
 		for (String pair : keyPairs) {
 			String[] parts = pair.split("\\|", -1);
 			String fileTrgtKeyBase = parts[0];
-			String agendaDate      = parts[1];
+			String agendaNo        = parts[1];
+			String agendaDate      = parts[2];
 
-			// 조합 규칙: (260001_2025-12-01)
-			String fileTrgtKey = fileTrgtKeyBase + "_" + agendaDate;
+			// 조합 규칙: (fileTrgtKey_agendaNo_agendaDate)
+			String fileTrgtKey = fileTrgtKeyBase + "_" + agendaNo + "_" + agendaDate;
 
 			Map<String, String> fileMap = new HashMap<>(paramMap);
 			fileMap.put("comonCd",     "FITR05");
@@ -92,6 +85,7 @@ public class PM20Svcimpl implements PM20Svc{
 				for (Map<String, String> f : files) {
 					// 프론트 매핑용 메타
 					f.put("fileTrgtKey", fileTrgtKeyBase);
+					f.put("agendaNo", agendaNo);
 					f.put("agendaDate", agendaDate);
 				}
 				allFiles.addAll(files);
@@ -142,6 +136,44 @@ public class PM20Svcimpl implements PM20Svc{
 	}
 
 	@Override
+	public List<Map<String, String>> select_agenda_no_by_date(Map<String, String> paramMap) {
+		return pm20Mapper.select_agenda_no_by_date(paramMap);
+	}
+
+	@Override
+	public int pm20_update_status(Map<String, String> paramMap) throws Exception {
+		return pm20Mapper.pm20_update_status(paramMap);
+	}
+
+	@Override
+	public int pm20_update_agenda_date(Map<String, String> paramMap) throws Exception {
+		int result = 0;
+
+		// 1) 파일 키 변경 대상 agendaNo 목록 확보
+		List<Map<String, String>> agendaList = pm20Mapper.select_agenda_no_by_date(paramMap);
+		String fileTrgtKey = paramMap.get("fileTrgtKey");
+		String oldDate = paramMap.get("oldDate");
+		String newDate = paramMap.get("newDate");
+
+		// 2) 안건 내용/참석자 날짜 변경
+		result += pm20Mapper.pm20_d03_update_date(paramMap);
+		result += pm20Mapper.pm20_d02_update_date(paramMap);
+
+		// 3) 첨부파일 FILE_TRGT_KEY 변경
+		if (agendaList != null && fileTrgtKey != null && oldDate != null && newDate != null) {
+			for (Map<String, String> row : agendaList) {
+				String agendaNo = row.get("agendaNo");
+				if (agendaNo == null || agendaNo.isEmpty()) continue;
+				Map<String, String> p = new HashMap<>();
+				p.put("oldFileTrgtKey", fileTrgtKey + "_" + agendaNo + "_" + oldDate);
+				p.put("newFileTrgtKey", fileTrgtKey + "_" + agendaNo + "_" + newDate);
+				pm20Mapper.pm20_update_file_trgt_key(p);
+			}
+		}
+		return result;
+	}
+
+	@Override
 	public int delete_agenda(Map<String, String> paramMap) throws Exception {
 		int result = 0;
 		result += pm20Mapper.pm20_d03_delete_by_agenda(paramMap);
@@ -161,9 +193,11 @@ public class PM20Svcimpl implements PM20Svc{
 	public int pm20_d02_update(Map<String, Object> paramMap) throws Exception {
 		int result = 0;
 		List<Map<String,Object>> attedList = (List<Map<String,Object>>) paramMap.get("attendList");
-		
+
 		for (Map<String,Object> dtl : attedList) {
 			dtl.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+			dtl.put("agendaNo", paramMap.get("agendaNo"));
+			dtl.put("agendaVer", paramMap.get("agendaVer"));
 			dtl.put("agendaDate", paramMap.get("agendaDate"));
 			dtl.put("userId", paramMap.get("userId"));
 			dtl.put("pgmId",  paramMap.get("pgmId"));
@@ -193,6 +227,8 @@ public class PM20Svcimpl implements PM20Svc{
 		for (String id : ids) {
 			Map<String,Object> p = new HashMap<>();
 			p.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+			p.put("agendaNo", paramMap.get("agendaNo"));
+			p.put("agendaVer", paramMap.get("agendaVer"));
 			p.put("agendaDate", paramMap.get("agendaDate"));
 			p.put("userId", id);
 			result += pm20Mapper.pm20_d02_delete_selected(p);
@@ -204,14 +240,22 @@ public class PM20Svcimpl implements PM20Svc{
 	public int update_agenda_order(Map<String, String> paramMap) throws Exception {
 		int result = 0;
 		result += pm20Mapper.pm20_swap_agenda_no_d03(paramMap);
+		result += pm20Mapper.pm20_swap_agenda_no_d02(paramMap);
 		result += pm20Mapper.pm20_swap_agenda_no_d01(paramMap);
+		// 파일 FILE_TRGT_KEY swap (3단계: from->TEMP, to->from, TEMP->to)
+		pm20Mapper.pm20_swap_file_trgt_key(paramMap);
+		pm20Mapper.pm20_swap_file_trgt_key_step2(paramMap);
+		pm20Mapper.pm20_swap_file_trgt_key_step3(paramMap);
 		return result;
 	}
 
 	@Override
 	public int shift_agenda_order(Map<String, String> paramMap) throws Exception {
 		int result = 0;
+		// 파일 먼저 shift (큰 번호부터 처리해야 중복 방지)
+		pm20Mapper.pm20_shift_file_trgt_key(paramMap);
 		result += pm20Mapper.pm20_shift_agenda_no_d03(paramMap);
+		result += pm20Mapper.pm20_shift_agenda_no_d02(paramMap);
 		result += pm20Mapper.pm20_shift_agenda_no_d01(paramMap);
 		return result;
 	}
@@ -220,6 +264,7 @@ public class PM20Svcimpl implements PM20Svc{
 	public int move_agenda_order(Map<String, String> paramMap) throws Exception {
 		int result = 0;
 		result += pm20Mapper.pm20_move_agenda_no_d03(paramMap);
+		result += pm20Mapper.pm20_move_agenda_no_d02(paramMap);
 		result += pm20Mapper.pm20_move_agenda_no_d01(paramMap);
 		return result;
 	}

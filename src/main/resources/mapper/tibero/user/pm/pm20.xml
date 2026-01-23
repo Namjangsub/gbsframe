@@ -18,30 +18,40 @@
 		</if>
 	</select>
 
-	<select id="select_pm20m_Info" parameterType="map" resultType="CamelMap">
-		SELECT * 
-		FROM TB_PM20M01 
-		WHERE CO_CD = #{coCd} 
-		AND SALES_CD = #{salesCd}
-		<if test="ordrsNo != null and ordrsNo != ''">
-			AND ORDRS_NO = #{ordrsNo}
-		</if>
-		<if test="bizDiv != null and bizDiv != ''">
-			AND BIZ_DIV = #{bizDiv}
-		</if>
-		<if test="clntPjt != null and clntPjt != ''">
-			AND CLNT_PJT = #{clntPjt}
-		</if>
-		<if test="ordrsClntCd != null and ordrsClntCd != ''">
-			AND CLNT_CD = #{ordrsClntCd}
-		</if>
-		<if test="ordrsNo != null and ordrsNo != ''">
-			AND ORDRS_NO = #{ordrsNo}
-		</if>
-		<if test="ordrsNo != null and ordrsNo != ''">
-			AND ORDRS_NO = #{ordrsNo}
-		</if>
+	<select id="select_agenda_no_by_date" parameterType="Map" resultType="CamelMap">
+		SELECT DISTINCT
+			   AGENDA_NO
+		  FROM TB_PM20D03
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND AGENDA_DATE   = #{oldDate}
 	</select>
+
+	<update id="pm20_d03_update_date" parameterType="Map">
+		UPDATE TB_PM20D03
+		   SET AGENDA_DATE = #{newDate}
+			 , UDT_ID      = #{userId}
+			 , UDT_PGM     = #{pgmId}
+			 , UDT_DTTM    = SYSDATE
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND AGENDA_DATE   = #{oldDate}
+	</update>
+
+	<update id="pm20_d02_update_date" parameterType="Map">
+		UPDATE TB_PM20D02
+		   SET AGENDA_DATE = #{newDate}
+			 , UDT_ID      = #{userId}
+			 , UDT_PGM     = #{pgmId}
+			 , UDT_DTTM    = SYSDATE
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND AGENDA_DATE   = #{oldDate}
+	</update>
+
+	<update id="pm20_update_file_trgt_key" parameterType="Map">
+		UPDATE TB_CM08M01
+		   SET FILE_TRGT_KEY = #{newFileTrgtKey}
+		 WHERE FILE_TRGT_TYP = 'PM2001M01'
+		   AND FILE_TRGT_KEY = #{oldFileTrgtKey}
+	</update>
 
 	<select id="selectAgendaList" parameterType="Map" resultType="CamelMap">
 		/* 안건(D1) + 날짜별 내용(D3) : 날짜 컬럼용(세로형 반환) */
@@ -52,44 +62,50 @@
 			, D1.AGENDA_STATUS                        AS AGENDA_STATUS
 			, D1.SALES_CD                             AS SALES_CD
 			, D1.ORDRS_NO                             AS ORDRS_NO
-
+			, D1.CLNT_PJT                             AS CLNT_PJT
+			, (SELECT FN_CM05M01_CD_TO_NM(D1.CLNT_PJT) FROM DUAL)  AS CLNT_PJT_NM  --고객사프로젝트명
+			, D1.CLNT_CD                              AS CLNT_CD
+			, A.CLNT_NM                            	  AS CLNT_NM
+			, (NVL(A.CLNT_NM, '') || ' /' || CHR(10) || NVL((SELECT FN_CM05M01_CD_TO_NM(D1.CLNT_PJT) FROM DUAL), '')) AS CLNT_NM_PJT
 			, TO_CHAR(D3.AGENDA_DATE, 'YYYY-MM-DD')   AS AGENDA_DATE
 			, D3.AGENDA_VER                           AS AGENDA_VER
 			, D3.AGENDA_CNTS                          AS AGENDA_CNTS
 		FROM TB_PM20D01 D1
 						LEFT JOIN TB_PM20D03 D3 ON D3.FILE_TRGT_KEY = D1.FILE_TRGT_KEY
 											   AND D3.AGENDA_NO     = D1.AGENDA_NO
+						LEFT OUTER JOIN TB_BM02M01 AS A  ON D1.CLNT_CD = A.CLNT_CD
 		WHERE 1=1
 		AND D1.CO_CD   = #{coCd}
-		AND D1.BIZ_DIV = #{bizDiv}
-
+		  AND D1.BIZ_DIV = #{bizDiv}
 		<if test="salesCd != null and salesCd != ''">
-		AND D1.SALES_CD LIKE '%' || #{salesCd} || '%'
+		  AND D1.SALES_CD LIKE '%' || #{salesCd} || '%'
 		</if>
 
 		<if test="ordrsNo != null and ordrsNo != ''">
-		AND D1.ORDRS_NO LIKE '%' || #{ordrsNo} || '%'
+		  AND D1.ORDRS_NO LIKE '%' || #{ordrsNo} || '%'
 		</if>
 
 		<if test="clntCd != null and clntCd != ''">
-		AND D1.CLNT_CD = #{clntCd}
+		  AND D1.CLNT_CD = #{clntCd}
 		</if>
 
 		<if test="clntPjt != null and clntPjt != ''">
-		AND D1.CLNT_PJT = #{clntPjt}
+		  AND D1.CLNT_PJT = #{clntPjt}
 		</if>
 
 		<if test="mngId != null and mngId != ''">
-		AND D1.MNG_ID = #{mngId}
+		  AND D1.MNG_ID = #{mngId}
 		</if>
 
 		<if test="dataSearch != null and dataSearch != ''">
-		AND (
-			D1.AGENDA_TITLE LIKE '%' || #{dataSearch} || '%'
-			OR D3.AGENDA_CNTS LIKE '%' || #{dataSearch} || '%'
-		)
+		  AND (D1.AGENDA_TITLE LIKE '%' || #{dataSearch} || '%'OR D3.AGENDA_CNTS LIKE '%' || #{dataSearch} || '%')
 		</if>
-
+		<if test="bizDiv != null and bizDiv == 'AGENDA02' and reqDtFrom != null and reqDtFrom != ''">
+			AND D3.AGENDA_DATE &gt;= TO_DATE(#{reqDtFrom}, 'YYYY-MM-DD')
+		</if>
+		<if test="bizDiv != null and bizDiv == 'AGENDA02' and reqDtTo != null and reqDtTo != ''">
+			AND D3.AGENDA_DATE &lt;= TO_DATE(#{reqDtTo}, 'YYYY-MM-DD')
+		</if>
 		ORDER BY
 			TO_NUMBER(D1.AGENDA_NO)
 			, D3.AGENDA_DATE
@@ -99,14 +115,18 @@
 	<select id="select_pm20_d02_List" parameterType="Map" resultType="CamelMap">
 		SELECT
 				  T.FILE_TRGT_KEY										AS FILE_TRGT_KEY
-				, TO_CHAR(T.AGENDA_DATE, 'YYYY-MM-DD')				AS AGENDA_DATE
-				, T.USER_ID											AS ID
-				, (SELECT FN_CM06M01_ID_TO_NM(T.USER_ID) FROM DUAL)	AS NAME
+				, T.AGENDA_NO											AS AGENDA_NO
+				, T.AGENDA_VER											AS AGENDA_VER
+				, TO_CHAR(T.AGENDA_DATE, 'YYYY-MM-DD')					AS AGENDA_DATE
+				, T.USER_ID												AS ID
+				, (SELECT FN_CM06M01_ID_TO_NM(T.USER_ID) FROM DUAL)		AS NAME
 		FROM TB_PM20D02 T
 						LEFT OUTER JOIN TB_CM06M01 A ON A.ID = T.USER_ID
 						LEFT OUTER JOIN TB_CM07M01 B ON B.LEVEL_CD = A.LEVEL_CD
 		WHERE FILE_TRGT_KEY = #{fileTrgtKey}
-		ORDER BY CASE WHEN REGEXP_LIKE(B.LEVEL_CD, '[0-9]+') THEN TO_NUMBER(REGEXP_REPLACE(B.LEVEL_CD, '[^0-9]', '')) ELSE 0 END DESC
+		ORDER BY T.AGENDA_NO
+				, T.AGENDA_VER
+				, CASE WHEN REGEXP_LIKE(B.LEVEL_CD, '[0-9]+') THEN TO_NUMBER(REGEXP_REPLACE(B.LEVEL_CD, '[^0-9]', '')) ELSE 0 END DESC
 				, A.NAME
     </select>
 
@@ -213,6 +233,16 @@
 		)
 	</update>
 
+	<update id="pm20_update_status" parameterType="Map">
+		UPDATE TB_PM20D01
+		   SET AGENDA_STATUS = #{agendaStatus, jdbcType=VARCHAR}
+			 , UDT_ID        = #{userId}
+			 , UDT_DTTM      = SYSDATE
+			 , UDT_PGM       = #{pgmId}
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND AGENDA_NO      = #{agendaNo}
+	</update>
+
 	<update id="pm20_d3_insert_update" parameterType="Map">
 		MERGE INTO TB_PM20D03 A
 			USING DUAL
@@ -303,6 +333,8 @@
 			USING DUAL
 			ON (
 					FILE_TRGT_KEY 	= #{fileTrgtKey}
+					AND AGENDA_NO	= #{agendaNo}
+					AND AGENDA_VER	= #{agendaVer}
 					AND AGENDA_DATE = #{agendaDate}
 					AND USER_ID 	= #{attendId}
 			   )
@@ -315,6 +347,8 @@
 		INSERT
 		(
 				  FILE_TRGT_KEY
+				, AGENDA_NO
+				, AGENDA_VER
 				, AGENDA_DATE
 				, USER_ID
 				, CREAT_ID
@@ -323,6 +357,8 @@
 		)
 		VALUES(
 				  #{fileTrgtKey}
+				, #{agendaNo}
+				, #{agendaVer}
 				, #{agendaDate}
 				, #{attendId}
 				, #{userId}
@@ -342,6 +378,8 @@
 	<delete id="pm20_d02_delete_selected"  parameterType="Map">
 		DELETE FROM TB_PM20D02
 		 WHERE FILE_TRGT_KEY	= #{fileTrgtKey}
+		   AND AGENDA_NO		= #{agendaNo}
+		   AND AGENDA_VER		= #{agendaVer}
 		   AND AGENDA_DATE		= #{agendaDate}
 		   AND USER_ID			= #{userId}
 	</delete>
@@ -374,6 +412,20 @@
 		   AND AGENDA_NO IN (#{fromAgendaNo}, #{toAgendaNo})
 	</update>
 
+	<update id="pm20_swap_agenda_no_d02" parameterType="Map">
+		UPDATE TB_PM20D02
+		   SET AGENDA_NO = CASE
+				WHEN AGENDA_NO = #{fromAgendaNo} THEN #{toAgendaNo}
+				WHEN AGENDA_NO = #{toAgendaNo} THEN #{fromAgendaNo}
+				ELSE AGENDA_NO
+			END,
+			UDT_ID = #{userId},
+			UDT_DTTM = SYSDATE,
+			UDT_PGM = #{pgmId}
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+		   AND AGENDA_NO IN (#{fromAgendaNo}, #{toAgendaNo})
+	</update>
+
 	<update id="pm20_shift_agenda_no_d01" parameterType="Map">
 		UPDATE TB_PM20D01
 		   SET AGENDA_NO = TO_CHAR(TO_NUMBER(AGENDA_NO) + 1)
@@ -393,6 +445,16 @@
 		     , UDT_PGM = #{pgmId}
 		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
 		   AND BIZ_DIV = #{bizDiv}
+		   AND TO_NUMBER(AGENDA_NO) <![CDATA[>=]]> TO_NUMBER(#{fromAgendaNo})
+	</update>
+
+	<update id="pm20_shift_agenda_no_d02" parameterType="Map">
+		UPDATE TB_PM20D02
+		   SET AGENDA_NO = TO_CHAR(TO_NUMBER(AGENDA_NO) + 1)
+		     , UDT_ID = #{userId}
+		     , UDT_DTTM = SYSDATE
+		     , UDT_PGM = #{pgmId}
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
 		   AND TO_NUMBER(AGENDA_NO) <![CDATA[>=]]> TO_NUMBER(#{fromAgendaNo})
 	</update>
 
@@ -436,6 +498,57 @@
 			UDT_PGM = #{pgmId}
 		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
 		   AND BIZ_DIV = #{bizDiv}
+	</update>
+
+	<update id="pm20_move_agenda_no_d02" parameterType="Map">
+		UPDATE TB_PM20D02
+		   SET AGENDA_NO = CASE
+				WHEN AGENDA_NO = #{fromAgendaNo} THEN #{toAgendaNo}
+				WHEN TO_NUMBER(#{fromAgendaNo}) <![CDATA[<]]> TO_NUMBER(#{toAgendaNo})
+				 AND TO_NUMBER(AGENDA_NO) <![CDATA[>]]> TO_NUMBER(#{fromAgendaNo})
+				 AND TO_NUMBER(AGENDA_NO) <![CDATA[<=]]> TO_NUMBER(#{toAgendaNo})
+				 THEN TO_CHAR(TO_NUMBER(AGENDA_NO) - 1)
+				WHEN TO_NUMBER(#{fromAgendaNo}) <![CDATA[>]]> TO_NUMBER(#{toAgendaNo})
+				 AND TO_NUMBER(AGENDA_NO) <![CDATA[>=]]> TO_NUMBER(#{toAgendaNo})
+				 AND TO_NUMBER(AGENDA_NO) <![CDATA[<]]> TO_NUMBER(#{fromAgendaNo})
+				 THEN TO_CHAR(TO_NUMBER(AGENDA_NO) + 1)
+				ELSE AGENDA_NO
+			END,
+			UDT_ID = #{userId},
+			UDT_DTTM = SYSDATE,
+			UDT_PGM = #{pgmId}
+		 WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+	</update>
+
+	<!-- 파일 FILE_TRGT_KEY swap (위로/아래로) - 3단계: from→음수, to→from, 음수→to -->
+	<update id="pm20_swap_file_trgt_key" parameterType="Map">
+		UPDATE TB_CM08M01
+		   SET FILE_TRGT_KEY = REPLACE(FILE_TRGT_KEY, '_' || #{fromAgendaNo} || '_', '_-' || #{fromAgendaNo} || '_')
+		 WHERE FILE_TRGT_TYP = 'PM2001M01'
+		   AND FILE_TRGT_KEY LIKE #{fileTrgtKey} || '_' || #{fromAgendaNo} || '_%'
+	</update>
+
+	<update id="pm20_swap_file_trgt_key_step2" parameterType="Map">
+		UPDATE TB_CM08M01
+		   SET FILE_TRGT_KEY = REPLACE(FILE_TRGT_KEY, '_' || #{toAgendaNo} || '_', '_' || #{fromAgendaNo} || '_')
+		 WHERE FILE_TRGT_TYP = 'PM2001M01'
+		   AND FILE_TRGT_KEY LIKE #{fileTrgtKey} || '_' || #{toAgendaNo} || '_%'
+	</update>
+
+	<update id="pm20_swap_file_trgt_key_step3" parameterType="Map">
+		UPDATE TB_CM08M01
+		   SET FILE_TRGT_KEY = REPLACE(FILE_TRGT_KEY, '_-' || #{fromAgendaNo} || '_', '_' || #{toAgendaNo} || '_')
+		 WHERE FILE_TRGT_TYP = 'PM2001M01'
+		   AND FILE_TRGT_KEY LIKE #{fileTrgtKey} || '_-' || #{fromAgendaNo} || '_%'
+	</update>
+
+	<!-- 파일 FILE_TRGT_KEY shift (안건 추가 시) -->
+	<update id="pm20_shift_file_trgt_key" parameterType="Map">
+		UPDATE TB_CM08M01
+		   SET FILE_TRGT_KEY = #{fileTrgtKey} || '_' || TO_CHAR(TO_NUMBER(SUBSTR(FILE_TRGT_KEY, LENGTH(#{fileTrgtKey}) + 2, INSTR(SUBSTR(FILE_TRGT_KEY, LENGTH(#{fileTrgtKey}) + 2), '_') - 1)) + 1) || '_' || SUBSTR(FILE_TRGT_KEY, INSTR(FILE_TRGT_KEY, '_', 1, 2) + 1)
+		 WHERE FILE_TRGT_TYP = 'PM2001M01'
+		   AND FILE_TRGT_KEY LIKE #{fileTrgtKey} || '_%'
+		   AND TO_NUMBER(SUBSTR(FILE_TRGT_KEY, LENGTH(#{fileTrgtKey}) + 2, INSTR(SUBSTR(FILE_TRGT_KEY, LENGTH(#{fileTrgtKey}) + 2), '_') - 1)) <![CDATA[>=]]> TO_NUMBER(#{fromAgendaNo})
 	</update>
 
 </mapper>

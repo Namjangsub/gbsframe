@@ -29,24 +29,6 @@ public class PM20Ctr {
         this.messageUtils = messageUtils;
     }
 
-	// 임팀장회의록 현황 조회
-	@PostMapping(value = "/selectList_pm20")
-	public String selectList_pm20(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
-		
-		List<Map<String, String>> result = pm20Svc.selectList_pm20(paramMap);
-		model.addAttribute("result", result);
-		
-		return "jsonView";
-	}
-
-	// 프로젝트별 매입원가현황 헤더 정보 조회
-	@PostMapping(value = "/select_pm20m_Info")
-	public String select_pm20m_Info(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		Map<String, String> result = pm20Svc.select_pm20m_Info(paramMap);
-		model.addAttribute("result", result);
-		return "jsonView";
-	}
-
 	// 프로젝트별 그리드 자식 트리 전체 리스트 조회 *(안건리스트, 참석자리스트, 파일리스트)
     @PostMapping("/selectAgendaList")
     public String selectAgendaList(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -82,6 +64,42 @@ public class PM20Ctr {
 	public String insert_update_agenda(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
 		try {
 			if (pm20Svc.insert_update_agenda(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	// 진행여부 update
+	@PostMapping(value = "/pm20_update_status")
+	public String pm20_update_status(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (pm20Svc.pm20_update_status(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	// 날짜 컬럼 변경 (안건/참석자/첨부파일 키 동기화)
+	@PostMapping(value = "/pm20_update_agenda_date")
+	public String pm20_update_agenda_date(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (pm20Svc.pm20_update_agenda_date(paramMap) != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
 			} else {
