@@ -229,16 +229,44 @@ public class WB26SvcImpl implements WB26Svc {
 		for(Map<String, String> dtl : detailMap) {
 			processe_salesCd = dtl.get("salesCd");
 			// SalesCd 가 바뀌면 버젼업 처리
-			if (!processe_salesCd.equals(saved_salesCd)) {
-				saveMap.put("salesCd", processe_salesCd);
-				int copyCnt = wb26Mapper.insertWbsScheduleHIST(saveMap);
-				if (copyCnt > 0) result += wb26Mapper.updateWbsScheduleVersionUp(saveMap);
-			}
+//			if (!processe_salesCd.equals(saved_salesCd)) {
+//				saveMap.put("salesCd", processe_salesCd);
+//				int copyCnt = wb26Mapper.insertWbsScheduleHIST(saveMap);
+//				if (copyCnt > 0) result += wb26Mapper.updateWbsScheduleVersionUp(saveMap);
+//			}
 			dtl.put("userId", userId);
 			dtl.put("pgmId", pgmId);
 			dtl.put("coCd", coCd);
+
+            String processe_deptCd = dtl.get("deptCd");
+            if ("S01".equals(processe_deptCd) ) {  //SQL문장 select_wb06_List  -> DEPT_TBL 참조 (수주확정, 목표원가/PFU배포)
+            	String[] wbsCodes = {"WBSCODE01", "WBSCODE02"}; //(수주확정, 목표원가/PFU배포)
+            	for (String code : wbsCodes) {
+            	    dtl.put("wbsPlanCodeId", code);
+            	    result += wb26Mapper.updateWbsScheduleVersionUpWbsCode(dtl);
+            	}
+            } else if ("S04".equals(processe_deptCd)) {  //SQL문장 select_wb06_List  -> DEPT_TBL 참조 (
+            	String[] wbsCodes = {"WBSCODE17", "WBSCODE04"}; //모델링완료, 구매완료
+            	for (String code : wbsCodes) {
+            	    dtl.put("wbsPlanCodeId", code);
+            	    result += wb26Mapper.updateWbsScheduleVersionUpWbsCode(dtl);
+            	}
+            } else if ("S09".equals(processe_deptCd)) {  //SQL문장 select_wb06_List  -> DEPT_TBL 참조
+            	String[] wbsCodes = {"WBSCODE07", "WBSCODE16"}; //자체시운전완료, 외부제작검수
+            	for (String code : wbsCodes) {
+            	    dtl.put("wbsPlanCodeId", code);
+            	    result += wb26Mapper.updateWbsScheduleVersionUpWbsCode(dtl);
+            	}
+            } else if ("S14".equals(processe_deptCd)) {  //SQL문장 select_wb06_List  -> DEPT_TBL 참조
+            	String[] wbsCodes = {"WBSCODE13", "WBSCODE14"}; //설치시운전(출발일), 설치시운전(복귀일)
+            	for (String code : wbsCodes) {
+            	    dtl.put("wbsPlanCodeId", code);
+            	    result += wb26Mapper.updateWbsScheduleVersionUpWbsCode(dtl);
+            	}
+            } else {
+            	result += wb26Mapper.updateWbsSchedule(dtl);
+            }
 			
-			result += wb26Mapper.updateWbsSchedule(dtl);
 			saved_salesCd = processe_salesCd;
 		}
 		return result;

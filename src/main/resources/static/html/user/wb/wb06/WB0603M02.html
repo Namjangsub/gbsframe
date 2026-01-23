@@ -253,6 +253,16 @@
       const d = new Date(ts);
       return ymd(d);
     }
+
+    // normalize date input to 'YYYY-MM-DD' if possible (supports number timestamp, 'YYYY-MM-DD', 'YYYYMMDD')
+    function toYmdStr(v){
+      if(v === null || v === undefined || v === '') return null;
+      if(typeof v === "number") return timestampToYmd(v);
+      const s = String(v).trim();
+      if(/^\d{8}$/.test(s)) return s.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3");
+      if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      return s; // fallback
+    }
     function escapeHtml(s){
       return String(s ?? "")
         .replaceAll("&","&amp;")
@@ -266,6 +276,7 @@
      * 툴팁 기능
      * ========================= */
     function showBarTooltip(rowObj, mouseX, mouseY){
+      if($("#ganttOverlapPicker").is(":visible")) return;
 
       const $tooltip = $("#barTooltip");
 
@@ -880,6 +891,7 @@ console.log(rowObj);
       const list = [];
       const bars = $canvas.find(".bar").filter(function(){
         const $b = $(this);
+        if($b.hasClass("act-bar")) return false;
         if($b.data("summary") === 1 || $b.data("summary") === "1") return false;
         return true;
       });
@@ -904,6 +916,7 @@ console.log(rowObj);
     }
 
     function showOverlapPicker(items, pageX, pageY){
+          hideBarTooltip(); // [MOD] 피커 뜰 때 기존 툴팁 제거
     	  const $p = ensureOverlapPicker();
     	  const $list = $p.find(".list").empty();
 
@@ -1367,8 +1380,8 @@ console.log(rowObj);
         }
 
         (r.rows || []).forEach((rowObj, rowIdx)=>{
-          const startDate = (typeof rowObj.wbsPlansDtFm === "number") ? timestampToYmd(rowObj.wbsPlansDtFm) : rowObj.wbsPlansDtFm;
-          const endDate   = (typeof rowObj.wbsPlaneDtFm === "number") ? timestampToYmd(rowObj.wbsPlaneDtFm) : rowObj.wbsPlaneDtFm;
+          const startDate = toYmdStr(rowObj.wbsPlansDtFm);
+          const endDate   = toYmdStr(rowObj.wbsPlaneDtFm);
           if(!startDate || !endDate) return;
 
           const left = daysBetween(STATE.viewStart, startDate) * CELL_W;
@@ -1376,8 +1389,19 @@ console.log(rowObj);
           const cls = deptClass(rowObj.deptCd || rowObj.deptNm);
           const deptNmSafe = escapeHtml(rowObj.deptNm || 'N/A');
 
+          // plan(계획) 구간은 기존 규칙(부서 컬러) 그대로 유지
+          const actStYmd  = toYmdStr(rowObj.actSt);
+          let actEndYmd = toYmdStr(rowObj.actEnd);
+          
+          // actProg가 0보다 크고 actSt가 있지만 actEnd가 없으면 현재일로 적용
+          if((rowObj.actProg && rowObj.actProg > 0) && actStYmd && !actEndYmd) {
+            actEndYmd = ymd(new Date());
+          }
+          
+          const hasAct = !!(actStYmd && actEndYmd && parseYMD(actStYmd) && parseYMD(actEndYmd));
+
           const $bar = $(`
-            <div class="bar ${cls}"
+            <div class="bar ${cls} plan-bar ${hasAct ? 'has-act' : ''}"
                  data-row="${idx}"
                  data-seg="${rowIdx}"
                  data-rowid="${escapeHtml(rowObj.fileTrgtKey || '')}"
@@ -1398,6 +1422,42 @@ console.log(rowObj);
           `);
           $bar.data("rowobj", rowObj);
           $canvas.append($bar);
+
+          // act(실적) bar는 동일 행/동일 bar 영역의 하단에 배치
+          if(hasAct){
+            // 날짜 역전 방지
+            let aSt = actStYmd, aEnd = actEndYmd;
+            if(parseYMD(aSt) > parseYMD(aEnd)){ const tmp = aSt; aSt = aEnd; aEnd = tmp; }
+
+            const actLeft = daysBetween(STATE.viewStart, aSt) * CELL_W;
+            const actWraw = (daysBetween(aSt, aEnd) + 1) * CELL_W;
+            const actW = Math.max(CELL_W, actWraw);
+
+            const p = rowObj.actProg;
+            const progTxt = (p === null || p === undefined || String(p).trim() === '')
+              ? '0%'
+              : (String(p).trim().endsWith('%') ? String(p).trim() : (String(p).trim() + '%'));
+            const pctNum = (() => {
+              const raw = (p === null || p === undefined) ? '' : String(p);
+              const n = parseInt(raw.replace('%','').trim(), 10);
+              return Number.isFinite(n) ? n : 0;
+            })();
+            const pctCls = (pctNum >= 100) ? 'act-pct-100' : 'act-pct-not100';
+
+            const st = String(rowObj.status || '').trim().toLowerCase();
+            const stCls = st ? ('act-status-' + st) : 'act-status-unk';
+
+            const $act = $(`
+              <div class="bar act-bar ${stCls} ${pctCls}" data-act="1"
+                   data-row="${idx}"
+                   data-seg="${rowIdx}"
+                   style="left:${actLeft}px;width:${actW}px;">
+                <div class="txt">${escapeHtml(progTxt)}</div>
+              </div>
+            `);
+            $act.data("rowobj", rowObj);
+            $canvas.append($act);
+          }
         });
 
         $WBS.append($row);
@@ -1532,6 +1592,9 @@ console.log(rowObj);
         const rowObj = $bar.data("rowobj");
 
         if(!rowObj || $bar.hasClass("is-active")) return;
+
+        // [MOD] 겹침 피커가 떠있으면 툴팁 금지
+        if($("#ganttOverlapPicker").is(":visible")) return;
 
         // 기존 timeout 취소
         clearTimeout(tooltipTimeout);
@@ -2774,6 +2837,8 @@ console.log(rowObj);
             // 백엔드 API 호출
             postAjax("/user/wb/wb26/updateWbsSchedule", paramData, null, function(response) {
               if(response && response.resultCode === 200) {
+				//변경이력 clear 처리
+                CHANGED_ROWS.clear();
                 toast('일정변경이 성공적으로 저장되었습니다.');
 //                 console.log('일정변경 업데이트 성공');
               } else {

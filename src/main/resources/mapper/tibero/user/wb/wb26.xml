@@ -2052,85 +2052,106 @@
     
     
     <select id="select_wb06_List" parameterType="Map" resultType="camelMap">
-		WITH DEPT_TBL AS (
-			SELECT *
-			FROM (
-                        SELECT 'WBSCODE01' AS WBS_PLAN_CODE_ID, '영업'    AS FULL_NM, '영' AS DEPT_NM, 'S01' AS DEPT_ID, 'GUN30' AS MNG_DEPT FROM DUAL
-                UNION SELECT 'WBSCODE02',                      '영업',             '영',            'S01',         'GUN30'    FROM DUAL
-                UNION SELECT 'WBSCODE03',                      '설계',             '설',            'S03',         'GUN40'    FROM DUAL
-                UNION SELECT 'WBSCODE17',                      '구매',             '구',            'S04',         'TRN50'    FROM DUAL
-                UNION SELECT 'WBSCODE04',                      '구매',             '구',            'S04',         'TRN50'    FROM DUAL
-                UNION SELECT 'WBSCODE18',                      '제품입고',          '제',            'S06',        'GUN30'     FROM DUAL
-                UNION SELECT 'WBSCODE05',                      '생산',             '생',            'S07',         'GUN60'    FROM DUAL
-                UNION SELECT 'WBSCODE06',                      '전기',             '전',            'S08',         'TRN50'    FROM DUAL
-                UNION SELECT 'WBSCODE07',                      '시운전',            '시',            'S09',        'TRN50'     FROM DUAL
-                UNION SELECT 'WBSCODE16',                      '시운전',            '시',            'S09',        'TRN50'   FROM DUAL
-                UNION SELECT 'WBSCODE09',                      '고객검수',          '고',            'S11',        'GUN30'     FROM DUAL
-                UNION SELECT 'WBSCODE11',                      '출하',             '출',            'S13',         'GUN30'    FROM DUAL
-                UNION SELECT 'WBSCODE13',                      '설치',             '치',            'S14',         'GUN30'    FROM DUAL
-                UNION SELECT 'WBSCODE14',                      '설치',             '치',            'S14',         'GUN30'    FROM DUAL
-                ) T 
-                LEFT OUTER JOIN ( 
-             SELECT  substr(VIEW_DEPT_ID,1,5) VIEW_DEPT_ID, MNG_ID AS TEAM_MNG_ID
-             FROM TB_CM06M01
-             WHERE TEAM_MANAGER = 'TEAM01'
-             AND USE_YN = 'Y'
-             AND MNG_ID IS NOT NULL
-                ) M ON M.VIEW_DEPT_ID = T.MNG_DEPT
-		),
-		src AS (
-			SELECT DISTINCT
-				W.CO_CD,
-				W.SALES_CD,
-				D.DEPT_ID,
-				D.DEPT_NM,
-				D.FULL_NM,
-				D.TEAM_MNG_ID,
-				W.WBS_PLANS_DT,
-				W.WBS_PLANE_DT,
-				W.WBS_PLAN_CODE_ID,
-				W.FILE_TRGT_KEY,
-				W.CLOSE_YN AS WBS_CLOSE_YN,
-				W.WBS_PLAN_MNG_ID
-			FROM TB_WB22M01 W
-			LEFT JOIN DEPT_TBL D
-			ON D.WBS_PLAN_CODE_ID = W.WBS_PLAN_CODE_ID
-			WHERE W.WBS_PLAN_CODE_KIND = 'WBSCODE'
-			<!-- SalesCode -->
-			<if test="salesCd != null and !salesCd.equals('')">
-			AND W.SALES_CD LIKE  '%' || #{salesCd} || '%'
-			</if>
-			AND W.CO_CD = 'GUN'
-			AND W.WBS_PLANS_DT IS NOT NULL
-			AND W.WBS_PLANE_DT IS NOT NULL
-			AND D.DEPT_ID IS NOT NULL
-		),
-		/* sales는 1회만 집계 */
-		sales AS (
-			SELECT
-				S0.CO_CD,
-				S0.SALES_CD,
-				MAX(C.EQP_NM)        AS EQP_NM,
-				MAX(C.ORDRS_NO)      AS ORDRS_NO,
-				MAX(M.ORDRS_CLNT_CD) AS ORDRS_CLNT_CD,
-				MAX(B.CLNT_NM)       AS CLNT_NM,
-				MAX(M.CLNT_PJT)      AS CLNT_PJT,
-				FN_CM05M01_CD_TO_NM(MAX(M.CLNT_PJT)) AS CLNT_PJT_NM,
-				MAX(W.FILE_TRGT_KEY) AS SJ_FILE_TRGT_KEY,
-                MAX(W.WBS_REMARK) 	 AS WBS_REMARK,
-                MAX(NVL(W.CLOSE_YN,'N')) AS CLOSE_YN,
-                MAX(W.SMRIZE_ID) 	 AS SMRIZE_ID
-			FROM (SELECT DISTINCT CO_CD, SALES_CD FROM src) S0
-			JOIN TB_CR02D02 C ON C.CO_CD = S0.CO_CD AND C.SALES_CD = S0.SALES_CD
-			JOIN TB_CR02M01 M ON M.ORDRS_NO = C.ORDRS_NO
-			JOIN TB_BM02M01 B ON B.CLNT_CD  = M.ORDRS_CLNT_CD
-            LEFT OUTER JOIN  (
-            			SELECT CO_CD, SALES_CD, FILE_TRGT_KEY, WBS_REMARK, CLOSE_YN , VER_NO, SMRIZE_ID
-            			FROM TB_WB21M01 W 
-            			WHERE W.VER_NO = (SELECT MAX(TO_NUMBER(VER_NO)) FROM TB_WB21M01 P1 WHERE P1.SJ_NO = W.SJ_NO)
-            ) W ON W.CO_CD = S0.CO_CD AND W.SALES_CD = S0.SALES_CD
-			GROUP BY S0.CO_CD, S0.SALES_CD
-		),
+		WITH  /* 기준일 1회 계산 */
+			today AS (
+				SELECT TRUNC(SYSDATE) AS D FROM DUAL
+			),
+			DEPT_TBL AS (
+				SELECT *
+				FROM (
+	                        SELECT 'WBSCODE01' AS WBS_PLAN_CODE_ID, '영업'    AS FULL_NM, '영' AS DEPT_NM, 'S01' AS DEPT_ID, 'GUN30' AS MNG_DEPT FROM DUAL
+	                UNION SELECT 'WBSCODE02',                      '영업',             '영',            'S01',         'GUN30'    FROM DUAL
+	                UNION SELECT 'WBSCODE03',                      '설계',             '설',            'S03',         'GUN40'    FROM DUAL
+	                UNION SELECT 'WBSCODE17',                      '구매',             '구',            'S04',         'TRN50'    FROM DUAL
+	                UNION SELECT 'WBSCODE04',                      '구매',             '구',            'S04',         'TRN50'    FROM DUAL
+	                UNION SELECT 'WBSCODE18',                      '제품입고',          '제',            'S06',        'GUN30'    FROM DUAL
+	                UNION SELECT 'WBSCODE05',                      '생산',             '생',            'S07',         'GUN60'    FROM DUAL
+	                UNION SELECT 'WBSCODE06',                      '전기',             '전',            'S08',         'TRN50'    FROM DUAL
+	                UNION SELECT 'WBSCODE07',                      '시운전',            '시',            'S09',        'TRN50'    FROM DUAL
+	                UNION SELECT 'WBSCODE16',                      '시운전',            '시',            'S09',        'TRN50'    FROM DUAL
+	                UNION SELECT 'WBSCODE09',                      '고객검수',          '고',            'S11',        'GUN30'    FROM DUAL
+	                UNION SELECT 'WBSCODE11',                      '출하',             '출',            'S13',         'GUN30'    FROM DUAL
+	                UNION SELECT 'WBSCODE13',                      '설치',             '치',            'S14',         'GUN30'    FROM DUAL
+	                UNION SELECT 'WBSCODE14',                      '설치',             '치',            'S14',         'GUN30'    FROM DUAL
+	                ) T 
+	                LEFT OUTER JOIN ( 
+	             SELECT  substr(VIEW_DEPT_ID,1,5) VIEW_DEPT_ID, MNG_ID AS TEAM_MNG_ID
+	             FROM TB_CM06M01
+	             WHERE TEAM_MANAGER = 'TEAM01'
+	             AND USE_YN = 'Y'
+	             AND MNG_ID IS NOT NULL
+	                ) M ON M.VIEW_DEPT_ID = T.MNG_DEPT
+			),
+			src AS (
+				SELECT 
+					W.CO_CD,
+					W.SALES_CD,
+					D.DEPT_ID,
+					D.DEPT_NM,
+					D.FULL_NM,
+					D.TEAM_MNG_ID,
+					W.WBS_PLANS_DT,
+					W.WBS_PLANE_DT,
+					W.WBS_PLAN_CODE_ID,
+					W.FILE_TRGT_KEY,
+					W.CLOSE_YN AS WBS_CLOSE_YN,
+					W.WBS_PLAN_MNG_ID
+				FROM TB_WB22M01 W
+				LEFT JOIN DEPT_TBL D
+				ON D.WBS_PLAN_CODE_ID = W.WBS_PLAN_CODE_ID
+				WHERE W.WBS_PLAN_CODE_KIND = 'WBSCODE'
+				<!-- SalesCode -->
+				<if test="salesCd != null and !salesCd.equals('')">
+				AND W.SALES_CD LIKE  '%' || #{salesCd} || '%'
+				</if>
+				AND W.CO_CD = 'GUN'
+				AND W.WBS_PLANS_DT IS NOT NULL
+				AND W.WBS_PLANE_DT IS NOT NULL
+				AND D.DEPT_ID IS NOT NULL
+			),
+			s0 AS (
+			  SELECT /*+ MATERIALIZE */ DISTINCT CO_CD, SALES_CD
+			  FROM src
+			),
+			wb21_latest AS (
+				SELECT CO_CD, SALES_CD, FILE_TRGT_KEY, WBS_REMARK, CLOSE_YN, VER_NO, SMRIZE_ID
+				FROM (
+				  SELECT
+				    W.*,
+				    ROW_NUMBER() OVER (
+				      PARTITION BY W.SJ_NO
+				      ORDER BY TO_NUMBER(W.VER_NO) DESC
+				    ) AS RN
+				  FROM TB_WB21M01 W
+				)
+				WHERE RN = 1
+			),
+			/* sales는 1회만 집계 */
+			sales AS (
+				SELECT
+					S0.CO_CD,
+					S0.SALES_CD,
+					MAX(C.EQP_NM)        AS EQP_NM,
+					MAX(C.ORDRS_NO)      AS ORDRS_NO,
+					MAX(M.ORDRS_CLNT_CD) AS ORDRS_CLNT_CD,
+					MAX(B.CLNT_NM)       AS CLNT_NM,
+					MAX(M.CLNT_PJT)      AS CLNT_PJT,
+					FN_CM05M01_CD_TO_NM(MAX(M.CLNT_PJT)) AS CLNT_PJT_NM,
+					MAX(W.FILE_TRGT_KEY) AS SJ_FILE_TRGT_KEY,
+	                MAX(W.WBS_REMARK) 	 AS WBS_REMARK,
+	                MAX(NVL(W.CLOSE_YN,'N')) AS CLOSE_YN,
+	                MAX(W.SMRIZE_ID) 	 AS SMRIZE_ID
+				FROM s0 S0
+				JOIN TB_CR02D02 C ON C.CO_CD = S0.CO_CD AND C.SALES_CD = S0.SALES_CD
+				JOIN TB_CR02M01 M ON M.ORDRS_NO = C.ORDRS_NO
+				JOIN TB_BM02M01 B ON B.CLNT_CD  = M.ORDRS_CLNT_CD
+	            LEFT OUTER JOIN  (
+	            			SELECT CO_CD, SALES_CD, FILE_TRGT_KEY, WBS_REMARK, CLOSE_YN , VER_NO, SMRIZE_ID
+	            			FROM TB_WB21M01 W 
+	            			WHERE W.VER_NO = (SELECT MAX(TO_NUMBER(VER_NO)) FROM TB_WB21M01 P1 WHERE P1.SJ_NO = W.SJ_NO)
+	            ) W ON W.CO_CD = S0.CO_CD AND W.SALES_CD = S0.SALES_CD
+				GROUP BY S0.CO_CD, S0.SALES_CD
+			),
 		base_lag AS (
 			SELECT
 				s.*,
@@ -2179,6 +2200,24 @@
 			FROM final_base
 			GROUP BY CO_CD, SALES_CD
 		)
+		, src_act AS (
+			  SELECT
+			    A.CO_CD,
+			    A.WBS_PLAN_CODE_KIND,
+			    A.SALES_CD,
+			    MAX(A.WBS_RSLTS_ID)    AS WBS_RSLTS_ID,
+			    AVG(A.WBS_RSLTS_RATE)  AS WBS_RSLTS_RATE,
+			    SUM(A.WBS_RSLTS_MH)    AS WBS_RSLTS_MH,
+			    MAX(A.WBS_RSLTS_CNTS)  AS WBS_RSLTS_CNTS,
+			    MIN(A.WBS_RSLTSS_DT)   AS WBS_RSLTSS_DT,
+			    MAX(A.WBS_RSLTSE_DT)   AS WBS_RSLTSE_DT,
+			    MAX(A.CLOSE_YN)        AS CLOSE_YN,
+			    SUM(A.DAYCNT)          AS DAYCNT
+			  FROM TB_WB23M01 A
+			  JOIN s0 ON s0.CO_CD = A.CO_CD AND s0.SALES_CD = A.SALES_CD
+			  WHERE A.WBS_PLAN_CODE_KIND != 'WBSCODE'
+			  GROUP BY A.CO_CD, A.SALES_CD, A.WBS_PLAN_CODE_KIND
+		)
 		SELECT
 			F.CO_CD,
 			F.SALES_CD,
@@ -2203,25 +2242,33 @@
             S.WBS_REMARK,	--WBS 특이사항
             S.SMRIZE_ID,
             F.WBS_PLAN_MNG_ID,
-            C.NAME 				AS WBS_PLAN_MNG_NM
+            C.NAME 				AS WBS_PLAN_MNG_NM,
+			CASE
+--			  WHEN ST.HOLD_YN = 'Y' THEN 'HOLD'
+			  WHEN ST.CLOSE_YN = 'Y' OR NVL(ST.WBS_RSLTS_RATE,0) >= 100 THEN 'DONE'
+			  WHEN NVL(ST.WBS_RSLTS_RATE,0) = 0 THEN 'PLN'
+			  ELSE 'ING'
+			END AS STATUS,                 			--진행상태 PLN ING DONE HOLD
+                 
+            NVL(ST.WBS_RSLTS_RATE, 0) AS ACT_PROG,		--진행율
+            TO_CHAR(ST.WBS_RSLTSS_DT, 'YYYY-MM-DD')  AS ACT_ST,			--실적 시작일
+            TO_CHAR(ST.WBS_RSLTSE_DT, 'YYYY-MM-DD')  AS ACT_END,		--실적 시작일
+            ST.WBS_RSLTS_CNTS AS MEMO			--메모
 		FROM final_base F
-		JOIN sales S
-		ON S.CO_CD = F.CO_CD AND S.SALES_CD = F.SALES_CD
-		JOIN sales_range R
-		ON R.CO_CD = F.CO_CD AND R.SALES_CD = F.SALES_CD
-		LEFT JOIN TB_CM06M01 C
-		ON C.ID = F.WBS_PLAN_MNG_ID
-		LEFT JOIN TB_CM05M01 C5
-		ON C5.CODE_ID = F.WBS_PLAN_CODE_ID
+		JOIN sales S            ON S.CO_CD = F.CO_CD AND S.SALES_CD = F.SALES_CD
+		JOIN sales_range R      ON R.CO_CD = F.CO_CD AND R.SALES_CD = F.SALES_CD
+		CROSS JOIN today T
+		LEFT JOIN TB_CM06M01 C  ON C.ID = F.WBS_PLAN_MNG_ID
+		LEFT JOIN TB_CM05M01 C5 ON C5.CODE_ID = F.WBS_PLAN_CODE_ID
+		LEFT JOIN src_act ST    ON ST.CO_CD = F.CO_CD AND ST.SALES_CD = F.SALES_CD AND ST.WBS_PLAN_CODE_KIND = F.WBS_PLAN_CODE_ID
 		WHERE 1=1
-
 		<choose>
 		  <!-- 1) salesCd, ordrsClntNm, clntPjt 모두 비었을 때만 "오늘 포함" 조건 적용 -->
 		  <when test="(salesCd == null or salesCd == '') 
 		          and (ordrsClntNm == null or ordrsClntNm == '') 
 		          and (clntPjt == null or clntPjt == '')">
-		    AND R.SALES_START <![CDATA[<]]> TRUNC(SYSDATE)
-		    AND R.SALES_END   <![CDATA[>]]> TRUNC(SYSDATE)
+		    AND R.SALES_START <![CDATA[<]]> T.D
+		    AND R.SALES_END   <![CDATA[>]]> T.D
 		  </when>
 		
 		  <!-- 2) 하나라도 값이 있으면 해당 값 기준으로만 필터 -->
@@ -2278,6 +2325,7 @@
 		  AND  SALES_CD = #{salesCd}
 	</update>
 
+
 	<update id="updateWbsSchedule" parameterType="Map">
 		UPDATE TB_WB22M01
 		SET    WBS_PLANS_DT = TO_DATE(#{wbsPlansDtFm}, 'YYYY-MM-DD')
@@ -2286,5 +2334,17 @@
 			 , UDT_PGM = #{pgmId}
 			 , UDT_DTTM = SYSDATE
 		WHERE  FILE_TRGT_KEY = #{fileTrgtKey}
+	</update>
+	<update id="updateWbsScheduleVersionUpWbsCode" parameterType="Map">
+		UPDATE TB_WB22M01
+		SET    WBS_PLANS_DT = TO_DATE(#{wbsPlansDtFm}, 'YYYY-MM-DD')
+			 , WBS_PLANE_DT = TO_DATE(#{wbsPlaneDtFm}, 'YYYY-MM-DD')
+			 , UDT_ID = #{userId}
+			 , UDT_PGM = #{pgmId}
+			 , UDT_DTTM = SYSDATE
+		WHERE  CO_CD = #{coCd}
+		  AND  SALES_CD = #{salesCd}
+		  AND  WBS_PLAN_CODE_ID = #{wbsPlanCodeId}
+		  AND  WBS_PLAN_CODE_KIND = 'WBSCODE'
 	</update>
 </mapper>
