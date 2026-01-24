@@ -45,7 +45,7 @@ public class WB26SvcImpl implements WB26Svc {
 	
 	// 그리드 리스트
 	@Override
-	public List<Map<String, String>> select_wb06_List(Map<String, String> paramMap) {
+	public List<Map<String, String>> select_wb06_List(Map paramMap) {
 		return wb26Mapper.select_wb06_List(paramMap);
 	}
 

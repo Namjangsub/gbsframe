@@ -19,7 +19,7 @@ public interface WB26Svc {
 
 	int select_wb2602_List_Count(Map<String, String> paramMap);
 	List<Map<String, String>> select_wb2602_List(Map<String, String> paramMap);
-	List<Map<String, String>> select_wb06_List(Map<String, String> paramMap);
+	List<Map<String, String>> select_wb06_List(Map paramMap);
 
 	int select_wb2603_List_Count(Map<String, String> paramMap);
 	List<Map<String, String>> select_wb2603_List(Map<String, String> paramMap);

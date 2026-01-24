@@ -1,0 +1,2700 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>사용자 임의 조정형 대시보드 (Split/Grid/Flow)</title>
+
+  <!-- CDN libs -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/split.js@1.6.5/dist/split.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#f4f6fa;
+      --panel:#ffffff;
+      --line:#e5e9f2;
+      --text:#1f2a37;
+      --muted:#6b7280;
+      --primary:#1d4ed8;
+      --danger:#dc2626;
+      --ok:#16a34a;
+      --warn:#f59e0b;
+
+      --gap:12px;
+      --rowH:92px;
+      --cols:12;
+
+      --shadow: 0 10px 22px rgba(16,24,40,.08);
+      --radius: 14px;
+      --toolbarH: 54px;
+      
+      --rulerSize: 30px;
+      --rulerBg: #2c3e50;
+      --rulerText: #ecf0f1;
+      --rulerMark: #7f8c8d;
+      --gridColor: rgba(99, 110, 114, 0.15);
+      --gridSize: 20px;
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, sans-serif;
+      color:var(--text);
+      background:var(--bg);
+      overflow:hidden;
+    }
+
+    .app{
+      height:100%;
+      display:flex;
+      flex-direction:column;
+    }
+
+    /* toolbar */
+    .toolbar{
+      height:var(--toolbarH);
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      border-bottom:1px solid var(--line);
+      background:#fff;
+    }
+    .toolbar .left{ display:flex; align-items:center; gap:8px; flex:1; }
+    .toolbar .right{ display:flex; align-items:center; gap:8px; }
+    .btn{
+      appearance:none; border:1px solid var(--line); background:#fff;
+      padding:8px 10px; border-radius:10px; cursor:pointer;
+      font-size:13px; line-height:1;
+    }
+    .btn:hover{ border-color:#cfd6e6; }
+    .btn.primary{ background:var(--primary); color:#fff; border-color:var(--primary); }
+    .btn.danger{ background:var(--danger); color:#fff; border-color:var(--danger); }
+    .btn.active{ outline:2px solid rgba(29,78,216,.22); border-color: rgba(29,78,216,.35); }
+    .pill{
+      font-size:12px; color:var(--muted);
+      padding:6px 10px; border:1px solid var(--line);
+      border-radius:999px; background:#fff;
+    }
+    .sep{ width:1px; height:24px; background:var(--line); margin:0 4px; }
+
+    /* main */
+    .main{
+      flex:1;
+      min-height:0;
+      display:flex;
+      position: relative;
+    }
+    
+    /* Rulers and Grid */
+    .ruler-corner{
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: var(--rulerSize);
+      height: var(--rulerSize);
+      background: var(--rulerBg);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--rulerText);
+      font-size: 10px;
+      font-weight: 700;
+      border-right: 1px solid rgba(255,255,255,0.1);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .ruler-horizontal{
+      position: absolute;
+      top: 0;
+      left: var(--rulerSize);
+      right: 0;
+      height: var(--rulerSize);
+      background: var(--rulerBg);
+      z-index: 99;
+      overflow: hidden;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .ruler-vertical{
+      position: absolute;
+      top: var(--rulerSize);
+      left: 0;
+      bottom: 0;
+      width: var(--rulerSize);
+      background: var(--rulerBg);
+      z-index: 99;
+      overflow: hidden;
+      border-right: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .ruler-marks{
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .ruler-mark{
+      position: absolute;
+      background: var(--rulerMark);
+    }
+    
+    .ruler-horizontal .ruler-mark{
+      width: 1px;
+      height: 8px;
+      bottom: 0;
+    }
+    
+    .ruler-horizontal .ruler-mark.major{
+      height: 14px;
+      background: var(--rulerText);
+    }
+    
+    .ruler-horizontal .ruler-mark.minor{
+      height: 5px;
+    }
+    
+    .ruler-vertical .ruler-mark{
+      width: 8px;
+      height: 1px;
+      right: 0;
+    }
+    
+    .ruler-vertical .ruler-mark.major{
+      width: 14px;
+      background: var(--rulerText);
+    }
+    
+    .ruler-vertical .ruler-mark.minor{
+      width: 5px;
+    }
+    
+    .ruler-label{
+      position: absolute;
+      color: var(--rulerText);
+      font-size: 9px;
+      font-weight: 600;
+      font-family: 'Courier New', monospace;
+      user-select: none;
+      pointer-events: none;
+    }
+    
+    .ruler-horizontal .ruler-label{
+      top: 2px;
+      transform: translateX(-50%);
+    }
+    
+    .ruler-vertical .ruler-label{
+      left: 2px;
+      transform: translateY(-50%);
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+    }
+    
+    .grid-background{
+      position: absolute;
+      top: var(--rulerSize);
+      left: var(--rulerSize);
+      right: 0;
+      bottom: 0;
+      background-image: 
+        linear-gradient(var(--gridColor) 1px, transparent 1px),
+        linear-gradient(90deg, var(--gridColor) 1px, transparent 1px);
+      background-size: var(--gridSize) var(--gridSize);
+      background-position: 0 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* split root */
+    #splitRoot{
+      flex:1;
+      min-width:0;
+      min-height:0;
+      display:flex;
+      height:100%;
+      margin-top: var(--rulerSize);
+      margin-left: var(--rulerSize);
+      position: relative;
+      z-index: 10;
+    }
+    .pane{
+      min-width:100px;
+      min-height:0;
+      overflow:auto;
+      padding: var(--gap);
+    }
+    #splitRoot.split-row .pane,
+    #splitRoot.split-col .pane{
+      flex: 0 0 auto;
+    }
+    #splitRoot.single-pane .pane{
+      flex: 1 1 auto;
+      width: 100%;
+      min-width: 0;
+    }
+    #splitRoot.split-col .pane{
+      min-height:0;
+    }
+    .paneHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin: 0 0 10px 0;
+      padding: 8px 10px;
+      border:1px solid var(--line);
+      border-radius: 12px;
+      background:#fff;
+      box-shadow: 0 4px 14px rgba(16,24,40,.05);
+    }
+    .paneHeader .title{
+      font-size:13px;
+      font-weight:700;
+      color:var(--text);
+    }
+    .paneHeader .meta{
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    /* Split.js gutter */
+    .gutter{
+      background: linear-gradient(180deg, #ffffff, #ffffff);
+      border-left:1px solid var(--line);
+      border-right:1px solid var(--line);
+      position:relative;
+      flex: 0 0 auto;
+    }
+    .gutter.gutter-horizontal{
+      cursor:col-resize;
+      width:10px;
+    }
+    .gutter.gutter-vertical{
+      cursor:row-resize;
+      height:10px;
+      width:100%;
+    }
+    .gutter::after{
+      content:"";
+      position:absolute;
+      top:50%;
+      left:50%;
+      transform:translate(-50%,-50%);
+      width:4px; height:40px;
+      border-radius:999px;
+      background:#d7deec;
+    }
+    .gutter.gutter-vertical::after{
+      width:40px; height:4px;
+    }
+
+    /* dashboards */
+    .dashboard{
+      position:relative;
+      min-height: 2000px;
+      width: 100%;
+    }
+
+
+    /* Grid */
+    .dashboard.grid{
+      position: relative;
+      min-height: 2000px;
+    }
+
+    /* Flow (옵션) */
+    .dashboard.flow{
+      display:flex;
+      flex-wrap:wrap;
+      gap: var(--gap);
+      align-content:flex-start;
+    }
+    .dashboard.flow .panel{
+      position:relative !important;
+      width: calc((100% - (var(--gap) * 2)) / 3);
+      min-width: 260px;
+      height: calc(var(--rowH) * 2);
+    }
+
+    /* Panel card */
+    .panel{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      position:absolute;
+      user-select:none;
+      touch-action:none;
+      min-width: 100px;
+      min-height: 100px;
+      padding: 2px;
+    }
+    
+    /* Scale panel content to fit panel size */
+    .panel .panelBody{
+      transform-origin: top left;
+      width: 100%;
+      height: 100%;
+    }
+    .panel.dragging{ opacity:.78; box-shadow: 0 14px 32px rgba(16,24,40,.12); }
+    .panel.selected{ outline: 3px solid rgba(29,78,216,.25); }
+
+    /* Panel header */
+    .panelHead{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:10px 10px 8px 10px;
+      border-bottom:1px solid var(--line);
+      background: #fff;
+    }
+    .headLeft{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      min-width:0;
+    }
+    .pIcon{
+      width:28px; height:28px;
+      display:grid; place-items:center;
+      border-radius:10px;
+      background:#f1f5ff;
+      border:1px solid rgba(29,78,216,.18);
+      flex:0 0 auto;
+      font-size:16px;
+    }
+    .pTitle{
+      font-size:13px;
+      font-weight:800;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width: 260px;
+    }
+    .headRight{
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    .iconBtn{
+      width:30px; height:30px;
+      border-radius:10px;
+      border:1px solid var(--line);
+      background:#fff;
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      font-size:14px;
+    }
+    .iconBtn:hover{ border-color:#cfd6e6; }
+    .badge{
+      font-size:11px;
+      padding:3px 8px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      color:var(--muted);
+      background:#fff;
+    }
+
+    .panel.compact .badge,
+    .panel.compact .headRight{
+      display:none;
+    }
+
+    /* Body */
+    .panelBody{
+      padding:10px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      height: calc(100% - 50px);
+    }
+    .section{
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px;
+      background:#fff;
+    }
+    .sectionTitle{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:8px;
+      font-weight:800;
+      font-size:12px;
+      color:var(--text);
+    }
+    .muted{ color:var(--muted); font-weight:600; font-size:12px; }
+
+    .list{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .li{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      font-size:12px;
+      color:var(--text);
+      padding:6px 8px;
+      border:1px solid var(--line);
+      border-radius:10px;
+      background:#fff;
+    }
+    .li .left{
+      display:flex; align-items:center; gap:8px; min-width:0;
+    }
+    .li .dot{
+      width:10px; height:10px; border-radius:999px;
+      background:#c7d2fe;
+      border:1px solid rgba(29,78,216,.25);
+      flex:0 0 auto;
+    }
+    .li .txt{
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      max-width: 240px;
+    }
+    .li .time{
+      font-size:11px; color:var(--muted); white-space:nowrap;
+    }
+
+    .kpiRow{
+      display:flex;
+      gap:10px;
+      align-items:stretch;
+    }
+    .kpi{
+      flex:1;
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px;
+      background:#fff;
+    }
+    .kpi .lbl{ font-size:11px; color:var(--muted); font-weight:700; }
+    .kpi .val{ font-size:22px; font-weight:900; margin-top:4px; }
+    .barWrap{
+      height:10px;
+      border-radius:999px;
+      background:#eef2ff;
+      border:1px solid rgba(29,78,216,.16);
+      overflow:hidden;
+      margin-top:10px;
+    }
+    .bar{
+      height:100%;
+      background: linear-gradient(90deg, rgba(29,78,216,.85), rgba(99,102,241,.85));
+      width:0%;
+    }
+
+    .counts{
+      display:flex;
+      gap:10px;
+    }
+    .count{
+      flex:1;
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px;
+      background:#fff;
+    }
+    .count .lbl{ font-size:11px; color:var(--muted); font-weight:800; }
+    .count .val{ font-size:20px; font-weight:900; margin-top:4px; }
+    .theme-ok .pIcon{ background: rgba(22,163,74,.08); border-color: rgba(22,163,74,.25); }
+    .theme-warn .pIcon{ background: rgba(245,158,11,.10); border-color: rgba(245,158,11,.25); }
+    .theme-danger .pIcon{ background: rgba(220,38,38,.10); border-color: rgba(220,38,38,.25); }
+
+    /* resize handle hint */
+    .resizeHint{
+      position:absolute;
+      right:8px; bottom:8px;
+      width:16px; height:16px;
+      opacity:.55;
+      background:
+        linear-gradient(135deg, transparent 50%, rgba(148,163,184,.85) 50%),
+        linear-gradient(135deg, transparent 64%, rgba(148,163,184,.55) 64%);
+      clip-path: polygon(0 100%, 100% 100%, 100% 0);
+      pointer-events:none;
+    }
+
+    /* context menu */
+    .ctx{
+      position:fixed;
+      z-index:9999;
+      min-width: 180px;
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:12px;
+      box-shadow: 0 18px 42px rgba(16,24,40,.14);
+      padding:6px;
+      display:none;
+    }
+    .ctx .item{
+      padding:10px 10px;
+      border-radius:10px;
+      cursor:pointer;
+      font-size:13px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:8px;
+    }
+    .ctx .item:hover{ background:#f6f8ff; }
+    .ctx .hint{ font-size:11px; color:var(--muted); }
+    .ctx .danger{ color: var(--danger); }
+
+    /* modal */
+    .modalBack{
+      position:fixed; inset:0;
+      background: rgba(17,24,39,.45);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index: 10000;
+      padding: 14px;
+    }
+    .modal{
+      width:min(920px, 96vw);
+      max-height: 90vh;
+      overflow:auto;
+      background:#fff;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.55);
+      box-shadow: 0 26px 70px rgba(16,24,40,.26);
+      padding:14px;
+    }
+    .modalHead{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:6px 6px 12px 6px;
+      border-bottom:1px solid var(--line);
+      margin-bottom:12px;
+    }
+    .modalHead .ttl{ font-weight:900; }
+    .grid2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+    }
+    .field{
+      display:flex; flex-direction:column; gap:6px;
+      padding:10px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:#fff;
+    }
+    .field label{
+      font-size:12px; font-weight:800; color:var(--text);
+    }
+    .field input, .field select, .field textarea{
+      font: inherit;
+      padding:10px;
+      border-radius:10px;
+      border:1px solid var(--line);
+      outline:none;
+    }
+    .field textarea{ min-height: 220px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:12px; }
+    .modalFoot{
+      display:flex; justify-content:flex-end; gap:8px;
+      padding-top:12px;
+      border-top:1px solid var(--line);
+      margin-top:12px;
+    }
+
+    /* drop hints */
+    .dropTarget{
+      outline:3px dashed rgba(29,78,216,.35);
+      outline-offset:-6px;
+    }
+    .mergeArmed{
+      border-color: rgba(29,78,216,.55) !important;
+      box-shadow: 0 0 0 4px rgba(29,78,216,.18), var(--shadow);
+    }
+  </style>
+</head>
+
+<body>
+<div class="app">
+  <div class="toolbar">
+    <div class="left">
+      <button class="btn" id="btnGrid">Grid</button>
+      <button class="btn active" id="btnSplit">Split</button>
+      <button class="btn" id="btnFlow">Flow</button>
+
+      <span class="sep"></span>
+
+      <button class="btn" id="btnDir">Split: 좌/우</button>
+      <button class="btn" id="btnPanes">Pane: 2</button>
+
+      <span class="sep"></span>
+
+      <button class="btn primary" id="btnAdd">+ 패널 추가</button>
+      <button class="btn" id="btnAuto">자동배치</button>
+      <button class="btn" id="btnUndo">Undo</button>
+      <button class="btn" id="btnExport">내보내기(JSON)</button>
+      <button class="btn" id="btnImport">가져오기(JSON)</button>
+      <button class="btn danger" id="btnReset">초기화</button>
+
+      <span class="sep"></span>
+      <span class="pill" id="saveState">저장됨</span>
+      <span class="pill" id="helpHint">팁: Shift+드랍 = Merge</span>
+    </div>
+
+    <div class="right">
+      <span class="pill" id="gridInfo">Snap: 10px | Grid: 20px | Ruler: ON</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- Rulers and Grid -->
+    <div class="ruler-corner">📐</div>
+    <div class="ruler-horizontal">
+      <div class="ruler-marks" id="rulerHorizontalMarks"></div>
+    </div>
+    <div class="ruler-vertical">
+      <div class="ruler-marks" id="rulerVerticalMarks"></div>
+    </div>
+    <div class="grid-background"></div>
+    
+    <div id="splitRoot"></div>
+  </div>
+</div>
+
+<!-- Context menu -->
+<div class="ctx" id="ctxMenu">
+  <div class="item" data-act="settings">⚙ 설정 <span class="hint">Enter</span></div>
+  <div class="item" data-act="copy">📋 복사 <span class="hint">Duplicate</span></div>
+  <div class="item" data-act="splitH">↔ 논리 분리(가로) <span class="hint">Split</span></div>
+  <div class="item" data-act="splitV">↕ 논리 분리(세로) <span class="hint">Split</span></div>
+  <div class="item" data-act="armMerge">🧩 Merge 대기 <span class="hint">다른 패널 클릭</span></div>
+  <div class="item danger" data-act="remove">🗑 삭제</div>
+</div>
+
+<!-- Modal -->
+<div class="modalBack" id="modalBack" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modalHead">
+      <div class="ttl" id="modalTitle">패널 설정</div>
+      <button class="btn" id="modalClose">닫기</button>
+    </div>
+
+    <div class="grid2">
+      <div class="field">
+        <label>제목</label>
+        <input id="fTitle" type="text" />
+      </div>
+
+      <div class="field">
+        <label>타입</label>
+        <select id="fType">
+          <option value="Worklog">Worklog</option>
+          <option value="Progress">Progress</option>
+          <option value="Issues">Issues</option>
+          <option value="Composite">Composite</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>아이콘</label>
+        <select id="fIcon"></select>
+      </div>
+
+      <div class="field">
+        <label>테마</label>
+        <select id="fTheme">
+          <option value="default">default</option>
+          <option value="ok">ok</option>
+          <option value="warn">warn</option>
+          <option value="danger">danger</option>
+        </select>
+      </div>
+
+      <div class="field" style="grid-column: 1 / -1;">
+        <label>데이터(JSON)</label>
+        <textarea id="fData"></textarea>
+        <div class="muted" id="dataHint">유효한 JSON만 저장됩니다. Composite의 경우 composite.sections/data를 편집하세요.</div>
+      </div>
+    </div>
+
+    <div class="modalFoot">
+      <button class="btn" id="btnValidate">JSON 검증</button>
+      <button class="btn primary" id="btnSave">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export/Import Modal -->
+<div class="modalBack" id="jsonBack" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modalHead">
+      <div class="ttl" id="jsonTitle">레이아웃 JSON</div>
+      <button class="btn" id="jsonClose">닫기</button>
+    </div>
+
+    <div class="field">
+      <label>JSON</label>
+      <textarea id="jsonArea" style="min-height: 420px;"></textarea>
+      <div class="muted" id="jsonHint"></div>
+    </div>
+
+    <div class="modalFoot">
+      <button class="btn" id="jsonCopy">복사</button>
+      <button class="btn primary" id="jsonApply">적용</button>
+    </div>
+  </div>
+</div>
+
+<script>
+$(function(){
+/* =========================
+   0) Utilities
+========================= */
+const LS_KEY = "DASH_LAYOUT_V1";
+const ICONS = ["📋","✅","⚠️","🧠","📈","🧩","🧰","🧾","🧲","🛰️","🧯","🔧","🗂️","🧪","🧱","🧷","🪪","🧭","🗒️","📌"];
+const uid = () => "p-" + Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+const deepClone = (o) => JSON.parse(JSON.stringify(o));
+
+function debounce(fn, wait){
+  let t = null;
+  return (...args) => {
+    if(t) clearTimeout(t);
+    t = setTimeout(() => fn(...args), wait);
+  };
+}
+
+function safeJsonParse(s){
+  try { return {ok:true, val: JSON.parse(s)}; }
+  catch(e){ return {ok:false, err: e}; }
+}
+
+function nowIso(){
+  return new Date().toISOString();
+}
+
+/* =========================
+   Rulers Generation
+========================= */
+function generateRulers(){
+  const hMarks = $("#rulerHorizontalMarks")[0];
+  const vMarks = $("#rulerVerticalMarks")[0];
+  
+  if(!hMarks || !vMarks) return;
+  
+  hMarks.innerHTML = "";
+  vMarks.innerHTML = "";
+  
+  const mainEl = $(".main")[0];
+  if(!mainEl) return;
+  
+  const rect = mainEl.getBoundingClientRect();
+  const rulerSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--rulerSize'));
+  
+  // Horizontal ruler marks (width - rulerSize)
+  const hWidth = rect.width - rulerSize;
+  for(let i = 0; i <= hWidth; i += 10){
+    const mark = document.createElement("div");
+    mark.className = "ruler-mark";
+    mark.style.left = i + "px";
+    
+    // Major marks every 100px, medium every 50px, minor every 10px
+    if(i % 100 === 0){
+      mark.classList.add("major");
+      const label = document.createElement("div");
+      label.className = "ruler-label";
+      label.textContent = i;
+      label.style.left = i + "px";
+      hMarks.appendChild(label);
+    }else if(i % 50 === 0){
+      // Medium mark
+      mark.style.height = "10px";
+    }else{
+      mark.classList.add("minor");
+    }
+    
+    hMarks.appendChild(mark);
+  }
+  
+  // Vertical ruler marks (height - rulerSize)
+  const vHeight = rect.height - rulerSize;
+  for(let i = 0; i <= vHeight; i += 10){
+    const mark = document.createElement("div");
+    mark.className = "ruler-mark";
+    mark.style.top = i + "px";
+    
+    // Major marks every 100px, medium every 50px, minor every 10px
+    if(i % 100 === 0){
+      mark.classList.add("major");
+      const label = document.createElement("div");
+      label.className = "ruler-label";
+      label.textContent = i;
+      label.style.top = i + "px";
+      vMarks.appendChild(label);
+    }else if(i % 50 === 0){
+      // Medium mark
+      mark.style.width = "10px";
+    }else{
+      mark.classList.add("minor");
+    }
+    
+    vMarks.appendChild(mark);
+  }
+}
+
+// Debounced ruler regeneration on resize
+const regenerateRulers = debounce(() => {
+  generateRulers();
+}, 250);
+
+$(window).on("resize", regenerateRulers);
+
+/* =========================
+   1) State
+========================= */
+let STATE = null;
+let SPLITTER = null;
+let DIR = "vertical";   // Split.js direction: 'horizontal' means top/bottom; 'vertical' means left/right
+let PANE_COUNT = 2;
+
+let UI = {
+  saveState: $("#saveState"),
+  gridInfo: $("#gridInfo"),
+  splitRoot: $("#splitRoot"),
+  ctxMenu: $("#ctxMenu"),
+  modalBack: $("#modalBack"),
+  jsonBack: $("#jsonBack"),
+  jsonArea: $("#jsonArea"),
+  jsonHint: $("#jsonHint"),
+  jsonTitle: $("#jsonTitle"),
+  modalTitle: $("#modalTitle"),
+  fTitle: $("#fTitle"),
+  fType: $("#fType"),
+  fIcon: $("#fIcon"),
+  fTheme: $("#fTheme"),
+  fData: $("#fData"),
+  dataHint: $("#dataHint"),
+  helpHint: $("#helpHint")
+};
+
+let DIR_LABEL = () => (STATE.split.direction === "vertical" ? "좌/우" : "상/하");
+
+let DIR_TO_SPLITJS = (dir) => (dir === "vertical" ? "horizontal" : "vertical");
+/*
+  Split.js option `direction`:
+    - 'horizontal' => panes arranged side-by-side (left/right) with vertical gutter
+    - 'vertical'   => panes stacked (top/bottom) with horizontal gutter
+  우리 STATE.split.direction:
+    - 'vertical' => 좌/우
+    - 'horizontal' => 상/하
+  따라서:
+    STATE.vertical  => Split.js horizontal
+    STATE.horizontal=> Split.js vertical
+*/
+
+/* =========================
+   2) Default layout (sample)
+========================= */
+function defaultState(){
+  const st = {
+    layoutMode: "split", // grid|split|flow
+    grid: { cols: 12, rowHeight: 92, gap: 12 },
+    split: {
+      enabled: true,
+      direction: "vertical", // vertical=좌우, horizontal=상하
+      panes: [
+        { paneId:"p1", ratio:0.55 },
+        { paneId:"p2", ratio:0.45 }
+      ]
+    },
+    panes: [
+      { paneId:"p1", panels: [] },
+      { paneId:"p2", panels: [] }
+    ],
+    meta: { savedAt: nowIso(), version: 1 }
+  };
+
+  // pane1
+  st.panes[0].panels.push(
+    mkPanel("Worklog","작업내역", "📋","default",{x:0,y:0,w:6,h:3}, {
+      items:[
+        {t:"DWG 버전관리 로그 점검", time:"09:12"},
+        {t:"MES 인터페이스 태그 검증", time:"10:05"},
+        {t:"DLP 정책 예외 승인 처리", time:"10:44"}
+      ]
+    }),
+    mkPanel("Issues","이슈현황", "⚠️","warn",{x:6,y:0,w:6,h:3}, { open:12, closed:34, sev1:2, sev2:5 }),
+    mkPanel("Worklog","최근 변경", "🧾","default",{x:0,y:3,w:12,h:2}, {
+      items:[
+        {t:"간트바 actBar 렌더링 규칙 적용", time:"11:20"},
+        {t:"툴팁/모달 충돌 로직 보정", time:"11:42"}
+      ]
+    })
+  );
+
+  // pane2
+  st.panes[1].panels.push(
+    mkPanel("Progress","진행상태", "📈","ok",{x:0,y:0,w:12,h:3}, { percent:72, status:"정상", kpi1:18, kpi2:4 }),
+    mkPanel("Issues","운영 이슈", "⚠️","danger",{x:0,y:3,w:6,h:2}, { open:6, closed:9, sev1:1, sev2:2 }),
+    mkPanel("Progress","배포 파이프라인", "✅","ok",{x:6,y:3,w:6,h:2}, { percent:91, status:"양호", kpi1:7, kpi2:1 })
+  );
+
+  // Merge 데모: pane1의 Worklog + Issues를 Composite로 미리 하나 생성 (옵션)
+  // 실제 merge 시나리오를 보여주기 위해 composite 하나를 추가하고, 공간 충돌 없이 배치
+  st.panes[0].panels.push(
+    mkComposite(
+      "통합 카드(작업+이슈)", "🧩", "default", {x:0,y:5,w:12,h:3},
+      [
+        {sectionId:"s1", type:"Worklog", visible:true, data:{ items:[{t:"주간 회의자료 정리", time:"13:10"},{t:"RAG 로그 스키마 개선", time:"13:40"}]}},
+        {sectionId:"s2", type:"Issues",  visible:true, data:{ open:3, closed:20, sev1:0, sev2:1 }}
+      ],
+      "stack"
+    )
+  );
+
+  return st;
+}
+
+function mkPanel(type,title,icon,theme,layout,data){
+  return {
+    id: uid(),
+    type, title, icon, theme,
+    layout: { x:layout.x, y:layout.y, w:layout.w, h:layout.h },
+    data: data || {}
+  };
+}
+
+function mkComposite(title, icon, theme, layout, sections, layoutPreset){
+  return {
+    id: uid(),
+    type: "Composite",
+    title,
+    icon,
+    theme,
+    layout: { x:layout.x, y:layout.y, w:layout.w, h:layout.h },
+    data: {},
+    composite: {
+      sections: sections || [],
+      layout: layoutPreset || "stack"
+    }
+  };
+}
+
+/* =========================
+   3) Persistence
+========================= */
+let dirty = false;
+const markDirty = () => {
+  dirty = true;
+  UI.saveState.text("변경됨");
+  UI.saveState.css({ borderColor: "rgba(245,158,11,.35)", color: "#92400e" });
+};
+const markSaved = () => {
+  dirty = false;
+  UI.saveState.text("저장됨");
+  UI.saveState.css({ borderColor: "", color: "" });
+};
+
+const autosave = debounce(() => {
+  try{
+    STATE.meta.savedAt = nowIso();
+    localStorage.setItem(LS_KEY, JSON.stringify(STATE));
+    markSaved();
+  }catch(e){
+    console.error(e);
+    UI.saveState.text("저장 오류");
+  }
+}, 400);
+
+function loadState(){
+  const raw = localStorage.getItem(LS_KEY);
+  if(!raw) return null;
+  const parsed = safeJsonParse(raw);
+  if(!parsed.ok) return null;
+  return parsed.val;
+}
+
+function resetState(){
+  localStorage.removeItem(LS_KEY);
+  STATE = defaultState();
+  applyCssVars();
+  renderAll();
+  markDirty();
+  autosave();
+}
+
+/* =========================
+   4) Rendering
+========================= */
+function applyCssVars(){
+  document.documentElement.style.setProperty("--gap", STATE.grid.gap + "px");
+  document.documentElement.style.setProperty("--rowH", STATE.grid.rowHeight + "px");
+  document.documentElement.style.setProperty("--cols", STATE.grid.cols);
+
+  UI.gridInfo.text(`Snap: 50px | Grid: 20px | Ruler: ON`);
+}
+
+function ensurePanes(count){
+  // normalize split.panes & panes array
+  const want = count;
+  const existing = STATE.split.panes.map(p=>p.paneId);
+  while(STATE.split.panes.length < want){
+    const pid = "p" + (STATE.split.panes.length + 1);
+    STATE.split.panes.push({ paneId: pid, ratio: 1/want });
+    STATE.panes.push({ paneId: pid, panels: [] });
+  }
+  while(STATE.split.panes.length > want){
+    const removed = STATE.split.panes.pop();
+    // removed pane panels -> move to first pane as fallback
+    const paneObj = STATE.panes.find(x=>x.paneId===removed.paneId);
+    if(paneObj && paneObj.panels.length){
+      const first = STATE.panes[0];
+      first.panels.push(...paneObj.panels);
+    }
+    STATE.panes = STATE.panes.filter(x=>x.paneId!==removed.paneId);
+  }
+
+  // normalize ratios
+  const n = STATE.split.panes.length;
+  let sum = STATE.split.panes.reduce((a,b)=>a+(+b.ratio||0),0);
+  if(sum <= 0){
+    STATE.split.panes.forEach(p=>p.ratio = 1/n);
+    sum = 1;
+  }
+  STATE.split.panes.forEach(p=>p.ratio = p.ratio / sum);
+}
+
+function renderAll(){
+  // destroy old split
+  if(SPLITTER){
+    try { SPLITTER.destroy(); } catch(_){}
+    SPLITTER = null;
+  }
+  UI.splitRoot.empty();
+  $("body").toggleClass("mode-grid", STATE.layoutMode === "grid");
+
+  // panes create (split 모드에서도 grid/flow 모드에서도 동일한 wrapper를 사용)
+  const paneIds = STATE.layoutMode === "grid"
+    ? ["p1"]
+    : (STATE.layoutMode === "flow" ? ["p1"] : STATE.split.panes.map(p=>p.paneId));
+
+  paneIds.forEach((paneId, idx) => {
+    const pane = document.createElement("div");
+    pane.className = "pane";
+    pane.dataset.paneId = paneId;
+
+    const header = document.createElement("div");
+    header.className = "paneHeader";
+    // Grid/Flow 모드에서는 "All Panes" 표시
+    const title = (STATE.layoutMode === "grid" || STATE.layoutMode === "flow") 
+      ? "All Panes" 
+      : `Pane ${paneId.toUpperCase()}`;
+    header.innerHTML = `
+      <div class="title">${title}</div>
+      <div class="meta">${STATE.layoutMode.toUpperCase()} · Drag/Resize/Merge/Split</div>
+    `;
+    pane.appendChild(header);
+
+    const dash = document.createElement("div");
+    dash.className = "dashboard " + (STATE.layoutMode === "flow" ? "flow" : "grid");
+    dash.dataset.paneId = paneId;
+    pane.appendChild(dash);
+
+    UI.splitRoot.append(pane);
+  });
+
+  // set flex direction for split layout
+  if(STATE.layoutMode === "split"){
+    const splitjsDirection = DIR_TO_SPLITJS(STATE.split.direction);
+    UI.splitRoot.css("flex-direction", (splitjsDirection === "vertical") ? "column" : "row");
+    UI.splitRoot.toggleClass("split-col", splitjsDirection === "vertical");
+    UI.splitRoot.toggleClass("split-row", splitjsDirection !== "vertical");
+    UI.splitRoot.removeClass("single-pane");
+  }else{
+    UI.splitRoot.css("flex-direction", "row");
+    UI.splitRoot.removeClass("split-col split-row");
+    UI.splitRoot.addClass("single-pane");
+  }
+
+  // initialize split only in split mode
+  if(STATE.layoutMode === "split"){
+    // Split.js expects children elements to split
+    const sizes = STATE.split.panes.map(p => Math.round(p.ratio * 1000) / 10); // %
+    const splitjsDirection = DIR_TO_SPLITJS(STATE.split.direction);
+
+    SPLITTER = Split(Array.from(UI.splitRoot[0].children), {
+      sizes,
+      minSize: 100,
+      gutterSize: 10,
+      snapOffset: 0,
+      direction: splitjsDirection,
+      onDragEnd: (newSizes) => {
+        // persist
+        // newSizes are percentages
+        STATE.split.panes.forEach((p,i)=> p.ratio = (newSizes[i]||0)/100);
+        markDirty();
+        autosave();
+      }
+    });
+  }
+
+  // render panels into each dashboard
+  const $dashboards = $(".dashboard");
+  $dashboards.empty();
+
+  const paneList = STATE.panes;
+  
+  // Grid/Flow 모드: 모든 panes의 패널들을 첫 번째 dashboard에 통합 렌더링
+  if(STATE.layoutMode === "grid" || STATE.layoutMode === "flow"){
+    const $mainDash = $(".dashboard").first();
+    if($mainDash.length){
+      if(STATE.layoutMode === "grid"){
+        const cols = STATE.grid.cols || 12;
+        const gap = STATE.grid.gap || 0;
+        const cell = 100;
+        const gridWidth = (cols * cell) + (Math.max(0, cols - 1) * gap);
+        $mainDash.css({ width: gridWidth + "px", maxWidth: gridWidth + "px" });
+      }else{
+        $mainDash.css({ width: "", maxWidth: "" });
+      }
+      paneList.forEach(paneObj => {
+        paneObj.panels.forEach(panel => {
+          const el = renderPanel(panel);
+          $mainDash.append(el);
+          positionPanelEl(el, panel);
+        });
+      });
+    }
+  }else{
+    // Split 모드: 각 pane의 패널들을 해당 dashboard에 렌더링
+    paneList.forEach(paneObj => {
+      const $dash = $(`.dashboard[data-pane-id="${paneObj.paneId}"]`);
+      if(!$dash.length) return;
+
+      paneObj.panels.forEach(panel => {
+        const el = renderPanel(panel);
+        $dash.append(el);
+        positionPanelEl(el, panel);
+      });
+    });
+  }
+
+  bindInteract();
+}
+
+function renderPanel(p){
+  const el = document.createElement("div");
+  el.className = "panel " + themeClass(p.theme);
+  el.dataset.id = p.id;
+
+  const typeBadge = p.type;
+
+  el.innerHTML = `
+    <div class="panelHead">
+      <div class="headLeft">
+        <div class="pIcon" title="icon">${escapeHtml(p.icon || "📌")}</div>
+        <div class="pTitle" title="${escapeAttr(p.title)}">${escapeHtml(p.title)}</div>
+        <span class="badge">${escapeHtml(typeBadge)}</span>
+      </div>
+      <div class="headRight">
+        <button class="iconBtn btnSettings" title="설정(⚙)">⚙</button>
+        <button class="iconBtn btnMore" title="더보기(…)" aria-label="more">…</button>
+      </div>
+    </div>
+    <div class="panelBody">
+      ${renderPanelBody(p)}
+    </div>
+    <div class="resizeHint" title="Resize"></div>
+  `;
+
+  // handlers
+  $(el).find(".btnSettings").on("click", (e) => {
+    e.stopPropagation();
+    openSettings(p.id);
+  });
+
+  $(el).find(".btnMore").on("click", (e) => {
+    e.stopPropagation();
+    // minimal: open context menu
+    const rect = el.getBoundingClientRect();
+    openCtxMenu(rect.left + 14, rect.top + 42, p.id);
+  });
+
+  $(el).on("click", () => {
+    clearSelection();
+    $(el).addClass("selected");
+    selectedPanelId = p.id;
+  });
+
+  $(el).on("contextmenu", (e) => {
+    e.preventDefault();
+    clearSelection();
+    $(el).addClass("selected");
+    selectedPanelId = p.id;
+    openCtxMenu(e.clientX, e.clientY, p.id);
+  });
+
+  return el;
+}
+
+function renderPanelBody(p){
+  if(p.type === "Worklog"){
+    const items = (p.data && p.data.items) ? p.data.items : [];
+    const lis = items.map(x => `
+      <div class="li">
+        <div class="left">
+          <span class="dot"></span>
+          <span class="txt" title="${escapeAttr(x.t||"")}">${escapeHtml(x.t||"")}</span>
+        </div>
+        <span class="time">${escapeHtml(x.time||"")}</span>
+      </div>
+    `).join("");
+    return `
+      <div class="section">
+        <div class="sectionTitle">
+          <span>최근 작업</span><span class="muted">${items.length}건</span>
+        </div>
+        <div class="list">${lis || `<div class="muted">등록된 작업이 없습니다.</div>`}</div>
+      </div>
+    `;
+  }
+
+  if(p.type === "Progress"){
+    const percent = clamp(+((p.data||{}).percent ?? 0), 0, 100);
+    const status = (p.data||{}).status || "상태";
+    const kpi1 = (p.data||{}).kpi1 ?? 0;
+    const kpi2 = (p.data||{}).kpi2 ?? 0;
+    // render
+    return `
+      <div class="section">
+        <div class="sectionTitle">
+          <span>진행률</span><span class="muted">${escapeHtml(status)}</span>
+        </div>
+        <div class="kpiRow">
+          <div class="kpi"><div class="lbl">진행(%)</div><div class="val">${percent}</div></div>
+          <div class="kpi"><div class="lbl">KPI-1</div><div class="val">${escapeHtml(String(kpi1))}</div></div>
+          <div class="kpi"><div class="lbl">KPI-2</div><div class="val">${escapeHtml(String(kpi2))}</div></div>
+        </div>
+        <div class="barWrap"><div class="bar" style="width:${percent}%"></div></div>
+      </div>
+    `;
+  }
+
+  if(p.type === "Issues"){
+    const open = +((p.data||{}).open ?? 0);
+    const closed = +((p.data||{}).closed ?? 0);
+    const sev1 = +((p.data||{}).sev1 ?? 0);
+    const sev2 = +((p.data||{}).sev2 ?? 0);
+    return `
+      <div class="section">
+        <div class="sectionTitle">
+          <span>이슈 요약</span><span class="muted">Open ${open}</span>
+        </div>
+        <div class="counts">
+          <div class="count"><div class="lbl">Open</div><div class="val">${open}</div></div>
+          <div class="count"><div class="lbl">Closed</div><div class="val">${closed}</div></div>
+        </div>
+        <div class="counts" style="margin-top:10px;">
+          <div class="count"><div class="lbl">Sev1</div><div class="val">${sev1}</div></div>
+          <div class="count"><div class="lbl">Sev2</div><div class="val">${sev2}</div></div>
+        </div>
+      </div>
+    `;
+  }
+
+  if(p.type === "Composite"){
+    const comp = p.composite || {sections:[], layout:"stack"};
+    const sections = (comp.sections || []).filter(s => s.visible !== false);
+    const preset = comp.layout || "stack";
+
+    // simple presets: stack / twoColumn / kpiRight
+    if(preset === "twoColumn"){
+      const left = sections[0] ? renderCompositeSection(sections[0]) : `<div class="muted">섹션 없음</div>`;
+      const right = sections[1] ? renderCompositeSection(sections[1]) : `<div class="muted">섹션 없음</div>`;
+      return `
+        <div class="kpiRow" style="height:100%;">
+          <div style="flex:1; min-width:0;">${left}</div>
+          <div style="flex:1; min-width:0;">${right}</div>
+        </div>
+      `;
+    }
+
+    if(preset === "kpiRight"){
+      const a = sections[0] ? renderCompositeSection(sections[0]) : `<div class="muted">섹션 없음</div>`;
+      const b = sections[1] ? renderCompositeSection(sections[1]) : `<div class="muted">섹션 없음</div>`;
+      return `
+        <div class="kpiRow" style="height:100%;">
+          <div style="flex:1.2; min-width:0;">${a}</div>
+          <div style="flex:.8; min-width:0;">${b}</div>
+        </div>
+      `;
+    }
+
+    // stack default
+    return sections.map(s => renderCompositeSection(s)).join("") || `<div class="muted">Composite 섹션이 비어있습니다.</div>`;
+  }
+
+  return `<div class="muted">지원되지 않는 타입입니다.</div>`;
+}
+
+function renderCompositeSection(sec){
+  const t = sec.type;
+  const data = sec.data || {};
+  const title = sec.title || t;
+
+  if(t === "Worklog"){
+    const items = data.items || [];
+    const lis = items.map(x => `
+      <div class="li">
+        <div class="left">
+          <span class="dot"></span>
+          <span class="txt" title="${escapeAttr(x.t||"")}">${escapeHtml(x.t||"")}</span>
+        </div>
+        <span class="time">${escapeHtml(x.time||"")}</span>
+      </div>
+    `).join("");
+    return `
+      <div class="section">
+        <div class="sectionTitle"><span>${escapeHtml(title)}</span><span class="muted">${items.length}건</span></div>
+        <div class="list">${lis || `<div class="muted">작업 없음</div>`}</div>
+      </div>
+    `;
+  }
+
+  if(t === "Issues"){
+    const open = +(data.open ?? 0);
+    const closed = +(data.closed ?? 0);
+    const sev1 = +(data.sev1 ?? 0);
+    const sev2 = +(data.sev2 ?? 0);
+    return `
+      <div class="section">
+        <div class="sectionTitle"><span>${escapeHtml(title)}</span><span class="muted">Open ${open}</span></div>
+        <div class="counts">
+          <div class="count"><div class="lbl">Open</div><div class="val">${open}</div></div>
+          <div class="count"><div class="lbl">Closed</div><div class="val">${closed}</div></div>
+        </div>
+        <div class="counts" style="margin-top:10px;">
+          <div class="count"><div class="lbl">Sev1</div><div class="val">${sev1}</div></div>
+          <div class="count"><div class="lbl">Sev2</div><div class="val">${sev2}</div></div>
+        </div>
+      </div>
+    `;
+  }
+
+  if(t === "Progress"){
+    const percent = clamp(+((data).percent ?? 0), 0, 100);
+    const status = data.status || "상태";
+    const kpi1 = data.kpi1 ?? 0;
+    const kpi2 = data.kpi2 ?? 0;
+    return `
+      <div class="section">
+        <div class="sectionTitle"><span>${escapeHtml(title)}</span><span class="muted">${escapeHtml(status)}</span></div>
+        <div class="kpiRow">
+          <div class="kpi"><div class="lbl">진행(%)</div><div class="val">${percent}</div></div>
+          <div class="kpi"><div class="lbl">KPI-1</div><div class="val">${escapeHtml(String(kpi1))}</div></div>
+          <div class="kpi"><div class="lbl">KPI-2</div><div class="val">${escapeHtml(String(kpi2))}</div></div>
+        </div>
+        <div class="barWrap"><div class="bar" style="width:${percent}%"></div></div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="section">
+      <div class="sectionTitle"><span>${escapeHtml(title)}</span><span class="muted">${escapeHtml(t)}</span></div>
+      <pre style="margin:0; font-size:12px; white-space:pre-wrap;">${escapeHtml(JSON.stringify(data, null, 2))}</pre>
+    </div>
+  `;
+}
+
+function applyPanelScale(el, width, height){
+  const panelBody = $(el).find(".panelBody")[0];
+  if(!panelBody) return;
+  const head = $(el).find(".panelHead")[0];
+  const headH = head ? head.getBoundingClientRect().height : 0;
+  const bodyW = Math.max(0, width);
+  const bodyH = Math.max(0, height - headH);
+  const baseSize = 300;
+  const scale = Math.min(bodyW / baseSize, bodyH / baseSize, 1);
+
+  el.classList.toggle("compact", width <= 200);
+
+  if(scale < 1){
+    panelBody.style.transform = `scale(${scale})`;
+    panelBody.style.transformOrigin = "top left";
+    panelBody.style.width = (bodyW / scale) + "px";
+    panelBody.style.height = (bodyH / scale) + "px";
+  }else{
+    panelBody.style.transform = "";
+    panelBody.style.width = "";
+    panelBody.style.height = "";
+  }
+}
+
+function positionPanelEl(el, p){
+  if(STATE.layoutMode === "flow"){
+    // flow: keep default CSS size; ignore x/y
+    el.style.position = "relative";
+    return;
+  }
+  
+  // Use pixel-based positioning
+  const layout = p.layout;
+  
+  // If pixel coordinates exist, use them; otherwise convert from grid coordinates
+  const left = layout.px?.x ?? (layout.x * 100);
+  const top = layout.px?.y ?? (layout.y * 100);
+  const width = layout.px?.w ?? (layout.w * 100);
+  const height = layout.px?.h ?? (layout.h * 100);
+  
+  el.style.position = "absolute";
+  el.style.left = left + "px";
+  el.style.top = top + "px";
+  el.style.width = width + "px";
+  el.style.height = height + "px";
+
+  applyPanelScale(el, width, height);
+}
+
+function themeClass(theme){
+  if(theme === "ok") return "theme-ok";
+  if(theme === "warn") return "theme-warn";
+  if(theme === "danger") return "theme-danger";
+  return "";
+}
+
+function escapeHtml(s){
+  return String(s ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#39;");
+}
+function escapeAttr(s){ return escapeHtml(s).replaceAll("\n"," "); }
+
+/* =========================
+   5) Layout & Collision
+========================= */
+function paneOf(panelId){
+  return STATE.panes.find(p => p.panels.some(x => x.id === panelId));
+}
+function getPanel(panelId){
+  for(const pn of STATE.panes){
+    const p = pn.panels.find(x=>x.id===panelId);
+    if(p) return p;
+  }
+  return null;
+}
+function removePanel(panelId){
+  for(const pn of STATE.panes){
+    const idx = pn.panels.findIndex(x=>x.id===panelId);
+    if(idx >= 0){
+      return pn.panels.splice(idx,1)[0];
+    }
+  }
+  return null;
+}
+function addPanelToPane(paneId, panel){
+  const pn = STATE.panes.find(x=>x.paneId===paneId);
+  if(!pn) return false;
+  pn.panels.push(panel);
+  return true;
+}
+
+function gridMetrics(dashEl){
+  const rect = dashEl.getBoundingClientRect();
+  const cols = STATE.grid.cols;
+  const gap = STATE.grid.gap;
+  // grid column width: (containerWidth - gap*(cols-1))/cols
+  const w = rect.width;
+  const colW = (w - gap * (cols - 1)) / cols;
+  const rowH = STATE.grid.rowHeight;
+  return { rect, cols, gap, colW, rowH };
+}
+
+function pointToCell(dashEl, clientX, clientY){
+  const m = gridMetrics(dashEl);
+  const x0 = clientX - m.rect.left;
+  const y0 = clientY - m.rect.top;
+
+  // approximate mapping
+  const col = Math.floor((x0 + m.gap) / (m.colW + m.gap));
+  const row = Math.floor((y0 + m.gap) / (m.rowH + m.gap));
+  return { x: clamp(col, 0, m.cols-1), y: Math.max(0, row) };
+}
+
+function rectsOverlap(a,b){
+  return !(a.x+a.w <= b.x || b.x+b.w <= a.x || a.y+a.h <= b.y || b.y+b.h <= a.y);
+}
+
+function panelRect(p){ return {x:p.layout.x,y:p.layout.y,w:p.layout.w,h:p.layout.h}; }
+
+function resolveCollision(paneId, movingId, desiredRect){
+  const pn = STATE.panes.find(x=>x.paneId===paneId);
+  if(!pn) return desiredRect;
+
+  const cols = STATE.grid.cols;
+
+  // clamp to cols
+  desiredRect.x = clamp(desiredRect.x, 0, cols - desiredRect.w);
+
+  // find overlaps
+  const moving = pn.panels.find(p=>p.id===movingId);
+  const overlaps = pn.panels
+    .filter(p=>p.id!==movingId)
+    .filter(p=> rectsOverlap(desiredRect, panelRect(p)));
+
+  if(overlaps.length === 0) return desiredRect;
+
+  // policy: if exactly one overlap and same size => swap
+  if(overlaps.length === 1 && moving){
+    const o = overlaps[0];
+    const same = (o.layout.w === desiredRect.w && o.layout.h === desiredRect.h);
+    if(same){
+      // swap rectangles
+      const old = deepClone(moving.layout);
+      o.layout = old;
+      return desiredRect;
+    }
+  }
+
+  // push: scan rows from desired y, try to find first free spot for moving's size
+  const size = {w: desiredRect.w, h: desiredRect.h};
+  const startY = desiredRect.y;
+  for(let y = startY; y < startY + 120; y++){ // bounded scan
+    for(let x = 0; x <= cols - size.w; x++){
+      const candidate = {x,y,w:size.w,h:size.h};
+      const hit = pn.panels.some(p => p.id!==movingId && rectsOverlap(candidate, panelRect(p)));
+      if(!hit) return candidate;
+    }
+  }
+
+  // fallback (should not)
+  return desiredRect;
+}
+
+function findDropPanelAt(clientX, clientY){
+  const el = document.elementFromPoint(clientX, clientY);
+  if(!el) return null;
+  const panelEl = el.closest(".panel");
+  if(!panelEl) return null;
+  return panelEl.dataset.id || null;
+}
+
+function findDropPanelByPoint(clientX, clientY, excludeId){
+  const els = document.elementsFromPoint(clientX, clientY);
+  for(const el of els){
+    const panelEl = el.closest?.(".panel");
+    if(panelEl && panelEl.dataset.id && panelEl.dataset.id !== excludeId){
+      return panelEl.dataset.id;
+    }
+  }
+  return null;
+}
+
+function findDropPanelByRect(rect, excludeId){
+  const candidates = $(".panel").toArray()
+    .filter(el => el.dataset.id && el.dataset.id !== excludeId);
+  let bestId = null;
+  let bestArea = 0;
+  candidates.forEach(el => {
+    const r = el.getBoundingClientRect();
+    const ix = Math.max(0, Math.min(rect.right, r.right) - Math.max(rect.left, r.left));
+    const iy = Math.max(0, Math.min(rect.bottom, r.bottom) - Math.max(rect.top, r.top));
+    const area = ix * iy;
+    if(area > bestArea){
+      bestArea = area;
+      bestId = el.dataset.id || null;
+    }
+  });
+  return bestId;
+}
+
+function findPaneAt(clientX, clientY){
+  const el = document.elementFromPoint(clientX, clientY);
+  if(!el) return null;
+  const pane = el.closest(".pane");
+  if(!pane) return null;
+  return pane.dataset.paneId || null;
+}
+
+function getDashboardForPane(paneId){
+  if(STATE.layoutMode === "split"){
+    return $(`.dashboard[data-pane-id="${paneId}"]`)[0];
+  }
+  return $(".dashboard")[0];
+}
+
+/* =========================
+   6) Interactions (drag/resize)
+========================= */
+let selectedPanelId = null;
+let ctxPanelId = null;
+let mergeArmedId = null;
+let SPLIT_LAYOUT_SNAPSHOT = null;
+let UNDO_STACK = [];
+let CLIPBOARD_PANEL = null;
+let LAST_MOUSE_POS = { x: 0, y: 0 };
+let SHIFT_DOWN = false;
+
+function pushUndo(){
+  UNDO_STACK.push(deepClone(STATE));
+  if(UNDO_STACK.length > 30) UNDO_STACK.shift();
+}
+
+function undo(){
+  const prev = UNDO_STACK.pop();
+  if(!prev) return;
+  STATE = deepClone(prev);
+  // normalize
+  if(!STATE.split) STATE.split = {enabled:true,direction:"vertical",panes:[{paneId:"p1",ratio:.55},{paneId:"p2",ratio:.45}]};
+  if(!STATE.panes) STATE.panes = [{paneId:"p1",panels:[]},{paneId:"p2",panels:[]}];
+  applyCssVars();
+  renderAll();
+  markDirty();
+  autosave();
+}
+
+function bindInteract(){
+  // clear previous interact bindings by reinitializing on selector (interactjs handles idempotently)
+  interact(".panel").unset();
+
+  if(STATE.layoutMode === "flow"){
+    // flow: basic drag reorder is non-trivial; keep drag disabled to avoid inconsistent UX
+    // still allow context menu/settings
+    return;
+  }
+
+  // draggable
+  interact(".panel").draggable({
+    inertia: false,
+    ignoreFrom: ".btnSettings, .btnMore, .iconBtn, button, input, select, textarea, a",
+    modifiers: [
+      interact.modifiers.snap({
+        targets: [
+          interact.snappers.grid({ x: 50, y: 50 })
+        ],
+        range: Infinity,
+        relativePoints: [ { x: 0, y: 0 } ]
+      })
+    ],
+    listeners: {
+      start (event) {
+        event.target.classList.add("dragging");
+        const id = event.target.dataset.id;
+        // selection
+        clearSelection();
+        event.target.classList.add("selected");
+        selectedPanelId = id;
+      },
+      move (event) {
+        // visual translate (for feedback only)
+        const target = event.target;
+        const dx = (parseFloat(target.getAttribute("data-dx")) || 0) + event.dx;
+        const dy = (parseFloat(target.getAttribute("data-dy")) || 0) + event.dy;
+        target.style.transform = `translate(${dx}px, ${dy}px)`;
+        target.setAttribute("data-dx", dx);
+        target.setAttribute("data-dy", dy);
+
+        // highlight drop panel / pane
+        const rect = target.getBoundingClientRect();
+        const cx = (rect.left + rect.right) / 2;
+        const cy = (rect.top + rect.bottom) / 2;
+        const overId = findDropPanelByPoint(cx, cy, target.dataset.id) || findDropPanelAt(event.clientX, event.clientY);
+        $(".panel.dropTarget").removeClass("dropTarget");
+        if(overId && overId !== target.dataset.id){
+          const $overEl = $(`.panel[data-id="${overId}"]`);
+          if($overEl.length) $overEl.addClass("dropTarget");
+        }
+      },
+      end (event) {
+        const target = event.target;
+        const id = target.dataset.id;
+        const dx = parseFloat(target.getAttribute("data-dx")) || 0;
+        const dy = parseFloat(target.getAttribute("data-dy")) || 0;
+
+        const isShift = (event.shiftKey === true) || (event?.originalEvent?.shiftKey === true) || SHIFT_DOWN;
+
+        // snapshot for undo on drag move
+        if(dx !== 0 || dy !== 0){
+          pushUndo();
+        }
+
+        // merge handling: Shift+drop on another panel
+        if(isShift){
+          const rect = target.getBoundingClientRect();
+          const movedRect = {
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom
+          };
+          const cx = (movedRect.left + movedRect.right) / 2;
+          const cy = (movedRect.top + movedRect.bottom) / 2;
+          const dropOnPanelId = findDropPanelByPoint(cx, cy, id)
+            || findDropPanelByRect(movedRect, id)
+            || findDropPanelAt(event.clientX, event.clientY);
+          if(dropOnPanelId && dropOnPanelId !== id){
+            doMerge(id, dropOnPanelId);
+            return;
+          }
+        }
+
+        const dropPaneId = findPaneAt(event.clientX, event.clientY) || paneOf(id)?.paneId || "p1";
+        const dashEl = $(`.dashboard[data-pane-id="${dropPaneId}"]`)[0];
+        if(!dashEl) return;
+
+        const p = getPanel(id);
+        if(!p) return;
+
+        // Get current pixel position (with snap applied by interact.js)
+        const rect = target.getBoundingClientRect();
+        const dashRect = dashEl.getBoundingClientRect();
+        
+        // Calculate position relative to dashboard and snap to 50px
+        const newLeft = Math.round((rect.left - dashRect.left) / 50) * 50;
+        const newTop = Math.round((rect.top - dashRect.top) / 50) * 50;
+        const newWidth = Math.round(rect.width / 10) * 10;
+        const newHeight = Math.round(rect.height / 10) * 10;
+
+        target.classList.remove("dragging");
+        target.style.transform = "";
+        target.removeAttribute("data-dx");
+        target.removeAttribute("data-dy");
+        $(".panel.dropTarget").removeClass("dropTarget");
+        
+        // Store pixel coordinates
+        if(!p.layout.px) p.layout.px = {};
+        p.layout.px.x = Math.max(0, newLeft);
+        p.layout.px.y = Math.max(0, newTop);
+        p.layout.px.w = Math.max(100, newWidth);
+        p.layout.px.h = Math.max(100, newHeight);
+        
+        // Also update grid coordinates for backwards compatibility
+        p.layout.x = Math.round(newLeft / 100);
+        p.layout.y = Math.round(newTop / 100);
+        p.layout.w = Math.max(1, Math.round(newWidth / 100));
+        p.layout.h = Math.max(1, Math.round(newHeight / 100));
+
+        // if moved across pane
+        const fromPane = paneOf(id)?.paneId;
+        if(fromPane && fromPane !== dropPaneId){
+          const moved = removePanel(id);
+          addPanelToPane(dropPaneId, moved);
+        }
+
+        markDirty();
+        autosave();
+        
+        // Update panel position and apply scale
+        positionPanelEl(target, p);
+      }
+    }
+  });
+
+  // resizable
+  interact(".panel").resizable({
+    edges: { left:false, right:true, bottom:true, top:false },
+    modifiers: [
+      interact.modifiers.snapSize({
+        targets: [
+          interact.snappers.grid({ width: 50, height: 50 })
+        ]
+      })
+    ],
+    listeners: {
+      move (event) {
+        const target = event.target;
+        const dx = (parseFloat(target.getAttribute("data-rdx")) || 0) + event.deltaRect.left;
+        const dy = (parseFloat(target.getAttribute("data-rdy")) || 0) + event.deltaRect.top;
+        target.style.transform = `translate(${dx}px, ${dy}px)`;
+        target.setAttribute("data-rdx", dx);
+        target.setAttribute("data-rdy", dy);
+
+        target.style.width = event.rect.width + "px";
+        target.style.height = event.rect.height + "px";
+        applyPanelScale(target, event.rect.width, event.rect.height);
+      },
+      end (event) {
+        const target = event.target;
+        const id = target.dataset.id;
+        const p = getPanel(id);
+        if(!p) return;
+
+        const paneId = paneOf(id)?.paneId || "p1";
+        const dashEl = $(`.dashboard[data-pane-id="${paneId}"]`)[0];
+        if(!dashEl) return;
+
+        // Get snapped size (interact.js already applies 50px snap)
+        const rect = target.getBoundingClientRect();
+        const dashRect = dashEl.getBoundingClientRect();
+        
+        const newLeft = Math.round((rect.left - dashRect.left) / 10) * 10;
+        const newTop = Math.round((rect.top - dashRect.top) / 10) * 10;
+        const newWidth = Math.round(rect.width / 50) * 50;
+        const newHeight = Math.round(rect.height / 50) * 50;
+        
+        // Store pixel coordinates
+        if(!p.layout.px) p.layout.px = {};
+        p.layout.px.x = Math.max(0, newLeft);
+        p.layout.px.y = Math.max(0, newTop);
+        p.layout.px.w = Math.max(100, newWidth);
+        p.layout.px.h = Math.max(100, newHeight);
+        
+        // Also update grid coordinates
+        p.layout.x = Math.round(newLeft / 100);
+        p.layout.y = Math.round(newTop / 100);
+        p.layout.w = Math.max(1, Math.round(newWidth / 100));
+        p.layout.h = Math.max(1, Math.round(newHeight / 100));
+
+        markDirty();
+        autosave();
+        
+        // reset inline resize styles after measuring
+        target.style.transform = "";
+        target.style.width = "";
+        target.style.height = "";
+        target.removeAttribute("data-rdx");
+        target.removeAttribute("data-rdy");
+        
+        // Update panel position and apply scale
+        positionPanelEl(target, p);
+      }
+    }
+  });
+}
+
+/* =========================
+   6.5) Copy Panel
+========================= */
+function doCopyPanel(panelId){
+  const p = getPanel(panelId);
+  if(!p) return;
+  pushUndo();
+  
+  const paneId = paneOf(panelId)?.paneId || "p1";
+  const pn = STATE.panes.find(x=>x.paneId===paneId);
+  if(!pn) return;
+  
+  // Deep clone the panel
+  const copied = deepClone(p);
+  copied.id = uid(); // Generate new unique ID
+  
+  // Update title to indicate it's a copy
+  copied.title = copied.title + " (복사본)";
+  
+  // Offset position in pixels (50px offset to avoid exact overlap)
+  if(!copied.layout.px) copied.layout.px = {};
+  const originalX = copied.layout.px.x ?? (copied.layout.x * 100);
+  const originalY = copied.layout.px.y ?? (copied.layout.y * 100);
+  const originalW = copied.layout.px.w ?? (copied.layout.w * 100);
+  const originalH = copied.layout.px.h ?? (copied.layout.h * 100);
+  
+  copied.layout.px.x = originalX + 50;
+  copied.layout.px.y = originalY + 50;
+  copied.layout.px.w = originalW;
+  copied.layout.px.h = originalH;
+  
+  // Also update grid coordinates
+  copied.layout.x = Math.round(copied.layout.px.x / 100);
+  copied.layout.y = Math.round(copied.layout.px.y / 100);
+  copied.layout.w = Math.max(1, Math.round(copied.layout.px.w / 100));
+  copied.layout.h = Math.max(1, Math.round(copied.layout.px.h / 100));
+  
+  // Add to pane
+  pn.panels.push(copied);
+  
+  markDirty();
+  autosave();
+  
+  // Render the new panel
+  const dash = getDashboardForPane(paneId);
+  if(dash){
+    const el = renderPanel(copied);
+    dash.appendChild(el);
+    positionPanelEl(el, copied);
+    bindInteract(); // Rebind interact for new panel
+  }
+  
+  // Auto-select the copied panel
+  setTimeout(() => {
+    const $copiedEl = $(`.panel[data-id="${copied.id}"]`);
+    if($copiedEl.length){
+      clearSelection();
+      $copiedEl.addClass("selected");
+      selectedPanelId = copied.id;
+    }
+  }, 50);
+}
+
+/* =========================
+   7) Merge / Split (logical)
+========================= */
+function doMerge(aId, bId){
+  if(aId === bId) return;
+  const a = getPanel(aId), b = getPanel(bId);
+  if(!a || !b) return;
+
+  pushUndo();
+
+  const paneA = paneOf(aId)?.paneId;
+  const paneB = paneOf(bId)?.paneId;
+  // 정책: 동일 pane만 merge 허용 (운영 안정성 관점)
+  if(paneA !== paneB){
+    alert("Merge는 동일 Pane 내 패널만 허용됩니다.");
+    return;
+  }
+
+  // create composite sections from each panel (already composite => include its sections)
+  const secFromPanel = (p) => {
+    if(p.type === "Composite" && p.composite?.sections){
+      return p.composite.sections.map(s => ({...deepClone(s), sectionId: uid()}));
+    }
+    return [{
+      sectionId: uid(),
+      type: p.type,
+      visible: true,
+      title: p.title,
+      data: deepClone(p.data || {})
+    }];
+  };
+
+  const sections = [
+    ...secFromPanel(a),
+    ...secFromPanel(b)
+  ];
+
+  // layout union
+  const ax2 = a.layout.x + a.layout.w;
+  const ay2 = a.layout.y + a.layout.h;
+  const bx2 = b.layout.x + b.layout.w;
+  const by2 = b.layout.y + b.layout.h;
+  const x = Math.min(a.layout.x, b.layout.x);
+  const y = Math.min(a.layout.y, b.layout.y);
+  const w = Math.min(STATE.grid.cols, Math.max(ax2, bx2) - x);
+  const h = Math.max(1, Math.max(ay2, by2) - y);
+
+  // choose preset based on types
+  const types = sections.map(s=>s.type);
+  let preset = "stack";
+  if(types.includes("Progress") && types.includes("Issues")) preset = "kpiRight";
+  else if(sections.length === 2) preset = "twoColumn";
+
+  const merged = mkComposite(
+    `통합: ${a.title} + ${b.title}`,
+    "🧩",
+    a.theme === "danger" || b.theme === "danger" ? "danger" : (a.theme === "warn" || b.theme === "warn" ? "warn" : "default"),
+    {x,y,w,h},
+    sections,
+    preset
+  );
+
+  // remove both and insert merged
+  removePanel(aId);
+  removePanel(bId);
+  addPanelToPane(paneA, merged);
+
+  // collision resolve
+  const resolved = resolveCollision(paneA, merged.id, panelRect(merged));
+  merged.layout.x = resolved.x;
+  merged.layout.y = resolved.y;
+
+  mergeArmedId = null;
+  markDirty();
+  autosave();
+  renderAll();
+}
+
+function doLogicalSplit(panelId, dir){
+  const p = getPanel(panelId);
+  if(!p) return;
+  pushUndo();
+  const paneId = paneOf(panelId)?.paneId || "p1";
+  const pn = STATE.panes.find(x=>x.paneId===paneId);
+  if(!pn) return;
+
+  // Get pixel coordinates
+  if(!p.layout.px) p.layout.px = {};
+  const pxX = p.layout.px.x ?? (p.layout.x * 100);
+  const pxY = p.layout.px.y ?? (p.layout.y * 100);
+  const pxW = p.layout.px.w ?? (p.layout.w * 100);
+  const pxH = p.layout.px.h ?? (p.layout.h * 100);
+
+  // 최소 크기 체크 (픽셀 기준)
+  if(dir === "V" && pxW < 100){
+    alert("가로 분리를 위해 패널 너비가 최소 100px 이상이어야 합니다.");
+    return;
+  }
+  if(dir === "H" && pxH < 100){
+    alert("세로 분리를 위해 패널 높이가 최소 100px 이상이어야 합니다.");
+    return;
+  }
+
+  const newP = mkPanel("Worklog", "신규 패널", "📋", "default", {x:0,y:0,w:1,h:1}, {
+    items:[{t:"새 작업", time:"--:--"}]
+  });
+
+  if(dir === "V"){
+    // Horizontal split (left/right)
+    const w1 = Math.floor(pxW / 2);
+    const w2 = pxW - w1;
+    
+    // Update original panel (left)
+    p.layout.px.x = pxX;
+    p.layout.px.y = pxY;
+    p.layout.px.w = w1;
+    p.layout.px.h = pxH;
+    
+    // New panel (right)
+    newP.layout.px = {
+      x: pxX + w1,
+      y: pxY,
+      w: w2,
+      h: pxH
+    };
+  }else{
+    // Vertical split (top/bottom)
+    const h1 = Math.floor(pxH / 2);
+    const h2 = pxH - h1;
+    
+    // Update original panel (top)
+    p.layout.px.x = pxX;
+    p.layout.px.y = pxY;
+    p.layout.px.w = pxW;
+    p.layout.px.h = h1;
+    
+    // New panel (bottom)
+    newP.layout.px = {
+      x: pxX,
+      y: pxY + h1,
+      w: pxW,
+      h: h2
+    };
+  }
+
+  // Update grid coordinates for both panels
+  p.layout.x = Math.round(p.layout.px.x / 100);
+  p.layout.y = Math.round(p.layout.px.y / 100);
+  p.layout.w = Math.max(1, Math.round(p.layout.px.w / 100));
+  p.layout.h = Math.max(1, Math.round(p.layout.px.h / 100));
+  
+  newP.layout.x = Math.round(newP.layout.px.x / 100);
+  newP.layout.y = Math.round(newP.layout.px.y / 100);
+  newP.layout.w = Math.max(1, Math.round(newP.layout.px.w / 100));
+  newP.layout.h = Math.max(1, Math.round(newP.layout.px.h / 100));
+
+  // Add new panel
+  pn.panels.push(newP);
+
+  markDirty();
+  autosave();
+  
+  // Update both panels in DOM
+  const $originalEl = $(`.panel[data-id="${p.id}"]`);
+  if($originalEl.length){
+    positionPanelEl($originalEl[0], p);
+  }
+  
+  // Render new panel
+  const dash = getDashboardForPane(paneId);
+  if(dash){
+    const el = renderPanel(newP);
+    dash.appendChild(el);
+    positionPanelEl(el, newP);
+    bindInteract(); // Rebind interact for new panel
+  }
+
+  // open settings immediately
+  setTimeout(() => openSettings(newP.id), 100);
+}
+
+/* =========================
+   8) Settings modal
+========================= */
+function initIconSelect(){
+  UI.fIcon.html(ICONS.map(x => `<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join(""));
+}
+initIconSelect();
+
+let editingPanelId = null;
+
+function openSettings(panelId){
+  const p = getPanel(panelId);
+  if(!p) return;
+  editingPanelId = panelId;
+
+  UI.modalTitle.text(`패널 설정: ${p.title}`);
+  UI.fTitle.val(p.title || "");
+  UI.fType.val(p.type || "Worklog");
+  UI.fIcon.val(p.icon || "📋");
+  UI.fTheme.val(p.theme || "default");
+
+  // data JSON
+  const payload = deepClone(p);
+  // keep only editable parts while still allowing composite edit
+  // user can edit "data" and "composite"
+  const editable = {
+    data: payload.data || {},
+    composite: payload.composite || undefined
+  };
+  UI.fData.val(JSON.stringify(editable, null, 2));
+
+  showModal(UI.modalBack, true);
+}
+
+function closeSettings(){
+  editingPanelId = null;
+  showModal(UI.modalBack, false);
+}
+
+$("#modalClose").on("click", closeSettings);
+UI.modalBack.on("click", (e) => {
+  if(e.target === UI.modalBack[0]) closeSettings();
+});
+$("#btnValidate").on("click", () => {
+  const parsed = safeJsonParse(UI.fData.val());
+  alert(parsed.ok ? "JSON 유효합니다." : ("JSON 오류: " + parsed.err.message));
+});
+$("#btnSave").on("click", () => {
+  if(!editingPanelId) return;
+  const p = getPanel(editingPanelId);
+  if(!p) return;
+
+  // primary fields
+  p.title = UI.fTitle.val().trim() || p.title;
+  p.type = UI.fType.val();
+  p.icon = UI.fIcon.val();
+  p.theme = UI.fTheme.val();
+
+  // data field (strict JSON)
+  const parsed = safeJsonParse(UI.fData.val());
+  if(!parsed.ok){
+    alert("JSON이 유효하지 않아 저장할 수 없습니다.\n" + parsed.err.message);
+    return;
+  }
+
+  // apply editable json: allow data/composite override
+  const v = parsed.val || {};
+  p.data = (v.data && typeof v.data === "object") ? v.data : {};
+  if(p.type === "Composite"){
+    // ensure composite
+    p.composite = (v.composite && typeof v.composite === "object") ? v.composite : (p.composite || {sections:[],layout:"stack"});
+    if(!Array.isArray(p.composite.sections)) p.composite.sections = [];
+    p.composite.layout = p.composite.layout || "stack";
+  }else{
+    delete p.composite;
+  }
+
+  markDirty();
+  autosave();
+  renderAll();
+  closeSettings();
+});
+
+/* =========================
+   9) Export / Import
+========================= */
+function openJsonModal(title, value, hint){
+  UI.jsonTitle.text(title);
+  UI.jsonArea.val(value || "");
+  UI.jsonHint.text(hint || "");
+  showModal(UI.jsonBack, true);
+}
+function closeJsonModal(){
+  showModal(UI.jsonBack, false);
+}
+$("#jsonClose").on("click", closeJsonModal);
+UI.jsonBack.on("click", (e) => {
+  if(e.target === UI.jsonBack[0]) closeJsonModal();
+});
+$("#jsonCopy").on("click", async () => {
+  try{
+    await navigator.clipboard.writeText(UI.jsonArea.val());
+    alert("클립보드에 복사했습니다.");
+  }catch(e){
+    alert("복사 실패: 브라우저 권한을 확인하세요.");
+  }
+});
+$("#jsonApply").on("click", () => {
+  const parsed = safeJsonParse(UI.jsonArea.val());
+  if(!parsed.ok){
+    alert("JSON 오류: " + parsed.err.message);
+    return;
+  }
+  const obj = parsed.val;
+  // minimal validation
+  if(!obj || typeof obj !== "object" || !obj.grid || !obj.panes){
+    alert("스키마가 올바르지 않습니다. (grid/panes 누락)");
+    return;
+  }
+  STATE = obj;
+  // normalize
+  if(!STATE.split) STATE.split = {enabled:false,direction:"vertical",panes:[{paneId:"p1",ratio:1}]};
+  if(!STATE.meta) STATE.meta = {savedAt: nowIso(), version:1};
+
+  // ensure panes
+  if(STATE.layoutMode === "split"){
+    ensurePanes(STATE.split.panes.length);
+  }else{
+    ensurePanes(2);
+  }
+
+  applyCssVars();
+  renderAll();
+  markDirty();
+  autosave();
+  closeJsonModal();
+});
+
+/* =========================
+   10) Context menu
+========================= */
+function openCtxMenu(x,y,panelId){
+  ctxPanelId = panelId;
+  UI.ctxMenu.data("panelId", panelId || "");
+
+  UI.ctxMenu.css({ left: x + "px", top: y + "px" }).show();
+}
+function closeCtxMenu(){
+  UI.ctxMenu.hide();
+  ctxPanelId = null;
+  UI.ctxMenu.data("panelId", "");
+}
+$(document).on("click", (e) => {
+  if(UI.ctxMenu.is(":visible")){
+    if(!$(e.target).closest(".ctx").length){
+      closeCtxMenu();
+    }
+  }
+});
+
+UI.ctxMenu.on("click", (e) => {
+  e.stopPropagation();
+  const item = $(e.target).closest(".item")[0];
+  const panelId = ctxPanelId || UI.ctxMenu.data("panelId");
+  if(!item || !panelId) return;
+  const act = item.dataset.act;
+
+  if(act === "settings"){
+    closeCtxMenu();
+    openSettings(panelId);
+    return;
+  }
+  if(act === "copy"){
+    closeCtxMenu();
+    doCopyPanel(panelId);
+    return;
+  }
+  if(act === "splitH"){
+    closeCtxMenu();
+    doLogicalSplit(panelId, "V"); // "가로 분할" => 좌우 나누기
+    return;
+  }
+  if(act === "splitV"){
+    closeCtxMenu();
+    doLogicalSplit(panelId, "H"); // "세로 분할" => 상하 나누기
+    return;
+  }
+  if(act === "armMerge"){
+    mergeArmedId = panelId;
+    closeCtxMenu();
+    armMergeUi(true);
+    return;
+  }
+  if(act === "remove"){
+    closeCtxMenu();
+    if(confirm("정말 삭제하시겠습니까?")){
+      pushUndo();
+      const panelEl = $(`.panel[data-id="${panelId}"]`)[0];
+      removePanel(panelId);
+      
+      // Remove from DOM
+      if(panelEl){
+        panelEl.remove();
+      }
+      
+      // Clear selection if deleted panel was selected
+      if(selectedPanelId === panelId){
+        selectedPanelId = null;
+      }
+      
+      markDirty();
+      autosave();
+    }
+    return;
+  }
+});
+
+function armMergeUi(on){
+  $(".panel").removeClass("mergeArmed");
+  if(on && mergeArmedId){
+    const $srcEl = $(`.panel[data-id="${mergeArmedId}"]`);
+    if($srcEl.length) $srcEl.addClass("mergeArmed");
+    UI.helpHint.text("Merge 대기: 대상 패널을 클릭하세요 (ESC 취소)");
+  }else{
+    UI.helpHint.text("팁: Shift+드랍 = Merge");
+  }
+}
+
+$(document).on("keydown", (e) => {
+  if(e.key === "Shift") SHIFT_DOWN = true;
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c"){
+    if(selectedPanelId){
+      const p = getPanel(selectedPanelId);
+      if(p){
+        CLIPBOARD_PANEL = deepClone(p);
+      }
+    }
+    return;
+  }
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v"){
+    if(CLIPBOARD_PANEL){
+      e.preventDefault();
+      pushUndo();
+      const paneId = (STATE.layoutMode === "split")
+        ? (findPaneAt(LAST_MOUSE_POS.x, LAST_MOUSE_POS.y) || paneOf(selectedPanelId)?.paneId || "p1")
+        : "p1";
+      const pn = STATE.panes.find(x=>x.paneId===paneId);
+      if(!pn) return;
+
+      const copied = deepClone(CLIPBOARD_PANEL);
+      copied.id = uid();
+      copied.title = (copied.title || "패널") + " (복사본)";
+
+      const dash = getDashboardForPane(paneId);
+      const dashRect = dash ? dash.getBoundingClientRect() : { left: 0, top: 0 };
+      const left = Math.max(0, Math.round((LAST_MOUSE_POS.x - dashRect.left) / 50) * 50);
+      const top = Math.max(0, Math.round((LAST_MOUSE_POS.y - dashRect.top) / 50) * 50);
+
+      if(!copied.layout.px) copied.layout.px = {};
+      copied.layout.px.x = left;
+      copied.layout.px.y = top;
+      copied.layout.px.w = copied.layout.px.w ?? (copied.layout.w * 100);
+      copied.layout.px.h = copied.layout.px.h ?? (copied.layout.h * 100);
+
+      copied.layout.x = Math.round(copied.layout.px.x / 100);
+      copied.layout.y = Math.round(copied.layout.px.y / 100);
+      copied.layout.w = Math.max(1, Math.round(copied.layout.px.w / 100));
+      copied.layout.h = Math.max(1, Math.round(copied.layout.px.h / 100));
+
+      pn.panels.push(copied);
+
+      const el = renderPanel(copied);
+      if(dash) dash.appendChild(el);
+      positionPanelEl(el, copied);
+      bindInteract();
+
+      clearSelection();
+      el.classList.add("selected");
+      selectedPanelId = copied.id;
+
+      markDirty();
+      autosave();
+    }
+    return;
+  }
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z"){
+    e.preventDefault();
+    undo();
+    return;
+  }
+  if(e.key === "Escape"){
+    mergeArmedId = null;
+    armMergeUi(false);
+    closeCtxMenu();
+    closeSettings();
+    closeJsonModal();
+  }
+  if(e.key === "Enter" && selectedPanelId){
+    openSettings(selectedPanelId);
+  }
+});
+
+$(document).on("keyup", (e) => {
+  if(e.key === "Shift") SHIFT_DOWN = false;
+});
+
+/* Merge armed click target */
+$(document).on("click", (e) => {
+  if(!mergeArmedId) return;
+  const panelEl = $(e.target).closest(".panel")[0];
+  if(!panelEl) return;
+  const tgt = panelEl.dataset.id;
+  if(!tgt || tgt === mergeArmedId) return;
+  doMerge(mergeArmedId, tgt);
+  mergeArmedId = null;
+  armMergeUi(false);
+});
+
+$(document).on("mousemove", (e) => {
+  LAST_MOUSE_POS.x = e.clientX;
+  LAST_MOUSE_POS.y = e.clientY;
+});
+
+/* =========================
+   10.5) Auto arrange
+========================= */
+function autoArrangePanels(){
+  pushUndo();
+  const gap = STATE.grid?.gap ?? 12;
+  const snap = 50;
+
+  const setPanelPos = (p, x, y, w, h) => {
+    if(!p.layout.px) p.layout.px = {};
+    p.layout.px.x = Math.max(0, Math.round(x / snap) * snap);
+    p.layout.px.y = Math.max(0, Math.round(y / snap) * snap);
+    p.layout.px.w = Math.max(100, Math.round(w / snap) * snap);
+    p.layout.px.h = Math.max(100, Math.round(h / snap) * snap);
+
+    p.layout.x = Math.round(p.layout.px.x / 100);
+    p.layout.y = Math.round(p.layout.px.y / 100);
+    p.layout.w = Math.max(1, Math.round(p.layout.px.w / 100));
+    p.layout.h = Math.max(1, Math.round(p.layout.px.h / 100));
+  };
+
+  const arrangeList = (panels, dashEl) => {
+    if(!dashEl) return;
+    const dashWidth = Math.max(100, Math.floor(dashEl.clientWidth || dashEl.getBoundingClientRect().width));
+    let x = 0;
+    let y = 0;
+    let rowH = 0;
+
+    panels.forEach(p => {
+      const baseW = p.layout.px?.w ?? (p.layout.w * 100);
+      const baseH = p.layout.px?.h ?? (p.layout.h * 100);
+      const w = Math.max(100, Math.round(baseW / snap) * snap);
+      const h = Math.max(100, Math.round(baseH / snap) * snap);
+
+      if(x > 0 && x + w > dashWidth){
+        x = 0;
+        y += rowH + gap;
+        rowH = 0;
+      }
+
+      setPanelPos(p, x, y, w, h);
+      x += w + gap;
+      rowH = Math.max(rowH, h);
+
+      const $el = $(`.panel[data-id="${p.id}"]`);
+      if($el.length) positionPanelEl($el[0], p);
+    });
+  };
+
+  if(STATE.layoutMode === "split"){
+    STATE.panes.forEach(paneObj => {
+      const dash = $(`.dashboard[data-pane-id="${paneObj.paneId}"]`)[0];
+      arrangeList(paneObj.panels, dash);
+    });
+  }else{
+    // grid/flow: render to the first dashboard
+    const dash = $(".dashboard")[0];
+    const allPanels = STATE.panes.flatMap(p => p.panels);
+    arrangeList(allPanels, dash);
+  }
+
+  markDirty();
+  autosave();
+}
+
+/* =========================
+   11) Toolbar actions
+========================= */
+function setMode(mode){
+  STATE.layoutMode = mode;
+  // split enable flag
+  STATE.split.enabled = (mode === "split");
+
+  // UI
+  $("#btnGrid").toggleClass("active", mode==="grid");
+  $("#btnSplit").toggleClass("active", mode==="split");
+  $("#btnFlow").toggleClass("active", mode==="flow");
+
+  markDirty();
+  autosave();
+  renderAll();
+  if(mode === "grid"){
+    // snapshot split layout so we can restore later
+    if(!SPLIT_LAYOUT_SNAPSHOT){
+      SPLIT_LAYOUT_SNAPSHOT = deepClone(STATE.panes);
+    }
+    autoArrangePanels();
+  }else if(mode === "split"){
+    if(SPLIT_LAYOUT_SNAPSHOT){
+      STATE.panes = deepClone(SPLIT_LAYOUT_SNAPSHOT);
+      SPLIT_LAYOUT_SNAPSHOT = null;
+      renderAll();
+    }
+  }
+}
+
+$("#btnGrid").on("click", () => setMode("grid"));
+$("#btnSplit").on("click", () => setMode("split"));
+$("#btnFlow").on("click", () => setMode("flow"));
+
+$("#btnDir").on("click", () => {
+  // toggle split direction
+  STATE.split.direction = (STATE.split.direction === "vertical") ? "horizontal" : "vertical";
+  $("#btnDir").text("Split: " + DIR_LABEL());
+  if(STATE.layoutMode === "split"){
+    markDirty();
+    autosave();
+    renderAll();
+  }else{
+    markDirty();
+    autosave();
+  }
+});
+
+$("#btnPanes").on("click", () => {
+  PANE_COUNT = (STATE.split.panes.length === 2) ? 3 : 2;
+  ensurePanes(PANE_COUNT);
+  // default ratios
+  STATE.split.panes.forEach(p => p.ratio = 1 / PANE_COUNT);
+  $("#btnPanes").text("Pane: " + PANE_COUNT);
+  markDirty();
+  autosave();
+  renderAll();
+});
+
+$("#btnAdd").on("click", () => {
+  const paneId = (STATE.layoutMode === "split") ? STATE.split.panes[0].paneId : "p1";
+  const pn = STATE.panes.find(x=>x.paneId===paneId);
+  if(!pn) return;
+
+  const p = mkPanel("Worklog", "신규 작업", "📋", "default", {x:0,y:0,w:4,h:2}, {
+    items:[{t:"새 작업 항목", time:"--:--"}]
+  });
+
+  // find first free spot
+  const resolved = resolveCollision(paneId, p.id, panelRect(p));
+  p.layout.x = resolved.x;
+  p.layout.y = resolved.y;
+
+  pn.panels.push(p);
+  markDirty();
+  autosave();
+  renderAll();
+  openSettings(p.id);
+});
+
+$("#btnAuto").on("click", () => {
+  autoArrangePanels();
+});
+$("#btnUndo").on("click", () => {
+  undo();
+});
+
+$("#btnExport").on("click", () => {
+  openJsonModal("내보내기: 레이아웃 JSON", JSON.stringify(STATE, null, 2), "복사 후 별도 보관 또는 서버 저장 API로 전송할 수 있습니다.");
+  // export modal does not apply by default (apply button still available)
+});
+$("#btnImport").on("click", () => {
+  openJsonModal("가져오기: 레이아웃 JSON", "", "여기에 JSON을 붙여넣고 [적용]을 누르세요. (스키마 오류 시 적용되지 않습니다.)");
+});
+$("#btnReset").on("click", () => {
+  if(confirm("저장된 레이아웃을 삭제하고 초기 상태로 되돌리겠습니까?")){
+    resetState();
+  }
+});
+
+function showModal(backEl, on){
+  backEl.css("display", on ? "flex" : "none");
+  backEl.attr("aria-hidden", on ? "false" : "true");
+}
+
+/* =========================
+   12) Selection helpers
+========================= */
+function clearSelection(){
+  $(".panel.selected").removeClass("selected");
+}
+
+$(document).on("keydown", (e) => {
+  if(!selectedPanelId) return;
+  if(STATE.layoutMode === "flow") return;
+
+  const p = getPanel(selectedPanelId);
+  if(!p) return;
+
+  const paneId = paneOf(selectedPanelId)?.paneId || "p1";
+  let moved = false;
+
+  const step = 1;
+  if(e.key === "ArrowLeft"){ p.layout.x = Math.max(0, p.layout.x - step); moved = true; }
+  if(e.key === "ArrowRight"){ p.layout.x = Math.min(STATE.grid.cols - p.layout.w, p.layout.x + step); moved = true; }
+  if(e.key === "ArrowUp"){ p.layout.y = Math.max(0, p.layout.y - step); moved = true; }
+  if(e.key === "ArrowDown"){ p.layout.y = Math.max(0, p.layout.y + step); moved = true; }
+
+  // ctrl+arrow => resize
+  if(e.ctrlKey){
+    moved = false;
+    if(e.key === "ArrowLeft"){ p.layout.w = Math.max(1, p.layout.w - 1); moved = true; }
+    if(e.key === "ArrowRight"){ p.layout.w = Math.min(STATE.grid.cols, p.layout.w + 1); moved = true; }
+    if(e.key === "ArrowUp"){ p.layout.h = Math.max(1, p.layout.h - 1); moved = true; }
+    if(e.key === "ArrowDown"){ p.layout.h = Math.min(50, p.layout.h + 1); moved = true; }
+    // clamp x
+    p.layout.x = clamp(p.layout.x, 0, STATE.grid.cols - p.layout.w);
+  }
+
+  if(moved){
+    const resolved = resolveCollision(paneId, selectedPanelId, panelRect(p));
+    p.layout.x = resolved.x; p.layout.y = resolved.y;
+    markDirty();
+    autosave();
+    renderAll();
+    e.preventDefault();
+  }
+});
+
+/* =========================
+   13) Startup
+========================= */
+(function init(){
+  const loaded = loadState();
+  STATE = loaded || defaultState();
+
+  // normalize, ensure required
+  if(!STATE.grid) STATE.grid = {cols:12,rowHeight:92,gap:12};
+  if(!STATE.split) STATE.split = {enabled:true,direction:"vertical",panes:[{paneId:"p1",ratio:.55},{paneId:"p2",ratio:.45}]};
+  if(!STATE.panes) STATE.panes = [{paneId:"p1",panels:[]},{paneId:"p2",panels:[]}];
+  if(!STATE.meta) STATE.meta = {savedAt: nowIso(), version: 1};
+
+  ensurePanes(STATE.split.panes.length || 2);
+
+  applyCssVars();
+  $("#btnDir").text("Split: " + DIR_LABEL());
+  $("#btnPanes").text("Pane: " + (STATE.split.panes.length || 2));
+
+  // mode buttons
+  $("#btnGrid").toggleClass("active", STATE.layoutMode==="grid");
+  $("#btnSplit").toggleClass("active", STATE.layoutMode==="split");
+  $("#btnFlow").toggleClass("active", STATE.layoutMode==="flow");
+
+  renderAll();
+  markSaved();
+  armMergeUi(false);
+  
+  // Generate rulers after initial render
+  setTimeout(() => {
+    generateRulers();
+  }, 100);
+})();
+});
+</script>
+
+<!--
+  ====== (참고) 서버 저장/조회 API 스펙 (요약) ======
+  POST   /api/dashboard-layouts
+  GET    /api/dashboard-layouts/{layoutId}
+  GET    /api/dashboard-layouts?ownerUserId={id}&scope=USER
+  PUT    /api/dashboard-layouts/{layoutId}/default
+  DELETE /api/dashboard-layouts/{layoutId}
+-->
+</body>
+</html>

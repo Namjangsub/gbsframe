@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>실행계획 > 기계별 WBS현황</title>
+  <style>
+    :root {
+      --primary: #3b82f6;
+      --dark: #1e293b;
+      --light: #f1f5f9;
+      --muted: #94a3b8;
+      --danger: #ef4444;
+      --border: #e2e8f0;
+      --label-width-base: 280px;
+      --badge-col-width-base: 48px;
+      --col-gap: 4px;
+      --lane-height-base: 32px;
+      --px-per-day-base: 12px;
+      --header-height-base: 32px;
+      --zoom-scale: 1;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; color: #334155; background: #fff; }
+
+    .topbar { background: #fff; border-bottom: 1px solid var(--border); padding: 12px 16px; position: sticky; top: 0; z-index: 30; }
+    .topbar-inner { max-width: 100%; }
+    .title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .title { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; }
+    .crumb { color: var(--dark); }
+    .crumb small { color: var(--muted); margin: 0 4px; }
+    .btns { display: flex; gap: 8px; }
+    .btn { padding: 6px 14px; border-radius: 4px; border: 1px solid var(--border); background: #fff; cursor: pointer; font-size: 12px; }
+    .btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .btn.dark { background: var(--dark); color: #fff; border-color: var(--dark); }
+    .btn.ghost { background: transparent; border-color: transparent; }
+
+    .search-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px 16px; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-weight: 500; color: #475569; font-size: 11px; }
+    .control { display: flex; align-items: center; gap: 4px; }
+    .control select, .control input { width: 100%; padding: 4px 8px; border: 1px solid var(--border); border-radius: 3px; font-size: 12px; }
+    .control input[type="date"] { width: 110px; }
+    .search-actions { grid-column: 1/-1; padding-top: 4px; }
+    .search-actions span { color: var(--muted); font-size: 11px; }
+
+    .wbs-toolbar { padding: 8px 0; display: flex; gap: 8px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin-top: 12px; }
+
+    .wbs-scroll {
+      overflow: auto;
+      position: relative;
+      height: calc(100vh - 220px);
+      background: #fff;
+      --label-width: calc(var(--label-width-base) * var(--zoom-scale));
+      --badge-col-width: calc(var(--badge-col-width-base) * var(--zoom-scale));
+      --lane-height: calc(var(--lane-height-base) * var(--zoom-scale));
+      --px-per-day: calc(var(--px-per-day-base) * var(--zoom-scale));
+      --header-height: calc(var(--header-height-base) * var(--zoom-scale));
+      --font-scale: var(--zoom-scale);
+    }
+    #timeline { min-width: 100%; position: relative; }
+
+    .gantt-header { display: flex; position: sticky; top: 0; z-index: 10; background: #fff; border-bottom: 1px solid var(--border); }
+    .header-left { width: var(--label-width); min-width: var(--label-width); position: sticky; left: 0; z-index: 20; background: #fff; border-right: 1px solid var(--border); padding: calc(4px * var(--font-scale)) calc(8px * var(--font-scale)); font-weight: 600; display: flex; align-items: center; gap: calc(8px * var(--font-scale)); font-size: calc(11px * var(--font-scale)); }
+    .header-right { flex: 1; position: relative; min-width: calc(600px * var(--font-scale)); }
+    .ruler-months, .ruler-weeks, .ruler-days { display: flex; height: var(--header-height); }
+    .ruler-months { border-bottom: 1px solid var(--border); }
+    .ruler-month { border-right: 1px solid var(--border); display: flex; align-items: center; padding: 0 calc(4px * var(--font-scale)); font-size: calc(11px * var(--font-scale)); font-weight: 600; background: #f8fafc; }
+    .ruler-week { border-right: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: calc(10px * var(--font-scale)); color: var(--muted); }
+    .ruler-day { border-right: 1px solid var(--border); text-align: center; font-size: calc(11px * var(--font-scale)); display: flex; align-items: center; justify-content: center; }
+    .ruler-day.weekend { background: #f1f5f9; }
+    .ruler-day.today { background: #dbeafe; }
+
+    .row-group { border-bottom: 1px solid var(--border); }
+    .group-label { display: flex; align-items: flex-start; padding: calc(8px * var(--font-scale)); background: #f8fafc; border-bottom: 1px solid var(--border); min-height: calc(40px * var(--font-scale)); position: sticky; left: 0; z-index: 4; }
+    .group-label-main { flex: 1; }
+    .group-label-title { font-weight: 600; color: #1e293b; font-size: calc(13px * var(--font-scale)); margin-bottom: calc(2px * var(--font-scale)); }
+    .group-label-sub { font-size: calc(11px * var(--font-scale)); color: #64748b; line-height: 1.4; }
+    .group-label-meta { display: flex; gap: calc(8px * var(--font-scale)); margin-top: calc(2px * var(--font-scale)); }
+    .group-label-meta span { font-size: calc(10px * var(--font-scale)); color: #94a3b8; }
+
+    .row-track { display: flex; position: relative; border-bottom: 1px solid var(--border); min-height: var(--lane-height); }
+    .track-label { width: var(--label-width); min-width: var(--label-width); padding: calc(6px * var(--font-scale)) calc(8px * var(--font-scale)); font-size: calc(11px * var(--font-scale)); display: flex; align-items: center; justify-content: space-between; background: #fff; border-right: 1px solid var(--border); position: sticky; left: 0; z-index: 5; }
+    .track-label-text { font-weight: 500; }
+    .track-label-badge { width: var(--badge-col-width); text-align: center; font-size: calc(10px * var(--font-scale)); color: var(--muted); }
+    .track-body { flex: 1; position: relative; min-height: var(--lane-height); background-image: repeating-linear-gradient(to right, transparent, transparent var(--col-gap), var(--border) var(--col-gap), var(--border) calc(var(--col-gap) * 2)); background-size: calc(var(--px-per-day) * 2) 100%; }
+
+    .shade { position: absolute; top: 0; bottom: 0; pointer-events: none; }
+    .shade.weekend { background: #f8fafc; opacity: 0.6; }
+    .shade.today { background: #dbeafe; opacity: 0.4; }
+    .today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--danger); z-index: 3; pointer-events: none; }
+
+    .row-track svg { width: 100%; height: 100%; display: block; }
+    .bar { cursor: move; rx: 6; ry: 6; fill-opacity: 0.7; }
+    .bar.ci-0 { fill: #a5d8ff; stroke: #74c0fc; stroke-opacity: 0.9; }
+    .bar.ci-1 { fill: #b2f2bb; stroke: #8ce99a; stroke-opacity: 0.9; }
+    .bar.ci-2 { fill: #ffd8a8; stroke: #ffc078; stroke-opacity: 0.9; }
+    .bar.ci-3 { fill: #d8b4fe; stroke: #c77dff; stroke-opacity: 0.9; }
+    .bar.ci-4 { fill: #ffc9c9; stroke: #ffa8a8; stroke-opacity: 0.9; }
+    .bar.expired { opacity: 0.75; }
+    .bar.overdue { opacity: 0.85; }
+    .bar-label { font-size: calc(10px * var(--font-scale)); fill: #334155; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+    .handle { cursor: ew-resize; opacity: 0; transition: opacity 0.15s; }
+    .bar:hover + .bar-label + .handle, .bar:hover + .bar-label + .handle + .handle { opacity: 0.4; }
+
+    #ganttTooltip { position: fixed; background: rgba(15, 23, 42, 0.95); color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 11px; pointer-events: none; z-index: 1000; display: none; max-width: 280px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    #ganttTooltip b { display: block; margin-bottom: 4px; font-size: 12px; }
+
+    .status-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--border); padding: 6px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--muted); }
+    #zoomVal { width: 30px; text-align: center; font-weight: 600; }
+
+    .toast { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.9); color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 12px; display: none; z-index: 1000; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="title-row">
+        <div class="title">
+          <span style="font-size:18px;">⚙️</span>
+          <span class="crumb">실행계획 <small>&gt;</small> 기계별 WBS현황</span>
+        </div>
+        <div class="btns">
+          <button class="btn dark" id="btnHelp">도움말 (Help)</button>
+          <button class="btn" id="btnReset">초기화 (Reset)</button>
+          <button class="btn primary" id="btnSearch">검색 (Search)</button>
+        </div>
+      </div>
+      <div class="search-grid">
+        <div class="field">
+          <label>* 회사 (Company)</label>
+          <div class="control">
+            <select id="fCompany" data-search>
+              <option value="">전체</option>
+              <option value="건양TT">건양TT</option>
+              <option value="건양IT">건양IT</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>SalesCode</label>
+          <div class="control">
+            <input id="fSalesCode" placeholder="SalesCode 입력" data-search/>
+          </div>
+        </div>
+        <div class="field">
+          <label>* 수주일자 (From~To)</label>
+          <div class="control">
+            <input id="fFrom" type="date" data-search/>
+            <span style="color:#94a3b8;font-weight:900;">~</span>
+            <input id="fTo" type="date" data-search/>
+          </div>
+        </div>
+        <div class="field">
+          <label>고객사PJT</label>
+          <div class="control">
+            <select id="fPjt" data-search>
+              <option value="">전체</option>
+              <option value="PJT-A">PJT-A</option>
+              <option value="PJT-B">PJT-B</option>
+              <option value="PJT-C">PJT-C</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>기계종류</label>
+          <div class="control">
+            <select id="fMachine" data-search>
+              <option value="">전체</option>
+              <option value="NX5E">NX5E</option>
+              <option value="BC4i">BC4i</option>
+              <option value="MX3">MX3</option>
+              <option value="XR2">XR2</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>고객사</label>
+          <div class="control">
+            <input id="fCustomer" placeholder="고객사 입력" data-search/>
+          </div>
+        </div>
+        <div class="field">
+          <label>수주구분</label>
+          <div class="control">
+            <select id="fOrderType" data-search>
+              <option value="">전체</option>
+              <option value="신규">신규</option>
+              <option value="개조">개조</option>
+              <option value="AS">AS</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>PM계획상태</label>
+          <div class="control">
+            <select id="fPmStatus" data-search>
+              <option value="">전체</option>
+              <option value="계획">계획</option>
+              <option value="진행">진행</option>
+              <option value="완료">완료</option>
+              <option value="지연">지연</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="wbs-toolbar">
+      <button class="btn primary" id="btnSave">SAVE CHANGES</button>
+      <button class="btn ghost" id="btnExport">EXPORT EXCEL</button>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+          <span>* 데모 화면: 드래그/리사이즈로 일정 변경 가능 (줌: 슬라이더 또는 Ctrl+마우스휠)</span>
+        <label style="font-size:11px;color:#64748b;">줌(px/day):</label>
+        <input id="zoomSlider" type="range" min="4" max="30" value="12"/>
+        <span id="zoomVal">12</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="wbs-scroll" id="wbsScroll">
+    <div id="timeline"></div>
+  </div>
+
+  <div class="status-bar">
+    <span id="sys-status">SYSTEM STATUS: OPERATIONAL</span>
+    <span id="auto-save">AUTO-SAVE ENABLED (MOCK)</span>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div id="ganttTooltip"></div>
+
+  <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+  <script>
+    (function() {
+      'use strict';
+      const MS = 86400000;
+
+      const state = {
+        viewStart: null,
+        viewEnd: null,
+        pxPerDay: 12,
+        rowsData: {},
+        rowDefs: {}
+      };
+
+      const jwt = { coCd: '건양TT', userId: 'USER001' };
+
+      const sod = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+      const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const parse = s => sod(new Date(s));
+      const days = (a, b) => Math.round((+sod(b) - +sod(a)) / MS);
+      const addDays = (d, n) => new Date(+sod(d) + n * MS);
+
+      const SALES_CDS = ['S202401', 'S202402', 'S202403', 'S202404', 'S202405', 'S202406', 'S202407', 'S202408'];
+      const CLNTPJTS = ['PJT-A', 'PJT-B', 'PJT-C'];
+      const EQPS = ['NX5E', 'BC4i', 'MX3', 'XR2'];
+      const MNGS = ['김철수', '이영희', '박민수', '최수진'];
+      const PLAN_TYPES = ['PM계획', '담당실적', '실적', '기타'];
+      const TASK_NAMES = ['연구소', '생산', '구매', '생/영', '영/연', '연/구', '구/생', '영업'];
+      const STATUS = ['계획', '진행', '완료', '지연'];
+      const LEGEND_COLORS = {
+        '조립': { fill: '#bbf7d0', stroke: '#86efac' },
+        '영업': { fill: '#c4b5fd', stroke: '#a78bfa' },
+        '연구소': { fill: '#fbcfe8', stroke: '#f9a8d4' },
+        '구매': { fill: '#fdba74', stroke: '#fb923c' },
+        '생산': { fill: '#a7f3d0', stroke: '#6ee7b7' },
+        '영/연': { fill: '#fecaca', stroke: '#fca5a5' },
+        '연/구': { fill: '#d9f99d', stroke: '#bef264' },
+        '구/생': { fill: '#99f6e4', stroke: '#5eead4' },
+        '생/영': { fill: '#bae6fd', stroke: '#7dd3fc' }
+      };
+      const BAR_PALETTE = [
+        { fill: '#bbf7d0', stroke: '#86efac' },
+        { fill: '#c4b5fd', stroke: '#a78bfa' },
+        { fill: '#fbcfe8', stroke: '#f9a8d4' },
+        { fill: '#fdba74', stroke: '#fb923c' },
+        { fill: '#a7f3d0', stroke: '#6ee7b7' },
+        { fill: '#fecaca', stroke: '#fca5a5' },
+        { fill: '#d9f99d', stroke: '#bef264' },
+        { fill: '#99f6e4', stroke: '#5eead4' },
+        { fill: '#bae6fd', stroke: '#7dd3fc' }
+      ];
+
+      function makeRng(seed) {
+        let s = seed >>> 0;
+        return () => {
+          s = (s * 1664525 + 1013904223) % 4294967296;
+          return s / 4294967296;
+        };
+      }
+
+      function getLabelColor(label) {
+        const text = (label || '기타').trim();
+        if (LEGEND_COLORS[text]) {
+          return LEGEND_COLORS[text];
+        }
+        const labelIndex = TASK_NAMES.indexOf(text);
+        if (labelIndex >= 0) {
+          return BAR_PALETTE[labelIndex % BAR_PALETTE.length];
+        }
+        let hash = 0;
+        for (let i = 0; i < text.length; i++) {
+          hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+        }
+        return BAR_PALETTE[hash % BAR_PALETTE.length];
+      }
+
+       function generateMockData(formData) {
+         const result = [];
+         const today = sod(new Date());
+         const searchStart = formData.strtDt ? parse(formData.strtDt) : addDays(today, -180);
+         const searchEnd = formData.endDt ? parse(formData.endDt) : addDays(today, 30);
+         const daySpan = Math.max(1, days(searchStart, searchEnd));
+
+         SALES_CDS.slice(0, 2).forEach((salesCd, si) => {
+           const rng = makeRng(1000 + si * 991);
+           const eqp = EQPS[si % EQPS.length];
+           const clntPjt = CLNTPJTS[si % CLNTPJTS.length];
+           const ordrsClntNm = ['삼성', 'LG', '현대', 'SK'][si % 4];
+           const ordrsDiv = ['신규', '개조', 'AS'][si % 3];
+           const mngIdNm = MNGS[si % MNGS.length];
+
+           ['PM'].forEach(cat => {
+             const count = 2 + Math.floor(rng() * 3);
+             for (let i = 0; i < count; i++) {
+               const seed = si * 1000 + cat.length * 100 + i;
+               const itemRng = makeRng(seed);
+               const planType = PLAN_TYPES[seed % PLAN_TYPES.length];
+               let startOff = Math.floor(itemRng() * daySpan);
+               if (i % 3 === 0) startOff = Math.max(0, startOff - 5);
+               let duration = 5 + Math.floor(itemRng() * 10);
+               if (i % 4 === 0) duration = 3 + Math.floor(itemRng() * 4);
+
+               let start = addDays(searchStart, startOff);
+                let end = addDays(start, duration - 1);
+                if (i % 5 === 0) {
+                  end = addDays(today, -(2 + Math.floor(itemRng() * 6)));
+                  start = addDays(end, -(2 + Math.floor(itemRng() * 8)));
+                }
+
+              const isExpired = end < today;
+              const scdStatus = STATUS[(seed + i) % STATUS.length];
+
+              result.push({
+                salesCd,
+                coCd: jwt.coCd,
+                planType,
+                wbsPlansDtFm: fmt(start),
+                wbsPlaneDtFm: fmt(end),
+                wbsPlanCodeId: `${salesCd}-${cat}-${i}`,
+                wbsPlanCodeNm: TASK_NAMES[seed % TASK_NAMES.length],
+                mngIdNm,
+                eqpNm: eqp,
+                '기계종류': eqp,
+                '수주구분': ordrsDiv,
+                '아이템구분': cat,
+                '기계구분': cat === 'PM' ? '표준' : '특수',
+                clntPjtNm: clntPjt,
+                clntNm: ordrsClntNm,
+                scdStatus,
+                cat,
+                start: fmt(start),
+                end: fmt(end),
+                overdue: (!isExpired && start < today && cat === 'PLAN' && i % 4 === 0) ? 'Y' : 'N',
+                confirmYn: cat === 'PM' && i % 3 === 0 ? 'Y' : 'N',
+                doneYn: cat === 'DO' && i % 4 === 0 ? 'Y' : 'N',
+                progress: cat === 'DO' ? (i % 5 === 0 ? '100' : (50 + (i % 3) * 20).toString()) : '',
+                expectMh: cat === 'DO' ? (8 + (i % 5) * 2).toString() : '',
+                key: `${salesCd}-${cat}-${i}`,
+                label: TASK_NAMES[seed % TASK_NAMES.length]
+              });
+            }
+          });
+         });
+
+
+         const filtered = result.filter(r => {
+           if (formData.coCd_S && r.coCd !== formData.coCd_S) return false;
+           if (formData.salesCd_S && !r.salesCd.includes(formData.salesCd_S)) return false;
+           if (formData.prdtGrp && r['기계종류'] !== formData.prdtGrp) return false;
+           if (formData.ordrsDiv_S && r['수주구분'] !== formData.ordrsDiv_S) return false;
+           if (formData.clntPjt_S && r.clntPjtNm !== formData.clntPjt_S) return false;
+           if (formData.ordrsClntNm_S && !r.clntNm.includes(formData.ordrsClntNm_S)) return false;
+           if (formData.scdStatus_S) {
+             if (formData.scdStatus_S === '지연') {
+               if (!((r.cat === 'PM' || r.cat === 'PLAN') && r.overdue === 'Y')) return false;
+             } else if (r.scdStatus !== formData.scdStatus_S) {
+               return false;
+             }
+           }
+           return true;
+         });
+         return filtered;
+      }
+
+      window.postAjax = (url, formData, options, cb) => {
+        setTimeout(() => {
+          const filtered = generateMockData(formData);
+          cb({ result: filtered });
+        }, 120);
+      };
+
+      function searchData() {
+        const formData = {
+          coCd_S: $('#fCompany').val(),
+          salesCd_S: $('#fSalesCode').val().trim(),
+          strtDt: $('#fFrom').val(),
+          endDt: $('#fTo').val(),
+          prdtGrp: $('#fMachine').val(),
+          ordrsDiv_S: $('#fOrderType').val(),
+          clntPjt_S: $('#fPjt').val(),
+          ordrsClntNm_S: $('#fCustomer').val().trim(),
+          scdStatus_S: $('#fPmStatus').val()
+        };
+
+        if (formData.strtDt && formData.endDt && formData.strtDt > formData.endDt) {
+          const tmp = formData.strtDt; formData.strtDt = formData.endDt; formData.endDt = tmp;
+          $('#fFrom').val(formData.strtDt);
+          $('#fTo').val(formData.endDt);
+          showToast('날짜가 자동 보정되었습니다.');
+        }
+
+        window.postAjax('/user/wb/wb26/select_wb2604_List', formData, null, res => {
+          if (!res.result || res.result.length === 0) {
+            showToast('검색 결과가 없습니다.');
+          }
+          transformAndRender(res.result || []);
+        });
+      }
+
+       function transformAndRender(result) {
+         state.rowsData = {};
+         state.rowDefs = {};
+
+        result.forEach(rec => {
+          const salesCd = rec.salesCd;
+          if (!state.rowsData[salesCd]) {
+            state.rowsData[salesCd] = { PM: [], PLAN: [], DO: [] };
+            state.rowDefs[salesCd] = {
+              salesCd,
+              eqpNm: rec.eqpNm,
+              mngIdNm: rec.mngIdNm,
+              '기계종류': rec['기계종류'],
+              '수주구분': rec['수주구분'],
+              clntPjtNm: rec.clntPjtNm,
+              clntNm: rec.clntNm,
+              '기계구분': rec['기계구분'],
+              '아이템구분': rec['아이템구분']
+            };
+          }
+
+          let cat = rec.cat;
+          if (!cat) {
+            if (rec.planType === 'PM계획') cat = 'PM';
+            else if (rec.planType === '실적' || rec.planType === '담당실적') cat = 'DO';
+            else cat = 'PLAN';
+          }
+
+          if (state.rowsData[salesCd][cat]) {
+            state.rowsData[salesCd][cat].push(rec);
+          }
+        });
+
+        calcViewRange();
+        renderGantt();
+      }
+
+      function calcViewRange() {
+        let minDate = null, maxDate = null;
+
+        Object.values(state.rowsData).forEach(buckets => {
+          ['PM', 'PLAN', 'DO'].forEach(cat => {
+            buckets[cat].forEach(item => {
+              const s = parse(item.start);
+              const e = parse(item.end);
+              if (!minDate || s < minDate) minDate = s;
+              if (!maxDate || e > maxDate) maxDate = e;
+            });
+          });
+        });
+
+        const endDtVal = $('#fTo').val();
+        if (endDtVal) {
+          const endDtParsed = parse(endDtVal);
+          if (!maxDate || endDtParsed > maxDate) maxDate = endDtParsed;
+        }
+
+        const today = sod(new Date());
+        state.viewStart = minDate || addDays(today, -60);
+        state.viewEnd = maxDate || addDays(today, 60);
+      }
+
+       function renderGantt() {
+         const $tl = $('#timeline').empty();
+         const totalDays = days(state.viewStart, state.viewEnd) + 1;
+         const pxPerDay = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--px-per-day')) || 12;
+         const width = totalDays * pxPerDay;
+
+        const $header = $('<div class="gantt-header"></div>');
+        const $headerLeft = $('<div class="header-left"><span>SalesCode</span><span style="color:#94a3b8;">/ 구분</span></div>');
+        const $headerRight = $('<div class="header-right"></div>');
+        const $rulerMonths = $('<div class="ruler-months"></div>');
+        const $rulerWeeks = $('<div class="ruler-weeks"></div>');
+        const $rulerDays = $('<div class="ruler-days"></div>');
+
+        const today = sod(new Date());
+        let curDate = new Date(state.viewStart);
+        const weekendSpans = [];
+
+        while (curDate <= state.viewEnd) {
+          const m = curDate.getMonth();
+          const y = curDate.getFullYear();
+          const monthEnd = new Date(y, m + 1, 0);
+          let daysInMonth = 0;
+          let mStart = new Date(curDate);
+
+          while (mStart.getMonth() === m && mStart <= state.viewEnd) {
+            daysInMonth++;
+            mStart = addDays(mStart, 1);
+          }
+          const monthW = daysInMonth * pxPerDay;
+          $rulerMonths.append(`<div class="ruler-month" style="width:${monthW}px;">${y}년 ${m + 1}월</div>`);
+
+          const wStart = new Date(curDate);
+          const wEnd = new Date(wStart);
+          wEnd.setDate(wEnd.getDate() + (6 - wStart.getDay()));
+
+          let iterStart = new Date(wStart);
+          while (iterStart <= monthEnd && iterStart <= state.viewEnd) {
+            let wDays = days(iterStart, wEnd) + 1;
+            if (wEnd > monthEnd) wDays = days(iterStart, monthEnd) + 1;
+            const weekW = wDays * pxPerDay;
+            const weekNum = Math.ceil((iterStart.getTime() - new Date(iterStart.getFullYear(), 0, 1).getTime()) / MS / 7);
+
+            $rulerWeeks.append(`<div class="ruler-week" style="width:${weekW}px;">W${weekNum}</div>`);
+            for (let i = 0; i < wDays; i++) {
+              const d = addDays(iterStart, i);
+              const isSun = d.getDay() === 0;
+              const isSat = d.getDay() === 6;
+              const isToday = d.getTime() === today.getTime();
+              if (isSun || isSat) {
+                weekendSpans.push({ start: d, end: d });
+              }
+              const dayClass = isSun || isSat ? 'weekend' : (isToday ? 'today' : '');
+              $rulerDays.append(`<div class="ruler-day ${dayClass}" style="width:${pxPerDay}px;">${d.getDate()}</div>`);
+            }
+
+            iterStart = addDays(wEnd, 1);
+            wEnd.setDate(iterStart.getDate() + 6);
+          }
+
+          curDate = addDays(curDate, daysInMonth);
+        }
+
+        $headerRight.append($rulerMonths).append($rulerWeeks).append($rulerDays);
+        $header.append($headerLeft).append($headerRight);
+        $tl.append($header);
+
+        const daysToToday = days(state.viewStart, today);
+        const todayX = daysToToday * pxPerDay + (pxPerDay / 2);
+        if (daysToToday >= 0 && daysToToday < totalDays) {
+          $headerRight.append(`<div class="today-line" style="left:${todayX}px;"></div>`);
+        }
+
+        Object.keys(state.rowsData).sort().forEach(salesCd => {
+          const def = state.rowDefs[salesCd];
+          const buckets = state.rowsData[salesCd];
+          const $group = $('<div class="row-group"></div>');
+
+          const $label = $(`<div class="group-label">
+            <div class="group-label-main">
+              <div class="group-label-title">${salesCd} / ${def['기계종류']} / ${def['수주구분']}</div>
+              <div class="group-label-sub">고객사: ${def.clntNm} (${def.clntPjtNm})</div>
+              <div class="group-label-meta">
+                <span>담당: ${def.mngIdNm}</span>
+                <span>기계: ${def.eqpNm}</span>
+                <span>구분: ${def['기계구분']}</span>
+              </div>
+            </div>
+          </div>`);
+          $group.append($label);
+
+          ['PM'].forEach(cat => {
+            const items = buckets[cat] || [];
+            const $track = $('<div class="row-track"></div>').data('cat', cat).data('row', salesCd);
+            const catLabels = { PM: 'PM계획' };
+            const $trackLabel = $(`<div class="track-label">
+              <span class="track-label-text">${catLabels[cat]}</span>
+              <span class="track-label-badge">${items.length}</span>
+            </div>`);
+            $track.append($trackLabel);
+
+            const $body = $('<div class="track-body" style="width:' + width + 'px;"></div>');
+
+            weekendSpans.forEach(ws => {
+              const offset = days(state.viewStart, ws.start) * pxPerDay;
+              const wWidth = pxPerDay;
+              $body.append(`<div class="shade weekend" style="left:${offset}px;width:${wWidth}px;"></div>`);
+            });
+            if (daysToToday >= 0 && daysToToday < totalDays) {
+              $body.append(`<div class="shade today" style="left:${todayX - (pxPerDay / 2)}px;width:${pxPerDay}px;"></div>`);
+            }
+            $body.append(`<div class="today-line" style="left:${todayX}px;"></div>`);
+
+            const svgNS = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(svgNS, 'svg');
+            svg.setAttribute('width', width);
+            svg.setAttribute('height', 32);
+            svg.style.display = 'block';
+
+            const withOverlaps = analyzeOverlaps(items);
+            withOverlaps.forEach(it => {
+              const s = parse(it.start);
+              const e = parse(it.end);
+              const x = days(state.viewStart, s) * pxPerDay;
+              const w = Math.max(4, (days(s, e) + 1) * pxPerDay - 4);
+              const y = 2;
+              const h = 28;
+
+              const rect = document.createElementNS(svgNS, 'rect');
+              rect.setAttribute('x', x);
+              rect.setAttribute('y', y);
+              rect.setAttribute('width', w);
+              rect.setAttribute('height', h);
+              rect.setAttribute('rx', 4);
+              rect.setAttribute('class', 'bar');
+              rect.setAttribute('fill-opacity', '0.6');
+              rect.setAttribute('stroke-opacity', '0.9');
+              if (it.overdue === 'Y') rect.classList.add('overdue');
+              else if (e < today) rect.classList.add('expired');
+              if (it.color) {
+                rect.setAttribute('fill', it.color.fill);
+                rect.setAttribute('stroke', it.color.stroke);
+              }
+              rect.dataset.key = it.key;
+              svg.appendChild(rect);
+
+              const text = document.createElementNS(svgNS, 'text');
+              text.setAttribute('x', x + w / 2);
+              text.setAttribute('y', y + h / 2);
+              text.setAttribute('class', 'bar-label');
+              text.textContent = it.label.length > 8 ? it.label.substr(0, 8) + '..' : it.label;
+              svg.appendChild(text);
+
+              const hw = 6;
+              const lh = document.createElementNS(svgNS, 'rect');
+              lh.setAttribute('x', x);
+              lh.setAttribute('y', y);
+              lh.setAttribute('width', hw);
+              lh.setAttribute('height', h);
+              lh.setAttribute('class', 'handle');
+              lh.dataset.dir = 'w';
+              lh.dataset.key = it.key;
+              svg.appendChild(lh);
+
+              const rh = document.createElementNS(svgNS, 'rect');
+              rh.setAttribute('x', x + w - hw);
+              rh.setAttribute('y', y);
+              rh.setAttribute('width', hw);
+              rh.setAttribute('height', h);
+              rh.setAttribute('class', 'handle');
+              rh.dataset.dir = 'e';
+              rh.dataset.key = it.key;
+              svg.appendChild(rh);
+
+              setupDragResize(rect, lh, rh, it, cat, salesCd);
+              rect.addEventListener('pointerdown', e => showTooltip(e.clientX, e.clientY, it));
+              rect.addEventListener('pointerup', hideTooltip);
+            });
+
+            $body[0].appendChild(svg);
+            $track.append($body);
+            $group.append($track);
+
+            $track.on('dblclick', () => {
+              alert(`WBS 계획등록 open (salesCd=${salesCd})`);
+            });
+          });
+
+          $tl.append($group);
+        });
+      }
+
+      function analyzeOverlaps(items) {
+        if (items.length === 0) return [];
+        const sorted = [...items].sort((a, b) => {
+          const ds = parse(a.start) - parse(b.start);
+          if (ds) return ds;
+          return parse(a.end) - parse(b.end);
+        });
+
+        return sorted.map(it => ({
+          ...it,
+          color: getLabelColor(it.label || it.wbsPlanCodeNm || '기타')
+        }));
+      }
+
+      let dragState = null;
+      function setupDragResize(rect, lh, rh, item, cat, salesCd) {
+        const onDown = (e, mode) => {
+          if (e.button !== 0) return;
+          e.stopPropagation();
+          e.preventDefault();
+
+          dragState = {
+            mode,
+            item,
+            cat,
+            salesCd,
+            startX: parseFloat(rect.getAttribute('x')),
+            startW: parseFloat(rect.getAttribute('width')),
+            clientX: e.clientX,
+            rect,
+            lh,
+            rh,
+            text: rect.parentNode.querySelector('.bar-label'),
+            hasMoved: false
+          };
+
+          document.addEventListener('pointermove', onMove);
+          document.addEventListener('pointerup', onUp);
+        };
+
+        const onMove = e => {
+          if (!dragState) return;
+          const dx = e.clientX - dragState.clientX;
+          if (Math.abs(dx) < 3) return;
+          dragState.hasMoved = true;
+
+          if (dragState.mode === 'move') {
+            const newX = dragState.startX + dx;
+            rect.setAttribute('x', newX);
+            const w = dragState.startW;
+            lh.setAttribute('x', newX);
+            rh.setAttribute('x', newX + w - 6);
+            dragState.text.setAttribute('x', newX + w / 2);
+            showTooltipRange(e.clientX, e.clientY, newX, w, dragState.item);
+          } else if (dragState.mode === 'w') {
+            const newW = dragState.startW - dx;
+            if (newW < 4) return;
+            const newX = dragState.startX + dx;
+            rect.setAttribute('x', newX);
+            rect.setAttribute('width', newW);
+            lh.setAttribute('x', newX);
+            rh.setAttribute('x', newX + newW - 6);
+            dragState.text.setAttribute('x', newX + newW / 2);
+            showTooltipRange(e.clientX, e.clientY, newX, newW, dragState.item);
+          } else if (dragState.mode === 'e') {
+            const newW = dragState.startW + dx;
+            if (newW < 4) return;
+            rect.setAttribute('width', newW);
+            rh.setAttribute('x', dragState.startX + newW - 6);
+            dragState.text.setAttribute('x', dragState.startX + newW / 2);
+            showTooltipRange(e.clientX, e.clientY, dragState.startX, newW, dragState.item);
+          }
+        };
+
+        const onUp = () => {
+          if (!dragState) return;
+          if (dragState.hasMoved) {
+            const curX = parseFloat(dragState.rect.getAttribute('x'));
+            const curW = parseFloat(dragState.rect.getAttribute('width'));
+
+            const pxPerDay = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--px-per-day')) || 12;
+            const newStart = dateFromX(curX);
+            const newEnd = dateFromX(curX + curW - pxPerDay);
+
+            dragState.item.start = fmt(clampDate(newStart));
+            dragState.item.end = fmt(clampDate(newEnd));
+
+            const buckets = state.rowsData[dragState.salesCd];
+            if (buckets) {
+              const catItems = buckets[dragState.cat];
+              const idx = catItems.findIndex(x => x.key === dragState.item.key);
+              if (idx >= 0) {
+                catItems[idx].start = dragState.item.start;
+                catItems[idx].end = dragState.item.end;
+              }
+            }
+
+            renderGantt();
+          }
+
+          document.removeEventListener('pointermove', onMove);
+          document.removeEventListener('pointerup', onUp);
+          dragState = null;
+          hideTooltip();
+        };
+
+        rect.addEventListener('pointerdown', e => onDown(e, 'move'));
+        lh.addEventListener('pointerdown', e => onDown(e, 'w'));
+        rh.addEventListener('pointerdown', e => onDown(e, 'e'));
+      }
+
+      function clampDate(date) {
+        const s = state.viewStart;
+        const e = state.viewEnd;
+        if (date < s) return s;
+        if (date > e) return e;
+        return date;
+      }
+
+      function dateFromX(x) {
+        const pxPerDay = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--px-per-day')) || 12;
+        const dayIdx = Math.round(x / pxPerDay);
+        return addDays(state.viewStart, dayIdx);
+      }
+
+      function showTooltip(x, y, item) {
+        const start = item.start;
+        const end = item.end;
+        const d = days(parse(start), parse(end)) + 1;
+        const $tt = $('#ganttTooltip');
+        $tt.html(`<b>${item.label}</b><br>기간: ${start} ~ ${end} (${d}일)<br>담당자: ${item.mngIdNm || '-'}`);
+        $tt.css({ left: x + 14, top: y + 14, display: 'block' });
+      }
+
+      function showTooltipRange(x, y, startX, width, item) {
+        const pxPerDay = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--px-per-day')) || 12;
+        const start = fmt(dateFromX(startX));
+        const end = fmt(dateFromX(startX + width - pxPerDay));
+        const d = days(parse(start), parse(end)) + 1;
+        const $tt = $('#ganttTooltip');
+        $tt.html(`<b>${item.label}</b><br>기간: ${start} ~ ${end} (${d}일)<br>담당자: ${item.mngIdNm || '-'}`);
+        $tt.css({ left: x + 14, top: y + 14, display: 'block' });
+      }
+
+      function hideTooltip() {
+        $('#ganttTooltip').hide();
+      }
+
+      function showToast(msg) {
+        const $t = $('#toast').text(msg).fadeIn();
+        setTimeout(() => $t.fadeOut(), 2000);
+      }
+
+      function setZoom(val) {
+        state.pxPerDay = val;
+        $('#zoomVal').text(val);
+        $('#zoomSlider').val(val);
+
+        // Calculate zoom scale ratio based on base px-per-day of 12
+        const basePxPerDay = 12;
+        const zoomScale = val / basePxPerDay;
+
+        // Update both CSS variables for proportional scaling
+        document.documentElement.style.setProperty('--zoom-scale', zoomScale);
+        document.documentElement.style.setProperty('--px-per-day', (basePxPerDay * zoomScale) + 'px');
+
+        renderGantt();
+      }
+
+      function initSearch() {
+        const today = sod(new Date());
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth() - 6, 1);
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        $('#fFrom').val(fmt(startOfMonth));
+        $('#fTo').val(fmt(endOfMonth));
+        $('#fCompany').val(jwt.coCd);
+      }
+
+      $(function() {
+        initSearch();
+        setZoom(parseInt($('#zoomSlider').val(), 10));
+        searchData();
+
+        $('[data-search]').on('change', searchData);
+        $('#btnHelp').click(() => alert('도움말 (Stub)'));
+        $('#btnReset').click(() => { initSearch(); searchData(); });
+        $('#btnSearch').click(searchData);
+
+        $('#zoomSlider').on('input', e => setZoom(parseInt(e.target.value, 10)));
+        $(document).on('wheel', e => {
+          if (e.ctrlKey) {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -1 : 1;
+            const currentVal = parseInt($('#zoomSlider').val(), 10);
+            let newVal = currentVal + delta * 2;
+            newVal = Math.max(4, Math.min(30, newVal));
+            setZoom(newVal);
+          }
+        });
+
+        let panning = false, pStartX = 0, pScrollLeft = 0, pStartY = 0, pScrollTop = 0;
+        $(document).on('pointerdown', '#timeline .row-track', e => {
+          if ($(e.target).is('rect, text, .handle')) return;
+          panning = true;
+          pStartX = e.clientX;
+          pStartY = e.clientY;
+          const $scroller = $('#wbsScroll');
+          pScrollLeft = $scroller.scrollLeft();
+          pScrollTop = $scroller.scrollTop();
+          e.target.setPointerCapture?.(e.pointerId || 1);
+        });
+        $(document).on('pointermove', e => {
+          if (!panning) return;
+          $('#wbsScroll').scrollLeft(pScrollLeft - (e.clientX - pStartX));
+          $('#wbsScroll').scrollTop(pScrollTop - (e.clientY - pStartY));
+        });
+        $(document).on('pointerup pointercancel', () => { panning = false; });
+
+        $('#btnSave').click(() => {
+          showToast('변경사항이 저장되었습니다 (Mock)');
+        });
+        $('#btnExport').click(() => showToast('Excel 내보내기 (Stub)'));
+      });
+    })();
+  </script>
+</body>
+</html>

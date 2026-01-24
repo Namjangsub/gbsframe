@@ -34,15 +34,29 @@ public class WB24Ctr {
     WB24Svc wb24Svc;
     
 	@PostMapping(value = "/selectWbsIssueList") 
-	public String selectWbsIssueList(@RequestBody Map<String, String> paramMap, ModelMap model) {	
-		int totalCnt = wb24Svc.selectWbsIssueListCount(paramMap); 
-		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+	public String selectWbsIssueList(@RequestBody Map<String, Object> paramMap, ModelMap model) {	
+		int totalCnt = wb24Svc.selectWbsIssueListCount(paramMap);
+		java.util.Map<String, String> pagingMap = new java.util.HashMap<>();
+		Object pageNo = paramMap.get("pageNo");
+		Object recordCnt = paramMap.get("recordCnt");
+		if (pageNo != null) pagingMap.put("pageNo", String.valueOf(pageNo));
+		if (recordCnt != null) pagingMap.put("recordCnt", String.valueOf(recordCnt));
+		PaginationInfo paginationInfo = new PaginationInfo(pagingMap, totalCnt);
+		paramMap.put("firstIndex", pagingMap.get("firstIndex"));
+		paramMap.put("lastIndex", pagingMap.get("lastIndex"));
         model.addAttribute("paginationInfo", paginationInfo);
 		  
 		List<Map<String, String>> fileList = wb24Svc.selectWbsIssueList(paramMap);
 		model.addAttribute("fileList", fileList);
 		return "jsonView";
     }
+
+	@PostMapping(value = "/selectWbsIssueCountBySalesCds")
+	public String selectWbsIssueCountBySalesCds(@RequestBody Map<String, Object> paramMap, ModelMap model) {
+		List<Map<String, String>> result = wb24Svc.selectWbsIssueCountBySalesCds(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
     
 	@PostMapping(value = "/selectWbsIssueListDashboard") 
 	public String selectWbsIssueListDashboard(@RequestBody Map<String, String> paramMap, ModelMap model) {	

@@ -40,7 +40,7 @@ public class WB26Ctr {
 
     //리스트 조회
 	@PostMapping(value = "/select_wb06_List")
-	public String select_wb06_List(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	public String select_wb06_List(@RequestBody Map<String, Object> paramMap, ModelMap model) {
 		List<Map<String, String>> result = wb26svc.select_wb06_List(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";

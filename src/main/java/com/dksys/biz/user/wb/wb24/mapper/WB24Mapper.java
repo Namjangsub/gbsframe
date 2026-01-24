@@ -8,9 +8,11 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface WB24Mapper {
 	
-	int selectWbsIssueListCount(Map<String, String> paramMap);
+	int selectWbsIssueListCount(Map paramMap);
 	
-	List<Map<String, String>> selectWbsIssueList(Map<String, String> paramMap);
+	List<Map<String, String>> selectWbsIssueList(Map paramMap);
+
+	List<Map<String, String>> selectWbsIssueCountBySalesCds(Map paramMap);
 	
 	Map<String, String> selectMaxWbsIssueNo(Map<String, String> paramMap);
 	

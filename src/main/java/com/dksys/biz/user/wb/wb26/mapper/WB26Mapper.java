@@ -12,7 +12,7 @@ public interface WB26Mapper {
 
 	// 그리드 리스트
 	List<Map<String, String>> select_wb26_List(Map<String, String> paramMap);
-	List<Map<String, String>> select_wb06_List(Map<String, String> paramMap);
+	List<Map<String, String>> select_wb06_List(Map paramMap);
 
 	int wb26save(Map<String, String> paramMap);
 

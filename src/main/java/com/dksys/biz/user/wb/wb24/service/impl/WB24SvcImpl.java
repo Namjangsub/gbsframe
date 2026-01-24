@@ -53,13 +53,18 @@ public class WB24SvcImpl implements WB24Svc {
 	ExceptionThrower thrower;
 
 	@Override
-	public int selectWbsIssueListCount(Map<String, String> paramMap) {;
+	public int selectWbsIssueListCount(Map paramMap) {
 		return wb24Mapper.selectWbsIssueListCount(paramMap);
 	}
 
 	@Override
-	public List<Map<String, String>> selectWbsIssueList(Map<String, String> paramMap) {
+	public List<Map<String, String>> selectWbsIssueList(Map paramMap) {
 		return wb24Mapper.selectWbsIssueList(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectWbsIssueCountBySalesCds(Map paramMap) {
+		return wb24Mapper.selectWbsIssueCountBySalesCds(paramMap);
 	}
 
 	@Override
