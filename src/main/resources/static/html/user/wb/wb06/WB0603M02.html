@@ -192,6 +192,7 @@ onkeyup="(event.keysalesCd == 8 || event.keysalesCd == 46) ? ordrsClntCd_S.value
           <label style="font-size:11px;color:#64748b;white-space:nowrap;">줌(px/day):</label>
           <input id="zoomSlider" type="range" min="2" max="20" value="8"/>
           <span id="zoomVal" style="display:inline-block; min-width:30px;">8</span>
+          <span id="zoomRenderStatus" style="display:none; color:#64748b; font-weight:800; font-size:11px; white-space:nowrap;">렌더링...</span>
         </div>
 
         <div class="wbs-toolbar" style="padding-left: 30px;">
@@ -1242,7 +1243,7 @@ console.log(rowObj);
       months.forEach(m=>{
         if(m.days <= 0) return;
         const w = m.days * CELL_W;
-        $months.append(`<div class="timeline-month" style="width:${w}px">${m.y}년 ${m.m+1}월</div>`);
+        $months.append(`<div class="timeline-month" data-days="${m.days}" style="width:${w}px">${m.y}년 ${m.m+1}월</div>`);
       });
 
       const $days = $('<div class="timeline-days"></div>');
@@ -1342,7 +1343,7 @@ console.log(rowObj);
             const w = (daysBetween(seg.wbsPlansDtFm, seg.wbsPlaneDtFm) + 1) * CELL_W;
             const cls = deptClass(seg.deptCd || seg.deptNm);
             const $bar = $(`
-              <div class="bar ${cls}" style="left:${left}px;width:${w}px; cursor:default;">
+              <div class="bar ${cls}" data-start="${escapeHtml(seg.wbsPlansDtFm)}" data-end="${escapeHtml(seg.wbsPlaneDtFm)}" style="left:${left}px;width:${w}px; cursor:default;">
                 <div class="txt">${escapeHtml(seg.deptNm)}</div>
               </div>
             `);
@@ -1385,7 +1386,7 @@ console.log(rowObj);
             const w = (daysBetween(seg.wbsPlansDtFm, seg.wbsPlaneDtFm) + 1) * CELL_W;
             const cls = deptClass(seg.deptCd);
             const $bar = $(`
-              <div class="bar ${cls}" style="left:${left}px;width:${w}px; cursor:default;">
+              <div class="bar ${cls}" data-start="${escapeHtml(seg.wbsPlansDtFm)}" data-end="${escapeHtml(seg.wbsPlaneDtFm)}" style="left:${left}px;width:${w}px; cursor:default;">
                 <div class="txt">${escapeHtml(seg.deptNm)}</div>
             </div>
             `);
@@ -1491,7 +1492,7 @@ console.log(rowObj);
             const stCls = st ? ('act-status-' + st) : 'act-status-unk';
 
             const $act = $(`
-              <div class="bar act-bar ${stCls} ${pctCls}" data-act="1"
+              <div class="bar act-bar ${stCls} ${pctCls}" data-act="1" data-start="${escapeHtml(aSt)}" data-end="${escapeHtml(aEnd)}"
                    data-row="${idx}"
                    data-seg="${rowIdx}"
                    style="left:${actLeft}px;width:${actW}px;">
@@ -2533,24 +2534,103 @@ console.log(rowObj);
     
     
     
-    // setZoom: 즉시 renderAll)
+    function applyZoomOnly(v){
+      const rootEl = $(":root").get(0);
+      if(rootEl && rootEl.style){
+        rootEl.style.setProperty("--px-per-day", v + "px");
+        rootEl.style.setProperty("--cellW", v + "px");
+      }
+
+      CELL_W = v;
+
+      // Timeline total width
+      const workdays = getWorkdays(STATE.viewStart, STATE.viewEnd);
+      const totalDays = (workdays && workdays.length) ? workdays.length : 0;
+      const totalWidth = totalDays * CELL_W;
+
+      if(rootEl && rootEl.style){
+        rootEl.style.setProperty("--timelineW", totalWidth + "px");
+      }
+
+      // Update month widths (days are static, width depends on CELL_W)
+      $(".timeline-month").each(function(){
+        const d = parseInt($(this).attr("data-days"), 10) || 0;
+        if(d > 0) this.style.width = (d * CELL_W) + "px";
+      });
+
+      // Update canvases
+      $(".timeline-canvas").each(function(){
+        this.style.width = totalWidth + "px";
+      });
+
+      // Update today indicators
+      const todayOffset = daysBetween(STATE.viewStart, STATE.today);
+      const todayLeft = (todayOffset * CELL_W) + "px";
+      $(".today-line").each(function(){
+        this.style.left = todayLeft;
+      });
+      $(".today-badge").css("left", todayLeft);
+
+      // Update bars by their start/end
+      const viewStart = STATE.viewStart;
+      $(".bar[data-start][data-end]").each(function(){
+        const $b = $(this);
+        const s = String($b.data("start") || "");
+        const e = String($b.data("end") || "");
+        if(!s || !e) return;
+        const left = daysBetween(viewStart, s) * CELL_W;
+        const w = (daysBetween(s, e) + 1) * CELL_W;
+        this.style.left = left + "px";
+        this.style.width = w + "px";
+      });
+
+      // Update drag/resize grid only (no destroy/recreate)
+      $(".bar.plan-bar").each(function(){
+        const $b = $(this);
+        if($b.data("uiDraggable")){
+          try{ $b.draggable("option", "grid", [CELL_W, 1]); }catch(e){}
+        }
+        if($b.data("uiResizable")){
+          try{ $b.resizable("option", "minWidth", CELL_W); }catch(e){}
+        }
+      });
+    }
+
+    // setZoom: apply zoom without full re-render
     function setZoom(val){
       const v = clamp(parseInt(val,10) || 8, 2, 20);
       $('#zoomVal').text(v);
       $('#zoomSlider').val(v);
 
-      (function(){
-        const rootEl = $(":root").get(0);
-        if(rootEl && rootEl.style){
-          rootEl.style.setProperty("--px-per-day", v + "px");
-          rootEl.style.setProperty("--cellW", v + "px");
-        }
-      })();
+      if(v === CELL_W) return;
 
-      CELL_W = v;
-
-      renderAll();
+      applyZoomOnly(v);
     }
+
+    function showZoomRenderStatus(){
+      $("#zoomRenderStatus").text("렌더링...").show();
+    }
+    function hideZoomRenderStatus(ms){
+      if(typeof ms === "number" && isFinite(ms)){
+        $("#zoomRenderStatus").text("렌더링 " + Math.round(ms) + "ms");
+        setTimeout(function(){ $("#zoomRenderStatus").hide(); }, 350);
+        return;
+      }
+      $("#zoomRenderStatus").hide();
+    }
+
+      // Slider drag can fire many events; debounce heavy re-render.
+      let ZOOM_APPLY_TIMER = 0;
+      let ZOOM_LAST_REQ = null;
+      function scheduleZoomApply(val){
+        const v = clamp(parseInt(val,10) || 8, 2, 20);
+        ZOOM_LAST_REQ = v;
+        $('#zoomVal').text(v);
+        clearTimeout(ZOOM_APPLY_TIMER);
+        ZOOM_APPLY_TIMER = setTimeout(function(){
+          setZoom(ZOOM_LAST_REQ);
+        }, 120);
+      }
 
     function fitTimelineToViewport(){
       const scroll = $("#wbsScroll").get(0);
@@ -2873,9 +2953,26 @@ console.log(rowObj);
       $("#btnPrint").off("click.wbs").on("click.wbs", doPrint);
 
       // zoom
-      $('#zoomSlider').off('input.wbs').on('input.wbs', function(e){
-        setZoom(parseInt(e.target.value, 10));
-      });
+      $('#zoomSlider')
+        .off('input.wbs')
+        .on('input.wbs', function(e){
+          scheduleZoomApply(e.target.value);
+        })
+        .off('change.wbs')
+        .on('change.wbs', function(e){
+          // Apply immediately when user releases the slider
+          clearTimeout(ZOOM_APPLY_TIMER);
+
+          showZoomRenderStatus();
+          const v = parseInt(e.target.value, 10);
+          // Ensure status paints before heavy render.
+          requestAnimationFrame(function(){
+            const t0 = (window.performance && typeof performance.now === "function") ? performance.now() : Date.now();
+            setZoom(v);
+            const t1 = (window.performance && typeof performance.now === "function") ? performance.now() : Date.now();
+            hideZoomRenderStatus(t1 - t0);
+          });
+        });
 
       $("#modalClose, #modalOk").off("click.wbs").on("click.wbs", closeModal);
       $("#modal").off("click.wbs").on("click.wbs", function(e){ if(e.target === this) closeModal(); });
