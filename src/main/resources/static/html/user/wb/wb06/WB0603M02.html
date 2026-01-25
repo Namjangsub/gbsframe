@@ -1485,35 +1485,44 @@ console.log(rowObj);
       // same-machine cell merge
       try{
         const $bodyRows = $WBS.find('.wbs-row').not('.header').not('.group-sep');
-
+ 
         $bodyRows.removeClass('merge-master merge-slave');
         $bodyRows.find('.c-clntPjtNm').removeClass('merged-start merged-hidden');
-        $bodyRows.find('.clntPjtNm-text').css({ height:'', minHeight:'' }).html('');
+        $bodyRows.find('.clntPjtNm-text').css({ height:'', minHeight:'' });
         $bodyRows.find('.pane-left').css('z-index','');
-
+ 
         spans.forEach(sp=>{
           const $first = $($bodyRows.get(sp.start));
           if(!$first || $first.length===0) return;
 
-          let totalH = 0;
+          const endIdx = sp.start + sp.length - 1;
+          const $last = $($bodyRows.get(endIdx));
+          if(!$last || $last.length===0) return;
+ 
           for(let i=0;i<sp.length;i++){
             const $r = $($bodyRows.get(sp.start + i));
-            totalH += ($r.outerHeight() || 0);
             $r.addClass(i===0 ? 'merge-master' : 'merge-slave');
           }
-
+ 
           const $firstCell = $first.find('.c-clntPjtNm');
           const $txt = $firstCell.find('.clntPjtNm-text');
-
+ 
           $firstCell.removeClass('merged-hidden').addClass('merged-start');
+          for(let i=1;i<sp.length;i++){
+            $($bodyRows.get(sp.start + i)).find('.c-clntPjtNm').addClass('merged-hidden');
+          }
+
+          // Measure after class changes for pixel-perfect merge height.
+          // Use DOMRect to avoid cumulative rounding errors (outerHeight summation).
+          $first[0].offsetHeight; // force reflow
+          const firstRect = $first[0].getBoundingClientRect();
+          const lastRect = $last[0].getBoundingClientRect();
+          // Leave room so the last row's own border-bottom stays visible.
+          // Use floor to avoid overshooting into the next row due to sub-pixel values.
+          const totalH = Math.max(0, Math.floor((lastRect.bottom - firstRect.top) - 1));
+
           $txt.css({ height: totalH + 'px', minHeight: totalH + 'px' })
               .html(sp.label || '');
-
-          for(let i=1;i<sp.length;i++){
-            const $r = $($bodyRows.get(sp.start + i));
-            $r.find('.c-clntPjtNm').addClass('merged-hidden');
-            $r.find('.clntPjtNm-text').html('');
-          }
         });
       }catch(e){
         console.warn('clntPjtNm merge error', e);
@@ -2752,6 +2761,7 @@ console.log(rowObj);
       $('#head_area').toggleClass('off');
       $('#top_area').toggleClass('on');
       $('#main_area').toggleClass('on');
+      $('#wbsPlanMngIdNm_S').val(jwt.userNm);
 
       // 날짜picker
       $('#strtDt_S').datepicker({
