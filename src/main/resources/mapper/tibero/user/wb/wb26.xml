@@ -2113,7 +2113,7 @@
 						AND W.SALES_CD LIKE  '%' || #{salesCd} || '%'
 					</when>
 				</choose>
-				AND W.CO_CD = 'GUN'
+				AND W.CO_CD = #{coCd}
 				AND W.WBS_PLANS_DT IS NOT NULL
 				AND W.WBS_PLANE_DT IS NOT NULL
 				AND D.DEPT_ID IS NOT NULL
@@ -2126,6 +2126,16 @@
 				<if test="wbsPlanMngIdNm != null and !wbsPlanMngIdNm.equals('')">
 				AND src.WBS_PLAN_MNG_ID_NM LIKE  '%' || #{wbsPlanMngIdNm} || '%'
 				</if>
+			)
+			,w0 AS (
+				SELECT  S0.CO_CD, S0.SALES_CD,
+				        COUNT(W.FILE_TRGT_KEY) AS problem_count,
+				        SUM(CASE WHEN W.ISS_STS != 'ISSSTS03' THEN 1 ELSE 0 END) AS problem_uncomplete
+				FROM s0 S0
+				JOIN TB_WB24M02 W
+				  ON W.CO_CD = S0.CO_CD
+				 AND W.SALES_CD = S0.SALES_CD
+				GROUP BY S0.CO_CD, S0.SALES_CD
 			),
 			wb21_latest AS (
 				SELECT CO_CD, SALES_CD, FILE_TRGT_KEY, WBS_REMARK, CLOSE_YN, VER_NO, SMRIZE_ID
@@ -2231,6 +2241,71 @@
 			  JOIN s0 ON s0.CO_CD = A.CO_CD AND s0.SALES_CD = A.SALES_CD
 			  WHERE A.WBS_PLAN_CODE_KIND != 'WBSCODE'
 			  GROUP BY A.CO_CD, A.SALES_CD, A.WBS_PLAN_CODE_KIND
+		),
+		WB AS (
+		    /*+ MATERIALIZE */
+		    SELECT
+		        W.CO_CD,
+		        W.VER_NO,
+		        W.SALES_CD,
+		        W.WBS_PLAN_CODE_ID,
+		        W.WBS_PLANS_DT,
+		        W.WBS_PLANE_DT
+		    FROM TB_WB22M01 W
+		    JOIN s0 ON s0.CO_CD = W.CO_CD AND s0.SALES_CD = W.SALES_CD
+		    WHERE W.WBS_PLAN_CODE_KIND = 'WBSCODE'
+		      AND W.WBS_PLANS_DT IS NOT NULL 
+		)
+		,WBK AS (
+		    /*+ MATERIALIZE */
+		    SELECT DISTINCT
+		        CO_CD, VER_NO, SALES_CD, WBS_PLAN_CODE_ID
+		    FROM WB
+		)
+		,PLAN AS (
+		    /* 일정계획수립건수 산정: 필요한 키만 집계 */
+		    SELECT
+		        K.CO_CD,
+		        K.SALES_CD,
+		        K.VER_NO,
+		        K.WBS_PLAN_CODE_ID,
+		        COUNT(W1.WBS_PLAN_CODE_ID) 				AS PLAN_CNT,
+		        MIN(W1.WBS_PLANS_DT) AS PLANS_DT,
+		        MAX(W1.WBS_PLANE_DT) AS PLANE_DT,
+		        MAX(CASE WHEN NVL(W1.WBS_PLANE_DT, TO_DATE('2999-12-31', 'YYYY-MM-DD')) <![CDATA[<=]]> K.WBS_PLANE_DT 
+		        		 THEN 0 
+		        		 ELSE 1 
+		        		 END)  		AS PLAN_UNCOMPLETE_COUNT, 
+		        SUM(W1.DAYCNT) 		AS PLAN_DAYCNT,
+		        W1.WBS_PLAN_CODE_ID AS PL_WBS_PLAN_CODE_ID,
+		        MIN(K.WBS_PLANS_DT)	AS PM_WBS_PLANS_DT,
+		        MAX(K.WBS_PLANE_DT) AS PM_WBS_PLANE_DT
+		    FROM WB K 
+		    LEFT OUTER JOIN TB_WB22M01 W1
+		      ON K.CO_CD = W1.CO_CD
+		     AND K.SALES_CD = W1.SALES_CD
+		     AND K.VER_NO = W1.VER_NO
+		     AND K.WBS_PLAN_CODE_ID = W1.WBS_PLAN_CODE_KIND
+		     AND W1.WBS_PLAN_CODE_KIND != 'WBSCODE'
+		     GROUP BY
+		        K.CO_CD, K.SALES_CD, K.VER_NO, K.WBS_PLAN_CODE_ID, W1.WBS_PLAN_CODE_ID
+		)
+		, ACT AS (
+		    SELECT
+		        P.CO_CD,
+		        P.SALES_CD,
+		        SUM(P.PLAN_UNCOMPLETE_COUNT) AS PLAN_UNCOMPLETE_COUNT,
+		        SUM(CASE WHEN P.PM_WBS_PLANE_DT <![CDATA[<]]> NVL(W2.WBS_RSLTSE_DT, TO_DATE('2999-12-31', 'YYYY-MM-DD'))
+		        		 THEN 1 
+		        		 ELSE 0 
+		        		 END) 				AS ACT_UNCOMPLETE_COUNT
+		    FROM PLAN P
+		    LEFT OUTER JOIN TB_WB23M01 W2
+		      ON P.CO_CD = W2.CO_CD
+		     AND P.SALES_CD = W2.SALES_CD
+		     AND P.PL_WBS_PLAN_CODE_ID = W2.WBS_PLAN_CODE_ID
+		    GROUP BY
+		        P.CO_CD, P.SALES_CD
 		)
 		SELECT
 			F.CO_CD,
@@ -2267,11 +2342,17 @@
             NVL(ST.WBS_RSLTS_RATE, 0) AS ACT_PROG,		--진행율
             TO_CHAR(ST.WBS_RSLTSS_DT, 'YYYY-MM-DD')  AS ACT_ST,			--실적 시작일
             TO_CHAR(ST.WBS_RSLTSE_DT, 'YYYY-MM-DD')  AS ACT_END,		--실적 시작일
-            ST.WBS_RSLTS_CNTS AS MEMO			--메모
+            ST.WBS_RSLTS_CNTS AS MEMO,			--메모
+            W0.problem_count,
+            W0.problem_uncomplete,
+            CASE WHEN AT.ACT_UNCOMPLETE_COUNT != 0 THEN '지연'
+                 ELSE '정상'  END     AS SCHEDULE_STATUS						--일정상태 ('정상', 지연)
 		FROM final_base F
 		JOIN sales S            ON S.CO_CD = F.CO_CD AND S.SALES_CD = F.SALES_CD
 		JOIN sales_range R      ON R.CO_CD = F.CO_CD AND R.SALES_CD = F.SALES_CD
 		CROSS JOIN today T
+		LEFT JOIN w0 W0         ON W0.CO_CD = F.CO_CD AND W0.SALES_CD = F.SALES_CD
+		LEFT JOIN ACT AT        ON AT.CO_CD = F.CO_CD AND AT.SALES_CD = F.SALES_CD
 		LEFT JOIN TB_CM06M01 C  ON C.ID = F.WBS_PLAN_MNG_ID
 		LEFT JOIN TB_CM05M01 C5 ON C5.CODE_ID = F.WBS_PLAN_CODE_ID
 		LEFT JOIN src_act ST    ON ST.CO_CD = F.CO_CD AND ST.SALES_CD = F.SALES_CD AND ST.WBS_PLAN_CODE_KIND = F.WBS_PLAN_CODE_ID
