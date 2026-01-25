@@ -121,7 +121,7 @@
 				<div class="search_form">
 					<input type="hidden" id="wbsPlanMngId_S"   name="wbsPlanMngId_S" data-search="wbsPlanMngId">
 					<input type="text"   id="wbsPlanMngIdNm_S" name="wbsPlanMngIdNm_S" data-search="wbsPlanMngIdNm" 
-						   onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = '' :  event.keyCode == 46 ? wbsPlanMngId_S.value = '' : event.keyCode == 13 ? searchData() : '';">
+onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = '' :  event.keyCode == 46 ? wbsPlanMngId_S.value = '' : event.keyCode == 13 ? searchData() : '';">
 					<a onclick="openUserSearch();"><i class="i_search_w"></i></a>
 				</div>
 			</td>
@@ -141,7 +141,7 @@
             <th>SalesCode</th>
             <td>
               <div class="search_form">
-                <input type="text" id="salesCd_S" name="salesCd_S" data-search="salesCd" onkeyup="event.keyCode==13 ? searchData() :''">
+<input type="text" id="salesCd_S" name="salesCd_S" data-search="salesCd" onkeyup="event.keyCode==13 ? searchData() :''">
                 <a onclick="wbsSalesCodeSearch($('#salesCd_S').val());"><i class="i_search_w"></i></a>
               </div>
             </td>
@@ -151,7 +151,7 @@
               <input type="hidden" id="ordrsClntCd_S" name="ordrsClntCd_S" data-search="ordrsClntCd">
               <div class="search_form">
                 <input type="text" id="ordrsClntNm_S" name="ordrsClntNm_S" data-search="ordrsClntNm"
-                       onkeyup="(event.keysalesCd == 8 || event.keysalesCd == 46) ? ordrsClntCd_S.value = '' : event.keysalesCd == 13 ? searchData() : ''">
+onkeyup="(event.keysalesCd == 8 || event.keysalesCd == 46) ? ordrsClntCd_S.value = '' : event.keysalesCd == 13 ? searchData() : ''">
                 <a onclick="opendClntSearch($('#ordrsClntNm_S').val());"><i class="i_search_w"></i></a>
               </div>
             </td>
@@ -185,8 +185,11 @@
         <div id="legend"></div>
 
         <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-          <span style="color:var(--muted);font-weight:800;font-size:12px;">(줌: 슬라이더 또는 Ctrl+마우스휠)</span>
-          <label style="font-size:11px;color:#64748b;">줌(px/day):</label>
+          <label style="display:flex;align-items:center;gap:6px;color:var(--muted);font-weight:800;font-size:12px;white-space:nowrap;">
+            <span style="white-space:nowrap;">auto-Zoom</span>
+            <input id="autoZoomChk" type="checkbox" checked />
+          </label>
+          <label style="font-size:11px;color:#64748b;white-space:nowrap;">줌(px/day):</label>
           <input id="zoomSlider" type="range" min="2" max="20" value="8"/>
           <span id="zoomVal" style="display:inline-block; min-width:30px;">8</span>
         </div>
@@ -1628,7 +1631,7 @@ console.log(rowObj);
             salesCd: salesCd,
             histYn: "N"
           }, function(){
-            if (typeof searchData === "function") searchData();
+          if (typeof searchData === "function") searchData();
           });
         });
       });
@@ -2532,7 +2535,7 @@ console.log(rowObj);
     
     // setZoom: 즉시 renderAll)
     function setZoom(val){
-      const v = clamp(parseInt(val,10) || 8, 4, 20);
+      const v = clamp(parseInt(val,10) || 8, 2, 20);
       $('#zoomVal').text(v);
       $('#zoomSlider').val(v);
 
@@ -2566,19 +2569,19 @@ console.log(rowObj);
       const available = Math.max(0, scroll.clientWidth - leftW - rightW - 100);
       if(!available) return false;
 
-      const target = clamp(Math.floor(available / totalDays), 4, 20);
-      if(target === CELL_W) return false;
-      
-//       setZoom(target); //초기 화면 로딩시 전체 일정을 볼수있게 줌변경하기
+      const target = clamp(Math.floor(available / totalDays), 2, 20);
 
-		// 최초 조회 1회만 자동 줌
-		if (!AUTO_SCROLL_TODAY_DONE) {
-		  requestAnimationFrame(function () {
-		    try { scrollToTodayCenter(); } catch(e) { /* ignore */ }
-		    AUTO_SCROLL_TODAY_DONE = true;
-		  });
+		// 초기 화면 로딩시 전체 일정을 볼 수 있게 줌/스크롤 조정
+		// target이 동일해도(줌 변화 없음) TODAY 중앙 스크롤은 수행해야 함
+		AUTO_SCROLL_TODAY_DONE = false;
+		if(target !== CELL_W){
+		  setZoom(target);
 		}
-      return true;
+		requestAnimationFrame(function () {
+		  try { scrollToTodayCenter(); } catch(e) { /* ignore */ }
+		  AUTO_SCROLL_TODAY_DONE = true;
+		});
+		return (target !== CELL_W);
     }
 
     
@@ -2633,6 +2636,10 @@ console.log(rowObj);
     /***********************
      * 11) 검색/초기화
      ************************/
+    function getAutoZoomFlag(){
+      return $("#autoZoomChk").is(":checked");
+    }
+
     // 거래처 검색
     window.opendClntSearch = function(inputValue) {
       var paramObj = { "searchValue" : inputValue, "clntDivCd" : "CLNTDIV12" };
@@ -2673,7 +2680,10 @@ console.log(rowObj);
       });
     };
 
-    window.searchData = function (isInitialLoad) {	// true: 최초 1회만
+    window.searchData = function (isInitialLoad) {	// true: auto-zoom 적용
+      if (typeof isInitialLoad === "undefined") {
+        isInitialLoad = getAutoZoomFlag();
+      }
       // 데이터 새로고침 시 확인 상태 초기화
       confirmedSalesCd.clear();
 
@@ -2776,11 +2786,10 @@ console.log(rowObj);
           renderAll();
           
 
-	       // 최초 조회 1회만 자동 줌
-	       if (isInitialLoad === true && !AUTO_ZOOM_DONE) {
+	       // auto-Zoom: 체크 상태(true)로 호출된 경우 매번 적용
+	       if (isInitialLoad === true) {
 	         requestAnimationFrame(function () {
 	           try { fitTimelineToViewport(); } catch(e) { /* ignore */ }
-	           AUTO_ZOOM_DONE = true;
 	         });
 	       }
         });
@@ -2797,7 +2806,7 @@ console.log(rowObj);
       $("#strtDt_S").val(dateToStr(moment().subtract(6, "months").startOf("month").toDate()));
       $("#endDt_S").val(dateToStr(moment(new Date()).endOf("month").toDate()));
 
-      $('[data-search]').on("change", function(){ searchData(false); });
+      $('[data-search]').on("change", function(){ searchData(); });
     };
 
     /***********************
@@ -2846,9 +2855,17 @@ console.log(rowObj);
       setZoom(parseInt($('#zoomSlider').val(), 10));
       
       // 최초 조회
-      searchData(true); // 최초 조회 1회만 자동 줌
+      searchData(); // auto-Zoom 체크에 따라 내부에서 판단
 
-      $("#btnSearch").off("click.wbs").on("click.wbs", function(){ searchData(false); });
+      // auto-Zoom을 다시 켰을 때 1회 실행되게 리셋
+      $("#autoZoomChk").off("change.wbs").on("change.wbs", function(){
+        if($(this).is(":checked")){
+          AUTO_ZOOM_DONE = false;
+          AUTO_SCROLL_TODAY_DONE = false;
+        }
+      });
+
+      $("#btnSearch").off("click.wbs").on("click.wbs", function(){ searchData(); });
       $("#btnReset").off("click.wbs").on("click.wbs", initSearch);
       $("#btnHelp").off("click.wbs").on("click.wbs", showHelp);
       $("#btnSave").off("click.wbs").on("click.wbs", doSave);
@@ -2925,7 +2942,7 @@ console.log(rowObj);
       });
       
       // 검색조건 이벤트 bind
-      $('[data-search]').on("change", function(){ searchData(false); });
+      $('[data-search]').on("change", function(){ searchData(); });
 
       // 권한체크
       authChk();
