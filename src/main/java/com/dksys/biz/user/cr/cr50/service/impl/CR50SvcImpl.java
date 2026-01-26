@@ -187,7 +187,8 @@ public class CR50SvcImpl implements CR50Svc {
         paramMap.put("reqNo", fileTrgtKey);
         List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
         if (!sharngChk.isEmpty()) {
-            QM01Mapper.deleteWbsSharngList(paramMap); 
+            // QM01Mapper.deleteWbsSharngList(paramMap); 
+            QM01Mapper.deleteApprovalList(paramMap); 
         }
 
 
@@ -220,7 +221,7 @@ public class CR50SvcImpl implements CR50Svc {
                     map.put("fileTrgtKey", fileTrgtKey);
                     map.put("pgmId", pgmId);
                     map.put("userId", userId);
-                    map.put("usrNm", userId);
+                    map.put("usrNm", map.get("todoId"));
                     map.put("histNo", histNo);
                     map.put("todoCoCd", coCd);
                     map.put("sanCtnSn", Integer.toString(++i));
@@ -401,7 +402,8 @@ public class CR50SvcImpl implements CR50Svc {
         paramMap.put("reqNo", fileTrgtKey);
         List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
         if (!sharngChk.isEmpty()) {
-            QM01Mapper.deleteWbsSharngList(paramMap); 
+            // QM01Mapper.deleteWbsSharngList(paramMap); 
+            QM01Mapper.deleteApprovalList(paramMap); 
         }
 
 
@@ -451,7 +453,7 @@ public class CR50SvcImpl implements CR50Svc {
         result += cr50Mapper.deletePfuSalesCdAll(paramMap);
 
         // 결재요청정보 삭제처리
-        result += wb20Mapper.deleteAllTodoMaster(paramMap);
+        result += QM01Mapper.deleteApprovalList(paramMap);
 
         // ---------------------------------------------------------------
         // 첨부 화일 처리 시작 (처음 등록시에는 화일 삭제할게 없음)

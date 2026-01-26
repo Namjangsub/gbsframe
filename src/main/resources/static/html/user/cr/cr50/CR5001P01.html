@@ -72,6 +72,7 @@
 	<input type="hidden" id="pgmId"     	name="pgmId"	value="CR5001P01">
 	<input type="hidden" id="ordrgMngNm"	name="creatNm" value="">		<!-- 알림톡발송용 생성자명(발주담당자) -->
 	<input type="hidden" id="ordrgMngTelNo"	name="ordrgMngTelNo" value="">		<!-- 알림톡발송용 생성자전화번호 -->		
+	<select id="pfuTodo" data-kind="SPECTODO" hidden></select>
 	
    	<div class="popup_area of_a" style="width: 100%; height: 820px;">
 	    <div class="tit_contents">
@@ -1894,10 +1895,10 @@
         formData.append("pfuPrdtDiv", $('#prdtDiv option:selected').data('rprc'));
 		
 		
-		
+		autoAppendApprovalUsers();
 
         // 공유대상자 리스트  TODO LIST에 등록하기 위한 모듈 추가
-        // 공유 : TODODIV10, TODODIV1040  결재 :TODODIV20, TODODIV2020
+        // 공유 : TODODIV10, TODODIV1120  결재 :TODODIV20, TODODIV2120
         var rowSharngList = gridViewPop7.target.list;
         var ParamObj = modalStack.last().paramObj.ParamObj;
 
@@ -2854,6 +2855,55 @@
 			});
 		}
  	}
+
+	// 결재자가 1명이라도 있으면 SPECTODO의 CODE_ETC 유저들 자동 추가
+	function autoAppendApprovalUsers() {
+		var gridList = gridViewPop7.target.list;
+
+		// 결재자가 1명이라도 있는 경우만 동작
+		if (!gridList.some(row => row.gb === '결재')) return;
+
+		// data-etc 속성에서 CODE_ETC 값 가져오기
+		var codeEtc = $('#pfuTodo option:selected').data('etc');
+		if (!codeEtc) return;
+
+		// 콤마로 분리하여 각 userId로 결재자 정보 조회 및 추가
+		codeEtc.split(',').forEach(function(userId) {
+			userId = userId.trim();
+			if (userId) approvalUserInfoData(userId, gridList);
+		});
+
+		// 그리드 리프레시
+		gridViewPop7.target.setData(gridList);
+	}
+
+	 //조치담당자정보 자동 추가하기
+	function approvalUserInfoData (appUserId, appArray) {
+		var formData = {
+			"userId" : appUserId,
+		}
+		postAjaxSync("/user/wb/wb24/selectRsltsMemberList", formData, null, function(data) {
+			if (data.resultList != '' && data.resultList!=null) {
+				//조치결과 결자자 정보 가져오기
+				let list = data.resultList[0];
+				if (appArray.some(item => item.usrNm === list.usrNm)) {
+					//Array에 usrNm 의 값중에 list.id와 같은 값이 있으면 true
+				} else {
+					appArray.push({
+								gb: "결재",
+								usrNm: list.usrNm,
+								name: list.name,
+								jik: list.jik,
+								dtNm: list.deptNm,
+								telNo: list.telNo,
+								offTelNo: list.offTelNo,
+								email: list.email,
+							});
+				}
+			}
+		});
+		return appArray;
+	}
 </script>
 
 </body>
