@@ -168,7 +168,10 @@
 		$('#removeBfuFileButton').click(function() {
 			let fileCnt = $('.fileTable').length;
 			if (fileCnt == 0)  return false;
-			if (fileCnt == 1) $('#removeBfuFileButton').hide();
+			if (fileCnt <= 1) {
+				$('#removeBfuFileButton').hide();
+				return false;
+			}
 			
 			if ($('#fileTable' + fileCnt + ' #updCheck').val() == 'U') {
 				$('#fileTable' + fileCnt + ' #updCheck').val('D');		//DB에서 불러오면 수정임 'U', 처음 등록시 C, 제거시 'D'
@@ -235,6 +238,13 @@
 					'</table>');
 				$('#bfuFile').append(newRow);
 			}
+		if ($('.fileTable').length <= 1) {
+			$('#removeBfuFileButton').hide();
+		} else {
+			$('#removeBfuFileButton').show();
+		}
+		const $lastRow = $('#fileTable' + $('.fileTable').length);
+		togglePreviewIcon($lastRow);
 	}
 
 	// 확장자에 따른 미리보기 아이콘 설정
@@ -295,7 +305,7 @@
 
 	// 등록
 	function insert_pm50() {
-		if (inputValidation($('.popup_area [required]')) && validateBfuFileInputs()) {
+		if (inputValidation($('.popup_area [required]')) && validateBfuFileInputsAllowContentOnly()) {
 			var formData = makeFormData();
 			filePostAjax("/user/pm/pm50/insert_pm50", formData, function(data) {
 				if (data.resultCode == 200) {
@@ -310,7 +320,7 @@
 
 	// 수정
 	function update_pm50() {
-		if (inputValidation($('.popup_area [required]')) && validateBfuFileInputs()) {
+		if (inputValidation($('.popup_area [required]')) && validateBfuFileInputsAllowContentOnly()) {
 			var formData = makeFormData();
 			filePostAjax("/user/pm/pm50/update_pm50", formData, function(data) {
 				if (data.resultCode == 200) {
@@ -458,6 +468,23 @@
 
 	    return isValid;
 	}
+
+	function validateBfuFileInputsAllowContentOnly() {
+	    let isValid = true;
+
+	    $('.fileTable:visible').each(function(index, table) {
+	        const $table = $(table);
+	        const content  = $table.find('textarea[name="bfuCnts"]').val().trim();
+
+	        if (content === "") {
+	            alert(`[泥⑤? ${index + 1}] ?댁슜??낅젰?댁빞 ?⑸땲??`);
+	            isValid = false;
+	            return false;  // .each 以묐떒
+	        }
+	    });
+
+	    return isValid;
+	}
 	
 
 	//사진 처리 변경 내역 저장 단 U인경우 삭제된것만 저장하면됨 
@@ -565,15 +592,28 @@
 					});
 					var idx = i + 1;
 					var $row = $('#fileTable' + idx);
-					var fileName = $row.find('#bfuFileNm').val();
-					var ext      = fileName.split('.').pop();
-					var iconSrc  = getIconSrcByExt(ext);
-					$row.find('.preview-icon').attr('src', iconSrc).show();
+					togglePreviewIcon($row);
 				}
 			}
 			
 
 		});
+	}
+
+	function togglePreviewIcon($row) {
+		const fileName = $row.find('#bfuFileNm').val();
+		const $icon = $row.find('.preview-icon');
+		if (!fileName) {
+			$icon.hide().attr('src', '');
+			return;
+		}
+		const ext = fileName.split('.').pop();
+		const iconSrc = getIconSrcByExt(ext);
+		if (iconSrc) {
+			$icon.attr('src', iconSrc).show();
+		} else {
+			$icon.hide().attr('src', '');
+		}
 	}
 
 	function downloadFile(_fileKey, _filename) {
@@ -755,7 +795,7 @@
 			talkBody.mobile = mobile;				//휴대전화번호
 			talkBody.template = "10003";			//템플릿관리화면 템플릿ID	- 발주서 V2
 			let talkJson = JSON.stringify(talkBody);
-			// sendCnt = kakaoSendReal(talkJson, talkParam, param);	// 출장자 사진업로드 카카오알림 막음 2025-12-02 최지상 / 사유 : 담당자 미지정
+			sendCnt = kakaoSendReal(talkJson, talkParam, param);	// 출장자 사진업로드 카카오알림 막음 2025-12-02 최지상 / 사유 : 담당자 미지정 -> 담당자지정 생산관리 손민성 차장
 		});
 		//대상 loop end
 		if( sendCnt > 0 ) {
@@ -767,7 +807,7 @@
 
 	// 출장자 사진업로드 작업 결재자 정보 추가
 	function selectTeamManagerApprovalAdd() {
-		appArray = approvalTeamManagerSpecialInfoData('lej', appArray);	// 출장자 사진업로드 등록 시 임은지 과장에게 결재 알림 발송
+		appArray = approvalTeamManagerSpecialInfoData('sms', appArray);	// 출장자 사진업로드 등록 시 임은지 과장에게 결재 알림 발송
 
 		// shaArray의 요소들을 appArray에 합치기
 		shaArray.forEach(item => appArray.push(item));

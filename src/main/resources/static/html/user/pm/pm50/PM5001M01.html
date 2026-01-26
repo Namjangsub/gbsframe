@@ -173,7 +173,7 @@
 								imageViewPopup(obj.coCd, obj.fileKey, fileName);
 							}
   		                } else if (this.column.key == "issNo") {
-							wbsIssModal();
+							wb24IssModal();
 						} else {
   		                	// 출장자 사진 Upload 조회
 							insert_pm50_modal("U");
@@ -505,9 +505,11 @@
 				"fileTrgtTyp"	: "PM5001P01_M"
 			};
 			putAjax("/user/pm/pm50/delete_pm50", paramObj, null, function(data) {
-				customAlert(data.resultMessage);
 				if (data.resultCode == 200) {
+					customAlert(data.resultMessage);
 					gridView.setData(0);
+				} else{
+					customAlert("삭제 중 오류가 발생했습니다. 전산실에 문의 바랍니다.");
 				}
 			});
 		}
@@ -516,11 +518,12 @@
 	// 문제등록 팝업
 	async function wb24_list_modal() {
 		var rows = gridView.target.getList("selected");
+
 		if (!rows || rows.length === 0) {
 			customAlert("먼저 하나 이상의 행을 선택해주세요.");
 			return false;
 		}
-		
+
 		if (rows.some(row => row.issNo)) {
 			customAlert("이미 문제가 등록되어 있습니다. 확인해주세요.");
 			return false;
@@ -531,68 +534,60 @@
 			return false;
 		}
 
-		// 파일 객체 생성
-// 		const fileListInfo = await Promise.all(rows.map(async row => {
-// 			const url = `/admin/cm/cm08/fileDownloadAuth2?fileKey=${row.fileKey}&userId=${jwt.userId}`;
-// 			const res = await fetch(url);
-// 			if (!res.ok) throw new Error(`이미지 다운로드 실패 (${res.status})`);
-// 			const blob = await res.blob();
-// 			// File 생성: 두 번째 인자로 파일명, 세 번째 옵션으로 MIME 타입 지정
-// 			return new File([blob], row.fileName, { type: blob.type });
-// 		}));
+		const fileListInfo = await Promise.all(rows.map(async (row) => {
+			// 파일키나 파일명이 없으면 null 반환 (API 호출 안함)
+			if (!row.fileKey || !row.fileName) {
+				return null;
+			}
+			
+			try {
+				// 파일 정보 요청
+				const fileInfoRes = await fetch("/admin/cm/cm08/fileDownInfo", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"Authorization": authorizationToken
+					},
+					body: JSON.stringify({ fileKey: row.fileKey })
+				});
+				if (!fileInfoRes.ok) throw new Error("파일 정보 요청 실패");
+				const data = await fileInfoRes.json();
+				const fileInfo = data.fileInfo;
 
-	    const fileListInfo = await Promise.all(rows.map(async (row) => {
-	        try {
-	            // 파일 정보 요청
-	            const fileInfoRes = await fetch("/admin/cm/cm08/fileDownInfo", {
-	                method: "POST",
-	                headers: {
-	                    "Content-Type": "application/json",
-	                    "Authorization": authorizationToken
-	                },
-	                body: JSON.stringify({ fileKey: row.fileKey })
-	            });
-
-	            if (!fileInfoRes.ok) throw new Error("파일 정보 요청 실패");
-
-	            const data = await fileInfoRes.json();
-	            const fileInfo = data.fileInfo;
-	            const filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName, "UTF-8");
+				const filePath = encodeURI(fileInfo.filePath + fileInfo.fileKey + "_" + fileInfo.fileName, "UTF-8");
 
 				// 파일 다운로드 요청
 				const fileRes = await fetch(`/admin/cm/cm08/fileDownloadAuth2?fileKey=${fileInfo.fileKey}&userId=${jwt.userId}&coCd=${$('#coCd_S').val()}`, {
 					method: "GET",
 					headers: {"Authorization": authorizationToken, "X-GBS-Source": "pdfjs-viewer"}
 				});
+				if (!fileRes.ok) throw new Error("파일 다운로드 실패");
+				const blob = await fileRes.blob();
 
-	            if (!fileRes.ok) throw new Error("파일 다운로드 실패");
+				// File 객체 생성
+				return new File([blob], fileInfo.fileName, { type: blob.type });
+			} catch (error) {
+				console.error(`파일 처리 중 오류 (${row.fileKey}):`, error);
+				return null;
+			}
+		}));
 
-	            const blob = await fileRes.blob();
-
-	            // File 객체 생성
-	            return new File([blob], fileInfo.fileName, { type: blob.type });
-	        } catch (error) {
-	            console.error(`파일 처리 중 오류 (${row.fileKey}):`, error);
-	            return null;
-	        }
-	    }));
-
-	    // null 제거
-// 	    fileListInfo.filter(file => file !== null);
-		
+		// null 제거
+		const validFileList = fileListInfo.filter(file => file !== null);
 
 		var paramObj = {
-			"coCd"				: $("#coCd_S").val(),
-			"salesCd" 			: rows[0].salesCd,
-			"fileListInfo"		: fileListInfo,
-			"selectedPm50List" 	: rows
+			"coCd" : $("#coCd_S").val(),
+			"salesCd" : rows[0].salesCd,
+			"fileListInfo" : validFileList,
+			"selectedPm50List" : rows
 		}
+
 		openModal("/static/html/user/pm/pm50/PM5001P02.html", 1400, 850, "", paramObj, function(data) {
 		});
 	}
 
 	// 문제번호가 있는 로우 실적팝업창 오픈
-	function wbsIssModal() {
+	function wb24IssModal() {
 		var row = gridView.target.getList("selected")[0];
 		if (row.issNo == undefined) {
 			customAlert("문제를 먼저 등록해주세요.")

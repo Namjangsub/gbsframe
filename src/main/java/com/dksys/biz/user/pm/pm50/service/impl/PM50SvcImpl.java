@@ -257,26 +257,29 @@ public class PM50SvcImpl implements PM50Svc{
 		} else {
 			pm50Mapper.delete_file_approval(paramMap);
 		}
-
-		//출장 사진 삭제
-		List<Map<String, String>> deleteBfuFileList = pm50Mapper.selectBfuFileRows(paramMap); 
-		if (deleteBfuFileList.size() > 0) {		  
-		    for (Map<String, String> deleteDtl : deleteBfuFileList) {
-		    	String fileKey = deleteDtl.get("fileKey");
-		        if (fileKey != null && !fileKey.isEmpty()) {	// 첨부파일이 있으면 처리함.
-					//첨부파일 상세내역 연계자료 삭제 처리
-				    cm08Svc.deleteFile( fileKey );
-		        }
-				// 사진등록 상세 내역 삭제 처리
-				result += pm50Mapper.delete_pm50_d01(paramMap);
-		    }
-			
-			List<Map<String, String>> selectBfuAllFileRows = pm50Mapper.selectBfuAllFileRows(paramMap);
-			if (selectBfuAllFileRows.size() == 0) {
-				result += pm50Mapper.delete_pm50_main(paramMap);
+		if (paramMap.containsKey("fileSeq")) {
+			//출장 사진 삭제
+			List<Map<String, String>> deleteBfuFileList = pm50Mapper.selectBfuFileRows(paramMap); 
+			if (deleteBfuFileList.size() > 0) {		  
+				for (Map<String, String> deleteDtl : deleteBfuFileList) {
+					String fileKey = deleteDtl.get("fileKey");
+					if (fileKey != null && !fileKey.isEmpty()) {	// 첨부파일이 있으면 처리함.
+						//첨부파일 상세내역 연계자료 삭제 처리
+						cm08Svc.deleteFile( fileKey );
+					}
+					// 사진등록 상세 내역 삭제 처리
+					result += pm50Mapper.delete_pm50_d01(paramMap);
+				}
+				
+				List<Map<String, String>> selectBfuAllFileRows = pm50Mapper.selectBfuAllFileRows(paramMap);
+				if (selectBfuAllFileRows.size() == 0) {
+					result += pm50Mapper.delete_pm50_main(paramMap);
+				}
+			} else {
+				return 0;
 			}
 		} else {
-			return 0;
+			result += pm50Mapper.delete_pm50_main(paramMap);
 		}
 
 		return result;
