@@ -134,6 +134,7 @@ public class CR50Ctr {
             if (cr50Svc.insertPfu(paramMap, mRequest) != 0) {
                 model.addAttribute("resultCode", 200);
                 model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+				model.addAttribute("fileTrgtKey", paramMap.get("fileTrgtKey"));
             } else {
                 model.addAttribute("resultCode", 500);
                 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
