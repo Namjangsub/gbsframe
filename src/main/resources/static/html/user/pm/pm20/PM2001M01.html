@@ -354,20 +354,7 @@
 		return ver > 0 ? ver : 1;
 	}
 
-	function findDetailRow(grid, agendaNo, agendaVer, colKey) {
-		if (!grid || !Array.isArray(grid.list)) return null;
-		return grid.list.find(r =>
-			r &&
-			r.rowType === 'DETAIL' &&
-			String(r.agendaNo || '') === String(agendaNo || '') &&
-			String(getAgendaVerForCell(r, colKey)) === String(agendaVer || getAgendaVerForCell(r, colKey))
-		);
-	}
-
-	function valueFormatter() {
-		return (this.value) ? '<span style="display: block; white-space: pre;">' + this.value + '</span>' : '';
-	}
-
+	// 업무구분이 프로젝트인경우 salesCd, 수주번호, 고객사PJT 중 하나는 반드시 입력되어야 함
 	function hasProjectSearchKey() {
 		const salesCd = String($('#salesCd_S').val() || '').trim();
 		const ordrsNo = String($('#ordrsNo_S').val() || '').trim();
@@ -375,18 +362,10 @@
 		return !!(salesCd || ordrsNo || clntPjt);
 	}
 
+	// 완료 여부 체크
 	function isAgendaCompleted(row) {
 		const v = String((row && row.mnStatus) || '').trim();
 		return v === 'Y' || v === '완료';
-	}
-
-	function agendaTitleFormatter() {
-		const v = (this.value == null) ? '' : String(this.value);
-		const status = String((this.item && this.item.mnStatus) || '').trim();
-		const statusUpper = status.toUpperCase();
-		const isProgress = (statusUpper === "N" || status === "진행");
-		const color = isProgress ? " color:#ff6161;" : "";
-		return '<span style="display:block; height:100%; white-space:pre;' + color + '">' + v + '</span>';
 	}
 
 	// 진행상태 코드
@@ -395,13 +374,6 @@
 		{'CD' : 'N', 'NM' : '진행'},
 		{'CD' : 'Y', 'NM' : '완료'}
 	];
-
-	// 진행상태 formatter
-	function statusFormatter() {
-		const cd = (this.value == null) ? '' : String(this.value);
-		const found = mnStatusCode.find(x => String(x.CD) === cd);
-		return found ? found.NM : '';
-	}
 
 	// =========================
 	// 통합 셀 formatter (내용 + 참석자 + 파일)
@@ -664,15 +636,15 @@
 							{key: "clntPjt", 		label: "고객사PJT", align: "center", width: 110, hidden: true},
 							{key: "clntPjtNm", 		label: "PJT", align: "center", width: 70, hidden: true},
 							{ key: "clntNmPjt", 	label: "고객사/PJT", align: "center", width: 150,
-									formatter: valueFormatter
-								},
+									formatter: function () {return (this.value) ? '<span style="display: block; white-space: pre;">' + this.value + '</span>' : ''; }
+							},
 							{key: "salesCd", 		label: "SALES CODE", align: "center", width: 110},
 							{key: "agendaTitle", 	label: "안건", align: "center", width: 150,
 								editor: {
 									type: "textarea",
 									disabled: function () { return this.item && this.item.rowType === 'DETAIL';}
 								},
-								formatter: agendaTitleFormatter
+								formatter: function () {return '<span style="display:block; height:100%; white-space:pre;' + ((String((this.item && this.item.mnStatus) || '').trim().toUpperCase() === "N" || String((this.item && this.item.mnStatus) || '').trim() === "진행") ? ' color:#ff6161;' : '') + '">' + ((this.value == null) ? '' : String(this.value)) + '</span>';}
 							},
 							buildDateColumnConfig('dateCol1', dateColMap['dateCol1']),
 							{key: "mnStatus", 		label: "진행여부", align: "center", width: 100,
@@ -681,7 +653,7 @@
 									disabled: function () {return this.item && this.item.rowType === 'DETAIL';},
 									config: {columnKeys: { optionValue: "CD", optionText: "NM" },options: mnStatusCode}
 								},
-								formatter: statusFormatter
+								formatter: function () {return (mnStatusCode.find(x => String(x.CD) === String((this.value == null) ? '' : this.value)) || {}).NM || '';}
 							}
 						]
 			});
@@ -1263,33 +1235,64 @@
 			var paramObj = {
 				"coCd"   : $('#coCd_S').val(),
 				"userId" : "",
-				"userNm" : ""
+				"userNm" : "",
+				"pm20Flag": "Y"
 			};
 
-			openModal("/static/html/cmn/modal/userSearch.html", 450, 650, "담당자 검색", paramObj, function(tree) {
-				var checkedId = tree.get_checked()[0];
-				if (!checkedId) return;
-
-				var checkedNode = tree.get_node(checkedId);
-				if (!checkedNode) return;
-
+			openModal("/static/html/cmn/modal/userSearch.html", 450, 650, "담당자 검색", paramObj, function(tree, personNodes) {
 				agendaRow.attendByColumn = agendaRow.attendByColumn || {};
 				agendaRow.attendByColumn[colKey] = agendaRow.attendByColumn[colKey] || [];
 
-				// 참석자 중복체크
-				if (agendaRow.attendByColumn[colKey].some(u => u && u.id == checkedNode.id && !u.toRemove)) {
-					if (typeof customAlert === "function") customAlert("이미 추가된 참석자입니다.");
-					return false;
+				var addedCount = 0;
+				var duplicateCount = 0;
+
+				// 다중 선택 모드 (personNodes가 있는 경우)
+				if (personNodes && personNodes.length > 0) {
+					personNodes.forEach(function(node) {
+						// 참석자 중복체크
+						if (agendaRow.attendByColumn[colKey].some(u => u && u.id == node.id && !u.toRemove)) {
+							duplicateCount++;
+							return;
+						}
+						agendaRow.attendByColumn[colKey].push({
+							id: node.id,
+							name: node.text,
+							toRemove: false
+						});
+						addedCount++;
+					});
+				} else {
+					// 단일 선택 모드 (기존 로직)
+					var checkedId = tree.get_checked()[0];
+					if (!checkedId) return;
+
+					var checkedNode = tree.get_node(checkedId);
+					if (!checkedNode) return;
+
+					// 참석자 중복체크
+					if (agendaRow.attendByColumn[colKey].some(u => u && u.id == checkedNode.id && !u.toRemove)) {
+						if (typeof customAlert === "function") customAlert("이미 추가된 참석자입니다.");
+						return false;
+					}
+
+					agendaRow.attendByColumn[colKey].push({
+						id: checkedNode.id,
+						name: checkedNode.text,
+						toRemove: false
+					});
+					addedCount++;
 				}
 
-				agendaRow.attendByColumn[colKey].push({
-					id: checkedNode.id,
-					name: checkedNode.text,
-					toRemove: false
-				});
+				if (addedCount > 0) {
+					grid.repaint();
+					pm20_d02_update(agendaRow, colKey);
+				}
 
-				grid.repaint();
-				pm20_d02_update(agendaRow, colKey);
+				if (duplicateCount > 0 && addedCount > 0) {
+					customAlert(addedCount + "명 추가, " + duplicateCount + "명 중복으로 제외되었습니다.");
+				} else if (duplicateCount > 0 && addedCount == 0) {
+					customAlert("선택된 사용자가 모두 이미 추가된 참석자입니다.");
+				}
 			});
 		});
 

@@ -30,12 +30,15 @@
 
 	// 트리 초기화
 	function initUserTree(userTree) {
-		$("#userTree").jstree("destroy");		
+		var paramObj = modalStack.last().paramObj;
+		var isMultiSelect = (paramObj.pm20Flag === 'Y');
+
+		$("#userTree").jstree("destroy");
 		$("#userTree").jstree(
 		{
 			"plugins": ['types', 'checkbox', 'search', 'sort'],
 			"core": {
-				"multiple": false,
+				"multiple": isMultiSelect,
 				"data": setUserTree(),
 				"dblclick_toggle2": false
 			},
@@ -50,7 +53,7 @@
 			},
 			"checkbox": {
 		    	"keep_selected_style": false,
-		    	"three_state": false
+		    	"three_state": isMultiSelect
 		    },
 		    "search": {
 		      	show_only_matches: false
@@ -133,18 +136,37 @@
 	
 	function executeCallback(){
 		var userTree = $('#userTree').jstree(true);
-		
-		if(userTree.get_checked() == 0){
+		var paramObj = modalStack.last().paramObj;
+		var isMultiSelect = (paramObj.pm20Flag === 'Y');
+		var checkedIds = userTree.get_checked();
+
+		if(checkedIds.length == 0){
 			alert("선택된 데이터가 없습니다.");
 			return false;
 		}
-		
-		if(userTree.get_node(userTree.get_checked()[0]).type != "person"){
-			alert("부서는 선택할 수 없습니다.");
-			return false;
-		}
 
-		modalStack.last().callback(userTree);
+		if(isMultiSelect) {
+			// 다중 선택 모드: person 타입만 필터링해서 콜백에 전달
+			var personNodes = [];
+			for(var i = 0; i < checkedIds.length; i++) {
+				var node = userTree.get_node(checkedIds[i]);
+				if(node.type === "person") {
+					personNodes.push(node);
+				}
+			}
+			if(personNodes.length == 0) {
+				alert("선택된 사용자가 없습니다.");
+				return false;
+			}
+			modalStack.last().callback(userTree, personNodes);
+		} else {
+			// 단일 선택 모드: 기존 로직 유지
+			if(userTree.get_node(checkedIds[0]).type != "person"){
+				alert("부서는 선택할 수 없습니다.");
+				return false;
+			}
+			modalStack.last().callback(userTree);
+		}
 		modalStack.close();
 	}
 
