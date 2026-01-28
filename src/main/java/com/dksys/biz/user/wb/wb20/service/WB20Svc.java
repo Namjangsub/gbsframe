@@ -56,4 +56,8 @@ public interface WB20Svc {
 
     Map<String, String> insertApprovalMemoComment(Map<String, String> paramMap);
 
+    List<Map<String, String>> selectKakaoReceiveList(Map<String, String> paramMap);
+
+    int saveKakaoReceiveList(Map<String, Object> paramMap);
+
 }

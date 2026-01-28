@@ -74,4 +74,9 @@ public interface WB20Mapper {
 
 	int insertApprovalMemoComment(Map<String, String> paramMap);
 
+	// 카카오톡 수신여부 설정
+	List<Map<String, String>> selectKakaoReceiveList(Map<String, String> paramMap);
+
+	int mergeKakaoReceive(Map<String, String> paramMap);
+
 }

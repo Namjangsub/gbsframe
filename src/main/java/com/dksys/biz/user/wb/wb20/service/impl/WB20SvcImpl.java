@@ -378,4 +378,55 @@ public class WB20SvcImpl implements WB20Svc {
     public List<Map<String, String>> selectCurrentUserApprovalDataListFromTodoKey(Map<String, String> paramMap) {
         return wb20Mapper.selectCurrentUserApprovalDataListFromTodoKey(paramMap);
     }
+
+    @Override
+    public List<Map<String, String>> selectKakaoReceiveList(Map<String, String> paramMap) {
+        return wb20Mapper.selectKakaoReceiveList(paramMap);
+    }
+
+    @Override
+    public int saveKakaoReceiveList(Map<String, Object> paramMap) {
+        Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+        Type listType = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
+        List<Map<String, String>> detailList = gson.fromJson((String) paramMap.get("detailArr"), listType);
+
+        int result = 0;
+        String coCd = (String) paramMap.get("coCd");
+        String userId = (String) paramMap.get("userId");
+        String chkUserId = (String) paramMap.get("chkUserId");
+        String pgmId = (String) paramMap.get("pgmId");
+
+        for (Map<String, String> detail : detailList) {
+            String remark = detail.get("remark");  // 결재/공유 둘 다에 같은 remark 저장
+
+            // 결재 CODE_ID가 있으면 저장
+            String apprCodeId = detail.get("apprCodeId");
+            if (apprCodeId != null && !apprCodeId.isEmpty()) {
+                Map<String, String> apprParam = new HashMap<>();
+                apprParam.put("coCd", coCd);
+                apprParam.put("codeId", apprCodeId);
+                apprParam.put("userId", userId);
+                apprParam.put("receiveYn", detail.get("apprReceiveYn"));
+                apprParam.put("chkUserId", chkUserId);
+                apprParam.put("pgmId", pgmId);
+                apprParam.put("remark", remark);
+                result += wb20Mapper.mergeKakaoReceive(apprParam);
+            }
+
+            // 공유 CODE_ID가 있으면 저장
+            String shareCodeId = detail.get("shareCodeId");
+            if (shareCodeId != null && !shareCodeId.isEmpty()) {
+                Map<String, String> shareParam = new HashMap<>();
+                shareParam.put("coCd", coCd);
+                shareParam.put("codeId", shareCodeId);
+                shareParam.put("userId", userId);
+                shareParam.put("receiveYn", detail.get("shareReceiveYn"));
+                shareParam.put("chkUserId", chkUserId);
+                shareParam.put("pgmId", pgmId);
+                shareParam.put("remark", remark);
+                result += wb20Mapper.mergeKakaoReceive(shareParam);
+            }
+        }
+        return result;
+    }
 }

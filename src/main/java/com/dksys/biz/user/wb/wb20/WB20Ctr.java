@@ -245,4 +245,27 @@ public class WB20Ctr {
         model.addAttribute("resultList", resultList);
         return "jsonView";
     }
+
+    // 카카오톡 수신여부 목록 조회
+    @PostMapping(value = "/selectKakaoReceiveList")
+    public String selectKakaoReceiveList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        List<Map<String, String>> resultList = wb20Svc.selectKakaoReceiveList(paramMap);
+        model.addAttribute("resultList", resultList);
+        return "jsonView";
+    }
+
+    // 카카오톡 수신여부 저장
+    @PutMapping(value = "/saveKakaoReceiveList")
+    public String saveKakaoReceiveList(@RequestBody Map<String, Object> paramMap, ModelMap model) {
+        try {
+            int result = wb20Svc.saveKakaoReceiveList(paramMap);
+            model.addAttribute("resultCode", 200);
+            model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+            model.addAttribute("saveCount", result);
+        } catch (Exception e) {
+            model.addAttribute("resultCode", 500);
+            model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+        }
+        return "jsonView";
+    }
 }

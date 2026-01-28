@@ -1162,5 +1162,62 @@
           WHERE
                 TODO_KEY 	= #{todoKey}
     </update>
-	
+
+	<!-- 카카오톡 수신여부 설정 조회 -->
+	<select id="selectKakaoReceiveList" parameterType="Map" resultType="camelMap">
+		SELECT
+			  REPLACE(REPLACE(REPLACE(COALESCE(A.CODE_NM, S.CODE_NM), '결제', ''), '결재', ''), '공유', '') AS TASK_NM
+			, A.CODE_ID AS APPR_CODE_ID
+			, NVL(AD.RECEIVE_YN, 'N') AS APPR_RECEIVE_YN
+			, TO_CHAR(AD.CHK_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS APPR_CHK_DTTM
+			, S.CODE_ID AS SHARE_CODE_ID
+			, NVL(SD.RECEIVE_YN, 'N') AS SHARE_RECEIVE_YN
+			, TO_CHAR(SD.CHK_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS SHARE_CHK_DTTM
+			, COALESCE(AD.REMARK, SD.REMARK, '') AS REMARK
+		FROM TB_CM05M01 S
+						LEFT OUTER JOIN TB_CM05M01 A ON A.CODE_KIND = 'TODODIV20'
+													AND A.USE_YN = 'Y'
+													AND A.CODE_ID != 'TODODIV2180'
+													AND REPLACE(REPLACE(REPLACE(A.CODE_NM, '결제', ''), '결재', ''), '공유', '')
+													  = REPLACE(REPLACE(REPLACE(S.CODE_NM, '결제', ''), '결재', ''), '공유', '')
+						LEFT OUTER JOIN TB_WB20D01 AD ON AD.CO_CD = #{coCd} AND AD.USER_ID = #{userId} AND AD.CODE_ID = A.CODE_ID
+						LEFT OUTER JOIN TB_WB20D01 SD ON SD.CO_CD = #{coCd} AND SD.USER_ID = #{userId} AND SD.CODE_ID = S.CODE_ID
+		WHERE S.CODE_KIND = 'TODODIV10'
+		  AND S.USE_YN = 'Y'
+		ORDER BY TO_NUMBER(REPLACE(S.CODE_ID, 'TODODIV', ''))
+	</select>
+
+	<!-- 카카오톡 수신여부 저장 (MERGE) - 수신여부 변경시에만 CHK_DTTM, CHK_USER_ID 업데이트 -->
+	<update id="mergeKakaoReceive" parameterType="Map">
+		MERGE INTO TB_WB20D01
+			USING DUAL ON (CO_CD = #{coCd} AND CODE_ID = #{codeId} AND USER_ID = #{userId})
+		WHEN MATCHED THEN
+			UPDATE SET
+						  RECEIVE_YN = #{receiveYn}
+						, CHK_DTTM = CASE WHEN RECEIVE_YN != #{receiveYn} THEN SYSDATE ELSE CHK_DTTM END
+						, CHK_USER_ID = CASE WHEN RECEIVE_YN != #{receiveYn} THEN #{chkUserId} ELSE CHK_USER_ID END
+						, CHK_PGM_ID = #{pgmId}
+						, REMARK = #{remark, jdbcType=VARCHAR}
+				WHEN NOT MATCHED THEN
+			INSERT (
+						  CO_CD
+						, CODE_ID
+						, USER_ID
+						, RECEIVE_YN
+						, CHK_DTTM
+						, CHK_USER_ID
+						, CHK_PGM_ID
+						, REMARK
+					)
+			VALUES (
+						  #{coCd}
+						, #{codeId}
+						, #{userId}
+						, #{receiveYn}
+						, CASE WHEN #{receiveYn} = 'Y' THEN SYSDATE ELSE NULL END
+						, CASE WHEN #{receiveYn} = 'Y' THEN #{chkUserId} ELSE NULL END
+						, #{pgmId}
+						, #{remark, jdbcType=VARCHAR}
+					)
+	</update>
  </mapper>
