@@ -1854,7 +1854,7 @@ function authChk(menuUrl){
 //	}
 	
 	if(!menuUrl){
-		var url = window.location.href;
+		var url = window.location.pathname;
 		menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
 	}
 	
@@ -1875,7 +1875,7 @@ function authChk(menuUrl){
 	            return false;
 	        }
         } else {
-        	console.error('권한정보가 없습니다.');
+//        	console.error('권한정보가 없습니다.');
 			location.href = connErrorUrl;
             return false;
         }
