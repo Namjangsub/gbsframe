@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -22,7 +21,6 @@ import com.dksys.biz.user.cr.cr50.service.CR50Svc;
 import com.dksys.biz.util.MessageUtils;
 
 @Controller
-@Transactional(rollbackFor = Exception.class)
 @RequestMapping("/user/cr/cr50")
 public class CR50Ctr {
     
