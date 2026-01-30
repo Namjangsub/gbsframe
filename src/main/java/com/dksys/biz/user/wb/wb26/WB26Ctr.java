@@ -3,6 +3,7 @@ package com.dksys.biz.user.wb.wb26;
 import java.util.List;
 import java.util.Map;
 
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -211,5 +212,113 @@ public class WB26Ctr {
   		}
   		return "jsonView";
     }
+
+    //리스트 조회
+	@PostMapping(value = "/select_wb0603p_List")
+	public String select_wb0603p_List(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = wb26svc.select_wb0603p_List(paramMap);
+		model.addAttribute("result", result);
+		List<Map<String, String>> resultProblem = wb26svc.select_wb0603p_Problem_List(paramMap);
+		model.addAttribute("resultProblem", resultProblem);
+		return "jsonView";
+	}
+
+
+
+	@PostMapping(value = "/updateWbsLevel2PlanGantt")
+    public String updateWbsLevel2PlanGantt(@RequestBody Map<String, String> paramMap,  ModelMap model) throws Exception {
+  		try {
+			if (wb26svc.updateWbsLevel2PlanGantt(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+				model.addAttribute("fileTrgtKey", paramMap.get("fileTrgtKey"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 	
+
+
+	@PostMapping(value = "/updateWbsLevel2ActGantt")
+	public String updateWbsLevel2ActGantt(@RequestBody Map<String, String> paramMap,  ModelMap model) throws Exception {
+		try {
+			if (wb26svc.updateWbsLevel2ActGantt(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+				model.addAttribute("rsltsFileTrgtKey", paramMap.get("rsltsFileTrgtKey"));
+				model.addAttribute("wbsRsltsNo", paramMap.get("wbsRsltsNo"));
+				model.addAttribute("wbsPlanCodeId", paramMap.get("wbsPlanCodeId2_P"));
+				model.addAttribute("wbsRsltseDt", paramMap.get("wbsRsltseDt"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/updateWbsLevel2MetaGantt")
+	public String updateWbsLevel2MetaGantt(@RequestBody Map<String, String> paramMap,  ModelMap model) throws Exception {
+		try {
+			if (wb26svc.updateWbsLevel2MetaGantt(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+				model.addAttribute("wbsRsltseDt", paramMap.get("wbsRsltseDt"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	
+	@PostMapping(value = "/deleteWbsLevel2Gantt")
+	public String deleteWbsLevel2Gantt(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (wb26svc.deleteWbsLevel2Gantt(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/deleteWbsLevel2GanttAct")
+	public String deleteWbsLevel2GanttAct(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+		try {
+			if (wb26svc.deleteWbsLevel2GanttAct(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 }

@@ -43,6 +43,15 @@ public interface WB26Mapper {
 	int updateWbsScheduleVersionUp(Map<String, String> param);
 	int updateWbsScheduleVersionUpWbsCode(Map<String, String> param);
 
+	List<Map<String, String>> select_wb0603p_List(Map paramMap);
+	List<Map<String, String>> select_wb0603p_Problem_List(Map paramMap);
+	
+	int deleteWbsLevel2Gantt(Map paramMap);
+
+	Map<String, String> select_wb0603p_fileTrgtKey_List(Map<String, String> paramMap);
+
+	int updateWbsLevel2MetaGantt_revisedFinishDt(Map<String, String> paramMap);
+
     // // 수금유형 검색
 	// List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap);
 }

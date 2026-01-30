@@ -1,0 +1,269 @@
+<div id="wbsPopup" class="popup_area of_a" style="width: 100%; height: 100%;">
+    <div class="tit_contents">
+        <h4 class="tit">TASK 템플릿 관리</h4>
+    </div>
+    
+    <div class="popup_table">
+        <div class="form-group">
+            <form id="popFormTask">
+            <input type="hidden" id="userId"        name="userId">
+            <input type="hidden" id="pgmId"         name="pgmId"    value="WB00604P05">
+            <input type="hidden" id="rsltsFileTrgtKey"         name="rsltsFileTrgtKey" >
+                <table class="popup_table">
+                    <colgroup>
+                          <col width="30%">
+                          <col width="70%">
+                    </colgroup>                  
+                   <thead>
+                         <tr>
+                            <td colspan="8" style="height:30px;text-align: left;">▣ 계획 정보</td>                                                
+                         </tr>
+                     </thead>
+                     <tr  style="text-align: left;">  
+                      <th>계획명</th>
+                      <td colspan="7">
+                      	  <input type="hidden" class="form-control" id="wbsPlanCodeId" name="wbsPlanCodeId" readonly style="color:#000000;">
+                      	  <input type="text" class="form-control" id="wbsPlanCodeNm" name="wbsPlanCodeNm" readonly style="color:#000000;">       
+                      </td>                       
+                    </tr> 
+                   <thead>
+                        <tr>
+                            <td colspan="9" style="height:30px;text-align: left;">
+                            <div style="float: left;">▣ TASK 템플릿</div>
+                            <div id="addrow2" class="add_btn_small pdl20">
+	                            <a id="btnTaskAdd" data-grid-control="templet-row-add" style="height: 30px; line-height: 28px;">+</a>
+	                            <a id="btnTaskDel" data-grid-control="templet-row-remove" style="height: 30px; line-height: 28px;">-</a>
+	                            <a id="btnTaskSave" onclick="taskTempletSave();" style="width:60px;height: 30px; line-height: 28px;">저장</a>
+	                        </div>
+                            </td>                                                
+                        </tr>
+                    </thead>                    
+                    <tbody>
+                    <tr style="text-align: left;">
+					    <td colspan="8"> 
+					    	<div>
+	                          <div class="ax5_grid" data-ax5grid="first-grid-modal" data-ax5grid-config="{}" style="height: 270px; width: 100%;" ></div>
+	                        </div>
+                        </td>
+					</tr> 
+                    </tbody>                    
+                </table>    
+            </form>
+        </div>
+    </div>    
+    
+    <!-- 하단 버튼 -->
+    <div class ="popup_bottom_btn">
+        <button type="button" id="actionBtn" onclick="addTaskTempletSave();">적용</button>
+        <button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+    </div>
+ </div>   
+<script type="text/javascript">
+setCommonSelect($(".popup_area select[data-kind]"));
+
+var gridTaskPop = {
+        initView : function() {
+            this.target = new ax5.ui.grid();
+            this.target.setConfig({
+                showRowSelector: true,
+                multipleSelect: true,
+                sortable: false,
+                target: $('[data-ax5grid="first-grid-modal"]'),
+                header: {
+                    align: "center",
+                    selector: true
+                },
+                body: {
+                     onClick: function () {
+                        this.self.select(this.dindex);
+                    },
+                    onDBLClick: function () {
+                    },
+                    mergeCells : ["gb"],
+                },
+                page : {
+                    navigationItemCount : 10,
+                    height : 30,
+                    display : true,
+                    firstIcon : '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+                    prevIcon : '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+                    nextIcon : '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+                    lastIcon : '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+                    onChange : function() {
+                        gridView.setData(this.page.selectPage);
+                    }
+                },
+                columns : [
+							{key: "rn",     label: "No.", align: "center",   width: 40, hidden : true},
+							{key: "codeId", label: "TASK명", hidden:true},
+							{key: "codeNm", label: "TASK명", label: "<span style='color: red;'>*</span>TASK명",    align: "left",   width: 405, editor: {type: "text"}},
+						]
+                    });
+                    return this;
+                },
+
+                setData : function(_pageNo) {
+                    var targetObj = this.target;
+                    var formData = {
+                            "wbsPlanCodeId" : $("#popFormTask #wbsPlanCodeId").val(),
+                            "wbsPlanCodeNm" : $("#popFormTask #wbsPlanCodeNm").val(),
+                            "userId" : jwt.userId, 
+                            "pageNo" : _pageNo + 1
+                    }
+                    postAjax("/user/wb/wb22/selectWbsTaskTempletList", formData, null, function(data){   
+                        try {
+                            var list = data.result;
+                            targetObj.setData({
+                                list : list,
+                                page : {
+                                            totalElements :  data.paginationInfo.totalRecordCount,
+                                } 
+                            });
+							// 팀장여부에 따른 Task 템플릿 수정 권한 제한 (팀장이면 수정가능)
+							if (list[0].teamManager != 'Y' ) {
+								$("#popFormTask #addrow2").hide();
+							} else {
+								$("#popFormTask #addrow2").show();
+							}
+                            //추가/ 삭제 내역 초기화
+                            taskDeleteRowArr = [];
+                            taskAddRowArr = [];
+                        } catch (error) {
+                            alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+                            return null; // 오류 발생 시 null 반환
+                        } finally {
+                            // console.log("함수 실행 완료.");
+                        } 
+                    });
+                },
+
+    }
+    
+     debugger;
+$(document).ready(function() {
+
+	$("#popFormTask #wbsPlanCodeId").val(modalStack.last().paramObj.wbsPlanCodeId);
+	$("#popFormTask #wbsPlanCodeNm").val(modalStack.last().paramObj.wbsPlanCodeNm);
+	
+	gridTaskPop.initView().setData(0);
+	
+// 	authChk();
+  
+});
+
+var taskDeleteRowArr = [];
+var taskAddRowArr = [];
+
+$('[data-grid-control]').click(function () {
+    switch (this.getAttribute("data-grid-control")) {  
+    case "templet-row-add":  
+    	var newRow = {};
+        newRow = {
+        		codeId:"", 
+        		codeNm: ""
+                };
+        gridTaskPop.target.addRow($.extend({}, newRow), "last"); 
+        taskAddRowArr.push(newRow); 
+      break;
+    case "templet-row-remove":
+	   	 // Validation 체크         
+	   	 var row = gridTaskPop.target.getList("selected")[0];
+        if (row == undefined) {
+            alert("삭제대상을 선택하세요");
+            return;
+        }
+
+   	 	//행삭제
+        var rowList = gridTaskPop.target.getList("selected");
+        if (rowList != undefined) {
+            $.each(rowList, function(idx, elem){
+                var rowListObj = elem;
+                if (rowListObj.codeId) 
+                	taskDeleteRowArr.push(rowListObj);         
+            });
+            gridTaskPop.target.deleteRow("selected");
+        }
+      break;
+   }    
+});
+
+function taskTempletSave() {	
+	
+	var formData = new FormData(); 
+	formData.append("wbsPlanCodeId", $('#wbsPlanCodeId').val());
+	
+	var rowList = gridTaskPop.target.getList();
+	if(rowList.length > 0) {
+	    var rowListArr = [];
+	    $.each(rowList, function(idx, elem){   
+	        var rowListObj = elem;
+	        
+	        rowListObj["codeId"] = elem.codeId;
+	        rowListObj["codeNm"] = elem.codeNm;
+
+	        rowListObj["userId"] = jwt.userId;
+	        rowListObj["pgmId"] = "WB2201P05";
+	        
+	        rowListArr.push(rowListObj);         
+	    });
+	    formData.append("rowListArr", JSON.stringify(rowListArr));
+    }    
+    formData.append("taskAddRowArr", JSON.stringify(taskAddRowArr));
+    formData.append("taskDeleteRowArr", JSON.stringify(taskDeleteRowArr));
+
+	filePostAjax("/user/wb/wb22/saveWbsTaskTempletList", formData, function(data) {
+// 	    alert(data.resultMessage);                              
+	    if (data.resultCode == 200) {                          
+	    	gridTaskPop.setData(0);                  
+	    }
+	});
+}
+
+function addTaskTempletSave() {
+	var gridTaskPopRow = gridTaskPop.target.getList("selected");
+	if (!gridTaskPopRow?.length) { alert("적용할 TASK를 선택하세요."); return; }
+	
+	// 선택행을 rn 오름차순으로 정렬
+	const gridTaskPopSorted = [...gridTaskPopRow].sort((a,b) => (a.rn||0) - (b.rn||0));
+
+    // 부모창 함수 호출 (WB0604M01.html의 addTemplateTasks)
+    if(window.parent && typeof window.parent.addTemplateTasks === 'function') {
+        window.parent.addTemplateTasks(gridTaskPopSorted);
+    } else if(window.opener && typeof window.opener.addTemplateTasks === 'function') {
+        window.opener.addTemplateTasks(gridTaskPopSorted);
+    } else if(typeof window.addTemplateTasks === 'function') { 
+        window.addTemplateTasks(gridTaskPopSorted);
+    } else {
+        alert("부모창의 addTemplateTasks 함수를 찾을 수 없습니다.");
+        return;
+    }
+
+	modalStack.close();
+}
+
+// 캘린더 데이 계산 함수 (종료일 - 시작일)
+function calculateCalendarCnt(startDate, endDate) {
+	if (!startDate || !endDate) return false;
+
+	const toUTC = (d) => {
+		if (d instanceof Date) {
+			return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+		}
+		if (typeof d === 'string') {
+			const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
+			if (!m) return NaN;
+			return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+		}
+		return NaN;
+	};
+
+	const startDay = toUTC(startDate);
+	const endDay   = toUTC(endDate);
+	if (!Number.isFinite(startDay) || !Number.isFinite(endDay)) return NaN;
+
+	if (endDay < startDay) return 0; // 역순 보호
+
+	return Math.floor((endDay - startDay) / 86400000) + 1; // 양끝 포함
+}
+
+</script>

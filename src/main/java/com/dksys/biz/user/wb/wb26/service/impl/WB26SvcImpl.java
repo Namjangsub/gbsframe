@@ -271,4 +271,177 @@ public class WB26SvcImpl implements WB26Svc {
 		}
 		return result;
 	}
+	
+
+	// 그리드 리스트
+	@Override
+	public List<Map<String, String>> select_wb0603p_List(Map paramMap) {
+		return wb26Mapper.select_wb0603p_List(paramMap);
+	}
+
+	// 그리드 리스트
+	@Override
+	public List<Map<String, String>> select_wb0603p_Problem_List(Map paramMap) {
+		return wb26Mapper.select_wb0603p_Problem_List(paramMap);
+	}
+	
+
+	@Override
+	public int updateWbsLevel2PlanGantt(Map<String, String> paramMap) throws Exception {
+
+		int result = 0;
+
+		//paramMap.get("fileTrgtKey") 가 DB에 있으면 변경
+		//없으면 신규 Insert 처리
+		Map<String, String> level2IsExist = wb26Mapper.select_wb0603p_fileTrgtKey_List(paramMap);
+		String fileTrgtKeyIsExist = null;
+		if (level2IsExist != null) {
+			fileTrgtKeyIsExist = level2IsExist.get("fileTrgtKey");
+		}
+		
+		String paramFileTrgtKey = paramMap.get("fileTrgtKey");
+		
+		if (paramFileTrgtKey != null && paramFileTrgtKey.length() > 0 && fileTrgtKeyIsExist != null	&& fileTrgtKeyIsExist.length() > 0) {
+			result = wb22Mapper.wbsLevel2Update(paramMap);
+		} else {
+			paramMap.put("coCd", paramMap.get("coCd"));
+			//계획번호 생성 TB_WB22M01 WBS_PLAN_NO + 1, 20260000001
+			String wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
+			paramMap.put("wbsPlanNo", wbsPlanNo);
+			paramMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeKind"));
+			//코드ID 생성 TB_WB22M01 WBS_PLAN_CODE_ID + 1, WBSCODE0401, WBSCODE0402
+			int wbsPlanCodeId = wb22Mapper.selectMaxWbsCode(paramMap);
+
+			String codeId = "";
+			if (wbsPlanCodeId < 10) {
+				codeId = "0" + String.valueOf(wbsPlanCodeId);
+			} else {
+				codeId = String.valueOf(wbsPlanCodeId);
+			}
+			paramMap.put("wbsPlanCodeId", paramMap.get("wbsPlanCodeKind") + codeId);
+
+			String fileTrgtKey = wb22Mapper.selectWbsSeqNext(paramMap);
+			paramMap.put("fileTrgtKey", fileTrgtKey);
+			result = wb22Mapper.wbsLevel2Insert(paramMap);
+		}
+
+		// 해당 계획에 대한 모든 실적과 Task 계획이 삭제되었으면 도면관리 대장에도 삭제
+//		int wbsRsltsLevel2Count = wb22Mapper.selectWbsRsltsLevel2Count(paramMap);
+//		if (wbsRsltsLevel2Count ==  0 && "WBSCODE03".equals(paramMap.get("wbsPlanCodeKind"))) {
+//			paramMap.put("dwgNo", paramMap.get("salesCd"));
+//			result += dw02Mapper.deleteDrawDocItem(paramMap);
+//		}
+
+		return result;
+	}
+
+	
+
+	@Override
+	public int updateWbsLevel2ActGantt(Map<String, String> paramMap) throws Exception {
+		int result = 0;
+
+		//지연이면 지연완료예정일 업데이트
+		
+
+		// 실적 저장 전 상태 및 지연 여부 자동 계산
+		String wbsPlaneDt = paramMap.get("wbsPlaneDt");     // 계획종료일
+		String wbsRsltseDt = paramMap.get("wbsRsltseDt");   // 실적종료일
+		String wbsRsltsRate = paramMap.get("wbsRsltsRate"); // 진척율
+		String wbsPlanStsCodeId = paramMap.get("wbsPlanStsCodeId");
+
+		// 1. 일자 비교를 통한 지연 여부 판단 (YYYY-MM-DD 또는 YYYYMMDD 등 포맷에 상관없도록 숫자만 추출하여 비교)
+		boolean isOverdue = false;
+		if(wbsPlaneDt != null && wbsRsltseDt != null) {
+			String planeDtClean = wbsPlaneDt.replaceAll("[^0-9]", "");
+			String rsltseDtClean = wbsRsltseDt.replaceAll("[^0-9]", "");
+			
+			if(planeDtClean.length() >= 8 && rsltseDtClean.length() >= 8) {
+				// 앞에 8자리(YYYYMMDD)만 비교
+				if(rsltseDtClean.substring(0,8).compareTo(planeDtClean.substring(0,8)) > 0) {
+					isOverdue = true;
+				}
+			}
+		}
+
+		// 2. 진척율 및 지연 여부에 따른 상태 코드(wbsPlanStsCodeId) 조정
+		if ("100".equals(wbsRsltsRate)) {
+			if (isOverdue) {
+				wbsPlanStsCodeId = "WBSPLANSTS40"; // 지연완료
+			} else {
+				wbsPlanStsCodeId = "WBSPLANSTS50"; // 정상완료
+			}
+		} else {
+			// 진척율이 100%가 아닌 경우 실적종료일은 저장하지 않음 (비즈니스 룰)
+			paramMap.put("wbsRsltseDt", "");
+			
+			if (isOverdue) {
+				wbsPlanStsCodeId = "WBSPLANSTS30"; // 지연
+			} else if (wbsRsltsRate != null && !"0".equals(wbsRsltsRate) && !"".equals(wbsRsltsRate)) {
+				// 진척율이 있고 100% 미만이며 지연이 아닌 경우 진행중 상태 유지
+				if (!"WBSPLANSTS30".equals(wbsPlanStsCodeId) && !"WBSPLANSTS40".equals(wbsPlanStsCodeId) && !"WBSPLANSTS50".equals(wbsPlanStsCodeId)) {
+					wbsPlanStsCodeId = "WBSPLANSTS20"; // 진행중
+				}
+			}
+		}
+
+		paramMap.put("wbsPlanStsCodeId", wbsPlanStsCodeId);
+
+		// 3. 지연 상태(WBSPLANSTS30)가 아닐 경우 지연완료예정일(revisedFinishDt) 초기화
+		if (!"WBSPLANSTS30".equals(wbsPlanStsCodeId)) {
+			paramMap.put("revisedFinishDt", "");
+		}
+		wb26Mapper.updateWbsLevel2MetaGantt_revisedFinishDt(paramMap);
+		//실적 고유번호가 0이면 Insert
+		//실적 고유번호가 0이 아니면 Update
+		int rsltsFileTrgtKey = Integer.parseInt(paramMap.get("rsltsFileTrgtKey"));
+		if(rsltsFileTrgtKey < 1) {
+			rsltsFileTrgtKey = wb22Mapper.selectWbsRstlsSeqNext(paramMap);
+			paramMap.put("rsltsFileTrgtKey", Integer.toString(rsltsFileTrgtKey));
+
+			paramMap.put("wbsPlanCodeId2_P", paramMap.get("taskId"));
+			paramMap.put("wbsPlanCodeKind2_P", paramMap.get("wbsPlanCodeKind"));
+			paramMap.put("salesCd2_P", paramMap.get("salesCd"));
+			paramMap.put("wbsRsltsId", paramMap.get("wbsPlanMngId"));
+
+			
+			result =  wb22Mapper.wbsRsltsInsert(paramMap);
+		} else {
+			result = wb22Mapper.wbsRsltsUpdate(paramMap);
+		}
+
+		return result;
+	}
+
+	@Override
+	public int updateWbsLevel2MetaGantt(Map<String, String> paramMap) throws Exception {
+		int result = updateWbsLevel2PlanGantt(paramMap);
+		result += updateWbsLevel2ActGantt(paramMap);
+		
+		return result;
+	}
+
+	@Override
+	public int deleteWbsLevel2Gantt(Map<String, String> paramMap) throws Exception {
+		return wb22Mapper.wbsLevel2Delete(paramMap);
+	}
+
+	@Override
+	public int deleteWbsLevel2GanttAct(Map<String, String> paramMap) throws Exception {
+		
+		//실적저장된 자료가 아니면 패스처리
+		int rsltsFileTrgtKey = Integer.parseInt(paramMap.get("rsltsFileTrgtKey"));
+		if(rsltsFileTrgtKey < 1) {
+			return 1;
+		}
+		// 실적 데이터 삭제 전 관련 문제(Issue) 등록 여부 체크
+		paramMap.put("wbsPlanCodeId", paramMap.get("taskId"));
+		int wbsIssueExistChk = wb22Mapper.wbsIssueExistChk(paramMap);
+		if (wbsIssueExistChk > 0) {
+			throw new RuntimeException("이미 문제가 등록되어 있어 삭제할 수 없습니다.");
+		}
+
+		return wb22Mapper.wbsRsltsDelete(paramMap);
+	}
+
 }

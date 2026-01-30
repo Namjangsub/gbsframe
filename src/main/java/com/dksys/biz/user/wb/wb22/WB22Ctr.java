@@ -209,6 +209,7 @@ public class WB22Ctr {
 			if (wb22Svc.wbsRsltsInsert(paramMap, mRequest) != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+				model.addAttribute("wbsRsltseDt", paramMap.get("wbsRsltseDt"));
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -227,6 +228,7 @@ public class WB22Ctr {
 			if (wb22Svc.wbsRsltsUpdate(paramMap, mRequest) != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+				model.addAttribute("wbsRsltseDt", paramMap.get("wbsRsltseDt"));
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));

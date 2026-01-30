@@ -3,6 +3,7 @@ package com.dksys.biz.user.wb.wb26.service;
 import java.util.List;
 import java.util.Map;
 
+import javax.servlet.http.HttpServletRequest;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 public interface WB26Svc {
@@ -38,4 +39,17 @@ public interface WB26Svc {
 	int updateWbsSchedule(Map<String, String> paramMap) throws Exception;
 	// // 수금유형 조회
 	// List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap);
+
+	List<Map<String, String>> select_wb0603p_List(Map<String, String> paramMap);
+	List<Map<String, String>> select_wb0603p_Problem_List(Map<String, String> paramMap);
+
+	// HttpServletRequest is safer if no files are uploaded
+	int updateWbsLevel2PlanGantt(Map<String, String> paramMap) throws Exception;
+
+	int updateWbsLevel2ActGantt(Map<String, String> paramMap) throws Exception;
+
+	int updateWbsLevel2MetaGantt(Map<String, String> paramMap) throws Exception;
+
+	int deleteWbsLevel2Gantt(Map<String, String> paramMap) throws Exception;
+	int deleteWbsLevel2GanttAct(Map<String, String> paramMap) throws Exception;
 }

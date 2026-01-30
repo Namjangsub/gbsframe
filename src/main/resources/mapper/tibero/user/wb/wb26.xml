@@ -2443,4 +2443,350 @@
 		  AND  WBS_PLAN_CODE_ID = #{wbsPlanCodeId}
 		  AND  WBS_PLAN_CODE_KIND = 'WBSCODE'
 	</update>
+	
+	
+
+    
+    <select id="select_wb0603p_List" parameterType="Map" resultType="camelMap">
+	    WITH
+			-- 1) 자식(계획/실적) base
+			child_base AS (
+			    SELECT
+			        X.FILE_TRGT_KEY,
+			        X.CO_CD,
+			        X.SALES_CD,
+			        X.WBS_PLAN_NO,
+			        X.WBS_PLAN_CODE_KIND,
+			        X.WBS_PLAN_CODE_ID,
+			        X.WBS_PLAN_CODE_NM,
+			        X.SEQ,
+			        X.VER_NO,
+			        X.WBS_PLAN_MNG_ID,
+			        X.WBS_PLANS_DT,
+			        X.WBS_PLANE_DT,
+			        X.DAYCNT,
+			        X.EXPECT_MH,
+			        X.WBS_PLAN_STS_CODE_ID,
+			        X.CLOSE_YN,
+			        X.CREAT_ID, X.CREAT_PGM, X.CREAT_DTTM,
+			        X.UDT_ID,   X.UDT_PGM,   X.UDT_DTTM,
+			        X.REVISED_FINISH_DT,
+			
+			        Y.FILE_TRGT_KEY AS RSLTS_FILE_TRGT_KEY,
+			        Y.WBS_RSLTS_NO,
+			        Y.WBS_RSLTS_ID,
+			        Y.WBS_RSLTS_RATE,
+			        Y.WBS_PLAN_MH    AS WBS_RSLTS_PLAN_MH,
+			        Y.WBS_RSLTS_MH,
+			        Y.WBS_RSLTS_CNTS,
+			        Y.WBS_RSLTSS_DT,
+			        Y.WBS_RSLTSE_DT,
+			        Y.DAYCNT         AS RSLTS_DAYCNT,
+			        NVL(Y.CLOSE_YN,'N') AS RSLTS_CLOSE_YN
+			    FROM TB_WB22M01 X
+			    LEFT JOIN TB_WB23M01 Y
+			      ON  X.CO_CD              = Y.CO_CD
+			      AND X.SALES_CD           = Y.SALES_CD
+			      AND X.WBS_PLAN_CODE_KIND = Y.WBS_PLAN_CODE_KIND
+			      AND X.WBS_PLAN_CODE_ID   = Y.WBS_PLAN_CODE_ID
+			      AND X.WBS_PLAN_NO        = Y.WBS_RSLTS_NO
+			    WHERE X.CO_CD              = #{coCd}
+			      AND X.SALES_CD           = #{salesCd}
+			      AND X.WBS_PLAN_CODE_KIND != 'WBSCODE'
+			      AND X.WBS_PLAN_MNG_ID is not null
+		    	  <if test="userId != null and userId != ''">
+			      AND X.WBS_PLAN_MNG_ID    = #{userId}
+			      </if>
+			),
+			-- 2) 부모는 TB_WB22M01에서 WBSCODE로 직접 조회
+			parent_base AS (
+			    SELECT
+			        P.FILE_TRGT_KEY,
+			        P.CO_CD,
+			        P.SALES_CD,
+			        P.WBS_PLAN_NO,
+			        P.WBS_PLAN_CODE_KIND,
+			        P.WBS_PLAN_CODE_ID,
+			        P.WBS_PLAN_CODE_NM,
+			        P.SEQ,
+			        P.VER_NO,
+			        P.WBS_PLAN_MNG_ID,
+			        P.WBS_PLANS_DT,
+			        P.WBS_PLANE_DT,
+			        P.DAYCNT,
+			        P.EXPECT_MH,
+			        P.WBS_PLAN_STS_CODE_ID,
+			        P.CLOSE_YN,
+			        P.CREAT_ID, P.CREAT_PGM, P.CREAT_DTTM,
+			        P.UDT_ID,   P.UDT_PGM,   P.UDT_DTTM,
+			        P.REVISED_FINISH_DT
+			    FROM TB_WB22M01 P
+			    WHERE P.CO_CD              = #{coCd}
+			      AND P.SALES_CD           = #{salesCd}
+			      AND P.WBS_PLAN_CODE_KIND = 'WBSCODE'
+			      AND P.WBS_PLAN_MNG_ID is not null
+		    	  <if test="userId != null and userId != ''">
+			      AND P.WBS_PLAN_MNG_ID    = #{userId}
+			      </if>
+			),
+			code_nm AS (SELECT CODE_ID, CODE_NM FROM TB_CM05M01),
+			user_nm AS (SELECT ID, NAME FROM TB_CM06M01),
+			iss AS (
+			    SELECT
+			        A1.CO_CD,
+			        A1.SALES_CD,
+			        A1.WBS_PLAN_CODE_KIND,
+			        A1.WBS_PLAN_CODE_ID,
+			        COUNT(CASE WHEN A1.WBS_PLAN_NO  IS NOT NULL THEN 1 END) AS P_ISS_CNT,
+			        COUNT(CASE WHEN A1.WBS_RSLTS_NO IS NOT NULL THEN 1 END) AS R_ISS_CNT
+			    FROM child_base cb
+			    JOIN TB_WB24M02 A1 ON A1.CO_CD = CB.CO_CD AND A1.WBS_PLAN_CODE_KIND = CB.WBS_PLAN_CODE_KIND AND A1.WBS_PLAN_CODE_ID = CB.WBS_PLAN_CODE_ID
+                                  AND (cb.WBS_PLAN_NO = A1.WBS_PLAN_NO OR cb.WBS_RSLTS_NO = A1.WBS_RSLTS_NO)
+			    GROUP BY A1.CO_CD, A1.SALES_CD, A1.WBS_PLAN_CODE_KIND, A1.WBS_PLAN_CODE_ID
+			)
+			
+			SELECT *
+			FROM (
+			    /* 부모 노드 */
+			    SELECT
+			        0 AS RN,
+			
+			        pb.FILE_TRGT_KEY,
+			        pb.CO_CD,
+			        pb.SALES_CD,
+			
+			        -- 트리용
+			        ''							AS WBS_PLAN_NO,
+			        pb.WBS_PLAN_CODE_ID 		AS ID,         -- 부모노드 ID
+			        CAST(NULL AS VARCHAR2(50))  AS PARENT_ID,
+			        Pb.WBS_PLAN_CODE_KIND 	    AS WBS_PLAN_CODE_KIND,
+			        csP.CODE_NM 				AS TITLE,      -- 부모 표시명(원하시면 ck.CODE_NM로 대체 가능)
+					pb.VER_NO,
+			
+			        -- 담당자/상태
+			        pb.WBS_PLAN_MNG_ID,
+			        umP.NAME AS WBS_PLAN_MNG_NM,
+			        pb.WBS_PLAN_STS_CODE_ID,
+			        '' WBS_PLAN_STS_CODE_ID_NM,
+			        TO_CHAR(pb.REVISED_FINISH_DT, 'YYYY-MM-DD') AS REVISED_FINISH_DT,
+			        pb.CLOSE_YN,
+			
+			        -- 계획일자
+			        TO_CHAR(pb.WBS_PLANS_DT, 'YYYY-MM-DD') AS PLAN_START_AT,
+			        TO_CHAR(pb.WBS_PLANE_DT, 'YYYY-MM-DD') AS PLAN_END_AT,
+			        pb.DAYCNT AS PLAN_DURATION_WD,
+			        pb.EXPECT_MH,
+			
+			        -- 실적(부모는 없음)
+			        CAST(NULL AS VARCHAR2(50)) AS RSLTS_FILE_TRGT_KEY,
+			        CAST(NULL AS VARCHAR2(50)) AS WBS_RSLTS_NO,
+			        CAST(NULL AS VARCHAR2(50)) AS WBS_RSLTS_ID,
+			        CAST(NULL AS VARCHAR2(200)) AS WBS_RSLTS_NM,
+			        CAST(NULL AS NUMBER) AS ACT_PROGRESS,
+			        CAST(NULL AS NUMBER) AS WBS_RSLTS_PLAN_MH,
+			        CAST(NULL AS NUMBER) AS WBS_RSLTS_MH,
+			        CAST(NULL AS VARCHAR2(4000)) AS WBS_RSLTS_CNTS,
+			        CAST(NULL AS VARCHAR2(10)) AS ACT_START_AT,
+			        CAST(NULL AS VARCHAR2(10)) AS ACT_END_AT,
+			        CAST(NULL AS VARCHAR2(10)) AS RSLTS_DAYCNT,
+			        CAST(NULL AS CHAR(1)) AS RSLTS_CLOSE_YN,
+			
+			        -- 이슈(부모는 보통 집계 대상이 아니면 NULL, 필요하면 아래처럼 0 처리)
+			        0 AS P_ISS_CNT,
+			        0 AS R_ISS_CNT,
+			
+			        pb.SEQ AS SEQ_SORT
+			    FROM parent_base pb
+			    LEFT JOIN user_nm umP ON umP.ID = pb.WBS_PLAN_MNG_ID
+			    LEFT JOIN code_nm csP ON csP.CODE_ID = pb.WBS_PLAN_CODE_ID
+			
+			    UNION ALL
+			
+			    /* 자식 노드 */
+			    SELECT
+			        ROW_NUMBER() OVER (ORDER BY cb.SEQ ASC) AS RN,
+			
+			        cb.FILE_TRGT_KEY,
+			        cb.CO_CD,
+			        cb.SALES_CD,
+			
+			        cb.WBS_PLAN_NO,
+			        cb.WBS_PLAN_CODE_ID 		AS ID,
+			        cb.WBS_PLAN_CODE_KIND 		AS PARENT_ID,     -- 부모 ID (= :wbsKind)
+			        cb.WBS_PLAN_CODE_KIND		AS WBS_PLAN_CODE_KIND,
+			        cb.WBS_PLAN_CODE_NM			AS TITLE,
+			        cb.VER_NO,
+			
+			        cb.WBS_PLAN_MNG_ID,
+			        um1.NAME AS ASSIGNEES,
+			        cb.WBS_PLAN_STS_CODE_ID,
+			        cs.CODE_NM					AS WBS_PLAN_STS_CODE_ID_NM,
+			        TO_CHAR(cb.REVISED_FINISH_DT, 'YYYY-MM-DD') AS REVISED_FINISH_DT,
+			        cb.CLOSE_YN,
+			
+			        TO_CHAR(cb.WBS_PLANS_DT, 'YYYY-MM-DD') AS PLAN_START_AT,
+			        TO_CHAR(cb.WBS_PLANE_DT, 'YYYY-MM-DD') AS PLAN_END_AT,
+			        cb.DAYCNT					AS PLAN_DURATION_WD,
+			        cb.EXPECT_MH,
+			
+			        cb.RSLTS_FILE_TRGT_KEY,
+			        cb.WBS_RSLTS_NO,
+			        cb.WBS_RSLTS_ID,
+			        um2.NAME AS WBS_RSLTS_NM,
+			        cb.WBS_RSLTS_RATE			AS ACT_PROGRESS,
+			        cb.WBS_RSLTS_PLAN_MH,
+			        cb.WBS_RSLTS_MH,
+			        cb.WBS_RSLTS_CNTS,
+			        TO_CHAR(cb.WBS_RSLTSS_DT, 'YYYY-MM-DD') AS ACT_START_AT,
+					CASE WHEN (cb.RSLTS_FILE_TRGT_KEY IS NOT NULL AND cb.WBS_RSLTSE_DT IS NULL) THEN TO_CHAR(SYSDATE, 'YYYY-MM-DD')
+					     ELSE TO_CHAR(cb.WBS_RSLTSE_DT, 'YYYY-MM-DD')
+					END AS ACT_END_AT,
+			        cb.RSLTS_DAYCNT,
+			        cb.RSLTS_CLOSE_YN,
+			
+			        NVL(i.P_ISS_CNT, 0) 		AS P_ISS_CNT,
+			        NVL(i.R_ISS_CNT, 0) 		AS R_ISS_CNT,
+			
+			        cb.SEQ 						AS SEQ_SORT
+			    FROM child_base cb
+			    LEFT JOIN user_nm um1 ON um1.ID = cb.WBS_PLAN_MNG_ID
+			    LEFT JOIN user_nm um2 ON um2.ID = cb.WBS_RSLTS_ID
+			    LEFT JOIN code_nm cs ON cs.CODE_ID = cb.WBS_PLAN_STS_CODE_ID
+			    LEFT JOIN iss i
+			      ON  i.CO_CD              = cb.CO_CD
+			      AND i.SALES_CD           = cb.SALES_CD
+			      AND i.WBS_PLAN_CODE_KIND = cb.WBS_PLAN_CODE_KIND
+			      AND i.WBS_PLAN_CODE_ID   = cb.WBS_PLAN_CODE_ID
+			)
+			ORDER BY
+			    CASE WHEN PARENT_ID IS NULL THEN 0 ELSE 1 END,
+			    SEQ_SORT;
+			    
+    </select>
+    
+    
+    
+    <select id="select_wb0603p_Problem_List" parameterType="Map" resultType="camelMap">
+	    WITH child_base AS (
+		    SELECT
+		        X.FILE_TRGT_KEY,
+		        X.CO_CD,
+		        X.SALES_CD,
+		        X.WBS_PLAN_NO,
+		        X.WBS_PLAN_CODE_KIND,
+		        X.WBS_PLAN_CODE_ID,
+		        X.WBS_PLAN_CODE_NM,
+		        X.SEQ,
+		        X.VER_NO,
+		        X.WBS_PLAN_MNG_ID,
+		        X.WBS_PLANS_DT,
+		        X.WBS_PLANE_DT,
+		        X.DAYCNT,
+		        X.EXPECT_MH,
+		        X.WBS_PLAN_STS_CODE_ID,
+		        X.CLOSE_YN,
+		        X.CREAT_ID, X.CREAT_PGM, X.CREAT_DTTM,
+		        X.UDT_ID,   X.UDT_PGM,   X.UDT_DTTM,
+		        Y.FILE_TRGT_KEY AS RSLTS_FILE_TRGT_KEY,
+		        Y.WBS_RSLTS_NO,
+		        Y.WBS_RSLTS_ID,
+		        Y.WBS_RSLTS_RATE,
+		        Y.WBS_PLAN_MH    AS WBS_RSLTS_PLAN_MH,
+		        Y.WBS_RSLTS_MH,
+		        Y.WBS_RSLTS_CNTS,
+		        Y.WBS_RSLTSS_DT,
+		        Y.WBS_RSLTSE_DT,
+		        Y.DAYCNT         AS RSLTS_DAYCNT,
+		        NVL(Y.CLOSE_YN,'N') AS RSLTS_CLOSE_YN
+		    FROM TB_WB22M01 X
+		    LEFT JOIN TB_WB23M01 Y
+		      ON  X.CO_CD              = Y.CO_CD
+		      AND X.SALES_CD           = Y.SALES_CD
+		      AND X.WBS_PLAN_CODE_KIND = Y.WBS_PLAN_CODE_KIND
+		      AND X.WBS_PLAN_CODE_ID   = Y.WBS_PLAN_CODE_ID
+		      AND X.WBS_PLAN_NO        = Y.WBS_RSLTS_NO
+		    WHERE X.CO_CD    = #{coCd}
+		      AND X.SALES_CD = #{salesCd}
+		      AND X.WBS_PLAN_CODE_KIND != 'WBSCODE'
+			  AND X.WBS_PLAN_MNG_ID is not null
+		   	  <if test="userId != null and userId != ''">
+			  AND X.WBS_PLAN_MNG_ID    = #{userId}
+			  </if>
+		),
+		user_nm AS (SELECT ID, NAME FROM TB_CM06M01)
+		SELECT
+		    A1.FILE_TRGT_KEY,
+		    A1.CO_CD,
+		    A1.WBS_PLAN_CODE_KIND,
+		    A1.WBS_PLAN_CODE_ID AS task_Id,
+		
+		    A1.ISS_NO AS issue_Id,
+		    A1.ISS_SJ AS title,
+		    A1.ISS_DIV,
+		    A1.ISS_CNTS,
+		    A1.ISS_STS,
+		    CASE
+		        WHEN ((A1.ISS_STS = 'ISSSTS03') OR (Q.REQ_ST = 'REQST03')) THEN '완료'
+		        WHEN ((A1.ISS_STS = 'ISSSTS02') OR (A1.REQ_NO IS NOT NULL)) THEN '처리중'
+		        ELSE '발생'
+		    END AS status,
+		    A1.ACT_ID,
+		    U1.NAME 			AS owner,
+		
+		    A1.WBS_PLAN_NO,
+		    A1.WBS_RSLTS_NO,
+		    A1.SALES_CD,
+		
+		    A1.MID_CD,
+		    A1.SUB_CD,
+		    A1.REQ_NO,
+		    A1.VEND_CD,
+		    A1.MC_PART_CD,
+		    A1.IMPORTANT_CD,
+		    A1.IMPACT_CD,
+		    A1.ETC_INPUT,
+		    A1.CUST_REQ_DT,
+		    A1.REQ_DT,
+		    A1.DELAY_DAY,
+		    TO_CHAR(A1.CREAT_DTTM , 'YYYY-MM-DD') AS occurred_At,
+		    'MEDIUM' AS severity
+		FROM child_base cb
+		JOIN TB_WB24M02 A1
+		  ON  A1.CO_CD = cb.CO_CD
+		  AND A1.SALES_CD = cb.SALES_CD
+		  AND A1.WBS_PLAN_CODE_KIND = cb.WBS_PLAN_CODE_KIND
+		  AND A1.WBS_PLAN_CODE_ID   = cb.WBS_PLAN_CODE_ID
+		  AND (
+		        cb.WBS_PLAN_NO  = A1.WBS_PLAN_NO
+		     OR cb.WBS_RSLTS_NO = A1.WBS_RSLTS_NO
+		 	 )
+		 LEFT JOIN TB_QM01M01 Q ON Q.REQ_NO = A1.REQ_NO
+		 LEFT JOIN user_nm u1 ON u1.ID = A1.ACT_ID
+			    
+    </select>
+    
+    
+    <select id="select_wb0603p_fileTrgtKey_List" parameterType="Map" resultType="camelMap">
+		SELECT FILE_TRGT_KEY, 	CO_CD, 				WBS_PLAN_NO,	 	WBS_PLAN_CODE_KIND, 	WBS_PLAN_CODE_ID, 	WBS_PLAN_CODE_NM, 	VER_NO, 
+			   SALES_CD, 		SEQ, 				WBS_PLAN_MNG_ID, 	WBS_PLANS_DT, 			WBS_PLANE_DT, 		DAYCNT, 			WBS_PLAN_STS_CODE_ID, 
+			   LOCK_YN, 		CLOSE_YN, 			CLOSE_ID, 			CLOSE_DTTM,             EXPECT_MH, 			CHG_REQ_STR_DT, 	CHG_REQ_END_DT, 
+			   CHG_REASON, 		CHG_REQ_USER_ID, 	CHG_REQ_STATUS, 	CHG_REQ_APPLY_DT, 		VER_UP_REASON, 		CREAT_ID, 			CREAT_PGM, 
+			   CREAT_DTTM, 		UDT_ID, 			UDT_PGM, 			UDT_DTTM
+		 FROM   TB_WB22M01
+		WHERE  FILE_TRGT_KEY = #{fileTrgtKey, jdbcType=VARCHAR}
+    </select>
+    
+    
+	<update id="updateWbsLevel2MetaGantt_revisedFinishDt" parameterType="Map">
+		UPDATE TB_WB22M01
+		SET    REVISED_FINISH_DT 		= #{revisedFinishDt}
+			 , WBS_PLAN_STS_CODE_ID     = #{wbsPlanStsCodeId}
+			 , UDT_ID   = #{userId}
+			 , UDT_PGM  = #{pgmId}
+			 , UDT_DTTM = SYSDATE
+		WHERE  FILE_TRGT_KEY = #{fileTrgtKey}
+		  AND  (REVISED_FINISH_DT   != #{revisedFinishDt}
+		   OR  WBS_PLAN_STS_CODE_ID != #{wbsPlanStsCodeId})
+	</update>
+	
 </mapper>
