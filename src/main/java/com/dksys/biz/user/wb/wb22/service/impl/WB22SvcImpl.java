@@ -621,7 +621,7 @@ public class WB22SvcImpl implements WB22Svc {
 
 //		String todoTitle1 = paramMap.get("clntNm_P") + "-" + paramMap.get("clntPjtNm_P") + "(" + paramMap.get("salesCd2_P") + ") " + paramMap.get("wbsPlanCodeNm2_P") + " 실적 공유";
 //		String todoTitle1 = paramMap.get("clntNm_P") + "-" + paramMap.get("clntPjtNm_P") + paramMap.get("salesCd2_P") + " 실적 공유";
-		String todoTitle1 = "[WBS실적_등록]" + paramMap.get("clntNm_P") + "-" + paramMap.get("clntPjtNm_P") + paramMap.get("salesCd2_P");
+		String todoTitle1 = "[WBS실적_등록]" + paramMap.get("salesCd2_P") + paramMap.get("wbsPlanCodeNm2_P");
 
 		// String todoTitle = "TASK명 : " + paramMap.get("wbsPlanCodeNm2_P") + ", SALES CODE : " + paramMap.get("salesCd2_P") + " 실적일자 : " +
 		// paramMap.get("wbsRsltssDt") + " ~ " + paramMap.get("wbsRsltseDt");
@@ -646,7 +646,7 @@ public class WB22SvcImpl implements WB22Svc {
 
 //		String todoTitle2 = paramMap.get("clntNm_P") + "-" + paramMap.get("clntPjtNm_P") + "(" + paramMap.get("salesCd2_P") + ") " + paramMap.get("wbsPlanCodeNm2_P") + " 실적 결재";
 //		String todoTitle2 = paramMap.get("clntNm_P") + "-" + paramMap.get("clntPjtNm_P") + paramMap.get("salesCd2_P") + " 실적 결재";
-		String todoTitle2 = "[WBS실적_등록]" + paramMap.get("clntNm_P") + "-" + paramMap.get("clntPjtNm_P") + paramMap.get("salesCd2_P");
+		String todoTitle2 = "[WBS실적_등록]" + paramMap.get("salesCd2_P") + paramMap.get("wbsPlanCodeNm2_P");
 
 		// 결재
 		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {
@@ -740,13 +740,14 @@ public class WB22SvcImpl implements WB22Svc {
 
 //		String todoTitle1 = paramMap.get("clntNm_P") + "-" + paramMap.get("clntPjtNm_P") + "(" + paramMap.get("salesCd2_P") + ") " + paramMap.get("wbsPlanCodeNm2_P") + " 실적 공유";
 //		String todoTitle1 = paramMap.get("clntNm_P") + "-" + paramMap.get("clntPjtNm_P") + paramMap.get("salesCd2_P") + " 실적 공유";
-		String todoTitle1 = "[WBS실적_변경]" + paramMap.get("clntNm_P") + "-" + paramMap.get("clntPjtNm_P") + paramMap.get("salesCd2_P");
+		String todoTitle1 = "[WBS실적_변경]" + paramMap.get("salesCd2_P") + paramMap.get("wbsPlanCodeNm2_P");
 
 		paramMap.put("reqNo", paramMap.get("wbsRsltsNo"));
 		paramMap.put("salesCd", paramMap.get("salesCd2_P"));
 
+		QM01Mapper.deleteWbsSharngList(paramMap);
 		if (Integer.parseInt(paramMap.get("approvalYnCnt")) == 0) {
-			QM01Mapper.deleteWbsSharngList(paramMap);
+//			QM01Mapper.deleteWbsSharngList(paramMap);
 
 			Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {
 			}.getType();
@@ -771,7 +772,7 @@ public class WB22SvcImpl implements WB22Svc {
 			}
 
 //			String todoTitle2 = paramMap.get("clntNm_P") + "-" + paramMap.get("clntPjtNm_P") + "(" + paramMap.get("salesCd2_P") + ") " + paramMap.get("wbsPlanCodeNm2_P") + " 실적 결재";
-			String todoTitle2 = "[WBS실적_변경]" + paramMap.get("clntNm_P") + "-" + paramMap.get("clntPjtNm_P") + paramMap.get("salesCd2_P");
+			String todoTitle2 = "[WBS실적_변경]" + paramMap.get("salesCd2_P") + paramMap.get("wbsPlanCodeNm2_P");
 
 			// 결재
 			Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {

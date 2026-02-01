@@ -387,9 +387,9 @@ function refreshSummariesOnly(){
   
   // 1. 이슈 및 OVERDUE 기본 집계
   for(const t of STATE.tasks.values()){
-    const allIss = STATE.issues.filter(i => i.taskId===t.id);
-    t.issueOpenCnt = allIss.length; // 발생 (전체 건수)
-    t.issueHighCnt = allIss.filter(i => i.status !== "완료").length; // 미완 (COMPLETED가 아닌 건수)
+    // 백엔드에서 집계된 이슈 건수 사용 (발생 = 계획이슈 + 실적이슈, 미완 = ISSUE_HIGH_CNT)
+    t.issueOpenCnt = Number(t.pIssCnt || t.P_ISS_CNT || 0) + Number(t.rIssCnt || t.R_ISS_CNT || 0);
+    t.issueHighCnt = Number(t.issueHighCnt || t.ISSUE_HIGH_CNT || 0);
     
     // 이 시점에 planOverdueYn 등을 날짜 기반으로 다시 갱신
     if (t.planEndAt) {
@@ -498,7 +498,7 @@ function getTaskListInTreeOrder(){
 }
 
 /** ---------- Data Loading ---------- */
-function loadWbsData(){
+function loadWbsData(callback){
   const formData = {
     coCd: $("#coCd").val() || 'GUN',
     salesCd: $("#salesCd_S").val(), 
@@ -526,6 +526,9 @@ function loadWbsData(){
     }
 
     STATE.tasks.clear();
+    if (list.length > 0) {
+      if (list[0].coCd) $("#coCd").val(list[0].coCd);
+    }
     list.forEach(item => {
       // 날짜 형식 방어 (yyyymmdd -> yyyy-mm-dd)
       const toDash = (s) => (s && /^\d{8}$/.test(s)) ? `${s.substr(0,4)}-${s.substr(4,2)}-${s.substr(6,2)}` : s;
@@ -580,12 +583,21 @@ function loadWbsData(){
     autoZoomToFit();
     renderAll();
     setToast("WBS 데이터 로드 완료", {type:"ok", autoHideMs:1500});
+
+    if(typeof callback === 'function') callback();
   });
 }
 
 /** 데이터 검색 (재조회) */
 function searchData(){
-  loadWbsData();
+  loadWbsData(function() {
+    setTimeout(function() {
+      if (STATE.selectedId) {
+        focusOnTreeTask(STATE.selectedId);
+        focusOnGanttTask(STATE.selectedId);
+      }
+    }, 300);
+  });
 }
 
 
@@ -1685,7 +1697,14 @@ function renderDetail(){
     
     if(typeof openModal === 'function') {
       openModal("/static/html/user/wb/wb24/WB2401P11.html", 1200, 870, "WBS 실적문제수정", paramObj, function (){
-         loadWbsData();
+         loadWbsData(function() {
+            setTimeout(function() {
+              if (STATE.selectedId) {
+                focusOnTreeTask(STATE.selectedId);
+                focusOnGanttTask(STATE.selectedId);
+              }
+            }, 300);
+         });
       });
     } else {
       alert("openModal 함수를 찾을 수 없습니다.");
@@ -2263,26 +2282,27 @@ function init(){
     // 기본 키 및 컨텍스트 추가
     paramObj["fileTrgtKey_P"] = t.fileTrgtKey;
     paramObj["wbsPlanCodeId_P"] = t.id;
+    paramObj["coCd_P"] = t.coCd;
     
-    // 실적(ACT) 데이터가 저장되지 않은 경우 차단
-    if (!t.rsltsFileTrgtKey) {
-      setToast("실적(ACT)이 저장된 상태에서만 결재/첨부가 가능합니다.", {type:"warn"});
-      return;
-    }
-
-    paramObj["actionType"] = "U";
-    paramObj["rsltsFileTrgtKey_P"] = t.rsltsFileTrgtKey;
+    paramObj["actionType"] = t.rsltsFileTrgtKey ? "U" : "C";
+    paramObj["rsltsFileTrgtKey_P"] = t.rsltsFileTrgtKey || "0";
     paramObj["wbsPlanNo"] = t.wbsPlanNo;
     paramObj["wbsRsltsNo"] = t.wbsRsltsNo;
 
-    // openSecondModal 호출 (WB2201P02.html)
-    // 체크: openSecondModal이 없으면 openModal 등을 사용
-    if(typeof openSecondModal === 'function') {
-      openSecondModal("/static/html/user/wb/wb22/WB2201P02.html", 1200, 700, "WBS 실적등록", paramObj, function () {
-         // loadWbsData(); 
+    // openModal 호출 (WB0604P02.html)
+    if(typeof openModal === 'function') {
+      openModal("/static/html/user/wb/wb06/WB0604P02.html", 1200, 800, "WBS 실적 및 결재", paramObj, function () {
+         loadWbsData(function() {
+            setTimeout(function() {
+              if (STATE.selectedId) {
+                focusOnTreeTask(STATE.selectedId);
+                focusOnGanttTask(STATE.selectedId);
+              }
+            }, 300);
+         }); 
       });
     } else {
-      alert("팝업 함수(openSecondModal)를 찾을 수 없습니다.");
+      setToast("openModal 함수를 찾을 수 없습니다.", {type:"warn"});
     }
   });
 
@@ -2337,8 +2357,15 @@ function init(){
 
     if(typeof openModal === 'function') {
       openModal("/static/html/user/wb/wb24/WB2401P11.html", 1200, 870, "WBS 실적문제등록", paramObj, function () {
-        // 성공 시 데이터 재조회 (필요 시)
-        loadWbsData();
+        // 성공 시 데이터 재조회 및 현재 카드 이동
+        loadWbsData(function() {
+          setTimeout(function() {
+            if (STATE.selectedId) {
+              focusOnTreeTask(STATE.selectedId);
+              focusOnGanttTask(STATE.selectedId);
+            }
+          }, 300);
+        });
       });
     } else {
       alert("openModal 함수를 찾을 수 없습니다.");
@@ -2605,7 +2632,7 @@ function init(){
 
     //Sales Code 검색
     window.wbsSalesCodeSearch = function() {
-      var paramObj = { "coCd" : $('#coCd_S').val(), "searchValue": $('#salesCd_S').val() };
+      var paramObj = { "coCd" : $('#coCd').val(), "searchValue": $('#salesCd_S').val() };
       openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1200, 700, "SALES CODE 검색", paramObj, function (grid){
         var row = grid.target.getList("selected")[0];
 
@@ -2620,6 +2647,7 @@ $(function() {
   // URL 파라미터 추출
   const urlParams = new URLSearchParams(window.location.search);
   const salesCd = urlParams.get('salesCd') || "";
+  const coCd = urlParams.get('coCd') || "";
   const userId = urlParams.get('userId');
   const equpNm = urlParams.get('equpNm') || "";
   const userNm = (typeof jwt !== 'undefined') ? (jwt.userNm || "") : "";
@@ -2635,6 +2663,7 @@ $(function() {
 
   // 파라미터가 있으면 해당 값으로 설정, 없으면 기존 기본값 유지
   if (salesCd) $('#salesCd_S').val(salesCd);
+  if (coCd) $('#coCd').val(coCd);
   if (userId) {
     // userId 처리가 필요한 경우 별도 input(hidden 등)이나 전역변수에 저장
     if ($('#userId').length === 0) {

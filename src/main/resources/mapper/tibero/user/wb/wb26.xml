@@ -2538,10 +2538,16 @@
 			        A1.WBS_PLAN_CODE_KIND,
 			        A1.WBS_PLAN_CODE_ID,
 			        COUNT(CASE WHEN A1.WBS_PLAN_NO  IS NOT NULL THEN 1 END) AS P_ISS_CNT,
-			        COUNT(CASE WHEN A1.WBS_RSLTS_NO IS NOT NULL THEN 1 END) AS R_ISS_CNT
+			        COUNT(CASE WHEN A1.WBS_RSLTS_NO IS NOT NULL THEN 1 END) AS R_ISS_CNT,
+				    SUM(CASE
+				        WHEN ((A1.ISS_STS = 'ISSSTS03') OR (Q.REQ_ST = 'REQST03')) THEN 0	--완료
+				        WHEN ((A1.ISS_STS = 'ISSSTS02') OR (A1.REQ_NO IS NOT NULL)) THEN 1	--진행중
+				        ELSE 1																--발생
+				    END) AS ISSUE_HIGH_CNT
 			    FROM child_base cb
 			    JOIN TB_WB24M02 A1 ON A1.CO_CD = CB.CO_CD AND A1.WBS_PLAN_CODE_KIND = CB.WBS_PLAN_CODE_KIND AND A1.WBS_PLAN_CODE_ID = CB.WBS_PLAN_CODE_ID
                                   AND (cb.WBS_PLAN_NO = A1.WBS_PLAN_NO OR cb.WBS_RSLTS_NO = A1.WBS_RSLTS_NO)
+		 		LEFT JOIN TB_QM01M01 Q ON Q.REQ_NO = A1.REQ_NO
 			    GROUP BY A1.CO_CD, A1.SALES_CD, A1.WBS_PLAN_CODE_KIND, A1.WBS_PLAN_CODE_ID
 			)
 			
@@ -2594,6 +2600,7 @@
 			        -- 이슈(부모는 보통 집계 대상이 아니면 NULL, 필요하면 아래처럼 0 처리)
 			        0 AS P_ISS_CNT,
 			        0 AS R_ISS_CNT,
+			        0 AS ISSUE_HIGH_CNT,
 			
 			        pb.SEQ AS SEQ_SORT
 			    FROM parent_base pb
@@ -2646,6 +2653,7 @@
 			
 			        NVL(i.P_ISS_CNT, 0) 		AS P_ISS_CNT,
 			        NVL(i.R_ISS_CNT, 0) 		AS R_ISS_CNT,
+			        NVL(i.ISSUE_HIGH_CNT, 0)	AS ISSUE_HIGH_CNT,
 			
 			        cb.SEQ 						AS SEQ_SORT
 			    FROM child_base cb
