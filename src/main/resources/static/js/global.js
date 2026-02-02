@@ -3408,8 +3408,9 @@ function openapi(prompt) {
 	//ollama  API Call  --> "aiType":"OLLAMA"
 	const paramObj = {
 			 "aiType"		: "OLLAMA"
-			,"originMsg"	: $('#'+prompt).val()
-			,"prompt"		: "\n -여기까지 오타 확인하고 문장을 자연스럽게 수정해줘 "
+			,"originMsg"	: `원문: """${$('#'+prompt).val()}""" `
+			,"prompt"		: `원문 문장을 최소 수정 원칙으로 오타/맞춤법/띄어쓰기만 바로잡고, 표현은 필요한 범위에서만 격식 있게 다듬어라.
+			문장 구조/어휘 변경은 최소화하고, 추가 설명 금지. 출력은 수정본만 제시하라.`
 	}
 	postAjax("/user/bot/chatRtv", paramObj, null, function(data){
 		try {
