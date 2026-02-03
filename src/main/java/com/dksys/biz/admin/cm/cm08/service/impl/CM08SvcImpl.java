@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
 import java.net.URLEncoder;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
@@ -29,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
@@ -39,10 +42,48 @@ import com.dksys.biz.util.DateUtil;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
-
+/****************************************************************************************
+ * 2026.02.03
+ * 파일 업로드 시 파일 개수 리턴
+ * 
+ * “파일 1개 저장됐는데 2번째에서 실패하면 1번째가 롤백”은 2가지 레이어로 처리됩니다.
+ * 
+ * 1) DB 롤백(1번째 insertFile 취소)
+ * - 롤백 “로직”은 코드에 delete로 직접 쓰여있는 게 아니라, Spring 트랜잭션 AOP가 합니다.
+ * - 해당 메서드들에 붙인 @Transactional(rollbackFor = Exception.class) 때문에, 2번째에서 예외가 발생해 메서드 밖으로 던져지면
+ *   트랜잭션이 rollback 되면서 1번째 cm08Mapper.insertFile(...)도 같이 취소됩니다.
+ * - 대상 메서드: src/main/java/com/dksys/biz/admin/cm/cm08/service/impl/CM08SvcImpl.java의
+ *   - uploadFile(String, String, MultipartHttpServletRequest)
+ *   - uploadFile(Map<String,String>, MultipartHttpServletRequest)
+ *   - uploadTreeFile(String, Map, MultipartHttpServletRequest)
+ *   - copyTreeFile(...)
+ *   - fileUpload(...)
+ * 
+ * 2) 파일시스템 롤백(1번째로 써진 파일 삭제)
+ * - 각 업로드/복사 메서드에서 성공적으로 써진 파일을 written 리스트에 넣고,
+ * - 이후 실패 시 catch (Exception e)에서 written에 들어있는 파일들을 best-effort로 delete() 하는 부분이 “파일 1개 저장 롤백(정리)” 로직입니다.
+ * - 위치: 같은 파일 CM08SvcImpl.java 각 메서드의 catch (Exception e) { for (File f : written) { ... f.delete(); } ... throw ... }
+ * 
+ * 참고: 트랜잭션 롤백이 실제로 동작하려면 “프록시를 통한 호출”이어야 하는데, fileUpload(...)는 cm08Svc.uploadFile(...)로
+ *       호출해서(자기 자신 주입 프록시) 이 조건을 만족합니다. 다른 서비스에서 CM08Svc를 주입받아 호출하는 경우도 보통 프록시
+ *       경유라 롤백됩니다.
+ * 
+ ****************************************************************************************/
 @Service
 public class CM08SvcImpl implements CM08Svc {
     private static final Logger logger = LoggerFactory.getLogger(CM08SvcImpl.class);
+
+    private static final class FileStorageException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        private FileStorageException(String message) {
+            super(message);
+        }
+
+        private FileStorageException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
 
     @Autowired
     CM08Mapper cm08Mapper;
@@ -57,6 +98,7 @@ public class CM08SvcImpl implements CM08Svc {
     private String uploadDir;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int uploadFile(String fileTrgtTyp, String fileTrgtKey, MultipartHttpServletRequest mRequest) {
         List<MultipartFile> fileList =  new ArrayList<>();
         //PM0101M01_M ==> 작업일보에서 출장경비용 첨부파일인경우, 그외 해당 화면의 프로그램명으로 들어옴
@@ -89,160 +131,202 @@ public class CM08SvcImpl implements CM08Svc {
         } else { //첨부 파이이 없으므로 작업 종료함.
         	return 0;
         }
+        String safeTrgtTyp = requireSafePathSegment(fileTrgtTyp, "fileTrgtTyp");
+
         String year = DateUtil.getCurrentYyyy();
         String month = DateUtil.getCurrentMm();
-        String path = uploadDir + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
-        for (MultipartFile mf : fileList) {
-            String originFileName = mf.getOriginalFilename(); // 원본 파일 명
-            // long fileSize = mf.getSize(); // 파일 사이즈
-
-            HashMap<String, String> param = new HashMap<String, String>();
-            param.put("fileSize", String.valueOf(mf.getSize()));
-            if (originFileName != null) {
-                // originFileName으로 작업 수행
-                param.put("fileType", originFileName.split("\\.")[originFileName.split("\\.").length - 1]);
-                param.put("fileName", originFileName);
-            } else {
-                // originFileName이 null인 경우 처리
-                param.put("fileType", "err");
-                param.put("fileName", "error");
-            }
-            param.put("filePath", path);
-            param.put("fileTrgtTyp", fileTrgtTyp);
-            param.put("fileTrgtKey", fileTrgtKey);
-            param.put("userId", mRequest.getParameter("userId"));
-            param.put("pgmId", fileTrgtTyp);
-            param.put("coCd", mRequest.getParameter("coCd"));
-            param.put("comonCd", mRequest.getParameter("comonCd"));
-            if ("TB_BM02M01".equals(fileTrgtTyp)) {
-            	param.put("clntCd", fileTrgtKey);
-            	param.put("comonCd", "FITR9903"); //거래처 첨부 디렉토리
-            } else {
-        		Map<String, String> chk = fetchAllowedDataMap(param);
-        		param.put("coCd",    nz(chk,"coCd")    == null ? "" : nz(chk,"coCd"));
-        		param.put("clntCd",  nz(chk,"clntCd")  == null ? "" : nz(chk,"clntCd"));
-        		param.put("prjctCd", nz(chk,"prjctCd") == null ? "" : nz(chk,"prjctCd"));
-        		param.put("ordrsNo", nz(chk,"ordrsNo") == null ? "" : nz(chk,"ordrsNo"));
-        		param.put("itemCd",  nz(chk,"itemDiv") == null ? "" : nz(chk,"itemDiv")); 
-        		param.put("prdtCd",  nz(chk,"prdtCd")  == null ? "" : nz(chk,"prdtCd"));
-        		param.put("salesCd", nz(chk,"salesCd") == null ? "" : nz(chk,"salesCd"));
-            }
-            try {
-                cm08Mapper.insertFile(param);
-                String saveFile = param.get("fileKey") + "_" + originFileName;
-                File f = new File(path);
-                if (!f.isDirectory()) f.mkdirs();
-
-                // if(fileTrgtTyp.equals("TB_OD01M01") || fileTrgtTyp.equals("TB_BM02M01") || fileTrgtTyp.equals("TB_OD02M01") || fileTrgtTyp.equals("TB_AR14M01")) {
-                mf.transferTo(new File(path + saveFile));
-                // }
-
-            } catch (IllegalStateException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        Path baseDir = resolveBaseUploadDir();
+        Path dir = baseDir.resolve(Paths.get(safeTrgtTyp, year, month)).normalize();
+        if (!dir.startsWith(baseDir)) {
+            throw new FileStorageException("Invalid upload path");
         }
-        return 0;
+        String dirForDb = dir.toString() + File.separator;
+
+        int savedCount = 0;
+        List<File> written = new ArrayList<>();
+        try {
+            Files.createDirectories(dir);
+
+            for (MultipartFile mf : fileList) {
+                if (mf == null || mf.isEmpty()) {
+                    continue;
+                }
+
+                String originFileName = mf.getOriginalFilename();
+                String safeFileName = sanitizeFilename(originFileName);
+                String fileType = extractFileExtension(safeFileName);
+
+                HashMap<String, String> param = new HashMap<String, String>();
+                param.put("fileSize", String.valueOf(mf.getSize()));
+                param.put("fileType", fileType);
+                param.put("fileName", safeFileName);
+                param.put("filePath", dirForDb);
+                param.put("fileTrgtTyp", safeTrgtTyp);
+                param.put("fileTrgtKey", fileTrgtKey);
+                param.put("userId", mRequest.getParameter("userId"));
+                param.put("pgmId", safeTrgtTyp);
+                param.put("coCd", mRequest.getParameter("coCd"));
+                param.put("comonCd", mRequest.getParameter("comonCd"));
+
+                if ("TB_BM02M01".equals(safeTrgtTyp)) {
+                    param.put("clntCd", fileTrgtKey);
+                    param.put("comonCd", "FITR9903"); //거래처 첨부 디렉토리
+                } else {
+                    Map<String, String> chk = fetchAllowedDataMap(param);
+                    param.put("coCd",    nz(chk,"coCd")    == null ? "" : nz(chk,"coCd"));
+                    param.put("clntCd",  nz(chk,"clntCd")  == null ? "" : nz(chk,"clntCd"));
+                    param.put("prjctCd", nz(chk,"prjctCd") == null ? "" : nz(chk,"prjctCd"));
+                    param.put("ordrsNo", nz(chk,"ordrsNo") == null ? "" : nz(chk,"ordrsNo"));
+                    param.put("itemCd",  nz(chk,"itemDiv") == null ? "" : nz(chk,"itemDiv"));
+                    param.put("prdtCd",  nz(chk,"prdtCd")  == null ? "" : nz(chk,"prdtCd"));
+                    param.put("salesCd", nz(chk,"salesCd") == null ? "" : nz(chk,"salesCd"));
+                }
+
+                cm08Mapper.insertFile(param);
+                String saveFile = param.get("fileKey") + "_" + safeFileName;
+                File target = new File(dirForDb, saveFile);
+                mf.transferTo(target);
+                written.add(target);
+                savedCount++;
+            }
+        } catch (Exception e) {
+            for (File f : written) {
+                try {
+                    if (f != null && f.exists()) {
+                        f.delete();
+                    }
+                } catch (Exception ignore) {
+                    // best effort
+                }
+            }
+            logger.error("File upload failed (typ={}, key={})", safeTrgtTyp, fileTrgtKey, e);
+            throw (e instanceof RuntimeException) ? (RuntimeException) e : new FileStorageException("File upload failed", e);
+        }
+        return savedCount;
     }
 
     //CLNT_CD,PRDT_CD,ITEM_CD,SALES_CD,PRJCT_CD,CO_CD,COMON_CD-->paramMap 으로 처리
     //화일관리 추가 구현
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int uploadFile(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
 		String fileTrgtTyp = String.valueOf(paramMap.get("fileTrgtTyp"));
-    	String fileTrgtKey = String.valueOf(paramMap.get("fileTrgtKey"));
-    	
-    	List<MultipartFile> fileList = mRequest.getFiles("files");
-    	String year = DateUtil.getCurrentYyyy();
-    	String month = DateUtil.getCurrentMm();
-    	String path = uploadDir + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
-    	for (MultipartFile mf : fileList) {
-    		String originFileName = mf.getOriginalFilename(); // 원본 파일 명
-    		// long fileSize = mf.getSize(); // 파일 사이즈
-    		
-    		HashMap<String, String> param = new HashMap<String, String>(paramMap);
-    		
-    		param.put("fileSize", String.valueOf(mf.getSize()));
-    		if (originFileName != null) {
-    			// originFileName으로 작업 수행
-    			param.put("fileType", originFileName.split("\\.")[originFileName.split("\\.").length - 1]);
-    			param.put("fileName", originFileName);
-    		} else {
-    			// originFileName이 null인 경우 처리
-    			param.put("fileType", "err");
-    			param.put("fileName", "error");
-    		}
-    		param.put("filePath", path);
-    		param.put("fileTrgtTyp", fileTrgtTyp);
-    		param.put("fileTrgtKey", fileTrgtKey);
-    		param.put("pgmId", fileTrgtTyp);
-    		
-    		param.put("coCd",   nz(paramMap,"coCd"));
-    		param.put("userId", nz(paramMap,"userId"));
-    		param.put("clntCd", nz(paramMap,"clntCd"));
-    		param.put("prdtCd", nz(paramMap,"prdtCd"));
-    		param.put("itemCd", nz(paramMap,"itemCd"));
-    		param.put("salesCd", nz(paramMap,"salesCd"));
-    		param.put("prjctCd", nz(paramMap,"prjctCd"));
-    		param.put("ordrsNo", nz(paramMap,"ordrsNo"));
-    		
-    		Map<String, String> chk = fetchAllowedDataMap(param);
-    		param.put("coCd",    nz(chk,"coCd")    == null ? "" : nz(chk,"coCd"));
-    		param.put("clntCd",  nz(chk,"clntCd")  == null ? "" : nz(chk,"clntCd"));
-    		param.put("prjctCd", nz(chk,"prjctCd") == null ? "" : nz(chk,"prjctCd"));
-    		param.put("ordrsNo", nz(chk,"ordrsNo") == null ? "" : nz(chk,"ordrsNo"));
-    		param.put("itemCd", nz(chk,"itemDiv") == null ? "" : nz(chk,"itemDiv")); 
-    		param.put("prdtCd",  nz(chk,"prdtCd")  == null ? "" : nz(chk,"prdtCd"));
-    		param.put("salesCd", nz(chk,"salesCd") == null ? "" : nz(chk,"salesCd"));
-    		
-            try {
-    			cm08Mapper.insertFile(param);
-    			String saveFile = param.get("fileKey") + "_" + originFileName;
-    			File f = new File(path);
-    			if (!f.isDirectory()) f.mkdirs();
-    			
-    			// if(fileTrgtTyp.equals("TB_OD01M01") || fileTrgtTyp.equals("TB_BM02M01") || fileTrgtTyp.equals("TB_OD02M01") || fileTrgtTyp.equals("TB_AR14M01")) {
-    			mf.transferTo(new File(path + saveFile));
-    			// }
-                paramMap.put("fileKey", param.get("fileKey"));
-    		} catch (IllegalStateException e) {
-    			e.printStackTrace();
-    		} catch (IOException e) {
-    			e.printStackTrace();
-    		}
-    	}
-    	return 0;
+	    	String fileTrgtKey = String.valueOf(paramMap.get("fileTrgtKey"));
+	        String safeTrgtTyp = requireSafePathSegment(fileTrgtTyp, "fileTrgtTyp");
+      	
+      	List<MultipartFile> fileList = mRequest.getFiles("files");
+	    	String year = DateUtil.getCurrentYyyy();
+	    	String month = DateUtil.getCurrentMm();
+	        Path baseDir = resolveBaseUploadDir();
+	        Path dir = baseDir.resolve(Paths.get(safeTrgtTyp, year, month)).normalize();
+	        if (!dir.startsWith(baseDir)) {
+	            throw new FileStorageException("Invalid upload path");
+	        }
+	        String dirForDb = dir.toString() + File.separator;
+
+	        int savedCount = 0;
+	        List<File> written = new ArrayList<>();
+	        try {
+	            Files.createDirectories(dir);
+	            for (MultipartFile mf : fileList) {
+	                if (mf == null || mf.isEmpty()) {
+	                    continue;
+	                }
+
+	                String originFileName = mf.getOriginalFilename();
+	                String safeFileName = sanitizeFilename(originFileName);
+	                String fileType = extractFileExtension(safeFileName);
+
+	                HashMap<String, String> param = new HashMap<String, String>(paramMap);
+	                param.put("fileSize", String.valueOf(mf.getSize()));
+	                param.put("fileType", fileType);
+	                param.put("fileName", safeFileName);
+	                param.put("filePath", dirForDb);
+	                param.put("fileTrgtTyp", safeTrgtTyp);
+	                param.put("fileTrgtKey", fileTrgtKey);
+	                param.put("pgmId", safeTrgtTyp);
+
+	                param.put("coCd",   nz(paramMap,"coCd"));
+	                param.put("userId", nz(paramMap,"userId"));
+	                param.put("clntCd", nz(paramMap,"clntCd"));
+	                param.put("prdtCd", nz(paramMap,"prdtCd"));
+	                param.put("itemCd", nz(paramMap,"itemCd"));
+	                param.put("salesCd", nz(paramMap,"salesCd"));
+	                param.put("prjctCd", nz(paramMap,"prjctCd"));
+	                param.put("ordrsNo", nz(paramMap,"ordrsNo"));
+
+	                Map<String, String> chk = fetchAllowedDataMap(param);
+	                param.put("coCd",    nz(chk,"coCd")    == null ? "" : nz(chk,"coCd"));
+	                param.put("clntCd",  nz(chk,"clntCd")  == null ? "" : nz(chk,"clntCd"));
+	                param.put("prjctCd", nz(chk,"prjctCd") == null ? "" : nz(chk,"prjctCd"));
+	                param.put("ordrsNo", nz(chk,"ordrsNo") == null ? "" : nz(chk,"ordrsNo"));
+	                param.put("itemCd", nz(chk,"itemDiv") == null ? "" : nz(chk,"itemDiv"));
+	                param.put("prdtCd",  nz(chk,"prdtCd")  == null ? "" : nz(chk,"prdtCd"));
+	                param.put("salesCd", nz(chk,"salesCd") == null ? "" : nz(chk,"salesCd"));
+
+	                cm08Mapper.insertFile(param);
+	                String saveFile = param.get("fileKey") + "_" + safeFileName;
+	                File target = new File(dirForDb, saveFile);
+	                mf.transferTo(target);
+	                written.add(target);
+	                savedCount++;
+	                paramMap.put("fileKey", param.get("fileKey"));
+	            }
+	        } catch (Exception e) {
+	            for (File f : written) {
+	                try {
+	                    if (f != null && f.exists()) {
+	                        f.delete();
+	                    }
+	                } catch (Exception ignore) {
+	                    // best effort
+	                }
+	            }
+	            logger.error("File upload failed (typ={}, key={})", safeTrgtTyp, fileTrgtKey, e);
+	            throw (e instanceof RuntimeException) ? (RuntimeException) e : new FileStorageException("File upload failed", e);
+	        }
+	        return savedCount;
     }
     @Override
     public  int uploadTreeFile(String fileTrgtTyp,String fileTrgtKey, MultipartHttpServletRequest mRequest) {
         return 1;
     }
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public  int uploadTreeFile(String fileTrgtTyp,Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
         List<MultipartFile> fileList = mRequest.getFiles("files");
+        String safeTrgtTyp = requireSafePathSegment(fileTrgtTyp, "fileTrgtTyp");
         String year = DateUtil.getCurrentYyyy();
         String month = DateUtil.getCurrentMm();
-        String path = uploadDir + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
-        for (int i = 0; i < fileList.size(); i++) {
-            try {
+        Path baseDir = resolveBaseUploadDir();
+        Path dir = baseDir.resolve(Paths.get(safeTrgtTyp, year, month)).normalize();
+        if (!dir.startsWith(baseDir)) {
+            throw new FileStorageException("Invalid upload path");
+        }
+        String dirForDb = dir.toString() + File.separator;
+
+        int savedCount = 0;
+        List<File> written = new ArrayList<>();
+        try {
+            Files.createDirectories(dir);
+            for (int i = 0; i < fileList.size(); i++) {
                 MultipartFile mf = fileList.get(i);
-                String originFileName = mf.getOriginalFilename(); // 원본 파일 명
+                if (mf == null || mf.isEmpty()) {
+                    continue;
+                }
+
+                String originFileName = mf.getOriginalFilename();
+                String safeFileName = sanitizeFilename(originFileName);
+                String fileType = extractFileExtension(safeFileName);
+
                 HashMap<String, String> param = new HashMap<String, String>();
                 param.put("fileSize", String.valueOf(mf.getSize()));
-                if (originFileName != null) {
-                    // originFileName으로 작업 수행
-                    param.put("fileType", originFileName.split("\\.")[originFileName.split("\\.").length - 1]);
-                    param.put("fileName", originFileName);
-                } else {
-                    // originFileName이 null인 경우 처리
-                    param.put("fileType", "err");
-                    param.put("fileName", "error");
-                }
-                param.put("filePath", path);
-                param.put("fileTrgtTyp", fileTrgtTyp);
+                param.put("fileType", fileType);
+                param.put("fileName", safeFileName);
+                param.put("filePath", dirForDb);
+                param.put("fileTrgtTyp", safeTrgtTyp);
                 param.put("userId", mRequest.getParameter("userId"));
-                param.put("pgmId", fileTrgtTyp);
+                param.put("pgmId", safeTrgtTyp);
                 param.put("coCd", mRequest.getParameter("coCd"));
                 String comonCdKey = "comonCd_" + i;
                 String comonCd = mRequest.getParameter(comonCdKey);
@@ -250,33 +334,50 @@ public class CM08SvcImpl implements CM08Svc {
                 param.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
                 String userId = mRequest.getParameter("userId");
                 param.put("creatId", userId);
-                param.put("creatPgm", fileTrgtTyp);
-                cm08Mapper.insertFile(param);
-                String saveFile = param.get("fileKey") + "_" + originFileName;
-                File f = new File(path);
-                if (!f.isDirectory()) f.mkdirs();
-                // if(fileTrgtTyp.equals("TB_OD01M01") || fileTrgtTyp.equals("TB_BM02M01") || fileTrgtTyp.equals("TB_OD02M01") || fileTrgtTyp.equals("TB_AR14M01")) {
-                mf.transferTo(new File(path + saveFile));
-                // }
+                param.put("creatPgm", safeTrgtTyp);
 
-            } catch (IllegalStateException e) {
-                logger.error("IllegalStateException occurred: ", e);
-            } catch (IOException e) {
-                logger.error("IOException occurred: ", e);
+                cm08Mapper.insertFile(param);
+                String saveFile = param.get("fileKey") + "_" + safeFileName;
+                File target = new File(dirForDb, saveFile);
+                mf.transferTo(target);
+                written.add(target);
+                savedCount++;
             }
+        } catch (Exception e) {
+            for (File f : written) {
+                try {
+                    if (f != null && f.exists()) {
+                        f.delete();
+                    }
+                } catch (Exception ignore) {
+                    // best effort
+                }
+            }
+            logger.error("Tree file upload failed (typ={})", safeTrgtTyp, e);
+            throw (e instanceof RuntimeException) ? (RuntimeException) e : new FileStorageException("Tree file upload failed", e);
         }
-        return 0;
+        return savedCount;
     }
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int copyTreeFile(String fileTrgtTyp, Map<String, String> paramMap, MultipartHttpServletRequest mRequest) {
-        System.out.println("copyTreeFile 실행");
+        String safeTrgtTyp = requireSafePathSegment(fileTrgtTyp, "fileTrgtTyp");
         String year = DateUtil.getCurrentYyyy();
         String month = DateUtil.getCurrentMm();
-        String path = uploadDir + File.separator + fileTrgtTyp + File.separator + year + File.separator + month + File.separator;
+
+        Path baseDir = resolveBaseUploadDir();
+        Path destDir = baseDir.resolve(Paths.get(safeTrgtTyp, year, month)).normalize();
+        if (!destDir.startsWith(baseDir)) {
+            throw new FileStorageException("Invalid upload path");
+        }
+        String destDirForDb = destDir.toString() + File.separator;
 
         int i = 0;
-        while (true) {
-            System.out.println("카운트: "+i);
+        int copiedCount = 0;
+        List<File> written = new ArrayList<>();
+        try {
+            Files.createDirectories(destDir);
+            while (true) {
             String comonCdKey = "comonCd_" + i;
             String filePathKey = "filePath_" + i;
             String fileNameKey = "fileName_" + i;
@@ -287,49 +388,68 @@ public class CM08SvcImpl implements CM08Svc {
             String fileName = mRequest.getParameter(fileNameKey);
             String filePKey = mRequest.getParameter(fileKey);
 
-            System.out.println("카운트: "+i +"||"+comonCd+"||"+filePath+"||"+fileName);
             if (comonCd == null || filePath == null || fileName == null) {
                 break; // 해당 키로부터 정보를 얻지 못한 경우, 더 이상의 처리를 멈춥니다.
             }
 
+            String safeSourceFileKey = requireNumericId(filePKey, "fileKey");
+            String safeFileName = sanitizeFilename(fileName);
+
+	            Path sourceDir = Paths.get(filePath.trim()).toAbsolutePath().normalize();
+	            if (!sourceDir.startsWith(baseDir)) {
+	                throw new FileStorageException("Invalid source path");
+	            }
+
+            Path sourcePath = sourceDir.resolve(safeSourceFileKey + "_" + safeFileName).normalize();
+            if (!sourcePath.startsWith(sourceDir)) {
+                throw new FileStorageException("Invalid source file path");
+            }
+
+            File sourceFile = sourcePath.toFile();
+            if (!sourceFile.exists() || !sourceFile.isFile()) {
+                throw new FileStorageException("Source file not found");
+            }
+
             // 복사된 파일에 대한 정보를 DB에 저장
             HashMap<String, String> param = new HashMap<>();
-            param.put("fileSize", "0");
-            param.put("fileType", fileName.substring(fileName.lastIndexOf(".") + 1));
-            param.put("fileName", fileName);
-            param.put("filePath", path);
-            param.put("fileTrgtTyp", fileTrgtTyp);
+            param.put("fileSize", String.valueOf(sourceFile.length()));
+            param.put("fileType", extractFileExtension(safeFileName));
+            param.put("fileName", safeFileName);
+            param.put("filePath", destDirForDb);
+            param.put("fileTrgtTyp", safeTrgtTyp);
             param.put("userId", mRequest.getParameter("userId"));
-            param.put("pgmId", fileTrgtTyp);
+            param.put("pgmId", safeTrgtTyp);
             param.put("coCd", mRequest.getParameter("coCd"));
             param.put("comonCd", comonCd);
             param.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
             String userId = mRequest.getParameter("userId");
             param.put("creatId", userId);
-            param.put("creatPgm", fileTrgtTyp);
+            param.put("creatPgm", safeTrgtTyp);
             cm08Mapper.insertFile(param);
             String nowFileKey = param.get("fileKey");
 
-            File sourceFile = new File(filePath +filePKey+"_"+fileName);
-            String saveFile = nowFileKey + "_" + fileName;
-            File targetFile = new File(path + saveFile);
-
-            if (!targetFile.getParentFile().exists()) { // 타겟 경로가 존재하지 않으면 생성
-                targetFile.getParentFile().mkdirs();
-            }
-
-            try {
-                Files.copy(sourceFile.toPath(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException e) {
-                e.printStackTrace();
-                return -1; // 파일 복사에 실패한 경우 -1을 반환
-            }
-
-
+            String saveFile = nowFileKey + "_" + safeFileName;
+            File targetFile = new File(destDirForDb, saveFile);
+            Files.copy(sourceFile.toPath(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            written.add(targetFile);
+            copiedCount++;
             i++;
         }
+        } catch (Exception e) {
+            for (File f : written) {
+                try {
+                    if (f != null && f.exists()) {
+                        f.delete();
+                    }
+                } catch (Exception ignore) {
+                    // best effort
+                }
+            }
+            logger.error("copyTreeFile failed (typ={})", safeTrgtTyp, e);
+            throw (e instanceof RuntimeException) ? (RuntimeException) e : new FileStorageException("copyTreeFile failed", e);
+        }
 
-        return 0;
+        return copiedCount;
     }
     @Override
     public List<Map<String, String>> selectFileList(Map<String, String> paramMap) {
@@ -448,8 +568,7 @@ public class CM08SvcImpl implements CM08Svc {
                 }
             }
             FileOutputStream fileOut = null;
-            String path = "C:\\upload\\" + fileName;
-            File f = new File(path);
+            File f = new File(uploadDir, fileName);
 //        	if(!f.isDirectory()) f.mkdirs();
             fileOut = new FileOutputStream(f);
             xWorkbook.write(fileOut);
@@ -614,6 +733,9 @@ public class CM08SvcImpl implements CM08Svc {
          * 1. 각 업무별 테이블에 있는 값을 기준으로설정하기
          *******************************************************************************************/
         Map<String, String> m = cm08Mapper.selectMByTarget(paramMap);
+        if (m == null) {
+            return Collections.emptyMap();
+        }
         m.put("FILE_TRGT_TYP",typ); //String typ = nz(paramMap, "fileTrgtTyp");
 
         // 타입 결정 우선순위: salesCd > ordrsNo > clntCd > coCd
@@ -693,6 +815,7 @@ public class CM08SvcImpl implements CM08Svc {
     }
 
 	@Override
+	@Transactional(rollbackFor = Exception.class)
 	public int fileUpload(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type mapList = new TypeToken<ArrayList<Map<String, String>>>() { }.getType();
@@ -730,10 +853,9 @@ public class CM08SvcImpl implements CM08Svc {
         //첨부 화일 처리 시작
         //---------------------------------------------------------------
         if (uploadFileList.size() > 0) {
-        	param.put("fileTrgtTyp", paramMap.get("pgmId"));
-        	param.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
-            cm08Svc.uploadFile(param, mRequest);
-			result += 1;
+          	param.put("fileTrgtTyp", paramMap.get("pgmId"));
+          	param.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+			result += cm08Svc.uploadFile(param, mRequest);
         }
 
         for(String fileKey : deleteFileList) {
@@ -744,6 +866,83 @@ public class CM08SvcImpl implements CM08Svc {
         //---------------------------------------------------------------
 
 		return result;
+	}
+
+	private Path resolveBaseUploadDir() {
+	    String base = (uploadDir == null) ? null : uploadDir.trim();
+	    if (base == null || base.isEmpty()) {
+	        throw new FileStorageException("Upload base directory is not configured");
+	    }
+	    return Paths.get(base).toAbsolutePath().normalize();
+	}
+
+	private static String requireSafePathSegment(String v, String field) {
+	    if (v == null) {
+	        throw new FileStorageException(field + " is required");
+	    }
+	    String s = v.trim();
+	    if (s.isEmpty()) {
+	        throw new FileStorageException(field + " is required");
+	    }
+	    // allow: letters/digits/_/- only (blocks traversal and path separators)
+	    if (!s.matches("[A-Za-z0-9_-]+")) {
+	        throw new FileStorageException("Invalid " + field);
+	    }
+	    return s;
+	}
+
+	private static String requireNumericId(String v, String field) {
+	    if (v == null) {
+	        throw new FileStorageException(field + " is required");
+	    }
+	    String s = v.trim();
+	    if (!s.matches("\\d+")) {
+	        throw new FileStorageException("Invalid " + field);
+	    }
+	    return s;
+	}
+
+	private static String sanitizeFilename(String name) {
+	    String s = (name == null) ? "" : name;
+	    // strip any client-supplied path
+	    s = s.replace('\\', '/');
+	    int slash = s.lastIndexOf('/');
+	    if (slash >= 0) {
+	        s = s.substring(slash + 1);
+	    }
+	    s = s.trim();
+	    if (s.isEmpty()) {
+	        s = "file";
+	    }
+	    // remove control chars
+	    s = s.replaceAll("[\\x00-\\x1F\\x7F]", "");
+	    // replace Windows-illegal characters
+	    s = s.replaceAll("[\\\\/:*?\"<>|]", "_");
+	    // avoid trailing dot/space on Windows
+	    while (s.endsWith(" ") || s.endsWith(".")) {
+	        s = s.substring(0, s.length() - 1);
+	    }
+	    if (s.isEmpty() || ".".equals(s) || "..".equals(s)) {
+	        s = "file";
+	    }
+	    // cap length to avoid filesystem limits
+	    if (s.length() > 180) {
+	        s = s.substring(0, 180);
+	    }
+	    return s;
+	}
+
+	private static String extractFileExtension(String fileName) {
+	    if (fileName == null) return "bin";
+	    int dot = fileName.lastIndexOf('.');
+	    if (dot <= 0 || dot == fileName.length() - 1) {
+	        return "bin";
+	    }
+	    String ext = fileName.substring(dot + 1).trim();
+	    if (ext.isEmpty()) return "bin";
+	    // keep DB stable and avoid weird characters
+	    if (!ext.matches("[A-Za-z0-9]+")) return "bin";
+	    return ext.toLowerCase();
 	}
     
 }
