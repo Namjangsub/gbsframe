@@ -1,19 +1,10 @@
 <style>
-/* body { */
-/*     font-family: Arial, sans-serif; */
-/*     background-color: #f5f7fa; */
-/*     margin: 20px; */
-/* } */
-
 .employee-container {
     max-width: 100%;
     max-height: 90vh; /* 뷰포트 높이의 90%로 제한 */
     margin: 0 auto;
     background-color: #ffffff;
-    padding-bottom: 0px;
-    padding-top: 0px;
-    padding-left: 10px;
-    padding-right: 10px;
+    padding: 0 10px;
     border-radius: 10px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     overflow-y: auto;
@@ -65,6 +56,35 @@
     height: 60px;
     object-fit: cover;
     border-radius: 8px;
+    display: block; /* Ensure it behaves correctly when toggled */
+}
+
+/* New Placeholder Styles */
+.no-image-placeholder {
+    width: 50px;
+    height: 60px;
+    background-color: #e9ecef;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    border-radius: 8px;
+    font-weight: bold;
+}
+
+.popup-no-image-placeholder {
+    width: 60px;
+    height: 70px;
+    background-color: #e9ecef;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    border-radius: 8px;
+    font-weight: bold;
+    margin-bottom: 10px;
 }
 
 .employee-info {
@@ -73,7 +93,7 @@
     justify-content: center;
 }
 
-#stsName {
+.stsName {
     font-weight: bold;
     color: #343a40;
     margin-bottom: 2px;
@@ -136,10 +156,10 @@
 }
 </style>
 
-<div id="userStatusPopup">
+<div id="userStatusPopup" style="position: relative;">
 	<div class="employee-container">
 	    <div class="employee-table" id="employeeStatusListContainer">
-	        <div class="org-header">조직명</div>
+	        <!-- <div class="org-header">조직명</div> -->
 	    </div>
 	</div>
     <div id="popup" class="popup">
@@ -150,8 +170,11 @@
 		          <col width="70%">
 		        </colgroup>
 	        	<tr>
-	        		<td rowspan=4>
-			            <img id="image1" src="" class="popup-img zoomable">
+	        		<td rowspan="4">
+                        <!-- Image Element -->
+			            <img id="image1" src="" class="popup-img zoomable" alt="User Image">
+                        <!-- Placeholder Element (Hidden by default) -->
+                        <div id="noImage1" class="popup-no-image-placeholder" style="display:none;">준비중</div>
 	        		</td>
 	        		<td>
 	        		    <div class="popup-text">
@@ -189,33 +212,49 @@
 </div>
 
 <script type="text/javascript">
-var mouseX = 0;
-var mouseY = 0;
 $(document).ready(function() {
     createEmployeeList();
-    $('.popup-trigger').on('click', function (event) {
+    
+    // Popup Trigger Click Event
+    $(document).on('click', '.popup-trigger', function (event) {
         event.stopPropagation();
 
-        const $popup = $('#popup');// 페이지 내의 좌표
-        mouseX = event.pageX;
-        mouseY = event.pageY;
-        let modalPosition = $('#userStatusPopup').offset();
-        let width = $('#userStatusPopup').width();
-        let height = $('#userStatusPopup').height();
+        const $popup = $('#popup');
+        let mouseX = event.pageX;
+        let mouseY = event.pageY;
         
-        mouseX -= modalPosition.left;
-        mouseY -= modalPosition.top;
-//      // 팝업이 화면을 벗어나지 않도록 조정
-        if ((mouseX + 250) > width) {
-            mouseX = width - 250;
+        // Relative container adjustment
+        let $container = $('#userStatusPopup');
+        let modalPosition = $container.offset();
+        
+        // Always subtract offset because #userStatusPopup is now position: relative
+        if (modalPosition) {
+            mouseX -= modalPosition.left;
+            mouseY -= modalPosition.top;
         }
 
-        if ((mouseY + 160) > height) {
-            mouseY = height - 160;
+        let width = $container.width();
+        let height = $container.height();
+        
+        // 팝업이 화면을 벗어나지 않도록 조정 (Adjust to keep popup within bounds)
+        const popupWidth = 260; // Slightly larger buffer (240px + border/padding)
+        const popupHeight = 180;
+
+        // Right edge check
+        if ((mouseX + popupWidth) > width) {
+            mouseX = width - popupWidth;
+            // Prevent negative positions if container is very narrow
+            if (mouseX < 0) mouseX = 0; 
+        }
+
+        // Bottom edge check
+        if ((mouseY + popupHeight) > height) {
+            mouseY = height - popupHeight;
+             // Prevent negative positions
+             if (mouseY < 0) mouseY = 0;
         }
         
-        //서버에서 이미지와 관련 정보 가져오기
-//         imageFileChk($(this).data('img'));	
+        // Populate popup data (Image or Placeholder)
         imageFileChk($(this));	
 
         $popup.css({
@@ -224,6 +263,7 @@ $(document).ready(function() {
         }).fadeIn();
     });
 
+    // Close popup on outside click
     $(document).on('click', function (event) {
         const $popup = $('#popup');
         if (!$popup.is(event.target) && !$popup.has(event.target).length) {
@@ -246,39 +286,57 @@ $(document).ready(function() {
 function createEmployeeList() {
     $('#employeeStatusListContainer').empty();
     var param = {};
+    
+    // Using postAjaxSync as per original code pattern
     postAjaxSync("/admin/cm/cm06/checkUserIdImageList", param, null, function(data) {
         var codeList = data.result;
         var container = $('#employeeStatusListContainer');
         var table = $('<table>').addClass('employee-table').appendTo(container);
+        
+        if (!codeList || codeList.length === 0) {
+            container.append('<div style="text-align:center; padding:20px;">데이터가 없습니다.</div>');
+            return;
+        }
+        
+        // var orgName = codeList[0]?.orgNm || "조직명";
+        
+        // Add Header
+        // $('<div>').addClass('org-header').text(orgName).prependTo(container);
+        
         var lastDept = '';
         var tableRow = null;
         var tdCount = 0;
+        const MAX_COLS = 5;
 
-        var orgName = codeList[0]?.orgNm || "조직명";
-        container.find('.org-header').text(orgName);
         $.each(codeList, function(index, item) {
+            // New Department Start
             if (lastDept !== item.dept) {
-                if (tdCount > 0) {
-                    while (tdCount < 5) {
+                // Fill remaining cells of previous row if exists
+                if (tableRow && tdCount > 0) {
+                    while (tdCount < MAX_COLS) {
                         $('<td>').appendTo(tableRow);
                         tdCount++;
                     }
                 }
+                
+                // Start new row for new department
                 tableRow = $('<tr>').addClass('empTR');
                 $('<th>').text(item.deptNm + " (" + item.cnt + ")").appendTo(tableRow);
-                container.find('table').append(tableRow); 
+                table.append(tableRow); 
+                
                 lastDept = item.dept;
                 tdCount = 0;
             }
 
-            if (tdCount === 5) {
+            // Start new row if max columns reached
+            if (tdCount === MAX_COLS) {
                 tableRow = $('<tr>').addClass('empTR');
-                $('<th>').appendTo(tableRow);
-                container.find('table').append(tableRow);
+                $('<th>').appendTo(tableRow); // Empty header cell for alignment
+                table.append(tableRow);
                 tdCount = 0;
             }
 
-            var userName = item.name + " " + item.levelNm.replace(/\s+/g, '');
+            var userName = (item.name || '') + " " + (item.levelNm ? item.levelNm.replace(/\s+/g, '') : '');
             var txtTitle = `${userName}님은 정상 근무중입니다.`;
             var workHoly = ''; 
             var textColor = 'rgb(0, 69, 191)';
@@ -286,29 +344,45 @@ function createEmployeeList() {
             if (item.workHolyNm) {
                 workHoly = '(' + item.workHolyNm.slice(2) + ')';
                 textColor = 'rgb(255 0 242)';
-                txtTitle = `${userName}님은 ${item.workHolyNm.slice(2)}중입니다.\n${item.workRptRmk}`;
+                txtTitle = `${userName}님은 ${item.workHolyNm.slice(2)}중입니다.\n${item.workRptRmk || ''}`;
             }
 
             const tdElement = $('<td>');
             const cardDiv = $('<div>').addClass('employee-card popup-trigger')
                                       .attr({
                                           'data-img': item.id,
-                                          'data-telno': item.telNo ?? '',
-                                          'data-offtelno': item.offTelNo ?? '',
-                                          'data-message': item.message ?? '',
-                                          'title': txtTitle
+                                          'data-name': userName + workHoly,
+                                          'data-telno': item.telNo || '',
+                                          'data-offtelno': item.offTelNo || '',
+                                          'data-message': item.message || '',
+                                          'title': txtTitle,
+                                          'data-has-image': (item.userImg && item.userImg.length > 0) ? 'Y' : 'N'
                                       });
 
-            $('<img>')
-                .addClass('employee-photo')
-                .attr('src', item.userImg ? item.userImg.map(code => String.fromCharCode(code)).join('') : '')
-                .css('filter', workHoly == '' ? '' : 'grayscale(100%)')
-                .appendTo(cardDiv);
+            // Handle Image Source OR Placeholder
+            let imgSrc = '';
+            if (item.userImg && Array.isArray(item.userImg) && item.userImg.length > 0) {
+                 imgSrc = item.userImg.map(code => String.fromCharCode(code)).join('');
+                 $('<img>')
+                    .addClass('employee-photo')
+                    .attr('src', imgSrc)
+                    .css('filter', workHoly == '' ? '' : 'grayscale(100%)')
+                    .appendTo(cardDiv);
+            } else {
+                // Create Placeholder
+                $('<div>')
+                    .addClass('no-image-placeholder')
+                    .text('준비중')
+                    .css('filter', workHoly == '' ? '' : 'grayscale(100%)')
+                    .appendTo(cardDiv);
+            }
 
             const infoDiv = $('<div>').addClass('employee-info').appendTo(cardDiv);
 
+            // CHANGED: id="stsName" -> class="stsName" to avoid duplicates
             $('<span>')
-                .attr({ 'id': 'stsName', 'style': 'color:' + textColor })
+                .addClass('stsName')
+                .css('color', textColor)
                 .text(userName + workHoly)
                 .appendTo(infoDiv);
 
@@ -319,17 +393,17 @@ function createEmployeeList() {
                 `<i class="fa fa-hands-helping" style="color:${workHoly == '' ? setStatus(item.commLoad) : 'gray'}"></i>`
             );
             infoDiv.append(statusIcons);
-            infoDiv.append(`<span style="color:gray">${item.telNo ?? ''}</span>`);
+            infoDiv.append(`<span style="color:gray">${item.telNo || ''}</span>`);
 
             tdElement.append(cardDiv);
-//             tableRow.append(tdElement);
             tableRow.append(tdElement);
 
             tdCount++;
         });
 
-        if (tdCount > 0 && tdCount < 5) {
-            while (tdCount < 5) {
+        // Fill remaining cells for the last row
+        if (tdCount > 0 && tdCount < MAX_COLS) {
+            while (tdCount < MAX_COLS) {
                 $('<td>').appendTo(tableRow);
                 tdCount++;
             }
@@ -338,18 +412,26 @@ function createEmployeeList() {
 }
 
 function setStatus(set) {
-//     return set === "COMM3" ? "emp_red" : set === "COMM2" ? "emp_orange" : "emp_blue";
     return set === "COMM3" ? "red" : set === "COMM2" ? "orange" : "gray";
 }
 
-function imageFileChk(data) {
-	var src = $(data).closest('.employee-card').find('.employee-photo').attr('src');
-	$('#popup').find('img').attr('src', src);
+function imageFileChk($element) {
+    var hasImage = $element.data('has-image') === 'Y';
+    
+    if (hasImage) {
+        var src = $element.find('.employee-photo').attr('src');
+        $('#image1').attr('src', src).show();
+        $('#noImage1').hide();
+    } else {
+        $('#image1').hide();
+        $('#noImage1').show();
+    }
+    
 	$('#image1').removeClass('zoomed');
-
-	$('#name').text($(data).children('.employee-info').children('#stsName').text() ??'');
-	$('#telNo').text('H.' + $(data).data('telno') ?? '');
-	$('#offTelNo').text('O.' + $(data).data('offtelno') ?? '');
-	$('#message').text($(data).data('message') ?? '');
+    
+	$('#name').text($element.data('name') || ''); 
+	$('#telNo').text('H.' + ($element.data('telno') || ''));
+	$('#offTelNo').text('O.' + ($element.data('offtelno') || ''));
+	$('#message').text($element.data('message') || '');
 }
 </script>
