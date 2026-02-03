@@ -120,4 +120,6 @@ public interface CR02Mapper {
 	Map<String, Object> settledAmtCreditTotalAmt(Map<String, String> paramMap);
 
 	Map<String, String> selectBomCheck(Map<String, String> paramMap);
+
+	void updateWb21m01(Map<String, String> param);
 }

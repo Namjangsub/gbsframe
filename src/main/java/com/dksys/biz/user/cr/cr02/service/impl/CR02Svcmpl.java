@@ -636,6 +636,13 @@ public class CR02Svcmpl implements CR02Svc {
                         }
                         // 수주 상세 업데이트
                         cr02Mapper.updateOrdrsDetail(detailMap);
+						// 설비 수정시 과제테이블 update 처리하기
+						if ("ORDRSDTLDIV3010".equals(detailMap.get("ordrsDtlDiv30"))) {
+							detailMap.put("mkerDiv", "MAKERDIV10");
+						} else {
+							detailMap.put("mkerDiv", "MAKERDIV20");
+						}
+						cr02Mapper.updateWb21m01(detailMap);
 
                     } else if (jobType.equals("C")) {
                             //신규 입력이면서 '설비'코드 일때 신규 sales_cd 만들기(sales_cd 값이 빈칸, null, 길이 0 일떄)
