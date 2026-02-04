@@ -310,19 +310,33 @@
 		}
 		return rtnColor;
 	}
+
+	// 일정관리 권한에 따른 편집가능 여부 체크 함수
 	function canEditPlanRow(row) {
 		if (!row) return false;
 
+		// 전기 인원은 WBSCODE06(전기완료)만 수정 가능
+		const isElectUser = jwt.userId === 'canmtb' || jwt.userId === 'tjswlssky' || jwt.userId === 'famyg80';
+		if (isElectUser) {
+			return row.wbsPlanCodeId === 'WBSCODE06';
+		}
+
 		const sameDeptTeamManager = teamManagerYnFlag && row.deptId && jwt.deptId && row.deptId.slice(0, 5) == jwt.deptId.slice(0, 5);
 
-		const prdMngEtc = ($('#prdMngChk option').attr('data-etc') || '');
+		const prdMngEtc = ($('#prdMngChk option').attr('data-etc') || '');				// 생산관리 권한
 		const prdMngIds = prdMngEtc.replace(/\s/g, '').split(',').filter(Boolean);
-		const privilegedUser =
-			$('#smrizeId').val() == jwt.userId ||
-			prdMngIds.includes(jwt.userId) ||
+
+		// 시스템관리자, js.nam, ssj: 확정 여부 상관없이 수정 가능
+		const privilegedUserAlways =
 			jwt.authInfo.includes('AUTH999') ||
 			jwt.userId == 'js.nam' ||
 			jwt.userId == 'ssj';
+
+		// 총괄PM, 생산관리: 미확정일 때만 수정 가능
+		const privilegedUserUnconfirmed =
+			$('#smrizeId').val() == jwt.userId ||
+			prdMngIds.includes(jwt.userId);
+
 		const unconfirmed = $("#wbsPlanCloseYn").val() !== "Y";
 
 		// 빈로우에 대한 추가 설정
@@ -333,7 +347,7 @@
 		const extraAllowedByPlanCode = coCd === "GUN" && mappedDeptId && jwt.deptId && mappedDeptId === jwt.deptId.slice(0, 5) && isTeam01;
 		const extraAllowedTRN = coCd === "TRN" && mappedDeptId === "TRN50" && isTeam01;
 
-		return sameDeptTeamManager || (unconfirmed && privilegedUser) || extraAllowedByPlanCode || extraAllowedTRN;
+		return sameDeptTeamManager || privilegedUserAlways || (unconfirmed && privilegedUserUnconfirmed) || extraAllowedByPlanCode || extraAllowedTRN;
 	}
 
 	var gridView1 = {
@@ -401,9 +415,8 @@
 					},
 					onDBLClick: function () {
 						var idx = this.dindex;
-						// Validation 체크: 팀장이 아니거나 다른 부서인 경우 확정 상태에서 변경 불가
+						// Validation 체크: 수정 권한 없으면 return
 						if (!canEditPlanRow(this.item)) {
-							//alert("확정된 상태입니다.");
 							return;
 						}
 
@@ -417,25 +430,34 @@
 								"useYn": "Y"
 							};
 							openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "담당자 검색", paramObj, function (tree){
+								var row = gridView1.target.getList("selected")[0];
+								var isElectPlanAllower = row.wbsPlanCodeId === 'WBSCODE06' && (jwt.userId === 'canmtb' || jwt.userId === 'tjswlssky' || jwt.userId === 'famyg80');
 								var checkedId = tree.get_checked()[0];
 								var checkedNode = tree.get_node(checkedId);
-								if (closeYn == "Y" && teamManagerYnFlag && (checkedNode.original.parent.slice(0,5) != jwt.deptId.slice(0,5))) {
+
+								// 확정일 때만 부서 체크, 총괄PM/생산관리/시스템관리자는 부서 제한 없음
+								var prdMngIds = ($('#prdMngChk option').attr('data-etc') || '').replace(/\s/g, '').split(',').filter(Boolean);
+								var isPrivilegedUser = $('#smrizeId').val() == jwt.userId || prdMngIds.includes(jwt.userId) || jwt.authInfo.includes('AUTH999') || jwt.userId == 'js.nam' || jwt.userId == 'ssj';
+
+								if (closeYn == "Y" && !isPrivilegedUser && jwt.deptId.slice(0, 5) !== checkedNode.original.parent.slice(0, 5)) {
 									customAlert("같은 부서원만 선택 가능합니다.");
 									return false;
 								}
-
+																
 								var newMngNm = checkedNode.text;  // 변경 후 담당자명
 
 								gridView1.target.updateRow($.extend({}, gridView1.target.list[idx], {wbsPlanMngId : checkedNode.id}), idx);
 								gridView1.target.updateRow($.extend({}, gridView1.target.list[idx], {wbsPlanMngNm : newMngNm}), idx);
 
-								$("#popForm #btn1").show();                  // 저장만 표시
+								// 미확정일 때 저장버튼 표시
+								if (closeYn !== "Y") {
+									$("#popForm #btn1").show();
+								}
 
-								// 팀장이 담당자를 변경한 경우 버전업 처리 (확정/미확정 상관없이)
-								if (teamManagerYnFlag && (checkedNode.original.originDeptId.slice(0,5) == jwt.deptId.slice(0,5))) {
-									// 담당자가 실제로 변경된 경우에만 버전업
+								// 권한 있는 사용자가 담당자를 변경한 경우 저장 처리 (확정일 때)
+								if (closeYn == "Y" && canEditPlanRow(row)) {
 									if (oldMngNm !== newMngNm) {
-										updateWbsPlanVerUp(idx, 'mngId', { oldValue: oldMngNm, newValue: newMngNm });
+										updateWbsPlan(idx, 'mngId', { oldValue: oldMngNm, newValue: newMngNm });
 									} else {
 										wbsLevel1Insert();
 									}
@@ -508,11 +530,10 @@
 							this.self.setValue(this.dindex, "daycnt", 0);
 						}
 
-						// 팀장이 시작일자/종료일자를 변경한 경우 버전업 처리 (확정/미확정 상관없이)
-						if (teamManagerYnFlag && (this.item.deptId.slice(0,5) == jwt.deptId.slice(0,5))) {
+						// 확정일 때 권한 있는 사용자가 시작일자/종료일자를 변경한 경우 자동 저장 처리
+						if (this.item.closeYn == "Y" && canEditPlanRow(this.item)) {
 							if ((this.key === 'wbsPlansDt' || this.key === 'wbsPlaneDt') && oldValue !== newValue) {
-								// 일자 변경 (시작일자 또는 종료일자)
-								updateWbsPlanVerUp(this.dindex, 'date', null);
+								updateWbsPlan(this.dindex, 'date', null);
 							}
 						}
 
@@ -567,8 +588,11 @@
 					},
 					onClick: function (item, param, e) {
 // 						console.log("contextMenu onPaste");
-						//하나라도 수정되면 저장버튼 활성화
-						$("#popForm #btn1").show();  //저장버튼
+						//하나라도 수정되면 저장버튼 활성화 (미확정일 때만)
+						var row = gridView1.target.list[param.dindex];
+						if (row && row.closeYn !== "Y") {
+							$("#popForm #btn1").show();  //저장버튼
+						}
 						thisGridRow = param.dindex;
 						thisGridCol = param.colIndex;
 
@@ -580,7 +604,7 @@
 							// 1. History백업
 							// 2. 현재자료 백업
 							// 3. 일정삭제 및 Task 계획 및 실적 일괄 삭제, 첨부파일 삭제
-							updateWbsPlanVerUp(thisGridRow, 'delete', null);
+							updateWbsPlan(thisGridRow, 'delete', null);
 							if (false) {  // 미확정일 때도 버전업 처리하므로 아래 로직은 사용하지 않음
 								let fromRowNo = param.dindex;
 								if (firstRow != "")  fromRowNo = firstRow;
@@ -692,14 +716,23 @@
 								$("#popForm #wbsPlanVerUpReason").val(reason);
 								
 								var val2 = list[i].closeYn;
+								// 확정/Ver.Up 버튼 권한 체크
+								var prdMngIds = ($('#prdMngChk option').attr('data-etc') || '').replace(/\s/g,'').split(',').filter(Boolean);
+								var isElectUser = jwt.userId === 'canmtb' || jwt.userId === 'tjswlssky' || jwt.userId === 'famyg80';
+								var hasConfirmPermission = !isElectUser && ($('#smrizeId').val() == jwt.userId || prdMngIds.includes(jwt.userId) || jwt.authInfo.includes('AUTH999') || jwt.userId == 'js.nam' || jwt.userId == 'ssj');
+
 								if (val2 == "Y") {
-									// $("#popForm #btn4").show();  //Ver.Up버튼
+									if (hasConfirmPermission) {
+										$("#popForm #btn4").show();  //Ver.Up버튼
+									}
 									$("#popForm #btn3").hide();  //확정버튼
 									$("#popForm #btn1").hide();  //저장버튼
 								} else {
 									$("#popForm #btn4").hide();
-									$("#popForm #btn3").show();
-									$("#popForm #btn1").hide();
+									if (hasConfirmPermission) {
+										$("#popForm #btn3").show();  //확정버튼
+									}
+									// $("#popForm #btn1").hide();
 									$("#popForm #addrow2").hide();	// 일정미확정일경우 Task 버튼영역 숨김
 								}
 								$("#popForm #wbsPlanCloseYn").val(val2);
@@ -750,18 +783,17 @@
 					// console.log("함수 실행 완료.");
 				}
 			});
-			// Validation 체크 총괄PM이 아니면 자기담당인TASK만 조회가능
+			// Validation 체크 - 확정버튼 권한
 			var smrizeId = $('#smrizeId').val();
-
-			// 1. 총괄 PM인 경우만 수정 +  생산관리권한 있는사람만
-			if(smrizeId == jwt.userId || $('#prdMngChk option').attr('data-etc').replace(/\s/g,'').split(',').includes(jwt.userId) || jwt.userId == 'js.nam' || jwt.userId == 'ssj'){
+			var prdMngIds = ($('#prdMngChk option').attr('data-etc') || '').replace(/\s/g,'').split(',').filter(Boolean);
+			var isElectUser = jwt.userId === 'canmtb' || jwt.userId === 'tjswlssky' || jwt.userId === 'famyg80';
+			var hasConfirmPermission = !isElectUser && (smrizeId == jwt.userId || prdMngIds.includes(jwt.userId) || jwt.authInfo.includes('AUTH999') || jwt.userId == 'js.nam' || jwt.userId == 'ssj');
+			if(hasConfirmPermission){
 				$("#popForm #btn15").show();
-				$("#popForm #btn1").show();
 				$("#popForm #btn3").show();
 				$("#popForm #btn4").show();
 			}else{
 				$("#popForm #btn15").hide();
-				$("#popForm #btn1").hide();
 				$("#popForm #btn3").hide();
 				$("#popForm #btn4").hide();
 			}
@@ -1079,7 +1111,7 @@
 		// $("#popForm #addrow2").hide();
 		$("#popForm #btn2").hide(); // 위 코드가 작동을 안해서 넣어둠
 		//저장, 확정, Ver.Up 버튼 숨김 처리
-// 		$("#popForm #btn1").hide();
+		$("#popForm #btn1").hide();
 // 		$("#popForm #btn3").hide();
 // 		$("#popForm #btn4").hide();
 
@@ -1270,7 +1302,7 @@
 		//Validation 체크
 		var row = gridView1.target.getList()[0];
 		if (row != undefined) {
-			if (row.closeYn == "Y" && !teamManagerYnFlag) {
+			if (row.closeYn == "Y" && !canEditPlanRow(row)) {
 				alert("확정된 상태입니다.");
 				return;
 			}
@@ -1358,6 +1390,7 @@
 				// alert(data.resultMessage);
 			}
 			if (data.resultCode == 200) {
+				$("#popForm #btn1").hide();  // 저장 완료 후 저장버튼 숨김
 				gridView1.setData(0);
 				gridView2.setData(0);
 				if(fromConfirm){
@@ -2691,10 +2724,13 @@
 	
 	
 	function onPlanExceptChange(value){
-		
-		
-		
-		$("#popForm #btn1").show();
+
+
+
+		// 미확정일 때만 저장버튼 표시
+		if ($("#wbsPlanCloseYn").val() !== "Y") {
+			$("#popForm #btn1").show();
+		}
 		//alert($("#popForm #fileTrgtKey").val());
 		sjVerUpMakeFromData();
 		var rowList = gridView1.target.getList();
@@ -3013,7 +3049,7 @@
 	
 	// changeType: 'delete' | 'mngId' | 'date'
 	// changeInfo: { oldValue, newValue } (담당자 변경 시: oldValue=이전담당자명, newValue=신규담당자명)
-	function updateWbsPlanVerUp(dindex, changeType, changeInfo) {
+	function updateWbsPlan(dindex, changeType, changeInfo) {
 		var row = gridView1.target.list[dindex];
 		var verUpReasonValue = "";
 
