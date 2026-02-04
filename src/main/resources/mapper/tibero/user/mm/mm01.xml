@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.mm.mm01.mapper.MM01Mapper">
+
+	<select id="selectMindMapList" parameterType="Map" resultType="CamelMap">
+		WITH root AS (
+			SELECT C.CO_CD
+				 , C.ORDRS_NO
+				 , C.ORDRS_CLNT_CD
+				 , B.CLNT_NM		AS ORDRS_CLNT_NM
+				 , C.CLNT_PJT
+				 , M.CODE_NM		AS CLNT_PJT_NM
+				 , C.CTRT_NM
+				 , 'ROOT'			AS ISROOT
+			FROM TB_CR02M01 C
+			LEFT JOIN TB_CM05M01 M ON M.CODE_ID = C.CLNT_PJT
+			LEFT JOIN TB_BM02M01 B ON B.CLNT_CD = C.ORDRS_CLNT_CD
+			WHERE 1=1
+			<if test="ordrsNo != null and ordrsNo != ''">
+				AND C.ORDRS_NO LIKE '%' || #{ordrsNo} || '%'
+			</if>
+		)
+		, salesCd AS (
+				SELECT C.CO_CD
+				     , C.ORDRS_NO
+					 , C.ORDRS_CLNT_CD
+					 , C.ORDRS_CLNT_NM
+					 , C.CLNT_PJT
+					 , C.CLNT_PJT_NM
+					 , C.CTRT_NM
+					 , ''			AS ISROOT
+				     , D.SALES_CD
+				     , D.EQP_NM
+				     , D.MCTYPE
+				     , M.CODE_NM 	AS MCTYPE_NM
+				     , D.ORDRS_SEQ
+				FROM root C
+				JOIN TB_CR02D02 D ON D.CO_CD = C.CO_CD AND D.ORDRS_NO = C.ORDRS_NO
+				LEFT JOIN TB_CM05M01 M ON M.CODE_ID = D.MCTYPE
+				WHERE D.SALES_CD IS NOT NULL
+				<if test="salesCd != null and salesCd != ''">
+					AND D.SALES_CD LIKE '%' || #{salesCd} || '%'
+				</if> 
+			)
+			, iss AS (
+				SELECT S.CO_CD
+				     , S.ORDRS_NO
+					 , S.ORDRS_CLNT_CD
+					 , S.ORDRS_CLNT_NM
+					 , S.CLNT_PJT
+					 , S.CLNT_PJT_NM
+					 , S.CTRT_NM
+					 , S.ISROOT
+				     , S.SALES_CD
+				     , S.EQP_NM
+				     , S.MCTYPE
+				     , S.MCTYPE_NM
+				     , W.ISS_SJ
+				     , W.ISS_NO
+                     , CASE
+                           WHEN ((W.ISS_STS = 'ISSSTS03') OR (Q.REQ_ST = 'REQST03')) THEN 'ISSSTS03'
+                           WHEN ((W.ISS_STS = 'ISSSTS02') OR (W.REQ_NO IS NOT NULL)) THEN 'ISSSTS02'
+                           ELSE 'ISSSTS01'
+                       END AS ISS_STS
+				     , M5.CODE_NM 		AS ISS_STS_NM
+				     , W.ACT_ID
+				     , M.NAME			AS ACT_NM
+				     , W.REQ_NO
+				     , W.FILE_TRGT_KEY
+				FROM salesCd S
+				JOIN TB_WB24M02 W ON W.CO_CD = S.CO_CD AND W.SALES_CD = S.SALES_CD
+				LEFT JOIN TB_CM06M01 M ON M.ID = W.ACT_ID
+				LEFT JOIN TB_CM05M01 M5 ON M5.CODE_ID = W.ISS_STS
+				LEFT JOIN TB_QM01M01 Q ON Q.REQ_NO = W.REQ_NO
+			)
+			, req AS (
+				SELECT S.CO_CD
+				     , S.ORDRS_NO
+					 , S.ORDRS_CLNT_CD
+					 , S.ORDRS_CLNT_NM
+					 , S.CLNT_PJT
+					 , S.CLNT_PJT_NM
+					 , S.CTRT_NM
+					 , S.ISROOT
+				     , S.SALES_CD
+				     , S.EQP_NM
+				     , S.MCTYPE
+				     , S.MCTYPE_NM
+				     , S.ISS_SJ
+				     , S.ISS_NO
+				     , S.ISS_STS
+				     , S.ISS_STS_NM
+				     , S.ACT_ID
+				     , S.ACT_NM
+				     , S.REQ_NO
+				     , S.FILE_TRGT_KEY
+					 , Q.REG_ID
+					 , Q.REQ_ST
+					 , M.CODE_NM		AS REQ_ST_NM
+				FROM iss S
+				JOIN TB_QM01M01 Q ON Q.REQ_NO = S.REQ_NO
+				LEFT JOIN TB_CM05M01 M ON M.CODE_ID = Q.REQ_ST
+			)
+			-- 1. 최상위 '수주' 노드 (고정)
+			SELECT 
+				   'ROOT_MASTER'		AS ID
+				 , '' 					AS PARENTID
+				 , 'ROOT' 				AS ISROOT
+				 , '수주' 				AS TOPIC
+				 , '' 					AS ORDRS_NO
+				 , '' 					AS ORDRS_CLNT_NM
+				 , '' 					AS CLNT_PJT_NM
+				 , '' 					AS SALES_CD
+				 , '' 					AS MCTYPE_NM
+			     , '' 					AS ISS_STS
+			     , '' 					AS ISS_STS_NM
+			     , '' 					AS ACT_ID
+			     , '' 					AS ACT_NM
+			     , '' 					AS REG_ID
+			     , '' 					AS REQ_ST
+			     , '' 					AS REQ_ST_NM
+			     , '1' 					AS DATA_TYPE
+			FROM DUAL
+			UNION ALL
+			-- 2. 프로젝트 노드 ('수주'의 자식)
+			SELECT 
+				   ORDRS_NO				AS ID
+				 , 'ROOT_MASTER'		AS PARENTID
+				 , '' 					AS ISROOT
+				 , ORDRS_CLNT_NM || '_' || CLNT_PJT_NM	AS TOPIC
+				 , ORDRS_NO
+				 , ORDRS_CLNT_NM
+				 , CLNT_PJT_NM
+				 , '' SALES_CD
+				 , '' MCTYPE_NM
+			     , '' ISS_STS
+			     , '' ISS_STS_NM
+			     , '' ACT_ID
+			     , '' ACT_NM
+			     , '' REG_ID
+			     , '' REQ_ST
+			     , '' REQ_ST_NM
+			     , '2' 					AS DATA_TYPE
+			FROM root
+			UNION ALL 
+				SELECT 
+					   SALES_CD				AS ID
+					 , ORDRS_NO				AS PARENTID
+					 , ISROOT
+					 , EQP_NM	            AS TOPIC
+					 , ORDRS_NO
+					 , ORDRS_CLNT_NM
+					 , CLNT_PJT_NM
+					 , SALES_CD
+					 , MCTYPE_NM
+				     , '' ISS_STS
+				     , '' ISS_STS_NM
+				     , '' ACT_ID
+				     , '' ACT_NM
+				     , '' REG_ID
+				     , '' REQ_ST
+				     , '' REQ_ST_NM
+			     	 , '3' 					AS DATA_TYPE
+				FROM salesCd
+			UNION ALL 
+				SELECT 
+					   ISS_NO				AS ID
+					 , SALES_CD				AS PARENTID
+					 , ISROOT
+					 , ISS_SJ	            AS TOPIC
+					 , ORDRS_NO
+					 , ORDRS_CLNT_NM
+					 , CLNT_PJT_NM
+					 , SALES_CD
+					 , MCTYPE_NM
+				     , ISS_STS
+				     , ISS_STS_NM
+				     , ACT_ID
+				     , ACT_NM
+				     , '' REG_ID
+				     , '' REQ_ST
+				     , '' REQ_ST_NM
+			     	 , '4' 					AS DATA_TYPE
+				FROM iss
+			UNION ALL 
+				SELECT 
+					   REQ_NO				AS ID
+					 , ISS_NO				AS PARENTID
+					 , ISROOT
+					 , REQ_NO	            AS TOPIC
+					 , ORDRS_NO
+					 , ORDRS_CLNT_NM
+					 , CLNT_PJT_NM
+					 , SALES_CD
+					 , MCTYPE_NM
+				     , ISS_STS
+				     , ISS_STS_NM
+				     , ACT_ID
+				     , ACT_NM
+				     , REG_ID
+				     , REQ_ST
+				     , REQ_ST_NM
+			     	 , '5' 					AS DATA_TYPE
+				FROM req
+	</select>
+
+</mapper>

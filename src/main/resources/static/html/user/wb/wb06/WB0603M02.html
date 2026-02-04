@@ -74,15 +74,31 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   
   <link rel="stylesheet" href="./WB0603M02.css">
-
-
+    <style type="text/css">
+      /* Selected Row Highlight */
+      .wbs-row.selected {
+        position: relative; /* Context for pseudo-element */
+        z-index: 50 !important; /* Lower than menu (100) */
+      }
+      /* Draw border/tint ON TOP of children using pseudo-element */
+      .wbs-row.selected::after {
+        content: "";
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        border: 3px solid #1e3a8a; /* Strong Blue Border */
+        background-color: rgba(30, 58, 138, 0.1); /* Tint */
+        z-index: 99; /* Highest possible below menu (100) to cover sticky panes */
+        pointer-events: none; /* Allow clicks to pass through */
+        box-sizing: border-box;
+      }
+    </style>
 </head>
 
 <body>
   <div id="head_area"></div>
   <div id="top_area"></div>
   <div id="main_area">
-
+    
     <input type="hidden" id="pgmId"  name="pgmId" value="WB0603M02">
 	<select id="prdMngChk" data-kind="SPECRTS" hidden></select>
     <!-- 페이지 상단 -->
@@ -179,14 +195,19 @@ onkeyup="(event.keysalesCd == 8 || event.keysalesCd == 46) ? ordrsClntCd_S.value
       </div>
     </div>
     <!-- 검색조건 END -->
-
+    
     <div class="topbar">
       <div class="legend">
         <div id="legend"></div>
 
         <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+          <!-- Mind Map Button -->
+          <button class="btn ghost" onclick="mindMapInquiryModal()" style="padding: 2px 8px;font-size: 11px;font-weight:bold;color:#1e3a8a;border:1px solid #1e3a8a;width: 160px;height: 24px;">
+             <i class="fa fa-sitemap"></i> Mind Map
+          </button>
+
           <label style="display:flex;align-items:center;gap:6px;color:var(--muted);font-weight:800;font-size:12px;white-space:nowrap;">
-            <span style="white-space:nowrap;">auto-Zoom</span>
+<!--             <span style="white-space:nowrap;">auto-Zoom</span> -->
             <input id="autoZoomChk" type="checkbox" checked />
           </label>
           <label style="font-size:11px;color:#64748b;white-space:nowrap;">줌(px/day):</label>
@@ -199,9 +220,9 @@ onkeyup="(event.keysalesCd == 8 || event.keysalesCd == 46) ? ordrsClntCd_S.value
           <span style="color:var(--muted);font-weight:800;font-size:12px;">
             * 드래그/리사이즈로 일정 변경 가능 (SAVE CHANGES로 변경분 확인)
           </span>
-          <button class="btn ghost" id="btnSave">SAVE CHANGES</button>
-          <button class="btn primary" id="btnExport">EXPORT EXCEL</button>
-          <button class="btn ghost" id="btnPrint">PRINT</button>
+          <button class="btn ghost" id="btnSave"><i class="fa fa-folder"></i>SAVE CHANGES</button>
+          <button class="btn primary" id="btnExport"><i class="fa fa-file-excel"></i>EXPORT EXCEL</button>
+          <button class="btn ghost" id="btnPrint"><i class="fa fa-print"></i>PRINT</button>
         </div>
       </div>
     </div>
@@ -305,7 +326,6 @@ onkeyup="(event.keysalesCd == 8 || event.keysalesCd == 46) ? ordrsClntCd_S.value
       // 진행률 표시
       const progress = rowObj.actProg || 0;
       const progressText = rowObj.actSt ? `${progress}%` : "시작전";
-console.log(rowObj);
       // 툴팁 내용 구성
       const title = rowObj.fullNm || rowObj.deptNm || 'N/A';
       const content = `
@@ -1405,7 +1425,7 @@ console.log(rowObj);
         const puCount = Number(r.problemUncomplete || 0);
         const badBgCls = (puCount > 0) ? 'is-bad-bg' : '';
         const $row = $(`
-          <div class="wbs-row data-row ${badBgCls}" data-rowid="${escapeHtml(r.salesCd)}" data-salescd="${escapeHtml(r.salesCd || '')}">
+          <div class="wbs-row data-row ${badBgCls}" data-rowid="${escapeHtml(r.salesCd)}" data-salescd="${escapeHtml(r.salesCd || '')}" data-ordrsno="${escapeHtml(r.ordrsNo || '')}" data-planverno="${escapeHtml(r.planVerNo || '')}">
             <div class="pane-left">
               <div class="cell c-clntPjtNm ${showclntPjtNm ? '' : 'merged-hidden'}"><span class="clntPjtNm-text">${showclntPjtNm ? formatMachineLabel(r.clntNm, r.clntPjtNm) : ''}</span></div>
               <div class="cell c-eqpNm">${escapeHtml(r.eqpNm || '')}</div>
@@ -3080,6 +3100,102 @@ console.log(rowObj);
   })();
   
 
+  /* [Mind Map Integration] */
+  $(document).ready(function() {
+      // Row Click Selection
+      $("#wbs").on("click", ".wbs-row", function() {
+          $(".wbs-row").removeClass("selected");
+          $(this).addClass("selected");
+      });
+
+      // [Row Double Click] Open WBS Plan Modal
+      $("#wbs").on("dblclick", ".wbs-row", function(e) {
+          // Ignore if clicking on a Gantt Bar
+          if ($(e.target).closest('.bar').length > 0) return;
+          
+          // Ensure row is selected
+          $(".wbs-row").removeClass("selected");
+          $(this).addClass("selected");
+
+          wbsPlanInsertModal();
+      });
+  });
+  
+  // WBS Plan Insert Modal
+  window.wbsPlanInsertModal = function() {
+      // Find selected row
+      var $selected = $(".wbs-row.selected");
+      if ($selected.length === 0) {
+          // Fallback: try to find the row that was double clicked if logic failed
+          // But binding above handles selection.
+          alert("SALES CODE을 선택하세요");
+          return;
+      }
+      
+      var salesCd = $selected.data("salescd"); // Ensure case matches HTML attribute
+      var coCd = $("#coCd_S").val(); // or data-cocd if available?
+      var ordrsNo = $selected.data("ordrsno");
+      
+      // In WB0603M02, we don't strictly have planVerNo/histYn in the row data usually.
+      // We pass what we have. WB2201P01 likely fetches details by salesCd.
+      
+      if (salesCd) {
+          var paramObj = {
+              "coCd": coCd,
+              "salesCd": salesCd,
+              "ordrsNo": ordrsNo,
+              "planVerNo": $selected.data("planverno"), 
+              "histYn": 'N',  //최종 일정에 대한 수정반영하기
+          };
+          openModal("/static/html/user/wb/wb22/WB2201P01.html", 1400, 900, "WBS 계획등록", paramObj, function () {
+              searchData(); // Refresh WBS
+          });
+      } else {
+          alert("SALES CODE을 선택하세요");
+      }
+  };
+
+  // Global function for onclick button
+  window.mindMapInquiryModal = function() {
+      var $selected = $(".wbs-row.selected");
+      if ($selected.length === 0) {
+          alert("조회할 행을 선택해주세요.");
+          return;
+      }
+      var salesCd = $selected.data("salescd");
+      var ordrsNo = $selected.data("ordrsno");
+      var coCd = $("#coCd_S").val();
+      
+      // Fallback if ordrsNo is not in data attribute but might be in salesCd
+      if (!ordrsNo && salesCd) {
+          ordrsNo = salesCd.split('-')[0];
+      }
+      
+      if (!salesCd) {
+          alert("선택한 행에 Sales Code 정보가 없습니다.");
+          return;
+      }
+
+      // Open in New Tab
+      const targetUrl = "/static/html/user/mm/mm01/MM0103M01.html";
+      const tabIdentifier = "MM0103M01_TAB"; 
+      
+      const params = $.param({
+        "salesCd" : salesCd,
+        "ordrsNo" : ordrsNo,
+        "coCd"    : coCd,
+        "pgmId"   : "MM0103M01"
+      });
+      
+      const finalUrl = `${targetUrl}?${params}`;
+      const popup = window.open(finalUrl, tabIdentifier);
+
+      if (popup) {
+        popup.focus();
+      } else {
+        alert('팝업 차단이 설정되어 있습니다. 브라우저 설정에서 팝업 차단을 해제해 주세요.');
+      }
+  };
   </script>
 </body>
 </html>
