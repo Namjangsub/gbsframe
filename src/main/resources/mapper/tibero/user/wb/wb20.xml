@@ -1220,4 +1220,85 @@
 						, #{remark, jdbcType=VARCHAR}
 					)
 	</update>
+
+	<select id="selectPfuShareList" parameterType="Map"  resultType="camelMap">
+		SELECT
+			TRIM(REGEXP_SUBSTR(T.CODE_ETC, '[^,]+', 1, N.LVL)) AS USER_ID
+		FROM TB_CM05M01 T
+						JOIN (
+							SELECT LEVEL AS LVL
+							FROM DUAL
+							CONNECT BY LEVEL <![CDATA[ <= ]]> 100
+						) N ON N.LVL <![CDATA[ <= ]]> REGEXP_COUNT(T.CODE_ETC, ',') + 1
+		WHERE T.CODE_KIND = 'SPECTODO'  -- PFU공유자 코드
+		ORDER BY N.LVL;
+	</select>
+
+	<select id="selectNextTodoKey" parameterType="Map"  resultType="int">
+		SELECT NVL(MAX(TODO_KEY), 0) + 1 FROM TB_WB20M03
+	</select>
+
+	<insert id="insertPfuSharngList" parameterType="Map">
+		INSERT INTO TB_WB20M03
+		(
+			  TODO_KEY
+			, SANCTN_SN
+			, CO_CD
+			, TODO_DIV1_CODE_ID
+			, TODO_DIV2_CODE_ID
+			, TODO_ID
+			, SALES_CD
+			, PG_PATH
+			, TODO_FILE_TRGT_KEY
+			, TODO_CO_CD
+			, TODO_NO
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+			, PG_PARAM
+			, TODO_TITL
+			, ETC_FIELD2
+			, ETC_FIELD3
+			, TODO_CODE_ID
+		)
+		SELECT
+			#{toDoKey}
+			, #{sanCtnSn}
+			, #{coCd}
+			, #{todoDiv1CodeId}
+			, #{todoDiv2CodeId}
+			, #{usrNm}
+			, #{salesCd, jdbcType=VARCHAR}
+			, #{pgPath}
+			, #{fileTrgtKey}
+			, #{todoCoCd}
+			, #{reqNo}
+			, #{userId}
+			, #{pgmId}
+			, ( SELECT nvl(max(CREAT_DTTM), SYSDATE)
+				FROM TB_WB20M03 T
+				WHERE T.TODO_FILE_TRGT_KEY = #{fileTrgtKey}
+				AND T.TODO_NO            = #{reqNo}
+				AND T.CREAT_PGM          = #{pgmId, jdbcType=VARCHAR}
+				<if test="histNo != null and !histNo.equals('')" >
+				AND T.ETC_FIELD2       = #{histNo, jdbcType=VARCHAR}
+				</if>
+			   )
+			, #{pgParam}
+			, (SELECT #{todoTitle, jdbcType=VARCHAR}||' '||FN_CR02_KAKAO_TITLE_NM(#{reqNo}, #{histNo, jdbcType=VARCHAR}) FROM DUAL)
+			, #{histNo, jdbcType=VARCHAR}
+			, 'N'
+			, 'insertWbsSharngList'
+		FROM DUAL
+		WHERE NOT EXISTS (
+			SELECT 1
+			FROM TB_WB20M03 X
+			WHERE X.TODO_FILE_TRGT_KEY = #{fileTrgtKey}
+			AND X.TODO_ID            = #{usrNm}
+			AND X.TODO_NO            = #{reqNo}
+			<if test="histNo != null and !histNo.equals('')" >
+				AND X.ETC_FIELD2       = #{histNo, jdbcType=VARCHAR}
+			</if>
+		)
+	</insert>
  </mapper>

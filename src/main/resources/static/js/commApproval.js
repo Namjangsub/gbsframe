@@ -307,7 +307,17 @@ function Approval(htmlParam, param, popParam) {
 					let todoYn = data.result.todoYn;
 					if( todoYn == "Y" || todoCfOpn != '') {		//모든 결재요청이 완료되면 카톡 전송
 						paramMap.bigo = "";		//보완요청일경우만 자료가 있음.
-						
+						// 여기서 PFU 결재 완료시 공유로 고정 공유자 db에 insert
+						// 추가로 알림도 발송해야함
+						if (paramMap.todoDiv2CodeId == "TODODIV2120") {
+							postAjaxSync("/user/wb/wb20/insertPfuShareUser", paramMap, null, function(data){
+								if(data.resultCode == 200){
+									sendTodoPfuShare(paramMap);
+								} else {
+									customAlert("PFU공유자 등록중 오류가 발생 되었습니다. 전산실에 문의해주세요.");
+								}
+							});
+						}
 						sendTodoFinal(paramMap);
 					}
 

@@ -429,4 +429,53 @@ public class WB20SvcImpl implements WB20Svc {
         }
         return result;
     }
+
+	@Override
+	public int insertPfuShareUser(Map<String, String> paramMap) throws Exception {
+		int result = 0;
+		String pgParam =
+			createPgParam(
+					"T", 
+					paramMap.get("todoFileTrgtKey"), 
+					paramMap.get("coCd"), 
+					paramMap.get("salesCd").substring(0, 5),
+					paramMap.get("salesCd")
+			);
+		String todoTitle = paramMap.get("todoTitl").replace("결재", "공유").replace("[신규]", "").trim();;
+
+		List<Map<String, String>> selectPfuShareList = wb20Mapper.selectPfuShareList(paramMap);
+		int i = 0;
+		for (Map<String, String> shareUser : selectPfuShareList) {
+			// shareUser.putAll(paramMap);
+			int todoKey = wb20Mapper.selectNextTodoKey(paramMap);
+			Map<String, String> param = new HashMap<>();
+			param.put("toDoKey", Integer.toString(todoKey));
+			param.put("reqNo", paramMap.get("todoFileTrgtKey"));
+			param.put("salesCd", paramMap.get("salesCd"));
+			param.put("fileTrgtKey", paramMap.get("todoFileTrgtKey"));
+			param.put("pgmId", "CR5001P01");
+			param.put("userId", paramMap.get("userId"));
+			param.put("usrNm", shareUser.get("userId"));
+			param.put("histNo", paramMap.get("histNo"));
+			param.put("coCd", paramMap.get("coCd"));
+			param.put("todoCoCd", paramMap.get("coCd"));
+			param.put("sanCtnSn", Integer.toString(++i));
+			param.put("todoDiv1CodeId", "TODODIV10");
+			param.put("todoDiv2CodeId", "TODODIV1120");
+			param.put("pgPath", "/user/cr/cr50/CR5001P01.html");
+			param.put("pgParam", pgParam);
+			param.put("todoTitle", todoTitle);
+
+			wb20Mapper.insertPfuSharngList(param);
+			result++;
+		}
+
+		return result;
+	}
+
+	private String createPgParam(String actionType, String fileTrgtKey, String coCd, String ordrsNo, String salesCd) {
+        return String.format("{\"actionType\":\"%s\",\"fileTrgtKey\":\"%s\",\"coCd\":\"%s\",\"ordrsNo\":\"%s\",\"salesCd\":\"%s\"}", 
+                             actionType, fileTrgtKey, coCd, ordrsNo, salesCd);
+    }
+
 }

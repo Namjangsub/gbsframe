@@ -268,4 +268,22 @@ public class WB20Ctr {
         }
         return "jsonView";
     }
+
+	// PFU 공유자 등록
+    @PostMapping(value = "/insertPfuShareUser")
+    public String insertPfuShareUser(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
+        try {
+            if(wb20Svc.insertPfuShareUser(paramMap) !=0 ) {
+                model.addAttribute("resultCode", 200);
+                model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+            } else {
+                model.addAttribute("resultCode", 500);
+                model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+            }
+        } catch(Exception e) {
+            model.addAttribute("resultCode", 900);
+            model.addAttribute("resultMessage", e.getMessage());
+        }
+        return "jsonView";
+    }
 }

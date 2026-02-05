@@ -79,4 +79,10 @@ public interface WB20Mapper {
 
 	int mergeKakaoReceive(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectPfuShareList(Map<String, String> paramMap);
+
+	int selectNextTodoKey(Map<String, String> paramMap);
+
+	int insertPfuSharngList(Map<String, String> paramMap);
+
 }

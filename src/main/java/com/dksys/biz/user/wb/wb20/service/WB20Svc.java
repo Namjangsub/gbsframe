@@ -60,4 +60,6 @@ public interface WB20Svc {
 
     int saveKakaoReceiveList(Map<String, Object> paramMap);
 
+	int insertPfuShareUser(Map<String, String> paramMap) throws Exception;
+
 }
