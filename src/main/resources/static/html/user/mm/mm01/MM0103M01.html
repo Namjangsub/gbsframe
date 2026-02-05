@@ -32,6 +32,7 @@
 	<script src="/static/js/ax5/ax5mask.min.js"></script>
 	<script src="/static/js/ax5/ax5modal.min.js"></script>
 	<script src="/static/js/tui-grid/4.21.22/tui-grid.min.js"></script>
+	<script src="/static/js/jstree/jstree.min.js"></script>
 	<script src="/static/js/global.js"></script>
 	<script src="/static/js/exceljs.min.js"></script>
 	<script src="/static/js/fileTree.js"></script>
@@ -47,6 +48,43 @@
     <script src="./jsmind.draggable-node.js"></script>
     <style type="text/css">
         #jsmind_container { width: 1900px; height: 890px; border: solid 1px #ccc; background: #f4f4f4; }
+        
+        /* Tooltip Style */
+        #node-tooltip {
+            position: absolute;
+            display: none;
+            background-color: rgba(50, 50, 50, 0.9);
+            color: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 9999;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            pointer-events: none; /* Prevent flickering */
+            max-width: 300px;
+            line-height: 1.4;
+        }
+        #node-tooltip table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #node-tooltip th {
+            text-align: left;
+            padding-right: 10px;
+            color: #aaa;
+            font-weight: normal;
+        }
+        #node-tooltip td {
+            text-align: left;
+            word-break: break-all;
+        }
+        #node-tooltip .tooltip-header {
+            font-weight: bold;
+            margin-bottom: 5px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #777;
+            font-size: 13px;
+        }
     </style>
     
 </head>
@@ -61,13 +99,19 @@
 	<!-- 검색 콘텐츠 -->
 	<div class="contents search">
 		<!--  테이블 인풋 4분할  -->
-		<table class="table_input type04">
+		<table class="table_input type05">
 	        <!-- Search Bar -->
 			<tr>
+				<th>회사</th>
+				<td>
+						<select id="coCd_S" name="coCd_S" data-kind="CO" data-search="coCd" required>
+							<option value="">전체</option>
+						</select>
+				</td>
 				<th>SalesCode</th>
 				<td>
 					<div class="search_form" style="display: flex; align-items: center;">
-						<input type="text" id="salesCd" name="salesCd" data-search="salesCd">
+						<input type="text" id="salesCd_S" name="salesCd_S" data-search="salesCd">
 						<a onclick="wbsSalesCodeSearch();"><i class="i_search_w"></i></a>
 					</div>
                 </td>
@@ -85,6 +129,8 @@
 		</table>
     </div>
     <div id="jsmind_container" style="height: calc(100% - 40px);"></div>
+    <!-- Tooltip Container -->
+    <div id="node-tooltip"></div>
  </div>
     <script type="text/javascript">
     const blueGradient = ['#0d47a1', '#1565c0', '#1976d2', '#1e88e5', '#2196f3', '#42a5f5', '#64b5f6', '#90caf9', '#bbdefb', '#e3f2fd'];
@@ -94,17 +140,33 @@
     var jm = null;
     function load_jsmind() {
         var param = {
-            salesCd: $('#salesCd').val(),
-            ordrsNo: $('#salesCd').val().slice(0, 5).trim(),
+            salesCd: $('#salesCd_S').val(),
+            ordrsNo: $('#salesCd_S').val().slice(0, 5).trim(),
         };
 
+        var mindMapData = [];
+        var agendaData = [];
+
+        // 1. Existing MindMap, Agenda List
         postAjax('/user/mm/mm01/selectMindMapList', param, null, function(data) {
-            if (data.resultList) {
-                renderMind(data.resultList);
+            // 1. Existing MindMap List
+            if (data.mindMapData) {
+                mindMapData = data.mindMapData;
+            }
+            // 2. New Agenda List
+            if (data.agendaData) {
+                agendaData = data.agendaData;
+            }
+            
+            var combinedData = mindMapData.concat(agendaData);
+            if (combinedData.length > 0) {
+                renderMind(combinedData);
             } else {
-                alert("데이터 조회 실패");
+                alert("데이터 조회 실패 또는 데이터가 없습니다.");
             }
         });
+
+
     }
     
 
@@ -120,18 +182,37 @@
  		
  		
 
-		// URL 파라미터 추출
-		const urlParams = new URLSearchParams(window.location.search);
-		const salesCd = urlParams.get('salesCd') || "";
-		const coCd = urlParams.get('coCd') || "";
-		
-		if (salesCd) $('#salesCd').val(salesCd);
-		if (coCd) $('#coCd').val(coCd);
+ 		// Load Parameters (Prioritize LocalStorage, Fallback to URL)
+        var storedParams = localStorage.getItem("MM0103M01_PARAMS");
+        var hasStoredParams = false;
+        
+        if (storedParams) {
+            try {
+                var params = JSON.parse(storedParams);
+                if (params.salesCd) {
+                    $('#salesCd_S').val(params.salesCd);
+                    hasStoredParams = true;
+                }
+                if (params.coCd) $('#coCd_S').val(params.coCd);
+                if (params.pgmId) $('#pgmId').val(params.pgmId);
+            } catch(e) {
+                console.error("Param Parse Error", e);
+            }
+        }
+        
+        if (!hasStoredParams) {
+            // Fallback to URL Params
+    		const urlParams = new URLSearchParams(window.location.search);
+    		const salesCd = urlParams.get('salesCd') || "";
+    		const coCd = urlParams.get('coCd') || "";
+    		if (salesCd) $('#salesCd_S').val(salesCd);
+    		if (coCd) $('#coCd_S').val(coCd);
+        }
 
          load_jsmind();
          
          // Auto search on Enter or Blur
-         $('#salesCd').on('keypress', function(e) {
+         $('#salesCd_S').on('keypress', function(e) {
              if (e.which == 13) {
                  load_jsmind();
                  $(this).blur(); // Remove focus
@@ -147,7 +228,198 @@
          window.addEventListener('popstate', function(event) {
              location.href = "/static/index.html";
          });
+
+         // [Tooltip Implementation]
+         // Event delegation for dynamically created jmnode elements
+         $(document).on('mouseenter', 'jmnode', function(e) {
+             var nodeid = $(this).attr('nodeid');
+             if (!jm) return;
+             
+             var node = jm.get_node(nodeid);
+             if (node && node.data) {
+                 showTooltip(e, node);
+             }
+         }).on('mouseleave', 'jmnode', function() {
+             $('#node-tooltip').hide();
+         }).on('mousemove', 'jmnode', function(e) {
+             moveTooltip(e);
+         }).on('dblclick', 'jmnode', function(e) {
+             var nodeid = $(this).attr('nodeid');
+             if (!jm) return;
+             var node = jm.get_node(nodeid);
+             
+             // Handle potential nested data (resolve node.data or node.data.data)
+             var data = node.data;
+             if (data && data.data) data = data.data;
+             
+             // Ensure dataType matches robustly
+             var dataType = (data && data.dataType) ? String(data.dataType) : "";
+             
+             if (dataType == '6') {
+                 // [Type 6] Agenda (안건)
+                 const targetUrl = "/static/html/user/pm/pm20/PM2001M01.html";
+                 const tabIdentifier = "PM2001M01_TAB";
+                 
+                 localStorage.setItem("PM2001M01_PARAMS", JSON.stringify({
+                     salesCd: data.salesCd || "",
+                     ordrsNo: data.ordrsNo || "",
+                     coCd: $('#coCd_S').val() || "GUN"
+                 }));
+                 
+                 const popup = window.open(targetUrl, tabIdentifier);
+                 if (popup) popup.focus();
+                 
+             } else if (dataType == '3') {
+                if (data && data.salesCd) {
+                    var paramObj = {
+                        "coCd": data.coCd,
+                        "salesCd": data.salesCd,
+                        "planVerNo": "",
+                        "histYn": 'N',
+                    };
+                    openModal("/static/html/user/wb/wb22/WB2201P01.html", 1400, 900, "WBS 계획등록", paramObj, function () {
+                        load_jsmind();
+                    });
+                }
+             } else if (dataType == '4') {
+                 // [Type 4] Issue Correction (실적문제수정)
+                 var paramObj = {
+                    "actionType"     : "U4",
+                    "coCd"           : data.coCd,
+                    "salesCd"        : data.salesCd,
+                    "issFileTrgtKey" : data.fileTrgtKey
+                 };
+                 openModal("/static/html/user/wb/wb24/WB2401P11.html", 1200, 870, "WBS 실적문제수정", paramObj, function (){
+                     load_jsmind(); // Refresh on close
+                 });
+                 
+             } else if (dataType == '5') {
+                if (data.id) {
+                    // 발주요청번호가 존재하면 발주요청서 수정 업무 시작
+                    var paramObj = {
+                        "actionType" : "U",
+                        "reqNo"    : data.id,
+                        "coCd" 	   : data.coCd,
+                        "userId"   : jwt.userId,
+                        "deptId"   : jwt.deptId,
+                        "issNo"    : data.parentid,
+                        "pgmId"    : "QM0101M01"
+                    };
+                    openModal("/static/html/user/qm/qm01/QM0101P01.html", 1600, 870, "", paramObj, function(data) {
+                        if (data == 'ok') load_jsmind();
+                    });
+                } 
+             }
+         });
  	});
+    
+    function showTooltip(e, node) {
+        if (!node.data) return;
+        var data = node.data.data;
+        // console.log("Tooltip Data:", data); // Debugging
+
+        var html = '<div class="tooltip-header">' + (node.topic || 'Node Info') + '</div>';
+        html += '<table>';
+        
+        var fields = [
+            { key: 'id', label: 'ID' },
+            { key: 'ordrsNo', label: '수주번호' }, // Check ordrsNo, ORDRSNO, ORDRS_NO
+            { key: 'salesCd', label: 'Sales Code' }, // Check salesCd, SALESCD, SALES_CD
+            { key: 'ordrsClntNm', label: '고객사' }, // Check ordrsClntNm, ORDRSCLNTNM, ORDRS_CLNT_NM
+            { key: 'clntPjtNm', label: 'Project' }, // Check clntPjtNm, CLNTPJTNM, CLNT_PJT_NM
+            { key: 'mctypeNm', label: '설비유형' }, // Check mctypeNm, MCTYPENM, MCTYPE_NM
+            { key: 'issueNo', label: '문제번호' }, // Check issueNo, ISSUENO, ISSUE_NO
+            { key: 'reqNo', label: '발주요청번호' }, // Check reqNo, REQNO, REQ_NO
+            { key: 'issSts', label: '문제상태' }, // Check issStsNm, ISSSTSNM, ISS_STS_NM
+            { key: 'reqStNm', label: '발주요청서상태' }, // Check reqStsNm, REQSTSNM, REQ_STS_NM    
+            { key: 'dataType', label: 'Data Type' },
+            { key: 'agendaStatusNm', label: '회의자료-안건상태' },
+            { key: 'agendaCnts', label: '회의자료-안건내용' },
+            { key: 'issCnts', label: '문제내용' },
+            { key: 'reqRmk', label: '발주요청서비고' }
+        ];
+
+        var dataTypeMap = {
+            "1": "root",
+            "2": "수주 자료",
+            "3": "기계설비",
+            "4": "문제발생자료",
+            "5": "요인별발주요청서 자료",
+            "6": "회의자료-안건"
+        };
+
+        // Pre-fetch reqStNm for the override logic using the helper
+        var reqStNmVal = getValueIgnoreCase(data, 'reqStNm');
+        
+        var issStsMap = {
+            "ISSSTS01": "접수중",
+            "ISSSTS02": "진행중",
+            "ISSSTS03": "완료"
+        };
+
+        fields.forEach(function(f) {
+            var val = getValueIgnoreCase(data, f.key);
+            
+            // Override logic: if issSts is being processed and reqStNm exists, use reqStNm
+            if (f.key === 'issSts') {
+                 if (reqStNmVal) {
+                     val = reqStNmVal;
+                 } else if (val && issStsMap[val]) {
+                     val = issStsMap[val];
+                 }
+            }
+
+            // Apply dataType mapping
+            if (f.key === 'dataType' && val && dataTypeMap[val]) {
+                val = dataTypeMap[val];
+            }
+            
+            if (val !== undefined && val !== null && val !== '') {
+                html += '<tr><th>' + f.label + '</th><td>' + val + '</td></tr>';
+            }
+        });
+        
+        html += '</table>';
+        
+        $('#node-tooltip').html(html).show();
+        moveTooltip(e);
+    }
+    
+    // Helper to find value with various key formats
+    function getValueIgnoreCase(data, key) {
+        if (data[key]) return data[key];
+        
+        var upperKey = key.toUpperCase();
+        if (data[upperKey]) return data[upperKey];
+        
+        // Try Snake Case conversion (e.g. ordrsNo -> ORDRS_NO)
+        var snakeKey = key.replace(/([A-Z])/g, "_$1").toUpperCase();
+        if (data[snakeKey]) return data[snakeKey];
+        
+        return "";
+    }
+
+    function moveTooltip(e) {
+        var tooltip = $('#node-tooltip');
+        var offset = 15; // Distance from mouse cursor
+        
+        // Calculate position
+        var top = e.pageY + offset;
+        var left = e.pageX + offset;
+        
+        // Boundary checks (optional, but good for UX)
+        if (left + tooltip.outerWidth() > $(window).width()) {
+            left = e.pageX - tooltip.outerWidth() - offset;
+        }
+        if (top + tooltip.outerHeight() > $(window).height()) {
+            top = e.pageY - tooltip.outerHeight() - offset;
+        }
+
+        tooltip.css({
+            top: top,
+            left: left
+        });
+    }
 
      function renderMind(dbList) {
          // console.log("renderMind data:", dbList);
@@ -170,6 +442,8 @@
              var actNm = item.actNm || item.ACT_NM || '';
              var reqSt = item.reqSt || item.REQ_ST || '';
              var issSts = item.issSts || item.ISS_STS || '';
+             var direction = item.direction || item.DIRECTION || '';
+             var agendaStatus = item.agendaStatus || item.AGENDA_STATUS || '';
              
              // Topic Formatting
              var displayTopic = topic;
@@ -186,6 +460,12 @@
                  if (issSts !== 'ISSSTS03') {
                      displayTopic += ' <i class="fa fa-exclamation-circle" style="color:red; font-size:14px; margin-left:4px;" title="미완료"></i>';
                  }
+             } else if (dataType == '6') {
+                 // Type 6: Agenda (+ warning if not Y)
+                 displayTopic = id + ' / ' + topic;
+                 if (agendaStatus !== 'Y') {
+                      displayTopic += ' <i class="fa fa-exclamation-circle" style="color:red; font-size:14px; margin-left:4px;" title="진행중"></i>';
+                 }
              } else if (parseInt(dataType) >= 2) {
                  // Type 2,3: id / topic
                  displayTopic = id + ' / ' + topic;
@@ -193,7 +473,8 @@
 
              var node = {
                  id: id,
-                 topic: displayTopic
+                 topic: displayTopic,
+                 direction: direction
              };
              
              if (parentid && parentid !== 'ROOT' && parentid !== '') {
@@ -201,11 +482,12 @@
              } else {
                  node.isroot = true;
              }
-
+             
              // Color Logic
              if ((dataType == '4' && issSts === 'ISSSTS03') || 
-                 (dataType == '5' && reqSt === 'REQST03')) {
-                  // Completed Issue/Request -> Neutral/No Color
+                 (dataType == '5' && reqSt === 'REQST03') ||
+                 (dataType == '6' && agendaStatus === 'Y')) {
+                  // Completed Issue/Request/Agenda -> Neutral/No Color
                   node['background-color'] = '#f0f0f0'; 
                   node['foreground-color'] = '#777'; // Dimmed text
              } else {
@@ -372,7 +654,7 @@
       */
      function saveMindMapImage() {
          captureMindMap().then(canvas => {
-             const salesCd = $('#salesCd').val() || "MindMap";
+             const salesCd = $('#salesCd_S').val() || "MindMap";
              const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,"");
              const filename = `MindMap_${salesCd}_${dateStr}.png`;
              
@@ -418,12 +700,12 @@
    	function wbsSalesCodeSearch() {
 
    		var paramObj = {
-   		   "coCd" : $('#coCd').val(),
-   		   "salesCd": $('#salesCd').val()
+   		   "coCd" : $('#coCd_S').val(),
+   		   "salesCd": $('#salesCd_S').val()
    		};
    		openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1200, 700, "SALES CODE 검색", paramObj, function (grid){
    			var row = grid.target.getList("selected")[0];
-   			$('#salesCd').val(row.salesCd);
+   			$('#salesCd_S').val(row.salesCd); 
    			//$('#wbsClntPjt').val(row.clntPjt); // 고객사 PJT
    			//$('#prdtCd_S').val(row.prdtCd); // 제품구분
    			//$('#prdtNm_S').val(row.prdtCdNm); // 제품구분
@@ -434,6 +716,23 @@
    			load_jsmind();
    		});
    	}
+
+    // [Type 4/5 Logic Helpers]
+
+    // Issue View/Edit Modal (Also used for Type 4 indirectly or Type 5 check)
+    function wbsIssModal(row) {
+        var paramObj = {
+            "actionType"     : "U4",
+            "coCd"           : row.coCd,
+            "salesCd"        : row.salesCd,
+            "issFileTrgtKey" : row.fileTrgtKey
+        };
+        // Reuse same modal as Type 4
+        openModal("/static/html/user/wb/wb24/WB2401P11.html", 1200, 870, "WBS 실적문제수정", paramObj, function (){
+             load_jsmind();
+        });
+    }
+
 </script>
    </body>
 </html>

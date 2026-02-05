@@ -22,4 +22,9 @@ public class MM01SvcImpl implements MM01Svc {
 		return mm01Mapper.selectMindMapList(paramMap);
 	}
 
+	@Override
+	public List<Map<String, String>> selectAgendaList(Map<String, String> paramMap) {
+		return mm01Mapper.selectAgendaList(paramMap);
+	}
+
 }

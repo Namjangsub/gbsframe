@@ -23,11 +23,27 @@ public class MM01Ctr {
 	@Autowired
 	private MM01Svc mm01Svc;
 
+	@PostMapping(value = "/selectAgendaList")
+	public String selectAgendaList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		try {
+			List<Map<String, String>> resultList = mm01Svc.selectAgendaList(paramMap);
+			model.addAttribute("resultList", resultList);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("select"));
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		}
+		return "jsonView";
+	}
+
 	@PostMapping(value = "/selectMindMapList")
 	public String selectMindMapList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		try {
-			List<Map<String, String>> resultList = mm01Svc.selectMindMapList(paramMap);
-			model.addAttribute("resultList", resultList);
+			List<Map<String, String>> mindMapData = mm01Svc.selectMindMapList(paramMap);
+			model.addAttribute("mindMapData", mindMapData);
+			List<Map<String, String>> agendaData = mm01Svc.selectAgendaList(paramMap);
+			model.addAttribute("agendaData", agendaData);
 			model.addAttribute("resultCode", 200);
 			model.addAttribute("resultMessage", messageUtils.getMessage("select"));
 		} catch (Exception e) {

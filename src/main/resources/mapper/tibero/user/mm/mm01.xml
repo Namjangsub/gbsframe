@@ -43,6 +43,12 @@
 					AND D.SALES_CD LIKE '%' || #{salesCd} || '%'
 				</if> 
 			)
+			, wbs as (
+				SELECT W.CO_CD, W.SALES_CD, MAX(W.VER_NO) AS VER_NO
+				FROM TB_WB22M01 W
+				JOIN salesCd S ON S.CO_CD = W.CO_CD AND S.SALES_CD = W.SALES_CD
+				GROUP BY W.CO_CD, W.SALES_CD
+			)
 			, iss AS (
 				SELECT S.CO_CD
 				     , S.ORDRS_NO
@@ -68,6 +74,7 @@
 				     , M.NAME			AS ACT_NM
 				     , W.REQ_NO
 				     , W.FILE_TRGT_KEY
+		     		 , W.ISS_CNTS
 				FROM salesCd S
 				JOIN TB_WB24M02 W ON W.CO_CD = S.CO_CD AND W.SALES_CD = S.SALES_CD
 				LEFT JOIN TB_CM06M01 M ON M.ID = W.ACT_ID
@@ -98,6 +105,7 @@
 					 , Q.REG_ID
 					 , Q.REQ_ST
 					 , M.CODE_NM		AS REQ_ST_NM
+					 , Q.REQ_RMK
 				FROM iss S
 				JOIN TB_QM01M01 Q ON Q.REQ_NO = S.REQ_NO
 				LEFT JOIN TB_CM05M01 M ON M.CODE_ID = Q.REQ_ST
@@ -108,6 +116,8 @@
 				 , '' 					AS PARENTID
 				 , 'ROOT' 				AS ISROOT
 				 , '수주' 				AS TOPIC
+				 , '' 					AS FILE_TRGT_KEY
+				 , '' 					AS CO_CD
 				 , '' 					AS ORDRS_NO
 				 , '' 					AS ORDRS_CLNT_NM
 				 , '' 					AS CLNT_PJT_NM
@@ -120,7 +130,11 @@
 			     , '' 					AS REG_ID
 			     , '' 					AS REQ_ST
 			     , '' 					AS REQ_ST_NM
+			     , '' 					AS ISS_CNTS
+			     , '' 					AS REQ_RMK
+			     , '' 					AS VER_NO
 			     , '1' 					AS DATA_TYPE
+		     	 , 'right' 				AS DIRECTION
 			FROM DUAL
 			UNION ALL
 			-- 2. 프로젝트 노드 ('수주'의 자식)
@@ -129,6 +143,8 @@
 				 , 'ROOT_MASTER'		AS PARENTID
 				 , '' 					AS ISROOT
 				 , ORDRS_CLNT_NM || '_' || CLNT_PJT_NM	AS TOPIC
+				 , '' 					AS FILE_TRGT_KEY
+				 , CO_CD 				AS CO_CD
 				 , ORDRS_NO
 				 , ORDRS_CLNT_NM
 				 , CLNT_PJT_NM
@@ -141,19 +157,25 @@
 			     , '' REG_ID
 			     , '' REQ_ST
 			     , '' REQ_ST_NM
+			     , '' ISS_CNTS
+			     , '' REQ_RMK
+			     , '' VER_NO
 			     , '2' 					AS DATA_TYPE
+		     	 , 'right' 				AS DIRECTION
 			FROM root
 			UNION ALL 
 				SELECT 
-					   SALES_CD				AS ID
-					 , ORDRS_NO				AS PARENTID
-					 , ISROOT
-					 , EQP_NM	            AS TOPIC
-					 , ORDRS_NO
-					 , ORDRS_CLNT_NM
-					 , CLNT_PJT_NM
-					 , SALES_CD
-					 , MCTYPE_NM
+					   S.SALES_CD				AS ID
+					 , S.ORDRS_NO				AS PARENTID
+					 , S.ISROOT
+					 , S.EQP_NM	            AS TOPIC
+					 , ''						AS FILE_TRGT_KEY
+					 , S.CO_CD
+					 , S.ORDRS_NO
+					 , S.ORDRS_CLNT_NM
+					 , S.CLNT_PJT_NM
+					 , S.SALES_CD
+					 , S.MCTYPE_NM
 				     , '' ISS_STS
 				     , '' ISS_STS_NM
 				     , '' ACT_ID
@@ -161,14 +183,21 @@
 				     , '' REG_ID
 				     , '' REQ_ST
 				     , '' REQ_ST_NM
+				     , '' ISS_CNTS
+				     , '' REQ_RMK
+					 , W.VER_NO
 			     	 , '3' 					AS DATA_TYPE
-				FROM salesCd
+		     	 	 , 'right' 				AS DIRECTION
+				FROM salesCd S
+				LEFT JOIN wbs W ON W.CO_CD = S.CO_CD AND W.SALES_CD = S.SALES_CD
 			UNION ALL 
 				SELECT 
 					   ISS_NO				AS ID
 					 , SALES_CD				AS PARENTID
 					 , ISROOT
 					 , ISS_SJ	            AS TOPIC
+					 , FILE_TRGT_KEY
+					 , CO_CD
 					 , ORDRS_NO
 					 , ORDRS_CLNT_NM
 					 , CLNT_PJT_NM
@@ -181,7 +210,11 @@
 				     , '' REG_ID
 				     , '' REQ_ST
 				     , '' REQ_ST_NM
+				     , ISS_CNTS
+				     , '' REQ_RMK
+			     	 , '' VER_NO
 			     	 , '4' 					AS DATA_TYPE
+		     	 	 , 'right' 				AS DIRECTION
 				FROM iss
 			UNION ALL 
 				SELECT 
@@ -189,6 +222,8 @@
 					 , ISS_NO				AS PARENTID
 					 , ISROOT
 					 , REQ_NO	            AS TOPIC
+					 , FILE_TRGT_KEY
+					 , CO_CD
 					 , ORDRS_NO
 					 , ORDRS_CLNT_NM
 					 , CLNT_PJT_NM
@@ -201,8 +236,153 @@
 				     , REG_ID
 				     , REQ_ST
 				     , REQ_ST_NM
+				     , '' ISS_CNTS
+				     , REQ_RMK
+			     	 , '' VER_NO
 			     	 , '5' 					AS DATA_TYPE
+		     	 	 , 'right' 				AS DIRECTION
 				FROM req
 	</select>
+
+    <select id="selectAgendaList" parameterType="Map" resultType="CamelMap">
+        WITH agenda AS (
+            SELECT M.FILE_TRGT_KEY
+                 , M.CO_CD
+                 , M.MNG_ID
+                 , M.CLNT_CD
+                 , B.CLNT_NM		AS ORDRS_CLNT_NM
+                 , M.CLNT_PJT
+                 , E.CODE_NM		AS CLNT_PJT_NM
+                 , M.ORDRS_NO
+                 , M.SALES_CD
+                 , M.CREAT_ID
+                 , D.AGENDA_NO
+                 , D.AGENDA_TITLE
+				 , D3.AGENDA_CNTS
+                 , D.AGENDA_STATUS
+                 , D.CREAT_DTTM AS AGENDA_CREAT_DTTM
+                 , '' MCTYPE_NM
+                 , ''			AS ISROOT
+            FROM TB_PM20M01 M
+            LEFT JOIN TB_PM20D01 D ON D.FILE_TRGT_KEY = M.FILE_TRGT_KEY
+			LEFT JOIN TB_PM20D03 D3 ON D3.FILE_TRGT_KEY = M.FILE_TRGT_KEY AND D3.AGENDA_NO = D.AGENDA_NO AND D3.AGENDA_VER = (SELECT MAX(AGENDA_VER) FROM TB_PM20D03 D3 WHERE D3.FILE_TRGT_KEY = M.FILE_TRGT_KEY AND D3.AGENDA_NO = D.AGENDA_NO)	
+            LEFT JOIN TB_CM05M01 E ON E.CODE_ID = M.CLNT_PJT
+            LEFT JOIN TB_BM02M01 B ON B.CLNT_CD = M.CLNT_CD
+            WHERE M.BIZ_DIV = 'AGENDA01'
+            <if test="salesCd != null and salesCd != ''">
+                AND M.SALES_CD LIKE '%' || #{salesCd} || '%'
+            </if>
+        )
+        , root AS (
+            SELECT DISTINCT A.CO_CD
+                 , A.ORDRS_NO
+                 , C.ORDRS_CLNT_CD
+                 , B.CLNT_NM		AS ORDRS_CLNT_NM
+                 , C.CLNT_PJT
+                 , M.CODE_NM		AS CLNT_PJT_NM
+                 , C.CTRT_NM
+                 , 'ROOT'			AS ISROOT
+            FROM agenda A
+            LEFT JOIN TB_CR02M01 C ON C.ORDRS_NO = A.ORDRS_NO
+            LEFT JOIN TB_CM05M01 M ON M.CODE_ID = C.CLNT_PJT
+            LEFT JOIN TB_BM02M01 B ON B.CLNT_CD = C.ORDRS_CLNT_CD
+            WHERE 1=1
+            <if test="ordrsNo != null and ordrsNo != ''">
+                AND A.ORDRS_NO LIKE '%' || #{ordrsNo} || '%'
+            </if>
+        )
+        , salesCd AS (
+            SELECT DISTINCT C.CO_CD
+                 , C.ORDRS_NO
+                 , C.ORDRS_CLNT_CD
+                 , C.ORDRS_CLNT_NM
+                 , C.CLNT_PJT
+                 , C.CLNT_PJT_NM
+                 , C.CTRT_NM
+                 , ''			AS ISROOT
+                 , D.SALES_CD
+                 , D.EQP_NM
+                 , D.MCTYPE
+                 , M.CODE_NM 	AS MCTYPE_NM
+                 , D.ORDRS_SEQ
+            FROM root C
+            JOIN agenda A  ON A.CO_CD = C.CO_CD AND A.ORDRS_NO = C.ORDRS_NO
+            JOIN TB_CR02D02 D ON D.CO_CD = C.CO_CD AND D.ORDRS_NO = C.ORDRS_NO AND D.SALES_CD = A.SALES_CD
+            LEFT JOIN TB_CM05M01 M ON M.CODE_ID = D.MCTYPE
+            WHERE D.SALES_CD IS NOT NULL
+        )
+        SELECT 
+               ORDRS_NO || 'A'				AS ID
+			 , 'ROOT_MASTER' 		AS PARENTID
+			 , '' ISROOT
+             , ORDRS_CLNT_NM || '_' || CLNT_PJT_NM	AS TOPIC
+			 , '' FILE_TRGT_KEY
+			 , CO_CD
+             , ORDRS_NO
+             , ORDRS_CLNT_NM
+             , CLNT_PJT_NM
+             , '' SALES_CD
+             , '' MCTYPE_NM
+             , '' AGENDA_STATUS
+             , '' AGENDA_STATUS_NM
+             , '' ACT_ID
+             , '' ACT_NM
+             , '' REG_ID
+             , '' REQ_ST
+             , '' REQ_ST_NM
+			 , '' AGENDA_CNTS
+             , '2' 					AS DATA_TYPE
+             , 'left' AS DIRECTION
+        FROM root
+    UNION ALL 
+        SELECT 
+               SALES_CD || 'A'				AS ID
+             , ORDRS_NO || 'A'				AS PARENTID
+             , ISROOT
+             , EQP_NM	        	AS TOPIC
+			 , '' FILE_TRGT_KEY
+			 , CO_CD
+             , ORDRS_NO
+             , ORDRS_CLNT_NM
+             , CLNT_PJT_NM
+             , SALES_CD
+             , MCTYPE_NM
+             , '' AGENDA_STATUS
+             , '' AGENDA_STATUS_NM
+             , '' ACT_ID
+             , '' ACT_NM
+             , '' REG_ID
+             , '' REQ_ST
+             , '' REQ_ST_NM
+			 , '' AGENDA_CNTS
+             , '3' 					AS DATA_TYPE
+             , 'left' AS DIRECTION
+        FROM salesCd
+    UNION ALL 
+        SELECT 
+               FILE_TRGT_KEY || '-' || AGENDA_NO		AS ID
+             , SALES_CD || 'A'				AS PARENTID
+             , ISROOT
+             , AGENDA_TITLE         AS TOPIC
+			 , FILE_TRGT_KEY
+			 , CO_CD
+             , ORDRS_NO
+             , ORDRS_CLNT_NM
+             , CLNT_PJT_NM
+             , SALES_CD
+             , MCTYPE_NM
+             , AGENDA_STATUS
+             , case WHEN AGENDA_STATUS='Y' THEN '완료'
+                    ELSE '진행중' 		   END  AGENDA_STATUS_NM
+             , '' ACT_ID
+             , '' ACT_NM
+             , '' REG_ID
+             , '' REQ_ST
+             , '' REQ_ST_NM
+			 , AGENDA_CNTS
+             , '6' 					AS DATA_TYPE
+             , 'left' AS DIRECTION
+        FROM agenda
+    </select>
 
 </mapper>

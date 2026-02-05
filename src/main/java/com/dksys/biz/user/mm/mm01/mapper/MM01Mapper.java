@@ -10,4 +10,6 @@ public interface MM01Mapper {
 
 	List<Map<String, String>> selectMindMapList(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectAgendaList(Map<String, String> paramMap);
+
 }
