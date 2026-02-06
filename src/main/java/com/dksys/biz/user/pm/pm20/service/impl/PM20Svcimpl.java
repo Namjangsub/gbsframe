@@ -178,6 +178,10 @@ public class PM20Svcimpl implements PM20Svc{
 		int result = 0;
 		result += pm20Mapper.pm20_d03_delete_by_agenda(paramMap);
 		result += pm20Mapper.pm20_d01_delete(paramMap);
+		
+		// 메인삭제 (안건이 하나도 없으면 메인삭제 쿼리)
+		result += pm20Mapper.pm20_m01_delete_main(paramMap);
+
 		return result;
 	}
 

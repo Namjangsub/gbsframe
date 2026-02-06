@@ -71,4 +71,6 @@ public interface PM20Mapper {
 
 	int pm20_shift_file_trgt_key(Map<String, String> param);
 
+	int pm20_m01_delete_main(Map<String, String> paramMap);
+
 }
