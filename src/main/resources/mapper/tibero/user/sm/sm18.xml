@@ -846,9 +846,8 @@
 								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN 'R' ELSE 'Y' END IS_COST
 								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN CR.ORDRS_NO 
 								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN '' ELSE C.ORDRS_NO END ORDRS_NO --수주번호
-								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD
-								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN RM.SALES_CD
-									   WHEN substr(A.ORDRG_NO,0,3) = 'COS' AND C.COST_AMT != SD.ORDRS_AMT THEN SD.SALES_CD ELSE C.SALES_CD END SALES_CD
+								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.SALES_CD 
+							   		   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN RM.SALES_CD ELSE C.SALES_CD END SALES_CD
 								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.PCHS_CLNT_CD 
 								   	   WHEN substr(A.ORDRG_NO,0,3) = 'RET' THEN RM.PCHS_CLNT_CD ELSE C.PCHS_CLNT_CD END PCHS_CLNT_CD
 								, CASE WHEN substr(A.ORDRG_NO,0,3) = 'BAL' THEN M.FILE_TRGT_KEY 
@@ -875,7 +874,21 @@
 							LEFT OUTER JOIN TB_SM06M01 RM ON(RM.CO_CD = R.CO_CD AND RM.RET_NO = R.RET_NO)		/* 반품 상세 */
 							LEFT OUTER JOIN TB_CM06M01 U ON U.ID = A.CREAT_ID
 							LEFT OUTER JOIN TB_CM04M01 CD ON CD.DEPT_ID = SUBSTRING(U.DEPT_ID,0,5)
-							LEFT OUTER JOIN TB_SM10D01 SD ON C.COST_NO = SD.COST_NO AND SD.CHK_SAVE_CD = 'Y'
+							<!-- LEFT OUTER JOIN TB_SM10D01 SD ON C.COST_NO = SD.COST_NO AND SD.CHK_SAVE_CD = 'Y' -->
+							LEFT OUTER JOIN (
+											SELECT *
+											FROM (
+												SELECT SD.*
+													, ROW_NUMBER() OVER (
+														PARTITION BY SD.COST_NO
+														ORDER BY SD.UDT_DTTM DESC
+													) RN
+												FROM TB_SM10D01 SD
+												WHERE SD.CHK_SAVE_CD = 'Y'
+											)
+											WHERE RN = 1
+										) SD
+										ON C.COST_NO = SD.COST_NO
 							LEFT OUTER JOIN TB_CR02D02 CR ON CR.SALES_CD = CASE WHEN substr(A.ORDRG_NO,1,3) = 'BAL' THEN M.SALES_CD
 																				WHEN substr(A.ORDRG_NO,1,3) = 'RET' THEN RM.SALES_CD
 																				ELSE C.SALES_CD
