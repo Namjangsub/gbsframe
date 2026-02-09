@@ -94,6 +94,31 @@
 		WHERE MN_DATE = #{mnDate}
     </select>
 
+	<select id="selectD01Cell" parameterType="Map" resultType="CamelMap">
+		SELECT
+			  MN_SUBJECT
+			, MN_ETC_ALL
+			, MN_STATUS
+			, LOCK_YN
+			, LOCK_USER
+		FROM TB_PM10D01
+		WHERE MN_DATE    = #{mnDate}
+		  AND MN_SUB_SEQ = #{mnSubSeq}
+	</select>
+
+	<select id="selectD03Cell" parameterType="Map" resultType="CamelMap">
+		SELECT
+			  MN_DEPT_CD
+			, MN_CNTS
+			, MN_RESULT
+			, LOCK_YN
+			, LOCK_USER
+		FROM TB_PM10D03
+		WHERE MN_DATE    = #{mnDate}
+		  AND MN_SUB_SEQ = #{mnSubSeq}
+		  AND MN_DEPT_CD = #{mnDeptCd}
+	</select>
+
 	<update id="pm10_main_update" parameterType="Map">
 		MERGE INTO TB_PM10M01 A
 			USING DUAL
@@ -143,6 +168,9 @@
 					, ORDRS_NO          = #{ordrsNo, jdbcType=VARCHAR}  
 					, MN_ETC_ALL        = #{mnEtcAll, jdbcType=VARCHAR}  
 					, MN_STATUS         = #{mnStatus, jdbcType=VARCHAR}  
+					, LOCK_YN			= 'N'
+					, LOCK_USER			= NULL
+					, LOCK_DTTM			= NULL
 					, UDT_ID			= #{userId}
 					, UDT_DTTM			= SYSDATE
 					, UDT_PGM			= #{pgmId}
@@ -158,6 +186,9 @@
 				, ORDRS_NO
 				, MN_ETC_ALL
 				, MN_STATUS
+				, LOCK_YN
+				, LOCK_USER
+				, LOCK_DTTM
 				, CREAT_ID
 				, CREAT_DTTM
 				, CREAT_PGM
@@ -172,6 +203,9 @@
 				, #{ordrsNo, jdbcType=VARCHAR}
 				, #{mnEtcAll, jdbcType=VARCHAR}
 				, #{mnStatus, jdbcType=VARCHAR}
+				, 'N'
+				, NULL
+				, NULL
 				, #{userId}
 				, SYSDATE
 				, #{pgmId}
@@ -202,6 +236,9 @@
 				, MN_STATUS			= #{mnStatus, jdbcType=VARCHAR}
 				, CLNT_PJT			= #{clntPjt, jdbcType=VARCHAR}
 				, CLNT_CD			= #{clntCd, jdbcType=VARCHAR}
+				, LOCK_YN			= 'N'
+				, LOCK_USER			= NULL
+				, LOCK_DTTM			= NULL
 				, UDT_ID			= #{userId}
 				, UDT_DTTM			= SYSDATE
 				, UDT_PGM			= #{pgmId}
@@ -218,6 +255,9 @@
 				, MN_STATUS
 				, CLNT_PJT
 				, CLNT_CD
+				, LOCK_YN
+				, LOCK_USER
+				, LOCK_DTTM
 				, CREAT_ID
 				, CREAT_DTTM
 				, CREAT_PGM
@@ -232,6 +272,9 @@
 				, #{mnStatus, jdbcType=VARCHAR}
 				, #{clntPjt, jdbcType=VARCHAR}
 				, #{clntCd, jdbcType=VARCHAR}
+				, 'N'
+				, NULL
+				, NULL
 				, #{userId}
 				, SYSDATE
 				, #{pgmId}
@@ -335,5 +378,81 @@
 		 WHERE MN_DATE		= #{mnDate}
 		   AND USER_ID		= #{userId}
 	</delete>
+
+	<update id="lockD01Cell" parameterType="Map">
+		UPDATE TB_PM10D01
+		SET
+			  LOCK_YN   = 'Y'
+			, LOCK_USER = #{userId}
+			, LOCK_DTTM = SYSDATE
+		WHERE MN_DATE    = #{mnDate}
+		  AND MN_SUB_SEQ = #{mnSubSeq}
+		  AND (NVL(LOCK_YN, 'N') != 'Y' OR LOCK_USER = #{userId})
+	</update>
+
+	<update id="lockD03Cell" parameterType="Map">
+		UPDATE TB_PM10D03
+		SET
+			  LOCK_YN   = 'Y'
+			, LOCK_USER = #{userId}
+			, LOCK_DTTM = SYSDATE
+		WHERE MN_DATE    = #{mnDate}
+		  AND MN_SUB_SEQ = #{mnSubSeq}
+		  AND MN_DEPT_CD = #{mnDeptCd}
+		  AND (NVL(LOCK_YN, 'N') != 'Y' OR LOCK_USER = #{userId})
+	</update>
+
+	<update id="unlockD01Cell" parameterType="Map">
+		UPDATE TB_PM10D01
+		SET
+			  LOCK_YN   = 'N'
+			, LOCK_USER = NULL
+			, LOCK_DTTM = NULL
+		WHERE MN_DATE    = #{mnDate}
+		  AND MN_SUB_SEQ = #{mnSubSeq}
+		  AND LOCK_USER  = #{userId}
+	</update>
+
+	<update id="unlockD03Cell" parameterType="Map">
+		UPDATE TB_PM10D03
+		SET
+			  LOCK_YN   = 'N'
+			, LOCK_USER = NULL
+			, LOCK_DTTM = NULL
+		WHERE MN_DATE    = #{mnDate}
+		  AND MN_SUB_SEQ = #{mnSubSeq}
+		  AND MN_DEPT_CD = #{mnDeptCd}
+		  AND LOCK_USER  = #{userId}
+	</update>
+
+	<update id="unlockD01ByUser" parameterType="Map">
+		UPDATE TB_PM10D01
+		SET
+			  LOCK_YN   = 'N'
+			, LOCK_USER = NULL
+			, LOCK_DTTM = NULL
+		WHERE MN_DATE   = #{mnDate}
+		  AND LOCK_USER = #{userId}
+		  AND EXISTS (
+						SELECT 1
+							FROM TB_PM10D01 B
+							WHERE B.MN_DATE = #{mnDate}
+					)
+	</update>
+
+	<update id="unlockD03ByUser" parameterType="Map">
+		UPDATE TB_PM10D03
+		SET
+			  LOCK_YN   = 'N'
+			, LOCK_USER = NULL
+			, LOCK_DTTM = NULL
+		WHERE MN_DATE   = #{mnDate}
+		  AND LOCK_USER = #{userId}
+		  AND EXISTS (
+						SELECT 1
+							FROM TB_PM10D03 B
+							WHERE B.MN_DATE = #{mnDate}
+					)
+	</update>
     
 </mapper>

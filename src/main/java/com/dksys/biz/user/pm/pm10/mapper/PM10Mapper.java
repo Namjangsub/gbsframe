@@ -34,4 +34,20 @@ public interface PM10Mapper {
 
 	int pm10_d02_delete(Map<String, Object> param);
 
+	int lockD01Cell(Map<String, String> param);
+
+	int lockD03Cell(Map<String, String> param);
+
+	int unlockD01Cell(Map<String, String> param);
+
+	int unlockD03Cell(Map<String, String> param);
+
+	int unlockD01ByUser(Map<String, String> param);
+
+	int unlockD03ByUser(Map<String, String> param);
+
+	Map<String, String> selectD01Cell(Map<String, String> param);
+
+	Map<String, String> selectD03Cell(Map<String, String> param);
+
 }

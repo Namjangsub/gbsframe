@@ -163,6 +163,9 @@ let currentFileColumn = null;
 var mnFileArr = [];
 var deleteFileArr = [];
 let attendFlag = true;	// 구분이 회의결과일 때 참석자 리스트 update를 위한 flag
+let lastEditedCell = null;
+let currentLockInfo = null;
+let lastScrollPos = null;
 
 const DEFAULT_ATTEND_LIST = [
 	{ id: 'EMJ8105',    name: '김태호',   title: '부사장' },
@@ -223,7 +226,9 @@ const baseFileCol = {
     editor: {
         type: "textarea",
         disabled: function () {
-            return this.item.isFileRow || $('#mnDiv_S').val() === 'MNDIV99';
+            return this.item.isFileRow
+				|| $('#mnDiv_S').val() === 'MNDIV99'
+				|| !lockCellForEdit(this.item, this.key);
         }
     },
     formatter: fileCellFormatter
@@ -242,9 +247,210 @@ const deptCodeMap = {
 	gun10MnCnts:'GUN10', gun80MnCnts:'GUN80', gun70MnCnts: 'GUN70'
 };
 
-	var mnGridView = {
-		initView: function(){
-		this.target = new ax5.ui.grid();
+function getLockTarget(item, colKey) {
+	if (!item || !colKey) return null;
+	if (item.isFileRow || item.isNoticeRow) return null;
+
+	if (colKey === 'mnSubject' || colKey === 'mnEtcAll' || colKey === 'mnStatus') {
+		return {
+			targetType: 'D01',
+			mnDate: item.mnDate || $('#mnDate_S').val(),
+			mnSubSeq: item.mnSubSeq
+		};
+	}
+	if (deptCodeMap[colKey]) {
+		return {
+			targetType: 'D03',
+			mnDate: item.mnDate || $('#mnDate_S').val(),
+			mnSubSeq: item.mnSubSeq,
+			mnDeptCd: deptCodeMap[colKey]
+		};
+	}
+	return null;
+}
+
+function isSameLock(a, b) {
+	if (!a || !b) return false;
+	return a.targetType === b.targetType
+		&& a.mnDate === b.mnDate
+		&& String(a.mnSubSeq) === String(b.mnSubSeq)
+		&& String(a.mnDeptCd || '') === String(b.mnDeptCd || '');
+}
+
+let popupObserver = null;
+function syncPopupTextareaValue(value) {
+	if (value === undefined) return;
+	const $popup = $('[data-ax5grid-popup="textarea"] textarea');
+	if ($popup.length) {
+		$popup.val(value);
+		return;
+	}
+	if (popupObserver) {
+		popupObserver.disconnect();
+		popupObserver = null;
+	}
+	popupObserver = new MutationObserver(function() {
+		const $newPopup = $('[data-ax5grid-popup="textarea"] textarea');
+		if ($newPopup.length) {
+			$newPopup.val(value);
+			popupObserver.disconnect();
+			popupObserver = null;
+		}
+	});
+	popupObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+function applyCellDataFromLock(item, colKey, cellData) {
+	if (!cellData || !item) return;
+	let targetKey = colKey;
+	if (cellData.mnDeptCd) {
+		for (const key in deptCodeMap) {
+			if (deptCodeMap[key] === cellData.mnDeptCd) {
+				targetKey = key;
+				break;
+			}
+		}
+	}
+	if (colKey === 'mnSubject' && cellData.mnSubject !== undefined) {
+		item.mnSubject = cellData.mnSubject;
+		syncPopupTextareaValue(item.mnSubject);
+	}
+	if (colKey === 'mnEtcAll' && cellData.mnEtcAll !== undefined) {
+		item.mnEtcAll = cellData.mnEtcAll;
+		syncPopupTextareaValue(item.mnEtcAll);
+	}
+	if (colKey === 'mnStatus' && cellData.mnStatus !== undefined) {
+		item.mnStatus = cellData.mnStatus;
+	}
+	if (deptCodeMap[targetKey]) {
+		const mnDiv = $("#mnDiv_S").val();
+		let value = null;
+		if (mnDiv === 'MNDIV02') {
+			value = (cellData.mnResult && cellData.mnResult !== '') ? cellData.mnResult : cellData.mnCnts;
+		} else {
+			value = cellData.mnCnts;
+		}
+		if (value !== undefined) {
+			item[targetKey] = value;
+			syncPopupTextareaValue(value);
+		}
+	}
+	// 에디터가 내부 캐시값을 쓰는 경우가 있어 그리드 값도 동기화
+	const grid = mnGridView && mnGridView.target ? mnGridView.target : null;
+	if (grid && typeof grid.setValue === "function") {
+		const rowIndex = Array.isArray(grid.list) ? grid.list.indexOf(item) : -1;
+		if (rowIndex >= 0) {
+			grid.setValue(rowIndex, targetKey, item[targetKey], true);
+			return;
+		}
+	}
+	mnGridView.target.repaint();
+}
+
+function lockCellForEdit(item, colKey) {
+	const lockTarget = getLockTarget(item, colKey);
+	if (!lockTarget) return true;
+	if (!lockTarget.mnSubSeq || lockTarget.mnSubSeq <= 0) return true;
+
+	if (currentLockInfo && !isSameLock(currentLockInfo, lockTarget)) {
+		unlockCell(currentLockInfo);
+	}
+
+	const paramObj = {
+		targetType: lockTarget.targetType,
+		mnDate: lockTarget.mnDate,
+		mnSubSeq: lockTarget.mnSubSeq,
+		mnDeptCd: lockTarget.mnDeptCd,
+		userId: $('#userId').val()
+	};
+
+	let lockOk = false;
+	postAjaxSync("/user/pm/pm10/pm10_lock_cell", paramObj, null, function(data){
+		if (data.resultCode === 200) {
+			lockOk = true;
+			currentLockInfo = { ...lockTarget, colKey };
+			applyCellDataFromLock(item, colKey, data.cellData);
+		} else if (data.resultCode === 409) {
+			alert("수정중인 셀은 수정할수 없습니다.");
+			mnGridView.setData(0);
+			lockOk = false;
+			return false;
+		} else {
+			alert("락 처리 실패: " + (data.resultMessage || ""));
+			lockOk = false;
+		}
+	});
+	return lockOk;
+}
+
+function unlockCell(lockInfo) {
+	if (!lockInfo) return;
+	const paramObj = {
+		targetType: lockInfo.targetType,
+		mnDate: lockInfo.mnDate,
+		mnSubSeq: lockInfo.mnSubSeq,
+		mnDeptCd: lockInfo.mnDeptCd,
+		userId: $('#userId').val()
+	};
+	postAjax("/user/pm/pm10/pm10_unlock_cell", paramObj, null, function() {});
+	currentLockInfo = null;
+}
+
+function unlockUserLocks() {
+	const paramObj = {
+		mnDate: $('#mnDate_S').val(),
+		userId: $('#userId').val()
+	};
+	postAjaxSync("/user/pm/pm10/pm10_unlock_user_cells", paramObj, null, function() {});
+	currentLockInfo = null;
+}
+
+function focusLastEditedCell() {
+	if (!lastEditedCell) return;
+	const grid = mnGridView.target;
+	let rowIndex = -1;
+	if (lastEditedCell.isNoticeRow) {
+		rowIndex = grid.list.findIndex(r => r.isNoticeRow);
+	} else if (String(lastEditedCell.mnSubSeq) === '0') {
+		// 신규 행: 서버에서 MAX+1로 발급되므로 가장 큰 mnSubSeq를 가진 행을 찾는다
+		let maxSeq = 0;
+		grid.list.forEach((r, idx) => {
+			if (!r.isFileRow && !r.isNoticeRow && Number(r.mnSubSeq) > maxSeq) {
+				maxSeq = Number(r.mnSubSeq);
+				rowIndex = idx;
+			}
+		});
+	} else {
+		rowIndex = grid.list.findIndex(r =>
+			!r.isFileRow && !r.isNoticeRow &&
+			String(r.mnSubSeq) === String(lastEditedCell.mnSubSeq) &&
+			String(r.mnDate) === String(lastEditedCell.mnDate)
+		);
+	}
+	if (rowIndex >= 0) {
+		grid.select(rowIndex);
+		let colIndex = -1;
+		if (grid.colGroup && lastEditedCell.colKey) {
+			colIndex = grid.colGroup.findIndex(c => c && c.key === lastEditedCell.colKey);
+		}
+		if (colIndex >= 0) {
+			grid.focus(rowIndex, colIndex);
+		} else {
+			grid.focus(rowIndex, lastEditedCell.colKey);
+		}
+	}
+	if (rowIndex >= 0 && typeof grid.scrollTo === "function" && grid.xvar && grid.xvar.bodyTrHeight) {
+		const frozen = grid.xvar.frozenRowIndex || 0;
+		const top = -Math.max(0, rowIndex - frozen) * grid.xvar.bodyTrHeight;
+		grid.scrollTo({ top: top });
+	}
+	lastScrollPos = null;
+	lastEditedCell = null;
+}
+
+var mnGridView = {
+	initView: function(){
+	this.target = new ax5.ui.grid();
 		this.target.setConfig({
 			frozenColumnIndex : 1,
 			showRowSelector: false,
@@ -260,6 +466,9 @@ const deptCodeMap = {
 			body: {
 				columnHeight: 50,
 				onClick: function () {
+					if (currentLockInfo && !mnGridView.target.isInlineEditing) {
+						unlockCell(currentLockInfo);
+					}
 					this.self.clearSelect();
 					this.self.select(this.dindex);
 					const colKey = this.column.key;
@@ -275,6 +484,9 @@ const deptCodeMap = {
 				},
 				onDBLClick: function () {
 					if (this.item.mnSubject === '공지사항') return false;
+					if ($('#mnDiv_S').val() === 'MNDIV99') return false;
+					if (this.item.isFileRow || this.item.isNoticeRow) return false;
+					return false;
 				},
 				onDataChanged: function(){
 					if (this.key === 'mnSubject' || this.key === 'mnStatus' || this.key === 'mnEtcAll') {
@@ -287,6 +499,16 @@ const deptCodeMap = {
 						recalcSortOrder();
 					}
 					this.self.repaint(true);
+				},
+				inlineEdit: {
+					active: function () {
+						
+					},
+					deActive: function () {
+						if (currentLockInfo) {
+							unlockCell(currentLockInfo);
+						}
+					}
 				}
 			},
 			page: {
@@ -302,7 +524,7 @@ const deptCodeMap = {
 				}
 			},
 			columns: [
-						{ key: "mnSubject", 	label: "PROJECT<br>/<br>주제", 	align: "left", width: 100, editor: {type: "textarea",disabled: function () {return this.item.isFileRow || this.item.isNoticeRow;}}, formatter: valueFormatter},
+						{ key: "mnSubject", 	label: "PROJECT<br>/<br>주제", 	align: "left", width: 100, editor: {type: "textarea",disabled: function () {return this.item.isFileRow || this.item.isNoticeRow || !lockCellForEdit(this.item, 'mnSubject');}}, formatter: valueFormatter},
 						{ key: "mnSubSeq", 		label: "순번", 					align: "left", width: 100, hidden: true},
 						{ key: "gun30MnCnts", 	label: "영업<br>국내/해외", 	align: "left", width: 220, ...baseFileCol},
 						{ key: "gun60MnCnts", 	label: "생산", 					align: "left", width: 220, ...baseFileCol},
@@ -317,15 +539,28 @@ const deptCodeMap = {
 						{ key: "gun80MnCnts", 	label: "전산", 					align: "left", width: 220, ...baseFileCol},
 						{ key: "gun10MnCnts", 	label: "경영지원,회계", 		align: "left", width: 220, ...baseFileCol},
 						{ key: "gun00MnCnts", 	label: "임원", 					align: "left", width: 220, ...baseFileCol},
-						{ key: "mnEtcAll", 		label: "비고", 					align: "left", width: 220, editor: {type: "textarea"}, formatter: valueFormatter },
+						{ key: "mnEtcAll", 		label: "비고", 					align: "left", width: 220, editor: {type: "textarea", disabled: function () {return !lockCellForEdit(this.item, 'mnEtcAll');}}, formatter: valueFormatter },
 						{ key: "mnSortNo", 		label: "정렬순서", 				align: "center", width: 80, hidden: true},
 						{ key: "mnWeeks", 		label: "주차", 					align: "center", width: 80, hidden: true},
 						
 					]
 			});
+			
+			const releaseLockHandler = function() {
+				if (currentLockInfo) {
+					unlockCell(currentLockInfo);
+				}
+			};
+			// 이벤트에 따른 셀 락 해제 바인딩
+			$(document).on('mousedown', '[data-ax5grid-popup="textarea"] button', releaseLockHandler);
+			$(document).on('blur', '[data-ax5grid-popup="textarea"] textarea', releaseLockHandler);
+			$('[data-ax5grid="mnGrid-grid"]').on('focusout', '[data-ax5grid-editor]', releaseLockHandler);
+			$('[data-ax5grid="mnGrid-grid"]').on('blur', 'input, textarea, select', releaseLockHandler);
+
 			return this;
-		},	
+		},
 		setData: function(_pageNo) {
+			unlockUserLocks();
 			var targetObj = this.target;
 			var paramObj = {};
 			$.each($('#main_area [data-search]'), function(idx, elem){
@@ -442,6 +677,8 @@ const deptCodeMap = {
 						});
 					});
 
+					targetObj.xvar.paintStartRowIndex = undefined;
+					targetObj.xvar.paintStartColumnIndex = undefined;
 					targetObj.setData({
 						list: merged,
 						page: { totalElements: merged.length }
@@ -453,6 +690,7 @@ const deptCodeMap = {
 					alert("오류 발생!! 전산실 연락 바랍니다: " + error.message);
 				} finally {
 					syncRowHeights();
+					focusLastEditedCell();
 				}
 			});
 		}
@@ -793,6 +1031,13 @@ const deptCodeMap = {
 			item.mnSortNo = newSortNo;
 		}
 
+		lastEditedCell = {
+			mnDate: $('#mnDate_S').val(),
+			mnSubSeq: newSubSeq,
+			colKey: colKey,
+			isNoticeRow: !!item.isNoticeRow
+		};
+
 		var paramObj = {
 			mnDate		: $('#mnDate_S').val(),
 			mnWeeks		: $('#mnWeeks_S').val(),
@@ -807,8 +1052,18 @@ const deptCodeMap = {
 
 		postAjax('/user/pm/pm10/pm10_d01_update', paramObj, null, function(data) {
 			if (data.resultCode === 200) {
+				if (currentLockInfo) {
+					unlockCell(currentLockInfo);
+				}
+				lastScrollPos = {
+					top: mnGridView.target.$.panel["body-scroll"].position().top,
+					left: mnGridView.target.$.panel["body-scroll"].position().left
+				};
 				mnGridView.setData();
 			} else {
+				if (currentLockInfo) {
+					unlockCell(currentLockInfo);
+				}
 				alert('수정 실패: ' + data.resultMessage);
 			}
 		});
@@ -826,6 +1081,14 @@ const deptCodeMap = {
 
 		// 신규이면 maxSeq + 1, 아니면 기존 seq 유지
 		const newSubSeq = item.mnSubSeq > 0 ? item.mnSubSeq : (maxSeq + 1);
+		item.mnSubSeq = newSubSeq;
+
+	lastEditedCell = {
+		mnDate: $('#mnDate_S').val(),
+		mnSubSeq: newSubSeq,
+		colKey: colKey,
+		isNoticeRow: !!item.isNoticeRow
+	};
 
 		var paramObj = {
 			mnDate    : $('#mnDate_S').val(),
@@ -846,8 +1109,18 @@ const deptCodeMap = {
 		};
 		postAjax('/user/pm/pm10/pm10_d03_update', paramObj, null, function(data) {
 			if (data.resultCode === 200) {
+				if (currentLockInfo) {
+					unlockCell(currentLockInfo);
+				}
+				lastScrollPos = {
+					top: mnGridView.target.$.panel["body-scroll"].position().top,
+					left: mnGridView.target.$.panel["body-scroll"].position().left
+				};
 				mnGridView.setData();
 			} else {
+				if (currentLockInfo) {
+					unlockCell(currentLockInfo);
+				}
 				alert('수정 실패: ' + data.resultMessage);
 			}
 		});

@@ -26,4 +26,18 @@ public interface PM10Svc {
 	int pm10_d02_delete(Map<String, Object> paramMap) throws Exception;
 
 	public int mnUploadFile(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
+	int lockD01Cell(Map<String, String> param) throws Exception;
+
+	int lockD03Cell(Map<String, String> param) throws Exception;
+
+	int unlockD01Cell(Map<String, String> param) throws Exception;
+
+	int unlockD03Cell(Map<String, String> param) throws Exception;
+
+	int unlockUserLocks(Map<String, String> param) throws Exception;
+
+	Map<String, String> selectD01Cell(Map<String, String> param) throws Exception;
+
+	Map<String, String> selectD03Cell(Map<String, String> param) throws Exception;
 }

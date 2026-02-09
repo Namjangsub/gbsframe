@@ -222,5 +222,42 @@ public class PM10Svcimpl implements PM10Svc {
 		return result;
 	}
 
+	@Override
+	public int lockD01Cell(Map<String, String> param) throws Exception {
+		return pm10Mapper.lockD01Cell(param);
+	}
+
+	@Override
+	public int lockD03Cell(Map<String, String> param) throws Exception {
+		return pm10Mapper.lockD03Cell(param);
+	}
+
+	@Override
+	public int unlockD01Cell(Map<String, String> param) throws Exception {
+		return pm10Mapper.unlockD01Cell(param);
+	}
+
+	@Override
+	public int unlockD03Cell(Map<String, String> param) throws Exception {
+		return pm10Mapper.unlockD03Cell(param);
+	}
+
+	@Override
+	public int unlockUserLocks(Map<String, String> param) throws Exception {
+		int result = 0;
+		result += pm10Mapper.unlockD01ByUser(param);
+		result += pm10Mapper.unlockD03ByUser(param);
+		return result;
+	}
+
+	@Override
+	public Map<String, String> selectD01Cell(Map<String, String> param) throws Exception {
+		return pm10Mapper.selectD01Cell(param);
+	}
+
+	@Override
+	public Map<String, String> selectD03Cell(Map<String, String> param) throws Exception {
+		return pm10Mapper.selectD03Cell(param);
+	}
 
 }

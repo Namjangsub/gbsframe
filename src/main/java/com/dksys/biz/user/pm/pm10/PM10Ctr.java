@@ -183,4 +183,85 @@ public class PM10Ctr {
 		
 		return "jsonView";
 	}
+
+	// 셀 잠금
+	@PostMapping("/pm10_lock_cell")
+	public String pm10_lock_cell(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
+		try {
+			String targetType = param.get("targetType");
+			String userId = param.get("userId");
+			int lockResult = 0;
+			Map<String, String> cellData = null;
+
+			if ("D01".equals(targetType)) {
+				lockResult = pm10Svc.lockD01Cell(param);
+				cellData = pm10Svc.selectD01Cell(param);
+			} else if ("D03".equals(targetType)) {
+				lockResult = pm10Svc.lockD03Cell(param);
+				cellData = pm10Svc.selectD03Cell(param);
+			}
+
+			boolean lockedByOther = false;
+			if (cellData != null) {
+				String lockYn = cellData.get("lockYn");
+				String lockUser = cellData.get("lockUser");
+				if ("Y".equals(lockYn) && lockUser != null && !lockUser.equals(userId)) {
+					lockedByOther = true;
+				}
+			}
+
+			if (!lockedByOther) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("cellData", cellData);
+			} else {
+				model.addAttribute("resultCode", 409);
+				model.addAttribute("resultMessage", "locked");
+			}
+		} catch(Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	// 셀 잠금 해제
+	@PostMapping("/pm10_unlock_cell")
+	public String pm10_unlock_cell(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
+		try {
+			String targetType = param.get("targetType");
+			int unlockResult = 0;
+
+			if ("D01".equals(targetType)) {
+				unlockResult = pm10Svc.unlockD01Cell(param);
+			} else if ("D03".equals(targetType)) {
+				unlockResult = pm10Svc.unlockD03Cell(param);
+			}
+
+			if (unlockResult >= 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+		} catch(Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	// 사용자 잠금 해제 (setData 호출 시)
+	@PostMapping("/pm10_unlock_user_cells")
+	public String pm10_unlock_user_cells(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
+		try {
+			pm10Svc.unlockUserLocks(param);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+		} catch(Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 }
