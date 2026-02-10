@@ -215,9 +215,10 @@ public class PM10Ctr {
 				model.addAttribute("cellData", cellData);
 			} else {
 				model.addAttribute("resultCode", 409);
-				model.addAttribute("resultMessage", "locked");
+				String lockUserNm = (cellData != null) ? cellData.get("lockUserNm") : null;
+				model.addAttribute("resultMessage", lockUserNm != null ? lockUserNm : "다른 사용자");
 			}
-		} catch(Exception e) {
+		} catch (Exception e) {
 			model.addAttribute("resultCode", 900);
 			model.addAttribute("resultMessage", e.getMessage());
 		}
