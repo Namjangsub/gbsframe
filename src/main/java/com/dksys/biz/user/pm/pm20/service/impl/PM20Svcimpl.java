@@ -23,7 +23,7 @@ import com.google.gson.reflect.TypeToken;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
-public class PM20Svcimpl implements PM20Svc{
+public class PM20Svcimpl implements PM20Svc {
 
 	@Autowired
 	PM20Mapper pm20Mapper;
@@ -32,7 +32,7 @@ public class PM20Svcimpl implements PM20Svc{
 	CM08Svc cm08Svc;
 
 	@Autowired
-    CM15Svc cm15Svc;
+	CM15Svc cm15Svc;
 
 	@Override
 	public List<Map<String, String>> selectAgendaList(Map<String, String> paramMap) {
@@ -51,11 +51,11 @@ public class PM20Svcimpl implements PM20Svc{
 		if (agendaList != null) {
 			for (Map<String, String> row : agendaList) {
 				String fileTrgtKey = row.get("fileTrgtKey");
-				String agendaNo    = row.get("agendaNo");
-				String agendaDate  = row.get("agendaDate");
+				String agendaNo = row.get("agendaNo");
+				String agendaDate = row.get("agendaDate");
 				if (fileTrgtKey != null && !fileTrgtKey.isEmpty()
-					&& agendaNo != null && !agendaNo.isEmpty()
-					&& agendaDate != null && !agendaDate.isEmpty()) {
+						&& agendaNo != null && !agendaNo.isEmpty()
+						&& agendaDate != null && !agendaDate.isEmpty()) {
 					keyPairs.add(fileTrgtKey + "|" + agendaNo + "|" + agendaDate);
 				}
 			}
@@ -66,19 +66,19 @@ public class PM20Svcimpl implements PM20Svc{
 		for (String pair : keyPairs) {
 			String[] parts = pair.split("\\|", -1);
 			String fileTrgtKeyBase = parts[0];
-			String agendaNo        = parts[1];
-			String agendaDate      = parts[2];
+			String agendaNo = parts[1];
+			String agendaDate = parts[2];
 
 			// 조합 규칙: (fileTrgtKey_agendaNo_agendaDate)
 			String fileTrgtKey = fileTrgtKeyBase + "_" + agendaNo + "_" + agendaDate;
 
 			Map<String, String> fileMap = new HashMap<>(paramMap);
-			fileMap.put("comonCd",     "FITR05");
-			fileMap.put("coCd",        paramMap.get("coCd"));
+			fileMap.put("comonCd", "FITR05");
+			fileMap.put("coCd", paramMap.get("coCd"));
 			fileMap.put("fileTrgtTyp", "PM2001M01");
 			fileMap.put("fileTrgtKey", fileTrgtKey);
-			fileMap.put("jobType",     "fileList");
-			fileMap.put("userId",    paramMap.get("userId"));
+			fileMap.put("jobType", "fileList");
+			fileMap.put("userId", paramMap.get("userId"));
 
 			List<Map<String, String>> files = cm08Svc.selectFileList(fileMap);
 			if (files != null && !files.isEmpty()) {
@@ -107,7 +107,7 @@ public class PM20Svcimpl implements PM20Svc{
 	public List<Map<String, String>> select_pm20_d02_List(Map<String, String> paramMap) {
 		return pm20Mapper.select_pm20_d02_List(paramMap);
 	}
-	
+
 	@Override
 	public int insert_update_agenda_title(Map<String, String> paramMap) throws Exception {
 		String fileTrgtKey = "";
@@ -127,8 +127,18 @@ public class PM20Svcimpl implements PM20Svc{
 	@Override
 	public int insert_update_agenda(Map<String, String> paramMap) throws Exception {
 		int result = 0;
-		
+
+		// fileTrgtKey 생성 (신규인 경우)
+		if (!paramMap.containsKey("fileTrgtKey") || paramMap.get("fileTrgtKey") == null
+				|| paramMap.get("fileTrgtKey").isEmpty()) {
+			String yy = String.format("%02d", LocalDate.now().getYear() % 100);
+			paramMap.put("yy", yy);
+			String maxSeq = pm20Mapper.selectMaxFileTrgtKeySeq(paramMap);
+			paramMap.put("fileTrgtKey", yy + maxSeq);
+		}
+
 		result += pm20Mapper.pm20_main_update(paramMap); // 회의주제 마스터 테이블 insert/update
+		result += pm20Mapper.insert_update_agenda_title(paramMap); // 안건 제목도 함께 저장 (TB_PM20D01)
 		if (paramMap.containsKey("agendaNo")) {
 			result += pm20Mapper.pm20_d3_insert_update(paramMap); // 회의주제 상세 테이블 insert/update
 		}
@@ -163,7 +173,8 @@ public class PM20Svcimpl implements PM20Svc{
 		if (agendaList != null && fileTrgtKey != null && oldDate != null && newDate != null) {
 			for (Map<String, String> row : agendaList) {
 				String agendaNo = row.get("agendaNo");
-				if (agendaNo == null || agendaNo.isEmpty()) continue;
+				if (agendaNo == null || agendaNo.isEmpty())
+					continue;
 				Map<String, String> p = new HashMap<>();
 				p.put("oldFileTrgtKey", fileTrgtKey + "_" + agendaNo + "_" + oldDate);
 				p.put("newFileTrgtKey", fileTrgtKey + "_" + agendaNo + "_" + newDate);
@@ -178,7 +189,7 @@ public class PM20Svcimpl implements PM20Svc{
 		int result = 0;
 		result += pm20Mapper.pm20_d03_delete_by_agenda(paramMap);
 		result += pm20Mapper.pm20_d01_delete(paramMap);
-		
+
 		// 메인삭제 (안건이 하나도 없으면 메인삭제 쿼리)
 		result += pm20Mapper.pm20_m01_delete_main(paramMap);
 
@@ -196,15 +207,15 @@ public class PM20Svcimpl implements PM20Svc{
 	@Override
 	public int pm20_d02_update(Map<String, Object> paramMap) throws Exception {
 		int result = 0;
-		List<Map<String,Object>> attedList = (List<Map<String,Object>>) paramMap.get("attendList");
+		List<Map<String, Object>> attedList = (List<Map<String, Object>>) paramMap.get("attendList");
 
-		for (Map<String,Object> dtl : attedList) {
+		for (Map<String, Object> dtl : attedList) {
 			dtl.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 			dtl.put("agendaNo", paramMap.get("agendaNo"));
 			dtl.put("agendaVer", paramMap.get("agendaVer"));
 			dtl.put("agendaDate", paramMap.get("agendaDate"));
 			dtl.put("userId", paramMap.get("userId"));
-			dtl.put("pgmId",  paramMap.get("pgmId"));
+			dtl.put("pgmId", paramMap.get("pgmId"));
 			result += pm20Mapper.pm20_d02_update(dtl);
 		}
 		return result;
@@ -215,7 +226,7 @@ public class PM20Svcimpl implements PM20Svc{
 		int result = 0;
 		List<String> ids = (List<String>) paramMap.get("attendIds");
 		for (String id : ids) {
-			Map<String,Object> p = new HashMap<>();
+			Map<String, Object> p = new HashMap<>();
 			p.put("mnDate", paramMap.get("mnDate"));
 			p.put("userId", id);
 			result += pm20Mapper.pm20_d02_delete(p);
@@ -227,9 +238,10 @@ public class PM20Svcimpl implements PM20Svc{
 	public int pm20_d02_delete_selected(Map<String, Object> paramMap) throws Exception {
 		int result = 0;
 		List<String> ids = (List<String>) paramMap.get("attendIds");
-		if (ids == null) return 0;
+		if (ids == null)
+			return 0;
 		for (String id : ids) {
-			Map<String,Object> p = new HashMap<>();
+			Map<String, Object> p = new HashMap<>();
 			p.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
 			p.put("agendaNo", paramMap.get("agendaNo"));
 			p.put("agendaVer", paramMap.get("agendaVer"));
@@ -281,9 +293,9 @@ public class PM20Svcimpl implements PM20Svc{
 		String deleteJson = paramMap.get("deleteFileArr");
 		if (deleteJson != null && !deleteJson.isEmpty()) {
 			List<Map<String, String>> deleteList = new Gson().fromJson(
-				deleteJson,
-				new TypeToken<List<Map<String, String>>>(){}.getType()
-			);
+					deleteJson,
+					new TypeToken<List<Map<String, String>>>() {
+					}.getType());
 			for (Map<String, String> entry : deleteList) {
 				String fileKey = entry.get("fileKey");
 				cm08Svc.deleteFile(fileKey);
@@ -293,12 +305,12 @@ public class PM20Svcimpl implements PM20Svc{
 		// 업로드할 파일이 있으면 업로드
 		List<MultipartFile> fileList = mRequest.getFiles("files");
 		if (!fileList.isEmpty()) {
-			//"FITR05"은 공통코드에서 사진,미디어 첨부 디렉토리임
-			paramMap.put("comonCd",        "FITR05");
-			paramMap.put("coCd",           paramMap.get("coCd"));
-			paramMap.put("jobType",        "fileUp");
-			paramMap.put("fileTrgtTyp",    paramMap.get("pgmId"));
-			paramMap.put("fileTrgtKey",    mRequest.getParameter("fileTrgtKey"));
+			// "FITR05"은 공통코드에서 사진,미디어 첨부 디렉토리임
+			paramMap.put("comonCd", "FITR05");
+			paramMap.put("coCd", paramMap.get("coCd"));
+			paramMap.put("jobType", "fileUp");
+			paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
+			paramMap.put("fileTrgtKey", mRequest.getParameter("fileTrgtKey"));
 			cm15Svc.selectFileAuthCheck(paramMap);
 
 			// 업로드
