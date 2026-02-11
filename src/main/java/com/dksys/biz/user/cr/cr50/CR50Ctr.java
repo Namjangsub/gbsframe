@@ -249,8 +249,11 @@ public class CR50Ctr {
     public String updatePfuVersionUpProcess(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
         try {
             if (cr50Svc.updatePfuVersionUpProcess(paramMap) != 0) {
+                List<Map<String, String>> result = cr50Svc.selectPfuInfoSalesCdList(paramMap);
+                model.addAttribute("result", result);
+                
                 model.addAttribute("resultCode", 200);
-                model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+                model.addAttribute("resultMessage", messageUtils.getMessage("save"));
             } else {
                 model.addAttribute("resultCode", 500);
                 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));

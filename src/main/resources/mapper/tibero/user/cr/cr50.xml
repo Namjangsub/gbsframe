@@ -238,6 +238,17 @@
 		                             LEFT OUTER JOIN TB_CR50D02 AS CD ON X.SALES_CD = CD.SALES_CD --PFU 등록정보
 		                             LEFT OUTER JOIN TB_CR50M01 AS CR ON CR.FILE_TRGT_KEY = CD.FILE_TRGT_KEY --PFU 등록정보
 		                     )
+		                , APP AS (  --결재상태
+								  SELECT CASE WHEN  NVL(COUNT(A.TODO_KEY),0) = SUM(DECODE(NVL(A.SANCTN_STTUS, 'N'), 'N', 0, 'Y', 1) ) 
+											  THEN 'Y'
+										 	  ELSE TO_CHAR(NVL(SUM(DECODE(NVL(A.SANCTN_STTUS, 'N'), 'N', 0, 'Y', 1) ), 0) )
+							            	  END TODO_YN
+							             , A.TODO_NO, A.ETC_FIELD2, A.SALES_CD
+								    FROM SUBJ X
+								    JOIN TB_WB20M03 A ON X.PFU_NO = A.TODO_NO AND X.MAX_VER_NO = A.ETC_FIELD2
+							       WHERE A.TODO_DIV1_CODE_ID = 'TODODIV20'
+							       GROUP BY  A.TODO_NO, A.ETC_FIELD2, A.SALES_CD
+		                )
 		                SELECT X.FILE_TRGT_KEY
 		                     , X.CO_CD              --회사코드
 		                     , X.CO_NM              --회사명 
@@ -295,16 +306,10 @@
 		                     , X.PRDT_STEP
 		                     , (SELECT FN_CM05M01_CD_TO_NM(X.PRDT_STEP) FROM DUAL) AS PRDT_STEP_NM
 		                     , X.PFU_VER_NO
-							 , (SELECT CASE WHEN ( COUNT(A.TODO_KEY) = SUM(DECODE(NVL(A.SANCTN_STTUS, 'N'), 'N', 0, 'Y', 1) ) )
-											  THEN 'Y'
-										 	  ELSE TO_CHAR( SUM(DECODE(NVL(A.SANCTN_STTUS, 'N'), 'N', 0, 'Y', 1) ) )
-							            	   END TODO_YN
-								    FROM TB_WB20M03 A
-							       WHERE A.TODO_NO = X.PFU_NO
-							         AND A.ETC_FIELD2 = X.MAX_VER_NO
-							         AND A.TODO_DIV1_CODE_ID = 'TODODIV20') AS APP_STATUS  --결재상태
+							 , NVL(TODO_YN, 0) 		 AS APP_STATUS  --결재상태
 		                  FROM SJD AS CR 
 		                       LEFT OUTER JOIN SUBJ X ON X.CO_CD = CR.CO_CD AND X.SALES_CD = CR.SALES_CD 
+		                       LEFT OUTER JOIN APP A ON A.TODO_NO = X.PFU_NO AND A.ETC_FIELD2 = X.MAX_VER_NO
 		                 WHERE 1=1
 						   AND X.SALES_CD IS NOT NULL
                            <if test="lastYn != null and !lastYn.equals('')">

@@ -184,6 +184,7 @@ public class CR50SvcImpl implements CR50Svc {
         String pgmId = paramMap.get("pgmId");
         String userId = paramMap.get("userId");
 
+
         paramMap.put("reqNo", fileTrgtKey);
         List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
         if (!sharngChk.isEmpty()) {
@@ -201,14 +202,14 @@ public class CR50SvcImpl implements CR50Svc {
         return result;
     }
 
-    private String createPgParam(String actionType, String fileTrgtKey, String coCd, String ordrsNo, String salesCd) {
-        return String.format("{\"actionType\":\"%s\",\"fileTrgtKey\":\"%s\",\"coCd\":\"%s\",\"ordrsNo\":\"%s\",\"salesCd\":\"%s\"}", 
-                             actionType, fileTrgtKey, coCd, ordrsNo, salesCd);
+    private String createPgParam(String actionType, String fileTrgtKey, String coCd, String ordrsNo, String salesCd, String verNo) {
+        return String.format("{\"actionType\":\"%s\",\"fileTrgtKey\":\"%s\",\"coCd\":\"%s\",\"ordrsNo\":\"%s\",\"salesCd\":\"%s\",\"verNo\":\"%s\"}", 
+                             actionType, fileTrgtKey, coCd, ordrsNo, salesCd, verNo);
     }
 
 
     private void processInformation(String jsonData, String actionType, Consumer<Map<String, String>> insertFunction,
-                                    String fileTrgtKey, String coCd, String ordrsNo, String salesCd, String pgmId, String userId, String histNo) {
+                                    String fileTrgtKey, String coCd, String ordrsNo, String salesCd, String pgmId, String userId, String verNo) {
         Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
         Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
         List<Map<String, String>> list = gsonDtl.fromJson(jsonData, dtlMap);
@@ -222,10 +223,10 @@ public class CR50SvcImpl implements CR50Svc {
                     map.put("pgmId", pgmId);
                     map.put("userId", userId);
                     map.put("usrNm", map.get("todoId"));
-                    map.put("histNo", histNo);
+                    map.put("histNo", verNo);
                     map.put("todoCoCd", coCd);
                     map.put("sanCtnSn", Integer.toString(++i));
-                    map.put("pgParam", createPgParam(actionType, fileTrgtKey, coCd, ordrsNo, salesCd));
+                    map.put("pgParam", createPgParam(actionType, fileTrgtKey, coCd, ordrsNo, salesCd, verNo));
                     map.put("todoTitle", fileTrgtKey + ", " + map.get("todoTitle"));
                     QM01Mapper.insertWbsSharngList(map);
 //                } catch (Exception e) {
@@ -398,6 +399,7 @@ public class CR50SvcImpl implements CR50Svc {
         String coCd = paramMap.get("coCd");
         String pgmId = paramMap.get("pgmId");
         String userId = paramMap.get("userId");
+        String verNo = paramMap.get("verNo");
 
         paramMap.put("reqNo", fileTrgtKey);
         List<Map<String, String>> sharngChk = QM01Mapper.deleteWbsSharngListChk(paramMap); 
@@ -408,10 +410,10 @@ public class CR50SvcImpl implements CR50Svc {
 
 
         // Process sharing data
-        processInformation(paramMap.get("rowSharngListArr"), "T", QM01Mapper::insertWbsSharngList, fileTrgtKey, coCd, ordrsNo, salesCd, pgmId, userId, "1");
+        processInformation(paramMap.get("rowSharngListArr"), "T", QM01Mapper::insertWbsSharngList, fileTrgtKey, coCd, ordrsNo, salesCd, pgmId, userId, verNo);
 
         // Process approval data
-        processInformation(paramMap.get("rowApprovalListArr"), "S", QM01Mapper::insertWbsApprovalList, fileTrgtKey, coCd, ordrsNo, salesCd, pgmId, userId, "1");
+        processInformation(paramMap.get("rowApprovalListArr"), "S", QM01Mapper::insertWbsApprovalList, fileTrgtKey, coCd, ordrsNo, salesCd, pgmId, userId, verNo);
 
         return result;
     }
