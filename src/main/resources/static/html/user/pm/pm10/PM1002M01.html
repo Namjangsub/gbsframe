@@ -181,8 +181,8 @@
 	let attendFlag = true;	// 구분이 회의결과일 때 참석자 리스트 update를 위한 flag
 	let lastEditedCell = null;
 	let currentLockInfo = null;
-	let lastScrollPos = null;
 	let lastClickedColKey = null;
+	var isSyncing = false;
 
 	// === Soft Lock 3단계 방어 체계 ===
 	var isEditing = false;			// 1. 편집 중 플래그 (폴링 제어)
@@ -399,7 +399,12 @@
 		if (grid && typeof grid.setValue === "function") {
 			const rowIndex = Array.isArray(grid.list) ? grid.list.indexOf(item) : -1;
 			if (rowIndex >= 0) {
-				grid.setValue(rowIndex, targetKey, item[targetKey], true);
+				isSyncing = true;
+				try {
+					grid.setValue(rowIndex, targetKey, item[targetKey], true);
+				} finally {
+					isSyncing = false;
+				}
 				return;
 			}
 		}
@@ -453,7 +458,9 @@
 			mnDeptCd: lockInfo.mnDeptCd,
 			userId: $('#userId').val()
 		};
-		postAjax("/user/pm/pm10/pm10_unlock_cell", paramObj, null, function () { });
+		postAjax("/user/pm/pm10/pm10_unlock_cell", paramObj, null, function () {
+			mnGridView.updateData(true);	// unlock 완료 후 다른 사용자 변경사항 반영
+		});
 		currentLockInfo = null;
 		isEditing = false;			// 1. 편집 종료 → 폴링 재개
 		clearTimeout(idleTimer);		// 3. 유휴 타이머 해제
@@ -488,78 +495,42 @@
 	}
 
 	function focusLastEditedCell() {
+		if (!lastEditedCell) return;
 		var grid = mnGridView.target;
 
-		if (!lastEditedCell && !lastScrollPos) return;
-		if (!lastEditedCell && lastScrollPos) {
-			if (grid && typeof grid.scrollTo === "function") {
-				grid.scrollTo({ top: lastScrollPos.top, left: lastScrollPos.left });
+		// 행 찾기
+		var rowIndex = findRowIndex(grid, lastEditedCell);
+		if (rowIndex < 0) { lastEditedCell = null; return; }
+
+		// 선택 + 포커스 (focus가 자동으로 스크롤 처리)
+		grid.select(rowIndex);
+		if (lastEditedCell.colKey) {
+			var colIndex = grid.colGroup.findIndex(c => c && c.key === lastEditedCell.colKey);
+			if (colIndex >= 0) {
+				grid.focus(rowIndex, colIndex);
 			}
-			lastScrollPos = null;
-			return;
 		}
-		let rowIndex = -1;
-		if (lastEditedCell.isNoticeRow) {
-			rowIndex = mnGridView.target.list.findIndex(r => r.isNoticeRow);
-		} else if (lastEditedCell.isFileRow) {
-			rowIndex = mnGridView.target.list.findIndex(r => r.isFileRow);
-		} else if (String(lastEditedCell.mnSubSeq) === '0') {
-			// 신규 행: 서버에서 MAX+1로 발급되므로 가장 큰 mnSubSeq를 가진 행을 찾는다
-			let maxSeq = 0;
-			mnGridView.target.list.forEach((r, idx) => {
+
+		lastEditedCell = null;
+	}
+
+	function findRowIndex(grid, editInfo) {
+		if (editInfo.isNoticeRow) return grid.list.findIndex(r => r.isNoticeRow);
+		if (editInfo.isFileRow) return grid.list.findIndex(r => r.isFileRow);
+		if (String(editInfo.mnSubSeq) === '0') {
+			// 신규 행: 가장 큰 mnSubSeq
+			var maxSeq = 0, maxIdx = -1;
+			grid.list.forEach((r, idx) => {
 				if (!r.isFileRow && !r.isNoticeRow && Number(r.mnSubSeq) > maxSeq) {
-					maxSeq = Number(r.mnSubSeq);
-					rowIndex = idx;
+					maxSeq = Number(r.mnSubSeq); maxIdx = idx;
 				}
 			});
-		} else {
-			rowIndex = mnGridView.target.list.findIndex(r =>
-				!r.isFileRow && !r.isNoticeRow &&
-				String(r.mnSubSeq) === String(lastEditedCell.mnSubSeq) &&
-				String(r.mnDate) === String(lastEditedCell.mnDate)
-			);
+			return maxIdx;
 		}
-		if (rowIndex >= 0) {
-			mnGridView.target.select(rowIndex);
-			let colIndex = -1;
-			if (mnGridView.target.colGroup && lastEditedCell.colKey) {
-				colIndex = mnGridView.target.colGroup.findIndex(c => c && c.key === lastEditedCell.colKey);
-			}
-			if (colIndex >= 0) {
-				mnGridView.target.focus(rowIndex, colIndex);
-			} else if (lastEditedCell.colKey) {
-				mnGridView.target.focus(rowIndex, lastEditedCell.colKey);
-			}
-		}
-		// 스크롤 위치 복원
-		var savedScrollPos = lastScrollPos;
-		var savedRowIndex = rowIndex;
-		setTimeout(function () {
-			try {
-				var grid = mnGridView.target;
-				// 1) 먼저 가로 스크롤 CSS 설정 (repaint가 이 left 값을 읽어 올바른 컬럼을 렌더링)
-				if (savedScrollPos && savedScrollPos.left) {
-					grid.$.panel["body-scroll"].css("left", savedScrollPos.left);
-					grid.$.panel["header-scroll"].css("left", savedScrollPos.left);
-					if (grid.$.panel["top-body-scroll"]) {
-						grid.$.panel["top-body-scroll"].css("left", savedScrollPos.left);
-					}
-					if (grid.$.panel["bottom-body-scroll"]) {
-						grid.$.panel["bottom-body-scroll"].css("left", savedScrollPos.left);
-					}
-				}
-				// 2) 세로 스크롤 복원 (scrollTo({top})이 repaint 트리거 → 위에서 설정한 left CSS를 읽어 정확한 컬럼 렌더)
-				if (savedScrollPos) {
-					grid.scrollTo({ top: savedScrollPos.top });
-				} else if (savedRowIndex >= 0 && grid.xvar && grid.xvar.bodyTrHeight) {
-					var frozen = grid.xvar.frozenRowIndex || 0;
-					var top = -Math.max(0, savedRowIndex - frozen) * grid.xvar.bodyTrHeight;
-					grid.scrollTo({ top: top });
-				}
-			} catch (e) { }
-		}, 50);
-		lastScrollPos = null;
-		lastEditedCell = null;
+		return grid.list.findIndex(r =>
+			!r.isFileRow && !r.isNoticeRow &&
+			String(r.mnSubSeq) === String(editInfo.mnSubSeq)
+		);
 	}
 
 	var mnGridView = {
@@ -604,6 +575,16 @@
 						return false;
 					},
 					onDataChanged: function () {
+						if (isSyncing) return; // setValue에 의한 트리거 무시
+
+						// 편집 셀 정보 저장
+						lastEditedCell = {
+							mnDate: this.item.mnDate || $('#mnDate_S').val(),
+							mnSubSeq: this.item.mnSubSeq,
+							colKey: this.key,
+							isNoticeRow: !!this.item.isNoticeRow
+						};
+
 						if (this.key === 'mnSubject' || this.key === 'mnStatus' || this.key === 'mnEtcAll') {
 							pm10_d01_update(this.item, this.key, this.value);
 						} else {
@@ -834,6 +815,14 @@
 				try {
 					var newList = mnGridView.processGridData(data);
 					var oldList = mnGridView.target.list;
+
+					// 행 수가 달라졌으면 전체 리로드 (다른 사용자가 행 추가/삭제)
+					if (newList.length !== oldList.length) {
+						mnGridView.target.setData({ list: newList, page: { totalElements: newList.length } });
+						if (data.d02List) select_p10_d02_List(data.d02List);
+						return;
+					}
+
 					var deptCols = Object.keys(deptCodeMap);
 					var otherCols = ['mnStatus', 'mnEtcAll'];
 					var hasLockChange = false;
@@ -892,22 +881,27 @@
 								// 하지만 repaint가 비동기거나 깜빡임을 줄이기 위해 setValue도 호출하는 게 안전.
 							}
 
-							// 값 변경 체크 및 setValue
-							deptCols.forEach(colKey => {
-								if (String(oldItem[colKey] || '') !== String(newItem[colKey] || '')) {
-									mnGridView.target.setValue(oldItemIndex, colKey, newItem[colKey]);
+							// 값 변경 체크 및 setValue (isSyncing으로 onDataChanged 트리거 방지)
+							isSyncing = true;
+							try {
+								deptCols.forEach(colKey => {
+									if (String(oldItem[colKey] || '') !== String(newItem[colKey] || '')) {
+										mnGridView.target.setValue(oldItemIndex, colKey, newItem[colKey]);
+									}
+								});
+								otherCols.forEach(colKey => {
+									if (String(oldItem[colKey] || '') !== String(newItem[colKey] || '')) {
+										mnGridView.target.setValue(oldItemIndex, colKey, newItem[colKey]);
+									}
+								});
+								if (String(oldItem.mnSubject || '') !== String(newItem.mnSubject || '')) {
+									mnGridView.target.setValue(oldItemIndex, 'mnSubject', newItem.mnSubject);
 								}
-							});
-							otherCols.forEach(colKey => {
-								if (String(oldItem[colKey] || '') !== String(newItem[colKey] || '')) {
-									mnGridView.target.setValue(oldItemIndex, colKey, newItem[colKey]);
+								if (String(oldItem.mnSortNo || 0) !== String(newItem.mnSortNo || 0)) {
+									mnGridView.target.setValue(oldItemIndex, "mnSortNo", newItem.mnSortNo);
 								}
-							});
-							if (String(oldItem.mnSubject || '') !== String(newItem.mnSubject || '')) {
-								mnGridView.target.setValue(oldItemIndex, 'mnSubject', newItem.mnSubject);
-							}
-							if (String(oldItem.mnSortNo || 0) !== String(newItem.mnSortNo || 0)) {
-								mnGridView.target.setValue(oldItemIndex, "mnSortNo", newItem.mnSortNo);
+							} finally {
+								isSyncing = false;
 							}
 						}
 					});
@@ -923,7 +917,7 @@
 					}
 				} catch (error) {
 				}
-			});
+			}, false);
 		}
 
 	}
@@ -1309,20 +1303,10 @@
 		};
 
 		postAjax('/user/pm/pm10/pm10_d01_update', paramObj, null, function (data) {
-			if (data.resultCode === 200) {
-				if (currentLockInfo) {
-					unlockCell(currentLockInfo);
-				}
-				lastScrollPos = {
-					top: mnGridView.target.$.panel["body-scroll"].position().top,
-					left: mnGridView.target.$.panel["body-scroll"].position().left
-				};
-				mnGridView.setData();
-			} else {
-				if (currentLockInfo) {
-					unlockCell(currentLockInfo);
-				}
+			if (currentLockInfo) unlockCell(currentLockInfo);
+			if (data.resultCode !== 200) {
 				alert('수정 실패: ' + data.resultMessage);
+				mnGridView.setData(); // 실패 시에만 전체 리로드
 			}
 		});
 	}
@@ -1367,20 +1351,10 @@
 			pgmId: $('#pgmId').val()
 		};
 		postAjax('/user/pm/pm10/pm10_d03_update', paramObj, null, function (data) {
-			if (data.resultCode === 200) {
-				if (currentLockInfo) {
-					unlockCell(currentLockInfo);
-				}
-				lastScrollPos = {
-					top: mnGridView.target.$.panel["body-scroll"].position().top,
-					left: mnGridView.target.$.panel["body-scroll"].position().left
-				};
-				mnGridView.setData();
-			} else {
-				if (currentLockInfo) {
-					unlockCell(currentLockInfo);
-				}
+			if (currentLockInfo) unlockCell(currentLockInfo);
+			if (data.resultCode !== 200) {
 				alert('수정 실패: ' + data.resultMessage);
+				mnGridView.setData(); // 실패 시에만 전체 리로드
 			}
 		});
 	}
@@ -1459,12 +1433,6 @@
 
 	// 첨부파일 Start
 	function mnUploadFile() {
-		// 스크롤 위치 저장
-		// 스크롤 위치 저장 (혹시 몰라 pixel 위치도 저장)
-		lastScrollPos = {
-			top: mnGridView.target.$.panel["body-scroll"].position().top,
-			left: mnGridView.target.$.panel["body-scroll"].position().left
-		};
 		// 파일 첨부인 경우 lastEditedCell 명시적 지정
 		if (currentFileRow && currentFileColumn) {
 			lastEditedCell = { isFileRow: true, colKey: currentFileColumn };
@@ -1652,7 +1620,7 @@
 		const dataRows = allRows.filter(r => !r.isFileRow && !r.isNoticeRow);
 
 		// 로우가 없으면 정렬순서 계산 return
-		if (dataRows.length == 0 && noticeRow.mnSortNo == 0) {
+		if (dataRows.length == 0 && noticeRow && noticeRow.mnSortNo == 0) {
 			return false;
 		}
 
@@ -1666,22 +1634,22 @@
 				: 0;
 		}
 
+		// setData 대신 list를 직접 교체하고 repaint (스크롤 유지)
 		const newList = [
 			...dataRows,
 			...(noticeRow ? [noticeRow] : []),
 			...(fileRow ? [fileRow] : [])
 		];
-		grid.setData({
-			list: newList,
-			page: { totalElements: newList.length }
-		});
+		grid.list = newList;
+		grid.repaint();
 
+		// 정렬순서 서버 저장
 		const sortSave = allRows
 			.filter(r => !r.isFileRow && r.mnSubSeq > 0)
 			.map(r => ({
 				mnSubSeq: r.mnSubSeq,
 				mnSortNo: r.mnSortNo
-			}))
+			}));
 
 		var paramObj = {
 			mnDate: $('#mnDate_S').val(),
@@ -1690,11 +1658,7 @@
 			list: sortSave
 		};
 
-		postAjax('/user/pm/pm10/pm10_d01_sortNo_update', paramObj, null, function (data) {
-			if (data.resultCode == 200) {
-				// mnGridView.setData();
-			}
-		});
+		postAjax('/user/pm/pm10/pm10_d01_sortNo_update', paramObj, null, function (data) {});
 	}
 
 	//Select 선택 코드값 체크하여 명을 출력
