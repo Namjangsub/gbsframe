@@ -181,7 +181,8 @@
 	let attendFlag = true;	// 구분이 회의결과일 때 참석자 리스트 update를 위한 flag
 	let lastEditedCell = null;
 	let currentLockInfo = null;
-	let lastScrollPos = null;
+	let lastClickedColKey = null;
+	var isSyncing = false;
 
 	// === Soft Lock 3단계 방어 체계 ===
 	var isEditing = false;			// 1. 편집 중 플래그 (폴링 제어)
@@ -189,18 +190,20 @@
 	var isPolling = false;			// 2. 폴링 중 여부 (unlockUserLocks 스킵용)
 	var idleTimer = null;			// 3. 유휴 타이머
 	var IDLE_TIMEOUT_MS = 10 * 60 * 1000;	// 3. 유휴 타임아웃 10분
+	var isPopupView = false;
 
 	const DEFAULT_ATTEND_LIST = [
-		{ id: 'EMJ8105',    name: '김태호',   title: '부사장' },
-		{ id: 'kimjhv',     name: '김재현',   title: '전 무' },
-		{ id: 'kimihz',     name: '김일희',   title: '상 무' },
-		{ id: 'K98452000',  name: '김동현',   title: '상 무' },
-		{ id: 'shjung',     name: '정상훈',   title: '부 장' },
-		{ id: 'h4ng10',     name: '허상렬',   title: '부 장' },
-		{ id: 'canmtb',     name: '한동주',   title: '과 장' },
-		{ id: 'js.nam',     name: '남장섭',   title: '실 장' },
-		{ id: 'cyh',        name: '조영희',   title: '부 장' },
-		{ id: 'jwc',        name: '조완철',   title: '차 장' },
+		{ id: 'EMJ8105', name: '김태호', title: '부사장' },
+		{ id: 'kimjhv', name: '김재현', title: '전 무' },
+		{ id: 'kimihz', name: '김일희', title: '상 무' },
+		{ id: 'K98452000', name: '김동현', title: '상 무' },
+		{ id: 'shjung', name: '정상훈', title: '부 장' },
+		{ id: 'h4ng10', name: '허상렬', title: '부 장' },
+		{ id: 'canmtb', name: '한동주', title: '과 장' },
+		{ id: 'js.nam', name: '남장섭', title: '실 장' },
+		{ id: 'cyh', name: '조영희', title: '부 장' },
+		{ id: 'jwc', name: '조완철', title: '차 장' },
+		{ id: 'sms', name: '손민성', title: '차 장' },
 	];
 	let attendList = DEFAULT_ATTEND_LIST.map(u => ({ ...u }));
 
@@ -224,7 +227,7 @@
 		const currentUserId = $('#userId').val();
 		// D01 컬럼 (mnSubject, mnEtcAll, mnStatus)
 		if (colKey === 'mnSubject' || colKey === 'mnEtcAll' || colKey === 'mnStatus') {
-			if (item.d01LockYn === 'Y' && item.d01LockUserNm && item.d01LockUserNm !== currentUserId) {
+			if (item.d01LockYn === 'Y' && item.d01LockUserNm) {
 				return { lockYn: item.d01LockYn, lockUserNm: item.d01LockUserNm };
 			}
 			return null;
@@ -235,7 +238,7 @@
 			const lockYnKey = deptCd.toLowerCase().replace(/([a-z])(\d)/g, '$1$2') + 'LockYn';
 			const lockNmKey = deptCd.toLowerCase().replace(/([a-z])(\d)/g, '$1$2') + 'LockUserNm';
 			// CamelMap 키: gun00LockYn, gun30LockUserNm 등
-			if (item[lockYnKey] === 'Y' && item[lockNmKey] && item[lockNmKey] !== currentUserId) {
+			if (item[lockYnKey] === 'Y' && item[lockNmKey]) {
 				return { lockYn: item[lockYnKey], lockUserNm: item[lockNmKey] };
 			}
 		}
@@ -292,7 +295,7 @@
 	};
 
 	const mnStatusCode = [
-		{ 'CD': '',  'NM' : '' },
+		{ 'CD': '', 'NM': '' },
 		{ 'CD': 'N', 'NM': '진행' },
 		{ 'CD': 'Y', 'NM': '완료' }
 	]
@@ -301,7 +304,7 @@
 	const deptCodeMap = {
 		gun00MnCnts: 'GUN00', gun60MnCnts: 'GUN60', gun30MnCnts: 'GUN30',
 		gun40MnCnts: 'GUN40', trn5010MnCnts: 'TRN5010', trn5020MnCnts: 'TRN5020',
-		gun10MnCnts: 'GUN10', gun80MnCnts: 'GUN80', gun70MnCnts: 'GUN70'
+		gun10MnCnts: 'GUN10', gun80MnCnts: 'GUN80', gun70MnCnts: 'GUN70', gun75MnCnts: 'GUN75'
 	};
 
 	function getLockTarget(item, colKey) {
@@ -397,7 +400,12 @@
 		if (grid && typeof grid.setValue === "function") {
 			const rowIndex = Array.isArray(grid.list) ? grid.list.indexOf(item) : -1;
 			if (rowIndex >= 0) {
-				grid.setValue(rowIndex, targetKey, item[targetKey], true);
+				isSyncing = true;
+				try {
+					grid.setValue(rowIndex, targetKey, item[targetKey], true);
+				} finally {
+					isSyncing = false;
+				}
 				return;
 			}
 		}
@@ -451,7 +459,9 @@
 			mnDeptCd: lockInfo.mnDeptCd,
 			userId: $('#userId').val()
 		};
-		postAjax("/user/pm/pm10/pm10_unlock_cell", paramObj, null, function () { });
+		postAjax("/user/pm/pm10/pm10_unlock_cell", paramObj, null, function () {
+			mnGridView.updateData(true);	// unlock 완료 후 다른 사용자 변경사항 반영
+		});
 		currentLockInfo = null;
 		isEditing = false;			// 1. 편집 종료 → 폴링 재개
 		clearTimeout(idleTimer);		// 3. 유휴 타이머 해제
@@ -487,45 +497,41 @@
 
 	function focusLastEditedCell() {
 		if (!lastEditedCell) return;
-		const grid = mnGridView.target;
-		let rowIndex = -1;
-		if (lastEditedCell.isNoticeRow) {
-			rowIndex = grid.list.findIndex(r => r.isNoticeRow);
-		} else if (String(lastEditedCell.mnSubSeq) === '0') {
-			// 신규 행: 서버에서 MAX+1로 발급되므로 가장 큰 mnSubSeq를 가진 행을 찾는다
-			let maxSeq = 0;
-			grid.list.forEach((r, idx) => {
-				if (!r.isFileRow && !r.isNoticeRow && Number(r.mnSubSeq) > maxSeq) {
-					maxSeq = Number(r.mnSubSeq);
-					rowIndex = idx;
-				}
-			});
-		} else {
-			rowIndex = grid.list.findIndex(r =>
-				!r.isFileRow && !r.isNoticeRow &&
-				String(r.mnSubSeq) === String(lastEditedCell.mnSubSeq) &&
-				String(r.mnDate) === String(lastEditedCell.mnDate)
-			);
-		}
-		if (rowIndex >= 0) {
-			grid.select(rowIndex);
-			let colIndex = -1;
-			if (grid.colGroup && lastEditedCell.colKey) {
-				colIndex = grid.colGroup.findIndex(c => c && c.key === lastEditedCell.colKey);
-			}
+		var grid = mnGridView.target;
+
+		// 행 찾기
+		var rowIndex = findRowIndex(grid, lastEditedCell);
+		if (rowIndex < 0) { lastEditedCell = null; return; }
+
+		// 선택 + 포커스 (focus가 자동으로 스크롤 처리)
+		grid.select(rowIndex);
+		if (lastEditedCell.colKey) {
+			var colIndex = grid.colGroup.findIndex(c => c && c.key === lastEditedCell.colKey);
 			if (colIndex >= 0) {
 				grid.focus(rowIndex, colIndex);
-			} else {
-				grid.focus(rowIndex, lastEditedCell.colKey);
 			}
 		}
-		if (rowIndex >= 0 && typeof grid.scrollTo === "function" && grid.xvar && grid.xvar.bodyTrHeight) {
-			const frozen = grid.xvar.frozenRowIndex || 0;
-			const top = -Math.max(0, rowIndex - frozen) * grid.xvar.bodyTrHeight;
-			grid.scrollTo({ top: top });
-		}
-		lastScrollPos = null;
+
 		lastEditedCell = null;
+	}
+
+	function findRowIndex(grid, editInfo) {
+		if (editInfo.isNoticeRow) return grid.list.findIndex(r => r.isNoticeRow);
+		if (editInfo.isFileRow) return grid.list.findIndex(r => r.isFileRow);
+		if (String(editInfo.mnSubSeq) === '0') {
+			// 신규 행: 가장 큰 mnSubSeq
+			var maxSeq = 0, maxIdx = -1;
+			grid.list.forEach((r, idx) => {
+				if (!r.isFileRow && !r.isNoticeRow && Number(r.mnSubSeq) > maxSeq) {
+					maxSeq = Number(r.mnSubSeq); maxIdx = idx;
+				}
+			});
+			return maxIdx;
+		}
+		return grid.list.findIndex(r =>
+			!r.isFileRow && !r.isNoticeRow &&
+			String(r.mnSubSeq) === String(editInfo.mnSubSeq)
+		);
 	}
 
 	var mnGridView = {
@@ -552,6 +558,7 @@
 						this.self.clearSelect();
 						this.self.select(this.dindex);
 						const colKey = this.column.key;
+						lastClickedColKey = colKey;
 						const files = (this.item.filesByColumn && this.item.filesByColumn[colKey]) || [];
 						if ($('#mnDiv_S').val() === 'MNDIV99') return;
 						if (this.column.key == 'mnSubject' && this.item.mnSubject === '파일첨부') return;
@@ -569,6 +576,16 @@
 						return false;
 					},
 					onDataChanged: function () {
+						if (isSyncing) return; // setValue에 의한 트리거 무시
+
+						// 편집 셀 정보 저장
+						lastEditedCell = {
+							mnDate: this.item.mnDate || $('#mnDate_S').val(),
+							mnSubSeq: this.item.mnSubSeq,
+							colKey: this.key,
+							isNoticeRow: !!this.item.isNoticeRow
+						};
+
 						if (this.key === 'mnSubject' || this.key === 'mnStatus' || this.key === 'mnEtcAll') {
 							pm10_d01_update(this.item, this.key, this.value);
 						} else {
@@ -609,6 +626,7 @@
 					{ key: "mnSubSeq", label: "순번", align: "left", width: 100, hidden: true },
 					{ key: "gun30MnCnts", label: "영업<br>국내/해외", align: "left", width: 220, ...baseFileCol },
 					{ key: "gun60MnCnts", label: "생산", align: "left", width: 220, ...baseFileCol },
+					{ key: "gun70MnCnts", label: "생산관리", align: "left", width: 220, ...baseFileCol },
 					{ key: "gun40MnCnts", label: "기술연구소", align: "left", width: 220, ...baseFileCol },
 					{
 						key: undefined, label: "구매외주", columns: [
@@ -616,7 +634,7 @@
 							{ key: "trn5020MnCnts", label: "전기", align: "left", width: 220, ...baseFileCol },
 						]
 					},
-					{ key: "gun70MnCnts", label: "S.PM", align: "left", width: 220, ...baseFileCol },
+					{ key: "gun75MnCnts", label: "S.PM", align: "left", width: 220, ...baseFileCol },
 					{ key: "gun80MnCnts", label: "전산", align: "left", width: 220, ...baseFileCol },
 					{ key: "gun10MnCnts", label: "경영지원,회계", align: "left", width: 220, ...baseFileCol },
 					{ key: "gun00MnCnts", label: "임원", align: "left", width: 220, ...baseFileCol },
@@ -641,6 +659,7 @@
 			return this;
 		},
 		setData: function (_pageNo) {
+			if (isPopupView) return false;
 			unlockUserLocks();
 			var targetObj = this.target;
 			var paramObj = {};
@@ -656,108 +675,7 @@
 
 			postAjax("/user/pm/pm10/selectMnList", paramObj, null, function (data) {
 				try {
-					// data.result가 없으면 빈 배열 처리
-					var list = Array.isArray(data.result) ? data.result : [];
-
-					// rnum이 있는 회의록만 추출
-					var rows = list.filter(r => r.rnum !== undefined);
-
-					// 공지사항 기본 구조
-					let noticeRow = rows.find(r => r.mnSubject === '공지사항');
-					if (!noticeRow) {
-						noticeRow = {
-							mnDate: $('#mnDate_S').val(),
-							mnWeeks: $('#mnWeeks_S').val(),
-							mnSubSeq: 0,
-							mnSubject: '공지사항',
-							mnSortNo: 0,
-							isNoticeRow: true,
-							gun00MnCnts: '', gun30MnCnts: '', gun40MnCnts: '', gun60MnCnts: '',
-							trn5010MnCnts: '', trn5020MnCnts: '', gun10MnCnts: '', gun80MnCnts: '',
-							mnStatus: '', mnEtcAll: ''
-						};
-					} else {
-						noticeRow.isNoticeRow = true;
-					}
-
-					// 파일첨부 처리: data.result 중 files 키를 가진 객체에서 JSON 파싱
-					const fileEntry = list.find(r => typeof r.files === 'string');
-					const parsedFiles = fileEntry ? JSON.parse(fileEntry.files) : [];
-
-					// fileRow 기본 구조
-					const fileRow = {
-						mnDate			: $('#mnDate_S').val(),
-						mnWeeks			: $('#mnWeeks_S').val(),
-						mnSubSeq		: 0,
-						mnSubject		: '파일첨부',
-						gun00MnCnts		: '', gun30MnCnts: '', gun40MnCnts: '', gun60MnCnts: '',
-						trn5010MnCnts	: '', trn5020MnCnts: '', gun10MnCnts: '', gun80MnCnts: '',
-						mnStatus		: '', 
-						mnEtcAll		: '',
-						mnSortNo		: 0,
-						isFileRow		: true,
-						filesByColumn	: {}
-					};
-
-					// parsedFiles 배열 돌면서 deptCodeMap에 맞춰 바로 filesByColumn에 추가
-					parsedFiles.forEach(f => {
-						const deptCode = String(f.fileTrgtKey).split('-').length >= 2 ? String(f.fileTrgtKey).split('-')[1] : '';
-						const colKey = Object.keys(deptCodeMap)
-							.find(key => deptCodeMap[key] === deptCode);
-						if (!colKey) return;
-
-						if (!fileRow.filesByColumn[colKey]) {
-							fileRow.filesByColumn[colKey] = [];
-						}
-						fileRow.filesByColumn[colKey].push({
-							name	: f.fileName,
-							fileKey	: f.fileKey,
-							fileType: f.fileType
-						});
-					});
-
-					// merged 배열 생성
-					const nonNoticeRows = rows.filter(r => r.mnSubject !== '공지사항');
-					const merged = [...nonNoticeRows, noticeRow, fileRow].sort((a, b) => {
-						if (a.isFileRow) return 1;
-						if (b.isFileRow) return -1;
-						if (a.isNoticeRow) return 1;
-						if (b.isNoticeRow) return -1;
-						return ((a.mnSortNo || 0) - (b.mnSortNo || 0));
-					});
-
-
-
-					// 구분에 따른 그리드 화면 조회
-					const deptCols = Object.keys(deptCodeMap);
-					merged.forEach(item => {
-						deptCols.forEach(colKey => {
-							const cntsVal = item[colKey] || '';
-							const resultKey = colKey.replace('MnCnts', 'MnResult');
-							const resultVal = item[resultKey] || '';
-
-							if ($('#mnDiv_S').val() === 'MNDIV01') {
-								// 사전공지
-								item[colKey] = cntsVal;
-							}
-							else if ($('#mnDiv_S').val() === 'MNDIV02') {
-								// 회의결과가 없으면 사전공지자료를 보여줌
-								item[colKey] = (resultVal) ? resultVal : cntsVal;
-							}
-							else if ($('#mnDiv_S').val() === 'MNDIV99') {
-								// 전체조회: 빈 값은 섹션에서 제외
-								let parts = [];
-								if (cntsVal) {
-									parts.push(`[사전공지]\n${cntsVal}`);
-								}
-								if (resultVal) {
-									parts.push(`[회의결과]\n${resultVal}`);
-								}
-								// 둘 다 비어 있으면 빈 문자열
-								item[colKey] = parts.length ? parts.join('\n\n') : '';
-							}
-						});
-					});
+					var merged = mnGridView.processGridData(data);
 
 					targetObj.xvar.paintStartRowIndex = undefined;
 					targetObj.xvar.paintStartColumnIndex = undefined;
@@ -775,6 +693,234 @@
 					focusLastEditedCell();
 				}
 			});
+		},
+		processGridData: function (data) {
+			if (!data) return [];
+			var list = Array.isArray(data.result) ? data.result : [];
+
+			// rnum이 있는 회의록만 추출
+			var rows = list.filter(r => r.rnum !== undefined);
+
+			// 공지사항 기본 구조
+			let noticeRow = rows.find(r => r.mnSubject === '공지사항');
+			if (!noticeRow) {
+				noticeRow = {
+					mnDate: $('#mnDate_S').val(),
+					mnWeeks: $('#mnWeeks_S').val(),
+					mnSubSeq: 0,
+					mnSubject: '공지사항',
+					mnSortNo: 0,
+					isNoticeRow: true,
+					gun00MnCnts: '', gun30MnCnts: '', gun40MnCnts: '', gun60MnCnts: '',
+					trn5010MnCnts: '', trn5020MnCnts: '', gun10MnCnts: '', gun80MnCnts: '',
+					mnStatus: '', mnEtcAll: ''
+				};
+			} else {
+				noticeRow.isNoticeRow = true;
+			}
+
+			// 파일첨부 처리: data.result 중 files 키를 가진 객체에서 JSON 파싱
+			const fileEntry = list.find(r => typeof r.files === 'string');
+			const parsedFiles = fileEntry ? JSON.parse(fileEntry.files) : [];
+
+			// fileRow 기본 구조
+			const fileRow = {
+				mnDate: $('#mnDate_S').val(),
+				mnWeeks: $('#mnWeeks_S').val(),
+				mnSubSeq: 0,
+				mnSubject: '파일첨부',
+				gun00MnCnts: '', gun30MnCnts: '', gun40MnCnts: '', gun60MnCnts: '',
+				trn5010MnCnts: '', trn5020MnCnts: '', gun10MnCnts: '', gun80MnCnts: '',
+				mnStatus: '',
+				mnEtcAll: '',
+				mnSortNo: 0,
+				isFileRow: true,
+				filesByColumn: {}
+			};
+
+			// parsedFiles 배열 돌면서 deptCodeMap에 맞춰 바로 filesByColumn에 추가
+			parsedFiles.forEach(f => {
+				const deptCode = String(f.fileTrgtKey).split('-').length >= 2 ? String(f.fileTrgtKey).split('-')[1] : '';
+				const colKey = Object.keys(deptCodeMap)
+					.find(key => deptCodeMap[key] === deptCode);
+				if (!colKey) return;
+
+				if (!fileRow.filesByColumn[colKey]) {
+					fileRow.filesByColumn[colKey] = [];
+				}
+				fileRow.filesByColumn[colKey].push({
+					name: f.fileName,
+					fileKey: f.fileKey,
+					fileType: f.fileType
+				});
+			});
+
+			// merged 배열 생성
+			const nonNoticeRows = rows.filter(r => r.mnSubject !== '공지사항');
+			const merged = [...nonNoticeRows, noticeRow, fileRow].sort((a, b) => {
+				if (a.isFileRow) return 1;
+				if (b.isFileRow) return -1;
+				if (a.isNoticeRow) return 1;
+				if (b.isNoticeRow) return -1;
+				return ((a.mnSortNo || 0) - (b.mnSortNo || 0));
+			});
+
+			// 구분에 따른 그리드 화면 조회
+			const deptCols = Object.keys(deptCodeMap);
+			const mnDivVal = $('#mnDiv_S').val();
+
+			merged.forEach(item => {
+				deptCols.forEach(colKey => {
+					const cntsVal = item[colKey] || '';
+					const resultKey = colKey.replace('MnCnts', 'MnResult');
+					const resultVal = item[resultKey] || '';
+
+					if (mnDivVal === 'MNDIV01') {
+						// 사전공지
+						item[colKey] = cntsVal;
+					}
+					else if (mnDivVal === 'MNDIV02') {
+						// 회의결과가 없으면 사전공지자료를 보여줌
+						item[colKey] = (resultVal) ? resultVal : cntsVal;
+					}
+					else if (mnDivVal === 'MNDIV99') {
+						// 전체조회: 빈 값은 섹션에서 제외
+						let parts = [];
+						if (cntsVal) {
+							parts.push(`[사전공지]\n${cntsVal}`);
+						}
+						if (resultVal) {
+							parts.push(`[회의결과]\n${resultVal}`);
+						}
+						// 둘 다 비어 있으면 빈 문자열
+						item[colKey] = parts.length ? parts.join('\n\n') : '';
+					}
+				});
+			});
+
+			return merged;
+		},
+		updateData: function (isPolling) {
+			if (isPopupView) return false;
+			var targetObj = this.target;
+			var paramObj = {};
+			$.each($('#main_area [data-search]'), function (idx, elem) {
+				if ($(elem).hasClass("input_calendar")) {
+					paramObj[$(elem).data("search")] = deleteHyphenStr($(elem).val());
+				} else {
+					paramObj[$(elem).data("search")] = $(elem).val();
+				}
+			});
+			paramObj.userId = jwt.userId;
+			paramObj.deptCodes = JSON.stringify(Object.values(deptCodeMap));
+
+			postAjax("/user/pm/pm10/selectMnList", paramObj, null, function (data) {
+				try {
+					var newList = mnGridView.processGridData(data);
+					var oldList = mnGridView.target.list;
+
+					// 행 수가 달라졌으면 전체 리로드 (다른 사용자가 행 추가/삭제)
+					if (newList.length !== oldList.length) {
+						mnGridView.target.setData({ list: newList, page: { totalElements: newList.length } });
+						if (data.d02List) select_p10_d02_List(data.d02List);
+						return;
+					}
+
+					var deptCols = Object.keys(deptCodeMap);
+					var otherCols = ['mnStatus', 'mnEtcAll'];
+					var hasLockChange = false;
+
+					// 부서별 Lock Key 매핑 미리 생성
+					var deptLockKeys = {};
+					deptCols.forEach(colKey => {
+						const deptCd = deptCodeMap[colKey];
+						const prefix = deptCd.toLowerCase().replace(/([a-z])(\d)/g, '$1$2');
+						deptLockKeys[colKey] = {
+							yn: prefix + 'LockYn',
+							nm: prefix + 'LockUserNm'
+						};
+					});
+
+					newList.forEach(newItem => {
+						var oldItemIndex = -1;
+						if (newItem.isNoticeRow) {
+							oldItemIndex = oldList.findIndex(r => r.isNoticeRow);
+						} else if (newItem.isFileRow) {
+							oldItemIndex = oldList.findIndex(r => r.isFileRow);
+						} else {
+							oldItemIndex = oldList.findIndex(r =>
+								!r.isNoticeRow && !r.isFileRow &&
+								String(r.mnDate) === String(newItem.mnDate) &&
+								String(r.mnSubSeq) === String(newItem.mnSubSeq)
+							);
+						}
+
+						if (oldItemIndex >= 0) {
+							var oldItem = oldList[oldItemIndex];
+							let isItemLockChanged = false;
+
+							// 1. D01 Lock Check
+							if ((oldItem.d01LockYn !== newItem.d01LockYn) || (oldItem.d01LockUserNm !== newItem.d01LockUserNm)) {
+								isItemLockChanged = true;
+							}
+
+							// 2. Dept Lock Check
+							if (!isItemLockChanged) {
+								for (var colKey of deptCols) {
+									const keys = deptLockKeys[colKey];
+									if ((oldItem[keys.yn] !== newItem[keys.yn]) || (oldItem[keys.nm] !== newItem[keys.nm])) {
+										isItemLockChanged = true;
+										break;
+									}
+								}
+							}
+
+							if (isItemLockChanged) {
+								hasLockChange = true;
+								Object.assign(oldItem, newItem); // 데이터 전체 동기화
+							} else {
+								// 락 변경이 없으면 값 변경 체크 (락 변경 시엔 repaint 하므로 setValue 불필요하거나, 스크롤 유지를 위해 둘다 해도 됨)
+								// 여기선 효율성을 위해 락 변경 없을 때만 setValue (어차피 repaint되면 값도 갱신됨)
+								// 하지만 repaint가 비동기거나 깜빡임을 줄이기 위해 setValue도 호출하는 게 안전.
+							}
+
+							// 값 변경 체크 및 setValue (isSyncing으로 onDataChanged 트리거 방지)
+							isSyncing = true;
+							try {
+								deptCols.forEach(colKey => {
+									if (String(oldItem[colKey] || '') !== String(newItem[colKey] || '')) {
+										mnGridView.target.setValue(oldItemIndex, colKey, newItem[colKey]);
+									}
+								});
+								otherCols.forEach(colKey => {
+									if (String(oldItem[colKey] || '') !== String(newItem[colKey] || '')) {
+										mnGridView.target.setValue(oldItemIndex, colKey, newItem[colKey]);
+									}
+								});
+								if (String(oldItem.mnSubject || '') !== String(newItem.mnSubject || '')) {
+									mnGridView.target.setValue(oldItemIndex, 'mnSubject', newItem.mnSubject);
+								}
+								if (String(oldItem.mnSortNo || 0) !== String(newItem.mnSortNo || 0)) {
+									mnGridView.target.setValue(oldItemIndex, "mnSortNo", newItem.mnSortNo);
+								}
+							} finally {
+								isSyncing = false;
+							}
+						}
+					});
+
+					if (data.d02List) select_p10_d02_List(data.d02List);
+
+					// 락 정보 변경이 감지되면 전체 리페인트 (뱃지 갱신)
+					if (!isPolling) {
+						syncRowHeights();
+						focusLastEditedCell();
+					} else if (hasLockChange) {
+						mnGridView.target.repaint();
+					}
+				} catch (error) {
+				}
+			}, false);
 		}
 
 	}
@@ -912,6 +1058,9 @@
 				const removed = row.filesByColumn[colKey].splice(idx, 1)[0];
 				deleteFileArr.push({ fileKey: removed.fileKey });
 
+				// 파일 삭제 후에도 해당 위치 복원
+				lastEditedCell = { isFileRow: true, colKey: colKey };
+
 				mnGridView.target.repaint();
 				mnUploadFile();
 			}
@@ -931,7 +1080,16 @@
 					fileName: f.name,
 					coCd: $('#coCd_S').val()
 				}));
-			imageViewPopup('GUN', fileKey, fileName, imageList);
+			isPopupView = true;
+			var paramObj = {
+				fileKey: fileKey,
+				fileName: fileName,
+				fileList: imageList,
+				coCd: 'GUN'
+			};
+			openThirdModal("/static/html/cmn/modal/attachImageView.html",$('body').width() - 40, $('body').height() - 50, fileName, paramObj,function () {
+				isEditing = false;
+			});
 		});
 
 		$(window).on('resize', showSize);
@@ -939,13 +1097,12 @@
 
 		// 2. Polling: 30초마다 그리드 데이터 갱신 (편집 중이 아닐 때만)
 		pollInterval = setInterval(function () {
-			if (isEditing) return;
-			isPolling = true;
-			mnGridView.setData(0);
-			isPolling = false;
+			if (isEditing || isPopupView) return;
+			// 델타 업데이트 방식 사용 (스크롤/포커스 유지됨)
+			mnGridView.updateData(true);
 		}, 30000);
 
-		// ⑤ beforeunload: 브라우저 이탈 시 즉시 락 해제
+		// 5. beforeunload: 브라우저 이탈 시 즉시 락 해제
 		window.addEventListener('beforeunload', function () {
 			if (currentLockInfo) {
 				navigator.sendBeacon(
@@ -1158,20 +1315,10 @@
 		};
 
 		postAjax('/user/pm/pm10/pm10_d01_update', paramObj, null, function (data) {
-			if (data.resultCode === 200) {
-				if (currentLockInfo) {
-					unlockCell(currentLockInfo);
-				}
-				lastScrollPos = {
-					top: mnGridView.target.$.panel["body-scroll"].position().top,
-					left: mnGridView.target.$.panel["body-scroll"].position().left
-				};
-				mnGridView.setData();
-			} else {
-				if (currentLockInfo) {
-					unlockCell(currentLockInfo);
-				}
+			if (currentLockInfo) unlockCell(currentLockInfo);
+			if (data.resultCode !== 200) {
 				alert('수정 실패: ' + data.resultMessage);
+				mnGridView.setData(); // 실패 시에만 전체 리로드
 			}
 		});
 	}
@@ -1207,28 +1354,19 @@
 			mnDeptCd: deptCodeMap[colKey],
 			mnCnts: $("#mnDiv_S").val() === 'MNDIV01' ? value : '',  // 사전공지
 			mnEtc: '',
+			mnEtcAll: item.mnEtcAll,
 			mnResult: $("#mnDiv_S").val() === 'MNDIV02' ? value : '',  // 회의결과
-			mnStatus: '',
+			mnStatus: item.mnStatus,
 			clntPjt: '',
 			clntCd: '',
 			userId: $('#userId').val(),
 			pgmId: $('#pgmId').val()
 		};
 		postAjax('/user/pm/pm10/pm10_d03_update', paramObj, null, function (data) {
-			if (data.resultCode === 200) {
-				if (currentLockInfo) {
-					unlockCell(currentLockInfo);
-				}
-				lastScrollPos = {
-					top: mnGridView.target.$.panel["body-scroll"].position().top,
-					left: mnGridView.target.$.panel["body-scroll"].position().left
-				};
-				mnGridView.setData();
-			} else {
-				if (currentLockInfo) {
-					unlockCell(currentLockInfo);
-				}
+			if (currentLockInfo) unlockCell(currentLockInfo);
+			if (data.resultCode !== 200) {
 				alert('수정 실패: ' + data.resultMessage);
+				mnGridView.setData(); // 실패 시에만 전체 리로드
 			}
 		});
 	}
@@ -1307,6 +1445,11 @@
 
 	// 첨부파일 Start
 	function mnUploadFile() {
+		// 파일 첨부인 경우 lastEditedCell 명시적 지정
+		if (currentFileRow && currentFileColumn) {
+			lastEditedCell = { isFileRow: true, colKey: currentFileColumn };
+		}
+
 		var formData = new FormData();
 
 		formData.append("userId", $("#userId").val());
@@ -1489,7 +1632,7 @@
 		const dataRows = allRows.filter(r => !r.isFileRow && !r.isNoticeRow);
 
 		// 로우가 없으면 정렬순서 계산 return
-		if (dataRows.length == 0 && noticeRow.mnSortNo == 0) {
+		if (dataRows.length == 0 && noticeRow && noticeRow.mnSortNo == 0) {
 			return false;
 		}
 
@@ -1503,22 +1646,22 @@
 				: 0;
 		}
 
+		// setData 대신 list를 직접 교체하고 repaint (스크롤 유지)
 		const newList = [
 			...dataRows,
 			...(noticeRow ? [noticeRow] : []),
 			...(fileRow ? [fileRow] : [])
 		];
-		grid.setData({
-			list: newList,
-			page: { totalElements: newList.length }
-		});
+		grid.list = newList;
+		grid.repaint();
 
+		// 정렬순서 서버 저장
 		const sortSave = allRows
 			.filter(r => !r.isFileRow && r.mnSubSeq > 0)
 			.map(r => ({
 				mnSubSeq: r.mnSubSeq,
 				mnSortNo: r.mnSortNo
-			}))
+			}));
 
 		var paramObj = {
 			mnDate: $('#mnDate_S').val(),
@@ -1527,11 +1670,7 @@
 			list: sortSave
 		};
 
-		postAjax('/user/pm/pm10/pm10_d01_sortNo_update', paramObj, null, function (data) {
-			if (data.resultCode == 200) {
-				// mnGridView.setData();
-			}
-		});
+		postAjax('/user/pm/pm10/pm10_d01_sortNo_update', paramObj, null, function (data) {});
 	}
 
 	//Select 선택 코드값 체크하여 명을 출력
