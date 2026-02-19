@@ -861,81 +861,84 @@
 		}
 
 		const tempOrdrsDiv = $("#ordrsDiv").val();
-		if (!detailAcFlag) {
-			if(tempOrdrsDiv == "ORDRSDIV3" || tempOrdrsDiv == "ORDRSDIV8" || tempOrdrsDiv == "ORDRSDIV9"){ //무상AS start, 수주취소, 가수주건
-			} else {
-				//수금내역
-				if (rowListPlan.length == 0 && !detailAcFlag) {
-					commaChange();
-					alert("수금내역을 확인해 주세요?");
+
+		// 수금내역 데이터 수집 (항상 실행 - 정산상계/추후정산이 있어도 기존 수금정보 유지)
+		if(tempOrdrsDiv == "ORDRSDIV3" || tempOrdrsDiv == "ORDRSDIV8" || tempOrdrsDiv == "ORDRSDIV9"){ //무상AS, 수주취소, 가수주건
+		} else {
+			// 수금 필수 체크 (정산상계/추후정산이면 스킵)
+			if (rowListPlan.length == 0 && !detailAcFlag) {
+				commaChange();
+				alert("수금내역을 확인해 주세요?");
+				return false;
+			}
+
+			$.each(rowListPlan, function (idx, elem) {
+				var planObj = {};
+
+				planObj["clmnPlanSeq"] = idx + 1;
+				planObj["clmnPlanDiv"] = elem.clmnPlanDiv;
+				planObj["clmnDivSeq"] = elem.clmnDivSeq;
+				planObj["clmnRate"] = elem.clmnRate;
+				// planObj["clmnAmt"] = pasIntChk(elem.clmnAmt.replace(/,/g, ''));
+				planObj["clmnAmt"] = elem.clmnAmt;
+
+				let clmnDt = new Date(elem.clmnDt);
+
+				if(isNaN(clmnDt)) {
+					clmnDtCnt++;
+				}
+
+				let pmntDtAfterBill = pasIntChk(elem.pmntDtAfterBill, 10); // 문자열을 숫자로 변환
+				// clmnDt에서 pmntDtAfterBill를 뺍니다.
+				clmnDt.setDate(clmnDt.getDate() - pmntDtAfterBill);
+
+				// Date 객체를 YYYY-MM-DD 형식의 문자열로 변환
+				let convertDateToString = function (dateObj) {
+					let month = '' + (dateObj.getMonth() + 1),
+					day = '' + dateObj.getDate(),
+					year = dateObj.getFullYear();
+
+					if (month.length < 2)
+					month = '0' + month;
+
+					if (day.length < 2)
+					day = '0' + day;
+
+					return [year, month, day].join('-');
+				};
+
+				if(elem.clmnAmt == 0) {
+					clmnAmtCnt++;
+				}
+
+				// 계산된 날짜를 billPblsDt에 할당 일자없으면 null로 세팅
+				if(isNaN(pmntDtAfterBill)) {
+					planObj["billPblsDt"] = "";
+					planObj["pmntDtAfterBill"] = "";
+				} else {
+					planObj["billPblsDt"] = convertDateToString(clmnDt);
+					planObj["pmntDtAfterBill"] = pmntDtAfterBill;
+				}
+				planObj["clmnDt"] = elem.clmnDt;
+				planObj["clmnMgmtStatus"] = elem.clmnMgmtStatus;
+
+				planArr.push(planObj);
+			});
+
+			//수금정보 입력 자료 중복 체크 (수금구분과  차수가 중복확인)
+			const chkValues = new Set();
+			for (const obj of rowListPlan) {
+				let chkValue = obj.clmnPlanDiv + obj.clmnDivSeq; //수금구분 || 수금차수 중복 체크를 확인용
+				if (chkValues.has(chkValue)) {
+					alert("수금구분과 차수가 중복됩니다. 확인바랍니다.");
 					return false;
 				}
+				chkValues.add(chkValue);
+			}
 
-				$.each(rowListPlan, function (idx, elem) {
-					var planObj = {};
-
-					planObj["clmnPlanSeq"] = idx + 1;
-					planObj["clmnPlanDiv"] = elem.clmnPlanDiv;
-					planObj["clmnDivSeq"] = elem.clmnDivSeq;
-					planObj["clmnRate"] = elem.clmnRate;
-					// planObj["clmnAmt"] = pasIntChk(elem.clmnAmt.replace(/,/g, ''));
-					planObj["clmnAmt"] = elem.clmnAmt;
-
-					let clmnDt = new Date(elem.clmnDt);
-
-					if(isNaN(clmnDt)) {
-						clmnDtCnt++;
-					}
-
-					let pmntDtAfterBill = pasIntChk(elem.pmntDtAfterBill, 10); // 문자열을 숫자로 변환
-					// clmnDt에서 pmntDtAfterBill를 뺍니다.
-					clmnDt.setDate(clmnDt.getDate() - pmntDtAfterBill);
-
-					// Date 객체를 YYYY-MM-DD 형식의 문자열로 변환
-					let convertDateToString = function (dateObj) {
-						let month = '' + (dateObj.getMonth() + 1),
-						day = '' + dateObj.getDate(),
-						year = dateObj.getFullYear();
-
-						if (month.length < 2)
-						month = '0' + month;
-
-						if (day.length < 2)
-						day = '0' + day;
-
-						return [year, month, day].join('-');
-					};
-
-					if(elem.clmnAmt == 0) {
-						clmnAmtCnt++;
-					}
-
-					// 계산된 날짜를 billPblsDt에 할당 일자없으면 null로 세팅
-					if(isNaN(pmntDtAfterBill)) {
-						planObj["billPblsDt"] = "";
-						planObj["pmntDtAfterBill"] = "";
-					} else {
-						planObj["billPblsDt"] = convertDateToString(clmnDt);
-						planObj["pmntDtAfterBill"] = pmntDtAfterBill;
-					}
-					planObj["clmnDt"] = elem.clmnDt;
-					planObj["clmnMgmtStatus"] = elem.clmnMgmtStatus;
-
-					planArr.push(planObj);
-				});
-
-				//수금정보 입력 자료 중복 체크 (수금구분과  차수가 중복확인)
-				const chkValues = new Set();
-				for (const obj of rowListPlan) {
-					let chkValue = obj.clmnPlanDiv + obj.clmnDivSeq; //수금구분 || 수금차수 중복 체크를 확인용
-					if (chkValues.has(chkValue)) {
-						alert("수금구분과 차수가 중복됩니다. 확인바랍니다.");
-						return false;
-					}
-					chkValues.add(chkValue);
-				}
-
-				if(clmnAmtCnt > 0 && !detailAcFlag) {
+			// 정산상계/추후정산이 아닐 때만 금액/일자 필수 체크
+			if (!detailAcFlag) {
+				if(clmnAmtCnt > 0) {
 					commaChange();
 					alert("수금계획 금액이 없습니다!");
 					return false;
@@ -963,8 +966,8 @@
 					}
 				}
 			}
-			//무상AS end
 		}
+		//무상AS end
 
 		if($('#coCd').val() == 'TRN' && $('#ordrsClntCd').val() == refCode) { //투루넷,건양 start //refCode = 1 (GUN, 건양아이티티의 거래처등록번호 추출 설정하기)
 		} else {
