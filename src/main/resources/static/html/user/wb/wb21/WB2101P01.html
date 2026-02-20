@@ -20,6 +20,7 @@
 			<input type="hidden" id="maxVerNo" 	name="maxVerNo">
 			<input type="hidden" id="pgmId" 	name="pgmId" value="WB2101P02">
 			<input type="hidden" id="fileTrgtKey" 	name="fileTrgtKey">
+			<select id="prdMngChk" data-kind="SPECRTS" hidden></select>
 			<table class="popup_table">
 				<colgroup>
 					<col width="15%">
@@ -108,7 +109,7 @@
 					<td colspan="1"></td>
 					<th>일정예외상황</th>
 					<td>
-						<select id="planExcept" name="planExcept" data-kind="PLANEXCEPT" class="form-control">
+						<select id="planExcept" name="planExcept" data-kind="PLANEXCEPT" class="form-control" onchange="onPlanExceptChange(this.value)">
 						</select>
 					</td>
 				</tr>
@@ -203,7 +204,56 @@
 						<input type="text" id="manualElecFileNm" name="manualElecFileNm" readonly>
 					</td>
 				</tr>
+				<thead>
+					<tr>
+						<td colspan="9" style="height:30px;">
+							<div style="display:flex; justify-content:space-between; align-items:center;">
+								<div style="display:flex; align-items:center; text-align:left;">
+									<span style="margin-right:10px;">▣ 일정계획정보</span>
 
+									<!-- <div id="copyCheckBox">
+										<label style="margin-right:10px;">
+											<input type="checkbox" id="allPjtYn" class="copyChk" style="vertical-align: middle; margin-right:3px; margin-bottom:4px;"/>프로젝트 전체
+										</label>
+
+										<label style="margin-right:10px;">
+											<input type="checkbox" id="taskPlanYn" class="copyChk" style="vertical-align: middle; margin-right:3px; margin-bottom:4px;"/>TASK 계획 포함
+										</label>
+									</div> -->
+								</div>
+								<div id="addrow1" class="add_btn_small pdl10" style="white-space:nowrap;">
+									<a id="btn15" onclick="copyAllPlanPopUp();" style="width:60px;height:30px;line-height:28px;">복사</a>
+									<a id="btn1" onclick="wbsLevel1Insert();" style="width:60px;height:30px;line-height:28px;">저장</a>
+									<a id="btn2" onclick="updateWbsChanges();" style="width:100px;height:30px;line-height:28px;">변경요청 저장</a>
+									<!-- <a id="btn2" onclick="wbsLevel1confirm('N');" data-grid-control="row-add2" style="width:60px;height: 30px; line-height: 28px;">미확정</a> -->
+									<a id="btn3" onclick="wbsLevel1confirm('Y');" style="width:60px;height:30px;line-height:28px;">확정</a>
+									<a id="btn4" onclick="createWbsPlanVerUp();" style="width:60px;height:30px;line-height:28px;">Ver. Up</a>
+								</div>
+
+							</div>
+						</td>
+					</tr>
+				</thead>
+				<tr style="text-align: left;">
+					<th>계획기본정보</th>
+					<th>Ver.</th>
+					<td>
+						<input type="text" id="wbsPlanVerNo" name="wbsPlanVerNo" readonly>
+					</td>
+					<td colspan="2">
+						<input type="text" id="wbsPlanVerUpReason" name="wbsPlanVerUpReason" readonly>
+					</td>
+					</td>
+					<th style="color: blue;">확정</th>
+					<td>
+						<input type="hidden" id="wbsPlanCloseYn" name="wbsPlanCloseYn" style="color: blue;" readonly><div id="wbsPlanClose"></div>
+					</td>
+				</tr>
+				<tr>
+					<td colspan="9">
+						<div class="ax5_grid" data-ax5grid="popup-grid1" data-ax5grid-config="{}" style="height: 445px; width: 100%" ></div>
+					</td>
+				</tr>
 				<tr>
 					<tr style="text-align: left;">
 						<th>비고<br>(1000자)</th>
@@ -243,6 +293,543 @@
     var actionType = '';
 	var fileTrgtKey = '';
 	var originDeDt = '';
+	var planVerNo = '';
+	var histYn = "N";
+	var wbsPlanCodeKind = null;
+	var deleteRowArr = [];
+	var addRowArr = [];
+	var level__index = 0;
+	var firstCol = '';
+	var firstRow = '';
+	var thisGridRow = 0;
+	var thisGridCol = 0;
+	var teamManagerYnFlag = false;
+
+	ax5.ui.grid.formatter["chkYn"] = function () {
+		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
+		return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
+	};
+
+	//---------------------------------------------------
+	/*  WBSPLANSTS10	미진행
+		WBSPLANSTS20	진행중
+		WBSPLANSTS30	지연
+		WBSPLANSTS40	지연완료
+		WBSPLANSTS50	정상완료 */
+	var wbsPlanStsCodeId = [];
+	var paramObj = {codeKind : "WBSPLANSTS"};
+
+	postAjaxSync("/user/wb/wb21/selectCodeList", paramObj, null, function(data) {
+		wbsPlanStsCodeId = data.resultList;
+	});
+	//---------------------------------------------------
+
+	const deptByPlanCode = {
+		"WBSCODE01" : "GUN30",
+		"WBSCODE02" : "GUN30",
+		"WBSCODE03" : "GUN40",
+		"WBSCODE04" : "TRN50",
+		"WBSCODE05" : "GUN60",
+		"WBSCODE06" : "TRN50",
+		"WBSCODE07" : "GUN60",
+		"WBSCODE08" : "GUN60",
+		"WBSCODE09" : "GUN30",
+		"WBSCODE10" : "GUN30",
+		"WBSCODE11" : "GUN30",
+		"WBSCODE12" : "GUN30",
+		"WBSCODE13" : "GUN30",
+		"WBSCODE14" : "GUN30",
+		"WBSCODE15" : "GUN30",
+		"WBSCODE16" : "GUN30",
+		"WBSCODE17" : "TRN50",
+		"WBSCODE18" : "GUN30"
+	}
+
+	function gridColor(item) {
+		let rtnColor = "";
+		if (item.wbsPlanMngId == jwt.userId) {
+			rtnColor = "grid-row-yellow";
+		}
+		return rtnColor;
+	}
+
+	// 일정관리 권한에 따른 편집가능 여부 체크 함수
+	function canEditPlanRow(row) {
+		if (!row) return false;
+
+		// 전기 인원은 WBSCODE06(전기완료)만 수정 가능
+		const isElectUser = jwt.userId === 'canmtb' || jwt.userId === 'tjswlssky' || jwt.userId === 'famyg80';
+		if (isElectUser) {
+			return row.wbsPlanCodeId === 'WBSCODE06';
+		}
+
+		const sameDeptTeamManager = teamManagerYnFlag && row.deptId && jwt.deptId && row.deptId.slice(0, 5) == jwt.deptId.slice(0, 5);
+
+		// 생산관리 권한
+		const prdMngIds = ($('#prdMngChk option').attr('data-etc') || '').replace(/\s/g, '').split(',').filter(Boolean);
+
+		// 시스템관리자, js.nam, ssj: 확정 여부 상관없이 수정 가능
+		const privilegedUserAlways =
+			jwt.authInfo.includes('AUTH999') ||
+			jwt.userId == 'js.nam' ||
+			jwt.userId == 'ssj' ||
+			prdMngIds.includes(jwt.userId);
+
+		// 총괄PM, 생산관리: 미확정일 때만 수정 가능
+		const privilegedUserUnconfirmed =
+			$('#smrizeId').val() == jwt.userId;
+
+		const unconfirmed = $("#wbsPlanCloseYn").val() !== "Y";
+
+		// 빈로우에 대한 추가 설정
+		const coCd = $("#coCd").val();
+		const mappedDeptId = deptByPlanCode[row.wbsPlanCodeId];
+		const isTeam01 = jwt.teamManager === "TEAM01";
+
+		const extraAllowedByPlanCode = coCd === "GUN" && mappedDeptId && jwt.deptId && mappedDeptId === jwt.deptId.slice(0, 5) && isTeam01;
+		const extraAllowedTRN = coCd === "TRN" && mappedDeptId === "TRN50" && isTeam01;
+
+		return sameDeptTeamManager || privilegedUserAlways || (unconfirmed && privilegedUserUnconfirmed) || extraAllowedByPlanCode || extraAllowedTRN;
+	}
+
+
+	var gridView1 = {
+		initView: function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showRowSelector: false,
+				multipleSelect: false,
+				sortable: false,
+				target: $('[data-ax5grid="popup-grid1"]'),
+				header: {
+					align: "center",
+					selector: false,
+				},
+				page : {
+					navigationItemCount : 10,
+					height : 0,
+					use : false,
+				},
+				body: {
+					onClick: function (event, e) {
+						this.self.select(this.dindex);
+						var idx = this.dindex;
+						firstCol = this.colIndex;
+						firstRow = this.dindex;
+
+						// 일정관리 미확정일때도 Task 계획 및 실적 조회가능하게 수정 2025-09-22 최지상
+						if(histYn == "N") {
+							// if (addRowArr.length  > 0 || deleteRowArr.length  > 0) {
+							// 	if (confirm("TASK별 정보내 추가 또는 삭제 내역이 존재합니다. 저장 후 처리하세요?")) {
+							// 		gridView1.target.select(lastGridView1Rownum);
+							// 		return;
+							// 	}
+							// }
+							deleteRowArr = [];
+							addRowArr = [];
+							
+							wbsPlanCodeKind = this.item.wbsPlanCodeId;
+							
+							// Validation 체크 총괄PM이 아니면 자기담당인TASK만 조회가능
+							var smrizeId = $('#smrizeId').val();
+							var row = gridView1.target.getList("selected")[0];
+							level__index = row.__index;
+							// 1. 총괄 PM인 경우 조회만 됨
+							//  총괄PM 또는 일정관리 담당자 한동주 가능-->
+							// 등록내용은 전체 조회가 되고,  수정권한만 제거 함. 남장섭 231215 확인
+							// Validation 체크 - 2레벨 담당자 체크 버튼 보임 처리
+							if (row != undefined && row.wbsPlanMngId != jwt.userId && this.item.closeYn != "Y") {
+								$("#wb21_popForm #addrow2").hide();
+							}else {
+								$("#wb21_popForm #addrow2").show();
+							}
+// 							if(jwt.userId == smrizeId || jwt.userId == 'ycy'){
+// 								gridView2.setData(0);
+// 							}else if(row != undefined && row.wbsPlanMngId == jwt.userId){
+// 								// 2. 자신이 담당자인 TASK 조회
+// 								gridView2.setData(0);
+// 							}else{
+// 								gridView2.setData(0);
+// 							}
+
+							// gridView2.setData(0);
+						}
+
+					},
+					onDBLClick: function () {
+						var idx = this.dindex;
+						// Validation 체크: 수정 권한 없으면 return
+						if (!canEditPlanRow(this.item)) {
+							return;
+						}
+
+						if (this.column.key=='wbsPlanMngNm') {
+							var closeYn = this.item.closeYn;
+							var deptId = this.item.deptId;
+							var oldMngNm = this.item.wbsPlanMngNm || '';  // 변경 전 담당자명 저장
+							var paramObj = {
+								"coCd" : coCd,
+								"userId": '',
+								"useYn": "Y"
+							};
+							openSecondModal("/static/html/cmn/modal/userSearch.html", 450, 650, "담당자 검색", paramObj, function (tree){
+								var row = gridView1.target.getList("selected")[0];
+								var isElectPlanAllower = row.wbsPlanCodeId === 'WBSCODE06' && (jwt.userId === 'canmtb' || jwt.userId === 'tjswlssky' || jwt.userId === 'famyg80');
+								var checkedId = tree.get_checked()[0];
+								var checkedNode = tree.get_node(checkedId);
+
+								// 확정일 때만 부서 체크, 총괄PM/생산관리/시스템관리자는 부서 제한 없음
+								var prdMngIds = ($('#prdMngChk option').attr('data-etc') || '').replace(/\s/g, '').split(',').filter(Boolean);
+								var isPrivilegedUser = $('#smrizeId').val() == jwt.userId || prdMngIds.includes(jwt.userId) || jwt.authInfo.includes('AUTH999') || jwt.userId == 'js.nam' || jwt.userId == 'ssj';
+
+								if (closeYn == "Y" && !isPrivilegedUser && jwt.deptId.slice(0, 5) !== checkedNode.original.parent.slice(0, 5)) {
+									customAlert("같은 부서원만 선택 가능합니다.");
+									return false;
+								}
+																
+								var newMngNm = checkedNode.text;  // 변경 후 담당자명
+
+								gridView1.target.updateRow($.extend({}, gridView1.target.list[idx], {wbsPlanMngId : checkedNode.id}), idx);
+								gridView1.target.updateRow($.extend({}, gridView1.target.list[idx], {wbsPlanMngNm : newMngNm}), idx);
+
+								// 미확정일 때 저장버튼 표시
+								if (closeYn !== "Y") {
+									$("#wb21_popForm #btn1").show();
+								}
+
+								// 권한 있는 사용자가 담당자를 변경한 경우 저장 처리 (확정일 때)
+								if (closeYn == "Y" && canEditPlanRow(row)) {
+									if (oldMngNm !== newMngNm) {
+										updateWbsPlan(idx, 'mngId', { oldValue: oldMngNm, newValue: newMngNm });
+									} else {
+										wbsLevel1Insert();
+									}
+								}
+							});
+						} else if (this.column.key=='wbsPlansDt' || this.column.key=='wbsPlaneDt') {
+							
+						}
+
+					},
+					onDataChanged: function (param) {
+						var that = this;
+						var oldValue = this.before;  // 변경 전 값
+						var newValue = this.value;   // 변경 후 값
+
+						//하나라도 수정되면 저장버튼 활성화,
+						//   setValue는 onDataChanged 이벤트 없음.--> 해당함수에서 처리해야함
+
+						// 버튼 표시 로직 (과제 확정 시에만 동작)
+						if ($('#wb21_popForm #closeYn').val() == "Y") {
+							if (this.key == "chgReason") {
+								$("#wb21_popForm #btn2").show();
+							} else if (this.item.closeYn != "Y") {
+								$("#wb21_popForm #btn1").show();
+							}
+						}
+
+						const fDate = new Date(this.item.wbsPlansDt);
+						const tDate = new Date(this.item.wbsPlaneDt);
+
+						//시작일
+						const beginDt = new Date($('#beginDt').val());
+						//완료검수일
+						const acptncDt = new Date($('#acptncDt').val());
+
+						//1. 시작일자가 시작일 이전이면 안됨
+// 						if(this.item.wbsPlansDt != undefined && fDate < beginDt){
+// 							alert("시작일자는 시작일 이전 일 수 없습니다.");
+// 							this.self.setValue(this.dindex, "wbsPlaneDt", null);
+// 							return false;
+// 						}
+
+						//2. 종료일자가 완료검수일 이후면 안됨
+// 						if(this.item.wbsPlaneDt != undefined && tDate > acptncDt){
+// 							alert("종료일자는 완료검수일 이후 일 수 없습니다.");
+// 							this.self.setValue(this.dindex, "wbsPlaneDt", null);
+// 							return false;
+// 						}
+
+						//3. 시작일자는 종료일자 이후일 수 없다.
+// 						if(this.item.wbsPlansDt != undefined && this.item.wbsPlaneDt != undefined && fDate > tDate) {
+// 							// alert("시작일자는 종료일자 이후 일 수 없습니다.");
+// 							let dtSelect = confirm("시작일자는 종료일자 이후 일 수 없습니다.");
+// 							if (dtSelect) {
+// 								//확인이면 종료일자를 시작일자로 설정
+// 								this.self.setValue(this.dindex, "wbsPlaneDt", this.item.wbsPlansDt);
+// 							} else {
+// 								this.self.setValue(this.dindex, "wbsPlansDt", null);
+// 							}
+// 							return false;
+// 						}
+
+						if((this.key === 'wbsPlansDt' || this.key === 'wbsPlaneDt') && this.item.wbsPlansDt != undefined && this.item.wbsPlaneDt != undefined){
+							this.self.setValue(this.dindex, "daycnt", calculateCalendarCnt(this.item.wbsPlansDt, this.item.wbsPlaneDt));
+						}
+
+						// 확정일 때 권한 있는 사용자가 시작일자/종료일자를 변경한 경우 자동 저장 처리
+						if (this.item.closeYn == "Y" && canEditPlanRow(this.item)) {
+							if ((this.key === 'wbsPlansDt' || this.key === 'wbsPlaneDt') && oldValue !== newValue) {
+								updateWbsPlan(this.dindex, 'date', null);
+							}
+						}
+
+						// if ($("#allPjtYn").is(":checked") && (this.key === "wbsPlanMngId" || this.key === "wbsPlansDt" || this.key === "wbsPlaneDt")) {
+						// 	this.self.setValue(this.dindex, "allPjtYn", "Y");
+						// }
+						// if ($("#taskPlanYn").is(":checked") && (this.key === "wbsPlanMngId" || this.key === "wbsPlansDt" || this.key === "wbsPlaneDt")) {
+						// 	this.self.setValue(this.dindex, "taskPlanYn", "Y");
+						// }
+
+						// //  // 담당자 ID, 시작일자, 종료일자 변경시
+						// if (this.item.taskPlanYn == "Y" && (this.key == "wbsPlanMngId" || this.key == "wbsPlansDt" || this.key == "wbsPlaneDt")) {
+						// 	chkRsltsExist(this.item);
+						// }
+					},
+				},
+				contextMenu: {
+					iconWidth: 20,
+					acceleratorWidth: 100,
+					itemClickAndClose: false,
+					icons: {
+						'arrow': '<i class="fa fa-caret-right"></i>'
+					},
+					items: [
+						{type: 1, label: "붙여넣기"},
+						{divide: true},
+						{type: 1, label: "내용삭제"},
+					],
+					popupFilter: function (item, param) {
+
+						// 우클릭 컨텐츠박스 권한에 따른 제어
+						// 1. 팀장이면서 해당 계획에 담당자 또는 같은 부서의 직원의 계획이면 변경 붙여넣기 및 내용삭제 가능
+						// 2. 전기완료 계획인 경우 한동주, 오선진 제어 가능하게 (deptId로 제어함)
+						// 3. 총괄PM, 생산관리담당자, 시스템관리자(AUTH999) 이면 붙여넣기 및 내용삭제 가능
+						// 4. 위 조건에 해당하지 않으면 붙여넣기 및 내용삭제 방지
+						const selectedRow = gridView1.target.list[param.dindex];
+						if (teamManagerYnFlag && (selectedRow.wbsPlanMngId == jwt.userId || selectedRow.deptId.slice(0,5) == jwt.deptId.slice(0,5))) {
+							return true;
+						} else if (selectedRow.wbsPlanCodeId == 'WBSCODE06' && (jwt.deptId =='TRN5020' || jwt.deptId =='TRN5040')) {
+							return true;
+						} else if ($('#smrizeId').val() == jwt.userId || $('#prdMngChk option').attr('data-etc').replace(/\s/g,'').split(',').includes(jwt.userId) || jwt.authInfo.includes('AUTH999') ) {
+							return true;
+						} else {
+							return false;
+						}
+						//console.log(item, param);
+						if (param.element) {
+							return true;
+						} else {
+							return item.type == 1;
+						}
+					},
+					onClick: function (item, param, e) {
+// 						console.log("contextMenu onPaste");
+						//하나라도 수정되면 저장버튼 활성화 (미확정일 때만)
+						var row = gridView1.target.list[param.dindex];
+						if (row && row.closeYn !== "Y") {
+							$("#wb21_popForm #btn1").show();  //저장버튼
+						}
+						thisGridRow = param.dindex;
+						thisGridCol = param.colIndex;
+
+						if (item.label == "붙여넣기") {
+							gridPaste(gridView1.target, thisGridRow, thisGridCol);
+						} else if (item.label == "내용삭제") {
+							var row = gridView1.target.list[thisGridRow];
+							// DB에 저장된 적 없는 경우 (최초 등록 상태) 그리드 값만 초기화
+							if (!row.fileTrgtKey || !row.verNo) {
+								gridView1.target.setValue(thisGridRow, 'wbsPlanMngId', '');
+								gridView1.target.setValue(thisGridRow, 'wbsPlanMngNm', '');
+								gridView1.target.setValue(thisGridRow, 'wbsPlansDt', '');
+								gridView1.target.setValue(thisGridRow, 'wbsPlaneDt', '');
+								gridView1.target.setValue(thisGridRow, 'daycnt', '');
+								$("#wb21_popForm #btn1").show(); // 저장버튼 표시
+							} else {
+								// DB에 저장된 경우 버전업 처리
+								updateWbsPlan(thisGridRow, 'delete', null);
+							}
+						}
+						gridView1.target.contextMenu.close();
+					}
+				},
+				columns: [
+					{key: "rn",            label: "No."				,    align: "center",   width: 40},
+					{key: "fileTrgtKey",   label: "FILE TRGT KEY"	,    hidden:true},
+					{key: "coCd",          label: "회사"				,    hidden:true},
+					{key: "salesCd",       label: "SALES CODE"		,    hidden:true},
+					{key: "wbsPlanNo",     label: "계획번호"			,    hidden:true},
+					{key: "wbsPlanCodeId", label: "계획코드"			,    hidden:true},
+					{key: "wbsCodeDesc",   label: "코드설명"			,    hidden:true},
+					{key: "verNo",         label: "Ver."			,    align: "center",   width: 100,      hidden: true},
+					{key: "wbsPlanCodeNm", label: "계획명"			,    align: "left",   width: 170, styleClass: function () {return gridColor(this.item);}},
+					{key: "wbsPlanMngId",  label: "담당자 ID"			,    align: "center",   width: 80, styleClass: function () {return gridColor(this.item);}},
+					{key: "wbsPlanMngNm",  label: "<span style='color: red;'>*</span>담당자명",    align: "center",   width: 80, styleClass: function () {return gridColor(this.item);}},
+					{key: "wbsPlansDt",    label: "<span style='color: red;'>*</span>시작일자",      align: "center",   width: 120,
+						editor: {type: "date", config: { content: { config: { mode: "day", selectMode: "day" } } },
+						disabled: function () { return !canEditPlanRow(this.item); }, }
+						, styleClass: function () {return gridColor(this.item);}},
+					{key: "wbsPlaneDt",    label: "<span style='color: red;'>*</span>종료일자",      align: "center",   width: 120,
+						editor: { type: "date", config: { content: { config: { mode: "day", selectMode: "day" }, } },
+						disabled: function () { return !canEditPlanRow(this.item); }, }
+						, styleClass: function () {return gridColor(this.item);}},
+					{key: "daycnt",  label: "소요일수",    align: "center",   width: 80,  
+						formatter: function () {
+							const n = Number(this.value);
+							return Number.isFinite(n) ? String(n) : "0";
+						},
+						styleClass: function () {return gridColor(this.item);}},
+					{key: "rsltssDt", label: "<span style='color: #0000FF;'>실적시작일</span>", align: "center", width: 120,
+						formatter: function () { return '<div style="color: #0000FF">' + (this.value||'') + '</div>'; }
+						, styleClass: function () {return gridColor(this.item);}},
+					{key: "rsltseDt", label: "<span style='color: #0000FF;'>실적종료일</span>", align: "center", width: 120,
+						formatter: function () { return '<div style="color: #0000FF">' + (this.value||'') + '</div>'; }
+						, styleClass: function () {return gridColor(this.item);}},
+					{key: "rsltDaycnt",  label: "<span style='color: #0000FF;'>실적소요일수</span>",    align: "center",   width: 80 ,
+						formatter: function () { return '<div style="color: #0000FF">' + (calculateCalendarCnt(this.item.rsltssDt, this.item.rsltseDt)||'') + '</div>'; }
+						, styleClass: function () {return gridColor(this.item);}},
+					{key: "chgReason",    label: "변경사유",   	   width: "*", align: "center", editor: {type: "text"}},
+					{key: "closeYn",      label: "확정"			,  width: 80, align: "center" , formatter: "chkYn",      hidden: true},
+					{key: "wbsPlanStsCodeIdNm"					,  hidden: true},
+					{key: "creatId",      label: "생성자"			,  hidden: true},
+					{key: "creatNm",      label: "생성자명"		,  hidden: true},
+					{key: "creatDttm",    label: "생성일시"		,  hidden: true},
+					{key: "udtId",        label: "최종변경자"		,  hidden: true},
+					{key: "udtNm",        label: "최종변경자명"		,  hidden: true},
+					{key: "udtDttm",      label: "최종변경일자"		,  hidden: true},
+					{key: "levelNm",      label: "직급"		,  hidden: true},
+					{key: "allPjtYn",     label: "프로젝트 전체"      ,  hidden: true},
+					{key: "taskPlanYn",   label: "Task계획 포함"      ,  hidden: true},
+					{key: "rsltDete",     label: "실적삭제여부"      ,  hidden: true}
+				]
+			});
+			return this;
+		},
+		setData: function() {
+			var targetObj = this.target;
+			var formData = {
+				"coCd" : $("#wb21_popForm #coCd").val(),
+				"salesCd" : $("#wb21_popForm #salesCd").val(),
+				"beginDt" : $("#wb21_popForm #beginDt").val(),
+				"acptncDt" : $("#wb21_popForm #acptncDt").val(),
+				"reqreDaycnt" : $("#wb21_popForm #reqreDaycnt").val(),
+				"planVerNo" : $("#wb21_popForm #wbsPlanVerNo").val(),
+				"userId" :  $("#wb21_popForm #smrizeId").val(),
+				"histYn" : 'N'
+			}
+			var ajaxUrl;
+			if(histYn == "N"){
+				ajaxUrl = "/user/wb/wb22/selectWBS1Level";
+			}else{
+				ajaxUrl = "/user/wb/wb22/selectHistWBS1Level";
+
+				$('.tit').text('과제관리 이력조회');
+				$('#actionBtn').hide();
+				$("#wb21_popForm #addrow1").hide();
+				$("#wb21_popForm #addrow2").hide();
+			}
+			postAjax(ajaxUrl, formData, null, function(data){
+				try {
+					var list = data.fileList;
+					var i = 0;
+					if (list != undefined) {
+						$.each(list, function(idx, obj){
+							obj.allPjtYn = "N";
+							obj.taskPlanYn = "N";
+							list[i].daycnt = calculateCalendarCnt (obj.wbsPlansDt, obj.wbsPlaneDt);
+							if(i == 0){
+	// 							console.log(list[i]);
+								var ver = list[i].verNo;
+								var reason = list[i].verUpReason;
+								$("#wb21_popForm #wbsPlanVerNo").val(ver);
+								$("#wb21_popForm #wbsPlanVerUpReason").val(reason);
+								
+								var val2 = list[i].closeYn;
+								// 확정/Ver.Up 버튼 권한 체크
+								var prdMngIds = ($('#wb21_popForm #prdMngChk option').attr('data-etc') || '').replace(/\s/g,'').split(',').filter(Boolean);
+								var isElectUser = jwt.userId === 'canmtb' || jwt.userId === 'tjswlssky' || jwt.userId === 'famyg80';
+								var hasConfirmPermission = !isElectUser && ($('#smrizeId').val() == jwt.userId || prdMngIds.includes(jwt.userId) || jwt.authInfo.includes('AUTH999') || jwt.userId == 'js.nam' || jwt.userId == 'ssj');
+
+								if (val2 == "Y") {
+									if (hasConfirmPermission) {
+										$("#wb21_popForm #btn4").show();  //Ver.Up버튼
+									}
+									$("#wb21_popForm #btn3").hide();  //확정버튼
+									$("#wb21_popForm #btn1").hide();  //저장버튼
+									$("#wb21_popForm #btn2").hide();  //변경요청 저장버튼
+								} else {
+									$("#wb21_popForm #btn4").hide();
+									// 과제 확정 시에만 일정 버튼 표시
+									if ($('#wb21_popForm #closeYn').val() == "Y") {
+										if (hasConfirmPermission) {
+											$("#wb21_popForm #btn3").show();  //확정버튼
+										}
+										$("#wb21_popForm #btn1").hide();  //저장버튼 기본 숨김 (수정 시 표시)
+										$("#wb21_popForm #btn2").hide();  //변경요청 저장 기본 숨김
+									}
+									$("#wb21_popForm #addrow2").hide();	// 일정미확정일경우 Task 버튼영역 숨김
+								}
+								$("#wb21_popForm #wbsPlanCloseYn").val(val2);
+								var color2 = val2 == "Y" ? "color-circle_02.png" : "color-circle_01.png";
+								var html2 = '<img src="/static/img/'+color2+'" align="center" style="width: 10px;height: 10px;"></img>';
+								$("#wb21_popForm #wbsPlanClose").html(html2);
+								
+							    // if (val2 === 'Y') {
+							    //     $('#planExcept').hide();        // select 숨김
+							    //     $('#planExceptNm').show();      // input 표시
+							    // } else if (val2 === 'N') {
+							    //     $('#planExcept').show();        // select 표시
+							    //     $('#planExceptNm').hide();      // input 숨김
+							    // }
+								
+							}
+							i++;
+						});
+						targetObj.setData({
+							list : list,
+							page : {
+								// totalElements : list.length
+							}
+						});
+
+						gridView1.target.select(level__index, {selected: true});
+					}
+				} catch (error) {
+					alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+					return null; // 오류 발생 시 null 반환
+				} finally {
+					// console.log("함수 실행 완료.");
+				}
+			});
+			// Validation 체크 - 확정버튼 권한
+			var smrizeId = $('#wb21_popForm #smrizeId').val();
+			var prdMngIds = ($('#prdMngChk option').attr('data-etc') || '').replace(/\s/g,'').split(',').filter(Boolean);
+			var isElectUser = jwt.userId === 'canmtb' || jwt.userId === 'tjswlssky' || jwt.userId === 'famyg80';
+			var hasConfirmPermission = !isElectUser && (smrizeId == jwt.userId || prdMngIds.includes(jwt.userId) || jwt.authInfo.includes('AUTH999') || jwt.userId == 'js.nam' || jwt.userId == 'ssj');
+			
+			// [MODIFIED] 일정 계획 버튼 표시 로직
+			if ($('#wb21_popForm #closeYn').val() == "Y") {
+				if(hasConfirmPermission){
+					$("#wb21_popForm #btn15").show(); // 복사
+					$("#wb21_popForm #btn3").show();  // 확정
+					$("#wb21_popForm #btn4").show();  // Ver.Up
+				} else {
+					$("#wb21_popForm #btn15").hide();
+					$("#wb21_popForm #btn3").hide();
+					$("#wb21_popForm #btn4").hide();
+				}
+			} else {
+				// 과제가 확정되지 않은 경우 모든 일정 계획 버튼 숨김
+				$("#wb21_popForm #btn15").hide();
+				$("#wb21_popForm #btn1").hide();
+				$("#wb21_popForm #btn2").hide();
+				$("#wb21_popForm #btn3").hide();
+				$("#wb21_popForm #btn4").hide();
+			}
+		}
+	}
+
+
 	$(document).ready(function() {
 		setCommonSelect($(".popup_area select[data-kind]"));
 
@@ -357,6 +944,9 @@
 		//---------------------------------------------------------------
 		//첨부 화일 처리 끝
 		//---------------------------------------------------------------
+
+		gridView1.initView().setData(0);
+
 		authChk();
 	});
 
@@ -781,7 +1371,11 @@
 				filePutAjax("/user/wb/wb21/sjConfirmY", formData, function(data) {
 					if(data.resultCode == 200) {
 						// alert("확정 되었습니다.");
-                        wb21_kakaoTodo(); 
+                        wb21_kakaoTodo();
+						
+						// 일정 계획 확정 연동
+						wbsLevel1confirm('Y');
+
 						gridView.setData(0);
 						modalClose();
 					} else {
@@ -830,7 +1424,7 @@
 			return;
 		}
 
-		if ($("#closeYn").val() == "N") {
+		if ($("#wbsPlanCloseYn").val() == "N") {
 			alert("미확정 상태입니다. 신규 버전을 생성할 수 없습니다.");
 			return;
 		}
@@ -914,6 +1508,510 @@
 				}
 			});
 		});
+	}
+
+	// 복사
+	function copyAllPlanPopUp() {
+		var paramObj = {};
+		paramObj["coCd"] = $('#wb21_popForm #coCd').val(); 
+		paramObj["pgmId"] = "WB2201M02";
+		var tempCode = $("#wb21_popForm #salesCd").val(); 
+		paramObj["searchValue"] = tempCode.substring(0,5);
+		openSecondModal("/static/html/cmn/modal/wbsPlanConfirmSearch.html", 1200, 870, "일정계획 일괄 대상 검색", paramObj);
+	}
+
+	// 저장
+	function wbsLevel1Insert(fromConfirm) {
+		if (addRowArr.length  > 0 || deleteRowArr.length  > 0) {
+			alert("TASK별 정보내 추가 또는 삭제 내역이 존재합니다.\n 저장 후 처리하세요");
+			return;
+		}
+		
+		//유효성 체크
+		var row = gridView1.target.getList()[0];
+		if (row != undefined) {
+			if (row.closeYn == "Y" && !canEditPlanRow(row)) {
+				alert("확정된 상태입니다.");
+				return;
+			}
+		}
+		////////////////
+
+		var rowList = gridView1.target.getList();
+		var formData = new FormData();
+		var actionType = null;
+
+		formData.append("coCd", $("#wb21_popForm #coCd").val());
+		formData.append("year", $('#wb21_popForm #beginDt').val().substring(0,4));
+		formData.append("salesCd", $('#wb21_popForm #salesCd').val());
+		formData.append("userId", jwt.userId);
+		
+		if(rowList.length > 0) {
+			var rowListArr = [];
+			$.each(rowList, function(idx, elem){
+				if (elem.fileTrgtKey != undefined) {
+					actionType = "U";
+				}
+				else {
+					actionType = "C";
+				}
+				var row = gridView1.target.getList()[idx];
+				var rowListObj = elem;
+
+				rowListObj["actionType"] = actionType;
+
+				rowListObj["coCd"] = elem.coCd;
+				rowListObj["salesCd"] = $('#wb21_popForm #salesCd').val();
+				rowListObj["wbsPlanCodeId"] = elem.wbsPlanCodeId;
+				rowListObj["wbsPlanCodeNm"] = elem.wbsPlanCodeNm;
+				if (actionType == "U") {
+					rowListObj["fileTrgtKey"] = elem.fileTrgtKey;
+					rowListObj["wbsPlanNo"] = elem.wbsPlanNo;
+				}
+				rowListObj["salesCd"] = elem.salesCd;
+				if (elem.verNo != undefined) {
+					rowListObj["verNo"] = elem.verNo;
+				}
+				else {
+					//신규 등록시 동일버젼 내에서 버전번호 최대값 추출
+					const largestValue = rowList.reduce((maxObject, currentObject) => {
+						return currentObject["verNo"] > maxObject["verNo"] ? currentObject : maxObject;
+						}, rowList[0]);
+
+					rowListObj["verNo"] = (largestValue["verNo"] == undefined) ? 1 : largestValue["verNo"] ;
+				}
+
+				if (elem.wbsPlanMngId != undefined) {
+					rowListObj["wbsPlanMngId"] = elem.wbsPlanMngId;
+				}
+				else {
+					rowListObj["wbsPlanMngId"] = "";
+				}
+
+				rowListObj["wbsPlansDt"] = elem.wbsPlansDt;
+				rowListObj["wbsPlaneDt"] = elem.wbsPlaneDt;
+				rowListObj["daycnt"] = elem.daycnt;
+				var wbsPlanStsCodeId = "";
+
+				if (elem.wbsPlanStsCodeId != undefined) {
+					wbsPlanStsCodeId = elem.wbsPlanStsCodeId;
+				}
+
+				rowListObj["wbsPlanStsCodeId"] = wbsPlanStsCodeId;
+				rowListObj["creatId"] = jwt.userId;
+				rowListObj["creatPgm"] = "WB2101P01"; 
+				rowListObj["chgReason"] = elem.chgReason;		
+				rowListObj["allPjtYn"] = elem.allPjtYn;			
+				rowListObj["taskPlanYn"] = elem.taskPlanYn;		
+				rowListObj["taskPlanYn"] = elem.taskPlanYn;		
+
+				rowListArr.push(rowListObj);
+			});
+			formData.append("rowListArr", JSON.stringify(rowListArr));
+		}
+
+		filePostAjax("/user/wb/wb22/wbsLevel1Insert", formData, function(data) {
+			if(!fromConfirm){
+				// alert(data.resultMessage);
+			}
+			if (data.resultCode == 200) {
+				$("#wb21_popForm #btn1").hide();  
+				gridView1.setData(0);
+				if(fromConfirm){
+					getGrid1RowList();
+				}
+			}
+		});
+	}
+	
+	// 변경사항 저장
+	function updateWbsChanges() {
+		var changedData = gridView1.target.getList().filter(function(row) {
+			return row.__modified__;  
+		});
+
+		if (changedData.length === 0) {
+			alert('변경된 내용이 없습니다.');
+			return;  
+		}
+
+		var formData = new FormData();
+
+		formData.append("coCd", $('#wb21_popForm #coCd').val());
+		formData.append("salesCd", $('#wb21_popForm #salesCd').val());
+
+		var filteredData = changedData.map(function(row) {
+			return {
+				coCd: row.coCd,
+				salesCd: $('#wb21_popForm #salesCd').val(),
+				fileTrgtKey: row.fileTrgtKey,
+				chgReason: row.chgReason
+			};
+		});
+
+		formData.append("changedData", JSON.stringify(filteredData));
+
+		filePostAjax("/user/wb/wb22/updateWbsChanges", formData, function(data) {
+			if (data.resultCode == 200) {
+				gridView1.setData(0);
+			} else {
+				alert(data.resultMessage);
+			}
+		});
+	}
+
+	// 확정
+	function wbsLevel1confirm(flag) {
+		if (addRowArr.length  > 0 || deleteRowArr.length  > 0) {
+			alert("TASK별 정보내 추가 또는 삭제 내역이 존재합니다. 저장 후 처리하세요");
+			return;
+		}
+
+		var rowList = gridView1.target.getList();
+		var chk = 0;
+		var chkError = "";
+		var chk2 = 0;
+		var chk2Error = "";
+		var chk3 = 0;
+		var chk3Error = "";
+		var chk4 = 0;
+		if (rowList.length > 0) {
+			let planExceptCd = $('#wb21_popForm #planExcept').val();  
+			let wbsCodeArr = [];
+			if (planExceptCd == 'PLANEXCEPT01') {
+				wbsCodeArr = ["WBSCODE01","WBSCODE02","WBSCODE11","WBSCODE12","WBSCODE13","WBSCODE14"];
+			} else {
+				wbsCodeArr = ["WBSCODE01","WBSCODE02"];
+			}
+			$.each(rowList, function(idx, elem){
+				if (wbsCodeArr.indexOf(elem.wbsPlanCodeId) !== -1) {
+					if (elem.wbsPlanMngId == undefined || elem.wbsPlanMngId == "") {
+						chk++;
+						chkError += chk==1 ? "" : ", "
+						chkError += idx+1
+					}
+					if (elem.wbsPlansDt == undefined || elem.wbsPlansDt == "") {
+						chk2++;
+						chk2Error += chk2==1 ? "" : ", "
+						chk2Error += idx+1
+					}
+					if (elem.wbsPlaneDt == undefined || elem.wbsPlaneDt == "") {
+						 chk3++;
+						chk3Error += chk3==1 ? "" : ", "
+						chk3Error += idx+1
+					 }
+				}
+
+				chkwbsPlanMngId = elem.wbsPlanMngId == undefined ? "" : elem.wbsPlanMngId;
+				chkwbsPlansDt = elem.wbsPlansDt == undefined ? "" : elem.wbsPlansDt;
+				chkwbsPlaneDt = elem.wbsPlaneDt == undefined ? "" : elem.wbsPlaneDt;
+				if (chkwbsPlanMngId != "" ||
+					chkwbsPlansDt != "" ||
+					chkwbsPlaneDt != "") {
+					if (chkwbsPlanMngId == undefined || chkwbsPlanMngId == "") {
+						chk4++;
+						alert(elem.wbsPlanCodeNm + " 업무 담당자를 입력하세요.");
+						return false;
+					}
+					if (chkwbsPlansDt == undefined || chkwbsPlansDt == "") {
+						chk4++;
+						alert(elem.wbsPlanCodeNm + " 시작일자를 입력하세요.");
+						return false;
+					}
+					if (chkwbsPlaneDt == undefined || chkwbsPlaneDt == "") {
+						chk4++;
+						alert(elem.wbsPlanCodeNm + " 종료일자를 입력하세요");
+						return false;
+					 }
+				}
+			});
+
+			if (chk4 > 0 ) { 
+				return;
+			}
+			if (chk > 0) {
+				alert(chkError + " 담당자명은 지정되어야 확정 가능합니다.");
+				return;
+			}
+			if (chk2 > 0 || chk3 > 0) {
+				alert(chk2Error +" 계획시작일자를 입력해야 확정 가능합니다.");
+				return;
+			}
+			if (chk2 > 0 || chk3 > 0) {
+				alert(chk2Error+ " 계획시작일자" +chk3Error+ " 계획종료일자를 입력해야 확정 가능합니다.");
+				return;
+			}
+
+		}
+		
+		var wbsPlanVerNo = $("#wb21_popForm #wbsPlanVerNo").val();
+		if(wbsPlanVerNo == "" || wbsPlanVerNo == null || wbsPlanVerNo == undefined){
+			wbsLevel1Insert(true);
+		}else{
+			wbsLevel1Submit(flag);
+		}
+	}
+	
+	// 일정계획 확정
+	function wbsLevel1Submit(flag,list){
+		
+		var row = gridView1.target.getList()[0];
+		var rowList = gridView1.target.getList();
+		if (list){
+			
+			row = list[0];
+			rowList = list;
+		}
+		if (row != undefined && row.fileTrgtKey != undefined) {
+			if (flag == "N") {
+				// Validation 체크
+				if (row.closeYn == "N") {
+					alert("미확정된 상태입니다.");
+					return;
+				}
+				/////////////////
+
+				if(confirm("미확정하시겠습니까?")){
+					var formData = new FormData();
+					if(rowList.length > 0) {
+						var rowListArr = [];
+						$.each(rowList, function(idx, elem){
+							if (elem.fileTrgtKey != undefined) {
+								var rowListObj = elem;
+								rowListObj["coCd"] = elem.coCd;
+								rowListObj["wbsPlanCodeId"] = elem.wbsPlanCodeId;
+								rowListObj["wbsPlanCodeNm"] = elem.wbsPlanCodeNm;
+								rowListObj["fileTrgtKey"] = elem.fileTrgtKey;
+								rowListObj["wbsPlanNo"] = elem.wbsPlanNo;
+								rowListObj["salesCd"] = elem.salesCd;
+								rowListObj["verNo"] = elem.verNo;
+								rowListObj["wbsPlanMngId"] = elem.wbsPlanMngId;
+								rowListObj["wbsPlansDt"] = elem.wbsPlansDt;
+								rowListObj["wbsPlaneDt"] = elem.wbsPlaneDt;
+								rowListObj["daycnt"] = elem.daycnt;
+								rowListObj["wbsPlanStsCodeId"] = elem.wbsPlanStsCodeId;
+								rowListObj["flag"] = flag;
+								rowListObj["creatId"] = jwt.userId;
+								rowListObj["creatPgm"] = "WB2101P01"; 
+								rowListArr.push(rowListObj);
+							}
+						});
+						formData.append("rowListArr", JSON.stringify(rowListArr));
+					}
+
+					filePostAjax("/user/wb/wb22/wbsLevel1confirm", formData, function(data){
+						if(data.resultCode == 200){
+// 							alert("미확정 되었습니다.");
+							gridView1.setData(0);
+						} else {
+							alert("오류가 있습니다.\n" + data.resultMessage);
+						}
+					});
+				}
+			} else {
+				// Validation 체크
+				if (flag == "Y" && row.closeYn == "Y") {
+					alert("확정된 상태입니다.");
+					return;
+				}
+
+				if(confirm("일정계획을 확정하시겠습니까?")){
+					var formData = new FormData();
+					if(rowList.length > 0) {
+						var rowListArr = [];
+						$.each(rowList, function(idx, elem){
+							if (elem.fileTrgtKey != undefined) {
+								var rowListObj = elem;
+								rowListObj["coCd"] = elem.coCd;
+								rowListObj["wbsPlanCodeId"] = elem.wbsPlanCodeId;
+								rowListObj["wbsPlanCodeNm"] = elem.wbsPlanCodeNm;
+								rowListObj["fileTrgtKey"] = elem.fileTrgtKey;
+								rowListObj["wbsPlanNo"] = elem.wbsPlanNo;
+								rowListObj["salesCd"] = elem.salesCd;
+								rowListObj["verNo"] = elem.verNo;
+								rowListObj["wbsPlanMngId"] = elem.wbsPlanMngId;
+								rowListObj["wbsPlansDt"] = elem.wbsPlansDt;
+								rowListObj["wbsPlaneDt"] = elem.wbsPlaneDt;
+								rowListObj["daycnt"] = elem.daycnt;
+								rowListObj["wbsPlanStsCodeId"] = elem.wbsPlanStsCodeId;
+								rowListObj["flag"] = flag;
+								rowListObj["creatId"] = jwt.userId;
+								rowListObj["creatPgm"] = "WB2101P01";
+								rowListArr.push(rowListObj);
+							}
+						});
+						formData.append("rowListArr", JSON.stringify(rowListArr));
+					}
+								
+					 filePostAjax("/user/wb/wb22/wbsLevel1confirm", formData, function(data){ 
+						if(data.resultCode == 200){
+							gridView1.setData(0);
+						} else {
+							alert("오류가 있습니다.\n" + data.resultMessage);
+						}
+					}); 
+				}
+			}
+		}
+	}
+	
+	// 저장 후 재조회
+	function getGrid1RowList(){
+		var formData = {
+				"coCd" : $("#wb21_popForm #coCd").val(),
+				"salesCd" : $("#wb21_popForm #salesCd").val(),
+				"beginDt" : $('#wb21_popForm #beginDt').val(),
+				"acptncDt" : $('#wb21_popForm #acptncDt').val(),
+				"reqreDaycnt" : $('#wb21_popForm #reqreDaycnt').val(),
+				"planVerNo" : $("#wb21_popForm #wbsPlanVerNo").val(),
+				"userId" : $('#wb21_popForm #smrizeId').val(),
+				"histYn" : histYn
+			}
+			var ajaxUrl;	
+				ajaxUrl = "/user/wb/wb22/selectWBS1Level";
+		
+		
+		postAjax(ajaxUrl, formData, null, function(data){
+			try {
+				var list = data.fileList;
+				var i = 0;
+				$.each(list, function(idx, obj){
+					list[i].daycnt = calculateCalendarCnt(obj.wbsPlansDt, obj.wbsPlaneDt);
+					i++;
+				});
+				
+				wbsLevel1Submit('Y',list);
+			} catch (error) {
+				alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+				return null; 
+			}
+		});
+	}
+
+	// 일정계획 Ver.Up
+	function createWbsPlanVerUp() {
+		if (addRowArr.length  > 0 || deleteRowArr.length  > 0) {
+			alert("TASK별 정보내 추가 또는 삭제 내역이 존재합니다. 저장 후 처리하세요");
+			return;
+		}
+		// 유효성 체크
+		var row = gridView1.target.getList()[0];
+		if (row.closeYn == "N") {
+			alert("미확정 상태입니다. 신규 버전을 생성할 수 없습니다.");
+			return;
+		}
+
+		var rowList = gridView1.target.getList();
+		var chk = 0;
+		if (rowList.length > 0) {
+			$.each(rowList, function(idx, elem){
+				if (elem.wbsPlanMngId == undefined || elem.wbsPlanMngId == "") {
+					chk++;
+				}
+			});
+		}
+
+		// 버전업 사유 입력
+		var reason = prompt("Ver.Up 사유를 입력하세요.");
+		if (reason === null) return; // 취소됨
+		const verUpReasonValue = String(reason || '').trim();
+		
+		if (!verUpReasonValue) {
+			alert('Ver.Up 사유를 입력하세요.');
+			return false;
+		}
+
+		var formData = new FormData();
+		formData.append("coCd", $('#wb21_popForm #coCd').val());
+		formData.append("salesCd", $('#wb21_popForm #salesCd').val());
+		formData.append("verNo", row.verNo);
+		formData.append("verUpReason", verUpReasonValue);
+
+		// 다음 버전 번호 조회
+		var planData = {
+			"coCd" : $('#wb21_popForm #coCd').val(),
+			"salesCd" : $('#wb21_popForm #salesCd').val()
+		};
+		var nextVerNo = 0;
+		postAjaxSync("/user/wb/wb22/selectVerNoNext", planData, null, function(data){
+			nextVerNo = data.result[0].verNo;
+		});
+		
+		if (nextVerNo == 0) {
+			alert("버전 정보를 가져오는데 실패했습니다.");
+			return;
+		}
+		
+		formData.append("newVerNo", nextVerNo);
+
+
+		var rowList = gridView1.target.getList();
+		var rowListArr = [];
+		$.each(rowList, function(idx, elem){
+			// ... mapping similar to wbsLevel1Insert but with specific fields for VerUp ...
+			var rowListObj = elem;
+			// For VerUp we basically copy current rows to history and create new version rows.
+			// The backend wbsVerUpInsert handles the logic. We need to pass current rows.
+			if (elem.fileTrgtKey != undefined) {
+				rowListObj["coCd"] = elem.coCd;
+					rowListObj["fileTrgtKey"] = elem.fileTrgtKey;
+					rowListObj["wbsPlanNo"] = elem.wbsPlanNo;
+					rowListObj["wbsPlanCodeId"] = elem.wbsPlanCodeId;
+					rowListObj["salesCd"] = elem.salesCd;
+					rowListObj["verNo"] = elem.verNo;
+					if (elem.wbsPlanCodeNm != undefined) {
+						rowListObj["wbsPlanCodeNm"] = elem.wbsPlanCodeNm;
+					}
+					else {
+						rowListObj["wbsPlanCodeNm"] = "";
+					}
+
+					if (elem.wbsPlanMngId != undefined) {
+						rowListObj["wbsPlanMngId"] = elem.wbsPlanMngId;
+					}
+					else {
+						rowListObj["wbsPlanMngId"] = "";
+					}
+
+					rowListObj["wbsPlansDt"] = elem.wbsPlansDt;
+					rowListObj["wbsPlaneDt"] = elem.wbsPlaneDt;
+					rowListObj["daycnt"] = elem.daycnt;
+					rowListObj["wbsPlanStsCodeId"] = elem.wbsPlanStsCodeId;
+					rowListObj["closeYn"] = elem.closeYn;
+					rowListObj["creatId"] = jwt.userId;
+					rowListObj["creatPgm"] = "WB2101P01";
+					rowListObj["verUpReason"] = verUpReasonValue;
+					rowListArr.push(rowListObj);
+			}
+		});
+		formData.append("rowListArr", JSON.stringify(rowListArr));
+
+		filePostAjax("/user/wb/wb22/wbsVerUpInsert", formData, function(data) {
+			if (data.resultCode == 200) {
+				gridView1.setData(0);
+			} else {
+				alert("미확정 상태입니다.")
+				gridView1.setData(0);
+			}
+		});
+	}
+	
+	function calculateCalendarCnt(startDate, endDate) {
+		if (!startDate || !endDate) return 0;
+		const toUTC = (d) => {
+			if (d instanceof Date) return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+			if (typeof d === 'string') {
+				const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
+				if (!m) return NaN;
+				return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+			}
+			return NaN;
+		};
+		const startDay = toUTC(startDate);
+		const endDay   = toUTC(endDate);
+		if (!Number.isFinite(startDay) || !Number.isFinite(endDay)) return NaN;
+		if (endDay < startDay) return 0; 
+		return Math.floor((endDay - startDay) / 86400000) + 1; 
 	}
 
     /*
@@ -1123,5 +2221,116 @@ function wb21_kakaoTodo() {
 		if (endDay < startDay) return 0; // 역순 보호
 
 		return Math.floor((endDay - startDay) / 86400000) + 1; // 양끝 포함
+	}
+
+	// changeType: 'delete' | 'mngId' | 'date'
+	// changeInfo: { oldValue, newValue } (담당자 변경 시: oldValue=이전담당자명, newValue=신규담당자명)
+	function updateWbsPlan(dindex, changeType, changeInfo) {
+		debugger;
+		var row = gridView1.target.list[dindex];
+		var verUpReasonValue = "";
+
+		// 변경 유형에 따라 버전업 사유 생성
+		if (changeType === 'delete') {
+			// 내용삭제: 기존 로직 유지
+			verUpReasonValue = jwt.userNm + ("수정" || '') + " (" + row.wbsPlanCodeNm + " 일정 삭제)";
+		} else if (changeType === 'mngId') {
+			// 담당자 변경
+			verUpReasonValue = jwt.userNm + ("수정" || '') + " (담당자 " + (changeInfo.oldValue || '') + "에서 " + (changeInfo.newValue || '') + "으로 변경)";
+		} else if (changeType === 'date') {
+			// 일자 변경 (시작일자 또는 종료일자)
+			verUpReasonValue = jwt.userNm + ("수정" || '') + " (" + row.wbsPlanCodeNm + " 일정수정)";
+		} else {
+			// 기본값 (기존 로직)
+			verUpReasonValue = jwt.userNm + ("수정" || '') + " (" + row.wbsPlanCodeNm + " 일정 삭제)";
+		}
+
+		var formData = new FormData();
+		formData.append("coCd", $('#wb21_popForm #coCd').val());
+		formData.append("year", $('#wb21_popForm #beginDt').val().substring(0,4));
+		formData.append("salesCd", $('#wb21_popForm #salesCd').val());
+		formData.append("verNo", row.verNo);
+		formData.append("creatId", jwt.userId);
+		formData.append("userId", jwt.userId);
+		formData.append("creatPgm", $('#wb21_popForm #pgmId').val());
+		formData.append("verUpReason", verUpReasonValue);
+		formData.append("wbsPlanCodeId", row.wbsPlanCodeId);
+		formData.append("changeType", changeType || 'delete');	// 변경 유형 전달
+		formData.append("flag", $("#wbsPlanCloseYn").val());	// 일정 확정 유무
+
+		var strYear = new Date().toISOString().substring(2, 4);
+		var planData = {
+			"coCd" : $('#wb21_popForm #coCd').val(),
+			"salesCd" : $('#wb21_popForm #salesCd').val()
+		};
+		postAjaxSync("/user/wb/wb22/selectVerNoNext", planData, null, function(data){
+			formData.append("newVerNo", data.result[0].verNo);
+		});
+
+		var rowList = gridView1.target.getList();
+		var rowListArr = [];
+		$.each(rowList, function(idx, elem){
+			var row = gridView1.target.getList()[idx];
+			var rowListObj = elem;
+			rowListObj["coCd"] = elem.coCd;
+			rowListObj["fileTrgtKey"] = elem.fileTrgtKey;
+			rowListObj["wbsPlanNo"] = elem.wbsPlanNo;
+			rowListObj["wbsPlanCodeId"] = elem.wbsPlanCodeId;
+			rowListObj["salesCd"] = elem.salesCd;
+			rowListObj["verNo"] = elem.verNo;
+			if (elem.wbsPlanCodeNm != undefined) {
+				rowListObj["wbsPlanCodeNm"] = elem.wbsPlanCodeNm;
+			}
+			else {
+				rowListObj["wbsPlanCodeNm"] = "";
+			}
+
+			if (elem.wbsPlanMngId != undefined) {
+				rowListObj["wbsPlanMngId"] = elem.wbsPlanMngId;
+			}
+			else {
+				rowListObj["wbsPlanMngId"] = "";
+			}
+
+			rowListObj["wbsPlansDt"] = elem.wbsPlansDt;
+			rowListObj["wbsPlaneDt"] = elem.wbsPlaneDt;
+			rowListObj["daycnt"] = elem.daycnt;
+			rowListObj["wbsPlanStsCodeId"] = elem.wbsPlanStsCodeId;
+			rowListObj["closeYn"] = elem.closeYn;
+			rowListObj["creatId"] = jwt.userId;
+			rowListObj["creatPgm"] = "WB2201M01";
+			rowListObj["verUpReason"] = verUpReasonValue;
+			rowListArr.push(rowListObj);
+		});
+		formData.append("rowListArr", JSON.stringify(rowListArr));
+
+		filePostAjax("/user/wb/wb22/updateWbsPlan", formData, function(data){
+			if (data.resultCode == 200) {
+			} else {
+				customAlert(data.resultMessage);
+			}
+			gridView1.setData(0);
+		});
+	}
+
+	// 일정예외사항 변경 시 처리
+	function onPlanExceptChange(value){
+		// 미확정일 때만 저장버튼 표시
+		if ($("#wb21_popForm #wbsPlanCloseYn").val() !== "Y") {
+			$("#wb21_popForm #btn1").show();
+		}
+		var rowList = gridView1.target.getList();
+		if (value != 'PLANEXCEPT01') {
+			$.each(rowList, function(idx, elem) {
+				if (["WBSCODE11", "WBSCODE12", "WBSCODE13", "WBSCODE14"].includes(elem.wbsPlanCodeId)) {
+					elem.wbsPlanMngId = "";
+					elem.wbsPlanMngNm = "";
+					elem.daycnt = "";
+					elem.wbsPlansDt = "";
+					elem.wbsPlaneDt = "";
+				}
+			});
+			gridView1.target.setData(rowList);
+		}
 	}
 </script>
