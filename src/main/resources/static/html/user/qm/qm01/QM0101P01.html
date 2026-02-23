@@ -356,6 +356,7 @@
 	const currDivId = "#qmpopFormQ01";		//현재화면의 Form ID,	poup 화면을 중복으로 Call 할시 필드명 중복으로 구분 안됨
 	var sameTimeResultChk = "";
 	var teamManagerFlag = false;
+	var targetDeptCd = ""; 	// 팀장 판단 기준 부서 (발행자 현직→발행자 부서, 퇴사자→작성자 부서)
 	var ordrsDiv3Chk = false;
 	
 	//담당자가 바뀌었을때 문제등록 사유 유지하기 위함 변수 설정
@@ -1020,11 +1021,13 @@ var ModalApp = (function() {
 			// 작성자의 부서는 작성자 정보 출력시 저장해야함.
 			if (data.result.ordrgId.slice(0,7) == 'gyrsult') {
 				let tempRegDeptId = data.result.regDeptId;
-					createCheckBox(tempRegDeptId);	//퇴사자인경우 작성자기준으로 등록사유 생성함
+				createCheckBox(tempRegDeptId);	//퇴사자인경우 작성자기준으로 등록사유 생성함
 				selectAuth(tempRegDeptId);
+				targetDeptCd = tempRegDeptId;	// 퇴사자이면 작성자 부서 기준
 			} else {
 				createCheckBox(data.result.deptCd);
 				selectAuth(data.result.deptCd);
+				targetDeptCd = data.result.deptCd;	// 현직이면 발행자 부서 기준
 			}
 
 			fileTrgtKey = data.result.fileTrgtKey; //발주요청서의 등록번호로 설정하기
@@ -2447,7 +2450,7 @@ var ModalApp = (function() {
 		reqNo = modalStack.last().paramObj.reqNo;
 		if (reqNo == undefined) fileTrgtKey = 0; //이슈에서 넘어온 fileTrgtKey는 이슈등록에 대한 번호임.
 		$(currFormId + " #fileTrgtKey").val(fileTrgtKey);
-		$("#fileUpBtn").hide();
+		$(currDivId +" #fileUpBtn").hide();
 
 		setCommonSelect($(".popup_area select[data-kind]"));
 		ModalApp.setByCoCd(modalStack.last().paramObj.coCd);
@@ -2538,7 +2541,7 @@ var ModalApp = (function() {
 								}
 							}
 							if (key == 'salesCd'){$('#matrDrwNo').val(value);} // 도면번호 처리
-							if (key == 'actDeptId'){ModalApp.selectAuth(value)};
+							if (key == 'actDeptId'){ModalApp.selectAuth(value); targetDeptCd = value;} // 발행자(조치담당자) 부서 세팅
 							if (key == 'subCd'){savedSubCd = value;}	// 등록사유 저장해놓고 나중에 등록사유 태그쪽에 값 넣기
 							if (key == 'etcInput'){savedEtcInput = value;}	// 등록사유 저장해놓고 나중에 등록사유 태그쪽에 값 넣기
 							if (key == 'issSj') {title = value;}	// 제목 처리
@@ -2630,8 +2633,13 @@ var ModalApp = (function() {
 			$(currDivId + " #actionBtn2").remove();
 
 		}
-		// 팝업창 열릴때 근본원인, 근본예방대책 필드 클릭방지
-		if (teamManagerFlag && $(currFormId + " #ordrgId").val() == jwt.userId) {
+		// 팀장 여부 판단: 발행자가 현직이면 발행자 부서 기준, 퇴사자이면 작성자 부서 기준
+		// targetDeptCd는 selectQtyReqInfo에서 이미 세팅됨
+		if (jwt.teamManager == 'TEAM01' && jwt.deptId.slice(0,5) == targetDeptCd.slice(0,5)) {
+			teamManagerFlag = true;
+		}
+		// 팝업창 열릴때 근본원인, 근본예방대책 필드 활성/비활성 제어
+		if (teamManagerFlag) {
 			$(currFormId + ' #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').addClass('hit');
 			$(currFormId + ' #fdmtSolutCnt').closest('td').prev('th').addClass('hit');
 			$(currFormId + ' #fdmtSolutCnt').attr('required', 'true');
@@ -2639,7 +2647,6 @@ var ModalApp = (function() {
 		} else {
 			$(currFormId + ' #FDMTSOLUT-radioButtonContainer').closest('td').prev('th').removeClass('hit');
 			$(currFormId + ' #fdmtSolutCnt').closest('td').prev('th').removeClass('hit');
-			// $(currFormId + ' #fdmtSolutCnt').attr('required', 'false');
 			$(currFormId + ' .teamManagerApproval').addClass('no-click');
 		}
 
