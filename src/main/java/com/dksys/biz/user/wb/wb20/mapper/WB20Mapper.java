@@ -85,4 +85,6 @@ public interface WB20Mapper {
 
 	int insertPfuSharngList(Map<String, String> paramMap);
 
+	int updateWbsIssueApprovalSync(Map<String, String> paramMap);
+
 }
