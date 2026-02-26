@@ -1,0 +1,807 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.wb.wb07.mapper.WB07Mapper">
+    
+    <select id="select_wb07_List" parameterType="Map" resultType="camelMap">
+		WITH  /* 기준일 1회 계산 */
+			today AS (
+				SELECT TRUNC(SYSDATE) AS D FROM DUAL
+			),
+			DEPT_TBL AS (
+				SELECT *
+				FROM (
+	                      SELECT 'WBSCODE01' AS WBS_PLAN_CODE_ID, '수주확정' AS FULL_NM,  '수' AS DEPT_NM,  'S01' AS DEPT_ID, 'GUN30' AS MNG_DEPT FROM DUAL  
+	                UNION SELECT 'WBSCODE02',                     '원가PFU',              '원',             'S02',            'GUN30' FROM DUAL
+	                UNION SELECT 'WBSCODE03',                     '설계',                 '설',             'S03',            'GUN40' FROM DUAL
+	                UNION SELECT 'WBSCODE17',                     '모델링',               '모',             'S04',            'TRN50' FROM DUAL
+	                UNION SELECT 'WBSCODE04',                     '구매',                 '구',             'S05',            'TRN50' FROM DUAL
+	                UNION SELECT 'WBSCODE18',                     '샘플공급',             '샘',             'S06',            'GUN30' FROM DUAL
+	                UNION SELECT 'WBSCODE05',                     '기계조립',             '기',             'S07',            'GUN60' FROM DUAL
+	                UNION SELECT 'WBSCODE06',                     '전기',                 '전',             'S08',            'TRN50' FROM DUAL
+	                UNION SELECT 'WBSCODE07',                     '자체시운전',           '자',             'S09',            'GUN30' FROM DUAL
+	                UNION SELECT 'WBSCODE16',                     '외부검수',             '외',             'S10',            'GUN60' FROM DUAL
+	                UNION SELECT 'WBSCODE09',                     '고객검수',             '고',             'S11',            'GUN30' FROM DUAL
+	                UNION SELECT 'WBSCODE10',                     '포장',                 '포',             'S12',            'GUN30' FROM DUAL
+	                UNION SELECT 'WBSCODE11',                     '출고',                 '출',             'S13',            'GUN30' FROM DUAL
+	                UNION SELECT 'WBSCODE12',                     '도착',                 '도',             'S14',            'GUN30' FROM DUAL
+	                UNION SELECT 'WBSCODE13',                     '설치출발',             '발',             'S15',            'GUN30' FROM DUAL
+	                UNION SELECT 'WBSCODE14',                     '설치복귀',             '귀',             'S16',            'GUN30' FROM DUAL
+	                ) T 
+	                LEFT OUTER JOIN ( 
+	             SELECT  substr(VIEW_DEPT_ID,1,5) VIEW_DEPT_ID, MNG_ID AS TEAM_MNG_ID
+	             FROM TB_CM06M01
+	             WHERE TEAM_MANAGER = 'TEAM01'
+	             AND USE_YN = 'Y'
+	             AND MNG_ID IS NOT NULL
+	                ) M ON M.VIEW_DEPT_ID = T.MNG_DEPT
+			),
+			src AS (
+				SELECT 
+					W.CO_CD,
+					W.SALES_CD,
+					D.DEPT_ID,
+					D.DEPT_NM,
+					D.FULL_NM,
+					D.TEAM_MNG_ID,
+					W.WBS_PLANS_DT,
+					W.WBS_PLANE_DT,
+					W.WBS_PLAN_CODE_ID,
+					W.FILE_TRGT_KEY,
+					W.CLOSE_YN AS WBS_CLOSE_YN,
+					W.WBS_PLAN_MNG_ID,
+					C.NAME 	  AS WBS_PLAN_MNG_ID_NM,
+					W.VER_NO
+				FROM TB_WB22M01 W
+				LEFT JOIN DEPT_TBL D ON D.WBS_PLAN_CODE_ID = W.WBS_PLAN_CODE_ID
+				LEFT JOIN TB_CM06M01 C ON C.ID = W.WBS_PLAN_MNG_ID
+				WHERE W.WBS_PLAN_CODE_KIND = 'WBSCODE'
+				<!-- SalesCode: salesCds (IN) 우선, 없으면 기존 salesCd LIKE 유지 -->
+				<choose>
+					<when test="salesCds != null and salesCds.size() > 0">
+						AND W.SALES_CD IN
+						<foreach collection="salesCds" item="cd" open="(" separator="," close=")">
+							#{cd}
+						</foreach>
+					</when>
+					<when test="salesCd != null and !salesCd.equals('')">
+						AND W.SALES_CD LIKE  '%' || #{salesCd} || '%'
+					</when>
+				</choose>
+				AND W.CO_CD = #{coCd}
+				AND W.WBS_PLANS_DT IS NOT NULL
+				AND W.WBS_PLANE_DT IS NOT NULL
+				AND D.DEPT_ID IS NOT NULL
+			),
+			s0 AS (
+			  SELECT /*+ MATERIALIZE */ DISTINCT CO_CD, SALES_CD
+			  FROM src
+			  WHERE 1 = 1
+				<!-- SalesCode -->
+				<if test="wbsPlanMngIdNm != null and !wbsPlanMngIdNm.equals('')">
+				AND src.WBS_PLAN_MNG_ID_NM LIKE  '%' || #{wbsPlanMngIdNm} || '%'
+				</if>
+			)
+			,w0 AS (
+				SELECT  S0.CO_CD, S0.SALES_CD,
+				        COUNT(W.FILE_TRGT_KEY) AS problem_count,
+				        SUM(CASE WHEN W.REQ_NO IS NULL AND W.ISS_STS != 'ISSSTS03' THEN 1
+				                 WHEN Q.REQ_ST != 'REQST03' THEN 1 
+				                 ELSE 0 END) AS problem_uncomplete
+				FROM s0 S0
+				JOIN TB_WB24M02 W ON W.CO_CD = S0.CO_CD AND W.SALES_CD = S0.SALES_CD
+				JOIN TB_QM01M01 Q ON Q.REQ_NO = W.REQ_NO
+				GROUP BY S0.CO_CD, S0.SALES_CD
+			),
+			wb21_latest AS (
+				SELECT CO_CD, SALES_CD, FILE_TRGT_KEY, WBS_REMARK, CLOSE_YN, VER_NO, SMRIZE_ID
+				FROM (
+				  SELECT
+				    W.*,
+				    ROW_NUMBER() OVER (
+				      PARTITION BY W.SJ_NO
+				      ORDER BY TO_NUMBER(W.VER_NO) DESC
+				    ) AS RN
+				  FROM TB_WB21M01 W
+				)
+				WHERE RN = 1
+			),
+			/* sales는 1회만 집계 */
+			sales AS (
+				SELECT
+					S0.CO_CD,
+					S0.SALES_CD,
+					MAX(C.EQP_NM)        AS EQP_NM,
+					MAX(C.ORDRS_NO)      AS ORDRS_NO,
+					MAX(M.ORDRS_CLNT_CD) AS ORDRS_CLNT_CD,
+					MAX(B.CLNT_NM)       AS CLNT_NM,
+					MAX(M.CLNT_PJT)      AS CLNT_PJT,
+					FN_CM05M01_CD_TO_NM(MAX(M.CLNT_PJT)) AS CLNT_PJT_NM,
+					MAX(W.FILE_TRGT_KEY) AS SJ_FILE_TRGT_KEY,
+	                MAX(W.WBS_REMARK) 	 AS WBS_REMARK,
+	                MAX(NVL(W.CLOSE_YN,'N')) AS CLOSE_YN,
+	                MAX(W.SMRIZE_ID) 	 AS SMRIZE_ID,
+	                MAX(W.VER_NO) 	 	 AS SJ_VER_NO
+				FROM s0 S0
+				JOIN TB_CR02D02 C ON C.CO_CD = S0.CO_CD AND C.SALES_CD = S0.SALES_CD
+				JOIN TB_CR02M01 M ON M.ORDRS_NO = C.ORDRS_NO
+				JOIN TB_BM02M01 B ON B.CLNT_CD  = M.ORDRS_CLNT_CD
+	            LEFT OUTER JOIN  (
+	            			SELECT CO_CD, SALES_CD, FILE_TRGT_KEY, WBS_REMARK, CLOSE_YN , VER_NO, SMRIZE_ID
+	            			FROM TB_WB21M01 W 
+	            			WHERE W.VER_NO = (SELECT MAX(TO_NUMBER(VER_NO)) FROM TB_WB21M01 P1 WHERE P1.SJ_NO = W.SJ_NO)
+	            ) W ON W.CO_CD = S0.CO_CD AND W.SALES_CD = S0.SALES_CD
+				GROUP BY S0.CO_CD, S0.SALES_CD
+			),
+		base_lag AS (
+			SELECT
+				s.*,
+				LAG(DEPT_ID) OVER (
+					PARTITION BY CO_CD, SALES_CD
+					ORDER BY WBS_PLANS_DT, WBS_PLANE_DT, DEPT_ID, WBS_PLAN_CODE_ID, FILE_TRGT_KEY
+				) AS PREV_DEPT_ID
+			FROM src s
+		),
+		base_run AS (
+			SELECT
+				b.*,
+				SUM(
+					CASE WHEN b.PREV_DEPT_ID = b.DEPT_ID THEN 0 ELSE 1 END
+				) OVER (
+					PARTITION BY CO_CD, SALES_CD
+					ORDER BY WBS_PLANS_DT, WBS_PLANE_DT, DEPT_ID, WBS_PLAN_CODE_ID
+				) AS RUN_ID
+			FROM base_lag b
+		),
+		/* 여기서 먼저 run 단위로 집계(최종 GROUP BY 문제 제거) */
+		final_base AS (
+			SELECT
+				CO_CD,
+				SALES_CD,
+				RUN_ID,
+				DEPT_ID,
+				MAX(DEPT_NM)  AS DEPT_NM,
+				MAX(FULL_NM)  AS FULL_NM,
+				MAX(TEAM_MNG_ID)   AS TEAM_MNG_ID,
+				MIN(WBS_PLANS_DT)  AS WBS_PLANS_DT_FM,
+				MAX(WBS_PLANE_DT)  AS WBS_PLANE_DT_FM,
+				MAX(FILE_TRGT_KEY) AS FILE_TRGT_KEY,
+				MAX(WBS_PLAN_CODE_ID) AS WBS_PLAN_CODE_ID,
+				MAX(WBS_PLAN_MNG_ID) AS WBS_PLAN_MNG_ID,
+				MAX(WBS_CLOSE_YN)  AS WBS_CLOSE_YN,		--일정마감여부
+				MAX(VER_NO)        AS PLAN_VER_NO
+			FROM base_run
+			GROUP BY CO_CD, SALES_CD, RUN_ID, DEPT_ID
+		),
+		sales_range AS (
+			SELECT
+				CO_CD,
+				SALES_CD,
+				MIN(WBS_PLANS_DT_FM) AS SALES_START,
+				MAX(WBS_PLANE_DT_FM) AS SALES_END
+			FROM final_base
+			GROUP BY CO_CD, SALES_CD
+		)
+		, src_act AS (
+			  SELECT
+			    A.CO_CD,
+			    A.WBS_PLAN_CODE_KIND,
+			    A.SALES_CD,
+			    MAX(A.WBS_RSLTS_ID)    AS WBS_RSLTS_ID,
+			    AVG(A.WBS_RSLTS_RATE)  AS WBS_RSLTS_RATE,
+			    SUM(A.WBS_RSLTS_MH)    AS WBS_RSLTS_MH,
+			    MAX(A.WBS_RSLTS_CNTS)  AS WBS_RSLTS_CNTS,
+			    MIN(A.WBS_RSLTSS_DT)   AS WBS_RSLTSS_DT,
+			    MAX(A.WBS_RSLTSE_DT)   AS WBS_RSLTSE_DT,
+			    MAX(A.CLOSE_YN)        AS CLOSE_YN,
+			    SUM(A.DAYCNT)          AS DAYCNT
+			  FROM TB_WB23M01 A
+			  JOIN s0 ON s0.CO_CD = A.CO_CD AND s0.SALES_CD = A.SALES_CD
+			  WHERE A.WBS_PLAN_CODE_KIND != 'WBSCODE'
+			  GROUP BY A.CO_CD, A.SALES_CD, A.WBS_PLAN_CODE_KIND
+		),
+		WB AS (
+		    /*+ MATERIALIZE */
+		    SELECT
+		        W.CO_CD,
+		        W.VER_NO,
+		        W.SALES_CD,
+		        W.WBS_PLAN_CODE_ID,
+		        W.WBS_PLANS_DT,
+		        W.WBS_PLANE_DT
+		    FROM TB_WB22M01 W
+		    JOIN s0 ON s0.CO_CD = W.CO_CD AND s0.SALES_CD = W.SALES_CD
+		    WHERE W.WBS_PLAN_CODE_KIND = 'WBSCODE'
+		      AND W.WBS_PLANS_DT IS NOT NULL 
+		)
+		,WBK AS (
+		    /*+ MATERIALIZE */
+		    SELECT DISTINCT
+		        CO_CD, VER_NO, SALES_CD, WBS_PLAN_CODE_ID
+		    FROM WB
+		)
+		, plan AS (
+			SELECT 
+				W.CO_CD,
+				W.SALES_CD,
+				W.WBS_PLANS_DT,
+				W.WBS_PLANE_DT,
+				W.WBS_PLAN_CODE_ID,
+				W.VER_NO,
+				WR.WBS_RSLTS_NO, WR.WBS_PLAN_CODE_ID, WR.WBS_RSLTS_RATE, WR.WBS_RSLTS_MH, WR.WBS_RSLTSS_DT, WR.WBS_RSLTSE_DT, WR.CLOSE_YN,
+				CASE WHEN NVL(WR.CLOSE_YN, 'N') = 'Y' THEN '0' 
+				     ELSE '1' END UN_COMPLETED
+			FROM WB W
+			LEFT JOIN TB_WB23M01 WR ON WR.CO_CD = W.CO_CD AND WR.SALES_CD = W.SALES_CD AND WR.WBS_PLAN_CODE_KIND = W.WBS_PLAN_CODE_ID
+			CROSS JOIN today T
+			WHERE W.CO_CD = 'GUN'
+			AND W.WBS_PLANE_DT <![CDATA[<]]> T.D
+		)
+		, unRslt AS (
+		  	SELECT  P.CO_CD,
+				  	P.SALES_CD,
+				  	MIN(P.WBS_PLANS_DT)		AS WBS_PLANS_DT,
+					MAX(P.WBS_PLANE_DT) 	AS WBS_PLANE_DT,
+					SUM(P.UN_COMPLETED)		AS UN_COMPLETED
+		  	FROM plan P
+			GROUP BY P.CO_CD, P.SALES_CD
+			HAVING SUM(P.UN_COMPLETED)	> 0 
+		)
+		SELECT
+			F.CO_CD,
+			F.SALES_CD,
+			F.DEPT_ID,
+			F.DEPT_NM,
+			F.FULL_NM,
+			F.TEAM_MNG_ID,
+			TO_CHAR(F.WBS_PLANS_DT_FM, 'YYYY-MM-DD') 		AS WBS_PLANS_DT_FM,
+			TO_CHAR(F.WBS_PLANE_DT_FM, 'YYYY-MM-DD') 		AS WBS_PLANE_DT_FM,
+			F.WBS_CLOSE_YN,														--일정마감여부
+			F.PLAN_VER_NO,
+			F.WBS_PLAN_CODE_ID,
+			C5.CODE_NM  									AS WBS_PLAN_CODE_NM,
+			S.EQP_NM,
+			S.ORDRS_NO,
+			S.ORDRS_CLNT_CD,
+			S.CLNT_NM,
+			S.CLNT_PJT,
+			S.CLNT_PJT_NM,
+            F.FILE_TRGT_KEY,
+            S.SJ_FILE_TRGT_KEY, --과제마스터키
+            S.CLOSE_YN,			--과제마감여부
+            S.WBS_REMARK,		--WBS 특이사항
+            S.SMRIZE_ID,
+            S.SJ_VER_NO,
+            F.WBS_PLAN_MNG_ID,
+            C.NAME 											AS WBS_PLAN_MNG_NM,
+			CASE
+--			  WHEN ST.HOLD_YN = 'Y' THEN 'HOLD'
+			  WHEN ST.CLOSE_YN = 'Y' OR NVL(ST.WBS_RSLTS_RATE,0) >= 100 THEN 'DONE'
+			  WHEN NVL(ST.WBS_RSLTS_RATE,0) = 0 THEN 'PLN'
+			  ELSE 'ING'
+			END 											AS STATUS,                 			--진행상태 PLN ING DONE HOLD
+            ST.CLOSE_YN 			  						AS ACT_CLOSE_YN,     
+            NVL(ST.WBS_RSLTS_RATE, 0) 						AS ACT_PROG,		--진행율
+            TO_CHAR(ST.WBS_RSLTSS_DT, 'YYYY-MM-DD')  		AS ACT_ST,			--실적 시작일
+            TO_CHAR(ST.WBS_RSLTSE_DT, 'YYYY-MM-DD')  		AS ACT_END,		--실적 시작일
+            ST.WBS_RSLTS_CNTS 								AS MEMO,			--메모
+			NVL(W0.PROBLEM_COUNT, 0)						AS PROBLEM_COUNT,
+			NVL(W0.PROBLEM_UNCOMPLETE, 0)					AS PROBLEM_UNCOMPLETE,PROBLEM_UNCOMPLETE,
+			NVL(UN.UN_COMPLETED, 0) 						AS UN_COMPLETED
+		FROM final_base F
+		JOIN sales S            ON S.CO_CD = F.CO_CD AND S.SALES_CD = F.SALES_CD
+		JOIN sales_range R      ON R.CO_CD = F.CO_CD AND R.SALES_CD = F.SALES_CD
+		CROSS JOIN today T
+		LEFT JOIN w0 W0         ON W0.CO_CD = F.CO_CD AND W0.SALES_CD = F.SALES_CD
+		LEFT JOIN unRslt UN     ON UN.CO_CD = F.CO_CD AND UN.SALES_CD = F.SALES_CD
+		LEFT JOIN TB_CM06M01 C  ON C.ID = F.WBS_PLAN_MNG_ID
+		LEFT JOIN TB_CM05M01 C5 ON C5.CODE_ID = F.WBS_PLAN_CODE_ID
+		LEFT JOIN src_act ST    ON ST.CO_CD = F.CO_CD AND ST.SALES_CD = F.SALES_CD AND ST.WBS_PLAN_CODE_KIND = F.WBS_PLAN_CODE_ID
+		WHERE 1=1
+		<choose>
+		  <!-- 1) salesCd, ordrsClntNm, clntPjt 모두 비었을 때만 "오늘 포함" 조건 적용 -->
+		  <when test="(salesCd == null or salesCd == '') 
+		          and (ordrsClntNm == null or ordrsClntNm == '') 
+		          and (clntPjt == null or clntPjt == '')">
+		    AND R.SALES_START <![CDATA[<]]> T.D
+		    AND R.SALES_END   <![CDATA[>]]> T.D
+		  </when>
+		
+		  <!-- 2) 하나라도 값이 있으면 해당 값 기준으로만 필터 -->
+		  <otherwise>
+		
+		    <if test="salesCd != null and salesCd != ''">
+		      AND F.SALES_CD LIKE '%' || #{salesCd} || '%'
+		    </if>
+		    <if test="ordrsClntNm != null and ordrsClntNm != ''">
+		      AND S.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'
+		    </if>
+		
+		    <if test="clntPjt != null and clntPjt != ''">
+		      AND S.CLNT_PJT = #{clntPjt}
+		    </if>
+		  </otherwise>
+		</choose>
+		ORDER BY
+			F.CO_CD,
+			F.SALES_CD,
+			F.WBS_PLANS_DT_FM,
+			F.DEPT_ID
+
+    </select>
+    
+    
+
+	<update id="updateWbsRemarks" parameterType="Map">
+		UPDATE TB_WB21M01
+		SET    WBS_REMARK = #{remarks, jdbcType=VARCHAR}
+			 , UDT_ID   = #{userId}
+			 , UDT_PGM  = #{pgmId}
+			 , UDT_DTTM = SYSDATE
+		WHERE  FILE_TRGT_KEY = #{sjFileTrgtKey}
+	</update>
+
+	<select id="selectWb22d02ExtraInfo" parameterType="Map" resultType="camelMap">
+		SELECT
+			  CO_CD
+			, SALES_CD
+			, DESIGN_MNG
+			, TO_CHAR(DELIVER_DAY, 'YYYY-MM-DD') AS DELIVER_DAY
+			, MODEL_CLNT_NM
+			, TO_CHAR(MODEL_COMP_DT, 'YYYY-MM-DD') AS MODEL_COMP_DT
+			, OUT_CLNT_NM
+			, TO_CHAR(OUT_COMP_DT, 'YYYY-MM-DD') AS OUT_COMP_DT
+			, CAM_CLNT_NM
+			, TO_CHAR(CAM_COMP_DT, 'YYYY-MM-DD') AS CAM_COMP_DT
+			, MACHIN_MNG_NM
+			, MM_MEMO
+			, DWG_MEMO
+			, PRD_MEMO
+			, SALES_MEMO
+			, PM_MEMO
+			, REMARK
+			, CREAT_ID
+			, CREAT_PGM
+			, TO_CHAR(CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
+			, UDT_ID
+			, UDT_PGM
+			, TO_CHAR(UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS')  AS UDT_DTTM
+		FROM TB_WB22D02
+		WHERE CO_CD = #{coCd}
+		  AND SALES_CD = #{salesCd}
+	</select>
+
+	<select id="selectWb22d02ExtraInfoGrid" parameterType="Map" resultType="camelMap">
+		WITH  /* 기준일 1회 계산 */
+			today AS (
+				SELECT TRUNC(SYSDATE) AS D FROM DUAL
+			),
+			src AS (
+				SELECT 
+					W.CO_CD,
+					W.SALES_CD,
+					MIN(W.WBS_PLANS_DT)  AS WBS_PLANS_DT_FM,
+					MAX(W.WBS_PLANE_DT)  AS WBS_PLANE_DT_FM,
+					MAX(W.VER_NO)        AS PLAN_VER_NO,
+					MAX(W.CLOSE_YN)      AS PLAN_CLOSE_YN
+				FROM TB_WB22M01 W
+				CROSS JOIN today T
+				WHERE W.CO_CD = 'GUN'
+				AND W.WBS_PLAN_CODE_KIND = 'WBSCODE'
+				AND W.WBS_PLANS_DT IS NOT NULL
+				AND W.WBS_PLANE_DT IS NOT NULL
+				GROUP BY W.CO_CD, W.SALES_CD, T.D
+			<choose>
+			  <!-- 1) salesCd, ordrsClntNm, clntPjt 모두 비었을 때만 "오늘 포함" 조건 적용 -->
+			  <when test="(salesCd == null or salesCd == '') 
+			          and (ordrsClntNm == null or ordrsClntNm == '') 
+			          and (clntPjt == null or clntPjt == '')">
+				  HAVING MIN(W.WBS_PLANS_DT) <![CDATA[<=]]> T.D 
+				  AND MAX(W.WBS_PLANE_DT) <![CDATA[>=]]> T.D
+			  </when>
+			  <!-- 2) 하나라도 값이 있으면 해당 값 기준으로만 필터 -->
+			  <otherwise>
+			    <if test="salesCd != null and salesCd != ''">
+			      HAVING  W.SALES_CD LIKE '%' || #{salesCd} || '%'
+			    </if>
+			  </otherwise>
+			</choose>
+			)
+			, plan AS (
+				SELECT 
+					W.CO_CD,
+					W.SALES_CD,
+					W.WBS_PLANS_DT,
+					W.WBS_PLANE_DT,
+					W.WBS_PLAN_CODE_ID,
+					W.VER_NO,
+					WR.WBS_RSLTS_NO, WR.WBS_PLAN_CODE_ID, WR.WBS_RSLTS_RATE, WR.WBS_RSLTS_MH, WR.WBS_RSLTSS_DT, WR.WBS_RSLTSE_DT, WR.CLOSE_YN,
+					CASE WHEN NVL(WR.CLOSE_YN, 'N') = 'Y' THEN '0' 
+					     ELSE '1' END UN_COMPLETED
+				FROM TB_WB22M01 W
+				JOIN src S ON W.CO_CD = S.CO_CD AND W.SALES_CD = S.SALES_CD
+				LEFT JOIN TB_WB23M01 WR ON WR.CO_CD = W.CO_CD AND WR.SALES_CD = W.SALES_CD AND WR.WBS_PLAN_CODE_KIND = W.WBS_PLAN_CODE_ID
+				CROSS JOIN today T
+				WHERE W.CO_CD = 'GUN'
+				AND W.WBS_PLAN_CODE_KIND = 'WBSCODE'
+				AND W.WBS_PLANS_DT IS NOT NULL
+				AND W.WBS_PLANE_DT IS NOT NULL
+				AND W.WBS_PLANE_DT  <![CDATA[<]]>  T.D
+			)
+			, unRslt AS (
+			  	SELECT  P.CO_CD,
+					  	P.SALES_CD,
+					  	MIN(P.WBS_PLANS_DT)		AS WBS_PLANS_DT,
+						MAX(P.WBS_PLANE_DT) 	AS WBS_PLANE_DT,
+						SUM(P.UN_COMPLETED)		AS UN_COMPLETED
+			  	FROM plan P
+				GROUP BY P.CO_CD, P.SALES_CD
+				HAVING SUM(P.UN_COMPLETED)	> 0 
+			)
+			, s0 AS (
+			  SELECT  S.CO_CD
+			  		, S.SALES_CD
+			  		, C.EQP_NM
+					, B.CLNT_NM       AS CLNT_NM
+					, M.CLNT_PJT      AS CLNT_PJT
+					, FN_CM05M01_CD_TO_NM(M.CLNT_PJT) AS CLNT_PJT_NM
+			  FROM src S
+				JOIN TB_CR02D02 C ON C.CO_CD = S.CO_CD AND C.SALES_CD = S.SALES_CD
+				JOIN TB_CR02M01 M ON M.ORDRS_NO = C.ORDRS_NO
+				JOIN TB_BM02M01 B ON B.CLNT_CD  = M.ORDRS_CLNT_CD
+			)
+			,w0 AS (
+				SELECT  S0.CO_CD, S0.SALES_CD,
+				        COUNT(W.FILE_TRGT_KEY) AS problem_count,
+				        SUM(CASE WHEN W.REQ_NO IS NULL AND W.ISS_STS != 'ISSSTS03' THEN 1
+				                 WHEN Q.REQ_ST != 'REQST03' THEN 1 
+				                 ELSE 0 END) AS problem_uncomplete
+				FROM s0 S0
+				JOIN TB_WB24M02 W ON W.CO_CD = S0.CO_CD AND W.SALES_CD = S0.SALES_CD
+				JOIN TB_QM01M01 Q ON Q.REQ_NO = W.REQ_NO
+				GROUP BY S0.CO_CD, S0.SALES_CD
+			)
+		SELECT
+			  R.CO_CD
+			, R.SALES_CD
+			, R.PLAN_CLOSE_YN
+			, S0.EQP_NM
+			, S0.CLNT_NM       AS CLNT_NM
+			, S0.CLNT_PJT      AS CLNT_PJT
+			, S0.CLNT_PJT_NM
+			, R.WBS_PLANS_DT_FM
+			, R.WBS_PLANE_DT_FM
+			, F.DESIGN_MNG
+			, TO_CHAR(F.DELIVER_DAY, 'YYYY-MM-DD') AS DELIVER_DAY
+			, F.MODEL_CLNT_NM
+			, TO_CHAR(F.MODEL_COMP_DT, 'YYYY-MM-DD') AS MODEL_COMP_DT
+			, F.OUT_CLNT_NM
+			, TO_CHAR(F.OUT_COMP_DT, 'YYYY-MM-DD') AS OUT_COMP_DT
+			, F.CAM_CLNT_NM
+			, TO_CHAR(F.CAM_COMP_DT, 'YYYY-MM-DD') AS CAM_COMP_DT
+			, F.MACHIN_MNG_NM
+			, F.MM_MEMO
+			, F.DWG_MEMO
+			, F.PRD_MEMO
+			, F.SALES_MEMO
+			, F.PM_MEMO
+			, F.REMARK
+			, F.CREAT_ID
+			, F.CREAT_PGM
+			, TO_CHAR(F.CREAT_DTTM, 'YYYY-MM-DD HH24:MI:SS') AS CREAT_DTTM
+			, F.UDT_ID
+			, F.UDT_PGM
+			, TO_CHAR(F.UDT_DTTM, 'YYYY-MM-DD HH24:MI:SS')  AS UDT_DTTM
+			, NVL(W0.problem_count, 0)						AS problem_count
+			, NVL(W0.problem_uncomplete, 0)					AS problem_uncomplete
+			, NVL(UN.UN_COMPLETED, 0) 						AS UN_COMPLETED
+		FROM src R  
+		LEFT JOIN TB_WB22D02 F ON R.CO_CD = F.CO_CD AND R.SALES_CD = F.SALES_CD
+		JOIN S0 ON S0.CO_CD = R.CO_CD AND S0.SALES_CD = R.SALES_CD
+		LEFT JOIN W0 ON W0.CO_CD = R.CO_CD AND W0.SALES_CD = R.SALES_CD
+		LEFT JOIN unRslt UN ON UN.CO_CD = R.CO_CD AND UN.SALES_CD = R.SALES_CD
+		CROSS JOIN today T
+		WHERE R.CO_CD = 'GUN'
+		<choose>
+		  <!-- 1) salesCd, ordrsClntNm, clntPjt 모두 비었을 때만 "오늘 포함" 조건 적용 -->
+		  <when test="(salesCd == null or salesCd == '') 
+		          and (ordrsClntNm == null or ordrsClntNm == '') 
+		          and (clntPjt == null or clntPjt == '')">
+		    AND R.WBS_PLANS_DT_FM <![CDATA[<=]]> T.D
+		    AND R.WBS_PLANE_DT_FM <![CDATA[>=]]> T.D
+		  </when>
+		
+		  <!-- 2) 하나라도 값이 있으면 해당 값 기준으로만 필터 -->
+		  <otherwise>
+		
+		    <if test="salesCd != null and salesCd != ''">
+		      AND R.SALES_CD LIKE '%' || #{salesCd} || '%'
+		    </if>
+		    <if test="ordrsClntNm != null and ordrsClntNm != ''">
+		      AND S0.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'
+		    </if>
+		
+		    <if test="clntPjt != null and clntPjt != ''">
+		      AND S0.CLNT_PJT = #{clntPjt}
+		    </if>
+		  </otherwise>
+		</choose>
+		ORDER BY R.CO_CD, R.SALES_CD
+	</select>
+
+	<update id="updateWb22d02ExtraInfo" parameterType="Map">
+		UPDATE TB_WB22D02
+		SET
+			  DESIGN_MNG = #{designMng, jdbcType=VARCHAR}
+			, DELIVER_DAY = TO_DATE(NULLIF(TRIM(#{deliverDay, jdbcType=VARCHAR}), ''), 'YYYY-MM-DD')
+			, MODEL_CLNT_NM = #{modelClntNm, jdbcType=VARCHAR}
+			, MODEL_COMP_DT = TO_DATE(NULLIF(TRIM(#{modelCompDt, jdbcType=VARCHAR}), ''), 'YYYY-MM-DD')
+			, OUT_CLNT_NM = #{outClntNm, jdbcType=VARCHAR}
+			, OUT_COMP_DT = TO_DATE(NULLIF(TRIM(#{outCompDt, jdbcType=VARCHAR}), ''), 'YYYY-MM-DD')
+			, CAM_CLNT_NM = #{camClntNm, jdbcType=VARCHAR}
+			, CAM_COMP_DT = TO_DATE(NULLIF(TRIM(#{camCompDt, jdbcType=VARCHAR}), ''), 'YYYY-MM-DD')
+			, MACHIN_MNG_NM = #{machinMngNm, jdbcType=VARCHAR}
+			, MM_MEMO = #{mmMemo, jdbcType=VARCHAR}
+			, DWG_MEMO = #{dwgMemo, jdbcType=VARCHAR}
+			, PRD_MEMO = #{prdMemo, jdbcType=VARCHAR}
+			, SALES_MEMO = #{salesMemo, jdbcType=VARCHAR}
+			, PM_MEMO = #{pmMemo, jdbcType=VARCHAR}
+			, REMARK = #{remark, jdbcType=VARCHAR}
+			, UDT_ID = #{userId}
+			, UDT_PGM = #{pgmId}
+			, UDT_DTTM = SYSDATE
+		WHERE CO_CD = #{coCd}
+		  AND SALES_CD = #{salesCd}
+  		  -- 아래는 동시성(Optimistic Lock) 체크 목적이라면 문자열 비교 대신 "타입"으로 비교 권고
+		  AND ( #{udtDttm} IS NULL OR UDT_DTTM = TO_TIMESTAMP(#{udtDttm}, 'YYYY-MM-DD HH24:MI:SS') )
+	</update>
+
+	<insert id="insertWb22d02ExtraInfo" parameterType="Map">
+		INSERT INTO TB_WB22D02 (
+			  CO_CD
+			, SALES_CD
+			, DESIGN_MNG
+			, DELIVER_DAY
+			, MODEL_CLNT_NM
+			, MODEL_COMP_DT
+			, OUT_CLNT_NM
+			, OUT_COMP_DT
+			, CAM_CLNT_NM
+			, CAM_COMP_DT
+			, MACHIN_MNG_NM
+			, MM_MEMO
+			, DWG_MEMO
+			, PRD_MEMO
+			, SALES_MEMO
+			, PM_MEMO
+			, REMARK
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+			, UDT_ID
+			, UDT_PGM
+			, UDT_DTTM
+		) VALUES (
+			  #{coCd}
+			, #{salesCd}
+			, #{designMng, jdbcType=VARCHAR}
+			, TO_DATE(NULLIF(TRIM(#{deliverDay, jdbcType=VARCHAR}), ''), 'YYYY-MM-DD')
+			, #{modelClntNm, jdbcType=VARCHAR}
+			, TO_DATE(NULLIF(TRIM(#{modelCompDt, jdbcType=VARCHAR}), ''), 'YYYY-MM-DD')
+			, #{outClntNm, jdbcType=VARCHAR}
+			, TO_DATE(NULLIF(TRIM(#{outCompDt, jdbcType=VARCHAR}), ''), 'YYYY-MM-DD')
+			, #{camClntNm, jdbcType=VARCHAR}
+			, TO_DATE(NULLIF(TRIM(#{camCompDt, jdbcType=VARCHAR}), ''), 'YYYY-MM-DD')
+			, #{machinMngNm, jdbcType=VARCHAR}
+			, #{mmMemo, jdbcType=VARCHAR}
+			, #{dwgMemo, jdbcType=VARCHAR}
+			, #{prdMemo, jdbcType=VARCHAR}
+			, #{salesMemo, jdbcType=VARCHAR}
+			, #{pmMemo, jdbcType=VARCHAR}
+			, #{remark, jdbcType=VARCHAR}
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+		)
+	</insert>
+
+	<insert id="insertWbsScheduleHIST" parameterType="Map">
+		INSERT INTO TB_WB22M01_HIST
+		SELECT FILE_TRGT_KEY, 	CO_CD, 				WBS_PLAN_NO,	 	WBS_PLAN_CODE_KIND, 	WBS_PLAN_CODE_ID, 	WBS_PLAN_CODE_NM, 	VER_NO, 
+			   SALES_CD, 		SEQ, 				WBS_PLAN_MNG_ID, 	WBS_PLANS_DT, 			WBS_PLANE_DT, 		DAYCNT, 			WBS_PLAN_STS_CODE_ID, 
+			   LOCK_YN, 		CLOSE_YN, 			CLOSE_ID, 			CLOSE_DTTM,             EXPECT_MH, 			CHG_REQ_STR_DT, 	CHG_REQ_END_DT, 
+			   CHG_REASON, 		CHG_REQ_USER_ID, 	CHG_REQ_STATUS, 	CHG_REQ_APPLY_DT, 		VER_UP_REASON, 		CREAT_ID, 			CREAT_PGM, 
+			   CREAT_DTTM, 		UDT_ID, 			UDT_PGM, 			UDT_DTTM
+		 FROM   TB_WB22M01
+		WHERE  CO_CD = #{coCd}
+		  AND  SALES_CD = #{salesCd}
+		  AND  CLOSE_YN = 'Y'
+	</insert>
+
+	<update id="updateWbsScheduleVersionUp" parameterType="Map">
+		UPDATE TB_WB22M01
+		SET    VER_NO = TO_CHAR(TO_NUMBER(NVL(VER_NO, '0')) + 1)
+			 , UDT_ID = #{userId}
+			 , UDT_PGM = #{pgmId}
+			 , UDT_DTTM = SYSDATE
+		WHERE  CO_CD = #{coCd}
+		  AND  SALES_CD = #{salesCd}
+	</update>
+
+
+	<update id="updateWbsSchedule" parameterType="Map">
+		UPDATE TB_WB22M01
+		SET    WBS_PLANS_DT = TO_DATE(#{wbsPlansDtFm}, 'YYYY-MM-DD')
+			 , WBS_PLANE_DT = TO_DATE(#{wbsPlaneDtFm}, 'YYYY-MM-DD')
+			 , UDT_ID = #{userId}
+			 , UDT_PGM = #{pgmId}
+			 , UDT_DTTM = SYSDATE
+		WHERE  FILE_TRGT_KEY = #{fileTrgtKey}
+	</update>
+	<update id="updateWbsScheduleVersionUpWbsCode" parameterType="Map">
+		UPDATE TB_WB22M01
+		SET    WBS_PLANS_DT = TO_DATE(#{wbsPlansDtFm}, 'YYYY-MM-DD')
+			 , WBS_PLANE_DT = TO_DATE(#{wbsPlaneDtFm}, 'YYYY-MM-DD')
+			 , UDT_ID = #{userId}
+			 , UDT_PGM = #{pgmId}
+			 , UDT_DTTM = SYSDATE
+		WHERE  CO_CD = #{coCd}
+		  AND  SALES_CD = #{salesCd}
+		  AND  WBS_PLAN_CODE_ID = #{wbsPlanCodeId}
+		  AND  WBS_PLAN_CODE_KIND = 'WBSCODE'
+	</update>
+	
+	
+	<update id="updateWbsLevel2MetaGantt_revisedFinishDt" parameterType="Map">
+		UPDATE TB_WB22M01
+		SET    REVISED_FINISH_DT 		= #{revisedFinishDt}
+			 , WBS_PLAN_STS_CODE_ID     = #{wbsPlanStsCodeId}
+			 , CLOSE_YN = #{planCloseYn}
+			 , UDT_ID   = #{userId}
+			 , UDT_PGM  = #{pgmId}
+			 , UDT_DTTM = SYSDATE
+		WHERE  CO_CD = #{coCd}
+		  AND  SALES_CD = #{salesCd}
+		  AND  WBS_PLAN_CODE_KIND = #{wbsPlanCodeKind}
+		  AND  (REVISED_FINISH_DT   != #{revisedFinishDt}
+		   OR  WBS_PLAN_STS_CODE_ID != #{wbsPlanStsCodeId})
+	</update>
+	
+	<update id="upsertWbsActualStart" parameterType="Map">
+		MERGE INTO TB_WB23M01 A
+		USING (
+			SELECT 
+				FILE_TRGT_KEY, CO_CD, WBS_PLAN_NO AS WBS_RSLTS_NO, WBS_PLAN_CODE_KIND, WBS_PLAN_CODE_ID, SALES_CD, WBS_PLAN_MNG_ID AS WBS_RSLTS_ID
+			FROM TB_WB22M01
+			WHERE CO_CD = #{coCd} AND SALES_CD = #{salesCd} AND WBS_PLAN_CODE_ID = #{wbsPlanCodeId} AND WBS_PLAN_CODE_KIND = 'WBSCODE'
+		) B
+		ON (A.CO_CD = B.CO_CD AND A.SALES_CD = B.SALES_CD AND A.WBS_PLAN_CODE_ID = B.WBS_PLAN_CODE_ID AND A.WBS_PLAN_CODE_KIND = B.WBS_PLAN_CODE_KIND)
+		WHEN MATCHED THEN
+			UPDATE SET 
+				WBS_RSLTSS_DT = TRUNC(SYSDATE),
+				CLOSE_YN = #{actCloseYn},
+				UDT_ID = #{userId},
+				UDT_PGM = #{pgmId},
+				UDT_DTTM = SYSDATE
+		WHEN NOT MATCHED THEN
+			INSERT (FILE_TRGT_KEY, CO_CD, WBS_RSLTS_NO, WBS_PLAN_CODE_KIND, WBS_PLAN_CODE_ID, SALES_CD, 
+					WBS_RSLTS_ID, WBS_RSLTSS_DT, WBS_RSLTS_RATE, LOCK_YN, CLOSE_YN, CREAT_ID, CREAT_PGM, CREAT_DTTM)
+			VALUES (B.FILE_TRGT_KEY, B.CO_CD, B.WBS_RSLTS_NO, B.WBS_PLAN_CODE_KIND, B.WBS_PLAN_CODE_ID, B.SALES_CD, 
+					B.WBS_RSLTS_ID, TRUNC(SYSDATE), 1, 'N', #{actCloseYn}, #{userId}, #{pgmId}, SYSDATE)
+	</update>
+
+	<select id="selectWbsActualFileTrgtKey" parameterType="Map" resultType="String">
+		SELECT FILE_TRGT_KEY
+		FROM TB_WB23M01
+		WHERE CO_CD = #{coCd}
+		  AND SALES_CD = #{salesCd}
+		  AND WBS_PLAN_CODE_KIND = #{wbsPlanCodeKind}
+		  AND ROWNUM = 1
+	</select>
+
+	<update id="updateWbsActualComplete" parameterType="Map">
+		MERGE INTO TB_WB23M01 A
+		USING (
+				SELECT 
+			        #{coCd} 			AS CO_CD,
+			        #{salesCd} 			AS SALES_CD,
+			        #{wbsPlanCodeKind} 	AS WBS_PLAN_CODE_KIND
+			    FROM DUAL
+		) B
+		ON (A.CO_CD = B.CO_CD AND A.SALES_CD = B.SALES_CD AND A.WBS_PLAN_CODE_KIND = B.WBS_PLAN_CODE_KIND)
+		WHEN MATCHED THEN
+			UPDATE SET 
+				WBS_RSLTSS_DT = #{wbsRsltssDt},
+				WBS_RSLTSE_DT = #{wbsRsltseDt, jdbcType=VARCHAR},
+				WBS_PLAN_MH = #{wbsPlanMh},
+				WBS_RSLTS_MH = #{wbsRsltsMh},
+				WBS_RSLTS_RATE = #{wbsRsltsRate},
+				DAYCNT = #{daycnt},
+				CLOSE_YN = #{actCloseYn},
+				UDT_ID = #{userId},
+				UDT_PGM = #{pgmId},
+				UDT_DTTM = SYSDATE
+			WHERE NVL(CLOSE_YN, 'N') != 'Y' -- 이미 마감된 건 업데이트 제외
+		WHEN NOT MATCHED THEN
+			INSERT (FILE_TRGT_KEY, CO_CD, WBS_RSLTS_NO, WBS_PLAN_CODE_KIND, WBS_PLAN_CODE_ID, SALES_CD, DAYCNT,
+					WBS_RSLTS_ID, WBS_RSLTSS_DT, WBS_RSLTSE_DT, WBS_PLAN_MH, WBS_RSLTS_MH, WBS_RSLTS_RATE, LOCK_YN, CLOSE_YN, CREAT_ID, CREAT_PGM, CREAT_DTTM)
+			VALUES (#{rsltsFileTrgtKey}, #{coCd}, #{wbsPlanNo}, #{wbsPlanCodeKind}, #{wbsPlanCodeId}, #{salesCd}, #{daycnt},
+					#{wbsPlanMngId}, #{wbsRsltssDt}, #{wbsRsltseDt, jdbcType=VARCHAR}, #{wbsPlanMh}, #{wbsRsltsMh}, #{wbsRsltsRate}, 'N', #{actCloseYn}, #{userId}, #{pgmId}, SYSDATE)
+	</update>
+
+	<update id="updateWbsActualReset" parameterType="Map">
+		UPDATE TB_WB23M01
+		SET WBS_RSLTSE_DT = NULL,
+			WBS_RSLTS_RATE = 1,
+			CLOSE_YN = 'N',
+			UDT_ID = #{userId},
+			UDT_PGM = #{pgmId},
+			UDT_DTTM = SYSDATE
+		WHERE CO_CD = #{coCd} 
+		  AND SALES_CD = #{salesCd} 
+		  AND WBS_PLAN_CODE_KIND = #{wbsPlanCodeKind}
+	</update>
+
+	<delete id="deleteWbsActual" parameterType="Map">
+		DELETE FROM TB_WB23M01
+		WHERE CO_CD = #{coCd} 
+		  AND SALES_CD = #{salesCd} 
+		  AND WBS_PLAN_CODE_KIND = #{wbsPlanCodeKind}
+	</delete>
+
+
+	<delete id="deleteWbsActualPlanClear" parameterType="Map">
+		UPDATE TB_WB22M01
+		SET 
+			WBS_PLAN_STS_CODE_ID  = #{wbsPlanStsCodeId},
+			CLOSE_YN  = #{planCloseYnd},
+			UDT_ID = #{userId},
+			UDT_PGM = #{pgmId},
+			UDT_DTTM = SYSDATE
+		WHERE CO_CD = #{coCd} 
+		  AND SALES_CD = #{salesCd} 
+		  AND WBS_PLAN_CODE_KIND = #{wbsPlanCodeKind}
+	</delete>
+
+
+	<update id="updateWbsActualLevel2Insert" parameterType="Map">
+		MERGE INTO TB_WB22M01 A
+		USING (
+				SELECT 
+			        #{coCd} 			AS CO_CD,
+			        #{salesCd} 			AS SALES_CD,
+			        #{wbsPlanCodeKind} 	AS WBS_PLAN_CODE_KIND
+			    FROM DUAL
+		) B
+		ON (A.CO_CD = B.CO_CD AND A.SALES_CD = B.SALES_CD AND A.WBS_PLAN_CODE_KIND = B.WBS_PLAN_CODE_KIND)
+		WHEN MATCHED THEN
+			UPDATE SET 
+				WBS_PLAN_CODE_NM = #{wbsPlanCodeNm, jdbcType=VARCHAR},
+				WBS_PLAN_MNG_ID = #{wbsPlanMngId, jdbcType=VARCHAR},
+				WBS_PLANS_DT = #{wbsPlansDt, jdbcType=VARCHAR},
+				WBS_PLANE_DT = #{wbsPlaneDt, jdbcType=VARCHAR},
+				DAYCNT = #{daycnt, jdbcType=VARCHAR},
+				EXPECT_MH = #{expectMh, jdbcType=VARCHAR},
+				WBS_PLAN_STS_CODE_ID = #{wbsPlanStsCodeId},
+				UDT_ID = #{creatId},
+				UDT_PGM = #{creatPgm},
+				UDT_DTTM = SYSDATE,
+				VER_UP_REASON = #{verUpReason, jdbcType=VARCHAR},
+				REVISED_FINISH_DT = #{revisedFinishDt, jdbcType=VARCHAR}
+			WHERE NVL(CLOSE_YN, 'N') != 'Y' -- 이미 마감된 건 업데이트 제외
+		WHEN NOT MATCHED THEN
+			INSERT (
+				FILE_TRGT_KEY, CO_CD, WBS_PLAN_NO, WBS_PLAN_CODE_KIND, WBS_PLAN_CODE_ID, WBS_PLAN_CODE_NM, SALES_CD,
+				VER_NO, SEQ, WBS_PLAN_MNG_ID, WBS_PLANS_DT, WBS_PLANE_DT, DAYCNT, EXPECT_MH, WBS_PLAN_STS_CODE_ID,
+				CLOSE_YN, CREAT_ID, CREAT_PGM, CREAT_DTTM, VER_UP_REASON, REVISED_FINISH_DT
+			)
+			VALUES (
+				#{planFileTrgtKey}, #{coCd}, #{wbsPlanNo}, #{wbsPlanCodeKind}, #{wbsPlanCodeId}, #{wbsPlanCodeNm}, #{salesCd},
+				#{verNo}, 1, #{wbsPlanMngId}, #{wbsPlansDt}, #{wbsPlaneDt}, #{daycnt}, #{expectMh, jdbcType=VARCHAR}, #{wbsPlanStsCodeId},
+				'Y', #{creatId}, #{creatPgm}, SYSDATE, #{verUpReason, jdbcType=VARCHAR}, #{revisedFinishDt, jdbcType=VARCHAR}
+			)
+	</update>
+</mapper>

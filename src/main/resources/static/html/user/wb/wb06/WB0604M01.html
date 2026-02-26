@@ -118,18 +118,18 @@
   <section class="card">
     <div class="hd">
       <div>간트</div>
+      <div id="rangeInfo"></div>
       <div class="toolbar">
-        <button class="btn" id="btnRecalc">재조회</button>
+        <button class="btn primary" id="btnRecalc">일정다시불러오기</button>
         <button class="btn primary" id="btnToday">오늘</button>
         <button class="btn" id="btnEditPlan">편집: 계획</button>
         <button class="btn" id="btnEditAct">편집: 실적</button>
         <span id="editModeInfo" style="font-size:12px; color:var(--primary); font-weight:700;"></span>
         <label style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:4px; margin-left:8px;">
           Zoom:
-          <input id="zoomSlider" type="range" min="2" max="20" value="12" style="width:80px;"/>
-          <span id="zoomVal">12</span>px 
+          <input id="zoomSlider" type="range" min="2" max="20" value="20" style="width:80px;"/>
+          <span id="zoomVal">20</span>
         </label>
-        <span id="rangeInfo" style="margin-left:auto;"></span>
       </div>
     </div>
     <div class="bd">
@@ -328,8 +328,16 @@ function collectDownstreamTaskIds(seedIds){
 function normalizeTaskFields(){
   // 기존(startAt/durationWd) 데이터가 들어오더라도 PLAN 필드로 흡수할 수 있게 방어(확장 대비)
   for(const t of STATE.tasks.values()){
-    if(t.planDurationWd==null) t.planDurationWd = Math.max(1, Number(t.durationWd||1));
     if(!t.planStartAt && t.startAt) t.planStartAt = t.startAt;
+    if(!t.planEndAt && t.endAt) t.planEndAt = t.endAt;
+
+    // 만약 planStartAt과 planEndAt이 모두 있다면, durationWd보다 두 날짜의 실제 근무일수를 우선시함
+    if(t.planStartAt && t.planEndAt) {
+        t.planDurationWd = Math.max(1, diffWorkingDaysInclusive(t.planStartAt, t.planEndAt));
+    } else {
+        if(t.planDurationWd==null) t.planDurationWd = Math.max(1, Number(t.durationWd||1));
+    }
+    
     // ACT 필드 방어
     if(t.actProgress==null) t.actProgress = 0;
   }
@@ -340,9 +348,12 @@ function recalcPlanAll(){
 
   // 1. 개별 태스크 정규화 및 종료일 산정 (부모 요약 제외)
   for(const t of STATE.tasks.values()){
-    if(t.planStartAt) t.planStartAt = nextWorkingDay(t.planStartAt);
-    const dur = Math.max(1, Number(t.planDurationWd||1));
-    t.planEndAt = addWorkingDays(t.planStartAt || STATE.view.baseDate, dur - 1);
+    // [USER REQ] 백엔드에서 가져온 계획 날짜는 그대로 유지 (자동 보정 금지)
+    // planEndAt이 명시적으로 존재하면 보존하고, 없을 때만 기간을 기반으로 산출
+    if (!t.planEndAt) {
+        const dur = Math.max(1, Number(t.planDurationWd||1));
+        t.planEndAt = addWorkingDays(t.planStartAt || STATE.view.baseDate, dur - 1);
+    }
     
     // 경고 초기화
     t.planWarnYn = "N";
@@ -404,36 +415,48 @@ function refreshSummariesOnly(){
     
     // 이 시점에 planOverdueYn 등을 날짜 기반으로 다시 갱신
     if (t.planEndAt) {
-      t.planOverdueYn = (diffDays(today, t.planEndAt) < 0) ? "Y" : "N";
+      const isCompleted = (t.wbsPlanStsCodeId === "WBSPLANSTS40" || t.wbsPlanStsCodeId === "WBSPLANSTS50");
+      t.planOverdueYn = (diffDays(today, t.planEndAt) < 0 && !isCompleted) ? "Y" : "N";
     } else {
       t.planOverdueYn = "N";
     }
   }
 
-  // 2. 부모 노드 실적(ACT) 자동 요약 (Bottom-up approach)
-  for(const t of STATE.tasks.values()){
-    if(t.parentId === null){
-      const children = Array.from(STATE.tasks.values()).filter(c => c.parentId === t.id);
+  // 2. 모든 부모 노드 실적(ACT) 및 계획(PLAN) 자동 요약 (Bottom-up approach)
+  // 깊이가 깊은 노드부터 처리하기 위해 모든 태스크를 역순 정렬하거나 반복적으로 처리
+  const allTasks = Array.from(STATE.tasks.values());
+  const parentTasks = allTasks.filter(t => allTasks.some(c => c.parentId === t.id));
+  
+  // 단순화를 위해 자식의 자식을 가지는 구조도 반영되도록 여러 번 수행하거나 트리 구조 순회
+  // 여기서는 수정을 최소화하면서 모든 부모가 자식을 집계하도록 루프 강화
+  parentTasks.forEach(t => {
+      const children = allTasks.filter(c => c.parentId === t.id);
       if(children.length > 0){
         let minS = null, maxE = null, totalProg = 0, countProg = 0;
+        let pMinS = null, pMaxE = null;
+
         children.forEach(c => {
+          // ACT 집계
           if(c.actStartAt){
             if(!minS || diffDays(minS, c.actStartAt) < 0) minS = c.actStartAt;
           }
           if(c.actEndAt){
             if(!maxE || diffDays(maxE, c.actEndAt) > 0) maxE = c.actEndAt;
           }
+
           totalProg += (c.actProgress || 0);
           countProg++;
         });
+
         t.actStartAt = minS;
         t.actEndAt = maxE;
         t.actProgress = countProg > 0 ? Math.round(totalProg / countProg) : 0;
       }
-    }
+  });
     
-    // 3. 모든 노드(부모 포함)의 상태(status)와 상태코드(wbsPlanStsCodeId)를 날짜/진척율 기반으로 재계산
-    // 실시간 드래그나 요약 이후에도 "지연" 상태를 정확히 유지하기 위함
+  // 3. 모든 노드(부모 포함)의 상태(status)와 상태코드(wbsPlanStsCodeId)를 날짜/진척율 기반으로 재계산
+  // 실시간 드래그나 요약 이후에도 "지연" 상태를 정확히 유지하기 위함
+  for(const t of STATE.tasks.values()){
     const ap = Number(t.actProgress || 0);
     const pe = t.planEndAt;
     const ae = (t.actStartAt && !t.actEndAt) ? today : t.actEndAt;
@@ -509,7 +532,13 @@ function getTaskListInTreeOrder(){
 }
 
 /** ---------- Data Loading ---------- */
-function loadWbsData(callback){
+function loadWbsData(opt, callback){
+  if (typeof opt === 'function') {
+    callback = opt;
+    opt = {};
+  }
+  const keepZoom = opt && opt.keepZoom;
+
   const formData = {
     coCd: $("#coCd").val() || 'GUN',
     salesCd: $("#salesCd_S").val(), 
@@ -591,8 +620,17 @@ function loadWbsData(callback){
     refreshSummariesOnly();
     recalcPlanAll(); // This might update dates
     updateGanttRange(); 
-    autoZoomToFit();
+    // [USER REQ] 초기 로딩시 zoom 변경없이 20px 로 유지
+    // if (!keepZoom) autoZoomToFit();
     renderAll();
+    
+    // 렌더링 완료 후 오늘 날짜로 포커스
+    if (!keepZoom) {
+      setTimeout(() => {
+        $("#btnToday").trigger("click");
+      }, 100);
+    }
+    
     setToast("WBS 데이터 로드 완료", {type:"ok", autoHideMs:1500});
 
     if(typeof callback === 'function') callback();
@@ -600,8 +638,8 @@ function loadWbsData(callback){
 }
 
 /** 데이터 검색 (재조회) */
-function searchData(){
-  loadWbsData(function() {
+function searchData(keepZoom){
+  loadWbsData({keepZoom: !!keepZoom}, function() {
     setTimeout(function() {
       if (STATE.selectedId) {
         focusOnTreeTask(STATE.selectedId);
@@ -641,7 +679,7 @@ function updateGanttRange() {
 
 /** 전체 타임라인이 한 화면에 보이도록 배율(Zoom) 자동 조정 */
 function autoZoomToFit() {
-  const wrap = $("#ganttWrap");
+  const wrap = $("#gantt");
   if (!wrap.length || !STATE.view.days) return;
 
   const totalW = wrap.width();
@@ -688,7 +726,8 @@ function renderTree(){
     $("<div>").text(t.title).appendTo(r1);
     
     const badges = $("<div>").addClass("badges").appendTo(r1);
-    $("<span>").addClass("badge primary").text(`${t.status||"TODO"} ${t.progress||0}%`).appendTo(badges);
+    const statusClass = t.wbsPlanStsCodeId === "WBSPLANSTS40" ? "badge danger" : "badge primary";
+    $("<span>").addClass(statusClass).text(`${t.status||"TODO"} ${t.progress||0}%`).appendTo(badges);
 
     if(t.planOverdueYn==="Y") $("<span>").addClass("badge danger").text("기한경과(PLAN)").appendTo(badges);
     if(t.planWarnYn==="Y") $("<span>").addClass("badge warn").text(warnLabelPlan(t)).appendTo(badges);
@@ -957,7 +996,7 @@ async function saveToServer(pending) {
     // Use postAjax instead of filePostAjax for standard form data
     if(typeof postAjax === 'function') {
       postAjax(url, param, null, function(res) {
-        if(res.resultCode == 200 || res.ok) {
+        if(res && (res.resultCode == 200 || res.ok)) {
            // 백엔드에서 생성/업데이트된 키 및 보정된 데이터 반영
            if(t) {
              if(res.fileTrgtKey) t.fileTrgtKey = res.fileTrgtKey;
@@ -976,22 +1015,25 @@ async function saveToServer(pending) {
                  if (res.wbsRsltseDt === "") {
                      t.actEndAt = toYmd(new Date());
                  } else {
-                     t.actEndAt = toYmdStr(res.wbsRsltseDt);
+                     // toYmdStr 유틸리티 부재 시 방어 코드
+                     const rDt = String(res.wbsRsltseDt);
+                     t.actEndAt = (rDt.length === 8) ? `${rDt.substr(0,4)}-${rDt.substr(4,2)}-${rDt.substr(6,2)}` : rDt;
                  }
              } else {
                  // Fallback: 진척도 100% 미만 시 종료일 현재일로 동기화
-                 if(t.actProgress < 100) t.actEndAt = toYmd(new Date());
+                 if(t.actProgress < 100 && t.actStartAt) t.actEndAt = toYmd(new Date());
              }
            }
            resolve(res);
         } else {
-           const msg = res.resultMessage || res.msg || "";
-           alert("서버 처리 오류! " + msg);
+           const msg = (res && (res.resultMessage || res.msg)) || "서버 통신 오류";
+           // alert("서버 처리 오류! " + msg); // Toast가 있으므로 alert 중복 제거 고려
            reject(new Error(msg));
         }
       });
     } else {
       console.error("postAjax is not defined");
+      reject(new Error("postAjax is not defined"));
     }
     
   });
@@ -1558,7 +1600,7 @@ function renderDetail(){
     <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom: 6px;">
       <input class="inp" id="wbsPlanCodeNm" type="text" value="${escapeHtml(t.title)}" style="font-weight:900; font-size:15px; width:100%; border:1px solid transparent; background:transparent; padding:4px;" placeholder="TASK명 입력" />
       <div class="badges">
-        <span class="badge primary">${escapeHtml((t.status||"TODO")+" "+(t.progress||0)+"%")}</span>
+        <span class="${t.wbsPlanStsCodeId === 'WBSPLANSTS40' ? 'badge danger' : 'badge primary'}">${escapeHtml((t.status||"TODO")+" "+(t.progress||0)+"%")}</span>
         ${t.planOverdueYn==="Y" ? `<span class="badge danger">기한경과(PLAN)</span>` : ``}
         ${t.planWarnYn==="Y" ? `<span class="badge warn">${escapeHtml(warnLabelPlan(t))}</span>` : ``}
       </div>
@@ -1774,9 +1816,10 @@ function renderDetail(){
       const dur = Math.max(1, diffWorkingDaysInclusive(s, e));
       elD.val(dur);
 
-      if(t.planStartAt !== s || t.planDurationWd !== dur) {
+      if(t.planStartAt !== s || t.planEndAt !== e || t.planDurationWd !== dur) {
         hideToast();
         t.planStartAt = s;
+        t.planEndAt = e;
         t.planDurationWd = dur;
         t._planDirty = true; 
         recalcPlanAll();
@@ -1966,10 +2009,16 @@ function renderDetail(){
   const prevEnd = t.planEndAt;
 
   const planStartRaw = $("#wbsPlansDt").val() || null;
+  const planEndRaw = $("#wbsPlaneDt").val() || null;
   const planDur = Math.max(1, Number($("#daycnt").val()||1));
 
   const ns = planStartRaw ? nextWorkingDay(planStartRaw) : (t.planStartAt || nextWorkingDay(STATE.view.baseDate));
-  const ne = addWorkingDays(ns, planDur - 1);
+  let ne = planEndRaw ? nextWorkingDay(planEndRaw) : (t.planEndAt || null);
+  
+  // 종료일이 여전히 없다면 기간을 통해 설정
+  if (!ne) {
+     ne = addWorkingDays(ns, planDur - 1);
+  }
 
   commitDetailSave("PLAN", t.id, prevStart, prevEnd, ns, ne, planDur);
   $("#btnSavePlan").removeClass("highlight-blue");
@@ -2139,7 +2188,7 @@ function focusOnGanttTask(taskId) {
   const t = STATE.tasks.get(taskId);
   if (!t) return;
 
-  const wrap = $("#ganttWrap");
+  const wrap = $("#gantt");
   if (!wrap.length) return;
 
   const taskList = getTaskListInTreeOrder();
@@ -2317,8 +2366,8 @@ function init(){
     }
   });
 
-  $("#btnRecalc, #btnSearch #btnReset").on("click", ()=>{
-    searchData();
+  $("#btnRecalc, #btnSearch, #btnReset").on("click", ()=>{
+    searchData(true);
   });
 
   
@@ -2327,7 +2376,7 @@ function init(){
     const today=toYmd(new Date());
     const idx=diffDays(STATE.view.baseDate, today);
     if(idx>=0 && idx<STATE.view.days){
-      const wrap=$("#ganttWrap");
+      const wrap=$("#gantt");
       const dayW = getDayW();
       wrap.scrollLeft(Math.max(0, idx*dayW - 200));
     }
@@ -2436,7 +2485,7 @@ function init(){
       id: newId,
       parentId: pid,
       wbsPlanCodeKind: pid, // 부모 코드를 종류로 분류
-      title: "신규 TASK",
+      title: sel.title || "신규 TASK",
       
       // 부모로부터 상속받거나 기본값 설정
       coCd: parent ? parent.coCd : ($("#coCd").val() || "GUN"),
@@ -2474,6 +2523,13 @@ function init(){
     STATE.selectedId = newId;
     recalcPlanAll();
     renderAll();
+    
+    // 신규 추가된 TASK로 포커스 이동 (간트 선택 및 마인드맵 카드 포커스)
+    setTimeout(() => {
+      focusOnTreeTask(newId);
+      focusOnGanttTask(newId);
+    }, 150);
+
     setToast("신규 TASK가 추가되었습니다.");
   });
 
