@@ -596,6 +596,15 @@
 							recalcSortOrder();
 						}
 						this.self.repaint(true);
+						// scroll 행이 현재 columnHeight보다 커진 경우에만 frozen 동기화 (늘어날 때만)
+						var curColH = (mnGridView.target.config.body || {}).columnHeight || 50;
+						var maxH = 0;
+						$('[data-ax5grid="mnGrid-grid"]').find('[data-ax5grid-panel-scroll="body"] tr').each(function () {
+							maxH = Math.max(maxH, $(this).outerHeight() || 0);
+						});
+						if (maxH > curColH) {
+							setTimeout(syncRowHeights, 0);
+						}
 					},
 					inlineEdit: {
 						active: function () {
@@ -1177,24 +1186,26 @@
 		const grid = mnGridView.target;
 		const selected = grid.getList("selected");  // 선택된 행 배열
 
+		// 공지사항 행의 인덱스 (공지사항·파일첨부 위에 삽입하기 위한 기준)
+		const noticeIndex = grid.list.findIndex(r => r.isNoticeRow);
+		const defaultInsertIndex = noticeIndex >= 0 ? noticeIndex : grid.list.length;
+
 		let insertIndex;
 		if (selected.length > 0) {
 			const sel = selected[0];
 
-			if (sel.mnSubject === "공지사항") {
-				return false;
+			// 공지사항·파일첨부 행이 선택되어 있으면 공지사항 바로 위(defaultInsertIndex)에 삽입
+			if (sel.isNoticeRow || sel.isFileRow) {
+				insertIndex = defaultInsertIndex;
+			} else {
+				insertIndex = grid.list.findIndex(r =>
+					r.mnDate === sel.mnDate &&
+					r.mnSubSeq === sel.mnSubSeq
+				) + 1;
 			}
-
-			insertIndex = grid.list.findIndex(r =>
-				r.mnDate === sel.mnDate &&
-				r.mnSubSeq === sel.mnSubSeq
-			) + 1;
 		} else {
-			insertIndex = grid.list.findIndex(r => r.mnSubject === '공지사항');
-			if (insertIndex < 0) {
-				// 공지사항이 없으면 맨 끝
-				insertIndex = grid.list.length;
-			}
+			// 아무것도 선택되지 않은 경우 공지사항 바로 위에 삽입
+			insertIndex = defaultInsertIndex;
 		}
 
 		// 새 행 객체 생성
@@ -1549,7 +1560,6 @@
 	}
 
 
-	// ax5grid 세팅 후 아래 함수 호출
 	function syncRowHeights() {
 		var $rows = $('[data-ax5grid="mnGrid-grid"]').find('[data-ax5grid-panel-scroll="body"] tr');
 		var maxHeight = 30;
