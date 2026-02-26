@@ -248,8 +248,9 @@ public class CR50Ctr {
     @PutMapping(value = "/updatePfuVersionUpProcess")
     public String updatePfuVersionUpProcess(@RequestBody Map<String, String> paramMap, ModelMap model) throws Exception {
         try {
+            paramMap.put("fileTrgtKey", paramMap.get("pfuNo"));
             if (cr50Svc.updatePfuVersionUpProcess(paramMap) != 0) {
-                List<Map<String, String>> result = cr50Svc.selectPfuInfoSalesCdList(paramMap);
+                Map<String, String> result = cr50Svc.selectPfuInfo(paramMap);
                 model.addAttribute("result", result);
                 
                 model.addAttribute("resultCode", 200);

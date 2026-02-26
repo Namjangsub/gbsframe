@@ -226,6 +226,7 @@
 					                                 AND CLOSE_YN LIKE '%${closeYn}%'                
 					                                </if>
 		                         
+
 							                         AND EXISTS (SELECT 'X'    --과제등록된 SALES_CD 만 
 							                                       FROM SJD P 
 							                                      WHERE P.CO_CD    = X.CO_CD
@@ -245,7 +246,7 @@
 							            	  END TODO_YN
 							             , A.TODO_NO, A.ETC_FIELD2, A.SALES_CD
 								    FROM SUBJ X
-								    JOIN TB_WB20M03 A ON X.PFU_NO = A.TODO_NO AND X.MAX_VER_NO = A.ETC_FIELD2
+								    JOIN TB_WB20M03 A ON X.PFU_NO = A.TODO_NO AND TO_CHAR(X.PFU_VER_NO) = A.ETC_FIELD2 -- 수정1: X.MAX_VER_NO -> TO_CHAR(X.PFU_VER_NO)
 							       WHERE A.TODO_DIV1_CODE_ID = 'TODODIV20'
 							       GROUP BY  A.TODO_NO, A.ETC_FIELD2, A.SALES_CD
 		                )
@@ -306,10 +307,10 @@
 		                     , X.PRDT_STEP
 		                     , (SELECT FN_CM05M01_CD_TO_NM(X.PRDT_STEP) FROM DUAL) AS PRDT_STEP_NM
 		                     , X.PFU_VER_NO
-							 , NVL(TODO_YN, 0) 		 AS APP_STATUS  --결재상태
+							 , NVL(A.TODO_YN, 'N') 		 AS APP_STATUS  -- 수정2: NVL(TODO_YN, 0) -> NVL(A.TODO_YN, 'N')
 		                  FROM SJD AS CR 
 		                       LEFT OUTER JOIN SUBJ X ON X.CO_CD = CR.CO_CD AND X.SALES_CD = CR.SALES_CD 
-		                       LEFT OUTER JOIN APP A ON A.TODO_NO = X.PFU_NO AND A.ETC_FIELD2 = X.MAX_VER_NO
+		                       LEFT OUTER JOIN APP A ON A.TODO_NO = X.PFU_NO AND A.ETC_FIELD2 = TO_CHAR(X.PFU_VER_NO) -- 수정3: X.MAX_VER_NO -> TO_CHAR(X.PFU_VER_NO)
 		                 WHERE 1=1
 						   AND X.SALES_CD IS NOT NULL
                            <if test="lastYn != null and !lastYn.equals('')">
@@ -631,6 +632,7 @@
 	  			(  	SELECT CASE WHEN max(SANCTN_STTUS) = 'Y' THEN 'Y' ELSE 'N' END AS APPROVAL_CHKECK
 					FROM TB_WB20M03
 					WHERE TODO_NO = #{fileTrgtKey}
+					  AND ETC_FIELD2 = #{verNo}
 					  AND TODO_DIV2_CODE_ID = 'TODODIV2120'
 				) AS W
 		 WHERE 1 = 1
