@@ -304,6 +304,7 @@ public class WB26SvcImpl implements WB26Svc {
 		String fileTrgtKeyIsExist = null;
 		if (level2IsExist != null) {
 			fileTrgtKeyIsExist = level2IsExist.get("fileTrgtKey");
+			paramMap.put("wbsPlanNo", level2IsExist.get("wbsPlanNo"));
 		}
 		
 		String paramFileTrgtKey = paramMap.get("fileTrgtKey");
