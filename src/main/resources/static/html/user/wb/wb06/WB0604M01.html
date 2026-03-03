@@ -122,8 +122,8 @@
       <div class="toolbar">
         <button class="btn primary" id="btnRecalc">일정다시불러오기</button>
         <button class="btn primary" id="btnToday">오늘</button>
-        <button class="btn" id="btnEditPlan">편집: 계획</button>
-        <button class="btn" id="btnEditAct">편집: 실적</button>
+        <button class="btn" id="btnEditPlan" style="display:none;">편집: 계획</button>
+        <button class="btn" id="btnEditAct" style="display:none;">편집: 실적</button>
         <button class="btn primary" id="btnBatchSave" style="margin-left:8px; background-color:#2196F3; color:white;">저장(일괄)</button>
         <span id="editModeInfo" style="font-size:12px; color:var(--primary); font-weight:700;"></span>
         <label style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:4px; margin-left:8px;">
@@ -627,14 +627,27 @@ function loadWbsData(opt, callback){
     refreshSummariesOnly();
     recalcPlanAll(); // This might update dates
     updateGanttRange(); 
+
+    // URL/Storage로 넘어온 타겟 Task ID가 있다면 STATE에 Selected 상태 적용
+    if (window.initTargetWbsPlanCodeId && STATE.tasks.has(window.initTargetWbsPlanCodeId)) {
+        STATE.selectedId = window.initTargetWbsPlanCodeId;
+        window.initTargetWbsPlanCodeId = ""; // 1회성 적용 후 초기화
+    }
+
     // [USER REQ] 초기 로딩시 zoom 변경없이 20px 로 유지
     // if (!keepZoom) autoZoomToFit();
     renderAll();
     
-    // 렌더링 완료 후 오늘 날짜로 포커스
+    // 렌더링 완료 후 Focus 처리
     if (!keepZoom) {
       setTimeout(() => {
-        $("#btnToday").trigger("click");
+        // 지정된 타겟이 있으면 해당 위치로 스크롤 및 하이라이트, 없으면 디폴트로 오늘 날짜
+        if (STATE.selectedId) {
+            focusOnTreeTask(STATE.selectedId);
+            focusOnGanttTask(STATE.selectedId);
+        } else {
+            $("#btnToday").trigger("click");
+        }
       }, 100);
     }
     
@@ -2846,6 +2859,9 @@ $(function() {
   const userId = params.userId || urlParams.get('userId');
   const equpNm = params.equpNm || urlParams.get('equpNm') || "";
   const userNm = (typeof jwt !== 'undefined') ? (jwt.userNm || "") : "";
+  
+  // 팝업 연동 시 선택된 간트 바의 wbsPlanCodeId 임시 저장
+  window.initTargetWbsPlanCodeId = params.wbsPlanCodeId || urlParams.get('wbsPlanCodeId') || "";
 
   // 제목에 [salesCd, userNm] 정보 추가
   const subTitle = `WBS Task 관리 [${salesCd}${userNm ? ', ' + userNm : ''}${equpNm ? ', ' + equpNm : ''}]`;
