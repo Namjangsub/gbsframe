@@ -38,4 +38,8 @@ public interface CR10Svc {
 
   int updateLgistlistImage(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws IOException;
 
+  List<Map<String, String>> selectLgistPartList(Map<String, String> paramMap);
+
+  int updatePartListImage(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws IOException;
+
 }

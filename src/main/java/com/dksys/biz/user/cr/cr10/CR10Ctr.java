@@ -77,6 +77,10 @@ public class CR10Ctr {
 		paramMap.put("lgistNo", result.get("lgistNo"));
 		List<Map<String, String>> lgistItemList = cr10Svc.selectLgistItemList(paramMap);
 		model.addAttribute("lgistItemList", lgistItemList);
+
+		List<Map<String, String>> lgistPartList = cr10Svc.selectLgistPartList(paramMap);
+		model.addAttribute("lgistPartList", lgistPartList);
+
 		return "jsonView";
 	}
 
@@ -138,6 +142,47 @@ public class CR10Ctr {
 	        while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
 	        return out.toByteArray();
 	    }
+	}
+	
+	@ResponseBody
+	@GetMapping("/partListImage")
+	public ResponseEntity<byte[]> getPartListImage(
+	        @RequestParam("lgistNo") String lgistNo,
+	        @RequestParam("lgistPartNoSeq") int lgistPartNoSeq
+	) throws Exception {
+
+	    Map<String, Object> p = new HashMap<>();
+	    p.put("lgistNo", lgistNo);
+	    p.put("lgistPartNoSeq", lgistPartNoSeq);
+
+	    Map<String, Object> r = cr10Mapper.selectLgistPartListImage(p);
+	    if (r == null) return ResponseEntity.notFound().build();
+
+	    Object imgObj  = r.get("lgistPartImg");
+	    if (imgObj == null) imgObj = r.get("lgistpartimg"); // 키 소문자 대비
+	    Object mimeObj = r.get("lgistPartImgMime");
+	    if (mimeObj == null) mimeObj = r.get("lgistpartimgmime");
+
+	    if (imgObj == null) return ResponseEntity.notFound().build();
+
+	    byte[] imgBytes;
+	    if (imgObj instanceof byte[]) {
+	        imgBytes = (byte[]) imgObj;
+	    } else if (imgObj instanceof java.sql.Blob) {
+	        imgBytes = blobToBytes((java.sql.Blob) imgObj);
+	    } else {
+	        throw new IllegalStateException("IMG type not supported: " + imgObj.getClass());
+	    }
+
+	    if (imgBytes == null || imgBytes.length == 0) return ResponseEntity.notFound().build();
+
+	    String mime = (mimeObj == null) ? "application/octet-stream" : String.valueOf(mimeObj).trim();
+	    if (mime.isEmpty()) mime = "application/octet-stream";
+
+	    return ResponseEntity.ok()
+	            .contentType(org.springframework.http.MediaType.parseMediaType(mime))
+	            .header("Cache-Control", "no-cache")
+	            .body(imgBytes);
 	}
 	
 	
@@ -218,6 +263,27 @@ public class CR10Ctr {
 			if (result == 9999 ) {
 				model.addAttribute("resultCode", 9999);
 				model.addAttribute("resultMessage", "출하 설비 LIST에 처리할 자료가 없습니다.");
+			} else if (result != 0 ) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			};
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+	  	return "jsonView";
+	}
+	
+	@PostMapping(value = "/updatePartListImage")
+	public String updatePartListImage(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+	  	try {
+	  		int result = cr10Svc.updatePartListImage(paramMap, mRequest);
+			if (result == 9999 ) {
+				model.addAttribute("resultCode", 9999);
+				model.addAttribute("resultMessage", "PART LIST에 처리할 자료가 없습니다.");
 			} else if (result != 0 ) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("update"));

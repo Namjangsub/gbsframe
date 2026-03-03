@@ -148,6 +148,110 @@ public class CR10SvcImpl implements CR10Svc {
 	    	}
 	    }
 
+		if (paramMap.get("tripRptS") != null && paramMap.get("tripRptS").length() > 0 && !"\"\"".equals(paramMap.get("tripRptS"))) {
+			List<Map<String, String>> tripRptS = gsonDtl.fromJson(paramMap.get("tripRptS"), dtlMap);
+			List<MultipartFile> files = mRequest.getFiles("lgistFiles");
+			String[] seqArr = mRequest.getParameterValues("lgistFilesSeq");
+			Map<String, MultipartFile> fileMap = new HashMap<>();
+			if (files != null && seqArr != null) {
+				int n = Math.min(files.size(), seqArr.length);
+				for (int i = 0; i < n; i++) {
+					String seq = (seqArr[i] == null) ? "" : seqArr[i].trim();
+					MultipartFile mf = files.get(i);
+					if (seq.isEmpty() || mf == null || mf.isEmpty()) continue;
+					fileMap.put(seq, mf);
+				}
+			}
+
+			for (Map<String, String> dtl : tripRptS) {
+				dtl.put("lgistNo", lgistNo);
+				dtl.put("userId", paramMap.get("userId"));
+				dtl.put("pgmId", paramMap.get("pgmId"));
+
+				String seq = dtl.get("lgistNoSeq");
+				if (seq == null || seq.trim().isEmpty()) {
+					seq = dtl.get("workRptNoSeq");
+				}
+				MultipartFile mf = (seq == null) ? null : fileMap.get(seq);
+
+				if (mf != null && !mf.isEmpty()) {
+					byte[] blob = mf.getBytes();
+					String orgName = safeFileName(mf.getOriginalFilename(), 50);
+					String mime = (mf.getContentType() == null) ? "" : mf.getContentType();
+					dtl.put("lgistItemImgNm", orgName);
+					dtl.put("lgistItemImgMime", mime);
+					@SuppressWarnings("unchecked")
+					Map raw = (Map) dtl;
+					raw.put("lgistItemImg", blob);
+				} else {
+					dtl.put("lgistItemImgNm", "");
+					dtl.put("lgistItemImgMime", "");
+					@SuppressWarnings("unchecked")
+					Map raw = (Map) dtl;
+					raw.put("lgistItemImg", null);
+				}
+
+				String updCheck = dtl.get("updCheck");
+				if ("D".equals(updCheck)) {
+					cr10Mapper.deleteLgistItemImageDetail(dtl);
+				} else {
+					cr10Mapper.mergeLgistItemImageDetail(dtl);
+				}
+			}
+		}
+
+		if (paramMap.get("partListS") != null && paramMap.get("partListS").length() > 0 && !"\"\"".equals(paramMap.get("partListS"))) {
+			List<Map<String, String>> partListS = gsonDtl.fromJson(paramMap.get("partListS"), dtlMap);
+			List<MultipartFile> filesp = mRequest.getFiles("partFiles");
+			String[] seqArrp = mRequest.getParameterValues("partFilesSeq");
+			Map<String, MultipartFile> fileMapp = new HashMap<>();
+			if (filesp != null && seqArrp != null) {
+				int n = Math.min(filesp.size(), seqArrp.length);
+				for (int i = 0; i < n; i++) {
+					String seq = (seqArrp[i] == null) ? "" : seqArrp[i].trim();
+					MultipartFile mf = filesp.get(i);
+					if (seq.isEmpty() || mf == null || mf.isEmpty()) continue;
+					fileMapp.put(seq, mf);
+				}
+			}
+
+			for (Map<String, String> dtl : partListS) {
+				dtl.put("lgistNo", lgistNo);
+				dtl.put("userId", paramMap.get("userId"));
+				dtl.put("pgmId", paramMap.get("pgmId"));
+
+				String seq = dtl.get("lgistPartNoSeq");
+				if (seq == null || seq.trim().isEmpty()) {
+					seq = dtl.get("workRptNoSeq");
+				}
+				MultipartFile mf = (seq == null) ? null : fileMapp.get(seq);
+
+				if (mf != null && !mf.isEmpty()) {
+					byte[] blob = mf.getBytes();
+					String orgName = safeFileName(mf.getOriginalFilename(), 50);
+					String mime = (mf.getContentType() == null) ? "" : mf.getContentType();
+					dtl.put("lgistPartImgNm", orgName);
+					dtl.put("lgistPartImgMime", mime);
+					@SuppressWarnings("unchecked")
+					Map raw = (Map) dtl;
+					raw.put("lgistPartImg", blob);
+				} else {
+					dtl.put("lgistPartImgNm", "");
+					dtl.put("lgistPartImgMime", "");
+					@SuppressWarnings("unchecked")
+					Map raw = (Map) dtl;
+					raw.put("lgistPartImg", null);
+				}
+
+				String updCheck = dtl.get("updCheck");
+				if ("D".equals(updCheck)) {
+					cr10Mapper.deleteLgistPartImageDetail(dtl);
+				} else {
+					cr10Mapper.mergeLgistPartImageDetail(dtl);
+				}
+			}
+		}
+
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------
@@ -373,6 +477,54 @@ public class CR10SvcImpl implements CR10Svc {
     	} else {
     		cr10Mapper.mergeLgistItemImageDetail(dtl);
     	}
+    }
+    
+    List<Map<String, String>> partListS = null;
+    if(paramMap.get("partListS") != null && paramMap.get("partListS").length() > 0 && !"\"\"".equals(paramMap.get("partListS")) ) {
+	    partListS = gsonDtl.fromJson(paramMap.get("partListS"), dtlMap);
+		List<MultipartFile> filesp = mRequest.getFiles("partFiles");
+		String[] seqArrp = mRequest.getParameterValues("partFilesSeq");
+		Map<String, MultipartFile> fileMapp = new HashMap<>();
+		if (filesp != null && seqArrp != null) {
+		    int n = Math.min(filesp.size(), seqArrp.length);
+		    for (int i = 0; i < n; i++) {
+		        String seq = (seqArrp[i] == null) ? "" : seqArrp[i].trim();
+		        MultipartFile mf = filesp.get(i);
+		        if (seq.isEmpty() || mf == null || mf.isEmpty()) continue;
+		        fileMapp.put(seq, mf); 
+		    }
+		}
+		for (Map<String, String> dtl : partListS) {
+	    	dtl.put("userId", paramMap.get("userId"));
+	    	dtl.put("pgmId", paramMap.get("pgmId"));
+	        String seq = dtl.get("lgistPartNoSeq");
+	        if (seq == null || (seq == null || seq.trim().isEmpty())) {
+	            seq = dtl.get("workRptNoSeq"); 
+	        }
+	        MultipartFile mf = (seq == null) ? null : fileMapp.get(seq);
+	        if (mf != null && !mf.isEmpty()) {
+	            byte[] blob = mf.getBytes();
+	            String orgName = safeFileName(mf.getOriginalFilename(), 50);
+	            String mime = (mf.getContentType() == null) ? "" : mf.getContentType();
+	            dtl.put("lgistPartImgNm", orgName);
+	            dtl.put("lgistPartImgMime", mime);
+	            @SuppressWarnings("unchecked")
+	            Map raw = (Map) dtl;
+	            raw.put("lgistPartImg", blob);
+	        } else {
+	            dtl.put("lgistPartImgNm", "");
+	            dtl.put("lgistPartImgMime", "");
+	            @SuppressWarnings("unchecked")
+	            Map raw = (Map) dtl;
+	            raw.put("lgistPartImg", null);
+	        }
+	    	String updCheck = dtl.get("updCheck").toString();
+	    	if ("D".equals(updCheck)) {
+	    		cr10Mapper.deleteLgistPartImageDetail(dtl);
+	    	} else {
+	    		cr10Mapper.mergeLgistPartImageDetail(dtl);
+	    	}
+	    }
     }
 
     
@@ -623,6 +775,89 @@ public class CR10SvcImpl implements CR10Svc {
   @Override
   public int updateTodoAppConfirm(Map<String, String> paramMap) throws Exception {
 	  return cr10Mapper.updateTodoAppConfirm(paramMap);
+  }
+
+  @Override
+  public List<Map<String, String>> selectLgistPartList(Map<String, String> paramMap) {
+	  List<Map<String, String>> list = cr10Mapper.selectLgistPartList(paramMap);
+	  String lgistNo = paramMap.get("lgistNo");
+	  for (Map<String, String> row : list) {
+	      String seq = row.get("lgistPartNoSeq");
+	      String hasImg = row.get("hasImg");
+	      if ("Y".equalsIgnoreCase(hasImg)) {
+	          row.put("imgUrl", "/user/cr/cr10/partListImage?lgistNo=" + lgistNo + "&lgistPartNoSeq=" + seq);
+	      } else {
+	          row.put("imgUrl", "");
+	      }
+	  }
+	  return list;
+  }
+
+  @Override
+  public int updatePartListImage(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws IOException {
+	Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
+	Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
+
+    List<Map<String, String>> partListS = gsonDtl.fromJson(paramMap.get("partListS"), dtlMap);
+
+	List<MultipartFile> files = mRequest.getFiles("partFiles");
+	String[] seqArr = mRequest.getParameterValues("partFilesSeq");
+
+	Map<String, MultipartFile> fileMap = new HashMap<>();
+	if (files != null && seqArr != null) {
+	    int n = Math.min(files.size(), seqArr.length);
+	    for (int i = 0; i < n; i++) {
+	        String seq = (seqArr[i] == null) ? "" : seqArr[i].trim();
+	        MultipartFile mf = files.get(i);
+	        if (seq.isEmpty() || mf == null || mf.isEmpty()) continue;
+	        fileMap.put(seq, mf); 
+	    }
+	}
+
+    if ((partListS == null || partListS.isEmpty()) && fileMap.isEmpty()) {
+        return 9999; 
+    }
+    
+    int result = 0;
+    for (Map<String, String> dtl : partListS) {
+    	dtl.put("userId", paramMap.get("userId"));
+    	dtl.put("pgmId", paramMap.get("pgmId"));
+
+        String seq = dtl.get("lgistPartNoSeq");
+        if (seq == null || (seq == null || seq.trim().isEmpty())) {
+            seq = dtl.get("workRptNoSeq"); // fallback
+        }
+
+        MultipartFile mf = (seq == null) ? null : fileMap.get(seq);
+
+        if (mf != null && !mf.isEmpty()) {
+            byte[] blob = mf.getBytes();
+            String orgName = safeFileName(mf.getOriginalFilename(), 50);
+            String mime = (mf.getContentType() == null) ? "" : mf.getContentType();
+
+            dtl.put("lgistPartImgNm", orgName);
+            dtl.put("lgistPartImgMime", mime);
+
+            @SuppressWarnings("unchecked")
+            Map raw = (Map) dtl;
+            raw.put("lgistPartImg", blob);
+        } else {
+            dtl.put("lgistPartImgNm", "");
+            dtl.put("lgistPartImgMime", "");
+            @SuppressWarnings("unchecked")
+            Map raw = (Map) dtl;
+            raw.put("lgistPartImg", null);
+        }
+        
+    	String updCheck = dtl.get("updCheck").toString();
+    	if ("D".equals(updCheck)) {
+    		result = cr10Mapper.deleteLgistPartImageDetail(dtl);
+    	} else {
+    		result = cr10Mapper.mergeLgistPartImageDetail(dtl);
+    	}
+    }
+	
+    return result;
   }
 
 }

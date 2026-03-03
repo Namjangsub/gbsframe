@@ -63,4 +63,12 @@ public interface CR10Mapper {
 
   Map<String, Object> selectLgistItemListImage(Map<String, Object> p);
   
+  int mergeLgistPartImageDetail(Map<String, String> paramMap);
+  
+  int deleteLgistPartImageDetail(Map<String, String> paramMap);
+
+  List<Map<String, String>> selectLgistPartList(Map<String, String> paramMap);
+
+  Map<String, Object> selectLgistPartListImage(Map<String, Object> p);
+  
 }

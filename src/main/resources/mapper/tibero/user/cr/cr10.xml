@@ -1450,5 +1450,125 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 	  WHERE LGIST_NO = #{lgistNo}
 	    AND LGIST_NO_SEQ = #{lgistNoSeq}
 	</delete>
+
+	<!-- PART LIST -->
+	<select id="selectLgistPartList" parameterType="Map" resultType="camelMap">
+		SELECT 
+			    A.LGIST_NO                AS LGIST_NO,
+			    A.LGIST_PART_NO_SEQ       AS LGIST_PART_NO_SEQ,
+			    A.LGIST_PART_ITEM_NO      AS LGIST_PART_ITEM_NO,
+			    A.LGIST_PART_ITEM_NM      AS LGIST_PART_ITEM_NM,
+			    A.LGIST_PART_SPEC_MAT     AS LGIST_PART_SPEC_MAT,
+			    A.LGIST_PART_MAKER        AS LGIST_PART_MAKER,
+			    A.LGIST_PART_QTY          AS LGIST_PART_QTY,
+			    A.LGIST_PART_PRICE        AS LGIST_PART_PRICE,
+			    A.LGIST_PART_AMOUNT       AS LGIST_PART_AMOUNT,
+			    A.LGIST_PART_WEIGHT       AS LGIST_PART_WEIGHT,
+			    A.LGIST_PART_IMG_NM       AS LGIST_PART_IMG_NM,
+			    A.LGIST_PART_IMG_MIME     AS LGIST_PART_IMG_MIME,
+			    CASE WHEN A.LGIST_PART_IMG IS NULL THEN 'N' ELSE 'Y' END AS HAS_IMG
+		 FROM TB_CR11D03 A
+		WHERE LGIST_NO = #{lgistNo}
+		ORDER BY LGIST_PART_NO_SEQ
+	</select>
+	
+	<!-- PART LIST 관련 이미지 조회 -->
+	<select id="selectLgistPartListImage" parameterType="map" resultType="map">
+		SELECT
+				LGIST_PART_IMG      AS "lgistPartImg",
+				LGIST_PART_IMG_MIME AS "lgistPartImgMime"
+		FROM TB_CR11D03
+		WHERE LGIST_NO = #{lgistNo}
+		  AND LGIST_PART_NO_SEQ = #{lgistPartNoSeq}
+	</select>
+
+	<resultMap id="partImgMap" type="hashMap">
+		<result property="lgistPartImg" column="lgistPartImg" jdbcType="BLOB" javaType="byte[]"/>
+	</resultMap>
+
+	<update id="mergeLgistPartImageDetail" parameterType="map">
+		MERGE INTO TB_CR11D03 T
+		USING (
+		  SELECT
+		    #{lgistNo}       					        AS LGIST_NO,
+		    #{lgistPartNoSeq}    					    AS LGIST_PART_NO_SEQ,
+		    #{lgistPartItemNo, jdbcType=VARCHAR}   		AS LGIST_PART_ITEM_NO,
+		    #{lgistPartItemNm, jdbcType=VARCHAR}   		AS LGIST_PART_ITEM_NM,
+		    #{lgistPartSpecMat, jdbcType=VARCHAR}  		AS LGIST_PART_SPEC_MAT,
+		    #{lgistPartMaker, jdbcType=VARCHAR}  	    AS LGIST_PART_MAKER,
+		    #{lgistPartQty, jdbcType=NUMERIC}  		    AS LGIST_PART_QTY,
+		    #{lgistPartPrice, jdbcType=NUMERIC}  		AS LGIST_PART_PRICE,
+		    #{lgistPartAmount, jdbcType=NUMERIC}  		AS LGIST_PART_AMOUNT,
+		    #{lgistPartWeight, jdbcType=VARCHAR}  	    AS LGIST_PART_WEIGHT,
+		    #{lgistPartImg, jdbcType=BLOB}              AS LGIST_PART_IMG,
+		    #{lgistPartImgNm, jdbcType=VARCHAR}         AS LGIST_PART_IMG_NM,
+		    #{lgistPartImgMime, jdbcType=VARCHAR}       AS LGIST_PART_IMG_MIME,
+		    #{userId, jdbcType=VARCHAR}        			AS CREAT_ID,
+		    #{pgmId, jdbcType=VARCHAR}         			AS CREAT_PGM
+		  FROM DUAL
+		) S
+		ON (T.LGIST_NO = S.LGIST_NO AND T.LGIST_PART_NO_SEQ = S.LGIST_PART_NO_SEQ)
+		
+		WHEN MATCHED THEN
+		  UPDATE SET
+		    T.LGIST_PART_ITEM_NO   = S.LGIST_PART_ITEM_NO,
+		    T.LGIST_PART_ITEM_NM   = S.LGIST_PART_ITEM_NM,
+		    T.LGIST_PART_SPEC_MAT  = S.LGIST_PART_SPEC_MAT,
+		    T.LGIST_PART_MAKER     = S.LGIST_PART_MAKER,
+		    T.LGIST_PART_QTY       = S.LGIST_PART_QTY,
+		    T.LGIST_PART_PRICE     = S.LGIST_PART_PRICE,
+		    T.LGIST_PART_AMOUNT    = S.LGIST_PART_AMOUNT,
+		    T.LGIST_PART_WEIGHT    = S.LGIST_PART_WEIGHT,
+		    T.UDT_ID               = S.CREAT_ID,
+		    T.UDT_DTTM             = SYSTIMESTAMP,
+		    T.UDT_PGM              = S.CREAT_PGM
+		      , T.LGIST_PART_IMG      = S.LGIST_PART_IMG
+		      , T.LGIST_PART_IMG_NM   = S.LGIST_PART_IMG_NM
+		      , T.LGIST_PART_IMG_MIME = S.LGIST_PART_IMG_MIME
+		
+		WHEN NOT MATCHED THEN
+		  INSERT (
+		    LGIST_NO,
+		    LGIST_PART_NO_SEQ,
+		    LGIST_PART_ITEM_NO,
+		    LGIST_PART_ITEM_NM,
+		    LGIST_PART_SPEC_MAT,
+		    LGIST_PART_MAKER,
+		    LGIST_PART_QTY,
+		    LGIST_PART_PRICE,
+		    LGIST_PART_AMOUNT,
+		    LGIST_PART_WEIGHT,
+		    LGIST_PART_IMG,
+		    LGIST_PART_IMG_NM,
+		    LGIST_PART_IMG_MIME,
+		    CREAT_ID,
+		    CREAT_DTTM,
+		    CREAT_PGM
+		  )
+		  VALUES (
+		    S.LGIST_NO,
+		    S.LGIST_PART_NO_SEQ,
+		    S.LGIST_PART_ITEM_NO,
+		    S.LGIST_PART_ITEM_NM,
+		    S.LGIST_PART_SPEC_MAT,
+		    S.LGIST_PART_MAKER,
+		    S.LGIST_PART_QTY,
+		    S.LGIST_PART_PRICE,
+		    S.LGIST_PART_AMOUNT,
+		    S.LGIST_PART_WEIGHT,
+		    S.LGIST_PART_IMG,
+		    S.LGIST_PART_IMG_NM,
+		    S.LGIST_PART_IMG_MIME,
+		    S.CREAT_ID,
+		    SYSTIMESTAMP,
+		    S.CREAT_PGM
+		  )
+	</update>
+
+	<delete id="deleteLgistPartImageDetail" parameterType="Map">
+	  DELETE TB_CR11D03
+	  WHERE LGIST_NO = #{lgistNo}
+	    AND LGIST_PART_NO_SEQ = #{lgistPartNoSeq}
+	</delete>
 	
 </mapper>
