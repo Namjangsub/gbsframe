@@ -124,6 +124,7 @@
         <button class="btn primary" id="btnToday">오늘</button>
         <button class="btn" id="btnEditPlan">편집: 계획</button>
         <button class="btn" id="btnEditAct">편집: 실적</button>
+        <button class="btn primary" id="btnBatchSave" style="margin-left:8px; background-color:#2196F3; color:white;">저장(일괄)</button>
         <span id="editModeInfo" style="font-size:12px; color:var(--primary); font-weight:700;"></span>
         <label style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:4px; margin-left:8px;">
           Zoom:
@@ -455,33 +456,38 @@ function refreshSummariesOnly(){
   });
     
   // 3. 모든 노드(부모 포함)의 상태(status)와 상태코드(wbsPlanStsCodeId)를 날짜/진척율 기반으로 재계산
-  // 실시간 드래그나 요약 이후에도 "지연" 상태를 정확히 유지하기 위함
   for(const t of STATE.tasks.values()){
     const ap = Number(t.actProgress || 0);
     const pe = t.planEndAt;
-    const ae = (t.actStartAt && !t.actEndAt) ? today : t.actEndAt;
+    const ae = t.actEndAt;
+    const isStarted = !!t.actStartAt || ap > 0;
 
-    // 추가: WBSCODE 타입인데 하위 TASK가 없으면 지연 상태로 강제 전환
-    const isWbsCode = (t.wbsPlanCodeKind === 'WBSCODE');
-    const hasChildren = Array.from(STATE.tasks.values()).some(c => c.parentId === t.id);
-    const isDelayed = (pe && ae && ae > pe); // 계획 종료일보다 실적 종료일이 늦은 경우
+    let isDelayed = false;
 
-    if (isWbsCode && !hasChildren) {
-      t.wbsPlanStsCodeId = "WBSPLANSTS30";
-    } else if (ap === 100) {
-      t.wbsPlanStsCodeId = isDelayed ? "WBSPLANSTS40" : "WBSPLANSTS50"; // 지연 여부에 따라 상태 구분
-    } else if (isDelayed || (pe && pe < today)) {
-      t.wbsPlanStsCodeId = "WBSPLANSTS30";
-    } else if (t.revisedFinishDt) {
-      t.wbsPlanStsCodeId = "WBSPLANSTS30";
-    } else if (ap > 0) {
-      t.wbsPlanStsCodeId = "WBSPLANSTS20";
+    if (ap === 100) {
+      // 완료(100%) 시: 실적종료일이 계획종료일을 초과한 경우(pe < ae) 지연완료
+      if (pe && ae && pe < ae) isDelayed = true;
     } else {
-      // 기존에 서버에서 받은 값이 있으면 활용하되, 없으면 미진행
-      if (!t.wbsPlanStsCodeId || t.wbsPlanStsCodeId === "TODO") {
-         t.wbsPlanStsCodeId = "WBSPLANSTS10";
+      // 미완료 시:
+      // 1. 계획종료일이 이미 지난 경우 (pe < today). pe == today 이면 < 판정에 의해 지연아님(False)이 정상작동함.
+      if (pe && pe < today) isDelayed = true;
+      // 2. (혹시 미래의 날짜라도) 완료예정일(수정일)이 계획종료일을 초과한 경우
+      if (t.revisedFinishDt && pe && pe < t.revisedFinishDt) isDelayed = true;
+    }
+
+    // 수동으로 지정한 상태가 아닐 때에만 날짜 기반 자동 업데이트 수행
+    if (!t._isManualStatus) {
+      if (ap === 100) {
+        t.wbsPlanStsCodeId = isDelayed ? "WBSPLANSTS40" : "WBSPLANSTS50"; // 지연완료 / 정상완료
+      } else if (isDelayed) {
+        t.wbsPlanStsCodeId = "WBSPLANSTS30"; // 지연
+      } else if (isStarted) {
+        t.wbsPlanStsCodeId = "WBSPLANSTS20"; // 진행중
+      } else {
+        t.wbsPlanStsCodeId = "WBSPLANSTS10"; // 미진행
       }
     }
+
     t.status = STS_NAME[t.wbsPlanStsCodeId] || "TODO";
   }
 }
@@ -611,7 +617,8 @@ function loadWbsData(opt, callback){
         wbsPlanCodeId: item.wbsPlanCodeId,
         wbsPlanNo: item.wbsPlanNo,
         wbsPlanCodeKind: item.wbsPlanCodeKind,
-        wbsRsltsNo: item.wbsRsltsNo || item.wbsPlanCodeId // 기본값은 PlanCodeId 사용
+        wbsRsltsNo: item.wbsRsltsNo || item.wbsPlanCodeId, // 기본값은 PlanCodeId 사용
+        _originalTitle: item.wbsPlanCodeNm || item.title || item.WBS_PLAN_CODE_NM || "Untitled"
       };
       STATE.tasks.set(t.id, t);
     });
@@ -929,11 +936,12 @@ async function saveToServer(pending) {
   return new Promise((resolve, reject) => {
     let url = "";
     
-    // 바 타입에 따른 엔드포인트 분기 샘플
     if(pending.barType === "PLAN") {
       url = "/user/wb/wb26/updateWbsLevel2PlanGantt";
     } else if(pending.barType === "ACT") {
       url = (pending.editType === "CLEAR") ? "/user/wb/wb26/deleteWbsLevel2GanttAct" : "/user/wb/wb26/updateWbsLevel2ActGantt";
+    } else if(pending.barType === "NAME") {
+      url = "/user/wb/wb26/updateWbsLevel2TaskNameGantt";
     } else {
       url = "/user/wb/wb26/updateWbsLevel2MetaGantt";
     }
@@ -959,34 +967,34 @@ async function saveToServer(pending) {
       salesCd: $('#salesCd_H').val(),
       
       // MyBatis wbsLevel2Update Mapping
-      fileTrgtKey: t.fileTrgtKey,
-      rsltsFileTrgtKey: t.rsltsFileTrgtKey || 0, // 실적 고유번호 (0이면 Insert, 아니면 Update)
-      seq: t.seq,
+      fileTrgtKey: t.fileTrgtKey || "",	//PLAN TASK 계획 고유번호
+      rsltsFileTrgtKey: t.rsltsFileTrgtKey | 0,	//RESULT TASK 실적 고유번호
+      seq: t.seq || 0,
       wbsPlanCodeNm: t.title,
       wbsPlanMngId: t.wbsPlanMngId,
       // If editing PLAN, use new values; otherwise use existing
-      wbsPlansDt: (pending.barType === "PLAN") ? pending.normalizedStart : t.planStartAt,
-      wbsPlaneDt: (pending.barType === "PLAN") ? pending.normalizedEnd : t.planEndAt,
-      daycnt: (pending.barType === "PLAN") ? pending.durationWd : t.planDurationWd,
+      wbsPlansDt: (pending.barType === "PLAN" && pending.normalizedStart !== undefined) ? pending.normalizedStart : t.planStartAt,
+      wbsPlaneDt: (pending.barType === "PLAN" && pending.normalizedEnd !== undefined) ? pending.normalizedEnd : t.planEndAt,
+      daycnt: (pending.barType === "PLAN" && pending.durationWd !== undefined) ? pending.durationWd : t.planDurationWd,
       
       // ACT 처리: CLEAR인 경우 빈 문자열로, 아니면 새 값 또는 기존 값 사용
       // (비즈니스 룰: 진척율 100%가 아니면 실적종료일은 현재일로 전송)
       wbsRsltssDt: (pending.barType === "ACT" && pending.editType === "CLEAR") ? "" : 
-                   (pending.barType === "ACT" ? (pending.normalizedStart || "") : (t.actStartAt || "")),
+                   (pending.barType === "ACT" && pending.normalizedStart !== undefined ? pending.normalizedStart : (t.actStartAt || "")),
       wbsRsltseDt: (pending.barType === "ACT" && pending.editType === "CLEAR") ? "" : 
-                   (t.actProgress < 100 ? toYmd(new Date()) : (pending.barType === "ACT" ? (pending.normalizedEnd || "") : (t.actEndAt || ""))),
-      rsltsDaycnt: (pending.barType === "ACT") ? pending.durationWd : t.actDurationWd,
-      expectMh: t.expectMh,
-      wbsRsltsMh: t.wbsRsltsMh,
+                   (t.actProgress < 100 ? toYmd(new Date()) : (pending.barType === "ACT" && pending.normalizedEnd !== undefined ? pending.normalizedEnd : (t.actEndAt || ""))),
+      rsltsDaycnt: (pending.barType === "ACT" && pending.durationWd !== undefined) ? pending.durationWd : t.actDurationWd,
+      expectMh: t.expectMh || "0",
+      wbsRsltsMh: t.wbsRsltsMh || "0",
       wbsPlanStsCodeId: t.wbsPlanStsCodeId,
-      revisedFinishDt: t.revisedFinishDt,
+      revisedFinishDt: t.revisedFinishDt || "",
       wbsPlanCodeKind: t.wbsPlanCodeKind,
-      verUpReason: t.verUpReason,
-      verNo: t.verNo,
-      wbsPlanCodeId: t.wbsPlanCodeId,
-      wbsRsltsNo: t.wbsPlanNo,
-      wbsRsltsCnts: t.resultsCnts,
-      wbsRsltsRate: t.actProgress, 
+      verUpReason: t.verUpReason || "",
+      verNo: t.verNo || "",
+      wbsPlanCodeId: t.wbsPlanCodeId || t.id,
+      wbsRsltsNo: t.wbsRsltsNo || t.wbsPlanNo || t.wbsPlanCodeId || t.fileTrgtKey || "", // PLAN의 고유번호 계승 방어 코드
+      wbsRsltsCnts: t.resultsCnts || "",
+      wbsRsltsRate: t.actProgress || 0, 
 
       // Aliases for UDT_ID/UDT_PGM
       creatId: $("#userId").val(),
@@ -999,30 +1007,65 @@ async function saveToServer(pending) {
         if(res && (res.resultCode == 200 || res.ok)) {
            // 백엔드에서 생성/업데이트된 키 및 보정된 데이터 반영
            if(t) {
-             if(res.fileTrgtKey) t.fileTrgtKey = res.fileTrgtKey;
-             if(res.rsltsFileTrgtKey) t.rsltsFileTrgtKey = Number(res.rsltsFileTrgtKey);
-             if(res.wbsPlanCodeId) t.wbsPlanCodeId = res.wbsPlanCodeId;
-             if(res.wbsRsltsNo) t.wbsRsltsNo = res.wbsRsltsNo;
-             
-             // 백엔드 비즈니스 룰에 의해 보정된 결과 반영 (지연완료 등)
-             if(res.wbsPlanStsCodeId) {
-                t.wbsPlanStsCodeId = res.wbsPlanStsCodeId;
-                t.status = STS_NAME[t.wbsPlanStsCodeId] || t.status;
-             }
-             
-             // 백엔드에서 받은 실적종료일이 빈값('')이면 오늘 날짜로 설정
-             if (res.wbsRsltseDt !== undefined) {
-                 if (res.wbsRsltseDt === "") {
-                     t.actEndAt = toYmd(new Date());
-                 } else {
-                     // toYmdStr 유틸리티 부재 시 방어 코드
-                     const rDt = String(res.wbsRsltseDt);
-                     t.actEndAt = (rDt.length === 8) ? `${rDt.substr(0,4)}-${rDt.substr(4,2)}-${rDt.substr(6,2)}` : rDt;
-                 }
-             } else {
-                 // Fallback: 진척도 100% 미만 시 종료일 현재일로 동기화
-                 if(t.actProgress < 100 && t.actStartAt) t.actEndAt = toYmd(new Date());
-             }
+			 if (pending.barType === "PLAN") {
+				 const taskPlan = res.lastTaskPlan;
+	             if(taskPlan.fileTrgtKey) t.fileTrgtKey = taskPlan.fileTrgtKey;
+	             if(taskPlan.wbsPlanCodeId) t.wbsPlanCodeId = taskPlan.wbsPlanCodeId;
+	             if(taskPlan.wbsPlanNo) t.wbsPlanNo = taskPlan.wbsPlanNo;
+	             
+	             // 백엔드 비즈니스 룰에 의해 보정된 결과 반영 (지연완료 등)
+	             if(taskPlan.wbsPlanStsCodeId) {
+	                t.wbsPlanStsCodeId = taskPlan.wbsPlanStsCodeId;
+	                t.status = STS_NAME[t.wbsPlanStsCodeId] || t.status;
+	             }
+			 } else if (pending.barType === "ACT") {
+	             if(res.rsltsFileTrgtKey) t.rsltsFileTrgtKey = res.rsltsFileTrgtKey;
+	             if(res.wbsRsltsNo) t.wbsRsltsNo = res.wbsRsltsNo;
+	             if(res.wbsPlanCodeId) t.wbsPlanCodeId = res.wbsPlanCodeId;
+	             // 백엔드에서 받은 실적종료일이 빈값('')이면 오늘 날짜로 설정
+	             if (res.wbsRsltseDt !== undefined) {
+	                 if (res.wbsRsltseDt === "") {
+	                     t.actEndAt = toYmd(new Date());
+	                 } else {
+	                     // toYmdStr 유틸리티 부재 시 방어 코드
+	                     const rDt = String(res.wbsRsltseDt);
+	                     t.actEndAt = (rDt.length === 8) ? `${rDt.substr(0,4)}-${rDt.substr(4,2)}-${rDt.substr(6,2)}` : rDt;
+	                 }
+	             } else {
+	                 // Fallback: 진척도 100% 미만 시 종료일 현재일로 동기화
+	                 if(t.actProgress < 100 && t.actStartAt) t.actEndAt = toYmd(new Date());
+	             }
+			 } else if (pending.barType === "META" ) {
+				 const taskPlan = res.lastTaskPlan;
+	             if(taskPlan.fileTrgtKey) t.fileTrgtKey = taskPlan.fileTrgtKey;
+	             if(taskPlan.wbsPlanCodeId) t.wbsPlanCodeId = taskPlan.wbsPlanCodeId;
+	             if(taskPlan.wbsPlanNo) t.wbsPlanNo = taskPlan.wbsPlanNo;
+	             
+	             // 백엔드 비즈니스 룰에 의해 보정된 결과 반영 (지연완료 등)
+	             if(taskPlan.wbsPlanStsCodeId) {
+	                t.wbsPlanStsCodeId = taskPlan.wbsPlanStsCodeId;
+	                t.status = STS_NAME[t.wbsPlanStsCodeId] || t.status;
+	             }
+
+	             if(res.rsltsFileTrgtKey) t.rsltsFileTrgtKey = res.rsltsFileTrgtKey;
+	             if(res.wbsRsltsNo) t.wbsRsltsNo = res.wbsRsltsNo;
+	             if(res.wbsPlanCodeId) t.wbsPlanCodeId = res.wbsPlanCodeId;
+	             // 백엔드에서 받은 실적종료일이 빈값('')이면 오늘 날짜로 설정
+	             if (res.wbsRsltseDt !== undefined) {
+	                 if (res.wbsRsltseDt === "") {
+	                     t.actEndAt = toYmd(new Date());
+	                 } else {
+	                     // toYmdStr 유틸리티 부재 시 방어 코드
+	                     const rDt = String(res.wbsRsltseDt);
+	                     t.actEndAt = (rDt.length === 8) ? `${rDt.substr(0,4)}-${rDt.substr(4,2)}-${rDt.substr(6,2)}` : rDt;
+	                 }
+	             } else {
+	                 // Fallback: 진척도 100% 미만 시 종료일 현재일로 동기화
+	                 if(t.actProgress < 100 && t.actStartAt) t.actEndAt = toYmd(new Date());
+	             }
+			 } else if (pending.barType === "NAME") {
+			                 // Only name is updated, skip other syncing. 
+			 }
            }
            resolve(res);
         } else {
@@ -1056,6 +1099,7 @@ function applyPendingChange(p){
     
     t.planStartAt = p.normalizedStart;
     if(isChanged) t._planDirty = true; 
+    t._isManualStatus = false; // 드래그 시 수동 상태 리셋
 
     if(p.editType !== "MOVE"){
       t.planDurationWd = Math.max(1, Number(p.durationWd || 1));
@@ -1068,6 +1112,7 @@ function applyPendingChange(p){
     t.actStartAt = p.normalizedStart;
     t.actEndAt = p.normalizedEnd;
     if(isChanged) t._actDirty = true; 
+    t._isManualStatus = false; // 드래그 시 수동 상태 리셋
     
     if(p.editType === "MOVE" && p.origStart && p.origEnd){
       const prevDur = diffWorkingDaysInclusive(p.origStart, p.origEnd);
@@ -1137,58 +1182,24 @@ function commitDetailSave(barType, taskId, origStart, origEnd, normalizedStart, 
 }
 function commitChangeAndToast(p){
   pushUndoSnapshot(); // Push UI state BEFORE change
-  const snap = snapshotTasks();
 
   applyPendingChange(p);
 
   startUndoWindow(5000);
-  setToast("저장 중...", {type:"ok", canUndo:true});
-
-  TOAST.lastAction = { snapshot: snap, pending: p, saveFn: saveToServer };
-
-  (async ()=>{
-    try{
-      await saveToServer(p);
-      const t = STATE.tasks.get(p.taskId);
-      if(!t) return;
-
-      if(p.barType==="PLAN"){
-        t._planDirty = false; // Clear dirty
-        const warn = (t.planWarnYn==="Y") ? `
-- ${warnLabelPlan(t)}` : "";
-        setToast(
-          `저장 성공(PLAN/${p.editType})
-- ${p.origStart} ~ ${p.origEnd}
-- ${t.planStartAt} ~ ${t.planEndAt} (WD ${t.planDurationWd})${warn}`,
-          {type:(t.planWarnYn==="Y")?"warn":"ok", canUndo:true, autoHideMs:null} // Persist for undo
-        );
-      } else if(p.barType==="ACT"){
-        t._actDirty = false; // Clear dirty
-        t._metaDirty = false; // Also clear meta dirty since ACT save includes it
-        
-        // Update original values to current saved state
-        t._originalActStart = t.actStartAt || null;
-        t._originalActEnd = t.actEndAt || null;
-        
-        setToast(
-          `저장 성공(ACT/${p.editType})
-- ${p.origStart} ~ ${p.origEnd}
-- ${t.actStartAt||"-"} ~ ${t.actEndAt||"-"} (진척 ${t.actProgress||0}%)`,
-          {type:"ok", canUndo:true, autoHideMs:null} // Persist for undo
-        );
-      } else {
-        t._metaDirty = false; // Clear dirty
-    	  setToast(`${p.barType} 일정이 저장되었습니다.`, { type:"ok", autoHideMs:null, canUndo:true }); // Persist for undo
-      }
-      renderAll(); // Re-render to update highlights
-      
-      // Push post-save snapshot to UNDO_STACK for Ctrl+Z
-      // This ensures Ctrl+Z restores to the saved state, not the pre-change state
-      pushUndoSnapshot();
-    }catch(e){
-      setToast("저장 실패- 네트워크/서버 오류 가정- [재시도] 또는 5초 내 [롤백] 가능", {type:"err", canUndo:true, canRetry:true});
-    }
-  })();
+  
+  // [USER REQ] 단건 즉시 저장(saveToServer)하지 않고 
+  // 화면 상단 일괄 저장 버튼(#btnBatchSave)으로 모아서 전송하기 위해 
+  // Dirty flag와 화면/스냅샷 상태만 유지합니다.
+  if(p.barType==="PLAN"){
+    setToast("계획 일정이 변경되었습니다. 상단의 [저장(일괄)] 버튼을 눌러 확정하세요.", {type:"ok", autoHideMs:3000, canUndo:true});
+  } else if(p.barType==="ACT"){
+    setToast("실적 일정이 변경되었습니다. 상단의 [저장(일괄)] 버튼을 눌러 확정하세요.", {type:"ok", autoHideMs:3000, canUndo:true});
+  } else {
+    setToast("상세 일정이 변경되었습니다. 상단의 [저장(일괄)] 버튼을 눌러 확정하세요.", {type:"ok", autoHideMs:3000, canUndo:true});
+  }
+  
+  // 버튼 하이라이트/플래그 노출을 위해 강제 렌더링
+  renderAll(); 
 }
 
 /** ---------- Drag Handlers (PLAN/ACT) ----------  (PLAN/ACT) ---------- */
@@ -1470,6 +1481,29 @@ function renderGantt(){
         }
         renderTree(); // 좌측 마인드맵 동기화
       })
+      .on("blur", function() {
+        const newTitle = $(this).val();
+        if (newTitle !== t._originalTitle) {
+          t.title = newTitle;
+          t._originalTitle = newTitle;
+          t._metaDirty = true;
+          
+          if (t.fileTrgtKey) {
+            saveToServer({ taskId: t.id, barType: "NAME", editType: "GANTT" })
+              .then(() => {
+                setToast("TASK 이름 수정 완료", {type:"ok", autoHideMs: 1500});
+                t._metaDirty = false;
+                renderTree();
+                renderGantt();
+              })
+              .catch(e => setToast("TASK 이름 수정 실패: " + e.message, {type:"err"}));
+          } else {
+            setToast("TASK 이름 변경됨 (저장: PLAN 최초 저장 시 반영)", {type:"ok", autoHideMs: 2500});
+            renderTree();
+            renderGantt();
+          }
+        }
+      })
       .appendTo(name);
 
     const line = $("<div>")
@@ -1691,9 +1725,9 @@ function renderDetail(){
       </select>
     </div>
     
-    <div class="field" id="divRevisedFinishDt" style="display: ${t.wbsPlanStsCodeId === 'WBSPLANSTS30' ? 'grid' : 'none'};">
+    <div class="field" id="divRevisedFinishDt" style="display: ${(t.wbsPlanStsCodeId === 'WBSPLANSTS30' || t.wbsPlanStsCodeId === 'WBSPLANSTS40') ? 'grid' : 'none'};">
       <label>완료예정일</label>
-      <input class="inp ${t.wbsPlanStsCodeId === 'WBSPLANSTS30' ? 'required-delayed' : ''}" id="revisedFinishDt" type="date" value="${t.revisedFinishDt || ""}"/>
+      <input class="inp ${(t.wbsPlanStsCodeId === 'WBSPLANSTS30' || t.wbsPlanStsCodeId === 'WBSPLANSTS40') ? 'required-delayed' : ''}" id="revisedFinishDt" type="date" value="${t.revisedFinishDt || ""}"/>
     </div>
 
     <div class="field">
@@ -1822,6 +1856,7 @@ function renderDetail(){
         t.planEndAt = e;
         t.planDurationWd = dur;
         t._planDirty = true; 
+        t._isManualStatus = false; // 날짜 수정 시 수동 상태 리셋
         recalcPlanAll();
         renderTree();
         renderGantt(); 
@@ -1856,6 +1891,7 @@ function renderDetail(){
     if(oldS !== s || oldE !== e) {
       t.actStartAt = s;
       t.actEndAt = e;
+      t._isManualStatus = false; // 실적 날짜 입력 시 수동 상태 리셋
       
       // 날짜 변경 시 "진행(%)" 수치 자동 계산 (Manual Progress나 Status와 연동하지 않음)
       const autoProg = recalcAutoProgress(t);
@@ -1910,6 +1946,8 @@ function renderDetail(){
 
     // 1. 상태(Status Code)가 변경된 경우
     if (newCode !== t.wbsPlanStsCodeId) {
+      t._isManualStatus = true; // 수동 상태 플래그 설정
+      
       if (newCode === "WBSPLANSTS50" || newCode === "WBSPLANSTS40") { // 완료계 포괄
         nap = 100;
         elActP.val(100);
@@ -1946,7 +1984,7 @@ function renderDetail(){
     
     // 지연 상태(WBSPLANSTS30/40)일 때 완료예정일/실적필드 강조
     const isDelayedStatus = (newCode === "WBSPLANSTS30" || newCode === "WBSPLANSTS40");
-    $("#divRevisedFinishDt").css("display", (newCode === "WBSPLANSTS30") ? "grid" : "none");
+    $("#divRevisedFinishDt").css("display", isDelayedStatus ? "grid" : "none");
     $("#wbsPlanStsCodeId, #revisedFinishDt, #wbsRsltsEDt").toggleClass("required-delayed", isDelayedStatus);
 
     if(t.title !== newTitle || t.status !== ns || t.wbsPlanStsCodeId !== newCode || t.actProgress !== nap || t.resultsCnts !== nr || t.wbsRsltsMh !== nem || t.revisedFinishDt !== nrf) {
@@ -1955,6 +1993,7 @@ function renderDetail(){
       t.status = ns;
       t.wbsPlanStsCodeId = newCode;
       t.actProgress = nap;
+      t.progress = nap;
       t.resultsCnts = nr;
       t.wbsRsltsMh = nem;
       t.revisedFinishDt = nrf;
@@ -2001,7 +2040,32 @@ function renderDetail(){
   $("#wbsPlanCodeNm").on("focus", function() { 
     $(this).css({background:"#fff", border:"1px solid #d1d5db"}); 
   });
-  $("#wbsPlanCodeNm").on("blur", function() { $(this).css({background:"transparent", border:"1px solid transparent"}); });
+  $("#wbsPlanCodeNm").on("blur", function() { 
+    $(this).css({background:"transparent", border:"1px solid transparent"});
+    
+    // TASK명이 변경되었고 기존에 등록된 TASK(fileTrgtKey 보유)라면 즉시 백엔드 단일 TASK명 업데이트 DB 반영 API 호출
+    const newTitle = $(this).val();
+    if (newTitle !== t._originalTitle) {
+      t.title = newTitle;
+      t._originalTitle = newTitle;
+      t._metaDirty = true;
+      
+      if (t.fileTrgtKey) {
+        saveToServer({ taskId: t.id, barType: "NAME", editType: "DETAIL" })
+          .then(() => {
+            setToast("TASK 이름 수정 완료", {type:"ok", autoHideMs: 1500});
+            t._metaDirty = false;
+            renderTree();
+            renderGantt();
+          })
+          .catch(e => setToast("TASK 이름 수정 실패: " + e.message, {type:"err"}));
+      } else {
+        setToast("TASK 이름 변경됨 (저장: PLAN 최초 저장 시 반영)", {type:"ok", autoHideMs: 2500});
+        renderTree();
+        renderGantt();
+      }
+    }
+  });
 
   // PLAN 저장
   $("#btnSavePlan").on("click", ()=>{
@@ -2019,9 +2083,24 @@ function renderDetail(){
   if (!ne) {
      ne = addWorkingDays(ns, planDur - 1);
   }
-
+debugger;
   commitDetailSave("PLAN", t.id, prevStart, prevEnd, ns, ne, planDur);
-  $("#btnSavePlan").removeClass("highlight-blue");
+  
+  // 파라미터가 명시적으로 전달되도록 객체 구성 (최신 t.* 변수들은 commitDetailSave -> applyPendingChange 를 거치며 이미 세팅됨)
+  saveToServer({ 
+    taskId: t.id, 
+    barType: "PLAN", 
+    editType: "DETAIL",
+    normalizedStart: ns,      // 직접 파라미터로 넘김
+    normalizedEnd: ne,        // 직접 파라미터로 넘김
+    durationWd: planDur       // 직접 파라미터로 넘김
+  })
+    .then(() => {
+      setToast("PLAN 저장 완료", {type:"ok"});
+      t._planDirty = false;
+      renderDetail();
+    })
+    .catch(e => setToast("PLAN 저장 실패: " + e.message, {type:"err"}));
 });
 // 실적→계획 동기화(요구 발생 빈도 높음)
   $("#btnSyncPlanFromAct").on("click", ()=>{
@@ -2064,10 +2143,29 @@ function renderDetail(){
   }
 
   t.actProgress = actProg;
+  t.progress = actProg;
   const dur = (ns && ne) ? Math.max(1, diffWorkingDaysInclusive(ns, ne)) : 1;
 
   commitDetailSave("ACT", t.id, prevStart, prevEnd, ns, ne, dur);
-  $("#btnSaveAct").removeClass("highlight-blue");
+  
+  saveToServer({ 
+    taskId: t.id, 
+    barType: "ACT", 
+    editType: "DETAIL",
+    normalizedStart: ns, 
+    normalizedEnd: ne, 
+    durationWd: dur 
+  })
+    .then(() => {
+      setToast("ACT 저장 완료", {type:"ok"});
+      t._actDirty = false;
+      t._metaDirty = false;
+      refreshSummariesOnly();
+      renderDetail();
+      renderTree();
+      renderGantt();
+    })
+    .catch(e => setToast("ACT 저장 실패: " + e.message, {type:"err"}));
 });
 // ACT 제거
   $("#btnClearAct").on("click", ()=>{
@@ -2077,107 +2175,51 @@ function renderDetail(){
   const prevEnd = t.actEndAt;
   
   pushUndoSnapshot();
-  const snap = snapshotTasks();
   
   // 프론트엔드에서 즉시 제거
   t.actStartAt = null;
   t.actEndAt = null;
   t.actProgress = 0;
+  t.progress = 0;
   t.actDurationWd = 0;
   t.actWarnYn = "N";
-  t._actDirty = true;
   
-  refreshSummariesOnly();
-  renderAll();
-  
-  startUndoWindow(5000);
-  setToast("ACT 제거 중...", {type:"ok", canUndo:true});
-  TOAST.lastAction = { snapshot: snap, pending: {taskId:t.id, barType:"ACT", editType:"CLEAR"}, saveFn: saveToServer };
-  
-  // 백엔드 저장
-  (async ()=>{
-    try{
-      await saveToServer({
-        taskId: t.id,
-        barType: "ACT",
-        editType: "CLEAR",
-        normalizedStart: null,
-        normalizedEnd: null,
-        origStart: prevStart || "-",
-        origEnd: prevEnd || "-"
-      });
-      
+  saveToServer({ taskId: t.id, barType: "ACT", editType: "CLEAR" })
+    .then(() => {
+      setToast("ACT 제거됨", {type:"ok", canUndo:true, autoHideMs:2500});
       t._actDirty = false;
-      setToast("ACT 제거 완료", {type:"ok", canUndo:true, autoHideMs:2000});
+      refreshSummariesOnly();
       renderAll();
-      
-      // Push post-save snapshot to UNDO_STACK for Ctrl+Z
-      pushUndoSnapshot();
-    }catch(e){
-      setToast("ACT 제거 실패 - [재시도] 또는 5초 내 [롤백] 가능", {type:"err", canUndo:true, canRetry:true});
-    }
-  })();
+    })
+    .catch(e => setToast("ACT 제거 실패: " + e.message, {type:"err"}));
 });
 // 공통 저장
   $("#btnSaveMeta").on("click", ()=>{
   pushUndoSnapshot();
-  const snap = snapshotTasks();
 
-  // syncMeta가 실시간으로 t 객체를 업데이트하므로 별도 추출 없이 t를 직접 사용하거나, 
-  // 마지막으로 UI 값을 다시 한번 t에 확실히 반영
   const ns = $("#wbsPlanStsCodeId").val();
   const nap = Math.min(100, Math.max(0, Number($("#actProgress").val()||0)));
   const nr = $("#wbsRsltsCnts").val();
   const nem = $("#wbsRsltsMh").val();
   
-  t.status = ns;
-  t.wbsPlanStsCodeId = STS_CODE[ns] || t.wbsPlanStsCodeId;
+  t.status = STS_NAME[ns] || t.status;
+  t.wbsPlanStsCodeId = ns || t.wbsPlanStsCodeId;
   t.actProgress = nap;
+  t.progress = nap;
   t.resultsCnts = nr;
   t.wbsRsltsMh = nem;
-
-  refreshSummariesOnly();
-  renderAll();
-
-  startUndoWindow(5000);
-  setToast("저장 중...(공통)", {type:"ok", canUndo:true});
-  TOAST.lastAction = { snapshot: snap, pending: {taskId:t.id, barType:"META", editType:"DETAIL_META"}, saveFn: saveToServer };
-
-  (async ()=>{
-    try{
-      await saveToServer({
-        taskId: t.id, 
-        barType: "META", 
-        editType: "DETAIL_META", 
-        status: t.status, 
-        progress: t.actProgress,
-        resultsCnts: t.resultsCnts,
-        expectMh: t.expectMh,
-        wbsRsltsMh: t.wbsRsltsMh
-      });
-      
-      // 백엔드에서 Plan + Act + Meta를 모두 처리하므로 모든 dirty 플래그 클리어
-      t._metaDirty = false;
-      t._planDirty = false;
-      t._actDirty = false;
-
-      // 실적 비교 원본값 갱신
-      t._originalActStart = t.actStartAt || null;
-      t._originalActEnd = t.actEndAt || null;
-      
-      setToast("공통 저장 완료 (PLAN/ACT/META)", {type:"ok", canUndo:true, autoHideMs:2000}); 
-      
-      // 버튼 하이라이트 제거
-      $("#btnSaveMeta, #btnSavePlan, #btnSaveAct").removeClass("highlight-blue");
-      
-      // Push post-save snapshot to UNDO_STACK for Ctrl+Z
-      pushUndoSnapshot();
-      
-      renderAll(); 
-    }catch(e){
-      setToast("공통 저장 실패 - [재시도] 또는 5초 내 [롤백] 가능", {type:"err", canUndo:true, canRetry:true});
-    }
-  })();
+  
+  saveToServer({
+    taskId: t.id, barType: "META", editType: "DETAIL_META", 
+    status: t.status, progress: t.actProgress, resultsCnts: t.resultsCnts, expectMh: t.expectMh, wbsRsltsMh: t.wbsRsltsMh
+  }).then(() => {
+    t._metaDirty = false;
+    t._actDirty = false;
+    t._planDirty = false;
+    refreshSummariesOnly();
+    renderAll();
+    setToast("공통 저장 완료", {type:"ok", canUndo:true, autoHideMs:3000});
+  }).catch(e => setToast("공통 저장 실패: " + e.message, {type:"err"}));
 });
 
   $("#btnFocus").on("click", () => focusOnGanttTask(t.id));
@@ -2216,20 +2258,23 @@ function focusOnGanttTask(taskId) {
 
 /** 좌측 트리에서 특정 TASK 위치로 스크롤 이동 */
 function focusOnTreeTask(taskId) {
-  const card = $(`.nodeCard[data-id="${taskId}"]`);
-  if (!card.length) return;
+  // renderAll 등에 의해 DOM이 갱신된 직후 레이아웃 재계산 반영을 위해 짧은 딜레이 부여
+  setTimeout(() => {
+    const card = $(`.nodeCard[data-id="${taskId}"]`);
+    if (!card.length) return;
 
-  const wrap = card.closest(".bd");
-  if (!wrap.length) return;
+    const wrap = card.closest(".bd");
+    if (!wrap.length) return;
 
-  // 세로축 중앙 정렬
-  const wrapH = wrap.innerHeight();
-  const cardTop = card.position().top; // wrap 기준으로 상대 위치
-  const currentScroll = wrap.scrollTop();
-  
-  wrap.animate({
-    scrollTop: currentScroll + cardTop - (wrapH / 2) + (card.outerHeight() / 2)
-  }, 200);
+    // 세로축 중앙 정렬을 위한 정확한 위치 연산 (offset 기반)
+    const wrapH = wrap.innerHeight();
+    const currentScroll = wrap.scrollTop();
+    const cardTop = card.offset().top - wrap.offset().top + currentScroll;
+    
+    wrap.animate({
+      scrollTop: cardTop - (wrapH / 2) + (card.outerHeight() / 2)
+    }, 200);
+  }, 50);
 }
 
 
@@ -2370,7 +2415,71 @@ function init(){
     searchData(true);
   });
 
-  
+  // ========== 일괄 저장 (Batch Save) 로직 ==========
+  $("#btnBatchSave").on("click", async () => {
+    let hasChanges = false;
+    for (const t of Array.from(STATE.tasks.values())) {
+        if (t._planDirty || t._actDirty || t._metaDirty) hasChanges = true;
+    }
+    
+    if(!hasChanges){
+        setToast("저장할 변경점이 없습니다.", {type:"warn"});
+        return;
+    }
+
+    try {
+        setToast("일괄 업데이트 진행중...", {type:"warn", autoHideMs:null});
+        
+        // 1. PLAN 우선 처리 (신규 생성 시 wbsRsltsNo 등 실적용 키 확보를 위해)
+        const planPromises = [];
+        for (const t of Array.from(STATE.tasks.values())) {
+            if (t._planDirty) {
+                const p = { taskId: t.id, barType: "PLAN", editType: "DETAIL" };
+                planPromises.push(saveToServer(p).then(() => { t._planDirty = false; }));
+            }
+        }
+        
+        if (planPromises.length > 0) {
+            await Promise.all(planPromises);
+        }
+        
+        // 2. ACT / META 처리 (PLAN 저장이 완료되어 t.rsltsFileTrgtKey 등이 갱신된 상태)
+        const actPromises = [];
+        for (const t of Array.from(STATE.tasks.values())) {
+            if (t._actDirty || t._metaDirty) {
+                const p = {
+                    taskId: t.id, 
+                    barType: (!t.actStartAt && !t.actEndAt) ? "ACT" : "META", 
+                    editType: (!t.actStartAt && !t.actEndAt) ? "CLEAR" : "DETAIL_META", 
+                    status: t.status, 
+                    progress: t.actProgress,
+                    resultsCnts: t.resultsCnts,
+                    expectMh: t.expectMh,
+                    wbsRsltsMh: t.wbsRsltsMh
+                };
+                actPromises.push(saveToServer(p).then(() => { 
+                    t._actDirty = false; 
+                    t._metaDirty = false; 
+                    t._originalActStart = t.actStartAt || null;
+                    t._originalActEnd = t.actEndAt || null;
+                }));
+            }
+        }
+        
+        if (actPromises.length > 0) {
+            await Promise.all(actPromises);
+        }
+        
+        setToast("★ 모든 변경사항이 성공적으로 일괄 저장되었습니다.", {type:"ok", autoHideMs:2500});
+        
+        $("#btnSaveMeta, #btnSavePlan, #btnSaveAct").removeClass("highlight-blue");
+        pushUndoSnapshot();
+        renderAll();
+    } catch(err) {
+        setToast("일괄 저장 과정에서 일부 API 처리 오류가 발생했습니다.", {type:"err"});
+    }
+  });
+  // ===============================================
   
   $("#btnToday").on("click", ()=>{
     const today=toYmd(new Date());
@@ -2515,7 +2624,8 @@ function init(){
       resultsCnts: "",
       
       assignees: parent ? (parent.assignees || []) :$("#useId").val(),
-      _planDirty: true // 신규 추가는 계획(PLAN) 변경으로 간주
+      _planDirty: true, // 신규 추가는 계획(PLAN) 변경으로 간주
+      _originalTitle: sel.title || "신규 TASK"
     };
     
     pushUndoSnapshot();

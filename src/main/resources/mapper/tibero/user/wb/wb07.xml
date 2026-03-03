@@ -36,7 +36,7 @@
 	             AND MNG_ID IS NOT NULL
 	                ) M ON M.VIEW_DEPT_ID = T.MNG_DEPT
 			),
-			src AS (
+			totPlan AS (
 				SELECT 
 					W.CO_CD,
 					W.SALES_CD,
@@ -46,14 +46,49 @@
 					D.TEAM_MNG_ID,
 					W.WBS_PLANS_DT,
 					W.WBS_PLANE_DT,
+					W.WBS_PLAN_CODE_KIND,
 					W.WBS_PLAN_CODE_ID,
 					W.FILE_TRGT_KEY,
 					W.CLOSE_YN AS WBS_CLOSE_YN,
 					W.WBS_PLAN_MNG_ID,
-					C.NAME 	  AS WBS_PLAN_MNG_ID_NM,
 					W.VER_NO
 				FROM TB_WB22M01 W
 				LEFT JOIN DEPT_TBL D ON D.WBS_PLAN_CODE_ID = W.WBS_PLAN_CODE_ID
+				WHERE W.CO_CD = #{coCd}
+				<!-- SalesCode: salesCds (IN) 우선, 없으면 기존 salesCd LIKE 유지 -->
+				<choose>
+					<when test="salesCds != null and salesCds.size() > 0">
+						AND W.SALES_CD IN
+						<foreach collection="salesCds" item="cd" open="(" separator="," close=")">
+							#{cd}
+						</foreach>
+					</when>
+					<when test="salesCd != null and !salesCd.equals('')">
+						AND W.SALES_CD LIKE  '%' || #{salesCd} || '%'
+					</when>
+				</choose>
+				AND W.CO_CD = #{coCd}
+				AND W.WBS_PLANS_DT IS NOT NULL
+				AND W.WBS_PLANE_DT IS NOT NULL
+--				AND D.DEPT_ID IS NOT NULL
+			),
+			src AS (
+				SELECT 
+					W.CO_CD,
+					W.SALES_CD,
+					W.DEPT_ID,
+					W.DEPT_NM,
+					W.FULL_NM,
+					W.TEAM_MNG_ID,
+					W.WBS_PLANS_DT,
+					W.WBS_PLANE_DT,
+					W.WBS_PLAN_CODE_ID,
+					W.FILE_TRGT_KEY,
+					W.WBS_CLOSE_YN AS WBS_CLOSE_YN,
+					W.WBS_PLAN_MNG_ID,
+					C.NAME 	  AS WBS_PLAN_MNG_ID_NM,
+					W.VER_NO
+				FROM totPlan W
 				LEFT JOIN TB_CM06M01 C ON C.ID = W.WBS_PLAN_MNG_ID
 				WHERE W.WBS_PLAN_CODE_KIND = 'WBSCODE'
 				<!-- SalesCode: salesCds (IN) 우선, 없으면 기존 salesCd LIKE 유지 -->
@@ -71,7 +106,7 @@
 				AND W.CO_CD = #{coCd}
 				AND W.WBS_PLANS_DT IS NOT NULL
 				AND W.WBS_PLANE_DT IS NOT NULL
-				AND D.DEPT_ID IS NOT NULL
+				AND W.DEPT_ID IS NOT NULL
 			),
 			s0 AS (
 			  SELECT /*+ MATERIALIZE */ DISTINCT CO_CD, SALES_CD
@@ -92,6 +127,22 @@
 				JOIN TB_WB24M02 W ON W.CO_CD = S0.CO_CD AND W.SALES_CD = S0.SALES_CD
 				JOIN TB_QM01M01 Q ON Q.REQ_NO = W.REQ_NO
 				GROUP BY S0.CO_CD, S0.SALES_CD
+			)
+			-- level2 plan 등록건수
+			,l2PlanCnt AS (
+				SELECT  W.CO_CD, W.SALES_CD, W.WBS_PLAN_CODE_KIND,
+				        COUNT(W.FILE_TRGT_KEY) AS NOT_WBSCODE_COUNT
+				FROM totPlan W
+				WHERE W.WBS_PLAN_CODE_KIND != 'WBSCODE'
+				GROUP BY W.CO_CD, W.SALES_CD, W.WBS_PLAN_CODE_KIND
+			)
+			-- 전체 계획 건수 산정 level2계획이 존재하면 level2 계획건수를, 
+			-- level2 계획이 없으면 level1 기준으론 필요계획건수는 1로 설정함.
+			,l2PlanTotCnt AS (
+				SELECT    W.CO_CD, W.SALES_CD, W.WBS_PLAN_CODE_ID
+						, NVL(C.NOT_WBSCODE_COUNT, 1) AS LEVEL2_PLANT_COUNT
+				FROM src W
+				LEFT JOIN l2PlanCnt C ON C.CO_CD = W.CO_CD AND C.SALES_CD = W.SALES_CD AND C.WBS_PLAN_CODE_KIND = W.WBS_PLAN_CODE_ID
 			),
 			wb21_latest AS (
 				SELECT CO_CD, SALES_CD, FILE_TRGT_KEY, WBS_REMARK, CLOSE_YN, VER_NO, SMRIZE_ID
@@ -188,11 +239,15 @@
 			    A.WBS_PLAN_CODE_KIND,
 			    A.SALES_CD,
 			    MAX(A.WBS_RSLTS_ID)    AS WBS_RSLTS_ID,
-			    AVG(A.WBS_RSLTS_RATE)  AS WBS_RSLTS_RATE,
+			    SUM(A.WBS_RSLTS_RATE)  AS WBS_RSLTS_RATE,
 			    SUM(A.WBS_RSLTS_MH)    AS WBS_RSLTS_MH,
 			    MAX(A.WBS_RSLTS_CNTS)  AS WBS_RSLTS_CNTS,
 			    MIN(A.WBS_RSLTSS_DT)   AS WBS_RSLTSS_DT,
-			    MAX(A.WBS_RSLTSE_DT)   AS WBS_RSLTSE_DT,
+			    /* 수정된 로직: 해당 그룹의 최소 진척률이 100이면 MAX(종료일), 아니면 오늘 */
+			    CASE 
+			        WHEN MIN(A.WBS_RSLTS_RATE) = 100 THEN MAX(A.WBS_RSLTSE_DT)
+			        ELSE TRUNC(SYSDATE) 
+			    END AS WBS_RSLTSE_DT,
 			    MAX(A.CLOSE_YN)        AS CLOSE_YN,
 			    SUM(A.DAYCNT)          AS DAYCNT
 			  FROM TB_WB23M01 A
@@ -277,24 +332,27 @@
             C.NAME 											AS WBS_PLAN_MNG_NM,
 			CASE
 --			  WHEN ST.HOLD_YN = 'Y' THEN 'HOLD'
-			  WHEN ST.CLOSE_YN = 'Y' OR NVL(ST.WBS_RSLTS_RATE,0) >= 100 THEN 'DONE'
-			  WHEN NVL(ST.WBS_RSLTS_RATE,0) = 0 THEN 'PLN'
+			  WHEN ST.CLOSE_YN = 'Y' OR ROUND(NVL(ST.WBS_RSLTS_RATE, 0) / L2C.LEVEL2_PLANT_COUNT, 0) >= 100 THEN 'DONE'
+			  WHEN ROUND(NVL(ST.WBS_RSLTS_RATE, 0) / L2C.LEVEL2_PLANT_COUNT, 0) = 0 THEN 'PLN'
 			  ELSE 'ING'
 			END 											AS STATUS,                 			--진행상태 PLN ING DONE HOLD
-            ST.CLOSE_YN 			  						AS ACT_CLOSE_YN,     
-            NVL(ST.WBS_RSLTS_RATE, 0) 						AS ACT_PROG,		--진행율
+            ST.CLOSE_YN 			  						AS ACT_CLOSE_YN,   
+            ROUND(NVL(ST.WBS_RSLTS_RATE, 0) / L2C.LEVEL2_PLANT_COUNT, 0)	AS ACT_PROG,		--진행율
             TO_CHAR(ST.WBS_RSLTSS_DT, 'YYYY-MM-DD')  		AS ACT_ST,			--실적 시작일
             TO_CHAR(ST.WBS_RSLTSE_DT, 'YYYY-MM-DD')  		AS ACT_END,		--실적 시작일
             ST.WBS_RSLTS_CNTS 								AS MEMO,			--메모
 			NVL(W0.PROBLEM_COUNT, 0)						AS PROBLEM_COUNT,
 			NVL(W0.PROBLEM_UNCOMPLETE, 0)					AS PROBLEM_UNCOMPLETE,PROBLEM_UNCOMPLETE,
-			NVL(UN.UN_COMPLETED, 0) 						AS UN_COMPLETED
+			NVL(UN.UN_COMPLETED, 0) 						AS UN_COMPLETED,
+			NVL(LP.NOT_WBSCODE_COUNT, 0)					AS NOT_WBSCODE_COUNT 
 		FROM final_base F
 		JOIN sales S            ON S.CO_CD = F.CO_CD AND S.SALES_CD = F.SALES_CD
 		JOIN sales_range R      ON R.CO_CD = F.CO_CD AND R.SALES_CD = F.SALES_CD
 		CROSS JOIN today T
+		LEFT JOIN l2PlanTotCnt L2C ON L2C.CO_CD = F.CO_CD AND L2C.SALES_CD = F.SALES_CD AND L2C.WBS_PLAN_CODE_ID = F.WBS_PLAN_CODE_ID
 		LEFT JOIN w0 W0         ON W0.CO_CD = F.CO_CD AND W0.SALES_CD = F.SALES_CD
 		LEFT JOIN unRslt UN     ON UN.CO_CD = F.CO_CD AND UN.SALES_CD = F.SALES_CD
+		LEFT JOIN l2PlanCnt LP  ON LP.CO_CD = F.CO_CD AND LP.SALES_CD = F.SALES_CD AND LP.WBS_PLAN_CODE_KIND = F.WBS_PLAN_CODE_ID
 		LEFT JOIN TB_CM06M01 C  ON C.ID = F.WBS_PLAN_MNG_ID
 		LEFT JOIN TB_CM05M01 C5 ON C5.CODE_ID = F.WBS_PLAN_CODE_ID
 		LEFT JOIN src_act ST    ON ST.CO_CD = F.CO_CD AND ST.SALES_CD = F.SALES_CD AND ST.WBS_PLAN_CODE_KIND = F.WBS_PLAN_CODE_ID
@@ -655,10 +713,35 @@
 		  AND  WBS_PLAN_CODE_KIND = 'WBSCODE'
 	</update>
 	
+	<update id="wbsLevel2PlanChange" parameterType="Map">
+		UPDATE TB_WB22M01
+		SET    WBS_PLANS_DT = TO_DATE(#{wbsPlansDtFm}, 'YYYY-MM-DD')
+			 , WBS_PLANE_DT = TO_DATE(#{wbsPlaneDtFm}, 'YYYY-MM-DD')
+			 , UDT_ID = #{userId}
+			 , UDT_PGM = #{pgmId}
+			 , UDT_DTTM = SYSDATE
+		WHERE  CO_CD = #{coCd}
+		  AND  SALES_CD = #{salesCd}
+		  AND  WBS_PLAN_CODE_KIND = #{wbsPlanCodeId}
+	</update>
+	
+	
+	<update id="wbsLevel2ActChange" parameterType="Map">
+		UPDATE TB_WB23M01
+		SET    WBS_RSLTSS_DT = TO_DATE(#{wbsPlansDtFm}, 'YYYY-MM-DD')
+			 , WBS_RSLTSE_DT = TO_DATE(#{wbsPlaneDtFm}, 'YYYY-MM-DD')
+			 , UDT_ID = #{userId}
+			 , UDT_PGM = #{pgmId}
+			 , UDT_DTTM = SYSDATE
+		WHERE  CO_CD = #{coCd}
+		  AND  SALES_CD = #{salesCd}
+		  AND  WBS_PLAN_CODE_KIND = #{wbsPlanCodeId}
+	</update>
+	
 	
 	<update id="updateWbsLevel2MetaGantt_revisedFinishDt" parameterType="Map">
 		UPDATE TB_WB22M01
-		SET    REVISED_FINISH_DT 		= #{revisedFinishDt}
+		SET    REVISED_FINISH_DT 		= #{revisedFinishDt, jdbcType=VARCHAR}
 			 , WBS_PLAN_STS_CODE_ID     = #{wbsPlanStsCodeId}
 			 , CLOSE_YN = #{planCloseYn}
 			 , UDT_ID   = #{userId}
@@ -667,7 +750,7 @@
 		WHERE  CO_CD = #{coCd}
 		  AND  SALES_CD = #{salesCd}
 		  AND  WBS_PLAN_CODE_KIND = #{wbsPlanCodeKind}
-		  AND  (REVISED_FINISH_DT   != #{revisedFinishDt}
+		  AND  (REVISED_FINISH_DT != #{revisedFinishDt, jdbcType=VARCHAR}
 		   OR  WBS_PLAN_STS_CODE_ID != #{wbsPlanStsCodeId})
 	</update>
 	
@@ -754,7 +837,14 @@
 	</delete>
 
 
-	<delete id="deleteWbsActualPlanClear" parameterType="Map">
+	<delete id="deleteWbsLevel2Plan" parameterType="Map">
+		DELETE FROM TB_WB22M01
+		WHERE CO_CD = #{coCd} 
+		  AND SALES_CD = #{salesCd} 
+		  AND WBS_PLAN_CODE_KIND = #{wbsPlanCodeKind}
+	</delete>
+
+	<update id="deleteWbsActualPlanClear" parameterType="Map">
 		UPDATE TB_WB22M01
 		SET 
 			WBS_PLAN_STS_CODE_ID  = #{wbsPlanStsCodeId},
@@ -765,7 +855,7 @@
 		WHERE CO_CD = #{coCd} 
 		  AND SALES_CD = #{salesCd} 
 		  AND WBS_PLAN_CODE_KIND = #{wbsPlanCodeKind}
-	</delete>
+	</update>
 
 
 	<update id="updateWbsActualLevel2Insert" parameterType="Map">
@@ -805,4 +895,16 @@
 				'Y', #{creatId}, #{creatPgm}, SYSDATE, #{verUpReason, jdbcType=VARCHAR}, #{revisedFinishDt, jdbcType=VARCHAR}
 			)
 	</update>
+	
+	
+	
+	
+	<select id="selectWbsPlanLevel2KindCount" parameterType="map" resultType="int">
+		SELECT COUNT(*) 
+		  FROM TB_WB22M01
+		 WHERE CO_CD 	= #{coCd}
+		   AND SALES_CD = #{salesCd}
+		   AND WBS_PLAN_CODE_KIND 	= #{wbsPlanCodeKind}
+	</select>
+	
 </mapper>

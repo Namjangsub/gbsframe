@@ -52,6 +52,6 @@ public interface WB26Mapper {
 
 	int updateWbsLevel2MetaGantt_revisedFinishDt(Map<String, String> paramMap);
 
-    // // 수금유형 검색
-	// List<Map<String, Object>> selectPmntmtdCd(Map<String, String> paramMap);
+
+	int updateWbsLevel2TaskNameGantt(Map<String, String> paramMap);
 }

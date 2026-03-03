@@ -84,7 +84,7 @@
   <div id="top_area"></div>
   <div id="main_area">
     
-    <input type="hidden" id="pgmId"  name="pgmId" value="WB0603M02">
+    <input type="hidden" id="pgmId"  name="pgmId" value="WB0701M01">
 	<select id="prdMngChk" data-kind="SPECRTS" hidden></select>
     <!-- 페이지 상단 -->
     <div class="contents no_bg">
@@ -123,7 +123,7 @@
 				<div class="search_form">
 					<input type="hidden" id="wbsPlanMngId_S"   name="wbsPlanMngId_S" data-search="wbsPlanMngId">
 					<input type="text"   id="wbsPlanMngIdNm_S" name="wbsPlanMngIdNm_S" data-search="wbsPlanMngIdNm" 
-onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = '' :  event.keyCode == 46 ? wbsPlanMngId_S.value = '' : event.keyCode == 13 ? searchData() : '';">
+onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = '' :  event.keyCode == 46 ? wbsPlanMngId_S.value = '' : event.keyCode == 13 ? searchData(false) : '';">
 					<a onclick="openUserSearch();"><i class="i_search_w"></i></a>
 				</div>
 			</td>
@@ -143,7 +143,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = ''
             <th>SalesCode</th>
             <td>
               <div class="search_form">
-<input type="text" id="salesCd_S" name="salesCd_S" data-search="salesCd" onkeyup="event.keyCode==13 ? searchData() :''">
+<input type="text" id="salesCd_S" name="salesCd_S" data-search="salesCd" onkeyup="event.keyCode==13 ? searchData(false) :''">
                 <a onclick="wbsSalesCodeSearch($('#salesCd_S').val());"><i class="i_search_w"></i></a>
               </div>
             </td>
@@ -153,7 +153,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = ''
               <input type="hidden" id="ordrsClntCd_S" name="ordrsClntCd_S" data-search="ordrsClntCd">
               <div class="search_form">
                 <input type="text" id="ordrsClntNm_S" name="ordrsClntNm_S" data-search="ordrsClntNm"
-onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' : event.keyCode == 13 ? searchData() : ''">
+onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' : event.keyCode == 13 ? searchData(false) : ''">
                 <a onclick="opendClntSearch($('#ordrsClntNm_S').val());"><i class="i_search_w"></i></a>
               </div>
             </td>
@@ -1580,6 +1580,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
                  data-wbsplanmngnm="${escapeHtml(rowObj.wbsPlanMngNm || '')}"
                  data-wbsplancodeid="${escapeHtml(rowObj.wbsPlanCodeId || '')}"
                  data-wbsplancodenm="${escapeHtml(rowObj.wbsPlanCodeNm || '')}"
+                 data-notwbscodecount="${escapeHtml(rowObj.notWbscodeCount || '0')}"
                  data-deptnm="${deptNmSafe}"
                  data-start="${escapeHtml(startDate)}"
                  data-end="${escapeHtml(endDate)}"
@@ -1855,7 +1856,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
         scrollX: true,
         scrollY: true,
         bodyHeight: "fitToParent",
-        rowHeight: 32,
+        rowHeight: 40,
         columnOptions: { resizable: true }
       });
 
@@ -1955,6 +1956,12 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
                grid.removeRowClassName(rowKey, "tui-grid-row-delay");
             }
           });
+          
+          // [Scroll State Sync] Restore Scroll Position 
+          if(pendingScrollToSalesCd) {
+             scrollGridToSalesCd(pendingScrollToSalesCd);
+             pendingScrollToSalesCd = null;
+          }
         }catch(e){}
       }, 200); // 렌더링 동기화를 위해 대기시간 소폭 증가
 
@@ -2167,7 +2174,65 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       });
     }
 
+    let pendingScrollToSalesCd = null;
+
+    function getTopSalesCdFromGantt() {
+      const $scroll = $("#wbsScroll");
+      if(!$scroll.length) return null;
+      let topCd = null;
+      const scrollTop = $scroll.scrollTop();
+      const $rows = $scroll.find(".wbs-row.data-row");
+      for(let i=0; i<$rows.length; i++){
+         const $r = $($rows[i]);
+         if($r[0].offsetTop >= scrollTop) {
+             topCd = $r.data("salescd");
+             break;
+         }
+      }
+      return topCd;
+    }
+
+    function scrollGanttToSalesCd(salesCd) {
+      if(!salesCd) return;
+      const $scroll = $("#wbsScroll");
+      const $row = $scroll.find(".wbs-row.data-row[data-salescd='" + salesCd + "']").first();
+      if($row.length) {
+         // wbsHeadH (52px)
+         const offset = $row[0].offsetTop - 52;
+         $scroll.scrollTop(offset > 0 ? offset : 0);
+      }
+    }
+
+    function getTopSalesCdFromGrid() {
+      if(!EXTRA_TUI_GRID) return null;
+      const bodyArea = document.querySelector("#extraGridOverlay .tui-grid-rside-area .tui-grid-body-area");
+      if(bodyArea) {
+          const scrollTop = bodyArea.scrollTop;
+          const rowIndex = Math.floor(scrollTop / 32);
+          const data = EXTRA_TUI_GRID.grid.getData();
+          if(data && data[rowIndex]) {
+              return data[rowIndex].salesCd;
+          }
+      }
+      return null;
+    }
+
+    function scrollGridToSalesCd(salesCd) {
+      if(!salesCd || !EXTRA_TUI_GRID) return;
+      const data = EXTRA_TUI_GRID.grid.getData();
+      const idx = data.findIndex(r => String(r.salesCd) === String(salesCd));
+      if(idx >= 0) {
+          const targetTop = idx * 32;
+          const bodyArea = document.querySelector("#extraGridOverlay .tui-grid-rside-area .tui-grid-body-area");
+          const lsideArea = document.querySelector("#extraGridOverlay .tui-grid-lside-area .tui-grid-body-area");
+          if(bodyArea) bodyArea.scrollTop = targetTop;
+          if(lsideArea) lsideArea.scrollTop = targetTop;
+      }
+    }
+
     function openExtraGridOverlay(){
+      pendingScrollToSalesCd = getTopSalesCdFromGantt();
+      
       const $card = $(".wbs-card");
       $card.removeClass("max-gantt-mode").addClass("overlay-grid-mode");
       initExtraTuiGrid();
@@ -2179,11 +2244,19 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
     }
 
     function closeExtraGridOverlay(){
+      const topSalesCd = getTopSalesCdFromGrid();
+      
       const $card = $(".wbs-card");
       $card.removeClass("overlay-grid-mode").addClass("max-gantt-mode");
       CURRENT_HEADER_MODE = HEADER_MODE.MAX;
       applyHeaderModeUI();
       setOverlayToggleButtonText(false);
+      
+      if(topSalesCd) {
+         setTimeout(function() {
+             scrollGanttToSalesCd(topSalesCd);
+         }, 0);
+      }
     }
 
     function setOverlayToggleButtonText(isOverlay){
@@ -2269,7 +2342,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 //             salesCd: salesCd,
 //             histYn: "N"
 //           }, function(){
-//           	if (typeof searchData === "function") searchData();
+//           	if (typeof searchData === "function") searchData(false);
 //           });
 
 
@@ -2300,6 +2373,9 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
           e.preventDefault();
           e.stopPropagation();
           const barData = $(this).data("rowobj");
+          barData.$bar = $(this); 
+          barData.isActBar = $(this).hasClass("act-bar");
+          barData.isPlanBar = $(this).hasClass("plan-bar");
           showGanttContextMenu(e.pageX, e.pageY, barData);
         });
       });
@@ -2309,7 +2385,6 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       $WBS.off("mouseenter.wbsTooltip", ".bar[data-row]")
           .on("mouseenter.wbsTooltip", ".bar[data-row]", function(e){
         const $bar = $(this);
-        const rowId = $bar.data("row");
         const rowObj = $bar.data("rowobj");
 
         if(!rowObj || $bar.hasClass("is-active")) return;
@@ -2395,6 +2470,50 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 
     window.callGanttAction = function(action, data) {
       $("#ganttContextMenu").remove();
+
+      // 우클릭했던 Bar DOM 요소
+      const $bar = data.$bar; 
+      data.$bar = ""; 
+      const isActual = data.isActBar;
+      
+      // plan-bar 드래그 시 역산하는 것과 완전히 동일한 로직 적용
+      if ($bar && $bar.length > 0) {
+          const leftPx = parseInt($bar.css("left"), 10) || 0;
+          const widthPx = Math.max(CELL_W, parseInt($bar.css("width"), 10) || CELL_W);
+
+          const startOffset = Math.round(leftPx / CELL_W);
+          const rawDays = widthPx / CELL_W;
+          const daysLen = Math.max(1, rawDays <= 1.5 ? 1 : Math.round(rawDays));
+
+          const newStart = addDays(STATE.viewStart, startOffset);
+          const newEnd   = addDays(newStart, daysLen - 1);
+
+          // clamp to view
+          const minStart = STATE.viewStart;
+          const maxEnd   = STATE.viewEnd;
+          let s = newStart;
+          let e = newEnd;
+
+          if(daysBetween(minStart, s) < 0) s = minStart;
+          if(daysBetween(e, maxEnd) < 0) e = maxEnd;
+
+          // console.log("드래그된 위치 기반 시작일:", s);
+          // console.log("드래그된 리사이즈 기반 종료일:", e);
+          
+          data.computedStart = s;
+          data.computedEnd = e;
+      }
+
+      if (action=='deleteActual') {
+	      if (!confirm('실적 삭제하겠습니까?')) {
+	        return;
+	      } 
+      } else if (action=='completeActualConfirmed') {  //실적 완료
+          // data.wbsPlansDtFm = data.computedStart;
+          // data.wbsPlaneDtFm = data.computedEnd;
+      } 
+      
+
       const param = {
         action: action,
         ...data,
@@ -2403,13 +2522,6 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
         pgmId: "WB0603M03"
       };
 
-
-      if (action=='deleteActual') {
-	      if (!confirm('실적 삭제하겠습니까?')) {
-	        return;
-	      } 
-      }
-      
       const urlMap = {
         'createActualUnconfirmed': '/user/wb/wb07/createActualUnconfirmed',
         'completeActualConfirmed': '/user/wb/wb07/completeActualConfirmed',
@@ -2429,24 +2541,27 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 
     function applyBarChange($bar){
 
+        const isActBar = $bar.hasClass("act-bar");
       // 일정확정된 자료는 버전 변경 확인 (salesCd별로 한 번만)
       const salesCd = $bar.data("salescd") || $bar.closest('.wbs-row').data('salescd');
-      if ($bar.data("rowobj") && $bar.data("rowobj").wbsCloseYn == "Y" && salesCd && !confirmedSalesCd.has(salesCd)){
-        if (!confirm('일정확정된 자료는 Version이 변경됩니다. 진행하시겠습니까?')) {
-          // 취소 시 원래 위치와 크기로 복원 
-          const originalLeft = $bar.data("originalLeft");
-          const originalWidth = $bar.data("originalWidth");
-          if (originalLeft !== undefined) {
-            $bar.css("left", originalLeft);
-          }
-          if (originalWidth !== undefined) {
-            $bar.css("width", originalWidth);
-          }
-          return;
-        } else {
-          // 확인 완료된 salesCd 기록
-          confirmedSalesCd.add(salesCd);
-        }
+      if (!isActBar) {
+	      if ($bar.data("rowobj") && $bar.data("rowobj").wbsCloseYn == "Y" && salesCd && !confirmedSalesCd.has(salesCd)){
+	        if (!confirm('일정확정된 자료는 Version이 변경됩니다. 진행하시겠습니까?')) {
+	          // 취소 시 원래 위치와 크기로 복원 
+	          const originalLeft = $bar.data("originalLeft");
+	          const originalWidth = $bar.data("originalWidth");
+	          if (originalLeft !== undefined) {
+	            $bar.css("left", originalLeft);
+	          }
+	          if (originalWidth !== undefined) {
+	            $bar.css("width", originalWidth);
+	          }
+	          return;
+	        } else {
+	          // 확인 완료된 salesCd 기록
+	          confirmedSalesCd.add(salesCd);
+	        }
+	      }
       }
 
       // 1) 키 값은 절대 free variable 금지: 항상 DOM/data에서 추출
@@ -2510,24 +2625,70 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 			return;
 		}
 		
-      row.wbsPlansDtFm = s;
-      row.wbsPlaneDtFm = e;
-      $bar.data("start", s);
-      $bar.data("end", e);
-      $bar.attr("data-start", s);
-      $bar.attr("data-end", e);
-
-      toast(`일정 변경: ${row.deptNm} (${s} ~ ${e})`);
-      updateSummaryRowForOrdrs(ORDRS_NO);
-
-      // dirty
-      const $rowEl = $bar.closest(".wbs-row");
-      $rowEl.addClass("row-dirty");
-      const key = row.fileTrgtKey || `${row.salesCd}`;
-      CHANGED_ROWS.set(key, row);
       
-      // [User Request] Change Save button to red on modification
-      $("#btnSave").addClass("btn-unsaved");
+      if (isActBar) {
+          debugger;
+          // 실정 Bar를 이동 또는 크기 변경식 아무 처리없이 Bar 크기만 변경함
+          if (row.actCloseYn == "N") {
+  			return;
+          }
+          
+        if (!confirm('하위 일정계획 전체가 변경됩니다. 진행하시겠습니까?')) {
+            const originalLeft = $bar.data("originalLeft");
+            const originalWidth = $bar.data("originalWidth");
+            if (originalLeft !== undefined) $bar.css("left", originalLeft);
+            if (originalWidth !== undefined) $bar.css("width", originalWidth);
+            return;
+        }
+
+        const param = {
+          coCd: row.coCd || "",
+          salesCd: row.salesCd,
+          wbsPlanCodeId: row.wbsPlanCodeId,
+          wbsPlansDtFm: s,
+          wbsPlaneDtFm: e,
+          userId: jwt ? jwt.userId : "",
+          pgmId: $("#pgmId").val() || "WB0701M01"
+        };
+        
+        postAjax("/user/wb/wb07/wbsLevel2PlanChange", param, null, function(res) {
+          if (res && res.resultCode === 200) {
+            toast(`일정 변경 완료: ${row.deptNm} (${s} ~ ${e})`);
+            row.actSt = s;
+            row.actEnd = e;
+            $bar.data("start", s);
+            $bar.data("end", e);
+            $bar.attr("data-start", s);
+            $bar.attr("data-end", e);
+            if(typeof searchData === "function") searchData(false);
+          } else {
+            toast("일정 변경 처리에 실패했습니다.");
+            const orL = $bar.data("originalLeft");
+            const orW = $bar.data("originalWidth");
+            if (orL !== undefined) $bar.css("left", orL);
+            if (orW !== undefined) $bar.css("width", orW);
+          }
+        });
+      } else {
+	      row.wbsPlansDtFm = s;
+	      row.wbsPlaneDtFm = e;
+	      $bar.data("start", s);
+	      $bar.data("end", e);
+	      $bar.attr("data-start", s);
+	      $bar.attr("data-end", e);
+	
+	      toast(`일정 변경: ${row.deptNm} (${s} ~ ${e})`);
+	      updateSummaryRowForOrdrs(ORDRS_NO);
+	
+	      // dirty
+	      const $rowEl = $bar.closest(".wbs-row");
+	      $rowEl.addClass("row-dirty");
+	      const key = row.fileTrgtKey || `${row.salesCd}`;
+	      CHANGED_ROWS.set(key, row);
+	      
+	      // [User Request] Change Save button to red on modification
+	      $("#btnSave").addClass("btn-unsaved");
+      }
     }
 
     function bindRemarks(){
@@ -3482,7 +3643,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 
         if ($('#salesCd_S').val() !=  row.salesCd) {
 	        $('#salesCd_S').val(row.salesCd);
-	        searchData();
+	        searchData(false);
         }
       });
     };
@@ -3496,7 +3657,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
         if ($('#wbsPlanMngId_S').val() !=  checkedNode.id) {
 	        $('#wbsPlanMngId_S').val(checkedNode.id);
 	        $('#wbsPlanMngIdNm_S').val(checkedNode.text);
-			searchData();  //작성자가 변경되면 실행하기
+			searchData(false);  //작성자가 변경되면 실행하기
         }
       });
     };
@@ -3568,6 +3729,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
                 problemCount: item.problemCount || '',
                 problemUncomplete: item.problemUncomplete || '',
                 scheduleStatus: item.scheduleStatus || '',
+                notWbscodeCount: item.notWbscodeCount || item.notWbscodeCount || 0,
                 ...item
               };
 
@@ -3591,6 +3753,13 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
 
               const endDate = new Date(maxDate);
               endDate.setDate(endDate.getDate() + 7);
+
+              // [MOD] Ensure at least 3 months gap (approx 90 days)
+              const timeDiff = endDate.getTime() - startDate.getTime();
+              const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+              if(daysDiff < 90) {
+                 endDate.setDate(startDate.getDate() + 90);
+              }
 
               STATE.viewStart = ymd(startDate);
               STATE.viewEnd   = ymd(endDate);
@@ -3638,7 +3807,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       $("#strtDt_S").val(dateToStr(moment().subtract(6, "months").startOf("month").toDate()));
       $("#endDt_S").val(dateToStr(moment(new Date()).endOf("month").toDate()));
 
-      $('[data-search]').on("change", function(){ searchData(); });
+      $('[data-search]').on("change", function(){ searchData(false); });
     };
 
     /***********************
@@ -3703,7 +3872,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       });
 
       $("#btnSearch").off("click.wbs").on("click.wbs", function(){
-        searchData();
+        searchData(false);
       });
       $("#btnReset").off("click.wbs").on("click.wbs", initSearch);
       $("#btnHelp").off("click.wbs").on("click.wbs", showHelp);
@@ -3820,7 +3989,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       });
       
       // 검색조건 이벤트 bind
-      $('[data-search]').on("change", function(){ searchData(); });
+      $('[data-search]').on("change", function(){ searchData(false); });
 
       // 권한체크
 //       authChk();
@@ -3848,7 +4017,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
       var coCd = $("#coCd_S").val(); // or data-cocd if available?
       var ordrsNo = $selected.data("ordrsno");
       
-      // In WB0603M02, we don't strictly have planVerNo/histYn in the row data usually.
+      // In WB0701M01, we don't strictly have planVerNo/histYn in the row data usually.
       // We pass what we have. WB2201P01 likely fetches details by salesCd.
       
       if (salesCd) {
@@ -3860,7 +4029,7 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
               "histYn": 'N',  //최종 일정에 대한 수정반영하기
           };
           openModal("/static/html/user/wb/wb22/WB2201P01.html", 1400, 900, "WBS 계획등록", paramObj, function () {
-              searchData(); // Refresh WBS
+              searchData(false); // Refresh WBS
           });
       } else {
           alert("SALES CODE을 선택하세요");

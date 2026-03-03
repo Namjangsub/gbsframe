@@ -50,6 +50,10 @@ public interface WB26Svc {
 
 	int updateWbsLevel2MetaGantt(Map<String, String> paramMap) throws Exception;
 
+	int updateWbsLevel2TaskNameGantt(Map<String, String> paramMap) throws Exception;
+
 	int deleteWbsLevel2Gantt(Map<String, String> paramMap) throws Exception;
 	int deleteWbsLevel2GanttAct(Map<String, String> paramMap) throws Exception;
+
+	Map<String, String> select_wb0603p_fileTrgtKey_List(Map<String, String> paramMap);
 }

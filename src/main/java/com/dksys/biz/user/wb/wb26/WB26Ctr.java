@@ -232,6 +232,9 @@ public class WB26Ctr {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
 				model.addAttribute("fileTrgtKey", paramMap.get("fileTrgtKey"));
+				//등록된 TASK 일정 현황 추출하여 프론트엔드에 전달하기
+				Map<String, String> lastTaskPlan = wb26svc.select_wb0603p_fileTrgtKey_List(paramMap);
+				model.addAttribute("lastTaskPlan", lastTaskPlan);
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -274,12 +277,37 @@ public class WB26Ctr {
 			if (wb26svc.updateWbsLevel2MetaGantt(paramMap) != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+				model.addAttribute("fileTrgtKey", paramMap.get("fileTrgtKey"));
+				//등록된 TASK 일정 현황 추출하여 프론트엔드에 전달하기
+				Map<String, String> lastTaskPlan = wb26svc.select_wb0603p_fileTrgtKey_List(paramMap);
+				model.addAttribute("lastTaskPlan", lastTaskPlan);
+				
+				model.addAttribute("rsltsFileTrgtKey", paramMap.get("rsltsFileTrgtKey"));
+				model.addAttribute("wbsRsltsNo", paramMap.get("wbsRsltsNo"));
+				model.addAttribute("wbsPlanCodeId", paramMap.get("wbsPlanCodeId2_P"));
 				model.addAttribute("wbsRsltseDt", paramMap.get("wbsRsltseDt"));
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
 			}
 			;
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/updateWbsLevel2TaskNameGantt")
+	public String updateWbsLevel2TaskNameGantt(@RequestBody Map<String, String> paramMap,  ModelMap model) throws Exception {
+		try {
+			if (wb26svc.updateWbsLevel2TaskNameGantt(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
 		} catch (Exception e) {
 			model.addAttribute("resultCode", 900);
 			model.addAttribute("resultMessage", e.getMessage());

@@ -27,6 +27,7 @@ public interface WB07Svc {
 	int updateWbsRemarks(Map<String, String> paramMap);
 
 	int updateWbsSchedule(Map<String, String> paramMap) throws Exception;
+	int wbsLevel2PlanChange(Map<String, String> paramMap) throws Exception;
 
 	
 }

@@ -286,6 +286,13 @@ public class WB26SvcImpl implements WB26Svc {
 	}
 	
 
+	// 그리드 리스트
+	@Override
+	public Map<String, String> select_wb0603p_fileTrgtKey_List(Map paramMap) {
+		return wb26Mapper.select_wb0603p_fileTrgtKey_List(paramMap);
+	}
+	
+
 	@Override
 	public int updateWbsLevel2PlanGantt(Map<String, String> paramMap) throws Exception {
 
@@ -371,6 +378,7 @@ public class WB26SvcImpl implements WB26Svc {
 			} else {
 				wbsPlanStsCodeId = "WBSPLANSTS50"; // 정상완료
 			}
+			paramMap.put("rsltsDaycnt", paramMap.get("daycnt"));
 		} else {
 			// 진척율이 100%가 아닌 경우 실적종료일은 저장하지 않음 (비즈니스 룰)
 			paramMap.put("wbsRsltseDt", "");
@@ -383,6 +391,7 @@ public class WB26SvcImpl implements WB26Svc {
 					wbsPlanStsCodeId = "WBSPLANSTS20"; // 진행중
 				}
 			}
+			paramMap.put("rsltsDaycnt", "0");
 		}
 
 		paramMap.put("wbsPlanStsCodeId", wbsPlanStsCodeId);
@@ -416,9 +425,16 @@ public class WB26SvcImpl implements WB26Svc {
 	@Override
 	public int updateWbsLevel2MetaGantt(Map<String, String> paramMap) throws Exception {
 		int result = updateWbsLevel2PlanGantt(paramMap);
+		paramMap.put("wbsRsltsNo",  paramMap.get("wbsPlanNo"));
 		result += updateWbsLevel2ActGantt(paramMap);
 		
 		return result;
+	}
+
+	@Override
+	public int updateWbsLevel2TaskNameGantt(Map<String, String> paramMap) throws Exception {
+		// Only updates WBS_PLAN_CODE_NM
+		return wb26Mapper.updateWbsLevel2TaskNameGantt(paramMap);
 	}
 
 	@Override

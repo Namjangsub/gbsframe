@@ -128,37 +128,21 @@ public class WB07SvcImpl implements WB07Svc {
 			dtl.put("pgmId", pgmId);
 			dtl.put("coCd", coCd);
 
-            String processe_deptCd = dtl.get("deptCd");
-            if ("S01".equals(processe_deptCd) ) {  //SQL문장 select_wb06_List  -> DEPT_TBL 참조 (수주확정, 목표원가/PFU배포)
-            	String[] wbsCodes = {"WBSCODE01", "WBSCODE02"}; //(수주확정, 목표원가/PFU배포)
-            	for (String code : wbsCodes) {
-            	    dtl.put("wbsPlanCodeId", code);
-            	    result += wb07Mapper.updateWbsScheduleVersionUpWbsCode(dtl);
-            	}
-            } else if ("S04".equals(processe_deptCd)) {  //SQL문장 select_wb06_List  -> DEPT_TBL 참조 (
-            	String[] wbsCodes = {"WBSCODE17", "WBSCODE04"}; //모델링완료, 구매완료
-            	for (String code : wbsCodes) {
-            	    dtl.put("wbsPlanCodeId", code);
-            	    result += wb07Mapper.updateWbsScheduleVersionUpWbsCode(dtl);
-            	}
-            } else if ("S09".equals(processe_deptCd)) {  //SQL문장 select_wb06_List  -> DEPT_TBL 참조
-            	String[] wbsCodes = {"WBSCODE07", "WBSCODE16"}; //자체시운전완료, 외부제작검수
-            	for (String code : wbsCodes) {
-            	    dtl.put("wbsPlanCodeId", code);
-            	    result += wb07Mapper.updateWbsScheduleVersionUpWbsCode(dtl);
-            	}
-            } else if ("S14".equals(processe_deptCd)) {  //SQL문장 select_wb06_List  -> DEPT_TBL 참조
-            	String[] wbsCodes = {"WBSCODE13", "WBSCODE14"}; //설치시운전(출발일), 설치시운전(복귀일)
-            	for (String code : wbsCodes) {
-            	    dtl.put("wbsPlanCodeId", code);
-            	    result += wb07Mapper.updateWbsScheduleVersionUpWbsCode(dtl);
-            	}
-            } else {
-            	result += wb07Mapper.updateWbsSchedule(dtl);
-            }
+//            result += wb07Mapper.updateWbsScheduleVersionUpWbsCode(dtl);
+			result += wb07Mapper.updateWbsSchedule(dtl); //WBS_PLAN_CODE_KIND = 'WBSCODE'
+			result += wb07Mapper.wbsLevel2PlanChange(dtl); //WBS_PLAN_CODE_KIND = #{wbsplancodeid}
 			
 			saved_salesCd = processe_salesCd;
 		}
+		return result;
+	}
+
+	@Override
+	public int wbsLevel2PlanChange(Map<String, String> paramMap) throws Exception {
+		// Level2(TASK) 계획/실적 동일하게 수정 반영
+		int result = 0;
+		result += wb07Mapper.wbsLevel2PlanChange(paramMap);
+		result += wb07Mapper.wbsLevel2ActChange(paramMap);
 		return result;
 	}
 
@@ -413,6 +397,9 @@ public class WB07SvcImpl implements WB07Svc {
 	
 	@Override
 	public int createActualUnconfirmed(Map<String, String> paramMap) throws Exception {
+		if (!wbsOwnerChk(paramMap)) {
+			throw new RuntimeException("담당자 또는 담당팀장외 실적 변경 할 수 없습니다.");
+		}
 		int result = 0;
 		result += completeActualConfirmed(paramMap);
 		return result;
@@ -421,6 +408,9 @@ public class WB07SvcImpl implements WB07Svc {
 
 	@Override
 	public int completeActualConfirmed(Map<String, String> paramMap) throws Exception {
+		if (!wbsOwnerChk(paramMap)) {
+			throw new RuntimeException("담당자 또는 담당팀장외 실적 변경 할 수 없습니다.");
+		}
 		int result = 0;
 
 		// Task 계획 저장시 해당 과제가 확정(Y)이면서 Task등록하는 일정이있어야하며 해당 일정도 Y인지 Check
@@ -432,25 +422,49 @@ public class WB07SvcImpl implements WB07Svc {
 		}
 		
 
-		String currentYear = String.valueOf(LocalDate.now().getYear());
-		paramMap.put("year", currentYear);
+		String planFileTrgtKey = "";
+		String wbsPlanNo = "";
+		String codeId = "";
+		//  Level2(TASK) 계획이 2개이상이거나 실적에 문제가 등록되어 있으면 삭제처리 불가
+		//  각 단계별  하나의 Level2(TASK)계획과 실적은 또한 1건만으로 처리하고자함.
+		//  이전 생성된 TASK 계획이 2건 이상이면 삭제하고 Level2(TASK) : 실적을= 1:1 관계 유지하기 위함
+		int selectWbsPlanLevel2KindCount = wb07Mapper.selectWbsPlanLevel2KindCount(paramMap);
+		int wbsIssueExistChk = wb22Mapper.wbsIssueExistChk(paramMap);
+		if (selectWbsPlanLevel2KindCount > 1 && wbsIssueExistChk > 0) {
+			throw new RuntimeException("Task에 등록된 문제가 있습니다.");
+		} else if (selectWbsPlanLevel2KindCount == 1) {
+			// Level2(TASK)계획이 1건이면
+			List<Map<String, String>> planLevel2 = wb22Mapper.wbsPlanListChk(paramMap);
+			planFileTrgtKey = planLevel2.get(0).get("fileTrgtKey");
+			wbsPlanNo = planLevel2.get(0).get("fileTrgtKey");
+			codeId = planLevel2.get(0).get("wbsPlanCodeId") + "01";
+		} else {
+			// Level2(TASK) 실적 삭제, 계획 삭제
+			deleteActual(paramMap);
+			
+			codeId = paramMap.get("wbsPlanCodeId") + "01";
+			planFileTrgtKey =  wb22Mapper.selectWbsSeqNext(paramMap);
+			
+			String currentYear = String.valueOf(LocalDate.now().getYear());
+			paramMap.put("year", currentYear);
+			wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
+		}
+		
 
-		String codeKind = paramMap.get("wbsPlanCodeId") + "01";
 		// TB_WB22M01 (Plan) 처리
-		// level2 계획이 존재하면 Pass
+		// level2 계획이 존재하면 계획과 동일하게 실적처리
+		
 		//        계획이 없은면 계획 신규 등록  및 확정처리
 		//        계획과 동일한 실적처리 100%, Y,  입력된 시작일, 종료일로 처리
 
-		String planFileTrgtKey =  wb22Mapper.selectWbsSeqNext(paramMap);
 		paramMap.put("planFileTrgtKey", planFileTrgtKey);
 		paramMap.put("fileTrgtKey", planFileTrgtKey);
-
-		String wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
 		paramMap.put("wbsPlanNo", wbsPlanNo);
+		paramMap.put("wbsPlanCodeId", codeId);
+
 		paramMap.put("verNo", paramMap.get("planVerNo"));
 		paramMap.put("wbsPlansDt", paramMap.get("wbsPlansDtFm"));
 		paramMap.put("wbsPlaneDt", paramMap.get("wbsPlaneDtFm"));
-		paramMap.put("wbsPlanCodeId", codeKind);
 		paramMap.put("creatId", paramMap.get("userId"));
 		paramMap.put("creatPgm", paramMap.get("pgmId"));
 		paramMap.put("verUpReason", "간트바에서 자동 생성");
@@ -486,11 +500,16 @@ public class WB07SvcImpl implements WB07Svc {
 		//    - 기존 자료가 있으면 해당 키 사용, 없으면 신규 시퀀스 생성
 		String rsltsFileTrgtKey = wb07Mapper.selectWbsActualFileTrgtKey(paramMap);
 		if (rsltsFileTrgtKey == null || rsltsFileTrgtKey.isEmpty()) {
-			rsltsFileTrgtKey = String.valueOf(wb22Mapper.selectWbsRstlsSeqNext(paramMap));
+//			rsltsFileTrgtKey = String.valueOf(wb22Mapper.selectWbsRstlsSeqNext(paramMap));
+			rsltsFileTrgtKey = planFileTrgtKey;
 		}
 		paramMap.put("rsltsFileTrgtKey", rsltsFileTrgtKey); 
 		
 		// 2. 실적등록 및 완료처리 (위에서 확보한 fileTrgtKey가 MERGE의 Insert 시 사용됨)
+		if (paramMap.get("action").equals("completeActualConfirmed")) {
+			paramMap.put("wbsRsltssDt", paramMap.get("computedStart"));
+			paramMap.put("wbsRsltseDt", paramMap.get("computedEnd"));
+		}
 		result += wb07Mapper.updateWbsActualComplete(paramMap);
 		
 		//상태변경
@@ -503,6 +522,9 @@ public class WB07SvcImpl implements WB07Svc {
 
 	@Override
 	public int resetActualUnconfirmed(Map<String, String> paramMap) throws Exception {
+		if (!wbsOwnerChk(paramMap)) {
+			throw new RuntimeException("담당자 또는 담당팀장외 실적 변경 할 수 없습니다.");
+		}
 		int result = 0;
 		paramMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeId"));
 		paramMap.put("wbsRsltsRate", "1");
@@ -521,21 +543,45 @@ public class WB07SvcImpl implements WB07Svc {
 
 	@Override
 	public int deleteActual(Map<String, String> paramMap) throws Exception {
+		if (!wbsOwnerChk(paramMap)) {
+			throw new RuntimeException("담당자 또는 담당팀장외 실적 삭제 할 수 없습니다.");
+		}
+		
 		int result = 0;
 		paramMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeId"));
 		
-		// 1) 실적(TB_WB23M01) 삭제
+		// 1) 실적(TB_WB24M02) 문제 등록시 삭제 불가
+		//    관련 실적에 문제 등록되어 있으면  삭제 불가
+		//     salesCd + wbsPlanCodeId 로 TB_WB24M02 자료 존재 체크
+		int wbsLevel2InsertChk = wb22Mapper.wbsIssueExistChk(paramMap);
+		if (wbsLevel2InsertChk > 0) {
+			throw new RuntimeException("Task에 등록된 문제가 있습니다.");
+		}
+		
+
+		// 2) 실적(TB_WB23M01) 삭제
 		result += wb07Mapper.deleteWbsActual(paramMap);
+		// 3) Level 2 계획 (TB_WB22M01) 삭제
+		result += wb07Mapper.deleteWbsLevel2Plan(paramMap);
 		
 		//상태변경
-		paramMap.put("wbsPlanStsCodeId", "WBSPLANSTS20"); 
-		paramMap.put("planCloseYn", "N"); 
-//		result += wb07Mapper.deleteWbsActualPlanClear(paramMap);
-		result += updateWbsLevel2ActGantt(paramMap);
+//		paramMap.put("wbsPlanStsCodeId", "WBSPLANSTS20"); 
+//		paramMap.put("planCloseYn", "N"); 
+//		result += updateWbsLevel2ActGantt(paramMap);
 
 		return result;
 	}
 
+
+	private boolean wbsOwnerChk(Map<String, String> paramMap) {
+
+		String userId = paramMap.get("userId");
+		if (userId.equals(paramMap.get("teamMngId")) || userId.equals(paramMap.get("wbsPlanMngId")) || userId.equals("js.nam")) {
+			return true;
+		}
+		return false;
+		
+	}
 
 	private long calculateWorkingDays(String startStr, String endStr) {
 		if (startStr == null || endStr == null || startStr.isEmpty() || endStr.isEmpty()) return 0;

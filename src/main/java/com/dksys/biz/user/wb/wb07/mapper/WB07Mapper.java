@@ -24,8 +24,8 @@ public interface WB07Mapper {
 	int updateWbsScheduleVersionUp(Map<String, String> param);
 	int updateWbsSchedule(Map<String, String> param);
 	int updateWbsScheduleVersionUpWbsCode(Map<String, String> param);
+	int wbsLevel2PlanChange(Map<String, String> param);
 	
-
 	int updateWbsLevel2MetaGantt_revisedFinishDt(Map<String, String> paramMap);
 	int upsertWbsActualStart(Map<String, String> paramMap);
 	String selectWbsActualFileTrgtKey(Map<String, String> paramMap);
@@ -37,5 +37,14 @@ public interface WB07Mapper {
 	int deleteWbsActualPlanClear(Map<String, String> paramMap);
 	
 	int updateWbsActualLevel2Insert(Map<String, String> paramMap);
+
+
+	int deleteWbsLevel2Plan(Map<String, String> paramMap);
+
+
+	int selectWbsPlanLevel2KindCount(Map<String, String> paramMap);
+
+
+	int wbsLevel2ActChange(Map<String, String> paramMap);
 	
 }
