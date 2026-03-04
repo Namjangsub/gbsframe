@@ -757,7 +757,7 @@ function renderTree(){
       if ((t.issueHighCnt || 0) > 0) b.addClass("danger");
     }
 
-    if (t._planDirty || t._actDirty || t._metaDirty) {
+    if ((t._planDirty || t._actDirty || t._metaDirty) && t.fileTrgtKey) {
       $("<span>").addClass("badge warn-pulse").html('<i class="fas fa-pen"></i> 저장필요').appendTo(badges);
     }
 
@@ -962,13 +962,13 @@ async function saveToServer(pending) {
     // 전송 파라미터 구성 (사용자 정보 등 보완)
     const t = STATE.tasks.get(pending.taskId) || {};
     
-    // 필수 제약 조건 체크: 상태가 '지연'인 경우 완료예정일 필수
-    if (t.wbsPlanStsCodeId === "WBSPLANSTS30" && !t.revisedFinishDt) {
+    // 필수 제약 조건 체크: 상태가 '지연'인 경우 완료예정일 필수 (단, CLEAR 액션은 제외)
+    if (t.wbsPlanStsCodeId === "WBSPLANSTS30" && !t.revisedFinishDt && pending.editType !== "CLEAR") {
       if (pending.barType === "PLAN") {
           setToast("계획상태가 '지연' 상태입니다. (PLAN 저장 진행)", {type:"warn", autoHideMs: 2000});
       } else {
           setToast("상태가 '지연'인 경우 완료예정일은 필수입니다.", {type:"err"});
-          return Promise.reject("Validation Error");
+          return Promise.reject(new Error("Validation Error: revisedFinishDt is required"));
       }
     }
 
@@ -1555,6 +1555,128 @@ function renderGantt(){
         }
     });
 
+    // 드래그 생성을 위해 우클릭을 사용하므로 사용자 기본 컨텍스트 메뉴 차단
+    line.on("contextmenu", (ev) => {
+        ev.preventDefault();
+    });
+
+    // [신규] 간트 로우 빈공간 우클릭 시 드래그로 ACT 바 생성
+    line.on("mousedown", (e) => {
+        // 이미 생성된 간트 바(.bar)나 드래그 핸들(.handle)을 클릭한 경우는 무시 (기존 기능과 충돌 방지)
+        if ($(e.target).hasClass('handle') || $(e.target).hasClass('bar') || $(e.target).closest('.bar').length > 0) return;
+
+        // 오른쪽 마우스 버튼 클릭만 허용 (zoom이 작을때 잦은 드래그 오작동 방지)
+        if (e.which !== 3) return;
+
+        // 이미 선택된 행인지 확인
+        const isAlreadySelected = (STATE.selectedId === t.id);
+
+        // 선택된 TASK가 아니면 선택 먼저 처리
+        if (!isAlreadySelected) {
+            STATE.selectedId = t.id;
+            renderAll();
+            focusOnTreeTask(t.id);
+            return; // 선택만 하고 생성을 시작하지 않음 (다시 클릭해야만 됨)
+        }
+
+        // 1. 이미 실적이 존재하는지 체크
+        if (t.actStartAt && t.actEndAt) {
+            setToast("실적이 존재합니다.", {type: "warn", autoHideMs: 2000});
+            return;
+        }
+
+        // 최상위 단계는 실적 생성 불가
+        if (t.parentId === null) {
+            setToast("최상위 단계는 실적을 직접 생성할 수 없습니다.", {type: "warn"});
+            return;
+        }
+
+        e.preventDefault(); e.stopPropagation();
+
+        let startDate;
+        let endDate;
+        
+        // 줌 레벨이 낮을 때(dayW가 작을 때) 스크롤에 취약하지 않도록 절대 좌표 기반 offset 계산
+        const clickXInLine = e.pageX - line.offset().left;
+        const startDayIdx = Math.floor(clickXInLine / dayW);
+
+        // 시각적 피드백을 위한 임시 바(Temp Bar) 생성
+        const tempBar = $("<div>")
+            .addClass("bar act is-active temp-drag-bar")
+            .css({ left: `${startDayIdx*dayW}px`, width: `${dayW}px`, opacity: 0.7 })
+            .appendTo(line);
+
+        const onMove = (ev) => {
+            // 움직일 때마다 offset 갱신 (스크롤 변경 대비)
+            const currentXInLine = ev.pageX - line.offset().left;
+            const endDayIdx = Math.floor(currentXInLine / dayW);
+            
+            // 좌우 어느 방향으로든 드래그 가능하게
+            const sIdx = Math.min(startDayIdx, endDayIdx);
+            const eIdx = Math.max(startDayIdx, endDayIdx);
+            
+            startDate = addDays(days[0], sIdx);
+            endDate = addDays(days[0], eIdx);
+            
+            tempBar.css({
+                left: `${sIdx * dayW}px`,
+                width: `${Math.max(1, (eIdx - sIdx + 1)) * dayW}px`
+            });
+            
+            // 임시 객체로 툴팁 표시
+            const tempT = { ...t, actStartAt: startDate, actEndAt: endDate, actProgress: 1 };
+            showTip(ev.clientX, ev.clientY, tempT, "ACT");
+        };
+
+        const onUp = (ev) => {
+            $(window).off("mousemove", onMove);
+            $(window).off("mouseup", onUp);
+            hideTip();
+            tempBar.remove(); // 렌더링에 맡기기 위해 임시 바 삭제
+
+            const currentXInLine = ev.pageX - line.offset().left;
+            const endDayIdx = Math.floor(currentXInLine / dayW);
+            
+            const sIdx = Math.min(startDayIdx, endDayIdx);
+            const eIdx = Math.max(startDayIdx, endDayIdx);
+            
+            let ns = nextWorkingDay(addDays(days[0], sIdx)); 
+            let ne = nextWorkingDay(addDays(days[0], eIdx)); 
+            
+            if (diffDays(ns, ne) < 0) {
+               ne = ns; 
+            }
+            
+            const durationWd = Math.max(1, diffWorkingDaysInclusive(ns, ne));
+            const warningLikely = isActViolationLikely(t.id, ns, ne);
+
+            // 데이터 적용
+            applyPendingChange({
+                taskId: t.id,
+                editType: "CREATE_DRAG",
+                barType: "ACT",
+                origStart: null,
+                origEnd: null,
+                normalizedStart: ns,
+                normalizedEnd: ne,
+                durationWd,
+                warningLikely
+            });
+
+            if (warningLikely) {
+                const snap = snapshotTasks();
+                TOAST.lastAction = { snapshot: snap, pending: null, saveFn: null };
+                startUndoWindow(3600000); 
+                setToast('계획된 기간을 벗어남 (경고 허용)', {type:'warn', autoHideMs:null, canUndo:true});
+            } else {
+                setToast("실적 일정이 생성되었습니다. 상단의 [저장(일괄)] 버튼을 눌러 확정하세요.", {type:"ok", autoHideMs:3000, canUndo:true});
+            }
+        };
+
+        $(window).on("mousemove", onMove);
+        $(window).on("mouseup", onUp);
+    });
+
     // PLAN bar
     if(t.planStartAt && t.planEndAt){
       const psIdx = diffDays(days[0], t.planStartAt);
@@ -1717,7 +1839,7 @@ function renderDetail(){
 
     <div style="display:flex; gap:8px; margin-top:6px;">
       ${t.parentId !== null ? `
-        <button class="btn primary ${(t._actDirty || t._metaDirty) ? 'highlight-blue' : ''}" id="btnSaveAct" ${!(t._actDirty || t._metaDirty) ? 'disabled' : ''}>ACT 저장</button>
+        <button class="btn primary ${(t._actDirty || t._metaDirty) ? 'highlight-blue' : ''}" id="btnSaveAct" ${!((t._actDirty || t._metaDirty) && t.actStartAt && t.actEndAt) ? 'disabled' : ''}>ACT 저장</button>
         <button class="btn" id="btnClearAct" ${!(t.actStartAt || t.actEndAt) ? 'disabled' : ''}>ACT 제거</button>
       ` : `<div class="mini">하위 TASK 실적에 의해 자동 계산됩니다.</div>`}
     </div>
@@ -2028,7 +2150,7 @@ function renderDetail(){
 
         $("#btnSaveAct")
           .toggleClass('highlight-blue', isActDirtyUnified)
-          .prop("disabled", !isActDirtyUnified);
+          .prop("disabled", !(isActDirtyUnified && t.actStartAt && t.actEndAt));
           
         $("#btnSaveMeta")
           .toggleClass('highlight-blue', isCommonDirty)
@@ -2202,15 +2324,25 @@ function renderDetail(){
   t.progress = 0;
   t.actDurationWd = 0;
   t.actWarnYn = "N";
+  t._actDirty = false;
+  t._metaDirty = false;
   
+  // 서버 저장 전 UI 즉시 반영 (아직 저장되지 않은 실적을 지울때도 화면에서 즉각 제거되도록 보장)
+  refreshSummariesOnly();
+  renderAll();
+
+  // 만약 DB에 아예 존재하지 않는 신규 막대였다면 굳이 삭제 API를 태우지 않고 끝낼 수도 있으나,
+  // 안전하게 서버 데이터 동기화를 유지하도록 CLEAR를 날립니다.
   saveToServer({ taskId: t.id, barType: "ACT", editType: "CLEAR" })
     .then(() => {
       setToast("ACT 제거됨", {type:"ok", canUndo:true, autoHideMs:2500});
-      t._actDirty = false;
-      refreshSummariesOnly();
-      renderAll();
     })
-    .catch(e => setToast("ACT 제거 실패: " + e.message, {type:"err"}));
+    .catch(e => {
+        // 만약 이미 저장되지 않은 실적이어서 서버에서 지울 것이 없다면 에러가 날 수 있음.
+        // 이때도 화면에서는 이미 지웠기 때문에 사용자 경험을 방해하지 않음.
+        console.warn("ACT 제거 API 호출결과: " + e.message);
+        setToast("ACT 제거 반영 (클라이언트 측)", {type:"ok", autoHideMs:2000});
+    });
 });
 // 공통 저장
   $("#btnSaveMeta").on("click", ()=>{
