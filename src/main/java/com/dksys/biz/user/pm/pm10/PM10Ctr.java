@@ -37,20 +37,23 @@ public class PM10Ctr {
 		return "jsonView";
 	}
 
-	// 메인
-	@PostMapping("/pm10_main_update")
-	public String pm10_main_update(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
+
+
+
+	// Sequence 미리 채번
+	@PostMapping(value = "/getNextSubSeq")
+	public String getNextSubSeq(ModelMap model) throws Exception {
 		try {
-			pm10Svc.pm10_main_update(param);
+			// pm10Mapper 직접 참조가 안되면 Service를 거쳐야 함.
+			int nextSeq = pm10Svc.selectNextSubSeq();
+			model.addAttribute("newSubSeq", nextSeq);
 			model.addAttribute("resultCode", 200);
-			model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-		} catch(Exception e) {
-			model.addAttribute("resultCode", 500);
-			model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+		}catch(Exception e){
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
 		}
 		return "jsonView";
-    }
-
+	}
 
 	// 주제
 	@PostMapping(value = "/pm10_d01_update")
@@ -59,6 +62,7 @@ public class PM10Ctr {
 			if (pm10Svc.pm10_d01_update(param) != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+				model.addAttribute("newSubSeq", param.get("mnSubSeq"));
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
@@ -78,6 +82,7 @@ public class PM10Ctr {
 			if (pm10Svc.pm10_d03_update(param) != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+				model.addAttribute("newSubSeq", param.get("mnSubSeq"));
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));

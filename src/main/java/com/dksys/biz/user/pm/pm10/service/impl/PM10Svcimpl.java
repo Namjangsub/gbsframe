@@ -40,6 +40,11 @@ public class PM10Svcimpl implements PM10Svc {
 		// 회의록 리스트 조회
 		List<Map<String, String>> mnList = pm10Mapper.selectMnList(paramMap);
 
+		// [Critical Fix] 해당 날짜에 데이터가 없으면 빈 리스트 반환 (NPE 방지)
+		if (mnList == null || mnList.isEmpty()) {
+			return new ArrayList<>();
+		}
+
 		// 결과를 담을 새로운 리스트에 회의록 복사
 		List<Map<String, String>> resultList = new ArrayList<>(mnList);
 
@@ -85,16 +90,54 @@ public class PM10Svcimpl implements PM10Svc {
 	}
 
 	@Override
+	public int pm10_d01_update(Map<String, String> param) throws Exception {
+		String mnSubSeqStr = param.get("mnSubSeq");
+		if (mnSubSeqStr == null || "".equals(mnSubSeqStr) || "0".equals(mnSubSeqStr)) {
+			// 공지사항인 경우 동시 생성 방지를 위해 기존 번호가 있는지 한 번 더 확인
+			String mnSubject = param.get("mnSubject");
+			if ("공지사항".equals(mnSubject)) {
+				Integer existSeq = pm10Mapper.selectNoticeSubSeq(param);
+				if (existSeq != null && existSeq > 0) {
+					param.put("mnSubSeq", String.valueOf(existSeq));
+				} else {
+					Integer newSeq = pm10Mapper.selectNextSubSeq();
+					param.put("mnSubSeq", String.valueOf(newSeq));
+				}
+			} else {
+				Integer newSeq = pm10Mapper.selectNextSubSeq();
+				param.put("mnSubSeq", String.valueOf(newSeq));
+			}
+		}
+		pm10Mapper.pm10_main_update(param);
+		return pm10Mapper.pm10_d01_update(param);
+	}
+
+	@Override
 	public int pm10_d03_update(Map<String, String> param) throws Exception {
+		String mnSubSeqStr = param.get("mnSubSeq");
+		if (mnSubSeqStr == null || "".equals(mnSubSeqStr) || "0".equals(mnSubSeqStr)) {
+			// 공지사항인 경우 동시 생성 방지를 위해 기존 번호가 있는지 한 번 더 확인
+			String mnSubject = param.get("mnSubject");
+			if ("공지사항".equals(mnSubject)) {
+				Integer existSeq = pm10Mapper.selectNoticeSubSeq(param);
+				if (existSeq != null && existSeq > 0) {
+					param.put("mnSubSeq", String.valueOf(existSeq));
+				} else {
+					Integer newSeq = pm10Mapper.selectNextSubSeq();
+					param.put("mnSubSeq", String.valueOf(newSeq));
+				}
+			} else {
+				Integer newSeq = pm10Mapper.selectNextSubSeq();
+				param.put("mnSubSeq", String.valueOf(newSeq));
+			}
+		}
 		pm10Mapper.pm10_main_update(param); // 일자별 마스터테이블 추가
-		pm10Mapper.pm10_d01_update(param); // 주제 추가
+		pm10Mapper.pm10_d01_upsert_safe(param); // 주제 행 보장 (LOCK 컬럼 건드리지 않음)
 		return pm10Mapper.pm10_d03_update(param);
 	}
 
 	@Override
 	public int deleteMn(Map<String, String> paramMap) throws Exception {
-		// D01 삭제
-
 		Integer result = 0;
 
 		Object mnSubSeq = paramMap.get("mnSubSeq");
@@ -106,29 +149,42 @@ public class PM10Svcimpl implements PM10Svc {
 			// D03 삭제 (회의 내용)
 			result += pm10Mapper.deleteMnD03(paramMap);
 		}
-		int deleteM01Count = pm10Mapper.deleteMnM01(paramMap);  
+		int deletedMasterCount = pm10Mapper.deleteMnM01(paramMap);
+		result += deletedMasterCount;
 
-		String fileInfoJson = paramMap.get("fileInfoJson");
+		// [Critical Fix] 마스터(M01) 데이터가 삭제되었다면 = 모든 일반 주제(D01)가 다 지워져서 날짜 당 데이터가 없을 때만 첨부파일을 싹 지움
+		if (deletedMasterCount > 0) {
+			String fileInfoJson = paramMap.get("fileInfoJson");
 
-		if (deleteM01Count > 0 && fileInfoJson != null && !fileInfoJson.isEmpty()) {
-			Map<String, List<Map<String, Object>>> fileInfoMap = new Gson().fromJson(fileInfoJson, new TypeToken<Map<String, List<Map<String, Object>>>>(){}.getType());
+			if (fileInfoJson != null && !fileInfoJson.isEmpty()) {
+				Map<String, List<Map<String, Object>>> fileInfoMap = new Gson().fromJson(
+					fileInfoJson,
+					new TypeToken<Map<String, List<Map<String, Object>>>>(){}.getType()
+				);
 
-			for (Map.Entry<String, List<Map<String, Object>>> entry : fileInfoMap.entrySet()) {
-				List<Map<String, Object>> fileList = entry.getValue();
-				for (Map<String, Object> file : fileList) {
-					String fileKey = String.valueOf(file.get("fileKey"));
-					if (fileKey != null && !fileKey.isEmpty()) {
+				for (Map.Entry<String, List<Map<String, Object>>> entry : fileInfoMap.entrySet()) {
+					List<Map<String, Object>> fileList = entry.getValue();
+					for (Map<String, Object> file : fileList) {
+						String fileKey = String.valueOf(file.get("fileKey"));
+						if (fileKey == null || fileKey.isEmpty() || "0".equals(fileKey)) {
+							continue;
+						}
 
-						Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
-						String filePath = fileInfo.get("filePath") + fileKey + "_" + fileInfo.get("fileName");
-
-						Map<String, String> deleteParam = new HashMap<>();
-						deleteParam.put("fileKey", fileKey);
-						deleteParam.put("mnDate", paramMap.get("mnDate"));
-						result = pm10Mapper.deleteMnFile(deleteParam);	// 임팀장 회의록 파일첨부 삭제 코드
 						try {
-							File f = new File(filePath);
-							f.delete();
+							// 물리 파일 삭제를 위한 경로 조회
+							Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
+							if (fileInfo != null) {
+								String filePath = fileInfo.get("filePath") + fileKey + "_" + fileInfo.get("fileName");
+								File f = new File(filePath);
+								if (f.exists()) f.delete();
+							}
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+
+						try {
+							cm08Svc.deleteFile(fileKey);
+							result++;
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
@@ -141,16 +197,10 @@ public class PM10Svcimpl implements PM10Svc {
 	}
 
 	@Override
-	public int pm10_d01_update(Map<String, String> param) throws Exception {
-		pm10Mapper.pm10_main_update(param);
-		return pm10Mapper.pm10_d01_update(param);
-	}
-
-	@Override
 	public int pm10_d01_sortNo_update(Map<String,Object> paramMap) throws Exception {
 		int result = 0;
 		List<Map<String,Object>> list = (List<Map<String,Object>>) paramMap.get("list");
-		
+
 		for (Map<String,Object> dtl : list) {
 			dtl.put("mnDate", paramMap.get("mnDate"));
 			dtl.put("userId", paramMap.get("userId"));
@@ -164,7 +214,7 @@ public class PM10Svcimpl implements PM10Svc {
 	public int pm10_d02_update(Map<String, Object> paramMap) throws Exception {
 		int result = 0;
 		List<Map<String,Object>> attedList = (List<Map<String,Object>>) paramMap.get("attendList");
-		
+
 		for (Map<String,Object> dtl : attedList) {
 			dtl.put("mnDate", paramMap.get("mnDate"));
 			dtl.put("userId", paramMap.get("userId"));
@@ -258,6 +308,11 @@ public class PM10Svcimpl implements PM10Svc {
 	@Override
 	public Map<String, String> selectD03Cell(Map<String, String> param) throws Exception {
 		return pm10Mapper.selectD03Cell(param);
+	}
+
+	@Override
+	public int selectNextSubSeq() throws Exception {
+		return pm10Mapper.selectNextSubSeq();
 	}
 
 }

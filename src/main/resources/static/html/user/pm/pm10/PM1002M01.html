@@ -85,15 +85,7 @@
 	<div id="main_area" style="position: static;height: 1080px;">
 
 		<!-- 페이지 상단 -->
-		<!-- <div class="contents no_bg">
-			<ul class="btn_ul">
-				<li class="btn_r">
-					<a onclick="manualPopup();"> <button type="button" class="bg_gray" onclick="manualPopup();">도움말</button></a>
-					<a onclick="initSearch();"><button class="bg_gray">초기화</button></a>
-					<a onclick="mnGridView.setData(0);"><button class="bg_gray">검 색</button></a>
-	            </li>
-            </ul>
-        </div> -->
+
 
 		<!-- 검색 콘텐츠 -->
 		<div class="contents search">
@@ -413,6 +405,14 @@
 	}
 
 	function lockCellForEdit(item, colKey) {
+		// [추가] 주제(mnSubject)가 비어있는데 부서 내용(D03)을 먼저 편집하려 하면 차단 (부모 없는 자식 데이터 방지)
+		if (deptCodeMap[colKey]) {
+			if (!item.mnSubject || item.mnSubject.trim() === '') {
+				alert("주제를 먼저 입력해야 부서 내용을 작성할 수 있습니다.");
+				return false;
+			}
+		}
+
 		const lockTarget = getLockTarget(item, colKey);
 		if (!lockTarget) return true;
 		if (!lockTarget.mnSubSeq || lockTarget.mnSubSeq <= 0) return true;
@@ -426,7 +426,8 @@
 			mnDate: lockTarget.mnDate,
 			mnSubSeq: lockTarget.mnSubSeq,
 			mnDeptCd: lockTarget.mnDeptCd,
-			userId: $('#userId').val()
+			userId: $('#userId').val(),
+			pgmId: $('#pgmId').val()
 		};
 
 		let lockOk = false;
@@ -828,8 +829,45 @@
 					var newList = mnGridView.processGridData(data);
 					var oldList = mnGridView.target.list;
 
-					// 행 수가 달라졌으면 전체 리로드 (다른 사용자가 행 추가/삭제)
+					// [수정] 델타 버그 (망가진 polling) 해결 
+					// 로컬 전용(아직 DB에 안 들어간) 빈 행 추출
+					var localUnsaved = oldList.filter(oldItem => 
+						!oldItem.isFileRow && !oldItem.isNoticeRow && 
+						String(oldItem.mnSubSeq) !== '0' &&
+						(!oldItem.mnSubject || oldItem.mnSubject.trim() === '') && // 작성된 적 없는 로컬 빈 칸
+						!newList.some(newItem => String(newItem.mnSubSeq) === String(oldItem.mnSubSeq))
+					);
+
+					// 뉴 리스트에 로컬 빈 껍데기를 병합하여 oldList와 동일한 비교선상에 올림
+					if (localUnsaved.length > 0) {
+						localUnsaved.forEach(u => newList.push(u));
+						// 다시 정렬
+						var dRows = newList.filter(r => !r.isFileRow && !r.isNoticeRow);
+						dRows.sort((a,b) => (a.mnSortNo || 0) - (b.mnSortNo || 0));
+						var fRow = newList.find(r => r.isFileRow);
+						var nRow = newList.find(r => r.isNoticeRow);
+						newList = [...dRows, nRow, fRow].filter(x => x);
+					}
+
+					// 행 구성 요소가 완전히 바뀌었는지(남이 새 행을 추가했는지) 정밀 비교
+					var isStructureChanged = false;
 					if (newList.length !== oldList.length) {
+						isStructureChanged = true;
+					} else {
+						// 길이가 같아도 PK(mnSubSeq) 풀이 서로 다르면 구조가 바뀐 것
+						for(var i=0; i<newList.length; i++) {
+							var nr = newList[i];
+							var found = oldList.some(or => 
+								(nr.isNoticeRow && or.isNoticeRow) || 
+								(nr.isFileRow && or.isFileRow) || 
+								(!nr.isNoticeRow && !nr.isFileRow && String(nr.mnSubSeq) === String(or.mnSubSeq))
+							);
+							if (!found) { isStructureChanged = true; break; }
+						}
+					}
+
+					// 누군가 새 행을 쌌거나 지웠다면 풀 리로드
+					if (isStructureChanged) {
 						mnGridView.target.setData({ list: newList, page: { totalElements: newList.length } });
 						if (data.d02List) select_p10_d02_List(data.d02List);
 						return;
@@ -867,6 +905,34 @@
 						if (oldItemIndex >= 0) {
 							var oldItem = oldList[oldItemIndex];
 							let isItemLockChanged = false;
+
+							// 0. 첨부파일(isFileRow) 항목의 파일 리스트 변경 감지
+							if (newItem.isFileRow) {
+								let fileChanged = false;
+								for (var colKey of deptCols) {
+									var newFiles = (newItem.filesByColumn && newItem.filesByColumn[colKey]) || [];
+									var oldFiles = (oldItem.filesByColumn && oldItem.filesByColumn[colKey]) || [];
+									if (newFiles.length !== oldFiles.length) {
+										fileChanged = true;
+										break;
+									} else {
+										// 갯수가 같아도 안의 파일키가 다른지 비교
+										for (let f = 0; f < newFiles.length; f++) {
+											if (String(newFiles[f].fileKey) !== String(oldFiles[f].fileKey)) {
+												fileChanged = true;
+												break;
+											}
+										}
+										if (fileChanged) break;
+									}
+								}
+								// 변경되었다면 데이터 덮어쓰고 강제 그리드 반영
+								if (fileChanged) {
+									oldItem.filesByColumn = newItem.filesByColumn; // 데이터 교체
+									// 파일 셀들은 모두 repaint를 통해 새로 그려짐
+									hasLockChange = true; 
+								}
+							}
 
 							// 1. D01 Lock Check
 							if ((oldItem.d01LockYn !== newItem.d01LockYn) || (oldItem.d01LockUserNm !== newItem.d01LockUserNm)) {
@@ -934,13 +1000,7 @@
 
 	}
 
-	function initSearch() {
-		// datepicker를 제외한 select, input 값 모두 초기화
-		$(".contents.search select").val("");
-		$(".contents.search input").val("");
-		// 회사 초기화
-		$('#mnDate_S').val(moment().day(5).format('YYYY-MM-DD'));
-	}
+
 
 	$(document).ready(function () {
 		//초기설정들
@@ -969,8 +1029,7 @@
 		}).datepicker("setDate", moment().day(5).toDate());
 		$('#mnWeeks_S').val(moment($('#mnDate_S').val(), 'YYYY-MM-DD').isoWeek());
 
-		// 접속자 회사 set
-		$("#userId").val(jwt.userId);
+
 
 		// 참석자 삭제("-") 버튼
 		$('#removeAttendBtn').on('click', () => {
@@ -996,13 +1055,14 @@
 		$('#mnDiv_S').on('change', function () {
 			if ($('#mnDiv_S').val() === 'MNDIV01') {
 				$('.attend-area').hide();
-
+				$('#moveUp, #moveDown, #addRow, #deleteRow').show();
 			}
 			else if ($('#mnDiv_S').val() === 'MNDIV02') {
 				// 구분이 회의결과로 바뀌면 참석자 리스트 UPDATE 하고 attendFlag를 false로 변경 -> 이 로직은 회의결과로 들어왔을 때 딱 한번 참석자 리스트 업데이트 하기 위함
 				if (attendFlag) {
 					pm10_d02_update();
 				}
+				$('#moveUp, #moveDown, #addRow, #deleteRow').show();
 
 				$('.attend-area').show().css('pointer-events', 'auto');
 				$('#addAttendBtn, #removeAttendBtn').show();
@@ -1012,6 +1072,7 @@
 				$('.attend-area').show().css('pointer-events', 'none');
 				$('#addAttendBtn, #removeAttendBtn').hide();
 				$('#attendCheckboxContainer input.attend-checkbox').prop('disabled', true).css('pointer-events', 'none').css('cursor', 'default');
+				$('#moveUp, #moveDown, #addRow, #deleteRow').hide();
 			}
 		});
 
@@ -1106,7 +1167,9 @@
 
 		// 2. Polling: 30초마다 그리드 데이터 갱신 (편집 중이 아닐 때만)
 		pollInterval = setInterval(function () {
-			if (isEditing || isPopupView) return;
+			if (isEditing || isPopupView) {
+				return;
+			}
 			// 델타 업데이트 방식 사용 (스크롤/포커스 유지됨)
 			mnGridView.updateData(true);
 		}, 30000);
@@ -1183,6 +1246,10 @@
 
 	// 행 추가
 	function insertMn() {
+		if ($('#mnDiv_S').val() === 'MNDIV99') {
+			alert('전체조회 화면에서는 행을 추가할 수 없습니다.');
+			return false;
+		}
 		const grid = mnGridView.target;
 		const selected = grid.getList("selected");  // 선택된 행 배열
 
@@ -1208,24 +1275,34 @@
 			insertIndex = defaultInsertIndex;
 		}
 
-		// 새 행 객체 생성
-		const newRow = {
-			mnDate: $('#mnDate_S').val(),
-			mnWeeks: $('#mnWeeks_S').val(),
-			mnSubSeq: 0,      // 서버에서 INSERT 시 발급
-			mnSubject: '',
-			mnSortNo: 0,      // 임시값
-			isNoticeRow: false,
-			isFileRow: false
-		};
+		postAjaxSync('/user/pm/pm10/getNextSubSeq', {}, null, function(data) {
+			if (data.resultCode === 200) {
+				// 새 행 객체 생성
+				const newRow = {
+					mnDate: $('#mnDate_S').val(),
+					mnWeeks: $('#mnWeeks_S').val(),
+					mnSubSeq: data.newSubSeq, // 서버에서 미리 채번한 발급 번호 적용
+					mnSubject: '',
+					mnSortNo: 0,      // 임시값
+					isNoticeRow: false,
+					isFileRow: false
+				};
 
-		// 행 추가 및 리페인트
-		grid.addRow(newRow, insertIndex);
-		grid.repaint();
+				// 행 추가 및 리페인트
+				grid.addRow(newRow, insertIndex);
+				grid.repaint();
+			} else {
+				alert('행 번호 채번 실패: ' + data.resultMessage);
+			}
+		});
 	}
 
 	// 행 삭제
 	function deleteMn() {
+		if ($('#mnDiv_S').val() === 'MNDIV99') {
+			alert('전체조회 화면에서는 행을 삭제할 수 없습니다.');
+			return false;
+		}
 		const grid = mnGridView.target;
 		const fileRow = grid.list.find(r => r.isFileRow);
 		const sel = grid.getList("selected")[0];
@@ -1292,16 +1369,15 @@
 		let newSortNo;
 
 		if (item.isNoticeRow) {
-			// 신규 공지사항: 아직 subSeq가 0일 때만 마지막+1
-			newSubSeq = item.mnSubSeq > 0 ? item.mnSubSeq : normalRows.length + 1;
+			// 신규 공지사항: 추가 시 미리 받은 번호 유지
+			newSubSeq = item.mnSubSeq;
 			newSortNo = normalRows.length + 1;
 			// 화면에도 반영
-			item.mnSubSeq = newSubSeq;
 			item.mnSortNo = newSortNo;
 		}
 		else {
-			// 일반 주제: 위치에 맞춰 계산
-			newSubSeq = item.mnSubSeq || 0;
+			// 일반 주제: 위치에 맞춰 계산, 서버에서 미리 받은 seq 유지
+			newSubSeq = item.mnSubSeq;
 			newSortNo = normalRows.findIndex(r => r === item) + 1;
 			item.mnSortNo = newSortNo;
 		}
@@ -1330,6 +1406,11 @@
 			if (data.resultCode !== 200) {
 				alert('수정 실패: ' + data.resultMessage);
 				mnGridView.setData(); // 실패 시에만 전체 리로드
+			} else {
+				if (data.newSubSeq) {
+					item.mnSubSeq = parseInt(data.newSubSeq);
+					// 동기화 후 다시 렌더링이나 findIndex 처리를 원활하게 하기 위함
+				}
 			}
 		});
 	}
@@ -1344,9 +1425,8 @@
 		// 현재 존재하는 mnSubSeq의 최대값을 구한다. 없으면 0
 		const maxSeq = dataRows.reduce((max, r) => Math.max(max, r.mnSubSeq || 0), 0);
 
-		// 신규이면 maxSeq + 1, 아니면 기존 seq 유지
-		const newSubSeq = item.mnSubSeq > 0 ? item.mnSubSeq : (maxSeq + 1);
-		item.mnSubSeq = newSubSeq;
+		// 신규 행도 미리 서버에서 시퀀스를 받아왔으므로 기존 item.mnSubSeq 그대로 사용
+		const newSubSeq = item.mnSubSeq;
 
 		lastEditedCell = {
 			mnDate: $('#mnDate_S').val(),
@@ -1378,6 +1458,10 @@
 			if (data.resultCode !== 200) {
 				alert('수정 실패: ' + data.resultMessage);
 				mnGridView.setData(); // 실패 시에만 전체 리로드
+			} else {
+				if (data.newSubSeq) {
+					item.mnSubSeq = parseInt(data.newSubSeq);
+				}
 			}
 		});
 	}
@@ -1476,8 +1560,6 @@
 		// 삭제할 파일 키들
 		formData.append("deleteFileArr", JSON.stringify(deleteFileArr));
 		formData.append("fileTrgtKey", $("#mnDate_S").val().replace(/-/g, "") + "-" + deptCodeMap[currentFileColumn]);
-		formData.append("userId", $("#userId").val());
-		formData.append("pgmId", $("#pgmId").val());
 
 		filePostAjax("/user/pm/pm10/mnUploadFile", formData, function (data) {
 			mnGridView.setData();
@@ -1488,7 +1570,18 @@
 
 	// 엑셀다운로드
 	function jsonToExcel(grid) {
-		const list = grid.target.getList();
+		const list = grid.target.getList().map(row => {
+			const newRow = { ...row };
+			if (newRow.isFileRow && newRow.filesByColumn) {
+				Object.keys(newRow.filesByColumn).forEach(colKey => {
+					const files = newRow.filesByColumn[colKey];
+					if (files && files.length > 0) {
+						newRow[colKey] = files.map(f => f.name).join('\r\n');
+					}
+				});
+			}
+			return newRow;
+		});
 		const raw = grid.target.colGroup;
 
 		const header = raw.map(col => ({
@@ -1551,13 +1644,7 @@
 	}
 
 
-	function gridMaxHeightResize() {
-		var gridHeigth = $('[data-ax5grid="mnGrid-grid"]').find('[data-ax5grid-panel-scroll="body"]').height()
-			+ $('[data-ax5grid="mnGrid-grid"]').find('[data-ax5grid-panel="header"]').height();
-		if (gridHeigth > 755) {
-			mnGridView.target.setHeight(gridHeigth);
-		}
-	}
+
 
 
 	function syncRowHeights() {
@@ -1578,6 +1665,10 @@
 
 	// 선택된 행 하나를 위로 한 칸 이동
 	function moveSelectedUp() {
+		if ($('#mnDiv_S').val() === 'MNDIV99') {
+			alert('전체조회 화면에서는 행을 이동할 수 없습니다.');
+			return false;
+		}
 		const grid = mnGridView.target;
 		const list = grid.list;
 		const sel = grid.getList("selected")[0];
@@ -1606,6 +1697,10 @@
 
 	// 선택된 행 하나를 아래로 한 칸 이동
 	function moveSelectedDown() {
+		if ($('#mnDiv_S').val() === 'MNDIV99') {
+			alert('전체조회 화면에서는 행을 이동할 수 없습니다.');
+			return false;
+		}
 		const grid = mnGridView.target;
 		const list = grid.list;
 		const sel = grid.getList("selected")[0];
@@ -1624,6 +1719,10 @@
 		);
 		// 유효하지 않거나 마지막 인덱스이면 리턴
 		if (idx < 0 || idx >= list.length - 1) return;
+
+		// 공지사항 행 경계 체크 (공지사항 위치를 넘어갈 수 없음)
+		const noticeIdx = list.findIndex(r => r.isNoticeRow);
+		if (noticeIdx >= 0 && idx + 1 >= noticeIdx) return;
 
 		// 한 칸 아래로 스왑
 		[list[idx], list[idx + 1]] = [list[idx + 1], list[idx]];

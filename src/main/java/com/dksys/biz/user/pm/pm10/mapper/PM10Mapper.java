@@ -16,6 +16,9 @@ public interface PM10Mapper {
 
 	int pm10_d01_update(Map<String, String> param);
 
+	/** D03 저장 시 사용 - LOCK 컬럼을 건드리지 않는 안전 D01 Upsert */
+	int pm10_d01_upsert_safe(Map<String, String> param);
+
 	int pm10_d03_update(Map<String, String> param);
 
 	int deleteMnM01(Map<String, String> paramMap);
@@ -49,5 +52,11 @@ public interface PM10Mapper {
 	Map<String, String> selectD01Cell(Map<String, String> param);
 
 	Map<String, String> selectD03Cell(Map<String, String> param);
+
+	/** 신규 행 INSERT 시 Sequence 채번 */
+	Integer selectNextSubSeq();
+
+	/** 공지사항 기존 행 존재 여부 확인 */
+	Integer selectNoticeSubSeq(Map<String, String> param);
 
 }

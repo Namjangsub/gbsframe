@@ -67,7 +67,6 @@
 					    D1.MN_SORT_NO,
 					    MAX(D1.MN_ETC_ALL) 	AS MN_ETC_ALL,
 					    MAX(D1.MN_STATUS)	AS MN_STATUS,
-					    MAX(T.MN_WEEKS)	AS MN_WEEKS,
 
 						-- D01 잠금 정보
 						MAX(D1.LOCK_YN)		AS D01_LOCK_YN,
@@ -96,7 +95,6 @@
 						MAX(CASE WHEN D3.MN_DEPT_CD = 'GUN70'   THEN (SELECT FN_CM06M01_ID_TO_NM(D3.LOCK_USER) FROM DUAL) END) AS GUN70_LOCK_USER_NM
 				FROM TB_PM10M01 T
 							LEFT OUTER JOIN TB_PM10D01 D1 ON D1.MN_DATE = T.MN_DATE
-							<!-- LEFT OUTER JOIN TB_PM10D02 D2 ON D2.MN_DATE = T.MN_DATE -->
 							LEFT OUTER JOIN TB_PM10D03 D3 ON D3.MN_DATE = T.MN_DATE AND D3.MN_SUB_SEQ = D1.MN_SUB_SEQ
 							LEFT OUTER JOIN TB_CM06M01 LU1 ON LU1.ID = D1.LOCK_USER
 				WHERE 1 = 1
@@ -187,6 +185,19 @@
 		)
 	</update>
 
+	<!-- Sequence를 이용한 신규 MN_SUB_SEQ 채번 -->
+	<select id="selectNextSubSeq" resultType="java.lang.Integer">
+		SELECT TB_PM10M01_SQ01.NEXTVAL FROM DUAL
+	</select>
+
+	<!-- 공지사항 중복 생성 방지용 기존 공지사항 SEQ 조회 -->
+	<select id="selectNoticeSubSeq" parameterType="Map" resultType="java.lang.Integer">
+		SELECT MAX(MN_SUB_SEQ)
+		FROM TB_PM10D01
+		WHERE MN_DATE = #{mnDate}
+		  AND MN_SUBJECT = '공지사항'
+	</select>
+
 	<update id="pm10_d01_update" parameterType="Map">
 		MERGE INTO TB_PM10D01 A
 			USING DUAL
@@ -230,7 +241,7 @@
 		)
 		VALUES(
 				  #{mnDate}
-				, (SELECT NVL(MAX(MN_SUB_SEQ), 0) + 1 FROM   TB_PM10D01 WHERE  MN_DATE = #{mnDate})
+				, #{mnSubSeq}
 				, #{mnSortNo}
 				, #{mnSubject}
 				, #{clntPjt, jdbcType=VARCHAR}
@@ -247,6 +258,58 @@
 		)
 	</update>
 
+
+	<!-- D03 저장 시 사용하는 안전 D01 Upsert: LOCK 컬럼을 건드리지 않아 타 사용자 잠금 해제 부작용 방지 -->
+	<update id="pm10_d01_upsert_safe" parameterType="Map">
+		MERGE INTO TB_PM10D01 A
+			USING DUAL
+			ON (
+					MN_DATE 	= #{mnDate}
+				AND MN_SUB_SEQ 	= #{mnSubSeq}
+			   )
+		WHEN MATCHED THEN
+			UPDATE SET
+					  MN_SORT_NO	= #{mnSortNo}
+					, UDT_ID		= #{userId}
+					, UDT_DTTM		= SYSDATE
+					, UDT_PGM		= #{pgmId}
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+				  MN_DATE
+				, MN_SUB_SEQ
+				, MN_SORT_NO
+				, MN_SUBJECT
+				, CLNT_PJT
+				, CLNT_CD
+				, ORDRS_NO
+				, MN_ETC_ALL
+				, MN_STATUS
+				, LOCK_YN
+				, LOCK_USER
+				, LOCK_DTTM
+				, CREAT_ID
+				, CREAT_DTTM
+				, CREAT_PGM
+		)
+		VALUES(
+				  #{mnDate}
+				, (SELECT NVL(MAX(MN_SUB_SEQ), 0) + 1 FROM TB_PM10D01 WHERE MN_DATE = #{mnDate})
+				, #{mnSortNo}
+				, #{mnSubject}
+				, #{clntPjt, jdbcType=VARCHAR}
+				, #{clntCd, jdbcType=VARCHAR}
+				, #{ordrsNo, jdbcType=VARCHAR}
+				, #{mnEtcAll, jdbcType=VARCHAR}
+				, #{mnStatus, jdbcType=VARCHAR}
+				, 'N'
+				, NULL
+				, NULL
+				, #{userId}
+				, SYSDATE
+				, #{pgmId}
+		)
+	</update>
 
 
 	<update id="pm10_d03_update" parameterType="Map">
@@ -429,16 +492,56 @@
 	</update>
 
 	<update id="lockD03Cell" parameterType="Map">
-		UPDATE TB_PM10D03
-		SET
-			  LOCK_YN   = 'Y'
-			, LOCK_USER = #{userId}
-			, LOCK_DTTM = SYSDATE
-		WHERE MN_DATE    = #{mnDate}
-		  AND MN_SUB_SEQ = #{mnSubSeq}
-		  AND MN_DEPT_CD = #{mnDeptCd}
-		  AND (NVL(LOCK_YN, 'N') != 'Y' OR LOCK_USER = #{userId}
-		       OR LOCK_DTTM <![CDATA[<]]> SYSDATE - (1/24/60) * 15)
+		MERGE INTO TB_PM10D03 A
+			USING DUAL
+			ON (
+					MN_DATE    = #{mnDate}
+				AND MN_SUB_SEQ = #{mnSubSeq}
+				AND MN_DEPT_CD = #{mnDeptCd}
+			   )
+		WHEN MATCHED THEN
+			UPDATE SET
+				  LOCK_YN   = 'Y'
+				, LOCK_USER = #{userId}
+				, LOCK_DTTM = SYSDATE
+			WHERE (NVL(A.LOCK_YN, 'N') != 'Y' OR A.LOCK_USER = #{userId}
+			       OR A.LOCK_DTTM <![CDATA[<]]> SYSDATE - (1/24/60) * 15)
+		WHEN NOT MATCHED THEN
+		INSERT
+		(
+				  MN_DATE
+				, MN_SUB_SEQ
+				, MN_DEPT_CD
+				, MN_CNTS
+				, MN_ETC
+				, MN_RESULT
+				, MN_STATUS
+				, CLNT_PJT
+				, CLNT_CD
+				, LOCK_YN
+				, LOCK_USER
+				, LOCK_DTTM
+				, CREAT_ID
+				, CREAT_DTTM
+				, CREAT_PGM
+		)
+		VALUES(
+				  #{mnDate}
+				, #{mnSubSeq}
+				, #{mnDeptCd}
+				, #{mnCnts, jdbcType=VARCHAR}
+				, #{mnEtc, jdbcType=VARCHAR}
+				, #{mnResult, jdbcType=VARCHAR}
+				, #{mnStatus, jdbcType=VARCHAR}
+				, #{clntPjt, jdbcType=VARCHAR}
+				, #{clntCd, jdbcType=VARCHAR}
+				, 'Y'
+				, #{userId}
+				, SYSDATE
+				, #{userId}
+				, SYSDATE
+				, #{pgmId}
+		)
 	</update>
 
 	<update id="unlockD01Cell" parameterType="Map">

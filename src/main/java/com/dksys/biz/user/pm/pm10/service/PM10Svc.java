@@ -40,4 +40,6 @@ public interface PM10Svc {
 	Map<String, String> selectD01Cell(Map<String, String> param) throws Exception;
 
 	Map<String, String> selectD03Cell(Map<String, String> param) throws Exception;
+
+	int selectNextSubSeq() throws Exception;
 }
