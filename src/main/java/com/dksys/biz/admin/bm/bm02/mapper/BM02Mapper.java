@@ -16,7 +16,11 @@ public interface BM02Mapper {
 	
 	int insertClnt(Map<String, String> paramMap);
 	
+	int insertClntLgist(Map<String, String> paramMap);
+	
 	int updateClnt(Map<String, String> paramMap);
+	
+	int mergeClntLgist(Map<String, String> paramMap);
 	
 	int unuseClnt(Map<String, String> paramMap);
 	

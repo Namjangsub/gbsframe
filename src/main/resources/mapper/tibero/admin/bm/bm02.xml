@@ -289,7 +289,7 @@
 	
 	<select id="selectClntInfo" resultMap="resultInfoMap">
 		SELECT
-			CLNT_CD, CLNT_NM, CRN, COPRT_NO,
+			A.CLNT_CD, CLNT_NM, CRN, COPRT_NO,
 			CLNT_DIV_CD, REPST_NM,
 			BIZCON_NM, BSTY_NM,
 			BIZ_ZIP, BIZ_ADDR, BIZ_ADDR_DTL,
@@ -300,6 +300,18 @@
 			CLNT_RMK, USE_YN,
 			LINK_GRP_YN,
             LINK_GRP_CLNT_CD,
+			D04.TRNS_DIV,
+			D04.DMS_TRNS_AREA_DIV,
+			D04.DMS_SEND_CND_DIV,
+			D04.DMS_SEND_CND_DIV_ETC,
+			D04.DMS_PACK_KIND_DIV,
+			D04.OVS_TRNS_AREA_DIV,
+			D04.OVS_SEND_CND_DIV,
+			D04.OVS_SEND_CND_DIV_ETC,
+			D04.OVS_PACK_KIND_DIV,
+			D04.ARVL_PLACE,
+			D04.ARVL_ADDR,
+			D04.ARVL_CHRG_CONT,
 			#{userId} AS USER_ID,
 			#{coCd} AS CO_CD,
             NVL((SELECT SUM(B.PLDG_AMT * PLDG_RCOGN_RATE / 100) FROM TB_BM02D02 B
@@ -315,8 +327,9 @@
 	        A.SELL_CLMN_RMK     <!-- 판매 수금 비고-->
 		FROM
 			TB_BM02M01 A
+			LEFT OUTER JOIN TB_BM02D04 D04 ON D04.CLNT_CD = A.CLNT_CD
 		WHERE
-			CLNT_CD = #{clntCd}
+			A.CLNT_CD = #{clntCd}
 	</select>
 	
 	<select id="selectClntFileList" resultType="CamelMap">
@@ -526,6 +539,50 @@
 		)
 	</insert>
 	
+	<insert id="insertClntLgist">
+		INSERT INTO TB_BM02D04 (
+			  CLNT_CD
+			, TRNS_DIV
+			, DMS_TRNS_AREA_DIV
+			, DMS_SEND_CND_DIV
+			, DMS_SEND_CND_DIV_ETC
+			, DMS_PACK_KIND_DIV
+			, OVS_TRNS_AREA_DIV
+			, OVS_SEND_CND_DIV
+			, OVS_SEND_CND_DIV_ETC
+			, OVS_PACK_KIND_DIV
+			, ARVL_PLACE
+			, ARVL_ADDR
+			, ARVL_CHRG_CONT
+			, CREAT_ID
+			, CREAT_PGM
+			, CREAT_DTTM
+			, UDT_ID
+			, UDT_PGM
+			, UDT_DTTM
+		) VALUES (
+			  #{clntCd_P}
+			, #{trnsDiv,             jdbcType=VARCHAR}
+			, #{dmsTrnsAreaDiv,      jdbcType=VARCHAR}
+			, #{dmsSendCndDiv,     	 jdbcType=VARCHAR}
+			, #{dmsSendCndDivEtc,    jdbcType=VARCHAR}
+			, #{dmsPackKindDiv,      jdbcType=VARCHAR}
+			, #{ovsTrnsAreaDiv,      jdbcType=VARCHAR}
+			, #{ovsSendCndDiv,     	 jdbcType=VARCHAR}
+			, #{ovsSendCndDivEtc,    jdbcType=VARCHAR}
+			, #{ovsPackKindDiv,      jdbcType=VARCHAR}
+			, #{arvlPlace,     	 	 jdbcType=VARCHAR}
+			, #{arvlAddr,     	 	 jdbcType=VARCHAR}
+			, #{arvlChrgCont,     	 jdbcType=VARCHAR}
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+			, #{userId}
+			, #{pgmId}
+			, SYSDATE
+		)
+	</insert>
+	
 	<update id="updateClnt">
 		UPDATE
 			TB_BM02M01
@@ -569,6 +626,71 @@
             SELL_CLMN_RMK    = #{sellClmnRmk}
 		WHERE
 			CLNT_CD = #{clntCd_P}
+	</update>
+	
+	<update id="mergeClntLgist">
+		MERGE INTO TB_BM02D04 A
+		USING DUAL
+		ON (A.CLNT_CD = #{clntCd_P})
+		WHEN MATCHED THEN
+			UPDATE SET
+				  A.TRNS_DIV             = #{trnsDiv,             jdbcType=VARCHAR}
+				, A.DMS_TRNS_AREA_DIV    = #{dmsTrnsAreaDiv,      jdbcType=VARCHAR}
+				, A.DMS_SEND_CND_DIV     = #{dmsSendCndDiv,     	 jdbcType=VARCHAR}
+				, A.DMS_SEND_CND_DIV_ETC = #{dmsSendCndDivEtc,    jdbcType=VARCHAR}
+				, A.DMS_PACK_KIND_DIV    = #{dmsPackKindDiv,      jdbcType=VARCHAR}
+				, A.OVS_TRNS_AREA_DIV    = #{ovsTrnsAreaDiv,      jdbcType=VARCHAR}
+				, A.OVS_SEND_CND_DIV     = #{ovsSendCndDiv,     	 jdbcType=VARCHAR}
+				, A.OVS_SEND_CND_DIV_ETC = #{ovsSendCndDivEtc,    jdbcType=VARCHAR}
+				, A.OVS_PACK_KIND_DIV    = #{ovsPackKindDiv,      jdbcType=VARCHAR}
+				, A.ARVL_PLACE           = #{arvlPlace,     	 	 jdbcType=VARCHAR}
+				, A.ARVL_ADDR            = #{arvlAddr,     	 	 jdbcType=VARCHAR}
+				, A.ARVL_CHRG_CONT       = #{arvlChrgCont,     	 jdbcType=VARCHAR}
+				, A.UDT_ID               = #{userId}
+				, A.UDT_PGM              = #{pgmId}
+				, A.UDT_DTTM             = SYSDATE
+		WHEN NOT MATCHED THEN
+			INSERT (
+				  CLNT_CD
+				, TRNS_DIV
+				, DMS_TRNS_AREA_DIV
+				, DMS_SEND_CND_DIV
+				, DMS_SEND_CND_DIV_ETC
+				, DMS_PACK_KIND_DIV
+				, OVS_TRNS_AREA_DIV
+				, OVS_SEND_CND_DIV
+				, OVS_SEND_CND_DIV_ETC
+				, OVS_PACK_KIND_DIV
+				, ARVL_PLACE
+				, ARVL_ADDR
+				, ARVL_CHRG_CONT
+				, CREAT_ID
+				, CREAT_PGM
+				, CREAT_DTTM
+				, UDT_ID
+				, UDT_PGM
+				, UDT_DTTM
+			) VALUES (
+				  #{clntCd_P}
+				, #{trnsDiv,             jdbcType=VARCHAR}
+				, #{dmsTrnsAreaDiv,      jdbcType=VARCHAR}
+				, #{dmsSendCndDiv,     	 jdbcType=VARCHAR}
+				, #{dmsSendCndDivEtc,    jdbcType=VARCHAR}
+				, #{dmsPackKindDiv,      jdbcType=VARCHAR}
+				, #{ovsTrnsAreaDiv,      jdbcType=VARCHAR}
+				, #{ovsSendCndDiv,     	 jdbcType=VARCHAR}
+				, #{ovsSendCndDivEtc,    jdbcType=VARCHAR}
+				, #{ovsPackKindDiv,      jdbcType=VARCHAR}
+				, #{arvlPlace,     	 	 jdbcType=VARCHAR}
+				, #{arvlAddr,     	 	 jdbcType=VARCHAR}
+				, #{arvlChrgCont,     	 jdbcType=VARCHAR}
+				, #{userId}
+				, #{pgmId}
+				, SYSDATE
+				, #{userId}
+				, #{pgmId}
+				, SYSDATE
+			)
 	</update>
 	
 	<update id="unuseClnt">

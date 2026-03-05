@@ -49,6 +49,7 @@ public class BM02SvcImpl implements BM02Svc {
 		
 		// 거래처 insert 
 		bm02Mapper.insertClnt(paramMap);
+		bm02Mapper.insertClntLgist(paramMap);
 		
 		List<Map<String, String>> bizdeptList = gson.fromJson(paramMap.get("bizdeptArr"), mapList);
 		if(bizdeptList != null) {
@@ -95,6 +96,7 @@ public class BM02SvcImpl implements BM02Svc {
 		
 		// 거래처 update
 		bm02Mapper.updateClnt(paramMap);
+		bm02Mapper.mergeClntLgist(paramMap);
 		
 		
 		List<Map<String, String>> bizdeptList = gson.fromJson(paramMap.get("bizdeptArr"), mapList);
