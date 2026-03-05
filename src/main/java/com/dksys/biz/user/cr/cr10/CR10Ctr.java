@@ -77,7 +77,7 @@ public class CR10Ctr {
 		paramMap.put("lgistNo", result.get("lgistNo"));
 		List<Map<String, String>> lgistItemList = cr10Svc.selectLgistItemList(paramMap);
 		model.addAttribute("lgistItemList", lgistItemList);
-
+		
 		List<Map<String, String>> lgistPartList = cr10Svc.selectLgistPartList(paramMap);
 		model.addAttribute("lgistPartList", lgistPartList);
 
@@ -331,6 +331,19 @@ public class CR10Ctr {
 			model.addAttribute("resultMessage", e.getMessage());
 		}
 	  	return "jsonView";
+	}
+
+	@PostMapping("/updateLgistCompl")
+	public String updateLgistCompl(@RequestBody List<Map<String, String>> paramList, ModelMap model) throws Exception {
+		try {
+			cr10Svc.updateLgistCompl(paramList);
+			model.addAttribute("resultCode", 200);
+			model.addAttribute("resultMessage", "배송완료 처리가 완료되었습니다.");
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 500);
+			model.addAttribute("resultMessage", "처리 중 오류가 발생했습니다: " + e.getMessage());
+		}
+		return "jsonView";
 	}
 
 }

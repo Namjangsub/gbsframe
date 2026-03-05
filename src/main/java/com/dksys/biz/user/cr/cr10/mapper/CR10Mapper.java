@@ -70,5 +70,7 @@ public interface CR10Mapper {
   List<Map<String, String>> selectLgistPartList(Map<String, String> paramMap);
 
   Map<String, Object> selectLgistPartListImage(Map<String, Object> p);
+
+  int updateLgistCompl(Map<String, String> param);
   
 }

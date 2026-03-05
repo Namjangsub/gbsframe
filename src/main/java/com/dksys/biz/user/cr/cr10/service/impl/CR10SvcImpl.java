@@ -860,4 +860,14 @@ public class CR10SvcImpl implements CR10Svc {
     return result;
   }
 
+  @Override
+  @Transactional(rollbackFor = Exception.class)
+  public int updateLgistCompl(List<Map<String, String>> paramList) throws Exception {
+    int result = 0;
+    for (Map<String, String> param : paramList) {
+        result += cr10Mapper.updateLgistCompl(param);
+    }
+    return result;
+  }
+
 }
