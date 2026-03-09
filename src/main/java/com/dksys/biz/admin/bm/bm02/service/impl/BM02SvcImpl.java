@@ -237,4 +237,9 @@ public class BM02SvcImpl implements BM02Svc {
 	public Map<String, String> selectClntBusinessMngInfo(Map<String, String> paramMap) {
 		return bm02Mapper.selectClntBusinessMngInfo(paramMap);
 	}
+
+	@Override
+	public Map<String, String> selectBmLgistInfo(Map<String, String> paramMap) {
+		return bm02Mapper.selectBmLgistInfo(paramMap);
+	}
 }

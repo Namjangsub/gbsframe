@@ -1,0 +1,137 @@
+<div id="logstHistory" class="popup_area of_a" style="width: 100%; height: 100%;">
+	<div class="tit_contents">
+		<h4 class="tit">물류 발송 이력 조회</h4>
+	</div>
+
+	<div class="popup_table">
+		<input type="hidden" id="coCd" name="coCd">
+		<input type="hidden" id="ordrsClntCd" name="ordrsClntCd">
+
+		<div class="layout">
+			<!-- List Area -->
+			<div class="main_box" style="height: 480px;">
+				<div class="contents_wrap_p">
+					<div data-ax5grid="history-grid" data-ax5grid-config="{}" style="height: 500px; width: 100%;"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Bottom button area -->
+	<div class="popup_bottom_btn">
+		<button type="button" class="btn btn-default btn-sm" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+
+<script type="text/javascript">
+	var historyGridView = {
+		initView: function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showLineNumber: true,
+				showRowSelector: false,
+				multipleSelect: false,
+				sortable: true,
+				target: $('[data-ax5grid="history-grid"]'),
+				header: {
+					align: "center",
+					selector: false
+				},
+				body: {
+					onDBLClick: function () {
+						var row = this.item;
+						var paramObj = modalStack.last().paramObj;
+						var parentWin = modalStack.last().callbackWindow || window.parent;
+
+						// 1. 공용 사용을 위한 콜백 함수 연동 (파라미터로 callbackFunc 명을 넘긴 경우 최우선 실행)
+						if (paramObj.callbackFunc && typeof parentWin[paramObj.callbackFunc] === 'function') {
+							parentWin[paramObj.callbackFunc](row);
+							modalStack.close();
+							return;
+						}
+
+						// 2. 콜백이 지정되지 않은 경우의 기본 맵핑(CR1001P01 등)
+						if(parentWin.$("#staPlace").length > 0) {
+							// 출발지/도착지 텍스트 정보
+							if(row.staPlace) parentWin.$("#staPlace").val(row.staPlace);
+							if(row.staAddr) parentWin.$("#staAddr").val(row.staAddr);
+							if(row.arvlPlace) parentWin.$("#arvlPlace").val(row.arvlPlace);
+							if(row.arvlAddr) parentWin.$("#arvlAddr").val(row.arvlAddr);
+							
+							// 출발지/도착지 담당자 정보
+							if(row.staChrgCont) parentWin.$("#staChrgCont").val(row.staChrgCont);
+							if(row.arvlChrgCont) parentWin.$("#arvlChrgCont").val(row.arvlChrgCont);
+							
+							if(row.staChrgId) {
+								if(typeof parentWin.setChrgInfo === 'function') {
+									parentWin.setChrgInfo(row.staChrgId, row.staChrgIdNm); 
+								} else {
+									parentWin.$("#staChrgId").val(row.staChrgId);
+									parentWin.$("#staChrgIdNm").val(row.staChrgIdNm);
+								}
+							}
+
+							// 3. 운송 및 발송 조건 연동 로직 (수정 가능한 상태인지 검증)
+							var $trnsDiv = parentWin.$("#trnsDiv");
+							if(row.trnsDiv && $trnsDiv.length > 0) {
+								var isTrnsDivEditable = !($trnsDiv.is(":disabled") || $trnsDiv.prop("readonly"));
+
+								if (isTrnsDivEditable) {
+									$trnsDiv.val(row.trnsDiv).trigger('change');
+									
+									// 시간차를 두고 상세 세팅 (콤보박스 렌더링 이후 세팅되도록)
+									setTimeout(function(){
+										if(row.trnsDiv == "LGISTDIV0301") { // 국내
+											if(parentWin.$("#dmsTrnsAreaDiv").length > 0) parentWin.$("#dmsTrnsAreaDiv").val(row.dmsTrnsAreaDiv);
+											if(parentWin.$("#dmsSendCndDiv").length > 0) parentWin.$("#dmsSendCndDiv").val(row.dmsSendCndDiv).trigger('change');
+											if(parentWin.$("#dmsSendCndDivEtc").length > 0) parentWin.$("#dmsSendCndDivEtc").val(row.dmsSendCndDivEtc);
+										} else { // 해외
+											if(parentWin.$("#ovsTrnsAreaDiv").length > 0) parentWin.$("#ovsTrnsAreaDiv").val(row.ovsTrnsAreaDiv);
+											if(parentWin.$("#ovsSendCndDiv").length > 0) parentWin.$("#ovsSendCndDiv").val(row.ovsSendCndDiv).trigger('change');
+											if(parentWin.$("#ovsSendCndDivEtc").length > 0) parentWin.$("#ovsSendCndDivEtc").val(row.ovsSendCndDivEtc);
+											if(parentWin.$("#ovsPackKindDiv").length > 0) parentWin.$("#ovsPackKindDiv").val(row.ovsPackKindDiv);
+										}
+									}, 100);
+								}
+							}
+						}
+						modalStack.close();
+					}
+				},
+				columns: [
+// 					{key: "lgistNo", label: "물류번호", align: "center", width: 100},
+					{key: "pblicteDt", label: "발행일자", align: "center", width: 80},
+					{key: "trnsDivNm", label: "운송구분", align: "center", width: 60},
+					{key: "arvlPlace", label: "도착지명", align: "left", width: 160},
+					{key: "arvlAddr", label: "도착주소", align: "left", width: 340},
+					{key: "arvlChrgCont", label: "도착담당", align: "center", width: 170},
+					{key: "staPlace", label: "출발지명", align: "left", width: 100},
+					{key: "staAddr", label: "출발주소", align: "left", width: 240},
+					{key: "staChrgCont", label: "출발담당", align: "center", width: 90},
+				]
+			});
+			return this;
+		},
+		setData: function() {
+			var targetObj = this.target;
+			var paramObj = {
+				"coCd": $('#logstHistory #coCd').val(),
+				"ordrsClntCd": $('#logstHistory #ordrsClntCd').val()
+			};
+			
+			postAjax("/user/cr/cr10/selectLgistHistoryList", paramObj, null, function(data){
+				var list = data.resultList || [];
+				targetObj.setData(list);
+			});
+		}
+	}
+
+	$(document).ready(function() {
+		// 부모창 파라미터 값 세팅
+		$('#logstHistory #coCd').val(modalStack.last().paramObj.coCd || "");
+		$('#logstHistory #ordrsClntCd').val(modalStack.last().paramObj.ordrsClntCd || "");
+
+		// 그리드 초기화 및 자동 조회
+		historyGridView.initView().setData();
+	});
+</script>

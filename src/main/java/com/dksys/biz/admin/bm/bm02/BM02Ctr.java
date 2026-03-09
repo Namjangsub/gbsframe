@@ -175,4 +175,12 @@ public class BM02Ctr {
         return "jsonView";
     }
 
+	// 거래처 물류 정보 조회
+	@PostMapping("/selectBmLgistInfo")
+    public String selectBmLgistInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+    	Map<String, String> lgistInfo = bm02Svc.selectBmLgistInfo(paramMap);
+    	model.addAttribute("result", lgistInfo);
+        return "jsonView";
+    }
+    
 }

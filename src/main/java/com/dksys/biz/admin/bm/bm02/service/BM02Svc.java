@@ -37,4 +37,6 @@ public interface BM02Svc {
 
 	Map<String, String> selectClntBusinessMngInfo(Map<String, String> paramMap);
 
+	Map<String, String> selectBmLgistInfo(Map<String, String> paramMap);
+
 }
