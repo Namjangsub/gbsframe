@@ -993,9 +993,201 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 				        FROM TB_WB20M03 A
 				        WHERE A.TODO_NO = T.LGIST_NO) AS APP_STATUS
 		, T.STA_CHRG_CONT
+		, REQ_NO
 		FROM TB_CR11M01 T
 		--LEFT OUTER JOIN APP_STATUS_LIST AP ON T.CO_CD = AP.CO_CD AND T.TODO_DIV1_CODE_ID = AP.TODO_DIV1_CODE_ID AND T.TODO_DIV2_CODE_ID = AP.TODO_DIV2_CODE_ID
 	  WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+	</select>
+
+	<select id="selectDefaultLgistLocation" parameterType="Map" resultType="camelMap">
+		SELECT STA_PLACE
+		     , STA_ADDR
+		     , STA_CHRG_CONT
+		     , ARVL_PLACE
+		     , ARVL_ADDR
+		     , ARVL_CHRG_CONT
+		  FROM (
+		        SELECT STA_PLACE
+		             , STA_ADDR
+		             , STA_CHRG_CONT
+		             , ARVL_PLACE
+		             , ARVL_ADDR
+		             , ARVL_CHRG_CONT
+		          FROM TB_CR11M01
+		         WHERE CO_CD = #{coCd}
+		           <if test="reqId != null and !reqId.equals('')">
+		           AND REQ_ID = #{reqId}
+		           </if>
+		         ORDER BY CREAT_DTTM DESC
+		       )
+		 WHERE ROWNUM = 1
+	</select>
+
+	<select id="selectDefaultTrnsDiv" parameterType="Map" resultType="camelMap">
+		SELECT
+		    TRNS_DIV,
+		    DMS_TRNS_AREA_DIV,
+		    DMS_SEND_CND_DIV,
+		    DMS_SEND_CND_DIV_ETC,
+		    DMS_PACK_KIND_DIV,
+		    OVS_TRNS_AREA_DIV,
+		    OVS_SEND_CND_DIV,
+		    OVS_SEND_CND_DIV_ETC,
+		    OVS_PACK_KIND_DIV,
+		    ARVL_PLACE,
+		    ARVL_ADDR,
+		    ARVL_CHRG_CONT
+		FROM (
+		    SELECT *
+		    FROM (
+		        <trim suffixOverrides="UNION ALL">
+		            <if test="reqNo != null and reqNo != ''">
+		            SELECT
+		                1 AS PRI,
+		                TRNS_DIV,
+		                DMS_TRNS_AREA_DIV,
+		                DMS_SEND_CND_DIV,
+		                DMS_SEND_CND_DIV_ETC,
+		                DMS_PACK_KIND_DIV,
+		                OVS_TRNS_AREA_DIV,
+		                OVS_SEND_CND_DIV,
+		                OVS_SEND_CND_DIV_ETC,
+		                OVS_PACK_KIND_DIV,
+		                ARVL_PLACE,
+		                ARVL_ADDR,
+		                ARVL_CHRG_CONT
+		            FROM TB_QM01D04
+		            WHERE REQ_NO = #{reqNo}
+		              AND TRNS_DIV IS NOT NULL
+		            UNION ALL
+		            </if>
+		
+		            <if test="ordrsNo != null and ordrsNo != ''">
+		            SELECT
+		                2 AS PRI,
+		                TRNS_DIV,
+		                DMS_TRNS_AREA_DIV,
+		                DMS_SEND_CND_DIV,
+		                DMS_SEND_CND_DIV_ETC,
+		                DMS_PACK_KIND_DIV,
+		                OVS_TRNS_AREA_DIV,
+		                OVS_SEND_CND_DIV,
+		                OVS_SEND_CND_DIV_ETC,
+		                OVS_PACK_KIND_DIV,
+		                ARVL_PLACE,
+		                ARVL_ADDR,
+		                ARVL_CHRG_CONT
+		            FROM TB_CR02D04
+		            WHERE CO_CD = #{coCd}
+		              AND ORDRS_NO = #{ordrsNo}
+		              AND TRNS_DIV IS NOT NULL
+		            UNION ALL
+		            </if>
+		
+		            <if test="clntCd != null and clntCd != ''">
+		            SELECT
+		                3 AS PRI,
+		                TRNS_DIV,
+		                DMS_TRNS_AREA_DIV,
+		                DMS_SEND_CND_DIV,
+		                DMS_SEND_CND_DIV_ETC,
+		                DMS_PACK_KIND_DIV,
+		                OVS_TRNS_AREA_DIV,
+		                OVS_SEND_CND_DIV,
+		                OVS_SEND_CND_DIV_ETC,
+		                OVS_PACK_KIND_DIV,
+		                ARVL_PLACE,
+		                ARVL_ADDR,
+		                ARVL_CHRG_CONT
+		            FROM TB_BM02D04
+		            WHERE CLNT_CD = #{clntCd}
+		              AND TRNS_DIV IS NOT NULL
+		            UNION ALL
+		            </if>
+		        </trim>
+		
+		        -- 아무 조건도 없거나, 조건은 있으나 데이터가 없을 때 NULL 1행 보장
+		        UNION ALL
+		        SELECT
+		            9 AS PRI,
+		            NULL AS TRNS_DIV,
+		            NULL AS DMS_TRNS_AREA_DIV,
+		            NULL AS DMS_SEND_CND_DIV,
+		            NULL AS DMS_SEND_CND_DIV_ETC,
+		            NULL AS DMS_PACK_KIND_DIV,
+		            NULL AS OVS_TRNS_AREA_DIV,
+		            NULL AS OVS_SEND_CND_DIV,
+		            NULL AS OVS_SEND_CND_DIV_ETC,
+		            NULL AS OVS_PACK_KIND_DIV,
+		            NULL AS ARVL_PLACE,
+		            NULL AS ARVL_ADDR,
+		            NULL AS ARVL_CHRG_CONT
+		        FROM DUAL
+		    )
+		    ORDER BY PRI
+		)
+		WHERE ROWNUM = 1
+	</select>
+
+	<select id="selectLgistHistoryList" parameterType="Map" resultType="camelMap">
+		SELECT *
+		FROM (
+			SELECT
+				C.ORDRS_CLNT_CD,
+				T.PBLICTE_DT,
+				T.CLAS_DIV,
+				FN_CM05M01_CD_TO_NM(T.CLAS_DIV) AS CLAS_DIV_NM,
+				T.TRNS_DIV,
+				FN_CM05M01_CD_TO_NM(T.TRNS_DIV) AS TRNS_DIV_NM,
+				T.DMS_TRNS_AREA_DIV,
+				T.DMS_SEND_CND_DIV,
+				T.DMS_SEND_CND_DIV_ETC,
+				T.DMS_PACK_KIND_DIV,
+				T.OVS_TRNS_AREA_DIV,
+				T.OVS_SEND_CND_DIV,
+				T.OVS_SEND_CND_DIV_ETC,
+				T.OVS_PACK_KIND_DIV,
+				T.STA_PLACE,
+				T.STA_ADDR,
+				T.STA_CHRG_ID,
+				T.ARVL_PLACE,
+				T.ARVL_ADDR,
+				T.ARVL_CHRG_CONT,
+				ROW_NUMBER() OVER (
+					PARTITION BY
+						C.ORDRS_CLNT_CD,
+						/* 주소가 다르면 다른 그룹 -> 목록에 그대로 남음 */
+						NVL(TRIM(T.STA_ADDR), ' '),
+						NVL(TRIM(T.ARVL_ADDR), ' '),
+						/* 필요 시 장소까지 포함(주소가 같아도 장소명이 다른 케이스 분리) */
+						NVL(TRIM(T.STA_PLACE), ' '),
+						NVL(TRIM(T.ARVL_PLACE), ' ')
+						/* “물류정보까지 동일해야 중복”이면 아래 라인들을 추가
+						, NVL(TRIM(T.TRNS_DIV), ' ')
+						, NVL(TRIM(T.DMS_TRNS_AREA_DIV), ' ')
+						, NVL(TRIM(T.DMS_SEND_CND_DIV), ' ')
+						, NVL(TRIM(T.DMS_SEND_CND_DIV_ETC), ' ')
+						, NVL(TRIM(T.DMS_PACK_KIND_DIV), ' ')
+						, NVL(TRIM(T.OVS_TRNS_AREA_DIV), ' ')
+						, NVL(TRIM(T.OVS_SEND_CND_DIV), ' ')
+						, NVL(TRIM(T.OVS_SEND_CND_DIV_ETC), ' ')
+						, NVL(TRIM(T.OVS_PACK_KIND_DIV), ' ')
+						*/
+					ORDER BY
+						T.PBLICTE_DT DESC,
+						T.LGIST_NO DESC
+				) AS RN
+			FROM TB_CR11M01 T
+			JOIN TB_CR02M01 C
+			ON C.CO_CD = T.CO_CD
+			AND C.ORDRS_NO = T.ORDRS_NO
+			WHERE T.CO_CD = #{coCd}
+			<if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
+			AND C.ORDRS_CLNT_CD = #{ordrsClntCd}
+			</if>
+		)
+		WHERE RN = 1
+		ORDER BY PBLICTE_DT DESC
 	</select>
 
 	<!-- 납품ITEM LIST -->
@@ -1083,7 +1275,26 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 		  ORDER BY APP_SEQ
 	</select>
 
-	<select id="selectLgistNoNext" parameterType="Map" resultType="String">
+			<select id="selectApprovalLockCntByFileTrgtKey" parameterType="Map" resultType="int">
+		SELECT COUNT(1)
+		  FROM TB_WB20M03 W
+		  JOIN TB_CR11M01 M
+		    ON M.LGIST_NO = W.TODO_NO
+		   AND M.CO_CD = W.CO_CD
+		 WHERE W.TODO_DIV1_CODE_ID = 'TODODIV20'
+		   <choose>
+		    <when test="fileTrgtKey != null and !fileTrgtKey.equals('')">
+		    AND M.FILE_TRGT_KEY = #{fileTrgtKey, jdbcType=VARCHAR}
+		    </when>
+		    <when test="lgistNo != null and !lgistNo.equals('')">
+		    AND M.LGIST_NO = #{lgistNo, jdbcType=VARCHAR}
+		    </when>
+		    <otherwise>
+		    AND 1 = 0
+		    </otherwise>
+		   </choose>
+	</select>
+<select id="selectLgistNoNext" parameterType="Map" resultType="String">
 		SELECT 'LGT'||TO_CHAR(SYSDATE,'YY')||'-'||TRIM(TO_CHAR(NVL(MAX(TO_NUMBER(NVL(FILE_TRGT_KEY,'0'))),0) + 1,'00000')) FROM TB_CR11M01
 	</select>
 
@@ -1134,6 +1345,7 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
         , CREAT_PGM
         , CREAT_DTTM
         , STA_CHRG_CONT
+        , REQ_NO
         )
         VALUES
         ( #{fileTrgtKey}
@@ -1141,7 +1353,7 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
 		, #{lgistNo, jdbcType=VARCHAR}
 		, #{ordrsNo, jdbcType=VARCHAR}
 		, #{clntPjt, jdbcType=VARCHAR}
-		, #{pblicteDt, jdbcType=VARCHAR}
+		, TO_CHAR(SYSDATE, 'YYYY-MM-DD')
 		, #{reqId, jdbcType=VARCHAR}
 		, #{partNo, jdbcType=VARCHAR}
 		, #{reqFxDt, jdbcType=VARCHAR}
@@ -1178,6 +1390,7 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
         , #{pgmId, jdbcType=VARCHAR}
         , SYSDATE
         , #{staChrgCont, jdbcType=VARCHAR}
+        , #{reqNo, jdbcType=VARCHAR}
         )
     </insert>
 
@@ -1187,7 +1400,7 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
             , LGIST_NO = #{lgistNo, jdbcType=VARCHAR}
             , ORDRS_NO = #{ordrsNo, jdbcType=VARCHAR}
             , CLNT_PJT = #{clntPjt, jdbcType=VARCHAR}
-            , PBLICTE_DT = #{pblicteDt, jdbcType=VARCHAR}
+            /* , PBLICTE_DT = #{pblicteDt, jdbcType=VARCHAR} */
             , REQ_ID = #{reqId, jdbcType=VARCHAR}
             , PART_NO = #{partNo, jdbcType=VARCHAR}
             , REQ_FX_DT = #{reqFxDt, jdbcType=VARCHAR}
@@ -1224,6 +1437,7 @@ SELECT (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL) AS CO_NM
             , UDT_PGM       = #{pgmId, jdbcType=VARCHAR}
             , UDT_DTTM      = SYSDATE
             , STA_CHRG_CONT = #{staChrgCont, jdbcType=VARCHAR}
+            , REQ_NO = #{reqNo, jdbcType=VARCHAR}
         WHERE FILE_TRGT_KEY = #{fileTrgtKey, jdbcType=VARCHAR}
     </update>
 

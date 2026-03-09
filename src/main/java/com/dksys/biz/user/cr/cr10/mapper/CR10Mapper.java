@@ -22,6 +22,12 @@ public interface CR10Mapper {
 
   Map<String, String> selectLgistMastInfo(Map<String, String> paramMap);
 
+  Map<String, String> selectDefaultLgistLocation(Map<String, String> paramMap);
+
+  Map<String, String> selectDefaultTrnsDiv(Map<String, String> paramMap);
+
+  List<Map<String, String>> selectLgistHistoryList(Map<String, String> paramMap);
+
   String selectLgistAppCount(Map<String, String> paramMap);
 
   List<Map<String, String>> selectLgistAppList(Map<String, String> paramMap);
@@ -31,6 +37,8 @@ public interface CR10Mapper {
   int selectTodoAppCount(Map<String, String> paramMap);
 
   int selectTodoAppSanctnSn(Map<String, String> paramMap);
+
+  int selectApprovalLockCntByFileTrgtKey(Map<String, String> paramMap);
 
   int insertLgistMast(Map<String, String> paramMap);
 

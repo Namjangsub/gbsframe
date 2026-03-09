@@ -68,19 +68,45 @@ public class CR10Ctr {
 	}
 
 	@PostMapping(value = "/selectLgistMastInfo")
-		public String selectLgistMastInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	public String selectLgistMastInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		Map<String, String> result = cr10Svc.selectLgistMastInfo(paramMap);
 		model.addAttribute("result", result);
 		List<Map<String, String>> resultList = cr10Svc.selectLgistAppList(paramMap);
 		model.addAttribute("resultAppList", resultList);
-		
-		paramMap.put("lgistNo", result.get("lgistNo"));
-		List<Map<String, String>> lgistItemList = cr10Svc.selectLgistItemList(paramMap);
-		model.addAttribute("lgistItemList", lgistItemList);
-		
-		List<Map<String, String>> lgistPartList = cr10Svc.selectLgistPartList(paramMap);
-		model.addAttribute("lgistPartList", lgistPartList);
 
+		if (result != null && result.get("lgistNo") != null) {
+			paramMap.put("lgistNo", result.get("lgistNo"));
+			List<Map<String, String>> lgistItemList = cr10Svc.selectLgistItemList(paramMap);
+			model.addAttribute("lgistItemList", lgistItemList);
+
+			List<Map<String, String>> lgistPartList = cr10Svc.selectLgistPartList(paramMap);
+			model.addAttribute("lgistPartList", lgistPartList);
+		} else {
+			model.addAttribute("lgistItemList", java.util.Collections.emptyList());
+			model.addAttribute("lgistPartList", java.util.Collections.emptyList());
+		}
+
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/selectDefaultLgistLocation")
+	public String selectDefaultLgistLocation(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = cr10Svc.selectDefaultLgistLocation(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+@PostMapping(value = "/selectDefaultTrnsDiv")
+public String selectDefaultTrnsDiv(@RequestBody Map<String, String> paramMap, ModelMap model) {
+Map<String, String> result = cr10Svc.selectDefaultTrnsDiv(paramMap);
+model.addAttribute("result", result);
+return "jsonView";
+}
+
+	@PostMapping(value = "/selectLgistHistoryList")
+	public String selectLgistHistoryList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> resultList = cr10Svc.selectLgistHistoryList(paramMap);
+		model.addAttribute("resultList", resultList);
 		return "jsonView";
 	}
 

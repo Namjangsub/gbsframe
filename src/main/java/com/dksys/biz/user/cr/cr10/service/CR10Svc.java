@@ -19,6 +19,12 @@ public interface CR10Svc {
   List<Map<String, String>> selectSelesCdViewList(Map<String, String> paramMap);
 
   Map<String, String> selectLgistMastInfo(Map<String, String> paramMap);
+  
+  Map<String, String> selectDefaultLgistLocation(Map<String, String> paramMap);
+  
+  Map<String, String> selectDefaultTrnsDiv(Map<String, String> paramMap);
+
+  List<Map<String, String>> selectLgistHistoryList(Map<String, String> paramMap);
 
   List<Map<String, String>> selectLgistAppList(Map<String, String> paramMap);
 

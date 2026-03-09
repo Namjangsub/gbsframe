@@ -159,7 +159,16 @@
 			</td>
 			<th class="hit">발행일자</th>
 			<td>
-				<input id="pblicteDt" name="pblicteDt" class="input_calendar form-control" autocomplete="off" onkeyup="dateMask(this);" required msg="발행일자" date="today" onchange="monthCloseChk(this.value);">
+				<input id="pblicteDt" name="pblicteDt" class="form-control" readonly="readonly" required msg="발행일자" date="today">
+			</td>
+			<th>발주요청번호</th>
+			<td>
+				<div style="display: flex; gap: 5px; align-items: center;">
+					<div class="search_form" style="flex: 1;">
+						<input type="text" id="reqNo" name="reqNo" class="form-control" readonly msg="발주요청번호" onchange="fetchDefaultTrnsDiv();">
+						<a onclick="openPurchaseSearch();"><i class="i_search_w"></i></a>
+					</div>
+				</div>
 			</td>
         </tr>
         <tr>
@@ -176,7 +185,7 @@
 			</td>
 			<th class="hit">요구일정일자</th>
 			<td>
-				<input id="reqFxDt" name="reqFxDt" class="input_calendar form-control" autocomplete="off" onkeyup="dateMask(this);" required msg="요구일정일자" date="today">
+				<input id="reqFxDt" name="reqFxDt" class="input_calendar form-control" autocomplete="off" onkeyup="dateMask(this);" required msg="요구일정일자">
 			</td>
  			<td colspan="2">
  				<div style="float:left;margin-top:5px;">
@@ -199,12 +208,15 @@
 
         <tr>
 			<th class="hit">국내/해외 구분</th>
-			<td>
-				<select id="trnsDiv" name="trnsDiv" data-kind="LGISTDIV03" onchange="changeTrnsDiv(this.value)" msg="운송구분" class="form-control" required>
-				   <option value="">선택</option>
-				</select>
+			<td colspan="3">
+				<div style="display: flex; gap: 5px; align-items: center;">
+					<select id="trnsDiv" name="trnsDiv" data-kind="LGISTDIV03" onchange="changeTrnsDiv(this.value)" msg="운송구분" class="form-control" style="width: 150px;" required>
+					   <option value="">선택</option>
+					</select>
+					<button type="button" class="btn btn-default btn-sm" onclick="openLgistHistorySearch();">이력조회</button>
+				</div>
 			</td>
- 			<th colspan="6"></th>
+ 			<th colspan="4"></th>
         </tr>
 
         <tr id="dmsTran">
@@ -327,15 +339,15 @@
 				<input data-positive comma type="text" id="frmlcAfterWt" name="frmlcAfterWt" maxlength="10" class="form-control" msg="포장후무게"
 				style="float:left;width:80%;"><span style="float:right;width:20%;margin-top:3px;">kg</span>
 			</td>
-			<th>출하계획일</th>
+			<th class="hit">출하계획일</th>
 			<td>
 				<!-- <input id="shipmntDt" name="shipmntDt" class="input_calendar form-control" autocomplete="off" onkeyup="dateMask(this);" msg="출하계획일" date> -->
-				<input type="text" class="input_calendar" id="shipmntDt" name="shipmntDt" autocomplete="off" date>
+				<input type="text" class="input_calendar form-control" id="shipmntDt" name="shipmntDt" autocomplete="off" required msg="출하계획일">
 			</td>
-			<th>희망도착일</th>
+			<th class="hit">희망도착일</th>
 			<td>
 				<!-- <input id="hopeArvlDt" name="hopeArvlDt" class="input_calendar form-control" autocomplete="off" onkeyup="dateMask(this);" msg="희망도착일" date> -->
-				<input type="text" class="input_calendar" id="hopeArvlDt" name="hopeArvlDt" autocomplete="off" date>
+				<input type="text" class="input_calendar form-control" id="hopeArvlDt" name="hopeArvlDt" autocomplete="off" required msg="희망도착일">
 			</td>
         </tr>
 
@@ -511,6 +523,20 @@
 	function valueFormatter() {
 		return (this.value) ? '<span style="display: block; white-space: pre;">' + this.value + '</span>' : '';
 	}
+	function normalizeAppStatus(value) {
+		if (isEmpty(value)) return "APP0";
+		return String(value).trim();
+	}
+
+	function isApprovalLocked() {
+		return normalizeAppStatus(appStatus) !== "APP0";
+	}
+
+	function getApprovalLockMessage() {
+		return normalizeAppStatus(appStatus) === "Y"
+			? "결재가 완료된 문서는 수정할 수 없습니다."
+			: "결재가 이미 진행중입니다.";
+	}
 
 	var salescdGridView = {
 			initView: function(){
@@ -610,12 +636,25 @@
 							}
 						});
 						gridResize(list.length); //그리드 높이 조정
-						$.each($.extend({}, list), function (idx, elem) {
-							if(elem.chkYn == "Y" && elem.useYn == "Y") {
-								var select_idx = Number(idx);
-								salescdGridView.target.select(select_idx);
+						if (actionType === "C") {
+							// 신규 등록(C) 모드: CR0901에서 더블클릭 시 전달된 salesCd 자동 선택
+							var paramSalesCd = modalStack.last().paramObj.salesCd;
+							if (typeof paramSalesCd !== "undefined" && paramSalesCd !== "") {
+								$.each(list, function (idx, elem) {
+									if (elem.salesCd === paramSalesCd) {
+										salescdGridView.target.select(Number(idx));
+										return false; // 첫 번째 일치 항목만 선택 후 루프 종료
+									}
+								});
 							}
-						});
+						} else if (actionType === "U") {
+							// 수정(U) 모드: TB_CR11D01에 등록된 데이터(chkYn === 'Y')만 그리드 체크 표시, 파라미터는 무시
+							$.each(list, function (idx, elem) {
+								if (elem.chkYn === "Y") {
+									salescdGridView.target.select(Number(idx));
+								}
+							});
+						}
 					} catch (error) {
 						customAlert("오류 발생!! 전산실 연락 바랍니다", error.message);
 						return null; // 오류 발생 시 null 반환
@@ -742,7 +781,6 @@
 
 	};
 
-	debugger;
 	$(document).ready(function() {
 		setComboOptions($(".popup_area select[data-kind]"));
 		setByCoCd(modalStack.last().paramObj.coCd);
@@ -759,7 +797,9 @@
 		$('#shipmntDt').datepicker({
 		          format : "yyyy-mm-dd",
 		          language : "ko",
-		          autoclose : true
+		          autoclose : true,
+		          forceParse: false,
+		          todayHighlight: true
 		})
 		.on("changeDate", function(){
 			if($('#hopeArvlDt').val() != ""){
@@ -774,13 +814,41 @@
 		$('#hopeArvlDt').datepicker({
 		          format : "yyyy-mm-dd",
 		          language : "ko",
-		          autoclose : true
+		          autoclose : true,
+		          forceParse: false,
+		          todayHighlight: true
 		})
 		.on("changeDate", function(){//출하계획일(2023.10.10) > 희망도착일(2023.10.12)
 		          if($('#shipmntDt').val() > $('#hopeArvlDt').val()){
 		                    customAlert("날짜를 확인해주세요");
 		                    $('#hopeArvlDt').datepicker("setDate", new Date($('#shipmntDt').val()));
 		          }
+		});
+
+		//요구일정일자
+		$('#reqFxDt').datepicker({
+		    format : "yyyy-mm-dd",
+		    language : "ko",
+		    autoclose : true,
+		    forceParse: false,
+		    todayHighlight: true
+		})
+		.on("changeDate", function(){
+		    var reqFxDt = $('#reqFxDt').val();
+		    var shipmntDt = $('#shipmntDt').val();
+		    if(shipmntDt != "" && shipmntDt < reqFxDt){
+		        $('#shipmntDt').datepicker("setDate", reqFxDt);
+		    }
+		});
+
+		// 출하계획일 이벤트 핸들러 보완 (요구일정일자 체크 추가)
+		$('#shipmntDt').on("changeDate", function(){
+		    var reqFxDt = $('#reqFxDt').val();
+		    var shipmntDt = $('#shipmntDt').val();
+		    if(reqFxDt != "" && shipmntDt < reqFxDt){
+		        customAlert("출하계획일은 요구일정일자보다 작을 수 없습니다.");
+		        $('#shipmntDt').datepicker("setDate", reqFxDt);
+		    }
 		});
 
 
@@ -799,7 +867,7 @@
 			//---------------------------------------------------------------
 			//첨부 화일 처리 끝
 			//---------------------------------------------------------------
-// 			$(".fileList_height").hide();//없으면 버튼 안나옴.
+// 			$(".fileList_height").hide();//없으면 버튼 안나옴. 
 		});
 		
 // 		console.log(actionType);
@@ -821,6 +889,10 @@
 			//initLoadForm(".popup_area");//input,select,textarea 기능활성화
 
 			let loadData = {
+					"pblicteDt" : dateToStr(new Date()),
+					"reqFxDt" : dateToStr(new Date()),
+					"shipmntDt" : dateToStr(new Date()),
+					"hopeArvlDt" : dateToStr(new Date()),
 					"fileTrgtKey" : modalStack.last().paramObj.fileTrgtKey,
 					"coCd" : modalStack.last().paramObj.coCd,
 					"ordrsNo" : modalStack.last().paramObj.ordrsNo,
@@ -829,6 +901,7 @@
 					"reqIdNm" : modalStack.last().paramObj.reqIdNm,
 					"ordrsClntNm" : modalStack.last().paramObj.ordrsClntNm,
 					"ordrsClntCd" : modalStack.last().paramObj.ordrsClntCd,
+					"reqNo" : modalStack.last().paramObj.reqNo,
 					"clasDiv" : "LGISTDIV0101", //출고를 기본으로 한다. 출고(LGISTDIV0101),입고(LGISTDIV0102)
 			};
 			loadFormData("#popForm", loadData , function(){
@@ -838,6 +911,16 @@
 
 				salescdGridView.initView().setData(0);
 				gridViewPop2.initView();
+
+				// 선택된 발주요청서 데이터 객체 구성
+				var selectedReqData = {
+					reqNo: modalStack.last().paramObj.reqNo,
+					ordrsNo: modalStack.last().paramObj.ordrsNo, // 팝업 그리드에 해당 필드가 있어야 함
+					clntCd: modalStack.last().paramObj.ordrsClntCd,   // 팝업 그리드에 해당 필드가 있어야 함
+				};
+				// 기본 물류정보(TRNS_DIV) 우선순위 연동 세팅
+				fetchDefaultTrnsDiv(selectedReqData);
+
 			});
 			$('#coCd').trigger('change'); //파일트리 새로 그리기
 		} else if (actionType == "U") {
@@ -1006,10 +1089,10 @@
 				changeSetEtc(data.dmsSendCndDiv,"dmsSendCndDiv");
 				changeSetEtc(data.ovsSendCndDiv,"ovsSendCndDiv");
 
-				appStatus = data.appStatus;
+				appStatus = normalizeAppStatus(data.appStatus);
 // 				if(isEmpty(appStatus)) appStatus = "APP0";
 // 				if(appStatus != "APP0"){
-					if(approvalYn()) {
+					if (isApprovalLocked()) {
 						//결재중 일때 화면잠금.
 						setDisplayLock();
 				    }
@@ -1086,19 +1169,19 @@
 	
 	// 등록
 	function insertLgistMast() {
-		if (inputValidation($('.popup_area [required]'))) {						// 필수 필드의 유효성 검사
-			var formData = makeFormData();										// 요청이 통과하면 makeFormData() 함수를 이용해 formData를 생성
-// 			setFormLock(".popup_area");
-			filePostAjax("/user/cr/cr10/insertLgistMast", formData,				// 파일을 포함한 데이터를 서버로 전송하는 비동기적인 AJAX 요청을 수행
+		if (inputValidation($('.popup_area [required]'))) {
+			var formData = makeFormData();
+			setFormLock(".popup_area");
+			filePostAjax("/user/cr/cr10/insertLgistMast", formData,
 					function(data) {
-						customAlert(data.resultMessage);								// 결과 메시지를 alert으로 출력
-						if (data.resultCode == 200) {							//  요청이 성공(200)한 경우, gridView.setData(0)를 호출하여 그리드 뷰를 업데이트하고,
-
-							tLgistNo = data.lgistNo;  	//lgistNo 가지고 오기
-							kakaoTodo();     			//kakaoTodo 호출
-
+						customAlert(data.resultMessage);
+						if (data.resultCode == 200) {
+							tLgistNo = data.lgistNo;
+							kakaoTodo();
 							gridView.setData(0);
-							modalStack.close();									// 모달을 닫음
+							modalStack.close();
+						} else {
+							setFormUnLock(".popup_area");
 						}
 					});
 		}
@@ -1106,12 +1189,8 @@
 
 	// 수정
 	function updateLgistMast() {
-// 		if(appStatus != "APP0"){
-// 			customAlert("결재진행중 입니다. 결재진행중인 내역은 수정 할 수 없습니다.");
-// 			return;
-// 		}
-		if( approvalYn() ) {
-	        customAlert("결재가 이미 진행중입니다.");
+		if (isApprovalLocked()) {
+	        customAlert(getApprovalLockMessage());
 	        return;
 	    }
 
@@ -1121,11 +1200,11 @@
 	      	filePostAjax("/user/cr/cr10/updateLgistMast", formData,function(data) {
 						customAlert(data.resultMessage);
 						if (data.resultCode == 200) {
-
 							kakaoTodo();     //kakaoTodo 호출
-
 							gridView.setData(0);
 							modalStack.close();
+						} else {
+							setFormUnLock(".popup_area");
 						}
 					});
 		}
@@ -1430,9 +1509,12 @@
 
 	function setDisplayLock(){
 		setDisabledInput("#popForm" , true);
-		$('.tit').text('물류진행요청 수정 (결재진행중)');
-
-		//$("#actionBtn").prop("disabled", true);
+		$('#popForm select').prop("disabled", true);
+		$('#popForm .input_calendar').prop('disabled', true);
+		$('#popForm button').prop('disabled', true);
+		$('#popForm a').css('pointer-events', 'none');
+		$('.add_btn_small.pdl10').hide();
+		$("#actionBtn").prop("disabled", true).hide();
 	}
 
 	//  업체명 검색 //
@@ -1453,6 +1535,10 @@
 	}
 
 	function openUserTree(_id) {
+		if (isApprovalLocked()) {
+			customAlert(getApprovalLockMessage());
+			return false;
+		}
 		if($('#reqIdNm').prop("disabled")) return false;
 
 		var paramObj = {
@@ -1494,8 +1580,8 @@
 
 	//공유대상자 추가
 	function insertShareUserModal() {
-		if( approvalYn() ) {
-			customAlert("결재가 이미 진행중입니다.");
+		if (isApprovalLocked()) {
+			customAlert(getApprovalLockMessage());
 			return;
 		}
 
@@ -1565,8 +1651,8 @@
 	}
 
 	function deleteShareUser(){
-		if( approvalYn() ) {
-	        customAlert("결재가 이미 진행중입니다.");
+		if (isApprovalLocked()) {
+	        customAlert(getApprovalLockMessage());
 	        return;
 	    }
 	    var selRow = parseInt(gridViewPop2.target.selectedDataIndexs);
@@ -1583,8 +1669,8 @@
 
 	//공유대상자 추가
 	function insertShareUserModal2() {
-		if( approvalYn2() ) {
-			customAlert("결재가 이미 진행중입니다.");
+		if (isApprovalLocked()) {
+			customAlert(getApprovalLockMessage());
 			return;
 		}
 
@@ -1653,8 +1739,8 @@
 	}
 
 	function deleteShareUser2() {
-		if( approvalYn2() ) {
-			customAlert("결재가 이미 진행중입니다.");
+		if (isApprovalLocked()) {
+			customAlert(getApprovalLockMessage());
 			return;
 		}
 
@@ -2904,5 +2990,193 @@
 	  });
 	  nextTripSeq = maxSeq;
 	}
+
+	// 발주요청번호 돋보기 검색 팝업
+	function openPurchaseSearch() {
+		if (isApprovalLocked()) {
+			customAlert(getApprovalLockMessage());
+			return false;
+		}
+
+		let searchCheckVal = $("#reqNo").val()
+		let searchNameVal = (searchCheckVal == undefined || searchCheckVal == '') ? "T.SALES_CD" : "T.REQ_NO" ;
+		searchCheckVal = (searchCheckVal == undefined || searchCheckVal == '') ? $("#ordrsNo").val() || "" : "" ;
+		var paramObj = {
+				"coCd" : $("#coCd").val(),
+				"searchValue" : searchCheckVal,
+				"searchName" : searchNameVal,
+		}		
 	
+		paramObj.orderFlag = "Y";
+		openSecondModal("/static/html/cmn/modal/purchaseSearch.html", 1200, 680, "요인별요청번호 검색", paramObj, function (grid) {
+			var row = grid.target.getList("selected")[0];
+			
+			// 선택된 발주요청서 데이터 객체 구성
+			var selectedReqData = {
+				reqNo: row.reqNo,
+				ordrsNo: row.ordrsNo, // 팝업 그리드에 해당 필드가 있어야 함
+				clntCd: row.clntCd    // 팝업 그리드에 해당 필드가 있어야 함
+			};
+			
+			// 기본 물류정보(TRNS_DIV) 연계 조회 호출 (팝업 선택 데이터 전달)
+			fetchDefaultTrnsDiv(selectedReqData);
+		});
+	}
+
+	// 기본 물류정보(TRNS_DIV) 우선순위 연동 세팅
+	function fetchDefaultTrnsDiv(selectedReqData) {
+		debugger;
+		var formOrdrsNo = $("#ordrsNo").val();       // 현재 수주번호
+		var formClntCd = $("#ordrsClntCd").val();    // 현재 고객사
+		var reqNoVal = $("#reqNo").val();            // 현재 발주요청번호 (수기입력용)
+
+		// 1. 발주요청서 팝업을 통해 값이 전달된 경우 검증
+		if (selectedReqData) {
+			// 화면의 수주번호/고객사와 팝업의 데이터가 다르면 거부
+			if (selectedReqData.ordrsNo !== formOrdrsNo || selectedReqData.clntCd !== formClntCd) {
+				customAlert("선택하신 발주요청번호는 현재 수주번호 및 고객사와 일치하지 않아 물류정보가 변경되지 않습니다.");
+				 $("#reqNo").val("");
+				return;
+			}
+			// 일치하면 값 적용
+			$("#reqNo").val(selectedReqData.reqNo);
+			reqNoVal = selectedReqData.reqNo;
+		}
+
+		// 요청번호가 비어있으면 백엔드 호출 전 기본 처리
+		if (!reqNoVal && !formOrdrsNo && !formClntCd) return;
+
+		var param = {
+			coCd: $("#coCd").val(),               // 필수: 회사코드
+			reqNo: reqNoVal,                      // 1순위: 발주요청번호
+			ordrsNo: formOrdrsNo,                 // 2순위: 수주번호
+			clntCd: formClntCd                    // 3순위: 고객사코드
+		};
+
+		postAjax("/user/cr/cr10/selectDefaultTrnsDiv", param, null, function (data) {
+			if (data && data.result && data.result.trnsDiv) {
+				var row = data.result;
+				$("#trnsDiv").val(row.trnsDiv).trigger('change');
+				
+				// UI 변경 연동 (setTimeout으로 렌더링 대기 후 값 세팅)
+				setTimeout(function() {
+					if(row.trnsDiv == "LGISTDIV0301") { // 국내
+						if(row.dmsTrnsAreaDiv) $("#dmsTrnsAreaDiv").val(row.dmsTrnsAreaDiv);
+						if(row.dmsSendCndDiv)  $("#dmsSendCndDiv").val(row.dmsSendCndDiv).trigger('change');
+						if(row.dmsSendCndDivEtc) $("#dmsSendCndDivEtc").val(row.dmsSendCndDivEtc);
+						if(row.dmsPackKindDiv) $("#dmsPackKindDiv").val(row.dmsPackKindDiv);
+					} else if(row.trnsDiv == "LGISTDIV0302") { // 해외
+						if(row.ovsTrnsAreaDiv) $("#ovsTrnsAreaDiv").val(row.ovsTrnsAreaDiv);
+						if(row.ovsSendCndDiv)  $("#ovsSendCndDiv").val(row.ovsSendCndDiv).trigger('change');
+						if(row.ovsSendCndDivEtc) $("#ovsSendCndDivEtc").val(row.ovsSendCndDivEtc);
+						if(row.ovsPackKindDiv) $("#ovsPackKindDiv").val(row.ovsPackKindDiv);
+					}
+					
+					if(row.arvlPlace) $("#arvlPlace").val(row.arvlPlace);
+					if(row.arvlAddr)  $("#arvlAddr").val(row.arvlAddr);
+					if(row.arvlChrgCont) $("#arvlChrgCont").val(row.arvlChrgCont);
+				}, 100);
+			}
+		});
+	}
+	
+	// 이력조회 팝업 호출 함수
+	function openLgistHistorySearch() {
+		if (isApprovalLocked()) {
+			customAlert(getApprovalLockMessage());
+			return false;
+		}
+
+		var paramObj = {
+			coCd: $('#coCd').val(),
+			ordrsClntCd: $('#ordrsClntCd').val(),
+			callbackFunc: "applyLgistHistory"
+		};
+
+		openSecondModal("/static/html/user/cr/cr10/CR1002P01.html", 1300, 660, "물류 발송 이력 검색", paramObj);
+	}
+
+	// 이력조회 팝업에서 선택 결과 바인딩 콜백
+	function applyLgistHistory(row) {
+		if (!row) return;
+		
+		$("#trnsDiv").val(row.trnsDiv).trigger('change');
+		setTimeout(function() {
+			if(row.trnsDiv == "LGISTDIV0301") { // 국내
+				$("#dmsTrnsAreaDiv").val(row.dmsTrnsAreaDiv);
+				$("#dmsSendCndDiv").val(row.dmsSendCndDiv).trigger('change');
+				$("#dmsSendCndDivEtc").val(row.dmsSendCndDivEtc);
+			} else { // 해외
+				$("#ovsTrnsAreaDiv").val(row.ovsTrnsAreaDiv);
+				$("#ovsSendCndDiv").val(row.ovsSendCndDiv).trigger('change');
+				$("#ovsSendCndDivEtc").val(row.ovsSendCndDivEtc);
+				$("#ovsPackKindDiv").val(row.ovsPackKindDiv);
+			}
+		}, 100);
+
+		$("#staPlace").val(row.staPlace);
+		$("#arvlPlace").val(row.arvlPlace);
+		$("#staAddr").val(row.staAddr);
+		$("#arvlAddr").val(row.arvlAddr);
+		$("#staChrgCont").val(row.staChrgCont);
+		$("#arvlChrgCont").val(row.arvlChrgCont);
+	}
+
+	function setFormLock(_form, _isIdCheck, _callback){
+		if(isEmpty(_isIdCheck)) {
+			_isIdCheck = false;
+		}
+		$(_form).css("opacity","0.5");
+		$.each($(_form+" input"), function (idx, elem) {
+			$(elem).prop("disabled", true);
+		});
+		$.each($(_form+" textarea"), function (idx, elem) {
+			$(elem).prop("disabled", true);
+		});
+		$.each($(_form+" select"), function (idx, elem) {
+			$(elem).prop("disabled", true);
+		});
+		$.each($(_form+" button"), function (idx, elem) {
+			$(elem).prop("disabled", true);
+		});
+		$.each($(_form+" a"), function (idx, elem) {
+			if(_isIdCheck) {
+				var data_onclick = $(elem).attr('data-onclick');
+				if(!isEmpty(data_onclick)) {
+					$(elem).attr('onclick', '').unbind('click');
+				}
+			}
+			else {
+				$(elem).attr('onclick', '').unbind('click');
+			}
+		});
+		if(!isEmpty(_callback)){ setTimeout(function(){ _callback(); }, 10); }
+	}
+
+	function setFormUnLock(_form, _isIdCheck, _callback){
+		if(isEmpty(_isIdCheck)) {
+			_isIdCheck = false;
+		}
+		$(_form).css("opacity","1");
+		$.each($(_form+" input"), function (idx, elem) {
+			$(elem).prop("disabled", false);
+		});
+		$.each($(_form+" textarea"), function (idx, elem) {
+			$(elem).prop("disabled", false);
+		});
+		$.each($(_form+" select"), function (idx, elem) {
+			$(elem).prop("disabled", false);
+		});
+		$.each($(_form+" button"), function (idx, elem) {
+			$(elem).prop("disabled", false);
+		});
+		$.each($(_form+" a"), function (idx, elem) {
+			var data_onclick = $(elem).attr('data-onclick');
+			if(!isEmpty(data_onclick) && _isIdCheck) {
+				$(elem).attr('onclick', data_onclick).bind('click');
+			}
+		});
+		if(!isEmpty(_callback)){ setTimeout(function(){ _callback(); }, 10); }
+	}
+
 </script>
