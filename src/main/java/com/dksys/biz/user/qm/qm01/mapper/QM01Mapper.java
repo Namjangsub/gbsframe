@@ -62,6 +62,8 @@ public interface QM01Mapper {
 
 	int deleteQualityResp(Map<String, String> paramMap);
 
+	int mergeQualityReqLgist(Map<String, String> paramMap);
+
 	List<Map<String, String>> selectApprovalList(Map<String, String> paramMap);
 
 	List<Map<String, String>> deleteWbsSharngListChk(Map<String, String> paramMap);

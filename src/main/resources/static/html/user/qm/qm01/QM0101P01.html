@@ -145,12 +145,89 @@
 					</td>
 				</tr>
 		
+				<!-- 물류정보 추가 반영 -->
+        <tr>
+        	<td colspan="8" style="text-align: left; background-color: #f2f2f2; font-size: 14px; font-weight: bold; border-top: 2px solid #ccc; padding: 10px 15px;">
+				<i class="fas fa-caret-right"></i> 물류 정보 ( 거래처에 뮬류정보가 있으면 자동 등록됨 )
+			</td>
+        </tr>
+        <tr>
+			<th class="trnsDivTh">국내/해외 물류 구분</th>
+			<td colspan="3">
+				<div style="display: flex; gap: 5px; align-items: center;">
+					<select id="trnsDiv" name="trnsDiv" data-kind="LGISTDIV03" onchange="ModalApp.changeTrnsDiv(this.value)" msg="운송구분" class="form-control" style="width: 200px;">
+					   <option value="">선택</option>
+					</select>
+					<button type="button" id="lgistHistoryBtn" class="btn btn-default btn-sm" onclick="ModalApp.openLgistHistorySearch();">이력조회</button>
+				</div>
+			</td>
+ 			<th colspan="4"></th>
+        </tr>
+        <tr class="dmsTran" style="display:none;">
+			<th class="dmsClass">국내운송구분</th>
+			<td>
+				<select id="dmsTrnsAreaDiv" name="dmsTrnsAreaDiv" data-kind="LGISTDIV0201" msg="국내운송지역" class="form-control">
+				   <option value="">선택</option>
+				</select>
+			</td>
+			<th class="dmsClass">국내발송조건</th>
+			<td>
+				<select id="dmsSendCndDiv" name="dmsSendCndDiv" data-kind="LGISTDIV0202" onchange="ModalApp.changeSetEtc(this.value,this.name)" msg="국내발송조건" class="form-control">
+				   <option value="">선택</option>
+				</select>
+			</td>
+			<td colspan="4">
+				<input data-maxlength="300" type="text" class="form-control" id="dmsSendCndDivEtc" name="dmsSendCndDivEtc" msg="국내발송조건 -기타" readonly="readonly">
+			</td>
+        </tr>
+
+        <tr class="ovsTran" style="display:none;">
+			<th class="ovsClass">해외운송구분</th>
+			<td>
+				<select id="ovsTrnsAreaDiv" name="ovsTrnsAreaDiv" data-kind="LGISTDIV0204" msg="해외운송지역" class="form-control">
+				   <option value="">선택</option>
+				</select>
+			</td>
+			<th class="ovsClass">해외발송조건</th>
+			<td>
+				<div style="display:flex; flex-direction:column; gap:5px;">
+					<select id="ovsSendCndDiv" name="ovsSendCndDiv" data-kind="LGISTDIV0205" onchange="ModalApp.changeSetEtc(this.value,this.name)" msg="해외발송조건" class="form-control">
+					   <option value="">선택</option>
+					</select>
+				</div>
+			</td>
+			<td colspan="2">
+				<input data-maxlength="300" type="text" class="form-control" id="ovsSendCndDivEtc" name="ovsSendCndDivEtc" msg="해외발송조건 -기타" readonly="readonly">
+			</td>
+			<th class="ovsClass">해외포장종류</th>
+			<td colspan="1">
+				<select id="ovsPackKindDiv" name="ovsPackKindDiv" data-kind="LGISTDIV0206" msg="해외포장종류" class="form-control">
+				   <option value="">선택</option>
+				</select>
+			</td>
+        </tr>
+
+        <tr class="trnsInfo" style="display:none;">
+			<th>도착지 업체명</th>
+			<td colspan="1">
+				<input data-maxlength="300" type="text" id="arvlPlace" name="arvlPlace" msg="업체명" class="form-control">
+			</td>
+			<th>도착지 담당자/연락처</th>
+			<td colspan="1">
+	             <input data-maxlength="300" type="text" id="arvlChrgCont" name="arvlChrgCont" msg="담당자/연락처" class="form-control">
+			</td>
+			<th>도착지 주소</th>
+			<td colspan="3">
+	             <textarea data-maxlength="300" rows="1" id="arvlAddr" name="arvlAddr" class="form-control"  msg="주소"></textarea>
+			</td>
+        </tr>
+					
 				<tr>
 					<th rowspan="1" id="cobgb">등록 사유</th>
 					<td rowspan="1" colspan= "3" style="text-align:left; vertical-align:top;">
 						<div id="COBGB-checkboxContainer"></div>
 					</td>
-						
+	
 					<td colspan= 4>
 						<div>
 							<table style="border:0px;">
@@ -1018,6 +1095,7 @@ var ModalApp = (function() {
 		var formData = {
 		"fileTrgtKey"	: fileTrgtKey,
 		"reqNo"		: reqNo,
+		"onlyLgistQM"   : (actionType != 'C' ? 'Y' : 'N') // 수정모드일 때는 TB_QM01D04 정보만 조회
 		}
 		postAjaxSync("/user/qm/qm01/selectQtyReqInfo", formData, null, function(data) {
 		//분류,등록사유 자동생성시 20240708이전에는 전체 옵션 표시, 이후에는 정상, 문제 분리 표시용 end
@@ -1190,8 +1268,112 @@ var ModalApp = (function() {
 			txtareaHeightResize($(currFormId + ' #reqRmk'));
 			txtareaHeightResize($(currFormId + ' #fdmtSolutCnt'));
 
+			// 물류정보 화면 제어
+			changeTrnsDiv($(currFormId + ' #trnsDiv').val());
+			changeSetEtc($(currFormId + ' #dmsSendCndDiv').val(), 'dmsSendCndDiv');
+			changeSetEtc($(currFormId + ' #ovsSendCndDiv').val(), 'ovsSendCndDiv');
 		});
 	}
+
+	function changeTrnsDiv(value) {
+		if (value == "LGISTDIV0301") { // 국내
+			$(".dmsTran").show();
+			$(".ovsTran").hide();
+			$(".trnsInfo").show();
+			
+			// 필수값 설정
+			$(currFormId + " #dmsTrnsAreaDiv").attr("required", true).closest("td").prev("th").addClass("hit");
+			$(currFormId + " #dmsSendCndDiv").attr("required", true).closest("td").prev("th").addClass("hit");
+			$(currFormId + " #arvlPlace").attr("required", true).closest("td").prev("th").addClass("hit");
+			$(currFormId + " #arvlAddr").attr("required", true).closest("td").prev("th").addClass("hit");
+			$(currFormId + " #arvlChrgCont").attr("required", true).closest("td").prev("th").addClass("hit");
+			
+			// 해외 필드 비필수 처리
+			$(currFormId + " #ovsTrnsAreaDiv").removeAttr("required").closest("td").prev("th").removeClass("hit");
+			$(currFormId + " #ovsSendCndDiv").removeAttr("required").closest("td").prev("th").removeClass("hit");
+			$(currFormId + " #ovsPackKindDiv").removeAttr("required").closest("td").prev("th").removeClass("hit");
+			$(currFormId + " #ovsSendCndDivEtc").removeAttr("required");
+			
+		} else if (value == "LGISTDIV0302") { // 해외
+			$(".dmsTran").hide();
+			$(".ovsTran").show();
+			$(".trnsInfo").show();
+			
+			// 필수값 설정
+			$(currFormId + " #ovsTrnsAreaDiv").attr("required", true).closest("td").prev("th").addClass("hit");
+			$(currFormId + " #ovsSendCndDiv").attr("required", true).closest("td").prev("th").addClass("hit");
+			$(currFormId + " #ovsPackKindDiv").attr("required", true).closest("td").prev("th").addClass("hit");
+			$(currFormId + " #arvlPlace").attr("required", true).closest("td").prev("th").addClass("hit");
+			$(currFormId + " #arvlAddr").attr("required", true).closest("td").prev("th").addClass("hit");
+			$(currFormId + " #arvlChrgCont").attr("required", true).closest("td").prev("th").addClass("hit");
+			
+			// 국내 필드 비필수 처리
+			$(currFormId + " #dmsTrnsAreaDiv").removeAttr("required").closest("td").prev("th").removeClass("hit");
+			$(currFormId + " #dmsSendCndDiv").removeAttr("required").closest("td").prev("th").removeClass("hit");
+			$(currFormId + " #dmsSendCndDivEtc").removeAttr("required");
+			
+		} else { // 선택 안함 (물류정보 입력 안함)
+			$(".dmsTran").hide();
+			$(".ovsTran").hide();
+			$(".trnsInfo").hide();
+			
+			// 모든 물류 관련 필드 필수 해제
+			$(".dmsTran, .ovsTran, .trnsInfo").find("select, input, textarea").removeAttr("required");
+			$(".dmsClass, .ovsClass, .trnsDivTh").removeClass("hit");
+			$(currFormId + " #arvlPlace").removeAttr("required").closest("td").prev("th").removeClass("hit");
+			$(currFormId + " #arvlAddr").removeAttr("required").closest("td").prev("th").removeClass("hit");
+			$(currFormId + " #arvlChrgCont").removeAttr("required").closest("td").prev("th").removeClass("hit");
+
+			// 모든 필드 초기화
+			$(".dmsTran, .ovsTran, .trnsInfo").find("select, input, textarea").val("");
+		}
+	}
+
+	function changeSetEtc(value, name) {
+		var etcInputId = (name == 'dmsSendCndDiv') ? '#dmsSendCndDivEtc' : '#ovsSendCndDivEtc';
+		
+		// 기타인 경우 (코드 끝자리가 99인 경우로 판단)
+		if (value && value.slice(-2) == '99') {
+			$(currFormId + ' ' + etcInputId).attr("readonly", false).attr("required", true);
+		} else {
+			$(currFormId + ' ' + etcInputId).val("").attr("readonly", true).removeAttr("required");
+		}
+	}
+
+	// 이력조회 팝업 호출 함수
+	function openLgistHistorySearch() {
+		var paramObj = {
+			coCd: $(currFormId + ' #coCd').val(),
+			ordrsClntCd: $(currFormId + ' #clntCd').val(),
+			callbackFunc: "applyLgistHistory"
+		};
+
+		openSecondModal("/static/html/user/cr/cr10/CR1002P01.html", 1300, 660, "물류 발송 이력 검색", paramObj);
+	}
+
+	// 이력조회 팝업에서 선택 결과 바인딩 콜백
+	function applyLgistHistory(row) {
+		if (!row) return;
+		
+		$(currFormId + " #trnsDiv").val(row.trnsDiv).trigger('change');
+		setTimeout(function() {
+			if(row.trnsDiv == "LGISTDIV0301") { // 국내
+				$(currFormId + " #dmsTrnsAreaDiv").val(row.dmsTrnsAreaDiv);
+				$(currFormId + " #dmsSendCndDiv").val(row.dmsSendCndDiv).trigger('change');
+				$(currFormId + " #dmsSendCndDivEtc").val(row.dmsSendCndDivEtc);
+			} else { // 해외
+				$(currFormId + " #ovsTrnsAreaDiv").val(row.ovsTrnsAreaDiv);
+				$(currFormId + " #ovsSendCndDiv").val(row.ovsSendCndDiv).trigger('change');
+				$(currFormId + " #ovsSendCndDivEtc").val(row.ovsSendCndDivEtc);
+				$(currFormId + " #ovsPackKindDiv").val(row.ovsPackKindDiv);
+			}
+		}, 100);
+
+		$(currFormId + " #arvlPlace").val(row.arvlPlace);
+		$(currFormId + " #arvlAddr").val(row.arvlAddr);
+		$(currFormId + " #arvlChrgCont").val(row.arvlChrgCont);
+	}
+	window.applyLgistHistory = applyLgistHistory;
 
 
 	function formFieldControl(_procType='결과일괄등록') {					//필수입력필드 조정
@@ -2479,7 +2661,11 @@ var ModalApp = (function() {
 		renderFromJson,
 		setJson,
 		selectSalesCdDrawFileListModal,
-		selectDw03FileListInfo
+		selectDw03FileListInfo,
+		changeTrnsDiv,
+		changeSetEtc,
+		openLgistHistorySearch,
+		applyLgistHistory
     };
 	})();
 

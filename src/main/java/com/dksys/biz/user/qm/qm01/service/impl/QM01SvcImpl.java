@@ -169,6 +169,7 @@ public class QM01SvcImpl implements QM01Svc {
         // 첨부 화일 권한체크 끝
         // ---------------------------------------------------------------
         int result = QM01Mapper.updateQualityReq(paramMap);
+        QM01Mapper.mergeQualityReqLgist(paramMap);
 
         result += wb24Mapper.updateVendCd(paramMap);
 
@@ -370,6 +371,7 @@ public class QM01SvcImpl implements QM01Svc {
 		paramMap.put("fileTrgtKey", Integer.toString(fileTrgtKey));
 		paramMap.put("reqNo", reqNo);
 		int result = QM01Mapper.insertQualityReq(paramMap);
+		QM01Mapper.mergeQualityReqLgist(paramMap);
 
 		Gson gson2 = new Gson();
 		// DW Version테이블에 확정정보 Update 처리
