@@ -678,13 +678,24 @@
                , FN_CM05M01_CD_TO_NM(T.CURR_CD) AS CURR_CD_NM
                , FN_CM05M01_CD_TO_NM(T.PMNT_MTD) AS PMNT_MTD_NM
                , FN_CM05M01_CD_TO_NM(T.INPEXP_CD) AS INPEXP_CD_NM
-        FROM (SELECT *
-              FROM TB_CR02M01
-              WHERE CO_CD = #{coCd}
-                AND FILE_TRGT_KEY = #{fileTrgtKey}
-              ) T
+               , C.TRNS_DIV
+               , C.DMS_TRNS_AREA_DIV
+               , C.DMS_SEND_CND_DIV
+               , C.DMS_SEND_CND_DIV_ETC
+               , C.DMS_PACK_KIND_DIV
+               , C.OVS_TRNS_AREA_DIV
+               , C.OVS_SEND_CND_DIV
+               , C.OVS_SEND_CND_DIV_ETC
+               , C.OVS_PACK_KIND_DIV
+               , C.ARVL_PLACE
+               , C.ARVL_ADDR
+               , C.ARVL_CHRG_CONT
+        FROM TB_CR02M01 T
                    LEFT OUTER JOIN TB_BM02M01 B ON T.ORDRS_CLNT_CD = B.CLNT_CD
                    LEFT OUTER JOIN TB_BM06M01 P ON T.PRJCT_SEQ = P.PRJCT_SEQ
+                   LEFT OUTER JOIN TB_CR02D04 C ON T.CO_CD = C.CO_CD AND T.ORDRS_NO = C.ORDRS_NO
+       WHERE T.CO_CD = #{coCd}
+         AND T.FILE_TRGT_KEY = #{fileTrgtKey}
     </select>
 
     <select id="selectOrdrsDetails" parameterType="map" resultType="CamelMap">
@@ -801,6 +812,7 @@
                     FWD_EXCH_JOIN_DT,
                     FWD_EXCH_CHK_LIST,
                     ORDRGER,
+                    ETC_FIELD3,	--발주자전호번호
                     EXRATE,
                     MNG_ID,
                     CTRT_DOC,
@@ -829,6 +841,7 @@
                     #{fwdExchJoinDt},
                     #{fwdExchChkList},
                     #{ordrger},
+                    #{etcField3},	--발주자전호번호
                     #{exrate},
                     #{mngId},
                     #{ctrtDoc},
@@ -858,6 +871,7 @@
             FWD_EXCH_JOIN_DT  = #{fwdExchJoinDt},
             FWD_EXCH_CHK_LIST = #{fwdExchChkList},
             ORDRGER           = #{ordrger},
+            ETC_FIELD3         = #{etcField3},	--발주자전호번호
             EXRATE            = #{exrate},
             MNG_ID            = #{mngId},
             CTRT_DOC          = #{ctrtDoc, jdbcType=VARCHAR},
@@ -869,6 +883,63 @@
 			UDT_DTTM 		  = SYSDATE,
 			PRJCT_SEQ 		  = #{prjctSeq}
             WHERE FILE_TRGT_KEY = #{fileTrgtKey}
+    </update>
+
+    <insert id="insertOrdrsLgist" parameterType="map">
+        INSERT INTO TB_CR02D04 (
+              CO_CD, ORDRS_NO,
+              TRNS_DIV, DMS_TRNS_AREA_DIV, DMS_SEND_CND_DIV, DMS_SEND_CND_DIV_ETC,
+              DMS_PACK_KIND_DIV, OVS_TRNS_AREA_DIV, OVS_SEND_CND_DIV, OVS_SEND_CND_DIV_ETC,
+              OVS_PACK_KIND_DIV, ARVL_PLACE, ARVL_ADDR, ARVL_CHRG_CONT,
+              CREAT_ID, CREAT_PGM, CREAT_DTTM, UDT_ID, UDT_PGM, UDT_DTTM
+        ) VALUES (
+              #{coCd}, #{ordrsNo},
+              #{trnsDiv, jdbcType=VARCHAR}, #{dmsTrnsAreaDiv, jdbcType=VARCHAR},
+              #{dmsSendCndDiv, jdbcType=VARCHAR}, #{dmsSendCndDivEtc, jdbcType=VARCHAR},
+              #{dmsPackKindDiv, jdbcType=VARCHAR}, #{ovsTrnsAreaDiv, jdbcType=VARCHAR},
+              #{ovsSendCndDiv, jdbcType=VARCHAR}, #{ovsSendCndDivEtc, jdbcType=VARCHAR},
+              #{ovsPackKindDiv, jdbcType=VARCHAR}, #{arvlPlace, jdbcType=VARCHAR},
+              #{arvlAddr, jdbcType=VARCHAR}, #{arvlChrgCont, jdbcType=VARCHAR},
+              #{userId}, #{pgmId}, SYSDATE, #{userId}, #{pgmId}, SYSDATE
+        )
+    </insert>
+
+    <update id="mergeOrdrsLgist" parameterType="map">
+        MERGE INTO TB_CR02D04 A
+        USING DUAL
+        ON (A.CO_CD = #{coCd} AND A.ORDRS_NO = #{ordrsNo})
+        WHEN MATCHED THEN
+            UPDATE SET
+                  A.TRNS_DIV             = #{trnsDiv,             jdbcType=VARCHAR}
+                , A.DMS_TRNS_AREA_DIV    = #{dmsTrnsAreaDiv,      jdbcType=VARCHAR}
+                , A.DMS_SEND_CND_DIV     = #{dmsSendCndDiv,       jdbcType=VARCHAR}
+                , A.DMS_SEND_CND_DIV_ETC = #{dmsSendCndDivEtc,    jdbcType=VARCHAR}
+                , A.DMS_PACK_KIND_DIV    = #{dmsPackKindDiv,      jdbcType=VARCHAR}
+                , A.OVS_TRNS_AREA_DIV    = #{ovsTrnsAreaDiv,      jdbcType=VARCHAR}
+                , A.OVS_SEND_CND_DIV     = #{ovsSendCndDiv,       jdbcType=VARCHAR}
+                , A.OVS_SEND_CND_DIV_ETC = #{ovsSendCndDivEtc,    jdbcType=VARCHAR}
+                , A.OVS_PACK_KIND_DIV    = #{ovsPackKindDiv,      jdbcType=VARCHAR}
+                , A.ARVL_PLACE           = #{arvlPlace,           jdbcType=VARCHAR}
+                , A.ARVL_ADDR            = #{arvlAddr,            jdbcType=VARCHAR}
+                , A.ARVL_CHRG_CONT       = #{arvlChrgCont,        jdbcType=VARCHAR}
+                , A.UDT_ID               = #{userId}
+                , A.UDT_PGM              = #{pgmId}
+                , A.UDT_DTTM             = SYSDATE
+        WHEN NOT MATCHED THEN
+            INSERT (
+                  CO_CD, ORDRS_NO, TRNS_DIV, DMS_TRNS_AREA_DIV, DMS_SEND_CND_DIV, DMS_SEND_CND_DIV_ETC,
+                  DMS_PACK_KIND_DIV, OVS_TRNS_AREA_DIV, OVS_SEND_CND_DIV, OVS_SEND_CND_DIV_ETC,
+                  OVS_PACK_KIND_DIV, ARVL_PLACE, ARVL_ADDR, ARVL_CHRG_CONT,
+                  CREAT_ID, CREAT_PGM, CREAT_DTTM, UDT_ID, UDT_PGM, UDT_DTTM
+            ) VALUES (
+                  #{coCd}, #{ordrsNo}, #{trnsDiv, jdbcType=VARCHAR}, #{dmsTrnsAreaDiv, jdbcType=VARCHAR},
+                  #{dmsSendCndDiv, jdbcType=VARCHAR}, #{dmsSendCndDivEtc, jdbcType=VARCHAR},
+                  #{dmsPackKindDiv, jdbcType=VARCHAR}, #{ovsTrnsAreaDiv, jdbcType=VARCHAR},
+                  #{ovsSendCndDiv, jdbcType=VARCHAR}, #{ovsSendCndDivEtc, jdbcType=VARCHAR},
+                  #{ovsPackKindDiv, jdbcType=VARCHAR}, #{arvlPlace, jdbcType=VARCHAR},
+                  #{arvlAddr, jdbcType=VARCHAR}, #{arvlChrgCont, jdbcType=VARCHAR},
+                  #{userId}, #{pgmId}, SYSDATE, #{userId}, #{pgmId}, SYSDATE
+            )
     </update>
 
     <select id="callUpdateOrdrsNo" statementType="CALLABLE" parameterType="map">

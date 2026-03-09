@@ -35,9 +35,11 @@ public interface CR02Mapper {
     String selectItemDivEtc(Map<String, String> param);
 
     int insertOrdrs(Map<String, String> param);
+    int insertOrdrsLgist(Map<String, String> param);
 
     // void updateOrdrs(Map<String, String> param);
     int updateOrdrs(Map<String, String> param);
+    int mergeOrdrsLgist(Map<String, String> param);
 
     int insertOrdrsDetail(Map<String, String> param);
 

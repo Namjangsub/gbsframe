@@ -165,6 +165,7 @@ public class CR02Svcmpl implements CR02Svc {
 
         cr01Svc.updateEstConfirm(param);
         cr02Mapper.insertOrdrs(param);
+        cr02Mapper.insertOrdrsLgist(param);
 
         //List<Map<String, String>> planArr = gson.fromJson(removeEmptyObjects(param.get("planArr")), mapList);
         List<Map<String, String>> planArr = gson.fromJson(param.get("planArr"), mapList);
@@ -489,6 +490,7 @@ public class CR02Svcmpl implements CR02Svc {
             cr01Svc.updateEstConfirm(param);
         }
         result += cr02Mapper.updateOrdrs(param);
+        cr02Mapper.mergeOrdrsLgist(param);
 
         //////////////수금정보  update 수정////////
         updateOrdrsPmntPlanProcess(param, mRequest );
