@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.dksys.biz.user.cr.cr09.mapper.CR09Mapper">
+
+    <select id="selectLgistPlanList" parameterType="Map" resultType="CamelMap">
+        /* CR0901M01.selectLgistPlanList - 물류진행 예정정보 현황 조회 (UNION 구조 개편) */
+        WITH 
+        WBS_INFO AS (
+            /* WBS 마감 및 일정 정보 사전 추출 - 최신 버전(Max VER_NO) 반영 */
+            SELECT W22.CO_CD
+                 , W22.SALES_CD
+                 , W22.WBS_PLANS_DT
+                 , W22.WBS_PLANE_DT
+                 , W22.WBS_PLAN_MNG_ID
+                 , W21.VER_NO
+            FROM   TB_WB22M01 W22
+            INNER JOIN (
+                SELECT CO_CD, SALES_CD, CLOSE_YN, VER_NO
+                FROM   (
+                        SELECT CO_CD, SALES_CD, CLOSE_YN, VER_NO,
+                               ROW_NUMBER() OVER(PARTITION BY CO_CD, SALES_CD ORDER BY LPAD(NVL(VER_NO, '0'), 10, '0') DESC) AS VER_RN
+                        FROM   TB_WB21M01
+                       ) 
+                WHERE  VER_RN = 1
+            ) W21 ON W22.SALES_CD = W21.SALES_CD AND W22.VER_NO = W21.VER_NO
+            WHERE  W21.CLOSE_YN = 'Y'
+              AND  W22.WBS_PLAN_CODE_ID = 'WBSCODE11'
+              AND  W22.WBS_PLAN_MNG_ID IS NOT NULL
+        ),
+        LGIST_REQ_INFO AS (
+            /* 순수 물류진행요청(TB_CR11M01)에 등록된 내역 추출 (미완료건 포함) */
+            SELECT M11.CO_CD
+                 , M11.ORDRS_NO
+                 , M11.LGIST_NO
+                 , D11.SALES_CD
+                 , NVL(M11.LGIST_COMPL_YN, 'N') AS LGIST_COMPL_YN
+                 , M11.LGIST_COMPL_DTTM
+                 , M11.TRNS_DIV
+                 , M11.DMS_TRNS_AREA_DIV
+                 , M11.OVS_TRNS_AREA_DIV
+                 , M11.DMS_SEND_CND_DIV
+                 , M11.OVS_SEND_CND_DIV
+                 , M11.DMS_SEND_CND_DIV_ETC
+                 , M11.OVS_SEND_CND_DIV_ETC
+                 , M11.DMS_PACK_KIND_DIV
+                 , M11.OVS_PACK_KIND_DIV
+                 , M11.ARVL_PLACE
+                 , M11.ARVL_CHRG_CONT
+                 , M11.ARVL_ADDR
+                 , M11.FILE_TRGT_KEY
+                 , M11.SHIPMNT_DT
+                 , M11.HOPE_ARVL_DT
+            FROM   TB_CR11M01 M11
+            INNER JOIN TB_CR11D01 D11 ON M11.LGIST_NO = D11.LGIST_NO
+        ),
+        UNION_DATA AS (
+            /* =========================================================================
+               1. 수주에서 추출한 물류 예정정보 (물류요청서 유무와 상관없이 WBS 기간 내 조회)
+               ========================================================================= */
+            SELECT D04.CO_CD
+                 , D04.ORDRS_NO
+                 , D02.SALES_CD
+                 , D02.ORDRS_QTY
+                 
+                 , M01.ORDRS_CLNT_CD
+                 , B02.CLNT_NM							  AS ORDRS_CLNT_NM
+                 , M01.MNG_ID
+                 , FN_CM06M01_ID_TO_NM(M01.MNG_ID)        AS MNG_ID_NM
+                 
+                 , CASE WHEN W.WBS_PLANE_DT IS NULL THEN '수주'
+                        ELSE 'WBS'  END 				  AS LGIST_TYPE
+                 , D04.TRNS_DIV           -- TB_CR02D04 ORG 컬럼들
+                 , D04.DMS_TRNS_AREA_DIV
+                 , D04.DMS_SEND_CND_DIV
+                 , D04.DMS_SEND_CND_DIV_ETC
+                 , D04.DMS_PACK_KIND_DIV
+                 , D04.OVS_TRNS_AREA_DIV
+                 , D04.OVS_SEND_CND_DIV
+                 , D04.OVS_SEND_CND_DIV_ETC
+                 , D04.OVS_PACK_KIND_DIV
+                 , D04.ARVL_PLACE         AS D04_ARVL_PLACE
+                 , D04.ARVL_CHRG_CONT     AS D04_ARVL_CHRG_CONT
+                 , D04.ARVL_ADDR          AS D04_ARVL_ADDR
+                 
+                 , W.WBS_PLAN_MNG_ID
+                 , FN_CM06M01_ID_TO_NM(W.WBS_PLAN_MNG_ID) AS PLAN_MNG_ID_NM
+                 , TO_CHAR(W.WBS_PLANS_DT, 'YYYY-MM-DD')  AS WBS_STA_DT
+                 , TO_CHAR(W.WBS_PLANE_DT, 'YYYY-MM-DD')  AS WBS_END_DT
+                 
+                 , FN_CM05M01_CD_TO_NM(NVL(REQ.TRNS_DIV, D04.TRNS_DIV)) AS TRNS_DIV_NM
+                 , FN_CM05M01_CD_TO_NM(CASE WHEN NVL(REQ.TRNS_DIV, D04.TRNS_DIV) = 'LGISTDIV0301' THEN NVL(REQ.DMS_TRNS_AREA_DIV, D04.DMS_TRNS_AREA_DIV) ELSE NVL(REQ.OVS_TRNS_AREA_DIV, D04.OVS_TRNS_AREA_DIV) END) AS TRNS_AREA_DIV_NM
+                 , FN_CM05M01_CD_TO_NM(CASE WHEN NVL(REQ.TRNS_DIV, D04.TRNS_DIV) = 'LGISTDIV0301' THEN NVL(REQ.DMS_SEND_CND_DIV, D04.DMS_SEND_CND_DIV)  ELSE NVL(REQ.OVS_SEND_CND_DIV, D04.OVS_SEND_CND_DIV)  END) AS SEND_CND_DIV_NM
+                 , CASE WHEN NVL(REQ.TRNS_DIV, D04.TRNS_DIV) = 'LGISTDIV0301' THEN NVL(REQ.DMS_SEND_CND_DIV_ETC, D04.DMS_SEND_CND_DIV_ETC) ELSE NVL(REQ.OVS_SEND_CND_DIV_ETC, D04.OVS_SEND_CND_DIV_ETC) END AS SEND_CND_DIV_ETC
+                 , FN_CM05M01_CD_TO_NM(CASE WHEN NVL(REQ.TRNS_DIV, D04.TRNS_DIV) = 'LGISTDIV0301' THEN NVL(REQ.DMS_PACK_KIND_DIV, D04.DMS_PACK_KIND_DIV) ELSE NVL(REQ.OVS_PACK_KIND_DIV, D04.OVS_PACK_KIND_DIV) END) AS PACK_KIND_DIV_NM
+
+                 , NVL(REQ.ARVL_PLACE, D04.ARVL_PLACE)                    AS ARVL_PLACE
+                 , NVL(REQ.ARVL_CHRG_CONT, D04.ARVL_CHRG_CONT)            AS ARVL_CHRG_CONT
+                 , NVL(REQ.ARVL_ADDR, D04.ARVL_ADDR)                      AS ARVL_ADDR
+                 
+                 , REQ.LGIST_NO
+                 , NVL(REQ.LGIST_COMPL_YN, 'N')                           AS LGIST_COMPL_YN
+                 , TO_CHAR(REQ.LGIST_COMPL_DTTM, 'YYYY-MM-DD')            AS LGIST_COMPL_DT
+                 , CASE WHEN REQ.LGIST_COMPL_YN = 'Y' THEN '완료' ELSE '예정' END AS LGIST_STATUS
+
+                 , '' AS FILE_TRGT_KEY
+                 , '' AS REQ_NO
+            FROM   TB_CR02D02 D02
+            INNER JOIN TB_CR02D04 D04 ON D02.CO_CD = D04.CO_CD AND D02.ORDRS_NO = D04.ORDRS_NO
+            INNER JOIN TB_CR02M01 M01 ON D02.CO_CD = M01.CO_CD AND D02.ORDRS_NO = M01.ORDRS_NO
+            LEFT OUTER JOIN WBS_INFO       W   ON D02.SALES_CD = W.SALES_CD
+            LEFT OUTER JOIN LGIST_REQ_INFO REQ ON D02.SALES_CD = REQ.SALES_CD
+            LEFT OUTER JOIN TB_BM02M01 B02 ON B02.CLNT_CD = M01.ORDRS_CLNT_CD
+            WHERE  D04.CO_CD = #{coCd}
+			  AND NOT EXISTS (
+			      SELECT 1
+			      FROM TB_CR11D01 X
+			      JOIN TB_CR11M01 M
+			        ON M.LGIST_NO = X.LGIST_NO
+			      WHERE M.CO_CD    = D02.CO_CD
+			        AND X.SALES_CD = D02.SALES_CD
+			  )
+              <choose>
+              	<when test="salesCd != null and !salesCd.equals('')">
+              	</when>
+              	<otherwise>
+	              <if test="wbsDtFr != null and !wbsDtFr.equals('') and wbsDtTo != null and !wbsDtTo.equals('')">
+	              AND  (W.WBS_PLANS_DT <![CDATA[>=]]> #{wbsDtFr} AND W.WBS_PLANE_DT <![CDATA[<=]]> #{wbsDtTo})
+	              </if>
+              	</otherwise>
+              </choose>
+              
+            UNION
+            
+            /* =========================================================================
+               2. 물류요청이 발행되어 완료되지 않은 것 (WBS 검색 기간 무관하게 조회)
+               ========================================================================= */
+            SELECT REQ.CO_CD
+                 , REQ.ORDRS_NO
+
+                 , REQ.SALES_CD
+                 , D02.ORDRS_QTY
+
+                 , M01.ORDRS_CLNT_CD
+                 , B02.CLNT_NM							  AS ORDRS_CLNT_NM
+                 , M01.MNG_ID
+                 , FN_CM06M01_ID_TO_NM(M01.MNG_ID)        AS MNG_ID_NM
+                 , '물류' 				 AS LGIST_TYPE
+                 , REQ.TRNS_DIV
+                 , REQ.DMS_TRNS_AREA_DIV
+                 , REQ.DMS_SEND_CND_DIV
+                 , REQ.DMS_SEND_CND_DIV_ETC
+                 , REQ.DMS_PACK_KIND_DIV
+                 , REQ.OVS_TRNS_AREA_DIV
+                 , REQ.OVS_SEND_CND_DIV
+                 , REQ.OVS_SEND_CND_DIV_ETC
+                 , REQ.OVS_PACK_KIND_DIV
+                 , REQ.ARVL_PLACE         AS D04_ARVL_PLACE
+                 , REQ.ARVL_CHRG_CONT     AS D04_ARVL_CHRG_CONT
+                 , REQ.ARVL_ADDR          AS D04_ARVL_ADDR
+
+                 , W.WBS_PLAN_MNG_ID
+                 , FN_CM06M01_ID_TO_NM(W.WBS_PLAN_MNG_ID) AS PLAN_MNG_ID_NM
+                 , REQ.SHIPMNT_DT  AS WBS_STA_DT
+                 , REQ.HOPE_ARVL_DT  AS WBS_END_DT
+
+                 , FN_CM05M01_CD_TO_NM(REQ.TRNS_DIV) AS TRNS_DIV_NM
+                 , FN_CM05M01_CD_TO_NM(CASE WHEN REQ.TRNS_DIV = 'LGISTDIV0301' THEN REQ.DMS_TRNS_AREA_DIV ELSE REQ.OVS_TRNS_AREA_DIV END) AS TRNS_AREA_DIV_NM
+                 , FN_CM05M01_CD_TO_NM(CASE WHEN REQ.TRNS_DIV = 'LGISTDIV0301' THEN REQ.DMS_SEND_CND_DIV  ELSE REQ.OVS_SEND_CND_DIV  END) AS SEND_CND_DIV_NM
+                 , CASE WHEN REQ.TRNS_DIV = 'LGISTDIV0301' THEN REQ.DMS_SEND_CND_DIV_ETC ELSE REQ.OVS_SEND_CND_DIV_ETC END AS SEND_CND_DIV_ETC
+                 , FN_CM05M01_CD_TO_NM(CASE WHEN REQ.TRNS_DIV = 'LGISTDIV0301' THEN REQ.DMS_PACK_KIND_DIV ELSE REQ.OVS_PACK_KIND_DIV END) AS PACK_KIND_DIV_NM
+
+                 , NVL(REQ.ARVL_PLACE, D04.ARVL_PLACE)                    AS ARVL_PLACE
+                 , NVL(REQ.ARVL_CHRG_CONT, D04.ARVL_CHRG_CONT)            AS ARVL_CHRG_CONT
+                 , NVL(REQ.ARVL_ADDR, D04.ARVL_ADDR)                      AS ARVL_ADDR
+
+                 , REQ.LGIST_NO
+                 , NVL(REQ.LGIST_COMPL_YN, 'N')                           AS LGIST_COMPL_YN
+                 , TO_CHAR(REQ.LGIST_COMPL_DTTM, 'YYYY-MM-DD')            AS LGIST_COMPL_DT
+                 , CASE WHEN REQ.LGIST_COMPL_YN = 'Y' THEN '완료' ELSE '예정' END AS LGIST_STATUS
+                 
+                 , REQ.FILE_TRGT_KEY
+                 , '' AS REQ_NO
+            FROM LGIST_REQ_INFO   REQ 
+            LEFT OUTER JOIN TB_CR02D02 D02 ON D02.CO_CD = REQ.CO_CD AND D02.SALES_CD = REQ.SALES_CD
+            LEFT OUTER JOIN TB_CR02D04 D04 ON D02.CO_CD = D04.CO_CD AND D02.ORDRS_NO = D04.ORDRS_NO
+            INNER JOIN TB_CR02M01 M01      ON D02.CO_CD = M01.CO_CD AND D02.ORDRS_NO = M01.ORDRS_NO
+            LEFT OUTER JOIN WBS_INFO   W   ON D02.SALES_CD = W.SALES_CD
+            LEFT OUTER JOIN TB_BM02M01 B02 ON B02.CLNT_CD = M01.ORDRS_CLNT_CD
+            WHERE  REQ.CO_CD = #{coCd}
+            
+            
+            UNION
+            /* =========================================================================
+               3. 발주요청서에서 물류요청이 발행되어 완료되지 않은 것
+               ========================================================================= */
+            SELECT QM.CO_CD
+                 , D02.ORDRS_NO
+
+                 , QM.SALES_CD
+                 , D02.ORDRS_QTY
+
+                 , M01.ORDRS_CLNT_CD
+                 , B02.CLNT_NM							  AS ORDRS_CLNT_NM
+                 , M01.MNG_ID
+                 , FN_CM06M01_ID_TO_NM(M01.MNG_ID)        AS MNG_ID_NM
+                 , '발주' 				 				  AS LGIST_TYPE
+                 , Q04.TRNS_DIV
+                 , Q04.DMS_TRNS_AREA_DIV
+                 , Q04.DMS_SEND_CND_DIV
+                 , Q04.DMS_SEND_CND_DIV_ETC
+                 , Q04.DMS_PACK_KIND_DIV
+                 , Q04.OVS_TRNS_AREA_DIV
+                 , Q04.OVS_SEND_CND_DIV
+                 , Q04.OVS_SEND_CND_DIV_ETC
+                 , Q04.OVS_PACK_KIND_DIV
+                 , Q04.ARVL_PLACE         AS D04_ARVL_PLACE
+                 , Q04.ARVL_CHRG_CONT     AS D04_ARVL_CHRG_CONT
+                 , Q04.ARVL_ADDR          AS D04_ARVL_ADDR
+
+                 , W.WBS_PLAN_MNG_ID
+                 , FN_CM06M01_ID_TO_NM(W.WBS_PLAN_MNG_ID) 	AS PLAN_MNG_ID_NM
+                 , TO_CHAR(QM.REQ_DT, 'YYYY-MM-DD')  		AS WBS_STA_DT
+                 , TO_CHAR(QM.CUST_REQ_DT, 'YYYY-MM-DD')  	AS WBS_STA_DT
+
+                 , FN_CM05M01_CD_TO_NM(Q04.TRNS_DIV) AS TRNS_DIV_NM
+                 , FN_CM05M01_CD_TO_NM(CASE WHEN Q04.TRNS_DIV = 'LGISTDIV0301' THEN Q04.DMS_TRNS_AREA_DIV ELSE Q04.OVS_TRNS_AREA_DIV END) AS TRNS_AREA_DIV_NM
+                 , FN_CM05M01_CD_TO_NM(CASE WHEN Q04.TRNS_DIV = 'LGISTDIV0301' THEN Q04.DMS_SEND_CND_DIV  ELSE Q04.OVS_SEND_CND_DIV  END) AS SEND_CND_DIV_NM
+                 , CASE WHEN Q04.TRNS_DIV = 'LGISTDIV0301' THEN Q04.DMS_SEND_CND_DIV_ETC ELSE Q04.OVS_SEND_CND_DIV_ETC END AS SEND_CND_DIV_ETC
+                 , FN_CM05M01_CD_TO_NM(CASE WHEN Q04.TRNS_DIV = 'LGISTDIV0301' THEN Q04.DMS_PACK_KIND_DIV ELSE Q04.OVS_PACK_KIND_DIV END) AS PACK_KIND_DIV_NM
+
+                 , NVL(Q04.ARVL_PLACE, D04.ARVL_PLACE)                    AS ARVL_PLACE
+                 , NVL(Q04.ARVL_CHRG_CONT, D04.ARVL_CHRG_CONT)            AS ARVL_CHRG_CONT
+                 , NVL(Q04.ARVL_ADDR, D04.ARVL_ADDR)                      AS ARVL_ADDR
+
+                 , LG.LGIST_NO
+                 , NVL(LG.LGIST_COMPL_YN, 'N')                           AS LGIST_COMPL_YN
+                 , TO_CHAR(LG.LGIST_COMPL_DTTM, 'YYYY-MM-DD')            AS LGIST_COMPL_DT
+                 , CASE WHEN LG.LGIST_COMPL_YN = 'Y' THEN '완료' ELSE '예정' END AS LGIST_STATUS
+
+                 , LG.FILE_TRGT_KEY
+                 , Q04.REQ_NO
+            FROM TB_QM01D04 Q04 
+            JOIN TB_QM01M01 QM  ON QM.REQ_NO = Q04.REQ_NO   
+            JOIN TB_CR02D02 D02 ON D02.CO_CD = QM.CO_CD AND D02.SALES_CD = QM.SALES_CD
+            LEFT OUTER JOIN TB_CR02D04 D04 ON D02.CO_CD = D04.CO_CD AND D02.ORDRS_NO = D04.ORDRS_NO
+            JOIN TB_CR02M01 M01 ON M01.CO_CD = D02.CO_CD AND M01.ORDRS_NO = D02.ORDRS_NO
+            LEFT OUTER JOIN TB_BM02M01 B02 ON B02.CLNT_CD = M01.ORDRS_CLNT_CD
+            LEFT OUTER JOIN WBS_INFO       W   ON D02.SALES_CD = W.SALES_CD
+            LEFT OUTER JOIN LGIST_REQ_INFO LG ON QM.SALES_CD = LG.SALES_CD
+            WHERE  QM.CO_CD =  #{coCd}
+        )
+        SELECT U.*
+        FROM   UNION_DATA U
+        WHERE  1 = 1
+          <if test="ordrsClntCd != null and !ordrsClntCd.equals('')">
+          AND  U.ORDRS_CLNT_CD = #{ordrsClntCd}
+          </if>
+          <if test="clntNm != null and !clntNm.equals('')">
+          AND  U.ORDRS_CLNT_NM LIKE '%' || #{clntNm} || '%'
+          </if>
+          <if test="salesCd != null and !salesCd.equals('')">
+          AND  U.SALES_CD LIKE '%' || #{salesCd} || '%'
+          </if>
+          <if test="mngIdNm != null and !mngIdNm.equals('')">
+          AND  U.MNG_ID_NM LIKE '%' || #{mngIdNm} || '%'
+          </if>
+          <if test="planMngIdNm != null and !planMngIdNm.equals('')">
+          AND  U.PLAN_MNG_ID_NM LIKE '%' || #{planMngIdNm} || '%'
+          </if>
+          
+          <if test="lgistStatus_S == 'PLAN'">
+          AND  U.LGIST_COMPL_YN = 'N'
+          </if>
+          <if test="lgistStatus_S == 'COMPL'">
+          AND  U.LGIST_COMPL_YN = 'Y'
+          </if>
+          
+          <if test="lgistType_S != null and !lgistType_S.equals('')">
+          AND  U.LGIST_TYPE = #{lgistType_S}
+          </if>
+          
+        /* 수주번호, SalesCD , 고객사명, 물류번호순 정렬 */
+       ORDER BY  U.ORDRS_NO DESC, U.SALES_CD ASC, U.ORDRS_CLNT_NM ASC,U.LGIST_NO DESC 
+    </select>
+
+    <update id="updateLgistCompl" parameterType="Map">
+        /* CR0901M01.updateLgistCompl - 물류완료 처리 */
+        UPDATE TB_CR11M01
+        SET    LGIST_COMPL_YN   = 'Y'
+             , LGIST_COMPL_DTTM = SYSDATE
+             , UDT_ID           = #{userId}
+             , UDT_DTTM         = SYSDATE
+        WHERE  LGIST_NO         = #{lgistNo}
+    </update>
+
+    <update id="cancelLgistCompl" parameterType="Map">
+        /* CR0901M01.cancelLgistCompl - 물류완료 취소 처리 */
+        UPDATE TB_CR11M01
+        SET    LGIST_COMPL_YN   = 'N'
+             , LGIST_COMPL_DTTM = NULL
+             , UDT_ID           = #{userId}
+             , UDT_DTTM         = SYSDATE
+        WHERE  LGIST_NO         = #{lgistNo}
+    </update>
+
+</mapper>
