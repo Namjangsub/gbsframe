@@ -71,9 +71,6 @@ public class CR10Ctr {
 	public String selectLgistMastInfo(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		Map<String, String> result = cr10Svc.selectLgistMastInfo(paramMap);
 		model.addAttribute("result", result);
-		List<Map<String, String>> resultList = cr10Svc.selectLgistAppList(paramMap);
-		model.addAttribute("resultAppList", resultList);
-
 		if (result != null && result.get("lgistNo") != null) {
 			paramMap.put("lgistNo", result.get("lgistNo"));
 			List<Map<String, String>> lgistItemList = cr10Svc.selectLgistItemList(paramMap);
@@ -96,12 +93,12 @@ public class CR10Ctr {
 		return "jsonView";
 	}
 
-@PostMapping(value = "/selectDefaultTrnsDiv")
-public String selectDefaultTrnsDiv(@RequestBody Map<String, String> paramMap, ModelMap model) {
-Map<String, String> result = cr10Svc.selectDefaultTrnsDiv(paramMap);
-model.addAttribute("result", result);
-return "jsonView";
-}
+	@PostMapping(value = "/selectDefaultTrnsDiv")
+		public String selectDefaultTrnsDiv(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		Map<String, String> result = cr10Svc.selectDefaultTrnsDiv(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 
 	@PostMapping(value = "/selectLgistHistoryList")
 	public String selectLgistHistoryList(@RequestBody Map<String, String> paramMap, ModelMap model) {

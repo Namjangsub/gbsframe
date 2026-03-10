@@ -1,5 +1,12 @@
-</style>
 <style>
+/* locked-grid: row selector disabled */
+.locked-grid [data-ax5grid-column-attr="rowSelector"],
+.locked-grid [data-ax5grid-column-attr="rowSelector"] .ax5grid-cell {
+    pointer-events: none !important;
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+
 /* 테이블 */
 .tripTable, .partListTable{
   width:100%;
@@ -504,7 +511,7 @@
 	var lgistNo = null;
 	var tLgistNo = null;
 
-	var appStatus = "APP0";// 결재상태
+	var appStatus = "N";// 결재상태
 	var grid_onDataChanged = true;
 	
 	// key: workRptNoSeq(또는 data-idx), value: { file: File, meta: {...} }
@@ -524,12 +531,12 @@
 		return (this.value) ? '<span style="display: block; white-space: pre;">' + this.value + '</span>' : '';
 	}
 	function normalizeAppStatus(value) {
-		if (isEmpty(value)) return "APP0";
+		if (isEmpty(value)) return "N";
 		return String(value).trim();
 	}
 
 	function isApprovalLocked() {
-		return normalizeAppStatus(appStatus) !== "APP0";
+		return normalizeAppStatus(appStatus) !== "N";
 	}
 
 	function getApprovalLockMessage() {
@@ -538,6 +545,15 @@
 			: "결재가 이미 진행중입니다.";
 	}
 
+	ax5.ui.grid.formatter["chkYn"] = function () {
+	    var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
+	    if(this.value == "Y" || this.value == "N") {
+	        return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
+	    }
+	    else {
+	    	return ' ';
+	    }
+	};
 	var salescdGridView = {
 			initView: function(){
 				this.target = new ax5.ui.grid();
@@ -554,7 +570,7 @@
 			        body: {
 			        	  //mergeCells : ["coCd","salesCd", "dsgnNo", "upperCd","lowerCd","ordrgDiv10"],
 			              onClick: function () {
-			            	  if(appStatus == "APP0"){
+			            	  if(appStatus == "N"){
 	  			              	this.self.select(this.dindex);
 	  			              	//useYn: 현재물류의 선택유무  , oldUseYn: 데이타사용유무
 	  			              	grid_onDataChanged = false;
@@ -573,7 +589,7 @@
 				          },
 				          onDataChanged: function () {
 				        	  if(grid_onDataChanged == false) return;
-			            	  if(appStatus == "APP0"){
+			            	  if(appStatus == "N"){
 				        	  	  grid_onDataChanged = false;
 			            		  if(this.item.chkYn == "Y" || this.item.oldUseYn == "N") {
 			  			              	if(this.item.useYn == "N") {
@@ -734,9 +750,10 @@
 											totalElements :  data.paginationInfo.totalRecordCount,
 										}
 									});
-									if (list.some(item => item.sanctnSttus === "Y")) { //결재자중에 한명이라도 결재, 공유가 되었으면 수정 불가로 수정버튼 숨김
+									if (list.some(item => item.sanctnSttus === "Y") && isApprovalLocked()) { //결재자중에 한명이라도 결재, 공유가 되었으면 수정 불가로 수정버튼 숨김
 										$('#actionBtn').hide();
 										$('#fileUpBtn').show();
+										setDisplayLock();
 									}
 								}
 							} catch (error) {
@@ -759,7 +776,7 @@
 	    };
 
 	function gridAllCheck(){
-		if(appStatus != "APP0"){return;}
+		if(appStatus != "N"){return;}
 		var header_col0_check_box = $('[data-ax5grid="salescd-grid"] [data-ax5grid-container="header"] table tr td[data-ax5grid-column-attr="rowSelector"][data-ax5grid-column-row="0"][data-ax5grid-column-col="0"][data-ax5grid-column-key="__checkbox_header__"]');
 		var is_selected = header_col0_check_box.attr("data-ax5grid-selected");
 		var grid_all_check = true;
@@ -924,9 +941,6 @@
 			});
 			$('#coCd').trigger('change'); //파일트리 새로 그리기
 		} else if (actionType == "U") {
-			if(isEmpty($("#staAddr").val())) $("#staAddr").val(modalStack.last().paramObj.coAddr || "");
-			if(isEmpty($("#arvlAddr").val())) $("#arvlAddr").val(modalStack.last().paramObj.clntAddr ||"");
-
 			$('#printBtn').show();
 
 			$('.tit').text('물류진행요청 수정');
@@ -1076,6 +1090,7 @@
 		}
 	}
 
+	// 등록된 물류정보 조회하기
 	function selectLgistMastInfo() {						//그리드에 뿌리는 데이터
 		var formData = {
 			"fileTrgtKey" : fileTrgtKey,
@@ -1089,14 +1104,11 @@
 				changeSetEtc(data.dmsSendCndDiv,"dmsSendCndDiv");
 				changeSetEtc(data.ovsSendCndDiv,"ovsSendCndDiv");
 
-				appStatus = normalizeAppStatus(data.appStatus);
-// 				if(isEmpty(appStatus)) appStatus = "APP0";
-// 				if(appStatus != "APP0"){
-					if (isApprovalLocked()) {
-						//결재중 일때 화면잠금.
-						setDisplayLock();
-				    }
-// 				}
+				//결재진행상태코드
+				appStatus = data.appStatus;
+				if (appStatus == "Y") {
+					setDisplayLock();
+			    }
 			});
 // 			monthCloseChk($('#pblicteDt').val());
 			$('#coCd').trigger('change'); //파일트리 새로 그리기
@@ -1232,6 +1244,8 @@
 		setFormLock(".popup_area");
       	filePostAjax("/user/cr/cr10/updateLgistlistImage", formData,function(data) {
 			if (data.resultCode == 200) {
+				customAlert("출하 설비 LIST 저장이 완료되었습니다.");
+				setFormUnLock(".popup_area");
 			} else {
 				customAlert(data.resultMessage);
 				setFormUnLock(".popup_area");
@@ -1263,7 +1277,9 @@
 		//  disabled 처리시 값 전송안됨 아래에서 폼데이터 추가
 		//---------------------------------------------------------------
 		formData.append("coCd", $('#coCd').val());
-		formData.append("clntPjtNm", $("#clntPjt :selected").text())
+		formData.append("clntPjtNm", $("#clntPjt :selected").text());
+		formData.append("lgistNo", $('#lgistNo').val());
+		formData.append("fileTrgtKey", $('#fileTrgtKey').val());
 		//formData.append("workRptNo", $('#workRptNo').val());
 		//formData.append("reqIdNm", $('#reqIdNm').val());
 		//formData.append("pblicteDt", $('#pblicteDt').val());
@@ -1480,7 +1496,7 @@
 	                rowSharngListObj["name"] = elem.name;
 	                rowSharngListObj["telNo"] = elem.telNo;
 	                rowSharngListObj["email"] = elem.eMail;
-	                rowSharngListObj["pgPath"] = "/user/cr/cr10/CR1001P03.html";
+	                rowSharngListObj["pgPath"] = "/user/cr/cr10/CR1001P01.html";
 	                rowSharngListArr.push(rowSharngListObj);
 	            }
 	            else if (elem.gb == '결재'){
@@ -1495,7 +1511,7 @@
 	                rowApprovalListObj["name"] = elem.name;
 	                rowApprovalListObj["telNo"] = elem.telNo;
 	                rowApprovalListObj["email"] = elem.eMail;
-	                rowApprovalListObj["pgPath"] = "/user/cr/cr10/CR1001P03.html";
+	                rowApprovalListObj["pgPath"] = "/user/cr/cr10/CR1001P01.html";
 	                rowApprovalListArr.push(rowApprovalListObj);
 	            }
 	        });
@@ -1508,13 +1524,17 @@
 
 
 	function setDisplayLock(){
+		var $popup = $(document).find('.popup_area').first();
 		setDisabledInput("#popForm" , true);
 		$('#popForm select').prop("disabled", true);
 		$('#popForm .input_calendar').prop('disabled', true);
 		$('#popForm button').prop('disabled', true);
 		$('#popForm a').css('pointer-events', 'none');
-		$('.add_btn_small.pdl10').hide();
-		$("#actionBtn").prop("disabled", true).hide();
+		$popup.find('.add_btn_small.pdl10').hide();
+		$popup.find("#actionBtn").prop("disabled", true).hide();
+		
+		// locked-grid: row selector disabled
+		$popup.find('[data-ax5grid="salescd-grid"]').addClass("locked-grid");
 	}
 
 	//  업체명 검색 //
@@ -3025,7 +3045,6 @@
 
 	// 기본 물류정보(TRNS_DIV) 우선순위 연동 세팅
 	function fetchDefaultTrnsDiv(selectedReqData) {
-		debugger;
 		var formOrdrsNo = $("#ordrsNo").val();       // 현재 수주번호
 		var formClntCd = $("#ordrsClntCd").val();    // 현재 고객사
 		var reqNoVal = $("#reqNo").val();            // 현재 발주요청번호 (수기입력용)

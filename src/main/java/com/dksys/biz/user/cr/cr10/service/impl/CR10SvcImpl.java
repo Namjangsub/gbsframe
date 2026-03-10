@@ -125,17 +125,17 @@ public class CR10SvcImpl implements CR10Svc {
 	    Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 
 		//---------------------------------------------------------------
-		//첨? ?일 처리 권한체크 ?작 -->?일 ?로?? ?? 권한 ?으?Exception 처리 ??
-	  	//   ?수?:  jobType, userId, comonCd
+		//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+	  	//   필수값 :  jobType, userId, comonCd
 		//---------------------------------------------------------------
 		List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
 		if (uploadFileList.size() > 0) {
-				//?근 권한 ?으?Exception 발생
+				//접근 권한 없으면 Exception 발생
 				paramMap.put("jobType", "fileUp");
 				cm15Svc.selectFileAuthCheck(paramMap);
 		}
 		//---------------------------------------------------------------
-		//첨? ?일 권한체크  ??
+		//첨부 화일 권한체크  끝
 		//---------------------------------------------------------------
 		String  lgistNo = String.valueOf(cr10Mapper.selectLgistNoNext(paramMap));
 		paramMap.put("lgistNo", lgistNo);
@@ -267,7 +267,7 @@ public class CR10SvcImpl implements CR10Svc {
 		}
 
 		//---------------------------------------------------------------
-		//첨? ?일 처리 ?작  (처음 ?록?에???일 ???게 ?음)
+		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------
 		if (uploadFileList.size() > 0) {
 		    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
@@ -275,11 +275,11 @@ public class CR10SvcImpl implements CR10Svc {
 		    cm08Svc.uploadFile(paramMap, mRequest);
 		}
 		//---------------------------------------------------------------
-		//첨? ?일 처리  ??
+		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
 
 		//---------------------------------------------------------------
-		//결재 처리 ?작
+		//결재 처리 시작
 		//---------------------------------------------------------------
 //	    List<Map<String, String>> reqList = cr10Mapper.selectTodoAppReqList(paramMap);
 //	    List<Map<String, String>> toDoAppList = gsonDtl.fromJson(reqList.toString(), dtlMap);
@@ -304,13 +304,17 @@ public class CR10SvcImpl implements CR10Svc {
 //	    paramMap.put("todoDiv2CodeId", todoDiv2CodeId);
 //	    cr10Mapper.updateLgistMastTodoApp(paramMap);
 		//---------------------------------------------------------------
-		//결재 처리  ??
+		//결재 처리  끝
 		//---------------------------------------------------------------
 
-		//??결재 처리
+		//신 결재 처리
 		Gson gson = new Gson();		
-		String pgParam = "{\"fileTrgtKey\":\""+ String.valueOf(paramMap.get("fileTrgtKey")) +"\"}";
-		String todoTitle1 = lgistNo + " 물류진행?청 공유"; 
+		String pgParam = "{\"fileTrgtKey\":\"" + String.valueOf(paramMap.get("fileTrgtKey")) + "\""
+			+ ",\"coCd\":\"" + String.valueOf(paramMap.get("coCd")) + "\""
+			+ ",\"ordrsNo\":\"" + String.valueOf(paramMap.get("ordrsNo")) + "\""
+			+ ",\"lgistNo\":\"" + String.valueOf(paramMap.get("lgistNo")) + "\""
+			+ ",\"actionType\":\"U\"}";
+		String todoTitle1 = lgistNo + " 물류진행요청 공유"; 
 		
 		Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 		List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
@@ -334,7 +338,7 @@ public class CR10SvcImpl implements CR10Svc {
 		}
 
 		
-		String todoTitle2 = lgistNo + " 물류진행?청 결재"; 
+		String todoTitle2 = lgistNo + " 물류진행요청 결재"; 
 		
 		//결재
 		Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -357,15 +361,17 @@ public class CR10SvcImpl implements CR10Svc {
 	            }
 	        }
 		}
-		//??결재 ??
+		//신 결재 끝
 	    return rtnMap;
   }
+  
   private void assertApprovalEditable(Map<String, String> paramMap) throws Exception {
     int lockCnt = cr10Mapper.selectApprovalLockCntByFileTrgtKey(paramMap);
     if (lockCnt > 0) {
-      throw new Exception("  Ǵ Ϸ    ϴ.");
+      throw new Exception("결재진행된 정보는 수정이불가능 합니다.");
     }
   }
+  
   @Override
   public int updateLgistMast(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 	assertApprovalEditable(paramMap);
@@ -374,31 +380,31 @@ public class CR10SvcImpl implements CR10Svc {
 	Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
 
 	//---------------------------------------------------------------
-	//첨? ?일 처리 권한체크 ?작 -->?일 ?로?? ?? 권한 ?으?Exception 처리 ??
-  	//   ?수?:  jobType, userId, comonCd
+	//첨부 화일 처리 권한체크 시작 -->파일 업로드, 삭제 권한 없으면 Exception 처리 됨
+  	//   필수값 :  jobType, userId, comonCd
 	//---------------------------------------------------------------
     HashMap<String, String> param = new HashMap<>();
     param.put("userId", paramMap.get("userId"));
 	param.put("coCd", paramMap.get("coCd"));
-    param.put("comonCd", paramMap.get("comonCd"));  //?로?엔?에 ?어???일 ????치 ?보
+    param.put("comonCd", paramMap.get("comonCd"));  //프로트엔드에 넘어온 화일 저장 위치 정보
 
 	List<Map<String, String>> uploadFileList = gsonDtl.fromJson(paramMap.get("uploadFileArr"), dtlMap);
 	if (uploadFileList.size() > 0) {
-			//?근 권한 ?으?Exception 발생 (jobType, userId, comonCd 3??수??요)
+			//접근 권한 없으면 Exception 발생 (jobType, userId, comonCd 3개 필수값 필요)
 			param.put("jobType", "fileUp");
 			cm15Svc.selectFileAuthCheck(param);
 	}
 	String[] deleteFileArr = gsonDtl.fromJson(paramMap.get("deleteFileArr"), String[].class);
 	List<String> deleteFileList = Arrays.asList(deleteFileArr);
-    for(String fileKey : deleteFileList) {  // ?????일 ?나???? ?요(?체 목록?서 ?? ?택???요??
+    for(String fileKey : deleteFileList) {  // 삭제할 파일 하나씩 점검 필요(전체 목록에서 삭제 선택시 필요함)
 		    Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
-			//?근 권한 ?으?Exception 발생
-		    param.put("comonCd", fileInfo.get("comonCd"));  //?????일??보???????치 ?보
+			//접근 권한 없으면 Exception 발생
+		    param.put("comonCd", fileInfo.get("comonCd"));  //삭제할 파일이 보관된 저장 위치 정보
 		    param.put("jobType", "fileDelete");
 			cm15Svc.selectFileAuthCheck(param);
 	}
 	//---------------------------------------------------------------
-	//첨? ?일 권한체크  ??
+	//첨부 화일 권한체크  끝
 	//---------------------------------------------------------------
 
 	int result = cr10Mapper.deleteLgistDetailAll(paramMap);
@@ -413,12 +419,12 @@ public class CR10SvcImpl implements CR10Svc {
 
 		paramMap.put("salesCd", dtl.get("salesCd"));
 		
-    	//      반복문에?는 ??dtl)??"userId"? "pgmId"?추?
+    	//      반복문에서는 각 맵(dtl)에 "userId"와 "pgmId"를 추가
     	String dtaChk = dtl.get("dtaChk").toString();
-    	/* "dtaChk" 값을 ?인?여
-    	 * "I"??경우 cr10Mapper.insertLgistDetail(dtl)???출?여 ?로?트 ???보??입?고,
-    	 * "U"??경우 cr10Mapper.updateLgistDetail(dtl)???출?여 ?로?트 ???보??데?트?고,
-    	 * "D"??경우 * cr10Mapper.deleteLgistDetail(dtl)???출?여 ?로?트 ???보???.		 */
+    	/* "dtaChk" 값을 확인하여
+    	 * "I"인 경우 cr10Mapper.insertLgistDetail(dtl)을 호출하여 프로젝트 세부정보를 삽입하고,
+    	 * "U"인 경우 cr10Mapper.updateLgistDetail(dtl)을 호출하여 프로젝트 세부정보를 업데이트하고,
+    	 * "D"인 경우 * cr10Mapper.deleteLgistDetail(dtl)을 호출하여 프로젝트 세부정보를 삭제.		 */
     	if ("I".equals(dtaChk)) {
     		//dtl.put("prjctSeq", paramMap.get("prjctSeq"));
     		cr10Mapper.insertLgistDetail(dtl);
@@ -432,7 +438,7 @@ public class CR10SvcImpl implements CR10Svc {
 
     List<Map<String, String>> tripRptS = gsonDtl.fromJson(paramMap.get("tripRptS"), dtlMap);
 
-	// 1) ?로???일/seq ?신
+	// 1) 업로드 파일/seq 수신
 	List<MultipartFile> files = mRequest.getFiles("lgistFiles");
 	String[] seqArr = mRequest.getParameterValues("lgistFilesSeq");
 
@@ -453,8 +459,8 @@ public class CR10SvcImpl implements CR10Svc {
     	dtl.put("pgmId", paramMap.get("pgmId"));
 
 
-        // dtl?서 매핑??seq) 추출: ?론?에???? ?명??맞추?요
-        // 보통 lgistNoSeq ?는 workRptNoSeq ??나??어?니??
+        // dtl에서 매핑키(seq) 추출: 프론트에서 넣은 키명에 맞추세요
+        // 보통 lgistNoSeq 또는 workRptNoSeq 중 하나로 들어옵니다.
         String seq = dtl.get("lgistNoSeq");
         if (seq == null || (seq == null || seq.trim().isEmpty())) {
             seq = dtl.get("workRptNoSeq"); // fallback
@@ -463,27 +469,27 @@ public class CR10SvcImpl implements CR10Svc {
         MultipartFile mf = (seq == null) ? null : fileMap.get(seq);
 
         if (mf != null && !mf.isEmpty()) {
-            // BLOB ??용 byte[]
+            // BLOB 저장용 byte[]
             byte[] blob = mf.getBytes();
 
-            // ?일?컬럼 50???한 고려)
+            // 파일명(컬럼 50자 제한 고려)
             String orgName = safeFileName(mf.getOriginalFilename(), 50);
             String mime = (mf.getContentType() == null) ? "" : mf.getContentType();
 
-            // MyBatis ?라미터??길 ??팅
-            // mapper XML?서 #{lgistItemImg, jdbcType=BLOB} ?받도?
+            // MyBatis 파라미터로 넘길 값 세팅
+            // mapper XML에서 #{lgistItemImg, jdbcType=BLOB} 로 받도록
             dtl.put("lgistItemImgNm", orgName);
             dtl.put("lgistItemImgMime", mime);
 
-            // Map<String,String>?는 byte[]?put?????습?다.
-            // ?결: (A) Map<String,Object>?바꾸거나, (B) 별도 ?라미터 객체??야 ?니??
-            // ?래??최소 ?정?로 가?한 방식: Map??Object?캐스?해??byte[]??는 ?회
+            // Map<String,String>에는 byte[]를 put할 수 없습니다.
+            // 해결: (A) Map<String,Object>로 바꾸거나, (B) 별도 파라미터 객체를 써야 합니다.
+            // 아래는 최소 수정으로 가능한 방식: Map을 Object로 캐스팅해서 byte[]를 넣는 우회
             @SuppressWarnings("unchecked")
             Map raw = (Map) dtl;
             raw.put("lgistItemImg", blob);
         } else {
-            // ?일???으???지 컬럼? ?? ?거??null 처리
-            // update??경우 기존 BLOB ???려?XML?서 <if test="lgistItemImg != null"> 처리 ?요
+            // 파일이 없으면 이미지 컬럼은 넣지 않거나 null 처리
+            // update일 경우 기존 BLOB 유지하려면 XML에서 <if test="lgistItemImg != null"> 처리 필요
             dtl.put("lgistItemImgNm", "");
             dtl.put("lgistItemImgMime", "");
             @SuppressWarnings("unchecked")
@@ -492,7 +498,7 @@ public class CR10SvcImpl implements CR10Svc {
         }
 
     	String updCheck = dtl.get("updCheck").toString();
-    	/* "updCheck" 값을 ?인?여 */
+    	/* "updCheck" 값을 확인하여 */
     	if ("D".equals(updCheck)) {
     		cr10Mapper.deleteLgistItemImageDetail(dtl);
     	} else {
@@ -551,7 +557,7 @@ public class CR10SvcImpl implements CR10Svc {
     
     
 	//---------------------------------------------------------------
-	//첨? ?일 처리 ?작
+	//첨부 화일 처리 시작
 	//---------------------------------------------------------------
     if (uploadFileList.size() > 0) {
 	    paramMap.put("fileTrgtTyp", paramMap.get("pgmId"));
@@ -563,10 +569,10 @@ public class CR10SvcImpl implements CR10Svc {
     	cm08Svc.deleteFile(fileKey);
     }
 	//---------------------------------------------------------------
-	//첨? ?일 처리  ??
+	//첨부 화일 처리  끝
 	//---------------------------------------------------------------
     //---------------------------------------------------------------
-    //결재 처리 ?작 -?정?에??처리 ???역???다?결재 처리?다.
+    //결재 처리 시작 -수정시에도 처리 한 내역이 없다면 결재 처리한다.
     //---------------------------------------------------------------
 //    int todoAppCount = cr10Mapper.selectTodoAppCount(paramMap);
 //    if(todoAppCount == 0) {
@@ -590,17 +596,21 @@ public class CR10SvcImpl implements CR10Svc {
 //	    cr10Mapper.updateLgistMastTodoApp(paramMap);
 //    }
     //---------------------------------------------------------------
-    //결재 처리  ??
+    //결재 처리  끝
     //---------------------------------------------------------------
 
-	//??결재 처리
+	//신 결재 처리
     
-    //?단 기존 리스????
+    //일단 기존 리스트 삭제
 	QM01Mapper.deleteApprovalList(paramMap); 
 	
 	Gson gson = new Gson();		
-	String pgParam = "{\"fileTrgtKey\":\""+ String.valueOf(paramMap.get("fileTrgtKey")) +"\"}";
-	String todoTitle1 = paramMap.get("lgistNo") + " 물류진행?청 공유"; 
+	String pgParam = "{\"fileTrgtKey\":\"" + String.valueOf(paramMap.get("fileTrgtKey")) + "\""
+		+ ",\"coCd\":\"" + String.valueOf(paramMap.get("coCd")) + "\""
+		+ ",\"ordrsNo\":\"" + String.valueOf(paramMap.get("ordrsNo")) + "\""
+		+ ",\"lgistNo\":\"" + String.valueOf(paramMap.get("lgistNo")) + "\""
+		+ ",\"actionType\":\"U\"}";
+	String todoTitle1 = paramMap.get("lgistNo") + " 물류진행요청 공유"; 
 	
 	Type stringList2 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
 	List<Map<String, String>> sharngArr = gson.fromJson(paramMap.get("rowSharngListArr"), stringList2);
@@ -624,7 +634,7 @@ public class CR10SvcImpl implements CR10Svc {
 	}
 
 	
-	String todoTitle2 = paramMap.get("lgistNo") + " 물류진행?청 결재"; 
+	String todoTitle2 = paramMap.get("lgistNo") + " 물류진행요청 결재"; 
 	
 	//결재
 	Type stringList3 = new TypeToken<ArrayList<Map<String, String>>>() {}.getType();
@@ -647,7 +657,7 @@ public class CR10SvcImpl implements CR10Svc {
             }
         }
 	}
-	//??결재 ??
+	//신 결재 끝
 	
     return result;
   }
@@ -669,7 +679,7 @@ public class CR10SvcImpl implements CR10Svc {
 
     List<Map<String, String>> tripRptS = gsonDtl.fromJson(paramMap.get("tripRptS"), dtlMap);
 
-	// 1) ?로???일/seq ?신
+	// 1) 업로드 파일/seq 수신
 	List<MultipartFile> files = mRequest.getFiles("lgistFiles");
 	String[] seqArr = mRequest.getParameterValues("lgistFilesSeq");
 
@@ -687,9 +697,9 @@ public class CR10SvcImpl implements CR10Svc {
 	
 
 
-    // ?료가 ?나???으?PASS
+    // 자료가 하나도 없으면 PASS
     if ((tripRptS == null || tripRptS.isEmpty()) && fileMap.isEmpty()) {
-        return 9999; // 처리????음, 9999 ?론?엔?에??처리?야??
+        return 9999; // 처리할 게 없음, 9999 프론트엔드에서 처리해야함
     }
     
 	
@@ -699,8 +709,8 @@ public class CR10SvcImpl implements CR10Svc {
     	dtl.put("pgmId", paramMap.get("pgmId"));
 
 
-        // dtl?서 매핑??seq) 추출: ?론?에???? ?명??맞추?요
-        // 보통 lgistNoSeq ?는 workRptNoSeq ??나??어?니??
+        // dtl에서 매핑키(seq) 추출: 프론트에서 넣은 키명에 맞추세요
+        // 보통 lgistNoSeq 또는 workRptNoSeq 중 하나로 들어옵니다.
         String seq = dtl.get("lgistNoSeq");
         if (seq == null || (seq == null || seq.trim().isEmpty())) {
             seq = dtl.get("workRptNoSeq"); // fallback
@@ -709,27 +719,27 @@ public class CR10SvcImpl implements CR10Svc {
         MultipartFile mf = (seq == null) ? null : fileMap.get(seq);
 
         if (mf != null && !mf.isEmpty()) {
-            // BLOB ??용 byte[]
+            // BLOB 저장용 byte[]
             byte[] blob = mf.getBytes();
 
-            // ?일?컬럼 50???한 고려)
+            // 파일명(컬럼 50자 제한 고려)
             String orgName = safeFileName(mf.getOriginalFilename(), 50);
             String mime = (mf.getContentType() == null) ? "" : mf.getContentType();
 
-            // MyBatis ?라미터??길 ??팅
-            // mapper XML?서 #{lgistItemImg, jdbcType=BLOB} ?받도?
+            // MyBatis 파라미터로 넘길 값 세팅
+            // mapper XML에서 #{lgistItemImg, jdbcType=BLOB} 로 받도록
             dtl.put("lgistItemImgNm", orgName);
             dtl.put("lgistItemImgMime", mime);
 
-            // Map<String,String>?는 byte[]?put?????습?다.
-            // ?결: (A) Map<String,Object>?바꾸거나, (B) 별도 ?라미터 객체??야 ?니??
-            // ?래??최소 ?정?로 가?한 방식: Map??Object?캐스?해??byte[]??는 ?회
+            // Map<String,String>에는 byte[]를 put할 수 없습니다.
+            // 해결: (A) Map<String,Object>로 바꾸거나, (B) 별도 파라미터 객체를 써야 합니다.
+            // 아래는 최소 수정으로 가능한 방식: Map을 Object로 캐스팅해서 byte[]를 넣는 우회
             @SuppressWarnings("unchecked")
             Map raw = (Map) dtl;
             raw.put("lgistItemImg", blob);
         } else {
-            // ?일???으???지 컬럼? ?? ?거??null 처리
-            // update??경우 기존 BLOB ???려?XML?서 <if test="lgistItemImg != null"> 처리 ?요
+            // 파일이 없으면 이미지 컬럼은 넣지 않거나 null 처리
+            // update일 경우 기존 BLOB 유지하려면 XML에서 <if test="lgistItemImg != null"> 처리 필요
             dtl.put("lgistItemImgNm", "");
             dtl.put("lgistItemImgMime", "");
             @SuppressWarnings("unchecked")
@@ -738,7 +748,7 @@ public class CR10SvcImpl implements CR10Svc {
         }
         
     	String updCheck = dtl.get("updCheck").toString();
-    	/* "updCheck" 값을 ?인?여 */
+    	/* "updCheck" 값을 확인하여 */
     	if ("D".equals(updCheck)) {
     		result = cr10Mapper.deleteLgistItemImageDetail(dtl);
     	} else {
@@ -755,8 +765,8 @@ public class CR10SvcImpl implements CR10Svc {
   public int deleteLgistMast(Map<String, String> paramMap) throws Exception {
       assertApprovalEditable(paramMap);
 	    //---------------------------------------------------------------
-		//첨? ?일 권한체크  ?작 -->?? 권한 ?으?Exception, 관???일 ?체 체크
-	  	//   ?수?:  jobType, userId, comonCd
+		//첨부 화일 권한체크  시작 -->삭제 권한 없으면 Exception, 관련 화일 전체 체크
+	  	//   필수값 :  jobType, userId, comonCd
 		//---------------------------------------------------------------
 	    List<Map<String, String>> deleteFileList = cm08Svc.selectFileListAll(paramMap);
 	    HashMap<String, String> param = new HashMap<>();
@@ -765,14 +775,14 @@ public class CR10SvcImpl implements CR10Svc {
 	    param.put("userId", paramMap.get("userId"));
 	    if (deleteFileList.size() > 0) {
 		    for (Map<String, String> dtl : deleteFileList) {
-					//?근 권한 ?으?Exception 발생
+					//접근 권한 없으면 Exception 발생
 		            param.put("comonCd",  dtl.get("comonCd"));
 
 					cm15Svc.selectFileAuthCheck(param);
 			}
 	    }
 		//---------------------------------------------------------------
-		//첨? ?일 권한체크 ??
+		//첨부 화일 권한체크 끝
 		//---------------------------------------------------------------
 
 	  int result = cr10Mapper.deleteLgistDetailAll(paramMap);
@@ -780,7 +790,7 @@ public class CR10SvcImpl implements CR10Svc {
 	  result += cr10Mapper.deleteTodoDetail(paramMap);
 
 		//---------------------------------------------------------------
-		//첨? ?일 처리 ?작  (처음 ?록?에???일 ???게 ?음)
+		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
 		//---------------------------------------------------------------
 		if (deleteFileList.size() > 0) {
 		    for (Map<String, String> deleteDtl : deleteFileList) {
@@ -789,7 +799,7 @@ public class CR10SvcImpl implements CR10Svc {
 		    }
 		}
 		//---------------------------------------------------------------
-		//첨? ?일 처리  ??
+		//첨부 화일 처리  끝
 		//---------------------------------------------------------------
 	    return result;
   }
