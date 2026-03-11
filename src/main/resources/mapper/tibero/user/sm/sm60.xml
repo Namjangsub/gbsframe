@@ -76,19 +76,32 @@
 					) A
 						LEFT OUTER JOIN TB_BM02M01 AS C ON PCHS_CLNT_CD = C.CLNT_CD   --거래처마스터
 						LEFT OUTER JOIN (
-		            						SELECT  B.*
-												  , (SELECT FN_CM06M01_ID_TO_NM(B.SALES_EMP_ID) FROM DUAL) AS SALES_EMP_ID_NM
-											FROM (
-											    SELECT 
-											          B.CLNT_CD
-											        , B.BIZDEPT_SN
-											        , B.SALES_EMP_ID
-											        , B.SALES_CO_CD
-											        , ROW_NUMBER() OVER (PARTITION BY B.CLNT_CD ORDER BY B.BIZDEPT_SN ASC) AS rn
-											    FROM TB_BM02D01 B
---											    WHERE B.SALES_CO_CD = 'TRN'  --구매업무는 트루넷에서 처리함
-												) B
-											WHERE rn = 1
+								        SELECT
+								              B.CLNT_CD
+								            , B.BIZDEPT_SN
+								            , B.SALES_EMP_ID
+								            , B.SALES_CO_CD
+								            , FN_CM06M01_ID_TO_NM(B.SALES_EMP_ID) AS SALES_EMP_ID_NM
+								        FROM (
+								            SELECT
+								                  B.CLNT_CD
+								                , B.BIZDEPT_SN
+								                , B.SALES_EMP_ID
+								                , B.SALES_CO_CD
+								                , ROW_NUMBER() OVER (
+								                      PARTITION BY B.CLNT_CD
+								                      ORDER BY B.BIZDEPT_SN ASC, B.SALES_EMP_ID ASC
+								                  ) AS RN
+								            FROM TB_BM02D01 B
+								            WHERE B.USE_YN = 'Y'
+									    	  <if test="mngIdCd != null and !mngIdCd.equals('')">
+									    	  AND B.SALES_EMP_ID  IN ( ${mngIdCd} )
+									    	  </if>
+									    	  <if test="mngIdCdNm != null and !mngIdCdNm.equals('')">
+									    	  AND B.SALES_EMP_ID_NM LIKE '%'|| #{mngIdCdNm} || '%'
+									    	  </if>
+									    	  ) B
+									     WHERE RN = 1
 	    								) B2 ON B2.CLNT_CD = PCHS_CLNT_CD
 				  WHERE 1=1 
 				GROUP BY C.CLNT_NM, PCHS_CLNT_CD
@@ -172,7 +185,7 @@
 										        , B.SALES_CO_CD
 										        , ROW_NUMBER() OVER (PARTITION BY B.CLNT_CD ORDER BY B.BIZDEPT_SN ASC) AS rn
 										    FROM TB_BM02D01 B
---										    WHERE B.SALES_CO_CD = 'TRN'  --구매업무는 트루넷에서 처리함
+	                                        WHERE B.USE_YN = 'Y'
 											) B
 										WHERE rn = 1
     								) B2 ON B2.CLNT_CD = PCHS_CLNT_CD
