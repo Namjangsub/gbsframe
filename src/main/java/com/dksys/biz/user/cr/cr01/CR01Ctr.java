@@ -40,7 +40,6 @@ public class CR01Ctr {
     @PostMapping("/selectEstList")
     public String selectEstList(@RequestBody Map<String, String> param, ModelMap model) {
         int totalCnt = cr01svc.selectEstCount(param);
-        System.out.println(totalCnt + "총로우");
         PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
         model.addAttribute("paginationInfo", paginationInfo);
 
@@ -52,7 +51,6 @@ public class CR01Ctr {
     @PostMapping("/selectEstListModal")
     public String selectEstListModal(@RequestBody Map<String, String> param, ModelMap model) {
         int totalCnt = cr01svc.selectEstCountModal(param);
-        System.out.println(totalCnt + "총로우");
         PaginationInfo paginationInfo = new PaginationInfo(param, totalCnt);
         model.addAttribute("paginationInfo", paginationInfo);
 
@@ -76,7 +74,6 @@ public class CR01Ctr {
         int totalCnt = cr01svc.selectEstDetailCount(paramMap);
         PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
         model.addAttribute("paginationInfo", paginationInfo);
-        System.out.println(totalCnt + "총로우");
         Map<String, Object> estInfo = cr01svc.selectEstInfo(paramMap);
         model.addAttribute("estInfo", estInfo);
         return "jsonView";
@@ -100,7 +97,6 @@ public class CR01Ctr {
     public String insertEstDeg(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) {
         try {
             Map<String, Object> newEstMap = cr01svc.insertEstDeg(paramMap, mRequest);
-            System.out.println(newEstMap + "최종");
             model.addAttribute("resultCode", 200);
             model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
             model.addAttribute("param", newEstMap);
