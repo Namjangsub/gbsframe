@@ -597,14 +597,19 @@
 							recalcSortOrder();
 						}
 						this.self.repaint(true);
-						// scroll 행이 현재 columnHeight보다 커진 경우에만 frozen 동기화 (늘어날 때만)
-						var curColH = (mnGridView.target.config.body || {}).columnHeight || 50;
-						var maxH = 0;
-						$('[data-ax5grid="mnGrid-grid"]').find('[data-ax5grid-panel-scroll="body"] tr').each(function () {
-							maxH = Math.max(maxH, $(this).outerHeight() || 0);
-						});
-						if (maxH > curColH) {
+						if (this.key === 'mnSubject') {
+							// 틀고정 패널이라 DOM으로 높이 감지 불가 → 무조건 syncRowHeights 실행
 							setTimeout(syncRowHeights, 0);
+						} else {
+							// 다른 컬럼: 스크롤 패널이 실제로 커진 경우에만 실행 (스크롤 위치 보존)
+							var curColH = (mnGridView.target.config.body || {}).columnHeight || 50;
+							var maxH = 0;
+							$('[data-ax5grid="mnGrid-grid"]').find('[data-ax5grid-panel-scroll="body"] tr').each(function () {
+								maxH = Math.max(maxH, $(this).outerHeight() || 0);
+							});
+							if (maxH > curColH) {
+								setTimeout(syncRowHeights, 0);
+							}
 						}
 					},
 					inlineEdit: {
@@ -699,7 +704,7 @@
 				} catch (error) {
 					alert("오류 발생!! 전산실 연락 바랍니다: " + error.message);
 				} finally {
-					syncRowHeights();
+					syncRowHeights(true);
 					focusLastEditedCell();
 				}
 			});
@@ -1647,20 +1652,43 @@
 
 
 
-	function syncRowHeights() {
-		var $rows = $('[data-ax5grid="mnGrid-grid"]').find('[data-ax5grid-panel-scroll="body"] tr');
+	function syncRowHeights(forceFullScan) {
+		var grid = mnGridView.target;
+		var $gridEl = $('[data-ax5grid="mnGrid-grid"]');
+		var oldConfig = grid.config.body || {};
+
+		// 주제(mnSubject) 편집 시 or 초기 로드(forceFullScan):
+		// 틀고정 패널은 DOM 높이가 고정되므로 임시 해제 후 측정
+		var editedKey = lastEditedCell ? lastEditedCell.colKey : null;
+		var needFullScan = forceFullScan || (editedKey === 'mnSubject');
+		if (needFullScan) {
+			$gridEl.css('visibility', 'hidden');
+			grid.setConfig({ frozenColumnIndex: 0 });
+		}
+
 		var maxHeight = 30;
-		$rows.each(function () {
-			var rowHeight = $(this).outerHeight();
-			if (rowHeight > maxHeight) maxHeight = rowHeight;
+		$gridEl.find('[data-ax5grid-panel-scroll="body"] tr').each(function () {
+			var h = $(this).outerHeight() || 0;
+			if (h > maxHeight) maxHeight = h;
 		});
-		// grid에 적용
-		var oldConfig = mnGridView.target.config.body || {};
-		mnGridView.target.setConfig({
-			body: $.extend({}, oldConfig, { columnHeight: maxHeight })
-		});
-		mnGridView.target.repaint();
+
+		if (needFullScan) {
+			// 틀고정 복원 + columnHeight 적용 후 표시
+			grid.setConfig({
+				frozenColumnIndex: 1,
+				body: $.extend({}, oldConfig, { columnHeight: maxHeight })
+			});
+			grid.repaint();
+			$gridEl.css('visibility', '');
+		} else {
+			// 다른 컬럼: 스크롤 위치 유지하며 높이만 적용
+			grid.setConfig({
+				body: $.extend({}, oldConfig, { columnHeight: maxHeight })
+			});
+			grid.repaint();
+		}
 	}
+
 
 
 	// 선택된 행 하나를 위로 한 칸 이동
