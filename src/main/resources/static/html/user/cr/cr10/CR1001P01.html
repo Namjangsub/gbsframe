@@ -510,6 +510,7 @@
 	var fileTrgtKey = null;
 	var lgistNo = null;
 	var tLgistNo = null;
+	var lgistComplYn = null; //배송완료여부
 
 	var appStatus = "N";// 결재상태
 	var grid_onDataChanged = true;
@@ -633,15 +634,13 @@
 
 			setData: function(_page){
 				var target = this.target;
-				/*
 				var formData = {
 					"coCd" 		 : $("#coCd").val(),
 					"ordrsNo" 	 : $("#ordrsNo").val(),
 					"fileTrgtKey": $("#fileTrgtKey").val(),
+					"lgistNo"    : $("#lgistNo").val(),
+					"clasDiv"    : $("#clasDiv").val(),
 				}
-				*/
-
-				var formData = getSearchParam("#popForm");
 	    		postAjax("/user/cr/cr10/selectSelesCdList", formData, null, function(data) {
 					try {
 						var list = data.resultList;
@@ -752,7 +751,12 @@
 									});
 									if (list.some(item => item.sanctnSttus === "Y") && isApprovalLocked()) { //결재자중에 한명이라도 결재, 공유가 되었으면 수정 불가로 수정버튼 숨김
 										$('#actionBtn').hide();
-										$('#fileUpBtn').show();
+
+										// 배송완료처리되었으면 출하설비LIST, 부품LIST, 첨부파일 수정금지 처리
+										if (lgistComplYn == "Y") {
+										} else {
+											$('#fileUpBtn').show();
+										}
 										setDisplayLock();
 									}
 								}
@@ -944,14 +948,15 @@
 			$('#printBtn').show();
 
 			$('.tit').text('물류진행요청 수정');
+			salescdGridView.initView();
 			selectLgistMastInfo();
 
 			$('#actionBtn').text("수정");
 			$('#actionBtn').on("click", function() {
 				updateLgistMast();
 			});
-			salescdGridView.initView();
 			gridViewPop2.initView().setData(0);
+
 		}
 
 
@@ -1095,7 +1100,7 @@
 		var formData = {
 			"fileTrgtKey" : fileTrgtKey,
 		}
-		postAjax("/user/cr/cr10/selectLgistMastInfo", formData, null, function(data) {
+		postAjaxSync("/user/cr/cr10/selectLgistMastInfo", formData, null, function(data) {
 			loadFormData("#popForm", data.result, function(data){
 				salescdGridView.setData(0);//입고,출고 에 따라 그리드 데이타 변경
 
@@ -1104,11 +1109,18 @@
 				changeSetEtc(data.dmsSendCndDiv,"dmsSendCndDiv");
 				changeSetEtc(data.ovsSendCndDiv,"ovsSendCndDiv");
 
+
+				lgistComplYn = data.lgistComplYn;
+				//배송완료처리되었으면 출하설비LIST, 부품LIST, 첨부파일 수정금지 처리
+				if (lgistComplYn == "Y") {
+					setDisplayAppendLock();			
+				}
 				//결재진행상태코드
 				appStatus = data.appStatus;
 				if (appStatus == "Y") {
 					setDisplayLock();
 			    }
+
 			});
 // 			monthCloseChk($('#pblicteDt').val());
 			$('#coCd').trigger('change'); //파일트리 새로 그리기
@@ -1125,7 +1137,6 @@
 			    	appendPartListRow(row, "SERVER");
 			    });
 		    }
-		
 		});
 	}
 	
@@ -1535,6 +1546,18 @@
 		
 		// locked-grid: row selector disabled
 		$popup.find('[data-ax5grid="salescd-grid"]').addClass("locked-grid");
+	}
+
+	function setDisplayAppendLock(){
+		$('#listSaveButton').hide();       // 출하설비LIST 저장 버튼 숨김
+		$('#addDayileRptTrpButton').hide();   // 출하설비LIST 추가 버튼 숨김
+		$('#partListSaveButton').hide();   // 부품LIST 저장 버튼 숨김
+		$('#addPartListButton').hide();   // 부품LIST 추가 버튼 숨김
+		$('#fileUpBtn').hide();              // 공통 첨부파일 버튼 숨김
+
+		// 일괄붙여넣기 텍스트 박스 비활성화
+		$('#bulkPasteBox').prop('disabled', true);
+		$('#partBulkPasteBox').prop('disabled', true);
 	}
 
 	//  업체명 검색 //
