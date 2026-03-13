@@ -20,20 +20,19 @@ import com.dksys.biz.user.mail.service.EmailSvc;
 import javax.activation.DataHandler;
 import javax.activation.DataSource;
 import javax.activation.FileDataSource;
+import javax.annotation.PostConstruct;
 import javax.mail.Authenticator;
 import javax.mail.Message.RecipientType;
 import javax.mail.Multipart;
 import javax.mail.PasswordAuthentication;
 import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeMultipart;
-import javax.mail.internet.MimeUtility;
 import javax.mail.util.ByteArrayDataSource;
 import javax.mail.Session;
 import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeBodyPart;
 
-import java.io.UnsupportedEncodingException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
@@ -59,6 +58,20 @@ public class EmailSvcImpl implements EmailSvc {
     
     @Autowired
     MailMapper mailMapper;
+    
+
+    @PostConstruct
+    public void initMailMimeProperties() {
+        System.setProperty("mail.mime.encodefilename", "true");
+        System.setProperty("mail.mime.decodefilename", "true");
+        System.setProperty("mail.mime.encodeparameters", "true");
+        System.setProperty("mail.mime.decodeparameters", "true");
+        System.setProperty("mail.mime.splitlongparameters", "false");
+
+        // 필요 시 추가 검토
+        // System.setProperty("mail.mime.encodefilename", "true");
+        // System.setProperty("mail.mime.decodefilename", "true");
+    }
     
     @Autowired
     private UrlService urlService;    
@@ -132,8 +145,8 @@ public class EmailSvcImpl implements EmailSvc {
         String mailCnts = "";
         if ("free".equals(paramMap.get("cntsType"))) {
         	mailCnts = "<pre>" + paramMap.get("mailCnts") + "</pre>" 
-				+ "<a href=" + paramMap.get("shortUrl") + " target='_blank' title='발주서 확인'>발주서</a>"
-				+ " <a> 비밀코드 : " + paramMap.get("chkCode") + "</a>";
+        			 + "<tr><td><a href=" + paramMap.get("shortUrl") + "target='_blank'> title='발주서 확인'>발주서</a></td></tr>"
+				     + " <a> 비밀코드 : " + paramMap.get("chkCode") + "</a>";
         } else {        	
         	mailCnts = setHtmlContext(authCode, paramMap);
         }
@@ -159,58 +172,44 @@ public class EmailSvcImpl implements EmailSvc {
 //
 //        // JavaMailProperties 설정
 //        mailSenderImpl.setJavaMailProperties(properties);  
-        
         MimeMessage mimeMessage = javaMailSender.createMimeMessage();
-        MimeMessageHelper mimeMessageHelper = new MimeMessageHelper(mimeMessage, true, "UTF-8"); //파일첨부 기능 상용여부 (true:사용, false:미사용)
-        mimeMessage.setFrom(new InternetAddress(paramMap.get("mailFrom")));
-//        String toValue = paramMap.get("mailTo");
-//        List<String> validToAddresses = filterValidEmailAddresses(toValue);
-//        for (String address : validToAddresses) {
-//        	mimeMessageHelper.addTo(address);
-//        }
-//        String ccValue = paramMap.get("mailCc");
-//        List<String> validCcAddresses = filterValidEmailAddresses(ccValue);
-//        for (String address : validCcAddresses) {
-//        	mimeMessageHelper.addCc(address);
-//        }    
+        MimeMessageHelper mimeMessageHelper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+
+        mimeMessageHelper.setFrom(paramMap.get("mailFrom"));
+
         String toValue = paramMap.get("mailTo");
         List<String> validToAddresses = filterValidEmailAddresses(toValue);
-        String[] toAddressesArray = validToAddresses.toArray(new String[0]);
-        mimeMessageHelper.setTo(toAddressesArray);
-        
+        if (validToAddresses == null || validToAddresses.isEmpty()) {
+            throw new IllegalArgumentException("수신자(mailTo)가 없습니다.");
+        }
+        mimeMessageHelper.setTo(validToAddresses.toArray(new String[0]));
+
         String ccValue = paramMap.get("mailCc");
         List<String> validCcAddresses = filterValidEmailAddresses(ccValue);
-        String[] ccAddressesArray = validCcAddresses.toArray(new String[0]);
-        mimeMessageHelper.setCc(ccAddressesArray);        
-//        String bccValue = paramMap.get("mailBcc");
-//        List<String> validBccAddresses = filterValidEmailAddresses(bccValue);
-//        for (String address : validCcAddresses) {
-//        	mimeMessageHelper.setCc(address);
-//        } 
-        mimeMessageHelper.setSubject(paramMap.get("mailTitle")); // 메일 제목
-        
-        // html로 텍스트 설정
+        if (validCcAddresses != null && !validCcAddresses.isEmpty()) {
+            mimeMessageHelper.setCc(validCcAddresses.toArray(new String[0]));
+        }
+
+        mimeMessageHelper.setSubject(paramMap.get("mailTitle"));
         mimeMessageHelper.setText(mailCnts, true);
-      
-        mimeMessageHelper.addInline("logo", new ClassPathResource("static/img/Logo.png"));//템플릿에 들어가는 이미지 cid로 삽입
- 
+        mimeMessageHelper.addInline("logo", new ClassPathResource("static/img/Logo.png"));
 
         List<MultipartFile> fileList = mRequest.getFiles("files");
-        // 첨부 파일이 있는 경우에만 처리
-    	if (fileList != null && fileList.size() > 0) {
-    	    for (MultipartFile mf : fileList) {
-    	        String originFileName = mf.getOriginalFilename();
-    	        try {
-    	            // 파일 이름을 인코딩하여 첨부 파일 추가
-    	            String encodedFileName = MimeUtility.encodeText(originFileName, "UTF-8", "B");
-    	            mimeMessageHelper.addAttachment(encodedFileName, mf);
-    	        } catch (UnsupportedEncodingException e) {
-    	            // 파일 이름 인코딩 에러 처리
-    	            e.printStackTrace();
-    	        }
-    	    }
-    	}
-    	
+        if (fileList != null && !fileList.isEmpty()) {
+            for (MultipartFile mf : fileList) {
+                if (mf == null || mf.isEmpty()) {
+                    continue;
+                }
+
+                String fileName = mf.getOriginalFilename();
+                if (fileName == null || fileName.trim().isEmpty()) {
+                    continue;
+                }
+
+               	mimeMessageHelper.addAttachment(fileName, mf);
+            }
+        }
+
         javaMailSender.send(mimeMessage);
         
         return 1;
@@ -282,6 +281,7 @@ public class EmailSvcImpl implements EmailSvc {
 
         return validEmailAddresses;
     }
+    
     
 	@Override
 	public int selectMailCount(java.util.Map<String, String> paramMap) {
