@@ -689,7 +689,12 @@ public class QM01SvcImpl implements QM01Svc {
 		//---------------------------------------------------------------  
 		//첨부 화일 처리  끝 
 		//---------------------------------------------------------------  
-		 	  
+		
+		// 7. DW Version테이블에 확정정보 초기화 처리
+		List<Map<String, String>> selectDw03FileListInfo = dw03Mapper.selectDw03FileListInfo(paramMap);
+		if (selectDw03FileListInfo.size() >0) {
+			dw03Mapper.initialDw03(paramMap);
+		}
 	    return result;
   }
   
