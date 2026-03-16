@@ -1,5 +1,31 @@
 package com.dksys.biz.user.mail.service.impl;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javax.activation.DataHandler;
+import javax.activation.DataSource;
+import javax.activation.FileDataSource;
+import javax.annotation.PostConstruct;
+import javax.mail.Authenticator;
+import javax.mail.Message.RecipientType;
+import javax.mail.Multipart;
+import javax.mail.PasswordAuthentication;
+import javax.mail.Session;
+import javax.mail.Transport;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeBodyPart;
+import javax.mail.internet.MimeMessage;
+import javax.mail.internet.MimeMultipart;
+import javax.mail.util.ByteArrayDataSource;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
@@ -16,32 +42,6 @@ import org.thymeleaf.spring5.SpringTemplateEngine;
 import com.dksys.biz.rest.url.service.UrlService;
 import com.dksys.biz.user.mail.mapper.MailMapper;
 import com.dksys.biz.user.mail.service.EmailSvc;
-
-import javax.activation.DataHandler;
-import javax.activation.DataSource;
-import javax.activation.FileDataSource;
-import javax.annotation.PostConstruct;
-import javax.mail.Authenticator;
-import javax.mail.Message.RecipientType;
-import javax.mail.Multipart;
-import javax.mail.PasswordAuthentication;
-import javax.mail.internet.MimeMessage;
-import javax.mail.internet.MimeMultipart;
-import javax.mail.util.ByteArrayDataSource;
-import javax.mail.Session;
-import javax.mail.Transport;
-import javax.mail.internet.InternetAddress;
-import javax.mail.internet.MimeBodyPart;
-
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.Map;
-import java.util.Properties;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -145,8 +145,8 @@ public class EmailSvcImpl implements EmailSvc {
         String mailCnts = "";
         if ("free".equals(paramMap.get("cntsType"))) {
         	mailCnts = "<pre>" + paramMap.get("mailCnts") + "</pre>" 
-        			 + "<tr><td><a href=" + paramMap.get("shortUrl") + "target='_blank'> title='발주서 확인'>발주서</a></td></tr>"
-				     + " <a> 비밀코드 : " + paramMap.get("chkCode") + "</a>";
+        			+ "<a href=" + paramMap.get("shortUrl") + " target='_blank' title='발주서 확인'>발주서</a>"
+				+ " <a> 비밀코드 : " + paramMap.get("chkCode") + "</a>";
         } else {        	
         	mailCnts = setHtmlContext(authCode, paramMap);
         }
