@@ -25,6 +25,9 @@ public class EmailCtr {
     @Autowired
 	EmailSvc emailSvc;
 
+	@Autowired
+	com.dksys.biz.user.mail.service.MailLoggingSvc mailLoggingSvc;
+
 	@Value("${spring.mailType}")
 	private String mailType;
 	
@@ -66,17 +69,18 @@ public class EmailCtr {
 			model.addAttribute("shortUrl", paramMap.get("shortUrl"));
 			model.addAttribute("chkCode", paramMap.get("chkCode"));
 		}catch(Exception e){
-			String errorMessage = e.getMessage() != null ? e.getMessage() : "알수 없는 오류 확인 필요";
+			String errorMessage = e.getMessage() != null ? e.getMessage() : "Unknown Network/SMTP error";
 			paramMap.put("errorYn", "Y");
 			paramMap.put("errorText", errorMessage);
 			try {
-//				int count = emailSvc.updateMailError(paramMap);
-				int count = emailSvc.insertMail(paramMap); //오류로그 남기기 Exception 발생시 rollback되어 초기등록된 자료가 없음~
+				int count = mailLoggingSvc.insertMailLog(paramMap); // 독립 트랜잭션으로 오류로그 강제 저장
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("mailSendFail"));
+				model.addAttribute("detailMessage", errorMessage);
 			}catch(Exception ex){	  
 				model.addAttribute("resultCode", 900);
-				model.addAttribute("resultMessage", ex.getMessage());
+				model.addAttribute("resultMessage", "서버 로깅 실패: " + ex.getMessage());
+				model.addAttribute("detailMessage", ex.getMessage());
 			}
 		}
 		return "jsonView";

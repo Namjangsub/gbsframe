@@ -124,7 +124,7 @@ public class EmailSvcImpl implements EmailSvc {
             hostAddress += ":" + port;
         }
 
-        System.out.println("Host Address: " + hostAddress);
+//        System.out.println("Host Address: " + hostAddress);
         String targetUrl = hostAddress + "/static/redirectChkCode.html?" + hostAddress + ":8443/ubi4/ubihtml.jsp" + paramMap.get("tempUrl");
         paramMap.put("longUrl", targetUrl);
         paramMap.put("hostAddress", hostAddress);
@@ -132,15 +132,15 @@ public class EmailSvcImpl implements EmailSvc {
 	    	Map<String, String> returnUrl = urlService.generateShortUrl(paramMap);
 	    	paramMap.put("shortUrl", returnUrl.get("shortUrl"));
 	    	paramMap.put("chkCode", returnUrl.get("chkCode"));
-	    	System.out.println("shortUrl: " + returnUrl);
+//	    	System.out.println("shortUrl: " + returnUrl);
     	}catch(Exception e){  //ShortURL 생성 실패시 링크없이 메일 전송 처리하기 위함
     		paramMap.put("shortUrl", "");
 	    	paramMap.put("chkCode", "");
-	    	System.out.println("shortUrl: ShortURL 생성 실패하였습니다.");
+//	    	System.out.println("shortUrl: ShortURL 생성 실패하였습니다.");
     	}
         
         String authCode = createCode();
-        System.out.println("authCode: " + authCode);
+//        System.out.println("authCode: " + authCode);
         // html로 텍스트 설정
         String mailCnts = "";
         if ("free".equals(paramMap.get("cntsType"))) {
