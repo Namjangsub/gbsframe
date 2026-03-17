@@ -17,8 +17,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import com.dksys.biz.cmn.vo.PaginationInfo;
+import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.user.cr.cr50.service.CR50Svc;
 import com.dksys.biz.util.MessageUtils;
+import java.util.HashMap;
 
 @Controller
 @RequestMapping("/user/cr/cr50")
@@ -31,6 +33,9 @@ public class CR50Ctr {
 
     @Autowired
     CR50Svc cr50Svc;
+    
+    @Autowired
+    CM08Svc cm08Svc;
     
 
     
@@ -133,14 +138,58 @@ public class CR50Ctr {
                 model.addAttribute("resultCode", 200);
                 model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
 				model.addAttribute("fileTrgtKey", paramMap.get("fileTrgtKey"));
+
+                // PDF 생성 및 서버 저장 트리거
+                try {
+                    Map<String, String> reportParam = new HashMap<>(paramMap);
+                    reportParam.put("file", "CR5001M01.jrf");
+                    reportParam.put("fileTrgtTyp", "CR5001P01");
+                    reportParam.put("comonCd", "FITR0202"); // 영업-PFU최종 폴더
+                    reportParam.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+                    reportParam.put("exportFileName", "PFU_" + paramMap.get("ordrsNo") + "_" + paramMap.get("fileTrgtKey") + ".pdf");
+                    
+                    String arg = "coCd#" + paramMap.get("coCd") 
+                               + "#partNo#" + "B" 
+                               + "#pfuNo#" + paramMap.get("fileTrgtKey") 
+                               + "#fromSalesCd#" + paramMap.get("fromSalesCd") 
+                               + "#ordrsNo#" + paramMap.get("ordrsNo") 
+                               + "#userId#" + paramMap.get("userId") 
+                               + "#";
+                    reportParam.put("arg", arg);
+
+                    int newFileKey = cm08Svc.saveUbiReport(reportParam);
+                    
+                    // 이전 보고서 파일 삭제 (Cleanup)
+                    Map<String, String> deleteParam = new HashMap<>();
+                    deleteParam.put("coCd", paramMap.get("coCd"));
+                    deleteParam.put("fileTrgtTyp", "CR5001P01");
+                    deleteParam.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+                    deleteParam.put("userId", paramMap.get("userId"));
+                    List<Map<String, String>> fileList = cm08Svc.selectFileList(deleteParam);
+                    for (Map<String, String> file : fileList) {
+                        String fKey = String.valueOf(file.get("fileKey"));
+                        String fName = file.get("fileName");
+                        if (fName.equals("PFU_" + paramMap.get("ordrsNo") + "_" + paramMap.get("fileTrgtKey") + ".pdf") && !fKey.equals(String.valueOf(newFileKey))) {
+                            cm08Svc.deleteFile(fKey);
+                        }
+                    }
+                    
+                    model.addAttribute("reportResultCode", 200);
+                    model.addAttribute("reportResultMessage", "리포트가 서버에 성공적으로 저장되었습니다.");
+                } catch (Exception re) {
+                    logger.error("PFU 데이터는 저장되었으나 리포트 생성 중 오류 발생", re);
+                    model.addAttribute("reportResultCode", 500);
+                    model.addAttribute("reportResultMessage", "리포트 생성 오류: " + re.getMessage());
+                }
             } else {
                 model.addAttribute("resultCode", 500);
                 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
             }
-            ;
         } catch (Exception e) {
             model.addAttribute("resultCode", 900);
-            model.addAttribute("resultDBError", ((SQLException) e.getCause()).getSQLState());
+            if (e.getCause() instanceof SQLException) {
+                model.addAttribute("resultDBError", ((SQLException) e.getCause()).getSQLState());
+            }
             model.addAttribute("resultMessage", e.getMessage());
         }
         return "jsonView";
@@ -152,11 +201,53 @@ public class CR50Ctr {
             if (cr50Svc.updatePfu(paramMap, mRequest) != 0) {
                 model.addAttribute("resultCode", 200);
                 model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+
+                // PDF 생성 및 서버 저장 트리거
+                try {
+                    Map<String, String> reportParam = new HashMap<>(paramMap);
+                    reportParam.put("file", "CR5001M01.jrf");
+                    reportParam.put("fileTrgtTyp", "CR5001P01");
+                    reportParam.put("comonCd", "FITR0202"); // 영업-PFU최종 폴더
+                    reportParam.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+                    reportParam.put("exportFileName", "PFU_" + paramMap.get("ordrsNo") + "_" + paramMap.get("fileTrgtKey") + ".pdf");
+                    
+                    String arg = "coCd#" + paramMap.get("coCd") 
+                               + "#partNo#" + "B" 
+                               + "#pfuNo#" + paramMap.get("fileTrgtKey") 
+                               + "#fromSalesCd#" + paramMap.get("fromSalesCd") 
+                               + "#ordrsNo#" + paramMap.get("ordrsNo") 
+                               + "#userId#" + paramMap.get("userId") 
+                               + "#";
+                    reportParam.put("arg", arg);
+
+                    int newFileKey = cm08Svc.saveUbiReport(reportParam);
+                    
+                    // 이전 보고서 파일 삭제 (Cleanup)
+                    Map<String, String> deleteParam = new HashMap<>();
+                    deleteParam.put("coCd", paramMap.get("coCd") );
+                    deleteParam.put("fileTrgtTyp",  "CR5001P01");
+                    deleteParam.put("fileTrgtKey", paramMap.get("fileTrgtKey"));
+                    deleteParam.put("userId", paramMap.get("userId"));
+                    List<Map<String, String>> fileList = cm08Svc.selectFileList(deleteParam);
+                    for (Map<String, String> file : fileList) {
+                        String fKey = String.valueOf(file.get("fileKey"));
+                        String fName = file.get("fileName");
+                        if (fName.equals("PFU_" + paramMap.get("ordrsNo") + "_" + paramMap.get("fileTrgtKey") + ".pdf") && !fKey.equals(String.valueOf(newFileKey))) {
+                            cm08Svc.deleteFile(fKey);
+                        }
+                    }
+                    
+                    model.addAttribute("reportResultCode", 200);
+                    model.addAttribute("reportResultMessage", "리포트가 서버에 성공적으로 저장되었습니다.");
+                } catch (Exception re) {
+                    logger.error("PFU 데이터는 수정되었으나 리포트 생성 중 오류 발생", re);
+                    model.addAttribute("reportResultCode", 500);
+                    model.addAttribute("reportResultMessage", "리포트 생성 오류: " + re.getMessage());
+                }
             } else {
                 model.addAttribute("resultCode", 500);
                 model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
             }
-            ;
         } catch (Exception e) {
             model.addAttribute("resultCode", 900);
             model.addAttribute("resultMessage", e.getMessage());

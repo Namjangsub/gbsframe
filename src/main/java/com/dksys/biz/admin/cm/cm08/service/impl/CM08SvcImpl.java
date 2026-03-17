@@ -3,6 +3,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.util.Base64;
 import java.lang.reflect.Type;
 import java.net.URLEncoder;
 import java.nio.file.Path;
@@ -19,6 +20,15 @@ import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -39,6 +49,7 @@ import com.dksys.biz.admin.cm.cm08.mapper.CM08Mapper;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.util.DateUtil;
+import com.dksys.biz.util.StringUtil;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
@@ -93,6 +104,9 @@ public class CM08SvcImpl implements CM08Svc {
 
 	@Autowired
     CM15Svc cm15Svc;
+    
+	@Value("${ubi.prefix:https://gbs.gunyangitt.co.kr:8443/ubi4}")
+	private String ubiprefix;
 
     @Value("${file.uploadDir}")
     private String uploadDir;
@@ -943,6 +957,120 @@ public class CM08SvcImpl implements CM08Svc {
 	    // keep DB stable and avoid weird characters
 	    if (!ext.matches("[A-Za-z0-9]+")) return "bin";
 	    return ext.toLowerCase();
+	}
+
+	@Override
+	@Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+	public int saveUbiReport(Map<String, String> paramMap) {
+		String fileTrgtTyp = paramMap.get("fileTrgtTyp");
+		String fileTrgtKey = paramMap.get("fileTrgtKey");
+		String jrfFile = paramMap.get("file"); // e.g., CR5001M01.jrf
+		String arg = paramMap.get("arg"); // e.g., coCd#10#salesCd#...#
+		String exportFileName = paramMap.get("exportFileName");
+
+		if (exportFileName == null || exportFileName.isEmpty()) {
+			exportFileName = "Report_" + DateUtil.getCurrentYyyymmdd() + ".pdf";
+		}
+
+		// UbiReport export URL 구성
+		String exportUrl = ubiprefix + "/ubiexport.jsp";
+		UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(exportUrl)
+				.queryParam("file", jrfFile)
+				.queryParam("arg", arg)
+				.queryParam("resid", "UBIHTML")
+				.queryParam("exporttype", "pdf");
+
+		RestTemplate restTemplate = new RestTemplate();
+		try {
+			logger.info("Calling UbiReport Server: {}", builder.toUriString());
+			
+			// PDF 파일 요청을 위한 헤더 설정 - binary/pdf 명시
+			HttpHeaders headers = new HttpHeaders();
+			headers.setAccept(Collections.singletonList(MediaType.APPLICATION_PDF));
+			HttpEntity<String> entity = new HttpEntity<>(headers);
+
+			ResponseEntity<String> response = restTemplate.exchange(
+					builder.build().toUri(), 
+					HttpMethod.GET, 
+					entity, 
+					String.class);
+			
+			String jsonResponse = response.getBody();
+			if (jsonResponse == null || jsonResponse.isEmpty()) {
+				throw new FileStorageException("Empty response received from UbiReport server");
+			}
+
+			// JSON 파싱 (Gson 사용)
+			Gson gson = new Gson();
+			Map<String, Object> responseMap = gson.fromJson(jsonResponse, new TypeToken<Map<String, Object>>(){}.getType());
+			
+			String base64Data = (String) responseMap.get("base64FileData");
+			if (base64Data == null || base64Data.isEmpty()) {
+				logger.error("Response from UbiReport server does not contain base64FileData. Response: {}", jsonResponse);
+				throw new FileStorageException("UbiReport server returned success, but PDF data is missing.");
+			}
+
+			// Base64 디코딩
+			byte[] pdfBytes = Base64.getDecoder().decode(base64Data);
+
+			if (pdfBytes == null || pdfBytes.length == 0) {
+				throw new FileStorageException("Decoded PDF data is empty.");
+			}
+			
+			// [PDF 검증] 파일 헤더 체크 (%PDF-)
+			if (pdfBytes.length < 4 || pdfBytes[0] != 0x25 || pdfBytes[1] != 0x50 || pdfBytes[2] != 0x44 || pdfBytes[3] != 0x46) {
+				logger.error("Invalid PDF Header after decoding. Data preview: {}", new String(pdfBytes, 0, Math.min(pdfBytes.length, 20)));
+				throw new FileStorageException("Decoded data is not a valid PDF format.");
+			}
+
+			// 파일 저장 로직 (uploadFile 로직 재사용)
+			String safeTrgtTyp = requireSafePathSegment(fileTrgtTyp, "fileTrgtTyp");
+			String year = DateUtil.getCurrentYyyy();
+			String month = DateUtil.getCurrentMm();
+			Path baseDir = resolveBaseUploadDir();
+			Path dir = baseDir.resolve(Paths.get(safeTrgtTyp, year, month)).normalize();
+			Files.createDirectories(dir);
+			String dirForDb = dir.toString() + File.separator;
+
+			String safeFileName = sanitizeFilename(exportFileName);
+			String fileType = extractFileExtension(safeFileName);
+
+			HashMap<String, String> dbParam = new HashMap<>(paramMap);
+			dbParam.put("fileSize", String.valueOf(pdfBytes.length));
+			dbParam.put("fileType", fileType);
+			dbParam.put("fileName", safeFileName);
+			dbParam.put("filePath", dirForDb);
+			dbParam.put("fileTrgtTyp", safeTrgtTyp);
+			dbParam.put("fileTrgtKey", fileTrgtKey);
+			// dbParam.put("userId", paramMap.get("userId")); // 이미 들어있음
+
+			// 권한 체크 및 보완 데이터 매핑 (기존 로직 활용)
+			Map<String, String> chk = fetchAllowedDataMap(dbParam);
+			if (chk != null && !chk.isEmpty()) {
+				dbParam.put("coCd",    StringUtil.nvlObj(chk.get("coCd")));
+				dbParam.put("clntCd",  StringUtil.nvlObj(chk.get("clntCd")));
+				dbParam.put("prjctCd", StringUtil.nvlObj(chk.get("prjctCd")));
+				dbParam.put("ordrsNo", StringUtil.nvlObj(chk.get("ordrsNo")));
+				dbParam.put("itemCd",  StringUtil.nvlObj(chk.get("itemDiv")));
+				dbParam.put("prdtCd",  StringUtil.nvlObj(chk.get("prdtCd")));
+				dbParam.put("salesCd", StringUtil.nvlObj(chk.get("salesCd")));
+			}
+
+			cm08Mapper.insertFile(dbParam);
+			String fileKey = dbParam.get("fileKey");
+			File targetFile = new File(dirForDb, fileKey + "_" + safeFileName);
+			
+			try (FileOutputStream fos = new FileOutputStream(targetFile)) {
+				fos.write(pdfBytes);
+			}
+			
+			logger.info("Successfully saved UbiReport PDF: {}", targetFile.getAbsolutePath());
+			return Integer.parseInt(fileKey);
+
+		} catch (Exception e) {
+			logger.error("Failed to save UbiReport PDF", e);
+			throw new FileStorageException("UbiReport PDF generation or saving failed: " + e.getMessage(), e);
+		}
 	}
     
 }

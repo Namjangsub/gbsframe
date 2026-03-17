@@ -55,5 +55,7 @@ public interface CM08Svc {
 
 	int fileUpload(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
 
+	int saveUbiReport(Map<String, String> param);
+
 
 }
