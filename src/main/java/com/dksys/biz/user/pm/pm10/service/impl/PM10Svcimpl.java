@@ -40,16 +40,16 @@ public class PM10Svcimpl implements PM10Svc {
 		// 회의록 리스트 조회
 		List<Map<String, String>> mnList = pm10Mapper.selectMnList(paramMap);
 
-		// [Critical Fix] 해당 날짜에 데이터가 없으면 빈 리스트 반환 (NPE 방지)
-		if (mnList == null || mnList.isEmpty()) {
-			return new ArrayList<>();
+		// 결과를 담을 새로운 리스트 (mnList가 null이면 빈 리스트로 시작)
+		List<Map<String, String>> resultList = (mnList != null) ? new ArrayList<>(mnList) : new ArrayList<>();
+
+		// 날짜 정보 추출 (mnList가 비어있으면 paramMap에서 가져옴)
+		String rawDate = "";
+		if (mnList != null && !mnList.isEmpty()) {
+			rawDate = mnList.get(0).get("mnDate").replace("-", "");
+		} else {
+			rawDate = paramMap.get("mnDate").replace("-", "");
 		}
-
-		// 결과를 담을 새로운 리스트에 회의록 복사
-		List<Map<String, String>> resultList = new ArrayList<>(mnList);
-
-		// 첫 번째 회의록의 날짜(rawDate)만 사용
-		String rawDate = mnList.get(0).get("mnDate").replace("-", "");
 
 		// 모든 부서코드로 파일 조회하여 allFiles 에 모으기
 		List<Map<String, String>> allFiles = new ArrayList<>();
@@ -73,6 +73,8 @@ public class PM10Svcimpl implements PM10Svc {
 			Map<String, String> fileRow = new HashMap<>();
 			// fileRow에는 원본 회의록과 구분하기 위해 "files"키에만 JSON 문자열을 담음
 			fileRow.put("files", gson.toJson(allFiles));
+			// 날짜 정보가 없으면 그리드에서 행 생성이 안 될 수 있으므로 추가
+			fileRow.put("mnDate", paramMap.get("mnDate"));
 			resultList.add(fileRow);
 		}
 
@@ -152,46 +154,8 @@ public class PM10Svcimpl implements PM10Svc {
 		int deletedMasterCount = pm10Mapper.deleteMnM01(paramMap);
 		result += deletedMasterCount;
 
-		// [Critical Fix] 마스터(M01) 데이터가 삭제되었다면 = 모든 일반 주제(D01)가 다 지워져서 날짜 당 데이터가 없을 때만 첨부파일을 싹 지움
-		if (deletedMasterCount > 0) {
-			String fileInfoJson = paramMap.get("fileInfoJson");
-
-			if (fileInfoJson != null && !fileInfoJson.isEmpty()) {
-				Map<String, List<Map<String, Object>>> fileInfoMap = new Gson().fromJson(
-					fileInfoJson,
-					new TypeToken<Map<String, List<Map<String, Object>>>>(){}.getType()
-				);
-
-				for (Map.Entry<String, List<Map<String, Object>>> entry : fileInfoMap.entrySet()) {
-					List<Map<String, Object>> fileList = entry.getValue();
-					for (Map<String, Object> file : fileList) {
-						String fileKey = String.valueOf(file.get("fileKey"));
-						if (fileKey == null || fileKey.isEmpty() || "0".equals(fileKey)) {
-							continue;
-						}
-
-						try {
-							// 물리 파일 삭제를 위한 경로 조회
-							Map<String, String> fileInfo = cm08Svc.selectFileInfo(fileKey);
-							if (fileInfo != null) {
-								String filePath = fileInfo.get("filePath") + fileKey + "_" + fileInfo.get("fileName");
-								File f = new File(filePath);
-								if (f.exists()) f.delete();
-							}
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
-
-						try {
-							cm08Svc.deleteFile(fileKey);
-							result++;
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
-					}
-				}
-			}
-		}
+		// [수정] 마스터(M01) 데이터가 삭제되더라도 첨부파일을 물리적으로 삭제하는 로직은 제거함
+		// (회의 로우가 없더라도 기존 첨부파일은 유지되어야 함)
 
 		return result;
 	}
