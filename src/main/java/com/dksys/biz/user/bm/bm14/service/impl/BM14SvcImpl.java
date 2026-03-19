@@ -357,8 +357,17 @@ public class BM14SvcImpl implements BM14Svc {
 								fileTrgtKey = Integer.toString(bm14Mapper.selectBomSeqNext(listArrMap));
 								String upperKey = selectSpareInfo.get("lowerKey");
 								String dsgnNo = listArrMap.get("salesCd") + "-" + updateRow.get("upperCd");
+								
+								Map<String, String> parentParam = new HashMap<>();
+								parentParam.put("fileTrgtKey", String.valueOf(updateRow.get("upperKey")));
+								Map<String, String> parentRow = bm14Mapper.selectBomInfo(parentParam);
+
 								Map<String,String> param1 = new HashMap<>();
-								param1.putAll(updateRow);
+								if (parentRow != null) {
+									param1.putAll(parentRow);
+								} else {
+									param1.putAll(updateRow);
+								}
 								param1.put("upperKey", upperKey);
 								param1.put("userId", listArrMap.get("userId"));
 								param1.put("pgmId", listArrMap.get("pgmId"));
@@ -418,8 +427,17 @@ public class BM14SvcImpl implements BM14Svc {
 							fileTrgtKey = Integer.toString(bm14Mapper.selectBomSeqNext(listArrMap));
 							String upperKey = selectSpareInfo2.get("lowerKey");
 							String dsgnNo = listArrMap.get("salesCd") + "-" + updateRow.get("upperCd");
+							
+							Map<String, String> parentParam = new HashMap<>();
+							parentParam.put("fileTrgtKey", String.valueOf(updateRow.get("upperKey")));
+							Map<String, String> parentRow = bm14Mapper.selectBomInfo(parentParam);
+
 							Map<String,String> param1 = new HashMap<>();
-							param1.putAll(updateRow);
+							if (parentRow != null) {
+								param1.putAll(parentRow);
+							} else {
+								param1.putAll(updateRow);
+							}
 							param1.put("upperKey", upperKey);
 							param1.put("userId", listArrMap.get("userId"));
 							param1.put("pgmId", listArrMap.get("pgmId"));
