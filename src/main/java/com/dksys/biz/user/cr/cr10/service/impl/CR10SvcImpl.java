@@ -897,7 +897,6 @@ public class CR10SvcImpl implements CR10Svc {
   public int updateLgistCompl(List<Map<String, String>> paramList) throws Exception {
     int result = 0;
     for (Map<String, String> param : paramList) {
-        assertApprovalEditable(param);
         result += cr10Mapper.updateLgistCompl(param);
     }
     return result;
