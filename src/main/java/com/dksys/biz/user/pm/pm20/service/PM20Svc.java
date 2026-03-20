@@ -9,6 +9,8 @@ public interface PM20Svc {
 
 	List<Map<String, String>> selectAgendaList(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectRegisteredAgendaList(Map<String, String> paramMap);
+
 	List<Map<String, String>> select_agenda_no_by_date(Map<String, String> paramMap);
 
 	List<Map<String, String>> select_pm20_d02_List(Map<String, String> paramMap);

@@ -1,0 +1,124 @@
+<div id="commonPopup">
+	<div class="popup_area">
+		<div class="popup_table">
+			<table>
+				<colgroup>
+					<col width="20%">
+					<col width="20%">
+					<col width="">
+				</colgroup>
+				<tr>
+					<td>
+						<select id="coCd_PS" name="coCd_PS" data-kind="CO" data-search="coCd" required msg="회사" onchange="ModalPM2001P01GridView.setData(0);">
+						</select>
+					</td>
+					<td>
+						<select id="bizDiv_PS" name="bizDiv_PS" data-search="bizDiv" onchange="ModalPM2001P01GridView.setData(0);">
+							<option value="">업무구분(전체)</option>
+							<option value="AGENDA01">프로젝트</option>
+							<option value="AGENDA02">일반회의</option>
+						</select>
+					</td>
+					<td>
+						<div class="search_form">
+							<input type="text" id="searchValue_PS" name="searchValue_PS" placeholder="Sales Code / 수주번호 / 주제 검색" onkeypress="if(event.keyCode == 13){ModalPM2001P01GridView.setData(0);}">
+							<a onclick="ModalPM2001P01GridView.setData(0);">
+								<i class="i_search_w"></i>
+							</a>
+						</div>
+					</td>
+				</tr>
+			</table>
+			<div class="ax5_grid" data-ax5grid="ModalPM2001P01-grid" data-ax5grid-config="{}" style="height: 400px; width: 100%"></div>
+		</div>
+	</div>
+	<div class="popup_bottom_btn">
+		<button type="button" onclick="executeCallback();">선택</button>
+		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+
+<script type="text/javascript">
+	var ModalPM2001P01GridView = {
+		initView : function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				showLineNumber  : true,
+				showRowSelector : false,
+				multipleSelect  : false,
+				target : $('[data-ax5grid="ModalPM2001P01-grid"]'),
+				header : {
+					align : "center",
+					selector : false
+				},
+				body : {
+					onClick : function() {
+						this.self.select(this.dindex);
+					},
+					onDBLClick: function () {
+						executeCallback();
+					}
+				},
+				page : {
+					display   : false
+				},
+				columns : [
+					{key : "coCd", 			label : "회사",          hidden : true},
+					{key : "bizDiv", 		label : "업무구분코드",    hidden : true},
+					{key : "bizDivNm", 		label : "업무구분",      align : "center", width : 80, 
+						formatter: function() {
+							return this.item.bizDiv === 'AGENDA01' ? '프로젝트' : '일반회의';
+						}
+					},
+					{key : "salesCd", 		label : "Sales Code",   align : "left",   width : 120},
+					{key : "ordrsNo", 		label : "수주번호",      align : "center", width : 80},
+					{key : "clntNm", 	  	label : "고객사명",      align : "left",   width : 130},
+					{key : "mnSubject", 	label : "회의주제",      align : "left",   width : 200},
+					{key : "creatDttm", 	label : "최초등록일",    align : "center", width : 120}
+				]
+			});
+			return this;
+		},
+		setData : function(_pageNo) {
+			var targetObj = this.target;
+			var paramObj = {};
+			paramObj.coCd = $('#coCd_PS').val();
+			paramObj.bizDiv = $('#bizDiv_PS').val();
+			
+			var searchValue = $('#searchValue_PS').val();
+			// 통합 검색 필드 매핑 ( salesCd / ordrsNo / mnSubject )
+			paramObj.salesCd = searchValue;
+			paramObj.ordrsNo = searchValue;
+			paramObj.mnSubject = searchValue;
+
+			postAjax("/user/pm/pm20/selectRegisteredAgendaList", paramObj, null, function(data) {
+				var list = data.result;
+				targetObj.setData({
+					list : list,
+					page : {
+						totalElements : list.length
+					}
+				});
+			});
+		}
+	}
+
+	$(document).ready(function() {
+		setCommonSelect($('#commonPopup select[data-kind]'));
+		// 파라미터로 넘어온 회사 코드 있으면 설정
+		if(modalStack.last().paramObj.coCd){
+			$("#coCd_PS").val(modalStack.last().paramObj.coCd);
+		}
+		ModalPM2001P01GridView.initView().setData(0);
+	});
+
+	function executeCallback(){
+		var list = ModalPM2001P01GridView.target.getList("selected");
+		if(list.length == 0) {
+			alert("항목을 선택해주세요.");
+			return;
+		}
+		modalStack.last().callback(list[0]);
+		modalStack.close();
+	}
+</script>

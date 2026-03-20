@@ -109,6 +109,11 @@ public class PM20Svcimpl implements PM20Svc {
 	}
 
 	@Override
+	public List<Map<String, String>> selectRegisteredAgendaList(Map<String, String> paramMap) {
+		return pm20Mapper.selectList_pm20(paramMap);
+	}
+
+	@Override
 	public int insert_update_agenda_title(Map<String, String> paramMap) throws Exception {
 		String fileTrgtKey = "";
 		if (!paramMap.containsKey("fileTrgtKey") || paramMap.get("fileTrgtKey").isEmpty()) {

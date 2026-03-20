@@ -34,12 +34,22 @@ public class PM20Ctr {
     public String selectAgendaList(@RequestBody Map<String, String> paramMap, ModelMap model) {
     	List<Map<String, String>> result = pm20Svc.selectAgendaList(paramMap);
     	model.addAttribute("result", result);
-		paramMap.put("fileTrgtKey", result.get(0).get("fileTrgtKey"));
-		// 참석자 조회
-		List<Map<String, String>> d02List = pm20Svc.select_pm20_d02_List(paramMap);
-		model.addAttribute("d02List", d02List);
+		if (result != null && result.size() > 0) {
+			paramMap.put("fileTrgtKey", result.get(0).get("fileTrgtKey"));
+			// 참석자 조회
+			List<Map<String, String>> d02List = pm20Svc.select_pm20_d02_List(paramMap);
+			model.addAttribute("d02List", d02List);
+		}
     	return "jsonView";
     }
+
+	// 기등록 회의록 목록 조회 (팝업용)
+	@PostMapping("/selectRegisteredAgendaList")
+	public String selectRegisteredAgendaList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = pm20Svc.selectRegisteredAgendaList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 
 	// 주제별 안건 제목 등록 및 수정
 	@PostMapping(value = "/insert_update_agenda_title")
