@@ -39,6 +39,23 @@
 						</div>
 					</td>
 				</tr>
+			</tbody>
+		</table>
+		
+		<table class="form-group popup_table">
+			<colgroup>
+				<col style="width: 15%;">
+				<col style="width: 85%;">
+			</colgroup>
+			<thead>
+				<tr>
+					<td colspan="1" style="text-align: left;">첨부파일정보</td>
+					<td style="text-align: right;">
+						<a class="tbody_more_btn"></a>
+					</td>
+				</tr>
+			</thead>
+			<tbody>
 				<tr>
 					<th>
 						<button type="button" id="buttonFile" class="btn btn-primary btn-sm" style="height: 25px; line-height: 15px;" onclick="notiFile.click();">첨부파일</button>
@@ -56,7 +73,15 @@
 				<col style="width: 17%;">
 				<col style="width: 33%;">
 			</colgroup>
-			<tbody>
+			<thead>
+				<tr>
+					<td colspan="3" style="text-align: left;">기본정보</td>
+					<td style="text-align: right;">
+						<a class="tbody_more_btn"></a>
+					</td>
+				</tr>
+			</thead>
+			<tbody style="display: none;">
 				<tr>
 					<th>팝업 여부</th>
 					<td>
@@ -159,6 +184,10 @@
 				$('input:radio[name=exprtnYn]:input[value="N"]').prop("checked", true);
 			} 
 		});
+		$('a.tbody_more_btn').click(function() {
+			$(this).toggleClass('on');
+			$(this).closest('table').find('tbody').toggle();
+		});
 
         // tinymce html 편집기 start ----------------------------------------------------------
 	    var plugins = [
@@ -179,12 +208,13 @@
 	    	license_key: 'gpl',
         	selector: '#notiCntsClob',
 //         	height: 450,
-            max_height: 400,
+            max_height: 570,
             autoresize_bottom_margin: 0,
             setup: function (editor) {
                 editor.on('init', function () {
+	            	enableBlobImageCopyToClipboard(editor);
 //                     editor.getDoc().body.style.maxHeight = '400px';
-                    editor.getDoc().body.style.height = '400px';
+                    editor.getDoc().body.style.height = '570px';
                     editor.getDoc().body.style.overflowY = 'auto';
                     editor.getBody().style.fontSize = '10pt';
                     if(actionType == "U")  {
@@ -282,6 +312,48 @@
 		autoclose : true
 	});
 
+	
+	function enableBlobImageCopyToClipboard(editor) {
+	  editor.on('copy', async (e) => {
+	    try {
+	      // 1) 현재 선택 노드에서 IMG를 최대한 안정적으로 찾기
+	      let node = editor.selection && editor.selection.getNode ? editor.selection.getNode() : null;
+
+	      // IMG가 직접 선택되지 않은 경우(figure/a/span 등) 대비
+	      let img = null;
+	      if (node) {
+	        if (node.nodeName === 'IMG') img = node;
+	        else if (node.querySelector) img = node.querySelector('img');
+	        if (!img && node.closest) img = node.closest('img');
+	      }
+
+	      // 그래도 없으면 종료(텍스트 복사 등은 기본 동작 유지)
+	      if (!img) return;
+
+	      const src = img.getAttribute('src') || '';
+	      if (!src.startsWith('blob:')) return; // blob 아닌 이미지는 기본복사로 놔둠
+
+	      // 2) 여기서만 기본복사 막고, 실제 이미지로 클립보드에 쓰기 시도
+	      e.preventDefault();
+
+	      const blob = await fetch(src).then(r => r.blob());
+	      const mime = blob.type || 'image/png';
+
+	      await navigator.clipboard.write([
+	        new ClipboardItem({ [mime]: blob })
+	      ]);
+
+	    } catch (err) {
+	      // 실패하면 사용자는 "복사가 안됨"으로 느끼므로,
+	      // 최소한 로깅으로 원인 파악 가능하게 남김
+	      console.error('Blob image copy failed:', err);
+
+	      // 필요하면 여기서 preventDefault를 하지 않도록 구조를 바꾸면
+	      // "기본 HTML 복사"는 유지되는데, PPT에는 여전히 안 붙을 가능성이 큽니다.
+	    }
+	  });
+	}
+	
 	function insertNoti() {
 		if(inputValidation($('input[required]'))) {
 			var formData = makeFormData();
