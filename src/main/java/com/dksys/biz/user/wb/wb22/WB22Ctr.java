@@ -359,6 +359,18 @@ public class WB22Ctr {
 		return "jsonView";
 	}
 
+	// 일괄복사부분 조회(확정이든 미확정이든 상관없이 조회)
+	@PostMapping(value = "/ModalwbsPlanList")
+	public String ModalwbsPlanList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = wb22Svc.ModalwbsPlanListCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+
+		List<Map<String, String>> resultList = wb22Svc.ModalwbsPlanList(paramMap);
+		model.addAttribute("resultList", resultList);
+		return "jsonView";
+	}
+
 	@PostMapping(value = "/confirm_copy")
 	public String confirm_copy(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		try {

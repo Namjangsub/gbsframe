@@ -70,6 +70,10 @@ public interface WB22Svc {
 	int ModalwbsPlanconfirmListCount(Map<String, String> paramMap);
 	
 	List<Map<String, String>> ModalwbsPlanconfirmList(Map<String, String> paramMap);
+
+	int ModalwbsPlanListCount(Map<String, String> paramMap);
+	
+	List<Map<String, String>> ModalwbsPlanList(Map<String, String> paramMap);
 	
 	int confirm_copy(Map<String, String> paramMap);
 	

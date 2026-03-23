@@ -108,6 +108,10 @@ public interface WB22Mapper {
 
 	List<Map<String, String>> ModalwbsPlanconfirmList(Map<String, String> paramMap);
 
+	int ModalwbsPlanListCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> ModalwbsPlanList(Map<String, String> paramMap);
+
 	List<Map<String, String>> selectWbcPlan(Map<String, String> paramMap);
 
 	int updateWbcPlan(Map<String, String> sharngMap);

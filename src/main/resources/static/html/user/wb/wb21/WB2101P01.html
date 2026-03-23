@@ -40,7 +40,8 @@
 									<span style="margin-right:10px;">▣ 과제정보</span>
 								</div>
 								<div class="add_btn_small pdl10" style="white-space:nowrap;">
-									<a id="copyBtn" onclick="wbsSjNocopySearch();" style="height: 30px; line-height: 28px; width: 60px;" authchk>복사</a>
+									<a id="copyBtn" onclick="wbsSjPlanCopySearch();" style="height: 30px; line-height: 28px; width: 100px;" authchk>과제+일정 복사</a>
+									<a id="copyBtn" onclick="wbsSjNocopySearch();" style="height: 30px; line-height: 28px; width: 60px;" authchk>과제 복사</a>
 									<a id="confirm" onclick="confirmY();" style="height: 30px; line-height: 28px; width: 60px;" authchk>확정</a>
 									<!-- <a id="unconfirm" onclick="confirmN();" style="height: 30px; line-height: 28px; width: 60px;">미확정</a> -->
 									<a id="verUp" onclick="createVerUp();" style="height: 30px; line-height: 28px; width: 60px;" authchk>Ver.Up</a>
@@ -232,7 +233,7 @@
 									</div> -->
 								</div>
 								<div id="addrow1" class="add_btn_small pdl10" style="white-space:nowrap;">
-									<a id="btn15" onclick="copyAllPlanPopUp();" style="width:60px;height:30px;line-height:28px;">복사</a>
+									<a id="btn15" onclick="copyAllPlanPopUpList();" style="width:60px;height:30px;line-height:28px;">일정 복사</a>
 									<a id="btn1" onclick="wbsLevel1Insert();" style="width:60px;height:30px;line-height:28px;">저장</a>
 									<a id="btn2" onclick="updateWbsChanges();" style="width:100px;height:30px;line-height:28px;">변경요청 저장</a>
 									<!-- <a id="btn2" onclick="wbsLevel1confirm('N');" data-grid-control="row-add2" style="width:60px;height: 30px; line-height: 28px;">미확정</a> -->
@@ -1619,6 +1620,19 @@
 				});
 	}
 
+	function wbsSjPlanCopySearch() {
+		var paramObj = {};
+		paramObj["fileTrgtKey"] = fileTrgtKey;
+		paramObj["coCd"] = $("#wb21_popForm #coCd").val();
+        var tempCode = $("#wb21_popForm #salesCd").val();
+        paramObj["searchValue"] = tempCode.substring(0,5);
+		paramObj["fromSalesCd"] = $("#wb21_popForm #salesCd").val();
+        paramObj["pgmId"] = "WB2101M02";
+		paramObj["sameTimeFlag"] = "Y";
+		// openSecondModal("/static/html/cmn/modal/wbsPlanListSearch.html", 1200, 870, "과제+일정 복사대상 검색", paramObj);
+		openSecondModal("/static/html/cmn/modal/wbsPlanListSearch.html", 1200, 870,  ` 과제+일정 복사대상 검색.&nbsp;&nbsp; <span style="color:#d32f2f;font-weight:700;">*현재 SALES CODE의 과제정보와 일정정보를 대상 SALES CODE로 복사*</span>`, paramObj);
+	}
+
 	function wbsSjNocopySearch() {
 		var paramObj = {};
 		paramObj["fileTrgtKey"] = fileTrgtKey;
@@ -1715,10 +1729,10 @@
                         wb21_kakaoTodo();
 						
 						// 일정 계획 확정 연동
-						wbsLevel1confirm('Y');
-
-						gridView.setData(0);
-						modalClose();
+						wbsLevel1confirm('Y', function() {
+							gridView.setData(0);
+							modalClose();
+						});
 					} else {
 						alert("확정 작업 실패했습니다." + data );
 					}
@@ -1856,7 +1870,7 @@
 		});
 	}
 
-	// 복사
+	// 일정계획 복사
 	function copyAllPlanPopUp() {
 		var paramObj = {};
 		paramObj["coCd"] = $('#wb21_popForm #coCd').val(); 
@@ -1866,10 +1880,21 @@
 		openSecondModal("/static/html/cmn/modal/wbsPlanConfirmSearch.html", 1200, 870, "일정계획 일괄 대상 검색", paramObj);
 	}
 
+	// 일정계획 복사
+	function copyAllPlanPopUpList() {
+		var paramObj = {};
+		paramObj["coCd"] = $('#wb21_popForm #coCd').val(); 
+		paramObj["pgmId"] = "WB2201M02";
+		var tempCode = $("#wb21_popForm #salesCd").val(); 
+		paramObj["searchValue"] = tempCode.substring(0,5);
+		openSecondModal("/static/html/cmn/modal/wbsPlanListSearch.html", 1200, 870, "일정계획 일괄 대상 검색", paramObj);
+	}
+
 	// 저장
-	function wbsLevel1Insert(fromConfirm) {
+	function wbsLevel1Insert(fromConfirm, callback) {
 		if (addRowArr.length  > 0 || deleteRowArr.length  > 0) {
 			alert("TASK별 정보내 추가 또는 삭제 내역이 존재합니다.\n 저장 후 처리하세요");
+			if (callback) callback();
 			return;
 		}
 		
@@ -1878,6 +1903,7 @@
 		if (row != undefined) {
 			if (row.closeYn == "Y" && !canEditPlanRow(row)) {
 				alert("확정된 상태입니다.");
+				if (callback) callback();
 				return;
 			}
 		}
@@ -1965,8 +1991,12 @@
 				gridView1.setData(0);
 				gridView2.setData(0);
 				if(fromConfirm){
-					getGrid1RowList();
+					getGrid1RowList(callback);
+				} else {
+					if(callback) callback();
 				}
+			} else {
+				if(callback) callback();
 			}
 		});
 	}
@@ -2010,9 +2040,10 @@
 	}
 
 	// 확정
-	function wbsLevel1confirm(flag) {
+	function wbsLevel1confirm(flag, callback) {
 		if (addRowArr.length  > 0 || deleteRowArr.length  > 0) {
 			alert("TASK별 정보내 추가 또는 삭제 내역이 존재합니다. 저장 후 처리하세요");
+			if(callback) callback();
 			return;
 		}
 
@@ -2076,18 +2107,22 @@
 			});
 
 			if (chk4 > 0 ) { 
+				if(callback) callback();
 				return;
 			}
 			if (chk > 0) {
 				alert(chkError + " 담당자명은 지정되어야 확정 가능합니다.");
+				if(callback) callback();
 				return;
 			}
 			if (chk2 > 0 || chk3 > 0) {
 				alert(chk2Error +" 계획시작일자를 입력해야 확정 가능합니다.");
+				if(callback) callback();
 				return;
 			}
 			if (chk2 > 0 || chk3 > 0) {
 				alert(chk2Error+ " 계획시작일자" +chk3Error+ " 계획종료일자를 입력해야 확정 가능합니다.");
+				if(callback) callback();
 				return;
 			}
 
@@ -2095,14 +2130,14 @@
 		
 		var wbsPlanVerNo = $("#wb21_popForm #wbsPlanVerNo").val();
 		if(wbsPlanVerNo == "" || wbsPlanVerNo == null || wbsPlanVerNo == undefined){
-			wbsLevel1Insert(true);
+			wbsLevel1Insert(true, callback);
 		}else{
-			wbsLevel1Submit(flag);
+			wbsLevel1Submit(flag, null, callback);
 		}
 	}
 	
 	// 일정계획 확정
-	function wbsLevel1Submit(flag,list){
+	function wbsLevel1Submit(flag,list, callback){
 		
 		var row = gridView1.target.getList()[0];
 		var rowList = gridView1.target.getList();
@@ -2116,6 +2151,7 @@
 				// Validation 체크
 				if (row.closeYn == "N") {
 					alert("미확정된 상태입니다.");
+					if(callback) callback();
 					return;
 				}
 				/////////////////
@@ -2152,15 +2188,20 @@
 						if(data.resultCode == 200){
 // 							alert("미확정 되었습니다.");
 							gridView1.setData(0);
+							if(callback) callback();
 						} else {
 							alert("오류가 있습니다.\n" + data.resultMessage);
+							if(callback) callback();
 						}
 					});
+				} else {
+					if(callback) callback();
 				}
 			} else {
 				// Validation 체크
 				if (flag == "Y" && row.closeYn == "Y") {
 					alert("확정된 상태입니다.");
+					if(callback) callback();
 					return;
 				}
 
@@ -2195,17 +2236,23 @@
 					 filePostAjax("/user/wb/wb22/wbsLevel1confirm", formData, function(data){ 
 						if(data.resultCode == 200){
 							gridView1.setData(0);
+							if(callback) callback();
 						} else {
 							alert("오류가 있습니다.\n" + data.resultMessage);
+							if(callback) callback();
 						}
 					}); 
+				} else {
+					if(callback) callback();
 				}
 			}
+		} else {
+			if (callback) callback();
 		}
 	}
 	
 	// 저장 후 재조회
-	function getGrid1RowList(){
+	function getGrid1RowList(callback){
 		var formData = {
 				"coCd" : $("#wb21_popForm #coCd").val(),
 				"salesCd" : $("#wb21_popForm #salesCd").val(),
@@ -2229,9 +2276,10 @@
 					i++;
 				});
 				
-				wbsLevel1Submit('Y',list);
+				wbsLevel1Submit('Y',list, callback);
 			} catch (error) {
 				alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+				if(callback) callback();
 				return null; 
 			}
 		});
@@ -2889,15 +2937,16 @@ function wb21_kakaoTodo() {
 
     //to-do결재요청 알림톡
     function wb21_commKaKaoSendTodo(param) {
-//        console.log('---카카오 발주및출장요청서 알림톡발송시작 --' + param);
-
-       //알림톡수신번호 채번
-       var talkMessage = null             //발송될 내용 template
+       var template = null             //발송될 내용 template
        var mobile = null               //수신인 휴대전화번호
        var sendList = [];
        let talkParam = {};
        let talkBody = {};
        let sendCnt = 0;
+//        console.log('---카카오 발주및출장요청서 알림톡발송시작 --' + param);
+
+       //알림톡수신번호 채번
+       var talkMessage = null             //발송될 내용 template
        postAjaxSync("/user/bm/bm18/selectMaxMessageIdTodoNew", param, null
                 , function(data) {
                    if(data.resultList.length > 0 ) {
