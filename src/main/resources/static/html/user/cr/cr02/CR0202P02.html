@@ -449,6 +449,67 @@
 	}
     
     /***********전역변수****************/
+	const isViewMode = (modalStack.last().paramObj.actionType !== "C" && modalStack.last().paramObj.actionType !== "U") || jwt.userId === 'EMJ8105';
+
+	// 그리드 그룹화(서브토탈) 설정 정보 변수화
+	const gridGroupingConfig = {
+		by : ["ordrsDtlDiv10Type"],
+		columns : [
+			{label : function () {return this.groupBy.labels[0];}, colspan: 3, align: "center"},
+			{colspan: 6},
+			{label : function () {return (this.groupBy.labels.length == 1) ? this.groupBy.labels[0] + " 합계" : this.groupBy.labels[1];}, colspan: 2, align: "center"},
+			{colspan: 1},
+			{key : "estTrgtCost" , collector : "sum", formatter : "money", align : "right"},
+			{key : "ordrsPrcMach" , collector : "sum", formatter : "money", align : "right"},
+			{key : "ordrsPrcElcty"   , collector : "sum", formatter : "money", align : "right", styleClass : "grid-font-blue-bold" },
+			{key: "ordrsPrc", collector: function () {
+				var value = 0;
+				this.list.forEach(function (n) {
+					if (!n.__isGrouping) value += (pasIntChk(n.ordrsPrcMach) + pasIntChk(n.ordrsPrcElcty));
+				});
+				return addCommaStr(value);
+			},  align: "right"},
+			{key : "ordrsQty" , collector : "sum", formatter : "money", align : "right"},
+			{key : "estEpctMatPrc" , collector : "sum", formatter : "money", align : "right"},
+			{key : "trgtPchsPcostMach" , collector : "sum", formatter : "money", align : "right"},
+			{key : "trgtPchsPcostElcty" , collector : "sum", formatter : "money", align : "right"},
+			{key: "trgtsum",  collector: function () {
+				var value = 0;
+				this.list.forEach(function (n) {
+					if (!n.__isGrouping) value += (pasIntChk(n.trgtPchsPcostMach) + pasIntChk(n.trgtPchsPcostElcty));
+				});
+				return addCommaStr(value);
+			},  align: "right"},
+			{key : "trgtPchsPcostInHousePrcsn" , collector : "sum", formatter : "money", align : "right"},
+			{key: "machineValueAfterDeduction", collector: function () {
+				var value = 0;
+				this.list.forEach(function (n) {
+					if (!n.__isGrouping) value += (pasIntChk(n.trgtPchsPcostMach) - pasIntChk(n.trgtPchsPcostInHousePrcsn));
+				});
+				return addCommaStr(value);
+			}, align: "right"},
+			{},
+		]
+	};
+
+	// 버튼 가시성에 따른 그리드 그룹화 상태 동적 업데이트 함수
+	function updateGridGrouping() {
+		const isActuallyViewMode = (actionType !== "C" && actionType !== "U") || $("#actionOrdrsBtn").length === 0 || $("#actionOrdrsBtn").is(":hidden") || jwt.userId === 'EMJ8105';
+		
+		var newConfig = $.extend(true, {}, gridOrdrsDetail.config);
+		newConfig.body = newConfig.body || {};
+		newConfig.body.grouping = isActuallyViewMode ? $.extend(true, {}, gridGroupingConfig) : false;
+		gridOrdrsDetail.setConfig(newConfig);
+
+		var currentList = gridOrdrsDetail.getList();
+		if (currentList.length > 0) {
+			gridOrdrsDetail.setData({
+				list: currentList,
+				page: { totalElements: currentList.length }
+			});
+		}
+	}
+
     /* document.ready */
     $(document).ready(function () {
         setCommonSelect($(".popup_area select[data-kind]"));
@@ -770,7 +831,8 @@
                 {type: 2, label: "줄삭제"},
             ],
             popupFilter: function (item, param) {
-                //console.log(item, param);
+                // 조회 모드이거나 등록 버튼이 숨겨진/제거된 경우(결재 중 등) 메뉴 차단
+                if (isViewMode || $("#actionOrdrsBtn").length === 0 || $("#actionOrdrsBtn").is(":hidden")) return false;
                 if (param.element) {
                     return true;
                 } else {
@@ -1087,14 +1149,15 @@
                     
                     // const data = gridOrdrsDetail.getList();
                     // gridOrdrsDetail.setData(data);
-                    // gridResize(gridOrdrsDetail.list.length); //그리드 높이 조정
+                    // gridResize(gridOrdrsDetail.list.length+3); //그리드 높이 조정
                     // beforeGridSize = gridOrdrsDetail.list.length;
                     // gridOrdrsDetail.focus(row);  
                      
                     resetGridFocus(currEndRow, thisGridRow);
 			    // }
                 gridOrdrsDetail.repaint();
-            }
+            },
+            grouping: isViewMode ? gridGroupingConfig : false,
         },
         contextMenu: {
             iconWidth: 20,
@@ -1112,9 +1175,9 @@
                 {type: 2, label: "줄삭제"},
             ],
             popupFilter:
-
                 function (item, param) {
-                    //console.log(item, param);
+                    // 조회 모드이거나 등록 버튼이 숨겨진/제거된 경우(결재 중 등) 메뉴 차단
+                    if (isViewMode || $("#actionOrdrsBtn").length === 0 || $("#actionOrdrsBtn").is(":hidden")) return false;
                     if (param.element) {
                         return true;
                     } else {
@@ -1238,6 +1301,7 @@
    			            	$('#createHistory').hide();
    			            	$('#actionOrdrsBtn').hide();
    			            }
+                            updateGridGrouping();
    			       }
    						targetObj.setData({
    	  						list : list,
@@ -1383,7 +1447,7 @@
                     totalElements: ordrsDetails.length
                 }
             });
-	        gridResize(ordrsDetails.length); //그리드 높이 조정
+	        gridResize(ordrsDetails.length+3); //그리드 높이 조정
 	        
 	        //monthCloseChk($('#ordrsDt').val());  //마감일통제 원래 위치
 	        gridViewPop7.initView().setData(0);
@@ -1703,7 +1767,7 @@
     function resetGridFocus(endRow, row) {
         gridOrdrsDetail.focus(endRow);  
          
-        gridResize(gridOrdrsDetail.list.length); //그리드 높이 조정
+        gridResize(gridOrdrsDetail.list.length+3); //그리드 높이 조정
         beforeGridSize = gridOrdrsDetail.list.length;
         gridOrdrsDetail.focus(row);  
     }
@@ -1724,6 +1788,7 @@
             	$("#histNo").val(parseInt(hist_no) + 1);
             	gridViewPop7.initView();
             	$('#actionOrdrsBtn').show();
+                updateGridGrouping();
                 alert("이력생성이 완료되었습니다.");
             });
         }

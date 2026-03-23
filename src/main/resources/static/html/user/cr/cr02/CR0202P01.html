@@ -441,6 +441,70 @@
 
 	var actionType = modalStack.last().paramObj.actionType;
 	var paramObj = modalStack.last().paramObj;
+	const isViewMode = (actionType !== "C" && actionType !== "U") || jwt.userId === 'EMJ8105';
+
+	// 그리드 그룹화(서브토탈) 설정 정보 변수화
+	const gridGroupingConfig = {
+		by : ["ordrsDtlDiv10Type"],
+		columns : [
+			{label : function () {return this.groupBy.labels[0];}, colspan: 3, align: "center"},
+			{colspan: 6},
+			{label : function () {return (this.groupBy.labels.length == 1) ? this.groupBy.labels[0] + " 합계" : this.groupBy.labels[1];}, colspan: 2, align: "center"},
+			{colspan: 1},
+			{key : "estTrgtCost" , collector : "sum", formatter : "money", align : "right"},
+			{key : "ordrsPrcMach" , collector : "sum", formatter : "money", align : "right"},
+			{key : "ordrsPrcElcty"   , collector : "sum", formatter : "money", align : "right", styleClass : "grid-font-blue-bold" },
+			{key: "ordrsPrc", collector: function () {
+				var value = 0;
+				this.list.forEach(function (n) {
+					if (!n.__isGrouping) value += (pasIntChk(n.ordrsPrcMach) + pasIntChk(n.ordrsPrcElcty));
+				});
+				return addCommaStr(value);
+			},  align: "right"},
+			{key : "ordrsQty" , collector : "sum", formatter : "money", align : "right"},
+			{key : "estEpctMatPrc" , collector : "sum", formatter : "money", align : "right"},
+			{key : "trgtPchsPcostMach" , collector : "sum", formatter : "money", align : "right"},
+			{key : "trgtPchsPcostElcty" , collector : "sum", formatter : "money", align : "right"},
+			{key: "trgtsum", collector: function () {
+				var value = 0;
+				this.list.forEach(function (n) {
+					if (!n.__isGrouping) value += (pasIntChk(n.trgtPchsPcostMach) + pasIntChk(n.trgtPchsPcostElcty));
+				});
+				return addCommaStr(value);
+			},  align: "right"},
+			{key : "trgtPchsPcostInHousePrcsn" , collector : "sum", formatter : "money", align : "right"},
+			{key: "trgtsum", collector: function () {
+				var value = 0;
+				this.list.forEach(function (n) {
+					if (!n.__isGrouping) value += (pasIntChk(n.trgtPchsPcostMach) - pasIntChk(n.trgtPchsPcostInHousePrcsn));
+				});
+				return addCommaStr(value);
+			},  align: "right"},
+			{},
+		]
+	};
+
+	// 버튼 가시성에 따른 그리드 그룹화 상태 동적 업데이트 함수
+	function updateGridGrouping() {
+		const isActuallyViewMode = (actionType !== "C" && actionType !== "U") || $("#actionOrdrsBtn").length === 0 || $("#actionOrdrsBtn").is(":hidden") || jwt.userId === 'EMJ8105';
+		
+		// gridOrdrsDetail.config 전체를 깊은 복사하여 안전하게 재설정함
+		var newConfig = $.extend(true, {}, gridOrdrsDetail.config);
+		newConfig.body = newConfig.body || {};
+		newConfig.body.grouping = isActuallyViewMode ? $.extend(true, {}, gridGroupingConfig) : false;
+		gridOrdrsDetail.setConfig(newConfig);
+
+		// 중요: ax5grid는 setData 시점에 그룹화가 계산되므로 리스트를 재설정해야 함
+		var currentList = gridOrdrsDetail.getList();
+		if (currentList.length > 0) {
+			gridOrdrsDetail.setData({
+				list: currentList,
+				page: {
+					totalElements: currentList.length
+				}
+			});
+		}
+	}
 
 	var deleteFileArr = [];
 	var selectedNodeId = "";
@@ -1616,7 +1680,8 @@
 				{type: 2, label: "줄삭제"},
 			],
 			popupFilter: function (item, param) {
-				//console.log(item, param);
+				// 조회 모드이거나 등록 버튼이 숨겨진/제거된 경우(결재 중 등) 메뉴 차단
+				if (isViewMode || $("#actionOrdrsBtn").length === 0 || $("#actionOrdrsBtn").is(":hidden")) return false;
 				if (param.element) {
 					return true;
 				} else {
@@ -1948,6 +2013,8 @@
 				// }
 				gridOrdrsDetail.repaint();
 			},
+			columnHeight: 26,
+			grouping: isViewMode ? gridGroupingConfig : false,
 		},
 		contextMenu: {
 			iconWidth: 20,
@@ -1967,9 +2034,9 @@
 				{type: 3, label: "관리용SalesCd생성"},
 			],
 			popupFilter:
-
 				function (item, param) {
-					//console.log(item, param);
+					// 조회 모드이거나 등록 버튼이 숨겨진/제거된 경우(결재 중 등) 메뉴 차단
+					if (isViewMode || $("#actionOrdrsBtn").length === 0 || $("#actionOrdrsBtn").is(":hidden")) return false;
 					if (param.element) {
 						return true;
 					} else {
@@ -2147,6 +2214,7 @@
 									// 이미 기본 숨김 처리되어 있으므로 추가 처리 불필요
 									$('#actionOrdrsBtn').show();
 								}
+								updateGridGrouping(); // 버튼 상태 변경 후 그리드 그룹화 상태 업데이트
 							}
 							targetObj.setData({
 								list : list,
@@ -2399,7 +2467,7 @@
 
 			$('#coCd').trigger('change'); //파일트리 새로 그리기
 			
-			gridResize(ordrsDetails.length+1); //그리드 높이 조정
+			gridResize(ordrsDetails.length+3); //그리드 높이 조정
 			//monthCloseChk($('#ordrsDt').val());  //마감일통제 원래 위치
 			gridViewPop7.initView().setData(0);
 			gridViewPop7.target.setHeight((gridViewPop7.target.list.length+1) * 27 + 123 );//그리드 높이 조정
@@ -2572,11 +2640,11 @@
 					row.cudCheck = "C";	//추가, 수정, 삭제구분
 					row.ordrsSeq = "0";	//삭제오류 방지용
 					gridOrdrsDetail.addRow(row, gridOrdrsDetail.list.length);
-					gridResize(gridOrdrsDetail.list.length + 1); //그리드 높이 조정
+					gridResize(gridOrdrsDetail.list.length + 3); //그리드 높이 조정
 				}
 				else {
 					gridOrdrsDetail.addRow(newRowData, gridOrdrsDetail.list.length);
-					gridResize(gridOrdrsDetail.list.length + 1); //그리드 높이 조정s
+					gridResize(gridOrdrsDetail.list.length + 3); //그리드 높이 조정s
 				}
 		// }
 		
@@ -3079,7 +3147,7 @@
 	function resetGridFocus(endRow, row) {
 		gridOrdrsDetail.focus(endRow);
 
-		gridResize(gridOrdrsDetail.list.length+2); //그리드 높이 조정
+		gridResize(gridOrdrsDetail.list.length+3); //그리드 높이 조정
 		beforeGridSize = gridOrdrsDetail.list.length;
 		gridOrdrsDetail.focus(row);
 	}
@@ -3171,10 +3239,11 @@
 		//     $('#ordrsNoTh').removeClass('hit');
 		//     $('#newOrdrsNo').removeAttr('required', 'required');
 		// }
-	//사용자 테이블의 회사코드와 자료의 회사코드가 다르면  조회모드만 작동
-	if ($('#popForm #coCd').val() != jwt.coCd) {
-		$('.coAuthChk').hide();
-	}
+		//사용자 테이블의 회사코드와 자료의 회사코드가 다르면  조회모드만 작동
+		if ($('#popForm #coCd').val() != jwt.coCd) {
+			$('.coAuthChk').hide();
+		}
+		updateGridGrouping(); // 권한에 따른 버튼 가시성 처리 후 그리드 그룹화 업데이트
 	}
 
 	function setInitSetting() {
