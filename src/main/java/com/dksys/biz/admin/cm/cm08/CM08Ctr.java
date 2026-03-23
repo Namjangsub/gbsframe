@@ -16,6 +16,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.util.FileCopyUtils;
@@ -49,6 +50,16 @@ public class CM08Ctr {
  	
 	@Autowired
 	CM15Svc cm15Svc;
+	
+	@Value("${spring.servlet.multipart.max-file-size:2000MB}")
+	private String maxFileSize;
+
+	@PostMapping(value = "/getMaxFileSize")
+	public String getMaxFileSize(ModelMap model) {
+		model.addAttribute("maxFileSize", maxFileSize);
+		model.addAttribute("resultCode", 200);
+		return "jsonView";
+	}
 	
 	@PostMapping(value="/fileDownInfo")
 	public String fileDownInfo(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
