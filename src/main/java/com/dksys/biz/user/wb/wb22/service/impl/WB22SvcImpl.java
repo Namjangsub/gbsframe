@@ -964,9 +964,20 @@ public class WB22SvcImpl implements WB22Svc {
 		return wb22Mapper.ModalwbsPlanconfirmListCount(paramMap);
 	}
 
+	// 전체 계획일정복사 부분
 	@Override
 	public List<Map<String, String>> ModalwbsPlanconfirmList(Map<String, String> paramMap) {
 		return wb22Mapper.ModalwbsPlanconfirmList(paramMap);
+	}
+
+	@Override
+	public int ModalwbsPlanListCount(Map<String, String> paramMap) {
+		return wb22Mapper.ModalwbsPlanListCount(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> ModalwbsPlanList(Map<String, String> paramMap) {
+		return wb22Mapper.ModalwbsPlanList(paramMap);
 	}
 
 	@Override
@@ -986,16 +997,69 @@ public class WB22SvcImpl implements WB22Svc {
 		String sYear = "";
 		userId = paramMap.get("userId");
 		sYear = paramMap.get("year");
+		String sameTimeFlag = paramMap.get("sameTimeFlag");
+		String sourceFileTrgtKey = paramMap.get("fileTrgtKey");
 
 		if (dtlParam.size() > 0) {
 
 			for (Map<String, String> dtl : dtlParam) {
 
 				String dtaChk = dtl.get("dtaChk").toString();
+				String planCloseYn = dtl.get("planCloseYn");
 				dtl.put("creatId", userId);
 				dtl.put("year", sYear);
 
 				if ("U".equals(dtaChk)) {
+
+					// 확정(Y) 상태인 경우 일정/과제 버전업 선행 처리
+					if ("Y".equals(planCloseYn)) {
+						// 1. 일정(Schedule) 버전업
+						Map<String, String> verUpParam = new HashMap<>();
+						verUpParam.put("coCd", dtl.get("coCd"));
+						verUpParam.put("salesCd", dtl.get("salesCd"));
+						verUpParam.put("verNo", dtl.get("planVerNo"));
+						verUpParam.put("verUpReason", "[" + paramMap.get("salesCd") + "] 일정 복사");
+						List<Map<String, String>> chkList = wb22Mapper.wbsVerUpInsertChk(verUpParam);
+						if (chkList != null && chkList.size() > 0) {
+							String oldVerNo = chkList.get(0).get("verNo");
+							int newVerNo = Integer.parseInt(oldVerNo) + 1;
+							verUpParam.put("verNo", oldVerNo);
+							verUpParam.put("newVerNo", String.valueOf(newVerNo));
+
+							for (Map<String, String> chkMap : chkList) {
+								chkMap.put("creatId", userId);
+								chkMap.put("verUpReasonb", verUpParam.get("verUpReason"));
+								wb22Mapper.wbsVerUpInsert(chkMap);
+							}
+							wb22Mapper.wbsVerUpUpdate(verUpParam);
+						}
+					}
+
+					// 2. 통합 복사 (과제도 함께 복사하는 경우)
+					if ("Y".equals(sameTimeFlag)) {
+						Map<String, String> copyDtl = new HashMap<>(dtl);
+						copyDtl.put("fileTrgtKey", sourceFileTrgtKey); // 복사할 원본 과제의 fileTrgtKey
+						copyDtl.put("userId", userId);
+						copyDtl.put("pgmId", "WB2101M02"); // 과제관리 화면 PGM ID
+
+						if ("Y".equals(planCloseYn)) {
+							// 대상이 확정 상태면 삭제 없이 버전(targetVerNo)을 올려서 Insert (과제 버전업)
+							String oldProjectVerNo = copyDtl.get("verNo");
+							int newProjectVerNo = (oldProjectVerNo != null && !oldProjectVerNo.isEmpty()) ? Integer.parseInt(oldProjectVerNo) + 1 : 2;
+							copyDtl.put("targetSjNo", copyDtl.get("sjNo"));
+							copyDtl.put("targetVerNo", String.valueOf(newProjectVerNo));
+							copyDtl.put("targetCloseYn", "Y"); // 복사된 과제도 확정 상태로 설정
+							wb21Mapper.copy_wb21(copyDtl);
+							wb21Mapper.insertWb21Hist(copyDtl);
+						} else {
+							// 대상이 미확정 상태면 기존 과제 삭제 후 동일 버전 유지
+							copyDtl.put("targetSjNo", copyDtl.get("sjNo"));
+							copyDtl.put("targetVerNo", copyDtl.get("verNo"));
+							copyDtl.put("targetCloseYn", "N");
+							wb21Mapper.delete_wb21(copyDtl);
+							wb21Mapper.copy_wb21(copyDtl);
+						}
+					}
 
 					List<Map<String, String>> chkCount = wb22Mapper.selectWbcPlan(dtl);
 
