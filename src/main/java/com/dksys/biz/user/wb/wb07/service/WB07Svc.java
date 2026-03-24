@@ -29,5 +29,9 @@ public interface WB07Svc {
 	int updateWbsSchedule(Map<String, String> paramMap) throws Exception;
 	int wbsLevel2PlanChange(Map<String, String> paramMap) throws Exception;
 
+	List<Map<String, Object>> selectWbsLevel2ListForPop(Map<String, Object> paramMap);
+	int completeActualConfirmedBatch(Map<String, Object> paramMap) throws Exception;
+
+	int removeActualConfirmedBatch(Map<String, Object> paramMap) throws Exception;
 	
 }

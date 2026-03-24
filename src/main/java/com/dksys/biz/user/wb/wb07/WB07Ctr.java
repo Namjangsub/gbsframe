@@ -179,5 +179,46 @@ public class WB07Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
+
+	@PostMapping(value = "/selectWbsLevel2ListForPop")
+	public String selectWbsLevel2ListForPop(@RequestBody Map<String, Object> paramMap, ModelMap model) {
+		List<Map<String, Object>> result = wb07svc.selectWbsLevel2ListForPop(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/completeActualConfirmedBatch")
+	public String completeActualConfirmedBatch(@RequestBody Map<String, Object> paramMap, ModelMap model) throws Exception {
+		try {
+			if (wb07svc.completeActualConfirmedBatch(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
+
+	@PostMapping(value = "/removeActualConfirmedBatch")
+	public String removeActualConfirmedBatch(@RequestBody Map<String, Object> paramMap, ModelMap model) throws Exception {
+		try {
+			if (wb07svc.removeActualConfirmedBatch(paramMap) != 0) {
+				model.addAttribute("resultCode", 200);
+				model.addAttribute("resultMessage", messageUtils.getMessage("delete"));
+			} else {
+				model.addAttribute("resultCode", 500);
+				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+			}
+		} catch (Exception e) {
+			model.addAttribute("resultCode", 900);
+			model.addAttribute("resultMessage", e.getMessage());
+		}
+		return "jsonView";
+	}
 	
 }

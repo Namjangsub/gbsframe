@@ -413,6 +413,7 @@ public class WB26SvcImpl implements WB26Svc {
 			paramMap.put("wbsPlanCodeKind2_P", paramMap.get("wbsPlanCodeKind"));
 			paramMap.put("salesCd2_P", paramMap.get("salesCd"));
 			paramMap.put("wbsRsltsId", paramMap.get("wbsPlanMngId"));
+			paramMap.put("wbsRsltsNo", paramMap.get("wbsPlanNo"));
 
 			
 			result =  wb22Mapper.wbsRsltsInsert(paramMap);

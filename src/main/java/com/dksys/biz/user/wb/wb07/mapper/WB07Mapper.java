@@ -47,4 +47,6 @@ public interface WB07Mapper {
 
 	int wbsLevel2ActChange(Map<String, String> paramMap);
 	
+	List<Map<String, Object>> selectWbsLevel2ListForPop(Map<String, Object> paramMap);
+	
 }
