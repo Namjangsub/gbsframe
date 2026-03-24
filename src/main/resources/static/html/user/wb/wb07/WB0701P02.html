@@ -10,7 +10,7 @@
             <input type="hidden" id="userId" name="userId">
             <input type="hidden" id="pgmId" name="pgmId" value="WB0701P02">
             
-            <div class="ax5_grid" data-ax5grid="popup-grid-task" style="height: 400px; width: 100%;"></div>
+            <div id="popup-grid-task" style="height: 400px; width: 100%;"></div>
         </form>
     </div>
     <div class="popup_bottom_btn">
@@ -20,48 +20,133 @@
     </div>
 </div>
 
+<link rel="stylesheet" href="/static/css/tui-grid/4.21.22/tui-grid.css" />
+<link rel="stylesheet" href="/static/bootstrap/css/bootstrap-datepicker.css">
+<script src="/static/js/tui-grid/4.21.22/tui-grid.min.js"></script>
+<script src="/static/js/common/GridAdapter.js"></script>
+<script type="text/javascript" src="/static/bootstrap/js/bootstrap-datepicker.min.js"></script>
+<script type="text/javascript" src="/static/bootstrap/js/bootstrap-datepicker.ko.min.js"></script>
+
+<style>
+    /* 메인 화면 폰트와 통일 */
+    .tui-grid-container, 
+    .tui-grid-cell, 
+    .tui-grid-header-cell {
+        font-family: "Noto Sans KR", Arial, "dotum", sans-serif !important;
+    }
+    .tui-grid-cell {
+        font-size: 12px !important;
+        height: 26px !important;
+        padding: 0 4px !important;
+    }
+    .tui-grid-header-cell {
+        font-size: 12px !important;
+        font-weight: 700 !important;
+        height: 26px !important;
+    }
+    
+    /* [최종] 완료 행 스타일 - 모든 레이어의 셀 배경색 강제 적용 */
+    .row-close-y td,
+    .row-close-y .tui-grid-cell,
+    .row-close-y .tui-grid-cell-content {
+        background-color: #f8f1ff !important;
+    }
+
+    /* 글자색 분리 - 가독성 확보 */
+    .row-close-y .tui-grid-cell-content {
+        color: #8e24aa !important;
+        font-weight: 700 !important;
+    }
+
+    /* 편집 가능 셀 표시 */
+    .tui-grid-cell-editable {
+        background-color: #fdfdf0 !important;
+    }
+</style>
+
 <script type="text/javascript">
+    // 날짜 선택 에디터 정의 (tui-grid용)
+    function DatePickerEditor(props) {
+        this.props = props;
+        this.el = document.createElement('input');
+        this.el.type = 'text';
+        this.el.className = 'tui-grid-content-input';
+        this.el.style.width = '100%';
+        this.el.autocomplete = 'off';
+        this.el.value = (props.value || '').substring(0, 10);
+    }
+    DatePickerEditor.prototype.getElement = function() { return this.el; };
+    DatePickerEditor.prototype.getValue = function() { return this.el.value; };
+    DatePickerEditor.prototype.mounted = function() {
+        var self = this;
+        $(this.el).datepicker({
+            format: 'yyyy-mm-dd',
+            language: 'ko',
+            autoclose: true,
+            todayHighlight: true
+        }).on('changeDate', function() {
+            setTimeout(function() { self.el.blur(); }, 0);
+        });
+        this.el.focus();
+        $(this.el).datepicker('show');
+    };
+    DatePickerEditor.prototype.beforeDestroy = function() {
+        $(this.el).datepicker('destroy');
+    };
+
     var gridViewTask = {
         initView: function() {
-            this.target = new ax5.ui.grid();
-            this.target.setConfig({
-                showRowSelector: true,
-                multipleSelect: true,
-                target: $('[data-ax5grid="popup-grid-task"]'),
-                header: { align: "center" },
-                body: {
-	 			    trStyleClass: function () {
-	 			        if (!this.item) return "";
-	 			        if (this.item.closeYn == "Y") return "grid-font-pupple";
-	 			    }
-	 		   },
-                columns: [
-                    {key: "wbsPlanCodeNm", label: "TASK명", width: 160, align: "left"},
-                    {key: "wbsPlanMngNm", label: "담당자", width: 60, align: "center"},
-                    {key: "wbsPlansDt", label: "계획시작일", width: 80, align: "center"},
-                    {key: "wbsPlaneDt", label: "계획종료일", width: 80, align: "center"},
-                    {key: "actProg", label: "진행율", width: 50, align: "right", formatter: function() { return (this.value || 0) + "%"; }},
-                    {key: "wbsRsltssDt", label: "실적시작일", width: 80, align: "center"},
-                    {key: "wbsRsltseDt", label: "실적종료일", width: 80, align: "center"},
-                    {key: "wbsRsltsCnts", label: "비고", width: "*", align: "left"},
-                    {key: "closeYn", label: "완료", width: 40, align: "center", hidden: true},
-                    {key: "planVerNo", label: "VerNo", width: 40, align: "center", hidden: true},
-                ]
+            var el = document.getElementById("popup-grid-task");
+            var columns = [
+                {header: "TASK명", name: "wbsPlanCodeNm", width: 160, align: "left"},
+                {header: "담당자", name: "wbsPlanMngNm", width: 60, align: "center"},
+                {header: "계획시작일", name: "wbsPlansDt", width: 80, align: "center"},
+                {header: "계획종료일", name: "wbsPlaneDt", width: 80, align: "center"},
+                {header: "진행율", name: "actProg", width: 50, align: "right", formatter: function(props) { return (props.value || 0) + "%"; }},
+                {header: "실적시작일", name: "wbsRsltssDt", width: 90, align: "center", editor: DatePickerEditor},
+                {header: "실적종료일", name: "wbsRsltseDt", width: 90, align: "center", editor: DatePickerEditor},
+                {header: "비고", name: "wbsRsltsCnts", width: 150, align: "left", editor: 'text'},
+                {header: "완료", name: "closeYn", hidden: true},
+                {header: "VerNo", name: "planVerNo", hidden: true},
+                {header: "rsltsFileTrgtKey", name: "rsltsFileTrgtKey", hidden: true}
+            ];
+
+            this.target = GridAdapter.create(el, columns, {
+                rowHeaders: ['checkbox'],
+                bodyHeight: 400,
+                rowHeight: 26,
+                minRowHeight: 26
             });
+            
+            // 데이터 로드/변경 시 완료 행 스타일 재적용 및 편집 불가 처리
+            this.target.grid.on('onGridUpdated', function() {
+                var grid = gridViewTask.target.grid;
+                grid.getData().forEach(function(row) {
+                    if (row.closeYn === 'Y') {
+                        // 행 스타일 적용
+                        grid.addRowClassName(row.rowKey, "row-close-y");
+                        
+                        // 실적 정보 편집 불가 처리
+                        grid.disableCell(row.rowKey, "wbsRsltssDt");
+                        grid.disableCell(row.rowKey, "wbsRsltseDt");
+                        grid.disableCell(row.rowKey, "wbsRsltsCnts");
+                    }
+                });
+            });
+
             return this;
         },
         setData: function() {
-            var targetObj = this.target;
+            var targetAdapter = this.target;
             var param = {
                 coCd: $("#popForm #coCd").val(),
                 salesCd: $("#popForm #salesCd").val(),
                 wbsPlanCodeKind: $("#popForm #wbsPlanCodeId").val()
             };
             postAjax("/user/wb/wb07/selectWbsLevel2ListForPop", param, null, function(data) {
-            	targetObj.setData({
-                    list: data.result,
-                    page: { totalElements: data.result.length }
-                });
+                if (data && data.result) {
+                    targetAdapter.setData(data.result);
+                }
             });
         }
     };
@@ -76,7 +161,7 @@
     });
 
     function removeSelectedTasks() {
-        var selectedList = gridViewTask.target.getList("selected");
+        var selectedList = gridViewTask.target.grid.getCheckedRows();
         // selectedList에서 closeYn이 Y인 경우만 선택 (이미 완료된 것만 취소 가능)
         selectedList = selectedList.filter(function(item) {
             return item.closeYn === 'Y';
@@ -94,7 +179,7 @@
         var param = {
             taskList: selectedList.map(function(item) {
                 return $.extend({}, item, {
-                    rsltsFileTrgtKey: item.rsltsFileTrgtKey || item.rsltsFileTrgtKey,
+                    rsltsFileTrgtKey: item.rsltsFileTrgtKey,
                     taskId: item.taskId || item.wbsPlanCodeId,
                     planVerNo: item.planVerNo || item.verNo
                 });
@@ -109,7 +194,7 @@
 
         postAjax("/user/wb/wb07/removeActualConfirmedBatch", param, null, function(res) {
             if (res && res.resultCode === 200) {
-                alert(res.resultMessage || "선택한 " + (res.successCount || selectedList.length) + "건의 TASK 완료가 취소되었습니다.");
+                alert(res.resultMessage || "선택한 건의 TASK 완료가 취소되었습니다.");
                 if (typeof parent.searchData === "function") {
                     parent.searchData(false);
                 }
@@ -121,7 +206,7 @@
     }
 
     function completeSelectedTasks() {
-        var selectedList = gridViewTask.target.getList("selected");
+        var selectedList = gridViewTask.target.grid.getCheckedRows();
         // selectedList에서 closeYn이 Y인 경우 제외
         selectedList = selectedList.filter(function(item) {
             return item.closeYn !== 'Y';
@@ -138,7 +223,6 @@
         
         var param = {
             taskList: selectedList.map(function(item) {
-                // 백엔드 updateWbsLevel2ActGantt에서 기대하는 기본값 처리
                 return $.extend({}, item, {
                     rsltsFileTrgtKey: item.rsltsFileTrgtKey || "0",
                     taskId: item.taskId || item.wbsPlanCodeId,
@@ -149,14 +233,13 @@
                 coCd: $("#popForm #coCd").val(),
                 userId: jwt.userId,
                 pgmId: "WB0701P02",
-                planVerNo: selectedList[0].planVerNo // 공통 버전 정보
+                planVerNo: selectedList[0].planVerNo
             }
         };
 
         postAjax("/user/wb/wb07/completeActualConfirmedBatch", param, null, function(res) {
             if (res && res.resultCode === 200) {
-                alert(res.resultMessage || "선택한 " + (res.successCount || selectedList.length) + "건의 TASK가 완료 처리되었습니다.");
-                // 부모 창의 searchData(false) 호출하여 간트바 새로 그리기
+                alert(res.resultMessage || "선택한 건의 TASK가 완료 처리되었습니다.");
                 if (typeof parent.searchData === "function") {
                     parent.searchData(false);
                 }
@@ -166,5 +249,4 @@
             }
         });
     }
-
 </script>

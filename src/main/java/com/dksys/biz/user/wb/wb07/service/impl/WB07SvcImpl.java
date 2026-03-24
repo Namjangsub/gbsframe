@@ -446,16 +446,16 @@ public class WB07SvcImpl implements WB07Svc {
 			planFileTrgtKey = planLevel2.get(0).get("fileTrgtKey");
 			wbsPlanNo = planLevel2.get(0).get("wbsPlanNo");
 			codeId = planLevel2.get(0).get("wbsPlanCodeId") + "01";
-//		} else {
-//			// Level2(TASK) 실적 삭제, 계획 삭제
+		} else {
+			// Level2(TASK) 실적 삭제, 계획 삭제
 //			deleteActual(paramMap);
-//			
-//			codeId = paramMap.get("wbsPlanCodeId") + "01";
-//			planFileTrgtKey =  wb22Mapper.selectWbsSeqNext(paramMap);
-//			
-//			String currentYear = String.valueOf(LocalDate.now().getYear());
-//			paramMap.put("year", currentYear);
-//			wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
+			
+			codeId = paramMap.get("wbsPlanCodeId") + "01";
+			planFileTrgtKey =  wb22Mapper.selectWbsSeqNext(paramMap);
+			
+			String currentYear = String.valueOf(LocalDate.now().getYear());
+			paramMap.put("year", currentYear);
+			wbsPlanNo = wb22Mapper.selectMaxWbsPlanNo(paramMap);
 		}
 		
 
@@ -582,10 +582,19 @@ public class WB07SvcImpl implements WB07Svc {
 	}
 
 
-	private boolean wbsOwnerChk(Map<String, String> paramMap) {
-
-		String userId = paramMap.get("userId");
-		if (userId.equals(paramMap.get("teamMngId")) || userId.equals(paramMap.get("wbsPlanMngId")) || userId.equals("js.nam")) {
+	private boolean wbsOwnerChk(Map<String, ?> paramMap) {
+		Object userIdObj = paramMap.get("userId");
+		if (userIdObj == null) return false;
+		
+		String userId = String.valueOf(userIdObj);
+		
+		Object teamMngIdObj = paramMap.get("teamMngId");
+		String teamMngId = (teamMngIdObj == null) ? "" : String.valueOf(teamMngIdObj);
+		
+		Object wbsPlanMngIdObj = paramMap.get("wbsPlanMngId");
+		String wbsPlanMngId = (wbsPlanMngIdObj == null) ? "" : String.valueOf(wbsPlanMngIdObj);
+		
+		if (userId.equals(teamMngId) || userId.equals(wbsPlanMngId) || userId.equals("js.nam")) {
 			return true;
 		}
 		return false;
@@ -624,6 +633,9 @@ public class WB07SvcImpl implements WB07Svc {
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public int completeActualConfirmedBatch(Map<String, Object> paramMap) throws Exception {
+		if (!wbsOwnerChk(paramMap)) {
+			throw new RuntimeException("담당자 또는 담당팀장외 실적 변경 할 수 없습니다.");
+		}
 		List<Map<String, String>> taskList = (List<Map<String, String>>) paramMap.get("taskList");
 		Map<String, Object> common = (Map<String, Object>) paramMap.get("common");
 		
@@ -708,6 +720,9 @@ public class WB07SvcImpl implements WB07Svc {
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public int removeActualConfirmedBatch(Map<String, Object> paramMap) throws Exception {
+		if (!wbsOwnerChk(paramMap)) {
+			throw new RuntimeException("담당자 또는 담당팀장외 실적 변경 할 수 없습니다.");
+		}
 		List<Map<String, String>> taskList = (List<Map<String, String>>) paramMap.get("taskList");
 		Map<String, Object> common = (Map<String, Object>) paramMap.get("common");
 		
