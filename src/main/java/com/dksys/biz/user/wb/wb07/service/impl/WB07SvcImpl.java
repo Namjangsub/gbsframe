@@ -415,7 +415,9 @@ public class WB07SvcImpl implements WB07Svc {
 
 		// Task 계획 저장시 해당 과제가 확정(Y)이면서 Task등록하는 일정이있어야하며 해당 일정도 Y인지 Check
 		paramMap.put("verNo", paramMap.get("planVerNo"));
-		paramMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeId"));
+		paramMap.put("wbsPlanCodeKind", paramMap.get("wbsPlanCodeId")); //WBSCODE11 --> WBSCODE11-WBSCODE1101
+		// WB220M01 에서 해당 salesCd, WBSCODE11, 최종버젼, 확정된자료가 없으면 등록불가능
+		// 일정관리담당자 확정했으면 하나는 존재해야함. 해당 작업단계 확정되지 않으면 수정 불가능함
 		int wbsLevel2InsertChk = wb22Mapper.wbsLevel2InsertChk(paramMap);
 		if (wbsLevel2InsertChk == 0) {
 			throw new RuntimeException("Task 계획을 저장할 수 없습니다. 일정확인 후 다시 시도해주세요.");
@@ -431,12 +433,12 @@ public class WB07SvcImpl implements WB07Svc {
 		int selectWbsPlanLevel2KindCount = wb07Mapper.selectWbsPlanLevel2KindCount(paramMap);
 		int wbsIssueExistChk = wb22Mapper.wbsIssueExistChk(paramMap);
 		if (selectWbsPlanLevel2KindCount > 1 && wbsIssueExistChk > 0) {
-			throw new RuntimeException("Task에 등록된 문제가 있습니다.");
+			throw new RuntimeException("TASK가 2건 이상이거나 Task에 등록된 문제가 있습니다.");
 		} else if (selectWbsPlanLevel2KindCount == 1) {
 			// Level2(TASK)계획이 1건이면
 			List<Map<String, String>> planLevel2 = wb22Mapper.wbsPlanListChk(paramMap);
 			planFileTrgtKey = planLevel2.get(0).get("fileTrgtKey");
-			wbsPlanNo = planLevel2.get(0).get("fileTrgtKey");
+			wbsPlanNo = planLevel2.get(0).get("wbsPlanNo");
 			codeId = planLevel2.get(0).get("wbsPlanCodeId") + "01";
 		} else {
 			// Level2(TASK) 실적 삭제, 계획 삭제
@@ -471,6 +473,7 @@ public class WB07SvcImpl implements WB07Svc {
 		paramMap.put("revisedFinishDt", paramMap.get("wbsPlaneDtFm"));
 		
 		paramMap.put("wbsRsltssDt", paramMap.get("wbsPlansDtFm"));
+		// 일정확정 / 미확정에 따라 진행율과완료일자 설정하기
 		if (paramMap.get("action").equals("completeActualConfirmed")) {
 			paramMap.put("wbsRsltsRate", "100");
 			paramMap.put("wbsRsltseDt", paramMap.get("wbsPlaneDtFm"));
