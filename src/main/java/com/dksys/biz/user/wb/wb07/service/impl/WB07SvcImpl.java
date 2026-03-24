@@ -633,120 +633,132 @@ public class WB07SvcImpl implements WB07Svc {
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public int completeActualConfirmedBatch(Map<String, Object> paramMap) throws Exception {
-		if (!wbsOwnerChk(paramMap)) {
-			throw new RuntimeException("담당자 또는 담당팀장외 실적 변경 할 수 없습니다.");
-		}
 		List<Map<String, String>> taskList = (List<Map<String, String>>) paramMap.get("taskList");
 		Map<String, Object> common = (Map<String, Object>) paramMap.get("common");
 		
+		if (!wbsOwnerChk(common)) {
+			throw new RuntimeException("담당자 또는 담당팀장외 실적 변경 할 수 없습니다.");
+		}
+		
 		int result = 0;
+		String coCd = (String) common.get("coCd");
+		String userId = (String) common.get("userId");
+		String pgmId = (String) common.get("pgmId");
+		String planVerNo = (String) common.get("planVerNo");
+		String today = LocalDate.now().toString();
+
 		for (Map<String, String> task : taskList) {
-			// 공통 정보 파라미터에 병합
-			task.put("coCd", (String) common.get("coCd"));
-			task.put("userId", (String) common.get("userId"));
-			task.put("pgmId", (String) common.get("pgmId"));
-			task.put("planVerNo", (String) common.get("planVerNo"));
-			task.put("fileTrgtKey", (String) task.get("planFileTrgtKey"));
-			task.put("wbsPlanStsCodeId", "WBSPLANSTS50"); // 상태코드 완료
-			task.put("wbsRsltsRate", "100"); // 완료는 100%
-			task.put("wbsRsltssDt", task.get("wbsPlansDt"));
-			if(task.get("wbsRsltseDt") == null || task.get("wbsRsltseDt").isEmpty()) {
-				task.put("wbsRsltseDt", LocalDate.now().toString()); // 실적종료일이 없으면 오늘 날짜
-			}
-
-			// 워킹데이(토/일 제외) 계산 로직 추가
-			long workingDays = calculateWorkingDays(task.get("wbsRsltssDt"), task.get("wbsRsltseDt"));
-			task.put("wbsRsltsMh", String.valueOf(workingDays));	//실적테이블 실적공수
-			task.put("rsltsDaycnt", String.valueOf(workingDays));		//실적테이블 소요일수
-
-			// 기존의 단건 완료 로직 호출
-			// result += this.completeActualConfirmed(task);
-
-			//실적 고유번호가 0이면 Insert
-			//실적 고유번호가 0이 아니면 Update
-			int rsltsFileTrgtKey = Integer.parseInt(task.get("rsltsFileTrgtKey"));
+			// 1. 공통 및 기본 정보 설정
+			task.put("coCd", coCd);
+			task.put("userId", userId);
+			task.put("pgmId", pgmId);
+			task.put("planVerNo", planVerNo);
+			task.put("fileTrgtKey", task.get("planFileTrgtKey"));
+			task.put("wbsPlanStsCodeId", "WBSPLANSTS50"); // 정상완료
+			task.put("wbsRsltsRate", "100");
 			task.put("salesCd2_P", task.get("salesCd"));
-			if(rsltsFileTrgtKey < 1) {
-				rsltsFileTrgtKey = wb22Mapper.selectWbsRstlsSeqNext(task);
-				task.put("rsltsFileTrgtKey", Integer.toString(rsltsFileTrgtKey));
+			
+			// 날짜 정보 보정
+			if (isEmpty(task.get("wbsRsltssDt"))) task.put("wbsRsltssDt", task.get("wbsPlansDt"));
+			if (isEmpty(task.get("wbsRsltseDt"))) task.put("wbsRsltseDt", today);
 
+			// 2. 공수 및 소요일수 계산
+			long workingDays = calculateWorkingDays(task.get("wbsRsltssDt"), task.get("wbsRsltseDt"));
+			task.put("wbsRsltsMh", String.valueOf(workingDays));
+			task.put("rsltsDaycnt", String.valueOf(workingDays));
+
+			// 3. 실적 데이터 저장 (Insert or Update)
+			int rsltsFileTrgtKey = Integer.parseInt(task.getOrDefault("rsltsFileTrgtKey", "0"));
+			if (rsltsFileTrgtKey < 1) {
+				rsltsFileTrgtKey = wb22Mapper.selectWbsRstlsSeqNext(task);
+				task.put("rsltsFileTrgtKey", String.valueOf(rsltsFileTrgtKey));
 				task.put("wbsPlanCodeId2_P", task.get("wbsPlanCodeId"));
 				task.put("wbsPlanCodeKind2_P", task.get("wbsPlanCodeKind"));
-				task.put("salesCd2_P", task.get("salesCd"));
 				task.put("wbsRsltsNo", task.get("wbsPlanNo"));
-				task.put("wbsRsltsId", task.get("wbsPlanMngId"));	// 담당자ID
-
-				result =  wb22Mapper.wbsRsltsInsert(task);
+				task.put("wbsRsltsId", task.get("wbsPlanMngId"));
+				result += wb22Mapper.wbsRsltsInsert(task);
 			} else {
-				result = wb22Mapper.wbsRsltsUpdate(task);
+				result += wb22Mapper.wbsRsltsUpdate(task);
 			}
 
-			// WBS Task실적 등록시 해당 Task의 WBS_PLAN_CODE_KIND가 'WBSCODE03'(설계완료)이고 실적등록하는 SALES_CD가 도면관리 대장에 없으면 자동 등록처리
-			int wbsPlanCodeKindCount = wb22Mapper.selectWbsPlanCodeKindCount(task);
-			if (wbsPlanCodeKindCount == 1 && "WBSCODE03".equals(task.get("wbsPlanCodeKind2_P"))) {
-
-				Map<String, String> salesCdMap = new HashMap<>();
-				salesCdMap.put("salesCd", task.get("salesCd2_P"));
-				Map<String, Object> selectDrawDocItemInfo = dw02Mapper.selectDrawDocItemInfo(salesCdMap);
-
-				Map<String, String> paramMap2 = new HashMap<>();
-				paramMap2.put("prdtGrp", (String) selectDrawDocItemInfo.get("prdtGrp"));
-				paramMap2.put("equipNm", (String) selectDrawDocItemInfo.get("equipNm"));
-				paramMap2.put("clntCd",  (String) selectDrawDocItemInfo.get("clntCd"));
-				paramMap2.put("clntNm",  (String) selectDrawDocItemInfo.get("clntNm"));
-
-				paramMap2.put("dwgNo", task.get("salesCd2_P"));
-				paramMap2.put("salesCd", task.get("salesCd2_P"));
-				paramMap2.put("dsgnEmpNm", task.get("userNm"));
-				paramMap2.put("startDt", task.get("wbsRsltssDt"));
-				paramMap2.put("remark", task.get("wbsRsltsCnts"));
-				paramMap2.put("userId", task.get("userId"));
-				paramMap2.put("pgmId", task.get("pgmId"));
-
-				result += dw02Mapper.insertDrawItem(paramMap2);
-			}
+			// 4. 설계완료(WBSCODE03) 특수 처리 (도면관리 자동 등록)
+			result += autoRegisterDrawingItem(task);
 			
-			//상태변경
-			// 실적 저장 전 상태 및 지연 여부 자동 계산
+			// 5. 후속 처리 (Gantt 상태 업데이트 및 확정)
 			updateWbsLevel2ActGantt(task);
-			
-			// 완료 Flag 처리 CLOSE_YN = 'Y', rsltsFileTrgtKey
-			task.put("flag", "Y"); // 완료는 Y
+			task.put("flag", "Y");
 			wb22Mapper.wbsRsltsconfirm(task);
 		}
 		return result;
 	}
 
+	/**
+	 * 설계완료(WBSCODE03) 단계일 경우 도면관리 대장에 자동 등록
+	 */
+	private int autoRegisterDrawingItem(Map<String, String> task) {
+		int codeKindCount = wb22Mapper.selectWbsPlanCodeKindCount(task);
+		if (codeKindCount == 1 && "WBSCODE03".equals(task.get("wbsPlanCodeKind2_P"))) {
+			Map<String, String> salesCdMap = new HashMap<>();
+			salesCdMap.put("salesCd", task.get("salesCd2_P"));
+			Map<String, Object> drawInfo = dw02Mapper.selectDrawDocItemInfo(salesCdMap);
+
+			if (drawInfo != null) {
+				Map<String, String> drawMap = new HashMap<>();
+				drawMap.put("prdtGrp",    String.valueOf(drawInfo.getOrDefault("prdtGrp", "")));
+				drawMap.put("equipNm",    String.valueOf(drawInfo.getOrDefault("equipNm", "")));
+				drawMap.put("clntCd",     String.valueOf(drawInfo.getOrDefault("clntCd", "")));
+				drawMap.put("clntNm",     String.valueOf(drawInfo.getOrDefault("clntNm", "")));
+				drawMap.put("dwgNo",      task.get("salesCd2_P"));
+				drawMap.put("salesCd",    task.get("salesCd2_P"));
+				drawMap.put("dsgnEmpNm",  task.get("userNm"));
+				drawMap.put("startDt",    task.get("wbsRsltssDt"));
+				drawMap.put("remark",     task.get("wbsRsltsCnts"));
+				drawMap.put("userId",     task.get("userId"));
+				drawMap.put("pgmId",      task.get("pgmId"));
+				return dw02Mapper.insertDrawItem(drawMap);
+			}
+		}
+		return 0;
+	}
+
+	private boolean isEmpty(String s) {
+		return s == null || s.trim().isEmpty();
+	}
+
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public int removeActualConfirmedBatch(Map<String, Object> paramMap) throws Exception {
-		if (!wbsOwnerChk(paramMap)) {
-			throw new RuntimeException("담당자 또는 담당팀장외 실적 변경 할 수 없습니다.");
-		}
 		List<Map<String, String>> taskList = (List<Map<String, String>>) paramMap.get("taskList");
 		Map<String, Object> common = (Map<String, Object>) paramMap.get("common");
+
+		if (!wbsOwnerChk(common)) {
+			throw new RuntimeException("담당자 또는 담당팀장외 실적 변경 할 수 없습니다.");
+		}
 		
 		int result = 0;
+		String coCd = (String) common.get("coCd");
+		String userId = (String) common.get("userId");
+		String pgmId = (String) common.get("pgmId");
+
 		for (Map<String, String> task : taskList) {
-			task.put("coCd", (String) common.get("coCd"));
-			task.put("userId", (String) common.get("userId"));
-			task.put("pgmId", (String) common.get("pgmId"));
+			task.put("coCd", coCd);
+			task.put("userId", userId);
+			task.put("pgmId", pgmId);
 			
-			// 실적 데이터 삭제 전 관련 문제(Issue) 등록 여부 체크 (WB26SvcImpl 로직 참고)
-			task.put("wbsPlanCodeId", task.get("wbsPlanCodeId"));
-			int wbsIssueExistChk = wb22Mapper.wbsIssueExistChk(task);
-			if (wbsIssueExistChk > 0) {
+			// 1. 삭제 전 이슈 등록 여부 체크
+			if (wb22Mapper.wbsIssueExistChk(task) > 0) {
 				throw new RuntimeException("이미 외부에 문제가 등록되어 있어 삭제할 수 없습니다. (SalesCd: " + task.get("salesCd") + ", Task: " + task.get("wbsPlanCodeNm") + ")");
 			}
 
-			task.put("fileTrgtKey", (String) task.get("rsltsFileTrgtKey"));
+			// 2. 실적 데이터 삭제
+			task.put("fileTrgtKey", task.get("rsltsFileTrgtKey"));
 			result += wb22Mapper.wbsRsltsGantDelete(task);
 			
-			// 상태 및 메타 정보 업데이트 (완료 취소이므로 진행중 또는 시작전으로 변경될 것)
+			// 3. 상태 초기화 및 Gantt동기화
 			task.put("wbsRsltsRate", "0");
 			task.put("wbsRsltssDt", "");
 			task.put("wbsRsltseDt", "");
-			task.put("wbsPlanStsCodeId", "WBSPLANSTS10"); // 시작전으로 초기화 (로직에 따라 다를 수 있음)
+			task.put("wbsPlanStsCodeId", "WBSPLANSTS10"); // 시작전
 			
 			updateWbsLevel2ActGantt(task);
 		}
