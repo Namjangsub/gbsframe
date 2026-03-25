@@ -62,4 +62,6 @@ public interface WB20Svc {
 
 	int insertPfuShareUser(Map<String, String> paramMap) throws Exception;
 
+	List<Map<String, String>> selectToDoMindMap(Map<String, String> paramMap);
+
 }

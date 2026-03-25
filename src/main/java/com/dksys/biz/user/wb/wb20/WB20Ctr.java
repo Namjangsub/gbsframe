@@ -286,4 +286,12 @@ public class WB20Ctr {
         }
         return "jsonView";
     }
+
+    // 마인드맵 전용 계층형 TO-DO 조회
+    @PostMapping(value = "/selectToDoMindMap")
+    public String selectToDoMindMap(@RequestBody Map<String, String> paramMap, ModelMap model) {
+        List<Map<String, String>> resultList = wb20Svc.selectToDoMindMap(paramMap);
+        model.addAttribute("resultList", resultList);
+        return "jsonView";
+    }
 }

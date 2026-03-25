@@ -481,4 +481,9 @@ public class WB20SvcImpl implements WB20Svc {
                              actionType, fileTrgtKey, coCd, ordrsNo, salesCd);
     }
 
+	@Override
+	public List<Map<String, String>> selectToDoMindMap(Map<String, String> paramMap) {
+		return wb20Mapper.selectToDoMindMap(paramMap);
+	}
+
 }

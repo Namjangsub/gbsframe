@@ -87,4 +87,6 @@ public interface WB20Mapper {
 
 	int updateWbsIssueApprovalSync(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectToDoMindMap(Map<String, String> paramMap);
+
 }
