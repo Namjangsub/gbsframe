@@ -18,10 +18,9 @@
 		box-shadow: 1px 1px rgba(0,0,0,0.15);
 	}
 	jmnode { 
-		white-space: nowrap !important; 
-		width: max-content !important; 
-		max-width: none !important; 
+		white-space: pre-wrap !important; 
 		line-height: normal; 
+		text-align: left;
 		padding-right: 10px !important; /* 아이콘이 숨쉴 공간 추가 */
 	}
 </style>
@@ -60,7 +59,7 @@
 		#node-tooltip th { text-align: left; padding-right: 10px; color: #aaa; font-weight: normal; }
 		#node-tooltip td { text-align: left; word-break: break-all; }
 		#node-tooltip .tooltip-header { font-weight: bold; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #777; font-size: 13px; }
-		jmnode { white-space: pre-wrap; max-width: 300px; line-height: normal; }
+		jmnode { white-space: pre-wrap; max-width: 500px; line-height: normal; }
 	</style>
 
 	<script src="/static/js/jquery-latest.min.js"></script>
@@ -181,7 +180,7 @@
 			</div>
 		</div>
 		<input type="hidden" id="userId"    name="userId">
-		<input type="hidden" id="pgmId"     name="pgmId" value="WB2001M01.html">
+		<input type="hidden" id="pgmId"     name="pgmId" value="WB2001M02.html">
 		<!-- // 콘텐츠 -->
 
 		<!-- 콘텐츠 -->
@@ -212,6 +211,7 @@
 <script type="text/javascript">
 
 	var jm = null;
+	var sameTimeResult = "N";
 	const sunsetBliss = ['#0d47a1', '#006494', '#006d77', '#166088', '#218380', '#73d2de', '#ffbc42', '#d81159', '#8f2d56', '#218380', '#73d2de'];
 
 	var gridView = {
@@ -336,23 +336,17 @@
 	function getGroupColor(item) {
 		var nodeId = item.nodeId;
 		var nodeName = item.nodeName || "";
+		var level = item.nodeLevel;
 
 		if (nodeId === 'APPR' || nodeId === 'SHARE') return '#006494';
 		
-		// "수주번호" 리터럴 폴더 색상
-		if (nodeName === '수주번호' || nodeId.indexOf('_ORDER') > -1) return '#166088';
+		// L2: 수주번호 노드 (대표색상)
+		if (level === 2) return '#166088';
 		
-		// 문제, 조치 등 이슈 핵심 관련은 빨간색
-		if (nodeName.match(/문제|조치/)) return '#d81159';
-		
-		// 발주/출장/결과 등은 이슈 하위에 있을 때(즉, ISS_NO가 있는 아이템의 부모 폴더일 때)만 빨간색
-		// SQL에서 ISS_NO가 포함된 NODE_ID를 생성할 것이므로 이를 체크
-		if (nodeName.match(/발주|출장|결과/) && nodeId.indexOf('_ISS_') > -1) return '#d81159';
+		// L3: Sales Code / 설비 노드
+		if (level === 3) return '#73d2de';
 
-		// SALES_CD 값 (26001-01NVFUP 등) 73d2de
-		if (item.nodeLevel === 5 || (nodeId.indexOf('_S_') > -1 && nodeId.indexOf('_S_EMPTY') === -1)) return '#73d2de';
-		
-		// 기타 폴더 006d77
+		// 기타 폴더
 		return '#006d77';
 	}
 
@@ -377,31 +371,29 @@
 			var parentId  = item.parentNodeId;
 			var nodeName  = item.nodeName;
 
+			var nodeObj = {
+				id: nodeId,
+				parentid: parentId,
+				topic: nodeName,
+				data: Object.assign({}, item) // 툴팁용 메타데이터 전체 바인딩
+			};
+
 			if (nodeType === 'GROUP') {
-				var bgColor = getGroupColor(item);
-				nodeArray.push({
-					id: nodeId,
-					parentid: parentId,
-					topic: nodeName,
-					'background-color': bgColor,
-					'foreground-color': '#fff'
-				});
+				nodeObj['background-color'] = getGroupColor(item);
+				nodeObj['foreground-color'] = (item.nodeLevel === 3) ? '#333' : '#fff'; // L3는 밝은색이므로 어두운 글자
+				nodeArray.push(nodeObj);
 			} else if (nodeType === 'ITEM') {
-				var leafNode = {
-					id: nodeId,
-					parentid: parentId,
-					topic: nodeName,
-					data: Object.assign({}, item)
-				};
 				if (item.sanctnSttus === 'Y') {
-					leafNode['background-color'] = '#f0f0f0';
-					leafNode['foreground-color'] = '#777';
+					nodeObj['background-color'] = '#f0f0f0';
+					nodeObj['foreground-color'] = '#777';
 				} else {
-					leafNode['background-color'] = '#ffe6e6';
-					leafNode['foreground-color'] = '#333';
-					leafNode.topic += ' <span style="display:inline-block;white-space:nowrap;vertical-align:middle;"><i class="fa fa-exclamation-circle" style="color:red;font-size:14px;margin-left:4px;" title="결재대기"></i>&nbsp;</span>';
+					// 이슈 관련(이슈번호가 있거나 명칭에 문제/조치 포함)은 연한 빨강 배경에 강조
+					var isIssue = (item.issNo || nodeName.indexOf('문제') > -1 || nodeName.indexOf('조치') > -1);
+					nodeObj['background-color'] = isIssue ? '#ffebeb' : '#fff9e6'; 
+					nodeObj['foreground-color'] = '#333';
+					nodeObj.topic += ' <span style="display:inline-block;white-space:nowrap;vertical-align:middle;"><i class="fa fa-exclamation-circle" style="color:red;font-size:14px;margin-left:4px;" title="결재대기"></i>&nbsp;</span>';
 				}
-				nodeArray.push(leafNode);
+				nodeArray.push(nodeObj);
 			}
 		});
 
@@ -429,41 +421,117 @@
 		if (!node || !node.data) return;
 		
 		var data = node.data;
+		// jsmind structure check
 		if (data.data && typeof data.data === 'object') {
 			data = data.data;
 		}
 
-		var html = '<div class="tooltip-header">' + (getValueIgnoreCase(data, 'todoTitl') || getValueIgnoreCase(data, 'topic') || 'To-Do 정보') + '</div>';
+		var level = data.nodeLevel;
+		var title = data.nodeName || data.todoTitl || '정보';
+		
+		var html = '<div class="tooltip-header">' + title + '</div>';
 		html += '<table>';
 		
-		var fields = [
-			{ key: 'todoDiv1CodeNm', label: '구분' },
-			{ key: 'todoDiv2CodeNm', label: '발생프로그램명' },
-			{ key: 'salesCd', label: 'SALES CODE' },
-			{ key: 'todoNo', label: '관련번호' },
-			{ key: 'creatNm', label: '최초요청자' },
-			{ key: 'creatDttm', label: '요청일자' },
-			{ key: 'shwTodoNo', label: '관리번호' },
-			{ key: 'todoNm', label: '대상자명' },
-			{ key: 'todoCfDt', label: '결재일자' },
-			{ key: 'todoCfOpn', label: '의견' }
-		];
+		var fields = [];
+		
+		// Map ordrsNo to ordrsNoVal for consistent tooltip display
+		data.ordrsNoVal = getValueIgnoreCase(data, 'ordrsNo');
+
+		// 노드 레벨에 따른 툴팁 필드 구성
+		if (level === 2) { 
+			// 수주번호 노드
+			fields = [
+				{ key: 'ordrsNoVal', label: '수주번호' },
+				{ key: 'clntNm', label: '고객사' },
+				{ key: 'pjtNm', label: 'Project' },
+				{ key: 'ordrsDivNm', label: '수주구분' },
+				{ key: 'ctrtNm', label: '계약명' },
+				{ key: 'ordrsRmk', label: '비고' },
+				{ key: 'mngNm', label: '담당자' }
+			];
+		} else if (level === 3) {
+			// Sales Code 노드
+			fields = [
+				{ key: 'salesCd', label: 'Sales Code' },
+				{ key: 'eqpNm', label: '설비명' },
+				{ key: 'ordrsNoVal', label: '수주번호' },
+				{ key: 'clntNm', label: '고객사' },
+				{ key: 'pjtNm', label: 'Project' }
+			];
+		} else {
+			// ITEM 노드: 업무 구분에 따라 필드 조정
+			var pgmNm = data.pgmNm || '';
+			
+			if (pgmNm.indexOf('물류') > -1) {
+				fields = [
+					{ key: 'ordrsNoVal', label: '수주번호' },
+					{ key: 'clntNm', label: '고객사' },
+					{ key: 'ordrsDivNm', label: '수주구분' },
+					{ key: 'pjtNm', label: 'Project' },
+					{ key: 'creatNm', label: '결재요청자' },
+					{ key: 'todoNo', label: '관리번호' }
+				];
+			} else if (pgmNm.indexOf('WBS') > -1 || data.issNo || data.reqNo) {
+				var div2 = data.todoDiv2CodeId;
+				
+				// 공통 헤더 필드
+				fields = [
+					{ key: 'ordrsNoVal', label: '수주번호' },
+					{ key: 'salesCd', label: 'Sales Code' },
+					{ key: 'clntNm', label: '고객사' },
+					{ key: 'pjtNm', label: 'Project' },
+					{ key: 'eqpNm', label: '설비명' }
+				];
+
+				// [WBS 문제] 관련 필드
+				if (div2 === 'TODODIV2060' || div2 === 'TODODIV2070' || div2 === 'TODODIV1030' || div2 === 'TODODIV1060') {
+					fields.push({ key: 'issNo', label: '문제번호' });
+					fields.push({ key: 'issStsNm', label: '문제상태' });
+					fields.push({ key: 'issCnts', label: '문제내용' });
+				} 
+				// [발주/출장 요청/결과] 관련 필드
+				else if (div2 === 'TODODIV2020' || div2 === 'TODODIV1040' || div2 === 'TODODIV2030' || div2 === 'TODODIV1050') {
+					fields.push({ key: 'reqNo', label: '발주요청번호' });
+					fields.push({ key: 'reqStNm', label: '발주요청서상태' });
+					fields.push({ key: 'reqRmk', label: '발주요청서비고' });
+				}
+				// 조치 결과 등 기타 WBS 이슈 체인
+				else if (data.issNo) {
+					fields.push({ key: 'issNo', label: '문제번호' });
+					fields.push({ key: 'issStsNm', label: '문제상태' });
+					fields.push({ key: 'issCnts', label: '문제내용' });
+				}
+
+				fields.push({ key: 'creatNm', label: '결재요청자' });
+			} else {
+				fields = [
+					{ key: 'ordrsNoVal', label: '수주번호' },
+					{ key: 'clntNm', label: '고객사' },
+					{ key: 'pjtNm', label: 'Project' },
+					{ key: 'ordrsDivNm', label: '수주구분' },
+					{ key: 'ctrtNm', label: '계약명' },
+					{ key: 'creatNm', label: '결재요청자' },
+					{ key: 'todoNo', label: '관련번호' }
+				];
+			}
+		}
 
 		function getValueIgnoreCase(obj, key) {
 			if (!obj) return '';
-			if (obj[key] !== undefined) return obj[key];
+			if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
 			var upperKey = key.toUpperCase();
-			if (obj[upperKey] !== undefined) return obj[upperKey];
-			var lowerKey = key.toLowerCase();
-			if (obj[lowerKey] !== undefined) return obj[lowerKey];
-			// CamelCase conversion check (e.g. todoDiv1CodeNm -> TODO_DIV1_CODE_NM)
-			var snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`).toUpperCase();
-			if (obj[snakeKey] !== undefined) return obj[snakeKey];
+			if (obj[upperKey] !== undefined && obj[upperKey] !== null && obj[upperKey] !== '') return obj[upperKey];
+			// Extended case matching
+			for (var k in obj) {
+				if (k.toLowerCase() === key.toLowerCase() || k.toLowerCase().replace(/_/g, '') === key.toLowerCase()) {
+					if (obj[k]) return obj[k];
+				}
+			}
 			return '';
 		}
 
 		fields.forEach(function(f) {
-			var val = getValueIgnoreCase(data, f.key);
+			var val = getValueIgnoreCase(data, f.key) || f.default;
 			if (val !== undefined && val !== null && val !== '') {
 				html += '<tr><th>' + f.label + '</th><td>' + val + '</td></tr>';
 			}
@@ -708,7 +776,7 @@
 			formData.append("todoDiv2CodeId", row.todoDiv2CodeId);
 			formData.append("todoFileTrgtKey", row.todoFileTrgtKey);
 			formData.append("creatId", jwt.userId);
-			formData.append("creatPgm", "WB2001M01");
+			formData.append("creatPgm", "WB2001M02");
 			//formData.append("todoCfDt", strDate);
 			filePutAjax("/user/wb/wb20/toDoCfDtUpdate", formData, function(data){
 				if(data.resultCode == 200){
@@ -797,7 +865,7 @@
 						, "reqNo":row.todoNo
 						, "todoTitl":row.todoTitl
 						, "sanctnSn":row.sanctnSn
-						, "pgmId": "WB2001M01"
+						, "pgmId": "WB2001M02"
 						, "userId": jwt.userId
 						, "histNo" : row.etcField2
 				};
@@ -863,7 +931,7 @@
 							, "todoDiv1CodeId":row.todoDiv1CodeId
 							, "todoDiv2CodeId":row.todoDiv2CodeId
 							, "todoFileTrgtKey":row.todoFileTrgtKey
-							, "pgmId": "WB2001M01"
+							, "pgmId": "WB2001M02"
 							, "userId": jwt.userId
 							, "deptId": jwt.deptId.slice(0,5)
 					};
@@ -938,7 +1006,7 @@
 					formData.append("todoDiv2CodeId", row.todoDiv2CodeId);
 					formData.append("todoFileTrgtKey", row.todoFileTrgtKey);
 					formData.append("creatId", jwt.userId);
-					formData.append("creatPgm", "WB2001M01");
+					formData.append("creatPgm", "WB2001M02");
 					filePutAjax("/user/wb/wb20/toDoCfDtUpdate", formData, function(data){
 						if(data.resultCode == 200){
 							//처리 성공하였습니다.
@@ -959,7 +1027,7 @@
 							, "todoDiv1CodeId":row.todoDiv1CodeId
 							, "todoDiv2CodeId":row.todoDiv2CodeId
 							, "todoFileTrgtKey":row.todoFileTrgtKey
-							, "pgmId"		: "WB2001M01"
+							, "pgmId"		: "WB2001M02"
 							, "userId"		: jwt.userId
 							, "issNo"		: row.todoNo
 					}
