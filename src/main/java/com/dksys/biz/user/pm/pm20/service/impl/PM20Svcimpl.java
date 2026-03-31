@@ -110,7 +110,7 @@ public class PM20Svcimpl implements PM20Svc {
 
 	@Override
 	public List<Map<String, String>> selectRegisteredAgendaList(Map<String, String> paramMap) {
-		return pm20Mapper.selectList_pm20(paramMap);
+		return pm20Mapper.selectRegisteredAgendaList(paramMap);
 	}
 
 	@Override
