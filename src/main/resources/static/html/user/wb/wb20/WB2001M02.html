@@ -59,7 +59,81 @@
 		#node-tooltip th { text-align: left; padding-right: 10px; color: #aaa; font-weight: normal; }
 		#node-tooltip td { text-align: left; word-break: break-all; }
 		#node-tooltip .tooltip-header { font-weight: bold; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #777; font-size: 13px; }
-		jmnode { white-space: pre-wrap; max-width: 500px; line-height: normal; }
+		
+		/* 마인드맵 노드: Flexbox로 수직/수평 정렬 완벽화 */
+		jmnode { 
+			display: flex !important;
+			align-items: center !important; /* 상하 중앙 정렬 */
+			justify-content: flex-start !important; /* 좌측 정렬 유지 */
+			width: auto !important; 
+			min-width: 40px;
+			max-width: 500px;
+			height: auto !important;
+			padding: 4px 10px !important; /* 상하 여백 여유 있게 조정 */
+			line-height: normal !important; 
+			border-radius: 3px !important;
+			box-shadow: 1px 1px 3px rgba(0,0,0,0.1) !important;
+			font-size: 12px;
+		}
+
+		/* 내부 텍스트 래퍼: 말줄임표(...) 효과 */
+		.node-text-wrapper {
+			display: block;
+			width: 100%;
+			overflow: hidden !important;
+			white-space: nowrap !important;
+			text-overflow: ellipsis !important; /* 초과 시 ... 표시 */
+		}
+
+		/* 수주번호 단계(Level 2, 3)만 고정 넓이 */
+		jmnode[nodeid*="_O_"],
+		jmnode[nodeid*="_S_"] {
+			width: 140px !important; 
+		}
+		
+		jmnode[nodeid*="_O_"] .node-text-wrapper,
+		jmnode[nodeid*="_S_"] .node-text-wrapper {
+			width: 120px !important;
+		}
+
+		/* ITEM 노드(할 일 상세) - 250px 고정 */
+		jmnode[nodeid^="TODO_"] {
+			width: 270px !important;
+		}
+		jmnode[nodeid^="TODO_"] .node-text-wrapper {
+			width: 250px !important;
+			height: 20px !important;
+		}
+		
+		/* 루트 및 상위 노드(Level 1)는 자동 넓이 */
+		jmnode[isroot="true"], 
+		jmnode[nodeid="APPR"], 
+		jmnode[nodeid="SHARE"] { 
+			width: auto !important; 
+		}
+		
+		jmnode[isroot="true"] .node-text-wrapper,
+		jmnode[nodeid="APPR"] .node-text-wrapper,
+		jmnode[nodeid="SHARE"] .node-text-wrapper {
+			width: auto !important;
+			text-overflow: clip !important; /* 루트는 말줄임표 생략 */
+		}
+		
+		/* 루트 및 상위 노드(Level 1)는 자동 넓이 유지 및 페이드 제거 */
+		jmnode[isroot="true"], 
+		jmnode[nodeid="APPR"], 
+		jmnode[nodeid="SHARE"] { 
+			width: auto !important; 
+		}
+		
+		jmnode[isroot="true"] .node-text-wrapper,
+		jmnode[nodeid="APPR"] .node-text-wrapper,
+		jmnode[nodeid="SHARE"] .node-text-wrapper {
+			width: auto !important;
+			-webkit-mask-image: none;
+			mask-image: none;
+		}
+	</style>
 	</style>
 
 	<script src="/static/js/jquery-latest.min.js"></script>
@@ -188,6 +262,9 @@
 		<!-- 콘텐츠 타이틀 -->
 		<div class="contents_tit">
 			<span  style="height: 30px; line-height: 30px;font-size: 15px;">TO-DO LIST </span>
+			<span style="height: 30px; line-height: 30px; font-size: 12px; color: #666; margin-left: 15px;">
+				<i class="fa fa-exclamation-circle" style="color:red;"></i> 미결재 항목
+			</span>
 			<div class="add_btn_small pdl10">
 				<a onclick="toDoConfirmApproval();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-check-square"></i> 1건결재/확인</a>
 				<a onclick="toDoConfirmCancel();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-check-square"></i> 1건결재취소</a>
@@ -260,13 +337,31 @@
 		openFile: function (item) {
 			if (!item) return;
 
-			let addParam = {"viewMode": 1, "todoView": "INQ", "todoKey":item.todoKey, "gridObj" :item};
+			// 방어 코드: 연결된 화면 경로가 없는 경우 404 서버 에러 및 강제 로그아웃 방지
+			if (!item.pgPath || item.pgPath === 'undefined' || item.pgPath.trim() === '') {
+				customAlert("결재 화면 경로가 존재하지 않습니다. 시스템 관리자에게 문의바랍니다.");
+				return false;
+			}
+
+			let addParam = {
+				"viewMode": 1, 
+				"todoView": "INQ", 
+				"todoKey": item.todoKey, 
+				"coCd": item.coCd,
+				"todoCoCd": item.coCd,
+				"todoDiv1CodeId": item.todoDiv1CodeId,
+				"todoFileTrgtKey": item.todoFileTrgtKey,
+				"etcField2": item.etcField2,
+				"gridObj" :item
+			};
+
 			let paramObj = {};
 			if (item.todoDiv2CodeId != "TODODIV9999") {
-				paramObj = JSON.parse(item.pgParam || '{}');
+				try {
+					paramObj = JSON.parse(item.pgParam || '{}');
+				} catch(e) { paramObj = {}; }
 				Object.assign(paramObj, addParam);
 			}
-			
 			var callbackFn = function() { gridView.setData(0); };
 			if (item.todoDiv2CodeId =="TODODIV1030" || item.todoDiv2CodeId =="TODODIV2060" ||
 				item.todoDiv2CodeId =="TODODIV1090" || item.todoDiv2CodeId =="TODODIV2090" ) { //이슈현황 화면 call
@@ -335,19 +430,20 @@
 
 	function getGroupColor(item) {
 		var nodeId = item.nodeId;
-		var nodeName = item.nodeName || "";
-		var level = item.nodeLevel;
+		var level = Number(item.nodeLevel); // 문자열 데이터를 숫자로 변환하여 비교
 
-		if (nodeId === 'APPR' || nodeId === 'SHARE') return '#006494';
+		// 최상위 루트 (결재/공유) - 진한 블루
+		if (nodeId === 'APPR') return '#0d47a1';
+		if (nodeId === 'SHARE') return '#0d47a1';
 		
-		// L2: 수주번호 노드 (대표색상)
-		if (level === 2) return '#166088';
+		// L2: 수주번호(오더번호) 노드
+		if (level == 2) return '#1565c0';
 		
 		// L3: Sales Code / 설비 노드
-		if (level === 3) return '#73d2de';
+		if (level == 3) return '#1976d2';
 
-		// 기타 폴더
-		return '#006d77';
+		// 기타 폴더 (Item 등)
+		return '#f0f0f0';
 	}
 
 	function renderMind(nodeList) {
@@ -363,7 +459,7 @@
 
 		// 루트 노드
 		nodeArray.push({ id: 'root', topic: 'TO-DO LIST', isroot: true,
-						'background-color': '#0d47a1', 'foreground-color': '#fff' });
+						'background-color': '#90caf9', 'foreground-color': '#000000' });
 
 		nodeList.forEach(function(item) {
 			var nodeType  = item.nodeType;
@@ -374,7 +470,7 @@
 			var nodeObj = {
 				id: nodeId,
 				parentid: parentId,
-				topic: nodeName,
+				topic: '<div class="node-text-wrapper">' + nodeName + '</div>',
 				data: Object.assign({}, item) // 툴팁용 메타데이터 전체 바인딩
 			};
 
@@ -383,15 +479,31 @@
 				nodeObj['foreground-color'] = (item.nodeLevel === 3) ? '#333' : '#fff'; // L3는 밝은색이므로 어두운 글자
 				nodeArray.push(nodeObj);
 			} else if (nodeType === 'ITEM') {
-				if (item.sanctnSttus === 'Y') {
+				var isMyTask = (item.todoId === jwt.userId);
+				var isDone = (item.sanctnSttus === 'Y');
+
+				if (isDone || !isMyTask) {
+					// 완료되었거나 타인의 결재 건: 회색 처리
 					nodeObj['background-color'] = '#f0f0f0';
 					nodeObj['foreground-color'] = '#777';
 				} else {
-					// 이슈 관련(이슈번호가 있거나 명칭에 문제/조치 포함)은 연한 빨강 배경에 강조
-					var isIssue = (item.issNo || nodeName.indexOf('문제') > -1 || nodeName.indexOf('조치') > -1);
-					nodeObj['background-color'] = isIssue ? '#ffebeb' : '#fff9e6'; 
+					// 내 결재 대기 건: 유형별 강조 색상
+					var isWbsIssue = (nodeName.indexOf('문제') > -1 || nodeName.indexOf('조치') > -1);
+					var isPurchase = (nodeName.indexOf('발주') > -1);
+
+					if (isWbsIssue) {
+						// WBS문제/조치: 조금 더 진한 연빨강
+						nodeObj['background-color'] = '#ffcdd2'; 
+					} else if (isPurchase) {
+						// 발주요청/결과: 주황형 노란색
+						nodeObj['background-color'] = '#fefed2'; 
+					} else {
+						// 나머지 내 결재 노드: 흰색
+						nodeObj['background-color'] = '#fefed2'; 
+					}
+					
 					nodeObj['foreground-color'] = '#333';
-					nodeObj.topic += ' <span style="display:inline-block;white-space:nowrap;vertical-align:middle;"><i class="fa fa-exclamation-circle" style="color:red;font-size:14px;margin-left:4px;" title="결재대기"></i>&nbsp;</span>';
+					nodeObj.topic = '<div class="node-text-wrapper"><i class="fa fa-exclamation-circle" style="color:red;font-size:14px;margin-right:4px;vertical-align: middle;position: relative;top: 1px;" title="결재대기"></i> ' + nodeName + '</div>';
 				}
 				nodeArray.push(nodeObj);
 			}
@@ -433,9 +545,6 @@
 		html += '<table>';
 		
 		var fields = [];
-		
-		// Map ordrsNo to ordrsNoVal for consistent tooltip display
-		data.ordrsNoVal = getValueIgnoreCase(data, 'ordrsNo');
 
 		// 노드 레벨에 따른 툴팁 필드 구성
 		if (level === 2) { 
@@ -459,10 +568,12 @@
 				{ key: 'pjtNm', label: 'Project' }
 			];
 		} else {
-			// ITEM 노드: 업무 구분에 따라 필드 조정
+			// ITEM 노드: TODO_DIV2_CODE_ID 기준으로 업무유형별 분기
+			var div2 = data.todoDiv2CodeId || '';
 			var pgmNm = data.pgmNm || '';
-			
+
 			if (pgmNm.indexOf('물류') > -1) {
+				// [물류요청서] - 기존 유지
 				fields = [
 					{ key: 'ordrsNoVal', label: '수주번호' },
 					{ key: 'clntNm', label: '고객사' },
@@ -471,47 +582,84 @@
 					{ key: 'creatNm', label: '결재요청자' },
 					{ key: 'todoNo', label: '관리번호' }
 				];
-			} else if (pgmNm.indexOf('WBS') > -1 || data.issNo || data.reqNo) {
-				var div2 = data.todoDiv2CodeId;
-				
-				// 공통 헤더 필드
+			} else if (div2 === 'TODODIV2060' || div2 === 'TODODIV1030') {
+				// [WBS문제]: 수주번호, SalesCd, 고객사, Project, 설비명, 문제상태, 문제내용(ISS_CNTS)
 				fields = [
 					{ key: 'ordrsNoVal', label: '수주번호' },
 					{ key: 'salesCd', label: 'Sales Code' },
 					{ key: 'clntNm', label: '고객사' },
 					{ key: 'pjtNm', label: 'Project' },
-					{ key: 'eqpNm', label: '설비명' }
+					{ key: 'eqpNm', label: '설비명' },
+					{ key: 'issStsNm', label: '문제상태' },
+					{ key: 'issCnts', label: '문제내용' },
+					{ key: 'creatNm', label: '결재요청자' }
 				];
-
-				// [WBS 문제] 관련 필드
-				if (div2 === 'TODODIV2060' || div2 === 'TODODIV2070' || div2 === 'TODODIV1030' || div2 === 'TODODIV1060') {
-					fields.push({ key: 'issNo', label: '문제번호' });
-					fields.push({ key: 'issStsNm', label: '문제상태' });
-					fields.push({ key: 'issCnts', label: '문제내용' });
-				} 
-				// [발주/출장 요청/결과] 관련 필드
-				else if (div2 === 'TODODIV2020' || div2 === 'TODODIV1040' || div2 === 'TODODIV2030' || div2 === 'TODODIV1050') {
-					fields.push({ key: 'reqNo', label: '발주요청번호' });
-					fields.push({ key: 'reqStNm', label: '발주요청서상태' });
-					fields.push({ key: 'reqRmk', label: '발주요청서비고' });
-				}
-				// 조치 결과 등 기타 WBS 이슈 체인
-				else if (data.issNo) {
-					fields.push({ key: 'issNo', label: '문제번호' });
-					fields.push({ key: 'issStsNm', label: '문제상태' });
-					fields.push({ key: 'issCnts', label: '문제내용' });
-				}
-
-				fields.push({ key: 'creatNm', label: '결재요청자' });
-			} else {
+			} else if (div2 === 'TODODIV2090' || div2 === 'TODODIV1090') {
+				// [WBS조치]: WBS문제와 동일
+				fields = [
+					{ key: 'ordrsNoVal', label: '수주번호' },
+					{ key: 'salesCd', label: 'Sales Code' },
+					{ key: 'clntNm', label: '고객사' },
+					{ key: 'pjtNm', label: 'Project' },
+					{ key: 'eqpNm', label: '설비명' },
+					{ key: 'issStsNm', label: '문제상태' },
+					{ key: 'issCnts', label: '문제내용' },
+					{ key: 'creatNm', label: '결재요청자' }
+				];
+			} else if (div2 === 'TODODIV2020' || div2 === 'TODODIV1040') {
+				// [발주/출장요청]: 문제상태/이슈내용 없음, 발주관련 정보만
+				fields = [
+					{ key: 'ordrsNoVal', label: '수주번호' },
+					{ key: 'salesCd', label: 'Sales Code' },
+					{ key: 'clntNm', label: '고객사' },
+					{ key: 'pjtNm', label: 'Project' },
+					{ key: 'eqpNm', label: '설비명' },
+					{ key: 'reqNo', label: '발주요청번호' },
+					{ key: 'reqStNm', label: '발주요청서상태' },
+					{ key: 'reqRmk', label: '발주요청서비고' },
+					{ key: 'creatNm', label: '결재요청자' }
+				];
+			} else if (div2 === 'TODODIV2030' || div2 === 'TODODIV1050') {
+				// [발주/출장결과]: 관리번호는 RES번호 (todoNo)
+				fields = [
+					{ key: 'ordrsNoVal', label: '수주번호' },
+					{ key: 'salesCd', label: 'Sales Code' },
+					{ key: 'clntNm', label: '고객사' },
+					{ key: 'pjtNm', label: 'Project' },
+					{ key: 'eqpNm', label: '설비명' },
+					{ key: 'reqNo', label: '발주요청번호' },
+					{ key: 'todoNo', label: '결과관리번호' },
+					{ key: 'reqStNm', label: '발주요청서상태' },
+					{ key: 'reqRmk', label: '발주요청서비고' },
+					{ key: 'creatNm', label: '결재요청자' }
+				];
+			} else if (div2 === 'TODODIV2100' || div2 === 'TODODIV1100') {
+				// [수주목표원가]: 수주번호, 고객사, Project, 결재요청자
 				fields = [
 					{ key: 'ordrsNoVal', label: '수주번호' },
 					{ key: 'clntNm', label: '고객사' },
 					{ key: 'pjtNm', label: 'Project' },
-					{ key: 'ordrsDivNm', label: '수주구분' },
-					{ key: 'ctrtNm', label: '계약명' },
-					{ key: 'creatNm', label: '결재요청자' },
-					{ key: 'todoNo', label: '관련번호' }
+					{ key: 'creatNm', label: '결재요청자' }
+				];
+			} else if (div2 === 'TODODIV1060' || div2 === 'TODODIV2070') {
+				// [WBS계획확정도]: 문제번호 대신 관리번호
+				fields = [
+					{ key: 'salesCd', label: 'Sales Code' },
+					{ key: 'clntNm', label: '고객사' },
+					{ key: 'pjtNm', label: 'Project' },
+					{ key: 'eqpNm', label: '설비명' },
+					{ key: 'todoNo', label: '관리번호' },
+					{ key: 'creatNm', label: '결재요청자' }
+				];
+			} else {
+				// [PFU / 기타 일반 결재]: SalesCode, 고객사, Project, 설비명, 관리번호, 결재요청자
+				fields = [
+					{ key: 'salesCd', label: 'Sales Code' },
+					{ key: 'clntNm', label: '고객사' },
+					{ key: 'pjtNm', label: 'Project' },
+					{ key: 'eqpNm', label: '설비명' },
+					{ key: 'todoNo', label: '관리번호' },
+					{ key: 'creatNm', label: '결재요청자' }
 				];
 			}
 		}
@@ -528,6 +676,11 @@
 				}
 			}
 			return '';
+		}
+
+		// ordrsNoVal 동적 계산 (salesCd 앞 5자리)
+		if (!data.ordrsNoVal && data.salesCd && data.salesCd.length >= 5) {
+			data.ordrsNoVal = data.salesCd.substring(0, 5);
 		}
 
 		fields.forEach(function(f) {
