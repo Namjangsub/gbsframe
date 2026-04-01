@@ -7,7 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface PM20Mapper {
-	List<Map<String, String>> selectList_pm20(Map<String, String> paramMap);
+	List<Map<String, String>> selectRegisteredAgendaList(Map<String, String> paramMap);
 
 	List<Map<String, String>> selectAgendaList(Map<String, String> paramMap);
 
