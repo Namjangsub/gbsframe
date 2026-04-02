@@ -49,7 +49,7 @@
 	<script src="/static/html/user/mm/mm01/jsmind.js"></script>
 	<script src="/static/html/user/mm/mm01/jsmind.draggable-node.js"></script>
 	<style type="text/css">
-		#jsmind_container { width: 100%; height: 725px; border: solid 1px #ccc; background: #f4f4f4; margin-top: 10px; }
+		#jsmind_container { width: 100%; height: 705px; border: solid 1px #ccc; background: #f4f4f4; margin-top: 10px; }
 		#node-tooltip {
 			position: absolute; display: none; background-color: rgba(50, 50, 50, 0.9); color: #fff;
 			padding: 10px; border-radius: 4px; font-size: 12px; z-index: 9999;
@@ -60,7 +60,6 @@
 		#node-tooltip td { text-align: left; word-break: break-all; }
 		#node-tooltip .tooltip-header { font-weight: bold; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #777; font-size: 13px; }
 		
-		/* 마인드맵 노드: Flexbox로 수직/수평 정렬 완벽화 */
 		jmnode { 
 			display: flex !important;
 			align-items: center !important; /* 상하 중앙 정렬 */
@@ -69,7 +68,7 @@
 			min-width: 40px;
 			max-width: 500px;
 			height: auto !important;
-			padding: 4px 10px !important; /* 상하 여백 여유 있게 조정 */
+			padding: 1px 5px !important;
 			line-height: normal !important; 
 			border-radius: 3px !important;
 			box-shadow: 1px 1px 3px rgba(0,0,0,0.1) !important;
@@ -96,12 +95,11 @@
 			width: 120px !important;
 		}
 
-		/* ITEM 노드(할 일 상세) - 250px 고정 */
+		/* ITEM 노드(할 일 상세) - 200px 고정 */
 		jmnode[nodeid^="TODO_"] {
-			width: 270px !important;
+			width: 200px !important;
 		}
 		jmnode[nodeid^="TODO_"] .node-text-wrapper {
-			width: 250px !important;
 			height: 20px !important;
 		}
 		
@@ -414,6 +412,16 @@
 			};
 			jm = new jsMind(mindOptions);
 
+			// 마인드맵 노드 더블클릭 이벤트 추가
+			$('#jsmind_container').on('dblclick', 'jmnode', function() {
+				var nodeid = $(this).attr('nodeid');
+				var node = jm.get_node(nodeid);
+				if (node && node.data && nodeid.indexOf('_S_') > -1) {
+					// Sales Code 노드(_S_)인 경우에만 팝업 호출
+					wbsPlanInsertModal(node.data);
+				}
+			});
+
 			if (jm) {
 				jm.show({meta: { name: 'ToDoMap', author: 'GBS', version: '1.0' }, format: 'node_array', data: [{ id: 'root', topic: '데이터를 불러오는 중입니다...', isroot: true }]});
 			}
@@ -434,14 +442,16 @@
 
 		// 최상위 루트 (결재/공유) - 진한 블루
 		if (nodeId === 'APPR') return '#0d47a1';
-		if (nodeId === 'SHARE') return '#0d47a1';
-		
-		// L2: 수주번호(오더번호) 노드
-		if (level == 2) return '#1565c0';
-		
-		// L3: Sales Code / 설비 노드
-		if (level == 3) return '#1976d2';
+		if (nodeId === 'SHARE') return '#3C47E3';
 
+		var rootKey = (item.parentNodeId || item.nodeId || '');
+        var isShare = rootKey.indexOf('SHARE') === 0;
+		
+		// L2: 수주번호
+        if (level == 2) return isShare ? '#4B54DD' : '#1565c0';
+
+        // L3: Sales Code
+        if (level == 3) return isShare ? '#565ED6' : '#1976d2';
 		// 기타 폴더 (Item 등)
 		return '#f0f0f0';
 	}
@@ -471,7 +481,7 @@
 				id: nodeId,
 				parentid: parentId,
 				topic: '<div class="node-text-wrapper">' + nodeName + '</div>',
-				data: Object.assign({}, item) // 툴팁용 메타데이터 전체 바인딩
+				data: Object.assign({histYn: 'N'}, item) // 기본적으로 histYn은 'N'으로 설정하여 바인딩
 			};
 
 			if (nodeType === 'GROUP') {
@@ -503,7 +513,7 @@
 					}
 					
 					nodeObj['foreground-color'] = '#333';
-					nodeObj.topic = '<div class="node-text-wrapper"><i class="fa fa-exclamation-circle" style="color:red;font-size:14px;margin-right:4px;vertical-align: middle;position: relative;top: 1px;" title="결재대기"></i> ' + nodeName + '</div>';
+					nodeObj.topic = '<div style="display:flex;align-items:center;width:100%;"><div class="node-text-wrapper" style="flex:1;">' + nodeName + '</div><i class="fa fa-exclamation-circle" style="color:red;font-size:14px;flex-shrink:0;margin-left:5px;" title="결재대기"></i></div>';
 				}
 				nodeArray.push(nodeObj);
 			}
@@ -590,7 +600,9 @@
 					{ key: 'clntNm', label: '고객사' },
 					{ key: 'pjtNm', label: 'Project' },
 					{ key: 'eqpNm', label: '설비명' },
+					{ key: 'todoNo', label: '문제번호' },
 					{ key: 'issStsNm', label: '문제상태' },
+					{ key: 'issSj', label: '문제제목' },
 					{ key: 'issCnts', label: '문제내용' },
 					{ key: 'creatNm', label: '결재요청자' }
 				];
@@ -602,7 +614,9 @@
 					{ key: 'clntNm', label: '고객사' },
 					{ key: 'pjtNm', label: 'Project' },
 					{ key: 'eqpNm', label: '설비명' },
+					{ key: 'todoNo', label: '문제번호' },
 					{ key: 'issStsNm', label: '문제상태' },
+					{ key: 'issSj', label: '문제제목' },
 					{ key: 'issCnts', label: '문제내용' },
 					{ key: 'creatNm', label: '결재요청자' }
 				];
@@ -854,6 +868,36 @@
 		gridView.initView().setData(0);
 
 	})
+
+	// 일정관리 팝업창 호출
+	function wbsPlanInsertModal(nodeData) {
+        var row = nodeData || {};
+		if (row.data && typeof row.data === 'object') {
+			row = row.data;
+		}
+        
+        if (row != undefined) {
+            var paramObj = {
+                "coCd": row.coCd,
+                "salesCd": row.sort4,
+                "planVerNo": row.planVerNo,
+                "histYn": row.histYn || 'N', // 데이터가 없으면 기본값 N
+            };
+            
+            if (!paramObj.planVerNo) {
+                alert("등록된 WBS 계획 버전이 없습니다.");
+                return;
+            }
+            
+            openModal("/static/html/user/wb/wb22/WB2201P01.html", 1400, 900, "WBS 계획등록", paramObj, function () {
+                if (typeof salesGridView !== "undefined") {
+                    salesGridView.setData(0);
+                }
+            });
+        } else {
+            alert("대상 Sales Code를 선택하세요.");
+        }
+    }
 
 	function openPrdtSearch(){
 		var paramObj = {
