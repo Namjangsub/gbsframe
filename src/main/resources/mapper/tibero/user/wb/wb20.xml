@@ -1321,7 +1321,7 @@
 	</update>
 
 		<!-- 마인드맵 전용 계층형 TO-DO 조회 (상사 제공 뼈대 쿼리 기반 + 일반 결재 통합) -->
-	<select id="selectToDoMindMap" parameterType="Map" resultType="camelMap">
+	<select id="selectToDoMindMapNam" parameterType="Map" resultType="camelMap">
 	WITH BASE_ALL AS (
 		SELECT
 			  T.TODO_NO
@@ -1339,14 +1339,15 @@
 			, T.ETC_FIELD2
 			, T.CREAT_PGM
 			, CASE WHEN T.TODO_DIV1_CODE_ID = 'TODODIV010' THEN '공유' ELSE '결재' END AS TODO_DIV1_CODE_NM
+			, CASE WHEN LENGTH(T.SALES_CD) >= 5 AND TRANSLATE(SUBSTR(T.SALES_CD, 1, 5), '1234567890', '##########') = '#####' THEN SUBSTR(T.SALES_CD, 1, 5)
+				ELSE NULL
+			  END AS ORDRS_NO_VAL
 		FROM TB_WB20M03 T
 						LEFT JOIN TB_CM06M01 B ON B.ID = T.TODO_ID
+						LEFT JOIN TB_CM05M01 X ON X.CODE_KIND = 'TODODIV20' AND X.CODE_ID = T.TODO_DIV2_CODE_ID
 		WHERE 1 = 1
 		<if test="coCd != null and !coCd.equals('')">
 		  AND T.CO_CD = #{coCd}
-		</if>
-		<if test="todoFromDt != null and !todoFromDt.equals('') and todoToDt != null and !todoToDt.equals('')">
-		  AND T.CREAT_DTTM BETWEEN TO_DATE(#{todoFromDt}, 'YYYYMMDD') AND TO_DATE(#{todoToDt}, 'YYYYMMDD') + 1
 		</if>
 		<if test="todoDivId != null and !todoDivId.equals('')">
 		  AND T.TODO_DIV1_CODE_ID = #{todoDivId}
@@ -1360,9 +1361,6 @@
 		<if test="todoNo != null and !todoNo.equals('')">
 			AND T.TODO_NO LIKE '%'||#{todoNo}||'%'
 		</if>
-		<if test="salesCd != null and !salesCd.equals('')">
-			AND T.SALES_CD LIKE '%'||#{salesCd}||'%'
-		</if>
 		<if test="todoDiv != null and !todoDiv.equals('')">
 			AND T.TODO_DIV1_CODE_ID = #{todoDiv}                 --구분
 		</if>
@@ -1372,14 +1370,22 @@
 		<if test="sanctnSttus != null and !sanctnSttus.equals('')">
 			AND T.SANCTN_STTUS = #{sanctnSttus, jdbcType=VARCHAR}
 		</if>
+		<if test="todoDivDetail != null and !todoDivDetail.equals('')">
+			AND X.CODE_NM = #{todoDivDetail}                 --요청
+		</if>
+    <choose>
+        <when test="salesCd != null and !salesCd.equals('')">
+         AND T.SALES_CD LIKE '%'||#{salesCd}||'%'
+        </when>
+        <otherwise>
+         AND T.CREAT_DTTM BETWEEN TO_DATE(#{todoFromDt}, 'YYYYMMDD') AND TO_DATE(#{todoToDt}, 'YYYYMMDD') + 1
+        </otherwise>
+    </choose>
 	)
 	, SEARCH_ALL AS (
 		SELECT
 			  T.*
 			, CASE WHEN 1=1
-				<if test="todoDivDetail != null and !todoDivDetail.equals('')">
-					AND X.CODE_NM = #{todoDivDetail}                 --요청
-				</if>
 			  THEN 1 ELSE 0 END AS SEARCH_MATCH_FLAG
 			, CASE WHEN LENGTH(T.SALES_CD) >= 5 AND TRANSLATE(SUBSTR(T.SALES_CD, 1, 5), '1234567890', '##########') = '#####' THEN SUBSTR(T.SALES_CD, 1, 5)
 				ELSE NULL
@@ -1398,7 +1404,7 @@
 	/* 각 타입별 대표키 지정 (중복 노드 방지) */
 	, BASE_WBS_REP AS (
 		SELECT T.*
-			, ROW_NUMBER() OVER (PARTITION BY TODO_NO, TODO_DIV1_CODE_ID, TODO_DIV2_CODE_ID ORDER BY SEARCH_MATCH_FLAG DESC, TODO_KEY ASC) AS RN
+			, ROW_NUMBER() OVER (PARTITION BY TODO_NO, TODO_DIV1_CODE_ID, TODO_DIV2_CODE_ID ORDER BY  TODO_KEY ASC) AS RN
 		FROM BASE_WBS T
 	)
 	, BASE_WBS_ONLY AS ( SELECT * FROM BASE_WBS_REP WHERE RN = 1 )
@@ -1630,5 +1636,484 @@
 		, A.SORT4, A.SORT5, A.SORT6
 		, A.NODE_LEVEL, A.TODO_KEY
 	</select>
+	
+		<!-- 마인드맵 전용 계층형 TO-DO 조회 (상사 제공 뼈대 쿼리 기반 + 일반 결재 통합) -->
+	<select id="selectToDoMindMap" parameterType="Map" resultType="camelMap">
+		WITH base_all AS (
+		    SELECT
+		          t.TODO_NO
+		        , t.TODO_ID
+		        , t.TODO_KEY
+		        , t.SANCTN_STTUS
+		        , t.TODO_DIV2_CODE_ID
+		        , t.SALES_CD
+				, T.TODO_DIV1_CODE_ID
+				, T.CO_CD
+				, T.TODO_FILE_TRGT_KEY
+				, T.PG_PATH
+				, T.PG_PARAM
+				, T.TODO_TITL
+				, T.ETC_FIELD2
+				, T.CREAT_PGM
+				, CASE WHEN T.TODO_DIV1_CODE_ID = 'TODODIV10' THEN '공유' ELSE '결재' END AS TODO_DIV1_CODE_NM
+				, CR.ORDRS_NO 			AS  ORDRS_NO
+				, CASE WHEN T.TODO_DIV1_CODE_ID IN ('TODODIV10', 'TODODIV010') THEN 'SHARE' ELSE 'APPR' END AS APPR_DIV
+				, B.NAME 				AS TODO_NM
+				, MC.NAME 				AS CREAT_NM
+				, DV2.CODE_NM 			AS TODO_DIV2_CODE_NM
+				, TRIM(REPLACE(
+					CASE DV2.CODE_NM
+						WHEN '발주/출장요청'   THEN '발주요청'
+						WHEN '발주/출장결과'   THEN '발주결과'
+						WHEN '출장자사진업로드' THEN '출장'
+						WHEN '대금지급요청결재' THEN '대금지급'
+						WHEN '대금지급요청공유' THEN '대금지급'
+						WHEN '업무요청공유' THEN '업무요청'
+						WHEN '업무요청결재' THEN '업무요청'
+						ELSE FN_CM05M01_CD_TO_NM(T.TODO_DIV2_CODE_ID)
+					END, 'WBS', '')) 	AS PGM_NM
+				, W24.ISS_SJ
+				, W24.ISS_STS
+				, W24.ISS_CNTS
+				, W24.ACT_ID
+				, (SELECT TO_CHAR(MIN(TO_NUMBER(P22.VER_NO))) FROM TB_WB22M01 P22 WHERE P22.SALES_CD = T.SALES_CD) AS PLAN_VER_NO
+				, CR.CTRT_NM, BC.CLNT_NM, PJ.CODE_NM AS PJT_NM, ODV.CODE_NM AS ORDRS_DIV_NM, EQ.EQP_NM
+		    FROM TB_WB20M03 t
+			LEFT JOIN TB_CM06M01 B ON B.ID = T.TODO_ID
+			LEFT JOIN TB_CM06M01 MC ON MC.ID = T.CREAT_ID
+			LEFT JOIN TB_CM05M01 DV2 ON DV2.CODE_ID = T.TODO_DIV2_CODE_ID
+			LEFT JOIN TB_WB24M02 W24 ON W24.ISS_NO = T.TODO_NO
+				LEFT JOIN TB_CR02D02 EQ ON T.CO_CD = EQ.CO_CD AND T.SALES_CD = EQ.SALES_CD
+				LEFT JOIN TB_CR02M01 CR ON T.CO_CD = CR.CO_CD AND (CR.ORDRS_NO = EQ.ORDRS_NO OR CR.ORDRS_NO = T.SALES_CD)
+				LEFT JOIN TB_BM02M01 BC ON CR.ORDRS_CLNT_CD = BC.CLNT_CD
+				LEFT JOIN TB_CM05M01 PJ ON CR.CLNT_PJT = PJ.CODE_ID
+				LEFT JOIN TB_CM05M01 ODV ON CR.ORDRS_DIV = ODV.CODE_ID
+		    WHERE 1 = 1
+			<if test="coCd != null and !coCd.equals('')">
+			  AND T.CO_CD = #{coCd}
+			</if>
+			<if test="salesMngNm != null and !salesMngNm.equals('')">
+			  AND B.NAME LIKE '%' || #{salesMngNm} || '%' --공유대상자
+			</if>
+			<if test="!salesMngId != null and !salesMngId.equals('')">
+			  AND T.TODO_ID = #{salesMngId}				--공유대상자
+			</if>
+			<if test="todoDiv != null and !todoDiv.equals('')">
+			  AND T.TODO_DIV1_CODE_ID = #{todoDiv}                 --구분
+			</if>
+			<if test="sanctnSttus != null and !sanctnSttus.equals('')">
+			  AND T.SANCTN_STTUS = #{sanctnSttus, jdbcType=VARCHAR}
+			</if>
+			<if test="todoDivId != null and !todoDivId.equals('')">
+			  AND T.TODO_DIV1_CODE_ID = #{todoDivId}
+			</if>
+    <choose>
+        <when test="salesCd == null and todoNo == null">
+         	  AND T.CREAT_DTTM BETWEEN TO_DATE(#{todoFromDt}, 'YYYYMMDD') AND TO_DATE(#{todoToDt}, 'YYYYMMDD') + 1
+        </when>
+        <otherwise>
+	        <if  test="salesCd != null and !salesCd.equals('')">
+	         AND T.SALES_CD LIKE '%'||#{salesCd}||'%'
+			</if>
+			<if test="todoNo != null and !todoNo.equals('')">
+			  AND T.TODO_NO LIKE '%'||#{todoNo}||'%'
+			</if>
+        </otherwise>
+    </choose>
+		)
+		, base_iss AS (
+		    SELECT
+		          t.*
+		    FROM base_all t
+		    WHERE 1 = 1
+		    AND t.TODO_DIV2_CODE_ID IN ('TODODIV2060',   -- 문제 발생
+		   								  'TODODIV2090',   -- 문제 조치
+		   								  'TODODIV2020',   -- 발주 요청
+		   								  'TODODIV2030')   -- 발주 결과
+		)
+		, req_rslt AS (
+		    SELECT
+		          qm.ISS_NO						AS base_iss_TODO_NO
+		        , b.TODO_ID						AS base_iss_TODO_ID
+		        , NVL2(qm.ISS_NO,NVL(b.SANCTN_STTUS,'E'),'')	AS base_iss_SANCTN_STTUS
+		        , b9.TODO_NO					AS iss_rslt_TODO_NO
+		        , b9.TODO_ID					AS iss_rslt_TODO_ID
+		        , b9.SANCTN_STTUS				AS iss_rslt_SANCTN_STTUS
+		        , qp.REQ_NO 					AS req_TODO_NO
+		        , b3.TODO_ID					AS req_TODO_ID
+		        , NVL2(qp.REQ_NO,NVL(b3.SANCTN_STTUS,'E'),'') 	AS req_SANCTN_STTUS
+		        , base_iss.TODO_NO 				AS rslt_TODO_NO
+		        , base_iss.TODO_ID				AS rslt_TODO_ID
+		        , NVL2(base_iss.TODO_NO,NVL(base_iss.SANCTN_STTUS,'E'),'')		AS rslt_SANCTN_STTUS
+		        , qp.SAME_TIME_RESULT			AS rslt_SAME_TIME_RESULT
+		        , WI.ISS_NO
+		        , qm.PART_CD
+				, qm.REQ_RMK
+				, qp.MEAS_RST
+				, qp.RESLT_RST
+				, qp.THGH_RST
+				, base_iss.*
+		    FROM base_iss		--발주결과
+		    JOIN TB_QM01P01 qp ON qp.RSLT_NO = base_iss.TODO_NO
+		    LEFT JOIN TB_QM01M01 qm 		ON qm.REQ_NO = qp.REQ_NO
+		    LEFT JOIN base_iss   b  ON b.TODO_NO = qm.ISS_NO AND b.TODO_DIV2_CODE_ID = 'TODODIV2060' -- 문제 발생
+		    LEFT JOIN base_iss   b2 ON b2.TODO_NO = qp.RSLT_NO
+		    LEFT JOIN base_iss   b3 ON b3.TODO_NO = qp.REQ_NO
+		    LEFT JOIN TB_WB24M02 WI ON WI.ISS_NO = qm.ISS_NO -- 문제발생
+		    LEFT JOIN base_iss   b9 ON b9.TODO_NO = qm.ISS_NO AND b9.TODO_DIV2_CODE_ID = 'TODODIV2090' --문제조치
+		    WHERE base_iss.TODO_DIV2_CODE_ID = 'TODODIV2030'   -- 발주 결과
+		)
+		, req AS (
+		    SELECT
+		          qm.ISS_NO						AS base_iss_TODO_NO
+		        , b.TODO_ID						AS base_iss_TODO_ID
+		        , NVL2(qm.ISS_NO,NVL(b.SANCTN_STTUS,'E'),'')	AS base_iss_SANCTN_STTUS
+		        , b9.TODO_NO					AS iss_rslt_TODO_NO
+		        , b9.TODO_ID					AS iss_rslt_TODO_ID
+		        , b9.SANCTN_STTUS				AS iss_rslt_SANCTN_STTUS
+		        , base_iss.TODO_NO 				AS req_TODO_NO
+		        , base_iss.TODO_ID				AS req_TODO_ID
+		        , base_iss.SANCTN_STTUS			AS req_SANCTN_STTUS
+		        , ''							AS rslt_TODO_NO
+		        , ''							AS rslt_TODO_ID
+		        , ''							AS rslt_SANCTN_STTUS
+		        , 'N'							AS rslt_SAME_TIME_RESULT
+		        , WI.ISS_NO
+		        , qm.PART_CD
+				, qm.REQ_RMK
+				, ''
+				, ''
+				, ''
+				, base_iss.*
+		    FROM base_iss
+		    JOIN TB_QM01M01 qm 		ON qm.REQ_NO = base_iss.TODO_NO
+		    LEFT JOIN base_iss   b  ON b.TODO_NO = qm.ISS_NO AND b.TODO_DIV2_CODE_ID = 'TODODIV2060' --문제 발생
+		    LEFT JOIN TB_WB24M02 WI ON WI.ISS_NO = qm.ISS_NO -- 문제발생
+		    LEFT JOIN base_iss   b9 ON b9.TODO_NO = qm.ISS_NO AND b9.TODO_DIV2_CODE_ID = 'TODODIV2090' --문제조치
+		    WHERE base_iss.TODO_DIV2_CODE_ID = 'TODODIV2020'   -- 발주요청
+		      AND NOT EXISTS (SELECT 1 FROM req_rslt WHERE req_rslt.req_TODO_NO = qm.REQ_NO )
+		)
+		, iss_rslt AS (
+		    SELECT
+		          b.TODO_NO						AS base_iss_TODO_NO
+		        , b.TODO_ID						AS base_iss_TODO_ID
+		        , NVL2(b.TODO_NO, NVL(b.SANCTN_STTUS,'E'),'')	AS base_iss_SANCTN_STTUS
+		        , t.TODO_NO						AS iss_rslt_TODO_NO
+		        , t.TODO_ID						AS iss_rslt_TODO_ID
+		        , t.SANCTN_STTUS				AS iss_rslt_SANCTN_STTUS
+		        , '' 							AS req_TODO_NO
+		        , '' 							AS req_TODO_ID
+		        , ''							AS req_SANCTN_STTUS
+		        , '' 							AS rslt_TODO_NO
+		        , '' 							AS rslt_TODO_ID
+		        , ''							AS rslt_SANCTN_STTUS
+		        , '' 							AS rslt_SAME_TIME_RESULT
+		        , WI.ISS_NO
+		        , '' PART_CD
+				, '' REQ_RMK
+				, '' MEAS_RST
+				, '' RESLT_RST
+				, '' THGH_RST
+				, t.*
+		    FROM base_iss t
+		    LEFT JOIN base_iss b   ON b.TODO_NO = t.TODO_NO AND b.TODO_DIV2_CODE_ID = 'TODODIV2060'
+		    JOIN TB_WB24M03 WI ON WI.ISS_NO = t.TODO_NO -- 문제 발생
+		    WHERE t.TODO_DIV2_CODE_ID = 'TODODIV2090'   -- 문제 조치
+		      AND NOT EXISTS (SELECT 1 FROM req_rslt WHERE req_rslt.iss_rslt_TODO_NO = t.TODO_NO )
+		      AND NOT EXISTS (SELECT 1 FROM req WHERE req.iss_rslt_TODO_NO = t.TODO_NO )
+		)
+		, iss AS (
+		    SELECT
+		          t.TODO_NO						AS base_iss_TODO_NO
+		        , t.TODO_ID						AS base_iss_TODO_ID
+		        , t.SANCTN_STTUS				AS base_iss_SANCTN_STTUS
+		        , b.TODO_NO						AS iss_rslt_TODO_NO
+		        , b.TODO_ID						AS iss_rslt_TODO_ID
+		        , b.SANCTN_STTUS				AS iss_rslt_SANCTN_STTUS
+		        , qm.REQ_NO						AS req_TODO_NO
+		        , b2.TODO_ID					AS req_TODO_ID
+		        , NVL2(qm.REQ_NO,NVL(b2.SANCTN_STTUS,'E'),'') 	AS req_SANCTN_STTUS
+		        , qp.RSLT_NO 					AS rslt_TODO_NO
+		        , b3.TODO_ID					AS rslt_TODO_ID
+		        , NVL2( qp.RSLT_NO,NVL(b3.SANCTN_STTUS,'E'),'')		AS rslt_SANCTN_STTUS
+		        , qp.SAME_TIME_RESULT			AS rslt_SAME_TIME_RESULT
+		        , qm.ISS_NO
+		        , qm.PART_CD
+				, qm.REQ_RMK
+				, qp.MEAS_RST
+				, qp.RESLT_RST
+				, qp.THGH_RST
+				, t.*
+		    FROM base_iss t
+		    LEFT JOIN TB_WB20M03 b   ON b.TODO_ID = t.TODO_ID AND b.TODO_NO = t.TODO_NO AND b.TODO_DIV2_CODE_ID = 'TODODIV2090'  --문제조치
+		    LEFT JOIN TB_WB24M02 WI ON WI.ISS_NO = t.TODO_NO  -- 문제 조치
+		    LEFT JOIN TB_QM01M01 qm ON qm.ISS_NO = t.TODO_NO
+		    LEFT JOIN TB_QM01P01 qp ON qp.REQ_NO = qm.REQ_NO
+		    LEFT JOIN TB_WB20M03 b2 ON b2.TODO_ID = t.TODO_ID AND b2.TODO_NO = qp.REQ_NO AND b.TODO_DIV2_CODE_ID = 'TODODIV2020'	--발주요청
+		    LEFT JOIN TB_WB20M03 b3 ON b3.TODO_ID = t.TODO_ID AND b3.TODO_NO = qp.RSLT_NO AND b.TODO_DIV2_CODE_ID = 'TODODIV2030'	--발주결과
+		    WHERE t.TODO_DIV2_CODE_ID = 'TODODIV2060'   -- 문제 발생
+		      AND NOT EXISTS (SELECT 1 FROM req_rslt WHERE req_rslt.base_iss_TODO_NO = t.TODO_NO )
+		      AND NOT EXISTS (SELECT 1 FROM req WHERE req.base_iss_TODO_NO = t.TODO_NO )
+		      AND NOT EXISTS (SELECT 1 FROM iss_rslt WHERE iss_rslt.base_iss_TODO_NO = t.TODO_NO )
+		)
+		, conf_all AS (
+			SELECT * FROM iss
+			UNION all SELECT * FROM iss_rslt
+			UNION ALL SELECT * FROM req
+			UNION ALL SELECT * FROM req_rslt
+		)
+		/**********************************************************
+		 * 최종 SELECT: 트리 노드 생성
+		 * 레벨 0~2: GROUP 노드 (base_all 기반, TB_CR02D02 조인 1회)
+		 * 레벨 3~  : ITEM  노드 (conf_all 기반)
+		 **********************************************************/
+		, grp_nodes AS (
+		    -- 레벨 1: 결재구분 그룹 (APPR_DIV)
+		    SELECT DISTINCT
+		          'root'                          AS PARENT_NODE_ID
+		        , APPR_DIV                        AS NODE_ID
+		        , 'GROUP'                         AS NODE_TYPE
+		        , TODO_DIV1_CODE_NM               AS NODE_NAME
+		        , APPR_DIV
+		        , ''                              AS ORDRS_NO
+		        , ''                              AS SALES_CD_VAL
+		        , 1                               AS NODE_LEVEL
+		        , 0                               AS SORT_LEVEL
+		    FROM base_all
+		    UNION ALL
+		    -- 레벨 2: 수주번호 그룹
+		    SELECT DISTINCT
+		          APPR_DIV
+		        , APPR_DIV || '_O_' || NVL(t.ORDRS_NO,'기타')
+		        , 'GROUP'
+		        , NVL(t.ORDRS_NO,'기타') || <![CDATA['<br/>']]> || t.CLNT_NM || ' ' || t.PJT_NM AS NODE_NAME
+		        , t.APPR_DIV
+		        , NVL(t.ORDRS_NO,'기타')
+		        , ''
+		        , 2
+		        , 1
+		    FROM base_all t
+		    UNION ALL
+		    -- 레벨 3: 영업코드(장비) 그룹
+		    SELECT DISTINCT
+		          APPR_DIV || '_O_' || NVL(t.ORDRS_NO,'기타')
+		        , APPR_DIV || '_O_' || t.SALES_CD
+		        , 'GROUP'
+		        , T.SALES_CD|| <![CDATA['<br/>']]> || T.EQP_NM		AS NODE_NAME
+		        , t.APPR_DIV
+		        , t.ORDRS_NO
+		        , t.SALES_CD
+		        , 3
+		        , 2
+		    FROM base_all t
+		    WHERE t.ORDRS_NO != t.SALES_CD	--salesCd와 ordrsNo가 같은경우 중복 노드 발생됨
+		)
+		, w3_first AS (
+		    SELECT TODO_NO
+		         , PG_PATH
+		         , PG_PARAM
+		         , TODO_DIV2_CODE_ID
+		         , SALES_CD
+		         , TODO_DIV1_CODE_ID
+		         , CO_CD
+		         , TODO_FILE_TRGT_KEY
+		    FROM (
+		        SELECT w3.TODO_NO
+		             , w3.PG_PATH
+		             , w3.PG_PARAM
+			         , w3.TODO_DIV2_CODE_ID
+			         , w3.SALES_CD
+			         , w3.TODO_DIV1_CODE_ID
+			         , w3.CO_CD
+			         , w3.TODO_FILE_TRGT_KEY
+		             , ROW_NUMBER() OVER (
+		                   PARTITION BY w3.TODO_NO
+		                   ORDER BY w3.CREAT_DTTM DESC
+		               ) AS RN
+		        FROM TB_WB20M03 w3
+		    )
+		    WHERE RN = 1
+		)
+		-- ── 공통 NULL 채움 매크로 대신 인라인으로 정리 ──────────────────────────────
+		SELECT
+		      gn.PARENT_NODE_ID
+		    , gn.NODE_ID
+		    , gn.NODE_TYPE
+		    , gn.NODE_NAME
+		    , '' base_iss_TODO_NO,  '' base_iss_TODO_ID,  '' base_iss_SANCTN_STTUS
+		    , '' iss_rslt_TODO_NO,  '' iss_rslt_TODO_ID,  '' iss_rslt_SANCTN_STTUS
+		    , '' req_TODO_NO,        '' req_TODO_ID,        '' req_SANCTN_STTUS
+		    , '' rslt_TODO_NO,       '' rslt_TODO_ID,       '' rslt_SANCTN_STTUS
+		    , '' rslt_SAME_TIME_RESULT, '' ISS_NO,          '' PART_CD
+		    , '' REQ_RMK, '' MEAS_RST, '' RESLT_RST, '' THGH_RST
+		    , '' TODO_NO, '' TODO_ID, '' TODO_KEY, '' SANCTN_STTUS, '' TODO_DIV2_CODE_ID
+		    , '' SALES_CD, '' TODO_DIV1_CODE_ID, '' CO_CD, '' TODO_FILE_TRGT_KEY
+		    , '' PG_PATH, '' PG_PARAM, '' TODO_TITL, '' ETC_FIELD2, '' CREAT_PGM
+		    , '' TODO_DIV1_CODE_NM, '' ORDRS_NO, '' APPR_DIV, '' TODO_NM, '' CREAT_NM
+		    , '' TODO_DIV2_CODE_NM, '' PGM_NM, '' ISS_SJ, '' ISS_STS, '' ISS_CNTS
+		    , '' ACT_ID, '' PLAN_VER_NO, '' CTRT_NM, '' CLNT_NM, '' PJT_NM, '' ORDRS_DIV_NM, '' EQP_NM
+		    , gn.NODE_LEVEL
+		    , gn.SORT_LEVEL
+		    , 'GROP' POPUP_CALL_TYPE
+		    , '' PG_PATH_TO
+		    , '' PG_PARAM_TO
+		FROM grp_nodes gn
+		/***************************************
+		 * [케이스 1] 문제발생 있음 → 루트 ITEM
+		 ***************************************/
+		UNION ALL 
+		SELECT 
+		      APPR_DIV || '_O_' || T.SALES_CD
+		    , 'TODO_' || APPR_DIV || NVL(BASE_ISS_TODO_NO, ISS_RSLT_TODO_NO)
+		    , 'ITEM'
+		    , '[문제] ' || TODO_NM || '/' || NVL(ISS_SJ, TODO_TITL) || ISS_CNTS
+		    , T.*
+		    , 4, 3
+		    , SUBSTR(BASE_ISS_TODO_NO, 1, 3) AS POPUP_CALL_TYPE
+		    , w3_first.PG_PATH	as PG_PATH_TO
+		    , w3_first.PG_PARAM	as PG_PARAM_TO
+		FROM conf_all T
+		 LEFT JOIN w3_first ON w3_first.TODO_NO = T.BASE_ISS_TODO_NO
+		WHERE BASE_ISS_TODO_NO IS NOT NULL
+		/***************************************
+		 * [케이스 2] 문제발생 하위: 문제조치 (발주요청 없을 때)
+		 ***************************************/
+		UNION ALL
+		SELECT 
+		      'TODO_' || APPR_DIV || BASE_ISS_TODO_NO
+		    , 'TODO_' || BASE_ISS_TODO_NO || ISS_RSLT_TODO_NO
+		    , 'ITEM'
+		    , '[조치] ' || TODO_NM || '/' || NVL(ISS_SJ, TODO_TITL) || ISS_CNTS
+		    , T.*
+		    , 5, 4
+		    , 'RSLT' AS POPUP_CALL_TYPE
+		    , w3_first.PG_PATH	as PG_PATH_TO
+		    , w3_first.PG_PARAM	as PG_PARAM_TO
+		FROM conf_all T
+		 LEFT JOIN w3_first ON w3_first.TODO_NO = T.ISS_RSLT_TODO_NO
+		WHERE BASE_ISS_TODO_NO IS NOT NULL
+		  AND ISS_RSLT_TODO_NO IS NOT NULL
+		  AND REQ_TODO_NO      IS NULL
+		/***************************************
+		 * [케이스 3] 문제발생 하위: 발주요청 (문제조치 없을 때)
+		 ***************************************/
+		UNION ALL
+		SELECT 
+		      'TODO_' || APPR_DIV || BASE_ISS_TODO_NO
+		    , 'TODO_' || APPR_DIV || REQ_TODO_NO
+		    , 'ITEM'
+		    , '[발주요청] ' || NVL(CREAT_NM, TODO_NM) || REQ_RMK
+		    , T.*
+		    , 5, 4
+		    , SUBSTR(REQ_TODO_NO, 1, 3) AS POPUP_CALL_TYPE
+		    , w3_first.PG_PATH	as PG_PATH_TO
+		    , w3_first.PG_PARAM	as PG_PARAM_TO
+		FROM conf_all T
+		 LEFT JOIN w3_first ON w3_first.TODO_NO = T.REQ_TODO_NO
+		WHERE BASE_ISS_TODO_NO IS NOT NULL
+		  AND ISS_RSLT_TODO_NO IS NULL
+		  AND REQ_TODO_NO      IS NOT NULL
+		/***************************************
+		 * [케이스 4] 발주요청 하위: 발주결과
+		 ***************************************/
+		UNION ALL 
+		SELECT 
+		      'TODO_' || APPR_DIV || REQ_TODO_NO
+		    , 'TODO_' || APPR_DIV || RSLT_TODO_NO
+		    , 'ITEM'
+		    , '[발주결과] ' || NVL(CREAT_NM, TODO_NM) || REQ_RMK
+		    , T.*
+		    , 6, 5
+		    , SUBSTR(RSLT_TODO_NO, 1, 3) AS POPUP_CALL_TYPE
+		    , w3_first.PG_PATH	as PG_PATH_TO
+		    , w3_first.PG_PARAM	as PG_PARAM_TO
+		FROM conf_all T
+		 LEFT JOIN w3_first ON w3_first.TODO_NO = T.RSLT_TODO_NO
+		WHERE BASE_ISS_TODO_NO IS NOT NULL
+		  AND ISS_RSLT_TODO_NO IS NULL
+		  AND REQ_TODO_NO      IS NOT NULL
+		  AND RSLT_TODO_NO     IS NOT NULL
+		/***************************************
+		 * [케이스 5] 문제발생 없음, 문제조치 있음
+		 ***************************************/
+		UNION ALL 
+		SELECT 
+		      APPR_DIV || '_O_' || T.SALES_CD
+		    , 'TODO_' || APPR_DIV || ISS_RSLT_TODO_NO
+		    , 'ITEM'
+		    , '[발주요청] ' || NVL(CREAT_NM, TODO_NM) || REQ_RMK
+		    , T.*
+		    , 4, 3
+		    , 'RSLT' AS POPUP_CALL_TYPE
+		    , w3_first.PG_PATH	as PG_PATH_TO
+		    , w3_first.PG_PARAM	as PG_PARAM_TO
+		FROM conf_all T
+		 LEFT JOIN w3_first ON w3_first.TODO_NO = T.ISS_RSLT_TODO_NO
+		WHERE BASE_ISS_TODO_NO IS NULL
+		  AND ISS_RSLT_TODO_NO IS NOT NULL
+		/***************************************
+		 * [케이스 6] 문제발생·조치 없음, 발주요청만
+		 ***************************************/
+		UNION ALL 
+		SELECT 
+		      APPR_DIV || '_O_' || T.SALES_CD
+		    , 'TODO_' || APPR_DIV || REQ_TODO_NO
+		    , 'ITEM'
+		    , '[발주요청] ' || NVL(CREAT_NM, TODO_NM) || REQ_RMK
+		    , T.*
+		    , 4, 3
+		    , SUBSTR(REQ_TODO_NO, 1, 3) AS POPUP_CALL_TYPE
+		    , w3_first.PG_PATH	as PG_PATH_TO
+		    , w3_first.PG_PARAM	as PG_PARAM_TO
+		FROM conf_all T
+		 LEFT JOIN w3_first ON w3_first.TODO_NO = T.REQ_TODO_NO
+		WHERE BASE_ISS_TODO_NO IS NULL
+		  AND ISS_RSLT_TODO_NO IS NULL
+		  AND REQ_TODO_NO      IS NOT NULL
+		/***************************************
+		 * [케이스 7] 문제발생·조치 없음, 발주결과만
+		 ***************************************/
+		UNION ALL
+		SELECT 
+			      APPR_DIV || '_O_' || T.SALES_CD
+			    , 'TODO_' || APPR_DIV || RSLT_TODO_NO
+			    , 'ITEM'
+			    , '[발주요청] ' || NVL(CREAT_NM, TODO_NM) || REQ_RMK
+		    	, T.*
+			    , 4, 3
+		    , SUBSTR(RSLT_TODO_NO, 1, 3) AS POPUP_CALL_TYPE
+		    , w3_first.PG_PATH	as PG_PATH_TO
+		    , w3_first.PG_PARAM as PG_PARAM_TO
+		FROM conf_all AS T
+		 LEFT JOIN w3_first ON w3_first.TODO_NO = T.RSLT_TODO_NO
+		WHERE BASE_ISS_TODO_NO IS NULL
+		  AND ISS_RSLT_TODO_NO IS NULL
+		  AND RSLT_TODO_NO     IS NOT NULL
+		/***************************************
+		 * [케이스 8] 기타 결재건 (base_iss에 포함되지 않는 항목)
+		 ***************************************/
+		UNION ALL
+		SELECT
+		      APPR_DIV || '_O_' || SALES_CD
+		    , 'TODO_' || APPR_DIV || TODO_NO
+		    , 'ITEM'
+		    , '[' || PGM_NM || '] ' || TODO_TITL
+		    , '' base_iss_TODO_NO,  '' base_iss_TODO_ID,  '' base_iss_SANCTN_STTUS
+		    , '' iss_rslt_TODO_NO,  '' iss_rslt_TODO_ID,  '' iss_rslt_SANCTN_STTUS
+		    , '' req_TODO_NO,        '' req_TODO_ID,        '' req_SANCTN_STTUS
+		    , '' rslt_TODO_NO,       '' rslt_TODO_ID,       '' rslt_SANCTN_STTUS
+		    , '' rslt_SAME_TIME_RESULT, '' ISS_NO,          '' PART_CD
+		    , '' REQ_RMK, '' MEAS_RST, '' RESLT_RST, '' THGH_RST
+		    , ba.*
+		    , 4, 0
+		    , SUBSTR(ba.TODO_NO , 1, 3) AS POPUP_CALL_TYPE
+		    , ba.PG_PATH PG_PATH_TO, ba.PG_PARAM PG_PARAM_TO
+		FROM base_all ba
+		WHERE ba.TODO_NO IS NOT NULL
+		  AND NOT EXISTS (
+		      SELECT 1 FROM base_iss bi WHERE bi.TODO_NO = ba.TODO_NO
+		  )
+		ORDER BY PARENT_NODE_ID, SORT_LEVEL, ORDRS_NO DESC, SALES_CD, NODE_ID
 
+	</select>
  </mapper>

@@ -364,6 +364,14 @@
 				Object.assign(paramObj, addParam);
 			}
 			var callbackFn = function() { gridView.setData(0); };
+			
+			if (item.popupCallType == 'ISS' || item.popupCallType == 'RSLT' || item.popupCallType == 'REQ' || item.popupCallType == 'RES') {
+				paramObj = JSON.parse(item.pgParamTo || '{}');
+				paramObj.coCd = item.coCd;
+				paramObj.userId = jwt.userId;
+
+				openModal("/static/html" + item.pgPathTo,  1600, 850, "", paramObj, callbackFn);
+			} else
 			if (item.todoDiv2CodeId =="TODODIV1030" || item.todoDiv2CodeId =="TODODIV2060" ||
 				item.todoDiv2CodeId =="TODODIV1090" || item.todoDiv2CodeId =="TODODIV2090" ) { //이슈현황 화면 call
 				openModal("/static/html" + item.pgPath, 1200, 870, "", paramObj, callbackFn);
@@ -492,8 +500,24 @@
 				nodeObj['foreground-color'] = (item.nodeLevel === 3) ? '#333' : '#fff'; // L3는 밝은색이므로 어두운 글자
 				nodeArray.push(nodeObj);
 			} else if (nodeType === 'ITEM') {
-				var isMyTask = (item.todoId === jwt.userId);
-				var isDone = (item.sanctnSttus === 'Y');
+				var isMyTask = true;
+				var isDone = true;
+				if (item.popupCallType === 'ISS') { 
+					isDone = item.baseIssSanctnSttus === 'Y';
+					isMyTask = (item.baseIssTodoId === jwt.userId);
+				} else if (item.popupCallType === 'RSLT') { 
+					isDone = item.issRsltSanctnSttus === 'Y';
+					isMyTask = (item.issRsltTodoId === jwt.userId);
+				} else if (item.popupCallType === 'REQ') { 
+					isDone = item.reqSanctnSttus === 'Y';
+					isMyTask = (item.reqTodoId === jwt.userId);
+				} else if (item.popupCallType === 'RES') { 
+					isDone = item.rsltSanctnSttus === 'Y';
+					isMyTask = (item.rsltTodoId === jwt.userId);
+				} else {
+					isDone = (item.sanctnSttus === 'Y');
+					isMyTask = (item.todoId === jwt.userId);
+				}
 
 				if (isDone || !isMyTask) {
 					// 완료되었거나 타인의 결재 건: 회색 처리
@@ -583,6 +607,7 @@
 		} else {
 			// ITEM 노드: TODO_DIV2_CODE_ID 기준으로 업무유형별 분기
 			var div2 = data.todoDiv2CodeId || '';
+			var popupCallType = data.popupCallType || '';
 			var pgmNm = data.pgmNm || '';
 
 			if (pgmNm.indexOf('물류') > -1) {
@@ -595,7 +620,7 @@
 					{ key: 'creatNm', label: '결재요청자' },
 					{ key: 'todoNo', label: '관리번호' }
 				];
-			} else if (div2 === 'TODODIV2060' || div2 === 'TODODIV1030') {
+			} else if (popupCallType === 'ISS') { // || div2 === 'TODODIV2060' || div2 === 'TODODIV1030') {
 				// [WBS문제]: 수주번호, SalesCd, 고객사, Project, 설비명, 문제상태, 문제내용(ISS_CNTS)
 				fields = [
 					{ key: 'ordrsNoVal', label: '수주번호' },
@@ -609,7 +634,7 @@
 					{ key: 'issCnts', label: '문제내용' },
 					{ key: 'creatNm', label: '결재요청자' }
 				];
-			} else if (div2 === 'TODODIV2090' || div2 === 'TODODIV1090') {
+			} else if (popupCallType === 'RLST') {  // || div2 === 'TODODIV2090' || div2 === 'TODODIV1090') {
 				// [WBS조치]: WBS문제와 동일
 				fields = [
 					{ key: 'ordrsNoVal', label: '수주번호' },
@@ -623,7 +648,7 @@
 					{ key: 'issCnts', label: '문제내용' },
 					{ key: 'creatNm', label: '결재요청자' }
 				];
-			} else if (div2 === 'TODODIV2020' || div2 === 'TODODIV1040') {
+			} else if (popupCallType === 'REQ') {  //|| div2 === 'TODODIV2020' || div2 === 'TODODIV1040') {
 				// [발주/출장요청]: 문제상태/이슈내용 없음, 발주관련 정보만
 				fields = [
 					{ key: 'ordrsNoVal', label: '수주번호' },
@@ -631,12 +656,12 @@
 					{ key: 'clntNm', label: '고객사' },
 					{ key: 'pjtNm', label: 'Project' },
 					{ key: 'eqpNm', label: '설비명' },
-					{ key: 'reqNo', label: '발주요청번호' },
+					{ key: 'reqTodoNo', label: '발주요청번호' },
 					{ key: 'reqStNm', label: '발주요청서상태' },
 					{ key: 'reqRmk', label: '발주요청서비고' },
 					{ key: 'creatNm', label: '결재요청자' }
 				];
-			} else if (div2 === 'TODODIV2030' || div2 === 'TODODIV1050') {
+			} else if (popupCallType === 'RES') {  // || div2 === 'TODODIV2030' || div2 === 'TODODIV1050') {
 				// [발주/출장결과]: 관리번호는 RES번호 (todoNo)
 				fields = [
 					{ key: 'ordrsNoVal', label: '수주번호' },
@@ -644,8 +669,8 @@
 					{ key: 'clntNm', label: '고객사' },
 					{ key: 'pjtNm', label: 'Project' },
 					{ key: 'eqpNm', label: '설비명' },
-					{ key: 'reqNo', label: '발주요청번호' },
-					{ key: 'todoNo', label: '결과관리번호' },
+					{ key: 'reqTodoNo', label: '발주요청번호' },
+					{ key: 'rsltTodoNo', label: '결과관리번호' },
 					{ key: 'reqStNm', label: '발주요청서상태' },
 					{ key: 'reqRmk', label: '발주요청서비고' },
 					{ key: 'creatNm', label: '결재요청자' }
