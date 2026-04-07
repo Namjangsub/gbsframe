@@ -17,6 +17,7 @@ public interface WB20Mapper {
 	List<Map<String, String>> selectToDoListNewSql(Map<String, String> paramMap);
 
 	int toDoCfDtUpdate(Map<String, String> paramMap);
+	int toDoMindMapApprovalCancel(Map<String, String> paramMap);
 
 	int updateRsltsApproval(Map<String, String> paramMap);
 

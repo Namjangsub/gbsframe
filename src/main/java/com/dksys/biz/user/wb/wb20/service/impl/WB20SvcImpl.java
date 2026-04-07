@@ -62,6 +62,12 @@ public class WB20SvcImpl implements WB20Svc {
 	}
 
 	@Override
+	public int toDoMindMapApprovalCancel(Map<String, String> paramMap) {
+		int result = wb20Mapper.toDoMindMapApprovalCancel(paramMap);
+		return result;
+	}
+
+	@Override
 	public int updateRsltsApproval(Map<String, String> paramMap) {
 		int result = wb20Mapper.updateRsltsApproval(paramMap);
 		return result;

@@ -305,6 +305,19 @@
 <!-- 		           AND SALES_CD = #{salesCd} -->
 <!-- 		           AND TODO_FILE_TRGT_KEY = #{fileTrgtKey} -->
            </update>
+           
+		<!-- 마인드맵에서 결재취소 처리 -->
+		<!-- TODO_KEY는 TB_WB20M03테이블의 유니크 Key임 , 다른 키확인 필요 없음-->
+           <update id="toDoMindMapApprovalCancel" parameterType="Map">
+                UPDATE TB_WB20M03
+                   SET SANCTN_STTUS = 'N',
+                   	   TODO_CF_DT = '',
+                       UDT_ID = #{creatId},
+                       UDT_PGM = #{creatPgm},
+                       UDT_DTTM = SYSDATE
+                 WHERE
+                       TODO_KEY = #{todoKey}
+           </update>
 
            <select id="selectTodoDivList" parameterType="Map" resultType="camelMap">
 				SELECT DISTINCT
@@ -1734,19 +1747,23 @@
 		, req_rslt AS (
 		    SELECT
 		          qm.ISS_NO						AS base_iss_TODO_NO
-		        , b.TODO_ID						AS base_iss_TODO_ID
-		        , NVL2(qm.ISS_NO,NVL(b.SANCTN_STTUS,'E'),'')	AS base_iss_SANCTN_STTUS
-		        , b9.TODO_NO					AS iss_rslt_TODO_NO
+		        , b6.TODO_KEY					AS base_iss_TODO_KEY
+		        , b6.TODO_ID					AS base_iss_TODO_ID
+		        , NVL2(qm.ISS_NO,NVL(b6.SANCTN_STTUS,'E'),'')	AS base_iss_SANCTN_STTUS
+		        , W3.ISS_NO						AS iss_rslt_TODO_NO
+		        , b9.TODO_KEY					AS iss_rslt_TODO_KEY
 		        , b9.TODO_ID					AS iss_rslt_TODO_ID
-		        , b9.SANCTN_STTUS				AS iss_rslt_SANCTN_STTUS
-		        , qp.REQ_NO 					AS req_TODO_NO
-		        , b3.TODO_ID					AS req_TODO_ID
-		        , NVL2(qp.REQ_NO,NVL(b3.SANCTN_STTUS,'E'),'') 	AS req_SANCTN_STTUS
+		        , NVL2(W3.ISS_NO,NVL(b9.SANCTN_STTUS,'E'),'')	AS iss_rslt_SANCTN_STTUS
+		        , qp.REQ_NO						AS req_TODO_NO
+		        , b2.TODO_KEY					AS req_TODO_KEY
+		        , b2.TODO_ID					AS req_TODO_ID
+		        , NVL2(qp.REQ_NO,NVL(b2.SANCTN_STTUS,'E'),'') 	AS req_SANCTN_STTUS
 		        , base_iss.TODO_NO 				AS rslt_TODO_NO
+		        , base_iss.TODO_KEY				AS rslt_TODO_KEY
 		        , base_iss.TODO_ID				AS rslt_TODO_ID
-		        , NVL2(base_iss.TODO_NO,NVL(base_iss.SANCTN_STTUS,'E'),'')		AS rslt_SANCTN_STTUS
+		        , base_iss.SANCTN_STTUS			AS rslt_SANCTN_STTUS
 		        , qp.SAME_TIME_RESULT			AS rslt_SAME_TIME_RESULT
-		        , WI.ISS_NO
+		        , qm.ISS_NO
 		        , qm.PART_CD
 				, qm.REQ_RMK
 				, qp.MEAS_RST
@@ -1754,31 +1771,35 @@
 				, qp.THGH_RST
 				, base_iss.*
 		    FROM base_iss		--발주결과
-		    JOIN TB_QM01P01 qp ON qp.RSLT_NO = base_iss.TODO_NO
-		    LEFT JOIN TB_QM01M01 qm 		ON qm.REQ_NO = qp.REQ_NO
-		    LEFT JOIN base_iss   b  ON b.TODO_NO = qm.ISS_NO AND b.TODO_DIV2_CODE_ID = 'TODODIV2060' -- 문제 발생
-		    LEFT JOIN base_iss   b2 ON b2.TODO_NO = qp.RSLT_NO
-		    LEFT JOIN base_iss   b3 ON b3.TODO_NO = qp.REQ_NO
-		    LEFT JOIN TB_WB24M02 WI ON WI.ISS_NO = qm.ISS_NO -- 문제발생
-		    LEFT JOIN base_iss   b9 ON b9.TODO_NO = qm.ISS_NO AND b9.TODO_DIV2_CODE_ID = 'TODODIV2090' --문제조치
+		    JOIN TB_QM01P01 qp      ON qp.RSLT_NO = base_iss.TODO_NO
+		    LEFT JOIN TB_QM01M01 qm ON qm.REQ_NO = qp.REQ_NO
+		    LEFT JOIN TB_WB24M02 W2 ON W2.ISS_NO = qm.ISS_NO -- 문제발생
+		    LEFT JOIN TB_WB24M03 W3 ON W3.ISS_NO = qm.ISS_NO -- 문제발생
+		    LEFT JOIN TB_WB20M03 b6 ON b6.TODO_NO = qm.ISS_NO AND b6.TODO_DIV2_CODE_ID = 'TODODIV2060' AND b6.TODO_ID = base_iss.TODO_ID -- 문제 발생
+		    LEFT JOIN TB_WB20M03 b9 ON b9.TODO_NO = qm.ISS_NO AND b9.TODO_DIV2_CODE_ID = 'TODODIV2090' AND b9.TODO_ID = base_iss.TODO_ID --문제조치
+		    LEFT JOIN TB_WB20M03 b2 ON b2.TODO_NO = qp.REQ_NO AND b2.TODO_DIV2_CODE_ID = 'TODODIV2020' AND b2.TODO_ID = base_iss.TODO_ID --발주요청
 		    WHERE base_iss.TODO_DIV2_CODE_ID = 'TODODIV2030'   -- 발주 결과
 		)
 		, req AS (
 		    SELECT
 		          qm.ISS_NO						AS base_iss_TODO_NO
-		        , b.TODO_ID						AS base_iss_TODO_ID
-		        , NVL2(qm.ISS_NO,NVL(b.SANCTN_STTUS,'E'),'')	AS base_iss_SANCTN_STTUS
-		        , b9.TODO_NO					AS iss_rslt_TODO_NO
+		        , b6.TODO_KEY					AS base_iss_TODO_KEY
+		        , b6.TODO_ID					AS base_iss_TODO_ID
+		        , NVL2(qm.ISS_NO,NVL(b6.SANCTN_STTUS,'E'),'')	AS base_iss_SANCTN_STTUS
+		        , W3.ISS_NO						AS iss_rslt_TODO_NO
+		        , b9.TODO_KEY					AS iss_rslt_TODO_KEY
 		        , b9.TODO_ID					AS iss_rslt_TODO_ID
-		        , b9.SANCTN_STTUS				AS iss_rslt_SANCTN_STTUS
+		        , NVL2(W3.ISS_NO,NVL(b9.SANCTN_STTUS,'E'),'')	AS iss_rslt_SANCTN_STTUS
 		        , base_iss.TODO_NO 				AS req_TODO_NO
+		        , base_iss.TODO_KEY				AS req_TODO_KEY
 		        , base_iss.TODO_ID				AS req_TODO_ID
 		        , base_iss.SANCTN_STTUS			AS req_SANCTN_STTUS
-		        , ''							AS rslt_TODO_NO
-		        , ''							AS rslt_TODO_ID
-		        , ''							AS rslt_SANCTN_STTUS
+		        , qp.RSLT_NO					AS rslt_TODO_NO
+		        , b3.TODO_KEY					AS rslt_TODO_KEY
+		        , b3.TODO_ID					AS rslt_TODO_ID
+		        , NVL2(qp.RSLT_NO,NVL(b3.SANCTN_STTUS,'E'),'')	AS rslt_SANCTN_STTUS
 		        , 'N'							AS rslt_SAME_TIME_RESULT
-		        , WI.ISS_NO
+		        , qm.ISS_NO
 		        , qm.PART_CD
 				, qm.REQ_RMK
 				, ''
@@ -1787,28 +1808,35 @@
 				, base_iss.*
 		    FROM base_iss
 		    JOIN TB_QM01M01 qm 		ON qm.REQ_NO = base_iss.TODO_NO
-		    LEFT JOIN base_iss   b  ON b.TODO_NO = qm.ISS_NO AND b.TODO_DIV2_CODE_ID = 'TODODIV2060' --문제 발생
-		    LEFT JOIN TB_WB24M02 WI ON WI.ISS_NO = qm.ISS_NO -- 문제발생
-		    LEFT JOIN base_iss   b9 ON b9.TODO_NO = qm.ISS_NO AND b9.TODO_DIV2_CODE_ID = 'TODODIV2090' --문제조치
+		    LEFT JOIN TB_QM01P01 qp ON qp.REQ_NO = qm.REQ_NO -- 발주결과
+		    LEFT JOIN TB_WB24M02 W2 ON W2.ISS_NO = qm.ISS_NO -- 문제발생
+		    LEFT JOIN TB_WB24M03 W3 ON W3.ISS_NO = qm.ISS_NO -- 문제조치
+		    LEFT JOIN TB_WB20M03 b6 ON b6.TODO_NO = qm.ISS_NO AND b6.TODO_DIV2_CODE_ID = 'TODODIV2060' AND b6.TODO_ID = base_iss.TODO_ID 	--문제발생
+		    LEFT JOIN TB_WB20M03 b9 ON b9.TODO_NO = qm.ISS_NO AND b9.TODO_DIV2_CODE_ID = 'TODODIV2090' AND b9.TODO_ID = base_iss.TODO_ID	--문제조치
+		    LEFT JOIN TB_WB20M03 b3 ON b3.TODO_NO = qp.RSLT_NO AND b3.TODO_DIV2_CODE_ID = 'TODODIV2030' AND b3.TODO_ID = base_iss.TODO_ID  --발주결과
 		    WHERE base_iss.TODO_DIV2_CODE_ID = 'TODODIV2020'   -- 발주요청
 		      AND NOT EXISTS (SELECT 1 FROM req_rslt WHERE req_rslt.req_TODO_NO = qm.REQ_NO )
 		)
 		, iss_rslt AS (
 		    SELECT
-		          b.TODO_NO						AS base_iss_TODO_NO
-		        , b.TODO_ID						AS base_iss_TODO_ID
-		        , NVL2(b.TODO_NO, NVL(b.SANCTN_STTUS,'E'),'')	AS base_iss_SANCTN_STTUS
+		          WI.ISS_NO						AS base_iss_TODO_NO
+		        , b6.TODO_KEY					AS base_iss_TODO_KEY
+		        , b6.TODO_ID					AS base_iss_TODO_ID
+		        , NVL2(WI.ISS_NO, NVL(b6.SANCTN_STTUS,'E'),'')	AS base_iss_SANCTN_STTUS
 		        , t.TODO_NO						AS iss_rslt_TODO_NO
+		        , t.TODO_KEY					AS iss_rslt_TODO_KEY
 		        , t.TODO_ID						AS iss_rslt_TODO_ID
 		        , t.SANCTN_STTUS				AS iss_rslt_SANCTN_STTUS
 		        , '' 							AS req_TODO_NO
+		        , ''							AS req_TODO_KEY
 		        , '' 							AS req_TODO_ID
 		        , ''							AS req_SANCTN_STTUS
 		        , '' 							AS rslt_TODO_NO
+		        , ''							AS rslt_TODO_KEY
 		        , '' 							AS rslt_TODO_ID
 		        , ''							AS rslt_SANCTN_STTUS
 		        , '' 							AS rslt_SAME_TIME_RESULT
-		        , WI.ISS_NO
+		        , t.TODO_NO
 		        , '' PART_CD
 				, '' REQ_RMK
 				, '' MEAS_RST
@@ -1816,8 +1844,8 @@
 				, '' THGH_RST
 				, t.*
 		    FROM base_iss t
-		    LEFT JOIN base_iss b   ON b.TODO_NO = t.TODO_NO AND b.TODO_DIV2_CODE_ID = 'TODODIV2060'
-		    JOIN TB_WB24M03 WI ON WI.ISS_NO = t.TODO_NO -- 문제 발생
+		    LEFT JOIN TB_WB24M02 WI ON WI.ISS_NO = t.TODO_NO -- 문제 발생
+		    LEFT JOIN TB_WB20M03 b6 ON b6.TODO_NO = t.TODO_NO AND b6.TODO_DIV2_CODE_ID = 'TODODIV2060' AND b6.TODO_ID = T.TODO_ID
 		    WHERE t.TODO_DIV2_CODE_ID = 'TODODIV2090'   -- 문제 조치
 		      AND NOT EXISTS (SELECT 1 FROM req_rslt WHERE req_rslt.iss_rslt_TODO_NO = t.TODO_NO )
 		      AND NOT EXISTS (SELECT 1 FROM req WHERE req.iss_rslt_TODO_NO = t.TODO_NO )
@@ -1825,15 +1853,19 @@
 		, iss AS (
 		    SELECT
 		          t.TODO_NO						AS base_iss_TODO_NO
+		        , t.TODO_KEY					AS base_iss_TODO_KEY
 		        , t.TODO_ID						AS base_iss_TODO_ID
 		        , t.SANCTN_STTUS				AS base_iss_SANCTN_STTUS
-		        , b.TODO_NO						AS iss_rslt_TODO_NO
-		        , b.TODO_ID						AS iss_rslt_TODO_ID
-		        , b.SANCTN_STTUS				AS iss_rslt_SANCTN_STTUS
+		        , WI.ISS_NO						AS iss_rslt_TODO_NO
+		        , b9.TODO_KEY					AS iss_rslt_TODO_KEY
+		        , b9.TODO_ID					AS iss_rslt_TODO_ID
+		        , NVL2(WI.ISS_NO,NVL(b9.SANCTN_STTUS,'E'),'') 	AS iss_rslt_SANCTN_STTUS
 		        , qm.REQ_NO						AS req_TODO_NO
+		        , b2.TODO_KEY				AS req_TODO_KEY
 		        , b2.TODO_ID					AS req_TODO_ID
 		        , NVL2(qm.REQ_NO,NVL(b2.SANCTN_STTUS,'E'),'') 	AS req_SANCTN_STTUS
 		        , qp.RSLT_NO 					AS rslt_TODO_NO
+		        , b3.TODO_KEY					AS rslt_TODO_KEY
 		        , b3.TODO_ID					AS rslt_TODO_ID
 		        , NVL2( qp.RSLT_NO,NVL(b3.SANCTN_STTUS,'E'),'')		AS rslt_SANCTN_STTUS
 		        , qp.SAME_TIME_RESULT			AS rslt_SAME_TIME_RESULT
@@ -1845,12 +1877,12 @@
 				, qp.THGH_RST
 				, t.*
 		    FROM base_iss t
-		    LEFT JOIN TB_WB20M03 b   ON b.TODO_ID = t.TODO_ID AND b.TODO_NO = t.TODO_NO AND b.TODO_DIV2_CODE_ID = 'TODODIV2090'  --문제조치
-		    LEFT JOIN TB_WB24M02 WI ON WI.ISS_NO = t.TODO_NO  -- 문제 조치
+		    LEFT JOIN TB_WB24M03 WI ON WI.ISS_NO = t.TODO_NO
 		    LEFT JOIN TB_QM01M01 qm ON qm.ISS_NO = t.TODO_NO
 		    LEFT JOIN TB_QM01P01 qp ON qp.REQ_NO = qm.REQ_NO
-		    LEFT JOIN TB_WB20M03 b2 ON b2.TODO_ID = t.TODO_ID AND b2.TODO_NO = qp.REQ_NO AND b.TODO_DIV2_CODE_ID = 'TODODIV2020'	--발주요청
-		    LEFT JOIN TB_WB20M03 b3 ON b3.TODO_ID = t.TODO_ID AND b3.TODO_NO = qp.RSLT_NO AND b.TODO_DIV2_CODE_ID = 'TODODIV2030'	--발주결과
+		    LEFT JOIN TB_WB20M03 b9 ON b9.TODO_NO = t.TODO_NO AND b9.TODO_DIV2_CODE_ID = 'TODODIV2090' AND b9.TODO_ID = t.TODO_ID   --문제조치
+		    LEFT JOIN TB_WB20M03 b2 ON b2.TODO_NO = qp.REQ_NO AND b2.TODO_DIV2_CODE_ID = 'TODODIV2020' AND b2.TODO_ID = t.TODO_ID --발주요청
+		    LEFT JOIN TB_WB20M03 b3 ON b3.TODO_NO = qp.RSLT_NO AND b3.TODO_DIV2_CODE_ID = 'TODODIV2030' AND b3.TODO_ID = t.TODO_ID--발주결과
 		    WHERE t.TODO_DIV2_CODE_ID = 'TODODIV2060'   -- 문제 발생
 		      AND NOT EXISTS (SELECT 1 FROM req_rslt WHERE req_rslt.base_iss_TODO_NO = t.TODO_NO )
 		      AND NOT EXISTS (SELECT 1 FROM req WHERE req.base_iss_TODO_NO = t.TODO_NO )
@@ -1940,10 +1972,10 @@
 		    , gn.NODE_ID
 		    , gn.NODE_TYPE
 		    , gn.NODE_NAME
-		    , '' base_iss_TODO_NO,  '' base_iss_TODO_ID,  '' base_iss_SANCTN_STTUS
-		    , '' iss_rslt_TODO_NO,  '' iss_rslt_TODO_ID,  '' iss_rslt_SANCTN_STTUS
-		    , '' req_TODO_NO,        '' req_TODO_ID,        '' req_SANCTN_STTUS
-		    , '' rslt_TODO_NO,       '' rslt_TODO_ID,       '' rslt_SANCTN_STTUS
+		    , '' base_iss_TODO_NO,  '' base_iss_TODO_KEY,  	'' base_iss_TODO_ID,  '' base_iss_SANCTN_STTUS
+		    , '' iss_rslt_TODO_NO,  '' iss_rslt_TODO_KEY,  	'' iss_rslt_TODO_ID,  '' iss_rslt_SANCTN_STTUS
+		    , '' req_TODO_NO,       '' req_TODO_KEY,   		'' req_TODO_ID,        '' req_SANCTN_STTUS
+		    , '' rslt_TODO_NO,      '' rslt_TODO_KEY,		'' rslt_TODO_ID,       '' rslt_SANCTN_STTUS
 		    , '' rslt_SAME_TIME_RESULT, '' ISS_NO,          '' PART_CD
 		    , '' REQ_RMK, '' MEAS_RST, '' RESLT_RST, '' THGH_RST
 		    , '' TODO_NO, '' TODO_ID, '' TODO_KEY, '' SANCTN_STTUS, '' TODO_DIV2_CODE_ID
@@ -2095,13 +2127,13 @@
 		UNION ALL
 		SELECT
 		      APPR_DIV || '_O_' || SALES_CD
-		    , 'TODO_' || APPR_DIV || TODO_NO
+		    , 'TODO_' || APPR_DIV || TODO_NO || TODO_KEY
 		    , 'ITEM'
 		    , '[' || PGM_NM || '] ' || TODO_TITL
-		    , '' base_iss_TODO_NO,  '' base_iss_TODO_ID,  '' base_iss_SANCTN_STTUS
-		    , '' iss_rslt_TODO_NO,  '' iss_rslt_TODO_ID,  '' iss_rslt_SANCTN_STTUS
-		    , '' req_TODO_NO,        '' req_TODO_ID,        '' req_SANCTN_STTUS
-		    , '' rslt_TODO_NO,       '' rslt_TODO_ID,       '' rslt_SANCTN_STTUS
+		    , '' base_iss_TODO_NO,  '' base_iss_TODO_KEY,  	'' base_iss_TODO_ID,  '' base_iss_SANCTN_STTUS
+		    , '' iss_rslt_TODO_NO,  '' iss_rslt_TODO_KEY,  	'' iss_rslt_TODO_ID,  '' iss_rslt_SANCTN_STTUS
+		    , '' req_TODO_NO,       '' req_TODO_KEY,   		'' req_TODO_ID,        '' req_SANCTN_STTUS
+		    , '' rslt_TODO_NO,      '' rslt_TODO_KEY,		'' rslt_TODO_ID,       '' rslt_SANCTN_STTUS
 		    , '' rslt_SAME_TIME_RESULT, '' ISS_NO,          '' PART_CD
 		    , '' REQ_RMK, '' MEAS_RST, '' RESLT_RST, '' THGH_RST
 		    , ba.*

@@ -70,6 +70,14 @@ public class WB20Ctr {
     	return "jsonView";
       }
 
+	  @PostMapping(value = "/toDoMindMapApprovalCancel")
+      public String toDoMindMapApprovalCancel(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		wb20Svc.toDoMindMapApprovalCancel(paramMap);
+    	model.addAttribute("resultCode", 200);
+    	model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+    	return "jsonView";
+      }
+
 	  @PutMapping(value = "/updateRsltsApproval")
       public String updateRsltsApproval(@RequestParam Map<String, String> paramMap, ModelMap model) {
 		wb20Svc.updateRsltsApproval(paramMap);
