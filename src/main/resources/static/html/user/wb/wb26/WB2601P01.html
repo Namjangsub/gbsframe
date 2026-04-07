@@ -1,0 +1,101 @@
+<div class="popup_area" style="width: 100%; height: 100%; display: flex; flex-direction: column;">
+	<div class="tit_contents">
+		<h4 class="tit">미완료 현황</h4>
+	</div>
+	
+	<div class="popup_table" style="flex: 1; display: flex; flex-direction: column;">
+		<div class="ax5_grid" style="flex: 1;">
+			<div data-ax5grid="unfinished-grid" data-ax5grid-config="{}" style="height: 100%;"></div>
+		</div>
+	</div>
+	
+	<div class="popup_bottom_btn">
+		<button type="button" class="bg_gray" onclick="confirmSelect();">확인</button>
+		<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+	</div>
+</div>
+
+<script type="text/javascript">
+	var unfinishedGrid = new ax5.ui.grid();
+	var popParam = modalStack.last().paramObj;
+
+	$(document).ready(function() {
+		// 그리드 초기화
+		initUnfinishedGrid();
+		
+		// 데이터 조회
+		searchUnfinishedSummary();
+
+		// 리사이즈 이벤트 바인딩
+		$(window).on("resize", function() {
+			gridResize();
+		});
+
+		// 초기 사이즈 설정
+		gridResize();
+	});
+
+	function gridResize() {
+		var tagHeight = $(".popup_area").height() - $(".tit_contents").outerHeight() - $(".popup_bottom_btn").outerHeight() - 30;
+		unfinishedGrid.setHeight(tagHeight);
+	}
+
+	function initUnfinishedGrid() {
+		unfinishedGrid.setConfig({
+			target: $('[data-ax5grid="unfinished-grid"]'),
+			showRowSelector: false,
+			multipleSelect: false,
+			header: {
+				align: "center",
+			},
+			body: {
+				mergeCells : ["deptNm"],
+				onClick: function () {
+					this.self.select(this.dindex);
+				},
+				onDBLClick: function () {
+					this.self.select(this.dindex);
+					confirmSelect();
+				}
+			},
+			columns: [
+				{key: "deptNm",      	label: "팀명",     width: 150, align: "left"},
+				{key: "wbsMngNm",   	label: "담당자",   width: 100, align: "center"},
+				{key: "wbsMngId",   	label: "아이디",   width: 100, align: "center", hidden: true},
+				{key: "unfinishedCnt", 	label: "미완료 건수", width: 100, align: "right", formatter: "money"}
+			],
+			footSum: [
+		    	[
+		    		{label: "합계", colspan:3, align:"center"},
+		    		{key: "unfinishedCnt",		collector: "sum", formatter:"money", align: "center"},
+                 ]
+		    ],    
+		});
+	}
+
+	function searchUnfinishedSummary() {
+		var paramObj = {
+			"coCd": popParam.coCd,
+			"ordrsNo": popParam.ordrsNo,
+			"salesCd": popParam.salesCd
+		};
+
+		postAjax("/user/wb/wb26/select_wb26_unfinished_Summary", paramObj, null, function(data) {
+			var list = data.result;
+			unfinishedGrid.setData(list);
+		});
+	}
+
+	function confirmSelect() {
+		var selectedList = unfinishedGrid.getList("selected");
+		if (selectedList.length == 0) {
+			alert("행을 선택해주세요.");
+			return;
+		}
+		var row = selectedList[0];
+		if (modalStack.last().callback) {
+			modalStack.last().callback(row);
+		}
+		modalStack.close();
+	}
+</script>

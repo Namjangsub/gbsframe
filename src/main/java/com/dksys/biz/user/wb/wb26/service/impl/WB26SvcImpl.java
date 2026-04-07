@@ -37,6 +37,12 @@ public class WB26SvcImpl implements WB26Svc {
 		return wb26Mapper.select_wb26_Count(paramMap);
 	}
 
+	// 미완료현황 집계표 조회
+	@Override
+	public List<Map<String, String>> select_wb26_unfinished_Summary(Map<String, String> paramMap) {
+		return wb26Mapper.select_wb26_unfinished_Summary(paramMap);
+	}
+
 	// 그리드 리스트
 	@Override
 	public List<Map<String, String>> select_wb26_List(Map<String, String> paramMap) {

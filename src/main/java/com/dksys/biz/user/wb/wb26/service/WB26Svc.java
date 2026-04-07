@@ -11,6 +11,9 @@ public interface WB26Svc {
     // 그리드 카운트
 	int select_wb26_Count(Map<String, String> paramMap);
 	
+	// 미완료현황 집계표 조회
+	List<Map<String, String>> select_wb26_unfinished_Summary(Map<String, String> paramMap);
+	
 	// 그리드 리스트
 	List<Map<String, String>> select_wb26_List(Map<String, String> paramMap);
 

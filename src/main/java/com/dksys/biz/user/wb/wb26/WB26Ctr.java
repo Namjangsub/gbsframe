@@ -39,6 +39,14 @@ public class WB26Ctr {
 		return "jsonView";
 	}
 
+	// 미완료현황 집계표 조회
+	@PostMapping(value = "/select_wb26_unfinished_Summary")
+	public String select_wb26_unfinished_Summary(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		List<Map<String, String>> result = wb26svc.select_wb26_unfinished_Summary(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
+
     //리스트 조회
 	@PostMapping(value = "/select_wb06_List")
 	public String select_wb06_List(@RequestBody Map<String, Object> paramMap, ModelMap model) {
