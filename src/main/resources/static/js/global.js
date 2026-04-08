@@ -839,13 +839,18 @@ function parseJwt(token) {
 			location.href = connErrorUrl;
 		}
 	}
-    var base64Url = token.split('.')[1];
-    var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    var jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
+    try {
+        var base64Url = token.split('.')[1];
+		var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+		var jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+			return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+		}).join(''));
 
-    return JSON.parse(jsonPayload);
+		return JSON.parse(jsonPayload);
+    } catch (e) {
+        console.error("JWT Parsing Error:", e);
+        return null;
+    }
 };
 
 
@@ -1348,7 +1353,7 @@ function onlyDecimal(elem){
 // 한글 제거
 function exceptKorean(elem){
 	if (elem && elem.value && typeof elem.value === "string") {
-		elem.value = elem.value.replace(/[a-h|a-ㅣ|ga-heh]/g, "");
+		elem.value = elem.value.replace(/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g, "");
 	}
 //	$(elem).val($(elem).val().replace(/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g,""));
 }
