@@ -189,9 +189,9 @@
 	var thisGridCol = 0; // 선택된 열 정보 저장할 변수
 	
 	function wb26_gridColor(dataValue) {
+		if (!dataValue || !dataValue.item) return "";
 		let rtnColor = "";
 		let row = dataValue.item;
-
 		if (row.nonePlanYn == "Y") {
 			rtnColor = "grid-row-yellow";
 		}
@@ -253,6 +253,11 @@
 						}
 		            },
 					onDataChanged: function () {
+						// 무한 루프 방지: 자신이 변경하는 키인 경우 무시
+						if (this.key == "rsltDaycnt" || this.key == "dataChk") {
+							return;
+						}
+
 						if (this.item.rsltCloseYn == "Y") {
 							//alert("확정된 상태입니다.");
 							return;
@@ -260,9 +265,9 @@
 
 						// 일자 입력 시 소요일 지정
 						if(this.item.rsltStrtDt != "" && this.item.rsltEndDt != "") {
-							gridView.target.setValue(this.dindex, "rsltDaycnt", calculateCalendarCnt(this.item.rsltStrtDt, this.item.rsltEndDt));
+							this.self.setValue(this.dindex, "rsltDaycnt", calculateCalendarCnt(this.item.rsltStrtDt, this.item.rsltEndDt));
 						} else {
-							gridView.target.setValue(this.dindex, "rsltDaycnt", "0");
+							this.self.setValue(this.dindex, "rsltDaycnt", "0");
 						}
 						
 						// 수정 시 데이터 처리 지정						
@@ -317,6 +322,9 @@
 										}
 									},
 									disabled: function () {
+										// CTRL 키가 눌려 있으면 편집 방지 (복사/선택 작업 시 방해 금지)
+										if (window.event && window.event.ctrlKey) return true;
+
 										if (this.item.rsltCloseYn == "Y" || this.item.nonePlanYn == "Y") {
 											//alert("확정된 상태입니다.");
 											return true;
@@ -337,6 +345,9 @@
 										}
 									},
 									disabled: function () {
+										// CTRL 키가 눌려 있으면 편집 방지 (복사/선택 작업 시 방해 금지)
+										if (window.event && window.event.ctrlKey) return true;
+
 										if (this.item.rsltCloseYn == "Y" || this.item.nonePlanYn == "Y") {
 											//alert("확정된 상태입니다.");
 											return true;
@@ -353,6 +364,9 @@
 							{key: "rsltRate"   , label: "진척율"  , align: "right" , width: 60, formatter: "money",
 								editor: {
 									type: "money", disabled: function () {
+										// CTRL 키가 눌려 있으면 편집 방지 (복사/선택 작업 시 방해 금지)
+										if (window.event && window.event.ctrlKey) return true;
+
 										if (this.item.rsltCloseYn == "Y" || this.item.nonePlanYn == "Y") {
 											//alert("확정된 상태입니다.");
 											return true;
@@ -368,6 +382,9 @@
 							{key: "rsltIntocnt", label: "투입공수", align: "right" , width: 60, formatter: "money",
 								editor: {
 									type: "money", disabled: function () {
+										// CTRL 키가 눌려 있으면 편집 방지 (복사/선택 작업 시 방해 금지)
+										if (window.event && window.event.ctrlKey) return true;
+
 										if (this.item.rsltCloseYn == "Y" || this.item.nonePlanYn == "Y") {
 											//alert("확정된 상태입니다.");
 											return true;
@@ -709,18 +726,14 @@
 	}
 	
 	function gridPaste(thisGridRow, thisGridCol) {
-		$('#rsltStrtDt').off("change");
-		$('#rsltEndDt').off("change");
-		$('#rsltRate').off("change");
 
 		var pasteData = "";
 
 		navigator.clipboard.readText().then(pasteData => {
-			// console.log('클립보드에 저장된 값:', pasteData);
-			if (pasteData==undefined ||pasteData=="" || thisGridRow===undefined) {
+			if (!pasteData || thisGridRow === undefined || thisGridCol === undefined) {
 				return;
 			}
-			
+
 			// 붙여넣기할 데이터를 배열로 변환한다.
 			pasteData = (pasteData.charAt(pasteData.length - 1) === "\n") ? pasteData : pasteData + "\n";
 			var pasteRows = pasteData.split("\n").map(function(row) {
@@ -747,7 +760,7 @@
 			var list = gridView.target.list;
 			var rsltCloseYn = "Y";
 			var nonePlanYn = "Y";
-			
+
 			// 붙여넣기할 셀을 한 개씩 돌면서 값을 설정한다.
 			for (var i = 0; i < numRows-1; i++) {
 				
@@ -757,18 +770,18 @@
 					
 					//carriage return 문자 삭제
 					var cellData = pasteRows[i][j].replace(new RegExp('\r', 'ig'), '');
-					rsltCloseYn = list[calRow].rsltCloseYn;
-					nonePlanYn = list[calRow].nonePlanYn;
+					rsltCloseYn = list[calRow].rsltCloseYn || '';
+					nonePlanYn = list[calRow].nonePlanYn || '';
 
-					// 실적확정이 아니고 계획이 있을 때만 자료입력
-					if (rsltCloseYn != "Y" && nonePlanYn != "Y") {
+				// 실적확정이 아니고 계획이 있을 때만 자료입력
+				if (rsltCloseYn != "Y" && nonePlanYn != "Y") {
 						gridView.target.setValue(calRow, gridColumns[9].columns[calCol].key, cellData);
 					}
 				}
 			}
 			gridView.target.repaint();
 		});
-	};
+	}
 
 	function Row_data_Chk(taskStrtDt, taskEndDt, rsltStrtDt, rsltEndDt, rsltRate, rsltIntocnt, row) {
 		var gridList = gridView.target.getList();
