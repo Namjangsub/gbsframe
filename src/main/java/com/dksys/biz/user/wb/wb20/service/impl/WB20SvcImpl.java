@@ -118,6 +118,8 @@ public class WB20SvcImpl implements WB20Svc {
 		 */
 		String tempReqNo = paramMap.get("todoNo");
 		String todoDiv2CodeId = paramMap.get("todoDiv2CodeId");
+		String todoCfOpn = paramMap.get("todoCfOpn");
+		boolean pfuShareTarget = false;
 		// TODODIV2020:발주 및 출장 요청 상태코드 바꾸기
 		if ("TODODIV2020".equals(todoDiv2CodeId)) {
 			// 발주요청서 진행상태 변경 처리
@@ -193,6 +195,8 @@ public class WB20SvcImpl implements WB20Svc {
 		} else if ("TODODIV2130".equals(todoDiv2CodeId)) {
 			// ISS_STS: ISSSTS01 --> ISSSTS02 로 상태 변경처리
 			result += cm16Mapper.updateItoaIssueStChk(paramMap);
+		} else if ("TODODIV2120".equals(todoDiv2CodeId)) {
+			pfuShareTarget = true;
         } else if ("TODODIV2150".equals(todoDiv2CodeId)) { // 개선 제안서 작성부서 결재라인
             result += im01Mapper.updateImprvmStsCd(paramMap);
             result += im01Mapper.updateImprvmReqIdTxt(paramMap);
@@ -205,11 +209,27 @@ public class WB20SvcImpl implements WB20Svc {
 
 		// 최종결재 완료시 알림톡 발송 대상인지 확인
 		Map<String, String> resultMap = wb20Mapper.selectTodoFinalYn(paramMap);
-		resultMap.put("resultCount", Integer.toString(result));
+
+		// PFU결재완료 시 추가 공유자 설정
+		resultMap.put("RESULT_COUNT", Integer.toString(result));
+		resultMap.put("PFU_SHARE_TARGET_YN", "N");
+		resultMap.put("PFU_SHARE_RESULT_CODE", "");
+		resultMap.put("PFU_SHARE_RESULT_COUNT", "0");
+
+		if (pfuShareTarget && ("Y".equals(resultMap.get("todoYn")) || (todoCfOpn != null && !todoCfOpn.trim().isEmpty()))) {
+			resultMap.put("PFU_SHARE_TARGET_YN", "Y");
+			try {
+				int pfuShareResult = insertPfuShareUser(paramMap);
+				resultMap.put("PFU_SHARE_RESULT_CODE", pfuShareResult != 0 ? "200" : "500");
+				resultMap.put("PFU_SHARE_RESULT_COUNT", Integer.toString(pfuShareResult));
+			} catch (Exception e) {
+				resultMap.put("PFU_SHARE_RESULT_CODE", "900");
+			}
+		}
 
 		return resultMap;
 	}
-	
+
 	/* 공통결재 보완요청 insert */
 	@Override
 	public Map<String, String> insertApprovalMemoComment(Map<String, String> paramMap) {
