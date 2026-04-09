@@ -87,8 +87,11 @@
     <input type="hidden" id="pgmId"  name="pgmId" value="WB0701M01">
 	<select id="prdMngChk" data-kind="SPECRTS" hidden></select>
     <!-- 페이지 상단 -->
-    <div class="contents no_bg">
-      <ul class="btn_ul">
+    <div class="contents no_bg" style="display: flex; justify-content: space-between; align-items: center;">
+		<div style="font-size: 15px; font-weight: bold; margin-left: 15px;">조회 기준 : 과제확정된 자료만 표시됩니다.
+			<span style="font-size:13px; font-weight: normal;"> (※ 설비별 종료일자가 현재일 이전자료 + 실적미처리건)</span>
+		</div>
+      <ul class="btn_ul" style="margin: 0; padding: 0;">
         <li class="btn_r">
           <button type="button" id="btnToggleOverlay" class="bg_gray">추가정보</button>
           <button type="button" id="btnHelp" class="bg_gray">도움말</button>
@@ -128,15 +131,14 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? wbsPlanMngId_S.value = ''
 				</div>
 			</td>
 						
-						
-            <th></th>
-            <td></td>
-<!--             <th>수주구분</th> -->
-<!--             <td> -->
-<!--               <select id="ordrsDiv_S" name="ordrsDiv_S" data-kind="ORDRSDIV" data-search="ordrsDiv"> -->
-<!--                 <option value="">전체</option> -->
-<!--               </select> -->
-<!--             </td> -->
+            <th>간트조회기준</th>
+            <td>
+              <select id="searchType_S" name="searchType_S" data-search="searchType">
+                <option value="">전체</option>
+                <option value="MAXENDDT">계획일정미도래건만</option>
+                <option value="UNRESULT">실적미완료건만</option>
+              </select>
+            </td>
           </tr>
 
           <tr>
@@ -3784,21 +3786,25 @@ onkeyup="(event.keyCode == 8 || event.keyCode == 46) ? ordrsClntCd_S.value = '' 
             list = out;
 
             if (minDate && maxDate) {
-              const startDate = new Date(minDate);
-              startDate.setDate(startDate.getDate() - 7);
-
-              const endDate = new Date(maxDate);
-              endDate.setDate(endDate.getDate() + 7);
-
-              // [MOD] Ensure at least 3 months gap (approx 90 days)
-              const timeDiff = endDate.getTime() - startDate.getTime();
-              const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-              if(daysDiff < 90) {
-                 endDate.setDate(startDate.getDate() + 90);
+              // [REF] 간트 차트 표시 범위(viewStart, viewEnd) 계산 및 보완
+              const today = moment().startOf('day');
+              
+              // 시작일: 데이터 최소 시작일 - 14일
+              let start = moment(minDate).subtract(14, 'days');
+              
+              // 종료일: 데이터 최대 종료일 + 14일 (데이터가 과거면 오늘 + 14일 보장)
+              let end = moment(maxDate).add(14, 'days');
+              if (moment(maxDate).isBefore(today)) {
+                end = today.clone().add(14, 'days');
               }
 
-              STATE.viewStart = ymd(startDate);
-              STATE.viewEnd   = ymd(endDate);
+              // 최소 표시 기간 보완: 시작~종료 간격이 365일(1년) 미만이면 365일로 확장
+              if (end.diff(start, 'days') < 365) {
+                end = start.clone().add(365, 'days');
+              }
+
+              STATE.viewStart = start.format('YYYY-MM-DD');
+              STATE.viewEnd   = end.format('YYYY-MM-DD');
             }
           } else {
             console.warn('백엔드 데이터가 올바르지 않습니다:', list);

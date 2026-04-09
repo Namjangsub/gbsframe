@@ -35,8 +35,59 @@
 	             AND USE_YN = 'Y'
 	             AND MNG_ID IS NOT NULL
 	                ) M ON M.VIEW_DEPT_ID = T.MNG_DEPT
-			),
-			totPlan AS (
+			)
+			,job as (
+				SELECT CO_CD, SALES_CD, VER_NO, CLOSE_YN, SJ_NO, FILE_TRGT_KEY, WBS_REMARK, SMRIZE_ID
+				FROM (
+				    SELECT P.CO_CD
+				         , P.SALES_CD
+				         , P.VER_NO
+				         , P.CLOSE_YN
+				         , P.SJ_NO
+				         , P.FILE_TRGT_KEY
+				         , P.WBS_REMARK
+				         , P.SMRIZE_ID
+				         , ROW_NUMBER() OVER (PARTITION BY P.CO_CD,  P.SALES_CD ORDER BY TO_NUMBER(P.VER_NO) DESC) AS RN
+				      FROM TB_WB21M01 P
+				) T
+				WHERE T.RN = 1
+			)
+			, sales AS (
+				SELECT    C.CO_CD
+						, C.ORDRS_NO
+						, D.SALES_CD
+						, D.EQP_NM
+						, C.ORDRS_CLNT_CD
+						, C.CLNT_PJT
+						, FN_CM05M01_CD_TO_NM(C.CLNT_PJT) 	AS CLNT_PJT_NM
+						, B.CLNT_NM
+						, job.FILE_TRGT_KEY					AS SJ_FILE_TRGT_KEY
+						, job.WBS_REMARK
+						, job.CLOSE_YN
+						, job.SMRIZE_ID
+						, job.VER_NO						AS SJ_VER_NO
+				FROM TB_CR02M01 C
+					JOIN TB_CR02D02 D ON D.CO_CD = C.CO_CD AND D.ORDRS_NO = C.ORDRS_NO
+					JOIN job ON job.CO_CD = C.CO_CD AND job.SALES_CD = D.SALES_CD AND job.CLOSE_YN = 'Y'
+					LEFT JOIN TB_BM02M01 B ON B.CLNT_CD  = C.ORDRS_CLNT_CD
+				WHERE C.CO_CD = 'GUN'
+				<if test="salesCd == null or salesCd == ''">
+		          AND C.ORDRS_DT BETWEEN TO_DATE(#{strtDt},'YYYYMMDD') AND TO_DATE(#{endDt},'YYYYMMDD')  
+				</if>
+				<!-- SalesCode: salesCds (IN) 우선, 없으면 기존 salesCd LIKE 유지 -->
+				<choose>
+					<when test="salesCds != null and salesCds.size() > 0">
+						AND D.SALES_CD IN
+						<foreach collection="salesCds" item="cd" open="(" separator="," close=")">
+							#{cd}
+						</foreach>
+					</when>
+					<when test="salesCd != null and !salesCd.equals('')">
+						AND D.SALES_CD LIKE  '%' || #{salesCd} || '%'
+					</when>
+				</choose>
+			)
+			,totPlan AS (
 				SELECT 
 					W.CO_CD,
 					W.SALES_CD,
@@ -51,28 +102,17 @@
 					W.FILE_TRGT_KEY,
 					W.CLOSE_YN AS WBS_CLOSE_YN,
 					W.WBS_PLAN_MNG_ID,
-					W.VER_NO
+					W.VER_NO,
+					W.WBS_PLAN_NO
 				FROM TB_WB22M01 W
 				LEFT JOIN DEPT_TBL D ON D.WBS_PLAN_CODE_ID = W.WBS_PLAN_CODE_ID
-				WHERE W.CO_CD = #{coCd}
-				<!-- SalesCode: salesCds (IN) 우선, 없으면 기존 salesCd LIKE 유지 -->
-				<choose>
-					<when test="salesCds != null and salesCds.size() > 0">
-						AND W.SALES_CD IN
-						<foreach collection="salesCds" item="cd" open="(" separator="," close=")">
-							#{cd}
-						</foreach>
-					</when>
-					<when test="salesCd != null and !salesCd.equals('')">
-						AND W.SALES_CD LIKE  '%' || #{salesCd} || '%'
-					</when>
-				</choose>
-				AND W.CO_CD = #{coCd}
+				JOIN sales ON sales.CO_CD = W.CO_CD AND sales.SALES_CD = W.SALES_CD
+				WHERE 1 = 1
 				AND W.WBS_PLANS_DT IS NOT NULL
 				AND W.WBS_PLANE_DT IS NOT NULL
 --				AND D.DEPT_ID IS NOT NULL
-			),
-			src AS (
+			)
+			,src AS (
 				SELECT 
 					W.CO_CD,
 					W.SALES_CD,
@@ -87,43 +127,49 @@
 					W.WBS_CLOSE_YN AS WBS_CLOSE_YN,
 					W.WBS_PLAN_MNG_ID,
 					C.NAME 	  AS WBS_PLAN_MNG_ID_NM,
-					W.VER_NO
+					W.VER_NO,
+					W.WBS_PLAN_NO
 				FROM totPlan W
 				LEFT JOIN TB_CM06M01 C ON C.ID = W.WBS_PLAN_MNG_ID
 				WHERE W.WBS_PLAN_CODE_KIND = 'WBSCODE'
-				<!-- SalesCode: salesCds (IN) 우선, 없으면 기존 salesCd LIKE 유지 -->
-				<choose>
-					<when test="salesCds != null and salesCds.size() > 0">
-						AND W.SALES_CD IN
-						<foreach collection="salesCds" item="cd" open="(" separator="," close=")">
-							#{cd}
-						</foreach>
-					</when>
-					<when test="salesCd != null and !salesCd.equals('')">
-						AND W.SALES_CD LIKE  '%' || #{salesCd} || '%'
-					</when>
-				</choose>
-				AND W.CO_CD = #{coCd}
-				AND W.WBS_PLANS_DT IS NOT NULL
-				AND W.WBS_PLANE_DT IS NOT NULL
-				AND W.DEPT_ID IS NOT NULL
-			),
-			s0 AS (
-			  SELECT /*+ MATERIALIZE */ DISTINCT CO_CD, SALES_CD
-			  FROM src
-			  WHERE 1 = 1
-				<!-- SalesCode -->
-				<if test="wbsPlanMngIdNm != null and !wbsPlanMngIdNm.equals('')">
-				AND src.WBS_PLAN_MNG_ID_NM LIKE  '%' || #{wbsPlanMngIdNm} || '%'
-				</if>
 			)
+			, un_plan AS (
+			    -- 일정계획 확정건에 대한 계획수립 미등록 건
+			    SELECT P.SALES_CD
+			         , COUNT(*) AS un_plan_cnt
+			    FROM src P
+			         LEFT OUTER JOIN TB_WB22M01 R  ON R.CO_CD              = P.CO_CD
+										          AND R.SALES_CD           = P.SALES_CD
+										          AND R.WBS_PLAN_CODE_KIND = P.WBS_PLAN_CODE_ID
+			    WHERE R.FILE_TRGT_KEY IS NULL
+			    GROUP BY P.SALES_CD
+			)
+			, un_result AS (
+			    -- 과제 등록된 내용 중 일정계획 수립 확정 미완료 또는 실적 미완료 건
+			    SELECT P.SALES_CD
+			         , COUNT(*) AS un_result_cnt
+			    FROM totPlan P
+			         LEFT OUTER JOIN TB_WB23M01 R ON R.WBS_RSLTS_NO = P.WBS_PLAN_NO
+			    WHERE P.WBS_PLAN_CODE_KIND  <![CDATA[<>]]>  'WBSCODE'
+			      AND NVL(R.WBS_RSLTS_RATE, 0)  <![CDATA[<>]]>  100
+			    GROUP BY P.SALES_CD
+			)
+			, un_plan_result AS (
+				SELECT NVL(A.SALES_CD, B.SALES_CD)          AS SALES_CD
+				     , NVL(A.un_result_cnt, 0)              AS un_result_cnt
+				     , NVL(B.un_plan_cnt, 0)                AS un_plan_cnt
+				     , NVL(A.un_result_cnt, 0)
+				       + NVL(B.un_plan_cnt, 0)              AS total_un_cnt
+				FROM un_result A
+				     FULL OUTER JOIN un_plan B ON A.SALES_CD = B.SALES_CD
+			)	
 			,w0 AS (
 				SELECT  S0.CO_CD, S0.SALES_CD,
 				        COUNT(W.FILE_TRGT_KEY) AS problem_count,
 				        SUM(CASE WHEN W.REQ_NO IS NULL AND W.ISS_STS != 'ISSSTS03' THEN 1
 				                 WHEN Q.REQ_ST != 'REQST03' THEN 1 
 				                 ELSE 0 END) AS problem_uncomplete
-				FROM s0 S0
+				FROM sales S0
 				JOIN TB_WB24M02 W ON W.CO_CD = S0.CO_CD AND W.SALES_CD = S0.SALES_CD
 				JOIN TB_QM01M01 Q ON Q.REQ_NO = W.REQ_NO
 				GROUP BY S0.CO_CD, S0.SALES_CD
@@ -143,48 +189,8 @@
 						, NVL(C.NOT_WBSCODE_COUNT, 1) AS LEVEL2_PLANT_COUNT
 				FROM src W
 				LEFT JOIN l2PlanCnt C ON C.CO_CD = W.CO_CD AND C.SALES_CD = W.SALES_CD AND C.WBS_PLAN_CODE_KIND = W.WBS_PLAN_CODE_ID
-			),
-			wb21_latest AS (
-				SELECT CO_CD, SALES_CD, FILE_TRGT_KEY, WBS_REMARK, CLOSE_YN, VER_NO, SMRIZE_ID
-				FROM (
-				  SELECT
-				    W.*,
-				    ROW_NUMBER() OVER (
-				      PARTITION BY W.SJ_NO
-				      ORDER BY TO_NUMBER(W.VER_NO) DESC
-				    ) AS RN
-				  FROM TB_WB21M01 W
-				)
-				WHERE RN = 1
-			),
-			/* sales는 1회만 집계 */
-			sales AS (
-				SELECT
-					S0.CO_CD,
-					S0.SALES_CD,
-					MAX(C.EQP_NM)        AS EQP_NM,
-					MAX(C.ORDRS_NO)      AS ORDRS_NO,
-					MAX(M.ORDRS_CLNT_CD) AS ORDRS_CLNT_CD,
-					MAX(B.CLNT_NM)       AS CLNT_NM,
-					MAX(M.CLNT_PJT)      AS CLNT_PJT,
-					FN_CM05M01_CD_TO_NM(MAX(M.CLNT_PJT)) AS CLNT_PJT_NM,
-					MAX(W.FILE_TRGT_KEY) AS SJ_FILE_TRGT_KEY,
-	                MAX(W.WBS_REMARK) 	 AS WBS_REMARK,
-	                MAX(NVL(W.CLOSE_YN,'N')) AS CLOSE_YN,
-	                MAX(W.SMRIZE_ID) 	 AS SMRIZE_ID,
-	                MAX(W.VER_NO) 	 	 AS SJ_VER_NO
-				FROM s0 S0
-				JOIN TB_CR02D02 C ON C.CO_CD = S0.CO_CD AND C.SALES_CD = S0.SALES_CD
-				JOIN TB_CR02M01 M ON M.ORDRS_NO = C.ORDRS_NO
-				JOIN TB_BM02M01 B ON B.CLNT_CD  = M.ORDRS_CLNT_CD
-	            LEFT OUTER JOIN  (
-	            			SELECT CO_CD, SALES_CD, FILE_TRGT_KEY, WBS_REMARK, CLOSE_YN , VER_NO, SMRIZE_ID
-	            			FROM TB_WB21M01 W 
-	            			WHERE W.VER_NO = (SELECT MAX(TO_NUMBER(VER_NO)) FROM TB_WB21M01 P1 WHERE P1.SJ_NO = W.SJ_NO)
-	            ) W ON W.CO_CD = S0.CO_CD AND W.SALES_CD = S0.SALES_CD
-				GROUP BY S0.CO_CD, S0.SALES_CD
-			),
-		base_lag AS (
+			)
+		,base_lag AS (
 			SELECT
 				s.*,
 				LAG(DEPT_ID) OVER (
@@ -251,7 +257,7 @@
 			    MAX(A.CLOSE_YN)        AS CLOSE_YN,
 			    SUM(A.DAYCNT)          AS DAYCNT
 			  FROM TB_WB23M01 A
-			  JOIN s0 ON s0.CO_CD = A.CO_CD AND s0.SALES_CD = A.SALES_CD
+			  JOIN sales s0 ON s0.CO_CD = A.CO_CD AND s0.SALES_CD = A.SALES_CD
 			  WHERE A.WBS_PLAN_CODE_KIND != 'WBSCODE'
 			  GROUP BY A.CO_CD, A.SALES_CD, A.WBS_PLAN_CODE_KIND
 		),
@@ -265,7 +271,7 @@
 		        W.WBS_PLANS_DT,
 		        W.WBS_PLANE_DT
 		    FROM TB_WB22M01 W
-		    JOIN s0 ON s0.CO_CD = W.CO_CD AND s0.SALES_CD = W.SALES_CD
+		    JOIN sales  ON sales.CO_CD = W.CO_CD AND sales.SALES_CD = W.SALES_CD
 		    WHERE W.WBS_PLAN_CODE_KIND = 'WBSCODE'
 		      AND W.WBS_PLANS_DT IS NOT NULL 
 		)
@@ -290,7 +296,7 @@
 			LEFT JOIN TB_WB23M01 WR ON WR.CO_CD = W.CO_CD AND WR.SALES_CD = W.SALES_CD AND WR.WBS_PLAN_CODE_KIND = W.WBS_PLAN_CODE_ID
 			CROSS JOIN today T
 			WHERE W.CO_CD = 'GUN'
-			AND W.WBS_PLANE_DT <![CDATA[<]]> T.D
+			AND W.WBS_PLANE_DT <![CDATA[<>]]> T.D
 		)
 		, unRslt AS (
 		  	SELECT  P.CO_CD,
@@ -344,7 +350,8 @@
 			NVL(W0.PROBLEM_COUNT, 0)						AS PROBLEM_COUNT,
 			NVL(W0.PROBLEM_UNCOMPLETE, 0)					AS PROBLEM_UNCOMPLETE,PROBLEM_UNCOMPLETE,
 			NVL(UN.UN_COMPLETED, 0) 						AS UN_COMPLETED,
-			NVL(LP.NOT_WBSCODE_COUNT, 0)					AS NOT_WBSCODE_COUNT 
+			NVL(LP.NOT_WBSCODE_COUNT, 0)					AS NOT_WBSCODE_COUNT,
+			upr.total_un_cnt
 		FROM final_base F
 		JOIN sales S            ON S.CO_CD = F.CO_CD AND S.SALES_CD = F.SALES_CD
 		JOIN sales_range R      ON R.CO_CD = F.CO_CD AND R.SALES_CD = F.SALES_CD
@@ -356,19 +363,30 @@
 		LEFT JOIN TB_CM06M01 C  ON C.ID = F.WBS_PLAN_MNG_ID
 		LEFT JOIN TB_CM05M01 C5 ON C5.CODE_ID = F.WBS_PLAN_CODE_ID
 		LEFT JOIN src_act ST    ON ST.CO_CD = F.CO_CD AND ST.SALES_CD = F.SALES_CD AND ST.WBS_PLAN_CODE_KIND = F.WBS_PLAN_CODE_ID
+		LEFT JOIN un_plan_result upr ON  upr.SALES_CD = F.SALES_CD 
 		WHERE 1=1
 		<choose>
 		  <!-- 1) salesCd, ordrsClntNm, clntPjt 모두 비었을 때만 "오늘 포함" 조건 적용 -->
 		  <when test="(salesCd == null or salesCd == '') 
 		          and (ordrsClntNm == null or ordrsClntNm == '') 
 		          and (clntPjt == null or clntPjt == '')">
-		    AND R.SALES_START <![CDATA[<]]> T.D
-		    AND R.SALES_END   <![CDATA[>]]> T.D
+		    <choose>
+		      <when test="searchType == 'UNRESULT'">
+		        AND upr.total_un_cnt <![CDATA[>]]> 0
+		      </when>
+		      <when test="searchType == 'MAXENDDT'">
+		        AND (R.SALES_START <![CDATA[<]]> T.D AND R.SALES_END <![CDATA[>]]> T.D)
+		      </when>
+		      <otherwise>
+		        AND (
+		          upr.total_un_cnt <![CDATA[>]]> 0
+		          OR (R.SALES_START <![CDATA[<]]> T.D AND R.SALES_END <![CDATA[>]]> T.D)
+		        )
+		      </otherwise>
+		    </choose>
 		  </when>
-		
 		  <!-- 2) 하나라도 값이 있으면 해당 값 기준으로만 필터 -->
 		  <otherwise>
-		
 		    <if test="salesCd != null and salesCd != ''">
 		      AND F.SALES_CD LIKE '%' || #{salesCd} || '%'
 		    </if>

@@ -2,376 +2,360 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.dksys.biz.user.wb.wb25.mapper.WB25Mapper">
-
      <select id="selectWbsTaskEvlCount" parameterType="Map" resultType="int">
-         WITH SUBJ AS --확정된 과제정보   
-                 (
-                  SELECT X.CO_CD                                                      AS CO_CD              --회사코드
-                       , X.SALES_CD                                                    AS SALES_CD           --SALES Code
-                       , X.SJ_NM                                                       AS SJ_NM              --과제명
-                       , X.VER_NO                                                      AS VER_NO             --버젼
-                       , (SELECT FN_CM06M01_ID_TO_NM(X.SMRIZE_ID) FROM DUAL)          AS SMRIZE_NM          --총괄PM명
-                       , TO_CHAR(X.BEGIN_DT, 'YYYY-MM-DD')                             AS BEGIN_DT           --시작일
-                       , TO_CHAR(X.DE_DT, 'YYYY-MM-DD')                                AS DE_DT              --출고일
-                       , TO_CHAR(X.ACPTNC_DT, 'YYYY-MM-DD')                            AS ACPTNC_DT          --완료검수일
-                       , TO_CHAR(X.REQRE_DAYCNT)                                       AS REQRE_DAYCNT       --소요일수
-                       , X.DSGN_PLAN_HOUR                                              AS DSGN_PLAN_HOUR     --설계계획공수
-                       , X.PRDCTN_PLAN_HOUR                                            AS PRDCTN_PLAN_HOUR   --생산계획공수
-                       , X.FILE_TRGT_KEY
-                    FROM TB_WB21M01 X
-                   WHERE X.CO_CD = #{coCd}
-                     AND X.BEGIN_DT BETWEEN #{beginDt} AND #{deDt} --조회조건 : 과제시작일
-                     AND X.CLOSE_YN = 'Y'
-                     <if test="salesCd != null and !salesCd.equals('')">
-                       AND X.SALES_CD = #{salesCd}            
-                     </if>
-                 )  
-               , SJD AS --수주상세 
-                 ( 
-                  SELECT M.CO_CD                                              AS CO_CD        --회사코드
-                        , (SELECT FN_CM05M01_CD_TO_NM(M.CO_CD) FROM DUAL)     AS CO_NM        --회사명 
-                        , M.ORDRS_NO                                           AS ORDRS_NO     --수주번호
-                        , X.SALES_CD                                           AS SALES_CD     --SALES Code
+         WITH SUBJ AS (  --확정된 과제정보
+				SELECT T.CO_CD
+				     , T.SALES_CD
+				     , T.SJ_NM
+				     , T.VER_NO
+				     , T.SMRIZE_NM
+				     , T.BEGIN_DT
+				     , T.DE_DT
+				     , T.ACPTNC_DT
+				     , T.REQRE_DAYCNT
+				     , T.DSGN_PLAN_HOUR
+				     , T.PRDCTN_PLAN_HOUR
+				     , T.FILE_TRGT_KEY										AS SJ_FILE_TRGT_KEY
+                     , (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL)     AS CO_NM        --회사명 
+                        , D.ORDRS_NO                                           AS ORDRS_NO     --수주번호
                         , M.ORDRS_CLNT_CD                                      AS CLNT_CD      --고객코드
                         , C.CLNT_NM                                            AS CLNT_NM      --고객명
                         , M.CLNT_PJT                                           AS CLNT_PJT     --고객사프로젝트 
                         , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)  AS CLNT_PJT_NM  --고객사프로젝트명
-                        , X.ORDRS_PRC_MACH                                     AS ORDRS_PRC_MACH --수주가-기계파트
-                        , X.TRGT_PCHS_PCOST_MACH                               AS TRGT_PCOST_MACH--목표구매원가-기계파트
-                     FROM TB_CR02M01  M --수주마스터
-                          INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
-                          INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보 
-                    WHERE 1=1
-                      AND M.CO_CD = #{coCd}
-                      AND X.SALES_CD IS NOT NULL --비용제외
-                      AND EXISTS (SELECT 'X'    --조회된 과제의 SALES_CD 만 
-                                     FROM SUBJ P 
-                                    WHERE P.CO_CD    = #{coCd}
-                                      AND P.CO_CD    = X.CO_CD
-                                      AND P.SALES_CD = X.SALES_CD
-                                  ) 
-                 )
-               , EVAL AS --WBS 평가정보 
-                 (
-                  SELECT W.CO_CD                                           AS CO_CD     --회사코드
-                        , W.SALES_CD                                        AS SALES_CD  --SALSES_CD
-                        , TO_CHAR(W.EVL_DT, 'YYYY-MM-DD')                   AS EVL_DT    --평가일자 
-                        , W.EVL_ID                                          AS EVL_ID    --평가자ID
-                        , (SELECT FN_CM06M01_ID_TO_NM(W.EVL_ID) FROM DUAL) AS EVL_NM    --평가자명 
-                        , W.CLOSE_YN                                        AS CLOSE_YN  --확정여부 
-                        , W.EVL_CNTS                                        AS EVL_CNTS  --평가내용
-                        , W.FILE_TRGT_KEY                                   AS FILE_TRGT_KEY
-                     FROM TB_WB25M01 W--WBS평가
-                    WHERE W.CO_CD = #{coCd}
-                      AND EXISTS (SELECT 'X'    --조회된 과제의 SALES_CD 만 
-                                     FROM SUBJ P 
-                                    WHERE P.CO_CD    = #{coCd}
-                                      AND P.CO_CD    = W.CO_CD
-                                      AND P.SALES_CD = W.SALES_CD
-                                  ) 
-                 )
-               , RSLT AS --WBS 실적정보
-                 (              
-                  SELECT WR.CO_CD                AS CO_CD--회사코드
-                        , WR.SALES_CD             AS SALES_CD--SALES Code 
-                        , MIN(WR.WBS_RSLTSS_DT)  AS RSLTSS_DT     --TASK실적시작일
-                        , MAX(WR.WBS_RSLTSE_DT)  AS RSLTSE_DT     --TASK실적종료일 
-                        , SUM(WR.DAYCNT)         AS RSLT_DAYCNT   --TASK실적소요일
-                        , SUM(WR.WBS_RSLTS_MH)   AS RSLTS_MH      --WBS실적 공수                    
-                        , MAX(CASE WHEN WR.WBS_PLAN_CODE_KIND = 'WBSCODE14' AND WR.WBS_RSLTS_RATE = 100 THEN 'Y'
-                                    ELSE 'N'
-                              END)               AS WBS_CLOSE_YN --평가대상 유무 : 설치시운전(복귀일) 실적(WBSCODE14) = 100% --완료검수 실적(WBSCODE15) = 100%
-                     FROM TB_WB23M01  WR--WBS실적 정보
-                    WHERE WR.CO_CD    = #{coCd}
-                      AND EXISTS (SELECT 'X'    --조회된 과제의 SALES_CD 만 
-                                     FROM SUBJ P 
-                                    WHERE P.CO_CD    = #{coCd}
-                                      AND P.CO_CD    = WR.CO_CD
-                                      AND P.SALES_CD = WR.SALES_CD
-                                  ) 
-                    GROUP BY WR.CO_CD, WR.SALES_CD
-                 )
-               , ISU  AS --WBS 이슈정보
-                 (
-                  SELECT ISU.CO_CD            --회사코드
-                        , ISU.SALES_CD         --SALES Code 
-                        , SUM(CASE WHEN ISU.WBS_PLAN_NO  IS NOT NULL THEN 1 ELSE 0 END ) AS PLAN_CNT --계획 이슈
-                        , SUM(CASE WHEN ISU.WBS_RSLTS_NO IS NOT NULL THEN 1 ELSE 0 END ) AS RSLT_CNT --실적 이슈
-                     FROM TB_WB24M02  AS ISU  --WBS이슈 정보
-                    WHERE CO_CD = #{coCd}
-                      AND EXISTS (SELECT 'X' --조회된 과제의 SALES_CD 만 
-                                     FROM SUBJ P 
-                                    WHERE P.CO_CD    = #{coCd}
-                                      AND P.CO_CD    = ISU.CO_CD
-                                      AND P.SALES_CD = ISU.SALES_CD
-                                  ) 
-                   GROUP BY CO_CD, SALES_CD
-                 )
-            SELECT COUNT(*)
-              FROM (
-                    SELECT X.CO_CD                  AS CO_CD         --회사코드
-                         , CR.ORDRS_NO              AS ORDRS_NO      --수주번호
-                         , CR.CLNT_CD               AS CLNT_CD       --고객코드
-                         , CR.CLNT_NM               AS CLNT_NM       --고객명
-                         , CR.CLNT_PJT              AS CLNT_PJT      --고객사프로젝트 
-                         , CR.CLNT_PJT_NM           AS CLNT_PJT_NM   --고객사프로젝트명
-                         , X.SJ_NM                  AS SJ_NM         --과제명  
-                         , X.VER_NO                 AS VER_NO        --과제버젼    
-                         , X.SALES_CD               AS SALES_CD      --SALES Code 
-                         , X.SMRIZE_NM              AS SMRIZE_NM     --총괄PM명  
-                         , X.BEGIN_DT               AS BEGIN_DT      --과제시작일    
-                         , X.DE_DT                  AS DE_DT         --출고일    
-                         , X.ACPTNC_DT              AS ACPTNC_DT     --완료검수일 
-                         , X.REQRE_DAYCNT           AS REQRE_DAYCNT  --소요일수   
-                         , RS.RSLTSS_DT             AS RSLTSS_DT     --TASK실적시작일
-                         , RS.RSLTSE_DT             AS RSLTSE_DT     --TASK실적종료일 
-                         , RS.RSLT_DAYCNT           AS RSLT_DAYCNT   --TASK실적소요일
-                         , RS.RSLTS_MH              AS RSLTS_MH      --TASK실적 공수 
-                         , ISU.PLAN_CNT             AS PLAN_CNT      --계획 이슈
-                         , ISU.RSLT_CNT             AS RSLT_CNT      --실적 이슈
-                         , NVL(RS.WBS_CLOSE_YN,'N') AS WBS_CLOSE_YN  --평가대상
-                         , EV.EVL_DT                AS EVL_DT        --평가일자 
-                         , EV.EVL_NM                AS EVL_NM        --평가자명
-                         , EV.CLOSE_YN              AS PLAN_CLOSE_YN --계획확정여부 
-                         , EV.EVL_CNTS              AS EVL_CNTS      --평가내용
-                         , EV.FILE_TRGT_KEY         AS FILE_TRGT_KEY --FILE_TRGT_KEY
-                      FROM SUBJ X
-                           INNER      JOIN SJD  AS CR  ON X.CO_CD = CR.CO_CD  AND X.SALES_CD = CR.SALES_CD 
-                           LEFT OUTER JOIN EVAL AS EV  ON X.CO_CD = EV.CO_CD  AND X.SALES_CD = EV.SALES_CD 
-                           LEFT OUTER JOIN RSLT AS RS  ON X.CO_CD = RS.CO_CD  AND X.SALES_CD = RS.SALES_CD 
-                           LEFT OUTER JOIN ISU  AS ISU ON X.CO_CD = ISU.CO_CD AND X.SALES_CD = ISU.SALES_CD 
-                     WHERE 1=1
-                   ) T
-              WHERE 1=1
-              AND T.CO_CD = #{coCd}      
-                 <if test="salesCd != null and !salesCd.equals('')">
-                 AND T.SALES_CD = #{salesCd}        
-                 </if>
-                 <if test="closeYn != null and closeYn != ''">
-				 AND T.PLAN_CLOSE_YN = #{closeYn}
-				 </if>
-                 <if test="wbsCloseYn != null and !wbsCloseYn.equals('')">
-                 AND T.WBS_CLOSE_YN = #{wbsCloseYn}            
-                 </if>
-                 <if test="clntPjt != null and !clntPjt.equals('')">
-                 AND T.CLNT_PJT = #{clntPjt}            
-                 </if>
-                 <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
-                 AND T.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'            
-                 </if>
-                 AND T.BEGIN_DT BETWEEN #{beginDt} AND #{deDt}    
-        
+                        , D.ORDRS_PRC_MACH                                     AS ORDRS_PRC_MACH --수주가-기계파트
+                        , D.TRGT_PCHS_PCOST_MACH                               AS TRGT_PCOST_MACH--목표구매원가-기계파트
+                        , TO_CHAR(P.EVL_DT, 'YYYY-MM-DD')                   AS EVL_DT    --평가일자 
+                        , P.EVL_ID                                          AS EVL_ID    --평가자ID
+                        , (SELECT FN_CM06M01_ID_TO_NM(P.EVL_ID) FROM DUAL) AS EVL_NM    --평가자명 
+                        , P.CLOSE_YN                                        AS CLOSE_YN  --확정여부 
+                        , P.EVL_CNTS                                        AS EVL_CNTS  --평가내용
+                        , P.FILE_TRGT_KEY                                   AS FILE_TRGT_KEY
+				FROM (
+					    SELECT X.CO_CD                                              AS CO_CD               --회사코드       
+					         , X.SALES_CD                                            AS SALES_CD            --SALES Code
+					         , X.SJ_NM                                               AS SJ_NM               --과제명       
+					         , X.VER_NO                                              AS VER_NO              --버젼        
+					         , (SELECT FN_CM06M01_ID_TO_NM(X.SMRIZE_ID) FROM DUAL)   AS SMRIZE_NM          --총괄PM명      
+					         , TO_CHAR(X.BEGIN_DT, 'YYYY-MM-DD')                     AS BEGIN_DT            --시작일       
+					         , TO_CHAR(X.DE_DT, 'YYYY-MM-DD')                        AS DE_DT               --출고일       
+					         , TO_CHAR(X.ACPTNC_DT, 'YYYY-MM-DD')                    AS ACPTNC_DT           --완료검수일     
+					         , TO_CHAR(X.REQRE_DAYCNT)                               AS REQRE_DAYCNT        --소요일수      
+					         , X.DSGN_PLAN_HOUR                                      AS DSGN_PLAN_HOUR      --설계계획공수    
+					         , X.PRDCTN_PLAN_HOUR                                    AS PRDCTN_PLAN_HOUR    --생산계획공수    
+					         , X.FILE_TRGT_KEY                                       AS FILE_TRGT_KEY
+					         , ROW_NUMBER() OVER (
+					               PARTITION BY X.CO_CD, X.SALES_CD
+					               ORDER BY X.VER_NO DESC
+					           ) AS RN
+					    FROM TB_WB21M01 X
+					    WHERE X.CO_CD = #{coCd}
+					      AND X.BEGIN_DT BETWEEN #{beginDt} AND #{deDt} --조회조건 : 과제시작일
+					      AND X.CLOSE_YN = 'Y'
+                         <if test="salesCd != null and !salesCd.equals('')">
+                         AND X.SALES_CD = #{salesCd}           
+                         </if>
+					) T
+                        LEFT  JOIN TB_CR02D02 AS D ON D.CO_CD = T.CO_CD AND D.SALES_CD = T.SALES_CD	--수주상세   
+                        LEFT  JOIN TB_CR02M01 AS M ON M.CO_CD = T.CO_CD AND M.ORDRS_NO = D.ORDRS_NO	--수주마스터   
+                        LEFT  JOIN TB_BM02M01 AS C ON C.CLNT_CD = M.ORDRS_CLNT_CD  --거래처정보 
+                        LEFT  JOIN TB_WB25M01 AS P ON P.CO_CD = T.CO_CD AND P.SALES_CD = T.SALES_CD	--WBS평가
+				WHERE T.RN = 1    
+                <if test="clntPjt != null and !clntPjt.equals('')">
+                AND M.CLNT_PJT = #{clntPjt}            
+                </if>
+                <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
+                AND C.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'            
+                </if>
+         ) 
+       , RSLT AS ( --WBS 실적정보
+	          SELECT CO_CD, SALES_CD
+                        , MIN(Z.WBS_PLANS_DT)  AS RSLTSS_DT     --TASK실적시작일
+                        , MAX(Z.WBS_PLANE_DT)  AS RSLTSE_DT     --TASK실적종료일 
+                        , SUM(Z.DAYCNT)         AS RSLT_DAYCNT   --TASK실적소요일
+                        , SUM(Z.WBS_RSLTS_MH)   AS RSLTS_MH      --WBS실적 공수      
+	             , COUNT(*) AS UNFINISHED_CNT
+	             , CASE WHEN (COUNT(*) > 0 OR MIN(Z.WBS_PLANS_DT) IS NULL) THEN 'N' ELSE 'Y' END 		AS WBS_CLOSE_YN
+	          FROM (
+	                        --과제 등록된 내용중 일정계획 수립확정 되니 않은 건 확정건에 대한 계획수립 안한 내역 
+	                        SELECT P.SALES_CD                            AS SALES_CD
+	                             , P.WBS_PLAN_CODE_NM                    AS WBS_TASK_NM --WBS Task NM
+	                             , TO_CHAR(P.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT --WBS Task 시작일
+	                             , TO_CHAR(P.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT  --WBS Task 종료일
+	                             , NVL(R.WBS_RSLTS_RATE,0)               AS WBS_RATE    --WBS 실적 진행율
+	                             , TO_NUMBER(NVL(R.DAYCNT, '0'))         AS DAYCNT    --WBS 투입 일수
+	                             , NVL(R.WBS_RSLTS_MH,0)                 AS WBS_RSLTS_MH    --WBS 실적 MH
+	                             -- 관련코드 참고정보 -----------------------------------------------
+	                             , P.WBS_PLAN_CODE_KIND             AS WBS_PLAN_CD --WBS 계획CD
+	                             , P.WBS_PLAN_CODE_ID               AS WBS_TASK_ID --WBS Task ID 
+	                             , P.WBS_PLAN_MNG_ID                AS WBS_MNG_ID  --담당자ID
+	                             , P.CO_CD
+	                             , SJ.VER_NO                  		AS PLAN_VER_NO --계획ver 
+	                          FROM TB_WB22M01 P --WBS계획
+	                               INNER JOIN SUBJ SJ ON P.CO_CD = SJ.CO_CD AND P.SALES_CD = SJ.SALES_CD
+	                               LEFT OUTER JOIN TB_WB23M01 R ON P.CO_CD               = R.CO_CD 
+                                                                AND P.SALES_CD           = R.SALES_CD 
+                                                                AND P.WBS_PLAN_CODE_KIND = R.WBS_PLAN_CODE_KIND 
+                                                                AND P.WBS_PLAN_CODE_ID   = R.WBS_PLAN_CODE_ID
+	                         WHERE P.WBS_PLANE_DT   <![CDATA[ < ]]>   (SYSDATE + 0) --종료일 0일 이전 내역 
+	                           AND P.WBS_PLAN_CODE_KIND  <![CDATA[ <> ]]>   'WBSCODE'
+	                           AND NVL(R.WBS_RSLTS_RATE,0)  <![CDATA[ <> ]]>  100
+					 UNION All   --일정계획 확정건에 대한 계획수립 안한 내역 
+					         SELECT    P.SALES_CD                         AS SALES_CD 
+					                 , '일정계획수립'                         AS WBS_PLAN_NM
+		                             , TO_CHAR(P.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT --WBS Task 시작일
+		                             , TO_CHAR(P.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT  --WBS Task 종료일
+		                             , 0               AS WBS_RATE    --WBS 실적 진행율
+		                             , 0               AS DAYCNT    --WBS 투입 일수
+	                             	 , 0               AS WBS_RSLTS_MH    --WBS 실적 MH
+		                             -- 관련코드 참고정보 -----------------------------------------------
+		                             , P.WBS_PLAN_CODE_KIND             AS WBS_PLAN_CD --WBS 계획CD
+		                             , P.WBS_PLAN_CODE_ID               AS WBS_TASK_ID --WBS Task ID 
+		                             , P.WBS_PLAN_MNG_ID                AS WBS_MNG_ID  --담당자ID
+		                             , P.CO_CD
+	                             	 , SJ.VER_NO                  		AS PLAN_VER_NO --계획ver
+					         FROM TB_WB22M01 P 
+					         				LEFT OUTER JOIN TB_WB22M01 R ON R.CO_CD     = P.CO_CD
+					         				                               AND R.SALES_CD  =  P.SALES_CD
+					         				                               AND R.WBS_PLAN_CODE_KIND = P.WBS_PLAN_CODE_ID
+					         				LEFT OUTER JOIN SUBJ SJ  ON P.SALES_CD = SJ.SALES_CD
+					         WHERE 1 =1
+					           AND P.WBS_PLAN_CODE_KIND = 'WBSCODE' AND P.WBS_PLANS_DT IS NOT NULL AND P.WBS_PLAN_MNG_ID IS NOT NULL
+					           AND R.FILE_TRGT_KEY IS NULL  
+					           AND P.CLOSE_YN = 'Y'         
+	               ) AS Z
+	         WHERE  1 = 1
+	         AND WBS_MNG_ID IS NOT NULL 
+	         GROUP BY CO_CD, SALES_CD 
+	     )
+	   , ISU  AS ( --WBS 이슈정보
+              SELECT  ISU.CO_CD            --회사코드
+                    , ISU.SALES_CD         --SALES Code 
+                    , SUM(CASE WHEN ISU.WBS_PLAN_NO  IS NOT NULL THEN 1 ELSE 0 END ) AS PLAN_CNT --계획 이슈
+                    , SUM(CASE WHEN ISU.WBS_RSLTS_NO IS NOT NULL THEN 1 ELSE 0 END ) AS RSLT_CNT --실적 이슈
+                 FROM TB_WB24M02  AS ISU  --WBS이슈 정보
+                 JOIN SUBJ P ON P.CO_CD    = ISU.CO_CD AND P.SALES_CD = ISU.SALES_CD
+               GROUP BY ISU.CO_CD, ISU.SALES_CD
+     )
+		SELECT COUNT(*)
+		  FROM (
+                SELECT X.CO_CD                  AS CO_CD         --회사코드
+                     , X.ORDRS_NO               AS ORDRS_NO      --수주번호
+                     , X.CLNT_CD                AS CLNT_CD       --고객코드
+                     , X.CLNT_NM                AS CLNT_NM       --고객명
+                     , X.CLNT_PJT               AS CLNT_PJT      --고객사프로젝트 
+                     , X.CLNT_PJT_NM            AS CLNT_PJT_NM   --고객사프로젝트명
+                     , X.SJ_NM                  AS SJ_NM         --과제명  
+                     , X.VER_NO                 AS VER_NO        --과제버젼    
+                     , X.SALES_CD               AS SALES_CD      --SALES Code 
+                     , X.SMRIZE_NM              AS SMRIZE_NM     --총괄PM명  
+                     , X.BEGIN_DT               AS BEGIN_DT      --과제시작일    
+                     , X.DE_DT                  AS DE_DT         --출고일    
+                     , X.ACPTNC_DT              AS ACPTNC_DT     --완료검수일 
+                     , X.REQRE_DAYCNT           AS REQRE_DAYCNT  --소요일수   
+                     , RS.RSLTSS_DT				AS RSLTSS_DT      --TASK실적시작일
+                     , RS.RSLTSE_DT 			AS RSLTSE_DT     --TASK실적종료일 
+                     , RS.RSLT_DAYCNT           AS RSLT_DAYCNT   --TASK실적소요일
+                     , RS.RSLTS_MH              AS RSLTS_MH      --TASK실적 공수 
+                     , ISU.PLAN_CNT             AS PLAN_CNT      --계획 이슈
+                     , ISU.RSLT_CNT             AS RSLT_CNT      --실적 이슈
+	             	 , CASE WHEN X.ACPTNC_DT <![CDATA[ < ]]> TO_DATE(SYSDATE, 'YYYY-MM-DD') THEN 'Y' ELSE 'N' END AS WBS_CLOSE_YN --평가대상
+                     , X.EVL_DT                 AS EVL_DT        --평가일자 
+                     , X.EVL_ID                 AS EVL_ID        --평가자ID
+                     , X.EVL_NM                 AS EVL_NM        --평가자명
+                     , NVL(X.CLOSE_YN,'N')      AS PLAN_CLOSE_YN --계획확정여부 
+                     , X.EVL_CNTS               AS EVL_CNTS      --평가내용
+                     , X.FILE_TRGT_KEY          AS FILE_TRGT_KEY --FILE_TRGT_KEY
+                     , X.FILE_TRGT_KEY AS SJ_FILE_TRGT_KEY
+                  FROM SUBJ X
+                       LEFT OUTER JOIN RSLT AS RS  ON X.CO_CD = RS.CO_CD  AND X.SALES_CD = RS.SALES_CD 
+                       LEFT OUTER JOIN ISU  AS ISU ON X.CO_CD = ISU.CO_CD AND X.SALES_CD = ISU.SALES_CD 
+                 WHERE 1=1
+			   ) T
+		  WHERE 1=1
+		 <if test="wbsCloseYn != null and !wbsCloseYn.equals('')">
+		 AND T.WBS_CLOSE_YN = #{wbsCloseYn}            
+		 </if>
      </select>
 
 
      <select id="selectWbsTaskEvlList" parameterType="Map" resultType="camelMap">
      /* selectWbsTaskEvlList */
-         WITH SUBJ AS --확정된 과제정보
-                 (
-                  SELECT X.CO_CD                                                      AS CO_CD              --회사코드
-                       , X.SALES_CD                                                    AS SALES_CD           --SALES Code
-                       , X.SJ_NM                                                       AS SJ_NM              --과제명
-                       , X.VER_NO                                                      AS VER_NO             --버젼
-                       , (SELECT FN_CM06M01_ID_TO_NM(X.SMRIZE_ID) FROM DUAL)          AS SMRIZE_NM          --총괄PM명
-                       , TO_CHAR(X.BEGIN_DT, 'YYYY-MM-DD')                             AS BEGIN_DT           --시작일
-                       , TO_CHAR(X.DE_DT, 'YYYY-MM-DD')                                AS DE_DT              --출고일
-                       , TO_CHAR(X.ACPTNC_DT, 'YYYY-MM-DD')                            AS ACPTNC_DT          --완료검수일
-                       , TO_CHAR(X.REQRE_DAYCNT)                                       AS REQRE_DAYCNT       --소요일수
-                       , X.DSGN_PLAN_HOUR                                              AS DSGN_PLAN_HOUR     --설계계획공수
-                       , X.PRDCTN_PLAN_HOUR                                            AS PRDCTN_PLAN_HOUR   --생산계획공수
-                       , X.FILE_TRGT_KEY
-                    FROM TB_WB21M01 X
-                   WHERE X.CO_CD = #{coCd}
-                     AND X.BEGIN_DT BETWEEN #{beginDt} AND #{deDt} --조회조건 : 과제시작일
-                     AND X.CLOSE_YN = 'Y'
-                 )  
-               , SJD AS --수주상세 
-                 ( 
-                  SELECT M.CO_CD                                              AS CO_CD        --회사코드
-                        , (SELECT FN_CM05M01_CD_TO_NM(M.CO_CD) FROM DUAL)     AS CO_NM        --회사명 
-                        , M.ORDRS_NO                                           AS ORDRS_NO     --수주번호
-                        , X.SALES_CD                                           AS SALES_CD     --SALES Code
+         WITH SUBJ AS (  --확정된 과제정보
+				SELECT T.CO_CD
+				     , T.SALES_CD
+				     , T.SJ_NM
+				     , T.VER_NO
+				     , T.SMRIZE_NM
+				     , T.BEGIN_DT
+				     , T.DE_DT
+				     , T.ACPTNC_DT
+				     , T.REQRE_DAYCNT
+				     , T.DSGN_PLAN_HOUR
+				     , T.PRDCTN_PLAN_HOUR
+				     , T.FILE_TRGT_KEY										AS SJ_FILE_TRGT_KEY
+                     , (SELECT FN_CM05M01_CD_TO_NM(T.CO_CD) FROM DUAL)     AS CO_NM        --회사명 
+                        , D.ORDRS_NO                                           AS ORDRS_NO     --수주번호
                         , M.ORDRS_CLNT_CD                                      AS CLNT_CD      --고객코드
                         , C.CLNT_NM                                            AS CLNT_NM      --고객명
                         , M.CLNT_PJT                                           AS CLNT_PJT     --고객사프로젝트 
                         , (SELECT FN_CM05M01_CD_TO_NM(M.CLNT_PJT) FROM DUAL)  AS CLNT_PJT_NM  --고객사프로젝트명
-                        , X.ORDRS_PRC_MACH                                     AS ORDRS_PRC_MACH --수주가-기계파트
-                        , X.TRGT_PCHS_PCOST_MACH                               AS TRGT_PCOST_MACH--목표구매원가-기계파트
-                     FROM TB_CR02M01  M --수주마스터
-                          INNER JOIN TB_CR02D02 AS X ON X.CO_CD = M.CO_CD AND X.ORDRS_NO = M.ORDRS_NO--수주상세   
-                          INNER JOIN TB_BM02M01 AS C ON M.ORDRS_CLNT_CD = C.CLNT_CD --거래처정보 
-                    WHERE 1=1
-                      AND M.CO_CD = #{coCd}
-                      AND X.SALES_CD IS NOT NULL --비용제외
-                      AND EXISTS (SELECT 'X'    --조회된 과제의 SALES_CD 만 
-                                     FROM SUBJ P 
-                                    WHERE P.CO_CD    = #{coCd}
-                                      AND P.CO_CD    = X.CO_CD
-                                      AND P.SALES_CD = X.SALES_CD
-                                  ) 
-                 )
-               , EVAL AS --WBS 평가정보 
-                 (
-                  SELECT W.CO_CD                                           AS CO_CD     --회사코드
-                        , W.SALES_CD                                        AS SALES_CD  --SALSES_CD
-                        , TO_CHAR(W.EVL_DT, 'YYYY-MM-DD')                   AS EVL_DT    --평가일자 
-                        , W.EVL_ID                                          AS EVL_ID    --평가자ID
-                        , (SELECT FN_CM06M01_ID_TO_NM(W.EVL_ID) FROM DUAL) AS EVL_NM    --평가자명 
-                        , W.CLOSE_YN                                        AS CLOSE_YN  --확정여부 
-                        , W.EVL_CNTS                                        AS EVL_CNTS  --평가내용
-                        , W.FILE_TRGT_KEY                                   AS FILE_TRGT_KEY
-                     FROM TB_WB25M01 W--WBS평가
-                    WHERE W.CO_CD = #{coCd}
-                      AND EXISTS (SELECT 'X'    --조회된 과제의 SALES_CD 만 
-                                     FROM SUBJ P 
-                                    WHERE P.CO_CD    = #{coCd}
-                                      AND P.CO_CD    = W.CO_CD
-                                      AND P.SALES_CD = W.SALES_CD
-                                  ) 
-                 )
-               , RSLT AS --WBS 실적정보
-                 (              
-                  SELECT WR.CO_CD                AS CO_CD--회사코드
-                        , WR.SALES_CD             AS SALES_CD--SALES Code 
-                        , MIN(WR.WBS_RSLTSS_DT)  AS RSLTSS_DT     --TASK실적시작일
-                        , MAX(WR.WBS_RSLTSE_DT)  AS RSLTSE_DT     --TASK실적종료일 
-                        , SUM(WR.DAYCNT)         AS RSLT_DAYCNT   --TASK실적소요일
-                        , SUM(WR.WBS_RSLTS_MH)   AS RSLTS_MH      --WBS실적 공수                    
-                        <!-- , CASE WHEN EXISTS (
-												SELECT 1
-												FROM TB_WB23M01 WR2
-																JOIN TB_WB22M01 WP ON WP.SALES_CD = WR2.SALES_CD
-																				AND WP.WBS_PLAN_CODE_KIND = WR2.WBS_PLAN_CODE_KIND
-												WHERE WR2.CO_CD    = WR.CO_CD
-												AND WR2.SALES_CD = WR.SALES_CD
-												AND NVL(WR2.WBS_RSLTS_RATE, 0) = 100              
-											) THEN 'Y'
-							ELSE 'N'
-						  END                      AS WBS_CLOSE_YN -->
-						, CASE
-							WHEN
-							EXISTS (
-								SELECT 1
-								FROM TB_WB22M01 WP
-								WHERE WP.CO_CD  = WR.CO_CD
-								AND WP.SALES_CD = WR.SALES_CD
-								AND WP.WBS_PLAN_CODE_KIND IN (
-										'WBSCODE01','WBSCODE02', 'WBSCODE03', 'WBSCODE04', 'WBSCODE05', 'WBSCODE06','WBSCODE07','WBSCODE09','WBSCODE10',
-										'WBSCODE11','WBSCODE12','WBSCODE13','WBSCODE14','WBSCODE16','WBSCODE17','WBSCODE18'
-								)
-							)
-							AND
-							NOT EXISTS (
-								SELECT 1
-								FROM TB_WB22M01 WP
-								WHERE WP.CO_CD  = WR.CO_CD
-								AND WP.SALES_CD = WR.SALES_CD
-								AND WP.WBS_PLAN_CODE_KIND IN (
-										'WBSCODE01','WBSCODE02', 'WBSCODE03', 'WBSCODE04', 'WBSCODE05', 'WBSCODE06','WBSCODE07','WBSCODE09','WBSCODE10',
-										'WBSCODE11','WBSCODE12','WBSCODE13','WBSCODE14','WBSCODE16','WBSCODE17','WBSCODE18'
-								)
-								AND NOT EXISTS (
-										SELECT 1
-										FROM TB_WB23M01 WR2
-										WHERE WR2.CO_CD  = WR.CO_CD
-											AND WR2.SALES_CD = WR.SALES_CD
-											AND WR2.WBS_PLAN_CODE_KIND = WP.WBS_PLAN_CODE_KIND
-											AND WR2.WBS_PLAN_CODE_ID   = WP.WBS_PLAN_CODE_ID
-											AND NVL(WR2.WBS_RSLTS_RATE, 0) = 100
-								)
-							)
-							THEN 'Y'
-							ELSE 'N'
-						END AS WBS_CLOSE_YN
-                     FROM TB_WB23M01  WR--WBS실적 정보
-                    WHERE WR.CO_CD    = #{coCd}
-                      AND EXISTS (SELECT 'X'    --조회된 과제의 SALES_CD 만 
-                                     FROM SUBJ P 
-                                    WHERE P.CO_CD    = #{coCd}
-                                      AND P.CO_CD    = WR.CO_CD
-                                      AND P.SALES_CD = WR.SALES_CD
-                                  ) 
-                    GROUP BY WR.CO_CD, WR.SALES_CD
-                 )
-               , ISU  AS --WBS 이슈정보
-                 (
-                  SELECT ISU.CO_CD            --회사코드
-                        , ISU.SALES_CD         --SALES Code 
-                        , SUM(CASE WHEN ISU.WBS_PLAN_NO  IS NOT NULL THEN 1 ELSE 0 END ) AS PLAN_CNT --계획 이슈
-                        , SUM(CASE WHEN ISU.WBS_RSLTS_NO IS NOT NULL THEN 1 ELSE 0 END ) AS RSLT_CNT --실적 이슈
-                     FROM TB_WB24M02  AS ISU  --WBS이슈 정보
-                    WHERE CO_CD = #{coCd}
-                      AND EXISTS (SELECT 'X' --조회된 과제의 SALES_CD 만 
-                                     FROM SUBJ P 
-                                    WHERE P.CO_CD    = #{coCd}
-                                      AND P.CO_CD    = ISU.CO_CD
-                                      AND P.SALES_CD = ISU.SALES_CD
-                                  ) 
-                   GROUP BY CO_CD, SALES_CD
-                 )
-                 
-                 SELECT * FROM ( 
-                    SELECT ROWNUM AS RN, T.*
-                      FROM (
-                            SELECT X.CO_CD                  AS CO_CD         --회사코드
-                                 , CR.ORDRS_NO              AS ORDRS_NO      --수주번호
-                                 , CR.CLNT_CD               AS CLNT_CD       --고객코드
-                                 , CR.CLNT_NM               AS CLNT_NM       --고객명
-                                 , CR.CLNT_PJT              AS CLNT_PJT      --고객사프로젝트 
-                                 , CR.CLNT_PJT_NM           AS CLNT_PJT_NM   --고객사프로젝트명
-                                 , X.SJ_NM                  AS SJ_NM         --과제명  
-                                 , X.VER_NO                 AS VER_NO        --과제버젼    
-                                 , X.SALES_CD               AS SALES_CD      --SALES Code 
-                                 , X.SMRIZE_NM              AS SMRIZE_NM     --총괄PM명  
-                                 , X.BEGIN_DT               AS BEGIN_DT      --과제시작일    
-                                 , X.DE_DT                  AS DE_DT         --출고일    
-                                 , X.ACPTNC_DT              AS ACPTNC_DT     --완료검수일 
-                                 , X.REQRE_DAYCNT           AS REQRE_DAYCNT  --소요일수   
-                                 , TO_CHAR(RS.RSLTSS_DT, 'YYYY-MM-DD') AS RSLTSS_DT      --TASK실적시작일
-                                 , TO_CHAR(RS.RSLTSE_DT, 'YYYY-MM-DD') AS RSLTSE_DT     --TASK실적종료일 
-                                 , RS.RSLT_DAYCNT           AS RSLT_DAYCNT   --TASK실적소요일
-                                 , RS.RSLTS_MH              AS RSLTS_MH      --TASK실적 공수 
-                                 , ISU.PLAN_CNT             AS PLAN_CNT      --계획 이슈
-                                 , ISU.RSLT_CNT             AS RSLT_CNT      --실적 이슈
-								 , CASE WHEN TO_NUMBER(X.VER_NO) = MAX(TO_NUMBER(X.VER_NO)) OVER (PARTITION BY X.CO_CD, X.SALES_CD)
-										THEN NVL(RS.WBS_CLOSE_YN,'N')
-										ELSE 'N'
-								   END 						AS WBS_CLOSE_YN  --평가대상
-                                 , EV.EVL_DT                AS EVL_DT        --평가일자 
-                                 , EV.EVL_ID                AS EVL_ID        --평가자ID
-                                 , EV.EVL_NM                AS EVL_NM        --평가자명
-                                 , NVL(EV.CLOSE_YN,'N')     AS PLAN_CLOSE_YN --계획확정여부 
-                                 , EV.EVL_CNTS              AS EVL_CNTS      --평가내용
-                                 , EV.FILE_TRGT_KEY         AS FILE_TRGT_KEY --FILE_TRGT_KEY
-                                 , X.FILE_TRGT_KEY AS SJ_FILE_TRGT_KEY
-                              FROM SUBJ X
-                                   INNER      JOIN SJD  AS CR  ON X.CO_CD = CR.CO_CD  AND X.SALES_CD = CR.SALES_CD 
-                                   LEFT OUTER JOIN EVAL AS EV  ON X.CO_CD = EV.CO_CD  AND X.SALES_CD = EV.SALES_CD 
-                                   LEFT OUTER JOIN RSLT AS RS  ON X.CO_CD = RS.CO_CD  AND X.SALES_CD = RS.SALES_CD 
-                                   LEFT OUTER JOIN ISU  AS ISU ON X.CO_CD = ISU.CO_CD AND X.SALES_CD = ISU.SALES_CD 
-                             WHERE 1=1
-                           ) T
-                      WHERE 1=1
-                      AND T.CO_CD = #{coCd}      
+                        , D.ORDRS_PRC_MACH                                     AS ORDRS_PRC_MACH --수주가-기계파트
+                        , D.TRGT_PCHS_PCOST_MACH                               AS TRGT_PCOST_MACH--목표구매원가-기계파트
+                        , TO_CHAR(P.EVL_DT, 'YYYY-MM-DD')                   AS EVL_DT    --평가일자 
+                        , P.EVL_ID                                          AS EVL_ID    --평가자ID
+                        , (SELECT FN_CM06M01_ID_TO_NM(P.EVL_ID) FROM DUAL) AS EVL_NM    --평가자명 
+                        , P.CLOSE_YN                                        AS CLOSE_YN  --확정여부 
+                        , P.EVL_CNTS                                        AS EVL_CNTS  --평가내용
+                        , P.FILE_TRGT_KEY                                   AS FILE_TRGT_KEY
+				FROM (
+					    SELECT X.CO_CD                                              AS CO_CD               --회사코드       
+					         , X.SALES_CD                                            AS SALES_CD            --SALES Code
+					         , X.SJ_NM                                               AS SJ_NM               --과제명       
+					         , X.VER_NO                                              AS VER_NO              --버젼        
+					         , (SELECT FN_CM06M01_ID_TO_NM(X.SMRIZE_ID) FROM DUAL)   AS SMRIZE_NM          --총괄PM명      
+					         , TO_CHAR(X.BEGIN_DT, 'YYYY-MM-DD')                     AS BEGIN_DT            --시작일       
+					         , TO_CHAR(X.DE_DT, 'YYYY-MM-DD')                        AS DE_DT               --출고일       
+					         , TO_CHAR(X.ACPTNC_DT, 'YYYY-MM-DD')                    AS ACPTNC_DT           --완료검수일     
+					         , TO_CHAR(X.REQRE_DAYCNT)                               AS REQRE_DAYCNT        --소요일수      
+					         , X.DSGN_PLAN_HOUR                                      AS DSGN_PLAN_HOUR      --설계계획공수    
+					         , X.PRDCTN_PLAN_HOUR                                    AS PRDCTN_PLAN_HOUR    --생산계획공수    
+					         , X.FILE_TRGT_KEY                                       AS FILE_TRGT_KEY
+					         , ROW_NUMBER() OVER (
+					               PARTITION BY X.CO_CD, X.SALES_CD
+					               ORDER BY X.VER_NO DESC
+					           ) AS RN
+					    FROM TB_WB21M01 X
+					    WHERE X.CO_CD = #{coCd}
+					      AND X.BEGIN_DT BETWEEN #{beginDt} AND #{deDt} --조회조건 : 과제시작일
+					      AND X.CLOSE_YN = 'Y'
                          <if test="salesCd != null and !salesCd.equals('')">
-                         AND T.SALES_CD = #{salesCd}           
+                         AND X.SALES_CD = #{salesCd}           
                          </if>
-                         <if test="closeYn != null and closeYn != ''">
-						 AND T.PLAN_CLOSE_YN = #{closeYn}
-						 </if>
-                         <if test="wbsCloseYn != null and !wbsCloseYn.equals('')">
-                         AND T.WBS_CLOSE_YN = #{wbsCloseYn}            
-                         </if>
-                         <if test="clntPjt != null and !clntPjt.equals('')">
-                         AND T.CLNT_PJT = #{clntPjt}            
-                         </if>
-                         <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
-                         AND T.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'            
-                         </if>
-                         AND T.BEGIN_DT BETWEEN #{beginDt} AND #{deDt}         
-                         ORDER BY CLNT_CD, ORDRS_NO) W
-                         WHERE RN BETWEEN #{firstIndex} AND #{lastIndex}  
-
+					) T
+                        LEFT  JOIN TB_CR02D02 AS D ON D.CO_CD = T.CO_CD AND D.SALES_CD = T.SALES_CD	--수주상세   
+                        LEFT  JOIN TB_CR02M01 AS M ON M.CO_CD = T.CO_CD AND M.ORDRS_NO = D.ORDRS_NO	--수주마스터   
+                        LEFT  JOIN TB_BM02M01 AS C ON C.CLNT_CD = M.ORDRS_CLNT_CD  --거래처정보 
+                        LEFT  JOIN TB_WB25M01 AS P ON P.CO_CD = T.CO_CD AND P.SALES_CD = T.SALES_CD	--WBS평가
+				WHERE T.RN = 1    
+                <if test="clntPjt != null and !clntPjt.equals('')">
+                AND M.CLNT_PJT = #{clntPjt}            
+                </if>
+                <if test="ordrsClntNm != null and !ordrsClntNm.equals('')">
+                AND C.CLNT_NM LIKE '%' || #{ordrsClntNm} || '%'            
+                </if>
+         ) 
+       , RSLT AS ( --WBS 실적정보
+	          SELECT CO_CD, SALES_CD
+                        , MIN(Z.WBS_PLANS_DT)  AS RSLTSS_DT     --TASK실적시작일
+                        , MAX(Z.WBS_PLANE_DT)  AS RSLTSE_DT     --TASK실적종료일 
+                        , SUM(Z.DAYCNT)         AS RSLT_DAYCNT   --TASK실적소요일
+                        , SUM(Z.WBS_RSLTS_MH)   AS RSLTS_MH      --WBS실적 공수      
+	             , COUNT(*) AS UNFINISHED_CNT
+	             , CASE WHEN (COUNT(*) > 0 OR NVL(MIN(Z.WBS_PLANS_DT), '-') = '-') THEN 'N' ELSE 'Y' END 		AS WBS_CLOSE_YN
+	          FROM (
+	                        --과제 등록된 내용중 일정계획 수립확정 되니 않은 건 확정건에 대한 계획수립 안한 내역 
+	                        SELECT P.SALES_CD                            AS SALES_CD
+	                             , P.WBS_PLAN_CODE_NM                    AS WBS_TASK_NM --WBS Task NM
+	                             , TO_CHAR(P.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT --WBS Task 시작일
+	                             , TO_CHAR(P.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT  --WBS Task 종료일
+	                             , NVL(R.WBS_RSLTS_RATE,0)               AS WBS_RATE    --WBS 실적 진행율
+	                             , TO_NUMBER(NVL(R.DAYCNT, '0'))         AS DAYCNT    --WBS 투입 일수
+	                             , NVL(R.WBS_RSLTS_MH,0)                 AS WBS_RSLTS_MH    --WBS 실적 MH
+	                             -- 관련코드 참고정보 -----------------------------------------------
+	                             , P.WBS_PLAN_CODE_KIND             AS WBS_PLAN_CD --WBS 계획CD
+	                             , P.WBS_PLAN_CODE_ID               AS WBS_TASK_ID --WBS Task ID 
+	                             , P.WBS_PLAN_MNG_ID                AS WBS_MNG_ID  --담당자ID
+	                             , P.CO_CD
+	                             , SJ.VER_NO                  		AS PLAN_VER_NO --계획ver 
+	                          FROM TB_WB22M01 P --WBS계획
+	                               INNER JOIN SUBJ SJ ON P.CO_CD = SJ.CO_CD AND P.SALES_CD = SJ.SALES_CD
+	                               LEFT OUTER JOIN TB_WB23M01 R ON P.CO_CD               = R.CO_CD 
+                                                                AND P.SALES_CD           = R.SALES_CD 
+                                                                AND P.WBS_PLAN_CODE_KIND = R.WBS_PLAN_CODE_KIND 
+                                                                AND P.WBS_PLAN_CODE_ID   = R.WBS_PLAN_CODE_ID
+	                         WHERE P.WBS_PLANE_DT   <![CDATA[ < ]]>   (SYSDATE + 0) --종료일 0일 이전 내역 
+	                           AND P.WBS_PLAN_CODE_KIND  <![CDATA[ <> ]]>   'WBSCODE'
+	                           AND NVL(R.WBS_RSLTS_RATE,0)  <![CDATA[ <> ]]>  100
+					 UNION All   --일정계획 확정건에 대한 계획수립 안한 내역 
+					         SELECT    P.SALES_CD                         AS SALES_CD 
+					                 , '일정계획수립'                         AS WBS_PLAN_NM
+		                             , TO_CHAR(P.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT --WBS Task 시작일
+		                             , TO_CHAR(P.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT  --WBS Task 종료일
+		                             , 0               AS WBS_RATE    --WBS 실적 진행율
+		                             , 0               AS DAYCNT    --WBS 투입 일수
+	                             	 , 0               AS WBS_RSLTS_MH    --WBS 실적 MH
+		                             -- 관련코드 참고정보 -----------------------------------------------
+		                             , P.WBS_PLAN_CODE_KIND             AS WBS_PLAN_CD --WBS 계획CD
+		                             , P.WBS_PLAN_CODE_ID               AS WBS_TASK_ID --WBS Task ID 
+		                             , P.WBS_PLAN_MNG_ID                AS WBS_MNG_ID  --담당자ID
+		                             , P.CO_CD
+	                             	 , SJ.VER_NO                  		AS PLAN_VER_NO --계획ver
+					         FROM TB_WB22M01 P 
+					         				LEFT OUTER JOIN TB_WB22M01 R ON R.CO_CD     = P.CO_CD
+					         				                               AND R.SALES_CD  =  P.SALES_CD
+					         				                               AND R.WBS_PLAN_CODE_KIND = P.WBS_PLAN_CODE_ID
+					         				LEFT OUTER JOIN SUBJ SJ  ON P.SALES_CD = SJ.SALES_CD
+					         WHERE 1 =1
+					           AND P.WBS_PLAN_CODE_KIND = 'WBSCODE' AND P.WBS_PLANS_DT IS NOT NULL AND P.WBS_PLAN_MNG_ID IS NOT NULL
+					           AND R.FILE_TRGT_KEY IS NULL  
+					           AND P.CLOSE_YN = 'Y'         
+	               ) AS Z
+	         WHERE  1 = 1
+	         AND WBS_MNG_ID IS NOT NULL 
+	         GROUP BY CO_CD, SALES_CD 
+	     )
+	   , ISU  AS ( --WBS 이슈정보
+              SELECT  ISU.CO_CD            --회사코드
+                    , ISU.SALES_CD         --SALES Code 
+                    , SUM(CASE WHEN ISU.WBS_PLAN_NO  IS NOT NULL THEN 1 ELSE 0 END ) AS PLAN_CNT --계획 이슈
+                    , SUM(CASE WHEN ISU.WBS_RSLTS_NO IS NOT NULL THEN 1 ELSE 0 END ) AS RSLT_CNT --실적 이슈
+                 FROM TB_WB24M02  AS ISU  --WBS이슈 정보
+                 JOIN SUBJ P ON P.CO_CD    = ISU.CO_CD AND P.SALES_CD = ISU.SALES_CD
+               GROUP BY ISU.CO_CD, ISU.SALES_CD
+     )
+	 SELECT * FROM ( 
+		SELECT ROWNUM AS RN, T.*
+		  FROM (
+                SELECT X.CO_CD                  AS CO_CD         --회사코드
+                     , X.ORDRS_NO               AS ORDRS_NO      --수주번호
+                     , X.CLNT_CD                AS CLNT_CD       --고객코드
+                     , X.CLNT_NM                AS CLNT_NM       --고객명
+                     , X.CLNT_PJT               AS CLNT_PJT      --고객사프로젝트 
+                     , X.CLNT_PJT_NM            AS CLNT_PJT_NM   --고객사프로젝트명
+                     , X.SJ_NM                  AS SJ_NM         --과제명  
+                     , X.VER_NO                 AS VER_NO        --과제버젼    
+                     , X.SALES_CD               AS SALES_CD      --SALES Code 
+                     , X.SMRIZE_NM              AS SMRIZE_NM     --총괄PM명  
+                     , X.BEGIN_DT               AS BEGIN_DT      --과제시작일    
+                     , X.DE_DT                  AS DE_DT         --출고일    
+                     , X.ACPTNC_DT              AS ACPTNC_DT     --완료검수일 
+                     , X.REQRE_DAYCNT           AS REQRE_DAYCNT  --소요일수   
+                     , RS.RSLTSS_DT				AS RSLTSS_DT      --TASK실적시작일
+                     , RS.RSLTSE_DT 			AS RSLTSE_DT     --TASK실적종료일 
+                     , RS.RSLT_DAYCNT           AS RSLT_DAYCNT   --TASK실적소요일
+                     , RS.RSLTS_MH              AS RSLTS_MH      --TASK실적 공수 
+                     , ISU.PLAN_CNT             AS PLAN_CNT      --계획 이슈
+                     , ISU.RSLT_CNT             AS RSLT_CNT      --실적 이슈
+	             	 , CASE WHEN X.ACPTNC_DT <![CDATA[ < ]]> TO_DATE(SYSDATE, 'YYYY-MM-DD') THEN 'Y' ELSE 'N' END AS WBS_CLOSE_YN --평가대상
+                     , X.EVL_DT                 AS EVL_DT        --평가일자 
+                     , X.EVL_ID                 AS EVL_ID        --평가자ID
+                     , X.EVL_NM                 AS EVL_NM        --평가자명
+                     , NVL(X.CLOSE_YN,'N')      AS PLAN_CLOSE_YN --계획확정여부 
+                     , X.EVL_CNTS               AS EVL_CNTS      --평가내용
+                     , X.FILE_TRGT_KEY          AS FILE_TRGT_KEY --FILE_TRGT_KEY
+                     , X.FILE_TRGT_KEY AS SJ_FILE_TRGT_KEY
+                  FROM SUBJ X
+                       LEFT OUTER JOIN RSLT AS RS  ON X.CO_CD = RS.CO_CD  AND X.SALES_CD = RS.SALES_CD 
+                       LEFT OUTER JOIN ISU  AS ISU ON X.CO_CD = ISU.CO_CD AND X.SALES_CD = ISU.SALES_CD 
+                 WHERE 1=1
+			   ) T
+		  WHERE 1=1
+		 <if test="wbsCloseYn != null and !wbsCloseYn.equals('')">
+		 AND T.WBS_CLOSE_YN = #{wbsCloseYn}            
+		 </if>
+         	ORDER BY CLNT_CD, ORDRS_NO
+         ) W
+		 WHERE RN BETWEEN #{firstIndex} AND #{lastIndex}  
      </select>
           
      <select id="selectTaskEvlSeqNext" parameterType="Map" resultType="int">
@@ -485,8 +469,15 @@
 		       SELECT P.CO_CD
 		             , P.SALES_CD
 		             , MIN(TO_CHAR(P.WBS_PLANS_DT, 'YYYY-MM-DD'))  AS WBS_PLANS_DT --계획 시작일
-		             , MAX(TO_CHAR(P.WBS_PLANE_DT, 'YYYY-MM-DD'))  AS WBS_PLANE_DT --계획 종료일 
-		             , SUM(P.DAYCNT)                               AS DAYCNT       --소요일 합계
+		             , MAX(TO_CHAR(P.WBS_PLANE_DT, 'YYYY-MM-DD'))  AS WBS_PLANE_DT --계획 종료일
+		             , SUM(
+					    CASE
+					        WHEN TRIM(P.DAYCNT) IS NULL THEN 0
+					        WHEN REGEXP_LIKE(REPLACE(TRIM(P.DAYCNT), ',', ''), '^[+-]?[0-9]+(\.[0-9]+)?$')
+					             THEN TO_NUMBER(REPLACE(TRIM(P.DAYCNT), ',', ''))
+					        ELSE 0
+					    END
+					  ) AS DAYCNT       --소요일 합계
 		             , K.DSGN_EXP_MH                               AS DSGN_EXP_MH  --설계계획공수
 		             , K.PRD_EXP_MH                                AS PRD_EXP_MH   --생산계획공수
 		          FROM TB_WB22M01 AS P --WBS계획 정보
@@ -539,7 +530,7 @@
 		                              ON Q.REQ_NO = M.REQ_NO AND Q.SALES_CD = M.SALES_CD
 		       WHERE Q.CO_CD    = #{coCd}
 		         AND Q.SALES_CD = #{salesCd}
-				 AND Q.PART_CD  = 'COBTP03' --장애
+				 AND Q.PART_CD  IN ('COBTP03', 'COBTP10') --장애
 		       GROUP BY Q.CO_CD, Q.SALES_CD
 		     )
 		   , RSLT AS --WBS 실적정보
