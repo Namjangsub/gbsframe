@@ -40,4 +40,8 @@ public interface SM50Mapper {
 
 	List<Map<String, String>> selectSalesCdBomRemarkList(Map<String, String> paramMap);
 
+	int select_sm50_matr_Count(Map<String, String> paramMap);
+
+	List<Map<String, String>> select_sm50_matr_List(Map<String, String> paramMap);
+
 }

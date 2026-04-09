@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+import com.dksys.biz.cmn.vo.PaginationInfo;
 import com.dksys.biz.user.sm.sm50.service.SM50Svc;
 import com.dksys.biz.util.MessageUtils;
 
@@ -131,5 +132,15 @@ public class SM50Ctr {
 		return "jsonView";
 	}
     
+	// 자재단가 조회
+	@PostMapping(value = "/select_sm50_matr_List")
+	public String select_sm50_matr_List(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = sm50Svc.select_sm50_matr_Count(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+		List<Map<String, String>> result = sm50Svc.select_sm50_matr_List(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 	
 }

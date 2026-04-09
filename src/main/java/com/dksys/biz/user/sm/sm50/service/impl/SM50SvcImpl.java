@@ -120,4 +120,14 @@ public class SM50SvcImpl implements SM50Svc {
 		return sm50Mapper.selectSalesCdBomRemarkList(paramMap);
 	}
 
+	@Override
+	public int select_sm50_matr_Count(Map<String, String> paramMap) {
+		return sm50Mapper.select_sm50_matr_Count(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> select_sm50_matr_List(Map<String, String> paramMap) {
+		return sm50Mapper.select_sm50_matr_List(paramMap);
+	}
+
 }
