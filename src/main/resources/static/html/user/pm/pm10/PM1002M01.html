@@ -183,23 +183,24 @@
 	var idleTimer = null;			// 3. 유휴 타이머
 	var IDLE_TIMEOUT_MS = 10 * 60 * 1000;	// 3. 유휴 타임아웃 10분
 	var isPopupView = false;
+	let attendList = [];
 
-	const DEFAULT_ATTEND_LIST = [
-		{ id: 'EMJ8105', name: '김태호', title: '부사장' },
-		{ id: 'kimjhv', name: '김재현', title: '전 무' },
-		{ id: 'kimihz', name: '김일희', title: '상 무' },
-		{ id: 'K98452000', name: '김동현', title: '상 무' },
-		{ id: 'shjung', name: '정상훈', title: '부 장' },
-		{ id: 'h4ng10', name: '허상렬', title: '부 장' },
-		{ id: 'canmtb', name: '한동주', title: '과 장' },
-		{ id: 'js.nam', name: '남장섭', title: '실 장' },
-		{ id: 'cyh', name: '조영희', title: '부 장' },
-		{ id: 'jwc', name: '조완철', title: '차 장' },
-		{ id: 'sms', name: '손민성', title: '차 장' },
-	];
-	let attendList = DEFAULT_ATTEND_LIST.map(u => ({ ...u }));
-
-	const FIXED_ORDER = DEFAULT_ATTEND_LIST.map(u => u.id);
+	// const DEFAULT_ATTEND_LIST = [
+	// 	{ id: 'EMJ8105', name: '김태호', title: '부사장' },
+	// 	{ id: 'kimjhv', name: '김재현', title: '전 무' },
+	// 	{ id: 'kimihz', name: '김일희', title: '상 무' },
+	// 	{ id: 'K98452000', name: '김동현', title: '상 무' },
+	// 	{ id: 'shjung', name: '정상훈', title: '부 장' },
+	// 	{ id: 'h4ng10', name: '허상렬', title: '부 장' },
+	// 	{ id: 'canmtb', name: '한동주', title: '과 장' },
+	// 	{ id: 'js.nam', name: '남장섭', title: '실 장' },
+	// 	{ id: 'cyh', name: '조영희', title: '부 장' },
+	// 	{ id: 'jwc', name: '조완철', title: '차 장' },
+	// 	{ id: 'sms', name: '손민성', title: '차 장' },
+	// ];
+	// defalutAttendList();
+	let fixedAttendList = [];
+	let FIXED_ORDER = [];
 
 	//formatter 공통 함수
 	function valueFormatter() {
@@ -210,7 +211,6 @@
 		if (lockInfo && lockInfo.lockYn === 'Y' && lockInfo.lockUserNm) {
 			badge = '<span class="lock-badge">' + lockInfo.lockUserNm + ' 편집 중</span><br>';
 		}
-		
 		let cellVal = this.value || '';
 		
 		// "생산/생산관리" 병합 표시
@@ -650,7 +650,7 @@
 					{ key: "mnSubject", label: "PROJECT<br>/<br>주제", align: "left", width: 100, editor: { type: "textarea", disabled: function () { return this.item.isFileRow || this.item.isNoticeRow || !lockCellForEdit(this.item, 'mnSubject'); } }, formatter: valueFormatter },
 					{ key: "mnSubSeq", label: "순번", align: "left", width: 100, hidden: true },
 					{ key: "gun30MnCnts", label: "영업<br>국내/해외", align: "left", width: 220, ...baseFileCol },
-// 					{ key: "gun60MnCnts", label: "생산", align: "left", width: 220, ...baseFileCol },
+					// { key: "gun60MnCnts", label: "생산", align: "left", width: 220, ...baseFileCol },
 					{ key: "gun70MnCnts", label: "생산/생산관리", align: "left", width: 220, ...baseFileCol },
 					{ key: "gun40MnCnts", label: "기술연구소", align: "left", width: 220, ...baseFileCol },
 					{
@@ -709,6 +709,7 @@
 						page: { totalElements: merged.length }
 					});
 
+					defalutAttendList(data.defaultAttendList || []);
 					select_p10_d02_List(data.d02List || []);
 					recalcSortOrder();
 				} catch (error) {
@@ -881,9 +882,10 @@
 						}
 					}
 
-					// 누군가 새 행을 쌌거나 지웠다면 풀 리로드
+					// 누군가 새 행을 썻거나 지웠다면 풀 리로드
 					if (isStructureChanged) {
 						mnGridView.target.setData({ list: newList, page: { totalElements: newList.length } });
+						defalutAttendList(data.defaultAttendList || []);
 						if (data.d02List) select_p10_d02_List(data.d02List);
 						return;
 					}
@@ -999,6 +1001,7 @@
 						}
 					});
 
+					defalutAttendList(data.defaultAttendList || []);
 					if (data.d02List) select_p10_d02_List(data.d02List);
 
 					// 락 정보 변경이 감지되면 전체 리페인트 (뱃지 갱신)
@@ -1230,11 +1233,11 @@
 				id: user.id,
 				name: user.name,
 				title: user.title,
-				reasonCd: user.reasonCd
+				reasonCd: user.reasonCd,
+				reasonRmk: user.reasonRmk
 			}));
 		} else {
-			// 기본 참여자 전부를 reasonCd: 'Y' 로 설정
-			attendList = DEFAULT_ATTEND_LIST.map(user => ({ ...user, reasonCd: 'Y' }));
+			attendList = fixedAttendList.map(user => ({ ...user, reasonCd: 'Y' }));
 		}
 
 		// 고정 멤버 순서대로 정렬
@@ -1860,5 +1863,16 @@
 
 			});
 		}
-	}    
+	}
+
+	// 기본참석자
+	function defalutAttendList(list) {
+		const defaultList = Array.isArray(list) ? list : [];
+		fixedAttendList = defaultList.map(user => ({
+			id: user.id,
+			name: user.name,
+			title: user.title || ''
+		}));
+		FIXED_ORDER = fixedAttendList.map(user => user.id);
+	}
 </script>

@@ -111,4 +111,8 @@ public interface WB22Svc {
 	List<Map<String, String>> wbsRsltsChkExist(Map<String, String> paramMap);
 
 	int wb22OrdrsNoVersionUp(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception;
+
+	int wbsPlanChangeListCount(Map<String, String> paramMap);
+		
+	List<Map<String, String>> wbsPlanChangeList(Map<String, String> paramMap);	
 }
