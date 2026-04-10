@@ -34,6 +34,8 @@ public class PM10Ctr {
 		// 임팀장회의록 참석자 조회
 		List<Map<String, String>> d02List = pm10Svc.select_p10_d02_List(paramMap);
 		model.addAttribute("d02List", d02List);
+		List<Map<String, String>> defaultAttendList = pm10Svc.selectDefaultAttendList();
+		model.addAttribute("defaultAttendList", defaultAttendList);
 		return "jsonView";
 	}
 

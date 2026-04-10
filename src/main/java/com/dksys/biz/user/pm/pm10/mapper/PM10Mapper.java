@@ -12,6 +12,8 @@ public interface PM10Mapper {
 
 	List<Map<String, String>> select_p10_d02_List(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectDefaultAttendUsers(Map<String, Object> paramMap);
+
 	int pm10_main_update(Map<String, String> param);
 
 	int pm10_d01_update(Map<String, String> param);

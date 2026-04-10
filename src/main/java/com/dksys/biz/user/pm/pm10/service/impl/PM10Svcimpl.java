@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import com.dksys.biz.admin.cm.cm05.service.CM05Svc;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.user.pm.pm10.mapper.PM10Mapper;
@@ -31,6 +32,9 @@ public class PM10Svcimpl implements PM10Svc {
 
 	@Autowired
     CM15Svc cm15Svc;
+
+	@Autowired
+	CM05Svc cm05Svc;
 
 	@Override
 	public List<Map<String, String>> selectMnList(Map<String, String> paramMap) throws Exception {
@@ -84,6 +88,46 @@ public class PM10Svcimpl implements PM10Svc {
 	@Override
 	public List<Map<String, String>> select_p10_d02_List(Map<String, String> paramMap) {
 		return pm10Mapper.select_p10_d02_List(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> selectDefaultAttendList() throws Exception {
+		Map<String, String> codeParam = new HashMap<>();
+		codeParam.put("codeId", "SPECRTS04");
+
+		List<Map<String, String>> childCodeList = cm05Svc.selectChildCodeList(codeParam);
+		if (childCodeList == null || childCodeList.isEmpty()) {
+			return new ArrayList<>();
+		}
+
+		String codeEtc = childCodeList.get(0).get("codeEtc");
+		List<String> userIds = parseAttendIds(codeEtc);
+		if (userIds.isEmpty()) {
+			return new ArrayList<>();
+		}
+
+		Map<String, Object> paramMap = new HashMap<>();
+		paramMap.put("userIds", userIds);
+
+		List<Map<String, String>> userList = pm10Mapper.selectDefaultAttendUsers(paramMap);
+		if (userList == null || userList.isEmpty()) {
+			return new ArrayList<>();
+		}
+
+		Map<String, Map<String, String>> userMap = new HashMap<>();
+		for (Map<String, String> user : userList) {
+			userMap.put(user.get("id"), user);
+		}
+
+		List<Map<String, String>> orderedList = new ArrayList<>();
+		for (String userId : userIds) {
+			Map<String, String> user = userMap.get(userId);
+			if (user != null) {
+				orderedList.add(user);
+			}
+		}
+
+		return orderedList;
 	}
 
 	@Override
@@ -277,6 +321,22 @@ public class PM10Svcimpl implements PM10Svc {
 	@Override
 	public int selectNextSubSeq() throws Exception {
 		return pm10Mapper.selectNextSubSeq();
+	}
+
+	private List<String> parseAttendIds(String codeEtc) {
+		List<String> userIds = new ArrayList<>();
+		if (codeEtc == null || codeEtc.trim().isEmpty()) {
+			return userIds;
+		}
+
+		for (String rawId : codeEtc.split(",")) {
+			String userId = rawId == null ? "" : rawId.trim();
+			if (!userId.isEmpty() && !userIds.contains(userId)) {
+				userIds.add(userId);
+			}
+		}
+
+		return userIds;
 	}
 
 }

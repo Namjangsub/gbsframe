@@ -11,6 +11,8 @@ public interface PM10Svc {
 
 	List<Map<String, String>> select_p10_d02_List(Map<String, String> paramMap);
 
+	List<Map<String, String>> selectDefaultAttendList() throws Exception;
+
 	int pm10_main_update(Map<String, String> param) throws Exception;
 
 	int pm10_d01_update(Map<String, String> param) throws Exception;
