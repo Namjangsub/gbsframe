@@ -1,0 +1,175 @@
+<div id="wbsChangeHistory" class="popup_area of_a" style="width: 100%; height: 100%;">
+	<div class="tit_contents">
+		<h4 class="tit">일정변경이력</h4>
+	</div>
+	<!-- <div class="contents no_bg">
+		<div class="contents_tit">
+		</div> -->
+		<table>
+			<colgroup>
+				<col width="15%">
+				<col width="20%">
+				<col width="15%">
+				<col width="20%">
+				<!-- <col width="10%">
+				<col width="15%"> -->
+			</colgroup>
+			<tr>
+				<th>SALES CODE</th>
+				<td>
+					<input type="text" id="salesCd" name="salesCd" data-search="salesCd" readonly>
+				</td>
+				<th>계획명</th>
+				<td>
+					<input type="hidden" id="wbsPlanCodeId" name="wbsPlanCodeId" data-search="wbsPlanCodeId" readonly>
+					<input type="text" id="wbsPlanCodeNm" name="wbsPlanCodeNm" readonly>
+				</td>
+			</tr>
+		</table>
+		<!-- 그리드1 -->
+		<div class="contents">
+			<div class="ax5_grid">
+				<div data-ax5grid="gridPop" data-ax5grid-config="{}" style="width: 100%; height: 550px;  min-height:200px;"></div>
+			</div>
+		</div>
+	<!-- </div> -->
+</div>	
+<!-- 하단 버튼 -->
+<div class ="popup_bottom_btn">
+	<button type="button" class="close_btn" onclick="modalStack.close();">닫기</button>
+</div>
+
+<script type="text/javascript">
+	var salesCd = "";
+	var fileTrgtKey = "";
+	var wbsPlanCodeId = "";
+	var wbsPlanCodeNm = "";
+	var verNo = "";
+	const currDivId = "#wbsChangeHistory";
+
+	ax5.ui.grid.formatter["useYn"] = function () {
+		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
+		if (this.value == "E"){
+			return 'E';
+		} else {
+			return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
+		}
+	};
+	
+	var gridViewPopWb2201P11 = {
+		initView : function() {
+			this.target = new ax5.ui.grid();
+			this.target.setConfig({
+				// frozenColumnIndex : 5,
+				showLineNumber    : true,
+				showRowSelector   : false,
+				multipleSelect    : false,
+				sortable          : true,
+				target : $('[data-ax5grid="gridPop"]'),
+				header : {
+					align: "center",
+					selector: true
+				},
+
+				body: {
+					//columnHeight: 26,
+					// mergeCells : ["clntNm", "clntPjtNm", "ctrtNm", "ordrsAmt", "ioDt"],
+					mergeCells : ["clntCd", "clntNm", "inDt", "salesCd", "dsgnNo"],
+					onClick: function () {
+						var list = gridViewPopWb2201P11.target.getList("selected");
+                        $.each(list, function(idx, obj){
+                            gridViewPopWb2201P11.target.select(obj.__index, {selected: false});
+                        });
+	                    this.self.select(this.dindex);
+					},
+					onDataChanged: function () {
+						changeCheck(this);
+					}
+				},
+			
+				columns : [
+					{key: "rn"			, label: "No."      , align: "center", width: 60 , hidden: true},
+					{key: "changeDt"	, label: "변경일자" , align: "center", width: 130},
+					{key: "wbsPlanMngId", label: "담당자Id"   , align: "center", width: 100, hidden: true},
+					{key: "wbsPlanMngNm", label: "담당자"   , align: "center"  , width: 80},
+					{key: "wbsPlansDt"	, label: "시작일자"    , align: "center" , width: 120},
+					{key: "wbsPlaneDt"	, label: "종료일자"    , align: "center" , width: 120},
+					{key: "daycnt"		, label: "소요일수"    , align: "center" , width: 80},
+					{key: "verNo"		, label: "Ver."    , align: "center" , width: 50},
+					{key: "verUpReason"	, label: "VerUP.사유"    , align: "left" , width: "*"},
+					{key: "changeId"	, label: "변경자Id"    , align: "center" , width: 100, hidden: true},
+					{key: "changeNm"	, label: "변경자"    , align: "center" , width: 120}
+				],
+				
+				page: {
+	                navigationItemCount: 10,
+	                height: 30,
+	                display: true,
+	                firstIcon: '<i class="fa fa-step-backward" aria-hidden="true"></i>',
+	                prevIcon: '<i class="fa fa-caret-left" aria-hidden="true"></i>',
+	                nextIcon: '<i class="fa fa-caret-right" aria-hidden="true"></i>',
+	                lastIcon: '<i class="fa fa-step-forward" aria-hidden="true"></i>',
+	                onChange: function () {
+	                    gridViewPopWb2201P11.setData(this.page.selectPage);
+	                }
+	            }
+			});
+			return this;
+		},
+		
+		setData : function(_pageNo) {
+			var targetObj = this.target;
+			if (inputValidation($('input[required]'))) {
+				var formData = {};
+				formData["salesCd"] = salesCd;
+				formData["fileTrgtKey"] = fileTrgtKey;
+				formData["wbsPlanCodeId"] = wbsPlanCodeId;
+				formData["verNo"] = verNo;
+				formData["pageNo"]    = _pageNo + 1;
+				formData["recordCnt"] = 50;
+				//debugger;
+				postAjax("/user/wb/wb22/wbsPlanChangeList", formData, null, function(data) {
+					try {
+						var list = data.result;
+						targetObj.setData({
+							list : list,
+							page : {
+								currentPage   : _pageNo,
+								pageSize      : data.paginationInfo.pageSize,
+								totalElements : data.paginationInfo.totalRecordCount,
+								totalPages    : data.paginationInfo.totalPageCount
+							}
+						});
+						gridHeightResize(gridViewPopWb2201P11, 400); // 194 = 919 - 725 : 화면 Body 높이 - 그리드 기본크기 725
+					} catch (error) {
+						alert("오류 발생!! 전산실 연락 바랍니다", error.message);
+						return null; // 오류 발생 시 null 반환
+					} finally {
+						// console.log("함수 실행 완료.");
+					}					
+				});
+  			}
+  		}
+  	}
+
+	//화면로드시
+	$(document).ready(function() {
+		fileTrgtKey = modalStack.last().paramObj.fileTrgtKey;
+		salesCd = modalStack.last().paramObj.salesCd;
+		wbsPlanCodeId = modalStack.last().paramObj.wbsPlanCodeId;
+		wbsPlanCodeNm = modalStack.last().paramObj.wbsPlanCodeNm;
+		verNo = modalStack.last().paramObj.verNo;
+		$(currDivId + " #salesCd").val(salesCd);
+		$(currDivId + " #fileTrgtKey").val(fileTrgtKey);
+		$(currDivId + " #wbsPlanCodeId").val(wbsPlanCodeId);
+		$(currDivId + " #wbsPlanCodeNm").val(wbsPlanCodeNm);
+		$(currDivId + " #verNo").val(verNo);
+		//그리드 초기화
+		gridViewPopWb2201P11.initView().setData(0);
+		
+		
+		//권한체크
+		authChk();
+	});
+	
+</script>

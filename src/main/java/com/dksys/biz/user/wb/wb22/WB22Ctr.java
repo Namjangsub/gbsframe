@@ -613,4 +613,15 @@ public class WB22Ctr {
 		}
 		return "jsonView";
 	}
+
+	@PostMapping(value = "/wbsPlanChangeList")
+	public String wbsPlanChangeList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+		int totalCnt = wb22Svc.wbsPlanChangeListCount(paramMap);
+		PaginationInfo paginationInfo = new PaginationInfo(paramMap, totalCnt);
+		model.addAttribute("paginationInfo", paginationInfo);
+
+		List<Map<String, String>> result = wb22Svc.wbsPlanChangeList(paramMap);
+		model.addAttribute("result", result);
+		return "jsonView";
+	}
 }

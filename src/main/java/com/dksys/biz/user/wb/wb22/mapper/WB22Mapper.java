@@ -175,4 +175,8 @@ public interface WB22Mapper {
 	int deleteRslt(Map<String, String> paramMap);
 
 	int wb22OrdrsNoVersionUp(Map<String, String> paramMap);
+
+		int wbsPlanChangeListCount(Map<String, String> paramMap);
+
+	List<Map<String, String>> wbsPlanChangeList(Map<String, String> paramMap);
 }

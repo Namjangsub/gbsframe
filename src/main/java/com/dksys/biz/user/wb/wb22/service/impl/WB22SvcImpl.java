@@ -64,7 +64,6 @@ public class WB22SvcImpl implements WB22Svc {
 
 	@Override
 	public int selectWbsSjListCount(Map<String, String> paramMap) {
-		;
 		return wb22Mapper.selectWbsSjListCount(paramMap);
 	}
 
@@ -1512,5 +1511,15 @@ public class WB22SvcImpl implements WB22Svc {
 			}
 		}
 		return result;
+	}
+
+	@Override
+	public int wbsPlanChangeListCount(Map<String, String> paramMap) {
+		return wb22Mapper.wbsPlanChangeListCount(paramMap);
+	}
+
+	@Override
+	public List<Map<String, String>> wbsPlanChangeList(Map<String, String> paramMap) {
+		return wb22Mapper.wbsPlanChangeList(paramMap);
 	}
 }
