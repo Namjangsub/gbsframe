@@ -156,6 +156,8 @@ public interface WB22Mapper {
 	// 실적확정시 해당 salesCd 모든Task실적이 closeYn이 Y인지 체크
 	int wbsRsltsCloseChk(Map<String, String> paramMap);
 
+	int deleteDesignShare(Map<String, String> paramMap);
+
 	int selectWbsRsltsLevel2Count(Map<String, String> paramMap);
 
 	int wbsIssueExistChk(Map<String, String> paramMap);

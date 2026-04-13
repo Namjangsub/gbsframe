@@ -247,6 +247,9 @@ public class WB22Ctr {
 			if (wb22Svc.wbsRsltsconfirm(paramMap, mRequest) != 0) {
 				model.addAttribute("resultCode", 200);
 				model.addAttribute("resultMessage", messageUtils.getMessage("save"));
+				if ("Y".equals(paramMap.get("isDesignComplete"))) {
+					model.addAttribute("isDesignComplete", "Y");
+				}
 			} else {
 				model.addAttribute("resultCode", 500);
 				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));

@@ -295,7 +295,13 @@
 					Y.CHG_REASON,
 					Y.VER_UP_REASON,
 					M.DEPT_ID,
-					LV.LEVEL_NM
+					LV.LEVEL_NM,
+					CASE 
+						WHEN Y.WBS_PLAN_MNG_ID IS NULL AND Y.WBS_PLANS_DT IS NULL AND Y.WBS_PLANE_DT IS NULL THEN 'E' 
+						WHEN NVL(PT.PLAN_TASK_CNT, 0) = 0 THEN 'N'
+						WHEN NVL(PT.PLAN_TASK_CNT, 0) &lt;= NVL(Z.REAL_CLOSE_YN_COUNT, 0) THEN 'Y'
+						ELSE 'G'
+					END AS COMP_FLAG
 					FROM (
 								SELECT CODE_ID,
 										CODE_NM,
@@ -315,7 +321,7 @@
 										WBS_PLAN_MNG_ID,
 										TO_CHAR(WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT,
 										TO_CHAR(WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT,
-										DAYCNT,
+										DECODE(DAYCNT, '0', '', DAYCNT) AS DAYCNT,
 										WBS_PLAN_STS_CODE_ID,
 										LOCK_YN,
 										CLOSE_YN,
@@ -351,6 +357,7 @@
 										, SUM(WR.DAYCNT)          AS RSLT_DAYCNT   --TASK실적소요일
 										, COUNT(*) 				  AS TOTAL_COUNT
 										, COUNT(CASE WHEN (WR.CLOSE_YN = 'Y' OR WR.WBS_RSLTS_RATE = 100) THEN 1 END) AS CLOSE_YN_Y_COUNT
+										, COUNT(CASE WHEN WR.CLOSE_YN = 'Y' THEN 1 END) AS REAL_CLOSE_YN_COUNT
 									FROM TB_WB23M01  WR--WBS실적 정보
 									WHERE WR.CO_CD = #{coCd}
 									AND WR.SALES_CD = #{salesCd}
@@ -360,9 +367,16 @@
 									WBS_PLAN_CODE_KIND,
 									RSLTSS_DT,
 									CASE WHEN (TOTAL_COUNT = CLOSE_YN_Y_COUNT) THEN RSLTSE_DT ELSE '' END RSLTSE_DT,	--100 또는 확정 완료일경우만 종료일자있음
-									RSLT_DAYCNT
+									RSLT_DAYCNT,
+									REAL_CLOSE_YN_COUNT
 								FROM CD_Data
 							) Z ON X.CODE_ID = Z.WBS_PLAN_CODE_KIND
+					LEFT OUTER JOIN ( 
+						SELECT WBS_PLAN_CODE_KIND, COUNT(*) AS PLAN_TASK_CNT 
+						FROM TB_WB22M01 
+						WHERE CO_CD = #{coCd} AND SALES_CD = #{salesCd} 
+						GROUP BY WBS_PLAN_CODE_KIND
+					) PT ON X.CODE_ID = PT.WBS_PLAN_CODE_KIND
 					LEFT OUTER JOIN ( --이력정보에서 최종 버전의 담당자와 일정을 추출해서 담당자,일정 변경여부 판단에 사용한다.
 							SELECT WBS_PLAN_CODE_ID,
 									(WBS_PLAN_MNG_ID || TO_CHAR(WBS_PLANS_DT, 'YYYY-MM-DD') || TO_CHAR(WBS_PLANE_DT, 'YYYY-MM-DD')) AS LAST_PLAN_MNG
@@ -3156,6 +3170,14 @@
 		  AND WBS_PLAN_CODE_KIND = 'WBSCODE03'
 	</select>
 
+	<!-- 설계완료 공유 대상자 삭제 -->
+	<delete id="deleteDesignShare" parameterType="map">
+		DELETE FROM TB_WB20M03
+		WHERE SALES_CD = #{salesCd}
+		  AND TODO_DIV2_CODE_ID = 'TODODIV1015'
+		  AND TODO_NO = #{wbsRsltsNo}
+	</delete>
+
 	<select id="selectWbsRsltsLevel2Count" parameterType="map" resultType="int">
 		SELECT 
 			CASE WHEN EXISTS (
@@ -3281,17 +3303,52 @@
 
 	<select id="wbsPlanChangeListCount" parameterType="Map" resultType="int">
 		SELECT COUNT(*)
-		FROM TB_WB22D01 T
-		WHERE 1 = 1
-		  AND T.FILE_TRGT_KEY = #{fileTrgtKey}
-		  AND T.SALES_CD = #{salesCd}
-		  AND T.WBS_PLAN_CODE_ID = #{wbsPlanCodeId}
+		FROM (
+			SELECT DISTINCT
+					  TO_CHAR(T.TR_LOG_DTTM, 'YYYY-MM-DD HH24:MI') AS CHANGE_DT
+					, T.WBS_PLAN_MNG_ID
+					, T.WBS_PLANS_DT
+					, T.WBS_PLANE_DT
+					, DECODE(T.DAYCNT, 'false', '', T.DAYCNT) AS DAYCNT
+					, T.VER_NO
+					, T.VER_UP_REASON
+					, T.TR_LOG_ID	AS CHANGE_ID
+			FROM TB_WB22D01 T
+			WHERE 1 = 1
+			  AND T.FILE_TRGT_KEY = #{fileTrgtKey}
+			  AND T.SALES_CD = #{salesCd}
+			  AND T.WBS_PLAN_CODE_ID = #{wbsPlanCodeId}
+			  
+			UNION
+			
+			SELECT DISTINCT
+					  TO_CHAR(H.CLOSE_DTTM, 'YYYY-MM-DD HH24:MI') AS CHANGE_DT
+					, H.WBS_PLAN_MNG_ID
+					, H.WBS_PLANS_DT
+					, H.WBS_PLANE_DT
+					, DECODE(H.DAYCNT, 'false', '', H.DAYCNT) AS DAYCNT
+					, H.VER_NO
+					, H.VER_UP_REASON
+					, H.CLOSE_ID	AS CHANGE_ID
+			FROM TB_WB22M01_HIST H
+			WHERE 1 = 1
+			  AND H.FILE_TRGT_KEY = #{fileTrgtKey}
+			  AND H.SALES_CD = #{salesCd}
+			  AND H.WBS_PLAN_CODE_ID = #{wbsPlanCodeId}
+			  AND TO_NUMBER(H.VER_NO) &lt; (
+				  SELECT NVL(MIN(TO_NUMBER(D.VER_NO)), 9999)
+				  FROM TB_WB22D01 D
+				  WHERE D.FILE_TRGT_KEY = #{fileTrgtKey}
+					AND D.SALES_CD = #{salesCd}
+					AND D.WBS_PLAN_CODE_ID = #{wbsPlanCodeId}
+			  )
+		)
 	</select>
 
 	<select id="wbsPlanChangeList" parameterType="Map" resultType="camelMap">
 		SELECT A.*
 		FROM (
-			SELECT ROW_NUMBER() OVER (ORDER BY CHANGE_DT DESC) AS RN
+			SELECT ROW_NUMBER() OVER (ORDER BY CHANGE_DT DESC, TO_NUMBER(VER_NO) DESC) AS RN
 			     , X.*
 			FROM
 			(
@@ -3311,7 +3368,33 @@
 				AND T.FILE_TRGT_KEY = #{fileTrgtKey}
 				AND T.SALES_CD = #{salesCd}
 				AND T.WBS_PLAN_CODE_ID = #{wbsPlanCodeId}
-				ORDER BY CHANGE_DT DESC
+				
+				UNION
+				
+				SELECT DISTINCT
+					  TO_CHAR(H.CLOSE_DTTM, 'YYYY-MM-DD HH24:MI') AS CHANGE_DT
+					, H.WBS_PLAN_MNG_ID
+					, FN_CM06M01_ID_TO_NM(H.WBS_PLAN_MNG_ID) AS WBS_PLAN_MNG_NM
+					, TO_CHAR(H.WBS_PLANS_DT, 'YYYY-MM-DD') AS WBS_PLANS_DT
+					, TO_CHAR(H.WBS_PLANE_DT, 'YYYY-MM-DD') AS WBS_PLANE_DT
+					, DECODE(H.DAYCNT, 'false', '', H.DAYCNT) AS DAYCNT
+					, H.VER_NO
+					, H.VER_UP_REASON
+					, H.CLOSE_ID						AS CHANGE_ID
+					, FN_CM06M01_ID_TO_NM(H.CLOSE_ID) AS CHANGE_NM
+				FROM TB_WB22M01_HIST H
+				WHERE 1 = 1
+				AND H.FILE_TRGT_KEY = #{fileTrgtKey}
+				AND H.SALES_CD = #{salesCd}
+				AND H.WBS_PLAN_CODE_ID = #{wbsPlanCodeId}
+				AND TO_NUMBER(H.VER_NO) &lt; (
+					SELECT NVL(MIN(TO_NUMBER(D.VER_NO)), 9999)
+					FROM TB_WB22D01 D
+					WHERE D.FILE_TRGT_KEY = #{fileTrgtKey}
+					  AND D.SALES_CD = #{salesCd}
+					  AND D.WBS_PLAN_CODE_ID = #{wbsPlanCodeId}
+				)
+				ORDER BY CHANGE_DT DESC, TO_NUMBER(VER_NO) DESC
 			) X
 		) A
 		WHERE  1 = 1

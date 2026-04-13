@@ -270,6 +270,15 @@
 		var color = this.value == "Y" ? "color-circle_02.png" : "color-circle_01.png";
 		return '<img src="/static/img/'+color+'" style="width: 10px;height: 10px;"></img>';
 	};
+
+	// 실적컬럼 신호등처리
+	ax5.ui.grid.formatter["bilgYn"] = function () {
+		var flag = this.value;
+		if (flag === 'Y') return '<span style="color: blue; font-size: 11px;">●</span>';
+		if (flag === 'G') return '<span style="color: orange; font-size: 11px;">●</span>';
+		if (flag === 'N') return '<span style="color: red; font-size: 11px;">●</span>';
+		return '';
+	};
 	//---------------------------------------------------
 	/*  WBSPLANSTS10	미진행
 		WBSPLANSTS20	진행중
@@ -654,6 +663,7 @@
 							return Number.isFinite(n) ? String(n) : "0";
 						},
 						styleClass: function () {return gridColor(this.item);}},
+					{key: "compFlag",     label: "실적"	,    align: "center",   width: 50, formatter: "bilgYn", styleClass: function () {return gridColor(this.item);}},
 					{key: "rsltssDt", label: "<span style='color: #0000FF;'>실적시작일</span>", align: "center", width: 120,
 						formatter: function () { return '<div style="color: #0000FF">' + (this.value||'') + '</div>'; }
 						, styleClass: function () {return gridColor(this.item);}},
@@ -2076,6 +2086,10 @@
 				if(confirm("확정하시겠습니까?")){
 					var formData = new FormData();
 					formData.append("flag", flag);
+					formData.append("coCd", $("#coCd").val());
+					formData.append("salesCd", $("#salesCd").val());
+					formData.append("wbsPlanVerNo", $("#wbsPlanVerNo").val());
+					formData.append("wbsRsltsNo", row.wbsRsltsNo);
 					formData.append("rsltsFileTrgtKey", row.rsltsFileTrgtKey);
 					formData.append("userId", jwt.userId);
 					formData.append("pgmId", $("#pgmId").val());
@@ -2087,7 +2101,12 @@
 					filePostAjax("/user/wb/wb22/wbsRsltsconfirm", formData, function(data){
 						if(data.resultCode == 200){
 //                             alert("확정 되었습니다.");
+							gridView1.setData(0);
 							gridView2.setData(0);
+							if (data.isDesignComplete === "Y") {
+								row.isDesignComplete = "Y";
+								kakaoTodo_wbs22(row);
+							}
 						}
 					});
 				}
@@ -2095,6 +2114,10 @@
 				if(confirm("확정 취소하시겠습니까?")){
 					var formData = new FormData();
 					formData.append("flag", flag);
+					formData.append("coCd", $("#coCd").val());
+					formData.append("salesCd", $("#salesCd").val());
+					formData.append("wbsPlanVerNo", $("#wbsPlanVerNo").val());
+					formData.append("wbsRsltsNo", row.wbsRsltsNo);
 					formData.append("rsltsFileTrgtKey", row.rsltsFileTrgtKey);
 					formData.append("userId", jwt.userId);
 					formData.append("pgmId", $("#pgmId").val());
@@ -2106,6 +2129,7 @@
 					filePostAjax("/user/wb/wb22/wbsRsltsconfirm", formData, function(data){
 						if(data.resultCode == 200){
 //                             alert("확정 취소되었습니다.");
+							gridView1.setData(0);
 							gridView2.setData(0);
 						}
 					});
@@ -2357,7 +2381,7 @@
 
 	
 		// KAKAO 알림톡 모듈 부분 //////////////////////////////////////////
-	function kakaoTodo_wbs22() {
+	function kakaoTodo_wbs22(row) {
 		// if ($('#wbsPlanVerNo').val() != '1') {
 		// 	return false;
 		// }
@@ -2375,7 +2399,11 @@
 		}
 
 		let clntNm = (jwt.coCd=="GUN") ? "(주)건양ITT" : "트루넷";
-		kakaoSendBody_wbs22('','', 'WBS 일정계획','WBS 일정계획 확정','일정확인');
+		if (row &&row.isDesignComplete === "Y") {
+			kakaoSendDrwComp_wbs22(row,'설계완료');
+		} else {
+			kakaoSendBody_wbs22('','', 'WBS 일정계획','WBS 일정계획 확정','일정확인');
+		}
 		if (kakaoCnt > 0) {
 			kakaoCnt = 0;
 			alert("알림톡이 정상 발송되었습니다.");
@@ -2405,6 +2433,29 @@
 		commKaKaoSendTodo_wbs22(param);
 	}
 
+	function kakaoSendDrwComp_wbs22(row, gubun) {
+		let isUpdate = $('#popForm #wbsPlanVerNo').val() != "1";
+		let param = {
+			"tmplatDiv": "TMPLATDIV02"
+			, "coCd": $("#popForm #coCd").val()             //해당업무의 coCd(트르넷발주 TRN )
+			, "salesCd": $("#popForm #salesCd").val()             //해당업무의 coCd(트르넷발주 TRN )
+			, "verNo": $("#popForm #wbsPlanVerNo").val()             //해당업무의 coCd(트르넷발주 TRN )
+			, "todoDiv1CodeId": "" //"TODODIV10"                 //공통코드 해당업무 - 결재
+			, "todoDiv2CodeId": "" // "TODODIV1030"                   //공통코드 해당업무 - 결재 - 발주서
+			, "todoDiv1CodeNm": "" // "WBS문제"                        //공통코드 해당업무 - 결재 - 발주서
+			, "todoDiv2CodeNm": "" // "WBS계획문제"                       //공통코드 해당업무 - 결재 - 발주서
+			, "sanctnDiv2": gubun                            //템플릿 결재구분2    #{sanctnDiv2} 처리 바랍니다.
+			, "todoNo": row.wbsRsltsNo //실적번호 사용
+			, "clntCd": "1"                 //발신회사는 로그인사용자 회사
+			, "clntNm": ""             //로그의 수신거래처명
+			, "ordrgMngNm": jwt.userNm        //확정한 사람 이름
+			, "creatPgm": "WB2201P01"
+			, "userId": jwt.userId
+			, "todoTitle": "[설계 완료 공유] " + $("#popForm #salesCd").val()
+		}
+		commKaKaoSendTodo_wbs22(param);
+	}
+
 	//to-do결재요청 알림톡
 	function commKaKaoSendTodo_wbs22(param) {
 // 		console.log('---카카오 발주서 발행 알림톡발송시작 --' + param);
@@ -2420,29 +2471,40 @@
 		let sendCnt = 0;
 
 		// verNo 1인 경우와 1보다 큰 경우 분기
-		if ($('#wbsPlanVerNo').val() == "1") {
-			postAjaxSync("/user/bm/bm18/selectWbsPlanMaxMessageIdTodo", param, null, function(data) {
-				if(data.resultList.length > 0 ) {
-					if( data.resultList[0].maxMessageId != "" ) {
-						sendList = data.resultList;
-					} else {
-						alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
-						return;
-					}
+		if (param.sanctnDiv2 === "설계완료") {
+			postAjaxSync("/user/bm/bm18/selectMaxMessageIdTodo_kakao", param, null, function(data) {
+				if(data.resultList && data.resultList.length > 0 ) {
+					sendList = data.resultList;
+				} else {
+					alert("알림톡 발송 대상(설계완료 공유)을 찾을 수 없습니다.");
+					return;
 				}
 			});
-		}
-		else {
-			postAjaxSync("/user/bm/bm18/selectWbsPlanUpdateMaxMessageIdTodo", param, null, function(data) {
-				if(data.resultList.length > 0 ) {
-					if( data.resultList[0].maxMessageId != "" ) {
-						sendList = data.resultList;
-					} else {
-						alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
-						return;
+		} else {
+			if ($('#wbsPlanVerNo').val() == "1") {
+				postAjaxSync("/user/bm/bm18/selectWbsPlanMaxMessageIdTodo", param, null, function(data) {
+					if(data.resultList.length > 0 ) {
+						if( data.resultList[0].maxMessageId != "" ) {
+							sendList = data.resultList;
+						} else {
+							alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
+							return;
+						}
 					}
-				}
-			});
+				});
+			}
+			else {
+				postAjaxSync("/user/bm/bm18/selectWbsPlanUpdateMaxMessageIdTodo", param, null, function(data) {
+					if(data.resultList.length > 0 ) {
+						if( data.resultList[0].maxMessageId != "" ) {
+							sendList = data.resultList;
+						} else {
+							alert("알림톡 발송을 위한 messageId 생성에 실패 했습니다.");
+							return;
+						}
+					}
+				});
+			}
 		}
 
 
@@ -2456,16 +2518,30 @@
 			title = sendObj.todoTitl + "[" + sendObj.todoDiv2CodeNm + "]";
 
 			//로그용
-			param.rcvId = sendObj.todoId;           //todo 수신id
-			param.rcvNm = sendObj.name;             //todo 수신자명
-			param.nameTo = sendObj.name;                //todo 수신자명
-			param.sendDt = sendObj.sendDt;
-			param.title = sendObj.todoTitl;
-			param.todoDiv1CodeNm = "일정확인";
-			param.todoDiv2CodeNm = sendObj.todoDiv2CodeNm + ($('#popForm #wbsPlanVerNo').val() != "1" ? " 계획 수정" : " 계획 등록");
-			param.ordrgMngNm = sendObj.ordrgMngNm;
-			param.sanctnDiv2 = sendObj.sanctnDiv2;
-			param.ordrgMngTelNo = sendObj.telNo;
+			if (param.sanctnDiv2 === "설계완료") {
+				title = sendObj.todoTitl;
+				param.rcvId = sendObj.todoId;
+				param.rcvNm = sendObj.name;
+				param.nameTo = sendObj.name;
+				param.sendDt = sendObj.sendDt;
+				param.title = sendObj.todoTitl;
+				param.todoDiv1CodeNm = "공유";
+				param.todoDiv2CodeNm = "설계 완료 공유";
+				// sanctnDiv2는 이미 '설계완료'로 넘어왔으므로 덮어쓰지 않거나 필요시 세팅
+				param.ordrgMngNm = sendObj.ordrgMngNm || jwt.userNm;
+				param.ordrgMngTelNo = sendObj.telNo;
+			} else {
+				param.rcvId = sendObj.todoId;           //todo 수신id
+				param.rcvNm = sendObj.name;             //todo 수신자명
+				param.nameTo = sendObj.name;                //todo 수신자명
+				param.sendDt = sendObj.sendDt;
+				param.title = sendObj.todoTitl;
+				param.todoDiv1CodeNm = "일정확인";
+				param.todoDiv2CodeNm = sendObj.todoDiv2CodeNm + ($('#popForm #wbsPlanVerNo').val() != "1" ? " 계획 수정" : " 계획 등록");
+				param.ordrgMngNm = sendObj.ordrgMngNm;
+				param.sanctnDiv2 = sendObj.sanctnDiv2;
+				param.ordrgMngTelNo = sendObj.telNo;
+			}
 
 			if(mobile == "" || mobile == null) {
 				alert('수신전화번호가 없습니다.\r\n['+clntNm+'] 거래처관리의 사업부 첫번째 항목을 확인해 주십시오.');
@@ -2501,7 +2577,11 @@
 			talkBody.title = title;                 //알림톡 타이틀 -
 			talkBody.message = message;             //알림톡 메시지 (1000 byte)
 			talkBody.mobile = mobile;               //휴대전화번호
-			talkBody.template = "10003";            //템플릿관리화면 템플릿ID - 발주서 V2
+			if (param.sanctnDiv2 === "설계완료") {
+				talkBody.template = "10022";
+			} else {
+				talkBody.template = "10003";            //템플릿관리화면 템플릿ID - 발주서 V2
+			}
 			let talkJson = JSON.stringify(talkBody);
 			sendCnt = kakaoSendReal(talkJson, talkParam, param);
 		});

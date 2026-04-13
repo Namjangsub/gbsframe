@@ -837,8 +837,43 @@ public class WB22SvcImpl implements WB22Svc {
 		int closeYnChk = wb22Mapper.wbsRsltsCloseChk(paramMap);
 		if (closeYnChk == 1 && "WBSCODE03".equals(paramMap.get("wbsPlanCodeKind"))) {
 			result += dw02Mapper.updateRelDtNew(paramMap);
+			
+			// === h4ng10, sms 에게 공유 TO-DO / 알림톡 추가 ===
+			String salesCd = paramMap.get("salesCd");
+			String todoTitle = "[설계 완료 공유] " + (salesCd != null ? salesCd : "");
+			String[] targetUsers = {"h4ng10", "sms"};
+			for (int i = 0; i < targetUsers.length; i++) {
+				Map<String, String> sharngMap = new HashMap<>();
+				sharngMap.put("coCd", paramMap.get("coCd"));
+				// pgParam
+				String pgParam = String.format("{\"coCd\":\"%s\",\"salesCd\":\"%s\",\"planVerNo\":\"%s\",\"histYn\":\"N\"}",
+					paramMap.get("coCd"), salesCd, paramMap.get("wbsPlanVerNo"));
+				sharngMap.put("reqNo", paramMap.get("wbsRsltsNo")); // 실적번호
+				sharngMap.put("fileTrgtKey", paramMap.get("rsltsFileTrgtKey")); //
+				sharngMap.put("pgmId", "WB2201P01");
+				sharngMap.put("userId", paramMap.get("userId"));
+				sharngMap.put("sanCtnSn", Integer.toString(i + 1));
+				sharngMap.put("pgParam", pgParam);
+				sharngMap.put("todoTitle", todoTitle);
+				sharngMap.put("todoDiv1CodeId", "TODODIV10");
+				sharngMap.put("todoDiv2CodeId", "TODODIV1015");
+				sharngMap.put("usrNm", targetUsers[i]); // TODO_ID
+				sharngMap.put("salesCd", salesCd);
+				sharngMap.put("pgPath", "/user/wb/wb22/WB2201P01.html");
+				
+				sharngMap.put("todoCoCd", paramMap.get("coCd"));
+				sharngMap.put("histNo", "");
+				
+				try {
+					QM01Mapper.insertWbsSharngList(sharngMap);
+				} catch (Exception e) {}
+			}
+			paramMap.put("isDesignComplete", "Y");
 		} else {
 			if ("N".equals(paramMap.get("flag"))) {
+				if ("WBSCODE03".equals(paramMap.get("wbsPlanCodeKind"))) {
+					wb22Mapper.deleteDesignShare(paramMap);
+				}
 				result += dw02Mapper.updateRelDtInit(paramMap);
 			}
 		}
