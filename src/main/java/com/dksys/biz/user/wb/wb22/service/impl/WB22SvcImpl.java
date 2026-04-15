@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
+import com.dksys.biz.admin.cm.cm05.mapper.CM05Mapper;
 import com.dksys.biz.admin.cm.cm08.service.CM08Svc;
 import com.dksys.biz.admin.cm.cm15.service.CM15Svc;
 import com.dksys.biz.rest.url.Base62Util;
@@ -52,6 +53,9 @@ public class WB22SvcImpl implements WB22Svc {
 
 	@Autowired
     WB21Mapper wb21Mapper;
+
+	@Autowired
+    CM05Mapper cm05Mapper;
 
 	@Autowired
     private UrlMapper urlMapper;
@@ -830,56 +834,64 @@ public class WB22SvcImpl implements WB22Svc {
 	@Override
 	public int wbsRsltsconfirm(Map<String, String> paramMap, MultipartHttpServletRequest mRequest) throws Exception {
 		int result = 0;
-//		try {
 		result = wb22Mapper.wbsRsltsconfirm(paramMap);
-
-		// 설계완료 확정인경우
-		if ("WBSCODE03".equals(paramMap.get("wbsPlanCodeKind")) && "Y".equals(paramMap.get("flag"))) {
-			// 실적 확정시 모든 실적 확정 상태이면 해당 과제의 REL_DT 업데이트 처리
-			int closeYnChk = wb22Mapper.wbsRsltsCloseChk(paramMap);
-			if (closeYnChk == 1) {
-				result += dw02Mapper.updateRelDtNew(paramMap);
-				// === h4ng10, sms 에게 공유 TO-DO / 알림톡 추가 ===
-				String salesCd = paramMap.get("salesCd");
-				String todoTitle = "[설계 완료 공유] " + (salesCd != null ? salesCd : "");
-				String[] targetUsers = {"h4ng10", "sms"};
-				for (int i = 0; i < targetUsers.length; i++) {
-					Map<String, String> sharngMap = new HashMap<>();
-					sharngMap.put("coCd", paramMap.get("coCd"));
-					// pgParam
-					String pgParam = String.format("{\"coCd\":\"%s\",\"salesCd\":\"%s\",\"planVerNo\":\"%s\",\"histYn\":\"N\"}",
-						paramMap.get("coCd"), salesCd, paramMap.get("wbsPlanVerNo"));
-					sharngMap.put("reqNo", paramMap.get("wbsRsltsNo")); // 실적번호
-					sharngMap.put("fileTrgtKey", paramMap.get("rsltsFileTrgtKey")); //
-					sharngMap.put("pgmId", "WB2201P01");
-					sharngMap.put("userId", paramMap.get("userId"));
-					sharngMap.put("sanCtnSn", Integer.toString(i + 1));
-					sharngMap.put("pgParam", pgParam);
-					sharngMap.put("todoTitle", todoTitle);
-					sharngMap.put("todoDiv1CodeId", "TODODIV10");
-					sharngMap.put("todoDiv2CodeId", "TODODIV1015");
-					sharngMap.put("usrNm", targetUsers[i]); // TODO_ID
-					sharngMap.put("salesCd", salesCd);
-					sharngMap.put("pgPath", "/user/wb/wb22/WB2201P01.html");
+		if ("WBSCODE03".equals(paramMap.get("wbsPlanCodeKind"))){
+			// 설계만 처리되어야함.  WBSCODE03
+			// 설계완료 확정인경우
+			if ( "Y".equals(paramMap.get("flag"))) {
+				// 실적 확정시 모든 실적 확정 상태이면 해당 과제의 REL_DT 업데이트 처리
+				int closeYnChk = wb22Mapper.wbsRsltsCloseChk(paramMap);
+				if (closeYnChk == 1) {
+					// 설계도면 관리 대장 출도일자 설정하기
+					result += dw02Mapper.updateRelDtNew(paramMap);
 					
-					sharngMap.put("todoCoCd", paramMap.get("coCd"));
-					sharngMap.put("histNo", "");
-					
-					try {
-						QM01Mapper.insertWbsSharngList(sharngMap);
-					} catch (Exception e) {}
+					// === h4ng10, sms 에게 공유 TO-DO / 알림톡 추가 ===
+					String salesCd = paramMap.get("salesCd");
+					String todoTitle = "[설계 완료 공유] " + (salesCd != null ? salesCd : "");
+					// 설계완료시 공유대상자 조회
+					List<Map<String, String>> selectChildCodeList = cm05Mapper.selectChildCodeList(paramMap);
+					String[] targetUsers = new String[0];
+					if (selectChildCodeList != null && !selectChildCodeList.isEmpty()) {
+						String codeEtc = selectChildCodeList.get(0).get("codeEtc");
+						if (codeEtc != null && !codeEtc.trim().isEmpty()) {
+							targetUsers = codeEtc.split("\\s*,\\s*");
+						}
+					}
+					for (int i = 0; i < targetUsers.length; i++) {
+						Map<String, String> sharngMap = new HashMap<>();
+						sharngMap.put("coCd", paramMap.get("coCd"));
+						// pgParam
+						String pgParam = String.format("{\"coCd\":\"%s\",\"salesCd\":\"%s\",\"planVerNo\":\"%s\",\"histYn\":\"N\"}",
+							paramMap.get("coCd"), salesCd, paramMap.get("wbsPlanVerNo"));
+						sharngMap.put("reqNo", paramMap.get("wbsRsltsNo")); // 실적번호
+						sharngMap.put("fileTrgtKey", paramMap.get("rsltsFileTrgtKey")); //
+						sharngMap.put("pgmId", "WB2201P01");
+						sharngMap.put("userId", paramMap.get("userId"));
+						sharngMap.put("sanCtnSn", Integer.toString(i + 1));
+						sharngMap.put("pgParam", pgParam);
+						sharngMap.put("todoTitle", todoTitle);
+						sharngMap.put("todoDiv1CodeId", "TODODIV10");
+						sharngMap.put("todoDiv2CodeId", "TODODIV1015");
+						sharngMap.put("usrNm", targetUsers[i]); // TODO_ID
+						sharngMap.put("salesCd", salesCd);
+						sharngMap.put("pgPath", "/user/wb/wb22/WB2201P01.html");
+						
+						sharngMap.put("todoCoCd", paramMap.get("coCd"));
+						sharngMap.put("histNo", "");
+						
+						try {
+							QM01Mapper.insertWbsSharngList(sharngMap);
+						} catch (Exception e) {}
+					}
+					paramMap.put("isDesignComplete", "Y");
 				}
-				paramMap.put("isDesignComplete", "Y");
+			} else {
+				wb22Mapper.deleteDesignShare(paramMap);
+				
+				// 설계도면 관리 대장 출도일자 지우기
+				result += dw02Mapper.updateRelDtInit(paramMap);
 			}
-		} else if ("WBSCODE03".equals(paramMap.get("wbsPlanCodeKind")) && "N".equals(paramMap.get("flag"))) {
-			wb22Mapper.deleteDesignShare(paramMap);
-			
-		} else if ("N".equals(paramMap.get("flag"))) {
-			result += dw02Mapper.updateRelDtInit(paramMap);
 		}
-//		} catch (Exception e) {
-//			System.out.println("error2" + e.getMessage());
-//		}
 		return result;
 	}
 
