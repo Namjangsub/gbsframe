@@ -148,9 +148,9 @@
 				</span>
 				<div class="add_btn_small pdl10">
 					<a id="wb26saveBtn" onclick="wb26save();" style="height: 30px; line-height: 28px; width: 90px;" authchk><i class="fas fa-save"></i> 저장</a>
-					<a id="wb26confirmBtn" onclick="wb26confirm('Y');" style="height: 30px; line-height: 28px; width: 90px;" authchk>일괄확정</a>
-                    <a id="wb26cancelBtn" onclick="wb26confirm('N');" style="height: 30px; line-height: 28px; width: 90px;" authchk>확정취소</a>
-                    <a id="wb26unfinishedBtn" onclick="openUnfinishedPopup();" style="height: 30px; line-height: 28px; width: 90px;">미완료현황</a>
+					<a id="wb26confirmBtn" onclick="wb26confirm('Y');" style="height: 30px; line-height: 28px; width: 90px;" authchk><i class="fas fa-check-circle"></i> 일괄확정</a>
+                    <a id="wb26cancelBtn" onclick="wb26confirm('N');" style="height: 30px; line-height: 28px; width: 90px;" authchk><i class="fas fa-times-circle"></i> 확정취소</a>
+                    <a id="wb26unfinishedBtn" onclick="openUnfinishedPopup();" style="height: 30px; line-height: 28px; width: 90px;"><i class="fas fa-clipboard-list"></i> 미완료현황</a>
 				</div>
 				
 				<!-- 검색되는 ROW수 -->
@@ -453,18 +453,18 @@
 			return this;
 		},
 		
-		setData : function(_pageNo) {
+		setData : function(_pageNo, _focusRow) {
 			if (isFirst) return;
-			
+
 			var targetObj = this.target;
-			
+
 			if (inputValidation($('input[required]'))) {
 				var formData = {};
-				
+
 				$.each($('[data-search]'), function(idx, elem) {
 					formData[$(elem).data("search")] = $(elem).val();
 				});
-				
+
 				// formData["strtDt"]    = $("#strtDt_S").val().replace(/\-/g, '');
 				// formData["endDt"]     = $("#endDt_S").val().replace(/\-/g, '');
 				formData["pageNo"]    = _pageNo + 1;
@@ -482,6 +482,14 @@
 								totalPages    : data.paginationInfo.totalPageCount
 							}
 						});
+						if (_focusRow !== undefined && _focusRow !== null) {
+							var targetRow = Math.min(_focusRow, list.length - 1);
+							if (targetRow >= 0) {
+								setTimeout(function() {
+									gridView.target.focus(targetRow);
+								}, 50);
+							}
+						}
 					} catch (error) {
 						alert("오류 발생!! 전산실 연락 바랍니다", error.message);
 						return null; // 오류 발생 시 null 반환
@@ -617,10 +625,11 @@
 		formData.append("detailArr", JSON.stringify(detailArr));//선택된 ROW 만 formData에 저장
 		//상세자료 끝
 		
+		var savedRow = thisGridRow;
 		filePostAjax("/user/wb/wb26/wb26save", formData, function(data) {
 			alert(data.resultMessage);
 			if (data.resultCode == 200) {
-				gridView.setData(0);
+				gridView.setData(0, savedRow);
 			}
 		});
 	}
@@ -668,8 +677,25 @@
 			alert("처리할 자료를 선택해 주세요.");
 			return false;
 		}
-		
-		$.each(gridList, function(idx, elem) {			
+
+		if (confirmYn === 'Y') {
+			var invalid = false;
+			$.each(gridList, function(idx, elem) {
+				if (String(elem.rsltRate) !== '100') {
+					alert((idx + 1) + "번째 선택 항목의 진척율이 100이 아닙니다. 확정 처리가 불가합니다.");
+					invalid = true;
+					return false;
+				}
+				if (!elem.rsltEndDt || elem.rsltEndDt.trim() === '') {
+					alert((idx + 1) + "번째 선택 항목의 실적종료일이 없습니다. 확정 처리가 불가합니다.");
+					invalid = true;
+					return false;
+				}
+			});
+			if (invalid) return false;
+		}
+
+		$.each(gridList, function(idx, elem) {
 			gridList[idx].rsltCloseYn = confirmYn;
 		});
 		
