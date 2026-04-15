@@ -78,13 +78,15 @@ public class WB07Ctr {
 	@PostMapping(value = "/wbsLevel2PlanChange")
     public String wbsLevel2PlanChange(@RequestBody Map<String, String> paramMap,  ModelMap model) throws Exception {
   		try {
-  			if (wb07svc.wbsLevel2PlanChange(paramMap) != 0 ) {
+  			int result = wb07svc.wbsLevel2PlanChange(paramMap);
+  			if (result > 0 ) {
   				model.addAttribute("resultCode", 200);
   				model.addAttribute("resultMessage", messageUtils.getMessage("update"));
+  				model.addAttribute("result", result);
   			} else {
   				model.addAttribute("resultCode", 500);
   				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
+  			}
   		}catch(Exception e){
   			model.addAttribute("resultCode", 900);
   			model.addAttribute("resultMessage", e.getMessage());

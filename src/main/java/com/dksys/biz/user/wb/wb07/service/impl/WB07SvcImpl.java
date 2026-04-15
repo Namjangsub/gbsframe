@@ -143,10 +143,69 @@ public class WB07SvcImpl implements WB07Svc {
 
 	@Override
 	public int wbsLevel2PlanChange(Map<String, String> paramMap) throws Exception {
-		// Level2(TASK) 계획/실적 동일하게 수정 반영
+		// ✅ Level2(TASK) 계획/실적 동일하게 수정 반영 (여러 건 순차 처리 지원)
+		
+		// ✅ 필수 필드 검증
+		String wbsPlanCodeId = String.valueOf(paramMap.getOrDefault("wbsPlanCodeId", "")).trim();
+		String wbsPlansDtFm = String.valueOf(paramMap.getOrDefault("wbsPlansDtFm", "")).trim();
+		String wbsPlaneDtFm = String.valueOf(paramMap.getOrDefault("wbsPlaneDtFm", "")).trim();
+		String coCd = String.valueOf(paramMap.getOrDefault("coCd", "")).trim();
+		String userId = String.valueOf(paramMap.getOrDefault("userId", "")).trim();
+		String pgmId = String.valueOf(paramMap.getOrDefault("pgmId", "")).trim();
+		
+		if (wbsPlanCodeId.isEmpty() || wbsPlanCodeId.equals("null")) {
+			throw new RuntimeException("[필수필드] wbsPlanCodeId가 없습니다.");
+		}
+		
+		if (wbsPlansDtFm.isEmpty() || wbsPlansDtFm.equals("null")) {
+			throw new RuntimeException("[필수필드] wbsPlansDtFm(시작일)이 없습니다.");
+		}
+		
+		if (wbsPlaneDtFm.isEmpty() || wbsPlaneDtFm.equals("null")) {
+			throw new RuntimeException("[필수필드] wbsPlaneDtFm(종료일)이 없습니다.");
+		}
+		
+		if (coCd.isEmpty() || coCd.equals("null")) {
+			throw new RuntimeException("[필수필드] 회사코드(coCd)가 없습니다.");
+		}
+		
+		if (userId.isEmpty() || userId.equals("null")) {
+			throw new RuntimeException("[필수필드] 사용자ID(userId)가 없습니다.");
+		}
+		
+		// ✅ 날짜 검증 (yyyy-MM-dd 형식, 시작일 <= 종료일)
+		try {
+			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+			LocalDate startDate = LocalDate.parse(wbsPlansDtFm, formatter);
+			LocalDate endDate = LocalDate.parse(wbsPlaneDtFm, formatter);
+			
+			if (startDate.isAfter(endDate)) {
+				throw new RuntimeException("[날짜오류] 시작일(" + wbsPlansDtFm + ") > 종료일(" + wbsPlaneDtFm + ")");
+			}
+			
+			// 기간 길이 검증 (1년 이상은 불가)
+			long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate);
+			if (daysBetween > 365) {
+				throw new RuntimeException("[기간오류] 기간이 너무 깁니다 (" + (daysBetween + 1) + "일)");
+			}
+		} catch (java.time.format.DateTimeParseException e) {
+			throw new RuntimeException("[날짜형식오류] 날짜 형식이 올바르지 않습니다. (yyyy-MM-dd): " + e.getMessage());
+		}
+		
 		int result = 0;
-		result += wb07Mapper.wbsLevel2PlanChange(paramMap);
-		result += wb07Mapper.wbsLevel2ActChange(paramMap);
+		try {
+			// ✅ 트랜잭션 내에서 Plan 업데이트
+			int planResult = wb07Mapper.updateWbsScheduleVersionUpWbsCode(paramMap);
+//			int actResult = wb07Mapper.wbsLevel2ActChange(paramMap);
+			
+			result = planResult ;
+			
+		} catch (Exception e) {
+
+			e.printStackTrace();
+			throw e;  // 트랜잭션 롤백
+		}
+		
 		return result;
 	}
 
@@ -424,7 +483,7 @@ public class WB07SvcImpl implements WB07Svc {
 		// 일정관리담당자 확정했으면 하나는 존재해야함. 해당 작업단계 확정되지 않으면 수정 불가능함
 		int wbsLevel2InsertChk = wb22Mapper.wbsLevel2InsertChk(paramMap);
 		if (wbsLevel2InsertChk == 0) {
-			throw new RuntimeException("Task 계획을 저장할 수 없습니다. 일정확인 후 다시 시도해주세요.");
+			throw new RuntimeException("일정확정전에 Task 계획을 저장할 수 없습니다. 일정확인 후 다시 시도해주세요.");
 		}
 		
 
