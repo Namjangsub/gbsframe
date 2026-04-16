@@ -2585,6 +2585,12 @@
     
     <select id="select_wb0603p_List" parameterType="Map" resultType="camelMap">
 	    WITH
+			code_nm AS (SELECT CODE_ID, CODE_NM FROM TB_CM05M01),
+			user_nm AS (SELECT ID, NAME,VIEW_DEPT_ID, TEAM_MANAGER, MNG_ID FROM TB_CM06M01),
+			equp_nm AS (SELECT CO_CD, SALES_CD, EQP_NM 
+			    FROM TB_CR02D02 P
+			    WHERE P.CO_CD              = #{coCd}
+			      AND P.SALES_CD           = #{salesCd}),
 			-- 1) 자식(계획/실적) base
 			child_base AS (
 			    SELECT
@@ -2626,12 +2632,14 @@
 			      AND X.WBS_PLAN_CODE_KIND = Y.WBS_PLAN_CODE_KIND
 			      AND X.WBS_PLAN_CODE_ID   = Y.WBS_PLAN_CODE_ID
 			      AND X.WBS_PLAN_NO        = Y.WBS_RSLTS_NO
+			    LEFT JOIN user_nm um ON um.ID = X.WBS_PLAN_MNG_ID
 			    WHERE X.CO_CD              = #{coCd}
 			      AND X.SALES_CD           = #{salesCd}
 			      AND X.WBS_PLAN_CODE_KIND != 'WBSCODE'
 			      AND X.WBS_PLAN_MNG_ID is not null
 		    	  <if test="userId != null and userId != ''">
-			      AND X.WBS_PLAN_MNG_ID    = #{userId}
+		    	  --팀장인경우 팀원의 일정 관리 가능
+		    	  AND (X.WBS_PLAN_MNG_ID    = #{userId} OR um.MNG_ID = 'h4ng10')
 			      </if>
 			),
 			-- 2) 부모는 TB_WB22M01에서 WBSCODE로 직접 조회
@@ -2657,16 +2665,16 @@
 			        P.UDT_ID,   P.UDT_PGM,   P.UDT_DTTM,
 			        P.REVISED_FINISH_DT
 			    FROM TB_WB22M01 P
+			    LEFT JOIN user_nm um ON um.ID = P.WBS_PLAN_MNG_ID
 			    WHERE P.CO_CD              = #{coCd}
 			      AND P.SALES_CD           = #{salesCd}
 			      AND P.WBS_PLAN_CODE_KIND = 'WBSCODE'
 			      AND P.WBS_PLAN_MNG_ID is not null
 		    	  <if test="userId != null and userId != ''">
-			      AND P.WBS_PLAN_MNG_ID    = #{userId}
+		    	  --팀장인경우 팀원의 일정 관리 가능
+			      AND (P.WBS_PLAN_MNG_ID    = #{userId} OR um.MNG_ID = #{userId})
 			      </if>
 			),
-			code_nm AS (SELECT CODE_ID, CODE_NM FROM TB_CM05M01),
-			user_nm AS (SELECT ID, NAME FROM TB_CM06M01),
 			iss AS (
 			    SELECT
 			        A1.CO_CD,
@@ -2738,10 +2746,12 @@
 			        0 AS R_ISS_CNT,
 			        0 AS ISSUE_HIGH_CNT,
 			
-			        pb.SEQ AS SEQ_SORT
+			        pb.SEQ AS SEQ_SORT,
+			        eq.EQP_NM					AS EQP_NM
 			    FROM parent_base pb
 			    LEFT JOIN user_nm umP ON umP.ID = pb.WBS_PLAN_MNG_ID
 			    LEFT JOIN code_nm csP ON csP.CODE_ID = pb.WBS_PLAN_CODE_ID
+			    LEFT JOIN equp_nm eq ON eq.CO_CD = pb.CO_CD AND eq.SALES_CD = pb.SALES_CD
 			
 			    UNION ALL
 			
@@ -2791,11 +2801,13 @@
 			        NVL(i.R_ISS_CNT, 0) 		AS R_ISS_CNT,
 			        NVL(i.ISSUE_HIGH_CNT, 0)	AS ISSUE_HIGH_CNT,
 			
-			        cb.SEQ 						AS SEQ_SORT
+			        cb.SEQ 						AS SEQ_SORT,
+			        eq.EQP_NM					AS EQP_NM
 			    FROM child_base cb
 			    LEFT JOIN user_nm um1 ON um1.ID = cb.WBS_PLAN_MNG_ID
 			    LEFT JOIN user_nm um2 ON um2.ID = cb.WBS_RSLTS_ID
 			    LEFT JOIN code_nm cs ON cs.CODE_ID = cb.WBS_PLAN_STS_CODE_ID
+			    LEFT JOIN equp_nm eq ON eq.CO_CD = cb.CO_CD AND eq.SALES_CD = cb.SALES_CD
 			    LEFT JOIN iss i
 			      ON  i.CO_CD              = cb.CO_CD
 			      AND i.SALES_CD           = cb.SALES_CD
