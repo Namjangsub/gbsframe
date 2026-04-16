@@ -2585,8 +2585,14 @@
     
     <select id="select_wb0603p_List" parameterType="Map" resultType="camelMap">
 	    WITH
+			code_nm AS (SELECT CODE_ID, CODE_NM FROM TB_CM05M01),
+			user_nm AS (SELECT ID, NAME,VIEW_DEPT_ID, TEAM_MANAGER, MNG_ID FROM TB_CM06M01),
+			equp_nm AS (SELECT CO_CD, SALES_CD, EQP_NM 
+			    FROM TB_CR02D02 P
+			    WHERE P.CO_CD              = 'GUN'
+			      AND P.SALES_CD           = '25169-02AMCUP')
 			-- 1) 자식(계획/실적) base
-			child_base AS (
+			,child_base AS (
 			    SELECT
 			        X.FILE_TRGT_KEY,
 			        X.CO_CD,
@@ -2626,12 +2632,13 @@
 			      AND X.WBS_PLAN_CODE_KIND = Y.WBS_PLAN_CODE_KIND
 			      AND X.WBS_PLAN_CODE_ID   = Y.WBS_PLAN_CODE_ID
 			      AND X.WBS_PLAN_NO        = Y.WBS_RSLTS_NO
+			    LEFT JOIN user_nm um ON um.ID = X.WBS_PLAN_MNG_ID
 			    WHERE X.CO_CD              = #{coCd}
 			      AND X.SALES_CD           = #{salesCd}
 			      AND X.WBS_PLAN_CODE_KIND != 'WBSCODE'
 			      AND X.WBS_PLAN_MNG_ID is not null
 		    	  <if test="userId != null and userId != ''">
-			      AND X.WBS_PLAN_MNG_ID    = #{userId}
+			      AND (X.WBS_PLAN_MNG_ID = #{userId} OR um.MNG_ID = #{userId})
 			      </if>
 			),
 			-- 2) 부모는 TB_WB22M01에서 WBSCODE로 직접 조회
@@ -2657,16 +2664,15 @@
 			        P.UDT_ID,   P.UDT_PGM,   P.UDT_DTTM,
 			        P.REVISED_FINISH_DT
 			    FROM TB_WB22M01 P
+			    LEFT JOIN user_nm um ON um.ID = P.WBS_PLAN_MNG_ID
 			    WHERE P.CO_CD              = #{coCd}
 			      AND P.SALES_CD           = #{salesCd}
 			      AND P.WBS_PLAN_CODE_KIND = 'WBSCODE'
 			      AND P.WBS_PLAN_MNG_ID is not null
 		    	  <if test="userId != null and userId != ''">
-			      AND P.WBS_PLAN_MNG_ID    = #{userId}
+			      AND (P.WBS_PLAN_MNG_ID    = #{userId} OR um.MNG_ID = #{userId})
 			      </if>
 			),
-			code_nm AS (SELECT CODE_ID, CODE_NM FROM TB_CM05M01),
-			user_nm AS (SELECT ID, NAME FROM TB_CM06M01),
 			iss AS (
 			    SELECT
 			        A1.CO_CD,
