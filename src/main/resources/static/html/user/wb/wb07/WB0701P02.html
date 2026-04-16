@@ -118,6 +118,63 @@
                 minRowHeight: 26
             });
             
+            // 실적시작일/종료일 변경 시 즉시 유효성 검사
+            this.target.grid.on('afterChange', function(ev) {
+                if (!ev || !ev.changes) return;
+                var grid = gridViewTask.target.grid;
+                var today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                ev.changes.forEach(function(change) {
+                    var col = change.columnName;
+                    if (col !== 'wbsRsltssDt' && col !== 'wbsRsltseDt') return;
+
+                    var rowKey = change.rowKey;
+                    var row = grid.getRow(rowKey);
+                    var val = (change.value || '').trim();
+                    if (!val) return;
+
+                    var d = new Date(val);
+                    if (isNaN(d.getTime())) return;
+                    d.setHours(0, 0, 0, 0);
+
+                    // 오늘 이후 입력 불가
+                    if (d > today) {
+                        var fieldNm = col === 'wbsRsltssDt' ? '실적시작일' : '실적종료일';
+                        alert(fieldNm + '은 오늘 날짜 이후로 설정할 수 없습니다.');
+                        grid.setValue(rowKey, col, change.prevValue || '');
+                        return;
+                    }
+
+                    // 종료일 < 시작일 체크
+                    if (col === 'wbsRsltseDt') {
+                        var sSt = (row.wbsRsltssDt || '').trim();
+                        if (sSt) {
+                            var dSt = new Date(sSt);
+                            dSt.setHours(0, 0, 0, 0);
+                            if (d < dSt) {
+                                alert('실적종료일은 실적시작일보다 이전일 수 없습니다.');
+                                grid.setValue(rowKey, col, change.prevValue || '');
+                                return;
+                            }
+                        }
+                    }
+                    // 시작일 변경 시 기존 종료일과 역전 체크
+                    if (col === 'wbsRsltssDt') {
+                        var sEnd = (row.wbsRsltseDt || '').trim();
+                        if (sEnd) {
+                            var dEnd = new Date(sEnd);
+                            dEnd.setHours(0, 0, 0, 0);
+                            if (d > dEnd) {
+                                alert('실적시작일은 실적종료일보다 이후일 수 없습니다.');
+                                grid.setValue(rowKey, col, change.prevValue || '');
+                                return;
+                            }
+                        }
+                    }
+                });
+            });
+
             // 데이터 로드/변경 시 완료 행 스타일 재적용 및 편집 불가 처리
             this.target.grid.on('onGridUpdated', function() {
                 var grid = gridViewTask.target.grid;
@@ -235,7 +292,42 @@
         if (!confirm("선택한 " + selectedList.length + "건의 TASK를 완료 처리하시겠습니까?")) {
             return;
         }
-        
+
+        // 날짜 유효성 검사
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+        for (var i = 0; i < selectedList.length; i++) {
+            var item = selectedList[i];
+            var sSt = (item.wbsRsltssDt || "").replace(/-/g, "").trim();
+            var sEnd = (item.wbsRsltseDt || "").replace(/-/g, "").trim();
+            var label = item.wbsPlanCodeNm || item.taskId || (i + 1) + "번";
+
+            if (!sSt) {
+                alert("[" + label + "] 실적시작일을 입력하세요.");
+                return;
+            }
+            if (!sEnd) {
+                alert("[" + label + "] 실적종료일을 입력하세요.");
+                return;
+            }
+
+            var dSt  = new Date(sSt.substring(0,4) + "-" + sSt.substring(4,6) + "-" + sSt.substring(6,8));
+            var dEnd = new Date(sEnd.substring(0,4) + "-" + sEnd.substring(4,6) + "-" + sEnd.substring(6,8));
+
+            if (dSt > today) {
+                alert("[" + label + "] 실적시작일은 오늘 날짜 이후로 설정할 수 없습니다.");
+                return;
+            }
+            if (dEnd > today) {
+                alert("[" + label + "] 실적종료일은 오늘 날짜 이후로 설정할 수 없습니다.");
+                return;
+            }
+            if (dEnd < dSt) {
+                alert("[" + label + "] 실적종료일은 실적시작일보다 이전일 수 없습니다.");
+                return;
+            }
+        }
+
         var param = {
             taskList: selectedList.map(function(item) {
                 return $.extend({}, item, {

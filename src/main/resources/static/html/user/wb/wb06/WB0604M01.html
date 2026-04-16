@@ -1327,7 +1327,22 @@ function attachDualBarDragWithConfirm(barEl, handleL, handleR, taskId, baseYmd, 
     }
 
     const durationWd = Math.max(1, diffWorkingDaysInclusive(ns, ne));
-    
+
+    // 실적 바: 오늘 이후 날짜 설정 불가
+    if (barType === 'ACT') {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      if (ns > todayStr) {
+        renderGantt();
+        setTimeout(() => alert("실적 시작일은 오늘 날짜 이후로 설정할 수 없습니다."), 0);
+        return;
+      }
+      if (ne > todayStr) {
+        renderGantt();
+        setTimeout(() => alert("실적 종료일은 오늘 날짜 이후로 설정할 수 없습니다."), 0);
+        return;
+      }
+    }
+
     // 드래그 전 상태 스냅샷 (롤백 버튼용)
     const snap = snapshotTasks();
 
@@ -2007,6 +2022,13 @@ function renderDetail(){
     let e = elE.val();
     
     if(s && e) {
+      // 계획종료일 < 계획시작일 체크
+      if(e < s) {
+        elE.val(t.planEndAt || "");
+        alert("계획종료일은 계획시작일보다 이전일 수 없습니다.");
+        return;
+      }
+
       // 근무일 보정
       const ns = nextWorkingDay(s);
       const ne = nextWorkingDay(e);
@@ -2041,9 +2063,31 @@ function renderDetail(){
     const elE = $("#wbsRsltsEDt");
     const elActP = $("#actProgress"); // 진척도(Manual)
     const elP = $("#calcProgress");       // 진행도(Auto from WD)
-    
+
     let s = elS.val() || null;
     let e = elE.val() || null;
+
+    // 오늘 날짜 (시간 제거)
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    // 실적시작일 > 오늘 체크
+    if (s && s > todayStr) {
+      elS.val(t.actStartAt || "");
+      alert("실적시작일은 오늘 날짜 이후로 설정할 수 없습니다.");
+      return;
+    }
+    // 실적종료일 > 오늘 체크
+    if (e && e > todayStr) {
+      elE.val(t.actEndAt || "");
+      alert("실적종료일은 오늘 날짜 이후로 설정할 수 없습니다.");
+      return;
+    }
+    // 실적종료일 < 실적시작일 체크
+    if (s && e && e < s) {
+      elE.val(t.actEndAt || "");
+      alert("실적종료일은 실적시작일보다 이전일 수 없습니다.");
+      return;
+    }
 
     if(s) {
       const ns = nextWorkingDay(s);
