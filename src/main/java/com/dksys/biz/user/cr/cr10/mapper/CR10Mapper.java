@@ -63,7 +63,10 @@ public interface CR10Mapper {
   int deleteTodoDetail(Map<String, String> paramMap);
 
   int mergeLgistItemImageDetail(Map<String, String> paramMap);
+  
   int deleteLgistItemImageDetail(Map<String, String> paramMap);
+
+  int deleteLgistItemDetailAll(Map<String, String> paramMap);
 
   List<Map<String, String>> selectLgistItemList(Map<String, String> paramMap);
 
@@ -80,5 +83,7 @@ public interface CR10Mapper {
   Map<String, Object> selectLgistPartListImage(Map<String, Object> p);
 
   int updateLgistCompl(Map<String, String> param);
+
+  int deleteLgistPartDetailAll(Map<String, String> paramMap);
   
 }

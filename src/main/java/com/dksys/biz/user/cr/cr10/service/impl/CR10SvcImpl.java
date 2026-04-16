@@ -785,9 +785,11 @@ public class CR10SvcImpl implements CR10Svc {
 		//첨부 화일 권한체크 끝
 		//---------------------------------------------------------------
 
-	  int result = cr10Mapper.deleteLgistDetailAll(paramMap);
-	  result += cr10Mapper.deleteLgistMast(paramMap);
-	  result += cr10Mapper.deleteTodoDetail(paramMap);
+		int result = cr10Mapper.deleteLgistDetailAll(paramMap);		// 물류상세삭제
+		result += cr10Mapper.deleteLgistMast(paramMap);				// 물류마스터삭제
+		result += cr10Mapper.deleteTodoDetail(paramMap);			// 결재삭제
+		result += cr10Mapper.deleteLgistItemDetailAll(paramMap);	// 출하설비List 삭제
+		result += cr10Mapper.deleteLgistPartDetailAll(paramMap);	// partList 삭제
 
 		//---------------------------------------------------------------
 		//첨부 화일 처리 시작  (처음 등록시에는 화일 삭제할게 없음)
