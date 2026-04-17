@@ -390,6 +390,7 @@
 						var idx = this.dindex;
 						firstCol = this.colIndex;
 						firstRow = this.dindex;
+						_drpEditDindex = this.dindex; // 날짜범위 에디터에서 사용
 
 						// 일정관리 미확정일때도 Task 계획 및 실적 조회가능하게 수정 2025-09-22 최지상
 						if(histYn == "N") {
@@ -439,7 +440,6 @@
 						if (!canEditPlanRow(this.item)) {
 							return;
 						}
-
 						if (this.column.key=='wbsPlanMngNm') {
 							var closeYn = this.item.closeYn;
 							var deptId = this.item.deptId;
@@ -535,7 +535,7 @@
 // 						}
 
 						//3. 시작일자는 종료일자 이후일 수 없다.
-						if(this.item.wbsPlansDt != undefined && this.item.wbsPlaneDt != undefined && fDate > tDate) {
+						if(!drpApplying && this.item.wbsPlansDt != undefined && this.item.wbsPlaneDt != undefined && fDate > tDate) {
 							alert("종료일자가 시작일자보다 작을 수 없습니다.");
 							this.self.setValue(this.dindex, "wbsPlaneDt", this.item.wbsPlansDt);
 							return false;
@@ -651,12 +651,10 @@
 					{key: "wbsPlanMngId",  label: "담당자 ID"			,    align: "center",   width: 80, styleClass: function () {return gridColor(this.item);}},
 					{key: "wbsPlanMngNm",  label: "<span style='color: red;'>*</span>담당자명",    align: "center",   width: 80, styleClass: function () {return gridColor(this.item);}},
 					{key: "wbsPlansDt",    label: "<span style='color: red;'>*</span>시작일자",      align: "center",   width: 120,
-						editor: {type: "date", config: { content: { config: { mode: "day", selectMode: "day" } } },
-						disabled: function () { return !canEditPlanRow(this.item); }, }
+						editor: {type: "daterange", disabled: function () { return !canEditPlanRow(this.item); }}
 						, styleClass: function () {return gridColor(this.item);}},
 					{key: "wbsPlaneDt",    label: "<span style='color: red;'>*</span>종료일자",      align: "center",   width: 120,
-						editor: { type: "date", config: { content: { config: { mode: "day", selectMode: "day" }, } },
-						disabled: function () { return !canEditPlanRow(this.item); }, }
+						editor: {type: "daterange", disabled: function () { return !canEditPlanRow(this.item); }}
 						, styleClass: function () {return gridColor(this.item);}},
 					{key: "daycnt",  label: "소요일수",    align: "center",   width: 80,  
 						formatter: function () {
@@ -838,6 +836,7 @@
 					onClick: function () {
 						this.self.select(this.dindex);
 						var idx = this.dindex;
+						_drpEditDindex = this.dindex; // 날짜범위 에디터에서 사용
 
 						// Validation 체크
 						if (this.item.rsltsCloseYn == "Y") {
@@ -861,12 +860,6 @@
 					},
 					onDBLClick: function () {
 						this.self.select(this.dindex);
-						// Validation 체크
-						// if (this.item.rsltsCloseYn == "Y") {
-						// 	alert("확정된 상태입니다.");
-						// 	return;
-						// }
-						// wbsRsltsUpdateModal(this.dindex);
 						if (this.column.key=='rIssCnt') {
 							wbsRsltsIssuePopUp();
 						} else  if (this.column.key=='pIssCnt') {
@@ -943,38 +936,10 @@
 							{key: "wbsPlanMngId",  label: "담당자",    hidden:true},
 							{key: "wbsPlanMngNm",  label: "담당자명",    hidden:true},
 							{key: "wbsPlansDt",    label: "<span style='color: red;'>*</span>시작일자",      align: "center",   width: 80,
-								editor: {
-									type: "date", config: {
-										content: {
-											config: { mode: "day", selectMode: "day" }
-										}
-									},
-									disabled: function () {
-										// Validation 체크
-										if (this.item.rsltsCloseYn == "Y") {
-											//alert("확정된 상태입니다.");
-											return true;
-										}
-										//return false;
-									},
-								}
+								editor: {type: "daterange", disabled: function () { return this.item.rsltsCloseYn === 'Y'; }}
 							, styleClass: function () {return gridColor(this.item);}},
 							{key: "wbsPlaneDt",    label: "<span style='color: red;'>*</span>종료일자",      align: "center",   width: 80,
-								editor: {
-									type: "date", config: {
-										content: {
-											config: { mode: "day", selectMode: "day" }
-										}
-									},
-									disabled: function () {
-										// Validation 체크
-										if (this.item.rsltsCloseYn == "Y") {
-											//alert("확정된 상태입니다.");
-											return true;
-										}
-										//return false;
-									},
-								}
+								editor: {type: "daterange", disabled: function () { return this.item.rsltsCloseYn === 'Y'; }}
 							, styleClass: function () {return gridColor(this.item);}},
 							{key: "daycnt",    label: "소요일수",    align: "center",   width: 60, styleClass: function () {return gridColor(this.item);}},
 							{key: "expectMh",  label: "예상공수",    align: "center",   width: 60, editor: {type: "number"}, styleClass: function () {return gridColor(this.item);}},
@@ -3243,6 +3208,64 @@
 			gridView2.setData(0);
 		});
 	}
+
+	// ===== WBS 날짜 범위 선택기 =====
+	var _drpEditDindex = -1;
+	var drpApplying = false;
+	// ===== WBS 날짜 범위 선택기 끝 =====
+
+	// ===== daterange 커스텀 에디터 등록 =====
+	$(function(){
+		if(typeof ax5 === 'undefined' || !ax5.ui || !ax5.ui.grid || !ax5.ui.grid.inlineEditor) return;
+		ax5.ui.grid.inlineEditor['daterange'] = {
+			useReturnToSave: false,
+			editMode: 'popup',
+			getHtml: function(_root, _columnKey, _editor, _value){
+				return '<input type="text" data-ax5grid-editor="daterange" value="'+(_value||'')+'" readonly style="width:100%;box-sizing:border-box;cursor:pointer;background:transparent;border:none;outline:none;">';
+			},
+			init: function(_root, _columnKey, _editor, _$parent, _value){
+				var $el;
+				_$parent.append($el = jQuery(this.getHtml(_root, _columnKey, _editor, _value)));
+				this.bindUI(_root, _columnKey, $el, _editor, _$parent, _value);
+				return $el;
+			},
+			bindUI: function(_root, _columnKey, _$el, _editor, _$parent, _value){
+				var dindex = _drpEditDindex >= 0 ? _drpEditDindex : 0;
+				var item = _root.list ? _root.list[dindex] : null;
+				var sDt = item ? (item.wbsPlansDt||null) : null;
+				var eDt = item ? (item.wbsPlaneDt||null) : null;
+				var rect = _$parent[0] ? _$parent[0].getBoundingClientRect() : null;
+
+				// gridView2인 경우 gridView1 선택행의 시작/종료일을 min/max로 전달
+				var minDt = null, maxDt = null;
+				if(_root === gridView2.target){
+					var g1row = gridView1.target.getList('selected')[0];
+					if(g1row){ minDt = g1row.wbsPlansDt || null; maxDt = g1row.wbsPlaneDt || null; }
+				}
+
+				var colKey = _columnKey, gridRoot = _root, idx = dindex;
+				setTimeout(function(){
+					DateRangePicker.open({
+						startDt: sDt, endDt: eDt, minDt: minDt, maxDt: maxDt,
+						px: rect ? rect.left : undefined,
+						py: rect ? rect.bottom : undefined,
+						excludeSelectors: ['[data-ax5grid]'],
+						onApply: function(sd, ed){
+							drpApplying = true;
+							gridRoot.setValue(idx, 'wbsPlansDt', sd);
+							gridRoot.setValue(idx, 'wbsPlaneDt', ed);
+							drpApplying = false;
+							try { ax5.ui.grid.body.inlineEdit.deActive.call(gridRoot, 'CANCEL', colKey); } catch(ex){}
+						},
+						onCancel: function(){
+							try { ax5.ui.grid.body.inlineEdit.deActive.call(gridRoot, 'CANCEL', colKey); } catch(ex){}
+						}
+					});
+				}, 30);
+			}
+		};
+	});
+	// ===== daterange 커스텀 에디터 등록 끝 =====
 
 	function openWbsChangeHistPop(wbsPlanCodeId) {
 		var row = gridView1.target.getList("selected")[0];
