@@ -4124,3 +4124,139 @@ function fileUpload ($form) {
 //    });
 //
 //})();
+
+// ===== Global Date Range Picker =====
+window.DateRangePicker = (function(){
+    var _mx = 0, _my = 0;
+    $(document).on('mousemove.globalDRP', function(e){ _mx=e.clientX; _my=e.clientY; });
+
+    var s = { startDt:null, endDt:null, minDt:null, maxDt:null,
+              inited:false, justOpened:false,
+              onApply:null, onCancel:null, excludeSelectors:[] };
+
+    var HTML =
+        '<div id="globalDRP">' +
+        '  <div class="drp-top"><span class="drp-title">날짜 선택</span><button class="drp-close" id="gDrpClose">&#x2715;</button></div>' +
+        '  <div class="drp-bound-info" id="gDrpBoundInfo"></div>' +
+        '  <div class="drp-body">' +
+        '    <div class="drp-col"><div class="drp-col-label">시작일자</div><div id="gDrpStartCal"></div><div class="drp-sel-val" id="gDrpStartVal"></div></div>' +
+        '    <div class="drp-col"><div class="drp-col-label">종료일자</div><div id="gDrpEndCal"></div><div class="drp-sel-val" id="gDrpEndVal"></div></div>' +
+        '  </div>' +
+        '  <div class="drp-footer"><button class="drp-btn-apply" id="gDrpApply">선택완료</button><button class="drp-btn-cancel" id="gDrpCancel">취소</button></div>' +
+        '</div>';
+
+    function fmtDate(d){
+        if(!d || !(d instanceof Date) || isNaN(d.getTime())) return null;
+        var m = d.getMonth()+1, day = d.getDate();
+        return d.getFullYear() + '-' + (m<10?'0':'')+m + '-' + (day<10?'0':'')+day;
+    }
+
+    function ensureDOM(){
+        if(!$('#globalDRP').length){ $('body').append(HTML); }
+    }
+
+    function init(){
+        if(s.inited) return;
+        s.inited = true;
+
+        $('#gDrpStartCal').datepicker({ format:'yyyy-mm-dd', language:'ko', todayHighlight:true })
+            .on('changeDate', function(e){ s.startDt = fmtDate(e.date); $('#gDrpStartVal').text(s.startDt||''); });
+
+        $('#gDrpEndCal').datepicker({ format:'yyyy-mm-dd', language:'ko', todayHighlight:true })
+            .on('changeDate', function(e){ s.endDt = fmtDate(e.date); $('#gDrpEndVal').text(s.endDt||''); });
+
+        $('#gDrpApply').on('click', function(){
+            if(!s.startDt){ alert('시작일자를 선택하세요.'); return; }
+            if(!s.endDt){ alert('종료일자를 선택하세요.'); return; }
+            if(s.endDt < s.startDt){ alert('종료일자가 시작일자보다 작을 수 없습니다.'); return; }
+            if(s.minDt && s.startDt < s.minDt){ alert('시작일자는 계획 시작일자(' + s.minDt + ') 이전일 수 없습니다.'); return; }
+            if(s.maxDt && s.endDt > s.maxDt){ alert('종료일자는 계획 종료일자(' + s.maxDt + ') 이후일 수 없습니다.'); return; }
+            var cb = s.onApply;
+            var sd = s.startDt, ed = s.endDt;
+            var result = cb ? cb(sd, ed) : undefined;
+            if(result !== false) hide();
+        });
+
+        $('#gDrpCancel, #gDrpClose').on('click', function(){ hide(); if(s.onCancel) s.onCancel(); });
+
+        $(document).on('click.globalDRP', function(e){
+            if(s.justOpened) return;
+            if(!$('#globalDRP').is(':visible')) return;
+            if($(e.target).closest('#globalDRP').length) return;
+            var excluded = false;
+            $.each(s.excludeSelectors, function(_, sel){
+                if($(e.target).closest(sel).length){ excluded = true; return false; }
+            });
+            if(!excluded) hide();
+        });
+    }
+
+    function hide(){
+        $('#globalDRP').hide();
+    }
+
+    /**
+     * Open the date range picker.
+     * @param {Object} opts
+     *   opts.startDt       {string}   initial start date (yyyy-mm-dd)
+     *   opts.endDt         {string}   initial end date
+     *   opts.minDt         {string}   minimum selectable date
+     *   opts.maxDt         {string}   maximum selectable date
+     *   opts.px            {number}   left position (pixels); defaults to mouse X
+     *   opts.py            {number}   top  position (pixels); defaults to mouse Y
+     *   opts.onApply       {function} callback(startDt, endDt) on 선택완료
+     *   opts.onCancel      {function} callback on cancel/close
+     *   opts.excludeSelectors {Array} CSS selectors excluded from outside-click close
+     */
+    function open(opts){
+        opts = opts || {};
+        ensureDOM();
+        init();
+
+        s.startDt = opts.startDt || null;
+        s.endDt   = opts.endDt   || null;
+        s.minDt   = opts.minDt   || null;
+        s.maxDt   = opts.maxDt   || null;
+        s.onApply  = opts.onApply  || null;
+        s.onCancel = opts.onCancel || null;
+        s.excludeSelectors = opts.excludeSelectors || [];
+
+        // min/max date constraints on pickers
+        $('#gDrpStartCal').datepicker('setStartDate', s.minDt || -Infinity);
+        $('#gDrpStartCal').datepicker('setEndDate',   s.maxDt || Infinity);
+        $('#gDrpEndCal').datepicker('setStartDate',   s.minDt || -Infinity);
+        $('#gDrpEndCal').datepicker('setEndDate',     s.maxDt || Infinity);
+
+        // set initial dates
+        if(s.startDt){ $('#gDrpStartCal').datepicker('setDate', s.startDt); }
+        else { $('#gDrpStartCal').datepicker('clearDates'); }
+        $('#gDrpStartVal').text(s.startDt||'');
+
+        if(s.endDt){ $('#gDrpEndCal').datepicker('setDate', s.endDt); }
+        else { $('#gDrpEndCal').datepicker('clearDates'); }
+        $('#gDrpEndVal').text(s.endDt||'');
+
+        // bound info label
+        if(s.minDt || s.maxDt){
+            $('#gDrpBoundInfo').text('선택 가능 범위: ' + (s.minDt||'') + ' ~ ' + (s.maxDt||'')).show();
+        } else {
+            $('#gDrpBoundInfo').hide();
+        }
+
+        var $p = $('#globalDRP');
+        if($p.parent()[0] !== document.body){ $('body').append($p); }
+        $p.show();
+
+        var px = (opts.px !== undefined) ? opts.px : _mx;
+        var py = (opts.py !== undefined) ? opts.py : _my;
+        var pw = $p.outerWidth()||540, ph = $p.outerHeight()||320;
+        var ww = $(window).width(), wh = $(window).height();
+        $p.css({ left: Math.min(px, ww-pw-10), top: Math.min(py+8, wh-ph-10) });
+
+        s.justOpened = true;
+        setTimeout(function(){ s.justOpened = false; }, 200);
+    }
+
+    return { open:open, hide:hide };
+})();
+// ===== Global Date Range Picker End =====
