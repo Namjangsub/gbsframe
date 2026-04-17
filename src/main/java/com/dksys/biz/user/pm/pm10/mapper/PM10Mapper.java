@@ -1,4 +1,4 @@
-package com.dksys.biz.user.pm.pm10.mapper;
+﻿package com.dksys.biz.user.pm.pm10.mapper;
 
 import java.util.List;
 import java.util.Map;
@@ -60,5 +60,7 @@ public interface PM10Mapper {
 
 	/** 공지사항 기존 행 존재 여부 확인 */
 	Integer selectNoticeSubSeq(Map<String, String> param);
+
+	int deleteEmptyMnD03(Map<String, String> param);
 
 }

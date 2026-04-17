@@ -1,6 +1,5 @@
-package com.dksys.biz.user.pm.pm10.service.impl;
+﻿package com.dksys.biz.user.pm.pm10.service.impl;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -179,7 +178,13 @@ public class PM10Svcimpl implements PM10Svc {
 		}
 		pm10Mapper.pm10_main_update(param); // 일자별 마스터테이블 추가
 		pm10Mapper.pm10_d01_upsert_safe(param); // 주제 행 보장 (LOCK 컬럼 건드리지 않음)
-		return pm10Mapper.pm10_d03_update(param);
+		int result = pm10Mapper.pm10_d03_update(param);
+		
+		//공지사항 내용이 모두 비어있으면 삭제
+		if ("공지사항".equals(param.get("mnSubject"))) {
+			pm10Mapper.deleteEmptyMnD03(param);
+		}
+		return result;
 	}
 
 	@Override
