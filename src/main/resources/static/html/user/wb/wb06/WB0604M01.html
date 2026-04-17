@@ -576,6 +576,15 @@ function loadWbsData(opt, callback){
     STATE.tasks.clear();
     if (list.length > 0) {
       if (list[0].coCd) $("#coCd").val(list[0].coCd);
+      // 조회 완료 후 topSubMenu 타이틀 갱신 (엔터 조회 포함 모든 경우 처리)
+      if (typeof updateTopSubMenuTitle === "function") {
+        const titleSalesCd = $("#salesCd_S").val() || "";
+        // 응답에 eqpNm이 없으면 salesCode 조회 API로 설비명 별도 취득
+        const directEqpNm = list[0].eqpNm || list[0].equpNm || list[0].EQP_NM || list[0].EQUP_NM || "";
+        if (directEqpNm) {
+          updateTopSubMenuTitle(titleSalesCd, directEqpNm);
+        }
+      }
     }
     list.forEach(item => {
       // 날짜 형식 방어 (yyyymmdd -> yyyy-mm-dd)
@@ -1344,12 +1353,32 @@ function attachDualBarDragWithConfirm(barEl, handleL, handleR, taskId, baseYmd, 
       }
     }
 
+    // PLAN 바: 부모(parent-row) PLAN 범위를 벗어나면 차단
+    if (barType === 'PLAN') {
+      const t = STATE.tasks.get(taskId);
+      if (t && t.parentId) {
+        const parent = STATE.tasks.get(t.parentId);
+        if (parent && parent.planStartAt && parent.planEndAt) {
+          const startViolation = ns < parent.planStartAt;
+          const endViolation   = ne > parent.planEndAt;
+          if (startViolation || endViolation) {
+            renderGantt();
+            const msg = startViolation
+              ? `상위(${parent.title}) PLAN 시작일(${parent.planStartAt})보다 이전으로 설정할 수 없습니다.`
+              : `상위(${parent.title}) PLAN 종료일(${parent.planEndAt})을 초과하여 설정할 수 없습니다.`;
+            setTimeout(() => alert(msg), 0);
+            return;
+          }
+        }
+      }
+    }
+
     // 드래그 전 상태 스냅샷 (롤백 버튼용)
     const snap = snapshotTasks();
 
     const isPlanBar = (barType === 'PLAN');
-    const warningLikely = isPlanBar 
-      ? isPlanViolationLikely(taskId, ns, ne) 
+    const warningLikely = isPlanBar
+      ? isPlanViolationLikely(taskId, ns, ne)
       : isActViolationLikely(taskId, ns, ne);
 
     applyPendingChange({
@@ -1370,6 +1399,11 @@ function attachDualBarDragWithConfirm(barEl, handleL, handleR, taskId, baseYmd, 
       const msg = isPlanBar ? '상위 단계 기간을 벗어남 (경고 허용)' : '계획된 기간을 벗어남 (경고 허용)';
       // autoHideMs를 null로 설정하여 다른 작업 전까지 유지
       setToast(msg, {type:'warn', autoHideMs:null, canUndo:true});
+    }
+
+    // ACT 바 드래그/리사이즈 완료 후 상태 선택 팝업 표시
+    if (!isPlanBar && typeof showStatusMenu === "function") {
+      setTimeout(() => showStatusMenu(e, taskId), 0);
     }
   }
 
@@ -1705,18 +1739,16 @@ function renderGantt(){
             if (warningLikely) {
                 const snap = snapshotTasks();
                 TOAST.lastAction = { snapshot: snap, pending: null, saveFn: null };
-                startUndoWindow(3600000); 
+                startUndoWindow(3600000);
                 setToast('계획된 기간을 벗어남 (경고 허용)', {type:'warn', autoHideMs:null, canUndo:true});
             } else {
                 setToast("실적 일정이 생성되었습니다. 상태를 선택해 주세요.", {type:"ok", autoHideMs:3000, canUndo:true});
             }
 
-            // [USER REQ] 실적 바 생성 후 상태 선택 팝업 표시 (렌더링 후 안전하게 표시하기 위해 setTimeout 사용)
-            setTimeout(() => {
-                if (typeof showStatusMenu === "function") {
-                    showStatusMenu(ev, t.id);
-                }
-            }, 100);
+            // 신규 실적 생성 후 상태 선택 팝업 표시
+            if (typeof showStatusMenu === "function") {
+                setTimeout(() => showStatusMenu(ev, t.id), 0);
+            }
         };
 
         $(window).on("mousemove", onMove);
@@ -1762,16 +1794,17 @@ function renderGantt(){
       line.append(barPlan);
     }
 
-    // ACT bar
-    if(t.actStartAt && t.actEndAt){
+    // ACT bar (actEndAt 없으면 오늘 날짜로 표시 - 진행중 상태)
+    if(t.actStartAt){
+      const actEndDisplay = t.actEndAt || toYmd(new Date());
       const asIdx = diffDays(days[0], t.actStartAt);
-      const aeIdx = diffDays(days[0], t.actEndAt);
+      const aeIdx = diffDays(days[0], actEndDisplay);
       const barAct = $("<div>")
         .addClass("bar act")
         .toggleClass("parent", t.parentId === null)
         .toggleClass("is-active", t.id === STATE.selectedId)
         .toggleClass("violation", t.actWarnYn === "Y") // 실적 위반 점선 표시
-        .attr({ "data-start": t.actStartAt, "data-end": t.actEndAt })
+        .attr({ "data-start": t.actStartAt, "data-end": actEndDisplay })
         .css({ left: `${asIdx*dayW}px`, width: `${Math.max(1,(aeIdx-asIdx+1))*dayW}px` });
 
       const hl2 = $("<div>").addClass("handle left");
@@ -1885,7 +1918,7 @@ function renderDetail(){
 
     <div style="display:flex; gap:8px; margin-top:6px;">
       ${t.parentId !== null ? `
-        <button class="btn primary ${(t._actDirty || t._metaDirty) ? 'highlight-blue' : ''}" id="btnSaveAct" ${!((t._actDirty || t._metaDirty) && t.actStartAt && t.actEndAt) ? 'disabled' : ''}>ACT 저장</button>
+        <button class="btn primary ${(t._actDirty || t._metaDirty) ? 'highlight-blue' : ''}" id="btnSaveAct" ${!((t._actDirty || t._metaDirty) && t.actStartAt) ? 'disabled' : ''}>ACT 저장</button>
         <button class="btn" id="btnClearAct" ${!(t.actStartAt || t.actEndAt) ? 'disabled' : ''}>ACT 제거</button>
       ` : `<div class="mini">하위 TASK 실적에 의해 자동 계산됩니다.</div>`}
     </div>
@@ -2225,7 +2258,7 @@ function renderDetail(){
 
         $("#btnSaveAct")
           .toggleClass('highlight-blue', isActDirtyUnified)
-          .prop("disabled", !(isActDirtyUnified && t.actStartAt && t.actEndAt));
+          .prop("disabled", !(isActDirtyUnified && t.actStartAt));
           
         $("#btnSaveMeta")
           .toggleClass('highlight-blue', isCommonDirty)
@@ -3020,6 +3053,15 @@ function showStatusMenu(ev, taskId) {
             if (selectedCode === "WBSPLANSTS50" || selectedCode === "WBSPLANSTS40") {
                 t.actProgress = 100;
                 t.progress = 100;
+            } else if (selectedCode === "WBSPLANSTS20" || selectedCode === "WBSPLANSTS30") {
+                // 진행중/지연 선택 시 ACT 종료일 clear
+                t.actEndAt = null;
+                t._actDirty = true;
+                // 진행중/지연 선택 시 진척율이 100이면 1로 변경
+                if (t.actProgress >= 100) {
+                    t.actProgress = 1;
+                    t.progress = 1;
+                }
             } else if (selectedCode === "WBSPLANSTS10") {
                 t.actProgress = 0;
                 t.progress = 0;
@@ -3032,6 +3074,17 @@ function showStatusMenu(ev, taskId) {
 
     // ax5ui는 이벤트 객체를 넘기는 것이 좌표 안정성이 뛰어납니다.
     tempMenu.popup(ev);
+
+    // 마우스가 메뉴 영역을 벗어나면 자동으로 메뉴를 닫음
+    setTimeout(() => {
+        const $menuEl = $(".ax5-ui-menu").last();
+        if ($menuEl.length) {
+            $menuEl.on("mouseleave.autoClose", function() {
+                tempMenu.close();
+                $menuEl.off("mouseleave.autoClose");
+            });
+        }
+    }, 150);
 }
 
     // 템플릿(팝업)으로부터 건네받은 목록을 TASK로 일괄 추가
@@ -3123,6 +3176,16 @@ function showStatusMenu(ev, taskId) {
     };
 
     //Sales Code 검색
+    // topSubMenu 타이틀 갱신 공통 함수
+    window.updateTopSubMenuTitle = function(salesCd, eqpNm) {
+      const userNm = (typeof jwt !== 'undefined') ? (jwt.userNm || "") : "";
+      const parts = [salesCd];
+      if (eqpNm)  parts.push(eqpNm);
+      if (userNm) parts.push(userNm);
+      const subTitle = `WBS Task 관리 [${parts.join(', ')}]`;
+      $('#topSubMenu').text(subTitle);
+    };
+
     window.wbsSalesCodeSearch = function() {
       var paramObj = { "coCd" : $('#coCd').val(), "searchValue": $('#salesCd_S').val() };
       openSecondModal("/static/html/cmn/modal/wbsSalesCodeSearch.html", 1200, 700, "SALES CODE 검색", paramObj, function (grid){
@@ -3130,6 +3193,7 @@ function showStatusMenu(ev, taskId) {
 
         if ($('#salesCd_S').val() !=  row.salesCd) {
 	        $('#salesCd_S').val(row.salesCd);
+	        updateTopSubMenuTitle(row.salesCd, row.eqpNm || "");
 	        searchData();
         }
       });
