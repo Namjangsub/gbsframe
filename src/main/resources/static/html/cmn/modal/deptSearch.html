@@ -91,11 +91,11 @@
 		var deptTree = null;
 		var paramObj = modalStack.last().paramObj;
 		postAjaxSync("/admin/cm/cm04/selectDeptTree", paramObj, null, function(data){
-			deptTree = data.deptTree;
-
-			// 작업일보 관련 생산관리팀 부서 조회시 생산, 생산관리만 조회하겠끔
+			// 최하위부서는 트리에서 숨김
+			deptTree = trimDeptTree(data.deptTree);
+			// 작업일보 관련 생산관리 권한자는 기술연구소, 생산팀 조직만 조회
 			if (paramObj.prdMngChk) {
-				const targetUnits = ["GUN60", "GUN70"];
+				const targetUnits = ["GUN40", "GUN60"];
 				const rootUnits = ["GNG", "GUN"];
 				deptTree = deptTree.filter(node =>
 					rootUnits.includes(node.id) || 
@@ -106,11 +106,46 @@
 		});
 		return deptTree;
 	}
+
+	function trimDeptTree(nodes) {
+		if (!nodes || !nodes.length) return nodes;
+
+		var nodeMap = {};
+		nodes.forEach(function(node) {
+			nodeMap[node.id] = node;
+		});
+
+		// 모달의 최하위 하위부서는 숨김
+		var maxDepth = nodes.some(function(node) {
+			return node.parent === "#" && !node.upDeptId;
+		}) ? 3 : 2;
+
+		// 노드의 깊이 계산
+		function getDepth(node) {
+			var depth = 1;
+			var parentId = node.parent;
+
+			while (parentId && parentId !== "#") {
+				depth++;
+				parentId = nodeMap[parentId] ? nodeMap[parentId].parent : "#";
+			}
+
+			return depth;
+		}
+
+		return nodes.filter(function(node) {
+			return getDepth(node) <= maxDepth;
+		});
+	}
 	
 	// 트리 노드 select
 	function selectNode() {
 		var deptId = modalStack.last().paramObj.deptId;
 		if(deptId){
+			// 저장된 부서가 숨겨진 하위부서면 상위 부서로 바꿔서 선택한다.
+			if (!$('#deptTree').jstree(true).get_node(deptId) && deptId.length > 5) {
+				deptId = deptId.slice(0, 5);
+			}
 			$('#deptTree').jstree(true).select_node(deptId);
 		}else{
 			// 루트노드 펼침
