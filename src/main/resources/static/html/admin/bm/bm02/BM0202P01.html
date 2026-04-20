@@ -1084,6 +1084,47 @@
 	// 파일 추가
 	function setClntFile(elem) {
 		var tempFiles = elem.files;
+		
+		var totalFileSize = 0; // 신규 첨부파일 사이즈 처리용 변수
+		
+		// 1. 기존에 추가해둔 '신규 파일' 사이즈 합산
+		$.each(clntFileArr, function(idx, obj) {
+			if (obj.fileKey == 0) {
+				totalFileSize += obj.fileSize;
+			}
+		});
+
+		// 2. 방금 팝업창에서 선택한 파일 사이즈 합산
+		$.each(tempFiles, function(idx, obj) {
+			if (obj && obj.size) {
+				totalFileSize += obj.size;
+			}
+		});
+		// 3. 첨부파일 자료 용량이 yml 설정값(max-file-size) 이상인 경우 경고 후 중지
+		if (totalFileSize > 0) {
+			var MAX_SIZE = 2000 * 1024 * 1024; // Default fallback
+			postAjaxSync("/admin/cm/cm08/getMaxFileSize", null, null, function(data) {
+				if (data.resultCode == 200 && data.maxFileSize) {
+					var mbStr = data.maxFileSize.toUpperCase().replace("MB", "").replace("GB", "").trim();
+					var mbInt = parseInt(mbStr, 10);
+					if (!isNaN(mbInt)) {
+						if(data.maxFileSize.toUpperCase().indexOf("GB") > -1) {
+							mbInt = mbInt * 1024;
+						}
+						MAX_SIZE = mbInt * 1024 * 1024;
+					}
+				}
+			});
+			
+			if (totalFileSize >= MAX_SIZE) {
+				var limitMb = Math.round(MAX_SIZE / (1024 * 1024));
+				var attachMb = Math.round(totalFileSize / (1024 * 1024));
+				alert("첨부파일 자료 용량이 많습니다. 한도:" + limitMb + "MB < 첨부:" + attachMb + "MB\n분리해서 UPload하세요!");
+				$(elem).val("");
+				return false;
+			}
+		}
+
 		// 전역변수 배열에 선택된 파일 추가 
 		$.each(tempFiles, function(idx, obj){
 			var typeArr = obj.name.split(".");
