@@ -4260,3 +4260,106 @@ window.DateRangePicker = (function(){
     return { open:open, hide:hide };
 })();
 // ===== Global Date Range Picker End =====
+
+// ===== Global Single Date Picker =====
+window.SingleDatePicker = (function(){
+    var _mx = 0, _my = 0;
+    $(document).on('mousemove.globalSDP', function(e){ _mx=e.clientX; _my=e.clientY; });
+
+    var s = { date:null, allowClear:false, inited:false, justOpened:false, onApply:null, onCancel:null, excludeSelectors:[] };
+
+    var HTML =
+        '<div id="globalSDP">' +
+        '  <div class="drp-top"><span class="drp-title">날짜 선택</span><button class="drp-close" id="gSdpClose">&#x2715;</button></div>' +
+        '  <div class="drp-body" style="justify-content:center;">' +
+        '    <div class="drp-col"><div id="gSdpCal"></div><div class="drp-sel-val" id="gSdpVal"></div></div>' +
+        '  </div>' +
+        '  <div class="drp-footer">' +
+        '    <button class="drp-btn-apply" id="gSdpApply">선택완료</button>' +
+        '    <button class="drp-btn-cancel" id="gSdpClear" style="display:none;">선택해제</button>' +
+        '    <button class="drp-btn-cancel" id="gSdpCancel">취소</button>' +
+        '  </div>' +
+        '</div>';
+
+    function fmtDate(d){
+        if(!d || !(d instanceof Date) || isNaN(d.getTime())) return null;
+        var m = d.getMonth()+1, day = d.getDate();
+        return d.getFullYear() + '-' + (m<10?'0':'')+m + '-' + (day<10?'0':'')+day;
+    }
+
+    function ensureDOM(){
+        if(!$('#globalSDP').length){ $('body').append(HTML); }
+    }
+
+    function init(){
+        if(s.inited) return;
+        s.inited = true;
+
+        $('#gSdpCal').datepicker({ format:'yyyy-mm-dd', language:'ko', todayHighlight:true })
+            .on('changeDate', function(e){ s.date = fmtDate(e.date); $('#gSdpVal').text(s.date||''); });
+
+        $('#gSdpApply').on('click', function(){
+            if(!s.date){ alert('날짜를 선택하세요.'); return; }
+            var cb = s.onApply, dt = s.date;
+            var result = cb ? cb(dt) : undefined;
+            if(result !== false) hide();
+        });
+
+        $('#gSdpClear').on('click', function(){
+            var cb = s.onApply;
+            var result = cb ? cb(null) : undefined;
+            if(result !== false) hide();
+        });
+
+        $('#gSdpCancel, #gSdpClose').on('click', function(){ hide(); if(s.onCancel) s.onCancel(); });
+
+        $(document).on('click.globalSDP', function(e){
+            if(s.justOpened) return;
+            if(!$('#globalSDP').is(':visible')) return;
+            if($(e.target).closest('#globalSDP').length) return;
+            var excluded = false;
+            $.each(s.excludeSelectors, function(_, sel){
+                if($(e.target).closest(sel).length){ excluded = true; return false; }
+            });
+            if(!excluded) hide();
+        });
+    }
+
+    function hide(){
+        $('#globalSDP').hide();
+    }
+
+    function open(opts){
+        opts = opts || {};
+        ensureDOM();
+        init();
+
+        s.date      = opts.date      || null;
+        s.allowClear= opts.allowClear || false;
+        s.onApply   = opts.onApply   || null;
+        s.onCancel  = opts.onCancel  || null;
+        s.excludeSelectors = opts.excludeSelectors || [];
+
+        if(s.date){ $('#gSdpCal').datepicker('setDate', s.date); }
+        else { $('#gSdpCal').datepicker('clearDates'); }
+        $('#gSdpVal').text(s.date||'');
+        $('#gSdpClear').toggle(!!s.allowClear);
+
+        var $p = $('#globalSDP');
+        if($p.parent()[0] !== document.body){ $('body').append($p); }
+        $p.show();
+
+        var px = (opts.px !== undefined) ? opts.px : _mx;
+        var py = (opts.py !== undefined) ? opts.py : _my;
+        var pw = $p.outerWidth()||280, ph = $p.outerHeight()||320;
+        var ww = $(window).width(), wh = $(window).height();
+        $p.css({ left: Math.min(px, ww-pw-10), top: Math.min(py+8, wh-ph-10) });
+
+        s.justOpened = true;
+        setTimeout(function(){ s.justOpened = false; }, 200);
+    }
+
+    return { open:open, hide:hide };
+})();
+// ===== Global Single Date Picker End =====
+
