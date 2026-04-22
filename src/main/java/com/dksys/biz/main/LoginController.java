@@ -163,40 +163,22 @@ public class LoginController {
 //			}
 //		}
 
-//	 // 2. accessToken에서 username을 못 얻었다면 → refresh_token 시도
-//	    if (username == null) {
-//	        String refreshToken = extractRefreshToken(request);
-//	        if (refreshToken != null && !refreshToken.isEmpty()) {
-//	            try {
-//	                Claims refreshClaims = parseJwt(refreshToken);
-//	                username = refreshClaims.get("user_name", String.class); // 또는 "userId"
-//	            } catch (JwtException e) {
-//	                // refresh_token도 만료 또는 손상 → 무시
-//	            	System.out.println("refresh_token JwtException 처리 불가~~"+e);
-//	            } catch (Exception e) {
-//	                // refresh_token도 만료 또는 손상 → 무시
-//	            	System.out.println("refresh_token Exception 처리 불가~~"+e);
-//	            }
-//	        }
-//	    }
-
+		// 1. 정보 부족 시 쿠키(JWT)에서 보완
 		Cookie[] cookies = request.getCookies();
-		// deviceType가 없거나 undefined인 경우 쿠키에서 추출
-		if (deviceType == null || deviceType.isEmpty() || "undefined".equals(deviceType)) {
-			deviceType = (cookies != null && cookies.length > 0) ? cookies[0].getValue() : "UNKNOWN";
-		}
-
-		// userId가 없거나 undefined인 경우 쿠키의 Claim(sub)에서 추출
-		if (userId == null || "undefined".equals(userId)) {
+		if (userId == null || "undefined".equals(userId) || deviceType.isEmpty()) {
 			if (cookies != null) {
 				for (Cookie cookie : cookies) {
+					// CCV, access_token, refresh_token 순으로 토큰 탐색
 					if ("CCV".equals(cookie.getName()) || "access_token".equals(cookie.getName()) || "refresh_token".equals(cookie.getName())) {
 						try {
-							String sub = parseJwt(cookie.getValue()).getSubject();
-							if (sub != null && !"undefined".equals(sub)) {
-								userId = sub;
-								break;
+							Claims claims = parseJwt(cookie.getValue());
+							if (userId == null || "undefined".equals(userId)) {
+								userId = claims.getSubject();
 							}
+							if (deviceType.isEmpty()) {
+								deviceType = claims.get("dev", String.class);
+							}
+							if (userId != null && !deviceType.isEmpty()) break;
 						} catch (Exception e) {}
 					}
 				}
