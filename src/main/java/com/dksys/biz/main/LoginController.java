@@ -122,7 +122,7 @@ public class LoginController {
 //	public String logout(HttpServletRequest request, HttpServletResponse response) {
 	 public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
 		String userId = request.getParameter("userId");
-		String ip = RequestUtils.getClientIp();
+		String ip = RequestUtils.getClientIp(request);
 		String deviceType = "";
 		//토큰 필요없이 userId만 있음면 됨. (logout)
     	try {
