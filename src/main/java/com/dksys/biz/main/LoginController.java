@@ -40,13 +40,13 @@ public class LoginController {
 
     @Autowired
 	MessageUtils messageUtils;
-    
+
     @Autowired
     LoginService loginService;
-    
+
     @Autowired
     CM01Svc cm01Svc;
-    
+
     @Autowired
     CM06Svc cm06Svc;
 
@@ -98,13 +98,13 @@ public class LoginController {
     	}
         return "jsonView";
     }
-    
+
 //    @GetMapping(value = "/logout")
 //    public String logoutPage(HttpServletRequest request, HttpServletResponse response) {
 //      new SecurityContextLogoutHandler().logout(request, response, SecurityContextHolder.getContext().getAuthentication());
 //      return "redirect:/";
 //    }
-//    
+//
 
 	// 쿠키 삭제 처리 (로그아웃 시)
 
@@ -121,7 +121,9 @@ public class LoginController {
     @GetMapping("/customLogout")
 //	public String logout(HttpServletRequest request, HttpServletResponse response) {
 	 public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
-		
+		String userId = request.getParameter("userId");
+		String ip = RequestUtils.getClientIp();
+		String deviceType = "";
 		//토큰 필요없이 userId만 있음면 됨. (logout)
     	try {
 //    	    Map<String, String[]> map = request.getParameterMap();
@@ -129,23 +131,20 @@ public class LoginController {
 //    	        String[] values = map.get(key);
 //    	        System.out.println("PARAM " + key + " = " + Arrays.toString(values));
 //    	    }
-    	    
-    		String username = request.getParameter("userId");
-    		if (!"undefined".equals(username)) {
+
+    		if (userId != null && !"undefined".equals(userId)) {
 	    		// 1. 클라이언트 access_token 헤더에서 추출
 	//    	    String accessToken = resolveAccessToken(request);
 	//    	    String username = null;
 	    		String userAgent = RequestUtils.getUserAgent();
-	            String deviceType = RequestUtils.detectDeviceType(userAgent);
 	            com.dksys.biz.HomeController.FormFactor ff = homeController.detectFormFactor(request);
 	            deviceType = ff.name();
-	    		String clientIp = RequestUtils.getClientIp();
-	    		loginService.updateLogoutTime(username, userAgent, clientIp, deviceType);
+	    		loginService.updateLogoutTime(userId, userAgent, ip, deviceType);
     		}
 		} catch (Exception e) {
 			// 오류 처리하지 않음
 		}
-		
+
 //		// 2. 토큰이 있다면 블랙리스트 등록
 //	    if (accessToken != null && !accessToken.isEmpty()) {
 //			try {
@@ -163,7 +162,7 @@ public class LoginController {
 //				// 무시하고 refresh_token에서 시도
 //			}
 //		}
-	    
+
 //	 // 2. accessToken에서 username을 못 얻었다면 → refresh_token 시도
 //	    if (username == null) {
 //	        String refreshToken = extractRefreshToken(request);
@@ -180,13 +179,35 @@ public class LoginController {
 //	            }
 //	        }
 //	    }
-	    
+
+		Cookie[] cookies = request.getCookies();
+		// deviceType가 없거나 undefined인 경우 쿠키에서 추출
+		if (deviceType == null || deviceType.isEmpty() || "undefined".equals(deviceType)) {
+			deviceType = (cookies != null && cookies.length > 0) ? cookies[0].getValue() : "UNKNOWN";
+		}
+
+		// userId가 없거나 undefined인 경우 쿠키의 Claim(sub)에서 추출
+		if (userId == null || "undefined".equals(userId)) {
+			if (cookies != null) {
+				for (Cookie cookie : cookies) {
+					if ("CCV".equals(cookie.getName()) || "access_token".equals(cookie.getName()) || "refresh_token".equals(cookie.getName())) {
+						try {
+							String sub = parseJwt(cookie.getValue()).getSubject();
+							if (sub != null && !"undefined".equals(sub)) {
+								userId = sub;
+								break;
+							}
+						} catch (Exception e) {}
+					}
+				}
+			}
+		}
 		// 3. 쿠키 삭제
 	    RequestUtils.clearCookie("access_token", response);
 	    RequestUtils.clearCookie("refresh_token", response);
 		// 4. SecurityContext 강제 초기화 (auth == null 일 수 있어도 상관 없음)
 		SecurityContextHolder.clearContext();
-		System.out.println("-------->  로그아웃 처리 완료됨~~");
+		System.out.println("--------> 로그아웃 처리 완료됨~~ | 사용자ID: " + userId + ", IP: " + ip + ", deviceType: " + deviceType);
 //		return "redirect:/";
 
         Map<String, Object> result = new HashMap<>();
