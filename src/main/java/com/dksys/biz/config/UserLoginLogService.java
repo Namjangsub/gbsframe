@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 import com.dksys.biz.main.mapper.LoginMapper;
 @Service
 public class UserLoginLogService {
-    
+
 	@Autowired
 	LoginMapper loginMapper;
 
@@ -29,15 +29,15 @@ public class UserLoginLogService {
 			long hours = Duration.between(lastLoginTimestamp.toInstant(), Instant.now()).toHours();
 
 			if (hours < 24) {
-				System.out.println("24시간 이내 로그인");
+				System.out.println("24시간 이내 로그인 | 사용자ID: " + username + ", IP: " + ipAddress + ", deviceType: " + deviceType);
 				return true;
 			} else {
-				System.out.println("24시간 초과됨 → 재로그인 필요");
+				System.out.println("24시간 초과됨 → 재로그인 필요 | 사용자ID: " + username + ", IP: " + ipAddress + ", deviceType: " + deviceType);
 				return false;
 			}
 
 		} catch (Exception e) {
-			System.err.println("❌ 로그인 시간 조회 실패: " + e.getMessage());
+			System.err.println("[❌ 로그인 시간 조회 실패:  | 사용자ID: " + username + ", IP: " + ipAddress + ", deviceType: " + deviceType + "] " + e.getMessage());
 			return false;
 		}
 	}
