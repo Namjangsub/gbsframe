@@ -26,7 +26,7 @@ public class SM14Ctr {
 	MessageUtils messageUtils;
 
 	@Autowired
-	SM14Svc sm14Svc;	
+	SM14Svc sm14Svc;
 
 	// 매입관리 입고 조회
 	@PostMapping(value = "/selectPurchaseList")
@@ -38,7 +38,7 @@ public class SM14Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
-		
+
 
 	// 거래처별 매입 확정 집계 조회
 	@PostMapping(value = "/selectClntPurchaseList")
@@ -46,7 +46,7 @@ public class SM14Ctr {
 		List<Map<String, String>> result = sm14Svc.selectClntPurchaseList(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
-	}	
+	}
 
 	// 거래처별 매입 확정 상세 조회
 	@PostMapping(value = "/selectClntPurchaseDetailList")
@@ -54,10 +54,10 @@ public class SM14Ctr {
 		paramMap.put("mngIdCd", ObjectUtil.sqlInCodeGen(paramMap.get("mngIdCd")));
 		List<Map<String, String>> result = sm14Svc.selectClntPurchaseDetailList(paramMap);
 		model.addAttribute("result", result);
-		
+
 	   	List<Map<String, String>> resultMngId = sm14Svc.select_mngId_code(paramMap);
 	   	model.addAttribute("resultMngId", resultMngId);
-	   	
+
 		return "jsonView";
 	}
 		// 매입관리 발주 조회 엑셀
@@ -66,35 +66,27 @@ public class SM14Ctr {
 		List<Map<String, String>> result = sm14Svc.selectPurchaseExcelList(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
-	}	
+	}
 
-	
-	// 발주상세 조회
-	@PostMapping(value = "/selectPurchaseDetailList")
-	public String selectPurchaseDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
-		List<Map<String, String>> resultList = sm14Svc.selectPurchaseDetailList(paramMap);
-		model.addAttribute("resultList", resultList);
-		return "jsonView";
-	}	
-	
+
 	//매입확정관리 등록
-    @PostMapping(value = "/insertPurchaseBillDetail")
-    public String insertPurchase(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
-  		try {
-  			if (sm14Svc.insertPurchaseBillDetail(paramMap) != 0 ) {
-  				model.addAttribute("resultCode", 200);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
-  			} else {
-  				model.addAttribute("resultCode", 500);
-  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
-  			};
-  		}catch(Exception e){
-  			model.addAttribute("resultCode", 900);
-  			model.addAttribute("resultMessage", e.getMessage());
-  		}
-  		return "jsonView";
-    }	  
-    
+//    @PostMapping(value = "/insertPurchaseBillDetail")
+//    public String insertPurchase(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
+//  		try {
+//  			if (sm14Svc.insertPurchaseBillDetail(paramMap) != 0 ) {
+//  				model.addAttribute("resultCode", 200);
+//  				model.addAttribute("resultMessage", messageUtils.getMessage("insert"));
+//  			} else {
+//  				model.addAttribute("resultCode", 500);
+//  				model.addAttribute("resultMessage", messageUtils.getMessage("fail"));
+//  			};
+//  		}catch(Exception e){
+//  			model.addAttribute("resultCode", 900);
+//  			model.addAttribute("resultMessage", e.getMessage());
+//  		}
+//  		return "jsonView";
+//    }
+
 	//매입확정관리 선택등록
     @PostMapping(value = "/insertinsertPurchaseSel")
     public String insertinsertPurchaseSel(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
@@ -111,9 +103,9 @@ public class SM14Ctr {
   			model.addAttribute("resultMessage", e.getMessage());
   		}
   		return "jsonView";
-    }	   
-    
-	//매입 detail 삭제    
+    }
+
+	//매입 detail 삭제
 	@DeleteMapping(value = "/deletePurchaseDetail")
 	public String deletePurchaseDetail(@RequestBody Map<String, String> param, ModelMap model) throws Exception {
 		try {
@@ -131,7 +123,7 @@ public class SM14Ctr {
 		return "jsonView";
 	}
 
-	//세금계산서발행여부 
+	//세금계산서발행여부
 	@PostMapping(value = "/updateBillYn")
     public String updateBillYnChk(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
   		try {
@@ -147,9 +139,9 @@ public class SM14Ctr {
   			model.addAttribute("resultMessage", e.getMessage());
   		}
   		return "jsonView";
-    } 
+    }
 
-	//세금계산서발행여부 
+	//세금계산서발행여부
 	@PostMapping(value = "/updateBillSeqYn")
     public String updateBillSeqYn(@RequestParam Map<String, String> paramMap, MultipartHttpServletRequest mRequest, ModelMap model) throws Exception {
   		try {
@@ -165,15 +157,15 @@ public class SM14Ctr {
   			model.addAttribute("resultMessage", e.getMessage());
   		}
   		return "jsonView";
-    }  
-	
+    }
+
 	// 발주자재 조회
 	@PostMapping(value = "/selectOrdrgMatList")
 	public String selectOrdrgMatList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> resultList = sm14Svc.selectOrdrgMatList(paramMap);
 		model.addAttribute("resultList", resultList);
 		return "jsonView";
-	}	
+	}
 
 	// 매입관리 입고 조회 NEW
 	@PostMapping(value = "/selectPurchaseListNew")
@@ -191,10 +183,10 @@ public class SM14Ctr {
 
 	   	List<Map<String, String>> resultMngId = sm14Svc.select_mngId_code(paramMap);
 	   	model.addAttribute("resultMngId", resultMngId);
-	   	
+
 		return "jsonView";
 	}
-	
+
 
 	// 매입관리 입고 조회 NEW--Nam 거래처별 집계처리 하단그리드 세부내용
 	@PostMapping(value = "/sm14selectPurchaseListNew")
@@ -212,17 +204,17 @@ public class SM14Ctr {
 
 	   	List<Map<String, String>> resultMngId = sm14Svc.select_mngId_code(paramMap);
 	   	model.addAttribute("resultMngId", resultMngId);
-	   	
+
 		return "jsonView";
 	}
-	
+
 
 	// 매입관리 입고 조회 NAM 240226
 	@PostMapping(value = "/selectClntPurchaseInboundList")
 	public String selectClntPurchaseInboundList(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		paramMap.put("clntPjt", ObjectUtil.sqlInCodeGen(paramMap.get("clntPjt")));
 		paramMap.put("mngIdCd", ObjectUtil.sqlInCodeGen(paramMap.get("mngIdCd")));
-		
+
 		List<Map<String, String>> result = sm14Svc.selectClntPurchaseInboundList(paramMap);
 		model.addAttribute("result", result);
 
@@ -233,7 +225,7 @@ public class SM14Ctr {
 	   	model.addAttribute("resultMngId", resultMngId);
 		return "jsonView";
 	}
-	
+
 	// 발주/입고 조회 NEW
 	@PostMapping(value = "/selectOrderDetailListNew")
 	public String selectOrderDetailListNew(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -241,7 +233,7 @@ public class SM14Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
-	
+
 	// 발주/입고 조회 NEW
 	@PostMapping(value = "/selectOrderDetailListNewNam")
 	public String selectOrderDetailListNewNam(@RequestBody Map<String, String> paramMap, ModelMap model) {
@@ -249,19 +241,19 @@ public class SM14Ctr {
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
-	
+
 	// 매입 조회 NEW
 	@PostMapping(value = "/selectPchsDetailListNew")
-	public String selectPchsDetailList(@RequestBody Map<String, String> paramMap, ModelMap model) {
+	public String selectPchsDetailListNew(@RequestBody Map<String, String> paramMap, ModelMap model) {
 		List<Map<String, String>> result = sm14Svc.selectPchsDetailListNew(paramMap);
 		model.addAttribute("result", result);
 		return "jsonView";
 	}
-	
+
 	//매입확정관리 등록
     @PostMapping(value = "/insertPurchaseBillDetailNew")
     public String insertPurchaseBillDetailNew(@RequestParam Map<String, String> paramMap, ModelMap model) throws Exception {
-    	
+
   		try {
   			if (sm14Svc.insertPurchaseBillDetailNew(paramMap) != 0 ) {
   				model.addAttribute("resultCode", 200);
@@ -275,6 +267,6 @@ public class SM14Ctr {
   			model.addAttribute("resultMessage", e.getMessage());
   		}
   		return "jsonView";
-    }	  
+    }
 
 }

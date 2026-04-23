@@ -223,7 +223,14 @@
 			<td>
 				<input type="text" id="pchsVat" name="pchsVat"  data-search="pchsVat" comma data-ax5formatter="money" required msg="부가세"/>
 			</td>
-			<td colspan="2"></td>
+			<th>대금결제일자</th>
+			<td>
+				<!-- 거래처(구매처) 기본 매입마감일자를 selectOrderDetailView 에서 받아 초기화. 사용자 수정 가능. TB_SM12D01.PCHS_CLMN_DAY 로 저장 -->
+				<select id="pchsClmnDay" name="pchsClmnDay" data-search="pchsClmnDay" maxlength="10" placeholder="예: 10 또는 25">
+					<option value="10">10일 결제</option>
+					<option value="25">25일 결제</option>
+				</select>
+			</td>
 			<th class="hit">관리부서</th>
 			<td>
 				<select id="mngDeptCd" name="mngDeptCd" data-search="mngDeptCd" required msg="관리부서" >
@@ -450,20 +457,21 @@
   			    ],
 	           columns: [
 						 {key: "coCd", 				label: "회사코드", 			width: 100,		align: "center", 	hidden:true}					
-						,{key: "salesCd", 			label: "Sales Code", 	    width: 180,		align: "center"}
-						,{key: "ordrgNo", 			label: "발주번호", 		    width: 100,		align: "center"}
-						,{key: "ordrgSeq",	    	label: "발주순번",				width: 60,		align: "center", 	hidden:false}	
+						,{key: "salesCd", 			label: "Sales Code", 	    width: 150,		align: "center"}
+						,{key: "ordrgNo", 			label: "발주번호", 		    width: 80,		align: "center"}
+						,{key: "ordrgSeq",	    	label: "순번",				width: 50,		align: "center", 	hidden:false}	
 						,{key: "pchsNo", 			label: "매입번호", 		    width: 100,		align: "center"}
-						,{key: "pchsSeq",	    	label: "매입순번",				width: 60,		align: "center", 	hidden:false}						
-						,{key: "pchsDt", 		    label: "확정일자", 			width: 100,	align: "center"}
+						,{key: "pchsSeq",	    	label: "순번",				width: 50,		align: "center", 	hidden:false}						
+						,{key: "pchsDt", 		    label: "확정일자", 			width: 80,		align: "center"}
 						,{key: "pchsAmt", 			label: "매입금액", 			width: 120,		align: "right", formatter: "money"}
-						,{key: "pchsVat", 			label: "부가세", 			    width: 100,		align: "right", formatter: "money"}
+						,{key: "pchsVat", 			label: "부가세", 			width: 100,		align: "right", formatter: "money"}
 						,{key: "pchsTot", 			label: "합계", 				width: 120,		align: "right", formatter: "money"}
-						,{key: "payDiv", 	    	label: "영수", 				width:  80,		align: "center", 	hidden:true}
-						,{key: "payDivNm", 	    	label: "영수", 				width:  80,		align: "center"}
-						,{key: "payDivDt", 	    	label: "영수일자", 			width:  100,		align: "center"}
+						,{key: "payDiv", 	    	label: "영수", 				width:  60,		align: "center", 	hidden:true}
+						,{key: "payDivNm", 	    	label: "영수", 				width:  60,		align: "center"}
+						,{key: "payDivDt", 	    	label: "영수일자", 			width:  100,	align: "center"}
+						,{key: "pchsClmnDay", 	    label: "지급예정일", 		width:  80,		align: "center"}
 						,{key: "pchsRmk", 	    	label: "비고", 				width:  200,	align: "left"}
-						,{key: "creatNm", 		    label: "생성자", 			    width:  80,	align: "center"}
+						,{key: "creatNm", 		    label: "생성자", 			width:  60,		align: "center"}
 						,{key: "creatDttm", 	    label: "생성일자", 			width:  130,	align: "center"}
 	              ]
 	        });
@@ -489,12 +497,9 @@
 					if (remaindAmt < 0) remaindAmt= 0;
 					$('#pchsAmt').val(addCommaStr(remaindAmt));  //매입금액입력정보 Clear
 					setVat();  						//VAT 계산
-					if (remaindAmt != 0) {
-						$('#actionBtn').show();
-					} else {
-						$('#actionBtn').hide();
-					}
-					
+					//등록 버튼 표시 여부는 limitDate/inDt/actionType/remaindAmt 를 종합해서 판단
+					updateActionBtnVisibility();
+
 					targetObj.setData({
 						list : list,
 						page : {
@@ -633,9 +638,10 @@
 					} else {
 						customAlert(data.resultMessage);
 					}
-					gridViewPop.initView().setData(0);	
+					//서버 삭제 완료 후 UI 일괄 갱신 (이전에는 fnSetting 이 콜백 밖에서 실행되어 타이밍 이슈 발생)
+					gridViewPop.initView().setData(0);
+					fnSetting();
 				});
-				fnSetting();
 			}
 		});
 		
@@ -713,7 +719,7 @@
 		}
 
 		if (maxIndt > deleteHyphenStr($('#pchsDt').val())) {
- 	        customAlert("최종입고일 이전 매입확정처리 불가합니다.");
+ 	        customAlert("최종입고일(" + maxIndt + ") 이전 매입확정처리 불가합니다.");
  	        return false;
 		}
         
@@ -730,7 +736,8 @@
         let ipgoArr = [];
 		let rowData = gridViewPop.target.getList(); 
 		$.each(rowData, function (idx, elem) {
-			if ((pasIntChk(rowData[idx].inDtlAmt) != 0 && pasIntChk(rowData[idx].inQty) != 0 && rowData[idx].pchsNo == undefined) ){ 
+			//pchsNo 가 null/빈문자열/undefined 모두 미확정으로 간주 (이미 확정된 라인의 덮어쓰기 방지)
+			if (pasIntChk(rowData[idx].inDtlAmt) != 0 && pasIntChk(rowData[idx].inQty) != 0 && !rowData[idx].pchsNo) {
 				ipgoArr.push(rowData[idx]);
 			}
 		});
@@ -786,42 +793,41 @@
 	    gridViewPop.target.setHeight(tagHeight);
 	}
 
-	//제한일자 체크
+	//제한일자 체크 (alert 용도) + 전역 limit_yn 갱신
 	function limit_date_chk(chkValue) {
-		// monthCloseChk(chkValue);
-
-		//debugger;
-
 		limit_yn = "N";
-		
-		if (limitDate != null) {
-			if (limitDate > chkValue ) {
-				limit_yn = "Y";
-				customAlert('제한된 일자입니다. ' + limitDate + '일 이전은 데이터를 등록 및 수정할 수가 없습니다.');
-				//$('#actionBtn').remove();
-				$("#actionBtn").hide();
-			} else {
-				limit_yn = "N";
-				$("#actionBtn").show();
-			}
+
+		if (limitDate != null && limitDate > chkValue) {
+			limit_yn = "Y";
+			customAlert('제한된 일자입니다. ' + limitDate + '일 이전은 데이터를 등록 및 수정할 수가 없습니다.');
+		} else if (inDt != null && inDt > chkValue) {
+			customAlert('입고일 ' + inDt + ' 이전은 데이터를 등록 및 수정할 수가 없습니다.');
 		}
 
-		// 제한일자 위반이 아닌 경우 입고일자 체크
-		if (limit_yn == "N") {
-			if (inDt > chkValue ) {
-				customAlert('입고일 ' + inDt + ' 이전은 데이터를 등록 및 수정할 수가 없습니다.');
-				//$('#actionBtn').remove();
-				$("#actionBtn").hide();
-			} else {
-				$("#actionBtn").show();
-			}
-		}
+		//등록 버튼 노출 여부는 통합 판단 함수에 위임 (readonly / 전액확정 / 일자제약 종합)
+		updateActionBtnVisibility();
+	}
 
-		// actionType === "T" 읽기 조회
+	//등록 버튼 표시 통합 판단
+	//  우선순위: actionType=="T" > limitDate 위반 > inDt 위반 > 전액 확정(remaindAmt==0) > 표시
+	function updateActionBtnVisibility() {
 		if (actionType === "T") {
 			$("#actionBtn").hide();
-		} else {
-			$("#actionBtn").show();
+			return;
 		}
+		var chkValue = $('#pchsDt').val();
+		if (limitDate != null && limitDate > chkValue) {
+			$("#actionBtn").hide();
+			return;
+		}
+		if (inDt != null && inDt > chkValue) {
+			$("#actionBtn").hide();
+			return;
+		}
+		if (remaindAmt == 0) {
+			$("#actionBtn").hide();
+			return;
+		}
+		$("#actionBtn").show();
 	}
 </script>
