@@ -76,7 +76,7 @@ async function detectFormFactor() {
 	{
 		ipadType = 'iPad';
 		return 'tablet';
-	} 
+	}
 
   if (isTabletModel(ua)) return 'tablet';
   if (isPhoneModel(ua)) return 'phone';
@@ -162,7 +162,7 @@ var applyResponsiveViewport = (function () {
     if (scale > 1) {
       scale = 1;
     }
-	
+
 	if (deviceType != 'tablet') scale = scale * 0.95;
 	if (ipadType == 'iPad') scale = scale * 0.6;
     // 4) 소수점 정리
@@ -175,25 +175,25 @@ var applyResponsiveViewport = (function () {
     if (opts.lockScale) {
       content += ', maximum-scale=' + scale;
     }
-	
+
 //	console.log('innerWidth/innerHeight :', window.innerWidth, window.innerHeight);
 //	console.log('visualViewport        :',
 //	    window.visualViewport && window.visualViewport.width,
 //	    window.visualViewport && window.visualViewport.height);
 //	console.log('screen.width/height   :', screen.width, screen.height);
 //	console.log('devicePixelRatio      :', window.devicePixelRatio);
-//	
+//
 //	console.log('cssWidth=', cssWidth,
 //	            'cssHeight=', cssHeight,
 //	            'scaleW=', cssWidth / designWidth,
 //	            'scaleH=', cssHeight / opts.designHeight,
 //	            'scale(final)=', scale);
-//	alert('innerWidth/innerHeight :' + window.innerWidth + ', ' + window.innerHeight 
-//		+ '\nvisualViewport        :' + (window.visualViewport && window.visualViewport.width) 
+//	alert('innerWidth/innerHeight :' + window.innerWidth + ', ' + window.innerHeight
+//		+ '\nvisualViewport        :' + (window.visualViewport && window.visualViewport.width)
 //		                              + ', ' + (window.visualViewport && window.visualViewport.height)
-//		+ '\nscreen.width/height   :'+screen.width + ', ' + screen.height 
+//		+ '\nscreen.width/height   :'+screen.width + ', ' + screen.height
 //		+ '\nscale(final)          :'+ scale
-//		+ '\ndevicePixelRatio      :' + window.devicePixelRatio);			
+//		+ '\ndevicePixelRatio      :' + window.devicePixelRatio);
     if (opts.scalable === false) {
       content += ', user-scalable=no';
     }
@@ -212,7 +212,7 @@ var applyResponsiveViewport = (function () {
  * ax5grid용 롱터치(태블릿/모바일 전용)
  *  - gridInstance : new ax5.ui.grid() 인스턴스
  *  - handler(grid, dindex, item, $cell, colKey, evt)
- */	
+ */
 function bindTabletLongPressForGrid(gridInstance, handler) {
     if (!gridInstance) {
 //        console.warn("bindTabletLongPressForGrid: gridInstance is null/undefined");
@@ -248,7 +248,7 @@ function bindTabletLongPressForGrid(gridInstance, handler) {
 //	$bodyPanel.on("touchstart.gridLongPressDebug", function(e){
 //	    console.log("[DEBUG] body touchstart bubbled, target=", e.target);
 //	});
-	
+
 	// 이전 바인딩 제거
     $bodyPanel.off(".gridLongPressTouch");
 
@@ -271,10 +271,10 @@ function bindTabletLongPressForGrid(gridInstance, handler) {
 //    var CELL_SELECTOR = 'td[data-ax5grid-panel-name="body-scroll"]';
 //	var CELL_SELECTOR = 'td[data-ax5grid-data-index]';
 	var CELL_SELECTOR = 'td[data-ax5grid-column-attr="default"]';
-	
+
 	// 변경 : panel-name + column-attr 를 같이 사용
 //	var CELL_SELECTOR = 'td[data-ax5grid-column-attr="default"][data-ax5grid-panel-name="body-scroll"]';
-	  
+
 	// 기본 롱탭 메뉴(다운로드/공유/인쇄 등) 막기
 	// 우클릭/롱탭 메뉴 방지용
 	$bodyPanel
@@ -289,7 +289,7 @@ function bindTabletLongPressForGrid(gridInstance, handler) {
 	        return false;
 	    });
 
-			
+
     // colindex → 컬럼 key 로 매핑하는 헬퍼
     function resolveColKeyFromCell($cell) {
         // 1) 혹시라도 column-key 가 달려 있다면 우선 사용
@@ -561,7 +561,7 @@ var openModal = function(url, width, height, title, paramObj, callback) {
 //    	$.get(url, function(data) {
 //    		targetEl.append(data);
 //      	});
-    	
+
     	$.ajax({url: url, method: 'GET',
     		  headers: {'Authorization': authorizationToken },
     		  success: function(data) { targetEl.append(data); },
@@ -613,7 +613,7 @@ var openSecondModal = function(url, width, height, title, paramObj, callback) {
 //    	$.get(url, function(data) {
 //    		targetEl.append(data);
 //      	});
-    	
+
     	$.ajax({url: url, method: 'GET',
     		  headers: {'Authorization': authorizationToken },
     		  success: function(data) { targetEl.append(data); },
@@ -634,16 +634,16 @@ var openThirdModal = function(url, width, height, title, paramObj, callback) {
 		function resolveModalSize(w, h) {
 		  var vw = window.innerWidth || document.documentElement.clientWidth;
 		  var vh = window.innerHeight || document.documentElement.clientHeight;
-		
+
 		  var isNarrow = vw <= 900; // 모바일/좁은 폭 기준(필요시 조정)
 		  var margin = isNarrow ? 8 : 40;
-		
+
 		  // 숫자(px)만 들어온다고 가정하고 clamp (문자열 '100%' 등은 그대로 사용)
 		  function clampSize(v, max) {
 		    if (typeof v === "number") return Math.max(320, Math.min(v, max));
 		    return v; // '100%' 같은 값은 그대로
 		  }
-		
+
 		  if (isNarrow) {
 		    // 모바일: 화면에 맞춰 크게 열고, 스크롤은 body-frame에서 처리
 		    return {
@@ -657,7 +657,7 @@ var openThirdModal = function(url, width, height, title, paramObj, callback) {
 		    height: clampSize(h, vh - margin - 36)
 		  };
 		}
-		
+
 		size = resolveModalSize(width, height);
 	}
 
@@ -706,14 +706,14 @@ var openThirdModal = function(url, width, height, title, paramObj, callback) {
 			  "overflow-x": "hidden",
 			  "-webkit-overflow-scrolling": "touch"
 			});
-			
+
 			// 3) fragment를 누적 append 하지 말고, 매번 교체(레이아웃/이벤트 중복 방지)
 			targetEl.empty();
 		}
     	$.ajax({url: url, method: 'GET',
     		  headers: {'Authorization': authorizationToken },
-    		  success: function(data) { 
-					targetEl.append(data); 
+    		  success: function(data) {
+					targetEl.append(data);
 
 					if (deviceType != 'desktop') {
 						// 4) 좁은 폭에서 세로배치/스크롤이 확실히 먹게끔 “컨테이너 높이/스크롤” 보조
@@ -776,7 +776,7 @@ var openFourthModal = function(url, width, height, title, paramObj, callback) {
 //    	$.get(url, function(data) {
 //    		targetEl.append(data);
 //      	});
-    	
+
     	$.ajax({url: url, method: 'GET',
     		  headers: {'Authorization': authorizationToken },
     		  success: function(data) { targetEl.append(data); },
@@ -815,7 +815,7 @@ var openBlindModal = function(url, width, height, title, paramObj, callback) {
 //    	$.get(url, function(data) {
 //    		targetEl.append(data);
 //      	});
-    	
+
     	$.ajax({url: url, method: 'GET',
     		  headers: {'Authorization': authorizationToken },
     		  success: function(data) { targetEl.append(data); },
@@ -1472,7 +1472,7 @@ function checkMenuAuth(accessList) {
 		//if (jobType.equals("+")) 이면 insert 처리, else delete 처리
 		//id=U99 는 즐겨찾기 메뉴 ID, 제외하고 메뉴앞에 + 표지를 추가함
 		$("#U99 a").before('<span class="minus-icon">-</span>');
-		
+
 		//U99의 자손 a태그의 id를 배열로 추가
 		let U99DescendantIds = $("#U99 a")
 									    .filter(function() {
@@ -1491,14 +1491,14 @@ function checkMenuAuth(accessList) {
 		        $(this).before('<span class="plus-icon">+</span>');
 		    }
 		});
-		
+
 
         // +, - 클릭 시 addon() 실행
         $(".plus-icon, .minus-icon").click(function(event) {
             event.stopPropagation(); // 부모 요소로 이벤트 전파 방지
             favoritesMenuControl(this);
         });
-		
+
 	}
 
 
@@ -1507,9 +1507,9 @@ function favoritesMenuControl(obj){
     const $nextA = $(obj).next('a');
     const menuText = $nextA.length ? $nextA.text().trim() : '';
     const menuId = $nextA.length ? $nextA.attr('id') : '';
-    
-    if (!menuId.startsWith("U")) return false; 
-	
+
+    if (!menuId.startsWith("U")) return false;
+
 	var param = {
 		"jobType" 	: jobType,
 		"menuId" 	: menuId,
@@ -1525,14 +1525,14 @@ function favoritesMenuControl(obj){
 			customAlert(data.resultMessage);
 		}
 	})
-	
+
 }
 
 //로그아웃
 function logoutClick(){
 	localStorage.removeItem("access_token");
 	localStorage.removeItem("authArr");
-	
+
 	deleteCookie("menuIdx");
 	deleteCookie("menuSaveYn");
 	$.ajax({
@@ -1541,7 +1541,7 @@ function logoutClick(){
 	    beforeSend: function (request) {
             request.setRequestHeader("Authorization", authorizationToken);
         },
-	    xhrFields: { withCredentials: true }, 
+	    xhrFields: { withCredentials: true },
 	    success: function() {
 	        location.href = connErrorUrl; //접속 기기에 다른 로그인 Page로 이동
 	    }
@@ -1857,12 +1857,12 @@ function authChk(menuUrl){
 //	  }
 //	  meta.setAttribute('content', 'width=device-width, initial-scale=1');
 //	}
-	
+
 	if(!menuUrl){
 		var url = window.location.pathname;
 		menuUrl = url.substring(url.lastIndexOf("/") + 1, url.lastIndexOf("."));
 	}
-	
+
 		var arr = JSON.parse(localStorage.getItem("authArr"));
         //array함수로 기능 대체하고 버튼을 삭제함(버튼을 사용하는 프로그램은 오류 발생 가능)
         // 버튼 숨김으로 하면 소스 편집하여 강제처리가능으로 위험
@@ -2871,8 +2871,8 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 				cell.value = number;
 			    cell.font = dataFont;
 			}
-			
-			
+
+
 			if (typeof number === 'number') {
 				// 소숫점 이하 존재 여부 판단
 				if (Number.isInteger(number)) {
@@ -2894,8 +2894,8 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 				if (typeof value !== 'string') return value.toString().length;
 				return value.split(/\r?\n/).reduce((max, line) => Math.max(max, line.length), 0);
 			};
-			
-			
+
+
 			//셀폭은 기본 그리드 헤드 넓이를 기준으로 70% 크기의 셀폭을 최소 길이로 하고 컬럼 문자길이에 따라 조정합니다.
 			var cellValue = (cell.value !== undefined && cell.value !== null) ? cell.value.toString() : '';
 			let maxLineLength = getMaxLineLength(cellValue);
@@ -2923,25 +2923,25 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 	    const totalCols = outFieldArr.length;     // 엑셀 내보내는 실제 열 개수
 	    let col = 1;                              // 1-based column index
 	    let sumRowIdx = (lastRow || 1) + 1;       // 데이터 다음 줄(데이터 없으면 헤더 다음)
-	
+
 	    // 합계 행 스타일
 	    const sumFill = { type: "pattern", pattern: "solid", fgColor: { argb: "EEEEEE" } };
 	    const sumFont = { name: '나눔고딕', size: 10, bold: true, color: { argb: "000000" } };
 	    const sumBorder = { top:{style:"thin"}, bottom:{style:"thin"}, left:{style:"thin"}, right:{style:"thin"} };
-	
+
 	    sumCells.forEach(cellInfo => {
 	        if (col > totalCols) return; // 남은 열 없음
-	
+
 	        const span = Math.min(cellInfo.colspan || 1, totalCols - col + 1);
 	        const cell = worksheet.getCell(sumRowIdx, col);
-	
+
 	        // 값 계산/설정
 	        let raw = '';
 	        if (cellInfo.key && (cellInfo.collector || '').toLowerCase() === 'sum') {
 	            const val = sumOfKey(_excelJsonData, cellInfo.key);
 	            raw = val; // 숫자
 	            cell.value = val;
-				
+
 
 
 				if (typeof val === 'number') {
@@ -2962,12 +2962,12 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 	            if (/총계|합계|계/i.test(raw)) align = 'center';
 	            cell.alignment = { horizontal: align, vertical: 'middle' };
 	        }
-	
+
 	        // 병합
 	        if (span > 1) {
 	            worksheet.mergeCells(sumRowIdx, col, sumRowIdx, col + span - 1);
 	        }
-	
+
 	        // 스타일(병합 영역 포함)
 	        for (let c = col; c < col + span; c++) {
 	            const cCell = worksheet.getCell(sumRowIdx, c);
@@ -2975,10 +2975,10 @@ function exportJSONToExcel (_excelJsonData, _excelHeader, _excelFileName = 'exce
 	            cCell.font = sumFont;
 	            cCell.border = sumBorder;
 	        }
-	
+
 	        col += span;
 	    });
-	
+
 	    lastRow = sumRowIdx;
 	}
 	// ===================== (추가 끝) ==========================================
@@ -3338,12 +3338,12 @@ function imageViewPopup(_coCd, _fileKey, _filename, fileList = []) {
 
 //백엔드에서 해당 구매내역에 대한 거래처의 문제현황을 검색해오기
 //메세지 뿌리기
-// 파라메터 구성 
-//     1. 업무구분 코드(type) : 'M':구매  ,  'S':영업,   'D': 설계,   'P':생산 
-//     2. 거래처코드 (vendCd) : 구매처, 협력사 또는 고객사 
+// 파라메터 구성
+//     1. 업무구분 코드(type) : 'M':구매  ,  'S':영업,   'D': 설계,   'P':생산
+//     2. 거래처코드 (vendCd) : 구매처, 협력사 또는 고객사
 //     3. 구매인경우 자재목록(list) : 구매 아이템 내역을 포함하는  list 구매는 가공업체인 경우만 문제 관리 메세지 표시
 //
-// 영업인 경우 업체정보만 있음 
+// 영업인 경우 업체정보만 있음
 // 설계인경우에도 업체 정보만 있음
 function toastMsg(type, vendCd, list={}) { //theme : default, primary, success, info, warning, danger
 	let oemChecking = false;
@@ -3427,12 +3427,12 @@ function openapi(prompt) {
 			}
 		} catch {
 			customAlert("AI실행 오류 발생!! 전산실 연락 바랍니다.\n"+ error.message);
-			return false; 
+			return false;
 		} finally {
 			// 종료 처리;
 		}
 	});
-	
+
 }
 
 function disableFormAll(formId) {
@@ -3502,7 +3502,7 @@ function disableFormAll(formId) {
 			.off('click')
 			.on('click', function (e) { e.preventDefault(); })  // 안전망
 			.css({ 'pointer-events': 'none', 'opacity': 0.5 });
-			
+
 			}
 	});
 }
@@ -3591,7 +3591,7 @@ function customPrompt(message, defaultValue = '', appendMessage = '') {
                     text-align: center;
                 ">
                     <div id="custom-prompt-message" style="margin-bottom: 15px; font-size: 16px; color: #333;"></div>
-                    <input type="text" id="custom-prompt-input" value="${defaultValue}" 
+                    <input type="text" id="custom-prompt-input" value="${defaultValue}"
                            style="width: 90%; padding: 5px; margin-bottom: 20px; font-size: 14px; border: 1px solid #aaa; border-radius: 5px;" />
                     <div style="display:flex; justify-content: center; gap: 10px;">
                         <button id="custom-prompt-ok" style="padding: 5px 15px;">확인</button>
@@ -3721,7 +3721,7 @@ function fileUpload ($form) {
 			fileUploadArr.push(obj);
 		}
 	});
-	
+
 	if (fileUploadArr.length === 0 && treeModule.getDeleteFileArr().length === 0) {
 		customAlert("첨부/삭제할 파일이 없습니다.");
 		return false;
@@ -3816,7 +3816,7 @@ function fileUpload ($form) {
 //    // 1. Check if we are on a page that handles its own chat (Chat Rooms)
 //    // CHAT01M01 (List) and CHAT02M01 (Room)
 //    var path = window.location.pathname.toUpperCase();
-//    
+//
 //    // If on Chat Room (CHAT02M01), do NOT run global toast logic (Room handles it)
 //    if (path.indexOf("CHAT02M01") > -1) {
 //        return;
@@ -3864,7 +3864,7 @@ function fileUpload ($form) {
 //                }
 //            });
 //        }, function(error) {
-//             setTimeout(connectGlobalChat, 10000); 
+//             setTimeout(connectGlobalChat, 10000);
 //        });
 //    }
 //
@@ -3879,7 +3879,7 @@ function fileUpload ($form) {
 //                }
 //            }
 //        } catch(e) {}
-//        
+//
 //        var urlParams = new URLSearchParams(window.location.search);
 //        var urlRoomId = urlParams.get("roomId");
 //        if (urlRoomId && String(urlRoomId) === String(payload.roomId)) {
@@ -3974,7 +3974,7 @@ function fileUpload ($form) {
 //                </div>
 //            `);
 //            $toast = $('#global-chat-notification');
-//            
+//
 //            $toast.find('.gcn-close').on('click', function() {
 //                var currentMsgId = localStorage.getItem("global_chat_last_msg_id");
 //                dismissGlobalToast(currentMsgId);
@@ -3983,7 +3983,7 @@ function fileUpload ($form) {
 //
 //        // Robust Data Extraction
 //        var senderName = payload.senderName || payload.senderNm || payload.userNm || "";
-//        
+//
 //        // Fix Sender Check: backend sends 'senderUserId', not 'senderId' usually. Check both.
 //        var pSenderId = payload.senderUserId || payload.senderId || "";
 //        if (jwt && jwt.userId && String(pSenderId) === String(jwt.userId)) return;
@@ -3993,9 +3993,9 @@ function fileUpload ($form) {
 //        if (content.trim() === "") return;
 //
 //        var roomId = payload.roomId;
-//        var roomName = payload.roomName || "Chat Room"; 
-//        var sentAtVal = payload.sentAt || payload.timestamp; 
-//        
+//        var roomName = payload.roomName || "Chat Room";
+//        var sentAtVal = payload.sentAt || payload.timestamp;
+//
 //        var timeLabel = "";
 //        if (sentAtVal) {
 //             try {
@@ -4008,7 +4008,7 @@ function fileUpload ($form) {
 //                         timeLabel = d.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }) + " " + d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 //                     }
 //                 } else {
-//                     timeLabel = sentAtVal; 
+//                     timeLabel = sentAtVal;
 //                 }
 //             } catch(e) {
 //                 timeLabel = sentAtVal;
@@ -4019,7 +4019,7 @@ function fileUpload ($form) {
 //
 //        var safeRoomName = (roomName || "").replace(/"/g, "&quot;");
 //        var safeRoomId = (roomId || "").replace(/"/g, "&quot;");
-//        
+//
 //        // Sanitize content for HTML display
 //        var safeContent = content.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 //
@@ -4046,7 +4046,7 @@ function fileUpload ($form) {
 //            window.globalToastCloseTimer = null;
 //        }
 //    }
-//    
+//
 //    // Dismiss notification across all tabs
 //    function dismissGlobalToast(messageId) {
 //        var $toast = $('#global-chat-notification');
@@ -4059,7 +4059,7 @@ function fileUpload ($form) {
 //            clearTimeout(window.globalToastCloseTimer);
 //            window.globalToastCloseTimer = null;
 //        }
-//        
+//
 //        // Signal other tabs to dismiss
 //        if (messageId) {
 //            localStorage.setItem("global_chat_dismiss", JSON.stringify({
@@ -4093,22 +4093,22 @@ function fileUpload ($form) {
 //        window.globalToastCloseTimer = setTimeout(function() {
 //             var currentMsgId = localStorage.getItem("global_chat_last_msg_id");
 //             dismissGlobalToast(currentMsgId);
-//        }, 3000); 
+//        }, 3000);
 //    };
 //
 //    $(document).on('mousedown keydown', interactHandler);
-//    
+//
 //    $(document).on('click', '.gcn-message', function(e) {
 //        e.preventDefault();
 //        e.stopPropagation();
 //        var $target = $(this).closest('.gcn-message');
 //        var roomId = $target.attr('data-room-id');
 //        var roomName = $target.attr('data-room-name');
-//        
+//
 //        // Dismiss notification in all tabs when clicked
 //        var currentMsgId = localStorage.getItem("global_chat_last_msg_id");
 //        dismissGlobalToast(currentMsgId);
-//        
+//
 //        if (roomId) {
 //            var chatParams = {
 //                roomId: roomId,
@@ -4238,7 +4238,7 @@ window.DateRangePicker = (function(){
 
         // bound info label
         if(s.minDt || s.maxDt){
-            $('#gDrpBoundInfo').text('선택 가능 범위: ' + (s.minDt||'') + ' ~ ' + (s.maxDt||'')).show();
+            $('#gDrpBoundInfo').text('선택 가능 범위: ' + (s.minDt||'') + ' ~ ' + (s.maxDt||'')).css({color: 'red', fontWeight: 'bold'}).show();
         } else {
             $('#gDrpBoundInfo').hide();
         }
