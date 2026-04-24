@@ -450,7 +450,10 @@
 				applyCellDataFromLock(item, colKey, data.cellData);
 			} else if (data.resultCode === 409) {
 				alert((data.resultMessage || '다른 사용자') + "님이 수정 중인 셀입니다.");
-				mnGridView.setData(0);
+				// 현재 편집 중인 내용이 없을 때만 재조회 (편집 중 내용 보호)
+				if (!currentLockInfo) {
+					mnGridView.setData(0);
+				}
 				lockOk = false;
 				return false;
 			} else {
@@ -488,11 +491,42 @@
 		currentLockInfo = null;
 	}
 
+	// 팝업 textarea에 미저장 내용이 있으면 강제 저장 후 true 반환
+	function autoSaveIfPending() {
+		const $popup = $('[data-ax5grid-popup="textarea"] textarea');
+		if (!$popup.length || !currentLockInfo) return false;
+
+		const pendingVal = $popup.val();
+		const lock = currentLockInfo;
+
+		const grid = mnGridView.target;
+		let item = null;
+		if (lock.targetType === 'D01') {
+			item = grid.list.find(r =>
+				!r.isFileRow && String(r.mnSubSeq) === String(lock.mnSubSeq)
+			);
+		} else {
+			item = grid.list.find(r =>
+				!r.isFileRow && !r.isNoticeRow &&
+				String(r.mnSubSeq) === String(lock.mnSubSeq)
+			);
+		}
+		if (!item) return false;
+
+		if (lock.targetType === 'D01') {
+			pm10_d01_update(item, lock.colKey, pendingVal);
+		} else {
+			pm10_d03_update(item, lock.colKey, pendingVal);
+		}
+		return true;
+	}
+
 	// 3. 유휴 타이머 시작 함수
 	function startIdleTimer() {
 		clearTimeout(idleTimer);
 		idleTimer = setTimeout(function () {
 			if (currentLockInfo) {
+				autoSaveIfPending();	// 팝업 미저장 내용 먼저 저장
 				unlockCell(currentLockInfo);
 				alert("10분간 활동이 없어 편집 잠금이 해제되었습니다.");
 				isEditing = false;
