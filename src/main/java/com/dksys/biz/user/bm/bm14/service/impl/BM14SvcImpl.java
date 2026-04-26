@@ -20,15 +20,15 @@ import com.google.gson.reflect.TypeToken;
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class BM14SvcImpl implements BM14Svc {
-	
+
 	@Autowired
 	BM14Mapper bm14Mapper;
-	
+
 	@Autowired
 	BM14Svc bm14Svc;
 
 	private List<Map<String, String>> allChildNodeInfos;
-	
+
 	@Override
 	public List<Map<String, String>> selectBomTreeList(Map<String, String> paramMap) {
 		return bm14Mapper.selectBomTreeList(paramMap);
@@ -38,7 +38,7 @@ public class BM14SvcImpl implements BM14Svc {
 	public List<Map<String, String>> selectBomlevelList(Map<String, String> paramMap) {
 		return bm14Mapper.selectBomlevelList(paramMap);
 	}
-	
+
 	@Override
 	public List<Map<String, String>> selectBomAllLevelList(Map<String, String> paramMap) {
 		return bm14Mapper.selectBomAllLevelList(paramMap);
@@ -96,7 +96,7 @@ public class BM14SvcImpl implements BM14Svc {
 					} else if ("D".equals(updChk)) {
 						if (bm14Mapper.selectPchsBomCheck(dtl) == 0) {
 							result += bm14Mapper.deleteBom(dtl);
-							
+
 							// SPARE PART 관련 처리
 							if (paramMap.get("salesCd").equals(dtl.get("upperCd"))) { // 최상단 (salesCd)에서 해당 9000 삭제시
 								bm14Mapper.allCancelSpareBom(dtl);
@@ -127,7 +127,7 @@ public class BM14SvcImpl implements BM14Svc {
 				}
 		}
 		return result;
-		
+
 	}
 
 	@Override
@@ -138,56 +138,58 @@ public class BM14SvcImpl implements BM14Svc {
 		}
 		return result;
 	}
-	
+
 	@Override
 	public int deleteBom(Map<String, String> paramMap) {
 		return bm14Mapper.deleteBom(paramMap);
 	}
-	
+
 	@Override
 	public int copyBomTree(List<Map<String, String>> paramList) {
 		int result = 0;
 		String fileTrgtKey = "";
 		allChildNodeInfos = new ArrayList<>();
-		
+
 		for(Map<String, String> paramMap : paramList) {
 			//신규등록 키값 할당
 			fileTrgtKey = Integer.toString(bm14Mapper.selectBomSeqNext(paramMap));
 			paramMap.put("fileTrgtKey", fileTrgtKey);
-			paramMap.put("salesCdTo", paramMap.get("salesCd"));
+			if(paramMap.get("salesCdTo") == null || paramMap.get("salesCdTo").isEmpty()) {
+				paramMap.put("salesCdTo", paramMap.get("salesCd"));
+			}
 			//트리 복사
 			result += bm14Mapper.copyBomTree(paramMap);
-			
+
 			allChildNodeInfos = getAllChildNodeInfos(paramMap);
 //			for(Map<String, String> NodeInfo : allChildNodeInfos) {
 //			}
-			
-			/*{coCd=GUN, salesCd=23010-99TVFTE, salesCdTo=23010-99TVFTE, 
-			 * 복사하고자하는 대상 부모코드 : parentId=114, upperCd=2000, upperKey=114, 
-			 * 붙여넣기할 대상코드 하위코드 : childId=244, lowerCd=0050, lowerKey=244, 
+
+			/*{coCd=GUN, salesCd=23010-99TVFTE, salesCdTo=23010-99TVFTE,
+			 * 복사하고자하는 대상 부모코드 : parentId=114, upperCd=2000, upperKey=114,
+			 * 붙여넣기할 대상코드 하위코드 : childId=244, lowerCd=0050, lowerKey=244,
 			 * 새로 생성할 키값 : fileTrgtKey=1630} --> 신규생성된 lowerKey값도 동일하게 처리함
-			 * 
+			 *
 			 * {coCd=GUN, salesCd=23010-99TVFTE, salesCdTo=23010-99TVFTE,
 			 *  parentId=114, upperCd=2000, upperKey=114,
-			 *  childId=244, lowerCd=0050, lowerKey=244, 
+			 *  childId=244, lowerCd=0050, lowerKey=244,
 			 *  fileTrgtKey=1633}
-			 * 
+			 *
 			 * {coCd=GUN, salesCd=23010-99TVFTE, salesCdTo=23010-99TVFTE,
-			 *  parentId=114, upperCd=2000, upperKey=114, 
-			 *  childId=244, lowerCd=0050, lowerKey=244, 
-			 *  userId=jangsub.nam, pgmId=ZZ0101M01, 
+			 *  parentId=114, upperCd=2000, upperKey=114,
+			 *  childId=244, lowerCd=0050, lowerKey=244,
+			 *  userId=jangsub.nam, pgmId=ZZ0101M01,
 			 *  fileTrgtKey=1634}
 			 */
 		}
-		return result;	
+		return result;
 	}
-	
+
 	@Override
 	public List<Map<String, String>> getAllChildNodeInfos(Map<String, String> paramMap) {
-    	
+
 		Map<String, String> param = new HashMap<>();
 		List<Map<String, String>> nodeInfos = new ArrayList<>();
-		
+
 		int result = 0;
 		String fileTrgtKey = "";
 		/*
@@ -203,7 +205,7 @@ public class BM14SvcImpl implements BM14Svc {
 		List<Map<String, String>> topNodeInfo = bm14Mapper.selectBomlevelList(param);
 	    if (topNodeInfo.size() > 0) {
 		    for (Map<String, String> dtl : topNodeInfo) {
-		    	
+
 				fileTrgtKey = Integer.toString(bm14Mapper.selectBomSeqNext(param));
 				dtl.put("FILE_TRGT_KEY",fileTrgtKey);
 				dtl.put("UPPER_KEY", paramMap.get("fileTrgtKey") );
@@ -213,10 +215,10 @@ public class BM14SvcImpl implements BM14Svc {
 				dtl.put("CHANGE_YN", paramMap.get("changeYn"));
 				dtl.put("USER_ID", paramMap.get("userId"));
 				dtl.put("PGM_ID", paramMap.get("pgmId"));
-				
+
 				//lowerKey를 가지고 fileTrgtKey로 추가하는 작업
 				result += bm14Mapper.copyBomTree(dtl);
-				
+
 //		    	nodeInfos.add(dtl);
 		    	// 재귀적으로 자식 노드들의 정보 가져오기
 		    	dtl.put("parentId",  fileTrgtKey);
@@ -226,14 +228,14 @@ public class BM14SvcImpl implements BM14Svc {
 	    }
 
         return nodeInfos;
-    }	
+    }
 
 	@Override
 	public int checkBomInfo(Map<String, String> paramMap) {
 		return bm14Mapper.checkBomInfo(paramMap);
 	}
-	
-	
+
+
 	@Override
 	public int copyBomRootSalesCdTree(Map<String, String> paramMap) {
 		int result = 1;
@@ -241,7 +243,7 @@ public class BM14SvcImpl implements BM14Svc {
 		allChildNodeInfos = new ArrayList<>();
 
 		//프론트엔드에서 넘어오는 값
-		// 회사코드          : coCd 
+		// 회사코드          : coCd
 		// SalseCd    : salesCd  <--원본 SalseCd
 		// 복사 SalseCd : salesCdTo
 		//-----------------------------------------------------------------
@@ -252,7 +254,7 @@ public class BM14SvcImpl implements BM14Svc {
 		paramMap.put("fileTrgtKey", rootInfo.get("fileTrgtKey") );
 		paramMap.put("upperCd", rootInfo.get("lowerCd") );
 		paramMap.put("upperKey", rootInfo.get("lowerKey") );
-		
+
 		//타겟 SalesCode의 관련 정보 DB에서 읽어서 파라미터에 저장
 		rootInfo = bm14Mapper.selectBomRootSalesCdTree(paramMap);
 		paramMap.put("lowerCd", rootInfo.get("lowerCd") );
@@ -263,69 +265,69 @@ public class BM14SvcImpl implements BM14Svc {
 //		for(Map<String, String> NodeInfo : allChildNodeInfos) {
 //			allChildNodeInfos 함수내에서 트랜잭션 처리하므로 여기서는 패스함
 //		}
-			
+
 		/*
 		 * {coCd=GUN, salesCd=23010-99TVFTE, parentId=114, upperCd=2000, upperKey=114, childId=129, lowerCd=4200, lowerKey=129, fileTrgtKey=216}
-		 * 
+		 *
 		 */
-		return result;	
+		return result;
 	}
-	
-	
+
+
 	@Override
 	public List<Map<String, String>> selectBomAllLevelTempList(Map<String, String> paramMap) {
 		return bm14Mapper.selectBomAllLevelTempList(paramMap);
 	}
-	
+
 	@Override
 	public String insertTempBom(Map<String, String> paramMap) {
 		String result = null;
 		Gson gsonDtl = new GsonBuilder().disableHtmlEscaping().create();
 		Type dtlMap = new TypeToken<ArrayList<Map<String, String>>>(){}.getType();
-		
+
 		List<Map<String, String>> bomList = gsonDtl.fromJson(paramMap.get("bomArr"), dtlMap);
 	    for (Map<String, String> dtl : bomList) {
 	    	//재조회시 salesCd 획득을 위한 것
 	    	dtl.put("coCd", paramMap.get("coCd"));
 	    	dtl.put("userId", paramMap.get("userId"));
 	    	dtl.put("pgmId", paramMap.get("pgmId"));
-	    	
+
 	    	if (result == null || result.isEmpty()) {
 	    		result = dtl.get("salesCd");
 	    		//넣기 전 기존 데이터 삭제
 	    		bm14Mapper.deleteTempBom(dtl);
 	    	}
-	    	
+
 	    	bm14Mapper.insertTempBom(dtl);
 	    }
-	    
+
 	    paramMap.put("salesCd", result);
 	    bm14Mapper.callCheckTempBom(paramMap);
-	    
-		return result;	
+
+		return result;
 	}
-	
+
 	@Override
 	public Map<String, String> callDraftTempBom(Map<String, String> paramMap) {
 		bm14Mapper.callDraftTempBom(paramMap);
 		return paramMap;
 	}
-	
+
 	@Override
 	public List<Map<String, String>> selectBomAllEnterList(Map<String, String> paramMap) {
 		return bm14Mapper.selectBomAllEnterList(paramMap);
 	}
-	
+
 	@Override
 	public int selectBomAllEnterListCount(Map<String, String> paramMap) {
 		return bm14Mapper.selectBomAllEnterListCount(paramMap);
 	}
-	
+
 	@Override
 	public int confirmBom(Map<String, String> paramMap) {
 		return bm14Mapper.confirmBom(paramMap);
 	}
-	
+
 	@Override
 	public int recommendBom(Map<String, String> paramMap) {
 		Gson gson = new GsonBuilder().disableHtmlEscaping().create();
@@ -338,7 +340,7 @@ public class BM14SvcImpl implements BM14Svc {
 			int i = 0;
 			for (Map<String, String> listArrMap : listArr) {
 				try {
-					
+
 					result = bm14Mapper.recommendBom(listArrMap);
 
 					Map<String, String> updateRow = bm14Mapper.selectBomInfo(listArrMap);				// 추천 Spare Part가 된 row 정보
@@ -357,7 +359,7 @@ public class BM14SvcImpl implements BM14Svc {
 								fileTrgtKey = Integer.toString(bm14Mapper.selectBomSeqNext(listArrMap));
 								String upperKey = selectSpareInfo.get("lowerKey");
 								String dsgnNo = listArrMap.get("salesCd") + "-" + updateRow.get("upperCd");
-								
+
 								Map<String, String> parentParam = new HashMap<>();
 								parentParam.put("fileTrgtKey", String.valueOf(updateRow.get("upperKey")));
 								Map<String, String> parentRow = bm14Mapper.selectBomInfo(parentParam);
@@ -427,7 +429,7 @@ public class BM14SvcImpl implements BM14Svc {
 							fileTrgtKey = Integer.toString(bm14Mapper.selectBomSeqNext(listArrMap));
 							String upperKey = selectSpareInfo2.get("lowerKey");
 							String dsgnNo = listArrMap.get("salesCd") + "-" + updateRow.get("upperCd");
-							
+
 							Map<String, String> parentParam = new HashMap<>();
 							parentParam.put("fileTrgtKey", String.valueOf(updateRow.get("upperKey")));
 							Map<String, String> parentRow = bm14Mapper.selectBomInfo(parentParam);
@@ -488,7 +490,7 @@ public class BM14SvcImpl implements BM14Svc {
 				}
 			}
 		}
-		
+
 		return result;
 	}
 
